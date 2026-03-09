@@ -30,8 +30,9 @@ model-strategy:
 
 ## 규칙 참조
 
-CLAUDE.md `## Git Workflow` 섹션에 PR 규칙이 정의되어 있으면 해당 규칙을 따른다.
-없으면 표준 GitHub Flow를 따른다.
+**팀 PR 스킬**: `app-iOS/AI/skills/pr/SKILL.md`의 상세 워크플로우를 따른다.
+이 파일이 존재하면 해당 스킬의 Step 0~5 전체를 실행한다 (리뷰어 자동 지정 포함).
+없으면 CLAUDE.md `## Git Workflow` 섹션 → 표준 GitHub Flow 순으로 폴백.
 
 ---
 
@@ -60,6 +61,7 @@ CLAUDE.md `## Git Workflow` 섹션에 PR 규칙이 정의되어 있으면 해당
 | 2 | Push |
 | 3 | PR 생성 (템플릿 기반) |
 | 4 | Assignee 설정 |
+| 5 | Reviewer 설정 (`AI/teams.json` 기반) |
 
 ---
 
