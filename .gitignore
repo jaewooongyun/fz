@@ -1,0 +1,37 @@
+# ============================================
+# Ignore everything, whitelist fz ecosystem only
+# ============================================
+
+# Ignore all by default
+*
+
+# --- fz ecosystem whitelist ---
+
+# Skills
+!skills/
+!skills/*/
+!skills/**/SKILL.md
+!skills/**/references/
+!skills/**/references/**
+# Exclude heavy build artifacts inside skills
+skills/**/references/.venv/
+skills/**/references/__pycache__/
+skills/**/references/uv.lock
+
+# Agents
+!agents/
+!agents/*.md
+
+# Modules
+!modules/
+!modules/*.md
+!modules/patterns/
+!modules/patterns/*.md
+
+# Templates
+!templates/
+!templates/*.md
+
+# Repo files
+!.gitignore
+!README.md
