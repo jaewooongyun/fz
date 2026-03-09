@@ -186,6 +186,31 @@ guard let urlString = messageBody["url"] as? String,  // String as? String → O
 else { return }
 ```
 
+### ⛔ Guard Necessity Check (missing-guard 이슈 필수)
+
+"기존 코드에 `if X && Y` 패턴이 있는데 새 코드에 `X` guard가 없다"는 Pattern-Consistency 이슈를 보고할 때, evidence_trace에 반드시 Guard Necessity Check를 포함해야 한다.
+
+**절차**:
+1. 논쟁 중인 guard 변수(예: `isTimeMachineAvailable`)가 어떤 상태 변수를 지키는지 파악
+2. 그 상태 변수(예: `isAtLiveEdge`)의 ALL assignment 위치를 추적 (Serena 또는 Grep)
+3. 모든 setter가 이미 해당 guard 하에서만 호출되는지 확인
+
+```swift
+// Guard Necessity Check 예시:
+// 질문: isAtLiveEdge = false가 isTimeMachineAvailable 없이 발생할 수 있는가?
+// Step N: PlayerAdapter.swift:1841 — isAtLiveEdge 유일한 false 할당지점
+//   self.isAtLiveEdge = clampedTime >= Double(self.timeShiftTime)
+//   이 함수 = setTimeShift()
+// Step N+1: 모든 setTimeShift() 호출부 확인
+//   LiveEmbededControlView:XXX — if adapter.isTimeMachineAvailable { Task { await adapter.setTimeShift(...) } }
+//   LiveFullControlView:XXX   — if adapter.isTimeMachineAvailable { ... }
+// 결론: isAtLiveEdge = false ⟹ isTimeMachineAvailable = true (불변식 성립)
+//       isTimeMachineAvailable guard 추가는 redundant → 이슈 severity 하향
+```
+
+Guard가 genuinely redundant하면: severity를 suggestion으로 낮추고 confidence ceiling 65 적용.
+Guard가 필요함이 증명되면: INCLUDE 유지, "unguarded setter path" 경로를 evidence_trace에 명시.
+
 ### 예시: 상태 전환 누락 추적
 
 ```

@@ -170,6 +170,18 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 
 Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degradation" 섹션 참조).
 
+### ⛔ Orchestrator Bias 방지 규칙
+
+에이전트에게 작업을 위임할 때 Orchestrator 자신의 사전 판단이나 가설을 절대 포함하지 않는다.
+
+```
+금지: "ORCH-001: X가 누락된 것 같습니다. 이 관점으로 확인해주세요."
+금지: "핵심 이슈로 Y를 발견했습니다. 분석 시 참고하세요."
+허용: diff + symbols + base-behavior 파일만 전달. 에이전트가 독립 발견.
+```
+
+에이전트들이 동일한 가설을 공유하면 3/3 동의가 오히려 false confidence를 증폭시킨다 (homogeneous multi-agent failure). Orchestrator는 컨텍스트 데이터만 전달하고 판단은 에이전트에게 위임한다.
+
 ### Tier 1: Full Team (TeamCreate)
 
 ```
@@ -395,6 +407,39 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 **컴파일러 검증 불가 시** (XcodeBuildMCP 없음, SDK 경로 미확인 등):
 - 해당 이슈의 confidence ceiling을 65로 제한 (검증 없이 INCLUDE 불가)
 - 이슈에 `[컴파일러 검증 필요]` 태그 추가하여 Deliver에서 명시
+
+### 4.7. ⛔ Behavior-Verifiable Claim Gate (Runtime State 이슈)
+
+> **핵심 원칙**: "이 상태가 런타임에 실제로 발생할 수 있다"는 클레임은 에이전트가 패턴으로 추론할 수 없는 empirical fact다. 상태 할당 경로를 추적해야 한다.
+>
+> PR #3449 MAJOR-1 교훈: 3/3 에이전트가 `isTimeMachineAvailable` guard 누락을 major로 판정 (confidence 90). 실제 확인 결과: `isAtLiveEdge = false`는 `setTimeShift()` 안에서만 할당되고, 모든 `setTimeShift()` 호출부는 `isTimeMachineAvailable` 가드를 이미 갖고 있음 → 불변식: `isAtLiveEdge = false ⟹ isTimeMachineAvailable = true`. Guard가 redundant하므로 진짜 regression이 아님. 3/3 high-confidence 동의가 오히려 false positive를 증폭.
+
+**Behavior-Verifiable 이슈 감지 조건** (하나라도 해당하면):
+- 이슈 유형: "missing guard condition" (`guard`, `if X &&` 패턴 누락)
+- 이슈 유형: "기존 패턴 X가 있는데 새 코드에 없음" (Pattern-Consistency)
+- 이슈 설명에 `guard 누락`, `조건 없음`, `체크하지 않음`, `발생할 수 있다`, `될 수 있다` 포함
+- perspective: `architecture`, `state-management`, `guard`
+
+**처리 절차**:
+```
+1. INCLUDE 판정된 이슈 중 Behavior-Verifiable 이슈 식별
+2. 핵심 상태 변수(guarded variable) 식별 (예: `isAtLiveEdge`)
+3. 해당 변수의 ALL assignment 위치를 추적:
+   git show pr-{PR}:{FILE} 또는 Grep으로 "{variable} = " 검색
+4. 각 setter 호출부에서 논쟁 중인 guard가 이미 상위에서 적용되는지 확인
+5. 결과 해석:
+   ├─ 모든 setter가 이미 guard X에 의해 보호됨 → 불변식 성립
+   │   → confidence ceiling 65 + "[불변식 확인 필요]" 태그 + severity 하향 검토
+   ├─ setter 중 guard 없는 경로 존재 → 불변식 불성립
+   │   → INCLUDE 유지, evidence_trace에 "unguarded setter path" 명시
+   └─ 추적 불가 (외부 모듈, indirect 할당) → confidence ceiling 70 + "[런타임 검증 필요]" 태그
+6. 결과를 confidence-matrix.md에 기록: behavior_verified: true/false + trace
+```
+
+**Pattern-Consistency 이슈 처리**:
+- 순수하게 "기존 패턴 X가 있는데 새 코드에 없음" 근거만인 이슈 → `[패턴 일관성]` 태그 추가
+- 패턴 불일치가 functional difference를 만드는지 반드시 확인 (위 절차 적용)
+- 만들지 않는다면: confidence ceiling 75 → DA "challenge" 유도
 
 ### 5. ⛔ CHECKPOINT — 산출물 저장 (Compact Recovery)
 
