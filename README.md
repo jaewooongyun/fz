@@ -305,18 +305,86 @@ TEAM 모드에서 에이전트는 Lead(오케스트레이터)가 스폰하며, *
 
 ### 필수
 
-- **Claude Code** CLI
+| 도구 | 설명 | 설치 |
+|------|------|------|
+| **Claude Code** | CLI 런타임. 모든 스킬의 실행 환경 | `npm i -g @anthropic-ai/claude-code` |
 
-### 선택 (있으면 강화됨, 없으면 graceful degradation)
+### MCP 서버
 
-| 도구 | 용도 | 없을 때 |
-|------|------|--------|
-| Serena MCP | 심볼릭 서치, L2 메모리, 세션 | Grep/Glob 폴백 |
-| Codex CLI | Cross-model 교차 검증 (TEAM) | 검증 단계 스킵 |
-| SuperClaude (sc:*) | 분석, 인덱싱, 세션 저장 | 해당 기능 비활성 |
-| Context7 MCP | API 문서 조회 | 수동 참조 |
-| XcodeBuildMCP | iOS 빌드 검증 | xcodebuild 폴백 |
-| GitButler CLI | git 작업 | 표준 git 사용 |
+| MCP 서버 | 용도 | 사용 스킬 | 없을 때 |
+|----------|------|----------|--------|
+| **Serena** | 심볼릭 코드 탐색 + L2 메모리 + 세션 상태 | fz-code, fz-fix, fz-plan, fz-search, fz-review, fz-discover, fz-memory, fz-codex 등 거의 전체 | Grep/Glob/Read 폴백 |
+| **Context7** | 라이브러리/프레임워크 최신 문서 조회 | fz-code, fz-fix, fz-plan, fz-search + 대부분 에이전트 | 수동 API 문서 참조 |
+| **Sequential Thinking** | 복잡한 추론 체인 분해 | fz-fix, fz-plan, fz-discover, fz-review, fz-skill, fz-doc | Claude 네이티브 추론 |
+| **XcodeBuildMCP** | iOS 시뮬레이터 빌드/실행/테스트 | modules/build.md (fz-code, fz-fix 경유) | `xcodebuild` CLI 폴백 |
+| **Atlassian** | Jira 이슈 조회/전환/코멘트 | fz-plan, fz-commit, fz-pr | 수동 Jira 확인 |
+| **GitHub** | PR 생성/리뷰/코멘트 | fz-pr, fz-peer-review, fz-pr-digest | `gh` CLI 폴백 |
+| **LSP** | 타입 정보, 진단, 정의 이동 | fz-code, fz-fix, fz-search, fz-review | Serena/Grep 폴백 |
+
+### CLI 도구
+
+| CLI | 용도 | 사용 스킬 | 설치 | 없을 때 |
+|-----|------|----------|------|--------|
+| **Codex CLI** | Cross-model 교차 검증 (GPT 기반) | fz-codex, fz-review, fz-code, fz-plan, fz-peer-review | `npm i -g @openai/codex` + `~/.codex/config.toml` | 검증 단계 스킵 or `/sc:analyze` 폴백 |
+| **GitButler** (`but`) | 커밋, 브랜치, diff, push | gitbutler, fz-commit, fz-pr | [gitbutler.com](https://gitbutler.com) | 표준 `git` 사용 |
+| **GitHub CLI** (`gh`) | PR, 이슈, 인증 | fz-pr, fz-peer-review, fz-pr-digest | `brew install gh` | GitHub MCP 폴백 |
+| **xcodebuild** | iOS 빌드 (XcodeBuildMCP 폴백) | modules/build.md | Xcode 설치 시 포함 | — |
+| **uv + Python** | Excalidraw PNG 렌더링 | fz-excalidraw | `brew install uv` | JSON만 출력 (렌더 불가) |
+| **jq** | JSON 파싱 (회의록 처리) | fz-recording | `brew install jq` | `python -m json.tool` 폴백 |
+
+### 플러그인 / 외부 스킬
+
+| 플러그인 | 용도 | 사용처 | 없을 때 |
+|---------|------|--------|--------|
+| **SuperClaude** (`/sc:*`) | 분석, 인덱싱, 세션 저장/복원, 빌드, 테스트 등 20+ 커맨드 | fz 전체 (Phase 0 세션 부트스트랩, 빌드, 리뷰 3중 검증 등) | 해당 기능 비활성 |
+| **SwiftUI Expert** | SwiftUI 베스트 프랙티스, 성능 패턴 | fz-code, fz-fix + impl-*, review-* 에이전트 | iOS 전용 지식 미적용 |
+| **Swift Concurrency** | async/await, actor, Sendable 패턴 | fz-code, fz-fix + impl-*, review-quality 에이전트 | 동시성 전문 지식 미적용 |
+| **Skill Creator** | 스킬 eval/벤치마크 | fz-skill, fz-manage | `/fz-skill eval` 단독 사용 |
+
+### API 키 / 외부 서비스
+
+| 서비스 | 용도 | 필요 스킬 | 설정 |
+|--------|------|----------|------|
+| **OpenAI API** | Codex CLI 실행 | fz-codex + Codex 연동 전체 | `OPENAI_API_KEY` 환경변수 or `~/.codex/config.toml` |
+| **AssemblyAI** | 음성 STT + 화자 분리 | fz-recording (오디오 모드) | `ASSEMBLYAI_API_KEY` 환경변수 |
+| **Atlassian** | Jira/Confluence 접근 | fz-plan, fz-pr | Atlassian MCP 서버 설정 |
+| **GitHub** | 레포/PR 접근 | fz-pr, fz-peer-review | `gh auth login` or GitHub MCP 설정 |
+
+### Codex 스킬 (선택)
+
+Codex CLI 사용 시 `~/.codex/skills/`에 8개 전용 스킬 배치:
+
+| Codex 스킬 | 역할 |
+|-----------|------|
+| `fz-reviewer` | 코드 리뷰 |
+| `fz-architect` | 아키텍처 분석 |
+| `fz-guardian` | 안전성 검증 |
+| `fz-challenger` | 반론/도전 |
+| `fz-searcher` | 코드 탐색 |
+| `fz-fixer` | 버그 수정 |
+| `fz-drift` | 아키텍처 드리프트 감지 |
+| `fz-planner` | 독립 계획 수립 |
+
+### 최소 설치 vs 전체 설치
+
+**최소 설치** (코어 기능만):
+```
+Claude Code + Serena MCP
+```
+→ 코드 탐색, 구현, 리뷰의 기본 워크플로우 가능
+
+**권장 설치** (TEAM 교차 검증 포함):
+```
+Claude Code + Serena MCP + Context7 MCP + Codex CLI + SuperClaude
+```
+→ Cross-model 검증, 세션 관리, 문서 조회까지 활성화
+
+**전체 설치** (iOS 프로젝트 풀 스택):
+```
++ XcodeBuildMCP + GitButler + GitHub MCP/CLI + Atlassian MCP
++ SwiftUI Expert + Swift Concurrency + Sequential Thinking + LSP
++ AssemblyAI (회의록) + uv/Python (다이어그램)
+```
 
 ---
 
