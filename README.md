@@ -273,41 +273,33 @@ Lead ─┬── Agent(name:"impl-correctness", model:opus, team_name:...)
 Step 3: Peer-to-Peer 통신 ─── SendMessage로 직접 대화
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-★impl-correctness (O)           review-arch (S)            impl-quality (S)
-      │                               │                          │
-      │  Round 1: 각자 독립 분석 (다른 에이전트 초안 참조 금지)         │
-      │  ─── 코드 작성 ────           │─── 구조 분석 ───          │─── 패턴 체크 ───
-      │                               │                          │
-      │  ┌─ SendMessage ─────────────►│                          │
-      │  │  recipient: "review-arch"  │                          │
-      │  │  content: "Step 1 구현 완료,│                          │
-      │  │   Interactor 시그니처 검토  │                          │
-      │  │   부탁합니다"               │                          │
-      │  │  summary: "Step 1 리뷰 요청"                          │
-      │  └────────────────────────────│                          │
-      │                               │                          │
-      │  ┌────────────────────────────┤  SendMessage ───────────►│
-      │  │                            │  recipient: "impl-qual"  │
-      │  │                            │  content: "레이어 위반    │
-      │  │                            │   발견, 확인 부탁"        │
-      │  │◄───────────────────────────┤                          │
-      │  │  SendMessage               │                          │
-      │  │  recipient: "impl-correct" │                          │
-      │  │  content: "Router에서 직접  │                          │
-      │  │   API 호출 금지.            │                          │
-      │  │   UseCase 경유 필요"        │                          │
-      │  └────────────────────────────│                          │
-      │                               │                          │
-      │  Round 2: 피드백 반영 + 재작성                              │
-      │  ─── 코드 수정 ────           │                          │
-      │                               │                          │
-      │  Round 0.5: 합의 보고                                     │
-      │  ┌─ SendMessage ─────────────►│ Lead                     │
-      │  │  recipient: "lead"         │                          │
-      │  │  content: "[합의] 3인 동의. │                          │
-      │  │   구현 완료, 빌드 요청"      │                          │
-      │  └────────────────────────────│                          │
-      ▼                               ▼                          ▼
+  ★impl-correctness (O)          review-arch (S)          impl-quality (S)
+          │                            │                         │
+          │     Round 1: 독립 분석 (다른 에이전트 초안 참조 금지)   │
+          │                            │                         │
+          │ ①──── SendMessage ────────►│                         │
+          │                            │                         │
+          │                            │ ②── SendMessage ───────►│
+          │                            │                         │
+          │ ③◄─── SendMessage ─────────│                         │
+          │                            │                         │
+          │     Round 2: 피드백 반영 + 재작성                      │
+          │                            │                         │
+          │     Round 0.5: 합의 보고                              │
+          │ ④──── SendMessage ────────►│ → Lead                  │
+          │                            │                         │
+          ▼                            ▼                         ▼
+
+  메시지 상세:
+  ┌────┬──────────────────┬──────────────────────────────────────┐
+  │ #  │ recipient        │ content                              │
+  ├────┼──────────────────┼──────────────────────────────────────┤
+  │ ①  │ "review-arch"    │ "Step 1 구현 완료, 시그니처 검토 부탁"  │
+  │ ②  │ "impl-quality"   │ "레이어 위반 발견, 확인 부탁"           │
+  │ ③  │ "impl-correct"   │ "Router 직접 API 호출 금지.            │
+  │    │                  │  UseCase 경유 필요"                    │
+  │ ④  │ "lead"           │ "[합의] 3인 동의. 구현 완료, 빌드 요청"  │
+  └────┴──────────────────┴──────────────────────────────────────┘
 
 
 Step 4: Lead 게이트 실행
