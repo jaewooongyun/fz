@@ -66,6 +66,15 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 | **fz-plan** | 실현성 검증 (sonnet) | 계획 초안의 아키텍처 실현 가능성 검증. plan-structure와 Collaborative Design. |
 | **fz-discover** | 제약 발견 (sonnet) | 후보 옵션의 아키텍처 제약 위반 탐지. Adversarial 패턴 — 후보를 만들면 부순다. |
 
+## Library Semantics (이슈 판정 전 확인)
+
+이슈를 MAJOR/MINOR로 판정하기 전에 아래 시맨틱을 먼저 확인한다. 판단 없이 패턴만 보면 false positive가 된다.
+
+- **RxSwift `subscribe(onError:)` 누락**: 업스트림 함수가 `async`(non-throws)이고 내부에서 `try?`로 에러를 흡수하면 Single은 error emit 불가 → onError 누락이 regression이 아님
+- **RxSwift `subscribe(with:)`**: self를 약하게 캡처하고 클로저 실행 동안만 owner를 강하게 참조. retain cycle 아님. Task { await owner... }는 Task 완료까지 owner를 강하게 보유하지만, 해제 지연이 있을 뿐 lifecycle 위반은 아님
+- **Kingfisher 8 Task 스레드**: `Task { }` body는 cooperative thread pool. 구 콜백 기본값은 main queue → @MainActor 없이 UI 접근하면 regression
+- **`static var computed` vs `static let`**: computed property는 매번 새 인스턴스 생성 → 싱글톤 의도이면 regression
+
 ## Peer-to-Peer Protocol
 
 - 팀 내 피어에게 발견 즉시 공유 (아키텍처 위반이 다른 Lens 이슈로 이어지는 경우)

@@ -61,6 +61,15 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - 판정: VIOLATION / WARNING / OK
 - 근거 (코드 인용 또는 API 참조 결과)
 
+## Library Semantics (이슈 판정 전 확인)
+
+이슈를 MAJOR/MINOR로 판정하기 전에 아래 시맨틱을 확인한다. 패턴 매칭만으로 판단하면 false positive가 된다.
+
+- **Kingfisher 8 async API**: `retrieveImage(with:)` async throws. 호출부에서 `try?`로 감싸면 에러가 호출자에게 전달되지 않음 → 에러 전파 이슈 주장 시 반드시 호출부 `try?` 여부 확인
+- **Kingfisher 8 콜백 기본 큐**: Kingfisher 7/8 completion callback 기본값은 `.mainCurrentOrAsync`. `Task { }` 전환 시 @MainActor 없으면 thread가 달라짐 → UI 접근 regression 가능
+- **`@MainActor @objc` 조합**: ObjC 런타임은 Swift actor isolation을 인식하지 못함. @objc 메서드에 @MainActor를 붙여도 ObjC 호출자가 임의 스레드에서 호출 가능
+- **`static var computed`**: 매 접근마다 새 인스턴스 생성. 싱글톤/공유 캐시 의도면 `static let`으로 수정 필요 → regression
+
 ## Peer-to-Peer Protocol
 
 - 팀 내 피어에게 발견 즉시 공유 (품질 이슈가 다른 Lens와 연결된 경우)
