@@ -27,61 +27,61 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        사용자 (자연어 요청)                       │
+│                       사용자 (자연어 요청)                           │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Orchestrator          /fz  오케스트레이터                        │
-│                        의도 분석 → 복잡도 평가 → 파이프라인 결정    │
+│  Orchestrator          /fz  오케스트레이터                          │
+│                        의도 분석 → 복잡도 평가 → 파이프라인 결정          │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Skills (22개)         실행 가능한 워크플로우 단위                  │
+│  Skills (22개)         실행 가능한 워크플로우 단위                      │
 │                                                                 │
-│  ┌─ 개발 ──────┐ ┌─ 탐색 ────┐ ┌─ 검증 ──────┐ ┌─ 출하 ──┐    │
-│  │ fz-plan     │ │ fz-discover│ │ fz-review   │ │fz-commit│    │
-│  │ fz-code     │ │ fz-search  │ │ fz-codex    │ │fz-pr    │    │
-│  │ fz-fix      │ └────────────┘ │ fz-peer-rev │ └─────────┘    │
-│  └─────────────┘                └─────────────┘                 │
-│  ┌─ 문서 ──────┐ ┌─ 시스템 ───┐ ┌─ 보조 ──────────────────┐    │
-│  │ fz-doc      │ │ fz-skill   │ │ arch-critic  code-auditor│    │
-│  │ fz-memory   │ │ fz-manage  │ │ gitbutler    fz-new-file │    │
-│  │ fz-recording│ │ fz-excalidw│ │ fz-pr-digest             │    │
-│  └─────────────┘ └────────────┘ └──────────────────────────┘    │
+│  ┌─ 개발 ───────┐ ┌─── 탐색 ─────┐ ┌──── 검증 ────┐  ┌─ 출하 ─────┐  │
+│  │ fz-plan     │ │ fz-discover │ │ fz-review   │ │ fz-commit │  │
+│  │ fz-code     │ │ fz-search   │ │ fz-codex    │ │ fz-pr     │  │
+│  │ fz-fix      │ └─────────────┘ │ fz-peer-rev │ └───────────┘  │
+│  └─────────────┘                 └─────────────┘                │
+│  ┌─ 문서 ───────┐ ┌── 시스템 ────┐ ┌─ 보조 ─────────────────────┐   │
+│  │ fz-doc      │ │ fz-skill   │ │ arch-critic  code-auditor │   │
+│  │ fz-memory   │ │ fz-manage  │ │ gitbutler    fz-new-file  │   │
+│  │ fz-recording│ │ fz-excalidw│ │ fz-pr-digest              │   │
+│  └─────────────┘ └────────────┘ └───────────────────────────┘   │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Agents (14개)         TEAM 모드에서 스킬 내부의 전문 역할         │
+│  Agents (14개)         TEAM 모드에서 스킬 내부의 전문 역할               │
 │                                                                 │
-│  ┌─ 계획 ──────────┐ ┌─ 구현 ──────────┐ ┌─ 탐색 ──────────┐  │
-│  │ plan-structure   │ │ impl-correctness│ │ search-pattern  │  │
-│  │ plan-impact      │ │ impl-quality    │ │ search-symbolic │  │
-│  │ plan-edge-case   │ └─────────────────┘ └────────────────-┘  │
-│  │ plan-tradeoff    │ ┌─ 리뷰 ──────────┐ ┌─ 메모리 ────────┐ │
-│  └──────────────────┘ │ review-arch     │ │ memory-curator  │ │
-│                       │ review-quality  │ └─────────────────┘ │
-│                       │ review-correct. │                      │
-│                       │ review-direction│                      │
-│                       │ review-counter  │                      │
-│                       └─────────────────┘                      │
+│  ┌─ 계획 ────────────┐ ┌─ 구현 ───────────┐ ┌─ 탐색 ────────────┐   │
+│  │ plan-structure   │ │ impl-correctness│ │ search-pattern  │   │
+│  │ plan-impact      │ │ impl-quality    │ │ search-symbolic │   │
+│  │ plan-edge-case   │ └─────────────────┘ └────────────────-┘   │
+│  │ plan-tradeoff    │ ┌─ 리뷰 ────────────┐ ┌─ 메모리 ──────────┐  │
+│  └──────────────────┘ │ review-arch      │ │ memory-curator  │  │
+│                       │ review-quality   │ └─────────────────┘  │
+│                       │ review-correct.  │                      │
+│                       │ review-direction │                      │
+│                       │ review-counter   │                      │
+│                       └──────────────────┘                      │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Modules (15개)        스킬/에이전트가 공유하는 설정과 정책         │
+│  Modules (15개)        스킬/에이전트가 공유하는 설정과 정책               │
 │                                                                 │
 │  team-core  team-registry  build  session  complexity           │
 │  pipelines  intent-registry  execution-modes  governance        │
 │  cross-validation  context-artifacts  codex-strategy            │
 │  memory-guide  memory-policy  plugin-refs                       │
 │  └─ patterns/  adversarial  collaborative  pair-programming     │
-│                live-review  cross-verify                         │
+│                live-review  cross-verify                        │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Infrastructure        MCP 서버 + CLI + 플러그인                  │
+│  Infrastructure       MCP 서버 + CLI + 플러그인                     │
 │                                                                 │
 │  MCP: Serena  Context7  XcodeBuildMCP  Atlassian  GitHub  LSP   │
-│  CLI: Codex   GitButler  gh  xcodebuild  uv                    │
+│  CLI: Codex   GitButler  gh  xcodebuild  uv                     │
 │  Plugin: SuperClaude  SwiftUI-Expert  Swift-Concurrency         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -93,47 +93,47 @@
  │
  ▼
 ┌─── Phase 0: Session ──────────────────────────────────────────┐
-│  sc:load (이전 세션 복원) → 프로젝트 인덱스 확인 → PRJ 폴더 초기화 │
+│  sc:load (이전 세션 복원) → 프로젝트 인덱스 확인 → PRJ 폴더 초기화        │
+└───────────────────────────────┬───────────────────────────────┘
+                                ▼
+┌─── Phase 1: Intent ────────────────────────────────────────────┐
+│  키워드 추출 → intent-triggers 매칭 → 후보 스킬: fz-code, fz-review   │
+│  추가 신호: scope=중간, quality=보통  confidence: High              │
 └───────────────────────────────┬────────────────────────────────┘
                                 ▼
-┌─── Phase 1: Intent ───────────────────────────────────────────┐
-│  키워드 추출 → intent-triggers 매칭 → 후보 스킬: fz-code, fz-review│
-│  추가 신호: scope=중간, quality=보통  confidence: High            │
+┌─── Phase 2: Complexity ────────────────────────────────────────┐
+│  5차원 평가: Scope(1) Depth(1) Risk(1) Novelty(0) Verify(1)      │
+│  합산: 4점 → TEAM 모드 결정                                        │
 └───────────────────────────────┬────────────────────────────────┘
                                 ▼
-┌─── Phase 2: Complexity ───────────────────────────────────────┐
-│  5차원 평가: Scope(1) Depth(1) Risk(1) Novelty(0) Verify(1)   │
-│  합산: 4점 → TEAM 모드 결정                                     │
+┌─── Phase 3: Pipeline + Team ───────────────────────────────────┐
+│  매칭: code-to-review 파이프라인                                   │
+│  체인: fz-code → ✓build → ✓codex → fz-review → fz-commit        │
+│  팀: Lead(O) + ★impl-correctness(O) + review-arch(S)            │
+│       + review-quality(S) + impl-quality(S)                    │
+│  게이트 주입: build + codex check + friction-detect               │
 └───────────────────────────────┬────────────────────────────────┘
                                 ▼
-┌─── Phase 3: Pipeline + Team ──────────────────────────────────┐
-│  매칭: code-to-review 파이프라인                                 │
-│  체인: fz-code → ✓build → ✓codex → fz-review → fz-commit      │
-│  팀: Lead(O) + ★impl-correctness(O) + review-arch(S)           │
-│       + review-quality(S) + impl-quality(S)                     │
-│  게이트 주입: build + codex check + friction-detect              │
+┌─── Phase 4: Confirm ───────────────────────────────────────────┐
+│  파이프라인 시각화 출력 → 사용자 승인 대기                               │  
+│  [이대로 실행] [모드 변경] [단계 추가/축소] [커스텀]                      │
 └───────────────────────────────┬────────────────────────────────┘
                                 ▼
-┌─── Phase 4: Confirm ──────────────────────────────────────────┐
-│  파이프라인 시각화 출력 → 사용자 승인 대기                         │
-│  [이대로 실행] [모드 변경] [단계 추가/축소] [커스텀]               │
-└───────────────────────────────┬────────────────────────────────┘
-                                ▼
-┌─── Phase 5: Execute ──────────────────────────────────────────┐
+┌─── Phase 5: Execute ───────────────────────────────────────────┐
 │                                                                │
-│  Step 1: /fz-code ─── TeamCreate → 에이전트 스폰                │
-│          ★impl-correctness(O) ↔ review-arch(S) 페어 프로그래밍   │
-│          impl-quality(S) 실시간 품질 감시                        │
-│          매 Step마다 ✓friction-detect                           │
+│  Step 1: /fz-code ─── TeamCreate → 에이전트 스폰                   │
+│          ★impl-correctness(O) ↔ review-arch(S) 페어 프로그래밍     │
+│          impl-quality(S) 실시간 품질 감시                          │
+│          매 Step마다 ✓friction-detect                            │
 │                    │                                           │
-│  Step 2: ✓build ── Lead가 빌드 검증 (XcodeBuildMCP)             │
+│  Step 2: ✓build ── Lead가 빌드 검증 (XcodeBuildMCP)               │
 │                    │                                           │
-│  Step 3: ✓codex ── Lead가 Codex CLI로 교차 검증                 │
+│  Step 3: ✓codex ── Lead가 Codex CLI로 교차 검증                    │
 │                    │                                           │
-│  Step 4: /fz-review ─ review-arch(S) ↔ review-quality(S)      │
-│          라이브 리뷰 (서로 다른 렌즈로 동시 분석)                  │
+│  Step 4: /fz-review ─ review-arch(S) ↔ review-quality(S)       │
+│          라이브 리뷰 (서로 다른 렌즈로 동시 분석)                        │        
 │                    │                                           │
-│  Step 5: /fz-commit ─ Lead가 커밋 생성                          │
+│  Step 5: /fz-commit ─ Lead가 커밋 생성                            │
 │                    │                                           │
 │  완료: shutdown_request → TeamDelete → GC → sc:save             │
 └────────────────────────────────────────────────────────────────┘
@@ -146,37 +146,37 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 fz-discover ──────────┬── ★plan-structure (O)    설계 제안
-  제약조건 발견         ├── review-arch (S)        파괴적 검증
-  Adversarial 패턴     └── memory-curator (S)     과거 교훈
+  제약조건 발견           ├── review-arch (S)        파괴적 검증
+  Adversarial 패턴      └── memory-curator (S)     과거 교훈
 
-fz-plan ──────────────┬── review-direction (S)   방향 도전 (Phase 0.5)
-  계획 수립            ├── ★plan-structure (O)    구현 구조 설계
-  Collaborative 패턴   ├── plan-impact (S)        영향 범위 추적
-                      ├── plan-edge-case (S)     엣지 케이스 발굴
-                      ├── plan-tradeoff (S)      대안 비교
-                      └── memory-curator (S)     과거 교훈
+fz-plan ───────────────┬── review-direction (S)   방향 도전 (Phase 0.5)
+  계획 수립              ├── ★plan-structure (O)    구현 구조 설계
+  Collaborative 패턴    ├── plan-impact (S)        영향 범위 추적
+                       ├── plan-edge-case (S)     엣지 케이스 발굴
+                       ├── plan-tradeoff (S)      대안 비교
+                       └── memory-curator (S)     과거 교훈
 
-fz-code ──────────────┬── ★impl-correctness (O)  점진적 구현
-  코드 구현            ├── impl-quality (S)       코딩 표준 감시
+fz-code ───────────────┬── ★impl-correctness (O)  점진적 구현
+  코드 구현               ├── impl-quality (S)       코딩 표준 감시
   Pair Programming     ├── review-arch (S)        아키텍처 검토
-                      └── review-correctness (S) 기능 정확성 검증
+                       └── review-correctness (S) 기능 정확성 검증
 
-fz-review ────────────┬── review-arch (S)        아키텍처 리뷰
-  자기 코드 리뷰       ├── review-quality (S)     품질 + 성능 리뷰
-  Live Review 패턴     ├── review-correctness (S) 요구사항 충족 검증
-                      └── review-counter (S)     반론/Devil's Advocate
+fz-review ─────────────┬── review-arch (S)        아키텍처 리뷰
+  자기 코드 리뷰           ├── review-quality (S)     품질 + 성능 리뷰
+  Live Review 패턴      ├── review-correctness (S) 요구사항 충족 검증
+                       └── review-counter (S)     반론/Devil's Advocate
 
-fz-search --deep ─────┬── search-symbolic (S)    LSP/Serena 심볼 탐색
-  코드 탐색            └── search-pattern (S)     Grep/Glob 패턴 탐색
+fz-search --deep ──────┬── search-symbolic (S)    LSP/Serena 심볼 탐색
+  코드 탐색              └── search-pattern (S)     Grep/Glob 패턴 탐색
   Cross-Verify 패턴
 
-fz-fix (복잡) ────────┬── ★impl-correctness (O)  수정 구현
-  버그 수정            └── impl-quality (S)       품질 검증
+fz-fix (복잡) ──────────┬── ★impl-correctness (O)  수정 구현
+  버그 수정              └── impl-quality (S)       품질 검증
   Pair Programming
 
-fz-peer-review ───────┬── review-arch (S)        아키텍처 관점
-  동료 PR 리뷰         ├── review-quality (S)     품질 관점
-                      └── review-counter (S)     반론 관점
+fz-peer-review ────────┬── review-arch (S)        아키텍처 관점
+  동료 PR 리뷰           ├── review-quality (S)     품질 관점
+                       └── review-counter (S)     반론 관점
 
 ★ = Primary Worker (Opus 승격)    (O) = Opus    (S) = Sonnet
 ```
@@ -184,45 +184,45 @@ fz-peer-review ───────┬── review-arch (S)        아키텍�
 ### 4. 교차 검증 게이트
 
 ```
-파이프라인 진행 방향 ──────────────────────────────────────────→
+파이프라인 진행 방향 ─────────────────────────────────────────────────────→
 
-  계획 전         계획 후          구현 중           구현 후         출하 전
-────┼──────────────┼──────────────┼──────────────────┼──────────────┼────
-    │              │              │                  │              │
-    ▼              ▼              ▼                  ▼              ▼
-┌────────┐  ┌───────────┐  ┌──────────┐  ┌──────────────┐  ┌─────────┐
-│direction│  │stress-test│  │ friction │  │  ✓ build     │  │✓ codex  │
-│challenge│  │ Q1-Q5     │  │ detect   │  │  ✓ codex     │  │ check   │
-│         │  │           │  │          │  │  ✓ enforce   │  │         │
-│PROCEED  │  │Critical   │  │매 Step   │  │    (리팩토링) │  │Reflect  │
-│RECONSIDER│ │2+이면     │  │자동 실행 │  │              │  │Rate≥80% │
-│REDIRECT │  │자동 재작성│  │          │  │              │  │         │
-└────────┘  └───────────┘  └──────────┘  └──────────────┘  └─────────┘
-    │              │              │                  │              │
- review-       fz-plan        fz-code           build.md       fz-codex
- direction    stress-test   friction-detect   cross-valid.    codex CLI
-```
+  계획 전           계획 후            구현 중           구현 후           출하 전
+────┼───────────────┼────────────────┼────────────────┼───────────────┼────
+    │               │                │                │               │
+    ▼               ▼                ▼                ▼               ▼
+┌────────────┐  ┌─────────────┐  ┌──────────┐  ┌──────────────┐  ┌──────────┐
+│ direction  │  │ stress-test │  │ friction │  │  ✓ build     │  │ ✓ codex  │
+│ challenge  │  │  Q1-Q5      │  │ detect   │  │  ✓ codex     │  │  check   │
+│            │  │             │  │          │  │  ✓ enforce   │  │          │
+│ PROCEED    │  │ Critical    │  │ 매 Step   │  │    (리팩토링)  │  │ Reflect  │
+│ RECONSIDER │  │  2+이면      │  │ 자동 실행   │  │              │  │ Rate≥80% │
+│ REDIRECT   │  │  자동 재작성   │  │          │  │              │  │          │
+└────────────┘  └─────────────┘  └──────────┘  └──────────────┘  └──────────┘
+      │               │               │                │               │
+   review-         fz-plan         fz-code           build.md        fz-codex
+   direction      stress-test    friction-detect   cross-valid.     codex CLI
+``` 
 
 ### 5. TEAM 모드 통신 구조 (2.5-Turn Protocol)
 
 ```
-┌──────────────────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────────────┐
 │                        Lead (Opus)                            │
-│                     퍼실리테이터 역할                            │
-│           모니터링 + 교착 해소 + Gate 실행                       │
-└──────┬──────────────────────┬────────────────────┬───────────┘
+│                       퍼실리테이터 역할                            │
+│                 모니터링 + 교착 해소 + Gate 실행                    │
+└──────┬──────────────────────┬────────────────────┬────────────┘
        │ Task Brief           │                    │
        │ [Role][Context]      │                    │
        │ [Goal][Constraints]  │                    │
        │ [Deliverable]        │                    │
        ▼                      ▼                    ▼
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
 │ ★Primary (O) │     │  Agent-B (S) │     │  Agent-C (S) │
-│ 핵심 생산자    │     │  검증/보완    │     │  검증/보완    │
-└──────┬──────┘     └──────┬───────┘     └──────┬───────┘
+│ 핵심 생산자     │     │  검증/보완     │     │  검증/보완      │
+└──────┬───────┘     └──────┬───────┘     └──────┬───────┘
        │                   │                     │
        │◄──────────────────┼─────────────────────┤
-       │    Round 1: 각자 독립 분석 (참조 금지)      │
+       │    Round 1: 각자 독립 분석 (참조 금지)        │
        │                   │                     │
        ├──────────────────►│◄────────────────────┤
        │    Round 2: 피어에게 직접 SendMessage       │
@@ -233,7 +233,7 @@ fz-peer-review ───────┬── review-arch (S)        아키텍�
        │                   │                     │
        ▼                   ▼                     ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  합의 결과 → Lead에게 보고 → Lead가 Gate 실행 (build/codex)    │
+│  합의 결과 → Lead에게 보고 → Lead가 Gate 실행 (build/codex)         │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -242,17 +242,17 @@ fz-peer-review ───────┬── review-arch (S)        아키텍�
 ```
 /fz "로그인 화면 리팩토링해줘" --deep
 
-  ┌─────────┐   ✓direction    ┌─────────┐   ✓stress    ┌─────────┐
-  │fz-discover│─── challenge ──│ fz-plan │─── test ────│ fz-code │
-  │제약 발견   │               │ 설계     │             │ 구현     │
-  └─────────┘               └─────────┘             └────┬────┘
-                                                          │
-            ✓friction-detect (매 Step)                     │
-                                                          ▼
-  ┌─────────┐   ✓codex       ┌─────────┐   ✓build    ┌────────┐
-  │fz-commit │◄── check ─────│fz-review│◄── gate ────│✓enforce│
-  │ 커밋      │               │ 리뷰     │             │금지패턴 │
-  └────┬────┘               └─────────┘             └────────┘
+  ┌─────────────┐    ✓direction     ┌─────────┐    ✓stress    ┌─────────┐
+  │ fz-discover │──── challenge ────│ fz-plan │──── test ─────│ fz-code │
+  │ 제약 발견     │                   │ 설계      │               │ 구현     │
+  └─────────────┘                   └─────────┘               └────┬────┘
+                                                                   │
+            ✓friction-detect (매 Step)                              │
+                                                                   ▼
+  ┌───────────┐     ✓codex      ┌───────────┐    ✓build        ┌──────────┐
+  │ fz-commit │◄──── check ─────│ fz-review │◄──── gate ─────  │ ✓enforce │
+  │ 커밋       │                 │ 리뷰       │                  │ 금지패턴    │
+  └────┬──────┘                 └───────────┘                  └──────────┘
        │
        ▼
   ┌─────────┐
