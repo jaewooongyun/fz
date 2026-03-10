@@ -11,6 +11,7 @@
 | code-changes 생산 | simplify check (선택) | /simplify | 모든 모드 |
 | code-changes 생산 | Codex check | `fz-codex check` (팀 내 병렬) | TEAM |
 | code-changes 생산 (리팩토링) | enforcement 검증 | Anti-Pattern Grep + Module Boundary | 모든 모드 (Plan에 Constraints 있을 때) |
+| code-changes 생산 (시그니처 변경) | protocol conformance 검증 | find_referencing_symbols → 프로토콜 요구사항 양방향 확인 | 모든 모드 |
 | planning 생산 전 | 방향성 검증 | review-direction 에이전트 (Phase 0.5) | TEAM (fz-plan) |
 | planning 생산 전 | 교훈 회상 | memory-curator (memory-recall) | TEAM (--deep 또는 복잡도 4+) |
 | code-changes 생산 전 | 교훈 회상 | memory-curator (memory-recall) | TEAM (--deep 또는 복잡도 4+) |
@@ -28,7 +29,7 @@
 ### 코드 생산 파이프라인
 
 ```
-[코드 생산 스텝] → build → enforcement (리팩토링 시) → codex check (TEAM) → [다음 스텝]
+[코드 생산 스텝] → build → conformance (시그니처 변경 시) → enforcement (리팩토링 시) → codex check (TEAM) → [다음 스텝]
 
 예시 (fix-ship, TEAM):
   /fz-fix → build → codex check → /fz-commit → /fz-pr
