@@ -28,6 +28,10 @@ skills/**/references/uv.lock
 !modules/patterns/
 !modules/patterns/*.md
 
+# Guides
+!guides/
+!guides/*.md
+
 # Templates
 !templates/
 !templates/*.md
