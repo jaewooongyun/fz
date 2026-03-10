@@ -246,6 +246,16 @@ OK Triggering 테스트: N/N (3개+ 커버)
 
 하위 3개 스킬만 상세 분석 + 구체적 수정 가이드 출력.
 
+### 정기 Benchmark 사이클
+
+| 시점 | 트리거 | 권장 행동 |
+|------|--------|----------|
+| L3 변경 후 | modules/, guides/, templates/ 수정 | `benchmark` 실행하여 영향 확인 |
+| 스킬 3개+ 수정 후 | 일괄 업데이트 완료 | `benchmark --top3`로 품질 저하 확인 |
+| 주기적 | 2주마다 또는 대규모 작업 사이클 완료 후 | `benchmark` + `check` 연속 실행 |
+
+> /fz Completion에서 스킬/모듈 변경이 포함된 파이프라인 완료 시 `benchmark` 실행을 제안한다.
+
 ### Gate: Benchmark Complete
 - [ ] 전체 fz-* 스킬 Static Analysis 실행?
 - [ ] 스킬별 점수 산출 + 정렬?

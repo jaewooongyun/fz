@@ -37,7 +37,7 @@ model-strategy:
 > Phase 0 (Session) → Phase 1 (Intent) → Phase 2 (Complexity) → Phase 3 (Pipeline+Team) → Phase 4 (Confirm) → Phase 5 (Execute)
 
 - **6-Phase 오케스트레이션**: 세션 부트스트랩 → 의도 분석 → 복잡도 평가 → 파이프라인+팀 결정 → 확인 → 실행
-- **사전 정의 파이프라인** (16개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
+- **사전 정의 파이프라인** (17개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
 - **동적 파이프라인**: `provides`/`needs` 그래프 기반 자동 구성 (폴백)
 - **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead + Primary(O) + N×Sonnet)
 - **모델 승격**: 핵심 생산자(Primary Worker)를 opus로 자동 승격
@@ -196,7 +196,7 @@ model-strategy:
 
 ### 3.1 파이프라인 해결
 
-> 참조: `modules/pipelines.md` — 16개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
+> 참조: `modules/pipelines.md` — 17개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
 
 의도 키워드와 사전 정의 파이프라인의 트리거를 대조하여 최적 매칭합니다.
 매칭되지 않으면 3.2 동적 파이프라인으로 폴백.
