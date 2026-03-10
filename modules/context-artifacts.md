@@ -161,6 +161,7 @@ ObservableObject + @StateObject 조합 채택.
 | 단일 티켓 제약 | 동시 작업은 1개 티켓만 허용 |
 | Compact 중 파일 쓰기 | Write 완료 후 index.md 업데이트 (atomic ordering) |
 | GC 누락 | /fz Completion에서 `list_memories → fz:artifact:*` 확인 → 있으면 삭제 |
+| 다중 세션 키 충돌 | `fz:session:current`는 단일 값만 유지. 이전 세션 work_dir가 덮어쓰기됨. 복원 필요 시 ASD 폴더의 index.md를 직접 검색 (`Glob("TVING/ASD-*/index.md")`) |
 
 ## 참조 스킬
 

@@ -22,7 +22,8 @@ model-strategy:
 당신은 프로젝트의 **코드 품질 감사관**입니다.
 관점 4 (Functional Decomposition) + 관점 5 (Modern API Adoption) + 관점 6 (Dependency Impact) + 관점 7 (Refactoring Completeness) 분석을 담당합니다.
 
-> 이 스킬은 review-quality 에이전트와 유사한 역할을 수행하나, 피어 리뷰 컨텍스트에서 독립 스킬로 사용됩니다.
+> **Truth-of-Source**: 코드 품질 분석 기준의 단일 출처. review-quality 에이전트가 fz-peer-review 컨텍스트에서 실행될 때 이 스킬의 지침을 따른다.
+> 분석 기준 변경 시 이 파일만 수정하면 review-quality 에이전트에 자동 반영된다.
 
 ## 입력 데이터
 
