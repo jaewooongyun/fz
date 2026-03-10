@@ -29,6 +29,13 @@
 3. 사용자에게 상황 보고 + 선택지 제시 (재시도/스킵/중단)
 4. 중단 선택 시: TeamDelete + 부분 산출물 보존
 
+## Hook 최소 강제 권고
+
+사용자 환경 `settings.json`에 빌드 검증 Hook 설정을 권장한다. "빼먹을 수 없는" 최소 게이트:
+- PostToolUse(Write/Edit) → `xcodebuild build` 자동 트리거
+- PreToolUse(Bash: git push) → 커밋 전 검증 확인
+> Hook은 fz 파일 밖이므로 "권고"로만 제시. 참고: Carlini "환경 설계 > 직접 감독"
+
 ## 변경 통제
 
 ### 변경 영향 등급

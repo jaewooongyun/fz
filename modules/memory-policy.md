@@ -51,6 +51,18 @@
 | /fz-search | O | O | - | - | - |
 | /fz-codex | O | O | - | - | - |
 
+## 암묵적 결합 (Implicit Coupling)
+
+키 간 순서 의존성이 존재한다. 이를 인지하지 못하면 복원 시 데이터 불일치가 발생한다.
+
+| 의존 관계 | 설명 |
+|----------|------|
+| `session:current` → `artifact:*` | artifact 키의 work_dir 해석이 session:current에 의존 |
+| `checkpoint:plan-*` → `checkpoint:code-*` | code checkpoint는 plan 결과를 전제 |
+| `decision:*` → `artifact:*` | artifact가 decision을 참조할 수 있음 |
+
+GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락이 소실된다. GC 순서: artifact → checkpoint → session(유지).
+
 ## 스킬별 메모리 활용 패턴
 
 | 스킬 | 읽기 | 쓰기 |
