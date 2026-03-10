@@ -302,6 +302,32 @@ Plan에 Anti-Pattern Constraints가 있는 경우, 리팩토링 후 코드베이
 - [ ] 금지 패턴의 변형(alias, 간접 참조 등)도 검사했는가?
 ```
 
+### 검증 4-G: Protocol Conformance (프로토콜 적합성 검증)
+
+diff 내 메서드 시그니처 변경이 프로토콜 적합성을 깨뜨리지 않는지 검증합니다.
+
+```
+절차:
+1. diff에서 시그니처가 변경된 메서드 식별
+   - 파라미터 추가/제거/타입 변경/이름 변경
+2. 각 메서드에 대해 프로토콜 요구사항 여부 확인
+   - mcp__serena__find_referencing_symbols → 해당 메서드가 프로토콜에 선언되어 있는지
+3. 프로토콜 요구사항인 경우:
+   - 프로토콜 선언부가 diff에 포함되어 동일하게 변경되었는지 확인
+   - 선언부가 diff에 없으면 → "conformance_break" (severity: Critical)
+4. Swift 디폴트 파라미터 함정:
+   - `func foo(bar: Bool = false)`는 `func foo()` 요구사항을 만족시키지 않음
+   - 의도적 호환이면 → 파라미터 없는 오버로드 래퍼 추가 필요
+
+체크리스트:
+- [ ] 시그니처가 변경된 메서드 중 프로토콜 요구사항인 것이 있는가?
+- [ ] 프로토콜 선언부가 새 시그니처와 일치하도록 함께 변경되었는가?
+- [ ] 디폴트 파라미터만으로 적합성을 유지하려는 시도가 없는가?
+```
+
+> RIBs 아키텍처: ViewController에서 PresentableListener 프로토콜을 선언하고 Interactor가 구현.
+> 시그니처 변경 시 두 파일 모두 diff에 포함되어야 한다. Interactor만 변경 시 incremental build 성공 → clean build 실패.
+
 ### 검증 5: UI/UX Refactoring Safety
 
 View 파일 변경 포함 시 추가 검증:
@@ -338,6 +364,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] Anti-Pattern Enforcement 통과? (금지 패턴 0건, Plan에 Constraints 있을 때)
 - [ ] UI/UX Safety 통과? (View 변경 시 시각 검증 권고)
 - [ ] Spec Panel 통과? (새 모듈 시, 스펙 부합 확인)
+- [ ] Protocol Conformance 통과? (시그니처 변경 시, 프로토콜 선언부 동기화 확인)
 
 ---
 
