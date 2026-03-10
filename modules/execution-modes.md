@@ -49,6 +49,7 @@
 
 | 스킬 | completion-promise | max-iterations | 대상 Gate |
 |------|-------------------|----------------|----------|
+| fz-plan | STRESS_TEST_PASS | 2 | 설계 스트레스 테스트 (Critical < 2) |
 | fz-code | BUILD_SUCCESS | 3 | 빌드 검증 |
 | fz-fix | FIX_VERIFIED | 3 | 빌드 검증 |
 | fz-review | REFLECTION_80 | 3 | Reflection Rate ≥ 80% |

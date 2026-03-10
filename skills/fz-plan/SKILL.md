@@ -28,7 +28,7 @@ team-agents:
   supporting: [review-arch, review-direction, memory-curator]
 composable: true
 provides: [planning, architecture-analysis]
-needs: [none | refined-requirements]
+needs: [refined-requirements]
 intent-triggers:
   - "계획|설계|아키텍처|요구사항"
   - "plan|design|architect|requirement"
@@ -151,6 +151,15 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
 
 계획 수립 전, 요구사항의 접근 방향 자체가 최선인지 비판적으로 검토합니다.
 
+### 발동 조건
+
+| 조건 | Direction Challenge | 근거 |
+|------|:------------------:|------|
+| TEAM 모드 (plan-to-code, plan-only) | **필수** | review-direction 에이전트 활용 |
+| SOLO 모드 + 새로운 아키텍처 결정 | **필수** | Lead가 직접 6관점 검토 |
+| discover 결과에 명확한 방향 존재 | **스킵 가능** | 이미 제약 기반 방향이 결정됨 |
+| 단순 수정 (기존 패턴 따르기) | **스킵** | 방향성 검토가 과잉 |
+
 ### 절차
 
 1. **요구사항 + 현재 아키텍처 대조**:
@@ -235,6 +244,10 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
    - Q4에서 대안 패턴 최소 1개 필수 제시
    - Q5는 리팩토링/캡슐화 작업에서 특히 중요 — 기존 코드의 잔존 접근 경로를 Grep으로 사전 검색
    - 6가지 질문 모두 "문제없음"이면 → 그 판단 근거를 명시 (빈 리스크 = 분석 부족 의심)
+   - **Evaluator-Optimizer**: Q1-Q6에서 Critical 리스크 2개+ 발견 시 → 계획 자동 재작성 (최대 2회 반복)
+     - 1회차: Critical 리스크를 계획에 반영하여 재작성 → 스트레스 테스트 재실행
+     - 2회차: 여전히 Critical 2개+ → 사용자 에스컬레이션 (AskUserQuestion: "리스크 수용/계획 변경/중단")
+     - LOOP 모드 파라미터: `completion-promise: STRESS_TEST_PASS`, `max-iterations: 2`
 
 6. **구조화된 계획 출력**:
    - 구현 단계 목록 (Step별 변경 대상, 방법)
