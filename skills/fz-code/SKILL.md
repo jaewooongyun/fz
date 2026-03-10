@@ -26,7 +26,7 @@ allowed-tools: >-
   Edit, Write, Read, Bash(xcodebuild *), Bash(cd *)
 team-agents:
   primary: impl-correctness
-  supporting: [review-arch, impl-quality, memory-curator]
+  supporting: [review-arch, impl-quality, review-correctness, memory-curator]
 composable: true
 provides: [code-changes]
 needs: [planning]
@@ -100,6 +100,7 @@ TeamCreate("code-{feature}")
 ├── impl-correctness (★Opus): 점진적 구현 (Primary Worker)
 ├── review-arch (Sonnet): 구현 중 아키텍처 감시
 ├── impl-quality (Sonnet): 코딩 표준 + 패턴 일관성 실시간 피드백 [supporting]
+├── review-correctness (Sonnet): 기능 정확성 + 요구사항 충족 검증 [supporting]
 ├── memory-curator (Sonnet): 관련 교훈 발굴 + impl-correctness에 직접 전달 [선택적: --deep 또는 복잡도 4+]
 └── Cross-model 검증 (Lead가 검증 실행)
 ```

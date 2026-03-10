@@ -19,8 +19,8 @@
 | impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | |
 | review-arch | review | 아키텍처 결정 + 레이어 위반 | opus | Primary |
 | review-quality | review | 코드 품질 + Dead Code + 성능 | sonnet | |
-| review-correctness | review | 기능 정확성 + 요구사항 충족 | sonnet | |
-| review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | |
+| review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | fz-code TEAM 배정 |
+| review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | promoted-model: opus (direction-challenge) |
 | review-counter | review | 반론 + Devil's Advocate | sonnet | |
 | memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | |
 
@@ -44,7 +44,7 @@
 |------|---------|-----------|------|
 | /fz-discover | plan-structure (O) | review-arch (S) | adversarial |
 | /fz-plan | plan-structure (O) | review-arch (S), review-direction (S) | collaborative |
-| /fz-code | impl-correctness (O) | review-arch (S), impl-quality (S) | pair-programming |
+| /fz-code | impl-correctness (O) | review-arch (S), impl-quality (S), review-correctness (S) | pair-programming |
 | /fz-fix | impl-correctness (O) | — (SOLO) | N/A |
 | /fz-review | review-arch (O) | review-quality (S), review-counter (S) | live-review |
 | /fz-peer-review | review-arch (O) | review-quality (S), review-counter (S) | live-review |

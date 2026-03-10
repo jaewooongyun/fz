@@ -18,7 +18,7 @@
    ```
    에이전트 "Step N 완료" 보고 수신
    → ⛔ 체크포인트 기록 (PRJ: 파일, 비PRJ: write_memory)
-   → ⛔ Codex 교차 검증 (/fz-codex check — TEAM 모드 필수)
+   → ⛔ Codex 교차 검증 (/fz-codex check — 코드/계획 생산 TEAM 필수, 탐색은 --deep만)
    → 빌드 검증 (modules/build.md)
    → 다음 Step 배정 또는 Gate 판정
    ```
@@ -31,8 +31,9 @@
 
 모든 팀 통신의 기본 프로토콜. 진짜 상호 피드백을 보장하면서 비용을 제한한다.
 
-### Round 1: 분석 + 공유
-- 모든 에이전트: 자기 Lens로 독립 분석 수행
+### Round 1: 독립 분석 + 공유
+- 모든 에이전트: 자기 Lens로 **완전 독립** 분석 수행
+- ⚠️ **Sycophancy 방어**: 피어 초안을 보기 전에 자기 분석을 완성해야 함. 피어 초안 공유는 Round 1 완료 후에만 허용.
 - 분석 완료 → 피어에게 `SendMessage` (초안 공유)
 
 ### Round 2: 피드백 + 수정
@@ -42,7 +43,9 @@
 
 ### Round 0.5: 최종 보고
 - 피어 피드백까지 반영한 최종안 작성
-- Lead에게 `SendMessage` (최종 보고)
+- Lead에게 `SendMessage` (최종 보고). 보고에 반드시 포함:
+  - `[합의 항목]`: 피어와 합의된 결론 목록
+  - `[불합의 항목]`: 합의 안 된 사항 + 각자 의견 (Lead가 교차 검증 상태 파악)
 
 ### 토폴로지
 
@@ -54,6 +57,8 @@
 
 - 2명: Mesh — 직접 통신
 - 3명+: Star-enhanced — Supporting은 Primary를 경유
+  - ⚠️ **Primary 전달 의무**: Supporting 발견을 다른 Supporting에게 중계 시, 원본 핵심 발견을 그대로 인용 후 자기 의견 추가. 요약/축소 금지.
+  - **CC 옵션**: Supporting이 Primary에게 보내는 메시지의 핵심 발견을 다른 Supporting에게 동시 CC 가능 (정보 전파 지연 방지). Lead 판단으로 허용.
 - `--deep`: Full Mesh 허용 (3.5-Turn 확장, Round 3 추가)
 
 ### --deep 확장 (3.5-Turn)
@@ -81,7 +86,12 @@
 | Supporting | sonnet | 나머지 전부 |
 | Codex CLI | gpt-계열 | cross-model 다양성 (Lead가 직접 실행) |
 
-승격 원칙: Lead(O) + Primary(O) = 최대 opus 2개. 나머지 전부 sonnet.
+승격 원칙:
+- **동시** opus 최대 2개: Lead(O) + Primary(O). 나머지 전부 sonnet.
+- **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단 (modules/governance.md).
+- review-direction은 Direction Challenge(Round 0.5)에서 opus로 **순차 승격** 가능.
+  Round 0.5 완료 후 Round 1 시작이므로 동시 opus는 2개를 초과하지 않음.
+- promoted-model이 필요한 에이전트는 team-registry.md `promoted-model` 컬럼에 명시.
 
 ---
 
@@ -104,7 +114,14 @@ Lead 전용 도구가 필요한 경우: Lead가 조회 후 `SendMessage`로 결�
    - Primary → model: opus
    - Supporting → model: sonnet
 3. TaskCreate로 작업 목록 생성
-4. 각 에이전트에 SendMessage로 분석 대상/컨텍스트 전달
+4. 각 에이전트에 **구조화된 Task Brief**로 SendMessage 전달:
+   ```
+   [Role] 당신의 역할은 {역할}입니다
+   [Context] {작업 배경 + 이전 단계 결과}
+   [Goal] {구체적 목표 + 측정 가능한 완료 조건}
+   [Constraints] {건드리지 말 것 + 규칙}
+   [Deliverable] {기대 산출물 형식}
+   ```
 5. 2.5-Turn Protocol 실행 (패턴 파일 참조)
 6. Lead: 최종 보고 수신 → 통합 판단
 7. 완료: shutdown_request → TeamDelete
