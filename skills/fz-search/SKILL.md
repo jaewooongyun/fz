@@ -44,7 +44,7 @@ model-strategy:
 
 ## 개요
 
-> 4가지 모드: arch | layer | impact | pattern
+> ⛔ Phase 0 (ASD Pre-flight) → 4가지 모드: arch | layer | impact | pattern
 > 2가지 실행 방식: 순차(기본) | 병렬 교차 검증(--deep)
 
 - CLAUDE.md `## Directory Structure`의 git-root 기준으로 탐색
@@ -83,6 +83,24 @@ model-strategy:
 | 설명 요청 | `/sc:explain` | 탐색된 코드/구조 교육적 설명 |
 | 복잡한 탐색 후 | `→ /fz-fix` | 수정이 필요한 경우 전환 |
 | 설계 필요 시 | `→ /fz-plan` | 구조 변경 계획 수립 |
+
+---
+
+## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+
+> 반성 교훈: /fz 없이 직접 호출 시 ASD 폴더가 초기화되지 않아 아티팩트가 전부 누락됨.
+> 참조: `modules/context-artifacts.md` → "ASD Pre-flight" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `ASD-\d+` 패턴 추출
+2. 패턴 있으면: `TVING/ASD-xxxx/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
+3. 패턴 없으면: 비ASD 모드 (Serena Memory fallback)
+
+### Gate 0: ASD Ready
+- [ ] ⛔ 인자에서 ASD 패턴 체크 완료?
+- [ ] ⛔ ASD 패턴 있으면 폴더 + index.md 존재 확인?
+- [ ] WORK_DIR 결정됨?
 
 ---
 
@@ -336,6 +354,7 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 - 비ASD: `write_memory("fz:checkpoint:search", "모드: {mode}. 발견: {N}개 심볼. 핵심: {요약}")`
 
 ## Gate: Search Complete
+- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
 - [ ] 대상 심볼/패턴 파악 완료?
 - [ ] 영향 범위 식별?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)

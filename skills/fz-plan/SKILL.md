@@ -43,7 +43,7 @@ model-strategy:
 
 ## 개요
 
-> Phase 0 (Context) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
+> ⛔ Phase 0 (ASD Pre-flight) → Phase 0 (Context) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
 
 - 요구사항 구조 분해 + 영향 범위 분석
 - Serena 심볼 도구 기반 정밀 탐색
@@ -193,6 +193,24 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
 
 ---
 
+## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+
+> 반성 교훈: /fz 없이 직접 호출 시 ASD 폴더가 초기화되지 않아 아티팩트가 전부 누락됨.
+> 참조: `modules/context-artifacts.md` → "ASD Pre-flight" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `ASD-\d+` 패턴 추출
+2. 패턴 있으면: `TVING/ASD-xxxx/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
+3. 패턴 없으면: 비ASD 모드 (Serena Memory fallback)
+
+### Gate 0: ASD Ready
+- [ ] ⛔ 인자에서 ASD 패턴 체크 완료?
+- [ ] ⛔ ASD 패턴 있으면 폴더 + index.md 존재 확인?
+- [ ] WORK_DIR 결정됨?
+
+---
+
 ## Phase 1: Deep Planning
 
 요구사항을 구조적으로 분해하고, 영향 범위를 분석합니다.
@@ -210,6 +228,23 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
    - `mcp__serena__find_symbol` → 변경 대상 심볼 확인
    - `mcp__serena__find_referencing_symbols` → 영향받는 심볼/파일
    - `mcp__serena__search_for_pattern` → 기존 유사 구현 패턴
+
+   **⛔ Exhaustive Impact Scan** (반성 5차 — 누락 방지):
+   > 반성 교훈: 심볼 기반 탐색만으로는 글로벌 패턴(UIWindow.motionBegan 등), 런타임 비활성 경로, 사이드이펙트 순서를 놓친다.
+
+   심볼 기반 탐색 후 반드시 아래 4단계를 수행한다:
+
+   a. **텍스트 전수 검색**: 대상 타입/클래스명으로 `Grep` 전수 검색.
+      심볼 기반에서 찾은 참조와 대조하여 **빠진 참조**가 없는지 확인.
+      특히 문자열 참조, 글로벌 hook, extension 내 사용을 잡는다.
+   b. **런타임 도달성 검증**: 발견된 각 진입점(호출부)에 대해 실제 런타임에 도달 가능한지 확인.
+      코드 경로가 존재해도 UI 바인딩(gesture/button)이 없거나, feature flag로 비활성이면 "latent(잠재)" 표기.
+      검증 방법: 진입점의 view layer까지 추적하여 trigger가 존재하는지 확인.
+   c. **사이드이펙트/순서 분석**: 리팩토링 대상의 기존 액션 패턴에서 순서 의존성 식별.
+      예: `dismiss(animated:) completion → action` 패턴은 순서가 바뀌면 동작이 달라짐.
+      각 액션의 전제조건(pre-condition)과 부작용(side-effect)을 나열.
+   d. **Dead code 감지**: 변경 대상과 관련된 파일에서 미사용 헬퍼/메서드 식별.
+      `find_referencing_symbols` 결과가 0이면 dead code 후보 → 이관 대상에서 제외 + 삭제 후보로 기록.
 
 3. **API/라이브러리 문서 확인**:
    - `mcp__context7__resolve-library-id` → 라이브러리 ID
@@ -271,7 +306,13 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
    형식 참조: `modules/context-artifacts.md`
 
 ### Gate 1: Plan Ready
+- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
 - [ ] 영향 범위 분석 완료?
+- [ ] ⛔ Exhaustive Impact Scan 4단계 수행 완료? (반성 5차)
+  - [ ] 텍스트 전수 검색(Grep)으로 심볼 기반 결과와 대조했는가?
+  - [ ] 각 진입점의 런타임 도달성을 검증했는가? (latent 표기 포함)
+  - [ ] 기존 액션 패턴의 사이드이펙트/순서 의존성을 분석했는가?
+  - [ ] 관련 파일의 dead code를 감지했는가?
 - [ ] API 문서 확인 완료? (새 API 사용 시)
 - [ ] 기존 패턴과 일관성 확인?
 - [ ] 구현 단계가 명확하게 정의?

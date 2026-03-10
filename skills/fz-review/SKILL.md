@@ -39,7 +39,7 @@ model-strategy:
 
 ## 개요
 
-> Phase 5 (3중 검증: Serena // /fz-codex review // /sc:analyze) → Phase 5.5 (/fz-codex validate) → Rate >= 80%? → Phase 7 완료 | Phase 6 (개선) → 반복
+> ⛔ Phase 0 (ASD Pre-flight) → Phase 5 (3중 검증: Serena // /fz-codex review // /sc:analyze) → Phase 5.5 (/fz-codex validate) → Rate >= 80%? → Phase 7 완료 | Phase 6 (개선) → 반복
 
 - 3중 검증: Claude(Serena) + Codex(/fz-codex) + SuperClaude(sc:analyze)
 - 역방향 검증: Codex가 Claude의 수정 사항을 검증
@@ -145,6 +145,24 @@ Intent Context 전달 (필수):
 
 - `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
 - `{WORK_DIR}/plan/plan-final.md` 읽기 → 계획 대비 검증
+
+---
+
+## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+
+> 반성 교훈: /fz 없이 직접 호출 시 ASD 폴더가 초기화되지 않아 아티팩트가 전부 누락됨.
+> 참조: `modules/context-artifacts.md` → "ASD Pre-flight" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `ASD-\d+` 패턴 추출
+2. 패턴 있으면: `TVING/ASD-xxxx/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
+3. 패턴 없으면: 비ASD 모드 (Serena Memory fallback)
+
+### Gate 0: ASD Ready
+- [ ] ⛔ 인자에서 ASD 패턴 체크 완료?
+- [ ] ⛔ ASD 패턴 있으면 폴더 + index.md 존재 확인?
+- [ ] WORK_DIR 결정됨?
 
 ---
 
@@ -355,6 +373,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - 결과: Issue Tracker에 spec_concern 카테고리로 기록
 
 ### Gate 4: Review Passed
+- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
 - [ ] 참조 무결성 확인? (Serena)
 - [ ] ⛔ Codex 리뷰 통과? (Critical/Major 이슈 없음 — Codex 실행 자체가 필수)
 - [ ] /sc:analyze 통과? (심각한 문제 없음)

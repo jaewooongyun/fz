@@ -157,7 +157,7 @@ ObservableObject + @StateObject 조합 채택.
 | 상황 | 대응 |
 |------|------|
 | 세션 전환 | `fz:session:current`에 `work_dir` 저장하여 다음 세션에서 복원 |
-| /fz 없이 직접 스킬 호출 | 각 스킬이 WORK_DIR 환경 확인 → 없으면 아티팩트 기록 스킵 |
+| /fz 없이 직접 스킬 호출 | ⛔ 인자에 ASD-xxx 패턴 있으면 즉시 ASD 폴더 초기화 (아래 "ASD Pre-flight" 참조). 패턴 없으면 비ASD(Serena) 폴백 |
 | 단일 티켓 제약 | 동시 작업은 1개 티켓만 허용 |
 | Compact 중 파일 쓰기 | Write 완료 후 index.md 업데이트 (atomic ordering) |
 | GC 누락 | /fz Completion에서 `list_memories → fz:artifact:*` 확인 → 있으면 삭제 |
@@ -173,6 +173,28 @@ ObservableObject + @StateObject 조합 채택.
 | /fz-code | step/progress 기록 |
 | /fz-review | self-review 기록 |
 | /fz-peer-review | review-index.md + checkpoint 기록 (synthesized-issues.json, confidence-matrix.md) |
+
+## ⛔ ASD Pre-flight (모든 fz-* 스킬 필수)
+
+> 반성 4차 교훈: /fz 오케스트레이터를 거치지 않고 직접 스킬을 호출해도 ASD 폴더가 초기화되어야 한다.
+
+**모든 fz-* 스킬은 Phase 1 시작 전에 이 체크를 실행한다:**
+
+```
+1. 인자에서 ASD-\d+ 패턴 추출
+2. 패턴 있으면:
+   a. TVING/ASD-xxxx/ 폴더 존재 확인
+   b. 없으면 즉시 mkdir -p + index.md 생성
+   c. WORK_DIR = TVING/ASD-xxxx/
+3. 패턴 없으면:
+   a. 브랜치명에서 ASD-\d+ 추출 시도
+   b. 없으면 비ASD 모드 (Serena Memory fallback)
+```
+
+**Gate 0 (ASD Pre-flight):**
+- [ ] 인자/브랜치에서 ASD 패턴 체크 완료?
+- [ ] ASD 패턴 있으면 폴더 + index.md 존재 확인?
+- [ ] WORK_DIR 결정됨? (ASD 경로 또는 "비ASD")
 
 ## 설계 원칙
 

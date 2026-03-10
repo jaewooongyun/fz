@@ -44,7 +44,7 @@ model-strategy:
 
 ## 개요
 
-> Step N 구현 → 빌드 검증 → (실패: 에러 수정 → 재빌드) → Gate 3 → /fz-review
+> ⛔ Phase 0 (ASD Pre-flight) → Step N 구현 → 빌드 검증 → (실패: 에러 수정 → 재빌드) → Gate 3 → /fz-review
 
 - 점진적 구현 + 매 Step 빌드 검증
 - 프로젝트 빌드 검증
@@ -127,6 +127,24 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 **핵심**: 구현 **중간에** 아키텍처 질문을 바로 해결. 다 만들고 뒤집기가 아니라 만들면서 확인.
 
 > impl-correctness 에이전트가 이 스킬의 워크플로우를 활용합니다.
+
+---
+
+## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+
+> 반성 교훈: /fz 없이 직접 호출 시 ASD 폴더가 초기화되지 않아 아티팩트가 전부 누락됨.
+> 참조: `modules/context-artifacts.md` → "ASD Pre-flight" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `ASD-\d+` 패턴 추출
+2. 패턴 있으면: `TVING/ASD-xxxx/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
+3. 패턴 없으면: 비ASD 모드 (Serena Memory fallback)
+
+### Gate 0: ASD Ready
+- [ ] ⛔ 인자에서 ASD 패턴 체크 완료?
+- [ ] ⛔ ASD 패턴 있으면 폴더 + index.md 존재 확인?
+- [ ] WORK_DIR 결정됨?
 
 ---
 
@@ -238,6 +256,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 
 ## Gate 3: Implementation Complete
 
+- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
 - [ ] 모든 Step 구현 완료?
 - [ ] 빌드 성공? (프로젝트 빌드 검증 통과)
 - [ ] 빌드 경고 최소화?
