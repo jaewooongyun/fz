@@ -23,128 +23,297 @@
 └── templates/        # 스킬/에이전트/모듈 생성 템플릿
 ```
 
-### 관계도
+### 1. 시스템 레이어 구조
 
 ```
-사용자 → /fz "요청" → 의도 분석 → 복잡도 평가 → 파이프라인 구성 → 실행
+┌─────────────────────────────────────────────────────────────────┐
+│                        사용자 (자연어 요청)                       │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Orchestrator          /fz  오케스트레이터                        │
+│                        의도 분석 → 복잡도 평가 → 파이프라인 결정    │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Skills (22개)         실행 가능한 워크플로우 단위                  │
+│                                                                 │
+│  ┌─ 개발 ──────┐ ┌─ 탐색 ────┐ ┌─ 검증 ──────┐ ┌─ 출하 ──┐    │
+│  │ fz-plan     │ │ fz-discover│ │ fz-review   │ │fz-commit│    │
+│  │ fz-code     │ │ fz-search  │ │ fz-codex    │ │fz-pr    │    │
+│  │ fz-fix      │ └────────────┘ │ fz-peer-rev │ └─────────┘    │
+│  └─────────────┘                └─────────────┘                 │
+│  ┌─ 문서 ──────┐ ┌─ 시스템 ───┐ ┌─ 보조 ──────────────────┐    │
+│  │ fz-doc      │ │ fz-skill   │ │ arch-critic  code-auditor│    │
+│  │ fz-memory   │ │ fz-manage  │ │ gitbutler    fz-new-file │    │
+│  │ fz-recording│ │ fz-excalidw│ │ fz-pr-digest             │    │
+│  └─────────────┘ └────────────┘ └──────────────────────────┘    │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Agents (14개)         TEAM 모드에서 스킬 내부의 전문 역할         │
+│                                                                 │
+│  ┌─ 계획 ──────────┐ ┌─ 구현 ──────────┐ ┌─ 탐색 ──────────┐  │
+│  │ plan-structure   │ │ impl-correctness│ │ search-pattern  │  │
+│  │ plan-impact      │ │ impl-quality    │ │ search-symbolic │  │
+│  │ plan-edge-case   │ └─────────────────┘ └────────────────-┘  │
+│  │ plan-tradeoff    │ ┌─ 리뷰 ──────────┐ ┌─ 메모리 ────────┐ │
+│  └──────────────────┘ │ review-arch     │ │ memory-curator  │ │
+│                       │ review-quality  │ └─────────────────┘ │
+│                       │ review-correct. │                      │
+│                       │ review-direction│                      │
+│                       │ review-counter  │                      │
+│                       └─────────────────┘                      │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Modules (15개)        스킬/에이전트가 공유하는 설정과 정책         │
+│                                                                 │
+│  team-core  team-registry  build  session  complexity           │
+│  pipelines  intent-registry  execution-modes  governance        │
+│  cross-validation  context-artifacts  codex-strategy            │
+│  memory-guide  memory-policy  plugin-refs                       │
+│  └─ patterns/  adversarial  collaborative  pair-programming     │
+│                live-review  cross-verify                         │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Infrastructure        MCP 서버 + CLI + 플러그인                  │
+│                                                                 │
+│  MCP: Serena  Context7  XcodeBuildMCP  Atlassian  GitHub  LSP   │
+│  CLI: Codex   GitButler  gh  xcodebuild  uv                    │
+│  Plugin: SuperClaude  SwiftUI-Expert  Swift-Concurrency         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 2. 오케스트레이션 플로우
+
+```
+/fz "기능 구현하고 리뷰까지"
+ │
+ ▼
+┌─── Phase 0: Session ──────────────────────────────────────────┐
+│  sc:load (이전 세션 복원) → 프로젝트 인덱스 확인 → ASD 폴더 초기화 │
+└───────────────────────────────┬────────────────────────────────┘
+                                ▼
+┌─── Phase 1: Intent ───────────────────────────────────────────┐
+│  키워드 추출 → intent-triggers 매칭 → 후보 스킬: fz-code, fz-review│
+│  추가 신호: scope=중간, quality=보통  confidence: High            │
+└───────────────────────────────┬────────────────────────────────┘
+                                ▼
+┌─── Phase 2: Complexity ───────────────────────────────────────┐
+│  5차원 평가: Scope(1) Depth(1) Risk(1) Novelty(0) Verify(1)   │
+│  합산: 4점 → TEAM 모드 결정                                     │
+└───────────────────────────────┬────────────────────────────────┘
+                                ▼
+┌─── Phase 3: Pipeline + Team ──────────────────────────────────┐
+│  매칭: code-to-review 파이프라인                                 │
+│  체인: fz-code → ✓build → ✓codex → fz-review → fz-commit      │
+│  팀: Lead(O) + ★impl-correctness(O) + review-arch(S)           │
+│       + review-quality(S) + impl-quality(S)                     │
+│  게이트 주입: build + codex check + friction-detect              │
+└───────────────────────────────┬────────────────────────────────┘
+                                ▼
+┌─── Phase 4: Confirm ──────────────────────────────────────────┐
+│  파이프라인 시각화 출력 → 사용자 승인 대기                         │
+│  [이대로 실행] [모드 변경] [단계 추가/축소] [커스텀]               │
+└───────────────────────────────┬────────────────────────────────┘
+                                ▼
+┌─── Phase 5: Execute ──────────────────────────────────────────┐
+│                                                                │
+│  Step 1: /fz-code ─── TeamCreate → 에이전트 스폰                │
+│          ★impl-correctness(O) ↔ review-arch(S) 페어 프로그래밍   │
+│          impl-quality(S) 실시간 품질 감시                        │
+│          매 Step마다 ✓friction-detect                           │
+│                    │                                           │
+│  Step 2: ✓build ── Lead가 빌드 검증 (XcodeBuildMCP)             │
+│                    │                                           │
+│  Step 3: ✓codex ── Lead가 Codex CLI로 교차 검증                 │
+│                    │                                           │
+│  Step 4: /fz-review ─ review-arch(S) ↔ review-quality(S)      │
+│          라이브 리뷰 (서로 다른 렌즈로 동시 분석)                  │
+│                    │                                           │
+│  Step 5: /fz-commit ─ Lead가 커밋 생성                          │
+│                    │                                           │
+│  완료: shutdown_request → TeamDelete → GC → sc:save             │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### 3. 스킬-에이전트 매핑
+
+```
+스킬 (SOLO/TEAM)              TEAM 모드 에이전트 구성
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+fz-discover ──────────┬── ★plan-structure (O)    설계 제안
+  제약조건 발견         ├── review-arch (S)        파괴적 검증
+  Adversarial 패턴     └── memory-curator (S)     과거 교훈
+
+fz-plan ──────────────┬── review-direction (S)   방향 도전 (Phase 0.5)
+  계획 수립            ├── ★plan-structure (O)    구현 구조 설계
+  Collaborative 패턴   ├── plan-impact (S)        영향 범위 추적
+                      ├── plan-edge-case (S)     엣지 케이스 발굴
+                      ├── plan-tradeoff (S)      대안 비교
+                      └── memory-curator (S)     과거 교훈
+
+fz-code ──────────────┬── ★impl-correctness (O)  점진적 구현
+  코드 구현            ├── impl-quality (S)       코딩 표준 감시
+  Pair Programming     ├── review-arch (S)        아키텍처 검토
+                      └── review-correctness (S) 기능 정확성 검증
+
+fz-review ────────────┬── review-arch (S)        아키텍처 리뷰
+  자기 코드 리뷰       ├── review-quality (S)     품질 + 성능 리뷰
+  Live Review 패턴     ├── review-correctness (S) 요구사항 충족 검증
+                      └── review-counter (S)     반론/Devil's Advocate
+
+fz-search --deep ─────┬── search-symbolic (S)    LSP/Serena 심볼 탐색
+  코드 탐색            └── search-pattern (S)     Grep/Glob 패턴 탐색
+  Cross-Verify 패턴
+
+fz-fix (복잡) ────────┬── ★impl-correctness (O)  수정 구현
+  버그 수정            └── impl-quality (S)       품질 검증
+  Pair Programming
+
+fz-peer-review ───────┬── review-arch (S)        아키텍처 관점
+  동료 PR 리뷰         ├── review-quality (S)     품질 관점
+                      └── review-counter (S)     반론 관점
+
+★ = Primary Worker (Opus 승격)    (O) = Opus    (S) = Sonnet
+```
+
+### 4. 교차 검증 게이트
+
+```
+파이프라인 진행 방향 ──────────────────────────────────────────→
+
+  계획 전         계획 후          구현 중           구현 후         출하 전
+────┼──────────────┼──────────────┼──────────────────┼──────────────┼────
+    │              │              │                  │              │
+    ▼              ▼              ▼                  ▼              ▼
+┌────────┐  ┌───────────┐  ┌──────────┐  ┌──────────────┐  ┌─────────┐
+│direction│  │stress-test│  │ friction │  │  ✓ build     │  │✓ codex  │
+│challenge│  │ Q1-Q5     │  │ detect   │  │  ✓ codex     │  │ check   │
+│         │  │           │  │          │  │  ✓ enforce   │  │         │
+│PROCEED  │  │Critical   │  │매 Step   │  │    (리팩토링) │  │Reflect  │
+│RECONSIDER│ │2+이면     │  │자동 실행 │  │              │  │Rate≥80% │
+│REDIRECT │  │자동 재작성│  │          │  │              │  │         │
+└────────┘  └───────────┘  └──────────┘  └──────────────┘  └─────────┘
+    │              │              │                  │              │
+ review-       fz-plan        fz-code           build.md       fz-codex
+ direction    stress-test   friction-detect   cross-valid.    codex CLI
+```
+
+### 5. TEAM 모드 통신 구조 (2.5-Turn Protocol)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                        Lead (Opus)                            │
+│                     퍼실리테이터 역할                            │
+│           모니터링 + 교착 해소 + Gate 실행                       │
+└──────┬──────────────────────┬────────────────────┬───────────┘
+       │ Task Brief           │                    │
+       │ [Role][Context]      │                    │
+       │ [Goal][Constraints]  │                    │
+       │ [Deliverable]        │                    │
+       ▼                      ▼                    ▼
+┌─────────────┐     ┌──────────────┐     ┌──────────────┐
+│ ★Primary (O) │     │  Agent-B (S) │     │  Agent-C (S) │
+│ 핵심 생산자    │     │  검증/보완    │     │  검증/보완    │
+└──────┬──────┘     └──────┬───────┘     └──────┬───────┘
+       │                   │                     │
+       │◄──────────────────┼─────────────────────┤
+       │    Round 1: 각자 독립 분석 (참조 금지)      │
+       │                   │                     │
+       ├──────────────────►│◄────────────────────┤
+       │    Round 2: 피어에게 직접 SendMessage       │
+       │    피드백 + 반박 + 보완                     │
+       │                   │                     │
+       │◄──────────────────┼─────────────────────┤
+       │    Round 0.5: [합의] or [불합의] 보고       │
+       │                   │                     │
+       ▼                   ▼                     ▼
+┌──────────────────────────────────────────────────────────────┐
+│  합의 결과 → Lead에게 보고 → Lead가 Gate 실행 (build/codex)    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 6. 파이프라인 예시: full-cycle
+
+```
+/fz "로그인 화면 리팩토링해줘" --deep
+
+  ┌─────────┐   ✓direction    ┌─────────┐   ✓stress    ┌─────────┐
+  │fz-discover│─── challenge ──│ fz-plan │─── test ────│ fz-code │
+  │제약 발견   │               │ 설계     │             │ 구현     │
+  └─────────┘               └─────────┘             └────┬────┘
                                                           │
-                        ┌─────────────────────────────────┤
-                        │                                 │
-                    SOLO 모드                          TEAM 모드
-                  (Lead 단독)                    (Lead + N개 에이전트)
-                        │                                 │
-                  스킬 순차 실행                     TeamCreate → 협업
-                        │                         에이전트 간 직접 대화
-                        │                         합의 → Lead 게이트
-                        ▼                                 ▼
-                      산출물                              산출물
+            ✓friction-detect (매 Step)                     │
+                                                          ▼
+  ┌─────────┐   ✓codex       ┌─────────┐   ✓build    ┌────────┐
+  │fz-commit │◄── check ─────│fz-review│◄── gate ────│✓enforce│
+  │ 커밋      │               │ 리뷰     │             │금지패턴 │
+  └────┬────┘               └─────────┘             └────────┘
+       │
+       ▼
+  ┌─────────┐
+  │ fz-pr   │   → PR 생성 → 완료
+  │ PR      │
+  └─────────┘
 ```
 
 ---
 
 ## Skills (22개)
 
-### 오케스트레이터
-
-| 스킬 | 호출 | 설명 |
-|------|------|------|
-| **fz** | `/fz "요청"` | 유니버셜 오케스트레이터. 자연어 → 스킬 파이프라인 자동 구성 + 복잡도 기반 SOLO/TEAM 결정 + 모델 승격 |
-
-### 개발 워크플로우
-
-| 스킬 | 호출 | 설명 |
-|------|------|------|
-| **fz-plan** | `/fz-plan` | 계획 수립 + 요구사항 분석 + 설계. 영향 범위 분석, Anti-Pattern Constraints 정의, 구현 전략 수립 |
-| **fz-code** | `/fz-code` | 코드 구현 + 빌드 검증. 계획 기반 점진적 구현, 매 Step마다 빌드 검증 + 마찰 감지 |
-| **fz-fix** | `/fz-fix` | 버그 수정. 원인 분석 → 수정 → 빌드 검증의 빠른 사이클 |
-| **fz-review** | `/fz-review` | 자기 코드 리뷰. Claude + Codex + sc:analyze 3중 검증, 역방향 검증 |
-| **fz-commit** | `/fz-commit` | Conventional Commit 형식 커밋 생성 |
-| **fz-pr** | `/fz-pr` | Fork 기반 PR 생성 자동화 (push → PR create) |
-
-### 탐색 & 발견
-
-| 스킬 | 호출 | 설명 |
-|------|------|------|
-| **fz-discover** | `/fz-discover` | 제약조건 발견 + 요구사항 정제. 소크라테스식 대화로 암묵적 제약을 표면화, Reject-Extract-Propose 프로토콜 |
-| **fz-search** | `/fz-search "대상"` | 코드 탐색 + 구조 분석 + 의존성 추적. 병렬 교차 검증으로 정확도 확보 |
-
-### 검증 & 리뷰
-
-| 스킬 | 호출 | 설명 |
-|------|------|------|
-| **fz-codex** | `/fz-codex` | Codex CLI를 통한 독립적 코드/계획 검증. Cross-model 상호검증 모듈 |
-| **fz-peer-review** | `/fz-peer-review` | 동료 PR 리뷰. 3-Model Cross-Review, 9개 관점 독립 분석 |
-| **fz-pr-digest** | `/fz-pr-digest` | PR/브랜치 변경 설명. Before/After 비교, 아키텍처 컨텍스트, 기술 학습 포인트 |
-
-### 문서 & 지식
-
-| 스킬 | 호출 | 설명 |
-|------|------|------|
-| **fz-doc** | `/fz-doc` | 스킬/에이전트/CLAUDE.md 문서 작성 + 개선. 가이드라인 기반 최적화 |
-| **fz-memory** | `/fz-memory` | 메모리 관리 + 교훈 회상. L1(Auto Memory) 정리, L2(Serena) GC, topic file 관리 |
-| **fz-recording** | `/fz-recording` | 녹음 파일 → 화자 분리 + 회의록 생성. AssemblyAI STT + AI 첨언 |
-
-### 시스템 관리
-
-| 스킬 | 호출 | 설명 |
-|------|------|------|
-| **fz-skill** | `/fz-skill` | 스킬/에이전트 CRUD + eval 품질 평가. L3/L2/L1 지능형 생성 |
-| **fz-manage** | `/fz-manage` | 생태계 관리. 인벤토리, 의존성, 헬스체크, 배치 벤치마크 |
-| **fz-new-file** | `/fz-new-file` | 새 파일 생성 시 헤더 서명 규칙 적용 |
-| **fz-excalidraw** | `/fz-excalidraw` | Excalidraw 다이어그램 생성/수정. 아키텍처, 워크플로우, 데이터 플로우 시각화 |
-
-### 보조 스킬
-
-| 스킬 | 호출 | 설명 |
-|------|------|------|
-| **arch-critic** | (팀 내부용) | 아키텍처 비평. 설계 결정과 확장성 평가 |
-| **code-auditor** | (팀 내부용) | 코드 품질 감사. 기능 분해, API 사용, 의존성 영향 평가 |
-| **gitbutler** | `but` | GitButler CLI 통합. `git` 대신 `but` 사용 |
+| 카테고리 | 스킬 | 호출 | 설명 |
+|---------|------|------|------|
+| **오케스트레이터** | fz | `/fz "요청"` | 자연어 → 파이프라인 자동 구성 + SOLO/TEAM 결정 |
+| **개발** | fz-plan | `/fz-plan` | 계획 수립 + 요구사항 분석 + 영향 범위 분석 |
+| | fz-code | `/fz-code` | 계획 기반 점진적 구현 + 매 Step 빌드 검증 |
+| | fz-fix | `/fz-fix` | 버그 수정. 원인 분석 → 수정 → 빌드 검증 |
+| | fz-review | `/fz-review` | 자기 코드 리뷰. Claude + Codex + sc:analyze 3중 검증 |
+| | fz-commit | `/fz-commit` | Conventional Commit 형식 커밋 |
+| | fz-pr | `/fz-pr` | Fork 기반 PR 생성 (push → PR create) |
+| **탐색** | fz-discover | `/fz-discover` | 소크라테스식 제약조건 발견 + Reject-Extract-Propose |
+| | fz-search | `/fz-search` | 코드 탐색 + 구조 분석 + 의존성 추적 |
+| **검증** | fz-codex | `/fz-codex` | Codex CLI 교차 검증. Cross-model 상호검증 |
+| | fz-peer-review | `/fz-peer-review` | 동료 PR 리뷰. 9개 관점 독립 분석 |
+| | fz-pr-digest | `/fz-pr-digest` | PR 변경 설명. Before/After + 학습 포인트 |
+| **문서** | fz-doc | `/fz-doc` | 스킬/에이전트/CLAUDE.md 문서 작성 |
+| | fz-memory | `/fz-memory` | 메모리 관리 (L1 정리, L2 GC, 교훈 회상) |
+| | fz-recording | `/fz-recording` | 녹음 → 화자 분리 + 회의록 (AssemblyAI) |
+| **시스템** | fz-skill | `/fz-skill` | 스킬/에이전트 CRUD + eval 품질 평가 |
+| | fz-manage | `/fz-manage` | 생태계 인벤토리, 헬스체크, 벤치마크 |
+| | fz-new-file | `/fz-new-file` | 새 파일 헤더 서명 규칙 |
+| | fz-excalidraw | `/fz-excalidraw` | Excalidraw 다이어그램 생성/수정 |
+| **보조** | arch-critic | (팀 내부용) | 아키텍처 비평 (Truth-of-Source) |
+| | code-auditor | (팀 내부용) | 코드 품질 감사 (Truth-of-Source) |
+| | gitbutler | `but` | GitButler CLI 통합 |
 
 ---
 
 ## Agents (14개)
 
-TEAM 모드에서 에이전트는 Lead(오케스트레이터)가 스폰하며, **에이전트 간 직접 대화(Peer-to-Peer)**로 협업합니다.
+TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to-Peer)**로 협업합니다.
 
-### 계획 에이전트
+| 도메인 | 에이전트 | 역할 | 참여 스킬 |
+|--------|---------|------|----------|
+| **계획** | plan-structure | 구현 구조 + Step 순서 설계 | fz-plan★, fz-discover★ |
+| | plan-impact | 영향 범위 + 소비자 변경 추적 | fz-plan |
+| | plan-edge-case | 엣지 케이스 + 실패 시나리오 발굴 | fz-plan |
+| | plan-tradeoff | 트레이드오프 + 대안 비교 | fz-plan |
+| **구현** | impl-correctness | 점진적 구현 + 기능 정확성 보장 | fz-code★, fz-fix★ |
+| | impl-quality | 코딩 표준 + 패턴 일관성 감시 | fz-code, fz-fix |
+| **리뷰** | review-arch | 아키텍처 결정 + 레이어 위반 | fz-code, fz-review, fz-peer-review, fz-discover |
+| | review-correctness | 기능 정확성 + 요구사항 충족 | fz-code, fz-review |
+| | review-quality | 코드 품질 + Dead Code + 성능 | fz-review, fz-peer-review |
+| | review-direction | 방향 도전 (PROCEED/RECONSIDER/REDIRECT) | fz-plan (Phase 0.5) |
+| | review-counter | 반론 + Devil's Advocate | fz-review, fz-peer-review |
+| **탐색** | search-pattern | Grep/Glob 넓은 범위 패턴 검색 | fz-search |
+| | search-symbolic | LSP/Serena 심볼 정밀 탐색 | fz-search |
+| **메모리** | memory-curator | 교훈/패턴/결정사항 발굴 | fz-plan, fz-discover |
 
-| 에이전트 | 역할 |
-|---------|------|
-| **plan-structure** | 구현 구조 + Step 순서 설계. 요구사항 분해, 영향 범위 분석 |
-| **plan-impact** | 영향 범위 + 소비자 변경 추적. 변경의 파급 효과 분석 |
-| **plan-edge-case** | 엣지 케이스 + 실패 시나리오 발굴. 계획의 약점과 누락 탐지 |
-| **plan-tradeoff** | 트레이드오프 + 대안 비교 평가. 설계 선택지의 장단점 분석 |
-
-### 구현 에이전트
-
-| 에이전트 | 역할 |
-|---------|------|
-| **impl-correctness** | 구현 정확성 + 테스트 작성. 계획 기반 점진적 구현과 기능 정확성 보장 |
-| **impl-quality** | 코딩 표준 + 패턴 일관성 감시. 구현 중 실시간 품질 피드백 |
-
-### 리뷰 에이전트
-
-| 에이전트 | 역할 |
-|---------|------|
-| **review-arch** | 아키텍처 결정 + 레이어 위반 리뷰. 설계 결정과 확장성 평가 |
-| **review-correctness** | 기능 정확성 + 요구사항 충족 리뷰. 구현이 계획과 일치하는지 검증 |
-| **review-quality** | 코드 품질 + Dead Code + 성능 리뷰. 기능 분리, API 사용, 성능 평가 |
-| **review-direction** | 방향성 적합성 + 대안 제시. 접근 방향 자체가 최선인지 도전 (PROCEED/RECONSIDER/REDIRECT) |
-| **review-counter** | 반론 + Devil's Advocate. 다른 리뷰어의 판단에 의도적으로 반박 |
-
-### 탐색 에이전트
-
-| 에이전트 | 역할 |
-|---------|------|
-| **search-pattern** | 패턴 기반 코드 탐색. Grep/Glob으로 넓은 범위 텍스트/파일 패턴 검색 |
-| **search-symbolic** | 심볼 기반 코드 탐색. LSP/Serena로 심볼 정의/참조/타입 정밀 탐색 |
-
-### 메모리 에이전트
-
-| 에이전트 | 역할 |
-|---------|------|
-| **memory-curator** | 메모리 큐레이션. topic file + Serena Memory에서 관련 교훈/패턴/결정사항 발굴 |
+> ★ = 해당 스킬에서 Primary Worker (Opus 승격)
 
 ---
 
@@ -152,83 +321,59 @@ TEAM 모드에서 에이전트는 Lead(오케스트레이터)가 스폰하며, *
 
 스킬과 에이전트가 공유하는 설정, 정책, 프로토콜.
 
-### 핵심 인프라
-
-| 모듈 | 설명 |
-|------|------|
-| **team-core.md** | TEAM 공통 프로토콜. 2.5-Turn 통신, 절대 규칙, 모델 전략 |
-| **team-registry.md** | 역량 기반 동적 팀 구성. 도메인 지정 시 에이전트 자동 수집 |
-| **build.md** | 빌드 검증 공통 모듈 |
-| **session.md** | 세션 자동 감지 + 이슈 트래커 연동 |
-
-### 정책 & 전략
-
-| 모듈 | 설명 |
-|------|------|
-| **complexity.md** | 5차원 복잡도 평가 (Scope, Depth, Risk, Novelty, Verification) → SOLO/TEAM 결정 |
-| **intent-registry.md** | 의도 트리거 패턴 + confidence 판정 규칙 |
-| **pipelines.md** | 17개 사전 정의 파이프라인 (트리거 + 체인 + 게이트 + 팀 구성) |
-| **execution-modes.md** | 실행 모드 확장 (BATCH, LOOP, SIMPLIFY) |
-| **governance.md** | 거버넌스 프레임워크. 변경 통제, 품질 게이트, 긴급 정지 |
-| **codex-strategy.md** | Codex 실행 전략. Base Branch, Effort, Diff Size, CLI Mode 설정 |
-
-### 메모리 관리
-
-| 모듈 | 설명 |
-|------|------|
-| **memory-guide.md** | L1 Auto Memory 관리 정책. MEMORY.md + topic file 관리 |
-| **memory-policy.md** | L2 Serena Memory 관리. 키 네이밍(`fz:*`) + GC 정책 |
-
-### 컨텍스트 & 산출물
-
-| 모듈 | 설명 |
-|------|------|
-| **context-artifacts.md** | Context Artifact 관리. 파일 기반 산출물 기록, compact 복원 전략 |
-| **cross-validation.md** | 교차 검증 게이트 자동 삽입. Codex + 빌드 + enforcement + Reflection Rate + Gate 절차적 강제 |
-| **plugin-refs.md** | 플러그인 참조 가이드. 스킬-역할별 플러그인 매칭 |
-
-### 팀 통신 패턴 (patterns/)
-
-| 패턴 | 적용 스킬 | 설명 |
-|------|----------|------|
-| **adversarial.md** | fz-discover | 선택지를 만들고 부수며 제약 발견 |
-| **collaborative.md** | fz-plan | 만들면서 동시에 토론하여 설계 개선 |
-| **pair-programming.md** | fz-code | 구현 중 실시간 품질 검증 |
-| **live-review.md** | fz-review, fz-peer-review | 2인이 다른 렌즈로 동시 리뷰 |
-| **cross-verify.md** | fz-search | 독립 탐색 전략 2개 → 교차 검증 |
+| 카테고리 | 모듈 | 설명 |
+|---------|------|------|
+| **핵심 인프라** | team-core.md | TEAM 프로토콜. 2.5-Turn, 절대 규칙, 모델 전략 |
+| | team-registry.md | 역량 기반 동적 팀 구성 + 모델 자동 배정 |
+| | build.md | 빌드 검증 공통 모듈 |
+| | session.md | 세션 자동 감지 + 이슈 트래커 연동 |
+| **정책** | complexity.md | 5차원 복잡도 → SOLO/TEAM 결정 |
+| | intent-registry.md | 의도 트리거 패턴 + confidence 판정 |
+| | pipelines.md | 17개 사전 정의 파이프라인 |
+| | execution-modes.md | BATCH, LOOP, SIMPLIFY 확장 모드 |
+| | governance.md | 거버넌스. 변경 통제 + 긴급 정지 |
+| | codex-strategy.md | Codex 실행 전략 (Branch, Effort, Mode) |
+| **메모리** | memory-guide.md | L1 Auto Memory (MEMORY.md + topic file) |
+| | memory-policy.md | L2 Serena Memory (`fz:*` 키 + GC) |
+| **컨텍스트** | context-artifacts.md | 파일 기반 산출물 + compact 복원 |
+| | cross-validation.md | 교차 검증 게이트 + Reflection Rate |
+| | plugin-refs.md | 스킬-역할별 플러그인 매칭 |
+| **통신 패턴** | patterns/adversarial.md | fz-discover: 만들고 부수며 제약 발견 |
+| | patterns/collaborative.md | fz-plan: 만들면서 토론하여 개선 |
+| | patterns/pair-programming.md | fz-code: 구현 중 실시간 검증 |
+| | patterns/live-review.md | fz-review: 다른 렌즈로 동시 리뷰 |
+| | patterns/cross-verify.md | fz-search: 독립 탐색 교차 검증 |
 
 ---
 
 ## 실행 모드
 
-### SOLO vs TEAM
-
 | | SOLO | TEAM |
 |---|------|------|
-| **판단 기준** | 복잡도 점수 0-3 | 복잡도 점수 4+ |
-| **실행자** | Lead(Opus) 단독 | Lead(Opus) + Primary(Opus) + N x Sonnet |
-| **통신** | 없음 (순차 실행) | 에이전트 간 Peer-to-Peer 직접 대화 (2.5-Turn Protocol) |
-| **교차 검증** | 선택적 | Codex 필수 참여 + Reflection Rate ≥80% |
-| **강제 옵션** | `--solo` | `--team`, `--deep` |
+| **판단** | 복잡도 0-3 | 복잡도 4+ |
+| **실행자** | Lead(Opus) 단독 | Lead(O) + ★Primary(O) + N×Sonnet |
+| **통신** | 순차 실행 | Peer-to-Peer 2.5-Turn Protocol |
+| **검증** | 선택적 | Codex 필수 + Reflection Rate ≥80% |
+| **옵션** | `--solo` | `--team`, `--deep` |
 
-### TEAM 추론 품질 보장
+### 품질 보장
 
 | 축 | 메커니즘 | 설명 |
 |---|---------|------|
-| **측정** | Reflection Rate | Codex가 제기한 이슈 중 반영 비율 (≥80% Gate) |
-| **강제** | Gate 절차적 강제 | build, codex check, stress-test — 스킵 불가, 실패 시 완료 표시 금지 |
-| **다양성** | Sycophancy 방어 | Round 1 독립 분석 → Round 2 피드백 → Round 0.5 합의/불합의 보고 |
+| **측정** | Reflection Rate | Codex 이슈 반영률 ≥80% Gate |
+| **강제** | Gate 절차적 강제 | build, codex, stress-test — 스킵 불가 |
+| **다양성** | Sycophancy 방어 | Round 1 독립 → Round 2 피드백 → Round 0.5 합의/불합의 |
 
-- **Task Brief 5요소**: 에이전트에게 `[Role] [Context] [Goal] [Constraints] [Deliverable]` 형식으로 전달
-- **Evaluator-Optimizer**: fz-plan stress-test에서 Critical 2개+ 시 자동 재작성 (최대 2회)
-- **Truth-of-Source**: arch-critic/code-auditor가 분석 기준의 단일 출처 역할
+- **Task Brief**: `[Role] [Context] [Goal] [Constraints] [Deliverable]`
+- **Evaluator-Optimizer**: stress-test Critical 2+이면 자동 재작성 (최대 2회)
+- **Truth-of-Source**: arch-critic/code-auditor가 분석 기준의 단일 출처
 
-### 실행 모드 확장
+### 확장 모드
 
 | 모드 | 옵션 | 설명 |
 |------|------|------|
 | **STANDARD** | (기본) | 일반 순차/병렬 실행 |
-| **BATCH** | `--batch` | worktree 격리 병렬 실행. 독립 3개+ 대상 |
+| **BATCH** | `--batch` | worktree 격리 병렬. 독립 3개+ |
 | **LOOP** | `--loop` | 자동 반복 + 에스컬레이션 래더 |
 
 ---
