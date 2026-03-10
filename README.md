@@ -19,6 +19,7 @@
 ├── agents/           # 14개 에이전트 — 팀 모드에서 전문 역할 수행
 ├── modules/          # 15개 모듈 — 스킬/에이전트가 공유하는 설정과 정책
 │   └── patterns/     # 5개 팀 통신 패턴
+├── guides/           # 5개 가이드 — 프롬프트 최적화, 스킬 작성, 테스팅, 트러블슈팅
 └── templates/        # 스킬/에이전트/모듈 생성 템플릿
 ```
 
@@ -166,7 +167,7 @@ TEAM 모드에서 에이전트는 Lead(오케스트레이터)가 스폰하며, *
 |------|------|
 | **complexity.md** | 5차원 복잡도 평가 (Scope, Depth, Risk, Novelty, Verification) → SOLO/TEAM 결정 |
 | **intent-registry.md** | 의도 트리거 패턴 + confidence 판정 규칙 |
-| **pipelines.md** | 14개 사전 정의 파이프라인 (트리거 + 체인 + 게이트 + 팀 구성) |
+| **pipelines.md** | 17개 사전 정의 파이프라인 (트리거 + 체인 + 게이트 + 팀 구성) |
 | **execution-modes.md** | 실행 모드 확장 (BATCH, LOOP, SIMPLIFY) |
 | **governance.md** | 거버넌스 프레임워크. 변경 통제, 품질 게이트, 긴급 정지 |
 | **codex-strategy.md** | Codex 실행 전략. Base Branch, Effort, Diff Size, CLI Mode 설정 |
@@ -183,7 +184,7 @@ TEAM 모드에서 에이전트는 Lead(오케스트레이터)가 스폰하며, *
 | 모듈 | 설명 |
 |------|------|
 | **context-artifacts.md** | Context Artifact 관리. 파일 기반 산출물 기록, compact 복원 전략 |
-| **cross-validation.md** | 교차 검증 게이트 자동 삽입. Codex + 빌드 + enforcement |
+| **cross-validation.md** | 교차 검증 게이트 자동 삽입. Codex + 빌드 + enforcement + Reflection Rate + Gate 절차적 강제 |
 | **plugin-refs.md** | 플러그인 참조 가이드. 스킬-역할별 플러그인 매칭 |
 
 ### 팀 통신 패턴 (patterns/)
@@ -206,9 +207,21 @@ TEAM 모드에서 에이전트는 Lead(오케스트레이터)가 스폰하며, *
 |---|------|------|
 | **판단 기준** | 복잡도 점수 0-3 | 복잡도 점수 4+ |
 | **실행자** | Lead(Opus) 단독 | Lead(Opus) + Primary(Opus) + N x Sonnet |
-| **통신** | 없음 (순차 실행) | 에이전트 간 Peer-to-Peer 직접 대화 |
-| **교차 검증** | 선택적 | Codex 필수 참여 |
+| **통신** | 없음 (순차 실행) | 에이전트 간 Peer-to-Peer 직접 대화 (2.5-Turn Protocol) |
+| **교차 검증** | 선택적 | Codex 필수 참여 + Reflection Rate ≥80% |
 | **강제 옵션** | `--solo` | `--team`, `--deep` |
+
+### TEAM 추론 품질 보장
+
+| 축 | 메커니즘 | 설명 |
+|---|---------|------|
+| **측정** | Reflection Rate | Codex가 제기한 이슈 중 반영 비율 (≥80% Gate) |
+| **강제** | Gate 절차적 강제 | build, codex check, stress-test — 스킵 불가, 실패 시 완료 표시 금지 |
+| **다양성** | Sycophancy 방어 | Round 1 독립 분석 → Round 2 피드백 → Round 0.5 합의/불합의 보고 |
+
+- **Task Brief 5요소**: 에이전트에게 `[Role] [Context] [Goal] [Constraints] [Deliverable]` 형식으로 전달
+- **Evaluator-Optimizer**: fz-plan stress-test에서 Critical 2개+ 시 자동 재작성 (최대 2회)
+- **Truth-of-Source**: arch-critic/code-auditor가 분석 기준의 단일 출처 역할
 
 ### 실행 모드 확장
 
@@ -278,8 +291,13 @@ TEAM 모드에서 에이전트는 Lead(오케스트레이터)가 스폰하며, *
 | **review-to-ship** | "리뷰하고 커밋" | fz-review → fz-commit |
 | **full-cycle** | "처음부터 끝까지" | fz-plan → fz-code → build → fz-review → fz-commit |
 | **discover** | "어떻게 구현할까?" | fz-discover → fz-plan |
+| **fix-ship** | "고치고 커밋" | fz-fix → build → fz-commit |
+| **explore-plan** | "분석하고 계획" | fz-search → fz-plan |
 | **drift-check** | "드리프트 체크" | fz-codex drift |
+| **plan-parallel** | "독립 플랜" | fz-codex plan |
 | **peer-review** | "PR 리뷰해줘" | fz-peer-review |
+| **pr-digest** | "PR 요약" | fz-pr-digest |
+| **doc-update** | "문서 업데이트" | fz-doc |
 
 ---
 
@@ -299,6 +317,20 @@ TEAM 모드에서 에이전트는 Lead(오케스트레이터)가 스폰하며, *
 | Context7 MCP | API 문서 조회 | 수동 참조 |
 | XcodeBuildMCP | iOS 빌드 검증 | xcodebuild 폴백 |
 | GitButler CLI | git 작업 | 표준 git 사용 |
+
+---
+
+## Guides (5개)
+
+스킬/에이전트 작성과 운영을 위한 실전 가이드.
+
+| 가이드 | 설명 |
+|--------|------|
+| **prompt-optimization.md** | 10대 프롬프트 원칙 + TEAM 추론 품질 3원칙 + Context Rot 대응 + ACE 패턴 |
+| **skill-authoring.md** | 스킬 작성 7원칙. YAML 설계, Progressive Disclosure, Gate, Evaluator-Optimizer |
+| **skill-testing.md** | 3단계 테스트 프레임워크 (Triggering, Functional, Performance) + eval 자동화 |
+| **skill-troubleshooting.md** | Triggering 문제, 지시 미준수, MCP 에러, TEAM 프로토콜 위반 진단 |
+| **agent-team-guide.md** | 에이전트 팀 운영 가이드. 2.5-Turn Protocol, Task Brief, 모델 전략 |
 
 ---
 
