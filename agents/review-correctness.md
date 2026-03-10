@@ -47,9 +47,15 @@ Verifies that the implementation matches the stated requirements and plan.
 - 판정: MISSING / INCORRECT / OK
 - 근거 (계획 항목과 코드 간 대응 관계 명시)
 
+## Context-Specific Behavior
+
+| 컨텍스트 | 역할 | 핵심 행동 |
+|---------|------|---------|
+| **fz-code** | 기능 정확성 감시 (sonnet) | 구현 중 요구사항 충족 여부 실시간 검증. impl-correctness에게 누락 요구사항/로직 오류 직접 전달. |
+| **fz-review** | 정확성 리뷰 (sonnet) | Requirement Coverage + Logic Correctness 관점 분석. review-arch와 발견 공유. |
+
 ## Peer-to-Peer Protocol
 
 - 팀 내 피어에게 발견 즉시 공유 (정확성 이슈가 다른 Lens와 연결된 경우)
 - 피어로부터 피드백을 수신하면 재검토 후 agree / maintain으로 응답
 - 전체 합의 후 Lead(오케스트레이터)에게 통합 보고
-- 현재 활성 팀 배정 없음 — 필요 시 스킬 YAML team-agents에 추가하여 활성화
