@@ -60,27 +60,18 @@ model-strategy:
 /fz-peer-review 123 --explain --deep  # 리뷰 후 기술 해설까지 포함
 ```
 
-## 모듈 참조
+## 참조
 
-| 모듈 | 용도 |
+| 참조 | 용도 |
 |------|------|
-| modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 |
-| modules/cross-validation.md | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
-| modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
-
-## Plugin 참조 (SwiftUI + Swift Concurrency)
-
-> 참조: `modules/plugin-refs.md` — SwiftUI Expert(리뷰 시) + Swift Concurrency(피어 리뷰 시) 섹션
-> diff에 `@MainActor|actor|async|@Observable` 패턴 감지 시 해당 플러그인 참조
-
-## 서브 스킬/스키마 참조
-
-| 스킬/스키마 | 경로 | 역할 |
-|------------|------|------|
-| arch-critic | `skills/arch-critic/SKILL.md` (글로벌) | 관점 1(Architecture) + 관점 2(Extensibility) |
-| code-auditor | `skills/code-auditor/SKILL.md` (글로벌) | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + **관점 7(Refactoring Completeness)** |
-| challenger 역할 | 3-Tier 디스커버리 (Codex 스킬) | 관점 3(Over-Engineering) + **관점 7 보조(Deprecated Dead Code)** + Devil's Advocate |
-| peer_review_schema | `~/.claude/schemas/codex_peer_review_schema.json` | Codex 응답 JSON 구조 |
+| `.claude/modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
+| `.claude/modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
+| `.claude/modules/peer-review-gates.md` | Synthesize 검증 게이트 4.5-4.8 전문 |
+| `.claude/modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
+| `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
+| `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
+| Codex challenger 스킬 | 관점 3(Over-Engineering) + 관점 7 보조 + Devil's Advocate |
+| `~/.claude/schemas/codex_peer_review_schema.json` | Codex 응답 JSON 구조 |
 
 ---
 
@@ -88,9 +79,9 @@ model-strategy:
 
 오케스트레이터가 직접 수행. `WORK_DIR=${PROJECT_ROOT}/peer-review-{PR_NUMBER}` (현재 작업 디렉토리 기준, 쓰기 불가 시 `.claude/tmp/` 폴백).
 
-### ⛔ WORK_DIR 초기화 (Gather 시작 시 반드시 첫 번째로 실행)
+### WORK_DIR 초기화 (Gather 첫 번째 단계)
 
-> **⛔ 아래 명령을 Gather의 다른 어떤 단계보다 먼저 실행하세요. WORK_DIR이 없으면 이후 모든 산출물 저장이 실패합니다.**
+WORK_DIR이 없으면 이후 모든 산출물 저장이 실패한다. Gather 시작 시 반드시 첫 번째로 실행.
 
 ```bash
 mkdir -p ${WORK_DIR}
@@ -105,13 +96,11 @@ gh auth status  # 성공→gh 사용, 실패→git 폴백 (git fetch upstream + 
 # GIT_ROOT 추출: modules/cross-validation.md의 GIT_ROOT 공유 유틸 참조
 ```
 
-### 0.5. PR 브랜치 접근 준비
+### 0.5. PR 브랜치 fetch
 
-PR 입력 시 PR 브랜치를 로컬에 fetch하여 이후 단계에서 `git show pr-{PR_NUMBER}:{FILE}`로 실제 코드를 직접 참조할 수 있게 한다. Codex DA가 현재 워크트리만 볼 수 있는 sandbox 제약을 우회하기 위해 필수.
-
+`git show pr-{PR}:{FILE}` 직접 참조 및 Codex DA sandbox 제약 우회를 위해 필수.
 ```bash
 git fetch upstream pull/{PR_NUMBER}/head:pr-{PR_NUMBER}
-# 이후: git show pr-{PR_NUMBER}:path/to/File.swift 로 PR 코드 직접 참조
 ```
 
 ### 1. 입력 파싱 + diff 수집
@@ -170,7 +159,7 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 
 Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degradation" 섹션 참조).
 
-### ⛔ Orchestrator Bias 방지 규칙
+### Orchestrator Bias 방지 규칙
 
 에이전트에게 작업을 위임할 때 Orchestrator 자신의 사전 판단이나 가설을 절대 포함하지 않는다.
 
@@ -188,16 +177,20 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degra
 TeamCreate("peer-review-{PR_NUMBER}")
 
 ├─ Teammate 배치: review-arch (opus ★, Task(team_name="peer-review-{PR}", subagent_type: general-purpose))
-│   Read: skills/arch-critic/SKILL.md (글로벌) + ${WORK_DIR}/diff.patch + symbols.json + requirements.md + base-behavior.md
-│   분석: 관점 1(Architecture Decision) + 관점 2(Extensibility)
+│   [Role] Architecture reviewer — 관점 1(Architecture Decision) + 관점 2(Extensibility)
+│   [Context] skills/arch-critic/SKILL.md + ${WORK_DIR}/diff.patch + symbols.json + requirements.md + base-behavior.md
+│   [Goal] diff 변경으로 인한 아키텍처 결정 및 확장성 이슈 독립 발굴
+│   [Constraints] 피어 결과 참조 금지 (Round 1 격리). max 10 issues. origin 분류 필수.
+│   [Deliverable] ${WORK_DIR}/arch-critic-result.json (에이전트 출력 스키마 준수)
 │   MCP: 필요 시 Serena 직접 호출 (pre-cache 보완)
-│   출력: ${WORK_DIR}/arch-critic-result.json
 │
 ├─ Teammate 배치: review-quality (sonnet, Task(team_name="peer-review-{PR}", subagent_type: general-purpose))
-│   Read: skills/code-auditor/SKILL.md (글로벌) + ${WORK_DIR}/diff.patch + symbols.json + requirements.md + base-behavior.md
-│   분석: 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring Completeness)
+│   [Role] Code quality reviewer — 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring Completeness)
+│   [Context] skills/code-auditor/SKILL.md + ${WORK_DIR}/diff.patch + symbols.json + requirements.md + base-behavior.md
+│   [Goal] 코드 품질·API 사용·의존성 관련 이슈 독립 발굴
+│   [Constraints] 피어 결과 참조 금지 (Round 1 격리). max 10 issues. origin 분류 필수.
+│   [Deliverable] ${WORK_DIR}/code-auditor-result.json (에이전트 출력 스키마 준수)
 │   MCP: 필요 시 Serena/Context7 직접 호출
-│   출력: ${WORK_DIR}/code-auditor-result.json
 │
 ├─ Teammate 배치: review-counter (sonnet, Task(team_name="peer-review-{PR}", subagent_type: general-purpose)) [Challenge 단계 후 실행]
 │   Read: ${WORK_DIR}/arch-critic-result.json + code-auditor-result.json + codex-challenger-result.json
@@ -285,10 +278,7 @@ codex exec \
 
 ### Codex Devil's Advocate (공통, 1회 추가 호출)
 
-**DA 사전 검증 (브랜치 일치 확인)**: DA는 `--sandbox read-only`로 현재 워크트리만 접근 가능. 현재 브랜치가 PR head와 다르면 DA의 reverse 판정이 무효가 될 수 있다.
-1. `git branch --show-current` vs PR headRefName 비교
-2. 불일치 시: DA 프롬프트에 `"현재 워크트리({branch})가 PR 브랜치({pr_branch})와 다름. git show pr-{PR}:file 참조 불가. reverse 판정 시 근거를 현 스냅샷이 아닌 diff 기준으로 작성할 것"` 경고 삽입
-3. DA 결과의 reverse 판정은 Orchestrator가 `git show pr-{PR}:{file}`로 반드시 교차 확인
+**DA 사전 검증**: 현재 브랜치 ≠ PR head이면 DA 프롬프트에 "diff 기준으로 작성" 경고 삽입. reverse 판정은 `git show pr-{PR}:{file}`로 교차 확인.
 
 ```bash
 codex exec \
@@ -314,26 +304,18 @@ sequential-thinking으로 Confidence Matrix를 계산한다.
 
 ### 1. agent_status 보정
 
-| Status | 처리 |
-|--------|------|
-| ok | 정상 가중치 |
-| partial | confidence × 0.7 |
-| failed | 투표 제외 (2-agent 모드) |
-| 전체 failed | Tier 하위 전환 (폴백 체인) |
+`ok`→정상 | `partial`→confidence×0.7 | `failed`→투표 제외(2-agent 모드) | 전체 failed→Tier 하위 전환
 
 ### 2. Origin 기반 Severity 보정
 
 에이전트가 보고한 `origin` 필드를 기반으로 severity를 보정한다.
 
-```
-origin 보정 규칙:
-├─ regression: severity 유지 (PR이 만든 문제)
-├─ pre-existing: severity cap → suggestion (기존과 동일한 동작)
-│   └─ 리포트 표기: "[기존 동작 동일]" 태그 추가
-├─ improvement: severity cap → minor (개선 여지, 강제 아님)
-│   └─ 리포트 표기: "[개선 제안]" 태그 추가
-└─ origin 미지정: base-behavior.md 교차 확인 후 Orchestrator가 직접 판정
-```
+| origin | 처리 | 리포트 태그 |
+|--------|------|------------|
+| regression | severity 유지 (PR이 만든 문제) | — |
+| pre-existing | severity cap → suggestion | `[기존 동작 동일]` |
+| improvement | severity cap → minor | `[개선 제안]` |
+| 미지정 | base-behavior.md 교차 확인 후 Orchestrator 직접 판정 | — |
 
 핵심 원칙: **PR 리뷰는 PR이 만든 변화를 평가한다.**
 기존 코드에 이미 있던 패턴을 PR의 결함으로 지적하지 않는다.
@@ -368,78 +350,11 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 
 > Origin 열 추가: `R`(regression), `P`(pre-existing), `I`(improvement). pre-existing은 severity가 suggestion으로 cap됨.
 
-### 4.5. Line Verification Gate (Major 이슈만)
+### 4.5-4.8. Verification Gates
 
-Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
-1. `git show pr-{PR_NUMBER}:{FILE}` 로 실제 코드 확인
-2. 에이전트가 보고한 line_range와 실제 위치 대조
-3. 불일치 시 실제 라인 번호로 업데이트 → `verified_line_range` 필드 추가
-4. 검증된 evidence_trace의 코드 블록에 `file:line` 주석 보강
-
-### 4.6. ⛔ Claim Verification Gate (Compiler-Verifiable 이슈)
-
-> **⛔ 4.6 gate 실행 전에 현재 Synthesize 중간 상태를 먼저 파일로 저장하라.**
-> gate는 컴파일러 실행 + 결과 해석으로 시간이 걸린다. 저장 전 compact가 발생하면 이전 분석이 사라진다.
-> 저장 순서: `synthesized-issues-partial.json` → gate 실행 → 결과 반영 → `confidence-matrix.md` 최종 저장.
-
-> **핵심 원칙**: "컴파일러 경고/에러가 발생한다/발생하지 않는다"는 클레임은 에이전트가 추론할 수 없는 empirical fact다. 컴파일러가 final judge다.
+> 참조: `modules/peer-review-gates.md` — Line Verification (4.5) + Compiler-Verifiable (4.6) + Behavior-Verifiable (4.7) + RxSwift Error Path (4.8) 게이트 전문
 >
-> PR #3434 MINOR-001 교훈: 3/3 에이전트가 "UITabBarItem Sendable 경고 발생" 주장 → 실제 빌드 결과: 현재 코드 경고 없음, 제안 코드(@MainActor 추가) 오히려 경고 발생. Swift 5.10 `sending` semantics를 아무도 컴파일러로 확인하지 않았음.
-
-**Compiler-Verifiable 이슈 감지 조건** (하나라도 해당하면):
-- perspective: `concurrency` 또는 `sendable`
-- 이슈 설명에 `경고`, `warning`, `Sendable`, `sending`, `actor isolation`, `@MainActor` 포함
-- 클레임이 "이 코드가 컴파일러 경고를 발생시킨다/않는다"
-
-**처리 절차**:
-```
-1. INCLUDE 판정된 이슈 중 Compiler-Verifiable 이슈 식별
-2. `swiftc -strict-concurrency=complete -swift-version 5 minimal_repro.swift` 실행
-   - minimal_repro: git show pr-{PR}:{FILE}에서 해당 함수/클로저 추출
-   - swiftc 경로: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc
-3. 결과 해석:
-   ├─ 에이전트가 "경고 발생한다" 주장 + 실제 경고 없음 → EXCLUDE (이슈 DROP)
-   ├─ 에이전트가 "경고 발생한다" 주장 + 실제 경고 있음 → INCLUDE 유지
-   └─ Swift 6 모드도 추가 확인: -strict-concurrency=complete -swift-version 6
-4. 검증 결과를 confidence-matrix.md에 기록: compiler_verified: true/false + result
-```
-
-**컴파일러 검증 불가 시** (XcodeBuildMCP 없음, SDK 경로 미확인 등):
-- 해당 이슈의 confidence ceiling을 65로 제한 (검증 없이 INCLUDE 불가)
-- 이슈에 `[컴파일러 검증 필요]` 태그 추가하여 Deliver에서 명시
-
-### 4.7. ⛔ Behavior-Verifiable Claim Gate (Runtime State 이슈)
-
-> **핵심 원칙**: "이 상태가 런타임에 실제로 발생할 수 있다"는 클레임은 에이전트가 패턴으로 추론할 수 없는 empirical fact다. 상태 할당 경로를 추적해야 한다.
->
-> PR #3449 MAJOR-1 교훈: 3/3 에이전트가 `isTimeMachineAvailable` guard 누락을 major로 판정 (confidence 90). 실제 확인 결과: `isAtLiveEdge = false`는 `setTimeShift()` 안에서만 할당되고, 모든 `setTimeShift()` 호출부는 `isTimeMachineAvailable` 가드를 이미 갖고 있음 → 불변식: `isAtLiveEdge = false ⟹ isTimeMachineAvailable = true`. Guard가 redundant하므로 진짜 regression이 아님. 3/3 high-confidence 동의가 오히려 false positive를 증폭.
-
-**Behavior-Verifiable 이슈 감지 조건** (하나라도 해당하면):
-- 이슈 유형: "missing guard condition" (`guard`, `if X &&` 패턴 누락)
-- 이슈 유형: "기존 패턴 X가 있는데 새 코드에 없음" (Pattern-Consistency)
-- 이슈 설명에 `guard 누락`, `조건 없음`, `체크하지 않음`, `발생할 수 있다`, `될 수 있다` 포함
-- perspective: `architecture`, `state-management`, `guard`
-
-**처리 절차**:
-```
-1. INCLUDE 판정된 이슈 중 Behavior-Verifiable 이슈 식별
-2. 핵심 상태 변수(guarded variable) 식별 (예: `isAtLiveEdge`)
-3. 해당 변수의 ALL assignment 위치를 추적:
-   git show pr-{PR}:{FILE} 또는 Grep으로 "{variable} = " 검색
-4. 각 setter 호출부에서 논쟁 중인 guard가 이미 상위에서 적용되는지 확인
-5. 결과 해석:
-   ├─ 모든 setter가 이미 guard X에 의해 보호됨 → 불변식 성립
-   │   → confidence ceiling 65 + "[불변식 확인 필요]" 태그 + severity 하향 검토
-   ├─ setter 중 guard 없는 경로 존재 → 불변식 불성립
-   │   → INCLUDE 유지, evidence_trace에 "unguarded setter path" 명시
-   └─ 추적 불가 (외부 모듈, indirect 할당) → confidence ceiling 70 + "[런타임 검증 필요]" 태그
-6. 결과를 confidence-matrix.md에 기록: behavior_verified: true/false + trace
-```
-
-**Pattern-Consistency 이슈 처리**:
-- 순수하게 "기존 패턴 X가 있는데 새 코드에 없음" 근거만인 이슈 → `[패턴 일관성]` 태그 추가
-- 패턴 불일치가 functional difference를 만드는지 반드시 확인 (위 절차 적용)
-- 만들지 않는다면: confidence ceiling 75 → DA "challenge" 유도
+> 게이트 실행 전: `synthesized-issues-partial.json` 중간 저장 필수 (compact 방지)
 
 ### 5. ⛔ CHECKPOINT — 산출물 저장 (Compact Recovery)
 
@@ -453,18 +368,7 @@ ${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (마크다운)
 ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 ```
 
-review-index.md 형식:
-```markdown
-# Peer Review #{PR_NUMBER} — Context Index
-## Phase: {Synthesize|Deliver}
-## Artifacts
-- diff.patch, symbols.json, requirements.md, base-behavior.md
-- arch-critic-result.json, code-auditor-result.json, codex-*-result.json
-- synthesized-issues.json — {N}개 이슈 (Major {M}, Minor {m})
-- confidence-matrix.md
-```
-
-> Compact 감지 시: `${WORK_DIR}/review-index.md` 읽기 → Phase 확인 → 해당 산출물 로드 → 중단 지점 재개.
+> review-index.md: Phase + Artifacts 목록 기록. Compact 감지 시 이 파일 읽어 산출물 로드 → 중단 지점 재개.
 
 ---
 
@@ -511,24 +415,7 @@ review-index.md 형식:
 >    └── pr-comments.md
 > ```
 
-- `${WORK_DIR}/review-report.md` — 통합 보고서. 이슈별 형식:
-
-```markdown
-### MAJOR-N: {제목}
-**File**: `{file}:{verified_line_range}`
-**Origin**: {origin} | **Confidence**: {N} | **Found by**: {agents}
-
-**What**: {description — WHY 포함}
-**Impact**: {impact}
-
-**Evidence**:
-  // [기존] {base_file}:{line} — {코드}
-  // [신규] {pr_file}:{line} — {코드} ← {문제 표시}
-
-**Suggestion**: {제안}
-
-> **PR Comment**: {부드러운 톤 코멘트, 복사 가능}
-```
+- `${WORK_DIR}/review-report.md` — 통합 보고서. 이슈별 필수 필드: `File:line` | Origin/Confidence/Found-by | What(WHY포함,400자) | Impact(major+) | Evidence(기존↔신규 코드블록) | Suggestion | PR Comment(부드러운 톤)
 
 - `${WORK_DIR}/pr-comments.md` — 이슈별 부드러운 톤 PR 코멘트 모음 (복사/붙여넣기용)
 - `${WORK_DIR}/*-result.json` — 에이전트/Codex 원본 결과
