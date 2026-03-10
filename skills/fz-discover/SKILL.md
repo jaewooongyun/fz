@@ -46,7 +46,7 @@ model-strategy:
 
 ## 개요
 
-> Phase 1 (Problem Framing) → Phase 2 (Iterative Constraint Discovery) ↔ 사용자 대화 → Phase 3 (Convergence) → Phase 4 (Handoff)
+> ⛔ Phase 0 (PRJ Pre-flight) → Phase 1 (Problem Framing) → Phase 2 (Iterative Constraint Discovery) ↔ 사용자 대화 → Phase 3 (Convergence) → Phase 4 (Handoff)
 
 - 발산 후 수렴 (Diamond): 넓게 탐색한 후 제약으로 좁히기
 - Reject-Extract-Propose 프로토콜: 거절 → 제약 추출 → 대안 제시를 한 턴에
@@ -170,6 +170,27 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 
 ---
 
+## ⛔ Phase 0: PRJ Pre-flight (반성 4차 — 누락 방지)
+
+> 반성 교훈: /fz 없이 직접 호출 시 PRJ 폴더가 초기화되지 않아 5라운드 아티팩트 전부 누락됨.
+> 참조: `modules/context-artifacts.md` → "PRJ Pre-flight" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `PRJ-\d+` 패턴 추출 (예: `[PRJ-542]`)
+2. 패턴 있으면:
+   - `{작업 폴더}/PRJ-xxxx/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
+   - `{작업 폴더}/PRJ-xxxx/discover/` 서브폴더 생성
+   - WORK_DIR 설정
+3. 패턴 없으면: 비PRJ 모드 (Serena Memory fallback)
+
+### Gate 0: PRJ Ready
+- [ ] ⛔ 인자에서 PRJ 패턴 체크 완료?
+- [ ] ⛔ PRJ 패턴 있으면 폴더 + index.md 생성 완료?
+- [ ] WORK_DIR 결정됨?
+
+---
+
 ## Phase 1: Problem Framing
 
 사용자 질문에서 핵심 문제를 추출하고, 코드 탐색으로 암묵적 제약을 사전 식별합니다.
@@ -202,6 +223,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    ```
 
 ### Gate 1: Problem Framed
+- [ ] ⛔ Gate 0 (PRJ Pre-flight) 통과했는가?
 - [ ] 핵심 결정 사항이 명확하게 식별되었는가?
 - [ ] 관련 코드 구조를 탐색했는가?
 - [ ] 초기 제약이 1개 이상 식별되었는가?
