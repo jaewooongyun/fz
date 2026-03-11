@@ -148,6 +148,28 @@ Intent Context 전달 (필수):
 
 ---
 
+### ⛔ 모듈화 리뷰 원칙 (Modularization Review Scope)
+
+> **원칙**: 모듈화 리뷰의 범위 = 패키지 코드 + 앱 측 소비자 코드 + 진입점
+> **이유**: 모듈화는 경계를 만드는 작업이므로, 경계 양쪽을 모두 검증해야 한다. 패키지만 보면 "소비자가 올바르게 사용하는지"를 놓친다.
+
+모듈화/캡슐화 작업에서 Lead는 리뷰 대상을 구성할 때 반드시 포함해야 한다:
+1. **패키지 내부 코드** (당연히 포함)
+2. **앱 측 소비자 코드**: 패키지의 public API를 호출하는 앱 코드 전부
+   - `Grep(pattern="import {모듈명}", path=앱 소스 루트)` → 소비자 파일 목록
+   - 각 소비자 파일의 사용 패턴이 설계 의도와 일치하는지
+3. **진입점 코드**: AppDelegate, SceneDelegate, UIWindow extension, Info.plist 등 앱 생명주기 진입점
+   - 특히 글로벌 hook (motionBegan, userActivity 등)
+
+이 원칙은 TEAM 모드에서 Lead가 에이전트에게 리뷰 대상을 전달할 때 적용:
+```
+Intent Context 전달 시 추가:
+[소비자 코드]: {앱 측 소비자 파일 목록}
+[진입점]: {AppDelegate/SceneDelegate/UIWindow extension 등}
+```
+
+---
+
 ## ⛔ Phase 0: PRJ Pre-flight (반성 4차 — 누락 방지)
 
 > 반성 교훈: /fz 없이 직접 호출 시 PRJ 폴더가 초기화되지 않아 아티팩트가 전부 누락됨.
@@ -279,9 +301,9 @@ diff 기반 검증만으로는 **"변경되지 않았지만 삭제/수정되어�
 > 이 검증은 /fz-discover → /fz-plan → /fz-code 파이프라인에서만 활성화.
 > /fz-discover 없이 직접 코딩한 경우에는 생략.
 
-### 검증 4-E: Module Boundary (접근 제어 검증)
+### 검증 4-E: Module Boundary + Consumer Quality (접근 제어 + 소비자 품질 검증)
 
-모듈 경계에서의 access control이 설계 의도와 일치하는지 검증합니다.
+모듈 경계에서의 access control이 설계 의도와 일치하는지, **그리고 소비자가 모듈을 올바르게 사용하는지** 검증합니다.
 
 ```
 절차:
@@ -294,11 +316,21 @@ diff 기반 검증만으로는 **"변경되지 않았지만 삭제/수정되어�
 3. 모듈 간 의존 방향 확인
    - 하위 모듈이 상위 모듈에 의존하지 않는지
    - mcp__serena__find_referencing_symbols → 역방향 참조 탐지
+4. ⛔ 소비자 코드 품질 검증 (모듈화/캡슐화 작업 시 필수):
+   - Grep(pattern="import {모듈명}", path=앱 소스 루트) → 소비자 파일 전수 수집
+   - 각 소비자가 public API만 사용하는지 (internal 심볼 직접 접근 없는지)
+   - 소비자의 사용 패턴이 모듈 설계 의도와 일치하는지
+   - 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)에서의
+     모듈 초기화/호출이 올바른지
+   - 기존 앱 코드에 남아있는 모듈 이전 전 레거시 패턴이 정리되었는지
 
 체크리스트:
 - [ ] public API가 의도적으로 노출된 것인가? (internal이어야 할 심볼이 public이 아닌가?)
 - [ ] 모듈 내부 구현 세부사항(proxy, internal state 등)이 외부에 노출되지 않았는가?
 - [ ] 의존 방향이 아키텍처 규칙(상위→하위만)을 준수하는가?
+- [ ] ⛔ 소비자 코드가 모듈의 public API를 올바르게 사용하는가?
+- [ ] ⛔ 앱 진입점(AppDelegate/SceneDelegate/UIWindow)의 모듈 연동이 정상인가?
+- [ ] ⛔ 모듈화 이전의 레거시 코드(직접 참조, 중복 로직)가 앱에 남아있지 않은가?
 ```
 
 ### 검증 4-F: Anti-Pattern Enforcement (잔존 금지 패턴 검증)
