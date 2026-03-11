@@ -121,6 +121,11 @@ cd "$GIT_ROOT" && codex exec review \
 ```bash
 SHARED_MODULES="$GIT_ROOT/TvingUI $GIT_ROOT/tving-common $GIT_ROOT/Managers"
 # --add-dir는 반복 가능: --add-dir dir1 --add-dir dir2
+
+# 모듈화 작업 시: 앱 측 소비자 디렉토리도 포함
+# 패키지만 리뷰하면 소비자 코드의 사용 품질을 놓침
+CONSUMER_DIRS="$GIT_ROOT/Apps/Sources $GIT_ROOT/Apps/Sources/iOS/DebugTools"
+# 예: --add-dir $SHARED_MODULES --add-dir $CONSUMER_DIRS
 ```
 
 ### verify -- 계획 검증
@@ -163,6 +168,7 @@ codex exec \
    Q4 경계 케이스: 이 추상화가 커버하지 못하는 케이스는 무엇이고, 대안은?
    Q5 접근 경계: '차단/제거/캡슐화'를 의도한 접근 경로가 실제로 차단되는가? access modifier(public/internal/private)가 의도와 일치하는가? 기존 코드가 이벤트 채널을 우회하여 직접 호출하는 경로가 남아있지 않은가?
    Q6 이벤트 스코프: 이벤트/로그 전송 설계가 포함되어 있다면, 각 이벤트가 측정 목적에 부합하는가? 이벤트 발화 위치의 컨텍스트가 측정 대상과 일치하는가?
+   Q7 소비자 코드 품질: 모듈화/캡슐화 작업인 경우, 앱 측 소비자 코드가 모듈의 public API를 올바르게 사용하는가? 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)의 모듈 연동이 정상인가? 모듈화 이전의 레거시 패턴이 앱에 남아있지 않은가?
 
    각 질문에 대해 verdict(pass/warn/fail)와 reasoning을 제시하라.
    계획의 리스크 매트릭스가 빈약하거나 누락된 경우 반드시 지적하라.

@@ -46,10 +46,18 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - A/B 테스트 등 외부 시스템(Hackle, Firebase RC 등)이 관리하는 값을 앱 로컬에 캐싱하면 실험 왜곡
 - 판단 기준: "앱 재시작 후에도 이 값이 반드시 유지되어야 하는가?" — NO면 인메모리(Subject/State)로 충분
 
+### 6. Consumer Integration Quality (모듈화/캡슐화 작업 시)
+
+- 모듈의 public API를 사용하는 **앱 측 소비자 코드**가 설계 의도대로 사용하는가?
+- 소비자가 모듈 내부 구현에 의존하지 않고 public 인터페이스만 사용하는가?
+- 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)에서 모듈 연동이 올바른가?
+- 모듈화 이전의 레거시 패턴(직접 참조, 중복 로직, 인라인 구현)이 앱에 남아있지 않은가?
+- 판단 기준: "이 소비자 코드가 모듈의 존재 목적을 무력화하지 않는가?"
+
 ## Output Format
 
 보고 항목마다:
-- 위반 유형 (Dependency Direction / Circular Ref / Role Separation / Extensibility / Dead Code)
+- 위반 유형 (Dependency Direction / Circular Ref / Role Separation / Extensibility / Dead Code / Consumer Integration)
 - 관련 심볼 또는 파일 경로
 - 판정: VIOLATION / WARNING / OK
 - 근거 (코드 인용 또는 심볼 참조 결과)

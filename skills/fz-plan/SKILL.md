@@ -245,6 +245,12 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
       각 액션의 전제조건(pre-condition)과 부작용(side-effect)을 나열.
    d. **Dead code 감지**: 변경 대상과 관련된 파일에서 미사용 헬퍼/메서드 식별.
       `find_referencing_symbols` 결과가 0이면 dead code 후보 → 이관 대상에서 제외 + 삭제 후보로 기록.
+   e. **⛔ 소비자 코드 품질 스캔** (모듈화/캡슐화 작업 시 필수):
+      모듈 경계를 만드는 작업에서는 경계 양쪽을 모두 분석해야 한다.
+      `Grep(pattern="import {모듈명}", path=앱 소스 루트)` → 앱 측 소비자 파일 전수 수집.
+      각 소비자의 사용 패턴이 모듈 설계 의도와 일치하는지 확인.
+      앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension 등)의 모듈 연동 코드 확인.
+      계획에 소비자 코드 변경 Step을 명시적으로 포함.
 
 3. **API/라이브러리 문서 확인**:
    - `mcp__context7__resolve-library-id` → 라이브러리 ID
@@ -313,6 +319,7 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
   - [ ] 각 진입점의 런타임 도달성을 검증했는가? (latent 표기 포함)
   - [ ] 기존 액션 패턴의 사이드이펙트/순서 의존성을 분석했는가?
   - [ ] 관련 파일의 dead code를 감지했는가?
+  - [ ] ⛔ 모듈화 작업이면 소비자 코드 품질 스캔(e단계)을 수행했는가?
 - [ ] API 문서 확인 완료? (새 API 사용 시)
 - [ ] 기존 패턴과 일관성 확인?
 - [ ] 구현 단계가 명확하게 정의?
