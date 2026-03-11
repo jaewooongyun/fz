@@ -171,33 +171,88 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degra
 
 에이전트들이 동일한 가설을 공유하면 3/3 동의가 오히려 false confidence를 증폭시킨다 (homogeneous multi-agent failure). Orchestrator는 컨텍스트 데이터만 전달하고 판단은 에이전트에게 위임한다.
 
-### Tier 1: Full Team (TeamCreate)
+### ⛔ Gate 0: 팀 생성 필수 (Tier 2+)
+
+> Tier 2 이상에서는 반드시 아래 순서를 실행한다. **standalone Agent() 호출 금지.**
+>
+> ```
+> ⛔ 검증: TeamCreate 호출 없이 Agent(subagent_type=...) 호출 → 위반
+> ⛔ 검증: Agent() 호출 시 team_name 파라미터 누락 → 위반
+> ```
+>
+> standalone Agent는 결과가 return으로만 전달되어 에이전트 간 상호 통신(SendMessage)이 불가능하다.
+> TeamCreate → Agent(team_name=...) → SendMessage 경로만 허용.
+
+### Tier 2: Lite Team — 실행 시퀀스
 
 ```
-TeamCreate("peer-review-{PR_NUMBER}")
+# 1. 팀 생성 (⛔ 필수)
+TeamCreate(team_name="peer-review-{PR_NUMBER}", description="PR #{PR_NUMBER} peer review")
 
-├─ Teammate 배치: review-arch (opus ★, Task(team_name="peer-review-{PR}", subagent_type: general-purpose))
-│   [Role] Architecture reviewer — 관점 1(Architecture Decision) + 관점 2(Extensibility)
-│   [Context] skills/arch-critic/SKILL.md + ${WORK_DIR}/diff.patch + symbols.json + requirements.md + base-behavior.md
-│   [Goal] diff 변경으로 인한 아키텍처 결정 및 확장성 이슈 독립 발굴
-│   [Constraints] 피어 결과 참조 금지 (Round 1 격리). max 10 issues. origin 분류 필수.
-│   [Deliverable] ${WORK_DIR}/arch-critic-result.json (에이전트 출력 스키마 준수)
-│   MCP: 필요 시 Serena 직접 호출 (pre-cache 보완)
-│
-├─ Teammate 배치: review-quality (sonnet, Task(team_name="peer-review-{PR}", subagent_type: general-purpose))
-│   [Role] Code quality reviewer — 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring Completeness)
-│   [Context] skills/code-auditor/SKILL.md + ${WORK_DIR}/diff.patch + symbols.json + requirements.md + base-behavior.md
-│   [Goal] 코드 품질·API 사용·의존성 관련 이슈 독립 발굴
-│   [Constraints] 피어 결과 참조 금지 (Round 1 격리). max 10 issues. origin 분류 필수.
-│   [Deliverable] ${WORK_DIR}/code-auditor-result.json (에이전트 출력 스키마 준수)
-│   MCP: 필요 시 Serena/Context7 직접 호출
-│
-├─ Teammate 배치: review-counter (sonnet, Task(team_name="peer-review-{PR}", subagent_type: general-purpose)) [Challenge 단계 후 실행]
-│   Read: ${WORK_DIR}/arch-critic-result.json + code-auditor-result.json + codex-challenger-result.json
-│   역할: 관점 8(Requirements Alignment 보조) — 3개 에이전트 "OK" 판정 영역 집중 반론
-│   출력: ${WORK_DIR}/counter-result.json → Challenge 단계 Confidence Matrix 보정 입력
-│
-└─ Bash (병렬): codex exec — 팀 외부, 독립 실행
+# 2. 태스크 생성
+TaskCreate(subject="Architecture review (관점 1,2)")   # → task-1
+TaskCreate(subject="Code quality review (관점 4-7)")    # → task-2
+
+# 3. 에이전트 스폰 (team_name ⛔ 필수!)
+Agent(
+  name="review-arch",
+  team_name="peer-review-{PR}",  # ⛔ 없으면 standalone 위반!
+  model="opus",
+  subagent_type="general-purpose",
+  prompt="[Task Brief] ..."
+)
+Agent(
+  name="review-quality",
+  team_name="peer-review-{PR}",  # ⛔ 필수
+  model="sonnet",
+  subagent_type="general-purpose",
+  prompt="[Task Brief] ..."
+)
+
+# 4. Codex challenger — 팀 외부, Lead가 Bash로 직접 실행
+Bash("codex exec ...")
+
+# 5. 에이전트 완료 대기 → Lead가 결과 합성 (Challenge 방법 A)
+# 6. shutdown_request → TeamDelete
+```
+
+Task Brief 내용 (각 에이전트):
+- review-arch: skills/arch-critic/SKILL.md + ${WORK_DIR}/diff.patch + symbols.json + requirements.md + base-behavior.md
+  - [Goal] diff 변경으로 인한 아키텍처 결정 및 확장성 이슈 독립 발굴
+  - [Constraints] 피어 결과 참조 금지 (Round 1 격리). max 10 issues. origin 분류 필수.
+  - [Deliverable] ${WORK_DIR}/arch-critic-result.json
+
+- review-quality: skills/code-auditor/SKILL.md + 동일 컨텍스트 파일
+  - [Goal] 코드 품질·API 사용·의존성 관련 이슈 독립 발굴
+  - [Constraints] 피어 결과 참조 금지 (Round 1 격리). max 10 issues. origin 분류 필수.
+  - [Deliverable] ${WORK_DIR}/code-auditor-result.json
+
+### Tier 3: Full Team (--deep) — 추가 시퀀스
+
+Tier 2 시퀀스 완료 후, 2.5-Turn Protocol 실행:
+
+```
+# Round 1 완료 (Tier 2 시퀀스)
+# 각 에이전트가 ${WORK_DIR}/*-result.json 저장 완료
+
+# Round 2: 교차 피드백 (SendMessage 필수!)
+# review-arch: Read code-auditor-result.json → SendMessage(review-quality, 피드백)
+# review-quality: Read arch-critic-result.json → SendMessage(review-arch, 피드백)
+
+# Round 0.5: 최종 보고
+# review-arch → SendMessage(Lead): 최종 이슈 + [합의/불합의 항목]
+# review-quality → SendMessage(Lead): 최종 이슈 + [합의/불합의 항목]
+
+# review-counter 스폰 (Challenge 단계)
+Agent(
+  name="review-counter",
+  team_name="peer-review-{PR}",  # ⛔ 필수
+  model="sonnet",
+  subagent_type="general-purpose",
+  prompt="3개 에이전트 결과 교차 반론. OK 판정 영역 집중."
+)
+
+# Codex DA → Lead 합성 → shutdown_request → TeamDelete
 ```
 
 ### Codex 호출 (Analyze)
@@ -469,6 +524,9 @@ diff > 2000줄 → AskUserQuestion 필수 ($3+ 예상)
 - 자기 코드 리뷰 (→ `/fz-review`)
 - Codex 위임 (→ `/fz-codex`) — codex exec 직접 호출
 - Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Guidelines` 위임)
+- ⛔ **standalone Agent() 호출 금지** — Tier 2+ 에서 team_name 없는 Agent 호출은 팀 프로토콜 위반.
+  서브에이전트 결과는 return으로만 전달되어 상호 비판(Cross-Critique/SendMessage)이 불가능하다.
+  반드시 TeamCreate → Agent(team_name=...) → SendMessage 경로를 사용한다.
 
 ## 에러 대응
 
