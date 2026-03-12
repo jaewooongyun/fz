@@ -6,6 +6,7 @@ description: >-
   Use in plan/code/review teams for context-aware recall.
 model: sonnet
 tools: Read, Grep, Glob, mcp__serena__read_memory, mcp__serena__list_memories, mcp__serena__find_symbol, mcp__serena__search_for_pattern, mcp__context7__resolve-library-id, mcp__context7__query-docs
+memory: user
 ---
 
 ## Role

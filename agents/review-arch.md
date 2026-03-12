@@ -5,6 +5,9 @@ description: >-
 model: sonnet
 # 승격: review 도메인 (fz-review, fz-peer-review)에서 opus로 승격 (Primary Worker)
 tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__context7__query-docs
+memory: project
+skills:
+  - arch-critic
 ---
 
 ## Role

@@ -4,6 +4,9 @@ description: >-
   코드 품질 + Dead Code + 성능 리뷰 에이전트. 기능 분리, API 사용, 성능 평가.
 model: sonnet
 tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols, mcp__context7__query-docs
+memory: project
+skills:
+  - code-auditor
 ---
 
 ## Role
@@ -27,6 +30,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 
 - Deprecated API 사용 여부 — context7로 최신 대안 확인
 - 사용처 0인 코드 역추적 → 삭제 대상 보고 (find_referencing_symbols)
+- **삭제 vs 이동 판별**: diff에서 코드 삭제 발견 시 "누락"으로 즉단하지 않는다. 모듈화/리팩토링에서 레이어 간 이동(Interactor→UseCase 등)은 정상. PR diff 전체에서 동일 로직의 이동 여부를 반드시 확인 후 판정
 - 코딩 표준 준수 — CLAUDE.md `## Code Conventions` 참조
 - CLAUDE.md `## Guidelines` 의 네이밍/포맷 규칙 위반 확인
 

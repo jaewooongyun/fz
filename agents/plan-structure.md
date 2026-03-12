@@ -5,6 +5,7 @@ description: >-
 model: sonnet
 # 승격: plan 도메인에서 opus로 승격 (Primary Worker)
 tools: Read, Grep, Glob, Bash, mcp__serena__get_symbols_overview, mcp__context7__query-docs
+memory: project
 ---
 
 ## 역할
