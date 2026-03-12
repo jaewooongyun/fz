@@ -7,22 +7,26 @@
 
 ## 에이전트 Capabilities
 
-| 에이전트 | domain | lens | model | 비고 |
-|---------|--------|------|-------|------|
-| search-symbolic | search | 심볼 정밀 탐색 (정의/참조/타입) | sonnet | Serena 도구 |
-| search-pattern | search | 텍스트 패턴 넓은 범위 탐색 | sonnet | Grep/Glob 도구 |
-| plan-structure | plan | 구현 구조 + Step 순서 설계 | opus | Primary |
-| plan-tradeoff | plan | 트레이드오프 + 대안 비교 평가 | sonnet | |
-| plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | |
-| plan-impact | plan | 영향 범위 + 소비자 변경 추적 | sonnet | |
-| impl-correctness | implement | 구현 정확성 + 테스트 작성 | opus | Primary |
-| impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | |
-| review-arch | review | 아키텍처 결정 + 레이어 위반 | opus | Primary |
-| review-quality | review | 코드 품질 + Dead Code + 성능 | sonnet | |
-| review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | fz-code TEAM 배정 |
-| review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | promoted-model: opus (direction-challenge) |
-| review-counter | review | 반론 + Devil's Advocate | sonnet | |
-| memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | |
+> **model 컬럼 해석**: `default` = frontmatter 기본값, `promoted` = Lead가 스폰 시 승격하는 모델.
+> Primary 에이전트의 frontmatter는 `model: sonnet`이지만, TEAM 스폰 시 Lead가 `model: "opus"`를 명시적으로 전달한다.
+> 이 설계는 "동시 opus 최대 2개" 거버넌스를 Lead가 직접 제어하기 위함이다.
+
+| 에이전트 | domain | lens | default | promoted | memory | skills | isolation | 비고 |
+|---------|--------|------|---------|----------|--------|--------|-----------|------|
+| search-symbolic | search | 심볼 정밀 탐색 (정의/참조/타입) | sonnet | — | — | — | — | Serena 도구 |
+| search-pattern | search | 텍스트 패턴 넓은 범위 탐색 | sonnet | — | — | — | — | Grep/Glob 도구 |
+| plan-structure | plan | 구현 구조 + Step 순서 설계 | sonnet | opus | project | — | — | Primary |
+| plan-tradeoff | plan | 트레이드오프 + 대안 비교 평가 | sonnet | — | — | — | — | |
+| plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | — | — | — | — | |
+| plan-impact | plan | 영향 범위 + 소비자 변경 추적 | sonnet | — | — | — | — | |
+| impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | worktree | Primary |
+| impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | — | — | — | — | |
+| review-arch | review | 아키텍처 결정 + 레이어 위반 | sonnet | opus | project | arch-critic | — | Primary |
+| review-quality | review | 코드 품질 + Dead Code + 성능 | sonnet | — | project | code-auditor | — | |
+| review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | — | — | — | — | fz-code TEAM 배정 |
+| review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | opus | — | — | — | direction-challenge 시 승격 |
+| review-counter | review | 반론 + Devil's Advocate | sonnet | — | — | — | — | |
+| memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | — | user | — | — | |
 
 ---
 
@@ -31,7 +35,7 @@
 ```
 1. 스킬이 도메인을 지정 (예: fz-plan → domain: plan)
 2. 레지스트리에서 해당 domain의 모든 에이전트 수집
-3. model=opus인 에이전트 = Primary Worker
+3. promoted=opus인 에이전트 = Primary Worker (Lead가 스폰 시 model:"opus" 전달)
 4. 나머지 = Supporting
 5. 팀 크기에 따라 토폴로지 결정:
    - 2명 → Mesh

@@ -385,6 +385,100 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 
 ---
 
+## 8. Agent Frontmatter 고급 기능 (v2.1+)
+
+> Source: Claude Code 공식 Sub-agents/Agent Teams 문서 (2026-03). 기존 fz 에이전트에 점진적으로 적용.
+
+### 8.1 Persistent Memory (`memory` 필드)
+
+에이전트가 세션 간 학습 내용을 영속 저장한다. `~/.claude/agent-memory/{name}/` (user) 또는 `.claude/agent-memory/{name}/` (project).
+
+```yaml
+---
+name: review-arch
+memory: project
+---
+```
+
+- 에이전트가 MEMORY.md를 자동 관리 (200줄 제한, 자동 큐레이션)
+- 코드베이스 패턴, 아키텍처 결정, 반복 이슈를 세션 간 축적
+- **적용 우선순위**: review-arch (아키텍처 패턴) > impl-correctness (버그 패턴) > review-quality (품질 패턴)
+
+### 8.2 Skills Preloading (`skills` 필드)
+
+에이전트 context에 스킬 내용을 사전 주입한다. Read(SKILL.md) 턴이 불필요해진다.
+
+```yaml
+---
+name: impl-correctness
+skills:
+  - fz-code
+---
+```
+
+- 스킬 전체 내용이 시스템 프롬프트에 포함됨
+- 부모 대화의 스킬을 상속하지 않음 — 명시적 선언 필요
+- **주의**: 스킬 내용이 context를 소비하므로 필요한 스킬만 선별
+
+### 8.3 Per-Agent Hooks (`hooks` 필드)
+
+에이전트별 라이프사이클 훅으로 자동 품질 게이트를 구현한다.
+
+```yaml
+---
+name: impl-correctness
+hooks:
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "./scripts/lint-check.sh"
+---
+```
+
+| 이벤트 | 용도 | 예시 |
+|--------|------|------|
+| PreToolUse | 도구 사용 전 검증 | Bash 명령 화이트리스트 |
+| PostToolUse | 도구 사용 후 검증 | 편집 후 린트 실행 |
+| Stop | 에이전트 완료 시 | 최종 출력 형식 검증 |
+
+- **팀 훅**: `TeammateIdle` (exit 2=계속 작업), `TaskCompleted` (exit 2=완료 차단)은 settings.json에서 정의
+
+### 8.4 Worktree Isolation (`isolation` 필드)
+
+에이전트가 격리된 git worktree에서 실행된다. 파일 충돌 방지.
+
+```yaml
+---
+name: impl-correctness
+isolation: worktree
+---
+```
+
+- 변경 없으면 worktree 자동 정리
+- **적용**: TEAM code에서 impl-correctness가 코드 수정 시 안전한 격리 환경
+
+### 8.5 기타 유용한 필드
+
+| 필드 | 용도 | fz 활용 |
+|------|------|---------|
+| `maxTurns` | 에이전트 턴 수 제한 | Supporting 에이전트의 과도한 분석 방지 |
+| `disallowedTools` | 도구 차단 (denylist) | `tools` allowlist의 보완 |
+| `permissionMode` | 에이전트별 권한 | review → `plan` (read-only), impl → `acceptEdits` |
+| `mcpServers` | 에이전트별 MCP | review-arch → serena만, review-quality → serena + context7 |
+| `background: true` | 항상 백그라운드 | 탐색/캐싱 에이전트에 적합 |
+
+### 8.6 도입 로드맵
+
+| 단계 | 적용 | 대상 에이전트 | 상태 |
+|------|------|-------------|------|
+| Phase 1 | `memory: project\|user` | review-arch, impl-correctness, plan-structure, review-quality(project), memory-curator(user) | ✅ 적용 |
+| Phase 2 | `skills:` | review-arch(arch-critic), review-quality(code-auditor) | ✅ 적용 |
+| Phase 3 | `TaskCompleted` hook | settings.json (팀 레벨) | ✅ 적용 (산출물 미작성 방지) |
+| Phase 4 | `isolation: worktree` | impl-correctness | ✅ 적용 |
+
+---
+
 ## Quick Reference
 
 ```
@@ -406,4 +500,10 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
   에이전트 --> SendMessage(에이전트)  (직접)
   합의 --> SendMessage(lead)          (보고)
   Lead --> /fz-codex                  (검증 게이트)
+
+고급 (§8):
+  memory: project → 세션 간 학습
+  skills: [fz-code] → 스킬 사전 주입
+  hooks: PostToolUse → 자동 품질 게이트
+  isolation: worktree → 코드 수정 격리
 ```
