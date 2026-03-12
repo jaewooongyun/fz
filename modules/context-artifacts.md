@@ -196,7 +196,25 @@ ObservableObject + @StateObject 조합 채택.
 - [ ] ASD 패턴 있으면 폴더 + index.md 존재 확인?
 - [ ] WORK_DIR 결정됨? (ASD 경로 또는 "비ASD")
 
+## 사전 예방적 Context 관리
+
+> compact recovery는 사후 대응이다. 아래는 compact를 **지연/방지**하기 위한 사전 전략.
+
+### 원칙: Context 여유 = 실행 품질
+
+auto-compact는 맥락 손실을 수반한다. compact 발동을 최대한 늦추면 실행 품질이 유지된다.
+
+### 적용 규칙
+
+1. **MCP 출력 격리**: 대용량 결과(Grep, 심볼 분석, Codex)는 파일로 저장 후 Read 참조. context에 raw 출력 남기지 않음
+2. **중간 산출물 즉시 기록**: 분석 결과가 나오면 대화에 축적하지 말고 ASD 파일/Serena에 즉시 기록 → compact 시 Read로 복원
+3. **에이전트 스폰 최소화**: 스폰마다 ~50K 토큰 재주입. 단순 작업은 직접 실행
+4. **참조 파일 선택적 로드**: 전체 파일 Read 대신 필요 섹션만 (offset/limit). 500줄+ 파일은 분할 읽기
+
+> 상세: `guides/prompt-optimization.md` §2.5 (Context Budget 관리)
+
 ## 설계 원칙
 
 - Progressive Disclosure Level 3 (필요 시에만 로드)
 - 500줄 이하 유지
+- Context 여유 = 실행 품질 (사전 예방 > 사후 복구)
