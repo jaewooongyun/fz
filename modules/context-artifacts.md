@@ -11,11 +11,10 @@
 ## 폴더 구조
 
 ```
-{작업 폴더}/PRJ-xxxx/
+{CWD}/PRJ-xxxx/          # 또는 {CWD}/NOTASK-{YYYYMMDD}/
 ├── index.md              # Compact recovery 엔트리 포인트 (append-only)
 ├── discover/
-│   ├── round-1.md ~ round-N.md
-│   └── constraints.md    # 최종 제약 매트릭스 (rolling overwrite)
+│   └── discover-journal.md  # 누적형 저널 (Current State 상단 + Round History 하단)
 ├── plan/
 │   ├── plan-v1.md ~ plan-vN.md
 │   └── plan-final.md
@@ -26,9 +25,11 @@
     └── self-review.md
 ```
 
-## Ticket ID 해석
+> `{CWD}` = 현재 작업 디렉토리. 어디서 실행하든 해당 위치에 저장.
 
-우선순위: 명시적 인자 > 브랜치명 (`PRJ-\d+` 추출) > AskUserQuestion > `NOTASK-{YYYYMMDD}`
+## Work Dir 결정
+
+우선순위: 명시적 인자 PRJ-xxxx > 브랜치명 (`PRJ-\d+` 추출) > AskUserQuestion(저장 여부) > Serena Memory fallback
 
 ## index.md 프로토콜
 
@@ -40,9 +41,7 @@ index.md는 append-only로 관리한다. Active Phase 갱신 시 기존 Phase �
 ## Active Phase: discover
 
 ## Artifacts
-- [discover] round-1.md — 초기 제약 5개 발견 (C1-C5)
-- [discover] round-2.md — 사용자 피드백 반영, C6-C8 추가
-- [discover] constraints.md — 최종 14개 제약 매트릭스
+- [discover] discover-journal.md — Round 3 기준, 제약 8개(C1-C8), 생존 후보 2개
 ```
 
 ## Compact Recovery Protocol
@@ -50,7 +49,7 @@ index.md는 append-only로 관리한다. Active Phase 갱신 시 기존 Phase �
 1. `fz:session:current`에서 `work_dir` 읽기
 2. `{WORK_DIR}/index.md` 읽기
 3. Active Phase의 최신 아티팩트 로드
-4. 상위 Phase 핵심 산출물 로드 (discover→constraints.md, plan→plan-final.md)
+4. 상위 Phase 핵심 산출물 로드 (discover→discover-journal.md Current State, plan→plan-final.md)
 5. 컨텍스트 복원 완료 알림
 
 ## Serena Memory와의 관계
@@ -69,7 +68,7 @@ PRJ 폴더가 없어도 핵심 산출물은 Serena Memory에 경량 저장한다
 |------|------|
 | 트리거 | 각 스킬의 Phase 완료 또는 의미 있는 분석 결과 발생 |
 | 키 | `fz:checkpoint:{skill}-{phase}` (예: `fz:checkpoint:plan-analysis`) |
-| 내용 | ~200자 핵심 결정 요약 |
+| 내용 | ~200자 핵심 결정 요약 (discover는 ~500자 — 제약 매트릭스+생존 후보+핵심 추론 포함) |
 | 복원 | `list_memories("fz:checkpoint:*")` → 최신 키 읽기 → 마지막 진행 지점 재개 |
 | GC | 파이프라인 완료 시 `fz:checkpoint:*` 일괄 삭제 (기존 GC 로직) |
 
@@ -92,11 +91,11 @@ Both:     PRJ 파일 + Serena Memory 동시 저장 (이중 안전망)
 
 ## 파일 크기 제한
 
-| 파일 유형 | 최대 크기 |
-|----------|----------|
-| round | 2K tokens |
-| plan | 3K tokens |
-| step | 1.5K tokens |
+| 파일 유형 | 최대 크기 | 비고 |
+|----------|----------|------|
+| discover-journal | 5K tokens | Current State(~2K, **상세** — 요약 아님) + Round History(~3K 누적) |
+| plan | 3K tokens | |
+| step | 1.5K tokens | |
 
 ## TEAM 로깅
 
@@ -112,40 +111,70 @@ PRJ 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 ## Active Phase: code
 
 ## Artifacts
-- [discover] round-1.md — RIBs 의존성 3개 발견 (C1-C3)
-- [discover] round-2.md — 동시성 제약 추가 (C4-C5)
-- [discover] constraints.md — 최종 5개 제약 매트릭스
+- [discover] discover-journal.md — Round 2 기준, 제약 5개(C1-C5), 생존 후보 1개
 - [plan] plan-v1.md — 3-Step 계획 초안
 - [plan] plan-final.md — 사용자 승인 계획
 - [code] step-1.md — Repository 구현 완료, 빌드 성공
 - [code] progress.md — Step 1/3 완료
 ```
 
-### 예시 2: round 파일
+### 예시 2: discover-journal.md
 
 ```markdown
-# Round 2 — 사용자 피드백 반영
+# Discover Journal — 상태 관리 패턴 선택
 
-## 새로 발견된 제약
-- C6: iOS 16 호환 필요 (@Observable 사용 불가)
-- C7: weak var는 optional chaining 사용
-- C8: 기존 RIBs Router와 동일 패턴 유지
+## Current State (Round 3 기준)
 
-## 후보 평가
-| 접근법 | C6 | C7 | C8 | 채택 |
-|--------|----|----|-----|------|
-| ObservableObject | O | O | O | 채택 |
-| @Observable | X | O | O | 탈락 |
+### 제약 매트릭스
+| # | 제약 | 출처 | 확신도 |
+|---|------|------|--------|
+| C1 | RIBs Interactor가 비즈니스 로직 담당 | 아키텍처 원칙 | 높음 |
+| C2 | 기존 Combine 기반 (@Published + sink) | 코드 탐색 | 높음 |
+| C3 | 보일러플레이트 최소화 (caller 부담 적게) | 사용자 | 중간 |
+| C4 | iOS 16 호환 필요 (@Observable 사용 불가) | 사용자 | 높음 |
+| C5 | 기존 RIBs Router와 동일 패턴 유지 | 코드 탐색 | 높음 |
 
-## 결정
-ObservableObject + @StateObject 조합 채택.
+### 생존 후보
+| 후보 | 모든 제약 | 비고 |
+|------|----------|------|
+| D: ObservableObject + @StateObject | O | Combine 친화, iOS 16 호환 |
+
+### 탈락 후보 (사유)
+- A: @Observable 직접 사용 — C4 위반 (iOS 16 미지원)
+- B: Interactor→ViewModel 브릿지 — C3 위반 (브릿지 보일러플레이트 과다)
+- C: 직접 @State — C1 위반 (비즈니스 로직이 View에 노출)
+
+### 정제된 요구사항
+1. ObservableObject 프로토콜 채택 + @Published 프로퍼티
+2. View에서 @StateObject로 소유, init 파라미터로 주입
+3. Interactor는 Combine sink로 ViewModel 구독
+
+---
+
+## Round History
+
+### Round 1 — 초기 탐색
+- **새 제약**: C1(RIBs Interactor), C2(Combine 기반)
+- **핵심 추론**: find_symbol로 기존 ViewModel 5개 확인, 모두 @Published+Combine 패턴
+- **코드 참조**: `ContentDetailViewModel:14` — @Published var items
+
+### Round 2 — 사용자 피드백
+- **새 제약**: C3(보일러플레이트 최소화)
+- **핵심 추론**: 옵션 B의 브릿지 코드가 파일당 ~30줄 추가. 사용자 "너무 많다" 피드백
+- **사용자 우려**: "모든 화면마다 브릿지 코드를 넣어야 하나?"
+- **결정**: 옵션 B 탈락
+
+### Round 3 — iOS 호환성 확인
+- **새 제약**: C4(iOS 16), C5(Router 패턴)
+- **핵심 추론**: @Observable은 iOS 17+ 전용. 프로젝트 최소 타겟 iOS 16.
+- **결정**: 옵션 A 탈락 → 옵션 D(ObservableObject) 수렴
 ```
 
 ### 예시 3: compact recovery
 
 ```
 [Compact 감지] 대화 컨텍스트 손실됨.
-1. fz:session:current → work_dir: "{작업 폴더}/PRJ-1234"
+1. fz:session:current → work_dir: "{CWD}/PRJ-1234"
 2. PRJ-1234/index.md 읽기 → Active Phase: code, Step 1/3 완료
 3. code/progress.md 로드 → Step 1-2 완료 이력 + Step 3 진행 중
 4. plan/plan-final.md 로드 → 3-Step 계획 확인
@@ -157,44 +186,47 @@ ObservableObject + @StateObject 조합 채택.
 | 상황 | 대응 |
 |------|------|
 | 세션 전환 | `fz:session:current`에 `work_dir` 저장하여 다음 세션에서 복원 |
-| /fz 없이 직접 스킬 호출 | ⛔ 인자에 PRJ-xxx 패턴 있으면 즉시 PRJ 폴더 초기화 (아래 "PRJ Pre-flight" 참조). 패턴 없으면 비PRJ(Serena) 폴백 |
+| /fz 없이 직접 스킬 호출 | ⛔ Work Dir Resolution 실행: PRJ 패턴 → 자동 생성, 없으면 → 사용자 질문 |
 | 단일 티켓 제약 | 동시 작업은 1개 티켓만 허용 |
 | Compact 중 파일 쓰기 | Write 완료 후 index.md 업데이트 (atomic ordering) |
 | GC 누락 | /fz Completion에서 `list_memories → fz:artifact:*` 확인 → 있으면 삭제 |
-| 다중 세션 키 충돌 | `fz:session:current`는 단일 값만 유지. 이전 세션 work_dir가 덮어쓰기됨. 복원 필요 시 PRJ 폴더의 index.md를 직접 검색 (`Glob("{작업 폴더}/PRJ-*/index.md")`) |
+| 다중 세션 키 충돌 | `fz:session:current`는 단일 값만 유지. 이전 세션 work_dir가 덮어쓰기됨. 복원 필요 시 index.md를 직접 검색 (`Glob("**/PRJ-*/index.md")` 또는 `Glob("**/NOTASK-*/index.md")`) |
 
 ## 참조 스킬
 
 | 스킬 | 참조 이유 |
 |------|----------|
-| /fz | PRJ 폴더 초기화 + work_dir 저장 |
-| /fz-discover | round/constraints 기록 |
+| /fz | Work Dir Resolution + work_dir 저장 |
+| /fz-discover | discover-journal.md 누적 기록 |
 | /fz-plan | plan 버전 기록 |
 | /fz-code | step/progress 기록 |
 | /fz-review | self-review 기록 |
 | /fz-peer-review | review-index.md + checkpoint 기록 (synthesized-issues.json, confidence-matrix.md) |
 
-## ⛔ PRJ Pre-flight (모든 fz-* 스킬 필수)
+## ⛔ Work Dir Resolution (모든 fz-* 스킬 필수)
 
-> 반성 4차 교훈: /fz 오케스트레이터를 거치지 않고 직접 스킬을 호출해도 PRJ 폴더가 초기화되어야 한다.
+> 반성 4차 교훈 + 5차 교훈: 직접 호출 시에도 폴더가 초기화되어야 하며, 비PRJ에서도 파일 저장이 가능해야 한다.
 
 **모든 fz-* 스킬은 Phase 1 시작 전에 이 체크를 실행한다:**
 
 ```
 1. 인자에서 PRJ-\d+ 패턴 추출
-2. 패턴 있으면:
-   a. {작업 폴더}/PRJ-xxxx/ 폴더 존재 확인
+2. 패턴 있으면 → 무조건 자동 저장:
+   a. {CWD}/PRJ-xxxx/ 폴더 존재 확인
    b. 없으면 즉시 mkdir -p + index.md 생성
-   c. WORK_DIR = {작업 폴더}/PRJ-xxxx/
+   c. WORK_DIR = {CWD}/PRJ-xxxx/
 3. 패턴 없으면:
-   a. 브랜치명에서 PRJ-\d+ 추출 시도
-   b. 없으면 비PRJ 모드 (Serena Memory fallback)
+   a. 브랜치명에서 PRJ-\d+ 추출 시도 → 있으면 2번과 동일
+   b. 없으면 → AskUserQuestion: "이 작업의 산출물을 파일로 저장할까요?"
+      - 예 → {CWD}/NOTASK-{YYYYMMDD}/ 폴더 생성 + index.md + WORK_DIR 설정
+      - 아니오 → Serena Memory fallback (경량)
 ```
 
-**Gate 0 (PRJ Pre-flight):**
+**Gate 0 (Work Dir Resolution):**
 - [ ] 인자/브랜치에서 PRJ 패턴 체크 완료?
-- [ ] PRJ 패턴 있으면 폴더 + index.md 존재 확인?
-- [ ] WORK_DIR 결정됨? (PRJ 경로 또는 "비PRJ")
+- [ ] PRJ 패턴 있으면 폴더 자동 생성 완료?
+- [ ] 패턴 없으면 사용자에게 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (PRJ 경로 / NOTASK 경로 / Serena fallback)
 
 ## 사전 예방적 Context 관리
 
