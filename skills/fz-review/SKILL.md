@@ -75,13 +75,9 @@ model-strategy:
 
 | Phase | sc: 명령어 | 용도 |
 |-------|-----------|------|
-| Phase 5 | `/sc:analyze` | 코드 품질/보안/성능 분석 |
-| Phase 5 | `→ /fz-codex review` | Codex 코드 리뷰 (독립 스킬) |
-| Phase 5 | `/sc:spec-panel` | 스펙 부합 전문가 패널 리뷰 (새 모듈 변경 시) |
-| Phase 5.5 | `→ /fz-codex validate` | 역검증 (독립 스킬) |
-| Phase 6 | `/sc:improve` | 발견 이슈 기반 코드 개선 |
-| Phase 6 | `/sc:cleanup` | dead code, unused import 정리 (삭제 권고 이슈 시) |
-| Phase 6 | `/sc:reflect` | 수정 후 자체 검증 |
+| Phase 5 | `/sc:analyze`, `/fz-codex review`, `/sc:spec-panel` | 품질분석, Codex 리뷰, 스펙 패널 |
+| Phase 5.5 | `/fz-codex validate` | 역검증 |
+| Phase 6 | `/sc:improve`, `/sc:cleanup`, `/sc:reflect` | 개선, 정리, 자체검증 |
 | Phase 7 | `/sc:test` | 최종 테스트 검증 |
 
 ## 팀 에이전트 모드 (Review Squad)
@@ -119,32 +115,14 @@ Round 3: 합의 → Lead 보고
 
 ### MCP 제약 + Intent Context
 
-```
-MCP 제약: review-arch/review-quality는 serena, context7만 접근 가능.
-Atlassian/LSP 정보 필요 시 Lead가 조회 후 SendMessage로 전달.
-
-Intent Context 전달 (필수):
-에이전트에게 diff만 전달하지 마세요. 반드시 "변경 의도 요약"을 함께 전달합니다.
-
-포맷:
----
-[변경 의도]: {새 심볼}이 {기존 심볼}을 대체. {기존 심볼}의 사용처가 0이면 삭제 대상.
-[대체 대상]: {기존 심볼 이름}, {기존 파일}
----
-```
+- MCP 제약: review-arch/review-quality는 serena, context7만 접근. Atlassian/LSP → Lead가 조회 후 전달.
+- **Intent Context 전달 (필수)**: diff + `[변경 의도]: {새 심볼}이 {기존 심볼}을 대체` + `[대체 대상]: {기존 심볼, 파일}`
 
 ---
 
-### (선택) Pre-review /simplify
+### (선택) Pre-review /simplify → 사전 품질 정리 (참조: modules/execution-modes.md)
 
-- /simplify 사전 정리로 일반 품질 이슈 사전 해소 (참조: modules/execution-modes.md)
-
----
-
-### PRJ 컨텍스트 로딩 (PRJ 폴더 활성 시)
-
-- `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
-- `{WORK_DIR}/plan/plan-final.md` 읽기 → 계획 대비 검증
+### PRJ 컨텍스트 로딩 (PRJ 활성 시): `{WORK_DIR}/code/progress.md` + `plan/plan-final.md` 읽기
 
 ---
 
@@ -278,59 +256,23 @@ diff 기반 검증만으로는 **"변경되지 않았지만 삭제/수정되어�
 > **왜 필요한가**: 3중 리뷰가 모두 diff 기반이므로, "안 바뀐 dead code"는 전부 놓침.
 > 이 검증이 유일하게 diff **밖**을 보는 단계. 리팩토링 작업에서 특히 중요.
 
-### 검증 4-D: Constraint Matrix Compliance (제약 매트릭스 부합, 조건부)
-
-/fz-discover의 `constraint-matrix`가 있는 경우, 구현이 발견된 제약을 실제로 준수하는지 검증합니다.
+### 검증 4-D: Constraint Matrix Compliance (조건부: /fz-discover 산출물 있을 때)
 
 ```
-전제조건: 세션 내 /fz-discover 산출물(제약 매트릭스 + 결정 근거)이 존재
-
-절차:
-1. 제약 매트릭스에서 각 제약 추출
-2. diff에서 채택된 옵션의 구현이 각 제약을 만족하는지 확인
-   - mcp__serena__find_symbol → 구현체가 제약을 준수하는 구조인지
-   - Grep → 탈락된 옵션의 패턴이 코드에 없는지
-3. 위반 발견 시 → "constraint_violation" 카테고리로 이슈 생성
-
-체크리스트:
-- [ ] 채택된 옵션이 모든 제약을 만족하는 방식으로 구현되었는가?
-- [ ] 탈락된 옵션의 패턴이 코드에 남아있지 않은가?
-- [ ] 결정 근거에 명시된 트레이드오프가 의도대로 수용되었는가?
+1. 제약 매트릭스 → 각 제약 추출 → diff에서 구현 부합 확인 (find_symbol + Grep)
+2. 위반 → "constraint_violation" 이슈. 탈락 옵션 패턴 잔존 → 이슈
 ```
 
-> 이 검증은 /fz-discover → /fz-plan → /fz-code 파이프라인에서만 활성화.
-> /fz-discover 없이 직접 코딩한 경우에는 생략.
-
-### 검증 4-E: Module Boundary + Consumer Quality (접근 제어 + 소비자 품질 검증)
-
-모듈 경계에서의 access control이 설계 의도와 일치하는지, **그리고 소비자가 모듈을 올바르게 사용하는지** 검증합니다.
+### 검증 4-E: Module Boundary + Consumer Quality (모듈화 작업 시)
 
 ```
-절차:
-1. diff에서 변경된 심볼의 access modifier 확인
-   - public/open으로 노출된 심볼이 의도적인지 검증
-   - mcp__serena__find_symbol → access level 확인
-2. 변경 모듈의 public API surface 검사
-   - 내부 구현 세부사항이 public으로 노출되지 않았는지
-   - Grep(pattern="public (var|let|func)", path="변경 모듈")
-3. 모듈 간 의존 방향 확인
-   - 하위 모듈이 상위 모듈에 의존하지 않는지
-   - mcp__serena__find_referencing_symbols → 역방향 참조 탐지
-4. ⛔ 소비자 코드 품질 검증 (모듈화/캡슐화 작업 시 필수):
-   - Grep(pattern="import {모듈명}", path=앱 소스 루트) → 소비자 파일 전수 수집
-   - 각 소비자가 public API만 사용하는지 (internal 심볼 직접 접근 없는지)
-   - 소비자의 사용 패턴이 모듈 설계 의도와 일치하는지
-   - 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)에서의
-     모듈 초기화/호출이 올바른지
-   - 기존 앱 코드에 남아있는 모듈 이전 전 레거시 패턴이 정리되었는지
-
-체크리스트:
-- [ ] public API가 의도적으로 노출된 것인가? (internal이어야 할 심볼이 public이 아닌가?)
-- [ ] 모듈 내부 구현 세부사항(proxy, internal state 등)이 외부에 노출되지 않았는가?
-- [ ] 의존 방향이 아키텍처 규칙(상위→하위만)을 준수하는가?
-- [ ] ⛔ 소비자 코드가 모듈의 public API를 올바르게 사용하는가?
-- [ ] ⛔ 앱 진입점(AppDelegate/SceneDelegate/UIWindow)의 모듈 연동이 정상인가?
-- [ ] ⛔ 모듈화 이전의 레거시 코드(직접 참조, 중복 로직)가 앱에 남아있지 않은가?
+1. access modifier: public/open 노출이 의도적인지 (find_symbol)
+2. API surface: internal 세부사항이 public으로 노출되지 않았는지
+3. 의존 방향: 하위→상위 역방향 참조 없는지 (find_referencing_symbols)
+4. ⛔ 소비자 검증: Grep("import {모듈}") → 소비자 전수 수집
+   - public API만 사용하는지, 설계 의도와 일치하는지
+   - 앱 진입점(AppDelegate/SceneDelegate/UIWindow) 연동 정상인지
+   - 모듈화 이전 레거시 패턴 잔존 여부
 ```
 
 ### 검증 4-F: Anti-Pattern Enforcement (잔존 금지 패턴 검증)
@@ -476,19 +418,7 @@ Reflection Rate >= 80%?
 
 ### 사용자 에스컬레이션 (/ralph-loop 한도 후)
 
-```markdown
-반복 개선 한도 도달
-
-**현재 상태**:
-- 총 이슈: N개, 해결: X개, 미해결: Y개
-- 최종 Reflection Rate: ZZ%
-
-**선택지**:
-1. 미해결 이슈를 DEFERRED로 마킹하고 완료
-2. 추가 N회 반복 시도
-3. 수동 해결 후 재검증
-4. 작업 중단
-```
+반복 한도 도달 시: 현재 상태(총/해결/미해결/Rate) 보고 + 선택지 제시 (DEFERRED 마킹 / 추가 반복 / 수동 해결 / 중단)
 
 ### Gate 5: Final Quality
 - [ ] 모든 Critical 이슈 수정 완료?
@@ -501,43 +431,14 @@ Reflection Rate >= 80%?
 
 ## Phase 7: Completion (완료 처리)
 
-Gate 5 통과 후 작업을 최종 완료합니다.
+Gate 5 통과 후:
+1. **잔여 작업 확인**: sequential-thinking → 완료 체크리스트 (Gate 통과, 미해결 이슈, 범위 외 변경)
+2. **Final Issue Report 생성**: `modules/session.md` 참조
+3. **세션 저장**: `write_memory` (작업 요약 + 결정사항 + 변경 심볼)
+4. **아티팩트 기록** (PRJ 활성 시): `{WORK_DIR}/review/self-review.md` + `index.md` 업데이트
+5. **Git 연계** (사용자 확인 후): `/fz-commit` → `/fz-pr`
 
-### 절차
-
-1. **잔여 작업 확인**:
-   - `mcp__sequential-thinking__sequentialthinking` → 완료 체크리스트 단계별 검토 (Gate 통과 여부, 미해결 이슈, 범위 외 변경)
-
-2. **Final Issue Report 생성**: 참조 `modules/session.md` — Final Report 섹션
-
-3. **세션 결과 저장**:
-   - `mcp__serena__write_memory` → 작업 요약, 결정사항, 변경 심볼
-
-3.5. **아티팩트 기록** (PRJ 폴더 활성 시):
-   - `{WORK_DIR}/review/self-review.md` — 리뷰 결과 + 발견 이슈 + 권고사항
-   - `{WORK_DIR}/index.md`에 항목 추가
-
-4. **Git 연계** (사용자 확인 후):
-   - `/fz-commit` → 커밋 생성
-   - `/fz-pr` → PR 생성
-
-### 완료 보고 형식
-
-```markdown
-작업 완료
-
-**세션**: SESSION-YYYYMMDD_HHMMSS
-**총 이슈**: N개 발견 → X개 해결, Y개 보류
-**최종 Reflection Rate**: ZZ%
-**반복 횟수**: N회
-
-**변경 파일**:
-- file1.swift (심볼: A, B, C)
-
-**다음 단계**:
-- /fz-commit으로 커밋 생성
-- /fz-pr로 PR 생성
-```
+완료 보고: 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계
 
 ---
 
