@@ -266,25 +266,25 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - 새 제약이 계속 나옴 → 라운드 계속 (사용자가 plan 전환을 결정할 때까지)
 
 6. **⛔ 저널 갱신** (항상 — compact recovery 필수):
-   단일 `discover-journal.md`에 누적 기록한다. compact 후 이 파일 하나만 Read하면 전체 복원.
-   - PRJ 활성: `{WORK_DIR}/discover/discover-journal.md` 갱신 + `{WORK_DIR}/index.md` 업데이트
-     - **Current State 섹션** (파일 상단, ~2K tokens): 매 라운드 **상세하게** 덮어쓰기.
+   `discover-journal.md`를 매 라운드 **전체 덮어쓰기**한다. compact 후 이 파일 하나만 Read하면 전체 복원.
+   - PRJ 활성: `{WORK_DIR}/discover/discover-journal.md` 덮어쓰기 + `{WORK_DIR}/index.md` 업데이트
+     - 파일 전체를 매 라운드 갱신 (~2K tokens). **상세하게** 기록:
        제약 매트릭스(각 제약의 이유+출처), 생존 후보(왜 생존하는지), 탈락 후보(구체적 위반 사유),
        현재까지의 핵심 결정 흐름, 미결 질문. **요약이 아니라 컨텍스트 복원에 충분한 상세도 유지.**
-     - **Round History 섹션** (파일 하단): append — 해당 라운드의 새 제약, 핵심 추론, 사용자 우려, 코드 참조
+     - Round History는 유지하지 않음 — 탈락 후보 사유가 롤백 근거 역할.
    - 비PRJ: `write_memory("fz:checkpoint:discover-current", "제약 {N}개: {C1~CN}. 생존: {후보}. 핵심 추론: {요약}")` (매 라운드 덮어쓰기)
    형식 참조: `modules/context-artifacts.md` → "discover-journal 형식"
 
 ### discover-journal.md 형식
 
-> 한 파일에 Current State(상단, 상세) + Round History(하단, 경량). Compact recovery 시 Current State만 읽으면 전체 복원.
-> **원칙: Current State는 요약이 아니라 "이것만 읽으면 대화 없이도 판단할 수 있는" 수준의 상세도를 유지한다.**
+> 파일 전체를 매 라운드 덮어쓰기. Round History 없음 — 과거 이력은 Current State의 탈락 후보 사유에 흡수.
+> **원칙: "이것만 읽으면 대화 없이도 판단할 수 있는" 수준의 상세도를 유지한다.**
 
 ```markdown
 # Discover Journal — {문제 한 줄 요약}
 
 ## Current State (Round {N} 기준)
-<!-- 매 라운드 이 섹션만 덮어쓰기 -->
+<!-- 매 라운드 파일 전체 덮어쓰기 -->
 
 ### 제약 매트릭스
 | # | 제약 | 출처 | 확신도 |
@@ -304,21 +304,6 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 
 ### 현재 미결 질문
 {수렴에 필요한 정보를 얻기 위한 질문}
-
----
-
-## Round History
-
-### Round 1 — {라운드 주제}
-- **새 제약**: C3({설명}, 출처: 사용자), C4({설명}, 출처: 코드)
-- **핵심 추론**: {왜 이 제약이 중요한지, 어떤 후보가 탈락했는지}
-- **사용자 우려**: "{사용자 원문 핵심}"
-- **코드 참조**: `{파일:심볼}` — {발견 내용}
-
-### Round 2 — {라운드 주제}
-- **새 제약**: C5({설명})
-- **핵심 추론**: {추론 과정}
-- **결정**: {이 라운드에서 확정된 사항}
 ```
 
 ### 라운드 대화 출력 형식 (사용자에게 보여주는 형식)
