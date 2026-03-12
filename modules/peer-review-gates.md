@@ -1,7 +1,7 @@
 # Peer Review Verification Gates
 
-Synthesize 단계에서 실행하는 4가지 검증 게이트.
-4.5 → 4.6 → 4.7 → 4.8 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
+Synthesize 단계에서 실행하는 5가지 검증 게이트.
+4.5 → 4.6 → 4.7 → 4.7-A → 4.8 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
 
 ---
 
@@ -74,6 +74,47 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 ```
 
 Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드는지 확인. 아니라면 confidence ceiling 75.
+
+---
+
+## Gate 4.7-A: Deleted Logic Migration Check
+
+> **핵심 원칙**: "diff에서 코드 삭제 = 로직 누락"이라고 단정할 수 없다. 모듈화/리팩토링 PR에서는 로직이 다른 파일로 이동하는 것이 일반적이다. 삭제를 발견하면 "PR 전체에서 동일 로직이 다른 위치로 이동했는지"를 먼저 확인해야 한다.
+>
+> PR #3473 교훈: review-quality가 Interactor의 `guard getConnectState() != .open` 삭제를 "연결 상태 체크 누락 (minor regression)"으로 판정. 실제: guard가 `SendbirdTvingTalkChatUseCase.connect()` 내부로 이동한 것. diff는 파일 A의 `-guard`와 파일 B의 `+guard`를 별개 이벤트로 보여주므로 이동을 자동 연결하지 않는다.
+
+**감지 조건** (하나라도 해당하면):
+- origin이 `regression`이고 설명에 `삭제`, `누락`, `제거`, `없음`, `빠짐`, `removed`, `missing`, `deleted` 포함
+- "기존에 있던 X가 새 코드에 없다" 유형의 이슈
+- PR이 모듈화/리팩토링 목적 (레이어 간 코드 이동이 빈번한 컨텍스트)
+
+**처리 절차**:
+```
+1. INCLUDE 이슈 중 "삭제/누락" 키워드가 포함된 regression 이슈 식별
+2. 삭제된 로직의 핵심 패턴 추출 (함수명, guard 조건식, 핵심 키워드)
+3. PR 브랜치 전체에서 해당 패턴을 Grep 검색:
+   - `git show pr-{PR}:{FILE}` 로 변경 파일 직접 확인
+   - 또는 Grep으로 PR에서 변경된 파일 전체 스캔
+4. 결과 해석:
+   ├─ 동일/유사 로직이 다른 파일에 존재 → "relocated" 판정
+   │   → EXCLUDE (이슈 DROP) + confidence-matrix에 relocated: true 기록
+   ├─ 유사하지만 조건/범위가 다름 → confidence ceiling 70 + "[이동 확인 필요]" 태그
+   └─ 어디에도 없음 → INCLUDE 유지 (진짜 삭제)
+```
+
+**Few-shot 예시**:
+```swift
+// BAD: diff에서 삭제만 보고 즉단
+// Interactor diff: -guard SendbirdChat.getConnectState() != .open else { return }
+// → "연결 상태 체크 누락 (regression)" 판정
+// (UseCase에 이동한 것을 확인하지 않음)
+
+// GOOD: 삭제 발견 → PR 전체에서 핵심 패턴 검색
+// 1. 삭제된 패턴: "getConnectState() != .open"
+// 2. Grep 검색: git show pr-3473 전체에서 "getConnectState" 검색
+// 3. 발견: SendbirdTvingTalkChatUseCase.swift:57에 동일 guard
+// 4. 판정: relocated → 이슈 DROP
+```
 
 ---
 

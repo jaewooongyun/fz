@@ -66,7 +66,7 @@ model-strategy:
 |------|------|
 | `.claude/modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
 | `.claude/modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
-| `.claude/modules/peer-review-gates.md` | Synthesize 검증 게이트 4.5-4.8 전문 |
+| `.claude/modules/peer-review-gates.md` | Synthesize 검증 게이트 4.5-4.8 전문 (4.7-A Deleted Logic Migration 포함) |
 | `.claude/modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
@@ -186,73 +186,26 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degra
 ### Tier 2: Lite Team — 실행 시퀀스
 
 ```
-# 1. 팀 생성 (⛔ 필수)
-TeamCreate(team_name="peer-review-{PR_NUMBER}", description="PR #{PR_NUMBER} peer review")
-
-# 2. 태스크 생성
-TaskCreate(subject="Architecture review (관점 1,2)")   # → task-1
-TaskCreate(subject="Code quality review (관점 4-7)")    # → task-2
-
-# 3. 에이전트 스폰 (team_name ⛔ 필수!)
-Agent(
-  name="review-arch",
-  team_name="peer-review-{PR}",  # ⛔ 없으면 standalone 위반!
-  model="opus",
-  subagent_type="general-purpose",
-  prompt="[Task Brief] ..."
-)
-Agent(
-  name="review-quality",
-  team_name="peer-review-{PR}",  # ⛔ 필수
-  model="sonnet",
-  subagent_type="general-purpose",
-  prompt="[Task Brief] ..."
-)
-
-# 4. Codex challenger — 팀 외부, Lead가 Bash로 직접 실행
-Bash("codex exec ...")
-
-# 5. 에이전트 완료 대기 → Lead가 결과 합성 (Challenge 방법 A)
-# 6. shutdown_request → TeamDelete
+1. TeamCreate(team_name="peer-review-{PR}")               # ⛔ 필수
+2. TaskCreate × 2 (Architecture + Code quality)
+3. Agent(name="review-arch", team_name=..., model="opus")  # ⛔ team_name 필수
+   Agent(name="review-quality", team_name=..., model="sonnet")
+4. Bash("codex exec ...")                                  # Codex challenger
+5. 에이전트 완료 대기 → Lead 합성 → shutdown_request → TeamDelete
 ```
 
-Task Brief 내용 (각 에이전트):
-- review-arch: skills/arch-critic/SKILL.md + ${WORK_DIR}/diff.patch + symbols.json + requirements.md + base-behavior.md
-  - [Goal] diff 변경으로 인한 아키텍처 결정 및 확장성 이슈 독립 발굴
-  - [Constraints] 피어 결과 참조 금지 (Round 1 격리). max 10 issues. origin 분류 필수.
-  - [Deliverable] ${WORK_DIR}/arch-critic-result.json
-
-- review-quality: skills/code-auditor/SKILL.md + 동일 컨텍스트 파일
-  - [Goal] 코드 품질·API 사용·의존성 관련 이슈 독립 발굴
-  - [Constraints] 피어 결과 참조 금지 (Round 1 격리). max 10 issues. origin 분류 필수.
-  - [Deliverable] ${WORK_DIR}/code-auditor-result.json
+Task Brief (각 에이전트): skills/{arch-critic|code-auditor}/SKILL.md + ${WORK_DIR}/(diff.patch + symbols.json + requirements.md + base-behavior.md)
+- [Goal] 독립 이슈 발굴 | [Constraints] 피어 참조 금지, max 10, origin 필수
+- [Deliverable] ${WORK_DIR}/{arch-critic|code-auditor}-result.json
 
 ### Tier 3: Full Team (--deep) — 추가 시퀀스
 
-Tier 2 시퀀스 완료 후, 2.5-Turn Protocol 실행:
-
+Tier 2 완료 후 2.5-Turn Protocol:
 ```
-# Round 1 완료 (Tier 2 시퀀스)
-# 각 에이전트가 ${WORK_DIR}/*-result.json 저장 완료
-
-# Round 2: 교차 피드백 (SendMessage 필수!)
-# review-arch: Read code-auditor-result.json → SendMessage(review-quality, 피드백)
-# review-quality: Read arch-critic-result.json → SendMessage(review-arch, 피드백)
-
-# Round 0.5: 최종 보고
-# review-arch → SendMessage(Lead): 최종 이슈 + [합의/불합의 항목]
-# review-quality → SendMessage(Lead): 최종 이슈 + [합의/불합의 항목]
-
-# review-counter 스폰 (Challenge 단계)
-Agent(
-  name="review-counter",
-  team_name="peer-review-{PR}",  # ⛔ 필수
-  model="sonnet",
-  subagent_type="general-purpose",
-  prompt="3개 에이전트 결과 교차 반론. OK 판정 영역 집중."
-)
-
-# Codex DA → Lead 합성 → shutdown_request → TeamDelete
+Round 1: (Tier 2) 각 에이전트 독립 분석 → *-result.json 저장
+Round 2: 교차 피드백 (SendMessage 필수) — review-arch ↔ review-quality
+Round 0.5: 최종 보고 → Lead에 [합의/불합의 항목] 전달
+→ review-counter 스폰 (DA 패스) → Codex DA → Lead 합성 → TeamDelete
 ```
 
 ### Codex 호출 (Analyze)
@@ -280,31 +233,9 @@ codex exec \
 
 ### 에이전트 출력 스키마
 
-```json
-{
-  "agent": "review-arch | review-quality",
-  "agent_status": "ok | partial | failed",
-  "status_reason": "정상 | pre-cache 부분 실패 등",
-  "issues": [{
-    "id": "ARCH-001",
-    "perspective": "architecture | extensibility | ...",
-    "file": "SomeRouter.swift", "line_range": "45-60",
-    "severity": "critical | major | minor | suggestion",
-    "confidence": 85,
-    "origin": "regression | pre-existing | improvement",
-    "description": "문제 설명 (400자). WHY 포함: 기존 동작과의 차이 + 발생 조건 + 결과",
-    "impact": "실제 사용자/시스템 영향 (major 이상 필수, minor null)",
-    "suggestion": "수정 제안 (300자 이내)",
-    "evidence_trace": "// Step 1: file:line ...\n// Step 2: ... (major+ 필수, minor null)"
-  }],
-  "strengths": ["최대 3개"],
-  "overall_assessment": "excellent | good | needs_improvement | major_concerns"
-}
-```
+`{agent, agent_status, status_reason, issues[], strengths[], overall_assessment}` — 상세 필드는 arch-critic/code-auditor SKILL.md 참조.
 
-**Per-Agent 제약**: max 10 issues, description ≤400chars (WHY 필수), impact 필드 major+ 필수, suggestion ≤300chars, strengths ≤3, ~3K tokens.
-
-> **파싱 참고**: review-arch/review-quality 결과에는 `challenges` 키가 없음(Codex DA 전용). Orchestrator는 `challenges` 기본값 `[]`로 처리.
+**Per-Agent 제약**: max 10 issues, description ≤400chars (WHY 필수), impact major+ 필수, suggestion ≤300chars, strengths ≤3. `challenges` 키는 Codex DA 전용 (기본값 `[]`).
 
 ---
 
@@ -376,6 +307,13 @@ sequential-thinking으로 Confidence Matrix를 계산한다.
 기존 코드에 이미 있던 패턴을 PR의 결함으로 지적하지 않는다.
 개선 가능 여지는 suggestion으로 언급하되, 수정을 강제하지 않는다.
 
+```
+BAD: Interactor에서 guard 삭제 → "연결 상태 체크 누락 (regression)" 즉단
+     (UseCase에 동일 guard 이동을 확인하지 않음)
+GOOD: Interactor guard 삭제 발견 → PR diff 전체 Grep("getConnectState")
+     → UseCase.connect()에 동일 guard 이동 확인 → origin: relocated → 이슈 DROP
+```
+
 ### 2.5. PR Intent Alignment Check
 
 PR title/body/requirements.md의 핵심 의도를 각 regression 이슈와 교차 확인한다. PR이 "기능 제거/전환"을 명시한 경우, 해당 기능의 부수효과(이벤트, 상태 초기화 등) 제거는 의도적일 수 있다.
@@ -407,7 +345,7 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 
 ### 4.5-4.8. Verification Gates
 
-> 참조: `modules/peer-review-gates.md` — Line Verification (4.5) + Compiler-Verifiable (4.6) + Behavior-Verifiable (4.7) + RxSwift Error Path (4.8) 게이트 전문
+> 참조: `modules/peer-review-gates.md` — Line Verification (4.5) + Compiler-Verifiable (4.6) + Behavior-Verifiable (4.7) + Deleted Logic Migration (4.7-A) + RxSwift Error Path (4.8) 게이트 전문
 >
 > 게이트 실행 전: `synthesized-issues-partial.json` 중간 저장 필수 (compact 방지)
 

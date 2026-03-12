@@ -228,6 +228,20 @@ class SomeInteractor {
 - [ ] deprecated init/메서드 미호출? → 삭제 대상
 - [ ] 삭제 대상의 의존 코드도 정리되었는가?
 
+### 삭제 vs 이동 판별 원칙
+
+diff에서 코드 삭제를 발견하면 "누락"이라고 바로 판정하지 않는다. 모듈화/리팩토링 PR에서 레이어 간 로직 이동(Interactor→UseCase, ViewController→View 등)은 정상적인 패턴이다. "삭제됨" 판정 전에 PR 코드 전체에서 동일 로직이 다른 위치에 존재하는지 확인한다.
+
+```swift
+// BAD: diff에서 삭제만 보고 판정
+// Interactor에서 `guard getConnectState() != .open` 삭제됨
+// → "연결 체크 누락 (regression)" 즉단  ← 이동 확인 없이
+
+// GOOD: 삭제 발견 → PR diff 전체에서 핵심 패턴 검색
+// Interactor에서 guard 삭제 → "getConnectState" Grep 검색
+// → UseCase.connect() 내부에 동일 guard 이동 확인 → 이슈 대상 아님
+```
+
 ### Dependency Impact(관점 6)와의 경계
 
 - **관점 6**: 변경이 다른 모듈에 미치는 "구조적 영향" (파급 범위)
