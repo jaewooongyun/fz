@@ -617,6 +617,30 @@ Claude Code + Serena MCP + Context7 MCP + Codex CLI + SuperClaude
 
 ---
 
+## Changelog
+
+### v2.2 (2026-03-12) — Agent Teams + Context Budget + Peer Review Gate
+
+**Agent Teams Frontmatter 적용 (Phase 1-4)**
+- `memory: project|user` — 5개 에이전트에 세션 간 영속 학습 적용 (review-arch, impl-correctness, plan-structure, review-quality, memory-curator)
+- `skills: [name]` — review-arch(arch-critic), review-quality(code-auditor)에 스킬 사전 주입
+- `isolation: worktree` — impl-correctness에 코드 수정 격리
+- `TaskCompleted` hook — 에이전트 완료 시 산출물 존재 검증 (settings.json 팀 레벨)
+- team-registry.md 모델 컬럼을 `default`/`promoted`로 분리 (거버넌스 명확화)
+- agent-team-guide.md §8 전체 문서화
+
+**Context Budget 관리**
+- prompt-optimization.md §2.5 — MCP 출력 격리, 도구 정의 최소화, 서브에이전트 효율
+- 트리밍 비저하 원칙 — Gate/Few-shot/Step 삭제 금지 (prompt-optimization.md + skill-authoring.md)
+- context-artifacts.md — 사전 예방적 Context 관리 섹션 추가
+
+**Peer Review Deleted Logic Migration Gate**
+- Gate 4.7-A — 모듈화/리팩토링 PR에서 "삭제 = 누락" 오탐 방지
+- arch-critic, code-auditor, review-quality에 "삭제 vs 이동 판별" 원칙 추가
+- fz-peer-review, fz-review 토큰 최적화 (-230줄, 정보 보존)
+
+---
+
 ## Guides (5개)
 
 스킬/에이전트 작성과 운영을 위한 실전 가이드.
