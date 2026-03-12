@@ -108,9 +108,10 @@ model-strategy:
    - 없고 탐색 파이프라인이면 → `/sc:index-repo` 실행 제안
    - 조건: explore, explore-plan, bug-hunt 파이프라인에서만
 
-3. **ASD 폴더 초기화** (4+ 스텝 파이프라인에서):
+3. **Work Dir 초기화** (4+ 스텝 파이프라인에서):
    - Ticket ID 해석 (참조: `modules/context-artifacts.md`)
-   - `TVING/ASD-xxxx/` 폴더 + index.md 생성
+   - ASD 패턴 → `{CWD}/ASD-xxxx/` 자동 생성
+   - 패턴 없음 → AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
    - `fz:session:current`에 `work_dir` 경로 저장
 
 4. **교훈 사전 로드** (선택):

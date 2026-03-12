@@ -195,19 +195,17 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
 
 ## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
 
-> 반성 교훈: /fz 없이 직접 호출 시 ASD 폴더가 초기화되지 않아 아티팩트가 전부 누락됨.
-> 참조: `modules/context-artifacts.md` → "ASD Pre-flight" 섹션
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
 
 **Phase 1 시작 전에 반드시 실행:**
 
 1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면: `TVING/ASD-xxxx/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
-3. 패턴 없으면: 비ASD 모드 (Serena Memory fallback)
+2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 자동 생성 + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
 
-### Gate 0: ASD Ready
-- [ ] ⛔ 인자에서 ASD 패턴 체크 완료?
-- [ ] ⛔ ASD 패턴 있으면 폴더 + index.md 존재 확인?
-- [ ] WORK_DIR 결정됨?
+### Gate 0: Work Dir Ready
+- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
 
 ---
 
