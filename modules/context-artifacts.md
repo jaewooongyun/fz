@@ -93,7 +93,7 @@ Both:     ASD 파일 + Serena Memory 동시 저장 (이중 안전망)
 
 | 파일 유형 | 최대 크기 | 비고 |
 |----------|----------|------|
-| discover-journal | 5K tokens | Current State(~2K, **상세** — 요약 아님) + Round History(~3K 누적) |
+| discover-journal | 2K tokens | 매 라운드 전체 덮어쓰기 (**상세** — 요약 아님). Round History 없음 |
 | plan | 3K tokens | |
 | step | 1.5K tokens | |
 
@@ -148,26 +148,6 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 1. ObservableObject 프로토콜 채택 + @Published 프로퍼티
 2. View에서 @StateObject로 소유, init 파라미터로 주입
 3. Interactor는 Combine sink로 ViewModel 구독
-
----
-
-## Round History
-
-### Round 1 — 초기 탐색
-- **새 제약**: C1(RIBs Interactor), C2(Combine 기반)
-- **핵심 추론**: find_symbol로 기존 ViewModel 5개 확인, 모두 @Published+Combine 패턴
-- **코드 참조**: `ContentDetailViewModel:14` — @Published var items
-
-### Round 2 — 사용자 피드백
-- **새 제약**: C3(보일러플레이트 최소화)
-- **핵심 추론**: 옵션 B의 브릿지 코드가 파일당 ~30줄 추가. 사용자 "너무 많다" 피드백
-- **사용자 우려**: "모든 화면마다 브릿지 코드를 넣어야 하나?"
-- **결정**: 옵션 B 탈락
-
-### Round 3 — iOS 호환성 확인
-- **새 제약**: C4(iOS 16), C5(Router 패턴)
-- **핵심 추론**: @Observable은 iOS 17+ 전용. 프로젝트 최소 타겟 iOS 16.
-- **결정**: 옵션 A 탈락 → 옵션 D(ObservableObject) 수렴
 ```
 
 ### 예시 3: compact recovery
