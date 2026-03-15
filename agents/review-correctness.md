@@ -59,3 +59,8 @@ Verifies that the implementation matches the stated requirements and plan.
 - 팀 내 피어에게 발견 즉시 공유 (정확성 이슈가 다른 Lens와 연결된 경우)
 - 피어로부터 피드백을 수신하면 재검토 후 agree / maintain으로 응답
 - 전체 합의 후 Lead(오케스트레이터)에게 통합 보고
+
+## Escalation to Lead
+- 요구사항과 구현 간 불일치가 의도적인지 판단 불가 시
+- 판단 confidence < 60% 시
+- Boundaries 밖 이슈 발견 시

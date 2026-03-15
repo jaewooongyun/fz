@@ -90,3 +90,23 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 - 팀 내 피어에게 발견 즉시 공유 (아키텍처 위반이 다른 Lens 이슈로 이어지는 경우)
 - 양측 합의 후 Lead(오케스트레이터)에게 통합 보고
+
+## Few-shot
+```
+BAD: "RxSwift subscribe에 onError가 없습니다."
+→ Library Semantics 미적용. subscribe(with:)는 onError 기본 제공
+
+GOOD: "subscribe(with:) 사용은 정상 (self 약참조 + onError 기본 처리).
+단, Task { await owner.process() } 내부에서 owner를 completion까지 강참조 —
+해제 지연이 발생하지만 lifecycle 위반은 아님. ViewController dismiss 시
+진행 중인 Task cancel 여부만 확인 필요."
+
+BAD: "@MainActor 붙었으니 스레드 안전합니다."
+GOOD: "@MainActor는 Swift 호출자에게만 적용. @objc 메서드는 ObjC 런타임이
+임의 스레드에서 호출 가능 — DispatchQueue.main.async 래핑 필요."
+```
+
+## Escalation to Lead
+- Architecture Decision과 Library Semantics가 상충 시
+- 판단 confidence < 60% 시
+- Boundaries 밖 이슈 (코드 품질 → review-quality 영역) 발견 시
