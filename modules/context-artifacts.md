@@ -12,20 +12,49 @@
 
 ```
 {CWD}/ASD-xxxx/          # 또는 {CWD}/NOTASK-{YYYYMMDD}/
-├── index.md              # Compact recovery 엔트리 포인트 (append-only)
+├── index.md              # Compact recovery 엔트리 포인트 (Essential Context=덮어쓰기, Artifacts=append)
 ├── discover/
-│   └── discover-journal.md  # 누적형 저널 (Current State 상단 + Round History 하단)
+│   ├── discover-journal.md  # plan 전 discover (canonical)
+│   ├── discover-plan.md     # plan 실행 중 ad-hoc (Phase-Tagged)
+│   ├── discover-code.md     # code 실행 중 ad-hoc (Phase-Tagged)
+│   ├── discover-review.md   # review 실행 중 ad-hoc (Phase-Tagged)
+│   └── discover-team.md     # TEAM 모드 adversarial discovery 통신 기록
 ├── plan/
 │   ├── plan-v1.md ~ plan-vN.md
-│   └── plan-final.md
+│   ├── plan-final.md
+│   ├── direction-challenge.md  # Phase 0.5 방향성 도전 결과 (PROCEED/RECONSIDER/REDIRECT)
+│   ├── plan-team.md            # TEAM 모드 collaborative design 통신 기록
+│   └── verify-result.md        # Phase 2 검증 verdict + 이슈 요약
 ├── code/
 │   ├── step-1.md ~ step-N.md
-│   └── progress.md       # 전체 진행 상태 (누적형 — 이전 Step 핵심 결정 한 줄씩 유지)
+│   ├── progress.md       # 전체 진행 상태 (누적형 — 이전 Step 핵심 결정 한 줄씩 유지)
+│   └── code-team.md      # TEAM 모드 pair programming 통신 기록
+├── fix/
+│   └── fix-analysis.md   # fz-fix 원인 분석 + 수정 기록
+├── search/
+│   └── search-result.md  # fz-search 탐색 결과
 └── review/
-    └── self-review.md
+    ├── self-review.md     # fz-review 자기 리뷰 결과
+    └── review-team.md     # TEAM 모드 live review 핵심 통신 기록
 ```
 
-> `{CWD}` = 현재 작업 디렉토리. 어디서 실행하든 해당 위치에 저장.
+### Standalone Work Dir (peer-review)
+
+fz-peer-review는 ASD 폴더와 별도 WORK_DIR을 사용:
+
+```
+{PROJECT_ROOT}/peer-review-{PR_NUMBER}/
+├── review-index.md
+├── synthesized-issues.json
+├── confidence-matrix.md
+├── review-report.md
+├── pr-comments.md
+└── {agent}-result.json        # raw 에이전트 결과 (arch, quality, codex)
+```
+
+> ASD 트리 내 중첩하지 않는 이유: peer-review는 PR 단위로 독립 실행되며, ASD 티켓 작업과 무관할 수 있다.
+
+> `{CWD}` = PROJECT_ROOT (CLAUDE.md가 위치한 디렉토리). GIT_ROOT(app-iOS/)와 다를 수 있음. 개인 산출물은 PROJECT_ROOT에만 생성.
 
 ## Work Dir 결정
 
@@ -33,32 +62,135 @@
 
 ## index.md 프로토콜
 
-index.md는 append-only로 관리한다. Active Phase 갱신 시 기존 Phase 아티팩트를 유지한다.
+index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `## Artifacts`(append-only).
 
 ```markdown
 # ASD-xxxx Context Index
 
-## Active Phase: discover
+## Active Phase: code
 
-## Artifacts
-- [discover] discover-journal.md — Round 3 기준, 제약 8개(C1-C8), 생존 후보 2개
+## Essential Context (매 Phase 완료 시 /fz가 덮어쓰기)
+- Mode: TEAM
+- Key Decisions:
+  - [plan] ObservableObject 채택 (iOS 16 호환)
+  - [code] Step 1/3 완료, Repository 구현
+- Constraints: C1(RIBs), C2(Combine), C4(iOS 16)
+- Pending: Step 2 ViewModel 구현
+
+## Artifacts (append-only — 기존 Phase 엔트리 유지)
+- [discover] discover-journal.md — Round 2 기준
+- [discover-code] discover-code.md — code 중 ad-hoc (Phase-Tagged)
+- [plan] plan-final.md — 사용자 승인
+- [code] step-1.md — Repository 완료
 ```
+
+> **핵심**: `## Essential Context`는 /fz가 단독 관리하는 **덮어쓰기** 섹션. 서브스킬은 Essential 항목을 반환하고 /fz가 기록한다.
 
 ## Compact Recovery Protocol
 
+0. `fz:checkpoint:essential` 읽기 → Essential Context (Key Decisions, Constraints, Active Phase) 즉시 복원
 1. `fz:session:current`에서 `work_dir` 읽기
-2. `{WORK_DIR}/index.md` 읽기
+2. `{WORK_DIR}/index.md` 읽기 → `## Essential Context` 섹션으로 상세 복원
 3. Active Phase의 최신 아티팩트 로드
 4. 상위 Phase 핵심 산출물 로드 (discover→discover-journal.md Current State, plan→plan-final.md)
 5. 컨텍스트 복원 완료 알림
+
+## Proactive Context Protocol
+
+> 기존: Write(저장)만 하고 Read(로드) 없음 → compact 후 복원 불가
+> 개선: Write + Read. /fz가 중앙에서 Essential Context를 관리
+
+```
+[기존] Phase A → Write(artifact) → (compact?) → Phase B → (복원 시도)
+[개선] Phase A → Write(artifact) → /fz가 Essential Context 업데이트 → Phase B → /fz가 Read → 서브스킬 실행
+```
+
+### Essential vs Disposable
+
+| Essential (보존) | Disposable (자연 소멸 OK) |
+|-----------------|-------------------------|
+| 사용자 결정/승인 | 탐색 중간 결과 |
+| 제약 조건 | raw MCP 출력 |
+| 아키텍처 선택 근거 | 에이전트 간 토론 과정 |
+| Gate 통과/실패 이력 | 코드 diff 상세 |
+| Active Phase + Step 진행률 | 빌드 로그 |
+| mid-pipeline discover 결정 | /btw로 물어본 일회성 질문 |
+
+```
+Essential: "[plan] Step 3개 계획 확정. RIBs 패턴. ContentDetail{Builder,Router,Interactor,VC}."
+Disposable: "Grep 결과 42개 파일 매칭. find_referencing_symbols 호출 3회."
+```
+
+## Upstream Hydration Sets
+
+> Codex M5: 스킬별 Phase 0에서 Read해야 하는 파일 목록 표준화. Artifact drift 방지.
+
+| 스킬 | Upstream (Read 대상) |
+|------|---------------------|
+| discover | (없음 — 첫 진입점) |
+| discover (mid-pipeline) | `index.md` → Active Phase 판별 |
+| plan | `discover/discover-journal.md` (있으면), `discover/discover-plan.md` (있으면) |
+| code | `plan/plan-final.md`, `discover/discover-journal.md`, `discover/discover-code.md` (있으면), `code/progress.md`, 최신 `code/step-N.md` |
+| review | `plan/plan-final.md`, `code/progress.md`, 최신 `code/step-N.md`, `discover/discover-review.md` (있으면) |
+| fix | `fix/fix-analysis.md` (있으면), `search/` 결과 (있으면) |
+| search | (없음 — 독립 탐색) |
+
+> ⛔ `constraints.md` 참조 금지 — canonical은 `discover-journal.md`
+
+## Phase-Tagged Discover
+
+> mid-pipeline 질문 context 보존. 어느 Phase에서 발생한 질문인지 추적.
+
+### 프로토콜
+
+```
+1. /fz-discover 호출 시:
+   a. index.md 존재 확인 → 없으면 기본 모드 (discover-journal.md)
+   b. 있으면 → Active Phase 읽기
+   c. Active Phase가 discover 또는 없음 → discover-journal.md (기본)
+   d. Active Phase가 plan/code/review → discover-{phase}.md에 저장
+   e. index.md Artifacts에 [discover-{phase}] 엔트리 추가
+
+2. Upstream 스킬이 자기 discover 파일을 Read:
+   - /fz-plan → discover-plan.md (있으면)
+   - /fz-code → discover-code.md (있으면)
+   - /fz-review → discover-review.md (있으면)
+
+3. 비ASD 모드:
+   - fz:checkpoint:discover-{phase} 키로 Serena Memory에 저장
+```
+
+### 동일 Phase 내 다중 Discover 규칙
+
+```
+discover-journal.md (DISCOVER_TAG=journal): 전체 덮어쓰기 (매 라운드)
+discover-{phase}.md (DISCOVER_TAG=plan|code|review): APPEND + topic header
+- topic header로 분리: ## Topic: {질문 요약} (YYYY-MM-DD HH:MM)
+- 파일 크기 1K tokens 초과 시 → 이전 topic 요약 압축 (최신 topic 상세 유지)
+```
+
+## Ephemeral vs Persistent (/btw 통합)
+
+> Anthropic: "/btw — dismissible overlay, never enters conversation history"
+
+| 질문 유형 | 도구 | 저장 | 예시 |
+|----------|------|------|------|
+| 일회성 지식 질문 | `/btw` | ❌ | "CurrentValueSubject와 @Published 차이?" |
+| 결정/제약 발견 | `/fz-discover` | ✅ | "이 패턴을 쓸지 말지 결정해야 해" |
+| 중간 확인 | `/fz-discover` | ✅ | "지금 구현 방향이 맞나 확인" |
+
+**판별 규칙**: 답변이 향후 Phase에 영향을 미치면 persistent (/fz-discover), 아니면 ephemeral (/btw).
 
 ## Serena Memory와의 관계
 
 | 파이프라인 길이 | 전략 | 이유 |
 |---------------|------|------|
-| 1-3 스텝 | 대화 컨텍스트 | compact 전에 완료 가능 |
-| 4+ 스텝 + ASD 폴더 | 파일 기반 (이 모듈) | compact 후 Read로 복원 |
-| 4+ 스텝 - ASD 폴더 | Serena Memory (`modules/memory-policy.md`) | 기존 호환 |
+| 1-3 스텝 | Serena `fz:checkpoint:essential` (3K) | compact 대비 경량 보호 |
+| 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 ASD | compact 위험 낮음. context-heavy 스킬 포함 시 ASD 권장 |
+| 6+ 스텝 또는 context-heavy | ASD 파일 기반 (이 모듈) | compact 후 Read로 복원 <!-- 기존: 4+ 스텝 --> |
+| 10+ 스텝 | ASD 필수 + compact 주의 안내 | 장기 파이프라인 |
+
+> **context-heavy 스킬**: discover, search --deep, peer-review (대량 context 생산)
 
 ## 비ASD 모드 (Serena Memory Fallback)
 
@@ -89,17 +221,31 @@ Both:     ASD 파일 + Serena Memory 동시 저장 (이중 안전망)
 4. 복원 완료 알림 → 중단 지점부터 재개
 ```
 
-## 파일 크기 제한
+## Artifact Token Budget
+
+> 현재 환경: Opus 4.6 (1M context). 모델/context 변경 시 이 테이블 재검토.
+> 원칙: 전체 artifact 로드 합계 ≤ 100K tokens. 나머지는 실행 working memory.
+> Context Rot 원칙(집중 > 분산)은 context 크기와 무관하게 동일 적용.
 
 | 파일 유형 | 최대 크기 | 비고 |
 |----------|----------|------|
-| discover-journal | 2K tokens | 매 라운드 전체 덮어쓰기 (**상세** — 요약 아님). Round History 없음 |
-| plan | 3K tokens | |
-| step | 1.5K tokens | |
+| Essential Context (index.md) | 3K tokens | Key Decisions + Constraints + Active State <!-- 기존: 500자 --> |
+| discover-journal | 10K tokens | 매 라운드 전체 덮어쓰기 (**상세**). Round History 없음 <!-- 기존: 2K --> |
+| discover-{phase} | 5K tokens | Phase별 APPEND + topic header <!-- 기존: 1K --> |
+| plan-v{N} / plan-final | 10K tokens | 설계 결정 + 영향 분석 + 리스크 <!-- 기존: 3K --> |
+| code/step-{N} | 3K tokens | 구현 결과 + 결정 근거 <!-- 기존: 1.5K --> |
+| code/progress | 5K tokens | 전체 Step 진행 상황 <!-- 기존: 1.5K --> |
+| *-team.md | 5K tokens | 요약 기본. 원본은 *-team-full.md (drill-down용, Hydration 대상 아님) |
+| verify-result.md | 3K tokens | Codex 요약 (원본: verify-result-full.md) |
+
+**Eviction 우선순위** (budget 100K 초과 시):
+1. 가장 오래된 discover-{phase}.md (journal은 보존)
+2. 완료된 step-{N}.md (progress.md 요약으로 대체)
+3. *-team.md (요약만 보존)
 
 ## TEAM 로깅
 
-ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요약을 기록한다.
+ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요약 (5K). 원본 전문은 `*-team-full.md`에 별도 보존 (drill-down용).
 
 ## Few-shot 예시
 
@@ -118,7 +264,7 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 - [code] progress.md — Step 1/3 완료
 ```
 
-### 예시 2: discover-journal.md
+### 예시 2: discover-journal.md (discover-journal 형식)
 
 ```markdown
 # Discover Journal — 상태 관리 패턴 선택
@@ -150,6 +296,14 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 3. Interactor는 Combine sink로 ViewModel 구독
 ```
 
+### 최종 산출물 확장 (Phase 3 수렴 시)
+
+기본 discover-journal 형식에 아래 섹션을 추가:
+- `### 채택된 해` — 최종 선택 + 한 줄 설명
+- `### 수용한 트레이드오프` — 있다면
+- `### 정제된 요구사항` — 구현 가능한 구체적 항목 목록
+- `### 결정 근거` — 채택 이유 + 코드 참조
+
 ### 예시 3: compact recovery
 
 ```
@@ -171,6 +325,7 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 | Compact 중 파일 쓰기 | Write 완료 후 index.md 업데이트 (atomic ordering) |
 | GC 누락 | /fz Completion에서 `list_memories → fz:artifact:*` 확인 → 있으면 삭제 |
 | 다중 세션 키 충돌 | `fz:session:current`는 단일 값만 유지. 이전 세션 work_dir가 덮어쓰기됨. 복원 필요 시 index.md를 직접 검색 (`Glob("**/ASD-*/index.md")` 또는 `Glob("**/NOTASK-*/index.md")`) |
+| Orphan checkpoint | Session Bootstrap 시 `fz:checkpoint:essential` 존재 확인 → 이전 중단 세션 감지 → 복원/삭제 선택 제안 |
 
 ## 참조 스킬
 
@@ -181,7 +336,7 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 | /fz-plan | plan 버전 기록 |
 | /fz-code | step/progress 기록 |
 | /fz-review | self-review 기록 |
-| /fz-peer-review | review-index.md + checkpoint 기록 (synthesized-issues.json, confidence-matrix.md) |
+| /fz-peer-review | review-index.md + 파일 산출물 (synthesized-issues.json, confidence-matrix.md, pr-comments.md) — Serena checkpoint 미사용 |
 
 ## ⛔ Work Dir Resolution (모든 fz-* 스킬 필수)
 
@@ -215,6 +370,24 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 ### 원칙: Context 여유 = 실행 품질
 
 auto-compact는 맥락 손실을 수반한다. compact 발동을 최대한 늦추면 실행 품질이 유지된다.
+
+### Filesystem Discovery > Compaction (Anthropic 공식)
+
+> "Claude is effective at discovering state from filesystem. Sometimes better than relying on compacted context."
+> — Anthropic Claude Code Best Practices (2026)
+
+compact 후 복원은 context summary보다 **파일 Read가 더 정확**하다. 따라서:
+- L3(파일)가 canonical, L2(Serena)는 cursor(위치 표시)
+- compact 발생 시: L2 읽기 → L3 파일 경로 파악 → L3 Read로 상세 복원
+
+### Context Decay 방어 (4유형 — 프로젝트 자체 분류)
+
+| 유형 | 설명 | 방어 |
+|------|------|------|
+| Poisoning | 잘못된 정보가 context에 잔류 | 결정 변경 시 Essential Context 즉시 덮어쓰기 |
+| Distraction | 불필요한 정보가 주의 분산 | MCP 출력 격리, Disposable 정보 미축적 |
+| Confusion | 상충하는 정보 공존 | Essential Context가 single source of truth |
+| Clash | 지시 간 충돌 | /fz 중앙 관리로 일관성 유지 |
 
 ### 적용 규칙
 
