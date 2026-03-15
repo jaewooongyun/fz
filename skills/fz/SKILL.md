@@ -108,21 +108,35 @@ model-strategy:
    - 없고 탐색 파이프라인이면 → `/sc:index-repo` 실행 제안
    - 조건: explore, explore-plan, bug-hunt 파이프라인에서만
 
-3. **Work Dir 초기화** (4+ 스텝 파이프라인에서):
+3. **Work Dir 초기화** (6+ 스텝 또는 context-heavy 스킬 포함 시):
    - Ticket ID 해석 (참조: `modules/context-artifacts.md`)
    - PRJ 패턴 → `{CWD}/PRJ-xxxx/` 자동 생성
    - 패턴 없음 → AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
    - `fz:session:current`에 `work_dir` 경로 저장
+   - context-heavy 스킬: discover, search --deep, peer-review <!-- 기존: 4+ 스텝 -->
+
+3b. **이전 중단 세션 감지**:
+   - `read_memory("fz:checkpoint:essential")` 확인
+   - 존재 시: "이전 중단된 세션이 있습니다. 복원하시겠습니까?" AskUserQuestion
+     - 예 → PRJ 폴더의 `index.md` Read → Active Phase + Essential Context 복원 ("Starting fresh + filesystem discovery" 패턴)
+     - 아니오 → `delete_memory("fz:checkpoint:essential")` 후 새 세션 시작
+   - **essential 미존재 시 폴백**: `list_memories("fz:checkpoint:*")` → phase checkpoint 존재 여부 확인
+     - 존재 시: 최신 checkpoint 키를 시간순 정렬 → 마지막 키 read → 해당 phase부터 복원 제안
+     - 미존재 시: 완전 새 세션 (복원 대상 없음)
 
 4. **교훈 사전 로드** (선택):
    - SOLO: Lead가 직접 topic file 스캔 (`modules/memory-guide.md` 태깅 기반)
    - TEAM: memory-curator 에이전트 포함 여부 결정 (복잡도 기반)
    - 조건: plan/code/review 파이프라인에서만
 
+5. **핵심 모듈 선로드** (6+ 스텝 또는 TEAM):
+   - `Read(modules/context-artifacts.md)` — Artifact Budget Table + 산출물 프로토콜
+   - `Read(modules/memory-policy.md)` — 메모리 키 네이밍
 ### Gate 0: Session Ready
 - [ ] 새 세션이면 이전 컨텍스트 복원 시도?
 - [ ] 탐색 파이프라인이면 인덱스 확인?
-- [ ] 4+ 스텝이면 PRJ 폴더 초기화?
+- [ ] 6+ 스텝 또는 context-heavy이면 PRJ 폴더 초기화?
+- [ ] 6+ 스텝 또는 TEAM이면 핵심 모듈 선로드?
 
 > **토큰 비용**: ~3,000-5,000 (세션당 1회). 개별 스킬마다 실행하지 않음.
 
@@ -385,9 +399,17 @@ Lead는 퍼실리테이터 (모니터링 + 교착 해소 + 게이트 실행).
 
 | 파이프라인 길이 | 전략 | 이유 |
 |---------------|------|------|
-| 1-3 스텝 | 대화 컨텍스트 | compact 전에 완료 가능 |
-| 4+ 스텝 + PRJ 폴더 | 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
-| 4+ 스텝 - PRJ 폴더 | Serena Memory (`modules/memory-policy.md`) | 기존 호환 |
+| 1-3 스텝 | Serena `fz:checkpoint:essential` (3K) | compact 대비 경량 보호 |
+| 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 PRJ | compact 위험 낮음 |
+| 6+ 스텝 또는 context-heavy | PRJ 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
+| 10+ 스텝 | PRJ 필수 + compact 주의 안내 | 장기 파이프라인 |
+
+### Essential Context 업데이트 (각 스킬 실행 후)
+
+각 스킬 완료 후 /fz가 중앙 관리:
+- **PRJ 활성**: `index.md`의 `## Essential Context` 섹션 **덮어쓰기** (Active Phase + Key Decisions + Constraints + Pending)
+- **비PRJ / 1-5 스텝**: `write_memory("fz:checkpoint:essential", "[{skill}] {핵심결정}. Constraints: {C목록}. Pending: {다음}.")` (~3,000자) <!-- 기존: ~500자 -->
+- **mid-pipeline /fz-discover 호출 시**: index.md Active Phase를 discover에 전달 → Phase-Tagged 저장 지원
 
 ### 단계 완료 보고 (각 단계)
 
@@ -449,7 +471,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 | Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | SOLO 폴백 |
 | 팀 에이전트 스폰 실패 | SOLO 폴백 | 사용자 에스컬레이션 |
 | provides/needs 체인 끊김 | 중간 스킬 자동 제안 | AskUserQuestion |
-| 파이프라인 6스텝+ | Artifact + 체크포인트 | /compact 안내 |
+| 파이프라인 12스텝+ | Artifact + 체크포인트 | compact 주의 안내 <!-- 기존: 6스텝+ --> |
 
 ## Completion → Next
 
@@ -457,6 +479,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 
 0. **GC 실행** (필수):
    - L2: `list_memories()` → `fz:artifact:*`, `fz:checkpoint:*` 키 수집 → 각 `delete_memory()` 실행
+   - `fz:checkpoint:essential` 명시적 삭제: `delete_memory("fz:checkpoint:essential")`
    - L1: 새 교훈 발생 여부 판단 → 있으면 topic file에 태깅하여 저장
    - L1 저장 시 `modules/memory-guide.md` 정책 준수: `[skill: X]` `[status: Y]` `[priority: Z]` 태깅
    - 참조: `modules/memory-policy.md`
