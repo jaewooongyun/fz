@@ -14,6 +14,9 @@ allowed-tools: >-
   mcp__serena__search_for_pattern,
   mcp__serena__find_file,
   mcp__serena__activate_project,
+  mcp__serena__read_memory,
+  mcp__serena__write_memory,
+  mcp__serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   mcp__github__get_pull_request,
   mcp__github__get_pull_request_files,
@@ -363,6 +366,11 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 
 > review-index.md: Phase + Artifacts 목록 기록. Compact 감지 시 이 파일 읽어 산출물 로드 → 중단 지점 재개.
 
+**비ASD Serena Fallback** (WORK_DIR 없을 때):
+```
+write_memory("fz:checkpoint:peer-review-synthesize", "PR#{number}: 이슈 {N}개 (Critical:{c}/Major:{m}/Minor:{n}). Confidence: {avg}%. 핵심: {top3_요약}")
+```
+
 ---
 
 ## Step: Deliver (전달)
@@ -416,6 +424,11 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 #### --post 시
 
 `gh pr comment {PR_NUMBER} --body "$(cat ${WORK_DIR}/review-report.md)"`
+
+**비ASD Serena Fallback** (WORK_DIR 없을 때):
+```
+write_memory("fz:checkpoint:peer-review-deliver", "PR#{number}: 판정 {verdict}. Critical:{c}/Major:{m}. 핵심이슈: {top3}. --post: {Y/N}")
+```
 
 ---
 

@@ -28,7 +28,7 @@ team-agents:
   supporting: [review-arch, review-direction, memory-curator]
 composable: true
 provides: [planning, architecture-analysis]
-needs: [refined-requirements]
+needs: [none]
 intent-triggers:
   - "계획|설계|아키텍처|요구사항"
   - "plan|design|architect|requirement"
@@ -43,7 +43,7 @@ model-strategy:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → Phase 0 (Context) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
+> ⛔ Phase 0 (ASD Pre-flight) → Phase 0b (Context) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
 
 - 요구사항 구조 분해 + 영향 범위 분석
 - Serena 심볼 도구 기반 정밀 탐색
@@ -120,7 +120,24 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
 
 ---
 
-## Phase 0: Context Loading
+## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+
+**Phase 0b (Context Loading) 시작 전에 반드시 실행:**
+
+1. 인자에서 `ASD-\d+` 패턴 추출
+2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+
+### Gate 0: Work Dir Ready
+- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
+
+---
+
+## Phase 0b: Context Loading
 
 이전 세션 컨텍스트와 프로젝트 상태를 로드합니다.
 
@@ -137,10 +154,11 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
    - `mcp__serena__find_symbol` → 컴포넌트 탐색
 
 5. **이전 Discover 결과 로드** (ASD 폴더 활성 시):
-   - `{WORK_DIR}/discover/constraints.md` 읽기 → 제약 매트릭스 복원
+   - `{WORK_DIR}/discover/discover-journal.md` 읽기 → 제약 매트릭스 복원
+   - `{WORK_DIR}/discover/discover-plan.md` 읽기 → mid-pipeline discover 결과 (있으면)
    - 있으면 Phase 1의 "요구사항 구조 분해" 스킵 가능 → 영향 분석부터
 
-### Gate 0: Context Ready
+### Gate 0b: Context Ready
 - [ ] 프로젝트 활성화 완료?
 - [ ] 대상 심볼 구조 파악?
 - [ ] 이전 컨텍스트 로드? (해당 시)
@@ -190,22 +208,6 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
 - [ ] 대안 최소 2개 제시?
 - [ ] 방향 판정 (PROCEED/RECONSIDER/REDIRECT)?
 - [ ] RECONSIDER/REDIRECT 시 사용자 확인?
-
----
-
-## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
-
-> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
-
-**Phase 1 시작 전에 반드시 실행:**
-
-1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 자동 생성 + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
-
-### Gate 0: Work Dir Ready
-- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
 
 ---
 

@@ -93,12 +93,13 @@ model-strategy:
 **Phase 1 시작 전에 반드시 실행:**
 
 1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 자동 생성 + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
+2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
 - [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
 

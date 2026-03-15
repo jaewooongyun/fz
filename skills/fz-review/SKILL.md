@@ -122,7 +122,12 @@ Round 3: 합의 → Lead 보고
 
 ### (선택) Pre-review /simplify → 사전 품질 정리 (참조: modules/execution-modes.md)
 
-### ASD 컨텍스트 로딩 (ASD 활성 시): `{WORK_DIR}/code/progress.md` + `plan/plan-final.md` 읽기
+### ASD 컨텍스트 로딩 (ASD 활성 시):
+- `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
+- `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
+- `{WORK_DIR}/code/step-*.md` 읽기 → 전체 구현 Step 상세 (1M context 활용)
+- `{WORK_DIR}/discover/discover-review.md` 읽기 → mid-pipeline discover 결과 (있으면)
+- `{WORK_DIR}/code/code-team.md` 읽기 → 구현 팀 통신 요약 (있으면)
 
 ---
 
@@ -155,12 +160,13 @@ Intent Context 전달 시 추가:
 **Phase 1 시작 전에 반드시 실행:**
 
 1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 자동 생성 + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
+2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
 - [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
 
@@ -424,6 +430,10 @@ Reflection Rate >= 80%?
 - [ ] Reflection Rate >= 80%?
 - [ ] 최대 반복 횟수 미초과?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
+
+### 비ASD Checkpoint (Phase 5 완료 후)
+
+- 비ASD 모드: `write_memory("fz:checkpoint:review-issues", "이슈 {N}개. Critical: {요약}. Reflection Rate: {X}%")`
 
 ---
 

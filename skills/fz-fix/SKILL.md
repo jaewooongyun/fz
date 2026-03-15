@@ -64,6 +64,8 @@ model-strategy:
 |------|------|
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP 실행 모드 |
+| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+| modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
@@ -83,6 +85,29 @@ model-strategy:
 | 복잡한 수정 후 | `/sc:reflect --type task` | 근본 원인 해결 여부 자체 검증 |
 | 코드 탐색 필요 | `→ /fz-search` | 전용 탐색 스킬로 전환 |
 | 복잡도 초과 | `→ /fz-plan` 또는 `→ /fz-code` | 스킬 전환 |
+
+---
+
+## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `ASD-\d+` 패턴 추출
+2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+
+### Gate 0: Work Dir Ready
+- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
+
+---
+
+### ASD 컨텍스트 로딩 (ASD 폴더 활성 시):
+- `{WORK_DIR}/fix/fix-analysis.md` 읽기 → 이전 수정 분석 복원 (있으면)
+- `{WORK_DIR}/search/search-result.md` 읽기 → fz-search 탐색 결과 (있으면)
 
 ---
 
@@ -176,9 +201,11 @@ Lead: 빌드 검증
 ---
 
 ## Gate: Bug Fix Complete
+- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
 - [ ] 빌드 성공?
 - [ ] 원인-수정 대응 명확?
-- [ ] 아티팩트 기록 완료? (ASD 폴더 활성 시: `{WORK_DIR}/fix/fix-analysis.md`)
+- [ ] 아티팩트 기록 완료? (ASD: `{WORK_DIR}/fix/fix-analysis.md`, 비ASD: `write_memory("fz:checkpoint:fix-{bug}", "원인: {요약}. 수정: {파일}. 빌드: OK")`)
 
 ---
 

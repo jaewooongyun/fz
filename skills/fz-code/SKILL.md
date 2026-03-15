@@ -68,6 +68,7 @@ model-strategy:
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+| modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
@@ -137,12 +138,13 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 **Phase 1 시작 전에 반드시 실행:**
 
 1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 자동 생성 + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
+2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
 - [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
 
@@ -168,7 +170,11 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 
 1.5. **ASD 컨텍스트 로딩** (ASD 폴더 활성 시):
    - `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
-   - `{WORK_DIR}/discover/constraints.md` 읽기 → 제약 조건 복원 (있으면)
+   - `{WORK_DIR}/plan/direction-challenge.md` 읽기 → 방향 판정 + 대안 비교 (있으면)
+   - `{WORK_DIR}/discover/discover-journal.md` 읽기 → 제약 조건 복원 (있으면)
+   - `{WORK_DIR}/discover/discover-code.md` 읽기 → mid-pipeline discover 결과 (있으면)
+   - `{WORK_DIR}/code/progress.md` 읽기 → 진행 상태 복원 (있으면)
+   - 최신 `{WORK_DIR}/code/step-N.md` 읽기 → 마지막 구현 상세 (있으면)
 
 2. **계획의 각 Step을 순서대로 구현**
    - 각 Step은 명확한 완료 조건을 가짐
