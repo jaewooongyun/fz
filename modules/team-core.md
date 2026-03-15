@@ -13,7 +13,7 @@
 2. 모든 파일 경로는 절대 경로 사용 (에이전트는 홈 디렉토리에서 시작).
 3. 완료 시: `shutdown_request` → 프로세스 종료 확인 → `TeamDelete`.
 4. Lead는 별도 에이전트 파일이 아닌 역할 모드 (스킬별 전환).
-5. ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요약을 기록한다. 참조: `modules/context-artifacts.md`
+5. ASD 폴더 활성 시: `{phase}/*-team.md`에 통신 요약 (5K)을 기록한다. 원본 전문은 `*-team-full.md`에 별도 보존 (drill-down용, Hydration 대상 아님). 참조: `modules/context-artifacts.md` <!-- 기존: 핵심 통신만 -->
 6. **⛔ Lead Checkpoint Protocol**: 에이전트 완료 보고 수신 후, Lead는 반드시 아래 순서를 실행한다. 순서 건너뛰기 금지.
    ```
    에이전트 "Step N 완료" 보고 수신

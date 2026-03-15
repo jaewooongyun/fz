@@ -177,6 +177,14 @@ Tier 1: CLAUDE.md `## Codex Skills` 테이블 → Tier 2: 글로벌 `fz-*` → T
 | /fz-codex | 검증 게이트 + get_codex_skill() 3-Tier 디스커버리 |
 | /fz | 파이프라인 검증 게이트 자동 삽입 |
 
+## Codex 검증 결과 보존 정책
+
+> 1M context 활용: 요약 + 원본 분리 (Progressive Disclosure)
+
+- **ASD 활성**: `verify-result.md` (요약 3K, Hydration 대상) + `verify-result-full.md` (원본, drill-down용)
+- **비ASD**: Serena checkpoint 요약만 (기존 동작)
+- 다음 Phase 스킬은 `verify-result.md` 요약을 Read. 상세 확인 시 `-full.md` drill-down.
+
 ## 설계 원칙
 
 - Progressive Disclosure Level 3 (필요 시에만 로드)
