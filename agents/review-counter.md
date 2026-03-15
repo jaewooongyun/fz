@@ -58,3 +58,8 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 - 반론 수신 에이전트는 재검토 후 agree / maintain / challenge 응답 의무
 - 최종 합의 결과를 Lead(오케스트레이터)에게 통합 보고
 - 현재 활성 배정: fz-review (선택적 DA 패스), fz-peer-review Tier 1 Challenge 단계
+
+## Escalation to Lead
+- 반론이 기각되었지만 강한 근거가 있는 경우 재에스컬레이션
+- 판단 confidence < 60% 시
+- 모든 피어가 동의하여 반론 대상이 없는 경우 (역할 미수행 보고)

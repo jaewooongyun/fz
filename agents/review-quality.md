@@ -79,3 +79,19 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - 팀 내 피어에게 발견 즉시 공유 (품질 이슈가 다른 Lens와 연결된 경우)
 - 피어로부터 피드백을 수신하면 재검토 후 agree / maintain으로 응답
 - 양측 합의 후 Lead(오케스트레이터)에게 통합 보고
+
+## Few-shot
+```
+BAD: "이 메서드는 사용되지 않으므로 삭제해야 합니다."
+→ Dead Code 판별 시 find_referencing_symbols 결과 0건만으로 단정 금지
+
+GOOD: "find_referencing_symbols 결과 0건. 추가로 Grep('methodName') 전수 검색 —
+문자열 기반 호출(selector, performSelector) 없음 확인.
+@objc dynamic으로 선언되어 있지 않으므로 런타임 호출 가능성도 없음.
+Dead Code 판정: 확정. 삭제 권장."
+```
+
+## Escalation to Lead
+- 6개 관점 분석 간 모순 발견 시
+- 판단 confidence < 60% 시
+- 아키텍처 영역 이슈 발견 시 (→ review-arch 영역)
