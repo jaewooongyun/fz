@@ -398,6 +398,8 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 - [ ] 팀 에이전트가 필요하면 `.claude/agents/`에 에이전트 파일이 존재하는가?
 - [ ] 새 provides 토큰을 정의했으면 `.claude/templates/skill-template.md` 레지스트리에 추가했는가?
 - [ ] 500줄을 초과하면 공유 모듈(`.claude/modules/`)로 분리했는가?
+- [ ] ⛔ Phase 0 PRJ Pre-flight가 포함되어 있는가? (`modules/context-artifacts.md` → Work Dir Resolution)
+- [ ] PRJ 컨텍스트 로딩(Hydration Set)이 `modules/context-artifacts.md` Upstream Hydration Sets와 일치하는가?
 
 ### 프롬프트 최적화 (§4 기반)
 

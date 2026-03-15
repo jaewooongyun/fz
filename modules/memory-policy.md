@@ -12,10 +12,23 @@
 |------------|---------|------|------|
 | `fz` | `session` | `fz:session:current` | 현재 활성 세션 + PRJ WORK_DIR 경로 |
 | `fz` | `artifact` | `fz:artifact:step1` | 파이프라인 단계 산출물 |
-| `fz` | `checkpoint` | `fz:checkpoint:{skill}-{phase}` | Phase 완료 또는 의미 있는 결과 시 경량 저장. PRJ 미활성 시 유일한 compact recovery 수단 |
+| `fz` | `checkpoint` | `fz:checkpoint:{skill}-{phase}` | Phase 완료 또는 의미 있는 결과 시 경량 저장. PRJ 미활성 시 유일한 compact recovery 수단. ~3,000자 <!-- 기존: 500자 --> 핵심 결정 요약 (Essential Context 포함) |
+| `fz` | `checkpoint` | `fz:checkpoint:essential` | /fz가 단독 관리. 현재 Active State + Key Decisions + Constraints (~3,000자 <!-- 기존: 500자 -->). 파이프라인 완료 시 삭제 |
+| `fz` | `checkpoint` | `fz:checkpoint:discover-{phase}` | mid-pipeline discover 결과. phase={plan\|code\|review}. 파이프라인 완료 시 삭제 |
+| `fz` | `checkpoint` | `fz:checkpoint:discover-{phase}-final` | discover 수렴 완료 시 최종 결과. `-final` suffix는 동일 phase 키를 덮어쓰지 않고 수렴 상태를 별도 보존 |
+| `fz` | `checkpoint` | `fz:checkpoint:review-issues` | fz-review Phase 5 완료 후 이슈 요약. 비PRJ 모드 전용 |
+| `fz` | `checkpoint` | `fz:checkpoint:plan-direction` | 방향 판정 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:plan-v{N}` | 계획 버전 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:plan-verify` | 검증 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:plan-final` | 최종 승인 계획 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:code-step{N}` | 구현 Step 진행 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:fix-{bug}` | 버그 수정 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:search` | 탐색 결과 (임시) |
 | `fz` | `decision` | `fz:decision:{topic}` | 아키텍처 결정사항 (영속) |
 | `fz` | `pattern` | `fz:pattern:{name}` | 학습된 패턴 (영속) |
-| `fz` | `peer` | `fz:peer:pr-{number}` | 피어 리뷰 결과 (임시) — fz-peer-review 완료 시 저장 |
+| `fz` | `peer` | `fz:peer:pr-{number}` | 피어 리뷰 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:peer-review-synthesize` | Synthesize 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:peer-review-deliver` | Deliver 결과 (임시) |
 
 ## 수명 정책 (GC)
 
@@ -50,6 +63,9 @@
 | /fz-fix | O | O | - | - | - |
 | /fz-search | O | O | - | - | - |
 | /fz-codex | O | O | - | - | - |
+| /fz-discover | O | O | O | - | O |
+| /fz-memory | O | O | O | O | O |
+| /fz-manage | O | - | - | - | O |
 
 ## 암묵적 결합 (Implicit Coupling)
 
@@ -67,33 +83,42 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 
 | 스킬 | 읽기 | 쓰기 |
 |------|------|------|
-| /fz | `fz:session:current` (복원) | `fz:session:current` (초기화 + work_dir) |
-| /fz-plan | `fz:session:current` | `fz:decision:{topic}` (영속) |
-| /fz-code | `fz:decision:{topic}` | `fz:artifact:step{N}` (임시) |
-| /fz-review | `fz:artifact:step{N}` | `fz:session:current` (이슈) |
-| /fz-fix | `fz:session:current` | `fz:pattern:{bug_type}` (영속) |
-| /fz-search | `fz:decision:{topic}` | `fz:artifact:search-{target}` (임시) |
+| /fz | `fz:session:current` (복원) | `fz:session:current` (초기화 + work_dir), `fz:checkpoint:essential` |
+| /fz-plan | `fz:session:current` | `fz:checkpoint:plan-direction`, `plan-v{N}`, `plan-verify`, `plan-final` + `fz:decision:{topic}` (영속) |
+| /fz-code | `fz:decision:{topic}`, `fz:checkpoint:plan-*` | `fz:checkpoint:code-step{N}` (임시) |
+| /fz-review | `fz:checkpoint:code-*` | `fz:checkpoint:review-issues` (임시) |
+| /fz-fix | `fz:session:current` | `fz:checkpoint:fix-{bug}` (임시) + `fz:pattern:{bug_type}` (영속) |
+| /fz-search | `fz:decision:{topic}` | `fz:checkpoint:search` (임시) |
+| /fz-discover | `fz:checkpoint:discover-{tag}` | `fz:checkpoint:discover-{tag}` (journal=덮어쓰기, phase=APPEND), `discover-{tag}-final` (수렴) |
+| /fz-memory | `fz:*` (전체 조회) | - (관리 전용, 직접 쓰기 없음) |
+| /fz-manage | `fz:session:current` | - (읽기 전용 조회) |
+| /fz-peer-review | `fz:checkpoint:peer-review-*` | `fz:checkpoint:peer-review-synthesize` (임시), `peer-review-deliver` (임시) |
 
 ## 참조 스킬
 
 | 스킬 | 참조 이유 |
 |------|----------|
-| /fz | 세션 초기화 + GC 실행 |
+| /fz | 세션 초기화 + GC 실행 + checkpoint:essential 관리 |
 | /fz-memory | 전체 메모리 관리 (audit/gc/recall/organize/remind) |
-| /fz-plan | decision 키 쓰기 |
-| /fz-code | artifact 키 쓰기 |
-| /fz-review | artifact 키 읽기 + session 이슈 쓰기 |
-| /fz-fix | pattern 키 쓰기 |
-| /fz-search | artifact 키 쓰기 |
+| /fz-plan | checkpoint:plan-* + decision 키 쓰기 |
+| /fz-code | checkpoint:code-step{N} 쓰기 |
+| /fz-review | checkpoint:review-issues 쓰기 |
+| /fz-fix | checkpoint:fix-{bug} + pattern 키 쓰기 |
+| /fz-search | checkpoint:search 쓰기 |
 | /fz-codex | session 키 읽기 |
+| /fz-discover | checkpoint:discover-{tag} 쓰기 + 결정사항 영속화 |
+| /fz-manage | session/checkpoint 읽기 + list (관리 조회) |
+| /fz-peer-review | checkpoint:peer-review-synthesize/deliver 쓰기 |
 
 ## Context 계층 요약
 
 | 계층 | 도구 | 상세 |
 |------|------|------|
-| L1 Hot | auto-memory (MEMORY.md) | `modules/memory-guide.md` 정책 준수 |
-| L2 Structured | Serena Memory (`fz:*`) | 파이프라인 내 단기 전달 |
-| L3 File Artifact | PRJ 폴더 파일 | compact recovery + 작업 기록 |
+| L1 Hot | auto-memory (MEMORY.md) | 세션 간 영속. 프로젝트 수준 교훈/패턴/규칙. `modules/memory-guide.md` 정책 준수 |
+| L2 Structured | Serena Memory (`fz:*`) | 세션 내 임시. 파이프라인 진행 상태/체크포인트 (~3,000자 <!-- 기존: 500자 -->). compact recovery 수단 |
+| L3 File Artifact | PRJ 폴더 파일 | 세션 내 상세. 무제한 크기 구조화 산출물. L3=canonical, L2=cursor |
+
+> L1.5: Serena decision/pattern 키는 L2 임시가 아닌 영속. GC 대상 아님.
 
 상세: `modules/context-artifacts.md` 참조 / L1 관리: `modules/memory-guide.md` 참조
 

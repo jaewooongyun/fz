@@ -10,6 +10,8 @@
 > - Context Rot (Chroma Research, 18 frontier models)
 > - Building Effective Agents (Anthropic 2024-12)
 > - Agents at Work: 2026 Playbook
+> - S10: Anthropic Platform Best Practices (2026) — Long context tips, State management (structured+unstructured), Context awareness, Multi-context window workflows
+> - S11: Anthropic Claude Code Best Practices (2026) — /btw ephemeral pattern, Kitchen sink 방지, Subagent isolation, Compaction instructions in CLAUDE.md, filesystem > compaction
 
 ---
 
@@ -442,7 +444,7 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 
 ### 왜 중요한가
 
-- 200K 토큰 중 사용 가능량 ~150K (나머지 25%는 working memory)
+- 1M context에서는 auto-compact가 200K 대비 훨씬 늦게 발동하므로 context 여유가 크다 <!-- 기존: 200K 토큰 중 사용 가능량 ~150K -->
 - auto-compact 발동 = 맥락 손실 = 실행 품질 하락
 - **집중된 300 토큰 > 비집중 113K 토큰** (§2 Context Rot 수치)
 - 따라서 context를 절약하는 모든 기법은 **성능 보호**를 위한 것
@@ -472,6 +474,11 @@ GOOD: head_limit 설정 + 필요한 파일만 선별 Read
 - 단순 작업은 서브에이전트 대신 직접 실행
 - TEAM 모드에서만 에이전트 스폰 (standalone Agent 남발 금지)
 - governance.md 에이전트 상한 준수
+
+**E. Proactive Context Protocol** — compact 전 선제 기록
+- Upstream Hydration Sets + Essential Context 패턴 적용: `modules/context-artifacts.md` 참조
+- Filesystem discovery > compaction (Anthropic 공식): compact 후 파일 Read가 context summary보다 정확
+- Ephemeral vs Persistent 질문 판별: `/btw`(일회성, 향후 Phase에 영향 없음) vs `/fz-discover`(persistent, 향후 Phase 영향 시)
 
 **체크리스트:**
 - [ ] 대용량 MCP 결과를 파일로 격리했는가? (context에 raw 출력 남기지 않음)
