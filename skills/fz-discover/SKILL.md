@@ -181,6 +181,11 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - `{CWD}/PRJ-xxxx/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
    - `{CWD}/PRJ-xxxx/discover/` 서브폴더 생성
    - WORK_DIR 설정
+2b. index.md 존재 시 → Active Phase 읽기 → DISCOVER_TAG 설정 (없으면 "journal")
+   - Active Phase = "plan" → DISCOVER_TAG = "plan"
+   - Active Phase = "code" → DISCOVER_TAG = "code"
+   - Active Phase = "review" → DISCOVER_TAG = "review"
+   - Active Phase = "discover" 또는 없음 → DISCOVER_TAG = "journal"
 3. 패턴 없으면:
    a. 브랜치명에서 `PRJ-\d+` 추출 시도 → 있으면 2번과 동일
    b. 없으면 → **AskUserQuestion**: "이 작업의 산출물을 파일로 저장할까요?"
@@ -192,6 +197,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 - [ ] PRJ 패턴 있으면 폴더 자동 생성 완료?
 - [ ] 패턴 없으면 사용자에게 저장 여부 질문 완료?
 - [ ] WORK_DIR 결정됨? (PRJ / NOTASK / Serena fallback)
+- [ ] DISCOVER_TAG 설정됨? (index.md Active Phase 기반)
 
 ---
 
@@ -266,64 +272,25 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - 새 제약이 계속 나옴 → 라운드 계속 (사용자가 plan 전환을 결정할 때까지)
 
 6. **⛔ 저널 갱신** (항상 — compact recovery 필수):
-   `discover-journal.md`를 매 라운드 **전체 덮어쓰기**한다. compact 후 이 파일 하나만 Read하면 전체 복원.
-   - PRJ 활성: `{WORK_DIR}/discover/discover-journal.md` 덮어쓰기 + `{WORK_DIR}/index.md` 업데이트
-     - 파일 전체를 매 라운드 갱신 (~2K tokens). **상세하게** 기록:
-       제약 매트릭스(각 제약의 이유+출처), 생존 후보(왜 생존하는지), 탈락 후보(구체적 위반 사유),
-       현재까지의 핵심 결정 흐름, 미결 질문. **요약이 아니라 컨텍스트 복원에 충분한 상세도 유지.**
+   `discover-{DISCOVER_TAG}.md` 갱신:
+   - DISCOVER_TAG = "journal" → **전체 덮어쓰기** (매 라운드). compact 후 이 파일 하나만 Read하면 전체 복원.
+   - DISCOVER_TAG = plan|code|review → **APPEND** + topic header (동일 phase 다중 discover 지원)
+   - PRJ 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` + `{WORK_DIR}/index.md` 업데이트
+     - journal: 파일 전체를 매 라운드 갱신 (~2K tokens). 상세하게 기록: 제약 매트릭스, 생존/탈락 후보, 핵심 결정 흐름, 미결 질문.
+     - phase: APPEND + `## Topic: {질문 요약}` header. 1K tokens 초과 시 이전 topic 압축.
      - Round History는 유지하지 않음 — 탈락 후보 사유가 롤백 근거 역할.
-   - 비PRJ: `write_memory("fz:checkpoint:discover-current", "제약 {N}개: {C1~CN}. 생존: {후보}. 핵심 추론: {요약}")` (매 라운드 덮어쓰기)
-   형식 참조: `modules/context-artifacts.md` → "discover-journal 형식"
+   - 비PRJ: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}", "제약 {N}개: {C1~CN}. 생존: {후보}. 핵심 추론: {요약}")` (매 라운드 덮어쓰기)
+   형식 참조: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)"
 
-### discover-journal.md 형식
+### discover-journal 형식
 
-> 파일 전체를 매 라운드 덮어쓰기. Round History 없음 — 과거 이력은 Current State의 탈락 후보 사유에 흡수.
-> **원칙: "이것만 읽으면 대화 없이도 판단할 수 있는" 수준의 상세도를 유지한다.**
+> 형식 상세 + 예시: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)" 참조.
+> 원칙: "이것만 읽으면 대화 없이도 판단할 수 있는" 수준의 상세도 유지.
+> 필수 섹션: 제약 매트릭스, 생존 후보, 탈락 후보(사유), 미결 질문.
 
-```markdown
-# Discover Journal — {문제 한 줄 요약}
+### 라운드 대화 출력 (사용자에게 보여주는 형식)
 
-## Current State (Round {N} 기준)
-<!-- 매 라운드 파일 전체 덮어쓰기 -->
-
-### 제약 매트릭스
-| # | 제약 | 출처 | 확신도 |
-|---|------|------|--------|
-| C1 | {설명} | {출처} | 높음 |
-| C2 | {설명} | {출처} | 중간 |
-| ... | ... | ... | ... |
-
-### 생존 후보
-| 후보 | 모든 제약 | 비고 |
-|------|----------|------|
-| D: {설명} | O | 현재 최선 |
-
-### 탈락 후보 (사유)
-- A: {이유 — C2 위반}
-- B: {이유 — C{N} 위반}
-
-### 현재 미결 질문
-{수렴에 필요한 정보를 얻기 위한 질문}
-```
-
-### 라운드 대화 출력 형식 (사용자에게 보여주는 형식)
-
-```markdown
-## Round N
-
-### 새 제약
-| # | 제약 | 출처 | 확신도 |
-|---|------|------|--------|
-| C{N} | {설명} | {사용자/코드/원칙} | 높음/중간 |
-
-### 후보 평가
-| 후보 | C1 | C2 | ... | C{N} | 상태 |
-|------|----|----|-----|------|------|
-| D: (신규) | O | O | ... | O | 생존 |
-
-### 다음 질문
-{수렴에 필요한 정보를 얻기 위한 질문}
-```
+매 라운드: 새 제약 테이블 + 후보 평가 매트릭스(C1~CN × 후보) + 다음 질문.
 
 ### Gate 2: Constraints Sufficient
 - [ ] 핵심 제약이 3개 이상 식별되었는가?
@@ -353,43 +320,13 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - 결정 근거 요약
 
 4. **⛔ 저널 최종 갱신** (항상 — compact recovery 필수):
-   discover-journal.md의 Current State를 최종본으로 갱신하고, 정제된 요구사항 섹션을 추가한다.
-   - PRJ 활성: `{WORK_DIR}/discover/discover-journal.md` Current State 최종 갱신 + `{WORK_DIR}/index.md` 업데이트
-   - 비PRJ: `write_memory("fz:checkpoint:discover-final", "제약 {N}개. 채택: {옵션}. 정제 요구사항: {요약}")`
+   `discover-{DISCOVER_TAG}.md`의 Current State를 최종본으로 갱신하고, 정제된 요구사항 섹션을 추가한다.
+   - PRJ 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` Current State 최종 갱신 + `{WORK_DIR}/index.md` 업데이트
+   - 비PRJ: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}-final", "제약 {N}개. 채택: {옵션}. 정제 요구사항: {요약}")`
 
 ### 최종 산출물 형식
 
-> Phase 3 완료 시 discover-journal.md의 Current State가 이 형태가 된다.
-
-```markdown
-## Current State (최종 — Round {N} 수렴)
-
-### 제약 매트릭스
-| # | 제약 | 출처 | 발견 라운드 |
-|---|------|------|-----------|
-| C1 | {설명} | {출처} | Phase 1 |
-| C2 | {설명} | {출처} | Round 1 |
-| ... | ... | ... | ... |
-
-### 채택된 해
-**{옵션 D}** — {한 줄 설명}
-
-### 탈락 후보 (사유)
-- A: {C2 위반 — 구체적 설명}
-- B: {C5 위반 — 구체적 설명}
-
-### 수용한 트레이드오프
-- {있다면}
-
-### 정제된 요구사항
-1. {구체적 요구사항 1}
-2. {구체적 요구사항 2}
-...
-
-### 결정 근거
-- 채택: {옵션 D} — 이유: {모든 제약 만족, 기존 패턴과 일관}
-- 코드 참조: {기존 패턴과의 일관성 근거}
-```
+> 형식 참조: `modules/context-artifacts.md` → "최종 산출물 확장 (Phase 3 수렴 시)"
 
 ### Gate 3: Converged
 - [ ] 최종 해가 모든 제약을 만족하는가? (또는 트레이드오프가 명시되었는가?)
@@ -412,7 +349,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 | PR 코멘트 작성 | 직접 출력 | 결정 근거를 코멘트 형식으로 가공 |
 | 토론 결과 기록 | Serena memory | 결정사항 + 제약 영속화 |
 
-> PRJ 폴더 활성 시: 다음 스킬이 `{WORK_DIR}/discover/discover-journal.md`의 Current State 섹션을 읽어 컨텍스트를 복원한다.
+> PRJ 폴더 활성 시: 다음 스킬이 `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md`의 Current State 섹션을 읽어 컨텍스트를 복원한다. (DISCOVER_TAG = index.md Active Phase 기반: journal|plan|code|review)
 
 ### 절차
 
