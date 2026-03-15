@@ -17,7 +17,7 @@
 │   ├── code-auditor/ # 코드 품질 감사 (peer review용)
 │   └── gitbutler/    # GitButler CLI 통합
 ├── agents/           # 14개 에이전트 — 팀 모드에서 전문 역할 수행
-├── modules/          # 15개 모듈 — 스킬/에이전트가 공유하는 설정과 정책
+├── modules/          # 16개 모듈 — 스킬/에이전트가 공유하는 설정과 정책
 │   └── patterns/     # 5개 팀 통신 패턴
 ├── guides/           # 5개 가이드 — 프롬프트 최적화, 스킬 작성, 테스팅, 트러블슈팅
 └── templates/        # 스킬/에이전트/모듈 생성 템플릿
@@ -618,6 +618,35 @@ Claude Code + Serena MCP + Context7 MCP + Codex CLI + SuperClaude
 ---
 
 ## Changelog
+
+### v2.3 (2026-03-15) — 1M Context Optimization + Ecosystem Health Fix
+
+**1M Context Infrastructure (Opus 4.6 1M)**
+- Artifact Token Budget 신설 — 100K cap + eviction 우선순위 (context-artifacts.md)
+- ASD 임계값 hybrid: `6+ step 또는 context-heavy` (기존 4+)
+- Essential Context 500자→3,000자 (memory-policy.md, fz/SKILL.md)
+- Proactive Module Loading — /fz Phase 0에서 핵심 모듈 선로드
+- Compact 경고 6+→12+ step, 4-tier 파이프라인 전략
+- prompt-optimization.md: 200K 하드코딩 → 상대 서술
+
+**Ecosystem Health Check Fix (86→95점)**
+- fz-plan: `needs: [refined-requirements]` → `[none]` (standalone 실행)
+- Phase 0 index.md 생성 — 5개 스킬에 compact recovery 추가
+- Discover 프로토콜: DISCOVER_TAG 기반 journal=덮어쓰기, phase=APPEND
+- fz-peer-review: Serena memory 도구 추가 + 2개 CHECKPOINT fallback
+- fz-excalidraw: 에러 대응 섹션 (18/18 일관성)
+- memory-policy.md: 4개 테이블 전면 수정 (stale → actual write_memory)
+- context-artifacts.md: CWD=PROJECT_ROOT 정의, standalone peer-review workdir
+
+**Agent Tier-1 Enrichment**
+- BAD/GOOD 예시: review-direction, review-arch, review-quality, memory-curator
+- Escalation Criteria: 5개 review 에이전트
+- Input Format (Task Brief): review-direction, memory-curator
+- Cross-skill wiring: fz-code direction-challenge, fz-review step files hydration
+
+**Cross-skill Context**
+- team-core.md: 통신 기록 요약 기본 + 원본 drill-down (*-team-full.md)
+- cross-validation.md: Codex transcript 요약/원본 분리 정책
 
 ### v2.2 (2026-03-12) — Agent Teams + Context Budget + Peer Review Gate
 
