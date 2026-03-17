@@ -135,7 +135,12 @@ mcp__serena__search_for_pattern  → @available(*, deprecated) 코드 검색
 → deprecated_symbols: [{symbol, file, reference_count}]
 ```
 
-**기존 유틸리티 탐색**: diff에서 새로 생성하는 객체(DateFormatter, JSONEncoder 등) 감지 → 동일 패키지/프로젝트의 기존 extension/유틸 Grep 검색. `existing_utilities: [{pattern, existing_file, existing_method}]`로 symbols.json에 포함. 에이전트가 "새 구현 제안" 대신 "기존 유틸 활용 제안"을 할 수 있게 한다.
+**기존 유틸리티 탐색**: diff에서 새로 생성 객체 감지 → 기존 extension/유틸 Grep 검색. `existing_utilities: [{pattern, existing_file, existing_method}]`
+
+**Base Class Hierarchy** (관점 6 pre-cache, Gate 4.6.5 입력):
+diff에 class init/willSet·didSet/access control 변경 감지 시 → `find_referencing_symbols`로 모든 subclass 수집 → 각 subclass의 init 시그니처 + super.init 호출 패턴 기록.
+`base_class_hierarchy: [{base_class, change_type, subclasses: [{name, file, init_sig, super_init_call}]}]`
+**핵심**: optional param(default: nil) 추가 시 subclass가 default init → dependency nil → silent regression. 컴파일러 미탐지.
 
 ### 1.5. 요구사항 수집 → `${WORK_DIR}/requirements.md`
 
@@ -229,6 +234,8 @@ codex exec \
    ## Origin Classification (필수)
    - regression: PR이 새로 만든 문제 (severity 유지)
    - pre-existing: 원본에도 동일한 패턴 (severity cap: suggestion)
+   ## Inheritance Chain (필수)
+   Base class init/willSet 변경 시 → 모든 subclass 검색 → default init(nil) 사용 subclass + 해당 화면에서 dependency 활성 사용 여부 확인. diff에 변경 없는 파일의 regression 특히 주의.
    - improvement: 개선 여지 (severity cap: minor)
    ## Diff
    $(cat ${WORK_DIR}/diff.patch | head -c 50000)"

@@ -56,6 +56,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - 주석의 추상화 수준이 코드의 추상화 수준과 일치하는가? (범용 유틸에 특정 기능 맥락 주석 금지)
 - TODO/FIXME가 실제로 불가능한 작업인가, 이미 가능한 작업을 유보하는가? (SDK 설치 후 "전환 예정" 등)
 - 래퍼 함수의 시그니처 파라미터가 내부 호출에 모두 전달되는가? (파라미터 미전달 = 무효화 버그)
+- **Base class init의 optional 파라미터가 subclass에서 전달되는가?** (default nil = dependency 미전달 = 기능 무효화. 컴파일러 미탐지)
 
 ## Output Format
 

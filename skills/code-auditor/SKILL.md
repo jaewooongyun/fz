@@ -170,6 +170,24 @@ protocol ContentDetailInteractable {
 }
 ```
 
+### Class Inheritance DI Pattern (PR #3478 교훈)
+
+**핵심**: Init의 optional 파라미터 변경은 프로토콜 conformance와 달리 **컴파일러가 안 잡는다**.
+
+**감지 조건**: Base class init에 optional param 추가/제거, willSet/didSet에 optional chaining 추가
+
+**분석 절차**:
+1. `symbols.json.base_class_hierarchy` 로드
+2. 각 subclass 확인: super.init()에서 새 param을 명시 전달하는가?
+3. Default init(nil) 사용 subclass → 해당 화면에서 dependency가 실제 필요한가?
+   - 화면에 preview/player/network 등 활성 기능 → dependency nil이면 기능 무효화
+4. Evidence: subclass file:line + 화면 기능 매핑
+
+```
+BAD: Base init에 `previewController: PreviewControlling? = nil` 추가 확인 → "DI 개선" 판정
+GOOD: 16개 subclass 중 미주입 11개 식별 → preview 활성 화면 2개 발견 → "알럿 시 trailer 미정지" major
+```
+
 ### 아키텍처 레이어 위반 탐지 (CLAUDE.md `## Architecture` 참조)
 
 `symbols.json.import_graph` 활용:

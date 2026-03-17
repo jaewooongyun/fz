@@ -47,6 +47,38 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 
 ---
 
+## Gate 4.6.5: Inheritance Chain Impact Gate
+
+> PR #3478 교훈: Base class init에 optional DI 파라미터 추가 시, 3/3 Claude 에이전트가 미탐지. Codex(gpt-5.4)만 발견.
+> 원인: diff에 subclass init 변경이 없어 분석 대상에서 제외됨. 컴파일러도 default value 존재로 미탐지.
+
+**감지 조건** (하나라도):
+- `symbols.json.base_class_hierarchy` 존재
+- INCLUDE 이슈 중 "DI 변경", "init 시그니처", "optional", "willSet/didSet" 키워드
+
+**처리 절차**:
+```
+1. base_class_hierarchy에서 변경된 base class 추출
+2. 각 subclass init 패턴 검증:
+   ├─ super.init(newParam: value) 명시 전달 → OK
+   └─ default init (newParam = nil) → Step 3으로
+3. 화면 기능 교차 검증:
+   ├─ subclass가 사용되는 View 파일 Read
+   ├─ 해당 dependency를 활성 사용하는 UI 컴포넌트 존재? (preview, player, network 등)
+   └─ 존재 → severity major (silent regression)
+4. 결과:
+   ├─ 모든 subclass 확인 + 필요한 곳 주입됨 → confidence 유지
+   ├─ 미주입 + 화면에서 dependency 미사용 → 안전 (기록만)
+   └─ 미주입 + 화면에서 dependency 활성 사용 → INCLUDE severity major
+```
+
+**Functional Test**:
+- Given: Base init에 optional param 추가, 16개 subclass → When: Gate 실행 → Then: 미주입+활성 2개 major 보고
+- Given: Base init 변경 없음 → When: 조건 체크 → Then: Gate 스킵
+- Given: Serena 실패 → When: Gate 실행 → Then: Grep 폴백 + confidence ceiling 70
+
+---
+
 ## Gate 4.7: Behavior-Verifiable Claim Gate
 
 > **핵심 원칙**: "이 상태가 런타임에 실제로 발생할 수 있다"는 에이전트가 패턴으로 추론할 수 없는 empirical fact. 상태 할당 경로를 추적해야 한다.

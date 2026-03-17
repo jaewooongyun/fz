@@ -211,6 +211,7 @@ User prompt에 추가:
 | 위반 | 원인 | 대응 |
 |------|------|------|
 | 동조 수렴 (모든 에이전트 동일 의견) | Round 1 독립성 미준수 | Task Brief에 "Round 1: 다른 에이전트 초안 참조 금지" 명시 |
+| **동종 모델 맹점** (3/3 동일 모델이 동일 이슈 미탐지) | 같은 모델은 같은 지식 갭 공유 | Codex(이종 모델) cross-validation 필수. "diff에 부재가 나타나지 않는" 패턴(상속 체인, optional DI, willSet 연쇄)에서 발생. PR#3478 교훈 참조 |
 | Gate 스킵 | Lead가 Gate를 "선택"으로 인식 | cross-validation.md Gate 절차적 강제 참조 |
 | 합의/불합의 미보고 | Round 0.5 규칙 누락 | Task Brief에 "[합의]/[불합의] 마커 필수" 포함 |
 | Task Brief 미구조화 | 역할/목표/제약 모호 | 5요소 형식 적용: [Role] [Context] [Goal] [Constraints] [Deliverable] |
