@@ -535,6 +535,7 @@ Phase 3 (Prune):  효과가 없는 지침을 제거
 | 검증 단계 없이 생성만 지시 | 오류 누적, 품질 저하 | validate -> fix -> repeat 루프 내장 |
 | 모든 도구를 allowed-tools에 포함 | 불필요한 도구 호출 증가 | 필요한 도구만 선별 |
 | 스킬 간 책임 범위 중복 | 충돌, 예측 불가 행동 | Will / Will Not 경계 명확히 설정 |
+| Base class 변경 후 상속 체인 미검증 | Subclass silent regression (컴파일러 미탐지) | Inheritance Chain Impact Gate: base_class_hierarchy → subclass init + 화면별 dependency 검증 |
 | TEAM에서 Gate를 "권고"로 취급 | 검증 누락, 품질 저하 | Gate 절차적 강제 (스킵 불가 조건 명시) |
 | 에이전트 간 초안 공유 후 분석 | Sycophancy/동조 수렴 | Round 1 독립 분석 → Round 2 피드백 순서 강제 |
 | 비구조화 Task 전달 | 역할 혼동, 중복/누락 작업 | Task Brief 5요소 형식 사용 |

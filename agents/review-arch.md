@@ -55,6 +55,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - 소비자가 모듈 내부 구현에 의존하지 않고 public 인터페이스만 사용하는가?
 - 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)에서 모듈 연동이 올바른가?
 - 모듈화 이전의 레거시 패턴(직접 참조, 중복 로직, 인라인 구현)이 앱에 남아있지 않은가?
+- **Base class의 optional DI 변경 시, subclass가 화면별로 필요한 dependency를 주입하는가?** (default nil = silent regression. Gate 4.6.5 참조)
 - 판단 기준: "이 소비자 코드가 모듈의 존재 목적을 무력화하지 않는가?"
 
 ## Output Format
