@@ -266,6 +266,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 - [ ] 빌드 경고 최소화?
 - [ ] 아키텍처 패턴 준수?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
+- [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] ⛔ Codex 교차 검증 완료? (TEAM 모드 — Lead가 /fz-codex check 실행)
 
 ---

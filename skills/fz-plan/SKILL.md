@@ -327,6 +327,7 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
 - [ ] 소비자 영향이 식별되었으면 계획에 반영?
 - [ ] 대안 패턴 최소 1개 제시?
 - [ ] 리팩토링 작업이면 Anti-Pattern Constraints 작성?
+- [ ] ⛔ 새 SPM 패키지 생성이면 Chore Step 포함? (.gitignore .build, Package.resolved, pbxproj 등록)
 - [ ] ⛔ 계획 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
 
 ---
