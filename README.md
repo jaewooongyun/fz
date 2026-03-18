@@ -10,12 +10,11 @@
 
 ```
 ~/.claude/
-├── skills/           # 22개 스킬 — 사용자가 직접 호출하는 워크플로우 단위
+├── skills/           # 21개 스킬 — 사용자가 직접 호출하는 워크플로우 단위
 │   ├── fz/           # 오케스트레이터 (모든 스킬의 진입점)
 │   ├── fz-*/         # 18개 도메인별 스킬
 │   ├── arch-critic/  # 아키텍처 비평 (peer review용)
 │   ├── code-auditor/ # 코드 품질 감사 (peer review용)
-│   └── gitbutler/    # GitButler CLI 통합
 ├── agents/           # 14개 에이전트 — 팀 모드에서 전문 역할 수행
 ├── modules/          # 16개 모듈 — 스킬/에이전트가 공유하는 설정과 정책
 │   └── patterns/     # 5개 팀 통신 패턴
@@ -36,7 +35,7 @@
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Skills (22개)         실행 가능한 워크플로우 단위                      │
+│  Skills (21개)         실행 가능한 워크플로우 단위                      │
 │                                                                 │
 │  ┌─ 개발 ───────┐ ┌─── 탐색 ─────┐ ┌──── 검증 ────┐  ┌─ 출하 ─────┐  │
 │  │ fz-plan     │ │ fz-discover │ │ fz-review   │ │ fz-commit │  │
@@ -45,7 +44,7 @@
 │  └─────────────┘                 └─────────────┘                │
 │  ┌─ 문서 ───────┐ ┌── 시스템 ────┐ ┌─ 보조 ─────────────────────┐   │
 │  │ fz-doc      │ │ fz-skill   │ │ arch-critic  code-auditor │   │
-│  │ fz-memory   │ │ fz-manage  │ │ gitbutler    fz-new-file  │   │
+│  │ fz-memory   │ │ fz-manage  │ │ fz-new-file               │   │
 │  │ fz-recording│ │ fz-excalidw│ │ fz-pr-digest              │   │
 │  └─────────────┘ └────────────┘ └───────────────────────────┘   │
 └────────────────────────────┬────────────────────────────────────┘
@@ -81,7 +80,7 @@
 │  Infrastructure       MCP 서버 + CLI + 플러그인                     │
 │                                                                 │
 │  MCP: Serena  Context7  XcodeBuildMCP  Atlassian  GitHub  LSP   │
-│  CLI: Codex   GitButler  gh  xcodebuild  uv                     │
+│  CLI: Codex   gh  xcodebuild  uv                                │
 │  Plugin: SuperClaude  SwiftUI-Expert  Swift-Concurrency         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -346,7 +345,7 @@ Lead ─┬── SendMessage(type:"shutdown_request", recipient:"impl-correctne
 
 ---
 
-## Skills (22개)
+## Skills (21개)
 
 | 카테고리 | 스킬 | 호출 | 설명 |
 |---------|------|------|------|
@@ -371,7 +370,6 @@ Lead ─┬── SendMessage(type:"shutdown_request", recipient:"impl-correctne
 | | fz-excalidraw | `/fz-excalidraw` | Excalidraw 다이어그램 생성/수정 |
 | **보조** | arch-critic | (팀 내부용) | 아키텍처 비평 (Truth-of-Source) |
 | | code-auditor | (팀 내부용) | 코드 품질 감사 (Truth-of-Source) |
-| | gitbutler | `but` | GitButler CLI 통합 |
 
 ---
 
@@ -555,7 +553,6 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | CLI | 용도 | 사용 스킬 | 설치 | 없을 때 |
 |-----|------|----------|------|--------|
 | **Codex CLI** | Cross-model 교차 검증 (GPT 기반) | fz-codex, fz-review, fz-code, fz-plan, fz-peer-review | `npm i -g @openai/codex` + `~/.codex/config.toml` | 검증 단계 스킵 or `/sc:analyze` 폴백 |
-| **GitButler** (`but`) | 커밋, 브랜치, diff, push | gitbutler, fz-commit, fz-pr | [gitbutler.com](https://gitbutler.com) | 표준 `git` 사용 |
 | **GitHub CLI** (`gh`) | PR, 이슈, 인증 | fz-pr, fz-peer-review, fz-pr-digest | `brew install gh` | GitHub MCP 폴백 |
 | **xcodebuild** | iOS 빌드 (XcodeBuildMCP 폴백) | modules/build.md | Xcode 설치 시 포함 | — |
 | **uv + Python** | Excalidraw PNG 렌더링 | fz-excalidraw | `brew install uv` | JSON만 출력 (렌더 불가) |
@@ -610,7 +607,7 @@ Claude Code + Serena MCP + Context7 MCP + Codex CLI + SuperClaude
 
 **전체 설치** (iOS 프로젝트 풀 스택):
 ```
-+ XcodeBuildMCP + GitButler + GitHub MCP/CLI + Atlassian MCP
++ XcodeBuildMCP + GitHub MCP/CLI + Atlassian MCP
 + SwiftUI Expert + Swift Concurrency + Sequential Thinking + LSP
 + AssemblyAI (회의록) + uv/Python (다이어그램)
 ```
