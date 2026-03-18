@@ -616,6 +616,18 @@ Claude Code + Serena MCP + Context7 MCP + Codex CLI + SuperClaude
 
 ## Changelog
 
+### v2.4 (2026-03-18) — Remove GitButler + Git Workflow Simplification
+
+**GitButler 제거**
+- GitButler 스킬 삭제 (`skills/gitbutler/` — SKILL.md + 3 reference files, -1,551줄)
+- README.md 스킬 목록, CLI 도구, Infrastructure 다이어그램에서 제거 (22→21 스킬)
+- 이유: Claude Code와 함께 사용 시 이점 없음 — 단일 working directory 공유로 Agent 병렬 작업 시 상호 오염 발생
+
+**Git 워크플로우 전환**
+- GitButler CLI(`but`) → 표준 `git` 명령으로 전환
+- 병렬 브랜치 작업: `git worktree`로 독립 디렉토리 생성 권장
+- 세션 시작: `but pull` → `git pull upstream develop`
+
 ### v2.3 (2026-03-15) — 1M Context Optimization + Ecosystem Health Fix
 
 **1M Context Infrastructure (Opus 4.6 1M)**
