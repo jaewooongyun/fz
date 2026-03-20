@@ -58,6 +58,11 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - 래퍼 함수의 시그니처 파라미터가 내부 호출에 모두 전달되는가? (파라미터 미전달 = 무효화 버그)
 - **Base class init의 optional 파라미터가 subclass에서 전달되는가?** (default nil = dependency 미전달 = 기능 무효화. 컴파일러 미탐지)
 
+### 7. Source Fidelity (리팩토링/마이그레이션 컨텍스트에서만)
+
+- 변환 후 코드에 원본에 없던 파라미터가 추가되지 않았는가?
+- git show 원본 비교로 추가/변경 사항이 의도적인지 확인
+
 ## Output Format
 
 보고 항목마다:
