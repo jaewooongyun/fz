@@ -19,7 +19,9 @@ in real time, providing feedback directly to `impl-correctness`.
 
 ## Monitoring Focus (Layer 1 - Generic Checklist)
 
-### Architecture Consistency
+### Architecture Consistency (Clean Architecture — Uncle Bob)
+- **Dependency Rule**: 안쪽 레이어가 바깥 레이어를 import하면 위반 (`guides/clean-architecture.md`)
+- **DIP**: UseCase가 구체 타입(Alamofire, CoreData)에 직접 의존하면 위반
 - 레이어 간 의존성 방향 준수 (CLAUDE.md `## Architecture` 참조)
 - 레이어별 책임 범위 위반 감지
 
