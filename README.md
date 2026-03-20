@@ -16,9 +16,9 @@
 │   ├── arch-critic/  # 아키텍처 비평 (peer review용)
 │   ├── code-auditor/ # 코드 품질 감사 (peer review용)
 ├── agents/           # 14개 에이전트 — 팀 모드에서 전문 역할 수행
-├── modules/          # 16개 모듈 — 스킬/에이전트가 공유하는 설정과 정책
+├── modules/          # 17개 모듈 — 스킬/에이전트가 공유하는 설정과 정책
 │   └── patterns/     # 5개 팀 통신 패턴
-├── guides/           # 5개 가이드 — 프롬프트 최적화, 스킬 작성, 테스팅, 트러블슈팅
+├── guides/           # 6개 가이드 — 프롬프트 최적화, 스킬 작성, 테스팅, 트러블슈팅, Clean Architecture
 └── templates/        # 스킬/에이전트/모듈 생성 템플릿
 ```
 
@@ -615,6 +615,49 @@ Claude Code + Serena MCP + Context7 MCP + Codex CLI + SuperClaude
 ---
 
 ## Changelog
+
+### v2.5 (2026-03-20) — skill-creator Integration + Description Overhaul + Clean Architecture
+
+**skill-creator 통합 (Runtime Trigger Eval + Description Optimization)**
+- fz-skill에 `optimize` 서브커맨드 추가 — skill-creator `run_loop.py` 활용, train/test split 기반 description 자동 최적화
+- fz-skill eval에 `Runtime Trigger Eval` phase 추가 — `run_eval.py`로 실제 `claude -p` 호출하여 트리거율 실측
+- fz-skill create에 Phase 5 (Description Optimization 제안) 추가
+- fz-manage benchmark에 `--with-trigger` 옵션 — 하위 3개 스킬 Quick Trigger Eval
+- fz-manage check에 #11 skill-creator 설치 확인 항목 추가
+- 신규 파일: `skills/fz-skill/references/skill-creator-integration.md` (L3 연동 가이드 + 실증 결과)
+- 신규 파이프라인: #18 `skill-optimize` (pipelines.md)
+- intent-registry.md에 fz-skill/fz-manage 자연어 트리거 보강
+
+**실증 테스트 결과 및 교훈**
+- 13개 스킬 전체 Runtime Trigger Eval 실행: 35/81 (43%)
+- 핵심 발견: `claude -p` 자동 트리거는 슬래시 커맨드 스킬에 제한적 — should-NOT-trigger 100% 정확, should-trigger 0%
+- description을 pushy 패턴으로 변경해도 트리거율 변화 없음 (43%→44%)
+- 근본 원인: Claude가 간단한 요청을 스킬 참조 없이 직접 처리하는 경향
+- 교훈 메모리 저장: `feedback_skill_creator_trigger_eval.md`
+
+**전체 스킬 Description 고도화 (18/18)**
+- skill-creator best practice 패턴 전면 적용:
+  - Third-person: "This skill should be used when..."
+  - Pushy triggers: "Make sure to use this skill whenever the user says: ..."
+  - Keyword coverage: "Covers: ..." (Korean + English)
+  - Boundary: "Do NOT use for..."
+- 누락 5개 스킬 추가 적용: fz-codex, fz-new-file, fz-pr-digest, fz-pr, fz-recording
+
+**500줄 제한 준수**
+- fz-review: 513 → 492줄 (redundant separators 제거)
+- fz-peer-review: 503 → 497줄 (redundant separators 제거)
+
+**Clean Architecture 가이드 (Uncle Bob 페르소나)**
+- 신규 파일: `guides/clean-architecture.md`
+- 내용: Dependency Rule, SOLID 5원칙, 4 Layers 정의, Boundary Crossing 규칙, Architecture Smells, Uncle Bob's Decision Rules, Pragmatic 균형
+- review-arch 에이전트: Architecture Decision에 Dependency Rule + SOLID 위반 감지 연결
+- impl-quality 에이전트: Architecture Consistency에 DIP 위반 감지 연결
+- fz-plan 스킬: 영향 분석 Step 4 "Clean Architecture 원칙 확인" 추가
+
+**생태계 건강 체크**
+- 전체 13개 항목 건강 체크 실행: 12.5/13 PASSING
+- YAML 필수 필드 100%, provides/needs 체인 완전, 깨진 참조 0개
+- 에이전트 14개 전부 유효, 모듈 17개 전부 존재
 
 ### v2.4 (2026-03-18) — Remove GitButler + Git Workflow Simplification
 
