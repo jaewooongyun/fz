@@ -1,8 +1,10 @@
 ---
 name: fz-pr
 description: >-
-  fork 기반 PR 생성 자동화 (푸시 → PR 생성, 풀리퀘스트, pull request).
-  Use when creating pull requests with ticket references.
+  This skill should be used when the user wants to create a pull request.
+  Make sure to use this skill whenever the user says: "PR 만들어", "풀리퀘스트",
+  "PR 생성", "create PR", "pull request".
+  Covers: PR 생성, fork 기반 푸시, 풀리퀘스트, 티켓 연동, 리뷰어 자동 지정.
   Do NOT use for commits (use fz-commit) or code review (use fz-review).
 user-invocable: true
 disable-model-invocation: true

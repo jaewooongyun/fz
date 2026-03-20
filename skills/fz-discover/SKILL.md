@@ -1,10 +1,12 @@
 ---
 name: fz-discover
 description: >-
-  대화를 통한 제약조건 발견 + 요구사항 정제 스킬. 소크라테스식 반복 대화로
-  암묵적 제약을 드러내고, Reject-Extract-Propose 프로토콜로 최적 해에 수렴.
-  Use when the problem is unclear, requirements are ambiguous, or multiple
-  architectural approaches need systematic comparison with constraint discovery.
+  This skill should be used when the user is unsure about approach and needs guided exploration.
+  Make sure to use this skill whenever the user says: "어떻게 하면 좋을까?", "뭐가 좋을까?",
+  "트레이드오프 비교", "고민이야", "방식이 여러 개인데", "요구사항이 불명확", "제약 조건 파악",
+  "how should I approach this?", "what's the trade-off?", "I'm not sure which way to go",
+  "help me figure out requirements", "compare approaches".
+  Covers: 어떻게, 뭐가 좋을까, 트레이드오프, 고민, 방식, 제약조건 발견, 소크라테스식 대화.
   Do NOT use when requirements are already clear (use fz-plan) or for code search (use fz-search).
 user-invocable: true
 argument-hint: "[해결하고 싶은 문제/질문]"

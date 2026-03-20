@@ -1,8 +1,11 @@
 ---
 name: fz-plan
 description: >-
-  계획 수립 + 요구사항 분석 + 설계 스킬. 영향 범위 분석과 구현 전략 수립.
-  Use when planning features, analyzing requirements, designing architecture, or breaking down tasks.
+  This skill should be used when the user asks to plan, design, or analyze before coding.
+  Make sure to use this skill whenever the user says: "계획 세워줘", "설계해줘", "아키텍처 잡아줘",
+  "요구사항 분석", "순서 정해줘", "어떻게 만들면 될까", "구조 잡아줘", "plan this", "design the architecture",
+  "break down the task", "what's the implementation strategy", "analyze requirements".
+  Covers: 계획, 설계, 아키텍처, 요구사항, 순서, 영향 범위 분석, 구현 전략 수립, 태스크 분해.
   Do NOT use for actual code implementation (use fz-code) or code search (use fz-search).
 user-invocable: true
 argument-hint: "[기능/요구사항 설명]"
@@ -251,6 +254,11 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
       각 소비자의 사용 패턴이 모듈 설계 의도와 일치하는지 확인.
       앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension 등)의 모듈 연동 코드 확인.
       계획에 소비자 코드 변경 Step을 명시적으로 포함.
+   f. **⛔ Import Removal Symbol Inventory** (import 제거 작업 시 필수):
+      `import X`를 제거할 파일 목록에 대해, X 모듈에서 가져오던 **모든** 심볼을 추출.
+      치환 패턴 테이블에 포함되지 않은 심볼 → 누락 후보로 플래그.
+      특히 typealias(`Parameters`), utility 타입(`Empty`), convenience method가 빠지기 쉬움.
+      방법: 대상 파일에서 대문자 시작 심볼 추출 → 제거할 모듈 소속 여부 확인.
 
 3. **API/라이브러리 문서 확인**:
    - `mcp__context7__resolve-library-id` → 라이브러리 ID
@@ -278,7 +286,7 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
    | Q2 소비자 영향 | 변경의 소비자(상위 레이어)에 새 분기/타입/프로토콜이 필요한가? | 소비자 변경을 계획에 포함 |
    | Q3 복잡도 이동 | 한 레이어의 단순화가 다른 레이어의 복잡도 증가로 이어지는가? | 이동 대상 레이어의 변경도 계획에 포함 |
    | Q4 경계 케이스 | 이 추상화가 커버하지 못하는 케이스는 무엇이고, 대안은? 상태 저장이 포함된 설계라면: 이 상태가 컴포넌트 라이프사이클 밖(앱 재시작)에서도 유지되어야 하는가? RIBs Interactor/VC가 살아있는 동안 인메모리(Subject/State)로 충분하지 않은가? A/B 테스트 등 외부 시스템이 관리하는 값을 앱 로컬에 캐싱하면 실험 왜곡 위험. | 대안 패턴 제시 + 하이브리드 가능성 검토. 영속화 불필요 판정 시 인메모리 대안 제시 |
-   | Q5 접근 경계 | "차단/제거/캡슐화"를 의도한 접근 경로가 실제로 차단되는가? access modifier(public/internal/private)가 의도와 일치하는가? 기존 코드가 이벤트 채널을 우회하여 직접 호출하는 경로가 남아있지 않은가? | 접근 제어 변경을 계획에 포함 + Anti-Pattern Constraints에 금지 패턴 기록 |
+   | Q5 접근 경계 | "차단/제거/캡슐화"를 의도한 접근 경로가 실제로 차단되는가? access modifier(public/internal/private)가 의도와 일치하는가? 기존 코드가 이벤트 채널을 우회하여 직접 호출하는 경로가 남아있지 않은가? **모듈화 작업 시 추가**: 모듈에 추가하는 각 public 타입에 대해 — (a) 타입의 필드/메서드가 모듈 책임 범위에 속하는가? (b) 도메인 특화 필드(비즈니스명, 하드코딩 UI 문자열)가 있는가? (c) 모듈 내부에서 실제 사용하는가, 아니면 pass-through인가? 하나라도 경계 밖이면 모듈에서 제외. | 접근 제어 변경을 계획에 포함 + Anti-Pattern Constraints에 금지 패턴 기록. 모듈화 시: Concern Classification 테이블 작성 |
    | Q6 이벤트 스코프 | 이벤트/로그 전송이 포함된 설계라면: 각 이벤트가 명시된 측정 목적에 부합하는가? 모든 사용자에게 동일하게 발화하는 이벤트(impression 등)가 A/B 분류 목적에 포함되어 있지 않은가? 이벤트 발화 위치의 컨텍스트가 측정 대상과 일치하는가? (예: 전체 콘텐츠 재생 이벤트에 라이브 전용 A/B 프로퍼티 추가는 스코프 불일치) | 불필요한 이벤트 제거 + 이벤트별 측정 목적 명시 |
 
    - 각 질문에서 리스크 발견 → 리스크 매트릭스에 기록
@@ -320,6 +328,7 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
   - [ ] 기존 액션 패턴의 사이드이펙트/순서 의존성을 분석했는가?
   - [ ] 관련 파일의 dead code를 감지했는가?
   - [ ] ⛔ 모듈화 작업이면 소비자 코드 품질 스캔(e단계)을 수행했는가?
+  - [ ] ⛔ import 제거 작업이면 Symbol Inventory(f단계)를 수행했는가?
 - [ ] API 문서 확인 완료? (새 API 사용 시)
 - [ ] 기존 패턴과 일관성 확인?
 - [ ] 구현 단계가 명확하게 정의?
@@ -328,6 +337,7 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
 - [ ] 대안 패턴 최소 1개 제시?
 - [ ] 리팩토링 작업이면 Anti-Pattern Constraints 작성?
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore Step 포함? (.gitignore .build, Package.resolved, pbxproj 등록)
+- [ ] ⛔ 모듈화 작업이면 Concern Classification 수행? (각 public type의 관심사가 모듈 책임에 부합)
 - [ ] ⛔ 계획 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
 
 ---
