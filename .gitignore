@@ -39,3 +39,4 @@ skills/**/references/uv.lock
 # Repo files
 !.gitignore
 !README.md
+!RELEASE_NOTES_*.md
