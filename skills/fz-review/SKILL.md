@@ -1,9 +1,12 @@
 ---
 name: fz-review
 description: >-
-  자기 코드 리뷰 + 품질 보증 스킬. 3중 검증(Claude+Codex+sc:analyze)과 역방향 검증.
-  Use when reviewing YOUR OWN code changes after implementation, validating quality, or running verification cycles.
-  Do NOT use for reviewing teammate's PR (use fz-peer-review).
+  This skill should be used when the user wants to review their own code changes or validate quality.
+  Make sure to use this skill whenever the user says: "리뷰해줘", "검증해줘", "품질 확인", "괜찮아?",
+  "검토해줘", "내 코드 봐줘", "문제 없어?", "review my changes", "validate this", "check quality",
+  "is this okay?", "verify my code".
+  Covers: 리뷰, 검증, 품질, 검토, 자기 코드 3중 검증과 역방향 검증.
+  Do NOT use for reviewing a teammate's PR (use fz-peer-review).
 user-invocable: true
 argument-hint: "[리뷰 대상 설명]"
 allowed-tools: >-
@@ -44,7 +47,6 @@ model-strategy:
 - 3중 검증: Claude(Serena) + Codex(/fz-codex) + SuperClaude(sc:analyze)
 - 역방향 검증: Codex가 Claude의 수정 사항을 검증
 - Reflection Rate 정량화 (>= 80% 통과)
-- /ralph-loop 한도 후 사용자 에스컬레이션
 
 ## 사용 시점
 
@@ -54,7 +56,6 @@ model-strategy:
 /fz-review "현재 Reflection Rate 얼마야?"
 /fz-review "Gate 5 통과 확인해줘"
 ```
-
 ## 모듈 참조
 
 | 모듈 | 용도 |
@@ -79,7 +80,6 @@ model-strategy:
 | Phase 5.5 | `/fz-codex validate` | 역검증 |
 | Phase 6 | `/sc:improve`, `/sc:cleanup`, `/sc:reflect` | 개선, 정리, 자체검증 |
 | Phase 7 | `/sc:test` | 최종 테스트 검증 |
-
 ## 팀 에이전트 모드 (Review Squad)
 
 > 팀 모드 규칙은 `.claude/modules/team-core.md` 참조
@@ -99,7 +99,6 @@ TeamCreate("review-{feature}")
 > review-counter는 선택적 DA 패스. review-arch/review-quality 초안 완성 후 SendMessage로 결과 전달 → review-counter가 "OK" 판정 영역을 집중 반론 → 합의 후 Lead 보고.
 
 > PRJ 폴더 활성 시: `{WORK_DIR}/review/review-team.md`에 live review 핵심 통신을 기록한다.
-
 ### 통신 패턴: Live Review (Peer-to-Peer)
 
 리뷰어들이 **분석하면서 서로 발견을 직접 공유**하고 교차 검증하는 패턴.
@@ -118,18 +117,13 @@ Round 3: 합의 → Lead 보고
 - MCP 제약: review-arch/review-quality는 serena, context7만 접근. Atlassian/LSP → Lead가 조회 후 전달.
 - **Intent Context 전달 (필수)**: diff + `[변경 의도]: {새 심볼}이 {기존 심볼}을 대체` + `[대체 대상]: {기존 심볼, 파일}`
 
----
-
 ### (선택) Pre-review /simplify → 사전 품질 정리 (참조: modules/execution-modes.md)
-
 ### PRJ 컨텍스트 로딩 (PRJ 활성 시):
 - `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
 - `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
 - `{WORK_DIR}/code/step-*.md` 읽기 → 전체 구현 Step 상세 (1M context 활용)
 - `{WORK_DIR}/discover/discover-review.md` 읽기 → mid-pipeline discover 결과 (있으면)
 - `{WORK_DIR}/code/code-team.md` 읽기 → 구현 팀 통신 요약 (있으면)
-
----
 
 ### ⛔ 모듈화 리뷰 원칙 (Modularization Review Scope)
 
@@ -168,8 +162,6 @@ Intent Context 전달 시 추가:
 - [ ] WORK_DIR 결정됨? (PRJ / NOTASK / Serena fallback)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
----
-
 ## Phase 4.5: Requirements Alignment (요구사항 부합)
 
 세션 task/plan과 diff를 대조하여 요구사항 부합 여부를 확인합니다.
@@ -191,8 +183,6 @@ Intent Context 전달 시 추가:
 - [ ] 세션 task/plan의 모든 요구사항이 구현되었는가?
 - [ ] 커밋 메시지에 명시된 변경이 실제 diff에 반영되었는가?
 - [ ] 범위 외 변경 (scope creep)이 포함되어 있지 않은가?
-
----
 
 ## Phase 5: Cross-Review (3중 검증)
 
@@ -281,6 +271,8 @@ diff 기반 검증만으로는 **"변경되지 않았지만 삭제/수정되어�
    - .gitignore에 `Packages/{name}/.build` 등록 확인
    - `Package.resolved` 커밋 여부 (외부 의존성 있으면 필수)
    - pbxproj에 `XCLocalSwiftPackageReference` 등록 확인
+  6. ⛔ 타입 소속 검증 (모듈화 작업 시): 각 public type에 대해 "이 타입의 관심사 = 이 모듈의 관심사?" 도메인 특화 필드/비즈니스 로직/하드코딩 UI 문자열 포함 시 모듈 경계 위반
+  7. ⛔ Symbol Coverage 검증 (import 제거 작업 시): diff에서 `import X` → `import Y`로 변경된 파일에서 X 모듈의 심볼(typealias, utility 타입 등)이 잔존하는지 grep. 잔존 시 → "symbol_orphan" 이슈
 ```
 
 ### 검증 4-F: Anti-Pattern Enforcement (잔존 금지 패턴 검증)
@@ -328,6 +320,23 @@ diff 내 메서드 시그니처 변경이 프로토콜 적합성을 깨뜨리지
 > RIBs 아키텍처: ViewController에서 PresentableListener 프로토콜을 선언하고 Interactor가 구현.
 > 시그니처 변경 시 두 파일 모두 diff에 포함되어야 한다. Interactor만 변경 시 incremental build 성공 → clean build 실패.
 
+### 검증 4-H: Source Fidelity (원본 준수 — 리팩토링/마이그레이션 시)
+
+리팩토링 diff에서 원본에 없던 파라미터/로직이 추가되지 않았는지 검증한다.
+
+```
+절차:
+1. diff에서 함수 호출 변경점 식별 (Before → After 패턴)
+2. 변경 후 코드에 원본에 없던 파라미터/인자가 추가되었는지 확인
+   - git show로 원본 코드 비교
+   - optional 파라미터에 기본값(nil)이 있는데 명시적 값으로 채워졌는지
+3. 추가 발견 시 → "source_deviation" 이슈 (severity: Major)
+
+체크리스트:
+- [ ] 리팩토링 diff에서 원본에 없던 파라미터가 추가되지 않았는가?
+- [ ] optional 파라미터가 불필요하게 명시적 값으로 채워지지 않았는가?
+```
+
 ### 검증 5: UI/UX Refactoring Safety
 
 View 파일 변경 포함 시 추가 검증:
@@ -362,12 +371,12 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] Constraint Matrix Compliance 통과? (제약 매트릭스 부합, /fz-discover 산출물 있을 때)
 - [ ] Refactoring Completeness 통과? (deprecated dead code 없음)
 - [ ] Module Boundary 통과? (access control이 의도와 일치)
+- [ ] ⛔ 타입 소속 검증 통과? (각 public type의 관심사가 모듈 책임에 부합)
 - [ ] Anti-Pattern Enforcement 통과? (금지 패턴 0건, Plan에 Constraints 있을 때)
 - [ ] UI/UX Safety 통과? (View 변경 시 시각 검증 권고)
 - [ ] Spec Panel 통과? (새 모듈 시, 스펙 부합 확인)
 - [ ] Protocol Conformance 통과? (시그니처 변경 시, 프로토콜 선언부 동기화 확인)
-
----
+- [ ] Source Fidelity 통과? (리팩토링 시, 원본 대비 추가된 파라미터/로직 없음)
 
 ## Phase 5.5: Feedback Verification (역방향 검증)
 
@@ -391,7 +400,6 @@ fz-codex validate가 수행하는 작업:
 - [ ] Feedback Reflection Rate >= 80%?
 - [ ] 새로 발견된 Critical 이슈가 없는가?
 - [ ] Regressed 이슈가 없는가?
-
 ### 판정 기준
 
 | Reflection Rate | Verdict | 다음 단계 |
@@ -399,8 +407,6 @@ fz-codex validate가 수행하는 작업:
 | >= 80% | `pass` | Gate 5 통과 → Phase 7 완료 |
 | 60% - 79% | `needs_work` | Phase 6 (재수정) |
 | < 60% | `fail` | Phase 6 (재수정, 2회 후 에스컬레이션) |
-
----
 
 ## Phase 6: Iterative Improvement
 
@@ -436,10 +442,7 @@ Reflection Rate >= 80%?
 - [ ] ⛔ 아티팩트 기록 완료? (PRJ: 파일, 비PRJ: Serena checkpoint)
 
 ### 비PRJ Checkpoint (Phase 5 완료 후)
-
 - 비PRJ 모드: `write_memory("fz:checkpoint:review-issues", "이슈 {N}개. Critical: {요약}. Reflection Rate: {X}%")`
-
----
 
 ## Phase 7: Completion (완료 처리)
 

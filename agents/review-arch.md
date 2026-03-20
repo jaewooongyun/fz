@@ -58,6 +58,12 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - **Base class의 optional DI 변경 시, subclass가 화면별로 필요한 dependency를 주입하는가?** (default nil = silent regression. Gate 4.6.5 참조)
 - 판단 기준: "이 소비자 코드가 모듈의 존재 목적을 무력화하지 않는가?"
 
+### 7. Source Fidelity (리팩토링/마이그레이션 컨텍스트에서만)
+
+- 변환된 코드가 원본에 없던 파라미터, 로직, 타입을 추가하고 있지 않은가?
+- optional 파라미터에 기본값(nil)이 있는데 명시적으로 값을 채운 곳이 없는가?
+- 판단 기준: "원본에 이것이 있었는가?" — NO면 제거 대상
+
 ## Output Format
 
 보고 항목마다:

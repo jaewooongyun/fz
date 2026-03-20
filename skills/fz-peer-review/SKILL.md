@@ -1,8 +1,11 @@
 ---
 name: fz-peer-review
 description: >-
-  팀원 코드 피어 리뷰. 3-Model Cross-Review로 9개 관점 독립 분석.
-  Use when reviewing a TEAMMATE's pull request or branch code with multi-perspective analysis.
+  This skill should be used when the user wants to review a teammate's PR or branch code.
+  Make sure to use this skill whenever the user says: "팀원 PR 리뷰해줘", "피어리뷰 해줘",
+  "동료 코드 봐줘", "PR 검토", "이 PR 리뷰", "peer review this PR", "review teammate's code",
+  "check this pull request", "review PR #123".
+  Covers: 팀원, PR 리뷰, 피어리뷰, 동료 코드, 3-Model Cross-Review, 9개 관점 독립 분석.
   Do NOT use for reviewing your own code (use fz-review).
 user-invocable: true
 disable-model-invocation: true
@@ -75,8 +78,6 @@ model-strategy:
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
 | Codex challenger 스킬 | 관점 3(Over-Engineering) + 관점 7 보조 + Devil's Advocate |
 | `~/.claude/schemas/codex_peer_review_schema.json` | Codex 응답 JSON 구조 |
-
----
 
 ## Step: Gather (컨텍스트 수집)
 
@@ -161,8 +162,6 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 <500줄 → FULL_INLINE | 500-2000줄 → SUMMARY | >2000줄 → FILE_LIST_ONLY
 ```
 
----
-
 ## Step: Analyze (독립 리뷰, 병렬)
 
 Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degradation" 섹션 참조).
@@ -246,8 +245,6 @@ codex exec \
 `{agent, agent_status, status_reason, issues[], strengths[], overall_assessment}` — 상세 필드는 arch-critic/code-auditor SKILL.md 참조.
 
 **Per-Agent 제약**: max 10 issues, description ≤400chars (WHY 필수), impact major+ 필수, suggestion ≤300chars, strengths ≤3. `challenges` 키는 Codex DA 전용 (기본값 `[]`).
-
----
 
 ## Step: Challenge (상호 비판)
 

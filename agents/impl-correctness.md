@@ -28,6 +28,12 @@ Primary code implementer. Implements code step by step based on plans, writes te
 - 코딩 표준: CLAUDE.md `## Guidelines` + `## Code Conventions` 섹션을 따른다.
 - 빌드: CLAUDE.md `## Build` 섹션의 명령어를 사용한다.
 
+## Source Fidelity (리팩토링/마이그레이션 시)
+
+원본 코드에 없는 것을 추가하지 않는다. optional 파라미터의 기본값이 있으면 생략한다.
+이유: "빈 값이 불안하니까 채워넣자"는 임의 판단이 원본 동작을 변경한다.
+추가가 필요하다고 판단되면 review-arch에게 질문하거나 Lead에게 에스컬레이션한다.
+
 ## Implementation Workflow
 
 1. Serena로 대상 심볼 확인 (`get_symbols_overview`, `find_symbol`)
