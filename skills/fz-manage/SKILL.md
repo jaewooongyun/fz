@@ -1,8 +1,11 @@
 ---
 name: fz-manage
 description: >-
-  fz- 스킬 시스템 관리 도구. 인벤토리, 의존성, 건강 체크, 일괄 품질 평가(benchmark), CRUD.
-  Use when managing skills, checking health, benchmarking quality, or viewing dependencies.
+  This skill should be used when the user wants to inspect or manage the fz- skill ecosystem as a whole.
+  Make sure to use this skill whenever the user says: "스킬 목록 보여줘", "건강 체크해줘",
+  "벤치마크 돌려줘", "의존성 확인", "스킬 관리", "전체 상태", "manage skills", "list all skills",
+  "health check", "run benchmark", "check dependencies", "skill inventory".
+  Covers: 스킬 목록, 건강 체크, 벤치마크, 의존성, 관리, 인벤토리, 일괄 품질 평가.
   Do NOT use for individual skill eval (use fz-skill eval) or skill CRUD (use fz-skill).
 user-invocable: true
 disable-model-invocation: true
@@ -47,6 +50,7 @@ model-strategy:
 /fz-manage check            # 건강 체크 (fz + Agent 통합)
 /fz-manage benchmark        # 전체 스킬 일괄 품질 평가
 /fz-manage benchmark --top3 # 하위 3개 스킬 개선 제안
+/fz-manage benchmark --with-trigger  # 하위 3개에 실측 트리거율 추가
 /fz-manage create fz-test   # 새 스킬 생성
 /fz-manage edit fz-plan     # 스킬 편집
 /fz-manage delete fz-test   # 스킬 삭제
@@ -177,6 +181,7 @@ fz- 스킬 + 에이전트를 일괄 검증합니다.
 | 8 | Agent | Team MCP 호환성 | 에이전트가 Team 불가 MCP 참조하지 않는지 |
 | 9 | fz-* | 테스트 케이스 존재 | SKILL.md에 "## 테스트 케이스" 섹션 또는 참조 링크 |
 | 10 | fz-* | Triggering 테스트 | should trigger + should NOT trigger 최소 3개 |
+| 11 | Infra | skill-creator 설치 | Glob으로 `run_loop.py` 탐색 → 있으면 OK, 없으면 WARN |
 
 ### 출력 형식
 
@@ -246,6 +251,16 @@ OK Triggering 테스트: N/N (3개+ 커버)
 
 하위 3개 스킬만 상세 분석 + 구체적 수정 가이드 출력.
 
+### `--with-trigger` 옵션
+
+하위 3개 스킬에 대해 skill-creator의 `run_eval.py` Quick Trigger Eval 추가 실행.
+상세: `~/.claude/skills/fz-skill/references/skill-creator-integration.md` "Quick Trigger Eval" 섹션.
+
+- 각 스킬: should-trigger 3개 + should-not-trigger 2개 자동 생성 → 1회 실행
+- 출력 테이블에 "Trigger" 컬럼 추가 (해당 스킬만, 나머지는 "-")
+- skill-creator 미설치 시: WARN 안내 후 Static Analysis만 실행
+- 스킬당 ~30초, 하위 3개만 = ~90초
+
 ### 정기 Benchmark 사이클
 
 | 시점 | 트리거 | 권장 행동 |
@@ -308,8 +323,6 @@ OK Triggering 테스트: N/N (3개+ 커버)
 
 - `check` → 문제 발견 시 `/fz-skill update` 안내
 - `deps` → 의존성 이상 시 `/fz-skill update` 안내
-- `benchmark` → 하위 스킬에 `/fz-skill eval` 또는 `/skill-creator` 안내
+- `benchmark` → 하위 스킬에 `/fz-skill eval` + `/fz-skill optimize` 안내
+- `benchmark --with-trigger` → 하위 3개에 실측 트리거율 추가, 낮으면 `/fz-skill optimize` 권장
 - `create` → 생성 완료 후 `check` 권장
-
-> `/skill-creator`는 fz-manage benchmark과 다른 관점의 독립 평가를 제공한다.
-> Benchmark 모드로 분산 분석 포함 품질 측정, Improve 모드로 description 자동 최적화 제안을 받을 수 있다.

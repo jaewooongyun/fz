@@ -175,6 +175,16 @@
 | 기본 모드 | SOLO |
 | 게이트 | 없음 |
 
+### 18. skill-optimize
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `스킬.*최적화\|description.*최적화\|트리거.*개선\|스킬.*트리거\|optimize.*skill\|trigger.*improve` |
+| 체인 | fz-skill eval → fz-skill optimize |
+| 기본 모드 | SOLO |
+| 게이트 | ✓ Runtime Trigger Eval (skill-creator run_eval.py) |
+| 특수 | skill-creator 미설치 시 eval만 실행 (optimize 스킵 + 설치 안내) |
+
 ---
 
 ## 동적 파이프라인 구성

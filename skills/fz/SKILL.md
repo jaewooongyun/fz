@@ -37,7 +37,7 @@ model-strategy:
 > Phase 0 (Session) → Phase 1 (Intent) → Phase 2 (Complexity) → Phase 3 (Pipeline+Team) → Phase 4 (Confirm) → Phase 5 (Execute)
 
 - **6-Phase 오케스트레이션**: 세션 부트스트랩 → 의도 분석 → 복잡도 평가 → 파이프라인+팀 결정 → 확인 → 실행
-- **사전 정의 파이프라인** (17개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
+- **사전 정의 파이프라인** (18개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
 - **동적 파이프라인**: `provides`/`needs` 그래프 기반 자동 구성 (폴백)
 - **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead + Primary(O) + N×Sonnet)
 - **모델 승격**: 핵심 생산자(Primary Worker)를 opus로 자동 승격
@@ -57,6 +57,7 @@ model-strategy:
 /fz "이걸 어떻게 구현하면 좋을까?"              # → discover (SOLO)
 /fz "모듈 12개 용어 통일" --batch              # → BATCH (worktree 병렬)
 /fz "빌드 실패 반복" --loop                    # → LOOP (자동 반복)
+/fz "스킬 트리거 최적화해줘"                    # → skill-optimize (SOLO)
 /fz "드리프트 체크해줘"                        # → drift-check (SOLO, fz-codex drift)
 /fz "독립 플랜 만들어줘"                       # → plan-parallel (SOLO, fz-codex plan)
 /fz "전체 봐줘"                               # → Medium confidence → AskUserQuestion 먼저
@@ -87,7 +88,7 @@ model-strategy:
 | modules/context-artifacts.md | PRJ 폴더 기반 compact recovery + 산출물 전달 |
 | modules/execution-modes.md | BATCH/LOOP/SIMPLIFY 실행 모드 |
 | modules/governance.md | kill-switch |
-| modules/pipelines.md | 17개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
+| modules/pipelines.md | 18개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
 | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
 | modules/plugin-refs.md | SwiftUI + Concurrency 플러그인 참조 가이드 |
 
@@ -211,7 +212,7 @@ model-strategy:
 
 ### 3.1 파이프라인 해결
 
-> 참조: `modules/pipelines.md` — 17개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
+> 참조: `modules/pipelines.md` — 18개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
 
 의도 키워드와 사전 정의 파이프라인의 트리거를 대조하여 최적 매칭합니다.
 매칭되지 않으면 3.2 동적 파이프라인으로 폴백.
@@ -493,8 +494,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
    - 리뷰 완료 → `/fz-commit` → `/fz-pr` 제안
    - 탐색만 완료 → `/fz-fix` 또는 `/fz-plan` 제안
    - 제약 발견 완료 → `/fz-plan` 제안 (정제된 요구사항 기반)
-   - 스킬 생성/수정 완료 → `/fz-skill eval` + `/skill-creator` 제안
+   - 스킬 생성/수정 완료 → `/fz-skill eval` + `/fz-skill optimize` 제안
    - 생태계 점검 필요 → `/fz-manage benchmark` 제안
    - 전체 사이클 완료 → 완료 보고서 출력
-
 > 모듈 참조: 상단 "모듈 참조" 섹션 참조

@@ -1,11 +1,14 @@
 ---
 name: fz-skill
 description: >-
-  스킬/에이전트 CRUD + 품질 평가 스킬. 지능형 생성(L3/L2/L1) + 수정 + 삭제 + eval 품질 평가.
-  Use when creating, modifying, evaluating skills or agents (eval, 평가, 품질, 검증).
+  This skill should be used when the user wants to create, modify, evaluate, or optimize skills and agents.
+  Make sure to use this skill whenever the user says: "스킬 만들어줘", "스킬 수정해줘",
+  "스킬 평가해줘", "에이전트 만들어줘", "최적화해줘", "description 개선", "create a skill",
+  "update this skill", "eval the skill", "optimize skill", "new agent".
+  Covers: 스킬 만들, 스킬 수정, 스킬 평가, 에이전트 생성, 최적화, CRUD, 품질 평가(eval).
   Do NOT use for document-only work (use fz-doc) or ecosystem health check (use fz-manage check/benchmark).
 user-invocable: true
-argument-hint: "[create|update|delete|new-agent|eval] [대상] [--from-discover]"
+argument-hint: "[create|update|delete|new-agent|eval|optimize] [대상] [--from-discover|--full|--runtime]"
 allowed-tools: >-
   Read, Write, Edit, Grep, Glob,
   mcp__sequential-thinking__sequentialthinking
@@ -17,7 +20,7 @@ provides: [skill-management]
 needs: [none]
 intent-triggers:
   - "스킬.*만들|스킬.*생성|스킬.*수정|스킬.*삭제|스킬.*평가|에이전트.*만들|에이전트.*생성"
-  - "create.*skill|new.*skill|update.*skill|delete.*skill|eval.*skill|create.*agent|new.*agent"
+  - "create.*skill|new.*skill|update.*skill|delete.*skill|eval.*skill|create.*agent|new.*agent|optimize.*skill|description.*최적화|트리거.*테스트"
 model-strategy:
   main: opus
   verifier: null
@@ -29,11 +32,12 @@ model-strategy:
 
 ## 개요
 
-> 서브커맨드: create | update | delete | new-agent | eval
+> 서브커맨드: create | update | delete | new-agent | eval | optimize
 
 - 스킬 생성: `.claude/templates/skill-template.md` + `.claude/guides/` 기반 지능형 생성
 - 에이전트 생성: `.claude/templates/agent-template.md` 기반
-- 품질 평가: Static Analysis + Triggering Test + Diff Eval
+- 품질 평가: Static Analysis + Runtime Trigger Eval + Triggering Test + Diff Eval
+- **Description 최적화**: skill-creator의 `run_loop.py` 활용, 실측 트리거율 기반 자동 개선
 - 문서 작성은 /fz-doc에 위임 (내부 모듈로 활용)
 - 3단계 자동화: L3(자동) → L2(대화형) → L1(템플릿+체크리스트)
 
@@ -47,6 +51,9 @@ model-strategy:
 /fz-skill new-agent test-runner "테스트 실행 에이전트" # 새 에이전트 생성
 /fz-skill eval fz-plan                               # 스킬 품질 평가
 /fz-skill eval fz-plan --diff                        # 수정 전/후 비교 평가
+/fz-skill eval fz-plan --runtime                     # 실측 트리거율 포함 평가
+/fz-skill optimize fz-plan                           # description 자동 최적화
+/fz-skill optimize fz-plan --full                    # description + 전체 eval 루프
 ```
 
 ## 가이드/템플릿 참조
@@ -118,6 +125,13 @@ model-strategy:
    - intent-triggers 중복 없음 확인
    - 500줄 이하 확인
 3. **출력**: 생성된 파일 경로 + 검증 결과
+
+### Phase 5: Description Optimization (권장)
+
+Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다.
+- AskUserQuestion: "Description 최적화를 실행하시겠습니까? (skill-creator run_loop.py 활용, ~5분)"
+- Yes → `optimize` 서브커맨드 실행
+- No → 완료
 
 ### Gate: Skill Created
 - [ ] YAML 13개 필드 중 필수 필드 완료?
@@ -226,7 +240,15 @@ model-strategy:
    | 과격 표현 | CRITICAL/MUST ALWAYS 등 부재 | PASS/WARN |
    | 에러 대응 | 테이블 존재 | PASS/WARN |
 
-3. **Triggering Test** (반자동):
+3. **Runtime Trigger Eval** (`--runtime` 옵션 또는 기본 포함):
+   skill-creator의 `run_eval.py`로 실제 `claude -p` 호출하여 트리거율 실측.
+   - 상세: `references/skill-creator-integration.md` 참조
+   - should-trigger 5개 + should-not-trigger 5개 자동 생성
+   - `run_eval.py` 실행 → 실측 trigger rate 산출
+   - PASS 기준: ≥80% 정확도
+   - **skill-creator 미설치 시**: SKIP (WARN) + 설치 안내, 정적 eval만 계속
+
+4. **Triggering Test** (반자동, Runtime 미실행 시 폴백):
    - description 키워드에서 should-trigger 쿼리 5개 자동 생성
    - Boundaries Will Not에서 should-NOT-trigger 쿼리 3개 자동 생성
    - 각 쿼리에 대해 트리거 적합성 자체 판단
@@ -245,9 +267,10 @@ model-strategy:
    | 항목 | 결과 | 비고 |
    |------|------|------|
    | Static Analysis | 7/8 PASS | Few-shot 2개 (WARN) |
-   | Triggering | 7/8 (87%) | "아키텍처" 미트리거 |
+   | Runtime Trigger | 8/10 (80%) | should-not 1개 오트리거 |
+   | Triggering (자체) | 7/8 (87%) | "아키텍처" 미트리거 |
 
-   총점: 85/100
+   총점: 85/100 (Static 65 + Runtime 16 + Triggering 4)
    개선 제안:
    - description에 "아키텍처" 키워드 추가
    - Few-shot 예시 1개 추가 (엣지 케이스)
@@ -288,6 +311,28 @@ Phase 2: 영향 보고 + 사용자 확인 → 삭제 + 후처리 안내
 
 ---
 
+## optimize — Description 최적화
+
+skill-creator의 `run_loop.py`를 활용하여 description의 실측 트리거 정확도를 자동 최적화한다.
+상세: `references/skill-creator-integration.md`
+
+### 절차 (요약)
+
+1. **경로 탐색 + Dependency Check**: skill-creator 플러그인 Glob 탐색, claude CLI + anthropic SDK 확인
+2. **Eval 쿼리 생성 + 사용자 검토**: intent-triggers → should-trigger 10개, Boundaries → should-not-trigger 10개 자동 생성 → eval_review.html로 브라우저 검토
+3. **최적화 루프**: `run_loop.py --max-iterations 5` 백그라운드 실행 (train/test 60/40 split, 쿼리당 3회)
+4. **결과 적용**: best_description 전후 비교 → 사용자 승인 → SKILL.md 반영
+
+`--full` 옵션: description 최적화 + 전체 eval 루프 (with-skill vs baseline 비교, grading, benchmark viewer)
+
+### Gate: Optimize Complete
+- [ ] skill-creator 경로 탐색 성공?
+- [ ] Eval 쿼리 20개 생성 + 사용자 검토 완료?
+- [ ] run_loop.py 실행 완료?
+- [ ] best_description 사용자 승인?
+
+---
+
 ## Boundaries
 
 **Will**:
@@ -295,7 +340,8 @@ Phase 2: 영향 보고 + 사용자 확인 → 삭제 + 후처리 안내
 - 기존 스킬 수정 (최적화 원칙 적용)
 - 스킬 삭제 (역의존성 분석 포함)
 - 새 에이전트 생성 (template + guide 기반)
-- 스킬 품질 평가 (eval)
+- 스킬 품질 평가 (eval — Static + Runtime Trigger)
+- Description 자동 최적화 (optimize — skill-creator 연동)
 - /fz-doc 패턴으로 문서 품질 보장
 - 생태계 정합성 검증
 
@@ -319,11 +365,8 @@ Phase 2: 영향 보고 + 사용자 확인 → 삭제 + 후처리 안내
 ## Completion → Next
 
 ```bash
-/fz-skill eval fz-{name}    # 품질 평가 (생성/수정 후 권장)
-/fz-manage check             # 생태계 건강 체크
-/fz-manage benchmark         # 전체 스킬 일괄 평가
-/skill-creator               # Anthropic 공식 Eval/Improve (보완적 사용)
+/fz-skill eval fz-{name}       # 품질 평가 (Static + Runtime Trigger)
+/fz-skill optimize fz-{name}   # description 자동 최적화 (생성/수정 후 권장)
+/fz-manage check                # 생태계 건강 체크
+/fz-manage benchmark            # 전체 스킬 일괄 평가
 ```
-
-> `/skill-creator`는 fz-skill eval과 다른 관점의 독립 평가를 제공한다.
-> Eval 모드로 다른 시각의 품질 측정, Improve 모드로 description 자동 최적화 제안을 받을 수 있다.
