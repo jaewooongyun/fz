@@ -1,8 +1,11 @@
 ---
 name: fz-codex
 description: >-
-  Codex CLI를 통한 독립적 코드/계획 검증 및 상호검증 모듈.
-  Use when verifying plans, reviewing code, or cross-validating changes with Codex.
+  This skill should be used when the user wants to cross-validate code or plans using Codex CLI.
+  Make sure to use this skill whenever the user says: "codex", "교차검증", "상호검증",
+  "cross-validate", "verify with codex".
+  Covers: Codex CLI, 교차검증, 상호검증, 독립 검증, 코드 리뷰 검증, 계획 검증.
+  Do NOT use for direct code review without Codex (use fz-review).
 user-invocable: true
 argument-hint: "[review|verify|validate|check|final] [대상]"
 allowed-tools: >-

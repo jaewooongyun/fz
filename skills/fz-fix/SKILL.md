@@ -1,8 +1,11 @@
 ---
 name: fz-fix
 description: >-
-  버그 수정 경량 스킬. 원인 분석 → 수정 → 빌드 검증의 빠른 사이클.
-  Use when fixing bugs, resolving crashes, correcting errors, or making quick targeted changes.
+  This skill should be used when the user reports a bug, crash, or error that needs fixing.
+  Make sure to use this skill whenever the user says: "고쳐줘", "수정해줘", "버그 있어", "크래시 나",
+  "에러 떠", "안 돼", "튕겨", "동작 안 해", "fix this", "it crashes", "there's a bug",
+  "getting an error", "not working", "broken".
+  Covers: 버그, 수정, 크래시, 에러, 고쳐, 안 돼, 튕겨, 빠른 원인 분석과 수정 사이클.
   Do NOT use for new feature implementation (use fz-code) or code exploration (use fz-search).
 user-invocable: true
 argument-hint: "[버그/에러 설명]"

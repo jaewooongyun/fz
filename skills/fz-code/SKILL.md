@@ -1,8 +1,11 @@
 ---
 name: fz-code
 description: >-
-  코드 구현 + 빌드 검증 스킬. 계획 기반 점진적 구현과 매 Step 빌드 검증.
-  Use when implementing new features, writing new code modules, or building planned functionality.
+  This skill should be used when the user asks to write, implement, or build code.
+  Make sure to use this skill whenever the user says: "구현해줘", "코드 짜줘", "만들어줘", "개발해줘",
+  "코딩해줘", "빌드해줘", "implement this", "code this up", "develop the feature", "build it",
+  "write the module", "create the class".
+  Covers: 구현, 코드, 만들어, 개발, 짜줘, 코딩, 빌드 검증, 계획 기반 점진적 구현.
   Do NOT use for bug fixes (use fz-fix) or code review (use fz-review).
 user-invocable: true
 argument-hint: "[구현 대상 설명]"
@@ -148,6 +151,9 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 
 ---
 
+> **임의 판단 금지**: 구현 중 "이게 맞겠지"라는 추측이 필요한 상황에서는 코드를 작성하지 않고 AskUserQuestion으로 사용자에게 확인한다.
+> 이유: 추측 기반 판단은 리뷰에서도 잡히지 않는 미묘한 동작 변경을 만든다.
+
 ## 구현 도구 선택 기준
 
 | 상황 | 도구 | 비고 |
@@ -194,6 +200,9 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | 검증 유보 | TODO/FIXME로 "나중에 전환", "추후 적용" 등 검증 없이 현재 구현을 정당화하는 주석 작성 | 이미 가능한 작업을 지연시킴 — 주석 작성 전에 실제로 불가능한지 SDK/API 확인 필수 |
    | 주석-추상화 불일치 | 범용 유틸/래퍼 클래스에 특정 기능 맥락의 주석 작성 (예: 범용 A/B 테스트 래퍼에 "카드형 Default" 주석) | 주석의 추상화 수준이 코드의 추상화 수준과 일치해야 함 — 범용 코드엔 범용 주석 |
    | 프로토콜 시그니처 불일치 | 메서드 시그니처 변경(파라미터 추가/제거/타입 변경) 시, `find_referencing_symbols`로 해당 메서드가 프로토콜 요구사항인지 자동 확인. 프로토콜 요구사항이면 선언부도 함께 변경되는지 검증. Swift 디폴트 파라미터(`= value`)는 프로토콜 적합성을 만족시키지 않음 — 별도 오버로드 필요 | RIBs에서 ViewController가 PresentableListener를 선언하고 Interactor가 구현하므로 파일이 분리됨. 시그니처만 변경하면 clean build에서 실패 |
+   | 모듈 경계 위반 | 모듈에 추가하는 타입이 도메인 특화 필드(비즈니스명), 하드코딩 UI 문자열, 또는 모듈 미사용 pass-through를 포함 | 도메인 로직이 인프라 모듈에 침투 — Plan의 Concern Classification과 대조. "이 타입이 여기 맞나?" 질문 |
+   | Import Orphan | import 제거 후 해당 모듈의 타입/typealias가 코드에 잔존 (빌드 시 "cannot find type" 에러 예정) | 치환 패턴 테이블 누락 — Plan의 Symbol Inventory와 대조하여 해당 심볼의 대체 방법 확인 |
+   | 원본 미존재 추가 | 리팩토링/마이그레이션에서 원본에 없던 파라미터, 로직, 타입을 추가하려 할 때. optional 파라미터에 기본값(nil)이 있는데 명시적으로 채우는 행위 포함 | 원본 동작 변경 위험 — AskUserQuestion 필수 |
 
    보고 형식:
    ```
@@ -284,6 +293,16 @@ Step 3 마찰 감지: ContentType 분기 5개 → Strategy 패턴 검토 필요
 - 원인: ContentDetailInteractor가 모든 타입을 직접 처리
 - 제안: ContentDetailStrategy 프로토콜 + 타입별 구현 분리
 - 판단: Step 4에서 분리 진행 (3개 이상 분기는 전략 패턴)
+
+BAD (원본 미존재 추가):
+// 원본: multipartFormData.append(fileURL, withName: "file")
+.init(data: try Data(contentsOf: fileURL), name: "file",
+      fileName: "file", mimeType: "application/octet-stream")
+→ 원본에 fileName/mimeType 없음. 임의 추가.
+
+GOOD:
+.init(data: try Data(contentsOf: fileURL), name: "file")
+→ optional 파라미터는 원본에 없으면 생략. 추가 필요 시 AskUserQuestion.
 ```
 
 ## Boundaries

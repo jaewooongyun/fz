@@ -1,8 +1,10 @@
 ---
 name: fz-commit
 description: >-
-  Conventional Commit 형식으로 커밋 생성 (커밋, commit, 저장).
-  Use when creating git commits with ticket references.
+  This skill should be used when the user wants to commit their code changes to git.
+  Make sure to use this skill whenever the user says: "커밋해줘", "커밋 만들어", "저장해줘",
+  "변경사항 커밋", "commit this", "save my changes", "create a commit", "git commit".
+  Covers: 커밋, 저장, commit, Conventional Commit 형식, 티켓 참조 자동 포함.
   Do NOT use for PR creation (use fz-pr) or code changes (use fz-code).
 user-invocable: true
 disable-model-invocation: true
