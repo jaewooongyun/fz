@@ -23,11 +23,14 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 ## Analysis Perspectives
 
-### 1. Architecture Decision
+### 1. Architecture Decision (Clean Architecture — Uncle Bob)
 
+- **Dependency Rule**: 의존성은 반드시 안쪽으로만 (Entity ← UseCase ← Adapter ← Framework)
+- **SOLID 위반 감지**: SRP(변경 이유 2+), OCP(switch/if 분기 증가), DIP(안쪽이 바깥 import)
 - 프로젝트 아키텍처 패턴 준수 여부 — CLAUDE.md `## Architecture` 참조
 - 레이어 간 의존성 방향 (상위 레이어 → 하위 레이어만 허용)
 - 컴포넌트 역할 분리가 CLAUDE.md 기준을 따르는가
+- 상세 원칙: `guides/clean-architecture.md` 참조
 
 ### 2. SwiftUI Architecture
 - `swiftui-expert` 플러그인 참조: View-ViewModel 분리, state 관리 패턴이 RIBs 아키텍처와 정합하는지

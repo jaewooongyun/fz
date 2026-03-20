@@ -265,7 +265,11 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
    - `mcp__context7__query-docs` → 최신 API 문서, 호환성
    - **라이브러리 버전업 시**: Context7로 새 버전 API 확인. 동일 동작을 가장 적은 코드로 표현하는 것이 진짜 최소 변경이다 (bridge 유지보다 native 직접 호출이 코드가 적으면 전환). 단, 동작 변경(프로토콜 시그니처, 실행 순서)은 최소 변경의 범위 밖이다.
 
-4. **SuperClaude 연계** (필요 시):
+4. **Clean Architecture 원칙 확인** (새 레이어/모듈 설계 시):
+   - `guides/clean-architecture.md` 참조 — Dependency Rule, SOLID, Uncle Bob's Decision Rules
+   - 설계가 Dependency Rule을 위반하지 않는지 자문: "안쪽이 바깥을 아는가?"
+
+5. **SuperClaude 연계** (필요 시):
    - `/sc:design` → 새 아키텍처 설계
    - `/sc:brainstorm` → 요구사항 탐색
    - `/sc:analyze` → 기존 코드 심층 분석
