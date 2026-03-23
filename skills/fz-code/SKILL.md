@@ -203,6 +203,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | 모듈 경계 위반 | 모듈에 추가하는 타입이 도메인 특화 필드(비즈니스명), 하드코딩 UI 문자열, 또는 모듈 미사용 pass-through를 포함 | 도메인 로직이 인프라 모듈에 침투 — Plan의 Concern Classification과 대조. "이 타입이 여기 맞나?" 질문 |
    | Import Orphan | import 제거 후 해당 모듈의 타입/typealias가 코드에 잔존 (빌드 시 "cannot find type" 에러 예정) | 치환 패턴 테이블 누락 — Plan의 Symbol Inventory와 대조하여 해당 심볼의 대체 방법 확인 |
    | 원본 미존재 추가 | 리팩토링/마이그레이션에서 원본에 없던 파라미터, 로직, 타입을 추가하려 할 때. optional 파라미터에 기본값(nil)이 있는데 명시적으로 채우는 행위 포함 | 원본 동작 변경 위험 — AskUserQuestion 필수 |
+   | 원본 버그 발견 | 모듈화/리팩토링 중 원본 코드의 버그를 발견 (dead code, 도달 불가 분기, 잘못된 순서 등) | "원본과 동일"로 방치 금지 — AskUserQuestion으로 수정 여부 확인. 혼자 판단하여 dismiss 금지 |
 
    보고 형식:
    ```
