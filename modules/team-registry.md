@@ -18,7 +18,7 @@
 | plan-structure | plan | 구현 구조 + Step 순서 설계 | sonnet | opus | project | — | — | Primary |
 | plan-tradeoff | plan | 트레이드오프 + 대안 비교 평가 | sonnet | — | — | — | — | |
 | plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | — | — | — | — | |
-| plan-impact | plan | 영향 범위 + 소비자 변경 추적 | sonnet | — | — | — | — | |
+| plan-impact | plan | 영향 범위 전담 (Exhaustive Impact Scan a~f) | sonnet | — | project | — | — | Impact Scanner |
 | impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | worktree | Primary |
 | impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | — | — | — | — | |
 | review-arch | review | 아키텍처 결정 + 레이어 위반 | sonnet | opus | project | arch-critic | — | Primary |
@@ -47,7 +47,7 @@
 | 스킬 | Primary | Supporting | 패턴 |
 |------|---------|-----------|------|
 | /fz-discover | plan-structure (O) | review-arch (S) | adversarial |
-| /fz-plan | plan-structure (O) | review-arch (S), review-direction (S) | collaborative |
+| /fz-plan | plan-structure (O) | plan-impact (S), review-arch (S), review-direction (S) | collaborative |
 | /fz-code | impl-correctness (O) | review-arch (S), impl-quality (S), review-correctness (S) | pair-programming |
 | /fz-fix | impl-correctness (O) | — (SOLO) | N/A |
 | /fz-review | review-arch (O) | review-quality (S), review-counter (S) | live-review |

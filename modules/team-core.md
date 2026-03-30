@@ -77,14 +77,22 @@
 
 ## 모델 전략
 
-2-Tier: opus(핵심) + sonnet(나머지). haiku 사용하지 않음.
+3-Tier: opus(핵심) + sonnet(나머지) + external(검증). haiku 사용하지 않음.
+
+> 근거: 같은 모델 N개는 비효과적(ICLR 2025). 이종 모델 조합이 핵심(X-MAS).
 
 | 역할 | 모델 | 조건 |
 |------|------|------|
 | Lead | opus | 항상 |
 | Primary Worker | opus | 팀 내 핵심 산출물 생산자 (도메인당 1명) |
-| Supporting | sonnet | 나머지 전부 |
-| Codex CLI | gpt-계열 | cross-model 다양성 (Lead가 직접 실행) |
+| Supporting | sonnet | 나머지 Claude 에이전트 전부 |
+| External 1 (Codex) | gpt-5.4 | cross-model 검증 (Lead가 CLI 직접 실행) |
+| External 2 (Gemini) | gemini-3 | Tiebreaker/Devil's Advocate (Lead가 CLI 직접 실행, 조건부) |
+
+외부 모델 실행 규칙:
+- Lead가 Codex/Gemini CLI를 직접 실행하고, 결과를 팀에 SendMessage로 공유
+- Codex: TEAM 모드에서 필수 (cross-validation.md 참조)
+- Gemini: --deep 또는 불일치 시에만 (Selective Consensus)
 
 승격 원칙:
 - **동시** opus 최대 2개: Lead(O) + Primary(O). 나머지 전부 sonnet.

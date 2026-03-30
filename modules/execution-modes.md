@@ -31,19 +31,28 @@
 - 2개 이하 파일 변경
 - 코드 생성 (빌드 검증 필요)
 
+### BATCH 자동 제안
+
+fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
+
+| 조건 | 제안 |
+|------|------|
+| plan에 독립 Step 3개+ | "/batch 병렬 실행 가능" 제안 |
+| 동일 패턴 반복 3회+ | "/batch 전환" 제안 |
+
 ## LOOP 모드 상세
 
 - /ralph-loop 파라미터: `--max-iterations N --completion-promise "GATE_PASSED"`
 - 에스컬레이션 래더 (각 반복마다 전략 상승):
 
-### 에스컬레이션 래더 (공통)
+### 에스컬레이션 래더 (스킬별 구체화)
 
-| Level | 전략 | 적용 |
-|-------|------|------|
-| L1 | 에러 직접 분석 → 수정 | 모든 Gate |
-| L2 | /sc:troubleshoot → 자동 진단 | 빌드 Gate |
-| L3 | /simplify → 복잡도 감소 | 코드 Gate |
-| L4 | AskUserQuestion → 사용자 에스컬레이션 | 최종 |
+| 스킬 | Gate | 1회 실패 | 2회 실패 | 3회 실패 |
+|------|------|---------|---------|---------|
+| fz-code | build | 에러 직접 수정 | /sc:troubleshoot | /simplify → AskUser |
+| fz-fix | build | 에러 직접 수정 | /sc:troubleshoot | AskUser |
+| fz-review | Reflection | 이슈 재확인 | Codex+Gemini 합의 | AskUser |
+| fz-plan | Stress Test | 계획 수정 | 계획 재작성 | AskUser |
 
 ### 스킬별 LOOP 파라미터
 
@@ -56,9 +65,13 @@
 
 ## SIMPLIFY 게이트 상세
 
-- /simplify는 선택적 게이트 (필수 아님)
-- 트리거 조건:
-  1. fz-code Step 완료 후 (코드 변경이 있을 때)
+- /simplify는 **조건부 필수** 게이트
+- 자동 트리거 조건 (필수):
+  1. Step에서 새 함수/메서드 3개+ 생성 → 과잉 추상화 감지
+  2. Step에서 100줄+ 코드 추가 → 복잡도 감소 필요
+  3. 3회 빌드 실패 후 성공 → 패치 누적 품질 저하
+- 선택적 트리거:
+  1. fz-code Step 완료 후 (위 조건 미해당 시)
   2. fz-review 시작 전 (pre-review cleanup)
 - `focus` 파라미터: 현재 Step의 관심사로 좁힘
 - 결과: 수정 적용 → 빌드 Gate 재확인

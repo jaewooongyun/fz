@@ -1,13 +1,13 @@
 ---
 name: fz-codex
 description: >-
-  This skill should be used when the user wants to cross-validate code or plans using Codex CLI.
+  This skill should be used when the user wants to cross-validate code or plans using Codex CLI (GPT).
   Make sure to use this skill whenever the user says: "codex", "교차검증", "상호검증",
-  "cross-validate", "verify with codex".
+  "cross-validate", "verify with codex", "GPT로 확인", "GPT로 검증".
   Covers: Codex CLI, 교차검증, 상호검증, 독립 검증, 코드 리뷰 검증, 계획 검증.
-  Do NOT use for direct code review without Codex (use fz-review).
+  Do NOT use for Gemini verification (use fz-gemini) or direct code review (use fz-review).
 user-invocable: true
-argument-hint: "[review|verify|validate|check|final] [대상]"
+argument-hint: "[review|verify|validate|check|final] [대상] [--provider gemini|codex] [--consensus]"
 allowed-tools: >-
   mcp__serena__search_for_pattern,
   mcp__serena__find_symbol,
@@ -18,8 +18,8 @@ composable: true
 provides: [verification]
 needs: [none]
 intent-triggers:
-  - "codex|교차검증"
-  - "codex|cross-validate|verify"
+  - "codex|교차검증|GPT"
+  - "codex|cross-validate|verify with codex"
 model-strategy:
   main: null
   verifier: sonnet
@@ -52,7 +52,27 @@ model-strategy:
 /fz-codex drift                     # 전체 코드베이스 아키텍처 드리프트 스캔
 /fz-codex plan "요구사항"            # Claude와 독립적인 플랜 생성 (교차 비교용)
 /fz-codex config                    # 설정 조회
+/fz-codex review --provider gemini   # Gemini 단독 리뷰
+/fz-codex verify --provider gemini   # Gemini 계획 검증
+/fz-codex review --consensus         # 3-Model 합의 (Codex + Gemini + Claude 비교)
 ```
+
+## 3-Model Consensus 모드
+
+> 근거: X-MAS(arxiv 2505.16997) — 이종 모델 조합 시 최대 47% 성능 향상
+> Gemini 단독 → `/fz-gemini` 스킬 사용. 여기서는 Codex + Gemini 합의만.
+
+### --consensus 옵션
+
+`/fz-codex review --consensus` 또는 `/fz-codex verify --consensus`
+
+Lead가 fz-codex + fz-gemini를 **병렬 실행**하여 합의:
+1. Codex 실행 (fz-codex) → 결과 A
+2. Gemini 실행 (fz-gemini) → 결과 B (병렬)
+3. Claude 비교 분석 → 합의표:
+   - A ∩ B (공통) → 높은 신뢰
+   - A - B / B - A (단독) → 중간 신뢰
+   - A ⊕ B (모순) → AskUserQuestion
 
 ## 모듈 참조
 

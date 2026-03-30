@@ -60,19 +60,38 @@ TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 �
 
 ---
 
-## Codex 포함 원칙 (TEAM 필수)
+## 외부 모델 포함 원칙 (TEAM 필수)
 
-모든 TEAM 스킬에 Codex CLI 참여. 파이프라인 게이트(후행)가 아닌 팀 내 병렬 검증자로 참여.
+> 핵심: TEAM = Claude 에이전트(N) + External(1-2). 코드/계획 생산 TEAM에 Codex 필수 + Gemini 조건부.
+> 근거: X-MAS(arxiv 2505.16997) — 이종 모델 조합 시 최대 47% 성능 향상.
 
-| 스킬 | Codex 서브커맨드 | 역할 | Codex 스킬 (3-Tier) |
-|------|----------------|------|-------------------|
-| /fz-plan | `fz-codex verify` | 계획 타당성 검증 | architect 역할 |
-| /fz-code | `fz-codex check` | 코드 품질 검증 | reviewer 역할 |
-| /fz-review | `fz-codex validate` | 리뷰 역검증 | guardian 역할 |
-| /fz-fix | `fz-codex check` | 수정 품질 검증 | reviewer 역할 |
-| /fz-search | `fz-codex` | 독립 탐색 경로 | searcher 역할 |
+| 스킬 | Codex | Gemini (조건부) | Codex 스킬 |
+|------|-------|----------------|-----------|
+| /fz-plan | `fz-codex verify` | `--consensus` 또는 `--deep` 시 | architect |
+| /fz-code | `fz-codex check` | Major 불일치 시 | reviewer |
+| /fz-review | `fz-codex validate` | Reflection < 80% 시 | guardian |
+| /fz-fix | `fz-codex check` | — | reviewer |
+| /fz-search | `fz-codex` | --deep 시 | searcher |
 
-> Codex 스킬은 3-Tier 디스커버리로 결정: CLAUDE.md `## Codex Skills` 매핑(Tier 1) → 글로벌 fz-*(Tier 2) → 인라인(Tier 3).
+> Codex 3-Tier 디스커버리: CLAUDE.md `## Codex Skills`(Tier 1) → 글로벌 fz-*(Tier 2) → 인라인(Tier 3).
+
+---
+
+## Selective Consensus (3-Model)
+
+Gemini는 항상 실행하지 않음. 불일치/의심 시에만 호출하여 비용 최적화:
+
+| 트리거 | 프로바이더 | 조건 |
+|--------|-----------|------|
+| code-changes (TEAM, 기본) | Codex | 기본 |
+| code-changes + Major 불일치 | Codex + Gemini | Codex와 Claude 판단 다를 때 |
+| planning (TEAM) | Codex verify | 기본 |
+| planning (--deep) | Codex + Gemini | 병렬 독립 검증 |
+| review + Reflection < 80% | Codex + Gemini | 재검증 강화 |
+
+### Disagreement 기록
+- PRJ 활성: `{WORK_DIR}/verify/consensus-{날짜}.md`
+- 비PRJ: `write_memory("fz:consensus:result", "합의/불일치 요약")`
 
 ---
 
@@ -82,6 +101,7 @@ TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 �
 |------|-----------------|-----------------|
 | SOLO | 빌드만 | 없음 (Lead 직접 판단) |
 | TEAM | 빌드 + Codex check + 에이전트 확인 | Codex verify + Lead 검토 |
+| TEAM --deep | 빌드 + Codex + Gemini 합의 | Codex + Gemini verify |
 
 ---
 

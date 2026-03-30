@@ -29,7 +29,7 @@ team-agents:
   primary: plan-structure
   supporting: [review-arch]
 composable: true
-provides: [refined-requirements, constraint-matrix, decision-rationale]
+provides: [landscape-map, trade-off-table, open-questions]
 needs: [none]
 intent-triggers:
   - "어떻게.*좋을까|어디에.*좋을까|뭐가.*맞을까|괜찮을까"
@@ -42,18 +42,19 @@ model-strategy:
   verifier: sonnet
 ---
 
-# /fz-discover - 제약조건 발견 + 요구사항 정제 스킬
+# /fz-discover - 풍경 탐색 + 경로 매핑 스킬
 
-> **행동 원칙**: 문제가 불명확할 때, 대화를 통해 제약조건을 하나씩 발견하고 모든 제약을 만족하는 해로 수렴한다. "거절할 때 즉시 대안을 제시"하는 Reject-Extract-Propose 프로토콜을 적용한다.
+> **행동 원칙**: 문제가 불명확할 때, 가능한 경로들의 풍경(landscape)을 탐색하고 각 경로의 비용/리스크/전제조건을 매핑한다. **결론을 내리지 않는다** — 결론은 plan이 내린다.
 
 ## 개요
 
-> ⛔ Phase 0 (PRJ Pre-flight) → Phase 1 (Problem Framing) → Phase 2 (Iterative Constraint Discovery) ↔ 사용자 대화 → Phase 3 (Convergence) → Phase 4 (Handoff)
+> ⛔ Phase 0 (PRJ Pre-flight) → Phase 1 (Problem Framing) → Phase 2 (Landscape Exploration) ↔ 사용자 대화 → Phase 3 (Path Mapping) → Phase 4 (Handoff)
 
-- 발산 후 수렴 (Diamond): 넓게 탐색한 후 제약으로 좁히기
-- Reject-Extract-Propose 프로토콜: 거절 → 제약 추출 → 대안 제시를 한 턴에
-- 제약 매트릭스: 대화 과정에서 점진적으로 채워지는 핵심 산출물
-- 코드 탐색 연동: 제약 검증을 위한 /fz-search 수준의 탐색 수행
+- 발산 중심 (Fan-out): 가능한 경로를 넓게 탐색
+- Reject-Extract-Propose 프로토콜: 거절 → 조건 추출 → 대안 제시를 한 턴에
+- Landscape Map: 경로 N개 + 각각의 전제조건/비용/리스크
+- **제약이 아닌 조건**: "불가"가 아니라 "이 경로를 선택하면 이런 비용이 든다"
+- 코드 탐색 연동: 각 경로의 실현 가능성 확인
 
 ## 사용 시점
 
@@ -242,36 +243,41 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 
 ---
 
-## Phase 2: Iterative Constraint Discovery
+## Phase 2: Landscape Exploration
 
-후보 옵션을 제시하고, 사용자 대화를 통해 제약을 발견하며, 제약 매트릭스를 갱신합니다.
+가능한 경로들을 넓게 탐색하고, 각 경로의 비용/리스크/전제조건을 매핑합니다.
+**탈락시키지 않는다** — "이 경로를 선택하면 이런 비용이 든다"로 기록.
 
 ### 절차 (매 라운드)
 
-1. **후보 옵션 제시** (2-3개):
-   - 각 옵션의 작동 방식 간결 설명
-   - 각 옵션이 만족/위반하는 제약 명시
-   - REP 규칙 2 적용: 본질이 같은 옵션은 합침
+1. **경로 제시** (2-4개):
+   - 각 경로의 작동 방식 간결 설명
+   - 각 경로의 **전제조건** (이 경로가 성립하려면 필요한 것)
+   - 각 경로의 **비용** (추가 작업량, 복잡도 증가, 유지보수 부담)
+   - 각 경로의 **리스크** (실패 가능성, 미지의 영역)
+   - REP 규칙 2 적용: 본질이 같은 경로는 합침
 
 2. **사용자 피드백 수집**:
-   - 직접 질문 또는 팀원 우려 → 새 제약으로 변환
-   - "보일러플레이트가 너무 많지 않을까?" → C5: caller 보일러플레이트 최소화
-   - "모든 화면에서 해야 하나?" → C6: 범용성 요구
+   - 직접 질문 또는 팀원 우려 → 새 **조건**으로 변환 (제약이 아닌 조건)
+   - "보일러플레이트가 너무 많지 않을까?" → 조건: caller 보일러플레이트가 적은 경로 선호
+   - "모든 화면에서 해야 하나?" → 조건: 범용성 요구 (경로별 범용성 비용 비교)
 
-3. **제약 검증 (필요 시)**:
-   - 코드 탐색으로 제약의 실재 여부 확인
-   - `mcp__serena__find_symbol` → "정말 BoardViewModel이 없는지?"
-   - `Grep` → "기존에 이 패턴을 쓰는 곳이 몇 개인지?"
+3. **조건의 불변성 검증** (핵심 추가):
+   - 발견된 조건에 대해: **"이 조건은 진짜 불변인가? 무시하면 어떻게 되는가?"**
+   - 코드 탐색으로 조건의 실재 여부 확인
+   - 불변 = hard constraint (기술적 불가능) → 표기: 🔒
+   - 가변 = soft preference (관성적 판단, 비용 문제) → 표기: 🔓
+   - 이 구분이 plan의 판단 자유도를 결정함
 
-4. **제약 매트릭스 갱신**:
-   - 새 제약 추가
-   - REP 규칙 3 적용: 기존 옵션 재평가
-   - 탈락 옵션은 탈락 사유와 함께 기록
+4. **Landscape Map 갱신**:
+   - 각 경로별: 전제조건 + 비용 + 리스크 + 조건 충족도
+   - **어떤 경로도 탈락시키지 않음** — 비용이 높은 경로도 "비용 X를 감수하면 가능"으로 유지
+   - 새 조건 발견 시 모든 경로에 대해 영향 재평가
 
-5. **수렴 판단**:
-   - 모든 제약을 만족하는 후보가 1개 → Phase 3으로
-   - 모든 후보가 1개 이상 제약 위반 → 트레이드오프 명시 + 사용자 선택
-   - 새 제약이 계속 나옴 → 라운드 계속 (사용자가 plan 전환을 결정할 때까지)
+5. **충분성 판단**:
+   - 경로들의 차이가 명확하고 사용자가 방향을 잡음 → Phase 3으로
+   - 경로 간 비용 차이가 불분명 → 추가 탐색 라운드
+   - 사용자가 plan 전환을 결정 → Phase 3으로
 
 6. **⛔ 저널 갱신** (항상 — compact recovery 필수):
    `discover-{DISCOVER_TAG}.md` 갱신:
@@ -301,40 +307,42 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 
 ---
 
-## Phase 3: Convergence
+## Phase 3: Path Mapping
 
-모든 제약을 만족하는 최종 해를 도출하고, 결정 근거를 정리합니다.
+탐색된 경로들을 정리하고, plan이 판단할 수 있는 형태로 매핑합니다.
+**⛔ 결론을 내리지 않는다** — 경로 선택은 plan의 몫.
 
 ### 절차
 
-1. **최종 해 도출**:
-   - `mcp__sequential-thinking__sequentialthinking` → 최종 후보가 모든 제약을 만족하는지 단계별 검증
-   - 만족 불가능 시: 어떤 제약을 완화할지 사용자에게 선택권 제시
+1. **Landscape Map 최종 정리**:
+   - `mcp__sequential-thinking__sequentialthinking` → 각 경로가 성립하는 조건과 비용을 정리
+   - 경로별: 전제조건 + 비용 + 리스크 + 조건 충족도
 
-2. **결정 근거 정리**:
-   - 왜 이 해가 선택되었는지 (다른 후보가 탈락한 제약 명시)
-   - 수용한 트레이드오프 (있다면)
-   - 관련 코드 참조 (기존 패턴과의 일관성 근거)
+2. **Trade-off Table 생성**:
 
-3. **최종 산출물 생성**:
-   - 제약 매트릭스 최종본
-   - 정제된 요구사항 (구현에 필요한 구체적 사항)
-   - 결정 근거 요약
+   ```markdown
+   | 경로 | 전제조건 | 비용 | 리스크 | 추천 상황 |
+   |------|---------|------|--------|----------|
+   | A | ... | 낮음 | 낮음 | 단순한 경우 |
+   | B | ... | 중간 | 중간 | 확장성 필요 시 |
+   | C | ... | 높음 | 낮음 | 장기 유지보수 중시 |
+   ```
 
-4. **⛔ 저널 최종 갱신** (항상 — compact recovery 필수):
-   `discover-{DISCOVER_TAG}.md`의 Current State를 최종본으로 갱신하고, 정제된 요구사항 섹션을 추가한다.
-   - PRJ 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` Current State 최종 갱신 + `{WORK_DIR}/index.md` 업데이트
-   - 비PRJ: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}-final", "제약 {N}개. 채택: {옵션}. 정제 요구사항: {요약}")`
+3. **Open Questions 정리**:
+   - 아직 답이 안 나온 질문들 (plan이 탐색해야 할 것)
+   - 조건의 불변성이 불확실한 항목 (🔓 표기된 것)
+   - 코드 탐색으로도 확인하지 못한 것
 
-### 최종 산출물 형식
+4. **⛔ 저널 최종 갱신** (항상):
+   - PRJ 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` 최종 갱신 + `{WORK_DIR}/index.md` 업데이트
+   - 비PRJ: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}-final", "경로 {N}개. 조건: {요약}. 열린질문: {N}개")`
 
-> 형식 참조: `modules/context-artifacts.md` → "최종 산출물 확장 (Phase 3 수렴 시)"
-
-### Gate 3: Converged
-- [ ] 최종 해가 모든 제약을 만족하는가? (또는 트레이드오프가 명시되었는가?)
-- [ ] 결정 근거가 명확한가?
-- [ ] 정제된 요구사항이 구현 가능한 수준으로 구체적인가?
-- [ ] ⛔ 아티팩트 기록 완료? (PRJ: 파일, 비PRJ: Serena checkpoint)
+### Gate 3: Paths Mapped
+- [ ] 경로가 2개 이상 매핑되었는가?
+- [ ] 각 경로의 전제조건/비용/리스크가 명시되었는가?
+- [ ] 조건의 불변성(🔒/🔓)이 구분되었는가?
+- [ ] 열린 질문이 정리되었는가?
+- [ ] ⛔ 아티팩트 기록 완료?
 
 ---
 
@@ -395,20 +403,22 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 ## Few-shot 예시
 
 ```
-BAD (제약 없이 바로 추천):
+BAD (결론 강제):
 사용자: "상태 관리를 어떻게 하면 좋을까?"
-답변: "@StateObject를 쓰세요."
-→ 제약 탐색 없이 단일 정답 제시. 코드 구조/기존 패턴 미확인.
+답변: "C1, C2 제약에 의해 @StateObject가 유일한 해입니다."
+→ 제약을 발견한 게 아니라 결론을 강제. plan이 다른 경로를 탐색할 여지 없음.
 
-GOOD (REP 프로토콜 + 제약 발견):
+GOOD (풍경 탐색 + 경로 비교):
 사용자: "상태 관리를 어떻게 하면 좋을까?"
 Phase 1: find_symbol → 기존 ViewModel 구조 확인, 기존 패턴(@Published + Combine) 식별
-→ 초기 제약: C1(RIBs Interactor가 비즈니스 로직 담당), C2(기존 Combine 기반)
-Round 1: 후보 A(@StateObject), B(Interactor→ViewModel), C(직접 @State)
-→ 각 후보가 C1, C2 만족/위반 여부 명시
-→ 사용자 피드백으로 C3(보일러플레이트 최소화) 발견
-Round 2: 후보 B 탈락(C3 위반), 새 후보 D 생성
-→ 제약 매트릭스 갱신 → 수렴
+→ 코드 기반 조건: 기존 Combine 패턴(🔓 관성, 전환 가능), RIBs Interactor 구조(🔒 아키텍처)
+Round 1: 경로 탐색
+  경로 A(@StateObject): 비용 낮음, 전제=ViewModel 존재, 리스크=RIBs 패턴과 불일치
+  경로 B(Interactor→Subject): 비용 중간, 전제=Combine 유지, 리스크=보일러플레이트
+  경로 C(직접 @State): 비용 낮음, 전제=단순 UI, 리스크=복잡해지면 리팩 필요
+→ 사용자 "보일러플레이트 걱정" → 조건 추가: 경로별 보일러플레이트 비용 비교
+Round 2: 각 경로의 보일러플레이트 비용 구체화 (탈락 없이 비교)
+→ Phase 3: Trade-off Table + Open Questions → plan이 최적 경로 선택
 ```
 
 ```
