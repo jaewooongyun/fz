@@ -1,6 +1,7 @@
-# Adversarial Constraint Discovery
+# Landscape Exploration (Adversarial)
 
-> fz-discover 전용 패턴. 옵션을 만들고 부수는 adversarial 루프로 제약을 드러낸다.
+> fz-discover 전용 패턴. 경로를 만들고 비용/리스크를 탐색하는 adversarial 루프.
+> 핵심 전환: "제약으로 탈락" → "비용/리스크로 비교". 어떤 경로도 탈락시키지 않는다.
 > 전제: team-core.md 로드 완료.
 
 ---
@@ -9,46 +10,48 @@
 
 | 역할 | 에이전트 | 행동 |
 |------|---------|------|
-| Primary | plan-structure (O) | 후보 옵션 생성 + 제약 회피 대안 설계 |
-| Supporting | review-arch (S) | 아키텍처 관점 제약 발견 (트레이드오프 + 엣지 케이스 + 레이어 위반) |
+| Primary | plan-structure (O) | 경로 생성 + 각 경로의 전제조건/실현성 평가 |
+| Supporting | review-arch (S) | 각 경로의 비용/리스크 탐색 + 조건 불변성(🔒/🔓) 판별 |
 
 ## 2.5-Turn 적용 (Mesh, 2명)
 
-### Round 1: 옵션 생성 + 제약 발견
+### Round 1: 경로 생성 + 비용 탐색
 ```
-plan-structure: 후보 옵션 2-3개 생성
-  → SendMessage(review-arch): "후보입니다. 제약 위반 찾아주세요: {옵션들}"
+plan-structure: 경로 2-4개 생성 (각각의 전제조건 명시)
+  → SendMessage(review-arch): "경로입니다. 각 경로의 비용/리스크를 탐색해주세요"
 
-review-arch: 각 후보의 아키텍처 제약 식별 (트레이드오프 + 엣지 케이스 + 레이어 위반)
-  → SendMessage(plan-structure): "옵션 A는 C1 위반, 옵션 B는 C2 위반. 근거: {코드 참조}"
-```
-
-### Round 2: 대안 생성 + 재검증
-```
-plan-structure: 제약 회피하는 새 옵션 D 생성
-  → SendMessage(review-arch): "새 옵션 D입니다. 기존 제약 C1, C2 모두 회피. 확인해주세요"
-
-review-arch: 새 옵션 검증 + 새 제약 발견 시 추가
-  → SendMessage(plan-structure): "C1, C2 OK. 새 제약 C3 발견: {근거}"
+review-arch: 각 경로의 비용/리스크 + 조건 불변성 판별
+  → SendMessage(plan-structure): "경로 A: 비용 낮음/리스크 중간. 조건 X는 🔒불변, Y는 🔓가변(관성). 근거: {코드}"
 ```
 
-### Round 0.5: 최종 보고
+### Round 2: 추가 경로 + 조건 도전
 ```
-plan-structure → SendMessage(Lead): "옵션 D 채택. 제약 매트릭스 최종본: {C1-C5}"
-review-arch → SendMessage(Lead): "아키텍처 검증 완료. 트레이드오프 + 엣지 케이스 커버리지: {내용}"
+plan-structure: 🔓가변 조건을 무시하는 새 경로 탐색 + 기존 경로 조건 업데이트
+  → SendMessage(review-arch): "조건 Y를 무시한 경로 D입니다. 실현 가능한지 확인해주세요"
+
+review-arch: 경로 D 실현성 + 조건 Y 무시 시 실제 비용 산정
+  → SendMessage(plan-structure): "Y 무시 시 비용: {구체적}. 새 조건 Z 발견: {근거}"
+```
+
+### Round 0.5: Landscape Map 보고
+```
+plan-structure → SendMessage(Lead): "경로 A/B/C/D. Trade-off Table. Open Questions 3개"
+review-arch → SendMessage(Lead): "조건 불변성 판별 완료. 🔒 3개, 🔓 2개. 비용/리스크 요약"
 ```
 
 ## Lead 역할
 
-- 사용자 대화 관리 (질문 수집 → 새 제약으로 변환)
-- 제약 매트릭스 최종 통합
-- 교착 시: 트레이드오프 명시 + 사용자 선택 요청
+- 사용자 대화 관리 (질문 수집 → 새 **조건**으로 변환, 제약이 아님)
+- Landscape Map 최종 통합
+- 외부 모델 실행 (TEAM --deep 시): Codex/Gemini에게 "완전히 다른 경로" 탐색 요청
+- 교착 시: Trade-off Table 제시 + "plan이 판단합니다" 안내
 
 ## 핵심 원칙
 
-- plan-structure가 만들고, review-arch가 부순다
-- 이 adversarial 루프에서 암묵적 제약이 드러난다
-- Reject-Extract-Propose: 거절 시 즉시 제약 추출 + 대안 제시
+- plan-structure가 경로를 만들고, review-arch가 **비용/리스크를 밝힌다** (부수지 않는다)
+- 조건은 🔒불변(기술적 불가능)과 🔓가변(관성/비용)으로 구분
+- **어떤 경로도 탈락시키지 않는다** — "비용 X를 감수하면 가능"으로 유지
+- discover는 결론을 내리지 않는다 — landscape를 그리고 plan에 넘긴다
 
 ## 참조 스킬
 

@@ -1,19 +1,34 @@
 ---
 name: plan-impact
 description: >-
-  영향 범위 + 소비자 변경 추적 에이전트. 변경의 파급 효과 분석.
+  영향 범위 + 소비자 변경 추적 에이전트. Exhaustive Impact Scan(a~f) 전담 수행.
+  변경의 파급 효과를 심볼 기반 + 텍스트 전수 검색으로 빠짐없이 분석.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview
+tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview, mcp__serena__search_for_pattern
 ---
 
 ## 역할
 
-변경의 파급 효과를 추적한다. 직접 소비자부터 간접 영향까지 레이어 전반의 변경 범위를 분석한다.
+변경의 파급 효과를 추적한다. 직접 소비자부터 간접 영향, 숨겨진 의존성까지 빠짐없이 분석한다.
+
+**렌즈**: "이 변경이 어디까지 퍼지는가?"
 
 ## MCP 도구
 
-- Primary: Serena (`find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`)
-- 소비자 체인 추적, 프로토콜/인터페이스 conformer 탐색에 집중
+- Primary: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`)
+- Secondary: Grep (텍스트 전수 검색 — 심볼 기반에서 놓치는 참조 보완)
+- 소비자 체인 추적, 프로토콜/인터페이스 conformer 탐색, 런타임 도달성 검증에 집중
+
+## Exhaustive Impact Scan (핵심 절차)
+
+plan-structure가 설계하는 동안 병렬로 수행:
+
+a. **텍스트 전수 검색**: 대상 타입/클래스명으로 Grep 전수 검색. 심볼 기반 결과와 대조하여 빠진 참조 식별.
+b. **런타임 도달성 검증**: 각 진입점의 실제 런타임 도달 여부 확인 (active/latent 구분).
+c. **사이드이펙트/순서 분석**: 기존 액션 패턴의 순서 의존성 식별.
+d. **Dead code 감지**: find_referencing_symbols 결과 0 → dead code 후보.
+e. **소비자 코드 품질 스캔** (모듈화 시): 앱 측 소비자 파일 전수 수집 + 사용 패턴 확인.
+f. **Import Symbol Inventory** (import 제거 시): 제거 대상 모듈의 모든 심볼 추출.
 
 ## 프로젝트 규칙
 

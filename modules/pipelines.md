@@ -159,7 +159,7 @@
 
 | 항목 | 값 |
 |------|---|
-| 트리거 | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` |
+| 트리거 | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획\|Gemini.*계획\|제미나이.*플랜` |
 | 체인 | fz-codex plan |
 | 기본 모드 | SOLO |
 | 실행자 | Lead → Codex plan (fz-planner 스킬) |
@@ -184,6 +184,16 @@
 | 기본 모드 | SOLO |
 | 게이트 | ✓ Runtime Trigger Eval (skill-creator run_eval.py) |
 | 특수 | skill-creator 미설치 시 eval만 실행 (optimize 스킵 + 설치 안내) |
+
+### 19. consensus-verify
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `합의\|consensus\|3모델\|멀티모델\|다른.*모델.*검증\|GPT.*Gemini\|제미나이.*검증\|multi-model` |
+| 체인 | fz-codex + fz-gemini (병렬) → Lead 합의표 |
+| 기본 모드 | SOLO |
+| 실행자 | Lead → Codex(fz-codex) + Gemini(fz-gemini) 병렬 → Claude 비교 합의 |
+| 게이트 | ✓ Selective Consensus (cross-validation.md) |
 
 ---
 

@@ -91,7 +91,7 @@ model-strategy:
 
 ---
 
-## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+## ⛔ Phase 0: ASD Pre-flight
 
 > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
 
@@ -120,18 +120,26 @@ model-strategy:
 
 > **프로젝트 규칙**: CLAUDE.md `## Guidelines` 섹션을 따른다.
 
-### Step 1: 버그 탐색 및 원인 분석
+### Step 1a: Reproduce — 재현 조건 확인
 
-1. **증상 파악**: 에러 메시지, 크래시 로그 확인
-2. **관련 코드 탐색** (Serena):
+1. **증상 파악**: 에러 메시지, 크래시 로그, 재현 경로 먼저 확인
+2. 재현 가능한 정확한 경로를 식별 (UI 흐름, API 호출 순서 등)
+
+### Step 1b: Isolate — 최소 범위로 좁히기
+
+1. **관련 코드 탐색** (Serena):
    - `mcp__serena__search_for_pattern` → 에러 메시지/키워드 검색
    - `mcp__serena__find_symbol` → 의심 심볼 찾기
    - `mcp__serena__find_referencing_symbols` → 호출 관계 파악
-3. **원인 추론** (복잡한 버그):
-   - `mcp__sequential-thinking__sequentialthinking` → 구조적 추론
+2. 원인 후보를 2-3개로 좁힘
+
+### Step 1c: Root-Cause — 증상이 아닌 원인 추적
+
+1. **구조적 추론** (복잡한 버그):
+   - `mcp__sequential-thinking__sequentialthinking` → 5 Whys 기법
    - `/sc:troubleshoot` → 자동 진단
    - `/sc:explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명
-     (트리거: 에러가 프로젝트 외부 코드에서 발생할 때)
+2. **⛔ Step 1c 완료 전 코드 수정 금지**. root-cause가 불명확하면 AskUserQuestion.
 
 ### Step 2: 수정
 
@@ -148,9 +156,9 @@ model-strategy:
 
 /ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
 
-### Step 4: (선택) 간단 리뷰
+### Step 4: Verify Fix (필수)
 
-복잡한 수정이었다면:
+수정이 재현 경로(Step 1a)에서 문제를 해결했는지 확인:
 - `mcp__serena__find_referencing_symbols` → 참조 무결성 확인
 - `/sc:analyze` → 빠른 품질 체크
 - `/sc:reflect --type task` → 수정이 근본 원인을 해결했는지 자체 검증

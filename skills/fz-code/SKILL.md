@@ -134,7 +134,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 
 ---
 
-## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+## ⛔ Phase 0: ASD Pre-flight
 
 > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
 
@@ -183,7 +183,11 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    - 최신 `{WORK_DIR}/code/step-N.md` 읽기 → 마지막 구현 상세 (있으면)
 
 2. **계획의 각 Step을 순서대로 구현**
-   - 각 Step은 명확한 완료 조건을 가짐
+   - 각 Step 완료 시 확인 (다음 Step 전제조건):
+     - □ 빌드 성공 (modules/build.md)
+     - □ 시그니처 변경 시: conformance 보존 확인 (`find_referencing_symbols`)
+     - □ 타입 변경 시: caller 1개 샘플 확인 (의도대로 호출되는지)
+   - /simplify 자동 트리거: 새 함수 3개+ 또는 100줄+ 추가 시 (modules/execution-modes.md)
 
 3. **구현 마찰 감지** (Implementation Friction Detection):
    각 Step 구현 중 아래 신호 감지 시 멈추고 사용자에게 보고:

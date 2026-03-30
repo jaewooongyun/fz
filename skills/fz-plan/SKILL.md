@@ -28,7 +28,7 @@ allowed-tools: >-
   Read, Grep, Glob
 team-agents:
   primary: plan-structure
-  supporting: [review-arch, review-direction, memory-curator]
+  supporting: [plan-impact, review-arch, review-direction, memory-curator]
 composable: true
 provides: [planning, architecture-analysis]
 needs: [none]
@@ -94,36 +94,59 @@ model-strategy:
 
 ```
 TeamCreate("plan-{feature}")
-├── Lead (Opus): 오케스트레이션 + 최종 판단
-├── plan-structure (★Opus): 핵심 계획 수립 (Primary Worker)
-├── review-arch (Sonnet): 아키텍처 실현성 검증
+├── Lead (Opus): 오케스트레이션 + 외부 모델 실행 + 최종 합성
+├── plan-structure (★Opus): 설계 + 분해 + 문서화 (Primary Worker)
+├── plan-impact (Sonnet): 영향 범위 전담 — Exhaustive Impact Scan (a~f)
+├── review-arch (Sonnet): 아키텍처 패턴 검증 (RIBs + Clean Architecture)
 ├── review-direction (Sonnet): 방향성 비판 + 대안 제시 (Phase 0.5)
-├── memory-curator (Sonnet): 관련 교훈 발굴 + plan-structure에 직접 전달 [선택적: --deep 또는 복잡도 4+]
-└── Cross-model 독립 검증 (Lead가 검증 실행)
+├── memory-curator (Sonnet): 관련 교훈 발굴 [선택적: --deep 또는 복잡도 4+]
+├── Codex verify (Lead 실행, GPT-5.4): 독립 계획 검증
+└── Gemini challenge (Lead 실행, Gemini-3): Devil's Advocate [조건부: --deep]
 ```
+
+**6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거):
+
+| 에이전트 | 렌즈 | 핵심 질문 |
+|---------|------|----------|
+| plan-structure | 설계 + 분해 | "어떻게 나누고 만들 것인가?" |
+| plan-impact | 영향 범위 | "이 변경이 어디까지 퍼지는가?" |
+| review-arch | 아키텍처 일관성 | "기존 패턴/규칙과 맞는가?" |
+| review-direction | 방향성 도전 | "근본적으로 다른 접근은?" |
+| Codex verify | 독립 검증 | "이 계획에 빠진 것은?" |
+| Gemini challenge | Devil's Advocate | "이 계획이 실패할 가장 큰 위험은?" |
 
 > ASD 폴더 활성 시: `{WORK_DIR}/plan/plan-team.md`에 direction-challenge + collaborative design 핵심 통신을 기록한다.
 
-### 통신 패턴: Collaborative Design (Peer-to-Peer)
+### 통신 패턴: Parallel Analysis + Cross-Feedback
 
-plan-structure와 review-arch가 **만들면서 직접 토론**하여 설계를 고도화하는 패턴.
-Lead를 거치지 않고 직접 SendMessage로 대화한다.
+3개 Claude 에이전트가 **다른 렌즈로 병렬 분석** 후 교차 피드백하는 패턴.
+Lead는 외부 모델(Codex/Gemini)을 병렬 실행하여 이종 검증을 확보한다.
 
 ```
-Round 1: plan-structure → 초안 작성 → SendMessage(review-arch): "초안입니다. 실현성 검토해주세요"
-         review-arch → SendMessage(plan-structure): "Module X 의존성 역전. 대안: {제안}"
-Round 2: plan-structure → 피드백 반영 + 질문 → SendMessage(review-arch): "수정했는데 Y 영향은?"
-         review-arch → SendMessage(plan-structure): "Y는 OK. Z 프로토콜 변경 필요"
-Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계안: {결과}"
+[Round 1 — 병렬 독립 분석]
+  plan-structure: 요구사항 분해 + 초기 설계
+  plan-impact: Exhaustive Impact Scan (a~f) — 영향 범위 전담
+  review-arch: 아키텍처 패턴 매칭 (RIBs/Clean Architecture)
+  Lead: Codex verify + Gemini challenge (병렬 CLI 실행)
+
+[Round 2 — 교차 피드백]
+  plan-impact → plan-structure: "영향 범위 + 숨겨진 의존성 + dead code"
+  review-arch → plan-structure: "패턴 위반 + Dependency Rule + 대안"
+  Lead → plan-structure: "GPT 이슈 {N}개, Gemini 도전 {M}개"
+  plan-structure: 모든 피드백 통합 → 설계 수정
+
+[Round 0.5 — 최종 보고]
+  plan-structure → Lead: "최종 계획 + [합의/불합의 항목]"
+  Lead: 6개 렌즈 발견 통합 → 합의표 작성
 ```
 
-**핵심**: 설계하는 **도중에** 실현성 검증이 들어오므로 완성 후 뒤집는 일이 없다.
+**핵심**: 설계/영향분석/패턴검증이 **동시에** 진행되고, 외부 모델이 Claude blind spot을 보완한다.
 
 > plan-structure 에이전트가 이 스킬의 워크플로우를 활용합니다.
 
 ---
 
-## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+## ⛔ Phase 0: ASD Pre-flight
 
 > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
 
@@ -157,9 +180,11 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
    - `mcp__serena__find_symbol` → 컴포넌트 탐색
 
 5. **이전 Discover 결과 로드** (ASD 폴더 활성 시):
-   - `{WORK_DIR}/discover/discover-journal.md` 읽기 → 제약 매트릭스 복원
+   - `{WORK_DIR}/discover/discover-journal.md` 읽기 → Landscape Map + Trade-off Table + Open Questions 복원
    - `{WORK_DIR}/discover/discover-plan.md` 읽기 → mid-pipeline discover 결과 (있으면)
-   - 있으면 Phase 1의 "요구사항 구조 분해" 스킵 가능 → 영향 분석부터
+   - **⛔ discover 결과는 "전제"가 아닌 "참고"**: plan은 discover의 경로 중 하나를 선택하거나, 새 경로를 설계할 수 있음
+   - 🔒불변 조건만 plan의 제약으로 채택. 🔓가변 조건은 비용 비교 대상으로만 활용
+   - Open Questions는 plan Phase 1에서 추가 탐색 대상
 
 ### Gate 0b: Context Ready
 - [ ] 프로젝트 활성화 완료?
@@ -223,8 +248,9 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
 ### 절차
 
 1. **요구사항 구조 분해**:
-   - /fz-discover의 `refined-requirements`가 있으면 → 이미 정제된 요구사항이므로 구조 분해 단계 생략, 바로 영향 분석으로
-   - /fz-discover의 `constraint-matrix`가 있으면 → 설계 스트레스 테스트(Q1-Q6)에서 이미 발견된 제약은 재검증 생략
+   - /fz-discover의 `landscape-map`이 있으면 → 경로 비교 기반으로 최적 경로를 선택하고 영향 분석으로 진입
+   - /fz-discover의 `open-questions`가 있으면 → 구조 분해 시 해당 질문을 우선 탐색
+   - /fz-discover의 `trade-off-table`이 있으면 → Direction Challenge(Phase 0.5)에서 이미 비교된 경로 활용
    - 없으면 → `mcp__sequential-thinking__sequentialthinking` → 단계별 분해 (기존 절차)
 
 2. **코드베이스 영향 분석**:
@@ -232,8 +258,8 @@ Round 3: 양쪽 합의 → SendMessage(team-lead): "합의 완료. 최종 설계
    - `mcp__serena__find_referencing_symbols` → 영향받는 심볼/파일
    - `mcp__serena__search_for_pattern` → 기존 유사 구현 패턴
 
-   **⛔ Exhaustive Impact Scan** (반성 5차 — 누락 방지):
-   > 반성 교훈: 심볼 기반 탐색만으로는 글로벌 패턴(UIWindow.motionBegan 등), 런타임 비활성 경로, 사이드이펙트 순서를 놓친다.
+   **⛔ Exhaustive Impact Scan**:
+   > TEAM 모드에서는 plan-impact 에이전트가 이 단계를 전담 수행한다 (병렬).
 
    심볼 기반 탐색 후 반드시 아래 4단계를 수행한다:
 
