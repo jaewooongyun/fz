@@ -10,9 +10,9 @@
 
 ```
 ~/.claude/
-├── skills/           # 21개 스킬 — 사용자가 직접 호출하는 워크플로우 단위
+├── skills/           # 22개 스킬 — 사용자가 직접 호출하는 워크플로우 단위
 │   ├── fz/           # 오케스트레이터 (모든 스킬의 진입점)
-│   ├── fz-*/         # 18개 도메인별 스킬
+│   ├── fz-*/         # 19개 도메인별 스킬 (fz-gemini 추가)
 │   ├── arch-critic/  # 아키텍처 비평 (peer review용)
 │   ├── code-auditor/ # 코드 품질 감사 (peer review용)
 ├── agents/           # 14개 에이전트 — 팀 모드에서 전문 역할 수행
@@ -35,7 +35,7 @@
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Skills (21개)         실행 가능한 워크플로우 단위                      │
+│  Skills (22개)         실행 가능한 워크플로우 단위                      │
 │                                                                 │
 │  ┌─ 개발 ───────┐ ┌─── 탐색 ─────┐ ┌──── 검증 ────┐  ┌─ 출하 ─────┐  │
 │  │ fz-plan     │ │ fz-discover │ │ fz-review   │ │ fz-commit │  │
@@ -80,7 +80,7 @@
 │  Infrastructure       MCP 서버 + CLI + 플러그인                     │
 │                                                                 │
 │  MCP: Serena  Context7  XcodeBuildMCP  Atlassian  GitHub  LSP   │
-│  CLI: Codex   gh  xcodebuild  uv                                │
+│  CLI: Codex  Gemini  gh  xcodebuild  uv                        │
 │  Plugin: SuperClaude  SwiftUI-Expert  Swift-Concurrency         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -144,16 +144,17 @@
 스킬 (SOLO/TEAM)              TEAM 모드 에이전트 구성
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-fz-discover ──────────┬── ★plan-structure (O)    설계 제안
-  제약조건 발견           ├── review-arch (S)        파괴적 검증
-  Adversarial 패턴      └── memory-curator (S)     과거 교훈
+fz-discover ──────────┬── ★plan-structure (O)    경로 생성 + 실현성
+  풍경 탐색 + 경로 매핑    ├── review-arch (S)        비용/리스크 탐색 + 🔒/🔓 판별
+  Landscape 패턴        └── memory-curator (S)     과거 교훈
 
 fz-plan ───────────────┬── review-direction (S)   방향 도전 (Phase 0.5)
-  계획 수립              ├── ★plan-structure (O)    구현 구조 설계
-  Collaborative 패턴    ├── plan-impact (S)        영향 범위 추적
-                       ├── plan-edge-case (S)     엣지 케이스 발굴
-                       ├── plan-tradeoff (S)      대안 비교
-                       └── memory-curator (S)     과거 교훈
+  6-Agent Plan Team     ├── ★plan-structure (O)    설계 + 문서화
+  Parallel Analysis     ├── plan-impact (S)        Exhaustive Impact Scan 전담
+                       ├── review-arch (S)        아키텍처 패턴 검증
+                       ├── memory-curator (S)     과거 교훈
+                       ├── Codex verify (GPT)     독립 계획 검증
+                       └── Gemini challenge       Devil's Advocate [--deep]
 
 fz-code ───────────────┬── ★impl-correctness (O)  점진적 구현
   코드 구현               ├── impl-quality (S)       코딩 표준 감시
@@ -345,20 +346,21 @@ Lead ─┬── SendMessage(type:"shutdown_request", recipient:"impl-correctne
 
 ---
 
-## Skills (21개)
+## Skills (22개)
 
 | 카테고리 | 스킬 | 호출 | 설명 |
 |---------|------|------|------|
 | **오케스트레이터** | fz | `/fz "요청"` | 자연어 → 파이프라인 자동 구성 + SOLO/TEAM 결정 |
 | **개발** | fz-plan | `/fz-plan` | 계획 수립 + 요구사항 분석 + 영향 범위 분석 |
-| | fz-code | `/fz-code` | 계획 기반 점진적 구현 + 매 Step 빌드 검증 |
-| | fz-fix | `/fz-fix` | 버그 수정. 원인 분석 → 수정 → 빌드 검증 |
+| | fz-code | `/fz-code` | 계획 기반 점진적 구현 + 매 Step 빌드 검증 + Step 완료 조건 3개 |
+| | fz-fix | `/fz-fix` | 버그 수정. 4-Phase (Reproduce→Isolate→Root-Cause→Verify) |
 | | fz-review | `/fz-review` | 자기 코드 리뷰. Claude + Codex + sc:analyze 3중 검증 |
 | | fz-commit | `/fz-commit` | Conventional Commit 형식 커밋 |
 | | fz-pr | `/fz-pr` | Fork 기반 PR 생성 (push → PR create) |
-| **탐색** | fz-discover | `/fz-discover` | 소크라테스식 제약조건 발견 + Reject-Extract-Propose |
+| **탐색** | fz-discover | `/fz-discover` | 풍경 탐색 + 경로 매핑. 결론 없이 landscape를 그려 plan에 전달 |
 | | fz-search | `/fz-search` | 코드 탐색 + 구조 분석 + 의존성 추적 |
-| **검증** | fz-codex | `/fz-codex` | Codex CLI 교차 검증. Cross-model 상호검증 (Q1-Q7) |
+| **검증** | fz-codex | `/fz-codex` | Codex CLI(GPT) 교차 검증 + --consensus (3-Model 합의) |
+| | fz-gemini | `/fz-gemini` | Gemini CLI Devil's Advocate. 대안 관점 + 위험 분석 |
 | | fz-peer-review | `/fz-peer-review` | 동료 PR 리뷰. 9개 관점 독립 분석 + TeamCreate 프로토콜 |
 | | fz-pr-digest | `/fz-pr-digest` | PR 변경 설명. Before/After + 학습 포인트 |
 | **문서** | fz-doc | `/fz-doc` | 스킬/에이전트/CLAUDE.md 문서 작성 |
@@ -380,7 +382,7 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | 도메인 | 에이전트 | 역할 | 참여 스킬 |
 |--------|---------|------|----------|
 | **계획** | plan-structure | 구현 구조 + Step 순서 설계 | fz-plan★, fz-discover★ |
-| | plan-impact | 영향 범위 + 소비자 변경 추적 | fz-plan |
+| | plan-impact | Exhaustive Impact Scan 전담 (영향 범위 + 숨겨진 의존성) | fz-plan |
 | | plan-edge-case | 엣지 케이스 + 실패 시나리오 발굴 | fz-plan |
 | | plan-tradeoff | 트레이드오프 + 대안 비교 | fz-plan |
 | **구현** | impl-correctness | 점진적 구현 + 기능 정확성 보장 | fz-code★, fz-fix★ |
@@ -410,7 +412,7 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | | session.md | 세션 자동 감지 + 이슈 트래커 연동 |
 | **정책** | complexity.md | 5차원 복잡도 → SOLO/TEAM 결정 |
 | | intent-registry.md | 의도 트리거 패턴 + confidence 판정 |
-| | pipelines.md | 17개 사전 정의 파이프라인 |
+| | pipelines.md | 19개 사전 정의 파이프라인 |
 | | execution-modes.md | BATCH, LOOP, SIMPLIFY 확장 모드 |
 | | governance.md | 거버넌스. 변경 통제 + 긴급 정지 |
 | | codex-strategy.md | Codex 실행 전략 (Branch, Effort, Mode) |
@@ -419,8 +421,9 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | **컨텍스트** | context-artifacts.md | 파일 기반 산출물 + compact 복원 |
 | | cross-validation.md | 교차 검증 게이트 + Reflection Rate + Consumer Quality |
 | | plugin-refs.md | 스킬-역할별 플러그인 매칭 |
-| **통신 패턴** | patterns/adversarial.md | fz-discover: 만들고 부수며 제약 발견 |
-| | patterns/collaborative.md | fz-plan: 만들면서 토론하여 개선 |
+| | cross-validation.md | + Selective Consensus (3-Model: Claude+GPT+Gemini) |
+| **통신 패턴** | patterns/adversarial.md | fz-discover: 경로 생성 + 비용/리스크 탐색 (Landscape) |
+| | patterns/collaborative.md | fz-plan: 6-Agent 병렬 분석 + 교차 피드백 |
 | | patterns/pair-programming.md | fz-code: 구현 중 실시간 검증 |
 | | patterns/live-review.md | fz-review: 다른 렌즈로 동시 리뷰 |
 | | patterns/cross-verify.md | fz-search: 독립 탐색 교차 검증 |
@@ -524,6 +527,7 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | **plan-parallel** | "독립 플랜" | fz-codex plan |
 | **peer-review** | "PR 리뷰해줘" | fz-peer-review |
 | **pr-digest** | "PR 요약" | fz-pr-digest |
+| **consensus-verify** | "3모델 합의 검증" | fz-codex + fz-gemini (병렬) |
 | **doc-update** | "문서 업데이트" | fz-doc |
 
 ---
@@ -553,6 +557,7 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | CLI | 용도 | 사용 스킬 | 설치 | 없을 때 |
 |-----|------|----------|------|--------|
 | **Codex CLI** | Cross-model 교차 검증 (GPT 기반) | fz-codex, fz-review, fz-code, fz-plan, fz-peer-review | `npm i -g @openai/codex` + `~/.codex/config.toml` | 검증 단계 스킵 or `/sc:analyze` 폴백 |
+| **Gemini CLI** | Devil's Advocate + 장문 분석 (1M context) | fz-gemini, consensus-verify | `npm i -g @google/gemini-cli` + OAuth GCA 인증 | Gemini 검증 스킵 |
 | **GitHub CLI** (`gh`) | PR, 이슈, 인증 | fz-pr, fz-peer-review, fz-pr-digest | `brew install gh` | GitHub MCP 폴백 |
 | **xcodebuild** | iOS 빌드 (XcodeBuildMCP 폴백) | modules/build.md | Xcode 설치 시 포함 | — |
 | **uv + Python** | Excalidraw PNG 렌더링 | fz-excalidraw | `brew install uv` | JSON만 출력 (렌더 불가) |
@@ -615,6 +620,43 @@ Claude Code + Serena MCP + Context7 MCP + Codex CLI + SuperClaude
 ---
 
 ## Changelog
+
+### v3.0 (2026-03-30) — 3-Model Triad + 6-Agent Team + Landscape Discover
+
+**3-Model Triad Architecture (연구 기반: X-MAS 47% 향상, ICLR 2025)**
+- Claude(생산) + GPT/Codex(검증) + Gemini(Devil's Advocate) 3모델 체계
+- fz-gemini 스킬 신규 생성 — Gemini CLI 전용 (review, verify, challenge)
+- fz-codex에 --consensus 옵션 — 3모델 합의 모드
+- cross-validation.md: Selective Consensus (불일치 시에만 Gemini 호출)
+- team-core.md: 2-Tier → 3-Tier 모델 전략 (opus/sonnet/external)
+- consensus-verify 파이프라인 신규 (#19)
+
+**6-Agent Plan Team**
+- fz-plan: 4 Claude + 1 GPT + 1 Gemini = 6개 차별화된 렌즈
+- plan-impact 에이전트를 Impact Scanner로 강화 (Exhaustive Impact Scan 전담)
+- Parallel Analysis + Cross-Feedback 통신 패턴
+- 각 에이전트가 다른 질문을 던짐 (같은 질문 금지)
+
+**Landscape Discover (discover 패러다임 전환)**
+- "제약 발견 + 수렴" → "풍경 탐색 + 경로 매핑"
+- provides: constraint-matrix → landscape-map + trade-off-table + open-questions
+- 조건 불변성 구분: 🔒 hard constraint vs 🔓 soft preference
+- discover는 결론을 내리지 않음 — plan이 경로를 선택
+- adversarial 패턴: "부수기" → "비용/리스크 밝히기"
+
+**Native Commands 활성화**
+- /simplify: 선택 → 조건부 필수 (새 함수 3개+, 100줄+, 3회 빌드 실패)
+- /batch: 독립 Step 3개+ 감지 시 자동 제안
+- LOOP: 스킬별 에스컬레이션 래더 구체화
+
+**Skill Refinement**
+- fz-fix: 4-Phase 디버깅 (Reproduce → Isolate → Root-Cause → Verify Fix)
+- fz-code: Step 완료 조건 3개 명시 (빌드 + conformance + caller 확인)
+- Hooks 기반 물리적 강제: git commit 차단, platformFilter 자동 검사
+
+**De-overfit**
+- 반성 마커 제거 (규칙 유지, 출처만 삭제)
+- Gate 체크리스트 경량화 (공통/조건부 분리)
 
 ### v2.5 (2026-03-20) — skill-creator Integration + Description Overhaul + Clean Architecture
 
