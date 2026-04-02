@@ -51,11 +51,34 @@ review-arch → SendMessage(impl-correctness):
 이 즉석 질문은 2.5-Turn 메시지 카운트에 포함하지 않는다.
 다만 Round 0.5 이전까지만 허용.
 
+## Supporting 에이전트 통신
+
+### impl-quality → impl-correctness (매 Step 완료마다)
+```
+impl-quality: Step N 구현 코드 검토 (빌드 성공 후)
+  → SendMessage(impl-correctness):
+    "패턴 피드백: (1) LGTM 또는 (2) Issue {N}건:
+     - {코딩 표준}: {위치} — {수정 제안}
+     - {패턴 불일치}: {기존 패턴} vs {현재 구현}"
+```
+타이밍: 매 Step 완료 + 빌드 성공 직후. Lead에게 보고하지 않음 (피어 직접).
+
+### review-correctness → impl-correctness (중간점 + 마지막)
+3+ Step 구현의 50% 지점 + 마지막 Step 완료 후:
+```
+review-correctness: RTM 대비 진행도 확인
+  → SendMessage(impl-correctness):
+    "요구사항 체크: R1 implemented, R2 implemented, R3 pending.
+     우려: R3의 검증 방법이 불충분하지 않은지?"
+```
+타이밍: 전체 Step의 50% 완료 시점 + Gate 3 진입 전.
+
 ## Lead 역할
 
-- 계획(Step 목록) 전달 → 에이전트에 구현 지시
+- 계획(Step 목록) + Handoff Brief 전달 → 에이전트에 구현 지시
 - 매 Step 완료 후 빌드 검증 수행
 - 빌드 실패 시 에러 정보를 impl-correctness에 전달
+- L3 에이전트 결과 도착 시 팀 피드백 (team-core.md L3-to-L1)
 - Codex 검증 위임 (fz-codex check)
 
 ## 참조 스킬

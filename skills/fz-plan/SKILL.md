@@ -28,7 +28,7 @@ allowed-tools: >-
   Read, Grep, Glob
 team-agents:
   primary: plan-structure
-  supporting: [plan-impact, review-arch, review-direction, memory-curator]
+  supporting: [plan-impact, plan-edge-case, review-arch, review-direction, memory-curator]
 composable: true
 provides: [planning, architecture-analysis]
 needs: [none]
@@ -68,6 +68,7 @@ model-strategy:
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | PRJ 폴더 기반 compact recovery + 비PRJ Serena checkpoint |
+| modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -80,6 +81,7 @@ model-strategy:
 | Phase 1 | `/sc:workflow` | PRD → 구현 워크플로우 자동 생성 (5+ Step 시) |
 | Phase 1 | `/sc:spec-panel` | 아키텍처 스펙 전문가 패널 리뷰 (새 모듈 시, --deep 시) |
 | Phase 2 | 검증 도구 | 계획 검증 (독립 스킬) |
+| Phase 2 | `/sc:estimate` | 공수 추정 (복잡도 4+ 시, 조건부) |
 | Phase 3 | `/sc:reflect` | 피드백 반영 후 자체 검증 |
 
 ## Plugin 참조 (Swift Concurrency)
@@ -97,9 +99,10 @@ TeamCreate("plan-{feature}")
 ├── Lead (Opus): 오케스트레이션 + 외부 모델 실행 + 최종 합성
 ├── plan-structure (★Opus): 설계 + 분해 + 문서화 (Primary Worker)
 ├── plan-impact (Sonnet): 영향 범위 전담 — Exhaustive Impact Scan (a~f)
+├── plan-edge-case (Sonnet): 엣지 케이스 + 실패 시나리오 발굴
 ├── review-arch (Sonnet): 아키텍처 패턴 검증 (RIBs + Clean Architecture)
 ├── review-direction (Sonnet): 방향성 비판 + 대안 제시 (Phase 0.5)
-├── memory-curator (Sonnet): 관련 교훈 발굴 [선택적: --deep 또는 복잡도 4+]
+├── memory-curator (Sonnet): 관련 교훈 발굴
 ├── Codex verify (Lead 실행, GPT-5.4): 독립 계획 검증
 └── Gemini challenge (Lead 실행, Gemini-3): Devil's Advocate [조건부: --deep]
 ```
@@ -185,6 +188,7 @@ Lead는 외부 모델(Codex/Gemini)을 병렬 실행하여 이종 검증을 확�
    - **⛔ discover 결과는 "전제"가 아닌 "참고"**: plan은 discover의 경로 중 하나를 선택하거나, 새 경로를 설계할 수 있음
    - 🔒불변 조건만 plan의 제약으로 채택. 🔓가변 조건은 비용 비교 대상으로만 활용
    - Open Questions는 plan Phase 1에서 추가 탐색 대상
+   - ⛔ **Scope Expansion**: discover 변경 대상의 상위 모듈/프로토콜에서 `get_symbols_overview` → 놓친 형제 타입/간접 소비자를 탐색 범위에 추가
 
 ### Gate 0b: Context Ready
 - [ ] 프로젝트 활성화 완료?
@@ -328,7 +332,11 @@ Lead는 외부 모델(Codex/Gemini)을 병렬 실행하여 이종 검증을 확�
      - 2회차: 여전히 Critical 2개+ → 사용자 에스컬레이션 (AskUserQuestion: "리스크 수용/계획 변경/중단")
      - LOOP 모드 파라미터: `completion-promise: STRESS_TEST_PASS`, `max-iterations: 2`
 
-6. **구조화된 계획 출력**:
+6. **⛔ RTM 작성** (plan 포함 파이프라인에서 필수 — 참조: `modules/rtm.md`):
+   - 각 요구사항에 Req-ID 부여 → Step 매핑 → 검증 방법 명시
+   - discover 정제된 요구사항이 있으면 1:1 매핑
+
+7. **구조화된 계획 출력**:
    - 구현 단계 목록 (Step별 변경 대상, 방법)
    - 영향받는 심볼/파일 목록
    - 필요한 API/라이브러리 정보

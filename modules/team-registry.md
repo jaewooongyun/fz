@@ -16,7 +16,7 @@
 | search-symbolic | search | 심볼 정밀 탐색 (정의/참조/타입) | sonnet | — | — | — | — | Serena 도구 |
 | search-pattern | search | 텍스트 패턴 넓은 범위 탐색 | sonnet | — | — | — | — | Grep/Glob 도구 |
 | plan-structure | plan | 구현 구조 + Step 순서 설계 | sonnet | opus | project | — | — | Primary |
-| plan-tradeoff | plan | 트레이드오프 + 대안 비교 평가 | sonnet | — | — | — | — | |
+| ~~plan-tradeoff~~ | ~~plan~~ | ~~트레이드오프 + 대안 비교 평가~~ | — | — | — | — | — | **ARCHIVED**: discover가 대체. 어떤 스킬 YAML에서도 미사용 |
 | plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | — | — | — | — | |
 | plan-impact | plan | 영향 범위 전담 (Exhaustive Impact Scan a~f) | sonnet | — | project | — | — | Impact Scanner |
 | impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | worktree | Primary |
@@ -26,7 +26,7 @@
 | review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | — | — | — | — | fz-code TEAM 배정 |
 | review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | opus | — | — | — | direction-challenge 시 승격 |
 | review-counter | review | 반론 + Devil's Advocate | sonnet | — | — | — | — | |
-| memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | — | user | — | — | |
+| memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | — | user | — | — | 모든 TEAM 모드 참여 |
 
 ---
 
@@ -47,10 +47,10 @@
 | 스킬 | Primary | Supporting | 패턴 |
 |------|---------|-----------|------|
 | /fz-discover | plan-structure (O) | review-arch (S) | adversarial |
-| /fz-plan | plan-structure (O) | plan-impact (S), review-arch (S), review-direction (S) | collaborative |
-| /fz-code | impl-correctness (O) | review-arch (S), impl-quality (S), review-correctness (S) | pair-programming |
+| /fz-plan | plan-structure (O) | plan-impact (S), plan-edge-case (S), review-arch (S), review-direction (S), memory-curator (S) | collaborative |
+| /fz-code | impl-correctness (O) | review-arch (S), impl-quality (S), review-correctness (S), memory-curator (S) | pair-programming |
 | /fz-fix | impl-correctness (O) | — (SOLO) | N/A |
-| /fz-review | review-arch (O) | review-quality (S), review-counter (S) | live-review |
+| /fz-review | review-arch (O) | review-quality (S), review-counter (S), memory-curator (S) | live-review |
 | /fz-peer-review | review-arch (O) | review-quality (S), review-counter (S) | live-review |
 | /fz-search | — | search-symbolic (S), search-pattern (S) | cross-verify |
 | /fz-memory | — | memory-curator (S) | solo/team |

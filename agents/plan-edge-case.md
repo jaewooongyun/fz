@@ -57,4 +57,4 @@ tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
 
 - `plan-structure`에게 발견된 엣지 케이스를 직접 `SendMessage`로 공유한다.
 - `plan-structure`로부터 초안 수신 시 엣지 케이스 관점에서 즉시 피드백한다.
-- 다른 피어(plan-tradeoff, plan-impact)와의 소통은 `plan-structure`를 통해 간접 공유한다.
+- 다른 피어(plan-impact 등)와의 소통은 `plan-structure`를 통해 간접 공유한다.
