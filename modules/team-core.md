@@ -25,6 +25,36 @@
    - Codex 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백
    - compact 전에 체크포인트가 없으면 복원 불가 — **기록이 검증보다 선행**
 
+7. **⛔ L3 결과 팀 피드백** (L3-to-L1 Feedback):
+   L3 에이전트(modules/native-agents.md)의 background 결과가 도착하면:
+   ```
+   조건: L3 이슈 1건+ 발견 AND TEAM 에이전트가 Round 0.5 전
+   절차:
+   1. Lead가 L3 결과 수신
+   2. Lead → SendMessage(Primary): "[L3 피드백] {에이전트명}: {N}건 발견. 핵심: {요약}. 자기 렌즈로 재분석해주세요."
+   3. Primary: L3 발견을 iOS 특화 관점으로 재분석 → severity 조정 + 연쇄 이슈 식별
+   4. Primary → Lead: "L3 반영 완료. severity 조정 {N}건, 연쇄 이슈 {M}건"
+   ```
+   - L3 이슈 0건 → 스킵
+   - TEAM이 이미 Round 0.5 이후 → Lead가 직접 Issue Tracker에 merge (끼어들지 않음)
+
+---
+
+## 파이프라인 간 Handoff Brief
+
+팀 전환(plan→code, code→review) 시 다음 팀 Primary에게 첫 SendMessage로 전달.
+
+```
+[Handoff from {이전 스킬}]
+[Key Decisions]: {핵심 설계 결정 3줄 이내}
+[Risks]: {리스크 매트릭스 요약}
+[Watch Points]: {다음 팀이 주의할 사항}
+[RTM]: {pending Req-ID 목록}
+```
+
+소스: ASD 활성 → 이전 Phase 산출물에서 추출. 비ASD → Serena checkpoint.
+전달 시점: 다음 TeamCreate 직후, Primary에게 Task Brief와 함께.
+
 ---
 
 ## 2.5-Turn Protocol
@@ -54,6 +84,7 @@
 | 2명 | Mesh (직접 통신) | 2 | 2 | 2 | 6 |
 | 3명 | Star-enhanced (Supporting→Primary) | 4 | 4 | 3 | 11 |
 | 4명 | Star-enhanced | 6 | 6 | 4 | 16 |
+| 5명+ | Star-enhanced + CC | 8 | 8 | 5 | 21 |
 
 - 2명: Mesh — 직접 통신
 - 3명+: Star-enhanced — Supporting은 Primary를 경유

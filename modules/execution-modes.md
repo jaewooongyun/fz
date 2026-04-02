@@ -30,6 +30,16 @@
 - 파일 간 의존성 있음 (A 수정이 B에 영향)
 - 2개 이하 파일 변경
 - 코드 생성 (빌드 검증 필요)
+- 새 코드 생성 (RIB, 모듈 등 아키텍처 판단 필요)
+- review-arch 검증이 필요한 구조적 변경
+
+### BATCH merge 후 통합 게이트 (필수)
+
+모든 worktree merge 완료 후 반드시 수행:
+1. 프로젝트 전체 빌드 (modules/build.md)
+2. 빌드 실패 시: 충돌 파일 식별 → 수동 해결 → 재빌드
+3. 빌드 성공 → 파이프라인 다음 스킬 진행
+4. (선택) /sc:analyze → merge 후 정적 분석
 
 ### BATCH 자동 제안
 
@@ -65,15 +75,21 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 
 ## SIMPLIFY 게이트 상세
 
-- /simplify는 **조건부 필수** 게이트
-- 자동 트리거 조건 (필수):
-  1. Step에서 새 함수/메서드 3개+ 생성 → 과잉 추상화 감지
-  2. Step에서 100줄+ 코드 추가 → 복잡도 감소 필요
-  3. 3회 빌드 실패 후 성공 → 패치 누적 품질 저하
-- 선택적 트리거:
-  1. fz-code Step 완료 후 (위 조건 미해당 시)
-  2. fz-review 시작 전 (pre-review cleanup)
-- `focus` 파라미터: 현재 Step의 관심사로 좁힘
+- /simplify는 **2단계 트리거** 시스템
+
+### 필수 gate (스킵 불가, 자동 실행)
+1. Step에서 새 함수/메서드 3개+ 생성 → 과잉 추상화 감지
+2. Step에서 100줄+ 코드 추가 → 복잡도 감소 필요
+3. 3회 빌드 실패 후 성공 → 패치 누적 품질 저하
+
+### 선택 suggestion (사용자 스킵 가능)
+1. fz-code Step 완료 후 (위 조건 미해당 시)
+2. fz-review 시작 전 (pre-review cleanup)
+
+### 설계 의도 보존
+- `focus` 파라미터에 Plan의 핵심 설계 결정을 포함한다
+- 예: `/simplify focus on "Strategy 패턴 유지, UseCase 분리 보존"`
+- Plan의 Anti-Pattern Constraints에 명시된 구조는 simplify가 변경하지 않는다
 - 결과: 수정 적용 → 빌드 Gate 재확인
 
 ## 모드 결정 플로우

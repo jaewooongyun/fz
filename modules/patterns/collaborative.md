@@ -10,10 +10,13 @@
 | 역할 | 에이전트 | 행동 |
 |------|---------|------|
 | Primary | plan-structure (O) | 구현 구조 설계 + Step 순서 결정 |
-| Supporting | review-arch (S) | 아키텍처 실현성 + 트레이드오프 + 영향 범위 검증 |
+| Supporting | plan-impact (S) | 영향 범위 전담 (Exhaustive Impact Scan a~f) |
+| Supporting | plan-edge-case (S) | 경계 케이스 + 실패 시나리오 발굴 |
+| Supporting | review-arch (S) | 아키텍처 실현성 + 패턴 검증 |
 | Supporting | review-direction (S) | 방향성 도전 + 대안 제시 (Round 0.5) |
+| Supporting | memory-curator (S) | 관련 교훈 발굴 + plan-structure에 전달 |
 
-## 2.5-Turn 적용 (Star-enhanced, 3명)
+## 2.5-Turn 적용 (Star-enhanced, 5명+)
 
 ### Round 0.5: 방향성 도전 (Direction Challenge)
 ```
@@ -34,14 +37,22 @@ review-direction → SendMessage(Lead): "방향 판정 완료: {PROCEED/RECONSID
 
 > RECONSIDER/REDIRECT 시 Lead가 사용자에게 보고 후 진행 여부 확인.
 
-### Round 1: 초안 + 실현성 검증
+### Round 1: 초안 + 병렬 분석 (Star-enhanced, 5명)
 ```
 plan-structure: 구현 계획 초안 작성 (Step 순서 + 변경 대상)
-  → SendMessage(review-arch): "계획 초안입니다. 아키텍처 실현성 + 트레이드오프 + 영향 범위 검토해주세요"
+  → SendMessage(review-arch): "계획 초안입니다. 아키텍처 패턴 검토해주세요"
+  → SendMessage(plan-impact): "계획 초안입니다. 영향 범위 분석해주세요"
+  → SendMessage(plan-edge-case): "계획 초안입니다. 경계 케이스 찾아주세요"
 
-review-arch → SendMessage(plan-structure):
-  "Step 2의 패턴 A vs B: A는 레이어 위반, B 추천. 영향 파일 {N}개. 엣지 케이스: {시나리오}"
+[병렬 실행]
+review-arch → SendMessage(plan-structure): "패턴 A vs B: A 레이어 위반, B 추천"
+plan-impact → SendMessage(plan-structure): "영향 범위 {N}개 파일. 숨겨진 의존성: {내용}"
+  → CC(plan-edge-case): "영향 범위에서 경계 케이스 확인 필요: {2-3건}"
+plan-edge-case → SendMessage(plan-structure): "경계 케이스 {M}건: {요약}"
+  → CC(plan-impact): "경계 케이스 중 영향 범위 확인 필요: {내용}"
 ```
+
+핵심: plan-edge-case↔plan-impact CC 교차로 "경계 케이스가 영향 범위에서 발생" 연쇄 발견.
 
 ### Round 2: 피드백 반영 + 재검증
 ```

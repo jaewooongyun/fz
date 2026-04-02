@@ -15,14 +15,22 @@
 | code-changes 생산 (시그니처 변경) | protocol conformance 검증 | find_referencing_symbols → 프로토콜 요구사항 양방향 확인 | 모든 모드 |
 | code-changes 생산 (init 변경) | inheritance DI conformance | base_class_hierarchy → subclass init + 화면별 dependency 확인 (Gate 4.6.5) | 모든 모드 (init 변경 시) |
 | planning 생산 전 | 방향성 검증 | review-direction 에이전트 (Phase 0.5) | TEAM (fz-plan) |
-| planning 생산 전 | 교훈 회상 | memory-curator (memory-recall) | TEAM (--deep 또는 복잡도 4+) |
-| code-changes 생산 전 | 교훈 회상 | memory-curator (memory-recall) | TEAM (--deep 또는 복잡도 4+) |
-| review 시작 전 | 교훈 회상 | memory-curator (memory-recall) | TEAM (--deep 또는 복잡도 4+) |
+| planning 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
+| code-changes 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
+| review 시작 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
 | planning 생산 | 계획 검증 | `fz-codex verify` (팀 내 병렬) | TEAM |
 | review 포함 | 다관점 리뷰 | review-arch + review-quality + Codex (팀 내 병렬) | TEAM |
 | search 포함 | 교차 검증 | search-symbolic + search-pattern + Codex (팀 내 병렬) | TEAM(--deep) |
 | commit/pr 포함 | Pre-ship gate | `fz-codex check` | TEAM |
 | fix 포함 | 수정 검증 | `fz-codex check` (팀 내 병렬) | TEAM |
+| review 포함 | L3 에러 처리 스캔 | silent-failure-hunter (Agent background) | TEAM (diff에 에러처리 코드 포함 시) |
+| review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | TEAM (diff에 새 타입 정의 포함 시) |
+| code-changes 생산 | SC 빌드 진단 | `/sc:troubleshoot --fix` 자동 | 빌드 2회 연속 실패 시 |
+| planning 생산 | SC 공수 추정 | `/sc:estimate --breakdown` | plan + 복잡도 4+ |
+| review 포함 | L3 결과 팀 피드백 | Lead → Primary SendMessage (team-core.md L3-to-L1) | TEAM (L3 이슈 1건+ AND Round 0.5 전) |
+| code 포함 | Supporting 진행도 체크 | review-correctness → impl-correctness RTM 체크 | TEAM (3+ Step 50% 시점) |
+| review 시작 전 | Scope Expansion 검증 | plan 영향 범위 ⊇ discover 범위 확인. plan이 더 좁으면 warning | discover 산출물 존재 시 |
+| code 시작 전 | 시야 축소 감지 | plan 영향 범위 vs discover 범위 비교 → 좁으면 마찰 신호 | discover 산출물 존재 시 |
 
 ---
 

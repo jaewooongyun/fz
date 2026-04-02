@@ -16,7 +16,7 @@
 │   ├── arch-critic/  # 아키텍처 비평 (peer review용)
 │   ├── code-auditor/ # 코드 품질 감사 (peer review용)
 ├── agents/           # 14개 에이전트 — 팀 모드에서 전문 역할 수행
-├── modules/          # 17개 모듈 — 스킬/에이전트가 공유하는 설정과 정책
+├── modules/          # 17+2개 모듈 — 스킬/에이전트가 공유하는 설정과 정책 (rtm, native-agents 포함)
 │   └── patterns/     # 5개 팀 통신 패턴
 ├── guides/           # 6개 가이드 — 프롬프트 최적화, 스킬 작성, 테스팅, 트러블슈팅, Clean Architecture
 └── templates/        # 스킬/에이전트/모듈 생성 템플릿
@@ -56,7 +56,7 @@
 │  │ plan-structure   │ │ impl-correctness│ │ search-pattern  │   │
 │  │ plan-impact      │ │ impl-quality    │ │ search-symbolic │   │
 │  │ plan-edge-case   │ └─────────────────┘ └────────────────-┘   │
-│  │ plan-tradeoff    │ ┌─ 리뷰 ────────────┐ ┌─ 메모리 ──────────┐  │
+│  │ ~~plan-tradeoff~~│ ┌─ 리뷰 ────────────┐ ┌─ 메모리 ──────────┐  │
 │  └──────────────────┘ │ review-arch      │ │ memory-curator  │  │
 │                       │ review-quality   │ └─────────────────┘  │
 │                       │ review-correct.  │                      │
@@ -66,12 +66,12 @@
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Modules (15개)        스킬/에이전트가 공유하는 설정과 정책               │
+│  Modules (17개)        스킬/에이전트가 공유하는 설정과 정책               │
 │                                                                 │
 │  team-core  team-registry  build  session  complexity           │
 │  pipelines  intent-registry  execution-modes  governance        │
 │  cross-validation  context-artifacts  codex-strategy            │
-│  memory-guide  memory-policy  plugin-refs                       │
+│  memory-guide  memory-policy  plugin-refs  rtm  native-agents   │
 │  └─ patterns/  adversarial  collaborative  pair-programming     │
 │                live-review  cross-verify                        │
 └────────────────────────────┬────────────────────────────────────┘
@@ -384,7 +384,7 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | **계획** | plan-structure | 구현 구조 + Step 순서 설계 | fz-plan★, fz-discover★ |
 | | plan-impact | Exhaustive Impact Scan 전담 (영향 범위 + 숨겨진 의존성) | fz-plan |
 | | plan-edge-case | 엣지 케이스 + 실패 시나리오 발굴 | fz-plan |
-| | plan-tradeoff | 트레이드오프 + 대안 비교 | fz-plan |
+| | ~~plan-tradeoff~~ | ~~트레이드오프 + 대안 비교~~ | **ARCHIVED** (discover가 대체) |
 | **구현** | impl-correctness | 점진적 구현 + 기능 정확성 보장 | fz-code★, fz-fix★ |
 | | impl-quality | 코딩 표준 + 패턴 일관성 감시 | fz-code, fz-fix |
 | **리뷰** | review-arch | 아키텍처 결정 + 레이어 위반 + Consumer Integration | fz-code, fz-review, fz-peer-review, fz-discover |
@@ -394,7 +394,7 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | | review-counter | 반론 + Devil's Advocate | fz-review, fz-peer-review |
 | **탐색** | search-pattern | Grep/Glob 넓은 범위 패턴 검색 | fz-search |
 | | search-symbolic | LSP/Serena 심볼 정밀 탐색 | fz-search |
-| **메모리** | memory-curator | 교훈/패턴/결정사항 발굴 | fz-plan, fz-discover |
+| **메모리** | memory-curator | 교훈/패턴/결정사항 발굴 | 모든 TEAM (fz-plan, fz-code, fz-review, fz-discover) |
 
 > ★ = 해당 스킬에서 Primary Worker (Opus 승격)
 
@@ -422,6 +422,8 @@ TEAM 모드에서 Lead가 스폰하며, **에이전트 간 직접 대화(Peer-to
 | | cross-validation.md | 교차 검증 게이트 + Reflection Rate + Consumer Quality |
 | | plugin-refs.md | 스킬-역할별 플러그인 매칭 |
 | | cross-validation.md | + Selective Consensus (3-Model: Claude+GPT+Gemini) |
+| **추적성** | rtm.md | Requirements Traceability Matrix (plan→code→review ID 추적) |
+| **L3 통합** | native-agents.md | 네이티브 에이전트 통합 정책 (silent-failure-hunter, type-design-analyzer) |
 | **통신 패턴** | patterns/adversarial.md | fz-discover: 경로 생성 + 비용/리스크 탐색 (Landscape) |
 | | patterns/collaborative.md | fz-plan: 6-Agent 병렬 분석 + 교차 피드백 |
 | | patterns/pair-programming.md | fz-code: 구현 중 실시간 검증 |
@@ -620,6 +622,41 @@ Claude Code + Serena MCP + Context7 MCP + Codex CLI + SuperClaude
 ---
 
 ## Changelog
+
+### v3.1 (2026-04-02) — RTM + Teams v2 + Scope Expansion + L3 에이전트
+
+**RTM (Requirements Traceability Matrix)**
+- modules/rtm.md 신규 — plan이 Req-ID 생성 → code가 implemented 갱신 → review가 기계적 확인
+- 산문 매칭 → ID 기반 추적으로 요구사항 누락 방어
+
+**L3 네이티브 에이전트 통합**
+- modules/native-agents.md 신규 — silent-failure-hunter + type-design-analyzer를 review Phase 5에 background 스폰
+- L1(fz커스텀) > L3(네이티브) 원칙: L3는 보강만, TeamCreate 참여 금지
+
+**Teams v2 — 팀 내부 통신 강화**
+- L3→L1 피드백: L3 발견을 Lead가 Primary에 SendMessage → iOS 특화 재분석
+- Supporting 활성화: impl-quality 매 Step 피드백, review-correctness 50%+마지막 RTM 체크
+- Handoff Brief: plan→code 팀 전환 시 Key Decisions+Risks+Watch Points 구조화 전달
+- plan-edge-case↔plan-impact CC: Supporting 간 교차로 연쇄 발견
+- 5명+ 토폴로지: team-core.md에 Star-enhanced+CC 행 추가
+
+**Scope Expansion — discover 시야 제한 4겹 방어**
+- plan-impact: 변경 대상의 프로토콜/부모/같은 모듈까지 확장 탐색
+- fz-plan Phase 0b: discover 로드 후 상위 수준 get_symbols_overview
+- fz-code Phase 1.6: plan 영향 범위 < discover 범위이면 "시야 축소 위험" 마찰 신호
+- cross-validation: review 시작 전 plan⊇discover 범위 확인
+
+**네이티브 기능 강화**
+- BATCH: merge 후 통합 빌드 gate 필수 + 부적합 조건 강화 (RIB/모듈 생성 금지)
+- SIMPLIFY: 필수 gate 3가지 + 선택 suggestion 2가지 명확 분리 + 설계 의도 보존
+- SC 조건 기반 자동 트리거: 빌드2실패→sc:troubleshoot, 3+Step 중간→sc:reflect, 복잡도4+→sc:estimate
+- sc:save 모든 파이프라인 종료 시 (이전: 코드 변경만)
+
+**정합성 개선**
+- plan-edge-case: fz-plan YAML+registry+pipelines+pattern 4-way 동기화
+- memory-curator: 모든 TEAM 참여 (이전: --deep/복잡도4+)
+- plan-tradeoff: ARCHIVED (discover가 대체)
+- 변경 파일 22개, RTM 19/19 verified, 리뷰 이슈 0건
 
 ### v3.0 (2026-03-30) — 3-Model Triad + 6-Agent Team + Landscape Discover
 

@@ -74,6 +74,7 @@ model-strategy:
 |------|------|
 | modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (Adversarial Constraint Discovery 패턴) |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+| modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -81,7 +82,9 @@ model-strategy:
 |-------|-----------|------|
 | Phase 1 | `/sc:analyze` | 기존 코드/아키텍처 분석으로 암묵적 제약 사전 식별 |
 | Phase 2 | `/sc:brainstorm` | 후보 옵션 발산이 필요할 때 |
+| Phase 2 | `/sc:business-panel` | UX/전략 관점 분석 (`--business` 시) |
 | Phase 2 | `/sc:explain` | 기존 패턴/규칙의 교육적 설명 |
+| Phase 2 | L3 `deep-research-agent` | 외부 기술/라이브러리 조사 (modules/native-agents.md) |
 | Phase 3 | `/sc:reflect` | 수렴된 결과 자체 검증 |
 | Phase 4 | `→ /fz-plan` | 정제된 요구사항으로 구현 계획 수립 |
 

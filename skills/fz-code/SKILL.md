@@ -73,6 +73,8 @@ model-strategy:
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+| modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
+| modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 
@@ -83,14 +85,13 @@ model-strategy:
 
 ## sc: 활용 (SuperClaude 연계)
 
-| 상황 | sc: 명령어 | 용도 |
-|------|-----------|------|
-| 복잡한 다중 파일 구현 | `/sc:implement` | SuperClaude 위임 |
-| 빌드 실패 | `/sc:troubleshoot` | 에러 원인 자동 분석/수정 |
-| 빌드 프로세스 | `/sc:build` | 빌드 최적화 |
-| Step 완료 후 | `/sc:analyze` | 구현 코드 즉석 품질 체크 |
-| Step 완료 후 | `/sc:reflect --type task` | 요구사항 부합 자체 검증 (3+ Step 구현 시만) |
-| API 불확실 | Context7 + `/sc:explain` | 문법/API 확인 |
+| 조건 | sc: 명령어 | 자동/수동 |
+|------|-----------|----------|
+| 빌드 **2회 연속** 실패 | `/sc:troubleshoot --fix` | **자동** |
+| 5+ 파일 변경한 Step | `/sc:analyze --focus quality` | **자동 제안** |
+| 3+ Step 구현 중간점 | `/sc:reflect --type task` | **필수** |
+| 복잡한 다중 파일 구현 | `/sc:implement` | 수동 |
+| API 불확실 | Context7 + `/sc:explain` | 수동 |
 
 ## 팀 에이전트 모드
 
@@ -182,12 +183,18 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    - `{WORK_DIR}/code/progress.md` 읽기 → 진행 상태 복원 (있으면)
    - 최신 `{WORK_DIR}/code/step-N.md` 읽기 → 마지막 구현 상세 (있으면)
 
+1.6. **⛔ Scope Expansion 확인** (discover 결과 + plan-final.md 모두 존재 시):
+   - plan-final.md의 영향 범위 파일 목록 vs discover journal의 언급 범위 비교
+   - plan 영향 범위가 discover 범위보다 **좁으면** → ⚠️ 마찰 신호 "시야 축소 위험" 보고
+   - plan이 discover보다 넓거나 같으면 → OK (Scope Expansion 작동 확인)
+
 2. **계획의 각 Step을 순서대로 구현**
    - 각 Step 완료 시 확인 (다음 Step 전제조건):
      - □ 빌드 성공 (modules/build.md)
      - □ 시그니처 변경 시: conformance 보존 확인 (`find_referencing_symbols`)
      - □ 타입 변경 시: caller 1개 샘플 확인 (의도대로 호출되는지)
    - /simplify 자동 트리거: 새 함수 3개+ 또는 100줄+ 추가 시 (modules/execution-modes.md)
+   - ⛔ RTM 갱신: 해당 Step의 Req-ID를 `implemented`로 갱신 (참조: modules/rtm.md)
 
 3. **구현 마찰 감지** (Implementation Friction Detection):
    각 Step 구현 중 아래 신호 감지 시 멈추고 사용자에게 보고:

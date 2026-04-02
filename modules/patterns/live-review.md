@@ -36,13 +36,33 @@ review-quality: arch 이슈 중 성능 영향 부분 보충
   → SendMessage(review-arch): "A2 이슈는 성능 영향 없음 확인. severity 유지 OK"
 ```
 
+### L3 Integration (Round 2 이후, L3 결과 도착 시)
+
+L3 에이전트 발견을 L1 리뷰어가 재분석하는 연쇄 패턴. (참조: team-core.md L3-to-L1 Feedback)
+
+```
+Lead → SendMessage(review-arch):
+  "[L3 피드백] silent-failure-hunter: {N}건. 아키텍처 관점에서 에러 전파 설계 재확인해주세요"
+
+review-arch → SendMessage(review-quality):
+  "L3가 잡은 에러 처리 누락 중 {M}건은 dead code 연관. 확인해주세요"
+
+review-quality → SendMessage(review-arch):
+  "확인. {X}건 dead code 내부 (severity 하향), {Y}건 활성 코드 (severity 유지)"
+
+양쪽 → SendMessage(Lead): "L3 피드백 통합 완료. 최종 조정: {내용}"
+```
+
+핵심: L3가 범용 탐지 → L1이 iOS 특화 판단 → 피어 간 교차로 false positive 제거.
+조건: L3 이슈 0건이면 이 라운드 전체 스킵.
+
 ### Round 0.5: 최종 보고
 ```
 review-arch → SendMessage(Lead):
-  - 아키텍처 + 정확성 최종 이슈 목록 + severity 조정 근거
+  - 아키텍처 + 정확성 최종 이슈 목록 + severity 조정 근거 + L3 반영 사항
 
 review-quality → SendMessage(Lead):
-  - 품질 + 성능 최종 이슈 목록 + 피어 피드백 반영 사항
+  - 품질 + 성능 최종 이슈 목록 + 피어 피드백 반영 사항 + L3 반영 사항
 ```
 
 ## Lead 역할

@@ -38,6 +38,7 @@
 | 체인 | fz-discover |
 | 기본 모드 | SOLO |
 | TEAM 모드 | plan-structure(★O) + review-arch (adversarial) |
+| SC 연계 | `--business` 시 `/sc:business-panel` (UX/전략 분석) |
 
 ### 4. bug-hunt
 
@@ -64,7 +65,7 @@
 | 트리거 | `계획, 설계, 아키텍처` |
 | 체인 | fz-plan |
 | 기본 모드 | SOLO |
-| TEAM 모드 | plan-structure(★O) + plan-tradeoff + plan-edge-case + plan-impact (collaborative) |
+| TEAM 모드 | plan-structure(★O) + plan-edge-case + plan-impact + review-arch + review-direction (collaborative) |
 | 게이트 | ✓ direction-challenge (Phase 0.5) + ✓ stress-test(Q1-Q5) |
 
 ### 7. plan-to-code
@@ -74,7 +75,7 @@
 | 트리거 | `계획.*구현, 설계.*개발, 만들어줘` |
 | 체인 | fz-plan → fz-code |
 | 기본 모드 | TEAM |
-| TEAM 모드 | plan 팀 → impl-correctness(★O) + review-arch |
+| TEAM 모드 | plan 팀 (plan-edge-case 포함) → impl-correctness(★O) + review-arch |
 | 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ codex check |
 
 ### 8. code-only
