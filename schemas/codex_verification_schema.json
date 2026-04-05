@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codex_verification_schema.json",
+  "title": "Codex Verification Response Schema",
+  "description": "Codex가 피드백 반영 여부를 검증한 후 반환하는 구조화된 응답 형식",
+  "type": "object",
+  "required": ["verification_id", "original_review_id", "issue_resolutions", "feedback_reflection_rate", "verdict"],
+  "properties": {
+    "verification_id": {
+      "type": "string",
+      "pattern": "^VER-[0-9]{3,}$",
+      "description": "검증 고유 식별자 (예: VER-001)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "검증 생성 시각 (ISO 8601)"
+    },
+    "original_review_id": {
+      "type": "string",
+      "pattern": "^REV-[0-9]{3,}$",
+      "description": "검증 대상 원본 리뷰 ID"
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "현재 반복 횟수"
+    },
+    "issue_resolutions": {
+      "type": "array",
+      "description": "각 이슈별 해결 상태",
+      "items": {
+        "type": "object",
+        "required": ["issue_id", "resolution_status"],
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "pattern": "^ISSUE-[0-9]{3,}$",
+            "description": "원본 이슈 ID"
+          },
+          "resolution_status": {
+            "type": "string",
+            "enum": ["resolved", "partially_resolved", "unresolved", "regressed"],
+            "description": "해결 상태: resolved(완전 해결), partially_resolved(부분 해결), unresolved(미해결), regressed(악화)"
+          },
+          "verification_notes": {
+            "type": "string",
+            "description": "검증 상세 노트"
+          },
+          "remaining_work": {
+            "type": "string",
+            "description": "남은 작업 설명 (partially_resolved/unresolved 시)"
+          }
+        }
+      }
+    },
+    "new_issues_found": {
+      "type": "array",
+      "description": "검증 중 새로 발견된 이슈 (codex_review_schema의 issues 형식과 동일)",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "category", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^ISSUE-[0-9]{3,}$"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "major", "minor", "suggestion"]
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "file": { "type": "string" },
+              "symbol": { "type": "string" },
+              "line_range": { "type": "string" }
+            }
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "feedback_reflection_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "피드백 반영률 (0.0 ~ 1.0). 계산식: (resolved×1.0 + partially_resolved×0.5) / total_issues"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "needs_work", "fail"],
+      "description": "검증 결과: pass(통과, Rate≥80%), needs_work(추가 작업 필요), fail(실패)"
+    },
+    "verification_summary": {
+      "type": "string",
+      "description": "검증 결과 요약"
+    },
+    "recommendations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "추가 권장 사항"
+    }
+  }
+}

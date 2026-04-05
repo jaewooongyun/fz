@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codex_review_schema.json",
+  "title": "Codex Review Response Schema",
+  "description": "Codex review/verify/validate/check/final/commit 응답 형식. OpenAI Structured Outputs 규격 준수.",
+  "type": "object",
+  "required": ["review_id", "timestamp", "review_type", "issues", "summary", "verdict", "overall_feedback", "strengths"],
+  "additionalProperties": false,
+  "properties": {
+    "review_id": {
+      "type": "string",
+      "description": "리뷰 고유 식별자 (예: REV-001)"
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "리뷰 생성 시각 (ISO 8601)"
+    },
+    "review_type": {
+      "type": "string",
+      "enum": ["plan_validation", "code_review", "verification"],
+      "description": "리뷰 유형"
+    },
+    "issues": {
+      "type": "array",
+      "description": "발견된 이슈 목록",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "category", "description", "location", "suggestion", "confidence", "code_snippet", "alternatives", "recommended"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "이슈 고유 식별자 (예: ISSUE-001)"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "major", "minor", "suggestion"],
+            "description": "심각도"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "architecture", "extensibility", "over_engineering", "decomposition",
+              "modern_api", "dependency", "performance", "refactoring_completeness",
+              "concurrency_safety", "requirements_alignment", "logic_error",
+              "security", "memory", "thread_safety", "style", "documentation",
+              "testing", "scope_creep", "other"
+            ],
+            "description": "이슈 분류"
+          },
+          "description": {
+            "type": "string",
+            "description": "문제점 상세 설명"
+          },
+          "location": {
+            "type": "object",
+            "required": ["file", "symbol", "line_range"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "type": "string", "description": "파일 경로" },
+              "symbol": { "type": ["string", "null"], "description": "심볼 이름" },
+              "line_range": { "type": ["string", "null"], "description": "라인 범위 (예: 10-25)" }
+            }
+          },
+          "suggestion": {
+            "type": ["string", "null"],
+            "description": "수정 제안"
+          },
+          "confidence": {
+            "type": "integer",
+            "description": "이슈 신뢰도 0-100"
+          },
+          "code_snippet": {
+            "type": ["string", "null"],
+            "description": "관련 코드 스니펫"
+          },
+          "alternatives": {
+            "type": ["array", "null"],
+            "description": "대안 비교",
+            "items": {
+              "type": "object",
+              "required": ["label", "description", "pros", "cons"],
+              "additionalProperties": false,
+              "properties": {
+                "label": { "type": "string", "description": "대안 명칭" },
+                "description": { "type": "string", "description": "접근 방식 설명" },
+                "pros": { "type": "array", "items": { "type": "string" } },
+                "cons": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          },
+          "recommended": {
+            "type": ["string", "null"],
+            "description": "추천 대안 label"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_issues", "by_severity", "by_category"],
+      "additionalProperties": false,
+      "properties": {
+        "total_issues": { "type": "integer", "description": "총 이슈 수" },
+        "by_severity": {
+          "type": "object",
+          "required": ["critical", "major", "minor", "suggestion"],
+          "additionalProperties": false,
+          "properties": {
+            "critical": { "type": "integer", "description": "critical 수" },
+            "major": { "type": "integer", "description": "major 수" },
+            "minor": { "type": "integer", "description": "minor 수" },
+            "suggestion": { "type": "integer", "description": "suggestion 수" }
+          }
+        },
+        "by_category": {
+          "type": "string",
+          "description": "카테고리별 이슈 수 요약"
+        }
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["approved", "needs_revision", "rejected"],
+      "description": "최종 판정"
+    },
+    "overall_feedback": {
+      "type": "string",
+      "description": "전체적인 피드백"
+    },
+    "strengths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "코드/계획의 강점"
+    }
+  }
+}
