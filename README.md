@@ -6,7 +6,68 @@
 
 ---
 
+## Installation
+
+### 1. 사전 요구사항
+
+```bash
+# Claude Code (필수)
+npm install -g @anthropic-ai/claude-code
+
+# Serena MCP (필수 — LSP + Memory)
+# Claude Code settings.json에 MCP 서버로 등록
+# https://github.com/AbanteAI/serena
+```
+
+### 2. fz 설치
+
+```bash
+# fz 레포 클론
+git clone https://github.com/jaewooongyun/fz.git ~/.claude
+
+# Codex 네이티브 스킬 심볼릭 링크 (Codex CLI 사용 시)
+bash ~/.claude/scripts/setup-codex-skills.sh
+```
+
+### 3. 프로젝트 CLAUDE.md 설정
+
+프로젝트 루트에 `CLAUDE.md`를 작성합니다. fz의 모든 스킬/에이전트가 이 파일을 참조합니다.
+
+```bash
+# 템플릿 복사 후 프로젝트에 맞게 수정
+cp ~/.claude/templates/CLAUDE.md.template ./CLAUDE.md
+```
+
+필수 섹션: `## Architecture`, `## Build`, `## Code Conventions`
+선택 섹션: `## Git Workflow`, `## Plugins`, `## External Models`
+
+### 4. 권장 MCP 서버 (선택)
+
+| MCP 서버 | 용도 | 설치 |
+|----------|------|------|
+| **Serena** | LSP + Memory (필수) | [GitHub](https://github.com/AbanteAI/serena) |
+| **Context7** | 라이브러리 문서 조회 | [GitHub](https://github.com/upstash/context7) |
+| **Sequential Thinking** | 복잡한 추론 | Claude Code 내장 또는 MCP 등록 |
+| **Codex CLI** | GPT 교차 검증 | `npm install -g @openai/codex` |
+| **SuperClaude** | sc: 명령어 체계 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
+
+프로젝트별 추가:
+- iOS: XcodeBuildMCP, SwiftUI Expert, Swift Concurrency
+- Web: 해당 없음 (기본 구성으로 충분)
+
+### 5. 설치 확인
+
+```bash
+# Claude Code에서 fz 스킬 로드 확인
+claude
+> /fz "안녕"   # → fz 오케스트레이터가 응답하면 정상
+```
+
+---
+
 ## Quick Start
+
+### /fz 오케스트레이터 (자연어 → 자동 파이프라인)
 
 ```bash
 /fz "버그 찾아서 고쳐줘"              # bug-hunt → fz-search → fz-fix
@@ -14,6 +75,19 @@
 /fz "코드 리뷰하고 커밋해줘"           # review-to-ship
 /fz "이걸 어떻게 구현하면 좋을까?"      # discover → 풍경 탐색
 ```
+
+### 개별 스킬 직접 실행
+
+```bash
+/fz-plan "로그인 기능 설계해줘"        # 계획만 수립
+/fz-code "계획대로 구현해줘"           # 구현만 실행
+/fz-review "내 코드 리뷰해줘"          # 3중 검증 리뷰
+/fz-fix "이 크래시 고쳐줘"             # 버그 수정
+/fz-search "UserRepository 찾아줘"    # 코드 탐색
+/fz-codex review                      # GPT 교차 검증
+```
+
+### 옵션
 
 | 옵션 | 설명 |
 |------|------|
@@ -188,13 +262,13 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## 외부 의존성
 
-**필수**: Claude Code + Serena MCP
+> 설치 방법: [Installation](#installation) 참조
 
-**권장**: + Context7 MCP + Codex CLI + SuperClaude
-
-**전체 (iOS)**: + XcodeBuildMCP + GitHub MCP/CLI + Atlassian MCP + SwiftUI Expert + Swift Concurrency + Sequential Thinking + LSP
-
-상세: `guides/` 디렉토리의 각 가이드 참조
+| 구분 | 도구 |
+|------|------|
+| **필수** | Claude Code + Serena MCP |
+| **권장** | + Context7 + Codex CLI + SuperClaude |
+| **iOS** | + XcodeBuildMCP + SwiftUI Expert + Swift Concurrency |
 
 ---
 
