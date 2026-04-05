@@ -35,7 +35,7 @@ model-strategy:
 > 대상 분석 → 가이드 참조 → 문서 생성/수정 → 최적화 검증
 
 - 스킬 SKILL.md, 에이전트 프롬프트, CLAUDE.md, 모듈 문서 작성
-- `.claude/guides/` 가이드라인 기반 품질 보장
+- `guides/` 가이드라인 기반 품질 보장
 - `/sc:document` 연계: 범용 문서 작업 위임 가능
 - 3단계 자동화: L3(자동) → L2(대화형) → L1(템플릿+체크리스트)
 
@@ -53,12 +53,12 @@ model-strategy:
 
 | 가이드 | 경로 | 참조 시점 |
 |--------|------|----------|
-| 프롬프트 최적화 | `.claude/guides/prompt-optimization.md` | 모든 문서 작성/수정 시 |
-| 스킬 작성법 | `.claude/guides/skill-authoring.md` | 스킬 문서 작성 시 |
-| 에이전트/팀 가이드 | `.claude/guides/agent-team-guide.md` | 에이전트 문서 작성 시 |
-| 스킬 템플릿 | `.claude/templates/skill-template.md` | 스킬 문서 생성 시 |
-| 에이전트 템플릿 | `.claude/templates/agent-template.md` | 에이전트 문서 생성 시 |
-| 모듈 템플릿 | `.claude/templates/module-template.md` | 모듈 문서 생성 시 |
+| 프롬프트 최적화 | `guides/prompt-optimization.md` | 모든 문서 작성/수정 시 |
+| 스킬 작성법 | `guides/skill-authoring.md` | 스킬 문서 작성 시 |
+| 에이전트/팀 가이드 | `guides/agent-team-guide.md` | 에이전트 문서 작성 시 |
+| 스킬 템플릿 | `templates/skill-template.md` | 스킬 문서 생성 시 |
+| 에이전트 템플릿 | `templates/agent-template.md` | 에이전트 문서 생성 시 |
+| 모듈 템플릿 | `templates/module-template.md` | 모듈 문서 생성 시 |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -91,9 +91,9 @@ model-strategy:
 
 ### 스킬 문서 작성 시
 
-1. `Read(.claude/templates/skill-template.md)` → YAML + 본문 스켈레톤
-2. `Read(.claude/guides/skill-authoring.md)` → 작성 가이드라인
-3. `Read(.claude/guides/prompt-optimization.md)` → 10대 원칙
+1. `Read(templates/skill-template.md)` → YAML + 본문 스켈레톤
+2. `Read(guides/skill-authoring.md)` → 작성 가이드라인
+3. `Read(guides/prompt-optimization.md)` → 10대 원칙
 4. 문서 생성/수정:
    - description: 무엇+언제+언제아닌지+한영키워드 (원칙 2)
    - 본문 500줄 이하 (원칙 3)
@@ -104,8 +104,8 @@ model-strategy:
 
 ### 에이전트 문서 작성 시
 
-1. `Read(.claude/templates/agent-template.md)` → YAML + 프롬프트 스켈레톤
-2. `Read(.claude/guides/agent-team-guide.md)` → 에이전트 작성법
+1. `Read(templates/agent-template.md)` → YAML + 프롬프트 스켈레톤
+2. `Read(guides/agent-team-guide.md)` → 에이전트 작성법
 3. 문서 생성/수정:
    - 역할 선언 1줄
    - MCP 도구 4-tier 전략
@@ -114,13 +114,13 @@ model-strategy:
 
 ### CLAUDE.md 수정 시
 
-1. `Read(.claude/guides/prompt-optimization.md)` → Context Rot 대응
+1. `Read(guides/prompt-optimization.md)` → Context Rot 대응
 2. 핵심 지시를 앞부분에 배치
 3. 400줄 이내 유지 (기존 규칙)
 
 ### 모듈 문서 작성 시
 
-1. `Read(.claude/templates/module-template.md)` → 모듈 스켈레톤
+1. `Read(templates/module-template.md)` → 모듈 스켈레톤
 2. 참조 스킬 테이블 작성
 3. 500줄 이하, 100줄+ 시 목차
 

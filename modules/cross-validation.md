@@ -198,8 +198,9 @@ get_codex_skill() {
   if [ -d "$HOME/.codex/skills/fz-${ROLE}" ]; then
     echo "fz-${ROLE}"; return
   fi
-  # Tier 2b: ~/.claude/codex-skills/ (repo 포함본 — 폴백)
-  if [ -d "$HOME/.claude/codex-skills/fz-${ROLE}" ]; then
+  # Tier 2b: codex-skills/ (플러그인 포함본 — 폴백, 심볼릭 링크 설치 시 Tier 2a에서 해결)
+  local PLUGIN_CODEX="$(cd "$(dirname "${BASH_SOURCE[0]}")/../codex-skills" 2>/dev/null && pwd)"
+  if [ -n "$PLUGIN_CODEX" ] && [ -d "$PLUGIN_CODEX/fz-${ROLE}" ]; then
     echo "fz-${ROLE}"; return
   fi
   echo ""

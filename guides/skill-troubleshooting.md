@@ -15,7 +15,7 @@
 - "이 스킬이 있는 줄 몰랐어요" 피드백 발생
 
 **진단:**
-1. "Ask Claude" 테스트 실행 (`.claude/guides/skill-testing.md` §3)
+1. "Ask Claude" 테스트 실행 (`guides/skill-testing.md` §3)
 2. Claude가 description을 정확히 인용하는지 확인
 3. 누락된 키워드 식별
 
@@ -238,7 +238,7 @@ User prompt에 추가:
 질문: "fz-{name} 스킬은 언제 쓰는 거야?"
 분석: Claude가 description을 정확히 인용하는가?
 조치: 누락 키워드 → description에 추가
-상세: .claude/guides/skill-testing.md §3
+상세: guides/skill-testing.md §3
 ```
 
 ### /fz-manage check 항목별 대응
@@ -251,7 +251,7 @@ User prompt에 추가:
 | #4 intent-triggers 중복 | §1.3 절차대로 키워드 분리 |
 | #5 스킬 크기 | 500줄 초과 → 모듈 분리 (Level 3) |
 | #6 깨진 파일 참조 | 경로 오류 수정, 삭제된 파일 참조 제거 |
-| #7 에이전트 파일 | `.claude/agents/` 내 YAML 필드 확인 |
+| #7 에이전트 파일 | `agents/` 내 YAML 필드 확인 |
 | #8 Team MCP 호환 | 팀 불가 MCP 참조 제거 |
 | #9 테스트 케이스 | "## 테스트 케이스" 섹션 또는 참조 링크 추가 |
 | #10 Triggering 테스트 | should + should-NOT 최소 3개 작성 |
@@ -273,8 +273,8 @@ User prompt에 추가:
 
 ## 참조
 
-- 테스트 방법론: `.claude/guides/skill-testing.md`
-- 스킬 작성법: `.claude/guides/skill-authoring.md`
-- 프롬프트 최적화: `.claude/guides/prompt-optimization.md`
-- Codex 교차검증: `.claude/skills/fz-codex/SKILL.md`
+- 테스트 방법론: `guides/skill-testing.md`
+- 스킬 작성법: `guides/skill-authoring.md`
+- 프롬프트 최적화: `guides/prompt-optimization.md`
+- Codex 교차검증: `skills/fz-codex/SKILL.md`
 - 건강 체크: `/fz-manage check`

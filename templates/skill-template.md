@@ -1,6 +1,6 @@
 # Skill Template
 
-> Template for authoring Claude Code skills (`.claude/skills/fz-*.md`).
+> Template for authoring Claude Code skills (`skills/fz-*.md`).
 > Each SKILL.md should stay under **500 lines** — focused 300 tokens outperform unfocused 113K tokens.
 
 ---
@@ -49,7 +49,7 @@ disable-model-invocation: false          # true: 사용자 명시 호출만 허�
 | `user-invocable` | required | Whether users can call directly | `false` for sub-skills called only by orchestrators |
 | `argument-hint` | optional | Usage hint shown to user | Keep concise: `"[file] [--strict]"` |
 | `allowed-tools` | required | Tools this skill may use | List only what is needed. Bash can be pattern-restricted: `Bash(xcodebuild *)`, `Bash(git *)` |
-| `team-agents` | optional | Multi-agent configuration | `primary` runs the main loop; `supporting` agents assist. See `.claude/modules/team-registry.md` for agent list. |
+| `team-agents` | optional | Multi-agent configuration | `primary` runs the main loop; `supporting` agents assist. See `modules/team-registry.md` for agent list. |
 | `composable` | optional | Can be chained in pipelines | Set `true` if output feeds another skill |
 | `provides` | optional | Capability tokens this skill outputs | See registry below |
 | `needs` | optional | Capability tokens required as input | Use `[none]` if self-contained |
@@ -119,8 +119,8 @@ Input → Phase 1 → Phase 2 → ... → Output
 
 | 모듈 | 용도 |
 |------|------|
-| `.claude/modules/team-core.md` | 팀 프로토콜 |
-| `.claude/modules/team-registry.md` | 에이전트 동적 구성 |
+| `modules/team-core.md` | 팀 프로토콜 |
+| `modules/team-registry.md` | 에이전트 동적 구성 |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -179,7 +179,7 @@ Input → Phase 1 → Phase 2 → ... → Output
 | {엣지 조건} | /fz-{name} "{입력}" | {예상 결과} |
 | {실패 조건} | /fz-{name} "{입력}" | {에러 핸들링} |
 
-상세: `.claude/guides/skill-testing.md`
+상세: `guides/skill-testing.md`
 
 ## Boundaries
 
@@ -242,7 +242,7 @@ Before finalizing a new skill, verify:
 - [ ] Error handling table present?
 - [ ] Completion -> Next section present?
 - [ ] No aggressive language (avoid CRITICAL, MUST ALWAYS, etc.)?
-- [ ] References use explicit paths (`.claude/modules/X.md` not just `X.md`)?
+- [ ] References use explicit paths (`modules/X.md` not just `X.md`)?
 - [ ] Triggering test cases 최소 3개 (should + should-NOT)?
 - [ ] compatibility 필드 작성? (환경 의존성 있을 때)
 
@@ -258,5 +258,5 @@ Before finalizing a new skill, verify:
 | Will/Won't boundaries | Prevent scope creep with redirect alternatives |
 | Gate checklists | Verifiable completion conditions at each phase |
 | < 500 lines | Progressive Disclosure — YAML always loaded, body on relevance, refs on demand |
-| Explicit paths | `.claude/templates/X.md` not just `templates/X.md` |
+| Explicit paths | `templates/X.md` not just `templates/X.md` |
 | Natural language | "Use when..." not "CRITICAL: You MUST..." |

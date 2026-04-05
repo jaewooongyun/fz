@@ -111,7 +111,7 @@ jq '[.issues[] | select(.status != "resolved" and .status != "deferred")]' "$TRA
 
 ## 관련 스키마
 
-- `~/.claude/schemas/issue_tracker_schema.json`
+- `schemas/issue_tracker_schema.json`
 
 ## 참조 스킬
 

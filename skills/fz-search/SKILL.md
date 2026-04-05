@@ -257,7 +257,7 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 
 ## 병렬 교차 검증 (`--deep` 모드)
 
-> 팀 모드 규칙은 `.claude/modules/team-core.md` 참조
+> 팀 모드 규칙은 `modules/team-core.md` 참조
 
 ### 팀 구성
 

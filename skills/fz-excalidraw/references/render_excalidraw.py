@@ -1,13 +1,13 @@
 """Render Excalidraw JSON to PNG using Playwright + headless Chromium.
 
-Usage:
-    cd .claude/skills/excalidraw-diagram/references
+Usage (from this script's directory):
     uv run python render_excalidraw.py <path-to-file.excalidraw> [--output path.png] [--scale 2] [--width 1920]
 
-First-time setup:
-    cd .claude/skills/excalidraw-diagram/references
+First-time setup (from this script's directory):
     uv sync
     uv run playwright install chromium
+
+Note: This script is part of the fz plugin. Run from the directory containing this file.
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ def render(
         from playwright.sync_api import sync_playwright
     except ImportError:
         print("ERROR: playwright not installed.", file=sys.stderr)
-        print("Run: cd .claude/skills/excalidraw-diagram/references && uv sync && uv run playwright install chromium", file=sys.stderr)
+        print("Run: cd skills/fz-excalidraw/references && uv sync && uv run playwright install chromium", file=sys.stderr)
         sys.exit(1)
 
     # Read and validate
@@ -128,7 +128,7 @@ def render(
         except Exception as e:
             if "Executable doesn't exist" in str(e) or "browserType.launch" in str(e):
                 print("ERROR: Chromium not installed for Playwright.", file=sys.stderr)
-                print("Run: cd .claude/skills/excalidraw-diagram/references && uv run playwright install chromium", file=sys.stderr)
+                print("Run: cd skills/fz-excalidraw/references && uv run playwright install chromium", file=sys.stderr)
                 sys.exit(1)
             raise
 

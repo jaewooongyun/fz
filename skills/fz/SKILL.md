@@ -153,7 +153,7 @@ model-strategy:
 2. **intent-triggers 매칭**: 각 스킬 YAML의 `intent-triggers` 정규식과 대조
 
    ```
-   스킬 YAML 위치: .claude/skills/fz-*/SKILL.md
+   스킬 YAML 위치: skills/fz-*/SKILL.md
    매칭 방법: 각 스킬의 intent-triggers 정규식을 순회하며 매칭
    ```
 
@@ -343,7 +343,7 @@ Q: "이 작업의 범위를 확인합니다"
 
 ```
 각 단계:
-1. Read(.claude/skills/{스킬}/SKILL.md) → 해당 스킬의 지침 로드
+1. Read(skills/{스킬}/SKILL.md) → 해당 스킬의 지침 로드
 2. 스킬 지침에 따라 실행 (도구 호출, MCP 사용 등)
 3. 대화 컨텍스트에 산출물 축적 → 다음 단계가 자연 참조
 4. Gate 체크 → 통과 시 다음 단계, 실패 시 중단/계속 선택

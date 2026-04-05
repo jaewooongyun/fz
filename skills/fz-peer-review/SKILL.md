@@ -70,18 +70,18 @@ model-strategy:
 
 | 참조 | 용도 |
 |------|------|
-| `.claude/modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
-| `.claude/modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
-| `.claude/modules/peer-review-gates.md` | Synthesize 검증 게이트 4.5-4.8 전문 (4.7-A Deleted Logic Migration 포함) |
-| `.claude/modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
+| `modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
+| `modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
+| `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.5-4.8 전문 (4.7-A Deleted Logic Migration 포함) |
+| `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
 | Codex challenger 스킬 | 관점 3(Over-Engineering) + 관점 7 보조 + Devil's Advocate |
-| `~/.claude/schemas/codex_peer_review_schema.json` | Codex 응답 JSON 구조 |
+| `schemas/codex_peer_review_schema.json` | Codex 응답 JSON 구조 |
 
 ## Step: Gather (컨텍스트 수집)
 
-오케스트레이터가 직접 수행. `WORK_DIR=${PROJECT_ROOT}/peer-review-{PR_NUMBER}` (현재 작업 디렉토리 기준, 쓰기 불가 시 `.claude/tmp/` 폴백).
+오케스트레이터가 직접 수행. `WORK_DIR=${PROJECT_ROOT}/peer-review-{PR_NUMBER}` (현재 작업 디렉토리 기준, 쓰기 불가 시 `/tmp/fz-peer-review/` 폴백).
 
 ### WORK_DIR 초기화 (Gather 첫 번째 단계)
 
@@ -221,7 +221,7 @@ Round 0.5: 최종 보고 → Lead에 [합의/불합의 항목] 전달
 > Codex 모델: `~/.codex/config.toml`에서 설정된 모델 사용.
 
 ```bash
-SCHEMA_PATH="${HOME}/.claude/schemas/codex_peer_review_schema.json"
+SCHEMA_PATH="schemas/codex_peer_review_schema.json"
 CHALLENGER=$(get_codex_skill "challenger")  # cross-validation.md 3-Tier 디스커버리
 
 codex exec \

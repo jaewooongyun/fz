@@ -28,11 +28,11 @@
 2. 실패/비효율 지점 기록
 3. 성공할 때까지 반복 (Claude의 in-context learning 활용)
 4. 성공 패턴을 SKILL.md로 추출
-5. 3개 평가 시나리오로 검증 (`.claude/guides/skill-testing.md` §1)
+5. 3개 평가 시나리오로 검증 (`guides/skill-testing.md` §1)
 
 ### 작성
 
-- `.claude/templates/skill-template.md` 기반으로 시작한다
+- `templates/skill-template.md` 기반으로 시작한다
 - 템플릿의 모든 필드를 채운 후 불필요한 부분을 제거한다
 - 빈 필드를 남기지 않는다 — 명시적으로 `none`을 적는다
 
@@ -41,9 +41,9 @@
 - 3개 평가 시나리오를 정의한다 (정상, 경계, 실패)
 - 직접 호출로 결과를 확인한다: `/fz-{name} {시나리오}`
 - 파이프라인 내에서도 테스트한다: `/fz` 경유 호출
-- 상세 테스트 방법론: `.claude/guides/skill-testing.md` 참조
-- Ask Claude 디버깅: `.claude/guides/skill-testing.md` §3 참조
-- 트러블슈팅: `.claude/guides/skill-troubleshooting.md` 참조
+- 상세 테스트 방법론: `guides/skill-testing.md` 참조
+- Ask Claude 디버깅: `guides/skill-testing.md` §3 참조
+- 트러블슈팅: `guides/skill-troubleshooting.md` 참조
 
 ### Eval (품질 평가)
 
@@ -54,7 +54,7 @@
 
 ### 배포
 
-- `.claude/skills/{name}/SKILL.md`에 배치한다
+- `skills/{name}/SKILL.md`에 배치한다
 - `/fz-manage check`로 건강 체크 — 전체 통과 필수
 
 ### 진화
@@ -122,7 +122,7 @@ GOOD: "버그 수정 경량 스킬. 원인 분석 → 수정 → 빌드 검증�
 - 핵심만 포함한다: Phase, Gate, Boundaries
 - 부수적 내용은 경로만 명시한다:
   ```
-  빌드 검증 세부 절차는 `.claude/modules/build.md` 참조.
+  빌드 검증 세부 절차는 `modules/build.md` 참조.
   ```
 - 500줄 초과 시 증상: Claude가 후반부 지침을 무시하기 시작한다
 
@@ -141,30 +141,30 @@ GOOD: "버그 수정 경량 스킬. 원인 분석 → 수정 → 빌드 검증�
 - 반복 설명 (동일 원칙의 2번째+ 언급)
 - 도구 호출 예시 (Claude가 아는 도구 사용법)
 
-**500줄 초과 시 우선순위**: 삭제보다 **모듈 분리**를 먼저 시도한다. `.claude/modules/`로 이동하면 줄 수는 줄이되 정보는 보존된다.
+**500줄 초과 시 우선순위**: 삭제보다 **모듈 분리**를 먼저 시도한다. `modules/`로 이동하면 줄 수는 줄이되 정보는 보존된다.
 
 ### Level 3: References (필요 시 Read)
 
-- `.claude/modules/*.md`, `.claude/guides/*.md` 등 공유 파일
+- `modules/*.md`, `guides/*.md` 등 공유 파일
 - Claude가 Read 도구로 직접 읽는다 (자동 로딩 아님)
 - **1단계 깊이만**: SKILL.md → ref.md (O), ref.md → detail.md (X)
 - 100줄 이상 파일에는 목차를 포함한다
-- **명시적 절대 경로**: `.claude/modules/build.md` (not `modules/build.md`)
+- **플러그인 루트 상대 경로**: `modules/build.md` (not `../../modules/build.md`)
 
 ### 디렉토리 구조 예시
 
 ```
-.claude/skills/fz-code/
+skills/fz-code/
 ├── SKILL.md          ← Level 2 (500줄 이하)
 └── (단순 스킬은 하위 디렉토리 없음)
 
-.claude/modules/      ← Level 3 (공유 모듈)
+modules/      ← Level 3 (공유 모듈)
 ├── team-core.md
 ├── team-registry.md
 ├── patterns/
 └── ...
 
-.claude/guides/       ← Level 3 (공유 가이드)
+guides/       ← Level 3 (공유 가이드)
 ├── prompt-optimization.md
 ├── agent-team-guide.md
 └── ...
@@ -175,7 +175,7 @@ GOOD: "버그 수정 경량 스킬. 원인 분석 → 수정 → 빌드 검증�
 ## 4. 프롬프트 작성 최적화 원칙
 
 §2(Description), §3(Progressive Disclosure)에서 다루지 않은 핵심 원칙.
-상세 Before/After 예시와 이론: `.claude/guides/prompt-optimization.md` 참조.
+상세 Before/After 예시와 이론: `guides/prompt-optimization.md` 참조.
 
 ### 원칙 1: Claude가 모르는 것만 추가
 
@@ -256,7 +256,7 @@ GOOD: "Use this tool when reading or modifying files"
 
 ### 기존 토큰 레지스트리
 
-전체 목록은 `.claude/templates/skill-template.md`의 레지스트리 섹션 참조.
+전체 목록은 `templates/skill-template.md`의 레지스트리 섹션 참조.
 
 ### 설계 규칙
 
@@ -264,7 +264,7 @@ GOOD: "Use this tool when reading or modifying files"
 |------|------|------|
 | `needs: [none]` | 진입점 스킬 | fz-plan, fz-search, fz-fix |
 | `needs: [planning]` | 선행 스킬 필요 | fz-code (fz-plan 이후) |
-| 새 토큰 추가 시 | 레지스트리에도 반드시 추가 | `.claude/templates/skill-template.md` |
+| 새 토큰 추가 시 | 레지스트리에도 반드시 추가 | `templates/skill-template.md` |
 | 순환 금지 | A→B→A 형태 불가 | provides/needs 그래프 DAG 유지 |
 
 ### 파이프라인 매칭 흐름
@@ -273,7 +273,7 @@ GOOD: "Use this tool when reading or modifying files"
 사용자 요청
   → /fz intent 분석
   → intent-triggers 매칭
-  → 사전 정의 파이프라인 (.claude/modules/pipelines.md) 매칭
+  → 사전 정의 파이프라인 (modules/pipelines.md) 매칭
   → 미매칭 시 provides/needs 그래프로 동적 구성
 ```
 
@@ -334,20 +334,20 @@ team-agents:
 
 - Primary Worker는 1명만 지정한다
 - Supporting은 필요한 만큼 추가하되 3명 이하를 권장한다
-- 에이전트 파일은 `.claude/agents/`에 존재해야 한다
-- 에이전트 목록: `.claude/modules/team-registry.md` 참조
+- 에이전트 파일은 `agents/`에 존재해야 한다
+- 에이전트 목록: `modules/team-registry.md` 참조
 
 ### 통신 패턴 선택
 
 | 패턴 | 적용 스킬 | 핵심 동작 | 패턴 파일 |
 |------|-----------|-----------|----------|
-| Collaborative Design | fz-plan | 만들면서 토론 | `.claude/modules/patterns/collaborative.md` |
-| Pair Programming | fz-code | 구현 중 실시간 피드백 | `.claude/modules/patterns/pair-programming.md` |
-| Live Review | fz-review | 분석하면서 발견 공유 | `.claude/modules/patterns/live-review.md` |
-| Adversarial Discovery | fz-discover | 만들고 부수며 제약 발견 | `.claude/modules/patterns/adversarial.md` |
-| Cross-Verify | fz-search | 발견 즉시 교차 확인 | `.claude/modules/patterns/cross-verify.md` |
+| Collaborative Design | fz-plan | 만들면서 토론 | `modules/patterns/collaborative.md` |
+| Pair Programming | fz-code | 구현 중 실시간 피드백 | `modules/patterns/pair-programming.md` |
+| Live Review | fz-review | 분석하면서 발견 공유 | `modules/patterns/live-review.md` |
+| Adversarial Discovery | fz-discover | 만들고 부수며 제약 발견 | `modules/patterns/adversarial.md` |
+| Cross-Verify | fz-search | 발견 즉시 교차 확인 | `modules/patterns/cross-verify.md` |
 
-자세한 내용: `.claude/guides/agent-team-guide.md`
+자세한 내용: `guides/agent-team-guide.md`
 
 ---
 
@@ -374,7 +374,7 @@ team-agents:
 
 ### 필수 항목
 
-- [ ] `.claude/templates/skill-template.md` 기반으로 작성했는가?
+- [ ] `templates/skill-template.md` 기반으로 작성했는가?
 - [ ] description에 무엇/언제/언제 아닌지/키워드가 모두 포함되었는가?
 - [ ] provides/needs가 기존 체인과 정합하는가?
 - [ ] intent-triggers가 기존 스킬과 중복이 없는가?
@@ -390,14 +390,14 @@ team-agents:
 
 Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot 면제.
 단, 아래 항목은 필수: Description 4요소, Boundaries, 에러 대응 테이블.
-상세: `.claude/modules/governance.md` — Utility 스킬 예외 섹션.
+상세: `modules/governance.md` — Utility 스킬 예외 섹션.
 
 ### 상황별 항목
 
-- [ ] 파이프라인에 포함되는 스킬이면 `.claude/modules/pipelines.md`에 추가했는가?
-- [ ] 팀 에이전트가 필요하면 `.claude/agents/`에 에이전트 파일이 존재하는가?
-- [ ] 새 provides 토큰을 정의했으면 `.claude/templates/skill-template.md` 레지스트리에 추가했는가?
-- [ ] 500줄을 초과하면 공유 모듈(`.claude/modules/`)로 분리했는가?
+- [ ] 파이프라인에 포함되는 스킬이면 `modules/pipelines.md`에 추가했는가?
+- [ ] 팀 에이전트가 필요하면 `agents/`에 에이전트 파일이 존재하는가?
+- [ ] 새 provides 토큰을 정의했으면 `templates/skill-template.md` 레지스트리에 추가했는가?
+- [ ] 500줄을 초과하면 공유 모듈(`modules/`)로 분리했는가?
 - [ ] ⛔ Phase 0 PRJ Pre-flight가 포함되어 있는가? (`modules/context-artifacts.md` → Work Dir Resolution)
 - [ ] PRJ 컨텍스트 로딩(Hydration Set)이 `modules/context-artifacts.md` Upstream Hydration Sets와 일치하는가?
 
@@ -415,9 +415,9 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 
 - [ ] SKILL.md 본문이 500줄 이하인가?
 - [ ] Level 3 참조가 1단계 깊이를 넘지 않는가?
-- [ ] 모든 파일 참조 경로가 `.claude/`로 시작하는 명시적 경로인가?
+- [ ] 모든 파일 참조 경로가 플러그인 루트 상대 경로인가? (`.claude/` prefix 금지)
 
-> 상세 Before/After 예시와 이론: `.claude/guides/prompt-optimization.md` 참조.
+> 상세 Before/After 예시와 이론: `guides/prompt-optimization.md` 참조.
 
 ---
 
@@ -466,14 +466,14 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 | 데이터 형식 검증 | `scripts/validate.py --input {file}` |
 | 빌드 결과 파싱 | `scripts/parse_build_log.sh` |
 | 패턴 검증 (Anti-Pattern Constraints) | `scripts/check_patterns.sh` |
-| Codex 응답 스키마 검증 | `~/.claude/schemas/codex_review_schema.json` |
+| Codex 응답 스키마 검증 | `schemas/codex_review_schema.json` |
 
 ### scripts/ 디렉토리 규칙
 
-- `.claude/skills/{name}/scripts/`에 배치한다
+- `skills/{name}/scripts/`에 배치한다
 - 스크립트 자체는 토큰을 소비하지 않는다 (실행 결과만 소비)
 - SKILL.md에서 명시적 경로로 참조한다
-- JSON 스키마는 `~/.claude/schemas/`에 배치한다 (fz-codex의 `--output-schema` 활용)
+- JSON 스키마는 `schemas/`에 배치한다 (fz-codex의 `--output-schema` 활용)
 
 ### 스크립트 vs 언어 지시 판단 기준
 

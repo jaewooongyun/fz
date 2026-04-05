@@ -1,7 +1,7 @@
 # Agent & Team Configuration Guide
 
 > fz-* 스킬 생태계에서 에이전트 작성 및 팀 구성을 위한 종합 가이드.
-> 에이전트는 `.claude/agents/*.md`에 위치하며, 팀은 TeamCreate + SendMessage로 Peer-to-Peer 통신한다.
+> 에이전트는 `agents/*.md`에 위치하며, 팀은 TeamCreate + SendMessage로 Peer-to-Peer 통신한다.
 
 ---
 
@@ -88,7 +88,7 @@ SendMessage(lead): "빌드 검증 필요합니다. 대상: MyApp scheme, 변경 
 - [ ] 워크플로우 번호 매김 (Step 1, 2, 3...)
 - [ ] 결과 보고 형식 명시 (Markdown 구조)
 
-Agent 템플릿: `.claude/templates/agent-template.md`를 기반으로 작성한다.
+Agent 템플릿: `templates/agent-template.md`를 기반으로 작성한다.
 
 ---
 
@@ -159,7 +159,7 @@ GOOD (Mesh / Peer-to-Peer):
 
 ## 3. 통신 패턴 5가지
 
-> 각 패턴의 상세 구현은 `.claude/modules/patterns/` 디렉토리 참조.
+> 각 패턴의 상세 구현은 `modules/patterns/` 디렉토리 참조.
 
 ### 3.1 Collaborative Design (fz-plan)
 
@@ -269,7 +269,7 @@ search-pattern: Grep 기반 교차 확인
 
 ### 모델 승격 매트릭스
 
-상세 내용은 `.claude/modules/team-registry.md` 참조.
+상세 내용은 `modules/team-registry.md` 참조.
 
 | 파이프라인 | Primary Worker (opus) | Supporting (sonnet) |
 |-----------|----------------------|---------------------|
@@ -332,7 +332,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 
 새 에이전트를 추가할 때 다음을 확인한다:
 
-- [ ] `.claude/templates/agent-template.md` 기반으로 작성했는가?
+- [ ] `templates/agent-template.md` 기반으로 작성했는가?
 - [ ] 기존 에이전트와 역할 중복이 없는가?
   - plan-structure: 설계/계획 구조
   - plan-tradeoff: 트레이드오프 분석
@@ -351,13 +351,13 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 - [ ] Peer-to-Peer 통신 규칙을 포함했는가?
 - [ ] 모델 승격 조건을 주석으로 명시했는가?
 - [ ] `/fz-manage check` 통과 (에이전트 건강 체크 #7, #8)?
-- [ ] `.claude/guides/prompt-optimization.md` 10대 원칙을 준수하는가?
+- [ ] `guides/prompt-optimization.md` 10대 원칙을 준수하는가?
 
 ### 추가 시 업데이트 필요 항목
 
 새 에이전트가 기존 팀에 참여하는 경우:
 
-1. `.claude/modules/team-registry.md`에 에이전트 1줄 추가
+1. `modules/team-registry.md`에 에이전트 1줄 추가
 2. 관련 스킬 파일에서 TeamCreate 구성 업데이트
 3. 통신 대상 에이전트의 Peer-to-Peer 규칙 업데이트
 4. 모델 승격 매트릭스 업데이트 (Section 4 참조)
@@ -381,7 +381,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | search-pattern | search | sonnet | 텍스트 패턴 탐색 |
 | memory-curator | memory | sonnet | 교훈 발굴, 컨텍스트 매칭 |
 
-전체 에이전트 capabilities: `.claude/modules/team-registry.md` 참조.
+전체 에이전트 capabilities: `modules/team-registry.md` 참조.
 
 ---
 

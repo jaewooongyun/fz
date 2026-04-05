@@ -19,23 +19,37 @@ npm install -g @anthropic-ai/claude-code
 # https://github.com/AbanteAI/serena
 ```
 
-### 2. fz 설치
+### 2. fz 설치 (플러그인)
 
 ```bash
-# fz 레포 클론
-git clone https://github.com/jaewooongyun/fz.git ~/.claude
+# fz marketplace 등록 + 플러그인 설치
+claude plugin marketplace add github:jaewooongyun/fz
+claude plugin install fz
 
 # Codex 네이티브 스킬 심볼릭 링크 (Codex CLI 사용 시)
-bash ~/.claude/scripts/setup-codex-skills.sh
+# 플러그인 설치 경로에서 스크립트 실행
+bash ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/setup-codex-skills.sh
 ```
+
+<details>
+<summary>수동 설치 (git clone)</summary>
+
+```bash
+git clone https://github.com/jaewooongyun/fz.git ~/dev/fz-plugin
+claude --plugin-dir ~/dev/fz-plugin
+bash ~/dev/fz-plugin/scripts/setup-codex-skills.sh
+```
+</details>
 
 ### 3. 프로젝트 CLAUDE.md 설정
 
 프로젝트 루트에 `CLAUDE.md`를 작성합니다. fz의 모든 스킬/에이전트가 이 파일을 참조합니다.
 
 ```bash
-# 템플릿 복사 후 프로젝트에 맞게 수정
-cp ~/.claude/templates/CLAUDE.md.template ./CLAUDE.md
+# fz 플러그인 디렉토리의 templates/CLAUDE.md.template을 복사 후 수정
+# 플러그인 설치 시: ~/.claude/plugins/cache/fz-orchestrator/fz/*/templates/
+# 수동 설치 시: ~/dev/fz-plugin/templates/
+cp <fz-plugin-dir>/templates/CLAUDE.md.template ./CLAUDE.md
 ```
 
 필수 섹션: `## Architecture`, `## Build`, `## Code Conventions`
@@ -102,7 +116,7 @@ claude
 ## Architecture
 
 ```
-~/.claude/
+fz-plugin/ (or installed plugin cache)
 ├── skills/          21개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
 ├── agents/          14개 — plan-structure, impl-correctness, review-arch ...
 ├── modules/         20개 — team-core, pipelines, cross-validation, lead-reasoning, system-reminders ...

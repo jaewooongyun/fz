@@ -84,15 +84,15 @@ model-strategy:
 | Phase 7 | `/sc:test` | 최종 테스트 검증 |
 ## 팀 에이전트 모드 (Review Squad)
 
-> 팀 모드 규칙은 `.claude/modules/team-core.md` 참조
+> 팀 모드 규칙은 `modules/team-core.md` 참조
 
 ### 팀 구성
 
 ```
 TeamCreate("review-{feature}")
 ├── Lead (Opus): 4중 검증 오케스트레이션 + 수정 수행
-├── review-arch (★Opus): 아키텍처 리뷰 — .claude/agents/review-arch.md
-├── review-quality (Sonnet): 코드 품질 리뷰 — .claude/agents/review-quality.md
+├── review-arch (★Opus): 아키텍처 리뷰 — agents/review-arch.md
+├── review-quality (Sonnet): 코드 품질 리뷰 — agents/review-quality.md
 ├── review-correctness (Sonnet): Phase 4.5 요구사항 충족 검증 [RTM/plan 존재 시만 활성]
 ├── review-counter (Sonnet): DA 패스 — review-arch/review-quality "OK" 판정에 반론 [선택]
 ├── memory-curator (Sonnet): 관련 교훈 발굴 + review-arch에 직접 전달 [기본 포함, lightweight recall]

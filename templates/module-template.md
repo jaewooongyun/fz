@@ -1,6 +1,6 @@
 # Module Template
 
-> Progressive Disclosure Level 3 template for creating shared module files in `.claude/modules/`
+> Progressive Disclosure Level 3 template for creating shared module files in `modules/`
 
 ## Overview
 
@@ -78,4 +78,4 @@ Modules are reusable knowledge resources loaded by Claude via Read tool only whe
 - Keep modules focused and single-purpose
 - Use Korean for 참조 스킬 and 설계 원칙 sections
 - Structure with tables for lookup efficiency
-- Reference modules by their full path: `.claude/modules/{module-name}.md`
+- Reference modules by their full path: `modules/{module-name}.md`
