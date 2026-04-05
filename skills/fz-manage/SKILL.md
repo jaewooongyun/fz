@@ -72,10 +72,10 @@ model-strategy:
 
 ### 절차
 
-1. `Glob(".claude/skills/*/SKILL.md")` → fz- 스킬 목록
+1. `Glob("skills/*/SKILL.md")` → fz- 스킬 목록
 2. 각 SKILL.md의 YAML frontmatter 파싱
 3. `Glob("~/.claude/commands/sc/*.md")` → sc: 명령어 목록
-4. `Glob(".claude/modules/*.md")` → 공유 모듈 목록
+4. `Glob("modules/*.md")` → 공유 모듈 목록
 
 ### 출력 형식
 
@@ -100,9 +100,9 @@ build.md, governance.md, session.md, skill-template.md, team-core.md, README.md
 
 ### 절차
 
-1. `Read(".claude/skills/fz-{name}/SKILL.md")` → YAML frontmatter + 본문
+1. `Read("skills/fz-{name}/SKILL.md")` → YAML frontmatter + 본문
 2. YAML에서 `allowed-tools`, `provides`, `needs`, `intent-triggers`, `model-strategy` 추출
-3. `Grep("fz-{name}", ".claude/skills/")` → 역참조 (이 스킬을 참조하는 다른 스킬)
+3. `Grep("fz-{name}", "skills/")` → 역참조 (이 스킬을 참조하는 다른 스킬)
 4. 파일 크기 (줄 수) 계산
 
 ### 출력 형식
@@ -177,7 +177,7 @@ fz- 스킬 + 에이전트를 일괄 검증합니다.
 | 4 | fz-* | intent-triggers 중복 | 과도한 겹침 여부 |
 | 5 | fz-* | 스킬 크기 <= 500줄 | Progressive Disclosure 준수 |
 | 6 | fz-* | 깨진 파일 참조 | 본문 내 경로 참조 검증 |
-| 7 | Agent | 에이전트 파일 유효성 | `.claude/agents/*.md`에 name, description, model 존재 |
+| 7 | Agent | 에이전트 파일 유효성 | `agents/*.md`에 name, description, model 존재 |
 | 8 | Agent | Team MCP 호환성 | 에이전트가 Team 불가 MCP 참조하지 않는지 |
 | 9 | fz-* | 테스트 케이스 존재 | SKILL.md에 "## 테스트 케이스" 섹션 또는 참조 링크 |
 | 10 | fz-* | Triggering 테스트 | should trigger + should NOT trigger 최소 3개 |
@@ -210,7 +210,7 @@ OK Triggering 테스트: N/N (3개+ 커버)
 
 ### 절차
 
-1. `Glob(".claude/skills/*/SKILL.md")` → 전체 fz-* 스킬 목록
+1. `Glob("skills/*/SKILL.md")` → 전체 fz-* 스킬 목록
 2. 각 스킬에 대해 Static Analysis 8항목 실행:
 
    | 검증 항목 | 기준 | 판정 |
@@ -254,7 +254,7 @@ OK Triggering 테스트: N/N (3개+ 커버)
 ### `--with-trigger` 옵션
 
 하위 3개 스킬에 대해 skill-creator의 `run_eval.py` Quick Trigger Eval 추가 실행.
-상세: `~/.claude/skills/fz-skill/references/skill-creator-integration.md` "Quick Trigger Eval" 섹션.
+상세: `skills/fz-skill/references/skill-creator-integration.md` "Quick Trigger Eval" 섹션.
 
 - 각 스킬: should-trigger 3개 + should-not-trigger 2개 자동 생성 → 1회 실행
 - 출력 테이블에 "Trigger" 컬럼 추가 (해당 스킬만, 나머지는 "-")
@@ -281,7 +281,7 @@ OK Triggering 테스트: N/N (3개+ 커버)
 ## create / edit / delete — `/fz-skill`로 이관
 
 > 스킬/에이전트 CRUD 기능은 `/fz-skill`로 이관되었습니다.
-> `/fz-skill`은 `.claude/templates/` + `.claude/guides/` 기반의 지능형 생성/수정/삭제를 제공합니다.
+> `/fz-skill`은 `templates/` + `guides/` 기반의 지능형 생성/수정/삭제를 제공합니다.
 
 ```bash
 /fz-skill create fz-test "테스트 자동화 스킬"       # 새 스킬 생성

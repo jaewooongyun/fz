@@ -34,8 +34,8 @@ model-strategy:
 
 > 서브커맨드: create | update | delete | new-agent | eval | optimize
 
-- 스킬 생성: `.claude/templates/skill-template.md` + `.claude/guides/` 기반 지능형 생성
-- 에이전트 생성: `.claude/templates/agent-template.md` 기반
+- 스킬 생성: `templates/skill-template.md` + `guides/` 기반 지능형 생성
+- 에이전트 생성: `templates/agent-template.md` 기반
 - 품질 평가: Static Analysis + Runtime Trigger Eval + Triggering Test + Diff Eval
 - **Description 최적화**: skill-creator의 `run_loop.py` 활용, 실측 트리거율 기반 자동 개선
 - 문서 작성은 /fz-doc에 위임 (내부 모듈로 활용)
@@ -60,12 +60,12 @@ model-strategy:
 
 | 리소스 | 경로 | 참조 시점 |
 |--------|------|----------|
-| 스킬 템플릿 | `.claude/templates/skill-template.md` | create 시 |
-| 에이전트 템플릿 | `.claude/templates/agent-template.md` | new-agent 시 |
-| 모듈 템플릿 | `.claude/templates/module-template.md` | 모듈 생성 필요 시 |
-| 프롬프트 최적화 | `.claude/guides/prompt-optimization.md` | 모든 생성/수정 시 |
-| 스킬 작성법 | `.claude/guides/skill-authoring.md` | create, update 시 |
-| 에이전트/팀 가이드 | `.claude/guides/agent-team-guide.md` | new-agent 시 |
+| 스킬 템플릿 | `templates/skill-template.md` | create 시 |
+| 에이전트 템플릿 | `templates/agent-template.md` | new-agent 시 |
+| 모듈 템플릿 | `templates/module-template.md` | 모듈 생성 필요 시 |
+| 프롬프트 최적화 | `guides/prompt-optimization.md` | 모든 생성/수정 시 |
+| 스킬 작성법 | `guides/skill-authoring.md` | create, update 시 |
+| 에이전트/팀 가이드 | `guides/agent-team-guide.md` | new-agent 시 |
 
 ## /fz-doc 연계 (내부 모듈)
 
@@ -86,28 +86,28 @@ model-strategy:
    - `--from-discover`: /fz-discover의 정제된 요구사항이 있으면 L3 적용
 
 2. **기존 생태계 분석**:
-   - `Glob(".claude/skills/*/SKILL.md")` → 기존 스킬 목록
+   - `Glob("skills/*/SKILL.md")` → 기존 스킬 목록
    - `Grep(intent-triggers)` → 중복 트리거 사전 체크
    - provides/needs 체인에서 위치 결정
 
 ### Phase 2: 스켈레톤 생성
 
-1. `Read(.claude/templates/skill-template.md)` → 템플릿 로드
+1. `Read(templates/skill-template.md)` → 템플릿 로드
 2. YAML frontmatter 채우기:
    - `name`: fz-{name} 형식
    - `description`: 무엇+언제+언제아닌지+한영키워드
    - `provides/needs`: 기존 체인과 정합
    - `intent-triggers`: 중복 없는 한영 패턴
    - `allowed-tools`: 필요한 도구만
-   - `team-agents`: 복잡도에 따라 설정 (`.claude/modules/team-registry.md` 참조)
+   - `team-agents`: 복잡도에 따라 설정 (`modules/team-registry.md` 참조)
    - `model-strategy`: 역할에 맞는 모델
 
-3. 디렉토리 생성: `.claude/skills/fz-{name}/`
+3. 디렉토리 생성: `skills/fz-{name}/`
 
 ### Phase 3: 본문 작성 (/fz-doc 패턴)
 
-1. `Read(.claude/guides/skill-authoring.md)` → 작성 가이드라인
-2. `Read(.claude/guides/prompt-optimization.md)` → 10대 원칙
+1. `Read(guides/skill-authoring.md)` → 작성 가이드라인
+2. `Read(guides/prompt-optimization.md)` → 10대 원칙
 3. SKILL.md 본문 작성:
    - 행동 원칙 (1-2줄)
    - 개요 (프로세스 다이어그램 + 핵심 특징)
@@ -149,9 +149,9 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
 
 ### 절차
 
-1. `Read(.claude/skills/fz-{name}/SKILL.md)` → 현재 상태 파악
+1. `Read(skills/fz-{name}/SKILL.md)` → 현재 상태 파악
 2. 사용자 지시 분석 → 수정 범위 결정
-3. `Read(.claude/guides/prompt-optimization.md)` → 수정 시에도 원칙 적용
+3. `Read(guides/prompt-optimization.md)` → 수정 시에도 원칙 적용
 4. 수정 실행 (Edit 도구)
 5. 검증: 10대 원칙 체크 + 생태계 정합성
 
@@ -160,7 +160,7 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
 | 수정 유형 | 추가 확인 |
 |----------|----------|
 | description 변경 | intent-triggers와 일관성 |
-| provides/needs 변경 | `.claude/modules/pipelines.md` 영향 확인 |
+| provides/needs 변경 | `modules/pipelines.md` 영향 확인 |
 | allowed-tools 변경 | 에이전트 파일과 정합성 |
 | intent-triggers 변경 | 다른 스킬과 중복 체크 |
 
@@ -171,9 +171,9 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
 ### 절차
 
 1. **역의존성 확인**:
-   - `Grep("fz-{name}", ".claude/skills/")` → 참조하는 스킬
-   - `Grep("fz-{name}", ".claude/modules/")` → 참조하는 모듈
-   - `Grep("fz-{name}", ".claude/agents/")` → 참조하는 에이전트
+   - `Grep("fz-{name}", "skills/")` → 참조하는 스킬
+   - `Grep("fz-{name}", "modules/")` → 참조하는 모듈
+   - `Grep("fz-{name}", "agents/")` → 참조하는 에이전트
 
 2. **영향 보고**:
    ```markdown
@@ -198,10 +198,10 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
 
 ### 절차
 
-1. `Read(.claude/templates/agent-template.md)` → 템플릿 로드
-2. `Read(.claude/guides/agent-team-guide.md)` → 에이전트 작성법
+1. `Read(templates/agent-template.md)` → 템플릿 로드
+2. `Read(guides/agent-team-guide.md)` → 에이전트 작성법
 3. YAML frontmatter 채우기:
-   - `name`: `{domain}-{specialty}` 형식 (`.claude/modules/team-registry.md` 네이밍 규칙 준수)
+   - `name`: `{domain}-{specialty}` 형식 (`modules/team-registry.md` 네이밍 규칙 준수)
    - `description`: 역할+전문성+팀컨텍스트
    - `model`: 기본 sonnet (승격 조건 주석)
    - `tools`: 최소 필요 도구
@@ -211,8 +211,8 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
    - Peer-to-Peer 통신 규칙
    - 워크플로우
    - 결과 보고 형식
-5. 파일 생성: `.claude/agents/{name}.md`
-6. **team-registry.md 업데이트**: `.claude/modules/team-registry.md`에 에이전트 1줄 추가
+5. 파일 생성: `agents/{name}.md`
+6. **team-registry.md 업데이트**: `modules/team-registry.md`에 에이전트 1줄 추가
 7. 검증: agent-team-guide 체크리스트 적용
 
 ---
@@ -220,12 +220,12 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
 ## eval — 스킬 품질 평가
 
 대상 스킬의 품질을 자동 분석하고 개선 제안을 생성한다.
-테스트 프레임워크: `.claude/guides/skill-testing.md` 참조.
+테스트 프레임워크: `guides/skill-testing.md` 참조.
 
 ### 절차
 
 1. **대상 스킬 로드**:
-   - `Read(.claude/skills/fz-{name}/SKILL.md)` → YAML + 본문 파싱
+   - `Read(skills/fz-{name}/SKILL.md)` → YAML + 본문 파싱
 
 2. **Static Analysis** (자동):
 

@@ -179,7 +179,7 @@ model-strategy:
 
 ## 팀 에이전트 모드 (복잡한 버그)
 
-> 팀 모드 규칙은 `.claude/modules/team-core.md` 참조
+> 팀 모드 규칙은 `modules/team-core.md` 참조
 
 복잡한 버그(여러 파일 관련, 아키텍처 영향)에서 TEAM 모드 활성화.
 

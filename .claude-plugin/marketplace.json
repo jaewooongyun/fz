@@ -1,0 +1,29 @@
+{
+  "name": "fz-orchestrator",
+  "owner": {
+    "name": "Jaewoong Yun"
+  },
+  "metadata": {
+    "description": "fz AI development workflow orchestration system"
+  },
+  "plugins": [
+    {
+      "name": "fz",
+      "description": "AI development workflow orchestration: natural language → skill pipeline → multi-agent team → execution",
+      "repository": "https://github.com/jaewooongyun/fz",
+      "version": "3.3.0",
+      "author": {
+        "name": "Jaewoong Yun"
+      },
+      "license": "MIT",
+      "category": "development",
+      "tags": [
+        "orchestration",
+        "multi-agent",
+        "workflow",
+        "code-review"
+      ],
+      "source": "./"
+    }
+  ]
+}

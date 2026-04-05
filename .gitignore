@@ -1,79 +1,16 @@
-# ============================================
-# Ignore everything, whitelist fz ecosystem only
-# ============================================
+# OS
+.DS_Store
 
-# Ignore all by default
-*
+# Python (fz-excalidraw)
+__pycache__/
+*.pyc
+.venv/
+uv.lock
 
-# --- fz ecosystem whitelist ---
+# Editor
+*.swp
+*.swo
+*~
 
-# Skills
-!skills/
-!skills/*/
-!skills/**/SKILL.md
-!skills/**/references/
-!skills/**/references/**
-# Exclude heavy build artifacts inside skills
-skills/**/references/.venv/
-skills/**/references/__pycache__/
-skills/**/references/uv.lock
-
-# Agents (fz 전용만 — SC 에이전트는 SC 설치 시 자동 생성)
-!agents/
-!agents/*.md
-# SC 에이전트 제외 (superclaude install로 관리)
-agents/backend-architect.md
-agents/business-panel-experts.md
-agents/deep-research-agent.md
-agents/deep-research.md
-agents/devops-architect.md
-agents/frontend-architect.md
-agents/learning-guide.md
-agents/performance-engineer.md
-agents/pm-agent.md
-agents/python-expert.md
-agents/quality-engineer.md
-agents/refactoring-expert.md
-agents/repo-index.md
-agents/requirements-analyst.md
-agents/root-cause-analyst.md
-agents/security-engineer.md
-agents/self-review.md
-agents/socratic-mentor.md
-agents/system-architect.md
-agents/technical-writer.md
-
-# Modules
-!modules/
-!modules/*.md
-!modules/patterns/
-!modules/patterns/*.md
-
-# Guides
-!guides/
-!guides/*.md
-
-# Templates
-!templates/
-!templates/*.md
-!templates/*.template
-
-# Codex Skills (repo 포함본 — setup-codex-skills.sh로 심볼릭 링크)
-!codex-skills/
-!codex-skills/*/
-!codex-skills/**
-
-# Scripts
-!scripts/
-!scripts/*.sh
-
-# Schemas (Codex JSON schemas)
-!schemas/
-!schemas/*.json
-
-# Repo files
-!.gitignore
-!README.md
-!CHANGELOG.md
-!RELEASE_NOTES_*.md
-!LICENSE
+# Build
+.build/

@@ -88,7 +88,10 @@ model-strategy:
 ```python
 import sys
 import os
-sys.path.insert(0, os.path.expanduser("~/.claude/skills/fz-excalidraw/references"))
+# references/ is in the same directory as this SKILL.md
+# The model should resolve this from the skill's "Base directory" context
+SKILL_BASE = os.path.dirname(os.path.abspath(__file__)) if '__file__' in dir() else "."
+sys.path.insert(0, os.path.join(SKILL_BASE, "references"))
 from diagram_utils import reset, rect, txt, arr, elbow_arrow, hstack, vstack, diamond, ln, code_box, save
 
 reset()  # 버퍼 초기화
@@ -275,7 +278,8 @@ JSON만으로 다이어그램을 판단할 수 없다. **생성 후 반드시 �
 ### 렌더 명령
 
 ```bash
-cd ~/.claude/skills/fz-excalidraw/references && uv run python render_excalidraw.py <path-to-file.excalidraw>
+# {skill_base_dir}는 이 SKILL.md의 "Base directory" 경로로 대체
+cd {skill_base_dir}/references && uv run python render_excalidraw.py <path-to-file.excalidraw>
 ```
 
 렌더 결과 PNG를 **Read 도구로 직접 열어서** 확인한다.
@@ -283,7 +287,8 @@ cd ~/.claude/skills/fz-excalidraw/references && uv run python render_excalidraw.
 ### 최초 설정 (render_excalidraw.py 없을 때)
 
 ```bash
-cd ~/.claude/skills/fz-excalidraw/references
+# {skill_base_dir}는 이 SKILL.md의 "Base directory" 경로로 대체
+cd {skill_base_dir}/references
 uv sync
 uv run playwright install chromium
 ```

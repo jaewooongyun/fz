@@ -152,7 +152,7 @@ codex exec \
   -m "$(config.toml 모델)" \
   -c model_reasoning_effort=high \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
-  --output-schema ~/.claude/schemas/codex_review_schema.json \
+  --output-schema schemas/codex_review_schema.json \
   -o "$REVIEW_FILE" \
   -C "$GIT_ROOT" \
   "${SKILL_PROMPT}
@@ -200,7 +200,7 @@ codex exec \
   -m "$(config.toml 모델)" \
   -c model_reasoning_effort=high \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
-  --output-schema ~/.claude/schemas/codex_verification_schema.json \
+  --output-schema schemas/codex_verification_schema.json \
   -o "$VERIFICATION_FILE" \
   -C "$GIT_ROOT" \
   "${SKILL_PROMPT}
@@ -296,7 +296,7 @@ fi
 CHALLENGER_SKILL=$(get_codex_skill "challenger")
 if [ -n "$CHALLENGER_SKILL" ] && [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
   codex exec \
-    --output-schema ~/.claude/schemas/codex_peer_review_schema.json \
+    --output-schema schemas/codex_peer_review_schema.json \
     -c model_reasoning_effort=xhigh \
     --sandbox read-only \
     -o "$DA_REVIEW_FILE" \
@@ -477,10 +477,10 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 
 ## 관련 스키마
 
-- `~/.claude/schemas/codex_base_issue_schema.json` -- 공통 issue 정의 (severity, confidence, unified_category, alternatives)
-- `~/.claude/schemas/codex_review_schema.json` -- review/verify/validate/check/final/commit 응답
-- `~/.claude/schemas/codex_verification_schema.json` -- validate 역검증 응답
-- `~/.claude/schemas/codex_peer_review_schema.json` -- peer-review 에이전트 응답
+- `schemas/codex_base_issue_schema.json` -- 공통 issue 정의 (severity, confidence, unified_category, alternatives)
+- `schemas/codex_review_schema.json` -- review/verify/validate/check/final/commit 응답
+- `schemas/codex_verification_schema.json` -- validate 역검증 응답
+- `schemas/codex_peer_review_schema.json` -- peer-review 에이전트 응답
 
 ## 관련 Codex 스킬
 
