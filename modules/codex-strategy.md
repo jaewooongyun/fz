@@ -12,24 +12,21 @@ review, final 서브커맨드에서 `--base` 브랜치가 필요합니다.
 3. 현재 브랜치가 `hotfix/*` → `--base main`
 4. 그 외 → `AskUserQuestion`으로 사용자에게 확인
 
-## Reasoning Effort 전략
+## Reasoning Effort 전략 (사용자 명시 호출 기반)
 
-**서브커맨드 실행 전 AskUserQuestion으로 effort 레벨을 선택한다.**
+Codex 교차 검증은 **사용자가 필요할 때 명시적으로 호출**한다. 자동 경량 게이트 없음.
 
-```
-Q: "Reasoning effort를 선택하세요"
-옵션:
-  1. high — 속도-품질 균형 (기본, Recommended)
-  2. xhigh — 최고 정밀도 (시간 소요 증가)
-```
+| Tier | 맥락 | 모델 | Effort | 예상 시간 |
+|------|------|------|--------|----------|
+| **Standard** | 명시적 호출 (review, verify, check, adversarial) | `gpt-5.4` | `high` | ~3-5분 |
+| **Deep** | final, critical 재검증, --deep | `gpt-5.4` | `xhigh` | ~8-10분 |
 
-선택된 값을 `-c model_reasoning_effort=<선택>` 으로 모든 codex 호출에 적용.
+**결정 규칙**:
+- 기본: `config.toml` 값 (`gpt-5.4` + `high`)
+- `final` 또는 이전 검증에서 critical 발견 → **Deep** (자동 에스컬레이션)
+- 사용자가 `--deep` 플래그 사용 → **Deep**
 
-| 상황 | Effort | 비고 |
-|------|--------|------|
-| 기본 (모든 서브커맨드) | **사용자 선택** | 선택 없으면 high |
-| Critical 이슈 재검증 | **xhigh** | 이전 검증에서 critical 발견 시 자동 에스컬레이션 |
-| final (PR 전 최종) | **xhigh** | 사용자 선택 무관, 항상 최고 정밀도 |
+> Review Gate: OFF. 경량 모델(spark) 자동 게이트는 품질 ROI가 낮아 사용하지 않음.
 
 ## Diff 크기 적응 전략
 
@@ -55,9 +52,10 @@ DIFF_LINES=$(cd "$GIT_ROOT" && git diff --base "$BASE_BRANCH" --stat | tail -1 |
 - `final`: 항상 최대 커버리지 (Medium→Full 시도, Large→Key files)
 - `verify`, `validate`: diff 크기 무관 (프롬프트 기반)
 
-## CLI 모드 선택 전략 (0.111.0+)
+## CLI 모드 선택 전략 (0.118.0+, Hybrid)
 
-`codex exec review`가 git diff + 구조화 출력을 통합. 기존 `codex review`의 제약 해소.
+`codex exec review`가 git diff + 구조화 출력을 통합. Plugin 설치 시 review/check/adversarial은 `/codex:*` 우선.
+Plugin 미설치 시 모든 서브커맨드가 CLI로 동작 (폴백 투명).
 
 | 기준 | `codex exec review` | `codex exec` |
 |------|---------------------|-------------|

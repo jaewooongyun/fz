@@ -61,7 +61,7 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 |------|------|---------|---------|---------|
 | fz-code | build | 에러 직접 수정 | /sc:troubleshoot | /simplify → AskUser |
 | fz-fix | build | 에러 직접 수정 | /sc:troubleshoot | AskUser |
-| fz-review | Reflection | 이슈 재확인 | Codex+Gemini 합의 | AskUser |
+| fz-review | Reflection | 이슈 재확인 | Codex 검증 | AskUser |
 | fz-plan | Stress Test | 계획 수정 | 계획 재작성 | AskUser |
 
 ### 스킬별 LOOP 파라미터

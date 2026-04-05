@@ -97,6 +97,12 @@ GOOD: "find_referencing_symbols 결과 0건. 추가로 Grep('methodName') 전수
 Dead Code 판정: 확정. 삭제 권장."
 ```
 
+## Evaluator Tuning History
+> 피드백 검증 프로토콜을 통과한 패턴만 기록. 분류: `peer-review-learnings.md` 참조.
+> ⛔ 단일 사례로 규칙 만들지 않는다. preference(취향)는 학습 금지. needs-review는 검증 후.
+
+(현재 튜닝 이력 없음 — valid-suggestion 2회+ 관측 후 추가)
+
 ## Escalation to Lead
 - 6개 관점 분석 간 모순 발견 시
 - 판단 confidence < 60% 시

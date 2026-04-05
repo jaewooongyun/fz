@@ -14,6 +14,9 @@
 | code-changes 생산 (모듈화/캡슐화) | consumer quality 검증 | 소비자 파일 전수 수집 + 사용 패턴 + 진입점 검증 | 모든 모드 (모듈화 작업 시) |
 | code-changes 생산 (시그니처 변경) | protocol conformance 검증 | find_referencing_symbols → 프로토콜 요구사항 양방향 확인 | 모든 모드 |
 | code-changes 생산 (init 변경) | inheritance DI conformance | base_class_hierarchy → subclass init + 화면별 dependency 확인 (Gate 4.6.5) | 모든 모드 (init 변경 시) |
+| code-changes 생산 (제거/리팩토링) | implication-scan | lead-reasoning.md § Implication Scan | 모든 모드 (1차/2차 트리거) |
+| code-changes 생산 (모든) | Q-OBSERVE 경량 | lead-reasoning.md § 상시 경량 | 모든 모드 (상시) |
+| revert 작업 | origin-equivalence | lead-reasoning.md + cross-validation.md § origin-equivalence | 모든 모드 (revert 키워드) |
 | planning 생산 전 | 방향성 검증 | review-direction 에이전트 (Phase 0.5) | TEAM (fz-plan) |
 | planning 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
 | code-changes 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
@@ -39,7 +42,7 @@
 ### 코드 생산 파이프라인
 
 ```
-[코드 생산 스텝] → build → conformance (시그니처 변경 시) → enforcement (리팩토링 시) → consumer quality (모듈화 시) → codex check (TEAM) → [다음 스텝]
+[코드 생산 스텝] → build → conformance (시그니처 변경 시) → enforcement (리팩토링 시) → consumer quality (모듈화 시) → implication-scan (제거/리팩토링 시) → codex check (TEAM) → [다음 스텝]
 
 예시 (fix-ship, TEAM):
   /fz-fix → build → codex check → /fz-commit → /fz-pr
@@ -70,32 +73,31 @@ TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 �
 
 ## 외부 모델 포함 원칙 (TEAM 필수)
 
-> 핵심: TEAM = Claude 에이전트(N) + External(1-2). 코드/계획 생산 TEAM에 Codex 필수 + Gemini 조건부.
-> 근거: X-MAS(arxiv 2505.16997) — 이종 모델 조합 시 최대 47% 성능 향상.
+> 핵심: TEAM = Claude 에이전트(N) + Codex(1). 코드/계획 생산 TEAM에 Codex 필수.
+> 근거: X-MAS(arxiv 2505.16997) — 이종 모델 2개 조합으로 대부분의 이득 달성.
 
-| 스킬 | Codex | Gemini (조건부) | Codex 스킬 |
-|------|-------|----------------|-----------|
-| /fz-plan | `fz-codex verify` | `--consensus` 또는 `--deep` 시 | architect |
-| /fz-code | `fz-codex check` | Major 불일치 시 | reviewer |
-| /fz-review | `fz-codex validate` | Reflection < 80% 시 | guardian |
-| /fz-fix | `fz-codex check` | — | reviewer |
-| /fz-search | `fz-codex` | --deep 시 | searcher |
+| 스킬 | Codex | Codex 스킬 |
+|------|-------|-----------|
+| /fz-plan | `fz-codex verify` | architect |
+| /fz-code | `fz-codex check` | reviewer |
+| /fz-review | `fz-codex validate` | guardian |
+| /fz-fix | `fz-codex check` | reviewer |
+| /fz-search | `fz-codex` | searcher |
 
 > Codex 3-Tier 디스커버리: CLAUDE.md `## Codex Skills`(Tier 1) → 글로벌 fz-*(Tier 2) → 인라인(Tier 3).
 
 ---
 
-## Selective Consensus (3-Model)
+## Cross-Model Verification (2-Model)
 
-Gemini는 항상 실행하지 않음. 불일치/의심 시에만 호출하여 비용 최적화:
+Claude + Codex(GPT-5.4) 교차 검증:
 
-| 트리거 | 프로바이더 | 조건 |
-|--------|-----------|------|
-| code-changes (TEAM, 기본) | Codex | 기본 |
-| code-changes + Major 불일치 | Codex + Gemini | Codex와 Claude 판단 다를 때 |
-| planning (TEAM) | Codex verify | 기본 |
-| planning (--deep) | Codex + Gemini | 병렬 독립 검증 |
-| review + Reflection < 80% | Codex + Gemini | 재검증 강화 |
+| 트리거 | 프로바이더 | Effort |
+|--------|-----------|--------|
+| code-changes (TEAM) | Codex check | high |
+| planning (TEAM) | Codex verify | high |
+| final / --deep | Codex | xhigh |
+| 불일치 시 | AskUserQuestion | 사용자 판단 |
 
 ### Disagreement 기록
 - PRJ 활성: `{WORK_DIR}/verify/consensus-{날짜}.md`
@@ -108,8 +110,10 @@ Gemini는 항상 실행하지 않음. 불일치/의심 시에만 호출하여 �
 | 모드 | 코드 생산 후 검증 | 계획 생산 후 검증 |
 |------|-----------------|-----------------|
 | SOLO | 빌드만 | 없음 (Lead 직접 판단) |
-| TEAM | 빌드 + Codex check + 에이전트 확인 | Codex verify + Lead 검토 |
-| TEAM --deep | 빌드 + Codex + Gemini 합의 | Codex + Gemini verify |
+| TEAM | 빌드 + Codex check (gpt-5.4+high) + 에이전트 확인 | Codex verify (gpt-5.4+high) |
+| TEAM --deep | 빌드 + Codex (gpt-5.4+xhigh) | Codex verify (xhigh) |
+
+> Effort 정의: `modules/codex-strategy.md` 참조. 기본 high, final/--deep은 xhigh. Review Gate OFF.
 
 ---
 
@@ -205,6 +209,8 @@ Tier 1: CLAUDE.md `## Codex Skills` 테이블 → Tier 2: 글로벌 `fz-*` → T
 |------|----------|
 | /fz-codex | 검증 게이트 + get_codex_skill() 3-Tier 디스커버리 |
 | /fz | 파이프라인 검증 게이트 자동 삽입 |
+| modules/lead-reasoning.md | Implication Scan + origin-equivalence 추론 원칙 |
+| modules/system-reminders.md | Instruction fade-out 대응 트리거 정책 |
 
 ## Codex 검증 결과 보존 정책
 
@@ -214,7 +220,52 @@ Tier 1: CLAUDE.md `## Codex Skills` 테이블 → Tier 2: 글로벌 `fz-*` → T
 - **비PRJ**: Serena checkpoint 요약만 (기존 동작)
 - 다음 Phase 스킬은 `verify-result.md` 요약을 Read. 상세 확인 시 `-full.md` drill-down.
 
+---
+
+## Implication Scan 게이트
+
+> 참조: `modules/lead-reasoning.md` — 추론 원칙, 카테고리 분류, 자문 체크리스트, Register 형식
+
+### 트리거
+
+- **1차**: 제거/삭제/이동/이관/마이그레이션/리팩토링/DI변경/revert
+- **2차**: 프로토콜/access control/init·signature/모듈경계 변경
+- **상시**: Q-OBSERVE (모든 코드 변경에서 경량 스캔)
+
+### 파이프라인 위치
+
+```
+planning 후 → [implication-map] → stress-test → codex verify
+code-changes 후 → build → [implication-scan] → codex check
+```
+
+### 절차
+
+1. `lead-reasoning.md` 자문 체크리스트 실행 (Q-WHY/Q-COMPLETE/Q-EFFECT)
+2. `find_referencing_symbols` → 변경 심볼의 참조자 중 "이 변경을 위해 추가된" 코드 식별
+3. 실행 함의 발견 → [함의-A] 보고 + 사용자 확인
+4. 관찰 함의 발견 → [함의-B] 기록 (최대 2건, 출력은 Gate 완료 시)
+
+---
+
+## origin-equivalence 게이트 (revert 전용)
+
+> 트리거: "되돌리기", "revert", "원상복구", "undo", "롤백"
+
+⛔ 되돌릴 대상 = "키워드"가 아닌 "원본 상태 전체"
+
+1. 원본 커밋/상태 식별 (`git show {commit}^` 또는 기준 파일)
+2. 범위 = 대상 커밋이 추가한 모든 변경 (상태 복원)
+3. 완료 기준: 원본과의 동등성 확인
+
+체크리스트:
+- [ ] 원본 상태를 정확히 식별했는가?
+- [ ] 키워드 기반이 아닌 상태 기반으로 범위 정의했는가?
+- [ ] 원본과의 동등성(origin-equivalence) 확인했는가?
+
+---
+
 ## 설계 원칙
 
 - Progressive Disclosure Level 3 (필요 시에만 로드)
-- 500줄 이하 유지
+- 모듈이므로 줄 수 제한 없음

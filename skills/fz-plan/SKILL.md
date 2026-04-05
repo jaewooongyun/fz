@@ -104,7 +104,7 @@ TeamCreate("plan-{feature}")
 ├── review-direction (Sonnet): 방향성 비판 + 대안 제시 (Phase 0.5)
 ├── memory-curator (Sonnet): 관련 교훈 발굴
 ├── Codex verify (Lead 실행, GPT-5.4): 독립 계획 검증
-└── Gemini challenge (Lead 실행, Gemini-3): Devil's Advocate [조건부: --deep]
+└── Codex adversarial (Lead 실행, GPT-5.4): Devil's Advocate [--deep 시]
 ```
 
 **6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거):
@@ -116,26 +116,26 @@ TeamCreate("plan-{feature}")
 | review-arch | 아키텍처 일관성 | "기존 패턴/규칙과 맞는가?" |
 | review-direction | 방향성 도전 | "근본적으로 다른 접근은?" |
 | Codex verify | 독립 검증 | "이 계획에 빠진 것은?" |
-| Gemini challenge | Devil's Advocate | "이 계획이 실패할 가장 큰 위험은?" |
+| Codex adversarial | Devil's Advocate | "이 계획이 실패할 가장 큰 위험은?" |
 
 > PRJ 폴더 활성 시: `{WORK_DIR}/plan/plan-team.md`에 direction-challenge + collaborative design 핵심 통신을 기록한다.
 
 ### 통신 패턴: Parallel Analysis + Cross-Feedback
 
 3개 Claude 에이전트가 **다른 렌즈로 병렬 분석** 후 교차 피드백하는 패턴.
-Lead는 외부 모델(Codex/Gemini)을 병렬 실행하여 이종 검증을 확보한다.
+Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
 
 ```
 [Round 1 — 병렬 독립 분석]
   plan-structure: 요구사항 분해 + 초기 설계
   plan-impact: Exhaustive Impact Scan (a~f) — 영향 범위 전담
   review-arch: 아키텍처 패턴 매칭 (RIBs/Clean Architecture)
-  Lead: Codex verify + Gemini challenge (병렬 CLI 실행)
+  Lead: Codex verify (CLI 실행)
 
 [Round 2 — 교차 피드백]
   plan-impact → plan-structure: "영향 범위 + 숨겨진 의존성 + dead code"
   review-arch → plan-structure: "패턴 위반 + Dependency Rule + 대안"
-  Lead → plan-structure: "GPT 이슈 {N}개, Gemini 도전 {M}개"
+  Lead → plan-structure: "GPT 이슈 {N}개"
   plan-structure: 모든 피드백 통합 → 설계 수정
 
 [Round 0.5 — 최종 보고]
@@ -351,6 +351,8 @@ Lead는 외부 모델(Codex/Gemini)을 병렬 실행하여 이종 검증을 확�
      | # | 금지 패턴 | 검증 Grep 패턴 | 위반 시 영향 |
      |---|----------|---------------|-------------|
      예시: `| 1 | proxy 외부 접근 | \.proxy\. | 식별 가능 → 목표 무력화 |`
+     변경 유형별 잔존물 참조: `modules/lead-reasoning.md` §7
+   - **Implication Register**: `modules/lead-reasoning.md` §4 형식. 실행 함의는 Step에 명시, 관찰 함의는 별도 섹션.
 
 7. **⛔ 계획 파일 기록** (항상 — compact recovery 필수):
    - PRJ 활성: `{WORK_DIR}/plan/plan-v{N}.md` + `{WORK_DIR}/index.md` 업데이트

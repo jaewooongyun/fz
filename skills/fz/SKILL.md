@@ -254,7 +254,7 @@ model-strategy:
 planning 생산 전 → ✓ direction-challenge (review-direction, TEAM fz-plan Phase 0.5)
 planning 생산 후 → ✓ stress-test(Q1-Q5) + ✓ codex verify (TEAM)
 code-changes 생산 중 → ✓ friction-detect (매 Step, fz-code 내장)
-code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ codex check (TEAM)
+code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ implication-scan (제거/리팩 시) + ✓ codex check (TEAM)
 commit/pr 전 → ✓ codex check (TEAM)
 ```
 

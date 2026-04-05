@@ -31,9 +31,9 @@
 ~/.claude/
 ├── skills/          22개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
 ├── agents/          14개 — plan-structure, impl-correctness, review-arch ...
-├── modules/         17개 — team-core, pipelines, cross-validation, rtm ...
+├── modules/         19개 — team-core, pipelines, cross-validation, lead-reasoning, system-reminders ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
-├── guides/          6개 — prompt-optimization, skill-authoring ...
+├── guides/          7개 — prompt-optimization, skill-authoring, harness-engineering ...
 └── templates/       스킬/에이전트 생성 템플릿
 ```
 
@@ -62,7 +62,7 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
     │   Round 2: 피드백 + 반박 (직접 SendMessage)
     │   Round 0.5: [합의/불합의] Lead에 보고
     │
-    └── External: Codex(GPT) + Gemini(조건부)
+    └── External: Codex(GPT-5.4)
 ```
 
 ---
@@ -118,8 +118,9 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 ──┼──────────────┼────────────────┼────────────────┼───────────────┼──
   │              │                │                │               │
   direction      stress-test      friction         build           codex
-  challenge      Q1-Q6            detect           codex check     Reflection
-  (방향 도전)     (설계 스트레스)    (마찰 감지)       enforcement     Rate ≥80%
+  challenge      Q1-Q6            detect           implication     Reflection
+  (방향 도전)     (설계 스트레스)    (마찰 감지)       -scan           Rate ≥80%
+                                                   enforcement
                                                    L3 에이전트
 ```
 
@@ -163,10 +164,12 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 | 체계 | 설명 |
 |------|------|
 | **RTM** | plan→code→review 요구사항 ID 추적 (`modules/rtm.md`) |
-| **Scope Expansion** | discover 시야 제한 4겹 방어 (plan-impact, fz-plan, fz-code, cross-validation) |
-| **L3 에이전트** | silent-failure-hunter + type-design-analyzer review 보강 (`modules/native-agents.md`) |
-| **Teams v2** | L3→L1 피드백, Supporting 활성화, Handoff Brief, CC 교차 |
-| **3-Model Triad** | Claude(생산) + GPT/Codex(검증) + Gemini(도전) |
+| **Implication Scan** | 제거/리팩토링 시 의미론적 완결성 검사 (`modules/lead-reasoning.md`) |
+| **System Reminders** | Instruction fade-out 대응 트리거 기반 리마인더 (`modules/system-reminders.md`) |
+| **Scope Expansion** | discover 시야 제한 4겹 방어 |
+| **L3 에이전트** | silent-failure-hunter + type-design-analyzer review 보강 |
+| **Evaluator Tuning** | 피드백 검증 프로토콜 4단계 — 과적합 방지 (preference 학습 금지) |
+| **Harness Ablation** | 분기별 Gate 기여도 측정 → 불필요 컴포넌트 식별 |
 | **Sycophancy 방어** | Round 1 독립 → Round 2 피드백 → Round 0.5 합의/불합의 |
 
 ---
@@ -203,11 +206,12 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 | **skill-troubleshooting.md** | 트리거 문제, MCP 에러, TEAM 위반 진단 |
 | **agent-team-guide.md** | 에이전트 팀 (2.5-Turn, Task Brief, 모델 전략) |
 | **clean-architecture.md** | Dependency Rule, SOLID, Uncle Bob's Decision Rules |
+| **harness-engineering.md** | AI 에이전트 하네스 설계 (Anthropic 공식 + NLAH 논문 기반, 1035줄) |
 
 ---
 
 ## Changelog
 
-**현재 버전: v3.1** (2026-04-02) — RTM + Teams v2 + Scope Expansion + L3 에이전트
+**현재 버전: v3.2** (2026-04-05) — Lead Implication Gate + Harness Engineering + System Reminders + Evaluator Tuning
 
 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md)
