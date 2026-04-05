@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "issue_tracker_schema.json",
+  "title": "Issue Tracker Schema",
+  "description": "세션 전체에서 이슈를 추적하는 상태 관리 스키마",
+  "type": "object",
+  "required": ["session_id", "created_at", "issues", "iterations"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^SESSION-[0-9]{8}_[0-9]{6}$",
+      "description": "세션 고유 식별자 (예: SESSION-20260130_143022)"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "세션 생성 시각"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "마지막 업데이트 시각"
+    },
+    "task_description": {
+      "type": "string",
+      "description": "작업 설명"
+    },
+    "issues": {
+      "type": "array",
+      "description": "모든 이슈의 마스터 목록",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "category", "description", "status", "discovered_in"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^ISSUE-[0-9]{3,}$",
+            "description": "이슈 ID"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "major", "minor", "suggestion"]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "architecture",
+              "extensibility",
+              "over_engineering",
+              "decomposition",
+              "modern_api",
+              "dependency",
+              "performance",
+              "refactoring_completeness",
+              "concurrency_safety",
+              "requirements_alignment",
+              "logic_error",
+              "security",
+              "memory",
+              "thread_safety",
+              "style",
+              "documentation",
+              "testing",
+              "scope_creep",
+              "other"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "file": { "type": "string" },
+              "symbol": { "type": "string" },
+              "line_range": { "type": "string" }
+            }
+          },
+          "suggestion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["open", "addressed", "resolved", "reopened", "deferred"],
+            "description": "이슈 상태 (상태 머신: open→addressed→resolved, addressed→reopened→addressed)"
+          },
+          "discovered_in": {
+            "type": "string",
+            "description": "이슈 발견 Phase (예: phase_2, phase_5)"
+          },
+          "resolved_in": {
+            "type": "string",
+            "description": "이슈 해결 Phase"
+          },
+          "history": {
+            "type": "array",
+            "description": "상태 변경 이력",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": { "type": "string", "format": "date-time" },
+                "from_status": { "type": "string" },
+                "to_status": { "type": "string" },
+                "reason": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "iterations": {
+      "type": "array",
+      "description": "반복 개선 기록",
+      "items": {
+        "type": "object",
+        "required": ["iteration_number", "phase", "review_id"],
+        "properties": {
+          "iteration_number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "phase": {
+            "type": "string",
+            "description": "Phase 번호 (예: phase_2, phase_5, phase_5.5, phase_6)"
+          },
+          "review_id": {
+            "type": "string",
+            "description": "해당 반복의 리뷰 ID"
+          },
+          "verification_id": {
+            "type": "string",
+            "description": "해당 반복의 검증 ID (Phase 5.5+)"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issues_addressed": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "이 반복에서 처리한 이슈 ID 목록"
+          },
+          "feedback_reflection_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "이 반복의 피드백 반영률"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": ["pass", "needs_work", "fail"]
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "세션 전체 메트릭",
+      "properties": {
+        "total_issues_discovered": {
+          "type": "integer",
+          "description": "총 발견된 이슈 수"
+        },
+        "total_issues_resolved": {
+          "type": "integer",
+          "description": "총 해결된 이슈 수"
+        },
+        "average_reflection_rate": {
+          "type": "number",
+          "description": "평균 피드백 반영률"
+        },
+        "total_iterations": {
+          "type": "integer",
+          "description": "총 반복 횟수"
+        },
+        "critical_issues_count": {
+          "type": "integer"
+        },
+        "major_issues_count": {
+          "type": "integer"
+        }
+      }
+    },
+    "final_status": {
+      "type": "string",
+      "enum": ["in_progress", "completed", "escalated", "abandoned"],
+      "description": "세션 최종 상태"
+    }
+  }
+}

@@ -67,8 +67,13 @@ agents/technical-writer.md
 !scripts/
 !scripts/*.sh
 
+# Schemas (Codex JSON schemas)
+!schemas/
+!schemas/*.json
+
 # Repo files
 !.gitignore
 !README.md
 !CHANGELOG.md
 !RELEASE_NOTES_*.md
+!LICENSE
