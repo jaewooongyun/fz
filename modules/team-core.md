@@ -19,6 +19,7 @@
    에이전트 "Step N 완료" 보고 수신
    → ⛔ 체크포인트 기록 (ASD: 파일, 비ASD: write_memory)
    → ⛔ Codex 교차 검증 (/fz-codex check — 코드/계획 생산 TEAM 필수, 탐색은 --deep만)
+   → [제거/리팩토링 시] Implication Scan (modules/lead-reasoning.md + cross-validation.md)
    → 빌드 검증 (modules/build.md)
    → 다음 Step 배정 또는 Gate 판정
    ```
@@ -118,12 +119,10 @@
 | Primary Worker | opus | 팀 내 핵심 산출물 생산자 (도메인당 1명) |
 | Supporting | sonnet | 나머지 Claude 에이전트 전부 |
 | External 1 (Codex) | gpt-5.4 | cross-model 검증 (Lead가 CLI 직접 실행) |
-| External 2 (Gemini) | gemini-3 | Tiebreaker/Devil's Advocate (Lead가 CLI 직접 실행, 조건부) |
 
 외부 모델 실행 규칙:
-- Lead가 Codex/Gemini CLI를 직접 실행하고, 결과를 팀에 SendMessage로 공유
+- Lead가 Codex CLI를 직접 실행하고, 결과를 팀에 SendMessage로 공유
 - Codex: TEAM 모드에서 필수 (cross-validation.md 참조)
-- Gemini: --deep 또는 불일치 시에만 (Selective Consensus)
 
 승격 원칙:
 - **동시** opus 최대 2개: Lead(O) + Primary(O). 나머지 전부 sonnet.

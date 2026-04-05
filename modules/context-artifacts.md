@@ -115,6 +115,8 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 | Gate 통과/실패 이력 | 코드 diff 상세 |
 | Active Phase + Step 진행률 | 빌드 로그 |
 | mid-pipeline discover 결정 | /btw로 물어본 일회성 질문 |
+| Implication Register + 관찰 함의 (implications.md) | Implication Scan 중간 로그 |
+| Session Metrics (session-metrics.md) — gate/compact/reminder/turns | 개별 도구 결과 로그 |
 
 ```
 Essential: "[plan] Step 3개 계획 확정. RIBs 패턴. ContentDetail{Builder,Router,Interactor,VC}."

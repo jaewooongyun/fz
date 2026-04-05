@@ -5,9 +5,9 @@ description: >-
   Make sure to use this skill whenever the user says: "codex", "교차검증", "상호검증",
   "cross-validate", "verify with codex", "GPT로 확인", "GPT로 검증".
   Covers: Codex CLI, 교차검증, 상호검증, 독립 검증, 코드 리뷰 검증, 계획 검증.
-  Do NOT use for Gemini verification (use fz-gemini) or direct code review (use fz-review).
+  Do NOT use for direct code review (use fz-review).
 user-invocable: true
-argument-hint: "[review|verify|validate|check|final] [대상] [--provider gemini|codex] [--consensus]"
+argument-hint: "[review|verify|validate|check|final|adversarial] [대상]"
 allowed-tools: >-
   mcp__serena__search_for_pattern,
   mcp__serena__find_symbol,
@@ -25,19 +25,20 @@ model-strategy:
   verifier: sonnet
 ---
 
-# /fz-codex - Codex CLI 상호검증 스킬
+# /fz-codex - Codex 상호검증 스킬 (Hybrid)
 
-> **행동 원칙**: Codex CLI(0.111.0+, gpt-5.4)의 `codex exec review`(구조화 출력 + git diff 통합)와 `codex exec`(`--output-schema`)를 활용하여 독립적 교차 검증을 수행한다.
+> **행동 원칙**: Codex CLI(0.118.0+, gpt-5.4)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
+> CLI(`codex exec`) + Plugin(`/codex:*`, 설치 시) 자동 라우팅. Plugin 미설치 시 CLI 폴백.
 
 ## 개요
 
-> 서브커맨드: verify | review | validate | check | final | commit | config
+> 서브커맨드: verify | review | validate | check | final | commit | adversarial | drift | plan | config
 
-- **`codex exec review`**: git diff + 구조화 출력(`--json`, `-o`) + 모델 명시(`-m`) — review/check/final/commit
-- **`codex exec`**: 프롬프트 기반 검증 + `--output-schema` — verify/validate
+- **CLI** (`codex exec review`): git diff + `-o`/`--json` + `--add-dir` + 3-Tier 스킬 — review/check/final/commit
+- **CLI** (`codex exec`): 프롬프트 + `--output-schema` — verify/validate/drift/plan
+- **Plugin** (`/codex:*`): 설치 시 review/check/adversarial에 우선 사용. 백그라운드 Job 관리 (`status`/`result`)
 - **`--add-dir`**: 모노레포 공유 모듈 컨텍스트 확장 (TvingUI, tving-common 등)
-- **Codex 네이티브 스킬**: 3-Tier 디스커버리로 역할 기반 매칭
-- **Workspace memory**: 프로젝트별 리뷰 패턴 학습 → 반복 이슈 감지 정확도 향상
+- **Codex 네이티브 스킬**: 3-Tier 디스커버리 (`~/.codex/skills/`) 역할 기반 매칭
 
 ## 사용 시점
 
@@ -49,30 +50,11 @@ model-strategy:
 /fz-codex check                     # 커밋 전 빠른 검증 (uncommitted)
 /fz-codex final                     # PR 전 최종 종합 리뷰
 /fz-codex commit                    # 최근 커밋 검증
+/fz-codex adversarial               # Devil's Advocate 리뷰 (설계 결정 도전)
 /fz-codex drift                     # 전체 코드베이스 아키텍처 드리프트 스캔
 /fz-codex plan "요구사항"            # Claude와 독립적인 플랜 생성 (교차 비교용)
 /fz-codex config                    # 설정 조회
-/fz-codex review --provider gemini   # Gemini 단독 리뷰
-/fz-codex verify --provider gemini   # Gemini 계획 검증
-/fz-codex review --consensus         # 3-Model 합의 (Codex + Gemini + Claude 비교)
 ```
-
-## 3-Model Consensus 모드
-
-> 근거: X-MAS(arxiv 2505.16997) — 이종 모델 조합 시 최대 47% 성능 향상
-> Gemini 단독 → `/fz-gemini` 스킬 사용. 여기서는 Codex + Gemini 합의만.
-
-### --consensus 옵션
-
-`/fz-codex review --consensus` 또는 `/fz-codex verify --consensus`
-
-Lead가 fz-codex + fz-gemini를 **병렬 실행**하여 합의:
-1. Codex 실행 (fz-codex) → 결과 A
-2. Gemini 실행 (fz-gemini) → 결과 B (병렬)
-3. Claude 비교 분석 → 합의표:
-   - A ∩ B (공통) → 높은 신뢰
-   - A - B / B - A (단독) → 중간 신뢰
-   - A ⊕ B (모순) → AskUserQuestion
 
 ## 모듈 참조
 
@@ -114,42 +96,45 @@ Lead가 fz-codex + fz-gemini를 **병렬 실행**하여 합의:
 
 > 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드): `modules/codex-strategy.md`
 
+## Hybrid Routing (0.118.0+)
+
+서브커맨드별 최적 실행 경로. Plugin 미설치 시 경고 없이 CLI 폴백.
+
+| 서브커맨드 | Plugin 우선 | CLI (폴백/전용) | Plugin 불가 이유 |
+|-----------|------------|----------------|----------------|
+| review | `/codex:review --base` | `codex exec review -o` | — |
+| check | `/codex:review --scope working-tree` | `codex exec review --uncommitted` | — |
+| adversarial | `/codex:adversarial-review` | challenger 프롬프트 | — |
+| final/commit | — | CLI only | `--add-dir`, `--commit`, `resume` |
+| verify/validate | — | CLI only | `--output-schema` |
+| drift/plan | — | CLI only | 커스텀 스킬 + 구조화 출력 |
+
+> Plugin 감지: `codex mcp list 2>/dev/null | grep -q plugin`. 오류 시에도 CLI 자동 폴백.
+
 ---
 
 ## 서브커맨드
 
 ### review -- 코드 리뷰 (주력)
 
-fz-review의 Phase 5 Codex 부분. **`codex exec review` 사용 (0.111.0+).**
+fz-review의 Phase 5 Codex 부분. **Plugin 우선 → CLI 폴백.**
 
 ```bash
+# Plugin 모드 (우선 — --add-dir 불필요 시)
+/codex:review --base "$BASE_BRANCH" -m gpt-5.4 --json
+
+# CLI 모드 (폴백 — --add-dir 필요 시 또는 Plugin 미설치)
 cd "$GIT_ROOT" && codex exec review \
   --base "$BASE_BRANCH" \
   -m gpt-5.4 \
   -c model_reasoning_effort=high \
   --add-dir "$SHARED_MODULES" \
-  --title "[TICKET] 코드 리뷰" \
   -o "$REVIEW_FILE"
 ```
 
-**`codex exec review` 장점 (기존 `codex review` 대비)**:
-- `-m`: 호출별 모델 명시 → config.toml 의존 제거
-- `-o`: 최종 리뷰 텍스트 파일 캡처 (tee 파이핑 불필요, 누락 방지)
-- `--json`: JSONL 이벤트 스트림 (디버깅/파싱용, 선택)
-- `--add-dir`: 모노레포 공유 모듈(TvingUI, tving-common) 접근 → cross-module 분석
-- Git 변경 자동 인식 + 3-Tier 스킬 자동 트리거 유지
-- `--ephemeral`: 일회성 검증 시 세션 잔류 방지 (선택)
+**CLI 주요 플래그**: `-m`(모델), `-o`(파일 캡처), `--json`(JSONL), `--add-dir`(모노레포), `--ephemeral`(일회성)
 
-**`--add-dir` 패턴** (TVING 모노레포):
-```bash
-SHARED_MODULES="$GIT_ROOT/TvingUI $GIT_ROOT/tving-common $GIT_ROOT/Managers"
-# --add-dir는 반복 가능: --add-dir dir1 --add-dir dir2
-
-# 모듈화 작업 시: 앱 측 소비자 디렉토리도 포함
-# 패키지만 리뷰하면 소비자 코드의 사용 품질을 놓침
-CONSUMER_DIRS="$GIT_ROOT/Apps/Sources $GIT_ROOT/Apps/Sources/iOS/DebugTools"
-# 예: --add-dir $SHARED_MODULES --add-dir $CONSUMER_DIRS
-```
+**`--add-dir` 패턴**: `SHARED_MODULES="$GIT_ROOT/TvingUI $GIT_ROOT/tving-common $GIT_ROOT/Managers"`. 모듈화 시 소비자 디렉토리도 포함: `$GIT_ROOT/Apps/Sources`.
 
 ### verify -- 계획 검증
 
@@ -192,6 +177,7 @@ codex exec \
    Q5 접근 경계: '차단/제거/캡슐화'를 의도한 접근 경로가 실제로 차단되는가? access modifier(public/internal/private)가 의도와 일치하는가? 기존 코드가 이벤트 채널을 우회하여 직접 호출하는 경로가 남아있지 않은가?
    Q6 이벤트 스코프: 이벤트/로그 전송 설계가 포함되어 있다면, 각 이벤트가 측정 목적에 부합하는가? 이벤트 발화 위치의 컨텍스트가 측정 대상과 일치하는가?
    Q7 소비자 코드 품질: 모듈화/캡슐화 작업인 경우, 앱 측 소비자 코드가 모듈의 public API를 올바르게 사용하는가? 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)의 모듈 연동이 정상인가? 모듈화 이전의 레거시 패턴이 앱에 남아있지 않은가?
+   Q8 함의 커버리지: 계획이 지시의 "문자적 범위"뿐 아니라 "의미론적 범위"를 커버하는가? 제거/변경 대상이 존재하게 된 이유(원인 코드)까지 범위에 포함됐는가? 지시로 인해 무효화되는 코드(결과 코드)가 처리됐는가? verdict: pass/warn/fail + reasoning. (참조: modules/lead-reasoning.md)
 
    각 질문에 대해 verdict(pass/warn/fail)와 reasoning을 제시하라.
    계획의 리스크 매트릭스가 빈약하거나 누락된 경우 반드시 지적하라.
@@ -335,6 +321,22 @@ cd "$GIT_ROOT" && codex exec review \
   -o "$REVIEW_FILE"
 ```
 
+### adversarial -- Devil's Advocate 리뷰
+
+설계 결정에 도전하는 적대적 리뷰. final의 DA 패스를 독립 실행 가능.
+
+```bash
+# Plugin 모드 (우선)
+/codex:adversarial-review --base "$BASE_BRANCH" -m gpt-5.4 --json
+
+# CLI 폴백
+SKILL_NAME=$(get_codex_skill "challenger")
+codex exec -m gpt-5.4 -c model_reasoning_effort=xhigh \
+  --sandbox read-only -o "$DA_REVIEW_FILE" -C "$GIT_ROOT" \
+  "$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)
+   현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라."
+```
+
 ### drift -- 아키텍처 드리프트 전체 스캔
 
 전체 코드베이스를 1M context로 스캔하여 아키텍처 드리프트를 감지합니다.
@@ -396,36 +398,14 @@ codex exec \
 
 ### config -- 설정 조회
 
-```bash
-echo "=== Codex CLI $(codex --version) ==="
-cat ~/.codex/config.toml
-
-echo "=== Codex Features ==="
-codex features list 2>/dev/null | grep -E "stable|experimental"
-
-echo "=== Codex Skills ==="
-ls ~/.codex/skills/ | grep -v "^\."
-
-echo "=== Codex MCP ==="
-codex mcp list 2>/dev/null || echo "MCP 미설정"
-```
+`codex --version`, `~/.codex/config.toml`, `codex features list`, `ls ~/.codex/skills/`, `codex mcp list` 조회.
+Plugin 상태: `codex mcp list 2>/dev/null | grep plugin` (설치 시 `/codex:setup --json`).
 
 ---
 
 ## Issue Tracker 연동
 
-검증 결과를 자동으로 Issue Tracker에 기록합니다 (참조: modules/session.md).
-
-```bash
-# --output-schema (codex exec) 사용 시: 이미 JSON이므로 직접 jq 처리
-# codex exec review -o 사용 시: 최종 리뷰 텍스트 파일 → Claude가 파싱하여 Issue Tracker에 기록
-
-jq --arg phase "$PHASE" --slurpfile review "$REVIEW_FILE" '
-  .issues += ($review[0].issues | map(. + {
-    "discovered_in": $phase, "status": "open"
-  }))
-' "$TRACKER_FILE" > "${TRACKER_FILE}.tmp" && mv "${TRACKER_FILE}.tmp" "$TRACKER_FILE"
-```
+검증 결과를 자동으로 Issue Tracker에 기록 (참조: modules/session.md). `-o` 파일을 jq로 파싱하여 phase/status 태그 후 통합.
 
 ---
 
@@ -479,6 +459,9 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 
 | 에러 | 대응 | 폴백 |
 |------|------|------|
+| CLAUDE.md 미발견 | `../CLAUDE.md` → `CLAUDE.md` → `find .. -maxdepth 2` | 경고 후 계속 |
+| Guidelines 미발견 | `AI/` → `../app-iOS/AI/` 시도 | 일반 규칙 적용 |
+| Plugin 명령 실패 | CLI 자동 폴백 (`codex exec`) | 경고 없이 진행 |
 | Codex CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:analyze 단독 |
 | `codex exec review` 실패 | `codex exec` + diff 인라인 | 수동 분석 |
 | JSON 파싱 실패 | `-o` 파일 캡처 폴백 | Claude 분석 |
@@ -501,10 +484,4 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 
 ## 관련 Codex 스킬
 
-- 3-Tier 디스커버리로 결정 (Tier 1: CLAUDE.md ## Codex Skills, Tier 2: fz-*, Tier 3: 인라인)
-
-## sc: 활용 (SuperClaude 연계)
-
-- `sc:reflect`: Codex 결과 교차 검증
-- `sc:analyze`: 코드 분석 보조 (Codex 결과 보완)
-- `sc:troubleshoot`: Codex CLI 통신 문제 대응
+3-Tier 디스커버리로 결정. sc: `sc:reflect`(교차검증), `sc:analyze`(보완), `sc:troubleshoot`(통신 문제).

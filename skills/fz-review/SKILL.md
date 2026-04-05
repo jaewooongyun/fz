@@ -118,8 +118,6 @@ Round 3: 합의 → Lead 보고
 
 - MCP 제약: review-arch/review-quality는 serena, context7만 접근. Atlassian/LSP → Lead가 조회 후 전달.
 - **Intent Context 전달 (필수)**: diff + `[변경 의도]: {새 심볼}이 {기존 심볼}을 대체` + `[대체 대상]: {기존 심볼, 파일}`
-
-### (선택) Pre-review /simplify → 사전 품질 정리 (참조: modules/execution-modes.md)
 ### ASD 컨텍스트 로딩 (ASD 활성 시):
 - `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
 - `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
@@ -345,6 +343,8 @@ diff 내 메서드 시그니처 변경이 프로토콜 적합성을 깨뜨리지
 - [ ] optional 파라미터가 불필요하게 명시적 값으로 채워지지 않았는가?
 - [ ] ⛔ 원본 버그 발견 시: "원본과 동일"이 이슈 dismiss 근거가 되지 않았는가? 원본 버그 발견 → 사용자에게 보고 + 수정/후속 분리 판단 요청
 ```
+
+### 검증 4-I: Implication Coverage (함의 커버리지) — `modules/lead-reasoning.md` 참조. 제거/리팩토링 시 실행. 검증 4는 diff 안(judge), 4-I는 지시→diff 밖(auditor). 완료 보고에 "관찰 사항" 추가(§5).
 
 ### 검증 5: UI/UX Refactoring Safety
 

@@ -66,7 +66,7 @@
 | 체인 | fz-plan |
 | 기본 모드 | SOLO |
 | TEAM 모드 | plan-structure(★O) + plan-edge-case + plan-impact + review-arch + review-direction (collaborative) |
-| 게이트 | ✓ direction-challenge (Phase 0.5) + ✓ stress-test(Q1-Q5) |
+| 게이트 | ✓ direction-challenge (Phase 0.5) + ✓ stress-test(Q1-Q6) |
 
 ### 7. plan-to-code
 
@@ -76,7 +76,7 @@
 | 체인 | fz-plan → fz-code |
 | 기본 모드 | TEAM |
 | TEAM 모드 | plan 팀 (plan-edge-case 포함) → impl-correctness(★O) + review-arch |
-| 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ codex check |
+| 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ implication-scan (조건부) + ✓ codex check |
 
 ### 8. code-only
 
@@ -96,7 +96,7 @@
 | 체인 | fz-code → fz-review |
 | 기본 모드 | TEAM |
 | TEAM 모드 | impl-correctness(★O) → review-arch(★O) + review-quality (live-review) |
-| 게이트 | ✓ build + ✓ codex check |
+| 게이트 | ✓ build + ✓ implication-scan (조건부) + ✓ codex check |
 
 ### 10. review-only
 
@@ -160,7 +160,7 @@
 
 | 항목 | 값 |
 |------|---|
-| 트리거 | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획\|Gemini.*계획\|제미나이.*플랜` |
+| 트리거 | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` |
 | 체인 | fz-codex plan |
 | 기본 모드 | SOLO |
 | 실행자 | Lead → Codex plan (fz-planner 스킬) |
@@ -185,16 +185,6 @@
 | 기본 모드 | SOLO |
 | 게이트 | ✓ Runtime Trigger Eval (skill-creator run_eval.py) |
 | 특수 | skill-creator 미설치 시 eval만 실행 (optimize 스킵 + 설치 안내) |
-
-### 19. consensus-verify
-
-| 항목 | 값 |
-|------|---|
-| 트리거 | `합의\|consensus\|3모델\|멀티모델\|다른.*모델.*검증\|GPT.*Gemini\|제미나이.*검증\|multi-model` |
-| 체인 | fz-codex + fz-gemini (병렬) → Lead 합의표 |
-| 기본 모드 | SOLO |
-| 실행자 | Lead → Codex(fz-codex) + Gemini(fz-gemini) 병렬 → Claude 비교 합의 |
-| 게이트 | ✓ Selective Consensus (cross-validation.md) |
 
 ---
 

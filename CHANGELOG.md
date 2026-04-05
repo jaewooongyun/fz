@@ -1,5 +1,38 @@
 # Changelog
 
+### v3.2 (2026-04-05) — Lead Implication Gate + Harness Engineering + System Reminders
+
+**Lead Implication Gate** (analysis → plan → code → review 전체 반영)
+- modules/lead-reasoning.md 신규 (165줄) — 추론 원칙 + 카테고리 분류 + 자문 체크리스트 + Implication Register
+- cross-validation.md에 Implication Scan 게이트 + origin-equivalence 게이트 추가
+- fz-code 마찰 감지에 "구조적 잔존물" + "관찰 보고 의무" 항목 추가
+- fz-review 검증 4-I (Implication Coverage) 추가
+- fz-plan Implication Register 출력 + Anti-Pattern 가이드 강화
+- fz-codex Q8 함의 커버리지 질문 추가
+- fz-fix revert 감지 → origin-equivalence 게이트 라우팅
+- Codex 네이티브 스킬 4개 Implication taxonomy 통일
+
+**Harness Engineering Guide** (1035줄)
+- guides/harness-engineering.md 신규 — Anthropic 공식 2편 + NLAH 논문 + OpenDev 논문 + 오픈소스 구현체 기반
+- 5대 기둥, 4가지 아키텍처 패턴, 6가지 설계 원칙, Anti-Patterns, 측정 지표, fz 매핑
+- 11개 고품질 참고 문헌 (공식/학술만)
+
+**Harness 기반 fz 고도화**
+- modules/system-reminders.md 신규 — Instruction fade-out 대응 (트리거 기반 + 30턴 backstop)
+- MEMORY.md Ablation 프로세스 — 분기별 Gate 기여도 측정
+- CLAUDE.md Tool Usage 가이드라인 — Grep/Read/Bash 최적화
+- Evaluator Tuning — 피드백 검증 프로토콜 4단계 (과적합 방지)
+- review-arch/review-quality에 Tuning History 섹션
+
+**피드백 신뢰도 검증 (과적합 방지)**
+- 팀원 리뷰 코멘트 4단계 분류: project-rule / valid-suggestion / preference / needs-review
+- preference(취향)는 에이전트 학습 절대 금지
+
+**메모리 정리**
+- MEMORY.md 205줄 → 114줄 (44% 감소). 이미 반영된 반성/교훈 제거, 인덱스만 유지.
+
+---
+
 ### v3.1 (2026-04-02) — RTM + Teams v2 + Scope Expansion + L3 에이전트
 
 **RTM (Requirements Traceability Matrix)**

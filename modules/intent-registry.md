@@ -11,7 +11,7 @@
 | fz-plan | `계획\|설계\|아키텍처\|요구사항` | `plan\|design\|architect` |
 | fz-code | `구현\|코드\|만들어\|개발` | `implement\|code\|develop` |
 | fz-review | `리뷰\|검증\|품질\|검토` | `review\|validate\|quality` |
-| fz-fix | `수정\|고쳐\|버그\|크래시\|에러` | `fix\|bug\|crash\|error` |
+| fz-fix | `수정\|고쳐\|버그\|크래시\|에러\|되돌리기\|revert\|원상복구` | `fix\|bug\|crash\|error\|revert\|undo\|rollback` |
 | fz-search | `찾아\|탐색\|구조\|영향\|의존성` | `search\|explore\|structure` |
 | fz-codex | `codex\|교차검증` | `codex\|cross-validate` |
 | fz-commit | `커밋` | `commit` |

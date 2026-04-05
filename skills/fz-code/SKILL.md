@@ -75,6 +75,8 @@ model-strategy:
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
 | modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
+| modules/lead-reasoning.md | Implication Scan — 제거/리팩토링 시 의미론적 완결성 |
+| modules/system-reminders.md | Instruction fade-out 대응 — 트리거 기반 리마인더 |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 
@@ -215,6 +217,8 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | Import Orphan | import 제거 후 해당 모듈의 타입/typealias가 코드에 잔존 (빌드 시 "cannot find type" 에러 예정) | 치환 패턴 테이블 누락 — Plan의 Symbol Inventory와 대조하여 해당 심볼의 대체 방법 확인 |
    | 원본 미존재 추가 | 리팩토링/마이그레이션에서 원본에 없던 파라미터, 로직, 타입을 추가하려 할 때. optional 파라미터에 기본값(nil)이 있는데 명시적으로 채우는 행위 포함 | 원본 동작 변경 위험 — AskUserQuestion 필수 |
    | 원본 버그 발견 | 모듈화/리팩토링 중 원본 코드의 버그를 발견 (dead code, 도달 불가 분기, 잘못된 순서 등) | "원본과 동일"로 방치 금지 — AskUserQuestion으로 수정 여부 확인. 혼자 판단하여 dismiss 금지 |
+   | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가 잔존 | [Q-WHY] "이 구조가 추가된 이유가 해소됐는가?" find_referencing_symbols로 확인. 참조: modules/lead-reasoning.md §7 |
+   | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지. Gate 3 전 일괄 보고 |
 
    보고 형식:
    ```
@@ -288,6 +292,8 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 - [ ] 아키텍처 패턴 준수?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
+- [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
+- [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
 - [ ] ⛔ Codex 교차 검증 완료? (TEAM 모드 — Lead가 /fz-codex check 실행)
 
 ---

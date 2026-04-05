@@ -114,6 +114,15 @@ model-strategy:
 
 ---
 
+### revert/되돌리기 감지
+
+지시에 "되돌리기", "revert", "원상복구", "undo", "롤백" 키워드 감지 시:
+→ `cross-validation.md § origin-equivalence` 게이트 활성
+→ 키워드 기반이 아닌 **상태 기반**으로 범위 정의 (참조: `modules/lead-reasoning.md`)
+→ 완료 후 원본과의 동등성(origin-equivalence) 확인 필수
+
+---
+
 ## Mode A: 버그 수정 (Bug Fix)
 
 빠른 수정-빌드 사이클로 버그를 해결합니다.
