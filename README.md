@@ -81,8 +81,7 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
 | | `/fz-commit`, `/fz-pr` | 커밋 + Fork 기반 PR |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 (결론 없이 plan에 전달) |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern 이중 경로) |
-| **검증** | `/fz-codex` | Codex CLI 교차 검증 + `--consensus` 3모델 합의 |
-| | `/fz-gemini` | Gemini CLI Devil's Advocate |
+| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.4) |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점) |
 | **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage` | 문서, 메모리, 스킬 관리, 생태계 점검 |
 | **보조** | `/fz-new-file`, `/fz-excalidraw`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 다이어그램, 회의록, PR 요약 |
@@ -97,7 +96,8 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 |--------|:---:|---|
 | **계획** | plan-structure | plan-impact, plan-edge-case, review-arch, review-direction |
 | **구현** | impl-correctness | review-arch, impl-quality, review-correctness |
-| **리뷰** | review-arch | review-quality, review-counter |
+| **버그수정** | impl-correctness | review-arch (복잡도3+) |
+| **리뷰** | review-arch | review-quality, review-correctness(Phase4.5), review-counter |
 | **탐색** | — | search-symbolic, search-pattern |
 | **공통** | — | memory-curator (모든 TEAM 참여) |
 
@@ -214,6 +214,6 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v3.2.1** (2026-04-05) — Dependency Decoupling (로컬 경로/iOS 의존성 제거)
+**현재 버전: v3.2.2** (2026-04-05) — Agent Role Optimization (책임 재분배 + 팀 구성 강화)
 
 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md)

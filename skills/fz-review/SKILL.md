@@ -24,7 +24,7 @@ allowed-tools: >-
   Read, Grep, Glob
 team-agents:
   primary: review-arch
-  supporting: [review-quality, review-counter, memory-curator]
+  supporting: [review-quality, review-counter, review-correctness, memory-curator]
 composable: true
 provides: [review-results]
 needs: [code-changes]
@@ -93,13 +93,13 @@ TeamCreate("review-{feature}")
 ├── Lead (Opus): 4중 검증 오케스트레이션 + 수정 수행
 ├── review-arch (★Opus): 아키텍처 리뷰 — .claude/agents/review-arch.md
 ├── review-quality (Sonnet): 코드 품질 리뷰 — .claude/agents/review-quality.md
+├── review-correctness (Sonnet): Phase 4.5 요구사항 충족 검증 [RTM/plan 존재 시만 활성]
 ├── review-counter (Sonnet): DA 패스 — review-arch/review-quality "OK" 판정에 반론 [선택]
-├── memory-curator (Sonnet): 관련 교훈 발굴 + review-arch에 직접 전달 [선택적: --deep 또는 복잡도 4+]
+├── memory-curator (Sonnet): 관련 교훈 발굴 + review-arch에 직접 전달 [기본 포함, lightweight recall]
 └── Codex CLI: 역검증 (Lead가 /fz-codex validate 실행)
 ```
 
-> review-counter는 선택적 DA 패스. review-arch/review-quality 초안 완성 후 SendMessage로 결과 전달 → review-counter가 "OK" 판정 영역을 집중 반론 → 합의 후 Lead 보고.
-
+> review-counter는 선택적 DA 패스. review-correctness는 Phase 4.5에서만 활성 (RTM/plan 존재 시).
 > ASD 폴더 활성 시: `{WORK_DIR}/review/review-team.md`에 live review 핵심 통신을 기록한다.
 ### 통신 패턴: Live Review (Peer-to-Peer)
 

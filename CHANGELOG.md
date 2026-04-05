@@ -1,5 +1,25 @@
 # Changelog
 
+### v3.2.2 (2026-04-05) — Agent Role Optimization
+
+**에이전트 책임 재분배 (Codex verified)**
+- review-arch: 7→5 관점 축소 (Dead Code + Source Fidelity → review-quality 이관)
+- review-arch: Context-Specific Behavior 테이블 제거 (단일 책임 원칙)
+- review-quality: 리팩토링 완성도 항목 흡수, 7개 관점 명확화
+- plan-structure: 영향 범위 분석을 plan-impact에 명시적 위임 (SendMessage)
+
+**팀 구성 강화**
+- fz-review: review-correctness 추가 (Phase 4.5 RTM 검증 한정)
+- fz-fix: review-arch 조건부 참여 (복잡도 3+)
+- memory-curator: "선택적" → "기본 포함, lightweight recall" (cross-validation.md 일치)
+
+**동기화**
+- team-registry, pipelines.md, patterns/live-review.md 팀 구성 반영
+- fz-gemini 참조 제거 (README)
+- plan-tradeoff.md → .archived
+
+---
+
 ### v3.2.1 (2026-04-05) — Dependency Decoupling
 
 **로컬 경로/iOS 의존성 제거 (7-Step, 27파일)**
