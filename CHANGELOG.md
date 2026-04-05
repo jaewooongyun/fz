@@ -1,5 +1,26 @@
 # Changelog
 
+### v3.2.1 (2026-04-05) — Dependency Decoupling
+
+**로컬 경로/iOS 의존성 제거 (7-Step, 27파일)**
+- Step 1: fz-excalidraw 절대 경로(`/Users/jaewoongyun`) → `os.path.expanduser("~")` 동적 경로
+- Step 2: Codex 네이티브 스킬 repo 포함 (`codex-skills/` 8개) + `scripts/setup-codex-skills.sh` + `get_codex_skill()` Tier 2b 폴백
+- Step 3: 9개 에이전트 iOS 도메인 지식 → CLAUDE.md 키워드 기반 조건부 적용 + XcodeBuildMCP → "빌드 MCP 도구" 일반화
+- Step 4: `modules/build.md` → CLAUDE.md `## Build` 동적 추출 (xcodebuild/npm/yarn/cargo/gradle 매칭)
+- Step 5: fz-pr 팀 스킬 경로 → CLAUDE.md `## Git Workflow` 동적 참조
+- Step 6: `modules/plugin-refs.md` → 프로젝트 언어/프레임워크 기반 조건부 적용
+- Step 7: `templates/CLAUDE.md.template` — 새 사용자용 프로젝트 설정 템플릿
+
+**리뷰에서 발견된 기존 이슈 수정**
+- fz-review `## Guidelines` dangling reference → `## Code Conventions`
+- fz-code/fz-fix iOS 16 인라인 하드코딩 → CLAUDE.md `## Plugins` 동적 참조
+- `agent-team-guide.md` XcodeBuildMCP → 일반화
+- README 아키텍처 트리 + 카운트 최신화
+
+**제약**: 로컬 동작 100% 동일. CLAUDE.md에 iOS/RIBs 키워드 존재 시 조건부 활성화.
+
+---
+
 ### v3.2 (2026-04-05) — Lead Implication Gate + Harness Engineering + System Reminders
 
 **Lead Implication Gate** (analysis → plan → code → review 전체 반영)

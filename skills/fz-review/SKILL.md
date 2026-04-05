@@ -192,7 +192,7 @@ Intent Context 전달 시 추가:
 
 Claude(Serena), Codex, SuperClaude 3중 검증으로 코드 품질을 확보합니다.
 
-> **프로젝트 규칙**: CLAUDE.md `## Guidelines` 섹션을 따른다.
+> **프로젝트 규칙**: CLAUDE.md `## Code Conventions` 섹션을 따른다.
 
 ### 병렬 검증 전략
 

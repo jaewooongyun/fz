@@ -39,7 +39,7 @@ GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS projec
 ## Tools Strategy
 - **Primary**: serena find_symbol, serena get_symbols_overview
 - **Secondary**: context7 query-docs (외부 문서 참조 시)
-- **Unavailable**: XcodeBuildMCP, Atlassian (Lead에게 요청)
+- **Unavailable**: 빌드 MCP 도구, Atlassian (Lead에게 요청)
 ```
 
 ### 중요: Team Agent 도구 제약
@@ -47,7 +47,7 @@ GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS projec
 Team 에이전트는 일부 MCP 도구를 직접 호출할 수 없다:
 
 - **Atlassian (JIRA)** -- Lead에게 요청하여 이슈 조회/생성
-- **XcodeBuildMCP** -- Lead에게 요청하여 빌드/테스트 실행
+- **빌드 MCP 도구** -- Lead에게 요청하여 빌드/테스트 실행
 - **일부 LSP 도구** -- Lead가 빌드 검증 후 결과 공유
 
 에이전트가 이 도구들이 필요한 경우 SendMessage로 Lead에게 요청한다:

@@ -18,7 +18,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - **Primary**: Serena (`find_referencing_symbols`, `find_symbol`, `search_for_pattern` — Dead Code 추적, 패턴 검색)
 - **Secondary**: context7 (`query-docs` — deprecated API 대안 확인)
 - **Fallback**: Read, Grep, Glob
-- **사용 불가**: XcodeBuildMCP, Bash → Lead에게 위임
+- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임
 
 ## Analysis Perspectives
 
@@ -38,14 +38,12 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 
 - 성능에 부정적 영향을 주는 패턴이 있는가? (메인 스레드 부하, 메모리 누수, 비효율적 연산)
 
-### 4. SwiftUI Quality (`swiftui-expert` 플러그인 참조, SwiftUI 코드 포함 시)
+### 4. UI Framework Quality (CLAUDE.md `## Plugins`에 UI 프레임워크 플러그인 명시 시)
 
-- state-management: 프로퍼티 래퍼 선택 적절성 (iOS 16 기본: `@StateObject`/`@ObservedObject`)
-- view-structure: View body 복잡도, 서브뷰 추출 필요성
-- performance-patterns: 불필요한 재렌더링, 과도한 state 변경
-- iOS 17+ API 사용 시 `#available` 가드 확인 (CLAUDE.md `## Plugins` 참조)
+- SwiftUI: `swiftui-expert` 플러그인 기준 — state 관리, view 구조, 성능 패턴
+- 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md `## Plugins` 참조)
 
-### 5. Concurrency Safety (`swift-concurrency` 플러그인 참조, 동시성 코드 포함 시)
+### 5. Concurrency Safety (동시성 코드 포함 시, CLAUDE.md `## Plugins` 참조)
 
 - actor isolation 경계 위반 여부
 - Sendable conformance 적절성
@@ -74,6 +72,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 ## Library Semantics (이슈 판정 전 확인)
 
 이슈를 MAJOR/MINOR로 판정하기 전에 아래 시맨틱을 확인한다. 패턴 매칭만으로 판단하면 false positive가 된다.
+> 아래 라이브러리별 시맨틱은 코드베이스에서 해당 라이브러리 사용이 감지될 때만 적용.
 
 - **Kingfisher 8 async API**: `retrieveImage(with:)` async throws. 호출부에서 `try?`로 감싸면 에러가 호출자에게 전달되지 않음 → 에러 전파 이슈 주장 시 반드시 호출부 `try?` 여부 확인
 - **Kingfisher 8 콜백 기본 큐**: Kingfisher 7/8 completion callback 기본값은 `.mainCurrentOrAsync`. `Task { }` 전환 시 @MainActor 없으면 thread가 달라짐 → UI 접근 regression 가능

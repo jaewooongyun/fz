@@ -75,7 +75,7 @@ model-strategy:
 
 > 참조: `modules/plugin-refs.md` — SwiftUI Expert(수정 시) + Swift Concurrency(수정 시) 섹션
 > SwiftUI View 작업 시 `swiftui-expert` 플러그인 패턴 참조
-> **iOS 16 최소 타겟**: `@Observable`/`@Bindable` → `#available(iOS 17, *)` 필수. 기본은 `ObservableObject`/`@StateObject`
+> **최소 타겟 제약**: CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API 사용 시 availability 가드 필수
 > 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
 
 ## sc: 활용 (SuperClaude 연계)

@@ -87,7 +87,8 @@ model-strategy:
 
 ```python
 import sys
-sys.path.insert(0, "/Users/jaewoongyun/.claude/skills/fz-excalidraw/references")
+import os
+sys.path.insert(0, os.path.expanduser("~/.claude/skills/fz-excalidraw/references"))
 from diagram_utils import reset, rect, txt, arr, elbow_arrow, hstack, vstack, diamond, ln, code_box, save
 
 reset()  # 버퍼 초기화

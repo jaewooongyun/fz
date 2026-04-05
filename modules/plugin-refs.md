@@ -1,14 +1,17 @@
 # Plugin 참조 가이드
 
-> 스킬별 역할에 맞는 플러그인 참조 섹션만 참조.
-> 플러그인은 글로벌 설치 (`~/.claude/plugins/`). 프로젝트 CLAUDE.md의 언어/프레임워크에 따라 적용.
+> 이 모듈은 프로젝트 언어/프레임워크에 따라 **해당 섹션만** 적용한다.
+> CLAUDE.md `## Architecture` 또는 코드베이스에서 감지된 기준으로 판단.
+> 플러그인은 글로벌 설치 (`~/.claude/plugins/`). 프로젝트에 해당 플러그인이 있을 때만 참조.
 
 ## 활용 원칙
 
 1. 플러그인은 Claude가 자동 로드 — 스킬에서 플러그인 내용을 반복하지 않는다
 2. 스킬은 "어떤 상황에서 플러그인 참조를 활용할지" 가이드만 제공한다
 3. 프로젝트가 해당 언어/프레임워크를 사용하는지는 CLAUDE.md `## Architecture`에서 확인한다
-4. **iOS 16 최소 타겟** — CLAUDE.md `## Plugins` 참조. iOS 17+ API는 `#available` 필수
+4. 최소 타겟 제약 — CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API는 availability 가드 필수
+
+## iOS/Swift (Swift, SwiftUI, RIBs 프로젝트)
 
 ## 자동 감지 트리거
 

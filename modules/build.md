@@ -4,15 +4,23 @@
 
 ## 빌드 명령 결정
 
-1. CLAUDE.md `## Build` 섹션에 정의된 빌드 명령 (최우선)
-2. XcodeBuildMCP (`mcp__XcodeBuildMCP__build_sim`) (MCP 사용 가능 시)
-3. Bash (`xcodebuild`) (폴백)
-4. 사용자에게 질문 (위 모두 불가 시)
+1. CLAUDE.md `## Build` 섹션에 정의된 빌드 도구/명령 (최우선)
+2. CLAUDE.md 도구 매칭:
+   - XcodeBuildMCP 명시 → `mcp__XcodeBuildMCP__build_sim` 우선
+   - xcodebuild 명시 → `xcodebuild` 직접 실행
+   - npm/yarn 명시 → `npm run build` / `yarn build`
+   - cargo 명시 → `cargo build`
+   - gradle 명시 → `./gradlew build`
+3. 도구 미명시 → AskUserQuestion("빌드 명령을 알려주세요")
 
 ## 빌드 검증 절차
 
 1. 빌드 명령 결정 (위 우선순위)
-2. Clean Build 판단: 메서드/함수 시그니처 변경(파라미터 추가/제거/타입 변경)이 포함된 경우 → clean build 실행 (`mcp__XcodeBuildMCP__clean` 후 빌드, 또는 `xcodebuild clean build`). 이유: incremental build 캐시가 변경되지 않은 파일의 프로토콜 적합성 검사를 생략할 수 있음
+2. Clean Build 판단: 메서드/함수 시그니처 변경(파라미터 추가/제거/타입 변경)이 포함된 경우 → clean build 실행. 이유: incremental build 캐시가 변경되지 않은 파일의 적합성 검사를 생략할 수 있음
+   - xcodebuild: `mcp__XcodeBuildMCP__clean` 후 빌드, 또는 `xcodebuild clean build`
+   - npm/yarn: `rm -rf node_modules/.cache && npm run build`
+   - cargo: `cargo clean && cargo build`
+   - 기타: CLAUDE.md에 clean 명령이 있으면 사용
 3. 빌드 실행
 4. 에러 분석 → 수정 → 재빌드 (최대 3회)
 5. 3회 실패 시 사용자 에스컬레이션
@@ -32,11 +40,11 @@ Serena 불가 시 Edit + Grep으로 폴백.
 
 | 조건 | 행동 |
 |------|------|
-| 변경 파일에 대응하는 *Tests.swift 존재 | 해당 테스트 타겟 실행 |
+| 변경 파일에 대응하는 테스트 파일 존재 | 해당 테스트 실행 |
 | 테스트 파일 자체를 수정 | 해당 테스트 실행 |
 | 테스트 파일 없음 | 빌드 검증만 (테스트 스킵) |
 
-테스트 실행 명령: CLAUDE.md `## Build` 섹션의 테스트 명령 우선. 없으면 `xcodebuild test` 사용.
+테스트 실행 명령: CLAUDE.md `## Build` 섹션의 테스트 명령 우선. 미정의 시 빌드 도구에 따라 자동 결정.
 
 ## Gate 체크리스트
 

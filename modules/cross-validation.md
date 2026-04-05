@@ -194,7 +194,12 @@ get_codex_skill() {
   if [ -n "$SKILL" ] && [ -d "$HOME/.codex/skills/$SKILL" ]; then
     echo "$SKILL"; return
   fi
+  # Tier 2a: ~/.codex/skills/ (기존 설치 또는 심볼릭 링크)
   if [ -d "$HOME/.codex/skills/fz-${ROLE}" ]; then
+    echo "fz-${ROLE}"; return
+  fi
+  # Tier 2b: ~/.claude/codex-skills/ (repo 포함본 — 폴백)
+  if [ -d "$HOME/.claude/codex-skills/fz-${ROLE}" ]; then
     echo "fz-${ROLE}"; return
   fi
   echo ""

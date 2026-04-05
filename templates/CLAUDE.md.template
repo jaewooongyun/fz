@@ -1,0 +1,51 @@
+# CLAUDE.md
+
+> fz 생태계가 프로젝트에 맞게 동작하기 위해 필요한 프로젝트 설정 파일입니다.
+> 아래 섹션을 프로젝트에 맞게 작성하세요. fz 스킬/에이전트/모듈이 이 파일을 참조합니다.
+
+## Architecture
+- **아키텍처 패턴**: (예: RIBs + Clean Architecture, MVVM, MVC, Hexagonal 등)
+- **레이어 규칙**: (예: 상위→하위만 참조, Dependency Rule 등)
+- **네이밍**: (예: {Feature}Router, {Feature}ViewModel 등)
+- **상세 가이드라인 파일**: (있으면 경로)
+
+## Build
+| 도구 | 명령어 |
+|------|--------|
+| (빌드 도구) | (빌드 명령) |
+| (테스트 도구) | (테스트 명령) |
+
+- Schemes/Targets: (해당 시)
+- 패키지 매니저: (SPM, CocoaPods, npm, yarn, cargo 등)
+
+## Code Conventions
+- (프로젝트별 코딩 규칙)
+- (가이드라인 파일 경로)
+
+## Directory Structure
+- PROJECT_ROOT: (프로젝트 루트 경로)
+- GIT_ROOT: (git 저장소 경로, PROJECT_ROOT와 다를 때만)
+
+## Git Workflow
+- 커밋 규칙: (있으면)
+- PR 규칙: (있으면)
+- 팀 PR 스킬 경로: (있으면, 예: path/to/pr/SKILL.md)
+- 팀 커밋 스킬 경로: (있으면)
+
+## Plugins
+- **최소 타겟**: (예: iOS 16, Node 18 등)
+- (사용 중인 플러그인 목록과 설정)
+
+## External Models
+| 도구 | 명령어 | 용도 |
+|------|--------|------|
+| (Codex CLI 등) | (실행 명령) | (교차 검증 등) |
+
+## Codex Skills (선택 — Codex CLI 사용 시)
+| 역할 | 스킬명 |
+|------|--------|
+| reviewer | (스킬명) |
+| architect | (스킬명) |
+
+## Compact Recovery
+- ASD 폴더 작업 중 compact 발생 시: `fz:session:current` 읽기 → `work_dir` → `index.md` 읽기 → Active Phase 복원

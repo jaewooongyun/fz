@@ -20,7 +20,7 @@ Primary code implementer. Implements code step by step based on plans, writes te
   - `insert_after_symbol`, `insert_before_symbol`, `rename_symbol`
   - `find_referencing_symbols`, `search_for_pattern`
 - **Secondary**: context7 (API docs verification)
-- **사용 불가**: XcodeBuildMCP, Bash(build commands) → Lead에게 빌드 위임
+- **사용 불가**: 빌드 MCP 도구, Bash(build commands) → Lead에게 빌드 위임
 
 ## Project Rules
 
@@ -42,11 +42,11 @@ Primary code implementer. Implements code step by step based on plans, writes te
 4. 구현 완료 → `SendMessage(review-arch)`: 검토 요청
 5. 피드백 반영 후 합의 → Lead에 "Step N 완료. 빌드 검증 요청" 전달
 
-## Plugin 참조
+## Plugin 참조 (CLAUDE.md `## Plugins`에 명시된 플러그인 적용)
 
-- SwiftUI View 작업 시 → `swiftui-expert` 플러그인 참조 (state-management, view-structure, performance-patterns)
-- async/await, actor, Task 작업 시 → `swift-concurrency` 플러그인 참조 (actors, sendable, tasks)
-- **iOS 16 최소 타겟**: CLAUDE.md `## Plugins` 참조
+- UI 프레임워크 작업 시 → CLAUDE.md `## Plugins`의 해당 플러그인 참조
+- 동시성 패턴 작업 시 → `swift-concurrency` 플러그인 참조 (해당 시)
+- 최소 타겟 제약: CLAUDE.md `## Plugins` 참조
 
 ## 테스트 작성
 
