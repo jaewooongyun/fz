@@ -30,6 +30,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 
 - Deprecated API 사용 여부 — context7로 최신 대안 확인
 - 사용처 0인 코드 역추적 → 삭제 대상 보고 (find_referencing_symbols)
+- **리팩토링 완성도** (리팩토링 커밋에만): 미참조 심볼 잔존 여부 확인 (심볼 참조 카운팅)
 - **삭제 vs 이동 판별**: diff에서 코드 삭제 발견 시 "누락"으로 즉단하지 않는다. 모듈화/리팩토링에서 레이어 간 이동(Interactor→UseCase 등)은 정상. PR diff 전체에서 동일 로직의 이동 여부를 반드시 확인 후 판정
 - 코딩 표준 준수 — CLAUDE.md `## Code Conventions` 참조
 - CLAUDE.md `## Guidelines` 의 네이밍/포맷 규칙 위반 확인
@@ -103,6 +104,6 @@ Dead Code 판정: 확정. 삭제 권장."
 (현재 튜닝 이력 없음 — valid-suggestion 2회+ 관측 후 추가)
 
 ## Escalation to Lead
-- 6개 관점 분석 간 모순 발견 시
+- 7개 관점 분석 간 모순 발견 시
 - 판단 confidence < 60% 시
 - 아키텍처 영역 이슈 발견 시 (→ review-arch 영역)

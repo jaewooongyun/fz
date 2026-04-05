@@ -108,7 +108,7 @@ TeamCreate("code-{feature}")
 ├── review-arch (Sonnet): 구현 중 아키텍처 감시
 ├── impl-quality (Sonnet): 코딩 표준 + 패턴 일관성 실시간 피드백 [supporting]
 ├── review-correctness (Sonnet): 기능 정확성 + 요구사항 충족 검증 [supporting]
-├── memory-curator (Sonnet): 관련 교훈 발굴 + impl-correctness에 직접 전달 [선택적: --deep 또는 복잡도 4+]
+├── memory-curator (Sonnet): 관련 교훈 발굴 + impl-correctness에 직접 전달 [기본 포함, lightweight recall]
 └── Cross-model 검증 (Lead가 검증 실행)
 ```
 

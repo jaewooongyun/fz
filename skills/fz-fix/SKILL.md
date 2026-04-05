@@ -28,7 +28,8 @@ allowed-tools: >-
   Edit, Read, Bash(xcodebuild *), Bash(cd *)
 team-agents:
   primary: impl-correctness
-  supporting: []
+  supporting: [review-arch]
+  # review-arch 조건부: 복잡도 3+ 또는 아키텍처 관련 버그에서만 활성
 composable: false
 provides: [code-changes]
 needs: [none]
@@ -188,6 +189,7 @@ model-strategy:
 TeamCreate("fix-{bug}")
 ├── Lead (Opus): 오케스트레이션 + 빌드 검증
 ├── impl-correctness (★Opus): 버그 수정 (Primary Worker)
+├── review-arch (Sonnet): 아키텍처 영향 감시 [조건부: 복잡도 3+ 또는 아키텍처 관련]
 └── Cross-model 검증 (Lead가 검증 실행)
 ```
 

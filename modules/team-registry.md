@@ -23,7 +23,7 @@
 | impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | — | — | — | — | |
 | review-arch | review | 아키텍처 결정 + 레이어 위반 | sonnet | opus | project | arch-critic | — | Primary |
 | review-quality | review | 코드 품질 + Dead Code + 성능 | sonnet | — | project | code-auditor | — | |
-| review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | — | — | — | — | fz-code TEAM 배정 |
+| review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | — | — | — | — | fz-code TEAM + fz-review Phase 4.5 |
 | review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | opus | — | — | — | direction-challenge 시 승격 |
 | review-counter | review | 반론 + Devil's Advocate | sonnet | — | — | — | — | |
 | memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | — | user | — | — | 모든 TEAM 모드 참여 |
@@ -49,8 +49,8 @@
 | /fz-discover | plan-structure (O) | review-arch (S) | adversarial |
 | /fz-plan | plan-structure (O) | plan-impact (S), plan-edge-case (S), review-arch (S), review-direction (S), memory-curator (S) | collaborative |
 | /fz-code | impl-correctness (O) | review-arch (S), impl-quality (S), review-correctness (S), memory-curator (S) | pair-programming |
-| /fz-fix | impl-correctness (O) | — (SOLO) | N/A |
-| /fz-review | review-arch (O) | review-quality (S), review-counter (S), memory-curator (S) | live-review |
+| /fz-fix | impl-correctness (O) | review-arch (S, 복잡도3+) | pair-programming |
+| /fz-review | review-arch (O) | review-quality (S), review-counter (S), review-correctness (S, Phase4.5), memory-curator (S) | live-review |
 | /fz-peer-review | review-arch (O) | review-quality (S), review-counter (S) | live-review |
 | /fz-search | — | search-symbolic (S), search-pattern (S) | cross-verify |
 | /fz-memory | — | memory-curator (S) | solo/team |

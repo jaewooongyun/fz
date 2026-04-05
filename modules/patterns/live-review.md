@@ -9,11 +9,13 @@
 
 | 역할 | 에이전트 | Lens |
 |------|---------|------|
-| Primary | review-arch (O) | 아키텍처 결정 + 레이어 위반 + 정확성 |
-| Supporting | review-quality (S) | 코드 품질 + Dead Code + 성능 |
+| Primary | review-arch (O) | 아키텍처 결정 + 레이어 위반 |
+| Supporting | review-quality (S) | 코드 품질 + Dead Code + 성능 + 리팩토링 완성도 |
+| Supporting | review-correctness (S) | 요구사항 충족 (Phase 4.5만, RTM/plan 존재 시) |
+| Supporting | memory-curator (S) | 관련 교훈 발굴 (기본 포함, lightweight recall) |
 
-review-arch가 Primary (opus 승격). review-quality는 Supporting (sonnet). Lead가 통합.
-/fz-review(자기 코드)와 /fz-peer-review(팀원 PR) 모두 동일한 역할 배분 적용.
+review-arch가 Primary (opus 승격). 나머지 Supporting (sonnet). Lead가 통합.
+/fz-peer-review는 review-correctness, memory-curator 미포함 (review-arch + review-quality + review-counter만).
 
 ## 2.5-Turn 적용 (Mesh, 2명)
 

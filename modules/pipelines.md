@@ -95,7 +95,7 @@
 | 트리거 | `구현.*리뷰, 만들고.*검토` |
 | 체인 | fz-code → fz-review |
 | 기본 모드 | TEAM |
-| TEAM 모드 | impl-correctness(★O) → review-arch(★O) + review-quality (live-review) |
+| TEAM 모드 | impl-correctness(★O) → review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) |
 | 게이트 | ✓ build + ✓ implication-scan (조건부) + ✓ codex check |
 
 ### 10. review-only
@@ -105,7 +105,7 @@
 | 트리거 | `리뷰, 검증, 품질` |
 | 체인 | fz-review |
 | 기본 모드 | SOLO |
-| TEAM 모드 | review-arch(★O) + review-quality (live-review) |
+| TEAM 모드 | review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) |
 
 ### 11. review-to-ship
 
@@ -144,7 +144,7 @@
 | 트리거 | `피어리뷰, PR.*리뷰, 팀원.*코드` |
 | 체인 | fz-peer-review |
 | 기본 모드 | SOLO |
-| TEAM 모드 | review-arch(★O) + review-quality (live-review) |
+| TEAM 모드 | review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) |
 
 ### 15. drift-check
 
