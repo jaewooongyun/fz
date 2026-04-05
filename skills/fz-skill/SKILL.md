@@ -1,12 +1,8 @@
 ---
 name: fz-skill
 description: >-
-  This skill should be used when the user wants to create, modify, evaluate, or optimize skills and agents.
-  Make sure to use this skill whenever the user says: "스킬 만들어줘", "스킬 수정해줘",
-  "스킬 평가해줘", "에이전트 만들어줘", "최적화해줘", "description 개선", "create a skill",
-  "update this skill", "eval the skill", "optimize skill", "new agent".
-  Covers: 스킬 만들, 스킬 수정, 스킬 평가, 에이전트 생성, 최적화, CRUD, 품질 평가(eval).
-  Do NOT use for document-only work (use fz-doc) or ecosystem health check (use fz-manage check/benchmark).
+  스킬/에이전트 CRUD + 최적화. 생성, 수정, 평가, 삭제.
+  예: 스킬 만들어줘, 에이전트 만들어줘, 스킬 평가해줘
 user-invocable: true
 argument-hint: "[create|update|delete|new-agent|eval|optimize] [대상] [--from-discover|--full|--runtime]"
 allowed-tools: >-

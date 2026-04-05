@@ -1,11 +1,8 @@
 ---
 name: fz-pr-digest
 description: >-
-  This skill should be used when the user wants to understand or learn from a PR's changes.
-  Make sure to use this skill whenever the user says: "설명해줘", "해설", "이해",
-  "뭐가 바뀐", "explain PR", "digest", "understand changes".
-  Covers: PR 해설, 변경 이해, Before/After 비교, 아키텍처 맥락, 기술 학습 포인트.
-  Do NOT use for finding issues (use fz-peer-review) or reviewing your own code (use fz-review).
+  PR 변경사항 해설 + 학습. Before/After 비교, 아키텍처 맥락 설명.
+  예: 설명해줘, 해설, 뭐가 바뀐, PR 이해
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[PR번호 또는 브랜치명] [--light | --deep]"

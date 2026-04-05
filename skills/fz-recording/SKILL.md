@@ -1,11 +1,8 @@
 ---
 name: fz-recording
 description: >-
-  This skill should be used when the user has an audio recording or transcript to turn into meeting notes.
-  Make sure to use this skill whenever the user says: "녹음", "회의록", "화자 분리",
-  "recording", "meeting notes", "transcribe".
-  Covers: 녹음 파일, 회의록, 화자 분리, STT, 음성 변환, AI 첨언, AssemblyAI.
-  Do NOT use for code-related tasks (use fz-code, fz-fix).
+  녹음 파일 → 회의록 변환. 화자 분리 + AI 첨언.
+  예: 녹음, 회의록, 화자 분리
 user-invocable: true
 argument-hint: "<audio-file> [--text <transcript>] [--speakers \"이름1,이름2\"]"
 allowed-tools: >-

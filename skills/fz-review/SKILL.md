@@ -1,12 +1,8 @@
 ---
 name: fz-review
 description: >-
-  This skill should be used when the user wants to review their own code changes or validate quality.
-  Make sure to use this skill whenever the user says: "리뷰해줘", "검증해줘", "품질 확인", "괜찮아?",
-  "검토해줘", "내 코드 봐줘", "문제 없어?", "review my changes", "validate this", "check quality",
-  "is this okay?", "verify my code".
-  Covers: 리뷰, 검증, 품질, 검토, 자기 코드 3중 검증과 역방향 검증.
-  Do NOT use for reviewing a teammate's PR (use fz-peer-review).
+  자기 코드 3중 검증(Claude+Codex+sc:analyze) + 역방향 검증.
+  예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘
 user-invocable: true
 argument-hint: "[리뷰 대상 설명]"
 allowed-tools: >-

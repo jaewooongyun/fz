@@ -1,12 +1,8 @@
 ---
 name: fz-search
 description: >-
-  This skill should be used when the user wants to find, explore, or trace code in the project.
-  Make sure to use this skill whenever the user says: "찾아줘", "탐색해줘", "구조 알려줘",
-  "의존성 추적", "어디 있어?", "누가 쓰고 있어?", "호출 관계", "search for", "find where",
-  "explore the structure", "trace dependencies", "who uses this?", "where is it defined?".
-  Covers: 찾아, 탐색, 구조, 의존성, 어디, 호출 관계, 코드 패턴 검색, 아키텍처 분석.
-  Do NOT use for code modification (use fz-fix or fz-code) or code review (use fz-review).
+  코드 탐색 + 의존성 추적. Serena 심볼 기반 정밀 검색.
+  예: 찾아줘, 탐색해줘, 어디 있어?, 누가 쓰고 있어?
 user-invocable: true
 argument-hint: "[검색 대상] [--mode arch|layer|impact|pattern] [--deep]"
 allowed-tools: >-

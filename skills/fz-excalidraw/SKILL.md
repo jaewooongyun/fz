@@ -1,13 +1,8 @@
 ---
 name: fz-excalidraw
 description: >-
-  This skill should be used when the user wants to create or edit visual diagrams.
-  Make sure to use this skill whenever the user says: "다이어그램 그려줘", "시각화해줘",
-  "구조도 만들어줘", "플로우차트 그려줘", "흐름도 그려줘", "아키텍처 그림", "도식화해줘",
-  "draw a diagram", "visualize this", "create a flowchart", "show me the architecture",
-  "draw the structure", "excalidraw".
-  Covers: 다이어그램, 그려줘, 시각화, 구조도, 플로우차트, 흐름도, 아키텍처 도식, Excalidraw JSON 생성/수정.
-  Do NOT use for Mermaid/PlantUML output, or pure code tasks without visualization need.
+  Excalidraw 다이어그램 생성. 아키텍처, 플로우차트, 구조도 시각화.
+  예: 다이어그램 그려줘, 시각화해줘, 구조도 만들어줘
 user-invocable: true
 argument-hint: "[다이어그램 설명] 또는 [기존 .excalidraw 파일 경로 + 업데이트 내용]"
 allowed-tools: >-

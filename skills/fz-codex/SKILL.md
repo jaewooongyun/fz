@@ -1,11 +1,8 @@
 ---
 name: fz-codex
 description: >-
-  This skill should be used when the user wants to cross-validate code or plans using Codex CLI (GPT).
-  Make sure to use this skill whenever the user says: "codex", "교차검증", "상호검증",
-  "cross-validate", "verify with codex", "GPT로 확인", "GPT로 검증".
-  Covers: Codex CLI, 교차검증, 상호검증, 독립 검증, 코드 리뷰 검증, 계획 검증.
-  Do NOT use for direct code review (use fz-review).
+  Codex CLI(GPT) 교차 검증. 코드/계획을 독립 모델로 상호 검증.
+  예: codex, 교차검증, GPT로 확인, 상호검증
 user-invocable: true
 argument-hint: "[review|verify|validate|check|final|adversarial] [대상]"
 allowed-tools: >-

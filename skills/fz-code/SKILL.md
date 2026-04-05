@@ -1,12 +1,8 @@
 ---
 name: fz-code
 description: >-
-  This skill should be used when the user asks to write, implement, or build code.
-  Make sure to use this skill whenever the user says: "구현해줘", "코드 짜줘", "만들어줘", "개발해줘",
-  "코딩해줘", "빌드해줘", "implement this", "code this up", "develop the feature", "build it",
-  "write the module", "create the class".
-  Covers: 구현, 코드, 만들어, 개발, 짜줘, 코딩, 빌드 검증, 계획 기반 점진적 구현.
-  Do NOT use for bug fixes (use fz-fix) or code review (use fz-review).
+  코드 구현 + 빌드 검증. 계획 기반 점진적 구현과 매 Step 빌드 검증.
+  예: 구현해줘, 코드 짜줘, 만들어줘, 개발해줘, 빌드해줘
 user-invocable: true
 argument-hint: "[구현 대상 설명]"
 allowed-tools: >-

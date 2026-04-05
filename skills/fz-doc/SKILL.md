@@ -1,12 +1,8 @@
 ---
 name: fz-doc
 description: >-
-  This skill should be used when the user wants to write, improve, or optimize documentation files.
-  Make sure to use this skill whenever the user says: "문서 작성해줘", "문서 개선해줘",
-  "SKILL.md 만들어줘", "CLAUDE.md 수정", "가이드 작성", "프롬프트 개선", "document this",
-  "write the SKILL.md", "improve CLAUDE.md", "optimize the description", "write guide".
-  Covers: 문서, 작성, 개선, SKILL.md, CLAUDE.md, 에이전트 프롬프트, 모듈 문서, 가이드라인 기반 최적화.
-  Do NOT use for code implementation (use fz-code) or code review (use fz-review).
+  문서 작성 + 프롬프트 최적화. SKILL.md, CLAUDE.md, 가이드 등 문서 CRUD.
+  예: 문서 작성해줘, SKILL.md 만들어줘, 프롬프트 개선
 user-invocable: true
 argument-hint: "[대상 파일/스킬] [--check] [--optimize]"
 allowed-tools: >-
