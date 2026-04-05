@@ -1,13 +1,8 @@
 ---
 name: fz-discover
 description: >-
-  This skill should be used when the user is unsure about approach and needs guided exploration.
-  Make sure to use this skill whenever the user says: "어떻게 하면 좋을까?", "뭐가 좋을까?",
-  "트레이드오프 비교", "고민이야", "방식이 여러 개인데", "요구사항이 불명확", "제약 조건 파악",
-  "how should I approach this?", "what's the trade-off?", "I'm not sure which way to go",
-  "help me figure out requirements", "compare approaches".
-  Covers: 어떻게, 뭐가 좋을까, 트레이드오프, 고민, 방식, 제약조건 발견, 소크라테스식 대화.
-  Do NOT use when requirements are already clear (use fz-plan) or for code search (use fz-search).
+  접근 방식 탐색 + 트레이드오프 비교. 요구사항이 불명확할 때 제약 기반 탐색.
+  예: 어떻게 하면 좋을까?, 트레이드오프 비교, 방식이 여러 개인데
 user-invocable: true
 argument-hint: "[해결하고 싶은 문제/질문]"
 allowed-tools: >-

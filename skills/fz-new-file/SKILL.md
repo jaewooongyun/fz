@@ -1,11 +1,8 @@
 ---
 name: fz-new-file
 description: >-
-  This skill should be used when the user creates a new source file and needs the correct header format.
-  Make sure to use this skill whenever the user says: "새 파일", "파일 생성", "헤더",
-  "new file", "file header", "create file".
-  Covers: 파일 헤더, 새 파일 생성, 헤더 서명, Swift 파일 생성, 소스 파일 헤더.
-  Do NOT use for existing file editing (use fz-code or fz-fix).
+  새 소스 파일 생성 + 헤더 서명. 프로젝트 규칙에 맞는 파일 헤더 자동 생성.
+  예: 새 파일, 파일 생성, 헤더
 user-invocable: false
 composable: false
 provides: [file-header]

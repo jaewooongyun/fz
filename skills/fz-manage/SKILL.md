@@ -1,12 +1,8 @@
 ---
 name: fz-manage
 description: >-
-  This skill should be used when the user wants to inspect or manage the fz- skill ecosystem as a whole.
-  Make sure to use this skill whenever the user says: "스킬 목록 보여줘", "건강 체크해줘",
-  "벤치마크 돌려줘", "의존성 확인", "스킬 관리", "전체 상태", "manage skills", "list all skills",
-  "health check", "run benchmark", "check dependencies", "skill inventory".
-  Covers: 스킬 목록, 건강 체크, 벤치마크, 의존성, 관리, 인벤토리, 일괄 품질 평가.
-  Do NOT use for individual skill eval (use fz-skill eval) or skill CRUD (use fz-skill).
+  fz 생태계 관리. 스킬 목록, 건강 체크, 벤치마크, 의존성 확인.
+  예: 스킬 목록 보여줘, 건강 체크해줘, 벤치마크 돌려줘
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[list|info|deps|check|benchmark|create|edit|delete] [대상]"

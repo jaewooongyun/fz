@@ -1,12 +1,8 @@
 ---
 name: fz-peer-review
 description: >-
-  This skill should be used when the user wants to review a teammate's PR or branch code.
-  Make sure to use this skill whenever the user says: "팀원 PR 리뷰해줘", "피어리뷰 해줘",
-  "동료 코드 봐줘", "PR 검토", "이 PR 리뷰", "peer review this PR", "review teammate's code",
-  "check this pull request", "review PR #123".
-  Covers: 팀원, PR 리뷰, 피어리뷰, 동료 코드, 3-Model Cross-Review, 9개 관점 독립 분석.
-  Do NOT use for reviewing your own code (use fz-review).
+  팀원 PR 코드 리뷰. 3-Model Cross-Review + 9개 관점 독립 분석.
+  예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[PR번호 또는 브랜치명] [--deep] [--post] [--explain]"

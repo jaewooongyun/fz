@@ -1,12 +1,8 @@
 ---
 name: fz-plan
 description: >-
-  This skill should be used when the user asks to plan, design, or analyze before coding.
-  Make sure to use this skill whenever the user says: "계획 세워줘", "설계해줘", "아키텍처 잡아줘",
-  "요구사항 분석", "순서 정해줘", "어떻게 만들면 될까", "구조 잡아줘", "plan this", "design the architecture",
-  "break down the task", "what's the implementation strategy", "analyze requirements".
-  Covers: 계획, 설계, 아키텍처, 요구사항, 순서, 영향 범위 분석, 구현 전략 수립, 태스크 분해.
-  Do NOT use for actual code implementation (use fz-code) or code search (use fz-search).
+  계획 수립 + 영향 범위 분석 + 설계. 요구사항 분해와 Serena 기반 코드베이스 탐색.
+  예: 계획 세워줘, 설계해줘, 아키텍처 잡아줘, 요구사항 분석
 user-invocable: true
 argument-hint: "[기능/요구사항 설명]"
 allowed-tools: >-

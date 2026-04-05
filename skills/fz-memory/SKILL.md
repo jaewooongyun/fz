@@ -1,12 +1,8 @@
 ---
 name: fz-memory
 description: >-
-  This skill should be used when the user wants to manage memory entries or recall past learnings.
-  Make sure to use this skill whenever the user says: "메모리 정리해줘", "교훈 떠올려줘",
-  "기억 정리", "메모리 감사", "지난번에 배운 거", "memory audit", "recall learnings",
-  "clean up memory", "organize memory", "what did we learn about X?".
-  Covers: 메모리 정리, 교훈 회상, 기억, L1/L2 GC, topic file 관리, 과거 학습 회상.
-  Do NOT use for code implementation (use fz-code) or code review (use fz-review).
+  메모리 관리 + 교훈 회상. L1/L2 GC, topic file 관리.
+  예: 메모리 정리해줘, 교훈 떠올려줘, 기억 정리
 user-invocable: true
 argument-hint: "[audit|gc|recall|organize|remind] [--skill fz-plan] [--deep]"
 allowed-tools: >-
