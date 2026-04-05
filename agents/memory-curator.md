@@ -24,7 +24,7 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
 - **Secondary** (최신성 검증): Context7 (`resolve-library-id` + `query-docs`)
   - 라이브러리 교훈이 최신 버전에서 유효한지 확인
 - **사용 불가**: Write, Edit, Delete (Memory 변경) → Lead에게 "저장 제안" SendMessage
-- **사용 불가**: XcodeBuildMCP, Atlassian → Lead 전용
+- **사용 불가**: 빌드 MCP 도구, Atlassian → Lead 전용
 
 ## Project Rules
 

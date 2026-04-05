@@ -32,9 +32,9 @@ model-strategy:
 
 ## 규칙 참조
 
-**팀 PR 스킬**: `app-iOS/AI/skills/pr/SKILL.md`의 상세 워크플로우를 따른다.
-이 파일이 존재하면 해당 스킬의 Step 0~5 전체를 실행한다 (리뷰어 자동 지정 포함).
-없으면 CLAUDE.md `## Git Workflow` 섹션 → 표준 GitHub Flow 순으로 폴백.
+**팀 PR 스킬**: CLAUDE.md `## Git Workflow` 섹션에서 팀 PR 스킬 경로를 참조한다.
+경로가 정의되어 있으면 해당 스킬의 워크플로우 전체를 실행한다 (리뷰어 자동 지정 포함).
+경로 미정의 시 기본 `gh pr create` 워크플로우를 사용한다.
 
 ---
 

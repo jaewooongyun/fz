@@ -19,7 +19,7 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 - **Primary**: Serena (`find_symbol`, `get_symbols_overview`, `search_for_pattern`, `find_referencing_symbols`)
 - **Secondary**: context7 (`query-docs` — 라이브러리/API 대안 확인)
 - **Fallback**: Read, Grep, Glob
-- **사용 불가**: XcodeBuildMCP, Bash → Lead에게 위임
+- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임
 
 ## Project Rules
 

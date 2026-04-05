@@ -29,12 +29,14 @@
 
 ```
 ~/.claude/
-├── skills/          22개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
+├── skills/          21개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
 ├── agents/          14개 — plan-structure, impl-correctness, review-arch ...
-├── modules/         19개 — team-core, pipelines, cross-validation, lead-reasoning, system-reminders ...
+├── modules/         20개 — team-core, pipelines, cross-validation, lead-reasoning, system-reminders ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
 ├── guides/          7개 — prompt-optimization, skill-authoring, harness-engineering ...
-└── templates/       스킬/에이전트 생성 템플릿
+├── codex-skills/    8개 — Codex 네이티브 스킬 (fz-reviewer, fz-architect ...)
+├── scripts/         설치/설정 스크립트 (setup-codex-skills.sh)
+└── templates/       스킬/에이전트/CLAUDE.md 생성 템플릿
 ```
 
 ### 오케스트레이션 플로우
@@ -212,6 +214,6 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v3.2** (2026-04-05) — Lead Implication Gate + Harness Engineering + System Reminders + Evaluator Tuning
+**현재 버전: v3.2.1** (2026-04-05) — Dependency Decoupling (로컬 경로/iOS 의존성 제거)
 
 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md)

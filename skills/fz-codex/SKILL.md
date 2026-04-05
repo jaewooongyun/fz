@@ -460,7 +460,7 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | CLAUDE.md 미발견 | `../CLAUDE.md` → `CLAUDE.md` → `find .. -maxdepth 2` | 경고 후 계속 |
-| Guidelines 미발견 | `AI/` → `../app-iOS/AI/` 시도 | 일반 규칙 적용 |
+| Guidelines 미발견 | CLAUDE.md `## Code Conventions` 참조 | 일반 규칙 적용 |
 | Plugin 명령 실패 | CLI 자동 폴백 (`codex exec`) | 경고 없이 진행 |
 | Codex CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:analyze 단독 |
 | `codex exec review` 실패 | `codex exec` + diff 인라인 | 수동 분석 |

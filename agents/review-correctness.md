@@ -14,7 +14,7 @@ Verifies that the implementation matches the stated requirements and plan.
 
 - **Primary**: Serena (`find_symbol`, `get_symbols_overview` — 심볼 구조 확인)
 - **Fallback**: Read, Grep, Glob
-- **사용 불가**: context7, XcodeBuildMCP, Bash → Lead에게 위임
+- **사용 불가**: context7, 빌드 MCP 도구, Bash → Lead에게 위임
 
 ## Analysis Perspectives
 

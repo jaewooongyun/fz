@@ -56,6 +56,16 @@ agents/technical-writer.md
 # Templates
 !templates/
 !templates/*.md
+!templates/*.template
+
+# Codex Skills (repo 포함본 — setup-codex-skills.sh로 심볼릭 링크)
+!codex-skills/
+!codex-skills/*/
+!codex-skills/**
+
+# Scripts
+!scripts/
+!scripts/*.sh
 
 # Repo files
 !.gitignore

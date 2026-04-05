@@ -19,7 +19,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - **Primary**: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`)
 - **Secondary**: context7 (`query-docs` — API 문서, 라이브러리 호환성 확인)
 - **Fallback**: Read, Grep, Glob
-- **사용 불가**: XcodeBuildMCP, Bash → Lead에게 위임
+- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임
 
 ## Analysis Perspectives
 
@@ -32,14 +32,15 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - 컴포넌트 역할 분리가 CLAUDE.md 기준을 따르는가
 - 상세 원칙: `guides/clean-architecture.md` 참조
 
-### 2. SwiftUI Architecture
-- `swiftui-expert` 플러그인 참조: View-ViewModel 분리, state 관리 패턴이 RIBs 아키텍처와 정합하는지
-- iOS 16 최소 타겟 제약 준수 (CLAUDE.md `## Plugins` 참조)
+### 2. UI Framework Architecture (CLAUDE.md에 UI 프레임워크 명시 시)
+- CLAUDE.md `## Plugins` 참조: UI 프레임워크별 플러그인 기준으로 state 관리 패턴 검증
+- 최소 타겟 제약 준수 (CLAUDE.md `## Plugins` 참조)
+- SwiftUI 프로젝트: `swiftui-expert` 플러그인, View-ViewModel 분리, RIBs 정합성
 
 ### 3. Extensibility
 
 - 프로토콜(인터페이스) 기반 추상화 적절성
-- 구체 타입 직접 참조 여부 — 이 프로젝트의 RIBs 레이어 규칙 위반 여부
+- 구체 타입 직접 참조 여부 — CLAUDE.md `## Architecture`의 레이어 규칙 위반 여부
 
 ### 4. Refactoring Completeness (리팩토링 커밋에만 적용)
 
@@ -47,8 +48,8 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 ### 5. State Lifecycle Alignment
 
-- 상태 저장 메커니즘(UserDefaults/Keychain/CoreData)이 컴포넌트 라이프사이클에 비해 과도하지 않은가?
-- RIBs Interactor가 살아있는 동안 유지되는 상태를 영속 저장소에 중복 저장하고 있지 않은가?
+- 상태 저장 메커니즘(UserDefaults/Keychain/CoreData 등)이 컴포넌트 라이프사이클에 비해 과도하지 않은가?
+- 컴포넌트가 살아있는 동안 유지되는 상태를 영속 저장소에 중복 저장하고 있지 않은가? (RIBs: Interactor 라이프사이클 기준)
 - A/B 테스트 등 외부 시스템(Hackle, Firebase RC 등)이 관리하는 값을 앱 로컬에 캐싱하면 실험 왜곡
 - 판단 기준: "앱 재시작 후에도 이 값이 반드시 유지되어야 하는가?" — NO면 인메모리(Subject/State)로 충분
 
@@ -90,6 +91,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 ## Library Semantics (이슈 판정 전 확인)
 
 이슈를 MAJOR/MINOR로 판정하기 전에 아래 시맨틱을 먼저 확인한다. 판단 없이 패턴만 보면 false positive가 된다.
+> 아래 라이브러리별 시맨틱은 코드베이스에서 해당 라이브러리 사용이 감지될 때만 적용.
 
 - **RxSwift `subscribe(onError:)` 누락**: 업스트림 함수가 `async`(non-throws)이고 내부에서 `try?`로 에러를 흡수하면 Single은 error emit 불가 → onError 누락이 regression이 아님
 - **RxSwift `subscribe(with:)`**: self를 약하게 캡처하고 클로저 실행 동안만 owner를 강하게 참조. retain cycle 아님. Task { await owner... }는 Task 완료까지 owner를 강하게 보유하지만, 해제 지연이 있을 뿐 lifecycle 위반은 아님

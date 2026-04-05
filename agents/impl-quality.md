@@ -35,10 +35,10 @@ in real time, providing feedback directly to `impl-correctness`.
 - 새 패턴 도입 시 기존 패턴과의 충돌 여부 확인
 - `search_for_pattern`으로 동일 패턴 사용 사례 확인
 
-### SwiftUI / Concurrency Quality
-- SwiftUI: `swiftui-expert` 플러그인 기준으로 state 관리 패턴 검증 (iOS 16 기본: `ObservableObject`+`@StateObject`)
-- Concurrency: `swift-concurrency` 플러그인 기준으로 actor isolation, Sendable 검증
-- iOS 17+ API (`@Observable`, `@Bindable`, `.onChange(of:){old,new}`) 사용 시 `#available` 가드 확인
+### UI Framework / Concurrency Quality (CLAUDE.md `## Plugins`에 명시된 플러그인 기준)
+- UI 프레임워크: CLAUDE.md `## Plugins`의 플러그인 기준으로 state 관리 패턴 검증
+- Concurrency: `swift-concurrency` 플러그인 기준으로 actor isolation, Sendable 검증 (해당 시)
+- 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md `## Plugins` 참조)
 
 ### Complexity Warning
 - 단일 심볼의 과도한 책임 감지

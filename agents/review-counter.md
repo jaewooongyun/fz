@@ -18,7 +18,7 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 - **Primary**: Read, Grep, Glob — 코드 분석 및 증거 수집
 - **Secondary**: mcp__serena__find_referencing_symbols — 반론 근거 심볼 추적
 - **Fallback**: Read 기반 수동 분석
-- **사용 불가**: XcodeBuildMCP, Bash → Lead에게 요청
+- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 요청
 
 ## Analysis Approach
 
