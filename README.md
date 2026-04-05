@@ -1,85 +1,100 @@
 # fz
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) 기반 AI 개발 워크플로우 오케스트레이션 시스템.
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) 플러그인 — AI 개발 워크플로우 오케스트레이션 시스템.
 
 자연어 요청 → 복잡도 평가 → 스킬 파이프라인 자동 구성 → 멀티 에이전트 팀 편성 → 실행.
 
 ---
 
-## Installation
+## 설치
 
 ### 1. 사전 요구사항
 
-```bash
-# Claude Code (필수)
-npm install -g @anthropic-ai/claude-code
-
-# Serena MCP (필수 — LSP + Memory)
-# Claude Code settings.json에 MCP 서버로 등록
-# https://github.com/AbanteAI/serena
-```
-
-### 2. fz 설치 (플러그인)
-
-```bash
-# fz marketplace 등록 + 플러그인 설치
-claude plugin marketplace add github:jaewooongyun/fz
-claude plugin install fz
-
-# Codex 네이티브 스킬 심볼릭 링크 (Codex CLI 사용 시)
-# 플러그인 설치 경로에서 스크립트 실행
-bash ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/setup-codex-skills.sh
-```
-
-<details>
-<summary>수동 설치 (git clone)</summary>
-
-```bash
-git clone https://github.com/jaewooongyun/fz.git ~/dev/fz-plugin
-claude --plugin-dir ~/dev/fz-plugin
-bash ~/dev/fz-plugin/scripts/setup-codex-skills.sh
-```
-</details>
-
-### 3. 프로젝트 CLAUDE.md 설정
-
-프로젝트 루트에 `CLAUDE.md`를 작성합니다. fz의 모든 스킬/에이전트가 이 파일을 참조합니다.
-
-```bash
-# fz 플러그인 디렉토리의 templates/CLAUDE.md.template을 복사 후 수정
-# 플러그인 설치 시: ~/.claude/plugins/cache/fz-orchestrator/fz/*/templates/
-# 수동 설치 시: ~/dev/fz-plugin/templates/
-cp <fz-plugin-dir>/templates/CLAUDE.md.template ./CLAUDE.md
-```
-
-필수 섹션: `## Architecture`, `## Build`, `## Code Conventions`
-선택 섹션: `## Git Workflow`, `## Plugins`, `## External Models`
-
-### 4. 권장 MCP 서버 (선택)
-
-| MCP 서버 | 용도 | 설치 |
-|----------|------|------|
-| **Serena** | LSP + Memory (필수) | [GitHub](https://github.com/AbanteAI/serena) |
-| **Context7** | 라이브러리 문서 조회 | [GitHub](https://github.com/upstash/context7) |
-| **Sequential Thinking** | 복잡한 추론 | Claude Code 내장 또는 MCP 등록 |
-| **Codex CLI** | GPT 교차 검증 | `npm install -g @openai/codex` |
-| **SuperClaude** | sc: 명령어 체계 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
+| 도구 | 필수 | 설치 |
+|------|:---:|------|
+| **Claude Code** | O | `npm install -g @anthropic-ai/claude-code` |
+| **Serena MCP** | O | [GitHub](https://github.com/AbanteAI/serena) — settings.json에 MCP 등록 |
+| Context7 | 권장 | [GitHub](https://github.com/upstash/context7) — 라이브러리 문서 조회 |
+| Codex CLI | 권장 | `npm install -g @openai/codex` — GPT 교차 검증 |
+| SuperClaude | 선택 | [GitHub](https://github.com/JeongJaeSoon/superclaude) — sc: 명령어 |
 
 프로젝트별 추가:
-- iOS: XcodeBuildMCP, SwiftUI Expert, Swift Concurrency
-- Web: 해당 없음 (기본 구성으로 충분)
+- **iOS**: XcodeBuildMCP, SwiftUI Expert 플러그인, Swift Concurrency 플러그인
+- **Web**: 기본 구성으로 충분
 
-### 5. 설치 확인
+### 2. fz 플러그인 설치
 
 ```bash
-# Claude Code에서 fz 스킬 로드 확인
+# 마켓플레이스 등록 (최초 1회)
+claude plugin marketplace add jaewooongyun/fz
+
+# 플러그인 설치
+claude plugin install fz
+```
+
+### 3. 설치 확인
+
+```bash
 claude
 > /fz "안녕"   # → fz 오케스트레이터가 응답하면 정상
 ```
 
+### 4. 프로젝트 CLAUDE.md 설정
+
+프로젝트 루트에 `CLAUDE.md`를 작성합니다. fz의 모든 스킬/에이전트가 이 파일을 참조합니다.
+
+필수 섹션: `## Architecture`, `## Build`, `## Code Conventions`
+선택 섹션: `## Git Workflow`, `## Plugins`, `## External Models`
+
+> 템플릿: `templates/CLAUDE.md.template` 참조
+
+### 5. Codex 네이티브 스킬 (선택 — Codex CLI 사용 시)
+
+```bash
+bash ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/setup-codex-skills.sh
+```
+
 ---
 
-## Quick Start
+## 업데이트
+
+```bash
+claude plugin update fz@fz-orchestrator
+```
+
+> 업데이트가 안 되면 마켓플레이스 캐시를 갱신:
+> ```bash
+> claude plugin marketplace remove fz-orchestrator
+> claude plugin marketplace add jaewooongyun/fz
+> claude plugin install fz
+> ```
+
+---
+
+## 개발 (fz 자체를 수정할 때)
+
+```bash
+# 소스코드 클론
+git clone https://github.com/jaewooongyun/fz.git ~/dev/fz-plugin
+
+# 로컬 개발 모드로 실행 (수정 즉시 반영)
+claude --plugin-dir ~/dev/fz-plugin
+
+# alias 설정 (선택)
+echo 'alias cfz="claude --plugin-dir ~/dev/fz-plugin"' >> ~/.zshrc
+```
+
+### 릴리즈
+
+1. `plugin.json` + `marketplace.json` **version bump** (필수)
+2. `git commit` + `git push`
+3. `git tag vX.Y.Z` + `git push --tags`
+
+> version bump 누락 시 `plugin update`가 "already at latest"로 스킵됨.
+
+---
+
+## 사용법
 
 ### /fz 오케스트레이터 (자연어 → 자동 파이프라인)
 
@@ -116,14 +131,16 @@ claude
 ## Architecture
 
 ```
-fz-plugin/ (or installed plugin cache)
+fz-plugin/
+├── .claude-plugin/  plugin.json + marketplace.json
 ├── skills/          21개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
-├── agents/          14개 — plan-structure, impl-correctness, review-arch ...
-├── modules/         20개 — team-core, pipelines, cross-validation, lead-reasoning, system-reminders ...
+├── agents/          13개 — plan-structure, impl-correctness, review-arch ...
+├── modules/         20개 — team-core, pipelines, cross-validation ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
-├── guides/          7개 — prompt-optimization, skill-authoring, harness-engineering ...
+├── guides/          7개 — prompt-optimization, skill-authoring ...
 ├── codex-skills/    8개 — Codex 네이티브 스킬 (fz-reviewer, fz-architect ...)
-├── scripts/         설치/설정 스크립트 (setup-codex-skills.sh)
+├── schemas/         5개 — Codex JSON 응답 스키마
+├── scripts/         setup-codex-skills.sh
 └── templates/       스킬/에이전트/CLAUDE.md 생성 템플릿
 ```
 
@@ -165,13 +182,13 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
 | **개발** | `/fz-plan` | 요구사항 분석 + 영향 범위 + RTM |
 | | `/fz-code` | 계획 기반 점진적 구현 + 빌드 검증 |
 | | `/fz-fix` | 버그 수정 (4-Phase 디버깅) |
-| | `/fz-review` | 3중 검증 (Claude + Codex + sc:analyze) + L3 에이전트 |
+| | `/fz-review` | 3중 검증 (Claude + Codex + sc:analyze) |
 | | `/fz-commit`, `/fz-pr` | 커밋 + Fork 기반 PR |
-| **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 (결론 없이 plan에 전달) |
-| | `/fz-search` | 코드 탐색 (symbolic + pattern 이중 경로) |
+| **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
+| | `/fz-search` | 코드 탐색 (symbolic + pattern) |
 | **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.4) |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점) |
-| **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage` | 문서, 메모리, 스킬 관리, 생태계 점검 |
+| **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage` | 문서, 메모리, 스킬 관리 |
 | **보조** | `/fz-new-file`, `/fz-excalidraw`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 다이어그램, 회의록, PR 요약 |
 
 ---
@@ -180,43 +197,17 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
 
 TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신**으로 협업.
 
-| 도메인 | Primary (Opus 승격) | Supporting (Sonnet) |
+| 도메인 | Primary (Opus) | Supporting (Sonnet) |
 |--------|:---:|---|
 | **계획** | plan-structure | plan-impact, plan-edge-case, review-arch, review-direction |
 | **구현** | impl-correctness | review-arch, impl-quality, review-correctness |
-| **버그수정** | impl-correctness | review-arch (복잡도3+) |
-| **리뷰** | review-arch | review-quality, review-correctness(Phase4.5), review-counter |
+| **리뷰** | review-arch | review-quality, review-correctness, review-counter |
 | **탐색** | — | search-symbolic, search-pattern |
 | **공통** | — | memory-curator (모든 TEAM 참여) |
 
-### 통신 패턴 (5가지)
-
-| 패턴 | 스킬 | 핵심 |
-|------|------|------|
-| **Adversarial** | fz-discover | 경로 생성 ↔ 비용/리스크 탐색 |
-| **Collaborative** | fz-plan | 6-Agent 병렬 분석 + CC 교차 |
-| **Pair Programming** | fz-code | 구현 중 실시간 아키텍처 질문 |
-| **Live Review** | fz-review | 다른 렌즈로 동시 분석 + L3 연쇄 |
-| **Cross-Verify** | fz-search | symbolic ↔ pattern 교차 검증 |
-
 ---
 
-## 검증 게이트
-
-```
-계획 전          계획 후           구현 중           구현 후           출하 전
-──┼──────────────┼────────────────┼────────────────┼───────────────┼──
-  │              │                │                │               │
-  direction      stress-test      friction         build           codex
-  challenge      Q1-Q6            detect           implication     Reflection
-  (방향 도전)     (설계 스트레스)    (마찰 감지)       -scan           Rate ≥80%
-                                                   enforcement
-                                                   L3 에이전트
-```
-
----
-
-## 파이프라인 (주요)
+## Pipelines (주요)
 
 | 파이프라인 | 트리거 | 체인 |
 |-----------|-------|------|
@@ -226,63 +217,8 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 | **code-to-review** | "구현하고 리뷰" | fz-code → build → fz-review |
 | **review-to-ship** | "리뷰하고 커밋" | fz-review → fz-commit |
 | **full-cycle** | "처음부터 끝까지" | fz-plan → fz-code → fz-review → fz-commit |
-| **discover** | "어떻게 구현할까?" | fz-discover → fz-plan |
 
-전체 19개 파이프라인: `modules/pipelines.md`
-
----
-
-## 실행 모드
-
-| | SOLO | TEAM |
-|---|------|------|
-| **판단** | 복잡도 0-3 | 복잡도 4+ |
-| **실행** | Lead(Opus) 단독 | Lead(O) + ★Primary(O) + N×Sonnet |
-| **통신** | 순차 실행 | 2.5-Turn Peer-to-Peer |
-| **검증** | 선택적 | Codex 필수 + Reflection Rate ≥80% |
-
-| 확장 모드 | 트리거 | 설명 |
-|----------|-------|------|
-| **BATCH** | `--batch` / 독립 3개+ | worktree 격리 병렬 + merge 후 빌드 gate |
-| **LOOP** | `--loop` / Gate 반복 | 자동 반복 + 에스컬레이션 래더 |
-| **SIMPLIFY** | 함수3+ / 100줄+ / 빌드3실패 | 필수 gate + 설계 의도 보존 |
-
----
-
-## 품질 보장 체계
-
-| 체계 | 설명 |
-|------|------|
-| **RTM** | plan→code→review 요구사항 ID 추적 (`modules/rtm.md`) |
-| **Implication Scan** | 제거/리팩토링 시 의미론적 완결성 검사 (`modules/lead-reasoning.md`) |
-| **System Reminders** | Instruction fade-out 대응 트리거 기반 리마인더 (`modules/system-reminders.md`) |
-| **Scope Expansion** | discover 시야 제한 4겹 방어 |
-| **L3 에이전트** | silent-failure-hunter + type-design-analyzer review 보강 |
-| **Evaluator Tuning** | 피드백 검증 프로토콜 4단계 — 과적합 방지 (preference 학습 금지) |
-| **Harness Ablation** | 분기별 Gate 기여도 측정 → 불필요 컴포넌트 식별 |
-| **Sycophancy 방어** | Round 1 독립 → Round 2 피드백 → Round 0.5 합의/불합의 |
-
----
-
-## 메모리 시스템
-
-| 계층 | 저장소 | 용도 |
-|------|--------|------|
-| **L1** | `~/.claude/projects/*/memory/` | 프로젝트별 교훈, 패턴 |
-| **L2** | Serena Memory (`fz:*` 키) | 세션 상태, 체크포인트 |
-| **L3** | ASD 폴더 (파일) | 장기 작업 산출물, compact 복원 |
-
----
-
-## 외부 의존성
-
-> 설치 방법: [Installation](#installation) 참조
-
-| 구분 | 도구 |
-|------|------|
-| **필수** | Claude Code + Serena MCP |
-| **권장** | + Context7 + Codex CLI + SuperClaude |
-| **iOS** | + XcodeBuildMCP + SwiftUI Expert + Swift Concurrency |
+전체 19개: `modules/pipelines.md`
 
 ---
 
@@ -291,17 +227,20 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 | 가이드 | 설명 |
 |--------|------|
 | **prompt-optimization.md** | 10대 프롬프트 원칙 + Context Rot 대응 |
-| **skill-authoring.md** | 스킬 작성 (YAML, Progressive Disclosure, 500줄 제한) |
-| **skill-testing.md** | 3단계 테스트 (Triggering, Functional, Performance) |
-| **skill-troubleshooting.md** | 트리거 문제, MCP 에러, TEAM 위반 진단 |
+| **skill-authoring.md** | 스킬 작성법 (YAML, Progressive Disclosure, 500줄 제한) |
 | **agent-team-guide.md** | 에이전트 팀 (2.5-Turn, Task Brief, 모델 전략) |
-| **clean-architecture.md** | Dependency Rule, SOLID, Uncle Bob's Decision Rules |
-| **harness-engineering.md** | AI 에이전트 하네스 설계 (Anthropic 공식 + NLAH 논문 기반, 1035줄) |
+| **clean-architecture.md** | Dependency Rule, SOLID |
+| **harness-engineering.md** | AI 에이전트 하네스 설계 (1035줄) |
 
 ---
 
 ## Changelog
 
-**현재 버전: v3.2.2** (2026-04-05) — Agent Role Optimization (책임 재분배 + 팀 구성 강화)
+**현재 버전: v3.3.1** (2026-04-05)
+
+- v3.3.1 — 스킬 description 한글화
+- v3.3.0 — Claude Code 플러그인 전환
+- v3.2.2 — Agent Role Optimization
+- v3.2.1 — Dependency Decoupling
 
 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md)
