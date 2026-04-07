@@ -11,7 +11,9 @@ ${WORK_DIR}/evidence/
 ├── old-new-pairs.md         — 변경 함수의 before/after 코드
 ├── producer-consumer.md     — enum/struct의 생성-소비 매핑
 ├── deletion-verification.md — 삭제 심볼의 잔존 참조 확인
-└── base-patterns.md         — regression 판정용 base 코드 패턴
+├── base-patterns.md         — regression 판정용 base 코드 패턴
+├── caller-analysis.md       — 신규/변경 init의 호출자 코드 + 참조 타입
+└── convention-samples.md    — 프로젝트 내 동일 패턴 샘플 (convention 판정)
 ```
 
 ## 수집 절차
@@ -70,6 +72,58 @@ Count == 0이면 "✅ 완전 제거", > 0이면 "⚠️ 잔존 {N}건"
 
 | Pattern | Base Code (file:line) | PR Code (file:line) | Same? |
 |---------|---------------------|--------------------|----|
+
+### e. Caller Analysis → `evidence/caller-analysis.md`
+
+> PR #3646 교훈: EpisodeUseCase init 선언만 보고 "올바른 패턴" 판정. 실제 caller(ViewModel)가
+> `DefaultEpisodeUseCase(repository: DefaultEpisodeRepository())` full chain을 하드코딩하는 것을 3개 모델 모두 놓침.
+
+PR에서 새로 생성/변경된 init, protocol, public API의 **호출자 코드**를 수집한다.
+에이전트는 "선언이 올바른가"만 판단하므로, "사용처에서 어떤 타입을 알아야 하는가"를
+Orchestrator가 사전에 제공해야 한다.
+
+대상:
+- 새로 추가된 init/factory (UseCase, Repository, ViewModel, Builder)
+- protocol 시그니처 변경
+- public/internal API 시그니처 변경
+
+수집:
+1. diff에서 신규/변경 init 식별 (함수 시그니처 추출)
+2. `git grep "TypeName(" pr-{PR} -- '*.swift'` → 호출자 파일:라인
+3. 각 호출자의 해당 라인 ±5줄 추출 (default param이 있으면 호출자의 default 값도 포함)
+4. 호출자가 참조하는 concrete 타입 목록 추출
+
+형식:
+
+| Declaration (file:line) | Caller (file:line) | Caller Layer | Types Caller Must Know |
+|------------------------|-------------------|-------------|----------------------|
+
+### f. Convention Sampling → `evidence/convention-samples.md`
+
+> PR #3646 교훈: 3/3 모델이 "UseCase default param = DIP 위반"을 major로 판정.
+> 실제: AppComponent, Event/Notice/Favorites Builder 등 프로젝트 전체에 같은 패턴.
+
+PR의 핵심 패턴과 **같은 패턴의 다른 모듈** 코드를 수집한다.
+"교과서적으로 틀렸다"보다 "이 프로젝트에서 어떻게 하고 있는가"가 리뷰의 기준이다.
+
+대상 (diff에서 식별, 최대 3개):
+- UseCase/Repository init 패턴 (default param 유무)
+- Builder/Component DI 패턴
+- 데이터 변환 위치 (Repository vs Interactor vs DTO.toEntity())
+- 에러 처리 패턴 (try? vs do-catch vs Result)
+
+수집:
+1. PR의 핵심 아키텍처 패턴 식별 (max 3)
+2. 각 패턴에 대해 Grep → 같은 프로젝트의 다른 모듈에서 동일 패턴 2-3개 수집
+3. 패턴 일관성 판정:
+   - 3+ 모듈이 동일 → "Convention" (에이전트에 전달)
+   - 1-2 모듈만 → "Minority"
+   - 0 모듈 → "Novel"
+
+형식:
+
+| Pattern | PR Code | Module A | Module B | Module C | Convention? |
+|---------|---------|----------|----------|----------|------------|
 
 ---
 
