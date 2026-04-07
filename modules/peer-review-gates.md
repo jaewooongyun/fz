@@ -263,6 +263,50 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
 
 ---
 
+## Gate 4.9: Call-site & Convention Verification
+
+> 사내 앱 PR 교훈: 3/3 모델이 "UseCase default param이 DIP 위반"을 major로 판정.
+> 실제: (1) AppComponent가 이미 같은 패턴 사용 (convention), (2) default 없는 UseCase의
+> caller(ViewModel)가 오히려 더 많은 concrete 타입을 참조 (역방향 문제).
+> 선언부 분석만으로는 실제 영향을 알 수 없다.
+
+**대상**: INCLUDE 이슈 중 init/DI/API 설계 관련 전체
+
+**처리 절차**:
+```
+1. evidence/caller-analysis.md에서 해당 이슈의 caller 코드 확인:
+   ├─ 이슈가 "X를 수정하라"고 제안 → 수정 후 caller가 더 많은 타입을 알아야 함?
+   │   YES → 역효과 (confidence -30 + "[caller 역효과]" 태그)
+   │   NO → 통과
+   └─ caller 데이터 없음 → Orchestrator가 즉석 수집 후 판단
+
+2. evidence/convention-samples.md에서 동일 패턴 확인:
+   ├─ Convention (3+ 모듈) → severity cap: suggestion + "[프로젝트 convention]"
+   ├─ Minority (1-2 모듈) → confidence 유지
+   └─ Novel (0 모듈) → confidence 유지
+
+3. 복합 판정:
+   ├─ caller 역효과 + convention → EXCLUDE (이슈 DROP)
+   ├─ caller 역효과만 → confidence -30
+   ├─ convention만 → severity cap: suggestion
+   └─ 둘 다 아님 → INCLUDE 유지
+```
+
+**Few-shot**:
+```
+BAD (Gate 4.9 미적용):
+  "UseCase default param 제거하라" (major) → 그대로 리포트에 포함
+  실제: 프로젝트 convention + 제거 시 caller(ViewModel)가 Repository까지 참조
+
+GOOD (Gate 4.9 적용):
+  Step 1: caller-analysis → ViewModel이 full chain 참조 발견 → 역효과
+  Step 2: convention-samples → AppComponent, Builder 3곳에 동일 패턴 → Convention
+  결과: EXCLUDE (caller 역효과 + convention)
+  대안 발견: "오히려 누락된 UseCase에 default 추가" (caller 개선 방향)
+```
+
+---
+
 ## Checkpoint (Gates 완료 후)
 
 게이트 실행 완료 후 반드시 파일로 저장:
