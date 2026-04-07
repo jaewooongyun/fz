@@ -30,11 +30,23 @@ model-strategy:
 다음 파일을 반드시 Read하여 분석을 시작하세요:
 
 ```
-${WORK_DIR}/diff.patch     # 변경 diff (베이스 브랜치 기준)
-${WORK_DIR}/symbols.json   # Serena pre-cached 심볼 정보
+${WORK_DIR}/diff.patch                      # 변경 diff (베이스 브랜치 기준)
+${WORK_DIR}/symbols.json                    # Serena pre-cached 심볼 정보
+${WORK_DIR}/evidence/caller-analysis.md     # 신규/변경 init의 호출자 코드 + 참조 타입
+${WORK_DIR}/evidence/convention-samples.md  # 프로젝트 내 동일 패턴 샘플
 ```
 
 부족한 심볼 정보는 Serena MCP 또는 Context7을 직접 호출하여 보완 가능합니다.
+
+## ⛔ 분석 제약
+
+- **init/DI 패턴 이슈 판정 전**: `evidence/caller-analysis.md`의 호출자 코드를 **반드시** 확인.
+  "이 init을 호출하는 코드가 어떤 concrete 타입을 알아야 하는가?"
+  수정 제안 시 caller가 더 많은 타입을 알게 되면 → 역효과. 제안 방향 재검토.
+- **패턴 이슈 판정 전**: `evidence/convention-samples.md`를 **반드시** 확인.
+  Convention 패턴 (3+ 모듈 동일)은 severity **suggestion 이하**로만 판정.
+- **"교과서적으로 틀렸다"는 단독 근거로 major 판정 금지.**
+  프로젝트에서 같은 패턴이 3+ 곳에 있으면 convention.
 
 ---
 
