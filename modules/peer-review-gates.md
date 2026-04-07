@@ -1,7 +1,65 @@
 # Peer Review Verification Gates
 
-Synthesize 단계에서 실행하는 5가지 검증 게이트.
-4.5 → 4.6 → 4.7 → 4.7-A → 4.8 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
+Synthesize 단계에서 실행하는 6가지 검증 게이트.
+4.4 → 4.5 → 4.6 → 4.7 → 4.7-A (+ Origin Verification) → 4.8 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
+
+> Gate 4.4 (Factual Claim Verification)는 사내 앱 PR에서 발견된 3건의 오탐을 방지하기 위해 추가.
+> 에이전트의 사실적 주장(existence/source/behavior/origin)을 Orchestrator가 기계적으로 검증한다.
+
+---
+
+## Gate 4.4: Factual Claim Verification (Major+ 이슈)
+
+> **핵심 원칙**: 에이전트의 "파일 X에 심볼 Y가 있다/없다" 주장은 empirical fact이다.
+> Orchestrator가 git grep/git show로 기계적으로 확인한다. 에이전트 합의(3/3)는 사실을 보장하지 않는다.
+>
+> 사내 앱 PR 교훈 3건:
+> - Sonnet "ChromecastManager.swift (L365)에서 BDCustomAlertView 호출" 주장 → git grep 결과 0건 (환각)
+> - 2/3 모델 "서버 제공 타이틀 무시" 주장 → throw site 확인 시 클라이언트 하드코딩 (부분 코드 읽기)
+> - 3/3 모델 "새로운 continuation hang 위험" 주장 → base 코드에도 동일 패턴 (origin 오판)
+
+**대상**: INCLUDE 이슈 중 severity **Major 이상** 전체. Minor는 선택적.
+
+**처리 절차**:
+```
+1. 이슈의 핵심 주장(claim) 추출 + 유형 분류:
+
+   | 주장 유형 | 예시 | 검증 방법 |
+   |----------|------|----------|
+   | Existence | "파일 X에 심볼 Y가 잔존" | git grep {Y} pr-{PR} -- '*.swift' '*.m' |
+   | Source | "이 값이 서버에서 온다" | git show pr-{PR}:{file} → 값 생성 site 확인 |
+   | Behavior | "새 코드에서 W 동작이 누락" | git show pr-{PR}:{file} + base:{file} → 비교 |
+   | Origin | "이것은 regression이다" | git show base:{file} → old 코드에 동일 패턴? |
+
+2. 주장 유형별 기계적 검증 (Orchestrator가 Bash로 직접 실행):
+
+   Existence Claim:
+     git grep {symbol} pr-{PR} -- '*.swift' '*.m' '*.h'
+     → 0건: 주장 반증 → EXCLUDE
+     → 1건+: 주장 확인 → INCLUDE 유지
+
+   Source Claim:
+     git show pr-{PR}:{file} | grep -A5 '{context}'
+     → evidence/producer-consumer.md와 대조
+     → 불일치: 주장 반증 → EXCLUDE
+
+   Behavior Claim:
+     git show base:{file} vs git show pr-{PR}:{file}
+     → evidence/old-new-pairs.md와 대조
+     → 동일 동작: 주장 반증 → severity 하향 or EXCLUDE
+
+   Origin Claim (regression 주장):
+     git show base:{file} | grep '{pattern}'
+     → base에도 동일 패턴 존재: origin을 pre-existing으로 재분류
+     → severity cap: suggestion
+
+3. 검증 결과 기록:
+   ├─ 주장 확인 → INCLUDE 유지, claim_verified: true
+   ├─ 주장 반증 → EXCLUDE, claim_verified: false, reason: {증거}
+   └─ 검증 불가 → confidence ceiling 65 + [검증 필요] 태그
+```
+
+**비용**: Major 이슈당 ~10초 (git grep/show 1-2회). 전체 리뷰에 30-60초 추가.
 
 ---
 
@@ -146,6 +204,30 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
 // 2. Grep 검색: git show pr-3473 전체에서 "getConnectState" 검색
 // 3. 발견: Sendbird대상 앱TalkChatUseCase.swift:57에 동일 guard
 // 4. 판정: relocated → 이슈 DROP
+```
+
+### Gate 4.7-A 확장: Origin Verification (모든 regression 이슈)
+
+> 사내 앱 PR 교훈: 3/3 모델이 "새로운 continuation hang 위험" → regression 판정(confidence 88).
+> 실제: base 코드의 `BDCustomAlertView.instantiateAlert()` guard에서도 동일한 continuation leak 패턴 존재.
+> base 코드와 비교하지 않고 새 코드만 분석하면 pre-existing 패턴을 regression으로 오판한다.
+
+**대상**: 기존 4.7-A 대상(삭제/누락) + **모든 regression 판정 이슈**
+
+**추가 절차** (기존 4.7-A 이후):
+```
+모든 origin: regression 이슈에 대해:
+1. evidence/base-patterns.md에서 해당 코드 패턴의 base 버전 확인
+2. evidence/old-new-pairs.md에서 old/new 코드 비교
+3. base에 동일/유사 취약점 패턴이 존재하면:
+   ├─ 동일 패턴 (코드 구조 같음) → origin: pre-existing, severity cap: suggestion
+   ├─ 유사 패턴 (다른 메커니즘 같은 효과) → origin 유지, "[base에도 유사 패턴]" 태그
+   └─ base에 없는 새 패턴 → origin: regression 확인 (severity 유지)
+4. confidence-matrix.md에 기록: origin_verified: true/false + base_evidence
+
+⛔ evidence 파일이 없으면 (Gather에서 미수집):
+  Orchestrator가 즉석에서 git show base:{file} 실행하여 확인.
+  "확인 불가" 상태로 INCLUDE하지 않는다.
 ```
 
 ---
