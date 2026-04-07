@@ -68,7 +68,8 @@ model-strategy:
 |------|------|
 | `modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
 | `modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
-| `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.5-4.8 전문 (4.7-A Deleted Logic Migration 포함) |
+| `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.8 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification 포함) |
+| `modules/evidence-collection.md` | Gather 2.6 Code Evidence Collection 수집 절차 상세 (a~d) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
@@ -147,9 +148,27 @@ PR title/body에서 JIRA 티켓 ID 추출 + acceptance criteria 수집. JIRA 연
 
 View 파일 변경 감지 시 리포트에 "UI 변경 감지 — 시뮬레이터 확인 권고" 삽입 + review-quality에 집중 지시.
 
+### 2.6. Code Evidence Collection → `${WORK_DIR}/evidence/`
+
+> 참조: `modules/evidence-collection.md` — 수집 절차 상세 (a~d)
+>
+> 에이전트는 Bash/git show 접근 불가. Orchestrator가 사전에 실제 코드를 수집하여 에이전트에게 데이터로 전달한다.
+
+```bash
+mkdir -p ${WORK_DIR}/evidence
+```
+
+| 수집 대상 | 산출물 | 목적 |
+|----------|--------|------|
+| 변경 함수 old/new 페어 | `evidence/old-new-pairs.md` | origin 판정 근거 |
+| Producer/Consumer 매핑 | `evidence/producer-consumer.md` | `_` destructuring, 값 출처 확인 |
+| 삭제 심볼 잔존 참조 | `evidence/deletion-verification.md` | compile break 주장 검증 |
+| base 코드 패턴 | `evidence/base-patterns.md` | regression vs pre-existing 판별 |
+
 ### 3. 원본 동작 수집 → `${WORK_DIR}/base-behavior.md`
 
 `git show ${BASE_BRANCH}:${FILE_PATH}`로 변경 함수의 원본 코드를 추출. 에이전트가 origin(regression/pre-existing/improvement)을 판정하는 근거로 사용.
+**⛔ 제네릭 설명이 아닌 실제 코드를 포함해야 한다.** 특히 enum throw site, factory method, DI 등 값의 생성 지점은 반드시 코드로 수집.
 
 ### 4. diff 크기별 모드 결정
 
@@ -164,15 +183,23 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degra
 
 ### Orchestrator Bias 방지 규칙
 
-에이전트에게 작업을 위임할 때 Orchestrator 자신의 사전 판단이나 가설을 절대 포함하지 않는다.
+에이전트에게 **가설이 아닌 데이터만** 전달한다. Orchestrator의 해석/추측은 에이전트의 독립성을 파괴한다.
+
+> PR #3639 교훈: "server-provided button titles" 가설 주입 → 2/3 에이전트가 사실로 수용 → 오탐. 실제: 클라이언트 하드코딩.
 
 ```
-금지: "ORCH-001: X가 누락된 것 같습니다. 이 관점으로 확인해주세요."
-금지: "핵심 이슈로 Y를 발견했습니다. 분석 시 참고하세요."
-허용: diff + symbols + base-behavior 파일만 전달. 에이전트가 독립 발견.
+⛔ 금지: "old code used server-provided titles" / "X가 누락된 것 같습니다"
+✅ 허용: "forceUpdate에서 _, _ destructuring. evidence/producer-consumer.md 참조"
 ```
 
-에이전트들이 동일한 가설을 공유하면 3/3 동의가 오히려 false confidence를 증폭시킨다 (homogeneous multi-agent failure). Orchestrator는 컨텍스트 데이터만 전달하고 판단은 에이전트에게 위임한다.
+**Evidence-Only Brief Template**:
+```
+[Goal] {관점}에서 독립 이슈 발굴
+[Data] diff.patch + evidence/(old-new-pairs|producer-consumer|deletion-verification|base-patterns).md + symbols.json + requirements.md + base-behavior.md
+[Constraints] 피어 참조 금지, max 10, origin 필수, 추론 아닌 코드 증거 기반만
+```
+
+**Self-Check**: 프롬프트에 "~인 것 같다" / 내 의견 / 사실 단정 포함 시 → 제거 후 데이터로 대체.
 
 ### ⛔ Gate 0: 팀 생성 필수 (Tier 2+)
 
@@ -337,18 +364,25 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 └─ 0/3: EXCLUDE
 ```
 
+### 3.5. Correlated Agreement Detection
+
+3/3 동의 이슈의 evidence_trace를 분류: 코드 인용 있으면 `CV`(code-verified), 추론만이면 `IO`(inference-only).
+- 3/3 + 전원 IO → `[correlated]` 태그 + Gate 4.4 강제 실행. 통과 못 하면 confidence cap 75.
+- 1개+ CV → 신뢰도 유지.
+
 ### 4. Confidence Matrix 출력
 
 ```markdown
-| # | Issue | Origin | Sev | Arch | Auditor | Codex | DA | Votes | Final | Decision |
-|---|-------|--------|-----|------|---------|-------|----|-------|-------|----------|
+| # | Issue | Origin | Sev | Arch | Auditor | Codex | DA | Votes | Basis | Final | Decision |
+|---|-------|--------|-----|------|---------|-------|----|-------|-------|-------|----------|
 ```
 
-> Origin 열 추가: `R`(regression), `P`(pre-existing), `I`(improvement). pre-existing은 severity가 suggestion으로 cap됨.
+> Origin 열: `R`(regression), `P`(pre-existing), `I`(improvement). pre-existing → severity cap: suggestion.
+> Basis 열: `CV`(code-verified), `IO`(inference-only). IO + 3/3 → [correlated] 태그.
 
-### 4.5-4.8. Verification Gates
+### 4.4-4.8. Verification Gates
 
-> 참조: `modules/peer-review-gates.md` — Line Verification (4.5) + Compiler-Verifiable (4.6) + Behavior-Verifiable (4.7) + Deleted Logic Migration (4.7-A) + RxSwift Error Path (4.8) 게이트 전문
+> 참조: `modules/peer-review-gates.md` — **Factual Claim Verification (4.4)** + Line Verification (4.5) + Compiler-Verifiable (4.6) + Behavior-Verifiable (4.7) + Deleted Logic Migration (4.7-A) + RxSwift Error Path (4.8) 게이트 전문
 >
 > 게이트 실행 전: `synthesized-issues-partial.json` 중간 저장 필수 (compact 방지)
 
