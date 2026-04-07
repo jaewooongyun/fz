@@ -68,8 +68,8 @@ model-strategy:
 |------|------|
 | `modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
 | `modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
-| `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.8 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification 포함) |
-| `modules/evidence-collection.md` | Gather 2.6 Code Evidence Collection 수집 절차 상세 (a~d) |
+| `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |
+| `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
@@ -164,6 +164,15 @@ mkdir -p ${WORK_DIR}/evidence
 | Producer/Consumer 매핑 | `evidence/producer-consumer.md` | `_` destructuring, 값 출처 확인 |
 | 삭제 심볼 잔존 참조 | `evidence/deletion-verification.md` | compile break 주장 검증 |
 | base 코드 패턴 | `evidence/base-patterns.md` | regression vs pre-existing 판별 |
+| 호출자 코드 | `evidence/caller-analysis.md` | init/DI의 실제 사용처 + 참조 타입 |
+| 프로젝트 convention 샘플 | `evidence/convention-samples.md` | 동일 패턴의 다른 모듈 (3+ = convention) |
+
+### 2.7-2.8. Caller Analysis + Convention Sampling
+
+> 참조: `modules/evidence-collection.md` — 섹션 e (Caller Analysis), 섹션 f (Convention Sampling)
+>
+> ⛔ init/DI 패턴 변경이 있는 PR에서 필수. "선언부만 보고 판단" 방지.
+> PR #3646 교훈: 선언이 깔끔해도 caller가 더러우면 의미 없다. convention 패턴을 위반으로 지적하면 안 된다.
 
 ### 3. 원본 동작 수집 → `${WORK_DIR}/base-behavior.md`
 
@@ -195,8 +204,12 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degra
 **Evidence-Only Brief Template**:
 ```
 [Goal] {관점}에서 독립 이슈 발굴
-[Data] diff.patch + evidence/(old-new-pairs|producer-consumer|deletion-verification|base-patterns).md + symbols.json + requirements.md + base-behavior.md
-[Constraints] 피어 참조 금지, max 10, origin 필수, 추론 아닌 코드 증거 기반만
+[Data] diff.patch + evidence/*.md + symbols.json + requirements.md + base-behavior.md
+[Constraints]
+- 피어 참조 금지, max 10, origin 필수, 추론 아닌 코드 증거 기반만
+- ⛔ init/DI 이슈 시: evidence/caller-analysis.md 필수 확인 — "호출자가 어떤 타입을 알아야 하는가?"
+- ⛔ 패턴 이슈 시: evidence/convention-samples.md 필수 확인 — "프로젝트 convention과 일치하는가?"
+- Convention 패턴(3+ 모듈 동일)을 위반으로 판정하지 않는다 (suggestion까지만 허용)
 ```
 
 **Self-Check**: 프롬프트에 "~인 것 같다" / 내 의견 / 사실 단정 포함 시 → 제거 후 데이터로 대체.
@@ -292,6 +305,23 @@ codex exec \
 └─ 최종 Confidence Matrix 업데이트
 ```
 
+### Cross-Critique Anti-Sycophancy Rule
+
+> PR #3646 교훈: Sonnet(QUAL-4)이 코드 증거 있는 정답을 제시했으나,
+> Opus(ARCH-1)의 "아키텍처 원칙상" 이론적 주장에 self-reverse. 유일하게 맞는 판단이 탈락.
+
+⛔ 코드 증거 없이 피어의 이론적 주장에 self-reverse 금지.
+
+- challenge/reverse 시 **코드 증거** (file:line + 실제 코드) 필수
+- 자신의 finding 철회는 피어가 **caller 코드 또는 convention 증거**를 제시한 경우에만
+- "아키텍처 원칙상 X" (이론) vs "호출 구조를 보면 Y" (실증) → 실증 우선
+
+```
+BAD: ARCH-1 "DIP 위반" → QUAL-4 "맞습니다, 철회합니다" (증거 없는 동조)
+GOOD: ARCH-1 "DIP 위반" → QUAL-4 "caller-analysis.md를 보면 default 없는 쪽이
+      오히려 ViewModel에서 더 많은 concrete 타입을 참조합니다" (증거 기반 보완)
+```
+
 ### Codex Devil's Advocate (공통, 1회 추가 호출)
 
 **DA 사전 검증**: 현재 브랜치 ≠ PR head이면 DA 프롬프트에 "diff 기준으로 작성" 경고 삽입. reverse 판정은 `git show pr-{PR}:{file}`로 교차 확인.
@@ -380,9 +410,9 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 > Origin 열: `R`(regression), `P`(pre-existing), `I`(improvement). pre-existing → severity cap: suggestion.
 > Basis 열: `CV`(code-verified), `IO`(inference-only). IO + 3/3 → [correlated] 태그.
 
-### 4.4-4.8. Verification Gates
+### 4.4-4.9. Verification Gates
 
-> 참조: `modules/peer-review-gates.md` — **Factual Claim Verification (4.4)** + Line Verification (4.5) + Compiler-Verifiable (4.6) + Behavior-Verifiable (4.7) + Deleted Logic Migration (4.7-A) + RxSwift Error Path (4.8) 게이트 전문
+> 참조: `modules/peer-review-gates.md` — Factual Claim (4.4) + Line (4.5) + Compiler (4.6) + Behavior (4.7) + Deleted Logic (4.7-A) + RxSwift Error Path (4.8) + **Call-site & Convention (4.9)** 게이트 전문
 >
 > 게이트 실행 전: `synthesized-issues-partial.json` 중간 저장 필수 (compact 방지)
 
