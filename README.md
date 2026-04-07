@@ -187,7 +187,7 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
 | **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.4) |
-| | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점) |
+| | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
 | **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage` | 문서, 메모리, 스킬 관리 |
 | **보조** | `/fz-new-file`, `/fz-excalidraw`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 다이어그램, 회의록, PR 요약 |
 
@@ -236,11 +236,12 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v3.3.1** (2026-04-05)
+**현재 버전: v3.4.0** (2026-04-07)
 
+- v3.4.0 — Peer Review 호출 구조 분석 + Convention 검증 (PR #3646 교훈 반영)
+- v3.3.2 — 플러그인 중심으로 README 전면 개편
 - v3.3.1 — 스킬 description 한글화
 - v3.3.0 — Claude Code 플러그인 전환
 - v3.2.2 — Agent Role Optimization
-- v3.2.1 — Dependency Decoupling
 
 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md)
