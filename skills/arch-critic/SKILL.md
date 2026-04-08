@@ -357,16 +357,18 @@ severity major 이상 아키텍처 이슈에 대안 비교표 필수 포함:
 
 ---
 
-## Per-Agent 제약
+## Per-Agent 품질 원칙
+
+시니어 엔지니어가 PR 코멘트로 달 만한 이슈만 보고한다. **이슈 0개도 유효한 결과다.**
+자체 confidence 80% 미만이면 보고하지 않는다. 이슈 수가 많으면 진짜 문제가 marginal finding에 묻힌다.
 
 | 항목 | 제한값 |
 |------|--------|
-| 최대 이슈 수 | 10개 (핵심 이슈 집중) |
 | description | 400자 이내 (WHY 필수) |
 | impact | major 이상 필수, minor 이하 null |
 | suggestion | 300자 이내 |
 | strengths | 최대 3개 |
-| 신뢰도 임계치 | confidence < 70 → 제외 |
+| 자체 신뢰도 임계치 | confidence < 80 → 보고하지 않음 |
 
 ## 판정 기준
 
