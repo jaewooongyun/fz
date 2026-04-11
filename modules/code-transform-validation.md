@@ -14,24 +14,45 @@
 
 ---
 
-## Transformation Spec
+## Transformation Spec (v3.8)
 
 Plan의 각 패턴 변환 Step에 작성. fz-code/fz-review가 참조.
+`spec-version` 필드 필수. v3.7 Spec(필드 없음)은 하위 호환 — 새 항목 검증 면제.
 
 ```markdown
 ### Transformation Spec
+spec-version: 3.8
 
-| 항목 | 원본 분석 | After 요구사항 |
-|------|----------|--------------|
-| 실행 스레드 | {원본 API의 스레드 특성} | {After 스레드 보장 방법} |
-| 에러 처리 | {원본 에러 분기 수 + 패턴} | {After 에러 보존 방법} |
-| 실행 보장 | {finally/ensure/defer 패턴} | {After 동등 패턴} |
-| 추상화 수준 | {원본 helper/struct/extension} | {After 추상화 — 줄 수 비교} |
-| 인스턴스 관리 | {원본 static/인스턴스 패턴} | {After 인스턴스 전략} |
-| 디코딩 경로 | {원본 응답 파싱 방법} | {After 디코딩 패턴} |
+| 항목 | 원본 분석 | After 요구사항 | 검증 |
+|------|----------|--------------|------|
+| 실행 스레드 | {원본 API의 스레드 특성} [verified: source] | {After 스레드 보장 방법} | Heavy |
+| 에러 처리 | {원본 에러 분기 수 + 패턴} [verified: source] | {After 에러 보존 방법} | Light |
+| 실행 보장 | {finally/ensure/defer 패턴} [verified: source] | {After 동등 패턴} | Light |
+| 추상화 수준 | {원본 helper/struct/extension} | {After 추상화 — 줄 수 비교} | Skip |
+| 인스턴스 관리 | {원본 static/인스턴스 패턴} | {After 인스턴스 전략} | Skip |
+| 디코딩 경로 | {원본 응답 파싱 방법} [verified: source] | {After 디코딩 패턴} | Light |
+| 요청 파라미터 | {원본 키 목록 + nil/omit 처리} [verified: source] | {After 키 동일 보존. nil → 키 제외} | Heavy |
 ```
 
+> `[verified: source]` 태그가 없는 기술적 주장은 **자동 unverified** (Default-Deny).
+> 참조: `modules/uncertainty-verification.md`
+
 ---
+
+## Zero-Exception Thread Rule (기본값)
+
+원본이 특정 스레드에서 실행되면 After도 동일 스레드.
+
+| 원본 스레드 | After 기본값 |
+|------------|------------|
+| `.done { }` (main queue) | `Task { @MainActor in }` |
+| `observe(on: MainScheduler)` | `@MainActor` |
+| `DispatchQueue.main.async` | `@MainActor` |
+| completion handler (main) | `@MainActor` |
+
+예외 허용: `modules/uncertainty-verification.md`의 Heavy 검증 3단계 충족 시만.
+
+> "thread-safe"는 예외 근거가 될 수 없다. mutation safety ≠ downstream observer 실행 스레드.
 
 ## 검증 체크리스트
 
@@ -42,30 +63,41 @@ Plan의 각 패턴 변환 Step에 작성. fz-code/fz-review가 참조.
 - [ ] 에러 분기가 원본과 1:1 매핑되는가?
 - [ ] After 줄 수가 Before의 2배 이상이면 추상화를 제안했는가?
 - [ ] 언어 런타임 제약을 확인했는가?
+- [ ] ⛔ 각 기술적 주장에 [verified: source] 태그가 있는가? (Default-Deny)
+- [ ] ⛔ 요청 파라미터 키 목록이 원본과 일치하는가? (omit ≠ default)
+- [ ] ⛔ "실행 스레드" 항목이 Zero-Exception 규칙을 준수하는가?
 ```
 
 ### fz-code (구현 시 — Behavioral Equivalence Check)
 
 ```
 Transformation Spec이 있는 Step 완료 후:
-1. Spec 로드
+1. Spec 로드 (spec-version 확인)
 2. 원본 코드 Read (git show 또는 Plan Before)
 3. 대조:
-   - Spec "실행 스레드" ↔ After Task/@MainActor
+   - Spec "실행 스레드" ↔ After @MainActor — Zero-Exception 기계적 확인
    - Spec "에러 처리" ↔ After catch 분기 수 + 패턴
    - Spec "추상화 수준" ↔ After 줄 수
-4. 불일치 → 마찰 보고 → 사용자 확인
+   - ⛔ Spec "요청 파라미터" ↔ After 파라미터 키 — 추가/삭제 0건 확인
+4. ⛔ [verified] 태그 확인 (fail-closed):
+   - Spec의 기술적 주장 중 [verified] 없는 항목 → 구현 전 검증 강제
+   - 검증 방법: uncertainty-verification.md의 Cost Tiers 참조
+5. 불일치 → 마찰 보고 → 사용자 확인
 ```
 
 ### fz-review (diff 검증 시 — 검증 4-K)
 
 ```
-1. Plan Transformation Spec 로드
+1. Plan Transformation Spec 로드 (spec-version 확인)
 2. diff 변환 ↔ Spec 대조:
    - 스레드: @MainActor 명시 → diff에 존재?
    - 에러: 분기 N개 → diff catch N개?
    - 추상화: extension 명시 → diff에 존재?
-3. 불일치 → "transformation_deviation" 이슈
+   - ⛔ 요청 파라미터: 원본 키 목록 → diff에 키 추가/삭제?
+3. ⛔ Zero-Exception Thread: main queue 변환에 @MainActor 누락 → "thread_violation" (Critical)
+4. ⛔ Parameter Presence: 원본 대비 키 추가 → "parameter_addition" (Major)
+5. ⛔ Default-Deny: "기술적 주장인데 [verified] 태그 없음" → violation
+6. 불일치 → "transformation_deviation" 이슈
 ```
 
 ---
@@ -102,6 +134,7 @@ Transformation Spec이 있는 Step 완료 후:
 | 스레드 컨텍스트 불일치 | Spec에 "@MainActor 필수" → 구현이 일반 Task | 원본 main queue 미보존 |
 | 에러 경로 축소 | 원본 catch 분기 N개 → After < N개. `== .case` 사용 | enum case 합침. 동작 변경 |
 | 퀄리티 역행 | After 줄 수 > Before 2배, 추상화 인라인 해체 | 리팩토링이 코드를 악화 |
+| 파라미터 키 불일치 | 원본 API에 없던 키 추가 또는 있던 키 제거. nil → default value 전송도 "추가"에 해당 | omit ≠ explicit default — 서버 동작 변경 가능 |
 
 ---
 

@@ -1,5 +1,44 @@
 # Changelog
 
+### v3.8.0 (2026-04-12) — Uncertainty-Aware Harness
+
+**핵심**: LLM이 모르는 것을 인정하고, 검증 도구로 확인하고, 실패에서 학습하는 하네스 시스템.
+근거: PR-D1 리뷰에서 Codex(GPT-5.4)가 Claude blind spot 2건 발견. Codex Adversarial 6건 반영.
+
+**신규 모듈: `modules/uncertainty-verification.md`**
+- Default-Deny: [verified: source] 태그 없는 기술적 주장은 자동 unverified
+- Verification Cost Tiers: Heavy(스레드/API계약) / Light(일반) / Skip(코드 확인)
+- Evidence Source Priority: 코드 > 테스트 > 공식 문서 > 훈련 데이터
+- Memory Feedback Loop: 검증 실패 → 교훈 기록 → 규칙 승격
+- Pilot-first: v3.8은 Transformation Spec 경로만. 효과 확인 후 확장
+
+**모듈 개선: `modules/code-transform-validation.md`**
+- Zero-Exception Thread Rule: 원본 main queue → After @MainActor 무조건 (기본값)
+- Transformation Spec v3.8: spec-version 필드 + 7번째 항목(요청 파라미터) + [verified] 태그
+- 마찰 신호 4번째: 파라미터 키 불일치 (omit ≠ explicit default)
+- BEC/4-K fail-closed: [verified] 없는 주장 → 구현 전 검증 강제
+
+**스킬 개선 (4개)**
+- fz-plan: Default-Deny [verified] 의무화 + Gate 1 체크리스트 3항목 (+7줄)
+- fz-code: BEC fail-closed + 파라미터 키 마찰 신호 (+5줄)
+- fz-review: 4-K enforcement + Gate 4 체크리스트 + Harness Metrics 보고 형식 (+22줄)
+- fz-fix: uncertainty-verification 모듈 참조 (+1줄)
+
+**Codex 스킬 개선 (2개)**
+- fz-reviewer: Zero-Exception + Default-Deny + Parameter Presence (+9줄)
+- fz-architect: 동일 규칙 요약 (+3줄)
+
+**모듈 개선: `modules/cross-validation.md`**
+- spec-verify: Codex가 Spec 기술적 정확성 검증 (TEAM 필수)
+- confident-error: cross-model 불일치 → 교훈 기록
+- default-deny enforcement: [verified] 없으면 fail-closed
+
+**Harness Metrics (신규)**
+- fz-review 완료 보고에 Gate별 이슈 수 기록 형식 추가
+- 분기별 ablation 분석의 전제 데이터 수집 인프라
+
+---
+
 ### v3.7.0 (2026-04-12) — Code Transformation Validation
 
 **신규 모듈: `modules/code-transform-validation.md`**

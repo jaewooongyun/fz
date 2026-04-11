@@ -139,6 +139,15 @@ diff에 PromiseKit→async/await, callback→async, RxSwift→Combine 등 패턴
 - After 줄 수 > Before 2배 → 추상화 부재 (protocol extension, convenience method 검토)
 - Repository 인스턴스: stored property 1회 생성 (매 호출마다 Default*Repository() 금지)
 
+### Zero-Exception Thread + Uncertainty Verification (v3.8)
+- **Zero-Exception**: 원본 main queue → After에 @MainActor 존재 확인. "thread-safe API" 예외 불허 (기본값)
+- 예외 주장 시: `[verified: {도구}]` 태그 + 3단계 Heavy 검증 확인
+- BehaviorRelay.accept()의 mutation lock ≠ subscriber 실행 스레드 — thread-safe ≠ thread-equivalent
+- **Default-Deny**: Spec의 기술적 주장에 `[verified]` 없으면 → 자동 unverified → violation 후보
+- **Parameter Presence**: 원본 API에 없던 파라미터 키가 After에 추가 → "parameter_addition" (omit ≠ default)
+- `[unverified]` 태그 주장이 있으면 → Context7 확인 권고
+- 검증 소스 우선순위: 코드 > 테스트 > 공식 문서 > 훈련 데이터
+
 ## Context Scope (1M Context — diff is insufficient)
 
 diff만 보는 것은 불충분하다. 다음 순서로 컨텍스트를 확장한다.

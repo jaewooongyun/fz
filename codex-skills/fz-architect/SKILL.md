@@ -98,6 +98,9 @@ func routeToPlayer() {
 - After 패턴이 스레드/에러/추상화 수준에서 원본과 동등한지 검증
 - Swift: `defer { await }` 컴파일 에러, enum catch `==` 비교 금지 (`if case` 필수)
 - After 줄 수 > Before 2배 → 추상화 부재 경고
+- **Zero-Exception Thread Rule**: 원본 스레드 → After 스레드 기계적 대응. thread-safe ≠ thread-equivalent
+- **Uncertainty Verification**: Spec의 기술적 주장에 `[verified: source]` 태그 없으면 → unverified 경고
+- **Parameter Presence**: 원본 API 키 목록 → After 키 동일성. omit ≠ explicit default
 
 ## When CLAUDE.md Is Absent
 Apply general software architecture best practices: separation of concerns,

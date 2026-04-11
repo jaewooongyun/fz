@@ -37,6 +37,9 @@
 | planning 생산 (패턴 변환) | transformation spec | code-transform-validation.md Spec 작성 + Context7 확인 | 모든 모드 (패턴 변환 시) |
 | code-changes 생산 (패턴 변환) | behavioral equivalence | Spec 대비 구현 대조 (스레드/에러/추상화) | 모든 모드 (Spec 있을 때) |
 | review 포함 (패턴 변환) | transformation equivalence (4-K) | Spec 대비 diff 대조 | 모든 모드 (Spec 있을 때) |
+| planning 생산 (Spec v3.8) | spec-verify | Codex가 Spec의 기술적 정확성 검증 (스레드 모델, 파라미터 의미론, Default-Deny) | TEAM 필수, SOLO 권장 |
+| cross-model 불일치 감지 | confident-error | Claude vs Codex 판정 불일치 → 교훈 기록 + 상세 분석 (uncertainty-verification.md) | 자동 |
+| code/review (Spec v3.8) | default-deny enforcement | Spec 기술적 주장에 [verified] 없으면 fail-closed | 모든 모드 (spec-version 3.8) |
 
 ---
 
