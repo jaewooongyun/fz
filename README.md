@@ -135,7 +135,7 @@ fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
 ├── skills/          21개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
 ├── agents/          13개 — plan-structure, impl-correctness, review-arch ...
-├── modules/         20개 — team-core, pipelines, cross-validation ...
+├── modules/         21개 — team-core, pipelines, cross-validation, code-transform-validation ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
 ├── guides/          7개 — prompt-optimization, skill-authoring ...
 ├── codex-skills/    8개 — Codex 네이티브 스킬 (fz-reviewer, fz-architect ...)
@@ -236,8 +236,9 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v3.6.0** (2026-04-11)
+**현재 버전: v3.7.0** (2026-04-12)
 
+- v3.7.0 — Code Transformation Validation (코드 변환 동등성 검증 — 3중 검증축 추가)
 - v3.6.0 — iOS/Swift 역방향 진단 트리거 + Concurrency Safety Audit (PR #3665 교훈 반영)
 - v3.5.0 — Peer Review false positive 감소 (Gather Verification Gate + Quality Gate)
 - v3.4.0 — Peer Review 호출 구조 분석 + Convention 검증 (PR #3646 교훈 반영)

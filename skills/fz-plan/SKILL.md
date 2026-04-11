@@ -65,6 +65,7 @@ model-strategy:
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 비ASD Serena checkpoint |
 | modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
+| modules/code-transform-validation.md | 코드 변환 동등성 — Transformation Spec + 검증 체크리스트 (패턴 변환 시) |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -350,7 +351,14 @@ Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
      변경 유형별 잔존물 참조: `modules/lead-reasoning.md` §7
    - **Implication Register**: `modules/lead-reasoning.md` §4 형식. 실행 함의는 Step에 명시, 관찰 함의는 별도 섹션.
 
-7. **⛔ 계획 파일 기록** (항상 — compact recovery 필수):
+8. **⛔ Transformation Spec 작성** (비동기/네트워크/UI 패턴 변환 Step에 필수 — 참조: `modules/code-transform-validation.md`):
+   - 원본 코드 Read → 런타임 특성 추출 (스레드, 에러 경로, 실행 보장)
+   - Context7로 원본 API 동작 확인 (PromiseKit .done = main queue 등)
+   - Spec 테이블 작성 (실행 스레드, 에러 처리, 실행 보장, 추상화, 인스턴스, 디코딩)
+   - ⚠️ After 줄 수 > Before 2배 → 추상화 설계 필수 제안
+   - ⚠️ 언어 런타임 제약 확인 (Swift: defer+await 금지, catch if case, @MainActor 위치)
+
+9. **⛔ 계획 파일 기록** (항상 — compact recovery 필수):
    - ASD 활성: `{WORK_DIR}/plan/plan-v{N}.md` + `{WORK_DIR}/index.md` 업데이트
    - 비ASD: `write_memory("fz:checkpoint:plan-v{N}", "Steps: {N}개. 핵심결정: {요약}. 리스크: {요약}")`
    형식 참조: `modules/context-artifacts.md`
@@ -374,6 +382,7 @@ Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
 - [ ] 리팩토링 작업이면 Anti-Pattern Constraints 작성?
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore Step 포함? (.gitignore .build, Package.resolved, pbxproj 등록)
 - [ ] ⛔ 모듈화 작업이면 Concern Classification 수행? (각 public type의 관심사가 모듈 책임에 부합)
+- [ ] ⛔ 패턴 변환 Step에 Transformation Spec 작성? (원본 스레드/에러/추상화/언어 제약 확인)
 - [ ] ⛔ 계획 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
 
 ---

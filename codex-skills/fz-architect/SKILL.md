@@ -91,6 +91,14 @@ func routeToPlayer() {
 }
 ```
 
+## Code Transformation Validation (패턴 변환 포함 계획 시)
+
+계획에 비동기 패턴 변환(PromiseKit→async, callback→async 등)이 포함될 때:
+- 원본 API 스레드 특성 확인 (PromiseKit .done = main queue, RxSwift observe(on:) 등)
+- After 패턴이 스레드/에러/추상화 수준에서 원본과 동등한지 검증
+- Swift: `defer { await }` 컴파일 에러, enum catch `==` 비교 금지 (`if case` 필수)
+- After 줄 수 > Before 2배 → 추상화 부재 경고
+
 ## When CLAUDE.md Is Absent
 Apply general software architecture best practices: separation of concerns,
 dependency inversion, single responsibility, and KISS principle for validation.

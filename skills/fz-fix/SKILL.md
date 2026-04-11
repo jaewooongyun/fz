@@ -67,6 +67,7 @@ model-strategy:
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+| modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 
@@ -148,6 +149,10 @@ model-strategy:
 2. **⛔ Step 1c 완료 전 코드 수정 금지**. root-cause가 불명확하면 AskUserQuestion.
 
 ### Step 2: 수정
+
+⛔ **패턴 변환 감지** (수정이 비동기/네트워크/UI 패턴 변환을 포함할 때):
+- `modules/code-transform-validation.md` 참조. 원본 런타임 특성(스레드, 에러) 확인 후 수정
+- Context7로 원본 API 동작 확인. 수정 후 Behavioral Equivalence Check 수행
 
 | 상황 | 도구 |
 |------|------|
