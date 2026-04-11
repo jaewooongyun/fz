@@ -44,7 +44,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - SwiftUI: `swiftui-expert` 플러그인 기준 — state 관리, view 구조, 성능 패턴
 - 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md `## Plugins` 참조)
 
-### 5. Concurrency Safety (동시성 코드 포함 시, CLAUDE.md `## Plugins` 참조)
+### 5. Concurrency Safety (동시성 코드 포함 시 **또는 역방향 감지 트리거 활성 시**, CLAUDE.md `## Plugins` 참조)
 
 - actor isolation 경계 위반 여부
 - Sendable conformance 적절성
@@ -79,6 +79,10 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - **Kingfisher 8 콜백 기본 큐**: Kingfisher 7/8 completion callback 기본값은 `.mainCurrentOrAsync`. `Task { }` 전환 시 @MainActor 없으면 thread가 달라짐 → UI 접근 regression 가능
 - **`@MainActor @objc` 조합**: ObjC 런타임은 Swift actor isolation을 인식하지 못함. @objc 메서드에 @MainActor를 붙여도 ObjC 호출자가 임의 스레드에서 호출 가능
 - **`static var computed`**: 매 접근마다 새 인스턴스 생성. 싱글톤/공유 캐시 의도면 `static let`으로 수정 필요 → regression
+- **싱글톤 가변 상태**: `static let shared` + mutable `var` → 동기화 메커니즘 필수. `DispatchQueue.main.async` 쓰기면 "모든 읽기도 main인가?" 역추적 필수. plugin-refs.md 역방향 트리거 참조
+- **싱글톤 deinit**: `static let shared` + `private init()` → deinit 내 정리 로직(cancel, removeObserver)은 dead code
+- **비동기 기본값**: 비동기 데이터 소스로 채워지는 property의 기본값 → 소비자 guard/if 분기 영향 평가. `= false`가 부팅 시 차단 유발 가능
+- **API 내부 retention**: context7 query-docs로 API 파라미터 내부 retention 확인 후 중복 멤버변수 판별
 
 ## Peer-to-Peer Protocol
 

@@ -80,6 +80,7 @@ model-strategy:
 > SwiftUI View 작업 시 `swiftui-expert` 플러그인 패턴 참조
 > **최소 타겟 제약**: CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API 사용 시 availability 가드 필수
 > 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
+> **역방향 트리거**: `modules/plugin-refs.md` "역방향 감지 트리거" 참조. `@MainActor`/`actor` 등이 없어도 싱글톤+가변상태 감지 시 안전성 분석 활성화
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -215,6 +216,9 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | 원본 버그 발견 | 모듈화/리팩토링 중 원본 코드의 버그를 발견 (dead code, 도달 불가 분기, 잘못된 순서 등) | "원본과 동일"로 방치 금지 — AskUserQuestion으로 수정 여부 확인. 혼자 판단하여 dismiss 금지 |
    | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가 잔존 | [Q-WHY] "이 구조가 추가된 이유가 해소됐는가?" find_referencing_symbols로 확인. 참조: modules/lead-reasoning.md §7 |
    | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지. Gate 3 전 일괄 보고 |
+   | 동기화 부재 | singleton/shared 타입에 `var` 추가/수정 시, `@MainActor`/`actor`/lock/serial queue 보호 없음 | data race 위험 — plugin-refs.md 역방향 트리거 참조. 동시성 보호 메커니즘 추가 필요 |
+   | 싱글톤 deinit | `static let shared` 타입에 `deinit` 작성 시 | deinit은 호출되지 않음 — 정리가 필요하면 명시적 `tearDown()` 메서드 사용 |
+   | 기본값 소비자 영향 | 비동기 채워지는 property에 기본값(`= false`, `= nil`) 설정 시 | 소비자가 첫 콜백 전에 읽으면 기본값으로 분기 — guard/if 패턴 영향 확인 |
 
    보고 형식:
    ```
