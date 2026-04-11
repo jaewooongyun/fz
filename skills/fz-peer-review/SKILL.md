@@ -202,6 +202,14 @@ BAD:  grep -A2 "platforms" → ".iOS, .tvOS" → Key Fact: "visionOS 미지원"
 GOOD: grep → 초기 수집 → Read(Package.swift) 전체 확인 → "visionOS 포함" 수정
 ```
 
+### 4.5. ⛔ 패턴 변환 감지 (diff에 비동기/네트워크/UI 패턴 변경 포함 시)
+
+diff에 `async/await`, `Task {`, `@MainActor`, `catch`, PromiseKit→async 변환이 감지되면:
+- `modules/code-transform-validation.md` 참조
+- 변경 전 코드의 스레드/에러 특성 확인 (`git show` 또는 base branch)
+- diff의 After 코드가 원본과 동등한 동작을 보장하는지 검증
+- 불일치 시 리뷰 코멘트에 "transformation_deviation" 이슈 기록
+
 ### 5. diff 크기별 모드 결정
 
 ```

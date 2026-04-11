@@ -71,6 +71,7 @@ model-strategy:
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
 | modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
+| modules/code-transform-validation.md | 코드 변환 동등성 — BEC 절차 + 마찰 신호 (패턴 변환 시) |
 | modules/lead-reasoning.md | Implication Scan — 제거/리팩토링 시 의미론적 완결성 |
 | modules/system-reminders.md | Instruction fade-out 대응 — 트리거 기반 리마인더 |
 
@@ -215,6 +216,9 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | 원본 미존재 추가 | 리팩토링/마이그레이션에서 원본에 없던 파라미터, 로직, 타입을 추가하려 할 때. optional 파라미터에 기본값(nil)이 있는데 명시적으로 채우는 행위 포함 | 원본 동작 변경 위험 — AskUserQuestion 필수 |
    | 원본 버그 발견 | 모듈화/리팩토링 중 원본 코드의 버그를 발견 (dead code, 도달 불가 분기, 잘못된 순서 등) | "원본과 동일"로 방치 금지 — AskUserQuestion으로 수정 여부 확인. 혼자 판단하여 dismiss 금지 |
    | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가 잔존 | [Q-WHY] "이 구조가 추가된 이유가 해소됐는가?" find_referencing_symbols로 확인. 참조: modules/lead-reasoning.md §7 |
+   | 스레드 컨텍스트 불일치 | Plan Transformation Spec에 "@MainActor 필수" → 구현이 일반 Task. 원본이 main queue(PromiseKit .done 등)인데 After가 background Task | 원본 main queue 미보존 — `@MainActor Task` 필요. 참조: `modules/code-transform-validation.md` |
+   | 에러 경로 축소 | 원본 switch/catch 분기 N개 → After catch < N개. `== .case(value)` 비교 사용 | enum associated value 무시. `if case` 패턴 매칭 필수 |
+   | 퀄리티 역행 | After 줄 수 > Before 2배. 원본 추상화(struct/helper/extension)가 인라인 해체 | 리팩토링이 코드 악화. protocol extension/convenience 검토 |
    | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지. Gate 3 전 일괄 보고 |
    | 동기화 부재 | singleton/shared 타입에 `var` 추가/수정 시, `@MainActor`/`actor`/lock/serial queue 보호 없음 | data race 위험 — plugin-refs.md 역방향 트리거 참조. 동시성 보호 메커니즘 추가 필요 |
    | 싱글톤 deinit | `static let shared` 타입에 `deinit` 작성 시 | deinit은 호출되지 않음 — 정리가 필요하면 명시적 `tearDown()` 메서드 사용 |
@@ -252,6 +256,13 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 5. **(선택) /simplify 게이트**: 코드 변경이 있을 때 `/simplify focus on {step-context}` (참조: modules/execution-modes.md)
 
 6. **매 Step 완료 후 빌드 검증**: 참조 `modules/build.md`
+
+6.3. **⛔ Behavioral Equivalence Check** (Transformation Spec이 있는 Step 완료 후):
+   - Plan의 Transformation Spec 로드 → 원본 코드 Read
+   - Spec "실행 스레드" ↔ 구현의 Task/@MainActor 대조
+   - Spec "에러 처리" ↔ 구현의 catch 분기 수 + 패턴 대조
+   - Spec "추상화 수준" ↔ 구현 줄 수 대조
+   - 불일치 → 마찰 보고 → 사용자 확인. 참조: `modules/code-transform-validation.md`
 
 6.5. **⛔ 아티팩트 기록** (항상 — compact recovery 필수):
    각 구현 Step 완료 후 진행 상태를 기록한다.

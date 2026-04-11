@@ -1,5 +1,25 @@
 # Changelog
 
+### v3.7.0 (2026-04-12) — Code Transformation Validation
+
+**신규 모듈: `modules/code-transform-validation.md`**
+- 코드 변환(Before→After) 동작 동등성 + 구조 품질 검증 공유 모듈
+- Transformation Spec 형식 + 검증 체크리스트 + Swift 변환 규칙 + Context7 활용
+- 3중 검증: Plan(Spec 작성) → Code(BEC 대조) → Review(4-K 준수)
+- 트리거: 비동기/네트워크/UI 패턴 변환 시에만 활성 (단순 치환 제외)
+
+**스킬 개선 (6개)**
+- fz-plan: Transformation Spec 작성 절차 + Gate 1 체크리스트 (+10줄)
+- fz-code: 마찰 신호 3개 + Behavioral Equivalence Check (+11줄)
+- fz-review: 검증 4-K Transformation Equivalence (+15줄)
+- fz-fix: 패턴 변환 감지 + 모듈 참조 (+5줄)
+- fz-peer-review: Gather 4.5 패턴 변환 감지 (+8줄)
+- fz-codex reviewer/architect: Swift 변환 규칙 임베딩 (+17줄)
+
+**모듈 개선**: cross-validation.md 게이트 테이블 transformation 3행 추가
+
+근거: PR-D1 플랜 7개 이슈 미탐지 사후 분석 (반성 11차)
+
 ### v3.6.0 (2026-04-11) — iOS/Swift Reverse Diagnostic Triggers
 
 **역방향 감지 트리거 (plugin-refs.md)**

@@ -34,6 +34,9 @@
 | code 포함 | Supporting 진행도 체크 | review-correctness → impl-correctness RTM 체크 | TEAM (3+ Step 50% 시점) |
 | review 시작 전 | Scope Expansion 검증 | plan 영향 범위 ⊇ discover 범위 확인. plan이 더 좁으면 warning | discover 산출물 존재 시 |
 | code 시작 전 | 시야 축소 감지 | plan 영향 범위 vs discover 범위 비교 → 좁으면 마찰 신호 | discover 산출물 존재 시 |
+| planning 생산 (패턴 변환) | transformation spec | code-transform-validation.md Spec 작성 + Context7 확인 | 모든 모드 (패턴 변환 시) |
+| code-changes 생산 (패턴 변환) | behavioral equivalence | Spec 대비 구현 대조 (스레드/에러/추상화) | 모든 모드 (Spec 있을 때) |
+| review 포함 (패턴 변환) | transformation equivalence (4-K) | Spec 대비 diff 대조 | 모든 모드 (Spec 있을 때) |
 
 ---
 

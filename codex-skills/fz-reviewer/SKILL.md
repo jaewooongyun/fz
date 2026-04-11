@@ -130,6 +130,15 @@ Review Output:
   ✅ Correct: `group.addTask { [weak self] in ... await MainActor.run { /* UI */ } }`
   ❌ Wrong suggestion: `group.addTask { @MainActor [weak self] in }` — causes warning, not removes it
 
+### Code Transformation Equivalence (패턴 변환 검증)
+diff에 PromiseKit→async/await, callback→async, RxSwift→Combine 등 패턴 변환이 포함될 때:
+- PromiseKit `.done { }` = main queue → After는 `Task { @MainActor in }` 필수. 일반 Task는 오류
+- `.catch { switch case }` → `catch { if case }`. enum associated value `==` 비교 금지
+- `.ensure { }` / `.finally { }` → `try?` 후 순차 실행. **defer 내 await 컴파일 에러**
+- `.cauterize()` → `try?` (fire-and-forget)
+- After 줄 수 > Before 2배 → 추상화 부재 (protocol extension, convenience method 검토)
+- Repository 인스턴스: stored property 1회 생성 (매 호출마다 Default*Repository() 금지)
+
 ## Context Scope (1M Context — diff is insufficient)
 
 diff만 보는 것은 불충분하다. 다음 순서로 컨텍스트를 확장한다.

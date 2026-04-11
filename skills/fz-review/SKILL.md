@@ -346,6 +346,20 @@ diff 내 메서드 시그니처 변경이 프로토콜 적합성을 깨뜨리지
 
 ### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 가변 상태 동기화(L1 필수) + 콜백 스레드/@Published/기본값/API retention(L2 권장) 검사.
 
+### 검증 4-K: Transformation Equivalence (코드 변환 동등성 — Plan에 Transformation Spec 있을 때)
+
+Plan에 Transformation Spec이 포함된 경우, diff가 Spec 요구사항을 준수하는지 검증. 참조: `modules/code-transform-validation.md`
+
+```
+1. Plan Transformation Spec 로드
+2. diff 변환 ↔ Spec 대조:
+   - 스레드: Spec "@MainActor 필수" → diff에 @MainActor 존재?
+   - 에러: Spec "분기 N개" → diff catch 분기 = N?
+   - 추상화: Spec "protocol extension" → diff에 extension?
+   - 인스턴스: Spec "stored property" → diff에 선언?
+3. 불일치 → "transformation_deviation" (severity: Major)
+```
+
 ### 검증 5: UI/UX Refactoring Safety
 
 View 파일 변경 포함 시 추가 검증:
@@ -386,6 +400,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] Spec Panel 통과? (새 모듈 시, 스펙 부합 확인)
 - [ ] Protocol Conformance 통과? (시그니처 변경 시, 프로토콜 선언부 동기화 확인)
 - [ ] Source Fidelity 통과? (리팩토링 시, 원본 대비 추가된 파라미터/로직 없음)
+- [ ] Transformation Equivalence 통과? (Spec 있을 때, 스레드/에러/추상화 요구사항 준수)
 - [ ] Concurrency Safety Audit 통과? (싱글톤 가변 상태 동기화, 콜백 스레드, @Published 스레드 — modules/safety-audit.md)
 
 ## Phase 5.5: Feedback Verification (역방향 검증)
