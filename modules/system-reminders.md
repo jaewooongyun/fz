@@ -18,6 +18,7 @@
 | T2 | Gate 실패 **1회+** | "Gate 체크리스트 전체 재확인. 실패 항목: {항목명}" | 반성 4차: Gate 바이패스 |
 | T3 | 제거/리팩토링 작업 중 **10턴+** | "Implication Scan 수행했는가? Q-WHY: 이 코드가 존재하게 된 이유가 해소됐는가?" | lead-reasoning.md |
 | T4 | TEAM 에이전트 완료 보고 수신 | "Lead Checkpoint Protocol 순서: 체크포인트 → Codex → [Implication] → 빌드 → 다음" | team-core.md Rule 6 |
+| T5 | diff에 `static let shared` 타입의 `var` property 변경 감지 | "싱글톤 가변 상태 수정 감지. 확인: (1) 동기화 보호 (@MainActor/actor/lock) (2) deinit dead code (3) 기본값 소비자 영향. 참조: plugin-refs.md 역방향 트리거, modules/safety-audit.md" | PR#3665: plugin 미활성으로 data race 미감지 |
 
 ## Low-frequency Backstop
 

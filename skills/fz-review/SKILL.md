@@ -64,11 +64,13 @@ model-strategy:
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/rtm.md | RTM 검증 — Phase 4.5에서 Req-ID 상태 확인 |
 | modules/native-agents.md | L3 에이전트 스폰 — Phase 5 병렬 검증 |
+| modules/safety-audit.md | 검증 4-J Concurrency Safety Audit — 역방향 안전성 감사 |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 
 > 참조: `modules/plugin-refs.md` — SwiftUI Expert(리뷰 시) + Swift Concurrency(리뷰 시) 섹션
 > diff에 `@MainActor|actor|async|@Observable` 패턴 감지 시 해당 플러그인 참조
+> **역방향 트리거**: diff에 동시성 키워드가 **없어도**, `static let shared` + `var` 등 역방향 트리거 패턴 감지 시 Concurrency Safety 관점 적용
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -342,6 +344,8 @@ diff 내 메서드 시그니처 변경이 프로토콜 적합성을 깨뜨리지
 
 ### 검증 4-I: Implication Coverage (함의 커버리지) — `modules/lead-reasoning.md` 참조. 제거/리팩토링 시 실행. 검증 4는 diff 안(judge), 4-I는 지시→diff 밖(auditor). 완료 보고에 "관찰 사항" 추가(§5).
 
+### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 가변 상태 동기화(L1 필수) + 콜백 스레드/@Published/기본값/API retention(L2 권장) 검사.
+
 ### 검증 5: UI/UX Refactoring Safety
 
 View 파일 변경 포함 시 추가 검증:
@@ -382,6 +386,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] Spec Panel 통과? (새 모듈 시, 스펙 부합 확인)
 - [ ] Protocol Conformance 통과? (시그니처 변경 시, 프로토콜 선언부 동기화 확인)
 - [ ] Source Fidelity 통과? (리팩토링 시, 원본 대비 추가된 파라미터/로직 없음)
+- [ ] Concurrency Safety Audit 통과? (싱글톤 가변 상태 동기화, 콜백 스레드, @Published 스레드 — modules/safety-audit.md)
 
 ## Phase 5.5: Feedback Verification (역방향 검증)
 

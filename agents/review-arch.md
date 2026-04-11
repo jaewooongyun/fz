@@ -48,6 +48,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - 컴포넌트가 살아있는 동안 유지되는 상태를 영속 저장소에 중복 저장하고 있지 않은가? (RIBs: Interactor 라이프사이클 기준)
 - A/B 테스트 등 외부 시스템(Hackle, Firebase RC 등)이 관리하는 값을 앱 로컬에 캐싱하면 실험 왜곡
 - 판단 기준: "앱 재시작 후에도 이 값이 반드시 유지되어야 하는가?" — NO면 인메모리(Subject/State)로 충분
+- **싱글톤 스레드 접근성**: `static let shared` + `internal` getter → 모듈 내 임의 스레드에서 읽기 가능. main confinement 쓰기가 있어도 읽기 보장 불가 → `@MainActor`/`actor` 전환이 근본 해결. plugin-refs.md 역방향 트리거 참조
 
 ### 5. Consumer Integration Quality (모듈화/캡슐화 작업 시)
 
@@ -75,6 +76,8 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - **RxSwift `subscribe(with:)`**: self를 약하게 캡처하고 클로저 실행 동안만 owner를 강하게 참조. retain cycle 아님. Task { await owner... }는 Task 완료까지 owner를 강하게 보유하지만, 해제 지연이 있을 뿐 lifecycle 위반은 아님
 - **Kingfisher 8 Task 스레드**: `Task { }` body는 cooperative thread pool. 구 콜백 기본값은 main queue → @MainActor 없이 UI 접근하면 regression
 - **`static var computed` vs `static let`**: computed property는 매번 새 인스턴스 생성 → 싱글톤 의도이면 regression
+- **싱글톤 lifecycle**: `static let shared` → deinit은 프로세스 종료 시에만 호출. deinit 내 정리 로직(cancel, removeObserver)은 dead code
+- **NWPathMonitor 콜백 스레드**: `pathUpdateHandler`는 `start(queue:)`의 queue에서 실행. main이 아니면 property 쓰기가 background → main thread 읽기와 data race
 
 ## Peer-to-Peer Protocol
 

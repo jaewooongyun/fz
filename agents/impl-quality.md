@@ -47,6 +47,7 @@ in real time, providing feedback directly to `impl-correctness`.
 
 ### Memory Safety
 - `weak` 누락으로 인한 잠재적 retain cycle 감지
+- 싱글톤 가변 상태 동기화 누락 감지 (plugin-refs.md 역방향 트리거 참조)
 - CLAUDE.md `## Code Conventions` 메모리 규칙과 대조
 
 ## Peer-to-Peer Communication

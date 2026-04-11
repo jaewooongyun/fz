@@ -27,6 +27,26 @@
 | `Sendable`, `@Sendable`, `sending` | Swift Concurrency | sendable |
 | `AsyncStream`, `AsyncSequence`, `TaskGroup` | Swift Concurrency | tasks, performance |
 
+## 역방향 감지 트리거 (부재 패턴)
+
+코드에 아래 **존재 패턴**이 있으면서 **부재 패턴**에 해당하면, 해당 관점을 활성화한다.
+Swift Concurrency/SwiftUI 플러그인 활성 여부와 **무관하게** 항상 동작한다.
+
+### Level 1 (구문 — 항상 적용)
+
+| 존재 패턴 | 부재 패턴 | 진단 |
+|----------|----------|------|
+| `static let shared` + `var` (가변 stored property) | `@MainActor` / `actor` / `NSLock` / `os_unfair_lock` / `OSAllocatedUnfairLock` / `DispatchQueue` 동기화 없음 | **싱글톤 가변 상태 동기화 누락**. 쓰기/읽기 스레드 분석 필요 |
+| `static let shared` + `deinit` | — | **싱글톤 deinit dead code**. 프로세스 종료 시에만 호출 → 정리 로직 미실행 |
+
+### Level 2 (의미론 — 검증 4-J에서 사용)
+
+| 존재 패턴 | 부재 패턴 | 진단 |
+|----------|----------|------|
+| completion handler / `pathUpdateHandler` / delegate callback | callback 내부에 `DispatchQueue.main` / `@MainActor` 없음 | **콜백 실행 스레드 ≠ 소비자 스레드 가능성**. context7로 API 콜백 스레드 확인 |
+| 비동기 API 초기화 + stored property 기본값 | — | **첫 콜백 전 기본값의 소비자 영향**. guard/if 분기에서 잘못된 분기 진입 가능 |
+| `ObservableObject` + `@Published var` | `@MainActor` 없음 | **@Published background 쓰기 시 UI 스레드 위반**. 런타임 경고 발생 |
+
 ### iOS 16 기본 패턴 (최소 타겟 준수)
 
 | API | iOS 16 기본 | iOS 17+ 대안 | 조건 |
