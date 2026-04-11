@@ -44,16 +44,11 @@ model-strategy:
 
 > ⛔ Phase 0 (ASD Pre-flight) → Phase 0b (Context) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
 
-- 요구사항 구조 분해 + 영향 범위 분석
-- Serena 심볼 도구 기반 정밀 탐색
-
-## 사용 시점
+요구사항 구조 분해 + 영향 범위 분석. Serena 심볼 도구 기반 정밀 탐색.
 
 ```bash
-/fz-plan "새 기능 계획해줘"
-/fz-plan "아키텍처를 더 상세하게 해줘"
-/fz-plan "피드백 반영해서 수정해줘"
-/fz-plan "Gate 2 통과 확인해줘"
+/fz-plan "새 기능 계획해줘"        /fz-plan "피드백 반영해서 수정해줘"
+/fz-plan "아키텍처를 더 상세하게"   /fz-plan "Gate 2 통과 확인해줘"
 ```
 
 ## 모듈 참조
@@ -66,6 +61,7 @@ model-strategy:
 | modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 비ASD Serena checkpoint |
 | modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
 | modules/code-transform-validation.md | 코드 변환 동등성 — Transformation Spec + 검증 체크리스트 (패턴 변환 시) |
+| modules/uncertainty-verification.md | 기술적 주장 → Default-Deny 검증 (하네스 원칙, Transformation Spec Pilot) |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -82,7 +78,6 @@ model-strategy:
 | Phase 3 | `/sc:reflect` | 피드백 반영 후 자체 검증 |
 
 ## Plugin 참조 (Swift Concurrency)
-
 > 참조: `modules/plugin-refs.md` — Swift Concurrency(계획 시) 섹션
 
 ## 팀 에이전트 모드
@@ -119,38 +114,20 @@ TeamCreate("plan-{feature}")
 
 ### 통신 패턴: Parallel Analysis + Cross-Feedback
 
-3개 Claude 에이전트가 **다른 렌즈로 병렬 분석** 후 교차 피드백하는 패턴.
-Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
+3개 Claude 에이전트가 **다른 렌즈로 병렬 분석** 후 교차 피드백. Lead는 Codex를 실행하여 이종 검증 확보.
 
 ```
-[Round 1 — 병렬 독립 분석]
-  plan-structure: 요구사항 분해 + 초기 설계
-  plan-impact: Exhaustive Impact Scan (a~f) — 영향 범위 전담
-  review-arch: 아키텍처 패턴 매칭 (RIBs/Clean Architecture)
-  Lead: Codex verify (CLI 실행)
-
-[Round 2 — 교차 피드백]
-  plan-impact → plan-structure: "영향 범위 + 숨겨진 의존성 + dead code"
-  review-arch → plan-structure: "패턴 위반 + Dependency Rule + 대안"
-  Lead → plan-structure: "GPT 이슈 {N}개"
-  plan-structure: 모든 피드백 통합 → 설계 수정
-
-[Round 0.5 — 최종 보고]
-  plan-structure → Lead: "최종 계획 + [합의/불합의 항목]"
-  Lead: 6개 렌즈 발견 통합 → 합의표 작성
+[Round 1 — 병렬] plan-structure: 분해+설계 / plan-impact: Impact Scan(a~f) / review-arch: 패턴 매칭 / Lead: Codex verify
+[Round 2 — 교차] plan-impact→structure: 영향+의존+dead / review-arch→structure: 위반+대안 / Lead→structure: GPT이슈 / structure: 통합수정
+[Round 3 — 보고] structure→Lead: 최종계획+합의표 / Lead: 6렌즈 통합
 ```
-
-**핵심**: 설계/영향분석/패턴검증이 **동시에** 진행되고, 외부 모델이 Claude blind spot을 보완한다.
 
 > plan-structure 에이전트가 이 스킬의 워크플로우를 활용합니다.
 
 ---
 
 ## ⛔ Phase 0: ASD Pre-flight
-
-> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
-
-**Phase 0b (Context Loading) 시작 전에 반드시 실행:**
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 0b 전에 반드시 실행.**
 
 1. 인자에서 `ASD-\d+` 패턴 추출
 2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
@@ -164,9 +141,6 @@ Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
 ---
 
 ## Phase 0b: Context Loading
-
-이전 세션 컨텍스트와 프로젝트 상태를 로드합니다.
-
 ### 절차
 
 1. **세션 감지**: 참조 `modules/session.md`
@@ -195,9 +169,6 @@ Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
 ---
 
 ## Phase 0.5: Direction Challenge
-
-계획 수립 전, 요구사항의 접근 방향 자체가 최선인지 비판적으로 검토합니다.
-
 ### 발동 조건
 
 | 조건 | Direction Challenge | 근거 |
@@ -241,9 +212,6 @@ Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
 ---
 
 ## Phase 1: Deep Planning
-
-요구사항을 구조적으로 분해하고, 영향 범위를 분석합니다.
-
 > **프로젝트 규칙**: CLAUDE.md `## Architecture` 섹션을 따른다.
 
 ### 절차
@@ -357,6 +325,9 @@ Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
    - Spec 테이블 작성 (실행 스레드, 에러 처리, 실행 보장, 추상화, 인스턴스, 디코딩)
    - ⚠️ After 줄 수 > Before 2배 → 추상화 설계 필수 제안
    - ⚠️ 언어 런타임 제약 확인 (Swift: defer+await 금지, catch if case, @MainActor 위치)
+   - ⛔ **Default-Deny**: 각 기술적 주장에 `[verified: source]` 태그 의무화. 태그 없으면 자동 unverified → fz-code BEC에서 차단. `modules/uncertainty-verification.md` 참조
+   - **요청 파라미터 키 목록**: 원본 API 호출의 파라미터 키를 열거. After에서 키 추가/삭제 시 명시적 근거 필수. nil → default value 전송은 "키 추가"에 해당
+   - **spec-version**: Transformation Spec에 `spec-version: 3.8` 필드 추가
 
 9. **⛔ 계획 파일 기록** (항상 — compact recovery 필수):
    - ASD 활성: `{WORK_DIR}/plan/plan-v{N}.md` + `{WORK_DIR}/index.md` 업데이트
@@ -383,14 +354,14 @@ Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore Step 포함? (.gitignore .build, Package.resolved, pbxproj 등록)
 - [ ] ⛔ 모듈화 작업이면 Concern Classification 수행? (각 public type의 관심사가 모듈 책임에 부합)
 - [ ] ⛔ 패턴 변환 Step에 Transformation Spec 작성? (원본 스레드/에러/추상화/언어 제약 확인)
+- [ ] ⛔ Transformation Spec의 기술적 주장에 [verified: source] 태그가 있는가? (Default-Deny)
+- [ ] ⛔ "실행 스레드"가 Zero-Exception 규칙을 준수하는가?
+- [ ] ⛔ 요청 파라미터 키 목록이 원본과 일치하는가?
 - [ ] ⛔ 계획 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
 
 ---
 
 ## Phase 2: Plan Validation
-
-계획을 검증합니다. **독립 검증 도구를 활용합니다.**
-
 ### 절차
 
 ```bash
@@ -414,9 +385,6 @@ Lead는 외부 모델(Codex)을 실행하여 이종 검증을 확보한다.
 ---
 
 ## Phase 3: Feedback Integration
-
-검증 피드백을 분석하고 계획을 수정합니다.
-
 ### 절차
 
 1. **피드백 심화 분석**:
@@ -472,17 +440,8 @@ Step 4: ContentDetailViewController SwiftUI 기반 UI
 
 ## Boundaries
 
-코드 수정은 /fz-code 또는 /fz-fix에 위임한다. 이 스킬은 계획 수립과 검증만 수행한다.
-
-**Will**:
-- 요구사항 구조 분해 및 영향 분석
-- Serena 기반 코드베이스 탐색
-- 구조화된 구현 계획 출력
-- 계획 검증
-
-**Will Not**:
-- 코드 직접 수정 (→ /fz-code)
-- 빌드 실행 (→ /fz-code)
+**Will**: 요구사항 분해, 영향 분석, Serena 탐색, 구현 계획 출력, 계획 검증
+**Will Not**: 코드 수정 (→ /fz-code), 빌드 실행 (→ /fz-code)
 
 ## 에러 대응
 

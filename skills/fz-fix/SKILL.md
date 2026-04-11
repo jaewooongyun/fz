@@ -68,6 +68,7 @@ model-strategy:
 | modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
+| modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 

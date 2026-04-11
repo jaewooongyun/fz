@@ -72,6 +72,7 @@ model-strategy:
 | modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
 | modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
 | modules/code-transform-validation.md | 코드 변환 동등성 — BEC 절차 + 마찰 신호 (패턴 변환 시) |
+| modules/uncertainty-verification.md | BEC fail-closed — [verified] 없는 주장 구현 전 검증 강제 |
 | modules/lead-reasoning.md | Implication Scan — 제거/리팩토링 시 의미론적 완결성 |
 | modules/system-reminders.md | Instruction fade-out 대응 — 트리거 기반 리마인더 |
 
@@ -215,6 +216,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | Import Orphan | import 제거 후 해당 모듈의 타입/typealias가 코드에 잔존 (빌드 시 "cannot find type" 에러 예정) | 치환 패턴 테이블 누락 — Plan의 Symbol Inventory와 대조하여 해당 심볼의 대체 방법 확인 |
    | 원본 미존재 추가 | 리팩토링/마이그레이션에서 원본에 없던 파라미터, 로직, 타입을 추가하려 할 때. optional 파라미터에 기본값(nil)이 있는데 명시적으로 채우는 행위 포함 | 원본 동작 변경 위험 — AskUserQuestion 필수 |
    | 원본 버그 발견 | 모듈화/리팩토링 중 원본 코드의 버그를 발견 (dead code, 도달 불가 분기, 잘못된 순서 등) | "원본과 동일"로 방치 금지 — AskUserQuestion으로 수정 여부 확인. 혼자 판단하여 dismiss 금지 |
+   | 파라미터 키 불일치 | 원본 API에 없던 키 추가 또는 삭제. nil → default value 전송 포함 | omit ≠ explicit default — 서버 동작 변경 가능. AskUserQuestion: "이 키 추가가 의도적인가?" |
    | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가 잔존 | [Q-WHY] "이 구조가 추가된 이유가 해소됐는가?" find_referencing_symbols로 확인. 참조: modules/lead-reasoning.md §7 |
    | 스레드 컨텍스트 불일치 | Plan Transformation Spec에 "@MainActor 필수" → 구현이 일반 Task. 원본이 main queue(PromiseKit .done 등)인데 After가 background Task | 원본 main queue 미보존 — `@MainActor Task` 필요. 참조: `modules/code-transform-validation.md` |
    | 에러 경로 축소 | 원본 switch/catch 분기 N개 → After catch < N개. `== .case(value)` 비교 사용 | enum associated value 무시. `if case` 패턴 매칭 필수 |
@@ -263,6 +265,9 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    - Spec "에러 처리" ↔ 구현의 catch 분기 수 + 패턴 대조
    - Spec "추상화 수준" ↔ 구현 줄 수 대조
    - 불일치 → 마찰 보고 → 사용자 확인. 참조: `modules/code-transform-validation.md`
+   - ⛔ Spec "실행 스레드" ↔ @MainActor: Zero-Exception 기계적 확인. 원본 main queue → After @MainActor 무조건
+   - ⛔ Spec "요청 파라미터" ↔ 키 목록: 추가/삭제 0건 확인
+   - ⛔ [verified] 태그 확인 (fail-closed): Spec에 [verified] 없는 주장 → 구현 전 검증 강제 (uncertainty-verification.md)
 
 6.5. **⛔ 아티팩트 기록** (항상 — compact recovery 필수):
    각 구현 Step 완료 후 진행 상태를 기록한다.
