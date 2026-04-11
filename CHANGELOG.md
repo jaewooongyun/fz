@@ -1,5 +1,37 @@
 # Changelog
 
+### v3.6.0 (2026-04-11) — iOS/Swift Reverse Diagnostic Triggers
+
+**역방향 감지 트리거 (plugin-refs.md)**
+- 기존: 패턴 존재(e.g. `@MainActor`)만 트리거 → 패턴 부재 시 플러그인 비활성
+- 신규: **패턴 부재** 시에도 안전성 관점 활성화 (Swift Concurrency 플러그인 활성 여부와 무관)
+- Level 1 (구문): 싱글톤+가변상태 동기화 누락, 싱글톤 deinit dead code
+- Level 2 (의미론): 콜백 스레드 불일치, @Published background 쓰기, 비동기 기본값 소비자 영향
+
+**Concurrency Safety Audit — 검증 4-J (modules/safety-audit.md)**
+- fz-review Phase 5에 항상 실행되는 안전성 감사 단계 추가
+- 싱글톤 가변 상태 동기화 (L1 필수) + 콜백 스레드/@Published/기본값/API retention (L2 권장)
+- Progressive Disclosure Level 3: 별도 모듈로 분리 (fz-review 500줄 한도 대응)
+
+**에이전트 iOS/Swift 시맨틱 보강**
+- review-quality: Concurrency Safety 활성 조건에 "역방향 트리거" 추가 + Library Semantics 4항목
+- review-arch: State Lifecycle에 싱글톤 스레드 접근성 + Library Semantics 2항목
+- impl-quality: Memory Safety에 싱글톤 가변 상태 동기화 누락 감지
+
+**fz-code Implementation Friction 3행 추가**
+- 동기화 부재 (singleton + var + 보호 없음)
+- 싱글톤 deinit (static let shared + deinit)
+- 기본값 소비자 영향 (비동기 property + 기본값)
+
+**System Reminders T5 추가**
+- 싱글톤 가변 상태 변경 감지 시 자동 리마인더 (동기화/deinit/기본값 확인)
+
+**배경**: PR #3665 (NetworkMonitor) 리뷰에서 팀원이 발견한 4가지 이슈를 fz가 하나도 선제 감지 못함.
+근본 원인: 트리거가 패턴 존재만 감지 → 가장 위험한 코드(보호 필요하나 없는 코드)가 가장 적은 검토를 받는 구조적 맹점.
+82행 추가로 구조적 맹점 해소 (8파일: 7수정 + safety-audit.md 신규).
+
+---
+
 ### v3.2.2 (2026-04-05) — Agent Role Optimization
 
 **에이전트 책임 재분배 (Codex verified)**

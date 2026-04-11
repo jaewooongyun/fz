@@ -236,12 +236,12 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v3.4.0** (2026-04-07)
+**현재 버전: v3.6.0** (2026-04-11)
 
+- v3.6.0 — iOS/Swift 역방향 진단 트리거 + Concurrency Safety Audit (PR #3665 교훈 반영)
+- v3.5.0 — Peer Review false positive 감소 (Gather Verification Gate + Quality Gate)
 - v3.4.0 — Peer Review 호출 구조 분석 + Convention 검증 (PR #3646 교훈 반영)
 - v3.3.2 — 플러그인 중심으로 README 전면 개편
-- v3.3.1 — 스킬 description 한글화
 - v3.3.0 — Claude Code 플러그인 전환
-- v3.2.2 — Agent Role Optimization
 
 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md)
