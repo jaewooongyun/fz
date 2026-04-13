@@ -60,6 +60,7 @@ model-strategy:
 | modules/native-agents.md | L3 에이전트 스폰 — Phase 5 병렬 검증 |
 | modules/safety-audit.md | 검증 4-J Concurrency Safety Audit — 역방향 안전성 감사 |
 | modules/uncertainty-verification.md | 4-K enforcement — [verified] 없는 주장 violation 판정 |
+| modules/cross-validation.md | 검증 게이트 + 외부 피드백 검증 + 런타임 주장 검증 |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 > 참조: `modules/plugin-refs.md` — SwiftUI Expert + Swift Concurrency (리뷰 시) 섹션

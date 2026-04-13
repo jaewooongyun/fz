@@ -225,6 +225,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | 동기화 부재 | singleton/shared 타입에 `var` 추가/수정 시, `@MainActor`/`actor`/lock/serial queue 보호 없음 | data race 위험 — plugin-refs.md 역방향 트리거 참조. 동시성 보호 메커니즘 추가 필요 |
    | 싱글톤 deinit | `static let shared` 타입에 `deinit` 작성 시 | deinit은 호출되지 않음 — 정리가 필요하면 명시적 `tearDown()` 메서드 사용 |
    | 기본값 소비자 영향 | 비동기 채워지는 property에 기본값(`= false`, `= nil`) 설정 시 | 소비자가 첫 콜백 전에 읽으면 기본값으로 분기 — guard/if 패턴 영향 확인 |
+   | 외부 피드백 무검증 수긍 | 외부 도구/리뷰어의 "파라미터 누락" 등 지적에 함수 시그니처 확인 없이 동의 | Read(시그니처) + 기존 패턴 대조 필수 — cross-validation.md § External Feedback Gate |
 
    보고 형식:
    ```
