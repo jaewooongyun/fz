@@ -1,6 +1,6 @@
 # 사전 정의 파이프라인 (Pipelines)
 
-> /fz Phase 3에서 의도 키워드와 매칭하는 사전 정의 파이프라인 17개.
+> /fz Phase 3에서 의도 키워드와 매칭하는 사전 정의 파이프라인 19개.
 
 ## 참조 스킬
 
@@ -186,11 +186,26 @@
 | 게이트 | ✓ Runtime Trigger Eval (skill-creator run_eval.py) |
 | 특수 | skill-creator 미설치 시 eval만 실행 (optimize 스킵 + 설치 안내) |
 
+### 19. pr-comment-review
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `코드레빗\|PR.*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` |
+| 체인 | (내부 절차) classify-all → verify-each → user-confirm |
+| 기본 모드 | SOLO |
+| 게이트 | ✓ external-feedback-verify (각 코멘트별) |
+| 특수 | 하이브리드 경량 파이프라인. External Feedback Gate 의무 적용 |
+
+**절차**:
+1. **classify-all**: PR 코멘트 전체 fetch (`gh api`) → 심각도 분류 (critical/major/minor/nitpick) + 피드백 신뢰도 4단계 (project-rule/valid-suggestion/preference/needs-review)
+2. **verify-each**: 각 코멘트에 External Feedback Gate 적용 — Read(함수 시그니처) + 기존 패턴 대조 → valid/invalid/needs-investigation 판정
+3. **user-confirm**: 코멘트별 판정 + 대응 초안 테이블 → 사용자 승인 → (선택) GitHub 답변 포스트
+
 ---
 
 ## 동적 파이프라인 구성
 
-사전 정의 17개에 매칭되지 않을 때 provides/needs 그래프로 자동 구성:
+사전 정의 19개에 매칭되지 않을 때 provides/needs 그래프로 자동 구성:
 
 ```
 provides/needs 체인:

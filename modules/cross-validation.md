@@ -312,6 +312,27 @@ code-changes 후 → build → [implication-scan] → codex check
 
 ---
 
+## SOLO 모드 검증 게이트 요약
+
+> 하네스 원칙 4 + Gap G-R1: SOLO에서도 **결정론적 도구 호출**로 최소 Generator≠Evaluator 분리
+
+SOLO 모드에서는 에이전트 스폰/Codex 교차 검증 없이, 결정론적 도구만으로 검증한다.
+
+| 상황 | 검증 방법 | 참조 |
+|------|----------|------|
+| 외부 피드백 판정 | ⛔ Read(함수 시그니처) + 패턴 대조 필수 | § External Feedback Gate |
+| 런타임 동작 주장 | Bash 실행 가능하면 실행, 불가면 "미검증" 표기 | § Runtime Claim Gate [관찰 모드] |
+| 3+ 파일 변경 후 자기 평가 | `/sc:reflect` 자동 트리거 | fz-code sc: 테이블 |
+| 시그니처 변경 | `find_referencing_symbols` → conformance 확인 | 검증 유형별 전략 테이블: protocol conformance |
+
+⛔ SOLO에서 **하지 않는 것** (AP1 과도한 구조화 방지):
+- Codex 교차 검증 (TEAM 전용)
+- 에이전트 스폰 (TEAM 전용)
+- stress-test Q1-Q6 (fz-plan TEAM 전용)
+- 주관적 평가 분리가 필요하면 → TEAM 모드 전환 제안
+
+---
+
 ## 설계 원칙
 
 - Progressive Disclosure Level 3 (필요 시에만 로드)

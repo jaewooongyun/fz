@@ -230,14 +230,15 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 | **skill-authoring.md** | 스킬 작성법 (YAML, Progressive Disclosure, 500줄 제한) |
 | **agent-team-guide.md** | 에이전트 팀 (2.5-Turn, Task Brief, 모델 전략) |
 | **clean-architecture.md** | Dependency Rule, SOLID |
-| **harness-engineering.md** | AI 에이전트 하네스 설계 (1035줄) |
+| **harness-engineering.md** | AI 에이전트 하네스 설계 + NLAH Gap 분석 (1046줄) |
 
 ---
 
 ## Changelog
 
-**현재 버전: v3.8.0** (2026-04-12)
+**현재 버전: v3.9.0** (2026-04-14)
 
+- v3.9.0 — Harness Engineering Enhancement (SOLO G≠E 결정론적 검증 + PR 코멘트 파이프라인 + NLAH Gap 분석)
 - v3.8.0 — Uncertainty-Aware Harness (Default-Deny 검증 + Zero-Exception Thread + Harness Metrics)
 - v3.7.0 — Code Transformation Validation (코드 변환 동등성 검증 — 3중 검증축 추가)
 - v3.6.0 — iOS/Swift 역방향 진단 트리거 + Concurrency Safety Audit (PR #3665 교훈 반영)

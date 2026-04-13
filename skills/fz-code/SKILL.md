@@ -90,6 +90,7 @@ model-strategy:
 |------|-----------|----------|
 | 빌드 **2회 연속** 실패 | `/sc:troubleshoot --fix` | **자동** |
 | 5+ 파일 변경한 Step | `/sc:analyze --focus quality` | **자동 제안** |
+| SOLO + 3+ 파일 변경 | `/sc:reflect --type correctness` | **자동** |
 | 3+ Step 구현 중간점 | `/sc:reflect --type task` | **필수** |
 | 복잡한 다중 파일 구현 | `/sc:implement` | 수동 |
 | API 불확실 | Context7 + `/sc:explain` | 수동 |
@@ -311,6 +312,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
+- [ ] SOLO + 3+ 파일 변경이면 `/sc:reflect` 실행했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
 - [ ] ⛔ Codex 교차 검증 완료? (TEAM 모드 — Lead가 /fz-codex check 실행)
 
 ---
