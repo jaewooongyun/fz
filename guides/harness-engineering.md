@@ -990,6 +990,17 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
 | Defense-in-Depth | 5계층: SKILL Gate + cross-validation + Team + Codex + Hooks | 다중 검증 레이어 |
 
+### Gap 분석 (NLAH 기반, 2026-04-14)
+
+위 매핑에서 커버되지 않는 하네스 구성요소:
+
+| NLAH 차원 | Gap ID | 내용 | 대응 |
+|----------|--------|------|------|
+| R (Roles) | G-R1 | SOLO에서 Generator≠Evaluator 무효화 | SOLO 결정론적 검증 삽입 (cross-validation.md § SOLO 모드) |
+| S (Stage) | G-S1 | 외부 이벤트(PR 코멘트) 진입점 없음 | pr-comment-review 파이프라인 (pipelines.md #19) |
+| F (Failure) | G-F1 | 추론 실패 자동 감지/복구 없음 | Runtime Claim Gate [관찰 모드] (cross-validation.md) |
+| Σ (State) | G-Σ1 | 컨텍스트 비용 높음 (스킬 1회 ~5K 토큰) | 인프라 제약 — 현재 전략(모듈 분리 + 500줄 제한) 유지 |
+
 ---
 
 ## 참고 문헌 (공식/학술/고품질만)

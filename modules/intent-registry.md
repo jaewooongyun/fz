@@ -25,6 +25,7 @@
 | fz-codex (drift) | `드리프트\|아키텍처.*점검\|레이어.*위반\|전체.*스캔\|점검해줘\|훑어봐\|전체.*봐줘\|전체.*확인해줘` | `drift\|arch.*check\|full.*scan` |
 | fz-codex (plan) | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` | `independent.*plan\|parallel.*plan\|cross.*plan` |
 | fz-memory | `메모리.*정리\|메모리.*관리\|메모리.*감사\|교훈.*회상\|기억.*떠올려` | `memory.*audit\|memory.*gc\|memory.*recall\|memory.*organize\|cleanup.*memory` |
+| fz — pipeline: pr-comment-review | `코드레빗\|PR.*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` | `coderabbit\|PR.*comment.*analysis\|external.*review.*comment\|review.*comment\|feedback.*check` |
 
 ## 구어체 보강 트리거
 
