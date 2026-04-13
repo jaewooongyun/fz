@@ -40,6 +40,8 @@
 | planning 생산 (Spec v3.8) | spec-verify | Codex가 Spec의 기술적 정확성 검증 (스레드 모델, 파라미터 의미론, Default-Deny) | TEAM 필수, SOLO 권장 |
 | cross-model 불일치 감지 | confident-error | Claude vs Codex 판정 불일치 → 교훈 기록 + 상세 분석 (uncertainty-verification.md) | 자동 |
 | code/review (Spec v3.8) | default-deny enforcement | Spec 기술적 주장에 [verified] 없으면 fail-closed | 모든 모드 (spec-version 3.8) |
+| 외부 피드백 수신 시 | external-feedback-verify | Read(시그니처) + 기존 패턴 대조 → valid/invalid 판정 | 모든 모드 |
+| 런타임 동작 단정 시 | runtime-claim-verify | Bash Swift 스크립트 실행 또는 "미검증" 표기 | 모든 모드 [관찰] |
 
 ---
 
@@ -274,6 +276,39 @@ code-changes 후 → build → [implication-scan] → codex check
 - [ ] 원본 상태를 정확히 식별했는가?
 - [ ] 키워드 기반이 아닌 상태 기반으로 범위 정의했는가?
 - [ ] 원본과의 동등성(origin-equivalence) 확인했는가?
+
+---
+
+## 외부 피드백 검증 (External Feedback Gate)
+
+> 하네스 원칙 4 적용: Generator≠Evaluator — 외부 피드백에 결정론적 검증 삽입
+
+트리거: CodeRabbit, Codex, 팀원이 "파라미터 누락/타입 불일치/동작 변경" 지적 시
+⛔ diff만 보고 동의/반박 금지.
+
+절차:
+1. Read(해당 함수 시그니처) — 오버로드 구분 포함
+2. 기존 동일 패턴(이전 PR, 같은 시리즈 이전 커밋) 대조
+3. 판정: valid / invalid / needs-investigation + 근거 1줄
+
+**Why:** ASD-1002 세션에서 CodeRabbit이 "includeGradeCode: false 누락" 지적 → diff만 보고 수긍 → 실제로 LegacyResponse 오버로드에 해당 파라미터가 존재하지 않았음. 같은 세션에서 2건 발생.
+
+---
+
+## 런타임 동작 주장 검증 (Runtime Claim Gate) [관찰 모드]
+
+> 하네스 NLAH-A: 비결정론적 추론 → 결정론적 어댑터(Bash) 교체
+
+트리거: "~는 안전하다", "~로 변환된다", "타입 캐스팅이 ~" 등 런타임 동작 단정
+조건: Swift 타입 시스템, Foundation API 동작, NSNumber 브리징 등 저수준 주장
+
+절차:
+1. 가능하면 Bash Swift 스크립트로 실제 실행하여 확인
+2. 실행 불가능하면 → "미검증 (추론)" 표기 후 사용자에게 고지
+
+> [관찰 모드]: 단일 사건(ASD-1002 castToSendable)에서 도출. 하네스 과적합 방지 원칙에 따라 2건+ 재발 시 lead-reasoning.md §8로 강화.
+
+**Why:** castToSendable의 Bool/Int 변환 안전성을 직관으로 "안전하다" 판단 → 취소 → Bash 테스트로 위험 확인. 실행 검증이 있었으면 1번에 끝났음.
 
 ---
 
