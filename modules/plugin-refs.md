@@ -88,7 +88,7 @@ Swift Concurrency/SwiftUI 플러그인 활성 여부와 **무관하게** 항상 
 | 참조 항목 | 적용 시점 |
 |----------|----------|
 | async-await-basics | async 함수 작성, async let 사용, **continuation bridge → native async 전환 판별** |
-| actors | @MainActor, actor 정의, isolation 설계 |
+| actors | @MainActor, actor 정의, isolation 설계, **패턴 변환 시 래퍼 범위 최소성 판단** |
 | tasks | Task 생성, TaskGroup 사용, cancellation 처리, **독립 비동기 호출 2+개 → async let 병렬화 검토** |
 | sendable | Sendable conformance, 경계 넘기 |
 | memory-management | Task 내 retain cycle 방지 |
@@ -105,6 +105,7 @@ Swift Concurrency/SwiftUI 플러그인 활성 여부와 **무관하게** 항상 
 
 - Structured concurrency 우선? (TaskGroup > 단독 Task)
 - @MainActor가 진정 필요한 곳에만 적용?
+- @MainActor 블록 범위가 최소인가? (불필요 문장 포함 여부) [ablation: scope-min-v1]
 - Sendable 경계에서 안전한 데이터 전달?
 - Task cancellation 적절히 처리?
 - retain cycle 방지? (Task 내 self 캡처)

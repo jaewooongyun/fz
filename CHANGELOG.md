@@ -1,5 +1,53 @@
 # Changelog
 
+### v3.10.0 (2026-04-15) — Scope Minimality
+
+**핵심**: 코드 패턴 변환 시 기계적 1:1 래핑을 방지하는 "의미 판단" 체크포인트를 파이프라인 3단계(Plan→Code→Review)에 추가.
+근거: PR #3694 (ASD-1002)에서 PromiseKit `.done` → `async/await` 전환 시, 클로저 전체를 `MainActor.run`으로 기계적 래핑하여 순수 연산까지 main thread에 묶는 실수 발생. hyundongyang 코멘트로 발견.
+
+**Zero-Exception Thread Rule 범위 한정** (`modules/code-transform-validation.md`)
+- 기존: "원본 main queue → After @MainActor 무조건" (기계적 전체 래핑 정당화)
+- 변경: @MainActor **보장**은 필수이나 블록 **범위**는 실제로 main thread가 필요한 문장에만 한정
+- Scope Minimality 단서 신규 추가 (Zero-Exception Rule 섹션 내)
+
+**BEC step 3.5: Wrapper Scope Minimality** (`modules/code-transform-validation.md`)
+- Behavioral Equivalence Check에 래퍼 범위 최소성 검증 단계 추가
+- "이 문장이 해당 컨텍스트를 필요로 하는가?" 개별 판단 의무화
+- 패턴 변환 시 Swift Concurrency 플러그인 필수 참조 지시 (BEC step 6)
+
+**마찰 신호: "래퍼 범위 과잉"** (`skills/fz-code/SKILL.md`, `modules/code-transform-validation.md`)
+- fz-code 25번째 마찰 패턴: @MainActor/do-catch/Task 블록 내 불필요 문장 포함 감지
+- code-transform-validation 5번째 마찰 신호: 동일 패턴
+- "스레드 컨텍스트 불일치"(too little)와 보완 쌍(too much)
+
+**fz-review 4-K: wrapper_overscope** (`skills/fz-review/SKILL.md`)
+- Transformation Equivalence 검증에 Wrapper Scope Minimality 체크 추가 (severity: Major)
+- Gate 4 체크리스트 + Harness Metrics 테이블 확장
+
+**plugin-refs.md actors 확장** (`modules/plugin-refs.md`)
+- 구현 시: actors 행에 "패턴 변환 시 래퍼 범위 최소성 판단" 추가
+- 리뷰 시: "@MainActor 블록 범위가 최소인가?" 체크 추가
+
+**버그 수정**
+- `code-transform-validation.md`: "Review(4-J)" → "Review(4-K)" 오표기 수정
+- `plugin.json`: 3.8.0 → 3.10.0 (v3.9.0 릴리즈 시 bump 누락 수정)
+- `marketplace.json`: 3.4.0 → 3.10.0 (동일)
+
+**ablation 관측**
+- 전체 새 항목에 `[ablation: scope-min-v1]` 태그 (4개 파일 8곳)
+- 3회 패턴 변환 작업 후 이슈 발견 >= 1이면 Load-bearing 승격, 0이면 제거 검토
+
+변경: 4개 파일, +14줄 -3줄. TEAM --deep (4 agents, 2 rounds) + 3중 리뷰 (3 agents) 검증.
+
+---
+
+### v3.9.0 (2026-04-14) — Harness Engineering Enhancement
+
+**핵심**: SOLO 모드에서 Generator≠Evaluator 분리 불가능한 구조적 Gap 해소 + PR 코멘트 학습 파이프라인 설계.
+근거: harness-engineering.md 작성 과정에서 발견한 NLAH Gap 5건 중 상위 2건.
+
+---
+
 ### v3.8.0 (2026-04-12) — Uncertainty-Aware Harness
 
 **핵심**: LLM이 모르는 것을 인정하고, 검증 도구로 확인하고, 실패에서 학습하는 하네스 시스템.
