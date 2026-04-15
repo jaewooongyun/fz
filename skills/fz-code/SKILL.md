@@ -220,6 +220,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | 파라미터 키 불일치 | 원본 API에 없던 키 추가 또는 삭제. nil → default value 전송 포함 | omit ≠ explicit default — 서버 동작 변경 가능. AskUserQuestion: "이 키 추가가 의도적인가?" |
    | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가 잔존 | [Q-WHY] "이 구조가 추가된 이유가 해소됐는가?" find_referencing_symbols로 확인. 참조: modules/lead-reasoning.md §7 |
    | 스레드 컨텍스트 불일치 | Plan Transformation Spec에 "@MainActor 필수" → 구현이 일반 Task. 원본이 main queue(PromiseKit .done 등)인데 After가 background Task | 원본 main queue 미보존 — `@MainActor Task` 필요. 참조: `modules/code-transform-validation.md` |
+   | 래퍼 범위 과잉 | @MainActor/do-catch/Task 블록 내에 해당 컨텍스트 불필요 문장 포함. 원본 `.done { UI업데이트; 데이터변환 }` → After `MainActor.run { UI업데이트; 데이터변환 }` 전체 래핑 | 기계적 1:1 변환 — 문장별 컨텍스트 필요성 판단 후 최소 범위 분리. 참조: `modules/code-transform-validation.md` [ablation: scope-min-v1] |
    | 에러 경로 축소 | 원본 switch/catch 분기 N개 → After catch < N개. `== .case(value)` 비교 사용 | enum associated value 무시. `if case` 패턴 매칭 필수 |
    | 퀄리티 역행 | After 줄 수 > Before 2배. 원본 추상화(struct/helper/extension)가 인라인 해체 | 리팩토링이 코드 악화. protocol extension/convenience 검토 |
    | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지. Gate 3 전 일괄 보고 |
@@ -267,7 +268,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    - Spec "에러 처리" ↔ 구현의 catch 분기 수 + 패턴 대조
    - Spec "추상화 수준" ↔ 구현 줄 수 대조
    - 불일치 → 마찰 보고 → 사용자 확인. 참조: `modules/code-transform-validation.md`
-   - ⛔ Spec "실행 스레드" ↔ @MainActor: Zero-Exception 기계적 확인. 원본 main queue → After @MainActor 무조건
+   - ⛔ Spec "실행 스레드" ↔ @MainActor: Zero-Exception 기계적 확인. 원본 main queue → After @MainActor 보장 (범위는 필요 문장에만 한정 — `code-transform-validation.md` Scope Minimality 단서)
    - ⛔ Spec "요청 파라미터" ↔ 키 목록: 추가/삭제 0건 확인
    - ⛔ [verified] 태그 확인 (fail-closed): Spec에 [verified] 없는 주장 → 구현 전 검증 강제 (uncertainty-verification.md)
 

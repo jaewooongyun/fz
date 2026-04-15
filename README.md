@@ -236,8 +236,9 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v3.9.0** (2026-04-14)
+**현재 버전: v3.10.0** (2026-04-15)
 
+- v3.10.0 — Scope Minimality (기계적 코드 변환 방지 — Zero-Exception 범위 한정 + BEC 3.5 + 마찰 감지 + 4-K 검증)
 - v3.9.0 — Harness Engineering Enhancement (SOLO G≠E 결정론적 검증 + PR 코멘트 파이프라인 + NLAH Gap 분석)
 - v3.8.0 — Uncertainty-Aware Harness (Default-Deny 검증 + Zero-Exception Thread + Harness Metrics)
 - v3.7.0 — Code Transformation Validation (코드 변환 동등성 검증 — 3중 검증축 추가)

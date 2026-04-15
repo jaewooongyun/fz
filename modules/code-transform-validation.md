@@ -54,6 +54,8 @@ spec-version: 3.8
 
 > "thread-safe"는 예외 근거가 될 수 없다. mutation safety ≠ downstream observer 실행 스레드.
 
+> ⛔ Scope Minimality 단서: @MainActor **보장**은 필수이나, 블록 **범위**는 실제로 main thread가 필요한 문장에만 한정한다. 원본 `.done { A; B; C }` 중 A만 UI 조작이면 → `@MainActor in { A }` + `B; C`는 블록 외부. 전체 래핑은 기계적 변환. [ablation: scope-min-v1]
+
 ## 검증 체크리스트
 
 ### fz-plan (Spec 작성 시)
@@ -79,10 +81,13 @@ Transformation Spec이 있는 Step 완료 후:
    - Spec "에러 처리" ↔ After catch 분기 수 + 패턴
    - Spec "추상화 수준" ↔ After 줄 수
    - ⛔ Spec "요청 파라미터" ↔ After 파라미터 키 — 추가/삭제 0건 확인
+   - ⛔ Wrapper Scope Minimality: @MainActor/do-catch 블록 내 각 문장 → "이 문장이 해당 컨텍스트를 필요로 하는가?" 개별 판단. 불필요 문장 포함 → 블록 밖으로 분리 [ablation: scope-min-v1]
+     └ 판단 기준: 이 파일 상단 "Scope Minimality 단서" 참조
 4. ⛔ [verified] 태그 확인 (fail-closed):
    - Spec의 기술적 주장 중 [verified] 없는 항목 → 구현 전 검증 강제
    - 검증 방법: uncertainty-verification.md의 Cost Tiers 참조
 5. 불일치 → 마찰 보고 → 사용자 확인
+6. ⛔ 패턴 변환 감지 시 Swift Concurrency 플러그인 필수 참조 (`modules/plugin-refs.md` — actors, tasks). 자동 감지 트리거에만 의존 금지 [ablation: scope-min-v1]
 ```
 
 ### fz-review (diff 검증 시 — 검증 4-K)
@@ -135,6 +140,7 @@ Transformation Spec이 있는 Step 완료 후:
 | 에러 경로 축소 | 원본 catch 분기 N개 → After < N개. `== .case` 사용 | enum case 합침. 동작 변경 |
 | 퀄리티 역행 | After 줄 수 > Before 2배, 추상화 인라인 해체 | 리팩토링이 코드를 악화 |
 | 파라미터 키 불일치 | 원본 API에 없던 키 추가 또는 있던 키 제거. nil → default value 전송도 "추가"에 해당 | omit ≠ explicit default — 서버 동작 변경 가능 |
+| 래퍼 범위 과잉 | @MainActor/do-catch/Task 블록이 해당 컨텍스트 불필요 문장을 포함. 원본 `.done { A; B; C }` → After `MainActor.run { A; B; C }` 전체 래핑 | 기계적 1:1 변환 증상 — 문장별 컨텍스트 필요성 판단 후 최소 범위로 분리 [ablation: scope-min-v1] |
 
 ---
 
@@ -142,4 +148,4 @@ Transformation Spec이 있는 Step 완료 후:
 
 - Progressive Disclosure Level 3
 - 트리거 기반: 패턴 변환 감지 시에만 활성. 단순 치환은 생략
-- 3중 검증: Plan(Spec) → Code(BEC) → Review(4-J)
+- 3중 검증: Plan(Spec) → Code(BEC) → Review(4-K)
