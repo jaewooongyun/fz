@@ -77,6 +77,22 @@ SendMessage(lead): "빌드 검증 필요합니다. 대상: MyApp scheme, 변경 
 <!-- model-upgrade: opus when Primary in plan/code/full-cycle teams -->
 ```
 
+### 승격 메커니즘 상세
+
+승격은 **TeamCreate 시 Lead가 명시적으로 model 파라미터를 지정**하여 이루어진다:
+- 에이전트 파일의 `model: sonnet`은 **기본값** (SOLO 모드, 또는 Supporting 역할 시)
+- TeamCreate에서 Primary Worker로 지정될 때 Lead가 `model: opus`로 오버라이드
+- 에이전트 파일에는 주석(`# 승격: ... opus`)으로 승격 조건만 기록
+- 실제 승격 여부는 `team-registry.md`의 `promoted-model` 컬럼이 결정
+
+```
+예시:
+  TeamCreate("plan-feature-x")
+  → plan-structure: model=opus (promoted-model=opus이므로)
+  → review-arch: model=sonnet (promoted-model 없음)
+  → review-direction: model=sonnet (기본), Phase 0.5에서 순차 opus 승격
+```
+
 ### Agent 파일 체크리스트
 
 - [ ] name: `{domain}-{specialty}` (예: `plan-structure`, `review-arch`)
