@@ -178,6 +178,12 @@ fz- 스킬 + 에이전트를 일괄 검증합니다.
 | 9 | fz-* | 테스트 케이스 존재 | SKILL.md에 "## 테스트 케이스" 섹션 또는 참조 링크 |
 | 10 | fz-* | Triggering 테스트 | should trigger + should NOT trigger 최소 3개 |
 | 11 | Infra | skill-creator 설치 | Glob으로 `run_loop.py` 탐색 → 있으면 OK, 없으면 WARN |
+| 12 | Agent | frontmatter tools ↔ 본문 도구 정합 | frontmatter tools 파싱 → 본문 Primary/Secondary 도구와 교차 대조 |
+| 13 | fz-* + Agent | CLAUDE.md 섹션 참조 유효성 | `## {섹션명}` 패턴 추출 → CLAUDE.md 헤딩과 교차 확인 |
+| 14 | Module | 목차 ↔ 본문 섹션 일치 | 상단 나열과 실제 ## 헤딩 비교 |
+| 15 | Infra | CLAUDE.md 금지 패턴 준수 | Grep(head/tail 등 금지 패턴) → 모듈/스킬 내 0건 확인 |
+| 16 | Agent | team-registry ↔ patterns 참여자 일치 | team-registry 에이전트 목록 ↔ patterns/*.md 역할 테이블 양방향 대조 |
+| 17 | fz-* | Gate 증거 패턴 존재 | Gate 체크리스트에 "Evidence:" 행 존재 여부 확인 |
 
 ### 출력 형식
 

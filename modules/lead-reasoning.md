@@ -14,6 +14,70 @@
 
 ---
 
+## 1.5. 추론 원칙: Conclusion Scope Verification
+
+**결론 범위 불일치**: "안전하다/문제없다/OK" 결론에 도달했을 때, 그 결론의 범위가 원래 질문의 범위와 일치하는지 검증한다.
+
+### 부분 → 전체 오류 (Partial-to-Whole Fallacy)
+
+한 측면의 긍정적 결론이 전체 평가를 대체하는 오류.
+
+```
+BAD:  hackleApp?.variation() → nil → 기본값 "A" → "안전" → 분석 종료
+      → setUserId() nil 동작(userId 유실) 미분석
+
+GOOD: hackleApp?.variation() → nil → 클라이언트 기본값 "A"
+      hackleApp?.setUserId() → nil → 서버 IDENTIFIER_NOT_FOUND
+      hackleApp?.track() → nil → 이벤트 유실
+      → 클라이언트 안전 / 서버 데이터 유실 → 부분적 안전
+```
+
+**원칙**: "안전하다" 결론 도달 시 → "이 결론이 다루지 않는 측면은?" 자문. 같은 객체/모듈의 다른 메서드, 다른 이해관계자(클라이언트/서버/대시보드)를 명시적으로 나열.
+
+### 현재 → 본질 오류 (Contingent-to-Inherent Fallacy)
+
+현재 조건에서의 안전을 본질적 안전으로 취급하는 오류.
+
+```
+BAD:  "현재 호출부 1곳 → 동시 접근 없음 → thread-safe"
+      → public 싱글톤 메서드에 호출부가 추가되면 즉시 unsafe
+
+GOOD: "public 싱글톤 메서드 → 누구든 어디서든 호출 가능 → 본질적으로 thread-safe 구조 필수"
+```
+
+**원칙**: 안전성 판단은 "현재 사용 방식"이 아닌 "이 코드의 접근성과 설계"로. public = 미래 호출부 가정 필수. 싱글톤 = 다중 스레드 접근 가정 필수.
+
+### 연산 분류 오류 (Operation Classification Fallacy)
+
+한 블록 내의 "순수 연산"과 "side effect"를 같은 스레드 안전성 범주로 취급하는 오류.
+
+```
+BAD:  "JSON 파싱은 순수 연산 → 프로퍼티 할당도 MainActor 불필요"
+      → 파싱(순수: 입력→출력, 외부 상태 변경 없음)과 할당(side effect: self.property 변경)은 다른 범주
+      → 프로퍼티 할당을 background에서 실행하면 Main thread 소비자와 data race
+
+GOOD: "JSON 파싱은 background OK. 프로퍼티 할당은 소비자 스레드를 확인 후 결정"
+      → 파싱: let json = try JSONSerialization... (순수 → 어디서든 OK)
+      → 할당: self.requestId = value (side effect → 소비자가 Main이면 MainActor 필요)
+```
+
+**원칙**: 코드 블록을 "MainActor 밖으로 이동"할 때, 블록 내 각 문장을 순수 연산(외부 상태 무변경)과 side effect(프로퍼티 할당, UI 갱신, 알림 발송)로 분류. side effect는 소비자 스레드를 확인 후 배치.
+
+### 복합 오류 (Compound Fallacy) — 엣지 케이스
+
+두 오류가 결합되면 검출이 더 어려워진다.
+
+```
+BAD:  "현재 호출부 1곳 → 동시 접근 없음" + "앱 크래시 안 함 → 안전"
+      → Contingent-to-Inherent + Partial-to-Whole 복합
+      → 미래 호출부 미고려 + 서버 데이터 유실 미분석
+
+GOOD: "public 싱글톤 → 다중 접근 가정" + "클라이언트/서버/대시보드 각각 평가"
+      → 본질적 안전성 기준 적용 + 이해관계자별 독립 평가
+```
+
+---
+
 ## 2. 카테고리 분류
 
 ### Execution Implication (실행 함의)
@@ -62,6 +126,15 @@
 ```
 [Q-OBSERVE]   지시와 무관하게, 탐색 중 설계 문제를 발견했는가?
              → 발견 시 [함의-B] 형식 기록. 실행 금지. 보고 상한: 최대 2건.
+[Q-SCOPE]     "안전/OK" 결론의 범위가 질문 전체를 커버하는가?
+             → 같은 객체의 다른 메서드, 다른 이해관계자(클라이언트/서버)를 분석했는가?
+             → "이 결론이 다루지 않는 측면은?" 명시. 빈 답변 = 분석 부족 의심.
+[Q-INHERENT]  이 판단은 본질적 속성인가, 현재 조건인가?
+             → "현재 N곳/현재 단일 스레드/현재 사용하지 않음" = 현재 조건 (불안정)
+             → "private/actor/lock 보호/프로토콜 제약" = 본질적 속성 (안정)
+[Q-COVERAGE]  분석 범위가 "전체/모든"인데, 실제로 전체를 다뤘는가?
+             → Glob/find 결과 N개 중 분석한 M개. M/N < 100%면 누락 목록 명시.
+             → "분석하지 않은 영역"이 빈 목록이면 분석 부족 의심.
 ```
 
 ---
@@ -112,7 +185,7 @@ plan 출력에 포함하여 code→review까지 cross-phase 전달.
 
 | 모드 | 조건 | 실행 범위 |
 |------|------|----------|
-| **전체** | 1차/2차 트리거 해당 | Q-WHY + Q-COMPLETE + Q-EFFECT + Q-OBSERVE |
+| **전체** | 1차/2차 트리거 해당 | Q-WHY + Q-COMPLETE + Q-EFFECT + 상시(Q-OBSERVE, Q-SCOPE, Q-INHERENT) |
 | **최소** | urgency 신호 ("빠르게", "급해") | 실행 함의(컴파일 직결)만. 관찰은 파일 저장만, 출력 안 함 |
 | **revert** | revert/되돌리기 작업 | 실행 함의 비활성. 관찰만 선택적 허용. "원본에도 존재하던 패턴" 제외 |
 
@@ -142,9 +215,9 @@ plan의 Anti-Pattern Constraints 작성 시 참조.
 
 변경 유형: `프로토콜 변경`, `access control 변경`, `init/signature 변경`, `모듈 경계 변경`
 
-### 상시 (Q-OBSERVE만)
+### 상시 (Q-OBSERVE + Q-SCOPE + Q-INHERENT)
 
-모든 코드 변경에서 경량 스캔.
+모든 코드 변경 + 문서/파일 전체 분석에서 경량 스캔. 안전성 결론의 범위 검증(§1.5) + 분석 커버리지 검증(Q-COVERAGE)을 포함.
 
 ---
 

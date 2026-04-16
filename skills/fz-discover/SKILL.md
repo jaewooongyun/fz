@@ -44,6 +44,7 @@ model-strategy:
 ## 개요
 
 > ⛔ Phase 0 (PRJ Pre-flight) → Phase 1 (Problem Framing) → Phase 2 (Landscape Exploration) ↔ 사용자 대화 → Phase 3 (Path Mapping) → Phase 4 (Handoff)
+> 루프 프리미티브: Tree Search (Adversarial Discovery) (H6, Inside the Scaffold)
 
 - 발산 중심 (Fan-out): 가능한 경로를 넓게 탐색
 - Reject-Extract-Propose 프로토콜: 거절 → 조건 추출 → 대안 제시를 한 턴에
@@ -70,6 +71,7 @@ model-strategy:
 | modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (Adversarial Constraint Discovery 패턴) |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
+| modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -238,6 +240,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 - [ ] 핵심 결정 사항이 명확하게 식별되었는가?
 - [ ] 관련 코드 구조를 탐색했는가?
 - [ ] 초기 제약이 1개 이상 식별되었는가?
+- [ ] "전체" 분석 요청이면 Coverage Gate 통과? (대상 N개, 분석 M개, M/N = {비율}%)
 
 ---
 
