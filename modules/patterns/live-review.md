@@ -13,9 +13,10 @@
 | Supporting | review-quality (S) | 코드 품질 + Dead Code + 성능 + 리팩토링 완성도 |
 | Supporting | review-correctness (S) | 요구사항 충족 (Phase 4.5만, RTM/plan 존재 시) |
 | Supporting | memory-curator (S) | 관련 교훈 발굴 (기본 포함, lightweight recall) |
+| Supporting | review-counter (S) | 역방향 검증 — 다른 에이전트 판단에 반론 (선택적 DA 패스) |
 
 review-arch가 Primary (opus 승격). 나머지 Supporting (sonnet). Lead가 통합.
-/fz-peer-review는 review-correctness, memory-curator 미포함 (review-arch + review-quality + review-counter만).
+/fz-peer-review는 review-correctness, memory-curator 미포함.
 
 ## 2.5-Turn 적용 (Mesh, 2명)
 
