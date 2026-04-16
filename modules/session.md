@@ -44,7 +44,7 @@ mkdir -p "$TRACKER_DIR"
 
 find_recent_session() {
   RECENT=$(find "$TRACKER_DIR" -name "SESSION-*_issues.json" -mmin -60 2>/dev/null | \
-           xargs ls -t 2>/dev/null | head -1)
+           xargs ls -t 2>/dev/null | awk 'NR==1')
   echo "$RECENT"
 }
 

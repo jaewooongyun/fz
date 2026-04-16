@@ -3,7 +3,7 @@ name: review-quality
 description: >-
   코드 품질 + Dead Code + 성능 리뷰 에이전트. 기능 분리, API 사용, 성능 평가.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__search_for_pattern, mcp__context7__query-docs
 memory: project
 skills:
   - code-auditor
@@ -33,7 +33,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - **리팩토링 완성도** (리팩토링 커밋에만): 미참조 심볼 잔존 여부 확인 (심볼 참조 카운팅)
 - **삭제 vs 이동 판별**: diff에서 코드 삭제 발견 시 "누락"으로 즉단하지 않는다. 모듈화/리팩토링에서 레이어 간 이동(Interactor→UseCase 등)은 정상. PR diff 전체에서 동일 로직의 이동 여부를 반드시 확인 후 판정
 - 코딩 표준 준수 — CLAUDE.md `## Code Conventions` 참조
-- CLAUDE.md `## Guidelines` 의 네이밍/포맷 규칙 위반 확인
+- CLAUDE.md `## Code Conventions` 의 네이밍/포맷 규칙 위반 확인
 
 ### 3. Performance Awareness
 

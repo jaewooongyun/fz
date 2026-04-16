@@ -34,7 +34,7 @@ diff 크기에 따라 Codex 호출 전략을 자동 선택합니다.
 
 **크기 측정**:
 ```bash
-DIFF_LINES=$(cd "$GIT_ROOT" && git diff --base "$BASE_BRANCH" --stat | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+')
+DIFF_LINES=$(cd "$GIT_ROOT" && git diff --base "$BASE_BRANCH" --stat | awk 'END{print}' | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+')
 ```
 
 | diff 크기 | 전략 | 실행 방법 |
@@ -77,3 +77,18 @@ Plugin 미설치 시 모든 서브커맨드가 CLI로 동작 (폴백 투명).
 | validate | `codex exec` | 이슈 목록 + `--output-schema` JSON 필요 |
 
 **심화 패턴**: `codex exec review`로 1차 리뷰 → `codex exec resume --last`로 특정 이슈 심화 검증. `final`에서 자동 적용.
+
+## Sandbox Permissions
+
+Codex CLI의 `sandbox_permissions` 설정:
+
+| 권한 | 용도 | 사용 스킬 |
+|------|------|----------|
+| `disk-full-read-access` | 전체 코드베이스 읽기 (drift 스캔, 독립 플랜) | fz-drift, fz-planner |
+| `read-only` (기본) | 변경 없이 읽기만 | fz-challenger, fz-searcher |
+| (미지정) | Codex 기본 샌드박스 | fz-reviewer, fz-guardian, fz-fixer |
+
+설정 방법: `codex exec -c 'sandbox_permissions=["disk-full-read-access"]'`
+
+> `disk-full-read-access`는 Codex가 프로젝트 디렉토리 전체를 읽을 수 있게 허용한다.
+> 쓰기 권한은 부여하지 않으므로 코드 수정 위험 없음.

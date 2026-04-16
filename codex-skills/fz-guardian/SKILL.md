@@ -11,7 +11,7 @@ Verify that feedback has been fully applied and no regressions are introduced.
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and layer rules.
-3. `## Guidelines` — find and read guideline files (paths relative to GIT_ROOT):
+3. Guideline files — find and read (paths relative to GIT_ROOT):
    - `AI/ai-guidelines.md` — coding rules and project conventions.
    - `AI/review-guidelines.md` — review standards and criteria.
 4. `## Code Conventions` — identify coding rules.
@@ -52,9 +52,16 @@ Verify that feedback has been fully applied and no regressions are introduced.
 - Check that existing behavior is preserved where intended.
 - Flag any behavioral changes that were not explicitly requested.
 
+### Transformation Equivalence (패턴 변환 포함 피드백 시)
+- 피드백에 비동기 패턴 변환(PromiseKit→async, callback→async 등)이 포함될 때:
+- 원본 API 스레드 특성 확인 (PromiseKit .done = main queue)
+- After 패턴이 스레드/에러 수준에서 원본과 동등한지 검증
+- Zero-Exception Thread: 원본 main queue → After @MainActor 필수
+- After 줄 수 > Before 2배 → 추상화 부재 경고
+
 ## Output Format
 
-Matches `codex_verification_schema.json`. Key enum values:
+Matches `schemas/codex_verification_schema.json`. Key enum values:
 - `resolution_status`: `resolved` | `partially_resolved` | `unresolved` | `regressed`
 - `verdict`: `pass` | `needs_work` | `fail`
 - Feedback reflection rate: `(resolved*1.0 + partially_resolved*0.5) / total_issues`

@@ -11,7 +11,7 @@ Validate plans and designs for architectural consistency and completeness.
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and layer rules.
-3. `## Guidelines` — find and read guideline files (paths relative to GIT_ROOT):
+3. Guideline files — find and read (paths relative to GIT_ROOT):
    - `AI/ai-guidelines.md` — coding rules and project conventions.
    - `AI/review-guidelines.md` — review standards and criteria.
 4. `## Code Conventions` — identify coding rules and structural conventions.
@@ -35,13 +35,15 @@ Validate plans and designs for architectural consistency and completeness.
 - Side effects on existing functionality are documented.
 - Migration or backward compatibility needs are addressed.
 
-### Stress Test Questions (Q1-Q5)
+### Stress Test Questions (Q1-Q7)
 Independently verify each design decision against:
 - Q1 다중성: 이 설계가 1개일 때와 N개일 때 동일하게 작동하는가?
 - Q2 소비자 영향: 변경의 소비자(상위 레이어)에 새 분기/타입/프로토콜이 필요한가?
 - Q3 복잡도 이동: 한 레이어의 단순화가 다른 레이어의 복잡도 증가로 이어지는가?
 - Q4 경계 케이스: 이 추상화가 커버하지 못하는 케이스는 무엇이고, 대안은?
 - Q5 접근 경계: 의도한 접근 경로가 실제로 차단되는가? access modifier가 의도와 일치하는가?
+- Q6 이벤트 스코프: 이벤트/로그 전송이 포함된 설계라면, 각 이벤트가 측정 목적에 부합하는가? 이벤트 발화 위치의 컨텍스트가 측정 대상과 일치하는가?
+- Q7 소비자 코드 품질: 모듈화/캡슐화 작업인 경우, 앱 측 소비자 코드가 모듈의 public API를 올바르게 사용하는가? 앱 생명주기 진입점의 모듈 연동이 정상인가?
 
 ### Q8 Implication Coverage
 - Does the plan cover the "semantic scope" of the instruction, not just the "literal scope"?
@@ -90,6 +92,15 @@ func routeToPlayer() {
     attachChild(playerBuilder.build(withListener: interactable))
 }
 ```
+
+## iOS Domain Knowledge (Architecture Focus)
+
+> iOS 16 최소 타겟. iOS 17+ API는 `#available` 필수.
+
+- **RIBs**: Router=navigation, Interactor=business logic, Builder=DI. 계획이 역할을 위반하지 않는지 확인
+- **SwiftUI State**: iOS 16 = `ObservableObject + @StateObject` / iOS 17+ = `@Observable + @State` (`#available`)
+- **Concurrency**: `@MainActor` 범위 최소화. 계획에서 스레드 전환이 포함되면 원본 스레드 특성 확인
+- **모듈 경계**: public 타입이 모듈 책임 범위에 속하는지. 도메인 특화 필드가 인프라 모듈에 침투하지 않는지
 
 ## Code Transformation Validation (패턴 변환 포함 계획 시)
 

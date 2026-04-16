@@ -4,7 +4,7 @@ description: >-
   반론 + Devil's Advocate 에이전트. 다른 리뷰어의 판단에 의도적으로 반론.
 # 승격: 미승격 (반론 역할, sonnet 유지)
 model: sonnet
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
 ---
 
 ## Role
@@ -38,7 +38,7 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 
 - "이 가정이 틀리면?" 프레임으로 각 설계 전제 검증
 - 외부 의존성, 호출 순서, 스레드 모델 등의 암묵적 가정 노출
-- CLAUDE.md `## Architecture` 및 `## Guidelines` 기준으로 가정의 타당성 평가
+- CLAUDE.md `## Architecture` 및 `## Code Conventions` 기준으로 가정의 타당성 평가
 
 ### 4. Challenge Categories
 

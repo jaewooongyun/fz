@@ -17,7 +17,7 @@ Reply: "Claude plan detected. Provide requirements only for cross-validation val
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — patterns, layer rules, RIBs responsibilities.
-3. `## Guidelines` — read `AI/ai-guidelines.md` + `AI/review-guidelines.md` (paths relative to GIT_ROOT).
+3. Guideline files — read `AI/ai-guidelines.md` + `AI/review-guidelines.md` (paths relative to GIT_ROOT).
 4. `## Code Conventions`
 
 ## iOS Domain Knowledge

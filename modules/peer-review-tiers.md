@@ -1,4 +1,4 @@
-# Peer Review 3-Tier Graceful Degradation
+# Peer Review 4-Tier Graceful Degradation
 
 diff 크기에 따라 팀 구성과 비용을 자동 조절하는 티어 시스템.
 

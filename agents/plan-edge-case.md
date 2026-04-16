@@ -13,12 +13,12 @@ tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
 ## MCP 도구
 
 - Serena (`find_referencing_symbols`): 변경 대상의 소비자 탐색 및 영향 파악
-- sequential-thinking: 복합 실패 시나리오 추론
+- 복합 실패 시나리오 추론: Lead에게 sequential-thinking 실행 요청
 
 ## 프로젝트 규칙
 
 - 아키텍처: CLAUDE.md `## Architecture` 섹션의 패턴과 레이어 규칙을 따른다.
-- 코딩 표준: CLAUDE.md `## Guidelines` + `## Code Conventions` 섹션을 따른다.
+- 코딩 표준: CLAUDE.md `## Code Conventions` 섹션을 따른다.
 
 ## 탐색 범주
 
