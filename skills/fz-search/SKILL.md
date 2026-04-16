@@ -44,6 +44,7 @@ model-strategy:
 
 > ⛔ Phase 0 (ASD Pre-flight) → 4가지 모드: arch | layer | impact | pattern
 > 2가지 실행 방식: 순차(기본) | 병렬 교차 검증(--deep)
+> 루프 프리미티브: ReAct (H6, Inside the Scaffold)
 
 - CLAUDE.md `## Directory Structure`의 git-root 기준으로 탐색
 - 프로젝트 아키텍처 구조를 이해하는 전용 탐색
@@ -67,6 +68,7 @@ model-strategy:
 |------|------|
 | modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (TeamCreate 강제 + 상호 통신) |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+| modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
 
 ## Plugin 참조 (SwiftUI)
 
@@ -355,6 +357,7 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 - [ ] 대상 심볼/패턴 파악 완료?
 - [ ] 영향 범위 식별?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
+- [ ] "전체/전수" 탐색 요청이면 Coverage Gate 통과? (modules/cross-validation.md § Coverage Gate 참조)
 
 ---
 

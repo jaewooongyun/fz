@@ -2,16 +2,39 @@
 
 > 실전 최적화 체크리스트. 이론이 아닌 즉시 적용 가능한 가이드.
 >
-> **Sources:**
-> - Anthropic Claude 4 Best Practices (2026-02-24)
+> **Sources (last audited: 2026-04-16):**
+>
+> **Tier 1 — Anthropic Official:**
+> - Claude 4 Best Practices (live docs, Claude 4.6 포함) — prompt-engineering, agentic systems, adaptive thinking
 > - Anthropic Skill Authoring Best Practices
-> - Anthropic 32-page Skills Guide (2026-01-29)
-> - ACE: Agentic Context Engineering (Stanford, arXiv 2510.04618)
-> - Context Rot (Chroma Research, 18 frontier models)
-> - Building Effective Agents (Anthropic 2024-12)
-> - Agents at Work: 2026 Playbook
-> - S10: Anthropic Platform Best Practices (2026) — Long context tips, State management (structured+unstructured), Context awareness, Multi-context window workflows
-> - S11: Anthropic Claude Code Best Practices (2026) — /btw ephemeral pattern, Kitchen sink 방지, Subagent isolation, Compaction instructions in CLAUDE.md, filesystem > compaction
+> - Anthropic 32-page Skills Guide (2026-01-29) — progressive disclosure, trigger testing, YAML, skill-MCP
+> - Building Effective Agents (Anthropic 2024-12) — foundational, augmented-LLM building blocks
+> - Effective Harnesses for Long-Running Agents (Anthropic 2025-11) — Initializer/Coding Agent 패턴, JSON > Markdown, clean state
+> - Harness Design for Long-Running Apps (Anthropic 2026-03) — Planner/Generator/Evaluator, **"self-evaluation is unreliable"**, context reset > compaction
+> - Scaling Managed Agents (Anthropic 2026-04) — Brain/Hands/Session 분리, session = queryable event log
+> - 2026 Agentic Coding Trends Report (Anthropic) — 산업 데이터, human-in-the-loop 패턴
+> - Anthropic Platform Best Practices (living reference) — Long context, State management, Multi-context workflows
+> - Anthropic Claude Code Best Practices (living reference) — Subagent isolation, Compaction, filesystem > compaction
+>
+> **Tier 2 — Academic (peer-reviewed):**
+> - ACE: Agentic Context Engineering v3 (Stanford, ICLR 2026, arXiv 2510.04618) — context collapse, brevity bias
+> - Context Rot (Chroma Research, 18 frontier models) — 집중된 300토큰 > 비집중 113K토큰
+> - IFScale (arXiv 2507.11538) — 규칙 수 증가 → 정확도 저하 (500규칙→68%)
+> - MAST (NeurIPS 2025, arXiv 2503.13657) — multi-agent 실패 14모드, 67% 에이전트 상호작용에서 발생
+> - Inside the Scaffold (arXiv 2604.03515, 2026-04) — 13개 코딩 에이전트 분석, 5가지 루프 프리미티브
+> - Multi-Agent Collaboration Survey (arXiv 2501.06322) — 협업 유형/구조/전략/프로토콜 분류
+> - CONSENSAGENT (ACL 2025) — 동적 프롬프트 정제로 sycophancy 완화
+>
+> **Tier 3 — Community/Practitioner:**
+> - Agents at Work: 2026 Playbook — ReAct, verification-aware planning, circuit breakers
+> - Addy Osmani: The Code Agent Orchestra (2026) — Claude Code subagents, peer-to-peer messaging
+> - Context Mode (mksg.lu) — 98% 토큰 축소, FTS5 세션 연속성
+> - Cloudflare Code Mode — MCP→TypeScript API, ~1000토큰
+>
+> **Deprecated (2026-04-16 퇴출):**
+> - ~~DyLAN (COLM 2024)~~ → Multi-Agent Collaboration Survey로 대체 (Claude 4.x 이전 벤치마크)
+> - ~~서브에이전트 토큰 연구 (dev.to)~~ → Anthropic Agent Teams 공식 문서로 대체
+> - ~~hyperdev 컨텍스트 보호~~ → Claude Code 네이티브 기능으로 흡수됨
 
 ---
 
@@ -210,22 +233,23 @@ Output: 빈 배열 []은 정상 응답. 404와 구분 필요 → /src/api/errorH
 
 ---
 
-### 원칙 6: 피드백 루프 내장
+### 원칙 6: 피드백 루프 내장 — 외부 검증 우선
 
-**근거:** Anthropic + Building Effective Agents. 생성만 하고 검증하지 않으면 오류가 누적된다.
-
-**Pattern:** 생성 -> 검증 -> 수정 -> 재검증
+**근거**: §3b H2 참조 — "Self-evaluation is unreliable." 같은 모델이 생성하고 같은 모델이 검증하면 동일한 맹점을 공유한다.
 
 **체크리스트:**
 - [ ] Gate 조건을 체크리스트 형태로 명시했는가?
 - [ ] 실패 시 구체적 행동이 명시되어 있는가?
 - [ ] "validate -> fix -> repeat" 패턴이 적용되어 있는가?
 - [ ] 최대 반복 횟수가 설정되어 있는가?
+- [ ] **검증 주체가 생성 주체와 독립되어 있는가?** (self-eval 지양)
 
 **Before / After:**
 ```
 BAD:  "코드를 작성하라"
+BAD:  "코드를 작성하고 스스로 리뷰하라" → self-evaluation은 unreliable (Anthropic 2026-03)
 GOOD: "코드를 작성하라. 완료 후 typecheck를 실행하고, 실패 시 수정하라. 3회 반복 후에도 실패하면 보고하라."
+BEST: "코드를 작성하라. Codex로 교차 검증 후, 불일치 시 수정. 3회 반복 후 에스컬레이션."
 ```
 
 ---
@@ -367,8 +391,8 @@ GOOD: "Check the relevant files before making changes"
 
 ## 1b. TEAM 모드 추론 품질 3원칙 (2026-03-10 추가)
 
-> Sources: MAST 프레임워크 (arXiv 2503.13657), DyLAN (COLM 2024), Addy Osmani Agent Teams
-> 참고: `fz-enhancement/references.md`
+> Sources: MAST (NeurIPS 2025, arXiv 2503.13657), Multi-Agent Collaboration Survey (arXiv 2501.06322), CONSENSAGENT (ACL 2025), Addy Osmani: The Code Agent Orchestra (2026)
+> Harness: Harness Design for Long-Running Apps (Anthropic 2026-03) — "self-evaluation is unreliable" → cross-model 검증 정당화
 
 TEAM 모드에서 고성능 추론을 보장하는 3축:
 
@@ -398,7 +422,9 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 ### 다양성 (Diversity)
 
 **Sycophancy 방어 — Round 1 독립성**: 에이전트가 서로의 초안을 보기 전에 독립 분석을 완료해야 한다.
-- MAST: 67% 오류는 에이전트 간 상호작용에서 발생. "false consensus"가 핵심 실패 모드.
+- MAST (NeurIPS 2025): 67% 오류는 에이전트 간 상호작용에서 발생. "false consensus"가 핵심 실패 모드. 14개 실패 모드 중 "inter-agent misalignment" 카테고리가 가장 치명적.
+- CONSENSAGENT (ACL 2025): 동적 프롬프트 정제(dynamic prompt refinement)로 sycophancy를 런타임에 완화. 정적 방어(Round 1 독립성)와 동적 방어(상호작용 중 교정)를 결합하면 효과 극대화.
+- Multi-Agent Collaboration Survey (arXiv 2501.06322): 협업 구조를 peer/centralized/distributed로 분류. fz의 Peer-to-Peer 패턴은 "peer" 구조 + "role-based" 전략의 조합.
 - Round 1에서 독립성을 보장하면 동조 편향을 차단한다.
 
 **Task Brief 5요소**: 에이전트에게 작업 전달 시 `[Role] [Context] [Goal] [Constraints] [Deliverable]` 형식.
@@ -435,12 +461,25 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 5. 유사 내용 중복: 하나로 통합
 ```
 
+### Scope Clarification (적용 경계)
+
+각 원칙에는 적용되는 맥락과 적용되지 않는 맥락이 있다. 원칙을 다른 맥락에서 오용하면 오히려 품질이 하락한다.
+
+| 원칙 | 적용 맥락 | ⛔ 비적용 맥락 |
+|------|----------|--------------|
+| "집중 300토큰 > 비집중 113K토큰" | **출력** 작성 시 불필요한 정보 배제 | 입력 탐색 범위 축소. "전체" 분석 지시 시 탐색 범위는 축소하지 않는다 |
+| "500줄 이하 유지" | SKILL.md 본문 | 가이드(guides/), 모듈(modules/)은 제한 없음 |
+| "Claude가 아는 것 반복 금지" | 프로젝트 고유 정보 작성 시 | Gate 체크리스트, Few-shot 예시는 삭제 금지 (트리밍 비저하 원칙) |
+| "원칙+이유 > if-then 테이블" | 행동 가이드 작성 시 | 결정론적 검증(빌드, Grep 패턴)은 if-then이 더 정확 |
+
+**Why**: "집중>분산" 원칙이 "전체 분석 요청에서 선별 읽기"의 정당화로 오용될 수 있다. 원칙의 적용 경계를 명시하여 thought-terminator 방지.
+
 ---
 
 ## 2.5. Context Budget 관리 (실행 품질 보호)
 
 > **1순위: 성능** — context 여유가 추론 품질을 결정한다. 토큰 절약은 수단이지 목적이 아니다.
-> Source: Context Mode (mksg.lu), Cloudflare Code Mode, 서브에이전트 토큰 연구 (dev.to), hyperdev 컨텍스트 보호
+> Source: Context Mode (mksg.lu), Cloudflare Code Mode, Scaling Managed Agents (Anthropic 2026-04) — Brain/Hands/Session 분리, session = external event log
 
 ### 왜 중요한가
 
@@ -490,7 +529,8 @@ GOOD: head_limit 설정 + 필요한 파일만 선별 Read
 
 ## 3. ACE 패턴: 진화하는 플레이북
 
-> Source: ACE - Agentic Context Engineering (Stanford, arXiv 2510.04618)
+> Source: ACE - Agentic Context Engineering v3 (Stanford, ICLR 2026, arXiv 2510.04618)
+> ACE v3 성과: +10.6% agent 벤치마크, +8.6% finance 벤치마크. Context collapse와 brevity bias를 structured incremental updates로 해결.
 
 프롬프트를 정적 문서가 아닌 **진화하는 플레이북**으로 관리하라.
 
@@ -518,6 +558,105 @@ Phase 3 (Prune):  효과가 없는 지침을 제거
 
 ---
 
+## 3b. 하네스 엔지니어링 원칙 (2026-04-16 추가)
+
+> Sources: Anthropic Engineering 3부작
+> - Effective Harnesses for Long-Running Agents (2025-11)
+> - Harness Design for Long-Running Application Development (2026-03)
+> - Scaling Managed Agents: Decoupling the Brain from the Hands (2026-04)
+> 추가: Inside the Scaffold (arXiv 2604.03515, 2026-04) — 13개 코딩 에이전트 스캐폴드 분석
+
+Anthropic이 자사 에이전트 운영 경험에서 도출한 하네스 설계 원칙. fz 생태계의 아키텍처 결정을 공식 근거로 뒷받침한다.
+
+### 원칙 H1: 하네스의 모든 컴포넌트는 "모델이 혼자 못하는 것"에 대한 가정이다
+
+> "Every component in a harness encodes an assumption about what the model can't do on its own." — Anthropic 2026-03
+
+하네스에 규칙을 추가할 때마다 "모델이 이것을 스스로 할 수 없다"는 가정을 인코딩하는 것이다. 가정이 틀리면(모델이 실제로 할 수 있으면) 하네스가 오히려 성능을 저해한다. 따라서:
+- 규칙 추가 전: "모델이 이 판단을 스스로 할 수 있는가?" 자문
+- 하네스 ablation: 분기별 Gate 기여도 분류 (Load-bearing / Neutral / Overhead)
+- fz 적용: `guides/harness-engineering.md` §7 Ablation 프로세스와 직접 연결
+
+```
+BAD:  실패할 때마다 체크리스트 행 추가 → 500개 규칙 → 68% 준수율 (IFScale)
+GOOD: "이 실패가 반복되는가?" → Yes: 원칙+이유 1줄 → No: 일회성이면 추가하지 않음
+```
+
+### 원칙 H2: Self-evaluation은 unreliable — 외부 Evaluator 필수
+
+> "Self-evaluation is unreliable — external evaluators outperform self-grading." — Anthropic 2026-03
+
+같은 모델이 생성하고 같은 모델이 평가하면 동일한 맹점을 공유한다. Planner/Generator/Evaluator 3-agent GAN 패턴에서 독립 Evaluator가 self-grading 대비 유의미하게 높은 정확도를 보임.
+
+fz 적용:
+- Claude(생성) + Codex/GPT(검증)의 cross-model 패턴이 이 원칙의 직접 구현
+- `/fz-review`의 3중 검증(Claude + Codex + sc:analyze)이 Evaluator 다양성 확보
+- SOLO 모드에서도 `/sc:reflect`가 최소한의 self-check를 제공하지만, TEAM의 cross-model이 더 신뢰성 높음
+
+### 원칙 H3: Context reset + structured handoff > compaction
+
+> "Context resets with structured handoffs beat compaction for coherence." — Anthropic 2026-03
+> "Filesystem discovery > compaction" — Anthropic Claude Code Best Practices
+
+긴 세션에서 auto-compact에 의존하면 맥락이 손실된다. 대신:
+1. 핵심 결정사항을 **파일 시스템에 기록** (ASD 폴더, index.md)
+2. 새 컨텍스트에서 **파일을 Read**하여 복원 (structured handoff)
+3. 이 방식이 compact된 요약보다 정확한 복원을 보장
+
+fz 적용: `modules/context-artifacts.md`의 ASD 폴더 전략이 이 원칙의 구현. `fz:checkpoint:essential`은 경량 버전.
+
+### 원칙 H4: Brain / Hands / Session 분리
+
+> "Decouple the brain from the hands." — Anthropic 2026-04
+
+| 컴포넌트 | 역할 | fz 대응 |
+|---------|------|---------|
+| **Brain** | 추론 + 계획 + 판단 | Lead (오케스트레이터) |
+| **Hands** | 도구 실행 + 코드 수정 | impl-correctness, review-arch 등 서브에이전트 |
+| **Session** | 상태 추적 + 이벤트 로그 | ASD 폴더 + Serena Memory |
+
+핵심: Session을 context window **밖**의 조회 가능한 이벤트 로그로 관리한다. context window 안에 모든 상태를 유지하려 하면 Context Rot이 가속된다.
+
+### 원칙 H5: Initializer / Coding Agent 2-part 패턴
+
+> "Split initialization from execution." — Anthropic 2025-11
+
+| Phase | 역할 | 산출물 |
+|-------|------|--------|
+| **Initializer** | 프로젝트 구조 파악 + 계획 수립 + feature list 생성 | JSON feature list (Markdown 아님 — 모델 재작성 방지) |
+| **Coding Agent** | feature list 기반 점진적 구현 + `claude-progress.txt` 업데이트 | 코드 + 진행 상태 |
+
+fz 적용:
+- `/fz-plan` (Initializer) → `plan-final.md` + RTM → `/fz-code` (Coding Agent) → `progress.md` + `step-N.md`
+- feature list를 JSON이 아닌 Markdown으로 관리하고 있는 현재 구조는 재검토 대상 (모델이 plan을 수정하는 위험)
+
+### 원칙 H6: 5가지 루프 프리미티브
+
+> Inside the Scaffold (arXiv 2604.03515): 13개 코딩 에이전트 분석 결과, 5가지 기본 루프 패턴.
+
+| 프리미티브 | 설명 | fz 대응 |
+|-----------|------|---------|
+| **ReAct** | 관찰 → 추론 → 행동 반복 | fz-search, fz-fix (SOLO) |
+| **Generate-Test-Repair** | 생성 → 테스트 → 실패 시 수정 | fz-code (빌드 검증 루프) |
+| **Plan-Execute** | 계획 수립 → 순차 실행 | fz-plan → fz-code |
+| **Multi-Attempt Retry** | 동일 작업 N회 시도, 최선 선택 | /ralph-loop 에스컬레이션 래더 |
+| **Tree Search** | 여러 경로 탐색 후 최적 선택 | fz-discover (Adversarial Discovery) |
+
+11/13 에이전트가 복수 프리미티브를 조합한다. fz도 Plan-Execute + Generate-Test-Repair를 기본으로, TEAM 모드에서 Multi-Attempt를 추가.
+
+### 체크리스트: 하네스 설계 시
+
+```
+[ ] H1. 추가하려는 규칙이 "모델이 스스로 못하는 것"인가? (가정 검증)
+[ ] H2. 검증 주체가 생성 주체와 독립되어 있는가? (self-eval 지양)
+[ ] H3. 긴 세션의 상태를 파일 시스템에 기록하고 있는가? (compact 의존 지양)
+[ ] H4. Brain/Hands/Session이 분리되어 있는가? (session = 외부 로그)
+[ ] H5. 계획과 실행이 분리되어 있는가? (Initializer/Coding Agent)
+[ ] H6. 어떤 루프 프리미티브 조합을 사용하는가? (명시)
+```
+
+---
+
 ## 4. Anti-Patterns
 
 | Anti-Pattern | 이유 | 대안 |
@@ -539,6 +678,10 @@ Phase 3 (Prune):  효과가 없는 지침을 제거
 | TEAM에서 Gate를 "권고"로 취급 | 검증 누락, 품질 저하 | Gate 절차적 강제 (스킵 불가 조건 명시) |
 | 에이전트 간 초안 공유 후 분석 | Sycophancy/동조 수렴 | Round 1 독립 분석 → Round 2 피드백 순서 강제 |
 | 비구조화 Task 전달 | 역할 혼동, 중복/누락 작업 | Task Brief 5요소 형식 사용 |
+| Self-evaluation으로 품질 보장 시도 | 생성자와 동일 맹점 공유 (Anthropic 2026-03) | 외부 Evaluator / cross-model 검증 |
+| Session 상태를 context window에만 유지 | compact 시 맥락 손실, coherence 저하 | 파일 시스템 기록 + Read 복원 (§3b H3) |
+| 하네스 가정 미검증 | 모델이 할 수 있는 것까지 규칙화 → overtriggering | 분기별 ablation으로 규칙 기여도 검증 (§3b H1) |
+| Markdown으로 구조화 데이터 관리 | 모델이 재작성할 위험 (Anthropic 2025-11) | JSON feature list 등 기계 파싱 가능 형식 |
 
 ---
 
@@ -559,4 +702,7 @@ Phase 3 (Prune):  효과가 없는 지침을 제거
 [ ] 11. TEAM 모드: Task Brief 5요소 형식 사용? (§1b)
 [ ] 12. TEAM 모드: Round 1 독립성 + 합의/불합의 보고? (§1b)
 [ ] 13. 대용량 MCP 결과를 파일로 격리했는가? (§2.5 Context Budget)
+[ ] 14. 하네스: 규칙이 "모델이 스스로 못하는 것"에 대한 가정인가? (§3b H1)
+[ ] 15. 하네스: 검증 주체가 생성 주체와 독립되어 있는가? (§3b H2)
+[ ] 16. 하네스: 세션 상태를 파일 시스템에 기록하고 있는가? (§3b H3)
 ```

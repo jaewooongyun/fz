@@ -43,6 +43,7 @@ model-strategy:
 ## 개요
 
 > ⛔ Phase 0 (ASD Pre-flight) → Phase 0b (Context) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
+> 루프 프리미티브: Plan-Execute + Evaluator-Optimizer (H6, Inside the Scaffold)
 
 요구사항 구조 분해 + 영향 범위 분석. Serena 심볼 도구 기반 정밀 탐색.
 
@@ -335,10 +336,12 @@ TeamCreate("plan-{feature}")
    형식 참조: `modules/context-artifacts.md`
 
 ### Gate 1: Plan Ready
+> **Why (H1)**: 영향 범위가 불완전하면 구현 시 예상 외 파일을 건드리게 되고, 리뷰에서도 범위 밖 변경을 놓친다.
 - [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
 - [ ] 영향 범위 분석 완료?
 - [ ] ⛔ Exhaustive Impact Scan 4단계 수행 완료? (반성 5차)
   - [ ] 텍스트 전수 검색(Grep)으로 심볼 기반 결과와 대조했는가?
+        Evidence: Grep("{타입명}") → {N}건 vs find_referencing_symbols → {M}건
   - [ ] 각 진입점의 런타임 도달성을 검증했는가? (latent 표기 포함)
   - [ ] 기존 액션 패턴의 사이드이펙트/순서 의존성을 분석했는가?
   - [ ] 관련 파일의 dead code를 감지했는가?
@@ -358,6 +361,9 @@ TeamCreate("plan-{feature}")
 - [ ] ⛔ "실행 스레드"가 Zero-Exception 규칙을 준수하는가?
 - [ ] ⛔ 요청 파라미터 키 목록이 원본과 일치하는가?
 - [ ] ⛔ 계획 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
+
+> **Gate 증거 첨부** (H2 원칙 — self-check 보완): 결정론적 도구 출력이 있는 Gate 항목은
+> `Evidence:` 행에 도구 결과 요약을 기록한다. self-check "완료?"보다 도구 출력이 신뢰할 수 있다.
 
 ---
 
