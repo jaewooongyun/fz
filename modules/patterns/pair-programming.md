@@ -11,6 +11,9 @@
 |------|---------|------|
 | Primary | impl-correctness (O) | 코드 구현 + 테스트 작성 |
 | Supporting | review-arch (S) | 아키텍처 실현성 + 패턴 일관성 검증 |
+| Supporting | impl-quality (S) | 코딩 표준 + 패턴 일관성 실시간 피드백 (매 Step 완료 시) |
+| Supporting | review-correctness (S) | 기능 정확성 + RTM 체크 (3+ Step 50% 시점 + 마지막) |
+| Supporting | memory-curator (S) | 관련 교훈 발굴 + impl-correctness에 직접 전달 |
 
 ## 2.5-Turn 적용 (Mesh, 2명)
 

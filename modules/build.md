@@ -27,8 +27,16 @@
 
 ## 에러 유형별 대응
 
-심볼 도구(Serena)를 우선 활용하여 빌드 에러를 해결한다 — 시그니처 확인, import 추가, 정의 위치 탐색 등.
-Serena 불가 시 Edit + Grep으로 폴백.
+| 에러 유형 | 증상 | 1차 대응 | 2차 대응 |
+|----------|------|---------|---------|
+| 컴파일 에러 | `cannot find type`, `undeclared` | Serena `find_symbol` → 누락 import/타입 확인 | Grep으로 해당 심볼 위치 탐색 |
+| 링크 에러 | `undefined symbol`, `duplicate symbol` | Serena `find_referencing_symbols` → 중복/누락 확인 | 빌드 설정(pbxproj) 확인 |
+| 시그니처 불일치 | `missing argument`, `extra argument` | Serena → 프로토콜 요구사항 확인 | clean build |
+| 모듈 미발견 | `no such module` | Package.swift/pbxproj 대상 등록 확인 | SPM resolve (`swift package resolve`) |
+| 타입 불일치 | `cannot convert`, `type mismatch` | Read → 원본/변환 타입 비교 | Context7 → API 시그니처 확인 |
+| 접근 제어 | `inaccessible`, `internal` | access modifier 확인 → public/internal 조정 | 모듈 경계 설계 재검토 |
+
+> Serena 불가 시: Edit + Grep으로 폴백
 
 ## 빌드-수정 반복 패턴
 

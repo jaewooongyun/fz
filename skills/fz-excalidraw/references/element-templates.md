@@ -115,6 +115,48 @@ Copy-paste JSON templates for each Excalidraw element type. The `strokeColor` an
 }
 ```
 
+## Diamond (decision/condition)
+
+```json
+{
+  "type": "diamond",
+  "x": 200,
+  "y": 100,
+  "width": 120,
+  "height": 80,
+  "angle": 0,
+  "strokeColor": "#STROKE_COLOR",
+  "backgroundColor": "#FILL_COLOR",
+  "fillStyle": "solid",
+  "strokeWidth": 2,
+  "roughness": 0,
+  "opacity": 100,
+  "roundness": null
+}
+```
+
+## Ellipse (state/event)
+
+```json
+{
+  "type": "ellipse",
+  "x": 200,
+  "y": 100,
+  "width": 120,
+  "height": 80,
+  "angle": 0,
+  "strokeColor": "#STROKE_COLOR",
+  "backgroundColor": "#FILL_COLOR",
+  "fillStyle": "solid",
+  "strokeWidth": 2,
+  "roughness": 0,
+  "opacity": 100,
+  "roundness": { "type": 2 }
+}
+```
+
+> 색상은 placeholder — 실제 값은 `color-palette.md`에서 참조.
+
 ## Text (centered in shape)
 ```json
 {
