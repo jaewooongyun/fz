@@ -107,6 +107,20 @@
 
 ---
 
+## 아키텍처 매핑 (Anthropic H4: Brain/Hands/Session)
+
+> Source: Scaling Managed Agents (Anthropic 2026-04) — "Decouple the brain from the hands."
+
+| 컴포넌트 | 역할 | fz 대응 |
+|---------|------|---------|
+| **Brain** | 추론 + 계획 + 판단 | Lead (오케스트레이터) |
+| **Hands** | 도구 실행 + 코드 수정 | Primary/Supporting 에이전트 (impl-correctness, review-arch 등) |
+| **Session** | 상태 추적 + 이벤트 로그 | ASD 폴더 + Serena Memory (context window **밖**) |
+
+핵심: Session을 context window 밖의 조회 가능한 이벤트 로그로 관리한다. context window 안에 모든 상태를 유지하려 하면 Context Rot이 가속된다.
+
+---
+
 ## 모델 전략
 
 3-Tier: opus(핵심) + sonnet(나머지) + external(검증). haiku 사용하지 않음.

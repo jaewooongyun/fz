@@ -39,6 +39,7 @@ model-strategy:
 ## 개요
 
 > ⛔ Phase 0 (ASD Pre-flight) → Phase 5 (3중 검증: Serena // /fz-codex review // /sc:analyze) → Phase 5.5 (/fz-codex validate) → Rate >= 80%? → Phase 7 완료 | Phase 6 (개선) → 반복
+> 루프 프리미티브: Evaluator-Optimizer + Multi-Attempt Retry (H6, Inside the Scaffold)
 
 3중 검증(Claude+Codex+sc:analyze) + 역방향 검증 + Reflection Rate 정량화 (>=80% 통과).
 
@@ -300,7 +301,7 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
 
 ### 검증 4-I: Implication Coverage (함의 커버리지) — `modules/lead-reasoning.md` 참조. 제거/리팩토링 시 실행. 검증 4는 diff 안(judge), 4-I는 지시→diff 밖(auditor). 완료 보고에 "관찰 사항" 추가(§5).
 
-### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 가변 상태 동기화(L1 필수) + 콜백 스레드/@Published/기본값/API retention(L2 권장) 검사.
+### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 가변 상태 동기화+비대칭 동기화(L1 필수) + 콜백 스레드/@Published/기본값/SDK 래퍼/Task 프로퍼티 쓰기/check-then-act(L2 권장) 검사.
 
 ### 검증 4-K: Transformation Equivalence (코드 변환 동등성 — Plan에 Transformation Spec 있을 때)
 
@@ -362,6 +363,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] Source Fidelity 통과? (리팩토링 시, 원본 대비 추가된 파라미터/로직 없음)
 - [ ] Transformation Equivalence 통과? (Spec 있을 때, 스레드/에러/추상화 요구사항 준수)
 - [ ] Concurrency Safety Audit 통과? (싱글톤 가변 상태 동기화, 콜백 스레드, @Published 스레드 — modules/safety-audit.md)
+- [ ] ⛔ Concurrency Safety Audit **실행 여부** 확인? (diff에 class/struct 타입 변경이 포함되면 safety-audit.md 절차 실행 필수 — "해당 없음" 판정에도 판정 근거 명시)
 - [ ] ⛔ Zero-Exception Thread Rule 통과? (main queue 변환에 @MainActor 누락 없음)
 - [ ] ⛔ Wrapper Scope Minimality 통과? (@MainActor 블록 내 불필요 문장 없음) [ablation: scope-min-v1]
 - [ ] ⛔ 요청 파라미터 키 동등성 통과? (원본 대비 추가/삭제 키 없음)

@@ -44,6 +44,7 @@ model-strategy:
 ## 개요
 
 > ⛔ Phase 0 (ASD Pre-flight) → Step N 구현 → 빌드 검증 → (실패: 에러 수정 → 재빌드) → Gate 3 → /fz-review
+> 루프 프리미티브: Generate-Test-Repair + Plan-Execute (H6, Inside the Scaffold)
 
 - 점진적 구현 + 매 Step 빌드 검증
 - 프로젝트 빌드 검증
@@ -228,6 +229,9 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | 싱글톤 deinit | `static let shared` 타입에 `deinit` 작성 시 | deinit은 호출되지 않음 — 정리가 필요하면 명시적 `tearDown()` 메서드 사용 |
    | 기본값 소비자 영향 | 비동기 채워지는 property에 기본값(`= false`, `= nil`) 설정 시 | 소비자가 첫 콜백 전에 읽으면 기본값으로 분기 — guard/if 패턴 영향 확인 |
    | 외부 피드백 무검증 수긍 | 외부 도구/리뷰어의 "파라미터 누락" 등 지적에 함수 시그니처 확인 없이 동의 | Read(시그니처) + 기존 패턴 대조 필수 — cross-validation.md § External Feedback Gate |
+   | SDK 래퍼 부분 분석 | 외부 SDK 객체의 `?.` 메서드 중 일부만 nil 동작 분석하고 나머지 건너뜀. "안전" 결론으로 추가 분석 중단 | 같은 객체의 모든 `?.` 메서드 nil 동작 + 서버 관점 전수 분석. 참조: `modules/lead-reasoning.md` §1.5 |
+   | Task 내부 프로퍼티 쓰기 | `Task { }` 블록 내에서 `self.property = value`를 `MainActor.run` 밖에서 실행. 특히 리뷰어 조언으로 MainActor 범위를 줄일 때 순수 연산과 side effect를 분류하지 않고 함께 밖으로 이동 | 각 문장을 순수 연산(파싱, 변환)과 side effect(프로퍼티 할당, UI)로 분류. side effect는 소비자 스레드 확인 후 배치. 참조: `modules/lead-reasoning.md` §1.5 |
+   | 핵심 시나리오 보류 | PR이 해결하려는 원래 문제(버그, 크래시)의 재현 시나리오 중 하나가 "다음 PR에서 수정"으로 보류됨. 특히 race condition 수정에서 경합 시나리오 일부만 해결 | PR 목표와 보류 시나리오를 대조. 원래 버그가 보류 시나리오에서 재현 가능하면 → 현재 PR에서 해결 필수 또는 AskUserQuestion |
 
    보고 형식:
    ```
