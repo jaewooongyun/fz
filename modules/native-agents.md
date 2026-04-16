@@ -7,10 +7,10 @@
 
 | 에이전트 | 고유 가치 | 배치 Phase | 스폰 방식 |
 |---------|----------|-----------|----------|
-| **silent-failure-hunter** | catch 블록 조용한 실패, 부적절한 fallback 탐지 | review Phase 5 | `Agent(subagent_type=)` background |
-| **type-design-analyzer** | 타입 캡슐화, 불변량 표현, 정량 평가 | review Phase 5 | `Agent(subagent_type=)` background |
-| **code-simplifier** | 프로젝트 가이드라인 기반 코드 정리 | review Phase 6 (pre-ship) | `Agent(subagent_type=)` background |
-| **deep-research-agent** | 외부 지식 수집 (multi-hop reasoning) | discover Phase 2 | `Agent(subagent_type=)` foreground |
+| **silent-failure-hunter** | catch 블록 조용한 실패, 부적절한 fallback 탐지 | review Phase 5 | `Agent(subagent_type="silent-failure-hunter")` background |
+| **type-design-analyzer** | 타입 캡슐화, 불변량 표현, 정량 평가 | review Phase 5 | `Agent(subagent_type="type-design-analyzer")` background |
+| **code-simplifier** | 프로젝트 가이드라인 기반 코드 정리 | review Phase 6 (pre-ship) | `Agent(subagent_type="code-simplifier")` background |
+| **deep-research-agent** | 외부 지식 수집 (multi-hop reasoning) | discover Phase 2 | `Agent(subagent_type="deep-research-agent")` foreground |
 
 ## 불채택 에이전트 (fz가 더 우수)
 

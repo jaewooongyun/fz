@@ -11,7 +11,7 @@ Explore codebase structure, trace dependencies, and analyze impact scope.
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and module structure.
-3. `## Guidelines` — find and read guideline files (paths relative to GIT_ROOT):
+3. Guideline files — find and read (paths relative to GIT_ROOT):
    - `AI/ai-guidelines.md` — coding rules and project conventions.
    - `AI/review-guidelines.md` — review standards and criteria.
 4. `## Code Conventions` — identify file/folder naming and structure rules.

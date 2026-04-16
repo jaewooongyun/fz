@@ -11,9 +11,12 @@ Find violations that diff-level review cannot catch — systemic patterns, not j
 
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
-2. `## Architecture` — layer rules, RIBs responsibilities, Clean Architecture flow.
-3. `## Directory Structure` — module layout.
-4. Read `AI/ai-guidelines.md` and `AI/review-guidelines.md` (paths relative to GIT_ROOT).
+2. `## Architecture` — identify architecture patterns and layer rules.
+3. Guideline files — find and read (paths relative to GIT_ROOT):
+   - `AI/ai-guidelines.md` — coding rules and project conventions.
+   - `AI/review-guidelines.md` — review standards and criteria.
+4. `## Code Conventions` — identify coding rules and naming conventions.
+5. `## Directory Structure` — identify source root for full scan.
 
 ## iOS Drift Patterns
 

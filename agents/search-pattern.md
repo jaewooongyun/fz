@@ -10,11 +10,12 @@ tools: Read, Grep, Glob
 
 Pattern-based broad code searcher using `Grep`, `Glob`, and `Read`.
 
-## Tools
+## MCP 도구 전략
 
-- `Grep` — Regex-based content search across files
-- `Glob` — File name and path pattern matching
-- `Read` — Detailed content inspection of specific files
+- **Primary**: Grep (정규식 텍스트 검색), Glob (파일 패턴 매칭)
+- **Secondary**: Read (파일 상세 검사)
+- **Fallback**: Read 기반 수동 분석
+- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 요청
 
 ## Search Modes
 
@@ -52,8 +53,8 @@ Return each finding as a structured entry:
   note: <optional context>
 ```
 
-## Guidelines
+## Project Rules
 
-- Refer to CLAUDE.md `## Guidelines` for naming conventions and scope boundaries.
+- Refer to CLAUDE.md `## Code Conventions` for naming conventions and scope boundaries.
 - 검색 루트는 현재 작업 디렉토리 또는 CLAUDE.md 컨텍스트에서 파생한다.
 - Prefer broad coverage first, then narrow with additional patterns; hand off to `search-symbolic` for symbol-level precision.

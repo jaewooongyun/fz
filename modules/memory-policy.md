@@ -14,8 +14,8 @@
 | `fz` | `artifact` | `fz:artifact:step1` | 파이프라인 단계 산출물 |
 | `fz` | `checkpoint` | `fz:checkpoint:{skill}-{phase}` | Phase 완료 또는 의미 있는 결과 시 경량 저장. ASD 미활성 시 유일한 compact recovery 수단. ~3,000자 <!-- 기존: 500자 --> 핵심 결정 요약 (Essential Context 포함) |
 | `fz` | `checkpoint` | `fz:checkpoint:essential` | /fz가 단독 관리. 현재 Active State + Key Decisions + Constraints (~3,000자 <!-- 기존: 500자 -->). 파이프라인 완료 시 삭제 |
-| `fz` | `checkpoint` | `fz:checkpoint:discover-{phase}` | mid-pipeline discover 결과. phase={plan\|code\|review}. 파이프라인 완료 시 삭제 |
-| `fz` | `checkpoint` | `fz:checkpoint:discover-{phase}-final` | discover 수렴 완료 시 최종 결과. `-final` suffix는 동일 phase 키를 덮어쓰지 않고 수렴 상태를 별도 보존 |
+| `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}` | mid-pipeline discover 결과. phase={plan\|code\|review}. 파이프라인 완료 시 삭제 |
+| `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}-final` | discover 수렴 완료 시 최종 결과. `-final` suffix는 동일 phase 키를 덮어쓰지 않고 수렴 상태를 별도 보존 |
 | `fz` | `checkpoint` | `fz:checkpoint:review-issues` | fz-review Phase 5 완료 후 이슈 요약. 비ASD 모드 전용 |
 | `fz` | `checkpoint` | `fz:checkpoint:implication-{skill}` | Implication Scan 결과 (비ASD 시). 실행/관찰 함의 요약. 파이프라인 완료 시 삭제 |
 | `fz` | `checkpoint` | `fz:checkpoint:plan-direction` | 방향 판정 결과 (임시) |
@@ -67,6 +67,7 @@
 | /fz-discover | O | O | O | - | O |
 | /fz-memory | O | O | O | O | O |
 | /fz-manage | O | - | - | - | O |
+| /fz-peer-review | O | O | - | - | - |
 
 ## 암묵적 결합 (Implicit Coupling)
 

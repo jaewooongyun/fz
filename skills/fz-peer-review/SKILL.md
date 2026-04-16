@@ -127,18 +127,10 @@ mcp__serena__find_symbol                → Protocol 정의, conformer
 
 **추가 필드**: `arch_layer_map` (아키텍처 컴포넌트 매핑, CLAUDE.md ## Architecture 기반), `import_graph` (의존성 방향), `stream_paradigms` (리액티브 프레임워크 사용 패턴), `protocol_conformers`, `deprecated_symbols`
 
-**deprecated 심볼 탐지** (관점 7 pre-cache):
-```
-mcp__serena__search_for_pattern  → @available(*, deprecated) 코드 검색
-→ deprecated_symbols: [{symbol, file, reference_count}]
-```
-
-**기존 유틸리티 탐색**: diff에서 새로 생성 객체 감지 → 기존 extension/유틸 Grep 검색. `existing_utilities: [{pattern, existing_file, existing_method}]`
-
-**Base Class Hierarchy** (관점 6 pre-cache, Gate 4.6.5 입력):
-diff에 class init/willSet·didSet/access control 변경 감지 시 → `find_referencing_symbols`로 모든 subclass 수집 → 각 subclass의 init 시그니처 + super.init 호출 패턴 기록.
-`base_class_hierarchy: [{base_class, change_type, subclasses: [{name, file, init_sig, super_init_call}]}]`
-**핵심**: optional param(default: nil) 추가 시 subclass가 default init → dependency nil → silent regression. 컴파일러 미탐지.
+**추가 pre-cache** (관점 6-7):
+- `deprecated_symbols`: `search_for_pattern` → `@available(*, deprecated)` 탐지
+- `existing_utilities`: diff 신규 객체 → 기존 extension/유틸 Grep
+- `base_class_hierarchy`: class init/willSet 변경 시 → `find_referencing_symbols`로 subclass 수집 (optional param default:nil → subclass silent regression 주의)
 
 ### 1.5. 요구사항 수집 → `${WORK_DIR}/requirements.md`
 
@@ -181,26 +173,16 @@ mkdir -p ${WORK_DIR}/evidence
 
 ### 4. ⛔ Fact Verification Gate (Gather 완료 검증)
 
-Gather에서 도출된 Key Facts를 Analyze에 전달하기 전에 **독립된 도구로 교차 확인**한다.
-Gather의 도구 출력은 잘릴 수 있다(grep -A 옵션 등). 검증 없이 전달하면 모든 에이전트가 동일 오류를 공유한다.
+Key Facts를 Analyze 전달 전에 **수집과 다른 도구로 교차 확인**. 도구 출력 잘림(grep -A 등) → 검증 없이 전달 시 전 에이전트 동일 오탐.
 
 ```
 절차:
-1. Gather에서 도출된 Key Facts 목록 작성 (플랫폼 지원, 심볼 존재, 의존성 관계 등)
-2. 각 Key Fact를 수집과 다른 방법으로 재확인:
-   - grep 결과 → Read(전체 파일)로 재확인
-   - 심볼 존재/미존재 주장 → find_symbol로 재확인
-   - 플랫폼 지원 주장 → Package.swift 전체 Read로 재확인
+1. Key Facts 목록 작성 (플랫폼 지원, 심볼 존재, 의존성 관계 등)
+2. 각 Fact를 다른 방법으로 재확인 (grep→Read, 심볼→find_symbol, 플랫폼→Package.swift Read)
 3. 불일치 발견 시 Key Fact 수정
 ```
 
-원칙: **"Cross-model 검증은 cross-data일 때만 작동한다."** Gather 오류는 N-Model 교차 검증으로 잡히지 않는다.
-
-```
-BAD:  grep -A2 "platforms" → ".iOS, .tvOS" → Key Fact: "visionOS 미지원"
-      (grep이 3번째 줄 .visionOS를 잘라냄 → 3-Model 전원 오탐)
-GOOD: grep → 초기 수집 → Read(Package.swift) 전체 확인 → "visionOS 포함" 수정
-```
+원칙: **"Cross-model 검증은 cross-data일 때만 작동한다."** (예: grep -A2로 잘린 결과 → 3-Model 전원 오탐)
 
 ### 4.5. ⛔ 패턴 변환 감지 (diff에 비동기/네트워크/UI 패턴 변경 포함 시)
 
@@ -498,7 +480,7 @@ write_memory("fz:checkpoint:peer-review-deliver", "PR#{number}: 판정 {verdict}
 - 코드를 직접 수정하지 않음 (리뷰만 수행)
 - 자기 코드 리뷰 (→ `/fz-review`)
 - Codex 위임 (→ `/fz-codex`) — codex exec 직접 호출
-- Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Guidelines` 위임)
+- Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Code Conventions` 위임)
 - ⛔ **standalone Agent() 호출 금지** — Tier 2+ 에서는 TeamCreate → Agent(team_name=...) → SendMessage 필수.
 ## 에러 대응
 

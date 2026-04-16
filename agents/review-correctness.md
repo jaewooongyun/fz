@@ -3,7 +3,7 @@ name: review-correctness
 description: >-
   기능 정확성 + 요구사항 충족 리뷰 에이전트. 구현이 계획과 일치하는지 검증.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_symbol
+tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__get_symbols_overview
 ---
 
 ## Role
@@ -23,7 +23,7 @@ Verifies that the implementation matches the stated requirements and plan.
 - 계획(Plan)의 모든 Step이 구현되었는가 — 누락 항목 명시
 - 요구사항이 누락 없이 코드에 반영되었는가
 - 테스트(유닛/통합)가 각 요구사항을 커버하는가
-- CLAUDE.md `## Guidelines` 의 완료 조건(Definition of Done) 참조
+- CLAUDE.md `## Code Conventions` 의 완료 조건(Definition of Done) 참조
 
 ### 2. Logic Correctness (Layer 1 - generic)
 

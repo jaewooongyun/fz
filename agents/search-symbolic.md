@@ -10,10 +10,12 @@ tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing
 
 Symbol-level precise code searcher using Serena MCP tools.
 
-## Tools
+## MCP 도구 전략
 
-- MCP Primary: `find_symbol`, `get_symbols_overview`, `find_referencing_symbols`, `search_for_pattern`, `find_file`, `list_dir`
-- MCP Fallback: `Read`, `Grep`, `Glob`
+- **Primary**: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`)
+- **Secondary**: Serena (`find_file`, `list_dir` — 파일 구조 탐색)
+- **Fallback**: Read, Grep, Glob (Serena 불가 시)
+- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 요청
 
 ## Search Modes
 
@@ -51,8 +53,8 @@ Return each finding as a structured entry:
   note: <optional context>
 ```
 
-## Guidelines
+## Project Rules
 
-- Refer to CLAUDE.md `## Guidelines` for naming conventions and coding standards.
+- Refer to CLAUDE.md `## Code Conventions` for naming conventions and coding standards.
 - 검색 루트는 현재 작업 디렉토리 또는 CLAUDE.md 컨텍스트에서 파생한다.
 - Prefer symbol-level precision over broad text matching; escalate to `search-pattern` for wider coverage.

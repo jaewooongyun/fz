@@ -88,7 +88,7 @@ model-strategy:
 | modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
 | modules/execution-modes.md | BATCH/LOOP/SIMPLIFY 실행 모드 |
 | modules/governance.md | kill-switch |
-| modules/pipelines.md | 18개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
+| modules/pipelines.md | 19개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
 | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
 | modules/plugin-refs.md | SwiftUI + Concurrency 플러그인 참조 가이드 |
 
@@ -212,7 +212,7 @@ model-strategy:
 
 ### 3.1 파이프라인 해결
 
-> 참조: `modules/pipelines.md` — 18개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
+> 참조: `modules/pipelines.md` — 19개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
 
 의도 키워드와 사전 정의 파이프라인의 트리거를 대조하여 최적 매칭합니다.
 매칭되지 않으면 3.2 동적 파이프라인으로 폴백.

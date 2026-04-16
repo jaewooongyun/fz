@@ -1,7 +1,7 @@
 # Peer Review Verification Gates
 
-Synthesize 단계에서 실행하는 6가지 검증 게이트.
-4.4 → 4.5 → 4.6 → 4.7 → 4.7-A (+ Origin Verification) → 4.8 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
+Synthesize 단계에서 실행하는 8가지 검증 게이트.
+4.4 → 4.5 → 4.6 → 4.6.5 → 4.7 → 4.7-A (+ Origin Verification) → 4.8 → 4.9 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
 
 > Gate 4.4 (Factual Claim Verification)는 PR #3639에서 발견된 3건의 오탐을 방지하기 위해 추가.
 > 에이전트의 사실적 주장(existence/source/behavior/origin)을 Orchestrator가 기계적으로 검증한다.

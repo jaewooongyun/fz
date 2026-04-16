@@ -371,7 +371,7 @@ peer-review WORK_DIR: ${PROJECT_ROOT}/peer-review-{PR_NUMBER}/
 
 ### 가이드라인 참조
 
-- PR 분석 시 프로젝트 규칙은 CLAUDE.md `## Guidelines` 섹션을 참조한다.
+- PR 분석 시 프로젝트 규칙은 CLAUDE.md `## Code Conventions` 섹션을 참조한다.
 - 아키텍처 평가 기준은 CLAUDE.md `## Architecture` 섹션을 따른다.
 
 ---

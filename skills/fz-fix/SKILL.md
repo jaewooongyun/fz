@@ -44,6 +44,7 @@ model-strategy:
 ## 개요
 
 > 탐색 → 분석 → 수정 → 빌드 (실패 시 반복) → 리뷰(선택)
+> 루프 프리미티브: ReAct + Generate-Test-Repair (H6, Inside the Scaffold)
 
 - 빠른 수정-빌드 반복에 최적화
 - 검증 선택적 (복잡할 때만)
@@ -126,7 +127,7 @@ model-strategy:
 
 빠른 수정-빌드 사이클로 버그를 해결합니다.
 
-> **프로젝트 규칙**: CLAUDE.md `## Guidelines` 섹션을 따른다.
+> **프로젝트 규칙**: CLAUDE.md `## Code Conventions` 섹션을 따른다.
 
 ### Step 1a: Reproduce — 재현 조건 확인
 

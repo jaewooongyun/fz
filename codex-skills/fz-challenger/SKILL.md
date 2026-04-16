@@ -48,7 +48,7 @@ Reversal trigger: If evidence suggests current code has NO warnings (e.g., PR wa
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and layer rules.
-3. `## Guidelines` — find and read guideline files (paths relative to GIT_ROOT):
+3. Guideline files — find and read (paths relative to GIT_ROOT):
    - `AI/ai-guidelines.md` — coding rules and project conventions.
    - `AI/review-guidelines.md` — review standards and criteria.
 4. `## Code Conventions` — identify coding rules.
@@ -83,7 +83,7 @@ For each identified issue, assign one verdict:
 
 ## Output Format
 
-Matches `codex_peer_review_schema.json`. Key enum values:
+Matches `schemas/codex_peer_review_schema.json`. Key enum values:
 - `action` (challenge verdict): `agree` | `challenge` | `supplement` | `reverse`
 - `severity`: `critical` | `major` | `minor` | `suggestion`
 - `origin`: `regression` | `pre-existing` | `improvement`

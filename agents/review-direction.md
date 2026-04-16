@@ -24,7 +24,7 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 ## Project Rules
 
 - 아키텍처: CLAUDE.md `## Architecture` 섹션의 패턴과 레이어 규칙을 따른다.
-- 코딩 표준: CLAUDE.md `## Guidelines` + `## Code Conventions` 섹션을 따른다.
+- 코딩 표준: CLAUDE.md `## Code Conventions` 섹션을 따른다.
 
 ## Analysis Perspectives (6)
 

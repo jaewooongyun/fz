@@ -155,7 +155,7 @@ codex exec \
   "${SKILL_PROMPT}
 
    이 구현 계획을 검증하라.
-   CLAUDE.md ## Guidelines 섹션의 가이드라인을 참조하라.
+   CLAUDE.md ## Code Conventions 섹션의 가이드라인을 참조하라.
 
    ## 계획
    $PLAN_CONTENT
@@ -203,7 +203,7 @@ codex exec \
   "${SKILL_PROMPT}
 
    피드백 반영 여부를 검증하라.
-   CLAUDE.md ## Guidelines 섹션의 리뷰 가이드라인을 참조하라.
+   CLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.
 
    ## 원본 이슈
    $ORIGINAL_ISSUES

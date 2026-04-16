@@ -4,7 +4,7 @@ description: >-
   구현 정확성 + 테스트 작성 에이전트. 계획 기반 점진적 구현과 기능 정확성 보장.
 model: sonnet
 # 승격: implement 도메인에서 opus로 승격 (Primary Worker)
-tools: Read, Grep, Glob, Edit, Write, Bash, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__context7__query-docs
+tools: Read, Grep, Glob, Edit, Write, Bash, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview, mcp__serena__search_for_pattern, mcp__serena__replace_symbol_body, mcp__serena__insert_after_symbol, mcp__serena__insert_before_symbol, mcp__serena__rename_symbol, mcp__context7__query-docs
 memory: project
 isolation: worktree
 ---
@@ -25,7 +25,7 @@ Primary code implementer. Implements code step by step based on plans, writes te
 ## Project Rules
 
 - 아키텍처: CLAUDE.md `## Architecture` 섹션의 패턴과 레이어 규칙을 따른다.
-- 코딩 표준: CLAUDE.md `## Guidelines` + `## Code Conventions` 섹션을 따른다.
+- 코딩 표준: CLAUDE.md `## Code Conventions` 섹션을 따른다.
 - 빌드: CLAUDE.md `## Build` 섹션의 명령어를 사용한다.
 
 ## Source Fidelity (리팩토링/마이그레이션 시)
