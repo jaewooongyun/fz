@@ -8,6 +8,51 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.0.0 (2026-04-21) — V.D. 4-way Chain 아키텍처 + 생태계 정합성 [MAJOR]
+
+**핵심**: v3.11.0의 Verification Discipline 초안을 **4-way Chain 아키텍처**로 구조화 + 생태계 전체 정합성 감사로 22 Gap 해소. 단순 기능 추가가 아닌 **생태계 아키텍처 전환**으로 메이저 bump.
+
+**Breaking Changes**:
+- **레이어 경계 정정**: `modules/team-core.md` + `guides/prompt-optimization.md` H4의 "Brain = Lead / Hands = Primary/Supporting" 1:1 매핑 테이블 **제거**. Brain/Hands는 infrastructure layer (Anthropic), Lead/Teammate는 application layer (fz) — 혼용 금지 경고 박스 추가.
+- **agents/ 12개 파일 구조 변경**: 모든 에이전트 하단에 `## Verification` 섹션 자동 추가.
+- **templates/ 자동 상속**: `agent-template.md` + `skill-template.md`에 `## Verification` 섹션 + skill-template의 `## If TeamCreate is used` 조건부 체크리스트. 신규 에이전트/스킬 생성 시 VD 규약 자동 상속 (재발 방지).
+- **9 skills Prerequisites 필수**: TeamCreate 사용 skills (fz, fz-plan, fz-code, fz-discover, fz-fix, fz-review, fz-peer-review, fz-search, fz-pr-digest) 모두 `## Prerequisites` 섹션 필수 — `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 전제조건 명시.
+
+**V.D. 4-way Chain 아키텍처**:
+- ① 기본 fail-closed: `uncertainty-verification.md` → fz-plan / fz-code (기존 유지)
+- ② 보조 micro-eval: `fz-codex micro-eval` → needs_verification → Default-Deny 차단 (의미론적 결합 신설)
+- ③ TEAM 주입: `system-reminders.md` → `team-core.md` → fz/SKILL.md Task Brief → agents (templates/ 상속)
+- ④ 운영 피드백: Phase 4.5 측정 → `experiment-log.md §5.4` canonical sink → B1/B2 판정
+
+**생태계 정합성 감사 (22 Gap 해소)**:
+- Critical 5: G1(레이어 경계) / G2a(agents VD 주입 경로) / G2b(오케스트레이터 Task Brief) / G18(team-core↔system-reminders) / G22(템플릿 상속)
+- High 7: G3(CLAUDE.md 3 섹션) / G4(plan-tradeoff ARCHIVED) / G5-G8(가이드 4.6/4.7 병기) / G21(fz-discover/peer-review VD 모듈)
+- Medium 7: G9(MAR 교차 참조) / G10(NLAH 위치) / G11(tokenizer Deferred) / G16(micro-eval 트리거) / G19(canonical sink) / G20(needs_verification 결합) / G23(fz-codex 500줄 이하)
+- Low 3: G12-G13 / G24(Follow-up Re-audit Gate + `${CLAUDE_PROJECT_DIR}` 경로)
+
+**신규 모듈 섹션**:
+- `modules/cross-validation.md` "Follow-up Re-audit Gate" (Phase B1/B2 활성)
+- `modules/cross-validation.md` "micro-eval 호출 트리거 (공통)" (Claim-Type 라우팅 확장)
+- `modules/memory-guide.md` "Claude Memory tool과의 관계" (fz L1 vs Anthropic client-side)
+- `CLAUDE.md` (root) "Verification Discipline" / "Opus 4.7 Adaptation" / "Agent Teams Environment Flag" 3섹션
+
+**검증 방법 강화**:
+- v3 패치에서 "키워드 grep" → "구조적 검증 (헤더 + bullet exact-match + 인접성)"로 전환
+- `^## Verification` 헤더 + bullet 3개 exact-match
+- TeamCreate 라인 ±20줄 내 VD Brief 매치
+- 팀 생성 절차 ±10줄 내 system-reminders + T6 + T7 동시 매치
+
+**audit 방법론**:
+- 3-Model 수렴: Claude Discover(4명) + Codex verify ×4 + Claude meta-analysis → 9 검증 라운드
+- memory-curator 3-E "Claude blind spot" 실증: G22(템플릿) + fz-search/fz-pr-digest env flag drift + 카운트 regression 모두 Codex가 발견
+- Plan v1 → v2 → v3 → 구현 → Codex final-v2 approved (0/0/0)
+
+**경로/버전**:
+- plugin.json: 3.10.0 → 4.0.0 (v3.11 변경도 plugin.json 미반영이었음 — 함께 통합)
+- marketplace.json: 3.10.0 → 4.0.0
+
+**검증 상태**: Codex final v2 **approved** (Critical 0 / Major 0 / Minor 0). audit 산출물은 `TVING/NOTASK-20260421-fz-audit/` 하위 16개 파일 보관.
+
 ### v3.11.0 (2026-04-21) — Opus 4.7 Adaptation + Verification Discipline
 
 **핵심**: Claude Opus 4.7 (2026-04-16 GA) 출시에 따른 가이드 전면 업데이트. 2차 Codex cross-validation 기반 팩트 오류 정정 + 논문 근거 보강 + 공식 자료 정합성 확보.
