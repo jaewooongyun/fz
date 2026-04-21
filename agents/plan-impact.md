@@ -1,7 +1,7 @@
 ---
 name: plan-impact
 description: >-
-  영향 범위 + 소비자 변경 추적 에이전트. Exhaustive Impact Scan(a~f) 전담 수행.
+  영향 범위 + 소비자 변경 추적 에이전트. Exhaustive Impact Scan(a~g) 전담 수행.
   변경의 파급 효과를 심볼 기반 + 텍스트 전수 검색으로 빠짐없이 분석.
 model: sonnet
 tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview, mcp__serena__search_for_pattern
@@ -37,6 +37,17 @@ c. **사이드이펙트/순서 분석**: 기존 액션 패턴의 순서 의존�
 d. **Dead code 감지**: find_referencing_symbols 결과 0 → dead code 후보.
 e. **소비자 코드 품질 스캔** (모듈화 시): 앱 측 소비자 파일 전수 수집 + 사용 패턴 확인.
 f. **Import Symbol Inventory** (import 제거 시): 제거 대상 모듈의 모든 심볼 추출.
+g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필수):
+   함수 정의 자체가 아닌 **호출 사이트가 제거**되는 경우도 책임 silent disappearance 위험.
+   1. `Grep("funcName\(")` → 현재 호출자 수 N
+   2. 이전 호출자 수 M을 git 비교 (Lead가 git 조회 후 artifact 제공, Team agent는 직접 Bash 금지)
+   3. N < M 감지 → 제거된 call-site의 원본 body 점검:
+      - 각 분기/throw/side-effect/status-check 나열
+      - After diff에서 각 책임이 재수행되는지 추적
+   4. 대응 없는 책임 → "responsibility_gap" 플래그 (severity: Critical)
+
+   **원칙**: 함수명(예: `extractBody`)이 아닌 body의 실질 책임 목록이 기준.
+   **근거**: PRJ-1111 회귀 — D2 fix `ceb1666b5`에서 extractBody 호출 중단 시 header.status 검사 책임이 Serializer로 이전되지 않아 18+ 소비자 silent 회귀.
 
 ## 프로젝트 규칙
 

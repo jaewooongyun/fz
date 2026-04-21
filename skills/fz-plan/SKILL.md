@@ -96,7 +96,7 @@ model-strategy:
 TeamCreate("plan-{feature}")
 ├── Lead (Opus): 오케스트레이션 + 외부 모델 실행 + 최종 합성
 ├── plan-structure (★Opus): 설계 + 분해 + 문서화 (Primary Worker)
-├── plan-impact (Sonnet): 영향 범위 전담 — Exhaustive Impact Scan (a~f)
+├── plan-impact (Sonnet): 영향 범위 전담 — Exhaustive Impact Scan (a~g)
 ├── plan-edge-case (Sonnet): 엣지 케이스 + 실패 시나리오 발굴
 ├── review-arch (Sonnet): 아키텍처 패턴 검증 (RIBs + Clean Architecture)
 ├── review-direction (Sonnet): 방향성 비판 + 대안 제시 (Phase 0.5)
@@ -123,7 +123,7 @@ TeamCreate("plan-{feature}")
 3개 Claude 에이전트가 **다른 렌즈로 병렬 분석** 후 교차 피드백. Lead는 Codex를 실행하여 이종 검증 확보.
 
 ```
-[Round 1 — 병렬] plan-structure: 분해+설계 / plan-impact: Impact Scan(a~f) / review-arch: 패턴 매칭 / Lead: Codex verify
+[Round 1 — 병렬] plan-structure: 분해+설계 / plan-impact: Impact Scan(a~g) / review-arch: 패턴 매칭 / Lead: Codex verify
 [Round 2 — 교차] plan-impact→structure: 영향+의존+dead / review-arch→structure: 위반+대안 / Lead→structure: GPT이슈 / structure: 통합수정
 [Round 3 — 보고] structure→Lead: 최종계획+합의표 / Lead: 6렌즈 통합
 ```
