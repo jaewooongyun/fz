@@ -236,9 +236,9 @@ Step 1: ContentDetailBuilder 생성 (DI: ContentRepository, ImageCacheUseCase)
 - **Gate는 절차적 강제**: 스킵 불가. 실패 시 해당 단계를 "완료"로 표시할 수 없다 (`modules/cross-validation.md` 참조)
 - **Evaluator-Optimizer 패턴**: stress-test 등에서 Critical 2개+ 발견 시 자동 재작성 (최대 2회). 초과 시 사용자 에스컬레이션
 
-### 원칙 8: Claude 4.6 과격 표현 제거
+### 원칙 8: Claude 4.6/4.7 과격 표현 제거
 
-Claude 4.6은 과격한 지시어에 overtriggering을 일으킨다.
+Claude 4.6은 과격한 지시어에 overtriggering을 일으킨다. **Opus 4.7 (2026-04-16 GA)** 부터는 "more literal instruction following" 변화로 인해 과격 지시가 더욱 literal하게 적용될 위험이 증가했다.
 
 ```
 BAD:  "CRITICAL: You MUST ALWAYS use this tool"
@@ -247,6 +247,7 @@ GOOD: "Use this tool when reading or modifying files"
 
 - "CRITICAL", "MUST ALWAYS", "NEVER EVER" → 자연스러운 표현으로 대체
 - Anti-laziness가 필요하면 SKILL.md가 아닌 user prompt 쪽에 배치
+- 참조: `guides/prompt-optimization.md` 동일 원칙 8 (Opus 4.7 literal interpretation 상세)
 
 ---
 

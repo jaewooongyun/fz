@@ -142,7 +142,7 @@ GOOD: "에러 시 테이블의 폴백 전략을 순서대로 실행하라."
 **증상:** Claude가 Gate 체크를 건너뛰거나 검증 없이 완료 보고.
 
 **솔루션:**
-- SKILL.md에 과격한 표현을 다시 넣지 않는다 (overtriggering 위험)
+- SKILL.md에 과격한 표현을 다시 넣지 않는다 (overtriggering 위험. Opus 4.7부터는 literal interpretation으로 더 위험)
 - **user prompt** 쪽에 격려 문구를 배치한다
 
 ```

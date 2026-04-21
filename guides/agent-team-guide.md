@@ -289,7 +289,7 @@ search-pattern: Grep 기반 교차 확인
 
 | 파이프라인 | Primary Worker (opus) | Supporting (sonnet) |
 |-----------|----------------------|---------------------|
-| plan-* | plan-structure | review-arch, plan-tradeoff, plan-edge-case |
+| plan-* | plan-structure | review-arch, ~~plan-tradeoff~~ (ARCHIVED: discover가 대체), plan-edge-case |
 | code-* | impl-correctness | review-arch, impl-quality |
 | review-* | review-arch | review-quality, review-correctness |
 | search --deep | (both sonnet) | search-symbolic + search-pattern |
@@ -334,7 +334,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | Anti-Pattern | 이유 | 대안 |
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
-| 서브에이전트 과다 | Claude 4.6 경향, 비용 폭증 | SOLO for simple tasks |
+| 서브에이전트 과다 | Claude 4.6/4.7 경향, 비용 폭증 (Opus 4.7 literal interpretation으로 강화) | SOLO for simple tasks |
 | standalone Task | 통신 불가, 고립된 작업 | TeamCreate 필수 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
 | 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 2-Tier (Lead+Primary=opus, rest=sonnet) |
@@ -351,7 +351,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 - [ ] `templates/agent-template.md` 기반으로 작성했는가?
 - [ ] 기존 에이전트와 역할 중복이 없는가?
   - plan-structure: 설계/계획 구조
-  - plan-tradeoff: 트레이드오프 분석
+  - ~~plan-tradeoff~~ (ARCHIVED: discover가 대체): 트레이드오프 분석
   - plan-edge-case: 경계 케이스 분석
   - plan-impact: 영향 범위 분석
   - review-arch: 아키텍처 비평
@@ -383,7 +383,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | 에이전트 | Domain | 기본 모델 | 전문 영역 |
 |---------|--------|----------|----------|
 | plan-structure | plan | sonnet (opus 승격) | 설계, 계획, 구조화 |
-| plan-tradeoff | plan | sonnet | 트레이드오프 분석 |
+| ~~plan-tradeoff~~ (ARCHIVED) | ~~plan~~ | — | ~~트레이드오프 분석~~ — discover가 대체 |
 | plan-edge-case | plan | sonnet | 경계 케이스 발견 |
 | plan-impact | plan | sonnet | 영향 범위 분석 |
 | review-arch | review | sonnet (opus 승격) | 아키텍처 비평, 설계 검증 |
