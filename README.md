@@ -172,14 +172,14 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
     └── External: Codex(GPT-5.4)
 ```
 
-### Verification Discipline (v3.11+)
+### Verification Discipline 4-way Chain (v4.0+)
 
-**추정을 사실로 단정 금지** 원칙이 전 파이프라인에 내장됨. 과거 상태/수치/외부 판정 인용 시 실측 또는 명시적 미검증 태그 의무화.
+**추정을 사실로 단정 금지** 원칙이 생태계 전체에 4-way 체인으로 구조화됨. v4.0에서 단일 선형 체인을 4개 독립 체인으로 재설계 + 템플릿 레이어 자동 상속으로 재발 방지 메커니즘 확보.
 
 ```
 답변 생성 시
     ↓
-Fail-Closed 키워드 가드 (T6/T7 트리거)
+Fail-Closed 키워드 가드 (T6/T7 트리거 — modules/team-core.md TEAM boot 자동 주입)
     ├── 과거 상태 키워드 ("원본은", "이전은") 감지
     │   → 직전 5턴 검증 도구 호출 흔적 없으면 [미검증] 자동 태그
     │
@@ -190,16 +190,32 @@ Lead Reasoning §1.5 Fallacy 체크
     ├── Partial-to-Whole (부분→전체)
     ├── Contingent-to-Inherent (현재→본질)
     ├── Operation Classification (연산 분류)
-    └── Speculation-to-Fact (추정→사실) ← v3.11 신규
+    └── Speculation-to-Fact (추정→사실)
     ↓
 fz-codex micro-eval 서브커맨드 (단일 주장 독립 재평가)
     → verdict: agree | disagree | partial | needs_verification
+    → needs_verification ⇔ uncertainty-verification.md Default-Deny (의미론적 결합, v4.0)
     ↓
-fz-review Phase 4.5 B3 체크리스트 (Phase A 효과 측정)
-    → 5개 지표 자동 수집 (T6/T7 발동, 사전 차단, 태그 빈도, reversal, precision)
+fz-review Phase 4.5 B3 체크리스트 + experiment-log.md §5.4 canonical sink (v4.0)
+    → 5개 지표 자동 수집 → 누적 → B1/B2 진입 판정
 ```
 
-### 근거 연구 (v3.11 공식 인용)
+### V.D. 4-way Chain (v4.0 아키텍처)
+
+```
+① 기본 fail-closed:  uncertainty-verification → fz-plan / fz-code
+② 보조 micro-eval:   fz-codex micro-eval → needs_verification → Default-Deny 차단
+③ TEAM 주입:         system-reminders → team-core → fz/SKILL.md Task Brief → agents (templates/ 상속)
+④ 운영 피드백:       Phase 4.5 측정 → experiment-log.md §5.4 canonical sink → B1/B2 판정
+```
+
+**재발 방지 메커니즘 (v4.0)**:
+- `templates/agent-template.md` + `templates/skill-template.md`에 `## Verification` 섹션 자동 상속
+- `templates/skill-template.md`의 `## If TeamCreate is used` 조건부 체크리스트로 env flag 누락 차단
+- `modules/team-core.md` TEAM 생성 절차에 T6/T7 트리거 주입 명시
+- TeamCreate 사용 9 skills (fz, fz-plan, fz-code, fz-discover, fz-fix, fz-review, fz-peer-review, fz-search, fz-pr-digest) 모두 `## Prerequisites` 섹션 필수
+
+### 근거 연구 (v4.0 공식 인용)
 
 | 출처 | 적용 |
 |------|------|
@@ -226,7 +242,7 @@ fz-review Phase 4.5 B3 체크리스트 (Phase A 효과 측정)
 | | `/fz-commit`, `/fz-pr` | 커밋 + Fork 기반 PR |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
-| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.4) + `micro-eval` 단일 주장 재평가 (v3.11) |
+| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.4) + `micro-eval` 단일 주장 재평가 (needs_verification ⇔ Default-Deny 결합, v4.0) |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
 | **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage` | 문서, 메모리, 스킬 관리 |
 | **보조** | `/fz-new-file`, `/fz-excalidraw`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 다이어그램, 회의록, PR 요약 |
@@ -276,9 +292,10 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v3.11.0** (2026-04-21)
+**현재 버전: v4.0.0** (2026-04-21)
 
-- v3.11.0 — Opus 4.7 Adaptation + Verification Discipline (Phase A Fail-Closed 트리거 + Phase B3 측정 도구 + Opus 4.7 세대 전환 반영 + 논문 근거 9편 보강 + 공식 Agent Teams 사양 정합)
+- **v4.0.0 — V.D. 4-way Chain 아키텍처 + 생태계 정합성** (Brain/Hands ↔ Lead/Teammate 레이어 경계 명시 + 템플릿 자동 상속 재발 방지 + 9 skills 필수 Prerequisites + TEAM boot VD 트리거 주입 + Chain-Closure 논리 링크 + canonical sink normalization). 상세: [RELEASE_NOTES_v4.0.0.md](RELEASE_NOTES_v4.0.0.md).
+- v3.11.0 — Opus 4.7 Adaptation + Verification Discipline 초안 (Phase A Fail-Closed 트리거 + Phase B3 측정 도구 + Opus 4.7 세대 전환 반영 + 논문 근거 9편 보강 + 공식 Agent Teams 사양 정합)
 - v3.10.0 — Scope Minimality (기계적 코드 변환 방지 — Zero-Exception 범위 한정 + BEC 3.5 + 마찰 감지 + 4-K 검증)
 - v3.9.0 — Harness Engineering Enhancement (SOLO G≠E 결정론적 검증 + PR 코멘트 파이프라인 + NLAH Gap 분석)
 - v3.8.0 — Uncertainty-Aware Harness (Default-Deny 검증 + Zero-Exception Thread + Harness Metrics)
