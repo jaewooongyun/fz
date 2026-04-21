@@ -605,14 +605,17 @@ fz 적용:
 
 fz 적용: `modules/context-artifacts.md`의 ASD 폴더 전략이 이 원칙의 구현. `fz:checkpoint:essential`은 경량 버전.
 
-### 원칙 H4: Brain / Hands / Session 분리
+### 원칙 H4: Session 계층 관리 전략
 
 > "Decouple the brain from the hands." — Anthropic 2026-04
 
+> ⛔ **Brain/Hands(infrastructure)와 Lead/Teammate(application)는 서로 다른 레이어.** 혼용 금지.
+> — Brain/Hands: Anthropic "many brains, many hands" 인프라 추상화 (Sandbox, Session, Harness 3-component)
+> — Lead/Teammate: fz의 TeamCreate + Task(N) 애플리케이션 역할 협업 패턴
+> 참조: `guides/harness-engineering.md` §1.3 (Infrastructure vs Application Layer)
+
 | 컴포넌트 | 역할 | fz 대응 |
 |---------|------|---------|
-| **Brain** | 추론 + 계획 + 판단 | Lead (오케스트레이터) |
-| **Hands** | 도구 실행 + 코드 수정 | impl-correctness, review-arch 등 서브에이전트 |
 | **Session** | 상태 추적 + 이벤트 로그 | ASD 폴더 + Serena Memory |
 
 핵심: Session을 context window **밖**의 조회 가능한 이벤트 로그로 관리한다. context window 안에 모든 상태를 유지하려 하면 Context Rot이 가속된다.
@@ -666,8 +669,8 @@ fz 적용:
 | 시간 의존 정보 ("2026년 3월 기준") | 곧 오래된 정보가 됨 | 상대 표현 또는 버전 기반 표현 사용 |
 | 비일관적 용어 사용 | 같은 개념에 다른 이름 -> 혼동 | 용어를 하나로 통일, 용어집 관리 |
 | 깊은 참조 중첩 (A -> B -> C -> D) | Context Rot 가속, 정보 손실 | 최대 1단계 깊이만 허용 |
-| "CRITICAL / MUST ALWAYS" 남용 | Claude 4.6에서 overtriggering 유발 | 자연스럽고 구체적인 표현 사용 |
-| 과도한 서브에이전트 위임 | Claude 4.6의 과잉 위임 경향 강화 | 단순 작업은 직접 실행하도록 지시 |
+| "CRITICAL / MUST ALWAYS" 남용 | Claude 4.6/4.7에서 overtriggering 유발 (4.7 literal interpretation으로 더 위험) | 자연스럽고 구체적인 표현 사용 |
+| 과도한 서브에이전트 위임 | Claude 4.6/4.7의 과잉 위임 경향 강화 | 단순 작업은 직접 실행하도록 지시 |
 | Claude가 아는 것을 다시 설명 | 토큰 낭비, Context Rot 가속 | 프로젝트 고유 정보만 포함 |
 | 실패에서 체크리스트 행 추가 반사 | 규칙 수 증가→준수율 저하, Claude 추론 억압 | 원칙+이유 한 줄로 대체 (보충 4a) |
 | 예시 없이 장문으로 설명 | 모호함, 해석 편차 | Few-shot 예시 3-5개로 대체 |

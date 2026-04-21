@@ -64,3 +64,15 @@ Verifies that the implementation matches the stated requirements and plan.
 - 요구사항과 구현 간 불일치가 의도적인지 판단 불가 시
 - 판단 confidence < 60% 시
 - Boundaries 밖 이슈 발견 시
+
+---
+
+## Verification
+
+모든 에이전트는 다음 Verification Discipline 규약을 따른다:
+
+- 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
+- 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
+- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
+
+관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

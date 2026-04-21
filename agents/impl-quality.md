@@ -58,3 +58,15 @@ in real time, providing feedback directly to `impl-correctness`.
   - 이슈 없음: `"LGTM"`
   - 이슈 있음: `"이슈 N건: {이슈1 설명} / {이슈2 설명} / ..."`
 - 피드백은 간결하고 실행 가능한 수준으로 작성한다.
+
+---
+
+## Verification
+
+모든 에이전트는 다음 Verification Discipline 규약을 따른다:
+
+- 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
+- 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
+- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
+
+관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).
