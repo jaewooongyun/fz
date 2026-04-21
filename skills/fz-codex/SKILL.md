@@ -40,19 +40,10 @@ model-strategy:
 ## 사용 시점
 
 ```bash
-/fz-codex review                    # 코드 리뷰 (develop 대비)
-/fz-codex review --base main        # 특정 브랜치 대비 리뷰
-/fz-codex verify "계획 검증해줘"     # 구현 계획 검증
-/fz-codex validate "피드백 확인해줘"  # 피드백 반영 역검증
-/fz-codex check                     # 커밋 전 빠른 검증 (uncommitted)
-/fz-codex final                     # PR 전 최종 종합 리뷰
-/fz-codex commit                    # 최근 커밋 검증
-/fz-codex adversarial               # Devil's Advocate 리뷰 (설계 결정 도전)
-/fz-codex drift                     # 전체 코드베이스 아키텍처 드리프트 스캔
-/fz-codex plan "요구사항"            # Claude와 독립적인 플랜 생성 (교차 비교용)
-/fz-codex micro-eval "주장" [컨텍스트] # 단일 주장 독립 재평가 (Claim-Type 라우팅용, 경량)
-/fz-codex config                    # 설정 조회
+/fz-codex {review|verify|validate|check|final|commit|adversarial|drift|plan|micro-eval|config} [args]
 ```
+
+자세한 옵션과 컨텍스트는 `## 서브커맨드` 섹션 이하 각 서브섹션 참조.
 
 ## 모듈 참조
 
@@ -67,7 +58,7 @@ model-strategy:
 
 ## Codex 스킬 3-Tier 디스커버리
 
-> canonical 정의: modules/cross-validation.md 참조.
+> 3-Tier 디스커버리 정의: `modules/cross-validation.md § get_codex_skill()` 참조.
 
 역할 기반 동적 결정: Tier 1(CLAUDE.md `## Codex Skills` 테이블) → Tier 2(글로벌 `fz-*`) → Tier 3(인라인 프롬프트).
 
@@ -406,45 +397,17 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 - "이 주장이 맞는가?" 형태의 단일 이슈 검증
 - cross-validation.md Claim-Type 라우팅에서 분류/심각도 판단 → micro-eval로 흐름
 
-```bash
-CLAIM="$1"
-CONTEXT_HINT="${2:-}"
+**호출**: `codex exec` 공통 패턴 + 다음 차이:
+- skill: `challenger` (3-Tier 디스커버리), 폴백: "단일 주장을 독립 판정하라"
+- effort: `medium` + `--ephemeral` (경량)
+- 입력: `${CLAIM}` + `${CONTEXT_HINT}`
+- 출력: `verdict (agree | disagree | partial | needs_verification) + reasoning (1-3문장) + missing_evidence`
 
-SKILL_NAME=$(get_codex_skill "challenger")
-if [ -n "$SKILL_NAME" ]; then
-  SKILL_PROMPT="$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)"
-else
-  SKILL_PROMPT="단일 주장을 독립 판정하라. 배경 지식과 코드 확인으로만 판단."
-fi
+**verdict 의미**:
+- `agree` / `disagree` / `partial`: 주장 정확/틀림/일부
+- `needs_verification`: 증거 부족 — 답변 차단 (Anti-Pattern #6, BEC fail-closed)
 
-codex exec \
-  -m gpt-5.4 \
-  -c model_reasoning_effort=medium \
-  -c 'sandbox_permissions=["disk-full-read-access"]' \
-  --ephemeral \
-  -o "$MICRO_EVAL_FILE" \
-  -C "$GIT_ROOT" \
-  "${SKILL_PROMPT}
-
-   ## 재평가할 단일 주장
-   ${CLAIM}
-
-   ## 제공된 컨텍스트
-   ${CONTEXT_HINT}
-
-   독립 판정하라:
-   1. verdict: agree | disagree | partial | needs_verification
-   2. reasoning: 1-3문장 근거
-   3. missing_evidence: 판단에 부족한 근거 (있으면 구체 명시)
-
-   verdict 의미:
-   - agree: 주장이 정확함
-   - disagree: 주장이 틀림
-   - partial: 주장의 일부만 맞음
-   - needs_verification: 증거 부족으로 판정 불가 — 답변 차단 대상 (Anti-Pattern #6 발동)
-
-   단일 주장이므로 전체 코드 스캔 불필요. 해당 주장의 진위만 확인."
-```
+> **의미론적 결합**: `needs_verification` verdict = `modules/uncertainty-verification.md` Default-Deny 조건(증거 부족). BEC fail-closed 차단 의미와 동일. micro-eval 결과가 `needs_verification`이면 해당 주장은 fz-plan/fz-code의 `[verified]` 태그 게이트에서 자동 차단된다.
 
 > **effort**: `medium` (기본). 경량 호출 — 수백 토큰 단위.
 > **사용 시점**: 단일 심각도/분류 주장 → full review 대신 경량 호출로 교차 검증.
@@ -473,20 +436,12 @@ Plugin 상태: `codex mcp list 2>/dev/null | grep plugin` (설치 시 `/codex:se
 ## Few-shot 예시
 
 ```
-BAD (Codex 출력 무비판 수용):
-codex exec review → "LGTM" → 그대로 approved 판정
-→ Claude 독립 판단 없이 Codex 결과만 전달. 교차 검증 아님.
-
-GOOD (교차 검증):
-codex exec review → Issue 3개 발견
-Claude 독립 분석 → Issue 2개 중복 + 1개 새 Issue 발견
-→ 합산: 4개 Issue (Codex 3 + Claude 1, 중복 2 제외)
-→ 구조화된 보고 + verdict 판정
+BAD: codex exec review → "LGTM" → 그대로 approved (Claude 독립 판단 없음, 교차 검증 아님)
+GOOD: codex 3 issues + Claude 독립 1 신규 = 4 issues 합산 + verdict 판정
 ```
 
 ```
-BAD: 계획 검증에 `codex exec review` 사용 → review는 코드 리뷰용.
-GOOD: 코드 리뷰→`codex exec review -o`, 계획 검증→`codex exec --output-schema`, 심화→`codex exec resume --last`
+서브커맨드 매핑: 코드 리뷰→`codex exec review -o`, 계획 검증→`codex exec --output-schema`, 심화→`codex exec resume --last`
 ```
 
 ---
