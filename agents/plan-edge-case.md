@@ -58,3 +58,15 @@ tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
 - `plan-structure`에게 발견된 엣지 케이스를 직접 `SendMessage`로 공유한다.
 - `plan-structure`로부터 초안 수신 시 엣지 케이스 관점에서 즉시 피드백한다.
 - 다른 피어(plan-impact 등)와의 소통은 `plan-structure`를 통해 간접 공유한다.
+
+---
+
+## Verification
+
+모든 에이전트는 다음 Verification Discipline 규약을 따른다:
+
+- 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
+- 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
+- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
+
+관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

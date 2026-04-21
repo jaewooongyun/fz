@@ -107,14 +107,17 @@
 
 ---
 
-## 아키텍처 매핑 (Anthropic H4: Brain/Hands/Session)
+## Session 계층 관리 전략
 
 > Source: Scaling Managed Agents (Anthropic 2026-04) — "Decouple the brain from the hands."
 
+> ⛔ **Brain/Hands(infrastructure)와 Lead/Teammate(application)는 서로 다른 레이어.** 혼용 금지.
+> — Brain/Hands: Anthropic "many brains, many hands" 인프라 추상화 (Sandbox, Session, Harness 3-component)
+> — Lead/Teammate: fz의 TeamCreate + Task(N) 애플리케이션 역할 협업 패턴
+> 참조: `guides/harness-engineering.md` §1.3 (Infrastructure vs Application Layer)
+
 | 컴포넌트 | 역할 | fz 대응 |
 |---------|------|---------|
-| **Brain** | 추론 + 계획 + 판단 | Lead (오케스트레이터) |
-| **Hands** | 도구 실행 + 코드 수정 | Primary/Supporting 에이전트 (impl-correctness, review-arch 등) |
 | **Session** | 상태 추적 + 이벤트 로그 | PRJ 폴더 + Serena Memory (context window **밖**) |
 
 핵심: Session을 context window 밖의 조회 가능한 이벤트 로그로 관리한다. context window 안에 모든 상태를 유지하려 하면 Context Rot이 가속된다.
@@ -125,7 +128,7 @@
 
 3-Tier: opus(핵심) + sonnet(나머지) + external(검증). haiku 사용하지 않음.
 
-> 근거: 같은 모델 N개는 비효과적(ICLR 2025). 이종 모델 조합이 핵심(X-MAS).
+> 근거: 같은 모델 N개는 비효과적(ICLR 2025). 이종 모델 조합이 핵심(X-MAS). 역할 분리(MAR, arxiv 2512.20845)는 multi-agent 안정성을 보장.
 
 | 역할 | 모델 | 조건 |
 |------|------|------|
@@ -171,6 +174,15 @@ Lead 전용 도구가 필요한 경우: Lead가 조회 후 `SendMessage`로 결�
 > 상세: `guides/agent-team-guide.md` §8
 
 ## 팀 생성 절차
+
+### Verification Discipline 트리거 주입 (TEAM boot)
+
+TEAM boot 시 `modules/system-reminders.md`의 T6/T7 트리거가 모든 에이전트에 전파된다.
+
+- T6: 과거 상태 주장 키워드 감지 + 검증 도구 호출 흔적 없음 → Fail-Closed 리마인더
+- T7: 과거 판단 아티팩트(`follow-up-tasks.md`, `codex-review*.md`, `plan-v*.md`) 인용 감지 → 재실측 요구
+
+참조: `modules/system-reminders.md` (T6/T7), `modules/uncertainty-verification.md` (Default-Deny)
 
 ```
 1. TeamCreate(team_name, description)

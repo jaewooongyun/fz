@@ -76,6 +76,11 @@ model-strategy:
 
 ---
 
+## Prerequisites
+
+- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
 ## 모듈 참조
 
 | 모듈 | 용도 |
@@ -370,6 +375,16 @@ Lead는 퍼실리테이터 (모니터링 + 교착 해소 + 게이트 실행).
 4. 합의 → Lead 보고 → Lead 게이트 실행 (빌드/Codex)
 5. 완료 → shutdown_request → TeamDelete
 ```
+
+### Verification Discipline Brief (모든 Task spawn에 자동 포함)
+
+TeamCreate 후 각 Task spawn 프롬프트에 다음 규약이 자동 포함된다:
+
+1. 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
+2. 외부 모델 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
+3. T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
+
+참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).
 
 ### 스킬별 통신 패턴
 

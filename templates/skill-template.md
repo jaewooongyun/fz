@@ -260,3 +260,25 @@ Before finalizing a new skill, verify:
 | < 500 lines | Progressive Disclosure — YAML always loaded, body on relevance, refs on demand |
 | Explicit paths | `templates/X.md` not just `templates/X.md` |
 | Natural language | "Use when..." not "CRITICAL: You MUST..." |
+
+---
+
+## Verification
+
+모든 스킬은 다음 Verification Discipline 규약을 따른다:
+
+- 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
+- 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
+- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
+
+관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).
+
+---
+
+## If TeamCreate is used (조건부 필수)
+
+TeamCreate를 호출하는 스킬이면 다음 3항목 필수:
+
+- [ ] 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 전제조건 명시 (Phase 0/1 또는 Prerequisites 섹션)
+- [ ] `modules/team-core.md` 참조 (TEAM 실행 프로토콜 + VD 트리거 주입)
+- [ ] VD Task Brief 주입 경로 (`skills/fz/SKILL.md` §5.2 TEAM Execution 참조)

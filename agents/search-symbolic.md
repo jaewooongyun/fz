@@ -58,3 +58,15 @@ Return each finding as a structured entry:
 - Refer to CLAUDE.md `## Code Conventions` for naming conventions and coding standards.
 - 검색 루트는 현재 작업 디렉토리 또는 CLAUDE.md 컨텍스트에서 파생한다.
 - Prefer symbol-level precision over broad text matching; escalate to `search-pattern` for wider coverage.
+
+---
+
+## Verification
+
+모든 에이전트는 다음 Verification Discipline 규약을 따른다:
+
+- 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
+- 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
+- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
+
+관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).
