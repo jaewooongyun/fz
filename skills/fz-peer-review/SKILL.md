@@ -62,12 +62,19 @@ model-strategy:
 /fz-peer-review 123 --explain --deep  # 리뷰 후 기술 해설까지 포함
 ```
 
+## Prerequisites
+
+- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
 ## 참조
 
 | 참조 | 용도 |
 |------|------|
 | `modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
 | `modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
+| `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
+| `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
 | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |
 | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
