@@ -114,6 +114,8 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 
 ## Context 계층 요약
 
+> **근거 — 왜 계층화가 필요한가**: 1M context window는 **safety net이지 strategy가 아니다**. Intelligence Degradation in Long-Context LLMs (arxiv 2601.15300) + Context Length Alone Hurts (arxiv 2510.05381, EMNLP 2025 Findings) — 컨텍스트 확대 자체가 모델 성능을 저하시킴. 따라서 L1/L2/L3 분리는 "용량 부족 대응"이 아니라 "집중 > 분산" 원칙의 구조적 강제.
+
 | 계층 | 도구 | 상세 |
 |------|------|------|
 | L1 Hot | auto-memory (MEMORY.md) | 세션 간 영속. 프로젝트 수준 교훈/패턴/규칙. `modules/memory-guide.md` 정책 준수 |
@@ -121,6 +123,21 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 | L3 File Artifact | PRJ 폴더 파일 | 세션 내 상세. 무제한 크기 구조화 산출물. L3=canonical, L2=cursor |
 
 > L1.5: Serena decision/pattern 키는 L2 임시가 아닌 영속. GC 대상 아님.
+
+### Claude Memory tool과의 관계
+
+> 참조: Anthropic 공식 Memory tool (file-system-based memory, https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool). Opus 4.7 (2026-04-16 GA) release notes: "Opus 4.7 is better at using file system-based memory" — 4.7이 도구를 새로 추가한 것은 아님, **더 잘 활용**.
+
+공식 Memory tool은 **client-side 도구** — 저장 backend/위치는 **사용자/애플리케이션이 제어**. "across conversations"/"persist between sessions" 지원. 기능적으로 fz의 L3 (PRJ 폴더 + `.claude/projects/.../memory/`)와 **중복 가능성** 존재:
+
+| 관점 | fz 자체 구현 (L1/L3) | Claude Memory tool |
+|------|----------------------|---------------------|
+| 저장소 | `MEMORY.md` + PRJ 폴더 + Serena | 클라이언트/애플리케이션 관리 backend |
+| 관리 | fz 파이프라인 + memory-guide.md 정책 | 도구 구성 + 모델 사용 패턴 |
+| 세션 | cross-session (파일 기반) | cross-session 가능 (backend 구성에 따름) |
+| 이식성 | Claude Code 독립 | Claude API/Code 공통 |
+
+**현재 정책**: fz는 자체 L1/L2/L3 유지. 이유 — (a) 명시적 정책/태깅 제어, (b) Serena MCP와 직접 연동, (c) fz 파이프라인 Gate 연계. **미래 전환 판단 기준**: Memory tool을 fz L1.5 수준 정책(태깅/GC/읽기 권한)으로 감싸는 어댑터를 만들 가치가 생기면 재검토. [미검증: 2026-04 시점 공식 문서 기반, 실사용 실측 부재]
 
 상세: `modules/context-artifacts.md` 참조 / L1 관리: `modules/memory-guide.md` 참조
 
