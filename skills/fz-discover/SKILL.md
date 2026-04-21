@@ -64,6 +64,11 @@ model-strategy:
 /fz-discover "팀원이 이런 우려를 제기했는데"              # 우려 기반 제약 발견
 ```
 
+## Prerequisites
+
+- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
 ## 모듈 참조
 
 | 모듈 | 용도 |
@@ -72,6 +77,8 @@ model-strategy:
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
 | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
+| modules/lead-reasoning.md | Speculation-to-Fact Fallacy (§1.5) — 탐색 결과 주장 시 [verified] 태그 |
+| modules/uncertainty-verification.md | Default-Deny — 증거 없는 옵션/제약 주장 차단 |
 
 ## sc: 활용 (SuperClaude 연계)
 

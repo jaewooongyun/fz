@@ -57,6 +57,11 @@ model-strategy:
 
 ---
 
+## Prerequisites
+
+- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
 ## 3-Tier 깊이
 
 | Tier | 플래그 | 내용 | 토큰 비용 |

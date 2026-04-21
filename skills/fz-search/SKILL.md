@@ -62,6 +62,11 @@ model-strategy:
 /fz-search --deep "ContentDetail 모듈 구조"           # 병렬 교차 검증
 ```
 
+## Prerequisites
+
+- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
 ## 모듈 참조
 
 | 모듈 | 용도 |

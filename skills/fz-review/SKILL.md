@@ -49,6 +49,12 @@ model-strategy:
 /fz-review "구현한 코드 리뷰해줘"     /fz-review "현재 Reflection Rate 얼마야?"
 /fz-review "Codex 피드백 반영, 재검증" /fz-review "Gate 5 통과 확인해줘"
 ```
+
+## Prerequisites
+
+- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
 ## 모듈 참조
 
 | 모듈 | 용도 |
@@ -170,7 +176,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 판단 날짜 + 근거 유형(실측/추정/외부 리뷰) 분류
 - [ ] 추정/외부 리뷰 기반 → 현재 시점 재실측 (`git show`/`Read`/`grep`)
 - [ ] 재실측 결과 ≠ 아티팩트 → 업데이트 이슈 생성 (category: artifact_stale)
-- [ ] 참조: `memory/feedback_followup_artifact_reaudit.md`, `cross-validation.md § Follow-up Re-audit Gate` (Phase B1/B2 후 활성)
+- [ ] 참조: `${CLAUDE_PROJECT_DIR}/memory/feedback_followup_artifact_reaudit.md`, `cross-validation.md § Follow-up Re-audit Gate` (Phase B1/B2 후 활성)
 
 **Phase A 효과 측정** (B1/B2 진입 조건 5개 지표 1:1 매핑):
 - [ ] 지표①: T6/T7 발동 건수 + Speculation-to-Fact Fallacy 차단 사례 (세션당)
@@ -178,7 +184,8 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 지표③: `[verified]` / `[미검증]` 태그 빈도 + 무태그 과거 주장("원본/기존/이전/D{N} 이전") 위반 건수
 - [ ] 지표④: 세션 reversal 횟수 (사용자 판정 뒤집기 — 기준선 4회)
 - [ ] 지표⑤: A5 micro-eval 호출 건수 N + confirmed C + false positive F → precision = C/N
-- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (ASD) 또는 Serena `fz:metrics:phase-a-session-{N}` (비ASD). 최종 보고 "## Phase A Metrics" 섹션 포함 + plan-v3.2 §4.3 5개 지표 업데이트
+- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (ASD 세션 임시) 또는 Serena `fz:metrics:phase-a-session-{N}` (비ASD 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함 + plan-v3.2 §4.3 5개 지표 업데이트
+- [ ] **canonical sink**: 세션 결과를 `experiment-log.md §5.4 Harness Metrics 누적`에 누적 (5 세션 누적 후 B1/B2 진입 판정). 다른 sink는 backlink만 허용 (3중화 금지).
 
 ## Phase 5: Cross-Review (3중 검증)
 > **프로젝트 규칙**: CLAUDE.md `## Code Conventions` 섹션을 따른다.
@@ -458,6 +465,8 @@ Gate 5 통과 후:
 완료 보고: 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계
 
 ### Harness Metrics (v3.8+)
+
+> **Canonical sink**: 누적 데이터는 `experiment-log.md §5.4`에 기록한다 (B1/B2 진입 판정용). 본 섹션은 세션 보고 형식만 정의하고, 누적은 canonical sink로 backlink.
 
 리뷰 완료 보고에 Gate별 이슈 수를 기록한다:
 
