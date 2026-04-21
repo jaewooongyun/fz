@@ -1,5 +1,52 @@
 # Changelog
 
+### v3.11.0 (2026-04-21) — Opus 4.7 Adaptation + Verification Discipline
+
+**핵심**: Claude Opus 4.7 (2026-04-16 GA) 출시에 따른 가이드 전면 업데이트. 2차 Codex cross-validation 기반 팩트 오류 정정 + 논문 근거 보강 + 공식 자료 정합성 확보.
+
+**검증 상태**: Phase 1/2 Codex **approved**. Phase 3 (N1/N3/CHANGELOG) Codex 3라운드 iterate 후 approved.
+
+**배경 research**:
+- 1차 research: `claudedocs/research_fz_guide_updates_2026-04-21.md` (504줄)
+- 2차 refined research: `claudedocs/research_fz_guide_refined_2026-04-21.md` (593줄) — 1차의 hallucination 3건 catch
+- 통합 Gap Matrix: `claudedocs/fz_guide_update_gap_matrix_2026-04-21.md`
+
+**Phase 1 — Critical 팩트 정정** (2건 실제 수정, 3건 hallucination 판명)
+- `modules/cross-validation.md` L85: X-MAS(arxiv 2505.16997) 주장 완화 — 논문 abstract 재확인 결과 "2-model isolation" 실험 부재, "heterogeneous > homogeneous, MATH +8.4%, AIME +47%"로 정정
+- `modules/context-artifacts.md` L228-230: Opus 4.6 → **Opus 4.7 (1M context, 2026-04-16 GA)** + tokenizer 1.00-1.35x 변경 주의 + Korean [미검증] 태그
+
+**Phase 2 — Opus 4.7 하드코딩 정리 + 논문 근거 보강** (13 edits)
+- `guides/harness-engineering.md`: 7곳 Opus 4.7 반영 (모델 세대 테이블 4-column 확장, tokenizer 경고, shallow long-context 주의)
+- `guides/prompt-optimization.md` L276-278: Opus 4.7 "more literal instruction following" 경고 추가
+- `guides/agent-team-guide.md` L406-411: 공식 사양 명시 (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, hard limit 명시 없음/3-5 권장, TeammateIdle/TaskCreated/TaskCompleted hooks)
+- `modules/system-reminders.md`: Drift No More (arxiv 2510.07777) reminder injection 효과 근거 추가
+- `modules/cross-validation.md`: VeriGuard (arxiv 2510.05156) dual-stage verification 근거 추가
+- `skills/fz-review/SKILL.md`: MAR — Multi-Agent Reflexion (arxiv 2512.20845) 3중 검증 이론 근거
+- `modules/memory-policy.md`: Intelligence Degradation (arxiv 2601.15300) + Context Length Hurts (arxiv 2510.05381) "1M = safety net not strategy" 근거
+
+**Phase 3 — Infrastructure 구분 + Memory tool 관계** (2 additions)
+- `guides/harness-engineering.md §1.3` 신규: Anthropic Scaling Managed Agents (2026-04-08) Brain/Hands 인프라 레이어와 fz Lead/Teammate 애플리케이션 레이어 구분 테이블
+- `modules/memory-policy.md`: Opus 4.7 공식 Memory tool (file-system-based)과 fz 자체 L1/L2/L3의 중복 가능성 + 미래 전환 판단 기준
+
+**Deferred**
+- M5 (NLAH 13 agent list 갱신): Open Question — 논문 전문 확인 후 별도 업데이트
+- N2 (Task Budgets beta): Messages API only, Codex CLI 미지원으로 fz 적용 불가
+
+**Verification Discipline 적용 사례 (메타 교훈)**
+- 1차 research의 hallucination 3건(`CLAUDE.md 40% 채택률`, `fz에 'ICLR 2025 Inside the Scaffold' 오인용 존재`, `Agent Skills OpenAI/MS 채택`)을 2차 research와 실측 grep으로 모두 catch → 잘못된 수정 방지
+- Gap Matrix의 "Critical 4건" 중 3건이 fz 가이드에 존재하지 않는 이슈로 판명 → 실제 수정은 C3 + H1 2건만
+- `[verified: source]` / `[미검증: 이유]` 태그 원칙 전파 — 공식 부재 부분 명시적 표시
+
+**근거 논문 인용 재정렬**
+- X-MAS (2505.16997) — 이종 조합 근거, abstract 기반 보수적 해석
+- Drift No More (2510.07777) — reminder 효과
+- MAR (2512.20845) — 역할 분리 이론
+- VeriGuard (2510.05156) — dual-stage verification
+- Intelligence Degradation (2601.15300) + Context Length Hurts (2510.05381) — 1M context 원칙
+- NLAH (2603.25723) — 하네스 formalism (인용 유지, 13 agent list deferred)
+
+---
+
 ### v3.10.0 (2026-04-15) — Scope Minimality
 
 **핵심**: 코드 패턴 변환 시 기계적 1:1 래핑을 방지하는 "의미 판단" 체크포인트를 파이프라인 3단계(Plan→Code→Review)에 추가.

@@ -172,6 +172,46 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
     └── External: Codex(GPT-5.4)
 ```
 
+### Verification Discipline (v3.11+)
+
+**추정을 사실로 단정 금지** 원칙이 전 파이프라인에 내장됨. 과거 상태/수치/외부 판정 인용 시 실측 또는 명시적 미검증 태그 의무화.
+
+```
+답변 생성 시
+    ↓
+Fail-Closed 키워드 가드 (T6/T7 트리거)
+    ├── 과거 상태 키워드 ("원본은", "이전은") 감지
+    │   → 직전 5턴 검증 도구 호출 흔적 없으면 [미검증] 자동 태그
+    │
+    └── 아티팩트 인용 (follow-up-tasks.md 등) 감지
+        → 현재 시점 재실측 강제 또는 [아카이브] 태그
+    ↓
+Lead Reasoning §1.5 Fallacy 체크
+    ├── Partial-to-Whole (부분→전체)
+    ├── Contingent-to-Inherent (현재→본질)
+    ├── Operation Classification (연산 분류)
+    └── Speculation-to-Fact (추정→사실) ← v3.11 신규
+    ↓
+fz-codex micro-eval 서브커맨드 (단일 주장 독립 재평가)
+    → verdict: agree | disagree | partial | needs_verification
+    ↓
+fz-review Phase 4.5 B3 체크리스트 (Phase A 효과 측정)
+    → 5개 지표 자동 수집 (T6/T7 발동, 사전 차단, 태그 빈도, reversal, precision)
+```
+
+### 근거 연구 (v3.11 공식 인용)
+
+| 출처 | 적용 |
+|------|------|
+| Anthropic: Harness Design for Long-Running Applications (2026-03) | harness-engineering.md 원칙 2-3 |
+| Anthropic: Scaling Managed Agents (2026-04) | §1.3 infrastructure vs application 레이어 구분 |
+| arxiv 2603.25723 NLAH | C, R, S, A, Σ, F formalism |
+| arxiv 2505.16997 X-MAS | 이종 모델 조합 (MATH +8.4%, AIME +47%) |
+| arxiv 2510.07777 Drift No More | system-reminders 근거 |
+| arxiv 2510.05156 VeriGuard | dual-stage verification (fz cross-validation) |
+| arxiv 2512.20845 MAR | 3중 검증 역할 분리 이론 |
+| arxiv 2601.15300 + 2510.05381 | 1M context "safety net not strategy" |
+
 ---
 
 ## Skills
@@ -186,7 +226,7 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
 | | `/fz-commit`, `/fz-pr` | 커밋 + Fork 기반 PR |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
-| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.4) |
+| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.4) + `micro-eval` 단일 주장 재평가 (v3.11) |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
 | **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage` | 문서, 메모리, 스킬 관리 |
 | **보조** | `/fz-new-file`, `/fz-excalidraw`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 다이어그램, 회의록, PR 요약 |
@@ -236,8 +276,9 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v3.10.0** (2026-04-15)
+**현재 버전: v3.11.0** (2026-04-21)
 
+- v3.11.0 — Opus 4.7 Adaptation + Verification Discipline (Phase A Fail-Closed 트리거 + Phase B3 측정 도구 + Opus 4.7 세대 전환 반영 + 논문 근거 9편 보강 + 공식 Agent Teams 사양 정합)
 - v3.10.0 — Scope Minimality (기계적 코드 변환 방지 — Zero-Exception 범위 한정 + BEC 3.5 + 마찰 감지 + 4-K 검증)
 - v3.9.0 — Harness Engineering Enhancement (SOLO G≠E 결정론적 검증 + PR 코멘트 파이프라인 + NLAH Gap 분석)
 - v3.8.0 — Uncertainty-Aware Harness (Default-Deny 검증 + Zero-Exception Thread + Harness Metrics)
