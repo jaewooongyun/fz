@@ -29,7 +29,7 @@ model-strategy:
 
 ## 개요
 
-> 서브커맨드: verify | review | validate | check | final | commit | adversarial | drift | plan | config
+> 서브커맨드: verify | review | validate | check | final | commit | adversarial | drift | plan | micro-eval | config
 
 - **CLI** (`codex exec review`): git diff + `-o`/`--json` + `--add-dir` + 3-Tier 스킬 — review/check/final/commit
 - **CLI** (`codex exec`): 프롬프트 + `--output-schema` — verify/validate/drift/plan
@@ -50,6 +50,7 @@ model-strategy:
 /fz-codex adversarial               # Devil's Advocate 리뷰 (설계 결정 도전)
 /fz-codex drift                     # 전체 코드베이스 아키텍처 드리프트 스캔
 /fz-codex plan "요구사항"            # Claude와 독립적인 플랜 생성 (교차 비교용)
+/fz-codex micro-eval "주장" [컨텍스트] # 단일 주장 독립 재평가 (Claim-Type 라우팅용, 경량)
 /fz-codex config                    # 설정 조회
 ```
 
@@ -105,6 +106,7 @@ model-strategy:
 | final/commit | — | CLI only | `--add-dir`, `--commit`, `resume` |
 | verify/validate | — | CLI only | `--output-schema` |
 | drift/plan | — | CLI only | 커스텀 스킬 + 구조화 출력 |
+| micro-eval | — | CLI only | 경량 단일 주장 재평가, `--ephemeral` |
 
 > Plugin 감지: `codex mcp list 2>/dev/null | grep -q plugin`. 오류 시에도 CLI 자동 폴백.
 
@@ -392,6 +394,61 @@ codex exec \
 > **C4 원칙**: Claude의 중간 작업물(계획 텍스트)을 전달하지 않는다. 요구사항만 공유.
 > **effort**: `xhigh` — 독립 설계이므로 최고 추론력 활용.
 > **비교**: 결과를 Claude 계획과 나란히 놓고 `Divergence Points` 섹션 검토.
+
+### micro-eval -- 단일 주장 독립 재평가 (Claim-Type 라우팅)
+
+단일 주장(severity 판단, 분류, 사실 주장 등)을 Codex로 빠르게 독립 재평가합니다.
+Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-Type 라우팅의 "분류/심각도 판단" 카테고리를 처리.
+
+**사용 시점**:
+- Claude가 Critical/Major로 판정한 이슈가 실제 그 심각도인지 재확인
+- 외부(팀원/Codex 이전 응답) 지적의 유효성 빠른 확인
+- "이 주장이 맞는가?" 형태의 단일 이슈 검증
+- cross-validation.md Claim-Type 라우팅에서 분류/심각도 판단 → micro-eval로 흐름
+
+```bash
+CLAIM="$1"
+CONTEXT_HINT="${2:-}"
+
+SKILL_NAME=$(get_codex_skill "challenger")
+if [ -n "$SKILL_NAME" ]; then
+  SKILL_PROMPT="$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)"
+else
+  SKILL_PROMPT="단일 주장을 독립 판정하라. 배경 지식과 코드 확인으로만 판단."
+fi
+
+codex exec \
+  -m gpt-5.4 \
+  -c model_reasoning_effort=medium \
+  -c 'sandbox_permissions=["disk-full-read-access"]' \
+  --ephemeral \
+  -o "$MICRO_EVAL_FILE" \
+  -C "$GIT_ROOT" \
+  "${SKILL_PROMPT}
+
+   ## 재평가할 단일 주장
+   ${CLAIM}
+
+   ## 제공된 컨텍스트
+   ${CONTEXT_HINT}
+
+   독립 판정하라:
+   1. verdict: agree | disagree | partial | needs_verification
+   2. reasoning: 1-3문장 근거
+   3. missing_evidence: 판단에 부족한 근거 (있으면 구체 명시)
+
+   verdict 의미:
+   - agree: 주장이 정확함
+   - disagree: 주장이 틀림
+   - partial: 주장의 일부만 맞음
+   - needs_verification: 증거 부족으로 판정 불가 — 답변 차단 대상 (Anti-Pattern #6 발동)
+
+   단일 주장이므로 전체 코드 스캔 불필요. 해당 주장의 진위만 확인."
+```
+
+> **effort**: `medium` (기본). 경량 호출 — 수백 토큰 단위.
+> **사용 시점**: 단일 심각도/분류 주장 → full review 대신 경량 호출로 교차 검증.
+> **비용**: `[미검증: 운영 초기 호출 후 기준선 설정]` — Phase A 운영 후 실측.
 
 ### config -- 설정 조회
 
