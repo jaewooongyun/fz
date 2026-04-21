@@ -1,5 +1,13 @@
 # Changelog
 
+## Retired Citation Policy
+
+릴리즈마다 인용 논문이 rotate되면 추적 신뢰도가 떨어진다. 다음 정책을 적용한다:
+
+- **Active citations**: 현행 modules/skills/agents에서 직접 인용되는 논문 (예: NLAH 2603.25723, X-MAS 2505.16997, Drift No More 2510.07777, VeriGuard 2510.05156, MAR 2512.20845, Intelligence Degradation 2601.15300, Context Length Hurts 2510.05381, OpenDev 2603.05344)
+- **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
+- **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
+
 ### v3.11.0 (2026-04-21) — Opus 4.7 Adaptation + Verification Discipline
 
 **핵심**: Claude Opus 4.7 (2026-04-16 GA) 출시에 따른 가이드 전면 업데이트. 2차 Codex cross-validation 기반 팩트 오류 정정 + 논문 근거 보강 + 공식 자료 정합성 확보.
