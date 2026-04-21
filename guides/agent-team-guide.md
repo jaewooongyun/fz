@@ -403,7 +403,12 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 
 ## 8. Agent Frontmatter 고급 기능 (v2.1+)
 
-> Source: Claude Code 공식 Sub-agents/Agent Teams 문서 (2026-03). 기존 fz 에이전트에 점진적으로 적용.
+> Source: Claude Code 공식 Sub-agents/Agent Teams 문서 (2026-03, v2.1.32+). 기존 fz 에이전트에 점진적으로 적용.
+> **공식 사양** [verified: 2차 research 2026-04-21, code.claude.com/docs/en/agent-teams]:
+> - 활성화 flag: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+> - 팀 크기: **hard limit 명시 없음, 3-5 teammates 권장**
+> - 통신: SendMessage peer-to-peer, shared task list, file locking
+> - Hooks 연계: `TeammateIdle`, `TaskCreated`, `TaskCompleted` events (Gate 강제에 활용 가능)
 
 ### 8.1 Persistent Memory (`memory` 필드)
 
