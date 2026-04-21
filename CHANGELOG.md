@@ -8,6 +8,40 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.1.0 (2026-04-21) — Call-Site Deprecation Audit + Function Responsibility Audit [MINOR]
+
+**핵심**: ASD-1111 회귀 ("함수 이름 ≠ 함수 책임" + "호출 중단 ≠ 정의 제거" 패턴)를 fz 생태계로 반영. plan-impact의 Exhaustive Impact Scan을 `a~f` → `a~g`로 확장하고 review-correctness에 Function Responsibility Audit 절차 추가. v1~v4 needs_revision 반복 후 **18차 반성 (Scope Inflation 방어) 4 규칙** 등록 + v5.3 Codex approved 후 구현.
+
+**신규 검증 절차**:
+- `agents/plan-impact.md` §Exhaustive Impact Scan 항목 g "Call-Site Deprecation Audit" — 함수 호출자 수 변화 감지 + 책임 분해. severity: Critical `responsibility_gap` 플래그.
+- `agents/review-correctness.md` §2 Logic Correctness "Function Responsibility Audit" bullet — Lead가 base ref resolve 후 artifact 전달. agent는 Bash 금지 (guides/agent-team-guide.md §1 준수). severity: Critical `missing_responsibility` 플래그. ⛔ `HEAD^` 하드코딩 금지 (merge-base 우선).
+- `skills/fz-plan/SKILL.md` `Impact Scan (a~f)` → `(a~g)` 2곳 일관성 업데이트.
+
+**18차 반성 적용 (Scope Inflation 방어)**:
+- 규칙 1 (Complexity Drift): v4 complexity 19 → v5 7 축소
+- 규칙 2 (Self-Assessment Blindness): `[verified: 리터럴 명령어 출력]` 태그 의무
+- 규칙 3 (Additive-Only 금지): v5에서 v4의 13개 Step DEFERRED
+- 규칙 4 (Codex 3회 한도): 4회째 needs_revision 후 사용자 에스컬레이션
+
+**DEFERRED (v5 plan 명시)**:
+Helper-A Baseline Resolution 모듈, Helper-B Codex Degraded Gate, Plan-to-Source Gate 4.5.5, Edge Case Enforcement 5 cases, `/fz-manage propagate-lessons`, Trigger Precedence, Origin-Behavior Fallacy, Atomic Rewrite, SKILL.md Module Split — 별도 ASD 티켓 처리.
+
+**검증 이력**: v1~v4 Codex needs_revision (Major 4→5→3→4) → v5 Major 2 → v5.1 Major 1 → v5.2 Major 0 → v5.3 approved (Q1-Q8 전체 pass, Issues 0) → 구현 Codex check --deep (Major 0, P2 2건 DEFERRED 범위) → validate approved (Reflection Rate 100%).
+
+**변경 파일** (+24/-3):
+- `agents/plan-impact.md` (+13/-1)
+- `agents/review-correctness.md` (+10)
+- `skills/fz-plan/SKILL.md` (+2/-2)
+
+**마이그레이션**: 없음 (backward-compatible).
+
+**관련 분석 산출물** (외부 TVING/ASD-1111 폴더):
+- `review/regression-root-cause-analysis.md` — 7 시스템 패턴 (git 실측 교정판)
+- `analysis/fz-ecosystem-gap-analysis.md` — Gap 매트릭스
+- `plan/fz-ecosystem-improvement-plan-v{1-5}.md` + `verify-result*.md` — 8회 Codex verify 이력
+
+---
+
 ### v4.0.0 (2026-04-21) — V.D. 4-way Chain 아키텍처 + 생태계 정합성 [MAJOR]
 
 **핵심**: v3.11.0의 Verification Discipline 초안을 **4-way Chain 아키텍처**로 구조화 + 생태계 전체 정합성 감사로 22 Gap 해소. 단순 기능 추가가 아닌 **생태계 아키텍처 전환**으로 메이저 bump.

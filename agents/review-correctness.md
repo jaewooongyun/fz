@@ -31,6 +31,16 @@ Verifies that the implementation matches the stated requirements and plan.
 - 에러 처리가 명세된 실패 시나리오를 모두 다루는가
 - 상태 전이가 완전한가 (모든 입력 경우를 처리하는가)
 - 조건 분기 누락 (else/default 누락 등)
+- **Function Responsibility Audit** (함수 제거 / 호출 중단 감지 시):
+  1. Lead에게 SendMessage로 원본 body 요청 (Team agent는 Bash 없음 — guides/agent-team-guide.md §1 준수)
+  2. Lead가 **PR base ref** (`origin/{base_branch}` 또는 `git merge-base HEAD @{upstream}`)를 resolve하여 `git show ${BASE_REF}:filepath` 실행 후 artifact 전달 (⛔ `HEAD^` 하드코딩 금지 — stacked/multi-commit 리뷰에서 잘못된 baseline 위험. 단일 commit local mode에서만 `HEAD^` 폴백 허용)
+  3. 원본 body를 조건 분기 1개 = 책임 1개로 분해
+  4. Scalability: ≤ 20줄 자동 분해, 21-100줄 sampling + AskUserQuestion, 100+ 줄 사용자 에스컬레이션
+  5. After diff에서 각 책임 대응 코드 추적
+  6. 대응 없는 책임 → "missing_responsibility" (severity: Critical)
+  - Baseline 결정 실패 시: `[baseline: unknown]` 태그 → Gate skip + 사유 기록
+  - **원칙**: 함수명이 helper-like(`extractBody`, `parseHeader`)여도 body 실질 책임 목록이 기준. "이 함수가 수행하던 모든 책임이 어디로 이전됐는가?"
+  - **근거**: ASD-1111 회귀 — D2 fix `ceb1666b5`에서 extractBody 호출 중단 시 header.status 검사 책임이 Serializer로 이전되지 않아 18+ 소비자 silent 회귀.
 
 ### 3. Edge Case Coverage (Layer 1 - generic)
 
