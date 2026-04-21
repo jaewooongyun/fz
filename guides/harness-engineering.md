@@ -42,6 +42,22 @@ Harness H = (C, R, S, A, Σ, F) where:
 
 이 형식의 가치: 하네스를 **분석 가능한 과학적 객체**로 만든다. 각 구성 요소를 독립적으로 교체·제거(ablation)·비교할 수 있다.
 
+### 1.3 Infrastructure Layer vs Application Layer 구분
+
+> 참조: Anthropic "Scaling Managed Agents: Decoupling the Brain from the Hands" (2026-04-08, https://www.anthropic.com/engineering/managed-agents)
+
+Anthropic은 **managed agents**를 `Brain (model reasoning)` + `Hands (tool execution)`로 분리하는 **인프라 레이어** 패턴을 제시. 구성: `Session` + `Harness` + `Sandbox`. 이 3-component는 OS/infrastructure 수준의 관심사.
+
+fz의 `Lead + Teammate` (TeamCreate + SendMessage)는 **애플리케이션 레이어**의 다관점 협업 패턴. Brain/Hands의 subset이 아니라 다른 계층.
+
+| 계층 | Anthropic Brain/Hands | fz Lead/Teammate |
+|------|----------------------|------------------|
+| 목적 | 모델 실행 격리 + 보안 + 스케일링 | 다관점 검토 + 역할 분리 |
+| 범위 | 인프라 (Session/Harness/Sandbox) | 애플리케이션 (에이전트 협업) |
+| 중복 여부 | fz는 Brain/Hands **위에서** 작동 — 상호 대체 아님 |
+
+**독자 주의**: Anthropic "Scaling Managed Agents" 글의 핵심 표현은 **"many brains, many hands"** — 이는 인프라 수준의 모델 실행/도구 격리 패턴. fz Lead/Teammate는 애플리케이션 수준의 역할 협업 패턴이므로 혼용 금지.
+
 ---
 
 ## 2. 왜 Harness인가
@@ -52,7 +68,7 @@ Harness H = (C, R, S, A, Σ, F) where:
 |------|------|-----------|-----------|
 | **무상태** | 세션 간 기억 없음 | "교대 근무 엔지니어가 이전 기억 없이 출근" | 세션 영속화 + 핸드오프 아티팩트 |
 | **자신감 있는 오류** | 자기 평가 시 과대 평가 | "명백히 깨진 게임을 '모든 기능이 작동합니다'로 평가" | Generator≠Evaluator 분리 |
-| **컨텍스트 불안** | 긴 작업에서 일관성 상실 | Sonnet 4.5가 윈도우 한도 근처에서 조기 마무리 | Context Reset + 구조화된 핸드오프 |
+| **컨텍스트 불안** | 긴 작업에서 일관성 상실 | Sonnet 4.5/4.6가 윈도우 한도 근처에서 조기 마무리 (Opus 4.6/4.7에서 개선, 다만 "shallow long-context adaptation" [미검증: Claude 실측 부재]) | Context Reset + 구조화된 핸드오프 |
 | **무제한 접근** | 통제 없는 도구 접근 | `rm -rf /`, force push, 비밀 파일 읽기 | 권한 계층 + 스키마 필터링 |
 
 > 출처: Anthropic 공식 — "자기 작업을 평가하라고 하면, 에이전트는 품질이 명백히 떨어져도 자신있게 칭찬하는 경향"
@@ -470,7 +486,7 @@ Generator → 개선 후 → sprint-progress.md 업데이트
 | 공유 | 없음 | 내보내기 + 공유 URL |
 | 게임플레이 | 비기능적 | 완전한 플레이 모드 |
 
-**DAW (디지털 오디오 워크스테이션) 사례** (Opus 4.6):
+**DAW (디지털 오디오 워크스테이션) 사례** (Opus 4.6 시점, 2025-11):
 
 ```
 비용 분석:
@@ -605,14 +621,14 @@ Sprint 구조, 멀티에이전트 평가 등은 모델이 혼자 못 할 때만 
 
 > "모든 하네스 컴포넌트는 모델이 혼자 못 하는 것에 대한 가정. 그 가정을 스트레스 테스트하라."
 
-**Anthropic의 실제 재검토 사례** (Opus 4.6 출시 후):
+**Anthropic의 실제 재검토 사례** (Opus 4.6 전환 시점 [미검증: Opus 4.7 공식 하네스 재검토 포스트 부재]):
 
-| 컴포넌트 | Sonnet 4.5 시절 | Opus 4.6 이후 | 변경 이유 |
-|----------|---------------|-------------|----------|
-| Sprint 분해 | 필수 (세분화 없으면 혼란) | **제거** | 계획 능력 향상으로 불필요 |
-| 스프린트별 평가 | 매 스프린트마다 | **최종 1회만** | 장문 컨텍스트 능력으로 중간 점검 불필요 |
-| Context Reset | 필수 (Compaction 불충분) | **선택** | Compaction 품질 향상 |
-| Evaluator | 항상 실행 | **조건부** | 단순 작업은 혼자 충분 |
+| 컴포넌트 | Sonnet 4.5 시절 | Opus 4.6 이후 | Opus 4.7 (2026-04-16 GA) | 변경 이유 |
+|----------|---------------|-------------|--------------------------|----------|
+| Sprint 분해 | 필수 (세분화 없으면 혼란) | **제거** | [미검증: 공식 재검토 포스트 부재. 잠정 4.6 동일] | 계획 능력 향상으로 불필요 |
+| 스프린트별 평가 | 매 스프린트마다 | **최종 1회만** | [미검증: 동일] | 장문 컨텍스트 능력으로 중간 점검 불필요 |
+| Context Reset | 필수 (Compaction 불충분) | **선택** | [미검증: 동일. tokenizer 1.00-1.35x 영향 자체 실측 필요] | Compaction 품질 향상 |
+| Evaluator | 항상 실행 | **조건부** | [미검증: 동일] | 단순 작업은 혼자 충분 |
 
 > "평가자는 고정된 예/아니오 결정이 아니다. 현재 모델이 혼자서 안정적으로 못 하는 작업에서만 비용 대비 가치가 있다."
 
@@ -718,7 +734,9 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 결과: 초기 결정의 근거 손실, 컨텍스트 불안, 조기 마무리
 대응: Context Reset + 핸드오프 아티팩트
 
-예외: Opus 4.6+ 1M context에서는 Compaction이 충분할 수 있음 (원칙 2)
+예외: Opus 4.6+ 1M context는 Compaction 충분 [verified: Anthropic 2026.03 재검토 포스트].
+     Opus 4.7에서도 동등 동작은 [미검증: 공식 재검토 포스트 부재, 잠정 4.6 패턴 유지].
+     tokenizer 1.00-1.35x 증가 [미검증: Korean 실측 부재] — L1/L2 크기 영향 자체 측정 필요.
 ```
 
 ### Anti-Pattern 4: 모든 액션에 승인 요청
@@ -739,7 +757,8 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 대응: 원칙 2 — 새 모델마다 하네스 재검토
 
 Anthropic 실제 사례:
-  Sonnet 4.5: Sprint 분해 필수 → Opus 4.6: Sprint 제거
+  Sonnet 4.5: Sprint 분해 필수 → Opus 4.6: Sprint 제거 (2025-11)
+  Opus 4.7 (2026-04-16 GA): [미검증 — 공식 재검토 포스트 부재. 자체 실측 필요]
   이렇게 제거된 컴포넌트가 "모델이 성장한 증거"
 ```
 
@@ -935,6 +954,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 |-----------|-------------|-----------------|
 | Sonnet 4.5 | Context Reset 필수, Sprint 분해 필수, Evaluator 필수 | — |
 | Opus 4.6 | Context Reset 선택, Compaction 충분, Evaluator 조건부 | Sprint 분해, 스프린트별 평가 |
+| **Opus 4.7 (2026-04-16 GA)** | **[미검증: 공식 재검토 포스트 부재]. 잠정 Opus 4.6 패턴 유지 + tokenizer 1.00-1.35x 증가 주의** | **[미검증]. 자체 실측 후 결정** |
 | 미래 모델 | ? | Evaluator? 컨텍스트 관리? |
 
 > "하네스 설계자의 일은 '다음 신기한 조합을 계속 찾는 것'이다." — Anthropic
