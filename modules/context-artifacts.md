@@ -225,7 +225,8 @@ Both:     ASD 파일 + Serena Memory 동시 저장 (이중 안전망)
 
 ## Artifact Token Budget
 
-> 현재 환경: Opus 4.6 (1M context). 모델/context 변경 시 이 테이블 재검토.
+> 현재 환경: **Opus 4.7 (1M context, 2026-04-16 GA)**. 이전 환경: Opus 4.6 (1M context).
+> ⚠️ **Opus 4.7 tokenizer 변경**: 1.00-1.35x 토큰 증가 (공식). Korean 대량 prompt 실측 필요 `[미검증: fz 자체 count_tokens 측정 대기]`. 측정 후 하단 테이블 크기 조정 가능.
 > 원칙: 전체 artifact 로드 합계 ≤ 100K tokens. 나머지는 실행 working memory.
 > Context Rot 원칙(집중 > 분산)은 context 크기와 무관하게 동일 적용.
 

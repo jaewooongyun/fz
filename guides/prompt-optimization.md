@@ -273,9 +273,9 @@ Fallback:   대안 도구 (Primary 실패 시 사용)
 
 ---
 
-### 원칙 8: Claude 4.6 과격 표현 제거
+### 원칙 8: Claude 4.6/4.7 과격 표현 제거
 
-**근거:** Anthropic Claude 4 Best Practices (2026-02-24). Claude 4.6은 이전 모델보다 훨씬 proactive하다. 과격한 지시어는 overtriggering을 유발한다.
+**근거:** Anthropic Claude 4 Best Practices (2026-02-24). Claude 4.6은 이전 모델보다 훨씬 proactive하다. 과격한 지시어는 overtriggering을 유발한다. **Opus 4.7 (2026-04-16 GA)에서 "more literal instruction following" 변화** → 과격 지시가 literal하게 적용될 위험 증가 (공식 Opus 4.7 release notes).
 
 **체크리스트:**
 - [ ] "CRITICAL", "MUST ALWAYS", "NEVER EVER" 등의 표현이 없는가?
