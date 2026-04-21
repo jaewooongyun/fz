@@ -43,6 +43,8 @@ model-strategy:
 
 3중 검증(Claude+Codex+sc:analyze) + 역방향 검증 + Reflection Rate 정량화 (>=80% 통과).
 
+> 이론 근거: MAR — Multi-Agent Reflexion (arxiv 2512.20845) — **acting/diagnosing/critiquing/aggregating 역할 분리**가 단일 에이전트 self-review보다 정확도 높음. fz의 Claude(acting) + Codex(critiquing/diagnosing) + Lead(aggregating) 역할 분리와 구조적 정합.
+
 ```bash
 /fz-review "구현한 코드 리뷰해줘"     /fz-review "현재 Reflection Rate 얼마야?"
 /fz-review "Codex 피드백 반영, 재검증" /fz-review "Gate 5 통과 확인해줘"
@@ -161,6 +163,22 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 세션 task/plan의 모든 요구사항이 구현되었는가?
 - [ ] 커밋 메시지에 명시된 변경이 실제 diff에 반영되었는가?
 - [ ] 범위 외 변경 (scope creep)이 포함되어 있지 않은가?
+
+### ⛔ B3: Follow-up 아티팩트 재검증 + Phase A 효과 측정 (v3.2.2)
+
+**Follow-up 재검증** (follow-up-tasks.md / codex-review*.md / plan-v*.md 인용 시):
+- [ ] 판단 날짜 + 근거 유형(실측/추정/외부 리뷰) 분류
+- [ ] 추정/외부 리뷰 기반 → 현재 시점 재실측 (`git show`/`Read`/`grep`)
+- [ ] 재실측 결과 ≠ 아티팩트 → 업데이트 이슈 생성 (category: artifact_stale)
+- [ ] 참조: `memory/feedback_followup_artifact_reaudit.md`, `cross-validation.md § Follow-up Re-audit Gate` (Phase B1/B2 후 활성)
+
+**Phase A 효과 측정** (B1/B2 진입 조건 5개 지표 1:1 매핑):
+- [ ] 지표①: T6/T7 발동 건수 + Speculation-to-Fact Fallacy 차단 사례 (세션당)
+- [ ] 지표②: 실제 사전 차단 사례 (발동 후 실측으로 뒤집기 방지된 실증)
+- [ ] 지표③: `[verified]` / `[미검증]` 태그 빈도 + 무태그 과거 주장("원본/기존/이전/D{N} 이전") 위반 건수
+- [ ] 지표④: 세션 reversal 횟수 (사용자 판정 뒤집기 — 기준선 4회)
+- [ ] 지표⑤: A5 micro-eval 호출 건수 N + confirmed C + false positive F → precision = C/N
+- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (ASD) 또는 Serena `fz:metrics:phase-a-session-{N}` (비ASD). 최종 보고 "## Phase A Metrics" 섹션 포함 + plan-v3.2 §4.3 5개 지표 업데이트
 
 ## Phase 5: Cross-Review (3중 검증)
 > **프로젝트 규칙**: CLAUDE.md `## Code Conventions` 섹션을 따른다.
