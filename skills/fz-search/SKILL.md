@@ -368,7 +368,7 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 
 ## Boundaries
 
-**CRITICAL**: 코드 수정 절대 금지 (Read-Only)
+**Read-Only**: 이 스킬은 코드를 수정하지 않습니다.
 
 **Will**:
 - 4가지 모드의 코드 탐색 (arch, layer, impact, pattern)
