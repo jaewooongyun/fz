@@ -161,14 +161,14 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 3. diff에서 각 요구사항 구현 여부 확인
    - Serena find_symbol → 신규 심볼이 요구사항에 매핑되는지
 4. 미구현/부분구현 → 이슈 (category: requirements_gap)
-5. 범위 외 변경 → 이슈 (category: scope_creep)
+5. 범위 외 변경 → 이슈 (category: scope_creep). **⛔ plan-final.md §Y Write Scope 존재 시 diff 파일 ⊆ §Y 검증 필수** (없으면 plan 기반 소프트 판정)
 ```
 
 ### 체크리스트
 
 - [ ] 세션 task/plan의 모든 요구사항이 구현되었는가?
 - [ ] 커밋 메시지에 명시된 변경이 실제 diff에 반영되었는가?
-- [ ] 범위 외 변경 (scope creep)이 포함되어 있지 않은가?
+- [ ] 범위 외 변경 (scope creep)이 포함되어 있지 않은가? (§Y Write Scope 정의 시 diff ⊆ §Y 검증)
 
 ### ⛔ B3: Follow-up 아티팩트 재검증 + Phase A 효과 측정 (v3.2.2)
 
