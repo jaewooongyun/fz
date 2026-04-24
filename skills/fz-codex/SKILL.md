@@ -24,7 +24,7 @@ model-strategy:
 
 # /fz-codex - Codex 상호검증 스킬 (Hybrid)
 
-> **행동 원칙**: Codex CLI(0.118.0+, gpt-5.4)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
+> **행동 원칙**: Codex CLI(0.124.0+, gpt-5.5)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
 > CLI(`codex exec`) + Plugin(`/codex:*`, 설치 시) 자동 라우팅. Plugin 미설치 시 CLI 폴백.
 
 ## 개요
@@ -85,9 +85,10 @@ model-strategy:
 
 > 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드): `modules/codex-strategy.md`
 
-## Hybrid Routing (0.118.0+)
+## Hybrid Routing (0.118.0+; gpt-5.5 requires 0.124.0+)
 
 서브커맨드별 최적 실행 경로. Plugin 미설치 시 경고 없이 CLI 폴백.
+> 버전 플로어: Hybrid 라우팅 자체는 0.118.0부터 동작한다. 아래 `-m gpt-5.5` 예시는 0.124.0 이상이 필요하며, 그 이전 CLI에서는 `-m` 없이 config 기본값으로 폴백하거나 `-m gpt-5.4`를 사용한다.
 
 | 서브커맨드 | Plugin 우선 | CLI (폴백/전용) | Plugin 불가 이유 |
 |-----------|------------|----------------|----------------|
@@ -111,12 +112,12 @@ fz-review의 Phase 5 Codex 부분. **Plugin 우선 → CLI 폴백.**
 
 ```bash
 # Plugin 모드 (우선 — --add-dir 불필요 시)
-/codex:review --base "$BASE_BRANCH" -m gpt-5.4 --json
+/codex:review --base "$BASE_BRANCH" -m gpt-5.5 --json
 
 # CLI 모드 (폴백 — --add-dir 필요 시 또는 Plugin 미설치)
 cd "$GIT_ROOT" && codex exec review \
   --base "$BASE_BRANCH" \
-  -m gpt-5.4 \
+  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   --add-dir "$SHARED_MODULES" \
   -o "$REVIEW_FILE"
@@ -231,7 +232,7 @@ fi
 ```bash
 cd "$GIT_ROOT" && codex exec review \
   --uncommitted \
-  -m gpt-5.4 \
+  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   --ephemeral \
   -o "$REVIEW_FILE"
@@ -264,7 +265,7 @@ fi
 # 1차: 전체 리뷰
 cd "$GIT_ROOT" && codex exec review \
   --base "$BASE_BRANCH" \
-  -m gpt-5.4 \
+  -m gpt-5.5 \
   -c model_reasoning_effort=xhigh \
   --add-dir "$SHARED_MODULES" \
   --title "[TICKET] PR 전 최종 리뷰" \
@@ -305,7 +306,7 @@ fi
 ```bash
 cd "$GIT_ROOT" && codex exec review \
   --commit "${COMMIT_SHA:-HEAD}" \
-  -m gpt-5.4 \
+  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   --ephemeral \
   -o "$REVIEW_FILE"
@@ -317,11 +318,11 @@ cd "$GIT_ROOT" && codex exec review \
 
 ```bash
 # Plugin 모드 (우선)
-/codex:adversarial-review --base "$BASE_BRANCH" -m gpt-5.4 --json
+/codex:adversarial-review --base "$BASE_BRANCH" -m gpt-5.5 --json
 
 # CLI 폴백
 SKILL_NAME=$(get_codex_skill "challenger")
-codex exec -m gpt-5.4 -c model_reasoning_effort=xhigh \
+codex exec -m gpt-5.5 -c model_reasoning_effort=xhigh \
   --sandbox read-only -o "$DA_REVIEW_FILE" -C "$GIT_ROOT" \
   "$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)
    현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라."
@@ -340,7 +341,7 @@ else
 fi
 
 codex exec \
-  -m gpt-5.4 \
+  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
   -o "$DRIFT_REPORT_FILE" \
@@ -368,7 +369,7 @@ else
 fi
 
 codex exec \
-  -m gpt-5.4 \
+  -m gpt-5.5 \
   -c model_reasoning_effort=xhigh \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
   -o "$PLAN_FILE" \
@@ -474,7 +475,7 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 | Codex CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:analyze 단독 |
 | `codex exec review` 실패 | `codex exec` + diff 인라인 | 수동 분석 |
 | JSON 파싱 실패 | `-o` 파일 캡처 폴백 | Claude 분석 |
-| 모델 미지원 (`gpt-5.4`) | config.toml 모델로 폴백 (`-m` 제거) | -- |
+| 모델 미지원 (`gpt-5.5`) | config.toml 모델로 폴백 (`-m` 제거) | -- |
 | 3회 연속 실패 | 사용자 에스컬레이션 | -- |
 
 ## Completion → Next
