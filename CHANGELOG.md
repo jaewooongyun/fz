@@ -8,6 +8,45 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.2.0 (2026-04-24) — Scope Challenge + fz Guide Compliance [MINOR]
+
+**핵심**: 두 축 결합. (A) ASD-1136 Scope Challenge — fz-plan Phase 3에서 Codex verify 이슈를 `scope_disposition`으로 분류, "발견된 것 = 고쳐야 할 것" 자동 번역 차단. Read/Write Scope 분리 + `§X/§Y/§Z` handoff 계약. (B) `/fz-manage` 전체 리뷰로 도출된 5개 가이드 위반(500줄 초과 2건 + 과격 표현 1건 + Few-shot 부족 3건 + YAML 컨벤션 불일치 2건)을 4-Wave로 해소. 21/21 스킬이 skill-authoring.md + prompt-optimization.md + skill-template.md 전 축을 준수.
+
+**Feature Set A — Scope Challenge (ASD-1136)**:
+- `modules/scope-challenge.md` 신규 (117줄): Q-S1~S4 체크포인트 + Lead 독립 분류(Generator≠Evaluator) + 5개 disposition 매핑(scope-in/out/invariant-risk/parent-reopen/improvement) + Thought-terminator 감지 + Q-S5 Appendix (Decision Re-open Gate).
+- `modules/promotion-ledger.md` 신규 (69줄): P1/P2 eligible session 관측 ledger (학습 승격 금지 원칙, 2회 관측 후 P0).
+- `agents/plan-impact.md`: 출력을 Read Scope(넓게 탐색) + Write Scope(binary 판정 최소) + Acceptance Criteria 3-섹션으로 분리. write-in 3조건 명시.
+- `agents/plan-structure.md`: plan-final.md §X/§Y/§Z handoff 계약. fz-code는 §Y+§Z, fz-review는 §Y.
+- `schemas/codex_review_schema.json` + `codex_peer_review_schema.json`: `schemaVersion` v1.1 required + `issues[].scope_disposition` nullable (v1.0 backward-compat).
+- `skills/fz-plan/SKILL.md`: intent-triggers refactor 패턴 추가 + Phase 3 §1b Q-S1~S4 의무화 + Phase 3 §5 Refactoring Mode AskUserQuestion.
+- `skills/fz-review/SKILL.md`: Phase 4.5에 §Y Write Scope 정의 시 diff ⊆ §Y 검증 필수.
+- `skills/fz-codex/SKILL.md`: response schemaVersion version-aware 파싱 (v1.1이면 disposition read, 미존재/v1.0이면 Lead 수동).
+
+**Feature Set B — fz Guide Compliance Audit**:
+- YAML 통일: `arch-critic`/`code-auditor`의 `mcp-servers: []` → `allowed-tools: []` (fz-new-file 선례, 21/21 스킬 일관). 권한 변경 없음 — 실제 도구는 agents/review-arch.md/review-quality.md가 선언.
+- 과격 표현 완화: `skills/fz-search/SKILL.md:371` `**CRITICAL**: 코드 수정 절대 금지` → `**Read-Only**: 이 스킬은 코드를 수정하지 않습니다` (Opus 4.7 literal interpretation 대응, Will Not 섹션이 이미 동일 제약).
+- 500줄 준수: `skills/fz-review/SKILL.md` 508→487 (Phase 5.5 → `modules/feedback-verification.md` 48줄 신규), `skills/fz/SKILL.md` 515→463 (Phase 4 시각화+AskUserQuestion+적극적 확인 원칙 → `modules/fz-pipeline-proposal.md` 74줄 신규). Gate 4는 SKILL.md에 유지(트리밍 비저하 원칙). 두 신규 모듈 상단에 "Scope of Applicability" 명시.
+- Few-shot ≥3쌍: `code-auditor`(Convention/Dead code/레이어 위반), `fz-codex`(review/verify/validate), `fz-review`(리뷰 보고/Anti-Pattern 잔존/Source Fidelity). 본문 실제 시나리오 기반(원본 미존재 추가 금지 원칙).
+- `docs/design/lessons-to-module-pipeline.md` 신규 (195줄, 설계만): 17차+18차 교훈 도구화 경로 `/fz-manage reflect-to-module` 서브커맨드 설계. 4개 컴포넌트(Memory Parser + Relevance Scorer + Suggestion Generator + Scope Inflation Detector). **⛔ 구현 승인 전 실행 금지** — 본 설계 자체가 Scope Inflation 위험 내포. 경로 하드코딩 금지(`${PLUGIN_ROOT}`, `${CLAUDE_PROJECT_MEMORY}` 변수화 + CLI 인자).
+
+**Codex Cross-Validation (fz Guide Compliance 검증 중, 3회 수렴)**:
+- [P2] `modules/feedback-verification.md:19` Reflection Rate 공식이 canonical schema와 divergence → 스키마 정렬 수정 (fz-code "원본 미존재 추가" 마찰 신호 재발 사례).
+- [P2] `docs/design/lessons-to-module-pipeline.md:48-52` 하드코딩 경로 → 변수화 + CLI 인자화 (마켓플레이스 배포 이식성).
+
+두 이슈 모두 Claude 단독 리뷰 blind spot. 18차 교훈 "Codex 3회 한도" 내 수렴.
+
+**변경 파일** (+610/-99):
+- Feature Set A: 9 파일 (agents 2 + modules 3 + schemas 2 + skills 3)
+- Feature Set B: 9 파일 (skills 6 + modules 2 + docs 1)
+
+**마이그레이션**: 없음 (backward-compatible). Schema v1.1은 v1.0 응답 null 수용. YAML `allowed-tools: []`는 권한 불변.
+
+**Plugin Metadata**:
+- `.claude-plugin/plugin.json`: 4.1.0 → 4.2.0
+- `.claude-plugin/marketplace.json`: 4.0.0 → 4.2.0 (v4.1.0 릴리즈 시 bump 누락 수정 포함)
+
+---
+
 ### v4.1.0 (2026-04-21) — Call-Site Deprecation Audit + Function Responsibility Audit [MINOR]
 
 **핵심**: ASD-1111 회귀 ("함수 이름 ≠ 함수 책임" + "호출 중단 ≠ 정의 제거" 패턴)를 fz 생태계로 반영. plan-impact의 Exhaustive Impact Scan을 `a~f` → `a~g`로 확장하고 review-correctness에 Function Responsibility Audit 절차 추가. v1~v4 needs_revision 반복 후 **18차 반성 (Scope Inflation 방어) 4 규칙** 등록 + v5.3 Codex approved 후 구현.

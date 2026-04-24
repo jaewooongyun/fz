@@ -1,0 +1,204 @@
+# RELEASE NOTES v4.2.0 — Scope Challenge + fz Guide Compliance
+
+> Release Date: 2026-04-24
+> Previous: v4.1.0 (2026-04-21)
+> Bump Type: **MINOR** (backward-compatible: new modules/agents + documentation refactor)
+
+---
+
+## 🎯 핵심 요약
+
+두 축의 개선이 결합된 릴리즈:
+
+1. **ASD-1136 Scope Challenge**: `fz-plan` Phase 3에서 Codex verify 이슈를 **scope_disposition**으로 분류하여 "발견된 것 = 고쳐야 할 것" 자동 번역을 차단. Plan `§X/§Y/§Z` handoff 계약으로 **Read Scope(탐색)** vs **Write Scope(구현)** 분리.
+
+2. **fz Guide Compliance Audit**: `/fz-manage` 전체 리뷰 결과로 도출된 5개 가이드 위반을 해소. `guides/skill-authoring.md` 500줄 제한 위반 2건, `prompt-optimization.md` 과격 표현/Few-shot 부족, `skill-template.md` YAML 컨벤션 불일치 전부 수정. 21/21 스킬이 가이드 전 축을 준수.
+
+v4.1.0에서 "함수 이름 ≠ 함수 책임"을 포착했다면, v4.2.0은 **"계획 = 구현 최소 집합"** 원칙을 시스템화한다.
+
+---
+
+## 🆕 Feature Set A: Scope Challenge (ASD-1136)
+
+### 1. `modules/scope-challenge.md` 신규 (117줄)
+
+Codex verify 응답의 각 이슈를 `scope_disposition`으로 분류하는 Q-S1 ~ Q-S4 체크포인트 + Lead 독립 판정 절차(Generator ≠ Evaluator).
+
+**5개 disposition 매핑**:
+
+| disposition | Phase 3 조치 |
+|-------------|-------------|
+| `scope-in` | 플랜에 반영 |
+| `scope-out` | 후속 ticket 분리 |
+| `invariant-risk` | AskUserQuestion |
+| `parent-reopen` | Phase 0.5 재진입 제안 |
+| `improvement` | 보류 또는 후속 ticket |
+
+**Thought-terminator 감지**: "보장해야", "반드시 처리", "invariant 위반", "graceful degradation" 등이 판정을 주도하면 자동 AskUserQuestion으로 차단.
+
+**Q-S5 Appendix**: Decision Re-open Gate (P2-A). 부모 결정을 무효화하는 Codex 이슈 감지 시 Phase 0.5 재진입.
+
+### 2. `agents/plan-impact.md` Read/Write Scope 분리
+
+출력 형식을 3-섹션으로 분리:
+- **Read Scope**: 빠짐없이 넓게 탐색
+- **Write Scope**: binary 판정으로 최소한 구현
+- **Acceptance Criteria**: 완료 판정 기준
+
+**write-in 3가지 조건**: 요구사항 직접 충족 / obstacle 해제 / Q0 Behavior Preservation 예외.
+
+### 3. `agents/plan-structure.md` §X/§Y/§Z handoff 계약
+
+`plan-final.md` 템플릿에 3-섹션 명시:
+- `§X Read` — 탐색 범위
+- `§Y Write` — 실제 구현 범위
+- `§Z Acceptance` — rule 11차 (After 코드 컴파일 가능 기준) embedded
+
+**소비자 계약**:
+- `fz-code`는 `§Y + §Z` 기준으로 구현
+- `fz-review`는 `§Y` 기준으로 scope_creep 판정
+
+### 4. `modules/promotion-ledger.md` 신규 (69줄)
+
+P1/P2 eligible session 관측 ledger. **학습 승격 금지 원칙** — 2회 관측 후 P0 승격.
+
+### 5. Schema v1.1 Rollout (backward-compat)
+
+`schemas/codex_review_schema.json` + `codex_peer_review_schema.json`:
+- `schemaVersion` enum `["1.0", "1.1"]` required
+- `issues[].scope_disposition` nullable enum (`scope-in`/`scope-out`/`invariant-risk`/`parent-reopen`/`improvement`/null)
+
+`skills/fz-codex/SKILL.md`: response `schemaVersion` version-aware 파싱 — v1.1이면 disposition read, 미존재/v1.0이면 Lead 수동 분류.
+
+### 6. `skills/fz-plan/SKILL.md` 통합
+
+- `intent-triggers`에 "리팩토링|치환|흡수|이전|migration|refactor" 추가
+- Phase 3 §1b: 각 Codex 이슈 반영 전 scope-challenge.md Q-S1~S4 실행 의무
+- Phase 3 §5: Refactoring Mode AskUserQuestion (P0-light)
+
+**Subtractive 원칙** (rule 18차) 준수: 별도 Phase 1.0 추가 없이 기존 Phase 3에 1단계 깊이 모듈 참조로 통합. fz-plan SKILL.md: 475→482줄 (500줄 이하).
+
+### 7. `skills/fz-review/SKILL.md` Phase 4.5
+
+"plan-final.md §Y Write Scope 정의 시 diff 파일 ⊆ §Y 검증 필수" 추가. Write Scope 정의가 없으면 기존 플랜 기반 소프트 판정으로 fallback.
+
+---
+
+## 🆕 Feature Set B: fz Guide Compliance Audit
+
+`/fz-manage` 전체 리뷰(`list` + `benchmark` + `check`)로 도출된 5개 가이드 위반을 4-Wave로 해소.
+
+### 1. YAML 컨벤션 통일 (`skill-template.md` 준수)
+
+`arch-critic`과 `code-auditor`가 유일하게 `mcp-servers: []`를 사용 (19개 스킬은 `allowed-tools`). 이는 `skill-template.md` line 51 "required" 규정 위반. **`allowed-tools: []`로 통일** — `fz-new-file` 선례 따름(user-invocable: false + empty tools). 권한 모델 변경 없음(실제 도구 호출은 `agents/review-arch.md`/`agents/review-quality.md`의 `tools` 필드에서).
+
+**결과**: 21/21 스킬 YAML 일관성 확보.
+
+### 2. 과격 표현 완화 (`prompt-optimization.md` 준수)
+
+`skills/fz-search/SKILL.md:371`: `**CRITICAL**: 코드 수정 절대 금지 (Read-Only)` → `**Read-Only**: 이 스킬은 코드를 수정하지 않습니다`. Opus 4.7 literal interpretation 대응. `Will Not` 섹션이 이미 동일 제약을 선언하므로 CRITICAL 레이블은 중복 강조였고 over-triggering 위험이 있었음.
+
+### 3. SKILL.md 500줄 준수 (`skill-authoring.md` 준수)
+
+**fz-review**: 508 → 487줄 (21줄 감축). Phase 5.5 Feedback Verification(절차+Gate 4.5+판정기준)을 **`modules/feedback-verification.md` 신규 (48줄)** 로 분리.
+
+**fz (오케스트레이터)**: 515 → 463줄 (52줄 감축). Phase 4 User Confirmation의 시각화 형식 + AskUserQuestion 선택지 + 적극적 확인 원칙을 **`modules/fz-pipeline-proposal.md` 신규 (74줄)** 로 분리. Gate 4는 SKILL.md에 유지(트리밍 비저하 원칙).
+
+두 신규 모듈 모두 상단에 **"Scope of Applicability"** 명시 — 다른 스킬 오용 방지(설계 스트레스 테스트 Q5 대응).
+
+**결과**: 21/21 스킬이 ≤500줄(최대 fz-peer-review 497줄).
+
+### 4. Few-shot 예시 ≥3쌍 (`prompt-optimization.md` 준수)
+
+`code-auditor`, `fz-codex`, `fz-review` 3개 스킬에 본문 실제 시나리오 기반 BAD/GOOD 쌍을 추가 (임의 시나리오 금지 — fz-code "원본 미존재 추가" 마찰 신호 방어).
+
+| 스킬 | 예시 주제 |
+|------|---------|
+| code-auditor | Convention 판정 / Dead code / 아키텍처 레이어 위반 |
+| fz-codex | review / verify / validate 3개 서브커맨드 BAD/GOOD |
+| fz-review | 리뷰 완료 보고 / Anti-Pattern 잔존(검증 4-F) / Source Fidelity(검증 4-H) |
+
+Few-shot 추가가 500줄 초과를 유발하여 블록 형식으로 압축 — **R1(크기)와 R4(Few-shot) 동시 충족**.
+
+### 5. `docs/design/lessons-to-module-pipeline.md` 신규 (설계만)
+
+17차(Pre-Gate Failure + Reflection Gap) + 18차(Scope Inflation Defense) 교훈의 "기록과 반영 괴리" gap을 해소하는 `/fz-manage reflect-to-module` 서브커맨드 설계. 4개 컴포넌트(Memory Parser + Relevance Scorer + Suggestion Generator + Scope Inflation Detector).
+
+**⛔ 설계 문서 단계에서 멈춤** — 본 설계 자체가 Scope Inflation 위험을 내포하므로 사용자 명시 승인 전 구현 금지. 승인 3경로(A Pilot / B 보류 / C 경량 대안) 제시.
+
+경로 하드코딩 금지: `${PLUGIN_ROOT}`, `${CLAUDE_PROJECT_MEMORY}` 변수화 + `--memory-file`/`--plugin-root` CLI 인자(마켓플레이스 배포 이식성).
+
+---
+
+## 🔍 Codex Cross-Validation Findings (이번 릴리즈 검증 중)
+
+`/fz-codex check`로 fz Guide Compliance 변경을 독립 검증. **3회 반복으로 clean 도달** (18차 교훈 "Codex 3회 한도" 준수).
+
+### Issue #1 [P2] Resolved
+- **파일**: `modules/feedback-verification.md:19`
+- **내용**: 내가 새 모듈에 추가한 Reflection Rate 공식 `(resolved) / total`이 `schemas/codex_verification_schema.json` canonical 정의 `(resolved×1.0 + partially_resolved×0.5) / total_issues`와 divergence
+- **Root Cause**: 원본 fz-review Phase 5.5에는 공식이 없었는데 "도움 되려고" 추가 → fz-code "원본 미존재 추가" 마찰 신호의 정확한 재발
+- **Fix**: 스키마 canonical source 명시 후 공식 정렬
+
+### Issue #2 [P2] Resolved
+- **파일**: `docs/design/lessons-to-module-pipeline.md:48-52`
+- **내용**: 설계 문서에 `/Users/jaewoongyun/...` 절대 경로 하드코딩 → 마켓플레이스 배포 시 이식성 훼손
+- **Fix**: `${PLUGIN_ROOT}`/`${CLAUDE_PROJECT_MEMORY}` 변수화 + CLI 인자화 + 경로 해석 원칙 명문화
+
+**검증 가치**: 두 이슈 모두 Claude 단독 리뷰에서 감지 불가했을 blind spot. #1은 `schemas/` 사전 조사 누락, #2는 "로컬 개발 vs 마켓플레이스 배포" context 전환 인식 실패. Cross-model 검증이 18차 "3회 한도" 내 수렴.
+
+---
+
+## 📊 변경 파일 통계
+
+```
+17 files changed, 610 insertions(+), 99 deletions(-)
+```
+
+**Feature Set A (ASD-1136)**:
+- `agents/plan-impact.md` (+7/-2)
+- `agents/plan-structure.md` (+6/-1)
+- `modules/context-artifacts.md` (+10)
+- `modules/scope-challenge.md` (+117 new)
+- `modules/promotion-ledger.md` (+69 new)
+- `schemas/codex_peer_review_schema.json` (+13/-1)
+- `schemas/codex_review_schema.json` (+13/-1)
+- `skills/fz-plan/SKILL.md` (+7)
+- `skills/fz-review/SKILL.md` (+9/-1) — Phase 4.5 Write Scope
+
+**Feature Set B (fz Guide Compliance)**:
+- `skills/arch-critic/SKILL.md` (+1/-1) — YAML
+- `skills/code-auditor/SKILL.md` (+33/-1) — YAML + Few-shot
+- `skills/fz-search/SKILL.md` (+1/-1) — CRITICAL
+- `skills/fz-review/SKILL.md` (+35/-43) — Phase 5.5 extract + Few-shot
+- `skills/fz/SKILL.md` (+2/-54) — Phase 4 extract
+- `skills/fz-codex/SKILL.md` (+4/-7) — Few-shot
+- `modules/feedback-verification.md` (+48 new)
+- `modules/fz-pipeline-proposal.md` (+74 new)
+- `docs/design/lessons-to-module-pipeline.md` (+195 new)
+
+---
+
+## 🚚 마이그레이션
+
+**없음** (backward-compatible).
+
+- Schema v1.1: v1.0 응답에서 `scope_disposition` null 수용 (optional rollout)
+- YAML `allowed-tools: []`: 실제 권한 변경 없음 (에이전트가 tools 선언)
+- 모듈 분리: SKILL.md에서 `modules/` 링크로 참조, Progressive Disclosure로 자동 follow
+
+---
+
+## 🔗 관련 링크
+
+- [CHANGELOG.md](CHANGELOG.md) — 전체 변경 이력
+- [ASD-1136 Scope Challenge 원본 분석](https://github.com/jaewooongyun/fz) (TVING/monitoring/ASD-1136)
+- [v4.1.0 Release Notes](RELEASE_NOTES_v4.1.0.md) — Call-Site Deprecation Audit
+- [guides/skill-authoring.md](guides/skill-authoring.md) — 500줄 원칙
+- [guides/prompt-optimization.md](guides/prompt-optimization.md) — Few-shot + tone-down
+
+---
+
+## 🙏 감사
+
+Codex (gpt-5.5) 교차 검증이 Issue #1/#2를 Claude blind spot에서 독립 발견. 이번에도 cross-model 수렴(3회 한도)이 정상 작동.

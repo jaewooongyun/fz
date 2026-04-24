@@ -292,9 +292,10 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ## Changelog
 
-**현재 버전: v4.1.0** (2026-04-21)
+**현재 버전: v4.2.0** (2026-04-24)
 
-- **v4.1.0 — Call-Site Deprecation Audit + Function Responsibility Audit** (ASD-1111 회귀 기반 plan-impact §g 신규 + review-correctness §2 Function Responsibility Audit 신규 — 함수 호출 중단 시 책임 silent disappearance 방지. v1~v4 needs_revision 반복 후 18차 반성 Scope Inflation 방어 4 규칙 적용 → v5.3 Codex approved). 상세: [RELEASE_NOTES_v4.1.0.md](RELEASE_NOTES_v4.1.0.md).
+- **v4.2.0 — Scope Challenge + fz Guide Compliance** (ASD-1136: `modules/scope-challenge.md` 신규 — Codex verify 이슈 `scope_disposition` 분류(Q-S1~S4) + Lead 독립 판정 + `agents/plan-impact.md` Read/Write Scope 분리 + plan-final.md §X/§Y/§Z handoff 계약 + Schema v1.1 rollout. 추가로 `/fz-manage` 전체 리뷰로 5개 가이드 위반 해소(500줄 준수 2 + CRITICAL 완화 + Few-shot ≥3쌍 3개 스킬 + YAML 통일 2 → 21/21 스킬 guide 전축 준수). Lessons-to-Module 파이프라인 설계 문서 추가(승인 대기)). 상세: [RELEASE_NOTES_v4.2.0.md](RELEASE_NOTES_v4.2.0.md).
+- v4.1.0 — Call-Site Deprecation Audit + Function Responsibility Audit (ASD-1111 회귀 기반 plan-impact §g 신규 + review-correctness §2 Function Responsibility Audit 신규 — 함수 호출 중단 시 책임 silent disappearance 방지. v1~v4 needs_revision 반복 후 18차 반성 Scope Inflation 방어 4 규칙 적용 → v5.3 Codex approved). 상세: [RELEASE_NOTES_v4.1.0.md](RELEASE_NOTES_v4.1.0.md).
 - v4.0.0 — V.D. 4-way Chain 아키텍처 + 생태계 정합성 (Brain/Hands ↔ Lead/Teammate 레이어 경계 명시 + 템플릿 자동 상속 재발 방지 + 9 skills 필수 Prerequisites + TEAM boot VD 트리거 주입 + Chain-Closure 논리 링크 + canonical sink normalization). 상세: [RELEASE_NOTES_v4.0.0.md](RELEASE_NOTES_v4.0.0.md).
 - v3.11.0 — Opus 4.7 Adaptation + Verification Discipline 초안 (Phase A Fail-Closed 트리거 + Phase B3 측정 도구 + Opus 4.7 세대 전환 반영 + 논문 근거 9편 보강 + 공식 Agent Teams 사양 정합)
 - v3.10.0 — Scope Minimality (기계적 코드 변환 방지 — Zero-Exception 범위 한정 + BEC 3.5 + 마찰 감지 + 4-K 검증)
