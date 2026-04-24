@@ -395,31 +395,10 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] ⛔ Default-Deny 통과? (Spec 기술적 주장에 [verified] 태그 존재)
 
 ## Phase 5.5: Feedback Verification (역방향 검증)
-### 절차
 
-```bash
-# 독립 스킬로 위임
-/fz-codex validate "피드백 반영 검증"
-```
-
-fz-codex validate가 수행하는 작업:
-- 이전 이슈 목록 + Claude 수정 내용 → Codex에 전송
-- 이슈별 해결 상태 검증 (resolved / partially_resolved / unresolved / regressed)
-- Reflection Rate 계산
-- Issue Tracker 상태 업데이트
-
-### Gate 4.5: Feedback Verified
-- [ ] Codex가 이전 이슈들의 해결 상태를 검증했는가?
-- [ ] Feedback Reflection Rate >= 80%?
-- [ ] 새로 발견된 Critical 이슈가 없는가?
-- [ ] Regressed 이슈가 없는가?
-### 판정 기준
-
-| Reflection Rate | Verdict | 다음 단계 |
-|-----------------|---------|----------|
-| >= 80% | `pass` | Gate 5 통과 → Phase 7 완료 |
-| 60% - 79% | `needs_work` | Phase 6 (재수정) |
-| < 60% | `fail` | Phase 6 (재수정, 2회 후 에스컬레이션) |
+> 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
+>
+> 요약: `/fz-codex validate "피드백 반영 검증"` 실행 → Reflection Rate 계산 → 80%+ `pass` / 60-79% `needs_work` / <60% `fail`
 
 ## Phase 6: Iterative Improvement
 ### 반복 조건
