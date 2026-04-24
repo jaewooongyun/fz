@@ -86,6 +86,16 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 
 > **핵심**: `## Essential Context`는 /fz가 단독 관리하는 **덮어쓰기** 섹션. 서브스킬은 Essential 항목을 반환하고 /fz가 기록한다.
 
+### plan-final.md 템플릿 (ASD-1136 v2.2 P0-A)
+
+`plan-final.md`는 다음 3개 섹션을 분리 명시 (scope creep 차단):
+
+- **§X Read Scope (Impact Scan)**: plan-impact Exhaustive Impact Scan 결과 전체. 탐색 범위를 좁히지 않는다.
+- **§Y Write Scope (Implementation)**: §X 중 실제 변경하는 항목만 (`write-in` 판정). 각 항목에 근거 명시 — (1) 요구사항 직접 충족 / (2) obstacle 해제 / (3) Q0 Behavior Preservation 예외.
+- **§Z Acceptance Criteria**: §Y 각 항목의 검증 가능한 완료 기준 (컴파일 가능 / test 통과 / grep 패턴 매칭). criteria 미명시 항목은 §Y 포함 불가 (→ §X 이동 + 후속 ticket).
+
+**handoff 계약**: fz-code는 §Y + §Z만 참조 (Read Scope 무관). fz-review Phase 4.5는 §Y 기준으로 scope_creep 판정. 이 구조로 "Read Scope = Write Scope" 자동 번역 차단 (ASD-1136 RC4 해소).
+
 ## Compact Recovery Protocol
 
 0. `fz:checkpoint:essential` 읽기 → Essential Context (Key Decisions, Constraints, Active Phase) 즉시 복원
