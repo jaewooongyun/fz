@@ -1,5 +1,7 @@
 # fz
 
+[![Release](https://img.shields.io/github/v/release/jaewooongyun/fz?label=latest&color=blue)](https://github.com/jaewooongyun/fz/releases/latest) [![License](https://img.shields.io/github/license/jaewooongyun/fz?color=green)](LICENSE) [![Changelog](https://img.shields.io/badge/changelog-md-lightgrey)](CHANGELOG.md)
+
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 플러그인 — AI 개발 워크플로우 오케스트레이션 시스템.
 
 자연어 요청 → 복잡도 평가 → 스킬 파이프라인 자동 구성 → 멀티 에이전트 팀 편성 → 실행.
@@ -290,22 +292,4 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 
 ---
 
-## Changelog
-
-**현재 버전: v4.2.0** (2026-04-24)
-
-- **v4.2.0 — Scope Challenge + fz Guide Compliance** (ASD-1136: `modules/scope-challenge.md` 신규 — Codex verify 이슈 `scope_disposition` 분류(Q-S1~S4) + Lead 독립 판정 + `agents/plan-impact.md` Read/Write Scope 분리 + plan-final.md §X/§Y/§Z handoff 계약 + Schema v1.1 rollout. 추가로 `/fz-manage` 전체 리뷰로 5개 가이드 위반 해소(500줄 준수 2 + CRITICAL 완화 + Few-shot ≥3쌍 3개 스킬 + YAML 통일 2 → 21/21 스킬 guide 전축 준수). Lessons-to-Module 파이프라인 설계 문서 추가(승인 대기)). 상세: [docs/releases/v4.2.0.md](docs/releases/v4.2.0.md).
-- v4.1.0 — Call-Site Deprecation Audit + Function Responsibility Audit (ASD-1111 회귀 기반 plan-impact §g 신규 + review-correctness §2 Function Responsibility Audit 신규 — 함수 호출 중단 시 책임 silent disappearance 방지. v1~v4 needs_revision 반복 후 18차 반성 Scope Inflation 방어 4 규칙 적용 → v5.3 Codex approved). 상세: [docs/releases/v4.1.0.md](docs/releases/v4.1.0.md).
-- v4.0.0 — V.D. 4-way Chain 아키텍처 + 생태계 정합성 (Brain/Hands ↔ Lead/Teammate 레이어 경계 명시 + 템플릿 자동 상속 재발 방지 + 9 skills 필수 Prerequisites + TEAM boot VD 트리거 주입 + Chain-Closure 논리 링크 + canonical sink normalization). 상세: [docs/releases/v4.0.0.md](docs/releases/v4.0.0.md).
-- v3.11.0 — Opus 4.7 Adaptation + Verification Discipline 초안 (Phase A Fail-Closed 트리거 + Phase B3 측정 도구 + Opus 4.7 세대 전환 반영 + 논문 근거 9편 보강 + 공식 Agent Teams 사양 정합)
-- v3.10.0 — Scope Minimality (기계적 코드 변환 방지 — Zero-Exception 범위 한정 + BEC 3.5 + 마찰 감지 + 4-K 검증)
-- v3.9.0 — Harness Engineering Enhancement (SOLO G≠E 결정론적 검증 + PR 코멘트 파이프라인 + NLAH Gap 분석)
-- v3.8.0 — Uncertainty-Aware Harness (Default-Deny 검증 + Zero-Exception Thread + Harness Metrics)
-- v3.7.0 — Code Transformation Validation (코드 변환 동등성 검증 — 3중 검증축 추가)
-- v3.6.0 — iOS/Swift 역방향 진단 트리거 + Concurrency Safety Audit (PR #3665 교훈 반영)
-- v3.5.0 — Peer Review false positive 감소 (Gather Verification Gate + Quality Gate)
-- v3.4.0 — Peer Review 호출 구조 분석 + Convention 검증 (PR #3646 교훈 반영)
-- v3.3.2 — 플러그인 중심으로 README 전면 개편
-- v3.3.0 — Claude Code 플러그인 전환
-
-전체 변경 이력: [CHANGELOG.md](CHANGELOG.md)
+> 버전 및 변경 이력은 상단 배지의 Release / Changelog 링크 참조.
