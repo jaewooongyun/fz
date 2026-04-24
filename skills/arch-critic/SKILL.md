@@ -6,7 +6,7 @@ description: >
 user-invocable: false
 category: tool
 requires: []
-mcp-servers: []
+allowed-tools: []
 sc-commands: [sc:analyze, sc:design]
 composable: true
 provides: [architecture-analysis]

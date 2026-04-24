@@ -7,7 +7,7 @@ description: >
 user-invocable: false
 category: tool
 requires: []
-mcp-servers: []
+allowed-tools: []
 sc-commands: [sc:analyze, sc:reflect]
 composable: true
 provides: [code-quality-analysis]
