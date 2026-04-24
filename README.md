@@ -169,7 +169,7 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
     │   Round 2: 피드백 + 반박 (직접 SendMessage)
     │   Round 0.5: [합의/불합의] Lead에 보고
     │
-    └── External: Codex(GPT-5.4)
+    └── External: Codex(GPT-5.5)
 ```
 
 ### Verification Discipline 4-way Chain (v4.0+)
@@ -242,7 +242,7 @@ fz-review Phase 4.5 B3 체크리스트 + experiment-log.md §5.4 canonical sink 
 | | `/fz-commit`, `/fz-pr` | 커밋 + Fork 기반 PR |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
-| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.4) + `micro-eval` 단일 주장 재평가 (needs_verification ⇔ Default-Deny 결합, v4.0) |
+| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.5) + `micro-eval` 단일 주장 재평가 (needs_verification ⇔ Default-Deny 결합, v4.0) |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
 | **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage` | 문서, 메모리, 스킬 관리 |
 | **보조** | `/fz-new-file`, `/fz-excalidraw`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 다이어그램, 회의록, PR 요약 |

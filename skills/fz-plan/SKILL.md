@@ -101,8 +101,8 @@ TeamCreate("plan-{feature}")
 ├── review-arch (Sonnet): 아키텍처 패턴 검증 (RIBs + Clean Architecture)
 ├── review-direction (Sonnet): 방향성 비판 + 대안 제시 (Phase 0.5)
 ├── memory-curator (Sonnet): 관련 교훈 발굴
-├── Codex verify (Lead 실행, GPT-5.4): 독립 계획 검증
-└── Codex adversarial (Lead 실행, GPT-5.4): Devil's Advocate [--deep 시]
+├── Codex verify (Lead 실행, GPT-5.5): 독립 계획 검증
+└── Codex adversarial (Lead 실행, GPT-5.5): Devil's Advocate [--deep 시]
 ```
 
 **6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거):

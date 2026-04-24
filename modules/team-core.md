@@ -135,7 +135,7 @@
 | Lead | opus | 항상 |
 | Primary Worker | opus | 팀 내 핵심 산출물 생산자 (도메인당 1명) |
 | Supporting | sonnet | 나머지 Claude 에이전트 전부 |
-| External 1 (Codex) | gpt-5.4 | cross-model 검증 (Lead가 CLI 직접 실행) |
+| External 1 (Codex) | gpt-5.5 | cross-model 검증 (Lead가 CLI 직접 실행) |
 
 외부 모델 실행 규칙:
 - Lead가 Codex CLI를 직접 실행하고, 결과를 팀에 SendMessage로 공유
