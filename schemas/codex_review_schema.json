@@ -4,9 +4,14 @@
   "title": "Codex Review Response Schema",
   "description": "Codex review/verify/validate/check/final/commit 응답 형식. OpenAI Structured Outputs 규격 준수.",
   "type": "object",
-  "required": ["review_id", "timestamp", "review_type", "issues", "summary", "verdict", "overall_feedback", "strengths"],
+  "required": ["schemaVersion", "review_id", "timestamp", "review_type", "issues", "summary", "verdict", "overall_feedback", "strengths"],
   "additionalProperties": false,
   "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0", "1.1"],
+      "description": "스키마 버전. v1.1에서 scope_disposition 필드 추가 (ASD-1136 v2.2)"
+    },
     "review_id": {
       "type": "string",
       "description": "리뷰 고유 식별자 (예: REV-001)"
@@ -25,9 +30,14 @@
       "description": "발견된 이슈 목록",
       "items": {
         "type": "object",
-        "required": ["id", "severity", "category", "description", "location", "suggestion", "confidence", "code_snippet", "alternatives", "recommended"],
+        "required": ["id", "severity", "category", "description", "location", "suggestion", "confidence", "code_snippet", "alternatives", "recommended", "scope_disposition"],
         "additionalProperties": false,
         "properties": {
+          "scope_disposition": {
+            "type": ["string", "null"],
+            "enum": ["scope-in", "scope-out", "invariant-risk", "parent-reopen", "improvement", null],
+            "description": "이슈 scope 분류 (v1.1+). Lead/Codex 독립 판정 후 채택. modules/scope-challenge.md 참조. null은 legacy 호환 (v1.0 응답)"
+          },
           "id": {
             "type": "string",
             "description": "이슈 고유 식별자 (예: ISSUE-001)"

@@ -445,6 +445,8 @@ GOOD: codex 3 issues + Claude 독립 1 신규 = 4 issues 합산 + verdict 판정
 서브커맨드 매핑: 코드 리뷰→`codex exec review -o`, 계획 검증→`codex exec --output-schema`, 심화→`codex exec resume --last`
 ```
 
+Schema version: 응답 `schemaVersion`이 `"1.1"`이면 `scope_disposition` read, 미존재/`"1.0"`이면 Lead가 `modules/scope-challenge.md` 수동 실행 (`jq '.schemaVersion // "1.0"'`).
+
 ---
 
 ## Boundaries

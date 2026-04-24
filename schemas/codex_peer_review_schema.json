@@ -4,9 +4,14 @@
   "title": "Codex Peer Review Response Schema",
   "description": "피어 리뷰 에이전트(arch-critic, code-auditor, codex-challenger)의 구조화된 응답 형식. base_issue_schema 참조.",
   "type": "object",
-  "required": ["agent", "agent_status", "status_reason", "issues", "challenges", "strengths", "overall_assessment"],
+  "required": ["schemaVersion", "agent", "agent_status", "status_reason", "issues", "challenges", "strengths", "overall_assessment"],
   "additionalProperties": false,
   "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0", "1.1"],
+      "description": "스키마 버전. v1.1에서 issues[].scope_disposition 추가 (ASD-1136 v2.2)"
+    },
     "agent": {
       "type": "string",
       "description": "에이전트 ID (예: arch-critic, code-auditor, codex-challenger)"
@@ -26,12 +31,17 @@
       "maxItems": 10,
       "items": {
         "type": "object",
-        "required": ["id", "perspective", "file", "line_range", "severity", "confidence", "origin", "description", "impact", "suggestion", "alternatives", "recommended", "evidence_trace"],
+        "required": ["id", "perspective", "file", "line_range", "severity", "confidence", "origin", "description", "impact", "suggestion", "alternatives", "recommended", "evidence_trace", "scope_disposition"],
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string",
             "description": "이슈 고유 식별자 (예: ARCH-001, CODE-003)"
+          },
+          "scope_disposition": {
+            "type": ["string", "null"],
+            "enum": ["scope-in", "scope-out", "invariant-risk", "parent-reopen", "improvement", null],
+            "description": "이슈 scope 분류 (v1.1+). origin과 매핑: regression→scope-in, pre-existing→scope-out, improvement→improvement. parent-reopen은 Q-S5 발동 시 (P2-A). null은 legacy 호환"
           },
           "perspective": {
             "$comment": "→ codex_base_issue_schema.json#/$defs/unified_category 의 서브셋 (peer-review 관점용)",
