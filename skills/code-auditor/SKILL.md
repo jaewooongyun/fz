@@ -432,6 +432,38 @@ func routeToDetail() {
 | Major 1-2개 | `needs_improvement` |
 | Critical >= 1개 또는 Major >= 3개 | `major_concerns` |
 
+## Few-shot 예시
+
+### 예시 1 — Convention 판정 (분석 제약)
+
+```
+BAD: "일반적으로 struct가 권장됨" 교과서 기준만으로 class 사용을 major 판정
+     → convention-samples.md 미확인 상태로 "교과서적 틀림" 근거로 분류
+GOOD: convention-samples.md 로드 → 프로젝트 내 동일 패턴 3+ 곳 발견 확인
+     → 해당 패턴은 convention → severity: suggestion 이하로만 판정
+     → "프로젝트 컨벤션과 일치하나 개선 여지 있음" 톤으로 제안
+```
+
+### 예시 2 — Dead code 식별 (관점 7: Refactoring Completeness)
+
+```
+BAD: diff에서 새 심볼 `ContentRepositoryV2` 도입 확인 → "신규 추가" 판정만 보고
+     → 기존 `ContentRepository`가 여전히 사용처 있는지 미확인 → 이중 유지 상태 놓침
+GOOD: find_referencing_symbols로 대체 대상 `ContentRepository` 사용처 역추적
+     → 사용처 = 0 확인 → severity: major "삭제 대상 dead code" 분류
+     → @available(*, deprecated) 어노테이션 누락도 함께 지적
+```
+
+### 예시 3 — 아키텍처 레이어 위반 (symbols.json.import_graph 활용)
+
+```
+BAD: 새 import 라인만 훑고 "상위 모듈 참조" 문자열 매칭으로 판정
+     → 중간 레이어 경유 여부 미확인 → 정상 참조를 violation으로 오판
+GOOD: symbols.json.import_graph 로드 → Repository → UseCase 역방향 참조 경로 탐지
+     → CLAUDE.md `## Architecture`의 레이어 순서(Network→Repository→UseCase→Workflow)와 대조
+     → 역방향 참조 확인 시 critical, 레이어 건너뛰기면 major로 세분화
+```
+
 ## 언어 정책
 
 - 이슈 description/suggestion: **한국어**로 작성

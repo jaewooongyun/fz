@@ -437,15 +437,12 @@ Plugin 상태: `codex mcp list 2>/dev/null | grep plugin` (설치 시 `/codex:se
 ## Few-shot 예시
 
 ```
-BAD: codex exec review → "LGTM" → 그대로 approved (Claude 독립 판단 없음, 교차 검증 아님)
-GOOD: codex 3 issues + Claude 독립 1 신규 = 4 issues 합산 + verdict 판정
+예시 1 — review: BAD codex "LGTM" 자체판단없이 approved / GOOD codex 3 issues + Claude 독립 1 = 4 issues + verdict
+예시 2 — verify: BAD codex "승인" → 단일모델 Phase 2 통과 / GOOD codex가 plan 독립재작성 → Claude와 diff → "divergence" 기록
+예시 3 — validate: BAD Rate 85% 수치만 보고 pass (regressed 놓침) / GOOD resolved/partial/unresolved/regressed 4축 → regressed 0 + Rate 80+ 동시
 ```
 
-```
-서브커맨드 매핑: 코드 리뷰→`codex exec review -o`, 계획 검증→`codex exec --output-schema`, 심화→`codex exec resume --last`
-```
-
-Schema version: 응답 `schemaVersion`이 `"1.1"`이면 `scope_disposition` read, 미존재/`"1.0"`이면 Lead가 `modules/scope-challenge.md` 수동 실행 (`jq '.schemaVersion // "1.0"'`).
+서브커맨드: 리뷰→`codex exec review -o`, 검증→`--output-schema`, 심화→`resume --last`. Schema version: `"1.1"`이면 `scope_disposition` read, 미존재/`"1.0"`이면 Lead가 `modules/scope-challenge.md` 수동 실행 (`jq '.schemaVersion // "1.0"'`).
 
 ---
 

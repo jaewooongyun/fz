@@ -466,8 +466,17 @@ Gate 5 통과 후:
 ## Few-shot 예시
 
 ```
-BAD: 리뷰 완료. 문제 없음. → 근거 없음, Rate 없음
-GOOD: 발견 이슈 N개 + Reflection Rate: X/Y (ZZ%) + Codex 교차 검증 결과
+예시 1 — 리뷰 완료 보고:
+  BAD:  "리뷰 완료. 문제 없음." → 근거 없음, Rate 없음
+  GOOD: 이슈 N개 + Reflection Rate: X/Y (ZZ%) + Codex 교차 검증 결과
+
+예시 2 — Anti-Pattern 잔존 검증 (검증 4-F):
+  BAD:  diff 삭제 라인만 확인 → "패턴 제거" 판정 (다른 파일에 잔존)
+  GOOD: Plan의 Anti-Pattern Constraints Grep 패턴으로 변경 파일 + 관련 모듈 전수 검색 → 매칭 0 확인
+
+예시 3 — Source Fidelity (검증 4-H, 리팩토링/마이그레이션):
+  BAD:  컴파일+테스트 통과 → "동작 유지" 판정 (`.done` main queue → 일반 Task 미감지)
+  GOOD: Transformation Spec의 실행 스레드/에러 경로/파라미터 키 3축 모두 일치 확인
 ```
 
 ## Boundaries
