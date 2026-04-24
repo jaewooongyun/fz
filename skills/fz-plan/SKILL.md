@@ -31,6 +31,7 @@ needs: [none]
 intent-triggers:
   - "계획|설계|아키텍처|요구사항"
   - "plan|design|architect|requirement"
+  - "리팩토링|치환|흡수|이전|migration|refactor"
 model-strategy:
   main: opus
   verifier: sonnet
@@ -68,6 +69,8 @@ model-strategy:
 | modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
 | modules/code-transform-validation.md | 코드 변환 동등성 — Transformation Spec + 검증 체크리스트 (패턴 변환 시) |
 | modules/uncertainty-verification.md | 기술적 주장 → Default-Deny 검증 (하네스 원칙, Transformation Spec Pilot) |
+| modules/scope-challenge.md | Phase 3 Codex 이슈 scope_disposition 분류 + Lead 독립 판정 (additive 자동 번역 차단) |
+| modules/promotion-ledger.md | P1/P2 조치 eligible session 관측 기록 (학습 승격 금지) |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -404,6 +407,8 @@ TeamCreate("plan-{feature}")
      - **Major**: 수정 권장
      - **Minor**: 선택적 수정
 
+1b. **⛔ Scope Challenge (이슈당 필수)**: 각 Codex 이슈를 플랜에 반영 전 `modules/scope-challenge.md` Q-S1~S4 실행 → `scope_disposition` 분류. Lead는 Codex 결과를 **읽기 전** 독립 판정 후 비교 (Generator≠Evaluator).
+
 2. **요구사항 일치 검증**:
    - `mcp__sequential-thinking__sequentialthinking` → 수정 전후 요구사항 부합도 단계별 비교
    - `/sc:reflect` → 자체 검증
@@ -416,6 +421,8 @@ TeamCreate("plan-{feature}")
 4. **⛔ 수정 계획 기록** (항상 — compact recovery 필수):
    - ASD 활성: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` 복사 + `index.md` 업데이트
    - 비ASD: `write_memory("fz:checkpoint:plan-final", "최종 계획: Steps {N}개. 피드백 반영: {요약}. verdict: approved")`
+
+5. **Refactoring Mode 감지 (P0-light)**: intent-triggers에 리팩토링/치환/흡수/migration 매칭 시 AskUserQuestion 1회 — "이 작업은 리팩토링 감지. refactoring-aware 분류(Q-S5 Appendix 활성)를 적용할까요?" 사용자 예 시 Q-S5 활성, 아니오 시 기존 flow.
 
 ### Gate 2: Validation Passed
 - [ ] Critical 이슈 모두 해결?
