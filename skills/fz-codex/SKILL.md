@@ -355,11 +355,13 @@ cd "$GIT_ROOT" && codex exec review \
 | `warn` | warning issue 1건+ but critical/major 0건 | 사용자 보고 + 진행 옵션 |
 | `fail` | critical/major issue 1건+ | 차단, 사용자 결정 필수 |
 
-**판정 grep** (`$REVIEW_FILE`에 적용, case-insensitive):
-- `severity.*(?i)(critical\|major)` 매칭 1건+ → `fail`
-- 위 매칭 0건 + `severity.*(?i)warn` 매칭 1건+ → `warn`
-- 둘 다 0 + 파일 존재 + 비어있지 않음 → `pass`
+**판정 grep** (`$REVIEW_FILE`에 적용, `grep -Eiq`로 case-insensitive 강제):
+- `grep -Eiq 'severity.*(critical|major)' "$REVIEW_FILE"` 매칭 → `fail`
+- 위 매칭 0건 + `grep -Eiq 'severity.*(minor|suggestion)' "$REVIEW_FILE"` 매칭 → `warn`
+- 둘 다 0건 + 파일 존재 + 비어있지 않음 → `pass`
 - 파일 없음 또는 빈 파일 → `warn` (false PASS 방지)
+
+> severity enum: `critical | major | minor | suggestion` (review schemas 정의). `warn`/`warning`은 매칭 대상 아님.
 
 **/fz-fixer 연결**: 리뷰 결과에 수정 제안이 포함된 경우(issues with suggestion 필드 비어있지 않음), /fz-fixer 스킬을 참조하여 수정 전략을 제시한다.
 
