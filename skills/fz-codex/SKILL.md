@@ -104,6 +104,111 @@ model-strategy:
 
 ---
 
+## ⛔ Bash 호출 Hygiene (29차 교훈, 필수)
+
+`codex exec` 또는 `codex review`를 Bash 도구로 호출할 때 반드시 적용. 미적용 시 무한 hang 또는 trusted directory 에러.
+
+### 1. Stdin 닫기 의무 (`< /dev/null`)
+
+**증상**: Codex 0.124.0이 `Reading additional input from stdin...`에서 무한 대기. 13분 hang 후에도 응답 없음.
+
+**원인**: Bash pipe에 codex exec를 연결하면 stdin이 열린 채 전달됨 → Codex가 대화형 입력을 기대 → 무한 hang.
+
+**필수 패턴**:
+```bash
+# ❌ 잘못된 호출 (hang 발생)
+codex exec ... "prompt" 2>&1 | tail -20
+
+# ✅ 올바른 호출 (stdin 명시 close)
+codex exec ... "prompt" < /dev/null 2>&1 | tail -20
+```
+
+**적용 범위**: 본 SKILL.md의 모든 Bash 예시 (review/verify/validate/check/final/commit/adversarial/drift/plan/micro-eval). 점진적으로 모든 인라인 예시에 `< /dev/null` 추가.
+
+### 2. Trusted Directory 확인 + Skip Flag
+
+**증상**: `Not inside a trusted directory and --skip-git-repo-check was not specified.` 에러로 즉시 종료.
+
+**원인**: PROJECT_ROOT(`TVING/`) ≠ GIT_ROOT(`app-iOS/`)인 dual-root 구조에서 Codex가 git repo 외부 실행을 거부.
+
+**필수 패턴**:
+```bash
+# Working dir이 git repo 밖일 때 (e.g., -C /Users/jaewoongyun/dev/TVING)
+codex exec ... --skip-git-repo-check ... "prompt" < /dev/null
+
+# Working dir이 git repo 내부일 때 (e.g., -C /Users/jaewoongyun/dev/TVING/app-iOS)
+# → --skip-git-repo-check 불필요. config.toml `[projects."<path>"] trust_level = "trusted"`로도 가능.
+```
+
+**판정 logic** (Lead가 자동 적용):
+```bash
+if git -C "$WORK_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+  SKIP_FLAG=""
+else
+  SKIP_FLAG="--skip-git-repo-check"
+fi
+```
+
+### 3. `-o` 파일 출력 시 stdout buffering 주의
+
+**관찰**: `-o /path/to/output.md`로 결과를 파일에 쓰면 stdout에는 진행 stream만 출력. `2>&1 | tail -N`은 마지막 N줄(완료 메시지)만 캡처. 실제 결과는 `-o` 파일에서 Read.
+
+**Pattern**:
+```bash
+# 파일 출력 + tail은 진행 확인용
+codex exec ... -o "$RESULT_FILE" "prompt" < /dev/null 2>&1 | tail -5
+
+# 결과 읽기는 별도 도구로
+Read("$RESULT_FILE")  # 실제 verify 결과
+```
+
+### 4. Background Task 의무 영역
+
+**조건**: gpt-5.5 high effort + Plan 300줄+ 입력 시 5-8분 소요. Bash foreground는 timeout 위험 + Claude context 차지.
+
+**패턴**: `run_in_background: true` + `ScheduleWakeup`으로 비동기 처리.
+
+### 5. ⛔ Trust Level 필수 (30차 교훈, Critical)
+
+**증상**: `codex exec --profile <NAME>` 호출 시 `[profiles.<NAME>].sandbox_permissions` 설정이 무시되고 header에 `sandbox: read-only`로 force. Profile 설계 전체 무효화.
+
+**원인**: Codex CLI 0.124.0은 실행 path가 `[projects.<path>] trust_level = "trusted"`로 명시되지 않으면 **"untrusted directory" 취급** → profile `sandbox_permissions` 설정을 무시하고 baseline read-only로 강제.
+
+**증거 (T1C-5c, verified)**:
+- Test A-D (trust_level 없음, 4 variations): 모두 `sandbox: read-only`
+- Test E (trust_level 추가, 한 줄 차이): `sandbox: workspace-write` ✅
+- 5단계 가설 수렴: `--ephemeral` force → multi-profile 의존 → `prod` 예약어 → config diff → **trust_level 필수**
+
+**필수 config** (`~/.codex/config.toml`):
+```toml
+[projects."/Users/jaewoongyun/dev/TVING/app-iOS"]  # GIT_ROOT
+trust_level = "trusted"
+
+[projects."/Users/jaewoongyun/dev/TVING"]  # PROJECT_ROOT
+trust_level = "trusted"
+
+[projects."/Users/jaewoongyun/dev/fz-plugin"]  # fz-plugin dev
+trust_level = "trusted"
+```
+
+**fz-codex 호출 시 적용 범위**:
+- **Profile 사용 시 (--profile)**: trust_level 없으면 sandbox 무효화 → profile 설계 전체 붕괴
+- **Profile 미사용 시 (-c 'sandbox_permissions=...')**: trust_level 없어도 inline override는 적용 가능 [미검증, 추후 probe]
+- **대안 폴백**: 매 호출에 `-c 'projects."<path>".trust_level="trusted"'` inline override (현재 fz-codex SKILL.md의 read-only hard-coded는 이 영향 받지 않음)
+
+**`--skip-git-repo-check` vs trust_level**:
+- `--skip-git-repo-check`: git repo check 우회만, trust 수준과 무관
+- `trust_level = "trusted"`: Codex sandbox 정책에 직접 영향
+
+**판정 logic** (Lead가 호출 전 확인):
+```bash
+if ! grep -qE "\[projects\." ~/.codex/config.toml; then
+  echo "WARNING: trust_level 미설정. profile 사용 시 sandbox 무효 가능성."
+fi
+```
+
+---
+
 ## 서브커맨드
 
 ### review -- 코드 리뷰 (주력)
@@ -158,7 +263,7 @@ codex exec \
    $AFFECTED_SYMBOLS
 
    ## 설계 스트레스 테스트 독립 검증 (필수)
-   계획의 핵심 설계 결정에 대해 아래 6가지 질문을 독립적으로 평가하라.
+   계획의 핵심 설계 결정에 대해 아래 8가지 질문을 독립적으로 평가하라.
    계획에 이미 리스크 매트릭스가 있더라도, 동의 여부와 무관하게 자체 판단하라.
 
    Q1 다중성: 제안된 설계가 1개일 때와 N개일 때 동일하게 작동하는가?
@@ -239,6 +344,22 @@ cd "$GIT_ROOT" && codex exec review \
 ```
 
 > `--ephemeral`: 일회성 검증이므로 세션 미저장. 3-Tier 스킬 자동 트리거.
+
+#### check verdict contract (호출자 분기 규칙)
+
+`/fz-codex check` 결과는 다음 verdict 중 하나로 분류 (호출자 SKILL — fz-fix 등 — 이 분기 처리):
+
+| verdict | 조건 | 호출자 권장 행동 |
+|---------|------|----------------|
+| `pass` | critical/major issue 0건 | 다음 단계 진행 |
+| `warn` | warning issue 1건+ but critical/major 0건 | 사용자 보고 + 진행 옵션 |
+| `fail` | critical/major issue 1건+ | 차단, 사용자 결정 필수 |
+
+**판정 grep** (`$REVIEW_FILE`에 적용, case-insensitive):
+- `severity.*(?i)(critical\|major)` 매칭 1건+ → `fail`
+- 위 매칭 0건 + `severity.*(?i)warn` 매칭 1건+ → `warn`
+- 둘 다 0 + 파일 존재 + 비어있지 않음 → `pass`
+- 파일 없음 또는 빈 파일 → `warn` (false PASS 방지)
 
 **/fz-fixer 연결**: 리뷰 결과에 수정 제안이 포함된 경우(issues with suggestion 필드 비어있지 않음), /fz-fixer 스킬을 참조하여 수정 전략을 제시한다.
 
@@ -476,6 +597,9 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 | JSON 파싱 실패 | `-o` 파일 캡처 폴백 | Claude 분석 |
 | 모델 미지원 (`gpt-5.5`) | config.toml 모델로 폴백 (`-m` 제거) | -- |
 | 3회 연속 실패 | 사용자 에스컬레이션 | -- |
+| **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (§Bash 호출 Hygiene 1) | 프로세스 kill + 재시도 |
+| **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (§Bash 호출 Hygiene 2) | working dir을 GIT_ROOT로 변경 |
+| **`--profile` 사용 시 sandbox가 read-only로 force** (30차, Critical) | `[projects.<path>] trust_level = "trusted"` 추가 (§Bash 호출 Hygiene 5) | `-c 'sandbox_permissions=...'` inline override |
 
 ## Completion → Next
 
