@@ -71,7 +71,7 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 | fz-plan | STRESS_TEST_PASS | 2 | 설계 스트레스 테스트 (Critical < 2) |
 | fz-code | BUILD_SUCCESS | 3 | 빌드 검증 |
 | fz-fix | FIX_VERIFIED | 3 | 빌드 검증 |
-| fz-review | REFLECTION_80 | 3 | Reflection Rate ≥ 80% |
+| fz-review | REFLECTION_80 | 3 | Reflection Rate ≥ 80% (N≥10에서만 gating — 참조: `modules/cross-validation.md § Reflection Rate threshold`) |
 
 ## SIMPLIFY 게이트 상세
 

@@ -25,7 +25,7 @@
 ## Gate 4.5: Feedback Verified
 
 - [ ] Codex가 이전 이슈들의 해결 상태를 검증했는가?
-- [ ] Feedback Reflection Rate >= 80%?
+- [ ] Feedback Reflection Rate threshold pass? (N<10이면 preliminary — 참조: `modules/cross-validation.md § Reflection Rate threshold`)
 - [ ] 새로 발견된 Critical 이슈가 없는가?
 - [ ] Regressed 이슈가 없는가?
 

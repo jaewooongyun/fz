@@ -396,9 +396,11 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 
 ## Phase 5.5: Feedback Verification (역방향 검증)
 
+> **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). 추가 verify round는 명시적 critical 발견 시에만.
+>
 > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
 >
-> 요약: `/fz-codex validate "피드백 반영 검증"` 실행 → Reflection Rate 계산 → 80%+ `pass` / 60-79% `needs_work` / <60% `fail`
+> 요약: `/fz-codex validate "피드백 반영 검증"` 실행 → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
 
 ## Phase 6: Iterative Improvement
 ### 반복 조건

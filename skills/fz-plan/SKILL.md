@@ -195,6 +195,7 @@ TeamCreate("plan-{feature}")
    - 이미 verified → `[verified: source]` 태그 보유 (코드/문서/명령어 출력)
    - 미검증 → `[미검증: 이유]` 태그 + Plan 차원에서 제외
    - probe 필요 → `/fz-discover` Phase 1.5 (Constraint Probe) 호출
+   - **Codex Micro-Eval Assist (optional)**: 핵심 가정 + `[verified: source]` 부재 + primitive/contract 확인 비용 높음 시 → `/fz-codex micro-eval "이 가정 검증"` (effort=medium, 1-shot). Lead 판단으로 호출, 자동 발동 ❌ — 새 Phase/Gate 신설 ❌ (33차 default = action 정합).
 3. **probe 결과 통합**: discover 산출물에서 3 axes 모두 verified 가정만 Plan 차원에 포함
 
 ### Gate 0c: Constraints Verified for Plan
@@ -207,6 +208,9 @@ TeamCreate("plan-{feature}")
 ---
 
 ## Phase 0.5: Direction Challenge
+
+> **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). verification escalation은 명시적 risk signal 발생 시에만.
+
 ### 발동 조건
 
 | 조건 | Direction Challenge | 근거 |

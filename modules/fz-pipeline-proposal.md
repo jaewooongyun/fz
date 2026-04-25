@@ -67,7 +67,9 @@ Q: "이 작업의 범위를 확인합니다"
 
 ---
 
-## 권고 Default 정책 (33차 — Recommendation Default Bias 방어)
+## 권고 Default 정책 (Lead Action Default 적용)
+
+> **Default = action with proportional verification** (참조: `modules/lead-action-default.md`).
 
 **Implementation-ready 시점부터 권고 default = implementation**. verify 우선 권고는 사용자 명시 안전 우려 시에만.
 

@@ -207,6 +207,47 @@ if ! grep -qE "\[projects\." ~/.codex/config.toml; then
 fi
 ```
 
+### 6. Standard Hygiene Wrapper Template (모든 Codex 호출에 복붙)
+
+> 5 hygiene rules (1-5) + zsh glob 회피 + output readback을 통합한 표준 wrapper. 매 호출마다 5 규칙 직접 적용 부담 제거.
+
+```bash
+# 0. 프롬프트 파일화 (zsh glob 회피 — '\b', '[a-z]' 등 regex 패턴 포함 시 필수)
+#    권고: heredoc 또는 Write tool 사용 (echo는 멀티라인/따옴표 escape 어려움)
+cat > /tmp/codex-prompt.txt << 'EOF'
+...your prompt with regex/quotes/multiline...
+EOF
+
+# 1. Trust check (rule 5, 30차)
+if ! grep -qE "\[projects\." ~/.codex/config.toml; then
+  echo "WARNING: trust_level 미설정"
+fi
+
+# 2. Skip flag 결정 (rule 2)
+if git -C "$WORK_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+  SKIP_FLAG=""
+else
+  SKIP_FLAG="--skip-git-repo-check"
+fi
+
+# 3. 표준 호출 (rule 1: stdin close + rule 3: -o output)
+codex exec \
+  -c 'sandbox_permissions=["disk-full-read-access"]' \
+  $SKIP_FLAG \
+  -o "$RESULT_FILE" \
+  -C "$WORK_DIR" \
+  "$(cat /tmp/codex-prompt.txt)" < /dev/null
+
+# 4. 결과 읽기 (rule 3 readback — Codex Q1 보정)
+#    Read tool로 $RESULT_FILE 읽기 (stdout은 진행 stream만)
+
+# 5. Background mode (rule 4)
+#    high effort + 300줄+ 입력 시: run_in_background=true + ScheduleWakeup
+#    foreground 사용 시 timeout 위험 + Claude context 차지
+```
+
+**적용 권고**: 본 SKILL.md의 모든 서브커맨드 예시(review/verify/validate/check/final/commit/adversarial/drift/plan/micro-eval)는 본 wrapper 패턴을 따른다. zsh glob 패턴(`\b`, `[a-z]+` 등)이 프롬프트에 포함되면 file mode 필수.
+
 ---
 
 ## Effort Routing (δ-2)

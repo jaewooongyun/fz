@@ -47,6 +47,22 @@
 > 판단 기준: 10건 → 이슈 0건 Gate = Neutral 후보
 > 데이터 소스 1 (Markdown table): /fz-review 완료 보고의 ## Harness Metrics 섹션
 > 데이터 소스 2 (jsonl): `experiment-log-traces.jsonl` — T1-B Observability 구현으로 도입된 Agents SDK Tracing schema. `workflow_name=fz_tier1g_ensemble` 또는 `fz_review_run` group_id별 누적
+> Reflection Rate threshold rule: 참조 `modules/cross-validation.md § Reflection Rate threshold` (N<10 preliminary, gating 보류)
+
+### Codex Unique Findings 추적 (cross-model 가치 정량화)
+
+매 cross-model verify 후 다음 schema로 기록:
+
+```yaml
+session: <session-id>
+date: YYYY-MM-DD
+codex_unique_findings: <int>      # Codex만 catch한 critical/major findings
+claude_unique_findings: <int>     # Claude self-review만 catch한 findings  
+convergent_findings: <int>        # 양측 일치 findings
+total_findings: <int>             # codex_unique + claude_unique + convergent
+```
+
+> 목적: Cross-model verify 가치를 정량 evidence로 누적. 본 세션(2026-04-25 codex-utilization)에서 Codex unique 2건 (Step 1 readback, codex-strategy 충돌) 발견 — 활용 가치 정당화.
 
 ### T1-G Ensemble Sprint Metrics (2026-04-25 CP-2 Early Qualification)
 
@@ -254,7 +270,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 
 ### CP-3 진단
 
-- **Threshold**: Rate ≥ 80% (TEAM review, Plan v3.1.3 §CP-3)
+- **Threshold**: Rate ≥ 80% (TEAM review, Plan v3.1.3 §CP-3) — **gating는 N≥10에서만** (참조: `modules/cross-validation.md § Reflection Rate threshold`)
 - **Strict 73%**: BELOW threshold (PARTIAL을 미반영으로 셈 시)
 - **Lenient 86%**: ABOVE threshold (PARTIAL을 부분 반영으로 셈 시)
 - **Sample size**: 3 / 5 (CP-3는 5건+ 누적 필요)
