@@ -67,6 +67,22 @@ Q: "이 작업의 범위를 확인합니다"
 
 ---
 
+## 권고 Default 정책 (33차 — Recommendation Default Bias 방어)
+
+**Implementation-ready 시점부터 권고 default = implementation**. verify 우선 권고는 사용자 명시 안전 우려 시에만.
+
+### 권고 표시 규칙
+
+| 상황 | First Option (Default) | Second Option |
+|------|---------------------|---------------|
+| verify `approved`/`conditional-minor` | **Implementation 진입** (v{N+1} 자동 작성 금지, 18차와 동일 강도) | 사용자 명시 추가 verify 요청 시 |
+| verify `needs_revision` | Plan v{N+1} (18차 3회 한도) | 사용자 에스컬레이션 |
+| 연속 메타 작업 ≥ 2회 (학습/정식화/SKILL.md 강화) | **Implementation 사이클로 복귀** | 사용자 명시 메타 작업 결정 시 |
+
+> 33차 출처: `feedback_recommendation_default_bias.md` (Recommendation Default Bias)
+
+---
+
 ## 관련 모듈
 
 - `modules/complexity.md` — TEAM/SOLO 모드 점수 산정
