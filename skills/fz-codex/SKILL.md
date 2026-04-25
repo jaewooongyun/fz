@@ -209,6 +209,24 @@ fi
 
 ---
 
+## Effort Routing (δ-2)
+
+`-c model_reasoning_effort=<medium|high|xhigh>` 매핑. 단순 호출에 xhigh 낭비 + 심화 호출에 medium 부족 방지.
+
+| 서브커맨드 | effort | 근거 |
+|----------|:------:|------|
+| `micro-eval` | **medium** | 단일 주장 재평가, 수백 토큰 단위 |
+| `review`, `check`, `verify`, `validate`, `commit`, `drift` | **high** | 리뷰/검증 표준 |
+| `final` (1차+resume 2차), `adversarial`, `plan` | **xhigh** | 종합 리뷰 + 독립 설계 + DA 패스 |
+
+**Critical 자동 에스컬레이션**: 이전 검증에서 critical 이슈 발견 시 → high → xhigh 자동 전환 (validate/verify에 명시).
+
+**원칙**: effort는 호출 종류 기준 (단순/표준/심화), 모델 가용성 기준 아님. gpt-5.5 high가 gpt-5.4 xhigh보다 빠르고 정확하면 default = gpt-5.5 high.
+
+> δ-2 출처: plan v3.1.3 §Tier 1 row 5. 32차 axis (a) probe: `plan_mode_reasoning_effort` direct flag 미존재 → `-c model_reasoning_effort=...` config override 형식이 정식 primitive.
+
+---
+
 ## 서브커맨드
 
 ### review -- 코드 리뷰 (주력)
