@@ -60,7 +60,7 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 | 스킬 | Gate | 1회 실패 | 2회 실패 | 3회 실패 |
 |------|------|---------|---------|---------|
 | fz-code | build | 에러 직접 수정 | /sc:troubleshoot | /simplify → AskUser |
-| fz-fix | build | 에러 직접 수정 | /sc:troubleshoot | AskUser |
+| fz-fix | build | 에러 직접 수정 | /sc:troubleshoot | /fz-codex check 보조 진단 1회 → AskUser |
 | fz-review | Reflection | 이슈 재확인 | Codex 검증 | AskUser |
 | fz-plan | Stress Test | 계획 수정 | 계획 재작성 | AskUser |
 
