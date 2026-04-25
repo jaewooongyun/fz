@@ -43,7 +43,7 @@ model-strategy:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → Phase 0b (Context) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
+> ⛔ Phase 0 (ASD Pre-flight) → Phase 0b (Context) → Phase 0c (Constraint Probe Pre-flight) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
 > 루프 프리미티브: Plan-Execute + Evaluator-Optimizer (H6, Inside the Scaffold)
 
 요구사항 구조 분해 + 영향 범위 분석. Serena 심볼 도구 기반 정밀 탐색.
@@ -174,6 +174,35 @@ TeamCreate("plan-{feature}")
 - [ ] 프로젝트 활성화 완료?
 - [ ] 대상 심볼 구조 파악?
 - [ ] 이전 컨텍스트 로드? (해당 시)
+
+---
+
+## Phase 0c: Constraint Probe Pre-flight (31차 방어)
+
+> Plan 핵심 차원이 primitive(CLI flag / config key / value enum / env precondition)에 의존하면 추측 위에 작성하지 않는다. 실측으로 가정 검증 후 차원 포함. 참조: `feedback_plan_before_probe.md`.
+
+발동: 외부 primitive 의존 시 필수. 코드베이스 내부 패턴만 의존하면 스킵.
+
+### 절차
+
+1. **가정 추출**: 요구사항/discover 결과에서 primitive 의존 가정 식별
+   - **가정의 3 axes 점검** (32차 방어 — Probe Coverage Gap):
+     - (a) **존재 가정**: primitive가 작동하는가? (existence)
+     - (b) **권한/경계 가정**: 호출 측 SKILL.md `allowed-tools` / `Bash(*)` 패턴이 호출 허용? (boundary)
+     - (c) **결과 contract 가정**: 결과 형식/verdict가 호출자 해석과 일치? (contract)
+   - 3 axes 모두 점검. 어느 하나라도 미검증이면 차원에서 제외 또는 explicit assumption tag.
+2. **검증 분류** (각 가정 × 3 axes 별):
+   - 이미 verified → `[verified: source]` 태그 보유 (코드/문서/명령어 출력)
+   - 미검증 → `[미검증: 이유]` 태그 + Plan 차원에서 제외
+   - probe 필요 → `/fz-discover` Phase 1.5 (Constraint Probe) 호출
+3. **probe 결과 통합**: discover 산출물에서 3 axes 모두 verified 가정만 Plan 차원에 포함
+
+### Gate 0c: Constraints Verified for Plan
+- [ ] primitive 의존 가정 모두 식별?
+- [ ] 각 가정의 **3 axes** (존재 / 권한·경계 / 결과 contract) 모두 분류 완료? (32차 방어)
+- [ ] 미검증 axis는 Plan 차원에서 제외 또는 explicit assumption tag?
+- [ ] probe 필요 시 `/fz-discover` 선행 완료?
+- 미통과 시 → ⛔ Plan 작성 차단
 
 ---
 
