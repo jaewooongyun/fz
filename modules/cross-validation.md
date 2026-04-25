@@ -3,6 +3,39 @@
 > fz Phase 3에서 파이프라인에 검증 게이트를 자동 삽입. 모든 모드에서 최소한의 검증 보장.
 > 핵심 원칙: TEAM = Claude 에이전트(N) + Codex(1). 코드/계획 생산 TEAM에 Codex CLI 필수 참여. 탐색 파이프라인은 --deep만.
 
+## 이론 근거 — Heterogeneity + Blind-spot Complementarity (T1-E)
+
+> fz의 Codex 교차 검증은 "debate / adversarial review" 프레임이 아닌 **"Self-preference bias 상쇄 + 이종 blind spot 보완 + Generator≠Evaluator 강제"** 프레임으로 이해.
+
+### 4 메커니즘
+
+| 메커니즘 | 출처 | fz 적용 |
+|---------|------|--------|
+| **Self-preference bias 상쇄** | 2025 LLM-as-Judge 연구 다수 — 같은 모델이 자기 출력을 우호적으로 평가 | Generator (Claude) ≠ Evaluator (Codex) 강제. fz-codex `verify`/`check`가 이 분리의 구체화 |
+| **이종 blind spot 보완** | MoA "collaborativeness" (Wang 2024, ICLR 2025 Spotlight, +7.6pp AlpacaEval) | Claude family blind spot을 GPT family가 catch (15차/23차 패턴 — Codex 단독 발견 누적 사례) |
+| **Generator≠Evaluator 강제** | Anthropic Harness Engineering H2 (2026-03) — "Self-evaluation is unreliable" | TEAM 모드에 Codex 필수 참여. SOLO에서도 결정론적 도구 호출 (Q-OBSERVE 경량) |
+| **Position bias 회피** | Order effect on judgment (LLM-Judge 연구) | T1-G ensemble: 출력 randomize + Source label anonymize (CP-1 Step 3 규칙 5/6/7) |
+
+### "Debate 프레임" 회의론 (X-3 기각 근거)
+
+ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원됨. "Adversarial debate"가 아닌 **"이종 모델 다관점 + Lead 종합"** 프레임이 학술적으로 더 정확. fz는 X-3 ("Debate 확장")을 기각하고 본 프레임 채택.
+
+### 적용 가이드
+
+- **fz-codex 모든 서브커맨드** = Generator≠Evaluator 분리 구현체
+- **T1-G ensemble** = MoA-Lite 2-layer 구현 (cross-agent diversity 강화)
+- **η-1** (예정) = Position bias 회피의 prompt-level 강화
+- **Reflection Rate 측정** = 이종 blind spot 보완 효과 정량화 (T1-B §5.5 schema)
+
+### 학술 참조
+
+- LLM-as-Judge self-preference: 2025 다수 연구
+- MoA collaborativeness: Wang 2024, ICLR 2025 Spotlight
+- Harness Self-eval unreliability: Anthropic 2026-03 (Planner/Generator/Evaluator)
+- Debate 회의론: ICLR 2025 Blogposts
+
+---
+
 ## 검증 유형별 전략
 
 | 파이프라인 카테고리 | 검증 유형 | 메커니즘 | 모드 조건 |
