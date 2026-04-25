@@ -8,6 +8,34 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.3.0 (2026-04-25) — fz GPT/Codex Tier 1+2 완성 [MINOR]
+
+**핵심**: fz GPT/Codex 고도화 프로젝트 사실상 완료. Tier 1 7/7 + Tier 2 1/1. T2-A (β-1 Gemini) 폐기 — cross-provider 비채택. α-2 BLOCKER 해소. 31차/32차/33차 메타 교훈 active defense 정식화.
+
+**Tier 1 7/7** (본 릴리즈에 5건 추가):
+- **T1-D fz-fix Codex 통합** (c4c994b, fe2ee8a, cfcaf91): `--codex` 옵션 위임 패턴 + verdict contract (pass/warn/fail) + grep severity 정정
+- **T1-B Tracing 자동화** (4519f7a): experiment-log §5.5 schema + Agent Teams Hook (~/.claude/hooks.json + agent-teams.sh)
+- **δ-2 Effort Routing** (9150621): Codex 서브커맨드별 effort 매핑 (medium/high/xhigh)
+- **T1-E 이론 근거 보강** (058537e): cross-validation.md "Heterogeneity + Blind-spot Complementarity" 프레임 (4 메커니즘 + 학술 근거)
+- **η-1 Prompt Independence Gate** (75c051b): TEAM Round 1 sycophancy 절차적 강제 + Gate 1.0
+
+**Tier 2 1/1**:
+- **T2-B Sprint Contract** (33d1363): modules/sprint-contract.md + fz-plan Phase 0.7 (Codex가 구현 전 SC 작성)
+
+**T2-A 폐기 + stale 정정** (8f4e7ae):
+- β-1 Gemini 통합 비채택 결정 — cross-provider stake 자체 미채택
+- guides/harness-engineering.md L663/L1008 stale "3-Model Triad" 참조 정정
+
+**메타 교훈 active defense 정식화**:
+- **31차 Plan-before-Probe** (c4c994b): fz-plan Phase 0c + fz-discover Phase 1.5 (Constraint Probe Pre-flight)
+- **32차 Probe Coverage Gap**: 3-axes sub-checklist (존재 / 권한·경계 / 결과 contract)
+- **33차 Recommendation Default Bias** (5fdc4bf): modules/fz-pipeline-proposal.md 권고 default 정책 (Implementation default + v{N+1} 자동 작성 차단)
+
+**Reflection Rate 측정 시작** (6fd93b7):
+- experiment-log §5.5에 3 entries (T1-D verify v1/v2/self-dogfood)
+- Sample 3/5 (CP-3 5건+ 누적 필요), Strict 73% / Lenient 86%
+- 32차 dogfooding 1차 효과: patch 2건 사전 회피
+
 ### v4.2.0 (2026-04-24) — Scope Challenge + fz Guide Compliance [MINOR]
 
 **핵심**: 두 축 결합. (A) ASD-1136 Scope Challenge — fz-plan Phase 3에서 Codex verify 이슈를 `scope_disposition`으로 분류, "발견된 것 = 고쳐야 할 것" 자동 번역 차단. Read/Write Scope 분리 + `§X/§Y/§Z` handoff 계약. (B) `/fz-manage` 전체 리뷰로 도출된 5개 가이드 위반(500줄 초과 2건 + 과격 표현 1건 + Few-shot 부족 3건 + YAML 컨벤션 불일치 2건)을 4-Wave로 해소. 21/21 스킬이 skill-authoring.md + prompt-optimization.md + skill-template.md 전 축을 준수.
