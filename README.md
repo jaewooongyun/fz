@@ -137,7 +137,7 @@ fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
 ├── skills/          21개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
 ├── agents/          13개 — plan-structure, impl-correctness, review-arch ...
-├── modules/         22개 — team-core, pipelines, cross-validation, code-transform-validation, uncertainty-verification ...
+├── modules/         24개 — team-core, pipelines, cross-validation, lead-action-default, lesson-intake, sprint-contract ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
 ├── guides/          7개 — prompt-optimization, skill-authoring ...
 ├── codex-skills/    8개 — Codex 네이티브 스킬 (fz-reviewer, fz-architect ...)
@@ -210,6 +210,28 @@ fz-review Phase 4.5 B3 체크리스트 + experiment-log.md §5.4 canonical sink 
 ③ TEAM 주입:         system-reminders → team-core → fz/SKILL.md Task Brief → agents (templates/ 상속)
 ④ 운영 피드백:       Phase 4.5 측정 → experiment-log.md §5.4 canonical sink → B1/B2 판정
 ```
+
+### Lead Action Default Principle (v4.3 통합)
+
+```
+Lead default = action with proportional verification
+```
+
+31차/32차/33차 메타 교훈을 단일 원칙으로 통합. **verify는 명시적 risk signal에서만**.
+
+| Manifestation | Trigger | Action |
+|---------------|---------|--------|
+| 31차 (Plan-before-Probe) | primitive 의존 가정 | constraint probe 선행 |
+| 32차 (Probe Coverage) | enumeration 누락 | 3-axes sub-checklist |
+| 33차 (Recommendation Default) | implementation-ready | default = implementation |
+
+상세: `modules/lead-action-default.md` (≤30 lines thin reference) + `modules/lesson-intake.md` (decision tree).
+
+### Sprint Contract Pattern (T2-B, v4.3)
+
+cross-skill + 5+ Step plan 시 발동: **Codex가 success criteria를 사전 commit → Lead가 plan 작성** → Codex verify. Self-preference bias 우회 + Generator≠Evaluator 시간 분리.
+
+상세: `modules/sprint-contract.md` + `fz-plan` Phase 0.7.
 
 **재발 방지 메커니즘 (v4.0)**:
 - `templates/agent-template.md` + `templates/skill-template.md`에 `## Verification` 섹션 자동 상속

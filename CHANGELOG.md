@@ -36,6 +36,27 @@
 - Sample 3/5 (CP-3 5건+ 누적 필요), Strict 73% / Lenient 86%
 - 32차 dogfooding 1차 효과: patch 2건 사전 회피
 
+**Health-Plan v2 통합 + Codex-Utilization v1** (69c78a9, 본 릴리즈에 추가):
+
+*Health-Plan v2 (P0 — 31/32/33 consolidation, behavior-change-first)*:
+- `modules/lead-action-default.md` 신규 (23 lines thin reference) — Lead default = action with proportional verification 단일 원칙
+- `modules/lesson-intake.md` 신규 (16 lines decision tree) — 미래 lesson family 분기 (same mode merge / new mode separate)
+- `modules/cross-validation.md`: Reflection Rate threshold authoritative source (N<10 preliminary / 10≤N<30 provisional / N≥30 stable)
+- 5 backlinks (history-preserving, no rewrite): experiment-log, fz-review, feedback-verification, sprint-contract, execution-modes
+- Hot-path "default = action" inline edit (3 files): fz-plan Phase 0.5 / fz-review Phase 5.5 / fz-pipeline-proposal
+
+*Codex-Utilization v1 (P0 — friction reduction + T2-B first dogfooding)*:
+- `skills/fz-codex/SKILL.md`: Standard Hygiene Wrapper Template (### 6) — 5 hygiene rules + zsh glob 회피 + output readback + heredoc 권고
+- `modules/codex-strategy.md`: adversarial high→xhigh 정합화 + Light tier (cross-reference inconsistency 해소)
+- `skills/fz-plan/SKILL.md` Phase 0c: Codex Micro-Eval optional assist (조건: 핵심 가정 + [verified] 부재 + primitive 비용 높음)
+- `experiment-log.md §5.4`: Codex Unique Findings tracking schema (cross-model 가치 정량 evidence 누적)
+
+*Cross-model verification 결과*:
+- Health-plan v2 (Codex GPT-5.5): APPROVED_WITH_NOTES — Codex unique 4건 (Q1/Q2/Q5/Q6 critical, Claude self-review blind spots)
+- Codex-utilization v1: APPROVED_WITH_NOTES — Codex unique 1건 (codex-strategy.md adversarial 충돌 line-level factual catch)
+- **T2-B Sprint Contract pattern 첫 dogfooding 실증** — Codex pre-commit SC → Lead plan v1 → Codex verify → 1 round 압축 (vs 일반 cross-model 2-3 cycles)
+- Reflection Rate N=6 (preliminary, gating 보류 — self-rule applied)
+
 ### v4.2.0 (2026-04-24) — Scope Challenge + fz Guide Compliance [MINOR]
 
 **핵심**: 두 축 결합. (A) ASD-1136 Scope Challenge — fz-plan Phase 3에서 Codex verify 이슈를 `scope_disposition`으로 분류, "발견된 것 = 고쳐야 할 것" 자동 번역 차단. Read/Write Scope 분리 + `§X/§Y/§Z` handoff 계약. (B) `/fz-manage` 전체 리뷰로 도출된 5개 가이드 위반(500줄 초과 2건 + 과격 표현 1건 + Few-shot 부족 3건 + YAML 컨벤션 불일치 2건)을 4-Wave로 해소. 21/21 스킬이 skill-authoring.md + prompt-optimization.md + skill-template.md 전 축을 준수.
