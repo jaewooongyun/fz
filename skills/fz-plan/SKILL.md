@@ -43,7 +43,7 @@ model-strategy:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → Phase 0b (Context) → Phase 0c (Constraint Probe Pre-flight) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
+> ⛔ Phase 0 (ASD Pre-flight) → Phase 0b (Context) → Phase 0c (Constraint Probe Pre-flight) → Phase 0.5 (Direction Challenge) → Phase 0.7 (Sprint Contract, TEAM 5+ Step) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
 > 루프 프리미티브: Plan-Execute + Evaluator-Optimizer (H6, Inside the Scaffold)
 
 요구사항 구조 분해 + 영향 범위 분석. Serena 심볼 도구 기반 정밀 탐색.
@@ -246,6 +246,28 @@ TeamCreate("plan-{feature}")
 - [ ] 대안 최소 2개 제시?
 - [ ] 방향 판정 (PROCEED/RECONSIDER/REDIRECT)?
 - [ ] RECONSIDER/REDIRECT 시 사용자 확인?
+
+---
+
+## Phase 0.7: Sprint Contract (T2-B, TEAM mode)
+
+> 발동: **TEAM mode + (5+ Step Plan 또는 Cross-skill 변경)**. 단순 수정/탐색 스킵.
+
+Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude 동의/수정 → Phase 1 진입. 사후 수정 비용 감소.
+
+- 절차: `modules/sprint-contract.md` §절차 (4-step)
+- Schema: `modules/sprint-contract.md` §Schema (yaml: success_criteria + anti_criteria + scope_boundary)
+- Lead Decision: **agree** → Phase 1 / **modify** → Codex re-verify 1회 (한도) / **reject** → Phase 0.5 재진입
+
+### Gate 0.7: Sprint Contract Agreed
+
+- [ ] Codex Sprint Contract 작성 완료? (`sprint-contract-codex.md` 또는 `fz:checkpoint:sprint-contract`)
+- [ ] 모든 SC가 measurable + binary 판정 가능?
+- [ ] anti_criteria 명시? (제거/리팩토링 작업 시)
+- [ ] Lead 동의 (agree) 또는 modify 후 합의?
+- 미통과 시 → ⛔ Phase 1 작성 차단
+
+> Phase 0.7 출처: Anthropic Harness Engineering 패턴 B (2026-03) + Plan v3.1.3 §T2-B. 학술 근거: `modules/cross-validation.md` §이론 근거 (Generator≠Evaluator + MoA collaborativeness).
 
 ---
 
