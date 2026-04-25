@@ -43,7 +43,7 @@ model-strategy:
 
 ## 개요
 
-> ⛔ Phase 0 (PRJ Pre-flight) → Phase 1 (Problem Framing) → Phase 2 (Landscape Exploration) ↔ 사용자 대화 → Phase 3 (Path Mapping) → Phase 4 (Handoff)
+> ⛔ Phase 0 (PRJ Pre-flight) → Phase 1 (Problem Framing) → Phase 1.5 (Constraint Probe) → Phase 2 (Landscape Exploration) ↔ 사용자 대화 → Phase 3 (Path Mapping) → Phase 4 (Handoff)
 > 루프 프리미티브: Tree Search (Adversarial Discovery) (H6, Inside the Scaffold)
 
 - 발산 중심 (Fan-out): 가능한 경로를 넓게 탐색
@@ -251,6 +251,36 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 
 ---
 
+## Phase 1.5: Constraint Probe (Plan-Before-Probe 방어)
+
+> Phase 1 제약 매트릭스에서 primitive 의존 가정(CLI flag / config key / value enum / env)은 실측으로 검증. 추측된 제약 위에 Plan 작성 시 실측마다 Plan 무력화. 참조: `feedback_plan_before_probe.md`.
+
+### 절차
+
+1. **가정 추출**: Phase 1 제약 매트릭스에서 primitive 의존 가정 분리
+   - **가정의 3 axes 점검** (32차 방어 — Probe Coverage Gap):
+     - (a) **존재 가정**: primitive 작동 verify? (existence)
+     - (b) **권한/경계 가정**: 호출 측 `allowed-tools` / `Bash(*)` 패턴 호출 허용? (boundary)
+     - (c) **결과 contract 가정**: verdict/format 호출자 해석과 일치? (contract)
+   - 3 axes 모두 enumerate. 미검증 axis는 Phase 2 차원 제외 또는 explicit assumption tag.
+2. **실측 방법** (가정 × axis 별):
+   - 실제 명령 실행 + `--help` grep (axis a)
+   - 호출 측 SKILL.md frontmatter `allowed-tools` 검사 (axis b)
+   - 결과 형식/verdict enum 명세 검사 또는 정의 (axis c)
+   - Binary string scan (`strings $(which CLI)`)
+   - Negative control (invalid value → enum error로 valid values enumerate)
+3. **결과 기록**: `probe-constraints.md` 또는 저널에 각 가정 × axis별 `[verified: result]` 또는 `[미검증: 이유]`
+4. **Phase 2 입력 정제**: 3 axes 모두 verified 가정만 Landscape 차원 포함, 부분 미검증은 explicit assumption tag로 차원 포함 또는 제외
+
+### Gate 1.5: Constraints Verified
+- [ ] primitive 의존 가정 모두 분류?
+- [ ] 각 가정의 **3 axes** (존재 / 권한·경계 / 결과 contract) 모두 분류 완료? (32차 방어)
+- [ ] verified 가정 × axis에 실측 명령/출력 첨부?
+- [ ] 미검증 axis는 Phase 2 차원에서 제외 또는 explicit assumption tag?
+- 미통과 시 → ⛔ Phase 2 Landscape 차단. /fz-plan Gate 0c의 입력으로 활용 — 3 axes verified 가정만 Plan 차원에 포함.
+
+---
+
 ## Phase 2: Landscape Exploration
 
 가능한 경로들을 넓게 탐색하고, 각 경로의 비용/리스크/전제조건을 매핑합니다.
@@ -312,6 +342,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 - [ ] 핵심 제약이 3개 이상 식별되었는가?
 - [ ] 생존 후보가 1-2개로 좁혀졌는가?
 - [ ] 사용자가 추가 우려를 제기하지 않았는가?
+- [ ] Phase 1.5 Constraint Probe 결과 반영? (verified 가정만 차원에 포함, 미검증 제외)
 
 ---
 
