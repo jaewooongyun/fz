@@ -660,7 +660,7 @@ Level 2 (권장): Generator ≠ Evaluator (별도 프롬프트 + 채점 기준)
 
 Level 3 (강력): Generator ≠ Evaluator + 다른 모델
   장점: 이종 모델 blind spot 보완. 단점: 비용 + 통합 복잡도.
-  예: fz의 3-Model Triad (Claude + Codex + Gemini)
+  예: fz의 Cross-model Verification (Claude + Codex). cross-provider 확장 (Gemini 등)은 측정 데이터 누적 후 결정 (현재 비채택).
 ```
 
 ### 원칙 5: 점진적 진행이 일발 완성보다 낫다
@@ -1005,7 +1005,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Sprint Contract | Plan의 Anti-Pattern Constraints | 금지 패턴 + Grep 자동 검증 |
 | Evaluator Tuning | 반성 기록 (1-10차) + 교훈 topic file | 실패에서 학습 |
 | Implication Reasoning | lead-reasoning.md (2026.04 추가) | 표면→의미론 추론 |
-| Cross-model Verification | fz-codex (3-Model Triad: Claude+Codex+Gemini) | 이종 모델 blind spot 보완 |
+| Cross-model Verification | fz-codex (Claude + Codex; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
 | Lazy Tool Discovery | modules/ Progressive Disclosure Level 3 | 필요 시에만 로드 |
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
 | Defense-in-Depth | 5계층: SKILL Gate + cross-validation + Team + Codex + Hooks | 다중 검증 레이어 |
