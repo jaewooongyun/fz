@@ -181,17 +181,30 @@ Claude + Codex(GPT-5.5) 교차 검증:
 
 ---
 
-## Reflection Rate
+## Reflection Rate (Authoritative Source)
+
+> 본 섹션이 fz 생태계 Reflection Rate threshold rule의 **단일 진실 원천**(authoritative source)입니다. 다른 모듈/SKILL.md는 본 섹션으로 backlink만 허용 (history rewrite 금지, 기존 본문은 유지).
 
 **계산식**: Reflection Rate = (Codex가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100%. **N=0 (Codex가 이슈 0개 제기) 시 `N/A`로 기록** — division-by-zero 방지 + 기준 미달 판정 아님 (vacuously passes).
+
+### Reflection Rate threshold (Sample Size Confidence Gate)
+
+| Sample N | Status | Verdict 가능 |
+|----------|--------|------------|
+| N < 10 | **preliminary** | ❌ verdict 보류 — measurement only. threshold 80%는 N≥10 데이터 누적 후 재설정 |
+| 10 ≤ N < 30 | provisional | ⚠️ 점수 + 95% CI 발표 |
+| N ≥ 30 | stable | ✅ trend analysis 가능 |
+
+**왜**: N=3-5 sample에서 73%-86% 변동 관측. 통계적 유의성 부재 → 작은 표본에서 threshold gating 시 false positive/negative 위험.
 
 | 모드 | Reflection Rate 추적 | 기준 |
 |------|---------------------|------|
 | SOLO | 추적 없음 | 사용자 직접 판단 |
-| TEAM | Reflection Rate >= 80% (N>=1일 때) | fz-review 메커니즘 적용. N=0이면 vacuous pass |
+| TEAM | Reflection Rate 추적 (N<10이면 preliminary) | N≥10에서만 ≥80% gating. N=0이면 vacuous pass |
 
-> 예시 1: Codex가 이슈 5개 제기 → Claude가 4개 수정 반영 → 80% (PASS)
-> 예시 2: Codex가 이슈 0개 제기 → Reflection Rate N/A (vacuous pass, 기준 미달 아님)
+> 예시 1 (N≥10): Codex 5 이슈 / Claude 4 반영 → 80% (provisional or stable, threshold pass)
+> 예시 2 (N<10, current): N=5에서 81-86% → preliminary, no verdict gating
+> 예시 3: Codex 0 이슈 → N/A (vacuous pass)
 
 ---
 

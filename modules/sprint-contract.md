@@ -53,7 +53,7 @@ anti_criteria:
     detection: <탐지 방법>
 
 review_pass_threshold:
-  reflection_rate_min: 80
+  reflection_rate_min: 80  # N<10이면 preliminary, gating 보류 — 참조: modules/cross-validation.md § Reflection Rate threshold
   required_resolutions: [SC-1, SC-2]  # 부분 해결 불허 항목
 
 scope_boundary:
