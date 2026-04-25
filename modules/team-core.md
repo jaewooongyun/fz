@@ -62,10 +62,30 @@
 
 모든 팀 통신의 기본 프로토콜. 진짜 상호 피드백을 보장하면서 비용을 제한한다.
 
-### Round 1: 독립 분석 + 공유
-- 모든 에이전트: 자기 Lens로 **완전 독립** 분석 수행
-- ⚠️ **Sycophancy 방어**: 피어 초안을 보기 전에 자기 분석을 완성해야 함. 피어 초안 공유는 Round 1 완료 후에만 허용.
-- 분석 완료 → 피어에게 `SendMessage` (초안 공유)
+### Round 1: 독립 분석 + 공유 (η-1 Prompt Independence Gate)
+
+> 절차적 강제: 피어 초안 공유는 본 게이트 통과 후에만 허용. 위반 시 Lead 차단.
+
+#### 절차
+
+1. **독립 분석** (mandatory): 모든 에이전트는 자기 Lens로 **완전 독립** 분석 완료
+   - 피어 초안/사전 정보 미수신 상태에서 분석
+   - 자기 발견을 자기 도구로만 검증 (피어 도구 결과 참조 금지)
+
+2. **독립성 검증** (Lead 게이트, η-1):
+   - 각 에이전트 첫 SendMessage 패턴 검사 — 피어 reference (`@agent`, "피어 X의 의견", "agent_2가 catch한") 발견 시 차단
+   - "피어 X의 의견에 동의/반대" 형식은 **Round 2부터** 허용
+   - 위반 감지 → Round 1 재실행 (해당 에이전트만 또는 전체)
+
+3. **공유** (Round 1 완료 후): 분석 완료 → 피어에게 `SendMessage` (초안 공유)
+
+#### Gate 1.0: Independence Verified (η-1 절차적 강제)
+
+- [ ] 모든 에이전트가 독립 분석 완료 보고했는가?
+- [ ] 첫 SendMessage 패턴에 피어 reference 없는가?
+- [ ] 미통과 → Round 1 재실행 또는 sycophancy 위험 명시 후 진행
+
+> η-1 출처: `guides/prompt-optimization.md §1b` Diversity. CONSENSAGENT (ACL 2025) + MAST (NeurIPS 2025) 67% multi-agent 오류 = inter-agent sycophancy 핵심 실패 모드. 본 게이트로 차단.
 
 ### Round 2: 피드백 + 수정
 - 피어의 분석을 읽고 피드백 작성
