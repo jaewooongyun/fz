@@ -172,3 +172,98 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
       model: sonnet
       created: 2026-04-25T12:00:00Z
   ended: 2026-04-25T12:01:00Z
+
+### Reflection Rate Entries (T1-D 사이클, 2026-04-25)
+
+```yaml
+- team_id: T1-D-verify-v1
+  date: 2026-04-25
+  task: T1-D Plan v1 Codex verify (직접 호출 설계)
+  agents:
+    - name: Lead
+      model: opus
+      turns: 1
+    - name: codex-architect
+      model: gpt-5.5
+      turns: 1
+      effort: high
+  reflection_rate:
+    issues_total: 5
+    issues_resolved_strict: 2     # P0#1 allowed-tools, P2 measurement criteria
+    issues_resolved_partial: 3    # P0#2 false PASS, P1#1 LOOP regression, P1#2 cross-skill drift
+    rate_pct_strict: 40           # RESOLVED only / total
+    rate_pct_lenient: 70          # RESOLVED + (PARTIAL × 0.5) / total
+  metadata:
+    verdict: needs_revision
+    follow_up: "Plan v2 (위임형 재설계)"
+    self_dogfood: false
+
+- team_id: T1-D-verify-v2
+  date: 2026-04-25
+  task: T1-D Plan v2 Codex verify (위임형 재설계 후)
+  agents:
+    - name: Lead
+      model: opus
+      turns: 1
+    - name: codex-architect
+      model: gpt-5.5
+      turns: 1
+      effort: high
+  reflection_rate:
+    issues_total: 4               # new issues in v2 (P0×1, P1×2, P2×1)
+    issues_resolved: 4            # all fixed via split implementation (T1-D1/D2/D3)
+    rate_pct: 100
+  metadata:
+    verdict: needs_revision
+    follow_up: "T1-D 분할 (D2 fz-codex contract + D3 execution-modes + D1 fz-fix --codex)"
+    escalation: "21차 18-한도 적용 → C 에스컬레이션 → 분할 결정"
+    self_dogfood: false
+
+- team_id: T1-D-self-dogfood
+  date: 2026-04-25
+  task: T1-D commit fe2ee8a Codex check (자기 검증)
+  agents:
+    - name: Lead
+      model: opus
+      turns: 1
+    - name: codex-reviewer
+      model: gpt-5.5
+      turns: 1
+      effort: high
+  reflection_rate:
+    issues_total: 2               # grep PCRE + severity enum mismatch
+    issues_resolved: 2            # both fixed in cfcaf91
+    rate_pct: 100
+  metadata:
+    verdict: needs_revision
+    follow_up: "cfcaf91 immediate patch (33차 implementation default 적용)"
+    self_dogfood: true
+    cross_model_solo_catch: 1     # 15차 패턴 — Codex 단독 발견
+```
+
+### 누적 통계 (3 entries)
+
+| 측정 | 값 | 해석 |
+|------|---:|------|
+| Total verify/check 사이클 | 3 | T1-D 단일 작업 사이클 |
+| Total issues raised | 11 | 5 + 4 + 2 |
+| Issues resolved (strict, RESOLVED only) | 8 | 2 + 4 + 2 |
+| Issues resolved (lenient, PARTIAL × 0.5) | 9.5 | (2 + 1.5) + 4 + 2 |
+| **Reflection Rate (strict)** | **73%** | 8/11 |
+| **Reflection Rate (lenient)** | **86%** | 9.5/11 |
+
+### CP-3 진단
+
+- **Threshold**: Rate ≥ 80% (TEAM review, Plan v3.1.3 §CP-3)
+- **Strict 73%**: BELOW threshold (PARTIAL을 미반영으로 셈 시)
+- **Lenient 86%**: ABOVE threshold (PARTIAL을 부분 반영으로 셈 시)
+- **Sample size**: 3 / 5 (CP-3는 5건+ 누적 필요)
+- **결론**: **3건만으로는 CP-3 미충족**. 2건 추가 데이터 필요. Tier 2 작업의 자연 verify cycle (T2-A discover/verify, T2-B Sprint Contract verify)에서 누적 → CP-3 재판정.
+
+### 32차 Probe Coverage 효과 (별도 측정)
+
+| 지표 | 값 |
+|------|---:|
+| Phase 0c probe 회피 patch (T1-B-3 drop + §5.x 신설 명확화) | 2 |
+| Phase 0c probe 회피 patch (T1-D primitive enumerate) | (verify v1에서 catch됐으므로 0) |
+| 32차 dogfooding 1차 효과 | 2건 사전 회피 |
