@@ -112,8 +112,8 @@ Claude + Codex(GPT-5.5) 교차 검증:
 | 불일치 시 | AskUserQuestion | 사용자 판단 |
 
 ### Disagreement 기록
-- ASD 활성: `{WORK_DIR}/verify/consensus-{날짜}.md`
-- 비ASD: `write_memory("fz:consensus:result", "합의/불일치 요약")`
+- ASD 활성: `{WORK_DIR}/verify/consensus-{YYYYMMDD_HHMMSS}.md` (timestamp suffix로 같은 날 다중 session overwrite 방지)
+- 비ASD: `write_memory("fz:consensus:{YYYYMMDD_HHMMSS}", "합의/불일치 요약")` (상수 key 대신 timestamp suffix)
 
 ---
 
@@ -150,14 +150,15 @@ Claude + Codex(GPT-5.5) 교차 검증:
 
 ## Reflection Rate
 
-**계산식**: Reflection Rate = (Codex가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100%
+**계산식**: Reflection Rate = (Codex가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100%. **N=0 (Codex가 이슈 0개 제기) 시 `N/A`로 기록** — division-by-zero 방지 + 기준 미달 판정 아님 (vacuously passes).
 
 | 모드 | Reflection Rate 추적 | 기준 |
 |------|---------------------|------|
 | SOLO | 추적 없음 | 사용자 직접 판단 |
-| TEAM | Reflection Rate >= 80% | fz-review 메커니즘 적용 |
+| TEAM | Reflection Rate >= 80% (N>=1일 때) | fz-review 메커니즘 적용. N=0이면 vacuous pass |
 
-> 예시: Codex가 이슈 5개 제기 → Claude가 4개 수정 반영 → 80% (PASS)
+> 예시 1: Codex가 이슈 5개 제기 → Claude가 4개 수정 반영 → 80% (PASS)
+> 예시 2: Codex가 이슈 0개 제기 → Reflection Rate N/A (vacuous pass, 기준 미달 아님)
 
 ---
 
