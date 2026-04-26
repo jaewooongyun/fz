@@ -233,6 +233,17 @@ cross-skill + 5+ Step plan 시 발동: **Codex가 success criteria를 사전 com
 
 상세: `modules/sprint-contract.md` + `fz-plan` Phase 0.7.
 
+### Mapping Layer SPOF Defense (v4.4)
+
+refactoring PR의 evidence 매핑이 ground truth와 atom-level 동등인지 검증. 6-Layer LLM 검증이 같은 매핑 base를 공유하면 매핑 오류는 layer 수와 무관하게 통과 — **Mapping Layer Single-Point-of-Failure** 방어. 검증 신뢰도 = `min(매핑 정확성, layer 정확성)` (multiplicative 아님).
+
+- `evidence/semantic-mapping.md` — atom-level mapping table + `[verified: source]` 의무 (`OldAPI → NewAPI` 한 줄 매핑 금지)
+- **Gate 4.4-A Mapping Fidelity Gate** — refactoring PR + artifact 부재 → fail-closed Critical / `mapping_status=lossy` → auto-include
+- Default-Deny 좁은 확장 — peer-review mapping/equivalence claim에 한정 (전역 확대 X)
+- Layer Diversity 통합 — deterministic source(`git show / Read / grep`) + LLM 판단 조합
+
+상세: `modules/peer-review-gates.md` Gate 4.4-A + `modules/evidence-collection.md` a2. Semantic Mapping Ground Truth.
+
 **재발 방지 메커니즘 (v4.0)**:
 - `templates/agent-template.md` + `templates/skill-template.md`에 `## Verification` 섹션 자동 상속
 - `templates/skill-template.md`의 `## If TeamCreate is used` 조건부 체크리스트로 env flag 누락 차단

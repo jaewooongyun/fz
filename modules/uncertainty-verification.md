@@ -6,9 +6,18 @@
 
 ## Default-Deny 원칙
 
-Transformation Spec의 기술적 주장에 `[verified: source]` 태그가 **없으면 자동 unverified**.
+다음 영역의 기술적 주장에 `[verified: source]` 태그가 **없으면 자동 unverified**:
+
+1. **Transformation Spec 기술적 주장** (v3.8 도입)
+2. **Peer-review mapping/equivalence claim** (v4.4.0 도입 — 좁은 확장)
+   - 적용 대상 문장 패턴: `"A는 B와 동일"`, `"X가 Y로 대체됨"`, `"기존 조건 보존"`, `"behavior equivalent"`
+   - 태그 형식: `[verified: semantic-mapping.md M-XXX + source lines]`
+   - 적용 범위: `${WORK_DIR}/evidence/semantic-mapping.md`의 mapping row + agent finding의 동등성 주장
+   - 전역 확대 금지 — 본 좁은 영역에만 적용
+
 fz-code BEC에서 [verified] 없는 주장은 구현 전 검증 강제 (fail-closed).
 fz-review 4-K에서 "기술적 주장인데 근거 태그 없음" = violation.
+fz-peer-review Gate 4.4-A에서 mapping claim의 [verified] 부재 = `mapping_status=unverified` (v4.4.0).
 
 > "모르면 보수적으로. 알면 증거와 함께."
 > LLM이 "확실하다"고 주장하는 것은 증거가 아님. 검증 도구의 출력만이 증거.

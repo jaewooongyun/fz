@@ -61,6 +61,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 
 - 변환 후 코드에 원본에 없던 파라미터가 추가되지 않았는가?
 - git show 원본 비교로 추가/변경 사항이 의도적인지 확인
+- **Mapping atom 검증** (v4.4.0): `${WORK_DIR}/evidence/semantic-mapping.md` 존재 시 — 각 mapping row의 `mapping_status` 확인. `lossy_atoms` 비어있지 않으면 finding 자동 생성 (severity: **critical** — Gate 4.4-A `mapping_status=lossy` auto-include와 정렬). `unverified` + 동등 결론 → confidence ceiling 65 적용.
 
 ## Output Format
 
