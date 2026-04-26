@@ -24,8 +24,9 @@ allowed-tools: >-
   Edit, Read, Bash(xcodebuild *), Bash(cd *)
 team-agents:
   primary: impl-correctness
-  supporting: [review-arch]
+  supporting: [review-arch, impl-quality, review-quality]
   # review-arch 조건부: 복잡도 3+ 또는 아키텍처 관련 버그에서만 활성
+  # impl-quality + review-quality: Swift/iOS 안티패턴 차단 (역방향 트리거 발동 시)
 composable: false
 provides: [code-changes]
 needs: [none]
@@ -83,6 +84,20 @@ model-strategy:
 > SwiftUI View 작업 시 `swiftui-expert` 플러그인 패턴 참조
 > **최소 타겟 제약**: CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API 사용 시 availability 가드 필수
 > 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
+
+### ⛔ 역방향 트리거 (absence-pattern detection)
+
+> 참조: `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 부재해도 다음 패턴이 감지되면 안전성 분석을 활성화한다.
+
+수정 대상이 다음 3 패턴 중 하나라도 해당하면 동시성 안전성 검증 의무:
+
+1. **싱글톤 가변 상태**: `static let shared` + 가변 stored property (`var X: T`) — 동기화 메커니즘(`@MainActor` / `actor` / `NSLock` / `OSAllocatedUnfairLock` / serial queue) 부재 시 data race 위험. 수정 시 동기화 추가 또는 actor 전환 검토.
+
+2. **콜백 스레드 모호**: completion handler / `pathUpdateHandler` / delegate callback 내부에 `DispatchQueue.main` / `@MainActor` 보호 부재 — 콜백 실행 스레드 ≠ 소비자 스레드 가능성. context7로 API 콜백 스레드 확인 후 수정.
+
+3. **ObservableObject + @Published + @MainActor 부재**: `@Published var` 쓰기가 background 스레드에서 발생할 수 있는데 클래스/메서드에 `@MainActor` 부재 — UI 스레드 위반 런타임 경고. 수정 시 `@MainActor` 추가 또는 `await MainActor.run` 래핑.
+
+수정 자체가 안티패턴 도입할 위험이 있으므로 fix 시작 전 위 3 패턴 사전 점검 의무.
 
 ## sc: 활용 (SuperClaude 연계)
 

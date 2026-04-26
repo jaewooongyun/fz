@@ -72,7 +72,7 @@ model-strategy:
 | final (DA 패스) | challenger | fz-challenger | `codex exec` + `get_codex_skill("challenger")` — major 이상 이슈 발견 시 |
 | verify/validate (탐색 보조) | searcher | fz-searcher | `codex exec` + `get_codex_skill("searcher")` — 심볼 탐색 필요 시 |
 | check (수정 제안) | fixer | fz-fixer | `codex exec` + `get_codex_skill("fixer")` — fixable 이슈 존재 시 |
-| drift | drift-detector | fz-drift | `codex exec` + `get_codex_skill("drift-detector")` — 전체 스캔 |
+| drift | drift | fz-drift | `codex exec` + `get_codex_skill("drift")` — 전체 스캔 |
 | plan | planner | fz-planner | `codex exec` + `get_codex_skill("planner")` — 독립 플랜, xhigh effort |
 
 스킬 위치: `~/.codex/skills/` (3-Tier 디스커버리로 결정)
@@ -515,7 +515,7 @@ codex exec -m gpt-5.5 -c model_reasoning_effort=xhigh \
 전체 코드베이스를 1M context로 스캔하여 아키텍처 드리프트를 감지합니다.
 
 ```bash
-SKILL_NAME=$(get_codex_skill "drift-detector")
+SKILL_NAME=$(get_codex_skill "drift")
 if [ -n "$SKILL_NAME" ]; then
   SKILL_PROMPT="$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)"
 else

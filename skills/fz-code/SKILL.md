@@ -160,6 +160,23 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
 
 ---
 
+## Phase 0.5: Swift Pattern Pre-detection (Swift/iOS 프로젝트 한정)
+
+> 발동: CLAUDE.md `## Architecture`가 Swift/iOS 지정 + plan에 D/E/F/G token 1건 이상 발견 시. 비Swift/iOS는 스킵.
+> 본문: `modules/swift-pattern-detection.md` 참조 (Level 3) — 4 원칙(D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환) + 각 원칙 token + 발동 행동 + Few-shot. **G는 Phase 1.5 P3와 mirror로 cross-skill consistency 보장**.
+
+### Gate 0.5: Swift Pattern Pre-detection 통과
+- [ ] Swift/iOS 프로젝트? (아니면 skip)
+- [ ] `modules/swift-pattern-detection.md` Read 완료? (D/E/F/G 원칙 4개 token 스캔)
+- [ ] 발견된 trigger 모두 plugin-refs.md 매칭 + 대응 명시?
+- [ ] F (위험 패턴) 발견 시 안전성 메커니즘이 step에 포함?
+- [ ] G (패턴 변환) 발견 시 원본 동작 보존이 step에 명시?
+- 미통과 시 → ⛔ 구현 절차 진입 차단
+
+발동 시 행동: trigger 매칭 결과를 `{WORK_DIR}/code/phase-0.5-detection.md`에 기록 (ASD 활성 시) 또는 Serena `fz:checkpoint:phase-0.5` (비ASD).
+
+---
+
 > **임의 판단 금지**: 구현 중 "이게 맞겠지"라는 추측이 필요한 상황에서는 코드를 작성하지 않고 AskUserQuestion으로 사용자에게 확인한다.
 > 이유: 추측 기반 판단은 리뷰에서도 잡히지 않는 미묘한 동작 변경을 만든다.
 

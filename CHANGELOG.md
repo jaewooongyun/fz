@@ -8,6 +8,65 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.5.0 (2026-04-26) — Swift/iOS Quality Framework (3-Layer Evidence) [MINOR]
+
+**핵심**: Plan/Code/Review 각 단계에서 Claude + Codex가 **evidence-based clear Swift/iOS coding**을 수행하도록 fz framework에 3-Layer Evidence 정합 통합. 사용자 redirect ("plan/code/review 시 Swift/iOS/구조 품질 안좋음 + 둘 다 근거 기반 명확한 코딩")의 직접 답.
+
+**발견 경로**:
+- `/Users/jaewoongyun/dev/TVING/fz-ios-utilization/` 8단계 cross-model verify cycle (Claude + Codex GPT-5.5)
+- 1차 분석: B+ → 2차 reframe → Sprint Contract (Codex) → Plan v1 → v2 → v2.1 → v2.2 → Round 5 verify
+- 5-round 누적 Codex unique 16건 + Claude deep-review unique 5건 → 23차 메타 패턴 ("Cross-model 마지막 안전망") 5번 입증
+
+**P0/P1 — 13 SC 적용 (3-Layer × Meta)**:
+
+Layer 1 PLAN:
+- `agents/plan-structure.md` Swift/iOS Domain Awareness 신설 — plugin-refs.md + swift-anti-pattern-preblock.md + Domain Tier 직접 참조
+- `skills/fz-plan/SKILL.md` Phase 1.5 (Swift Anti-Pattern Pre-block) 신설 — Gate + module reference / iOS 16 minimum target 명시
+- `codex-skills/fz-planner/SKILL.md` SwiftUI Planning Checklist + Swift Concurrency Planning Checklist + Sendable Boundary Planning 3 anchor 강화
+
+Layer 2 CODE:
+- `agents/impl-quality.md` tools에 mcp__context7 등록 (dead reference fix)
+- `codex-skills/fz-fixer/SKILL.md` SwiftUI Repair Patterns + Concurrency Repair Patterns + Anti-Repair Patterns 3 anchor 추가
+- `skills/fz-code/SKILL.md` Phase 0.5 (Swift Pattern Pre-detection) 신설 — Gate + module reference
+
+Layer 3 REVIEW:
+- `skills/fz-fix/SKILL.md` supporting [review-arch] → [review-arch, impl-quality, review-quality] + 역방향 트리거 가이드 (3 absence-pattern)
+- `skills/fz-review/SKILL.md` iOS 16 minimum target 검증 의무 명시
+- `skills/fz-codex/SKILL.md` `/fz-codex drift` 라우팅 버그 수정 (`drift-detector` → `drift`, L518 + L75 doc table)
+
+Meta — Evidence Framework:
+- `modules/uncertainty-verification.md` **Swift/iOS Domain Tier** 신설 — 7개 주장 유형 × Heavy/Light × Mandatory Sources. Heavy 정책 **additive (non-overriding)** 명시
+- `experiment-log.md` §5.6 **Plugin Trigger Activation** + Load-bearing Test 절차 신설 — 원칙별 ablation schema
+
+**신규 modules (2개)**:
+- `modules/swift-anti-pattern-preblock.md` — 3 원칙 (P1 SwiftUI 결정 / P2 Concurrency isolation / P3 패턴 변환 보존) + token + Few-shot
+- `modules/swift-pattern-detection.md` — 4 원칙 (D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환) + Phase 1.5 P3 ↔ G mirror
+
+**fz Guide 정합 (deep review 적용)**:
+- `prompt-optimization.md` 원칙 4a (원칙+이유 > if-then 테이블) 적용 — 9 if-then inventory → 7 원칙+이유 재작성
+- `prompt-optimization.md` 원칙 5 (Few-shot ≥3) 적용 — 각 module BAD/GOOD 1쌍 이상
+- `skill-authoring.md` "트리밍 비저하 원칙" 적용 — Gate 1.5/0.5 보존 + 본문 module 분리
+- `harness-engineering.md` H1 (가정 검증) 대응 — F9 Load-bearing Test 절차 신설
+
+**Cross-Validation 5-cycle**:
+- Round 1 (analysis): Codex unique 3 (drift routing 등)
+- Round 2 (verify v2): Codex unique 4 (SC-L2-1 broken 등)
+- Round 3 (verify v2.1): Codex unique 2 (markdown escape 등)
+- Round 4 (deep review): Codex unique 5 (575줄, SC-L1-1 등) + Claude unique 5 (fz guide deep)
+- Round 5 (final verify): Codex unique 2 (untracked, 12→13 mismatch) — **Reflection Rate 90% (strict) / 95% (lenient)**
+
+**Verification**:
+- 13 SC PASS (12 verifiable + 1 partial)
+- 6 AC PASS
+- Plugin validate ✔ Passed
+- 23차 메타 패턴 5-round 모두 입증
+
+**관련 문서** (TVING workspace):
+- `~/dev/TVING/fz-ios-utilization/plan/plan-v2.2.md` (Plan, RTM 13 rows)
+- `~/dev/TVING/fz-ios-utilization/verify/round5-codex.md` (Codex Round 5 final verify)
+
+---
+
 ### v4.4.0 (2026-04-26) — Mapping Layer SPOF Defense [MINOR]
 
 **핵심**: peer review 시스템에 **Mapping Layer Single-Point-of-Failure 방어** 도입. 6-Layer LLM 검증이 같은 evidence 매핑 base를 공유하면 매핑 오류는 layer 수와 무관하게 통과한다는 구조적 결함 발견 → atom-level decomposition + fail-closed pre-trigger + cross-stage severity 정렬로 차단.

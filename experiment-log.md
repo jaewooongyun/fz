@@ -283,3 +283,80 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | Phase 0c probe 회피 patch (T1-B-3 drop + §5.x 신설 명확화) | 2 |
 | Phase 0c probe 회피 patch (T1-D primitive enumerate) | (verify v1에서 catch됐으므로 0) |
 | 32차 dogfooding 1차 효과 | 2건 사전 회피 |
+
+---
+
+## §5.6 Plugin Trigger Activation (Phase A 효과 측정)
+
+> 신설: 2026-04-26 (fz-ios-utilization Plan v2.2 M-2)
+> 목표: SwiftUI Expert + Swift Concurrency 플러그인의 자동 감지 트리거 + v3.6 역방향 트리거가 실제 iOS 코드 세션에서 발동되는 빈도 + 효과 측정
+> 판단 기준: 10건 누적 → trigger pattern 효과성 검토 (Load-bearing/Neutral/Overhead 분류)
+> 데이터 소스: /fz-code, /fz-fix, /fz-review 세션 종료 시 수동 또는 hook 자동 기록
+
+### Schema (per session, YAML)
+
+```yaml
+- session_id: <ASD-xxxx 또는 NOTASK-yyyymmdd>
+  date: YYYY-MM-DD
+  pipeline: <fz-code | fz-fix | fz-review | fz-plan | ...>
+  swiftui_triggers_detected: <int>      # 감지된 SwiftUI 패턴 수 (@State, @Observable, body: some View 등)
+  concurrency_triggers_detected: <int>  # 감지된 Concurrency 패턴 수 (@MainActor, async, Sendable 등)
+  reverse_triggers_fired: <int>         # v3.6 역방향 트리거 발동 수 (싱글톤+var, 콜백 스레드 모호 등)
+  plugin_consulted_swiftui: <bool>      # swiftui-expert 플러그인 실제 참조 여부 (의식적 참조)
+  plugin_consulted_concurrency: <bool>  # swift-concurrency 플러그인 실제 참조 여부
+  context7_called_count: <int>          # context7 query-docs 호출 수 (API 검증용)
+  issues_caught_by_plugin: <int>        # 플러그인 참조로 발견한 안티패턴/이슈 수
+  issues_missed_without_plugin: <int>   # 플러그인 미참조로 놓쳤을 이슈 수 (사후 분석/리뷰에서 확인)
+  metadata: {}                          # task-specific (e.g., layer-affected, severity-distribution)
+```
+
+### Auto-collection (선택)
+
+본 섹션은 **수동 기록 우선**. 자동화는 §5.5 hook 패턴 확장 시 검토 (`~/.claude/hooks/agent-teams.sh` 변형으로 plugin trigger 빈도 capture 가능).
+
+### 누적 데이터 (시작 시점: 2026-04-26)
+
+| # | 날짜 | 세션 | swiftui/concurrency triggers | reverse fired | plugin consulted (UI/Cnc) | context7 calls | 이슈 catch | 비고 |
+|---|------|------|:-:|:-:|:-:|:-:|:-:|------|
+| | | | | | | | | |
+
+### Load-bearing Test 절차 (F9 — 원칙별 ablation)
+
+> 출처: `guides/harness-engineering.md` §3 원칙 1 (Q1 load-bearing test) + §5 원칙 2 (모델 변경 시 하네스 재검토).
+> 목표: Phase 1.5 P1/P2/P3 + Phase 0.5 D/E/F/G 원칙 7개 각각의 기여도 측정 → Load-bearing / Neutral / Overhead 분류.
+
+**측정 schema (per principle, per session)**:
+```yaml
+- session_id: <ASD-xxxx 또는 NOTASK-yyyymmdd>
+  date: YYYY-MM-DD
+  pipeline: <fz-plan | fz-code>
+  principle_evaluated: <P1 | P2 | P3 | D | E | F | G>
+  trigger_token_matched: <int>          # 해당 원칙의 token 매칭 빈도
+  issue_caught_with_principle: <int>    # 원칙 활성화로 발견한 안티패턴 수
+  issue_missed_without_principle: <int> # 원칙 비활성화 시 놓친 안티패턴 수 (counterfactual, 사후 추정)
+  catch_rate: <float>                   # issue_caught / trigger_token_matched
+  ablation_classification: <load-bearing | neutral | overhead | pending>
+```
+
+**Ablation 절차**:
+1. 5+ 세션 누적 후 원칙별 catch_rate 산출
+2. catch_rate > 30% → Load-bearing (강화 대상)
+3. catch_rate < 5% AND trigger_token_matched > 10 → Neutral 후보
+4. issue_missed > issue_caught → Overhead (정의 재검토)
+5. Phase B 진입 시 Neutral 후보를 통제된 ablation으로 검증 (해당 원칙 비활성 세션 vs 활성 세션 비교)
+
+### Phase B 진입 조건
+
+10건 누적 후 다음 분류 기준 적용:
+
+| 분류 | 기준 | 행동 |
+|------|------|------|
+| **Load-bearing** | catch rate > 30% (issues_caught / total_triggers_detected) | 강화 대상 — plugin 참조 가이드 보강 |
+| **Neutral 후보** | catch rate < 5% AND plugin_consulted = false 다수 | ablation 검토 — 트리거 패턴 활성화 비용 대비 효과 미흡 |
+| **Overhead** | issues_missed > issues_caught | 트리거 정의 재검토 — 패턴 매칭 정확도 개선 |
+
+### 31/32/33차 메타 패턴 측정 (반성 기반 메타 인덱스)
+
+각 세션의 reverse_triggers_fired 값은 v3.6 역방향 트리거의 실증 효과 데이터. 본 §5.6 누적이 plugin-refs.md "역방향 감지 트리거" 섹션의 Phase A 효과 측정 (uncertainty-verification.md `## Phase A/B 진입 판정` 모듈) sink로 작동.
+
+5건 누적 후: reverse_triggers_fired AVG < 1 → 역방향 트리거 정의 재검토. AVG > 3 → 트리거 강화 (추가 패턴 발굴).

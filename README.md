@@ -137,7 +137,7 @@ fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
 ├── skills/          21개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
 ├── agents/          13개 — plan-structure, impl-correctness, review-arch ...
-├── modules/         24개 — team-core, pipelines, cross-validation, lead-action-default, lesson-intake, sprint-contract ...
+├── modules/         26개 — team-core, pipelines, cross-validation, lead-action-default, lesson-intake, sprint-contract, swift-anti-pattern-preblock, swift-pattern-detection ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
 ├── guides/          7개 — prompt-optimization, skill-authoring ...
 ├── codex-skills/    8개 — Codex 네이티브 스킬 (fz-reviewer, fz-architect ...)
@@ -232,6 +232,26 @@ Lead default = action with proportional verification
 cross-skill + 5+ Step plan 시 발동: **Codex가 success criteria를 사전 commit → Lead가 plan 작성** → Codex verify. Self-preference bias 우회 + Generator≠Evaluator 시간 분리.
 
 상세: `modules/sprint-contract.md` + `fz-plan` Phase 0.7.
+
+### Swift/iOS Quality Framework — 3-Layer Evidence (v4.5)
+
+Plan/Code/Review 각 단계에서 Claude + Codex가 **evidence-based clear Swift/iOS coding**을 수행하도록 fz framework에 3-Layer Evidence 정합 통합. plan-structure agent + Phase 1.5 (Plan) + Phase 0.5 (Code) + Swift/iOS Domain Tier (Meta) 4축 강화.
+
+```
+Layer 1 PLAN   ─── plan-structure Swift Awareness + Phase 1.5 (Anti-Pattern Pre-block) + iOS 16 명시
+Layer 2 CODE   ─── impl-quality context7 + Phase 0.5 (Pattern Pre-detection) + Codex Repair Checklist
+Layer 3 REVIEW ─── fz-fix supporting (impl-quality + review-quality) + 역방향 트리거 + drift routing fix
+Meta           ─── Swift/iOS Domain Tier (additive layer) + §5.6 Plugin Trigger Activation + Load-bearing 절차
+```
+
+- `modules/swift-anti-pattern-preblock.md` (신규) — 3 원칙 (P1/P2/P3) + token + Few-shot
+- `modules/swift-pattern-detection.md` (신규) — 4 원칙 (D/E/F/G) + Phase 1.5 P3 ↔ G mirror
+- `modules/uncertainty-verification.md` Swift/iOS Domain Tier — 7개 주장 유형 × Heavy/Light × Mandatory Sources (additive, non-overriding 일반 Heavy 정책)
+- `experiment-log.md` §5.6 — Plugin trigger activation 측정 schema + 원칙별 ablation 절차
+
+5-cycle Cross-Validation (Claude + Codex GPT-5.5): Codex unique 16 + Claude deep-review unique 5 → Reflection Rate 90% (strict) / 95% (lenient).
+
+상세: `~/dev/TVING/fz-ios-utilization/plan/plan-v2.2.md` + `verify/round5-codex.md`.
 
 ### Mapping Layer SPOF Defense (v4.4)
 
