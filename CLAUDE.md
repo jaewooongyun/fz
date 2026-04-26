@@ -20,6 +20,26 @@
 claude plugin update fz@fz-orchestrator
 ```
 
+### Pre-commit Hooks (H1 원칙 — deterministic check)
+
+본 repo는 `.githooks/pre-commit`으로 user-specific 절대 경로 commit을 차단한다.
+
+**최초 1회 등록**:
+```bash
+bash scripts/setup-hooks.sh
+```
+
+이 명령은 `git config core.hooksPath .githooks`를 설정하여 hook이 활성화된다. clone 후 사용자마다 1회 실행 필요.
+
+**차단 패턴**: `/Users/{user}/`, `~/dev/{user}/`
+**In-scope**: README.md, CLAUDE.md, skills/, agents/, modules/, codex-skills/, schemas/, templates/, guides/, .claude-plugin/
+**예외**: CHANGELOG.md, docs/releases/ (historical reference 보존)
+**검사 범위**: staged diff의 추가된 라인만 (기존 잔존 reference 무시)
+
+**Bypass** (정당 사유 시): `git commit --no-verify` (권장 안 함, commit message에 사유 명시)
+
+**근거**: v4.5.0 release 시 README/CHANGELOG/SKILL에 user-specific 절대 경로 노출 → v4.5.1로 retroactive cleanup 후 재발 방지 mechanism 추가 (v4.6.0).
+
 ## Directory Structure
 - `skills/` — 21개 fz 스킬 (SKILL.md)
 - `agents/` — 13개 fz 에이전트

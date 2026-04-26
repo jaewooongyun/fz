@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# fz-plugin pre-commit: user-specific 절대 경로 차단
+# H1 원칙 (모델이 혼자 못하는 것) 구현 — deterministic check.
+#
+# Codex Round 2 unique finding 반영: staged diff 추가 라인만 검사하여
+# 기존 잔존 정당 reference (예: ~/dev/fz-plugin/...)는 self-block하지 않음.
+
+set -euo pipefail
+
+# In-scope 패턴 (CHANGELOG/docs/releases는 historical reference 보존)
+# Round 3 U3 fix: README.md + CLAUDE.md root docs 포함 (v4.5.1 root cause)
+SCOPED_RE='^(README\.md|CLAUDE\.md|skills|agents|modules|codex-skills|schemas|templates|guides|\.claude-plugin)'
+
+# 차단 패턴: user-specific 절대 경로
+USER_PATH_RE='/Users/[a-zA-Z0-9_-]+/|~/dev/[a-zA-Z0-9_-]+/'
+
+# 변경 파일 중 in-scope만 추출
+CHANGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E "$SCOPED_RE" || true)
+[ -z "$CHANGED" ] && exit 0
+
+EXIT=0
+for FILE in $CHANGED; do
+  # Staged diff에서 추가된 라인만 (`+`로 시작, `+++` filename header 제외)
+  ADDED_VIOLATIONS=$(git diff --cached -U0 -- "$FILE" \
+    | grep -E "^\+[^+]" \
+    | grep -nE "$USER_PATH_RE" \
+    || true)
+  if [ -n "$ADDED_VIOLATIONS" ]; then
+    echo "⛔ fz pre-commit: $FILE에 user-specific 절대 경로 신규 추가:"
+    echo "$ADDED_VIOLATIONS"
+    EXIT=1
+  fi
+done
+
+if [ "$EXIT" = "1" ]; then
+  echo ""
+  echo "차단 패턴: /Users/{user}/, ~/dev/{user}/"
+  echo "예외: CHANGELOG.md, docs/releases/ (historical reference)"
+  echo "      기존 잔존 reference (이미 commit된 라인) — 추가 라인만 검사"
+  echo ""
+  echo "Bypass (정당 사유 시): git commit --no-verify (권장 안 함, commit message에 사유 명시)"
+fi
+exit "$EXIT"

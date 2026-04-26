@@ -8,6 +8,42 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.6.0 (2026-04-26) — Cleanup: fz-plan slim + plugin-refs 정정 + pre-commit hook [MINOR]
+
+**핵심**: v4.5.0/v4.5.1 후속 cleanup 3건 통합. (1) fz-plan SKILL 555 → 452줄 (Phase 1 본문 module 분리), (2) plugin-refs 임베딩 테이블 v4.5.0 강화 반영, (3) user-specific 절대 경로 차단 pre-commit hook 신설.
+
+**3 작업**:
+
+A1. **fz-plan SKILL slim**: Phase 1 본문(L280-432, 153줄) → `modules/plan-deep-planning.md` 신설로 이동. SKILL은 Gate 1 + Why(H1) + 절차 요약만 보존 (트리밍 비저하). Progressive Disclosure Level 3 완전 준수.
+
+A3. **plugin-refs.md 임베딩 테이블 정정**:
+- `fz-planner` ✅✅✅ → "v4.5.0+ Planning Checklist 3 anchor" 명시
+- `fz-fixer` —/부분 → ✅✅ "v4.5.0+ Repair Checklist 3 anchor" 명시
+- `fz-challenger` over-engineering 관점 명시 (SwiftUI/RIBs/Concurrency 모두)
+- `fz-searcher` 추가 (검색 전용 — 임베딩 불필요)
+- 7 row → 8 row
+
+C1. **Pre-commit hook (`.githooks/pre-commit`)**: H1 원칙 (deterministic check) 구현.
+- 차단 패턴: `/Users/{user}/`, `~/dev/{user}/` (in-scope: README/CLAUDE/skills/agents/modules/codex-skills/schemas/templates/guides/.claude-plugin)
+- 예외: CHANGELOG.md, docs/releases/ (historical reference)
+- **staged diff 추가 라인만 검사** (Codex Round 2 finding 반영 — 기존 잔존 정당 reference self-block 차단)
+- 등록: `bash scripts/setup-hooks.sh` (clone 후 1회)
+- 근거: v4.5.0 release 시 user-specific 절대 경로 노출 incident 재발 방지
+
+**Cross-Validation 3-cycle**:
+- Round 1 (Sprint Contract): Codex 10 SC + 6 AC + 2 CUF
+- Round 2 (verify v2): needs_revision (Reflection Rate 56%) — 3 unique findings (false positive, RTM swap, stale plan-v1)
+- Round 3 (verify v3): needs_revision (Reflection Rate 78%) — 4 unique findings (whole-repo grep, AC-5 self-conflict, README scope, destructive test)
+- Implementation: 33차 default 적용 — U2/U3 critical fix만 plan에 반영 후 implementation 진입
+
+**fz Guide 정합 (plan 작성 자체에 적용)**:
+- 원칙 4a: Step "원칙+이유" 형태
+- 원칙 5: 각 Step BAD/GOOD Few-shot
+- 트리밍 비저하: A1이 모범 사례
+- H1: C1이 정확한 구현
+
+---
+
 ### v4.5.1 (2026-04-26) — docs fix: remove local work dir references [PATCH]
 
 **핵심**: v4.5.0 README/CHANGELOG에서 plugin 사용자에게 의미 없는 local work directory 참조를 제거 — privacy(절대 경로 username 노출) + clean reference 동시 해결.
