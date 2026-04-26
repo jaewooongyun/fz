@@ -27,15 +27,47 @@ Reply: "Claude plan detected. Provide requirements only for cross-validation val
 - New entry point: parent Router needs `attach`/`detach` methods + `buildXxx()` call
 - Cross-RIB event: Listener protocol defines child→parent event interface
 
-### SwiftUI Planning (iOS 16 minimum target)
-- State design: `ObservableObject + @StateObject` (iOS 16) vs `@Observable + @State` (iOS 17+, `#available`)
-- View decomposition: extract subviews when `body` > ~30 lines
-- Lifecycle: prefer `.task {}` modifier over `onAppear + Task {}`
+### SwiftUI Planning Checklist (iOS 16 minimum target)
 
-### Concurrency Planning
-- 2+ independent async calls → design as `async let` for parallelism
-- Actor isolation: minimize `@MainActor` scope to actual UI update code
-- Task lifecycle: store `Task` in property + cancel in `deinit`
+**State Design (planning decisions)**
+- New screen: who owns the data? `@StateObject` (View owns ViewModel) vs `@ObservedObject` (injected) — must be specified per ViewModel.
+- iOS 16 vs 17 split: `ObservableObject + @StateObject` (iOS 16) vs `@Observable + @State` (iOS 17+ requires `#available(iOS 17, *)` guard + iOS 16 fallback).
+- onChange signature: iOS 16 = `{ newValue in }` / iOS 17+ = `{ old, new in }` — match minimum target.
+- Two-way binding: `@Binding` (iOS 16) vs `@Bindable` (iOS 17+, `#available` required).
+
+**View Structure Planning**
+- Single responsibility: extract subviews when `body` > ~30 lines OR contains 5+ child views.
+- View ↔ ViewModel coupling: prefer separate `ViewState` value type over `Interactor: ObservableObject` to keep RIBs Interactor pure.
+- Lifecycle: prefer `.task {}` modifier (auto-cancel on disappear) over `onAppear + Task {}` (manual cancel needed).
+
+### Swift Concurrency Planning Checklist
+
+**Actor Isolation Design**
+- New actor: what data does it protect? Often `class + @MainActor` is sufficient if data is UI-bound.
+- `@MainActor` scope: prefer per-method or per-block isolation over whole-class. Apply only to UI-update paths.
+- Cross-actor data: must be `Sendable`. Plan the conformance ahead of implementation.
+
+**Async Patterns**
+- 2+ independent async calls → design as `async let` for parallelism (NOT sequential `await`).
+- TaskGroup justification: only when cancellation logic OR dynamic task count is needed; otherwise `async let` is simpler.
+- Continuation usage: must verify native async API absence via context7 before resorting to `withCheckedContinuation`/`withUnsafeContinuation`.
+- Task lifecycle: store `Task` in property + cancel in `deinit` for long-running work; prefer `.task {}` for view-bound work.
+
+**Pattern Migration Planning**
+- PromiseKit → async/await: `.done` is main queue → After: `Task { @MainActor in }` mandatory. Plain `Task {}` violates Zero-Exception thread rule.
+- Combine → async: subject patterns map to `AsyncStream`. Plan the `AsyncStream.Continuation` lifecycle (terminate on `deinit`).
+- Closure callback → async: continuation MUST be called exactly once. Plan the error path to avoid double-resume.
+
+### Sendable Boundary Planning
+
+**Cross-isolation Data**
+- Data crossing actor boundary → `Sendable` conformance required. Plan whether the type can be value (struct) or needs reference (final class) + `@unchecked Sendable` justification.
+- `@Sendable` closures: capture analysis required. `self` capture → `weak self` mandatory in long-lived Tasks.
+
+**Compiler Verification (Swift 6+ ready)**
+- Plan to enable strict concurrency checking on the target module before merging Concurrency-heavy changes.
+- `sending` parameter (Swift 5.10+): plan to use it for one-shot ownership transfer instead of `@Sendable` when value moves between actors.
+- `nonisolated`: plan when stateless methods on actor-isolated types should be reachable from any context.
 
 ## Planning Process
 

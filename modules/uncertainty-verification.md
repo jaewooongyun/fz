@@ -32,6 +32,36 @@ fz-peer-review Gate 4.4-A에서 mapping claim의 [verified] 부재 = `mapping_st
 
 Heavy 트리거: Transformation Spec의 "실행 스레드" 또는 "요청 파라미터" 항목.
 
+## Swift/iOS Domain Tier (도메인 specific 강화)
+
+> 발동: CLAUDE.md `## Architecture`가 Swift/iOS를 지정하는 프로젝트에서 Swift/iOS 관련 기술 주장 시. 일반 Heavy/Light/Skip Tier 위에 도메인 강제 layer 추가.
+>
+> ⛔ **Heavy Tier semantics 명확화 (F4 fix)**: 본 Domain Tier는 일반 Heavy Tier 정의를 **약화하지 않음(non-overriding)** + **추가 layer로 동작(additive)**. 일반 Heavy Tier(스레드 모델/API 계약)는 여전히 "3단계: Context7 + downstream 전수 + 플러그인" 모두 충족 의무. Swift/iOS Domain Tier는 그 위에 Mandatory Sources 인용을 추가 의무화한다 (택1이 아님).
+>
+> 일반 Heavy 트리거 충돌 시: 일반 Heavy(3단계 모두 충족) + Domain Tier(Mandatory Source 인용 의무) 둘 다 충족.
+
+다음 7개 주장 유형은 도메인 specific Mandatory Sources를 의무화한다. `[verified: ...]` 태그가 명시 sources 중 하나라도 인용하지 않으면 Default-Deny 적용 (해당 주장은 unverified로 간주, 구현/리뷰 차단).
+
+| Swift/iOS 주장 유형 | Required Tier | Mandatory Sources |
+|---|:---:|---|
+| **API 시그니처** (signature, parameters, return type) | Heavy | Context7 `query-docs` OR Read 실 코드 OR Apple 공식 문서 |
+| **콜백 실행 스레드** ("이 콜백은 main에서 호출됨") | Heavy | Context7 `query-docs` OR `modules/plugin-refs.md` "역방향 트리거" 섹션 OR 빌드 + 런타임 측정 |
+| **availability** ("이 API는 iOS 16에서 사용 가능") | Heavy | Apple 공식 문서 (`@available` 헤더 인용) OR Xcode 빌드 결과 |
+| **`@MainActor` / actor isolation 동작** | Heavy | swift-concurrency 플러그인 OR Apple Concurrency 가이드 |
+| **Sendable conformance 안전성** | Heavy | Swift 컴파일러 경고/에러 OR 컴파일러 진단 (strict concurrency check) |
+| **SwiftUI re-render 동작** | Light | swiftui-expert 플러그인 OR Apple SwiftUI 가이드 |
+| **RIBs 역할 위반** (Router/Interactor 책임) | Light | CLAUDE.md `## Architecture` OR `app-iOS/AI/ai-guidelines.md` |
+
+**Heavy** = `[verified: Context7]` 또는 `[verified: 빌드]` 또는 `[verified: 코드 L{N}]` 태그 의무 (Mandatory Source 인용 포함).
+**Light** = 1개 신뢰 소스 인용 (Mandatory Source 중 하나).
+**태그 없음** = Default-Deny → 해당 주장 unverified, fz-code BEC에서 차단.
+
+### 발동 예시
+
+- "이 콜백은 main에서 호출됩니다" → Heavy. Context7 query-docs로 SDK 문서 확인 + plugin-refs.md 역방향 트리거 매칭 의무. 둘 다 부재면 `[미검증: 콜백 스레드 미확인]` 태그 후 default `@MainActor` 보호 적용.
+- "@Observable은 iOS 17+ 필수" → Heavy (iOS 버전 가드 검증). Apple 공식 `@available(iOS 17.0, *)` 헤더 인용 의무.
+- "RIBs Router는 navigation만" → Light. `app-iOS/AI/ai-guidelines.md` 또는 CLAUDE.md `## Architecture` 인용.
+
 ## Evidence Source Priority
 
 | 우선순위 | 소스 | 태그 | 신뢰도 |

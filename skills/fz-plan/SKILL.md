@@ -88,6 +88,8 @@ model-strategy:
 
 ## Plugin 참조 (Swift Concurrency)
 > 참조: `modules/plugin-refs.md` — Swift Concurrency(계획 시) 섹션
+> **iOS 16 minimum target 제약**: CLAUDE.md `## Plugins` 참조. 계획에 iOS 17+ API (`@Observable`, `@Bindable`, onChange new signature) 사용 명시 시 `#available` 가드 step 포함 의무.
+> **availability 사전 결정**: SwiftUI State 설계 (iOS 16: `ObservableObject + @StateObject` / iOS 17+: `@Observable + @State`) → plan에 `#available` 분기 명시
 
 ## 팀 에이전트 모드
 
@@ -427,6 +429,22 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
 
 > **Gate 증거 첨부** (H2 원칙 — self-check 보완): 결정론적 도구 출력이 있는 Gate 항목은
 > `Evidence:` 행에 도구 결과 요약을 기록한다. self-check "완료?"보다 도구 출력이 신뢰할 수 있다.
+
+---
+
+## Phase 1.5: Swift Anti-Pattern Pre-block (Swift/iOS 프로젝트 한정)
+
+> 발동: CLAUDE.md `## Architecture`가 Swift/iOS 지정 + Plan에 SwiftUI/Concurrency/패턴 변환 포함 시 필수. 비Swift/iOS는 스킵.
+> 본문: `modules/swift-anti-pattern-preblock.md` 참조 (Level 3) — 3 원칙(P1 SwiftUI 결정 / P2 Concurrency isolation / P3 패턴 변환 보존) + 각 원칙 token + Few-shot.
+
+### Gate 1.5: Swift Anti-Pattern Pre-block 통과
+- [ ] Swift/iOS 프로젝트 + SwiftUI/Concurrency/패턴 변환 plan? (해당 시 `modules/swift-anti-pattern-preblock.md` Read 후 진입)
+- [ ] P1 SwiftUI 결정 명시? (owner / availability / View 책임)
+- [ ] P2 Concurrency isolation 범위 결정? (scope / 병렬화 / continuation 정당화)
+- [ ] P3 패턴 변환 시 원본 동작 보존? (스레드 / defer-await / enum catch)
+- 1건 미해결 → ⛔ Phase 2 차단
+
+> 발동 시 행동: `modules/swift-anti-pattern-preblock.md` Read + `modules/plugin-refs.md` 역방향 트리거 섹션 강제 참조 + 3 원칙 점검표 통과 후 Phase 2 진입.
 
 ---
 

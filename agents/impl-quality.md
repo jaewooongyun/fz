@@ -3,7 +3,7 @@ name: impl-quality
 description: >-
   코딩 표준 + 패턴 일관성 감시 에이전트. 구현 중 실시간 품질 피드백.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__search_for_pattern, mcp__serena__get_symbols_overview
+tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__search_for_pattern, mcp__serena__get_symbols_overview, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 ## Role
