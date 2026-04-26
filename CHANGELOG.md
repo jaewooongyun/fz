@@ -8,6 +8,51 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.4.0 (2026-04-26) — Mapping Layer SPOF Defense [MINOR]
+
+**핵심**: peer review 시스템에 **Mapping Layer Single-Point-of-Failure 방어** 도입. 6-Layer LLM 검증이 같은 evidence 매핑 base를 공유하면 매핑 오류는 layer 수와 무관하게 통과한다는 구조적 결함 발견 → atom-level decomposition + fail-closed pre-trigger + cross-stage severity 정렬로 차단.
+
+**발견 경로** (외부 사례 `[미검증: 사용자 제공]`):
+- TVING/app-iOS PR #3796 (ASD-1136 ReachabilityManager → NetworkMonitor) peer review에서 6-Layer 검증 (boolean equivalence + Opus + Sonnet + Codex + Lead self + Devil's Advocate) 통과 후 CodeRabbit (rule-based) 단독 발견
+- Root cause: `ReachabilityManager.isReachableViaWWAN() = (Reachable AND IsWWAN)` 이중 게이트인데, evidence 매핑이 `→ isReachableViaCellular` simplify되어 reachable atom 누락
+- 검증 신뢰도 = `min(매핑 정확성, layer 정확성)` — multiplicative 아님, layer N배 늘려도 매핑이 SPOF면 신뢰도 cap
+
+**P0 — 7 docs (신규 신설 0)**:
+- `modules/evidence-collection.md` **a2. Semantic Mapping Ground Truth** 절차 신설 — atom-level mapping table + `[verified: source]` 의무 + `mapping_status` 분류 (verified/lossy/over-mapped/unverified)
+- `modules/peer-review-gates.md` **Gate 4.4-A Mapping Fidelity Gate** + **fail-closed Pre-Trigger** — refactoring PR + `semantic-mapping.md` 부재 → Critical 자동 / `mapping_status=lossy` → auto-include
+- `modules/uncertainty-verification.md` **Default-Deny mapping claim** 좁은 확장 — `"A는 B와 동일"`, `"X가 Y로 대체됨"` 등 mapping/equivalence claim에 한정 (전역 확대 X)
+- `skills/fz-peer-review/SKILL.md` 4 위치 — Gather evidence table + Fact + Mapping Verification Gate + Brief Template + **Task Brief L260에 `evidence/*.md` 명시** (governance 500줄 정확 도달)
+- `agents/review-quality.md:60-64` Source Fidelity에 mapping atom 검증 (severity: critical, Gate 4.4-A 정렬)
+- `skills/code-auditor/SKILL.md:242-263` Refactoring Completeness 보강 — `lossy_atoms` 회귀 검증
+- `codex-skills/fz-challenger/SKILL.md` **Mapping Assumption Challenge** — Codex DA가 lossy/unverified row를 별도 challenge 대상으로
+
+**Layer Diversity 통합 해결**:
+- "더 많은 LLM 추가 ≠ Layer Diversity" 통찰 — 같은 매핑 base를 받으면 동일 결론 수렴
+- 진짜 Layer Diversity = deterministic source (`git show / Read / grep`) + LLM 판단의 조합 — fz `cross-data` 원칙과 정합
+
+**Cross-Validation 7-cycle 정당성 입증** (본 plan 작성 자체가 prototype):
+- Cycle 1: PR review (CodeRabbit 단독 발견) → 출발점
+- Cycle 2: Plan v1 (Codex independent가 verify 위반 catch)
+- Cycle 3: Plan v2 통합 (Claude self-review가 Q1 self-violation catch)
+- Cycle 4: Plan v2 verify (Codex가 v4.1.0 stale 메모리 + `[verified]` 위반 + line citation 잘못 catch — 5건 단독 발견)
+- Cycle 5: Plan v3 정정
+- Cycle 6: v4.4.0 적용 (모든 Step 실행)
+- Cycle 7: v4.4.0 review (Codex가 internal instruction conflict 단독 발견 P2/P3 → 즉시 fix)
+
+**메모리 정식화** (사용자 메모리):
+- `feedback_mapping_layer_spof.md` (신규) — 6-Layer 검증 SPOF 패턴 + Defense + How to apply
+- `MEMORY.md` index entry 추가 — Verification Discipline 섹션
+
+**메타 학습 — Internal Instruction Conflict는 새 종류 결함**:
+- self-review (grep 기반 mechanical check) → Anti-Pattern 0 violations
+- Codex review (semantic consistency 분석) → P2 (a2 trigger 정밀도) + P3 (lossy severity 불일치) 단독 발견
+- 두 패러다임이 만나는 지점에서 새 결함 분류 발견 — multi-module 변경에서 같은 개념(`lossy mapping`)이 module 간 drift
+
+**Verification**:
+- `claude plugin validate .` — ✓ Validation passed
+- `wc -l skills/fz-peer-review/SKILL.md` — 500 lines 정확 (governance ≤500 준수)
+- 변경량: 10 files (+115/-13 lines)
+
 ### v4.3.0 (2026-04-25) — fz GPT/Codex Tier 1+2 완성 [MINOR]
 
 **핵심**: fz GPT/Codex 고도화 프로젝트 사실상 완료. Tier 1 7/7 + Tier 2 1/1. T2-A (β-1 Gemini) 폐기 — cross-provider 비채택. α-2 BLOCKER 해소. 31차/32차/33차 메타 교훈 active defense 정식화.

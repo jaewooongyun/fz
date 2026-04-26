@@ -1,10 +1,11 @@
 # Peer Review Verification Gates
 
-Synthesize 단계에서 실행하는 8가지 검증 게이트.
-4.4 → 4.5 → 4.6 → 4.6.5 → 4.7 → 4.7-A (+ Origin Verification) → 4.8 → 4.9 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
+Synthesize 단계에서 실행하는 9가지 검증 게이트.
+4.4 → 4.4-A → 4.5 → 4.6 → 4.6.5 → 4.7 → 4.7-A (+ Origin Verification) → 4.8 → 4.9 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
 
 > Gate 4.4 (Factual Claim Verification)는 PR #3639에서 발견된 3건의 오탐을 방지하기 위해 추가.
 > 에이전트의 사실적 주장(existence/source/behavior/origin)을 Orchestrator가 기계적으로 검증한다.
+> Gate 4.4-A (Mapping Fidelity Gate, v4.4.0)는 Mapping Layer SPOF 방어. evidence 매핑이 ground truth와 atom-level 동등인지 검증한다.
 
 ---
 
@@ -60,6 +61,54 @@ Synthesize 단계에서 실행하는 8가지 검증 게이트.
 ```
 
 **비용**: Major 이슈당 ~10초 (git grep/show 1-2회). 전체 리뷰에 30-60초 추가.
+
+---
+
+## Gate 4.4-A: Mapping Fidelity Gate (refactoring PR, v4.4.0)
+
+> **핵심 원칙**: refactoring PR의 API/condition mapping이 ground truth와 atom-level 동등인지 검증한다.
+> Mapping Layer SPOF 방어 — 6-Layer LLM 검증이 같은 evidence 매핑 base를 공유하면 매핑 오류는 layer 수와 무관하게 통과한다.
+>
+> PR #3796 교훈 `[미검증: 사용자 제공]`:
+> - `ReachabilityManager.isReachableViaWWAN() = (Reachable AND IsWWAN)` 이중 게이트
+> - evidence 매핑이 `→ isReachableViaCellular`로 simplify되어 reachable 게이트 누락
+> - 6-Layer 검증 (boolean equiv + Opus + Sonnet + Codex + Lead self + DA) 모두 통과 → CodeRabbit (rule-based) 단독 발견
+
+### Pre-Trigger (fail-closed)
+
+**조건**: refactoring PR 감지 시 (diff에 API rename, 패턴 변환, type substitution 1건+)
+
+**Action**:
+1. `${WORK_DIR}/evidence/semantic-mapping.md` 존재 확인
+2. **부재** → ❌ Critical 이슈 자동 생성 ("Mapping artifact missing for refactoring PR")
+3. **존재** + row 0건 → ⚠️ Major 이슈 ("Refactoring PR with empty mapping")
+4. **존재** + row 1+ → 기본 Gate 4.4-A 발동
+
+→ Mapping artifact 자체 누락 시 SPOF 재발 가능성 차단.
+
+### 절차
+
+1. `semantic-mapping.md`의 모든 mapping row 추출
+2. 각 row 검증:
+   - `mapping_status=verified` → 통과
+   - `mapping_status=lossy` → ❌ candidate issue 자동 승격 (agent 투표와 무관)
+   - `mapping_status=unverified` + agent가 "동등/OK/문제없음" 결론 → ⚠️ confidence ceiling 65 + `[mapping 검증 필요]` 태그
+   - `mapping_status=over-mapped` → ⚠️ Major 이슈 (intentional? 사용자 확인)
+3. 3/3 agent 동의여도 Basis가 `IO`이고 mapping evidence가 unverified → ❌ INCLUDE 금지 (기존 Basis CV/IO 구조 재사용)
+
+### Failure 시 동작
+
+- `lossy` → Critical 이슈로 보고. Synthesize 단계에서 자동 INCLUDE.
+- `unverified` + 동등 결론 → confidence ceiling + 사용자 검토 요청.
+- `over-mapped` → Major 이슈 (사용자 확인).
+
+### 효과
+
+"모든 LLM이 같은 mapping을 믿고 OK"인 경우에도 deterministic evidence (`mapping_status=lossy`)가 우선 → Synthesize 단계에서 이슈 자동 생성. Layer Diversity 본 게이트 안에서 통합 해결 (deterministic source + LLM 판단).
+
+**비용**: mapping row당 ~10초 (git show + atom 비교). 전체 리뷰에 N×10초 추가.
+
+**참조**: `modules/evidence-collection.md` a2 절차, `modules/uncertainty-verification.md` Default-Deny mapping claim, `agents/review-quality.md:60-64` Source Fidelity (mapping atom 검증).
 
 ---
 

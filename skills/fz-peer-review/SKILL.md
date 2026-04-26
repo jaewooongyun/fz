@@ -160,6 +160,7 @@ mkdir -p ${WORK_DIR}/evidence
 | 수집 대상 | 산출물 | 목적 |
 |----------|--------|------|
 | 변경 함수 old/new 페어 | `evidence/old-new-pairs.md` | origin 판정 근거 |
+| API/condition mapping atom (refactoring 시) | `evidence/semantic-mapping.md` | Mapping Layer SPOF 방어 (v4.4.0, Gate 4.4-A) |
 | Producer/Consumer 매핑 | `evidence/producer-consumer.md` | `_` destructuring, 값 출처 확인 |
 | 삭제 심볼 잔존 참조 | `evidence/deletion-verification.md` | compile break 주장 검증 |
 | base 코드 패턴 | `evidence/base-patterns.md` | regression vs pre-existing 판별 |
@@ -178,15 +179,15 @@ mkdir -p ${WORK_DIR}/evidence
 `git show ${BASE_BRANCH}:${FILE_PATH}`로 변경 함수의 원본 코드를 추출. 에이전트가 origin(regression/pre-existing/improvement)을 판정하는 근거로 사용.
 **⛔ 제네릭 설명이 아닌 실제 코드를 포함해야 한다.** 특히 enum throw site, factory method, DI 등 값의 생성 지점은 반드시 코드로 수집.
 
-### 4. ⛔ Fact Verification Gate (Gather 완료 검증)
+### 4. ⛔ Fact + Mapping Verification Gate (Gather 완료 검증)
 
-Key Facts를 Analyze 전달 전에 **수집과 다른 도구로 교차 확인**. 도구 출력 잘림(grep -A 등) → 검증 없이 전달 시 전 에이전트 동일 오탐.
+Key Facts + **Mapping Facts** (v4.4.0)를 Analyze 전달 전에 **수집과 다른 도구로 교차 확인**. 도구 출력 잘림(grep -A 등) → 검증 없이 전달 시 전 에이전트 동일 오탐.
 
 ```
 절차:
-1. Key Facts 목록 작성 (플랫폼 지원, 심볼 존재, 의존성 관계 등)
-2. 각 Fact를 다른 방법으로 재확인 (grep→Read, 심볼→find_symbol, 플랫폼→Package.swift Read)
-3. 불일치 발견 시 Key Fact 수정
+1. Key Facts + Mapping Facts 작성 (refactoring 시 evidence/semantic-mapping.md atom decomposition 포함, v4.4.0)
+2. 각 Fact를 다른 방법으로 재확인. Mapping Fact는 ground truth source 직접 read로 atom-level 재검증 (Mapping Layer SPOF 방어)
+3. 불일치 발견 시 수정
 ```
 
 원칙: **"Cross-model 검증은 cross-data일 때만 작동한다."** (예: grep -A2로 잘린 결과 → 3-Model 전원 오탐)
@@ -229,6 +230,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degra
 - 피어 참조 금지, max 10, origin 필수, 추론 아닌 코드 증거 기반만
 - ⛔ init/DI 이슈 시: evidence/caller-analysis.md 필수 확인 — "호출자가 어떤 타입을 알아야 하는가?"
 - ⛔ 패턴 이슈 시: evidence/convention-samples.md 필수 확인 — "프로젝트 convention과 일치하는가?"
+- ⛔ mapping/equivalence claim (v4.4.0): evidence/semantic-mapping.md 필수 입력 — Lead 요약 문장이 아닌 raw source + atom table을 직접 read. mapping_status가 lossy/unverified인 항목은 별도 highlight
 - Convention 패턴(3+ 모듈 동일)을 위반으로 판정하지 않는다 (suggestion까지만 허용)
 ```
 
@@ -257,8 +259,9 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degra
 5. 에이전트 완료 대기 → Lead 합성 → shutdown_request → TeamDelete
 ```
 
-Task Brief (각 에이전트): skills/{arch-critic|code-auditor}/SKILL.md + ${WORK_DIR}/(diff.patch + symbols.json + requirements.md + base-behavior.md)
+Task Brief (각 에이전트): skills/{arch-critic|code-auditor}/SKILL.md + ${WORK_DIR}/(diff.patch + symbols.json + requirements.md + base-behavior.md + evidence/*.md)
 - [Goal] 독립 이슈 발굴 | [Constraints] 피어 참조 금지, origin 필수
+- [Mapping] evidence/semantic-mapping.md 존재 시 raw source + atom table 직접 read (Lead 요약 금지, v4.4.0)
 - [Deliverable] ${WORK_DIR}/{arch-critic|code-auditor}-result.json
 
 ### Tier 3: Full Team (--deep) — 추가 시퀀스

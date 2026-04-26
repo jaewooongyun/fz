@@ -11,7 +11,7 @@
       "name": "fz",
       "description": "AI development workflow orchestration: natural language → skill pipeline → multi-agent team → execution",
       "repository": "https://github.com/jaewooongyun/fz",
-      "version": "4.3.0",
+      "version": "4.4.0",
       "author": {
         "name": "Jaewoong Yun"
       },

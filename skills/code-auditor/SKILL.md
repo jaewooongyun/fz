@@ -257,6 +257,7 @@ class SomeInteractor {
 - [ ] `@available(*, deprecated)` 중 사용처 0? → 삭제 대상
 - [ ] deprecated init/메서드 미호출? → 삭제 대상
 - [ ] 삭제 대상의 의존 코드도 정리되었는가?
+- [ ] **Mapping atom 보존** (v4.4.0): `${WORK_DIR}/evidence/semantic-mapping.md` 존재 시 — 각 row의 `mapping_status=lossy` 항목이 회귀로 도입되지 않았는가? old의 atom이 new에 표현되는가?
 
 ### 삭제 vs 이동 판별 원칙
 

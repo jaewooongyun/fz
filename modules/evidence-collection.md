@@ -9,6 +9,7 @@
 ```
 ${WORK_DIR}/evidence/
 ├── old-new-pairs.md         — 변경 함수의 before/after 코드
+├── semantic-mapping.md      — API/condition mapping의 atom-level ground truth (v4.4.0 신규)
 ├── producer-consumer.md     — enum/struct의 생성-소비 매핑
 ├── deletion-verification.md — 삭제 심볼의 잔존 참조 확인
 ├── base-patterns.md         — regression 판정용 base 코드 패턴
@@ -33,6 +34,37 @@ git show pr-${PR_NUMBER}:${FILE} | 해당 함수 추출           → ## NEW
 ```
 
 함수당 최대 50줄, 총 최대 1000줄 제한.
+
+### a2. Semantic Mapping Ground Truth → `evidence/semantic-mapping.md` (v4.4.0)
+
+> Mapping Layer SPOF 방어. old/new mapping claim을 단순 `OldAPI → NewAPI` 한 줄로 작성하지 않고 atom-level decomposition + ground truth source 인용 의무.
+> 적용 조건: refactoring PR (API rename, 패턴 변환, type substitution 등) 감지 시 **의무 작성**. row 0건 또는 artifact 부재 시 fail-closed pre-trigger 발동 — `modules/peer-review-gates.md` Gate 4.4-A 참조.
+
+각 mapping마다 atom-level table 작성:
+
+| # | Old API | New API | old_definition (file:line) | new_definition / callsite | normalized_atoms (old) | normalized_atoms (new) | lossy_atoms | mapping_status |
+|---|---------|---------|---------------------------|---------------------------|------------------------|------------------------|-------------|----------------|
+| M-001 | `OldType.method()` | `NewType.method` | `[verified: source-file:line]` | `[verified: source-file:line]` | `[A, B]` | `[B]` | `[A]` | `lossy` |
+
+**필드 정의**:
+- `old_definition` / `new_definition`: ground truth source code 인용. `[verified: file:line]` 태그 의무.
+- `normalized_atoms`: boolean/composed predicate를 atom 단위로 분해 (예: `Reachable && IsWWAN` → `[Reachable, IsWWAN]`).
+- `lossy_atoms`: old에 있지만 new에 표현되지 않은 atom (있으면 lossy).
+- `mapping_status`:
+  - `verified` — atom 1:1 일치
+  - `lossy` — atom 누락 (new가 old의 일부 component 표현 못함)
+  - `over-mapped` — new가 old에 없는 atom 추가
+  - `unverified` — source 인용 부재 또는 contract 불명
+
+**Verify Discipline (의무)**:
+- [ ] 각 mapping row에 `[verified: file:line]` 태그?
+- [ ] normalized_atoms 분해 완료?
+- [ ] lossy_atoms 산출 완료 (빈 list여도 명시)?
+- [ ] mapping_status 분류 완료?
+
+**효과**: refactoring PR에서 API 의미 component 누락 (e.g., `isReachableViaWWAN() = Reachable AND WWAN` → 매핑이 `→ Cellular`로 simplified되어 Reachable 게이트 누락) 을 atom-level로 즉시 catch.
+
+**참조**: Gate 4.4-A Mapping Fidelity Gate (`modules/peer-review-gates.md`).
 
 ### b. Producer/Consumer 매핑 → `evidence/producer-consumer.md`
 

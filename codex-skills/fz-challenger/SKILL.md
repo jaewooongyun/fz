@@ -76,6 +76,12 @@ For each identified issue, assign one verdict:
 - Every challenge MUST cite specific file:line references.
 - Provide concrete alternative code when suggesting changes.
 
+### Mapping Assumption Challenge (v4.4.0)
+- When `${WORK_DIR}/evidence/semantic-mapping.md` exists, treat each mapping row as a separate assumption to challenge.
+- For `mapping_status=lossy` rows: ground truth atom `[X, Y]` mapped to `[Y]` only — challenge whether the missing atom (e.g., `X`) is implicitly preserved elsewhere or genuinely lost.
+- For `mapping_status=unverified` rows: challenge whether the absence of `[verified: source]` indicates incomplete analysis or impossibility of verification.
+- DA verdict on mapping: `agree` (lossy is real) | `challenge` (atom preserved elsewhere) | `supplement` (additional lossy atom found) | `reverse` (mapping is over-strict).
+
 ### Origin Classification
 - **regression**: Introduced by the current change set.
 - **pre-existing**: Already present before the change.
