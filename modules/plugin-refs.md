@@ -140,15 +140,18 @@ diff에 `@MainActor`, `actor`, `async`, `await`, `Task`, `Sendable`, `AsyncStrea
 | Codex 스킬 | SwiftUI | Concurrency | RIBs Lifecycle |
 |-----------|:-------:|:-----------:|:--------------:|
 | fz-reviewer | ✅ | ✅ | ✅ |
-| fz-architect | 부분 | 부분 | ✅ (Q1-Q5) |
+| fz-architect | 부분 (1줄) | 부분 (2줄) | ✅ (Q1-Q5) |
 | fz-drift | ✅ | ✅ | ✅ |
-| fz-planner | ✅ | ✅ | ✅ |
+| fz-planner | ✅ (v4.5.0+ Planning Checklist 3 anchor) | ✅ (v4.5.0+ Planning Checklist) | ✅ |
 | fz-guardian | — | ✅ | — |
-| fz-challenger | — | 부분 | — |
-| fz-fixer | — | 부분 | — |
+| fz-challenger | 부분 (over-engineering 관점) | 부분 (sending parameter semantics) | 부분 (Builder 과잉 관점) |
+| fz-fixer | ✅ (v4.5.0+ Repair Checklist 3 anchor) | ✅ (v4.5.0+ Repair Checklist) | — |
+| fz-searcher | — (search-only) | — (search-only) | 검색 예시만 (임베딩 불필요) |
 
 > 부분: 주요 패턴만 포함. 추후 확장 필요 시 해당 스킬 SKILL.md에 섹션 추가.
-> fz-challenger Concurrency(부분): sending parameter semantics 추가 (2026-03-09). SwiftUI/RIBs는 미추가.
+> fz-challenger over-engineering 관점: SwiftUI(@Observable 과잉) + RIBs(Builder 과잉) + Concurrency(sending semantics) 모두 명시 (v4.6.0 정정).
+> fz-searcher: 검색 전용 스킬이라 임베딩 불필요 (v4.6.0 추가).
+> v4.5.0+ 강화 명시: fz-planner는 SwiftUI/Concurrency/Sendable Boundary 3 anchor, fz-fixer는 SwiftUI Repair/Concurrency Repair/Anti-Repair 3 anchor (v4.6.0 정정).
 
 ## 설계 원칙
 
