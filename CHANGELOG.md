@@ -8,12 +8,28 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.5.1 (2026-04-26) — docs fix: remove local work dir references [PATCH]
+
+**핵심**: v4.5.0 README/CHANGELOG에서 plugin 사용자에게 의미 없는 local work directory 참조를 제거 — privacy(절대 경로 username 노출) + clean reference 동시 해결.
+
+**변경**:
+- `CHANGELOG.md` v4.5.0 entry — local user-specific 절대 경로 + `~/dev/...` 작업 폴더 참조 제거
+- `README.md` v4.5 섹션 — local 작업 폴더 참조 제거
+- `skills/fz-codex/SKILL.md` — working dir 예시(L136-140) + trust_level config 예시(L184-191)에서 user-specific 절대 경로 → `~/dev/{project}/...` 또는 placeholder로 일반화
+- GitHub Release v4.5.0 notes 정정 (post-release edit)
+
+**영향**: 동작 변경 없음. plugin install 사용자가 README에서 broken reference 못 보게 됨.
+
+**메타 교훈**: pre-commit grep으로 `/Users/{user}/`, `~/dev/{user}/` 절대 경로 차단 검증 추가 후보 (CLAUDE.md `## Git Workflow` 또는 `modules/cross-validation.md`).
+
+---
+
 ### v4.5.0 (2026-04-26) — Swift/iOS Quality Framework (3-Layer Evidence) [MINOR]
 
 **핵심**: Plan/Code/Review 각 단계에서 Claude + Codex가 **evidence-based clear Swift/iOS coding**을 수행하도록 fz framework에 3-Layer Evidence 정합 통합. 사용자 redirect ("plan/code/review 시 Swift/iOS/구조 품질 안좋음 + 둘 다 근거 기반 명확한 코딩")의 직접 답.
 
 **발견 경로**:
-- `/Users/jaewoongyun/dev/TVING/fz-ios-utilization/` 8단계 cross-model verify cycle (Claude + Codex GPT-5.5)
+- 8단계 cross-model verify cycle (Claude + Codex GPT-5.5)
 - 1차 분석: B+ → 2차 reframe → Sprint Contract (Codex) → Plan v1 → v2 → v2.1 → v2.2 → Round 5 verify
 - 5-round 누적 Codex unique 16건 + Claude deep-review unique 5건 → 23차 메타 패턴 ("Cross-model 마지막 안전망") 5번 입증
 
@@ -60,10 +76,6 @@ Meta — Evidence Framework:
 - 6 AC PASS
 - Plugin validate ✔ Passed
 - 23차 메타 패턴 5-round 모두 입증
-
-**관련 문서** (TVING workspace):
-- `~/dev/TVING/fz-ios-utilization/plan/plan-v2.2.md` (Plan, RTM 13 rows)
-- `~/dev/TVING/fz-ios-utilization/verify/round5-codex.md` (Codex Round 5 final verify)
 
 ---
 

@@ -133,10 +133,10 @@ codex exec ... "prompt" < /dev/null 2>&1 | tail -20
 
 **필수 패턴**:
 ```bash
-# Working dir이 git repo 밖일 때 (e.g., -C /Users/jaewoongyun/dev/TVING)
+# Working dir이 git repo 밖일 때 (e.g., -C ~/dev/{project} where {project}/.git is absent)
 codex exec ... --skip-git-repo-check ... "prompt" < /dev/null
 
-# Working dir이 git repo 내부일 때 (e.g., -C /Users/jaewoongyun/dev/TVING/app-iOS)
+# Working dir이 git repo 내부일 때 (e.g., -C ~/dev/{project}/{git-root})
 # → --skip-git-repo-check 불필요. config.toml `[projects."<path>"] trust_level = "trusted"`로도 가능.
 ```
 
@@ -181,13 +181,13 @@ Read("$RESULT_FILE")  # 실제 verify 결과
 
 **필수 config** (`~/.codex/config.toml`):
 ```toml
-[projects."/Users/jaewoongyun/dev/TVING/app-iOS"]  # GIT_ROOT
+[projects."<absolute path to GIT_ROOT>"]      # e.g., ~/dev/{project}/{git-root}
 trust_level = "trusted"
 
-[projects."/Users/jaewoongyun/dev/TVING"]  # PROJECT_ROOT
+[projects."<absolute path to PROJECT_ROOT>"]  # e.g., ~/dev/{project}
 trust_level = "trusted"
 
-[projects."/Users/jaewoongyun/dev/fz-plugin"]  # fz-plugin dev
+[projects."<absolute path to fz-plugin dev>"]  # e.g., ~/dev/fz-plugin (if you develop fz locally)
 trust_level = "trusted"
 ```
 

@@ -251,8 +251,6 @@ Meta           ─── Swift/iOS Domain Tier (additive layer) + §5.6 Plugin T
 
 5-cycle Cross-Validation (Claude + Codex GPT-5.5): Codex unique 16 + Claude deep-review unique 5 → Reflection Rate 90% (strict) / 95% (lenient).
 
-상세: `~/dev/TVING/fz-ios-utilization/plan/plan-v2.2.md` + `verify/round5-codex.md`.
-
 ### Mapping Layer SPOF Defense (v4.4)
 
 refactoring PR의 evidence 매핑이 ground truth와 atom-level 동등인지 검증. 6-Layer LLM 검증이 같은 매핑 base를 공유하면 매핑 오류는 layer 수와 무관하게 통과 — **Mapping Layer Single-Point-of-Failure** 방어. 검증 신뢰도 = `min(매핑 정확성, layer 정확성)` (multiplicative 아님).
