@@ -77,6 +77,23 @@ SendMessage(lead): "빌드 검증 필요합니다. 대상: MyApp scheme, 변경 
 <!-- model-upgrade: opus when Primary in plan/code/full-cycle teams -->
 ```
 
+### Same-model Cross-Verify Reflection Rate 정책 (UC-5, v4.8.0)
+
+> Single source: `guides/skill-troubleshooting.md` L214 "동종 모델 맹점".
+> 본 §은 Reflection Rate 측정 시 가중치 정책만 정의.
+
+**Canonical Rule (exclusion)**:
+- **동종 모델 cross-verify** (search-symbolic ↔ search-pattern 양쪽 sonnet, review-arch ↔ review-quality 양쪽 sonnet 등):
+  - **Headline Reflection Rate에서 제외**
+  - 이유: 같은 모델은 같은 지식 갭 공유 → false high reflection rate 방지
+- **이종 모델 cross-verify** (Claude ↔ Codex/GPT, sonnet ↔ opus):
+  - Headline Reflection Rate에 포함 (full credit, weight 1.0)
+
+**Auxiliary Weighted Rate (별도 보고)**:
+- 동종 모델 발견을 가중치 0.5로 헌정 표시할 보조 지표
+- experiment-log §5.5 schema 확장: `weighted_rate_pct` 필드 (canonical headline_rate_pct와 분리)
+- 두 metric은 **혼용 금지** — canonical은 exclusion, weighted는 auxiliary 별도 컬럼
+
 ### 승격 메커니즘 상세
 
 승격은 **TeamCreate 시 Lead가 명시적으로 model 파라미터를 지정**하여 이루어진다:
@@ -334,7 +351,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | Anti-Pattern | 이유 | 대안 |
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
-| 서브에이전트 과다 | Claude 4.6/4.7 경향, 비용 폭증 (Opus 4.7 literal interpretation으로 강화) | SOLO for simple tasks |
+| 서브에이전트 과다 | Claude 4.6/4.7 경향, 비용 폭증 (Opus 4.7 literal interpretation으로 강화 [verified: anthropic.com/news/claude-opus-4-7]) | SOLO for simple tasks |
 | standalone Task | 통신 불가, 고립된 작업 | TeamCreate 필수 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
 | 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 2-Tier (Lead+Primary=opus, rest=sonnet) |
@@ -409,6 +426,8 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 > - 팀 크기: **hard limit 명시 없음, 3-5 teammates 권장**
 > - 통신: SendMessage peer-to-peer, shared task list, file locking
 > - Hooks 연계: `TeammateIdle`, `TaskCreated`, `TaskCompleted` events (Gate 강제에 활용 가능)
+>
+> **추가 참조** [verified: developers.openai.com/codex/changelog]: **Codex CLI 0.124.0** (2026-04-23) — Automatic Review Agent + Browser Integration + GPT-5.5 통합. fz의 cross-model 검증 에이전트(Codex)가 Auto Review Agent로 패턴 강화 가능.
 
 ### 8.1 Persistent Memory (`memory` 필드)
 

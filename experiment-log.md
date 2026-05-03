@@ -6,6 +6,26 @@
 
 ---
 
+## Phase B 시작점 정의 (cross-experiment 통합 표)
+
+> 모든 §5.X 실험의 Phase B 진입 N 값을 단일 표로 명시. UC-17 fz v4.7.0 통일.
+> 본 표 + cross-validation.md `Reflection Rate threshold` 가 Phase B 정의의 single source.
+
+| 실험 | Phase B 진입 N | 표현 (본문에서 사용) | 출처 모듈 정합 |
+|------|:---:|---|---|
+| §5.1 JSON Plan 무결성 | 3건 (1 기준선 + 2 실험) | "3건 누적" | (자체 정의) |
+| §5.2 에이전트 턴 수 | 5건 | "5 sessions 누적" | (자체 정의) |
+| §5.3 Gate 증거 동작 | 5건 + 60% catch rate | "5건 누적, 60%+" | (자체 정의) |
+| §5.4 Harness Metrics (Severity Calibration) | 5 sprint | "5 sprint 누적" | (자체 정의) |
+| §5.5 Agent Teams Tracing (Reflection Rate) | **N≥10** | "N≥10 (preliminary if N<10)" | **cross-validation.md `§ Reflection Rate threshold`** |
+| §5.6 Plugin Trigger Activation | 10건 | "10건 누적" | (자체 정의) |
+
+**§5.5 특별 사항**: cross-validation.md "N<10이면 preliminary, gating 보류"를 single source로 사용. UC-1 (Reflection Rate CP-3) gating은 N≥10에서만 발화.
+
+**fz-review/SKILL.md "Phase B1/B2 후 활성"**: §5.6 (Phase A 효과 측정) → Phase B (Load-bearing Test) → B1/B2 ablation 단계 abstraction. 본 표 §5.6 row 참조.
+
+---
+
 ## 5.1 JSON Plan 실험
 
 > 목표: plan-final.json이 Markdown 대비 plan 무결성을 개선하는지 확인
@@ -136,8 +156,16 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
   reflection_rate:
     issues_total: N
     issues_resolved: N
-    rate_pct: NN | null   # null = vacuous (N=0)
-  metadata: {}            # task-specific (self_dogfood, sprint_id, etc)
+    rate_pct: NN | null            # null = vacuous (N=0). LEGACY (호환성 유지)
+    headline_rate_pct: NN | null   # UC-5 (v4.8.0): 이종 모델 only (canonical exclusion). DP3v2 정합
+    weighted_rate_pct: NN | null   # UC-5 (v4.8.0): 동종 모델 0.5 가중 포함 (auxiliary 별도 보고)
+  cost_proxy:                       # UC-6 (v4.8.0) cost_blast 측정. DP3v2-4 deterministic formula:
+    opus_turns: <int>               # = sum(agents[].turns where agents[].model == "opus")
+    opus_minutes: <float>            # = sum(agents[].completed - agents[].created where agents[].model == "opus") in minutes
+    total_agent_turns: <int>        # = sum(agents[].turns)  — baseline 비교용
+    total_agent_minutes: <float>    # = sum(agents[].completed - agents[].created) in minutes
+    # missing timestamp 처리: agents[].created 또는 agents[].completed null 시 해당 agent skip + metadata.skipped_agents 기록
+  metadata: {}            # task-specific (self_dogfood, sprint_id, skipped_agents, etc)
 ```
 
 ### Sample entry (self-dogfood, 본 schema 신설 자체)
@@ -307,8 +335,14 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
   context7_called_count: <int>          # context7 query-docs 호출 수 (API 검증용)
   issues_caught_by_plugin: <int>        # 플러그인 참조로 발견한 안티패턴/이슈 수
   issues_missed_without_plugin: <int>   # 플러그인 미참조로 놓쳤을 이슈 수 (사후 분석/리뷰에서 확인)
+  # UC-9 (v4.7.1): swift-anti-pattern-preblock P1/P2/P3 원칙별 catch_rate
+  catch_rate_p1: <float>                # P1 SwiftUI 결정 — caught/(caught+missed). 임계: >30% 강화 / <5% 비활성화
+  catch_rate_p2: <float>                # P2 Concurrency isolation 범위
+  catch_rate_p3: <float>                # P3 패턴 변환 보존
   metadata: {}                          # task-specific (e.g., layer-affected, severity-distribution)
 ```
+
+> P1/P2/P3 catch_rate 정의의 single source: `modules/swift-anti-pattern-preblock.md` § Catch Rate Threshold (UC-9, v4.7.1).
 
 ### Auto-collection (선택)
 

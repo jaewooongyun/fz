@@ -219,6 +219,17 @@ TeamCreate("fix-{bug}")
 └── Cross-model 검증 (Lead가 검증 실행)
 ```
 
+### Lead Spawn Override (UC-6, v4.8.0)
+
+> Lead가 TeamCreate 시 명시적으로 model 파라미터를 지정하여 Primary Worker를 opus로 승격한다.
+
+```
+TeamCreate("fix-{bug}")
+Agent(name="impl-correctness", team_name="fix-{bug}", model="opus")  # ★ Primary 승격
+# review-arch는 복잡도 3+ 시에만 추가 spawn:
+# Agent(name="review-arch", team_name="fix-{bug}", model="sonnet")
+```
+
 ### 통신 패턴: Pair Programming (경량, Peer-to-Peer)
 
 ```

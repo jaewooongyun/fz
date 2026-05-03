@@ -74,6 +74,7 @@ model-strategy:
 | 모듈 | 용도 |
 |------|------|
 | modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (Adversarial Constraint Discovery 패턴) |
+| modules/patterns/adversarial.md | Tree Search Adversarial Discovery (UC-11, v4.7.1 explicit reference) |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
 | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
