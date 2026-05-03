@@ -20,4 +20,4 @@
 
 ## Lesson Intake (이 원칙에 새 manifestation 추가 시)
 
-> 참조: `modules/lesson-intake.md`. 동일 failure mode만 manifestation 추가. 다른 mode는 별도 principle 후보.
+> 참조: `modules/memory-guide.md` § Lesson Intake Decision Tree. 동일 failure mode만 manifestation 추가. 다른 mode는 별도 principle 후보.

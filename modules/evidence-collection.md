@@ -4,6 +4,13 @@
 > 에이전트는 Bash/git show 접근 불가이므로 Orchestrator가 사전 수집한다.
 > PR #3639 교훈: diff만으로는 producer site, 삭제 심볼 잔존 여부를 확인할 수 없어 추론→환각→오탐 발생.
 
+## Module Role (UC-12, v4.7.1)
+
+- **Role**: **Producer** (raw evidence 수집 정책)
+- **Consumed by**: `modules/peer-review-gates.md` Gate 4.4-A, 4.7-A (evidence 파일 소비)
+- **Direction**: producer → consumer
+- **Note**: peer-review-gates의 Gate 4.4-A를 trigger 조건 인용은 procedure cross-reference (dependency edge 아님). acyclic 보장.
+
 ## 산출물 경로
 
 ```

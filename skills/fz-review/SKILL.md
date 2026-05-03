@@ -60,6 +60,7 @@ model-strategy:
 | 모듈 | 용도 |
 |------|------|
 | modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (TeamCreate 강제 + 상호 통신) |
+| modules/patterns/live-review.md | Live Review (review-arch ↔ review-quality 발견 즉시 공유) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
@@ -96,12 +97,25 @@ TeamCreate("review-{feature}")
 ├── review-arch (★Opus): 아키텍처 리뷰 — agents/review-arch.md
 ├── review-quality (Sonnet): 코드 품질 리뷰 — agents/review-quality.md
 ├── review-correctness (Sonnet): Phase 4.5 요구사항 충족 검증 [RTM/plan 존재 시만 활성]
-├── review-counter (Sonnet): DA 패스 — review-arch/review-quality "OK" 판정에 반론 [선택]
+├── review-counter (Sonnet): DA 패스 — review-arch/review-quality "OK" 판정에 반론 [항상 실행, v4.7.1 UC-14]
 ├── memory-curator (Sonnet): 관련 교훈 발굴 + review-arch에 직접 전달 [기본 포함, lightweight recall]
 └── Codex CLI: 역검증 (Lead가 /fz-codex validate 실행)
 ```
 
-> review-counter는 선택적 DA 패스. review-correctness는 Phase 4.5에서만 활성 (RTM/plan 존재 시).
+### Lead Spawn Override (UC-6, v4.8.0)
+
+> Lead가 TeamCreate 시 명시적으로 model 파라미터를 지정하여 Primary Worker를 opus로 승격한다.
+
+```
+TeamCreate("review-{feature}")
+Agent(name="review-arch", team_name="review-{feature}", model="opus")  # ★ Primary 승격
+Agent(name="review-quality", team_name="review-{feature}", model="sonnet")
+Agent(name="review-correctness", team_name="review-{feature}", model="sonnet")  # Phase 4.5만 활성
+Agent(name="review-counter", team_name="review-{feature}", model="sonnet")  # 항상 실행 (v4.7.1 UC-14)
+Agent(name="memory-curator", team_name="review-{feature}", model="sonnet")
+```
+
+> review-counter는 항상 실행 DA 패스 (v4.7.1, UC-14 — `team_rounds_delta` Q9 측정 baseline 1주). review-correctness는 Phase 4.5에서만 활성 (RTM/plan 존재 시).
 > ASD 폴더 활성 시: `{WORK_DIR}/review/review-team.md`에 live review 핵심 통신을 기록한다.
 ### 통신 패턴: Live Review (Peer-to-Peer)
 

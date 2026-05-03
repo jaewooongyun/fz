@@ -3,7 +3,7 @@
 > 본 모듈은 fz-plan SKILL.md Phase 1의 절차 본문을 담는다. SKILL은 Gate 1 + reference만 유지 (Progressive Disclosure Level 3).
 > 발동: fz-plan Phase 1 진입 시 자동 Read.
 
-## ⛔ Phase 1 Gate는 SKILL.md에 보존 (트리밍 비저하 원칙)
+## ⛔ Phase 1 Gate는 SKILL.md에 보존 (트리밍 비저하 원칙 — single source: `guides/prompt-optimization.md` §1 보충 3a)
 
 본 module은 **본문(절차)만** 담는다. Gate 1 체크리스트와 Why(H1)는 `skills/fz-plan/SKILL.md`에 남는다 (실행 핵심).
 
@@ -146,5 +146,5 @@ f. **⛔ Import Removal Symbol Inventory** (import 제거 작업 시 필수):
 ## 설계 원칙
 
 - Progressive Disclosure Level 3 (필요 시 Read)
-- Phase 1 Gate 1은 SKILL.md에 보존 (트리밍 비저하)
+- Phase 1 Gate 1은 SKILL.md에 보존 (트리밍 비저하 — single source: `guides/prompt-optimization.md` §1 보충 3a)
 - 가이드 문서이므로 줄 수 제한 없음

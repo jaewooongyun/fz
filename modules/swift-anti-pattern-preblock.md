@@ -120,6 +120,18 @@ test "$(grep -Ec '원칙 P1|원칙 P2|원칙 P3' "$M")" -ge 3
 grep -q 'BAD:' "$M" && grep -q 'GOOD:' "$M"
 ```
 
+## Catch Rate Threshold (UC-9, v4.7.1)
+
+각 P1/P2/P3 원칙별 catch_rate (탐지 정확도) 측정:
+
+- **측정 sink**: `experiment-log.md` §5.6 Plugin Trigger Activation entry — `catch_rate_p1`, `catch_rate_p2`, `catch_rate_p3` 필드
+- **계산식**: `catch_rate = issues_caught_by_principle / (issues_caught_by_principle + issues_missed_without_principle)`
+- **임계**:
+  - `catch_rate > 30%` → 원칙 강화 (token inventory 확장)
+  - `catch_rate < 5%` → 원칙 비활성화 검토 (false positive 多 가능성)
+- **데이터 임계**: 20건 누적 후 산출 (Phase B 진입 시점은 `experiment-log.md § Phase B 시작점 정의` 표 참조)
+- **Single source for swift anti-pattern threshold**: 본 §이 catch_rate 정의의 single source. 다른 모듈/스킬은 reference link만 유지.
+
 ## 설계 원칙
 
 - Progressive Disclosure Level 3 (필요 시에만 로드)

@@ -319,3 +319,4 @@ Uncle Bob 자신도 인정한다: "아키텍처는 상황에 맞게 적용해야
 - Robert C. Martin, *Clean Code* (2008)
 - Robert C. Martin, *Agile Software Development: Principles, Patterns, and Practices* (2002)
 - https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
+- OpenAI Codex CLI: https://developers.openai.com/codex/cli — fz cross-model verification 도구 (0.124.0, 2026-04-23)

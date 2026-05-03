@@ -72,6 +72,7 @@ model-strategy:
 | 참조 | 용도 |
 |------|------|
 | `modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
+| `modules/patterns/live-review.md` | Live Review (peer-review 공유 패턴, fz-review 동일) (UC-11, v4.7.1) |
 | `modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
 | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
 | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |

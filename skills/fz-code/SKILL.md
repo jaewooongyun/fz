@@ -69,6 +69,7 @@ model-strategy:
 | 모듈 | 용도 |
 |------|------|
 | modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (TeamCreate 강제 + 상호 통신) |
+| modules/patterns/pair-programming.md | Pair Programming (impl-correctness ↔ review-arch) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
@@ -116,6 +117,19 @@ TeamCreate("code-{feature}")
 ├── review-correctness (Sonnet): 기능 정확성 + 요구사항 충족 검증 [supporting]
 ├── memory-curator (Sonnet): 관련 교훈 발굴 + impl-correctness에 직접 전달 [기본 포함, lightweight recall]
 └── Cross-model 검증 (Lead가 검증 실행)
+```
+
+### Lead Spawn Override (UC-6, v4.8.0)
+
+> Lead가 TeamCreate 시 명시적으로 model 파라미터를 지정하여 Primary Worker를 opus로 승격한다.
+
+```
+TeamCreate("code-{feature}")
+Agent(name="impl-correctness", team_name="code-{feature}", model="opus")  # ★ Primary 승격
+Agent(name="review-arch", team_name="code-{feature}", model="sonnet")
+Agent(name="impl-quality", team_name="code-{feature}", model="sonnet")
+Agent(name="review-correctness", team_name="code-{feature}", model="sonnet")
+Agent(name="memory-curator", team_name="code-{feature}", model="sonnet")
 ```
 
 > impl-quality는 각 Step 완료 시 impl-correctness에게 패턴 일관성 피드백. Lead에게 보고하지 않고 impl-correctness와 직접 통신.

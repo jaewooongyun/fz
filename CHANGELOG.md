@@ -8,6 +8,58 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.7.1 (2026-05-04) — Implicit→Explicit Enforce: 11 actual fix UC + 5 verified-clean (3-Phase 통합) [MINOR]
+
+**핵심**: v4.6.0 deep analysis (skills 22 + agents 13 + modules 41 + guides 7 + codex-skills 8) → 24 update candidates → 4-Phase 분할 → STC-1 발화 후 Lead inline fix → v4.7.1 통합 release. **가이드 본문(docs)에 implicit하게 있던 규칙을 explicit reference + verification command로 enforce**.
+
+**3 메타 안전망 실전 검증**: 18차 Scope Inflation + STC-1 + Verification Discipline 모두 작동.
+
+**11 actual fix UC + 5 verified-clean**:
+
+**Phase 1 (Low Risk)**:
+- **UC-7** Trimming 비저하 Single Source 명확화 — `prompt-optimization §1 보충 3a`를 single source로 명시, skill-authoring §3는 reference link만 (16줄→8줄, 핵심 3 bullet 보존). plan-deep-planning + fz-plan/SKILL reference 추가
+- **UC-10** lesson-intake.md (17줄 fragment) → `memory-guide § Lesson Intake Decision Tree` 흡수. modules 26→25
+- **UC-17** experiment-log § "Phase B 시작점 정의 (cross-experiment 통합 표)" 신설 — 4종 표현 단일 source 통합
+- **UC-16/18/20 verified-clean** (probe로 already-addressed 확인)
+
+**Phase 2 (Medium Risk)**:
+- **UC-9** swift-anti-pattern-preblock § Catch Rate Threshold (>30% 강화 / <5% 비활성화) + experiment-log §5.6 P1/P2/P3 catch_rate 컬럼
+- **UC-11** 6 SKILL `## 모듈 참조`에 specific patterns/* 명시 (D6 reference accounting). dependency-graph "거짓 dangling" 정정
+- **UC-12** evidence-collection (Producer) + peer-review-gates (Consumer) Module Role 명시 — acyclic 보장, 합병 회피
+- **UC-14** fz-review review-counter `[선택]` → `[항상 실행]` (Sycophancy 방어)
+- **UC-8/15 verified-clean**
+
+**Phase 3 (High Risk — Codex 2 verify cycle)**:
+- **UC-4** harness-engineering §1.2.1 NLAH 6요소 ↔ H1-H6 매핑표 신설 — `[verified: harness L33-L38 + prompt-opt L598-L673]` (C↔H1+H2 / R↔H2+H5 / S↔H5+H6 / A↔H1 / Σ↔H3+H4 / F↔H6 partial)
+- **UC-5** agent-team-guide § Same-model Cross-Verify 정책 — Canonical: exclusion + Auxiliary: weighted_rate_pct 별도 보고
+- **UC-6 + ISSUE-016** 4 SKILL Lead Spawn Override (`Agent(name="...", model="opus")`) + fz-plan Round 0.5 → Round 1 Sequential Operating Contract (`shutdown_request → 종료 확인 → TeamDelete`). frontmatter mutation 회피 (governance "동시 opus ≤ 2" 보장)
+- **UC-13** harness-engineering ## Index (heading-based anchor only, ≤30 budget)
+
+**ISSUE 정밀 처리**:
+- **ISSUE-017** sprint-contract amendments 6 위치 — N≥5 → N≥10 (cross-validation 정합) + auto-trigger 표현 제거
+- **ISSUE-020** AC-9 portable awk script (per-hunk + same/adjacent line + governance 키워드 narrow)
+- **UC-6 cost_blast** experiment-log §5.5 cost_proxy schema deterministic formula — 1주 baseline 모니터링 의무
+- **UC-5 Reflection Rate** experiment-log §5.5 schema headline_rate_pct + weighted_rate_pct (legacy rate_pct 호환 유지)
+
+**Cross-validation 정합 (의도 외 변경)**:
+- clean-architecture.md OpenAI Codex CLI 참조 추가
+- skill-troubleshooting Opus 4.7/GPT-5.5 verified citation
+
+**3 메타 패턴 (F1/F3/F4)**:
+- F1 entity 누락 (1차 분석 fz-modernize 누락) — Codex 2차 verify catch
+- F3 state 누락 (already-addressed UC) — Phase 2/3 probe-first 효과 검증
+- F4 외부 정의 추정 (UC-4 NLAH 매핑) — Codex Phase 3 v1 Critical → v2 verified evidence
+
+**STC-1 정상 작동**: Phase 1 plan v1→v2 (66.7%) → v3 (16.7% regression) → STC-1 발화 → 분할. Phase 3 plan v1 (Critical 1) → v2 (77.8%, Critical 0) → Lead inline fix.
+
+**파일 변경**: 21 modified + 1 deleted (lesson-intake.md). +281 / -57.
+
+**가이드 root cause 매핑**: prompt-optimization §1 보충 3a (UC-7), skill-authoring §3 (UC-10), harness §7 Ablation (UC-9/UC-17), prompt-optimization §3 (UC-11/UC-13), skill-troubleshooting §3.4b (UC-14/UC-5), harness §1.2 + prompt-opt §H1-H6 (UC-4), team-registry L10-12 + agent-team-guide L93/L282 (UC-6).
+
+**상세 release notes**: [docs/releases/v4.7.1.md](docs/releases/v4.7.1.md)
+
+---
+
 ### v4.6.0 (2026-04-26) — Cleanup: fz-plan slim + plugin-refs 정정 + pre-commit hook [MINOR]
 
 **핵심**: v4.5.0/v4.5.1 후속 cleanup 3건 통합. (1) fz-plan SKILL 555 → 452줄 (Phase 1 본문 module 분리), (2) plugin-refs 임베딩 테이블 v4.5.0 강화 반영, (3) user-specific 절대 경로 차단 pre-commit hook 신설.

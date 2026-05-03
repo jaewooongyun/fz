@@ -63,6 +63,7 @@ model-strategy:
 | 모듈 | 용도 |
 |------|------|
 | modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (TeamCreate 강제 + 상호 통신) |
+| modules/patterns/collaborative.md | Phase 0.5 Collaborative Design (review-direction → plan-structure) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 비ASD Serena checkpoint |
@@ -109,6 +110,28 @@ TeamCreate("plan-{feature}")
 ├── Codex verify (Lead 실행, GPT-5.5): 독립 계획 검증
 └── Codex adversarial (Lead 실행, GPT-5.5): Devil's Advocate [--deep 시]
 ```
+
+### Round 0.5 → Round 1 Sequential Operating Contract (UC-6 + ISSUE-016, v4.8.0)
+
+> Phase 0.5 review-direction(opus) Round 0.5 완료 후에만 Phase 1 plan-structure(opus) Round 1 시작.
+> 동시 opus ≤ 2 governance 보장 (review-direction + Lead = 2 → 종료 후 plan-structure + Lead = 2).
+
+```
+# Phase 0.5 (Round 0.5 — sequential)
+TeamCreate(name="plan-{feature}-round0.5")
+Agent(name="review-direction", team_name="plan-{feature}-round0.5", model="opus")
+# ... Round 0.5 진행 (direction-challenge 판정)
+SendMessage(to="review-direction", content="shutdown_request")
+# 종료 확인 (process state polling)
+TeamDelete("plan-{feature}-round0.5")
+
+# Phase 1 (Round 1 — sequential, only after Round 0.5 종료 확인)
+TeamCreate(name="plan-{feature}-round1")
+Agent(name="plan-structure", team_name="plan-{feature}-round1", model="opus")
+# ... Round 1 진행 (collaborative design)
+```
+
+**Verification**: `grep -A5 "Round 0.5.*Sequential" skills/fz-plan/SKILL.md` → 1건 + grep `model="opus"` (review-direction + plan-structure 각각 1건 이상) + grep `shutdown_request` 1건.
 
 **6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거):
 
@@ -295,7 +318,7 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
 8. ⛔ Transformation Spec 작성 (패턴 변환 Step 시)
 9. ⛔ 계획 파일 기록 (compact recovery)
 
-> 각 절차 상세는 `modules/plan-deep-planning.md` 참조. 트리밍 비저하 원칙으로 Gate 1 + Why(H1)는 본 SKILL에 보존.
+> 각 절차 상세는 `modules/plan-deep-planning.md` 참조. 트리밍 비저하 원칙(single source: `guides/prompt-optimization.md` §1 보충 3a)으로 Gate 1 + Why(H1)는 본 SKILL에 보존.
 
 ### Gate 1: Plan Ready
 > **Why (H1)**: 영향 범위가 불완전하면 구현 시 예상 외 파일을 건드리게 되고, 리뷰에서도 범위 밖 변경을 놓친다.

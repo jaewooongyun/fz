@@ -3,6 +3,13 @@
 Synthesize 단계에서 실행하는 9가지 검증 게이트.
 4.4 → 4.4-A → 4.5 → 4.6 → 4.6.5 → 4.7 → 4.7-A (+ Origin Verification) → 4.8 → 4.9 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
 
+## Module Role (UC-12, v4.7.1)
+
+- **Role**: **Consumer** (evidence 기반 gate 운영)
+- **Consumes**: `modules/evidence-collection.md` raw evidence rows (Gate 4.4-A, 4.7-A에서 evidence 파일 소비)
+- **Direction**: producer ← consumer
+- **Note**: a2 절차에서 evidence-collection을 참조하는 것은 procedure cross-reference (dependency edge 아님). 합병 ❌ (Progressive Disclosure 보호).
+
 > Gate 4.4 (Factual Claim Verification)는 PR #3639에서 발견된 3건의 오탐을 방지하기 위해 추가.
 > 에이전트의 사실적 주장(existence/source/behavior/origin)을 Orchestrator가 기계적으로 검증한다.
 > Gate 4.4-A (Mapping Fidelity Gate, v4.4.0)는 Mapping Layer SPOF 방어. evidence 매핑이 ground truth와 atom-level 동등인지 검증한다.
