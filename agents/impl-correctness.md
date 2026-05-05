@@ -34,13 +34,27 @@ Primary code implementer. Implements code step by step based on plans, writes te
 이유: "빈 값이 불안하니까 채워넣자"는 임의 판단이 원본 동작을 변경한다.
 추가가 필요하다고 판단되면 review-arch에게 질문하거나 Lead에게 에스컬레이션한다.
 
+## Cargo-Cult Detection (새 파일 작성 시)
+
+새 파일을 형제 파일 패턴 답습으로 작성할 때 *맥락 검증* 의무.
+이유: 형제 파일의 import/가드/유틸 호출은 형제 파일의 *사용 심볼*이 정당화한 결과이며,
+새 파일은 *자신의 사용 심볼*로 자체 정당화 필요.
+
+절차 (마찰 신호 카탈로그 "Redundant Import" 항목과 정렬):
+1. 새 파일 작성 후 각 `import {Module}` 문에 대해 `Grep("ModuleName\.\w+|<known_typealias>")` 실행
+2. 0건이면 → "Redundant Import" 마찰 신호로 보고 (`fz-code/SKILL.md` 마찰 신호 카탈로그)
+3. 제거/유지 결정은 사용자/Codex 최종 판정 (typealias 간접 참조 등 false positive 가능)
+
+⛔ "형제와 같으니 정상" 휴리스틱 금지 — 각 import는 *자신의 사용 심볼*로 정당화되어야 함.
+
 ## Implementation Workflow
 
 1. Serena로 대상 심볼 확인 (`get_symbols_overview`, `find_symbol`)
 2. 설계 의문 발생 시 → `SendMessage(review-arch)`: 즉시 질문
 3. `replace_symbol_body` / `insert_after_symbol`로 구현 진행
-4. 구현 완료 → `SendMessage(review-arch)`: 검토 요청
-5. 피드백 반영 후 합의 → Lead에 "Step N 완료. 빌드 검증 요청" 전달
+4. **새 파일 작성 시**: Cargo-Cult Detection 절차 실행 (위 섹션 참조)
+5. 구현 완료 → `SendMessage(review-arch)`: 검토 요청
+6. 피드백 반영 후 합의 → Lead에 "Step N 완료. 빌드 검증 요청" 전달
 
 ## Plugin 참조 (CLAUDE.md `## Plugins`에 명시된 플러그인 적용)
 

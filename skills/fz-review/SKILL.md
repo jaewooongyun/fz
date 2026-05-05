@@ -281,7 +281,9 @@ fz-codex가 수행하는 작업:
    - `Package.resolved` 커밋 여부 (외부 의존성 있으면 필수)
    - pbxproj에 `XCLocalSwiftPackageReference` 등록 확인
   6. ⛔ 타입 소속 검증 (모듈화 작업 시): 각 public type에 대해 "이 타입의 관심사 = 이 모듈의 관심사?" 도메인 특화 필드/비즈니스 로직/하드코딩 UI 문자열 포함 시 모듈 경계 위반
-  7. ⛔ Symbol Coverage 검증 (import 제거 작업 시): diff에서 `import X` → `import Y`로 변경된 파일에서 X 모듈의 심볼(typealias, utility 타입 등)이 잔존하는지 grep. 잔존 시 → "symbol_orphan" 이슈
+  7. ⛔ Symbol Coverage 검증 (양방향):
+     - **제거 방향** (import 변경 작업): diff에서 `import X` → `import Y`로 변경된 파일에서 X 모듈의 심볼(typealias, utility 타입 등)이 잔존하는지 grep. 잔존 시 → "symbol_orphan" 이슈
+     - **추가 방향** (신규 import 추가 작업, P1 A2 추가 — cargo-cult 방어): 새로 추가된 `import X`에 대해 X 모듈의 알려진 심볼이 파일에서 사용되는지 grep. 0건이면 → "redundant_import" 이슈 (severity: minor — false positive 가능: typealias 간접 참조 등. 사용자/Codex 최종 판정)
 ```
 
 ### 검증 4-F: Anti-Pattern Enforcement (잔존 금지 패턴 검증)

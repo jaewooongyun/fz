@@ -63,6 +63,14 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - git show 원본 비교로 추가/변경 사항이 의도적인지 확인
 - **Mapping atom 검증** (v4.4.0): `${WORK_DIR}/evidence/semantic-mapping.md` 존재 시 — 각 mapping row의 `mapping_status` 확인. `lossy_atoms` 비어있지 않으면 finding 자동 생성 (severity: **critical** — Gate 4.4-A `mapping_status=lossy` auto-include와 정렬). `unverified` + 동등 결론 → confidence ceiling 65 적용.
 
+### 8. Cargo-Cult Import Detection (신규 파일/import 추가 컨텍스트)
+
+- 새로 추가된 `import X`에 대해 X 모듈의 알려진 심볼이 파일에서 사용되는가? (`fz-review/SKILL.md` 검증 4-E 항목 7 *추가 방향* 양방향 Symbol Coverage)
+- 0건이면 → "redundant_import" 이슈 (severity: **minor**) 보고
+- false positive 가능성 인지: typealias 간접 참조, 타입 추론에 의한 Module 의존, generic constraint 등
+- 판정: agree(removal) / maintain(retain) — 사용자/Codex 최종
+- 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과. 새 파일은 자체 정당화 필요. cargo-cult 패턴(문화로서 답습되는 *맥락 분리된* 패턴 모방) 차단
+
 ## Output Format
 
 보고 항목마다:
