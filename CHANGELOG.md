@@ -8,6 +8,56 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.8.0 (2026-05-06) — Cargo-Cult Defense + Lessons-to-Module Pipeline 도구화 [MINOR]
+
+**핵심**: ASD-1260 redundant import 사례를 트리거로 cargo-cult 패턴 *작성/리뷰/컴파일* 3중 다층 가드 + 누적 메모리 교훈을 fz 모듈에 반자동 반영하는 `/fz-manage reflect-to-module` 도구화. 메모리 17차(Reflection Gap)에 부분 응답.
+
+**5 메모리 e2e 검증** (precision 100% 유지):
+- 19차 (Pilot): 100% recall (5 modules)
+- 18차 (Sanity): 80% recall — overfit 검증
+- 15+16차: 67% recall (mixed file 한계 인정)
+- 17차: N/A (system-level, 자동화 범위 밖)
+- 33차: 50% recall
+- 34차: 60% recall
+- **평균 71.4% recall / 100% precision** (Gate 4 PASS at 70% threshold)
+
+**3중 다층 가드** (Phase 1):
+- 작성 시점: `impl-correctness` Cargo-Cult Detection 섹션 + Workflow 4번 호출
+- 리뷰 시점: `fz-review` 검증 4-E 항목 7 양방향 + `review-quality` Perspective 8
+- 컴파일 시점: TVING `.swiftlint.yml` `unused_import` rule (사용자 brew install 후)
+- `fz-code/SKILL.md` 마찰 신호 카탈로그 31번째 "Redundant Import" 추가
+
+**Lessons-to-Module Pipeline 도구화** (Phase 3):
+- `skills/fz-manage/scripts/parse_memory.py` (280줄) — Memory Parser (12 필드 추출)
+- `skills/fz-manage/scripts/score_relevance.py` v2.1 (270줄) — Relevance Scorer (5 component 점수, threshold 0.70)
+- `skills/fz-manage/prompts/generate_suggestion.md` (170줄) — Suggestion Generator (5 type 분류)
+- `fz-manage/SKILL.md` `reflect-to-module` 서브커맨드 통합 + Codex micro-eval 의무
+
+**Day-by-Day Calibration 9 fix 누적** (Phase 4):
+- Parser 5: SKILL_TAG / SELF_ID / hyphenated review / applies-to / split [공백,쉼표]
+- Scorer 4: cluster 3 (scope 유의어) / cluster 4 (silent disappearance) / auto trigger symmetry / v2.1 calibration
+
+**메모리 35차 신규**: "Calibrate-from-Real, not Plan-from-Imagination" — Multi-case 알고리즘은 1 사례 calibration → 다른 사례 일반화 검증 의무. 31차(Plan-before-Probe)의 algorithm-layer 대칭. Pilot 19차 100%/100% 직후 18차 0/0 발견 → Sanity Check가 2주 P4 매몰비용 차단.
+
+**잔여 6 갭 deferred** (실제 메모리 발생 시 fix, 35차 원칙):
+- 갭 8: SKILL_TO_AGENTS에 fz-codex 등 누락
+- 갭 14: "fz" cascade (precision 저하 위험)
+- 갭 18: 34차 cascade agents 약화
+- 갭 9: Generator "이미 적용됨" 검출
+- 갭 13: 17차 system-level 매핑
+- 갭 19: Mixed file id 분리
+
+**Files Changed**:
+- 변경 5: `fz-code/SKILL.md`, `fz-review/SKILL.md`, `fz-manage/SKILL.md`, `agents/impl-correctness.md`, `agents/review-quality.md`
+- 신규 3: `fz-manage/scripts/parse_memory.py`, `fz-manage/scripts/score_relevance.py`, `fz-manage/prompts/generate_suggestion.md`
+
+**참조**:
+- 작업 폴더: `~/dev/TVING/fz-cargo-cult-defense/` (Master plan + 7 artifact)
+- 트리거: ASD-1260 IAPDebugItems.swift `import TvingCore` redundant
+- Release note: `docs/releases/v4.8.0.md`
+
+---
+
 ### v4.7.1 (2026-05-04) — Implicit→Explicit Enforce: 11 actual fix UC + 5 verified-clean (3-Phase 통합) [MINOR]
 
 **핵심**: v4.6.0 deep analysis (skills 22 + agents 13 + modules 41 + guides 7 + codex-skills 8) → 24 update candidates → 4-Phase 분할 → STC-1 발화 후 Lead inline fix → v4.7.1 통합 release. **가이드 본문(docs)에 implicit하게 있던 규칙을 explicit reference + verification command로 enforce**.

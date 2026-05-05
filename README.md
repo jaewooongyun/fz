@@ -262,6 +262,17 @@ refactoring PR의 evidence 매핑이 ground truth와 atom-level 동등인지 검
 
 상세: `modules/peer-review-gates.md` Gate 4.4-A + `modules/evidence-collection.md` a2. Semantic Mapping Ground Truth.
 
+### Cargo-Cult Defense + Lessons-to-Module Pipeline (v4.8)
+
+ASD-1260 redundant import 사례를 트리거로 cargo-cult 패턴 *작성/리뷰/컴파일* 3중 다층 가드 + 누적 메모리 교훈을 fz 모듈에 반자동 반영하는 도구화. 메모리 17차(Reflection Gap) 부분 응답.
+
+- **3중 다층 가드**: 작성 시점(`impl-correctness` Cargo-Cult Detection) + 리뷰 시점(`fz-review` 검증 4-E 항목 7 양방향 Symbol Coverage + `review-quality` Perspective 8) + 컴파일 시점(SwiftLint `unused_import`)
+- **`/fz-manage reflect-to-module`** 신규 서브커맨드 — Memory Parser + Relevance Scorer v2.1 + Suggestion Generator + Codex micro-eval 5-Step (자동 적용 금지, 사용자 Final Authority)
+- **5 메모리 e2e 검증**: 평균 71.4% recall / 100% precision (Gate 4 PASS at 70% threshold)
+- **메모리 35차** "Calibrate-from-Real, not Plan-from-Imagination": 1 사례 calibration → 다른 사례 일반화 검증 의무 — 31차(Plan-before-Probe)의 algorithm-layer 대칭
+
+상세: `docs/releases/v4.8.0.md`.
+
 **재발 방지 메커니즘 (v4.0)**:
 - `templates/agent-template.md` + `templates/skill-template.md`에 `## Verification` 섹션 자동 상속
 - `templates/skill-template.md`의 `## If TeamCreate is used` 조건부 체크리스트로 env flag 누락 차단
