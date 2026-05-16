@@ -8,6 +8,67 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.9.0 (2026-05-17) — Authority Network + Codex Ecosystem Hardening + fz-modernize 신규 [MINOR]
+
+**핵심**: fz-plugin 가이드/스킬 + Codex 네이티브 스킬 + schemas에 외부 권위 자료 (Anthropic 공식 + arXiv 학술 + OpenAI Cookbook) 인용 네트워크 통합 + Codex self-reflexive 검증으로 발견된 plugin 감지 로직 critical bug fix. `/fz-modernize` 신규 메타-스킬 추가 (913 lines). Cross-Model 정량 효과 4회 누적 실증.
+
+**Active Citation 추가**:
+- Anthropic Multi-Agent Research System (2025-06): Token 80% performance variance — harness-engineering.md
+- Anthropic Scaling Managed Agents (2026-04): emitEvent API contract — context-artifacts.md
+- AgentFlow (arXiv 2604.20801): typed graph DSL — harness 참고문헌 + fz-planner
+- MAST FM-2.2 (NeurIPS 2025, arXiv 2503.13657): "Fail to ask for clarification" 6.8% — lead-action-default.md, prompt-optimization.md (active 환원)
+- Chain-of-Verification (arXiv 2309.11495): fz-fixer / fz-guardian / codex_verification_schema
+- VeriGuard (arXiv 2510.05156): dual-stage verification (이미 active, codex_verification_schema 명시 추가)
+
+**Stage 3 가이드 외부 권위 인용**:
+- `guides/harness-engineering.md` — Token 80% + AgentFlow + 학술 자료 3건 보강 (#8h/8i/8j)
+- `guides/prompt-optimization.md` — §1b TEAM 다양성 MAST FM-2.2 6.8% 정량 인용
+- `modules/context-artifacts.md` — Anthropic A3 emitEvent API contract reference
+- `modules/lead-action-default.md` — MAST FM-2.2 + 메모리 40차 trigger row 추가
+- `modules/cross-validation.md` — 메모리 23차 (Self-review blind spot) explicit reference
+
+**Tier 1+2 Claude 스킬 강화** (light 모드 + 36차 가드):
+- `/fz` Phase 1 `simplified_keywords` 신호 (메모리 40차 자동 라우팅)
+- `/fz-plan`, `/fz-code`, `/fz-review` `light` 모드 추가
+- `/fz-code`, `/fz-fix`, `/fz-commit` 36차 팀 공유 영역 가드
+- `/fz-commit` `PROTECTED_PATTERN` grep + ASR 의무
+
+**Codex 8 네이티브 스킬 Authority + Memory Lesson inline**:
+- 8 스킬 각 1건 Authority 인용 (Building Effective Agents / MAST / DSPy / CoVe / VeriGuard / AgentFlow / Three-Agent / Multi-Agent Research)
+- Memory Lesson inline: fz-fixer (36차), fz-reviewer (23차), fz-architect (32차), fz-planner (31차)
+
+**[CRITICAL] Codex Plugin 감지 로직 fix (Cbug-1)**:
+- Codex self-reflexive verify 단독 발견 — `codex mcp list` ≠ plugin (계층 다름)
+- 수정: `grep -q '^[plugins.' ~/.codex/config.toml && ls ~/.codex/plugins/cache/*/`
+
+**Codex Strategy + GPT-5.5 Preamble + Simplified Mode** (Cgap-1/Cnew-2/Cnew-3):
+- `modules/codex-strategy.md` 권위 인용 (Anthropic A2 + Context Rot + Codex CLI 0.124.0)
+- GPT-5 Prompting Guide "Rephrase → Outline → Narrate" 3-step preamble 표준
+- `/fz` simplified_keywords ↔ Codex `effort=medium` 자동 라우팅
+
+**fz-codex Hybrid Routing + Codex System Skills** (Cgap-2/Cnew-4):
+- OpenAI Codex CLI + GPT-5 Prompting Guide + ICLR Debate + CoVe 4건 권위 인용
+- `~/.codex/skills/.system/` 5개 system skill 활용 매트릭스
+
+**Codex Output Schemas 권위 출처** (Cgap-3):
+- 3 schemas description 필드에 MAST / LLM-PeerReview / VeriGuard / CoVe 권위 출처 명시
+
+**`/fz-modernize` 신규 메타-스킬** (913 lines, 6 files):
+- 6-phase 파이프라인 (Probe → Audit → Plan → Verify → Execute → Validate)
+- 10 메모리 교훈 통합 + AC1-AC11 (AC10 friendly bias / AC11 Self-Application 신설 금지)
+- light 모드 + self-application contract + 4-axes 옵션 시각화
+
+**fz-peer-review 4-Tier Graceful Degradation 확장**:
+- Tier 0 (Solo, <100 changed lines) 신규 + 자동 휴리스틱 (gh CLI 기반)
+- 옵션: `--tier N` (강제) / `--deep` (Cross-Critique) / `--codex` (challenger 추가)
+
+**Cross-Model 정량 효과 4회 누적 실증**:
+- Codex self-reflexive verify가 Claude self-review 대비 ~5배 발견 효과
+- 회당 평균 5건 단독 발견 (analysis / plan / ecosystem / final-review 각각 needs_revision)
+- Claude family blind spot: 권위 인용 누락 ~17%, systemic blind spot ~50%
+
+상세: `docs/releases/v4.9.0.md`.
+
 ### v4.8.0 (2026-05-06) — Cargo-Cult Defense + Lessons-to-Module Pipeline 도구화 [MINOR]
 
 **핵심**: ASD-1260 redundant import 사례를 트리거로 cargo-cult 패턴 *작성/리뷰/컴파일* 3중 다층 가드 + 누적 메모리 교훈을 fz 모듈에 반자동 반영하는 `/fz-manage reflect-to-module` 도구화. 메모리 17차(Reflection Gap)에 부분 응답.
