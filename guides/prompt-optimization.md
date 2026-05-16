@@ -449,7 +449,7 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 ### 다양성 (Diversity)
 
 **Sycophancy 방어 — Round 1 독립성**: 에이전트가 서로의 초안을 보기 전에 독립 분석을 완료해야 한다.
-- MAST (NeurIPS 2025): 67% 오류는 에이전트 간 상호작용에서 발생. "false consensus"가 핵심 실패 모드. 14개 실패 모드 중 "inter-agent misalignment" 카테고리가 가장 치명적.
+- MAST (NeurIPS 2025): 67% 오류는 에이전트 간 상호작용에서 발생. "false consensus"가 핵심 실패 모드. 14개 실패 모드 중 "inter-agent misalignment" 카테고리가 가장 치명적. 특히 **FM-2.2 "Fail to ask for clarification" = 6.8%** [verified: L4] — 모호한 요청을 그대로 진행하면 28개 시스템 평균 6.8% 실패 모드 trigger.
 - CONSENSAGENT (ACL 2025): 동적 프롬프트 정제(dynamic prompt refinement)로 sycophancy를 런타임에 완화. 정적 방어(Round 1 독립성)와 동적 방어(상호작용 중 교정)를 결합하면 효과 극대화.
 - Multi-Agent Collaboration Survey (arXiv 2501.06322): 협업 구조를 peer/centralized/distributed로 분류. fz의 Peer-to-Peer 패턴은 "peer" 구조 + "role-based" 전략의 조합.
 - Round 1에서 독립성을 보장하면 동조 편향을 차단한다.

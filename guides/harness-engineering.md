@@ -239,6 +239,8 @@ Layer 5: Lifecycle Hooks
 
 **프롬프트 캐싱**: 고정 섹션(Priority 10-50)을 프로바이더 수준에서 캐싱하여 매 호출마다 재전송하지 않음. 토큰 비용 절감 + 지연 감소.
 
+> 출처: Anthropic "How we built our multi-agent research system" (2025-06) — "Token usage explains 80% of the performance variance" [verified: A1]. 토큰 경제가 성능 분산의 80%를 설명한다. 따라서 본 섹션의 우선순위 기반 로드/캐싱은 단순 비용 최적화가 아닌 **성능의 1차 동인**.
+
 #### 서브시스템 2: Tool Result Optimization
 
 도구 실행 결과가 컨텍스트를 빠르게 소진한다. 최적화 전략:
@@ -1089,6 +1091,9 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 8e | Externalization in LLM Agents | — | arxiv 2604.08224 [arxiv preprint, 2026-04] — Memory/Skills/Protocols/Harness 통합 review | https://arxiv.org/abs/2604.08224 |
 | 8f | DSPy: Programming, not Prompting | Khattab et al. (Stanford NLP) | dspy.ai [official framework] — BootstrapFewShot/MIPROv2/GEPA optimizers | https://dspy.ai/ |
 | 8g | GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning | Agrawal/Tan/Soylu/...(Khattab 공저자) (Stanford+UCB) | arxiv 2507.19457 [ICLR 2026 Oral / peer-reviewed] — MIPROv2 +10% AIME-2025, GRPO 35x fewer rollouts | https://arxiv.org/abs/2507.19457 |
+| 8h | AgentFlow: Synthesizing Multi-Agent Harnesses | — | arxiv 2604.20801 [arxiv preprint, 2026-04] — typed graph DSL for multi-agent harness synthesis | https://arxiv.org/abs/2604.20801 |
+| 8i | AI Harness Engineering | — | arxiv 2605.13357 [arxiv preprint, 2026-05] — 본 세션 미검증 [검색됨] | — |
+| 8j | Affordance Agent Harness | — | arxiv 2605.00663 [arxiv preprint, 2026-05] — 본 세션 미검증 [검색됨] | — |
 
 ### OpenAI / Codex 공식
 

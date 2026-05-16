@@ -105,6 +105,8 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 4. 상위 Phase 핵심 산출물 로드 (discover→discover-journal.md Current State, plan→plan-final.md)
 5. 컨텍스트 복원 완료 알림
 
+> **추상화 참조**: Anthropic "Scaling Managed Agents: Decoupling the Brain from the Hands" (2026-04) — `emitEvent`/`getEvents` 같은 API contract가 파일 기반 영속화보다 일관성·queryability 우수 [verified: A3]. 현재 fz는 **파일 기반** (index.md + Serena Memory)이고 향후 API 추상화 도입 가능. fz의 ASD 폴더 + Essential Context = Anthropic의 Session event log 개념의 **filesystem 구현체**.
+
 ## Proactive Context Protocol
 
 > 기존: Write(저장)만 하고 Read(로드) 없음 → compact 후 복원 불가
@@ -349,7 +351,7 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 | /fz-plan | plan 버전 기록 |
 | /fz-code | step/progress 기록 |
 | /fz-review | self-review 기록 |
-| /fz-peer-review | review-index.md + 파일 산출물 (synthesized-issues.json, confidence-matrix.md, pr-comments.md) — Serena checkpoint 미사용 |
+| /fz-peer-review | review-index.md + 파일 산출물 (synthesized-issues.json, confidence-matrix.md, pr-comments.md, cost-log.json, tier.txt) — Serena checkpoint 미사용 |
 
 ## ⛔ Work Dir Resolution (모든 fz-* 스킬 필수)
 

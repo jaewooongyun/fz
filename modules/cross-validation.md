@@ -11,7 +11,7 @@
 
 | 메커니즘 | 출처 | fz 적용 |
 |---------|------|--------|
-| **Self-preference bias 상쇄** | 2025 LLM-as-Judge 연구 다수 — 같은 모델이 자기 출력을 우호적으로 평가 | Generator (Claude) ≠ Evaluator (Codex) 강제. fz-codex `verify`/`check`가 이 분리의 구체화 |
+| **Self-preference bias 상쇄** | 2025 LLM-as-Judge 연구 다수 — 같은 모델이 자기 출력을 우호적으로 평가 (메모리 23차 Self-review blind spot 메커니즘) | Generator (Claude) ≠ Evaluator (Codex) 강제. fz-codex `verify`/`check`가 이 분리의 구체화 |
 | **이종 blind spot 보완** | MoA "collaborativeness" (Wang 2024, ICLR 2025 Spotlight, +7.6pp AlpacaEval) | Claude family blind spot을 GPT family가 catch (15차/23차 패턴 — Codex 단독 발견 누적 사례) |
 | **Generator≠Evaluator 강제** | Anthropic Harness Engineering H2 (2026-03) — "Self-evaluation is unreliable" | TEAM 모드에 Codex 필수 참여. SOLO에서도 결정론적 도구 호출 (Q-OBSERVE 경량) |
 | **Position bias 회피** | Order effect on judgment (LLM-Judge 연구) | T1-G ensemble: 출력 randomize + Source label anonymize (CP-1 Step 3 규칙 5/6/7) |
