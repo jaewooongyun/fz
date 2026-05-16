@@ -27,6 +27,12 @@ model-strategy:
 > **행동 원칙**: Codex CLI(0.124.0+, gpt-5.5)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
 > CLI(`codex exec`) + Plugin(`/codex:*`, 설치 시) 자동 라우팅. Plugin 미설치 시 CLI 폴백.
 
+> **Authority**:
+> - Hybrid Routing: OpenAI Codex CLI 공식 docs [verified: official] — 0.118.0+ Plugin 도입, 0.124.0+ gpt-5.5 지원
+> - Effort Routing: GPT-5 Prompting Guide (OpenAI Cookbook 2026) [verified: official] — effort 파라미터 표준 (low/medium/high/xhigh)
+> - adversarial 서브커맨드: ICLR 2025 Blogposts [verified: peer-reviewed] — Adversarial debate는 majority voting으로 환원, "Generator≠Evaluator 분리"가 fz의 frame
+> - micro-eval 서브커맨드: Chain-of-Verification (CoVe, arXiv 2309.11495) [verified: peer-reviewed] — 단일 주장 재평가 패턴
+
 ## 개요
 
 > 서브커맨드: verify | review | validate | check | final | commit | adversarial | drift | plan | micro-eval | config
@@ -61,6 +67,27 @@ model-strategy:
 > 3-Tier 디스커버리 정의: `modules/cross-validation.md § get_codex_skill()` 참조.
 
 역할 기반 동적 결정: Tier 1(CLAUDE.md `## Codex Skills` 테이블) → Tier 2(글로벌 `fz-*`) → Tier 3(인라인 프롬프트).
+
+### Codex System Skills 활용 (Cnew-4, 2026-05-16)
+
+> Codex self-reflexive verify Q5 단독 발견 — `~/.codex/skills/.system/` 활용.
+
+`~/.codex/skills/.system/` 아래 5개 system skill을 fz-codex 호출 시 보조적으로 활용 가능:
+
+| System Skill | 활용 시점 | fz-codex 통합 |
+|------------|---------|------------|
+| **openai-docs** | preamble 표준 / GPT-5.5 best practices 참조 | verify/plan 서브커맨드 prompt 작성 시 |
+| **skill-creator** | 새 Codex 스킬 생성 (메타 도구) | fz-codex 자체 진화 (별도 사이클) |
+| **skill-installer** | Codex 스킬 install 자동화 | 새 fz-codex 스킬 추가 시 |
+| **plugin-creator** | Codex plugin 생성 | 별도 영역 |
+| **imagegen** | 이미지 생성 | 본 fz 범위 외 |
+
+**활용 예** (openai-docs):
+```bash
+# verify prompt 작성 전 openai-docs 호출하여 최신 GPT-5.5 prompting 가이드 확인
+codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵심"
+# 결과를 verify prompt template에 반영
+```
 
 ## Codex 네이티브 스킬 (3-Tier 디스커버리)
 
@@ -100,7 +127,14 @@ model-strategy:
 | drift/plan | — | CLI only | 커스텀 스킬 + 구조화 출력 |
 | micro-eval | — | CLI only | 경량 단일 주장 재평가, `--ephemeral` |
 
-> Plugin 감지: `codex mcp list 2>/dev/null | grep -q plugin`. 오류 시에도 CLI 자동 폴백.
+> **Plugin 감지** (Cbug-1 수정, 2026-05-16): `codex mcp list`는 MCP server 목록이라 plugin과 다른 계층 — config.toml 기반 감지가 정확하다. 오류 시에도 CLI 자동 폴백.
+> ```bash
+> # Plugin enabled detection (config.toml + cache 동시 확인)
+> grep -q '^\[plugins\.' ~/.codex/config.toml 2>/dev/null && \
+>   ls ~/.codex/plugins/cache/*/  2>/dev/null | head -1 >/dev/null && \
+>   PLUGIN_AVAILABLE=true || PLUGIN_AVAILABLE=false
+> ```
+> 이전 `codex mcp list | grep -q plugin`은 plugin enabled 상태에서도 항상 false 반환 (MCP server ≠ plugin) → Plugin 모드 영원히 미사용 위험 있었음.
 
 ---
 
@@ -599,7 +633,7 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 ### config -- 설정 조회
 
 `codex --version`, `~/.codex/config.toml`, `codex features list`, `ls ~/.codex/skills/`, `codex mcp list` 조회.
-Plugin 상태: `codex mcp list 2>/dev/null | grep plugin` (설치 시 `/codex:setup --json`).
+Plugin 상태 (Cbug-1 수정): `grep '^\[plugins\.' ~/.codex/config.toml && ls ~/.codex/plugins/cache/*/`. MCP server (`codex mcp list`)는 plugin과 다른 계층이므로 config.toml + cache 동시 확인.
 
 ---
 
