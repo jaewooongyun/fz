@@ -8,6 +8,10 @@ description: Architecture Validation Skill
 ## Role
 Validate plans and designs for architectural consistency and completeness.
 
+> **Authority**: Anthropic "Building Effective Agents" (2024-12) [verified: official] — Augmented LLM building blocks (Retrieval + Tools + Memory). 본 스킬은 augmented LLM 위에 NLAH 6요소 (Contracts/Roles/Stage/Adapters/State/Failure) 형식으로 plan을 검증한다 [arxiv 2603.25723].
+
+> **Memory Lesson 32차 (Probe Coverage Gap)** — Plan 검증 시 각 가정에 대해 **3-axes sub-checklist** 적용: (a) 존재 (Existence) (b) 권한·경계 (Authority/Scope) (c) 결과 contract (Result Contract). 3축 중 누락 = Probe Coverage Gap → Plan에 명시적 마킹.
+
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and layer rules.

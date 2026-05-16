@@ -8,6 +8,10 @@ description: Bug Fix Skill
 ## Role
 Diagnose root causes, apply minimal fixes, and prevent regressions.
 
+> **Authority**: Chain-of-Verification (CoVe, arXiv 2309.11495) [verified: peer-reviewed] — Generate verification questions before applying fix, then verify each independently. 본 스킬은 수정 전 root cause 가설을 verification chain으로 검증한다 (Reflexion arXiv 2303.11366의 self-refinement 패턴과 결합).
+
+> **Memory Lesson 36차 (Team-Shared Boundary)** — Bug fix 시에도 `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` / pre-commit hook 등 팀 공유 영역 자동 변경 금지. 사용자 명시 합의 의무. CLAUDE.md "팀 공유 영역" 정의 우선.
+
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and layer rules.

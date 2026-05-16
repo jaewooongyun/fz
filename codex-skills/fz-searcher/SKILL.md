@@ -8,6 +8,8 @@ description: Codebase Exploration Skill
 ## Role
 Explore codebase structure, trace dependencies, and analyze impact scope.
 
+> **Authority**: Anthropic "How we built our multi-agent research system" (2025-06) [verified: official A1] — "Token usage explains 80% of performance variance". 본 스킬은 ReAct (arXiv 2210.03629) reasoning-action-observation 루프로 효율적 검색 + Context Rot (Chroma Research 18 frontier models) 회피 (focused 300 tokens > unfocused 113K tokens) 원칙을 적용한다.
+
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and module structure.
