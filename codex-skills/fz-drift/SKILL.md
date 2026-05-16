@@ -9,6 +9,8 @@ description: Architecture Drift Detection Skill
 Detect architecture drift across the entire codebase using 1M context window.
 Find violations that diff-level review cannot catch — systemic patterns, not just changed lines.
 
+> **Authority**: DSPy "Programming, not prompting" (Stanford NLP, dspy.ai) [verified: official framework] — Architecture as code rather than ad-hoc prompts. 본 스킬은 CLAUDE.md `## Architecture` 규칙을 ground truth로, MAST 14 failure modes의 "System Design Issues" 카테고리 (arXiv 2503.13657) 기반으로 drift를 분류한다.
+
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and layer rules.

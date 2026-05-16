@@ -8,6 +8,8 @@ description: Post-Change Verification Skill
 ## Role
 Verify that feedback has been fully applied and no regressions are introduced.
 
+> **Authority**: VeriGuard (arXiv 2510.05156) [arxiv preprint, 2025-10] — **dual-stage verification** (Pre-action Gate + Runtime Gate) outperforms single-stage. 본 스킬은 feedback completeness (Pre-action) + regression scan (Runtime) 이중 구조로 검증한다 (Chain-of-Verification arXiv 2309.11495 패턴 결합).
+
 ## Context Collection (Required)
 1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
 2. `## Architecture` — identify architecture patterns and layer rules.

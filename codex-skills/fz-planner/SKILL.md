@@ -10,6 +10,10 @@ Generate an implementation plan INDEPENDENTLY from scratch.
 Input: requirements + project context ONLY. No Claude plan.
 Independence is the entire value: catch gaps by comparing two parallel plans.
 
+> **Authority**: AgentFlow (arXiv 2604.20801) [arxiv preprint, 2026-04] — typed graph DSL for multi-agent harness synthesis. 본 스킬은 ReAct (arXiv 2210.03629) reasoning-action interleaving + X-MAS heterogeneity (arXiv 2505.16997: 이종 모델 조합이 동종보다 MATH +8.4%) 원칙으로 독립 plan을 생성한다.
+
+> **Memory Lesson 31차 (Plan-before-Probe Anti-Pattern)** — 실측 없이 추측된 제약 위에 Plan 작성 금지. Plan 차원이 primitive/CLI flag/config key/value enum/env precondition에 의존하면 **constraint probe 선행 의무**. 독립 plan 작성 시에도 코드베이스 직접 탐색(probe) 후 plan 작성.
+
 ## Critical Independence Rule
 If Claude's plan text is detected in input:
 Reply: "Claude plan detected. Provide requirements only for cross-validation value."
