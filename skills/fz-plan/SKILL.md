@@ -4,7 +4,7 @@ description: >-
   계획 수립 + 영향 범위 분석 + 설계. 요구사항 분해와 Serena 기반 코드베이스 탐색.
   예: 계획 세워줘, 설계해줘, 아키텍처 잡아줘, 요구사항 분석
 user-invocable: true
-argument-hint: "[기능/요구사항 설명]"
+argument-hint: "[기능/요구사항 설명] [light]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
@@ -453,6 +453,18 @@ Step 4: ContentDetailViewController SwiftUI 기반 UI
 
 **Will**: 요구사항 분해, 영향 분석, Serena 탐색, 구현 계획 출력, 계획 검증
 **Will Not**: 코드 수정 (→ /fz-code), 빌드 실행 (→ /fz-code)
+
+### light 모드 (40차 simplified mode)
+
+사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-plan light "..."` 호출 시:
+- Phase 1 (Deep Planning)만 실행 — 구조 분해 + 영향 분석 + Step 출력
+- Phase 0.5 (Direction Challenge) 생략 (단순 수정 patterns 대상)
+- Phase 2 (Validation) + Phase 3 (Feedback) 생략 (Codex verify 미호출)
+- Stress Test Q1-Q6 생략, 리스크 매트릭스 간소화
+- Anti-Pattern Constraints 작성 생략 (리팩토링 작업 외)
+- 산출물: `{WORK_DIR}/plan/plan-light.md` (간소화 형식)
+
+조건: 메모리 40차 trigger 키워드 + 단순 수정/추가 작업에만. 새 아키텍처 결정 시 full 모드 강제.
 
 ## 에러 대응
 

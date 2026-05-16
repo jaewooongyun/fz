@@ -4,7 +4,7 @@ description: >-
   코드 구현 + 빌드 검증. 계획 기반 점진적 구현과 매 Step 빌드 검증.
   예: 구현해줘, 코드 짜줘, 만들어줘, 개발해줘, 빌드해줘
 user-invocable: true
-argument-hint: "[구현 대상 설명]"
+argument-hint: "[구현 대상 설명] [light]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
@@ -397,6 +397,18 @@ GOOD:
 **Will Not**:
 - 계획 없이 대규모 코드 생성 (→ /fz-plan)
 - 코드 리뷰/검증 (→ /fz-review)
+- **팀 공유 영역 자동 변경 (36차)**: `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` / pre-commit hook 등 변경 시 사용자 명시 합의 의무. CLAUDE.md "팀 공유 영역" 정의 우선, 부재 시 fallback list 적용
+
+### light 모드 (40차 simplified mode)
+
+사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-code light "..."` 호출 시:
+- Step 1 (incremental, 단일 변경)만 실행 — Plan의 첫 Step 또는 가장 작은 단위
+- Stress Test / 마찰 감지 간소화 (분기 폭증 / 잔존 패턴만 유지)
+- Codex 교차 검증 생략 (TEAM 모드라도 light 우선)
+- 매 Step 후 빌드 검증은 유지 (build 안전성은 필수)
+- 산출물: `{WORK_DIR}/code/step-light.md` (간소화)
+
+조건: 메모리 40차 trigger 키워드 + 단일 파일/심볼 변경에만. 5+ 파일 영향 또는 리팩토링 시 full 모드 강제.
 
 ## 에러 대응
 

@@ -320,6 +320,7 @@ GOOD (--codex 위임 패턴):
 - 대규모 리팩토링 (→ /fz-plan)
 - 풀 코드 리뷰 (→ /fz-review)
 - Codex CLI 직접 호출 (→ /fz-codex 위임)
+- **팀 공유 영역 자동 변경 (36차)**: fast fix 시에도 `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` 등 팀 영역 보호. 사용자 명시 합의 없이 자동 변경 금지
 
 ## 에러 대응
 

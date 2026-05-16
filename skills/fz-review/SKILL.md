@@ -4,7 +4,7 @@ description: >-
   자기 코드 3중 검증(Claude+Codex+sc:analyze) + 역방향 검증.
   예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘
 user-invocable: true
-argument-hint: "[리뷰 대상 설명]"
+argument-hint: "[리뷰 대상 설명] [light]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__find_referencing_symbols,
@@ -502,6 +502,17 @@ Gate 5 통과 후:
 
 **Will**: 3중 검증(Claude+Codex+sc:analyze), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리
 **Will Not**: 대규모 구현 (→ /fz-code), Codex 직접 호출 (→ /fz-codex), 계획 수립 (→ /fz-plan)
+
+### light 모드 (40차 simplified mode)
+
+사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-review light "..."` 호출 시:
+- review-arch 단독 (review-quality 생략) — 아키텍처 적합성만 평가
+- Codex 교차 검증 생략 (3중 → 1중)
+- 역방향 검증 (Phase 5.5) 생략
+- Reflection Rate 추적 생략
+- 산출물: `{WORK_DIR}/review/review-light.md` (간소화)
+
+조건: 메모리 40차 trigger 키워드 + 소규모 변경(5 파일 미만 + 100 LOC 미만)에만. 리팩토링/모듈화/시그니처 변경 시 full 모드 강제.
 
 ## 에러 대응
 

@@ -176,6 +176,7 @@ model-strategy:
 | `target_count` | 언급된 대상 파일/모듈 수 | Complexity Scope 차원 |
 | `cross_concern` | 여러 관심사가 교차하는지 | Complexity Risk 차원 |
 | `override_flags` | --solo, --team, --deep | 모드 Override |
+| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light" | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용 (fz-plan/fz-code/fz-review/fz-modernize) |
 
 ### Gate 1: Intent Resolved
 - [ ] 1개 이상의 스킬이 매칭되었는가?
