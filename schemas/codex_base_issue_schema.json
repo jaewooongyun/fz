@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "codex_base_issue_schema.json",
   "title": "Codex Base Issue Schema",
-  "description": "review/peer-review 스키마 공통 issue 정의. 두 스키마에서 $ref로 참조.",
+  "description": "review/peer-review 스키마 공통 issue 정의. 두 스키마에서 $ref로 참조. severity/unified_category 분류는 MAST taxonomy (NeurIPS 2025, arXiv 2503.13657) 14 failure modes 3 카테고리 (system design / inter-agent misalignment / task verification) 기반. OpenAI Structured Outputs 규격 준수.",
   "$defs": {
     "severity": {
       "type": "string",
