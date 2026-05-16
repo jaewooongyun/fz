@@ -5,7 +5,7 @@ description: >-
   예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토
 user-invocable: true
 disable-model-invocation: true
-argument-hint: "[PR번호 또는 브랜치명] [--deep] [--post] [--explain]"
+argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--codex] [--deep] [--post] [--explain]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
@@ -50,7 +50,7 @@ model-strategy:
 - **9개 관점**: Architecture Decision, Extensibility, Over-Engineering, Functional Decomposition, Modern API, Dependency Impact, **Refactoring Completeness**, **Concurrency Safety** (동시성 코드 포함 시), **Requirements Alignment**
 - **3-Model**: Opus(review-arch) + Sonnet(review-quality) + Codex(challenger)
 - **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정
-- **3-Tier Degradation**: diff 크기 기반 자동 Tier 선택 + 폴백 체인
+- **4-Tier Graceful Degradation**: diff 크기 기반 자동 Tier 선택 (Tier 0/1/2/3) + 폴백 체인
 
 ```bash
 /fz-peer-review 123                   # PR #123 리뷰
@@ -208,9 +208,92 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 <500줄 → FULL_INLINE | 500-2000줄 → SUMMARY | >2000줄 → FILE_LIST_ONLY
 ```
 
+### 5.5. Tier Determination (Auto-Tier)
+
+⛔ Gather Step 5 직후 필수 실행. 본 게이트 미실행 시 작은 PR도 Tier 2 디폴트로 진행되어 토큰 낭비.
+
+```bash
+# 1. Changed lines 측정 (PR 또는 branch). gh CLI는 .previous_filename (snake_case) 반환
+if [[ "$INPUT" =~ ^[0-9]+$ ]]; then
+  ADDED=$(gh pr view "$INPUT" --json additions -q '.additions' 2>/dev/null || echo 0)
+  DELETED=$(gh pr view "$INPUT" --json deletions -q '.deletions' 2>/dev/null || echo 0)
+  GENERATED_LINES=$(gh pr view "$INPUT" --json files -q '[.files[] | select(.path | test("(package-lock|pnpm-lock|yarn-lock|Package\\.resolved|Gemfile\\.lock|Cargo\\.lock|\\.pbxproj|\\.storyboard)$")) | .additions + .deletions] | add // 0' 2>/dev/null || echo 0)
+  # rename: gh CLI는 previous_filename (snake_case) 노출. 단, gh CLI 버전에 따라 다름 → fallback grep
+  RENAMED_LINES=$(gh pr view "$INPUT" --json files 2>/dev/null | jq '[.files[] | select(.previous_filename != null or .previousFilename != null) | .additions + .deletions] | add // 0' 2>/dev/null || echo 0)
+else
+  # branch input — BASE 존재 검증
+  case "$INPUT" in
+    feature/*) BASE="${BASE:-develop}";;
+    hotfix/*)  BASE="${BASE:-main}";;
+    *) BASE=$(AskUserQuestion "Base branch?");;
+  esac
+  git rev-parse --verify "$BASE" >/dev/null 2>&1 || git fetch origin "$BASE" 2>/dev/null || { echo "⛔ BASE '$BASE' not found. Abort tier auto."; TIER=2; }
+  ADDED=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '$1!="-"{a+=$1} END{print a+0}')
+  DELETED=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '$2!="-"{d+=$2} END{print d+0}')
+  GENERATED_LINES=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '/(package-lock|Package\.resolved|\.pbxproj|\.lock)/ {g+=$1+$2} END{print g+0}')
+  RENAMED_LINES=$(git diff --name-status "${BASE}...${INPUT}" 2>/dev/null | awk '/^R[0-9]/ {r++} END {print r*5+0}')  # rename 1건당 ~5줄 추정
+fi
+CHANGED_LINES=$((ADDED + DELETED))
+SIGNIFICANT_LINES=$((CHANGED_LINES - GENERATED_LINES))  # rename은 실 편집 가능성 있어 *차감 안 함* (보수적)
+[ "$SIGNIFICANT_LINES" -lt 0 ] && SIGNIFICANT_LINES=0
+[ "$RENAMED_LINES" -gt 0 ] && [ "$SIGNIFICANT_LINES" -lt 10 ] && {
+  AskUserQuestion "rename 위주 PR (SIGNIFICANT_LINES=$SIGNIFICANT_LINES). Tier 0 진행?"
+}
+
+# 2. --tier 옵션 최우선 (precedence: --tier > Risk escalation > auto)
+if [ -n "$TIER_OPT" ]; then
+  TIER=$TIER_OPT  # 사용자 명시 → 그대로. Risk escalation 적용 안 함 (precedence 모순 방지)
+else
+  # auto tier
+  if [ $SIGNIFICANT_LINES -lt 100 ]; then TIER=0
+  elif [ $SIGNIFICANT_LINES -lt 200 ]; then TIER=1
+  elif [ $SIGNIFICANT_LINES -lt 500 ]; then TIER=2
+  elif [ $SIGNIFICANT_LINES -lt 2000 ]; then TIER=2  # +cost warning
+  else
+    AskUserQuestion "diff $SIGNIFICANT_LINES줄. 진행?"
+    TIER=2
+  fi
+
+  # Risk-based escalation (auto일 때만 적용. 6 카테고리 → cap=Tier 2)
+  RISK_PATTERN='auth|token|secret|credential|authorization|permission|role|admin|session|keychain|crypto|certificate|privacy|payment|billing|refund|IAP|InAppPurchase|StoreKit|migration|schema|CoreData|database|sql|public func|public class|public protocol|deinit|removeFromSuperview|deleteAll|@MainActor|actor |async |Task \{|withCheckedContinuation|xcconfig|Package\.swift|ci_scripts'
+  RISK_MATCHES=$(grep -cE "$RISK_PATTERN" "${WORK_DIR}/diff.patch" 2>/dev/null || echo 0)
+  if [ "$RISK_MATCHES" -ge 2 ]; then TIER=$((TIER + 2))
+  elif [ "$RISK_MATCHES" -ge 1 ]; then TIER=$((TIER + 1))
+  fi
+  [ "$TIER" -gt 2 ] && TIER=2  # cap (--deep 명시 시에만 Tier 3 진입)
+fi
+
+# 3. --deep 옵션 처리 (Tier 2/3에서만 Cross-Critique 활성화)
+if [[ "$OPTS" == *"--deep"* ]]; then
+  [ "$TIER" -ge 2 ] && TIER=3 || echo "⚠️ --deep + Tier $TIER → warning. Tier 2 강제"
+  [ "$TIER" -lt 2 ] && TIER=2
+fi
+
+echo "$TIER" > ${WORK_DIR}/tier.txt
+echo "rationale: SIGNIFICANT=$SIGNIFICANT_LINES (added=$ADDED+del=$DELETED-gen=$GENERATED_LINES), risk=$RISK_MATCHES, override=${TIER_OPT:-auto}, deep=${OPTS}" >> ${WORK_DIR}/tier.txt
+```
+
+상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조.
+
+#### Few-shot
+```
+BAD: 13줄 PR → Tier 2 Lite Team 디폴트 → ~375K tokens
+GOOD: 13줄 PR → auto Tier 0 → Lead 단독 분석 → ~30-50K tokens
+```
+
+#### Gate 5.5: Tier Determined
+- [ ] CHANGED_LINES 계산 완료? (`gh pr view --json additions,deletions` 또는 `git diff --numstat`)
+- [ ] --tier 옵션 우선 적용?
+- [ ] auto 결정 결과 tier.txt 기록?
+
 ## Step: Analyze (독립 리뷰, 병렬)
 
-Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degradation" 섹션 참조).
+Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degradation" 섹션 참조).
+
+### Tier 0/1 분기
+- **Tier 0** → `modules/peer-review-tiers.md` §Tier 0 절차로 위임. 본 SKILL.md Analyze 후속 섹션(Gate 0 / Tier 2 / Tier 3) 모두 skip.
+- **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + Codex challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip.
+- **Tier 2/3** → 아래 기존 시퀀스 실행.
 
 ### Orchestrator Bias 방지 규칙
 
@@ -237,49 +320,9 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "3-Tier Graceful Degra
 
 **Self-Check**: 프롬프트에 "~인 것 같다" / 내 의견 / 사실 단정 포함 시 → 제거 후 데이터로 대체.
 
-### ⛔ Gate 0: 팀 생성 필수 (Tier 2+)
+### Tier 2/3 실행 시퀀스 + Codex Analyze
 
-> Tier 2 이상에서는 반드시 아래 순서를 실행한다. **standalone Agent() 호출 금지.**
->
-> ```
-> ⛔ 검증: TeamCreate 호출 없이 Agent(subagent_type=...) 호출 → 위반
-> ⛔ 검증: Agent() 호출 시 team_name 파라미터 누락 → 위반
-> ```
->
-> standalone Agent는 결과가 return으로만 전달되어 에이전트 간 상호 통신(SendMessage)이 불가능하다.
-> TeamCreate → Agent(team_name=...) → SendMessage 경로만 허용.
-
-### Tier 2: Lite Team — 실행 시퀀스
-
-```
-1. TeamCreate(team_name="peer-review-{PR}")               # ⛔ 필수
-2. TaskCreate × 2 (Architecture + Code quality)
-3. Agent(name="review-arch", team_name=..., model="opus")  # ⛔ team_name 필수
-   Agent(name="review-quality", team_name=..., model="sonnet")
-4. Bash("codex exec ...")                                  # Codex challenger
-5. 에이전트 완료 대기 → Lead 합성 → shutdown_request → TeamDelete
-```
-
-Task Brief (각 에이전트): skills/{arch-critic|code-auditor}/SKILL.md + ${WORK_DIR}/(diff.patch + symbols.json + requirements.md + base-behavior.md + evidence/*.md)
-- [Goal] 독립 이슈 발굴 | [Constraints] 피어 참조 금지, origin 필수
-- [Mapping] evidence/semantic-mapping.md 존재 시 raw source + atom table 직접 read (Lead 요약 금지, v4.4.0)
-- [Deliverable] ${WORK_DIR}/{arch-critic|code-auditor}-result.json
-
-### Tier 3: Full Team (--deep) — 추가 시퀀스
-
-Tier 2 완료 후 2.5-Turn Protocol:
-```
-Round 1: (Tier 2) 각 에이전트 독립 분석 → *-result.json 저장
-Round 2: 교차 피드백 (SendMessage 필수) — review-arch ↔ review-quality
-Round 0.5: 최종 보고 → Lead에 [합의/불합의 항목] 전달
-→ review-counter 스폰 (DA 패스) → Codex DA → Lead 합성 → TeamDelete
-```
-
-### Codex 호출 (Analyze)
-
-> `get_codex_skill()` 3-Tier 디스커버리 + codex exec 패턴: `modules/cross-validation.md` 참조.
-
-Codex challenger 프롬프트에 필수 포함: Origin Classification(regression/pre-existing/improvement) + Inheritance Chain(base class init/willSet 변경 시 subclass 검색). `schemas/codex_peer_review_schema.json` 스키마 사용. 결과: `${WORK_DIR}/codex-challenger-result.json`.
+> Tier 2/3 (`Gate 0: 팀 생성 필수 — standalone Agent 금지`), Lite Team / Full Team 실행 시퀀스, Task Brief 형식, Codex challenger 호출 절차는 `modules/peer-review-tiers.md` §Tier 2 / §Tier 3 / §Codex Analyze 참조.
 
 ### 에이전트 출력 스키마
 
@@ -312,28 +355,9 @@ WHY: 이슈 수가 많으면 리뷰어 피로가 증가하고, 진짜 문제가 
 └─ 최종 Confidence Matrix 업데이트
 ```
 
-### Cross-Critique Anti-Sycophancy Rule
+### Cross-Critique Anti-Sycophancy Rule + Codex Devil's Advocate
 
-> PR #3646 교훈: Sonnet(QUAL-4)이 코드 증거 있는 정답을 제시했으나,
-> Opus(ARCH-1)의 "아키텍처 원칙상" 이론적 주장에 self-reverse. 유일하게 맞는 판단이 탈락.
-
-⛔ 코드 증거 없이 피어의 이론적 주장에 self-reverse 금지.
-
-- challenge/reverse 시 **코드 증거** (file:line + 실제 코드) 필수
-- 자신의 finding 철회는 피어가 **caller 코드 또는 convention 증거**를 제시한 경우에만
-- "아키텍처 원칙상 X" (이론) vs "호출 구조를 보면 Y" (실증) → 실증 우선
-
-```
-BAD: ARCH-1 "DIP 위반" → QUAL-4 "맞습니다, 철회합니다" (증거 없는 동조)
-GOOD: ARCH-1 "DIP 위반" → QUAL-4 "caller-analysis.md를 보면 default 없는 쪽이
-      오히려 ViewModel에서 더 많은 concrete 타입을 참조합니다" (증거 기반 보완)
-```
-
-### Codex Devil's Advocate (공통, 1회 추가 호출)
-
-DA 사전 검증: 현재 브랜치 ≠ PR head이면 "diff 기준" 경고 삽입. reverse 판정은 `git show pr-{PR}:{file}`로 교차 확인. codex exec 호출 패턴은 `modules/cross-validation.md` 참조.
-
-DA 판정: `agree`→flagged_by 추가, `challenge`→confidence -20%, `supplement`→보완, `reverse`→EXCLUDE + 새 이슈(confidence 70). reverse 시 PR 브랜치 코드로 교차 확인.
+Anti-Sycophancy 규칙(코드 증거 없는 self-reverse 금지), reverse 판정 절차, DA 호출 패턴: `modules/peer-review-tiers.md` §Cross-Critique 참조.
 
 ---
 
@@ -473,7 +497,7 @@ write_memory("fz:checkpoint:peer-review-deliver", "PR#{number}: 판정 {verdict}
 
 ---
 
-## 3-Tier Graceful Degradation
+## 4-Tier Graceful Degradation
 
 > 참조: `modules/peer-review-tiers.md` — Tier 구성, 자동 선택, 타임아웃 + 폴백
 
@@ -486,7 +510,7 @@ write_memory("fz:checkpoint:peer-review-deliver", "PR#{number}: 판정 {verdict}
 - 3-Model Cross-Review + Confidence Matrix 투표
 - Codex Devil's Advocate로 편향 보정
 - gh pr comment로 리뷰 게시 (`--post`)
-- 3-Tier Graceful Degradation + 자동 폴백
+- 4-Tier Graceful Degradation + 자동 폴백
 **Will Not**:
 - 코드를 직접 수정하지 않음 (리뷰만 수행)
 - 자기 코드 리뷰 (→ `/fz-review`)
