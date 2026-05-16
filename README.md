@@ -135,13 +135,13 @@ echo 'alias cfz="claude --plugin-dir ~/dev/fz-plugin"' >> ~/.zshrc
 ```
 fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
-├── skills/          21개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix ...
+├── skills/          22개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
 ├── agents/          13개 — plan-structure, impl-correctness, review-arch ...
-├── modules/         25개 — team-core, pipelines, cross-validation, lead-action-default, memory-guide, sprint-contract, swift-anti-pattern-preblock, swift-pattern-detection ...
+├── modules/         34개 — team-core, pipelines, cross-validation, lead-action-default, codex-strategy, memory-guide, sprint-contract, swift-anti-pattern-preblock, swift-pattern-detection ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
-├── guides/          7개 — prompt-optimization, skill-authoring ...
-├── codex-skills/    8개 — Codex 네이티브 스킬 (fz-reviewer, fz-architect ...)
-├── schemas/         5개 — Codex JSON 응답 스키마
+├── guides/          7개 — prompt-optimization, skill-authoring, harness-engineering ...
+├── codex-skills/    8개 — Codex 네이티브 스킬 + Authority 인용 + Memory Lesson inline (fz-reviewer, fz-architect ...)
+├── schemas/         5개 — Codex JSON 응답 스키마 (MAST/LLM-PeerReview/VeriGuard/CoVe 권위 출처)
 ├── scripts/         setup-codex-skills.sh
 └── templates/       스킬/에이전트/CLAUDE.md 생성 템플릿
 ```
@@ -262,6 +262,53 @@ refactoring PR의 evidence 매핑이 ground truth와 atom-level 동등인지 검
 
 상세: `modules/peer-review-gates.md` Gate 4.4-A + `modules/evidence-collection.md` a2. Semantic Mapping Ground Truth.
 
+### Authority Network + Codex Ecosystem Hardening (v4.8.1)
+
+가이드/모듈/스킬 + Codex 네이티브 스킬 + schemas에 외부 권위 자료 (Anthropic 공식 + arXiv 학술 + OpenAI Cookbook) 인용 네트워크 통합 + Codex 측 self-reflexive 검증으로 발견된 plugin 감지 로직 critical bug fix. fz-modernize 신규 메타-스킬 추가.
+
+**Stage 3 가이드 외부 권위 인용 (Anthropic A1/A3 + MAST + 23차)**:
+- `guides/harness-engineering.md` — Anthropic "How we built our multi-agent research system" (2025-06) "Token usage explains 80% of performance variance" 권위 인용 + AgentFlow (arXiv 2604.20801), AI Harness Engineering (2605.13357), Affordance Agent Harness (2605.00663) 신규 학술 자료 3건
+- `modules/context-artifacts.md` — Anthropic "Scaling Managed Agents" (2026-04) emitEvent/getEvents API contract reference
+- `modules/lead-action-default.md` — MAST (NeurIPS 2025, arXiv 2503.13657) FM-2.2 "Fail to ask for clarification" 6.8% 정량 인용 + 메모리 40차 (Simplified Request) trigger row
+- `modules/cross-validation.md` — 메모리 23차 (Self-review blind spot) explicit reference
+
+**Tier 1+2 Claude 스킬 강화 (light 모드 + 36차 가드)**:
+- `/fz` Phase 1 `simplified_keywords` 신호 ("그냥/가볍게/단순/빠르게/light" 자동 라우팅, 메모리 40차)
+- `fz-plan/fz-code/fz-review` `light` 모드 (Phase/Step 축소, Codex 검증 생략)
+- `fz-code/fz-fix/fz-commit` 36차 가드 (`.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` 자동 변경 금지)
+- `fz-commit` `PROTECTED_PATTERN` grep + ASR 의무
+
+**Codex 8 네이티브 스킬 권위 인용 + Memory Lesson inline**:
+- Authority: Anthropic Building Effective Agents / MAST / DSPy / Chain-of-Verification / VeriGuard / AgentFlow / Three-Agent Harness / Multi-Agent Research System
+- Memory Lesson: fz-fixer (36차), fz-reviewer (23차), fz-architect (32차), fz-planner (31차)
+
+**Codex Plugin 감지 로직 [CRITICAL] fix (Cbug-1)**:
+- Codex self-reflexive verify 단독 발견 — 기존 `codex mcp list | grep -q plugin`은 MCP server ≠ plugin 계층 차이로 영원히 false 반환 → Plugin 모드 미사용 위험
+- 수정: `grep -q '^\[plugins\.' ~/.codex/config.toml && ls ~/.codex/plugins/cache/*/` (config.toml + cache 동시 확인)
+
+**Codex Strategy 권위 + GPT-5.5 Preamble 표준 + Simplified Mode 매핑 (Cgap-1/Cnew-2/Cnew-3)**:
+- `modules/codex-strategy.md` — Reasoning Effort (Anthropic A2 2026-03) + Diff 크기 (Context Rot Chroma) + CLI Mode (Codex CLI 0.124.0) 권위 인용
+- GPT-5 Prompting Guide "Rephrase Goal → Outline Plan → Narrate" 3-step preamble 표준
+- `/fz` simplified_keywords ↔ Codex `effort=medium` 자동 라우팅 (Claude light 모드와 정합)
+
+**fz-codex Hybrid Routing 권위 + Codex System Skills 활용 (Cgap-2/Cnew-4)**:
+- OpenAI Codex CLI + GPT-5 Prompting Guide + ICLR 2025 Debate 회의론 + CoVe 4건 권위 인용
+- `~/.codex/skills/.system/` 5개 system skill (openai-docs / skill-creator / skill-installer / plugin-creator / imagegen) 활용 매트릭스 (Codex Q5 단독 발견)
+
+**Codex Output Schemas 권위 출처 (Cgap-3)**:
+- `codex_base_issue_schema.json` — MAST 14 failure modes taxonomy (severity/unified_category)
+- `codex_peer_review_schema.json` — LLM-PeerReview ensemble + Anthropic Three-Agent Harness
+- `codex_verification_schema.json` — VeriGuard dual-stage (arXiv 2510.05156) + CoVe (arXiv 2309.11495)
+
+**`/fz-modernize` 신규 메타-스킬 (913 lines)**:
+- 6-phase 파이프라인: Probe → Audit → Plan → Verify → Execute → Validate
+- 10 메모리 교훈 통합 (16/17/18/23/31/32/33/34/36/40차) + AC1-AC11 (AC10 friendly bias / AC11 Self-Application 신설 금지)
+- light 모드 (40차) + self-application contract (23차) + 4-axes 옵션 시각화 (34차)
+
+**Cross-Model 정량 효과 4회 누적 실증**: Codex self-reflexive verify가 Claude self-review 5배+ 효과 (회당 평균 5건 단독 발견, 4/4 needs_revision). Claude family blind spot ~17% bias 추정이 보수적 — systemic blind spot (commit boundary, statistics, scope hygiene)은 ~50%+ 누락.
+
+상세: `docs/releases/v4.8.1.md` (작성 예정).
+
 ### Cargo-Cult Defense + Lessons-to-Module Pipeline (v4.8)
 
 PRJ-1260 redundant import 사례를 트리거로 cargo-cult 패턴 *작성/리뷰/컴파일* 3중 다층 가드 + 누적 메모리 교훈을 fz 모듈에 반자동 반영하는 도구화. 메모리 17차(Reflection Gap) 부분 응답.
@@ -308,7 +355,7 @@ PRJ-1260 redundant import 사례를 트리거로 cargo-cult 패턴 *작성/리�
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
 | **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.5) + `micro-eval` 단일 주장 재평가 (needs_verification ⇔ Default-Deny 결합, v4.0) |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
-| **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage` | 문서, 메모리, 스킬 관리 |
+| **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage`, `/fz-modernize` | 문서, 메모리, 스킬 관리 + 가이드 modernization (외부 권위 자료 Tier 1+2 갱신) |
 | **보조** | `/fz-new-file`, `/fz-excalidraw`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 다이어그램, 회의록, PR 요약 |
 
 ---
