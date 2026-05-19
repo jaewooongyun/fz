@@ -174,159 +174,17 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
     └── External: Codex(GPT-5.5)
 ```
 
-### Verification Discipline 4-way Chain (v4.0+)
+### What's New (v4.9.0)
 
-**추정을 사실로 단정 금지** 원칙이 생태계 전체에 4-way 체인으로 구조화됨. v4.0에서 단일 선형 체인을 4개 독립 체인으로 재설계 + 템플릿 레이어 자동 상속으로 재발 방지 메커니즘 확보.
+- **Authority Network**: 가이드/스킬/Codex 네이티브 스킬에 외부 권위 자료(Anthropic 공식 + arXiv 학술 + OpenAI Cookbook) 인용 네트워크 통합 — 상세 표는 아래 [근거 연구](#근거-연구).
+- **`/fz-modernize` 신규**: 가이드/문서 modernization 메타-스킬 (6-phase: Probe → Audit → Plan → Verify → Execute → Validate).
+- **Light 모드**: `/fz-plan`, `/fz-code`, `/fz-review`가 "그냥/가볍게/단순/빠르게" 키워드에 자동 라우팅 (Phase/Step 축소 + Codex 생략).
+- **Codex Plugin 감지 [CRITICAL] fix**: `config.toml + cache` 동시 확인으로 교정 (MCP server ≠ plugin 계층 분리).
+- **Cross-Model 정량 효과**: Codex self-reflexive verify가 Claude self-review 대비 5배+ 단독 발견 효과 4회 누적 실증.
 
-```
-답변 생성 시
-    ↓
-Fail-Closed 키워드 가드 (T6/T7 트리거 — modules/team-core.md TEAM boot 자동 주입)
-    ├── 과거 상태 키워드 ("원본은", "이전은") 감지
-    │   → 직전 5턴 검증 도구 호출 흔적 없으면 [미검증] 자동 태그
-    │
-    └── 아티팩트 인용 (follow-up-tasks.md 등) 감지
-        → 현재 시점 재실측 강제 또는 [아카이브] 태그
-    ↓
-Lead Reasoning §1.5 Fallacy 체크
-    ├── Partial-to-Whole (부분→전체)
-    ├── Contingent-to-Inherent (현재→본질)
-    ├── Operation Classification (연산 분류)
-    └── Speculation-to-Fact (추정→사실)
-    ↓
-fz-codex micro-eval 서브커맨드 (단일 주장 독립 재평가)
-    → verdict: agree | disagree | partial | needs_verification
-    → needs_verification ⇔ uncertainty-verification.md Default-Deny (의미론적 결합, v4.0)
-    ↓
-fz-review Phase 4.5 B3 체크리스트 + experiment-log.md §5.4 canonical sink (v4.0)
-    → 5개 지표 자동 수집 → 누적 → B1/B2 진입 판정
-```
+> 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
 
-### V.D. 4-way Chain (v4.0 아키텍처)
-
-```
-① 기본 fail-closed:  uncertainty-verification → fz-plan / fz-code
-② 보조 micro-eval:   fz-codex micro-eval → needs_verification → Default-Deny 차단
-③ TEAM 주입:         system-reminders → team-core → fz/SKILL.md Task Brief → agents (templates/ 상속)
-④ 운영 피드백:       Phase 4.5 측정 → experiment-log.md §5.4 canonical sink → B1/B2 판정
-```
-
-### Lead Action Default Principle (v4.3 통합)
-
-```
-Lead default = action with proportional verification
-```
-
-31차/32차/33차 메타 교훈을 단일 원칙으로 통합. **verify는 명시적 risk signal에서만**.
-
-| Manifestation | Trigger | Action |
-|---------------|---------|--------|
-| 31차 (Plan-before-Probe) | primitive 의존 가정 | constraint probe 선행 |
-| 32차 (Probe Coverage) | enumeration 누락 | 3-axes sub-checklist |
-| 33차 (Recommendation Default) | implementation-ready | default = implementation |
-
-상세: `modules/lead-action-default.md` (≤30 lines thin reference) + `modules/memory-guide.md` § Lesson Intake Decision Tree.
-
-### Sprint Contract Pattern (T2-B, v4.3)
-
-cross-skill + 5+ Step plan 시 발동: **Codex가 success criteria를 사전 commit → Lead가 plan 작성** → Codex verify. Self-preference bias 우회 + Generator≠Evaluator 시간 분리.
-
-상세: `modules/sprint-contract.md` + `fz-plan` Phase 0.7.
-
-### Swift/iOS Quality Framework — 3-Layer Evidence (v4.5)
-
-Plan/Code/Review 각 단계에서 Claude + Codex가 **evidence-based clear Swift/iOS coding**을 수행하도록 fz framework에 3-Layer Evidence 정합 통합. plan-structure agent + Phase 1.5 (Plan) + Phase 0.5 (Code) + Swift/iOS Domain Tier (Meta) 4축 강화.
-
-```
-Layer 1 PLAN   ─── plan-structure Swift Awareness + Phase 1.5 (Anti-Pattern Pre-block) + iOS 16 명시
-Layer 2 CODE   ─── impl-quality context7 + Phase 0.5 (Pattern Pre-detection) + Codex Repair Checklist
-Layer 3 REVIEW ─── fz-fix supporting (impl-quality + review-quality) + 역방향 트리거 + drift routing fix
-Meta           ─── Swift/iOS Domain Tier (additive layer) + §5.6 Plugin Trigger Activation + Load-bearing 절차
-```
-
-- `modules/swift-anti-pattern-preblock.md` (신규) — 3 원칙 (P1/P2/P3) + token + Few-shot
-- `modules/swift-pattern-detection.md` (신규) — 4 원칙 (D/E/F/G) + Phase 1.5 P3 ↔ G mirror
-- `modules/uncertainty-verification.md` Swift/iOS Domain Tier — 7개 주장 유형 × Heavy/Light × Mandatory Sources (additive, non-overriding 일반 Heavy 정책)
-- `experiment-log.md` §5.6 — Plugin trigger activation 측정 schema + 원칙별 ablation 절차
-
-5-cycle Cross-Validation (Claude + Codex GPT-5.5): Codex unique 16 + Claude deep-review unique 5 → Reflection Rate 90% (strict) / 95% (lenient).
-
-### Mapping Layer SPOF Defense (v4.4)
-
-refactoring PR의 evidence 매핑이 ground truth와 atom-level 동등인지 검증. 6-Layer LLM 검증이 같은 매핑 base를 공유하면 매핑 오류는 layer 수와 무관하게 통과 — **Mapping Layer Single-Point-of-Failure** 방어. 검증 신뢰도 = `min(매핑 정확성, layer 정확성)` (multiplicative 아님).
-
-- `evidence/semantic-mapping.md` — atom-level mapping table + `[verified: source]` 의무 (`OldAPI → NewAPI` 한 줄 매핑 금지)
-- **Gate 4.4-A Mapping Fidelity Gate** — refactoring PR + artifact 부재 → fail-closed Critical / `mapping_status=lossy` → auto-include
-- Default-Deny 좁은 확장 — peer-review mapping/equivalence claim에 한정 (전역 확대 X)
-- Layer Diversity 통합 — deterministic source(`git show / Read / grep`) + LLM 판단 조합
-
-상세: `modules/peer-review-gates.md` Gate 4.4-A + `modules/evidence-collection.md` a2. Semantic Mapping Ground Truth.
-
-### Authority Network + Codex Ecosystem Hardening (v4.8.1)
-
-가이드/모듈/스킬 + Codex 네이티브 스킬 + schemas에 외부 권위 자료 (Anthropic 공식 + arXiv 학술 + OpenAI Cookbook) 인용 네트워크 통합 + Codex 측 self-reflexive 검증으로 발견된 plugin 감지 로직 critical bug fix. fz-modernize 신규 메타-스킬 추가.
-
-**Stage 3 가이드 외부 권위 인용 (Anthropic A1/A3 + MAST + 23차)**:
-- `guides/harness-engineering.md` — Anthropic "How we built our multi-agent research system" (2025-06) "Token usage explains 80% of performance variance" 권위 인용 + AgentFlow (arXiv 2604.20801), AI Harness Engineering (2605.13357), Affordance Agent Harness (2605.00663) 신규 학술 자료 3건
-- `modules/context-artifacts.md` — Anthropic "Scaling Managed Agents" (2026-04) emitEvent/getEvents API contract reference
-- `modules/lead-action-default.md` — MAST (NeurIPS 2025, arXiv 2503.13657) FM-2.2 "Fail to ask for clarification" 6.8% 정량 인용 + 메모리 40차 (Simplified Request) trigger row
-- `modules/cross-validation.md` — 메모리 23차 (Self-review blind spot) explicit reference
-
-**Tier 1+2 Claude 스킬 강화 (light 모드 + 36차 가드)**:
-- `/fz` Phase 1 `simplified_keywords` 신호 ("그냥/가볍게/단순/빠르게/light" 자동 라우팅, 메모리 40차)
-- `fz-plan/fz-code/fz-review` `light` 모드 (Phase/Step 축소, Codex 검증 생략)
-- `fz-code/fz-fix/fz-commit` 36차 가드 (`.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` 자동 변경 금지)
-- `fz-commit` `PROTECTED_PATTERN` grep + ASR 의무
-
-**Codex 8 네이티브 스킬 권위 인용 + Memory Lesson inline**:
-- Authority: Anthropic Building Effective Agents / MAST / DSPy / Chain-of-Verification / VeriGuard / AgentFlow / Three-Agent Harness / Multi-Agent Research System
-- Memory Lesson: fz-fixer (36차), fz-reviewer (23차), fz-architect (32차), fz-planner (31차)
-
-**Codex Plugin 감지 로직 [CRITICAL] fix (Cbug-1)**:
-- Codex self-reflexive verify 단독 발견 — 기존 `codex mcp list | grep -q plugin`은 MCP server ≠ plugin 계층 차이로 영원히 false 반환 → Plugin 모드 미사용 위험
-- 수정: `grep -q '^\[plugins\.' ~/.codex/config.toml && ls ~/.codex/plugins/cache/*/` (config.toml + cache 동시 확인)
-
-**Codex Strategy 권위 + GPT-5.5 Preamble 표준 + Simplified Mode 매핑 (Cgap-1/Cnew-2/Cnew-3)**:
-- `modules/codex-strategy.md` — Reasoning Effort (Anthropic A2 2026-03) + Diff 크기 (Context Rot Chroma) + CLI Mode (Codex CLI 0.124.0) 권위 인용
-- GPT-5 Prompting Guide "Rephrase Goal → Outline Plan → Narrate" 3-step preamble 표준
-- `/fz` simplified_keywords ↔ Codex `effort=medium` 자동 라우팅 (Claude light 모드와 정합)
-
-**fz-codex Hybrid Routing 권위 + Codex System Skills 활용 (Cgap-2/Cnew-4)**:
-- OpenAI Codex CLI + GPT-5 Prompting Guide + ICLR 2025 Debate 회의론 + CoVe 4건 권위 인용
-- `~/.codex/skills/.system/` 5개 system skill (openai-docs / skill-creator / skill-installer / plugin-creator / imagegen) 활용 매트릭스 (Codex Q5 단독 발견)
-
-**Codex Output Schemas 권위 출처 (Cgap-3)**:
-- `codex_base_issue_schema.json` — MAST 14 failure modes taxonomy (severity/unified_category)
-- `codex_peer_review_schema.json` — LLM-PeerReview ensemble + Anthropic Three-Agent Harness
-- `codex_verification_schema.json` — VeriGuard dual-stage (arXiv 2510.05156) + CoVe (arXiv 2309.11495)
-
-**`/fz-modernize` 신규 메타-스킬 (913 lines)**:
-- 6-phase 파이프라인: Probe → Audit → Plan → Verify → Execute → Validate
-- 10 메모리 교훈 통합 (16/17/18/23/31/32/33/34/36/40차) + AC1-AC11 (AC10 friendly bias / AC11 Self-Application 신설 금지)
-- light 모드 (40차) + self-application contract (23차) + 4-axes 옵션 시각화 (34차)
-
-**Cross-Model 정량 효과 4회 누적 실증**: Codex self-reflexive verify가 Claude self-review 5배+ 효과 (회당 평균 5건 단독 발견, 4/4 needs_revision). Claude family blind spot ~17% bias 추정이 보수적 — systemic blind spot (commit boundary, statistics, scope hygiene)은 ~50%+ 누락.
-
-상세: `docs/releases/v4.8.1.md` (작성 예정).
-
-### Cargo-Cult Defense + Lessons-to-Module Pipeline (v4.8)
-
-PRJ-1260 redundant import 사례를 트리거로 cargo-cult 패턴 *작성/리뷰/컴파일* 3중 다층 가드 + 누적 메모리 교훈을 fz 모듈에 반자동 반영하는 도구화. 메모리 17차(Reflection Gap) 부분 응답.
-
-- **3중 다층 가드**: 작성 시점(`impl-correctness` Cargo-Cult Detection) + 리뷰 시점(`fz-review` 검증 4-E 항목 7 양방향 Symbol Coverage + `review-quality` Perspective 8) + 컴파일 시점(SwiftLint `unused_import`)
-- **`/fz-manage reflect-to-module`** 신규 서브커맨드 — Memory Parser + Relevance Scorer v2.1 + Suggestion Generator + Codex micro-eval 5-Step (자동 적용 금지, 사용자 Final Authority)
-- **5 메모리 e2e 검증**: 평균 71.4% recall / 100% precision (Gate 4 PASS at 70% threshold)
-- **메모리 35차** "Calibrate-from-Real, not Plan-from-Imagination": 1 사례 calibration → 다른 사례 일반화 검증 의무 — 31차(Plan-before-Probe)의 algorithm-layer 대칭
-
-상세: `docs/releases/v4.8.0.md`.
-
-**재발 방지 메커니즘 (v4.0)**:
-- `templates/agent-template.md` + `templates/skill-template.md`에 `## Verification` 섹션 자동 상속
-- `templates/skill-template.md`의 `## If TeamCreate is used` 조건부 체크리스트로 env flag 누락 차단
-- `modules/team-core.md` TEAM 생성 절차에 T6/T7 트리거 주입 명시
-- TeamCreate 사용 9 skills (fz, fz-plan, fz-code, fz-discover, fz-fix, fz-review, fz-peer-review, fz-search, fz-pr-digest) 모두 `## Prerequisites` 섹션 필수
-
-### 근거 연구 (v4.0 공식 인용)
+### 근거 연구
 
 | 출처 | 적용 |
 |------|------|
@@ -353,10 +211,10 @@ PRJ-1260 redundant import 사례를 트리거로 cargo-cult 패턴 *작성/리�
 | | `/fz-commit`, `/fz-pr` | 커밋 + Fork 기반 PR |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
-| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.5) + `micro-eval` 단일 주장 재평가 (needs_verification ⇔ Default-Deny 결합, v4.0) |
+| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.5) + `micro-eval` 단일 주장 재평가 |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
-| **문서/시스템** | `/fz-doc`, `/fz-memory`, `/fz-skill`, `/fz-manage`, `/fz-modernize` | 문서, 메모리, 스킬 관리 + 가이드 modernization (외부 권위 자료 Tier 1+2 갱신) |
-| **보조** | `/fz-new-file`, `/fz-excalidraw`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 다이어그램, 회의록, PR 요약 |
+| **문서/시스템** | `/fz-memory`, `/fz-skill`, `/fz-manage`, `/fz-modernize` | 메모리, 스킬 관리 (`write` 서브커맨드 = 문서 작성 + 글쓰기 + 프롬프트 최적화), 가이드 modernization |
+| **보조** | `/fz-new-file`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 회의록, PR 요약 |
 
 ---
 
