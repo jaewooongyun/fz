@@ -186,16 +186,52 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
 
 ### 근거 연구
 
+fz 가이드(`guides/*.md`)와 스킬이 인용하는 외부 권위 자료입니다. 가이드 본문에 더 자세한 출처 표가 있습니다 — 특히 `guides/harness-engineering.md` §References, `guides/prompt-optimization.md` Tier 1/2.
+
+#### Anthropic 공식
+
+| 출처 | 발표 | fz 적용 |
+|------|:---:|------|
+| [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) | 2024 | agent-team-guide.md / Codex 네이티브 스킬 권위 베이스 |
+| [Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) | 2025-11 | harness-engineering.md Pattern A (Initializer + Coding Agent) |
+| [How we built our multi-agent research system](https://www.anthropic.com/engineering/built-multi-agent-research-system) | 2025-06 | "Token 80% performance variance" → harness-engineering.md 우선순위 로딩 |
+| [Anthropic 32p Skills Guide](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/skill-best-practices) | 2026-01 | skill-authoring.md / skill-testing.md 3단계 테스트 + Under/Over-triggering |
+| [Claude 4 Best Practices](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/claude-4-best-practices) | 2026-02 | prompt-optimization.md §3 과격 지시어 가드 |
+| [Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps) | 2026-03 | "self-evaluation unreliable" → cross-validation 근거 / Planner-Generator-Evaluator |
+| [Scaling Managed Agents](https://www.anthropic.com/engineering/managed-agents) | 2026-04 | Brain/Hands/Session 분리 → context-artifacts.md emitEvent API contract |
+| [Introducing Claude Opus 4.7](https://www.anthropic.com/news/claude-opus-4-7) | 2026-04-16 | "literal instruction following" 변화 → 과격 지시어 가드 강화 |
+| [Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) | 2026 | prompt-optimization.md context 전략 (load-bearing skill of 2026) |
+| [Best Practices for Claude Code](https://www.anthropic.com/engineering/claude-code-best-practices) | 2026 | Subagent isolation / filesystem > compaction |
+
+#### OpenAI 공식
+
+| 출처 | 발표 | fz 적용 |
+|------|:---:|------|
+| [GPT-5 Prompting Guide (Cookbook)](https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide) | 2026 | fz-codex preamble 표준 ("Rephrase → Outline → Narrate") |
+| [Introducing GPT-5.5](https://openai.com/index/introducing-gpt-5-5/) + [System Card](https://openai.com/index/gpt-5-5-system-card/) | 2026-04-23 | "literal and thorough manner" → Codex 인용 가드 |
+| [Codex CLI Changelog 0.124.0](https://developers.openai.com/codex/changelog) | 2026-04-23 | fz-codex Hybrid Routing + Auto Review Agent + GPT-5.5 통합 |
+
+#### Academic (peer-reviewed / arXiv)
+
 | 출처 | 적용 |
 |------|------|
-| Anthropic: Harness Design for Long-Running Applications (2026-03) | harness-engineering.md 원칙 2-3 |
-| Anthropic: Scaling Managed Agents (2026-04) | §1.3 infrastructure vs application 레이어 구분 |
-| arxiv 2603.25723 NLAH | C, R, S, A, Σ, F formalism |
-| arxiv 2505.16997 X-MAS | 이종 모델 조합 (MATH +8.4%, AIME +47%) |
-| arxiv 2510.07777 Drift No More | system-reminders 근거 |
-| arxiv 2510.05156 VeriGuard | dual-stage verification (fz cross-validation) |
-| arxiv 2512.20845 MAR | 3중 검증 역할 분리 이론 |
-| arxiv 2601.15300 + 2510.05381 | 1M context "safety net not strategy" |
+| **NLAH** (Pan et al., Tsinghua/HIT) — [arXiv 2603.25723](https://arxiv.org/abs/2603.25723) | harness-engineering.md C/R/S/A/Σ/F formalism |
+| **MAST** (NeurIPS 2025) — [arXiv 2503.13657](https://arxiv.org/abs/2503.13657) | 14 failure modes + FM-2.2 "Fail to ask" 6.8% → lead-action-default.md |
+| **GEPA** (Stanford+UCB, ICLR 2026 Oral) — [arXiv 2507.19457](https://arxiv.org/abs/2507.19457) | Reflective prompt evolution (MIPROv2 +10% AIME) → fz-skill optimize |
+| **ACE: Agentic Context Engineering v3** (Stanford, ICLR 2026) — [arXiv 2510.04618](https://arxiv.org/abs/2510.04618) | context collapse / brevity bias → context-artifacts.md |
+| **CONSENSAGENT** (ACL 2025) | 동적 prompt refinement → sycophancy 런타임 완화 |
+| **X-MAS** — [arXiv 2505.16997](https://arxiv.org/abs/2505.16997) | 이종 모델 조합 (MATH +8.4%, AIME +47%) → cross-validation 정량 근거 |
+| **VeriGuard** — [arXiv 2510.05156](https://arxiv.org/abs/2510.05156) | dual-stage verification → fz cross-validation + codex_verification_schema |
+| **Chain-of-Verification (CoVe)** — [arXiv 2309.11495](https://arxiv.org/abs/2309.11495) | fz-fixer / codex_verification_schema 근거 |
+| **MAR** — [arXiv 2512.20845](https://arxiv.org/abs/2512.20845) | 3중 검증 역할 분리 이론 |
+| **Drift No More** — [arXiv 2510.07777](https://arxiv.org/abs/2510.07777) | system-reminders 근거 |
+| **AgentFlow** — [arXiv 2604.20801](https://arxiv.org/abs/2604.20801) | typed graph DSL → harness-engineering.md / fz-planner |
+| **Inside the Scaffold** — [arXiv 2604.03515](https://arxiv.org/abs/2604.03515) | 13개 coding agent 분석 → 5 loop primitives |
+| **IFScale** — [arXiv 2507.11538](https://arxiv.org/abs/2507.11538) | 규칙 수 증가 시 정확도 저하 (500규칙→68%) → skill-authoring 슬림화 |
+| **Multi-Agent Collaboration Survey** — [arXiv 2501.06322](https://arxiv.org/abs/2501.06322) | peer/centralized/distributed 분류 → TEAM P2P 패턴 분류 |
+| **OpenDev: AI Coding Agents for the Terminal** — [arXiv 2603.05344](https://arxiv.org/abs/2603.05344) | terminal harness 참고 |
+| **1M context "safety net not strategy"** — [arXiv 2601.15300](https://arxiv.org/abs/2601.15300) + [2510.05381](https://arxiv.org/abs/2510.05381) | filesystem > compaction 근거 |
+| **DSPy** (Khattab et al., Stanford NLP) — [dspy.ai](https://dspy.ai/) | optimizer 베이스 (BootstrapFewShot / MIPROv2 / GEPA) |
 
 ---
 
