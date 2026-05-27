@@ -135,9 +135,9 @@ echo 'alias cfz="claude --plugin-dir ~/dev/fz-plugin"' >> ~/.zshrc
 ```
 fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
-├── skills/          22개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
+├── skills/          20개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
 ├── agents/          13개 — plan-structure, impl-correctness, review-arch ...
-├── modules/         34개 — team-core, pipelines, cross-validation, lead-action-default, codex-strategy, memory-guide, sprint-contract, swift-anti-pattern-preblock, swift-pattern-detection ...
+├── modules/         37개 — team-core, pipelines, cross-validation, lead-action-default, codex-strategy, memory-guide, fz-codex-bash-hygiene, fz-codex-subcommands-core/aux, swift-anti-pattern-preblock ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
 ├── guides/          7개 — prompt-optimization, skill-authoring, harness-engineering ...
 ├── codex-skills/    8개 — Codex 네이티브 스킬 + Authority 인용 + Memory Lesson inline (fz-reviewer, fz-architect ...)
@@ -174,13 +174,13 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
     └── External: Codex(GPT-5.5)
 ```
 
-### What's New (v4.9.0)
+### What's New (v4.10.0)
 
-- **Authority Network**: 가이드/스킬/Codex 네이티브 스킬에 외부 권위 자료(Anthropic 공식 + arXiv 학술 + OpenAI Cookbook) 인용 네트워크 통합 — 상세 표는 아래 [근거 연구](#근거-연구).
-- **`/fz-modernize` 신규**: 가이드/문서 modernization 메타-스킬 (6-phase: Probe → Audit → Plan → Verify → Execute → Validate).
-- **Light 모드**: `/fz-plan`, `/fz-code`, `/fz-review`가 "그냥/가볍게/단순/빠르게" 키워드에 자동 라우팅 (Phase/Step 축소 + Codex 생략).
-- **Codex Plugin 감지 [CRITICAL] fix**: `config.toml + cache` 동시 확인으로 교정 (MCP server ≠ plugin 계층 분리).
-- **Cross-Model 정량 효과**: Codex self-reflexive verify가 Claude self-review 대비 5배+ 단독 발견 효과 4회 누적 실증.
+- **Sycophancy 방어 4원칙**: 무비판 동의·과잉 엔지니어링·근거 없는 칭찬·맥락 무시 차단 + 오류 발견 시 정정 의무 (CLAUDE.md + fz 전반).
+- **Active Recall 강제화**: Phase 0에서 관련 메모리 교훈을 능동 회상 + Gate 0 차단 (미회상 시 진행 불가).
+- **Reflection Pipeline (Working)**: 메모리 교훈 → 모듈 자동 반영 매칭 (`parse_memory`/`score_relevance` — context-anchored 클러스터링으로 false positive 차단).
+- **Phase 4 Default 역전**: implementation-ready 시점부터 권고 기본값 = 구현 (verify-forever 방어 — 메모리 33차).
+- **fz-codex 모듈 분리**: SKILL.md 757→268줄 + 3 모듈 (bash-hygiene / subcommands-core / subcommands-aux) — skill-authoring 500줄 한도 준수.
 
 > 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
 
