@@ -34,12 +34,38 @@
 
 ## AskUserQuestion 선택지
 
+> **Default 결정 알고리즘** (review-arch MUST-1 + Codex 검증 §5 MUST-1 합의):
+> Phase 4가 Phase 3 결정을 *역전하지 않는다*. Phase 4는 *추가 선택지 제시*만.
+
+### Phase 4 Default 결정 알고리즘
+
+| 조건 | Phase 4 First Option (Default) | 비고 |
+|------|------------------------------|------|
+| Phase 3 결정 = TEAM (complexity ≥ 4) | **TEAM (Phase 3 추천 유지)** | SOLO는 2번 선택지 ("위험 감수 SOLO 시작") |
+| Phase 3 결정 = SOLO + 40차 신호 매칭 (lead-action-default.md) | **SOLO + minimal** | TEAM은 2번 선택지 |
+| 사용자 `--deep` / `--team` 명시 | **사용자 명시 선택 유지 (override)** | Lead 재권장 금지 |
+
+### 선택지 형식 (조건별)
+
+**단순 요청 컨텍스트** (Phase 3 SOLO + 40차 매칭):
 ```
-1. 이대로 실행 (Recommended)
+1. SOLO + minimal (Default — 단순 요청)
+2. TEAM (확장 검증 필요 시)
+3. 커스텀 구성
+```
+
+**복잡 / 명시 컨텍스트** (Phase 3 TEAM 또는 --deep/--team override):
+```
+1. [Phase 3 추천] (Recommended)
 2. 모드 변경 (TEAM ↔ SOLO)
-3. 단계 추가/축소
-4. 커스텀 구성
+3. 커스텀 구성
 ```
+
+### 규칙
+
+- ⛔ 사용자 명시 선택 후 Lead 재권장 금지 (edge-cases Failure 4-2 완화)
+- ⛔ "Default = SOLO + minimal은 시작점이지 *상한 아님*" — complexity 또는 catch 누적 신호 시 TEAM 자동 전환 (Failure 4-3 완화)
+- ⛔ Phase 3 TEAM 결정 시 Phase 4가 SOLO로 *역전 금지* (review-arch MUST-1)
 
 ---
 
