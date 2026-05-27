@@ -8,6 +8,36 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.10.0 (2026-05-27) — Sycophancy 방어 + Active Recall + Reflection Pipeline Active [MINOR]
+
+**핵심**: 사용자 self-diagnosis (`fz-meta-improvement-2026-05-26.md` — ASD-1137 PR 작업 중 22개 사용자 catch: Sycophancy 동의 편향 + Over-engineering 패턴) 기반 **6 Priority 개선**. Active Recall 강제화 + Sycophancy 방어 4원칙 + Reflection Pipeline Active 전환 + Phase 4 Default 역전 + fz-codex 모듈 분리 (757→268줄, skill-authoring 500줄 한도 준수) + fz-doc·fz-excalidraw 제거. 8 commits (+ 이전 세션 README 정리 2). 28 files / +1032/-2289 LOC.
+
+**6 Priority 개선**:
+- **P1 Active Recall 강제화**: `skills/fz/SKILL.md` Phase 0 Step 4 교훈 사전 로드 (선택)→(강제) + Gate 0 차단 (미회상 시 진행 불가)
+- **P2 Sycophancy 방어 4원칙**: 무비판 동의·과잉 엔지니어링·근거 없는 칭찬·맥락 무시 차단 + 정정 의무 (TVING CLAUDE.md — 본 repo 외 + fz 전반)
+- **P3 Base Verification Gate**: `modules/fz-codex-bash-hygiene.md` §5.5 (git diff 분석 전 base 상태 검증)
+- **P4 Phase 4 Default 역전**: `modules/fz-pipeline-proposal.md` — implementation-ready 시 권고 기본값 = 구현 (verify-forever 방어, 메모리 33차)
+- **P5 Scope Drift + 41차 Reuse-First**: `skills/fz-plan/SKILL.md` Phase 0.5 — universal/extensible 인프라 + 5+ 사용처 시 신규 작성 default 금지
+- **P6 Reflection Pipeline Active**: `parse_memory.py` (한국어 cross-ref/meta-pattern + markdown link + originSessionId) + `score_relevance.py` (context-anchored 클러스터링 5a-5d, false positive 차단). Status Draft→Active(Partial)
+
+**fz-codex 모듈 분리** (`skills/fz-codex/SKILL.md` 757→268줄):
+- `modules/fz-codex-bash-hygiene.md` 신규 — §1-6 hygiene + §5.5 Base Verification Gate
+- `modules/fz-codex-subcommands-{core,aux}.md` 신규 — 11개 서브커맨드 분리
+- `cross-validation.md`·`feedback-verification.md` cross-ref 새 모듈 경로로 갱신
+
+**스킬 제거**:
+- `skills/fz-doc/` 제거 → `fz-skill` write 서브커맨드로 흡수
+- `skills/fz-excalidraw/` 제거 (references 7파일)
+- `intent-registry.md` 두 스킬 트리거 행 삭제
+
+**스킬 품질 가드 (candidate)**:
+- `fz-code`·`fz-review` 자산 추가/수정 시 가이드 명시 참조 의무
+- `fz-review` 검증 4-N (Swift Naming) + 4-O (Session-added Assets) candidate — ASD-1366, 5 sessions 관측 후 활성 결정
+
+**Cross-Model 검증**: fz-review 세션에서 Codex가 Claude self-review blind spot 3건 단독 발견 (module bash hygiene 미적용 / "자동 로드" 오기 / stale cross-ref) — 메모리 23차 재실증.
+
+**Breaking changes**: 없음 (모두 additive). fz-doc/fz-excalidraw 사용자는 `/fz-skill write` + 외부 다이어그램 도구로 이전.
+
 ### v4.9.0 (2026-05-17) — Authority Network + Codex Ecosystem Hardening + fz-modernize 신규 [MINOR]
 
 **핵심**: fz-plugin 가이드/스킬 + Codex 네이티브 스킬 + schemas에 외부 권위 자료 (Anthropic 공식 + arXiv 학술 + OpenAI Cookbook) 인용 네트워크 통합 + Codex self-reflexive 검증으로 발견된 plugin 감지 로직 critical bug fix. `/fz-modernize` 신규 메타-스킬 추가 (913 lines). Cross-Model 정량 효과 4회 누적 실증.
