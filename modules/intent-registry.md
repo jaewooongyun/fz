@@ -18,10 +18,8 @@
 | fz-pr | `PR\|풀리퀘스트` | `PR\|pull.?request` |
 | fz-peer-review | `피어리뷰\|팀원\|PR.*리뷰` | `peer.?review\|teammate` |
 | fz-pr-digest | `설명\|해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선` | `explain\|digest\|understand\|what.*changed` |
-| fz-skill | `스킬.*만들\|스킬.*생성\|스킬.*수정\|스킬.*삭제\|에이전트.*만들\|에이전트.*생성\|스킬.*평가\|스킬.*최적화\|description.*최적화\|트리거.*테스트\|트리거.*정확도` | `create.*skill\|new.*skill\|update.*skill\|delete.*skill\|create.*agent\|new.*agent\|eval.*skill\|optimize.*skill\|optimize.*description\|trigger.*test\|trigger.*accuracy` |
+| fz-skill | `스킬.*만들\|스킬.*생성\|스킬.*수정\|스킬.*삭제\|에이전트.*만들\|에이전트.*생성\|스킬.*평가\|스킬.*최적화\|description.*최적화\|트리거.*테스트\|트리거.*정확도\|문서.*작성\|글쓰기\|프롬프트.*최적화\|description.*개선\|가이드.*작성` | `create.*skill\|new.*skill\|update.*skill\|delete.*skill\|create.*agent\|new.*agent\|eval.*skill\|optimize.*skill\|optimize.*description\|trigger.*test\|trigger.*accuracy\|document\|write.*skill\|improve.*description\|optimize.*prompt` |
 | fz-manage | `관리\|스킬.*목록\|의존성\|체크\|벤치마크\|일괄.*평가\|건강.*체크\|생태계.*점검\|트리거.*벤치마크` | `manage\|skill.*list\|depend\|check\|benchmark\|batch.*eval\|health.*check\|trigger.*benchmark` |
-| fz-doc | `문서\|작성\|개선\|description\|가이드\|스킬.*작성\|에이전트.*작성` | `document\|write.*skill\|improve.*description\|optimize.*prompt` |
-| fz-excalidraw | `다이어그램\|그려줘\|시각화\|구조도\|플로우차트\|흐름도\|도식화` | `diagram\|excalidraw\|visualize\|draw\|flowchart` |
 | fz-codex (drift) | `드리프트\|아키텍처.*점검\|레이어.*위반\|전체.*스캔\|점검해줘\|훑어봐\|전체.*봐줘\|전체.*확인해줘` | `drift\|arch.*check\|full.*scan` |
 | fz-codex (plan) | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` | `independent.*plan\|parallel.*plan\|cross.*plan` |
 | fz-memory | `메모리.*정리\|메모리.*관리\|메모리.*감사\|교훈.*회상\|기억.*떠올려` | `memory.*audit\|memory.*gc\|memory.*recall\|memory.*organize\|cleanup.*memory` |
