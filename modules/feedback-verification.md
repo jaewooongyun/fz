@@ -45,4 +45,4 @@
 
 - `modules/cross-validation.md` — cross-model 검증 원칙
 - `modules/peer-review-tiers.md` — 이슈 severity 티어
-- `skills/fz-codex/SKILL.md` — `validate` 서브커맨드 상세
+- `modules/fz-codex-subcommands-core.md` — `validate` 서브커맨드 상세 (2026-05-27 모듈 분리로 경로 갱신)

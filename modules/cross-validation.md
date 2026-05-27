@@ -175,7 +175,7 @@ Claude + Codex(GPT-5.5) 교차 검증:
 /fz-codex micro-eval "주장 원문" [컨텍스트]
 ```
 
-응답: `verdict: agree | disagree | partial | needs_verification` (참조: `skills/fz-codex/SKILL.md § micro-eval` 섹션)
+응답: `verdict: agree | disagree | partial | needs_verification` (참조: `modules/fz-codex-subcommands-aux.md § micro-eval` 섹션 — 2026-05-27 모듈 분리로 경로 갱신)
 
 `needs_verification` 시: `modules/uncertainty-verification.md` Default-Deny 차단으로 연계.
 
