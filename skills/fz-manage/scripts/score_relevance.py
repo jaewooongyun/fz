@@ -50,6 +50,10 @@ SKILL_TO_AGENTS = {
     "fz-discover": ["plan-structure", "review-arch"],
     "fz-search": ["search-symbolic", "search-pattern"],
     "fz-fix": ["impl-correctness"],
+    # v3.3 (A3 옵션 A, 2026-05-26): 17차 false negative 해결 — fz-manage SKILL.md L287 "메모리 17차" 명시 catch
+    "fz-manage": [],       # Lead 작업 (에이전트 매핑 X)
+    "fz-codex": [],        # Codex 외부 검증 (에이전트 매핑 X)
+    "fz-modernize": ["impl-correctness", "review-arch"],
 }
 
 DEFAULT_CANDIDATE_GLOBS = [
@@ -89,12 +93,19 @@ def label_to_skill_name(label: str) -> str | None:
     return None
 
 
-def has_symmetry_in_module(text: str, parsed: dict[str, Any]) -> bool:
+def has_symmetry_in_module(text: str, parsed: dict[str, Any]) -> str | None:
     """본 메모리 패턴이 모듈에 대칭으로 존재하는지.
 
-    v3 (Sanity Check 18차 반영): 유의어 cluster로 확장.
-    같은 개념이 다른 단어로 표현되는 경우(scope inflation ↔ Scope Challenge ↔
-    scope_disposition) 매칭 가능. 19차 overfit 방어.
+    v3.1 (2026-05-26 Codex P6 정정 반영):
+      - bool → str | None: matched cluster name 반환 (false positive 판별 가능)
+      - Cluster 5 4 sub-cluster로 meta_pattern별 분리 (M1 정밀화):
+        * ordinal `40차|41차|33차` 단독 매칭 제거 (fz-review "41차 External Authority Bias" collision 차단)
+        * `reflection` 단일 단어 매칭 제거 (17차 reflection_gap false trigger 차단)
+
+    v3 (Sanity Check 18차 반영): 유의어 cluster로 확장. 19차 overfit 방어.
+
+    Returns:
+        matched cluster name (예: "scope_inflation", "recommendation_default_bias") 또는 None
     """
     core_lesson = parsed.get("core_lesson", "")
     core_lower = core_lesson.lower()
@@ -103,12 +114,12 @@ def has_symmetry_in_module(text: str, parsed: dict[str, Any]) -> bool:
     # Cluster 1: import / redundant
     if "import" in core_lower or "redundant" in core_lower:
         if re.search(r"import\s*orphan|symbol\s*coverage|symbol_orphan|redundant\s*import", body):
-            return True
+            return "import_redundant"
 
     # Cluster 2: self-review blind spot / cargo-cult
     if parsed.get("meta_pattern") == "self-review blind spot":
         if re.search(r"self[- ]review\s*meta[- ]loop|cargo[- ]cult", body):
-            return True
+            return "self_review_blind_spot"
 
     # Cluster 3: scope inflation (v3 신규 — 유의어 확장)
     scope_synonyms = (
@@ -118,7 +129,7 @@ def has_symmetry_in_module(text: str, parsed: dict[str, Any]) -> bool:
     )
     if re.search(r"scope|inflation|drift|팽창", core_lower):
         if re.search(scope_synonyms, body):
-            return True
+            return "scope_inflation"
 
     # Cluster 4: silent disappearance / 헬퍼 다중 책임 (v3.1 — P4 D+6 16차 반영)
     disappearance_synonyms = (
@@ -129,9 +140,48 @@ def has_symmetry_in_module(text: str, parsed: dict[str, Any]) -> bool:
     )
     if re.search(r"silent|disappearance|책임|헬퍼|helper|호출.*중단", core_lower):
         if re.search(disappearance_synonyms, body):
-            return True
+            return "silent_disappearance"
 
-    return False
+    # Cluster 5 (v3.1 — Codex P6 정정): meta_pattern별 분리 (M1 정밀화)
+    # ⛔ ordinal 단독 매칭 제거 (fz-review "41차 External Authority Bias" collision 차단)
+    # ⛔ `reflection` 단일 단어 매칭 제거 (17차 false trigger 차단)
+
+    # 5a: recommendation default bias (33차) — v3.5 (2026-05-27 Codex 잔여 권고)
+    # v3.4: context-anchored core (specific pattern만)
+    # v3.5: implementation-ready 단독 → context 결합 (recommendation|default|verify|권고 근처만)
+    #       Codex "implementation-ready 단독은 약간 넓다" 잔여 권고 반영
+    if re.search(
+        r"recommendation\s*default|verify\s*default|verify\s*approved|"
+        r"recommendation\s*default\s*bias|권고\s*default|"
+        r"implementation-ready.{0,30}(recommendation|default|verify|권고)|"
+        r"(recommendation|default|verify|권고).{0,30}implementation-ready",
+        core_lower,
+    ):
+        if re.search(r"recommendation\s*default\s*bias|verify\s*default|implementation-ready", body):
+            return "recommendation_default_bias"
+
+    # 5b: reuse-first default (41차)
+    if re.search(r"reuse|universal|기존\s*인프라", core_lower):
+        if re.search(r"reuse[- ]first|universal\s*infrastructure|기존\s*인프라\s*재활용", body):
+            return "reuse_first_default"
+
+    # 5c: simple request over-engineering (40차) — v3.2 (Priority A1, M2 회귀 trade-off 회복)
+    # ordinal 단독 매칭은 여전히 차단 (collision 위험), context-anchored 40차만 허용
+    if re.search(r"simple|단순|verification\s*loop", core_lower):
+        if re.search(
+            r"simple\s*request|단순\s*요청.*풀\s*절차|verification\s*loop\s*폭주|"
+            r"light\s*mode\s*\(40차|simplified[\s_-]*mode|"
+            r"40차.{0,30}simplified|simplified.{0,30}40차|40차.{0,20}trigger",
+            body,
+        ):
+            return "simple_request_over_engineering"
+
+    # 5d: reflection gap (17차) — core_lower에 명시 패턴만 매칭 (단일 단어 차단)
+    if re.search(r"reflection\s*gap|lessons-to-module|active\s*recall", core_lower):
+        if re.search(r"reflection\s*gap|lessons-to-module|active\s*recall|3-step\s*chain", body):
+            return "reflection_gap"
+
+    return None
 
 
 def identify_trigger_skills(
@@ -154,6 +204,7 @@ def identify_trigger_skills(
             reasons[skill] = f"direct mention via '{label}'"
 
     # 1.2: symmetry-extended trigger (해당 SKILL.md 파일에 symmetry 패턴 발견)
+    # v3.1 (M3 P6 정정): cluster name 기록 → false positive 판별 가능
     for skill in SKILL_TO_AGENTS:
         if skill in triggers:
             continue
@@ -161,9 +212,38 @@ def identify_trigger_skills(
         if not skill_path.exists():
             continue
         text = skill_path.read_text(encoding="utf-8", errors="replace")
-        if has_symmetry_in_module(text, parsed):
+        cluster = has_symmetry_in_module(text, parsed)
+        if cluster:
             triggers.add(skill)
-            reasons[skill] = "symmetry-extended (대칭 패턴 발견)"
+            reasons[skill] = f"symmetry-extended (cluster={cluster})"
+
+    # 1.3 (v3 2026-05-26 P6 개선): grep-based reference trigger
+    # 메모리 ID (예: "40차") 또는 name slug (예: "simple-request-over-engineering")가
+    # 모듈 본문에 명시되어 있으면 해당 모듈을 trigger로 등록.
+    # parsed["applied_location_explicit"]가 비어 있을 때 핵심 매칭 경로.
+    lesson_id = parsed.get("id", "")
+    name_slug = parsed.get("frontmatter", {}).get("name", "")
+    ref_patterns: list[str] = []
+    if lesson_id and re.search(r"\d+차", lesson_id):
+        # "40차" 형식만 ref pattern으로 (UUID/임의 slug 매칭 false positive 방지)
+        ref_patterns.append(re.escape(lesson_id))
+    if name_slug and "-" in name_slug:
+        # slug 변형: simple-request-over-engineering ↔ simple_request_over_engineering
+        slug_variant = name_slug.replace("-", "[-_]")
+        ref_patterns.append(slug_variant)
+
+    if ref_patterns:
+        combined = re.compile("|".join(ref_patterns), re.IGNORECASE)
+        for skill in SKILL_TO_AGENTS:
+            if skill in triggers:
+                continue
+            skill_path = fz_root / "skills" / skill / "SKILL.md"
+            if not skill_path.exists():
+                continue
+            text = skill_path.read_text(encoding="utf-8", errors="replace")
+            if combined.search(text):
+                triggers.add(skill)
+                reasons[skill] = f"grep-based reference ('{lesson_id or name_slug}' 본문 매칭)"
 
     return triggers, reasons
 
@@ -227,9 +307,11 @@ def score_module(
             reasons.append(f"semantic: {', '.join(matched_kws[:3])}")
 
     # 5. Symmetry bonus: trigger 기준이 아니라 모듈 자체에 대칭 패턴
-    if has_symmetry_in_module(text, parsed):
+    # v3.1 (M3 P6 정정): cluster name 기록 (false positive 판별 가능)
+    cluster_bonus = has_symmetry_in_module(text, parsed)
+    if cluster_bonus:
         components["symmetry_bonus"] = 0.20
-        reasons.append("symmetry_bonus: 대칭 패턴 발견")
+        reasons.append(f"symmetry_bonus: cluster={cluster_bonus}")
 
     # 5b. Trigger SKILL.md 자동 symmetry_bonus (P4 D+7 갭 6 fix)
     # trigger 자체가 강한 신호 — 사용자가 직접/유의어로 명시한 SKILL.md는

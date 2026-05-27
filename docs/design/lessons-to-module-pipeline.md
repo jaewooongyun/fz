@@ -1,9 +1,9 @@
 # Design: Lessons-to-Module Pipeline
 
-> **Status**: Draft (구현 승인 대기)
-> **Author**: Claude (fz-plan / fz-code cycle, 2026-04-24)
+> **Status**: **Active (Partial)** — Pilot dogfood 완료 (2026-05-26, `~/dev/TVING/fz-meta-2026-05-26/p6-dogfood-result.md` 참조). Parser/Scorer 작동 ✓ 하지만 한국어 키워드 매칭 한계 + 12 필드 중 5 누락 → Parser 개선 후속 필요. 다음 세션 첫 항목으로 *Parser 개선* 고정.
+> **Author**: Claude (fz-plan / fz-code cycle, 2026-04-24) + 2026-05-26 Active 전환 (Codex MUST 4 + 사용자 메타 분석)
 > **Source**: MEMORY.md 17차 (Pre-Gate Failure + Reflection Gap) + 18차 (Scope Inflation Defense)
-> **Scope**: 설계 전용 — 이 문서는 **구현 시작 트리거가 아님**. 사용자 명시 승인 후 별도 워크플로우 필요.
+> **Scope**: 설계 + 부분 작동 — 본 문서의 §4.4 Scope Inflation Detector가 *Priority 5 (Scope Drift Monitor)와 통합* (아래 §9 참조).
 
 ---
 
@@ -167,6 +167,46 @@ Plan v{N}에서 v{N+1}로 진화할 때 복잡도 5차원(Scope/Depth/Risk/Novel
 - **대안 1**: 완전 수동 (`/fz-memory reflect` 같은 형태로 사용자가 반성→스킬 매핑을 직접 주장)
   - 장점: 자동화 복잡도 제거 / 단점: 17차 "기록-반영 괴리" 재발 가능
 - **대안 2 (채택)**: 자동 제안 + 사용자 승인 필수 (본 설계)
+
+---
+
+## 9. Priority 5 (Scope Drift Monitor) 통합 결정 — 2026-05-26 (review-arch MUST-2)
+
+> **출처**: `~/dev/TVING/fz-meta-2026-05-26/arch-review.md` MUST-2 + `codex-verdict.md` §5 MUST-2 (review-arch와 Codex 합의)
+
+### 문제
+
+세 곳에서 동일 기능 (Scope Inflation 감지) 중복 위험:
+1. `modules/scope-challenge.md` (Phase 3 Codex 이슈 분류 전용, 현존)
+2. **본 문서 §4.4 Scope Inflation Detector** (Draft, Priority 6 활성화 시)
+3. 신규 `modules/scope-drift-monitor.md` (Priority 5 제안)
+
+### 통합 결정: 옵션 B 채택 — Priority 5 본 §4.4에 흡수
+
+| 옵션 | 채택? | 근거 |
+|------|:----:|------|
+| A: scope-drift-monitor.md 신규 + scope-challenge.md 유지 + §4.4 제거 | ❌ | 책임 경계 혼란 |
+| **B: 본 §4.4 활성화 + Priority 5 본 §4.4에 흡수** | **✅ 채택** | Single Responsibility + 신규 모듈 생성 회피 (Surgical Changes) |
+| C: Priority 5 보류 + 본 §4.4가 충족하는지 측정 후 결정 | ⏸ | 대안 (안전하지만 지연) |
+
+### 적용
+
+- **fz-plan/SKILL.md Phase 0.5 절차 2** ("Existing Pattern Reuse"): 41차 Reuse-First 신호 추가 (`universal*/extensible*/generic*/common*` 명명 + 5+ 사용처) — 2026-05-26 적용 완료
+- **본 §4.4 Scope Inflation Detector**: Priority 6 활성화와 함께 *Plan v{N+1} hook*으로 작동 (Plan iteration 차원 + 41차 신호 통합)
+- **신규 모듈 `scope-drift-monitor.md` 생성 금지** — 본 §4.4가 단일 책임
+
+### Pilot 결과 (2026-05-26 dogfood)
+
+- 40차/41차 메모리 입력 시 Parser/Scorer 작동 ✓ 단, **`0 modules / trigger_skills: []`** (한국어 키워드 매칭 한계)
+- 다음 세션 첫 항목: **Parser/Scorer 개선** (applied_location 추출 + 한국어 키워드 매칭)
+- 본 Pipeline의 *부분 작동* 상태가 Failure Mode 6-2 (`p6-dogfood-result.md` §Parser 한계) 정확한 재현
+
+### Cross-validation
+
+- review-arch MUST-2 ↔ Codex 검증 §5 MUST-2 *합의*
+- review-arch는 "통합 결정 기록 필수" 명시 (~/dev/TVING/fz-meta-2026-05-26/arch-review.md)
+- Codex는 "통합 결정 후 신규 모듈 *생성 금지*" 명시 (~/dev/TVING/fz-meta-2026-05-26/codex-verdict.md §5)
+- 본 §9가 양측 권고를 *기존 파일 안에* 통합 (메모리 36차 + Surgical Changes 준수)
 - **대안 3**: 완전 자동 + 자동 Edit
   - 거부 사유: 실수 발생 시 되돌리기 어려움, 18차 Scope Inflation 위험
 
