@@ -35,6 +35,8 @@ model-strategy:
 # /fz-review - 리뷰 + 품질 보증 스킬
 
 > **행동 원칙**: 3중 검증(Claude+Codex+sc:analyze)으로 코드 품질을 확보하고, Codex 역방향 검증으로 피드백 반영을 정량화한다. 검증 결과가 기준 미달이면 반복 개선한다.
+>
+> ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.md` 사전 참조. **Decision Tree (evidence ≥ 3 sessions) + 태깅 (`[skill:][status:][priority:]`) + MEMORY.md 200줄 한도** 모두 검증. 사후 catch 방지 (Layer 1+2+3 systematic weakness 차단).
 
 ## 개요
 
@@ -345,6 +347,58 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
 
 ### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 가변 상태 동기화+비대칭 동기화(L1 필수) + 콜백 스레드/@Published/기본값/SDK 래퍼/Task 프로퍼티 쓰기/check-then-act(L2 권장) 검사.
 
+### 검증 4-N: Swift Naming Compliance (Swift/iOS 프로젝트 한정) — **CANDIDATE (Lesson Intake Decision Tree)**
+
+> ⚠️ **Candidate 상태**: evidence 1 session (ASD-1366). `modules/memory-guide.md` Lesson Intake Decision Tree 명시 — *evidence < 3 sessions → candidate*. 활성 강제 X. 본 검증은 *권장 self-check*이지 *Gate 차단*이 아님. 5 sessions 관측 후 활성화 결정.
+> 발동: Swift/iOS 프로젝트 + diff에 새 식별자(helper/method/type/property) 발견 시 권장.
+> 참조: 메모리 `feedback_swift_naming_conventions.md` — Apple Swift API Design Guidelines 5축 self-check.
+
+```
+절차:
+1. diff에서 새 식별자 전수 추출 (Grep "^(\+\s*)?(func|private func|fileprivate func|public func|class|struct|enum|let|var) ")
+2. 각 식별자에 대해 5축 self-check:
+   (a) 반환값 있는데 동사형 → 위반 (예: getApp(), checkApp())
+   (b) `X or Y` 형태 → 위반 (예: appOrLog, getOrCreate)
+   (c) 부수 효과(log/persist/dispatch) 이름에 포함 → 위반
+   (d) `-ed/-ing` rule 위반 (mutating ↔ non-mutating 짝 부재) → 위반
+   (e) 사용자 표현 어휘 무시 → 위반
+3. 위반 발견 시 "naming_violation" 이슈 (severity: minor — 단 systematic하면 major)
+4. 권고: Apple 정합 이름 제시 (예: appOrLog → verifiedApp)
+
+체크리스트:
+- [ ] 새 식별자 전수 추출 완료?
+- [ ] 각 식별자에 5축 self-check 실행?
+- [ ] 위반 발견 시 권고 대안 명시?
+```
+
+> ASD-1366 사례: helper naming 4회 iteration(`withApp` → `appOrLog` → `verifiedApp`) — 사용자 지적으로 catch. fz-review 자체 검증으로 *사전 catch 가능*해야 함.
+
+### 검증 4-O: Session-added Assets Application (세션 중 추가 자산 적용) — **CANDIDATE (Lesson Intake Decision Tree)**
+
+> ⚠️ **Candidate 상태**: evidence 1 session (ASD-1366). `modules/memory-guide.md` Lesson Intake Decision Tree 명시. 활성 강제 X. 5 sessions 관측 후 활성화 결정. 또한 *기존 principle (메모리 41차 External Authority Bias)와 same failure mode 가능* — merge 후보로도 검토.
+> 발동: 본 세션에서 메모리/스킬/가이드를 *추가 또는 수정*한 경우 권장.
+> 목적: 추가 자산이 *현재 작업 검증에 적용*되었는지 명시 확인.
+
+```
+절차:
+1. 본 세션에서 추가/수정한 자산 목록화
+   - 메모리 파일 (~/.claude/projects/*/memory/feedback_*.md 신설/수정)
+   - 스킬 SKILL.md 수정
+   - 가이드 (modules/*.md, guides/*.md) 수정
+2. 각 자산에 대해 self-review 적용 확인:
+   - 자산이 명시하는 검증 항목 → self-review 절차에 명시 적용했는가?
+   - 검증 결과를 보고에 명시했는가?
+3. 미적용 자산 발견 시 → "missed_session_asset" 이슈 (severity: major)
+   - Lead가 작성만 하고 적용 안 한 경우 systematic weakness 표시
+
+체크리스트:
+- [ ] 본 세션 추가/수정 자산 목록 작성?
+- [ ] 각 자산이 self-review에 명시 적용?
+- [ ] 보고에 "어떤 자산을 어떻게 적용했는가" 명시?
+```
+
+> ASD-1366 사례: `feedback_swift_naming_conventions.md` + fz-code "Swift Naming 위반" 신호 추가 후 *self-review에서 미적용* — 사용자 지적으로 catch. *작성 + 적용이 비대칭*인 메타 패턴 (메모리 41차 재현).
+
 ### 검증 4-K: Transformation Equivalence (코드 변환 동등성 — Plan에 Transformation Spec 있을 때)
 
 Plan에 Transformation Spec이 포함된 경우, diff가 Spec 요구사항을 준수하는지 검증. 참조: `modules/code-transform-validation.md`
@@ -410,6 +464,8 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] ⛔ Wrapper Scope Minimality 통과? (@MainActor 블록 내 불필요 문장 없음) [ablation: scope-min-v1]
 - [ ] ⛔ 요청 파라미터 키 동등성 통과? (원본 대비 추가/삭제 키 없음)
 - [ ] ⛔ Default-Deny 통과? (Spec 기술적 주장에 [verified] 태그 존재)
+- [ ] ⚠️ Swift Naming Compliance 권장 통과? (검증 4-N **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
+- [ ] ⚠️ Session-added Assets Application 권장 통과? (검증 4-O **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
 
 ## Phase 5.5: Feedback Verification (역방향 검증)
 

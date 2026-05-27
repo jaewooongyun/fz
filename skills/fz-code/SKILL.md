@@ -40,6 +40,8 @@ model-strategy:
 # /fz-code - 구현 + 빌드 검증 스킬
 
 > **행동 원칙**: 검증된 계획을 기반으로 점진적으로 코드를 구현하고, 매 Step마다 빌드 검증을 수행한다. 빌드 성공을 확인한 후 다음 Step으로 진행한다.
+>
+> ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.md` 사전 참조. **Decision Tree (evidence ≥ 3 sessions) + 태깅 (`[skill:][status:][priority:]`) + MEMORY.md 200줄 한도** 모두 검증. 사후 catch 방지 (Layer 1+2+3 systematic weakness 차단).
 
 ## 개요
 
@@ -269,6 +271,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | Task 내부 프로퍼티 쓰기 | `Task { }` 블록 내에서 `self.property = value`를 `MainActor.run` 밖에서 실행. 특히 리뷰어 조언으로 MainActor 범위를 줄일 때 순수 연산과 side effect를 분류하지 않고 함께 밖으로 이동 | 각 문장을 순수 연산(파싱, 변환)과 side effect(프로퍼티 할당, UI)로 분류. side effect는 소비자 스레드 확인 후 배치. 참조: `modules/lead-reasoning.md` §1.5 |
    | 핵심 시나리오 보류 | PR이 해결하려는 원래 문제(버그, 크래시)의 재현 시나리오 중 하나가 "다음 PR에서 수정"으로 보류됨. 특히 race condition 수정에서 경합 시나리오 일부만 해결 | PR 목표와 보류 시나리오를 대조. 원래 버그가 보류 시나리오에서 재현 가능하면 → 현재 PR에서 해결 필수 또는 AskUserQuestion |
    | Redundant Import | 새 파일 작성 시 추가하는 각 `import {Module}` 문에 대해 그 모듈의 알려진 심볼이 파일 내에서 grep 0건 | 형제 파일 패턴 답습 의혹 (cargo-cult). 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과이며, 새 파일은 *자신의 사용 심볼*로 자체 정당화 필요. 검증: 새 파일 작성 후 각 import에 대해 `Grep("ModuleName\.\w+\|<known_typealias>")` 실행 → 0건이면 마찰 보고 (제거/유지 결정은 사용자/Codex 최종) |
+   | Swift Naming 위반 *[candidate: 1 session evidence]* | Swift/iOS 프로젝트에서 새 helper/method 이름이 (a) 반환값 있는데 동사형 (b) `X or Y` 형태 (예: `appOrLog`, `getOrCreate`) (c) 부수 효과(log/persist/dispatch)를 이름에 포함 (d) `-ed/-ing` rule 위반 (mutating ↔ non-mutating 짝 부재) (e) 사용자 표현 어휘 무시 | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). Apple Swift API Design Guidelines 미준수 후보 시그널. 검증: helper 작성 *전* 5축 self-check 권장. 위반 시 noun phrase + 단일 의미로 재명명 (예: `appOrLog` → `verifiedApp`). 참조: `feedback_swift_naming_conventions.md` (candidate memory). ASD-1366 4회 iteration 사례 |
 
    보고 형식:
    ```
