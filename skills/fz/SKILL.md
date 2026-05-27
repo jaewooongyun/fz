@@ -130,10 +130,13 @@ model-strategy:
      - 존재 시: 최신 checkpoint 키를 시간순 정렬 → 마지막 키 read → 해당 phase부터 복원 제안
      - 미존재 시: 완전 새 세션 (복원 대상 없음)
 
-4. **교훈 사전 로드** (선택):
-   - SOLO: Lead가 직접 topic file 스캔 (`modules/memory-guide.md` 태깅 기반)
+4. **교훈 사전 로드** (강제, 모든 파이프라인):
+   - SOLO: `modules/lead-action-default.md` Trigger Matrix 매칭 → 매칭된 메모리 ID + 적용 패턴 명시 출력
    - TEAM: memory-curator 에이전트 **모든 TEAM 모드**에서 포함
-   - 조건: plan/code/review 파이프라인에서만
+   - **의무 출력 형식**: `Active Recall: [ID-N차] → {매칭 패턴} → {추론된 행동}` (3-step chain)
+     - 예: `Active Recall: [40차] → "확인해줘" + 검토 산출물 존재 → full 파이프라인 차단, light mode`
+   - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄)
+   - ⛔ 선언만으로는 Gate 0 통과 불가 — 3-step chain 명시 의무 (edge-cases Failure 1-1 완화)
 
 5. **핵심 모듈 선로드** (6+ 스텝 또는 TEAM):
    - `Read(modules/context-artifacts.md)` — Artifact Budget Table + 산출물 프로토콜
@@ -143,6 +146,7 @@ model-strategy:
 - [ ] 탐색 파이프라인이면 인덱스 확인?
 - [ ] 6+ 스텝 또는 context-heavy이면 ASD 폴더 초기화?
 - [ ] 6+ 스텝 또는 TEAM이면 핵심 모듈 선로드?
+- [ ] **교훈 사전 로드 완료? Active Recall 3-step chain 출력 확인 (Step 4 의무)**
 
 > **토큰 비용**: ~3,000-5,000 (세션당 1회). 개별 스킬마다 실행하지 않음.
 
@@ -176,7 +180,7 @@ model-strategy:
 | `target_count` | 언급된 대상 파일/모듈 수 | Complexity Scope 차원 |
 | `cross_concern` | 여러 관심사가 교차하는지 | Complexity Risk 차원 |
 | `override_flags` | --solo, --team, --deep | 모드 Override |
-| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light" | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용 (fz-plan/fz-code/fz-review/fz-modernize) |
+| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — Codex MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (Codex 검증 §추가 발견 1) |
 
 ### Gate 1: Intent Resolved
 - [ ] 1개 이상의 스킬이 매칭되었는가?
