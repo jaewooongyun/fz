@@ -83,7 +83,7 @@ model-strategy:
 | Phase 1 | `/sc:research` | 외부 기술/라이브러리 조사 |
 | Phase 1 | `/sc:workflow` | PRD → 구현 워크플로우 자동 생성 (5+ Step 시) |
 | Phase 1 | `/sc:spec-panel` | 아키텍처 스펙 전문가 패널 리뷰 (새 모듈 시, --deep 시) |
-| Phase 2 | 검증 도구 | 계획 검증 (독립 스킬) |
+| Phase 2 | `/fz-codex verify` | 계획 검증 (독립 스킬 — Codex 교차 검증, `modules/fz-codex-subcommands-core.md § verify`) |
 | Phase 2 | `/sc:estimate` | 공수 추정 (복잡도 4+ 시, 조건부) |
 | Phase 3 | `/sc:reflect` | 피드백 반영 후 자체 검증 |
 
@@ -256,7 +256,7 @@ Agent(name="plan-structure", team_name="plan-{feature}-round1", model="opus")
    - Structural Fit: 현재 구조에 자연스러운가?
    - Alternative Paths: 근본적으로 다른 접근은? (**대안 최소 2개**)
    - Extensibility: N배 확장 시 유지 가능한가?
-   - Existing Pattern Reuse: 기존 패턴을 재활용할 수 있는가?
+   - Existing Pattern Reuse (41차 Reuse-First): 기존 패턴을 재활용할 수 있는가? **신호 기준**: `universal*/extensible*/generic*/common*` 명명 + 5+ 사용처 + URL-agnostic API 시그니처 → 신규 작성 default 차단. **예외**: 레거시 (마지막 수정 6개월+ 또는 deprecated 태그) 시 신규 작성 정당
    - Maintenance Cost: 장기 유지보수 비용은 합리적인가?
    - Over-Engineering Risk: 현재 요구 대비 과하지 않은가?
 
@@ -479,9 +479,4 @@ Step 4: ContentDetailViewController SwiftUI 기반 UI
 Gate 2 통과 후:
 ```bash
 /fz-code "검증된 계획대로 구현해줘"
-```
-
-아키텍처/모듈 구조 계획이면 다이어그램 시각화 제안:
-```bash
-/fz-excalidraw "방금 수립한 계획을 아키텍처 다이어그램으로 그려줘"
 ```
