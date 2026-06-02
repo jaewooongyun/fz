@@ -16,7 +16,6 @@
 | search-symbolic | search | 심볼 정밀 탐색 (정의/참조/타입) | sonnet | — | — | — | — | Serena 도구 |
 | search-pattern | search | 텍스트 패턴 넓은 범위 탐색 | sonnet | — | — | — | — | Grep/Glob 도구 |
 | plan-structure | plan | 구현 구조 + Step 순서 설계 | sonnet | opus | project | — | — | Primary |
-| ~~plan-tradeoff~~ | ~~plan~~ | ~~트레이드오프 + 대안 비교 평가~~ | — | — | — | — | — | **ARCHIVED**: discover가 대체. 어떤 스킬 YAML에서도 미사용 |
 | plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | — | — | — | — | |
 | plan-impact | plan | 영향 범위 전담 (Exhaustive Impact Scan a~f) | sonnet | — | project | — | — | Impact Scanner |
 | impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | worktree | Primary |
