@@ -16,7 +16,7 @@
 `/fz-codex validate`가 수행하는 작업:
 - 이전 이슈 목록 + Claude 수정 내용 → Codex에 전송
 - 이슈별 해결 상태 검증 (`resolved` / `partially_resolved` / `unresolved` / `regressed`)
-- Reflection Rate 계산 (canonical source: `schemas/codex_verification_schema.json`):
+- Reflection Rate 계산 (계산식 canonical: `schemas/codex_verification_schema.json`; threshold/gating 정책: `modules/cross-validation.md § Reflection Rate`):
   `(resolved × 1.0 + partially_resolved × 0.5) / total_issues`
 - Issue Tracker 상태 업데이트
 
