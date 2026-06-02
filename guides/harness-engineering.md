@@ -993,6 +993,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Sonnet 4.5 | Context Reset 필수, Sprint 분해 필수, Evaluator 필수 | — |
 | Opus 4.6 | Context Reset 선택, Compaction 충분, Evaluator 조건부 | Sprint 분해, 스프린트별 평가 |
 | **Opus 4.7 (2026-04-16 GA)** | **Compaction 충분 (4.6 동일), Length limits 자동 적용 (≤25/≤100 words)** [verified: A1 (partial); supporting: A5 — Cobus Greyling Medium]. tokenizer 1.00-1.35x [미검증: Korean 실측 부재] | **Sprint 분해 (4.6 동일), 스프린트별 평가, Evaluator (조건부)** [partially-verified: A5] |
+| **Opus 4.8 (2026-05, 현재)** | [미검증: 4.8 하네스 조정 데이터 부재 — 4.7 baseline 잠정 적용] | [미검증: 측정 후 갱신] |
 | 미래 모델 | ? | Evaluator? 컨텍스트 관리? |
 
 > "하네스 설계자의 일은 '다음 신기한 조합을 계속 찾는 것'이다." — Anthropic
