@@ -24,7 +24,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 
 - **fz-codex 모든 서브커맨드** = Generator≠Evaluator 분리 구현체
 - **T1-G ensemble** = MoA-Lite 2-layer 구현 (cross-agent diversity 강화)
-- **η-1** (예정) = Position bias 회피의 prompt-level 강화
+- **η-1** = Position bias 회피의 prompt-level 강화 (team-core.md Gate 1.0 Independence Verified로 구현)
 - **Reflection Rate 측정** = 이종 blind spot 보완 효과 정량화 (T1-B §5.5 schema)
 
 ### 학술 참조
@@ -183,9 +183,9 @@ Claude + Codex(GPT-5.5) 교차 검증:
 
 ## Reflection Rate (Authoritative Source)
 
-> 본 섹션이 fz 생태계 Reflection Rate threshold rule의 **단일 진실 원천**(authoritative source)입니다. 다른 모듈/SKILL.md는 본 섹션으로 backlink만 허용 (history rewrite 금지, 기존 본문은 유지).
+> 본 섹션이 fz 생태계 Reflection Rate **threshold/gating 정책**의 **단일 진실 원천**(authoritative source)입니다. 계산식 정밀 정의(partially_resolved 0.5 가중치 포함)는 `schemas/codex_verification_schema.json`이 canonical. 다른 모듈/SKILL.md는 본 섹션으로 backlink만 허용 (history rewrite 금지, 기존 본문은 유지).
 
-**계산식**: Reflection Rate = (Codex가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100%. **N=0 (Codex가 이슈 0개 제기) 시 `N/A`로 기록** — division-by-zero 방지 + 기준 미달 판정 아님 (vacuously passes).
+**계산식**: Reflection Rate = (Codex가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100% (정밀 계산식 — `partially_resolved`에 0.5 가중 — 은 `schemas/codex_verification_schema.json` canonical). **N=0 (Codex가 이슈 0개 제기) 시 `N/A`로 기록** — division-by-zero 방지 + 기준 미달 판정 아님 (vacuously passes).
 
 ### Reflection Rate threshold (Sample Size Confidence Gate)
 
@@ -401,7 +401,7 @@ code-changes 후 → build → [implication-scan] → codex check
 1. 가능하면 Bash Swift 스크립트로 실제 실행하여 확인
 2. 실행 불가능하면 → "미검증 (추론)" 표기 후 사용자에게 고지
 
-> [관찰 모드]: 단일 사건(ASD-1002 castToSendable)에서 도출. 하네스 과적합 방지 원칙에 따라 2건+ 재발 시 lead-reasoning.md §8로 강화.
+> [관찰 모드]: 단일 사건(ASD-1002 castToSendable)에서 도출. 하네스 과적합 방지 원칙에 따라 2건+ 재발 시 lead-reasoning.md로 강화.
 
 **Why:** castToSendable의 Bool/Int 변환 안전성을 직관으로 "안전하다" 판단 → 취소 → Bash 테스트로 위험 확인. 실행 검증이 있었으면 1번에 끝났음.
 
