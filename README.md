@@ -174,15 +174,14 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
     └── External: Codex(GPT-5.5)
 ```
 
-### What's New (v4.10.0)
+### What's New (v4.10.1) — 하네스 self-maintenance [PATCH]
 
-- **Sycophancy 방어 4원칙**: 무비판 동의·과잉 엔지니어링·근거 없는 칭찬·맥락 무시 차단 + 오류 발견 시 정정 의무 (CLAUDE.md + fz 전반).
-- **Active Recall 강제화**: Phase 0에서 관련 메모리 교훈을 능동 회상 + Gate 0 차단 (미회상 시 진행 불가).
-- **Reflection Pipeline (Working)**: 메모리 교훈 → 모듈 자동 반영 매칭 (`parse_memory`/`score_relevance` — context-anchored 클러스터링으로 false positive 차단).
-- **Phase 4 Default 역전**: implementation-ready 시점부터 권고 기본값 = 구현 (verify-forever 방어 — 메모리 33차).
-- **fz-codex 모듈 분리**: SKILL.md 757→268줄 + 3 모듈 (bash-hygiene / subcommands-core / subcommands-aux) — skill-authoring 500줄 한도 준수.
+- **figma candidate 신호 강화** (ASD-1718/1674): `fz-code` figma 마찰 신호에 색/정렬/텍스트 style-run/z-order 차원 + `data>render 눈대중 금지` + `figma 텍스트 미대조` 신규 candidate. *비활성(5-session gate)* — 동작 변화 아직 없음.
+- **hot-path 슬림화**: `agent-team-guide §3` 중복 pseudocode → `patterns/` 포인터 (550→457줄, operative 보존) + archived `plan-tradeoff` cleanup.
+- **모델 세대 갱신**: Opus 4.7→4.8 stale 참조 갱신 (`[미검증]` 태그 보존).
+- **maintenance**: Reflection Rate 계산식 schema 일원화(fix) + COST 축 ablation 측정 도구(dev-only) + .gitignore 정리.
 
-> 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
+> v4.10.0 (Sycophancy 방어 + Active Recall + Reflection Pipeline)의 PATCH. 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
 
 ### 근거 연구
 
