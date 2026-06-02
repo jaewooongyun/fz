@@ -8,6 +8,25 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.10.1 (2026-06-02) — 하네스 self-maintenance + figma candidate 신호 [PATCH]
+
+**핵심**: v4.10.0 이후 누적된 8 커밋의 하네스 유지보수 배치. ASD-1674/1718 figma 회고 기반 candidate 마찰 신호(비활성) + hot-path 슬림화 + 모델 세대 갱신(4.7→4.8) + ablation 측정 도구. **active 기능 0 → PATCH** — 모든 feat 커밋은 `5-session 관측 후 활성` gate 뒤 비활성 candidate이거나(figma 신호) 0-참조 dev 도구(측정 스크립트)라 플러그인 사용자가 관찰하는 동작 변화 없음. breaking change 0. 8 commits (TEAM plan+review로 검증, `TVOD/ASD-1718/fz-enhancement/`).
+
+**candidate 마찰 신호 (비활성 — 5-session 관측 후 활성 결정)**:
+- `feat(fz-code)` figma 신호 강화 (ASD-1718, `f3f6a5a`): `figma 수치 미측정` 신호에 **색/정렬(alignItems/justifyContent)/텍스트 style-run/z-order(childOrder)** 차원 + **data>render override 금지** 확장 + **`figma 텍스트 미대조`** 신규 candidate (2-session 재발 1674#2+1718#5). 42차 caveat는 *구조 데이터 부재(flattened IMAGE)* 한정으로 재범위화.
+- `feat(fz-code)` candidate 신호 3건 (ASD-1674, `f9dc847`): 기존 인프라 미확인 helper / 표면 churn / figma 수치 미측정.
+- `promotion-ledger` L-1~L-4 관측 #1(ASD-1674) + L-1 관측 #2(ASD-1718, 트랙 A 2/5). ⚠️ Codex verify PENDING — candidate→active 승격 게이트일 뿐 **릴리즈 무관**(candidate 추가엔 Codex 불요).
+
+**hot-path 슬림화 / cleanup** (⚠️ destructive — behavior-preserving 검증 완료):
+- `refactor(agent-team-guide)` (`f0a63ee`, **−103줄**): §3 5패턴 pseudocode 중복을 매핑 표 + `patterns/` 포인터로 압축 (550→457줄). operative pseudocode는 `modules/patterns/` 5파일에 보존 (검증: 5파일 모두 선존·더 풍부, f0a63ee가 patterns/ 미변경).
+- `chore(cleanup)` (`25b5e0e`, **−50줄**): `plan-tradeoff.md.archived`(이미 아카이브) + team-registry 취소선 행 제거. active 참조 0건 (검증: 전 repo grep — 잔존은 역사적 CHANGELOG 인용뿐).
+
+**maintenance**:
+- `fix(cross-validation)` (`0a9c3b0`): Reflection Rate 계산식 schema 일원화 (schema=계산식 canonical, cross-validation=threshold/gating canonical). 계산식 `(resolved×1.0 + partially_resolved×0.5)/total` 불변 — 권한 분리 문서 정정.
+- `docs(opus48)` (`20bc442`): Opus 4.7→4.8 stale 참조 갱신 (모든 미검증 주장 `[미검증]` 태그 보존, 역사적 citation 보존).
+- `feat(scripts)` (`fa73cf2`): `measure_constraint_load.py` 신규 (COST 축 hot-path ablation 측정 도구, inbound 참조 0건 — dev-only, 사용자 미노출).
+- `chore(gitignore)` (`3c73fc9`): `.fz-work/` 런타임 work dir + `experiment-log-traces.jsonl` 원시 텔레메트리 무시.
+
 ### v4.10.0 (2026-05-27) — Sycophancy 방어 + Active Recall + Reflection Pipeline Active [MINOR]
 
 **핵심**: 사용자 self-diagnosis (`fz-meta-improvement-2026-05-26.md` — ASD-1137 PR 작업 중 22개 사용자 catch: Sycophancy 동의 편향 + Over-engineering 패턴) 기반 **6 Priority 개선**. Active Recall 강제화 + Sycophancy 방어 4원칙 + Reflection Pipeline Active 전환 + Phase 4 Default 역전 + fz-codex 모듈 분리 (757→268줄, skill-authoring 500줄 한도 준수) + fz-doc·fz-excalidraw 제거. 8 commits (+ 이전 세션 README 정리 2). 28 files / +1032/-2289 LOC.
