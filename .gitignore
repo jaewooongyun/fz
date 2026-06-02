@@ -14,3 +14,7 @@ uv.lock
 
 # Build
 .build/
+
+# fz 런타임 work dir + 원시 텔레메트리 (curated experiment-log.md만 추적)
+.fz-work/
+experiment-log-traces.jsonl
