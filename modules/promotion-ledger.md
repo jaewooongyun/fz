@@ -74,10 +74,12 @@
 
 ### L-1: figma 토큰 테이블 exhaustiveness (23차 강화)
 - 관측 #1: ASD-1674 (catch #1,2,4,8,17,19,20 — figma 토큰 7건)
+- 관측 #2: ASD-1718, 2026-06-02 (catch #1~#9 + self-catch — figma 측정 미실시·color/style-run/정렬·data>render). 트랙 A 2/5 (figma 작업 세션, memory-guide:43). active 미전환: 5세션 미달 + Codex 활성 게이트 PENDING. 근거: [verified: retrospective:9,28,53,130 + ledger:81 트랙 A 카운트 기준]. Lead/Codex 일치 여부: user_decided (cross-model PENDING — 2026-06-01 한도초과)
 - 내용: figma 토큰 테이블 작성 시 변경 코드의 *모든 수치* enumerate 또는 non-exhaustive 마킹 + code 시점 per-value MCP 측정
 - generalize: **narrow** (figma/UI 전용) | 과적합 위험: 中
 - 근거: [verified: index.md — 23차로 figma-tokens.md 작성됐으나 §5 갭 테이블이 간격/마진 누락 → exhaustiveness 보증 부재]
 - ⚡ 조치 (2026-06-01): *code 시점* 부분(개별 수치 figma 대조)을 fz-code friction-detect에 **candidate 마찰 신호 추가** (active). *plan 시점* 부분(토큰 테이블 exhaustiveness, fz-plan §F) + broad CLAUDE.md 1줄은 **보류** (narrow + 42차 frame 한계 + 23차 중복 → Codex/사용자 판단)
+- ⚡ 조치 (2026-06-02, ASD-1718 관측 #2): fz-code:277 신호에 **색/style-run/정렬 enumeration + data>render(childOrder) clause 확장** + **`figma 텍스트 미대조` candidate 신호 신설**(text-content 2세션, candidate 유지). plan 시점 Node Inventory(회고 §5-A)는 **DEFERRED 유지** — code 시점 enumeration gap은 277의 '사전 토큰 테이블 exhaustive 신뢰 → 누락 항목 답습' clause로 cover. 42차 caveat는 *구조 데이터 부재(flattened IMAGE)* 한정으로 재범위화 (구조 데이터 존재 노드값 읽기는 결정론적). 적용: TVOD/ASD-1718/fz-enhancement/plan.md (TEAM plan+review)
 - 승격 목표 (트랙 A): figma 작업 세션 5회 관측 후 신호 활성 (memory-guide line 43). Codex verify = 활성 전 권장 게이트.
 
 ### L-2: fz-code 구현시점 reuse 게이트 (41차 enforcement plan→code 이동)
