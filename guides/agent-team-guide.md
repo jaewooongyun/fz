@@ -192,96 +192,17 @@ GOOD (Mesh / Peer-to-Peer):
 
 ## 3. 통신 패턴 5가지
 
-> 각 패턴의 상세 구현은 `modules/patterns/` 디렉토리 참조.
+> 상세 구현(pseudocode 흐름)은 `modules/patterns/`가 canonical. 아래는 빠른 매핑만 — 중복 pseudocode는 patterns/로 위임 (hot-path 슬림화).
 
-### 3.1 Collaborative Design (fz-plan)
+| 패턴 | 스킬 | 핵심 (에이전트 간 직접 대화) | 상세 |
+|------|------|------------------------------|------|
+| Collaborative Design | fz-plan | plan-structure ↔ review-arch: 설계하며 실현성 즉시 검증, 합의까지 직접 대화 | `patterns/collaborative.md` |
+| Pair Programming | fz-code | impl-correctness ↔ review-arch: 구현 도중 실시간 질문/피드백 (완성 후 리뷰 아님) | `patterns/pair-programming.md` |
+| Live Review | fz-review | review-arch ↔ review-quality: 분석 중 발견 즉시 공유 + 교차 확인으로 FP 감소 | `patterns/live-review.md` |
+| Adversarial Constraint Discovery | fz-discover | plan-structure(생성) ↔ review-arch(파괴): 만들고 부수며 제약 표면화, 수렴까지 반복 | `patterns/adversarial.md` |
+| Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ↔ search-pattern(텍스트): 다른 방법론 교차 확인 | `patterns/cross-verify.md` |
 
-설계하는 도중에 실현성 검증하는 패턴.
-
-```
-plan-structure --> 초안 작성
-  --> SendMessage(review-arch): "초안입니다. {설계 내용}"
-review-arch --> 검토
-  --> SendMessage(plan-structure): "의존성 역전 발견. 대안: {제안}"
-plan-structure --> 반영
-  --> SendMessage(review-arch): "수정했습니다. Y 영향은?"
-review-arch --> 확인
-  --> 양쪽 합의
-  --> SendMessage(lead): "최종 설계안"
-```
-
-- plan-structure가 설계를 만들면 review-arch가 즉시 검토한다.
-- 합의에 도달할 때까지 직접 대화한다.
-- 합의 후 Lead에게 최종 결과를 보고한다.
-
-### 3.2 Pair Programming (fz-code)
-
-구현 중 실시간 질문/검토하는 패턴.
-
-```
-impl-correctness: Step N 구현 중
-  --> SendMessage(review-arch): "이 패턴으로 구현 중인데 맞나요? {코드 스니펫}"
-review-arch: 즉시 피드백
-  --> SendMessage(impl-correctness): "OK" 또는 "다른 패턴 추천: {이유}"
-impl-correctness: 반영 후 계속
-```
-
-- impl-correctness가 불확실한 지점에서 review-arch에게 질문한다.
-- 완성 후 전체 리뷰가 아니라, 구현 도중 실시간 피드백이다.
-- 빈도: Step 단위 또는 패턴 결정 시점.
-
-### 3.3 Live Review (fz-review)
-
-분석하면서 발견을 공유하는 패턴.
-
-```
-review-arch: 아키텍처 분석 중 --> 발견 즉시 공유
-  --> SendMessage(review-quality): "레이어 위반 발견. 위치: {file}:{line}"
-review-quality: 품질 분석 + 교차 확인
-  --> SendMessage(review-arch): "동의. 추가로 dead code 발견: {file}"
-양쪽 합의
-  --> SendMessage(lead): "통합 리뷰 결과"
-```
-
-- 분석 완료 후 공유가 아니라, 분석 중 발견 즉시 공유한다.
-- 교차 확인으로 false positive를 줄인다.
-- 통합 결과를 Lead에게 보고한다.
-
-### 3.4 Adversarial Constraint Discovery (fz-discover)
-
-만들고 부수며 제약을 발견하는 패턴.
-
-```
-plan-structure: 후보 옵션 2-3개 생성
-  --> SendMessage(review-arch): "후보입니다. 제약 위반 찾아주세요"
-review-arch: 각 후보의 제약 위반 식별
-  --> SendMessage(plan-structure): "옵션 A는 C1 위반. 근거: {코드 참조}"
-plan-structure: 위반 안 하는 새 옵션 생성
-  --> 반복 (수렴할 때까지)
-  --> 합의
-  --> SendMessage(lead): "옵션 D + 제약 매트릭스"
-```
-
-- plan-structure는 생성자, review-arch는 파괴자 역할이다.
-- 반복을 통해 숨겨진 제약을 표면화한다.
-- 최종 결과에 제약 매트릭스를 포함한다.
-
-### 3.5 Cross-Verify Search (fz-search --deep)
-
-발견 즉시 교차 확인하는 패턴.
-
-```
-search-symbolic: Serena 기반 탐색 결과
-  --> SendMessage(search-pattern): "이 심볼 찾았는데 확인해주세요: {symbol}"
-search-pattern: Grep 기반 교차 확인
-  --> SendMessage(search-symbolic): "확인. 추가로 2개 더 발견: {locations}"
-양쪽 합의
-  --> SendMessage(lead): "교차 검증된 탐색 결과"
-```
-
-- search-symbolic은 AST/LSP 기반, search-pattern은 텍스트 패턴 기반이다.
-- 서로 다른 방법론으로 교차 확인하여 누락을 방지한다.
-- 양쪽 모두 sonnet으로 동작한다 (비용 효율).
+공통: 3명+ Star 토폴로지는 Supporting 발견을 Primary 경유 전달, 합의 후 Lead 보고. 라운드·토폴로지 상세는 `modules/team-core.md`.
 
 ---
 
@@ -306,7 +227,7 @@ search-pattern: Grep 기반 교차 확인
 
 | 파이프라인 | Primary Worker (opus) | Supporting (sonnet) |
 |-----------|----------------------|---------------------|
-| plan-* | plan-structure | review-arch, ~~plan-tradeoff~~ (ARCHIVED: discover가 대체), plan-edge-case |
+| plan-* | plan-structure | review-arch, plan-edge-case |
 | code-* | impl-correctness | review-arch, impl-quality |
 | review-* | review-arch | review-quality, review-correctness |
 | search --deep | (both sonnet) | search-symbolic + search-pattern |
@@ -351,7 +272,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | Anti-Pattern | 이유 | 대안 |
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
-| 서브에이전트 과다 | Claude 4.6/4.7 경향, 비용 폭증 (Opus 4.7 literal interpretation으로 강화 [verified: anthropic.com/news/claude-opus-4-7]) | SOLO for simple tasks |
+| 서브에이전트 과다 | Claude 4.6/4.7/4.8 경향, 비용 폭증 (Opus 4.7 literal interpretation으로 강화 [verified: anthropic.com/news/claude-opus-4-7]) | SOLO for simple tasks |
 | standalone Task | 통신 불가, 고립된 작업 | TeamCreate 필수 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
 | 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 2-Tier (Lead+Primary=opus, rest=sonnet) |
@@ -368,7 +289,6 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 - [ ] `templates/agent-template.md` 기반으로 작성했는가?
 - [ ] 기존 에이전트와 역할 중복이 없는가?
   - plan-structure: 설계/계획 구조
-  - ~~plan-tradeoff~~ (ARCHIVED: discover가 대체): 트레이드오프 분석
   - plan-edge-case: 경계 케이스 분석
   - plan-impact: 영향 범위 분석
   - review-arch: 아키텍처 비평
@@ -400,7 +320,6 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | 에이전트 | Domain | 기본 모델 | 전문 영역 |
 |---------|--------|----------|----------|
 | plan-structure | plan | sonnet (opus 승격) | 설계, 계획, 구조화 |
-| ~~plan-tradeoff~~ (ARCHIVED) | ~~plan~~ | — | ~~트레이드오프 분석~~ — discover가 대체 |
 | plan-edge-case | plan | sonnet | 경계 케이스 발견 |
 | plan-impact | plan | sonnet | 영향 범위 분석 |
 | review-arch | review | sonnet (opus 승격) | 아키텍처 비평, 설계 검증 |
@@ -426,8 +345,6 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 > - 팀 크기: **hard limit 명시 없음, 3-5 teammates 권장**
 > - 통신: SendMessage peer-to-peer, shared task list, file locking
 > - Hooks 연계: `TeammateIdle`, `TaskCreated`, `TaskCompleted` events (Gate 강제에 활용 가능)
->
-> **추가 참조** [verified: developers.openai.com/codex/changelog]: **Codex CLI 0.124.0** (2026-04-23) — Automatic Review Agent + Browser Integration + GPT-5.5 통합. fz의 cross-model 검증 에이전트(Codex)가 Auto Review Agent로 패턴 강화 가능.
 
 ### 8.1 Persistent Memory (`memory` 필드)
 
@@ -507,15 +424,6 @@ isolation: worktree
 | `permissionMode` | 에이전트별 권한 | review → `plan` (read-only), impl → `acceptEdits` |
 | `mcpServers` | 에이전트별 MCP | review-arch → serena만, review-quality → serena + context7 |
 | `background: true` | 항상 백그라운드 | 탐색/캐싱 에이전트에 적합 |
-
-### 8.6 도입 로드맵
-
-| 단계 | 적용 | 대상 에이전트 | 상태 |
-|------|------|-------------|------|
-| Phase 1 | `memory: project\|user` | review-arch, impl-correctness, plan-structure, review-quality(project), memory-curator(user) | ✅ 적용 |
-| Phase 2 | `skills:` | review-arch(arch-critic), review-quality(code-auditor) | ✅ 적용 |
-| Phase 3 | `TaskCompleted` hook | settings.json (팀 레벨) | ✅ 적용 (산출물 미작성 방지) |
-| Phase 4 | `isolation: worktree` | impl-correctness | ✅ 적용 |
 
 ---
 
