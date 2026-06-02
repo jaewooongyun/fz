@@ -272,6 +272,9 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    | 핵심 시나리오 보류 | PR이 해결하려는 원래 문제(버그, 크래시)의 재현 시나리오 중 하나가 "다음 PR에서 수정"으로 보류됨. 특히 race condition 수정에서 경합 시나리오 일부만 해결 | PR 목표와 보류 시나리오를 대조. 원래 버그가 보류 시나리오에서 재현 가능하면 → 현재 PR에서 해결 필수 또는 AskUserQuestion |
    | Redundant Import | 새 파일 작성 시 추가하는 각 `import {Module}` 문에 대해 그 모듈의 알려진 심볼이 파일 내에서 grep 0건 | 형제 파일 패턴 답습 의혹 (cargo-cult). 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과이며, 새 파일은 *자신의 사용 심볼*로 자체 정당화 필요. 검증: 새 파일 작성 후 각 import에 대해 `Grep("ModuleName\.\w+\|<known_typealias>")` 실행 → 0건이면 마찰 보고 (제거/유지 결정은 사용자/Codex 최종) |
    | Swift Naming 위반 *[candidate: 1 session evidence]* | Swift/iOS 프로젝트에서 새 helper/method 이름이 (a) 반환값 있는데 동사형 (b) `X or Y` 형태 (예: `appOrLog`, `getOrCreate`) (c) 부수 효과(log/persist/dispatch)를 이름에 포함 (d) `-ed/-ing` rule 위반 (mutating ↔ non-mutating 짝 부재) (e) 사용자 표현 어휘 무시 | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). Apple Swift API Design Guidelines 미준수 후보 시그널. 검증: helper 작성 *전* 5축 self-check 권장. 위반 시 noun phrase + 단일 의미로 재명명 (예: `appOrLog` → `verifiedApp`). 참조: `feedback_swift_naming_conventions.md` (candidate memory). ASD-1366 4회 iteration 사례 |
+   | 기존 인프라 미확인 helper *[candidate: 1 session evidence]* | 새 helper(포맷/변환/날짜·시간·숫자→문자열 류) 작성 *전* TvingCore/TvingUtil/Apps Util 3영역에 동일 기능 grep/symbol search 미실행 | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 41차 Reuse-First가 *plan 시점*엔 발화하나 *code 시점*엔 무방비 — 구현 중 helper 먼저 작성 → reactive catch. 검증: helper 작성 전 3영역 확인 → 기존 구현 있으면 reuse. 참조: `modules/promotion-ledger.md` L-2 + retrospective catch #3(DateFormatter)/#7(formatDuration) |
+   | 표면 churn *[candidate: 1 session evidence]* | 동일 UI 속성/레이아웃 값(좌표·offset·margin·spacing 등)을 *2회+* 변경 | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 반응적 재구현 신호. 2회+ 변경 시 → 코드 중단 → trade-off table로 모든 제약 동시 비교 → 사용자 결정 후 1회 구현. 비판을 반대편 flip 신호로 오인 금지(요구사항 기준 평가). 참조: `modules/promotion-ledger.md` L-3 + retrospective §7-8 (11-iteration) + 31/33/40차 |
+   | figma 수치 미측정 *[candidate: 1 session evidence]* | UI 레이아웃 수치(spacing/margin/offset/size/radius/opacity) 작성·수정 시 figma 노드 측정값과 1:1 대조 안 함 (사전 토큰 테이블을 exhaustive로 신뢰 → 누락 항목 원본값 답습 포함) | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 23차 figma 정밀이 *plan 시점 토큰 테이블*엔 발화하나 *code 시점 개별 수치*엔 무방비. figma MCP 있으면 flag-and-defer 금지 즉시 측정. ⚠️ frame/레이아웃 변경 *여부* 자체는 AI 한계(42차) — 디자이너 확인. 참조: `modules/promotion-ledger.md` L-1 + retrospective catch #8/#19/#20 |
 
    보고 형식:
    ```
@@ -284,6 +287,7 @@ Lead를 거치지 않고 직접 SendMessage로 소통한다.
    ```
 
    > 사용자가 "계속"이라고 해야 진행. 마찰 감지 시 무시 강행 금지.
+   > ⚠️ **`*[candidate: N session evidence]*` 태그 신호는 예외**: 권장 self-check이며 "무시 강행 금지"의 강제 대상이 *아니다* (memory-guide line 43 "활성 rule 등록 ❌" + fz-review 4-N "권장 self-check, Gate 차단 아님" 정합). 5 sessions 관측 후 활성 결정 시 비로소 강제 신호로 전환.
 
    **잔존 패턴 사전 검사** (Anti-Pattern Constraints가 있는 Plan에서만):
    Plan에 Anti-Pattern Constraints 테이블이 포함된 경우, 구현 시작 전 + 각 Step 완료 후에
