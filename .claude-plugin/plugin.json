@@ -1,6 +1,6 @@
 {
   "name": "fz",
-  "version": "4.10.1",
+  "version": "4.11.0",
   "description": "AI development workflow orchestration: natural language → complexity assessment → skill pipeline → multi-agent team → execution",
   "author": {
     "name": "Jaewoong Yun"

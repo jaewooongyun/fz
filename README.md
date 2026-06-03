@@ -174,14 +174,13 @@ Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
     └── External: Codex(GPT-5.5)
 ```
 
-### What's New (v4.10.1) — 하네스 self-maintenance [PATCH]
+### What's New (v4.11.0) — Opus 4.8 정합 + 인용 위생 + 하네스 구조 개선 [MINOR]
 
-- **figma candidate 신호 강화** (ASD-1718/1674): `fz-code` figma 마찰 신호에 색/정렬/텍스트 style-run/z-order 차원 + `data>render 눈대중 금지` + `figma 텍스트 미대조` 신규 candidate. *비활성(5-session gate)* — 동작 변화 아직 없음.
-- **hot-path 슬림화**: `agent-team-guide §3` 중복 pseudocode → `patterns/` 포인터 (550→457줄, operative 보존) + archived `plan-tradeoff` cleanup.
-- **모델 세대 갱신**: Opus 4.7→4.8 stale 참조 갱신 (`[미검증]` 태그 보존).
-- **maintenance**: Reflection Rate 계산식 schema 일원화(fix) + COST 축 ablation 측정 도구(dev-only) + .gitignore 정리.
+- **Opus 4.8 가이드 정합**: 공식(`anthropic.com/news/claude-opus-4-8`) verbatim 기반 — effort 기본 high / 자기 코드 결함 통과 ~4x↓ / tool-calling 효율↑(skip↓) / 단일 세션 수백 parallel subagents를 fz 적용으로 큐레이션(harness §10). 4.7 내용·Cobus·length-limit(04-20 철회) 제거. §8 "literal"→"instruction-following consistency"(공식 용어).
+- **인용 위생** (arXiv v3 원문 대조): MAST FC2 67%→**36.94%**(논문 "단일 지배 없음")·FM-2.2 6.80% / OpenDev 도구 7→8·서브시스템 6→7·fade-out 턴수치 제거 / NLAH IHR subset caveat / Context Rot "보편 임계값 없음". fz-challenger의 verified-태그 모순 해소.
+- **하네스 구조 개선**: §5 원칙7(운영점 — effort≠fan-out 레버 구분) + skill-authoring DELETE/MERGE-default 편집 rule + complexity parallelizable modifier + cross-validation A3(동종 합의 ≠ 독립검증).
 
-> v4.10.0 (Sycophancy 방어 + Active Recall + Reflection Pipeline)의 PATCH. 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
+> ⛔ 제거된 미검증 주장(공식과 배치): "fewer subagents"·"SWE-Pro 69.2%"·"literal". 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
 
 ### 근거 연구
 
