@@ -15,7 +15,7 @@
 | 40차-MUST3 (Codex precedence) | `--seq` 단독은 sequential thinking 모드이지 simplified trigger 아님. `--deep --seq` 또는 `--team --seq` 조합 시 elaborate 유지 | `--seq` 단독 keyword 매칭 금지 — 컨텍스트 조건 필수 (Codex 검증 §5 MUST 3) |
 | MAST FM-2.2 (Fail to ask for clarification) | 요청 모호 / 동사 없음 / 명사+키워드만 / 범위 불명확 | AskUserQuestion 발동 의무 |
 
-> 출처: MAST (NeurIPS 2025, arXiv 2503.13657) — FM-2.2 "Fail to ask for clarification" = **6.8% 오류율** [verified: L4]. 모호한 요청을 그대로 진행하면 28개 시스템 평균 6.8%의 실패 모드 trigger.
+> 출처: MAST (NeurIPS 2025, arXiv 2503.13657 v3) — FM-2.2 "Fail to ask for clarification" = **6.80% 오류율** [verified: v3 §4 원문 "(FM-2.2, 6.80%)"]. 모호한 요청을 그대로 진행하면 trigger (MAST-Data 7개 프레임워크 / 1642 traces).
 
 ## 3 Examples (inline)
 
