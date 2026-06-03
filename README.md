@@ -198,7 +198,7 @@ fz 가이드(`guides/*.md`)와 스킬이 인용하는 외부 권위 자료입니
 | [Claude 4 Best Practices](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/claude-4-best-practices) | 2026-02 | prompt-optimization.md §3 과격 지시어 가드 |
 | [Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps) | 2026-03 | "self-evaluation unreliable" → cross-validation 근거 / Planner-Generator-Evaluator |
 | [Scaling Managed Agents](https://www.anthropic.com/engineering/managed-agents) | 2026-04 | Brain/Hands/Session 분리 → context-artifacts.md emitEvent API contract |
-| [Introducing Claude Opus 4.7](https://www.anthropic.com/news/claude-opus-4-7) | 2026-04-16 | "literal instruction following" 변화 → 과격 지시어 가드 강화 |
+| [Introducing Claude Opus 4.8](https://www.anthropic.com/news/claude-opus-4-8) | 2026-05-28 | effort 기본 high + 자기결함 ~4x↓ + tool 효율↑ + 수백 parallel subagents → 가이드 4.8 갱신 |
 | [Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) | 2026 | prompt-optimization.md context 전략 (load-bearing skill of 2026) |
 | [Best Practices for Claude Code](https://www.anthropic.com/engineering/claude-code-best-practices) | 2026 | Subagent isolation / filesystem > compaction |
 

@@ -5,7 +5,7 @@
 > **Sources (last audited: 2026-04-30):**
 >
 > **Tier 1 — Anthropic Official:**
-> - Claude 4 Best Practices (live docs, Claude 4.6 포함) — prompt-engineering, agentic systems, adaptive thinking
+> - Claude 4 Best Practices (live docs) — prompt-engineering, agentic systems, adaptive thinking
 > - Anthropic Skill Authoring Best Practices
 > - Anthropic 32-page Skills Guide (2026-01-29) — progressive disclosure, trigger testing, YAML, skill-MCP
 > - Building Effective Agents (Anthropic 2024-12) — foundational, augmented-LLM building blocks
@@ -17,9 +17,9 @@
 > - Anthropic Claude Code Best Practices (living reference) — Subagent isolation, Compaction, filesystem > compaction
 > - **Effective Context Engineering for AI Agents (Anthropic 2026)** — "context engineering = load-bearing skill of 2026"
 > - **Tool Use Context Engineering Cookbook (Anthropic 2026)** — memory, compaction, tool clearing 실전
-> - **Introducing Claude Opus 4.7 (Anthropic 2026-04-16)** — release announcement, harness release 정체성
+> - **Introducing Claude Opus 4.8 (Anthropic 2026-05-28)** — release announcement (effort 기본 high, 자기 코드 결함 ~4x↓, tool-calling 효율↑, 단일 세션 수백 parallel subagents)
 > - **Best Practices for Claude Code (Anthropic, live reference)** — Claude Code 전용 prompt 가이드
-> - **Anthropic Prompting Best Practices (live)** — Opus 4.7/4.6/Sonnet 4.6/Haiku 4.5 공식 prompt 가이드
+> - **Anthropic Prompting Best Practices (live)** — Opus 4.8/Sonnet/Haiku 공식 prompt 가이드
 > - **Anthropic Interactive Prompt Engineering Tutorial (GitHub, 2026)** — 공식 튜토리얼
 > - **OpenAI Prompt Guidance (live)** — 공식 API prompt 가이드
 > - **GPT-5 Prompting Guide (OpenAI Cookbook, 2026)** — 공식 Cookbook
@@ -50,7 +50,6 @@
 >
 > **Tier 3 — Community/Practitioner:**
 > - Agents at Work: 2026 Playbook — ReAct, verification-aware planning, circuit breakers
-> - **Cobus Greyling: Claude Opus 4.7 is a harness release** [community: cobusgreyling.medium.com/claude-opus-4-7-is-a-harness-release-354f92cd1648] — Length limits, literal interpretation, code review recall +10% 인용 (verified 처리는 Anthropic 공식 supporting일 때만)
 > - Addy Osmani: The Code Agent Orchestra (2026) — Claude Code subagents, peer-to-peer messaging
 > - Context Mode (mksg.lu) — 98% 토큰 축소, FTS5 세션 연속성
 > - Cloudflare Code Mode — MCP→TypeScript API, ~1000토큰
@@ -300,9 +299,11 @@ Fallback:   대안 도구 (Primary 실패 시 사용)
 
 ---
 
-### 원칙 8: Claude 4.6/4.7 과격 표현 제거
+### 원칙 8: 과격 표현 제거 (Claude 4.8 instruction-following)
 
-**근거:** Anthropic Claude 4 Best Practices (2026-02-24). Claude 4.6은 이전 모델보다 훨씬 proactive하다. 과격한 지시어는 overtriggering을 유발한다. **Opus 4.7 (2026-04-16 GA)에서 "more literal instruction following" 변화** [verified: anthropic.com/news/claude-opus-4-7] + **GPT-5.5 (2026-04-23 GA)에서도 "literal and thorough manner" 동일 방향 변화** [verified: developers.openai.com/api/docs/guides/latest-model] → 과격 지시가 literal하게 적용될 위험 증가. **frontier 트렌드** (supporting: cobusgreyling.medium.com/claude-opus-4-7-is-a-harness-release-354f92cd1648).
+**근거:** Anthropic Claude 4 Best Practices + **Opus 4.8은 지시를 일관되게 따른다** ("uses tools cleanly and follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]). 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — Codex 측 동일 가드.)
+
+> **항목별 범위 명시 원칙**: broad 규칙은 적용 범위를 항목별로 명시하라. [이유] 범위가 명시된 지시가 더 정확히 적용된다. [GOOD] "verify each step, not just the first"  [BAD] "verify the step" (범위 모호). 메모리 8/13/18차(silent disappearance) 증상과 정합하는 일반 원칙 — 모델 버전 무관.
 
 **체크리스트:**
 - [ ] "CRITICAL", "MUST ALWAYS", "NEVER EVER" 등의 표현이 없는가?
@@ -326,7 +327,7 @@ GOOD: "Check the relevant files before making changes"
 ```
 
 **Why this matters:**
-- Claude 4.6은 지시를 충실히 따르려는 경향이 강함
+- Claude 4.8은 지시를 일관되게(consistency) 따르려는 경향이 강함
 - 과격한 표현은 불필요한 상황에서도 해당 행동을 트리거함
 - 결과: 과도한 도구 호출, 불필요한 검증 반복, 서브에이전트 남용
 - 자연스럽고 구체적인 표현이 더 정확한 행동을 유도함
@@ -696,8 +697,8 @@ fz 적용:
 | 시간 의존 정보 ("2026년 3월 기준") | 곧 오래된 정보가 됨 | 상대 표현 또는 버전 기반 표현 사용 |
 | 비일관적 용어 사용 | 같은 개념에 다른 이름 -> 혼동 | 용어를 하나로 통일, 용어집 관리 |
 | 깊은 참조 중첩 (A -> B -> C -> D) | Context Rot 가속, 정보 손실 | 최대 1단계 깊이만 허용 |
-| "CRITICAL / MUST ALWAYS" 남용 | Claude 4.6/4.7에서 overtriggering 유발 (4.7 literal interpretation으로 더 위험) | 자연스럽고 구체적인 표현 사용 |
-| 과도한 서브에이전트 위임 | Claude 4.6/4.7의 과잉 위임 경향 강화 | 단순 작업은 직접 실행하도록 지시 |
+| "CRITICAL / MUST ALWAYS" 남용 | Claude 4.8 instruction-following에서 과격 지시 그대로 적용 위험 | 자연스럽고 구체적인 표현 사용 |
+| 단순 작업에 서브에이전트 과다 위임 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율) | 단순 작업은 직접 실행하도록 지시 |
 | Claude가 아는 것을 다시 설명 | 토큰 낭비, Context Rot 가속 | 프로젝트 고유 정보만 포함 |
 | 실패에서 체크리스트 행 추가 반사 | 규칙 수 증가→준수율 저하, Claude 추론 억압 | 원칙+이유 한 줄로 대체 (보충 4a) |
 | 예시 없이 장문으로 설명 | 모호함, 해석 편차 | Few-shot 예시 3-5개로 대체 |

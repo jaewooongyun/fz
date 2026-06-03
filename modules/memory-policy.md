@@ -126,7 +126,7 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 
 ### Claude Memory tool과의 관계
 
-> 참조: Anthropic 공식 Memory tool (file-system-based memory, https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool). Opus 4.7 (2026-04-16 GA) release notes: "Opus 4.7 is better at using file system-based memory" — 4.7이 도구를 새로 추가한 것은 아님, **더 잘 활용**.
+> 참조: Anthropic 공식 Memory tool (file-system-based memory, https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool). Opus 4.x는 file-system 기반 메모리 활용도가 높음 — 도구를 새로 추가한 것이 아니라 **활용**이 강함.
 
 공식 Memory tool은 **client-side 도구** — 저장 backend/위치는 **사용자/애플리케이션이 제어**. "across conversations"/"persist between sessions" 지원. 기능적으로 fz의 L3 (PRJ 폴더 + `.claude/projects/.../memory/`)와 **중복 가능성** 존재:
 
