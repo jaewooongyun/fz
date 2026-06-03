@@ -26,7 +26,7 @@ LOG="{WORK_DIR}/verify/evidence-check.log"
 
 # 매트릭스에서 row 추출 (예: awk 또는 명시 배열)
 declare -a rows=(
-  "A1|Opus 4.7|https://example.com|Opus 4\.7"
+  "A1|Opus 4.8|https://example.com|Opus 4\.8"
   "A2|...|...|..."
   # ... 25 row
 )

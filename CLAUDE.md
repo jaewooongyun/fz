@@ -62,9 +62,9 @@ bash scripts/setup-hooks.sh
 
 ## Opus 4.8 Adaptation
 
-- **GA**: 2026-05 (Opus 4.8 현재 모델; 정확 일자 미확인)
-- **Tokenizer**: 1.00-1.35x 증가 (Opus 4.7 공식 baseline 상속, Opus 4.8 실측 미완료) [미검증: count_tokens 측정 필요]
-- **Behavior**: "more literal instruction following" — overtriggering 위험 증가 (4.7→4.8 지속 가정, 4.8 실측 미완료)
+- **GA**: 2026-05-28 [verified: anthropic.com/news/claude-opus-4-8]
+- **Tokenizer**: 1.00-1.35x 증가 (Opus 4.x baseline, fz 자체 실측 미완료) [미검증: count_tokens 측정 필요]
+- **Behavior** [verified: anthropic.com/news/claude-opus-4-8]: effort 기본 high(xhigh/max는 선택) / instruction-following consistency(과격·모호 지시 그대로 적용 위험) / 자기 코드 결함 통과 ~4x↓(self-eval 개선) / tool-calling 효율↑(required-call skip↓) / 단일 세션 수백 parallel subagents 지원
 - **Context window**: 1M 유지 (safety net 원칙, Intelligence Degradation + Context Length Hurts 논문 근거)
 
 상세: `modules/context-artifacts.md` (1M context 정책), `guides/harness-engineering.md` §1.3 (세대 전환 테이블), `guides/prompt-optimization.md` 원칙 8 (literal interpretation 대응).

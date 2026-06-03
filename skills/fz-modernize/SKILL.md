@@ -44,7 +44,7 @@ model-strategy:
 ## 사용 시점
 
 ```bash
-/fz-modernize "fz 가이드 7개를 Opus 4.7 출시 후 최신화"          # → full 파이프라인
+/fz-modernize "fz 가이드 7개를 Opus 4.8 출시 후 최신화"          # → full 파이프라인
 /fz-modernize light "그냥 가볍게 최신화"                       # → Phase 1+2 + Codex micro-eval (40차 simplified mode, 카운터 1 소비)
 /fz-modernize probe "guides/harness-engineering.md"           # → Phase 1만
 /fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
@@ -368,7 +368,7 @@ codex exec \
 
 ```
 예시 1 — full 파이프라인:
-  /fz-modernize "fz 가이드 7개를 Opus 4.7 출시 후 최신화"
+  /fz-modernize "fz 가이드 7개를 Opus 4.8 출시 후 최신화"
   → ASD 폴더 자동 생성
   → Phase 1 (Probe): WebSearch 5건 + Tier 1+2 분류
   → Phase 2 (Audit): grep으로 미검증 8곳 식별
