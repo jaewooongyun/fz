@@ -8,6 +8,31 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.11.0 (2026-06-04) — Opus 4.8 정합 + 인용 위생 + 하네스 구조 개선 [MINOR]
+
+**핵심**: fz 가이드를 Opus 4.8 공식 사양에 정합화 + arXiv 원문 대조 인용 수치 정정 + 하네스 구조 개선. 3 기능단위 커밋, 16파일 +80/-51. breaking change 0.
+
+**Opus 4.8 정합** (`anthropic.com/news/claude-opus-4-8` verbatim):
+- effort 기본 high(xhigh/max 선택) / 자기 코드 결함 통과 ~4x↓(self-eval 개선) / tool-calling 효율↑(required-call skip↓) / 단일 세션 수백 parallel subagents — fz 적용 4-bullet (harness §10).
+- 4.7 내용 제거: length-limit(04-16 적용→04-20 철회, ~3% 성능저하)·Cobus "harness release"·partially-verified 태그. §8 "literal"(4.7 community)→"instruction-following consistency"(4.8 공식). 모델 참조 claude-opus-4-8.
+- ⛔ 제거된 미검증 주장(공식과 배치): "fewer subagents"·"SWE-Pro 69.2%"·"literal" (이전 세션 [미검증: wp0rdknnz]였으나 공식 fetch가 배치 확인).
+
+**인용 위생** (arXiv v3 원문 대조):
+- MAST: FC2 inter-agent 67%→**36.94%** (FC1 41.77/FC3 21.30, 논문 명시 "단일 지배 카테고리 없음"), FM-2.2 **6.80%** + MAST-Data 7개 프레임워크/1642 traces. MAST active 인용(4곳).
+- OpenDev: 도구 카테고리 7→8(§2.4)·서브시스템 6→7(§2.3)·"instruction fade-out" 턴수치 제거(논문 미명시).
+- NLAH IHR ~74%에 benchmark subset caveat / Context Rot "64K 전모델"→"보편 임계값 없음(Chroma)".
+- codex-skills/fz-challenger의 "67% 가장 치명적"(verified 태그) 모순 해소.
+
+**하네스 구조 개선**:
+- harness §5 **원칙7(운영점)**: effort(추론깊이)≠SOLO/TEAM(에이전트수) 레버 구분 + max+ultracode 운영점 함의.
+- skill-authoring **WS4 DELETE/MERGE-default** 편집 operating rule (additive-only 방어, IFScale 근거).
+- complexity **parallelizable modifier**(coupled→single-thread, 별도 게이트 아님) + cross-validation **A3**(동종 합의 ≠ 독립검증).
+- harness Index §7/§11 ref 정정 (Module Ablation 방법론은 §11).
+
+**Cross-model 제약**: Codex(GPT) 할당량 초과로 본 릴리즈는 동종 Claude 다관점 검증 + 공식 docs verbatim 대조로 진행. cross-model 재검증은 복구 시 권장.
+
+상세: `docs/releases/v4.11.0.md`.
+
 ### v4.10.1 (2026-06-02) — 하네스 self-maintenance + figma candidate 신호 [PATCH]
 
 **핵심**: v4.10.0 이후 누적된 8 커밋의 하네스 유지보수 배치. ASD-1674/1718 figma 회고 기반 candidate 마찰 신호(비활성) + hot-path 슬림화 + 모델 세대 갱신(4.7→4.8) + ablation 측정 도구. **active 기능 0 → PATCH** — 모든 feat 커밋은 `5-session 관측 후 활성` gate 뒤 비활성 candidate이거나(figma 신호) 0-참조 dev 도구(측정 스크립트)라 플러그인 사용자가 관찰하는 동작 변화 없음. breaking change 0. 8 commits (TEAM plan+review로 검증, `TVOD/ASD-1718/fz-enhancement/`).
