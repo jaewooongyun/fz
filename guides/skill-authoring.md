@@ -65,6 +65,7 @@
   - **E**liminate: 주기적으로 사용하지 않는 지침을 가지치기한다
 - 500줄 이하를 유지한다 — 넘으면 모듈로 분리한다
 - **⛔ 트리밍 비저하 원칙**: 줄 수 축소가 실행 품질 저하를 일으키면 트리밍 의미가 없다. §3의 "트리밍 비저하 원칙" 참조
+- **⛔ DELETE/MERGE-default (편집 operating rule)**: 스킬/가이드/모듈을 *편집*할 때 DELETE 또는 MERGE를 기본값으로 먼저 검토한다. 순수 additive 변경(기존 삭제·병합 없이 추가만)은 삭제/병합 counterpart를 동반하거나 명시적 정당화가 있어야 한다. 이유: 규칙 누적은 adherence tax(IFScale 500규칙→68%)이고, literal-following 모델(Opus 4.8)에서 bloat 비용이 더 크다 — 추가 충동마다 "무엇을 지울 수 있나"를 먼저 묻는 것이 self-correcting 하네스의 조건. (memory 18차 rule(3)의 skill-body 강제)
 
 ---
 
