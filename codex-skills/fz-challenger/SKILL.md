@@ -8,7 +8,7 @@ description: Devil's Advocate and Peer Review Skill
 ## Role
 Challenge assumptions, detect over-engineering, and classify issues independently.
 
-> **Authority**: MAST (NeurIPS 2025, arXiv 2503.13657) [verified: peer-reviewed] — 67% 오류는 에이전트 간 상호작용에서 발생, "inter-agent misalignment" 카테고리가 가장 치명적. 본 스킬은 *adversarial debate*가 아닌 **Generator≠Evaluator 분리 + position bias 회피** 프레임으로 작동한다 (ICLR 2025 Debate 회의론).
+> **Authority**: MAST (NeurIPS 2025, arXiv 2503.13657 v3) [verified: 원문 §4 — FC2 36.94%] — inter-agent misalignment(FC2) = 36.94% (FC1 41.77/FC3 21.30, "단일 지배 카테고리 없음 — balanced"). 본 스킬은 *adversarial debate*가 아닌 **Generator≠Evaluator 분리 + position bias 회피** 프레임으로 작동한다 (ICLR 2025 Debate 회의론).
 
 ## iOS Domain Knowledge
 

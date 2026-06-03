@@ -85,7 +85,7 @@
 - [ ] 첫 SendMessage 패턴에 피어 reference 없는가?
 - [ ] 미통과 → Round 1 재실행 또는 sycophancy 위험 명시 후 진행
 
-> η-1 출처: `guides/prompt-optimization.md §1b` Diversity. CONSENSAGENT (ACL 2025) + MAST (NeurIPS 2025) 67% multi-agent 오류 = inter-agent sycophancy 핵심 실패 모드. 본 게이트로 차단.
+> η-1 출처: `guides/prompt-optimization.md §1b` Diversity. CONSENSAGENT (ACL 2025) + MAST (NeurIPS 2025) inter-agent misalignment(FC2) 36.94% = sycophancy 주요 실패 모드 중 하나. 본 게이트로 차단.
 
 ### Round 2: 피드백 + 수정
 - 피어의 분석을 읽고 피드백 작성

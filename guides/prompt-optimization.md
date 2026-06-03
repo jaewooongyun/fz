@@ -32,7 +32,7 @@
 > - ACE: Agentic Context Engineering v3 (Stanford, ICLR 2026, arXiv 2510.04618) — context collapse, brevity bias
 > - Context Rot (Chroma Research, 18 frontier models) — 집중된 300토큰 > 비집중 113K토큰
 > - IFScale (arXiv 2507.11538) — 규칙 수 증가 → 정확도 저하 (500규칙→68%)
-> - MAST (NeurIPS 2025, arXiv 2503.13657) — multi-agent 실패 14모드, 67% 에이전트 상호작용에서 발생
+> - MAST (NeurIPS 2025, arXiv 2503.13657) — multi-agent 실패 14모드 / 3 카테고리 (FC1 41.77% / FC2 inter-agent 36.94% / FC3 21.30%, 논문 명시 "단일 지배 카테고리 없음")
 > - Inside the Scaffold (arXiv 2604.03515, 2026-04) — 13개 코딩 에이전트 분석, 5가지 루프 프리미티브
 > - Multi-Agent Collaboration Survey (arXiv 2501.06322) — 협업 유형/구조/전략/프로토콜 분류
 > - CONSENSAGENT (ACL 2025) — 동적 프롬프트 정제로 sycophancy 완화
@@ -449,7 +449,7 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 ### 다양성 (Diversity)
 
 **Sycophancy 방어 — Round 1 독립성**: 에이전트가 서로의 초안을 보기 전에 독립 분석을 완료해야 한다.
-- MAST (NeurIPS 2025): 67% 오류는 에이전트 간 상호작용에서 발생. "false consensus"가 핵심 실패 모드. 14개 실패 모드 중 "inter-agent misalignment" 카테고리가 가장 치명적. 특히 **FM-2.2 "Fail to ask for clarification" = 6.8%** [verified: L4] — 모호한 요청을 그대로 진행하면 28개 시스템 평균 6.8% 실패 모드 trigger.
+- MAST (NeurIPS 2025): inter-agent misalignment(FC2) = 36.94% (FC1 41.77% / FC3 21.30%, 합 100%; 논문 명시 "단일 지배 카테고리 없음 — balanced"). "false consensus"가 주요 실패 모드 중 하나. 특히 **FM-2.2 "Fail to ask for clarification" = 6.80%** [verified: MAST v3 §4 원문 "(FM-2.2, 6.80%)"] — 모호한 요청을 그대로 진행하면 trigger (MAST-Data 7개 프레임워크 / 1642 traces).
 - CONSENSAGENT (ACL 2025): 동적 프롬프트 정제(dynamic prompt refinement)로 sycophancy를 런타임에 완화. 정적 방어(Round 1 독립성)와 동적 방어(상호작용 중 교정)를 결합하면 효과 극대화.
 - Multi-Agent Collaboration Survey (arXiv 2501.06322): 협업 구조를 peer/centralized/distributed로 분류. fz의 Peer-to-Peer 패턴은 "peer" 구조 + "role-based" 전략의 조합.
 - Round 1에서 독립성을 보장하면 동조 편향을 차단한다.
@@ -475,7 +475,7 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 |------|------|------|
 | 집중된 300토큰이 비집중 113K토큰보다 우수 | 대화 기반 작업 기준 | 핵심만 포함하고 불필요한 내용 제거 |
 | 중간 위치 정보 검색률 하락 | 30%+ 성능 하락 (Lost-in-the-Middle) | 핵심 지시를 문서 앞부분 또는 끝부분에 배치 |
-| 64K 토큰 이상에서 전 모델 성능 저하 | Context Rot 발생 구간 | Progressive Disclosure 필수 적용 |
+| 입력 길이 증가 시 전 모델 성능 저하 (보편 임계값 없음 — Chroma 명시; "64K"는 2차 출처) | Context Rot 발생 구간 | Progressive Disclosure 필수 적용 |
 | 주제 관련 오답이 무관 콘텐츠보다 해로움 | Distractor Interference 효과 | 부정확하거나 오래된 정보는 삭제 |
 
 **실전 적용 규칙:**
