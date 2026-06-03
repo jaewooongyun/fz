@@ -537,7 +537,7 @@ GOOD: head_limit 설정 + 필요한 파일만 선별 Read
 - defer_loading 활용: 필요 시에만 ToolSearch로 로드
 - 통합 가능한 도구는 통합 (20개→8개 = 60% 감소 사례)
 
-**D. 서브에이전트 효율** — 스폰마다 ~50K 토큰 재주입
+**D. 서브에이전트 효율** — 스폰마다 ~50K 토큰 재주입 (단, max+ultracode 운영점에선 *비용*보다 coordination·MAST 오버헤드가 binding 회피 이유 — `guides/harness-engineering.md §5 원칙 7` 참조)
 - 단순 작업은 서브에이전트 대신 직접 실행
 - TEAM 모드에서만 에이전트 스폰 (standalone Agent 남발 금지)
 - governance.md 에이전트 상한 준수

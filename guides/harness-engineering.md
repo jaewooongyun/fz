@@ -19,8 +19,8 @@ Anthropic 공식 엔지니어링 블로그, arxiv 논문, 오픈소스 구현체
 - §4 에이전트 패턴 A-D (Initializer, 3-Agent GAN, Plan→Work→Review, NLAH)
 - §5 실전 원칙
 - §6 Anti-patterns
-- §7 체크리스트 + Ablation 프로세스
-- §11 Phase B 시작점 (cross-experiment 표는 experiment-log.md 참조)
+- §7 실전 구현 체크리스트 (load-bearing 테스트 포함)
+- §11 측정 지표 + Module Ablation 방법론 (cross-experiment 표는 experiment-log.md 참조)
 - §12 fz 생태계 매핑 + Gap 분석
 
 > heading-based anchor only — line numbers 변동 시 자동 갱신 불필요. anchor 검증은 implementation 시점에 grep으로 동적 확인.
@@ -734,6 +734,23 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
   - 비전 한계로 미묘한 레이아웃 차이 놓침
   - 복잡한 드래그앤드롭 인터랙션 재현 어려움
 ```
+
+### 원칙 7: 운영점(Operating Point)을 하네스 가정으로 인코딩하라
+
+> H1("모든 하네스 컴포넌트 = 모델이 혼자 못 하는 것에 대한 가정")의 확장 — 가정에는 *운영 설정*도 포함된다. 운영점이 고정되면(예: Claude 세션 effort=max + ultracode) 하네스는 그 설정을 못 바꾸는 전제 위에서 설계한다.
+
+**레버 구분** (혼동 주의):
+- `effort`(추론 깊이) = 세션 설정. max 고정 시 하네스가 *못 낮춘다*.
+- `SOLO/TEAM`(에이전트 수) = `modules/complexity.md` 소유. fan-out을 제어하지 *추론 깊이가 아니다*.
+- → SOLO 게이팅으로는 overthinking(추론 깊이)을 못 막는다. 게이팅이 줄이는 것은 fan-out 비용·MAST 실패다.
+
+**max + ultracode 운영점의 함의**:
+- (a) token 비용은 *세션* binding 제약이 아니다 → 세션은 품질 최적화. 단 Codex/subagent leg의 per-call effort·비용은 fz가 여전히 소유한다 (`modules/codex-strategy.md` Standard/Deep/Light 티어 — 회귀시키지 않는다).
+- (b) max는 단순 작업도 깊게 추론한다(overthinking 가능). 세션 추론 깊이를 못 낮추므로, fz는 *task surface 축소*(light/simplified 모드 = 로드 instruction 감소)로 "무엇을 생각하는가"를 좁힌다 — 추론 깊이가 아니라 추론 *대상*을 줄이는 접근.
+- (c) ultracode는 workflow를 기본화하나 coupled 작업의 결합도는 바뀌지 않는다(§8 multi-agent 통신 + `guides/agent-team-guide.md` 참조). 비용 반론만 제거할 뿐 fan-out 정당화가 아니다.
+
+> 이유: 운영 설정을 하네스 가정으로 명시하면, 못 바꾸는 레버(세션 effort)에 헛된 게이팅을 걸지 않고 바꿀 수 있는 레버(surface·Codex effort·fan-out)에 집중하게 된다.
+> [미검증: "max가 단순작업서 overthinking" 정량 근거는 wp0rdknnz 단일 외부출처 — Anthropic 공식 docs URL 확보 후 verified 승격]
 
 ---
 

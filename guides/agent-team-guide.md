@@ -272,7 +272,8 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | Anti-Pattern | 이유 | 대안 |
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
-| 서브에이전트 과다 | Claude 4.6/4.7/4.8 경향, 비용 폭증 (Opus 4.7 literal interpretation으로 강화 [verified: anthropic.com/news/claude-opus-4-7]) | SOLO for simple tasks |
+| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]) | SOLO for simple tasks |
+| coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(step-repetition 등) + 동일 토큰예산서 우위 소멸 [미검증 근거: wp0rdknnz] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
 | standalone Task | 통신 불가, 고립된 작업 | TeamCreate 필수 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
 | 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 2-Tier (Lead+Primary=opus, rest=sonnet) |
