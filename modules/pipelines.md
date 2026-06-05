@@ -37,7 +37,7 @@
 | 트리거 | `어떻게.*좋을까, 트레이드오프, 뭐가.*맞을까` |
 | 체인 | fz-discover |
 | 기본 모드 | SOLO |
-| TEAM 모드 | plan-structure(★O) + review-arch (adversarial) |
+| TEAM 모드 | plan-structure(★O) + review-arch (adversarial) — (pilot: `workflows/discover-adversarial.js` Workflow 대체 실행) |
 | SC 연계 | `--business` 시 `/sc:business-panel` (UX/전략 분석) |
 
 ### 4. bug-hunt

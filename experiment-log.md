@@ -394,3 +394,29 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 각 세션의 reverse_triggers_fired 값은 v3.6 역방향 트리거의 실증 효과 데이터. 본 §5.6 누적이 plugin-refs.md "역방향 감지 트리거" 섹션의 Phase A 효과 측정 (uncertainty-verification.md `## Phase A/B 진입 판정` 모듈) sink로 작동.
 
 5건 누적 후: reverse_triggers_fired AVG < 1 → 역방향 트리거 정의 재검토. AVG > 3 → 트리거 강화 (추가 패턴 발굴).
+
+## §5.7 Workflow Tracing (TEAM→Workflow pilot, fz-discover)
+
+> Lead가 invoke마다 수동 append (hook 비의존 — §5.5 hook은 TaskCreated/TeammateIdle/TeamDeleted 의존, Workflow 모드 미발생).
+> 계획: TVING 워크스페이스 `fz-teams-workflow-migration/plan/plan-final.md` (계획 표기 §5.8은 실측 §5.6 다음 번호인 §5.7로 교정).
+
+### 확산 판정 임계 (사전 등록 — 변경 금지, 확증 편향 방어)
+
+- **신뢰성 (확산 판정 유일 기준)**: fz-discover 5건 전수 null률 0% + 완주율 100% + fallback 0건. 미달 → rollback 트리거.
+- **다양성 (--deep fan-out 유지/제거 판정 전용)**: --deep merged 고유 경로 수 > default 단일 생성 경로 수. 미충족 → --deep도 lean 회귀 (확산 판정엔 불사용).
+- **확산 3게이트**: G1 패턴별 적합성 (adversarial 성공 ≠ 타 패턴 자동 확산 — collaborative/pair-programming 개별 검토) / G2 Landscape 품질 관찰 (비정량 기록, 게이트 아님) / G3 TEAM 폴백 일몰 명시 결정.
+
+### 기록 형식 (invoke당 1행)
+
+| # | date | mode | agentCalls | nullCount | rounds | fallback | wall-clock | G2 품질 관찰 (경로수/evidence/openQ) |
+|---|------|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
+
+### 누적 데이터 (시작: 2026-06-05)
+
+| # | date | mode | agentCalls | nullCount | rounds | fallback | wall-clock | G2 품질 관찰 (경로수/evidence/openQ) |
+|---|------|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
+| 1 | 2026-06-05 | lean | 5 | 0 | 2 | 0 | 446s | ⛔ **품질 실패** — agentType 시스템 프롬프트의 ASD 컨텍스트 로딩이 args 압도, 무관한 TVOD 작업 폴더 anchoring (기계 지표 전부 통과 — G2 게이트 존재 이유 실증). OVERRIDE 강화로 교정 → #2 재실행 |
+| 2 | 2026-06-05 | lean | 5 | 0 | 2 | 0 | 411s | ⛔ **품질 실패 2** — 근본 원인 격리: scriptPath 호출 시 args가 JSON 문자열 도착(probe wf_89418b73 실측, typeof=string) → args.problem=undefined → 에이전트 입력 부재 상태로 무관 폴더(peer-review-4182) 탐색. r1은 OVERRIDE 강화 효과로 undefined를 정직 보고. 수정: 스크립트 방어 파싱(JSON.parse) + fail-fast 가드 → #3 재실행 |
+| 3 | 2026-06-05 | lean | 5 | 0 | 2 | 0 | 492s | ✅ **첫 clean 통과** — 정주제 6경로 landscape, §5.7 기존재 실측 발견 + Phase B 표 semantics 충돌 발견 + traces.jsonl 선례 반박(L69). evidence [verified Lxx] 인용 준수, 결론 미산출 ✓. G2: 경로 6/evidence 충실/openQ 5건 실질 |
+| 4 | 2026-06-05 | **deep** | 9 | 0 | 2 | 0 | 404s | ✅ clean — 렌즈 12 원천→4 병합그룹(mergedFrom 추적 정상), lean 미발견 D경로 발굴 + false prereq 실측 반박 2건. **다양성 지표 판정 보류**: 사전등록 문구 "merged 고유 경로 수 > default 단일 생성 경로 수"가 양의적 — (a) 병합그룹 4 vs lean 최종 6 → 미충족 / (b) 원천 렌즈경로 12 vs lean 6 → 충족. 지표 정의 모호 자체가 calibration 발견 — 5건 시점 판정 전 정의 확정 필요. wall-clock은 deep(404s) < lean#3(492s) — 병렬 효과 |
+| 5 | 2026-06-05 | **deep** | 10 | 0 | 2 | 0 | 482s | ✅ clean — **merge 수정 검증**: MergedPathSetSchema(maxItems 12) 적용 후 병합 5그룹 (이전 상한 4 돌파 — 스키마 탈락 강제 해소 실증). 신규: 입력 경로 오류를 Grep 실측으로 자가 교정 + freeze 블록 canonical 식별. ts 제거 계약 정상 동작 |

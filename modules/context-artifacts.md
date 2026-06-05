@@ -18,7 +18,7 @@
 │   ├── discover-plan.md     # plan 실행 중 ad-hoc (Phase-Tagged)
 │   ├── discover-code.md     # code 실행 중 ad-hoc (Phase-Tagged)
 │   ├── discover-review.md   # review 실행 중 ad-hoc (Phase-Tagged)
-│   └── discover-team.md     # TEAM 모드 adversarial discovery 통신 기록
+│   └── discover-team.md     # TEAM 모드 adversarial discovery 통신 기록 (Workflow pilot: 미생성 — transcript가 대체, canonical discover-journal.md 무변경)
 ├── plan/
 │   ├── plan-v1.md ~ plan-vN.md
 │   ├── plan-final.md

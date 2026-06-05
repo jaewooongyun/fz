@@ -19,7 +19,7 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
-  Read, Grep, Glob
+  Read, Grep, Glob, Workflow
 team-agents:
   primary: plan-structure
   supporting: [review-arch]
@@ -66,8 +66,8 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 폴백 (에러 대응 표)
+- 참조: `guides/agent-team-guide.md` §8 (TEAM 공식 사양 — 패턴 canonical 문서용, pilot 기간 실행 경로 아님)
 
 ## 모듈 참조
 
@@ -97,51 +97,38 @@ model-strategy:
 
 > 참조: `modules/plugin-refs.md` — SwiftUI Expert(상태 관리 결정 시) + Swift Concurrency(동시성 관련 제약 시)
 
-## 팀 에이전트 모드
+## 팀 에이전트 모드 (Workflow 오케스트레이션 — pilot)
 
-> 팀 모드 규칙은 `modules/team-core.md` 참조
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 pilot.
+> Adversarial Constraint Discovery 패턴의 canonical은 `modules/patterns/adversarial.md` — 라운드 의미론(만들고-부수기)은 스크립트가 구현하며, 패턴 문서는 보존(재배치이지 삭제 아님).
+> 스크립트: `workflows/discover-adversarial.js` (플러그인 루트 상대 경로) — agents/의 plan-structure·review-arch 정의를 agentType(`fz:` 네임스페이스)으로 재사용.
 
-### 팀 구성
+### 발동 조건
 
-```
-TeamCreate("discover-{topic}")
-├── Lead (Opus): 퍼실리테이터 + 사용자 대화 + 제약 매트릭스 관리
-├── plan-structure (★Opus): 대안 생성 + 실현성 평가 (Primary Worker)
-├── review-arch (Sonnet): 제약 발견 + 아키텍처 위반 감지
-└── (선택) Codex CLI: cross-model 제약 교차 검증 (Lead가 /fz-codex verify 실행)
-```
+기존 TEAM 발동 지점과 동일: 복잡도 4+ 또는 `--team`/`--deep` (아래 SOLO vs TEAM 판단표 준용). 사용자 대화형 탐색(Phase 2 ↔ 사용자)은 본 모드와 무관하게 SOLO가 담당 — Workflow는 **비대화 다라운드 탐색만** 대체한다.
 
-> ASD 폴더 활성 시: `{WORK_DIR}/discover/discover-team.md`에 에이전트 간 핵심 통신 요약을 기록한다.
+### 실행 절차 (Lead)
 
-### 통신 패턴: Adversarial Constraint Discovery (Peer-to-Peer)
+1. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContext`=Phase 0b 심볼 탐색 산출 요약 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중)
+2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/discover-adversarial.js', args })`
+   - default: lean 5-call — 경로생성(opus) → 비용평가(sonnet) → R2 추가경로 → R2 비용 → 합성(opus). TEAM 2-agent 비용 동급대
+   - --deep: 렌즈 3 fan-out(sonnet, 독립 생성) → 병합(opus, 탈락 금지) → 경로별 평가(동시 ≤4 chunk) → 합성. budget 가드 내장
+3. **반환 처리**:
+   - `mode: 'workflow'` → `landscape`(Trade-off Table + Open Questions)를 Phase 2/3 사용자 대화 입력으로 사용. Lead가 `discover-journal.md` 기록 (canonical 경로 무변경)
+   - `mode: 'fallback'` → 아래 에러 대응 표의 SOLO 폴백(Lead 단독 REP) 수행 + 사유를 experiment-log에 기록
+4. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `experiment-log.md` Workflow tracing 섹션에 수동 append
+5. **--deep cross-model**: Workflow 완료 후 Lead가 `/fz-codex verify` 별도 실행 (스크립트 내 cross-provider 스폰 금지)
 
-plan-structure가 **옵션을 만들고** review-arch가 **제약 위반을 찾는** 반복 루프.
-Lead는 사용자 대화를 관리하고, 제약 매트릭스를 업데이트한다.
+### TEAM 추론 품질 3원칙 보존 (guides/prompt-optimization.md §다양성 매핑)
 
-```
-Round 1 (옵션 생성 + 제약 발견):
-  Lead → 팀에 문제 전파 + 코드 컨텍스트 공유
-  plan-structure: 후보 옵션 2-3개 생성
-  → SendMessage(review-arch): "후보입니다. 제약 위반 찾아주세요: {옵션들}"
+| 원칙 | Workflow 보존 방식 |
+|------|-------------------|
+| Round 1 독립성 (sycophancy 방어) | 구조적 보장 — R1/렌즈 경로 생성 호출에 피어 데이터 미주입 (η-1 정신 계승, 정규식 검사 불필요화) |
+| Task Brief 5요소 | agent() 프롬프트 = [역할][문제/컨텍스트][목표] + schema(=Deliverable) + OVERRIDE(=Constraints) |
+| 합의/불합의 명시 | `conditions[].mutability`(locked/unlocked) + evidence·confidence로 표현 |
 
-  review-arch: 각 후보의 제약 위반 식별
-  → SendMessage(plan-structure): "옵션 A는 C1 위반, 옵션 B는 C2 위반. 근거: {코드 참조}"
-
-Round 2 (대안 생성 + 재검증):
-  plan-structure: 위반 안 하는 새 옵션 생성
-  → SendMessage(review-arch): "새 옵션 D입니다. 기존 제약 C1, C2 모두 회피. 확인해주세요"
-
-  review-arch: 새 옵션 검증 + 새 제약 발견 시 추가
-  → SendMessage(plan-structure): "C1, C2는 OK. 새 제약 C3 발견: {근거}"
-
-Round 3 (수렴):
-  plan-structure + review-arch: 합의
-  → SendMessage(team-lead): "옵션 D + 제약 매트릭스. C3은 트레이드오프로 수용"
-```
-
-핵심: plan-structure가 만들고, review-arch가 부순다. 이 adversarial 루프에서 제약이 드러난다.
-
-> plan-structure 에이전트가 이 스킬의 워크플로우를 활용합니다.
+> Workflow 추가 보장: 실패 에이전트 = null 명시(silent fail 불가) · 출력 스키마 강제 · resume 캐시 · 종료 핸드셰이크 부재(자동 정리). Reflection Rate는 cross-check 포함 시만 해당(--deep Codex 후행 검증).
+> 통신 기록: `discover-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰 여부는 확산 판정 시 결정.
 
 ---
 
@@ -497,7 +484,7 @@ GOOD (본질 같은 옵션 합치기):
 | 사용자 응답 없이 수렴 불가 | 현재까지의 제약 매트릭스 출력 + 판단 보류 | AskUserQuestion |
 | 장기 대화 (5라운드+) | context budget 상태 안내 + 아티팩트 기록 확인 | 계속 진행 |
 | Serena 연결 실패 | Grep + Glob 폴백 | 코드 없이 원칙 기반 추론 |
-| TEAM 에이전트 스폰 실패 | SOLO 폴백 | Lead 단독 REP 실행 |
+| Workflow 실행 실패 / `mode: 'fallback'` 반환 | SOLO 폴백 + 사유 experiment-log 기록 | Lead 단독 REP 실행 |
 | 모든 후보 탈락 | 제약 완화 제안 | 사용자에게 제약 우선순위 질문 |
 
 ## Completion → Next
