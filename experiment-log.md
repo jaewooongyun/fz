@@ -19,8 +19,11 @@
 | §5.4 Harness Metrics (Severity Calibration) | 5 sprint | "5 sprint 누적" | (자체 정의) |
 | §5.5 Agent Teams Tracing (Reflection Rate) | **N≥10** | "N≥10 (preliminary if N<10)" | **cross-validation.md `§ Reflection Rate threshold`** |
 | §5.6 Plugin Trigger Activation | 10건 | "10건 누적" | (자체 정의) |
+| §5.7 Workflow Tracing (TEAM→Workflow) | 5건 전수 (discover) / 3건 (search·review) | "null률 0% + 완주율 100% + fallback 0건" — **확산/롤백 게이트 (Phase B 진입 N 아님)** | **experiment-log.md §5.7 확산 판정 임계 (freeze)** |
 
 **§5.5 특별 사항**: cross-validation.md "N<10이면 preliminary, gating 보류"를 single source로 사용. UC-1 (Reflection Rate CP-3) gating은 N≥10에서만 발화.
+
+**§5.7 특별 사항**: §5.7의 N은 Phase B 진입 semantics가 아니라 TEAM→Workflow **확산/롤백 게이트**다 — 본 표에는 가시성 목적으로만 등재 (canonical은 §5.7 freeze 블록, 이중 정의 아님).
 
 **fz-review/SKILL.md "Phase B1/B2 후 활성"**: §5.6 (Phase A 효과 측정) → Phase B (Load-bearing Test) → B1/B2 ablation 단계 abstraction. 본 표 §5.6 row 참조.
 
@@ -403,15 +406,18 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 ### 확산 판정 임계 (사전 등록 — 변경 금지, 확증 편향 방어)
 
 - **신뢰성 (확산 판정 유일 기준)**: fz-discover 5건 전수 null률 0% + 완주율 100% + fallback 0건. 미달 → rollback 트리거.
-- **다양성 (--deep fan-out 유지/제거 판정 전용)**: --deep merged 고유 경로 수 > default 단일 생성 경로 수. 미충족 → --deep도 lean 회귀 (확산 판정엔 불사용).
+- **다양성 (--deep fan-out 유지/제거 판정 전용)**: **정의 (b) — mergedFrom 원천 렌즈 경로 수 > default lean 최종 경로 수** (탐색 폭 기준. 2026-06-05 사용자 확정 — invoke #4가 발견한 양의적 문구의 *명확화*이며 임계 이동 아님. 보조 질적 확인: lean 미발견 신규 경로 계열 ≥1). 미충족 → --deep도 lean 회귀 (확산 판정엔 불사용).
+  - 소급 판정 (정의 확정 시점): #4 = 12>6 **충족** (+D계열 신규) / #5 = 15>6 **충족** (+E계열 신규) → --deep fan-out 유지 방향, 5건 시점 최종
 - **확산 3게이트**: G1 패턴별 적합성 (adversarial 성공 ≠ 타 패턴 자동 확산 — collaborative/pair-programming 개별 검토) / G2 Landscape 품질 관찰 (비정량 기록, 게이트 아님) / G3 TEAM 폴백 일몰 명시 결정.
 
-### 기록 형식 (invoke당 1행)
+> 스킬별 분리 테이블 (2026-06-05 확산 Wave 1): 칼럼·임계가 스킬마다 다름 — discover 표·임계는 무변경 보존 (사전등록 분모 보호).
+
+### fz-discover (adversarial) — 기록 형식 (invoke당 1행)
 
 | # | date | mode | agentCalls | nullCount | rounds | fallback | wall-clock | G2 품질 관찰 (경로수/evidence/openQ) |
 |---|------|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
 
-### 누적 데이터 (시작: 2026-06-05)
+### fz-discover 누적 데이터 (시작: 2026-06-05)
 
 | # | date | mode | agentCalls | nullCount | rounds | fallback | wall-clock | G2 품질 관찰 (경로수/evidence/openQ) |
 |---|------|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
@@ -420,3 +426,19 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 3 | 2026-06-05 | lean | 5 | 0 | 2 | 0 | 492s | ✅ **첫 clean 통과** — 정주제 6경로 landscape, §5.7 기존재 실측 발견 + Phase B 표 semantics 충돌 발견 + traces.jsonl 선례 반박(L69). evidence [verified Lxx] 인용 준수, 결론 미산출 ✓. G2: 경로 6/evidence 충실/openQ 5건 실질 |
 | 4 | 2026-06-05 | **deep** | 9 | 0 | 2 | 0 | 404s | ✅ clean — 렌즈 12 원천→4 병합그룹(mergedFrom 추적 정상), lean 미발견 D경로 발굴 + false prereq 실측 반박 2건. **다양성 지표 판정 보류**: 사전등록 문구 "merged 고유 경로 수 > default 단일 생성 경로 수"가 양의적 — (a) 병합그룹 4 vs lean 최종 6 → 미충족 / (b) 원천 렌즈경로 12 vs lean 6 → 충족. 지표 정의 모호 자체가 calibration 발견 — 5건 시점 판정 전 정의 확정 필요. wall-clock은 deep(404s) < lean#3(492s) — 병렬 효과 |
 | 5 | 2026-06-05 | **deep** | 10 | 0 | 2 | 0 | 482s | ✅ clean — **merge 수정 검증**: MergedPathSetSchema(maxItems 12) 적용 후 병합 5그룹 (이전 상한 4 돌파 — 스키마 탈락 강제 해소 실증). 신규: 입력 경로 오류를 Grep 실측으로 자가 교정 + freeze 블록 canonical 식별. ts 제거 계약 정상 동작 |
+
+### fz-search (cross-verify) — Wave 1 전환 (시작: 2026-06-05)
+
+> 임계 (사전 등록): 3건 전수 null률 0% + stage 완주 + fallback 0건. G2-search 품질 관찰 = 등급 분포 합리성 / FP 제거 실증 / 누락 보완 실증.
+
+| # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-search (등급분포/FP제거/보완) |
+|---|------|-----------|-----------|--------|----------|-----------|----------------------------------|
+| 1 | 2026-06-05 | 5 | 0 | 3 | 0 | 264s | ✅ clean — discover-journal.md 참조처 27건 (★★★18/★★9/★0), ground truth 2/2 적중(fz-plan L191·fz-code L222), 라인 정밀 + 맥락 note 충실. 전환 직후 검증 invoke (실사용 표본 아님 — 임계 3건 중 1) |
+
+### fz-review (live-review) — Wave 1 전환 (시작: 2026-06-05)
+
+> 임계 (사전 등록): 3건 전수 null률 0% + stage 완주 + fallback 0건. G2-review 품질 관찰 = finding 유효성 / counter 조정 실증 / severity 근거 충실.
+
+| # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-review (finding/counter/severity) |
+|---|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
+| 1 | 2026-06-05 | 5 | 0 | 3 | 0 | 661s | ✅ clean — Wave 1 변경분 self-review: findings 11(실질 8, critical/major 0), okAreas 18, counter가 3건 추가 발견(C-1 okArea도전 소실/C-2 하드코딩/C-3 id중복=실버그) — DA 가치 실증. 8건 전부 즉시 수정 반영. 전환 직후 검증 invoke (임계 3건 중 1) |
