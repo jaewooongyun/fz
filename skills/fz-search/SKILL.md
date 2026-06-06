@@ -21,7 +21,8 @@ allowed-tools: >-
   mcp__lsp__references,
   mcp__lsp__hover,
   mcp__lsp__peek_definition,
-  Read, Grep, Glob
+  Read, Grep, Glob, Workflow
+
 team-agents:
   primary: null
   supporting: [search-symbolic, search-pattern]
@@ -64,7 +65,7 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 교차 검증 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 기본 모드(순차) 폴백
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -259,43 +260,27 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 
 ---
 
-## 병렬 교차 검증 (`--deep` 모드)
+## 병렬 교차 검증 (`--deep` 모드 — Workflow 오케스트레이션 pilot)
 
-> 팀 모드 규칙은 `modules/team-core.md` 참조
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
+> Cross-Verify 패턴 canonical: `modules/patterns/cross-verify.md` (보존 — 라운드 의미론은 스크립트가 구현).
+> 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 
-### 팀 구성
+### 실행 절차 (Lead)
 
-```
-TeamCreate("search-{target}")
-├── Lead (Opus): 쿼리 분석 + 결과 합성
-├── search-symbolic (Sonnet): Serena MCP 탐색
-└── search-pattern (Sonnet): Grep/Glob 탐색
-```
+1. **args 조립**: `query`=탐색 질의 원문 / `codeContext`=탐색 허용 범위(경로·디렉토리 — 명시적으로 한정)
+2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/search-cross-verify.js', args })`
+   - Stage 1 독립 병렬(symbolic+pattern, 피어 미주입) → Stage 2 교차(FP 판정+보완) → Stage 3 병합(opus 언어 지시) → 등급은 스크립트 binary 규칙. 총 5-call
+3. **반환 처리**: `mode:'workflow'` → results(신뢰도 포함)를 출력 형식으로 정리 / `mode:'fallback'` → 기본 모드(순차) 수행 + 사유 experiment-log 기록
+4. **지표 기록**: `return.metrics`(agentCalls/nullCount/stages/fallback) + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-search 테이블
 
-### 통신 패턴: Cross-Verify Search (Peer-to-Peer)
-
-탐색자들이 **발견 즉시 서로에게 직접 확인**을 요청하는 패턴.
-Lead를 거치지 않고 직접 SendMessage로 대화한다.
-
-```
-탐색 중:
-  search-symbolic → SendMessage(search-pattern): "Router 찾았어요. attach/detach 호출 위치 찾아주세요"
-  search-pattern → SendMessage(search-symbolic): "AuthModule에서도 참조 발견. 심볼 레벨 확인해주세요"
-  search-symbolic → SendMessage(search-pattern): "deprecated import만 있어요. false positive."
-  양쪽 → SendMessage(team-lead): "탐색 완료. 통합 결과: {결과}"
-```
-
-신뢰도: 양쪽 발견 = ★★★, Symbolic only = ★★, Pattern only = ★
-
-**핵심**: 한쪽의 발견이 즉시 다른 쪽의 탐색 방향을 안내. false positive 실시간 제거.
-
-### 신뢰도 등급
+### 신뢰도 등급 (canonical: cross-verify.md — 본 표가 구버전 출처-기준 표를 대체)
 
 | 등급 | 조건 | 의미 |
 |------|------|------|
 | ★★★ | Symbolic + Pattern 모두 발견 | 교차 확인 완료 (최고 신뢰) |
-| ★★ | Symbolic only | 구조적으로 정확 |
-| ★ | Pattern only | 넓은 범위, 노이즈 가능 |
+| ★★ | 한쪽 발견 + 교차 검증 통과(confirmed) | 검증된 단독 발견 |
+| ★ | 한쪽 발견 + 교차 미확인 | 노이즈 가능 — 수동 확인 권장 |
 
 ### 기본 모드 (--deep 없이)
 
