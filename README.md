@@ -4,7 +4,7 @@
 
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 플러그인 — AI 개발 워크플로우 오케스트레이션 시스템.
 
-자연어 요청 → 복잡도 평가 → 스킬 파이프라인 자동 구성 → 멀티 에이전트 팀 편성 → 실행.
+자연어 요청 → 복잡도 평가 → 스킬 파이프라인 자동 구성 → 네이티브 Workflow 멀티에이전트 오케스트레이션 → 실행.
 
 ---
 
@@ -137,6 +137,7 @@ fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
 ├── skills/          20개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
 ├── agents/          13개 — plan-structure, impl-correctness, review-arch ...
+├── workflows/       5개 — 네이티브 Workflow 결정적 스크립트 (discover-adversarial, plan-collaborative, code-pair ...)
 ├── modules/         37개 — team-core, pipelines, cross-validation, lead-action-default, codex-strategy, memory-guide, fz-codex-bash-hygiene, fz-codex-subcommands-core/aux, swift-anti-pattern-preblock ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
 ├── guides/          7개 — prompt-optimization, skill-authoring, harness-engineering ...
@@ -161,26 +162,34 @@ Phase 5  Execute ────────────── 스킬 체인 실행
 완료: GC → sc:save → 다음 행동 안내
 ```
 
-### TEAM 모드: 2.5-Turn Protocol
+### 멀티에이전트 실행: 네이티브 Workflow (v4.12)
 
 ```
-Lead (Opus) ─── 퍼실리테이터: 모니터링 + Gate 실행
+Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/Gate 실행
     │
-    ├── ★Primary (Opus) ←→ Supporting (Sonnet)
-    │   Round 1: 독립 분석 (피어 참조 금지)
-    │   Round 2: 피드백 + 반박 (직접 SendMessage)
-    │   Round 0.5: [합의/불합의] Lead에 보고
-    │
-    └── External: Codex(GPT-5.5)
+    └── workflows/*.js ─── 결정적 스크립트가 stage 오케스트레이션
+        agent(agentType: 'fz:plan-structure', schema) → 스키마 강제 JSON 반환
+        데이터는 스크립트 경유 (P2P 통신 유실·팀 정리 실패가 구조적으로 불가능)
 ```
 
-### What's New (v4.11.0) — Opus 4.8 정합 + 인용 위생 + 하네스 구조 개선 [MINOR]
+| 스킬 | 스크립트 | 구조 |
+|------|---------|------|
+| /fz-discover | discover-adversarial.js | lean 5-call / --deep 렌즈 3 fan-out |
+| /fz-search --deep | search-cross-verify.js | 심볼/패턴 독립 병렬 → 교차 FP 제거 → 병합 (5-call) |
+| /fz-review | review-live.js | arch/quality 병렬 → id-기반 교차 → counter DA (5-call) |
+| /fz-plan | plan-collaborative.js | direction 도전 → 초안 → 3렌즈+CC 교차 → 통합 (9-11 call) |
+| /fz-code, /fz-fix | code-pair.js | impl changeset(디스크 미수정) → 조건부 검토 → Lead 적용 (1-3 call) |
 
-- **Opus 4.8 가이드 정합**: 공식(`anthropic.com/news/claude-opus-4-8`) verbatim 기반 — effort 기본 high / 자기 코드 결함 통과 ~4x↓ / tool-calling 효율↑(skip↓) / 단일 세션 수백 parallel subagents를 fz 적용으로 큐레이션(harness §10). 4.7 내용·Cobus·length-limit(04-20 철회) 제거. §8 "literal"→"instruction-following consistency"(공식 용어).
-- **인용 위생** (arXiv v3 원문 대조): MAST FC2 67%→**36.94%**(논문 "단일 지배 없음")·FM-2.2 6.80% / OpenDev 도구 7→8·서브시스템 6→7·fade-out 턴수치 제거 / NLAH IHR subset caveat / Context Rot "보편 임계값 없음". fz-challenger의 verified-태그 모순 해소.
-- **하네스 구조 개선**: §5 원칙7(운영점 — effort≠fan-out 레버 구분) + skill-authoring DELETE/MERGE-default 편집 rule + complexity parallelizable modifier + cross-validation A3(동종 합의 ≠ 독립검증).
+> TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
-> ⛔ 제거된 미검증 주장(공식과 배치): "fewer subagents"·"SWE-Pro 69.2%"·"literal". 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
+### What's New (v4.12.0) — TEAM → 네이티브 Workflow 전환 (Wave 0-3) [MINOR]
+
+- **멀티에이전트 실행 전면 전환**: TEAM(TeamCreate+SendMessage P2P) 5개 스킬(discover/search/review/plan/code·fix)을 네이티브 Workflow 결정적 스크립트(`workflows/*.js` 5개, 1094줄)로 대체 — 통신 유실·팀 정리 실패 2대 오류 클래스가 구조적으로 제거(전 invoke 0건). 스키마 강제 JSON + null 명시 분기 + fallback 계약(SOLO 폴백).
+- **changeset 책임 재배분** (code-pair): 에이전트는 디스크를 수정하지 않고 changeset JSON(exact syntax + oldAnchor)만 반환 — Lead가 검증 후 적용+빌드. 검증 안 된 Edit이 디스크에 닿지 않는 구조.
+- **표준 패턴 3종 문서화** (skill-authoring §12 신설): OVERRIDE 블록(P2P·컨텍스트 로딩 무효화) / args 방어 파싱(scriptPath 호출 시 JSON 문자열 도착 — 실측) / agentType `fz:` namespace 필수.
+- **calibration 게이트 사전 등록** (experiment-log §5.7): 스킬별 임계 + G1(패턴별)/G2(품질)/G3(일몰) — TEAM 모듈 일몰(Wave 4)은 게이트 통과 후.
+
+> ⛔ Codex cross-model 검증은 할당량 부재로 미수행 (다각도 Claude 리뷰 대체) — 회복 시 후행 check 예정. 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
 
 ### 근거 연구
 
@@ -254,7 +263,7 @@ fz 가이드(`guides/*.md`)와 스킬이 인용하는 외부 권위 자료입니
 
 ## Agents
 
-TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신**으로 협업.
+Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈 정의** (v4.12). TEAM P2P 스폰은 legacy.
 
 | 도메인 | Primary (Opus) | Supporting (Sonnet) |
 |--------|:---:|---|
@@ -286,7 +295,7 @@ TEAM 모드에서 Lead가 스폰. **에이전트 간 Peer-to-Peer 직접 통신*
 | 가이드 | 설명 |
 |--------|------|
 | **prompt-optimization.md** | 10대 프롬프트 원칙 + Context Rot 대응 |
-| **skill-authoring.md** | 스킬 작성법 (YAML, Progressive Disclosure, 500줄 제한) |
+| **skill-authoring.md** | 스킬 작성법 (YAML, Progressive Disclosure, 500줄 제한, §12 Workflow 오케스트레이션) |
 | **agent-team-guide.md** | 에이전트 팀 (2.5-Turn, Task Brief, 모델 전략) |
 | **clean-architecture.md** | Dependency Rule, SOLID |
 | **harness-engineering.md** | AI 에이전트 하네스 설계 + NLAH Gap 분석 (1046줄) |
