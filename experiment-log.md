@@ -442,3 +442,11 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-review (finding/counter/severity) |
 |---|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
 | 1 | 2026-06-05 | 5 | 0 | 3 | 0 | 661s | ✅ clean — Wave 1 변경분 self-review: findings 11(실질 8, critical/major 0), okAreas 18, counter가 3건 추가 발견(C-1 okArea도전 소실/C-2 하드코딩/C-3 id중복=실버그) — DA 가치 실증. 8건 전부 즉시 수정 반영. 전환 직후 검증 invoke (임계 3건 중 1) |
+
+### fz-plan (collaborative) — Wave 2 전환 (시작: 2026-06-05)
+
+> 임계 (사전 등록): 3건 전수 null률 0% + stage 완주(5/5 또는 direction_escalation 정상 반환) + fallback 0건. G2-plan 품질 관찰 = direction 판정 합리성 / CC 교차 신규 발견 / steps verify 존재 / §Y writeScope가 §X 자동 복사 아님 / Lead 이관 책임(stress-test·RTM) 실수행 여부.
+
+| # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-plan (direction/CC/verify/§Y/Lead회귀) |
+|---|------|-----------|-----------|--------|----------|-----------|--------------------------------------------|
+| 1 | 2026-06-05 | 9 | 0 | 5 | 0 | 1101s | ✅ clean — Wave 3 계획 생산(dogfooding). G2 5축 전부 PASS: direction PROCEED 1-call(dead-call 제거 경로 첫 작동)/CC 신규 발견 2건 S8 반영/verify 9·9/§Y 6≠§X 15 rationale 분리/Lead 회귀(stress-test Q1-Q6+RTM 12행) 실수행. 특기: S0 책임 재배분을 자가 도출 + canonical 충돌을 OQ1 에스컬레이션 표시(임의 판단 금지 자발 준수). 전환 직후 검증 invoke (임계 3건 중 1) |
