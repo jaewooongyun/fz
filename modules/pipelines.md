@@ -19,7 +19,7 @@
 | 트리거 | `찾아, 탐색, 구조, 영향, 의존성` |
 | 체인 | fz-search |
 | 기본 모드 | SOLO |
-| TEAM 모드 | search-symbolic + search-pattern (cross-verify) |
+| TEAM 모드 | search-symbolic + search-pattern (cross-verify) — (Wave 1: `workflows/search-cross-verify.js` Workflow 대체 실행) |
 
 ### 2. explore-plan
 
@@ -105,7 +105,7 @@
 | 트리거 | `리뷰, 검증, 품질` |
 | 체인 | fz-review |
 | 기본 모드 | SOLO |
-| TEAM 모드 | review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) |
+| TEAM 모드 | review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) — (Wave 1: `workflows/review-live.js` Workflow 대체, correctness·curator는 Lead 경로) |
 
 ### 11. review-to-ship
 
@@ -144,7 +144,7 @@
 | 트리거 | `피어리뷰, PR.*리뷰, 팀원.*코드` |
 | 체인 | fz-peer-review |
 | 기본 모드 | SOLO |
-| TEAM 모드 | review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) |
+| TEAM 모드 | review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) — (Wave 1: `workflows/review-live.js` Workflow 대체, correctness·curator는 Lead 경로) |
 
 ### 15. drift-check
 
