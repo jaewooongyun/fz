@@ -75,7 +75,7 @@
 | 트리거 | `계획.*구현, 설계.*개발, 만들어줘` |
 | 체인 | fz-plan → fz-code |
 | 기본 모드 | TEAM |
-| TEAM 모드 | plan 팀 (plan-edge-case 포함) → impl-correctness(★O) + review-arch — (plan 단계는 Wave 2 Workflow 대체, code 단계는 Wave 3 예정) |
+| TEAM 모드 | plan 팀 (plan-edge-case 포함) → impl-correctness(★O) + review-arch — (plan 단계는 Wave 2 Workflow 대체, code 단계도 Wave 3: `workflows/code-pair.js` 대체) |
 | 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ implication-scan (조건부) + ✓ codex check |
 
 ### 8. code-only
@@ -85,7 +85,7 @@
 | 트리거 | `구현, 코드, 개발` (계획 이미 있을 때) |
 | 체인 | fz-code |
 | 기본 모드 | SOLO |
-| TEAM 모드 | impl-correctness(★O) + review-arch (pair-programming) |
+| TEAM 모드 | impl-correctness(★O) + review-arch (pair-programming) — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
 | 게이트 | ✓ build + ✓ friction-detect |
 
 ### 9. code-to-review

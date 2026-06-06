@@ -450,3 +450,19 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-plan (direction/CC/verify/§Y/Lead회귀) |
 |---|------|-----------|-----------|--------|----------|-----------|--------------------------------------------|
 | 1 | 2026-06-05 | 9 | 0 | 5 | 0 | 1101s | ✅ clean — Wave 3 계획 생산(dogfooding). G2 5축 전부 PASS: direction PROCEED 1-call(dead-call 제거 경로 첫 작동)/CC 신규 발견 2건 S8 반영/verify 9·9/§Y 6≠§X 15 rationale 분리/Lead 회귀(stress-test Q1-Q6+RTM 12행) 실수행. 특기: S0 책임 재배분을 자가 도출 + canonical 충돌을 OQ1 에스컬레이션 표시(임의 판단 금지 자발 준수). 전환 직후 검증 invoke (임계 3건 중 1) |
+
+### fz-code (pair-programming full) — Wave 3 전환 (시작: 2026-06-05)
+
+> 임계 (사전 등록): 3세션 전수 — changeset 적용 성공률 100%(의사코드/생략 0건) + 빌드 통과(Lead 검증) + fallback 0. **행 단위 = 세션당 1행 (N-Step 누적 집계 — invoke당 N행 발산 방지)**. G2-code = changeset exact syntax 충실도 / review 이슈 유효성 / residualIssues 처리.
+
+| # | date | steps | invokes | agentCalls(계) | nullCount | fallback | stage2-null steps | G2-code |
+|---|------|-------|---------|----------------|-----------|----------|-------------------|---------|
+| 1 | 2026-06-05 | 1 (SYNC-1) | 1 | 2 | 0 | 0 | 0 | ✅ clean — review pass→Stage3 생략(조건부 분기 첫 작동, 2-call). changeset 4 edits 전부 oldAnchor 정확(에이전트 자가 grep 유일성 검증) + compound 주석 부분 갱신 정밀. Lead 적용 4/4 + buildExpectation 검증 통과. 전환 직후 검증 세션 (임계 3세션 중 1) |
+
+### fz-fix (pair-programming light) — Wave 3 전환 (시작: 2026-06-05)
+
+> 임계 (사전 등록): 3세션 전수 동일. complexity 계약(Lead 재평가) 작동 여부를 G2에 포함.
+
+| # | date | steps | invokes | agentCalls(계) | nullCount | fallback | complexity 분기 | G2-fix |
+|---|------|-------|---------|----------------|-----------|----------|------------------|--------|
+| 1 | 2026-06-05 | 1 (FIX-1) | 1 | 1 | 0 | 0 | c=1→review 생략 (정상) | ✅ clean — 1-call, oldAnchor 정확(Lead 의심을 실측이 기각 — 에이전트가 실파일 Read 증거), 적용+검증 통과. 전환 직후 검증 세션 (임계 3세션 중 1) |
