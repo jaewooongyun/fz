@@ -21,7 +21,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__atlassian__get-issue,
   mcp__atlassian__search-issues,
-  Read, Grep, Glob
+  Read, Grep, Glob, Workflow
 team-agents:
   primary: plan-structure
   supporting: [plan-impact, plan-edge-case, review-arch, review-direction, memory-curator]
@@ -55,7 +55,7 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -96,67 +96,36 @@ model-strategy:
 
 > 팀 모드 규칙은 `modules/team-core.md` 참조
 
-### 팀 구성
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
+> Collaborative Design 패턴 canonical: `modules/patterns/collaborative.md` (보존 — 라운드 의미론은 스크립트가 구현).
+> 스크립트: `workflows/plan-collaborative.js` (플러그인 루트 상대) — agents/의 plan-structure·plan-impact·plan-edge-case·review-arch·review-direction 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+> 동시 opus ≤2(Lead 포함)는 `workflows/plan-collaborative.js`가 구조적으로 보장 (parallel 블록 sonnet 전용, opus 호출 전부 순차) — 구 Sequential Operating Contract(UC-6+ISSUE-016)의 보장을 스크립트 구조로 이전.
 
-```
-TeamCreate("plan-{feature}")
-├── Lead (Opus): 오케스트레이션 + 외부 모델 실행 + 최종 합성
-├── plan-structure (★Opus): 설계 + 분해 + 문서화 (Primary Worker)
-├── plan-impact (Sonnet): 영향 범위 전담 — Exhaustive Impact Scan (a~g)
-├── plan-edge-case (Sonnet): 엣지 케이스 + 실패 시나리오 발굴
-├── review-arch (Sonnet): 아키텍처 패턴 검증 (RIBs + Clean Architecture)
-├── review-direction (Sonnet): 방향성 비판 + 대안 제시 (Phase 0.5)
-├── memory-curator (Sonnet): 관련 교훈 발굴
-├── Codex verify (Lead 실행, GPT-5.5): 독립 계획 검증
-└── Codex adversarial (Lead 실행, GPT-5.5): Devil's Advocate [--deep 시]
-```
+### 실행 절차 (Lead)
 
-### Round 0.5 → Round 1 Sequential Operating Contract (UC-6 + ISSUE-016, v4.8.0)
+1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/plan/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
+2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/plan-collaborative.js', args })`
+   - Stage 0 direction(opus, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(sonnet) → Stage 3 CC 교차(edge↔impact) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증. 9-11 call
+4. **반환 처리**:
+   - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록
+   - `mode:'direction_escalation'` → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용)
+   - `mode:'fallback'` → SOLO 계획 수립 수행 + 사유 experiment-log 기록
+5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(Codex 회복 시) + Codex verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
+6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-plan 테이블
 
-> Phase 0.5 review-direction(opus) Round 0.5 완료 후에만 Phase 1 plan-structure(opus) Round 1 시작.
-> 동시 opus ≤ 2 governance 보장 (review-direction + Lead = 2 → 종료 후 plan-structure + Lead = 2).
+**6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거. Workflow stage에 동일 적용):
 
-```
-# Phase 0.5 (Round 0.5 — sequential)
-TeamCreate(name="plan-{feature}-round0.5")
-Agent(name="review-direction", team_name="plan-{feature}-round0.5", model="opus")
-# ... Round 0.5 진행 (direction-challenge 판정)
-SendMessage(to="review-direction", content="shutdown_request")
-# 종료 확인 (process state polling)
-TeamDelete("plan-{feature}-round0.5")
+| 렌즈 | 스크립트 위치 | 핵심 질문 |
+|------|--------------|----------|
+| plan-structure (설계+분해) | Stage 1 초안 + Stage 4 통합 | "어떻게 나누고 만들 것인가?" |
+| plan-impact (영향 범위) | Stage 2 + Stage 3 CC | "이 변경이 어디까지 퍼지는가?" |
+| plan-edge-case (경계) | Stage 2 + Stage 3 CC | "어디서 깨지는가?" |
+| review-arch (아키 일관성) | Stage 2 + Stage 5 재검증 | "기존 패턴/규칙과 맞는가?" |
+| review-direction (방향 도전) | Stage 0 | "근본적으로 다른 접근은?" |
+| Codex verify (독립 검증) | Workflow 외부 — Lead가 /fz-codex verify (Phase 2) | "이 계획에 빠진 것은?" |
 
-# Phase 1 (Round 1 — sequential, only after Round 0.5 종료 확인)
-TeamCreate(name="plan-{feature}-round1")
-Agent(name="plan-structure", team_name="plan-{feature}-round1", model="opus")
-# ... Round 1 진행 (collaborative design)
-```
-
-**Verification**: `grep -A5 "Round 0.5.*Sequential" skills/fz-plan/SKILL.md` → 1건 + grep `model="opus"` (review-direction + plan-structure 각각 1건 이상) + grep `shutdown_request` 1건.
-
-**6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거):
-
-| 에이전트 | 렌즈 | 핵심 질문 |
-|---------|------|----------|
-| plan-structure | 설계 + 분해 | "어떻게 나누고 만들 것인가?" |
-| plan-impact | 영향 범위 | "이 변경이 어디까지 퍼지는가?" |
-| review-arch | 아키텍처 일관성 | "기존 패턴/규칙과 맞는가?" |
-| review-direction | 방향성 도전 | "근본적으로 다른 접근은?" |
-| Codex verify | 독립 검증 | "이 계획에 빠진 것은?" |
-| Codex adversarial | Devil's Advocate | "이 계획이 실패할 가장 큰 위험은?" |
-
-> ASD 폴더 활성 시: `{WORK_DIR}/plan/plan-team.md`에 direction-challenge + collaborative design 핵심 통신을 기록한다.
-
-### 통신 패턴: Parallel Analysis + Cross-Feedback
-
-3개 Claude 에이전트가 **다른 렌즈로 병렬 분석** 후 교차 피드백. Lead는 Codex를 실행하여 이종 검증 확보.
-
-```
-[Round 1 — 병렬] plan-structure: 분해+설계 / plan-impact: Impact Scan(a~g) / review-arch: 패턴 매칭 / Lead: Codex verify
-[Round 2 — 교차] plan-impact→structure: 영향+의존+dead / review-arch→structure: 위반+대안 / Lead→structure: GPT이슈 / structure: 통합수정
-[Round 3 — 보고] structure→Lead: 최종계획+합의표 / Lead: 6렌즈 통합
-```
-
-> plan-structure 에이전트가 이 스킬의 워크플로우를 활용합니다.
+> 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰은 확산 판정 시 결정.
 
 ---
 
@@ -240,7 +209,7 @@ Agent(name="plan-structure", team_name="plan-{feature}-round1", model="opus")
 
 | 조건 | Direction Challenge | 근거 |
 |------|:------------------:|------|
-| TEAM 모드 (plan-to-code, plan-only) | **필수** | review-direction 에이전트 활용 |
+| Workflow 모드 (plan-to-code, plan-only) | **Stage 0이 수행** | workflows/plan-collaborative.js Stage 0 direction (escalation 시 본 절차 3 준용) |
 | SOLO 모드 + 새로운 아키텍처 결정 | **필수** | Lead가 직접 6관점 검토 |
 | discover 결과에 명확한 방향 존재 | **스킵 가능** | 이미 제약 기반 방향이 결정됨 |
 | 단순 수정 (기존 패턴 따르기) | **스킵** | 방향성 검토가 과잉 |
