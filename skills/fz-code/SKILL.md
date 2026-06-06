@@ -22,7 +22,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__lsp__diagnostics_delta,
   mcp__lsp__hover,
-  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *)
+  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Workflow
 team-agents:
   primary: impl-correctness
   supporting: [review-arch, impl-quality, review-correctness, memory-curator]
@@ -63,7 +63,7 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 구현 폴백
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -108,54 +108,24 @@ model-strategy:
 
 > 팀 모드 규칙은 `modules/team-core.md` 참조
 
-### 팀 구성
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 3 전환.
+> Pair Programming 패턴 canonical: `modules/patterns/pair-programming.md` (보존 — Workflow 평탄화 출처).
+> 스크립트: `workflows/code-pair.js` (mode='full') — agents/의 impl-correctness·review-arch 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+> ⛔ **책임 재배분 (사용자 승인)**: 에이전트는 디스크를 수정하지 않는다 — changeset JSON(exact syntax) 반환 → **Lead가 적용 + 빌드 검증**. 검증 안 된 에이전트 Edit이 디스크에 닿지 않는 안전 구조. "구현 중 즉석 질문"의 실시간성은 Step 경계로 양자화됨 (수용된 trade-off).
 
-```
-TeamCreate("code-{feature}")
-├── Lead (Opus): 오케스트레이션 + 빌드 검증
-├── impl-correctness (★Opus): 점진적 구현 (Primary Worker)
-├── review-arch (Sonnet): 구현 중 아키텍처 감시
-├── impl-quality (Sonnet): 코딩 표준 + 패턴 일관성 실시간 피드백 [supporting]
-├── review-correctness (Sonnet): 기능 정확성 + 요구사항 충족 검증 [supporting]
-├── memory-curator (Sonnet): 관련 교훈 발굴 + impl-correctness에 직접 전달 [기본 포함, lightweight recall]
-└── Cross-model 검증 (Lead가 검증 실행)
-```
+### 실행 절차 (Lead — Step 루프 소유)
 
-### Lead Spawn Override (UC-6, v4.8.0)
+각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
 
-> Lead가 TeamCreate 시 명시적으로 model 파라미터를 지정하여 Primary Worker를 opus로 승격한다.
-
-```
-TeamCreate("code-{feature}")
-Agent(name="impl-correctness", team_name="code-{feature}", model="opus")  # ★ Primary 승격
-Agent(name="review-arch", team_name="code-{feature}", model="sonnet")
-Agent(name="impl-quality", team_name="code-{feature}", model="sonnet")
-Agent(name="review-correctness", team_name="code-{feature}", model="sonnet")
-Agent(name="memory-curator", team_name="code-{feature}", model="sonnet")
-```
-
-> impl-quality는 각 Step 완료 시 impl-correctness에게 패턴 일관성 피드백. Lead에게 보고하지 않고 impl-correctness와 직접 통신.
-
-> ASD 폴더 활성 시: `{WORK_DIR}/code/code-team.md`에 pair programming 핵심 통신을 기록한다.
-
-### 통신 패턴: Pair Programming (Peer-to-Peer)
-
-impl-correctness와 review-arch가 **직접 대화하며** 코드를 만드는 패턴.
-Lead를 거치지 않고 직접 SendMessage로 소통한다.
-
-```
-구현 중:
-  impl-correctness → SendMessage(review-arch): "UseCase에서 두 Repo 조합, Workflow로 빼야 할까요?"
-  review-arch → SendMessage(impl-correctness): "네, Workflow가 맞습니다. 기존 패턴: {참고}"
-  impl-correctness → 구현 → SendMessage(review-arch): "Workflow 완료. 검토해주세요"
-  review-arch → SendMessage(impl-correctness): "LGTM"
-  양쪽 → SendMessage(team-lead): "Step N 완료"
-  Lead: 빌드 검증 → 다음 Step
-```
-
-**핵심**: 구현 **중간에** 아키텍처 질문을 바로 해결. 다 만들고 뒤집기가 아니라 만들면서 확인.
-
-> impl-correctness 에이전트가 이 스킬의 워크플로우를 활용합니다.
+1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
+2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify,complexity 1-5 — invoke마다 Lead 재평가} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })`
+   - Stage 1 impl(opus) changeset → Stage 2 review-arch(sonnet) 검토 → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, 2-3 call)
+4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유)
+5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
+6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead / `mode:'fallback'` → SOLO 구현 수행 + 사유 기록
+7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + Codex 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
+8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → `experiment-log.md` §5.7 fz-code 테이블. Stage2 null이 있었던 Step 수 별도 표기
 
 ---
 
