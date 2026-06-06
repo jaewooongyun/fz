@@ -479,3 +479,38 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 결과가 해석이 필요한가?       → 언어 지시
 결과가 구조화된 JSON인가?     → --output-schema (fz-codex 패턴)
 ```
+
+> §12와의 경계: 본 §11은 *스킬 내부 binary 검증 보조* 스크립트를 다룬다. 에이전트를 스폰하는 *오케스트레이션* 스크립트는 §12 참조.
+
+## 12. Workflow 오케스트레이션 (TEAM 대체 — 결정적 멀티에이전트)
+
+> 신설 정당화 (additive — DELETE/MERGE-default §3 충족): §7(팀 통신 패턴)은 TEAM 일몰 경로로 deprecated 예정이고, §11은 binary 검증 보조로 관심사가 다름(오케스트레이션 아님) — 기존 섹션 흡수 불가. pilot(fz-discover, 2026-06-05) 실측으로 검증된 계약만 수록.
+
+네이티브 Workflow 도구(결정적 JS 스크립트가 에이전트 fan-out/수렴을 소유)로 TEAM(TeamCreate+SendMessage)을 대체할 때의 규약.
+
+### 표준 패턴 3종 (전 스크립트 의무 — pilot 실측 검증)
+
+1. **OVERRIDE 블록**: agentType 재사용 시 모든 agent() 프롬프트 선두에 — "P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시 미적용. 에이전트 정의의 Phase 절차·ASD 폴더·이전 세션·메모리 컨텍스트 로딩도 미적용 — 이 프롬프트의 입력만이 과제 전부. 무관 작업 폴더 읽기 금지. 최종 텍스트가 반환값(1-shot raw data)." [근거: pilot invoke #1 — 에이전트 정의의 컨텍스트 로딩이 args를 압도해 무관 폴더 anchoring]
+2. **args 방어 파싱 + fail-fast**: scriptPath 호출 시 args가 JSON **문자열**로 도착한다 [실측: probe wf_89418b73, typeof=string] → `typeof args === 'string' ? JSON.parse(args) : args` + 필수 키 누락 시 에이전트 스폰 전 `{mode:'fallback'}` 즉시 반환 (fabrication 방지)
+3. **agentType 네임스페이스**: 플러그인 에이전트는 `fz:` prefix 필수 [실측: S0 — 'plan-structure' not found / 'fz:plan-structure' 동작]
+
+### 배치·호출 규약
+
+- 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
+- 호출(Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/....js', args })`. SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
+- 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
+
+### 산출물·거버넌스 계약
+
+- 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — mode='fallback'이면 Lead가 SOLO 폴백. wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
+- 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / opus 동시 ≤2 (Lead 포함 — fan-out 에이전트는 sonnet) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
+- 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
+- 검증 oracle: 래핑 syntax 검사(`async function wrap(...){...본문...}` 후 node --check — 직접 node --check는 CJS 관대 파싱으로 무효) + **실 invoke ≥1** + experiment-log §5.7 지표 기록
+
+### TEAM 추론 품질 3원칙 보존 매핑 (prompt-optimization §다양성)
+
+| 원칙 | Workflow 보존 |
+|------|--------------|
+| Round 1 독립성 | 초기 생성 호출에 피어 데이터 미주입 (구조적 보장) |
+| Task Brief 5요소 | [역할][문제/컨텍스트][목표] + schema(=Deliverable) + OVERRIDE(=Constraints) |
+| 합의/불합의 명시 | schema 필드로 표현 (예: mutability/severity + evidence) |
