@@ -8,6 +8,25 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.12.0 (2026-06-06) — TEAM → 네이티브 Workflow 전환 (Wave 0-3) [MINOR]
+
+**핵심**: TEAM(TeamCreate+SendMessage P2P) 멀티에이전트 실행을 네이티브 Workflow 결정적 스크립트로 전환 — 5개 스킬(discover/search/review/plan/code·fix) 전부. 통신 유실·팀 정리 실패 2대 오류 클래스가 구조적으로 제거(전 invoke 0건). 10 커밋, 17파일 +1336/-273. breaking change 0.
+
+**workflows/ 신설 (5 스크립트, 1094줄)**:
+- `discover-adversarial.js` (pilot) — lean 5-call / --deep 렌즈 3 fan-out → merge(MergedPathSetSchema 12) → 경로별 평가 chunk ≤4
+- `search-cross-verify.js` — 심볼/패턴 독립 병렬 → 교차 FP 제거 → 병합 + 신뢰도 등급(스크립트 binary rule)
+- `review-live.js` — arch(opus)+quality(sonnet) 병렬 → id-기반 교차 severity 조정 → counter DA(okAreas 도전) → 스크립트 병합
+- `plan-collaborative.js` — direction 판정(조건부 반박 왕복) → 초안 → 병렬 3렌즈 → CC 교차 2 → 통합(§X/§Y/§Z + RTM + implicationRegister) → 재검증 (9-11 call)
+- `code-pair.js` — impl changeset JSON(에이전트 디스크 미수정, exact syntax + oldAnchor) → 조건부 arch 검토(pass 시 Stage3 생략) → Lead 적용+빌드 (Step당 1 invoke, 책임 재배분)
+
+**표준 패턴 3종** (`guides/skill-authoring.md` §12 신설): ① OVERRIDE 블록(P2P + 에이전트 정의 컨텍스트 로딩 무효화 + 무관 폴더 금지) ② args 방어 파싱(scriptPath 호출 시 args가 JSON 문자열 도착 — probe 실측) + fail-fast ③ agentType `fz:` namespace 필수. 명명 워크플로우 자동 등록(meta.name → 스킬 목록) 실측 반영.
+
+**SKILL 5종 교체** (순감소 + 트리밍 비저하): fz-discover / fz-search(402→387) / fz-review(583→555) / fz-plan(483→452, 6렌즈 표 보존) / fz-code(435→405) / fz-fix(341→320). Gate·Few-shot·마찰 신호 표 전체 보존 + Lead 잔류 책임(Codex validate·RTM·memory recall) 명시.
+
+**calibration 게이트 사전 등록** (`experiment-log.md` §5.7): 스킬별 임계(discover 5건 / search·review·plan 3건 / code·fix 3세션) + G1(패턴별)/G2(품질 — 기계 지표 한계 실증 2건)/G3(일몰). TEAM 모듈은 legacy 보존, Wave 4 일몰은 게이트 통과 후.
+
+**검증**: 실 invoke 10회(§5.7) — null 0 / fallback 0 / 통신·정리 오류 0. changeset 적용 2회(oldAnchor 5/5). ⛔ Codex cross-model 미수행(할당량 부재, 다각도 Claude 리뷰 대체) — 후행 check 4건 누적.
+
 ### v4.11.0 (2026-06-04) — Opus 4.8 정합 + 인용 위생 + 하네스 구조 개선 [MINOR]
 
 **핵심**: fz 가이드를 Opus 4.8 공식 사양에 정합화 + arXiv 원문 대조 인용 수치 정정 + 하네스 구조 개선. 3 기능단위 커밋, 16파일 +80/-51. breaking change 0.
