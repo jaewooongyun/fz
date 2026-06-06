@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__lsp__diagnostics_delta,
   mcp__lsp__references,
-  Read, Grep, Glob
+  Read, Grep, Glob, Workflow
 team-agents:
   primary: review-arch
   supporting: [review-quality, review-counter, review-correctness, memory-curator]
@@ -54,7 +54,7 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -91,47 +91,19 @@ model-strategy:
 
 > 팀 모드 규칙은 `modules/team-core.md` 참조
 
-### 팀 구성
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
+> Live Review 패턴 canonical: `modules/patterns/live-review.md` (보존 — 라운드 의미론은 스크립트가 구현).
+> 스크립트: `workflows/review-live.js` (플러그인 루트 상대) — agents/의 review-arch·review-quality·review-counter 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 
-```
-TeamCreate("review-{feature}")
-├── Lead (Opus): 4중 검증 오케스트레이션 + 수정 수행
-├── review-arch (★Opus): 아키텍처 리뷰 — agents/review-arch.md
-├── review-quality (Sonnet): 코드 품질 리뷰 — agents/review-quality.md
-├── review-correctness (Sonnet): Phase 4.5 요구사항 충족 검증 [RTM/plan 존재 시만 활성]
-├── review-counter (Sonnet): DA 패스 — review-arch/review-quality "OK" 판정에 반론 [항상 실행, v4.7.1 UC-14]
-├── memory-curator (Sonnet): 관련 교훈 발굴 + review-arch에 직접 전달 [기본 포함, lightweight recall]
-└── Codex CLI: 역검증 (Lead가 /fz-codex validate 실행)
-```
+### 실행 절차 (Lead)
 
-### Lead Spawn Override (UC-6, v4.8.0)
-
-> Lead가 TeamCreate 시 명시적으로 model 파라미터를 지정하여 Primary Worker를 opus로 승격한다.
-
-```
-TeamCreate("review-{feature}")
-Agent(name="review-arch", team_name="review-{feature}", model="opus")  # ★ Primary 승격
-Agent(name="review-quality", team_name="review-{feature}", model="sonnet")
-Agent(name="review-correctness", team_name="review-{feature}", model="sonnet")  # Phase 4.5만 활성
-Agent(name="review-counter", team_name="review-{feature}", model="sonnet")  # 항상 실행 (v4.7.1 UC-14)
-Agent(name="memory-curator", team_name="review-{feature}", model="sonnet")
-```
-
-> review-counter는 항상 실행 DA 패스 (v4.7.1, UC-14 — `team_rounds_delta` Q9 측정 baseline 1주). review-correctness는 Phase 4.5에서만 활성 (RTM/plan 존재 시).
-> ASD 폴더 활성 시: `{WORK_DIR}/review/review-team.md`에 live review 핵심 통신을 기록한다.
-### 통신 패턴: Live Review (Peer-to-Peer)
-
-리뷰어들이 **분석하면서 서로 발견을 직접 공유** (Lead 거치지 않고 SendMessage 직접 대화).
-
-```
-Round 1: review-arch ↔ review-quality 실시간 발견 공유
-Round 2: 상호 피드백 → 수정
-Round 3: 합의 → Lead 보고
-```
-
-### MCP 제약 + Intent Context
-- review-arch/review-quality는 serena, context7만 접근. Atlassian/LSP → Lead가 조회 후 전달.
-- **Intent Context 전달 (필수)**: diff + `[변경 의도]: {새 심볼}이 {기존 심볼}을 대체` + `[대체 대상]: {기존 심볼, 파일}`
+1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12)
+2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js', args })`
+   - Stage 1 독립 병렬(review-arch opus + review-quality sonnet — opus 동시 1+Lead=2) → Stage 2 id-기반 교차 severity 조정 → Stage 3 review-counter DA(okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
+4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → SOLO 3중 검증 수행 + 사유 experiment-log 기록
+5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + Codex validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
+6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-review 테이블
 ### ASD 컨텍스트 로딩 (ASD 활성 시):
 - `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
 - `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
