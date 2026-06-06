@@ -21,7 +21,7 @@ allowed-tools: >-
   mcp__lsp__diagnostics_delta,
   mcp__lsp__hover,
   mcp__lsp__peek_definition,
-  Edit, Read, Bash(xcodebuild *), Bash(cd *)
+  Edit, Read, Bash(xcodebuild *), Bash(cd *), Workflow
 team-agents:
   primary: impl-correctness
   supporting: [review-arch, impl-quality, review-quality]
@@ -62,7 +62,7 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -203,42 +203,21 @@ model-strategy:
 
 ---
 
-## 팀 에이전트 모드 (복잡한 버그)
+## 팀 에이전트 모드 (복잡한 버그 — Workflow 오케스트레이션, Wave 3)
 
-> 팀 모드 규칙은 `modules/team-core.md` 참조
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체. 복잡한 버그(여러 파일, 아키텍처 영향)에서 활성화.
+> Pair Programming(경량) canonical: `modules/patterns/pair-programming.md` (보존 — 평탄화 출처).
+> 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.md` §12.
+> ⛔ 책임 재배분 (사용자 승인): 에이전트는 changeset JSON만 반환 — **Lead가 적용 + 빌드 검증**.
 
-복잡한 버그(여러 파일 관련, 아키텍처 영향)에서 TEAM 모드 활성화.
+### 실행 절차 (Lead)
 
-### 팀 구성
-
-```
-TeamCreate("fix-{bug}")
-├── Lead (Opus): 오케스트레이션 + 빌드 검증
-├── impl-correctness (★Opus): 버그 수정 (Primary Worker)
-├── review-arch (Sonnet): 아키텍처 영향 감시 [조건부: 복잡도 3+ 또는 아키텍처 관련]
-└── Cross-model 검증 (Lead가 검증 실행)
-```
-
-### Lead Spawn Override (UC-6, v4.8.0)
-
-> Lead가 TeamCreate 시 명시적으로 model 파라미터를 지정하여 Primary Worker를 opus로 승격한다.
-
-```
-TeamCreate("fix-{bug}")
-Agent(name="impl-correctness", team_name="fix-{bug}", model="opus")  # ★ Primary 승격
-# review-arch는 복잡도 3+ 시에만 추가 spawn:
-# Agent(name="review-arch", team_name="fix-{bug}", model="sonnet")
-```
-
-### 통신 패턴: Pair Programming (경량, Peer-to-Peer)
-
-```
-impl-correctness: 원인 분석 + 수정 → SendMessage(team-lead): "수정 완료. 빌드 검증 요청"
-Lead: 빌드 검증
-  → 이슈 시 SendMessage(impl-correctness): "피드백: {내용}. 반영해주세요"
-  → impl-correctness 수정 → 재검증
-  → 완료
-```
+1. **args 조립**: `mode:'light'` / `stepSpec`={id,title,goal,files,verify,**complexity**} / `contextPath`(버그 분석 요약 파일) / `changesetTarget` / `buildFeedback`(재시도 시)
+   - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
+2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review(sonnet). 1-2 call
+3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke
+4. **`mode:'fallback'` 반환 시**: SOLO 폴백 = Mode A Bug Fix Step 1-4 진입 — **--codex 처리 책임도 fallback 경로에서 유효** + 사유 experiment-log 기록
+5. **지표 기록**: 세션당 1행 → `experiment-log.md` §5.7 fz-fix 테이블. 단일 Step 다수 — Step 루프 1회면 invoke 1회로 종료
 
 ---
 

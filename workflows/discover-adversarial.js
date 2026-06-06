@@ -9,6 +9,7 @@
 //     에이전트 최종 텍스트 = 반환값(1-shot raw data) / 동시 캡 min(16, cores-2).
 //   호출(Lead, SKILL.md 절차): Workflow({ scriptPath: '{plugin_root}/workflows/discover-adversarial.js',
 //     args: { problem, codeContext, constraintsKnown, deep }  // ts 제거: 미사용 + resume 캐시 미스 유발 (리뷰 교정) })
+//   명명 등록: 플러그인 workflows/*.js의 meta.name이 명명 워크플로우로 자동 등록됨(스킬 목록 등장 실측) — scriptPath 없이 이름 'discover-adversarial' 호출 가능.
 //   반환 계약: { mode: 'workflow', landscape, paths, costs, metrics } 또는 { mode: 'fallback', reason }
 //     → mode='fallback'이면 Lead는 SKILL.md 기존 SOLO REP 경로 수행. wall-clock 측정은 Lead 책임(스크립트는 시각 API 불가).
 //
