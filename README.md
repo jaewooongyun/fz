@@ -15,7 +15,7 @@
 | 도구 | 필수 | 설치 |
 |------|:---:|------|
 | **Claude Code** | O | `npm install -g @anthropic-ai/claude-code` |
-| **Serena MCP** | O | [GitHub](https://github.com/AbanteAI/serena) — settings.json에 MCP 등록 |
+| **Serena MCP** | O | fz 설치 시 자동 등록 (`.mcp.json` 번들 → [oraios/serena](https://github.com/oraios/serena)). 런타임 `uv` 필수: `brew install uv` |
 | Context7 | 권장 | [GitHub](https://github.com/upstash/context7) — 라이브러리 문서 조회 |
 | Codex CLI | 권장 | `npm install -g @openai/codex` — GPT 교차 검증 |
 | SuperClaude | 선택 | [GitHub](https://github.com/JeongJaeSoon/superclaude) — sc: 명령어 |
@@ -181,6 +181,14 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 | /fz-code, /fz-fix | code-pair.js | impl changeset(디스크 미수정) → 조건부 검토 → Lead 적용 (1-3 call) |
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
+
+### What's New (v4.12.1) — Serena MCP 번들 + 미노출 도구 참조 정리 [PATCH]
+
+- **Serena MCP 자동 번들**: `.mcp.json` 추가 — `claude plugin install fz` 시 serena 자동 등록(수동 `claude mcp add` 불필요). 공식 oraios/serena + `--context claude-code` + `--project-from-cwd`. 런타임 `uv` 필수.
+- **미노출 도구 참조 정리**: serena 1.5.4 `claude-code` 컨텍스트 미노출 3종(`search_for_pattern`/`find_file`/`list_dir`) → `Grep`/`Glob`로 전 스킬·에이전트 정리(24파일 60 edit, 0 잔여). 심볼·메모리 도구는 유지 — 핵심 기능 무손상.
+- **README prerequisite 교정**: `AbanteAI`→`oraios/serena`(repo 이전), `uv` 런타임 명시.
+
+> 활성화: push/발행 후 `claude plugin update fz` → `/reload-plugins`. 전체 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
 
 ### What's New (v4.12.0) — TEAM → 네이티브 Workflow 전환 (Wave 0-3) [MINOR]
 
