@@ -8,6 +8,20 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.12.1 (2026-06-08) — Serena MCP 플러그인 번들 + 미노출 도구 참조 정리 [PATCH]
+
+**핵심**: Serena MCP를 `.mcp.json`으로 플러그인에 번들 — `claude plugin install fz` 시 자동 등록(수동 `claude mcp add` 불필요). 동시에 serena 1.5.4 `claude-code` 컨텍스트가 노출하지 않는 3개 도구 참조를 전 스킬·에이전트에서 정리. 4 커밋, 27파일. breaking change 0.
+
+**`.mcp.json` 번들 (feat)**:
+- `{ "serena": { "command": "uvx", "args": ["--from","git+https://github.com/oraios/serena","serena","start-mcp-server","--context","claude-code","--project-from-cwd"] } }`
+- 공식 serena 플러그인 포맷 + `--context claude-code`(공식판은 desktop-app default라 Claude Code 비최적) + `--project-from-cwd`. repo root = 플러그인 root(marketplace `source: "./"`). 런타임 `uv` 필수.
+
+**미노출 도구 참조 정리 (refactor)**: serena `claude-code` 컨텍스트 미노출 3종 — `search_for_pattern`→`Grep`, `find_file`/`list_dir`→`Glob`/`Read`. skill allowed-tools 10 + agent tools 7(+fz-memory 공유줄) + 본문/prose 지시 + fz-search 예시블록·에러표 + skill-troubleshooting 폴백체인 재번호. 24파일 60 edit, frontmatter 무결성 검증, 전 범위 0 잔여. 심볼·메모리 도구는 노출되므로 핵심 기능 무손상.
+
+**문서 (docs)**: README prerequisite 교정 — `AbanteAI/serena`(stale, repo 이전)→`oraios/serena`, "settings.json 수동 등록"→"자동 번들 + 런타임 `uv` 필수".
+
+**활성화**: push 후 `claude plugin update fz` → `/reload-plugins`(또는 재시작) → serena 서버 승인. 설치본은 별도 클론이라 version bump 필수(누락 시 update 스킵).
+
 ### v4.12.0 (2026-06-06) — TEAM → 네이티브 Workflow 전환 (Wave 0-3) [MINOR]
 
 **핵심**: TEAM(TeamCreate+SendMessage P2P) 멀티에이전트 실행을 네이티브 Workflow 결정적 스크립트로 전환 — 5개 스킬(discover/search/review/plan/code·fix) 전부. 통신 유실·팀 정리 실패 2대 오류 클래스가 구조적으로 제거(전 invoke 0건). 10 커밋, 17파일 +1336/-273. breaking change 0.
