@@ -6,7 +6,6 @@ description: >-
 user-invocable: true
 argument-hint: "[review|verify|validate|check|final|adversarial] [대상]"
 allowed-tools: >-
-  mcp__serena__search_for_pattern,
   mcp__serena__find_symbol,
   mcp__serena__write_memory,
   mcp__serena__read_memory,

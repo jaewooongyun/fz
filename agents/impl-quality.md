@@ -3,7 +3,7 @@ name: impl-quality
 description: >-
   코딩 표준 + 패턴 일관성 감시 에이전트. 구현 중 실시간 품질 피드백.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__search_for_pattern, mcp__serena__get_symbols_overview, mcp__context7__resolve-library-id, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 ## Role
@@ -14,7 +14,7 @@ in real time, providing feedback directly to `impl-correctness`.
 ## MCP Tool Priority
 
 - **Primary**: Serena
-  - `find_symbol`, `search_for_pattern`, `get_symbols_overview`
+  - `find_symbol`, `get_symbols_overview`
 - **Secondary**: context7 (표준 API 패턴 확인)
 
 ## Monitoring Focus (Layer 1 - Generic Checklist)
@@ -33,7 +33,7 @@ in real time, providing feedback directly to `impl-correctness`.
 ### Codebase Pattern Consistency
 - 기존 코드베이스의 유사 구현과 비교
 - 새 패턴 도입 시 기존 패턴과의 충돌 여부 확인
-- `search_for_pattern`으로 동일 패턴 사용 사례 확인
+- `Grep`으로 동일 패턴 사용 사례 확인
 
 ### UI Framework / Concurrency Quality (CLAUDE.md `## Plugins`에 명시된 플러그인 기준)
 - UI 프레임워크: CLAUDE.md `## Plugins`의 플러그인 기준으로 state 관리 패턴 검증

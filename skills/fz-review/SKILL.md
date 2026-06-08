@@ -8,7 +8,6 @@ argument-hint: "[리뷰 대상 설명] [light]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__find_referencing_symbols,
-  mcp__serena__search_for_pattern,
   mcp__serena__get_symbols_overview,
   mcp__serena__write_memory,
   mcp__serena__read_memory,
@@ -198,7 +197,7 @@ Results Merge & Dedup → Issue Tracker 통합
 
 ```
 mcp__serena__find_referencing_symbols → 변경된 심볼의 모든 참조 확인
-mcp__serena__search_for_pattern → 변경 후 패턴 일관성
+Grep → 변경 후 패턴 일관성
 mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분석 (요구사항별 충족 여부 단계별 검증)
 ```
 

@@ -10,8 +10,6 @@ argument-hint: >-
   [자연어 요청] [--solo] [--team] [--deep]
   예: "버그 찾아줘", "구현하고 리뷰" --team, "PR 리뷰" --deep
 allowed-tools: >-
-  mcp__serena__find_file,
-  mcp__serena__list_dir,
   mcp__serena__write_memory,
   mcp__serena__read_memory,
   mcp__serena__edit_memory,

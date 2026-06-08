@@ -3,7 +3,7 @@ name: review-quality
 description: >-
   코드 품질 + Dead Code + 성능 리뷰 에이전트. 기능 분리, API 사용, 성능 평가.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__search_for_pattern, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__context7__query-docs
 memory: project
 skills:
   - code-auditor
@@ -15,7 +15,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 
 ## MCP 도구 전략
 
-- **Primary**: Serena (`find_referencing_symbols`, `find_symbol`, `search_for_pattern` — Dead Code 추적, 패턴 검색)
+- **Primary**: Serena (`find_referencing_symbols`, `find_symbol` — Dead Code 추적) + `Grep` (패턴 검색)
 - **Secondary**: context7 (`query-docs` — deprecated API 대안 확인)
 - **Fallback**: Read, Grep, Glob
 - **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임

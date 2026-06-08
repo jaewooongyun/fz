@@ -9,8 +9,6 @@ allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
   mcp__serena__find_referencing_symbols,
-  mcp__serena__search_for_pattern,
-  mcp__serena__find_file,
   mcp__serena__activate_project,
   mcp__serena__read_memory,
   mcp__serena__write_memory,
@@ -217,7 +215,7 @@ model-strategy:
 ### 절차
 
 1. **요구사항 + 현재 아키텍처 대조**:
-   - `mcp__serena__search_for_pattern` → 기존 유사 구현 탐색
+   - `Grep` → 기존 유사 구현 탐색
    - `mcp__serena__get_symbols_overview` → 대상 영역 구조 파악
    - CLAUDE.md `## Architecture` 기준으로 접근 방향 평가
 

@@ -24,7 +24,7 @@
 
 - `mcp__serena__find_symbol` → 변경 대상 심볼 확인
 - `mcp__serena__find_referencing_symbols` → 영향받는 심볼/파일
-- `mcp__serena__search_for_pattern` → 기존 유사 구현 패턴
+- `Grep` → 기존 유사 구현 패턴
 
 #### ⛔ Exhaustive Impact Scan
 

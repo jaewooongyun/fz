@@ -247,7 +247,7 @@ class SomeInteractor {
 
 1. diff에서 새로 도입된 심볼 식별 → 커밋 메시지/diff 패턴으로 "대체 의도" 추론
 2. 대체 대상 심볼의 사용처 역추적 (`find_referencing_symbols`)
-3. `@available(*, deprecated)` 코드 검색 (`search_for_pattern`)
+3. `@available(*, deprecated)` 코드 검색 (`Grep`)
 4. 사용처 0인 deprecated 코드 → severity: major "삭제 대상"
 5. 관련 의존 코드(fallback 분기 등) 정리 여부 확인
 

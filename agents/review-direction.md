@@ -4,7 +4,7 @@ description: >-
   방향성 적합성 + 대안 제시 + 비판적 평가 에이전트. 접근 방향 자체가 최선인지 도전.
 # 승격: fz-plan Direction Challenge에서 opus로 승격 (Primary Worker)
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__search_for_pattern, mcp__serena__find_referencing_symbols, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__find_referencing_symbols, mcp__context7__query-docs
 ---
 
 ## Role
@@ -16,7 +16,7 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 
 ## MCP 도구 전략
 
-- **Primary**: Serena (`find_symbol`, `get_symbols_overview`, `search_for_pattern`, `find_referencing_symbols`)
+- **Primary**: Serena (`find_symbol`, `get_symbols_overview`, `find_referencing_symbols`)
 - **Secondary**: context7 (`query-docs` — 라이브러리/API 대안 확인)
 - **Fallback**: Read, Grep, Glob
 - **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임
@@ -33,7 +33,7 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 - 이 접근이 현재 아키텍처에 가장 자연스러운가?
 - 기존 패턴을 확장하는 것으로 충분하지 않은가?
 - 새 추상화/타입/모듈 도입이 정말 필요한가?
-- `search_for_pattern`으로 기존 유사 구현 확인
+- `Grep`으로 기존 유사 구현 확인
 
 ### 2. Alternative Paths
 

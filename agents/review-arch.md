@@ -16,7 +16,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 ## MCP 도구 전략
 
-- **Primary**: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`)
+- **Primary**: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`)
 - **Secondary**: context7 (`query-docs` — API 문서, 라이브러리 호환성 확인)
 - **Fallback**: Read, Grep, Glob
 - **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임
