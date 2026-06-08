@@ -9,8 +9,6 @@ argument-hint: "[list|info|deps|check|benchmark|reflect-to-module|create|edit|de
 allowed-tools: >-
   mcp__serena__list_memories,
   mcp__serena__read_memory,
-  mcp__serena__find_file,
-  mcp__serena__list_dir,
   Read, Grep, Glob, Bash, Edit, Write
 composable: false
 provides: []

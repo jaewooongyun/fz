@@ -10,7 +10,7 @@ allowed-tools: >-
   mcp__serena__read_memory, mcp__serena__write_memory,
   mcp__serena__edit_memory, mcp__serena__delete_memory,
   mcp__serena__list_memories,
-  mcp__serena__find_symbol, mcp__serena__search_for_pattern,
+  mcp__serena__find_symbol,
   mcp__context7__resolve-library-id, mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking
 team-agents:
@@ -38,7 +38,7 @@ model-strategy:
 - 5개 서브커맨드: audit, gc, recall, organize, remind
 - 3-Layer 메모리 관리: L1(Auto Memory) + L2(Serena) + L3(ASD 파일)
 - topic file 태그 기반 교훈 매칭
-- 코드 유효성 검증 (find_symbol + search_for_pattern)
+- 코드 유효성 검증 (find_symbol + Grep)
 
 ## 사용 시점
 
@@ -140,7 +140,7 @@ L2 임시키 삭제 + L1 stale 항목 정리 제안 + L3 잔존 ASD 정리.
 3. **topic file에서 태그 매칭**: `[skill: fz-{current}]` 패턴 Grep
 4. **매칭된 교훈의 유효성 검증**:
    a. `find_symbol` → 교훈에 언급된 심볼이 아직 존재하는지
-   b. `search_for_pattern` → 교훈에 언급된 패턴이 유효한지
+   b. `Grep` → 교훈에 언급된 패턴이 유효한지
    c. 라이브러리 관련 → Context7로 최신 API 확인
 5. **유효한 교훈만 요약** (3-5줄) + stale 교훈 표시
 6. **결과 주입**: SOLO → 대화 컨텍스트, TEAM → `SendMessage(Primary Worker)`
@@ -179,7 +179,7 @@ MEMORY.md 재구성 + topic file 분리/병합.
 
 1. **topic file 전체 스캔**: Grep으로 `[status: pending]` 검색
 2. **현재 상태 검증**:
-   a. `find_symbol` / `search_for_pattern` → 이미 수정되었는지 확인
+   a. `find_symbol` / `Grep` → 이미 수정되었는지 확인
    b. 이미 적용됨 → `[status: applied]`로 자동 업데이트
    c. 미적용 → 유지
 3. **미적용 항목 스킬별 그룹핑**

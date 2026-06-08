@@ -5,7 +5,7 @@ description: >-
   교훈/패턴/결정사항을 발굴하여 Primary Worker에게 전달.
   Use in plan/code/review teams for context-aware recall.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__read_memory, mcp__serena__list_memories, mcp__serena__find_symbol, mcp__serena__search_for_pattern, mcp__context7__resolve-library-id, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__serena__read_memory, mcp__serena__list_memories, mcp__serena__find_symbol, mcp__context7__resolve-library-id, mcp__context7__query-docs
 memory: user
 ---
 
@@ -19,7 +19,7 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
   - topic file 스캔 + `[skill: fz-{current}]` 태그 매칭
 - **Primary** (L2 탐색): Serena `read_memory` + `list_memories`
   - `fz:decision:*`, `fz:pattern:*` 키에서 관련 결정/패턴 발굴
-- **Secondary** (유효성 검증): Serena `find_symbol`, `search_for_pattern`
+- **Secondary** (유효성 검증): Serena `find_symbol` + `Grep`
   - 교훈에 언급된 심볼/패턴의 현재 존재 여부 확인
 - **Secondary** (최신성 검증): Context7 (`resolve-library-id` + `query-docs`)
   - 라이브러리 교훈이 최신 버전에서 유효한지 확인
@@ -39,7 +39,7 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
    b. L2: `list_memories()` → `fz:decision:*`, `fz:pattern:*` 중 관련 키 `read_memory`
 3. 발견된 교훈/결정의 유효성 검증:
    a. `find_symbol` → 언급된 심볼이 아직 존재하는지
-   b. `search_for_pattern` → 언급된 패턴이 아직 사용 중인지
+   b. `Grep` → 언급된 패턴이 아직 사용 중인지
    c. 라이브러리 관련 → Context7로 API 변경 여부 확인
 4. Primary Worker에게 직접 SendMessage (검증 결과 포함)
 5. 새로운 교훈 후보 감지 시 → Lead에게 보고: "새 교훈 후보: {설명}. topic file 저장을 제안합니다."

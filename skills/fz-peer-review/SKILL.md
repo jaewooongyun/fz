@@ -10,8 +10,6 @@ allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
   mcp__serena__find_referencing_symbols,
-  mcp__serena__search_for_pattern,
-  mcp__serena__find_file,
   mcp__serena__activate_project,
   mcp__serena__read_memory,
   mcp__serena__write_memory,
@@ -136,7 +134,7 @@ mcp__serena__find_symbol                → Protocol 정의, conformer
 **추가 필드**: `arch_layer_map` (아키텍처 컴포넌트 매핑, CLAUDE.md ## Architecture 기반), `import_graph` (의존성 방향), `stream_paradigms` (리액티브 프레임워크 사용 패턴), `protocol_conformers`, `deprecated_symbols`
 
 **추가 pre-cache** (관점 6-7):
-- `deprecated_symbols`: `search_for_pattern` → `@available(*, deprecated)` 탐지
+- `deprecated_symbols`: `Grep` → `@available(*, deprecated)` 탐지
 - `existing_utilities`: diff 신규 객체 → 기존 extension/유틸 Grep
 - `base_class_hierarchy`: class init/willSet 변경 시 → `find_referencing_symbols`로 subclass 수집 (optional param default:nil → subclass silent regression 주의)
 

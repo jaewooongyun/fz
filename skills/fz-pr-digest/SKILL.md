@@ -10,8 +10,6 @@ allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
   mcp__serena__find_referencing_symbols,
-  mcp__serena__search_for_pattern,
-  mcp__serena__find_file,
   mcp__serena__activate_project,
   mcp__github__get_pull_request,
   mcp__github__get_pull_request_files,

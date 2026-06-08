@@ -9,9 +9,6 @@ allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
   mcp__serena__find_referencing_symbols,
-  mcp__serena__search_for_pattern,
-  mcp__serena__find_file,
-  mcp__serena__list_dir,
   mcp__serena__activate_project,
   mcp__serena__read_memory,
   mcp__serena__write_memory,
@@ -179,7 +176,7 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 ### Serena 도구 호출 (Symbolic)
 
 ```
-1. search_for_pattern({Target}API)                → API 엔드포인트 검색
+1. Grep({Target}API)                → API 엔드포인트 검색
 2. find_symbol({Target}Repository)                → Repository 구현체
 3. find_referencing_symbols({Target}Repository)    → Repository 소비자
 4. find_symbol({Target}UseCase)                   → UseCase 구현체
@@ -240,7 +237,7 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 ### Serena 도구 호출 (Symbolic)
 
 ```
-1. search_for_pattern({regex})                     → 심볼릭 패턴 검색
+1. Grep({regex})                     → 심볼릭 패턴 검색
 2. get_symbols_overview({결과 파일들})               → 결과 파일의 심볼 컨텍스트
 ```
 
@@ -372,7 +369,7 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 
 | 에러 | 대응 | 폴백 |
 |------|------|------|
-| find_symbol 실패 | search_for_pattern 전환 | Grep + Glob 폴백 |
+| find_symbol 실패 | Grep 전환 | Glob 폴백 |
 | --deep 팀 생성 실패 | 순차 모드 자동 전환 | 단일 에이전트 실행 |
 | 결과 과다 (>200건) | head_limit + 파일 필터 | 모듈/디렉토리 필터 안내 |
 | 모드 판별 모호 | AskUserQuestion | 사용자 선택 |

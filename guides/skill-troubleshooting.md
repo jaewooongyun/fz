@@ -261,12 +261,11 @@ User prompt에 추가:
 ```
 1. mcp__serena__find_symbol        → 심볼 정의 탐색
 2. mcp__serena__find_referencing_symbols → 참조 추적
-3. mcp__serena__search_for_pattern → 패턴 기반 탐색
-4. mcp__serena__get_symbols_overview → 파일 심볼 개요
+3. mcp__serena__get_symbols_overview → 파일 심볼 개요
    ↓ 실패 시
-5. Grep → 텍스트 패턴 탐색
-6. Glob → 파일 패턴 탐색
-7. Read → 수동 파일 읽기
+4. Grep → 텍스트 패턴 탐색
+5. Glob → 파일 패턴 탐색
+6. Read → 수동 파일 읽기
 ```
 
 ---

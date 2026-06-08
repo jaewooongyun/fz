@@ -8,11 +8,9 @@ argument-hint: "[버그/에러 설명] [--codex]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
-  mcp__serena__search_for_pattern,
   mcp__serena__replace_symbol_body,
   mcp__serena__insert_after_symbol,
   mcp__serena__find_referencing_symbols,
-  mcp__serena__find_file,
   mcp__serena__read_memory,
   mcp__serena__write_memory,
   mcp__sequential-thinking__sequentialthinking,
@@ -158,7 +156,7 @@ model-strategy:
 ### Step 1b: Isolate — 최소 범위로 좁히기
 
 1. **관련 코드 탐색** (Serena):
-   - `mcp__serena__search_for_pattern` → 에러 메시지/키워드 검색
+   - `Grep` → 에러 메시지/키워드 검색
    - `mcp__serena__find_symbol` → 의심 심볼 찾기
    - `mcp__serena__find_referencing_symbols` → 호출 관계 파악
 2. 원인 후보를 2-3개로 좁힘
