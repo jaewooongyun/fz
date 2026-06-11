@@ -46,6 +46,7 @@ Swift Concurrency/SwiftUI 플러그인 활성 여부와 **무관하게** 항상 
 | completion handler / `pathUpdateHandler` / delegate callback | callback 내부에 `DispatchQueue.main` / `@MainActor` 없음 | **콜백 실행 스레드 ≠ 소비자 스레드 가능성**. context7로 API 콜백 스레드 확인 |
 | 비동기 API 초기화 + stored property 기본값 | — | **첫 콜백 전 기본값의 소비자 영향**. guard/if 분기에서 잘못된 분기 진입 가능 |
 | `ObservableObject` + `@Published var` | `@MainActor` 없음 | **@Published background 쓰기 시 UI 스레드 위반**. 런타임 경고 발생 |
+| 프레임워크 생명주기 콜백(RIBs `didBecomeActive`/`willResignActive` 등) 내 `@MainActor` 멤버 접근 또는 `MainActor.assumeIsolated` | 콜백 자체 nonisolated — 프레임워크가 호출 스레드 비보장 (RIBs activate()는 동기 직접 호출) | **bridge 선택을 결정으로 취급**: assumeIsolated(main 가정, 위반 시 crash=조기 탐지 덫) / `Task { @MainActor }`(무조건 보장, 생명주기 async화) / `Task.immediate`(iOS 26+ [verified], main이면 동기 실행) — trade-off 1회 제시 의무. 기존 Interactor 패턴 답습도 면제 아님 |
 
 ### iOS 16 기본 패턴 (최소 타겟 준수)
 

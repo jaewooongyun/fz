@@ -37,7 +37,7 @@ CLAUDE.md `## Architecture`가 Swift/iOS 프로젝트 + plan-final.md / plan-v*.
 
 **이유**: 동시성 키워드 신규 도입은 isolation 설계 + cancellation + Sendable 경계의 동시 결정을 요구. 일부만 결정하면 컴파일러 경고 또는 런타임 data race.
 
-**plan 검색 token**: `@MainActor`, `actor`, `Sendable`, `@Sendable`, `sending`, `async let`, `TaskGroup`, `AsyncStream`, `AsyncSequence`, `thread model`, `GCD.*Concurrency`, `DispatchQueue.*Actor`
+**plan 검색 token**: `@MainActor`, `actor`, `Sendable`, `@Sendable`, `sending`, `async let`, `TaskGroup`, `AsyncStream`, `AsyncSequence`, `thread model`, `GCD.*Concurrency`, `DispatchQueue.*Actor`, `MainActor.assumeIsolated`, `nonisolated`(생명주기 콜백 맥락)
 
 **발동 시 행동**:
 - `modules/plugin-refs.md` "Swift Concurrency" 섹션 적극 참조
