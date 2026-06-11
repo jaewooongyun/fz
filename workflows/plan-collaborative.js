@@ -5,7 +5,7 @@
 //   호출(Lead, SKILL.md 절차): Lead가 codeContext 요약을 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/plan-collaborative.js',
 //       args: { requirement, codeContextPath, constraintsKnown, discoverJournalPath? } })
-//   반환: { mode:'workflow', plan: PlanSchema, directionVerdict, metrics }
+//   반환: { mode:'workflow', plan: PlanSchema, directionVerdict, directionAlternatives, metrics }
 //     | { mode:'direction_escalation', verdict, alternatives, rebuttal, metrics } → Lead가 사용자 확인 (대화는 Workflow 밖)
 //     | { mode:'fallback', reason, metrics } → Lead는 SOLO plan 경로 수행.
 //   Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차): stress-test Q1-Q6 / RTM 검증 /
@@ -255,6 +255,7 @@ log(`완주 ${stagesCompleted}/5 stages — plan steps ${plan.steps.length} / wr
 return {
   mode: 'workflow',
   directionVerdict: direction.verdict,
+  directionAlternatives: direction.alternatives,
   plan: { ...plan, unresolvedPeerIssues: recheck ? recheck.remainingIssues : [] },
   recheckVerdict: recheck ? recheck.verdict : 'skipped',
   metrics: metrics(stagesCompleted), // Lead가 experiment-log §5.7 fz-plan 테이블 기록 + stress-test/RTM 검증/plan-v{N}.md 기록 실수행 (회귀 확인 의무)

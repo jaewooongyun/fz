@@ -106,7 +106,7 @@ model-strategy:
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/plan-collaborative.js', args })`
    - Stage 0 direction(opus, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(sonnet) → Stage 3 CC 교차(edge↔impact) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증. 9-11 call
 4. **반환 처리**:
-   - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록
+   - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
    - `mode:'direction_escalation'` → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용)
    - `mode:'fallback'` → SOLO 계획 수립 수행 + 사유 experiment-log 기록
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(Codex 회복 시) + Codex verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
@@ -210,7 +210,7 @@ model-strategy:
 | Workflow 모드 (plan-to-code, plan-only) | **Stage 0이 수행** | workflows/plan-collaborative.js Stage 0 direction (escalation 시 본 절차 3 준용) |
 | SOLO 모드 + 새로운 아키텍처 결정 | **필수** | Lead가 직접 6관점 검토 |
 | discover 결과에 명확한 방향 존재 | **스킵 가능** | 이미 제약 기반 방향이 결정됨 |
-| 단순 수정 (기존 패턴 따르기) | **스킵** | 방향성 검토가 과잉 |
+| 단순 수정 (기존 패턴 따르기) | **스킵** | 방향성 검토가 과잉. ⛔ 템플릿/형제 **미러링으로 신규 화면·컴포넌트를 생성**하는 작업은 단순 수정 아님 — 3축 결정 포함, 스킵 불가 (45차) |
 
 ### 절차
 
@@ -240,6 +240,7 @@ model-strategy:
 ### Gate 0.5: Direction Validated
 - [ ] 6개 관점 검토 완료?
 - [ ] 대안 최소 2개 제시?
+- [ ] 구조 결정별 대안 ≥2 + trade-off 기록? (SOLO 조기 체크 — Workflow 모드의 병합 확인은 Gate 1 담당. 답습/미러링이면 3축 — 45차)
 - [ ] 방향 판정 (PROCEED/RECONSIDER/REDIRECT)?
 - [ ] RECONSIDER/REDIRECT 시 사용자 확인?
 
@@ -312,6 +313,7 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
 - [ ] ⛔ Transformation Spec의 기술적 주장에 [verified: source] 태그가 있는가? (Default-Deny)
 - [ ] ⛔ "실행 스레드"가 Zero-Exception 규칙을 준수하는가?
 - [ ] ⛔ 요청 파라미터 키 목록이 원본과 일치하는가?
+- [ ] 구조 결정 옵션 테이블 포함 + 사용자 보고 제시? (Workflow 모드면 `directionAlternatives` 병합 확인. 답습/미러링이면 3축 필수 — 45차)
 - [ ] ⛔ 계획 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
 
 > **Gate 증거 첨부** (H2 원칙 — self-check 보완): 결정론적 도구 출력이 있는 Gate 항목은
