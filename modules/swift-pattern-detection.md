@@ -130,7 +130,7 @@ grep -q 'modules/swift-pattern-detection\.md' "$F"
 grep -q 'Gate 0\.5' "$F"
 # 본 모듈에 4 원칙 (D/E/F/G) + Few-shot 존재
 M=~/dev/fz-plugin/modules/swift-pattern-detection.md
-test "$(grep -Ec '원칙 D|원칙 E|원칙 F|원칙 G' "$M")" -eq 4
+test "$(grep -Ec '^### 원칙 [DEFG]' "$M")" -eq 4
 grep -q 'BAD:' "$M" && grep -q 'GOOD:' "$M"
 # Phase 1.5 P3와 mirror — 패턴 변환 trigger 명시 (F3 fix)
 grep -qE 'PromiseKit|defer.*await|enum catch' "$M"
