@@ -61,6 +61,7 @@
 | # | 날짜 | 스킬 | Gate | Evidence 채워짐? | 유용했나? | 비고 |
 |---|------|------|------|:---------------:|:--------:|------|
 | | | | | | | |
+| 1 | 2026-06-11 | fz-plan (SOLO --deep) | Gate 1 Exhaustive Impact Scan | ✅ 앵커 4/4 grep + pre-state 0 hit + 내장 self-test 비파괴 | ✅ F4 앵커 이중 후보를 Tuning History 자체 게이트 실측으로 해소 → counter approve | ASD-1802 fz gap fix plan-v2 |
 
 ---
 
@@ -442,6 +443,9 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-review (finding/counter/severity) |
 |---|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
 | 1 | 2026-06-05 | 5 | 0 | 3 | 0 | 661s | ✅ clean — Wave 1 변경분 self-review: findings 11(실질 8, critical/major 0), okAreas 18, counter가 3건 추가 발견(C-1 okArea도전 소실/C-2 하드코딩/C-3 id중복=실버그) — DA 가치 실증. 8건 전부 즉시 수정 반영. 전환 직후 검증 invoke (임계 3건 중 1) |
+| 2 | 2026-06-11 | 5 | 0 | 3 | 0 | 728s | ✅ clean — ASD-1889 미러 리팩토링 리뷰 (실사용): findings 8 (critical/major 0), counter가 XQ:Q-1 refute(현 브랜치에 없는 중복을 ASD-1802 워크트리 cross-worktree 혼동으로 주장 — FP 실증 기각) + okArea 1건 반박(미러 비교 기준 라벨 명확화) + C-1/C-2 추가 발견. cross가 [verified] 실측 인용 충실. Lead 판정: 코드 변경 0건(전부 pre-existing/미러 의도), 후속 후보 2건. 임계 3건 중 2 |
+| 3 | 2026-06-11 | 5 | 0 | 3 | 0 | 715s | ✅ clean — **plan 문서 리뷰 (비-diff 신규 사용례)**: fz-gap-fix-plan-final(v3.1) 사용자 3축(가이드 준수/과적합/일반화). findings 14 (critical 0/major 2/minor 12, FP 0), counter가 okArea 4건 도전(완화 편향 1건 적발) + C-1~C-3 추가. 전 finding [verified] 인용. Lead 처분: 15건(Lead 자체 발견 L1 §12 oracle 포함) → plan v3.2 반영 13 + 의도 유지·O7 기록 2. Codex 차단 대체 한계(RC4) 명시. **임계 3건 전수 달성 — null 0%·완주 100%·fallback 0** |
+| 4 | 2026-06-11 | 5 | 0 | 3 | 0 | 920s | ✅ clean — gap fix **적용 diff 리뷰** (8파일 179줄+메모리 3): findings 11 (critical/major 0, FP 0) — 9건은 O1·O7 기록 완비/의도 결정 재확인, 1건 즉시 반영(Gate 0.5 SOLO 맥락 명시), counter가 okArea refute 1건("§12 정확히 일치" 과장 — full-path 미검증 사실 재명시) + 리뷰어 evidence 라인 오류 1건(C-1) 적발. okAreas 25 — F1~F4·G1·G3 발화 체인 정적 도달 전부 확인. 4-F 7/7 기계 PASS |
 
 ### fz-plan (collaborative) — Wave 2 전환 (시작: 2026-06-05)
 
@@ -450,6 +454,8 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-plan (direction/CC/verify/§Y/Lead회귀) |
 |---|------|-----------|-----------|--------|----------|-----------|--------------------------------------------|
 | 1 | 2026-06-05 | 9 | 0 | 5 | 0 | 1101s | ✅ clean — Wave 3 계획 생산(dogfooding). G2 5축 전부 PASS: direction PROCEED 1-call(dead-call 제거 경로 첫 작동)/CC 신규 발견 2건 S8 반영/verify 9·9/§Y 6≠§X 15 rationale 분리/Lead 회귀(stress-test Q1-Q6+RTM 12행) 실수행. 특기: S0 책임 재배분을 자가 도출 + canonical 충돌을 OQ1 에스컬레이션 표시(임의 판단 금지 자발 준수). 전환 직후 검증 invoke (임계 3건 중 1) |
+
+> 2026-06-11 **G1 배선 적용** (반환 `directionAlternatives` + 헤더 계약 주석 동기화, ASD-1802 gap fix): §12 oracle — ①래핑 node --check PASS ②스모크 invoke 1회 = fail-fast 경로 정상(`mode:'fallback'`, 0 agent, 3ms — 위 누적 테이블 분모 **비포함**, 스모크는 실사용 아님) ③full-path 필드 실반환은 다음 실사용 invoke에서 확인.
 
 ### fz-code (pair-programming full) — Wave 3 전환 (시작: 2026-06-05)
 
