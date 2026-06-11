@@ -182,6 +182,16 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
+### What's New (v4.13.0) — Template Authority Bias 방어 + 구조 결정 옵션 사용자 배선 [MINOR]
+
+- **구조 결정 3축 Quick-Check** (review-direction): 템플릿/형제 미러링 계획이라도 **DI 출처 · 스레드 가정 · public API 모양**은 결정 대상 — 축별 대안 ≥2 + trade-off 의무. ASD-1802에서 외부 리뷰어가 3축 전부 선행 포착한 실패(파이프라인 0건)의 직접 대응.
+- **구조 결정 옵션의 사용자 배선** (G1): PROCEED 판정이어도 옵션 테이블이 plan에 포함되고 **사용자 보고 시 표로 제시** — `directionAlternatives` 반환 패스스루 + Gate 0.5/1 체크. "옵션은 기록이 아니라 제시가 목적".
+- **미러링 분류 정정** (G3): 미러링으로 신규 화면·컴포넌트 생성은 '단순 수정' 아님 — Direction Challenge 스킵 불가.
+- **감지 보강**: E token `MainActor.assumeIsolated`·`nonisolated` + 생명주기 콜백 역방향 트리거(bridge 3택 trade-off 제시 의무, `Task.immediate` iOS 26+) + boolean trap few-shot.
+- **fix**: swift-pattern-detection 내장 self-test 자기참조 매칭(상시 실패) anchoring 수정.
+
+> ⛔ Codex cross-model 검증은 할당량 차단(~6/28)으로 미수행 — Claude 다각도(counter 2회 + Review Squad 2회 + 결정론 oracle 전수) 대체, 회복 시 후행 check. 상세: [docs/releases/v4.13.0.md](docs/releases/v4.13.0.md)
+
 ### What's New (v4.12.1) — Serena MCP 번들 + 미노출 도구 참조 정리 [PATCH]
 
 - **Serena MCP 자동 번들**: `.mcp.json` 추가 — `claude plugin install fz` 시 serena 자동 등록(수동 `claude mcp add` 불필요). 공식 oraios/serena + `--context claude-code` + `--project-from-cwd`. 런타임 `uv` 필수.

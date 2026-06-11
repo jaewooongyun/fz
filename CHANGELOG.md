@@ -8,6 +8,24 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.13.0 (2026-06-11) — Template Authority Bias 방어 + 구조 결정 옵션 사용자 배선 [MINOR]
+
+**핵심**: ASD-1802에서 fz 풀 파이프라인이 외부 인간 리뷰어 지적 3건(Component의 UseCase 직접 생성 / didBecomeActive `MainActor.assumeIsolated` / boolean trap)을 **0건 선행 포착**한 실패 분석(RC 5개)의 최소 수정 세트. 층위 분리 설계 — 원칙층(45차 메모리+개방 단서) / 발화층(token·트리거·few-shot) / 전달층(사용자 배선) / 분류층. 6 커밋, 11파일. breaking change 0.
+
+**F1~F4 — 파이프라인이 잡게 (feat)**:
+- `agents/review-direction.md`: Structural Fit에 **구조 결정 3축 Quick-Check**(DI 출처·스레드 가정·public API 모양) — 템플릿/형제 미러링 계획이라도 3축은 "이미 결정됨"이 아닌 결정 대상, 축별 대안 ≥2 + 1줄 trade-off. 개방 단서(표에 없는 구조 결정도 동일 원칙) 포함
+- `modules/swift-pattern-detection.md`: 원칙 E token에 `MainActor.assumeIsolated`·`nonisolated`(생명주기 콜백 맥락)
+- `modules/plugin-refs.md`: Level 2 역방향 트리거에 프레임워크 생명주기 콜백 행 — bridge 3택(assumeIsolated=crash 덫 / Task hop=보장 / `Task.immediate` iOS 26+ [verified]=동기) trade-off 1회 제시 의무
+- `agents/review-quality.md`: boolean trap BAD/GOOD few-shot (`fetch(reset:)` → 의도별 분리)
+
+**G1·G3 — 사용자에게 보이게 (feat)**: PROCEED 경로에서 옵션이 생산돼도 사용자에게 도달하지 않던 배선 결손 해소 — `plan-collaborative.js` workflow 반환에 `directionAlternatives` 패스스루(PlanSchema·에이전트 프롬프트 무변경) + fz-plan 반환 처리 별도 병합 지시 + Gate 0.5(SOLO 조기)·Gate 1(병합 확인) 체크 + plan-deep-planning 절차 7 "구조 결정 옵션 테이블"(PROCEED여도 **사용자 보고 시 표로 제시**). G3: 발동 조건 분류 정정 — 미러링으로 신규 화면·컴포넌트 생성은 '단순 수정' 아님(스킵 불가).
+
+**fix**: swift-pattern-detection 내장 self-test 자기참조 매칭(카운트 7≠4 상시 실패) → `^### 원칙 [DEFG]` anchoring, PASS(4/4).
+
+**검증**: counter 에이전트 2회 approve(핸드오프 충실도 16/16 + delta 0이슈) + Review Squad 2회(plan 문서 리뷰 findings 15 처분 / 적용 diff 리뷰 findings 11 — critical/major 0, 발화 체인 정적 도달 전부 확인) + 결정론 oracle 전수(grep baseline 0→1 + 내장 self-test + §12 래핑 check·스모크 invoke). ⛔ Codex cross-model은 할당량 차단(~6/28)으로 미수행 — Claude 단독 한계(RC4) 명시, 회복 시 후행 check.
+
+**알려진 제약**: `directionAlternatives` full-path 실반환은 다음 fz-plan TEAM 실사용에서 확인 / 3축 실발화는 ASD-1889 실측이 최종 oracle / escalation `alternatives` 키 비대칭·Stage 4 직접 통합·Output Format 3축 행은 실측 후 후속(O7).
+
 ### v4.12.1 (2026-06-08) — Serena MCP 플러그인 번들 + 미노출 도구 참조 정리 [PATCH]
 
 **핵심**: Serena MCP를 `.mcp.json`으로 플러그인에 번들 — `claude plugin install fz` 시 자동 등록(수동 `claude mcp add` 불필요). 동시에 serena 1.5.4 `claude-code` 컨텍스트가 노출하지 않는 3개 도구 참조를 전 스킬·에이전트에서 정리. 4 커밋, 27파일. breaking change 0.
