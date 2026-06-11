@@ -35,6 +35,19 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 - 새 추상화/타입/모듈 도입이 정말 필요한가?
 - `Grep`으로 기존 유사 구현 확인
 
+#### 구조 결정 3축 Quick-Check — 템플릿/형제 답습 시에도 의무
+
+참고 템플릿·형제 코드를 미러링하는 계획이라도 아래 3축은 "이미 결정됨"이 아니라 **결정 대상**이다.
+각 축에 대안 ≥2 + 1줄 trade-off를 판정 산출물에 기록한다 (Template Authority Bias 방어 — ASD-1802에서 3축 전부 외부 리뷰어에게 선행 포착당한 실패 사례).
+
+| 축 | 질문 | 최소 대안 |
+|---|---|---|
+| DI 출처 | Component가 생성하는 의존성은 상위 주입 대상인가? 테스트 목 주입 경로가 존재하는가? | 내부 생성 vs 상위 주입 |
+| 스레드 가정 | 생명주기/콜백의 실행 스레드를 프레임워크가 보장하는가? (소스 실측 — 가정 금지) | assumeIsolated(가정·crash 덫) vs Task hop(보장·async화) vs Task.immediate(iOS 26+, main이면 동기) |
+| public API 모양 | 동작 모드를 가르는 Bool 파라미터인가? 의도별 메서드 분리가 호출부를 더 명확히 하는가? | Bool 모드 vs 의도별 분리 |
+
+> 이 3축은 실증된 대표 축이다 — 표에 없는 구조 결정(예: 에러 처리 전략, 상태 소유 위치)을 발견하면 동일 원칙(대안 ≥2 + 1줄 trade-off)으로 취급한다.
+
 ### 2. Alternative Paths
 
 - 근본적으로 다른 접근이 있는가? **최소 2개 대안 제시 필수** (현재 방향 포함)

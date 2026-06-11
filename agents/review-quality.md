@@ -108,6 +108,14 @@ GOOD: "find_referencing_symbols 결과 0건. 추가로 Grep('methodName') 전수
 문자열 기반 호출(selector, performSelector) 없음 확인.
 @objc dynamic으로 선언되어 있지 않으므로 런타임 호출 가능성도 없음.
 Dead Code 판정: 확정. 삭제 권장."
+
+BAD (API 표면 미검토):
+`fetchFanContents(reset: Bool)` — reset:true=첫 로드(cancel+page1), false=다음 페이지. 동작 정상이므로 통과.
+→ 호출부가 Bool의 의미를 기억해야 하는 boolean trap을 미지적.
+
+GOOD:
+Q-n: `fetchFanContents(reset:)`가 2개 독립 의도(재로드/페이지네이션)를 Bool로 구분 — 호출부 가독성·테스트 케이스 분리 저해.
+권장: `reloadFanContents()`/`loadNextPage()` 분리 + 공통 `fetchFanContents(page:)`. evidence: 호출부 2곳 인용.
 ```
 
 ## Evaluator Tuning History
