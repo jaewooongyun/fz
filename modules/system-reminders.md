@@ -21,6 +21,7 @@
 | T5 | diff에 `static let shared` 타입의 `var` property 변경 감지 | "싱글톤 가변 상태 수정 감지. 확인: (1) 동기화 보호 (@MainActor/actor/lock) (2) deinit dead code (3) 기본값 소비자 영향. 참조: plugin-refs.md 역방향 트리거, modules/safety-audit.md" | PR#3665: plugin 미활성으로 data race 미감지 |
 | T6 | 과거 상태 주장 키워드("원본은", "기존은", "이전은", "D{N} 이전") 감지 + 직전 5턴 내 `git show`/`Read`/`grep`/`find_referencing_symbols` 호출 흔적 없음 | "과거 상태 주장 감지 + 검증 도구 호출 흔적 없음. Fail-Closed: `git show {SHA}:{path}` 또는 `Read` 실행 후 주장하거나 `[미검증: 실측 없음]` 태그 부착. 참조: ${CLAUDE_PROJECT_DIR}/memory/feedback_source_claim_must_verify.md, lead-reasoning.md §1.5 Speculation-to-Fact" | ASD-909 F-7: 원본 추정으로 4회 reversal |
 | T7 | 과거 판단 아티팩트(`follow-up-tasks.md`, `codex-review*.md`, `plan-v*.md`) 인용 감지 | "과거 판단 아티팩트 인용 감지. 작성 시점 판단이므로 현재 시점 재실측 필수. 재검증 불가 시 `[아카이브: 재실측 불가, 작성 시점 {YYYY-MM-DD}]` 태그. 참조: ${CLAUDE_PROJECT_DIR}/memory/feedback_followup_artifact_reaudit.md" | ASD-909: follow-up-tasks.md 맹목 인용으로 재작업 |
+| T8 | (event signal 동반 시만 — 키워드 단독은 Q-COVERAGE에 위임) 전수/카운트/부정 주장 키워드("전수/모든/~뿐/N곳/N개/나머지는" — canonical: cross-validation.md §Coverage Gate) 감지 + [(측정 도구 호출 흔적 없이) 이전 턴 수치 재인용 OR 현재 컨텍스트에 원 측정 명령 출력 부재 OR 직전 근거 명령 head/tail 잘림 흔적] | "전수/카운트 주장 + 원 측정 부재/재인용 감지. Coverage Gate(검산식) 통과 확인. 재인용이면 head 없이 재실측(`rg X \| wc -l`). 적용 범위: 잘림·재인용·측정 부재 클래스 — 정규식 불완전(가짜 교차확인)은 Coverage Gate 검산식 담당. T6=과거 상태 주장 / T8=현재 대화 내 수치 재인용. Backstop 'SOLO 5턴 이하' 예외 비상속 (사고가 4턴 생존). 참조: cross-validation.md §Coverage Gate" | 2026-06-12 전수 주장 오판: `head -5` 잘린 출력 "2곳뿐" 단정 4턴 생존 (실제 11곳) |
 
 ## Low-frequency Backstop
 

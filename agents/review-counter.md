@@ -74,4 +74,4 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
 - T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
 
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).
+관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

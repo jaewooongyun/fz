@@ -345,7 +345,7 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 - [ ] 대상 심볼/패턴 파악 완료?
 - [ ] 영향 범위 식별?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
-- [ ] "전체/전수" 탐색 요청이면 Coverage Gate 통과? (modules/cross-validation.md § Coverage Gate 참조)
+- [ ] "전체/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("N곳"/"~뿐" 등)이면** Coverage Gate 통과? (canonical: modules/cross-validation.md § Coverage Gate 참조)
 
 ---
 
