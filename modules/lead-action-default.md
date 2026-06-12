@@ -10,7 +10,7 @@
 |---------------|----------------|-------------|
 | 31차 (Plan-before-Probe) | Plan 차원이 primitive/CLI flag/config key/value enum/env precondition에 의존 | constraint probe 선행 (`/fz-discover` Phase 1.5 또는 `fz-plan` Phase 0c) |
 | 32차 (Probe Coverage) | probe 대상 enumeration 중 (a) 존재 (b) 권한·경계 (c) 결과 contract 3축 중 누락 | 3-axes sub-checklist 적용 |
-| 33차 (Recommendation Default) | implementation-ready 시점 / verify approved or conditional-minor | **권고 default = implementation** (참조: `modules/fz-pipeline-proposal.md`) |
+| 33차 (Recommendation Default) | implementation-ready 시점 / verify approved or conditional-minor | **권고 default = implementation** (참조: `modules/fz-pipeline-proposal.md`) — Fable 공식 anti-overplanning 동방향: "When you have enough information to act, act" [verified: prompting-claude-fable-5] |
 | 40차 (Simplified Request) | 사용자 신호 "그냥/가볍게/단순/빠르게/확인해줘/해도 돼?/맞아?/한 번 봐줘" 키워드 + 검토 산출물 존재 + **no `--deep`/`--team`** override | 절차(TEAM/Phase/게이트 시퀀스) 차단, simplified mode 적용 (예: `/fz-modernize light`) — 단 산출물이 전수/카운트/부정 주장이면 Coverage Gate 유지 (light = 절차 생략이지 검증 생략 아님 → cross-validation.md §Coverage Gate) |
 | 40차-MUST3 (Codex precedence) | `--seq` 단독은 sequential thinking 모드이지 simplified trigger 아님. `--deep --seq` 또는 `--team --seq` 조합 시 elaborate 유지 | `--seq` 단독 keyword 매칭 금지 — 컨텍스트 조건 필수 (Codex 검증 §5 MUST 3) |
 | MAST FM-2.2 (Fail to ask for clarification) | 요청 모호 / 동사 없음 / 명사+키워드만 / 범위 불명확 | AskUserQuestion 발동 의무 |

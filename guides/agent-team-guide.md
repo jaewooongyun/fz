@@ -220,6 +220,7 @@ GOOD (Mesh / Peer-to-Peer):
   - **순차 승격** 허용: review-direction은 Direction Challenge(Round 0.5)에서 opus로 순차 승격 가능. Round 0.5 완료 후 Round 1이 시작되므로 동시 opus는 2개를 초과하지 않음.
   - 예외: full-cycle / plan-to-code 파이프라인에서 plan과 code 각각 Primary가 다르므로 순차적으로 opus를 사용한다.
 - **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단.
+- **Fable 5 (2026-06-09 GA)**: Opus 상위 tier, $10/$50 per MTok (opus의 2배). 2-Tier 원칙은 유지 — Lead는 세션 모델(`/model fable`)로 Fable일 수 있고, 서브에이전트도 `model: "fable"` 지정 가능 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/fable-model-guide.md` §5.
 
 ### 모델 승격 매트릭스
 

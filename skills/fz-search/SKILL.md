@@ -32,6 +32,7 @@ intent-triggers:
 model-strategy:
   main: opus
   verifier: sonnet
+effort: xhigh
 ---
 
 # /fz-search - 코드 탐색 & 구조 분석 스킬
@@ -69,7 +70,7 @@ model-strategy:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (TeamCreate 강제 + 상호 통신) |
+| modules/team-core.md + modules/patterns/ | Workflow 미가용 시 SOLO 폴백 협업 프로토콜 (canonical 패턴 출처) |
 | modules/patterns/cross-verify.md | Cross-Verify (search-symbolic ↔ search-pattern 교차 확인) (UC-11, v4.7.1) |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |

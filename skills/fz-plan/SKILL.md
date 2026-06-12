@@ -33,6 +33,7 @@ intent-triggers:
 model-strategy:
   main: opus
   verifier: sonnet
+effort: xhigh
 ---
 
 # /fz-plan - 계획 + 설계 스킬
@@ -60,7 +61,7 @@ model-strategy:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (TeamCreate 강제 + 상호 통신) |
+| modules/team-core.md + modules/patterns/ | Workflow 미가용 시 SOLO 폴백 협업 프로토콜 (canonical 패턴 출처) |
 | modules/patterns/collaborative.md | Phase 0.5 Collaborative Design (review-direction → plan-structure) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |

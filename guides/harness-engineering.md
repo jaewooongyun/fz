@@ -813,6 +813,7 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 Anthropic 실제 사례:
   Sonnet 4.5: Sprint 분해 필수 → Opus 4.6: Sprint 제거 (2025-11)
   Opus 4.8 (2026-05-28 GA): effort 기본 high + 자기 코드 결함 ~4x↓ + tool-calling 효율↑ [verified: anthropic.com/news/claude-opus-4-8]
+  Fable 5 (2026-06-09 GA): 이전 모델용 절차 지시가 품질 저하 요인으로 공식화 ("often too prescriptive... can degrade output quality") + 검증 리마인더 축소 권고 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]
   이렇게 제거/추가된 컴포넌트가 "모델이 성장한 증거"
 ```
 
@@ -1008,7 +1009,8 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 |-----------|-------------|-----------------|
 | Sonnet 4.5 | Context Reset 필수, Sprint 분해 필수, Evaluator 필수 | — |
 | Opus 4.6 | Context Reset 선택, Compaction 충분, Evaluator 조건부 | Sprint 분해, 스프린트별 평가 |
-| **Opus 4.8 (2026-05-28 GA, 현재)** | effort 기본 **high** (xhigh/max는 더 어려운 작업용), 1M Compaction 충분, tool-calling 효율↑(fewer steps·required-call skip↓), 단일 세션 수백 parallel subagents 지원 [verified: anthropic.com/news/claude-opus-4-8] | Evaluator 조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 *이종 blind-spot*은 여전히 cross-model 필요 [verified: 동] |
+| **Opus 4.8 (2026-05-28 GA, 현재 default)** | effort 기본 **high** (xhigh/max는 더 어려운 작업용), 1M Compaction 충분, tool-calling 효율↑(fewer steps·required-call skip↓), 단일 세션 수백 parallel subagents 지원 [verified: anthropic.com/news/claude-opus-4-8] | Evaluator 조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 *이종 blind-spot*은 여전히 cross-model 필요 [verified: 동] |
+| **Fable 5 (2026-06-09 GA, 옵트인 최상위)** | effort 기본 **high** (xhigh=capability-sensitive, low도 이전 모델 xhigh 상회 가능), thinking 상시 활성(끄기 불가), async parallel subagents 공식 권장, fresh-context verifier > self-critique, 단일 turn 수 분·자율 런 수 시간 전제의 타임아웃/진행표시 설계 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 + code.claude.com/docs/en/model-config] | step-by-step 절차 지시("often too prescriptive... can degrade output quality" — 단 Gate 가드레일 제거는 A/B 후 결정), 검증 리마인더("verifies its own work with less prompting"). 안전 분류기 refusal 시 Opus 자동 폴백 주의. 상세: `guides/fable-model-guide.md` |
 | 미래 모델 | ? | Evaluator? 컨텍스트 관리? |
 
 > **4.8 새 기능 → fz 적용** [verified: anthropic.com/news/claude-opus-4-8]:
@@ -1099,6 +1101,9 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 6c | Best Practices for Claude Code | Anthropic | 2026 | https://www.anthropic.com/engineering/claude-code-best-practices |
 | 6d | Introducing Claude Opus 4.8 | Anthropic | 2026-05-28 | https://www.anthropic.com/news/claude-opus-4-8 |
 | 6e | Scaling Managed Agents | Anthropic | 2026-04-08 | https://www.anthropic.com/engineering/managed-agents |
+| 6f | Introducing Claude Fable 5 and Claude Mythos 5 | Anthropic | 2026-06-09 | https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5 |
+| 6g | Prompting Claude Fable 5 | Anthropic | 2026 (live) | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 |
+| 6h | Claude Code: Model configuration | Anthropic | 2026 (live) | https://code.claude.com/docs/en/model-config |
 
 ### 학술 논문
 
