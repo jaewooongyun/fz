@@ -8,6 +8,22 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.14.0 (2026-06-12) — 전수 주장 오판(Exhaustive-Claim) 방어 + light 모드 검증 경계 [MINOR]
+
+**핵심**: api.tving.com 토큰 조사 세션에서 `rg|head -5` 잘린 출력을 "사용처 2곳뿐"으로 단정(실제 11곳)한 오판이 가짜 교차확인을 거쳐 4턴 생존한 사고의 재발 방지 최소 세트. 기존 방어(Coverage Gate·T6/T7·Cross-Verify)가 전부 존재했으나 **light 경로가 전량 우회** — "방어 부재"가 아닌 "방어 우회"가 근본 원인(RC1 라우팅 어휘 기반 / RC2 출력 커버리지 미정의 / RC3 멀티턴 캐싱 무방비 / RC4 교훈 키잉 과소 일반화). 신규 모듈/Phase/Gate 0건, 23파일 전부 기존 구조 내부 확장. breaking change 0.
+
+**F1 — light 모드 검증 경계 (feat)**: `lead-action-default.md` 40차 row + `fz/SKILL.md` simplified_keywords·abbreviated recall(:136) — "light = 절차 생략이지 검증 생략 아님". 산출물이 전수/카운트/부정 주장이면 `Read(cross-validation.md §Coverage Gate)` 후 적용 (인라인 Read 명령으로 텍스트→로드 다리 확보). [미검증: light 라우팅의 Step 4 실행 범위 — LLM 해석 의존, 후속 ③]
+
+**F2 — Coverage Gate 확장 (feat)**: 트리거 **기준** 확장(요청 어휘 OR **산출물 타입** — "확인해줘"형 light 요청의 전수 산출물 포착) + **canonical 선언**(Q-COVERAGE·fz-search/fz-discover Gate·T8 4곳 미러 동기화) + 절차 5항(명령 출력 커버리지: head/tail 잘림 금지 + `wc -l` 병기) + 6항(분할 합계 검산식 — 정규식 불완전 가짜 교차확인도 검산 불일치로 탐지) + Gate 조건 2항 + BAD/GOOD.
+
+**F3 — T8 리마인더 신설 (feat)**: `system-reminders.md` — 전수/카운트 주장 + event signal(측정 도구 미호출 재인용/원 측정 부재/잘림 흔적, T6 형제 AND 패턴) 감지 시 재실측 요구. Backstop 5턴 예외 비상속. 에이전트 12파일은 **포인터 레이블 행만** `(T6/T7/T8)` 동기화 — 행동 규율 행은 멀티턴 전용 T8 부적용으로 유지(dead rule 방지, 리뷰 A:A1).
+
+**F4 — 교훈 키잉 규칙 (feat)**: `memory-guide.md` Write Policy — 교훈은 도구·맥락 한정이 아닌 **실패 클래스**로 서술 ("Codex 출력 head 금지" ✕ → "전수 주장 근거 수집 시 출력 잘림 금지" ○).
+
+**+ OQ1 — 4 스킬 light/Gate 동기화 (feat)**: fz-plan/fz-review/fz-code light 섹션 + fz-discover Gate 1 — 산출물 타입 조건 1줄씩.
+
+**검증**: plan Workflow(9 agents·5 stages — 실측 신규 발견 4건: :136 사문화 위험/Q-COVERAGE 이중 진입점/에이전트 dead rule/memory-guide :30 충돌) + review Workflow(findings 18: major 8/minor 10, FP 0 — **적용 전 리뷰**가 plan 구조 결함 2건 포착, 전원 수용 → plan-v2) + 기계 verify 스위트(줄 수/카운트/과잉 교체/canonical 동기화 전수 통과). ⛔ Codex cross-model은 할당량 차단(~6/28)으로 미수행 — 회복 시 후속 재검증 5항.
+
 ### v4.13.0 (2026-06-11) — Template Authority Bias 방어 + 구조 결정 옵션 사용자 배선 [MINOR]
 
 **핵심**: ASD-1802에서 fz 풀 파이프라인이 외부 인간 리뷰어 지적 3건(Component의 UseCase 직접 생성 / didBecomeActive `MainActor.assumeIsolated` / boolean trap)을 **0건 선행 포착**한 실패 분석(RC 5개)의 최소 수정 세트. 층위 분리 설계 — 원칙층(45차 메모리+개방 단서) / 발화층(token·트리거·few-shot) / 전달층(사용자 배선) / 분류층. 6 커밋, 11파일. breaking change 0.
