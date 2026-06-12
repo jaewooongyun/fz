@@ -84,6 +84,7 @@ const OVERRIDE =
   '에이전트 정의의 Phase 절차·ASD 폴더·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
   '이 프롬프트의 [질의]/[탐색 범위]만이 과제의 전부다. ' +
   '무관한 작업 폴더(ASD-*, 토픽 폴더 등)를 읽지 말 것. 탐색은 [탐색 범위]가 지시한 경로만. ' +
+  '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. ' +
   '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. 출력은 schema 준수 JSON.'
 
 // ── args 방어 파싱 (§12 표준 패턴 2 — scriptPath 호출 시 args는 JSON 문자열 도착) ──
@@ -162,7 +163,7 @@ const merged = await callAgent(
   `[교차 판정(패턴측에 대한)] ${JSON.stringify(crossOnPattern)}\n[교차 판정(심볼측에 대한)] ${JSON.stringify(crossOnSymbolic)}\n` +
   `[목표] 동일 발견을 병합하고 sources에 출처(symbolic/pattern) 전부 표기. ` +
   `crossVerified는 교차 단계 confirmed 판정 여부. false_positive 판정 항목만 제외(근거 인용 항목 한정) — 그 외 무근거 탈락 금지.`,
-  { label: 'stage3-merge', agentType: 'fz:plan-structure', model: 'opus', schema: MergeSchema })
+  { label: 'stage3-merge', agentType: 'fz:plan-structure', model: 'fable', schema: MergeSchema }) // §5.8 ④ pilot (2026-06-12 사용자 합의·06-13 적용): synthesis fable 승격 1곳 — N=3 측정 후 확산/롤백
 if (!merged) {
   fallbackCount += 1
   const doneStages = (sym && pat) ? ((crossOnPattern && crossOnSymbolic) ? 2 : 1) : 1 // 리뷰 C-2 교정: 하드코딩 제거

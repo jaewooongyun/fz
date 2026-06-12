@@ -2,7 +2,7 @@
 
 > 실전 최적화 체크리스트. 이론이 아닌 즉시 적용 가능한 가이드.
 >
-> **Sources (last audited: 2026-04-30):**
+> **Sources (last audited: 2026-06-12):**
 >
 > **Tier 1 — Anthropic Official:**
 > - Claude 4 Best Practices (live docs) — prompt-engineering, agentic systems, adaptive thinking
@@ -18,6 +18,9 @@
 > - **Effective Context Engineering for AI Agents (Anthropic 2026)** — "context engineering = load-bearing skill of 2026"
 > - **Tool Use Context Engineering Cookbook (Anthropic 2026)** — memory, compaction, tool clearing 실전
 > - **Introducing Claude Opus 4.8 (Anthropic 2026-05-28)** — release announcement (effort 기본 high, 자기 코드 결함 ~4x↓, tool-calling 효율↑, 단일 세션 수백 parallel subagents)
+> - **Introducing Claude Fable 5 and Claude Mythos 5 (Anthropic 2026-06-09 GA)** — Opus 상위 tier ($10/$50), thinking 상시 활성, refusal/fallback/billing → 상세: `fable-model-guide.md`
+> - **Prompting Claude Fable 5 (Anthropic, live)** — Fable 전용 프롬프팅 (de-prescription, async subagents, grounded progress, reasoning_extraction 주의)
+> - **Claude Code: Model configuration (Anthropic, live)** — /model fable, effort 체계(frontmatter effort 포함), 안전 분류기 자동 폴백
 > - **Best Practices for Claude Code (Anthropic, live reference)** — Claude Code 전용 prompt 가이드
 > - **Anthropic Prompting Best Practices (live)** — Opus 4.8/Sonnet/Haiku 공식 prompt 가이드
 > - **Anthropic Interactive Prompt Engineering Tutorial (GitHub, 2026)** — 공식 튜토리얼
@@ -301,7 +304,7 @@ Fallback:   대안 도구 (Primary 실패 시 사용)
 
 ### 원칙 8: 과격 표현 제거 (Claude 4.8 instruction-following)
 
-**근거:** Anthropic Claude 4 Best Practices + **Opus 4.8은 지시를 일관되게 따른다** ("uses tools cleanly and follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]). 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — Codex 측 동일 가드.)
+**근거:** Anthropic Claude 4 Best Practices + **Opus 4.8은 지시를 일관되게 따른다** ("uses tools cleanly and follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]). 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — Codex 측 동일 가드.) **Fable 5는 한층 강화** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5].
 
 > **항목별 범위 명시 원칙**: broad 규칙은 적용 범위를 항목별로 명시하라. [이유] 범위가 명시된 지시가 더 정확히 적용된다. [GOOD] "verify each step, not just the first"  [BAD] "verify the step" (범위 모호). 메모리 8/13/18차(silent disappearance) 증상과 정합하는 일반 원칙 — 모델 버전 무관.
 

@@ -29,6 +29,7 @@ intent-triggers:
 model-strategy:
   main: opus
   verifier: sonnet
+effort: xhigh
 ---
 
 # /fz-review - 리뷰 + 품질 보증 스킬
@@ -60,7 +61,7 @@ model-strategy:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (TeamCreate 강제 + 상호 통신) |
+| modules/team-core.md + modules/patterns/ | Workflow 미가용 시 SOLO 폴백 협업 프로토콜 (canonical 패턴 출처) |
 | modules/patterns/live-review.md | Live Review (review-arch ↔ review-quality 발견 즉시 공유) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/build.md | 빌드 검증 |
@@ -212,6 +213,8 @@ fz-codex가 수행하는 작업:
 - Codex CLI에 변경 심볼 + diff 전송 (effort: high)
 - JSON 응답 파싱 → Issue Tracker 자동 기록
 - 이슈 요약 반환
+
+> **Codex 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 quota 불능 기간 — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 Fable 세션 자동상속으로 비용 2배)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ Codex 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]
 
 ### 검증 3: SuperClaude 정적 분석
 
@@ -547,6 +550,7 @@ Gate 5 통과 후:
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | fz-codex 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백 | Claude 자체 판단 |
+| fz-codex 장기 quota 불능 (기간 알려진 경우, 예: ~2026-06-28) | 재시도 생략 → 검증 2 불능 분기(Phase 5) 직행 — 매 검증 재시도 낭비 방지. **기간 만료 시 이 행 삭제 + 원복** (MEMORY.md Codex quota 줄과 동기화) | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
 

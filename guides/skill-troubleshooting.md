@@ -142,7 +142,7 @@ GOOD: "에러 시 테이블의 폴백 전략을 순서대로 실행하라."
 **증상:** Claude가 Gate 체크를 건너뛰거나 검증 없이 완료 보고.
 
 **솔루션:**
-- SKILL.md에 과격한 표현을 다시 넣지 않는다 (overtriggering 위험. Claude 4.8 instruction-following consistency로 과격 지시가 그대로 적용될 위험 [verified: anthropic.com/news/claude-opus-4-8]; GPT-5.5도 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model])
+- SKILL.md에 과격한 표현을 다시 넣지 않는다 (overtriggering 위험. Claude 4.8 instruction-following consistency로 과격 지시가 그대로 적용될 위험 [verified: anthropic.com/news/claude-opus-4-8]; GPT-5.5도 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]; Fable 5는 짧은 지시 조향이 공식 권장 — 과격 표현 불필요 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5])
 - **user prompt** 쪽에 격려 문구를 배치한다
 
 ```

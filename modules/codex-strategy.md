@@ -65,6 +65,10 @@ DIFF_LINES=$(cd "$GIT_ROOT" && git diff --base "$BASE_BRANCH" --stat | awk 'END{
 - `final`: 항상 최대 커버리지 (Medium→Full 시도, Large→Key files)
 - `verify`, `validate`: diff 크기 무관 (프롬프트 기반)
 
+## 장기 불능 인지 (기간 조건부)
+
+> Codex가 **기간이 알려진 장기 불능** 상태(예: quota 차단 ~2026-06-28)일 때: 서브커맨드 호출 전 재시도를 생략하고 각 스킬의 Codex 불능 분기(fz-review Phase 5 검증 2 불능 분기 등)로 직행한다 — 매 호출 재시도 1회 오버헤드 방지. ⛔ 무기한 표기 금지 — 반드시 만료 시점 명시. **기간 만료 시 이 노트 삭제 + 원경로 복원** (동기화 단일 포인트: MEMORY.md Codex quota 줄). 이종 blind-spot 안전망 상실은 폴백 산출물에 명시 의무 (15/23차).
+
 ## CLI 모드 선택 전략 (0.124.0+, Hybrid)
 
 `codex exec review`가 git diff + 구조화 출력을 통합. Plugin 설치 시 review/check/adversarial은 `/codex:*` 우선.

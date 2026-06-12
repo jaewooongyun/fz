@@ -33,6 +33,7 @@ intent-triggers:
 model-strategy:
   main: opus
   verifier: sonnet
+effort: xhigh
 ---
 
 # /fz-discover - 풍경 탐색 + 경로 매핑 스킬

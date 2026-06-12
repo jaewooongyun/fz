@@ -83,6 +83,7 @@ const OVERRIDE =
   '이 프롬프트의 [Step 명세]/[컨텍스트]만이 과제의 전부다. ' +
   '⛔ 디스크 수정 금지: Edit/Write/replace_symbol 등 어떤 파일 변경 도구도 사용하지 않는다 — changeset JSON 반환만. ' +
   '무관한 작업 폴더(ASD-*, 토픽 폴더 등)를 읽지 말 것. 파일 Read는 [Step 명세] files와 [컨텍스트] 경로만. ' +
+  '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. ' +
   '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. 출력은 schema 준수 JSON.'
 
 // ── args 방어 파싱 + fail-fast (§12 — 필수: mode/stepSpec/contextPath/changesetTarget) ──
