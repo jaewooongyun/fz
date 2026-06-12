@@ -20,6 +20,7 @@
 | §5.5 Agent Teams Tracing (Reflection Rate) | **N≥10** | "N≥10 (preliminary if N<10)" | **cross-validation.md `§ Reflection Rate threshold`** |
 | §5.6 Plugin Trigger Activation | 10건 | "10건 누적" | (자체 정의) |
 | §5.7 Workflow Tracing (TEAM→Workflow) | 5건 전수 (discover) / 3건 (search·review) | "null률 0% + 완주율 100% + fallback 0건" — **확산/롤백 게이트 (Phase B 진입 N 아님)** | **experiment-log.md §5.7 확산 판정 임계 (freeze)** |
+| §5.8 Fable 5 효율 배선 측정 큐 | ①effort N=5 / ②fresh-context N=5 / ③절차밀도 A/B쌍 1 / ④synthesis **비활성(게이트 종속)** | "§5.8 사전등록 임계 참조" | **experiment-log.md §5.8 사전등록 임계 (freeze)** |
 
 **§5.5 특별 사항**: cross-validation.md "N<10이면 preliminary, gating 보류"를 single source로 사용. UC-1 (Reflection Rate CP-3) gating은 N≥10에서만 발화.
 
@@ -447,6 +448,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 3 | 2026-06-11 | 5 | 0 | 3 | 0 | 715s | ✅ clean — **plan 문서 리뷰 (비-diff 신규 사용례)**: fz-gap-fix-plan-final(v3.1) 사용자 3축(가이드 준수/과적합/일반화). findings 14 (critical 0/major 2/minor 12, FP 0), counter가 okArea 4건 도전(완화 편향 1건 적발) + C-1~C-3 추가. 전 finding [verified] 인용. Lead 처분: 15건(Lead 자체 발견 L1 §12 oracle 포함) → plan v3.2 반영 13 + 의도 유지·O7 기록 2. Codex 차단 대체 한계(RC4) 명시. **임계 3건 전수 달성 — null 0%·완주 100%·fallback 0** |
 | 4 | 2026-06-11 | 5 | 0 | 3 | 0 | 920s | ✅ clean — gap fix **적용 diff 리뷰** (8파일 179줄+메모리 3): findings 11 (critical/major 0, FP 0) — 9건은 O1·O7 기록 완비/의도 결정 재확인, 1건 즉시 반영(Gate 0.5 SOLO 맥락 명시), counter가 okArea refute 1건("§12 정확히 일치" 과장 — full-path 미검증 사실 재명시) + 리뷰어 evidence 라인 오류 1건(C-1) 적발. okAreas 25 — F1~F4·G1·G3 발화 체인 정적 도달 전부 확인. 4-F 7/7 기계 PASS |
 | 5 | 2026-06-12 | 5 | 0 | 3 | 0 | 724s | ✅ clean — **plan 문서 리뷰** (전수 주장 오판 방어 plan-v1, #3 선례 동형·적용 전): findings 18 (critical 0/major 8/minor 10, FP 0) — 적용 전 리뷰가 plan 구조 결함 2건 포착(:436 트리거 요청 어휘 잔존=RC1 미해소 / 에이전트 행동 규율 행 T8=dead rule 12곳 재생산 위험). counter가 okArea 2건 refute(S7 verify 과잉 교체 미탐지 / 줄번호 신뢰 과대) + C-1~C-3. Lead 처분: 18건 전원 수용 → plan-v2 + 적용 반영. 실사용 표본 |
+| 6 | 2026-06-13 | 5 | 0 | 3 | 0 | 743s | ✅ clean — **Fable 5 대응(v4.14.0 Part A) diff 리뷰** (28 path, 실사용·Fable 세션): findings 7 (critical 0/major 2/minor 5, FP 0) — 두 major가 동일 실패 클래스(사후 사용자 피드백 반영 시 승계 문서 미동기화: effort 4스킬 3곳 stale + ④ 활성/비활성 3곳 이진 상충). counter 전건 uphold + finding 정확도 보완 노트 2건([verified: Read/Grep] 인용 충실 — grounded progress OVERRIDE 첫 적용 invoke). okAreas 13 + okArea 도전 4건 전부 uphold. Lead 처분: 7건 전원 수용 즉시 반영 → Reflection 7/7 grep 검증 100%. Codex validate 불능 — 결정론적 grep 대체 |
 
 ### fz-plan (collaborative) — Wave 2 전환 (시작: 2026-06-05)
 
@@ -456,6 +458,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 |---|------|-----------|-----------|--------|----------|-----------|--------------------------------------------|
 | 1 | 2026-06-05 | 9 | 0 | 5 | 0 | 1101s | ✅ clean — Wave 3 계획 생산(dogfooding). G2 5축 전부 PASS: direction PROCEED 1-call(dead-call 제거 경로 첫 작동)/CC 신규 발견 2건 S8 반영/verify 9·9/§Y 6≠§X 15 rationale 분리/Lead 회귀(stress-test Q1-Q6+RTM 12행) 실수행. 특기: S0 책임 재배분을 자가 도출 + canonical 충돌을 OQ1 에스컬레이션 표시(임의 판단 금지 자발 준수). 전환 직후 검증 invoke (임계 3건 중 1) |
 | 2 | 2026-06-12 | 9 | 0 | 5 | 0 | 1327s | ✅ clean — 전수 주장 오판 재발 방지 plan(자가 개선 dogfooding 2, G1 배선 후 첫 실사용). G2 5축 PASS: direction PROCEED+`directionAlternatives` 3건 실반환(G1 full-path 확인 — A채택/B·C 부분 흡수)/렌즈·CC 실측 신규 발견 4건(fz SKILL :136 사문화·Q-COVERAGE 이중 진입점·12에이전트 T8 dead rule·memory-guide :30 충돌)→S3/S5/S7/S8 신설/verify 11·11/§Y 19 rationale 분리/Lead 회귀(Q1-Q6+RTM 11+peer issue 실측 해소 1건) 실수행. 임계 3건 중 2 |
+| 3 | 2026-06-12 | 9 | 0 | 5 | 0 | 1300s | ✅ clean — Fable 5 고도화 플랜(v4.14.0 대상, Fable 세션 첫 invoke). G2 5축 PASS: direction PROCEED+directionAlternatives 3건(A채택/C S6흡수)/렌즈·CC 신규 발견 3건(STALE 6→4 정정·R8 검증지시 86→12 over-count 정정·S7 비용 baseline 3-state 의무)/verify 8 Steps 전부/§Y 13 rationale 분리/Lead 회귀(Q1-Q6+RTM 12) 실수행. 특기: Phase 2 fresh-context 검증(Codex quota 폴백)이 M1(S3 직교 폴백 혼동 — Workflow 산출 결함)+L2(docs/releases Glob 오측, "[verified]" 표기 포함) 추가 발견 → plan-v2 정정. Workflow [verified] 태그 신뢰 한계 관찰(16차 레이어 재현). 임계 3건 중 3 |
 
 > 2026-06-11 **G1 배선 적용** (반환 `directionAlternatives` + 헤더 계약 주석 동기화, ASD-1802 gap fix): §12 oracle — ①래핑 node --check PASS ②스모크 invoke 1회 = fail-fast 경로 정상(`mode:'fallback'`, 0 agent, 3ms — 위 누적 테이블 분모 **비포함**, 스모크는 실사용 아님) ③full-path 필드 실반환은 다음 실사용 invoke에서 확인.
 
@@ -474,3 +477,46 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | steps | invokes | agentCalls(계) | nullCount | fallback | complexity 분기 | G2-fix |
 |---|------|-------|---------|----------------|-----------|----------|------------------|--------|
 | 1 | 2026-06-05 | 1 (FIX-1) | 1 | 1 | 0 | 0 | c=1→review 생략 (정상) | ✅ clean — 1-call, oldAnchor 정확(Lead 의심을 실측이 기각 — 에이전트가 실파일 Read 증거), 적용+검증 통과. 전환 직후 검증 세션 (임계 3세션 중 1) |
+
+---
+
+## §5.8 Fable 5 효율 배선 측정 큐 (시작: 2026-06-12)
+
+> 출처: `~/dev/TVING/fz-fable-enhancement/plan/plan-final.md` S4 — 배선=가설/측정=검증 (31/35차). **사전등록 임계 변경 금지** (확증편향 방어).
+> freeze 범위 주석 (§5.7 동형): §5.7 freeze는 §5.7 데이터행+확산임계만 대상 — 본 §5.8 신설은 별도 허용. §5.8 ①② N=5 = 표준 Phase B 진입 / ④synthesis는 사용자 비용 합의 종속이었으며 **2026-06-12 합의로 활성, 06-13 pilot 적용으로 데이터 경로 개통** (④ 헤더 참조. **canonical 상태 = 본 §5.8 ④ 헤더**, CHANGELOG·release 노트는 cross-ref).
+> **공통 필드 의무**: 각 행에 `session_model`(fable|opus) + `env_subagent_model`(CLAUDE_CODE_SUBAGENT_MODEL 설정 유무) 기록 — effort 효과의 3-way 혼합(세션 모델×서브에이전트 모델×effort) 방지.
+
+### ① effort frontmatter 효과 (S5 배선 + 사용자 피드백: fz-plan·fz-review·fz-discover·fz-search `effort: xhigh` — 4스킬)
+
+> `[미검증: 스킬 frontmatter→Workflow agent() 전파 여부 — 공식 docs 미기술]` → 첫 측정에서 적용 범위(스킬 Lead 단계 한정 vs Workflow 단계 포함) 판별 기록.
+> 임계 (사전등록): N=5 누적 — xhigh의 G2 품질이 high 대비 동등+ AND 토큰 증가 ≤30% → 유지. 미달 → frontmatter 제거 (배선 롤백).
+> **비교군(high baseline) 수집 설계** (2026-06-12 probe 발견 결함 보수 — 임계 불변, 방법 보완): 4스킬 전부 xhigh 고정이라 자연 high 데이터 생성 불가 → **retro-baseline** = §5.7 누적표의 배선 전(2026-06-12 이전) 행들(fz-plan #1-2·fz-review·fz-discover — effort 기본 high 시절)의 wall-clock/G2 관찰을 비교군으로 사용. [fable probe 발견: "high 대비 측정의 분모 수집 설계 부재"]
+
+| # | date | skill | session_model | env_subagent_model | effort 적용 범위 확인 | 토큰(상대) | G2 품질 |
+|---|------|-------|---------------|--------------------|---------------------|-----------|---------|
+
+### ② fresh-context 검증자 catch (S3 배선: fz-review 검증 2 불능 분기)
+
+> 임계 (사전등록): N=5 누적 — Lead self-review 미발견 이슈 평균 ≥1건/세션 → 유지 (Codex 회복 후 병행 검토). 0건 수렴 → Codex 회복 시 원경로 단독 복귀.
+> 배선 전 실증 3건 (2026-06-12, 본 세션 — 분모 비포함 참고): 가이드 검증 23건 / plan-v1 M1+L2 (Workflow [verified] 오측 포함) / plan-v3 M1+L2 (승계 Step 교차 모순).
+
+| # | date | 대상 | session_model | catch (M/L) | self-review 미발견분 | 비고 |
+|---|------|------|---------------|-------------|---------------------|------|
+
+### ③ 절차 밀도(de-prescription) A/B — R8 확산 게이트 (fz-search 384줄 pilot)
+
+> 방법: 작업 폴더에 슬림 변형(절차 지시 축약 — **Gate·Few-shot·⛔ 가드레일 보존**) → 동일 쿼리 스킬 파일 swap 2-invoke → G2 + 토큰 비교.
+> 임계 (사전등록): 품질 비저하(G2 동등) AND 토큰 ≥10% 절감 → R8 확산 게이트 오픈 (fz-review·fz-plan 절차 슬림, 별도 사이클). 미달 → 현행 유지 + Fable de-prescription 가설("too prescriptive → degrade")의 fz 반례로 기록.
+
+| # | date | variant | session_model | 토큰 | G2 품질 | 판정 |
+|---|------|---------|---------------|------|---------|------|
+
+### ④ synthesis fable vs opus — **활성 (2026-06-12 사용자 합의 · 2026-06-13 pilot 적용 = 데이터 경로 개통)**
+
+> 활성 근거: 사용자 발화 "생각이 깊어야 되는 부분은 plan, review, discover, search 이런 부분은 fable5로 하면 좋고" (openQuestion 1 합의 신호) + A/B probe 정상 작동 확인. **pilot 적용 완료 (2026-06-13)**: search-cross-verify stage3-merge `model: 'fable'` — 1차 자동 적용은 권한 거부(06-12), 사용자 "반영해줘" 인가로 적용. 이후 fz-search --deep invoke마다 측정 누적 → N=3 확산/롤백 판정 (plan-collaborative·discover-adversarial은 pilot 결과 대기).
+> 선행 baseline 3-state: Lead=opus/syn=opus(구) · Lead=fable/syn=opus(직전) · Lead=fable/syn=fable(pilot). "승격=비용 2배" 단정은 baseline 실측 후.
+> 임계 (사전등록): pilot N=3 — fable synthesis의 G2 품질이 opus 대비 우위 신호(교차 병합 누락↓ 또는 FP 판정 정확도↑) ≥2/3 AND wall-clock 비악화 → plan-collaborative integrate 확산 검토. 미달 → opus 롤백.
+
+| # | date | 단계 | syn model | 토큰 | 품질 관찰 | 비고 |
+|---|------|------|-----------|------|----------|------|
+| 0 | 2026-06-12 | (probe — workflows 외 A/B) | fable vs opus | [미검증: per-agent 토큰 미분리] | **fable 우위 관찰**: 동일 synthesis 과제(§5.8 우선순위 판정, 동일 입력 2파일)에서 양측 동일 결론 도달하나 fable이 의존 관계 6 vs 4 + opus 미발견 결함 1건(① high baseline 분모 수집 불가) 추가 발견. opus 고유 발견(② 분모 오염 경고)도 유효 — 상호 보완 관찰. null/refusal 폴백 0 | wf_6de8db1d (2 agents, 190s). pilot 적용 근거 |
