@@ -8,7 +8,31 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
-### v4.14.0 (2026-06-12) — 전수 주장 오판(Exhaustive-Claim) 방어 + light 모드 검증 경계 [MINOR]
+### v4.14.0 (2026-06-13) — Claude Fable 5 대응 + 전수 주장 오판 방어 [MINOR]
+
+> 통합 릴리즈 — **Part A**: Claude Fable 5 대응 (Fable 세션) / **Part B**: 전수 주장 오판 방어 (별도 세션, 2026-06-12). 두 작업이 발행 전 로컬에서 합류하여 단일 MINOR로 통합.
+
+#### Part A — Claude Fable 5 대응: 모델 가이드 신설 + 효율 배선 + TEAM 레거시 정리
+
+**핵심**: Claude Fable 5(2026-06-09 GA, Opus 상위 tier·$10/$50) 대응 풀 사이클 — 공식 문서(Tier 1) 기반 신규 모델 가이드 + 기존 가이드 6파일 갱신 + effort/프롬프팅 적재적소 배선 + Workflow 전환 잔재 정리. 모든 배선은 §5.8 측정 큐 사전등록 동반(배선=가설/측정=검증, 31/35차). 플랜: plan Workflow(9 agents, 5/5 stages) + fresh-context 검증 2회(v1·v3 needs_revision → v2·v3.1 정정 — Workflow `[verified]` 오측·승계 Step 교차 모순 등 M2+L4 catch). breaking change 0.
+
+**F1 — Fable 모델 가이드 (docs)**: `guides/fable-model-guide.md` 신설 — 사양/API 동작 차이/Claude Code 통합(effort frontmatter·자동 폴백·서브에이전트 fable enum)/공식 효율 권고/fz 적용 전략(모델 4-axes 옵션)/스니펫 채택 현황 표. + prompt-optimization Sources(last audited 2026-06-12)·harness-engineering 모델 세대표·agent-team-guide §4·skill-authoring·skill-troubleshooting·team-registry·context-artifacts 환경 표기 Fable 갱신.
+
+**F2 — Codex 장기 불능 플래그 (feat)**: fz-review 에러 표 + codex-strategy.md — 기간이 알려진 quota 차단(예: ~2026-06-28) 시 재시도 생략·불능 분기 직행. ⛔ 무기한 표기 금지 + 만료 시 원복 명시 (MEMORY.md 동기화 단일 포인트).
+
+**F3 — fresh-context 검증자 배선 (feat)**: fz-review Phase 5 검증 2(Codex 필수)에 불능 분기 — fresh-context Agent 1-spawn(model 명시 의무 — Fable 세션 자동상속 비용 2배 방지), `[fresh-context: claude]` 태그로 이종 안전망 상실 명시. Workflow 폴백과 직교 조건. 근거: Fable 공식 "fresh-context verifier > self-critique" + 본 사이클 3연속 catch 실증.
+
+**F4 — effort 적재적소 배선 (feat)**: fz-plan·fz-review·fz-discover + fz-search(사용자 피드백 추가) frontmatter `effort: xhigh` (capability-sensitive **4스킬** — max는 frontmatter [미검증]으로 미배선, medium 강등 측정 전 금지) + fable-model-guide §3 사용 시점 가이드(high/xhigh/max/ultracode).
+
+**F5 — grounded progress 채택 (feat)**: Fable 공식 스니펫 7종 실측 선별(채택 1/보강 1/비채택 5 — 근거 표 기록). 채택분: fz SKILL VD Brief 4번 + team-core 트리거 주입 + workflows 5파일 OVERRIDE("주장은 도구 결과/입력 데이터 근거 지목 가능해야") — `[verified]` 오측(16/18차 + 본 사이클 Workflow 에이전트 실증)의 구조 방어.
+
+**F6 — TEAM 레거시 STALE 교정 (chore)**: Workflow 전환 완료 4스킬(fz-plan/code/review/search)의 "TeamCreate 강제" 문구 → "Workflow 미가용 시 SOLO 폴백 협업 프로토콜 (canonical 패턴 출처)" — 행 삭제 0(canonical 출처 보존), STALE 외 보존 참조(fz-discover·fz-fix 포함) 전부 무변경.
+
+**+ §5.8 측정 큐 (chore)**: experiment-log §5.8 신설 — ①effort 효과 ②fresh-context catch ③절차밀도 A/B(R8 확산 게이트, fz-search pilot) ④synthesis fable vs opus(**활성** — 2026-06-12 사용자 합의, 06-13 pilot 적용 완료: search-cross-verify stage3-merge `model: 'fable'`). 사전등록 임계 변경 금지 + session_model 필드 의무.
+
+**검증**: node --check 5/5 + verify grep 전수(STALE 0건·OVERRIDE 5건·effort 4건·workflows `model:` 필드 무변경) + reasoning_extraction 전수 grep 0건 + review Workflow(5 agents — findings 7: major 2/minor 5, FP 0, 전건 수용 반영). ⛔ Codex cross-model 할당량 차단(~6/28) — F3 fresh-context 분기가 본 사이클의 폴백 실증. 회복 시 후속 재검증.
+
+#### Part B — 전수 주장 오판(Exhaustive-Claim) 방어 + light 모드 검증 경계
 
 **핵심**: api.tving.com 토큰 조사 세션에서 `rg|head -5` 잘린 출력을 "사용처 2곳뿐"으로 단정(실제 11곳)한 오판이 가짜 교차확인을 거쳐 4턴 생존한 사고의 재발 방지 최소 세트. 기존 방어(Coverage Gate·T6/T7·Cross-Verify)가 전부 존재했으나 **light 경로가 전량 우회** — "방어 부재"가 아닌 "방어 우회"가 근본 원인(RC1 라우팅 어휘 기반 / RC2 출력 커버리지 미정의 / RC3 멀티턴 캐싱 무방비 / RC4 교훈 키잉 과소 일반화). 신규 모듈/Phase/Gate 0건, 23파일 전부 기존 구조 내부 확장. breaking change 0.
 

@@ -182,6 +182,20 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
+### What's New (v4.14.0) — Claude Fable 5 대응 + 전수 주장 오판 방어 [MINOR]
+
+**Part A — Claude Fable 5 대응** (2026-06-09 GA, Opus 상위 tier):
+- **모델 가이드 신설**: `guides/fable-model-guide.md` — 사양($10/$50·1M·thinking 상시)/API 동작 차이/Claude Code 통합(effort frontmatter·안전 분류기 자동 폴백·서브에이전트 fable enum)/공식 효율 권고/fz 모델 전략 4-axes + 스니펫 채택 현황. 기존 가이드 5파일 Fable 갱신.
+- **effort 적재적소 배선**: fz-plan·fz-review·fz-discover·fz-search frontmatter `effort: xhigh` (capability-sensitive 4스킬 — max/ultracode는 세션 레벨 운용 가이드로). 배선=가설/측정=검증 — `experiment-log.md` §5.8 측정 큐 4항목 사전등록 동반.
+- **grounded progress 채택**: Fable 공식 프롬프팅 스니펫 7종 실측 선별(채택 1/보강 1/비채택 5 — 근거 표) — VD Brief 4번 + team-core + workflows 5파일 OVERRIDE "주장은 도구 결과/입력 근거 지목 가능해야".
+- **Codex 공백 운용**: 장기 quota 불능 플래그(기간 조건부 ~6/28, 만료 원복 명시) + fresh-context 검증자 분기(fz-review 검증 2 대체 — 본 사이클 3연속 catch 실증, `[fresh-context: claude]` 이종성 상실 태그).
+- **synthesis pilot**: search-cross-verify stage3-merge `model: 'fable'` — A/B probe에서 fable이 opus 미발견 결함 1건 추가 발견(우위 관찰). 동시 fable 상한 1개 거버넌스 신설.
+- **TEAM 레거시 정리**: Workflow 전환 4스킬의 'TeamCreate 강제' STALE 문구 교정 (행 삭제 0, canonical 출처 보존).
+
+**Part B — 전수 주장 오판(Exhaustive-Claim) 방어**: `rg|head -5` 잘린 출력을 "사용처 2곳뿐"으로 단정(실제 11곳)한 오판이 4턴 생존한 사고의 재발 방지 — light 모드 검증 경계(F1) + Coverage Gate 산출물 타입 트리거·검산식(F2) + T8 리마인더(F3) + 교훈 실패 클래스 키잉(F4). 기존 방어가 전부 존재했으나 light 경로가 전량 우회 — "방어 부재"가 아닌 "방어 우회"가 근본 원인.
+
+> ⛔ Codex cross-model 미수행(quota ~6/28) — Workflow 다각도(plan 9 agents + review 5 agents ×2회, findings 25 전원 반영) + fresh-context 검증 2회 대체, 회복 시 후행 check. 상세: [docs/releases/v4.14.0.md](docs/releases/v4.14.0.md)
+
 ### What's New (v4.13.0) — Template Authority Bias 방어 + 구조 결정 옵션 사용자 배선 [MINOR]
 
 - **구조 결정 3축 Quick-Check** (review-direction): 템플릿/형제 미러링 계획이라도 **DI 출처 · 스레드 가정 · public API 모양**은 결정 대상 — 축별 대안 ≥2 + trade-off 의무. ASD-1802에서 외부 리뷰어가 3축 전부 선행 포착한 실패(파이프라인 0건)의 직접 대응.
@@ -225,6 +239,7 @@ fz 가이드(`guides/*.md`)와 스킬이 인용하는 외부 권위 자료입니
 | [Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps) | 2026-03 | "self-evaluation unreliable" → cross-validation 근거 / Planner-Generator-Evaluator |
 | [Scaling Managed Agents](https://www.anthropic.com/engineering/managed-agents) | 2026-04 | Brain/Hands/Session 분리 → context-artifacts.md emitEvent API contract |
 | [Introducing Claude Opus 4.8](https://www.anthropic.com/news/claude-opus-4-8) | 2026-05-28 | effort 기본 high + 자기결함 ~4x↓ + tool 효율↑ + 수백 parallel subagents → 가이드 4.8 갱신 |
+| [Introducing Claude Fable 5 & Mythos 5](https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5) + [Prompting Claude Fable 5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5) | 2026-06-09 | Opus 상위 tier·thinking 상시·de-prescription·fresh-context verifier → fable-model-guide.md 신설 + effort/grounded progress 배선 |
 | [Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) | 2026 | prompt-optimization.md context 전략 (load-bearing skill of 2026) |
 | [Best Practices for Claude Code](https://www.anthropic.com/engineering/claude-code-best-practices) | 2026 | Subagent isolation / filesystem > compaction |
 
