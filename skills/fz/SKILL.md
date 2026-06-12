@@ -133,7 +133,7 @@ model-strategy:
    - TEAM: memory-curator 에이전트 **모든 TEAM 모드**에서 포함
    - **의무 출력 형식**: `Active Recall: [ID-N차] → {매칭 패턴} → {추론된 행동}` (3-step chain)
      - 예: `Active Recall: [40차] → "확인해줘" + 검토 산출물 존재 → full 파이프라인 차단, light mode`
-   - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄)
+   - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄). 단, 산출물이 전수/카운트/부정 주장 예정이면 abbreviated여도 `Read(modules/cross-validation.md §Coverage Gate)` 후 적용 (light = 절차 생략이지 검증 생략 아님)
    - ⛔ 선언만으로는 Gate 0 통과 불가 — 3-step chain 명시 의무 (edge-cases Failure 1-1 완화)
 
 5. **핵심 모듈 선로드** (6+ 스텝 또는 TEAM):
@@ -178,7 +178,7 @@ model-strategy:
 | `target_count` | 언급된 대상 파일/모듈 수 | Complexity Scope 차원 |
 | `cross_concern` | 여러 관심사가 교차하는지 | Complexity Risk 차원 |
 | `override_flags` | --solo, --team, --deep | 모드 Override |
-| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — Codex MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (Codex 검증 §추가 발견 1) |
+| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — Codex MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (Codex 검증 §추가 발견 1). 단 산출물이 전수/카운트/부정 주장이면 light라도 Coverage Gate 유지 (검증 경계 — cross-validation.md §Coverage Gate) |
 
 ### Gate 1: Intent Resolved
 - [ ] 1개 이상의 스킬이 매칭되었는가?

@@ -431,6 +431,7 @@ Step 4: ContentDetailViewController SwiftUI 기반 UI
 - Phase 2 (Validation) + Phase 3 (Feedback) 생략 (Codex verify 미호출)
 - Stress Test Q1-Q6 생략, 리스크 매트릭스 간소화
 - Anti-Pattern Constraints 작성 생략 (리팩토링 작업 외)
+- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계)
 - 산출물: `{WORK_DIR}/plan/plan-light.md` (간소화 형식)
 
 조건: 메모리 40차 trigger 키워드 + 단순 수정/추가 작업에만. 새 아키텍처 결정 시 full 모드 강제.
