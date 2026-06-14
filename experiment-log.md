@@ -20,7 +20,7 @@
 | §5.5 Agent Teams Tracing (Reflection Rate) | **N≥10** | "N≥10 (preliminary if N<10)" | **cross-validation.md `§ Reflection Rate threshold`** |
 | §5.6 Plugin Trigger Activation | 10건 | "10건 누적" | (자체 정의) |
 | §5.7 Workflow Tracing (TEAM→Workflow) | 5건 전수 (discover) / 3건 (search·review) | "null률 0% + 완주율 100% + fallback 0건" — **확산/롤백 게이트 (Phase B 진입 N 아님)** | **experiment-log.md §5.7 확산 판정 임계 (freeze)** |
-| §5.8 Fable 5 효율 배선 측정 큐 | ①effort N=5 / ②fresh-context N=5 / ③절차밀도 A/B쌍 1 / ④synthesis **비활성(게이트 종속)** | "§5.8 사전등록 임계 참조" | **experiment-log.md §5.8 사전등록 임계 (freeze)** |
+| §5.8 Fable 5 효율 배선 측정 큐 | ①effort **철회(frontmatter 제거)** / ②fresh-context N=5 / ③절차밀도 A/B쌍 1 / ④synthesis **동결(fable 제재 — 해제 시 재개)** | "§5.8 사전등록 임계 참조" | **experiment-log.md §5.8 사전등록 임계 (freeze)** |
 
 **§5.5 특별 사항**: cross-validation.md "N<10이면 preliminary, gating 보류"를 single source로 사용. UC-1 (Reflection Rate CP-3) gating은 N≥10에서만 발화.
 
@@ -483,10 +483,12 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 ## §5.8 Fable 5 효율 배선 측정 큐 (시작: 2026-06-12)
 
 > 출처: `~/dev/TVING/fz-fable-enhancement/plan/plan-final.md` S4 — 배선=가설/측정=검증 (31/35차). **사전등록 임계 변경 금지** (확증편향 방어).
-> freeze 범위 주석 (§5.7 동형): §5.7 freeze는 §5.7 데이터행+확산임계만 대상 — 본 §5.8 신설은 별도 허용. §5.8 ①② N=5 = 표준 Phase B 진입 / ④synthesis는 사용자 비용 합의 종속이었으며 **2026-06-12 합의로 활성, 06-13 pilot 적용으로 데이터 경로 개통** (④ 헤더 참조. **canonical 상태 = 본 §5.8 ④ 헤더**, CHANGELOG·release 노트는 cross-ref).
+> freeze 범위 주석 (§5.7 동형): §5.7 freeze는 §5.7 데이터행+확산임계만 대상 — 본 §5.8 신설은 별도 허용. §5.8 ② N=5 = 표준 Phase B 진입 / ①effort·④synthesis는 **2026-06-14 fable 제재 롤백으로 측정 중단** (①철회: frontmatter 4건 제거 → 측정 대상 소멸 / ④동결: pilot opus 롤백, 제재 해제 시 재개 — ①④ 헤더 참조. **canonical 상태 = 각 헤더**, CHANGELOG·release 노트는 cross-ref).
 > **공통 필드 의무**: 각 행에 `session_model`(fable|opus) + `env_subagent_model`(CLAUDE_CODE_SUBAGENT_MODEL 설정 유무) 기록 — effort 효과의 3-way 혼합(세션 모델×서브에이전트 모델×effort) 방지.
 
-### ① effort frontmatter 효과 (S5 배선 + 사용자 피드백: fz-plan·fz-review·fz-discover·fz-search `effort: xhigh` — 4스킬)
+### ① effort frontmatter 효과 — **철회 (2026-06-14 fable 제재 롤백)**
+
+> **철회 사유 (2026-06-14)**: 사용자 effort 운용 = 세션 레벨 max(기본)/ultracode 확정 → 4스킬 `effort: xhigh` frontmatter 제거(B1). 측정 대상(frontmatter 효과)이 소멸하여 철회 — 동결 아님(fable 복귀와 무관, 세션 운용 방식이라 frontmatter 재도입 없음). 아래는 철회 전 설계 — 사료 보존.
 
 > `[미검증: 스킬 frontmatter→Workflow agent() 전파 여부 — 공식 docs 미기술]` → 첫 측정에서 적용 범위(스킬 Lead 단계 한정 vs Workflow 단계 포함) 판별 기록.
 > 임계 (사전등록): N=5 누적 — xhigh의 G2 품질이 high 대비 동등+ AND 토큰 증가 ≤30% → 유지. 미달 → frontmatter 제거 (배선 롤백).
@@ -511,9 +513,10 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | variant | session_model | 토큰 | G2 품질 | 판정 |
 |---|------|---------|---------------|------|---------|------|
 
-### ④ synthesis fable vs opus — **활성 (2026-06-12 사용자 합의 · 2026-06-13 pilot 적용 = 데이터 경로 개통)**
+### ④ synthesis fable vs opus — **동결 (2026-06-14 fable 제재: pilot opus 롤백, 제재 해제 시 재개)**
 
-> 활성 근거: 사용자 발화 "생각이 깊어야 되는 부분은 plan, review, discover, search 이런 부분은 fable5로 하면 좋고" (openQuestion 1 합의 신호) + A/B probe 정상 작동 확인. **pilot 적용 완료 (2026-06-13)**: search-cross-verify stage3-merge `model: 'fable'` — 1차 자동 적용은 권한 거부(06-12), 사용자 "반영해줘" 인가로 적용. 이후 fz-search --deep invoke마다 측정 누적 → N=3 확산/롤백 판정 (plan-collaborative·discover-adversarial은 pilot 결과 대기).
+> **동결 사유 (2026-06-14)**: Fable 5가 미국 제재로 외국인 사용 금지 → 세션 모델 opus 4.8 운용. synthesis pilot은 `model: 'opus'`로 롤백(search-cross-verify.js:166 — `model` 생략 시 agent 정의 `model: sonnet` 강등 위험이라 explicit opus). 측정 동결 — **사전등록 임계/baseline 설계 보존**, 제재 해제 + fable 세션 재개 시 `'opus'→'fable'` 1줄 전환으로 측정 재개. 아래는 동결 전 활성 근거 — 사료.
+> 활성 근거(사료): 사용자 발화 "생각이 깊어야 되는 부분은 plan, review, discover, search 이런 부분은 fable5로 하면 좋고" + A/B probe 정상 작동 확인. pilot 1차 자동 적용 권한 거부(06-12) → "반영해줘" 인가 적용(06-13) → 06-14 제재로 롤백.
 > 선행 baseline 3-state: Lead=opus/syn=opus(구) · Lead=fable/syn=opus(직전) · Lead=fable/syn=fable(pilot). "승격=비용 2배" 단정은 baseline 실측 후.
 > 임계 (사전등록): pilot N=3 — fable synthesis의 G2 품질이 opus 대비 우위 신호(교차 병합 누락↓ 또는 FP 판정 정확도↑) ≥2/3 AND wall-clock 비악화 → plan-collaborative integrate 확산 검토. 미달 → opus 롤백.
 

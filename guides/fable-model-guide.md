@@ -1,5 +1,7 @@
 # Claude Fable 5 Model Guide
 
+> ⛔ **사용 제한 (2026-06-14)**: Fable 5가 미국 제재로 외국인 사용 금지 → fz는 **Opus 4.8** 운용. effort는 **세션 레벨 max(기본) / ultracode(코딩·병렬 작업 — xhigh + dynamic workflow 오케스트레이션)**, **plain xhigh 미사용**. effort frontmatter 배선(4스킬)·synthesis fable pilot은 **롤백 완료** (§3 표·§5 effort 섹션·§5.8 ①④). 본 가이드 본문은 제재 해제 시 재사용 위해 **보존**.
+>
 > Claude Fable 5 / Claude Mythos 5의 사양 · API 동작 차이 · Claude Code 통합 · fz 생태계 적용 전략의 단일 참조.
 > 모델 무관 프롬프팅 원칙은 `prompt-optimization.md`, 하네스 설계는 `harness-engineering.md` 참조.
 >
@@ -74,7 +76,7 @@
 | 레벨 | fz 사용 시점 | 배선 상태 |
 |------|------------|----------|
 | `high` | 루틴 작업 기본 — 별도 설정 불요 (Fable 기본값) | 기본 (미배선) |
-| `xhigh` | capability-sensitive: 아키텍처 결정·복잡 디버깅·심층 plan/review/search | **fz-plan·fz-review·fz-discover·fz-search frontmatter 배선** (4스킬 — 효과는 §5.8 ① 측정 중, `[미검증: frontmatter→Workflow agent() 전파 여부]`) |
+| `xhigh` | capability-sensitive: 아키텍처 결정·복잡 디버깅·심층 plan/review/search | **frontmatter 배선 철회 (2026-06-14)** — 4스킬 `effort: xhigh` 제거. 사용자 운용 = 세션 max/ultracode, plain xhigh 미사용 (§5.8 ① 철회) |
 | `max` | 단발 최고난도 — 세션 한정(`/effort`), overthinking 경향 주의. frontmatter 값 허용 여부 [미검증] → 배선 금지 | 미배선 (세션 레벨만) |
 | `ultracode` | dynamic workflow 오케스트레이션이 필요한 substantive 작업 세션 — `/effort` 메뉴에서 활성 (frontmatter/settings 불가, 세션 한정) | 배선 불가 (사용 가이드만) |
 | `medium`/`low` | 루틴·경량 작업 — fz-commit·fz-pr 등 경량 스킬 후보이나 **측정 전 선제 강등 금지** (31차) | deferred 큐 |
@@ -150,10 +152,10 @@
 - ⛔ **동시 실행 상한**: fable 에이전트는 **동시 1개** (Lead 세션 제외) — "동시 opus 최대 2개" 거버넌스의 비용 등가(fable 1 ≈ opus 2, $10/$50 vs $5/$25). pilot 측정(§5.8 ④) 누적 후 재조정
 - ⚠️ **Workflow model 생략 함정**: `opts.model` 생략 시 메인 루프 모델 상속 — Fable 세션에서는 모든 미지정 에이전트가 Fable로 실행됨. fz workflows는 현재 전 호출에 opus/sonnet 명시되어 있어 안전 (2026-06-12 실측: workflows/*.js 5파일 전수 명시)
 
-### effort frontmatter 배선 (2026-06-12 일부 적용 — 잔여 후보 기록)
+### effort frontmatter 배선 — **2026-06-14 철회 (세션 운용 전환)** · 잔여 후보 기록
 
 스킬/서브에이전트 frontmatter `effort` 필드로 실행 중 override 가능 [verified: code.claude.com/docs/en/model-config]:
-- **적용 완료**: fz-plan·fz-review·fz-discover·fz-search `effort: xhigh` (4스킬, capability-sensitive — §3 표·§5.8 ① 측정 참조)
+- ~~적용: fz-plan·fz-review·fz-discover·fz-search `effort: xhigh` (4스킬)~~ → **철회 (2026-06-14)**: frontmatter 4건 제거. 사용자 effort 운용 = 세션 max(기본)/ultracode 확정 → frontmatter 배선 불요 (§5.8 ① 철회, §3 표 참조)
 - 잔여 후보: fz-commit·fz-pr 등 경량 스킬 `effort: medium` — 공식 기본값(high)이 대부분 작업에 적정이므로 **측정 없이 선제 강등 금지** (31차 Plan-before-Probe / 35차 Calibrate-from-Real)
 
 ### De-prescription 긴장 — fz Gate 체계와의 관계
