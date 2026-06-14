@@ -32,7 +32,6 @@ intent-triggers:
 model-strategy:
   main: opus
   verifier: sonnet
-effort: xhigh
 ---
 
 # /fz-search - 코드 탐색 & 구조 분석 스킬

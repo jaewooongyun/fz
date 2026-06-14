@@ -29,7 +29,6 @@ intent-triggers:
 model-strategy:
   main: opus
   verifier: sonnet
-effort: xhigh
 ---
 
 # /fz-review - 리뷰 + 품질 보증 스킬
