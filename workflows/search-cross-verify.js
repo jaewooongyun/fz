@@ -163,7 +163,7 @@ const merged = await callAgent(
   `[교차 판정(패턴측에 대한)] ${JSON.stringify(crossOnPattern)}\n[교차 판정(심볼측에 대한)] ${JSON.stringify(crossOnSymbolic)}\n` +
   `[목표] 동일 발견을 병합하고 sources에 출처(symbolic/pattern) 전부 표기. ` +
   `crossVerified는 교차 단계 confirmed 판정 여부. false_positive 판정 항목만 제외(근거 인용 항목 한정) — 그 외 무근거 탈락 금지.`,
-  { label: 'stage3-merge', agentType: 'fz:plan-structure', model: 'fable', schema: MergeSchema }) // §5.8 ④ pilot (2026-06-12 사용자 합의·06-13 적용): synthesis fable 승격 1곳 — N=3 측정 후 확산/롤백
+  { label: 'stage3-merge', agentType: 'fz:plan-structure', model: 'opus', schema: MergeSchema }) // §5.8 ④ 동결 (2026-06-14 fable 제재 롤백): fable 해제 시 'opus'→'fable' 1줄 전환 + ④ 재개. opus 명시 = 검색 에이전트(sonnet) 대비 synthesis 우위 유지 (model 생략 시 agent 정의 model:sonnet 강등 위험)
 if (!merged) {
   fallbackCount += 1
   const doneStages = (sym && pat) ? ((crossOnPattern && crossOnSymbolic) ? 2 : 1) : 1 // 리뷰 C-2 교정: 하드코딩 제거

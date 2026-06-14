@@ -33,7 +33,6 @@ intent-triggers:
 model-strategy:
   main: opus
   verifier: sonnet
-effort: xhigh
 ---
 
 # /fz-plan - 계획 + 설계 스킬
