@@ -182,6 +182,15 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
+### What's New (v4.14.1) — Fable 5 제재 대응 롤백 [PATCH]
+
+Fable 5 미국 제재(외국인 금지) → Opus 4.8 운용. v4.14.0 Part A의 fable 배선 롤백:
+- **synthesis opus 복귀**: search-cross-verify stage3-merge `model: 'fable'` → `'opus'` (search/plan/discover 3지점 통일). `model` 생략은 agent 정의 `model: sonnet` 강등 위험이라 explicit opus — fable 해제 시 1줄 전환.
+- **effort frontmatter 제거**: 4스킬(plan/review/discover/search) `effort: xhigh` 제거 — frontmatter가 세션 max/ultracode를 하향시키므로 세션 레벨 운용 전환 (우선순위 env var > frontmatter > 세션, [verified: model-config]).
+- **측정/문서 동결**: §5.8 ④synthesis 동결·①effort 철회 / fable 가이드 본문 보존 + 제재 배너(해제 시 재사용).
+
+> ⛔ Codex 미수행(quota ~6/28) — Constraint Probe(A2 sonnet 강등 차단) + node/grep 검증 대체. 상세: [docs/releases/v4.14.1.md](docs/releases/v4.14.1.md)
+
 ### What's New (v4.14.0) — Claude Fable 5 대응 + 전수 주장 오판 방어 [MINOR]
 
 **Part A — Claude Fable 5 대응** (2026-06-09 GA, Opus 상위 tier):
