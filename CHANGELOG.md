@@ -8,6 +8,20 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.14.1 (2026-06-14) — Fable 5 제재 대응 롤백 [PATCH]
+
+> Fable 5가 미국 제재로 외국인 사용 금지 → 세션 모델 Opus 4.8 운용. v4.14.0 Part A에서 배선한 fable 의존부를 롤백. 가이드 본문은 제재 해제 시 재사용 위해 보존(상태 표기만). breaking change 0 · 행 삭제 0(코드 5줄 변경 + 문서 freeze 표기).
+
+#### 롤백 (동작 변경)
+- **synthesis 모델 opus 복귀**: `workflows/search-cross-verify.js` stage3-merge `model: 'fable'` → `'opus'`. `model` 생략(세션 상속)은 `fz:plan-structure`의 `model: sonnet` 정의 때문에 sonnet 강등 위험 → explicit opus(검색 에이전트 sonnet 대비 synthesis 우위 유지). 3개 synthesis 지점(search/plan/discover) opus 통일. fable 해제 시 `'opus'→'fable'` 1줄 전환.
+- **effort frontmatter 제거**: fz-plan·fz-review·fz-discover·fz-search 4스킬 `effort: xhigh` 제거. effort 우선순위(env var > frontmatter > 세션)상 frontmatter가 세션 max/ultracode를 xhigh로 하향시키므로 세션 레벨 운용으로 전환 [verified: code.claude.com/docs/en/model-config].
+
+#### 측정/문서
+- §5.8 측정 큐: ④synthesis(fable) **동결**(제재 해제 시 재개 — 사전등록 임계 보존) / ①effort(frontmatter) **철회**(측정 대상 소멸) / ②③ 유지.
+- `fable-model-guide.md`: 상단 제재 배너 + §3 표·§5 effort 섹션 상태 표기 (사양 본문 보존 — 재사용 대비).
+
+> ⛔ Codex cross-model 미수행(quota ~6/28) — fz-discover Constraint Probe(A2 sonnet 강등 위험 실측 차단, 31차) + node --check + grep 전수 검증 대체, 회복 시 후행 check. 상세: [docs/releases/v4.14.1.md](docs/releases/v4.14.1.md)
+
 ### v4.14.0 (2026-06-13) — Claude Fable 5 대응 + 전수 주장 오판 방어 [MINOR]
 
 > 통합 릴리즈 — **Part A**: Claude Fable 5 대응 (Fable 세션) / **Part B**: 전수 주장 오판 방어 (별도 세션, 2026-06-12). 두 작업이 발행 전 로컬에서 합류하여 단일 MINOR로 통합.
