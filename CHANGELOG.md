@@ -8,6 +8,16 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.14.2 (2026-06-16) — fz-code 구조 평가 convention 면제 [PATCH]
+
+> fz-code `관찰 보고 의무`가 Clean Architecture 위반 보고 시 코드베이스 컨벤션(동일 패턴 3곳+)을 위반으로 오보고하지 않도록 convention 면제 + same-RIB DI 중복 예외 추가. 구조 평가 modality 비대칭 분석(3소스: 증거에이전트 3 + adversarial challenger + Codex gpt-5.5) 결과 — 하드룰=과적합이라 flag-only로 calibrate. breaking change 0 · 신규 row 0(기존 row MERGE).
+
+#### 개선 (동작 정밀화)
+- **convention 면제 + same-RIB 예외** (`skills/fz-code/SKILL.md:233`): "동일 패턴 코드베이스 3곳+ → convention 간주 보고 생략(예: 로컬 UseCase 생성, 56 Interactor 중 27%)" + "같은 RIB scope에서 Component 주입 dependency를 Interactor가 동일 재생성 시 convention 무관 보고". 구조 위반 포착은 유지 + 코드베이스 관행 false-positive 차단.
+- skill-authoring §3 DELETE/MERGE-default 준수 — 신규 row 0, 기존 row MERGE.
+
+> ✅ Codex cross-model verify **수행** (quota 차단 ~6/28 해제 확인) — needs_revision → 3보완 반영(same-RIB wording 한정 + behavioral probe SC5/SC6 + 잔여리스크). 상세: [docs/releases/v4.14.2.md](docs/releases/v4.14.2.md)
+
 ### v4.14.1 (2026-06-14) — Fable 5 제재 대응 롤백 [PATCH]
 
 > Fable 5가 미국 제재로 외국인 사용 금지 → 세션 모델 Opus 4.8 운용. v4.14.0 Part A에서 배선한 fable 의존부를 롤백. 가이드 본문은 제재 해제 시 재사용 위해 보존(상태 표기만). breaking change 0 · 행 삭제 0(코드 5줄 변경 + 문서 freeze 표기).

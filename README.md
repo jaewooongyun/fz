@@ -182,6 +182,14 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
+### What's New (v4.14.2) — fz-code 구조 평가 convention 면제 [PATCH]
+
+구조 평가 modality 비대칭 분석(3소스 검증: 증거에이전트 3 + adversarial challenger + Codex gpt-5.5) → 사용자 피드백 "구조 정합성 평가 약함"의 calibrated 처방:
+- **convention 면제 + same-RIB DI 예외** (fz-code:233 관찰 보고 의무 MERGE): Clean Architecture 위반 보고 시 "동일 패턴 3곳+ = 코드베이스 컨벤션 → 보고 생략"(예: 로컬 UseCase 27%) + "같은 RIB scope Component 주입 dependency 재생성은 convention 무관 보고". 구조 위반 포착 유지 + 관행 false-positive 차단.
+- **하드룰 미채택** (과적합 방지): 예시가 코드베이스 27% 컨벤션이라 단정 규칙은 진자역행 — challenger+Codex 수렴. skill-authoring §3 DELETE/MERGE-default 준수(신규 row 0).
+
+> ✅ Codex cross-model verify 복구·수행 (이전 quota 차단 ~6/28 해제) — needs_revision → behavioral probe SC5/SC6로 개선 실증. 상세: [docs/releases/v4.14.2.md](docs/releases/v4.14.2.md)
+
 ### What's New (v4.14.1) — Fable 5 제재 대응 롤백 [PATCH]
 
 Fable 5 미국 제재(외국인 금지) → Opus 4.8 운용. v4.14.0 Part A의 fable 배선 롤백:
