@@ -230,7 +230,7 @@ model-strategy:
    | 래퍼 범위 과잉 | @MainActor/do-catch/Task 블록 내에 해당 컨텍스트 불필요 문장 포함. 원본 `.done { UI업데이트; 데이터변환 }` → After `MainActor.run { UI업데이트; 데이터변환 }` 전체 래핑 | 기계적 1:1 변환 — 문장별 컨텍스트 필요성 판단 후 최소 범위 분리. 참조: `modules/code-transform-validation.md` [ablation: scope-min-v1] |
    | 에러 경로 축소 | 원본 switch/catch 분기 N개 → After catch < N개. `== .case(value)` 비교 사용 | enum associated value 무시. `if case` 패턴 매칭 필수 |
    | 퀄리티 역행 | After 줄 수 > Before 2배. 원본 추상화(struct/helper/extension)가 인라인 해체 | 리팩토링이 코드 악화. protocol extension/convenience 검토 |
-   | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지. Gate 3 전 일괄 보고 |
+   | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견. 단 동일 패턴이 코드베이스 3곳+ 존재하면 convention 간주 — 보고 생략(예: 로컬 UseCase 생성). 단 같은 RIB scope에서 Component가 주입 제공하는 dependency를 Interactor가 동일하게 재생성하면 convention 무관 보고 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지. Gate 3 전 일괄 보고 |
    | 동기화 부재 | singleton/shared 타입에 `var` 추가/수정 시, `@MainActor`/`actor`/lock/serial queue 보호 없음 | data race 위험 — plugin-refs.md 역방향 트리거 참조. 동시성 보호 메커니즘 추가 필요 |
    | 싱글톤 deinit | `static let shared` 타입에 `deinit` 작성 시 | deinit은 호출되지 않음 — 정리가 필요하면 명시적 `tearDown()` 메서드 사용 |
    | 기본값 소비자 영향 | 비동기 채워지는 property에 기본값(`= false`, `= nil`) 설정 시 | 소비자가 첫 콜백 전에 읽으면 기본값으로 분기 — guard/if 패턴 영향 확인 |
