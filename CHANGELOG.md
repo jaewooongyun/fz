@@ -8,6 +8,16 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.15.0 (2026-06-18) — 외부 리뷰어 catch 환류 회로 (promotion-ledger 트랙 C) [MINOR]
+
+> CodeRabbit 등 외부 이종 리뷰어가 fz-review 미탐 이슈를 잡았을 때 fz 자기개선 회로로 환류시키는 인프라. ASD-1793 PR에서 CodeRabbit이 fz가 놓친 retain cycle을 catch한 사례 분석(4-lens Workflow) 결과 — fz는 *능력*이 아니라 *환류 회로*가 단절돼 있었음(입구 pr-comment-review #19는 존재, 출구 4모듈 단절).
+>
+> - **promotion-ledger 트랙 C 신설**: 외부 도구가 `/fz-review --deep` 이후 actionable Major+ 발견 시 ledger 관측 진입 (4-classify project-rule/valid-suggestion만 카운트 → precision ~55% FP 차단). 관측 형식에 `finding-source` 필드 + P2-C(general closure-capture retain cycle lens) 관측 #0 등록.
+> - **pr-comment-review #19 펜**: user-confirm 후 `import-to-ledger` 절차 추가 → 외부 fz-miss를 Issue Tracker + 트랙 C에 자동 기록. 트랙 C를 작동시키는 트리거(펜).
+> - **fz-review Codex 불능 폴백 보강**: fresh-context Claude 검증자가 fz-reviewer Memory Management(retain cycle) 체크리스트 명시 적용 → Codex 부재 시 이종 parity 복원 (이번 miss 직접 처방). PR open 시 CodeRabbit 보조 이종 소스 안내.
+> - additive only (행 삭제 0) · 검출 Grep rule 신설 0 (safety-audit Grep lens는 트랙 C 3세션+ 후 deferred — memory-guide:45). breaking change 0.
+> - ⛔ Codex cross-model verify 미수행 (quota ~6/23) — 가이드 grounded(memory-guide:45 · prompt-opt:153-167 트리밍 비저하) + anchor probe 전수 검증 대체, 회복 시 후행. 상세: [docs/releases/v4.15.0.md](docs/releases/v4.15.0.md)
+
 ### v4.14.2 (2026-06-16) — fz-code 구조 평가 convention 면제 [PATCH]
 
 > fz-code `관찰 보고 의무`가 Clean Architecture 위반 보고 시 코드베이스 컨벤션(동일 패턴 3곳+)을 위반으로 오보고하지 않도록 convention 면제 + same-RIB DI 중복 예외 추가. 구조 평가 modality 비대칭 분석(3소스: 증거에이전트 3 + adversarial challenger + Codex gpt-5.5) 결과 — 하드룰=과적합이라 flag-only로 calibrate. breaking change 0 · 신규 row 0(기존 row MERGE).

@@ -182,6 +182,15 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
+### What's New (v4.15.0) — 외부 리뷰어 catch 환류 회로 (promotion-ledger 트랙 C) [MINOR]
+
+CodeRabbit 등 외부 이종 리뷰어가 fz-review 미탐 이슈를 잡았을 때 fz 자기개선 회로로 환류시키는 인프라 (ASD-1793 PR 4-lens 분석 — fz는 *능력*이 아니라 *환류 회로*가 단절: 입구 pr-comment-review #19는 존재, 출구 단절):
+- **promotion-ledger 트랙 C**: 외부 도구가 `/fz-review --deep` 이후 actionable Major+ 발견 시 ledger 관측 진입 (4-classify project-rule/valid-suggestion만 카운트 → precision ~55% FP 차단) + `finding-source` 필드 + P2-C(general closure-capture retain cycle lens) 관측 #0.
+- **pr-comment-review #19 펜**: user-confirm 후 `import-to-ledger` 절차 → 외부 fz-miss 자동 기록 (트랙 C 작동 트리거).
+- **fz-review Codex 폴백 보강**: fresh-context 검증자가 fz-reviewer retain-cycle 체크리스트 적용 → Codex 부재 시 이종 parity 복원. additive only · 검출 Grep rule 신설 0 (트랙 C 5세션+ 후 deferred — memory-guide:45).
+
+> ⛔ Codex cross-model verify 미수행(quota ~6/23) — 가이드 grounded(memory-guide:45·prompt-opt:153-167) + fresh-context opus 리뷰 대체(self-review 미탐 2건 catch — 23차 실증), 회복 시 후행. 상세: [docs/releases/v4.15.0.md](docs/releases/v4.15.0.md)
+
 ### What's New (v4.14.2) — fz-code 구조 평가 convention 면제 [PATCH]
 
 구조 평가 modality 비대칭 분석(3소스 검증: 증거에이전트 3 + adversarial challenger + Codex gpt-5.5) → 사용자 피드백 "구조 정합성 평가 약함"의 calibrated 처방:
