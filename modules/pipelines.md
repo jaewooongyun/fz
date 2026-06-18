@@ -191,7 +191,7 @@
 | 항목 | 값 |
 |------|---|
 | 트리거 | `코드레빗\|PR.*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` |
-| 체인 | (내부 절차) classify-all → verify-each → user-confirm |
+| 체인 | (내부 절차) classify-all → verify-each → user-confirm → import-to-ledger |
 | 기본 모드 | SOLO |
 | 게이트 | ✓ external-feedback-verify (각 코멘트별) |
 | 특수 | 하이브리드 경량 파이프라인. External Feedback Gate 의무 적용 |
@@ -200,6 +200,7 @@
 1. **classify-all**: PR 코멘트 전체 fetch (`gh api`) → 심각도 분류 (critical/major/minor/nitpick) + 피드백 신뢰도 4단계 (project-rule/valid-suggestion/preference/needs-review)
 2. **verify-each**: 각 코멘트에 External Feedback Gate 적용 — Read(함수 시그니처) + 기존 패턴 대조 → valid/invalid/needs-investigation 판정
 3. **user-confirm**: 코멘트별 판정 + 대응 초안 테이블 → 사용자 승인 → (선택) GitHub 답변 포스트
+4. **import-to-ledger** (트랙 C 펜): user-confirm에서 valid/needs-investigation으로 승인된 항목 중, 이번 세션이 `/fz-review --deep` 이후 외부 리뷰어가 발견한 fz-miss면 → (a) fz-review Issue Tracker에 append (severity/category/file/line/description), (b) `promotion-ledger.md` 트랙 C 관측 기록 (finding-source: external + 4-classify 분류). user-confirm 승인 게이트가 기록 전 사람 확인 보장 (precision ~55% FP 차단). fz-miss 아니면(외부가 새 이슈만 제기) skip. 단 트랙 C *활성화 카운트*엔 4-classify가 project-rule/valid-suggestion인 항목만 반영 — verify-each 판정축(valid/needs-investigation)과 신뢰도축(4-classify)은 독립이라 import돼도 count 제외 가능.
 
 ---
 
