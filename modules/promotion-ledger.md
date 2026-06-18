@@ -11,6 +11,10 @@
 (a) `/fz-plan` Phase 0.5 ~ Phase 3 중 하나 이상 실행
 (b) `/fz-codex verify` 또는 `/fz-review --deep` 실행
 
+**또는 트랙 C (외부 리뷰어 catch — 별도 경로, a+b와 무관)**:
+
+(c) 외부 도구(CodeRabbit/팀원/Codex)가 `/fz-review --deep` 이후에도 actionable Major+ 이슈를 1건 이상 발견한 세션. 단 4-classify(`feedback_review_trust_verification`)에서 `project-rule`/`valid-suggestion`으로 분류된 항목만 카운트 — `preference`/`needs-review`는 제외 (CodeRabbit precision ~55% 대응).
+
 ## 관측 기록 형식
 
 각 eligible session 종료 시 해당 P1/P2 항목에 1건 append:
@@ -20,6 +24,7 @@
 - Session: ASD-{번호}
 - Date: YYYY-MM-DD
 - 관측 내용: {발동 여부 + 상황}
+- finding-source: internal | external({tool}) — 미기재 시 internal 간주 (기존 L-1~L-4 등). external이면 4-classify 분류 명시 (project-rule|valid-suggestion만 카운트)
 - disposition 결과: {채택된 disposition}
 - 근거: [verified: {file}:{line}] 인용
 - Lead/Codex 일치 여부: agreed | user_decided
@@ -61,6 +66,14 @@
 - 관측 #0: ASD-1136 (plan-impact 단독 지적)
 - 승격 목표: ASD-1137+ 1건 (P1 승격)
 
+### P2-C: general closure-capture retain cycle lens (Claude 경로) — 트랙 C
+- 관측 #0: ASD-1793 (CodeRabbit Major1 — sheetRef 강한 캡처 cycle, fz-review 6-Layer 통과)
+- finding-source: external(CodeRabbit) — 4-classify: valid-suggestion
+- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. Codex `codex-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/Codex 비대칭).
+- generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
+- ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
+- 승격 목표 (트랙 C → 트랙 A): 별개 세션 추가 관측 후 safety-audit §확장 active 전환.
+
 ## ASD-1674 회고 후보 (P2, 관측 #1)
 
 > 출처: `TVING/TVOD/ASD-1674/retrospective/session-mistakes-2026-05-29.md` (20 catches) + `fz-improvement-analysis.md` (분류)
@@ -71,6 +84,7 @@
 > - **트랙 A (신호 활성·canonical)**: candidate friction 신호 → active 전환. 기준 = memory-guide line 43 **5 sessions 관측**. Codex verify = 활성 전 *권장 품질 게이트*(복구 시).
 > - **트랙 B (메모리 승격)**: lesson → MEMORY.md 항목/별도 모듈. ⛔ MEMORY.md 252줄 한도초과로 **현재 비권장**.
 > - L-1~L-3 1차 경로 = **트랙 A**. L-4(friction 신호 없음) = 트랙 B(ledger-only).
+> - **트랙 C (외부 리뷰어 catch, 2026-06-18 신설)**: 외부 도구(CodeRabbit/팀원/Codex)가 fz 미탐 이슈를 발견 → ledger 관측 진입. finding-source: external. 입구 = `pipelines.md` #19 pr-comment-review 절차 4(import-to-ledger). 활성(active) 전환은 트랙 A 기준(5 sessions) 준용 + 4-classify 통과분만 카운트.
 
 ### L-1: figma 토큰 테이블 exhaustiveness (23차 강화)
 - 관측 #1: ASD-1674 (catch #1,2,4,8,17,19,20 — figma 토큰 7건)

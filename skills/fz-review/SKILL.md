@@ -214,6 +214,9 @@ fz-codex가 수행하는 작업:
 - 이슈 요약 반환
 
 > **Codex 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 quota 불능 기간 — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 Fable 세션 자동상속으로 비용 2배)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ Codex 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]
+>
+> **⛔ retain cycle 점검 (rank3b, 2026-06-18)**: fresh-context 검증자는 retain cycle 검사 시 `codex-skills/fz-reviewer/SKILL.md` Memory Management(closures capturing `self` without `[weak self]`)를 명시 적용한다 — Codex 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
+> **보조 이종 소스 (rank6)**: PR이 열려 있으면 `/fz` pr-comment-review로 CodeRabbit 코멘트를 보조 이종 소스로 활용 가능 (강제 아닌 Lead 판단).
 
 ### 검증 3: SuperClaude 정적 분석
 
