@@ -13,6 +13,7 @@
 | 33차 (Recommendation Default) | implementation-ready 시점 / verify approved or conditional-minor | **권고 default = implementation** (참조: `modules/fz-pipeline-proposal.md`) — Fable 공식 anti-overplanning 동방향: "When you have enough information to act, act" [verified: prompting-claude-fable-5] |
 | 40차 (Simplified Request) | 사용자 신호 "그냥/가볍게/단순/빠르게/확인해줘/해도 돼?/맞아?/한 번 봐줘" 키워드 + 검토 산출물 존재 + **no `--deep`/`--team`** override | 절차(TEAM/Phase/게이트 시퀀스) 차단, simplified mode 적용 (예: `/fz-modernize light`) — 단 산출물이 전수/카운트/부정 주장이면 Coverage Gate 유지 (light = 절차 생략이지 검증 생략 아님 → cross-validation.md §Coverage Gate) |
 | 40차-MUST3 (Codex precedence) | `--seq` 단독은 sequential thinking 모드이지 simplified trigger 아님. `--deep --seq` 또는 `--team --seq` 조합 시 elaborate 유지 | `--seq` 단독 keyword 매칭 금지 — 컨텍스트 조건 필수 (Codex 검증 §5 MUST 3) |
+| F5/F6 (Decision-Type+Boundary) *[candidate: 2 session evidence]* | 구조/경계 포크 결단 시 | (가) 코드사실로 좁혀지는 엔지니어링 판단: 확신 권고+근거+"이의 없으면 진행"(메뉴 금지). (나) 제품·디자인·팀 컨벤션 소유: AskUserQuestion. plan 분할=판단 입력≠경계 권위. (`project_fz_harness_holes.md`) |
 | MAST FM-2.2 (Fail to ask for clarification) | 요청 모호 / 동사 없음 / 명사+키워드만 / 범위 불명확 | AskUserQuestion 발동 의무 |
 
 > 출처: MAST (NeurIPS 2025, arXiv 2503.13657 v3) — FM-2.2 "Fail to ask for clarification" = **6.80% 오류율** [verified: v3 §4 원문 "(FM-2.2, 6.80%)"]. 모호한 요청을 그대로 진행하면 trigger (MAST-Data 7개 프레임워크 / 1642 traces).
