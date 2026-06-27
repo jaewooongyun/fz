@@ -76,9 +76,9 @@ model-strategy:
 ### 절차
 
 **L1 검사**:
-1. MEMORY.md 줄수 확인 (200줄 한도 vs 현재)
+1. MEMORY.md 줄수 확인 (200줄 한도 vs 현재) + **entry 200자 초과 라인 수** (memory-guide "1줄 요약 ≤200자" — 초과 시 inline 상세를 topic file로 분리 대상)
 2. topic file 목록 + 각 줄수 + 최종 수정일
-3. MEMORY.md ↔ topic file 링크 정합성 (끊어진 링크)
+3. MEMORY.md ↔ topic file **양방향** 정합성 — 끊어진 링크(MEMORY.md→없는 파일) + **orphan**(파일 존재 → MEMORY.md 미참조). orphan은 색인 추가 또는 archive 대상
 4. 태그 통계: `[status: pending/applied/deferred]` 분포
 
 **L2 검사 (Serena)**:
@@ -253,7 +253,7 @@ MEMORY.md 재구성 + topic file 분리/병합.
 
 ## Completion -> Next
 
-- audit → gc 제안 (stale 항목 발견 시)
+- audit → gc 제안 (stale 항목 발견 시) + **organize 제안 (MEMORY.md 200줄 근접/초과 또는 orphan 발견 시)** — 제안만, auto-force ❌(40차)
 - gc → 완료 보고
 - recall → 현재 파이프라인 계속 진행
 - organize → audit 제안 (결과 검증)
