@@ -182,124 +182,17 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
-### What's New (v4.15.0) — 외부 리뷰어 catch 환류 회로 (promotion-ledger 트랙 C) [MINOR]
+### What's New (v4.16.0) — SKILL.md 분리 + visual oracle 강화 [MINOR]
 
-CodeRabbit 등 외부 이종 리뷰어가 fz-review 미탐 이슈를 잡았을 때 fz 자기개선 회로로 환류시키는 인프라 (ASD-1793 PR 4-lens 분석 — fz는 *능력*이 아니라 *환류 회로*가 단절: 입구 pr-comment-review #19는 존재, 출구 단절):
-- **promotion-ledger 트랙 C**: 외부 도구가 `/fz-review --deep` 이후 actionable Major+ 발견 시 ledger 관측 진입 (4-classify project-rule/valid-suggestion만 카운트 → precision ~55% FP 차단) + `finding-source` 필드 + P2-C(general closure-capture retain cycle lens) 관측 #0.
-- **pr-comment-review #19 펜**: user-confirm 후 `import-to-ledger` 절차 → 외부 fz-miss 자동 기록 (트랙 C 작동 트리거).
-- **fz-review Codex 폴백 보강**: fresh-context 검증자가 fz-reviewer retain-cycle 체크리스트 적용 → Codex 부재 시 이종 parity 복원. additive only · 검출 Grep rule 신설 0 (트랙 C 5세션+ 후 deferred — memory-guide:45).
+TVG-1219 환류 세션 — fz 자기참조 검증 한계를 `/fz-manage check` + 사용자 catch로 보완하며 적용:
+- **fz-review visual oracle 강화 (검증5/Gate)**: UI/제스처/애니메이션 동작 변경 시 빌드통과 ≠ 완료, visual oracle(시뮬+스크린샷/실기기) 미충족 시 "완료" 지양 — fz 런타임 정적검증 불가 = 사람 영역. evidence 3 sessions(38차·user_spec·TVG-1219) 기반 강화.
+- **SKILL.md 500↓ 분리 (Progressive Disclosure)**: fz-review 560→436(검증 4-D~H·4-N/O → `modules/review-checks.md`), fz-peer-review 523→463(Auto-Tier bash → `modules/peer-review-tiers.md` SSOT 일원화 + 판정 변수 명확화). 전체 SKILL.md ≤500.
+- **candidate 2종**: Sibling-Convention Check(skill-authoring P1) + 대칭/짝 경로(promotion-ledger L-5) — evidence 1 session, 5 sessions 후 active 재판정.
+- **fz-memory L1 audit 강화**: entry 200자 초과 + MEMORY.md↔topic 양방향 정합(orphan 탐지) + organize 제안.
 
-> ⛔ Codex cross-model verify 미수행(quota ~6/23) — 가이드 grounded(memory-guide:45·prompt-opt:153-167) + fresh-context opus 리뷰 대체(self-review 미탐 2건 catch — 23차 실증), 회복 시 후행. 상세: [docs/releases/v4.15.0.md](docs/releases/v4.15.0.md)
+> ⛔ Codex cross-model verify 미수행(quota ~6/30) — 동종 Workflow 3-lens + Lead 실측 대체(false positive 2건 차단, 23차 실증). 회복 시 후행. 상세: [docs/releases/v4.16.0.md](docs/releases/v4.16.0.md)
 
-### What's New (v4.14.2) — fz-code 구조 평가 convention 면제 [PATCH]
-
-구조 평가 modality 비대칭 분석(3소스 검증: 증거에이전트 3 + adversarial challenger + Codex gpt-5.5) → 사용자 피드백 "구조 정합성 평가 약함"의 calibrated 처방:
-- **convention 면제 + same-RIB DI 예외** (fz-code:233 관찰 보고 의무 MERGE): Clean Architecture 위반 보고 시 "동일 패턴 3곳+ = 코드베이스 컨벤션 → 보고 생략"(예: 로컬 UseCase 27%) + "같은 RIB scope Component 주입 dependency 재생성은 convention 무관 보고". 구조 위반 포착 유지 + 관행 false-positive 차단.
-- **하드룰 미채택** (과적합 방지): 예시가 코드베이스 27% 컨벤션이라 단정 규칙은 진자역행 — challenger+Codex 수렴. skill-authoring §3 DELETE/MERGE-default 준수(신규 row 0).
-
-> ✅ Codex cross-model verify 복구·수행 (이전 quota 차단 ~6/28 해제) — needs_revision → behavioral probe SC5/SC6로 개선 실증. 상세: [docs/releases/v4.14.2.md](docs/releases/v4.14.2.md)
-
-### What's New (v4.14.1) — Fable 5 제재 대응 롤백 [PATCH]
-
-Fable 5 미국 제재(외국인 금지) → Opus 4.8 운용. v4.14.0 Part A의 fable 배선 롤백:
-- **synthesis opus 복귀**: search-cross-verify stage3-merge `model: 'fable'` → `'opus'` (search/plan/discover 3지점 통일). `model` 생략은 agent 정의 `model: sonnet` 강등 위험이라 explicit opus — fable 해제 시 1줄 전환.
-- **effort frontmatter 제거**: 4스킬(plan/review/discover/search) `effort: xhigh` 제거 — frontmatter가 세션 max/ultracode를 하향시키므로 세션 레벨 운용 전환 (우선순위 env var > frontmatter > 세션, [verified: model-config]).
-- **측정/문서 동결**: §5.8 ④synthesis 동결·①effort 철회 / fable 가이드 본문 보존 + 제재 배너(해제 시 재사용).
-
-> ⛔ Codex 미수행(quota ~6/28) — Constraint Probe(A2 sonnet 강등 차단) + node/grep 검증 대체. 상세: [docs/releases/v4.14.1.md](docs/releases/v4.14.1.md)
-
-### What's New (v4.14.0) — Claude Fable 5 대응 + 전수 주장 오판 방어 [MINOR]
-
-**Part A — Claude Fable 5 대응** (2026-06-09 GA, Opus 상위 tier):
-- **모델 가이드 신설**: `guides/fable-model-guide.md` — 사양($10/$50·1M·thinking 상시)/API 동작 차이/Claude Code 통합(effort frontmatter·안전 분류기 자동 폴백·서브에이전트 fable enum)/공식 효율 권고/fz 모델 전략 4-axes + 스니펫 채택 현황. 기존 가이드 5파일 Fable 갱신.
-- **effort 적재적소 배선**: fz-plan·fz-review·fz-discover·fz-search frontmatter `effort: xhigh` (capability-sensitive 4스킬 — max/ultracode는 세션 레벨 운용 가이드로). 배선=가설/측정=검증 — `experiment-log.md` §5.8 측정 큐 4항목 사전등록 동반.
-- **grounded progress 채택**: Fable 공식 프롬프팅 스니펫 7종 실측 선별(채택 1/보강 1/비채택 5 — 근거 표) — VD Brief 4번 + team-core + workflows 5파일 OVERRIDE "주장은 도구 결과/입력 근거 지목 가능해야".
-- **Codex 공백 운용**: 장기 quota 불능 플래그(기간 조건부 ~6/28, 만료 원복 명시) + fresh-context 검증자 분기(fz-review 검증 2 대체 — 본 사이클 3연속 catch 실증, `[fresh-context: claude]` 이종성 상실 태그).
-- **synthesis pilot**: search-cross-verify stage3-merge `model: 'fable'` — A/B probe에서 fable이 opus 미발견 결함 1건 추가 발견(우위 관찰). 동시 fable 상한 1개 거버넌스 신설.
-- **TEAM 레거시 정리**: Workflow 전환 4스킬의 'TeamCreate 강제' STALE 문구 교정 (행 삭제 0, canonical 출처 보존).
-
-**Part B — 전수 주장 오판(Exhaustive-Claim) 방어**: `rg|head -5` 잘린 출력을 "사용처 2곳뿐"으로 단정(실제 11곳)한 오판이 4턴 생존한 사고의 재발 방지 — light 모드 검증 경계(F1) + Coverage Gate 산출물 타입 트리거·검산식(F2) + T8 리마인더(F3) + 교훈 실패 클래스 키잉(F4). 기존 방어가 전부 존재했으나 light 경로가 전량 우회 — "방어 부재"가 아닌 "방어 우회"가 근본 원인.
-
-> ⛔ Codex cross-model 미수행(quota ~6/28) — Workflow 다각도(plan 9 agents + review 5 agents ×2회, findings 25 전원 반영) + fresh-context 검증 2회 대체, 회복 시 후행 check. 상세: [docs/releases/v4.14.0.md](docs/releases/v4.14.0.md)
-
-### What's New (v4.13.0) — Template Authority Bias 방어 + 구조 결정 옵션 사용자 배선 [MINOR]
-
-- **구조 결정 3축 Quick-Check** (review-direction): 템플릿/형제 미러링 계획이라도 **DI 출처 · 스레드 가정 · public API 모양**은 결정 대상 — 축별 대안 ≥2 + trade-off 의무. ASD-1802에서 외부 리뷰어가 3축 전부 선행 포착한 실패(파이프라인 0건)의 직접 대응.
-- **구조 결정 옵션의 사용자 배선** (G1): PROCEED 판정이어도 옵션 테이블이 plan에 포함되고 **사용자 보고 시 표로 제시** — `directionAlternatives` 반환 패스스루 + Gate 0.5/1 체크. "옵션은 기록이 아니라 제시가 목적".
-- **미러링 분류 정정** (G3): 미러링으로 신규 화면·컴포넌트 생성은 '단순 수정' 아님 — Direction Challenge 스킵 불가.
-- **감지 보강**: E token `MainActor.assumeIsolated`·`nonisolated` + 생명주기 콜백 역방향 트리거(bridge 3택 trade-off 제시 의무, `Task.immediate` iOS 26+) + boolean trap few-shot.
-- **fix**: swift-pattern-detection 내장 self-test 자기참조 매칭(상시 실패) anchoring 수정.
-
-> ⛔ Codex cross-model 검증은 할당량 차단(~6/28)으로 미수행 — Claude 다각도(counter 2회 + Review Squad 2회 + 결정론 oracle 전수) 대체, 회복 시 후행 check. 상세: [docs/releases/v4.13.0.md](docs/releases/v4.13.0.md)
-
-### What's New (v4.12.1) — Serena MCP 번들 + 미노출 도구 참조 정리 [PATCH]
-
-- **Serena MCP 자동 번들**: `.mcp.json` 추가 — `claude plugin install fz` 시 serena 자동 등록(수동 `claude mcp add` 불필요). 공식 oraios/serena + `--context claude-code` + `--project-from-cwd`. 런타임 `uv` 필수.
-- **미노출 도구 참조 정리**: serena 1.5.4 `claude-code` 컨텍스트 미노출 3종(`search_for_pattern`/`find_file`/`list_dir`) → `Grep`/`Glob`로 전 스킬·에이전트 정리(24파일 60 edit, 0 잔여). 심볼·메모리 도구는 유지 — 핵심 기능 무손상.
-- **README prerequisite 교정**: `AbanteAI`→`oraios/serena`(repo 이전), `uv` 런타임 명시.
-
-> 활성화: push/발행 후 `claude plugin update fz` → `/reload-plugins`. 전체 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
-
-### What's New (v4.12.0) — TEAM → 네이티브 Workflow 전환 (Wave 0-3) [MINOR]
-
-- **멀티에이전트 실행 전면 전환**: TEAM(TeamCreate+SendMessage P2P) 5개 스킬(discover/search/review/plan/code·fix)을 네이티브 Workflow 결정적 스크립트(`workflows/*.js` 5개, 1094줄)로 대체 — 통신 유실·팀 정리 실패 2대 오류 클래스가 구조적으로 제거(전 invoke 0건). 스키마 강제 JSON + null 명시 분기 + fallback 계약(SOLO 폴백).
-- **changeset 책임 재배분** (code-pair): 에이전트는 디스크를 수정하지 않고 changeset JSON(exact syntax + oldAnchor)만 반환 — Lead가 검증 후 적용+빌드. 검증 안 된 Edit이 디스크에 닿지 않는 구조.
-- **표준 패턴 3종 문서화** (skill-authoring §12 신설): OVERRIDE 블록(P2P·컨텍스트 로딩 무효화) / args 방어 파싱(scriptPath 호출 시 JSON 문자열 도착 — 실측) / agentType `fz:` namespace 필수.
-- **calibration 게이트 사전 등록** (experiment-log §5.7): 스킬별 임계 + G1(패턴별)/G2(품질)/G3(일몰) — TEAM 모듈 일몰(Wave 4)은 게이트 통과 후.
-
-> ⛔ Codex cross-model 검증은 할당량 부재로 미수행 (다각도 Claude 리뷰 대체) — 회복 시 후행 check 예정. 전체 변경 이력: [CHANGELOG.md](CHANGELOG.md) · [Releases](https://github.com/jaewooongyun/fz/releases)
-
-### 근거 연구
-
-fz 가이드(`guides/*.md`)와 스킬이 인용하는 외부 권위 자료입니다. 가이드 본문에 더 자세한 출처 표가 있습니다 — 특히 `guides/harness-engineering.md` §References, `guides/prompt-optimization.md` Tier 1/2.
-
-#### Anthropic 공식
-
-| 출처 | 발표 | fz 적용 |
-|------|:---:|------|
-| [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) | 2024 | agent-team-guide.md / Codex 네이티브 스킬 권위 베이스 |
-| [Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) | 2025-11 | harness-engineering.md Pattern A (Initializer + Coding Agent) |
-| [How we built our multi-agent research system](https://www.anthropic.com/engineering/built-multi-agent-research-system) | 2025-06 | "Token 80% performance variance" → harness-engineering.md 우선순위 로딩 |
-| [Anthropic 32p Skills Guide](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/skill-best-practices) | 2026-01 | skill-authoring.md / skill-testing.md 3단계 테스트 + Under/Over-triggering |
-| [Claude 4 Best Practices](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/claude-4-best-practices) | 2026-02 | prompt-optimization.md §3 과격 지시어 가드 |
-| [Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps) | 2026-03 | "self-evaluation unreliable" → cross-validation 근거 / Planner-Generator-Evaluator |
-| [Scaling Managed Agents](https://www.anthropic.com/engineering/managed-agents) | 2026-04 | Brain/Hands/Session 분리 → context-artifacts.md emitEvent API contract |
-| [Introducing Claude Opus 4.8](https://www.anthropic.com/news/claude-opus-4-8) | 2026-05-28 | effort 기본 high + 자기결함 ~4x↓ + tool 효율↑ + 수백 parallel subagents → 가이드 4.8 갱신 |
-| [Introducing Claude Fable 5 & Mythos 5](https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5) + [Prompting Claude Fable 5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5) | 2026-06-09 | Opus 상위 tier·thinking 상시·de-prescription·fresh-context verifier → fable-model-guide.md 신설 + effort/grounded progress 배선 |
-| [Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) | 2026 | prompt-optimization.md context 전략 (load-bearing skill of 2026) |
-| [Best Practices for Claude Code](https://www.anthropic.com/engineering/claude-code-best-practices) | 2026 | Subagent isolation / filesystem > compaction |
-
-#### OpenAI 공식
-
-| 출처 | 발표 | fz 적용 |
-|------|:---:|------|
-| [GPT-5 Prompting Guide (Cookbook)](https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide) | 2026 | fz-codex preamble 표준 ("Rephrase → Outline → Narrate") |
-| [Introducing GPT-5.5](https://openai.com/index/introducing-gpt-5-5/) + [System Card](https://openai.com/index/gpt-5-5-system-card/) | 2026-04-23 | "literal and thorough manner" → Codex 인용 가드 |
-| [Codex CLI Changelog 0.124.0](https://developers.openai.com/codex/changelog) | 2026-04-23 | fz-codex Hybrid Routing + Auto Review Agent + GPT-5.5 통합 |
-
-#### Academic (peer-reviewed / arXiv)
-
-| 출처 | 적용 |
-|------|------|
-| **NLAH** (Pan et al., Tsinghua/HIT) — [arXiv 2603.25723](https://arxiv.org/abs/2603.25723) | harness-engineering.md C/R/S/A/Σ/F formalism |
-| **MAST** (NeurIPS 2025) — [arXiv 2503.13657](https://arxiv.org/abs/2503.13657) | 14 failure modes + FM-2.2 "Fail to ask" 6.8% → lead-action-default.md |
-| **GEPA** (Stanford+UCB, ICLR 2026 Oral) — [arXiv 2507.19457](https://arxiv.org/abs/2507.19457) | Reflective prompt evolution (MIPROv2 +10% AIME) → fz-skill optimize |
-| **ACE: Agentic Context Engineering v3** (Stanford, ICLR 2026) — [arXiv 2510.04618](https://arxiv.org/abs/2510.04618) | context collapse / brevity bias → context-artifacts.md |
-| **CONSENSAGENT** (ACL 2025) | 동적 prompt refinement → sycophancy 런타임 완화 |
-| **X-MAS** — [arXiv 2505.16997](https://arxiv.org/abs/2505.16997) | 이종 모델 조합 (MATH +8.4%, AIME +47%) → cross-validation 정량 근거 |
-| **VeriGuard** — [arXiv 2510.05156](https://arxiv.org/abs/2510.05156) | dual-stage verification → fz cross-validation + codex_verification_schema |
-| **Chain-of-Verification (CoVe)** — [arXiv 2309.11495](https://arxiv.org/abs/2309.11495) | fz-fixer / codex_verification_schema 근거 |
-| **MAR** — [arXiv 2512.20845](https://arxiv.org/abs/2512.20845) | 3중 검증 역할 분리 이론 |
-| **Drift No More** — [arXiv 2510.07777](https://arxiv.org/abs/2510.07777) | system-reminders 근거 |
-| **AgentFlow** — [arXiv 2604.20801](https://arxiv.org/abs/2604.20801) | typed graph DSL → harness-engineering.md / fz-planner |
-| **Inside the Scaffold** — [arXiv 2604.03515](https://arxiv.org/abs/2604.03515) | 13개 coding agent 분석 → 5 loop primitives |
-| **IFScale** — [arXiv 2507.11538](https://arxiv.org/abs/2507.11538) | 규칙 수 증가 시 정확도 저하 (500규칙→68%) → skill-authoring 슬림화 |
-| **Multi-Agent Collaboration Survey** — [arXiv 2501.06322](https://arxiv.org/abs/2501.06322) | peer/centralized/distributed 분류 → TEAM P2P 패턴 분류 |
-| **OpenDev: AI Coding Agents for the Terminal** — [arXiv 2603.05344](https://arxiv.org/abs/2603.05344) | terminal harness 참고 |
-| **1M context "safety net not strategy"** — [arXiv 2601.15300](https://arxiv.org/abs/2601.15300) + [2510.05381](https://arxiv.org/abs/2510.05381) | filesystem > compaction 근거 |
-| **DSPy** (Khattab et al., Stanford NLP) — [dspy.ai](https://dspy.ai/) | optimizer 베이스 (BootstrapFewShot / MIPROv2 / GEPA) |
-
----
+> 📦 이전 릴리즈 노트: [docs/releases/](docs/releases/) · 전체 변경 이력 [CHANGELOG.md](CHANGELOG.md)
 
 ## Skills
 
