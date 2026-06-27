@@ -119,6 +119,15 @@
 - 근거: [verified: retrospective catch #9 — fz-commit 본문 /sc:git 미사용 + Bash git commit 직접]
 - 승격 목표 (트랙 B, ledger-only — friction 신호 없음): P2→P1 = 세션 1건 + Codex verify + 사용자 승인.
 
+### L-5: 대칭/짝 경로 동시 수정 (③ TVG-1219 메타패턴)
+- 관측 #1: TVG-1219 (Date: 2026-06-27, fz 환류 세션) | finding-source: internal (사용자 catch)
+- 내용: fz-code/fz-plan에서 상보적 연산 쌍(expand↔collapse, container↔preview, add↔remove, open↔close 등) 중 한쪽만 수정 시 짝 경로 누락 — friction 신호 후보. 자동 grep 불가(설계 지식 필요)라 "짝 경로 확인했나?" 체크리스트 *질문* 형태로만.
+- generalize: broad (상보 연산 쌍은 SW 편재) | 과적합 위험: 中 (자동 grep 불가 → 질문 형태 한정, 과탐 피로 주의)
+- 근거: [verified: TVG-1219 retrospective T1 — container↔preview 비대칭 5건+ + CodeRabbit Major D1-D3 전부 T1] + [verified: 본 세션 MEMORY.md L45 harness-holes 짝 누락 실시간 재현 1건]
+- ⛔ 활성 차단: evidence 1 session [memory-guide:45] → candidate. active 전환 = 트랙 A **5 sessions** 누적 후. 같은 세션 다발(메타패턴 ~3 + 실시간 1)은 **1 count**.
+- finding-source: internal (사용자 catch — 활용 갭 세션) | 관련: [[feedback_fz_self_reference_blindspot]]
+- 승격 목표 (트랙 A): 5 sessions 관측 후 fz-plan 스트레스테스트Q 또는 fz-review 체크 신설 판정.
+
 ### REJECTED (subsumed — 등록 안 함, 재제안 방지용 기록)
 - ~~codebase-helper-3area-grep~~: 41차(Reuse-First) + fz-plan/fz-review reuse가 이미 포섭. 새 규칙 = 중복. (발화 지점 결함은 L-2로 분리 등록)
 - ~~asset-rename-impact-grep~~: 17차(Pre-Gate Failure 영향 범위 사전 grep)에 포섭. 별도 규칙 불요.
