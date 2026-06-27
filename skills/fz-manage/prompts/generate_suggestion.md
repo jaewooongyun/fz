@@ -45,7 +45,7 @@ Lead가 다음 변수들을 채워서 Claude에게 SendMessage로 전달:
 
 ### Type 3: bidirectional_extension
 - **언제**: 기존 단방향 검증을 *양방향*으로 확장해야 할 때
-- **예**: fz-review §검증 4-E 항목 7 "import 제거 작업 시" → "양방향 (제거 방향 + 추가 방향)"
+- **예**: review-checks.md §검증 4-E 항목 7 "import 제거 작업 시" → "양방향 (제거 방향 + 추가 방향)"
 - **diff 형태**: 기존 항목을 *2개 sub-item*으로 분리
 
 ### Type 4: perspective_addition

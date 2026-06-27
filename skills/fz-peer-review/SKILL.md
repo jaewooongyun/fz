@@ -208,68 +208,8 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 
 ### 5.5. Tier Determination (Auto-Tier)
 
-⛔ Gather Step 5 직후 필수 실행. 본 게이트 미실행 시 작은 PR도 Tier 2 디폴트로 진행되어 토큰 낭비.
-
-```bash
-# 1. Changed lines 측정 (PR 또는 branch). gh CLI는 .previous_filename (snake_case) 반환
-if [[ "$INPUT" =~ ^[0-9]+$ ]]; then
-  ADDED=$(gh pr view "$INPUT" --json additions -q '.additions' 2>/dev/null || echo 0)
-  DELETED=$(gh pr view "$INPUT" --json deletions -q '.deletions' 2>/dev/null || echo 0)
-  GENERATED_LINES=$(gh pr view "$INPUT" --json files -q '[.files[] | select(.path | test("(package-lock|pnpm-lock|yarn-lock|Package\\.resolved|Gemfile\\.lock|Cargo\\.lock|\\.pbxproj|\\.storyboard)$")) | .additions + .deletions] | add // 0' 2>/dev/null || echo 0)
-  # rename: gh CLI는 previous_filename (snake_case) 노출. 단, gh CLI 버전에 따라 다름 → fallback grep
-  RENAMED_LINES=$(gh pr view "$INPUT" --json files 2>/dev/null | jq '[.files[] | select(.previous_filename != null or .previousFilename != null) | .additions + .deletions] | add // 0' 2>/dev/null || echo 0)
-else
-  # branch input — BASE 존재 검증
-  case "$INPUT" in
-    feature/*) BASE="${BASE:-develop}";;
-    hotfix/*)  BASE="${BASE:-main}";;
-    *) BASE=$(AskUserQuestion "Base branch?");;
-  esac
-  git rev-parse --verify "$BASE" >/dev/null 2>&1 || git fetch origin "$BASE" 2>/dev/null || { echo "⛔ BASE '$BASE' not found. Abort tier auto."; TIER=2; }
-  ADDED=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '$1!="-"{a+=$1} END{print a+0}')
-  DELETED=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '$2!="-"{d+=$2} END{print d+0}')
-  GENERATED_LINES=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '/(package-lock|Package\.resolved|\.pbxproj|\.lock)/ {g+=$1+$2} END{print g+0}')
-  RENAMED_LINES=$(git diff --name-status "${BASE}...${INPUT}" 2>/dev/null | awk '/^R[0-9]/ {r++} END {print r*5+0}')  # rename 1건당 ~5줄 추정
-fi
-CHANGED_LINES=$((ADDED + DELETED))
-SIGNIFICANT_LINES=$((CHANGED_LINES - GENERATED_LINES))  # rename은 실 편집 가능성 있어 *차감 안 함* (보수적)
-[ "$SIGNIFICANT_LINES" -lt 0 ] && SIGNIFICANT_LINES=0
-[ "$RENAMED_LINES" -gt 0 ] && [ "$SIGNIFICANT_LINES" -lt 10 ] && {
-  AskUserQuestion "rename 위주 PR (SIGNIFICANT_LINES=$SIGNIFICANT_LINES). Tier 0 진행?"
-}
-
-# 2. --tier 옵션 최우선 (precedence: --tier > Risk escalation > auto)
-if [ -n "$TIER_OPT" ]; then
-  TIER=$TIER_OPT  # 사용자 명시 → 그대로. Risk escalation 적용 안 함 (precedence 모순 방지)
-else
-  # auto tier
-  if [ $SIGNIFICANT_LINES -lt 100 ]; then TIER=0
-  elif [ $SIGNIFICANT_LINES -lt 200 ]; then TIER=1
-  elif [ $SIGNIFICANT_LINES -lt 500 ]; then TIER=2
-  elif [ $SIGNIFICANT_LINES -lt 2000 ]; then TIER=2  # +cost warning
-  else
-    AskUserQuestion "diff $SIGNIFICANT_LINES줄. 진행?"
-    TIER=2
-  fi
-
-  # Risk-based escalation (auto일 때만 적용. 6 카테고리 → cap=Tier 2)
-  RISK_PATTERN='auth|token|secret|credential|authorization|permission|role|admin|session|keychain|crypto|certificate|privacy|payment|billing|refund|IAP|InAppPurchase|StoreKit|migration|schema|CoreData|database|sql|public func|public class|public protocol|deinit|removeFromSuperview|deleteAll|@MainActor|actor |async |Task \{|withCheckedContinuation|xcconfig|Package\.swift|ci_scripts'
-  RISK_MATCHES=$(grep -cE "$RISK_PATTERN" "${WORK_DIR}/diff.patch" 2>/dev/null || echo 0)
-  if [ "$RISK_MATCHES" -ge 2 ]; then TIER=$((TIER + 2))
-  elif [ "$RISK_MATCHES" -ge 1 ]; then TIER=$((TIER + 1))
-  fi
-  [ "$TIER" -gt 2 ] && TIER=2  # cap (--deep 명시 시에만 Tier 3 진입)
-fi
-
-# 3. --deep 옵션 처리 (Tier 2/3에서만 Cross-Critique 활성화)
-if [[ "$OPTS" == *"--deep"* ]]; then
-  [ "$TIER" -ge 2 ] && TIER=3 || echo "⚠️ --deep + Tier $TIER → warning. Tier 2 강제"
-  [ "$TIER" -lt 2 ] && TIER=2
-fi
-
-echo "$TIER" > ${WORK_DIR}/tier.txt
-echo "rationale: SIGNIFICANT=$SIGNIFICANT_LINES (added=$ADDED+del=$DELETED-gen=$GENERATED_LINES), risk=$RISK_MATCHES, override=${TIER_OPT:-auto}, deep=${OPTS}" >> ${WORK_DIR}/tier.txt
-```
+> ⛔ Gather Step 5 직후 필수 실행 (미실행 시 작은 PR도 Tier 2 디폴트 → 토큰 낭비).
+> **자동 선택 실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED + risk escalation): `modules/peer-review-tiers.md` "## 자동 휴리스틱 (단일 진실 원천)" → "### 자동 선택 실행 bash" 참조 (SSOT 단일 지점, L18 규칙).
 
 상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조.
 
