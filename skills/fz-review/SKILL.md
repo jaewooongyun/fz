@@ -404,7 +404,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - SwiftUI View body 구조 변경 → 레이아웃 영향
 - @State/@Binding 변경 → 데이터 흐름 무결성
 - Listener/Delegate 변경 → 메모리 누수 패턴 (CLAUDE.md 금지 패턴)
-- 권고: launch_app_sim + screenshot으로 UI 시각 검증
+- **완료기준 (UI/제스처/애니메이션 동작 변경 시)**: 빌드 통과 ≠ 완료. visual oracle(launch_app_sim + screenshot · 실기기 시각 확인) 미충족 시 "완료" 선언 지양 — fz는 런타임 동작을 정적으로 못 봄(자동 실행 불가 = 사람 영역, 🔒 강제 게이트 불가). 기존 'screenshot 권고'를 evidence 3 sessions(38차 ASD-1398 · user_spec ASD-1793 · TVG-1219) 기반으로 강화.
 ```
 
 ### 검증 6: Spec Panel 스펙 부합 (조건부)
@@ -429,7 +429,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] Module Boundary 통과? (access control이 의도와 일치)
 - [ ] ⛔ 타입 소속 검증 통과? (각 public type의 관심사가 모듈 책임에 부합)
 - [ ] Anti-Pattern Enforcement 통과? (금지 패턴 0건, Plan에 Constraints 있을 때)
-- [ ] UI/UX Safety 통과? (View 변경 시 시각 검증 권고)
+- [ ] UI/UX Safety 통과? (UI/제스처/애니메이션 변경 시 visual oracle 권장 — 빌드통과≠완료, fz 자동 불가=사람 영역. evidence 3 sessions 강화)
 - [ ] Spec Panel 통과? (새 모듈 시, 스펙 부합 확인)
 - [ ] Protocol Conformance 통과? (시그니처 변경 시, 프로토콜 선언부 동기화 확인)
 - [ ] Source Fidelity 통과? (리팩토링 시, 원본 대비 추가된 파라미터/로직 없음)
