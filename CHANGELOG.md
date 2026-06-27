@@ -8,6 +8,17 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.16.0 (2026-06-27) — SKILL.md 분리 + visual oracle 강화 [MINOR]
+
+> TVG-1219(유튜브식 플레이어 제스처) 작업 교훈을 fz에 환류. fz 자기참조 검증의 구조적 한계(동종 self-review)를 `/fz-manage check` + 사용자 catch로 보완. C(§1분리)는 가이드 위반으로 revert.
+>
+> - **fz-review visual oracle 강화 (검증5/Gate)**: UI/제스처/애니메이션 동작 변경 시 빌드통과 ≠ 완료, visual oracle(시뮬+스크린샷/실기기) 미충족 시 "완료" 지양 — fz 런타임 정적검증 불가 = 사람 영역. evidence 3 sessions(38차·user_spec·TVG-1219).
+> - **SKILL.md 500↓ 분리 (Progressive Disclosure)**: fz-review 560→436(검증 4-D~H·4-N/O → `modules/review-checks.md` MOVE), fz-peer-review 523→463(Auto-Tier bash → `modules/peer-review-tiers.md` SSOT 일원화 + 판정 변수 명확화). 전체 SKILL.md ≤500.
+> - **candidate 2종** (evidence 1 session): P1 Sibling-Convention Check(skill-authoring) + L-5 대칭/짝 경로(promotion-ledger).
+> - **fz-memory L1 audit 강화**: entry 200자 초과 + MEMORY.md↔topic 양방향 정합(orphan) + organize 제안.
+> - **Reverted**: C(§1 → skill-lifecycle.md 분리) + M4(헤더) — `feedback_guide_line_limit`(guides/ 500 면제·분리 금지) 위반을 `/fz-manage check`가 전제 catch → revert(P1 보존).
+> - ⛔ Codex cross-model verify 미수행 (quota ~6/30) — 동종 Workflow 3-lens + Lead 실측 대체(false positive 2건 차단, 23차 실증). 회복 시 후행. 상세: [docs/releases/v4.16.0.md](docs/releases/v4.16.0.md)
+
 ### v4.15.0 (2026-06-18) — 외부 리뷰어 catch 환류 회로 (promotion-ledger 트랙 C) [MINOR]
 
 > CodeRabbit 등 외부 이종 리뷰어가 fz-review 미탐 이슈를 잡았을 때 fz 자기개선 회로로 환류시키는 인프라. ASD-1793 PR에서 CodeRabbit이 fz가 놓친 retain cycle을 catch한 사례 분석(4-lens Workflow) 결과 — fz는 *능력*이 아니라 *환류 회로*가 단절돼 있었음(입구 pr-comment-review #19는 존재, 출구 4모듈 단절).
