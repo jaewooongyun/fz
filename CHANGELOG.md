@@ -4,9 +4,18 @@
 
 릴리즈마다 인용 논문이 rotate되면 추적 신뢰도가 떨어진다. 다음 정책을 적용한다:
 
-- **Active citations**: 현행 modules/skills/agents에서 직접 인용되는 논문 (예: NLAH 2603.25723, X-MAS 2505.16997, Drift No More 2510.07777, VeriGuard 2510.05156, MAR 2512.20845, Intelligence Degradation 2601.15300, Context Length Hurts 2510.05381, OpenDev 2603.05344)
-- **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release), MAST (2503.13657, v3.0 release)
+- **Active citations**: 현행 modules/skills/agents에서 직접 인용되는 논문 (예: NLAH 2603.25723, X-MAS 2505.16997, Drift No More 2510.07777, VeriGuard 2510.05156, MAR 2512.20845, Intelligence Degradation 2601.15300, Context Length Hurts 2510.05381, OpenDev 2603.05344, MAST 2503.13657)
+- **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release). MAST (2503.13657)는 v4.17.0에서 modules 재인용으로 active 환원
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
+
+### v4.17.0 (2026-06-29) — 가이드 모더나이제이션 + 가이드 준수 remediation [MINOR]
+
+> 외부 최신 권위 자료로 가이드 모더나이제이션 → 갱신 가이드 기준 플러그인 전체 감사 → remediation ①②③④ → 다각도 리뷰. 검증 사슬 각 단계가 직전을 교정.
+>
+> - **모더나이제이션(guides)**: `llm-references.md` 신규(Tier1/2/3 + arxiv 16 실증 + anti-pattern + deprecated 정책) · MAST(2503.13657) active 환원 · Opus 4.8 단일화(이전 버전 제거, fable frozen) · skill-testing §6.4 + §4 표 허용.
+> - **remediation ①②③④**: ① Fable frozen 전파(modules) · ② when-not 라우팅 17 스킬 · ③ Workflow 전환 일관성(fz·agent-team·agents 5·build) · ④ test-spec 17/17(Option A 10 + references 7) + eval §6.4(coverage recall≥90/verification precision≥80) + Few-shot 5스킬 ≥3쌍 + `examples/hooks.json.example`(opt-in, active 배선 0).
+> - **다각도 리뷰(--team --deep)**: 22 agent / 5차원 + adversarial verify → 16 findings 중 확정 8(전부 minor/nit, critical/major 0)·반증 8. CAL-1(Option B 7 버퍼 복원)·D1-4(precision 용어)·CAL-6(§9 비면제) 반영.
+> - ⛔ Codex cross-model 미수행(quota ~6/30) — 동종 fresh-context Claude Workflow 대체(이종 안전망 상실). 회복 시 후행. 상세: [docs/releases/v4.17.0.md](docs/releases/v4.17.0.md)
 
 ### v4.16.0 (2026-06-27) — SKILL.md 분리 + visual oracle 강화 [MINOR]
 
