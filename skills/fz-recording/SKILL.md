@@ -2,7 +2,7 @@
 name: fz-recording
 description: >-
   녹음 파일 → 회의록 변환. 화자 분리 + AI 첨언.
-  예: 녹음, 회의록, 화자 분리
+  예: 녹음, 회의록, 화자 분리 (비사용: 코드·문서·리뷰 작업 아님 — 녹음 전용)
 user-invocable: true
 argument-hint: "<audio-file> [--text <transcript>] [--speakers \"이름1,이름2\"]"
 allowed-tools: >-

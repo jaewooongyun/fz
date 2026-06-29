@@ -2,7 +2,7 @@
 name: fz-modernize
 description: >-
   가이드/문서 모더나이제이션 — 외부 최신 자료(Tier 1+2)로 갱신 + stale 항목 정리 + 정량 검증 (Codex 3회 + AC8 link).
-  예: 최신화, 가이드 업데이트, 모더나이제이션, 문서 갱신, stale 정리
+  예: 최신화, 가이드 업데이트, 모더나이제이션, 문서 갱신, stale 정리 (비사용: 코드 구현 →fz-code, 스킬 구조 →fz-skill)
 user-invocable: true
 argument-hint: "[probe|audit|plan|verify|execute|validate|full|light] [target]"
 allowed-tools: >-
@@ -92,6 +92,8 @@ model-strategy:
 | 2 | peer-reviewed 학술 | ✅ 단독 verified 가능 |
 | 2.5 | arxiv preprint | ⚠️ `[arxiv preprint]` Status 필수 |
 | 3 | Medium / blog (커뮤니티) | ⛔ 단독 verified 금지 — supporting only |
+
+> **컨벤션 (원칙 인용 + frozen 모델)**: ⓐ 일반 원칙(모델 무관)의 인용은 **모델-무관 출처**(공식 docs·peer-reviewed)로 앵커 — frozen/특정 모델 doc을 일반 원칙의 sole source로 쓰지 않는다. ⓑ frozen 모델(예: 제재 모델) 인용 감지 시 **Bucket 분류 선행**: A(일반원칙·frozen이 sole anchor → 재앵커) / B(그 모델 specific 또는 비-frozen 앵커 보유 → 보존) / C(registry) / D(live-framing → frozen 캐비엇 추가). A만 재앵커, canonical ref = 해당 모델 가이드 frozen 섹션.
 
 ---
 
@@ -314,6 +316,7 @@ codex exec \
    # 의도된 미검증만 남아야 함 (예: Korean tokenizer 실측 부재)
    ```
 4. **사용자 검토 체크포인트** (Step 1 완료 후 권장)
+5. **⛔ 소비처 전파 확인**: 가이드 canonical 수정 후, 변경된 개념/태그를 소비처(modules/skills/agents)에 grep 전수 → stale 잔존 0 확인. 가이드만 고치고 소비처 미전파 = "guide 새 vs consumer stale" 불일치(전파 완전성).
 
 ### Gate 5: Execute Complete
 - [ ] 모든 Step Edit 완료?
@@ -388,7 +391,28 @@ codex exec \
   GOOD: Probe 먼저 → Audit → Plan v1 (Probe 실측 기반) → Codex verify
 ```
 
+```
+BAD (Tier 3 단독 근거):
+커뮤니티 블로그 1건으로 가이드 항목 갱신 + [verified] 태그.
+→ AC9 위반. 단일 Tier 3는 supporting-only.
+
+GOOD:
+Tier 1(공식)/Tier 2(arxiv) 교차 확인 → [verified: Tier1/2], Tier 3 단독은 [partially-verified].
+```
+
+```
+BAD (링크 미검증 인용):
+URL을 추론으로 작성 → resolve 실패(환각 인용).
+
+GOOD:
+Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
+```
+
 ---
+
+## 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)
 
 ## Boundaries
 
