@@ -182,15 +182,14 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
-### What's New (v4.16.0) — SKILL.md 분리 + visual oracle 강화 [MINOR]
+### What's New (v4.17.0) — 가이드 모더나이제이션 + 가이드 준수 remediation [MINOR]
 
-TVG-1219 환류 세션 — fz 자기참조 검증 한계를 `/fz-manage check` + 사용자 catch로 보완하며 적용:
-- **fz-review visual oracle 강화 (검증5/Gate)**: UI/제스처/애니메이션 동작 변경 시 빌드통과 ≠ 완료, visual oracle(시뮬+스크린샷/실기기) 미충족 시 "완료" 지양 — fz 런타임 정적검증 불가 = 사람 영역. evidence 3 sessions(38차·user_spec·TVG-1219) 기반 강화.
-- **SKILL.md 500↓ 분리 (Progressive Disclosure)**: fz-review 560→436(검증 4-D~H·4-N/O → `modules/review-checks.md`), fz-peer-review 523→463(Auto-Tier bash → `modules/peer-review-tiers.md` SSOT 일원화 + 판정 변수 명확화). 전체 SKILL.md ≤500.
-- **candidate 2종**: Sibling-Convention Check(skill-authoring P1) + 대칭/짝 경로(promotion-ledger L-5) — evidence 1 session, 5 sessions 후 active 재판정.
-- **fz-memory L1 audit 강화**: entry 200자 초과 + MEMORY.md↔topic 양방향 정합(orphan 탐지) + organize 제안.
+외부 최신 권위 자료로 가이드를 모더나이제이션하고, 그 기준으로 플러그인 전체를 감사·정합화 (모더나이제이션 → audit → remediation ①②③④ → 다각도 리뷰):
+- **모더나이제이션 (guides)**: `llm-references.md` 신규(Tier1 공식·Tier2 arxiv 16 실증·Tier3 커뮤니티 + anti-pattern + deprecated 정책) · MAST(2503.13657) active 환원 · **Opus 4.8 단일화**(이전 버전 제거, fable frozen) · skill-testing §6.4(리뷰형 2단계) + §4 표 허용.
+- **remediation ①②③④**: ① Fable frozen 전파(modules) · ② **when-not 라우팅 17 스킬**(mis-route 차단) · ③ Workflow 전환 일관성(fz·agent-team·agents 5·build) · ④ **test-spec 17/17**(Option A 10 + references 7) + eval §6.4(coverage recall≥90/verification precision≥80) + Few-shot 5스킬 ≥3쌍 + `examples/hooks.json.example`(opt-in, active 배선 0).
+- **다각도 리뷰 (--team --deep)**: 22 agent / 5차원 + adversarial verify → 16 findings 중 확정 8(전부 minor/nit, critical/major 0)·반증 8. CAL-1(Option B 7 버퍼 복원)·D1-4(precision 용어)·CAL-6(§9 비면제) 반영.
 
-> ⛔ Codex cross-model verify 미수행(quota ~6/30) — 동종 Workflow 3-lens + Lead 실측 대체(false positive 2건 차단, 23차 실증). 회복 시 후행. 상세: [docs/releases/v4.16.0.md](docs/releases/v4.16.0.md)
+> ⛔ Codex cross-model verify 미수행(quota ~6/30) — 동종 fresh-context Claude Workflow(22 agent, 5차원+adversarial) 대체, 이종 안전망 상실 명시. 회복 시 후행. 상세: [docs/releases/v4.17.0.md](docs/releases/v4.17.0.md)
 
 > 📦 이전 릴리즈 노트: [docs/releases/](docs/releases/) · 전체 변경 이력 [CHANGELOG.md](CHANGELOG.md)
 
