@@ -750,7 +750,7 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 - (c) ultracode는 workflow를 기본화하나 coupled 작업의 결합도는 바뀌지 않는다(§8 multi-agent 통신 + `guides/agent-team-guide.md` 참조). 비용 반론만 제거할 뿐 fan-out 정당화가 아니다.
 
 > 이유: 운영 설정을 하네스 가정으로 명시하면, 못 바꾸는 레버(세션 effort)에 헛된 게이팅을 걸지 않고 바꿀 수 있는 레버(surface·Codex effort·fan-out)에 집중하게 된다.
-> [미검증: "max가 단순작업서 overthinking" 정량 근거는 wp0rdknnz 단일 외부출처 — Anthropic 공식 docs URL 확보 후 verified 승격]
+> [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — `max`는 "prone to overthinking" + "diminishing returns from increased token usage"; 학술 보강 arxiv 2502.08235(overthinking↑→성능↓)·2604.10739]
 
 ---
 
@@ -1070,7 +1070,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Cross-model Verification | fz-codex (Claude + Codex; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
 | Lazy Tool Discovery | modules/ Progressive Disclosure Level 3 | 필요 시에만 로드 |
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
-| Defense-in-Depth | 5계층: SKILL Gate + cross-validation + Team + Codex + Hooks | 다중 검증 레이어 |
+| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Team + Codex. **Hooks는 opt-in·런타임 미적용** (현재 `.githooks` commit-msg dev-time만 — Claude Code lifecycle hook 0건. 활성 hook 템플릿: `examples/hooks.json.example`, 설치는 팀합의) | 다중 검증 레이어 |
 
 ### Gap 분석 (NLAH 기반, 2026-04-14)
 
@@ -1118,9 +1118,9 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 8e | Externalization in LLM Agents | — | arxiv 2604.08224 [arxiv preprint, 2026-04] — Memory/Skills/Protocols/Harness 통합 review | https://arxiv.org/abs/2604.08224 |
 | 8f | DSPy: Programming, not Prompting | Khattab et al. (Stanford NLP) | dspy.ai [official framework] — BootstrapFewShot/MIPROv2/GEPA optimizers | https://dspy.ai/ |
 | 8g | GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning | Agrawal/Tan/Soylu/...(Khattab 공저자) (Stanford+UCB) | arxiv 2507.19457 [ICLR 2026 Oral / peer-reviewed] — MIPROv2 +10% AIME-2025, GRPO 35x fewer rollouts | https://arxiv.org/abs/2507.19457 |
-| 8h | AgentFlow: Synthesizing Multi-Agent Harnesses | — | arxiv 2604.20801 [arxiv preprint, 2026-04] — typed graph DSL for multi-agent harness synthesis | https://arxiv.org/abs/2604.20801 |
-| 8i | AI Harness Engineering | — | arxiv 2605.13357 [arxiv preprint, 2026-05] — 본 세션 미검증 [검색됨] | — |
-| 8j | Affordance Agent Harness | — | arxiv 2605.00663 [arxiv preprint, 2026-05] — 본 세션 미검증 [검색됨] | — |
+| 8h | Synthesizing Multi-Agent Harnesses for Vulnerability Discovery | Liu et al. | arxiv 2604.20801 [arxiv preprint, 2026-04] — 멀티에이전트 하네스 합성 (취약점 발견) | https://arxiv.org/abs/2604.20801 |
+| 8i | AI Harness Engineering: A Runtime Substrate for Foundation-Model Software Agents | Zhong et al. | arxiv 2605.13357 [arxiv preprint, 2026-05] — 하네스 런타임 substrate | https://arxiv.org/abs/2605.13357 |
+| 8j | Affordance Agent Harness: Verification-Gated Skill Orchestration | Huang et al. | arxiv 2605.00663 [arxiv preprint, 2026-05] — verification-gated skill orchestration | https://arxiv.org/abs/2605.00663 |
 
 ### OpenAI / Codex 공식
 
