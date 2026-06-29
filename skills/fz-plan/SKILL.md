@@ -2,7 +2,7 @@
 name: fz-plan
 description: >-
   계획 수립 + 영향 범위 분석 + 설계. 요구사항 분해와 Serena 기반 코드베이스 탐색.
-  예: 계획 세워줘, 설계해줘, 아키텍처 잡아줘, 요구사항 분석
+  예: 계획 세워줘, 설계해줘, 아키텍처 잡아줘, 요구사항 분석 (비사용: 접근 불명확 시 →fz-discover, 구현 →fz-code)
 user-invocable: true
 argument-hint: "[기능/요구사항 설명] [light]"
 allowed-tools: >-
@@ -418,6 +418,26 @@ Step 4: ContentDetailViewController SwiftUI 기반 UI
 ### 리스크 매트릭스
 | Q1 다중성 | ContentDetail이 여러 진입점(Home/Search/MyPage)에서 호출 | listener 프로토콜 통일 필요 |
 ```
+
+```
+BAD (실측 없는 제약 가정):
+CLI flag 존재를 가정하고 Plan 차원에 포함 → probe마다 Plan 무력화·재작성 사이클.
+
+GOOD:
+Phase 0c에서 3 axes(존재 / 권한·경계 / 결과 contract) 분류 → 미검증은 /fz-discover 선행 후 차원 포함.
+```
+
+```
+BAD (변환 스레드 미명시):
+PromiseKit .done → async Task 변환에 스레드 명시 없음 → 원본 main queue 유실, UI regression.
+
+GOOD:
+Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 → 구현이 @MainActor 보장.
+```
+
+## 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)
 
 ## Boundaries
 

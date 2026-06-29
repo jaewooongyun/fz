@@ -2,7 +2,7 @@
 name: fz-discover
 description: >-
   접근 방식 탐색 + 트레이드오프 비교. 요구사항이 불명확할 때 제약 기반 탐색.
-  예: 어떻게 하면 좋을까?, 트레이드오프 비교, 방식이 여러 개인데
+  예: 어떻게 하면 좋을까?, 트레이드오프 비교, 방식이 여러 개인데 (비사용: 방향 확정 후 계획 →fz-plan, 코드 위치 →fz-search)
 user-invocable: true
 argument-hint: "[해결하고 싶은 문제/질문]"
 allowed-tools: >-
@@ -459,6 +459,10 @@ GOOD (본질 같은 옵션 합치기):
 ```
 
 ---
+
+## 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)
 
 ## Boundaries
 

@@ -2,7 +2,7 @@
 name: fz-code
 description: >-
   코드 구현 + 빌드 검증. 계획 기반 점진적 구현과 매 Step 빌드 검증.
-  예: 구현해줘, 코드 짜줘, 만들어줘, 개발해줘, 빌드해줘
+  예: 구현해줘, 코드 짜줘, 만들어줘, 개발해줘, 빌드해줘 (비사용: 버그 수정 →fz-fix, 계획·설계 →fz-plan)
 user-invocable: true
 argument-hint: "[구현 대상 설명] [light]"
 allowed-tools: >-
@@ -230,7 +230,7 @@ model-strategy:
    | 래퍼 범위 과잉 | @MainActor/do-catch/Task 블록 내에 해당 컨텍스트 불필요 문장 포함. 원본 `.done { UI업데이트; 데이터변환 }` → After `MainActor.run { UI업데이트; 데이터변환 }` 전체 래핑 | 기계적 1:1 변환 — 문장별 컨텍스트 필요성 판단 후 최소 범위 분리. 참조: `modules/code-transform-validation.md` [ablation: scope-min-v1] |
    | 에러 경로 축소 | 원본 switch/catch 분기 N개 → After catch < N개. `== .case(value)` 비교 사용 | enum associated value 무시. `if case` 패턴 매칭 필수 |
    | 퀄리티 역행 | After 줄 수 > Before 2배. 원본 추상화(struct/helper/extension)가 인라인 해체 | 리팩토링이 코드 악화. protocol extension/convenience 검토 |
-   | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견. 단 동일 패턴이 코드베이스 3곳+ 존재하면 convention 간주 — 보고 생략(예: 로컬 UseCase 생성). 단 같은 RIB scope에서 Component가 주입 제공하는 dependency를 Interactor가 동일하게 재생성하면 convention 무관 보고 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지. Gate 3 전 일괄 보고 |
+   | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견. 단 동일 패턴이 코드베이스 3곳+ 존재하면 convention 간주 — 보고 생략(예: 로컬 UseCase 생성). 단 같은 RIB scope에서 Component가 주입 제공하는 dependency를 Interactor가 동일하게 재생성하면 convention 무관 보고 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지(범위 외 정리 금지 [verified: claude-4-best-practices]). Gate 3 전 일괄 보고 |
    | 동기화 부재 | singleton/shared 타입에 `var` 추가/수정 시, `@MainActor`/`actor`/lock/serial queue 보호 없음 | data race 위험 — plugin-refs.md 역방향 트리거 참조. 동시성 보호 메커니즘 추가 필요 |
    | 싱글톤 deinit | `static let shared` 타입에 `deinit` 작성 시 | deinit은 호출되지 않음 — 정리가 필요하면 명시적 `tearDown()` 메서드 사용 |
    | 기본값 소비자 영향 | 비동기 채워지는 property에 기본값(`= false`, `= nil`) 설정 시 | 소비자가 첫 콜백 전에 읽으면 기본값으로 분기 — guard/if 패턴 영향 확인 |
@@ -359,6 +359,47 @@ GOOD:
 .init(data: try Data(contentsOf: fileURL), name: "file")
 → optional 파라미터는 원본에 없으면 생략. 추가 필요 시 AskUserQuestion.
 ```
+
+```
+BAD (빌드 미검증 진행):
+Step 2 코드 작성 완료 → 바로 Step 3 착수.
+→ 매 Step 빌드 검증 누락. Step 3에서 누적 에러, 원인 Step 격리 불가.
+
+GOOD:
+Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
+→ clean build가 다음 Step 전제조건. 실패 시 해당 Step에서 격리·수정.
+```
+
+## 테스트 케이스
+
+### Triggering
+
+**should-trigger** (description '예:' 트리거 어휘 기반)
+
+| 쿼리 | 예상 | 근거 |
+|------|------|------|
+| "구현해줘" | trigger | description 예 — 핵심 유스케이스(코드 구현) |
+| "코드 짜줘" | trigger | description 예 — 코드 작성 |
+| "만들어줘" | trigger | description 예 + intent-trigger "만들어" |
+| "개발해줘" | trigger | description 예 + intent-trigger "개발" |
+| "빌드해줘" | trigger | description 예 — 매 Step 빌드 검증 |
+
+**should-NOT-trigger** (description '비사용:' / Boundaries Will Not의 대안 스킬)
+
+| 쿼리 | 예상 | redirect | 근거 |
+|------|------|----------|------|
+| "이 버그 고쳐줘" | NOT trigger | /fz-fix | description 비사용 "버그 수정 →fz-fix" |
+| "아키텍처 설계해줘" | NOT trigger | /fz-plan | description 비사용 "계획·설계 →fz-plan" + Will Not "계획 없이 대규모 코드 생성 (→/fz-plan)" |
+| "구현한 코드 리뷰해줘" | NOT trigger | /fz-review | Boundaries Will Not "코드 리뷰/검증 (→/fz-review)" |
+
+### Functional
+
+| Given | When | Then | type |
+|-------|------|------|------|
+| 승인된 `{WORK_DIR}/plan/plan-final.md`가 존재 | `/fz-code "검증된 계획대로 구현해줘"` | Plan의 모든 Step을 순차 구현 + 매 Step 빌드 성공 + Gate 3 체크리스트 전 항목 통과(모든 Step 완료·빌드 성공·아티팩트 기록 완료) | normal |
+| 구현 중 같은 대상에 switch/if/enum case 3개+ 발생 | Step N 구현 진행 | "분기 폭증" 마찰 신호를 보고 형식(신호/위치/현상/플랜 재검토)으로 출력 + 사용자 "계속" 응답 전까지 구현 진행 중단(무시 강행 없음) | edge-case |
+| Plan 존재 + 단일 파일/심볼 변경 + "가볍게" 신호 | `/fz-code light "이 변경만 빠르게 구현해줘"` | Plan 첫 Step(단일 변경)만 구현 + Codex 교차 검증 생략 + 매 Step 빌드 성공 유지 + `{WORK_DIR}/code/step-light.md` 산출 | edge-case |
+| Step 구현 중 컴파일 에러로 빌드 2회 연속 실패 | Step N 빌드 검증 | `/sc:troubleshoot --fix` 자동 트리거 후 재빌드, 반복 실패 시 `/ralph-loop` 래더로 에스컬레이션 — 빌드 성공 확인 전 다음 Step 진입 안 함(silent fail 없음) | failure |
 
 ## Boundaries
 

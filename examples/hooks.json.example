@@ -1,0 +1,28 @@
+{
+  "_note": "OPT-IN TEMPLATE — 런타임 미적용. 설치는 팀합의 후 .claude/settings.json 의 hooks 로 복사. 자동 배선 금지(팀 공유 영역). harness-engineering.md Defense-in-Depth + llm-references §1.1 /hooks(O3) 참조.",
+  "_why": "신뢰성 필수 동작(protected-folder write 차단, 편집 후 lint)은 advisory SKILL.md 텍스트가 아니라 결정론적 hook로 강제. exit 2=차단(stderr가 Claude에 피드백), exit 0=success.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "path=$(jq -r '.tool_input.file_path // empty'); case \"$path\" in */app-iOS/*) echo 'Blocked: app-iOS/ 는 팀 공유 영역 — 개인 작업 파일 생성 금지(CLAUDE.md)' >&2; exit 2;; esac; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "path=$(jq -r '.tool_input.file_path // empty'); case \"$path\" in *.swift) command -v swiftformat >/dev/null && swiftformat \"$path\" >/dev/null 2>&1 || true;; esac; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

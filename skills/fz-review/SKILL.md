@@ -2,7 +2,7 @@
 name: fz-review
 description: >-
   자기 코드 3중 검증(Claude+Codex+sc:analyze) + 역방향 검증.
-  예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘
+  예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR →fz-peer-review, 직접 수정 →fz-fix)
 user-invocable: true
 argument-hint: "[리뷰 대상 설명] [light]"
 allowed-tools: >-
@@ -213,7 +213,7 @@ fz-codex가 수행하는 작업:
 - JSON 응답 파싱 → Issue Tracker 자동 기록
 - 이슈 요약 반환
 
-> **Codex 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 quota 불능 기간 — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 Fable 세션 자동상속으로 비용 2배)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ Codex 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]
+> **Codex 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 quota 불능 기간 — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(Opus 4.8) 상속 — 소규모 diff에 opus는 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ Codex 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
 >
 > **⛔ retain cycle 점검 (rank3b, 2026-06-18)**: fresh-context 검증자는 retain cycle 검사 시 `codex-skills/fz-reviewer/SKILL.md` Memory Management(closures capturing `self` without `[weak self]`)를 명시 적용한다 — Codex 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
 > **보조 이종 소스 (rank6)**: PR이 열려 있으면 `/fz` pr-comment-review로 CodeRabbit 코멘트를 보조 이종 소스로 활용 가능 (강제 아닌 Lead 판단).
@@ -405,6 +405,34 @@ Gate 5 통과 후:
   BAD:  컴파일+테스트 통과 → "동작 유지" 판정 (`.done` main queue → 일반 Task 미감지)
   GOOD: Transformation Spec의 실행 스레드/에러 경로/파라미터 키 3축 모두 일치 확인
 ```
+
+## 테스트 케이스
+
+> 근거: `guides/skill-testing.md` §1(테스트 3단계) + §4(테스트 스펙 템플릿). Then은 객관 pass/fail oracle로 기술.
+
+### Triggering Test
+
+| 쿼리 | 예상 | 비고 |
+|------|------|------|
+| "구현한 코드 리뷰해줘" | trigger | 핵심 유스케이스 ('예: 리뷰해줘') |
+| "내가 짠 코드 검증해줘" | trigger | 자기 코드 검증 ('예: 검증해줘') |
+| "이 코드 품질 확인해줘" | trigger | 품질 분석 ('예: 품질 확인') |
+| "내 코드 괜찮아?" | trigger | 품질 자문 ('예: 괜찮아?') |
+| "내 코드 좀 봐줘" | trigger | 자기 코드 리뷰 ('예: 내 코드 봐줘') |
+| "팀원 PR 리뷰해줘" | NOT trigger | → fz-peer-review ('리뷰' 겹쳐도 팀원 PR은 범위 밖, '비사용:') |
+| "이 버그 직접 고쳐줘" | NOT trigger | → fz-fix (직접 수정, '비사용:') |
+| "이 기능 새로 구현해줘" | NOT trigger | → fz-code (대규모 구현, Will Not) |
+| "codex로 검증해줘" | NOT trigger | → fz-codex ('검증' 겹쳐도 Codex 직접 호출은 Will Not) |
+| "아키텍처 계획 세워줘" | NOT trigger | → fz-plan (계획 수립, Will Not) |
+
+### Functional Test
+
+| Given | When | Then | type |
+|-------|------|------|------|
+| 구현된 코드 diff 존재 + Codex CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-codex review` + `/sc:analyze`) 모두 실행(Codex 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
+| "그냥/가볍게" 신호 + 소규모 변경(5파일 미만 & 100 LOC 미만, 리팩토링/시그니처 변경 아님) | `/fz-review light "그냥 가볍게 봐줘"` | review-arch 단독 실행 + Codex 교차검증/Phase 5.5 역방향/Reflection Rate 추적 생략 + `review-light.md` 산출; 단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 적용(light에서도 생략 불가) | edge-case |
+| 인자에 `ASD-\d+` 패턴 없음 + 브랜치명 없음 | `/fz-review "내 코드 봐줘"` | Phase 0에서 저장 여부 AskUserQuestion 발생 → '예' 시 `NOTASK-{YYYYMMDD}/` + index.md 생성 / '아니오' 시 Serena fallback → WORK_DIR 결정 → Gate 0(Work Dir Ready) 3개 항목 통과 | edge-case |
+| 코드 diff 존재 + 검증 2에서 fz-codex 통신 실패 | `/fz-review "리뷰해줘"` | 재시도 1회 후 fresh-context Agent(review-correctness 관점)로 검증 2 대체 + 인용 태그 `[fresh-context: claude]` + 이종 안전망 상실 명시 (Agent 미가용 시 `/sc:analyze` 폴백); 검증 2 미생략 상태로 Gate 4 진행 | failure |
 
 ## Boundaries
 

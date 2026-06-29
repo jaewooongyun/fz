@@ -2,7 +2,7 @@
 name: fz-manage
 description: >-
   fz 생태계 관리. 스킬 목록, 건강 체크, 벤치마크, 의존성 확인.
-  예: 스킬 목록 보여줘, 건강 체크해줘, 벤치마크 돌려줘
+  예: 스킬 목록 보여줘, 건강 체크해줘, 벤치마크 돌려줘 (비사용: 개별 스킬 생성·수정 →fz-skill)
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[list|info|deps|check|benchmark|reflect-to-module|create|edit|delete] [대상]"
@@ -426,6 +426,10 @@ verdict: agree / disagree / partial / needs_verification
 세션 데이터 경로: `$HOME/.claude/sessions`
 
 ---
+
+## 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)
 
 ## Boundaries
 

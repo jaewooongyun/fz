@@ -2,7 +2,7 @@
 name: fz-peer-review
 description: >-
   팀원 PR 코드 리뷰. 3-Model Cross-Review + 9개 관점 독립 분석.
-  예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토
+  예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토 (비사용: 자기 코드 →fz-review, PR 해설 →fz-pr-digest)
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--codex] [--deep] [--post] [--explain]"
@@ -440,6 +440,20 @@ write_memory("fz:checkpoint:peer-review-deliver", "PR#{number}: 판정 {verdict}
 > 참조: `modules/peer-review-tiers.md` — Tier 구성, 자동 선택, 타임아웃 + 폴백
 
 ---
+
+## Few-shot 예시
+
+```
+BAD (작업 컨텍스트 오염):
+팀원 PR 리뷰에 gh pr checkout / 브랜치 전환 → 사용자 미커밋 변경·빌드 캐시 손실.
+
+GOOD:
+git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 → 현재 컨텍스트 보존.
+```
+
+## 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)
 
 ## Boundaries
 

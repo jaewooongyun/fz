@@ -2,7 +2,7 @@
 name: fz-pr-digest
 description: >-
   PR 변경사항 해설 + 학습. Before/After 비교, 아키텍처 맥락 설명.
-  예: 설명해줘, 해설, 뭐가 바뀐, PR 이해
+  예: 설명해줘, 해설, 뭐가 바뀐, PR 이해 (비사용: 평가·지적 →fz-peer-review)
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[PR번호 또는 브랜치명] [--light | --deep]"
@@ -415,6 +415,10 @@ TeamCreate("peer-review-{PR_NUMBER}")
 ```
 
 ---
+
+## 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)
 
 ## Boundaries
 

@@ -2,7 +2,7 @@
 name: fz-memory
 description: >-
   메모리 관리 + 교훈 회상. L1/L2 GC, topic file 관리.
-  예: 메모리 정리해줘, 교훈 떠올려줘, 기억 정리
+  예: 메모리 정리해줘, 교훈 떠올려줘, 기억 정리 (비사용: 스킬 편집 →fz-skill, 문서 갱신 →fz-modernize)
 user-invocable: true
 argument-hint: "[audit|gc|recall|organize|remind] [--skill fz-plan] [--deep]"
 allowed-tools: >-
