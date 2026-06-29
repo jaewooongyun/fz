@@ -58,6 +58,7 @@
 
 - [ ] 빌드 성공?
 - [ ] 빌드 경고 최소화?
+- [ ] UI/제스처/애니 변경 Step이면 visual oracle 충족? (launch_app_sim+screenshot 또는 실기기 — build-pass≠완료, fz-review:283 동일 기준) [verified: llm-references — UI는 shell 검사 불가]
 - [ ] 관련 테스트 통과? (테스트 존재 시)
 
 ## 참조 스킬

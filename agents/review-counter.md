@@ -54,6 +54,8 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 
 ## Peer-to-Peer Protocol
 
+> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
+
 - 팀 내 다른 리뷰 에이전트에게 반론을 직접 SendMessage로 전달
 - 반론 수신 에이전트는 재검토 후 agree / maintain / challenge 응답 의무
 - 최종 합의 결과를 Lead(오케스트레이터)에게 통합 보고

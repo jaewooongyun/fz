@@ -237,7 +237,7 @@ Both:     ASD 파일 + Serena Memory 동시 저장 (이중 안전망)
 
 ## Artifact Token Budget
 
-> 현재 환경: **Opus 4.8 (default) / Fable 5 (옵트인, 2026-06-09 GA)** — 둘 다 1M context [verified: anthropic.com/news/claude-opus-4-8 + platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5]. ASD 파일 전략은 모델 무관 유지 (1M에서도 compact 발생).
+> 현재 환경: **Opus 4.8 (운용)** — Fable 5는 frozen(제재 미운용, 해제 시 동일 1M). 둘 다 1M context [verified: anthropic.com/news/claude-opus-4-8 + platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5]. ASD 파일 전략은 모델 무관 유지 (1M에서도 compact 발생).
 > ⚠️ **tokenizer**: 1.00-1.35x 토큰 증가 (Opus 4.x baseline, fz 자체 실측 미완료) `[미검증: fz 자체 count_tokens 측정 대기]`. Fable 5는 Opus 4.8 tokenizer 동일이므로 동일 적용 [verified: claude-api 번들 스킬 — "same tokenizer as Opus 4.8"]. 측정 후 하단 테이블 크기 조정 가능.
 > 원칙: 전체 artifact 로드 합계 ≤ 100K tokens. 나머지는 실행 working memory.
 > Context Rot 원칙(집중 > 분산)은 context 크기와 무관하게 동일 적용.

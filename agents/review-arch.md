@@ -81,6 +81,8 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 ## Peer-to-Peer Protocol
 
+> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
+
 - 팀 내 피어에게 발견 즉시 공유 (아키텍처 위반이 다른 Lens 이슈로 이어지는 경우)
 - 양측 합의 후 Lead(오케스트레이터)에게 통합 보고
 
