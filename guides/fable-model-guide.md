@@ -1,4 +1,4 @@
-# Claude Fable 5 Model Guide
+# Model Guide — Opus 4.8 (운용) · Fable 5 (frozen)
 
 > ⛔ **사용 제한 (2026-06-14)**: Fable 5가 미국 제재로 외국인 사용 금지 → fz는 **Opus 4.8** 운용. effort는 **세션 레벨 max(기본) / ultracode(코딩·병렬 작업 — xhigh + dynamic workflow 오케스트레이션)**, **plain xhigh 미사용**. effort frontmatter 배선(4스킬)·synthesis fable pilot은 **롤백 완료** (§3 표·§5 effort 섹션·§5.8 ①④). 본 가이드 본문은 제재 해제 시 재사용 위해 **보존**.
 >
@@ -15,6 +15,23 @@
 > - **환경 실측** (Claude Code v2.1.170+, 2026-06-12) — Agent tool model enum, /model · /effort 동작
 
 ---
+
+## Opus 4.8 운용 (현행 기본 모델)
+
+fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides/llm-references.md` §1.2·§4·§5 + `prompt-optimization.md` 참조 (중복 회피).
+
+| 항목 | 값 |
+|------|-----|
+| Model ID / Context | `claude-opus-4-8` · 1M tokens (기본). 가격은 Appendix §1 참조 |
+| Thinking | adaptive (`thinking: {type: "adaptive"}`) — Opus 4.8 자동 [verified: platform.claude.com/docs/en/build-with-claude/extended-thinking]. adaptive > extended thinking [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices] |
+| effort | 코딩/agentic = **`xhigh`** 권장(최소 `high`); shallow reasoning 시 프롬프팅 말고 effort↑; **`max` = "prone to overthinking, diminishing returns"** [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8] |
+| 구버전 제거 (Opus 4.8 only) | manual `budget_tokens`(400)·prefill(미지원)·`interleaved-thinking-2025-05-14` 헤더(ignored) [verified: claude-4-best-practices · extended-thinking] |
+
+---
+
+# Appendix: Fable 5 (frozen — 제재 해제 시 재배선)
+
+> 미국 제재로 fz 미운용 (2026-06-14). 재배선 시 아래 상세 적용 — 본문 보존.
 
 ## 1. 모델 사양
 

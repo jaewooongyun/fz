@@ -202,6 +202,8 @@ GOOD (Mesh / Peer-to-Peer):
 | Adversarial Constraint Discovery | fz-discover | plan-structure(생성) ↔ review-arch(파괴): 만들고 부수며 제약 표면화, 수렴까지 반복 | `patterns/adversarial.md` |
 | Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ↔ search-pattern(텍스트): 다른 방법론 교차 확인 | `patterns/cross-verify.md` |
 
+> **실행 전환 (Wave 1-3)**: 위 5 패턴은 현재 `workflows/{discover-adversarial,plan-collaborative,review-live,code-pair,search-cross-verify}.js` 결정적 Workflow로 실행(P2P SendMessage 아님 — 라운드 의미론은 스크립트가 구현). TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존. 규약: `guides/skill-authoring.md` §12.
+
 공통: 3명+ Star 토폴로지는 Supporting 발견을 Primary 경유 전달, 합의 후 Lead 보고. 라운드·토폴로지 상세는 `modules/team-core.md`.
 
 ---
@@ -274,7 +276,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
 | 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]) | SOLO for simple tasks |
-| coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(step-repetition 등) + 동일 토큰예산서 우위 소멸 [미검증 근거: wp0rdknnz] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
+| coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) + 동일 토큰예산서 우위 소멸 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
 | standalone Task | 통신 불가, 고립된 작업 | TeamCreate 필수 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
 | 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 2-Tier (Lead+Primary=opus, rest=sonnet) |

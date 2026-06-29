@@ -61,6 +61,12 @@
 > - ~~DyLAN (COLM 2024)~~ → Multi-Agent Collaboration Survey로 대체 (Claude 4.x 이전 벤치마크)
 > - ~~서브에이전트 토큰 연구 (dev.to)~~ → Anthropic Agent Teams 공식 문서로 대체
 > - ~~hyperdev 컨텍스트 보호~~ → Claude Code 네이티브 기능으로 흡수됨
+>
+> **구버전 프롬프팅/API 제거 (Opus 4.8 only):**
+> - ~~manual `budget_tokens` extended thinking~~ → adaptive thinking + effort + `max_tokens` (Opus 4.7+/Fable 5에서 400 에러) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices]
+> - ~~prefilled responses (마지막 assistant turn)~~ → structured outputs / user turn 주입 (Claude 4.6+ 미지원) [verified: 동]
+> - ~~`interleaved-thinking-2025-05-14` beta header~~ → 자동 adaptive thinking (4.6+ ignored) [verified: platform.claude.com/docs/en/build-with-claude/extended-thinking]
+> - ~~over-prompting / anti-laziness ("If in doubt, use [tool]")~~ → dial back (최신 모델서 overtrigger) [verified: claude-4-best-practices]
 
 ---
 

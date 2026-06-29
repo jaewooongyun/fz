@@ -194,6 +194,7 @@ User prompt에 추가:
 - SKILL.md 줄 수 재확인 (500줄 이하)
 - 스킬 수 참고: Anthropic 공식 "20-50 skills is a good range"
 - 불필요한 모듈 참조 제거
+- invoke된 skill은 세션 내내 단일 메시지로 잔존(재read 안 함), compaction 시 token budget 내 재첨부 — 오래된 skill은 compaction 후 누락 가능 [verified: code.claude.com/docs/en/skills]
 
 ### 3.4 에이전트 통신 실패
 
