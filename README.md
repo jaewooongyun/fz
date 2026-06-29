@@ -245,6 +245,7 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 | 가이드 | 설명 |
 |--------|------|
+| **llm-references.md** | LLM·AI 권위 자료 단일 참조점 (Tier1 공식 / Tier2 arxiv 16 실증 / Tier3 커뮤니티) — 가이드·스킬 개선 1차 출처 |
 | **prompt-optimization.md** | 10대 프롬프트 원칙 + Context Rot 대응 |
 | **skill-authoring.md** | 스킬 작성법 (YAML, Progressive Disclosure, 500줄 제한, §12 Workflow 오케스트레이션) |
 | **agent-team-guide.md** | 에이전트 팀 (2.5-Turn, Task Brief, 모델 전략) |
