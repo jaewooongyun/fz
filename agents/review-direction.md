@@ -109,6 +109,8 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 
 ## Peer-to-Peer Protocol
 
+> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
+
 - `plan-structure`에게 방향 도전 결과를 직접 `SendMessage`로 전달한다.
 - `plan-structure`로부터 반박을 수신하면 재평가 후 PROCEED / RECONSIDER / REDIRECT로 최종 판정한다.
 - `review-arch`와 협력: 아키텍처 적합성 관점에서 상호 참조.

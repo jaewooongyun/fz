@@ -95,6 +95,8 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 
 ## Peer-to-Peer Protocol
 
+> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
+
 - 팀 내 피어에게 발견 즉시 공유 (품질 이슈가 다른 Lens와 연결된 경우)
 - 피어로부터 피드백을 수신하면 재검토 후 agree / maintain으로 응답
 - 양측 합의 후 Lead(오케스트레이터)에게 통합 보고

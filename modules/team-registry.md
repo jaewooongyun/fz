@@ -10,7 +10,7 @@
 > **model 컬럼 해석**: `default` = frontmatter 기본값, `promoted` = Lead가 스폰 시 승격하는 모델.
 > Primary 에이전트의 frontmatter는 `model: sonnet`이지만, TEAM 스폰 시 Lead가 `model: "opus"`를 명시적으로 전달한다.
 > 이 설계는 "동시 opus 최대 2개" 거버넌스를 Lead가 직접 제어하기 위함이다.
-> **fable** (2026-06-09 GA, opus 상위 tier·2배 비용): Agent/Workflow `model` 파라미터로 지정 가능하나 default/promoted 체계는 opus 유지 — 승격 기준은 `guides/fable-model-guide.md` §5.
+> **fable** (⛔ frozen — 제재로 미운용, fz는 Opus 4.8 운용): frozen 동안 Agent/Workflow `model` 지정 불가. default/promoted 체계는 opus. 해제 시 재배선 기준은 `guides/fable-model-guide.md` §5(보존).
 
 | 에이전트 | domain | lens | default | promoted | memory | skills | isolation | 비고 |
 |---------|--------|------|---------|----------|--------|--------|-----------|------|

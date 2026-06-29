@@ -27,7 +27,7 @@
 
 ## Parallelizable 판별 (TEAM 진입 시 modifier — 별도 게이트 아님)
 
-TEAM(4+)으로 판정돼도, 작업이 **tightly-coupled**(상호의존 결정이 많음 — 대부분의 구현/리팩토링)이면 fan-out 대신 **single-thread 구성 + 다관점 검증**을 권고한다. multi-agent fan-out은 **parallel + read-heavy + 단일 컨텍스트 초과**(탐색/리뷰/감사) 작업에서만 이득이 크다. 이유: coupled 작업의 병렬 분해는 MAST 실패 모드(step-repetition·reasoning-action mismatch)를 유발하고 동일 토큰 예산에서 우위가 사라진다 [미검증 근거: wp0rdknnz — Tran&Kiela 2026 / MAST]. 이 판별은 5차원 점수를 *대체하지 않고* TEAM 실행 형태(fan-out vs single-thread)를 조정하는 modifier다.
+TEAM(4+)으로 판정돼도, 작업이 **tightly-coupled**(상호의존 결정이 많음 — 대부분의 구현/리팩토링)이면 fan-out 대신 **single-thread 구성 + 다관점 검증**을 권고한다. multi-agent fan-out은 **parallel + read-heavy + 단일 컨텍스트 초과**(탐색/리뷰/감사) 작업에서만 이득이 크다. 이유: coupled 작업의 병렬 분해는 MAST 실패 모드(inter-agent misalignment·task verification 범주)를 유발하고 동일 토큰 예산에서 우위가 사라진다 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — Cemri]. 이 판별은 5차원 점수를 *대체하지 않고* TEAM 실행 형태(fan-out vs single-thread)를 조정하는 modifier다.
 
 ## Override 플래그 우선순위
 
