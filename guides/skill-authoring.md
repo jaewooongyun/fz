@@ -500,7 +500,7 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 ### 배치·호출 규약
 
 - 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
-- 호출(Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/....js', args })`. SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
+- 호출(Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/....js', args })`. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
 
 ### 산출물·거버넌스 계약

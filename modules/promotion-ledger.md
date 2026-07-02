@@ -132,6 +132,66 @@
 - ~~codebase-helper-3area-grep~~: 41차(Reuse-First) + fz-plan/fz-review reuse가 이미 포섭. 새 규칙 = 중복. (발화 지점 결함은 L-2로 분리 등록)
 - ~~asset-rename-impact-grep~~: 17차(Pre-Gate Failure 영향 범위 사전 grep)에 포섭. 별도 규칙 불요.
 
+## ASD-1794 회고 후보 (시청내역 v3 마이그레이션, 관측 #1)
+
+> 출처: `TVING/fz-asd1794-migration-retro/README.md` (실수 10건 + G1~G8) + `plan/plan-v2.md`
+> ⛔ **회고 자체 오류 정정**: 회고 §6/§9 "evidence ≥ 3 sessions"는 오류 — Track A 활성 임계 = **5 sessions** [verified: promotion-ledger.md:74 + memory-guide.md:45]. ≥3은 별도 모듈 분리 자격이지 active 임계 아님. (P-track P2→P1=1 / P1→P0=2는 별도 — ledger:33-45.)
+> **카운트 기준** (본 세션 채택): Track A friction 신호 = memory-guide:47 "별개 세션 관측" (L-1 #2 선례 ledger:91). Eligible (a)+(b)는 P-track 승격 전용으로 구분.
+> **dedup**: 회고 G6→기존 L-3(표면 churn), G8→기존 L-2(helper reuse). 신규 = G1·G2·G3·G4·G5 → L-6~L-10. G7(툴링 문서)은 friction 신호 아님 → ledger 미등록.
+> ⛔ **소급 카운트 불인정**: 회고 §5 "45차 근접"은 과거 세션 소급 아님 — L-6~L-10 전부 관측 #1부터 보수 시작.
+
+### L-6: DTO/Entity 미러링 시 서버 실필드 검증 (G1)
+- 관측 #1: ASD-1794 | Date: 2026-07-02 | finding-source: internal (사용자 catch)
+- 내용: 형제 DTO/Entity 미러링·필드 추가/제거 시 "이 필드를 서버가 실제 payload로 주는가?(apidog/실 응답)" 미확인. (a) 형제 필드 이식(#3 stored `id` — 서버 payload에 없음) (b) 서버 실필드 제거(#6 `lastPlayTime`).
+- generalize: narrow (DTO/Entity 미러링) | 과적합 위험: 中
+- 근거: [verified: README.md:19,22 #3·#6]. ⚠️ 경계: fz-code:227 "파라미터 키 불일치"는 *요청* 키 대상 — 본 신호는 *응답* DTO 필드로 구분.
+- ⛔ 활성 차단: evidence 1 session → candidate. 축2(계약 지식) 성격 — 순수 friction 질문만으론 약함, apidog OAS 주입(Track3 pilot S6)이 진짜 레버.
+- 승격 목표 (Track A): 5 sessions + Codex verify.
+
+### L-7: canonical 값-매핑 전량 복사 (G2)
+- 관측 #1: ASD-1794 | Date: 2026-07-02 | finding-source: internal (사용자 catch)
+- 내용: canonical/형제의 값 매핑(코드접두→타입 등) 통째 복사 → 미확정·불일치 값을 사실화(#4 mediaType P/SB/A/L). 각 항목이 현 도메인에서 실제 발생하는지·소스 일치하는지 미검증. 규칙: 미확정 값은 default(nil/else)로 확장점만.
+- generalize: narrow (값 매핑 복사) | 과적합 위험: 中 | 트리거=축1(복사 감지 코드판정)/해소=축2(값 유효성 도메인 지식) 하이브리드
+- 근거: [verified: README.md:20 #4] + [verified: feedback_template_authority_bias.md — 4th vector].
+- ⛔ 활성 차단: evidence 1 session → candidate.
+- 승격 목표 (Track A): 5 sessions + Codex verify.
+
+### L-8: 도메인 심볼에 API 버전/transport (G3)
+- 관측 #1: ASD-1794 | Date: 2026-07-02 | finding-source: internal (사용자 catch)
+- 내용: 도메인 타입/메서드/주석에 API 버전(v2/v3) 또는 transport 세부가 박힘(#1 `WatchHistoryV3Response`·`watchedHistoryV3Page`·"v3" 주석). 버전 공존은 파라미터 오버로드로, 도메인 심볼은 무버전.
+- generalize: narrow (Swift 심볼 네이밍) | 과적합 위험: 中 (grep FP — 버전 토큰 정교화)
+- 근거: [verified: README.md:17 #1] + [verified: feedback_no_api_version_in_domain_names.md — 신규 생성].
+- ⛔ 활성 차단: evidence 1 session → candidate. 기존 fz-code "Swift Naming"(축a~e, ASD-1366) + 4-N에 축(f)로 추가 — ⚠️ **evidence 카운트 분리**(축f=ASD-1794는 축a~e=ASD-1366과 이질).
+- 승격 목표 (Track A): 5 sessions + Codex verify.
+
+### L-9: DTO(계약 미러) vs Entity(사용분) 레이어 책임 (G4)
+- 관측 #1: ASD-1794 | Date: 2026-07-02 | finding-source: internal (사용자 catch)
+- 내용: "미사용/dead" 판정을 레이어별로 구분: DTO(Decodable payload 미러)에서 서버 실필드 제거 = 갭(#6 lastPlayTime), Entity(화면 사용분)에서 미사용 필드 제거 = OK. 한 레이어 판정을 다른 레이어에 오투영.
+- generalize: narrow (DTO/Entity 레이어) | 과적합 위험: 中 | 트리거=축1(레이어 식별)/해소=축2(서버 계약) 하이브리드. G1(#6)과 관점 공유.
+- 근거: [verified: README.md:22 #6·§2 P2].
+- ⛔ 활성 차단: evidence 1 session → candidate.
+- 승격 목표 (Track A): 5 sessions + Codex verify.
+
+### L-10: 신규 엔드포인트 prefix/컨벤션 사전 체크 (G5)
+- 관측 #1: ASD-1794 | Date: 2026-07-02 | finding-source: internal (사용자 런타임 catch)
+- 내용: 새 Repository 메서드 작성 시 동일 host 형제 엔드포인트의 path prefix(`/bff/app` 등) 실측 대조 없이 apidog 경로만 사용 → 실기기 404(#5). apidog 경로 ≠ 앱 게이트웨이 경로.
+- generalize: narrow (신규 엔드포인트) | 과적합 위험: 中 | 축2(계약 지식). 13차 server-contract 강화.
+- 근거: [verified: README.md:21 #5].
+- ⛔ 활성 차단: evidence 1 session → candidate. fz-plan Phase 0c Constraint Probe 확장(Track3 pilot S6, 별도 세션).
+- 승격 목표 (Track A): 5 sessions + Codex verify.
+
+### L-2 관측 #2 (G8 — ASD-1794, ⚠️ 카운트 보류)
+- 관측: ASD-1794 (#10 WatchLabel 자작 — 공용 `ContentLabelDTO`→`ContentLabel` 미탐색) | finding-source: internal (사용자 2턴 지적)
+- ⚠️ **카운트 보류**: eligible session (a)fz-plan Phase0.5~3 형식 증거 0건 + (b)Codex quota 생략 [verified: ASD-1794-work/review/self-review.md:3] → 둘 다 미확증. 관측만 등록, 5-session 카운트 미반영.
+- 확장 관측: L-2 검출법=util 3영역 grep이나 G8 실패(`ContentLabelDTO` 도메인 모델)는 3영역 밖 → **사용처 기반** 보강 필요(S3). memory-guide "same failure mode → merge"로 L-2 흡수 판정.
+- 근거: [verified: README.md:26 #10].
+
+### L-3 관측 #2 (G6 — ASD-1794, ⚠️ 카운트 보류)
+- 관측: ASD-1794 (#9 flip-flop: mediaType 확장→축소→재확장, lastPlayTime 유지→제거→복원) | finding-source: internal (사용자 매 flip)
+- ⚠️ **카운트 보류**: L-2와 동일 사유 (eligible 미확증).
+- 확장 관측: L-3 내용 문구는 이미 "UI/설계 문제" 포함(ledger:109) → ledger 편집 불요. fz-code 신호 문구("UI 속성값")만 설계원칙 flip으로 확장(S4).
+- 근거: [verified: README.md:25 #9].
+
 ## 미달 조치 정책
 
 eligible session 없이 3개월 경과 시:

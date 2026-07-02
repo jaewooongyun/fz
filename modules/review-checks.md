@@ -87,8 +87,8 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
 
 ### 검증 4-N: Swift Naming Compliance (Swift/iOS 프로젝트 한정) — **CANDIDATE (Lesson Intake Decision Tree)**
 
-> ⚠️ **Candidate 상태**: evidence 1 session (ASD-1366). `modules/memory-guide.md` Lesson Intake Decision Tree 명시 — *evidence < 3 sessions → candidate*. 활성 강제 X. 본 검증은 *권장 self-check*이지 *Gate 차단*이 아님. 5 sessions 관측 후 활성화 결정.
-> 발동: Swift/iOS 프로젝트 + diff에 새 식별자(helper/method/type/property) 발견 시 권장.
+> ⚠️ **Candidate 상태**: 축(a~e) evidence 1 session (ASD-1366). 축(f) evidence 1 session (ASD-1794, promotion-ledger L-8) — **축별 evidence 분리, 카운트 혼합 금지**. `modules/memory-guide.md` Lesson Intake Decision Tree 명시 — *evidence < 3 sessions → candidate*. 활성 강제 X. 본 검증은 *권장 self-check*이지 *Gate 차단*이 아님. 각 축 5 sessions 관측 후 활성화 결정.
+> 발동: Swift/iOS 프로젝트 + diff에 새 식별자(helper/method/type/property) 발견 시 권장. 축(f)는 주석도 대상.
 > 참조: 메모리 `feedback_swift_naming_conventions.md` — Apple Swift API Design Guidelines 5축 self-check.
 
 ```
@@ -100,6 +100,8 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
    (c) 부수 효과(log/persist/dispatch) 이름에 포함 → 위반
    (d) `-ed/-ing` rule 위반 (mutating ↔ non-mutating 짝 부재) → 위반
    (e) 사용자 표현 어휘 무시 → 위반
+   (f) 도메인 타입/메서드/주석에 API 버전(v2/v3) 또는 transport 세부 박힘 → 위반 (버전 공존은 파라미터 오버로드로, 도메인 심볼은 무버전. 예: `WatchHistoryV3Response`·`watchedHistoryV3Page`·"v3" 주석)
+   ⤷ 축(f)는 주석도 대상: step 1 grep(선언)에 더해 변경 hunk 주석에 `Grep "[vV][0-9]"`(transport 버전 토큰) 병행
 3. 위반 발견 시 "naming_violation" 이슈 (severity: minor — 단 systematic하면 major)
 4. 권고: Apple 정합 이름 제시 (예: appOrLog → verifiedApp)
 

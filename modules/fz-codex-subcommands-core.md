@@ -34,6 +34,8 @@ cd "$GIT_ROOT" && codex exec review \
 
 **`--add-dir` 패턴**: `SHARED_MODULES="$GIT_ROOT/TvingUI $GIT_ROOT/tving-common $GIT_ROOT/Managers"`. 모듈화 시 소비자 디렉토리도 포함: `$GIT_ROOT/Apps/Sources`.
 
+**⚠️ `review`는 flag-only** (G7/#7 회고 #8): `codex exec review`는 PROMPT positional을 받지 않는다 — 리뷰 대상 선택은 플래그(`--base`/`--uncommitted`)로만. 프롬프트 주입이 필요하면 `review` 서브커맨드가 아니라 `codex exec ... "PROMPT"`(verify 형식, §verify) 사용. `--uncommitted`와 PROMPT 문자열을 함께 주면 인자 충돌.
+
 ## verify -- 계획 검증
 
 fz-plan의 Phase 2. **`codex exec` + `--output-schema` 사용.**
