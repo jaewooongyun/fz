@@ -67,12 +67,10 @@ You are a {role} for {domain/project}.
 - 책임 2
 - 책임 3
 
-## Peer-to-Peer 통신 규칙
-1. 피어에게 직접 SendMessage로 소통. Lead를 거치지 마세요.
-2. 발견하면 즉시 관련 피어에게 공유.
-3. 피어의 메시지를 받으면 반드시 응답 (동의/반박/보완/질문).
-4. 합의에 도달하면 Lead에게 보고.
-5. 교착 상태이면 Lead에게 중재 요청.
+## 통신 규칙 (Workflow)
+1. 이 에이전트는 `workflows/*.js` 결정적 스크립트가 라운드를 소유한다 — P2P SendMessage 없음.
+2. 발견은 구조화 출력(schema)으로 반환하고, Lead/스크립트가 통합한다.
+3. 브리프 명시 채널이 에이전트 기본 지시보다 우선한다 (`guides/agent-team-guide.md` §2).
 
 ## 워크플로우
 1. {first action}

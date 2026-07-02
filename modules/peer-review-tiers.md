@@ -1,17 +1,19 @@
 # Peer Review 4-Tier Graceful Degradation
 
-diff 크기에 따라 팀 구성과 비용을 자동 조절하는 티어 시스템.
+diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
+
+> ⛔ **TEAM 일몰 재매핑 (Wave 4)**: Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행된다 (TeamCreate 아님). Tier 0/1은 이미 Lead-solo. 폴백 체인 Tier3→2→1→0은 `mode:'workflow'` → `mode:'fallback'` → Lead SOLO로 매핑. Codex는 out-of-band (Lead `/fz-codex`, 스크립트 내 스폰 금지).
 
 ---
 
 ## Tier 구성
 
-| Tier | review-arch | review-quality | Codex | Cross-Critique | 비용 상한 |
+| Tier | review-arch | review-quality/correctness | Codex | Cross-Critique | 비용 상한 |
 |------|------------|----------------|-------|---------------|----------|
 | **0 (Solo)** | Orchestrator 직접 | — | — | None | ~$0.10 |
-| **1 (Solo+Codex)** | Orchestrator 직접 | — | codex exec ×1 | None | ~$0.30 |
-| **2 (Lite Team)** | Opus 팀에이전트 ★ | Sonnet 팀에이전트 | codex exec ×1 | Lite (합성만) | ~$2.00 |
-| **3 (Full Team)** | Opus 팀에이전트 ★ | Sonnet 팀에이전트 | codex exec ×2 | Full (SendMessage + DA) | ~$3.50 |
+| **1 (Solo+Codex)** | Orchestrator 직접 | — | Lead /fz-codex ×1 | None | ~$0.30 |
+| **2 (Lite)** | peer-review.js Stage1 (opus) | Stage1 (sonnet) | Lead /fz-codex ×1 | 미투표 (Lead 병합) | ~$2.00 |
+| **3 (Full)** | peer-review.js Stage1 (opus) | Stage1 (sonnet) | Lead /fz-codex ×2 | Workflow Stage2 교차 + Stage3 counter DA | ~$3.50 |
 
 ## 자동 휴리스틱 (단일 진실 원천)
 

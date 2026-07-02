@@ -8,6 +8,16 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release). MAST (2503.13657)는 v4.17.0에서 modules 재인용으로 active 환원
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### [Unreleased] — Wave 4 TEAM 전면 일몰 (대안 A) [MINOR]
+
+> peer-review까지 Workflow 전환하여 TeamCreate+SendMessage 실행 경로 전면 제거. 트리거: 스폰 에이전트가 미바인딩 컨텍스트에서 SendMessage 호출 → 에러. 근본 = "에이전트 기본 지시가 브리프 명시 채널 override" 우선순위 미성문화.
+>
+> - **버그 클래스 제거**: `agent-team-guide.md` §2 "채널 우선순위 원칙(브리프 > 에이전트 기본 지시)" 성문화(LB2) · 로직-임베드 SendMessage 3에이전트(review-correctness/impl-correctness/memory-curator) → Lead prefetch/구조화 반환(LB1).
+> - **peer-review → Workflow**: `workflows/peer-review.js` 신규(Stage1 arch+quality+correctness 3-병렬 → Tier3 Stage2 arch↔quality 교차 + Stage3 counter DA, 6-call · Codex out-of-band). fz-peer-review SKILL Tier2/3 시퀀스 전환, allowed-tools+=Workflow.
+> - **진입점 정리**: fz-pr-digest 2 TeamCreate(pr-digest+peer-review) → Workflow · fz §5.2 TEAM Execution → Workflow Execution · fz-memory:146. **실제 TeamCreate 호출부 0건**.
+> - **에이전트/템플릿**: 12 에이전트 P2P 블록 → Workflow 노트 · agent-template/skill-template TEAM → Workflow(신규 산출물 TEAM 미상속) · team-core/peer-review-tiers 일몰 헤더 + Tier 재매핑.
+> - ⛔ **pending**: `peer-review.js` 실 invoke 캘리브레이션(실 PR 필요) · `patterns/*.md`는 canonical 라운드 의미론으로 보존 · 버전 범프+release는 캘리브레이션 후. 산출물: `~/dev/TVING/fz-team-sunset/`.
+
 ### v4.17.0 (2026-06-29) — 가이드 모더나이제이션 + 가이드 준수 remediation [MINOR]
 
 > 외부 최신 권위 자료로 가이드 모더나이제이션 → 갱신 가이드 기준 플러그인 전체 감사 → remediation ①②③④ → 다각도 리뷰. 검증 사슬 각 단계가 직전을 교정.

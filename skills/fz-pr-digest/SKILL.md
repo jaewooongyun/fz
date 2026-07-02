@@ -16,7 +16,7 @@ allowed-tools: >-
   mcp__github__get_pull_request_comments,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Read, Grep, Glob
+  Bash(git *), Read, Grep, Glob, Workflow
 composable: true
 provides: [pr-digest, code-understanding]
 needs: [none]
@@ -57,8 +57,8 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+- Deep Tier 심층 탐색은 네이티브 Workflow 도구 필요 — 미가용 시 SOLO 탐색 폴백
+- 참조: `guides/skill-authoring.md` §12 (Workflow 규약)
 
 ## 3-Tier 깊이
 
@@ -379,40 +379,15 @@ peer-review WORK_DIR: ${PROJECT_ROOT}/peer-review-{PR_NUMBER}/
 
 ---
 
-## TEAM 모드 (Deep Tier)
+## Deep Tier (Workflow)
 
-Deep Tier에서 팀 에이전트를 사용할 수 있다.
+Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체, Wave 4 — 결정적 스크립트, P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
 
-### 절대 규칙
-> 팀 모드 규칙은 modules/team-core.md 참조 (TeamCreate 필수, 에이전트 간 SendMessage 통신)
+### 심층 탐색
+- `Workflow({ scriptPath: '{플러그인 루트}/workflows/search-cross-verify.js', args })` — search-symbolic(심볼/Before-After 구조) ↔ search-pattern(아키텍처 패턴/기술 배경) 교차 검증. 반환을 digest 입력으로 결합.
 
-### 팀 구성 (Deep)
-
-```
-TeamCreate("pr-digest-{PR_NUMBER}")
-
-에이전트:
-  - search-symbolic (opus): 심볼 탐색 + Before/After 구조 분석 (Serena 활용)
-  - search-pattern (sonnet): 아키텍처 패턴 + 기술 배경 조사
-
-통신 패턴:
-  search-symbolic → search-pattern: "이 변경의 상위 컴포넌트 관계 확인해줘"
-  search-pattern → search-symbolic: "Root → Settings → FloatingWebView 구조야"
-  → 합의 후 team-lead에 보고
-```
-
-### peer-review 연계 시 TEAM 구성
-
-fz-peer-review Tier 3 + --explain --deep 시, peer-review 팀에 digest 역할을 추가:
-
-```
-TeamCreate("peer-review-{PR_NUMBER}")
-
-에이전트:
-  - review-arch (opus): 아키텍처 리뷰 (3-Tier 디스커버리)
-  - review-quality (sonnet): 코드 품질 리뷰 (3-Tier 디스커버리)
-  - 리뷰 완료 후 Lead가 pr-digest Deep 실행
-```
+### peer-review 연계
+- fz-peer-review Tier 3 + `--explain --deep` 시: Lead가 `workflows/peer-review.js`(`deep:true`) 실행 → reviews/issues 수신 → pr-digest Deep 해설과 결합. 각 스킬이 자신의 Workflow를 소유하므로 별도 TeamCreate 불필요.
 
 ---
 

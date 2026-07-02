@@ -143,7 +143,7 @@ L2 임시키 삭제 + L1 stale 항목 정리 제안 + L3 잔존 ASD 정리.
    b. `Grep` → 교훈에 언급된 패턴이 유효한지
    c. 라이브러리 관련 → Context7로 최신 API 확인
 5. **유효한 교훈만 요약** (3-5줄) + stale 교훈 표시
-6. **결과 주입**: SOLO → 대화 컨텍스트, TEAM → `SendMessage(Primary Worker)`
+6. **결과 주입**: SOLO → 대화 컨텍스트 / Workflow → 구조화 출력 반환 (Lead가 Primary Worker에 주입)
 
 ### Gate: Recall Complete
 - [ ] 관련 교훈 검색 완료?

@@ -131,9 +131,9 @@ Input → Phase 1 → Phase 2 → ... → Output
 
 ## 팀 에이전트 모드
 
-- **Primary**: {agent role and responsibility}
-- **Supporting**: {agent roles}
-- **Communication**: TeamCreate → parallel work → merge results
+- **Workflow**: `workflows/{skill}-{pattern}.js` 결정적 스크립트가 fan-out/수렴 소유 (§12)
+- **Agents**: agentType(`fz:`)으로 재사용 — 구조화 출력 반환, Lead 통합
+- **Communication**: P2P SendMessage 없음 — 스크립트가 라운드 구현
 
 ---
 
@@ -275,10 +275,10 @@ Before finalizing a new skill, verify:
 
 ---
 
-## If TeamCreate is used (조건부 필수)
+## If Workflow is used (조건부 필수)
 
-TeamCreate를 호출하는 스킬이면 다음 3항목 필수:
+Workflow(멀티에이전트 오케스트레이션)를 호출하는 스킬이면 다음 필수 (`guides/skill-authoring.md` §12):
 
-- [ ] 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 전제조건 명시 (Phase 0/1 또는 Prerequisites 섹션)
-- [ ] `modules/team-core.md` 참조 (TEAM 실행 프로토콜 + VD 트리거 주입)
-- [ ] VD Task Brief 주입 경로 (`skills/fz/SKILL.md` §5.2 TEAM Execution 참조)
+- [ ] frontmatter `allowed-tools`에 `Workflow` 추가 (누락 시 호출 불가 dead code)
+- [ ] 표준 3종 (OVERRIDE 블록 / args 방어 파싱+fail-fast / agentType `fz:`)
+- [ ] 반환 `{mode, metrics{...}}` 계약 + 검증 oracle (래핑 syntax + 실 invoke ≥1 + §5.7 기록)

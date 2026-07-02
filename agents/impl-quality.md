@@ -52,12 +52,7 @@ in real time, providing feedback directly to `impl-correctness`.
 
 ## Peer-to-Peer Communication
 
-- `impl-correctness`에게 직접 피드백을 전달한다.
-- 3인 팀(impl-correctness, impl-quality, Lead)에서는 Lead relay를 조건부 허용한다 (Star topology).
-- 응답 형식:
-  - 이슈 없음: `"LGTM"`
-  - 이슈 있음: `"이슈 N건: {이슈1 설명} / {이슈2 설명} / ..."`
-- 피드백은 간결하고 실행 가능한 수준으로 작성한다.
+- Workflow 전환됨 (Wave 4): `code-pair.js` 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 품질 피드백은 구조화 출력으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 
 ---
 

@@ -83,8 +83,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 > 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
 
-- 팀 내 피어에게 발견 즉시 공유 (아키텍처 위반이 다른 Lens 이슈로 이어지는 경우)
-- 양측 합의 후 Lead(오케스트레이터)에게 통합 보고
+- Workflow 전환됨 (Wave 4): 발견은 구조화 출력(schema)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 
 ## Few-shot
 ```

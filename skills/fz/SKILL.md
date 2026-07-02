@@ -308,29 +308,23 @@ commit/pr 전 → ✓ codex check (TEAM)
 
 **컨텍스트 패싱**: 대화 기반 (기존 v1과 동일). 4스텝+ 시 /compact 안내.
 
-### 5.2 TEAM Execution
+### 5.2 Workflow Execution
 
-> TEAM 모드에서 TeamCreate를 사용한다. standalone Task 단독 사용 시 에이전트 간 Peer-to-Peer 직접 통신이 불가능해 협업 가치가 사라진다.
-> 참조: `modules/team-core.md` — 공통 실행 프로토콜 (3-Phase 통신) + `modules/patterns/` — 스킬별 패턴
+> 멀티에이전트 실행은 네이티브 Workflow 결정적 스크립트가 소유한다 (TEAM 일몰, Wave 4). 스크립트가 fan-out/수렴/라운드를 구현 — P2P SendMessage 없음.
+> 참조: `guides/skill-authoring.md` §12 (Workflow 규약) + `modules/patterns/` (라운드 의미론 canonical, SOLO 폴백 시 참조).
 
-TeamCreate의 핵심 가치는 **에이전트 간 Peer-to-Peer 직접 통신**이다.
-Lead를 중계자로 쓰지 않는다. 에이전트들이 **만들면서 직접 토론**하여 고도화한다.
-Lead는 퍼실리테이터 (모니터링 + 교착 해소 + 게이트 실행).
+각 스킬은 자신의 `workflows/{skill}-{pattern}.js`를 소유한다. Lead는 스킬의 Workflow를 호출하고 반환(구조화 출력)을 통합한다. Lead는 퍼실리테이터 (호출 + 게이트 실행 + 통합).
 
 ```
-1. TeamCreate("{pipeline}-{feature}")
-2. Task(에이전트 N명) — 피어 목록 + 통신 규칙 포함하여 전달
-3. Collaborative Iteration (에이전트 간 직접 대화):
-   Round 1: 초안 → 피어에게 직접 SendMessage로 공유
-   Round 2: 피드백 → 피어에게 직접 반박/보완
-   Round 3+: 합의까지 반복 (최대 3라운드)
-4. 합의 → Lead 보고 → Lead 게이트 실행 (빌드/Codex)
-5. 완료 → shutdown_request → TeamDelete
+1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{플러그인 루트}/workflows/{skill}-{pattern}.js', args })
+2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
+3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/Codex) + 통합
+4. mode:'fallback' → Lead SOLO 수행 (patterns/ canonical 프로토콜 참조)
 ```
 
-### Verification Discipline Brief (모든 Task spawn에 자동 포함)
+### Verification Discipline Brief (모든 agent() spawn에 자동 포함)
 
-TeamCreate 후 각 Task spawn 프롬프트에 다음 규약이 자동 포함된다:
+Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 다음 규약이 자동 포함된다:
 
 1. 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 2. 외부 모델 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)

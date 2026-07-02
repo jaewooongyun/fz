@@ -1,7 +1,9 @@
 # Agent & Team Configuration Guide
 
-> fz-* 스킬 생태계에서 에이전트 작성 및 팀 구성을 위한 종합 가이드.
-> 에이전트는 `agents/*.md`에 위치하며, 팀은 TeamCreate + SendMessage로 Peer-to-Peer 통신한다.
+> fz-* 스킬 생태계에서 에이전트 작성 및 (역사적) 팀 구성을 위한 종합 가이드.
+> 에이전트는 `agents/*.md`에 위치하며, agentType(`fz:`)으로 `workflows/*.js` Workflow가 재사용한다.
+>
+> ⛔ **TEAM 일몰 (Wave 4)**: TeamCreate+SendMessage 실행 경로는 전면 네이티브 Workflow로 대체됨. 이 가이드의 TeamCreate/SendMessage/2.5-Turn 예시(§2/§3/§7)는 이제 (a) SOLO 폴백 협업 프로토콜 참조 (b) 역사적 의미론 기록으로만 유효하다. 신규 멀티에이전트 스킬은 `guides/skill-authoring.md` §12(Workflow 규약)를 따른다. §1 에이전트 작성법 + §2 채널 우선순위 원칙은 현행 유효.
 
 ---
 
@@ -187,6 +189,14 @@ GOOD (Mesh / Peer-to-Peer):
 - 모든 메시지의 중계자 역할 (에이전트끼리 직접 SendMessage)
 - 직접 코드 작성 (Primary Worker에 위임)
 - 상세 분석 수행 (Supporting 에이전트에 위임)
+
+### 채널 우선순위 원칙 (브리프 > 에이전트 기본 지시)
+
+에이전트 정의의 기본 통신/출력 지시(예: Peer-to-Peer Protocol의 SendMessage)보다 **스폰 브리프가 명시한 채널이 항상 우선**한다. 브리프가 출력 채널(파일 Write / 구조화 반환 / final message)을 지정하면, 에이전트 정의의 SendMessage 기본 지시는 그 브리프 범위에서 무효화된다.
+
+- 근거: 스폰 컨텍스트(백그라운드 subagent, Workflow agentType, native Agent())에 따라 SendMessage가 미바인딩일 수 있다. 에이전트가 정의의 기본 채널을 브리프보다 우선하면 미바인딩 컨텍스트에서 호출이 실패한다.
+- 이중 강제: (1) 에이전트 작성 시 본 원칙 준수 (2) Workflow는 OVERRIDE 블록으로 런타임 재강제 (`skill-authoring.md` §12).
+- ⛔ 이 원칙은 SendMessage 제거 후에도 유효하다 — 근본 원인은 특정 도구가 아니라 "기본 지시가 브리프를 override"하는 우선순위이므로, native Agent()/L3 경로에도 동일 적용된다.
 
 ---
 

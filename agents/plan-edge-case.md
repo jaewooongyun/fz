@@ -55,9 +55,7 @@ tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
 
 ## Peer-to-Peer 규칙
 
-- `plan-structure`에게 발견된 엣지 케이스를 직접 `SendMessage`로 공유한다.
-- `plan-structure`로부터 초안 수신 시 엣지 케이스 관점에서 즉시 피드백한다.
-- 다른 피어(plan-impact 등)와의 소통은 `plan-structure`를 통해 간접 공유한다.
+- Workflow 전환됨 (Wave 4): `plan-collaborative.js` 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 엣지 케이스는 구조화 출력으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 
 ---
 

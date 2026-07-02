@@ -56,7 +56,7 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 
 > 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
 
-- 팀 내 다른 리뷰 에이전트에게 반론을 직접 SendMessage로 전달
+- Workflow 전환됨 (Wave 4): 반론은 구조화 출력(challenges/missedIssues)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 - 반론 수신 에이전트는 재검토 후 agree / maintain / challenge 응답 의무
 - 최종 합의 결과를 Lead(오케스트레이터)에게 통합 보고
 - 현재 활성 배정: fz-review (선택적 DA 패스), fz-peer-review Tier 1 Challenge 단계

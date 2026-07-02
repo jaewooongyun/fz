@@ -32,8 +32,8 @@ Verifies that the implementation matches the stated requirements and plan.
 - 상태 전이가 완전한가 (모든 입력 경우를 처리하는가)
 - 조건 분기 누락 (else/default 누락 등)
 - **Function Responsibility Audit** (함수 제거 / 호출 중단 감지 시):
-  1. Lead에게 SendMessage로 원본 body 요청 (Team agent는 Bash 없음 — guides/agent-team-guide.md §1 준수)
-  2. Lead가 **PR base ref** (`origin/{base_branch}` 또는 `git merge-base HEAD @{upstream}`)를 resolve하여 `git show ${BASE_REF}:filepath` 실행 후 artifact 전달 (⛔ `HEAD^` 하드코딩 금지 — stacked/multi-commit 리뷰에서 잘못된 baseline 위험. 단일 commit local mode에서만 `HEAD^` 폴백 허용)
+  1. 원본 body는 브리프의 base 경로(Lead가 Gather에서 prefetch)에서 Read한다 — SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `guides/agent-team-guide.md` §2). 브리프에 base가 없으면 `originBodyRequest`(파일 경로) 필드로 반환 → Lead가 resolve 후 재주입.
+  2. Lead는 **PR base ref** (`origin/{base_branch}` 또는 `git merge-base HEAD @{upstream}`)를 resolve하여 `git show ${BASE_REF}:filepath`로 prefetch (⛔ `HEAD^` 하드코딩 금지 — stacked/multi-commit 리뷰에서 잘못된 baseline 위험. 단일 commit local mode에서만 `HEAD^` 폴백 허용)
   3. 원본 body를 조건 분기 1개 = 책임 1개로 분해
   4. Scalability: ≤ 20줄 자동 분해, 21-100줄 sampling + AskUserQuestion, 100+ 줄 사용자 에스컬레이션
   5. After diff에서 각 책임 대응 코드 추적

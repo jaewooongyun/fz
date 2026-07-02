@@ -22,7 +22,7 @@ allowed-tools: >-
   mcp__github__add_issue_comment,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Bash(codex *), Read, Grep, Glob
+  Bash(git *), Bash(codex *), Read, Grep, Glob, Workflow
 team-agents:
   primary: review-arch
   supporting: [review-quality, review-counter]
@@ -62,7 +62,7 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- Tier 2/3 Analyze는 네이티브 Workflow 도구 필요 (`workflows/peer-review.js`) — 미가용 시 SOLO 리뷰 폴백(`mode:'fallback'`)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 참조
@@ -258,9 +258,18 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 
 **Self-Check**: 프롬프트에 "~인 것 같다" / 내 의견 / 사실 단정 포함 시 → 제거 후 데이터로 대체.
 
-### Tier 2/3 실행 시퀀스 + Codex Analyze
+### Tier 2/3 실행 시퀀스 (Workflow)
 
-> Tier 2/3 (`Gate 0: 팀 생성 필수 — standalone Agent 금지`), Lite Team / Full Team 실행 시퀀스, Task Brief 형식, Codex challenger 호출 절차는 `modules/peer-review-tiers.md` §Tier 2 / §Tier 3 / §Codex Analyze 참조.
+> TEAM(TeamCreate+SendMessage) → 네이티브 Workflow 전환 (Wave 4). Analyze 코어는 `workflows/peer-review.js`가 소유한다 (결정적 스크립트 — P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
+
+1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, evidencePaths, basePath, deep } })`
+   - `deep=false` → **Tier 2 (Lite)**: Stage1 3-병렬(arch+quality+correctness), 3-call, Confidence Matrix 미투표(Lead 단순 병합)
+   - `deep=true` → **Tier 3 (Full)**: +Stage2 교차(arch↔quality) +Stage3 counter DA, 6-call
+   - base 원본은 Gather에서 prefetch하여 `basePath`로 전달 — 에이전트가 SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `agent-team-guide.md` §2)
+2. **반환 처리**: `mode:'workflow'` → reviews/issues를 Synthesize Step 입력으로. `mode:'fallback'` → Lead SOLO 리뷰 폴백.
+3. **Codex Analyze** (out-of-band, `--codex`/Tier3): Lead가 `/fz-codex` 경유 challenger 호출 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과는 Synthesize Confidence Matrix의 Codex 열로 주입.
+
+> 산출물 계약(Confidence Matrix, origin severity 보정, confidence<80 미보고, dedup+투표)은 Synthesize Step에 보존. metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록.
 
 ### 에이전트 출력 스키마
 
@@ -281,17 +290,11 @@ WHY: 이슈 수가 많으면 리뷰어 피로가 증가하고, 진짜 문제가 
 └─ 초기 Confidence Matrix 생성
 ```
 
-### 방법 B — `--deep` Cross-Critique
+### 방법 B — `--deep` Cross-Critique (Tier 3 Workflow)
 
-> ⚠️ 추가 ~$0.5-1.5, 시간 2-5분. `--deep` 사용 시 사전 비용/시간 경고 표시.
+> ⚠️ 추가 ~$0.5-1.5, 시간 2-5분. `--deep`(=Tier 3) 시 사전 비용/시간 경고 표시.
 
-```
-├─ 각 팀 에이전트가 다른 에이전트 결과를 Read
-├─ SendMessage로 동의/반박/보완 교환
-│   └─ diff/결과는 <review-data> 블록으로 감싸기
-├─ 합의 수렴 후 Orchestrator 종합
-└─ 최종 Confidence Matrix 업데이트
-```
+`deep=true`로 `peer-review.js` 호출 → Stage2(arch↔quality id-기반 교차 severity 조정 — correctness 불참, false_positive는 실측 인용 필수) + Stage3(review-counter DA — issues 반론 + strengths 도전)이 실행된다. SendMessage 실시간 멀티턴 수렴은 고정 1-pass 교차로 대체됨(충실도 trade-off — 은폐 말고 명시). 반환 `crossAdjustments`/`counter`를 Orchestrator가 Confidence Matrix에 반영.
 
 ### Cross-Critique Anti-Sycophancy Rule + Codex Devil's Advocate
 
@@ -468,7 +471,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 - 자기 코드 리뷰 (→ `/fz-review`)
 - Codex 위임 (→ `/fz-codex`) — codex exec 직접 호출
 - Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Code Conventions` 위임)
-- ⛔ **standalone Agent() 호출 금지** — Tier 2+ 에서는 TeamCreate → Agent(team_name=...) → SendMessage 필수.
+- ⛔ **standalone Agent() 호출 금지** — Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응
 
 `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, Codex 실패→2-agent 투표, Codex timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.

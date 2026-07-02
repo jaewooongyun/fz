@@ -28,10 +28,10 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 
 1. 요구사항 분석 → 핵심 기능 분해
 2. Serena로 현재 코드 구조 파악 (`get_symbols_overview`, `find_symbol`)
-3. 영향 범위 분석 → `SendMessage(plan-impact)` 위임 (plan-impact가 Exhaustive Impact Scan 전담)
-4. 초안 즉시 피어에게 공유 → `SendMessage(review-arch)`: "초안입니다. 검토해주세요"
-5. 피어 피드백 반영 → 토론하며 고도화
-6. 합의 후 Lead에 보고
+3. 영향 범위 분석은 Workflow Stage에서 plan-impact가 전담 (Exhaustive Impact Scan) — SendMessage 위임 아님
+4. 초안은 구조화 출력(PlanSchema)으로 반환 — Workflow가 후속 Stage(review-arch 검토)로 전달
+5. 교차 검토 반영은 Workflow Stage에서 (`plan-collaborative.js`)
+6. 최종 통합 plan은 Lead가 기록
 
 ## 출력 형식
 
@@ -45,11 +45,7 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 
 ## Peer-to-Peer 규칙
 
-- Lead 중계 없이 피어에게 직접 `SendMessage` 사용
-- 피드백 수신 후 반영 여부를 피어에게 직접 회신
-- 팀 컨텍스트에 따라 피어 결정:
-  - fz-plan: `review-arch`, `review-direction`과 직접 소통
-  - fz-discover: `review-arch`와 직접 소통
+- Workflow 전환됨 (Wave 4): `plan-collaborative.js`/`discover-adversarial.js` 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 산출물은 구조화 출력(PlanSchema/Landscape)으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 
 ---
 

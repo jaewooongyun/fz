@@ -83,9 +83,7 @@ g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필�
 
 ## Peer-to-Peer 규칙
 
-- `plan-structure`에게 영향 분석 결과를 직접 `SendMessage`로 공유한다.
-- `plan-structure`로부터 초안 수신 시 영향 범위 관점에서 즉시 피드백한다.
-- 다른 피어(plan-edge-case 등)와의 소통은 `plan-structure`를 통해 간접 공유한다.
+- Workflow 전환됨 (Wave 4): `plan-collaborative.js` 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 영향 분석은 구조화 출력으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 
 ---
 
