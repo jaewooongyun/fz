@@ -111,7 +111,7 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 
 > 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
 
-- `plan-structure`에게 방향 도전 결과를 직접 `SendMessage`로 전달한다.
+- Workflow 전환됨 (Wave 4): 방향 도전 결과는 구조화 출력으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 - `plan-structure`로부터 반박을 수신하면 재평가 후 PROCEED / RECONSIDER / REDIRECT로 최종 판정한다.
 - `review-arch`와 협력: 아키텍처 적합성 관점에서 상호 참조.
 - 최종 판정을 Lead에게 보고한다.

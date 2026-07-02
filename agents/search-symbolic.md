@@ -37,7 +37,7 @@ Symbol-level precise code searcher using Serena MCP tools.
 
 ## Peer-to-Peer Rules
 
-1. 발견 즉시 `search-pattern`에게 직접 SendMessage로 공유한다.
+1. Workflow 전환됨 (Wave 4): 발견은 구조화 출력으로 반환하고 스크립트가 교차 검증한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 2. `search-pattern`의 발견에 대해 심볼 레벨 확인을 즉시 수행한다.
 3. 합의 후 Lead에게 통합 결과를 보고한다.
 

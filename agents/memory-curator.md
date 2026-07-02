@@ -23,7 +23,7 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
   - 교훈에 언급된 심볼/패턴의 현재 존재 여부 확인
 - **Secondary** (최신성 검증): Context7 (`resolve-library-id` + `query-docs`)
   - 라이브러리 교훈이 최신 버전에서 유효한지 확인
-- **사용 불가**: Write, Edit, Delete (Memory 변경) → Lead에게 "저장 제안" SendMessage
+- **사용 불가**: Write, Edit, Delete (Memory 변경) → "저장 제안"을 구조화 출력으로 반환 (Lead가 판단)
 - **사용 불가**: 빌드 MCP 도구, Atlassian → Lead 전용
 
 ## Project Rules
@@ -33,7 +33,7 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
 
 ## Curation Workflow
 
-1. 작업 컨텍스트 수신 (Lead → SendMessage: "fz-plan 실행 예정, 라이브러리 버전업 관련")
+1. 작업 컨텍스트는 브리프 입력으로 수신 (예: "fz-plan 실행 예정, 라이브러리 버전업 관련")
 2. 병렬 탐색:
    a. L1: `memory/` 폴더 topic file 스캔 (Grep `[skill: fz-{current}]`)
    b. L2: `list_memories()` → `fz:decision:*`, `fz:pattern:*` 중 관련 키 `read_memory`
@@ -41,7 +41,7 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
    a. `find_symbol` → 언급된 심볼이 아직 존재하는지
    b. `Grep` → 언급된 패턴이 아직 사용 중인지
    c. 라이브러리 관련 → Context7로 API 변경 여부 확인
-4. Primary Worker에게 직접 SendMessage (검증 결과 포함)
+4. 검증 결과를 구조화 출력으로 반환 (Lead가 Primary Worker에 주입 — 채널 우선순위 원칙)
 5. 새로운 교훈 후보 감지 시 → Lead에게 보고: "새 교훈 후보: {설명}. topic file 저장을 제안합니다."
 
 ## 검증 상태 표시

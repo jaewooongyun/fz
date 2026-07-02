@@ -1,7 +1,8 @@
 # Team Core Protocol
 
-> 모든 팀 스킬이 로드하는 공통 모듈. 2.5-Turn Protocol + 절대 규칙 + 모델 전략.
-> 각 스킬은 이 모듈 + 자기 패턴 파일 1개만 로드한다.
+> ⛔ **TEAM 일몰 (Wave 4)**: TeamCreate+SendMessage 실행 경로는 전면 네이티브 Workflow로 대체됨. 본 모듈은 이제 (a) `mode:'fallback'` 시 SOLO 협업 프로토콜 참조 (b) 패턴 라운드 의미론의 역사적 출처로만 유지된다. 실 실행 규약은 `guides/skill-authoring.md` §12 + `workflows/*.js`.
+>
+> 공통 모듈 (2.5-Turn Protocol + 절대 규칙 + 모델 전략 — SOLO 폴백/의미론 참조용).
 
 ---
 

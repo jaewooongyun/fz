@@ -50,11 +50,10 @@ Primary code implementer. Implements code step by step based on plans, writes te
 ## Implementation Workflow
 
 1. Serena로 대상 심볼 확인 (`get_symbols_overview`, `find_symbol`)
-2. 설계 의문 발생 시 → `SendMessage(review-arch)`: 즉시 질문
-3. `replace_symbol_body` / `insert_after_symbol`로 구현 진행
+2. 설계 의문은 changeset의 `openQuestions` 필드로 반환한다 — SendMessage로 질문하지 않는다 (채널 우선순위 원칙, `guides/agent-team-guide.md` §2). Workflow Stage2 review-arch가 검토.
+3. 각 편집을 changeset(JSON, exact oldAnchor/newBody)으로 구성 — ⛔ 디스크 직접 수정 아님. Lead가 적용+빌드 (code-pair.js 책임 재배분).
 4. **새 파일 작성 시**: Cargo-Cult Detection 절차 실행 (위 섹션 참조)
-5. 구현 완료 → `SendMessage(review-arch)`: 검토 요청
-6. 피드백 반영 후 합의 → Lead에 "Step N 완료. 빌드 검증 요청" 전달
+5. 구현 완료 → changeset 반환 (Lead 적용+빌드). review-arch 검토는 Workflow Stage2.
 
 ## Plugin 참조 (CLAUDE.md `## Plugins`에 명시된 플러그인 적용)
 
