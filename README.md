@@ -165,7 +165,7 @@ Phase 5  Execute ────────────── 스킬 체인 실행
 ### 멀티에이전트 실행: 네이티브 Workflow (v4.12)
 
 ```
-Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/Gate 실행
+Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/Gate 실행
     │
     └── workflows/*.js ─── 결정적 스크립트가 stage 오케스트레이션
         agent(agentType: 'fz:plan-structure', schema) → 스키마 강제 JSON 반환
@@ -182,14 +182,15 @@ Lead (Opus) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
-### What's New (v4.17.0) — 가이드 모더나이제이션 + 가이드 준수 remediation [MINOR]
+### What's New (v4.18.0) — Fable 5 재배선: 판단=Fable / 수행=Opus·Sonnet [MINOR]
 
-외부 최신 권위 자료로 가이드를 모더나이제이션하고, 그 기준으로 플러그인 전체를 감사·정합화 (모더나이제이션 → audit → remediation ①②③④ → 다각도 리뷰):
-- **모더나이제이션 (guides)**: `llm-references.md` 신규(Tier1 공식·Tier2 arxiv 16 실증·Tier3 커뮤니티 + anti-pattern + deprecated 정책) · MAST(2503.13657) active 환원 · **Opus 4.8 단일화**(이전 버전 제거, fable frozen) · skill-testing §6.4(리뷰형 2단계) + §4 표 허용.
-- **remediation ①②③④**: ① Fable frozen 전파(modules) · ② **when-not 라우팅 17 스킬**(mis-route 차단) · ③ Workflow 전환 일관성(fz·agent-team·agents 5·build) · ④ **test-spec 17/17**(Option A 10 + references 7) + eval §6.4(coverage recall≥90/verification precision≥80) + Few-shot 5스킬 ≥3쌍 + `examples/hooks.json.example`(opt-in, active 배선 0).
-- **다각도 리뷰 (--team --deep)**: 22 agent / 5차원 + adversarial verify → 16 findings 중 확정 8(전부 minor/nit, critical/major 0)·반증 8. CAL-1(Option B 7 버퍼 복원)·D1-4(precision 용어)·CAL-6(§9 비면제) 반영.
+제재 해제 후 Lead=`/model fable`(B안 가동) + workflow **판단 지점 3곳**만 explicit `'fable'` 승격 — 출력 큰 생산은 opus 유지, 출력 작은 판단만 승격 (승격 3곳 → §5.8 측정 사전등록 → lint 기계 감시 → 문서 동기화 8파일):
+- **판단 지점 승격 3곳**: `search-cross-verify.js:166` stage3-merge(④ pilot 복원 — 기승인·측정 데이터 보유) · `plan-collaborative.js:154`/`:167` stage0-direction/final(⑤ 신설 — 판정문 출력이라 비용 할증 최소) → explicit `'fable'`. 생산 스테이지(rebuttal/draft/integrate)는 **opus 유지**(AC-1).
+- **측정 사전등록 (§5.8)**: ④ 동결→**재개** · ⑤ direction verdict **신설**(N=3, control=retro-baseline fz-plan #1-2 — fable 세션 제외로 대조군 오염 방지, 12필드 row schema). 배선=가설 / 측정=검증.
+- **lint 기계 감시**: `scripts/lint-model-explicit.sh` — agent 호출 model 명시 전수(36 calls) + fable=3 고정 양방향 + `CLAUDE_CODE_SUBAGENT_MODEL` 경고. AC-1/2/6 문서 규약 → **기계 검증** 승격(negative test 2종).
+- **문서 동기화 8파일 · 3-Tier**: fable-model-guide(제목·배너·§5 B 가동/C 부분적용) · governance(모델 동시 상한 행 신설: fable 1·opus 2) · fz SKILL(2-Tier→**3-Tier**, `main: fable`) · skill-authoring(§8 Lead=fable·§12 model 명시 의무+lint) · team-registry · context-artifacts.
 
-> ⛔ Codex cross-model verify 미수행(quota ~6/30) — 동종 fresh-context Claude Workflow(22 agent, 5차원+adversarial) 대체, 이종 안전망 상실 명시. 회복 시 후행. 상세: [docs/releases/v4.17.0.md](docs/releases/v4.17.0.md)
+> ⛔ Deferred: C안 확산(plan integrate·recheck / discover merge·landscape / review arch)은 ④⑤ N=3 임계 게이트 대기 · 워커 effort layering · Wave 4 TEAM 일몰은 [Unreleased] 존치. 상세: [docs/releases/v4.18.0.md](docs/releases/v4.18.0.md)
 
 > 📦 이전 릴리즈 노트: [docs/releases/](docs/releases/) · 전체 변경 이력 [CHANGELOG.md](CHANGELOG.md)
 
