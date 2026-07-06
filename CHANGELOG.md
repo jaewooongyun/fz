@@ -18,6 +18,17 @@
 > - **에이전트/템플릿**: 12 에이전트 P2P 블록 → Workflow 노트 · agent-template/skill-template TEAM → Workflow(신규 산출물 TEAM 미상속) · team-core/peer-review-tiers 일몰 헤더 + Tier 재매핑.
 > - ⛔ **pending**: `peer-review.js` 실 invoke 캘리브레이션(실 PR 필요) · `patterns/*.md`는 canonical 라운드 의미론으로 보존 · 버전 범프+release는 캘리브레이션 후. 산출물: `~/dev/TVING/fz-team-sunset/`.
 
+### v4.18.0 (2026-07-06) — Fable 5 재배선: 판단=Fable / 수행=Opus·Sonnet [MINOR]
+
+> 제재 해제(2026-07-05) 후 Lead=`/model fable`(B안 가동) + workflow **판단 지점 3곳**만 explicit `'fable'` 승격. 배선=가설/측정=검증(§5.8 사전등록) + lint 기계 감시. 구현 자체도 동일 구조로 수행(생산=code-pair 워커, Lead(fable)=적용·oracle·판정만).
+>
+> - **판단 지점 승격 3곳**: `search-cross-verify.js:166` stage3-merge(④ pilot 복원 — 기승인·측정 데이터 보유) · `plan-collaborative.js:154`/`:167` stage0-direction/final(⑤ 신설 — 판정문 출력이라 비용 할증 최소). 생산 스테이지(rebuttal/draft/integrate)는 opus 유지(AC-1)
+> - **측정 사전등록**: §5.8 ④ 동결→재개 · ⑤ direction verdict 신설(N=3, control=retro-baseline fz-plan #1-2 — fable 세션 #3 제외로 대조군 오염 방지, 12필드 row schema)
+> - **lint 신설**: `scripts/lint-model-explicit.sh` — agent 호출 model 명시 전수(36 calls) + fable=3 고정 양방향 + `CLAUDE_CODE_SUBAGENT_MODEL` 경고. AC-1/2/6이 문서 규약→**기계 검증**으로 승격 (negative test 2종)
+> - **문서 동기화 8파일**: fable-model-guide(제목·배너·§5 B 가동/C 부분적용/운용 패턴 3종/Appendix→본문 표제) · team-registry:13 · context-artifacts:240 · governance(모델 동시 상한 행 신설: fable 1·opus 2) · fz SKILL(2-Tier→3-Tier, frontmatter `main: fable`, Lead(F)) · skill-authoring(:509 워커 기준·§8 Lead=fable·§12 model 명시 의무+lint)
+> - **검증 사슬**: code-pair 검토 스테이지 실이슈 11건 캐치·반영 · Codex check **clean** · 세션한도+인터넷 중단 2회를 journal resume 캐시로 복구(stage 손실 0, §5.7 fz-code #2)
+> - ⛔ **Deferred**: C안 확산(plan integrate·recheck / discover merge·landscape / review arch — ④⑤ N=3 임계 게이트) · 워커 effort layering · Wave 4 TEAM 일몰은 [Unreleased] 유지(캘리브레이션 대기). 상세: [docs/releases/v4.18.0.md](docs/releases/v4.18.0.md)
+
 ### v4.17.0 (2026-06-29) — 가이드 모더나이제이션 + 가이드 준수 remediation [MINOR]
 
 > 외부 최신 권위 자료로 가이드 모더나이제이션 → 갱신 가이드 기준 플러그인 전체 감사 → remediation ①②③④ → 다각도 리뷰. 검증 사슬 각 단계가 직전을 교정.
