@@ -1,6 +1,6 @@
-# Model Guide — Opus 4.8 (운용) · Fable 5 (frozen)
+# Model Guide — Fable 5 (Lead 운용) · Opus 4.8 (수행)
 
-> ⛔ **사용 제한 (2026-06-14)**: Fable 5가 미국 제재로 외국인 사용 금지 → fz는 **Opus 4.8** 운용. effort는 **세션 레벨 max(기본) / ultracode(코딩·병렬 작업 — xhigh + dynamic workflow 오케스트레이션)**, **plain xhigh 미사용**. effort frontmatter 배선(4스킬)·synthesis fable pilot은 **롤백 완료** (§3 표·§5 effort 섹션·§5.8 ①④). 본 가이드 본문은 제재 해제 시 재사용 위해 **보존**.
+> ✅ **운용 상태 (2026-07-06)**: 2026-07-05 제재 해제 + 사용자 `/model fable`(max) 전환으로 **B안(Lead=Fable 5) 가동**. 2026-07-06 **재배선 완료** — 판단 지점 3곳 explicit `'fable'`: `search-cross-verify.js:166` merge + `plan-collaborative.js:154`/`:167` direction (§5.8 ④ 재개·⑤ 신설), `scripts/lint-model-explicit.sh` 기계 감시. effort는 **세션 레벨 max(기본)/ultracode** 운용 유지 — frontmatter 재배선 없음 (§5.8 ① 철회 유지).
 >
 > Claude Fable 5 / Claude Mythos 5의 사양 · API 동작 차이 · Claude Code 통합 · fz 생태계 적용 전략의 단일 참조.
 > 모델 무관 프롬프팅 원칙은 `prompt-optimization.md`, 하네스 설계는 `harness-engineering.md` 참조.
@@ -22,16 +22,16 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 
 | 항목 | 값 |
 |------|-----|
-| Model ID / Context | `claude-opus-4-8` · 1M tokens (기본). 가격은 Appendix §1 참조 |
+| Model ID / Context | `claude-opus-4-8` · 1M tokens (기본). 가격은 §1 (모델 사양) 참조 |
 | Thinking | adaptive (`thinking: {type: "adaptive"}`) — Opus 4.8 자동 [verified: platform.claude.com/docs/en/build-with-claude/extended-thinking]. adaptive > extended thinking [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices] |
 | effort | 코딩/agentic = **`xhigh`** 권장(최소 `high`); shallow reasoning 시 프롬프팅 말고 effort↑; **`max` = "prone to overthinking, diminishing returns"** [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8] |
 | 구버전 제거 (Opus 4.8 only) | manual `budget_tokens`(400)·prefill(미지원)·`interleaved-thinking-2025-05-14` 헤더(ignored) [verified: claude-4-best-practices · extended-thinking] |
 
 ---
 
-# Appendix: Fable 5 (frozen — 제재 해제 시 재배선)
+# Fable 5 상세 (운용 — Lead 배선 완료 2026-07-06)
 
-> 미국 제재로 fz 미운용 (2026-06-14). 재배선 시 아래 상세 적용 — 본문 보존.
+> 제재 해제 (2026-07-05) 후 Lead 배선 완료 (2026-07-06) — 아래 상세가 현행 운용 기준.
 
 ## 1. 모델 사양
 
@@ -100,7 +100,7 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 - `ultracode`: effort 레벨이 아닌 Claude Code 설정 — xhigh + substantive task마다 dynamic workflow 오케스트레이션 (세션 한정)
 - `ultrathink` 키워드: 해당 turn만 심층 추론 (effort 설정 불변). "think hard" 류는 더 이상 키워드 아님
 - Thinking은 Fable 5에서 **끌 수 없음** — Option+T 토글, `alwaysThinkingEnabled`, `MAX_THINKING_TOKENS=0` 모두 무효
-- ℹ️ `/model` 피커의 "max effort 저장" 메시지와 공식 docs의 "max는 세션 한정" 문구가 표면 상충 [미검증: 다음 세션에서 effort 지속 여부 실측 필요]
+- ℹ️ `/model` 피커의 "max effort 저장" 메시지와 공식 docs의 "max는 세션 한정" 문구가 표면 상충 [해소: 2026-07-05 실측 — 피커 stdout "saved as your default for new sessions with max effort"로 세션 간 지속 확인]
 
 ### 안전 분류기 자동 폴백 (Claude Code 고유)
 
@@ -160,14 +160,22 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 | 옵션 | 품질 | 비용 | 변경 범위 | 판정 |
 |------|------|------|----------|------|
 | A. 현행 유지 (Lead=세션 모델, Primary=opus, rest=sonnet) | 기준 | 기준 | 0 | Fable 미사용 시 |
-| **B. Lead만 Fable** (사용자가 `/model fable` — 설정 변경 불요) | Lead 추론·오케스트레이션 ↑ | Lead 토큰만 2배 | 0 (이미 가능) | **현재 권장 기본** |
-| C. Primary 선택 승격 (capability-sensitive 단일 호출만 `model: 'fable'`) | 병목 단계 ↑ | 해당 호출만 2배 | 워크플로/스킬 일부 | 측정 후 선별 도입 |
+| **B. Lead만 Fable** (사용자가 `/model fable` — 설정 변경 불요) | Lead 추론·오케스트레이션 ↑ | Lead 토큰만 2배 | 0 (이미 가능) | **가동 중** (2026-07-05 /model 전환) |
+| C. Primary 선택 승격 (capability-sensitive 단일 호출만 `model: 'fable'`) | 병목 단계 ↑ | 해당 호출만 2배 | 워크플로/스킬 일부 | **부분 적용** (2026-07-06 merge pilot + direction — 측정 ④⑤ 진행 중) |
 | D. 전면 Fable | 최대 | 전체 2배+ | 전체 | ⛔ 비권장 — "not the default upgrade path" |
 
 - **B가 공식 포지셔닝과 정합**: Fable의 강점(long-horizon 자율성, 모호성 처리, 위임 관리)은 Lead 역할 그 자체. Supporting 에이전트의 좁은 lens 작업은 sonnet으로 충분
-- **C 후보** (도입 시 우선순위): ① 워크플로 merge/synthesis 단계 (예: plan-collaborative의 통합 단계) ② fz-review Primary (Fable의 "Bug-finding recall noticeably higher" 공식 진술) ③ fz-discover landscape 합성. 도입 방법: Workflow `agent()` `opts.model: 'fable'` 또는 Agent tool `model: "fable"` [verified: 환경 실측]
+- **C (부분 적용)**: ① 워크플로 merge/synthesis 단계 — **적용됨** (search-cross-verify stage3-merge; 예로 들었던 plan-collaborative 통합/integrate 단계는 생산 스테이지라 opus 유지 — AC-1) ② fz-review Primary (Fable의 "Bug-finding recall noticeably higher" 공식 진술) — **Deferred** (AC-5) ③ fz-discover landscape 합성 — **Deferred** (AC-5). 도입 방법(②③): Workflow `agent()` `opts.model: 'fable'` 또는 Agent tool `model: "fable"` [verified: 환경 실측]
 - ⛔ **동시 실행 상한**: fable 에이전트는 **동시 1개** (Lead 세션 제외) — "동시 opus 최대 2개" 거버넌스의 비용 등가(fable 1 ≈ opus 2, $10/$50 vs $5/$25). pilot 측정(§5.8 ④) 누적 후 재조정
-- ⚠️ **Workflow model 생략 함정**: `opts.model` 생략 시 메인 루프 모델 상속 — Fable 세션에서는 모든 미지정 에이전트가 Fable로 실행됨. fz workflows는 현재 전 호출에 opus/sonnet 명시되어 있어 안전 (2026-06-12 실측: workflows/*.js 5파일 전수 명시)
+- ⚠️ **Workflow model 생략 함정**: `opts.model` 생략 시 메인 루프 모델 상속 — Fable 세션에서는 모든 미지정 에이전트가 Fable로 실행됨. fz workflows는 현재 전 호출에 model 명시(opus/sonnet + 판단 3지점 fable)되어 있어 안전 (2026-07-06 실측: workflows/*.js 6파일 전수 명시). `scripts/lint-model-explicit.sh`가 기계 검증 (전 호출 model 명시 + fable=3 고정)
+
+### 운용 패턴 (Lead=Fable 세션 — 2026-07-06)
+
+> B안 가동 상태에서 fable 강점을 실제로 끌어내는 3패턴. 새 주장 없이 §4 공식 권고를 fz 운용에 대응시킨 것.
+
+- **ⓐ 에스컬레이션 종점**: Gate 반복 실패·디버깅 막다른 길(워커 2사이클 루프)에서만 fable 단발 root-cause 에이전트를 스폰 — 동시 1 상한(위 4-axes C) 내 단발로만, 상시 승격 아님. 공식 §4 "hardest unsolved problems"에 정합.
+- **ⓑ long-horizon 세션**: 평소 쪼개던 다중 파이프라인을 한 세션에서 처리 — 공식 §4 "holds long sessions without losing the thread" + 1M 컨텍스트 + ASD 아티팩트 누적의 시너지. 단, 단일 요청이 수 분 소요(§2 Turn 길이)이므로 진행 표시·타임아웃 설계 병행.
+- **ⓒ outcome-delegation**: 승인 후 실행 경로는 Lead 재량에 위임 — 공식 §4 "Describe the outcome, not the steps". 승인 게이트 이후 step 단위 지시 대신 성공 기준만 전달.
 
 ### effort frontmatter 배선 — **2026-06-14 철회 (세션 운용 전환)** · 잔여 후보 기록
 
@@ -201,7 +209,7 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 
 - [x] fz 스킬/모듈 중 "사고 과정·추론을 출력하라" 류 지시 전수 grep → `reasoning_extraction` refusal 위험 평가 — **실측 0건** (2026-06-12, skills/·modules/·agents/·workflows/ 전수. `reasoning`/`사고` 매치는 전부 추론 품질·모듈명 등 정상 용법)
 - [ ] Fable 세션에서 fz-review self-review 품질 재측정 → Codex cross-model 의존도 재조정 (단, 이종 blind-spot 안전망 자체는 유지 — 15차/23차)
-- [ ] `/model` max effort 세션 지속성 실측 (위 [미검증] 해소)
+- [x] `/model` max effort 세션 지속성 실측 — **해소** (2026-07-05 `/model` 피커 stdout "saved as your default for new sessions with max effort" 실측; 위 [미검증] 종결)
 - [ ] TEAM(SendMessage) 패턴에 Fable의 "async subagent communication" 권고 반영 검토
 
 ## 설계 원칙
