@@ -355,7 +355,7 @@ team-agents:
 
 | 역할 | 모델 | 근거 |
 |------|------|------|
-| Lead (오케스트레이터) | opus | 최종 판단, 게이트 실행 |
+| Lead (오케스트레이터) | fable | 최종 판단, 게이트 실행 |
 | Primary Worker (핵심 생산) | opus (승격) | 계획, 코드, 설계 품질 |
 | Supporting (검증, 비평) | sonnet | 비용 효율, 충분한 품질 |
 | haiku | **미사용** | 프로젝트 정책 |
@@ -502,11 +502,12 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 - 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
 - 호출(Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/....js', args })`. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
+- agent() 호출 시 `opts.model` 명시 의무 — 생략 시 세션 모델(fable) 상속 → 생산 워커가 fable로 스폰돼 비용 2배 함정. `scripts/lint-model-explicit.sh`가 기계 검증 (model 키 누락 agent() 차단)
 
 ### 산출물·거버넌스 계약
 
 - 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — mode='fallback'이면 Lead가 SOLO 폴백. wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
-- 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / opus 동시 ≤2 (Lead 포함 — fan-out 에이전트는 sonnet) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
+- 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / opus 동시 ≤2 (워커 기준 — Lead는 fable, fan-out은 sonnet) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
 - 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
 - 검증 oracle: 래핑 syntax 검사(`async function wrap(...){...본문...}` 후 node --check — 직접 node --check는 CJS 관대 파싱으로 무효) + **실 invoke ≥1** + experiment-log §5.7 지표 기록
 

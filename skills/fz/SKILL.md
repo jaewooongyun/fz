@@ -23,7 +23,7 @@ provides: []
 needs: []
 intent-triggers: []
 model-strategy:
-  main: opus
+  main: fable
   verifier: null
 ---
 
@@ -39,8 +39,8 @@ model-strategy:
 - **사전 정의 파이프라인** (19개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
 - **동적 파이프라인**: `provides`/`needs` 그래프 기반 자동 구성 (폴백)
 - **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead + Primary(O) + N×Sonnet)
-- **모델 승격**: 핵심 생산자(Primary Worker)를 opus로 자동 승격
-- **2-Tier 모델**: opus(핵심) + sonnet(나머지). haiku 사용하지 않음
+- **모델 승격**: 핵심 생산자(Primary Worker)를 opus로 자동 승격 (fable 판단 지점과 별개)
+- **3-Tier 모델**: fable(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(핵심 생산 Primary) + sonnet(보조). haiku 사용하지 않음
 - **Codex 필수 참여**: 모든 TEAM 스킬에 Codex CLI 포함 → cross-model 상호검증
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
 - **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover는 `workflows/*.js` 결정적 Workflow, peer-review는 TeamCreate+SendMessage + Codex 활용
@@ -205,9 +205,9 @@ model-strategy:
 
 | 합산 | 모드 | 실행 모드 | 실행 방식 |
 |------|------|----------|----------|
-| 0-3 | SOLO | STANDARD | Lead(O) 단독, 순차 실행 |
+| 0-3 | SOLO | STANDARD | Lead(F) 단독, 순차 실행 |
 | 0-3 | SOLO | BATCH | worktree 격리 병렬 (--batch 또는 독립 3개+) |
-| 4+ | TEAM | STANDARD | Lead(O) + Primary(O) + N×Sonnet |
+| 4+ | TEAM | STANDARD | Lead(F) + Primary(O) + N×Sonnet |
 | 4+ | TEAM | LOOP | 자동 반복 + 에스컬레이션 (--loop 또는 Gate 반복 예상) |
 
 ### Gate 2: Complexity Assessed
@@ -425,7 +425,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 - 스킬 자체 로직 수행 (스킬 SKILL.md 지침에 위임)
 - 사용자 승인 없이 실행 (Phase 4 필수)
 - 코드를 직접 수정 (각 스킬에 위임)
-- opus 과다 사용 (Lead + Primary 최대 2개 원칙. full-cycle/plan-to-code은 예외: plan-structure+impl-correctness 각 단계 Primary)
+- opus 과다 사용 (opus 예산은 Primary 전용, 동시 ≤2 — Lead는 fable이라 opus 카운트 제외. full-cycle/plan-to-code은 예외: plan-structure+impl-correctness 각 단계 Primary. fable 동시 1, Lead 제외 — governance.md 상한 행 정합)
 - haiku 모델 사용
 
 ## 에러 대응
