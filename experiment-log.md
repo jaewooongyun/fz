@@ -469,6 +469,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | steps | invokes | agentCalls(계) | nullCount | fallback | stage2-null steps | G2-code |
 |---|------|-------|---------|----------------|-----------|----------|-------------------|---------|
 | 1 | 2026-06-05 | 1 (SYNC-1) | 1 | 2 | 0 | 0 | 0 | ✅ clean — review pass→Stage3 생략(조건부 분기 첫 작동, 2-call). changeset 4 edits 전부 oldAnchor 정확(에이전트 자가 grep 유일성 검증) + compound 주석 부분 갱신 정밀. Lead 적용 4/4 + buildExpectation 검증 통과. 전환 직후 검증 세션 (임계 3세션 중 1) |
+| 2 | 2026-07-06 | 10 (fable-rewire S1~S6b: full 5·light 4·resume 2) | 11 (재개 2 포함) | 21 | 0 | 0 | 0 | ✅ clean — changeset 적용 30/30 edits (anchor count==1 전수), 의사코드 0. review 스테이지가 실이슈 11건 캐치(대조군 오염·grep -H·AC 귀속·frontmatter main stale·§8 상충 등) 전부 유효. residual 2건(R1 헤딩·R2 §8)은 Lead 판정→후속 invoke로 해소. 특기: 세션한도·인터넷 중단 2회를 journal resume 캐시로 복구(stage 손실 0). session_model=fable(Lead)/워커 opus·sonnet 명시. Codex check clean. 임계 3세션 중 2 |
 
 ### fz-fix (pair-programming light) — Wave 3 전환 (시작: 2026-06-05)
 
@@ -483,7 +484,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 ## §5.8 Fable 5 효율 배선 측정 큐 (시작: 2026-06-12)
 
 > 출처: `~/dev/TVING/fz-fable-enhancement/plan/plan-final.md` S4 — 배선=가설/측정=검증 (31/35차). **사전등록 임계 변경 금지** (확증편향 방어).
-> freeze 범위 주석 (§5.7 동형): §5.7 freeze는 §5.7 데이터행+확산임계만 대상 — 본 §5.8 신설은 별도 허용. §5.8 ② N=5 = 표준 Phase B 진입 / ①effort·④synthesis는 **2026-06-14 fable 제재 롤백으로 측정 중단** (①철회: frontmatter 4건 제거 → 측정 대상 소멸 / ④동결: pilot opus 롤백, 제재 해제 시 재개 — ①④ 헤더 참조. **canonical 상태 = 각 헤더**, CHANGELOG·release 노트는 cross-ref).
+> freeze 범위 주석 (§5.7 동형): §5.7 freeze는 §5.7 데이터행+확산임계만 대상 — 본 §5.8 신설은 별도 허용. §5.8 ② N=5 = 표준 Phase B 진입 / ①effort는 **철회**(2026-06-14 fable 제재 롤백) · ④synthesis는 **재개**(2026-07-06 제재 해제) (①철회: frontmatter 4건 제거 → 측정 대상 소멸 / ④재개: pilot fable 복원 — search-cross-verify.js:166 `'opus'→'fable'` 1줄 전환, ①④ 헤더 참조. **canonical 상태 = 각 헤더**, CHANGELOG·release 노트는 cross-ref).
 > **공통 필드 의무**: 각 행에 `session_model`(fable|opus) + `env_subagent_model`(CLAUDE_CODE_SUBAGENT_MODEL 설정 유무) 기록 — effort 효과의 3-way 혼합(세션 모델×서브에이전트 모델×effort) 방지.
 
 ### ① effort frontmatter 효과 — **철회 (2026-06-14 fable 제재 롤백)**
@@ -513,7 +514,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | variant | session_model | 토큰 | G2 품질 | 판정 |
 |---|------|---------|---------------|------|---------|------|
 
-### ④ synthesis fable vs opus — **동결 (2026-06-14 fable 제재: pilot opus 롤백, 제재 해제 시 재개)**
+### ④ synthesis fable vs opus — **재개 (2026-07-06 제재 해제 — pilot 복원: search-cross-verify.js:166 fable)**
 
 > **동결 사유 (2026-06-14)**: Fable 5가 미국 제재로 외국인 사용 금지 → 세션 모델 opus 4.8 운용. synthesis pilot은 `model: 'opus'`로 롤백(search-cross-verify.js:166 — `model` 생략 시 agent 정의 `model: sonnet` 강등 위험이라 explicit opus). 측정 동결 — **사전등록 임계/baseline 설계 보존**, 제재 해제 + fable 세션 재개 시 `'opus'→'fable'` 1줄 전환으로 측정 재개. 아래는 동결 전 활성 근거 — 사료.
 > 활성 근거(사료): 사용자 발화 "생각이 깊어야 되는 부분은 plan, review, discover, search 이런 부분은 fable5로 하면 좋고" + A/B probe 정상 작동 확인. pilot 1차 자동 적용 권한 거부(06-12) → "반영해줘" 인가 적용(06-13) → 06-14 제재로 롤백.
@@ -523,3 +524,13 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | 단계 | syn model | 토큰 | 품질 관찰 | 비고 |
 |---|------|------|-----------|------|----------|------|
 | 0 | 2026-06-12 | (probe — workflows 외 A/B) | fable vs opus | [미검증: per-agent 토큰 미분리] | **fable 우위 관찰**: 동일 synthesis 과제(§5.8 우선순위 판정, 동일 입력 2파일)에서 양측 동일 결론 도달하나 fable이 의존 관계 6 vs 4 + opus 미발견 결함 1건(① high baseline 분모 수집 불가) 추가 발견. opus 고유 발견(② 분모 오염 경고)도 유효 — 상호 보완 관찰. null/refusal 폴백 0 | wf_6de8db1d (2 agents, 190s). pilot 적용 근거 |
+
+### ⑤ direction verdict fable vs opus (신설 2026-07-06)
+
+> 배선 근거: `plan-collaborative.js:154` stage0-direction · `:167` stage0-final을 fable로 승격(판정문 출력 — 생산 스테이지 대비 출력량 작아 비용 할증 최소). rebuttal·draft·integrate 등 생산 스테이지는 opus 유지.
+> 주 측정 대상: **stage0-direction**(상시 실행) · **stage0-final**은 비-PROCEED 시만 보너스 기록.
+> control (비교군): **retro-baseline** 기본 — §5.7 fz-plan **#1-2**(opus 세션; #3은 Fable 세션 첫 invoke라 제외 — ① retro-baseline 선례 계승, session_model=fable 오염 방지)의 stage0 direction 판정 관찰(근거 재현성·대안 품질·escalation 정확성)을 fable 판정과 대조. 불충분 시 **shadow-opus 3회 한정**(동일 case를 opus로 재판정해 직접 대조).
+> 임계 (사전등록): N=3 누적 — 판정 품질(근거 재현성·대안 품질·escalation 정확성)이 opus 대비 비열화 ≥2/3 AND wall-clock 비악화 → 유지 / 미달 → opus 롤백(2줄 원복).
+
+| # | date | case | verdict | retro_baseline_same? | evidence_citations | alternatives_count | escalation_correct? | 품질 관찰 | wall_clock | session_model | env_subagent_model |
+|---|------|------|---------|---------------------|--------------------|--------------------|--------------------|----------|-----------|---------------|--------------------|
