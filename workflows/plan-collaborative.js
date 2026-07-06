@@ -151,7 +151,7 @@ phase('Stage 0: 방향성 도전')
 let direction = await callAgent(
   `${OVERRIDE}\n[역할] 방향성 도전자(review-direction 렌즈) — 6관점: Structural Fit / Alternative Paths(2개+) / Extensibility / Reuse-First / Maintenance / Over-Engineering\n${CTX}\n` +
   `[목표] 접근 방향을 비판적으로 판정 (PROCEED/RECONSIDER/REDIRECT) + 대안 2개 이상 + 우려 사항. 근거 인용.`,
-  { label: 'stage0-direction', agentType: 'fz:review-direction', model: 'opus', schema: DirectionSchema })
+  { label: 'stage0-direction', agentType: 'fz:review-direction', model: 'fable', schema: DirectionSchema }) // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
 if (!direction) { fallbackCount += 1; return { mode: 'fallback', reason: 'direction null', metrics: metrics(0) } }
 
 if (direction.verdict !== 'PROCEED') {
@@ -164,7 +164,7 @@ if (direction.verdict !== 'PROCEED') {
   const finalDirection = rebuttal ? await callAgent(
     `${OVERRIDE}\n[역할] 방향성 도전자 — 최종 판정\n${CTX}\n[1차 판정] ${JSON.stringify(direction)}\n[설계자 반박] ${JSON.stringify(rebuttal)}\n` +
     `[목표] 반박을 평가해 최종 판정. 반박이 타당하면 PROCEED 전환 가능.`,
-    { label: 'stage0-final', agentType: 'fz:review-direction', model: 'opus', schema: DirectionSchema }) : null
+    { label: 'stage0-final', agentType: 'fz:review-direction', model: 'fable', schema: DirectionSchema }) : null // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
   if (finalDirection) direction = finalDirection
   if (direction.verdict !== 'PROCEED') {
     log(`direction 최종 ${direction.verdict} — 사용자 에스컬레이션 반환`)
