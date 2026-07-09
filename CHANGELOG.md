@@ -18,6 +18,16 @@
 > - **에이전트/템플릿**: 12 에이전트 P2P 블록 → Workflow 노트 · agent-template/skill-template TEAM → Workflow(신규 산출물 TEAM 미상속) · team-core/peer-review-tiers 일몰 헤더 + Tier 재매핑.
 > - ⛔ **pending**: `peer-review.js` 실 invoke 캘리브레이션(실 PR 필요) · `patterns/*.md`는 canonical 라운드 의미론으로 보존 · 버전 범프+release는 캘리브레이션 후. 산출물: `~/dev/TVING/fz-team-sunset/`.
 
+### v4.21.0 (2026-07-09) — 하네스 서베이 Wave C: code-pair pre-flight 크기 가드 (H5 scaffold collapse) [MINOR]
+
+> plan-final Wave C — 유일 미구현 하네스 홀 H5 조치. 과거 실사고(~800줄 changeset → StructuredOutput 5회 재시도→null·27분·206K 토큰·디스크 무변경)의 재발 방지. 서베이 scaffold collapse(2605.12129) 강한 유사 구조 + retry budget(2605.21516). D1 사용자 승인, 코드 생산=opus Workflow, Lead(fable)=적용·게이트.
+>
+> - **C1 캘리브레이션**: changeset newBody 크기별 StructuredOutput 성공률 실측(sonnet ×4). 100/200/300/500줄 **전부 성공(null 0·의사코드 0)** → **임계 SPLIT_THRESHOLD=600 확정**(실증 안전 500 · 실증 실패 800 사이). ⚠️ 계획 초기 추정 150줄은 과도 — 실측이 교정(150이면 정상 500줄 Step 분할 강제 = over-decomposition, 2605.21516 반대 실패모드). 산출물 `~/dev/TVING/harness-paper/code/c1-calibration.md`
+> - **C2 가드 (code-pair.js)**: ① pre-flight — `stepSpec.estimatedNewBodyLines`(Lead 추정) > 600 시 스폰 전 `mode:'split_required'` 반환(27분 낭비 회피) ② Stage1 null 경로 재정의 — `splitSuggested` 힌트(files≥4 OR complexity=5) + "일시 장애(세션/rate limit)는 재시도, Lead=fable SOLO는 사용자 승인" (H5 우려② 해소) ③ post-Stage-1 soft 경고(위험 구간 근접) ④ 소비처 4곳(헤더 계약 + fz-code/fz-fix/fz SKILL 반환 사다리)
+> - **C3 검증**: node --check EXIT=0 · lint PASS(fable=3) · 격리 스모크 10/10(over-decomposition 방지·하위호환·null≠과대 구분 포함) · Codex check P2 2건 반영 — (a) arg 문서에 estimatedNewBodyLines 누락 시 가드 dead → fz-code/fz-fix arg 조립에 명문화 (b) null 경로 `est !== null` 프록시가 작은 Step 일시장애 오분류 → 제거(est>임계는 pre-flight가 이미 조기 반환)
+> - **split_required는 하드 차단 아닌 Lead 판단 요구** — 경계 오판도 Lead 오버라이드 가능. 임계는 상수 노출(관측 실패에서 재조정)
+> - ⛔ **자기참조 blind spot 방어**: code-pair.js 자기수정이라 Codex 교차검증 필수(2 P2 실측 확인 후 반영). **하네스 홀 H1~H5/F5/F6 중 유일 미구현이던 H5 조치 완료**
+
 ### v4.20.0 (2026-07-09) — 하네스 서베이 Wave B: 메커니즘/모듈 정합 + Governance Decay 실측 [MINOR]
 
 > plan-final Wave B — 서베이 발견을 fz 메커니즘에 반영. B1(Governance Decay)은 실측 gate: 워커 OVERRIDE 경로(CLAUDE.md 미로딩)에서 ⛔ 규칙 유실 여부를 sonnet ×4 대조쌍으로 측정 → **unpinned 2/2 위반 → pinned 0/2**(서베이 2606.22528 구조 재현) → 강도=OVERRIDE 1문장(D5, over-engineering 회피). 생산 문안은 opus Workflow, Lead(fable)=적용·게이트.

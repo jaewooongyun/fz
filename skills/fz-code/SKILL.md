@@ -116,12 +116,13 @@ model-strategy:
 각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
 
 1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
-2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify,complexity 1-5 — invoke마다 Lead 재평가} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
+2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify,complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — 600 초과 예상 시 code-pair가 스폰 전 `split_required` 반환)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })`
    - Stage 1 impl(opus) changeset → Stage 2 review-arch(opus) 검토 → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, 2-3 call)
 4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유)
 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead / `mode:'fallback'` → SOLO 구현 수행 + 사유 기록
+   - **반환 mode 사다리 (H5 크기 가드)**: ① `mode:'split_required'` 또는 `mode:'fallback'`+`splitSuggested:true` → **Step 분할 후 재invoke** (과대 changeset scaffold collapse 방지) ② `mode:'fallback'`+일시 장애(세션/rate limit) 의심 → buildFeedback 없이 **재시도 1회** ③ ①②로 미해소 시에만 **Lead SOLO 직접 구현 — 사용자 승인 후** (⛔ Lead=fable 자동 SOLO 금지)
 7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + Codex 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
 8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → `experiment-log.md` §5.7 fz-code 테이블. Stage2 null이 있었던 Step 수 별도 표기
 

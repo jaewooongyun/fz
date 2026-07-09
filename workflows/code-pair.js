@@ -7,7 +7,8 @@
 //       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify,complexity}, contextPath, buildFeedback?, changesetTarget } })
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, residualIssues, metrics }
-//     | { mode:'fallback', reason, metrics } → Lead는 SOLO 구현 경로 수행.
+//     | { mode:'fallback', reason, splitSuggested?, metrics } → Lead는 SOLO 구현 경로 수행.
+//     | { mode:'split_required', reason, metrics } → Lead는 Step 분할 후 재invoke.
 //   ⛔ 책임 재배분 (S0, 사용자 승인 OQ1): 에이전트는 디스크를 수정하지 않는다 — changeset JSON만 반환.
 //     Lead가 적용(replace_symbol_body/Edit) + 빌드 검증 + 다음 Step invoke. 부분 적용 후 빌드 실패 시
 //     되돌리기/계속은 Lead 절차 (SKILL.md). 재시도 = buildFeedback 포함 새 invoke (resume 비의존 —
@@ -78,6 +79,8 @@ const ReviewSchema = {
   },
 }
 
+const SPLIT_THRESHOLD = 600 // 총 newBody 줄수 — C1 실측(≤500 안전)+H5 실사고(~800 실패) 사이 보수값. split_required=Lead 판단 요구(하드 차단 아님). 관측 실패에서 재조정.
+
 const OVERRIDE =
   '[Workflow 모드 오버라이드] P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시는 적용하지 않는다. ' +
   '에이전트 정의의 Phase 절차·ASD 폴더·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
@@ -118,6 +121,14 @@ const buildFeedback = (typeof input.buildFeedback === 'string' && input.buildFee
 const STEP = `[Step 명세] ${JSON.stringify(input.stepSpec)}\n[컨텍스트] 요약 파일: ${input.contextPath} (Read로 로드)\n[변경 대상 레포] ${input.changesetTarget}` +
   (buildFeedback ? `\n[이전 적용 빌드 피드백] ${buildFeedback}` : '')
 
+// ── H5 pre-flight 크기 가드 (스폰 전): Lead 제공 estimatedNewBodyLines가 임계 초과면 즉시 반환 ──
+// estimatedNewBodyLines 미제공(null)이면 스킵 — 전량 진행(하위호환). split_required는 Lead 판단 요구(하드 차단 아님).
+const est = (typeof input.stepSpec.estimatedNewBodyLines === 'number') ? input.stepSpec.estimatedNewBodyLines : null
+if (est !== null && est > SPLIT_THRESHOLD) {
+  log(`split_required — 예상 ${est}줄 > 임계 ${SPLIT_THRESHOLD} (스폰 전 차단)`)
+  return { mode: 'split_required', reason: `예상 changeset ~${est}줄 > 임계 ${SPLIT_THRESHOLD} — Step 분할 후 재invoke 권고 (scaffold collapse 방지)`, metrics: metrics(0) }
+}
+
 // ════════ Stage 1: 구현 changeset (opus) ════════
 phase('Stage 1: 구현 changeset')
 const changeset = await callAgent(
@@ -126,7 +137,27 @@ const changeset = await callAgent(
   `(의사코드·생략 금지). 대상 파일을 Read해 현재 상태 기준으로 작성. buildExpectation은 검증 가능 형태로.` +
   (buildFeedback ? ' 이전 빌드 피드백의 오류를 우선 해소.' : ''),
   { label: 'stage1-impl', agentType: 'fz:impl-correctness', model: 'opus', effort: 'xhigh', schema: ChangesetSchema })
-if (!changeset) { fallbackCount += 1; return { mode: 'fallback', reason: 'impl null — changeset 없이는 적용 불가', metrics: metrics(0) } }
+if (!changeset) {
+  fallbackCount += 1
+  // 크기 프록시(files>=4 OR complexity===5)면 split 힌트. ⚠️ null=무조건 split 아님 —
+  // B1 프로브 null은 세션한도(일시 장애)였음. Lead가 일시 장애 vs 과대 changeset 구분 (SKILL 사다리).
+  // ⚠️ est는 프록시에서 제외: est>임계면 pre-flight가 이미 조기 반환하므로 여기 도달한 est는 항상 ≤임계(작은 Step) —
+  //   est 존재만으로 split 제안하면 작은 Step의 일시 장애를 오분류(Codex C3 지적).
+  const splitSuggested = (Array.isArray(input.stepSpec.files) && input.stepSpec.files.length >= 4) || input.stepSpec.complexity === 5
+  return {
+    mode: 'fallback',
+    reason: 'impl null — changeset 없이는 적용 불가. 재시도 소진 — 과대 changeset 의심 시 Step 분할 우선(H5), 일시 장애(세션/rate limit)면 재시도. ⛔ Lead=fable SOLO 직접 구현은 사용자 승인 후',
+    splitSuggested,
+    metrics: metrics(0),
+  }
+}
+
+// ── H5 post-Stage-1 soft 경고: 실제 changeset 크기가 위험 구간 근접 시 경고 (반환 불변, 성공 유지) ──
+const actualNewBodyLines = (Array.isArray(changeset.files) ? changeset.files : []).reduce((sum, f) =>
+  sum + (Array.isArray(f.symbolEdits)
+    ? f.symbolEdits.reduce((s, e) => s + (typeof e.newBody === 'string' ? e.newBody.split('\n').length : 0), 0)
+    : 0), 0)
+if (actualNewBodyLines > SPLIT_THRESHOLD) log(`WARN changeset ~${actualNewBodyLines}줄 > ${SPLIT_THRESHOLD} — 위험 구간 근접, 차기 Step 분할 고려`)
 
 // ════════ Stage 2: 아키 검토 (조건부 — full: 항상 / light: complexity>=3 또는 누락) ════════
 let review = null
