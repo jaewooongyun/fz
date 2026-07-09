@@ -18,6 +18,7 @@ Anthropic 공식 엔지니어링 블로그, arxiv 논문, 오픈소스 구현체
 - §3 5대 기둥 (Tool Orchestration, Guardrails, Context Engineering, Error Recovery, Observability)
 - §4 에이전트 패턴 A-D (Initializer, 3-Agent GAN, Plan→Work→Review, NLAH)
 - §5 실전 원칙
+- §5.5 자기진화 하네스와 회귀 게이트 (2026-07, harness-paper 서베이)
 - §6 Anti-patterns
 - §7 실전 구현 체크리스트 (load-bearing 테스트 포함)
 - §11 측정 지표 + Module Ablation 방법론 (cross-experiment 표는 experiment-log.md 참조)
@@ -59,6 +60,8 @@ Harness H = (C, R, S, A, Σ, F) where:
 > 출처: NLAH 논문 (청화대/HIT, arxiv 2603.25723)
 
 이 형식의 가치: 하네스를 **분석 가능한 과학적 객체**로 만든다. 각 구성 요소를 독립적으로 교체·제거(ablation)·비교할 수 있다.
+
+> ⚠️ **택소노미 지위** (2026-07 추가): NLAH 6요소는 여러 경쟁 분류 중 하나다. 2026 상반기 서베이의 앵커는 2606.20683의 6런타임책임(observation·context·control·action·state·verification)이며 11책임(2605.13357)도 병존 — "분해 어휘가 6책임/11책임/3계층/범주론으로 … 표준 분류 어휘는 아직 없다." [외부: harness-paper §4-A/§5 트렌드5 — 원 논문 미대조]. 본 가이드는 NLAH를 실무 축으로 유지하되(§12에 6책임 자기점검 격자 병기) 어느 것도 권위로 채택하지 않는다.
 
 ### 1.2.1 NLAH 6요소 ↔ H1-H6 매핑 (UC-4, v4.8.0)
 
@@ -114,8 +117,11 @@ fz의 `Lead + Teammate` (TeamCreate + SendMessage)는 **애플리케이션 레�
 | LangChain 벤치마크 | 하네스 설계만 수정 | 없음 | 52.8% → 66.5% (**+13.7%p**) |
 | NLAH 논문 | 코드 하네스 → 자연어 하네스 | 없음 | 30.4% → 47.2% (**+16.8%p**) |
 | Anthropic Solo vs Harness | Solo → 3-Agent | 동일 모델 | $9/깨진 게임 → $200/완전한 앱 |
+| Claw-SWE-Bench (2026-06) | minimal → full adapter | 없음 (동일 GLM 5.1) | Pass@1 19.1% → 73.4% — "모델 선택이 29.4pp, 하네스 선택이 27.4pp를 움직임" [외부: harness-paper §4-D, arXiv 2606.12344 — 원 논문 미대조] |
+| StaminaBench (2026-06) | 하네스 최선↔최악 | 없음 | 최대 6배 격차 [외부: harness-paper §요약, arXiv 2606.19613 — 원 논문 미대조] |
 
 > 하네스 설계가 모델 능력보다 더 큰 병목이다. 모델을 바꾸기 전에 하네스를 먼저 개선하라.
+> ⚠️ 2026-06 행 출처 단서: harness-paper 서베이는 **에이전트 생성 메타분석**(arXiv 편중·census 아님 자기고지)이며 본 가이드는 원 논문을 재검증하지 않았다 — 방향성 근거로만 사용.
 
 ---
 
@@ -157,9 +163,13 @@ GOOD: 도구 자체가 스키마에 없음 → 에이전트가 존재를 모르�
 
 **Lazy Tool Discovery**: MCP 도구를 사전에 모두 로드하지 않고 필요할 때만 발견한다. 프롬프트 버짓 절약 + 불필요한 도구 노출 방지.
 
+> 업계·학술 수렴 (2026-07 추가): intent 기반 동적 툴 검색이 대규모에서 실증 — "7,471 툴에서 full-corpus schema 노출 99.8% 감소" [외부: harness-paper §4-G, SING arXiv 2606.16591 — 대규모 세팅 결과, fz 규모(수십)엔 방향 지지로만]. OpenAI Codex도 MCP 툴검색 기본화 [외부: harness-paper §4-K]. 스킬/MCP 30+ 임계 초과 시 intent 동적 검색 전환 검토 — 임계 도달 전 구현 금지(원칙 1).
+
 ### 기둥 2: Guardrails & Safety (안전 제약)
 
 결정론적 규칙이 여러 계층에서 동작한다.
+
+> **원칙: 안전은 확률이 아니라 결정론으로** (서베이 안전 테마, 2026-07 추가 — fz 트리거 ID T8과 무관) — 프롬프트/스키마 레벨 가드레일(Layer 1-2)은 확률적 준수라 우회될 수 있다. 신뢰성-필수 제약은 결정론적 실행 훅(Layer 5)/OS 레벨로 강제한다: "거버넌스 제약(누가 인가·무엇이 제한·누구 지시 우선)은 결정론적 런타임 변수이므로 LLM이 아니라 실행 훅이 강제해야 한다." [외부: harness-paper §4-H, Harness-MU arXiv 2606.21856 — 원 논문 미대조]. OS 커널 레벨(eBPF) 강제는 연구 인프라 수준 — 플러그인 계층은 훅 원칙까지.
 
 **Defense-in-Depth (깊이 방어) — 5계층 모델**:
 
@@ -213,6 +223,8 @@ Layer 5: Lifecycle Hooks
 | Perm | `git status`, `npm test` | **Auto-allow** | 안전한 읽기 명령 |
 
 **핵심 교훈**: "제약이 많을수록 오히려 안정성이 높아진다." — 승인 피로를 줄이려면 패턴 기반 자동 승인(Semi-Auto)을 활용한다.
+
+> **capability ≠ authorization** (2026-07 추가): 도구 노출 허용이 곧 인가가 아니다 — force push·`--no-verify` 같은 위험 *인자값* 단위의 재인가가 별도 축: "셋 다 기본 capability gating은 있으나 결정론적 fail-closed per-call value 인가 게이트가 없음." [외부: harness-paper §4-H, ScopeGate arXiv 2606.28679 — 원 논문 미대조]. 강제 지점은 tool-layer에서 per-call 인자값 인가로 하강 중.
 
 ### 기둥 3: Context Engineering (컨텍스트 관리)
 
@@ -320,6 +332,23 @@ Layer 2: Agentic Search — Code Explorer 서브에이전트로 의미적 탐색
 Layer 3: Context Assembly — 발견된 파일/심볼을 우선순위로 조립
 Layer 4: Optimization — 토큰 예산에 맞춰 압축/선택
 ```
+
+#### 서브시스템 7: Constraint Pinning — 거버넌스 제약 격리 (2026-07 추가)
+
+컨텍스트 압축은 효율 문제만이 아니라 **안전-critical 계층**이다. 압축 요약기가 거버넌스 제약(⛔ 규칙)을 조용히 탈락시키면, 이후 턴은 규칙이 없었던 것처럼 행동한다.
+
+> "컨텍스트 압축이 안전 제약을 조용히 삭제하는 실패 모드를 명명. … 위반율이 full-context 0% → 압축 후 30%(일부 모델 59%). … Compaction-Eviction Attack(요약기가 정책을 누락하도록 유도)이 전 모델을 무력화. Constraint Pinning(거버넌스 제약을 손실 압축에서 격리)으로 위반 0% 회복." [외부: harness-paper §4-C, arXiv 2606.22528 — 원 논문 미대조]
+
+```
+설계 원칙:
+  1. 거버넌스 제약은 손실 압축 대상에서 제외 (요약 금지 — verbatim 유지)
+  2. 압축/핸드오프 경계마다 활성 ⛔ 규칙을 명시 재기재
+  3. 설계 축 이동: "무엇을 버리나" → "가역적으로 무엇을 노출하나" [외부: harness-paper §4-C 개관 (VISTA·ACE)]
+  4. 계획도 비영속 — "계획 신호가 1스텝 후 4.1배 감쇠 … 재주입으로도 회복 안 됨" [외부: harness-paper §4-C, 2606.22953]
+     → 요약본이 아닌 원본 아티팩트 전체 전달 (fz journal 전체 전달 규율과 정합)
+```
+
+**fz 생태계 대응**: CLAUDE.md ⛔ 규칙은 시스템 프롬프트 재주입으로 부분 pin. 단 worker OVERRIDE 경로(CLAUDE.md 로딩 차단)와 compact 경계의 실제 유실 여부는 [미검증 — 실측(plan-final.md Wave B1) 후 Essential Context 분리 여부 결정].
 
 ### 기둥 4: Error Recovery & Feedback Loops (에러 복구)
 
@@ -683,6 +712,8 @@ BAD:  Verifier (-0.8%) — 평가자와의 정렬 충돌
 교훈: "구조를 추가하기 전에 — 이 구조가 경로를 좁히는가, 넓히는가?"
 ```
 
+> **역도 성립** (2026-07 추가): 구조를 *과하게* 좁혀도 해롭다 — "effective harness는 partial일 수 있다 — 초기 스텝만 지정하고 나머지는 에이전트에 맡기는 편이 완전 구조화 워크플로보다 pass rate가 높을 수 있음 … 실패 모드(over-decomposition·over-pruning·hallucinated execution)." [외부: harness-paper §4-I, arXiv 2605.21516 — 원 논문 미대조]. partial harness가 완전 워크플로를 이길 수 있으므로 Step 세분화(granularity)는 "더 잘게"가 항상 정답이 아니다.
+
 ### 원칙 4: 자기 평가를 믿지 마라 — Generator≠Evaluator
 
 > "자기 작업을 평가하라고 하면 자신있게 칭찬한다 — 품질이 떨어져도."
@@ -754,6 +785,22 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 
 ---
 
+## 5.5 자기진화 하네스와 회귀 게이트 (2026-07 추가)
+
+> 2026 상반기 서베이 최대 클러스터(T2). "하네스를 손으로 만드는 정적 산출물이 아니라, 실행 트레이스로부터 스스로 진단·수정·진화하는 대상으로 보는 계열." [외부: harness-paper §4-B, arXiv 2606.09498 외 — 원 논문 미대조]
+
+**계보**: Self-Harness(인간 개입 없는 자기 하네스 개선 baseline) → APEX(하네스+행동원칙+워크플로 토폴로지 3층 공진화) → HarnessX(조립 가능한 하네스 파운드리). 진화 신호원이 프롬프트 단일축에서 하네스·원칙·토폴로지·가중치의 다축으로 확장 중.
+
+**핵심 규율 3개** (fz는 이미 fz-skill/fz-memory/Lesson Intake로 부분 자기수정 수행 — 수동 검토 기반이라 아래 가드레일과 이미 정합):
+
+1. **회귀 게이트 / falsification 통과분만 수용**: 자기수정 제안은 회귀 테스트·반증 게이트를 통과한 것만 채택 — "3단계 루프: Weakness Mining → Harness Proposal(다양하되 최소의 수정 생성) → Proposal Validation(회귀 테스트 통과분만 수용)." [외부: harness-paper §4-B, Self-Harness arXiv 2606.09498 — 원 논문 미대조] / "자기진화가 요행·거짓 설명을 정책으로 굳히지 않도록 held-out acceptance gate·variance-aware credit·insight falsification·structural dedup을 도입." [외부: harness-paper §4-B, QueenBee arXiv 2606.27492 — 원 논문 미대조]
+2. **self-preference 단독 채택 금지**: 검증셋 없는 self-preference/self-consistency 신호만으로 스킬·메모리 변경을 확정하지 않는다 — 외부 채점(fz-codex 교차검증)을 병행.
+3. **잦은 갱신 균형추 (SEAGym)**: "잦은 업데이트가 held-out 개선에 실패하거나 유용한 중간 스냅샷이 나중에 붕괴할 수 있음." [외부: harness-paper §4-B, SEAGym arXiv 2606.17546 — 원 논문 미대조] → fz의 candidate 유지 규율(즉시 active 승격 안 함)·Lesson Intake evidence 카운팅·메모리 GC가 이미 이 붕괴 방어와 정합 — **현행 유지가 정답**(재설계 유발 금지).
+
+> **경계**: 본 절은 "프레임+가드레일" 서술이지 완전자동 self-evolution 이식 제안이 아니다(fz는 "임의 판단 금지·AskUserQuestion" 규율 유지). falsification의 일반 이론은 서베이가 미해결로 남긴 과제 — "'요행을 정책으로 굳히지 않는' falsification 게이트의 일반 이론이 필요." [외부: harness-paper §6 미해결과제3 — 원 논문 미대조]. fz의 부분 자기수정을 "이 문제 해결"로 격상 금지.
+
+---
+
 ## 6. Anti-Patterns (하지 말아야 할 것)
 
 ### Anti-Pattern 1: 과도한 구조화 (Over-Engineering)
@@ -767,6 +814,8 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
   → YES → 유지 (load-bearing)
   → NO → 제거
 ```
+
+> **비단조성 보강** (2026-07 추가): "어설픈 하네스는 오히려 해롭다"는 실증도 있다 — "minimal-shell TSR < model-only TSR(어설픈 하네스는 오히려 해롭다)." [외부: harness-paper §4-A, arXiv 2605.12129 — 원 논문 미대조]. 단 2-3B 소형모델 실증이라 Claude(sonnet/opus) 계열 일반화는 [미검증: 모델 스케일 차이] — 반증 가능 가설로만.
 
 ### Anti-Pattern 2: 자기 평가 의존
 
@@ -791,6 +840,10 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 
 예외: Opus 4.6+ 1M context는 Compaction 충분 [verified: Anthropic 2026.03 재검토 포스트]. Opus 4.8 동등 [verified: anthropic.com/news/claude-opus-4-8].
      tokenizer 1.00-1.35x 증가 [미검증: Korean tokenizer 실측 부재] — L1/L2 크기 영향 자체 측정 필요.
+
+⚠️ 예외의 범위 (2026-07 추가): 위 "충분"은 *작업 일관성* 축에 한정. 압축이 *거버넌스 제약*(⛔ 규칙)을
+     조용히 삭제하는 별도 실패축(Governance Decay)은 윈도우 크기와 무관하다 — §3 기둥3 서브시스템 7 참조.
+     [외부: harness-paper §4-C, arXiv 2606.22528 — 원 논문 미대조]
 ```
 
 ### Anti-Pattern 4: 모든 액션에 승인 요청
@@ -856,6 +909,7 @@ Step 4: 가드레일 추가
   □ 보호 파일 경고 (.env, credentials)
   □ 범위 외 변경 감지
   □ 린트/타입 체크 강제
+  □ 자기수정(스킬/메모리) 반영 전 회귀 게이트 통과 확인 (§5.5)
 
 Step 5: 관찰 장치 설치
   □ 에이전트 액션 로깅
@@ -935,6 +989,15 @@ Q6: 에이전트가 실패했을 때 복구 경로가 있는가? (회복력)
   - Lead가 중계해야 하는 경우 병목
 ```
 
+### 멀티에이전트의 근본 한계 (2026-07 추가)
+
+에이전트/통신을 늘리는 것이 항상 이득은 아니다 — 두 근본 병목:
+
+- **정보병목 (C_min)**: "정보이론적 상한: 제약 그래프 분할로 생기는 정보 병목(minimum cut cost C_min)에 따라 MAS 성공확률이 지수적으로 감쇠. C_min이 높으면 에이전트/통신을 늘리지 말고 태스크를 재구조화하라." [외부: harness-paper §4-F, arXiv 2606.13733 — 원 논문 미대조]
+- **권한 병목**: "관리 병목은 지각이 아니라 권한 부여(어떤 모델도 workspace-permission precision 50% 미달), 비용과 관리 품질 decoupled(API 비용 100배 차이인데 점수는 4배 미만)." [외부: harness-paper §4-F, ClawArena arXiv 2606.31174 — 원 논문 미대조]
+
+→ fz 함의: 워커 수를 늘리기 전에 "정보병목이 큰가"를 먼저 본다(§10 역방향 게이트). C_min 정량 계산은 실무 불가 → `modules/complexity.md`의 coupling modifier로 정성 근사.
+
 ---
 
 ## 9. 비용-품질 트레이드오프
@@ -966,6 +1029,8 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | **프롬프트 캐싱** | 시스템 프롬프트 고정 부분 캐싱 | 10-20% |
 | **적응형 깊이** | 단순 작업 → SOLO, 복잡 → TEAM | 작업별 |
 | **Early Exit** | 품질 충분 시 추가 반복 중단 | 10-30% |
+
+> **비용↑ ≠ 관리품질↑** (2026-07 추가): 강한 모델(opus) 승격이 관리 품질을 자동 보장하지 않는다 — "비용과 관리 품질 decoupled(API 비용 100배 차이인데 점수는 4배 미만)." [외부: harness-paper §4-F, ClawArena arXiv 2606.31174 — 원 논문 미대조]. 모델 라우팅으로 비용을 올려도 오케스트레이션(위임·권한부여) 설계가 병목이면 품질은 따라오지 않는다.
 
 ### ROI 판단 기준
 
@@ -1002,6 +1067,14 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
   ↓
 학술/이식 필요?                → YES → NLAH (D)
 ```
+
+### 역방향 게이트 — 에이전트를 늘리면 안 되는 조건 (2026-07 추가)
+
+위 결정 트리는 복잡도가 오르면 멀티에이전트로 상승하는 단조 흐름이다. 역방향 게이트를 함께 본다:
+
+- **정보병목 크면 재구조화 우선**: "C_min이 높으면 에이전트/통신을 늘리지 말고 태스크를 재구조화하라." [외부: harness-paper §4-F, arXiv 2606.13733 — 원 논문 미대조] (§8 근본 한계 참조).
+- **오케스트레이션 프롬프팅 과신 금지**: "멀티에이전트 오케스트레이션 프롬프팅은 별개의 과소평가된 능력 … 평균 pass rate 14.9%." [외부: harness-paper §4-F, PerspectiveGap arXiv 2606.08878 — 원 논문 미대조]. 강한 코딩 모델이라도 "무엇을 워커에게 전달하는가"는 별도 취약점 — 워커 추가가 자동으로 품질을 올리지 않는다.
+- **C_min 정량 계산은 실무 불가** → `modules/complexity.md` coupling modifier로 정성 근사(교체 아님, 기존 MAST 기반 fan-out 억제의 이론적 뒷받침).
 
 ### 모델 세대별 하네스 조정
 
@@ -1083,6 +1156,37 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | F (Failure) | G-F1 | 추론 실패 자동 감지/복구 없음 | Runtime Claim Gate [관찰 모드] (cross-validation.md) |
 | Σ (State) | G-Σ1 | 컨텍스트 비용 높음 (스킬 1회 ~5K 토큰) | 인프라 제약 — 현재 전략(모듈 분리 + 500줄 제한) 유지 |
 
+### 6런타임책임 자기점검 격자 (2026-07 추가 — 참고 축, 권위 아님)
+
+> 서베이 앵커는 2606.20683의 6런타임책임(observation·context·control·action·state·verification)이나 "표준 분류 어휘는 아직 없다"([외부: harness-paper §4-A/§5 트렌드5 — 원 논문 미대조]) — NLAH(§1.2) 교체가 아닌 병기, 자기점검용 참고 축.
+
+| 6런타임책임 (2606.20683) | fz 컴포넌트 | 상대 강도 |
+|------|-----------|----------|
+| observation (관찰) | discover/search 스킬 · workflow metrics | 약 — 트레이스 관측성 명시적 책임 부재 |
+| context (컨텍스트) | fz-memory · context-artifacts | 중~강 |
+| control (제어) | orchestrator 위임 로직 | 강 |
+| action (행동) | code/fix 스킬 · Adapters(Grep/git/빌드) | 강 |
+| state (상태) | 세션/워크트리 관리 · ASD 폴더 | 중~강 |
+| verification (검증) | review/fz-codex 게이트 | 강 |
+
+> 용도: fz의 상대적 약한 책임(observation 관측성)이 격자로 드러남. 서베이 스스로 표준 없음을 인정하므로 권위 채택 금지 — 참고 축으로만. [외부: harness-paper §4-A, arXiv 2606.20683 — 원 논문 미대조]
+
+### 하네스 홀 candidate ↔ 외부 수렴 근거 (2026-07 추가)
+
+> fz 하네스 홀 candidate(`project_fz_harness_holes.md`, H1~H5/F5/F6)에 대한 서베이 교차검증. **외부 정황 근거이지 evidence 카운터 증가·candidate→active 승격이 아니다** — 승격 규칙(독립세션 카운팅)은 `modules/promotion-ledger.md`가 canonical. 서베이는 census 아닌 arXiv 편중 에이전트 생성물([외부: harness-paper §요약]).
+
+| 홀 | 서베이 판정 | 근거 arXiv | 매핑 강도 |
+|----|-----------|-----------|----------|
+| H1 challenge-the-negative | 지지(테마)+보완 | 2606.08960 · 2606.27492 | 중 (thematic) |
+| H2 분류 완전성 | 지지(테마)+보완 | 2606.11686 · 2606.29914 | 중 |
+| H3 site 단위 분류 | 지지+보완(거의 1:1) | 2606.11686 | 강 |
+| H4 review-counter diff-scope | **보류를 지지** (비단조성·partial harness가 over-structuring 경계) | 2605.12129 · 2605.21516 | 약~중 (보류 유지) |
+| H5 changeset 크기 무가드 | 강한 지지 (scaffold collapse 강한 유사 구조[유비]) + 해법(retry budget·C_min 재구조화) | 2605.12129 · 2605.21516 · 2606.13733 | 강 |
+| F5 Decision-Type | 지지+보완 (L1-L4 risk-tier) | 2606.27243 · 2606.31174 | 중~강 |
+| F6 Boundary-Sizing | 지지+보완 (over-decomposition 동일 어휘) | 2605.21516 · 2606.13733 | 중~강 |
+
+> **과잉야심 방지**: H1/H5/F6은 서베이 미해결과제(falsification 일반이론·C_min 방법론)의 **국소 휴리스틱**이지 해결·일반화가 아니다 — "해결/일반화" 표현 금지. [외부: harness-paper §6 — 원 논문 미대조]
+
 ---
 
 ## 참고 문헌 (공식/학술/고품질만)
@@ -1121,6 +1225,37 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 8h | Synthesizing Multi-Agent Harnesses for Vulnerability Discovery | Liu et al. | arxiv 2604.20801 [arxiv preprint, 2026-04] — 멀티에이전트 하네스 합성 (취약점 발견) | https://arxiv.org/abs/2604.20801 |
 | 8i | AI Harness Engineering: A Runtime Substrate for Foundation-Model Software Agents | Zhong et al. | arxiv 2605.13357 [arxiv preprint, 2026-05] — 하네스 런타임 substrate | https://arxiv.org/abs/2605.13357 |
 | 8j | Affordance Agent Harness: Verification-Gated Skill Orchestration | Huang et al. | arxiv 2605.00663 [arxiv preprint, 2026-05] — verification-gated skill orchestration | https://arxiv.org/abs/2605.00663 |
+
+### 학술 논문 — 2026-06 wave (harness-paper 서베이 경유)
+
+> 아래는 본 가이드 본문이 실제 인용한 2026-05~06 논문만. 전 항목 **harness-paper 서베이 경유**이며 원 arXiv 논문을 재검증하지 않았다.
+
+| # | arXiv | 주제 | 본문 인용 위치 |
+|---|-------|------|--------------|
+| 8k | 2606.22528 | Governance Decay (압축→안전제약 삭제) | §3 기둥3 서브시스템7 |
+| 8l | 2606.21856 | Harness-MU (결정론적 안전 강제) | §3 기둥2 원칙 + modules/governance.md |
+| 8m | 2606.28679 | ScopeGate (capability≠authorization) | §3 기둥2 |
+| 8n | 2606.09498 | Self-Harness (자기 하네스 개선 baseline) | §5.5 |
+| 8o | 2606.27492 | QueenBee (insight falsification 게이트) | §5.5 |
+| 8p | 2606.17546 | SEAGym (잦은 갱신 붕괴 경고) | §5.5 |
+| 8q | 2606.20683 | QA→Task 6런타임책임 | §1.2 택소노미 + §12 격자 |
+| 8r | 2606.13733 | Task Structure C_min (정보병목 상한) | §8 근본한계 · §10 역방향게이트 · §12 홀표 |
+| 8s | 2606.08878 | PerspectiveGap (오케스트레이션 프롬프팅 14.9%) | §10 역방향게이트 |
+| 8t | 2606.31174 | ClawArena-Team (관리 병목=권한, 비용 decoupled) | §8 근본한계 · §9 각주 · §12 홀표 |
+| 8u | 2606.12344 | Claw-SWE-Bench (19.1%→73.4%) | §2.2 |
+| 8v | 2606.19613 | StaminaBench (최선/최악 6배) | §2.2 |
+| 8w | 2606.11686 | Layer-Isolated (집계가 가리는 slice 회귀) | §12 홀표 (H2/H3) |
+| 8x | 2606.17799 | Position: Coding Benchmarks Misaligned (모델/하네스/환경 분리) | §2.2 평가분리 명제 배경 (Position paper — 개별 각주 아님) |
+| 8y | 2606.16591 | SING (intent 동적 툴 검색) | §3 기둥1 Lazy Tool Discovery |
+| 8z | 2605.21516 | Inference-Time Alignment (partial harness·over-decomposition) | §5 원칙3 각주 · §12 홀표 |
+| 8aa | 2605.12129 | It's Not the Size (비단조성·scaffold collapse) | §6 AP1 각주 · §12 홀표 |
+| 8ab | 2606.08960 | Hardening Agent Benchmarks (hacker-fixer) | §12 홀표 (H1) |
+| 8ac | 2606.27243 | NOVA (L1-L4 risk-tier) | §12 홀표 (F5) |
+| 8ad | 2606.22953 | Plans Don't Persist (계획 신호 감쇠) | §3 기둥3 서브시스템7 |
+| 8ae | 2606.29914 | MemDelta (통제 A/B 프로토콜) | §12 홀표 (H2) |
+| 8survey | harness-paper 서베이 본체 | Harness Engineering 2026 (revfactory) | https://revfactory.github.io/harness-paper |
+
+> 단서: harness-paper는 **에이전트 생성 메타분석**이며 서베이 스스로 "완전한 census 아님·arXiv 편중·WebSearch 비활성·Meta/FAIR 부재"를 고지한다. 위 수치·주장은 서베이가 인용 논문에 대해 주장한 내용이고 **원 논문은 미재검증**이다 — 방향성 근거로만 사용, 사실 승격 금지.
 
 ### OpenAI / Codex 공식
 

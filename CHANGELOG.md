@@ -18,6 +18,16 @@
 > - **에이전트/템플릿**: 12 에이전트 P2P 블록 → Workflow 노트 · agent-template/skill-template TEAM → Workflow(신규 산출물 TEAM 미상속) · team-core/peer-review-tiers 일몰 헤더 + Tier 재매핑.
 > - ⛔ **pending**: `peer-review.js` 실 invoke 캘리브레이션(실 PR 필요) · `patterns/*.md`는 canonical 라운드 의미론으로 보존 · 버전 범프+release는 캘리브레이션 후. 산출물: `~/dev/TVING/fz-team-sunset/`.
 
+### v4.19.0 (2026-07-09) — 하네스 서베이 2026 반영 Wave A: 가이드 개정 + 워커 3-tier 재배선 확정 [MINOR]
+
+> "하네스 엔지니어링 2026" 서베이(revfactory.github.io/harness-paper — arXiv 86편 에이전트 생성 메타분석)를 3층 검증(추출 인용 81건 환각 0 · fz사실 45/47 · Codex ×4)으로 분석 → 13주제 proposal → plan-final Wave A 실행. 전 편집 추가/각주만(+137줄, 삭제 0), 서베이 인용은 `[외부: … 원 논문 미대조]` 태그 + census-아님 단서 의무.
+>
+> - **harness-engineering.md 18편집**: §5.5 자기진화+회귀 게이트 신설(T2 최대 클러스터 — SEAGym 빈도 균형추, "현행 candidate 규율 유지가 정답") · 기둥3 서브시스템7 Constraint Pinning(Governance Decay 0%→30% — 압축=안전-critical 계층) + AP3 caveat · 기둥2 결정론적 안전 강제 원칙+capability≠authorization · §8/§10 멀티에이전트 근본 한계+역방향 게이트(C_min 정보병목·PerspectiveGap 14.9%) · §2.2 정량 앵커 최신화(19.1%→73.4%, 6배 격차) · §12 6책임 자기점검 격자+하네스 홀↔외부 수렴 근거 표(승격 아님 명시) · 참고문헌 2026-06 wave 21편
+> - **skill-authoring.md**: 트리밍 비저하 3원칙에 "모델 전이 강건성" 외부 근거(절차적 체크리스트 > prose — 2604.25850, 근거 등급 낮음 명시) · **governance.md**: 결정론적 안전 강제 원칙 문단(훅 승격=settings.json 소유자 결정, 설치 지시 금지 불변)
+> - **워커 3-tier 재배선 확정(fdcfe56)**: 실질 분석·생산 워커 opus 승격(동시 ≤3) · lint ①-b effort 명시 검사 신설 · governance 비용 envelope(≈opus 5 equivalent) · setup-codex-skills 플러그인 스킬 링크 확장
+> - **검증 사슬**: 편집 문안 생산=Workflow(compose opus+review opus, pass) · 앵커 21/21 · AC1(137≤200)/AC8(200 OK) · Codex check 2이슈 반영(T8 식별자 충돌 해소 — fz 트리거 ID와 분리 표기 · 참고문헌 누락 2편 추가)
+> - ⛔ **Deferred (plan-final Wave B/C)**: B1 Governance Decay 실측 gate → Constraint Pinning 메커니즘(D5) · OVERRIDE 정합(D2) · 승격 임계 promotion-ledger canonical 동기화(D3) · memory-guide GC 망각축 · hygiene §7(clap `--`) · code-pair pre-flight 크기 가드(H5, C1 캘리브레이션 선행). 산출물: `~/dev/TVING/harness-paper/`
+
 ### v4.18.0 (2026-07-06) — Fable 5 재배선: 판단=Fable / 수행=Opus·Sonnet [MINOR]
 
 > 제재 해제(2026-07-05) 후 Lead=`/model fable`(B안 가동) + workflow **판단 지점 3곳**만 explicit `'fable'` 승격. 배선=가설/측정=검증(§5.8 사전등록) + lint 기계 감시. 구현 자체도 동일 구조로 수행(생산=code-pair 워커, Lead(fable)=적용·oracle·판정만).
