@@ -97,14 +97,14 @@ model-strategy:
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
 > Collaborative Design 패턴 canonical: `modules/patterns/collaborative.md` (보존 — 라운드 의미론은 스크립트가 구현).
 > 스크립트: `workflows/plan-collaborative.js` (플러그인 루트 상대) — agents/의 plan-structure·plan-impact·plan-edge-case·review-arch·review-direction 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
-> 동시 opus ≤2(Lead 포함)는 `workflows/plan-collaborative.js`가 구조적으로 보장 (parallel 블록 sonnet 전용, opus 호출 전부 순차) — 구 Sequential Operating Contract(UC-6+ISSUE-016)의 보장을 스크립트 구조로 이전.
+> 동시 opus ≤3(Lead 세션 fable은 별도)는 `workflows/plan-collaborative.js`가 구조적으로 보장 — Stage 2 병렬 3렌즈(plan-impact·plan-edge-case·review-arch)가 opus로 동시 실행되며 상한 내 유지. rate-limit 시 순차화 폴백(governance.md).
 
 ### 실행 절차 (Lead)
 
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/plan/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/plan-collaborative.js', args })`
-   - Stage 0 direction(opus, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(sonnet) → Stage 3 CC 교차(edge↔impact) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증. 9-11 call
+   - Stage 0 direction(fable, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2 — 반박은 opus) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(opus) → Stage 3 CC 교차(edge↔impact, opus) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증(opus). 9-11 call
 4. **반환 처리**:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
    - `mode:'direction_escalation'` → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용)

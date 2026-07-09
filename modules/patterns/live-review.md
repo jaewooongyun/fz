@@ -15,7 +15,7 @@
 | Supporting | memory-curator (S) | 관련 교훈 발굴 (기본 포함, lightweight recall) |
 | Supporting | review-counter (S) | 역방향 검증 — 다른 에이전트 판단에 반론 (선택적 DA 패스) |
 
-review-arch가 Primary (opus 승격). 나머지 Supporting (sonnet). Lead가 통합.
+review-arch가 Primary(opus). review-quality·review-correctness·review-counter는 실질 분석 워커(opus), memory-curator는 recall 성격(sonnet). Lead가 통합.
 /fz-peer-review는 review-correctness, memory-curator 미포함.
 
 ## 2.5-Turn 적용 (Mesh, 2명)

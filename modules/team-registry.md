@@ -8,8 +8,8 @@
 ## 에이전트 Capabilities
 
 > **model 컬럼 해석**: `default` = frontmatter 기본값, `promoted` = Lead가 스폰 시 승격하는 모델.
-> Primary 에이전트의 frontmatter는 `model: sonnet`이지만, TEAM 스폰 시 Lead가 `model: "opus"`를 명시적으로 전달한다.
-> 이 설계는 "동시 opus 최대 2개" 거버넌스를 Lead가 직접 제어하기 위함이다.
+> 실질 분석·생산 에이전트의 frontmatter는 `model: sonnet`이지만, 스폰 시 Lead가 `model: "opus"`를 명시적으로 전달한다.
+> 이 설계는 "동시 opus ≤3" 거버넌스를 Lead가 직접 제어하기 위함이다.
 > **fable** (운용 — 2026-07-06 해제): Lead 세션이 `/model fable`로 전환해 운용하며, Workflow 판단 지점 3곳(`workflows/search-cross-verify.js:166` merge · `workflows/plan-collaborative.js:154`/`:167` direction)만 explicit `'fable'` 지정. Agent default/promoted 체계(Primary=opus)는 유지. 동시 상한 fable 1(Lead 세션 제외). 감시는 `scripts/lint-model-explicit.sh`. 재배선 상세는 `guides/fable-model-guide.md` §5.
 
 | 에이전트 | domain | lens | default | promoted | memory | skills | isolation | 비고 |
@@ -17,15 +17,15 @@
 | search-symbolic | search | 심볼 정밀 탐색 (정의/참조/타입) | sonnet | — | — | — | — | Serena 도구 |
 | search-pattern | search | 텍스트 패턴 넓은 범위 탐색 | sonnet | — | — | — | — | Grep/Glob 도구 |
 | plan-structure | plan | 구현 구조 + Step 순서 설계 | sonnet | opus | project | — | — | Primary |
-| plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | — | — | — | — | |
-| plan-impact | plan | 영향 범위 전담 (Exhaustive Impact Scan a~f) | sonnet | — | project | — | — | Impact Scanner |
+| plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | opus | — | — | — | 실질 워커 |
+| plan-impact | plan | 영향 범위 전담 (Exhaustive Impact Scan a~f) | sonnet | opus | project | — | — | Impact Scanner · 실질 워커 |
 | impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | worktree | Primary |
-| impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | — | — | — | — | |
+| impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | opus | — | — | — | 실질 워커 |
 | review-arch | review | 아키텍처 결정 + 레이어 위반 | sonnet | opus | project | arch-critic | — | Primary |
-| review-quality | review | 코드 품질 + Dead Code + 성능 | sonnet | — | project | code-auditor | — | |
-| review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | — | — | — | — | fz-code TEAM + fz-review Phase 4.5 |
-| review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | opus | — | — | — | direction-challenge 시 승격 |
-| review-counter | review | 반론 + Devil's Advocate | sonnet | — | — | — | — | |
+| review-quality | review | 코드 품질 + Dead Code + 성능 | sonnet | opus | project | code-auditor | — | 실질 워커 |
+| review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | opus | — | — | — | fz-code TEAM + fz-review Phase 4.5 · 실질 워커 |
+| review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | opus | — | — | — | direction-challenge 판단 지점(Workflow=fable) |
+| review-counter | review | 반론 + Devil's Advocate | sonnet | opus | — | — | — | 실질 워커 |
 | memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | — | user | — | — | 모든 TEAM 모드 참여 |
 
 ---
@@ -35,8 +35,8 @@
 ```
 1. 스킬이 도메인을 지정 (예: fz-plan → domain: plan)
 2. 레지스트리에서 해당 domain의 모든 에이전트 수집
-3. promoted=opus인 에이전트 = Primary Worker (Lead가 스폰 시 model:"opus" 전달)
-4. 나머지 = Supporting
+3. promoted=opus인 에이전트 = 실질 분석·생산 워커 (Lead가 스폰 시 model:"opus" 전달). 그중 비고 "Primary" = 토폴로지 허브(도메인당 1명)
+4. promoted 없는(sonnet) 에이전트 = retrieval·breadth 단순 워커. 동시 opus ≤3 상한 준수
 5. 팀 크기에 따라 토폴로지 결정:
    - 2명 → Mesh
    - 3명+ → Star-enhanced (Supporting → Primary 경유)

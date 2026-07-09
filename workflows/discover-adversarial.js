@@ -8,7 +8,8 @@
 //   제약: P2P 통신 불가(데이터는 스크립트 경유) / 시각·난수 API 불가(시간 측정은 Lead 책임) /
 //     에이전트 최종 텍스트 = 반환값(1-shot raw data) / 동시 캡 min(16, cores-2).
 //   호출(Lead, SKILL.md 절차): Workflow({ scriptPath: '{plugin_root}/workflows/discover-adversarial.js',
-//     args: { problem, codeContext, constraintsKnown, deep }  // ts 제거: 미사용 + resume 캐시 미스 유발 (리뷰 교정) })
+//     args: { problem, codeContextPath, constraintsKnown, deep }  // codeContextPath = 요약 파일 절대경로 (대형 입력 §12) · ts 제거: 미사용 + resume 캐시 미스 유발 (리뷰 교정) })
+//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   명명 등록: 플러그인 workflows/*.js의 meta.name이 명명 워크플로우로 자동 등록됨(스킬 목록 등장 실측) — scriptPath 없이 이름 'discover-adversarial' 호출 가능.
 //   반환 계약: { mode: 'workflow', landscape, paths, costs, metrics } 또는 { mode: 'fallback', reason }
 //     → mode='fallback'이면 Lead는 SKILL.md 기존 SOLO REP 경로 수행. wall-clock 측정은 Lead 책임(스크립트는 시각 API 불가).
@@ -137,7 +138,7 @@ function evalCostThunk(pathBundle, lensLabel) {
     `[경로] ${JSON.stringify(pathBundle)}\n` +
     `[채점축] 각 경로 cost/risk(low/mid/high) + 조건 불변성(locked/unlocked) 1회 판정 + 근거 코드 인용(evidence) + 확신도(confidence). ` +
     `부수지 말고 비용을 밝힌다.`,
-    { label: `cost-${lensLabel}`, agentType: 'fz:review-arch', model: 'sonnet', schema: CostRiskSchema })
+    { label: `cost-${lensLabel}`, agentType: 'fz:review-arch', model: 'sonnet', effort: 'xhigh', schema: CostRiskSchema })
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -147,9 +148,9 @@ async function runLean() {
   phase('Round 1: 경로 생성 + 비용 탐색')
   const r1paths = await callAgent(
     `${OVERRIDE}\n[역할] 경로 생성자(plan-structure 렌즈)\n[문제] ${input.problem}\n` +
-    `[코드 컨텍스트] ${input.codeContext}\n[기지 제약] ${JSON.stringify(input.constraintsKnown)}\n` +
+    `[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드)\n[기지 제약] ${JSON.stringify(input.constraintsKnown)}\n` +
     `[목표] 경로 2-4개 생성, 각 전제조건 명시. 탈락시키지 말 것.`,
-    { label: 'r1-paths', agentType: 'fz:plan-structure', model: 'opus', schema: PathSetSchema })
+    { label: 'r1-paths', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: PathSetSchema })
   if (!r1paths) { fallbackCount += 1; return { mode: 'fallback', reason: 'r1-paths null', metrics: metrics() } }
 
   const r1cost = await evalCostThunk(r1paths.paths, 'r1')()
@@ -159,7 +160,7 @@ async function runLean() {
   const r2paths = await callAgent(
     `${OVERRIDE}\n[역할] 경로 생성자\n[기존 경로+비용] ${JSON.stringify({ r1paths, r1cost })}\n` +
     `[목표] unlocked(🔓) 조건을 무시한 새 경로 탐색 + 기존 경로 조건 업데이트.`,
-    { label: 'r2-paths', agentType: 'fz:plan-structure', model: 'opus', schema: PathSetSchema })
+    { label: 'r2-paths', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: PathSetSchema })
   const r2cost = r2paths ? await evalCostThunk(r2paths.paths, 'r2')() : null
   if (!r2paths) log('WARN r2-paths null — R2 skipped, R1만으로 Landscape (라운드 미완주)')
   else if (!r2cost) log('WARN r2-cost null — R2 비용 미산정 (부분 미완주)')
@@ -172,7 +173,7 @@ async function runLean() {
 
 // ════════════════════════════════════════════════════════════════
 //  --deep: 렌즈 3 fan-out(sonnet) → merge(opus 언어 지시) → 경로별 평가 chunk ≤4 → 합성
-//  렌즈 전부 sonnet — 동시 opus ≤2 준수(Lead 포함). refuter 없음.
+//  렌즈 전부 sonnet — 동시 opus ≤3 준수(Lead=fable 별도). refuter 없음.
 // ════════════════════════════════════════════════════════════════
 async function runDeep() {
   // budget 가드 실배선: 예산 부족 시 lean 회귀 (total null이면 remaining()=Infinity → 가드 미발동)
@@ -185,9 +186,9 @@ async function runDeep() {
   const lenses = ['reuse-first', 'greenfield', 'hybrid']
   const lensThunks = lenses.map((lens) => () => callAgent(
     `${OVERRIDE}\n[역할] 경로 생성자 — 렌즈: ${lens}\n[문제] ${input.problem}\n` +
-    `[코드 컨텍스트] ${input.codeContext}\n[기지 제약] ${JSON.stringify(input.constraintsKnown)}\n` +
+    `[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드)\n[기지 제약] ${JSON.stringify(input.constraintsKnown)}\n` +
     `[목표] ${lens} 관점에서 경로 2-4개 생성 + 전제조건. 탈락 없음.`,
-    { label: `lens-${lens}`, agentType: 'fz:plan-structure', model: 'sonnet', schema: PathSetSchema }))
+    { label: `lens-${lens}`, agentType: 'fz:plan-structure', model: 'sonnet', effort: 'xhigh', schema: PathSetSchema }))
   const lensResults = (await parallel(lensThunks)).filter(Boolean)
   if (lensResults.length === 0) { fallbackCount += 1; return { mode: 'fallback', reason: 'all lenses null', metrics: metrics() } }
   if (lensResults.length < lenses.length) log(`WARN 렌즈 ${lenses.length - lensResults.length}개 null (부분 fan-out)`)
@@ -198,7 +199,7 @@ async function runDeep() {
     `${OVERRIDE}\n[역할] 경로 병합자\n[렌즈별 경로] ${JSON.stringify(lensResults)}\n` +
     `[목표] 본질이 같은 경로는 병합하되 mergedFrom에 출처 렌즈 표기. 어떤 경로도 제거하지 말 것 — ` +
     `병합은 표기이지 탈락이 아니다. 진짜 다른 축만 분리 유지(REP 규칙 2).`,
-    { label: 'merge', agentType: 'fz:plan-structure', model: 'opus', schema: MergedPathSetSchema })
+    { label: 'merge', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: MergedPathSetSchema })
   if (!merged) { fallbackCount += 1; return { mode: 'fallback', reason: 'merge null', metrics: metrics() } }
 
   // 경로별 평가 — 구조적 유계: 렌즈3 × maxItems4 = 병합 전 ≤12, 병합은 중복 통합으로 감소만.
@@ -238,7 +239,7 @@ async function synth(allPaths, allCost, roundsCompleted) {
     `[비용/조건] ${JSON.stringify(allCost)}\n` +
     `[목표] Trade-off Table + Open Questions 3개 이상. 병합 경로는 mergedFrom 유지. ` +
     `결론을 내리지 말 것 — 경로 선택은 plan의 몫.`,
-    { label: 'landscape', agentType: 'fz:plan-structure', model: 'opus', schema: LandscapeSchema })
+    { label: 'landscape', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: LandscapeSchema })
   if (!map) { fallbackCount += 1; return { mode: 'fallback', reason: 'landscape null', metrics: metrics() } }
 
   return {
@@ -252,8 +253,8 @@ async function synth(allPaths, allCost, roundsCompleted) {
 
 // ── 진입점 (top-level await — 세션 실증 형식: return이 Lead 수신값) ──
 // fail-fast: args 미바인딩/필수 키 누락 시 에이전트 스폰 전 즉시 fallback (fabrication 방지)
-if (!input || !input.problem || !input.codeContext) {
-  log(`FATAL args invalid (typeof=${typeof args}) — problem/codeContext 필수. fallback`)
+if (!input || !input.problem || !input.codeContextPath) {
+  log(`FATAL args invalid (typeof=${typeof args}) — problem/codeContextPath 필수. fallback`)
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}, problem=${!!(input && input.problem)}`, metrics: metrics() }
 }

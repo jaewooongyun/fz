@@ -6,6 +6,8 @@
 # 목적 (experiment-log §5.8 ⑤ 측정 지원 · Anti-Pattern Constraint 감시):
 #   ① 전 workflow(workflows/*.js)의 agent 호출 opts 에 model: 명시 강제
 #      → AC-6 (model 생략 전환 금지 — 생략 시 agent 정의 기본 model 로 강등)
+#   ①-b 전 workflow 의 agent 호출 opts 에 effort: 명시 강제 (표준 effort=xhigh)
+#      → agent() 는 model+effort 모두 명시 의무 (skill-authoring §12) — effort 생략 시 세션 max 를 상속
 #   ② repo 전체 model: 'fable' 총계 == EXPECTED_FABLE 고정
 #      기대 분포: search-cross-verify.js ×1 + plan-collaborative.js ×2 = 3
 #      → AC-1 ("fable 지정은 정확히 3곳") 양방향 강제: 무단 확산(>3) · 무단 제거(<3) 모두 차단
@@ -20,9 +22,9 @@
 #
 # 검사 원리: agent 호출 opts 리터럴은 전부 single-line 이며 'agentType:' 를 고유 마커로
 #   갖는다 (주석의 destructuring {..model, agentType} 는 콜론이 없어 자동 제외). 따라서
-#   'agentType:' 를 포함한 라인은 'model:' 도 같은 라인에 포함해야 한다.
+#   'agentType:' 를 포함한 라인은 'model:' · 'effort:' 도 같은 라인에 포함해야 한다.
 #
-# exit: 0=PASS / 1=lint 위반(model 누락 또는 fable≠기대) / 2=설정 오류(대상 미탐)
+# exit: 0=PASS / 1=lint 위반(model/effort 누락 또는 fable≠기대) / 2=설정 오류(대상 미탐)
 
 set -euo pipefail
 
@@ -58,6 +60,18 @@ if [ "$checked" -eq 0 ]; then
   exit 2
 fi
 
+# ── ①-b effort 명시 검사: agentType: 마커 라인은 effort: 도 포함해야 함 (① 동형) ──
+missing_effort=0
+while IFS= read -r hit; do
+  if ! printf '%s\n' "$hit" | grep -Eq 'effort[[:space:]]*:'; then
+    file="${hit%%:*}"
+    rest="${hit#*:}"
+    lineno="${rest%%:*}"
+    echo "❌ effort 누락: ${file}:${lineno}" >&2
+    missing_effort=$((missing_effort + 1))
+  fi
+done < <(grep -nHE 'agentType[[:space:]]*:' "$WORKFLOWS_DIR"/*.js)
+
 # ── ② fable 지정 수 고정 검사 (grep no-match 시 pipefail 회피용 || true) ──
 fable_count=$(grep -hoE "model[[:space:]]*:[[:space:]]*'fable'" "$WORKFLOWS_DIR"/*.js | wc -l | tr -d ' ') || true
 
@@ -70,6 +84,10 @@ fi
 fail=0
 if [ "$missing" -gt 0 ]; then
   echo "❌ lint-model-explicit: model 누락 ${missing}건 (AC-6 위반)" >&2
+  fail=1
+fi
+if [ "$missing_effort" -gt 0 ]; then
+  echo "❌ lint-model-explicit: effort 누락 ${missing_effort}건 (①-b 위반 — agent() 는 model+effort 모두 명시)" >&2
   fail=1
 fi
 if [ "$fable_count" -ne "$EXPECTED_FABLE" ]; then

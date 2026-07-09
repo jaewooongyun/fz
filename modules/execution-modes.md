@@ -73,6 +73,13 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 | fz-fix | FIX_VERIFIED | 3 | 빌드 검증 |
 | fz-review | REFLECTION_80 | 3 | Reflection Rate ≥ 80% (N≥10에서만 gating — 참조: `modules/cross-validation.md § Reflection Rate threshold`) |
 
+### autonomous-reminder (Fable 5, LOOP 한정)
+
+자율 반복 실행 중에는 turn을 **텍스트 의도 선언만으로** 종료하지 않는다: 마지막 문단이 계획·의도·다음 단계 선언이면 해당 tool call을 실제로 실행하고, 종료는 작업 완료 또는 사용자만 줄 수 있는 입력 대기 시에만 한다. (출처: 공식 Prompting Claude Fable 5 Autonomous reminder 스니펫 — `guides/fable-model-guide.md` § 프롬프트 패턴.)
+
+- **우선 조항 (필수)**: completion-promise 충족 또는 max-iterations 도달 시 → 즉시 중단·보고가 본 리마인더보다 **우선**한다 (loop contract override 금지). "계속 진행"이 완주 계약을 덮지 않는다.
+- **LOOP 한정**: 본 리마인더는 LOOP 모드 자율 운행에만 적용 — 상시 세션에는 미적용 (하네스 중복 회피).
+
 ## SIMPLIFY 게이트 상세
 
 - /simplify는 **2단계 트리거** 시스템

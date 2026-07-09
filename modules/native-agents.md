@@ -27,6 +27,7 @@
 2. **Background 스폰**: review에서 fz TEAM과 병렬로 background 실행
 3. **결과 통합**: Lead가 L3 결과 수신 → Issue Tracker에 merge (fz 이슈와 동일 형식)
 4. **조건부 스폰**: 아래 조건 충족 시에만 스폰
+5. **모델·effort 명시**: L3 및 직접 Agent 스폰도 model 명시 의무 — 실질 분석·생산 관점은 `opus`, retrieval·breadth 성격은 `sonnet`, effort는 `xhigh` 명시 (미지정 시 부모 세션 모델·effort 상속)
 
 ### 스폰 조건
 

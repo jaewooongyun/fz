@@ -18,8 +18,8 @@
 
 | 합산 | 모드 | 실행 방식 |
 |------|------|---------|
-| 0-3 | SOLO | Lead(O) 단독, 순차 실행 |
-| 4+ | TEAM | Lead(O) + Primary(O) + N×Sonnet |
+| 0-3 | SOLO | Lead(fable) 단독, 순차 실행 |
+| 4+ | TEAM | Lead(fable) + Primary(opus) + 워커 opus/sonnet (동시 opus ≤3) |
 
 > **SOLO + Supporting 하이브리드**: SOLO 모드(0-3)에서도 특정 스킬은 조건부 Supporting 에이전트를 1명 추가할 수 있다.
 > 이 경우 TeamCreate는 사용하지 않고, Lead가 Supporting을 Agent로 직접 스폰한다.

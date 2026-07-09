@@ -5,7 +5,7 @@
 > Claude Fable 5 / Claude Mythos 5의 사양 · API 동작 차이 · Claude Code 통합 · fz 생태계 적용 전략의 단일 참조.
 > 모델 무관 프롬프팅 원칙은 `prompt-optimization.md`, 하네스 설계는 `harness-engineering.md` 참조.
 >
-> **Sources (last audited: 2026-06-12) — Tier 1 only:**
+> **Sources (last audited: 2026-07-07) — Tier 1 only:**
 >
 > - **Introducing Claude Fable 5 and Claude Mythos 5** (Anthropic, GA 2026-06-09) — platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5
 > - **Prompting Claude Fable 5** (Anthropic, live) — platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5
@@ -102,6 +102,8 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 - Thinking은 Fable 5에서 **끌 수 없음** — Option+T 토글, `alwaysThinkingEnabled`, `MAX_THINKING_TOKENS=0` 모두 무효
 - ℹ️ `/model` 피커의 "max effort 저장" 메시지와 공식 docs의 "max는 세션 한정" 문구가 표면 상충 [해소: 2026-07-05 실측 — 피커 stdout "saved as your default for new sessions with max effort"로 세션 간 지속 확인]
 
+> **T1 긴장 (공식 default vs fz 세션 운용)**: 공식 프롬프팅 문서는 `high`를 기본으로 두고 `max`를 논외(overthinking·diminishing returns)로 본다. fz 세션의 `max`/`ultracode` 상시 운용은 이 기본에서의 **의식적 이탈**로, 다중 파이프라인 오케스트레이션 난이도에 대한 사용자 결정이다 (공식 default를 몰라서가 아님).
+
 ### 안전 분류기 자동 폴백 (Claude Code 고유)
 
 - 분류기가 요청을 flag하면 → **해당 요청을 default Opus(4.8)로 자동 재실행** + transcript에 notice → 세션이 Opus로 계속됨. 복귀는 `/model fable` 재실행
@@ -131,7 +133,7 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 4. **결과를 기술하고 경로는 위임**: "Describe the outcome, not the steps"
 5. ⛔ **공격적 사이버보안·생물학은 비대상 도메인** — "Claude Fable 5 is not intended for offensive cybersecurity or biology and life sciences work" — refusal/폴백 대상
 
-### 프롬프트 패턴 (공식 스니펫 7종)
+### 프롬프트 패턴 (공식 스니펫 13종)
 
 | 패턴 | 트리거 상황 | 핵심 문구 (요지) |
 |------|-----------|----------------|
@@ -142,6 +144,12 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 | Async subagents | 병렬 위임 | "Delegate independent subtasks to subagents and keep working while they run." |
 | Memory | 세션 간 학습 | "Store one lesson per file with a one-line summary at the top." |
 | Readability | 장기 에이전틱 세션의 최종 요약 | "drop the working shorthand. Write complete sentences... If you have to choose between short and clear, choose clear." |
+| Brevity | 최종 응답의 장황함 | "Lead with the outcome" — 결론을 먼저, 근거는 뒤에 |
+| Checkpoint | 자율 런 중 확인 요청 빈도 | "Pause only when [the decision] genuinely requires the user; otherwise proceed." |
+| Memory bootstrap | 세션 시작 시 과거 학습 회상 | "Reflect on previous sessions [before you begin]." |
+| Autonomous reminder | 장기 자율 실행 프레이밍 | "You are operating autonomously" — 완료까지 계속 진행 |
+| Context reassurance | 컨텍스트 소진 불안으로 조기 압축/종료 | "You have ample context remaining" — 조기 요약·보존 불요 |
+| Intent context | 요청에 이유(why)가 빠짐 | "Give the reason, not only the request" — why를 주면 how를 위임 가능 |
 
 ### Scaffolding 변경 권고 (이전 모델 대비)
 
@@ -159,15 +167,28 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 
 | 옵션 | 품질 | 비용 | 변경 범위 | 판정 |
 |------|------|------|----------|------|
-| A. 현행 유지 (Lead=세션 모델, Primary=opus, rest=sonnet) | 기준 | 기준 | 0 | Fable 미사용 시 |
+| A. 재배선 이전 baseline (Lead=세션 모델, 워커 전반 sonnet) | 기준 | 기준 | 0 | 현행 아님 (재배선 확정으로 대체) |
 | **B. Lead만 Fable** (사용자가 `/model fable` — 설정 변경 불요) | Lead 추론·오케스트레이션 ↑ | Lead 토큰만 2배 | 0 (이미 가능) | **가동 중** (2026-07-05 /model 전환) |
-| C. Primary 선택 승격 (capability-sensitive 단일 호출만 `model: 'fable'`) | 병목 단계 ↑ | 해당 호출만 2배 | 워크플로/스킬 일부 | **부분 적용** (2026-07-06 merge pilot + direction — 측정 ④⑤ 진행 중) |
+| C. Primary 선택 승격 (capability-sensitive 단일 호출만 `model: 'fable'`) | 병목 단계 ↑ | 해당 호출만 2배 | 워크플로/스킬 일부 | **적용 확정** (판단 3지점 fable 고정: merge + direction ×2, lint `EXPECTED_FABLE=3`) — 추가 fable 승격(②③)은 측정 후 deferred |
 | D. 전면 Fable | 최대 | 전체 2배+ | 전체 | ⛔ 비권장 — "not the default upgrade path" |
 
-- **B가 공식 포지셔닝과 정합**: Fable의 강점(long-horizon 자율성, 모호성 처리, 위임 관리)은 Lead 역할 그 자체. Supporting 에이전트의 좁은 lens 작업은 sonnet으로 충분
-- **C (부분 적용)**: ① 워크플로 merge/synthesis 단계 — **적용됨** (search-cross-verify stage3-merge; 예로 들었던 plan-collaborative 통합/integrate 단계는 생산 스테이지라 opus 유지 — AC-1) ② fz-review Primary (Fable의 "Bug-finding recall noticeably higher" 공식 진술) — **Deferred** (AC-5) ③ fz-discover landscape 합성 — **Deferred** (AC-5). 도입 방법(②③): Workflow `agent()` `opts.model: 'fable'` 또는 Agent tool `model: "fable"` [verified: 환경 실측]
-- ⛔ **동시 실행 상한**: fable 에이전트는 **동시 1개** (Lead 세션 제외) — "동시 opus 최대 2개" 거버넌스의 비용 등가(fable 1 ≈ opus 2, $10/$50 vs $5/$25). pilot 측정(§5.8 ④) 누적 후 재조정
-- ⚠️ **Workflow model 생략 함정**: `opts.model` 생략 시 메인 루프 모델 상속 — Fable 세션에서는 모든 미지정 에이전트가 Fable로 실행됨. fz workflows는 현재 전 호출에 model 명시(opus/sonnet + 판단 3지점 fable)되어 있어 안전 (2026-07-06 실측: workflows/*.js 6파일 전수 명시). `scripts/lint-model-explicit.sh`가 기계 검증 (전 호출 model 명시 + fable=3 고정)
+- **B가 공식 포지셔닝과 정합**: Fable의 강점(long-horizon 자율성, 모호성 처리, 위임 관리)은 Lead 역할 그 자체. 워커 중 단순(retrieval·breadth) lens 작업은 sonnet으로 충분하고, 실질 분석·생산은 opus가 담당
+- **C (판단 3지점 확정 · ②③ deferred)**: ① 워크플로 merge/synthesis 단계 — **적용됨** (search-cross-verify stage3-merge; 예로 들었던 plan-collaborative 통합/integrate 단계는 생산 스테이지라 opus 유지 — AC-1) ② fz-review Primary (Fable의 "Bug-finding recall noticeably higher" 공식 진술) — **Deferred** (AC-5) ③ fz-discover landscape 합성 — **Deferred** (AC-5). 도입 방법(②③): Workflow `agent()` `opts.model: 'fable'` 또는 Agent tool `model: "fable"` [verified: 환경 실측]
+- ⛔ **동시 실행 상한**: opus 동시 ≤3 · fable 에이전트 **동시 1개**(Lead 세션 제외) · 총 ≤4. fable 1 ≈ opus 2 비용 등가($10/$50 vs $5/$25)이므로 최대 동시 = Lead(fable≈opus2) + opus 3 ≈ **opus 5 equivalent**. 측정 누적 후 재조정
+- ⚠️ **Workflow model 생략 함정**: `opts.model` 생략 시 메인 루프 모델 상속 — Fable 세션에서는 모든 미지정 에이전트가 Fable로 실행됨. fz workflows는 현재 전 호출에 model + `effort: 'xhigh'` 명시(opus/sonnet + 판단 3지점 fable)되어 있어 안전 (workflows/*.js 6파일 전수 명시). `scripts/lint-model-explicit.sh`가 기계 검증 (전 호출 model + effort 명시 + fable=3 고정)
+
+### 재배선 확정 배선 (정적 36콜) — 현행
+
+판단 3지점 fable 배선에 이어 비-Lead 워커의 opus/sonnet 분할이 확정됐다. 정적 콜사이트 36개 기준이 현행이다:
+
+- **판단 = fable 3** (불변) — search-cross-verify merge + plan-collaborative direction ×2. lint `EXPECTED_FABLE=3` 고정
+- **실질 분석·생산 워커 = opus 27** — plan/peer-review/review-live/code-pair의 impact·edge·arch·quality·correctness·cross-critique(CC)·counter·recheck·review 등 capability-sensitive 스테이지 (4-axes A의 "워커 전반 sonnet" baseline을 대체)
+- **단순(retrieval·breadth) = sonnet 6** — search stage1·2 + discover lens fan-out·cost-lens
+- 전 36콜 `effort: 'xhigh'` 명시 — 세션 max 상속을 차단하는 콜 단위 값. **세션 effort(max/ultracode)·frontmatter effort와는 별개 표면** (frontmatter는 배선 없음 유지)
+- opus 동시 실행 ≤3 (Lead=fable 제외, 총 ≤4)
+- **runtime fan-out**: discover lens 등 정적 1콜이 런타임 N인스턴스로 전개 — 동시성·비용은 런타임 기준 별도 계산
+
+> **T2 긴장 (long-lived subagents vs one-shot Workflow)**: 공식 §4 "Async subagents" 권고는 long-lived subagent가 read를 캐시해 토큰을 절감한다고 본다. fz의 one-shot Workflow `agent()` 전환은 그 캐시 절감을 **결정성**(재현 가능한 model·effort·스폰 순서)과 TEAM 스톨 회피(실측)와 맞바꾼 의식적 이탈이다. 상실한 캐시 절감분은 `experiment-log.md` 관측 컬럼(정적 콜 비용·캐시 히트)에서 상쇄 가설로 추적한다.
 
 ### 운용 패턴 (Lead=Fable 세션 — 2026-07-06)
 
@@ -193,7 +214,7 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 
 ### Fable 프롬프팅 스니펫 채택 현황 (2026-06-12 실측 선별)
 
-> ⛔ 7종 일괄 주입 금지 (DELETE/MERGE-default) — 기존 규약 중복을 실측한 후 빈 곳만 채택. 비채택 근거를 남겨 재논의 시 추적 가능하게.
+> ⛔ 13종 일괄 주입 금지 (DELETE/MERGE-default) — 기존 규약 중복을 실측한 후 빈 곳만 채택. 비채택 근거를 남겨 재논의 시 추적 가능하게.
 
 | 공식 스니펫 | 판정 | 근거 |
 |------------|------|------|
@@ -204,13 +225,19 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 | Memory | 비채택 | memory-curator + L1 topic file 체계 기존재 |
 | Readability | 비채택 | Claude Code 하네스 시스템 프롬프트 내장 영역 — 플러그인 중복 주입 회피 |
 | Async subagents | 비채택(이관) | 구조 트랙(오케스트레이션 레이어 background 위임) — 별도 사이클 |
+| Brevity | 비채택 | Claude Code 하네스 output style 내장 영역 — 플러그인 중복 주입 회피 (Readability와 동일 근거) |
+| Checkpoint | **채택** | lead-action-default genuine-need Gate가 동등 판단 기준 — "genuinely requires"를 승인 게이트 판정선으로 성문화. 단 Phase 4 최상위 승인 등 non-overridable 게이트는 제외 |
+| Memory bootstrap | 비채택 | memory-curator + L1 topic file 회상 체계 기존재 |
+| Autonomous reminder | **채택** | execution-modes LOOP 모드 한정 배선 — 자율 반복 실행 프레이밍(상시 주입 아님) |
+| Context reassurance | **채택** | fz SKILL `/compact` 안내 문구를 "충분한 컨텍스트 잔량" 프레이밍으로 재구성 반영 — 조기 압축·종료 방어 |
+| Intent context | **채택** | skill-authoring §12 규약 성문화(agent 스폰 시 intentContext 3요소) + plan CTX 목적 축 |
 
 ### 점검 항목 (후속 작업 후보)
 
 - [x] fz 스킬/모듈 중 "사고 과정·추론을 출력하라" 류 지시 전수 grep → `reasoning_extraction` refusal 위험 평가 — **실측 0건** (2026-06-12, skills/·modules/·agents/·workflows/ 전수. `reasoning`/`사고` 매치는 전부 추론 품질·모듈명 등 정상 용법)
 - [ ] Fable 세션에서 fz-review self-review 품질 재측정 → Codex cross-model 의존도 재조정 (단, 이종 blind-spot 안전망 자체는 유지 — 15차/23차)
 - [x] `/model` max effort 세션 지속성 실측 — **해소** (2026-07-05 `/model` 피커 stdout "saved as your default for new sessions with max effort" 실측; 위 [미검증] 종결)
-- [ ] TEAM(SendMessage) 패턴에 Fable의 "async subagent communication" 권고 반영 검토
+- [x] async subagent 권고 반영 — one-shot Workflow `agent()` 전환으로 대체 결정 (T2 긴장 참조: 캐시 절감 ↔ 결정성/스톨 회피 트레이드오프). TEAM(SendMessage) async 패턴 배선은 미채택
 
 ## 설계 원칙
 

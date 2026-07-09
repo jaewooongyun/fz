@@ -5,13 +5,14 @@
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/review-live.js',
 //       args: { diffPath, intentContext } })
+//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 SOLO 리뷰 경로 수행.
 //   Workflow 외부(Lead 책임 유지): L3 통합 / review-correctness(RTM 시 Phase 4.5) / Codex validate(Phase 5.5) / wall-clock.
 //
 // [설계 — modules/patterns/live-review.md 평탄화]
-//   Stage1 독립 병렬: review-arch(opus) + review-quality(sonnet) — Round 1 독립성 (opus 동시 1 + Lead = 2).
-//   Stage2 교차: 상대 findings에 id-기반 severity 조정/FP 판정 (live-review Round 2 동형, sonnet 2).
+//   Stage1 독립 병렬: review-arch(opus) + review-quality(opus) — Round 1 독립성 (opus 동시 2 + Lead=fable).
+//   Stage2 교차: 상대 findings에 id-기반 severity 조정/FP 판정 (live-review Round 2 동형, opus 2).
 //   Stage3 counter: DA 패스 — findings 반론 + okAreas 도전 (live-review.md L16 기존 Supporting — ablation Verifier 재판정 레이어 아님).
 //   병합: 스크립트 binary 규칙 (id-기반 verdict 반영 — §11/§12 분류: 기계 작업).
 //   budget 가드: 해당 없음 — 고정 5-call(가변 fan-out 없음). §12 거버넌스 단서 참조.
@@ -122,11 +123,11 @@ const [arch, quality] = await parallel([
   () => callAgent(
     `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}\n` +
     `[목표] 아키텍처 관점 findings (id는 A1, A2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
-    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', schema: ReviewFindingsSchema }),
+    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewFindingsSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
     `[목표] 품질 관점 findings (id는 Q1, Q2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
-    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'sonnet', schema: ReviewFindingsSchema }),
+    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: ReviewFindingsSchema }),
 ])
 if (!arch && !quality) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 both null', metrics: metrics(0) } }
 if (!arch || !quality) log('WARN stage1 한쪽 null — 단독 진행 (교차 조정 생략)')
@@ -144,11 +145,11 @@ if (arch && quality) {
     () => callAgent(
       `${OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대(품질) findings] ${JSON.stringify(quality.findings)}\n` +
       `[목표] 각 finding의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 finding은 additions(id A-X)로.`,
-      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'sonnet', schema: CrossReviewSchema }),
+      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
     () => callAgent(
       `${OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대(아키) findings] ${JSON.stringify(arch.findings)}\n` +
       `[목표] 각 finding의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 finding은 additions(id Q-X)로.`,
-      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'sonnet', schema: CrossReviewSchema }),
+      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
   ])
   archOnQuality = cross[0]
   qualityOnArch = cross[1]
@@ -167,7 +168,7 @@ const counter = await callAgent(
   `${OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
   `[findings] ${JSON.stringify(allFindings)}\n[okAreas(정상 판정)] ${JSON.stringify(allOkAreas)}\n` +
   `[목표] (1) 각 finding을 실측 재검증 — 과장/오독이면 refute + 인용. (2) okAreas에 "정말 OK인가?" 반례 탐색 — 반례 발견 시 missedFindings(id C-X)로. 라인 인용 오류를 특히 의심.`,
-  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'sonnet', schema: CounterSchema })
+  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: 'xhigh', schema: CounterSchema })
 if (!counter) log('WARN counter null — DA 패스 미수행 (findings 원판정 유지)')
 
 // ════════ 병합 — 스크립트 binary 규칙 (id-기반 verdict 반영) ════════

@@ -487,6 +487,17 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 > freeze 범위 주석 (§5.7 동형): §5.7 freeze는 §5.7 데이터행+확산임계만 대상 — 본 §5.8 신설은 별도 허용. §5.8 ② N=5 = 표준 Phase B 진입 / ①effort는 **철회**(2026-06-14 fable 제재 롤백) · ④synthesis는 **재개**(2026-07-06 제재 해제) (①철회: frontmatter 4건 제거 → 측정 대상 소멸 / ④재개: pilot fable 복원 — search-cross-verify.js:166 `'opus'→'fable'` 1줄 전환, ①④ 헤더 참조. **canonical 상태 = 각 헤더**, CHANGELOG·release 노트는 cross-ref).
 > **공통 필드 의무**: 각 행에 `session_model`(fable|opus) + `env_subagent_model`(CLAUDE_CODE_SUBAGENT_MODEL 설정 유무) 기록 — effort 효과의 3-way 혼합(세션 모델×서브에이전트 모델×effort) 방지.
 
+### 워커 재배선 baseline (2026-07-07)
+
+> 워커 3-tier 재배선(판단=fable / 실질 워커=opus / 단순=sonnet) 적용일 — ④·⑤ 측정의 새 기준점.
+
+- **(i) 새 baseline**: §5.8 ④·⑤(fable 판단 지점) 측정은 **2026-07-07부터 새 baseline**. 재배선 이전 관측과 **비교 금지** — 다수 sonnet 워커가 opus로 승격돼 세션 비용·품질 지형이 이동(confound). 이전 행/관측은 사료로만 보존.
+- **(ii) 신규 관측 컬럼**:
+  - **워크플로별 비용** — 정적 콜 수 vs 런타임 인스턴스 수를 **분리 계상**(정적 1콜 = 런타임 N인스턴스, 예: discover lens fan-out); 비용·동시성 계산은 런타임 기준.
+  - **캐시 히트** — opus 프롬프트 캐시 **최소 prefix 4096 tok 주의**(미달 시 캐시 미형성 → `cache_read_input_tokens=0`; 모델별 상이: Fable 5·Sonnet 4.6=2048).
+  - **xhigh 품질** — effort=xhigh 산출 품질 정성 관찰(high 대비 동등+ 여부).
+- **(iii) 상쇄 가설 검증 계획**: sonnet→opus 재배정은 콜당 +67%(입력 단가 opus≈1.67×sonnet)이나 세션 effort max→xhigh 하향이 추론 토큰을 감소시켜 세션 총비용 순증 < +67% — N=5 누적 후 정적콜 단가 × 실측 토큰(캐시 read/write 분리)으로 검증.
+
 ### ① effort frontmatter 효과 — **철회 (2026-06-14 fable 제재 롤백)**
 
 > **철회 사유 (2026-06-14)**: 사용자 effort 운용 = 세션 레벨 max(기본)/ultracode 확정 → 4스킬 `effort: xhigh` frontmatter 제거(B1). 측정 대상(frontmatter 효과)이 소멸하여 철회 — 동결 아님(fable 복귀와 무관, 세션 운용 방식이라 frontmatter 재도입 없음). 아래는 철회 전 설계 — 사료 보존.
