@@ -322,8 +322,8 @@ commit/pr 전 → ✓ codex check (TEAM)
 1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{플러그인 루트}/workflows/{skill}-{pattern}.js', args })
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
 3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/Codex) + 통합
-4. mode:'fallback' → Lead SOLO 수행 (patterns/ canonical 프로토콜 참조)
-5. mode:'split_required'(또는 fallback+splitSuggested) → Lead는 Step 분할 후 재invoke (code-pair H5 크기 가드, ⛔ Lead=fable 자동 SOLO 금지)
+4. mode:'split_required'(또는 fallback+splitSuggested) → Lead는 **먼저** Step 분할 후 재invoke (code-pair H5 크기 가드, ⛔ Lead=fable 자동 SOLO 금지 — 직접 구현은 사용자 승인 후)
+5. mode:'fallback'(split 힌트 없음, 일시 장애 의심) → 재시도 1회 → 미해소 시 Lead SOLO 수행 (patterns/ canonical 프로토콜 참조). 상세 사다리: fz-code SKILL 절차 6
 ```
 
 ### Verification Discipline Brief (모든 agent() spawn에 자동 포함)
