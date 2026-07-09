@@ -62,9 +62,10 @@ SendMessage(lead): "빌드 검증 필요합니다. 대상: TVINGApp scheme, 변�
 
 | 역할 | 기본 모델 | 승격 조건 | 승격 모델 |
 |------|----------|----------|----------|
-| Lead | opus | -- | -- |
+| Lead / Workflow 판단 지점 | fable | -- | -- |
 | Primary Worker | sonnet | 특정 팀에서 핵심 생산자 | opus |
-| Supporting | sonnet | -- | -- |
+| Supporting (실질 분석·생산) | sonnet | 계획·구현·리뷰 산출물 생산·분석 | opus |
+| Supporting (retrieval·breadth) | sonnet | -- | -- |
 
 승격 예시:
 
@@ -85,7 +86,7 @@ SendMessage(lead): "빌드 검증 필요합니다. 대상: TVINGApp scheme, 변�
 > 본 §은 Reflection Rate 측정 시 가중치 정책만 정의.
 
 **Canonical Rule (exclusion)**:
-- **동종 모델 cross-verify** (search-symbolic ↔ search-pattern 양쪽 sonnet, review-arch ↔ review-quality 양쪽 sonnet 등):
+- **동종 모델 cross-verify** (search-symbolic ↔ search-pattern 양쪽 sonnet, review-arch ↔ review-quality 양쪽 opus 등):
   - **Headline Reflection Rate에서 제외**
   - 이유: 같은 모델은 같은 지식 갭 공유 → false high reflection rate 방지
 - **이종 모델 cross-verify** (Claude ↔ Codex/GPT, sonnet ↔ opus):
@@ -220,34 +221,34 @@ GOOD (Mesh / Peer-to-Peer):
 
 ## 4. 모델 전략
 
-### 2-Tier 원칙
+### 3-Tier 원칙
 
 | Tier | 모델 | 역할 | 비용 |
 |------|------|------|------|
-| Tier 1 | opus | Lead + Primary Worker | 높음 |
-| Tier 2 | sonnet | Supporting agents | 중간 |
+| Tier 1 (판단) | fable | Lead 세션 + Workflow 판단 지점 3곳(plan direction ×2 · search merge) | 최상 |
+| Tier 2 (실질 워커) | opus | Primary Worker + 실질 분석·생산 에이전트 | 높음 |
+| Tier 3 (단순) | sonnet | retrieval·breadth 성격 (search 탐색, discover lens fan-out, memory-curator) | 중간 |
 
 - **haiku**: 이 프로젝트에서 미사용. 고성능 추론이 목표이므로 품질 저하 불가.
-- **Lead + Primary 동시 최대 2개 opus 원칙**: 팀당 동시 opus 인스턴스를 2개 이하로 유지한다.
-  - **순차 승격** 허용: review-direction은 Direction Challenge(Round 0.5)에서 opus로 순차 승격 가능. Round 0.5 완료 후 Round 1이 시작되므로 동시 opus는 2개를 초과하지 않음.
+- **동시 opus ≤3 원칙**: 팀당 동시 opus 인스턴스를 3개 이하로 유지한다 (Lead 세션 fable은 별도 카운트).
+  - **순차 승격** 허용: 병렬 opus 스폰은 순차 승격으로도 상한(≤3)을 넘지 않도록 유지한다.
   - 예외: full-cycle / plan-to-code 파이프라인에서 plan과 code 각각 Primary가 다르므로 순차적으로 opus를 사용한다.
 - **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단.
-- **Fable 5 (2026-06-09 GA)**: Opus 상위 tier, $10/$50 per MTok (opus의 2배). 2-Tier 원칙은 유지 — Lead는 세션 모델(`/model fable`)로 Fable일 수 있고, 서브에이전트도 `model: "fable"` 지정 가능 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/fable-model-guide.md` §5.
+- **Fable 5 (2026-06-09 GA)**: 판단 tier 모델, $10/$50 per MTok (opus의 2배). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/fable-model-guide.md` §5.
 
 ### 모델 승격 매트릭스
 
 상세 내용은 `modules/team-registry.md` 참조.
 
-| 파이프라인 | Primary Worker (opus) | Supporting (sonnet) |
-|-----------|----------------------|---------------------|
-| plan-* | plan-structure | review-arch, plan-edge-case |
-| code-* | impl-correctness | review-arch, impl-quality |
-| review-* | review-arch | review-quality, review-correctness |
-| search --deep | (both sonnet) | search-symbolic + search-pattern |
-| bug-hunt | impl-correctness | search-symbolic |
+| 파이프라인 | Primary (opus) | 실질 워커 (opus) | 단순 워커 (sonnet) |
+|-----------|----------------|------------------|--------------------|
+| plan-* | plan-structure | plan-impact, plan-edge-case, review-arch | memory-curator (direction=fable) |
+| code-* | impl-correctness | review-arch, impl-quality, review-correctness | memory-curator |
+| review-* | review-arch | review-quality, review-correctness, review-counter | memory-curator |
+| search --deep | -- | -- | search-symbolic, search-pattern (merge=fable) |
+| bug-hunt | impl-correctness | -- | search-symbolic |
 
-Primary Worker는 해당 파이프라인에서 opus로 승격된다.
-Supporting은 항상 sonnet을 유지한다.
+Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워커는 sonnet으로 실행된다 (동시 opus ≤3).
 
 ---
 
@@ -289,7 +290,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) + 동일 토큰예산서 우위 소멸 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
 | standalone Task | 통신 불가, 고립된 작업 | TeamCreate 필수 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
-| 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 2-Tier (Lead+Primary=opus, rest=sonnet) |
+| 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 3-Tier (판단=fable · 실질 워커=opus 동시 ≤3 · retrieval·breadth=sonnet) |
 | 에이전트 간 Lead 중계 | 지연 + 컨텍스트 손실 | 직접 SendMessage |
 | MCP 도구 무분별 사용 | 실패 시 복구 불가 | 4-tier 도구 전략 |
 | 승격 조건 미명시 | 팀마다 모델이 달라 혼란 | 에이전트 파일에 주석 |
@@ -454,7 +455,7 @@ isolation: worktree
 
 팀 구성:
   1. TeamCreate("{skill}-{feature}")
-  2. Lead(opus) + Primary(opus) + Supporting(sonnet) + Codex
+  2. Lead(fable) + Primary(opus) + 실질 워커(opus, 동시 ≤3) + 단순 워커(sonnet) + Codex
   3. Mesh topology (Peer-to-Peer)
   4. Lead = 퍼실리테이터/게이트/중재자
 

@@ -15,8 +15,30 @@
 | 40차-MUST3 (Codex precedence) | `--seq` 단독은 sequential thinking 모드이지 simplified trigger 아님. `--deep --seq` 또는 `--team --seq` 조합 시 elaborate 유지 | `--seq` 단독 keyword 매칭 금지 — 컨텍스트 조건 필수 (Codex 검증 §5 MUST 3) |
 | F5/F6 (Decision-Type+Boundary) *[candidate: 2 session evidence]* | 구조/경계 포크 결단 시 | (가) 코드사실로 좁혀지는 엔지니어링 판단: 확신 권고+근거+"이의 없으면 진행"(메뉴 금지). (나) 제품·디자인·팀 컨벤션 소유: AskUserQuestion. plan 분할=판단 입력≠경계 권위. (`project_fz_harness_holes.md`) |
 | MAST FM-2.2 (Fail to ask for clarification) | 요청 모호 / 동사 없음 / 명사+키워드만 / 범위 불명확 | AskUserQuestion 발동 의무 |
+| Fable 5 (Genuine-Need Pause) *[intra-pipeline runtime]* | 스텝 진행 중 재확인 또는 promise-종료 pause를 고려하는 시점 | 3조건(파괴적·비가역 행동 / 실질 scope 변경 / 사용자만 줄 수 있는 입력) 중 하나면 pause, 아니면 승인된 outcome 위임 범위 내 진행. non-overridable allowlist는 본 기준으로 우회 불가 (하단 § Genuine-Need Pause) |
 
 > 출처: MAST (NeurIPS 2025, arXiv 2503.13657 v3) — FM-2.2 "Fail to ask for clarification" = **6.80% 오류율** [verified: v3 §4 원문 "(FM-2.2, 6.80%)"]. 모호한 요청을 그대로 진행하면 trigger (MAST-Data 7개 프레임워크 / 1642 traces).
+
+## Genuine-Need Pause (Fable 5 checkpoint)
+
+> 대상 = **intra-pipeline runtime pause**만 (스텝 진행 중 재확인 · promise-종료 시점). 아래 allowlist의 명시 승인 게이트는 별개 규율.
+
+파이프라인 실행 중 turn을 멈추고 사용자 재확인을 구하는 것은 아래 3조건 중 하나에 해당할 때만:
+
+1. **파괴적·비가역 행동** — 되돌릴 수 없는 상태 변경
+2. **실질 scope 변경** — 승인된 outcome 범위를 벗어남
+3. **사용자만 줄 수 있는 입력** — 제품·디자인·팀 컨벤션 소유 / 코드 사실로 좁혀지지 않는 결단
+
+그 외에는 승인된 outcome 위임 범위 내에서 진행한다 (act when you have enough info). 출처: 공식 Prompting Claude Fable 5 checkpoint 스니펫 — "Pause only when [the decision] genuinely requires the user; otherwise proceed." (스니펫 원문·채택 근거: `guides/fable-model-guide.md` § 프롬프트 패턴 / 채택 현황).
+
+### non-overridable allowlist (본 기준으로 우회 불가)
+
+아래 명시 승인 게이트는 genuine-need 판정과 무관하게 항상 사용자 승인을 요한다 — 본 기준을 근거로 생략·우회 금지:
+
+- **fz Phase 4 파이프라인 착수 승인**
+- **fz-plan Gate 2 사용자 승인**
+- **팀 공유 영역 / 보호 파일 커밋**
+- **fz-modernize 적용 합의**
 
 ## 3 Examples (inline)
 

@@ -4,7 +4,8 @@
 //   표준 패턴 3종 적용. 대형 입력(코드 컨텍스트)은 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md 절차): Lead가 codeContext 요약을 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/plan-collaborative.js',
-//       args: { requirement, codeContextPath, constraintsKnown, discoverJournalPath? } })
+//       args: { requirement, codeContextPath, constraintsKnown, intentContext?, discoverJournalPath? } })
+//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', plan: PlanSchema, directionVerdict, directionAlternatives, metrics }
 //     | { mode:'direction_escalation', verdict, alternatives, rebuttal, metrics } → Lead가 사용자 확인 (대화는 Workflow 밖)
 //     | { mode:'fallback', reason, metrics } → Lead는 SOLO plan 경로 수행.
@@ -13,14 +14,15 @@
 //     plan-v{N}.md 파일 기록 / direction_escalation 사용자 대화 / wall-clock 측정.
 //
 // [설계 — modules/patterns/collaborative.md 평탄화]
-//   Stage 0 direction(opus): 6관점 판정. PROCEED → 즉시 진행 / 비-PROCEED → 반박 왕복 1회 (+2 call).
+//   Stage 0 direction(fable): 6관점 판정. PROCEED → 즉시 진행 / 비-PROCEED → 반박 왕복 1회 (+2 call).
 //     조건부화 정당화: 원 패턴(L28-33)은 무조건 반박 왕복이나, PROCEED 경로의 반박은 판정 불변
 //     dead-call이므로 제거 — 비-PROCEED만 판정 반전 기회 실재 (검증 승인 판정).
-//   Stage 1 draft(opus) → Stage 2 병렬 3 [impact(Scan a-f)/edge/arch, sonnet — 동시 3
+//   Stage 1 draft(opus) → Stage 2 병렬 3 [impact(Scan a-f)/edge/arch, opus — 동시 3
 //     [verified: §5.7 #4 deep — lens 3 동시 parallel clean]] → Stage 3 CC 교차 2 (collaborative L47-55
 //     보존: edge↔impact "경계 케이스가 영향 범위에서 발생" 연쇄) → Stage 4 integrate(opus, PlanSchema =
 //     다운스트림 계약 전체) → Stage 5 arch 재검증 (collaborative Round 2 L57-63).
-//   opus 동시 ≤1 (+Lead=2): 전 opus 호출 순차 — parallel 블록(Stage 2/3)은 sonnet 전용.
+//   opus 동시 ≤3 (+Lead=fable): parallel 블록(Stage 2 3콜 / Stage 3 2콜) opus 동시 실행 — 동시 상한 준수.
+//     Stage 2는 null 항목 1회 순차 재시도(parallelWithRetry — rate-limit/스폰 실패 폴백).
 //   budget 가드: 해당 없음 — 9-11 call, 분기 상한 고정(비-PROCEED 시 +2)이므로 가변 fan-out 아님 (§12 단서).
 
 export const meta = {
@@ -136,6 +138,18 @@ async function callAgent(prompt, opts) {
 function metrics(stagesCompleted) {
   return { agentCalls, nullCount: nullCalls, fallbackCount, stagesCompleted }
 }
+// rate-limit/스폰 실패 폴백 (Stage 2 병렬 3콜 한정): parallel 결과의 null 항목만 동일 thunk로 1회 순차 재시도
+// (parallel 경유 = barrier 실패→null 계약 재사용). 여전히 null이면 기존 all-null→fallback / 부분-null→WARN 경로 유지.
+async function parallelWithRetry(thunks) {
+  const out = await parallel(thunks)
+  for (let i = 0; i < out.length; i += 1) {
+    if (!out[i]) {
+      log(`병렬 ${i}번 null — 순차 재시도 1회 (rate-limit/스폰 실패 폴백)`)
+      out[i] = (await parallel([thunks[i]]))[0]
+    }
+  }
+  return out
+}
 
 if (!input || !input.requirement || !input.codeContextPath) {
   log(`FATAL args invalid (typeof=${typeof args}) — requirement/codeContextPath 필수. fallback`)
@@ -144,6 +158,7 @@ if (!input || !input.requirement || !input.codeContextPath) {
 }
 
 const CTX = `[요구사항] ${input.requirement}\n[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드)\n[기지 제약] ${JSON.stringify(input.constraintsKnown || [])}` +
+  (input.intentContext ? `\n[과제 목적] ${input.intentContext}` : '') +
   (input.discoverJournalPath ? `\n[discover 산출물] ${input.discoverJournalPath} (참고 — 전제 아님, 🔒불변 조건만 제약 채택)` : '')
 
 // ════════ Stage 0: Direction Challenge (collaborative L21-38 — PROCEED 경로는 dead-call 제거) ════════
@@ -151,7 +166,7 @@ phase('Stage 0: 방향성 도전')
 let direction = await callAgent(
   `${OVERRIDE}\n[역할] 방향성 도전자(review-direction 렌즈) — 6관점: Structural Fit / Alternative Paths(2개+) / Extensibility / Reuse-First / Maintenance / Over-Engineering\n${CTX}\n` +
   `[목표] 접근 방향을 비판적으로 판정 (PROCEED/RECONSIDER/REDIRECT) + 대안 2개 이상 + 우려 사항. 근거 인용.`,
-  { label: 'stage0-direction', agentType: 'fz:review-direction', model: 'fable', schema: DirectionSchema }) // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
+  { label: 'stage0-direction', agentType: 'fz:review-direction', model: 'fable', effort: 'xhigh', schema: DirectionSchema }) // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
 if (!direction) { fallbackCount += 1; return { mode: 'fallback', reason: 'direction null', metrics: metrics(0) } }
 
 if (direction.verdict !== 'PROCEED') {
@@ -160,11 +175,11 @@ if (direction.verdict !== 'PROCEED') {
   const rebuttal = await callAgent(
     `${OVERRIDE}\n[역할] 설계자(plan-structure 렌즈) — 방향 반박\n${CTX}\n[방향 판정] ${JSON.stringify(direction)}\n` +
     `[목표] 현재 방향의 근거로 반박하거나, 대안 수용 사유를 명시. 추가 제약 발견 시 포함.`,
-    { label: 'stage0-rebuttal', agentType: 'fz:plan-structure', model: 'opus', schema: RebuttalSchema })
+    { label: 'stage0-rebuttal', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: RebuttalSchema })
   const finalDirection = rebuttal ? await callAgent(
     `${OVERRIDE}\n[역할] 방향성 도전자 — 최종 판정\n${CTX}\n[1차 판정] ${JSON.stringify(direction)}\n[설계자 반박] ${JSON.stringify(rebuttal)}\n` +
     `[목표] 반박을 평가해 최종 판정. 반박이 타당하면 PROCEED 전환 가능.`,
-    { label: 'stage0-final', agentType: 'fz:review-direction', model: 'fable', schema: DirectionSchema }) : null // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
+    { label: 'stage0-final', agentType: 'fz:review-direction', model: 'fable', effort: 'xhigh', schema: DirectionSchema }) : null // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
   if (finalDirection) direction = finalDirection
   if (direction.verdict !== 'PROCEED') {
     log(`direction 최종 ${direction.verdict} — 사용자 에스컬레이션 반환`)
@@ -177,26 +192,26 @@ phase('Stage 1: 구조 초안')
 const draft = await callAgent(
   `${OVERRIDE}\n[역할] 설계자(plan-structure 렌즈) — 구조 분해 + Step 순서\n${CTX}\n[방향 판정·우려] ${JSON.stringify({ concerns: direction.concerns, alternatives: direction.alternatives })}\n` +
   `[목표] 구현 계획 초안: Step 분해(id/title/files/approach) + readScope(탐색 범위) + 가정 목록.`,
-  { label: 'stage1-draft', agentType: 'fz:plan-structure', model: 'opus', schema: DraftSchema })
+  { label: 'stage1-draft', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: DraftSchema })
 if (!draft) { fallbackCount += 1; return { mode: 'fallback', reason: 'draft null', metrics: metrics(1) } }
 
-// ════════ Stage 2: 병렬 3렌즈 (sonnet — 동시 3 [verified: §5.7 #4 deep lens 3 동시]) ════════
+// ════════ Stage 2: 병렬 3렌즈 (opus — 동시 3 [verified: §5.7 #4 deep lens 3 동시]) ════════
 phase('Stage 2: 영향/경계/아키 병렬 분석')
 const DRAFT_CTX = `${CTX}\n[계획 초안] ${JSON.stringify(draft)}`
-const [impact, edge, arch] = await parallel([
+const [impact, edge, arch] = await parallelWithRetry([
   () => callAgent(
     `${OVERRIDE}\n[역할] 영향 범위 분석가(plan-impact 렌즈) — Exhaustive Impact Scan a-f\n` +
     `(참조 허용: /Users/jaewoongyun/dev/fz-plugin/modules/plan-deep-planning.md — Scan 절차 정의)\n${DRAFT_CTX}\n` +
     `[목표] 텍스트 전수 검색 + 소비자 + dead code + 숨은 의존성. 각 항목 evidence 인용.`,
-    { label: 'stage2-impact', agentType: 'fz:plan-impact', model: 'sonnet', schema: ImpactSchema }),
+    { label: 'stage2-impact', agentType: 'fz:plan-impact', model: 'opus', effort: 'xhigh', schema: ImpactSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 경계 케이스 발굴자(plan-edge-case 렌즈)\n${DRAFT_CTX}\n` +
     `[목표] 경계 케이스 + 실패 시나리오 (id는 E1, E2...) + 영향 Step 매핑.`,
-    { label: 'stage2-edge', agentType: 'fz:plan-edge-case', model: 'sonnet', schema: EdgeSchema }),
+    { label: 'stage2-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: 'xhigh', schema: EdgeSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 아키텍처 검증자(review-arch 렌즈)\n${DRAFT_CTX}\n` +
     `[목표] 패턴 선택지 검증(A vs B + 추천 + 근거) + 기존 규약 위반 식별.`,
-    { label: 'stage2-arch', agentType: 'fz:review-arch', model: 'sonnet', schema: ArchSchema }),
+    { label: 'stage2-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ArchSchema }),
 ])
 if (!impact && !edge && !arch) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage2 all null', metrics: metrics(1) } }
 if (!impact || !edge || !arch) log('WARN stage2 부분 null — 해당 렌즈 결손 상태로 진행')
@@ -213,11 +228,11 @@ if (impact && edge) {
     () => callAgent(
       `${OVERRIDE}\n[역할] 영향 범위 분석가 — CC 교차\n[경계 케이스] ${JSON.stringify(edge.edgeCases)}\n[기존 영향 범위] ${JSON.stringify(impact.impactFiles)}\n` +
       `[목표] 각 경계 케이스가 영향 범위 내 어느 파일에서 발생하는지 연쇄 발견 (links: sourceId=E:id) + 영향 범위 추가분.`,
-      { label: 'stage3-impact-on-edge', agentType: 'fz:plan-impact', model: 'sonnet', schema: CrossSchema }),
+      { label: 'stage3-impact-on-edge', agentType: 'fz:plan-impact', model: 'opus', effort: 'xhigh', schema: CrossSchema }),
     () => callAgent(
       `${OVERRIDE}\n[역할] 경계 케이스 발굴자 — CC 교차 (입력 기반 — 제공된 영향 범위 데이터에서만 추론)\n[영향 범위] ${JSON.stringify(impact.impactFiles)}\n[숨은 의존성] ${JSON.stringify(impact.hiddenDependencies)}\n[기존 케이스] ${JSON.stringify(edge.edgeCases)}\n` +
       `[목표] 영향 범위에서 파생되는 추가 경계 케이스 (additions — 기존 미포함만).`,
-      { label: 'stage3-edge-on-impact', agentType: 'fz:plan-edge-case', model: 'sonnet', schema: CrossSchema }),
+      { label: 'stage3-edge-on-impact', agentType: 'fz:plan-edge-case', model: 'opus', effort: 'xhigh', schema: CrossSchema }),
   ])
   impactOnEdge = cc[0]
   edgeOnImpact = cc[1]
@@ -234,7 +249,7 @@ const plan = await callAgent(
   `2. rtm: 요구사항을 분해해 각 행 {reqId, requirement 원문, stepId, verify, status:'pending'}\n` +
   `3. implicationRegister: 제거/리팩토링 함의 발견 시 {type: exec(계획 내 실행)|obs(관찰 보고)} — 없으면 빈 배열\n` +
   `4. 각 step에 검증 가능한 verify. 리스크 매트릭스 + openQuestions(사용자 결정 필요만).`,
-  { label: 'stage4-integrate', agentType: 'fz:plan-structure', model: 'opus', schema: PlanSchema })
+  { label: 'stage4-integrate', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: PlanSchema })
 if (!plan) { fallbackCount += 1; return { mode: 'fallback', reason: 'integrate null', metrics: metrics(3) } }
 
 // ════════ Stage 5: 재검증 (collaborative Round 2 — 잔여는 반환, 수정 루프는 Lead 층) ════════
@@ -242,7 +257,7 @@ phase('Stage 5: 아키 재검증')
 const recheck = await callAgent(
   `${OVERRIDE}\n[역할] 아키텍처 검증자 — 재검증\n[1차 검증 결과] ${JSON.stringify(arch)}\n[최종 계획] ${JSON.stringify(plan)}\n` +
   `[목표] 1차 피드백 반영 여부 + 잔여 이슈. 각 잔여에 archVerdict(must-fix/optional/disagree) 마커 — 합의/불합의 명시.`,
-  { label: 'stage5-recheck', agentType: 'fz:review-arch', model: 'sonnet', schema: RecheckSchema })
+  { label: 'stage5-recheck', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: RecheckSchema })
 if (!recheck) log('WARN stage5 null — 재검증 미수행 (unresolvedPeerIssues 빈 채 반환)')
 
 const s1 = !!draft

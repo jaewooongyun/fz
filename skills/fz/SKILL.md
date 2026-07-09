@@ -38,9 +38,9 @@ model-strategy:
 - **6-Phase 오케스트레이션**: 세션 부트스트랩 → 의도 분석 → 복잡도 평가 → 파이프라인+팀 결정 → 확인 → 실행
 - **사전 정의 파이프라인** (19개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
 - **동적 파이프라인**: `provides`/`needs` 그래프 기반 자동 구성 (폴백)
-- **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead + Primary(O) + N×Sonnet)
-- **모델 승격**: 핵심 생산자(Primary Worker)를 opus로 자동 승격 (fable 판단 지점과 별개)
-- **3-Tier 모델**: fable(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(핵심 생산 Primary) + sonnet(보조). haiku 사용하지 않음
+- **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(fable) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
+- **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort xhigh) — fable 판단 지점 3곳과 별개
+- **3-Tier 모델**: fable(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3, effort xhigh) + sonnet(단순 작업). haiku 사용하지 않음
 - **Codex 필수 참여**: 모든 TEAM 스킬에 Codex CLI 포함 → cross-model 상호검증
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
 - **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover는 `workflows/*.js` 결정적 Workflow, peer-review는 TeamCreate+SendMessage + Codex 활용
@@ -148,6 +148,7 @@ model-strategy:
 - [ ] **교훈 사전 로드 완료? Active Recall 3-step chain 출력 확인 (Step 4 의무)**
 
 > **토큰 비용**: ~3,000-5,000 (세션당 1회). 개별 스킬마다 실행하지 않음.
+> 단, 6+ 스텝 또는 TEAM에서 핵심 모듈(`context-artifacts.md` 등) 선로드 포함 시 ~10K까지 상회 가능.
 
 ---
 
@@ -207,7 +208,7 @@ model-strategy:
 |------|------|----------|----------|
 | 0-3 | SOLO | STANDARD | Lead(F) 단독, 순차 실행 |
 | 0-3 | SOLO | BATCH | worktree 격리 병렬 (--batch 또는 독립 3개+) |
-| 4+ | TEAM | STANDARD | Lead(F) + Primary(O) + N×Sonnet |
+| 4+ | TEAM | STANDARD | Lead(F) + opus 워커(동시 ≤3) + 단순 sonnet |
 | 4+ | TEAM | LOOP | 자동 반복 + 에스컬레이션 (--loop 또는 Gate 반복 예상) |
 
 ### Gate 2: Complexity Assessed
@@ -247,8 +248,8 @@ model-strategy:
 
 ```
 1. 파이프라인 스텝 → 필요 에이전트 식별
-2. Primary Worker 판별 → opus 승격
-3. 나머지 에이전트 전부 sonnet으로 스폰 (제한 없음)
+2. 실질 생산 워커 판별 → opus 배정 (동시 ≤3, effort xhigh 명시)
+3. 단순 작업 에이전트만 sonnet으로 스폰
 4. 정적 팀 패턴 매칭 → 일치 시 정적 사용
 5. 미일치 시 동적 구성 적용
 ```
@@ -306,7 +307,7 @@ commit/pr 전 → ✓ codex check (TEAM)
 4. Gate 체크 → 통과 시 다음 단계, 실패 시 중단/계속 선택
 ```
 
-**컨텍스트 패싱**: 대화 기반 (기존 v1과 동일). 4스텝+ 시 /compact 안내.
+**컨텍스트 패싱**: 대화 기반 (기존 v1과 동일). 4스텝+ 시 /compact 안내 (작업은 중단 없이 계속 — checkpoint/ASD로 복원 가능).
 
 ### 5.2 Workflow Execution
 
@@ -365,7 +366,7 @@ Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 다음 규약이 
 | 1-3 스텝 | Serena `fz:checkpoint:essential` (3K) | compact 대비 경량 보호 |
 | 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 ASD | compact 위험 낮음 |
 | 6+ 스텝 또는 context-heavy | ASD 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
-| 10+ 스텝 | ASD 필수 + compact 주의 안내 | 장기 파이프라인 |
+| 10+ 스텝 | ASD 필수 + compact 대비 기록 확인(작업은 계속 — 아티팩트로 복원 가능) | 장기 파이프라인 |
 
 ### Essential Context 업데이트 (각 스킬 실행 후)
 
@@ -412,8 +413,8 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 - 사전 정의 파이프라인 빠른 매칭
 - provides/needs 기반 동적 파이프라인 구성
 - 복잡도 기반 자동 모드 결정 (SOLO/TEAM)
-- 모델 승격 전략 (Primary Worker → opus)
-- 동적 팀 에이전트 구성 (sonnet 제한 없음)
+- 모델 배정 전략 (실질 워커 → opus, 동시 ≤3)
+- 동적 팀 에이전트 구성 (단순 작업은 sonnet)
 - 교차 검증 게이트 자동 주입
 - 구조화된 Artifact 기반 컨텍스트 관리
 - 개별 스킬 TEAM 모드 지원
@@ -425,7 +426,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 - 스킬 자체 로직 수행 (스킬 SKILL.md 지침에 위임)
 - 사용자 승인 없이 실행 (Phase 4 필수)
 - 코드를 직접 수정 (각 스킬에 위임)
-- opus 과다 사용 (opus 예산은 Primary 전용, 동시 ≤2 — Lead는 fable이라 opus 카운트 제외. full-cycle/plan-to-code은 예외: plan-structure+impl-correctness 각 단계 Primary. fable 동시 1, Lead 제외 — governance.md 상한 행 정합)
+- opus 과다 사용 (실질 워커 동시 ≤3 · fable ≤1[Lead 제외] · 총 ≤4 — Lead는 fable이라 opus 카운트 제외. 전 워커 effort xhigh 명시. 비용 envelope ≈ Lead(fable) + opus 3 ≈ opus 5 equivalent — governance.md 상한 행 정합)
 - haiku 모델 사용
 
 ## 에러 대응
@@ -438,7 +439,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 | Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | SOLO 폴백 |
 | 팀 에이전트 스폰 실패 | SOLO 폴백 | 사용자 에스컬레이션 |
 | provides/needs 체인 끊김 | 중간 스킬 자동 제안 | AskUserQuestion |
-| 파이프라인 12스텝+ | Artifact + 체크포인트 | compact 주의 안내 <!-- 기존: 6스텝+ --> |
+| 파이프라인 12스텝+ | Artifact + 체크포인트 | compact 대비 기록 확인(작업은 계속 — 아티팩트로 복원 가능) <!-- 기존: 6스텝+ --> |
 
 ## Completion → Next
 

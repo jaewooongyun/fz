@@ -5,6 +5,7 @@
 //   호출(Lead, SKILL.md 절차 — Step 루프는 Lead 소유):
 //     Workflow({ scriptPath: '{plugin_root}/workflows/code-pair.js',
 //       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify,complexity}, contextPath, buildFeedback?, changesetTarget } })
+//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, residualIssues, metrics }
 //     | { mode:'fallback', reason, metrics } → Lead는 SOLO 구현 경로 수행.
 //   ⛔ 책임 재배분 (S0, 사용자 승인 OQ1): 에이전트는 디스크를 수정하지 않는다 — changeset JSON만 반환.
@@ -13,7 +14,7 @@
 //     buildFeedback이 args를 바꿔 캐시 키 불일치 [선례: ts 제거 — resume 캐시 미스 유발]).
 //
 // [설계 — modules/patterns/pair-programming.md 평탄화]
-//   full(fz-code): Stage1 impl(opus) changeset → Stage2 review-arch(sonnet) 검토 →
+//   full(fz-code): Stage1 impl(opus) changeset → Stage2 review-arch(opus) 검토 →
 //     Stage3 impl(opus) 이슈 반영 수정 — **조건부**: review pass면 Stage3 생략 (2-call).
 //     계획 표기 '고정 3-call'은 unresolved #2가 잠정 부정확 지적 — pass 경로 dead-call 제거가 정직
 //     (plan-collaborative direction 조건부화 동형). 분기 상한 고정(2-3 call) → 가변 fan-out 아님.
@@ -124,7 +125,7 @@ const changeset = await callAgent(
   `[목표] Step 목표를 달성하는 changeset 생산. 각 symbolEdit의 newBody는 Lead가 그대로 적용 가능한 exact syntax ` +
   `(의사코드·생략 금지). 대상 파일을 Read해 현재 상태 기준으로 작성. buildExpectation은 검증 가능 형태로.` +
   (buildFeedback ? ' 이전 빌드 피드백의 오류를 우선 해소.' : ''),
-  { label: 'stage1-impl', agentType: 'fz:impl-correctness', model: 'opus', schema: ChangesetSchema })
+  { label: 'stage1-impl', agentType: 'fz:impl-correctness', model: 'opus', effort: 'xhigh', schema: ChangesetSchema })
 if (!changeset) { fallbackCount += 1; return { mode: 'fallback', reason: 'impl null — changeset 없이는 적용 불가', metrics: metrics(0) } }
 
 // ════════ Stage 2: 아키 검토 (조건부 — full: 항상 / light: complexity>=3 또는 누락) ════════
@@ -136,7 +137,7 @@ if (needReview) {
   review = await callAgent(
     `${OVERRIDE}\n[역할] 아키텍처 검토자(review-arch 렌즈)\n${STEP}\n[changeset] ${JSON.stringify(changeset)}\n` +
     `[목표] changeset의 아키 위반·패턴 불일치·exact syntax 결함(의사코드 잔존 등) 검토. 이슈는 id(R1...) + 실측 인용.`,
-    { label: 'stage2-review', agentType: 'fz:review-arch', model: 'sonnet', schema: ReviewSchema })
+    { label: 'stage2-review', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewSchema })
   if (!review) log('WARN stage2 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)')
 } else {
   log(`light + complexity ${c} < 3 — review 생략`)
@@ -149,7 +150,7 @@ if (review && review.verdict === 'issues' && review.issues.length > 0) {
   const revised = await callAgent(
     `${OVERRIDE}\n[역할] 구현자 — 검토 반영\n${STEP}\n[원 changeset] ${JSON.stringify(changeset)}\n[검토 이슈] ${JSON.stringify(review.issues)}\n` +
     `[목표] 이슈를 반영한 수정 changeset. 동의하지 않는 이슈는 그대로 두되 summary에 사유 명시.`,
-    { label: 'stage3-revise', agentType: 'fz:impl-correctness', model: 'opus', schema: ChangesetSchema })
+    { label: 'stage3-revise', agentType: 'fz:impl-correctness', model: 'opus', effort: 'xhigh', schema: ChangesetSchema })
   if (revised) finalChangeset = revised
   else log('WARN stage3 null — 원 changeset 반환 (이슈 미반영, residualIssues 유지)')
 }

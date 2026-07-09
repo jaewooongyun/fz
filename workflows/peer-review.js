@@ -5,6 +5,7 @@
 //   호출(Lead, SKILL.md Analyze Step): Lead가 Gather 산출물(diff/evidence/base-behavior)을 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/peer-review.js',
 //       args: { diffPath, intentContext, evidencePaths?, basePath?, deep? } })
+//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   deep=false → Tier 2 (Lite): Stage1 3-병렬만 (3-call). Confidence Matrix 미투표 — Lead 단순 병합.
 //   deep=true  → Tier 3 (Full): +Stage2 교차(arch↔quality) +Stage3 counter DA (6-call). Lead full Matrix.
 //   반환: { mode:'workflow', reviews:[...], crossAdjustments, counter, metrics } 또는 { mode:'fallback', reason, metrics }.
@@ -111,6 +112,18 @@ async function callAgent(prompt, opts) {
 function metrics(stagesCompleted) {
   return { agentCalls, nullCount: nullCalls, fallbackCount, stagesCompleted }
 }
+// rate-limit/스폰 실패 폴백 (Stage 1 병렬 3콜 한정): parallel 결과의 null 항목만 동일 thunk로 1회 순차 재시도
+// (parallel 경유 = barrier 실패→null 계약 재사용). 여전히 null이면 기존 all-null→fallback / 부분-null→WARN 경로 유지.
+async function parallelWithRetry(thunks) {
+  const out = await parallel(thunks)
+  for (let i = 0; i < out.length; i += 1) {
+    if (!out[i]) {
+      log(`병렬 ${i}번 null — 순차 재시도 1회 (rate-limit/스폰 실패 폴백)`)
+      out[i] = (await parallel([thunks[i]]))[0]
+    }
+  }
+  return out
+}
 
 if (!input || !input.diffPath || !input.intentContext) {
   log(`FATAL args invalid (typeof=${typeof args}) — diffPath/intentContext 필수. fallback`)
@@ -125,20 +138,20 @@ const TARGET = `[리뷰 대상] diff 파일: ${input.diffPath} (Read로 로드)\
 
 // ════════ Stage 1: 독립 병렬 리뷰 (3-Model — Round 1 독립성) ════════
 phase('Stage 1: arch/quality/correctness 독립 리뷰')
-const [arch, quality, correctness] = await parallel([
+const [arch, quality, correctness] = await parallelWithRetry([
   () => callAgent(
     `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}\n` +
     `[목표] 아키텍처 관점 issues (id는 A1, A2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.`,
-    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', schema: PeerReviewSchema }),
+    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: PeerReviewSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
     `[목표] 품질 관점 issues (id는 Q1, Q2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.`,
-    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'sonnet', schema: PeerReviewSchema }),
+    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: PeerReviewSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 정확성 리뷰어(review-correctness 렌즈) — 요구사항 충족·로직 정확성·엣지 케이스\n${TARGET}\n` +
     `[목표] 정확성 관점 issues (id는 C1, C2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin. ` +
     `함수 제거/책임 이전 감지 시 base 원본(prefetch)과 대조 — 원본 책임이 어디로 이전됐는지 추적.`,
-    { label: 'stage1-correctness', agentType: 'fz:review-correctness', model: 'sonnet', schema: PeerReviewSchema }),
+    { label: 'stage1-correctness', agentType: 'fz:review-correctness', model: 'opus', effort: 'xhigh', schema: PeerReviewSchema }),
 ])
 if (!arch && !quality && !correctness) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 all null', metrics: metrics(0) } }
 if (!arch || !quality || !correctness) log('WARN stage1 일부 null — 단독 진행 (해당 렌즈 결측)')
@@ -170,11 +183,11 @@ if (arch && quality) {
     () => callAgent(
       `${OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대(품질) issues] ${JSON.stringify(quality.issues)}\n` +
       `[목표] 각 issue의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 issue는 additions(id A-X)로.`,
-      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'sonnet', schema: CrossReviewSchema }),
+      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
     () => callAgent(
       `${OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대(아키) issues] ${JSON.stringify(arch.issues)}\n` +
       `[목표] 각 issue의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 issue는 additions(id Q-X)로.`,
-      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'sonnet', schema: CrossReviewSchema }),
+      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
   ])
   archOnQuality = cross[0]
   qualityOnArch = cross[1]
@@ -193,7 +206,7 @@ const counter = await callAgent(
   `${OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
   `[issues] ${JSON.stringify(allIssues)}\n[strengths(정상/우수 판정)] ${JSON.stringify(allStrengths)}\n` +
   `[목표] (1) 각 issue를 실측 재검증 — 과장/오독이면 refute + 인용. (2) strengths에 "정말 문제 없나?" 반례 탐색 — 반례 발견 시 missedIssues(id CT-X)로. 라인 인용 오류를 특히 의심.`,
-  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'sonnet', schema: CounterSchema })
+  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: 'xhigh', schema: CounterSchema })
 if (!counter) log('WARN counter null — DA 패스 미수행 (issues 원판정 유지)')
 
 // ════════ 병합 — 스크립트 binary 규칙 (id-기반 verdict 반영. Confidence Matrix/투표는 Lead) ════════

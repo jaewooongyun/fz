@@ -107,15 +107,16 @@ model-strategy:
 
 ### 실행 절차 (Lead)
 
-1. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContext`=Phase 0b 심볼 탐색 산출 요약 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중)
-2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/discover-adversarial.js', args })`
+1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/discover/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
+2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/discover-adversarial.js', args })`
    - default: lean 5-call — 경로생성(opus) → 비용평가(sonnet) → R2 추가경로 → R2 비용 → 합성(opus). TEAM 2-agent 비용 동급대
    - --deep: 렌즈 3 fan-out(sonnet, 독립 생성) → 병합(opus, 탈락 금지) → 경로별 평가(동시 ≤4 chunk) → 합성. budget 가드 내장
-3. **반환 처리**:
+4. **반환 처리**:
    - `mode: 'workflow'` → `landscape`(Trade-off Table + Open Questions)를 Phase 2/3 사용자 대화 입력으로 사용. Lead가 `discover-journal.md` 기록 (canonical 경로 무변경)
    - `mode: 'fallback'` → 아래 에러 대응 표의 SOLO 폴백(Lead 단독 REP) 수행 + 사유를 experiment-log에 기록
-4. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `experiment-log.md` Workflow tracing 섹션에 수동 append
-5. **--deep cross-model**: Workflow 완료 후 Lead가 `/fz-codex verify` 별도 실행 (스크립트 내 cross-provider 스폰 금지)
+5. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `experiment-log.md` Workflow tracing 섹션에 수동 append
+6. **--deep cross-model**: Workflow 완료 후 Lead가 `/fz-codex verify` 별도 실행 (스크립트 내 cross-provider 스폰 금지)
 
 ### TEAM 추론 품질 3원칙 보존 (guides/prompt-optimization.md §다양성 매핑)
 

@@ -21,11 +21,11 @@
 | 1 | /fz-code | 점진적 구현 | impl-correctness ★ | opus |
 | 2 | ✓ build | 빌드 검증 | Lead | — |
 | 3 | ✓ codex check | 교차 검증 | Lead | codex |
-| 4 | /fz-review | 아키텍처 리뷰 | review-arch | sonnet |
-| 5 | /fz-review | 품질 리뷰 | review-quality | sonnet |
-| 6 | /fz-commit | 커밋 | Lead | opus |
+| 4 | /fz-review | 아키텍처 리뷰 | review-arch | opus |
+| 5 | /fz-review | 품질 리뷰 | review-quality | opus |
+| 6 | /fz-commit | 커밋 | Lead | fable |
 
-**에이전트**: Lead(O) + impl-correctness(★O) + review-arch(S) + review-quality(S)
+**에이전트**: Lead(fable) + impl-correctness(★opus) + review-arch(opus) + review-quality(opus) — 동시 opus ≤3
 ```
 
 > ✓ 접두사: 자동 삽입된 검증 게이트. ★: Primary Worker (opus).

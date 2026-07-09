@@ -328,8 +328,8 @@ SOLO가 기본이다. 팀이 필요한 근거가 없으면 SOLO로 실행한다.
 
 ```yaml
 team-agents:
-  primary: impl-correctness         # Primary Worker → 팀에서 opus로 승격
-  supporting: [review-arch]          # Supporting → sonnet 유지
+  primary: impl-correctness         # 핵심 생산 → opus
+  supporting: [review-arch]          # 실질 분석 → opus (단순 retrieval·breadth만 sonnet)
 ```
 
 - Primary Worker는 1명만 지정한다
@@ -356,15 +356,17 @@ team-agents:
 | 역할 | 모델 | 근거 |
 |------|------|------|
 | Lead (오케스트레이터) | fable | 최종 판단, 게이트 실행 |
-| Primary Worker (핵심 생산) | opus (승격) | 계획, 코드, 설계 품질 |
-| Supporting (검증, 비평) | sonnet | 비용 효율, 충분한 품질 |
+| 판단 지점 (workflow merge·direction) | fable | capability-sensitive 단일 호출 (정적 3지점, lint `EXPECTED_FABLE=3`) |
+| 실질 분석·생산 워커 | opus | 계획·코드·설계·리뷰·비평 품질 |
+| 단순 (retrieval·breadth) 워커 | sonnet | 비용 효율, 충분한 품질 |
 | haiku | **미사용** | 프로젝트 정책 |
 
 ### 승격 규칙
 
-- SOLO 모드: 스킬 기본 모델 사용 (보통 sonnet)
-- TEAM 모드: Primary Worker가 opus로 자동 승격
-- Supporting은 항상 sonnet 유지 — opus 승격 금지
+- SOLO 모드: Lead(세션 모델, 보통 fable) 직접 수행 — 재배선 정책 비적용
+- 워커 모델은 **작업 실질 기준** 배정: 실질 분석·생산 = opus / 단순 retrieval·breadth = sonnet — "Supporting은 항상 sonnet"은 폐기(검증·비평도 실질이면 opus, 예: peer-review CC·review-live counter)
+- 판단 지점(workflow merge·direction)만 fable (정적 3지점 고정, lint `EXPECTED_FABLE=3`)
+- 상세·근거: `guides/fable-model-guide.md` § 5 (fz 생태계 적용 전략)
 
 ---
 
@@ -502,7 +504,7 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 - 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
 - 호출(Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/....js', args })`. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
-- agent() 호출 시 `opts.model` 명시 의무 — 생략 시 세션 모델(fable) 상속 → 생산 워커가 fable로 스폰돼 비용 2배 함정. `scripts/lint-model-explicit.sh`가 기계 검증 (model 키 누락 agent() 차단)
+- agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정), effort 생략 시 세션 max effort 상속. 표준 `effort: 'xhigh'`(코딩·agentic 공식 권장). 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 (agentType 라인에 model 또는 effort 누락 시 차단)
 
 ### 산출물·거버넌스 계약
 
@@ -510,6 +512,14 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 - 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / opus 동시 ≤2 (워커 기준 — Lead는 fable, fan-out은 sonnet) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
 - 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
 - 검증 oracle: 래핑 syntax 검사(`async function wrap(...){...본문...}` 후 node --check — 직접 node --check는 CJS 관대 파싱으로 무효) + **실 invoke ≥1** + experiment-log §5.7 지표 기록
+
+### intentContext 규약 (과제 목적 전달)
+
+워커 프롬프트/args에 과제 목적 3요소를 전달하는 것을 권장한다 — 목적을 알면 워커가 관련 정보를 스스로 연결하고 의도를 오추론하지 않는다 (공식 Fable 5 Intent context: "Give the reason, not only the request").
+
+- **3요소**: (1) larger task — 지금 과제가 속한 상위 작업 · (2) 누구를 위한 것 — 수요자 · (3) 산출물이 가능하게 하는 것 — 이 산출물로 다음에 무엇을 하는가
+- **구현 선례**: review-live·peer-review는 `intentContext`를 **필수 args**로 받아(둘 다 누락 시 fail-fast `mode:'fallback'`) TARGET 문자열에 주입; plan-collaborative는 **선택 args**로 받아 CTX 목적 축에 조건부 주입 (`input.intentContext ? '[과제 목적] …' : ''`)
+- **OVERRIDE 오염 방어와의 관계**: intentContext는 **프롬프트 내부에 포함되는 정보**이지 외부 컨텍스트 pull이 아니다. OVERRIDE 블록(§ 표준 패턴 3종 1)이 금지하는 것은 에이전트 정의의 ASD 폴더·이전 세션·메모리 자동 로딩이며, Lead가 args로 명시 전달한 목적은 이에 해당하지 않는다 — 오염원이 아니라 과제 정의의 일부
 
 ### TEAM 추론 품질 3원칙 보존 매핑 (prompt-optimization §다양성)
 

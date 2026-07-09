@@ -20,10 +20,11 @@
 | 무한 루프 감지 | 동일 Gate 3회 연속 실패 | LOOP 에스컬레이션 래더 L4 → 사용자 에스컬레이션 |
 | 팀 교착 | 에이전트 간 3라운드 내 합의 불가 | Lead가 최종 판단 or 사용자 에스컬레이션 |
 | 리소스 초과 | 에이전트 5개 이상 동시 실행 | 추가 스폰 차단 + 기존 작업 완료 대기 |
-| 모델 비용 상한 초과 | fable 에이전트 동시 2개 이상 (Lead 세션 제외) 또는 opus 에이전트 동시 3개 이상 | 추가 스폰 차단 |
+| 모델 비용 상한 초과 | fable 에이전트 동시 2개 이상 (Lead 세션 제외) 또는 opus 에이전트 동시 4개 이상 | 추가 스폰 차단 |
 | 의도 이탈 | 실행 결과가 원래 요청과 무관 | 파이프라인 중단 + 사용자 확인 |
 
-> 모델 비용 상한 근거: fable 1 ≈ opus 2 비용 등가 ($10/$50 vs $5/$25). canonical `guides/fable-model-guide.md` §5.
+> 모델 비용 상한 근거: 최대 동시 = Lead(fable ≈ opus 2) + opus 3 ≈ **opus 5 equivalent**. 단가: sonnet $3/$15 · opus $5/$25 · fable $10/$50 (per MTok). fable 1 ≈ opus 2 비용 등가. canonical `guides/fable-model-guide.md` §5.
+> **rate-limit 폴백 계약**: 병렬 opus 스폰이 상한 미달로 실패/429 시 순차화 재시도 1회 → 재실패 시 `mode:'fallback'` 반환. 구현은 workflows 코드(plan-collaborative stage2 · peer-review stage1의 병렬 블록).
 
 ### Kill-Switch 실행 절차
 

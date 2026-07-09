@@ -147,15 +147,16 @@
 
 ## 모델 전략
 
-3-Tier: opus(핵심) + sonnet(나머지) + external(검증). haiku 사용하지 않음.
+판단=Fable · 실질 분석·생산 워커=opus · 단순(retrieval·breadth)=sonnet · external(검증)=Codex. haiku 사용하지 않음.
 
 > 근거: 같은 모델 N개는 비효과적(ICLR 2025). 이종 모델 조합이 핵심(X-MAS). 역할 분리(MAR, arxiv 2512.20845)는 multi-agent 안정성을 보장.
 
 | 역할 | 모델 | 조건 |
 |------|------|------|
-| Lead | opus | 항상 |
+| Lead / Workflow 판단 지점 | fable | Lead 세션 운용 + 판단 지점 3곳(plan direction ×2 · search merge) |
 | Primary Worker | opus | 팀 내 핵심 산출물 생산자 (도메인당 1명) |
-| Supporting | sonnet | 나머지 Claude 에이전트 전부 |
+| Supporting (실질 분석·생산) | opus | 계획·구현·리뷰 산출물을 직접 생산·분석하는 에이전트 |
+| Supporting (retrieval·breadth) | sonnet | search 심볼/패턴 탐색, discover lens fan-out, recall 성격 |
 | External 1 (Codex) | gpt-5.5 | cross-model 검증 (Lead가 CLI 직접 실행) |
 
 외부 모델 실행 규칙:
@@ -163,10 +164,10 @@
 - Codex: TEAM 모드에서 필수 (cross-validation.md 참조)
 
 승격 원칙:
-- **동시** opus 최대 2개: Lead(O) + Primary(O). 나머지 전부 sonnet.
+- **동시 opus ≤3** (Lead 세션 fable은 별도 카운트). 실질 분석·생산 워커는 opus, retrieval·breadth 성격의 단순 워커는 sonnet.
 - **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단 (modules/governance.md).
-- review-direction은 Direction Challenge(Round 0.5)에서 opus로 **순차 승격** 가능.
-  Round 0.5 완료 후 Round 1 시작이므로 동시 opus는 2개를 초과하지 않음.
+- review-direction은 Direction Challenge에서 판단 지점(fable)으로 운용.
+  병렬 opus 스폰은 순차 승격으로도 상한(≤3)을 초과하지 않도록 유지한다.
 - promoted-model이 필요한 에이전트는 team-registry.md `promoted-model` 컬럼에 명시.
 
 ---
@@ -210,7 +211,7 @@ TEAM boot 시 `modules/system-reminders.md`의 T6/T7 트리거가 모든 에이�
 1. TeamCreate(team_name, description)
 2. Agent 스폰 — team-registry.md 참조하여 도메인별 에이전트 수집
    - Primary → model: opus
-   - Supporting → model: sonnet
+   - Supporting → model: opus (실질 분석·생산) / sonnet (retrieval·breadth)
    - memory/skills/isolation: 에이전트 frontmatter에서 자동 적용
 3. TaskCreate로 작업 목록 생성
 4. 각 에이전트에 **구조화된 Task Brief**로 SendMessage 전달:
