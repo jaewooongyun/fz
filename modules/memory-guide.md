@@ -44,6 +44,8 @@
 | Different mode + evidence ≥ 3 sessions | **new principle** | 별도 모듈 생성. **Moratorium 종료 후에만** |
 | Different mode + evidence < 3 sessions | **candidate** | 5 sessions 관측 후 재판정. **활성 rule 등록 ❌** |
 
+> ⛔ 승격(candidate→active) 임계 canonical = `modules/promotion-ledger.md` Track A (**5 sessions**). 위 ≥3은 별도 모듈 분리(new principle) 자격이지 active 임계가 아님 — 코드 태그 표기도 5세션으로 통일 (2026-07-09 D3).
+
 **Evidence 출처**: `experiment-log.md §5.4` 또는 `fz:checkpoint:*` memory keys. 동일 failure mode가 **별개 세션**에서 관찰돼야 1 count.
 
 **예시**: 31/32/33 = same mode (Lead risk-aversion) → 단일 `lead-action-default.md` merge. 34차+ 후보 시 본 decision tree 먼저 실행.
@@ -70,6 +72,17 @@ topic file의 각 교훈 항목에 태그를 삽입하여 recall 시 매칭에 �
 - 30일+ 미참조 항목: `/fz-memory audit` 시 감사 대상으로 표시
 - `[status: applied]` 항목: 적용 확인 후 6개월 지나면 아카이브 후보
 - 아카이브/삭제는 사용자 확인 필수
+
+### GC 평가축 (recall이 아니라 forgetting)
+
+GC 품질은 recall/staleness만이 아니라 다음 2축으로 점검한다:
+- (a) **intent-aware deletion 정확도**: 삭제해야 할 stale/모순 항목을 실제로 지웠는가
+- (b) **contradiction persistence**: 모순 항목이 잔존하지 않는가
+
+근거: "프로덕션 실패는 recall이 아니라 forgetting 실패인데 기존 벤치는 recall만 측정." [외부: harness-paper §4-E, ForgetEval arXiv 2606.15903 — 원 논문 미대조]
+
+- fz 함의: `/fz-memory audit`에 "모순 탐지" 체크 1행 권고.
+- MemClaw 4실패모드 중 leakage/provenance는 단일 사용자 환경이라 범위 밖 — forgetting/contradiction만 채택.
 
 ## L1 ↔ L2 ↔ L3 경계
 

@@ -363,6 +363,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 
 > 출처: `guides/harness-engineering.md` §3 원칙 1 (Q1 load-bearing test) + §5 원칙 2 (모델 변경 시 하네스 재검토).
 > 목표: Phase 1.5 P1/P2/P3 + Phase 0.5 D/E/F/G 원칙 7개 각각의 기여도 측정 → Load-bearing / Neutral / Overhead 분류.
+> **컴포넌트 slice 분리 추적** (2026-07-09 추가): 집계 지표가 가리는 국소 회귀 감지를 위해 게이트별 catch rate·워크플로별 fallback/null rate를 세션 행에 분리 기록 (원천: workflow `metrics` — 기수집) [외부: harness-paper §4-D, Layer-Isolated 2606.11686 — 원 논문 미대조].
 
 **측정 schema (per principle, per session)**:
 ```yaml
