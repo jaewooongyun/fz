@@ -323,6 +323,7 @@ commit/pr 전 → ✓ codex check (TEAM)
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
 3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/Codex) + 통합
 4. mode:'fallback' → Lead SOLO 수행 (patterns/ canonical 프로토콜 참조)
+5. mode:'split_required'(또는 fallback+splitSuggested) → Lead는 Step 분할 후 재invoke (code-pair H5 크기 가드, ⛔ Lead=fable 자동 SOLO 금지)
 ```
 
 ### Verification Discipline Brief (모든 agent() spawn에 자동 포함)
