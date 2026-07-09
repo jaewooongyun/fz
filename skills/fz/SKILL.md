@@ -254,6 +254,8 @@ model-strategy:
 5. 미일치 시 동적 구성 적용
 ```
 
+> 워커 컨텍스트 전달 명세(무엇을 워커에 알릴지)를 팀 확정 시 재검토 — 오케스트레이션 프롬프팅은 코딩과 별개의 취약 능력 [외부: harness-paper §4-F, PerspectiveGap 2606.08878 — 평균 pass 14.9%, 원 논문 미대조].
+
 ### 3.4 교차 검증 게이트 주입
 
 > 참조: `modules/cross-validation.md`
@@ -325,11 +327,11 @@ commit/pr 전 → ✓ codex check (TEAM)
 
 ### Verification Discipline Brief (모든 agent() spawn에 자동 포함)
 
-Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 다음 규약이 자동 포함된다:
+Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④가 자동 포함된다 (2026-07-09 D2 정합 — 6개 워크플로 전수):
 
 1. 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 2. 외부 모델 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-3. T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
+3. T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 — **OVERRIDE 미포함(격리 워커의 파일접근 제한과 상충) → Lead 소관**
 4. 진행/완료 보고 전 각 주장을 이 세션의 도구 결과와 대조 — 근거 지목 불가 항목은 `[미검증]` 명시
 
 참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

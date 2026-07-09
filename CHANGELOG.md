@@ -18,6 +18,19 @@
 > - **에이전트/템플릿**: 12 에이전트 P2P 블록 → Workflow 노트 · agent-template/skill-template TEAM → Workflow(신규 산출물 TEAM 미상속) · team-core/peer-review-tiers 일몰 헤더 + Tier 재매핑.
 > - ⛔ **pending**: `peer-review.js` 실 invoke 캘리브레이션(실 PR 필요) · `patterns/*.md`는 canonical 라운드 의미론으로 보존 · 버전 범프+release는 캘리브레이션 후. 산출물: `~/dev/TVING/fz-team-sunset/`.
 
+### v4.20.0 (2026-07-09) — 하네스 서베이 Wave B: 메커니즘/모듈 정합 + Governance Decay 실측 [MINOR]
+
+> plan-final Wave B — 서베이 발견을 fz 메커니즘에 반영. B1(Governance Decay)은 실측 gate: 워커 OVERRIDE 경로(CLAUDE.md 미로딩)에서 ⛔ 규칙 유실 여부를 sonnet ×4 대조쌍으로 측정 → **unpinned 2/2 위반 → pinned 0/2**(서베이 2606.22528 구조 재현) → 강도=OVERRIDE 1문장(D5, over-engineering 회피). 생산 문안은 opus Workflow, Lead(fable)=적용·게이트.
+>
+> - **B2 Constraint Pinning**: 6개 워크플로 OVERRIDE에 거버넌스 방어 1문장(git 상태변경·raw codex exec 실행 제안 금지 → 사용자/스킬 경유). 실측 `~/dev/TVING/harness-paper/code/b1-measurement.md`
+> - **B5 OVERRIDE 검증 규약 정합**: 6워크플로에 규약②(외부 모델 재포장 금지) 균일 삽입 + fz SKILL:326 "①②④ 포함, ③(git show)=격리 워커 미적용·Lead 소관"으로 문서-코드 불일치(G-2-03) 해소
+> - **B6 승격 임계 canonical 통일(D3)**: `active:≥3세션`(cross-validation:455·fz-plan:246) → **5세션(promotion-ledger Track A)** + memory-guide에 canonical 참조. `≥3`=모듈 분리 자격이지 active 임계 아님을 명문화. 잔존 `active:≥3` 0
+> - **B3/B7 서베이 근거 정성 반영**: complexity coupling modifier에 정보병목(C_min) 1행 + fz SKILL 오케스트레이션 프롬프팅 취약성 노트 · experiment-log Load-bearing에 컴포넌트 slice 분리 추적(집계 마스킹 방어)
+> - **B4 memory-guide GC 망각축**: recall이 아니라 forgetting(intent-aware deletion·contradiction persistence, ForgetEval 2606.15903). fz-memory audit "모순 탐지" 권고
+> - **B8 hygiene §7**: codex exec 프롬프트 선두 하이픈 clap 오파싱 → `--` 구분자 필수(이 세션 실측). §6 canonical wrapper도 `--` 반영(Codex check P2)
+> - **검증**: lint PASS(36콜·fable=3) · JS 문법 전수 OK · Codex check P2 1건 반영(wrapper `--`). 참고문헌 8ad/8ae(2606.22953·29914)는 v4.19.0에서 추가 완료
+> - ⛔ **Deferred → Wave C**: code-pair pre-flight 크기 가드(H5, C1 다축 캘리브레이션 선행). A5 push+gh release는 사용자 실행 대기
+
 ### v4.19.0 (2026-07-09) — 하네스 서베이 2026 반영 Wave A: 가이드 개정 + 워커 3-tier 재배선 확정 [MINOR]
 
 > "하네스 엔지니어링 2026" 서베이(revfactory.github.io/harness-paper — arXiv 86편 에이전트 생성 메타분석)를 3층 검증(추출 인용 81건 환각 0 · fz사실 45/47 · Codex ×4)으로 분석 → 13주제 proposal → plan-final Wave A 실행. 전 편집 추가/각주만(+137줄, 삭제 0), 서베이 인용은 `[외부: … 원 논문 미대조]` 태그 + census-아님 단서 의무.

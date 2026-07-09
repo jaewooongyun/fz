@@ -13,6 +13,7 @@
 - §5 ⛔ Trust Level 필수 (30차, Critical)
 - §5.5 Base Verification Gate (git diff 분석 호출 시)
 - §6 Standard Hygiene Wrapper Template (복붙용)
+- §7 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자 필수)
 
 ## 1. Stdin 닫기 의무 (`< /dev/null`)
 
@@ -134,7 +135,7 @@ echo "▶ 변경 파일 ($(echo "$CHANGED_FILES" | wc -l)개): $CHANGED_FILES"
 
 ## 6. Standard Hygiene Wrapper Template
 
-> 5 hygiene rules (1-5) + zsh glob 회피 + output readback 통합.
+> 6 hygiene rules (1-5 + 7: `--` 구분자) + zsh glob 회피 + output readback 통합.
 
 ```bash
 # 0. 프롬프트 파일화 (zsh glob 회피)
@@ -154,19 +155,33 @@ else
   SKIP_FLAG="--skip-git-repo-check"
 fi
 
-# 3. 표준 호출 (rule 1: stdin close + rule 3: -o output)
+# 3. 표준 호출 (rule 1: stdin close + rule 3: -o output + rule 7: -- 구분자)
 codex exec \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
   $SKIP_FLAG \
   -o "$RESULT_FILE" \
   -C "$WORK_DIR" \
-  "$(cat /tmp/codex-prompt.txt)" < /dev/null
+  -- "$(cat /tmp/codex-prompt.txt)" < /dev/null
 
 # 4. 결과 읽기: Read tool로 $RESULT_FILE
 # 5. Background mode (rule 4): high effort + 300줄+ 시 run_in_background=true
 ```
 
 **적용 권고**: fz-codex/SKILL.md의 모든 서브커맨드 예시는 본 wrapper 패턴을 따른다.
+
+## 7. 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자)
+
+**증상**: `codex exec`의 positional 프롬프트가 하이픈으로 시작하면(예: SKILL.md YAML frontmatter의 `---` 3연속) clap이 이를 플래그로 오해석 → usage 에러로 즉시 종료.
+
+**원인**: clap은 end-of-options(`--`) 미지정 시 하이픈 선두 인자를 옵션으로 파싱.
+
+**필수 패턴**: `codex exec [flags]` 뒤에 `--`를 넣고 그 뒤에 프롬프트 인자.
+
+```bash
+codex exec ... -- "$(cat /tmp/codex-prompt.txt)" < /dev/null
+```
+
+**관찰**: 에러 캡처 시 `tail` 파이프 금지(clap 에러 본문 잘림 → 진단 지연), 전체 리다이렉트(`> log 2>&1`) 사용. (2026-07-09 harness-paper 세션 실측 — SKILL.md 주입 시 재현)
 
 ---
 
