@@ -4,7 +4,8 @@
 //   표준 패턴 3종 적용. Step당 1회 invoke — 빌드 oracle은 Lead 전용이므로 분할 invoke 구조.
 //   호출(Lead, SKILL.md 절차 — Step 루프는 Lead 소유):
 //     Workflow({ scriptPath: '{plugin_root}/workflows/code-pair.js',
-//       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify,complexity}, contextPath, buildFeedback?, changesetTarget } })
+//       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify,complexity, estimatedNewBodyLines?}, contextPath, buildFeedback?, changesetTarget } })
+//       estimatedNewBodyLines?: Lead 추정 총 newBody 줄수 — SPLIT_THRESHOLD(600) 초과 시 pre-flight가 스폰 전 split_required 반환(H5). 미제공 시 가드 skip(하위호환).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, residualIssues, metrics }
 //     | { mode:'fallback', reason, splitSuggested?, metrics } → Lead는 SOLO 구현 경로 수행.
@@ -100,6 +101,7 @@ const input = (() => {
 let agentCalls = 0
 let nullCalls = 0
 let fallbackCount = 0
+let splitCount = 0 // H5 pre-flight split_required 발동 수 — 임계 재조정 관측용(§12 observation 축)
 async function callAgent(prompt, opts) {
   agentCalls += 1
   const out = await agent(prompt, opts)
@@ -107,7 +109,7 @@ async function callAgent(prompt, opts) {
   return out
 }
 function metrics(stagesCompleted) {
-  return { agentCalls, nullCount: nullCalls, fallbackCount, stagesCompleted }
+  return { agentCalls, nullCount: nullCalls, fallbackCount, splitCount, stagesCompleted }
 }
 
 if (!input || !input.mode || !input.stepSpec || !input.contextPath || !input.changesetTarget) {
@@ -125,6 +127,7 @@ const STEP = `[Step 명세] ${JSON.stringify(input.stepSpec)}\n[컨텍스트] �
 // estimatedNewBodyLines 미제공(null)이면 스킵 — 전량 진행(하위호환). split_required는 Lead 판단 요구(하드 차단 아님).
 const est = (typeof input.stepSpec.estimatedNewBodyLines === 'number') ? input.stepSpec.estimatedNewBodyLines : null
 if (est !== null && est > SPLIT_THRESHOLD) {
+  splitCount += 1
   log(`split_required — 예상 ${est}줄 > 임계 ${SPLIT_THRESHOLD} (스폰 전 차단)`)
   return { mode: 'split_required', reason: `예상 changeset ~${est}줄 > 임계 ${SPLIT_THRESHOLD} — Step 분할 후 재invoke 권고 (scaffold collapse 방지)`, metrics: metrics(0) }
 }

@@ -116,7 +116,7 @@ model-strategy:
 각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
 
 1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
-2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify,complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — 600 초과 예상 시 code-pair가 스폰 전 `split_required` 반환)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
+2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify,complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })`
    - Stage 1 impl(opus) changeset → Stage 2 review-arch(opus) 검토 → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, 2-3 call)
 4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유)
