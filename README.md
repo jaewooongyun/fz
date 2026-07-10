@@ -182,15 +182,16 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
 
-### What's New (v4.18.0) — Fable 5 재배선: 판단=Fable / 수행=Opus·Sonnet [MINOR]
+### What's New (v4.19.0 ~ v4.21.0) — 하네스 서베이 2026 반영 (Wave A/B/C) [MINOR ×3]
 
-제재 해제 후 Lead=`/model fable`(B안 가동) + workflow **판단 지점 3곳**만 explicit `'fable'` 승격 — 출력 큰 생산은 opus 유지, 출력 작은 판단만 승격 (승격 3곳 → §5.8 측정 사전등록 → lint 기계 감시 → 문서 동기화 8파일):
-- **판단 지점 승격 3곳**: `search-cross-verify.js:166` stage3-merge(④ pilot 복원 — 기승인·측정 데이터 보유) · `plan-collaborative.js:154`/`:167` stage0-direction/final(⑤ 신설 — 판정문 출력이라 비용 할증 최소) → explicit `'fable'`. 생산 스테이지(rebuttal/draft/integrate)는 **opus 유지**(AC-1).
-- **측정 사전등록 (§5.8)**: ④ 동결→**재개** · ⑤ direction verdict **신설**(N=3, control=retro-baseline fz-plan #1-2 — fable 세션 제외로 대조군 오염 방지, 12필드 row schema). 배선=가설 / 측정=검증.
-- **lint 기계 감시**: `scripts/lint-model-explicit.sh` — agent 호출 model 명시 전수(36 calls) + fable=3 고정 양방향 + `CLAUDE_CODE_SUBAGENT_MODEL` 경고. AC-1/2/6 문서 규약 → **기계 검증** 승격(negative test 2종).
-- **문서 동기화 8파일 · 3-Tier**: fable-model-guide(제목·배너·§5 B 가동/C 부분적용) · governance(모델 동시 상한 행 신설: fable 1·opus 2) · fz SKILL(2-Tier→**3-Tier**, `main: fable`) · skill-authoring(§8 Lead=fable·§12 model 명시 의무+lint) · team-registry · context-artifacts.
+외부 서베이 "Harness Engineering 2026"(arXiv 86편 메타분석)을 3층 검증(추출 인용 81건 환각 0 · fz사실 45/47 · Codex 교차)으로 분석 → 개선 13주제 → 3-Wave 실행. 전 편집 add-only(삭제 0), 서베이 인용은 `[외부: … 원 논문 미대조]` + census 단서 의무. 생산=opus Workflow, Lead(fable)=적용·게이트.
 
-> ⛔ Deferred: C안 확산(plan integrate·recheck / discover merge·landscape / review arch)은 ④⑤ N=3 임계 게이트 대기 · 워커 effort layering · Wave 4 TEAM 일몰은 [Unreleased] 존치. 상세: [docs/releases/v4.18.0.md](docs/releases/v4.18.0.md)
+- **v4.19.0 Wave A — 가이드 개정**: `harness-engineering.md` 18편집 (§5.5 자기진화+회귀 게이트 신설 · 서브시스템7 Constraint Pinning·Governance Decay · 결정론적 안전 강제 원칙 · §8/§10 멀티에이전트 역방향 게이트 C_min · §2.2 정량 앵커 최신화 · §12 6책임 격자+하네스 홀 외부근거 표 · 참고문헌 2606 wave 21편) + skill-authoring 전이성 원칙 + governance T8. 상세: [docs/releases/v4.19.0.md](docs/releases/v4.19.0.md)
+- **v4.20.0 Wave B — 메커니즘/모듈 정합 + Governance Decay 실측**: B1 실측 gate(워커 OVERRIDE 경로 ⛔ 규칙 유실 **unpinned 2/2 위반 → pinned 0/2**, 서베이 2606.22528 재현) → OVERRIDE 6워크플로 거버넌스 방어 · 승격 임계 canonical 통일(`active:≥3`→5세션 promotion-ledger, 잔존 0) · memory-guide GC 망각축 · hygiene §7(clap `--`). 상세: [docs/releases/v4.20.0.md](docs/releases/v4.20.0.md)
+- **v4.21.0 Wave C — code-pair pre-flight 크기 가드 (하네스 홀 H5)**: 과거 실사고(~800줄 changeset → StructuredOutput 재시도 소진·27분·206K 토큰) 재발 방지. C1 캘리브레이션(임계 SPLIT_THRESHOLD=600 provisional — 하한 500 실측) → pre-flight `split_required`(하드 차단 아닌 Lead 판단 요구) + 소비처 4곳. **하네스 홀 H1~H5/F5/F6 중 유일 미구현이던 H5 조치 완료**. 상세: [docs/releases/v4.21.0.md](docs/releases/v4.21.0.md)
+
+> ✅ 자체리뷰(fz-review 2축: Claude 4렌즈 + Codex 이종): positive 11·critical 0·major 4(→confirmed 2+하향 2). 확정 결함(C1 "확정"→provisional 과대표현 정정, 헤더 계약 갭)은 dismiss 없이 수정(`591775a`). self-review blind spot을 이종 검증이 메운 사례.
+> ⛔ Deferred: C1 다축 캘리브레이션(실패 경계·다파일 조합)은 관측 실패에서 재조정 · Fable C안 확산 · Wave 4 TEAM 일몰은 [Unreleased] 존치.
 
 > 📦 이전 릴리즈 노트: [docs/releases/](docs/releases/) · 전체 변경 이력 [CHANGELOG.md](CHANGELOG.md)
 
