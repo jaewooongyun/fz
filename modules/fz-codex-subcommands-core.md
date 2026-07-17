@@ -19,12 +19,11 @@ fz-review의 Phase 5 Codex 부분. **Plugin 우선 → CLI 폴백.**
 
 ```bash
 # Plugin 모드 (우선 — --add-dir 불필요 시)
-/codex:review --base "$BASE_BRANCH" -m gpt-5.5 --json
+/codex:review --base "$BASE_BRANCH" --json
 
 # CLI 모드 (폴백 — --add-dir 필요 시 또는 Plugin 미설치)
 cd "$GIT_ROOT" && codex exec review \
   --base "$BASE_BRANCH" \
-  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   --add-dir "$SHARED_MODULES" \
   -o "$REVIEW_FILE"
@@ -141,7 +140,6 @@ fi
 ```bash
 cd "$GIT_ROOT" && codex exec review \
   --uncommitted \
-  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   --ephemeral \
   -o "$REVIEW_FILE"

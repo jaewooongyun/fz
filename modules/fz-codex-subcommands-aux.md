@@ -27,7 +27,6 @@
 # 1차: 전체 리뷰
 cd "$GIT_ROOT" && codex exec review \
   --base "$BASE_BRANCH" \
-  -m gpt-5.5 \
   -c model_reasoning_effort=xhigh \
   --add-dir "$SHARED_MODULES" \
   --title "[TICKET] PR 전 최종 리뷰" \
@@ -68,7 +67,6 @@ fi
 ```bash
 cd "$GIT_ROOT" && codex exec review \
   --commit "${COMMIT_SHA:-HEAD}" \
-  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   --ephemeral \
   -o "$REVIEW_FILE"
@@ -80,11 +78,11 @@ cd "$GIT_ROOT" && codex exec review \
 
 ```bash
 # Plugin 모드 (우선)
-/codex:adversarial-review --base "$BASE_BRANCH" -m gpt-5.5 --json
+/codex:adversarial-review --base "$BASE_BRANCH" --json
 
 # CLI 폴백
 SKILL_NAME=$(get_codex_skill "challenger")
-codex exec -m gpt-5.5 -c model_reasoning_effort=xhigh \
+codex exec -c model_reasoning_effort=xhigh \
   --sandbox read-only -o "$DA_REVIEW_FILE" -C "$GIT_ROOT" \
   "$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)
    현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라."
@@ -103,7 +101,6 @@ else
 fi
 
 codex exec \
-  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
   -o "$DRIFT_REPORT_FILE" \
@@ -131,7 +128,6 @@ else
 fi
 
 codex exec \
-  -m gpt-5.5 \
   -c model_reasoning_effort=xhigh \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
   -o "$PLAN_FILE" \
