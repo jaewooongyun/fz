@@ -82,7 +82,7 @@ SendMessage(lead): "빌드 검증 필요합니다. 대상: TVINGApp scheme, 변�
 
 ### Same-model Cross-Verify Reflection Rate 정책 (UC-5, v4.8.0)
 
-> Single source: `guides/skill-troubleshooting.md` L214 "동종 모델 맹점".
+> Single source: `guides/skill-troubleshooting.md` §3 위반 대응표의 "동종 모델 맹점" 행 (heading-based anchor — 줄번호 참조는 drift, 2026-07-18 실측 L214→L215 어긋남 교정).
 > 본 §은 Reflection Rate 측정 시 가중치 정책만 정의.
 
 **Canonical Rule (exclusion)**:
