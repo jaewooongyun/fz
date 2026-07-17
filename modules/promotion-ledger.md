@@ -192,6 +192,17 @@
 - 확장 관측: L-3 내용 문구는 이미 "UI/설계 문제" 포함(ledger:109) → ledger 편집 불요. fz-code 신호 문구("UI 속성값")만 설계원칙 flip으로 확장(S4).
 - 근거: [verified: README.md:25 #9].
 
+## TVG-2739 + fz-improvement 회고 후보 (2026-07-18)
+
+### L-11: 검증자 premise-challenge (전제 도전 지시)
+- 관측 #1: TVG-2739 (Date: 2026-07-15~16) | finding-source: internal (사용자 catch → 회고 E3/INC-9 — 미포함 실패 관측)
+- 관측 #2: fz-improvement-strategy plan 검증 (Date: 2026-07-18) | finding-source: internal (포함 실효 관측 — 지시가 작동)
+- 내용: adversarial/fresh-context 검증자 프롬프트에 "발견의 결론뿐 아니라 **전제**(위반 대상 문서/규칙/계획 자체의 결함 가능성)를 반증 범위에 명시 포함". 미포함 시 동종 검증자가 finder와 같은 권위 전제를 공유해 오판을 CONFIRMED(#1: plan-authority 오판 유지). 포함 시 검증자가 플랜의 핵심 전제 오진단("관측 수집 병목")을 반증(#2).
+- generalize: broad (모든 검증자 프롬프트) | 과적합 위험: 低 (프롬프트 1문장 — Gate/절차 신설 아님)
+- 근거: [verified: TVING/tvod/retrospective-TVG-2739/error-taxonomy.md E3 + incidents.md INC-9] + [verified: TVING/fz-improvement-strategy/plan/verify-result.md 특기]
+- ⛔ 활성 차단: evidence 2 sessions [memory-guide:45] → candidate. active 전환 = 트랙 A **5 sessions**.
+- 승격 목표 (트랙 A): 5 sessions 관측 후 fz-review 검증 2 불능 분기(fresh-context 폴백) + cross-validation 검증자 지시에 활성 반영 판정.
+
 ## 미달 조치 정책
 
 eligible session 없이 3개월 경과 시:
