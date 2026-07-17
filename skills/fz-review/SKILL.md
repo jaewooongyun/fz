@@ -456,7 +456,7 @@ Gate 5 통과 후:
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | fz-codex 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백 | Claude 자체 판단 |
-| fz-codex 장기 quota 불능 (기간 알려진 경우, 예: ~2026-06-28) | 재시도 생략 → 검증 2 불능 분기(Phase 5) 직행 — 매 검증 재시도 낭비 방지. **기간 만료 시 이 행 삭제 + 원복** (MEMORY.md Codex quota 줄과 동기화) | fresh-context Claude 검증자 |
+| fz-codex 장기 불능 (기간/사유 알려진 경우 — 현재: spend cap 2026-07-16~, 해제 미상) | 재시도 생략 → 검증 2 불능 분기(Phase 5) 직행 — 매 검증 재시도 낭비 방지. **해제 확인 시 이 행의 "현재:" 상태 제거 + 원복** (MEMORY.md Codex 줄과 동기화) | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
 
