@@ -102,7 +102,7 @@ model-strategy:
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → SOLO 3중 검증 수행 + 사유 experiment-log 기록
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + Codex validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
-6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-review 테이블
+6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-review 테이블. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
 ### ASD 컨텍스트 로딩 (ASD 활성 시):
 - `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
 - `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원

@@ -34,6 +34,7 @@
 
 > 목표: plan-final.json이 Markdown 대비 plan 무결성을 개선하는지 확인
 > 판단 기준: 3건 (1 기준선 + 2 실험) 후 비교
+> ⏸️ **DEFERRED (2026-07-18 사용자 결정)**: 측정 대상이 의도적 A/B 실험 필요(자연 발생 없음)라 0행. 2027-01 재평가 + Codex 복구 후 재확인. H5(JSON feature list) 연동 근거 보존 — 삭제 아님.
 
 | # | 날짜 | 방식 | plan 이탈? | 기능 누락? | 비고 |
 |---|------|------|:---------:|:---------:|------|
@@ -47,6 +48,7 @@
 
 > 목표: Supporting 에이전트의 적정 maxTurns 값 결정
 > 판단 기준: 5건 수집 → 평균의 1.5배를 maxTurns로 설정
+> 🗑️ **Wave 4 릴리스 시 REMOVED 예정 (2026-07-18 사용자 결정)**: 측정 대상(TEAM Supporting maxTurns)이 TEAM 일몰(Workflow one-shot 전환)로 소멸 — 릴리스 전까지 동결, 릴리스 시 본 섹션 삭제.
 
 | # | 날짜 | 스킬 | 에이전트 | 턴 수 | 비고 |
 |---|------|------|---------|:-----:|------|
@@ -325,6 +327,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 > 목표: SwiftUI Expert + Swift Concurrency 플러그인의 자동 감지 트리거 + v3.6 역방향 트리거가 실제 iOS 코드 세션에서 발동되는 빈도 + 효과 측정
 > 판단 기준: 10건 누적 → trigger pattern 효과성 검토 (Load-bearing/Neutral/Overhead 분류)
 > 데이터 소스: /fz-code, /fz-fix, /fz-review 세션 종료 시 수동 또는 hook 자동 기록
+> ✅ **유지 + 바인딩 (2026-07-18 사용자 결정)**: 유일한 '집행 갭' 큐(iOS 세션은 발생하나 기록 미실행) — fz-code·fz-review 지표 기록 절차에 append 상기 추가(Wave 1-2). 2~3세션 후에도 0행이면 DEFERRED 재판정.
 
 ### Schema (per session, YAML)
 
