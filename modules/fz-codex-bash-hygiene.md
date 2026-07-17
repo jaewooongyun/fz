@@ -60,7 +60,7 @@ codex exec ... -o "$RESULT_FILE" "prompt" < /dev/null 2>&1 | tail -5
 
 ## 4. Background Task 의무 영역
 
-**조건**: gpt-5.5 high effort + Plan 300줄+ 입력 시 5-8분 소요. Bash foreground는 timeout 위험.
+**조건**: high effort + Plan 300줄+ 입력 시 5-8분 소요(frontier 모델 실측). Bash foreground는 timeout 위험.
 
 **패턴**: `run_in_background: true` + `ScheduleWakeup`으로 비동기 처리.
 

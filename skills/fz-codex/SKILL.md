@@ -23,7 +23,7 @@ model-strategy:
 
 # /fz-codex - Codex 상호검증 스킬 (Hybrid)
 
-> **행동 원칙**: Codex CLI(0.124.0+, gpt-5.5)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
+> **행동 원칙**: Codex CLI(0.124.0+, 모델=config SSOT)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
 > CLI(`codex exec`) + Plugin(`/codex:*`, 설치 시) 자동 라우팅. Plugin 미설치 시 CLI 폴백.
 
 > **Authority**:
@@ -114,7 +114,7 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 ## Hybrid Routing (0.118.0+; gpt-5.5 requires 0.124.0+)
 
 서브커맨드별 최적 실행 경로. Plugin 미설치 시 경고 없이 CLI 폴백.
-> 버전 플로어: Hybrid 라우팅 자체는 0.118.0부터 동작한다. 예시는 `-m`을 생략해 config `model` 기본값(최신 frontier)을 사용한다 — 모델 버전을 pin하지 말 것(SSOT=config.toml). 구버전 CLI에서 config 모델이 미지원이면 에러 대응표(`모델 미지원 → -m 제거` 행)대로 폴백.
+> 버전 플로어: Hybrid 라우팅 자체는 0.118.0부터 동작한다. 예시는 `-m`을 생략해 config `model` 기본값(최신 frontier)을 사용한다 — 모델 버전을 pin하지 말 것(SSOT=config.toml). 구버전 CLI에서 config 모델이 미지원이면 에러 대응표 `모델 미지원` 행대로 대응.
 
 | 서브커맨드 | Plugin 우선 | CLI (폴백/전용) | Plugin 불가 이유 |
 |-----------|------------|----------------|----------------|
@@ -157,7 +157,7 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 
 **Critical 자동 에스컬레이션**: 이전 검증에서 critical 이슈 발견 시 → high → xhigh 자동 전환 (validate/verify에 명시).
 
-**원칙**: effort는 호출 종류 기준 (단순/표준/심화), 모델 가용성 기준 아님. gpt-5.5 high가 gpt-5.4 xhigh보다 빠르고 정확하면 default = gpt-5.5 high.
+**원칙**: effort는 호출 종류 기준 (단순/표준/심화), 모델 가용성 기준 아님. 최신 frontier(config 모델)의 high가 이전 세대 xhigh보다 빠르고 정확할 수 있으므로 default = config 모델 + high.
 
 > δ-2 출처: plan v3.1.3 §Tier 1 row 5. 32차 axis (a) probe: `plan_mode_reasoning_effort` direct flag 미존재 → `-c model_reasoning_effort=...` config override 형식이 정식 primitive.
 
@@ -274,7 +274,7 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 | Codex CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:analyze 단독 |
 | `codex exec review` 실패 | `codex exec` + diff 인라인 | 수동 분석 |
 | JSON 파싱 실패 | `-o` 파일 캡처 폴백 | Claude 분석 |
-| 모델 미지원 (`gpt-5.5`) | config.toml 모델로 폴백 (`-m` 제거) | -- |
+| 모델 미지원 (구버전 CLI가 config 모델 미인식) | CLI 업데이트 권장, 불가 시 config `model`을 호환 모델로 조정 (사용자 소관 — 임시 `-m` pin 금지) | -- |
 | 3회 연속 실패 | 사용자 에스컬레이션 | -- |
 | **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (`modules/fz-codex-bash-hygiene.md` § 1) | 프로세스 kill + 재시도 |
 | **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (`modules/fz-codex-bash-hygiene.md` § 2) | working dir을 GIT_ROOT로 변경 |

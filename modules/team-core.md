@@ -157,7 +157,7 @@
 | Primary Worker | opus | 팀 내 핵심 산출물 생산자 (도메인당 1명) |
 | Supporting (실질 분석·생산) | opus | 계획·구현·리뷰 산출물을 직접 생산·분석하는 에이전트 |
 | Supporting (retrieval·breadth) | sonnet | search 심볼/패턴 탐색, discover lens fan-out, recall 성격 |
-| External 1 (Codex) | gpt-5.5 | cross-model 검증 (Lead가 CLI 직접 실행) |
+| External 1 (Codex) | config 기본값 (최신 frontier) | cross-model 검증 (Lead가 CLI 직접 실행) |
 
 외부 모델 실행 규칙:
 - Lead가 Codex CLI를 직접 실행하고, 결과를 팀에 SendMessage로 공유
