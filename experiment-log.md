@@ -454,6 +454,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 4 | 2026-06-11 | 5 | 0 | 3 | 0 | 920s | ✅ clean — gap fix **적용 diff 리뷰** (8파일 179줄+메모리 3): findings 11 (critical/major 0, FP 0) — 9건은 O1·O7 기록 완비/의도 결정 재확인, 1건 즉시 반영(Gate 0.5 SOLO 맥락 명시), counter가 okArea refute 1건("§12 정확히 일치" 과장 — full-path 미검증 사실 재명시) + 리뷰어 evidence 라인 오류 1건(C-1) 적발. okAreas 25 — F1~F4·G1·G3 발화 체인 정적 도달 전부 확인. 4-F 7/7 기계 PASS |
 | 5 | 2026-06-12 | 5 | 0 | 3 | 0 | 724s | ✅ clean — **plan 문서 리뷰** (전수 주장 오판 방어 plan-v1, #3 선례 동형·적용 전): findings 18 (critical 0/major 8/minor 10, FP 0) — 적용 전 리뷰가 plan 구조 결함 2건 포착(:436 트리거 요청 어휘 잔존=RC1 미해소 / 에이전트 행동 규율 행 T8=dead rule 12곳 재생산 위험). counter가 okArea 2건 refute(S7 verify 과잉 교체 미탐지 / 줄번호 신뢰 과대) + C-1~C-3. Lead 처분: 18건 전원 수용 → plan-v2 + 적용 반영. 실사용 표본 |
 | 6 | 2026-06-13 | 5 | 0 | 3 | 0 | 743s | ✅ clean — **Fable 5 대응(v4.14.0 Part A) diff 리뷰** (28 path, 실사용·Fable 세션): findings 7 (critical 0/major 2/minor 5, FP 0) — 두 major가 동일 실패 클래스(사후 사용자 피드백 반영 시 승계 문서 미동기화: effort 4스킬 3곳 stale + ④ 활성/비활성 3곳 이진 상충). counter 전건 uphold + finding 정확도 보완 노트 2건([verified: Read/Grep] 인용 충실 — grounded progress OVERRIDE 첫 적용 invoke). okAreas 13 + okArea 도전 4건 전부 uphold. Lead 처분: 7건 전원 수용 즉시 반영 → Reflection 7/7 grep 검증 100%. Codex validate 불능 — 결정론적 grep 대체 |
+| 7 | 2026-07-18 | 5 | 2 | 2/3 | 0 | 4653s (invoke 2: 초회 1720s 스톨 2 + resume 2933s 캐시재생) | ⚠️ **부분 완주 — 정직 기록**: stage2 교차 2회 연속 API 스톨(Response stalled) = 임계 'null 0%' 위반 행. 대상: fz 자기수정 7커밋 diff(비-Swift). findings 11(major 3·minor 8, FP 0) — counter가 okArea 2건 refute + 신규 C-1 적발(신 fz-code 표 '입력 오류 제외'가 frozen 임계 무근거 완화로 보임 → Lead 판정: H5 재기준선 innocent reading 채택 + 승계 노트 명시로 해소). DA 가치 재실증. Codex 불능 — 이종 안전망 상실 명시 |
 
 ### fz-plan (collaborative) — Wave 2 전환 (시작: 2026-06-05)
 
@@ -489,6 +490,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 ### fz-code (pair-programming) — Wave 3 전환 (시작: 2026-07-10)
 
 > 임계 (사전 등록): 3건 전수 null률 0% + stage 완주 + fallback 0건(입력 오류 제외). G2-code 품질 관찰 = changeset 적용성(anchor 정합) / 리뷰 실효성 / 빌드 1회 통과율. 세션당 1행(N-Step 누적).
+> ⚠️ **승계 노트 (2026-07-18, 리뷰 C-1 반영)**: 본 표는 위 2026-06-05 표(pair-programming full)의 **신규 시리즈 재기준선**이다 — v4.21.0 H5 크기 가드(2026-07-09) 도입으로 fallback 의미론이 변경(입력 오류 fail-fast = 설계된 가드 정상 동작, 워크플로 실패 아님)되어 '입력 오류 제외'는 그 반영이지 구 frozen 임계의 사후 완화가 아님. 구 표(2/3 세션)는 사료 보존. fz-code SKILL 지표 라우팅은 본 표(현행)를 가리킨다.
 
 | # | date | steps | invokes | agentCalls | nullCount | fallback | 빌드 1회 통과 | G2-code 관찰 |
 |---|------|-------|---------|-----------|-----------|----------|--------------|--------------|
