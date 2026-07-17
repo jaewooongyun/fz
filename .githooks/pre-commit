@@ -26,7 +26,7 @@ for FILE in $CHANGED; do
     | grep -nE "$USER_PATH_RE" \
     || true)
   if [ -n "$ADDED_VIOLATIONS" ]; then
-    echo "⛔ fz pre-commit: $FILE에 user-specific 절대 경로 신규 추가:"
+    echo "⛔ fz pre-commit: ${FILE}에 user-specific 절대 경로 신규 추가:"
     echo "$ADDED_VIOLATIONS"
     EXIT=1
   fi
