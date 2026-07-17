@@ -18,6 +18,14 @@
 > - **에이전트/템플릿**: 12 에이전트 P2P 블록 → Workflow 노트 · agent-template/skill-template TEAM → Workflow(신규 산출물 TEAM 미상속) · team-core/peer-review-tiers 일몰 헤더 + Tier 재매핑.
 > - ⛔ **pending**: `peer-review.js` 실 invoke 캘리브레이션(실 PR 필요) · `patterns/*.md`는 canonical 라운드 의미론으로 보존 · 버전 범프+release는 캘리브레이션 후. 산출물: `~/dev/TVING/fz-team-sunset/`.
 
+### [Unreleased] — Codex 모델 pin de-version (SSOT=config.toml) [PATCH]
+
+> 사용자 정정 2회("5.6 나왔는데 왜 5.5?" → "버전 하나씩 막을 게 아니라 최신을 쓰게 해야지"): fz-codex 예시가 `-m gpt-5.5`를 하드코딩해 CLI 릴리즈마다 stale. 근본 수정 = 명령 예시의 `-m` 실행 pin 전면 제거 → config `model` 기본값(SSOT) 위임 = 항상 최신 frontier 자동 사용.
+>
+> - **실행 pin 제거(13곳/4파일)**: `fz-codex-subcommands-core.md`(review/check 3곳) · `fz-codex-subcommands-aux.md`(final/commit/adversarial/drift/plan 6곳) · `fz-modernize/SKILL.md`(verify 1곳) · `codex-strategy.md`(모델 명시 행 → `-m` 생략 권장 서술).
+> - **유지**: CLI 버전 플로어(0.118.0+/0.124.0+ 호환 사실) · 과거 일화(peer-review-gates.md gpt-5.4 발견 기록). fz-codex SKILL.md line 117 dangling 예시 참조 정리(edit로 발생한 orphan).
+> - ⛔ pending: plugin.json/marketplace.json version bump은 위 Wave 4 릴리즈 시 통합(현재 accumulation phase — 조기 bump 지양).
+
 ### v4.21.0 (2026-07-09) — 하네스 서베이 Wave C: code-pair pre-flight 크기 가드 (H5 scaffold collapse) [MINOR]
 
 > plan-final Wave C — 유일 미구현 하네스 홀 H5 조치. 과거 실사고(~800줄 changeset → StructuredOutput 5회 재시도→null·27분·206K 토큰·디스크 무변경)의 재발 방지. 서베이 scaffold collapse(2605.12129) 강한 유사 구조 + retry budget(2605.21516). D1 사용자 승인, 코드 생산=opus Workflow, Lead(fable)=적용·게이트.

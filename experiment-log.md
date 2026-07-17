@@ -429,6 +429,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 3 | 2026-06-05 | lean | 5 | 0 | 2 | 0 | 492s | ✅ **첫 clean 통과** — 정주제 6경로 landscape, §5.7 기존재 실측 발견 + Phase B 표 semantics 충돌 발견 + traces.jsonl 선례 반박(L69). evidence [verified Lxx] 인용 준수, 결론 미산출 ✓. G2: 경로 6/evidence 충실/openQ 5건 실질 |
 | 4 | 2026-06-05 | **deep** | 9 | 0 | 2 | 0 | 404s | ✅ clean — 렌즈 12 원천→4 병합그룹(mergedFrom 추적 정상), lean 미발견 D경로 발굴 + false prereq 실측 반박 2건. **다양성 지표 판정 보류**: 사전등록 문구 "merged 고유 경로 수 > default 단일 생성 경로 수"가 양의적 — (a) 병합그룹 4 vs lean 최종 6 → 미충족 / (b) 원천 렌즈경로 12 vs lean 6 → 충족. 지표 정의 모호 자체가 calibration 발견 — 5건 시점 판정 전 정의 확정 필요. wall-clock은 deep(404s) < lean#3(492s) — 병렬 효과 |
 | 5 | 2026-06-05 | **deep** | 10 | 0 | 2 | 0 | 482s | ✅ clean — **merge 수정 검증**: MergedPathSetSchema(maxItems 12) 적용 후 병합 5그룹 (이전 상한 4 돌파 — 스키마 탈락 강제 해소 실증). 신규: 입력 경로 오류를 Grep 실측으로 자가 교정 + freeze 블록 canonical 식별. ts 제거 계약 정상 동작 |
+| 6 | 2026-07-09 | lean | 5 | 0 | 2 | 0 | 1724s | ✅ clean — 실사용 (TVG-2134 레이어 분리 landscape). 경로 5 (mergedFrom 8 원천 추적 정상), openQ 6건 실질, [미검증] 태깅 준수(토글 인프라·F7 — 전자는 Lead 후속 grep으로 해소: RemoteConfigStream 존재). 결론 미산출 ✓. wall-clock 1724s로 #1-5(404-492s) 대비 3.5x↑ (Fable 세션 + 5축 문제 복잡도 — 비교 시 참고) |
 
 ### fz-search (cross-verify) — Wave 1 전환 (시작: 2026-06-05)
 
@@ -481,6 +482,14 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 1 | 2026-06-05 | 1 (FIX-1) | 1 | 1 | 0 | 0 | c=1→review 생략 (정상) | ✅ clean — 1-call, oldAnchor 정확(Lead 의심을 실측이 기각 — 에이전트가 실파일 Read 증거), 적용+검증 통과. 전환 직후 검증 세션 (임계 3세션 중 1) |
 
 ---
+
+### fz-code (pair-programming) — Wave 3 전환 (시작: 2026-07-10)
+
+> 임계 (사전 등록): 3건 전수 null률 0% + stage 완주 + fallback 0건(입력 오류 제외). G2-code 품질 관찰 = changeset 적용성(anchor 정합) / 리뷰 실효성 / 빌드 1회 통과율. 세션당 1행(N-Step 누적).
+
+| # | date | steps | invokes | agentCalls | nullCount | fallback | 빌드 1회 통과 | G2-code 관찰 |
+|---|------|-------|---------|-----------|-----------|----------|--------------|--------------|
+| 1 | 2026-07-10 | B2·B3 (TVG-2134 찜내역 Fan 편입) | 3 (유효 2 + args 오류 즉시 fallback 1 — Lead args의 깨진 유니코드 이스케이프, 스크립트 fail-fast 정상 동작) | 5 (B2: impl+review pass 2 / B3: impl+review issues+revise 3) | 0 | 1 (입력 오류 — 수정 후 재invoke 회복) | 2/2 (적용 후 각 1회 통과, anchor 불일치 0) | ✅ changeset 19파일 전건 적용, Stage2 리뷰가 B3에서 이슈 검출→Stage3 반영. Codex check가 defer 가드 누락(plan 반영 유실분) major 1건 검출 → Lead 실측 확인 후 2파일 정합화 |
 
 ## §5.8 Fable 5 효율 배선 측정 큐 (시작: 2026-06-12)
 
