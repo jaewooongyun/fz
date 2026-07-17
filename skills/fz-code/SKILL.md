@@ -124,7 +124,7 @@ model-strategy:
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead / `mode:'fallback'` → SOLO 구현 수행 + 사유 기록
    - **반환 mode 사다리 (H5 크기 가드)**: ① `mode:'split_required'` 또는 `mode:'fallback'`+`splitSuggested:true` → **Step 분할 후 재invoke** (과대 changeset scaffold collapse 방지) ② `mode:'fallback'`+일시 장애(세션/rate limit) 의심 → buildFeedback 없이 **재시도 1회** ③ ①②로 미해소 시에만 **Lead SOLO 직접 구현 — 사용자 승인 후** (⛔ Lead=fable 자동 SOLO 금지)
 7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + Codex 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
-8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → `experiment-log.md` §5.7 fz-code 테이블. Stage2 null이 있었던 Step 수 별도 표기
+8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → `experiment-log.md` §5.7 fz-code 테이블. Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
 
 ---
 
