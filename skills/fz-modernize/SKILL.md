@@ -279,7 +279,6 @@ done
 # 2. trust_level="trusted" 등록 (30차)
 # 3. -o flag 작동 안 할 시 stdout > file redirect 사용
 codex exec \
-  -m gpt-5.5 \
   -c model_reasoning_effort=high \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
   --skip-git-repo-check \

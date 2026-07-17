@@ -114,7 +114,7 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 ## Hybrid Routing (0.118.0+; gpt-5.5 requires 0.124.0+)
 
 서브커맨드별 최적 실행 경로. Plugin 미설치 시 경고 없이 CLI 폴백.
-> 버전 플로어: Hybrid 라우팅 자체는 0.118.0부터 동작한다. 아래 `-m gpt-5.5` 예시는 0.124.0 이상이 필요하며, 그 이전 CLI에서는 `-m` 없이 config 기본값으로 폴백하거나 `-m gpt-5.4`를 사용한다.
+> 버전 플로어: Hybrid 라우팅 자체는 0.118.0부터 동작한다. 예시는 `-m`을 생략해 config `model` 기본값(최신 frontier)을 사용한다 — 모델 버전을 pin하지 말 것(SSOT=config.toml). 구버전 CLI에서 config 모델이 미지원이면 에러 대응표(`모델 미지원 → -m 제거` 행)대로 폴백.
 
 | 서브커맨드 | Plugin 우선 | CLI (폴백/전용) | Plugin 불가 이유 |
 |-----------|------------|----------------|----------------|
