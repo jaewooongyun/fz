@@ -23,14 +23,14 @@ Codex 교차 검증은 **사용자가 필요할 때 명시적으로 호출**한�
 
 | Tier | 맥락 | 모델 | Effort | 예상 시간 |
 |------|------|------|--------|----------|
-| **Standard** | 명시적 호출 (review, verify, check, validate, commit, drift) | `gpt-5.5` | `high` | ~3-5분 |
-| **Deep** | final, adversarial, plan, critical 재검증, --deep | `gpt-5.5` | `xhigh` | ~8-10분 |
-| **Light** | micro-eval (단일 주장 재평가) | `gpt-5.5` | `medium` | ~1-2분 |
+| **Standard** | 명시적 호출 (review, verify, check, validate, commit, drift) | config 기본값 | `high` | ~3-5분 |
+| **Deep** | final, adversarial, plan, critical 재검증, --deep | config 기본값 | `xhigh` | ~8-10분 |
+| **Light** | micro-eval (단일 주장 재평가) | config 기본값 | `medium` | ~1-2분 |
 
 > Subcommand별 정확한 매핑은 `skills/fz-codex/SKILL.md § Effort Routing (δ-2)` 표 참조 (authoritative). adversarial=xhigh로 정합화 (2026-04-25, codex-utilization plan v1 Step 2 inline action).
 
 **결정 규칙**:
-- 기본: `config.toml` 값 (`gpt-5.5` + `high`)
+- 기본: 모델=`config.toml` `model`(SSOT — 값 인라인 표기 금지, 항상 최신 frontier) + effort=`high`
 - `final` 또는 이전 검증에서 critical 발견 → **Deep** (자동 에스컬레이션)
 - 사용자가 `--deep` 플래그 사용 → **Deep**
 - **`/fz` Phase 1 `simplified_keywords` 감지 시 → Light** (Cnew-2 자동 라우팅, 2026-05-16):
@@ -52,7 +52,7 @@ DIFF_LINES=$(cd "$GIT_ROOT" && git diff --base "$BASE_BRANCH" --stat | awk 'END{
 
 | diff 크기 | 전략 | 실행 방법 |
 |-----------|------|----------|
-| **Small** (<2000줄) | Full diff → `codex exec review` | gpt-5.5 1M context 활용, 구조화 전체 리뷰 (기본) |
+| **Small** (<2000줄) | Full diff → `codex exec review` | config 모델의 대형 컨텍스트 활용, 구조화 전체 리뷰 (기본) |
 | **Medium** (2000-8000줄) | File-split → `codex exec` xN | 변경 파일을 기능 그룹으로 분할, 그룹별 독립 리뷰 |
 | **Large** (>8000줄) | Key files + summary | 핵심 파일만 상세 리뷰 + 나머지 요약 |
 
@@ -116,7 +116,7 @@ Codex CLI의 `sandbox_permissions` 설정:
 
 > **Authority**: GPT-5 Prompting Guide (OpenAI Cookbook 2026) [verified: official] — "rephrase goal → outline plan → narrate" preamble 패턴 권장.
 
-Codex(gpt-5.5) 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 reasoning 품질 + 일관성 향상:
+Codex 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 reasoning 품질 + 일관성 향상:
 
 ```
 1. Rephrase Goal: 작업 목표를 자기 언어로 1-2문장 재기술

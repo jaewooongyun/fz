@@ -156,8 +156,8 @@ Claude + Codex(GPT-5.5) 교차 검증:
 | 모드 | 코드 생산 후 검증 | 계획 생산 후 검증 |
 |------|-----------------|-----------------|
 | SOLO | 빌드만 | 없음 (Lead 직접 판단) |
-| TEAM | 빌드 + Codex check (gpt-5.5+high) + 에이전트 확인 | Codex verify (gpt-5.5+high) |
-| TEAM --deep | 빌드 + Codex (gpt-5.5+xhigh) | Codex verify (xhigh) |
+| TEAM | 빌드 + Codex check (config 모델+high) + 에이전트 확인 | Codex verify (config 모델+high) |
+| TEAM --deep | 빌드 + Codex (config 모델+xhigh) | Codex verify (xhigh) |
 
 > Effort 정의: `modules/codex-strategy.md` 참조. 기본 high, final/--deep은 xhigh. Review Gate OFF.
 

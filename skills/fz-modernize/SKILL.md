@@ -57,7 +57,7 @@ model-strategy:
 ## Prerequisites
 
 - **외부 자료 접근**: WebSearch + WebFetch + Codex CLI (cross-model verify)
-- **Codex CLI 0.124.0+**: gpt-5.5 cross-model. trust_level="trusted" 설정 필요 (30차 교훈)
+- **Codex CLI 0.124.0+**: cross-model 검증(모델=config SSOT). trust_level="trusted" 설정 필요 (30차 교훈)
 - **6+ 스텝 자동 ASD 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 ASD ticket ID
 
 ## 모듈 참조
