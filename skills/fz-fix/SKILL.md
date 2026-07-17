@@ -216,7 +216,7 @@ model-strategy:
 3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke
 4. **`mode:'fallback'` 반환 시**: SOLO 폴백 = Mode A Bug Fix Step 1-4 진입 — **--codex 처리 책임도 fallback 경로에서 유효** + 사유 experiment-log 기록
    - **`mode:'split_required'`(또는 `splitSuggested:true`) 우선**: SOLO 폴백 전에 **Step 분할 후 재invoke** (H5 크기 가드 — fz-code 절차 6 사다리 동형). ⛔ Lead=fable 자동 SOLO 금지 — 직접 구현은 사용자 승인 후
-5. **지표 기록**: 세션당 1행 → `experiment-log.md` §5.7 fz-fix 테이블. 단일 Step 다수 — Step 루프 1회면 invoke 1회로 종료
+5. **지표 기록**: 세션당 1행 → `experiment-log.md` §5.7 fz-fix 테이블. 단일 Step 다수 — Step 루프 1회면 invoke 1회로 종료. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
 
 ---
 
