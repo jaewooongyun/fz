@@ -22,6 +22,7 @@
 | `SwiftUI`, `View`, `@State`, `@Binding`, `@StateObject`, `@ObservedObject` | SwiftUI Expert | state-management, view-structure |
 | `@Observable`, `@Bindable`, `@Environment` | SwiftUI Expert | state-management, latest-apis |
 | `body: some View`, `.modifier`, `ViewModifier` | SwiftUI Expert | view-structure, performance-patterns |
+| `Text("리터럴")`, `String(localized:)`, `LocalizedStringKey`, 로컬라이즈 문자열 변경 | SwiftUI Expert | 오버로드 시맨틱: 리터럴=`LocalizedStringKey`(로컬라이즈) vs 변수:String=`StringProtocol`(미로컬라이즈) |
 | `async`, `await`, `Task {`, `Task.detached` | Swift Concurrency | async-await-basics, tasks |
 | `@MainActor`, `actor `, `nonisolated` | Swift Concurrency | actors |
 | `Sendable`, `@Sendable`, `sending` | Swift Concurrency | sendable |

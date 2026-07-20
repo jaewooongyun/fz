@@ -379,7 +379,7 @@ code-changes 후 → build → [implication-scan] → codex check
 
 > 하네스 원칙 4 적용: Generator≠Evaluator — 외부 피드백에 결정론적 검증 삽입
 
-트리거: CodeRabbit, Codex, 팀원이 "파라미터 누락/타입 불일치/동작 변경" 지적 시
+트리거: CodeRabbit, Codex, 팀원이 "파라미터 누락/타입 불일치/동작 변경/컨벤션·로컬라이즈·규칙 적용" 지적 시
 ⛔ diff만 보고 동의/반박 금지.
 
 절차:
