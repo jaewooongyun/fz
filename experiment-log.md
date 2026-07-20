@@ -497,6 +497,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | steps | invokes | agentCalls | nullCount | fallback | 빌드 1회 통과 | G2-code 관찰 |
 |---|------|-------|---------|-----------|-----------|----------|--------------|--------------|
 | 1 | 2026-07-10 | B2·B3 (TVG-2134 찜내역 Fan 편입) | 3 (유효 2 + args 오류 즉시 fallback 1 — Lead args의 깨진 유니코드 이스케이프, 스크립트 fail-fast 정상 동작) | 5 (B2: impl+review pass 2 / B3: impl+review issues+revise 3) | 0 | 1 (입력 오류 — 수정 후 재invoke 회복) | 2/2 (적용 후 각 1회 통과, anchor 불일치 0) | ✅ changeset 19파일 전건 적용, Stage2 리뷰가 B3에서 이슈 검출→Stage3 반영. Codex check가 defer 가드 누락(plan 반영 유실분) major 1건 검출 → Lead 실측 확인 후 2파일 정합화 |
+| 2 | 2026-07-20 | TVG-2906 홀 반영(S1·S2·S5·S6 편집 + S4 등재, S3 보류) | 1 (SOLO Lead 직접 — 마크다운 국소편집, changeset=plan 명세, code-pair 과잉) | 0 | 0 | 0 | validate 1회 통과(빌드 대체) | ✅ 7파일 편집, grep 7/7·plugin validate·500줄·참조 회귀 무손상. Lead 판정 3건(OQ-c 카운트보류·OQ-d S3보류·H-P2 독립등재). Codex 불능 — 후속 fz-review 이관 |
 
 ## §5.8 Fable 5 효율 배선 측정 큐 (시작: 2026-06-12)
 
