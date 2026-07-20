@@ -131,6 +131,7 @@
 ### REJECTED (subsumed — 등록 안 함, 재제안 방지용 기록)
 - ~~codebase-helper-3area-grep~~: 41차(Reuse-First) + fz-plan/fz-review reuse가 이미 포섭. 새 규칙 = 중복. (발화 지점 결함은 L-2로 분리 등록)
 - ~~asset-rename-impact-grep~~: 17차(Pre-Gate Failure 영향 범위 사전 grep)에 포섭. 별도 규칙 불요.
+- ~~delimiter-collect-then-interpose (TVG-2906 H-C2)~~: surgical-changes 정당 트레이드오프 — 잔여 경계(genre 이하 leading sep)는 개봉예정에서 releaseDate 상시 존재로 도달 불가. 별도 규칙 불요.
 
 ## ASD-1794 회고 후보 (시청내역 v3 마이그레이션, 관측 #1)
 
@@ -202,6 +203,15 @@
 - 근거: [verified: TVING/tvod/retrospective-TVG-2739/error-taxonomy.md E3 + incidents.md INC-9] + [verified: TVING/fz-improvement-strategy/plan/verify-result.md 특기]
 - ⛔ 활성 차단: evidence 2 sessions [memory-guide:45] → candidate. active 전환 = 트랙 A **5 sessions**.
 - 승격 목표 (트랙 A): 5 sessions 관측 후 fz-review 검증 2 불능 분기(fresh-context 폴백) + cross-validation 검증자 지시에 활성 반영 판정.
+
+### L-12: 규칙/패턴 이식 시 근거(레이아웃/정책/데이터) 태깅 (TVG-2906 H-P2)
+- 관측 #1: TVG-2906 | Date: 2026-07-20 | finding-source: external(CodeRabbit/사용자 catch)
+- 내용: 규칙/패턴을 A화면→B화면 이식 시 "그 규칙의 근거가 레이아웃 제약/콘텐츠 정책/서버 데이터 중 무엇인가" 미검증 → 레이아웃 제약을 정책으로 오인해 이식(#1 밴드 좌상단 겹침 규칙을 인라인 헤더에 이식 후 철회). 규칙: 이식 전 근거 태그(레이아웃/정책/데이터) 명시 — 근거가 레이아웃이면 다른 레이아웃엔 미적용.
+- generalize: narrow (규칙 이식) | 과적합 위험: 中 | 트리거=이식 감지(코드)/해소=근거 분류(도메인 지식) 하이브리드
+- 근거: [verified: TVING/tvod/retrospective-TVG-2906/fz-plugin-holes.md I3·H-P2·G6("종류: 신규")]
+- ⛔ 활성 차단: evidence 1 session → candidate. ⚠️ **L-7과 별개**(리뷰 A:A2 판정): 상위 축(template-authority-bias)은 공유하나 해소 방식 상이(L-7=값 발생 여부 확인/default, L-12=근거 축 분류) — 홀 문서 G6도 "신규" 자체분류. same-failure-mode 미성립으로 독립 등재. cross-link: [[L-7]]
+- ⚠️ **카운트 보류** (OQ-c): TVG-2906 회고 세션의 eligibility (a)fz-plan Phase0.5~3 + (b)fz-codex verify/fz-review --deep 미확증(§meta light/solo 라우팅) → L-2/L-3 관측#2 선례대로 5-session 카운트 미반영. ledger:139 "별개 세션 카운트 유효" vs L-2/L-3 보류 선례 모순은 근본 이슈 — 별도 reconcile 대상.
+- 승격 목표 (Track A): 5 sessions + Codex verify.
 
 ## 미달 조치 정책
 

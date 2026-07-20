@@ -180,7 +180,7 @@ model-strategy:
 | `target_count` | 언급된 대상 파일/모듈 수 | Complexity Scope 차원 |
 | `cross_concern` | 여러 관심사가 교차하는지 | Complexity Risk 차원 |
 | `override_flags` | --solo, --team, --deep | 모드 Override |
-| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — Codex MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (Codex 검증 §추가 발견 1). 단 산출물이 전수/카운트/부정 주장이면 light라도 Coverage Gate 유지 (검증 경계 — cross-validation.md §Coverage Gate) |
+| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — Codex MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (Codex 검증 §추가 발견 1). 단 산출물이 전수/카운트/부정 주장이면 light라도 Coverage Gate 유지, 외부 피드백 수용/기각 판정이면 External Feedback Gate 유지 (검증 경계 — cross-validation.md §Coverage Gate·§External Feedback Gate) |
 
 ### Gate 1: Intent Resolved
 - [ ] 1개 이상의 스킬이 매칭되었는가?
