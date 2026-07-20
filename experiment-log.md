@@ -433,6 +433,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 4 | 2026-06-05 | **deep** | 9 | 0 | 2 | 0 | 404s | ✅ clean — 렌즈 12 원천→4 병합그룹(mergedFrom 추적 정상), lean 미발견 D경로 발굴 + false prereq 실측 반박 2건. **다양성 지표 판정 보류**: 사전등록 문구 "merged 고유 경로 수 > default 단일 생성 경로 수"가 양의적 — (a) 병합그룹 4 vs lean 최종 6 → 미충족 / (b) 원천 렌즈경로 12 vs lean 6 → 충족. 지표 정의 모호 자체가 calibration 발견 — 5건 시점 판정 전 정의 확정 필요. wall-clock은 deep(404s) < lean#3(492s) — 병렬 효과 |
 | 5 | 2026-06-05 | **deep** | 10 | 0 | 2 | 0 | 482s | ✅ clean — **merge 수정 검증**: MergedPathSetSchema(maxItems 12) 적용 후 병합 5그룹 (이전 상한 4 돌파 — 스키마 탈락 강제 해소 실증). 신규: 입력 경로 오류를 Grep 실측으로 자가 교정 + freeze 블록 canonical 식별. ts 제거 계약 정상 동작 |
 | 6 | 2026-07-09 | lean | 5 | 0 | 2 | 0 | 1724s | ✅ clean — 실사용 (TVG-2134 레이어 분리 landscape). 경로 5 (mergedFrom 8 원천 추적 정상), openQ 6건 실질, [미검증] 태깅 준수(토글 인프라·F7 — 전자는 Lead 후속 grep으로 해소: RemoteConfigStream 존재). 결론 미산출 ✓. wall-clock 1724s로 #1-5(404-492s) 대비 3.5x↑ (Fable 세션 + 5축 문제 복잡도 — 비교 시 참고) |
+| 7 | 2026-07-20 | lean | 5 | 0 | 2 | 0 | 3204s | ✅ clean — 실사용 (TVG-2906 홀 문서 → fz 반영 경로 landscape, 플러그인 메타). 경로 6(net-zero-floor 공통바닥 식별 + 직교 게이트 1), openQ 6건 실질. 특기: 라운드 간 인용 줄번호 불일치를 에이전트들이 상호 적발(r1cost 3/3 정확 vs 경로 저자 인용 14-23행 어긋남 — recheck 규율 가치는 OQ5로 이관, 결론 미산출 ✓). 워커의 홀 문서 Read는 OVERRIDE로 차단됨 — dedup 판별은 Lead codeContext 요약 경유(한계 명시, plan이 in-scope 반입) |
 
 ### fz-search (cross-verify) — Wave 1 전환 (시작: 2026-06-05)
 
