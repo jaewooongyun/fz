@@ -16,6 +16,7 @@
 | fz-codex | `codex\|교차검증` | `codex\|cross-validate` |
 | fz-commit | `커밋` | `commit` |
 | fz-pr | `PR\|풀리퀘스트` | `PR\|pull.?request` |
+| fz-rebase | `리베이스\|브랜치.*최신화\|브랜치.*동기화\|브랜치.*업데이트\|develop.*위로\|롱텀.*브랜치` | `rebase\|sync.*branch\|refresh.*branch\|update.*branch` |
 | fz-peer-review | `피어리뷰\|팀원\|PR.*리뷰` | `peer.?review\|teammate` |
 | fz-pr-digest | `설명\|해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선` | `explain\|digest\|understand\|what.*changed` |
 | fz-skill | `스킬.*만들\|스킬.*생성\|스킬.*수정\|스킬.*삭제\|에이전트.*만들\|에이전트.*생성\|스킬.*평가\|스킬.*최적화\|description.*최적화\|트리거.*테스트\|트리거.*정확도\|문서.*작성\|글쓰기\|프롬프트.*최적화\|description.*개선\|가이드.*작성` | `create.*skill\|new.*skill\|update.*skill\|delete.*skill\|create.*agent\|new.*agent\|eval.*skill\|optimize.*skill\|optimize.*description\|trigger.*test\|trigger.*accuracy\|document\|write.*skill\|improve.*description\|optimize.*prompt` |
