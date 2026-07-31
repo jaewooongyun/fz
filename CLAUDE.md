@@ -1,5 +1,7 @@
 # CLAUDE.md — fz Plugin
 
+> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조. 최신성 검사: `python3 scripts/lint_doc_freshness.py`
+
 ## Build
 - 빌드 없음 (마크다운 프로젝트)
 - 검증: `claude plugin validate .`
@@ -60,14 +62,16 @@ bash scripts/setup-hooks.sh
 
 상세: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy), `templates/agent-template.md` + `templates/skill-template.md` (자동 상속 섹션).
 
-## Opus 4.8 Adaptation
+## Opus 5 Adaptation (현행 기본 모델)
 
-- **GA**: 2026-05-28 [verified: anthropic.com/news/claude-opus-4-8]
-- **Tokenizer**: 1.00-1.35x 증가 (Opus 4.x baseline, fz 자체 실측 미완료) [미검증: count_tokens 측정 필요]
-- **Behavior** [verified: anthropic.com/news/claude-opus-4-8]: effort 기본 high(xhigh/max는 선택) / instruction-following consistency(과격·모호 지시 그대로 적용 위험) / 자기 코드 결함 통과 ~4x↓(self-eval 개선) / tool-calling 효율↑(required-call skip↓) / 단일 세션 수백 parallel subagents 지원
-- **Context window**: 1M 유지 (safety net 원칙, Intelligence Degradation + Context Length Hurts 논문 근거)
+- **GA**: 2026-07-24, `claude-opus-5`. **$5/$25 = Opus 4.8과 동일** [verified: platform.claude.com/docs/en/about-claude/models/whats-new-opus-5]
+- **Tokenizer**: Opus 4.7 도입분과 동일 → 4.7/4.8 대비 토큰 수 거의 불변. (pre-4.7 대비 1.00-1.35x 증가는 유지, fz 자체 실측 미완료) [미검증: count_tokens 측정 필요]
+- **Breaking 2**: ① **thinking 기본 ON** (4.8은 생략 시 OFF) — `max_tokens`는 thinking+응답 **합산** 하드캡이라 4.8 기준 타이트한 값은 **응답 절단** 위험 ② `thinking:{"type":"disabled"}`는 **effort ≤ `high`에서만**, `xhigh`/`max`와 조합 시 **400**
+- **effort**: 출발점 **`high`(기본)**, **`low`/`medium`이 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh`. ⛔ 이전 모델 effort 값 재사용 금지 → **fresh sweep** [verified: platform.claude.com/docs/en/build-with-claude/effort]
+- **Behavior** [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]: **자체검증 내장 → 검증 지시 삭제**(over-verification) / **subagent 위임 과다 → 캡**(4.8과 역방향) / 응답·산출물 장문화 → **길이는 프롬프트로**(effort로 안 됨) / 스코프 확장·자기정정 서술 과다 → 명시 제약
+- **Context window**: 1M 유지 (기본값이자 최대값). safety net 원칙, Intelligence Degradation + Context Length Hurts 논문 근거
 
-상세: `modules/context-artifacts.md` (1M context 정책), `guides/harness-engineering.md` §1.3 (세대 전환 테이블), `guides/prompt-optimization.md` 원칙 8 (literal interpretation 대응).
+상세: `guides/llm-references.md` §1.2·§5 (정본), `modules/context-artifacts.md` (1M context 정책), `guides/harness-engineering.md` §1.3 (세대 전환 테이블), `guides/prompt-optimization.md` 원칙 8 (literal interpretation 대응), `guides/fable-model-guide.md` (Fable 5 대비).
 
 ## Agent Teams Environment Flag
 

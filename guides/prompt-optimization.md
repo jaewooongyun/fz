@@ -2,7 +2,7 @@
 
 > 실전 최적화 체크리스트. 이론이 아닌 즉시 적용 가능한 가이드.
 >
-> **Sources (last audited: 2026-06-12):**
+> **Sources (last audited: 2026-07-25):**
 >
 > **Tier 1 — Anthropic Official:**
 > - Claude 4 Best Practices (live docs) — prompt-engineering, agentic systems, adaptive thinking
@@ -18,11 +18,13 @@
 > - **Effective Context Engineering for AI Agents (Anthropic 2026)** — "context engineering = load-bearing skill of 2026"
 > - **Tool Use Context Engineering Cookbook (Anthropic 2026)** — memory, compaction, tool clearing 실전
 > - **Introducing Claude Opus 4.8 (Anthropic 2026-05-28)** — release announcement (effort 기본 high, 자기 코드 결함 ~4x↓, tool-calling 효율↑, 단일 세션 수백 parallel subagents)
+> - **Introducing Claude Opus 5 (Anthropic 2026-07-24)** — release announcement. "comes close to the frontier intelligence of Claude Fable 5 at half the price", $5/$25(4.8 동일), effort dial 강조
+> - **What's new in Claude Opus 5 / Prompting Claude Opus 5 (Anthropic, live)** — **현행 기본 모델 정본**. thinking 기본 ON · thinking disabled는 effort ≤ high(400) · **검증 지시 삭제** · **subagent 위임 캡**(4.8 대비 역방향) · 길이는 프롬프트로(effort 아님) → 상세: `llm-references.md` §1.2
 > - **Introducing Claude Fable 5 and Claude Mythos 5 (Anthropic 2026-06-09 GA)** — Opus 상위 tier ($10/$50), thinking 상시 활성, refusal/fallback/billing → 상세: `fable-model-guide.md`
 > - **Prompting Claude Fable 5 (Anthropic, live)** — Fable 전용 프롬프팅 (de-prescription, async subagents, grounded progress, reasoning_extraction 주의)
 > - **Claude Code: Model configuration (Anthropic, live)** — /model fable, effort 체계(frontmatter effort 포함), 안전 분류기 자동 폴백
 > - **Best Practices for Claude Code (Anthropic, live reference)** — Claude Code 전용 prompt 가이드
-> - **Anthropic Prompting Best Practices (live)** — Opus 4.8/Sonnet/Haiku 공식 prompt 가이드
+> - **Anthropic Prompting Best Practices (live, `claude-prompting-best-practices`)** — 전 모델 공통 기법 + **모델별 페이지 분기**(`prompting-claude-{opus-5|fable-5|sonnet-5|opus-4-8}`). ⚠️ 모델별 프롬프팅이 1급 문서로 승격돼 세대 간 프롬프트 재사용이 기본 가정이 아니게 됨
 > - **Anthropic Interactive Prompt Engineering Tutorial (GitHub, 2026)** — 공식 튜토리얼
 > - **OpenAI Prompt Guidance (live)** — 공식 API prompt 가이드
 > - **GPT-5 Prompting Guide (OpenAI Cookbook, 2026)** — 공식 Cookbook
@@ -62,11 +64,16 @@
 > - ~~서브에이전트 토큰 연구 (dev.to)~~ → Anthropic Agent Teams 공식 문서로 대체
 > - ~~hyperdev 컨텍스트 보호~~ → Claude Code 네이티브 기능으로 흡수됨
 >
-> **구버전 프롬프팅/API 제거 (Opus 4.8 only):**
-> - ~~manual `budget_tokens` extended thinking~~ → adaptive thinking + effort + `max_tokens` (Opus 4.7+/Fable 5에서 400 에러) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices]
+> **구버전 프롬프팅/API 제거 (Opus 5 only):**
+> - ~~manual `budget_tokens` extended thinking~~ → adaptive thinking + effort + `max_tokens` (Opus 4.7+/5/Fable 5에서 400 에러) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices]
 > - ~~prefilled responses (마지막 assistant turn)~~ → structured outputs / user turn 주입 (Claude 4.6+ 미지원) [verified: 동]
 > - ~~`interleaved-thinking-2025-05-14` beta header~~ → 자동 adaptive thinking (4.6+ ignored) [verified: platform.claude.com/docs/en/build-with-claude/extended-thinking]
+> - ~~sampling 파라미터 `temperature`/`top_p`/`top_k`~~ → 프롬프팅으로 대체 (Opus 4.7+/5에서 400)
 > - ~~over-prompting / anti-laziness ("If in doubt, use [tool]")~~ → dial back (최신 모델서 overtrigger) [verified: claude-4-best-practices]
+> - **[2026-07-25 신설]** ~~검증 지시~~ ("include a final verification step" / "use a subagent to verify" / "double-check your answer" / "re-verify before responding") → **삭제**. Opus 5는 자체검증 내장이라 over-verification이 되며, 공식은 제거해도 *"with no loss in quality"* [verified: prompting-claude-opus-5]. ⚠️ **외부 verifier·이종 교차검증 원칙은 존치** — 제거 대상은 *모델에게 자기재확인을 시키는 문구*뿐
+> - **[2026-07-25 신설]** ~~"생각하지 마라 / 추론하지 마라" 류 규칙~~ → thinking OFF 시 `<thinking>` 태그 누출을 **증가**시킨다. 일반형(`Do not include internal or system XML tags`)을 쓰고, **태그를 이름으로 지목하지 말 것** [verified: 동]
+> - **[2026-07-25 신설]** ~~응답 축소 목적의 effort 하향~~ → Opus 5에서 effort는 **사고량**만 조절하고 가시 응답 길이는 신뢰성 있게 줄이지 못한다. **길이는 프롬프트로** [verified: platform.claude.com/docs/en/build-with-claude/effort]
+> - **[2026-07-25 신설]** ~~이전 모델에서 가져온 effort 값 재사용~~ → **fresh sweep** 필수 [verified: 동]
 
 ---
 

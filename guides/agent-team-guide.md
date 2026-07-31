@@ -1,5 +1,7 @@
 # Agent & Team Configuration Guide
 
+> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용(MAST 등 arxiv)은 개별 `[verified:]` 태그 참조.
+>
 > fz-* 스킬 생태계에서 에이전트 작성 및 (역사적) 팀 구성을 위한 종합 가이드.
 > 에이전트는 `agents/*.md`에 위치하며, agentType(`fz:`)으로 `workflows/*.js` Workflow가 재사용한다.
 >
@@ -286,7 +288,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | Anti-Pattern | 이유 | 대안 |
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
-| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]) | SOLO for simple tasks |
+| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: 세션 200·동시 20 (`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`/`_MAX_CONCURRENT_SUBAGENTS`, v2.1.219) — fz governance(opus 동시 ≤2~3)는 이보다 보수적 |
 | coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) + 동일 토큰예산서 우위 소멸 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
 | standalone Task | 통신 불가, 고립된 작업 | TeamCreate 필수 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
