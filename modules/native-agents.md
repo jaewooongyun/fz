@@ -1,5 +1,7 @@
 # L3 네이티브 에이전트 통합 정책
 
+> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료 (effort 값 선택 지침 Opus 5 반영).
+>
 > Claude Code 내장 에이전트 중 fz에 없는 고유 가치를 가진 에이전트만 선별 통합.
 > fz 커스텀 에이전트(L1)와 역할 중복 없이 보강 관점만 추가.
 
@@ -27,7 +29,7 @@
 2. **Background 스폰**: review에서 fz TEAM과 병렬로 background 실행
 3. **결과 통합**: Lead가 L3 결과 수신 → Issue Tracker에 merge (fz 이슈와 동일 형식)
 4. **조건부 스폰**: 아래 조건 충족 시에만 스폰
-5. **모델·effort 명시**: L3 및 직접 Agent 스폰도 model 명시 의무 — 실질 분석·생산 관점은 `opus`, retrieval·breadth 성격은 `sonnet`, effort는 `xhigh` 명시 (미지정 시 부모 세션 모델·effort 상속)
+5. **모델·effort 명시**: L3 및 직접 Agent 스폰도 model 명시 의무 — 실질 분석·생산 관점은 `opus`, retrieval·breadth 성격은 `sonnet`, **effort 명시 필수** (미지정 시 부모 세션 모델·effort 상속). 값 선택: Opus 5 기준 출발점은 `high`(기본), 탐색·retrieval 성격은 `low`/`medium`, demanding coding/agentic만 `xhigh` — ⛔ 이전 모델 값 재사용 말고 sweep 후 결정 [verified: platform.claude.com/docs/en/build-with-claude/effort]. 미측정 상태의 기본값은 현행(`xhigh`) 유지.
 
 ### 스폰 조건
 

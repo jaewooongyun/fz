@@ -1,5 +1,7 @@
 # Harness Engineering Guide
 
+> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료 (§1.3 세대 전환 테이블 Opus 5 행 포함). 그 외 인용(arxiv 하네스 논문군)은 §참고문헌 표 + 개별 `[verified:]` 태그 참조.
+>
 > "하네스의 모든 컴포넌트는 모델이 혼자 할 수 없는 것에 대한 가정을 인코딩한다.
 > 그 가정은 스트레스 테스트할 가치가 있다."
 > — Prithvi Rajasekaran, Anthropic Labs
@@ -782,6 +784,7 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 
 > 이유: 운영 설정을 하네스 가정으로 명시하면, 못 바꾸는 레버(세션 effort)에 헛된 게이팅을 걸지 않고 바꿀 수 있는 레버(surface·Codex effort·fan-out)에 집중하게 된다.
 > [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — `max`는 "prone to overthinking" + "diminishing returns from increased token usage"; 학술 보강 arxiv 2502.08235(overthinking↑→성능↓)·2604.10739]
+> ⚠️ **Opus 5 보정 (2026-07-25)**: 위 `max` 부정 평가는 **Opus 4.7/4.8 페이지의 문구**다. Opus 5 공식 문구는 톤이 다르다 — `max`는 *"when a task justifies unconstrained token spending"*, 그리고 Opus 5는 *"converts additional effort into better results more reliably than any earlier Opus model"* [verified: platform.claude.com/docs/en/build-with-claude/effort · about-claude/models/whats-new-opus-5]. 즉 **overthinking 경계는 여전히 유효한 운영 원칙이나, 근거를 4.8 문구에만 매달면 안 된다** — Opus 5에서는 측정(sweep)으로 운영점을 정할 것.
 
 ---
 
@@ -1082,8 +1085,9 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 |-----------|-------------|-----------------|
 | Sonnet 4.5 | Context Reset 필수, Sprint 분해 필수, Evaluator 필수 | — |
 | Opus 4.6 | Context Reset 선택, Compaction 충분, Evaluator 조건부 | Sprint 분해, 스프린트별 평가 |
-| **Opus 4.8 (2026-05-28 GA, 현재 default)** | effort 기본 **high** (xhigh/max는 더 어려운 작업용), 1M Compaction 충분, tool-calling 효율↑(fewer steps·required-call skip↓), 단일 세션 수백 parallel subagents 지원 [verified: anthropic.com/news/claude-opus-4-8] | Evaluator 조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 *이종 blind-spot*은 여전히 cross-model 필요 [verified: 동] |
+| **Opus 4.8 (2026-05-28 GA)** | effort 기본 **high** (xhigh/max는 더 어려운 작업용), 1M Compaction 충분, tool-calling 효율↑(fewer steps·required-call skip↓), 단일 세션 수백 parallel subagents 지원 [verified: anthropic.com/news/claude-opus-4-8] | Evaluator 조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 *이종 blind-spot*은 여전히 cross-model 필요 [verified: 동] |
 | **Fable 5 (2026-06-09 GA, 옵트인 최상위)** | effort 기본 **high** (xhigh=capability-sensitive, low도 이전 모델 xhigh 상회 가능), thinking 상시 활성(끄기 불가), async parallel subagents 공식 권장, fresh-context verifier > self-critique, 단일 turn 수 분·자율 런 수 시간 전제의 타임아웃/진행표시 설계 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 + code.claude.com/docs/en/model-config] | step-by-step 절차 지시("often too prescriptive... can degrade output quality" — 단 Gate 가드레일 제거는 A/B 후 결정), 검증 리마인더("verifies its own work with less prompting"). 안전 분류기 refusal 시 Opus 자동 폴백 주의. 상세: `guides/fable-model-guide.md` |
+| **Opus 5 (2026-07-24 GA, 현재 default)** | **위임 캡**(모델이 subagent를 과다 스폰 — 하네스측 `MAX_SUBAGENTS_PER_SESSION`=200·`MAX_CONCURRENT_SUBAGENTS`=20 + 프롬프트측 제약 병행), **길이 통제 프롬프트**(응답·산출물 장문화, effort로는 안 줄어듦), **스코프 제약**(요청 외 단계 추가 경향), `max_tokens` 재점검(thinking 기본 ON → thinking+응답 합산 하드캡) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 + code.claude.com/docs/en/changelog v2.1.219] | **검증 지시·검증 스캐폴딩** — 자체검증 내장, *"removing them reduces wasted tokens with no loss in quality"*. 하네스도 같은 방향으로 이동(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). ⚠️ *외부 oracle·이종 교차검증은 존치* — 제거 대상은 **자기재확인 지시**뿐 |
 | 미래 모델 | ? | Evaluator? 컨텍스트 관리? |
 
 > **4.8 새 기능 → fz 적용** [verified: anthropic.com/news/claude-opus-4-8]:
@@ -1091,6 +1095,14 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 > - **자기 코드 결함 통과 ~4x↓** → fz-review: self-eval 개선분 인정, cross-model(Codex)은 *이종 blind-spot* 보완으로 재포지션 (과대확신 방어가 주목적 아님).
 > - **tool-calling 효율↑ (fewer steps·required-call skip↓)** → 강제 tool 호출 게이트 완화 가능. 단 breadth fan-out엔 명시 기준 유지.
 > - **단일 세션 수백 parallel subagents 지원** → breadth/read-heavy 작업의 대규모 fan-out 공식 지지 (`modules/complexity.md` parallelizable modifier 정합).
+
+> **Opus 5 (2026-07-24) → fz 적용** [verified: prompting-claude-opus-5 · whats-new-opus-5 · effort · code.claude.com/docs/en/changelog]:
+> - ⛔ **검증 스캐폴딩 제거 방향** — 모델이 시키지 않아도 자기 작업을 검증한다. "final verification step 넣어라"/"subagent로 검증해라" 류 **프롬프트 지시**는 over-verification을 유발하므로 제거 대상. 하네스도 같은 판단(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). **⚠️ 단 fz의 교차검증 스테이지**(plan `stage5-recheck`, review `stage3-counter`, peer-review `stage2` 교차)는 *다른 관점의 검증*이지 *자기재확인*이 아니다 — **일괄 제거 금지, 개별 판단**.
+> - ⚠️ **위임 방향 역전** — 4.8은 subagent를 *덜* 쓰려 해서 유도가 필요했으나, Opus 5는 *과다* 위임한다. 4.8용으로 넣은 "더 위임하라" 문구가 있으면 **제거**하고 캡으로 대체. fz는 Workflow 스크립트가 fan-out을 결정적으로 제어하므로 영향이 제한적이나, `agent()` **내부**에서 Task/Agent 도구를 쓰는 경로가 있으면 캡 필요.
+> - **effort 운용 전환** — 출발점 `xhigh`→**`high`(기본)**, `low`/`medium`이 비용·지연의 **1차 레버**. ⛔ 이전 모델 effort 값 재사용 금지 → **fresh sweep** 후 결정 (§5 원칙 7 운영점과 정합: 운영점은 측정으로 정한다).
+> - **`max_tokens` 재점검** — thinking 기본 ON이라 `max_tokens`가 thinking+응답 **합산** 하드캡. 4.8 기준으로 타이트하게 잡은 경로는 응답 절단 위험. `xhigh`/`max` 운용 시 64k 출발.
+> - **길이는 프롬프트로** — 응답·산출물이 길어졌고 **effort로는 줄지 않는다**. 산출물 길이 계약이 필요한 스킬은 프롬프트에 명시.
+> - **하네스 상수 변경** — nested subagent depth **1→3**, 스폰 캡 세션 200·동시 20, dynamic workflow 기본 medium(<15 agents). fz governance 상한(opus 동시 ≤2~3)은 **이보다 훨씬 보수적**이므로 상충 없음 — 단 문서상 두 층위를 구분해 기술할 것.
 
 > "하네스 설계자의 일은 '다음 신기한 조합을 계속 찾는 것'이다." — Anthropic
 
@@ -1204,6 +1216,11 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 6b | Tool Use Context Engineering Cookbook | Anthropic | 2026 | https://platform.claude.com/cookbook/tool-use-context-engineering-context-engineering-tools |
 | 6c | Best Practices for Claude Code | Anthropic | 2026 | https://www.anthropic.com/engineering/claude-code-best-practices |
 | 6d | Introducing Claude Opus 4.8 | Anthropic | 2026-05-28 | https://www.anthropic.com/news/claude-opus-4-8 |
+| 6e | Introducing Claude Opus 5 | Anthropic | 2026-07-24 | https://www.anthropic.com/news/claude-opus-5 |
+| 6f | What's new in Claude Opus 5 | Anthropic | 2026-07-24 | https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5 |
+| 6g | Prompting Claude Opus 5 | Anthropic | live | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 |
+| 6h | Effort (per-model 권장) | Anthropic | live | https://platform.claude.com/docs/en/build-with-claude/effort |
+| 6i | Claude Code changelog (v2.1.219 하네스 변경) | Anthropic | 2026-07-24 | https://code.claude.com/docs/en/changelog |
 | 6e | Scaling Managed Agents | Anthropic | 2026-04-08 | https://www.anthropic.com/engineering/managed-agents |
 | 6f | Introducing Claude Fable 5 and Claude Mythos 5 | Anthropic | 2026-06-09 | https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5 |
 | 6g | Prompting Claude Fable 5 | Anthropic | 2026 (live) | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 |

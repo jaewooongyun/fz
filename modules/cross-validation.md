@@ -1,5 +1,7 @@
 # 교차 검증 주입 전략
 
+> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료 (Opus 5 "검증 지시 삭제" 지침 대비 게이트 존치 경계 성문화 포함).
+>
 > fz Phase 3에서 파이프라인에 검증 게이트를 자동 삽입. 모든 모드에서 최소한의 검증 보장.
 > 핵심 원칙: TEAM = Claude 에이전트(N) + Codex(1). 코드/계획 생산 TEAM에 Codex CLI 필수 참여. 탐색 파이프라인은 --deep만.
 
@@ -79,6 +81,12 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 ---
 
 ## 검증 게이트 자동 삽입 규칙
+
+> ⚠️ **Opus 5 경계선 (2026-07-25) — 이 게이트들은 존치한다.** Opus 5 공식 프롬프팅 가이드는 *검증 지시를 삭제하라*고 명시한다("include a final verification step" / "use a subagent to verify" / "double-check your answer" → 제거 시 *"no loss in quality"*) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. 그러나 **삭제 대상은 *모델에게 자기 작업을 재확인시키는 프롬프트 문구*** 다.
+>
+> 아래 게이트는 성격이 다르다 — **① 하네스가 실행하는 결정론적 oracle**(build·enforcement·implication-scan: 모델 판단이 아니라 도구 실행) **② 이종 모델 교차검증**(codex check/verify: 동종 self-eval이 못 잡는 blind-spot) **③ 다른 관점의 독립 분석**(direction challenge, review-arch/quality). 셋 다 자기재확인이 아니므로 **일괄 제거 금지**.
+>
+> ⛔ 반대로, 워커 프롬프트 안에 "마지막에 스스로 검증하라" 류 문구가 있다면 그건 제거 대상이다. **게이트(구조) ≠ 지시(문구)** — 이 구분을 흐리면 load-bearing 게이트가 사라진다.
 
 ### 코드 생산 파이프라인
 

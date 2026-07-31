@@ -1,5 +1,7 @@
 # 스킬 트러블슈팅 가이드
 
+> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
+>
 > fz-* 스킬에서 발생하는 일반적인 문제의 진단과 해결 방법.
 > Anthropic 32p Skills Guide의 Under/Over-triggering, Instructions Not Followed 패턴 기반.
 
@@ -142,7 +144,7 @@ GOOD: "에러 시 테이블의 폴백 전략을 순서대로 실행하라."
 **증상:** Claude가 Gate 체크를 건너뛰거나 검증 없이 완료 보고.
 
 **솔루션:**
-- SKILL.md에 과격한 표현을 다시 넣지 않는다 (overtriggering 위험. Claude 4.8 instruction-following consistency로 과격 지시가 그대로 적용될 위험 [verified: anthropic.com/news/claude-opus-4-8]; GPT-5.5도 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]; Fable 5는 짧은 지시 조향이 공식 권장 — 과격 표현 불필요 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5])
+- SKILL.md에 과격한 표현을 다시 넣지 않는다 (overtriggering 위험. Claude 4.8 instruction-following consistency로 과격 지시가 그대로 적용될 위험 [verified: anthropic.com/news/claude-opus-4-8]; GPT-5.5도 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]; Fable 5는 짧은 지시 조향이 공식 권장 — 과격 표현 불필요 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]; **Opus 5**는 여기에 더해 *지시를 겹치는 것 자체*가 비용이다 — 검증 지시는 자체검증과 중복 실행되므로 **삭제**가 권장 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5])
 - **user prompt** 쪽에 격려 문구를 배치한다
 
 ```

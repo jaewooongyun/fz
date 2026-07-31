@@ -1,5 +1,7 @@
 # 스킬 작성 실전 가이드
 
+> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
+>
 > fz-* 스킬 생태계에서 새 스킬을 설계하고 작성하기 위한 실무 가이드.
 > 이론이 아닌 실행 중심. 모든 예시는 기존 17+ 스킬 생태계 기반.
 
@@ -65,7 +67,8 @@
   - **E**liminate: 주기적으로 사용하지 않는 지침을 가지치기한다
 - 500줄 이하를 유지한다 — 넘으면 모듈로 분리한다
 - **⛔ 트리밍 비저하 원칙**: 줄 수 축소가 실행 품질 저하를 일으키면 트리밍 의미가 없다. §3의 "트리밍 비저하 원칙" 참조
-- **⛔ DELETE/MERGE-default (편집 operating rule)**: 스킬/가이드/모듈을 *편집*할 때 DELETE 또는 MERGE를 기본값으로 먼저 검토한다. 순수 additive 변경(기존 삭제·병합 없이 추가만)은 삭제/병합 counterpart를 동반하거나 명시적 정당화가 있어야 한다. 이유: 규칙 누적은 adherence tax(IFScale 500규칙→68%)이고, literal-following 모델(Opus 4.8)에서 bloat 비용이 더 크다 — 추가 충동마다 "무엇을 지울 수 있나"를 먼저 묻는 것이 self-correcting 하네스의 조건. (memory 18차 rule(3)의 skill-body 강제)
+- **⛔ DELETE/MERGE-default (편집 operating rule)**: 스킬/가이드/모듈을 *편집*할 때 DELETE 또는 MERGE를 기본값으로 먼저 검토한다. 순수 additive 변경(기존 삭제·병합 없이 추가만)은 삭제/병합 counterpart를 동반하거나 명시적 정당화가 있어야 한다. 이유: 규칙 누적은 adherence tax(IFScale 500규칙→68%)이고, literal-following 모델(Opus 4.8 이후)에서 bloat 비용이 더 크다 — 추가 충동마다 "무엇을 지울 수 있나"를 먼저 묻는 것이 self-correcting 하네스의 조건. (memory 18차 rule(3)의 skill-body 강제)
+  - **Opus 5가 이 규칙을 강화한다**: 공식 프롬프팅 가이드가 *제거*를 명시 지시한다 — 검증 지시("include a final verification step" / "use a subagent to verify" / "double-check your answer")를 **삭제**하라, *"removing them reduces wasted tokens **with no loss in quality**"* [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. 모델이 내재화한 행동에 지시를 겹치면 중복 실행이 된다. ⚠️ 단 §llm-references §4-2의 *외부 verifier·교차검증 원칙*은 별개 — 삭제 대상은 **모델에게 자기재확인을 시키는 문구**뿐.
 - **⚠️ Sibling-Convention Check (편집 operating rule, candidate)**: fz 자산에 candidate·검증·관측 항목을 *추가*할 때, 기존 동류 항목(예: fz-review 검증 4-N/4-O, promotion-ledger L-series)의 표기 템플릿을 먼저 grep해 일치시킨다 — `⚠️` 마커 · 「활성 강제 X」 · 「N sessions 후 결정」 등. 이유: 동류 컨벤션을 안 보고 새 표기를 즉흥 생성하면 일관성 붕괴 + 강제성 오인(candidate가 ⛔/blocking으로 오동작). 결정론 grep이라 즉시 가능. evidence: TVG-1219 환류 세션 ①(fz-review 검증5/Gate) candidate 표기 불일치 catch — `feedback_fz_self_reference_blindspot` 발현1(활용 갭). ⚠️ candidate(1 session) — 활성 강제 X, 5 sessions 후 active(⛔) 재판정.
 
 ---
@@ -239,7 +242,7 @@ Step 1: ContentDetailBuilder 생성 (DI: ContentRepository, ImageCacheUseCase)
 
 ### 원칙 8: 과격 표현 제거 (Claude 4.8 instruction-following)
 
-Claude 4.8은 지시를 일관되게 따른다 ("follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]) → 과격·모호한 지시가 그대로 적용될 위험. **GPT-5.5 (2026-04-23 GA)** 도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]. **Fable 5 (2026-06-09 GA)** 는 한층 더 — 짧은 지시로 대부분 행동 조향 가능하며, 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]).
+Claude 4.8은 지시를 일관되게 따른다 ("follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]) → 과격·모호한 지시가 그대로 적용될 위험. **GPT-5.5 (2026-04-23 GA)** 도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]. **Fable 5 (2026-06-09 GA)** 는 한층 더 — 짧은 지시로 대부분 행동 조향 가능하며, 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]). **Opus 5 (2026-07-24 GA)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5].
 
 ```
 BAD:  "CRITICAL: You MUST ALWAYS use this tool"
@@ -506,7 +509,11 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 - 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
 - 호출(Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/....js', args })`. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
-- agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정), effort 생략 시 세션 max effort 상속. 표준 `effort: 'xhigh'`(코딩·agentic 공식 권장). 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 (agentType 라인에 model 또는 effort 누락 시 차단)
+- agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정), effort 생략 시 세션 effort 상속. 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 (agentType 라인에 model 또는 effort 누락 시 차단)
+- **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `'xhigh'` 단일값. Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**.
+  - ⛔ **상수 일괄 교체 금지**: 공식이 *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* 을 요구. 측정 없이 `xhigh`→`high`로 치환하는 건 근거 없는 값을 근거 없는 값으로 바꾸는 것. **워크로드별 sweep 후** 스테이지 성격(생산/판정/탐색)에 맞춰 차등 배정. 미측정 상태의 기본값 = **현행 유지**.
+  - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [미검증: per-call `opts.effort` vs settings.json `effortLevel` 우선순위. 문서화된 체인은 `env var > frontmatter > 세션`이며 per-call opts는 미명시]
+  - ⛔ **effort로 응답 길이를 줄이려 하지 말 것** — Opus 5에서 effort는 사고량을 조절할 뿐 가시 응답 길이를 신뢰성 있게 줄이지 못한다. 길이는 프롬프트로. [verified: 동 effort 문서]
 
 ### 산출물·거버넌스 계약
 

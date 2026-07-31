@@ -1,12 +1,16 @@
-# Model Guide — Fable 5 (Lead 운용) · Opus 4.8 (수행)
+# Model Guide — Fable 5 (Lead 운용) · Opus 5 (수행)
 
 > ✅ **운용 상태 (2026-07-06)**: 2026-07-05 제재 해제 + 사용자 `/model fable`(max) 전환으로 **B안(Lead=Fable 5) 가동**. 2026-07-06 **재배선 완료** — 판단 지점 3곳 explicit `'fable'`: `search-cross-verify.js:166` merge + `plan-collaborative.js:154`/`:167` direction (§5.8 ④ 재개·⑤ 신설), `scripts/lint-model-explicit.sh` 기계 감시. effort는 **세션 레벨 max(기본)/ultracode** 운용 유지 — frontmatter 재배선 없음 (§5.8 ① 철회 유지).
 >
 > Claude Fable 5 / Claude Mythos 5의 사양 · API 동작 차이 · Claude Code 통합 · fz 생태계 적용 전략의 단일 참조.
 > 모델 무관 프롬프팅 원칙은 `prompt-optimization.md`, 하네스 설계는 `harness-engineering.md` 참조.
 >
-> **Sources (last audited: 2026-07-07) — Tier 1 only:**
+> **Sources (last audited: 2026-07-25) — Tier 1 only:**
 >
+> - **What's new in Claude Opus 5** (Anthropic, GA 2026-07-24) — platform.claude.com/docs/en/about-claude/models/whats-new-opus-5
+> - **Prompting Claude Opus 5** (Anthropic, live) — platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5
+> - **Effort** (Anthropic, live) — platform.claude.com/docs/en/build-with-claude/effort
+> - **Claude Platform release notes** (2026-07-24) — platform.claude.com/docs/en/release-notes/overview
 > - **Introducing Claude Fable 5 and Claude Mythos 5** (Anthropic, GA 2026-06-09) — platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5
 > - **Prompting Claude Fable 5** (Anthropic, live) — platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5
 > - **Claude Code: Model configuration** (Anthropic, live) — code.claude.com/docs/en/model-config
@@ -16,16 +20,17 @@
 
 ---
 
-## Opus 4.8 운용 (현행 기본 모델)
+## Opus 5 운용 (현행 기본 모델, 2026-07-24~)
 
 fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides/llm-references.md` §1.2·§4·§5 + `prompt-optimization.md` 참조 (중복 회피).
 
 | 항목 | 값 |
 |------|-----|
-| Model ID / Context | `claude-opus-4-8` · 1M tokens (기본). 가격은 §1 (모델 사양) 참조 |
-| Thinking | adaptive (`thinking: {type: "adaptive"}`) — Opus 4.8 자동 [verified: platform.claude.com/docs/en/build-with-claude/extended-thinking]. adaptive > extended thinking [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices] |
-| effort | 코딩/agentic = **`xhigh`** 권장(최소 `high`); shallow reasoning 시 프롬프팅 말고 effort↑; **`max` = "prone to overthinking, diminishing returns"** [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8] |
-| 구버전 제거 (Opus 4.8 only) | manual `budget_tokens`(400)·prefill(미지원)·`interleaved-thinking-2025-05-14` 헤더(ignored) [verified: claude-4-best-practices · extended-thinking] |
+| Model ID / Context | `claude-opus-5` · 1M tokens (**기본값이자 최대값**). 가격 **$5/$25** — Opus 4.8과 동일 |
+| Thinking | **기본 ON** — 파라미터 생략 시 adaptive 실행 (Opus 4.8은 생략 시 OFF였음). `{type:"adaptive"}`는 기본값과 동등. ⚠️ `max_tokens`는 **thinking+응답 합산** 하드캡 → 4.8 기준 타이트한 값은 **응답 절단** 위험 [verified: platform.claude.com/docs/en/about-claude/models/whats-new-opus-5] |
+| effort | 출발점 **`high`(기본)**; **`low`/`medium`을 비용·지연의 1차 레버**로; demanding coding/agentic만 `xhigh`; `max`는 무제한 지출 정당화 시. ⛔ **이전 모델 effort 값 재사용 금지 → fresh sweep** [verified: platform.claude.com/docs/en/build-with-claude/effort] |
+| thinking 비활성화 | `{"type":"disabled"}`는 **effort ≤ `high`에서만**. `xhigh`/`max`와 조합 시 **400**(요청 단위 검증) [verified: platform.claude.com/docs/en/release-notes/overview 2026-07-24] |
+| 구버전 제거 (Opus 5 only) | manual `budget_tokens`(400)·prefill(미지원)·sampling 파라미터(400)·`interleaved-thinking-2025-05-14`(ignored) + **[신설] 검증 지시**(over-verification)·**"생각하지 마라" 규칙**(태그 누출 증가)·**carried-over effort**. 상세 `llm-references.md` §5 |
 
 ---
 
@@ -42,27 +47,29 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 | GA | 2026-06-09 (Claude API, Claude Platform on AWS, Bedrock, Vertex AI, Foundry) |
 | Context window | **1M tokens (기본값이자 최대값)** |
 | Max output | 128K tokens/request |
-| 가격 | **$10 / $50 per MTok** (Opus 4.8 $5/$25의 정확히 2배) |
-| Tokenizer | Opus 4.8과 동일 — Opus 4.7/4.8에서 이전 시 토큰 수 거의 불변 |
+| 가격 | **$10 / $50 per MTok** (Opus 5 $5/$25의 정확히 2배 — Opus 5가 4.8과 동일 가격이라 배수 불변) |
+| Tokenizer | Opus 4.7에서 도입된 것과 동일 — Opus 4.7/4.8/**5**에서 이전 시 토큰 수 거의 불변 |
 | 데이터 보존 | **30-day retention 필수** — ZDR 조직은 모든 요청 400 |
 | Claude Mythos 5 | `claude-mythos-5` — 동일 능력/가격, **안전 분류기 없음**, Project Glasswing 한정 |
 
 [verified: platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5]
 
-⛔ **Fable 5는 기본 업그레이드 경로가 아니다**: "Migrate to Claude Fable 5 only when the user explicitly chose it. It is not the default Opus upgrade path" [verified: claude-api 번들 스킬 model-migration]. 일반 작업의 기본은 여전히 Opus 4.8.
+⛔ **Fable 5는 기본 업그레이드 경로가 아니다**: "Migrate to Claude Fable 5 only when the user explicitly chose it. It is not the default Opus upgrade path" [verified: claude-api 번들 스킬 model-migration]. 일반 작업의 기본은 **Opus 5**.
 
-## 2. Opus 4.8 대비 API 동작 차이
+> ⚠️ **2026-07-24 이후 tier 격차 재검토 필요**: Opus 5 발표문은 "a thoughtful and proactive model that comes close to the **frontier intelligence of Claude Fable 5 at half the price**" [verified: anthropic.com/news/claude-opus-5]. *근접*이지 동급은 아니나(발표문 자체가 생물학·공격적 사이버보안에서 Mythos 5에 뒤진다고 명시), **"Fable=최상위, Opus=수행"이라는 fz의 2-tier 전제는 비용·성능 근거가 이전만큼 자명하지 않다.** 판단 지점 fable 배선(§5.8 ④⑤)은 **측정 데이터로 재확인 후 결정** — 이 문서만으로 배선을 바꾸지 말 것.
+
+## 2. Opus 5 대비 API 동작 차이
 
 | 항목 | Fable 5 동작 | 위반 시 |
 |------|-------------|--------|
-| Thinking | **상시 활성** — `thinking` 파라미터 생략(또는 `{type: "adaptive"}`만 허용) | `disabled`/`budget_tokens` → 400 |
+| Thinking | **상시 활성 — 끄기 불가** (`thinking` 생략, 또는 `{type:"adaptive"}`만 허용). *Opus 5는 기본 ON이되 effort ≤ `high`에서 `disabled` 허용* — 여기서 갈린다 | `disabled`/`budget_tokens` → 400 |
 | Raw CoT | **절대 미반환** — `display: "summarized"`(요약) 또는 `"omitted"`(기본, 빈 문자열) | — |
 | 깊이 제어 | `output_config.effort`: `low`/`medium`/`high`/`xhigh`/`max` | — |
 | 샘플링 | `temperature`/`top_p`/`top_k` 제거 (4.7+ 동일) | 400 |
 | Prefill | 마지막 assistant-turn prefill 미지원 | 400 |
 | Refusal | 안전 분류기(공격적 사이버보안·생물학·reasoning 추출 대상)가 HTTP 200 + `stop_reason: "refusal"` 반환 가능. 출력 전 거부 = 과금 0 | — |
-| Fallback | 서버측 `fallbacks` 파라미터(beta) / SDK 미들웨어 / fallback credit으로 Opus 4.8 재시도 | — |
-| Prompt cache | 최소 캐시 prefix **2048 tokens** (Opus 4.8은 4096 — Fable이 더 짧은 프롬프트도 캐시) | — |
+| Fallback | 서버측 `fallbacks` 파라미터(beta) / SDK 미들웨어 / fallback credit으로 Opus 4.8 재시도. **2026-07-24 신설: `fallbacks:"default"`** — 거부 카테고리별 Anthropic 권장 폴백 자동 라우팅(모델 목록 직접 관리 불필요), 헤더 `server-side-fallback-2026-07-01` | — |
+| Prompt cache | 최소 캐시 prefix **512 tokens** — **Opus 5도 512로 동일**(4.8은 1024) [verified: platform.claude.com/docs/en/about-claude/models/whats-new-opus-5 "512 tokens, down from 1,024 on Claude Opus 4.8"]. ⚠️ *이전 판의 "Fable 2048 / Opus 4.8 4096"은 현행 공식 표와 불일치 — 2026-07-25 정정* | — |
 | Turn 길이 | 고난도 작업 단일 요청이 수 분(15분도 정상), 자율 런은 수 시간 — 타임아웃·진행 표시 설계 필요 | — |
 
 [verified: platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5 + claude-api 번들 스킬]
