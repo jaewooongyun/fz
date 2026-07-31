@@ -148,13 +148,17 @@ python3 -m scripts.run_loop \
 optimize에 `--full`을 추가하면 description 최적화에 더해 전체 eval 루프 실행:
 
 1. evals.json 생성 (test prompts + assertions)
-2. 서브에이전트로 with-skill vs without-skill 병렬 실행
+2. 서브에이전트로 with-skill vs baseline arm 병렬 실행 (baseline 정의는 `guides/skill-testing.md` §8 canonical)
 3. grader.md로 채점
 4. aggregate_benchmark.py로 benchmark.json 생성
 5. generate_review.py로 HTML 뷰어 제공
 6. 사용자 피드백 → 스킬 개선 → 반복
 
 > --full은 시간이 많이 소요되므로 주요 스킬 대규모 변경 시에만 권장.
+
+> ⛔ **격리 한계 (정직 고지)**: `--full`은 with-skill arm과 baseline arm을 **동일 부모 세션의 in-session 서브에이전트**로 스폰한다 (각 arm 별도 CLI 프로세스가 아님). 따라서 세션 레벨 플러그인·훅(always-on 룰셋 주입 등)이 **양쪽 arm에 동일 주입**되어 하드 격리가 불가하며, 결과는 **exploratory**로 취급한다 — "skill이 원인"이라 단정하려면 오염을 먼저 배제해야 한다.
+> - **baseline 정의**: `guides/skill-testing.md` §8 canonical 참조 (신규=without-skill / 기존 개선=old-skill).
+> - **오염 탐지·arm 격리 방법론 (canonical)**: `guides/skill-testing.md` §8 참조 — baseline arm이 skill·always-on 룰셋에 접근했는지 확인하는 방법·집계 계약은 §8이 single source. 진정한 프로세스 격리(arm별 `claude -p`)가 필요하면 별도 러너 사안 — 본 `--full` 범위 밖(D1).
 
 ## Quick Trigger Eval (benchmark용)
 
