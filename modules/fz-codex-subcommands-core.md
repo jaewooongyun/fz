@@ -31,7 +31,7 @@ cd "$GIT_ROOT" && codex exec review \
 
 **CLI 주요 플래그**: `-m`(모델), `-o`(파일 캡처), `--json`(JSONL), `--add-dir`(모노레포), `--ephemeral`(일회성)
 
-**`--add-dir` 패턴**: `SHARED_MODULES="$GIT_ROOT/TvingUI $GIT_ROOT/tving-common $GIT_ROOT/Managers"`. 모듈화 시 소비자 디렉토리도 포함: `$GIT_ROOT/Apps/Sources`.
+**`--add-dir` 패턴**: 프로젝트 `CLAUDE.md` `## Shared Modules`에 열거된 공유 모듈 경로를 조립한다 — `SHARED_MODULES="$GIT_ROOT/<모듈A> $GIT_ROOT/<모듈B> …"`. 모듈화 작업 시 **소비자 디렉토리도 포함**(예: 앱 소스 루트). ⛔ 섹션 미정의 시 하드코딩하지 말고 리포 구조에서 후보를 탐색해 사용자에게 확인.
 
 **⚠️ `review`는 flag-only** (G7/#7 회고 #8): `codex exec review`는 PROMPT positional을 받지 않는다 — 리뷰 대상 선택은 플래그(`--base`/`--uncommitted`)로만. 프롬프트 주입이 필요하면 `review` 서브커맨드가 아니라 `codex exec ... "PROMPT"`(verify 형식, §verify) 사용. `--uncommitted`와 PROMPT 문자열을 함께 주면 인자 충돌.
 

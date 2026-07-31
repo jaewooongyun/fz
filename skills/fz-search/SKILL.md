@@ -21,8 +21,8 @@ allowed-tools: >-
   Read, Grep, Glob, Workflow
 
 team-agents:
-  primary: null
-  supporting: [search-symbolic, search-pattern]
+  primary: null                                            # 단일 Primary 없음 — symbolic·pattern 대등 병렬
+  supporting: [search-symbolic, search-pattern, plan-structure]   # plan-structure = Stage 3 수렴 merge (fable)
 composable: true
 provides: [search-results, architecture-analysis]
 needs: [none]
@@ -261,13 +261,14 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
 > Cross-Verify 패턴 canonical: `modules/patterns/cross-verify.md` (보존 — 라운드 의미론은 스크립트가 구현).
-> 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+> 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern·**plan-structure** 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+> **모델 배정**: Stage 1·2는 `search-*`(sonnet 성격 — retrieval·breadth), **Stage 3 병합은 `plan-structure` 렌즈 + `fable`** — 3-Tier 정책의 *수렴 merge* 판단 지점 3곳 중 하나다(`scripts/lint-model-explicit.sh`의 `fable=3`에 계상).
 
 ### 실행 절차 (Lead)
 
 1. **args 조립**: `query`=탐색 질의 원문 / `codeContext`=탐색 허용 범위(경로·디렉토리 — 명시적으로 한정)
 2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/search-cross-verify.js', args })`
-   - Stage 1 독립 병렬(symbolic+pattern, 피어 미주입) → Stage 2 교차(FP 판정+보완) → Stage 3 병합(opus 언어 지시) → 등급은 스크립트 binary 규칙. 총 5-call
+   - Stage 1 독립 병렬(symbolic+pattern, 피어 미주입) → Stage 2 교차(FP 판정+보완) → **Stage 3 병합(`fable` — 수렴 merge 판단 지점)** → 등급은 스크립트 binary 규칙. 총 5-call
 3. **반환 처리**: `mode:'workflow'` → results(신뢰도 포함)를 출력 형식으로 정리 / `mode:'fallback'` → 기본 모드(순차) 수행 + 사유 experiment-log 기록
 4. **지표 기록**: `return.metrics`(agentCalls/nullCount/stages/fallback) + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-search 테이블
 

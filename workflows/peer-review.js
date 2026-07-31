@@ -8,7 +8,9 @@
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   deep=false → Tier 2 (Lite): Stage1 3-병렬만 (3-call). Confidence Matrix 미투표 — Lead 단순 병합.
 //   deep=true  → Tier 3 (Full): +Stage2 교차(arch↔quality) +Stage3 counter DA (6-call). Lead full Matrix.
-//   반환: { mode:'workflow', reviews:[...], crossAdjustments, counter, metrics } 또는 { mode:'fallback', reason, metrics }.
+//   반환(Tier 3): { mode:'workflow', tier, reviews:[...], issues, crossAdjustments:{archOnQuality,qualityOnArch},
+//                  strengthChallenges, distribution, metrics }  또는 { mode:'fallback', reason, metrics }.
+//     ⛔ `counter` 키는 없다 — counter DA 산출은 `strengthChallenges`로 반환된다.
 //   Workflow 외부(Lead 책임 유지): Confidence Matrix 계산(독립성 가중=판단) / origin severity 보정 /
 //     Codex DA(스크립트 밖 — Lead가 /fz-codex, cross-provider 스폰 금지 — 마이그레이션 결정) / dedup+투표 / wall-clock.
 //   base 원본은 Lead가 Gather에서 prefetch하여 basePath로 전달 (LB1 — 에이전트가 SendMessage로 요청하지 않음).

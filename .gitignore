@@ -18,3 +18,7 @@ uv.lock
 # fz 런타임 work dir + 원시 텔레메트리 (curated experiment-log.md만 추적)
 .fz-work/
 experiment-log-traces.jsonl
+
+# Claude Code 세션 산출물 — worktree는 리포 루트에 상주해 재귀 스캔을 오염시킨다
+# (예: `grep -r .` 이 worktree 사본까지 중복 계상 → 카운트 주장 왜곡)
+.claude/worktrees/

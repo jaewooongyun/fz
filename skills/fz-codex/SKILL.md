@@ -39,7 +39,7 @@ model-strategy:
 - **CLI** (`codex exec review`): git diff + `-o`/`--json` + `--add-dir` + 3-Tier 스킬 — review/check/final/commit
 - **CLI** (`codex exec`): 프롬프트 + `--output-schema` — verify/validate/drift/plan
 - **Plugin** (`/codex:*`): 설치 시 review/check/adversarial에 우선 사용. 백그라운드 Job 관리 (`status`/`result`)
-- **`--add-dir`**: 모노레포 공유 모듈 컨텍스트 확장 (TvingUI, tving-common 등)
+- **`--add-dir`**: 모노레포 공유 모듈 컨텍스트 확장 (대상은 프로젝트 `CLAUDE.md` `## Shared Modules` 기준)
 - **Codex 네이티브 스킬**: 3-Tier 디스커버리 (`~/.codex/skills/`) 역할 기반 매칭
 
 ## 사용 시점

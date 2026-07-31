@@ -39,11 +39,12 @@ model-strategy:
 - **사전 정의 파이프라인** (19개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
 - **동적 파이프라인**: `provides`/`needs` 그래프 기반 자동 구성 (폴백)
 - **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(fable) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
-- **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort xhigh) — fable 판단 지점 3곳과 별개
-- **3-Tier 모델**: fable(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3, effort xhigh) + sonnet(단순 작업). haiku 사용하지 않음
+- **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 현행 `xhigh`) — fable 판단 지점 3곳과 별개
+- **3-Tier 모델**: fable(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
+  > ℹ️ **effort (2026-07-25, Opus 5)**: 현행 배선은 전 호출 `xhigh` 단일값. Opus 5 공식 출발점은 **`high`(기본)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
 - **Codex 필수 참여**: 모든 TEAM 스킬에 Codex CLI 포함 → cross-model 상호검증
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
-- **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover는 `workflows/*.js` 결정적 Workflow, peer-review는 TeamCreate+SendMessage + Codex 활용
+- **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + Codex 교차검증
 
 ## 사용 시점
 
@@ -77,7 +78,7 @@ model-strategy:
 
 ## Prerequisites
 
-- TEAM 모드 사용 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (미설정 시 TeamCreate 실패)
+- TEAM 모드는 네이티브 **Workflow 도구** 가용 환경 필요 (미가용 시 SOLO 폴백). ⛔ `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`은 **TeamCreate 경로 전용**이며 Wave 4 전환 후 Workflow 경로에는 불필요
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -248,7 +249,7 @@ model-strategy:
 
 ```
 1. 파이프라인 스텝 → 필요 에이전트 식별
-2. 실질 생산 워커 판별 → opus 배정 (동시 ≤3, effort xhigh 명시)
+2. 실질 생산 워커 판별 → opus 배정 (동시 ≤3, effort 명시 의무 — 현행 `xhigh`, sweep 후 차등 배정 예정)
 3. 단순 작업 에이전트만 sonnet으로 스폰
 4. 정적 팀 패턴 매칭 → 일치 시 정적 사용
 5. 미일치 시 동적 구성 적용
@@ -429,7 +430,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 - 스킬 자체 로직 수행 (스킬 SKILL.md 지침에 위임)
 - 사용자 승인 없이 실행 (Phase 4 필수)
 - 코드를 직접 수정 (각 스킬에 위임)
-- opus 과다 사용 (실질 워커 동시 ≤3 · fable ≤1[Lead 제외] · 총 ≤4 — Lead는 fable이라 opus 카운트 제외. 전 워커 effort xhigh 명시. 비용 envelope ≈ Lead(fable) + opus 3 ≈ opus 5 equivalent — governance.md 상한 행 정합)
+- opus 과다 사용 (실질 워커 동시 ≤3 · fable ≤1[Lead 제외] · 총 ≤4 — Lead는 fable이라 opus 카운트 제외. 전 워커 effort 명시 의무(현행 `xhigh`). 비용 envelope ≈ Lead(fable) + opus 3 — governance.md 상한 행 정합)
 - haiku 모델 사용
 
 ## 에러 대응

@@ -98,7 +98,7 @@
 
 ### L-2: fz-code 구현시점 reuse 게이트 (41차 enforcement plan→code 이동)
 - 관측 #1: ASD-1674 (catch #3,6,7 — helper 중복 작성)
-- 내용: fz-code 구현 *전* TvingCore/TvingUtil/Apps Util grep 게이트 (현재 41차는 fz-plan에만 enforce)
+- 내용: fz-code 구현 *전* **공유 인프라 영역**(`CLAUDE.md ## Shared Modules`) grep 게이트 (현재 41차는 fz-plan에만 enforce)
 - generalize: **broad** (모든 helper 작성) | 과적합 위험: 低 (기존 방어 이동, 신규 규칙 아님)
 - 근거: [verified: fz-code/SKILL.md friction-detect에 reuse 항목 0건 — grep "reuse|코드반복|기존 helper" 결과]
 - ⚡ 조치 (2026-06-01): fz-code friction-detect에 **candidate 마찰 신호 추가**. candidate *추가*엔 Codex 불요 (41차 구조적 grep 검증 + 사용자 catch #3/#7 권위). 단 candidate→active *전환*엔 Codex verify 권장 (트랙 A). ledger=메모리 승격(트랙 B) 추적, friction 신호=code 시점 발화 (별개 레이어)

@@ -39,10 +39,11 @@ model-strategy:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → Phase 5 (3중 검증: Serena // /fz-codex review // /sc:analyze) → Phase 5.5 (/fz-codex validate) → Rate >= 80%? → Phase 7 완료 | Phase 6 (개선) → 반복
+> ⛔ Phase 0 (ASD Pre-flight) → Phase 5 (3중 검증: Serena // /fz-codex review // /sc:analyze) → Phase 5.5 (/fz-codex validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
 > 루프 프리미티브: Evaluator-Optimizer + Multi-Attempt Retry (H6, Inside the Scaffold)
 
-3중 검증(Claude+Codex+sc:analyze) + 역방향 검증 + Reflection Rate 정량화 (>=80% 통과).
+3중 검증(Claude+Codex+sc:analyze) + 역방향 검증 + Reflection Rate 정량화.
+⛔ **threshold gating은 `N≥10`에서만** — `N<10`은 `preliminary`(measurement only, verdict 보류)다. **정본 = `modules/cross-validation.md §Reflection Rate threshold`** (`:203` `N<10 → verdict 보류` · `:212` `N≥10에서만 ≥80% gating, N=0이면 vacuous pass`). 본 스킬은 정본을 인용하며 자체 임계를 정의하지 않는다.
 
 > 이론 근거: MAR — Multi-Agent Reflexion (arxiv 2512.20845) — **acting/diagnosing/critiquing/aggregating 역할 분리**가 단일 에이전트 self-review보다 정확도 높음. fz의 Claude(acting) + Codex(critiquing/diagnosing) + Lead(aggregating) 역할 분리와 구조적 정합.
 
@@ -213,7 +214,7 @@ fz-codex가 수행하는 작업:
 - JSON 응답 파싱 → Issue Tracker 자동 기록
 - 이슈 요약 반환
 
-> **Codex 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(Opus 4.8) 상속 — 소규모 diff에 opus는 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ Codex 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
+> **Codex 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=Fable 5) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ Codex 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
 >
 > **⛔ retain cycle 점검 (rank3b, 2026-06-18)**: fresh-context 검증자는 retain cycle 검사 시 `codex-skills/fz-reviewer/SKILL.md` Memory Management(closures capturing `self` without `[weak self]`)를 명시 적용한다 — Codex 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
 > **보조 이종 소스 (rank6)**: PR이 열려 있으면 `/fz` pr-comment-review로 CodeRabbit 코멘트를 보조 이종 소스로 활용 가능 (강제 아닌 Lead 판단).
@@ -331,10 +332,13 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 ### 반복 조건
 
 ```
-Reflection Rate >= 80%?
-├─ YES → Gate 5 통과 (완료)
-└─ NO → /ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
+N (Codex 제기 이슈 수) >= 10 ?
+├─ NO  → preliminary — Rate는 measurement only, verdict 보류 → Gate 5의 Rate 항목 N/A 처리
+└─ YES → Reflection Rate >= 80%?
+         ├─ YES → Gate 5 통과 (완료)
+         └─ NO  → /ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
 ```
+> 정본: `modules/cross-validation.md §Reflection Rate threshold`. ⛔ N<10에서 Rate 미달을 이유로 반복 루프를 돌리지 않는다 (통계적 소음).
 
 ### 절차
 
@@ -352,7 +356,7 @@ Reflection Rate >= 80%?
 ### Gate 5: Final Quality
 - [ ] 모든 Critical 이슈 수정 완료?
 - [ ] 최종 빌드 성공? (modules/build.md 절차)
-- [ ] Reflection Rate >= 80%?
+- [ ] Reflection Rate — **N≥10이면 ≥80%, N<10이면 `preliminary` 기록 후 N/A** (정본: `cross-validation.md §Reflection Rate threshold`)
 - [ ] 최대 반복 횟수 미초과?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
 
