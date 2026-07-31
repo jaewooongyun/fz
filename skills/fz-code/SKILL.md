@@ -145,9 +145,39 @@ model-strategy:
 
 ---
 
+## Phase 0.4: Plan Handoff Preflight
+
+> 발동: plan 기반 구현 해당 시. 탐색·단순 수정은 스킵.
+> ⛔ **Phase 0.5보다 먼저 실행** — Phase 0.5의 token 스캔과 아래 구조 검사가 이 복원 결과를 입력으로 받는다. 이후 절차에서 plan을 다시 로드하지 않는다(모든 복원 시도를 여기서 종료).
+
+1. **승인 plan 복원** — 아래 순서로 첫 성공을 채택한다:
+
+   | 모드 | 소스 |
+   |------|------|
+   | 동일 세션 연속 | 대화 컨텍스트 (별도 로드 불요) |
+   | ASD / NOTASK | `{WORK_DIR}/plan/plan-final.md` (WORK_DIR은 Gate 0에서 결정) |
+   | Serena fallback | `read_memory("fz:checkpoint:plan-final")` |
+
+   전 소스 실패 시 → plan 없는 구현으로 진행하되 **그 사실을 보고**한다 (차단 아님).
+
+2. **plan 구조 검사** (마찰 신호 — ⛔ Gate 차단 아님):
+   복원된 plan의 **작업 범위**(변경 파일·Step 기준)가 아래 요소를 건드리면 대응 결정이 plan에 있는지 확인한다.
+
+   | 작업 범위에 포함 | plan에 있어야 하는 결정 | Serena fallback 필드 |
+   |------|------|------|
+   | SwiftUI View | owner / availability / View 책임 | `swiftDecisions.swiftUI` |
+   | Concurrency (`actor`·`@MainActor`·async) | isolation 범위 | `swiftDecisions.isolation` |
+   | 패턴 변환 (마이그레이션·치환) | 원본 동작 보존 | `swiftDecisions.transform` |
+
+   누락 시 → 마찰 신호 **"plan 계약 미충족"** 보고 후 계속 (판단은 사용자).
+   ⛔ 이 검사는 D/E/F/G token 발견 여부와 **무관하게** 실행한다 — 결정이 빠진 plan은 token도 없으므로, token 게이팅 하에 두면 검사가 스스로 비활성화된다.
+
+---
+
 ## Phase 0.5: Swift Pattern Pre-detection (Swift/iOS 프로젝트 한정)
 
-> 발동: CLAUDE.md `## Architecture`가 Swift/iOS 지정 + plan에 D/E/F/G token 1건 이상 발견 시. 비Swift/iOS는 스킵.
+> 발동: CLAUDE.md `## Architecture`가 Swift/iOS 지정 + **Phase 0.4에서 복원된 plan**에 D/E/F/G token 1건 이상 발견 시. 비Swift/iOS는 스킵.
+> (token 게이팅은 `swift-pattern-detection.md` Read라는 **비싼 스캔**만 제어한다. 경량 구조 검사는 Phase 0.4가 무조건 수행.)
 > 본문: `modules/swift-pattern-detection.md` 참조 (Level 3) — 4 원칙(D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환) + 각 원칙 token + 발동 행동 + Few-shot. **G는 Phase 1.5 P3와 mirror로 cross-skill consistency 보장**.
 
 ### Gate 0.5: Swift Pattern Pre-detection 통과
@@ -186,7 +216,7 @@ model-strategy:
 1. **세션 감지**: 참조 `modules/session.md`
 
 1.5. **ASD 컨텍스트 로딩** (ASD 폴더 활성 시):
-   - `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
+   - plan-final: **Phase 0.4에서 복원된 것을 사용** — ⛔ 여기서 다시 로드하지 않는다 (늦은 로드는 Phase 0.4/0.5의 검사를 건너뛴 뒤 plan을 얻는 순서 역전을 만든다)
    - `{WORK_DIR}/plan/direction-challenge.md` 읽기 → 방향 판정 + 대안 비교 (있으면)
    - `{WORK_DIR}/discover/discover-journal.md` 읽기 → 제약 조건 복원 (있으면)
    - `{WORK_DIR}/discover/discover-code.md` 읽기 → mid-pipeline discover 결과 (있으면)
@@ -212,7 +242,7 @@ model-strategy:
    | 마찰 신호 | 감지 기준 | 의미 |
    |----------|----------|------|
    | 분기 폭증 | 같은 대상에 대한 switch/if/enum case 3개+ | 추상화가 변형을 통합하지 못함 |
-   | 코드 반복 | 유사 구조의 코드를 복사-수정 3회+ | 공통 추상화 필요 |
+   | 코드 반복 | 유사 구조의 코드를 복사-수정 3회+ (또는 편집으로 형제 함수 N개가 near-identical로 **수렴** — 편집 *후* post-diff 재스캔 *[candidate: 1 session — TVG-3131]*) | 공통 추상화 필요. 내 편집이 만든 중복 정리는 drive-by 아님(편집의 완결) |
    | 소비자 판별 로직 | ViewModel/Listener에 "어떤 X인지" 판별 코드 발생 | 하위 복잡도가 상위로 전이됨 |
    | workaround | 계획에 없던 우회 코드 작성 | 설계와 현실의 불일치 |
    | 잔존 패턴 | Plan의 Anti-Pattern Constraints에 명시된 금지 패턴이 기존 코드에 여전히 존재 | 리팩토링 미완성 — 해당 패턴 제거/대체 필요 |
@@ -241,7 +271,7 @@ model-strategy:
    | 핵심 시나리오 보류 | PR이 해결하려는 원래 문제(버그, 크래시)의 재현 시나리오 중 하나가 "다음 PR에서 수정"으로 보류됨. 특히 race condition 수정에서 경합 시나리오 일부만 해결 | PR 목표와 보류 시나리오를 대조. 원래 버그가 보류 시나리오에서 재현 가능하면 → 현재 PR에서 해결 필수 또는 AskUserQuestion |
    | Redundant Import | 새 파일 작성 시 추가하는 각 `import {Module}` 문에 대해 그 모듈의 알려진 심볼이 파일 내에서 grep 0건 | 형제 파일 패턴 답습 의혹 (cargo-cult). 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과이며, 새 파일은 *자신의 사용 심볼*로 자체 정당화 필요. 검증: 새 파일 작성 후 각 import에 대해 `Grep("ModuleName\.\w+\|<known_typealias>")` 실행 → 0건이면 마찰 보고 (제거/유지 결정은 사용자/Codex 최종) |
    | Swift Naming 위반 *[candidate: 1 session evidence]* | Swift/iOS 프로젝트에서 새 helper/method/type 이름 또는 주석이 (a) 반환값 있는데 동사형 (b) `X or Y` 형태 (예: `appOrLog`, `getOrCreate`) (c) 부수 효과(log/persist/dispatch)를 이름에 포함 (d) `-ed/-ing` rule 위반 (mutating ↔ non-mutating 짝 부재) (e) 사용자 표현 어휘 무시 (f) 도메인 타입/메서드/주석에 API 버전(v2/v3)·transport 세부 박힘 (예: `WatchHistoryV3Response`·"v3" 주석) | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). Apple Swift API Design Guidelines 미준수 후보 시그널. 검증: 작성 *전* self-check — 축(a~e)는 helper/method 이름, 축(f)는 타입/주석까지(주석은 `Grep "[vV][0-9]"` 병행). 위반 시 noun phrase + 단일 의미로 재명명(`appOrLog`→`verifiedApp`), 축(f)는 버전 제거(오버로드로 공존). ⚠️ **evidence 분리**: 축(a~e)=ASD-1366, 축(f)=ASD-1794 (카운트 혼합 금지). 동기 편집: `modules/review-checks.md` 4-N. 참조: `feedback_swift_naming_conventions.md` + `feedback_no_api_version_in_domain_names.md` + promotion-ledger L-8 |
-   | 기존 인프라 미확인 helper/공용모델 *[candidate: 1 session evidence]* | (helper) 새 helper(포맷/변환/날짜·시간·숫자→문자열 류) 작성 *전* TvingCore/TvingUtil/Apps Util 3영역 grep/symbol search 미실행 · (공유 도메인 모델) label/badge/price/grade 등 공유 개념 필드를 DTO/Entity에 추가하며 형제의 flat 로컬 복사본을 쓰기 *전* 대표 소비자(포스터/밴드)가 그 개념을 어떤 공용 타입으로 쓰는지 grep 미실행 | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 41차 Reuse-First가 *plan 시점*엔 발화하나 *code 시점*엔 무방비. ⚠️ 41차 신호는 **명명 기반**(`universal*/generic*/common*`)이라 `ContentLabelDTO`처럼 명명은 평범하나 실제 공용인 모델을 놓침 → **사용처 기반** 보강("대표 소비자가 이 개념을 어떤 타입으로 쓰나" grep). thought-terminator("그 공용 타입은 쓰기 불편/취약") 발생 시 실제 사용 경로(`.toEntity()` 등) 확인 후에만 기각. ⚠️ **evidence 분리**: helper=ASD-1674(#3/#7), 공용모델=ASD-1794(#10 — 카운트는 ledger L-2 판정, 현재 보류). memory-guide "same failure mode → merge"로 단일 신호 유지. 참조: `modules/promotion-ledger.md` L-2 |
+   | 기존 인프라 미확인 helper/공용모델 *[candidate: 1 session evidence]* | (helper) 새 helper(포맷/변환/날짜·시간·숫자→문자열 류) 작성 *전* **공유 인프라 영역**(프로젝트 `CLAUDE.md` `## Shared Modules` 지정 — 미정의 시 리포 루트에서 공용 유틸 디렉토리 후보를 grep으로 탐색) grep/symbol search 미실행 · (공유 도메인 모델) 공유 개념 필드(라벨/배지/가격/등급 등 여러 화면이 공유하는 개념)를 DTO/Entity에 추가하며 형제의 flat 로컬 복사본을 쓰기 *전* **대표 소비자**가 그 개념을 어떤 공용 타입으로 쓰는지 grep 미실행 | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 41차 Reuse-First가 *plan 시점*엔 발화하나 *code 시점*엔 무방비. ⚠️ 41차 신호는 **명명 기반**(`universal*/generic*/common*`)이라 `ContentLabelDTO`처럼 명명은 평범하나 실제 공용인 모델을 놓침 → **사용처 기반** 보강("대표 소비자가 이 개념을 어떤 타입으로 쓰나" grep). thought-terminator("그 공용 타입은 쓰기 불편/취약") 발생 시 실제 사용 경로(`.toEntity()` 등) 확인 후에만 기각. ⚠️ **evidence 분리**: helper=ASD-1674(#3/#7), 공용모델=ASD-1794(#10 — 카운트는 ledger L-2 판정, 현재 보류). memory-guide "same failure mode → merge"로 단일 신호 유지. 참조: `modules/promotion-ledger.md` L-2 |
    | 표면 churn *[candidate: 1 session evidence]* | 동일 UI 속성/레이아웃 값(좌표·offset·margin·spacing 등) 또는 **설계 원칙(레이어 소속·필드 포함/제외·네이밍)**을 *2회+* 변경 (예: mediaType 확장→축소→재확장, lastPlayTime 유지→제거→복원) | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 반응적 재구현 신호. 2회+ 변경 시 → 코드 중단 → trade-off table로 모든 제약 동시 비교 → 사용자 결정 후 1회 구현. **principle-lock**: 레이어/네이밍 원칙 flip 전 "새 증거인가, 국소 재판단인가?" 확인 — 국소 재판단이면 원칙 재확인 후 유지. 비판을 반대편 flip 신호로 오인 금지(요구사항 기준 평가). ⚠️ **evidence 분리**: UI값=ASD-1674(#13), 설계원칙 flip=ASD-1794(#9 — 카운트는 ledger L-3 판정, 현재 보류). 참조: `modules/promotion-ledger.md` L-3 + 31/33/40차 |
    | figma 수치 미측정 *[candidate: 2 session evidence]* | UI 레이아웃 수치(spacing/margin/offset/size/radius/opacity)·색(node fill ≠ TDS 눈대중)·텍스트 style-run({tsN} fill ≠ base fill)·정렬(컨테이너 alignItems/justifyContent) 작성·수정 시 figma 노드 측정값과 1:1 대조 안 함 (사전 토큰 테이블을 exhaustive로 신뢰 → 누락 항목 원본값 답습 포함; 컨테이너 노드의 gap/itemSpacing도 별도 측정). figma raw 노드 구조 데이터(fills/opacity/childOrder=z-order) 존재 시 그 값 그대로 적용 — render 눈대중 override 금지. | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 23차 figma 정밀이 *plan 시점 토큰 테이블*엔 발화하나 *code 시점 개별 수치*엔 무방비. figma MCP 있으면 flag-and-defer 금지 즉시 측정. ⚠️ figma 노드가 구조 데이터 없는 flattened IMAGE/SVG일 때 frame/레이아웃·정렬 변경 *여부* 판정은 AI 한계(42차) — 디자이너 확인 (구조 데이터 존재 노드의 값 읽기는 결정론적 대조 대상). 참조: `modules/promotion-ledger.md` L-1 + retrospective catch #8/#19/#20·ASD-1718 #1/#2/#3/#4/#9 |
    | figma 텍스트 미대조 *[candidate: 2 session evidence]* | 기존 화면/컴포넌트 재사용 시에도 버튼·라벨·알럿 텍스트를 figma 문자열과 전수 대조 안 함 (기존 코드 문구 답습) | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 1674#2 + 1718#5 2세션 연속 [verified] — text는 측정이 아닌 *대조* 차원, figma 수치 신호와 별도. 참조: retrospective catch #5/#8 + ASD-1674 catch #2 |

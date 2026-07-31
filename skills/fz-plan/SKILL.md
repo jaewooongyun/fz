@@ -102,7 +102,11 @@ model-strategy:
 ### 실행 절차 (Lead)
 
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/plan/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
-2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
+1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**):
+   프로젝트 지침 전체(CLAUDE.md·AGENTS.md 등 peer 파일 **모두**)에서 4축을 추출한다 — `architecturePattern` / `uiStack` / `dependencyDirection` / `naming`.
+   - 미확정 축 → `null`. 코드 실측(grep) 1회로 보완 시도하고, 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
+   - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / Codex)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
+2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/plan-collaborative.js', args })`
    - Stage 0 direction(fable, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2 — 반박은 opus) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(opus) → Stage 3 CC 교차(edge↔impact, opus) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증(opus). 9-11 call
 4. **반환 처리**:
@@ -165,7 +169,7 @@ model-strategy:
 ### Gate 0b: Context Ready
 - [ ] 프로젝트 활성화 완료?
 - [ ] 대상 심볼 구조 파악?
-- [ ] 이전 컨텍스트 로드? (해당 시)
+- [ ] 이전 컨텍스트 로드 + 아키텍처 제약 추출·conflict 상태 확인? (각각 해당 시)
 
 ---
 
@@ -381,9 +385,12 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
    - 현재 계획으로 구현 진행
    - 추가 논의
 
-4. **⛔ 수정 계획 기록** (항상 — compact recovery 필수):
-   - ASD 활성: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` 복사 + `index.md` 업데이트
-   - 비ASD: `write_memory("fz:checkpoint:plan-final", "최종 계획: Steps {N}개. 피드백 반영: {요약}. verdict: approved")`
+4. **⛔ 계획 기록** (항상 — compact recovery 필수 + `/fz-code` Phase 0.4 핸드오프 소스):
+   ⛔ **이슈 0건 승인이어도 이 기록은 발화한다.** `### Gate 2 전제조건`이 본 Phase보다 앞에 있어, 피드백이 없으면 본 Phase를 건너뛰어 `plan-final`이 생성되지 않는 경로가 생긴다.
+   - **WORK_DIR 존재(ASD 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` 복사 + `index.md` 업데이트
+   - **Serena fallback**: `write_memory("fz:checkpoint:plan-final", …)` — ⛔ 요약 문자열이 아니라 **계약 필드**를 담는다:
+     `{steps:[{id,title,files,verify}], swiftDecisions:{swiftUI,isolation,transform}, rtm:[…], verdict}`
+     (요약만 저장하면 `/fz-code` Phase 0.4의 구조 검사가 판정 불가)
 
 5. **Refactoring Mode 감지 (P0-light)**: intent-triggers에 리팩토링/치환/흡수/migration 매칭 시 AskUserQuestion 1회 — "이 작업은 리팩토링 감지. refactoring-aware 분류(Q-S5 Appendix 활성)를 적용할까요?" 사용자 예 시 Q-S5 활성, 아니오 시 기존 flow.
 

@@ -4,7 +4,10 @@
 //   표준 패턴 3종 적용. 대형 입력(코드 컨텍스트)은 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md 절차): Lead가 codeContext 요약을 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/plan-collaborative.js',
-//       args: { requirement, codeContextPath, constraintsKnown, intentContext?, discoverJournalPath? } })
+//       args: { requirement, codeContextPath, constraintsKnown, archConstraints?, intentContext?, discoverJournalPath? } })
+//   archConstraints = { architecturePattern, uiStack, dependencyDirection, naming, conflicts } — typed 아키텍처 객체.
+//     축은 미확정 시 null. 소스 간 모순 축도 null + conflicts[]에 보존(자동 승자 선정 안 함 — 런타임 식별 불가).
+//     CTX에 포함되어 Stage 0/1/2/4에 상속되고, CTX를 쓰지 않는 Stage 3·5에는 ARCH_CTX로 직접 전달된다.
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', plan: PlanSchema, directionVerdict, directionAlternatives, metrics }
 //     | { mode:'direction_escalation', verdict, alternatives, rebuttal, metrics } → Lead가 사용자 확인 (대화는 Workflow 밖)
@@ -114,7 +117,7 @@ const RecheckSchema = {
 const OVERRIDE =
   '[Workflow 모드 오버라이드] P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시는 적용하지 않는다. ' +
   '에이전트 정의의 Phase 절차·ASD 폴더·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
-  '이 프롬프트의 [요구사항]/[코드 컨텍스트]/[기지 제약]만이 과제의 전부다. ' +
+  '이 프롬프트의 [요구사항]/[코드 컨텍스트]/[기지 제약]/[아키텍처 제약]만이 과제의 전부다. ' +
   '무관한 작업 폴더(ASD-*, 토픽 폴더 등)를 읽지 말 것. 파일 접근은 명시된 경로와 그 안에 나열된 파일, 그리고 프롬프트가 허용한 모듈 문서만. ' +
   '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. ' +
   '실행 제안 금지: git 상태변경(commit/push 등)·raw codex exec는 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
@@ -158,7 +161,16 @@ if (!input || !input.requirement || !input.codeContextPath) {
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: metrics(0) }
 }
 
-const CTX = `[요구사항] ${input.requirement}\n[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드)\n[기지 제약] ${JSON.stringify(input.constraintsKnown || [])}` +
+// archConstraints = typed 아키텍처 객체(4축 + conflicts). constraintsKnown(배열형 일반 제약)과 타입·책임 분리.
+// 미전달 시 ARCH_CTX === '' → 프롬프트 무변화 (빈 값 렌더 안 함).
+const AC = input.archConstraints || null
+const ARCH_CTX = AC ? `\n[아키텍처 제약] ${JSON.stringify({
+  architecturePattern: AC.architecturePattern, uiStack: AC.uiStack,
+  dependencyDirection: AC.dependencyDirection, naming: AC.naming,
+  conflicts: AC.conflicts,
+})}` : ''
+
+const CTX = `[요구사항] ${input.requirement}\n[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드)\n[기지 제약] ${JSON.stringify(input.constraintsKnown || [])}` + ARCH_CTX +
   (input.intentContext ? `\n[과제 목적] ${input.intentContext}` : '') +
   (input.discoverJournalPath ? `\n[discover 산출물] ${input.discoverJournalPath} (참고 — 전제 아님, 🔒불변 조건만 제약 채택)` : '')
 
@@ -202,7 +214,7 @@ const DRAFT_CTX = `${CTX}\n[계획 초안] ${JSON.stringify(draft)}`
 const [impact, edge, arch] = await parallelWithRetry([
   () => callAgent(
     `${OVERRIDE}\n[역할] 영향 범위 분석가(plan-impact 렌즈) — Exhaustive Impact Scan a-f\n` +
-    `(참조 허용: /Users/jaewoongyun/dev/fz-plugin/modules/plan-deep-planning.md — Scan 절차 정의)\n${DRAFT_CTX}\n` +
+    `(참조 허용: {플러그인 루트}/modules/plan-deep-planning.md — Scan 절차 정의)\n${DRAFT_CTX}\n` +
     `[목표] 텍스트 전수 검색 + 소비자 + dead code + 숨은 의존성. 각 항목 evidence 인용.`,
     { label: 'stage2-impact', agentType: 'fz:plan-impact', model: 'opus', effort: 'xhigh', schema: ImpactSchema }),
   () => callAgent(
@@ -227,11 +239,11 @@ let edgeOnImpact = null
 if (impact && edge) {
   const cc = await parallel([
     () => callAgent(
-      `${OVERRIDE}\n[역할] 영향 범위 분석가 — CC 교차\n[경계 케이스] ${JSON.stringify(edge.edgeCases)}\n[기존 영향 범위] ${JSON.stringify(impact.impactFiles)}\n` +
+      `${OVERRIDE}\n[역할] 영향 범위 분석가 — CC 교차\n[경계 케이스] ${JSON.stringify(edge.edgeCases)}\n[기존 영향 범위] ${JSON.stringify(impact.impactFiles)}${ARCH_CTX}\n` +
       `[목표] 각 경계 케이스가 영향 범위 내 어느 파일에서 발생하는지 연쇄 발견 (links: sourceId=E:id) + 영향 범위 추가분.`,
       { label: 'stage3-impact-on-edge', agentType: 'fz:plan-impact', model: 'opus', effort: 'xhigh', schema: CrossSchema }),
     () => callAgent(
-      `${OVERRIDE}\n[역할] 경계 케이스 발굴자 — CC 교차 (입력 기반 — 제공된 영향 범위 데이터에서만 추론)\n[영향 범위] ${JSON.stringify(impact.impactFiles)}\n[숨은 의존성] ${JSON.stringify(impact.hiddenDependencies)}\n[기존 케이스] ${JSON.stringify(edge.edgeCases)}\n` +
+      `${OVERRIDE}\n[역할] 경계 케이스 발굴자 — CC 교차 (입력 기반 — 제공된 영향 범위 데이터와 아키텍처 제약에서만 추론; 코드 컨텍스트 Read·독립 탐색 금지)\n[영향 범위] ${JSON.stringify(impact.impactFiles)}\n[숨은 의존성] ${JSON.stringify(impact.hiddenDependencies)}\n[기존 케이스] ${JSON.stringify(edge.edgeCases)}${ARCH_CTX}\n` +
       `[목표] 영향 범위에서 파생되는 추가 경계 케이스 (additions — 기존 미포함만).`,
       { label: 'stage3-edge-on-impact', agentType: 'fz:plan-edge-case', model: 'opus', effort: 'xhigh', schema: CrossSchema }),
   ])
@@ -256,8 +268,8 @@ if (!plan) { fallbackCount += 1; return { mode: 'fallback', reason: 'integrate n
 // ════════ Stage 5: 재검증 (collaborative Round 2 — 잔여는 반환, 수정 루프는 Lead 층) ════════
 phase('Stage 5: 아키 재검증')
 const recheck = await callAgent(
-  `${OVERRIDE}\n[역할] 아키텍처 검증자 — 재검증\n[1차 검증 결과] ${JSON.stringify(arch)}\n[최종 계획] ${JSON.stringify(plan)}\n` +
-  `[목표] 1차 피드백 반영 여부 + 잔여 이슈. 각 잔여에 archVerdict(must-fix/optional/disagree) 마커 — 합의/불합의 명시.`,
+  `${OVERRIDE}\n[역할] 아키텍처 검증자 — 재검증\n[1차 검증 결과] ${JSON.stringify(arch)}\n[최종 계획] ${JSON.stringify(plan)}${ARCH_CTX}\n` +
+  `[목표] 1차 피드백 반영 여부 + 잔여 이슈. [아키텍처 제약]이 있으면 그것이 프로젝트 준수 재검증의 직접 근거다. 각 잔여에 archVerdict(must-fix/optional/disagree) 마커 — 합의/불합의 명시.`,
   { label: 'stage5-recheck', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: RecheckSchema })
 if (!recheck) log('WARN stage5 null — 재검증 미수행 (unresolvedPeerIssues 빈 채 반환)')
 
