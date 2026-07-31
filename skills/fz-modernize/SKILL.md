@@ -19,7 +19,7 @@ intent-triggers:
   - "최신화|모더나이제이션|모더나이즈|modernize"
   - "가이드 업데이트|문서 갱신|문서 업데이트|reference 업데이트"
   - "stale 정리|deprecated 정리|구버전 정리"
-  - "Opus.*4\\.\\d|GPT.*5\\.\\d|새 모델 출시|최신 모델"
+  - "[Oo]pus ?-?5|[Oo]pus.*4\\.\\d|[Ss]onnet ?-?5|[Ff]able ?-?5|GPT.*5\\.\\d|새 모델 출시|최신 모델"
 model-strategy:
   main: opus
   primary-worker: opus
@@ -44,7 +44,7 @@ model-strategy:
 ## 사용 시점
 
 ```bash
-/fz-modernize "fz 가이드 7개를 Opus 4.8 출시 후 최신화"          # → full 파이프라인
+/fz-modernize "fz 가이드 8개를 Opus 5 출시 후 최신화"          # → full 파이프라인
 /fz-modernize light "그냥 가볍게 최신화"                       # → Phase 1+2 + Codex micro-eval (40차 simplified mode, 카운터 1 소비)
 /fz-modernize probe "guides/harness-engineering.md"           # → Phase 1만
 /fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
@@ -162,23 +162,33 @@ model-strategy:
 
 ### 절차
 
-1. **grep으로 stale 패턴 추출**:
+1. **최신성 lint 실행 (기계 탐지 — 선행 의무)**:
    ```bash
-   grep -nE "\[미검증|미검증:|Deprecated|deprecated|last audited|outdated" guides/*.md
-   # 모델 패턴 변수 분리 (새 모델 출시 시 1곳만 갱신)
-   MODEL_PATTERN="Opus [0-9]+\.\d|GPT-[0-9]+\.\d|Sonnet [0-9]+\.\d|Claude [0-9]+\.\d|Haiku [0-9]+\.\d"
-   grep -nE "$MODEL_PATTERN" guides/*.md
+   python3 scripts/lint_doc_freshness.py --days 90
+   ```
+   - 산출: `missing-audit-date`(외부 출처 인용하나 감사일자 없음) · `stale-audit`(경과 초과) · `stale-model-ref`(구세대 모델명만 있고 현행 미언급)
+   - **현행 모델명은 `guides/llm-references.md`의 `모델 정책: <X> only`에서 자동 파싱**(SSOT) — 새 모델 출시 시 그 한 줄만 갱신하면 lint가 따라온다
+   - ⛔ **한계**: 최신성 ≠ 정확성. lint가 clean이어도 내용 검증은 별도 (Phase 1 probe 소관)
+   > 본 lint가 기존 `last audited` grep + `MODEL_PATTERN` grep을 대체한다 (수동 2건 → 결정론적 1건).
+
+2. **lint 미포괄 패턴 grep** (태그·인용):
+   ```bash
+   grep -nE "\[미검증|미검증:|Deprecated|deprecated|outdated" guides/*.md
    grep -nE "arxiv|arXiv" guides/*.md
    ```
-2. **각 stale 항목 → 해소 자료 매핑**:
+3. **각 stale 항목 → 해소 자료 매핑**:
    - probe-report의 어느 자료로 해소?
    - A1 직접 진술 가능? A5 해석으로 supporting? 또는 partially-verified?
-3. **`audit/audit-report.md` 작성** (template: `templates/audit-report.md`)
+4. **`audit/audit-report.md` 작성** (template: `templates/audit-report.md`)
    - 가이드별 변경 영향 표 (LOC 예상)
    - 미검증 태그 line 단위 처리 결정
    - Anti-Pattern Constraints 사전 식별
+5. **갱신한 파일에 감사일자 기록**: 외부 출처를 실제로 대조한 파일에만 `> **Sources (last audited: YYYY-MM-DD — {감사 축}):** ...` 헤더 갱신/추가.
+   - ⛔ **대조하지 않은 파일에 날짜를 넣지 말 것** — 하지 않은 감사를 주장하는 것이며 lint의 목적을 무력화한다. 미대조 파일은 lint 백로그로 남긴다.
+   - 감사 축을 명시할 것(예: `모델 사실 축`) — 무엇을 확인했는지 없으면 다음 세션이 "전부 확인됨"으로 오독한다
 
 ### Gate 2: Audit Complete
+- [ ] **lint 실행 완료? 신규 `stale-model-ref` 0건?** (`missing-audit-date` 잔존은 백로그로 허용 — 단 이번에 갱신한 파일은 해소 의무)
 - [ ] 미검증 태그 전수 식별?
 - [ ] 각 line별 처리 결정 (verified/partially-verified/community/유지)?
 - [ ] 가이드별 LOC 예상?
@@ -370,7 +380,7 @@ codex exec \
 
 ```
 예시 1 — full 파이프라인:
-  /fz-modernize "fz 가이드 7개를 Opus 4.8 출시 후 최신화"
+  /fz-modernize "fz 가이드 8개를 Opus 5 출시 후 최신화"
   → ASD 폴더 자동 생성
   → Phase 1 (Probe): WebSearch 5건 + Tier 1+2 분류
   → Phase 2 (Audit): grep으로 미검증 8곳 식별
@@ -424,6 +434,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 - verify-evidence-matrix.md 갱신
 - 사용자 합의 기반 깊이 제한
 - **light 모드 (40차)**: 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 시 Phase 1+2 + Codex micro-eval만 실행 (카운터 1 소비)
+  - ⛔ 단 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**(`modules/cross-validation.md §Coverage Gate`)는 light에서도 **생략 불가** — light는 절차 생략이지 검증 생략이 아니다. 본 스킬은 *최신성 전수 판정*을 산출하므로 특히 해당한다
 
 **Will Not**:
 - 본문 단락 통째 재구성 (AC1 위반)

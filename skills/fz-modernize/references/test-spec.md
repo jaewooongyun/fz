@@ -8,7 +8,7 @@
 |------|------|------|
 | "fz 가이드 7개 최신화해줘" | trigger | 핵심 유스케이스 — description '예: 최신화' |
 | "프롬프트 최적화 가이드 문서 갱신해줘" | trigger | description '예: 문서 갱신' |
-| "Opus 4.8 출시됐는데 가이드 모더나이제이션 해줘" | trigger | description '예: 모더나이제이션' + 새 모델 출시 어휘 |
+| "opus5 나왔는데 가이드 모더나이제이션 해줘" | trigger | description '예: 모더나이제이션' + 새 모델 출시 어휘. **소문자·붙임 표기**(`opus5`)는 실사용 형태 — 2026-07-25 트리거 정규식 버그의 회귀 케이스 |
 | "harness-engineering.md stale 항목 정리해줘" | trigger | description '예: stale 정리' |
 
 **should-NOT-trigger (≥3)**
