@@ -11,7 +11,7 @@
 // [설계 — modules/patterns/cross-verify.md 평탄화]
 //   Stage1 독립 병렬: search-symbolic(심볼) + search-pattern(텍스트) — Round 1 독립성 구조 보장.
 //   Stage2 교차: 각자 상대 결과를 받아 FP 판정/보완 (cross-verify Round 2 동형).
-//   Stage3 병합: opus agent 언어 지시 (동일성 판정 = 해석 작업 — §11/§12 분류).
+//   Stage3 병합: plan-structure 렌즈 + fable (동일성 판정 = 해석 작업 — §11/§12 분류). 3-Tier 수렴 merge 판단 지점.
 //   등급 부여: 스크립트 binary 규칙 — ★★★ 양쪽 발견 / ★★ 단독+교차확인 / ★ 단독+교차미확인
 //     (cross-verify.md 신뢰도 표의 규칙은 명문 [verified] — 부여 주체는 Lead→스크립트 이관 [design: calibration 확인 대상]).
 //   budget 가드: 해당 없음 — 고정 5-call(가변 fan-out 없음). §12 거버넌스 단서 참조.
