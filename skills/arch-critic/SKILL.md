@@ -327,11 +327,11 @@ severity major 이상 아키텍처 이슈에 대안 비교표 필수 포함:
 
 분석 완료 후 `${WORK_DIR}/arch-critic-result.json`에 저장:
 
+> ⛔ `agent_status`·`status_reason`은 **넣지 않는다** — `workflows/peer-review.js`의 `PeerReviewSchema`가 `['issues','strengths','overall_assessment']`만 받는다. 부분 분석 상황은 `overall_assessment`에 서술한다. (`agent` 키는 스크립트가 주입한다.)
+
 ```json
 {
   "agent": "review-arch",
-  "agent_status": "ok | partial | failed",
-  "status_reason": "정상 | pre-cache 부분 실패, import_graph 누락",
   "issues": [
     {
       "id": "ARCH-001",

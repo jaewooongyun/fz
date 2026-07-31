@@ -171,7 +171,7 @@ var body: some View {
 
 symbols.json의 `protocol_conformers` 사용:
 - Protocol signature 변경 시 모든 conformer 탐지
-- 미탐지 conformer가 있으면 `agent_status: partial`로 보고
+- 미탐지 conformer가 있으면 `overall_assessment`에 "conformer 일부 미탐지 — 부분 분석"으로 명시 (⛔ `agent_status` 필드는 스키마에 없다)
 
 ```swift
 // 예시: Protocol에 필수 메서드 추가
@@ -383,11 +383,11 @@ func routeToDetail() {
 
 분석 완료 후 `${WORK_DIR}/code-auditor-result.json`에 저장:
 
+> ⛔ `agent_status`·`status_reason`은 **넣지 않는다** — `workflows/peer-review.js`의 `PeerReviewSchema`가 `['issues','strengths','overall_assessment']`만 받는다. 부분 분석 상황은 `overall_assessment`에 서술한다. (`agent` 키는 스크립트가 주입한다.)
+
 ```json
 {
   "agent": "review-quality",
-  "agent_status": "ok | partial | failed",
-  "status_reason": "정상 | protocol_conformers 누락으로 부분 분석",
   "issues": [
     {
       "id": "CODE-001",
