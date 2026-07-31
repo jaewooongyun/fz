@@ -56,6 +56,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - TODO/FIXME가 실제로 불가능한 작업인가, 이미 가능한 작업을 유보하는가? (SDK 설치 후 "전환 예정" 등)
 - 래퍼 함수의 시그니처 파라미터가 내부 호출에 모두 전달되는가? (파라미터 미전달 = 무효화 버그)
 - **Base class init의 optional 파라미터가 subclass에서 전달되는가?** (default nil = dependency 미전달 = 기능 무효화. 컴파일러 미탐지)
+- ⚠️ **[candidate — 비차단 관찰, 활성 강제 X, 5 sessions 관측 후 active 재판정]** 활성 프로젝트의 CLAUDE.md/guidelines가 **"미래 변경 주석에 검증 가능한 트리거를 요구"하는 조항을 실제 선언·인용한 경우에만** 관찰: 미래 변경을 주장하는 주석(`TODO`/`FIXME`/`for now`/`later`/`필요 시`)이 검증 가능한 트리거(코드·테스트·운영지표 — 예: `N>1000일 때`, `p95 latency 초과 시`)를 명시하는가? 없으면 rot 위험 → `Comment Rot Risk | WARNING | 근거(프로젝트 정책 파일·절 인용) | 제거 또는 자립적 재작성`. 티켓ID/세션차수/시안은 트리거 근거 아님. (표기 근거: `guides/skill-authoring.md` §Sibling-Convention Check)
 
 ### 7. Source Fidelity (리팩토링/마이그레이션 컨텍스트에서만)
 
