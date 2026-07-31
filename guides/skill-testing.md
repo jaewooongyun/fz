@@ -2,7 +2,7 @@
 
 > fz-* 스킬의 품질을 측정 가능하게 보장하는 테스트 방법론.
 > **근거**: Anthropic Agent Skills 공식 + 검증 기반 테스트 원칙(verifier oracle · fresh-context 검증).
-> **Sources (last audited: 2026-06-28) — Tier 1:** code.claude.com/docs/en/{skills, sub-agents, best-practices} · platform.claude.com/.../prompting-claude-opus-4-8. 권위 자료 단일 참조점: `guides/llm-references.md`.
+> **Sources (last audited: 2026-07-25) — Tier 1:** code.claude.com/docs/en/{skills, sub-agents, best-practices, changelog} · platform.claude.com/.../prompting-claude-opus-5 · .../effort. 권위 자료 단일 참조점: `guides/llm-references.md`.
 
 ---
 
@@ -13,7 +13,7 @@
 1. **oracle은 객관 pass/fail로** — "looks done" 자가판정은 환각을 통과시킨다. Functional Test의 합격 판정은 test/build exit code·lint·script diff 같은 **실행 가능한 pass/fail**로 닫는다 [verified: code.claude.com/docs/en/best-practices].
 2. **검증자 ≠ 구현자** — 스킬 출력을 그 스킬을 만든 컨텍스트가 채점하면 안 된다. **fresh-context 검증자**(별도 세션/에이전트가 diff+기준만 보고 판정)가 self-critique보다 우월 [verified: code.claude.com/docs/en/sub-agents].
 
-> 이 두 원칙이 아래 §1~§7 전 절차의 바탕이다.
+> 이 두 원칙이 아래 §1~§8 전 절차의 바탕이다.
 
 ---
 
@@ -331,7 +331,7 @@ YAML + 본문 구조를 자동 검증합니다. `/fz-skill eval`의 8항목 체�
 
 ### 6.4 리뷰형 스킬 Eval — coverage / verification 2단계 분리 (verified)
 
-fz-review·fz-codex처럼 *스스로 finding을 내는* 스킬은 단일 점수로 평가하면 recall과 precision이 뒤섞인다. 2단계로 분리한다 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — "Code review harnesses" 섹션]:
+fz-review·fz-codex처럼 *스스로 finding을 내는* 스킬은 단일 점수로 평가하면 recall과 precision이 뒤섞인다. 2단계로 분리한다 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — "Code review harnesses" 섹션 · **Opus 5에서도 동일 유지**: "If your review prompt says 'only report high-severity issues' or 'be conservative,' the model may follow that instruction literally and report less; ask it to report everything and filter in a separate pass instead" — prompting-claude-opus-5]:
 
 1. **coverage 단계**: 스킬이 *모든* 후보 finding을 보고하는지 (불확실·저severity 포함). "be conservative/don't nitpick" 지시를 너무 충실히 따르면 recall이 떨어진다 — coverage 단계에선 필터링 금지.
 2. **verification 단계**: 별도 fresh-context 검증자(§0-2)가 각 finding의 실재성·severity를 판정해 선별. recall(coverage)과 precision(verification)을 *다른 단계*에서 측정.
@@ -380,6 +380,80 @@ A/B 비교 시 `/skill-creator`의 제안을 B 버전으로 테스트하면 효�
 /skill-creator   # Improve 모드로 description 최적화 제안 받기
 # → 제안된 description을 B 버전으로 A/B 비교 실행
 ```
+
+---
+
+## 8. Task-Outcome Benchmark (실제 repo·실행 검증)
+
+스킬이 트리거되느냐(§1)·description이 정확하냐(§7)를 넘어, **스킬이 실제 코딩 결과를 개선하는가**(VALUE 축)를 측정하는 프로토콜. §0의 두 원칙(객관 oracle + fresh-context 검증자)을 실제 과제에 적용한다.
+
+### 왜 별도 절차인가
+
+- `scripts/measure_constraint_load.py`는 COST(무엇이 비싼가)만 측정하고, "제거해도 에러가 안 느는가"(VALUE)는 **paired A/B + 회귀 라벨링이 필요하다**고 스스로 명시한다. §8이 그 VALUE 축이다.
+- §6.4(리뷰형 eval)의 coverage/verification은 리뷰 finding의 recall/precision 계약이지 **생성 코드의 task-success oracle이 아니다** — 대체 불가한 별도 갭.
+
+### 지표 계층 (⛔ LOC-primary 금지)
+
+| 계층 | 지표 | 판정 |
+|------|------|------|
+| **1차 (VALUE)** | task acceptance assertion/test 통과 = 생성 코드 실행 검증 | 객관 pass/fail (§0 원칙 1) |
+| **결과** | 회귀 라벨(resolved/regressed) + 완료율 | — |
+| **2차 (효율)** | LOC(git diff added-lines) · 토큰 · 시간 | 1차 통과분에 한해 비교 |
+
+> ⛔ 1차 oracle 없이 LOC만 비교하면 "task-outcome"이 아니라 "코드량 비교"다 — 그럴 땐 이름을 낮춰라.
+
+### same-agent A/B 격리 프로토콜 (수동)
+
+- **동일 에이전트**를 skill 유/무로 real public repo @고정커밋에 실제 티켓 수행. **baseline arm 정의 (canonical)**: skill 미적용 동일 에이전트 — 신규 스킬은 without-skill, 기존 스킬 개선은 old-skill(이전 버전); chatty bare 모델 아님
+- arm×run마다: 동일 고정 커밋의 **독립 worktree/clone** · 고정 model/effort/tool-budget · 빌드·의존성 캐시 정책 · timeout · **비신뢰 코드 실행 sandbox(safety tier)**
+- **오염 탐지 (canonical)**: baseline arm이 skill·always-on 룰셋에 접근 안 했는지 확인 — 플러그인의 SessionStart/SubagentStart 훅이 baseline arm에도 발화해 gap이 0으로 수렴한 오염 사례 있음 (arm 격리 필수). in-session 서브에이전트 A/B(예: skill-creator `--full`)의 오염 판정도 본 절이 single source.
+- **채점·집계 계약**: (a) **fresh-context 채점자** — 별도 세션/에이전트가 diff + acceptance test만 보고 판정(§0 원칙 2), (b) 오염 감지된 pair = `invalid/exploratory`로 **제외**, (c) task별 (with-skill, baseline) **paired 2×2**: (with pass, baseline fail)=resolved · (with fail, baseline pass)=regressed · 동일 결과=neutral, (d) 완료율 = with-skill pass task 수 / **오염 제외 후 유효 task 수**, (e) `n≥4 → median`은 **2차 효율 지표(LOC·토큰·시간)에만** 적용 — 1차 성공률·회귀는 비율/카운트로 집계. 워크스페이스 보존 → 오프라인 rescore
+
+> ⛔ **이건 방법론이다** — 실측이 필요할 때 이렇게 하라. clone/worktree/sandbox 자동 조립 러너 구축은 `guides/harness-engineering.md` §6 AP1(과잉구조화) 대상이며, 실제 스킬 회귀가 반복 관측된 뒤 사용자 결정으로 착수한다.
+
+### 8.1 effort sweep (§8의 특화 — arm 설정만 다름)
+
+**발동 조건**: 새 모델 전환 시. Opus 5 공식이 요구한다 — *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* [verified: platform.claude.com/docs/en/build-with-claude/effort]. 채점·집계·오염 탐지는 §8 계약을 그대로 상속하고, **arm 설정 방법만** 아래로 대체한다.
+
+**⛔ arm은 세션 레벨로 설정한다 — `workflows/*.js`의 per-call `opts.effort`를 수정하지 말 것**
+
+| 레이어 | 우선순위 | 근거 |
+|---|---|---|
+| `CLAUDE_CODE_EFFORT_LEVEL` env var | **최상위** | *"The environment variable takes precedence over all other methods"* [verified: code.claude.com/docs/en/model-config] |
+| skill/subagent frontmatter `effort` | 세션 위 | *"Frontmatter effort … overriding the session level but not the environment variable"* [verified: 동] |
+| Workflow `agent()` per-call `opts.effort` | **`[미검증]`** | 공식이 per-invocation **`model`** 파라미터는 실재 레이어로 명시하나(`CLAUDE_CODE_SUBAGENT_MODEL`이 "overrides the per-invocation `model` parameter"), **effort는 동일 서술이 없다** |
+| `settings.json` `effortLevel` (세션) | 기본 | *"a starting default, not enforcement"* [verified: 동] |
+
+> **이유**: per-call `opts.effort`의 지위가 미확정이므로, 그것으로 arm을 가르면 **arm이 실제로 갈렸는지 알 수 없다**. 미검증 메커니즘 위에 측정을 세우지 않는다. 현행 fz는 `.js` 36곳과 `settings.json:409`가 **모두 `xhigh`** 라 어느 쪽이 이기든 결과가 같아 이 모호성이 드러나지 않았다.
+
+**⛔ arm 적용 검증 (필수 — 매 run)**: Claude Code는 트랜스크립트 최상위에 `effort` 필드를 기록한다(v2.1.212+). run 직후 확인해 **의도한 arm이 실제 적용됐는지** 대조한다. 불일치 pair는 §8 오염 규칙에 따라 `invalid`로 **제외**.
+
+> **왜 형식이 아닌가** [verified: 실측 CC 2.1.220 · opus-5]: **무효 effort 값은 에러를 내지 않고 조용히 무시된다.** `CLAUDE_CODE_EFFORT_LEVEL=bogus`가 통과하며 하위 층 값이 그대로 남는다 — 검증 없이 env var만 세팅하면 **arm이 갈리지 않은 채 측정이 진행된다.** 기준선을 바꿔 확인함: settings 기본 `medium` + env `bogus` → `medium` 잔존, env `high` → `high` 적용.
+> 부수: `--settings`는 사용자 `settings.json`과 **병합**된다(미지정 키는 사용자 값 유지) — A/B 격리 시 의도한 키를 명시할 것. `{}`를 줘도 사용자 effortLevel이 살아남는다.
+> ⚠️ 재현 함정: 자기 세션 transcript는 계속 쓰이므로 `ls -t | head -1`은 headless run 파일을 못 찾는다 → **파일 집합 diff + 자기 세션 ID 제외**로 신규 파일을 특정할 것.
+
+**⛔ `ultracode`는 arm 값이 아니다** [verified: 실측 CC 2.1.220]: env var·`settings.json` **양 층에서 무효값과 구별 불가하게 무시된다**(기본 `medium`에 `ultracode` 주면 `medium` 잔존 — xhigh 아님). 따라서 `ultracode` on/off를 **비대화식 paired arm으로 만들 수 없다**. 대화식 세션 토글 전용이며, 그 상태를 headless run에 물려주는 경로는 확인되지 않았다.
+
+```bash
+# arm 설정 (택1) — .js 미변경
+CLAUDE_CODE_EFFORT_LEVEL=medium claude ...   # env var (최상위, 비대화식에 적합)
+/effort medium                                # 대화식 세션
+
+# arm 적용 검증 (run 직후)
+python3 - <<'PY'
+import json,glob,os,collections
+p=max(glob.glob(os.path.expanduser("~/.claude/projects/*/*.jsonl")), key=os.path.getmtime)
+c=collections.Counter(json.loads(l).get("effort") for l in open(p,errors="replace")
+                      if '"effort"' in l)
+print(p, dict(c))   # 의도한 arm 값만 나와야 정상
+PY
+```
+
+**arm 선정**: Opus 5 공식 출발점이 `high`(기본)이고 `low`/`medium`이 비용·지연의 1차 레버이므로 최소 `{low, medium, high}` 3-arm. `xhigh`는 demanding coding/agentic 대조군으로 추가.
+
+**대상 스킬 우선순위**: `measure_constraint_load.py` 의 **floor 큰 순** — `fz`(31,259) · `fz-review`(29,264) · `fz-code`(26,837). floor가 큰 스킬일수록 effort 변화의 절대 효과가 크다.
+
+⛔ **sweep 결과로 곧바로 `.js`를 고치지 말 것**: arm이 세션 레벨이었으므로 결론도 세션/frontmatter 레벨에 적용한다. per-call 배선 변경은 위 `[미검증]` 해소가 **선행**이다.
 
 ---
 
