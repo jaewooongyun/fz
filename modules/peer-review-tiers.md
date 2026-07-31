@@ -8,12 +8,16 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 
 ## Tier 구성
 
-| Tier | review-arch | review-quality/correctness | Codex | Cross-Critique | 비용 상한 |
-|------|------------|----------------|-------|---------------|----------|
-| **0 (Solo)** | Orchestrator 직접 | — | — | None | ~$0.10 |
-| **1 (Solo+Codex)** | Orchestrator 직접 | — | Lead /fz-codex ×1 | None | ~$0.30 |
-| **2 (Lite)** | peer-review.js Stage1 (opus) | Stage1 (sonnet) | Lead /fz-codex ×1 | 미투표 (Lead 병합) | ~$2.00 |
-| **3 (Full)** | peer-review.js Stage1 (opus) | Stage1 (sonnet) | Lead /fz-codex ×2 | Workflow Stage2 교차 + Stage3 counter DA | ~$3.50 |
+| Tier | review-arch | review-quality/correctness | Codex | Cross-Critique | 기본 agent call |
+|------|------------|----------------|-------|---------------|-----------|
+| **0 (Solo)** | Orchestrator 직접 | — | — | None | 0 |
+| **1 (Solo+Codex)** | Orchestrator 직접 | — | Lead /fz-codex ×1 | None | 0 (+Codex 1) |
+| **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-codex ×1 | 미투표 (Lead 병합) | **3** (전부 opus) |
+| **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-codex ×2 | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
+
+> ⛔ **모델은 스크립트가 single source** — `peer-review.js:147·151·156`(Stage1) · `:188·192`(Stage2) · `:211`(Stage3)이 전 호출 `model:'opus'`다. 에이전트 frontmatter(`review-quality`·`review-correctness`·`review-counter` = `sonnet`)와 `code-auditor/SKILL.md` `main: sonnet`은 **스크립트에 의해 override된다** — 실행 경로는 스크립트다.
+> ⛔ **재시도 포함 실제 호출 수는 더 클 수 있다** — `parallelWithRetry`가 Stage1 null 항목마다 1회 재호출하므로 **Tier 2는 3~6, Tier 3는 6~9**다(`peer-review.js:119-125`). 부분 실패로 Stage2가 생략되면 Tier 3가 6보다 적을 수도 있다. **권위 있는 수치는 반환값 `metrics.agentCalls`뿐이다.**
+> ⛔ **비용 상한 수치 열을 제거했다.** 기존 `~$2.00`/`~$3.50`은 "opus 1 + sonnet 1" 전제로 산정된 값이라 실제(opus 3 / opus 6)와 맞지 않았다. 추정치를 다른 추정치로 바꾸는 대신 **검증 가능한 call 수**로 대체한다 — 실제 비용은 `cost-log.json`이 invoke마다 실측으로 남긴다. [참고 실측: PR #4655 Tier 2 = 448K tokens]
 
 ## 자동 휴리스틱 (단일 진실 원천)
 
@@ -251,35 +255,39 @@ jq -e '
 
 ---
 
-## Tier 2: Lite Team — 실행 시퀀스
+## Tier 2: Lite — 실행 시퀀스
 
-> ⛔ Gate 0: 팀 생성 필수. **standalone Agent() 금지** — TeamCreate 호출 없이 Agent(subagent_type=...) 호출 또는 Agent() 호출 시 team_name 누락은 위반. standalone Agent는 결과가 return으로만 전달되어 에이전트 간 SendMessage 통신 불가.
+> ⛔ **standalone Agent() 금지** — Analyze는 `workflows/peer-review.js` Workflow가 소유한다 (결정적 스크립트, P2P SendMessage 없음). `SKILL.md` Boundaries와 동일 지시.
 
 ```
-1. TeamCreate(team_name="peer-review-{PR}")               # ⛔ 필수
-2. TaskCreate × 2 (Architecture + Code quality)
-3. Agent(name="review-arch", team_name=..., model="opus")  # ⛔ team_name 필수
-   Agent(name="review-quality", team_name=..., model="sonnet")
-4. Bash("codex exec ...")                                  # Codex challenger
-5. 에이전트 완료 대기 → Lead 합성 → shutdown_request → TeamDelete
+1. Lead: Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js',
+                    args: { diffPath, intentContext, evidencePaths, basePath, deep: false } })
+2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
+             → parallelWithRetry (null 항목 1회 순차 재시도 = rate-limit 폴백 계약)
+3. Lead: /fz-codex 경유 Codex challenger ×1  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
+4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
 ```
 
-Task Brief (각 에이전트): `skills/{arch-critic|code-auditor}/SKILL.md` + `${WORK_DIR}/(diff.patch + symbols.json + requirements.md + base-behavior.md + evidence/*.md)`
-- [Goal] 독립 이슈 발굴 | [Constraints] 피어 참조 금지, origin 필수
-- [Mapping] `evidence/semantic-mapping.md` 존재 시 raw source + atom table 직접 read (Lead 요약 금지, v4.4.0)
-- [Deliverable] `${WORK_DIR}/{arch-critic|code-auditor}-result.json`
+에이전트 브리프는 스크립트가 조립한다 (OVERRIDE 블록 + TARGET). Lead가 args로 넘길 것:
+- `diffPath` / `basePath`(base 원본 prefetch — 에이전트가 요청하지 않는다) / `evidencePaths`
+- [Mapping] `evidence/semantic-mapping.md` 존재 시 워커가 raw source + atom table을 직접 read (Lead 요약 금지, v4.4.0)
 
 ---
 
-## Tier 3: Full Team (--deep) — 추가 시퀀스
+## Tier 3: Full (--deep) — 추가 시퀀스
 
-Tier 2 완료 후 2.5-Turn Protocol:
+같은 스크립트를 `deep: true`로 호출하면 Stage2·3이 이어진다 (총 6 call).
+
 ```
-Round 1: (Tier 2) 각 에이전트 독립 분석 → *-result.json 저장
-Round 2: 교차 피드백 (SendMessage 필수) — review-arch ↔ review-quality
-Round 0.5: 최종 보고 → Lead에 [합의/불합의 항목] 전달
-→ review-counter 스폰 (DA 패스) → Codex DA → Lead 합성 → TeamDelete
+Stage 1: 3-병렬 독립 분석 (Round 1 독립성 — 피어 데이터 미주입)
+Stage 2: arch ↔ quality id-기반 교차 severity 조정 (correctness 불참)
+         false_positive 판정은 실측 인용 필수
+Stage 3: review-counter DA — issues 반론 + strengths 도전
+→ 반환 { …, crossAdjustments, strengthChallenges, distribution } → Lead가 Matrix에 반영
+→ Lead: Codex DA ×1 추가 (/fz-codex)
 ```
+
+> SendMessage 실시간 멀티턴 수렴은 **고정 1-pass 교차로 대체**됐다 (충실도 trade-off — 은폐하지 않고 명시). 라운드 의미론 canonical은 `patterns/live-review.md`에 보존.
 
 ---
 
@@ -328,6 +336,6 @@ DA 판정:
 
 ## 타임아웃 + 폴백
 
-에이전트별 타임아웃: review-arch/quality 5분, Codex 3분, 전체 15분.
-타임아웃 시 `agent_status: "timeout"` + confidence ×0.5.
+에이전트별 타임아웃 수치(review-arch/quality 5분, Codex 3분, 전체 15분)는 **운영 목표이지 배선이 아니다** — `workflows/peer-review.js`에 timeout 구현이 없다(grep 0건). 스톨은 Lead가 관측해 판단한다.
+타임아웃 항목은 `parallelWithRetry`가 1회 순차 재시도하고, 그래도 null이면 `reviews`에서 제외된다 — ⛔ `agent_status` 필드는 `PeerReviewSchema`에 없으므로 Lead 보정 대상이 아니다.
 폴백 체인: Tier 3→2→1→0 자동 전환.
