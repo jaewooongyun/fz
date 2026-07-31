@@ -76,6 +76,7 @@ model-strategy:
 | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
 | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |
 | `modules/peer-review-inline-anchoring.md` | Deliver `--post` 인라인 앵커 게시 7단계 + 확인 게이트 + 다지점 분할(SSOT). `Bash(gh *)`·`Write` 선언이 여기서 쓰인다 |
+| `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
 | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
@@ -423,14 +424,20 @@ Confidence Matrix → Major 이슈(file:line + What/Impact/Evidence/Suggestion) 
 >    └── pr-comments.md
 > ```
 
-- `${WORK_DIR}/review-report.md` — 통합 보고서. 이슈별 필수 필드: `File:line` | Origin/Confidence/Found-by | What(WHY포함,400자) | Impact(major+) | Evidence(기존↔신규 코드블록) | Suggestion | PR Comment(부드러운 톤)
+- `${WORK_DIR}/review-report.md` — 통합 보고서. 이슈별 필수 필드: `File:line` | Origin | Confidence | Found-by | What(WHY 포함) | Suggestion
+  서술 형태(인과가 한 문장으로 안 끝나는 결함): `modules/peer-review-finding-anatomy.md` — 필드 나열이 아니라 원칙. 결함마다 인과의 모양이 다르다
 
 - `${WORK_DIR}/pr-comments.md` — 이슈별 부드러운 톤 PR 코멘트 모음 (복사/붙여넣기용)
 - `${WORK_DIR}/*-result.json` — 에이전트/Codex 원본 결과
 
-#### --post 시
+#### --post 시 — 인라인 앵커 게시
 
-`gh pr comment {PR_NUMBER} --body "$(cat ${WORK_DIR}/review-report.md)"`
+발견을 PR 대화창이 아니라 **코드 라인 옆**(Files changed)에 붙인다. 7단계 절차·실패 대응·다지점 분할 전문: `modules/peer-review-inline-anchoring.md`
+
+`앵커 계산(scripts/diff_anchors.py) → 구간 선택(Lead) → non_anchorable은 본문 인용 → payload(top-level body = **review-report.md 전문**) → ⛔확인 게이트 → gh api …/pulls/{N}/reviews → 착지 검증`
+
+> ⛔ **확인 게이트** — 미리보기는 항상 출력하되, 차단은 셋 중 하나일 때만: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 (c) 겹치는 hunk 복수로 Lead가 구간 선택.
+> ⛔ `mcp__github__create_pull_request_review`로 대체 불가 — `comments[]`에 `start_line`·`side`가 없어 범위 하이라이트·LEFT 앵커가 안 된다. 이 스킬만 `Bash(gh *)`를 선언하는 이유.
 
 **비ASD Serena Fallback** (WORK_DIR 없을 때):
 ```
