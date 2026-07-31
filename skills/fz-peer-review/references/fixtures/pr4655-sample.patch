@@ -1,0 +1,500 @@
+diff --git a/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsCore.swift b/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsCore.swift
+index db8913515..22ef8b160 100644
+--- a/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsCore.swift
++++ b/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsCore.swift
+@@ -66,10 +66,9 @@ public final class ShortsCore: @preconcurrency ShortsPresentableListener {
+ 
+     public var configuration = ShortsConfiguration()
+ 
+-    let controller: ShortFormPlayerController<ShortsContent, ShortsPlayerContext, ShortsCore>
++    let controller: ShortFormPlayerControllerTemp<ShortsContent, ShortsPlayerContext, ShortsCore>
+ 
+     private var cancellables = Set<AnyCancellable>()
+-    private var previewPeekTriggeredIndices = Set<Int>()
+ 
+     private var contents: [ShortsContent] = []
+     // FIXME: 별도 서비스(e.g. ShortsFilterStateManager)로 분리 후 DI 적용 검토
+@@ -81,6 +80,9 @@ public final class ShortsCore: @preconcurrency ShortsPresentableListener {
+ 
+     private var hasSentEndLogForCurrentSession: Bool = false
+ 
++    /// 체인 자동 전환이 유발한 pause 상태 변화는 사용자 일시정지가 아니므로 shortsPause 시청 로그를 1회 억제한다.
++    private var suppressesNextPauseWatchLog = false
++
+     private var chainWatchTracker = ShortsChainWatchTracker()
+ 
+     private let isMainShorts: Bool
+@@ -108,7 +110,7 @@ public final class ShortsCore: @preconcurrency ShortsPresentableListener {
+         self.isMainShorts = isMainShorts
+         self.logging = logging
+ 
+-        controller = ShortFormPlayerController(prevThreshold: 1, nextThreshold: 1)
++        controller = ShortFormPlayerControllerTemp(prevThreshold: 1, nextThreshold: 1)
+ 
+         controller.dataSource = self
+         controller.delegate = self
+@@ -723,7 +725,6 @@ public final class ShortsCore: @preconcurrency ShortsPresentableListener {
+     func clearAllData() {
+ 
+         contents.removeAll()
+-        previewPeekTriggeredIndices.removeAll()
+         presenter.applyEmptySnapshot()
+     }
+ 
+@@ -1252,19 +1253,17 @@ extension ShortsCore: @preconcurrency ShortsPlayerUIDelegate {
+             )
+             self.presenter.scrollToItem(at: next, animated: true)
+         } else {
+-            NotificationCenter.default.post(name: .chainScrollToNext, object: nil)
++            NotificationCenter.default.post(
++                name: .chainScrollToNext,
++                object: nil,
++                userInfo: [
++                    ChainScrollUserInfoKey.rowIndex: playingIndex,
++                    ChainScrollUserInfoKey.coreID: ObjectIdentifier(self),
++                ]
++            )
+         }
+     }
+ 
+-    func scrollToPreview() {
+-
+-        let index = controller.playingIndex
+-        guard index != NSNotFound, content(at: index)?.group != nil else { return }
+-        guard previewPeekTriggeredIndices.contains(index) == false else { return }
+-        previewPeekTriggeredIndices.insert(index)
+-        NotificationCenter.default.post(name: .chainScrollToPreview, object: nil)
+-    }
+-
+     func updateItems(
+         filterStatus: ShortsContent.FilterStatus,
+         for origin: ShortsContent
+@@ -1369,10 +1368,10 @@ struct ShortsChainWatchTracker {
+     }
+ }
+ 
+-extension ShortsCore: ShortFormPlayerControllerDelegate {
++extension ShortsCore: ShortFormPlayerControllerDelegateTemp {
+ 
+     public func controller(
+-        _ controller: any ShortFormPlayerControllerType,
++        _ controller: any ShortFormPlayerControllerTypeTemp,
+         didChangePlayingIndex verticalIndex: Int,
+         horizontalIndex: Int,
+         from previousVerticalIndex: Int,
+@@ -1410,8 +1409,8 @@ extension ShortsCore: ShortFormPlayerControllerDelegate {
+     }
+ 
+     public func controller(
+-        _ controller: any ShortFormPlayerControllerType,
+-        player: ShortFormPlayer,
++        _ controller: any ShortFormPlayerControllerTypeTemp,
++        player: ShortFormPlayerTemp,
+         didChangeStatus status: PlayerStatus
+     ) {
+ 
+@@ -1451,30 +1450,30 @@ extension ShortsCore: ShortFormPlayerControllerDelegate {
+ 
+         if configuration.draggingState == .ready, configuration.progress > .zero {
+             if oldStatus == .play, status == .pause {
+-                sendWatchLog(logType: .shortsPause)
++                if suppressesNextPauseWatchLog {
++                    suppressesNextPauseWatchLog = false
++                } else {
++                    sendWatchLog(logType: .shortsPause)
++                }
+             } else if oldStatus == .pause, status == .play {
++                suppressesNextPauseWatchLog = false
+                 sendWatchLog(logType: .shortsResume)
+             }
+         }
+     }
+ 
+     public func controller(
+-        _ controller: any ShortFormPlayerControllerType,
+-        player: ShortFormPlayer,
++        _ controller: any ShortFormPlayerControllerTypeTemp,
++        player: ShortFormPlayerTemp,
+         didUpdateTime time: Double,
+         progress: Double
+     ) {
+         // progress 업데이트
+         configuration.updateProgressIfPossible(newValue: progress)
+-
+-        // 70% 이상 재생 시 chain preview 스크롤
+-        if progress >= 0.7 {
+-            scrollToPreview()
+-        }
+     }
+ 
+     public func controller(
+-        _ controller: any ShortFormPlayerControllerType,
++        _ controller: any ShortFormPlayerControllerTypeTemp,
+         canPlayAt verticalIndex: Int
+     ) -> Bool {
+         guard shortsPlayer(canPlayItem: nil) else { return false }
+@@ -1483,8 +1482,40 @@ extension ShortsCore: ShortFormPlayerControllerDelegate {
+     }
+ 
+     public func controller(
+-        _ controller: any ShortFormPlayerControllerType,
+-        player: ShortFormPlayer,
++        _ controller: any ShortFormPlayerControllerTypeTemp,
++        player: ShortFormPlayerTemp,
++        didPlayToEndAt verticalIndex: Int
++    ) -> ShortFormPlayerEndActionTemp {
++
++        let isActiveChainItem =
++            verticalIndex == controller.playingIndex
++            && player.horizontalIndex == controller.playingHorizontalIndex
++            && chainItems(at: verticalIndex).count > 1
++
++        guard isActiveChainItem,
++            shouldBlockPlayback == false,
++            hasPresentedScreen == false
++        else {
++            return .repeatItem
++        }
++
++        // 체인 재생 완료 시 다음 쇼츠로 자동 전환 (마지막 → 첫 번째 순환)
++        suppressesNextPauseWatchLog = true
++        NotificationCenter.default.post(
++            name: .chainScrollToNext,
++            object: nil,
++            userInfo: [
++                ChainScrollUserInfoKey.rowIndex: verticalIndex,
++                ChainScrollUserInfoKey.coreID: ObjectIdentifier(self),
++                ChainScrollUserInfoKey.reason: "auto",
++            ]
++        )
++        return .pause
++    }
++
++    public func controller(
++        _ controller: any ShortFormPlayerControllerTypeTemp,
++        player: ShortFormPlayerTemp,
+         didRepeatItemAt verticalIndex: Int
+     ) {
+         if verticalIndex == controller.playingIndex {
+@@ -1493,7 +1524,7 @@ extension ShortsCore: ShortFormPlayerControllerDelegate {
+     }
+ }
+ 
+-extension ShortsCore: ShortFormPlayerDataSource {
++extension ShortsCore: ShortFormPlayerDataSourceTemp {
+ 
+     public typealias Item = ShortsContent
+     public typealias Context = ShortsPlayerContext
+@@ -1518,14 +1549,14 @@ extension ShortsCore: ShortFormPlayerDataSource {
+         return context
+     }
+ 
+-    public func playerConfiguration(at verticalIndex: Int) -> ShortFormPlayerConfiguration {
++    public func playerConfiguration(at verticalIndex: Int) -> ShortFormPlayerConfigurationTemp {
+ 
+         let environment = ShortsExternalDependencies.environment
+         guard verticalIndex < items.count, items[verticalIndex].isConvivaEnabled, environment.isServerProduct else {
+             return .default
+         }
+ 
+-        return ShortFormPlayerConfiguration(
++        return ShortFormPlayerConfigurationTemp(
+             gsmoProfileKey: environment.gsmoProfileKey,
+             convivaCustomerKey: environment.convivaCustomerKey,
+             convivaGatewayUrl: environment.convivaGatewayUrl
+diff --git a/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsPlayerContext.swift b/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsPlayerContext.swift
+index aca94908b..6cffce113 100644
+--- a/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsPlayerContext.swift
++++ b/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsPlayerContext.swift
+@@ -14,7 +14,7 @@ import UIKit
+ 
+ // MARK: - ShortsPlayerContext
+ 
+-public class ShortsPlayerContext: ObservableObject, ShortFormPlayerContext {
++public class ShortsPlayerContext: ObservableObject, ShortFormPlayerContextTemp {
+ 
+     public typealias Item = ShortsContent
+ 
+@@ -30,7 +30,7 @@ public class ShortsPlayerContext: ObservableObject, ShortFormPlayerContext {
+     public var playableContentProvider: ((ShortsContent) -> PlayableAsset?)?
+ 
+     /// Protocol 요구사항: player (ShortFormPlayer)
+-    public weak var player: ShortFormPlayer? {
++    public weak var player: ShortFormPlayerTemp? {
+         didSet {
+             guard player !== oldValue else { return }
+             player?.playableContent = playableContentProvider?(item)
+diff --git a/Packages/TvingShorts/Sources/TvingShorts/Shorts/Views/ShortsChainView.swift b/Packages/TvingShorts/Sources/TvingShorts/Shorts/Views/ShortsChainView.swift
+index 0c64c68ea..ba7d6bc8a 100644
+--- a/Packages/TvingShorts/Sources/TvingShorts/Shorts/Views/ShortsChainView.swift
++++ b/Packages/TvingShorts/Sources/TvingShorts/Shorts/Views/ShortsChainView.swift
+@@ -77,6 +77,14 @@ public struct ShortsPageScrollViewRepresentable: UIViewRepresentable {
+             containerViewControllerRef
+         }
+ 
++        public var rowIndex: Int {
++            context.index
++        }
++
++        public var coreIdentifier: ObjectIdentifier? {
++            delegate.map { ObjectIdentifier($0) }
++        }
++
+         public var numberOfItems: Int {
+             if let grouped = context.item.groupedShortsContents, grouped.count > 0 {
+                 return grouped.count
+@@ -131,7 +139,6 @@ public struct ShortsPageScrollViewRepresentable: UIViewRepresentable {
+ 
+ public final class ShortsPageScrollView: UIScrollView {
+     private var chainScrollObserver: NSObjectProtocol?
+-    private var chainPreviewObserver: NSObjectProtocol?
+ 
+     enum ScrollDirectionOffset: Int {
+         case none = 0
+@@ -139,20 +146,12 @@ public final class ShortsPageScrollView: UIScrollView {
+         case previous = -1
+     }
+ 
+-    // MARK: - Peek state
+-    private enum PeekPhase { case idle, out, returning }
+-    private var peekPhase: PeekPhase = .idle
+-    private var peekCenterOrigin: CGPoint = .zero
+-
+     public var index = Int.zero {
+         didSet {
+             pageDelegate?.scrollView(self, activeIndexDidChanged: index)
+         }
+     }
+ 
+-    /// Enable to test peek via viewport tap (right area → peekNext, left area → peekPrevious).
+-    public var enablePeekTestTrigger: Bool = false
+-
+     deinit {
+         stopObservingChainScroll()
+         if !pageControllers.isEmpty, let container = pageDelegate?.containerViewController {
+@@ -166,9 +165,11 @@ public final class ShortsPageScrollView: UIScrollView {
+     private var offset: ScrollDirectionOffset = .none
+ 
+     private var pageControllers = [ShortsPageItemController<ShortsContentView>]()
+-    private var peekAnimator: UIViewPropertyAnimator?
+     public var isPrepared: Bool { !pageControllers.isEmpty }
+ 
++    /// 프로그래매틱 스크롤(자동재생 등)의 사유. `scrollDidFinished`에서 소비된다.
++    private var pendingScrollReason: String?
++
+     private lazy var viewportTapGesture: UITapGestureRecognizer = {
+         let gesture = UITapGestureRecognizer(target: self, action: #selector(handleViewportTap(_:)))
+         gesture.numberOfTapsRequired = 1
+@@ -192,19 +193,20 @@ public final class ShortsPageScrollView: UIScrollView {
+             forName: .chainScrollToNext,
+             object: nil,
+             queue: .main
+-        ) { [weak self] _ in
+-            self?.scrollTo(offset: .next)
+-        }
+-    }
+-
+-    private func startObservingChainPreview() {
+-        guard chainPreviewObserver == nil else { return }
+-        chainPreviewObserver = NotificationCenter.default.addObserver(
+-            forName: .chainScrollToPreview,
+-            object: nil,
+-            queue: .main
+-        ) { [weak self] _ in
+-            self?.peek(.next, percent: 0.1)
++        ) { [weak self] notification in
++            guard let self else { return }
++            if let coreID = notification.userInfo?[ChainScrollUserInfoKey.coreID] as? ObjectIdentifier,
++                coreID != self.pageDelegate?.coreIdentifier
++            {
++                return
++            }
++            if let rowIndex = notification.userInfo?[ChainScrollUserInfoKey.rowIndex] as? Int,
++                rowIndex != self.pageDelegate?.rowIndex
++            {
++                return
++            }
++            let reason = notification.userInfo?[ChainScrollUserInfoKey.reason] as? String
++            self.scrollTo(offset: .next, reason: reason)
+         }
+     }
+ 
+@@ -214,87 +216,6 @@ public final class ShortsPageScrollView: UIScrollView {
+             NotificationCenter.default.removeObserver(obs)
+             chainScrollObserver = nil
+         }
+-
+-        if let obs = chainPreviewObserver {
+-            NotificationCenter.default.removeObserver(obs)
+-            chainPreviewObserver = nil
+-        }
+-    }
+-
+-    // MARK: - Custom contentOffset animation
+-    private func animateContentOffset(
+-        to target: CGPoint,
+-        duration: TimeInterval = 0.25,
+-        delay: TimeInterval = 0.0,
+-        curve: UIView.AnimationCurve = .easeOut,
+-        completion: (() -> Void)? = nil
+-    ) {
+-        peekAnimator?.stopAnimation(true)
+-        let animator = UIViewPropertyAnimator(duration: duration, curve: curve) {
+-            self.contentOffset = target
+-        }
+-        animator.addCompletion { _ in
+-            completion?()
+-        }
+-        peekAnimator = animator
+-        animator.startAnimation(afterDelay: delay)
+-    }
+-
+-    private func animateContentOffsetSpring(
+-        to target: CGPoint,
+-        baseDuration: TimeInterval = 0.25,
+-        delay: TimeInterval = 0.0,
+-        mass: CGFloat = 1,
+-        stiffness: CGFloat = 80,
+-        damping: CGFloat = 20,
+-        initialVelocity: CGVector = .zero,
+-        completion: (() -> Void)? = nil
+-    ) {
+-        let distance = abs(self.contentOffset.x - target.x)
+-        let unit = min(1.0, max(0.0, distance / max(1.0, self.bounds.width)))
+-        let duration = baseDuration * (0.8 + 0.4 * unit)
+-
+-        peekAnimator?.stopAnimation(true)
+-        let timing = UISpringTimingParameters(mass: mass, stiffness: stiffness, damping: damping, initialVelocity: initialVelocity)
+-        let animator = UIViewPropertyAnimator(duration: duration, timingParameters: timing)
+-        animator.addAnimations {
+-            self.contentOffset = target
+-        }
+-        animator.addCompletion { _ in
+-            completion?()
+-        }
+-        peekAnimator = animator
+-        animator.startAnimation(afterDelay: delay)
+-    }
+-
+-    public func peekNext(percent: CGFloat = 0.1) {
+-        peek(.next, percent: percent)
+-    }
+-
+-    private func peek(_ dir: ScrollDirectionOffset, percent: CGFloat) {
+-        guard peekPhase == .idle else { return }
+-        guard !isDragging, !isDecelerating else { return }
+-        guard pageControllers.count >= 3 else { return }
+-
+-        let clamped = max(0.0, min(percent, 0.5))
+-        let base = pageControllers[1].view.frame.origin
+-        let delta = bounds.width * clamped
+-        let sign: CGFloat = (dir == .next) ? 1 : -1
+-        let target = CGPoint(x: base.x + sign * delta, y: base.y)
+-
+-        peekCenterOrigin = base
+-        peekPhase = .out
+-
+-        animateContentOffsetSpring(to: target, baseDuration: 0.25, delay: 0.0, mass: 1, stiffness: 80, damping: 20) { [weak self] in
+-            guard let self = self else { return }
+-            self.peekPhase = .returning
+-            self.animateContentOffsetSpring(to: self.peekCenterOrigin, baseDuration: 0.25, delay: 0.8, mass: 1, stiffness: 80, damping: 20) { [weak self] in
+-                guard let self = self else { return }
+-                self.peekPhase = .idle
+-                self.offset = .none
+-                self.pageDelegate?.scrollViewDidEndScrollingAnimation?(self)
+-            }
+-        }
+     }
+ 
+     override init(frame: CGRect) {
+@@ -314,14 +235,10 @@ public final class ShortsPageScrollView: UIScrollView {
+         self.showsHorizontalScrollIndicator = false
+         addGestureRecognizer(viewportTapGesture)
+         startObservingChainScroll()
+-        startObservingChainPreview()
+     }
+ 
+     public func clear() {
+ 
+-        peekAnimator?.stopAnimation(true)
+-        peekAnimator = nil
+-
+         stopObservingChainScroll()
+         if !pageControllers.isEmpty, let container = pageDelegate?.containerViewController {
+             pageControllers.forEach { $0.pageItemController(willUnload: container) }
+@@ -368,7 +285,6 @@ public final class ShortsPageScrollView: UIScrollView {
+     @objc private func handleViewportTap(_ gestureRecognizer: UITapGestureRecognizer) {
+ 
+         guard gestureRecognizer.state == .ended else { return }
+-        guard peekPhase == .idle else { return }
+ 
+         let width = max(bounds.width, 1)
+         let x = max(0, min(gestureRecognizer.location(in: self).x - contentOffset.x, width))
+@@ -504,8 +420,9 @@ public final class ShortsPageScrollView: UIScrollView {
+     private var scrollCooldownUntil: Date = .distantPast
+     private let scrollToCooldown: TimeInterval = 0.5
+ 
+-    func scrollTo(offset: ScrollDirectionOffset) {
+-        guard peekPhase == .idle else { return }
++    func scrollTo(offset: ScrollDirectionOffset, reason: String? = nil) {
++        // 사용자 조작 우선: 드래그/감속 중에는 프로그래매틱 스크롤을 무시
++        if isDragging || isDecelerating { return }
+         let now = Date()
+         guard now >= scrollCooldownUntil else { return }
+         guard pageControllers.count >= 3 else { return }
+@@ -514,7 +431,10 @@ public final class ShortsPageScrollView: UIScrollView {
+         } else if offset == .previous {
+             scrollRectToVisible(pageControllers[0].view.frame, animated: true)
+         }
+-        UISelectionFeedbackGenerator().selectionChanged()
++        pendingScrollReason = reason
++        if reason == nil {
++            UISelectionFeedbackGenerator().selectionChanged()
++        }
+         scrollCooldownUntil = now.addingTimeInterval(scrollToCooldown)
+     }
+ 
+@@ -549,13 +469,10 @@ public final class ShortsPageScrollView: UIScrollView {
+ extension ShortsPageScrollView: UIScrollViewDelegate {
+ 
+     public func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+-        peekAnimator?.stopAnimation(true)
+-        peekAnimator = nil
+-        if peekPhase != .idle { peekPhase = .idle }
++        pendingScrollReason = nil
+     }
+ 
+     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
+-        guard peekPhase == .idle else { return }
+         guard scrollView.contentSize.width > 0.0 else { return }
+         guard pageControllers.count >= 3 else { return }
+ 
+@@ -587,12 +504,13 @@ extension ShortsPageScrollView: UIScrollViewDelegate {
+     }
+ 
+     private func scrollDidFinished(with animating: Bool) {
+-        guard peekPhase == .idle else { return }
++        let programmaticReason = pendingScrollReason
++        pendingScrollReason = nil
+         guard pageControllers.count > 2, index != nextIndex else { return }
+ 
+         let scrollDirection = offset
+ 
+-        pageDelegate?.scrollView(self, didReceiveActiveIndexChangeReason: animating ? "tap" : "swipe", activeChainIndexChanged: index)
++        pageDelegate?.scrollView(self, didReceiveActiveIndexChangeReason: programmaticReason ?? (animating ? "tap" : "swipe"), activeChainIndexChanged: index)
+         index = nextIndex
+         offset = .none
+         guard let delegate = pageDelegate else { return }
+@@ -656,6 +574,12 @@ public protocol ShortsPageScrollViewDelegate: UIScrollViewDelegate {
+ 
+     var containerViewController: UIViewController? { get }
+ 
++    /// 이 체인 뷰가 속한 세로 인덱스. `.chainScrollToNext` 타게팅 판정에 사용.
++    var rowIndex: Int { get }
++
++    /// 이 체인 뷰가 속한 코어 식별자. 쇼츠 화면 중첩 시 `.chainScrollToNext` 발신 코어 판정에 사용.
++    var coreIdentifier: ObjectIdentifier? { get }
++
+     var numberOfItems: Int { get }
+ 
+     func scrollView(_ scrollView: ShortsPageScrollView, view at: Int) -> ShortsContentView?

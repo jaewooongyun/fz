@@ -22,7 +22,7 @@ allowed-tools: >-
   mcp__github__add_issue_comment,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Bash(codex *), Read, Grep, Glob, Workflow
+  Bash(git *), Bash(codex *), Bash(gh *), Read, Grep, Glob, Workflow, Write
 team-agents:
   primary: review-arch
   supporting: [review-quality, review-counter]
@@ -54,7 +54,7 @@ model-strategy:
 /fz-peer-review 123                   # PR #123 리뷰
 /fz-peer-review feature/ASD-456       # 브랜치 리뷰
 /fz-peer-review 123 --deep            # Cross-Critique 활성화 (추가 ~$0.5-1.5)
-/fz-peer-review 123 --post            # gh pr comment로 게시
+/fz-peer-review 123 --post            # 인라인 라인 앵커로 리뷰 게시
 /fz-peer-review 123 --tier 2          # Tier 강제 지정
 /fz-peer-review 123 --explain         # 리뷰 후 변경사항 해설 (fz-pr-digest 연계)
 /fz-peer-review 123 --explain --deep  # 리뷰 후 기술 해설까지 포함
@@ -75,6 +75,7 @@ model-strategy:
 | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
 | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
 | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |
+| `modules/peer-review-inline-anchoring.md` | Deliver `--post` 인라인 앵커 게시 7단계 + 확인 게이트 + 다지점 분할(SSOT). `Bash(gh *)`·`Write` 선언이 여기서 쓰인다 |
 | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
@@ -464,7 +465,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 - 팀원 PR/브랜치의 9개 관점 피어 리뷰
 - 3-Model Cross-Review + Confidence Matrix 투표
 - Codex Devil's Advocate로 편향 보정
-- gh pr comment로 리뷰 게시 (`--post`)
+- 인라인 라인 앵커 리뷰 게시 (`--post` — `gh api …/pulls/{N}/reviews`)
 - 4-Tier Graceful Degradation + 자동 폴백
 **Will Not**:
 - 코드를 직접 수정하지 않음 (리뷰만 수행)
