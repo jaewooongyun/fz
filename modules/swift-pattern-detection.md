@@ -14,7 +14,7 @@ CLAUDE.md `## Architecture`가 Swift/iOS 프로젝트 + plan-final.md / plan-v*.
 
 ## 행동 원칙 (원칙+이유 형태)
 
-> 본 모듈은 9개 if-then trigger가 아닌 **4개 원칙**으로 구성된다.
+> 본 모듈은 9개 if-then trigger가 아닌 **5개 원칙**으로 구성된다.
 > 각 원칙은 plan에서 검색할 token + 발동 시 행동을 제공한다.
 > 출처: `guides/prompt-optimization.md` 원칙 4a + Phase 1.5 mirror 원칙.
 
@@ -103,16 +103,58 @@ GOOD:
 
 ---
 
+### 원칙 H: 디자인 소스(figma) 대조 — 축마다 방법이 다르다
+
+**이유**: figma 노드값을 하나씩 옳게 읽어도 **화면에 보이는 값과 다를 수 있다**. 렌더 간격은 여러 노드값의 합성 결과이고, 일부 축은 API 응답에 값 자체가 없다. 단일 "노드값 대조" 규칙으로 뭉뚱그리면 두 경우를 모두 놓친다.
+
+**작업 검색 token**: figma 노드 조회, UI 수치(spacing/margin/padding/gap/size/radius/opacity) 작성·수정, 색·폰트 토큰 지정, 디자인 검수 대응
+
+**발동 시 행동** — 축을 먼저 분류한 뒤 방법을 고른다:
+
+| 축 | 방법 |
+|---|---|
+| **direct property** (fill·opacity·radius·size·font·childOrder) | raw 노드값 **그대로 적용**. render 눈대중 override 금지 |
+| **요소 간 실효 거리** | 두 요소 경계 **사이를 실제로 통과하는** gap·padding만 걸어가며 합산. ⚠️ flexible spacer·절대배치·음수 간격·modifier 순서가 개재하면 단순 합이 성립하지 않으므로 **그 경우는 렌더로 판정** |
+| **raw 미표현 축** (네이티브 리스트 marker geometry, glyph, raster 실렌더 등) | API에 값이 없음 → **렌더 스냅샷이 유일 oracle** |
+
+**provenance 의무**: 측정 산출물 헤더에 `file key` + `node ID` + `실측일`. 미기재 시 후속 세션이 동일 스냅샷 여부를 판정할 수 없다.
+
+**Few-shot**:
+
+```
+BAD:
+  figma 노드 padding 24 확인 → 코드 .padding(.top, 24) → "일치" 판정
+  → 실제 렌더 간격은 부모 stack의 gap 12가 더해진 36. 노드값은 맞았는데 화면이 틀림.
+
+GOOD:
+  두 요소 경계를 걸어가며 합산: root gap 12 + section padding 24 = 36
+  → 코드 24와 불일치 검출 → 36으로 수정
+```
+
+```
+BAD (edge — raw 미표현 축):
+  불릿 닷 크기를 figma API로 조회 → 응답에 크기 필드 없음 → "figma에 값이 없으니 현행 유지"
+  → 네이티브 리스트 서식이라 렌더는 •인데 데이터는 하이픈. 실제로는 불일치.
+
+GOOD:
+  raw에 값이 없는 축으로 분류 → 빌드 스크린샷 ↔ figma 렌더 대조로 판정
+```
+
+⚠️ *candidate (`promotion-ledger` L-1 트랙 A 3/5)* — 활성 강제 X. **활성 전 회귀 fixture 필수** (현재 oracle 0개).
+
+---
+
 ## Gate (fz-code Phase 0.5에서 사용)
 
 본 trigger가 plan에 1건 이상 발견되면 plugin-refs.md 강제 참조 + 안티패턴 점검 후 구현 절차 진입.
 
 - [ ] Swift/iOS 프로젝트? (아니면 skip)
-- [ ] D/E/F/G token plan 스캔 완료?
+- [ ] D/E/F/G/H token plan 스캔 완료?
 - [ ] 발견된 trigger 모두 plugin-refs.md 매칭 + 대응 명시?
 - [ ] F (위험 패턴) 발견 시 안전성 메커니즘이 step에 포함?
 - [ ] G (패턴 변환) 발견 시 원본 동작 보존이 step에 명시?
-- 미통과 시 → ⛔ 구현 절차 진입 차단
+- [ ] ⚠️ H (figma 대조) 발견 시 축 분류(direct / 실효 거리 / raw 미표현) 후 방법 선택? *(candidate — 강제 X)*
+- 미통과 시 → ⛔ 구현 절차 진입 차단. **단 H는 candidate이므로 차단 대상 제외** — 미충족은 기록만 (활성 전환 후 차단 대상 편입)
 
 ## 발동 결과 기록
 
@@ -128,9 +170,9 @@ grep -q 'Phase 0\.5.*Swift Pattern Pre-detection' "$F"
 grep -q 'modules/swift-pattern-detection\.md' "$F"
 # Gate 0.5 존재
 grep -q 'Gate 0\.5' "$F"
-# 본 모듈에 4 원칙 (D/E/F/G) + Few-shot 존재
+# 본 모듈에 5 원칙 (D/E/F/G/H) + Few-shot 존재
 M=~/dev/fz-plugin/modules/swift-pattern-detection.md
-test "$(grep -Ec '^### 원칙 [DEFG]' "$M")" -eq 4
+test "$(grep -Ec '^### 원칙 [DEFGH]' "$M")" -eq 5
 grep -q 'BAD:' "$M" && grep -q 'GOOD:' "$M"
 # Phase 1.5 P3와 mirror — 패턴 변환 trigger 명시 (F3 fix)
 grep -qE 'PromiseKit|defer.*await|enum catch' "$M"
