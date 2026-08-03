@@ -8,6 +8,21 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release). MAST (2503.13657)는 v4.17.0에서 modules 재인용으로 active 환원
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### [4.25.0] — figma 대조를 direct/composed 축으로 분리 + L-1 관측 3/5 (2026-08-03) [MINOR]
+
+> 회고 R5(`fz-retrospective/R5-figma-visual-token-not-measured.md`)가 "figma 커버리지 기준 **부재**"로 진단하고 "요소×축 표 선작성"을 처방했다. 실측 결과 **진단은 오진**이고(기준도 표도 이미 있었다) **처방은 효능 미확정**이다.
+>
+> - ⛔ **"기준 부재"는 오진**: `fz-code:276-277` 마찰 신호 2종 + `promotion-ledger L-1` + `feedback_design_spec_empirical_comparison` step 2("토큰별 1:1 비교")가 **전부 이미 존재**했다. 셋 다 candidate 미강제였을 뿐. [verified: grep — fz 자산 전체 figma 매치 2파일 11건]
+> - ⛔ **"표 선작성" 처방도 약화**: 표는 이미 작성돼 있었다 — `TVG-2520-work/figma-measure-exhaustive.md`(07-24 16:08)가 정정 커밋(07-29 04:10)보다 선행. **빈 칸 카운터는 완전성만 세고 채워진 값의 정확성은 못 센다.** ⚠️ 단 두 산출물의 node 집합이 달라(`114292…` vs node `6725-121653`) "표가 stale인가 / 합성을 놓쳤나"는 **경합 가설로 병기** — 확정 서술 금지.
+> - **`swift-pattern-detection.md` 원칙 H 신설**(기존 모듈 MERGE — 신규 모듈 아님): figma 대조를 **축 3분류**로 나눴다 — direct property(fill·opacity·radius·size·font)는 raw 직접 / 요소 간 **실효 거리**는 두 경계 사이를 통과하는 gap·padding만 합산(⚠️ flexible spacer·절대배치·음수간격·modifier 순서 개재 시 단순 합 불성립 → 렌더 판정) / **raw 미표현 축**은 렌더 스냅샷. + provenance 3필드. 실증: `root gap 12 + padding 24 = 36`인데 코드 24 [verified: `TVG-3554-work/figma-code-diff-01:98-100`] — 개별 노드값이 옳아도 합성을 안 하면 틀린다. `fz-code:276`은 **포인터만 유지**(1,231 → 1,284자).
+> - ⚠️ **작성 과정 기록**: 초판은 blanket 문장을 남긴 채 700자 순증(1,231→1,931)시키고 "교체·병합"이라 오기했고, 1차 수정본은 "ancestor path 합"으로 **과잉 일반화**했다(sibling 경계·spacer·절대배치에서 불성립). 둘 다 Codex 교차검증이 실측으로 잡았다 [외부: `codex-review-out.md:10059`, `codex-validate-out.md:2628`]. 최종형은 Level 3 모듈 분리 + 불성립 조건 명시.
+> - **raw 미표현 축 명시**: 관측된 native-list marker 노드 응답에는 닷 크기·들여쓰기가 **별도 값으로 없었다** [verified: `figma-code-diff-01:281-287` — 해당 노드 범위 한정, API 전반 일반화 아님] → 그 축은 렌더 스냅샷이 유일 oracle. 렌더 oracle 범위를 "알파/틴트"에서 "**raw로 표현되지 않는 축**"으로 재정의.
+> - **provenance 3필드 표준**: 측정 산출물 헤더에 `file key`+`node ID`+`실측일`. 미기재 시 후속 세션이 동일 스냅샷 여부를 판정 불가 — 본 세션이 실제로 그 벽에 막혔다(figma 조회 실패).
+> - **L-1 관측 #3(TVG-3554) 등재 → 트랙 A 3/5**. 카운트 근거 = `memory-guide.md` §Evidence 출처("동일 failure mode가 **별개 세션**에서 관찰돼야 1 count") + `promotion-ledger.md` §"카운트 기준 (본 세션 채택)"(Eligible `(a)+(b)`는 **P-track 승격 전용**, 트랙 A 비적용) — heading 앵커 인용(줄번호는 본 변경으로 이동). ⛔ **TVG-3406은 카운트 제외** — `finding-source: external`이라 트랙 C 진입 조건(① `/fz-review --deep` 이후 발견 ② actionable Major+ ③ 4-classify) 3개 모두 미증명. 초판의 "4/5"는 이 조건을 건너뛴 과다 계상이었다 [외부: Codex review `codex-review-out.md:10038-10048`].
+> - ⛔ **활성 전 필수 = 회귀 fixture** (현재 oracle **0개**): `parent gap 12 + child padding 24 → effective 36` 검출 / direct property 직접 비교 / raw 미표현 축 render-required / external 관측에 4-classify 없으면 lint 실패. `harness-engineering.md:799` 규율1(회귀·반증 게이트 통과분만 수용) 미충족 상태.
+> - ⛔ **합성값 자동 diff Adapter는 미착수**: figma node ↔ SwiftUI expression 매핑 계약 부재(`Spacer`·modifier 순서·`ScrollView`·safe area·hosting constraint 판단 필요) [외부: Codex verify **rejected** — `fz-h11-design-coverage/codex-verify-out.md:3437-3441`]. 2단 분리(figma calculator + mapping manifest) 재설계 후 재제안.
+> - **하네스 교훈**: Codex 단독 발견 4건(node 집합 차이 / taxonomy 산술 10≠11 / 닷 크기 API 부재 / ledger 규칙 오적용)이 **전부 Lead가 이미 읽은 파일 안에** 있었다 — `harness-engineering §5.5` 규율2(self-preference 단독 채택 금지)의 직접 실증.
+
 ### [4.24.0] — fz-rebase 내용 게이트를 경로 단위 배타 분할로 (2026-07-27) [MINOR]
 
 > 요구: "하나도 누락 및 덮어씌임 없게". 4.23.0의 게이트는 **유실 유형을 열거**(L1~L6)해 판정했다 — 열거는 빠뜨린 유형을 증명하지 못하고, 실제로 세 축이 검증 밖에 있었다(실측). 판정 근거를 열거에서 **구조**로 바꿨다.
