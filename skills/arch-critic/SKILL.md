@@ -162,7 +162,9 @@ class ContentDetailViewController: UIViewController {
 
 ## Evidence Trace (코드 추적 증거)
 
-severity major 이상 이슈에는 반드시 `evidence_trace`를 작성하세요.
+⛔ **`evidence_trace`는 스키마 필드가 아니다** — 아래 작성 규칙은 그대로 적용하되, 결과물은 **스키마 required 필드 `evidence`**(peer-review) / **`evidence`**(review-live)에 담는다. 별도 키로 emit하면 검증은 통과하지만 Lead의 Basis 열이 `evidence`를 읽으므로 추적이 **판정에 반영되지 않는다.** (본 문서에서 `evidence_trace`는 *작성 형식의 이름*으로만 쓴다.)
+
+severity major 이상 이슈에는 반드시 이 추적 형식을 작성하세요.
 텍스트 설명 대신 **실제 코드 경로를 step-by-step으로 보여주어 코드가 스스로 문제를 증명**하도록 합니다.
 
 ### 작성 규칙
@@ -253,23 +255,31 @@ window.addSubview(containerView)  // <- window 레벨, cleanupViews 범위 밖
   "severity": "major",
   "description": "URL 캐스팅 타입 불일치로 외부 열기가 항상 실패",
   "suggestion": "messageBody[\"url\"] as? String으로 변경 후 URL(string:)로 변환",
-  "evidence_trace": "// Step 1: JS bridge\npostMessage(JSON.stringify({url: \"https://...\"}))\n\n// Step 2: CommonWebView.swift:164\nJSONSerialization.jsonObject → [String: Any]\n// 값 타입 = String (JSONSerialization은 URL 객체 생성 불가)\n\n// Step 3: FloatingWebViewControlPlugin.swift:31\nmessageBody[\"url\"] as? URL  // String as? URL → nil <- BUG\n\n// 대비: AppControlPlugin.swift:28\nmessageBody[\"url\"] as? String  // OK"
+  "evidence": "// Step 1: JS bridge\npostMessage(JSON.stringify({url: \"https://...\"}))\n\n// Step 2: CommonWebView.swift:164\nJSONSerialization.jsonObject → [String: Any]\n// 값 타입 = String (JSONSerialization은 URL 객체 생성 불가)\n\n// Step 3: FloatingWebViewControlPlugin.swift:31\nmessageBody[\"url\"] as? URL  // String as? URL → nil <- BUG\n\n// 대비: AppControlPlugin.swift:28\nmessageBody[\"url\"] as? String  // OK"
 }
 ```
 
-> severity minor 이하: `"evidence_trace": null`
+> ⛔ 키는 **`evidence`** 다 — 추적 형식을 그 필드에 담는다(위 §머리 매핑 선언). severity minor 이하는 추적 없이 인용만.
 
 ---
 
 ## Alternative Design 분석
 
-severity major 이상 아키텍처 이슈에 대안 비교표 필수 포함:
+⛔ **`alternatives`·`recommended` 배열 필드는 어느 스키마에도 없다** — **본문 서술 필드에 인코딩한다.** 필드명은 호출한 워크플로에 따라 다르다:
 
-- `alternatives` 배열: 최소 2개, 최대 3개
-- 반드시 "A: 현재 구현(as-is)" 포함
-- `pros`/`cons` 각 1-3개
-- `recommended`에 추천 대안 label
-- severity minor 이하는 생략 (`suggestion`만)
+| 소비 워크플로 | 스키마 | 본문 서술 필드 |
+|---|---|---|
+| `workflows/peer-review.js` | `PeerReviewSchema` | **`description`** |
+| `workflows/review-live.js` | `ReviewFindingsSchema` | **`detail`** (⛔ `description` 없음) |
+
+실측 근거: 통제 A/B에서 에이전트가 필드 없이 `대안 A(현행)=… B=… C=…` 형태로 자체 인코딩해 대안 9/10을 냈다. 배열 필드를 emit하면 스키마 검증은 통과하지만(`additionalProperties` 미지정) Lead의 서술·매트릭스가 본문 필드만 읽으므로 **대안이 리포트에 도달하지 않는다.**
+
+구조 렌즈 이슈에는 **severity와 무관하게** 대안 비교를 본문 서술 필드에 포함한다 (⛔ `major 이상` 조건 아님 — A/B 실측 분포상 구조 이슈는 minor·suggestion으로도 판정되며, 그때 대안이 빠지면 "더 나은 구조"를 말하지 못한다):
+
+- 최소 2개, 최대 3개. 반드시 **"A(현행)"** 을 첫 항목으로
+- 각 항목에 trade-off 1줄 (장점/단점을 한 문장에)
+- 마지막에 `추천: {label}`
+- 형식: `대안 A(현행)={설명} — {trade-off}. B={설명} — {trade-off}. 추천: B`
 
 ### 예시
 
@@ -278,25 +288,14 @@ severity major 이상 아키텍처 이슈에 대안 비교표 필수 포함:
   "id": "ARCH-003",
   "perspective": "architecture",
   "severity": "major",
-  "description": "DTO를 class로 정의. 불변 데이터에 참조 타입 불필요.",
-  "suggestion": "struct로 전환하여 CoW 이점 확보.",
-  "alternatives": [
-    {
-      "label": "A: 현재 구현 (class DTO)",
-      "description": "class 기반 DTO 유지",
-      "pros": ["기존 코드와 일관성", "NSObject 상속 가능"],
-      "cons": ["불필요한 heap 할당", "의도치 않은 참조 공유 위험"]
-    },
-    {
-      "label": "B: struct DTO",
-      "description": "struct로 전환, Codable 유지",
-      "pros": ["CoW로 성능 이점", "값 의미론으로 안전성 향상"],
-      "cons": ["기존 참조 기반 코드 수정 필요"]
-    }
-  ],
-  "recommended": "B: struct DTO"
+  "origin": "improvement",
+  "description": "DTO를 class로 정의. 불변 데이터에 참조 타입 불필요. 대안 A(현행)=class 유지 — 기존 코드 일관성·NSObject 상속 가능하나 불필요한 heap 할당 + 의도치 않은 참조 공유 위험. B=struct 전환(Codable 유지) — CoW 성능 이점 + 값 의미론 안전성, 단 참조 기반 호출부 수정 필요. 추천: B",
+  "evidence": "ContentDTO.swift:12 `final class ContentDTO: Decodable` — 형제 DTO 5곳은 struct",
+  "suggestion": "struct로 전환하여 CoW 이점 확보. 참조 기반 호출부 3곳 수정."
 }
 ```
+
+⛔ 배열 필드(`alternatives`/`recommended`)를 쓰지 않는다 — 위 예시가 정본 형태다.
 
 ---
 
@@ -342,11 +341,9 @@ severity major 이상 아키텍처 이슈에 대안 비교표 필수 포함:
       "confidence": 85,
       "origin": "regression | pre-existing | improvement",
       "description": "문제 설명 (400자 이내). WHY 필수: 기존 동작과의 차이 + 발생 조건 + 결과 포함",
-      "impact": "실제 사용자/시스템에 미치는 영향 (major 이상 필수, minor 이하 null)",
-      "suggestion": "수정 제안 (300자 이내, 코드 예시 포함 권장)",
-      "alternatives": [{"label": "A: 현재 구현", "description": "...", "pros": ["..."], "cons": ["..."]}],
-      "recommended": "B: 추천 대안 label (major 이상, optional)",
-      "evidence_trace": "// Step 1: ...\n// Step 2: ...\n// 결론: ... (major 이상 필수, minor 이하 null)"
+      "evidence": "⛔ 스키마 required — 실제 diff/파일 인용. major 이상은 인과 추적을 여기에 함께 담는다: // Step 1: … // Step 2: … // 결론: …",
+      "impact": "⛔ 스키마 필드가 아니다 — 영향 서술은 description(peer)/detail(live) 안에 포함한다. 별도 키로 emit하면 Lead가 읽지 않는다",
+      "suggestion": "수정 제안 (300자 이내, 코드 예시 포함 권장)"
     }
   ],
   "strengths": [
@@ -366,7 +363,7 @@ severity major 이상 아키텍처 이슈에 대안 비교표 필수 포함:
 | 항목 | 제한값 |
 |------|--------|
 | description | 400자 이내 (WHY 필수) |
-| impact | major 이상 필수, minor 이하 null |
+| impact | ⛔ 스키마 필드 아님 — `description`에 영향 서술 포함 (major 이상 필수) |
 | suggestion | 300자 이내 |
 | strengths | 최대 3개 |
 | 자체 신뢰도 임계치 | confidence < 80 → 보고하지 않음 |

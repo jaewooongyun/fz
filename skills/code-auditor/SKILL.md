@@ -286,13 +286,15 @@ major 이상 이슈에는 suggestion에 "현재 vs 추천" 형식 사용:
 "현재: [코드 패턴 한 줄]\n추천: [대안 패턴 한 줄]\n근거: [이유]"
 ```
 
-severity major 이상에서 `alternatives` 배열 제공 가능 (peer_review_schema 참조).
+⛔ severity major 이상의 대안 비교는 **`description` 안에** 인코딩한다 — `alternatives` 배열 필드는 `PeerReviewSchema`에 없다(과거 `peer_review_schema` 참조는 **Codex 전용 스키마 오참조**였다). 형식은 `arch-critic` §Alternative Design과 동일.
 
 ---
 
 ## Evidence Trace (코드 추적 증거)
 
-severity major 이상 이슈에는 반드시 `evidence_trace`를 작성하세요.
+⛔ **`evidence_trace`는 스키마 필드가 아니다** — 아래 작성 규칙은 그대로 적용하되, 결과물은 **스키마 required 필드 `evidence`**에 담는다. 별도 키로 emit하면 검증은 통과하지만 Lead의 Basis 열이 `evidence`를 읽으므로 추적이 **판정에 반영되지 않는다.** (본 문서에서 `evidence_trace`는 *작성 형식의 이름*으로만 쓴다.)
+
+severity major 이상 이슈에는 반드시 이 추적 형식을 작성하세요.
 텍스트 설명 대신 **실제 코드 경로를 step-by-step으로 보여주어 코드가 스스로 문제를 증명**하도록 합니다.
 
 ### 작성 규칙
@@ -351,7 +353,7 @@ func routeToDetail() {
 // 올바른 경로: 비즈니스 로직 컴포넌트 → UseCase → 네비게이션 컴포넌트(결과 전달받아 네비게이션만)
 ```
 
-> severity minor 이하: `"evidence_trace": null`
+> ⛔ 키는 **`evidence`** 다 — 추적 형식을 그 필드에 담는다(위 §머리 매핑 선언). severity minor 이하는 추적 없이 인용만.
 
 ---
 
@@ -398,9 +400,9 @@ func routeToDetail() {
       "confidence": 90,
       "origin": "regression | pre-existing | improvement",
       "description": "문제 설명 (400자 이내). WHY 필수: 기존 동작과의 차이 + 발생 조건 + 결과 포함",
-      "impact": "실제 사용자/시스템에 미치는 영향 (major 이상 필수, minor 이하 null)",
-      "suggestion": "수정 제안 (300자 이내, 코드 예시 포함 권장)",
-      "evidence_trace": "// Step 1: ...\n// Step 2: ...\n// 결론: ... (major 이상 필수, minor 이하 null)"
+      "evidence": "⛔ 스키마 required — 실제 diff/파일 인용. major 이상은 인과 추적을 여기에 함께 담는다: // Step 1: … // Step 2: … // 결론: …",
+      "impact": "⛔ 스키마 필드가 아니다 — 영향 서술은 description(peer)/detail(live) 안에 포함한다. 별도 키로 emit하면 Lead가 읽지 않는다",
+      "suggestion": "수정 제안 (300자 이내, 코드 예시 포함 권장)"
     }
   ],
   "strengths": [
@@ -420,7 +422,7 @@ func routeToDetail() {
 | 항목 | 제한값 |
 |------|--------|
 | description | 400자 이내 (WHY 필수) |
-| impact | major 이상 필수, minor 이하 null |
+| impact | ⛔ 스키마 필드 아님 — `description`에 영향 서술 포함 (major 이상 필수) |
 | suggestion | 300자 이내 |
 | strengths | 최대 3개 |
 | 자체 신뢰도 임계치 | confidence < 80 → 보고하지 않음 |

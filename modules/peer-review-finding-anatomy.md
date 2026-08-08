@@ -19,7 +19,7 @@
 |------|-------------|
 | `review-report.md` 이슈 본문 | ✅ — 필수 필드 위에 서술을 얹는다 |
 | `pr-comments.md` / 게시 코멘트 | ✅ — 톤은 SKILL.md Comment Style Guide, 구조는 여기 |
-| 에이전트 JSON 산출 | ❌ — 스키마가 dedup·투표를 위해 균일해야 한다. 그 자리에선 필드가 맞다 |
+| 에이전트 JSON 산출 | ❌ **서술 형태**는 적용 안 함 — 스키마가 dedup·투표를 위해 균일해야 한다. ⚠️ 단 **대안 2개+의 *발굴*은 에이전트 소유**다(`description` 내 인코딩 — `skills/arch-critic/SKILL.md` §Alternative Design). Lead는 그 배열을 §3 C4 성격 라벨로 **재서술**한다 |
 
 **필드와 원칙은 대립하지 않는다.** 필드(`File:line`·`Origin`·`Confidence`·`Found-by`)는 *어떤 정보가 있어야 하는가*이고, 원칙은 *그 정보를 어떻게 엮어야 리뷰어가 따라오는가*이다.
 
