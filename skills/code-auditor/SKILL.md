@@ -47,6 +47,10 @@ ${WORK_DIR}/evidence/convention-samples.md  # 프로젝트 내 동일 패턴 샘
   Convention 패턴 (3+ 모듈 동일)은 severity **suggestion 이하**로만 판정.
 - **"교과서적으로 틀렸다"는 단독 근거로 major 판정 금지.**
   프로젝트에서 같은 패턴이 3+ 곳에 있으면 convention.
+- **convention은 양방향 입력이다** — 억제만이 아니라 **처방**에도 쓴다.
+  · 관례와 **같음** → 위 억제 규칙 적용 (severity 하향)
+  · 관례와 **다름** → *"형제 N곳이 X 형태인데 이번만 Y"*를 근거로 제시한다. 규칙 위반이 아니어도 유효한 지적이다.
+  ⛔ **N 강도 임계는 미정이다 — severity를 부여하지 않는다.** 표본 1건(PR #4679 I3, N=5)으로는 등급 근거가 없다. 형제 N곳을 세어 **근거로 제시하고 관찰 보고로 남긴다.** 임계 SSOT는 `modules/review-checks.md` 4-E (표본 3건 후 확정).
 
 ---
 

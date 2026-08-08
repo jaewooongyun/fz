@@ -28,6 +28,12 @@
   7. ⛔ Symbol Coverage 검증 (양방향):
      - **제거 방향** (import 변경 작업): diff에서 `import X` → `import Y`로 변경된 파일에서 X 모듈의 심볼(typealias, utility 타입 등)이 잔존하는지 grep. 잔존 시 → "symbol_orphan" 이슈
      - **추가 방향** (신규 import 추가 작업, P1 A2 추가 — cargo-cult 방어): 새로 추가된 `import X`에 대해 X 모듈의 알려진 심볼이 파일에서 사용되는지 grep. 0건이면 → "redundant_import" 이슈 (severity: minor — false positive 가능: typealias 간접 참조 등. 사용자/Codex 최종 판정)
+  8. ⛔ 형제 샘플(convention) 수집 — 4번 소비자 전수 수집과 같은 Grep 패스에서 함께 한다:
+     - diff의 각 구조 결정(DI 획득 방식·상태 보관 위치·public API 모양)에 대해 **같은 역할의 형제 심볼**을 Grep으로 수집한다. 예: `Grep("BookmarkUseCaseImpl(")` → 형제 Interactor N곳이 어떤 방식을 쓰는지
+     - 수집 결과는 판정의 **양방향 입력**이다:
+       · 관례와 **같음**(3+ 형제 동일) → severity 하향 (교과서 기준만으로 위반 판정 금지)
+       · 관례와 **다름** → *"형제 N곳이 X 형태"*를 근거로 제시. ⚠️ N의 강도 임계(N≥? → 어느 severity)는 **미정**이므로 현재는 **관찰 보고까지만** — 처방 severity는 부여하지 않는다 *[candidate: 표본 1건 — PR #4679 I3, N=5. 3 표본 후 임계 결정]*
+     - ⛔ 수집 없이 관례를 논하지 않는다. `arch-critic`이 review-arch에 함께 로드되어 "Convention 3+ 모듈은 suggestion 이하" 억제 규칙을 주입하므로, **수집이 없으면 억제 기준만 있고 근거가 없는 상태**가 된다
 ```
 
 ### 검증 4-F: Anti-Pattern Enforcement (잔존 금지 패턴 검증)
