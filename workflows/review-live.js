@@ -31,7 +31,7 @@ const ReviewFindingsSchema = {
         type: 'object', required: ['id', 'severity', 'category', 'title', 'detail', 'evidence'],
         properties: {
           id: { type: 'string', description: '리뷰어 내 고유 id (예: A1, Q3)' },
-          severity: { type: 'string', enum: ['critical', 'major', 'minor'] },
+          severity: { type: 'string', enum: ['critical', 'major', 'minor', 'suggestion'] },
           category: { type: 'string' },
           title: { type: 'string' },
           detail: { type: 'string' },
@@ -54,7 +54,7 @@ const CrossReviewSchema = {
         properties: {
           id: { type: 'string', description: '상대 리뷰어의 finding id' },
           verdict: { type: 'string', enum: ['agree', 'adjust', 'false_positive'] },
-          newSeverity: { type: 'string', enum: ['critical', 'major', 'minor'] },
+          newSeverity: { type: 'string', enum: ['critical', 'major', 'minor', 'suggestion'] },
           note: { type: 'string', description: 'false_positive/adjust는 실측 인용 필수' },
         },
       },
@@ -201,9 +201,10 @@ const dist = {
   critical: findings.filter(f => f.finalSeverity === 'critical').length,
   major: findings.filter(f => f.finalSeverity === 'major').length,
   minor: findings.filter(f => f.finalSeverity === 'minor').length,
+  suggestion: findings.filter(f => f.finalSeverity === 'suggestion').length,
   fpFlagged: findings.filter(f => f.crossVerdict === 'false_positive' || f.counterVerdict === 'refute').length,
 }
-log(`findings ${findings.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / FP·refute 플래그 ${dist.fpFlagged} (최종 기각은 Lead)`)
+log(`findings ${findings.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / suggestion ${dist.suggestion} / FP·refute 플래그 ${dist.fpFlagged} (최종 기각은 Lead)`)
 
 // stagesCompleted = 완전 완주한 stage 수 (리뷰 Q2 교정 — stage2 미완주+stage3 완주 시 오보고 방지)
 const s1full = !!(arch && quality)
