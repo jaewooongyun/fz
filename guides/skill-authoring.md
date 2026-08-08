@@ -515,6 +515,24 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
   - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [미검증: per-call `opts.effort` vs settings.json `effortLevel` 우선순위. 문서화된 체인은 `env var > frontmatter > 세션`이며 per-call opts는 미명시]
   - ⛔ **effort로 응답 길이를 줄이려 하지 말 것** — Opus 5에서 effort는 사고량을 조절할 뿐 가시 응답 길이를 신뢰성 있게 줄이지 못한다. 길이는 프롬프트로. [verified: 동 effort 문서]
 
+### resume 계약 + advisor 상속 (2026-08-08 신설)
+
+> 신설 정당화 (DELETE/MERGE-default): 본 §12는 배치·호출·model/effort·산출물·intentContext를 이미 소유하나 **중단 후 재개**와 **워커가 상속하는 세션 설정**을 다루지 않았다 — 기존 하위절 흡수 불가. 둘 다 실측으로 확인된 계약만 수록.
+
+**resume** [verified: code.claude.com/docs/en/workflows]
+- `Workflow({ scriptPath, resumeFromRunId })` — 변경되지 않은 `agent()` 호출의 **최장 prefix가 캐시로 즉시 반환**되고 첫 변경 지점부터 재실행된다. 같은 스크립트 + 같은 args = 100% 캐시 히트.
+- ⛔ **재생 순서 규칙**: *"Cached results stop at the first agent that didn't finish, and **every agent that started after that one runs again, even if it completed**."* → 팬아웃 중간에 멈추면 뒤에 시작된 완료분까지 전부 재실행된다.
+- ⚠️ **설계 함의**: 공식 결론은 *"**다수의 작은 에이전트가 하나의 큰 에이전트보다 진행을 더 보존한다**"* 이다. fz의 현행 워크플로는 **소수의 큰 에이전트 + 스테이지 배리어** 구조라 이 방향과 반대다 — 스테이지 세분화의 이득은 **미측정**이며 재검토 대상으로 남긴다.
+- **경계**: resume은 **동일 Claude Code 세션 내에서만** 동작한다. CC를 종료하면 다음 세션은 워크플로를 처음부터 시작한다 → 장기 워크플로는 ASD 아티팩트가 여전히 1차 복원 수단이다.
+- **진단**: `<transcriptDir>/journal.jsonl`이 agent별 **실제 반환값**을 1줄씩 기록한다. ⛔ 빈 결과·이상 결과 원인 규명 시 **추측 금지, journal 먼저 Read**.
+- ⛔ 스크립트 결정성 요구와 한 세트다 — `Date.now()`/`Math.random()`/무인자 `new Date()`는 **throw**된다(resume을 깨뜨리므로).
+
+**세션 설정 상속** [verified: 프로브 `wf_e7136199-140`, 2026-08-08]
+- ⛔ **워커는 세션 `advisorModel`을 상속한다.** 1-agent 프로브(`model:'opus'`)가 advisor를 실제 호출해 응답을 받았다 — `{"advisor_tool_available":true,"call_succeeded":true}`. 즉 fz의 opus 워커 전부가 advisor를 호출할 수 있다.
+  - **비용 계측 불가**: advisor 호출은 `usage.server_tool_use`에 기록되지 않는다(워커 트랜스크립트 `agent-*.jsonl`에서도 동일). `governance.md §사각지대` 참조 — `opus 동시 ≤3` envelope이 advisor 지출을 bound하지 않는다.
+  - ⛔ **ad-hoc 프로브 작성 시 advisor 호출을 유도하는 지시를 넣지 말 것** — 계측되지 않는 지출이 된다(도구 가용성 실증 같은 명시적 목적 제외).
+- ⛔ **`CLAUDE_CODE_SUBAGENT_MODEL`은 `opts.model`을 override한다** — *"the model Claude Code uses for all subagents, agent teams, and **agents in a workflow** … overrides the per-invocation `model` parameter and the subagent definition's `model` frontmatter"* [verified: /model-config]. 즉 **본 §12의 "model 명시 의무"를 무력화할 수 있는 유일한 변수**다. 워커 모델이 예상과 다르면 **1순위로 이 env var를 확인**하고, `inherit`로 정상 해석에 복귀시킨다.
+
 ### 산출물·거버넌스 계약
 
 - 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — mode='fallback'이면 Lead가 SOLO 폴백. wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
