@@ -8,6 +8,29 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release). MAST (2503.13657)는 v4.17.0에서 modules 재인용으로 active 환원
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.23.0 (2026-08-08) — llm-references §1.1b 신설: fz 의존 기능 7문서 색인 + 스폰 캡 stale 정정 [MINOR]
+
+> 감사 결과 **fz가 실행 경로에서 의존하는 Claude Code 기능 7종의 공식문서 행이 §1.1에 없었다.** 특히 `/model-config`은 `fable-model-guide.md`·`skill-testing.md:422`·`harness-engineering.md:1227`·CHANGELOG 등 **12개 지점에서 이미 1차 출처로 인용**되면서 색인 행만 없어 참조점이 분산돼 있었다. 산출물: `~/dev/TVING/claude-paradigm-scan/`(감사서·리스트).
+>
+> - **`guides/llm-references.md` §1.1b 신설 (7행)** — O11 `/model-config` · O12 `/workflows` · O13 `/worktrees` · O14 `/plugins-reference` · O15 `/settings` · O16 `/env-vars` · O17 `/commands`. ⛔ **DELETE/MERGE-default 충족 근거 = 순수 additive가 아니라 산재 인용의 통합**(§1.1b 헤더에 명시). 7개 전부 **원문 fetch 후 작성** — 미대조 내용은 넣지 않았다.
+> - ⭐ **fz 규약에 직접 영향 2건 발견**:
+>   - `CLAUDE_CODE_SUBAGENT_MODEL`이 subagent·agent team·**workflow agent** 전부에 적용되고 **per-invocation `model` 파라미터와 frontmatter `model`을 override**한다 → `skill-authoring §12`의 "model 명시 의무"를 무력화할 수 있는 유일한 변수. 진단 1순위.
+>   - `/env-vars`: *"any non-empty value **including `0`** turns the behavior on"* — **`=0`은 끄는 값이 아니다.** 실험 게이트를 `0`으로 껐다고 믿는 설정은 전부 재검증 대상.
+> - ⛔ **stale 정정 — 세션 생애 200 스폰 캡 제거**(v2.1.224): `llm-references.md:28,§4-4` · `harness-engineering.md:1090,1105` · `agent-team-guide.md:291` **5지점**. 남은 하네스 상한은 **동시 20 + depth 3**뿐. fz governance(opus 동시 ≤2~3)는 여전히 훨씬 보수적이라 **거버넌스 재설계 불필요** — 순수 사실 정정이다.
+> - **`/changelog (v2.1.220~226)` 행 추가** — ultraplan 제거 · workflow `import()` 샌드박스 탈출 픽스 · worktree 격리 전 세션 타입 확대 · `prompt-audit` 신설.
+> - **감사 축 명시** — `last audited` 2026-07-25 → **2026-08-08**, 단 *"§1.1·§1.1b만 전수 대조. §1.2는 07-25 그대로, §2·§3은 미대조"* 를 헤더에 병기(하지 않은 감사 주장 금지).
+> - **§6 가이드 매핑 확장** — fable-model-guide(O11) · governance/execution-modes(O12·O13·O17) 행 신설.
+>
+> **advisor 실증 2건 → 규약 반영** (2026-08-08, 동일 릴리즈):
+> - ⭐ **A2: Workflow `agent()`가 세션 `advisorModel`을 상속한다** [verified: 1-agent 프로브 `wf_e7136199-140`, `model:'opus'`] — `{"advisor_tool_available":true,"call_attempted":true,"call_succeeded":true}`. v2.1.223 changelog가 "workflow agents"를 별도 스폰 클래스로 열거한 것은 **모델 제한 경고 범위**에 한정되며 advisor 상속과 무관함이 확인됐다.
+> - ⭐ **A1: advisor 사용량은 트랜스크립트에 기록되지 않는다** [verified: 세션 트랜스크립트 3.1MB 전수] — advisor 6회 호출에도 `usage.server_tool_use` **289개 레코드 전수가 `{"web_fetch_requests":0,"web_search_requests":0}`뿐**. `advisor_*tokens` 류 필드 grep 0건. 워커 `agent-*.jsonl`에서도 재현.
+> - **`modules/governance.md` §사각지대 신설** — advisor가 ①kill-switch ②lint/런타임 캡 ③트랜스크립트 계측 **3중으로 안 잡힌다**는 것을 근거와 함께 명시. `/usage`(대화형)가 유일 관측 경로. ⛔ **`opus 동시 ≤3` envelope이 advisor 지출을 bound하지 않는다.** 운용 규칙 4항(baseline 선기록·ad-hoc 프로브 금지·워커 회당 비용 규모·끄는 법) 추가.
+> - **`guides/skill-authoring.md` §12에 「resume 계약 + advisor 상속」 신설** — `resumeFromRunId` 재생 순서 규칙(*"every agent that started after that one runs again, even if it completed"*) · **다수의 작은 에이전트가 진행을 더 보존**한다는 공식 결론과 fz의 소수-큰-에이전트 구조가 반대 방향임을 미측정 재검토 대상으로 명시 · resume은 동일 세션 한정 · `journal.jsonl` 진단 · ⛔ **`CLAUDE_CODE_SUBAGENT_MODEL`이 `opts.model`을 override**하므로 §12의 model 명시 의무를 무력화할 수 있음(진단 1순위).
+> - **`guides/agent-team-guide.md:218` stale 정정** — *"Workflow 미보유 팀(예: fz-peer-review)"* 은 사실이 아니다(`workflows/peer-review.js` 실재, `SKILL.md:65,270`이 Workflow 필수 명시). **Workflow 미보유 팀은 현재 없다.** `TeamCreate` 실행 경로 호출부도 **0건**임을 병기.
+> - **`modules/execution-modes.md` §SIMPLIFY 헤더 노트** — `/simplify`는 v2.1.154부터 **cleanup-only**(버그 헌팅은 `/code-review --fix`). fz의 게이트 3종(과잉 추상화·복잡도·패치 누적)은 cleanup 범위 안이라 **재배선 불필요**. ⚠️ `focus` 파라미터 사양은 공식 표에 행이 없어 **[미검증]**.
+>
+> ⛔ **미반영 (후속)**: `harness-engineering.md:1227` 참고문헌 행의 §1.1b 리다이렉트 · Tier 3 문서(`/permissions`·`/costs`·`/tools-reference`) 미수록 · **워크플로 스테이지 세분화**(resume 진행 보존 개선) 미측정 · effort sweep(P3) 미실행 — 3층 전부 `xhigh` 유지가 사용자 결정.
+
 ### v4.22.0 (2026-08-08) — 누적 릴리즈: fz-rebase 신설 · peer-review 인라인 게시 · Opus 5 대응 · 계측 도구 [MINOR]
 
 > v4.21.0 이후 약 한 달간 발행 없이 커밋만 누적됐다(28커밋 / 59파일 / +3,293 −222). 초안 번호 `4.23.0`~`4.25.0`은 origin·태그·Release 어디에도 존재한 적이 없어 **폐기하고 누적분 전체를 v4.22.0 하나로 발행**한다 — 구간에 `[MAJOR]` 0건이므로 `4.21.0 → 4.22.0`이 semver 정합. 상세: [docs/releases/v4.22.0.md](docs/releases/v4.22.0.md)
