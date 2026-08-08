@@ -4,7 +4,9 @@
 //   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/review-live.js',
-//       args: { diffPath, intentContext } })
+//       args: { diffPath, intentContext, structuralContext? } })
+//   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
+//     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 SOLO 리뷰 경로 수행.
@@ -116,12 +118,15 @@ if (!input || !input.diffPath || !input.intentContext) {
 }
 
 const TARGET = `[리뷰 대상] diff 파일: ${input.diffPath} (Read로 로드)\n[변경 의도] ${input.intentContext}`
+// 구조 축 브리프 — arch 렌즈에만 주입 (modules/review-structural-axes.md §2).
+// quality는 결함 축을 유지해야 하고, A/B 검증도 review-arch 1개로만 이뤄졌다.
+const structuralLine = input.structuralContext ? `\n[구조 축 — 이 렌즈 전용] ${input.structuralContext}` : ''
 
 // ════════ Stage 1: 독립 병렬 리뷰 (Round 1 독립성) ════════
 phase('Stage 1: arch/quality 독립 리뷰')
 const [arch, quality] = await parallel([
   () => callAgent(
-    `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}\n` +
+    `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}\n` +
     `[목표] 아키텍처 관점 findings (id는 A1, A2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
     { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewFindingsSchema }),
   () => callAgent(
@@ -203,8 +208,10 @@ const dist = {
   minor: findings.filter(f => f.finalSeverity === 'minor').length,
   suggestion: findings.filter(f => f.finalSeverity === 'suggestion').length,
   fpFlagged: findings.filter(f => f.crossVerdict === 'false_positive' || f.counterVerdict === 'refute').length,
+  // 구조 축 주입 여부 — structuralContext는 optional이라 누락 시 에러 없이 꺼진다. 반환값으로 판별 가능하게 남긴다.
+  structuralAxes: !!input.structuralContext,
 }
-log(`findings ${findings.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / suggestion ${dist.suggestion} / FP·refute 플래그 ${dist.fpFlagged} (최종 기각은 Lead)`)
+log(`findings ${findings.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / suggestion ${dist.suggestion} / FP·refute 플래그 ${dist.fpFlagged} / 구조축 ${dist.structuralAxes ? 'ON' : '⛔OFF'} (최종 기각은 Lead)`)
 
 // stagesCompleted = 완전 완주한 stage 수 (리뷰 Q2 교정 — stage2 미완주+stage3 완주 시 오보고 방지)
 const s1full = !!(arch && quality)

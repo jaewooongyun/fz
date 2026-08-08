@@ -127,6 +127,8 @@ Lead 단독으로 다음 4 perspectives 검토 (9 perspectives 중 핵심만):
 3. Modern API
 4. Requirements Alignment
 
+⛔ **구조 축은 Lead가 직접 적용한다** — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 위 4 perspectives와 **함께** 검토한다. Tier 0/1은 Workflow를 호출하지 않으므로 `args.structuralContext` 경로가 **존재하지 않는다**. 여기서 직접 적용하지 않으면 `<100줄` PR — 실무에서 가장 흔한 규모 — 은 구조 판정이 영구히 0건이다. (Tier 1도 "Tier 0와 동일 4 perspectives"이므로 본 항목을 승계한다.)
+
 sub-agent spawn 없음. Codex 호출 없음 (`--codex` 옵션 시 Tier 1 절차로 자동 전환).
 
 ### Synthesize
@@ -261,15 +263,19 @@ jq -e '
 
 ```
 1. Lead: Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js',
-                    args: { diffPath, intentContext, evidencePaths, basePath, deep: false } })
+                    args: { diffPath, intentContext, evidencePaths, basePath, deep: false,
+                            structuralContext } })   // ⛔ 누락 시 에러 없이 구조 축이 꺼진다
 2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
              → parallelWithRetry (null 항목 1회 순차 재시도 = rate-limit 폴백 계약)
 3. Lead: /fz-codex 경유 Codex challenger ×1  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
 4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
 ```
 
+⛔ **Tier 2 반환 계약 — Lead가 알아야 하는 필드 부재**: Tier 2는 `mergedIssues` 경로를 타지 않으므로(`peer-review.js:173-177`) 반환 `issues`에 **`finalSeverity`·`crossVerdict`·`counterVerdict`가 없다**. Tier 3에만 있다. Confidence Matrix를 만들 때 `severity`(원본)를 쓰고, 교차·DA 열은 "미수행"으로 표기한다 — 필드를 찾다 실패하면 Matrix가 판정 불가로 멈춘다.
+
 에이전트 브리프는 스크립트가 조립한다 (OVERRIDE 블록 + TARGET). Lead가 args로 넘길 것:
 - `diffPath` / `basePath`(base 원본 prefetch — 에이전트가 요청하지 않는다) / `evidencePaths`
+- `structuralContext` — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 담는다. **arch 렌즈에만 주입**되고 optional이므로, 빠뜨리면 `mode:'workflow'`가 정상 반환되면서 구조 판정만 0건이 된다
 - [Mapping] `evidence/semantic-mapping.md` 존재 시 워커가 raw source + atom table을 직접 read (Lead 요약 금지, v4.4.0)
 
 ---
