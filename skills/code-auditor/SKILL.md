@@ -365,7 +365,7 @@ func routeToDetail() {
 |--------|------|--------------|
 | `regression` | 이 PR이 새로 만든 문제. 원본 코드에 없던 동작. | severity 자유 (critical/major 가능) |
 | `pre-existing` | 원본 코드에도 동일한 패턴이 있었음. PR이 그대로 유지/이식. | severity cap: `suggestion` |
-| `improvement` | 문제는 아니지만 더 나은 방법이 있음. | severity cap: `minor` |
+| `improvement` | 문제는 아니지만 더 나은 방법이 있음. | **cap 없음** — 근거에 맞는 severity를 매긴다. 리포트에서 `[개선 제안]` 태그로 분리되고 verdict를 막지 않는다(non-blocking) |
 
 판정 절차:
 1. diff에서 문제 패턴 발견

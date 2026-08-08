@@ -330,7 +330,7 @@ Lead 보정 **불필요** — `peer-review.js`가 `reviews`를 `.filter(Boolean)
 |--------|------|------------|
 | regression | severity 유지 (PR이 만든 문제) | — |
 | pre-existing | severity cap → suggestion | `[기존 동작 동일]` |
-| improvement | severity cap → minor | `[개선 제안]` |
+| improvement | **cap 없음** — 에이전트 판정 유지. `raw`(에이전트)와 `adj`(보정 후)를 **병기**하고 ⛔ **non-blocking**(verdict를 막지 않음) | `[개선 제안]` |
 | 미지정 | base-behavior.md 교차 확인 후 Orchestrator 직접 판정 | — |
 
 핵심 원칙: **PR 리뷰는 PR이 만든 변화를 평가한다.**
@@ -376,8 +376,9 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 |---|-------|--------|-----|------|---------|-------|----|-------|-------|-------|----------|
 ```
 
-> Origin 열: `R`(regression), `P`(pre-existing), `I`(improvement). pre-existing → severity cap: suggestion.
+> Origin 열: `R`(regression), `P`(pre-existing), `I`(improvement). pre-existing → severity cap: suggestion. **`I`는 cap 없음 — `Sev` 열에 `raw→adj` 병기(⛔ `Final` 열은 confidence이므로 어휘 구분), non-blocking**.
 > Basis 열: `CV`(code-verified), `IO`(inference-only). IO + 3/3 → [correlated] 태그.
+> ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를 **Read 후 실행** — 전체 N / 분석 M 비율 보고. Codex 호출 시 같은 파일 §Reflection Rate도 산출(반영률 = Codex finding 중 최종 리포트 채택 / N · `N<10`은 preliminary·verdict 보류). same-model 교차(Stage 2 arch↔quality)는 `guides/agent-team-guide.md` §85-95대로 headline 제외.
 
 ### 4.4-4.9. Verification Gates
 
