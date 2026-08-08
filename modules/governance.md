@@ -26,6 +26,29 @@
 > 모델 비용 상한 근거: 최대 동시 = Lead(fable ≈ opus 2) + opus 3 ≈ **opus 5 equivalent**. 단가: sonnet $3/$15 · opus $5/$25 · fable $10/$50 (per MTok). fable 1 ≈ opus 2 비용 등가. canonical `guides/fable-model-guide.md` §5.
 > **rate-limit 폴백 계약**: 병렬 opus 스폰이 상한 미달로 실패/429 시 순차화 재시도 1회 → 재실패 시 `mode:'fallback'` 반환. 구현은 workflows 코드(plan-collaborative stage2 · peer-review stage1의 병렬 블록).
 
+### ⛔ 사각지대 — advisor 도구는 위 상한이 **전혀 보지 못한다**
+
+`advisorModel`이 설정된 세션에서 advisor는 **스폰된 에이전트가 아니라 서버사이드 tool call**이다. 따라서 이 문서의 모든 상한 밖에 있다.
+
+| 방어선 | advisor를 보는가 | 이유 |
+|--------|-----------------|------|
+| 위 kill-switch (에이전트 5+ 동시 · opus 4+ 동시) | ❌ | 에이전트가 아니라 tool call |
+| `scripts/lint-model-explicit.sh` · Workflow 런타임 캡(동시 16·총 1000) | ❌ | 대상 아님 |
+| **트랜스크립트 계측** (`usage.server_tool_use`) | ❌ | **필드 자체가 없다** |
+| `/usage` (대화형) | ✅ | **유일하게 작동하는 관측 경로** |
+
+**실측 근거 (2026-08-08)** — 이 3중 사각지대는 추정이 아니라 확인된 사실이다:
+- 세션 트랜스크립트 3.1MB 전수 파싱: advisor 호출 6회 발생했으나 `usage.server_tool_use` **289개 레코드 전수가 `{"web_fetch_requests":0,"web_search_requests":0}`뿐**. `advisor_*tokens`·`advisor_usage` 류 필드 grep **0건**. 워커 트랜스크립트(`agent-*.jsonl`)에서도 동일 재현.
+- 1-agent 프로브(`wf_e7136199-140`, `model:'opus'`): **Workflow `agent()`로 스폰된 opus 워커가 세션 `advisorModel`을 상속해 실제 호출에 성공**했다 — `{"advisor_tool_available":true,"call_succeeded":true}`.
+
+⛔ **따라서 `opus 동시 ≤3` 비용 envelope은 advisor 지출을 전혀 bound하지 않는다.** 워커 3개가 각자 advisor를 호출할 수 있고, 공식 문서상 *"There is no setting to cap or force advisor calls"* 이며 *"the advisor model's own read of the conversation is **not cached**"* 다. 사후 추적 수단은 `/usage`를 사람이 보는 것뿐이다.
+
+**운용 규칙**
+1. advisor 사용량을 **늘리려는 변경 전**에는 `/usage`로 baseline을 먼저 기록한다 (사후 복원 불가).
+2. ad-hoc Workflow 프로브 등 일회성 실행은 advisor 호출을 유도하는 지시를 넣지 않는다 — 계측되지 않는 지출이 된다.
+3. ⚠️ 격리 워커의 advisor는 **워커 자신의 컨텍스트만** 읽는다(메인 세션 트랜스크립트 아님) → 회당 비용은 메인 세션보다 작다. 리스크는 회당 비용이 아니라 **호출 수 × 무계측**이다.
+4. 끄려면 `advisorModel` **unset** 또는 `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`. ⛔ 실험 게이트류 env var를 `"0"`으로 두는 것은 끄는 게 아니다 — 공식: *"any non-empty value **including `0`** turns the behavior on"*.
+
 ### Kill-Switch 실행 절차
 
 1. 조건 감지 → 현재 Step 완료 대기 (진행 중 작업 보호)
