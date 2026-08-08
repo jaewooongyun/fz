@@ -208,9 +208,10 @@ v4.21.0 이후 한 달간 발행 없이 누적된 28커밋(59파일 / +3,293 −
 | | `/fz-fix` | 버그 수정 (4-Phase 디버깅) |
 | | `/fz-review` | 3중 검증 (Claude + Codex + sc:analyze) |
 | | `/fz-commit`, `/fz-pr` | 커밋 + Fork 기반 PR |
+| | `/fz-rebase` | 리베이스 조용한 유실 게이트 (경로 단위 배타 분할 + prepush 원격 실측) |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
-| **검증** | `/fz-codex` | Codex CLI 교차 검증 (GPT-5.5) + `micro-eval` 단일 주장 재평가 |
+| **검증** | `/fz-codex` | Codex CLI 교차 검증 (모델은 `config.toml` SSOT 위임 = 항상 최신 frontier) + `micro-eval` 단일 주장 재평가 |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
 | **문서/시스템** | `/fz-memory`, `/fz-skill`, `/fz-manage`, `/fz-modernize` | 메모리, 스킬 관리 (`write` 서브커맨드 = 문서 작성 + 글쓰기 + 프롬프트 최적화), 가이드 modernization |
 | **보조** | `/fz-new-file`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 회의록, PR 요약 |
@@ -219,7 +220,7 @@ v4.21.0 이후 한 달간 발행 없이 누적된 28커밋(59파일 / +3,293 −
 
 ## Agents
 
-Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈 정의** (v4.12). TEAM P2P 스폰은 legacy.
+Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈 정의** (v4.12). TEAM P2P 스폰은 v4.22.0에서 일몰 완료.
 
 | 도메인 | Primary (Opus) | Supporting (Sonnet) |
 |--------|:---:|---|
