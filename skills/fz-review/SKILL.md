@@ -299,7 +299,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 ### Gate 4: Review Passed
 - [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
 - [ ] 참조 무결성 확인? (Serena)
-- [ ] ⛔ Codex 리뷰 통과? (Critical/Major 이슈 없음 — Codex 실행 자체가 필수)
+- [ ] ⛔ Codex 리뷰 통과? (**Critical 0건 + Major는 결함(회귀·버그·영향범위)에 한해 차단** — ⛔ 구조 개선 제안은 major여도 **non-blocking**. `ReviewFindingsSchema`에 `origin`이 없어 기계 판별이 불가하므로 **Lead가 결함/개선을 판정**한다. 이 구분이 없으면 "제안"이 강제 수정이 된다. Codex 실행 자체는 필수)
 - [ ] /sc:analyze 통과? (심각한 문제 없음)
 - [ ] Constraint Matrix Compliance 통과? (제약 매트릭스 부합, /fz-discover 산출물 있을 때)
 - [ ] Refactoring Completeness 통과? (deprecated dead code 없음)
