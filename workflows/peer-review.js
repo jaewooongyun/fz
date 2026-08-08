@@ -241,9 +241,10 @@ const dist = {
   critical: mergedIssues.filter(f => f.finalSeverity === 'critical').length,
   major: mergedIssues.filter(f => f.finalSeverity === 'major').length,
   minor: mergedIssues.filter(f => f.finalSeverity === 'minor').length,
+  suggestion: mergedIssues.filter(f => f.finalSeverity === 'suggestion').length,
   fpFlagged: mergedIssues.filter(f => f.crossVerdict === 'false_positive' || f.counterVerdict === 'refute').length,
 }
-log(`Tier3 issues ${mergedIssues.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / FP·refute 플래그 ${dist.fpFlagged} (최종 투표·Matrix는 Lead)`)
+log(`Tier3 issues ${mergedIssues.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / suggestion ${dist.suggestion} / FP·refute 플래그 ${dist.fpFlagged} (최종 투표·Matrix는 Lead)`)
 
 // stagesCompleted = 완전 완주 stage 수 (stage2 미완주+stage3 완주 시 오보고 방지)
 const s1full = !!(arch && quality && correctness)
