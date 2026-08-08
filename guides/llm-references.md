@@ -1,7 +1,8 @@
 # LLM·AI 권위 자료 레퍼런스
 
 > 목적: Claude Code로 iOS/Swift 앱 작업(요구사항·리팩토링·멀티파일·리뷰·빌드/테스트)을 **오류·누락·환각 없이 최고 성능**으로 수행하기 위한 외부 권위 자료 단일 참조점. fz 가이드·스킬 개선 시 1차 출처로 사용한다.
-> **Sources (last audited: 2026-07-25):** Tier 1 공식 / Tier 2 arxiv·peer-reviewed / Tier 3 커뮤니티(supporting only).
+> **Sources (last audited: 2026-08-08):** Tier 1 공식 / Tier 2 arxiv·peer-reviewed / Tier 3 커뮤니티(supporting only).
+> ⛔ **감사 축 명시**: 2026-08-08 감사는 **§1.1·§1.1b(code.claude.com 운용 문서)** 전수 대조다. §1.2(platform.claude.com 프롬프팅)는 **2026-07-25 대조 그대로**이고, §2 arxiv·§3 커뮤니티는 **미대조**다 — 하지 않은 감사를 주장하지 않는다.
 > **모델 정책: Opus 5 only** (`claude-opus-5`, 2026-07-24 출시) — 구버전 backward-compat는 수록하지 않는다(§5).
 > ⚙️ **이 줄이 SSOT다** — `scripts/lint_doc_freshness.py`가 `모델 정책: <X> only` 를 파싱해 "현행 모델"을 결정한다. 새 모델 출시 시 **이 한 줄을 먼저 갱신**하면 lint가 나머지 문서의 stale 모델 참조를 자동 검출한다.
 > 인용 규약: `[verified: Tier1·2]` 단독 가능 / `[community: …]` 단독 verified 금지(supporting only).
@@ -27,6 +28,21 @@
 | /skills | **progressive disclosure** — body는 invoke 시에만 로드, description만 상시. budget 설정 `skillListingBudgetFraction`·`SLASH_COMMAND_TOOL_CHAR_BUDGET`. invoke된 skill은 세션 내내 단일 메시지로 지속, 재read 안 함. |
 | /changelog (v2.1.219, 2026-07-24) | **Opus 5 = 기본 Opus 모델**, `/fast` 대상 = Opus 5 + 4.8. **nested subagent depth 1→3** (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`로 비활성). 동시 스폰 캡 **20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217 신설), `/clear`로 리셋. dynamic workflow 기본 **medium(<15 agents)**. |
 | /changelog (v2.1.198~218) | subagent **기본 백그라운드** 실행(`/fork`=새 백그라운드 세션, `/subtask`=기존 in-session). permission 기본 `default`→**`manual`**(v2.1.200). **`/verify`·`/code-review` 자동 실행 중단**(v2.1.215, 수동 호출) — 모델측 over-verification(§1.2)에 대한 **하네스측 대응**. 트랜스크립트에 assistant 메시지별 **reasoning effort 기록**(v2.1.212). |
+| /changelog (v2.1.220~226, 2026-08-08) | **세션 생애 200 스폰 캡 제거**(v2.1.224) — *"Removed the 200-subagent-per-session spawn cap … **concurrency and depth limits still apply**"*. 동시 20·depth 3은 유지. **ultraplan 기능 제거**(v2.1.222). workflow 스크립트의 dynamic `import()` 샌드박스 탈출 픽스(v2.1.223). `/review`→`/code-review` 별칭 + 레벨 기억(v2.1.223). worktree 격리를 **파일 편집·Bash 전 세션 타입**에 적용(v2.1.222). `claude-api` 스킬에 `prompt-audit` 신설 — *"patterns written for older models"* 감사(v2.1.221). |
+
+### 1.1b Claude Code 운용 — fz 의존 기능 (verified 2026-08-08)
+
+> 신설 정당화 (DELETE/MERGE-default): **순수 additive가 아니라 산재 인용의 통합**이다. `/model-config`은 이미 `fable-model-guide.md`·`skill-testing.md:422`·`harness-engineering.md:1227`·`CHANGELOG` 등 **12개 지점에서 1차 출처로 인용**되는데 색인 행이 없어 참조점이 분산돼 있었다. 나머지 6개도 fz가 실행 경로에서 의존하는 기능인데 근거 행이 0이었다. ⛔ 후속: `harness-engineering.md:1227` 참고문헌 행을 본 표로 리다이렉트 (별건).
+
+| 페이지 | 핵심 (verified 2026-08-08) |
+|--------|---------------------------|
+| /model-config | ⛔ **`CLAUDE_CODE_SUBAGENT_MODEL`은 subagent·agent team·workflow agent 전부에 적용되고, per-invocation `model` 파라미터와 subagent frontmatter `model`을 override한다** — `inherit`로 정상 해석 복귀. **fz §12의 "model 명시 의무"를 무력화할 수 있는 유일한 변수** → 진단 시 1순위 확인. `opusplan`=plan mode는 opus, 실행은 sonnet. `availableModels` 제한 시 family alias는 **허용된 최신 버전으로 치환**되고 요청·치환 모델을 명시한 notice가 뜬다(v2.1.205+). |
+| /workflows (v2.1.154+) | 워크플로는 **subagent를 오케스트레이션하는 JS 스크립트**다. ⛔ **resume 재생 규칙**: *"Cached results stop at the first agent that didn't finish, and **every agent that started after that one runs again, even if it completed**"* → *"**다수의 작은 에이전트가 하나의 큰 에이전트보다 진행을 더 보존한다**"* (fz의 소수-큰-에이전트+배리어 구조와 **반대 방향** — 설계 재검토 입력). resume은 **동일 세션 내에서만**(CC 종료 시 다음 세션은 처음부터). size guideline `unrestricted`/`small(<5)`/`medium(<15)`/`large(<50)`, 기본 medium — **advice이지 cap 아님**. Large workflow 경고 = 25 agents 초과 또는 예상 1.5M 토큰(v2.1.203+, **advisory·중단 안 함**). ⛔ **워크플로 서브에이전트는 세션 permission mode와 무관하게 `acceptEdits`로 실행되고 파일 편집이 자동 승인**된다. 런타임 캡: 동시 ≤16(코어 적으면 감소)·총 1000·`import()` 포함 스크립트는 시작 전 실패. |
+| /worktrees | `--worktree`/`-w` → `.claude/worktrees/<name>/`, 브랜치 `worktree-<name>`. `worktree.baseRef`=`fresh`(기본, remote 기본 브랜치)/`head`(로컬 HEAD) — ⛔ **브랜치명 지정 불가**. `.worktreeinclude`는 **gitignored 파일만** 복사(추적 파일 미복제), ⛔ `WorktreeCreate` 훅 사용 시 **미처리**. **격리 3중 체크**(파일 편집·명령 cwd·**git 리다이렉트** `git -C`/`--git-dir`/`GIT_DIR`/`cd` 후 git)가 **세션이 스폰한 모든 subagent에 동일 적용**. `isolation: worktree` frontmatter → subagent 전용 워크트리(base는 `--worktree`와 동일). ⭐ **메인과 공유 3종**: `.git` · **project scope 플러그인**(v2.1.200+) · **permission 승인**(v2.1.211+ — worktree의 "don't ask again"이 메인 `.claude/settings.local.json`에 저장). ⛔ `.claude`·`worktrees`·대상이 **symlink면 생성 거부**(v2.1.212+). cleanup: `--worktree` 생성분은 **자동 제거 안 함**, subagent 워크트리만 `cleanupPeriodDays` sweep. |
+| /plugins-reference | `plugin.json`은 `.claude-plugin/`에, 나머지 디렉토리(`commands/`·`agents/`·`skills/`·`workflows/`)는 **플러그인 루트**에 둔다. 매니페스트 포함 시 **`name`만 필수**이고 이 `name`이 **네임스페이스를 결정**한다(fz의 `fz:` agentType prefix 근거). ⛔ 경로 필드(`commands`·`agents`·`workflows`·`outputStyles`)는 **기본 디렉토리를 대체**한다 — 명시하면 기본 `workflows/`는 **스캔되지 않는다**. 유지하려면 명시적으로 함께 나열. 설치 스코프: user(기본)/project(팀 공유). |
+| /settings | precedence **Managed > CLI > Local > Project > User**. `advisorModel`=`"opus"`/`"sonnet"`/full ID, **unset이 비활성화**, ⛔ `"fable"` 저장 시 *"attaches no advisor and **raises no error**"*. `effortLevel`=`low`/`medium`/`high`/`xhigh` — `--effort`·`CLAUDE_CODE_EFFORT_LEVEL`이 1세션 override. `disableWorkflows`(기본 false) · `cleanupPeriodDays`(기본 30일·최소 1, worktree sweep 주기와 공유). |
+| /env-vars | ⛔⭐ **"설정 여부만 읽는" 변수군이 있다** — *"any non-empty value **including `0`** turns the behavior on, and you turn the behavior off by **unsetting** the variable or setting it to an **empty** value."* 해당 확인: `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`·`DISABLE_TELEMETRY`. **`=0`은 끄는 값이 아니다** → 실험 게이트를 `0`으로 껐다고 믿는 설정은 전부 재검증 대상. `CLAUDE_CODE_EFFORT_LEVEL`=*"overrides `/effort`"*. ⚠️ **이 페이지 미등재 실측**: `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`·`MAX_SUBAGENT_SPAWN_DEPTH`·`MAX_SUBAGENTS_PER_SESSION`·`CLAUDE_CODE_SUBAGENT_MODEL` — 출처는 각각 /changelog·/model-config. |
+| /commands | `/batch`=**번들 스킬**. 5~30 독립 유닛 분해 → **유닛당 background subagent 1개 × 격리 worktree** → 각자 테스트 후 **PR 개설**. git 저장소 필요. ⚠️ **별도 세션이 아니라 subagent**이므로 세션 내 통신 대상이다. `/code-review`=번들 스킬(`--fix`/`--comment`/`ultra`, 레벨 미지정 시 **마지막 입력 레벨 재사용**, 로컬은 백그라운드 subagent, `/review`가 별칭). `/deep-research`=**번들 워크플로**. ⚠️ `/simplify`는 이 표에 **없다** — v2.1.154부터 **cleanup-only**이고 버그 헌팅은 `/code-review --fix`로 분리됐다 [출처: /code-review]. |
 
 ### 1.2 모델 프롬프팅 (Opus 5 — platform.claude.com/docs/en)
 
@@ -87,7 +103,7 @@
 
 ## 4. 핵심 원칙 (verified 종합) — fz 설계 정합
 
-> 약어: O1 /memory · O2 /best-practices · O3 /hooks · O4 /sub-agents · O5 /skills · O6 **prompting-opus-5** · O7 **claude-prompting-best-practices** · O8 thinking · O9 **effort** · O10 **/changelog** (모두 §1 Tier 1) · P1 2502.08235 · P2 2504.20799 · P3 2507.19457 · P4 2508.11126 (§2 Tier 2).
+> 약어: O1 /memory · O2 /best-practices · O3 /hooks · O4 /sub-agents · O5 /skills · O6 **prompting-opus-5** · O7 **claude-prompting-best-practices** · O8 thinking · O9 **effort** · O10 **/changelog** · **O11 /model-config · O12 /workflows · O13 /worktrees · O14 /plugins-reference · O15 /settings · O16 /env-vars · O17 /commands** (모두 §1 Tier 1) · P1 2502.08235 · P2 2504.20799 · P3 2507.19457 · P4 2508.11126 (§2 Tier 2).
 1. **하네스 레벨 결정론적 강제**: 신뢰성 필수 동작은 advisory memory가 아니라 hooks. [Tier1 §1.1]
 2. **verifier + adversarial review**: pass/fail oracle로 루프 종료 + 구현자≠채점자(fresh model 반박). [Tier1 §1.1 + P2]
    - ⚠️ **Opus 5 경계선 — 혼동 금지**: 이 원칙이 말하는 건 *하네스가 실행하는 외부 verifier*(빌드/테스트 oracle)와 *다른 관점의 교차검증*(구현자≠채점자)이다. 반면 **모델에게 "스스로 검증하라"고 지시하는 프롬프트**는 Opus 5에서 over-verification을 유발하므로 §5 제거 대상. **원칙은 유지, 자기재확인 지시만 제거.** [O6]
@@ -124,5 +140,7 @@ fz는 항상 최신 모델(현재 **Opus 5**, `claude-opus-5`, 2026-07-24)만 �
 | harness-engineering | §4(원칙) · O1·O2·O3 · P1 |
 | prompt-optimization | §5(구버전) · §4(anti-패턴) · P2·P3 |
 | agent-team-guide | MAST(2503.13657) · O4 · P4 |
-| skill-authoring · skill-troubleshooting | O5 · O4 · O3 |
-| skill-testing | §4-2(verifier) · O2·O6 |
+| skill-authoring · skill-troubleshooting | O5 · O4 · O3 · **O12(§12 Workflow 규약) · O14(`fz:` 네임스페이스)** |
+| skill-testing | §4-2(verifier) · O2·O6 · **O11·O15·O16(effort 우선순위 arm 검증)** |
+| **fable-model-guide** | **O11**(모델 별칭·치환) · O9 |
+| **governance / execution-modes** | **O12**(워크플로 캡·acceptEdits 강제) · **O13**(worktree 격리) · **O17**(`/batch`·`/simplify` 실체) |
