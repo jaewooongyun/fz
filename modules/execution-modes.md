@@ -82,6 +82,11 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 
 ## SIMPLIFY 게이트 상세
 
+> ℹ️ **`/simplify` 현행 사양 (v2.1.154+, verified 2026-08-08)**: *"From v2.1.154, `/simplify` runs a separate **cleanup-only** review that applies fixes **without hunting for bugs**. If you scripted `/simplify` for bug-finding, switch to `/code-review --fix`."* [code.claude.com/docs/en/code-review]
+> - ✅ **fz 용도와 정합** — 아래 게이트는 과잉 추상화·복잡도·패치 누적 품질을 겨냥하므로 cleanup-only 범위 안이다. 공식 경고 대상인 *버그 찾기* 용도가 아니다 → **재배선 불필요**.
+> - ⛔ 버그 탐지가 필요한 지점에 `/simplify`를 쓰지 말 것 — `/code-review --fix`가 그 역할이다.
+> - ⚠️ `/simplify`는 `/docs/en/commands` 번들 스킬 표에 **행이 없다**(`/code-review` 행에서 참조만 됨) → 아래 `focus` 파라미터 사양은 **[미검증]**이며 동작 이상 시 1순위 확인 대상.
+
 - /simplify는 **2단계 트리거** 시스템
 
 ### 필수 gate (스킵 불가, 자동 실행)
