@@ -25,7 +25,7 @@
 | /hooks | exit 2=차단(stderr→Claude 피드백), exit 1=non-blocking, exit 0=success(JSON 파싱). PreToolUse는 실행 전 차단. 30개 lifecycle 이벤트, 모델 결정과 무관히 자동 실행. |
 | /sub-agents | 격리 context window + custom system prompt + 특정 tool + summary만 반환. MD+YAML(body=system prompt), `.claude/agents`(project) > `~/.claude/agents`(user) 우선순위. description으로 자동 위임, "use proactively"로 유도. |
 | /skills | **progressive disclosure** — body는 invoke 시에만 로드, description만 상시. budget 설정 `skillListingBudgetFraction`·`SLASH_COMMAND_TOOL_CHAR_BUDGET`. invoke된 skill은 세션 내내 단일 메시지로 지속, 재read 안 함. |
-| /changelog (v2.1.219, 2026-07-24) | **Opus 5 = 기본 Opus 모델**, `/fast` 대상 = Opus 5 + 4.8. **nested subagent depth 1→3** (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`로 비활성). 스폰 캡 **세션 200**(`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`)·**동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), `/clear`로 리셋. dynamic workflow 기본 **medium(<15 agents)**. |
+| /changelog (v2.1.219, 2026-07-24) | **Opus 5 = 기본 Opus 모델**, `/fast` 대상 = Opus 5 + 4.8. **nested subagent depth 1→3** (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`로 비활성). 동시 스폰 캡 **20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217 신설), `/clear`로 리셋. dynamic workflow 기본 **medium(<15 agents)**. |
 | /changelog (v2.1.198~218) | subagent **기본 백그라운드** 실행(`/fork`=새 백그라운드 세션, `/subtask`=기존 in-session). permission 기본 `default`→**`manual`**(v2.1.200). **`/verify`·`/code-review` 자동 실행 중단**(v2.1.215, 수동 호출) — 모델측 over-verification(§1.2)에 대한 **하네스측 대응**. 트랜스크립트에 assistant 메시지별 **reasoning effort 기록**(v2.1.212). |
 
 ### 1.2 모델 프롬프팅 (Opus 5 — platform.claude.com/docs/en)
@@ -96,7 +96,7 @@
 4. **공식 anti-패턴 프롬프트** (fz Surgical Changes/Verification Discipline 정합):
    - anti-overengineering: "Only make changes directly requested or clearly necessary… A bug fix doesn't need surrounding code cleaned up." [O7]
    - anti-hallucination: "Never speculate about code you have not opened… MUST read the file before answering." [O7]
-   - subagent 과용 경계: 단일파일·순차 작업은 직접, 병렬·격리·독립 워크스트림에만 위임. [O7] — **Opus 5에서 중요도 상승**: 모델이 위임을 과다 시도하므로 하네스측 캡(O10: 세션 200·동시 20)과 프롬프트측 제약(O6)을 **함께** 건다.
+   - subagent 과용 경계: 단일파일·순차 작업은 직접, 병렬·격리·독립 워크스트림에만 위임. [O7] — **Opus 5에서 중요도 상승**: 모델이 위임을 과다 시도하므로 하네스측 캡(O10: **동시 20·depth 3** — 세션 생애 200 캡은 v2.1.224에서 제거됨)과 프롬프트측 제약(O6)을 **함께** 건다.
 
 ## 5. 구버전 제거 정책 (Opus 5 only)
 fz는 항상 최신 모델(현재 **Opus 5**, `claude-opus-5`, 2026-07-24)만 타깃. 다음은 **수록·권장하지 않는다**:
