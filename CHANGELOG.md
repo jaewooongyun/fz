@@ -8,156 +8,27 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release). MAST (2503.13657)는 v4.17.0에서 modules 재인용으로 active 환원
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
-### [4.25.0] — figma 대조를 direct/composed 축으로 분리 + L-1 관측 3/5 (2026-08-03) [MINOR]
+### v4.22.0 (2026-08-08) — 누적 릴리즈: fz-rebase 신설 · peer-review 인라인 게시 · Opus 5 대응 · 계측 도구 [MINOR]
 
-> 회고 R5(`fz-retrospective/R5-figma-visual-token-not-measured.md`)가 "figma 커버리지 기준 **부재**"로 진단하고 "요소×축 표 선작성"을 처방했다. 실측 결과 **진단은 오진**이고(기준도 표도 이미 있었다) **처방은 효능 미확정**이다.
+> v4.21.0 이후 약 한 달간 발행 없이 커밋만 누적됐다(28커밋 / 59파일 / +3,293 −222). 초안 번호 `4.23.0`~`4.25.0`은 origin·태그·Release 어디에도 존재한 적이 없어 **폐기하고 누적분 전체를 v4.22.0 하나로 발행**한다 — 구간에 `[MAJOR]` 0건이므로 `4.21.0 → 4.22.0`이 semver 정합. 상세: [docs/releases/v4.22.0.md](docs/releases/v4.22.0.md)
 >
-> - ⛔ **"기준 부재"는 오진**: `fz-code:276-277` 마찰 신호 2종 + `promotion-ledger L-1` + `feedback_design_spec_empirical_comparison` step 2("토큰별 1:1 비교")가 **전부 이미 존재**했다. 셋 다 candidate 미강제였을 뿐. [verified: grep — fz 자산 전체 figma 매치 2파일 11건]
-> - ⛔ **"표 선작성" 처방도 약화**: 표는 이미 작성돼 있었다 — `TVG-2520-work/figma-measure-exhaustive.md`(07-24 16:08)가 정정 커밋(07-29 04:10)보다 선행. **빈 칸 카운터는 완전성만 세고 채워진 값의 정확성은 못 센다.** ⚠️ 단 두 산출물의 node 집합이 달라(`114292…` vs node `6725-121653`) "표가 stale인가 / 합성을 놓쳤나"는 **경합 가설로 병기** — 확정 서술 금지.
-> - **`swift-pattern-detection.md` 원칙 H 신설**(기존 모듈 MERGE — 신규 모듈 아님): figma 대조를 **축 3분류**로 나눴다 — direct property(fill·opacity·radius·size·font)는 raw 직접 / 요소 간 **실효 거리**는 두 경계 사이를 통과하는 gap·padding만 합산(⚠️ flexible spacer·절대배치·음수간격·modifier 순서 개재 시 단순 합 불성립 → 렌더 판정) / **raw 미표현 축**은 렌더 스냅샷. + provenance 3필드. 실증: `root gap 12 + padding 24 = 36`인데 코드 24 [verified: `TVG-3554-work/figma-code-diff-01:98-100`] — 개별 노드값이 옳아도 합성을 안 하면 틀린다. `fz-code:276`은 **포인터만 유지**(1,231 → 1,284자).
-> - ⚠️ **작성 과정 기록**: 초판은 blanket 문장을 남긴 채 700자 순증(1,231→1,931)시키고 "교체·병합"이라 오기했고, 1차 수정본은 "ancestor path 합"으로 **과잉 일반화**했다(sibling 경계·spacer·절대배치에서 불성립). 둘 다 Codex 교차검증이 실측으로 잡았다 [외부: `codex-review-out.md:10059`, `codex-validate-out.md:2628`]. 최종형은 Level 3 모듈 분리 + 불성립 조건 명시.
-> - **raw 미표현 축 명시**: 관측된 native-list marker 노드 응답에는 닷 크기·들여쓰기가 **별도 값으로 없었다** [verified: `figma-code-diff-01:281-287` — 해당 노드 범위 한정, API 전반 일반화 아님] → 그 축은 렌더 스냅샷이 유일 oracle. 렌더 oracle 범위를 "알파/틴트"에서 "**raw로 표현되지 않는 축**"으로 재정의.
-> - **provenance 3필드 표준**: 측정 산출물 헤더에 `file key`+`node ID`+`실측일`. 미기재 시 후속 세션이 동일 스냅샷 여부를 판정 불가 — 본 세션이 실제로 그 벽에 막혔다(figma 조회 실패).
-> - **L-1 관측 #3(TVG-3554) 등재 → 트랙 A 3/5**. 카운트 근거 = `memory-guide.md` §Evidence 출처("동일 failure mode가 **별개 세션**에서 관찰돼야 1 count") + `promotion-ledger.md` §"카운트 기준 (본 세션 채택)"(Eligible `(a)+(b)`는 **P-track 승격 전용**, 트랙 A 비적용) — heading 앵커 인용(줄번호는 본 변경으로 이동). ⛔ **TVG-3406은 카운트 제외** — `finding-source: external`이라 트랙 C 진입 조건(① `/fz-review --deep` 이후 발견 ② actionable Major+ ③ 4-classify) 3개 모두 미증명. 초판의 "4/5"는 이 조건을 건너뛴 과다 계상이었다 [외부: Codex review `codex-review-out.md:10038-10048`].
-> - ⛔ **활성 전 필수 = 회귀 fixture** (현재 oracle **0개**): `parent gap 12 + child padding 24 → effective 36` 검출 / direct property 직접 비교 / raw 미표현 축 render-required / external 관측에 4-classify 없으면 lint 실패. `harness-engineering.md:799` 규율1(회귀·반증 게이트 통과분만 수용) 미충족 상태.
-> - ⛔ **합성값 자동 diff Adapter는 미착수**: figma node ↔ SwiftUI expression 매핑 계약 부재(`Spacer`·modifier 순서·`ScrollView`·safe area·hosting constraint 판단 필요) [외부: Codex verify **rejected** — `fz-h11-design-coverage/codex-verify-out.md:3437-3441`]. 2단 분리(figma calculator + mapping manifest) 재설계 후 재제안.
-> - **하네스 교훈**: Codex 단독 발견 4건(node 집합 차이 / taxonomy 산술 10≠11 / 닷 크기 API 부재 / ledger 규칙 오적용)이 **전부 Lead가 이미 읽은 파일 안에** 있었다 — `harness-engineering §5.5` 규율2(self-preference 단독 채택 금지)의 직접 실증.
-
-### [4.24.0] — fz-rebase 내용 게이트를 경로 단위 배타 분할로 (2026-07-27) [MINOR]
-
-> 요구: "하나도 누락 및 덮어씌임 없게". 4.23.0의 게이트는 **유실 유형을 열거**(L1~L6)해 판정했다 — 열거는 빠뜨린 유형을 증명하지 못하고, 실제로 세 축이 검증 밖에 있었다(실측). 판정 근거를 열거에서 **구조**로 바꿨다.
->
-> - **경로 단위 배타 분할** — 세 트리(PRE·BASE·POST) 경로 합집합을 세 버킷으로 나누고 각각 불변식을 둔다:
->   - **① MINE-only**(내가 변경 & base 미변경) → POST가 **PRE와 바이트 동일**(mode 포함). base가 손대지 않은 파일은 리베이스가 그대로 재현해야 한다.
->   - **② not MINE**(내가 미변경) → POST가 **BASE와 바이트 동일**. 다르면 팀원 변경 덮어쓰기 또는 무관 파일 오염.
->   - **③ OVERLAP**(양쪽 변경) → 텍스트는 라인 4방향(내 추가 유실 / 내 삭제 부활 / 팀원 추가 유실 / 팀원 삭제 부활), 바이너리는 **WARN**(라인 판정 불가 → 사람 확인).
->   - 결과: **텍스트·바이너리·mode·symlink·gitlink·추가·삭제·이동**이 열거 없이 판정 범위에 든다. 커버리지 **13/15**, ⛔비대상 2건 명시(커밋 메타데이터 · 워킹트리 dirty/stash — 리베이스 *내용* 유실이 아니라 워크플로 인접).
->   - base 측 rename은 **분할 전에 매핑**한다. 안 하면 팀원의 정당한 이동이 위반으로 오판된다(S4). 매핑 후 옛 경로가 버킷②의 "부재여야 함"으로 떨어져 **옛 경로 dead code 부활**(L3)이 자동 검출된다.
-> - ⛔ **`git cherry`는 머지 커밋을 보고하지 않는다** [실측: 원격 3커밋(머지 1) → `+` 2건, 머지 subject 0건] → 4.23.0 `prepush`는 **팀원의 머지 커밋 파괴를 놓쳤다**. 2단 판정 신설: 수동 해결을 품은 머지(`--remerge-diff` 비어있지 않음)=**HALT**(내용이 어느 부모에도 없다) / 평범한 PR 머지=**WARN**(내용은 부모에 보존, 구조만 소실). 평범한 머지마다 HALT하면 롱텀 브랜치에서 게이트를 쓸 수 없게 된다.
-> - ⛔ **바이너리 268/3,214(8.3%)가 라인 검사 밖이었다** [실측 app-iOS: `git grep -I` 텍스트 2,946 / 전체 3,214]. 분할의 blob 비교가 이 8.3%를 판정 범위로 들여온다. submodule은 부재 확인(`.gitmodules` 없음), mode는 100644/100755 혼재 → mode를 비교값에 포함.
-> - ⛔ **삭제 방향 양쪽 신설**: 내 삭제가 되살아남(modify/delete 충돌을 "파일 유지"로 해소) · 팀원 삭제가 되살아남. 각각 S7/S8로 재현·검증.
-> - ⛔ **롤백 앵커의 덮어씌임 수정**: 4.23.0은 리베이스 전 해시를 상태파일 1곳에만 뒀다 → `snapshot` 재실행이 이전 앵커를 덮어썼다. `refs/fz-rebase/pre/<branch>-<shorthash>` ref로 남긴다(해시가 이름에 있어 재실행이 덮지 못하고, ref이므로 GC에서 벗어나 audit이 PRE 트리를 계속 읽는 근거가 된다).
-> - ⛔ **자체 결함 1건 — awk `NR==FNR` 함정**: 첫 파일이 비면 `NR==FNR`이 두 번째 파일 전체에서도 참이 되어 **모든 라인이 첫 파일 것으로 소비되고 출력이 통째로 사라진다**. rename이 없는 리베이스(=대다수)에서 `mine` 집합이 빈 채 "위반 없음"으로 통과했다. 회귀 스위트가 `분할: MINE-only 0개`로 즉시 드러냈다(rename이 있는 S4만 통과한 것이 단서). 3곳을 `FILENAME==ARGV[1]`로 교체. 부수 수정: BSD `sed`는 치환부 `\t`를 탭으로 해석하지 않아 경로 접두를 awk로 변경.
-> - **성능** [실측 `feature/tvod`, 커밋 142·변경 300파일]: `snapshot` 7.0s → **0.4s**, `audit` 10.4s → **0.4s**. 라인 검사가 OVERLAP에만 걸리기 때문이다(300 중 0~4개).
-> - **회귀 스위트 20 assertion**(7→20, **20/20 PASS**): 유실 검출 10 + **오경보 방지 10**. 후자를 동등 비중으로 둔 이유는 게이트가 노이즈가 되면 결국 비활성화되기 때문이다. `[개조]` 표시 3건은 리베이스가 자연히 만들지 않는 상태를 인위적으로 만들어 바이너리·mode·무관파일 불변식이 실제로 강제되는지 확인한다.
-> - **미측정(보고서 명시)**: OVERLAP 방향②·④의 false-positive 율. 팀원이 추가한 라인을 내가 **의도적으로** 수정/삭제해도 발화한다 — 설계상 판정은 사용자 몫(귀속 커밋 제시)이지만 실사용 노이즈는 관측이 필요하다.
-
-### [4.23.0] — fz-rebase 양방향 조용한 유실 게이트 (2026-07-27) [MINOR]
-
-> 갭의 본질: 기존 검증 게이트는 **히스토리의 형태**(커밋 수 ≥ / 머지 수 ≥ / base 조상 / tree clean)만 검사해 "개수 보존 = 내용 보존"을 암묵 전제했다. 실제 유실은 대부분 **개수가 그대로인 채** 발생한다 — 팀원 작업으로 내 변경이 반영되지 않거나, 반대로 내 작업이 팀원 변경을 조용히 덮어쓴다. 게이트를 **형태 → 내용 → 원격** 3층으로 재구성했다.
->
-> - **조용한 유실 6종을 원문 근거와 함께 스킬에 명문화** (git 2.50.1 man page 실측 인용):
->   - **L1** 커밋 통째 드롭 — `--empty=drop` 기본 + *"commits which are clean cherry-picks ... are detected and dropped as a preliminary step"*. 경고는 나오지만 리베이스 로그(+githooks `tuist generate`)에 묻힌다.
->   - **L2** 머지 커밋의 수동 해결 소실 — *"Any resolved merge conflicts or manual amendments in these merge commits will have to be resolved/re-applied manually"*. **머지 개수가 보존**되어 종전 게이트를 전부 통과했다(완전 사각지대). `rerere` 미설정 확증 → 자동 재사용도 없음. app-iOS develop 최근 머지 20개 중 1건이 `--remerge-diff` 15줄 = 실존 리스크.
->   - **L3** 팀원의 이동/삭제로 내 hunk가 옛 경로에 dead code로 잔존 (rename 감지 실패·`merge.renameLimit` 기본 7000 초과).
->   - **L4** 충돌 해결 방향 역전 — *"the side reported as ours is the so-far rebased series ... In other words, the sides are swapped"*. 종전 스킬은 `-X ours/theirs` 금지만 하고 **수동 해결 시의 역전을 설명하지 않았다**.
->   - **L5** 무충돌 clean 적용으로 생성물/전체 재작성 커밋이 base 최신을 되돌림.
->   - **L6** ff-pull **이후** 팀원 push + 그 사이 fetch로 tracking 갱신 → `--force-with-lease`가 통과하면서 팀원 커밋만 파괴. 되돌릴 수 없는 단계인데 종전엔 커밋 수를 *제시*만 하고 게이트가 없었다.
-> - **`scripts/verify-rebase.sh` — 서브커맨드 3종 신설**: `snapshot`(리베이스 직전 기준선 + 위험 브리핑: 겹침 파일·팀원 이동/삭제 ∩ 내 변경·수동해결 머지) / `audit`(내용 정본) / `prepush`(`git ls-remote` 원격 실측 + `git cherry` 패치 등가로 파괴될 커밋 지목).
->   - **정본을 `range-diff` → 라인 보존 불변식으로 교체**: `range-diff`는 선형 시리즈를 전제해 **머지 커밋을 순회에서 제외한다**[실측: 8커밋(머지 1) → 7행, 머지 subject 부재] → 머지 히스토리가 내용인 롱텀 브랜치에서 L2가 검증 밖에 남는다. 순 diff의 추가 라인은 머지 안의 수동 해결까지 포함하므로 머지 구조와 무관하게 완전하다. `range-diff`는 **귀속 보조**로 격하.
->   - 양방향 대칭: ① `내 추가 라인 ⊄ POST 트리` → HALT / ② `base 추가 라인 ∩ 내 삭제 라인` → HALT + 귀속 커밋 제시. **흡수는 무경보** — base가 이미 품은 라인은 트리에 존재하므로 `--empty=drop` 정상 케이스가 경보를 만들지 않는다(게이트 무력화 방어).
->   - 상태는 `$(git rev-parse --git-dir)/fz-rebase-state` — 워크트리에서 `.git`은 **파일**이라 리터럴 사용 금지(실측: `…/.git/worktrees/<name>`), 워크트리별 격리가 의미론적으로도 정확.
-> - ⛔ **bash 3.2 crash 수정**: `check`가 key-path 미전달(=일반 케이스)에서 `key_paths[@]: unbound variable`로 **macOS 기본 bash 3.2.57에서 항상 exit 1** → 게이트가 있다고 믿는 상태였다(재현 후 수정). `${key_paths[@]+"${key_paths[@]}"}` 확장 방어.
-> - **DELETE/MERGE-default 준수** (`skill-authoring.md:70` — 순수 additive 금지): ①`check` 조건5 "key path 존재"는 **불변식 방향이 거꾸로**였다(팀원의 정당한 rename에 HALT / 옛 경로 dead code 부활은 통과) → 판정 권한을 `audit`의 착지 검증으로 이전하고 coarse smoke test로 격하 ②에러 표의 "커밋 감소 → range-diff로 확인" 행을 3단 등급 해소 경로로 병합 ③워크플로우 Step 3 1행을 형태/내용 2행으로 분해 ④TVING `git rm` 습관을 L3/L5 발생 경로로 재프레이밍(중복 서술 제거).
-> - **`scripts/test-gates.sh` 신설 — 게이트의 회귀 oracle**: 유실 6종을 픽스처 리포에서 재현해 HALT/무경보를 검사(**7/7 PASS**). 유실 검출(S1 S2 S5 S6)과 **오경보 없음**(S3 흡수·S4 rename·S6b 반영후)을 동등하게 검사한다 — 후자가 깨지면 게이트는 노이즈가 되어 무시된다. 실 레포 오염 방지 가드 내장(`g()`가 cwd를 매 호출 검사).
-> - **비채택(의도)**: `rerere` 활성화는 1줄 + `--no-rerere-autoupdate` 페어로만 — 과거 해결의 무언 재적용은 이 릴리즈가 막으려는 것과 동종의 조용한 변경이다. 빌드 검증은 안내만, plain CLI `xcodebuild` 처방 금지(Package.resolved churn).
-> - SKILL.md 283줄(≤500) · `intent-triggers`에 "리베이스.*(사라|누락|덮어)" 추가 — 유실 신고 쿼리를 이 스킬로 라우팅.
-
-### [Unreleased] — 아키텍처 제약 배달 11/11 + plan 핸드오프 순서 버그 수정 (2026-07-25) [MINOR]
-
-> Opus 5 가이드 준수 고도화의 구현분. 플랜 4라운드가 Codex에 전부 기각된 뒤 **기각 사유의 blocking 목록에서 도출한 축소 범위**만 구현했다(검증을 통과한 플랜이 아님 — 근거·범위: `~/dev/TVING/opus5-analysis/plan/impl-scope.md`). 신설 파일 **0개** / 3파일 `+64 −15`.
->
-> - **`workflows/plan-collaborative.js` — 아키텍처 제약이 11개 agent 프롬프트 전수에 도달** (종전 **8/11**): `archConstraints`(optional, typed) 신설 → `ARCH_CTX`를 **`CTX` 정의보다 앞에** 두고 `CTX`가 포함하게 해 Stage 0/1/2/4 **8개가 상속**, `CTX`를 쓰지 않는 Stage 3(×2)·Stage 5에는 **직접 주입**. 누락 3곳은 `stage3-impact-on-edge`·`stage3-edge-on-impact`·`stage5-recheck` — 특히 Stage 5는 역할이 *아키텍처 검증자*인데 제약을 받지 못했다.
->   - ⛔ **`OVERRIDE` 허용 입력에 `[아키텍처 제약]` 추가가 필수**: OVERRIDE가 *"이 프롬프트의 [요구사항]/[코드 컨텍스트]/[기지 제약]만이 과제의 전부다"* 로 입력을 제한하므로, 라벨을 열거하지 않으면 문자열이 바이트로 도달해도 **행동 계약상 무시가 허용된다**.
->   - Stage 3은 `:223`·`:234`가 *"독립 Serena 탐색 비기대"* · *"제공된 영향 범위 데이터에서만 추론"* 으로 **의도적으로 입력을 좁힌** 단계 → full `CTX`가 아니라 **좁은 4축 슬라이스만** 주입하고, 문구도 *"…영향 범위 데이터와 아키텍처 제약에서만 추론; 코드 컨텍스트 Read·독립 탐색 금지"* 로 고정.
->   - ⛔ `effort`/`model` **무변경** (`git diff | grep -cE '^[+-].*(effort|model):'` → 0). `lint-model-explicit.sh` PASS 유지(36 calls, fable=3).
-> - **`skills/fz-code/SKILL.md` — pre-existing 순서 버그 수정**: `Phase 0.5`(`:150`)가 *"plan에 D/E/F/G token 1건 이상"* 으로 발동하는데 plan 로드는 **절차 1.5(`:188`)** 였다 → **게이트가 자기 입력보다 38줄 먼저 평가**. `Phase 0.4 Plan Handoff Preflight` 신설(4모드 복원: 동일세션 / ASD·NOTASK / Serena)로 복원을 앞세우고, 절차 1.5의 늦은 로드를 **삭제**했다(재도입 시 순서 역전 재발). 경량 **plan 구조 검사**는 D/E/F/G token과 **무관하게** 실행 — 결정이 빠진 plan은 token도 없어 token 게이팅 하에 두면 검사가 스스로 비활성화된다. 검사는 Gate 0.5(`미통과 시 → ⛔ 차단`)가 아니라 **Phase 0.4의 마찰 신호**로 배치 → 체크박스 **19 불변**.
-> - **`skills/fz-plan/SKILL.md` — plan-final producer 3종 정정**: ① `:385` 분기 라벨 *"ASD 활성"* → **"WORK_DIR 존재(ASD 또는 NOTASK)"** (`:135,139`가 NOTASK에도 WORK_DIR을 부여하는데 Serena 요약 경로로 떨어졌다) ② Serena checkpoint에 **계약 필드**(`{steps, swiftDecisions:{swiftUI,isolation,transform}, rtm, verdict}`) 명시 — 요약 문자열로는 구조 검사 판정이 불가 ③ *"이슈 0건 승인이어도 기록은 발화"* — `### Gate 2 전제조건`이 Phase 3보다 앞에 있어 피드백이 없으면 `plan-final`이 생성되지 않는 경로가 있다. 실행 절차에 **아키텍처 제약 추출(1.5) → args 조립(2)** 순서를 고정하고 Gate 0b를 병합(체크박스 **45 불변**).
-> - ⛔ **`modules/project-arch-adapter.md` 신설 폐기**: 배달은 `.js` 편집이라 모듈이 기여하지 않고, 남는 내용은 `fz-plan:220,274`·`fz-code:184`가 **이미 지시**하며(실패 이전), `skill-authoring.md:68` DELETE/MERGE-default도 발동한다. **파생 효과** — 새 `> 참조:` 줄이 없어 **외부 참조 load floor 델타 0**(`fz-plan` 13,694 · `fz-code` 26,837 불변). 형식적 4상태 `status` 술어·필수축 정의·`conflicts[]` schema·fixture 4종은 **미해결 설계 질문으로 파일링**하고, `ARCH_CTX`에서 `status` 필드를 제외했다(도메인 미정의 필드를 11개 프롬프트에 실어 보내지 않는다).
-> - **precedence 하드코딩 폐기 → default-deny**: `CLAUDE.md > AGENTS.md`는 근거가 없다 — `harness-engineering.md:274-279`가 둘을 **동렬 나열**하고 런타임 식별자가 코드베이스에 없다. 소스 간 모순 축은 **자동 승자를 선정하지 않고** `null` + `conflicts[]` 보존 + 사용자 1회 보고. thin 보완 실패 시 **null 유지 + 그 축 제약 미적용**(중단·재질문 아님).
-> - **⚠️ P2 수치의 계측 한계 명시(T1)**: `measure_constraint_load.py:308`이 `skills/*/SKILL.md`만 스캔한다 → **`agents/`(13개)·`modules/` 상호 참조 미집계**. 따라서 P2 엔트리의 floor/ceiling은 *스킬 직접 참조 기준*이며 agents 경유 로드를 포함하지 않는다(`review-arch` 하나만 해도 5개 workflow에서 스폰되며 `clean-architecture.md`를 참조한다).
-
-### [Unreleased] — `ultracode`는 effort arm 값이 아님 (T0 실측, 2026-07-25) [PATCH]
-
-> P3에서 설계한 effort sweep의 arm 메커니즘을 실행 **전에** 검증한 결과, 플랜 T0의 원설계("arm: ultracode off/on paired")가 현 Claude Code 2.1.220에서 **성립하지 않음**을 확인했다. 산출물 `~/dev/TVING/opus5-analysis/t0-effort-arm-findings.md`.
->
-> - ⛔ **`ultracode`는 `CLAUDE_CODE_EFFORT_LEVEL`·`settings.json` 양 층에서 무효값(`bogus`)과 구별 불가하게 조용히 무시된다** [verified: 실측 CC 2.1.220 · claude-opus-5]. 결정적 반증 = 기준선을 `medium`으로 바꾸니 `ultracode` → **`medium`**(xhigh 아님). 기준선 `xhigh`에서 xhigh가 나온 것은 ultracode의 효과가 아니라 **기존 기본값 잔존**이었다.
-> - ⛔ **무효 effort 값은 에러를 내지 않는다** → `skill-testing.md §8.1`의 *"arm 적용 검증 필수 — 매 run"* 은 형식이 아니라 **필수 방어**다. 검증 없이 env var만 세팅하면 arm이 갈리지 않은 채 측정이 진행된다.
-> - `--settings`는 사용자 `settings.json`과 **병합**된다(미지정 키는 사용자 값 유지 — `{}`를 줘도 `effortLevel`이 생존). A/B 격리 시 의도한 키를 명시할 것.
-> - ⚠️ 재현 함정: 자기 세션 transcript는 계속 쓰이므로 `ls -t | head -1`은 headless run 파일을 찾지 못한다 → **파일 집합 diff + 자기 세션 ID 제외**.
-> - 유효 값 `low`/`medium`/`high`/`xhigh`는 env var로 정상 적용 확인(`low→low` · `high→high`, model `claude-opus-5`) → 계측기 자체는 동작한다.
-> - **사용자 결정(2026-07-25): `effort`는 `xhigh` 유지.** ⇒ T0-a effort sweep 실행 및 `workflows/*.js` 36곳 재조정 **불요**. `settings.json`도 무변경.
-
-### [Unreleased] — effort sweep 프로토콜 + 우선순위 확정 (P3 선행, 2026-07-25) [MINOR]
-
-> P3(effort sweep)의 전제였던 `[미검증]`(per-call `opts.effort` vs `settings.json effortLevel` 우선순위)을 공식 문서로 해소하고, 그 결과에 맞춰 sweep 프로토콜을 설계했다. **미검증 메커니즘 위에 측정을 세우지 않는다**는 것이 설계의 핵심.
->
-> - **우선순위 확정** [verified: code.claude.com/docs/en/model-config]: `CLAUDE_CODE_EFFORT_LEVEL`(최상위) > frontmatter `effort`(세션 위) > `settings.json effortLevel`(*"a starting default, not enforcement"*) > 모델 기본. 원문: *"The environment variable takes precedence over all other methods … Frontmatter effort … overriding the session level but not the environment variable."*
-> - ⚠️ **per-call `opts.effort`는 여전히 `[미검증]`**: 공식이 per-invocation **`model`** 파라미터는 실재 레이어로 명시하나(`CLAUDE_CODE_SUBAGENT_MODEL`이 "overrides the per-invocation `model` parameter"), **effort는 동일 서술이 없다**. 현행 fz는 `.js` 36곳과 `settings.json:409`가 **모두 `xhigh`** 라 어느 쪽이 이기든 결과가 같아 모호성이 드러나지 않았음.
-> - **`guides/skill-testing.md` §8.1 신설** — §8 paired A/B의 **특화 인스턴스**(채점·집계·오염 규칙 상속, arm 설정 방법만 대체). ⛔ **arm은 세션 레벨(env var / `/effort`)로 설정하고 `workflows/*.js`는 수정하지 않는다** — per-call 지위가 미확정이라 그것으로 arm을 가르면 arm이 실제 갈렸는지 알 수 없다.
-> - **arm 적용 검증 계기 발견**: Claude Code가 트랜스크립트 **최상위 `effort` 필드**를 기록(v2.1.212+). 실측 확인 — 최근 6세션 606건 전부 `xhigh`. §8.1에 검증 스니펫 수록(**실행 검증 완료**: 현 세션 `{'xhigh': 421}`). 의도한 arm과 불일치하는 pair는 §8 오염 규칙으로 `invalid` 제외.
-> - **arm·대상 선정 지침**: 최소 `{low, medium, high}` 3-arm(+`xhigh` 대조군). 대상은 `measure_constraint_load.py` **floor 큰 순** — `fz`(31,259) · `fz-review`(29,264) · `fz-code`(26,837).
-> - **P4**: `fz-modernize/references/test-spec.md` 트리거 케이스를 `"opus5 나왔는데…"`(소문자·붙임 = 실사용 형태)로 교체 — 2026-07-25 정규식 버그의 **회귀 테스트 케이스**로 승격.
-> - ⛔ **미변경 확정**: `workflows/*.js` 36곳 · `settings.json:409` — sweep 결론도 세션/frontmatter 레벨에 적용하며, per-call 배선 변경은 위 `[미검증]` 해소가 선행.
-
-### [Unreleased] — 제약 부하 floor/ceiling 분리 계측 (P2, 2026-07-25) [MINOR]
-
-> 감사(2026-07-25)에서 "fz-plan hot-path 45,808 tok"이 나왔으나, 도구가 스스로 *"참조는 UPPER BOUND, 실제 Read는 조건부"* 라고 명시해 **발견으로 보고할 수 없었다**. 이 수치를 확정하지 않으면 어떤 제거·축소도 근거가 없다(P3 effort sweep의 선행). `measure_constraint_load.py`에 분류를 구현해 확정한다.
->
-> - **3-버킷 분류 신설**: `catalog`(`## 모듈 참조` 표 행 — 카탈로그이지 로드 지시 아님) / `citation`(출처·근거 표기) / `load`(실제 로드 지시). **floor·ceiling은 `load` 버킷만** 집계.
-> - **floor(무조건) vs ceiling(로드 전체) 분리**: floor = 조건 마커 없는 로드 = 그 스킬을 부르면 **항상** 드는 비용. 표1을 `floor~tok / ceil~tok / floor%` 로 재구성.
-> - **`--refs <skill>` 감사 모드 신설**: 참조별 버킷·조건 판정 근거를 줄 단위로 출력. **휴리스틱을 반증 가능하게** 만드는 것이 목적 — 이 모드가 아래 오분류 3종을 전부 잡았다.
-> - **확정 결과**: `fz-plan` **45,808 → floor 13,694**(3.3배 축소, 26,291이 로드가 아니었음). 단 **`fz` 자신이 floor 31,259로 최고**(ceiling 동일 = 조건부 참조 0), `fz-review` 29,264 · `fz-code` 26,837. → **"제약 총량" 우려는 기각이 아니라 대상이 이동**.
-> - **구현 중 자체 감사로 잡은 오분류 3종**: ① 카탈로그 표 행을 로드로 계수(fz-plan 18,764 과대) ② 한 줄에 로드 지시+출처 표기 공존 시 오분류(7,527) → **"가장 가까운 마커 우선"** 규칙 ③ 조건이 **부모 줄**에 있는 경우(`5. 핵심 모듈 선로드 (6+ 스텝 또는 TEAM):` 하위 `Read(...)`) → **들여쓰기 조건 상속**.
-> - **docstring 한계 조항 갱신**: 기존 #2("측정 못 함")를 "부분 해소 + 잔여 한계 3종" 으로 교체, #4 신설. ⛔ 잔여 한계는 **전부 floor 과대평가 방향(안전측)** 임을 명시 — COST 축에서 과소평가가 더 위험하므로.
-> - 회귀 확인: `--json`(신규 필드 `load_refs`/`catalog_refs`/`citation_refs`/`excluded_tokens`/`refs_detail`) · `--sections` · 잘못된 인자 안전 종료 · `py_compile`.
-> - ⛔ **여전히 제거 정당화 아님**: COST ≠ REMOVAL-SAFETY. VALUE 축은 `guides/skill-testing.md` §8 paired A/B 프로토콜 소관, 제거는 사용자 결정(`harness-engineering.md` §7).
-
-### [Unreleased] — 문서 최신성 lint 도입 (P1, 2026-07-25) [MINOR]
-
-> 전수 감사(2026-07-25) 결과 `last audited` 보유 파일이 **105개 중 4개**뿐 — fz가 자기 문서의 stale을 탐지할 수단이 없었다. Opus 5 최신화도 자동 탐지가 아니라 사람이 출시를 알아채서 시작됐고, 직전 세션엔 `prompt-optimization.md` 내용을 갱신하고도 감사일자를 놓쳐 **별도 감사를 돌려서야** 발견됐다. 탐지를 사람 주의력에서 분리한다.
->
-> - **`scripts/lint_doc_freshness.py` 신설**: 3 규칙 — `missing-audit-date`(외부 출처 인용하나 감사일자 없음) · `stale-audit`(경과 초과, 기본 90일) · `stale-model-ref`(구세대 모델명만 있고 현행 미언급). `--days`/`--json`/`--strict`(exit 1) 지원.
-> - **SSOT = `guides/llm-references.md`의 `모델 정책: <X> only` 한 줄**. lint가 이걸 파싱해 "현행 모델"을 결정 → 새 모델 출시 시 한 곳만 갱신하면 나머지 문서 stale이 자동 검출된다. 해당 줄에 SSOT 표기 추가.
-> - **대상 한정**: 외부 URL(`platform.claude.com`·`code.claude.com`·`anthropic.com`·`arxiv`·`developers.openai.com`) 인용 문서 **22개**만. 내부 근거만 인용하는 문서는 외부가 바뀌어도 stale해지지 않으므로 제외 — 103개 전부에 헤더를 다는 것 자체가 과잉이다.
-> - **`fz-modernize` Phase 2 배선**: 절차 1에 lint 실행을 **선행 의무**로 추가하되, **기존 수동 grep 2건**(`last audited` / `MODEL_PATTERN`)을 **흡수·삭제**(DELETE/MERGE-default 준수 — 순수 additive 아님). Gate 2에 "신규 `stale-model-ref` 0건" 항목 추가. 절차 5에 감사일자 기록 규칙 + ⛔미대조 파일에 날짜 금지 명시.
-> - **감사일자 헤더 8파일 추가**: 이번 최신화에서 1차 소스로 **실제 대조한 파일에만** — CLAUDE.md · agent-team-guide · harness-engineering · skill-authoring · skill-troubleshooting · cross-validation · context-artifacts · native-agents. 감사 축(`모델 사실 축`) 명시. **미대조 10파일은 lint 백로그로 존치**(하지 않은 감사를 주장하면 도구가 무력화된다).
-> - **lint 지적 해소**: `verify-evidence-matrix.md:29` 예시 데이터 Opus 4.8 → Opus 5 (`stale-model-ref` 0건 달성).
-> - **언어 선택 근거**: bash 아닌 Python — `verify-rebase.sh`가 macOS bash 3.2 empty-array nounset으로 crash한 전례(메모리) + `measure_constraint_load.py` 선례.
-> - 결과: audit 날짜 보유 **4 → 12 / 22**, `stale-model-ref` **1 → 0**. 잔여 `missing-audit-date` 10건은 의도된 백로그.
-> - ⛔ **한계 명시**(스크립트 docstring): 최신성 ≠ 정확성 · 모델명 검사는 파일 단위 휴리스틱(인용 맥락 오탐 방지) · 대상은 외부 출처 인용 문서 한정.
-
-### [Unreleased] — Opus 5 출시 대응 가이드 최신화 (2026-07-25) [MINOR]
-
-> Claude Opus 5 GA(2026-07-24)로 fz 가이드의 모델 사실이 stale. 1차 소스 8종 실측 후 15파일 갱신. **코드(`workflows/*.js` effort 36곳·`settings.json`)는 미변경** — 공식이 *"run a fresh effort sweep on your evals rather than reusing them"* 을 요구하므로 측정 없는 상수 교체를 배제(사용자 결정).
->
-> - **정본 갱신**: `llm-references.md` — 모델 정책 Opus 4.8→**Opus 5**, §1.1에 Claude Code v2.1.219 하네스 행 2개 신설(subagent depth 1→3·스폰 캡 200/20·`/verify`·`/code-review` 자동실행 중단), §1.2 전면 교체(whats-new-opus-5·prompting-claude-opus-5·effort), 약어 O6~O10 재정의, audit 2026-06-28→07-25.
-> - **§5 구버전 제거 정책 확장**: API 레벨에 `disabled`+`xhigh`/`max`=400 추가 / **프롬프트 레벨 4종 신설** — 검증 지시("final verification step"/"use a subagent to verify"/"double-check")·"생각하지 마라" 류 규칙(태그 누출 증가)·carried-over effort·응답 축소 목적의 effort 하향.
-> - ⚠️ **경계선 성문화(신규 실패 클래스 방어)**: Opus 5의 "검증 지시 삭제" 권고를 오독하면 fz의 load-bearing 게이트가 삭제될 수 있음 → `cross-validation.md` §검증 게이트에 **게이트(구조) ≠ 지시(문구)** 구분 명시(외부 oracle·이종 교차검증·독립 관점은 **존치**, 자기재확인 문구만 제거). `llm-references.md` §4-2에도 동일 경계 추가.
-> - **방향 역전 기록**: subagent 위임 — 4.8=under-reach(유도 필요) → 5=over-reach(**캡 필요**). `agent-team-guide.md`·`harness-engineering.md`·`skill-authoring.md`에 반영. 4.8용 "더 위임하라" 문구는 제거 대상.
-> - **세대 전환 테이블**: `harness-engineering.md` §1.3에 **Opus 5 행 신설** — 필요해진 하네스(위임 캡·길이 통제·스코프 제약·`max_tokens` 재점검) / 불필요해진 하네스(검증 지시·검증 스캐폴딩). 출처 표 6e~6i 추가.
-> - **사실 정정**: `fable-model-guide.md` 프롬프트 캐시 최소 prefix **"Fable 2048 / Opus 4.8 4096" → "Fable 5·Opus 5 = 512 / Opus 4.8 = 1024"** (기존 값이 현행 공식 표와 불일치). Fable↔Opus tier 격차 재검토 노트 추가(Opus 5 = "close to frontier intelligence of Fable 5 at half the price" — 단 **배선 변경은 측정 후**).
-> - **버그 수정**: `fz-modernize` intent-trigger 정규식이 실사용 표현 `opus5`(소문자·붙임)를 미매칭 → `[Oo]pus ?-?5|...` 로 교정, 10/10 케이스 검증(오탐 0).
-> - **미변경 확정**: `docs/releases/*`·CHANGELOG(역사 기록) · `.claude/worktrees/**`(별도 워크트리) · `fz-codex/*`·`fz-codex-subcommands-*`·`codex-strategy.md`(**`xhigh`가 Codex/GPT `model_reasoning_effort`** — 다른 벤더 파라미터) · `clean-architecture.md`(모델 무관).
-> - ⛔ **pending**: effort sweep 측정 → 스테이지별 차등 배정 · `settings.json:409 effortLevel`과 `.js` per-call 우선순위 실측 `[미검증]` · 버전 범프/릴리즈는 사용자 소관(4.22.1 in-flight와 병합 여부 결정 필요). 산출물: `~/dev/TVING/opus5-analysis/`.
-
-### [Unreleased] — Wave 4 TEAM 전면 일몰 (대안 A) [MINOR]
-
-> peer-review까지 Workflow 전환하여 TeamCreate+SendMessage 실행 경로 전면 제거. 트리거: 스폰 에이전트가 미바인딩 컨텍스트에서 SendMessage 호출 → 에러. 근본 = "에이전트 기본 지시가 브리프 명시 채널 override" 우선순위 미성문화.
->
-> - **버그 클래스 제거**: `agent-team-guide.md` §2 "채널 우선순위 원칙(브리프 > 에이전트 기본 지시)" 성문화(LB2) · 로직-임베드 SendMessage 3에이전트(review-correctness/impl-correctness/memory-curator) → Lead prefetch/구조화 반환(LB1).
-> - **peer-review → Workflow**: `workflows/peer-review.js` 신규(Stage1 arch+quality+correctness 3-병렬 → Tier3 Stage2 arch↔quality 교차 + Stage3 counter DA, 6-call · Codex out-of-band). fz-peer-review SKILL Tier2/3 시퀀스 전환, allowed-tools+=Workflow.
-> - **진입점 정리**: fz-pr-digest 2 TeamCreate(pr-digest+peer-review) → Workflow · fz §5.2 TEAM Execution → Workflow Execution · fz-memory:146. **실제 TeamCreate 호출부 0건**.
-> - **에이전트/템플릿**: 12 에이전트 P2P 블록 → Workflow 노트 · agent-template/skill-template TEAM → Workflow(신규 산출물 TEAM 미상속) · team-core/peer-review-tiers 일몰 헤더 + Tier 재매핑.
-> - ⛔ **pending**: `peer-review.js` 실 invoke 캘리브레이션(실 PR 필요) · `patterns/*.md`는 canonical 라운드 의미론으로 보존 · 버전 범프+release는 캘리브레이션 후. 산출물: `~/dev/TVING/fz-team-sunset/`.
-
-### [Unreleased] — Codex 모델 pin de-version (SSOT=config.toml) [PATCH]
-
-> 사용자 정정 2회("5.6 나왔는데 왜 5.5?" → "버전 하나씩 막을 게 아니라 최신을 쓰게 해야지"): fz-codex 예시가 `-m gpt-5.5`를 하드코딩해 CLI 릴리즈마다 stale. 근본 수정 = 명령 예시의 `-m` 실행 pin 전면 제거 → config `model` 기본값(SSOT) 위임 = 항상 최신 frontier 자동 사용.
->
-> - **실행 pin 제거(13곳/4파일)**: `fz-codex-subcommands-core.md`(review/check 3곳) · `fz-codex-subcommands-aux.md`(final/commit/adversarial/drift/plan 6곳) · `fz-modernize/SKILL.md`(verify 1곳) · `codex-strategy.md`(모델 명시 행 → `-m` 생략 권장 서술).
-> - **유지**: CLI 버전 플로어(0.118.0+/0.124.0+ 호환 사실) · 과거 일화(peer-review-gates.md gpt-5.4 발견 기록). fz-codex SKILL.md line 117 dangling 예시 참조 정리(edit로 발생한 orphan).
-> - ⛔ pending: plugin.json/marketplace.json version bump은 위 Wave 4 릴리즈 시 통합(현재 accumulation phase — 조기 bump 지양).
+> - **fz-rebase 스킬 신설** — 리베이스 조용한 유실 게이트. 1차안(유실 유형 L1~L6 열거)은 **열거가 빠뜨린 유형을 증명하지 못해** 폐기하고, 세 트리(PRE·BASE·POST) 경로 합집합을 **경로 단위 배타 분할**(MINE-only / not MINE / OVERLAP)로 재설계. 텍스트·바이너리·mode·symlink·gitlink·추가·삭제·이동이 열거 없이 판정 범위에 든다(커버리지 13/15). `verify-rebase.sh`(snapshot/audit/prepush) + 회귀 20/20 PASS. 성능 `audit` 10.4s → **0.4s**
+>   - ⛔ 발견 3종: `git cherry`는 머지 커밋을 보고하지 않는다 · 바이너리 **268/3,214(8.3%)** 가 라인 검사 밖이었다 · awk `NR==FNR`은 첫 파일이 비면 출력이 통째로 사라진다(자체 결함, 회귀 스위트가 검출)
+> - **fz-peer-review 인라인 라인 앵커 게시** — `--post`가 대화창 단일 코멘트만 달아 리뷰어가 파일을 직접 찾아가야 했다. `scripts/diff_anchors.py`(Python stdlib 전용) + `peer-review-inline-anchoring.md`(게시 7단계 SSOT) + PR #4655 픽스처. 겹치는 hunk는 **모두 반환하고 선택은 Lead에게** — 어느 hunk가 논지인지는 의미 판단
+> - **발견 서술 원칙 모듈 신설** — 부정 주장은 후보를 소진해야 증명되고 순서 의존 결함은 경우를 전개해야 한다. 고정 필드에 안 들어간다. `peer-review-finding-anatomy.md` 원칙 3 + 형태 4종, 리포트 필수 필드 9 → 6
+> - **peer-review 문서↔코드 계약 정합** — `counter` 키 부재로 `--deep`의 Stage3 산출이 **버려지고 있었다** · `agent_status` 보정은 도달 불가한 죽은 절 · Tier 표 모델 열 sonnet ↔ 실제 opus 3 · Tier 2/3 본문이 SKILL Boundaries와 정면 충돌(TeamCreate 필수 지시)
+> - **Opus 5 출시 대응** — 1차 소스 8종 실측 후 15파일 갱신. ⛔ 코드(`workflows/*.js` effort 36곳)는 **미변경**(공식이 fresh sweep 요구). ⚠️ "검증 지시 삭제" 권고 오독 방어 = **게이트(구조) ≠ 지시(문구)** 경계 성문화. subagent 위임 방향 역전(4.8 under-reach → 5 over-reach = 캡 필요)
+>   - **T0 실측**: `ultracode`는 effort arm 값이 **아니다** — env·settings 양 층에서 무효값과 구별 불가하게 조용히 무시(기준선을 medium으로 바꾸니 medium 반환). 무효 effort는 에러를 내지 않으므로 arm 적용 검증이 필수 방어. **사용자 결정: `xhigh` 유지**
+>   - **effort 우선순위 확정**: env var > frontmatter > `settings.json`(*"a starting default, not enforcement"*) > 모델 기본. ⚠️ per-call `opts.effort`는 여전히 `[미검증]`
+> - **문서 최신성 lint 신설** (`scripts/lint_doc_freshness.py`) — `last audited` 보유가 105개 중 4개뿐이라 fz가 자기 stale을 탐지할 수단이 없었다. SSOT = `llm-references.md`의 모델 정책 한 줄. 결과 audit 날짜 **4 → 12/22**, `stale-model-ref` **1 → 0**
+> - **제약 부하 floor/ceiling 분리 계측** — 참조를 `catalog`/`citation`/`load` 3버킷으로 분류. `fz-plan` **45,808 → floor 13,694**(3.3배, 26,291이 로드가 아니었음). 단 **`fz` 자신이 floor 31,259로 최고** → 총량 우려는 기각이 아니라 **대상 이동**. ⛔ COST ≠ REMOVAL-SAFETY
+> - **아키텍처 제약 배달 11/11** (`plan-collaborative.js`, 종전 8/11) — 누락 3곳 중 Stage 5는 역할이 *아키텍처 검증자*인데 제약을 못 받았다. ⛔ `OVERRIDE` 허용 입력에 라벨 열거가 **필수**(없으면 바이트가 도달해도 행동 계약상 무시 허용). 신설 모듈 0개(`project-arch-adapter.md` 폐기 — 기존 스킬이 이미 지시)
+> - **fz-code plan 핸드오프 순서 버그 수정** — `Phase 0.5` 게이트가 자기 입력(plan 로드, 절차 1.5)보다 **38줄 먼저 평가**되고 있었다 → `Phase 0.4 Preflight` 신설
+> - **Wave 4 TEAM 전면 일몰** — `workflows/peer-review.js` 신규로 TeamCreate+SendMessage 실행 경로 전면 제거(**실제 호출부 0건**). 채널 우선순위 원칙(브리프 > 에이전트 기본 지시) 성문화
+> - **Codex 모델 pin de-version** — 실행 `-m` 13곳/4파일 제거 → config `model` SSOT 위임(항상 최신 frontier). CLI 버전 플로어는 호환 사실이라 유지
+> - **figma 대조 3축 분리(원칙 H)** — 회고 R5의 "기준 부재" 진단은 **오진**(기준도 표도 이미 존재). direct property / 실효 거리 합성 / raw 미표현 축으로 분리. 실증: `gap 12 + padding 24 = 36`인데 코드 24 — **개별 노드값이 옳아도 합성을 안 하면 틀린다**
+> - **인프라·문서 fix** — pre-commit 위반 출력 크래시(`${FILE}` 중괄호) · skill-testing §8 Task-Outcome Benchmark canonical · 다각도 리뷰 반영 3회분 · 관측/ledger 등재 9건
+> - ⛔ **미충족 게이트 2건을 명시하고 출하**(사용자 결정): ① Wave 4가 요구한 `peer-review.js` 실 invoke 캘리브레이션 — `experiment-log.md` §5.7에 fz-peer-review 테이블 자체가 부재 ② 원칙 H가 요구한 회귀 fixture — 현재 oracle 0개. 둘 다 *기능 결함*이 아니라 *약속한 검증 미이행*이며 candidate/pending 표시라 기본 경로를 차단하지 않는다. 후속 릴리즈에서 해소
 
 ### v4.21.0 (2026-07-09) — 하네스 서베이 Wave C: code-pair pre-flight 크기 가드 (H5 scaffold collapse) [MINOR]
 
