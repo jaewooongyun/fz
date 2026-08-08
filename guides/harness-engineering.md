@@ -1087,7 +1087,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Opus 4.6 | Context Reset 선택, Compaction 충분, Evaluator 조건부 | Sprint 분해, 스프린트별 평가 |
 | **Opus 4.8 (2026-05-28 GA)** | effort 기본 **high** (xhigh/max는 더 어려운 작업용), 1M Compaction 충분, tool-calling 효율↑(fewer steps·required-call skip↓), 단일 세션 수백 parallel subagents 지원 [verified: anthropic.com/news/claude-opus-4-8] | Evaluator 조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 *이종 blind-spot*은 여전히 cross-model 필요 [verified: 동] |
 | **Fable 5 (2026-06-09 GA, 옵트인 최상위)** | effort 기본 **high** (xhigh=capability-sensitive, low도 이전 모델 xhigh 상회 가능), thinking 상시 활성(끄기 불가), async parallel subagents 공식 권장, fresh-context verifier > self-critique, 단일 turn 수 분·자율 런 수 시간 전제의 타임아웃/진행표시 설계 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 + code.claude.com/docs/en/model-config] | step-by-step 절차 지시("often too prescriptive... can degrade output quality" — 단 Gate 가드레일 제거는 A/B 후 결정), 검증 리마인더("verifies its own work with less prompting"). 안전 분류기 refusal 시 Opus 자동 폴백 주의. 상세: `guides/fable-model-guide.md` |
-| **Opus 5 (2026-07-24 GA, 현재 default)** | **위임 캡**(모델이 subagent를 과다 스폰 — 하네스측 `MAX_SUBAGENTS_PER_SESSION`=200·`MAX_CONCURRENT_SUBAGENTS`=20 + 프롬프트측 제약 병행), **길이 통제 프롬프트**(응답·산출물 장문화, effort로는 안 줄어듦), **스코프 제약**(요청 외 단계 추가 경향), `max_tokens` 재점검(thinking 기본 ON → thinking+응답 합산 하드캡) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 + code.claude.com/docs/en/changelog v2.1.219] | **검증 지시·검증 스캐폴딩** — 자체검증 내장, *"removing them reduces wasted tokens with no loss in quality"*. 하네스도 같은 방향으로 이동(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). ⚠️ *외부 oracle·이종 교차검증은 존치* — 제거 대상은 **자기재확인 지시**뿐 |
+| **Opus 5 (2026-07-24 GA, 현재 default)** | **위임 캡**(모델이 subagent를 과다 스폰 — 하네스측 `MAX_CONCURRENT_SUBAGENTS`=20·`MAX_SUBAGENT_SPAWN_DEPTH`=3 + 프롬프트측 제약 병행. ⛔ 세션 생애 `MAX_SUBAGENTS_PER_SESSION`=200은 **v2.1.224에서 제거**), **길이 통제 프롬프트**(응답·산출물 장문화, effort로는 안 줄어듦), **스코프 제약**(요청 외 단계 추가 경향), `max_tokens` 재점검(thinking 기본 ON → thinking+응답 합산 하드캡) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 + code.claude.com/docs/en/changelog v2.1.219] | **검증 지시·검증 스캐폴딩** — 자체검증 내장, *"removing them reduces wasted tokens with no loss in quality"*. 하네스도 같은 방향으로 이동(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). ⚠️ *외부 oracle·이종 교차검증은 존치* — 제거 대상은 **자기재확인 지시**뿐 |
 | 미래 모델 | ? | Evaluator? 컨텍스트 관리? |
 
 > **4.8 새 기능 → fz 적용** [verified: anthropic.com/news/claude-opus-4-8]:
@@ -1102,7 +1102,8 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 > - **effort 운용 전환** — 출발점 `xhigh`→**`high`(기본)**, `low`/`medium`이 비용·지연의 **1차 레버**. ⛔ 이전 모델 effort 값 재사용 금지 → **fresh sweep** 후 결정 (§5 원칙 7 운영점과 정합: 운영점은 측정으로 정한다).
 > - **`max_tokens` 재점검** — thinking 기본 ON이라 `max_tokens`가 thinking+응답 **합산** 하드캡. 4.8 기준으로 타이트하게 잡은 경로는 응답 절단 위험. `xhigh`/`max` 운용 시 64k 출발.
 > - **길이는 프롬프트로** — 응답·산출물이 길어졌고 **effort로는 줄지 않는다**. 산출물 길이 계약이 필요한 스킬은 프롬프트에 명시.
-> - **하네스 상수 변경** — nested subagent depth **1→3**, 스폰 캡 세션 200·동시 20, dynamic workflow 기본 medium(<15 agents). fz governance 상한(opus 동시 ≤2~3)은 **이보다 훨씬 보수적**이므로 상충 없음 — 단 문서상 두 층위를 구분해 기술할 것.
+> - **하네스 상수 변경** — nested subagent depth **1→3**, **동시** 스폰 캡 20, dynamic workflow 기본 medium(<15 agents). fz governance 상한(opus 동시 ≤2~3)은 **동시 20보다 훨씬 보수적**이므로 상충 없음 — 단 문서상 두 층위를 구분해 기술할 것.
+>   - ⛔ **v2.1.224(2026-08-07) 갱신**: **세션 생애 200 스폰 캡은 제거**됐다 — *"Removed the 200-subagent-per-session spawn cap; long-running sessions no longer refuse new agents (**concurrency and depth limits still apply**)"*. 즉 남은 하네스 상한은 **동시 20 + depth 3**뿐이다. fz는 동시 ≤3(opus)이라 여전히 훨씬 보수적이므로 **거버넌스 재설계는 불필요**하고, 장기 세션에서 누적 스폰이 거부되던 제약만 사라졌다.
 
 > "하네스 설계자의 일은 '다음 신기한 조합을 계속 찾는 것'이다." — Anthropic
 
