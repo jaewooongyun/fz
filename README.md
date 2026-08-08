@@ -179,19 +179,22 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 | /fz-review | review-live.js | arch/quality 병렬 → id-기반 교차 → counter DA (5-call) |
 | /fz-plan | plan-collaborative.js | direction 도전 → 초안 → 3렌즈+CC 교차 → 통합 (9-11 call) |
 | /fz-code, /fz-fix | code-pair.js | impl changeset(디스크 미수정) → 조건부 검토 → Lead 적용 (1-3 call) |
+| /fz-peer-review | peer-review.js | arch/quality/correctness 3-병렬 → (deep) 교차 + counter DA (3 or 6-call) |
 
-> TEAM(TeamCreate+SendMessage P2P) 모드는 legacy — calibration 게이트(G1-G3) 통과 후 일몰 예정. 규약: `guides/skill-authoring.md` §12.
+> TEAM(TeamCreate+SendMessage P2P) 모드는 v4.22.0에서 **일몰 완료** — 실제 TeamCreate 호출부 0건. `patterns/*.md`는 canonical 라운드 의미론으로 보존. 규약: `guides/skill-authoring.md` §12.
 
-### What's New (v4.19.0 ~ v4.21.0) — 하네스 서베이 2026 반영 (Wave A/B/C) [MINOR ×3]
+### What's New (v4.22.0) — 누적 릴리즈: fz-rebase 신설 · peer-review 인라인 게시 · Opus 5 대응 [MINOR]
 
-외부 서베이 "Harness Engineering 2026"(arXiv 86편 메타분석)을 3층 검증(추출 인용 81건 환각 0 · fz사실 45/47 · Codex 교차)으로 분석 → 개선 13주제 → 3-Wave 실행. 전 편집 add-only(삭제 0), 서베이 인용은 `[외부: … 원 논문 미대조]` + census 단서 의무. 생산=opus Workflow, Lead(fable)=적용·게이트.
+v4.21.0 이후 한 달간 발행 없이 누적된 28커밋(59파일 / +3,293 −222)을 하나로 발행. 초안 번호 4.23.0~4.25.0은 어디에도 발행된 적이 없어 폐기하고 v4.22.0으로 통합했다.
 
-- **v4.19.0 Wave A — 가이드 개정**: `harness-engineering.md` 18편집 (§5.5 자기진화+회귀 게이트 신설 · 서브시스템7 Constraint Pinning·Governance Decay · 결정론적 안전 강제 원칙 · §8/§10 멀티에이전트 역방향 게이트 C_min · §2.2 정량 앵커 최신화 · §12 6책임 격자+하네스 홀 외부근거 표 · 참고문헌 2606 wave 21편) + skill-authoring 전이성 원칙 + governance T8. 상세: [docs/releases/v4.19.0.md](docs/releases/v4.19.0.md)
-- **v4.20.0 Wave B — 메커니즘/모듈 정합 + Governance Decay 실측**: B1 실측 gate(워커 OVERRIDE 경로 ⛔ 규칙 유실 **unpinned 2/2 위반 → pinned 0/2**, 서베이 2606.22528 재현) → OVERRIDE 6워크플로 거버넌스 방어 · 승격 임계 canonical 통일(`active:≥3`→5세션 promotion-ledger, 잔존 0) · memory-guide GC 망각축 · hygiene §7(clap `--`). 상세: [docs/releases/v4.20.0.md](docs/releases/v4.20.0.md)
-- **v4.21.0 Wave C — code-pair pre-flight 크기 가드 (하네스 홀 H5)**: 과거 실사고(~800줄 changeset → StructuredOutput 재시도 소진·27분·206K 토큰) 재발 방지. C1 캘리브레이션(임계 SPLIT_THRESHOLD=600 provisional — 하한 500 실측) → pre-flight `split_required`(하드 차단 아닌 Lead 판단 요구) + 소비처 4곳. **하네스 홀 H1~H5/F5/F6 중 유일 미구현이던 H5 조치 완료**. 상세: [docs/releases/v4.21.0.md](docs/releases/v4.21.0.md)
+- **`/fz-rebase` 신설 — 리베이스 조용한 유실 게이트**: 종전 게이트는 히스토리의 *형태*(커밋 수·머지 수)만 봐서 "개수 보존 = 내용 보존"을 암묵 전제했다. 유실 유형 열거(L1~L6)를 폐기하고 세 트리 경로 합집합을 **경로 단위 배타 분할**(MINE-only / not MINE / OVERLAP)로 재설계 — 텍스트·바이너리·mode·symlink·gitlink·추가·삭제·이동이 열거 없이 판정 범위(13/15). 회귀 20/20 PASS, `audit` 10.4s → **0.4s**
+- **`/fz-peer-review` 인라인 라인 앵커 게시**: 리포트의 file:line을 PR **Files changed 코드 라인 옆**에 직접 붙인다. `diff_anchors.py`(Python stdlib 전용) + 게시 7단계 SSOT 모듈 + PR 픽스처. 겹치는 hunk는 모두 반환하고 **선택은 Lead에게** — 어느 hunk가 논지인지는 의미 판단
+- **Opus 5 출시 대응**: 1차 소스 8종 실측 후 15파일 갱신, 코드는 미변경(공식이 fresh sweep 요구). ⚠️ "검증 지시 삭제" 권고 오독 방어 = **게이트(구조) ≠ 지시(문구)** 경계 성문화. T0 실측으로 `ultracode`가 effort arm 값이 **아님**을 확인(무효값과 구별 불가하게 조용히 무시)
+- **자기 문서 stale 탐지 도구화**: `lint_doc_freshness.py` 신설 — `last audited` 보유가 105개 중 4개뿐이었다. SSOT 한 줄로 현행 모델 판정 → 나머지 stale 자동 검출. 제약 부하는 floor/ceiling 분리 계측(`fz-plan` 45,808 → floor 13,694, 단 **`fz` 자신이 31,259로 최고**)
+- **Wave 4 TEAM 전면 일몰 + 아키텍처 제약 배달 11/11**: `peer-review.js` 신규로 TeamCreate 호출부 0건. `plan-collaborative.js`의 제약 미도달 3곳(특히 *아키텍처 검증자* 역할인 Stage 5) 해소
+- 상세: [docs/releases/v4.22.0.md](docs/releases/v4.22.0.md)
 
-> ✅ 자체리뷰(fz-review 2축: Claude 4렌즈 + Codex 이종): positive 11·critical 0·major 4(→confirmed 2+하향 2). 확정 결함(C1 "확정"→provisional 과대표현 정정, 헤더 계약 갭)은 dismiss 없이 수정(`591775a`). self-review blind spot을 이종 검증이 메운 사례.
-> ⛔ Deferred: C1 다축 캘리브레이션(실패 경계·다파일 조합)은 관측 실패에서 재조정 · Fable C안 확산 · Wave 4 TEAM 일몰은 [Unreleased] 존치.
+> ⛔ **미충족 게이트를 명시하고 출하**(사용자 결정): ① Wave 4가 요구한 `peer-review.js` 실 invoke 캘리브레이션 ② figma 원칙 H가 요구한 회귀 fixture(oracle 0개). 둘 다 *기능 결함*이 아니라 *약속한 검증 미이행*이며, candidate/pending 표시라 기본 경로를 차단하지 않는다. 후속 릴리즈에서 해소.
 
 > 📦 이전 릴리즈 노트: [docs/releases/](docs/releases/) · 전체 변경 이력 [CHANGELOG.md](CHANGELOG.md)
 
