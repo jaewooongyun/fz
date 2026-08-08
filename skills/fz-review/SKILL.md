@@ -73,6 +73,7 @@ model-strategy:
 | modules/safety-audit.md | 검증 4-J Concurrency Safety Audit — 역방향 안전성 감사 |
 | modules/uncertainty-verification.md | 4-K enforcement — [verified] 없는 주장 violation 판정 |
 | modules/cross-validation.md | 검증 게이트 + 외부 피드백 검증 + 런타임 주장 검증 |
+| modules/review-structural-axes.md | 구조 판정 5축 (fz-peer-review 공유). ⛔ Phase 5 전 **Read 후** §3+§4를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 > 참조: `modules/plugin-refs.md` — SwiftUI Expert + Swift Concurrency (리뷰 시) 섹션
@@ -98,7 +99,7 @@ model-strategy:
 ### 실행 절차 (Lead)
 
 1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12)
-2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계)
+2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js', args })`
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → SOLO 3중 검증 수행 + 사유 experiment-log 기록
@@ -446,7 +447,7 @@ Gate 5 통과 후:
 ### light 모드 (40차 simplified mode)
 
 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-review light "..."` 호출 시:
-- review-arch 단독 (review-quality 생략) — 아키텍처 적합성만 평가
+- review-arch 단독 (review-quality 생략) — 아키텍처 적합성만 평가. ⛔ **구조 축은 Lead가 직접 적용** — light는 Workflow 미호출이라 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read)
 - Codex 교차 검증 생략 (3중 → 1중)
 - 역방향 검증 (Phase 5.5) 생략
 - Reflection Rate 추적 생략

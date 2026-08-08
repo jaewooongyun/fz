@@ -25,6 +25,7 @@
 | `gh auth status` 실패 | `/fz-peer-review 123` | git 폴백 경로(`git fetch upstream` + `git diff`)로 `${WORK_DIR}/diff.patch` 생성(비어있지 않음) → 리뷰 파이프라인 계속 진행 = pass | failure |
 | Tier 2 결정, Codex challenger 호출 실패 | `/fz-peer-review 123` | 2-agent 투표 모드로 전환(review-arch + review-quality만, Codex 투표 제외) → Confidence Matrix 계산 완료 + 최종 verdict 산출(리뷰 비중단) = pass | failure |
 | Tier 3 실행, suggestion 등급 이슈 존재 | `/fz-peer-review 123 --deep` | 반환 `distribution.suggestion` 이 실제 suggestion 이슈 수와 일치 + log에 표기 = pass (H24 회귀 방어) | normal |
+| Tier 2/3 실행 | `/fz-peer-review 123` | `args.structuralContext` 가 전달되고 **arch 프롬프트에만** `[구조 축 — 이 렌즈 전용]` 이 포함 = pass. ⛔ `structuralLine` 이 조건부라 args 누락 시 **에러 없이 구조 축이 꺼진다** — quality/correctness 프롬프트에 포함되면 fail(결함 축 오염) | normal |
 
 ---
 

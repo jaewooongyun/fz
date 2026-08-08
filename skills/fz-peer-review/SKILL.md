@@ -79,6 +79,7 @@ model-strategy:
 | `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
 | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
+| `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
 | Codex challenger 스킬 | 관점 3(Over-Engineering) + 관점 7 보조 + Devil's Advocate |
@@ -267,7 +268,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 
 > TEAM(TeamCreate+SendMessage) → 네이티브 Workflow 전환 (Wave 4). Analyze 코어는 `workflows/peer-review.js`가 소유한다 (결정적 스크립트 — P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
 
-1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, evidencePaths, basePath, deep } })`
+1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, evidencePaths, basePath, deep, structuralContext } })` — `structuralContext`는 `modules/review-structural-axes.md`를 Read해 §3 축 + §4 경계 문구를 담는다 (미전달 시 구조 축 미적용)
    - `deep=false` → **Tier 2 (Lite)**: Stage1 3-병렬(arch+quality+correctness), **기본 3-call**(null 재시도 시 최대 6), Confidence Matrix 미투표(Lead 단순 병합)
    - `deep=true` → **Tier 3 (Full)**: +Stage2 교차(arch↔quality) +Stage3 counter DA, **기본 6-call**(부분 실패로 Stage2 생략 시 5, 재시도 시 최대 9). 권위 수치는 `metrics.agentCalls`
    - base 원본은 Gather에서 prefetch하여 `basePath`로 전달 — 에이전트가 SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `agent-team-guide.md` §2)
