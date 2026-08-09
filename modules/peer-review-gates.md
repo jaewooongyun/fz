@@ -170,6 +170,8 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 - `symbols.json.base_class_hierarchy` 존재
 - INCLUDE 이슈 중 "DI 변경", "init 시그니처", "optional", "willSet/didSet" 키워드
 
+⛔ **`symbols.json` 부재 시 조용히 스킵하지 않는다.** Gather Step 2(Serena pre-caching)를 생략했으면 이 게이트와 **관점 6(Dependency Impact) 전체**가 무력화된다(`protocol_conformers`·`base_class_hierarchy`·`import_graph` 의존). 부재를 확인하면 리포트에 **"관점 6·Gate 4.6.5 부분 수행 — symbols.json 미생성"**을 명시하고, INCLUDE 이슈 키워드 경로로 Grep 폴백 + confidence ceiling 70을 적용한다.
+
 **처리 절차**:
 ```
 1. base_class_hierarchy에서 변경된 base class 추출

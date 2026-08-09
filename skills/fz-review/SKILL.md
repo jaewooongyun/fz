@@ -19,6 +19,8 @@ allowed-tools: >-
   Read, Grep, Glob, Workflow
 team-agents:
   primary: review-arch
+  # workflow(review-live.js) 스폰 대상은 review-arch·review-quality·review-counter 3개.
+  # review-correctness(Phase 4.5)·memory-curator는 Lead가 직접 수행 — 스폰 목록 아님.
   supporting: [review-quality, review-counter, review-correctness, memory-curator]
 composable: true
 provides: [review-results]
@@ -174,7 +176,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 지표③: `[verified]` / `[미검증]` 태그 빈도 + 무태그 과거 주장("원본/기존/이전/D{N} 이전") 위반 건수
 - [ ] 지표④: 세션 reversal 횟수 (사용자 판정 뒤집기 — 기준선 4회)
 - [ ] 지표⑤: A5 micro-eval 호출 건수 N + confirmed C + false positive F → precision = C/N
-- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (ASD 세션 임시) 또는 Serena `fz:metrics:phase-a-session-{N}` (비ASD 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함 + plan-v3.2 §4.3 5개 지표 업데이트
+- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (ASD 세션 임시) 또는 Serena `fz:metrics:phase-a-session-{N}` (비ASD 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함
 - [ ] **canonical sink**: 세션 결과를 `experiment-log.md §5.4 Harness Metrics 누적`에 누적 (5 세션 누적 후 B1/B2 진입 판정). 다른 sink는 backlink만 허용 (3중화 금지).
 
 ## Phase 5: Cross-Review (3중 검증)
@@ -344,9 +346,7 @@ N (Codex 제기 이슈 수) >= 10 ?
 ### 절차
 
 1. **미해결 이슈 로드**: Issue Tracker에서 미해결 이슈 추출
-2. **이슈 수정** (TEAM 모드: impl-correctness에게 위임):
-   - SOLO: `mcp__serena__replace_symbol_body` → 심볼 단위 수정, `/sc:improve` → 복잡한 개선
-   - TEAM: SendMessage(impl-correctness): "미해결 이슈 목록 + 수정 요청" → impl-correctness가 수정 후 Lead 보고
+2. **이슈 수정** (Lead 직접 — `review-live.js`는 수정 에이전트를 스폰하지 않는다): `mcp__serena__replace_symbol_body` → 심볼 단위 수정, `/sc:improve` → 복잡한 개선
 3. **빌드 재검증**: 참조 `modules/build.md` — 빌드 검증 절차
 4. **Issue Tracker 상태 업데이트**: addressed로 변경
 5. **Phase 5.5로 돌아가 재검증**: `/fz-codex validate`
@@ -461,7 +461,7 @@ Gate 5 통과 후:
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | fz-codex 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백 | Claude 자체 판단 |
-| fz-codex 장기 불능 (기간/사유 알려진 경우 — 현재: spend cap 2026-07-16~, 해제 미상) | 재시도 생략 → 검증 2 불능 분기(Phase 5) 직행 — 매 검증 재시도 낭비 방지. **해제 확인 시 이 행의 "현재:" 상태 제거 + 원복** (MEMORY.md Codex 줄과 동기화) | fresh-context Claude 검증자 |
+| fz-codex 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다. probe 성립 = `codex exec`가 **non-empty 산출 + exit 0**(⛔ `--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
 
