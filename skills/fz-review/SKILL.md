@@ -241,10 +241,10 @@ fz-codex가 수행하는 작업:
 
 ### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 가변 상태 동기화+비대칭 동기화(L1 필수) + 콜백 스레드/@Published/기본값/SDK 래퍼/Task 프로퍼티 쓰기/check-then-act(L2 권장) 검사.
 
-### 검증 4-N/4-O: candidate self-check → `modules/review-checks.md`
+### 검증 4-N/4-O/4-P: candidate self-check → `modules/review-checks.md`
 
 > ⚠️ candidate (evidence 1 session, 활성 강제 X — 5 sessions 후 결정). 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
-> 4-N Swift Naming Compliance · 4-O Session-added Assets Application
+> 4-N Swift Naming Compliance · 4-O Session-added Assets Application · **4-P Post-State Consistency**(편집 라인이 놓인 *자리*의 일관성 — **(diff 안 스코프 × 일관성 질문)** 셀. `guides/harness-engineering.md` §12 **R8-A**, candidate)
 
 ### 검증 4-K: Transformation Equivalence (코드 변환 동등성 — Plan에 Transformation Spec 있을 때)
 
@@ -313,6 +313,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] ⛔ Default-Deny 통과? (Spec 기술적 주장에 [verified] 태그 존재)
 - [ ] ⚠️ Swift Naming Compliance 권장 통과? (검증 4-N **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
 - [ ] ⚠️ Session-added Assets Application 권장 통과? (검증 4-O **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
+- [ ] ⚠️ Post-State Consistency 권장 통과? (검증 4-P **candidate** — 활성 강제 X. **형제 균일성 게이트 통과 시에만** 발화, 접근수준·소유권 축 제외)
 
 ## Phase 5.5: Feedback Verification (역방향 검증)
 
