@@ -8,7 +8,13 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release). MAST (2503.13657)는 v4.17.0에서 modules 재인용으로 active 환원
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
-### v4.25.0 (2026-08-09) — 계약 lint 결정화 + inert frontmatter 51선언 제거 + Negative-Result Gate 신설 [MINOR]
+### v4.23.0 (2026-08-10) — 누적 통합: 계약 lint 결정화 · 리뷰 구조 판정 축 · llm-references §1.1b [MINOR]
+
+> **누적 통합 릴리즈.** v4.22.0(2026-08-08) 발행 이후 CHANGELOG에 초안 번호 `4.23.0`·`4.24.0`·`4.25.0` 세 섹션이 쌓였고 **셋 다 태그·GitHub Release 어디에도 없다** [verified: `git ls-remote --tags origin | grep -E 'refs/tags/v4\.2[0-9]'` → v4.20.0·v4.21.0·**v4.22.0**뿐 · `gh release list` Latest = **v4.22.0**]. 구간에 `[MAJOR]` 0건이므로 **누적분 전체를 v4.23.0 하나로 발행**하는 것이 semver 정합이다(`4.22.0 → 4.23.0`). 세 초안은 아래 **§A·§B·§C**로 보존한다(최신 먼저 — 본문 삭제 0줄). 매니페스트는 `4.25.0 → 4.23.0` 하향이나 **발행된 적 없는 번호**라 관측하는 소비자가 없다.
+>
+> ⛔ **이 정리는 v4.22.0에 이어 두 번째다.** 반복 원인은 릴리즈 절차가 아니라 **커밋 시점에 매니페스트를 먼저 bump하고 발행이 뒤따르지 않는 구조** — bump가 "발행 예약"으로 읽히지만 태그·Release가 없으면 그 번호는 존재하지 않는다. 상세: [docs/releases/v4.23.0.md](docs/releases/v4.23.0.md)
+
+#### A. 계약 lint 결정화 + inert frontmatter 51선언 제거 + Negative-Result Gate 신설 (초안 4.25.0, 2026-08-09)
 
 > 전수 감사(138자산 · `~/dev/TVING/fz-plugin-audit-2026-08-09/`)에서 확정한 F-0~F-25 중 **W0~W3b 범위**를 반영한다. 방향은 **C(정본) → B(기계화) → A(baseline 소비)** — `plan/direction-challenge.md`. Codex verify `needs_revision` 13이슈 **전량 수용**(`plan/verify-result.md`).
 
@@ -107,7 +113,7 @@
 
 > "The structural cause is **reactive expansion of bespoke partial interpreters**, followed by **self-tests derived from the same assumptions**. Each counterexample adds another regex, merge rule, waiver, or fixture **without an independent semantic oracle**."
 
-⛔ **그래서 패치 루프를 멈추고 감산했다.** 이하가 v4.25.0의 최종 형태다.
+⛔ **그래서 패치 루프를 멈추고 감산했다.** 이하가 §A의 최종 형태이며, v4.23.0으로 출하되는 형태다.
 
 **10-a. `#15` 삭제 (외부 C4 권고 수용) — `-112줄`**
 - 근거: 후보 15건에 **현재 위반 0** · 역사적 결함 2건은 이미 **구조적으로 수정**됨(`hygiene:125` 는 전체 집합에서 세고 표시만 자름 / `fz-modernize:345` 는 총계를 먼저 산출) · 항목 설명이 스스로 오탐을 인정 · R3/R4에서 문맥창·waiver 3종·heading 교차를 얹고도 H1·setext 경계를 놓쳤다
@@ -141,7 +147,7 @@
 - **OQ5 `description` 400자 cap → 수정 불필요.** `schemas/*.json`·`workflows/*.js`에 `maxLength` **0건** — `peer-review.js:41`의 `≤400chars`는 필드 설명 문자열 안의 **권고**일 뿐이고 초과 시 에러·잘림·거부가 없다. 리스크로 등록했던 것이 **오판**이었다.
 - **OQ9 리뷰 이슈 3중 계약 → 위생, 미처리.** 실측(`/fz-codex verify` 실행 결과): 지시 없던 required 4필드가 `scope_disposition` 13/13 · `code_snippet` 13/13 · `alternatives`/`recommended` **8/13 substantive**(대안 2개+trade-off), 잔여 5는 `null`이고 스키마가 `type:["array","null"]`이라 **정당**. 실제 피해 0 → (b) 계약 수렴은 "지금 잘 되는 것을 건드림". 필요 시 (a) 경로 태그 ~8곳이 저비용 진입점.
 
-### v4.24.0 (2026-08-09) — 리뷰 스킬 구조 판정 축 신설 + peer/fz-review 계약 정합화 [MINOR]
+#### B. 리뷰 스킬 구조 판정 축 신설 + peer/fz-review 계약 정합화 (초안 4.24.0, 2026-08-09)
 
 > 리뷰가 결함(요구사항·버그·영향범위)은 잘 찾고 **더 나은 구조는 못 찾는** 문제를 배선으로 해결한다. 근거는 **통제 A/B 1건**: 스키마·cap·에이전트·모델을 전부 고정하고 브리프만 결함축→구조축으로 바꿨더니 `review-arch` 1콜(116K)이 대안 **9/10** · 삭제라인 정량 **10/10** · 기존 3-렌즈 24건(533K) 미포착 **신규 6건** · 삭제가능 **95줄(변경량 29%)** 을 냈다. 능력 부족이 아니라 **하네스가 묻지 않았다**(`prompt-optimization.md` §3b H1). 산출물: `~/dev/TVING/fz-peer-review-upgrade/`(plan-v4 · Codex verify 10/10 채택 · 홀 인벤토리 H1~H24·R1~R11).
 >
@@ -178,10 +184,10 @@
 > - ⛔ **의도적 보류 2건 (수정하지 않음 — 근거)**:
 >   - **`confidence 80` 하한** (`peer-review.js:97` OVERRIDE) — A/B에서 이 하한을 **고정 변수로 유지**한 상태로 B군이 confidence 82~95, 대안 9/10을 냈다(전면 봉쇄 아님). 다만 B군이 I13을 `confidence<80`으로 자체 배제한 실측 1건이 있다(그 I13은 사람이 PR에 게시할 값이 있다고 판단한 항목). **OVERRIDE는 3개 렌즈 전부에 주입되므로 하한 완화는 결함 탐지 정밀도까지 건드린다** — evidence 1건으로 전 렌즈 공통 제약을 바꾸지 않는다. 관찰 유지(R7 `P5`).
 >   - **`fz-codex-subcommands-core.md:156-158` verdict 계약** — `pass/warn/fail`이 `critical/major` 기준이고 `suggestion`이 미정의다. Coverage 재측정 결과 severity로 차단·verdict를 정하는 지점 **6곳 중 이번 변경이 다룬 곳은 2곳**(`workflows/*.js`)뿐이다. 그러나 이 계약의 소비자는 **`/fz-codex check` → `fz-fix`** 이므로 리뷰 스킬 범위 밖이다 — 리뷰 고도화 PR에서 다른 스킬의 verdict 계약을 바꾸지 않는다(Surgical Changes). **다음 티켓 분리.**
-> - **버전 유지 (4.24.0, bump 없음)** — 4.24.0은 아직 **커밋·출하되지 않은 상태**다. 리뷰 수정은 같은 미출하 버전에 접합하는 것이 맞고, bump하면 4.24.0이 릴리즈된 것처럼 읽힌다. 출하되는 4.24.0이 위 수정을 포함한다.
+> - **버전 유지 (초안 4.24.0, bump 없음)** — 작성 시점에 4.24.0은 아직 **커밋·출하되지 않은 상태**였다. 리뷰 수정은 같은 미출하 초안에 접합하는 것이 맞고, bump하면 릴리즈된 것처럼 읽힌다. ⛔ **그 판단은 맞았고, 그 초안 번호는 결국 발행되지 않았다** — 위 수정은 v4.23.0(§B)으로 출하된다.
 > - ⚠️ **관찰 (조치 안 함)**: ① `ReviewFindingsSchema`에 `origin` 필드가 없어, `arch-critic`이 fz-review arch에도 로드되는 구조상 origin 표 지시가 **없는 필드를 가리킨다** — 이번 변경 전에도 그랬으므로 회귀는 아니나 cap 삭제로 지시의 하중이 커졌다. ② `arch-critic` 출력 형식 JSON의 `evidence_trace`도 스키마 필드명(`evidence`)과 불일치 — H2′ 소관.
 
-### v4.23.0 (2026-08-08) — llm-references §1.1b 신설: fz 의존 기능 7문서 색인 + 스폰 캡 stale 정정 [MINOR]
+#### C. llm-references §1.1b 신설: fz 의존 기능 7문서 색인 + 스폰 캡 stale 정정 (초안 4.23.0, 2026-08-08)
 
 > 감사 결과 **fz가 실행 경로에서 의존하는 Claude Code 기능 7종의 공식문서 행이 §1.1에 없었다.** 특히 `/model-config`은 `fable-model-guide.md`·`skill-testing.md:422`·`harness-engineering.md:1227`·CHANGELOG 등 **12개 지점에서 이미 1차 출처로 인용**되면서 색인 행만 없어 참조점이 분산돼 있었다. 산출물: `~/dev/TVING/claude-paradigm-scan/`(감사서·리스트).
 >
