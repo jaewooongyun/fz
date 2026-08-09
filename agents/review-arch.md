@@ -3,7 +3,7 @@ name: review-arch
 description: >-
   아키텍처 결정 + 레이어 위반 리뷰 에이전트. 설계 결정과 확장성 평가.
 model: sonnet
-# 승격: review 도메인 (fz-review, fz-peer-review)에서 opus로 승격 (Primary Worker)
+# ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview, mcp__context7__query-docs
 memory: project
 skills:
@@ -19,7 +19,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - **Primary**: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`)
 - **Secondary**: context7 (`query-docs` — API 문서, 라이브러리 호환성 확인)
 - **Fallback**: Read, Grep, Glob
-- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임
+- **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## Analysis Perspectives
 
@@ -80,8 +80,6 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - **NWPathMonitor 콜백 스레드**: `pathUpdateHandler`는 `start(queue:)`의 queue에서 실행. main이 아니면 property 쓰기가 background → main thread 읽기와 data race
 
 ## Peer-to-Peer Protocol
-
-> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
 
 - Workflow 전환됨 (Wave 4): 발견은 구조화 출력(schema)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 

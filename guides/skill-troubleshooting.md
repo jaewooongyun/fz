@@ -248,7 +248,7 @@ User prompt에 추가:
 
 | 항목 | 실패 시 조치 |
 |------|------------|
-| #1 YAML 필수 필드 | name, description, user-invocable, allowed-tools 확인 |
+| #1 YAML 필수 필드 | 정본 `modules/governance.md` § 스킬 최소 기준 확인 — L1 공식(`name`·`description`·`allowed-tools`·`user-invocable`) + L2 fz 정책(`provides`·`needs`). ⛔ 여기서 목록 재정의 금지 |
 | #2 MCP 유효성 | MCP 서버 상태 확인, allowed-tools에서 무효 도구 제거 |
 | #3 provides/needs 체인 | 누락된 provides 토큰 추가, needs 체인 DAG 검증 |
 | #4 intent-triggers 중복 | §1.3 절차대로 키워드 분리 |
@@ -258,6 +258,16 @@ User prompt에 추가:
 | #8 Team MCP 호환 | 팀 불가 MCP 참조 제거 |
 | #9 테스트 케이스 | "## 테스트 케이스" 섹션 또는 참조 링크 추가 |
 | #10 Triggering 테스트 | should + should-NOT 최소 3개 작성 |
+| #11 skill-creator 설치 | ⏸ SEMANTIC(외부 환경) — `run_loop.py` 존재 확인, 미설치는 WARN이지 FAIL 아님 |
+| #12 tools ↔ 본문 정합 | ⏸ THRESHOLD(도구명 grammar 미정) — frontmatter `tools:`와 본문 Primary/Secondary를 사람이 대조 |
+| #13 CLAUDE.md 섹션 참조 | ⏸ SEMANTIC — 참조 대상이 **소비 프로젝트**의 CLAUDE.md인지 플러그인 자신의 것인지 정적 구별 불가(2026-08-09 강등, 오탐 89건 실측) |
+| #14 모듈 목차 | 100줄+ 모듈에 `## 목차` 추가. 형식 선례 `modules/review-structural-axes.md`·`guides/harness-engineering.md` |
+| #15 금지 패턴 | 측정 파이프의 `head`/`tail` 잘림 제거 → `wc -l` 재실행. ⛔ BAD/GOOD few-shot 예시는 대상 아님 |
+| #16 registry ↔ agents | `modules/team-registry.md` Capabilities 표와 `agents/*.md` 양방향 일치 |
+| #17 Gate Evidence 패턴 | ⏸ THRESHOLD(정규식 미정) — Gate 체크리스트에 `Evidence:` 행 존재 여부를 사람이 확인 |
+| #N1~N6 (lint 신설) | `--list`로 항목 확인. N2=인벤토리 동기 · N4=ERE alternation · N5=신호 폐기 · N6=루트 앵커 |
+
+> ⛔ **항목 목록의 SSOT는 `scripts/lint_contracts.py --list`다.** 위 표는 *실패 시 조치*만 담고 항목 정의를 재정의하지 않는다.
 
 ### Serena Fallback 체인
 

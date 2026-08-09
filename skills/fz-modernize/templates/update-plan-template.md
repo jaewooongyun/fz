@@ -108,7 +108,7 @@ grep -rn "guides/{filename}:L\d+" modules/ skills/ docs/ 2>&1
 
 ### Gate 5d-2: Build-Equivalent (link 검증)
 
-`scripts/ac8-link-check.sh` 실행 → broken link 0건
+`skills/fz-modernize/scripts/ac8-link-check.sh` 실행 → broken link 0건
 
 ### Gate 5d-3: 직접 근거 매트릭스
 

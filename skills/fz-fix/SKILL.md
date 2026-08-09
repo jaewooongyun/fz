@@ -20,20 +20,11 @@ allowed-tools: >-
   mcp__lsp__hover,
   mcp__lsp__peek_definition,
   Edit, Read, Bash(xcodebuild *), Bash(cd *), Workflow
-team-agents:
-  primary: impl-correctness
-  supporting: [review-arch, impl-quality, review-quality]
-  # review-arch 조건부: 복잡도 3+ 또는 아키텍처 관련 버그에서만 활성
-  # impl-quality + review-quality: Swift/iOS 안티패턴 차단 (역방향 트리거 발동 시)
-composable: false
 provides: [code-changes]
 needs: [none]
 intent-triggers:
   - "수정|고쳐|버그|크래시|에러"
   - "fix|bug|crash|error|patch"
-model-strategy:
-  main: opus
-  verifier: null
 ---
 
 # /fz-fix - 버그 수정 스킬

@@ -40,7 +40,8 @@ f. **Import Symbol Inventory** (import 제거 시): 제거 대상 모듈의 모�
 g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필수):
    함수 정의 자체가 아닌 **호출 사이트가 제거**되는 경우도 책임 silent disappearance 위험.
    1. `Grep("funcName\(")` → 현재 호출자 수 N
-   2. 이전 호출자 수 M을 git 비교 (Lead가 git 조회 후 artifact 제공, Team agent는 직접 Bash 금지)
+   2. 이전 호출자 수 M은 git 비교가 필요하다 — **Bash 미보유**이므로 ⛔ **중간 요청 채널 없음(1-shot)**. 브리프에 base 산출물이 있으면 그것을 Read하고, 없으면 `originBodyRequest`류 **반환 필드로 필요를 명시**한다(Lead가 resolve 후 재주입). 선례: `agents/review-correctness.md` § Function Responsibility Audit
+      → M을 확보 못하면 `[baseline: unknown]` 태그 + 본 항목 skip 사유 명시 (⛔ 추정치로 N<M 판정 금지)
    3. N < M 감지 → 제거된 call-site의 원본 body 점검:
       - 각 분기/throw/side-effect/status-check 나열
       - After diff에서 각 책임이 재수행되는지 추적

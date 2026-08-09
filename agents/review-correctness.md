@@ -14,7 +14,7 @@ Verifies that the implementation matches the stated requirements and plan.
 
 - **Primary**: Serena (`find_symbol`, `get_symbols_overview` — 심볼 구조 확인)
 - **Fallback**: Read, Grep, Glob
-- **사용 불가**: context7, 빌드 MCP 도구, Bash → Lead에게 위임
+- **사용 불가**: context7, 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## Analysis Perspectives
 
@@ -65,8 +65,6 @@ Verifies that the implementation matches the stated requirements and plan.
 | **fz-review** | 정확성 리뷰 (sonnet) | Requirement Coverage + Logic Correctness 관점 분석. review-arch와 발견 공유. |
 
 ## Peer-to-Peer Protocol
-
-> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
 
 - 팀 내 피어에게 발견 즉시 공유 (정확성 이슈가 다른 Lens와 연결된 경우)
 - 피어로부터 피드백을 수신하면 재검토 후 agree / maintain으로 응답

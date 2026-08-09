@@ -109,9 +109,11 @@ GOOD: "설계 및 계획 구조 전문 에이전트. 요구사항 분해 + 영�
 | Pattern | tools 값 | Use case |
 |---------|----------|----------|
 | Read-only | `Read, Grep, Glob` | search-symbolic, review-quality |
-| Code agent | `Read, Grep, Glob, Edit, Write, Bash` | impl-correctness |
+| **Changeset producer** | `Read, Grep, Glob` + Serena **읽기** 도구 | **impl-correctness** — ⛔ 쓰기 도구 없음 |
 | Pattern-restricted | `Bash(xcodebuild *)` | 특정 명령만 허용 |
 | Team agent 제약 | MCP tools (Atlassian, XcodeBuild) | Lead-only, subagent 사용 불가 |
+
+⛔ **구현 에이전트에 쓰기 도구를 주지 않는다** (2026-08-09, 외부 감사 ISSUE-013로 본 표가 정정됐다). 산출물은 **changeset JSON**이고 **적용은 Lead**다(`workflows/code-pair.js`) — 워커는 디스크에 닿을 필요가 없다. 근거: `guides/harness-engineering.md` "에이전트가 시도할 수 없는 것은 실패할 수 없다 — 런타임 체크가 아닌 스키마 수준 필터링" + "capability ≠ authorization". ⛔ 이전 판이 `Code agent | Read, Grep, Glob, Edit, Write, Bash | impl-correctness`로 제시해, 본 템플릿으로 에이전트를 새로 만들면 **제거된 capability가 되살아났다.**
 
 ## Naming Convention
 

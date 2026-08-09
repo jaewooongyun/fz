@@ -50,7 +50,7 @@ fi
 
 ## AC8 Link Validity 결과 (Phase 6-1)
 
-> `scripts/ac8-link-check.sh` 실행 후 결과 기록.
+> `skills/fz-modernize/scripts/ac8-link-check.sh` 실행 후 결과 기록.
 
 | 항목 | 결과 |
 |------|-----|

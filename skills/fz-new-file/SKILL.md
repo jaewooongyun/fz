@@ -4,14 +4,10 @@ description: >-
   새 소스 파일 생성 + 헤더 서명. 프로젝트 규칙에 맞는 파일 헤더 자동 생성.
   예: 새 파일, 파일 생성, 헤더
 user-invocable: false
-composable: false
 provides: [file-header]
 needs: [none]
 intent-triggers: []
 allowed-tools: []
-model-strategy:
-  main: null
-  verifier: null
 ---
 
 # 파일 헤더 서명 규칙

@@ -3,7 +3,7 @@ name: plan-structure
 description: >-
   구현 구조 + Step 순서 설계 에이전트. 요구사항 분해, 영향 범위 분석, 구현 전략 수립.
 model: sonnet
-# 승격: plan 도메인에서 opus로 승격 (Primary Worker)
+# ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview, mcp__context7__query-docs
 memory: project
 ---
@@ -17,7 +17,7 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 - Primary: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `activate_project`)
 - Secondary: sequential-thinking (복잡한 설계 결정), context7 (API 문서)
 - Fallback: Read, Grep, Glob
-- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 요청
+- **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## 프로젝트 규칙
 

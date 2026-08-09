@@ -18,7 +18,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - **Primary**: Serena (`find_referencing_symbols`, `find_symbol` — Dead Code 추적) + `Grep` (패턴 검색)
 - **Secondary**: context7 (`query-docs` — deprecated API 대안 확인)
 - **Fallback**: Read, Grep, Glob
-- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임
+- **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## Analysis Perspectives
 
@@ -95,8 +95,6 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - **API 내부 retention**: context7 query-docs로 API 파라미터 내부 retention 확인 후 중복 멤버변수 판별
 
 ## Peer-to-Peer Protocol
-
-> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
 
 - Workflow 전환됨 (Wave 4): 발견은 구조화 출력(schema)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 

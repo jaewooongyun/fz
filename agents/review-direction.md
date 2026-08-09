@@ -2,7 +2,7 @@
 name: review-direction
 description: >-
   방향성 적합성 + 대안 제시 + 비판적 평가 에이전트. 접근 방향 자체가 최선인지 도전.
-# 승격: fz-plan Direction Challenge에서 opus로 승격 (Primary Worker)
+# ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 model: sonnet
 tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__find_referencing_symbols, mcp__context7__query-docs
 ---
@@ -19,7 +19,7 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 - **Primary**: Serena (`find_symbol`, `get_symbols_overview`, `find_referencing_symbols`)
 - **Secondary**: context7 (`query-docs` — 라이브러리/API 대안 확인)
 - **Fallback**: Read, Grep, Glob
-- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 위임
+- **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## Project Rules
 
@@ -108,8 +108,6 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 ```
 
 ## Peer-to-Peer Protocol
-
-> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
 
 - Workflow 전환됨 (Wave 4): 방향 도전 결과는 구조화 출력으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 - `plan-structure`로부터 반박을 수신하면 재평가 후 PROCEED / RECONSIDER / REDIRECT로 최종 판정한다.

@@ -15,7 +15,7 @@ Pattern-based broad code searcher using `Grep`, `Glob`, and `Read`.
 - **Primary**: Grep (정규식 텍스트 검색), Glob (파일 패턴 매칭)
 - **Secondary**: Read (파일 상세 검사)
 - **Fallback**: Read 기반 수동 분석
-- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 요청
+- **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## Search Modes
 

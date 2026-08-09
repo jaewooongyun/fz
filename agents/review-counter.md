@@ -2,7 +2,7 @@
 name: review-counter
 description: >-
   반론 + Devil's Advocate 에이전트. 다른 리뷰어의 판단에 의도적으로 반론.
-# 승격: 미승격 (반론 역할, sonnet 유지)
+# ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 model: sonnet
 tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
 ---
@@ -18,7 +18,7 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 - **Primary**: Read, Grep, Glob — 코드 분석 및 증거 수집
 - **Secondary**: mcp__serena__find_referencing_symbols — 반론 근거 심볼 추적
 - **Fallback**: Read 기반 수동 분석
-- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 요청
+- **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## Analysis Approach
 
@@ -53,8 +53,6 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 - 예상 실패 시나리오 또는 리스크 설명
 
 ## Peer-to-Peer Protocol
-
-> 적용 범위: TeamCreate 기반 팀(예: fz-peer-review) 경로. Workflow로 전환된 패턴(review-live 등)은 스크립트가 라운드를 구현(P2P SendMessage 아님).
 
 - Workflow 전환됨 (Wave 4): 반론은 구조화 출력(challenges/missedIssues)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 - 반론 수신 에이전트는 재검토 후 agree / maintain / challenge 응답 의무
