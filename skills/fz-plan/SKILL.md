@@ -20,19 +20,12 @@ allowed-tools: >-
   mcp__atlassian__get-issue,
   mcp__atlassian__search-issues,
   Read, Grep, Glob, Workflow
-team-agents:
-  primary: plan-structure
-  supporting: [plan-impact, plan-edge-case, review-arch, review-direction, memory-curator]
-composable: true
 provides: [planning, architecture-analysis]
 needs: [none]
 intent-triggers:
   - "계획|설계|아키텍처|요구사항"
   - "plan|design|architect|requirement"
   - "리팩토링|치환|흡수|이전|migration|refactor"
-model-strategy:
-  main: opus
-  verifier: sonnet
 ---
 
 # /fz-plan - 계획 + 설계 스킬
@@ -60,7 +53,7 @@ model-strategy:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/team-core.md + modules/patterns/ | Workflow 미가용 시 SOLO 폴백 협업 프로토콜 (canonical 패턴 출처) |
+| modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
 | modules/patterns/collaborative.md | Phase 0.5 Collaborative Design (review-direction → plan-structure) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
@@ -92,7 +85,7 @@ model-strategy:
 
 ## 팀 에이전트 모드
 
-> 팀 모드 규칙은 `modules/team-core.md` 참조
+> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
 > Collaborative Design 패턴 canonical: `modules/patterns/collaborative.md` (보존 — 라운드 의미론은 스크립트가 구현).

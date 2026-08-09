@@ -17,11 +17,11 @@
 | T1 | 파일 수정 **5개+** 도달 | "CLAUDE.md Architecture 규칙: 상위→하위만 참조. 현재 변경 범위가 넓어지고 있습니다." | 반성 5차: 영향 분석 불완전 |
 | T2 | Gate 실패 **1회+** | "Gate 체크리스트 전체 재확인. 실패 항목: {항목명}" | 반성 4차: Gate 바이패스 |
 | T3 | 제거/리팩토링 작업 중 **10턴+** | "Implication Scan 수행했는가? Q-WHY: 이 코드가 존재하게 된 이유가 해소됐는가?" | lead-reasoning.md |
-| T4 | TEAM 에이전트 완료 보고 수신 | "Lead Checkpoint Protocol 순서: 체크포인트 → Codex → [Implication] → 빌드 → 다음" | team-core.md Rule 6 |
+| T4 | Workflow 반환 수신 (또는 서브에이전트 완료 보고) | "Lead Checkpoint 순서: 체크포인트 → Codex → [Implication] → 빌드 → 다음. 반환 mode가 fallback/split_required면 **실패 복구 사다리**(guides/skill-authoring.md §12 L1~L4)로 분기" | guides/skill-authoring.md §12 (⛔ team-core.md Rule 6은 역사적 출처) |
 | T5 | diff에 `static let shared` 타입의 `var` property 변경 감지 | "싱글톤 가변 상태 수정 감지. 확인: (1) 동기화 보호 (@MainActor/actor/lock) (2) deinit dead code (3) 기본값 소비자 영향. 참조: plugin-refs.md 역방향 트리거, modules/safety-audit.md" | PR#3665: plugin 미활성으로 data race 미감지 |
 | T6 | 과거 상태 주장 키워드("원본은", "기존은", "이전은", "D{N} 이전") 감지 + 직전 5턴 내 `git show`/`Read`/`grep`/`find_referencing_symbols` 호출 흔적 없음 | "과거 상태 주장 감지 + 검증 도구 호출 흔적 없음. Fail-Closed: `git show {SHA}:{path}` 또는 `Read` 실행 후 주장하거나 `[미검증: 실측 없음]` 태그 부착. 참조: ${CLAUDE_PROJECT_DIR}/memory/feedback_source_claim_must_verify.md, lead-reasoning.md §1.5 Speculation-to-Fact" | ASD-909 F-7: 원본 추정으로 4회 reversal |
 | T7 | 과거 판단 아티팩트(`follow-up-tasks.md`, `codex-review*.md`, `plan-v*.md`) 인용 감지 | "과거 판단 아티팩트 인용 감지. 작성 시점 판단이므로 현재 시점 재실측 필수. 재검증 불가 시 `[아카이브: 재실측 불가, 작성 시점 {YYYY-MM-DD}]` 태그. 참조: ${CLAUDE_PROJECT_DIR}/memory/feedback_followup_artifact_reaudit.md" | ASD-909: follow-up-tasks.md 맹목 인용으로 재작업 |
-| T8 | (event signal 동반 시만 — 키워드 단독은 Q-COVERAGE에 위임) 전수/카운트/부정 주장 키워드("전수/모든/~뿐/N곳/N개/나머지는" — canonical: cross-validation.md §Coverage Gate) 감지 + [(측정 도구 호출 흔적 없이) 이전 턴 수치 재인용 OR 현재 컨텍스트에 원 측정 명령 출력 부재 OR 직전 근거 명령 head/tail 잘림 흔적] | "전수/카운트 주장 + 원 측정 부재/재인용 감지. Coverage Gate(검산식) 통과 확인. 재인용이면 head 없이 재실측(`rg X \| wc -l`). 적용 범위: 잘림·재인용·측정 부재 클래스 — 정규식 불완전(가짜 교차확인)은 Coverage Gate 검산식 담당. T6=과거 상태 주장 / T8=현재 대화 내 수치 재인용. Backstop 'SOLO 5턴 이하' 예외 비상속 (사고가 4턴 생존). 참조: cross-validation.md §Coverage Gate" | 2026-06-12 전수 주장 오판: `head -5` 잘린 출력 "2곳뿐" 단정 4턴 생존 (실제 11곳) |
+| T8 | (event signal 동반 시만 — 키워드 단독은 Q-COVERAGE에 위임) 전수/카운트/부정 주장 키워드 — 요청측 "전체/모든/생태계/전수" · 산출물측 "~뿐/N곳/N개/나머지는/전부" (⛔ 어휘 9개 전부 canonical과 동기: cross-validation.md §Coverage Gate) 감지 + [(측정 도구 호출 흔적 없이) 이전 턴 수치 재인용 OR 현재 컨텍스트에 원 측정 명령 출력 부재 OR 직전 근거 명령 head/tail 잘림 흔적] | "전수/카운트 주장 + 원 측정 부재/재인용 감지. Coverage Gate(검산식) 통과 확인. 재인용이면 head 없이 재실측(`rg X \| wc -l`). 적용 범위: 잘림·재인용·측정 부재 — **도구 유효성(정규식 불완전·신호 폐기·CWD 의존)은 `cross-validation.md` §Negative-Result Gate**(2026-08-09 구현; 그 전엔 위임만 있고 수신처가 없었다). T6=과거 상태 주장 / T8=현재 대화 내 수치 재인용. Backstop 'SOLO 5턴 이하' 예외 비상속 (사고가 4턴 생존). 참조: cross-validation.md §Coverage Gate · §Negative-Result Gate" | 2026-06-12 전수 주장 오판: `head -5` 잘린 출력 "2곳뿐" 단정 4턴 생존 (실제 11곳) |
 
 ## Low-frequency Backstop
 
@@ -41,7 +41,7 @@ EXCEPTION: SOLO + 5턴 이하 세션 → backstop 불필요
 | 스킬/모듈 | 참조 이유 |
 |----------|----------|
 | fz-code | 구현 절차에서 T1/T3 트리거 감지 |
-| team-core.md | T4 Lead Checkpoint에서 참조 |
+| guides/skill-authoring.md §12 | T4 Lead Checkpoint + 실패 복구 사다리 분기에서 참조 |
 | cross-validation.md | Gate 삽입 규칙에서 참조 |
 | lead-reasoning.md | T3에서 Implication Scan 연결 |
 

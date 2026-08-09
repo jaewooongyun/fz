@@ -2,6 +2,19 @@
 
 > fz-* 생태계의 변경 통제, 품질 게이트, 긴급 정지 정책.
 
+## 목차
+
+- [참조 스킬](#참조-스킬)
+- [Kill-Switch](#kill-switch)
+- [Hook 최소 강제 권고](#hook-최소-강제-권고)
+- [변경 통제](#변경-통제)
+- [품질 게이트](#품질-게이트)
+- [Truth-of-Source 정책](#truth-of-source-정책)
+- [모듈 분리 기준](#모듈-분리-기준)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## 참조 스킬
 
 | 스킬 | 참조 이유 |
@@ -51,10 +64,13 @@
 
 ### Kill-Switch 실행 절차
 
+⛔ **`TeamCreate`/`TeamDelete`/`shutdown_request`는 v2.1.178부터 존재하지 않는다** (`guides/agent-team-guide.md` §3 실측). 이전 판이 이 도구들을 비상 절차로 지시하고 있었다 — **비상 경로가 부재 도구에 의존**하던 상태다(2026-08-09 격리).
+
 1. 조건 감지 → 현재 Step 완료 대기 (진행 중 작업 보호)
-2. 팀 모드 시: 전체 에이전트에 `shutdown_request` 전송
+2. **Workflow 모드**: 실행 중 스크립트는 Lead가 중단 신호를 보낼 채널이 없다(1-shot 스테이지) → **현재 스테이지 완주를 기다리고 반환값을 받은 뒤 다음 invoke를 하지 않는다**. 강제 종료가 필요하면 `TaskStop`(harness 도구)이 유일 수단이다
 3. 사용자에게 상황 보고 + 선택지 제시 (재시도/스킵/중단)
-4. 중단 선택 시: TeamDelete + 부분 산출물 보존
+4. 중단 선택 시: **부분 산출물 보존**(ASD 폴더 기록 확인) + 다음 invoke 차단. 정리할 팀 리소스는 없다 — Workflow는 종료 핸드셰이크가 없고 자동 정리된다
+   > ✅ **폴백 분기 확정 (2026-08-09)**: 중단이 아니라 *복구*를 시도할 때는 `guides/skill-authoring.md` §12 **실패 복구 사다리**(L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션)를 따른다. Kill-Switch는 **L4에서 사용자가 "중단"을 선택한 경우**의 절차다
 
 ## Hook 최소 강제 권고
 
@@ -89,7 +105,7 @@
 
 | 항목 | 기준 | 근거 |
 |------|------|------|
-| YAML 필수 필드 | name, description, allowed-tools, provides, needs | Progressive Disclosure L1 |
+| YAML 필수 필드 (**정본** — 2층) | **L1 Claude Code 공식**: `name` · `description` · `allowed-tools` · `user-invocable` / **L2 fz 정책**: `provides` · `needs` | L1은 Progressive Disclosure L1, L2는 `/fz` 동적 파이프라인(`skills/fz/SKILL.md` §3.2)이 실제 소비 |
 | Description 4요소 | what + when + when-not + 한영키워드 | 트리거 정확도 |
 | 크기 제한 | ≤500줄 | Progressive Disclosure L2 |
 | Boundaries | Will/Will Not + 대안 | 범위 명확화 |
@@ -100,13 +116,34 @@
 Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot 면제.
 단, Description 4요소와 Boundaries는 필수.
 
+### Agent-Payload 스킬 범주 (2026-08-09 신설)
+
+**정의**: `user-invocable: false` + 에이전트 frontmatter `skills:` 로 **사전주입**되는 스킬. 현재 `arch-critic`(review-arch) · `code-auditor`(review-quality).
+
+⛔ **면제가 아니라 대체 게이트다.** 이 스킬은 사용자가 선택하지 않으므로(선택 시점에 description·Boundaries가 노출되지 않는다) Utility 예외와 성격이 다르다. 범주가 없어 두 스킬이 6개 게이트를 **영구 미충족**했고, 2026-06-28 감사의 T9c(에러 대응표)가 1년 가까이 미해결로 남은 근본 원인이다.
+
+| 항목 | 판정 |
+|---|---|
+| Phase · Gate · 에러 대응표 · 테스트 케이스 · description when-not · 한영 키워드 | **면제** — 선택 시점에 노출되지 않는다 |
+| **(a) 관점 커버리지** | 선언한 관점 수 = 본문 관점 섹션 수 |
+| **(b) 출력 필드 정합** | ⛔ **소비 스키마 집합 전체**와 정합. 단수 아님 — `arch-critic`은 `review-live.js`(`ReviewFindingsSchema.detail`) + `peer-review.js`(`PeerReviewSchema.description`) **2 계약**을 동시 지원한다 |
+| **(c) 사전주입 실재** | 대상 에이전트 frontmatter `skills:` 에 실제 선언 |
+
+- (a)(c)는 binary → `scripts/lint_contracts.py` 후속 항목
+- ⚠️ **(b)는 OQ9(리뷰 이슈 3중 계약) 미해소 시 기준 확정 불가** → 그때까지 **관찰 기록**, 게이트는 (a)(c)만
+
+> 근거: 2026-08-09 플러그인 자기 감사 F-6·F-17 (⛔ 개인 아티팩트 경로는 팀 코드에 남기지 않는다 — pre-commit 훅이 차단)
+
 ## Truth-of-Source 정책
 
 생태계 내 동일 정보가 여러 파일에 존재할 때의 우선순위:
 
 | 정보 | Truth-of-Source | 동기화 대상 |
 |------|----------------|------------|
-| 팀 구성 (에이전트 목록) | 스킬 YAML `team-agents` | team-registry.md, patterns/*.md |
+| **팀 구성 (에이전트 목록)** | **`workflows/*.js`의 `agentType` 인자** | team-registry.md, patterns/*.md — ⛔ 스킬 YAML `team-agents`는 **2026-08-09 제거**(런타임 효과 0이었다) |
+| **모델 배정** | **`workflows/*.js`의 `opts.model`** | agents/*.md(기본값 표기만), team-registry.md `promoted` 열. 감시 = `scripts/lint-model-explicit.sh` · ⛔ 스킬 YAML `model-strategy`는 **제거** |
+| **opus 동시 상한** | **`guides/fable-model-guide.md` §5** | governance.md kill-switch 행, agent-team-guide.md, skill-authoring.md §12 |
+| **YAML 필수 필드** | **본 문서 § 스킬 최소 기준** (L1 공식 4 + L2 fz 정책 2) | fz-manage check #1, skill-troubleshooting.md #1, templates/skill-template.md |
 | 에이전트 도구 | 에이전트 YAML `tools` | 본문 설명 |
 | 파이프라인 정의 | modules/pipelines.md | fz SKILL.md 인라인 |
 | 평가 기준 | guides/skill-testing.md | fz-skill eval, fz-manage benchmark |

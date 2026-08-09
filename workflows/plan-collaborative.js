@@ -11,7 +11,7 @@
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', plan: PlanSchema, directionVerdict, directionAlternatives, metrics }
 //     | { mode:'direction_escalation', verdict, alternatives, rebuttal, metrics } → Lead가 사용자 확인 (대화는 Workflow 밖)
-//     | { mode:'fallback', reason, metrics } → Lead는 SOLO plan 경로 수행.
+//     | { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
 //   Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차): stress-test Q1-Q6 / RTM 검증 /
 //     Phase 0.7 Sprint Contract(Codex 회복 시) / Codex verify(Phase 2) / memory-curator recall /
 //     plan-v{N}.md 파일 기록 / direction_escalation 사용자 대화 / wall-clock 측정.

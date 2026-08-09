@@ -23,18 +23,11 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   Bash(git *), Bash(codex *), Bash(gh *), Read, Grep, Glob, Workflow, Write
-team-agents:
-  primary: review-arch
-  supporting: [review-quality, review-counter]
-composable: false
 provides: [peer-review]
 needs: [none]
 intent-triggers:
   - "피어리뷰|팀원|PR.*리뷰"
   - "peer.?review|teammate|PR.*review"
-model-strategy:
-  main: opus
-  verifier: sonnet
 ---
 
 # /fz-peer-review - 팀원 코드 피어 리뷰
@@ -69,9 +62,9 @@ model-strategy:
 
 | 참조 | 용도 |
 |------|------|
-| `modules/team-core.md` + `patterns/` | TEAM 실행 프로토콜 |
+| `guides/skill-authoring.md` §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본). ⛔ `team-core.md`·`patterns/`는 역사적 출처 — 실행 절차 아님 |
 | `modules/patterns/live-review.md` | Live Review (peer-review 공유 패턴, fz-review 동일) (UC-11, v4.7.1) |
-| `modules/cross-validation.md` | get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
+| `modules/cross-validation.md` | get_codex_skill_path() 3-Tier 디스커버리, GIT_ROOT 추출 |
 | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
 | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
 | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |

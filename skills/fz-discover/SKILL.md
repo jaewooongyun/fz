@@ -18,10 +18,6 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
   Read, Grep, Glob, Workflow
-team-agents:
-  primary: plan-structure
-  supporting: [review-arch]
-composable: true
 provides: [landscape-map, trade-off-table, open-questions]
 needs: [none]
 intent-triggers:
@@ -30,9 +26,6 @@ intent-triggers:
   - "이게.*맞아|이렇게.*해도|어떤.*방식|비교.*해줘"
   - "맞는지|차이점|놓치고|어떻게.*생각"
   - "how.*should|where.*should|what.*best|trade.?off|difference|missing|what.*think"
-model-strategy:
-  main: opus
-  verifier: sonnet
 ---
 
 # /fz-discover - 풍경 탐색 + 경로 매핑 스킬
@@ -71,8 +64,8 @@ model-strategy:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 (Adversarial Constraint Discovery 패턴) |
-| modules/patterns/adversarial.md | Tree Search Adversarial Discovery (UC-11, v4.7.1 explicit reference) |
+| guides/skill-authoring.md §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본). ⛔ `team-core.md`는 역사적 출처 — 실행 절차 아님 |
+| modules/patterns/adversarial.md | Tree Search Adversarial Discovery — **설계 출처**(Workflow 평탄화 원본). ⛔ 폴백 실행 절차 아님 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
 | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
@@ -234,7 +227,8 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 - [ ] 핵심 결정 사항이 명확하게 식별되었는가?
 - [ ] 관련 코드 구조를 탐색했는가?
 - [ ] 초기 제약이 1개 이상 식별되었는가?
-- [ ] "전체" 분석 요청이거나 **산출물이 전수/카운트/부정 주장이면** Coverage Gate 통과? (대상 N개, 분석 M개, M/N = {비율}% — canonical: modules/cross-validation.md § Coverage Gate)
+- [ ] "전체/모든/생태계/전수" 분석 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (대상 N개, 분석 M개, M/N = {비율}% — canonical: `modules/cross-validation.md` § Coverage Gate, ⛔ 어휘 9개 동기)
+- [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
 - [ ] scope 판정(in/out 분류) 포함 시: 기각 표본 adversarial 재검 + site 단위 분류 — Coverage Gate § 절차 **step 7** 통과? (위 일반 커버리지 항목과 별개) *[candidate: 1 session evidence]*
 
 ---

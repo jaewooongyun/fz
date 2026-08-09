@@ -58,17 +58,17 @@ L3 에이전트 결과를 Issue Tracker에 통합할 때:
 | /fz-review | Phase 5 L3 에이전트 스폰 |
 | /fz-discover | deep-research-agent 스폰 |
 
-## 팀 피드백 프로토콜 (TEAM 모드)
+## 팀 피드백 프로토콜 (Workflow 모드)
 
-L3 결과가 TEAM과 동시에 진행될 때의 피드백 흐름:
+L3 결과가 Workflow와 동시에 진행될 때의 피드백 흐름:
 
 1. L3: `Agent(run_in_background=true)` 스폰
 2. 결과 도착 시 Lead 수신
-3. **TEAM Round 0.5 전**: Lead → Primary에게 `[L3 피드백]` SendMessage (team-core.md 참조)
-   → Primary가 iOS 특화 렌즈로 재분석 → severity 조정 + 연쇄 이슈 식별
-4. **TEAM Round 0.5 이후**: Lead가 직접 Issue Tracker에 merge (기존 동작)
+3. **다음 스테이지 invoke 전**: Lead가 `[L3 피드백]`을 **args/브리프에 주입**
+   → 해당 렌즈 워커가 재분석 → severity 조정 + 연쇄 이슈 식별
+4. **이미 진행 중인 invoke**: Lead가 직접 Issue Tracker에 merge (반환 후 통합)
 
-우선순위: TEAM 피어 통신 > L3 피드백 (Round 중간에 끼어들지 않음)
+⛔ **P2P 채널 없음**: `SendMessage`는 v2.1.178부터 부재이고 Workflow 워커는 1-shot이다 — 실행 중 워커에게 끼어들 수 없다. 피드백 전달 단위는 **invoke 경계**다.
 
 ### ⛔ Anti-Pattern
 - L3 에이전트를 TeamCreate로 스폰 금지 (2.5-Turn에 범용 에이전트 참여 = 품질 저하)

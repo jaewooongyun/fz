@@ -18,13 +18,9 @@ allowed-tools: >-
   mcp__serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   Read, Grep, Glob
-composable: false
 provides: []
 needs: []
 intent-triggers: []
-model-strategy:
-  main: fable
-  verifier: null
 ---
 
 # /fz - 유니버셜 오케스트레이터 (v3)
@@ -87,7 +83,7 @@ model-strategy:
 |------|------|
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/complexity.md | 5차원 복잡도 → 모드 결정 |
-| modules/team-core.md + modules/patterns/ | TEAM 실행 프로토콜 + 정적 팀 패턴 (TeamCreate + 3-Phase 통신 + 스킬별 패턴) |
+| modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리 L1~L4) |
 | modules/team-registry.md | 에이전트 + 모델 자동 결정 |
 | modules/cross-validation.md | 검증 게이트 자동 삽입 |
 | modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
@@ -315,7 +311,7 @@ commit/pr 전 → ✓ codex check (TEAM)
 ### 5.2 Workflow Execution
 
 > 멀티에이전트 실행은 네이티브 Workflow 결정적 스크립트가 소유한다 (TEAM 일몰, Wave 4). 스크립트가 fan-out/수렴/라운드를 구현 — P2P SendMessage 없음.
-> 참조: `guides/skill-authoring.md` §12 (Workflow 규약) + `modules/patterns/` (라운드 의미론 canonical, SOLO 폴백 시 참조).
+> 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본). ⛔ `modules/patterns/`는 라운드 의미론의 **설계 출처**일 뿐 폴백 실행 절차가 아니다.
 
 각 스킬은 자신의 `workflows/{skill}-{pattern}.js`를 소유한다. Lead는 스킬의 Workflow를 호출하고 반환(구조화 출력)을 통합한다. Lead는 퍼실리테이터 (호출 + 게이트 실행 + 통합).
 
@@ -323,8 +319,9 @@ commit/pr 전 → ✓ codex check (TEAM)
 1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{플러그인 루트}/workflows/{skill}-{pattern}.js', args })
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
 3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/Codex) + 통합
-4. mode:'split_required'(또는 fallback+splitSuggested) → Lead는 **먼저** Step 분할 후 재invoke (code-pair H5 크기 가드, ⛔ Lead=fable 자동 SOLO 금지 — 직접 구현은 사용자 승인 후)
-5. mode:'fallback'(split 힌트 없음, 일시 장애 의심) → 재시도 1회 → 미해소 시 Lead SOLO 수행 (patterns/ canonical 프로토콜 참조). 상세 사다리: fz-code SKILL 절차 6
+4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
+   **L1** split_required/splitSuggested → Step 분할 후 재invoke · **L2** 입력 오류 → 수정 후 재invoke(설계된 fail-fast) · **L3** 스톨·일시 장애 → **`resume` 우선**(동일 세션 한정) · **L4** 미해소 → 사용자 에스컬레이션
+   ⛔ Lead 단독 SOLO 수행은 **사용자 승인 후에만** (Lead=fable 자동 SOLO 금지)
 ```
 
 ### Verification Discipline Brief (모든 agent() spawn에 자동 포함)

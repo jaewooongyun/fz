@@ -331,10 +331,12 @@ SOLO가 기본이다. 팀이 필요한 근거가 없으면 SOLO로 실행한다.
 
 ### 팀 구성 패턴
 
-```yaml
-team-agents:
-  primary: impl-correctness         # 핵심 생산 → opus
-  supporting: [review-arch]          # 실질 분석 → opus (단순 retrieval·breadth만 sonnet)
+⛔ **스킬 YAML `team-agents`는 2026-08-09 제거됐다** — Wave 4 전환 후 팀 구성을 결정하지 않는 선언이었다. 구성은 **스크립트가 소유**한다 (정본: `modules/governance.md` § Truth-of-Source):
+
+```js
+// workflows/{skill}-{pattern}.js
+await agent(prompt, { label: 'stage1-impl', agentType: 'fz:impl-correctness',
+                      model: 'opus', effort: 'xhigh', schema: ChangesetSchema })
 ```
 
 - Primary Worker는 1명만 지정한다
@@ -509,7 +511,7 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 - 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
 - 호출(Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/....js', args })`. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
-- agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정), effort 생략 시 세션 effort 상속. 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 (agentType 라인에 model 또는 effort 누락 시 차단)
+- agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정), effort 생략 시 세션 effort 상속. 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 — ⛔ **차단이 아니라 "요청 시 검출"이다.** `/fz-manage check`가 호출할 때만 돌고, 실제 차단은 훅 설치 시에만 성립한다(훅은 `settings.json` = 사용자 소관, `modules/governance.md` § Hook 최소 강제 권고)
 - **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `'xhigh'` 단일값. Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**.
   - ⛔ **상수 일괄 교체 금지**: 공식이 *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* 을 요구. 측정 없이 `xhigh`→`high`로 치환하는 건 근거 없는 값을 근거 없는 값으로 바꾸는 것. **워크로드별 sweep 후** 스테이지 성격(생산/판정/탐색)에 맞춰 차등 배정. 미측정 상태의 기본값 = **현행 유지**.
   - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [미검증: per-call `opts.effort` vs settings.json `effortLevel` 우선순위. 문서화된 체인은 `env var > frontmatter > 세션`이며 per-call opts는 미명시]
@@ -536,9 +538,26 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 ### 산출물·거버넌스 계약
 
 - 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — mode='fallback'이면 Lead가 SOLO 폴백. wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
-- 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / opus 동시 ≤2 (워커 기준 — Lead는 fable, fan-out은 sonnet) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
+- 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / **opus 동시 ≤3** (워커 기준 — Lead는 fable, fan-out은 sonnet. **정본 = `guides/fable-model-guide.md` §5** — ⛔ 여기서 값을 재정의하지 않는다) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
 - 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
 - 검증 oracle: 래핑 syntax 검사(`async function wrap(...){...본문...}` 후 node --check — 직접 node --check는 CJS 관대 파싱으로 무효) + **실 invoke ≥1** + experiment-log §5.7 지표 기록
+
+### ⛔ 실패 복구 사다리 (`mode:'fallback'` · 스톨 — **본 절이 정본**)
+
+> 신설 근거(2026-08-09): 이전에는 5개 스킬이 폴백 절차로 `modules/team-core.md` + `modules/patterns/`(679줄)를 지목했으나 그 내용은 `TeamCreate`/`SendMessage` **P2P 절차**였다 — SOLO에는 에이전트가 없어 **실행 자체가 불가능**했다. 그런데 실측상 실패는 2회 발생하고 **두 번 다 아래 사다리로 복구**됐다(`experiment-log.md` §5.7 fz-code #1 · fz-review #8). `team-core` 사용 이력은 **0건**이다.
+> 즉 본 절은 새 프로토콜을 발명하는 것이 아니라 **이미 작동한 복구 경로를 성문화**한다.
+
+| 단계 | 조건 | 행동 | 실측 선례 |
+|:--:|---|---|---|
+| **L1** | `mode:'split_required'` 또는 `mode:'fallback'`+`splitSuggested:true` | **Step 분할 후 재invoke** (과대 changeset scaffold collapse 방어 — H5) | — |
+| **L2** | `mode:'fallback'` + 입력 오류 (args 파싱·필수 키 누락) | **입력 수정 후 재invoke.** ⛔ 워크플로 실패가 아니라 **설계된 fail-fast**다 | §5.7 fz-code #1 (2026-07-10, args 유니코드 이스케이프 깨짐 → 수정 후 회복) |
+| **L3** | 스테이지 스톨·일시 장애(세션/rate limit) | **`resume` 우선** — `Workflow({ scriptPath, resumeFromRunId })`. 변경 없는 agent()의 최장 prefix가 캐시 재생된다 | §5.7 fz-review #8 (2026-07-20, 초회 7287s 스톨 → resume 부분 재시도 성공) |
+| **L4** | L1~L3 미해소 | **사용자 에스컬레이션** — 선택지(재시도/범위축소/중단) 제시. ⛔ **Lead 단독 SOLO 수행은 사용자 승인 후에만** (Lead=fable 자동 SOLO 금지) | — |
+
+- ⛔ **`resume`은 동일 Claude Code 세션 내에서만** 동작한다 — 세션이 끝났으면 L3를 건너뛰고 ASD 아티팩트로 복원한다
+- ⛔ **재시도는 `buildFeedback` 등을 args에 넣어 캐시 키를 바꾼다** (resume 비의존 경로)
+- ⛔ **진단은 추측 금지** — `<transcriptDir>/journal.jsonl`이 agent별 실제 반환값을 기록한다. 빈 결과·이상 결과는 journal을 먼저 Read
+- `modules/team-core.md` + `modules/patterns/*.md`는 **라운드 의미론의 역사적 출처**다 — 폴백 실행 절차로 참조하지 않는다
 
 ### intentContext 규약 (과제 목적 전달)
 

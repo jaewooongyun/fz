@@ -17,20 +17,11 @@ allowed-tools: >-
   mcp__lsp__diagnostics_delta,
   mcp__lsp__references,
   Read, Grep, Glob, Workflow
-team-agents:
-  primary: review-arch
-  # workflow(review-live.js) 스폰 대상은 review-arch·review-quality·review-counter 3개.
-  # review-correctness(Phase 4.5)·memory-curator는 Lead가 직접 수행 — 스폰 목록 아님.
-  supporting: [review-quality, review-counter, review-correctness, memory-curator]
-composable: true
 provides: [review-results]
 needs: [code-changes]
 intent-triggers:
   - "리뷰|검증|품질|검토"
   - "review|validate|quality|check"
-model-strategy:
-  main: opus
-  verifier: sonnet
 ---
 
 # /fz-review - 리뷰 + 품질 보증 스킬
@@ -63,7 +54,7 @@ model-strategy:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/team-core.md + modules/patterns/ | Workflow 미가용 시 SOLO 폴백 협업 프로토콜 (canonical 패턴 출처) |
+| modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
 | modules/patterns/live-review.md | Live Review (review-arch ↔ review-quality 발견 즉시 공유) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/build.md | 빌드 검증 |
@@ -92,7 +83,7 @@ model-strategy:
 | 7 | `/sc:test` | 최종 테스트 검증 |
 ## 팀 에이전트 모드 (Review Squad)
 
-> 팀 모드 규칙은 `modules/team-core.md` 참조
+> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
 > Live Review 패턴 canonical: `modules/patterns/live-review.md` (보존 — 라운드 의미론은 스크립트가 구현).

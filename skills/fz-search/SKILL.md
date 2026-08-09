@@ -20,18 +20,11 @@ allowed-tools: >-
   mcp__lsp__peek_definition,
   Read, Grep, Glob, Workflow
 
-team-agents:
-  primary: null                                            # 단일 Primary 없음 — symbolic·pattern 대등 병렬
-  supporting: [search-symbolic, search-pattern, plan-structure]   # plan-structure = Stage 3 수렴 merge (fable)
-composable: true
 provides: [search-results, architecture-analysis]
 needs: [none]
 intent-triggers:
   - "찾아|탐색|구조|영향|의존성"
   - "search|explore|structure|impact|dependency"
-model-strategy:
-  main: opus
-  verifier: sonnet
 ---
 
 # /fz-search - 코드 탐색 & 구조 분석 스킬
@@ -69,7 +62,7 @@ model-strategy:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/team-core.md + modules/patterns/ | Workflow 미가용 시 SOLO 폴백 협업 프로토콜 (canonical 패턴 출처) |
+| modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
 | modules/patterns/cross-verify.md | Cross-Verify (search-symbolic ↔ search-pattern 교차 확인) (UC-11, v4.7.1) |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
@@ -346,7 +339,8 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 - [ ] 대상 심볼/패턴 파악 완료?
 - [ ] 영향 범위 식별?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
-- [ ] "전체/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("N곳"/"~뿐" 등)이면** Coverage Gate 통과? (canonical: modules/cross-validation.md § Coverage Gate 참조)
+- [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (canonical: `modules/cross-validation.md` § Coverage Gate — ⛔ 어휘 9개 동기)
+- [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
 
 ---
 
