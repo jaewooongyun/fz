@@ -6,6 +6,22 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 
 ---
 
+## 목차
+
+- [Tier 구성](#tier-구성)
+- [자동 휴리스틱 (단일 진실 원천)](#자동-휴리스틱-단일-진실-원천)
+- [Tier 0 (Solo) 절차](#tier-0-solo-절차)
+- [Tier 1 (Solo + Codex) 절차](#tier-1-solo--codex-절차)
+- [Tier-Adaptive Evidence](#tier-adaptive-evidence)
+- [비용 로깅 (모든 Tier)](#비용-로깅-모든-tier)
+- [Tier 2: Lite — 실행 시퀀스](#tier-2-lite--실행-시퀀스)
+- [Tier 3: Full (--deep) — 추가 시퀀스](#tier-3-full---deep--추가-시퀀스)
+- [Codex Analyze 호출](#codex-analyze-호출)
+- [Cross-Critique Anti-Sycophancy Rule](#cross-critique-anti-sycophancy-rule)
+- [타임아웃 + 폴백](#타임아웃--폴백)
+
+---
+
 ## Tier 구성
 
 | Tier | review-arch | review-quality/correctness | Codex | Cross-Critique | 기본 agent call |
@@ -299,7 +315,7 @@ Stage 3: review-counter DA — issues 반론 + strengths 도전
 
 ## Codex Analyze 호출
 
-> `get_codex_skill()` 3-Tier 디스커버리 + codex exec 패턴: `modules/cross-validation.md` 참조.
+> `get_codex_skill_path()` 3-Tier 디스커버리 + codex exec 패턴: `modules/cross-validation.md` 참조.
 
 Codex challenger 프롬프트에 필수 포함:
 - Origin Classification(regression/pre-existing/improvement)

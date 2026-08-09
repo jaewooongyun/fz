@@ -4,6 +4,20 @@
 > 목적: P1 → P0 및 P2 → P1 승격을 위한 eligible session 관측 누적
 > 원칙: 학습 승격 (자동 확장) 금지. AskUserQuestion + 기록만
 
+## 목차
+
+- [Eligible Session 정의](#eligible-session-정의)
+- [관측 기록 형식](#관측-기록-형식)
+- [P1 → P0 승격 조건](#p1--p0-승격-조건)
+- [P2 → P1 승격 조건](#p2--p1-승격-조건)
+- [현재 관측 대상 (v2.2 기준)](#현재-관측-대상-v22-기준)
+- [ASD-1674 회고 후보 (P2, 관측 #1)](#asd-1674-회고-후보-p2-관측-1)
+- [ASD-1794 회고 후보 (시청내역 v3 마이그레이션, 관측 #1)](#asd-1794-회고-후보-시청내역-v3-마이그레이션-관측-1)
+- [TVG-2739 + fz-improvement 회고 후보 (2026-07-18)](#tvg-2739--fz-improvement-회고-후보-2026-07-18)
+- [미달 조치 정책](#미달-조치-정책)
+
+---
+
 ## Eligible Session 정의
 
 다음 두 조건을 모두 충족하는 ASD-{번호} 세션:
@@ -81,7 +95,8 @@
 > ⛔ **승격 차단**: 2026-06-01 세션 Codex 한도 초과 → P2→P1 조건의 "Codex verify → approved" 미충족. 관측 #1 등록까지만. cross-model 검증 PENDING.
 >
 > **⛔ 2-트랙 구분 (모순 해소 2026-06-01)**: L-1~L-3은 friction 신호를 보유 → 두 lifecycle이 분리된다.
-> - **트랙 A (신호 활성·canonical)**: candidate friction 신호 → active 전환. 기준 = memory-guide line 43 **5 sessions 관측**. Codex verify = 활성 전 *권장 품질 게이트*(복구 시).
+> - **트랙 A (신호 활성 — ⛔ 본 항이 임계의 canonical)**: candidate friction 신호 → active 전환. 기준 = **독립 세션 5회 관측**. `modules/memory-guide.md` § Lesson Intake는 본 항을 링크하며 값을 재정의하지 않는다. Codex verify = 활성 전 *권장 품질 게이트*(복구 시).
+>   - ⛔ 이전 판은 *"기준 = memory-guide line 43"* 이라 적었다 — (a) **순환**(memory-guide는 여기를 canonical로 지목) (b) 줄번호가 실제와 2~4행 어긋남. heading anchor로 교체(2026-08-09).
 > - **트랙 B (메모리 승격)**: lesson → MEMORY.md 항목/별도 모듈. ⛔ MEMORY.md 252줄 한도초과로 **현재 비권장**.
 > - L-1~L-3 1차 경로 = **트랙 A**. L-4(friction 신호 없음) = 트랙 B(ledger-only).
 > - **트랙 C (외부 리뷰어 catch, 2026-06-18 신설)**: 외부 도구(CodeRabbit/팀원/Codex)가 fz 미탐 이슈를 발견 → ledger 관측 진입. finding-source: external. 입구 = `pipelines.md` #19 pr-comment-review 절차 4(import-to-ledger). 활성(active) 전환은 트랙 A 기준(5 sessions) 준용 + 4-classify 통과분만 카운트.

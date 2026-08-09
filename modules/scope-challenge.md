@@ -4,6 +4,18 @@
 > 원본 근거: ASD-1136 plan iteration 4회 (26시간, 40% 롤백) — 과잉 확장 방지
 > **1단계 깊이 원칙**: 본 모듈은 자체 완결. 다른 `modules/` 재참조 금지 (skill-authoring §3)
 
+## 목차
+
+- [목적](#목적)
+- [Q-S1 ~ Q-S4 체크포인트](#q-s1--q-s4-체크포인트)
+- [scope_disposition 분류](#scope_disposition-분류)
+- [origin ↔ scope_disposition 매핑](#origin--scope_disposition-매핑)
+- [Lead 독립 scope_disposition 절차 (P1-B Generator≠Evaluator)](#lead-독립-scope_disposition-절차-p1-b-generatorevaluator)
+- [Appendix: Q-S5 Decision Re-open Gate (P2-A, 관측 중)](#appendix-q-s5-decision-re-open-gate-p2-a-관측-중)
+- [Acceptance Criteria (P0-C 구현 완료 기준)](#acceptance-criteria-p0-c-구현-완료-기준)
+
+---
+
 ## 목적
 
 Codex verify 응답의 각 이슈를 `scope_disposition`으로 분류하여 fz-plan Phase 3에서 additive 자동 번역을 차단한다. Claude(Lead)와 Codex는 독립적으로 분류하며 불일치 시 사용자에게 에스컬레이션한다.

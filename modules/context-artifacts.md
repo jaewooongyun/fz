@@ -4,6 +4,30 @@
 >
 > 아티팩트를 파일로 기록한다. 대화 컨텍스트는 compact 시 손실되지만 파일은 남는다.
 
+## 목차
+
+- [핵심 원칙](#핵심-원칙)
+- [폴더 구조](#폴더-구조)
+- [Work Dir 결정](#work-dir-결정)
+- [index.md 프로토콜](#indexmd-프로토콜)
+- [Compact Recovery Protocol](#compact-recovery-protocol)
+- [Proactive Context Protocol](#proactive-context-protocol)
+- [Upstream Hydration Sets](#upstream-hydration-sets)
+- [Phase-Tagged Discover](#phase-tagged-discover)
+- [Ephemeral vs Persistent (/btw 통합)](#ephemeral-vs-persistent-btw-통합)
+- [Serena Memory와의 관계](#serena-memory와의-관계)
+- [비ASD 모드 (Serena Memory Fallback)](#비asd-모드-serena-memory-fallback)
+- [Artifact Token Budget](#artifact-token-budget)
+- [TEAM 로깅](#team-로깅)
+- [Few-shot 예시](#few-shot-예시)
+- [Edge Case 대응](#edge-case-대응)
+- [참조 스킬](#참조-스킬)
+- [⛔ Work Dir Resolution (모든 fz-* 스킬 필수)](#-work-dir-resolution-모든-fz--스킬-필수)
+- [사전 예방적 Context 관리](#사전-예방적-context-관리)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## 핵심 원칙
 
 - 아티팩트를 파일로 기록하는 이유: compact 후에도 Read로 복원할 수 있다.

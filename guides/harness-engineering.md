@@ -1102,7 +1102,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 > - **effort 운용 전환** — 출발점 `xhigh`→**`high`(기본)**, `low`/`medium`이 비용·지연의 **1차 레버**. ⛔ 이전 모델 effort 값 재사용 금지 → **fresh sweep** 후 결정 (§5 원칙 7 운영점과 정합: 운영점은 측정으로 정한다).
 > - **`max_tokens` 재점검** — thinking 기본 ON이라 `max_tokens`가 thinking+응답 **합산** 하드캡. 4.8 기준으로 타이트하게 잡은 경로는 응답 절단 위험. `xhigh`/`max` 운용 시 64k 출발.
 > - **길이는 프롬프트로** — 응답·산출물이 길어졌고 **effort로는 줄지 않는다**. 산출물 길이 계약이 필요한 스킬은 프롬프트에 명시.
-> - **하네스 상수 변경** — nested subagent depth **1→3**, **동시** 스폰 캡 20, dynamic workflow 기본 medium(<15 agents). fz governance 상한(opus 동시 ≤2~3)은 **동시 20보다 훨씬 보수적**이므로 상충 없음 — 단 문서상 두 층위를 구분해 기술할 것.
+> - **하네스 상수 변경** — nested subagent depth **1→3**, **동시** 스폰 캡 20, dynamic workflow 기본 medium(<15 agents). fz governance 상한(opus 동시 ≤3 — 정본 `guides/fable-model-guide.md` §5)은 **동시 20보다 훨씬 보수적**이므로 상충 없음 — 단 문서상 두 층위를 구분해 기술할 것.
 >   - ⛔ **v2.1.224(2026-08-07) 갱신**: **세션 생애 200 스폰 캡은 제거**됐다 — *"Removed the 200-subagent-per-session spawn cap; long-running sessions no longer refuse new agents (**concurrency and depth limits still apply**)"*. 즉 남은 하네스 상한은 **동시 20 + depth 3**뿐이다. fz는 동시 ≤3(opus)이라 여전히 훨씬 보수적이므로 **거버넌스 재설계는 불필요**하고, 장기 세션에서 누적 스폰이 거부되던 제약만 사라졌다.
 
 > "하네스 설계자의 일은 '다음 신기한 조합을 계속 찾는 것'이다." — Anthropic

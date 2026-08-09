@@ -6,6 +6,16 @@
 
 ---
 
+## 목차
+
+- [시각화 형식](#시각화-형식)
+- [AskUserQuestion 선택지](#askuserquestion-선택지)
+- [적극적 확인 원칙 (Step 8)](#적극적-확인-원칙-step-8)
+- [권고 Default 정책 (Lead Action Default 적용)](#권고-default-정책-lead-action-default-적용)
+- [관련 모듈](#관련-모듈)
+
+---
+
 ## 시각화 형식
 
 ```markdown

@@ -3,6 +3,18 @@
 > `skills/fz-review/SKILL.md` Phase 5에서 분리 (SKILL.md 500줄 한도 준수, 2026-06-27). 조건부 검증 본문 (4-D~4-H, 4-N/4-O candidate).
 > 발동: fz-review가 모듈화/리팩토링/마이그레이션/패턴변환 작업일 때 해당 검증 Read. 항상 실행 검증(1~3)·Gate 4·검증5는 SKILL.md 잔존.
 
+## 목차
+
+- [검증 4-D: Constraint Matrix Compliance](#검증-4-d-constraint-matrix-compliance-조건부-fz-discover-산출물-있을-때)
+- [검증 4-E: Module Boundary + Consumer Quality](#검증-4-e-module-boundary--consumer-quality-모듈화-작업-시)
+- [검증 4-F: Anti-Pattern Enforcement](#검증-4-f-anti-pattern-enforcement-잔존-금지-패턴-검증)
+- [검증 4-G: Protocol Conformance](#검증-4-g-protocol-conformance-프로토콜-적합성-검증)
+- [검증 4-H: Source Fidelity](#검증-4-h-source-fidelity-원본-준수--리팩토링마이그레이션-시)
+- [검증 4-N: Swift Naming Compliance ⚠️ candidate](#검증-4-n-swift-naming-compliance-swiftios-프로젝트-한정--candidate-lesson-intake-decision-tree)
+- [검증 4-O: Session-added Assets Application ⚠️ candidate](#검증-4-o-session-added-assets-application-세션-중-추가-자산-적용--candidate-lesson-intake-decision-tree)
+
+---
+
 ### 검증 4-D: Constraint Matrix Compliance (조건부: /fz-discover 산출물 있을 때)
 
 ```
