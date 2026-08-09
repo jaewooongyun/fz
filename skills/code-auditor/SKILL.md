@@ -9,12 +9,9 @@ category: tool
 requires: []
 allowed-tools: []
 sc-commands: [sc:analyze, sc:reflect]
-composable: true
 provides: [code-quality-analysis]
 needs: [none]
 intent-triggers: []
-model-strategy:
-  main: sonnet
 ---
 
 # Code Auditor — Quality, Modern API & Dependency Reviewer

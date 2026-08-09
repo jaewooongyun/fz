@@ -8,12 +8,9 @@ category: tool
 requires: []
 allowed-tools: []
 sc-commands: [sc:analyze, sc:design]
-composable: true
 provides: [architecture-analysis]
 needs: [none]
 intent-triggers: []
-model-strategy:
-  main: opus
 ---
 
 # Arch Critic — Architecture & Extensibility Reviewer

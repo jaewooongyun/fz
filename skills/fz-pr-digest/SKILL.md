@@ -17,15 +17,11 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   Bash(git *), Read, Grep, Glob, Workflow
-composable: true
 provides: [pr-digest, code-understanding]
 needs: [none]
 intent-triggers:
   - "설명|해설|이해|학습|알려줘|뭐가.*바뀐|어떻게.*개선"
   - "explain|digest|understand|learn|what.*changed|walkthrough"
-model-strategy:
-  main: opus
-  verifier: null
 ---
 
 # /fz-pr-digest - PR 변경사항 해설 (코드 학습용)

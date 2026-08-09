@@ -7,15 +7,11 @@ user-invocable: true
 argument-hint: "<audio-file> [--text <transcript>] [--speakers \"이름1,이름2\"]"
 allowed-tools: >-
   Read, Write, Bash(curl *), Bash(jq *), Bash(command -v *)
-composable: false
 provides: [documentation]
 needs: [none]
 intent-triggers:
   - "녹음|회의록|녹취|화자|분리|STT|음성"
   - "recording|meeting.*notes|transcri|diariz|speaker"
-model-strategy:
-  main: opus
-  verifier: null
 compatibility: >-
   macOS, AssemblyAI API key (무료 185시간), jq, curl
 ---

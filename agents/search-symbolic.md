@@ -15,7 +15,7 @@ Symbol-level precise code searcher using Serena MCP tools.
 - **Primary**: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`)
 - **Secondary**: `Glob` / `Read` (파일 구조 탐색)
 - **Fallback**: Read, Grep, Glob (Serena 불가 시)
-- **사용 불가**: 빌드 MCP 도구, Bash → Lead에게 요청
+- **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## Search Modes
 

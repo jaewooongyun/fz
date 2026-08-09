@@ -7,36 +7,32 @@
 
 ## YAML Frontmatter
 
-Every skill file begins with YAML frontmatter. All 13 fields are listed below.
+Every skill file begins with YAML frontmatter. All 10 fields are listed below.
 
 ```yaml
 ---
-name: fz-{name}                          # lowercase+hyphen, required
-description: >-                           # required — the most important field
+name: fz-{name}                          # lowercase+hyphen, required (L1 공식)
+description: >-                           # required (L1 공식) — the most important field
   {What it does} + {When to use} + {When NOT to use}.
   Bilingual keywords for matching.
-user-invocable: true|false               # required
+user-invocable: true|false               # required (L1 공식)
 argument-hint: "[target] [--options]"     # optional
-allowed-tools: >-                         # required — comma-separated
+allowed-tools: >-                         # required (L1 공식) — comma-separated
   mcp__serena__find_symbol,
   Edit, Read, Grep, Glob, Bash(pattern)
-team-agents:                              # optional
-  primary: agent-name|null
-  supporting: [agent-list]
-composable: true|false                    # optional
-provides: [capability-tokens]             # for pipeline composition
-needs: [capability-tokens|none]           # dependencies
+provides: [capability-tokens]             # required (L2 fz 정책) — /fz 동적 파이프라인이 소비
+needs: [capability-tokens|none]           # required (L2 fz 정책) — 자기완결이면 [none]
 intent-triggers:                          # for /fz orchestrator routing
   - "한국어|패턴"
   - "english|pattern"
-model-strategy:                           # optional
-  main: opus|sonnet
-  verifier: sonnet|null
 compatibility: >-                         # optional, 1-500 chars
   iOS 16+, Xcode 16+, Swift 6
 disable-model-invocation: false          # true: 사용자 명시 호출만 허용
 ---
 ```
+
+> ⛔ **필수 필드 정본은 `modules/governance.md` § 스킬 최소 기준**이다 — L1(Claude Code 공식 4) + L2(fz 정책 2). 이 템플릿은 그 정본을 반영하며 재정의하지 않는다.
+> ⛔ **제거된 필드 3종** (2026-08-09): `team-agents` · `composable` · `model-strategy` — 전부 fz 자작 필드로 **런타임 효과가 없었다**. 실효 결정자는 팀 구성·모델 = `workflows/*.js`, 파이프라인 = `provides`/`needs`.
 
 ---
 
@@ -48,13 +44,10 @@ disable-model-invocation: false          # true: 사용자 명시 호출만 허�
 | `description` | required | LLM selection signal | **The most critical field.** Claude picks skills by reasoning over this text — there is no algorithmic router. Write in 3rd person ("Processes files" not "I can help you"). Include what + when + when-not + bilingual keywords. |
 | `user-invocable` | required | Whether users can call directly | `false` for sub-skills called only by orchestrators |
 | `argument-hint` | optional | Usage hint shown to user | Keep concise: `"[file] [--strict]"` |
-| `allowed-tools` | required | Tools this skill may use | List only what is needed. Bash can be pattern-restricted: `Bash(xcodebuild *)`, `Bash(git *)` |
-| `team-agents` | optional | Multi-agent configuration | `primary` runs the main loop; `supporting` agents assist. See `modules/team-registry.md` for agent list. |
-| `composable` | optional | Can be chained in pipelines | Set `true` if output feeds another skill |
-| `provides` | optional | Capability tokens this skill outputs | See registry below |
-| `needs` | optional | Capability tokens required as input | Use `[none]` if self-contained |
+| `allowed-tools` | required (L1) | Tools this skill may use | List only what is needed. Bash can be pattern-restricted: `Bash(xcodebuild *)`, `Bash(git *)` |
+| `provides` | **required (L2 fz)** | Capability tokens this skill outputs | See registry below. `/fz` §3.2 동적 파이프라인이 실제 소비한다 |
+| `needs` | **required (L2 fz)** | Capability tokens required as input | Use `[none]` if self-contained |
 | `intent-triggers` | optional | Patterns for `/fz` orchestrator | Korean and English trigger phrases |
-| `model-strategy` | optional | Model selection per phase | `opus` for reasoning-heavy, `sonnet` for verification |
 | `disable-model-invocation` | optional | Claude의 자동 스킬 호출 방지 | `true` 설정 시 사용자 명시 호출만 허용 |
 | `compatibility` | optional | 환경 요구사항 | OS, 패키지, 네트워크 접근 등 |
 
@@ -119,7 +112,7 @@ Input → Phase 1 → Phase 2 → ... → Output
 
 | 모듈 | 용도 |
 |------|------|
-| `modules/team-core.md` | 팀 프로토콜 |
+| `guides/skill-authoring.md` §12 | 팀 모드 정본 — Workflow 규약 + 실패 복구 사다리 L1~L4. ⛔ `modules/team-core.md`를 팀 프로토콜로 지목하지 말 것 (역사적 출처) |
 | `modules/team-registry.md` | 에이전트 동적 구성 |
 
 ## sc: 활용 (SuperClaude 연계)

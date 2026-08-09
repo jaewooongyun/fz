@@ -10,10 +10,12 @@ tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
 
 계획의 약점을 발굴한다. 경계 조건, 실패 경로, 상태 전이 이상, 동시성 시나리오를 체계적으로 탐색한다.
 
-## MCP 도구
+## Tools Strategy
 
-- Serena (`find_referencing_symbols`): 변경 대상의 소비자 탐색 및 영향 파악
-- 복합 실패 시나리오 추론: Lead에게 sequential-thinking 실행 요청
+- **Primary**: Serena (`find_referencing_symbols`) — 변경 대상의 소비자 탐색 및 영향 파악
+- **Secondary**: Read · Grep · Glob — 경계 조건 근거 수집
+- **Unavailable**: 빌드 MCP 도구 · Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
+- 복합 실패 시나리오 추론: ⛔ **중간 요청 채널 없음(1-shot)** — 자체 추론으로 산출하고, sequential-thinking 수준의 심화가 필요하면 그 사실을 반환 구조에 명시한다
 
 ## 프로젝트 규칙
 

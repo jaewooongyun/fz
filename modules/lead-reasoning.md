@@ -3,6 +3,22 @@
 > Lead가 작업 결과를 보고하기 전에 "표면 처리를 넘는 추론"을 수행하는 공통 모듈.
 > 참조: fz-code(마찰 감지), fz-review(검증 4-I), fz-plan(Register 출력), fz-codex(Q8), cross-validation.md(게이트 삽입)
 
+## 목차
+
+- [1. 추론 원칙: Literal vs Semantic Scope](#1-추론-원칙-literal-vs-semantic-scope)
+- [1.5. 추론 원칙: Conclusion Scope Verification](#15-추론-원칙-conclusion-scope-verification)
+- [2. 카테고리 분류](#2-카테고리-분류)
+- [3. 자문 체크리스트](#3-자문-체크리스트)
+- [4. Implication Register (plan artifact)](#4-implication-register-plan-artifact)
+- [5. 보고 템플릿](#5-보고-템플릿)
+- [6. 모드](#6-모드)
+- [7. 변경 유형별 구조적 잔존물 체크리스트](#7-변경-유형별-구조적-잔존물-체크리스트)
+- [8. 트리거 조건](#8-트리거-조건)
+- [9. 검증 4 vs 4-I 경계](#9-검증-4-vs-4-i-경계)
+- [참조 스킬](#참조-스킬)
+
+---
+
 ## 1. 추론 원칙: Literal vs Semantic Scope
 
 - **Literal Scope**: 지시에 등장한 키워드를 직접 처리
@@ -160,10 +176,11 @@ GOOD: "public 싱글톤 → 다중 접근 가정" + "클라이언트/서버/대�
 [Q-INHERENT]  이 판단은 본질적 속성인가, 현재 조건인가?
              → "현재 N곳/현재 단일 스레드/현재 사용하지 않음" = 현재 조건 (불안정)
              → "private/actor/lock 보호/프로토콜 제약" = 본질적 속성 (안정)
-[Q-COVERAGE]  분석 범위가 "전체/모든"이거나 보고가 전수/카운트/부정 주장("N곳"/"~뿐"/"나머지는" 등)을 포함하는데, 실제로 전체를 다뤘는가? (canonical: cross-validation.md §Coverage Gate 트리거)
+[Q-COVERAGE]  분석 범위가 "전체/모든/생태계/전수"이거나 보고가 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")을 포함하는데, 실제로 전체를 다뤘는가? (canonical: cross-validation.md §Coverage Gate 트리거 — ⛔ 어휘 9개 전부 canonical과 동기)
              → Glob/find 결과 N개 중 분석한 M개. M/N < 100%면 누락 목록 명시.
              → 근거 명령에 head/tail 잘림이 있으면 전수 주장 금지 — wc -l 재실행.
              → "분석하지 않은 영역"이 빈 목록이면 분석 부족 의심.
+[Q-NEGATIVE]  "0건/부재/전부"를 결론으로 쓰는가? → 도구가 작동함을 먼저 증명(positive control) + exit code 판정 포함 + 다중 대상이면 라벨 (canonical: cross-validation.md §Negative-Result Gate)
 ```
 
 ---

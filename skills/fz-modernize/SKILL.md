@@ -12,7 +12,6 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   Task, TaskCreate, TaskUpdate,
   Skill
-composable: true
 provides: [doc-modernization]
 needs: [none]
 intent-triggers:
@@ -20,10 +19,6 @@ intent-triggers:
   - "가이드 업데이트|문서 갱신|문서 업데이트|reference 업데이트"
   - "stale 정리|deprecated 정리|구버전 정리"
   - "[Oo]pus ?-?5|[Oo]pus.*4\\.\\d|[Ss]onnet ?-?5|[Ff]able ?-?5|GPT.*5\\.\\d|새 모델 출시|최신 모델"
-model-strategy:
-  main: opus
-  primary-worker: opus
-  team-rest: sonnet
 ---
 
 # /fz-modernize - 가이드 모더나이제이션 스킬
@@ -140,7 +135,7 @@ model-strategy:
 3. **자료 분류 + 카테고리화** (probe-report.md template 따름):
    - A: 공식 모델 / B: 학술 논문 / C: 외부 도구 / D: 프롬프트·하네스 엔지니어링 / E: 도구·SDK / F: 멀티에이전트 / G: Community (Tier 3)
    - 각 자료 → URL + 발행일 + 핵심 인용
-4. **`probe/probe-report.md` 작성** (template: `templates/probe-report.md`)
+4. **`probe/probe-report.md` 작성** (template: `skills/fz-modernize/templates/probe-report.md`)
    - Tier별 매트릭스
    - Status 칼럼 (peer-reviewed / arxiv preprint / official / community)
    - 영향 예상 표 (어느 가이드의 어느 line이 stale인지)
@@ -179,7 +174,7 @@ model-strategy:
 3. **각 stale 항목 → 해소 자료 매핑**:
    - probe-report의 어느 자료로 해소?
    - A1 직접 진술 가능? A5 해석으로 supporting? 또는 partially-verified?
-4. **`audit/audit-report.md` 작성** (template: `templates/audit-report.md`)
+4. **`audit/audit-report.md` 작성** (template: `skills/fz-modernize/templates/audit-report.md`)
    - 가이드별 변경 영향 표 (LOC 예상)
    - 미검증 태그 line 단위 처리 결정
    - Anti-Pattern Constraints 사전 식별
@@ -347,7 +342,9 @@ codex exec \
    - 403 (bot 차단) ≠ broken link 구분
 2. **Impact Scan** (line 번호 deep-link 의존 모듈 확인):
    ```bash
-   grep -rn "guides/{filename}:L\d+" modules/ skills/ 2>&1 | head -20
+   # ⛔ Gate 6의 "deep-link 0건?" 판정 근거이므로 **총계를 먼저** 센다 (자른 목록으로 판정하면 틀린다)
+   grep -rnE "guides/\{filename\}:L[0-9]+" modules/ skills/ 2>/dev/null | grep -c . || echo 0
+   grep -rnE "guides/\{filename\}:L[0-9]+" modules/ skills/ 2>/dev/null | head -20   # 표시만 자름
    # line 번호 deep-link 발견 시 → 깨질 위험. path/section 참조만이 안전
    ```
 3. **verify-evidence-matrix.md 업데이트**:

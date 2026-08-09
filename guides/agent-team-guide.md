@@ -75,11 +75,11 @@ SendMessage(lead): "빌드 검증 필요합니다. 대상: TVINGApp scheme, 변�
 - **impl-correctness**: code / code-to-review / full-cycle 팀에서 opus로 승격
 - **review-arch**: review-only / peer-review 팀에서 opus로 승격
 
-승격은 팀 정의에서 선언하며, 에이전트 파일 자체는 기본 모델(sonnet)을 유지한다.
-승격 조건은 에이전트 파일에 주석으로 남긴다:
+에이전트 파일 `model:` 은 **기본값**(sonnet)을 유지하고, 실제 배정은 스크립트가 호출마다 명시한다:
 
-```markdown
-<!-- model-upgrade: opus when Primary in plan/code/full-cycle teams -->
+```js
+// workflows/{skill}-{pattern}.js — ⛔ 이것이 모델 배정의 정본이다
+await agent(prompt, { agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: … })
 ```
 
 ### Same-model Cross-Verify Reflection Rate 정책 (UC-5, v4.8.0)
@@ -104,8 +104,8 @@ SendMessage(lead): "빌드 검증 필요합니다. 대상: TVINGApp scheme, 변�
 승격은 **TeamCreate 시 Lead가 명시적으로 model 파라미터를 지정**하여 이루어진다:
 - 에이전트 파일의 `model: sonnet`은 **기본값** (SOLO 모드, 또는 Supporting 역할 시)
 - TeamCreate에서 Primary Worker로 지정될 때 Lead가 `model: opus`로 오버라이드
-- 에이전트 파일에는 주석(`# 승격: ... opus`)으로 승격 조건만 기록
-- 실제 승격 여부는 `team-registry.md`의 `promoted-model` 컬럼이 결정
+- ⛔ **실제 모델은 `workflows/*.js`의 `opts.model`이 결정한다** (정본: `modules/governance.md` § Truth-of-Source). `team-registry.md` `promoted` 열과 에이전트 `model:` 은 **기본값 표기**이며 스크립트가 override한다 — `modules/peer-review-tiers.md`가 이 override를 이미 문서화한다
+- ⛔ 에이전트 파일의 `# 승격: …` 주석은 **2026-08-09 제거**됐다 — 5곳 중 2곳(`review-counter` "미승격, sonnet 유지" ↔ 실제 opus / `review-direction` "opus 승격" ↔ 실제 fable)이 실제 배정과 어긋나 있었다. 4중 선언(주석·registry·`model-strategy`·스크립트)을 스크립트 단일 정본으로 수렴
 
 ```
 예시:
@@ -290,7 +290,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | Anti-Pattern | 이유 | 대안 |
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
-| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: **동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217)·**depth 3**(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, v2.1.219) — fz governance(opus 동시 ≤2~3)는 이보다 보수적. ⛔ 세션 생애 200 캡(`…MAX_SUBAGENTS_PER_SESSION`)은 **v2.1.224에서 제거**됐다 — 누적 스폰 제약은 더 이상 없고 **동시·depth만 남는다** |
+| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: **동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217)·**depth 3**(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, v2.1.219) — fz governance(**opus 동시 ≤3** — 정본 `guides/fable-model-guide.md` §5)는 이보다 보수적. ⛔ 세션 생애 200 캡(`…MAX_SUBAGENTS_PER_SESSION`)은 **v2.1.224에서 제거**됐다 — 누적 스폰 제약은 더 이상 없고 **동시·depth만 남는다** |
 | coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) + 동일 토큰예산서 우위 소멸 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
 | standalone Task | 통신 불가, 고립된 작업 | TeamCreate 필수 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
@@ -321,7 +321,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
   - search-pattern: 텍스트 패턴 기반 탐색
 - [ ] MCP 도구 4-tier 전략을 명시했는가?
 - [ ] Peer-to-Peer 통신 규칙을 포함했는가?
-- [ ] 모델 승격 조건을 주석으로 명시했는가?
+- [ ] 모델 배정을 **`workflows/*.js` `opts.model`에 명시**했는가? (⛔ 에이전트 주석 아님 — `scripts/lint-model-explicit.sh`가 검출)
 - [ ] `/fz-manage check` 통과 (에이전트 건강 체크 #7, #8)?
 - [ ] `guides/prompt-optimization.md` 10대 원칙을 준수하는가?
 
@@ -402,7 +402,7 @@ skills:
 
 ```yaml
 ---
-name: impl-correctness
+name: {쓰기 도구를 가진 에이전트}
 hooks:
   PostToolUse:
     - matcher: "Edit|Write"
@@ -411,6 +411,8 @@ hooks:
           command: "./scripts/lint-check.sh"
 ---
 ```
+
+⛔ **예시 주체 정정 (2026-08-09)**: 이전 판은 이 예시의 `name:`을 `impl-correctness`로 썼다. `impl-correctness`는 `tools:`에서 **쓰기 도구가 전부 제거**됐으므로(changeset JSON만 반환, 적용은 Lead) `Edit`/`Write` PostToolUse 훅은 **영원히 발화하지 않는다** — 예시가 존재하지 않는 조합을 보여주고 있었다. 쓰기 도구를 실제로 가진 에이전트에만 적용되는 패턴이다.
 
 | 이벤트 | 용도 | 예시 |
 |--------|------|------|
@@ -426,13 +428,14 @@ hooks:
 
 ```yaml
 ---
-name: impl-correctness
+name: {디스크를 수정하는 에이전트}
 isolation: worktree
 ---
 ```
 
 - 변경 없으면 worktree 자동 정리
-- **적용**: TEAM code에서 impl-correctness가 코드 수정 시 안전한 격리 환경
+- **적용**: 디스크를 **직접 수정하는** 에이전트의 병렬 실행 시 충돌 방지
+- ⛔ **예시 주체 정정 (2026-08-09, 감사 ISSUE-009)**: 이전 판은 `impl-correctness`를 예시로 썼다. `impl-correctness`는 `tools:`에서 **쓰기 도구가 전부 제거**됐고 산출물이 **changeset JSON**이며 적용은 Lead다(`workflows/code-pair.js`) — 디스크를 수정하지 않으므로 worktree 격리가 **불필요**하다. 근거: `guides/harness-engineering.md` "capability ≠ authorization" + 스키마 수준 필터링
 
 ### 8.5 기타 유용한 필드
 
@@ -440,7 +443,7 @@ isolation: worktree
 |------|------|---------|
 | `maxTurns` | 에이전트 턴 수 제한 | Supporting 에이전트의 과도한 분석 방지 |
 | `disallowedTools` | 도구 차단 (denylist) | `tools` allowlist의 보완 |
-| `permissionMode` | 에이전트별 권한 | review → `plan` (read-only), impl → `acceptEdits` |
+| `permissionMode` | 에이전트별 권한 | 전 리뷰·분석·**changeset 생산** 에이전트 → `plan`(read-only). ⛔ `acceptEdits`는 **디스크를 실제로 쓰는 에이전트에만** — `impl-correctness`는 해당 없음(쓰기 도구 부재) |
 | `mcpServers` | 에이전트별 MCP | review-arch → serena만, review-quality → serena + context7 |
 | `background: true` | 항상 백그라운드 | 탐색/캐싱 에이전트에 적합 |
 

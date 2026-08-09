@@ -10,15 +10,11 @@ allowed-tools: >-
   mcp__atlassian__get-issue,
   mcp__atlassian__search-issues,
   Bash(git *)
-composable: false
 provides: [commit]
 needs: [code-changes]
 intent-triggers:
   - "커밋"
   - "commit"
-model-strategy:
-  main: null
-  verifier: null
 ---
 
 # Git Commit Skill

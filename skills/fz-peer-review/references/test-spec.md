@@ -77,7 +77,7 @@ exit 0 = 계산 성공 (앵커 0건이어도 0) / exit 1 = 입력 오류
 
 | 제약 | oracle |
 |------|--------|
-| **Python 표준 라이브러리 전용** | `grep -E '^\s*(import\|from)' skills/fz-peer-review/scripts/diff_anchors.py` 결과가 stdlib만. 외부 패키지·외부 CLI 호출 0건 |
+| **Python 표준 라이브러리 전용** | `grep -E '^[[:space:]]*(import|from)' skills/fz-peer-review/scripts/diff_anchors.py` 결과가 stdlib만. 외부 패키지·외부 CLI 호출 0건 |
 | 문법 유효 | `python3 -c "import ast; ast.parse(open('skills/fz-peer-review/scripts/diff_anchors.py').read())"` exit 0 |
 
 > **⛔ 외부 의존 금지 근거**: 같은 레포의 `skills/fz-modernize/scripts/ac8-link-check.sh:29`가 `rg`(ripgrep)에 하드 의존하는데 미설치 환경에서 `exit 127`로 **실행 자체가 안 된다** (의존성 guard·폴백 부재). 같은 실패를 반복하지 않는다.

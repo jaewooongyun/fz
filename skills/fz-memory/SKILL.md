@@ -13,18 +13,11 @@ allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__context7__resolve-library-id, mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking
-team-agents:
-  primary: null
-  supporting: [memory-curator]
-composable: true
 provides: [memory-management, memory-recall]
 needs: [none]
 intent-triggers:
   - "메모리.*정리|메모리.*관리|메모리.*감사|교훈.*회상|기억.*떠올려"
   - "memory.*audit|memory.*gc|memory.*recall|memory.*organize|cleanup.*memory"
-model-strategy:
-  main: opus
-  verifier: null
 ---
 
 # /fz-memory - 메모리 관리 + 교훈 회상 스킬

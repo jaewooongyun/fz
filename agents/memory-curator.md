@@ -65,10 +65,10 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
 
 ## Peer-to-Peer Communication
 
-- Primary Worker에게 **직접** 교훈 전달 (Lead 중계 안 함)
+- Workflow 전환됨 (Wave 4): 교훈은 **구조화 출력으로 반환**하고 **Lead가 Primary Worker에 주입**한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
+  > ⛔ 이전 판은 *"Primary Worker에게 직접 전달 (Lead 중계 안 함)"* 이라 적어 같은 파일 § Curation Workflow 4번("Lead가 Primary Worker에 주입")과 **자기 모순**이었다 (2026-08-09 해소).
 - L2 decision/pattern과 L1 topic file의 **교차 참조** 결과 제공
-- 새 교훈 저장 제안은 Lead에게만 (쓰기 권한 없음)
-- 메시지 형식: "교훈 전달: N건 발견" 또는 "교훈 저장 제안: {설명}"
+- 새 교훈 저장 제안은 반환 구조에 포함한다 (쓰기 권한 없음 — 판단은 Lead)
 
 ## Input Format
 Lead로부터 Task Brief를 수신한다:
