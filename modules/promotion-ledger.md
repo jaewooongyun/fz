@@ -229,10 +229,11 @@
 ### L-11: 검증자 premise-challenge (전제 도전 지시)
 - 관측 #1: TVG-2739 (Date: 2026-07-15~16) | finding-source: internal (사용자 catch → 회고 E3/INC-9 — 미포함 실패 관측)
 - 관측 #2: fz-improvement-strategy plan 검증 (Date: 2026-07-18) | finding-source: internal (포함 실효 관측 — 지시가 작동)
+- 관측 #3: TVG-4099 R8 (Date: 2026-08-10) | finding-source: internal (사용자 catch) — **발동 지점이 다름**: #1·#2는 *검증자 프롬프트*, 본 관측은 **Lead의 외부 피드백 수용 시점**. Codex가 "plan Descope 위반"(자작 초안 문서 근거)을 지적하자 Lead가 코드 근거(같은 switch 내 형제 비대칭)보다 **문서 권위를 위에 두고** 수용 → 국소 되돌리기로 결함 유발. 처방은 provenance 랭킹((i)코드/런타임 (ii)사용자·팀 승인(권한) > (iii)자작 문서 > (iv)선호)이며 `fz-code` External Feedback Gate 행 + `harness-engineering` §12 R8-A 파생규율에 반영 [[L-13]]
 - 내용: adversarial/fresh-context 검증자 프롬프트에 "발견의 결론뿐 아니라 **전제**(위반 대상 문서/규칙/계획 자체의 결함 가능성)를 반증 범위에 명시 포함". 미포함 시 동종 검증자가 finder와 같은 권위 전제를 공유해 오판을 CONFIRMED(#1: plan-authority 오판 유지). 포함 시 검증자가 플랜의 핵심 전제 오진단("관측 수집 병목")을 반증(#2).
 - generalize: broad (모든 검증자 프롬프트) | 과적합 위험: 低 (프롬프트 1문장 — Gate/절차 신설 아님)
 - 근거: [verified: TVING/tvod/retrospective-TVG-2739/error-taxonomy.md E3 + incidents.md INC-9] + [verified: TVING/fz-improvement-strategy/plan/verify-result.md 특기]
-- ⛔ 활성 차단: evidence 2 sessions [memory-guide:45] → candidate. active 전환 = 트랙 A **5 sessions**.
+- ⛔ 활성 차단: evidence **3 sessions** (#3 TVG-4099 추가 2026-08-10) → candidate 유지. active 전환 = 트랙 A **5 sessions**.
 - 승격 목표 (트랙 A): 5 sessions 관측 후 fz-review 검증 2 불능 분기(fresh-context 폴백) + cross-validation 검증자 지시에 활성 반영 판정.
 
 ### L-12: 규칙/패턴 이식 시 근거(레이아웃/정책/데이터) 태깅 (TVG-2906 H-P2)
@@ -243,6 +244,29 @@
 - ⛔ 활성 차단: evidence 1 session → candidate. ⚠️ **L-7과 별개**: 상위 축(template-authority-bias)은 공유하나 해소 방식 상이(L-7=값 발생 여부 확인/default, L-12=근거 축 분류) + 홀 문서 G6가 "신규" 자체분류 → same-failure-mode 미성립으로 독립 등재. cross-link: [[L-7]]
 - ⚠️ **카운트 보류** (OQ-c): TVG-2906 회고 세션의 eligibility (a)fz-plan Phase0.5~3 + (b)fz-codex verify/fz-review --deep 미확증(§meta light/solo 라우팅) → L-2/L-3 관측#2 선례대로 5-session 카운트 미반영. ⚠️ **근본 모순**: 본 파일 "별개 세션 관측 카운트"(§카운트 기준) vs L-2/L-3/L-12 보류 관행이 상충 — Wave 3-1 ledger 재평가에서 reconcile 대상.
 - 승격 목표 (Track A): 5 sessions + Codex verify.
+
+### L-13: post-state 일관성 (peer slot 비대칭 — TVG-4099 R8)
+- 관측 #1: TVG-4099 | Date: 2026-08-10 | finding-source: **internal(사용자 catch)** — "상수로 해야지 거기만 하드코딩으로 하면 어떻게 해"
+- 내용: fz 검증이 **diff 안**(3중 리뷰)·**diff 밖**(검증 4·4-I) 두 축뿐이고, **"편집 라인이 놓인 자리가 일관적인가"(post-state)** 를 묻는 축이 부재. 편집한 라인이 peer slot 집합(같은 switch case 절·리터럴 컬렉션·초기화 목록·같은 레벨 분기)에 속하면 형제 슬롯을 읽고 표현 방식(상수 vs 리터럴·헬퍼 vs 인라인·네이밍) 대조 필요. ⛔ **빌드·테스트가 원리적으로 침묵**(문법 정상 + 값 동일)하는 구간이라 절차로만 검출.
+- 발현: `Style` enum 계산 프로퍼티 switch에서 `.poster`/`.mainBanner`는 `Metric` 상수, `.meta`만 리터럴 15/4/3. 외부 리뷰(Codex)의 "plan Descope 위반" 지적을 수용해 국소 되돌리기를 하며 발생.
+- generalize: **broad** (언어·도메인 무관 — 동종 슬롯이 열거된 모든 구조) | 과적합 위험: 低~中 (체크 절차 1개, 같은 블록 Read라 비용 0)
+- 근거: [verified: TVING/tvod/fz-retrospective/R8-local-edit-blindness.md — 세션 오류 6건 중 **4건이 "대상을 격리해 보고 그것이 속한 구조를 안 봄"** 동일 뿌리] + [verified: `fz-review:224` "3중 리뷰가 모두 diff 기반" 자인 · `fz-review:240` "검증 4는 diff 안, 4-I는 diff 밖" 축 명시 → 세 번째 축 공백 확인]
+- ⚠️ **표면 churn(L-3)과 별개**: L-3=*시간축*(동일 대상 2회+ 변경), L-13=*공간축*(형제 슬롯 비대칭). `memory-guide` "same failure mode → merge" 미성립. cross-link: [[L-3]]
+- ⚠️ **파생 규율은 L-11과 동축**: 본 사건의 2차 원인(외부 지적의 provenance 미분류 — 자작 계획서 권위를 코드 근거 위에 둠)은 L-11(검증자가 finder와 **권위 전제** 공유 → plan-authority 오판)과 같은 축이며 **발동 지점만 다름**(L-11=검증자 프롬프트 / 본건=Lead의 피드백 수용). ⇒ provenance 랭킹은 **독립 등재하지 않고** `fz-code` External Feedback Gate 행 보강 + `harness-engineering` §12 R8-A 파생규율로 흡수. cross-link: [[L-11]]
+- ⛔ 활성 차단: evidence 1 session → **candidate**. active 전환 = 트랙 A **5 sessions**.
+- ⛔ **외부 채점 미이행 (§5.5 규율 2 미충족)**: 본 항목은 등재 세션에 Codex 한도 소진으로 **cross-model 채점 없이** 자기 관측만으로 기술됐다. `harness-engineering.md` §5.5 규율 2("self-preference 단독 채택 금지 — 외부 채점 병행")상 **승격 조건에 5 sessions + 외부 채점 1회를 함께 요구**한다. 개념 정본 `§12 R8-A`에도 동일 경고 병기(출처 성격이 원칙 1~7과 다름 — 외부 권위 vs 자체 관측).
+- ⛔ **진단 정정 (2026-08-10, 3-렌즈 외부 검증)**: 최초 "post-state 축 부재" 판정은 **오진**. 형제 렌즈 6개 실재 [verified: `skill-authoring.md` §1 Sibling-Convention Check(**동일 실패 모드**) · `fz-review` §검증 1 "Grep → 변경 후 패턴 일관성" · `agents/impl-quality.md` "Codebase Pattern Consistency" · `codex-skills/fz-reviewer` · `evidence-collection.md` · `agents/review-direction.md`]. 정확한 진술 = **입도 부족(같은 블록 형제 단위 없음) + 소유자 미배선(`workflows/code-pair.js`가 impl-quality를 "미포함 기본값")**. ⇒ **선행 과제**: 대안 A(impl-quality 배선 복구)·B(Lead 체크리스트 1줄) vs C(현행 신설) 비용·발화율 비교 **미수행**.
+- ⛔ **실효성 실측 (오탐 8/9)**: TVG-4099 워크트리 peer slot 11곳 적용 → emit 9곳 중 진짜 1곳. "in-block 비용 0" 주장 **철회**(접근 수준·소유권은 소비처 결정 → 타 파일 Read + 리포 grep 필요). diff 앵커링 상속으로 **기존 비대칭 불가시**. ⇒ 4-P에 **형제 균일성 게이트 + 의미 비대칭 면제 + 소비처 의존 축 제외** 반영. 표본 소 — 일반화 금지.
+- ⛔ **활성 전 필수 (§5.5 규율 1 — 회귀·반증 게이트)**: 회귀 fixture 2개 — ① 형제 3절 중 1절만 리터럴인 switch에서 **검출**(TP) ② 형제가 정당한 의미 비대칭인 블록에서 **미검출**(FP=0). **현재 oracle 0개** [L-1 선례 형식 차용].
+- ⚡ 조치 (2026-08-10): `harness-engineering` §12 R8-A 신설(candidate) + 진단 정정 · `review-checks` 검증 4-P 신설 + 균일성 게이트 · `fz-code` friction-detect "peer slot 비대칭" 신호 + External Feedback Gate 행 provenance 보강 · `fz-review` 4-P 참조/체크리스트.
+- 승격 목표 (트랙 A): **5 sessions 관측 + Codex(또는 이종) 교차 채점 1회 + 회귀 fixture 2개** 후 `fz-code` friction-detect "peer slot 비대칭" + `fz-review` 4-P 활성 판정. ⚠️ 그 전에 **대안 A/B 비교** 결론이 선행돼야 한다(원칙 1).
+- ⚠️ **등재 절차 하자 (자기고발)**: 본 항목은 `fz-plan` 미경유 즉시 구현으로 작성됐다(`feedback_design_answers_not_impl_approval.md` "설계 결정 답변 ≠ 구현 승인" 위반). 사용자에게 "전체 재설계" 선택지를 제시할 때 **§5.5 규율 3("현행 유지가 정답 — 재설계 유발 금지")과 충돌한다는 사실을 고지하지 않았다.** 내용 자체의 타당성과 별개로 절차 하자를 기록에 남긴다. (세션 회고 원문 = TVG-4099 워크스페이스 `fz-retrospective/R8-review/`)
+
+### L-1 관측 #4 (R8-C — TVG-4099 figma 타이밍 갭, ⚠️ 카운트 보류)
+- 관측: TVG-4099 | Date: 2026-08-10 | finding-source: internal(사용자 catch)
+- 내용: 원칙 H(figma 대조)는 `fz-code` **Phase 0.5 게이트**라 code 단계에만 발화 → **최초 실측이 일어나는 discover/plan 단계는 무방비**. 본 세션에서 H를 읽고 축 분류까지 수행했으나(`code/phase-0.5-detection.md`), 그 전 단계에 작성한 `figma-spec.md` v1이 이미 (a)컴포넌트 정의만 보고 인스턴스 미확인 (b)iPad 가로 `(16,12)`를 부모 체인 확인 없이 "배너 내 오프셋"으로 단정 — 2건 오류 포함.
+- 처방 후보: 원칙 H **발동 시점을 "figma 노드를 조회하는 모든 단계"로 확장** (code 게이트 → 작업 성격 기반). ⚠️ 이미 `swift-pattern-detection.md` 원칙 H가 "발동 token은 plan 어휘가 아니라 **작업 성격**"이라 명시 — 즉 규칙 문구상으로는 커버되나 **fz-code Phase 0.5에만 Gate가 걸려 있어 실효 미발화**. 문구/배치 불일치.
+- ⚠️ **카운트 보류**: L-1은 이미 evidence 3 sessions이며 본 관측은 *발동 시점* 갭으로 기존 내용(측정 정확도)과 축이 다름 → 별도 항목 승격 vs L-1 확장 축 편입 판정을 Wave 재평가로 이월.
 
 ## 미달 조치 정책
 
