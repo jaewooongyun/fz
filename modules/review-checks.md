@@ -1,6 +1,6 @@
 # Review Checks — 조건부 정밀 검증 (fz-review Phase 5)
 
-> `skills/fz-review/SKILL.md` Phase 5에서 분리 (SKILL.md 500줄 한도 준수, 2026-06-27). 조건부 검증 본문 (4-D~4-H, 4-N/4-O candidate).
+> `skills/fz-review/SKILL.md` Phase 5에서 분리 (SKILL.md 500줄 한도 준수, 2026-06-27). 조건부 검증 본문 (4-D~4-H, 4-N/4-O/4-P candidate).
 > 발동: fz-review가 모듈화/리팩토링/마이그레이션/패턴변환 작업일 때 해당 검증 Read. 항상 실행 검증(1~3)·Gate 4·검증5는 SKILL.md 잔존.
 
 ## 목차
@@ -12,6 +12,7 @@
 - [검증 4-H: Source Fidelity](#검증-4-h-source-fidelity-원본-준수--리팩토링마이그레이션-시)
 - [검증 4-N: Swift Naming Compliance ⚠️ candidate](#검증-4-n-swift-naming-compliance-swiftios-프로젝트-한정--candidate-lesson-intake-decision-tree)
 - [검증 4-O: Session-added Assets Application ⚠️ candidate](#검증-4-o-session-added-assets-application-세션-중-추가-자산-적용--candidate-lesson-intake-decision-tree)
+- [검증 4-P: Post-State Consistency ⚠️ candidate](#검증-4-p-post-state-consistency-편집-지점-일관성-candidate-1-session-evidence)
 
 ---
 
@@ -156,3 +157,78 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
 ```
 
 > ASD-1366 사례: `feedback_swift_naming_conventions.md` + fz-code "Swift Naming 위반" 신호 추가 후 *self-review에서 미적용* — 사용자 지적으로 catch. *작성 + 적용이 비대칭*인 메타 패턴 (메모리 41차 재현).
+
+---
+
+### 검증 4-P: Post-State Consistency (편집 지점 일관성) *[candidate: 1 session evidence]*
+
+> ⚠️ **Candidate 상태**: evidence 1 session (TVG-4099, `promotion-ledger` **L-13**). `modules/memory-guide.md` Lesson Intake Decision Tree 명시. **활성 강제 X.** 5 sessions 관측 + 외부 채점 1회 후 활성화 결정.
+> **발동**: 편집이 **동종 슬롯이 열거된 구조**(아래 peer slot taxonomy)에 닿을 때만. 전 hunk 상시 적용 아님.
+>
+> ⛔ **진단 정정 (2026-08-10, 외부 검증 반영)**: 최초 서술은 *"post-state 축이 부재"* 였으나 **오진**이다 — 형제 렌즈가 실재한다: `skill-authoring.md` §1 **Sibling-Convention Check**(동류 항목 표기 grep — **본 검사와 같은 실패 모드**) · `fz-review` §검증 1("Grep → 변경 후 패턴 일관성") · `agents/impl-quality.md`("Codebase Pattern Consistency"). 정확한 진술은 **"존재하는 축의 (a) 입도 부족(같은 블록 형제 단위 없음) + (b) 소유자 미배선(`workflows/code-pair.js`가 impl-quality를 '미포함 기본값'으로 둠)"**.
+> ⇒ 본 검사를 확정하기 전에 **대안 A(impl-quality 배선 복구)** · **대안 B(Lead 책임 체크리스트 1줄)** 와의 비용·발화율 비교가 선행돼야 한다(`harness-engineering` 원칙 1 — 가장 단순한 해결책 먼저).
+>
+> ⛔ **오탐 실측 (표본 소, 일반화 금지)**: TVG-4099 워크트리 peer slot 11곳 적용 → emit 9곳 중 **진짜 결함 1곳**. 오탐의 공통 형태 = *표현 비대칭이 **의미 비대칭**(소비처 범위·값 결정 규칙·조건부 포함)을 정확히 반영*하는데 본 검사에 그 구분 축이 없음.
+> ⛔ **"비용 0" 주장 철회**: 접근 수준·상수 소유권은 **정의상 소비처가 결정**하므로 in-block 판정 불가 [실측: `liveIcon` non-private 근거가 `BandCell.swift` 프로토콜에 있음 / `Metric` public 정당성 판정에 리포 grep 4회 필요].
+> ⛔ **diff 앵커링 상속**: 절차가 "편집 hunk"에서 출발하므로 **편집이 닿지 않은 기존 비대칭은 보이지 않는다** — 본 검사가 극복하려던 한계를 그대로 물려받았다.
+>
+> 개념 정본: `guides/harness-engineering.md` §12 **R8-A**(delta-oracle vs post-state-oracle) — 단 그 원칙도 candidate·가설 상태.
+>
+> ⚠️ **현행 fz 게이트(빌드·테스트·swift-format)로는 침묵**한다 — post-state 불일치는 문법 정상 + 동작 불변인 경우가 많다. 단 *"기계 검증이 **원리적으로** 불가"* 는 과장이며(magic-number 계열 lint가 결정론적으로 잡는 부류), **lint 룰 대안 검토가 선행 과제로 남아 있다**.
+
+```
+절차: diff의 각 편집 hunk에 대해
+1. 그 라인이 peer slot 집합에 속하는가?
+   peer slot(결정론적) = 같은 switch의 case 절 · 리터럴 컬렉션 항목
+   peer slot(판단 개입) = 구조체 초기화 목록 · 같은 레벨 분기 · 연속된 동종 프로퍼티 선언
+     ⚠️ "동종" 판정은 의미 판단이라 결정론이 아니다 — 경계가 모호하면 2번으로 진행하지 말 것
+
+2. ⭐ 형제 균일성 게이트 (오탐 억제 — 실측 기반 필수 관문):
+   비교 축에 대해 **형제가 이미 균일한가?**
+   - 균일(예: 형제 2/2가 전부 상수 참조) → 3번 진행
+   - 불균일(형제가 애초에 여러 형태) → ⛔ **중단, 보고 금지**
+     [실측 근거: `BannerMainCell+LayoutConstant.swift` 형제 15개가 adapted/iPadOrNot/인라인산술/stored 4형태 →
+      게이트 없으면 전량 오탐. snp 제약 블록도 `$0` vs `make in` 혼재라 다수결 불가]
+
+3. 형제 슬롯 Read + 표현 방식 대조 — ⛔ **in-block 판정 가능한 축만**:
+   ✅ 상수 참조 vs 리터럴 하드코딩 · 헬퍼 호출 vs 인라인 구현 · 네이밍 컨벤션
+   ⛔ **제외(소비처 의존 — in-block 판정 원리적 불가)**: 접근 수준(public/internal) · 상수 소유권
+      [실측: `liveIcon` non-private 근거는 다른 파일의 프로토콜 요구 / `Metric` public 정당성은 리포 grep 4회 필요]
+      이 축을 보려면 소비처 grep이 필요하며 그 비용은 0이 아니다 → 4-E(access modifier 의도성) 소관
+
+4. 의미 비대칭 면제: 표현 차이가 **의미 차이를 반영**하면 보고 금지
+   - 값 결정 규칙이 다름(연속 스케일 vs 브레이크포인트 선택) · 조건부 포함 vs 단순 옵셔널
+   - 타입상 강제(`nil` 반환, `.zero` 관용 표기)
+   - 형제 3개 이상 + 과반이 동일 표현일 때만 발화
+
+5. 잔여 불일치 → "post_state_inconsistency" (severity: Minor, origin: defect)
+   ⛔ 처방은 "국소 되돌리기"가 아니라 **전체를 보고 알맞은 형태 선택**
+   ⛔ **tie-break 규칙 (검출 ≠ 처방)**: 비대칭을 감지해도 "계획서에 그렇게 썼으니 둔다"로 합리화 가능하다
+      (= 사건 당시와 같은 결론). 판정은 **provenance 랭킹**을 따른다 — 코드 현실 > 자작 초안 문서
+      (`harness-engineering` §12 R8-A 파생규율 · `promotion-ledger` L-11 관측 #3)
+   ⛔ 형제 다수가 안티패턴이면 → 마찰 보고만, 일괄 변경은 별도 티켓 (Surgical Changes)
+   ⛔ 형제와 맞추려 신규 추상화를 도입하는 것은 조기 추상화 — 사용자 확인 후에만
+
+체크리스트:
+- [ ] 편집 hunk가 peer slot에 속하는지 판정? (결정론적 축인지 확인)
+- [ ] ⭐ 형제가 비교 축에 대해 **균일**한가? (불균일이면 중단)
+- [ ] in-block 판정 가능한 축만 대조? (접근 수준·소유권 제외)
+- [ ] 표현 차이가 의미 차이를 반영하는지 확인? (반영하면 면제)
+- [ ] 불일치 시 provenance 랭킹으로 tie-break?
+```
+
+**Few-shot**:
+```
+BAD (delta만 검증):
+  요청: "meta 상수화를 되돌려라"
+  편집: Metric에서 3줄 삭제 + switch 3곳 리터럴화 → delta는 정확
+  결과: case .poster: Metric.posterHeight / case .meta: 15 / case .mainBanner: Metric.mainBannerHeight
+  → 같은 switch에서 한 절만 리터럴. 빌드 OK·값 동일이라 자동 oracle 전부 통과. 사용자 육안 발견.
+
+GOOD (post-state 검증):
+  편집 후 그 switch 블록 전체 Read → 형제 절은 전부 Metric 참조
+  → "내 편집만 표현이 다르다" 감지 → 되돌리기 대신 계획서를 갱신
+```
+
+> ⚠️ **표면 churn과 별개** (`fz-code` friction-detect): 표면 churn은 *시간축*(동일 대상 2회+ 변경), 4-P는 *공간축*(형제 슬롯 비대칭). `memory-guide` "same failure mode → merge" 기준상 병합 부적합.
+> TVG-4099 사례: 세션 오류 6건 중 4건이 "대상을 격리해 보고 그것이 속한 구조를 안 봄"이라는 동일 뿌리. 관측 기록 = `modules/promotion-ledger.md` **L-13** (세션 회고 원문은 ledger에서 링크).
