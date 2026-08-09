@@ -8,6 +8,139 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release). MAST (2503.13657)는 v4.17.0에서 modules 재인용으로 active 환원
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.25.0 (2026-08-09) — 계약 lint 결정화 + inert frontmatter 51선언 제거 + Negative-Result Gate 신설 [MINOR]
+
+> 전수 감사(138자산 · `~/dev/TVING/fz-plugin-audit-2026-08-09/`)에서 확정한 F-0~F-25 중 **W0~W3b 범위**를 반영한다. 방향은 **C(정본) → B(기계화) → A(baseline 소비)** — `plan/direction-challenge.md`. Codex verify `needs_revision` 13이슈 **전량 수용**(`plan/verify-result.md`).
+
+**1. `scripts/lint_contracts.py` 신설 — `fz-manage check` 17항목의 결정화 (F-2)**
+- 문제: 17항목이 **전부 언어 지시**였고 check용 스크립트가 0개였다 → 정의된 검사(#6 깨진 참조·#14 모듈 목차)가 있는데도 위반이 생존했다. `guides/skill-authoring.md` §11("결과가 binary → 스크립트")의 미이행.
+- ⛔ **스크립트가 항목 SSOT** — SKILL.md는 표를 재정의하지 않고 `--list`에 위임한다(이중 정의가 F-5·F-19의 원인이었다).
+- **24항목 / DETERMINISTIC 15 · THRESHOLD 3 · SEMANTIC 6** (⛔ 손으로 세지 말고 `lint_contracts.py --list` 출력을 전사한다 — 2026-08-09 감사 ISSUE-014에서 23/15/3/5로 stale했고, **2026-08-10 `#15` 삭제 후 25/16 으로 또 stale했다**. ⚠️ `#N2` 는 디렉토리 파일 수만 보므로 이 카운트는 **기계 검사 사각지대**다 — 항목 추가·삭제 시 수동 전사 의무).
+- ⛔ **exit 3분**: `0`=위반 없음 / `1`=위반 / `2`=**configuration·parse error**. 루트는 `Path(__file__)` 앵커(CWD 비의존). stdlib 전용.
+- `fz-manage check`가 `lint_contracts.py` + **기존 `lint-model-explicit.sh` + `lint_doc_freshness.py`** 를 함께 호출한다 — v1 초안은 새 lint만 만들고 기존 lint 배선을 빼먹어 F-2를 남겼다(Codex 단독 발견).
+- ⛔ **"차단"→"검출(요청 시)" 정직화**: 훅 미설치 상태에서 lint는 차단하지 않는다. 실제 차단은 `settings.json`(사용자 소관).
+- 첫 실행 129건 → 탐지기 4회 교정 → **위반 0건**. 교정 근거는 전부 *히트를 열어본 것*이다: #13은 `agents/*.md`의 `CLAUDE.md ## Architecture`가 **소비 프로젝트**를 뜻해 89건 오탐 → SEMANTIC 강등 · #N4는 마크다운 표의 `\|`(파이프 이스케이프)와 자기 설명 문구 제외 · #N6은 `$0`·`git rev-parse --show-toplevel` 앵커도 유효 · #15는 BAD/GOOD few-shot 제외.
+
+**2. inert frontmatter 3종 51선언 제거 (F-5·F-20)**
+- `team-agents`(9) · `composable`(21) · `model-strategy`(21) — 전부 **fz 자작 필드로 런타임 효과 0**. 실효 결정자는 팀 구성·모델 = `workflows/*.js`, 파이프라인 = `provides`/`needs`. `arch-critic: main:opus` ↔ `code-auditor: main:sonnet` 형제 불일치가 stale 위험을 실증했다.
+- 소비처 8곳 동반 갱신 + `governance.md §Truth-of-Source`에 **4항목 정본 지정**(모델 배정·팀 구성·opus 상한·YAML 필수 필드).
+- YAML 필수 필드를 **2층 분리**: L1 Claude Code 공식 4 / L2 fz 정책 2(`provides`·`needs` — `/fz` §3.2가 실제 소비). 3판본 충돌 해소.
+- opus 동시 상한 **≤3 통일**(정본 `fable-model-guide.md` §5) — `skill-authoring.md` §12만 ≤2로 이탈했고 `plan-collaborative.js`는 Stage 2에서 opus 3 병렬이라 참조 구현이 규약을 위반하고 있었다.
+
+**3. `modules/cross-validation.md` §Negative-Result Gate 신설 (F-25)**
+- ⛔ **신규 규칙이 아니다** — `system-reminders.md` T8이 *"정규식 불완전은 Coverage Gate 담당"*으로 이미 위임했으나 **수신처에 구현이 없었다**. Coverage Gate가 *범위*(N/M)를, 본 Gate가 *도구 유효성*을 본다.
+- 3요소: **positive control**(0건 결론 전 동일 명령이 반드시 매칭되는 케이스에서 non-zero 확인) · **신호 보존**(`>/dev/null 2>&1` 금지 + exit code 판정 포함) · **귀속 라벨**(다중 대상 스캔에 식별자).
+- 근거: 단일 세션 **12 인스턴스** 실측 — 그중 *0건 자체를 의심해서* 잡은 건 **0건**(전부 외부 지적·우연한 재측정·도구 에러메시지). `harness-engineering.md` H1 자문 NO.
+- 기계 검출 3항목: **N4** ERE alternation 오용(⚠️ BRE의 `\|`는 정당 → `grep -E` 동일 줄 한정) · **N5** 신호 폐기 · **N6** 루트 앵커.
+
+**4. 링크·인벤토리·목차 (F-7·F-11·F-21·F-23)**
+- 모듈 목차 **24개 추가**(100줄+ 30개 중 미보유분). 형식 선례 `review-structural-axes.md`·`harness-engineering.md`.
+- `fz-modernize` 자기 자산 참조 4곳 루트 기준 정정.
+- ⛔ **선재 버그**: `fz-peer-review/references/test-spec.md:80`의 `grep -E '^\s*(import\|from)'`은 ERE에서 alternation이 아니라 **항상 0건** → 그 stdlib 검사가 지금까지 통과로 오인돼 왔다(실증: 잘못된 패턴 0건 / 올바른 패턴 3건).
+- `CLAUDE.md` 인벤토리 정정(modules 20→**46** · guides 7→**9**) + lint **N2**가 실측 대조. 감사 진입 문서가 stale했다.
+
+**5. TEAM 일몰 완결 + 계약 정합 (F-1·F-6·F-12·F-19·F-22)**
+- **SSOT 동기화**: Coverage Gate canonical 어휘 **9개를 미러 4곳 전부에** 동기(Q-COVERAGE·T8·fz-search·fz-discover) — "생태계"·"전부"가 4곳 전부 누락돼 **동일 요청에 발동이 갈리던** 상태였다. 승격 임계 **canonical 순환 해소**(`memory-guide` ↔ `promotion-ledger`가 서로를 정본으로 지목 + 줄번호 2~4행 어긋남) → Track A 단일 정본 + heading anchor.
+- **에이전트 stale**: `agent-team-guide.md:219`가 2026-08-08에 정정한 *"TeamCreate 기반 팀"* 문구가 **5 에이전트에 잔존**하던 것 제거. 승격 주석 5곳 제거(그중 `review-counter` "미승격·sonnet 유지" ↔ 실제 opus / `review-direction` "opus" ↔ 실제 fable). `impl-correctness`·`memory-curator`의 미전환 P2P 블록 전환(후자는 같은 파일 내 자기모순이었다). **동반**: `agent-team-guide §7` 체크리스트가 지운 주석을 요구하던 것 재작성.
+- ⛔ **`get_codex_skill()` → `get_codex_skill_path()`** (**F-22 파손 수정**): 이전 함수는 Tier 2b에서 플러그인 `codex-skills/`를 확인한 뒤 **이름만** 반환했는데 호출자 8곳은 항상 `cat ~/.codex/skills/${NAME}/SKILL.md` 를 읽었다 → 심볼릭 부재 시 **Tier 3 폴백으로 가지 않고 존재하지 않는 경로를 읽었다**. 경로 반환으로 계약 통일 + `BASH_SOURCE` 의존 제거(마크다운 인라인 함수라 불안정). ⛔ **`setup-codex-skills.sh`는 dead가 아니라 load-bearing**임이 확정됐다.
+- **kill-switch**: 부재 도구(`TeamDelete`·`shutdown_request`) 지시 제거 — **비상 경로가 v2.1.178부터 없는 도구에 의존**하던 상태였다. Workflow 중단 절차로 교체(최종 형태는 OQ3 대기).
+- **Agent-Payload 스킬 범주 신설**: `user-invocable: false` + `skills:` 사전주입 스킬(arch-critic·code-auditor)이 어느 범주에도 없어 6게이트를 영구 미충족한 것이 T9c(2026-06-28 지적)가 1년 미해결된 근본 원인. ⛔ 면제가 아니라 **대체 게이트 3**((b) 출력 필드 정합은 **소비 스키마 집합 전체** 대상 — arch-critic은 2 계약 동시 지원).
+- **요청 채널**: (a) 도구 제약 서술 8곳의 채널 함의 제거 / (b) 실행 불가 지시 2곳(`plan-edge-case` sequential-thinking 요청 · `plan-impact` git artifact 요청)을 **반환 필드 패턴**으로 재작성(선례 `review-correctness` `originBodyRequest`).
+- **`§5.7` fz-peer-review 테이블 신설**: SKILL.md가 기록하라 지시한 테이블이 **존재하지 않았다**. 열 10개 — `tier`·`mode`·**fallback 사유**(`invalid-args` ≠ runtime-null)·wall-clock·`structuralAxes`. 단순 null률만으로는 신뢰성 실패와 입력 오류를 구별할 수 없다.
+
+**6. 실패 복구 사다리 정본화 — OQ3 해소로 B1·B2·B4 동시 해제 (F-1 b·F-13)**
+- ⛔ **문제**: 5개 스킬이 `mode:'fallback'` 절차로 `modules/team-core.md`+`patterns/`(679줄)를 지목했으나 내용은 `TeamCreate`·`SendMessage` P2P였다 — 이 도구들은 v2.1.178부터 **부재**하고 SOLO에는 에이전트도 없다. **가장 필요한 순간의 지침이 실행 불가**였다.
+- ⭐ **실측이 처방을 바꿨다**: 워크플로 실패는 **2회 실제 발생**했고(§5.7 fz-code #1 args 오류 · fz-review #8 초회 7287s 스톨) **두 번 다 재invoke·resume으로 복구**됐다. `team-core` 사용 이력은 **0건**. → 679줄 재작성이 아니라 **이미 작동한 경로를 성문화**하는 작업이었다.
+- **`guides/skill-authoring.md` §12 실패 복구 사다리 신설**: **L1** 분할 재invoke(H5) · **L2** 입력 오류 → 수정 재invoke(⛔ 워크플로 실패가 아니라 **설계된 fail-fast**) · **L3** 스톨·일시장애 → **`resume` 우선**(동일 세션 한정) · **L4** 사용자 에스컬레이션(⛔ Lead 단독 SOLO는 승인 후에만). 각 단계에 실측 선례 명기.
+- `team-core.md` **강등**("실행 절차로 참조하지 않는다") — 679줄은 **설계 출처**로 존치, 재작성 0줄. 소비처 5곳 + `fz`/`fz-code` 절차를 §12 위임으로.
+- `governance.md` Kill-Switch = **사다리 L4에서 '중단' 선택 시의 절차**로 위치 확정(OQ3 대기 주석 제거).
+- **B4**: `agents/impl-correctness.md` `tools:`에서 **쓰기 7종 제거**(`Edit`·`Write`·`Bash`·`replace_symbol_body`·`insert_*`·`rename_symbol`) — 유일 소비자 `code-pair.js`가 changeset JSON만 요구하고 Lead가 적용하므로 vestigial이었다. 이전에는 **프롬프트 금지만이 방어**였고 capability는 남아 있었다 → 이제 **시도 자체가 불가**(`harness-engineering` "스키마 수준 필터링" + "capability ≠ authorization").
+
+**7. 자기 리뷰 → 외부 감사 15이슈 전량 수정 (verdict rejected → 해소)**
+
+구현 후 `/fz-codex` 교차검증(`codex_review_schema.json`, effort high)이 **verdict=rejected**(critical 3 / major 11 / minor 1)를 냈다. Lead가 15건 전수 실측 → **오탐 0**. ⛔ 가장 중요한 발견은 **이 릴리스의 enforcement 계측기 자신이 vacuous했다**는 것 — "위반 0건 exit 0"이 깨끗함의 증거가 아니었다.
+
+**7-a. 계측기 신뢰성 (`scripts/lint_contracts.py`) — 통과가 곧 발화 가능성이 되도록**
+- ⛔ **양성 대조 하네스 신설 (fixture 23건, 매 실행 선행)**: `hits`는 *본 후보 수*라 패턴이 고장나도 0이 아니다 → `OK [검사 대상 13]`이 찍혔다. 이제 fixture 실패는 **exit 2(configuration error)** 이고 "위반 0건"으로 읽히지 않는다. `--self-test`로 단독 실행 가능. ⛔ 범위는 **정규식이 판정의 전부인 항목(#15·N4·N5·N6·N8)에 한정** — 구조 순회형은 파싱 실패가 이미 ParseError로 드러난다(`harness-engineering` §6 AP1 과도한 구조화 회피)
+- **#15 `TRUNC` 정정**: `-\w*\d`는 숫자가 플래그 토큰에 **붙은** 형태만 잡아 `head -5`·`head -n5`는 매칭하고 **가장 관용적인 `head -n 5`·`tail -n 20`을 놓쳤다** — 이 검사의 존재 이유가 통과하고 있었다
+- **#N6 정정**: 파일 전체 문자열 검색이라 ①`__file__`이 **주석에만** 있어도 앵커로 인정 ②무관한 `exit 2`가 fail-closed 가드로 인정 ③검사기 자신이 **자기 정규식 정의줄**로 통과. ⛔ **본 릴리스가 추가한 `codex-exec.sh`가 7번째 줄 주석의 "exit 2"로 통과하며 자기증명했다.** 이제 주석 제거 코드에서만 앵커를 찾고, 허용 3형태를 명시((a) 자기위치 앵커 (b) 마커 검사+비0 종료 (c) **사유 있는** 면제 선언). `chk_N6`와 fixture가 **동일 함수 `n6_ok`**를 쓴다(판정 드리프트 차단)
+- **#N1 정정**: `critical` 포함 enum을 정규식으로 찾고 못 찾으면 `continue` → **consumer에서 critical을 삭제하는 변경**(가장 중요한 양성 대조군)이 위반이 아니었다. 구조 순회(`find_severity_enums`)로 바꾸고 **정의 부재도 위반**으로
+- **`--only` 검증**: 알 수 없는 id → **exit 2**. 이전엔 `--only DOES_NOT_EXIST`가 검사 0개를 돌리고 "위반 0건 exit 0"을 냈다 — 오타 하나로 enforcement 전체가 조용히 무력
+- **#N3 항목 설명 축소**: "그 줄의 실제 내용 병기"를 주장했으나 구현은 행 범위만 검사 → 하는 일로 정정
+- **#N2 확장**: `scripts`·`agents`·`workflows` 카운트 등재 → 즉시 `scripts/ 선언 6 ≠ 실측 7` 검출(**한 세션 안에 만든 stale**)
+
+**7-b. lint 신규 2항목 — 사람 검사로 두 번 놓친 것을 기계화**
+- **#N7 셸 변수 정의-사용 불일치**: `get_codex_skill()` → `get_codex_skill_path()` 전환에서 **할당은 `_SKILL_PATH`, 조건문은 옛 `_SKILL`** 인 스니펫이 3곳 남아 `[ -n "$미정의" ]`=false → **searcher 보조·fixer 보조·final DA가 조용히 실행되지 않았다**(`subcommands-core.md:123,172` · `aux.md:49`). CHANGELOG의 "호출자 8곳 통일"은 **거짓이었다**
+- **#N8 목차 앵커 해소**: 본 릴리스가 24개 모듈에 추가한 목차의 앵커가 실제 heading과 불일치(8곳). ⛔ **그걸 고치려 쓴 첫 스크립트가 `\s+ → -`로 공백 연속을 합쳐 14곳을 새로 깨뜨렸다** — GitHub slugger는 구두점 제거 후 **공백 하나당 하이픈 하나**다(`A + B` → `a--b`). 총 **22개 앵커 정정**(대부분 선재 파손), 미해소 **0**
+
+**7-c. 기능 파손 2건 — 목표 미달이었던 것**
+- **`FZ_PLUGIN_ROOT` 초기화 절차 신설**: 소비 10곳 / **할당 0곳** — 8호출부가 전부 빈 값을 넘겨 **Tier 2b가 항상 건너뛰어졌다.** Tier 2b 파손을 고치려던 변경이 목표를 달성하지 못한 상태였다. 이제 스킬 base directory에서 유도 + **마커 디렉토리 fail-closed 검증** + 무효 시 경고(⛔ 조용한 빈 값 금지). ✅ Tier 2a 심볼릭이 있으면 무증상이라 실측 없이는 드러나지 않았다
+- 위 #N7 3곳 변수명 정정
+
+**7-d. 문서 모순 5건**
+- `CLAUDE.md` **Agent Teams Environment Flag** — "`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수"를 지시하는 동안 같은 리포가 `TeamCreate` 부재(v2.1.178~)를 선언했다. **런타임 진입 문서가 없는 실행 경로를 활성화하라 지시**하는 모순 → 역사적 기록으로 전환 + §12 위임
+- `templates/agent-template.md` — `Code agent | Read, Grep, Glob, **Edit, Write, Bash** | impl-correctness` 행이 남아 **본 템플릿으로 에이전트를 만들면 6절의 capability 축소가 되살아났다** → `Changeset producer`(쓰기 없음)로 정정 + 근거 명시
+- `agents/impl-correctness.md` Cargo-Cult 절차 — "**새 파일 작성 후** Grep"은 쓰기 도구 제거 후 **수행 불가**(changeset만 반환하므로 파일이 디스크에 없다) → 자기 `newBody` 분석 + 디스크 대조는 Lead 소관으로 책임 재배치
+- 워크플로 헤더 5곳 — `mode:'fallback' → Lead는 SOLO 경로 수행`이 §12 L4("사용자 승인 후에만")와 충돌 → 사다리 참조로 정렬. ⛔ **"워크플로 무변경" 불변식 이탈**이나 **주석 전용**(비주석 변경 0라인, `node --check` 6/6)
+- 폴백 지목 잔존 7곳 + 부재 도구 `SendMessage` 처방 4곳 — 6절 강등의 미완 부분(아래 8절)
+
+**7-e. 미수정 1건 (판정: 현재 피해 0)**
+- **#1 필수 필드 값 검증** — 키 *존재*만 보므로 빈 값이 통과한다. 다만 21개 스킬 전부 필수 키를 유지하고 있어 **현재 결함 0**이고, YAML 파서 도입은 비례적이지 않다. 계약 불완전성으로 기록만.
+
+**8. 6절 강등의 미완 — 폴백 지목 잔존 11곳 (전수 재조사)**
+
+⛔ 6절 적용 후 "폴백을 team-core/patterns로 지목: 0건"이라 보고했으나 **편집한 5곳만 검사한 결과**였다(Coverage Gate 위반). `team-core`/`patterns/` 지목 **111줄을 100% 분류**(사료 32 / 정당 17 / 잔존 62) → 실행·폴백 절차 지목 **11곳 정정**:
+- 스킬 7곳: `fz-peer-review:65`·`fz-discover:67`("TEAM 실행 프로토콜") · `fz:314`("SOLO 폴백 시 참조") · `fz-code:100`·`fz-plan:88`·`fz-review:86`("팀 모드 규칙은 team-core 참조") · **`templates/skill-template.md:115`**("팀 프로토콜" — 생성 템플릿이라 미래 스킬에 전파)
+- 부재 도구 처방 4곳: `cross-validation.md:95`·`native-agents.md:67`(`SendMessage` — v2.1.178~ 부재) · `system-reminders.md:20,44`(T4 근거) · `fz-manage:56,435`("각 스킬에서 직접 참조" — 이제 거짓)
+
+**9. `scripts/codex-exec.sh` 신설 — codex 호출 hygiene의 실행체 (`fz-codex-bash-hygiene.md` §8 정본)**
+
+⛔ **실측 실패 2건이 신설을 유발했다**: ① `codex exec review --uncommitted "<prompt>"` → **exit 2**(`subcommands-core.md:36`이 "인자 충돌"을 **이미 문서화**하고 있었다 — 산문 경고는 호출 시점에 읽혀야 작동한다) ② 래퍼 마지막 문장(`wc || echo`)의 exit이 태스크 exit으로 올라가 **codex exit 2를 0으로 보고**했다.
+- **사전 게이트**: 플래그 상호 배타(`review`+PROMPT → exit 10) · 필수 인자 · 경로 실재 · trust_level 경고 · git repo 판정
+- **사후 게이트(신설)**: exit≠0 → **12** / 빈 출력 → **13** / JSON 파싱 실패 → **14**. ⛔ **10~14는 전부 측정 실패**이며 "이슈 0건"이 아니다. 통과 시 `GATE-PASS json_ok issues=N verdict=V`를 stdout에 명시
+- 검증: 사전 게이트 **8종 전부 발화**(exit 10×6 / 11×2) + 성공 경로 `GATE-PASS` exit 0 — ⛔ 통과만 확인한 게이트는 무용하므로 발화 가능성을 함께 실측
+- §6 복붙 템플릿은 **참조로 강등**(붙이지 않으면 작동하지 않고, 실측상 누락이 재발했다). `guides/skill-authoring.md` §11 "binary → 스크립트"의 적용
+
+**10. 자기 감사 4라운드 → ⛔ NOT CONVERGING 판정 후 **감산 전환** (일반성 포기)**
+
+구현 diff를 `/fz-codex` 로 4회 교차검증했다. R1=15(critical 3) → R2=15(critical 3, **11건이 R1 수정에서 발생**) → plan 검증=11 → R3=14(critical 1) → R4=10(critical 0). R4에서 외부 판정이 **NOT CONVERGING** 이었다 [외부: codex]:
+
+> "The structural cause is **reactive expansion of bespoke partial interpreters**, followed by **self-tests derived from the same assumptions**. Each counterexample adds another regex, merge rule, waiver, or fixture **without an independent semantic oracle**."
+
+⛔ **그래서 패치 루프를 멈추고 감산했다.** 이하가 v4.25.0의 최종 형태다.
+
+**10-a. `#15` 삭제 (외부 C4 권고 수용) — `-112줄`**
+- 근거: 후보 15건에 **현재 위반 0** · 역사적 결함 2건은 이미 **구조적으로 수정**됨(`hygiene:125` 는 전체 집합에서 세고 표시만 자름 / `fz-modernize:345` 는 총계를 먼저 산출) · 항목 설명이 스스로 오탐을 인정 · R3/R4에서 문맥창·waiver 3종·heading 교차를 얹고도 H1·setext 경계를 놓쳤다
+- 부수: R4-ISSUE-007(heading 경계)이 **삭제와 함께 소멸**. `pred_15`·`TRUNC`·`COUNT_CLAIM`·`DIRECTIVE`·`EXAMPLE`·`NARRATIVE`·`DISPLAY_ONLY`·`CTX_MAX` 전부 제거
+
+**10-b. `validate-codex-output.py` 전면 재작성 — 범용 JSON Schema 자작 폐기 (`-20줄`)**
+- ⭐ **실측이 방향을 뒤집었다**: `schemas/*.json` 전수에서 **`$ref` 0건** · 반면 `pattern` **7건**. 나는 4라운드에 걸쳐 **`$ref` 해소·JSON Pointer·`%인코딩`·형제 병합**(가장 어려운 부분)을 자작했고 — **존재하지 않는 요구사항**이었다. 그 코드가 R4-ISSUE-003의 원인이다(`dict.update` 로 병합 → draft2020-12 는 **독립 적용**인데 로컬 `minimum:-5` 가 참조 `0` 을 지워 `-2` 통과)
+- 반대로 **실제 7번 쓰이는 `pattern` 은 무시**했다 → R4-ISSUE-002
+- ⇒ 지원 키워드를 **실측 빈도로 재정의**(type 162·description 107·enum 24·properties 22·items 21·required 17·additionalProperties 11·pattern 7·minimum 6·maximum 4·maxItems 1). **미지 키워드는 exit 2** (침묵 금지) · `format` 은 **주석 취급임을 명시**
+- ⛔ **범용 검증기가 아님을 docstring 에 선언**한다 — fz 스키마 구조만 해석한다
+
+**10-c. `#N6` 를 줄 화이트리스트로 — `ast` 일반 분석 폐기**
+- R4 실측: `from evil import Path as P` → `P(__file__)` 통과(ImportFrom.module 미검증) · `X().resolve(__file__)` 통과(임의 attr)
+- ⇒ 대상은 우리 스크립트 **10개**(.py 4 · .sh 6)뿐이므로 **실제 쓰는 줄을 정확히 열거**(`ANCHOR_LINES`)하고 **미지 형태는 거부**. 새 형태는 여기 추가하는 것이 명시 승인
+- heredoc: POSIX 종료 규칙(정확 일치 / `<<-` 탭만 / `<<\EOF` / 다중) 재구현을 폐기하고 **첫 `<<` 이후 전체를 데이터로 취급**(fail-closed). R4-ISSUE-006 3방향 동시 소멸
+- ⛔ **Lead 자체 발견 (2026-08-10)**: 전환 중 내가 넣은 범용 패턴 `[A-Z_]*="$(cd "…" && pwd)"` 가 **경로 무관**하게 허용돼 `cd "/tmp"`·`$HOME` 도 앵커로 인정했다 — fail-closed 화이트리스트에 **내가 구멍을 냈다**. 자기 위치 유도 경로(`BASH_SOURCE`/`$0`/`*DIR*`/`*ROOT*`)로 제한
+
+**10-d. 정정 4건**
+- `codex_review_schema.json` `confidence` 에 `minimum/maximum` **인라인**(`peer_review` 는 이미 정상, `review` 만 누락 → `confidence: 101` 통과) + **`#N1` 을 경계 정합까지 확장**
+- `health-check.sh`: 사전조건 검사(`python3`·`git`·lint 스크립트 실재) · **3상태 표기 ✅/⛔/⏸(UNRUN)** · **UNRUN 을 FAILED 보다 먼저 판정**(이전엔 `exit 1` 이 먼저 반환돼 미실행 총평이 보고되지 않았다)
+- `PARAGRAPH_LINE` 축소 — 마커는 **뒤에 공백이 있을 때만** 리스트/heading. `-foo`·`*emphasis*`·`#hashtag` 는 단락이므로 setext 밑줄을 받는다
+- 통합 fixture: `#N4`·`#N5` **계열별 파일**(파이썬 계열 순회 소실 탐지) · 위치 단정을 `startswith` → **경계 요구**(`:3` 이 `:30` 에 매칭됐다)
+- 레지스트리 불변식: `kind` **enum 검증**(`"DETERMINSTIC"` 오타 → 조용히 SKIP) · **`MIN_HITS ≥ 1`**(0·음수가 하한 무력화)
+
+**10-e. 결과 — 순감 `-132줄`**
+`lint_contracts.py` 1341→1229 · `validate-codex-output.py` 188→168. ⛔ **`plan-final.md` §변경 예산 초과(+418줄·스크립트 3개)를 실제로 되돌렸다** — 외부 검증이 그 초과를 독립 확인했고(+511/−94 net +417), 감산이 그 지적의 처방이었다.
+
+⛔ **기계 검사 사각지대 (candidate)**: CHANGELOG 의 **레지스트리 항목 카운트**는 어떤 lint 도 보지 않는다(`#N2` 는 디렉토리 *파일 수*만 본다). 2026-08-09 에 23/15/3/5 로 stale 했고 **`#15` 삭제 후 25/16 으로 또 stale** 했다. 항목 추가·삭제 시 `--list` 수동 전사 의무. ⚠️ 검사 신설은 **검증 라운드 직전에 새 표면을 만들지 않기 위해** 보류했다 — 다음 사이클 후보.
+
+**⛔ 미처리 (실측 기반 판정)**
+- **OQ5 `description` 400자 cap → 수정 불필요.** `schemas/*.json`·`workflows/*.js`에 `maxLength` **0건** — `peer-review.js:41`의 `≤400chars`는 필드 설명 문자열 안의 **권고**일 뿐이고 초과 시 에러·잘림·거부가 없다. 리스크로 등록했던 것이 **오판**이었다.
+- **OQ9 리뷰 이슈 3중 계약 → 위생, 미처리.** 실측(`/fz-codex verify` 실행 결과): 지시 없던 required 4필드가 `scope_disposition` 13/13 · `code_snippet` 13/13 · `alternatives`/`recommended` **8/13 substantive**(대안 2개+trade-off), 잔여 5는 `null`이고 스키마가 `type:["array","null"]`이라 **정당**. 실제 피해 0 → (b) 계약 수렴은 "지금 잘 되는 것을 건드림". 필요 시 (a) 경로 태그 ~8곳이 저비용 진입점.
+
 ### v4.24.0 (2026-08-09) — 리뷰 스킬 구조 판정 축 신설 + peer/fz-review 계약 정합화 [MINOR]
 
 > 리뷰가 결함(요구사항·버그·영향범위)은 잘 찾고 **더 나은 구조는 못 찾는** 문제를 배선으로 해결한다. 근거는 **통제 A/B 1건**: 스키마·cap·에이전트·모델을 전부 고정하고 브리프만 결함축→구조축으로 바꿨더니 `review-arch` 1콜(116K)이 대안 **9/10** · 삭제라인 정량 **10/10** · 기존 3-렌즈 24건(533K) 미포착 **신규 6건** · 삭제가능 **95줄(변경량 29%)** 을 냈다. 능력 부족이 아니라 **하네스가 묻지 않았다**(`prompt-optimization.md` §3b H1). 산출물: `~/dev/TVING/fz-peer-review-upgrade/`(plan-v4 · Codex verify 10/10 채택 · 홀 인벤토리 H1~H24·R1~R11).

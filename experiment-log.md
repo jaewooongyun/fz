@@ -499,6 +499,18 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 1 | 2026-07-10 | B2·B3 (TVG-2134 찜내역 Fan 편입) | 3 (유효 2 + args 오류 즉시 fallback 1 — Lead args의 깨진 유니코드 이스케이프, 스크립트 fail-fast 정상 동작) | 5 (B2: impl+review pass 2 / B3: impl+review issues+revise 3) | 0 | 1 (입력 오류 — 수정 후 재invoke 회복) | 2/2 (적용 후 각 1회 통과, anchor 불일치 0) | ✅ changeset 19파일 전건 적용, Stage2 리뷰가 B3에서 이슈 검출→Stage3 반영. Codex check가 defer 가드 누락(plan 반영 유실분) major 1건 검출 → Lead 실측 확인 후 2파일 정합화 |
 | 2 | 2026-07-20 | TVG-2906 홀 반영(S1·S2·S5·S6 편집 + S4 등재, S3 보류) | 1 (SOLO Lead 직접 — 마크다운 국소편집, changeset=plan 명세, code-pair 과잉) | 0 | 0 | 0 | validate 1회 통과(빌드 대체) | ✅ 7파일 편집, grep 7/7·plugin validate·500줄·참조 회귀 무손상. Lead 판정 3건(OQ-c 카운트보류·OQ-d S3보류·H-P2 독립등재). Codex 불능 — 후속 fz-review 이관 |
 
+### fz-peer-review (live-review) — Wave 4 전환 (시작: 2026-08-09)
+
+> ⛔ **신설 사유**: `skills/fz-peer-review/SKILL.md`가 *"metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록"* 이라 지시하는데 **테이블이 존재하지 않았다**(F-12). 지시가 없는 대상을 가리키고 있었다.
+> ⛔ 기존 §5.7 freeze 블록(확산 판정 임계)은 **불가침** — `experiment-log.md` §5.8 "freeze 범위 주석" 선례대로 **신설만** 허용한다.
+>
+> **임계 (사전 등록 — 변경 금지)**: 3건 전수 · `nullCount` 0 · stage 완주(**tier별 기대값 다름**: Tier 2 = Stage1+Stage2, Tier 3 = Stage1+Stage2+Stage3) · fallback 0 **단 `invalid-args`는 제외**(스크립트 fail-fast = 설계된 가드이지 워크플로 실패가 아님 — fz-code 2026-07-10 시리즈 선례 승계).
+> **G2-peer 품질 관찰축**: 렌즈별 발견 실효성 / cross severity 조정 근거 인용 / counter refute의 실측 근거 / Origin 보정 작동 / 구조 축(structuralAxes) 발견 신규성.
+> ⚠️ **열 설계 근거**: 단순 `null률·완주·fallback`만으로는 **신뢰성 실패와 입력 오류를 구별할 수 없다** — Tier·mode·fallback 사유를 분리 기록한다(Codex verify ISSUE-008).
+
+| # | date | tier | mode | agentCalls | nullCount | stages(기대/실제) | fallback (사유) | wall-clock | structuralAxes | G2-peer 관찰 |
+|---|------|:----:|------|-----------:|----------:|-------------------|-----------------|-----------:|:--------------:|--------------|
+
 ## §5.8 Fable 5 효율 배선 측정 큐 (시작: 2026-06-12)
 
 > 출처: `~/dev/TVING/fz-fable-enhancement/plan/plan-final.md` S4 — 배선=가설/측정=검증 (31/35차). **사전등록 임계 변경 금지** (확증편향 방어).

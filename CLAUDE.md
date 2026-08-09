@@ -43,13 +43,17 @@ bash scripts/setup-hooks.sh
 **근거**: v4.5.0 release 시 README/CHANGELOG/SKILL에 user-specific 절대 경로 노출 → v4.5.1로 retroactive cleanup 후 재발 방지 mechanism 추가 (v4.6.0).
 
 ## Directory Structure
-- `skills/` — 21개 fz 스킬 (SKILL.md)
-- `agents/` — 13개 fz 에이전트
-- `modules/` — 공유 모듈 (20개 + patterns/)
-- `guides/` — 가이드 문서 (7개)
+> ⛔ 아래 카운트는 `scripts/lint_contracts.py` **#N2가 실측과 대조**한다 — 손으로 세지 말고 lint를 돌려라 (2026-08-09까지 modules 20/guides 7로 stale했다).
+> ⛔ **형식 고정**: `` - `dir/` — 설명 (N개) `` — #N2는 백틱 경로 뒤의 `(N개` 를 찾는다. 형식이 다르면 **그 카테고리가 조용히 검사에서 빠진다** (2026-08-09 감사 ISSUE-002: `agents/`는 괄호 없어 미검사, `workflows/`는 선언 자체가 없었다).
+- `skills/` — fz 스킬 SKILL.md (21개)
+- `agents/` — fz 에이전트 (13개)
+- `modules/` — 공유 모듈 (46개 — 루트 41 + patterns/ 5)
+- `guides/` — 가이드 문서 (9개)
+- `workflows/` — 결정적 멀티에이전트 스크립트 (6개)
 - `templates/` — 스킬/에이전트/모듈/CLAUDE.md 템플릿
 - `codex-skills/` — Codex 네이티브 스킬 (8개)
 - `schemas/` — Codex JSON 스키마 (5개)
+- `scripts/` — lint·설치·호출·검증 스크립트 (10개). ⛔ `setup-codex-skills.sh`는 **load-bearing** — `~/.codex/skills/` 심볼릭이 `get_codex_skill_path()` Tier 2a를 성립시킨다. ⛔ codex 호출은 `codex-exec.sh` 경유 의무 (`modules/fz-codex-bash-hygiene.md` §8) · `FZ_PLUGIN_ROOT`는 `resolve-plugin-root.sh`로 해석 (Tier 2b 전제)
 - `.claude-plugin/` — plugin.json + marketplace.json
 
 ## Verification Discipline (v3.11+)
@@ -73,12 +77,11 @@ bash scripts/setup-hooks.sh
 
 상세: `guides/llm-references.md` §1.2·§5 (정본), `modules/context-artifacts.md` (1M context 정책), `guides/harness-engineering.md` §1.3 (세대 전환 테이블), `guides/prompt-optimization.md` 원칙 8 (literal interpretation 대응), `guides/fable-model-guide.md` (Fable 5 대비).
 
-## Agent Teams Environment Flag
+## Agent Teams Environment Flag — ⛔ 현행 경로에 불필요 (역사적 기록)
 
-TeamCreate 사용 스킬 실행 시 환경 변수 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 필수 (Claude Code v2.1.32+). 미설정 시 TeamCreate 호출이 실패한다.
+⛔ **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`을 설정하지 말 것.** 이 플래그는 `TeamCreate` 경로 전용이고, **`TeamCreate`는 Claude Code v2.1.178부터 부재**하다. 멀티에이전트 실행은 v4.22.0(Wave 4)에서 `workflows/*.js` 결정적 Workflow로 전면 이관됐다 — Workflow 도구는 이 플래그를 요구하지 않는다.
 
-```bash
-export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-```
+- 팀 모드 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
+- 역사적 사양(TEAM P2P 시절): `guides/agent-team-guide.md` §8 — ⛔ 실행 절차로 참조하지 않는다
 
-상세: `guides/agent-team-guide.md` §8 (공식 사양, hooks 연계, 권장 teammate 수).
+> 정정 근거(2026-08-09 외부 감사 ISSUE-011): 본 절이 "설정 필수"라 지시하는 동안 같은 리포가 `TeamCreate` 부재를 선언하고 있었다 — **런타임 진입 문서가 존재하지 않는 실행 경로를 활성화하라고 지시**하는 모순이었다.
