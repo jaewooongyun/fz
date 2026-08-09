@@ -10,16 +10,12 @@ allowed-tools: >-
   mcp__serena__list_memories,
   mcp__serena__read_memory,
   Read, Grep, Glob, Bash, Edit, Write
-composable: false
 provides: []
 needs: [none]
 intent-triggers:
   - "관리|스킬|의존성|체크|벤치마크|일괄.*평가"
   - "manage|skill|depend|check|benchmark|batch.*eval"
   - "메모리.*반영|교훈.*반영|reflect.*module|lessons.*module"
-model-strategy:
-  main: opus
-  verifier: null
 ---
 
 # /fz-manage - 스킬 시스템 관리
@@ -57,7 +53,7 @@ model-strategy:
 | 이전 서브커맨드 | 이동처 | 설명 |
 |---------------|--------|------|
 | `workflow` | `/fz` | 파이프라인 조합은 compositor가 담당 |
-| `team <pattern>` | `modules/team-core.md` + `modules/patterns/` | 각 스킬에서 직접 참조 |
+| `team <pattern>` | `workflows/*.js` + `guides/skill-authoring.md` §12 | 각 스킬이 자기 Workflow를 소유. ⛔ `team-core.md`·`patterns/`는 설계 출처 — 실행 절차 아님 |
 | `governance` | `modules/governance.md` | 거버넌스 프레임워크 |
 
 ---
@@ -97,7 +93,8 @@ build.md, governance.md, session.md, skill-template.md, team-core.md, README.md
 ### 절차
 
 1. `Read("skills/fz-{name}/SKILL.md")` → YAML frontmatter + 본문
-2. YAML에서 `allowed-tools`, `provides`, `needs`, `intent-triggers`, `model-strategy` 추출
+2. YAML에서 `allowed-tools`, `provides`, `needs`, `intent-triggers` 추출
+2b. **실효 모델은 YAML이 아니라 스크립트에서 읽는다** — `Grep("agentType: 'fz:", "workflows/{skill}-*.js")` → `model`/`effort` 인자 표시. ⛔ `model-strategy` frontmatter는 2026-08-09 제거(런타임 효과 0). 정본: `modules/governance.md` § Truth-of-Source
 3. `Grep("fz-{name}", "skills/")` → 역참조 (이 스킬을 참조하는 다른 스킬)
 4. 파일 크기 (줄 수) 계산
 
@@ -163,46 +160,45 @@ fz-manage      → serena(4)
 
 fz- 스킬 + 에이전트를 일괄 검증합니다.
 
+### 절차 (⛔ 스크립트 실행 — 언어 판정 아님)
+
+```bash
+{플러그인 루트}/scripts/health-check.sh                 # 전 검사 집계 (exit 0=전부 통과 / 1=실패 있음 / 2=사전조건)
+{플러그인 루트}/scripts/health-check.sh --strict-freshness   # 최신성 findings 도 실패로 취급
+```
+
+⛔ **인라인 블록으로 조립하지 말 것** (2026-08-09 감사 ISSUE-010, CRITICAL). 이전 판은 ①`FZ_ROOT`를 `$0`에서 유도했고 — **인라인 블록에서 `$0`은 셸**이라 `/` 또는 호출자 CWD로 해석됐다 ②세 명령을 status 캡처 없이 순차 실행해 **마지막 명령의 exit이 앞의 실패를 덮었다**. 특히 최신성 검사는 findings를 출력하며 exit 0을 내므로 **lint 실패가 사라졌다**. ⛔ 본 절이 바로 아래에서 "exit code를 판정에 포함한다"고 규정하면서 그 규칙을 위반하고 있었다.
+
+`health-check.sh`가 보장하는 것:
+- 루트를 **자기 위치**에서 해석 (`BASH_SOURCE[0]` — `$0`는 `source` 시 호출자를 가리킨다)
+- 각 검사의 exit을 **개별 캡처**해 표로 보고 → 하나라도 실패면 **비0**
+- lint `exit 2`(검사기 자체 고장)를 `exit 1`(위반 있음)과 **구별 표기**
+- SKIP(THRESHOLD·SEMANTIC) 건수를 **따로** 출력 — ⛔ SKIP은 PASS가 아니다
+
+⛔ **exit code를 판정에 포함한다** — `>/dev/null 2>&1`로 감싸지 않는다. `2`는 **PASS도 SKIP도 아니다**(configuration/parse error). 근거: `modules/cross-validation.md` §Negative-Result Gate.
+
 ### 검증 항목
 
-| # | 대상 | 검증 | 방법 |
-|---|------|------|------|
-| 1 | fz-* | YAML 필수 필드 | name, description, user-invocable, allowed-tools |
-| 2 | fz-* | MCP 유효성 | allowed-tools의 MCP 도구가 실제 존재하는지 |
-| 3 | fz-* | provides/needs 체인 | 모든 needs가 provides로 충족 가능한지 |
-| 4 | fz-* | intent-triggers 중복 | 과도한 겹침 여부 |
-| 5 | fz-* | 스킬 크기 <= 500줄 | Progressive Disclosure 준수 |
-| 6 | fz-* | 깨진 파일 참조 | 본문 내 경로 참조 검증 |
-| 7 | Agent | 에이전트 파일 유효성 | `agents/*.md`에 name, description, model 존재 |
-| 8 | Agent | Team MCP 호환성 | 에이전트가 Team 불가 MCP 참조하지 않는지 |
-| 9 | fz-* | 테스트 케이스 존재 | SKILL.md에 "## 테스트 케이스" 섹션 또는 참조 링크 |
-| 10 | fz-* | Triggering 테스트 | should trigger + should NOT trigger 최소 3개 |
-| 11 | Infra | skill-creator 설치 | Glob으로 `run_loop.py` 탐색 → 있으면 OK, 없으면 WARN |
-| 12 | Agent | frontmatter tools ↔ 본문 도구 정합 | frontmatter tools 파싱 → 본문 Primary/Secondary 도구와 교차 대조 |
-| 13 | fz-* + Agent | CLAUDE.md 섹션 참조 유효성 | `## {섹션명}` 패턴 추출 → CLAUDE.md 헤딩과 교차 확인 |
-| 14 | Module | 목차 ↔ 본문 섹션 일치 | 상단 나열과 실제 ## 헤딩 비교 |
-| 15 | Infra | CLAUDE.md 금지 패턴 준수 | Grep(head/tail 등 금지 패턴) → 모듈/스킬 내 0건 확인 |
-| 16 | Agent | team-registry ↔ patterns 참여자 일치 | team-registry 에이전트 목록 ↔ patterns/*.md 역할 테이블 양방향 대조 |
-| 17 | fz-* | Gate 증거 패턴 존재 | Gate 체크리스트에 "Evidence:" 행 존재 여부 확인 |
+⛔ **항목 목록의 SSOT는 `scripts/lint_contracts.py`다.** 여기서 재정의하지 않는다 — 두 곳에 쓰면 드리프트한다(플러그인 자기 감사에서 F-5·F-19로 실측된 실패 모드).
+
+```bash
+{플러그인 루트}/scripts/lint_contracts.py --list        # 항목 id · 판정자 · 설명
+```
+
+판정자 3분류 — **DETERMINISTIC**(스크립트 판정) / **THRESHOLD**(임계·문법 미정 → SKIP, 정하면 승격) / **SEMANTIC**(사람·모델 판정 → SKIP).
+⛔ **SKIP은 PASS가 아니다.** SKIP 항목은 Lead가 별도 판정하고 그 사실을 보고에 남긴다.
 
 ### 출력 형식
 
-```markdown
-## 건강 체크 결과
+⛔ **스크립트 출력을 그대로 인용한다** — 손으로 카운트를 옮겨 적지 않는다(하드코딩 카운트는 stale해진다. 실제로 이 자리에 `14/14`가 스킬 21개 시점까지 남아 있었다).
 
-OK YAML 필수 필드: 14/14 정상
-OK MCP 유효성: 6/6 서버
-OK provides/needs 체인: 완전
-OK intent-triggers: 관리됨
-OK 스킬 크기: 14/14 (500줄 미만)
-OK 깨진 참조: 0개
-OK 에이전트 파일: 6/6 정상
-OK Team MCP 호환: 6/6
-OK 테스트 케이스: N/N 존재
-OK Triggering 테스트: N/N (3개+ 커버)
+lint는 항목별로 `OK`/`FAIL(n)` + **`[검사 대상 N]`** 을 출력한다. `검사 대상 0`은 **⚠️ 별도 구획**으로 표시된다 — *대상 부재인지 패턴 고장인지 구별하라*(§Negative-Result Gate 요소1).
 
-총 점수: 100%
-```
+Lead가 보고에 추가할 것:
+- `health-check.sh`의 **검사별 exit 표**를 그대로 인용 (⛔ 요약해 "전부 통과"로 합치지 말 것)
+- **SKIP 항목별 별도 판정** (스크립트가 판정하지 않은 THRESHOLD·SEMANTIC — ⛔ PASS로 합산 금지)
+- lint `exit 2` 이면 **검사기 고장**으로 보고 (위반 0건이 아니다)
+- 최신성 findings 건수 (기본 모드에서는 exit에 미반영 — 경고)
 
 ---
 
@@ -443,7 +439,7 @@ verdict: agree / disagree / partial / needs_verification
 **Will Not**:
 - 개별 스킬 품질 평가 (→ `/fz-skill eval`)
 - 워크플로우 가이드 (→ `/fz`)
-- 팀 에이전트 생성 (→ `modules/team-core.md` + `modules/patterns/`, 각 스킬에서 직접 참조)
+- 팀 에이전트 생성 (→ 각 스킬의 `workflows/*.js`, 규약은 `guides/skill-authoring.md` §12)
 - 코드 수정 (→ 각 워크플로우 스킬)
 - 자동 적용 (`reflect-to-module`도 사용자 승인 필수, Codex 외부 검증 의무)
 
