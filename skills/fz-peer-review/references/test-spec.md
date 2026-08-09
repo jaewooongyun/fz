@@ -24,6 +24,7 @@
 | 지적 패턴이 base 브랜치에 이미 존재(`base-behavior.md`상 pre-existing), 에이전트가 `origin=pre-existing` 보고 | `/fz-peer-review 123` | Synthesize Origin 보정으로 해당 이슈 severity가 `suggestion`으로 cap + Confidence Matrix Origin 열 `P` + 리포트 `[기존 동작 동일]` 태그 부착 = pass | edge-case |
 | `gh auth status` 실패 | `/fz-peer-review 123` | git 폴백 경로(`git fetch upstream` + `git diff`)로 `${WORK_DIR}/diff.patch` 생성(비어있지 않음) → 리뷰 파이프라인 계속 진행 = pass | failure |
 | Tier 2 결정, Codex challenger 호출 실패 | `/fz-peer-review 123` | **3-렌즈**(review-arch + review-quality + review-correctness — `peer-review.js:143-157`) 결과만으로 투표 진행, Codex 열 제외 → Confidence Matrix 계산 완료 + 최종 verdict 산출(리뷰 비중단) = pass | failure |
+| Tier 2 실행, 리포트에 전수·부정 주장 포함("사용처 0건") | `/fz-peer-review 123` | Synthesize §4에서 `cross-validation.md` §Coverage Gate Read 후 **전체 N / 분석 M 비율 보고** = pass (미보고면 fail) | normal |
 | Tier 3 실행, suggestion 등급 이슈 존재 | `/fz-peer-review 123 --deep` | 반환 `distribution.suggestion` 이 실제 suggestion 이슈 수와 일치 + log에 표기 = pass (H24 회귀 방어) | normal |
 | Tier 2/3 실행 | `/fz-peer-review 123` | `args.structuralContext` 가 전달되고 **arch 프롬프트에만** `[구조 축 — 이 렌즈 전용]` 이 포함 = pass. ⛔ `structuralLine` 이 조건부라 args 누락 시 **에러 없이 구조 축이 꺼진다** — quality/correctness 프롬프트에 포함되면 fail(결함 축 오염) | normal |
 
