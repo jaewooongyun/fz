@@ -183,6 +183,22 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 v4.22.0에서 **일몰 완료** — 실제 TeamCreate 호출부 0건. `patterns/*.md`는 canonical 라운드 의미론으로 보존. 규약: `guides/skill-authoring.md` §12.
 
+### What's New (v4.23.1) — 배선 복구: 정의된 팀의 2/3이 안 돌고 있었다 [PATCH]
+
+`agent-team-guide`는 code-* 실질 워커를 **review-arch·impl-quality·review-correctness**로 정의하지만 Wave 3 Workflow 전환에서 **arch만 배선**됐다. 대조군 `plan-collaborative`는 정의된 5개를 전수 스폰한다 — `code-pair`만 "Codebase Pattern Consistency" 전담 렌즈가 빠져 있었고, 그래서 *같은 블록 형제 슬롯*의 표현 비대칭(상수 vs 리터럴)이 무방비였다.
+
+- ⭐ **`code-pair` Stage 2 → arch + impl-quality 병렬 2렌즈**(full 모드). 두 렌즈 결과를 단일 `review` 객체로 병합해 하류 계약(`s2` 완주 판정·Stage3 조건·`residualIssues`)을 보존한다. light는 arch 단독 유지(비용 보존) · opus 동시 ≤2
+- **검증 4-P 신설**(candidate) — "편집 라인이 놓인 *자리*가 일관적인가". 오탐 실측(peer slot 11곳 → emit 9곳 중 **진짜 1곳**)을 절차에 반영: **형제 균일성 게이트**(형제가 애초에 불균일하면 중단) · **소비처 의존 축 제외**(접근수준·소유권은 정의상 소비처가 결정 → in-block 판정 불가) · 의미 비대칭 면제 · provenance tie-break
+- ⛔ **"축 부재" 진단 철회 — 자기 재현 기록**: 초판은 이 관찰을 §5 "원칙 8"로 신설하며 *"형제 관계를 보는 렌즈가 어디에도 없다"* 고 단정했으나 **6개 실재**했다(그중 `skill-authoring` §1 Sibling-Convention Check는 **동일 실패 모드**로 이미 candidate 등재). 조사 대상을 3개로 스스로 한정하고 커버리지 실측 없이 홀을 선언한 것 자체가 그 관찰이 겨냥한 실패 모드다. 정확한 진단 = **입도 부족 + 소유자 미배선**
+- **§5 원칙 8 → §12 R8-A 강등**: 문서는 헤더·§설계원칙에서 *"공식/학술/고품질 출처만 인용"* 을 자기 정책으로 명시하는데, 원칙 1~7은 전부 외부 권위인 반면 원칙 8만 **자체 세션 관측 1건**이었다. 원칙 번호를 점유하면 하류가 동급 권위로 인용한다 → "하네스 홀 candidate" 표로 이동(외부 근거 = **미대조**), 하류 참조 8곳 갱신
+- **ledger 집행 결함 시정**: L-11 동축 판정을 선언만 하고 미집행 → 관측 #3 등재(evidence 2→3) · L-1 관측번호 충돌(#2 중복 → #4) · L-13 승격 조건에 **회귀 fixture 2개**(§5.5 규율 1) 추가
+- 상세: [docs/releases/v4.23.1.md](docs/releases/v4.23.1.md)
+
+> ⛔ **철회한 자기 주장 2건**: *"in-block 비용 0"* → 접근수준 판정에 타 파일 Read·리포 grep이 실제로 필요했다. *"기계 검증 원리적 불가"* → magic-number lint가 잡는 부류이며 lint 대안 검토는 선행 과제로 남는다.
+> ⛔ **미해결 3건**: 이중 등재(`fz-code` 신호 + 4-P) · `fz-review` 검증 4 원문 모순(*"유일하게 diff 밖"* vs *"검증 4는 diff 안"*) · `code-pair` S4 결정 근거 미추적.
+
+---
+
 ### What's New (v4.23.0) — 누적 통합: 계약 lint 결정화 · 리뷰 구조 판정 축 · llm-references §1.1b [MINOR]
 
 v4.22.0 이후 누적된 23커밋(**138자산 전수 자기 감사** 기반)을 하나로 발행. 초안 번호 4.23.0~4.25.0은 태그·Release 어디에도 없어 폐기하고 v4.23.0으로 통합했다(구간 `[MAJOR]` 0건 → semver 정합).
