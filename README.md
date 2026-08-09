@@ -183,18 +183,22 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 v4.22.0에서 **일몰 완료** — 실제 TeamCreate 호출부 0건. `patterns/*.md`는 canonical 라운드 의미론으로 보존. 규약: `guides/skill-authoring.md` §12.
 
-### What's New (v4.22.0) — 누적 릴리즈: fz-rebase 신설 · peer-review 인라인 게시 · Opus 5 대응 [MINOR]
+### What's New (v4.23.0) — 누적 통합: 계약 lint 결정화 · 리뷰 구조 판정 축 · llm-references §1.1b [MINOR]
 
-v4.21.0 이후 한 달간 발행 없이 누적된 28커밋(59파일 / +3,293 −222)을 하나로 발행. 초안 번호 4.23.0~4.25.0은 어디에도 발행된 적이 없어 폐기하고 v4.22.0으로 통합했다.
+v4.22.0 이후 누적된 23커밋(**138자산 전수 자기 감사** 기반)을 하나로 발행. 초안 번호 4.23.0~4.25.0은 태그·Release 어디에도 없어 폐기하고 v4.23.0으로 통합했다(구간 `[MAJOR]` 0건 → semver 정합).
 
-- **`/fz-rebase` 신설 — 리베이스 조용한 유실 게이트**: 종전 게이트는 히스토리의 *형태*(커밋 수·머지 수)만 봐서 "개수 보존 = 내용 보존"을 암묵 전제했다. 유실 유형 열거(L1~L6)를 폐기하고 세 트리 경로 합집합을 **경로 단위 배타 분할**(MINE-only / not MINE / OVERLAP)로 재설계 — 텍스트·바이너리·mode·symlink·gitlink·추가·삭제·이동이 열거 없이 판정 범위(13/15). 회귀 20/20 PASS, `audit` 10.4s → **0.4s**
-- **`/fz-peer-review` 인라인 라인 앵커 게시**: 리포트의 file:line을 PR **Files changed 코드 라인 옆**에 직접 붙인다. `diff_anchors.py`(Python stdlib 전용) + 게시 7단계 SSOT 모듈 + PR 픽스처. 겹치는 hunk는 모두 반환하고 **선택은 Lead에게** — 어느 hunk가 논지인지는 의미 판단
-- **Opus 5 출시 대응**: 1차 소스 8종 실측 후 15파일 갱신, 코드는 미변경(공식이 fresh sweep 요구). ⚠️ "검증 지시 삭제" 권고 오독 방어 = **게이트(구조) ≠ 지시(문구)** 경계 성문화. T0 실측으로 `ultracode`가 effort arm 값이 **아님**을 확인(무효값과 구별 불가하게 조용히 무시)
-- **자기 문서 stale 탐지 도구화**: `lint_doc_freshness.py` 신설 — `last audited` 보유가 105개 중 4개뿐이었다. SSOT 한 줄로 현행 모델 판정 → 나머지 stale 자동 검출. 제약 부하는 floor/ceiling 분리 계측(`fz-plan` 45,808 → floor 13,694, 단 **`fz` 자신이 31,259로 최고**)
-- **Wave 4 TEAM 전면 일몰 + 아키텍처 제약 배달 11/11**: `peer-review.js` 신규로 TeamCreate 호출부 0건. `plan-collaborative.js`의 제약 미도달 3곳(특히 *아키텍처 검증자* 역할인 Stage 5) 해소
-- 상세: [docs/releases/v4.22.0.md](docs/releases/v4.22.0.md)
+- ⭐ **`scripts/lint_contracts.py` 신설 — `/fz-manage check` 17항목의 결정화**: 항목이 **전부 언어 지시**였고 check용 스크립트가 0개였다 → 정의된 검사(깨진 참조·모듈 목차)가 있는데도 위반이 생존했다. 현재 **24항목**(DETERMINISTIC 15 / THRESHOLD 3 / SEMANTIC 6, ⛔ 손으로 세지 말고 `--list` 전사). 첫 실행 129건 → 탐지기 교정 4회 → 위반 0건
+- ⭐ **계측기가 자기 유효성을 증명한다 — 양성 대조 하네스**: `hits`는 *본 후보 수*라 패턴이 고장나도 0이 아니다 → "위반 0건 exit 0"이 깨끗함의 증거가 아니었다. fixture **46건 + 통합 5검사(9 위치)** 가 매 실행 선행하고, 실패는 **exit 2(configuration error)** 로 분리된다(PASS·SKIP 아님). 의도적 회귀 5종(무조건 `[]`·판정 반전·확장자 오필터·디렉토리 오제외·그럴듯한 가짜 히트) 전부 exit 2로 검출
+- **inert frontmatter 3종 51선언 제거**: `team-agents`(9)·`composable`(21)·`model-strategy`(21) — 전부 **런타임 효과 0**인 fz 자작 필드였고 형제 간 불일치가 stale 위험을 실증했다. 실효 결정자(`workflows/*.js` / `provides`·`needs`)를 `governance.md §Truth-of-Source`에 **4항목 정본 지정**
+- ⭐ **`cross-validation.md` §Negative-Result Gate 신설**: 신규 규칙이 아니라 **수신처에 구현이 없던 위임**을 채운 것. positive control · 신호 보존(`>/dev/null` 금지) · 귀속 라벨. 근거는 단일 세션 **12 인스턴스** 실측 — 그중 *0건 자체를 의심해서* 잡은 건 **0건**
+- ⭐ **리뷰의 구조 판정 축 신설**(`review-structural-axes.md`, peer-review ↔ fz-review 공유): 리뷰가 결함은 잘 찾고 **더 나은 구조는 못 찾던** 문제. **통제 A/B**(스키마·cap·에이전트·모델 고정, 브리프만 교체)에서 1콜이 대안 9/10 · 기존 3-렌즈 24건 미포착 **신규 6건** · 삭제가능 95줄을 냈다 — 능력이 아니라 **하네스가 묻지 않았다**
+- **실패 복구 사다리 L1~L4 정본화**(`skill-authoring.md` §12): 5개 스킬이 `fallback` 절차로 679줄을 지목했으나 내용은 **부재 도구**(`TeamCreate`·`SendMessage`) 기반이었다 — 가장 필요한 순간의 지침이 실행 불가. 실측(실패 2회 전부 재invoke·resume으로 복구, `team-core` 사용 0건)이 처방을 바꿨다. 동반: `impl-correctness`에서 **쓰기 7종 제거**(프롬프트 금지만이 방어였던 것 → 시도 자체 불가)
+- **codex 호출 정본 경로 신설**(`scripts/codex-exec.sh`): 사전 게이트 8종 + **사후 게이트**(exit≠0 → 12 / 빈 출력 → 13 / JSON 실패 → 14). ⛔ 10~14는 전부 **측정 실패**이며 "이슈 0건"이 아니다 — 래퍼 마지막 문장의 exit이 codex exit 2를 0으로 보고한 실측 실패가 신설을 유발했다
+- 상세: [docs/releases/v4.23.0.md](docs/releases/v4.23.0.md)
 
-> ⛔ **미충족 게이트를 명시하고 출하**(사용자 결정): ① Wave 4가 요구한 `peer-review.js` 실 invoke 캘리브레이션 ② figma 원칙 H가 요구한 회귀 fixture(oracle 0개). 둘 다 *기능 결함*이 아니라 *약속한 검증 미이행*이며, candidate/pending 표시라 기본 경로를 차단하지 않는다. 후속 릴리즈에서 해소.
+> ⛔ **4라운드 자기 감사 → `NOT CONVERGING` 판정 → 감산 전환**: 교차검증이 R1=15(critical 3) → R2=15(**11건이 R1 수정에서 발생**) → R3=14 → R4=10으로 줄지 않았고, 외부 판정이 원인을 *"독자 부분 해석기의 반응적 확장 + 같은 가정에서 파생된 self-test"* 로 지목했다. 그래서 패치를 멈추고 **삭제·비일반화**했다 — 검사 1개 삭제 · 출력 검증기 전면 재작성(실측: 스키마가 `$ref` **0건**·`pattern` **7건**인데 가장 어려운 `$ref` 해소를 자작하고 있었다) · `ast` 일반 분석 → 줄 화이트리스트. **순감 −132줄**로 예산 초과를 되돌렸다.
+>
+> ⛔ **기계 검사 사각지대 (다음 사이클)**: CHANGELOG의 **레지스트리 항목 카운트**는 어떤 lint도 보지 않는다(`#N2`는 디렉토리 *파일 수*만). 이번 사이클에 두 번 stale했다 — 항목 추가·삭제 시 `--list` 수동 전사 의무. 검증 라운드 직전에 새 표면을 만들지 않기 위해 신설을 보류했다.
 
 > 📦 이전 릴리즈 노트: [docs/releases/](docs/releases/) · 전체 변경 이력 [CHANGELOG.md](CHANGELOG.md)
 
