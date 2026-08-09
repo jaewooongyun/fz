@@ -16,19 +16,23 @@
 //     buildFeedback이 args를 바꿔 캐시 키 불일치 [선례: ts 제거 — resume 캐시 미스 유발]).
 //
 // [설계 — modules/patterns/pair-programming.md 평탄화]
-//   full(fz-code): Stage1 impl(opus) changeset → Stage2 review-arch(opus) 검토 →
-//     Stage3 impl(opus) 이슈 반영 수정 — **조건부**: review pass면 Stage3 생략 (2-call).
+//   full(fz-code): Stage1 impl(opus) changeset → Stage2 **병렬 2렌즈**(review-arch + impl-quality, opus) →
+//     Stage3 impl(opus) 이슈 반영 수정 — **조건부**: review pass면 Stage3 생략 (3-call).
 //     계획 표기 '고정 3-call'은 unresolved #2가 잠정 부정확 지적 — pass 경로 dead-call 제거가 정직
-//     (plan-collaborative direction 조건부화 동형). 분기 상한 고정(2-3 call) → 가변 fan-out 아님.
-//   light(fz-fix): Stage1 impl(opus) → Stage2 review는 stepSpec.complexity>=3만 (1-2 call).
-//     complexity 누락 시 review 포함 (안전 default) + log 명시.
-//   opus 동시 ≤1 (+Lead=2): 전 호출 순차 — parallel 미사용 (Step 내 의존 사슬).
-//   budget 가드: 해당 없음 — 분기 상한 고정 1-3 call (§12 단서).
-//   impl-quality/review-correctness/memory-curator: Lead 경로 (S4 결정 — 미포함 기본값).
+//     (plan-collaborative direction 조건부화 동형). 분기 상한 고정(3-4 call) → 가변 fan-out 아님.
+//   light(fz-fix): Stage1 impl(opus) → Stage2 review-arch 단독은 stepSpec.complexity>=3만 (1-2 call).
+//     complexity 누락 시 review 포함 (안전 default) + log 명시. ⛔ light에 impl-quality 미추가 (비용 유지).
+//   opus 동시 ≤2 (+Lead=3): Stage2 full만 parallel — Stage1↔2↔3은 의존 사슬이라 순차.
+//   budget 가드: 해당 없음 — 분기 상한 고정 1-4 call (§12 단서).
+//   ⚠️ **impl-quality 배선 복구 (2026-08-10)**: agent-team-guide §팀 구성이 code-* 실질 워커를
+//     review-arch·impl-quality·review-correctness로 정의하나 Wave 3 전환 시 arch만 배선됐다
+//     (구 주석 "S4 결정 — 미포함 기본값", 근거 문서 미추적). 대조군 plan-collaborative는 정의된 5개 전수 스폰.
+//     impl-quality의 "Codebase Pattern Consistency" 부재로 형제 슬롯 비대칭이 무방비였다
+//     [verified: TVG-4099 R8 — promotion-ledger L-13]. review-correctness/memory-curator는 여전히 Lead 경로.
 
 export const meta = {
   name: 'code-pair',
-  description: 'fz-code/fz-fix 구현 페어 — impl changeset(JSON, 디스크 미수정) → 조건부 arch 검토 → 수정. Step당 1 invoke, Lead가 적용+빌드. 1-3 call',
+  description: 'fz-code/fz-fix 구현 페어 — impl changeset(JSON, 디스크 미수정) → 조건부 검토(full: arch+quality 병렬) → 수정. Step당 1 invoke, Lead가 적용+빌드. 1-4 call',
 }
 
 const ChangesetSchema = {
@@ -162,17 +166,50 @@ const actualNewBodyLines = (Array.isArray(changeset.files) ? changeset.files : [
     : 0), 0)
 if (actualNewBodyLines > SPLIT_THRESHOLD) log(`WARN changeset ~${actualNewBodyLines}줄 > ${SPLIT_THRESHOLD} — 위험 구간 근접, 차기 Step 분할 고려`)
 
-// ════════ Stage 2: 아키 검토 (조건부 — full: 항상 / light: complexity>=3 또는 누락) ════════
+// ════════ Stage 2: 검토 (조건부 — full: arch+quality 병렬 2렌즈 / light: complexity>=3일 때 arch 단독) ════════
+// ⚠️ 배선 복구 (2026-08-10): agent-team-guide §팀 구성이 code-* 실질 워커를 review-arch·impl-quality·review-correctness로
+//   정의하나 Wave 3 전환 시 arch만 배선됐다("S4 결정 — 미포함 기본값", 근거 문서 미추적). 대조군 plan-collaborative는
+//   정의된 5개를 전수 스폰. impl-quality의 "Codebase Pattern Consistency"(기존 구현과 비교·패턴 충돌 확인)가
+//   부재해 형제 슬롯 비대칭이 무방비였다 [verified: TVG-4099 R8 — promotion-ledger L-13].
+//   full만 추가(light는 비용 유지). opus 동시 ≤2 (+Lead=3) — governance 상한 내.
 let review = null
 const c = input.stepSpec.complexity
 const needReview = input.mode === 'full' || (typeof c === 'number' ? c >= 3 : (log('NOTE complexity 누락 — 안전 default로 review 포함'), true))
 if (needReview) {
-  phase('Stage 2: 아키 검토')
-  review = await callAgent(
+  phase('Stage 2: 검토')
+  const archPrompt =
     `${OVERRIDE}\n[역할] 아키텍처 검토자(review-arch 렌즈)\n${STEP}\n[changeset] ${JSON.stringify(changeset)}\n` +
-    `[목표] changeset의 아키 위반·패턴 불일치·exact syntax 결함(의사코드 잔존 등) 검토. 이슈는 id(R1...) + 실측 인용.`,
-    { label: 'stage2-review', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewSchema })
-  if (!review) log('WARN stage2 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)')
+    `[목표] changeset의 아키 위반·패턴 불일치·exact syntax 결함(의사코드 잔존 등) 검토. 이슈는 id(R1...) + 실측 인용.`
+
+  if (input.mode === 'full') {
+    // 병렬 2렌즈 — 서로 다른 질문(아키 적합성 vs 코드베이스 패턴 일관성). 같은 질문 중복 금지.
+    const [archReview, qualityReview] = await parallel([
+      () => callAgent(archPrompt,
+        { label: 'stage2-review-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewSchema }),
+      () => callAgent(
+        `${OVERRIDE}\n[역할] 구현 품질 검토자(impl-quality 렌즈)\n${STEP}\n[changeset] ${JSON.stringify(changeset)}\n` +
+        `[목표] Codebase Pattern Consistency — 이 편집이 **놓인 자리**가 일관적인지 본다.\n` +
+        ` (a) 편집 라인이 동종 슬롯(같은 switch case 절·리터럴 컬렉션·연속 동종 프로퍼티)에 속하면 형제를 읽고 표현 방식 대조\n` +
+        `     — 상수 vs 리터럴 / 헬퍼 vs 인라인 / 네이밍. ⛔ 형제가 애초에 불균일하면 보고 금지(오탐).\n` +
+        `     ⛔ 접근수준·소유권은 소비처가 결정 → 이 렌즈에서 제외.\n` +
+        ` (b) 기존 코드베이스의 유사 구현과 비교, 새 패턴 도입 시 기존 패턴과의 충돌.\n` +
+        `이슈는 id(Q1...) + 실측 인용. 표현 차이가 **의미 차이**를 반영하면 이슈 아님.`,
+        { label: 'stage2-review-quality', agentType: 'fz:impl-quality', model: 'opus', effort: 'xhigh', schema: ReviewSchema }),
+    ])
+    // 하류 계약 보존: review는 단일 객체로 병합 (s2 완주 판정 / Stage3 조건 / residualIssues가 참조)
+    if (archReview || qualityReview) {
+      const issues = [...(archReview?.issues ?? []), ...(qualityReview?.issues ?? [])]
+      review = { verdict: issues.length > 0 ? 'issues' : 'pass', issues }
+      if (!archReview) log('WARN stage2 arch null — quality 단독 결과로 진행')
+      if (!qualityReview) log('WARN stage2 quality null — arch 단독 결과로 진행')
+    } else {
+      log('WARN stage2 양 렌즈 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)')
+    }
+  } else {
+    review = await callAgent(archPrompt,
+      { label: 'stage2-review', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewSchema })
+    if (!review) log('WARN stage2 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)')
+  }
 } else {
   log(`light + complexity ${c} < 3 — review 생략`)
 }
