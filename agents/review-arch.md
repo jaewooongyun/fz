@@ -4,7 +4,7 @@ description: >-
   아키텍처 결정 + 레이어 위반 리뷰 에이전트. 설계 결정과 확장성 평가.
 model: sonnet
 # 승격: review 도메인 (fz-review, fz-peer-review)에서 opus로 승격 (Primary Worker)
-tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview, mcp__context7__query-docs
 memory: project
 skills:
   - arch-critic

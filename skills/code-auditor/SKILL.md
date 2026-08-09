@@ -171,6 +171,8 @@ var body: some View {
 
 ## 관점 6: Dependency Impact
 
+⛔ **본 관점은 `symbols.json` 의존이 크다** — `protocol_conformers`·`base_class_hierarchy`·`import_graph`. 파일이 없거나 프롬프트가 경로를 주지 않았으면 **관점 6은 부분 수행**이다. 그 사실을 `overall_assessment`에 *"관점 6 부분 수행 — symbols.json 미제공"*으로 명시하고 Grep 폴백으로 대체한다 (`code-auditor:174` 부분 분석 표기 패턴과 동형).
+
 ### 프로토콜 변경 파급 분석
 
 symbols.json의 `protocol_conformers` 사용:

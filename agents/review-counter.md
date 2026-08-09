@@ -59,7 +59,7 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 - Workflow 전환됨 (Wave 4): 반론은 구조화 출력(challenges/missedIssues)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 - 반론 수신 에이전트는 재검토 후 agree / maintain / challenge 응답 의무
 - 최종 합의 결과를 Lead(오케스트레이터)에게 통합 보고
-- 현재 활성 배정: fz-review (선택적 DA 패스), fz-peer-review Tier 1 Challenge 단계
+- 현재 활성 배정: fz-review `review-live.js` Stage 3, fz-peer-review `peer-review.js` **Tier 3 Stage 3** (Tier 2에는 counter 없음)
 
 ## Escalation to Lead
 - 반론이 기각되었지만 강한 근거가 있는 경우 재에스컬레이션
