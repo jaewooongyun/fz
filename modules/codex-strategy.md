@@ -7,6 +7,18 @@
 > - **Diff 크기 정책**: Context Rot (Chroma Research, 18 frontier models) [verified: empirical study] — focused 300 tokens > unfocused 113K tokens. Small (<2000) full diff / Medium (2000-8000) file-split / Large (>8000) key files + summary
 > - **CLI Mode 라우팅**: Codex CLI Changelog 0.124.0 (OpenAI 2026-04-23) [verified: official] — Hybrid mode (0.118.0+ Plugin + CLI fallback), gpt-5.5 (0.124.0+)
 
+## 목차
+
+- [Base Branch 결정](#base-branch-결정)
+- [Reasoning Effort 전략 (사용자 명시 호출 기반)](#reasoning-effort-전략-사용자-명시-호출-기반)
+- [Diff 크기 적응 전략](#diff-크기-적응-전략)
+- [장기 불능 인지 (기간 조건부)](#장기-불능-인지-기간-조건부)
+- [CLI 모드 선택 전략 (0.124.0+, Hybrid)](#cli-모드-선택-전략-01240-hybrid)
+- [Sandbox Permissions](#sandbox-permissions)
+- [GPT-5.5 Preamble 표준 (Cnew-3, 2026-05-16)](#gpt-55-preamble-표준-cnew-3-2026-05-16)
+
+---
+
 ## Base Branch 결정
 
 review, final 서브커맨드에서 `--base` 브랜치가 필요합니다.

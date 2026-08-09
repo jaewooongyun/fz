@@ -40,9 +40,9 @@ cd "$GIT_ROOT" && codex exec review \
 fz-plan의 Phase 2. **`codex exec` + `--output-schema` 사용.**
 
 ```bash
-SKILL_NAME=$(get_codex_skill "architect")
-if [ -n "$SKILL_NAME" ]; then
-  SKILL_PROMPT="$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)"
+SKILL_PATH=$(get_codex_skill_path "architect" "$FZ_PLUGIN_ROOT")
+if [ -n "$SKILL_PATH" ]; then
+  SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
   SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."
 fi
@@ -88,9 +88,9 @@ codex exec \
 fz-review의 Phase 5.5. **`codex exec` + `--output-schema` 사용.**
 
 ```bash
-SKILL_NAME=$(get_codex_skill "guardian")
-if [ -n "$SKILL_NAME" ]; then
-  SKILL_PROMPT="$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)"
+SKILL_PATH=$(get_codex_skill_path "guardian" "$FZ_PLUGIN_ROOT")
+if [ -n "$SKILL_PATH" ]; then
+  SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
   SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."
 fi
@@ -119,13 +119,13 @@ codex exec \
 **/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.
 
 ```bash
-SEARCHER_SKILL=$(get_codex_skill "searcher")
-if [ -n "$SEARCHER_SKILL" ] && [ -z "$AFFECTED_SYMBOLS" ]; then
+SEARCHER_SKILL_PATH=$(get_codex_skill_path "searcher" "$FZ_PLUGIN_ROOT")
+if [ -n "$SEARCHER_SKILL_PATH" ] && [ -z "$AFFECTED_SYMBOLS" ]; then
   codex exec \
     -c model_reasoning_effort=high \
     --sandbox read-only \
     -C "$GIT_ROOT" \
-    "$(cat ~/.codex/skills/${SEARCHER_SKILL}/SKILL.md)
+    "$(cat "${SEARCHER_SKILL_PATH}")
 
      아래 변경 대상의 영향 심볼과 의존성 체인을 탐색하라.
      ## 변경 대상
@@ -168,13 +168,13 @@ cd "$GIT_ROOT" && codex exec review \
 **/fz-fixer 연결**: 리뷰 결과에 수정 제안이 포함된 경우(issues with suggestion 필드 비어있지 않음), /fz-fixer 스킬을 참조하여 수정 전략을 제시한다.
 
 ```bash
-FIXER_SKILL=$(get_codex_skill "fixer")
-if [ -n "$FIXER_SKILL" ] && [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
+FIXER_SKILL_PATH=$(get_codex_skill_path "fixer" "$FZ_PLUGIN_ROOT")
+if [ -n "$FIXER_SKILL_PATH" ] && [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
   codex exec \
     -c model_reasoning_effort=high \
     --sandbox read-only \
     -C "$GIT_ROOT" \
-    "$(cat ~/.codex/skills/${FIXER_SKILL}/SKILL.md)
+    "$(cat "${FIXER_SKILL_PATH}")
 
      위 리뷰 결과에서 수정이 필요한 이슈에 대해 Root Cause와 Fix Strategy를 제시하라.
      ## 이슈 목록
