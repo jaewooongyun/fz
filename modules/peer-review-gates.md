@@ -365,6 +365,24 @@ GOOD (Gate 4.9 적용):
 
 ---
 
+## Session-added Assets Application (Checkpoint 직전)
+
+> `modules/review-checks.md` 검증 4-O(fz-review)에서 이식. ⛔ 새 게이트가 아니다 — Checkpoint 절차의 한 항목이다.
+> ⚠️ *[candidate: evidence 1 session. 활성 강제 X — 5 sessions 후 결정]*
+
+**발동**: 이 세션에서 메모리·스킬·가이드·모듈을 **추가 또는 수정**한 경우.
+
+```
+1. 본 세션에서 추가/수정한 자산 목록화 (memory/feedback_*.md · SKILL.md · modules/*.md · guides/*.md)
+2. 각 자산이 명시하는 검증 항목을 이번 리뷰에 실제 적용했는지 확인
+3. 미적용 → **관찰 기록** `missed_session_asset` — ⛔ **severity를 부여하지 않는다.** Lead가 작성만 하고 적용 안 한 사실을 리포트 "관찰 사항"에 남긴다
+```
+
+⛔ **severity 미부여 이유**: 이 항목은 표본 1건 candidate다. severity를 붙이면 `major`가 verdict에 반영되어 **"활성 강제 X"라고 선언한 규칙이 즉시 판정을 바꾼다** — `guides/prompt-optimization.md §4`의 "체크리스트 행 추가 반사" 안티패턴이다. 5 sessions 관측 후 승격 시 비로소 severity를 논한다.
+
+왜: 자산을 만드는 것과 그 자산으로 자기 작업을 검증하는 것은 **비대칭**이다. 작성이 적용을 보장하지 않는다.
+⛔ 이 검사는 *이번 세션에 추가된* 자산만 본다 — 이전 세션의 자산 미적용은 대상이 아니다(그건 해당 자산 자체의 트리거 소관).
+
 ## Checkpoint (Gates 완료 후)
 
 게이트 실행 완료 후 반드시 파일로 저장:

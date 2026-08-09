@@ -359,8 +359,7 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 투표 로직:
 ├─ 3/3 동의: final = avg × 0.85 → INCLUDE
 │   └─ ⚠️ 3/3 동의는 신뢰를 증폭하지 않고 오히려 0.85로 할인한다.
-│      동일 Gather 데이터를 공유하면 같은 오류에 전원 동의한다.
-│      → "3/3 동의" 시 Fact Verification Gate 재확인 권장.
+│      동일 Gather 데이터를 공유하면 같은 오류에 전원 동의한다 → ⛔ **Fact Verification Gate 재확인.**
 ├─ 2/3 동의: final = avg × 0.9 → INCLUDE (소수 의견 주석)
 │   └─ 소수 반박이 있으면 해당 에이전트의 근거를 우선 검토
 ├─ 1/3 동의: final = avg × 0.6 → ≥70 INCLUDE, <70 EXCLUDE
