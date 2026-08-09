@@ -3,6 +3,17 @@
 > Plan 단계에서 Swift/iOS 안티패턴을 사전 차단하는 inventory.
 > fz-plan Phase 1.5에서 참조한다 (Level 3 — 필요 시 Read).
 
+## 목차
+
+- [발동 조건](#발동-조건)
+- [행동 원칙 (원칙+이유 형태)](#행동-원칙-원칙이유-형태)
+- [Gate (fz-plan Phase 1.5에서 사용)](#gate-fz-plan-phase-15에서-사용)
+- [검증 명령 (외부 grep용)](#검증-명령-외부-grep용)
+- [Catch Rate Threshold (UC-9, v4.7.1)](#catch-rate-threshold-uc-9-v471)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## 발동 조건
 
 CLAUDE.md `## Architecture`가 Swift/iOS 프로젝트 + Plan에 다음 중 하나 포함 시 필수:

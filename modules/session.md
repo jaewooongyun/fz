@@ -2,6 +2,18 @@
 
 > fz- 스킬의 세션 관리 및 Issue Tracker 공통 모듈. 프로젝트 무관 범용.
 
+## 목차
+
+- [세션 관리 — Serena Memory 활용 (Primary)](#세션-관리--serena-memory-활용-primary)
+- [세션 자동 감지 (Bash Fallback)](#세션-자동-감지-bash-fallback)
+- [이슈 상태 머신](#이슈-상태-머신)
+- [이슈 관리 (Bash)](#이슈-관리-bash)
+- [관련 스키마](#관련-스키마)
+- [참조 스킬](#참조-스킬)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## 세션 관리 — Serena Memory 활용 (Primary)
 
 > MCP First: Serena memory를 세션 저장소로 사용.

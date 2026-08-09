@@ -4,6 +4,20 @@
 > CLAUDE.md `## Architecture` 또는 코드베이스에서 감지된 기준으로 판단.
 > 플러그인은 글로벌 설치 (`~/.claude/plugins/`). 프로젝트에 해당 플러그인이 있을 때만 참조.
 
+## 목차
+
+- [활용 원칙](#활용-원칙)
+- [iOS/Swift (Swift, SwiftUI, RIBs 프로젝트)](#iosswift-swift-swiftui-ribs-프로젝트)
+- [자동 감지 트리거](#자동-감지-트리거)
+- [역방향 감지 트리거 (부재 패턴)](#역방향-감지-트리거-부재-패턴)
+- [SwiftUI Expert](#swiftui-expert)
+- [Swift Concurrency](#swift-concurrency)
+- [참조 스킬](#참조-스킬)
+- [Codex 스킬용 iOS 지식 임베딩 원칙](#codex-스킬용-ios-지식-임베딩-원칙)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## 활용 원칙
 
 1. 플러그인은 Claude가 자동 로드 — 스킬에서 플러그인 내용을 반복하지 않는다

@@ -2,6 +2,21 @@
 
 > MEMORY.md + topic file 관리 정책. 모든 fz-* 스킬이 교훈 저장/회상 시 참조.
 
+## 목차
+
+- [MEMORY.md 구조 규칙](#memorymd-구조-규칙)
+- [Topic File 네이밍 컨벤션](#topic-file-네이밍-컨벤션)
+- [Write Policy](#write-policy)
+- [Lesson Intake Decision Tree](#lesson-intake-decision-tree)
+- [Tagging Convention](#tagging-convention)
+- [Staleness Policy](#staleness-policy)
+- [L1 ↔ L2 ↔ L3 경계](#l1--l2--l3-경계)
+- [참조 스킬](#참조-스킬)
+- [Claude Memory tool과의 관계](#claude-memory-tool과의-관계)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## MEMORY.md 구조 규칙
 
 - **역할**: 인덱스 + 핵심 사실 요약 (상세는 topic file로 분리)

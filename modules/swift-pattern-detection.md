@@ -3,6 +3,17 @@
 > Code 구현 시작 전 plan을 스캔하여 Swift/iOS 안티패턴 trigger를 사전 감지하는 모듈.
 > fz-code Phase 0.5에서 참조한다 (Level 3 — 필요 시 Read).
 
+## 목차
+
+- [발동 조건](#발동-조건)
+- [행동 원칙 (원칙+이유 형태)](#행동-원칙-원칙이유-형태)
+- [Gate (fz-code Phase 0.5에서 사용)](#gate-fz-code-phase-05에서-사용)
+- [발동 결과 기록](#발동-결과-기록)
+- [검증 명령 (외부 grep용)](#검증-명령-외부-grep용)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## 발동 조건
 
 CLAUDE.md `## Architecture`가 Swift/iOS 프로젝트 + plan-final.md / plan-v*.md에 다음 trigger 중 하나 발견 시 활성:

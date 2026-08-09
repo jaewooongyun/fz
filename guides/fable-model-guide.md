@@ -168,7 +168,8 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 
 ## 5. fz 생태계 적용 전략
 
-> ⛔ 이 섹션은 **권고**다. model-strategy frontmatter · workflows/*.js 모델 변경 등 동작 변경은 비용 영향(2배)이 있으므로 별도 합의 후 적용한다.
+> ⛔ 이 섹션은 **권고**다. `workflows/*.js` `opts.model` 변경 등 동작 변경은 비용 영향(2배)이 있으므로 별도 합의 후 적용한다.
+> ⛔ **본 §5가 opus 동시 상한의 정본이다** (`modules/governance.md` § Truth-of-Source 지정). 모델 배정 정본은 `workflows/*.js` `opts.model` — 스킬 YAML `model-strategy`는 2026-08-09 제거(런타임 효과 0).
 
 ### 모델 전략 옵션 (4-axes)
 

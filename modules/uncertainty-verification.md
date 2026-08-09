@@ -4,6 +4,19 @@
 > 참조: guides/harness-engineering.md — Adapters, Guardrails, State Semantics
 > 적용: v3.8 — Transformation Spec 경로에서만 (Pilot). 효과 확인 후 확장.
 
+## 목차
+
+- [Default-Deny 원칙](#default-deny-원칙)
+- [Verification Cost Tiers](#verification-cost-tiers)
+- [Swift/iOS Domain Tier (도메인 specific 강화)](#swiftios-domain-tier-도메인-specific-강화)
+- [Evidence Source Priority](#evidence-source-priority)
+- [Verification Protocol (Heavy)](#verification-protocol-heavy)
+- [Context7 활용 (확장)](#context7-활용-확장)
+- [Memory Feedback Loop](#memory-feedback-loop)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## Default-Deny 원칙
 
 다음 영역의 기술적 주장에 `[verified: source]` 태그가 **없으면 자동 unverified**:

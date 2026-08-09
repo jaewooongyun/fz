@@ -3,6 +3,18 @@
 > 코드 변환(Before→After)이 포함된 작업에서 **동작 동등성 + 구조 품질**을 검증하는 공유 모듈.
 > 참조: fz-plan(Spec 작성), fz-code(BEC 검증), fz-review(Spec 준수), fz-fix(패턴 변환), fz-peer-review(외부 PR)
 
+## 목차
+
+- [트리거 조건](#트리거-조건)
+- [Transformation Spec (v3.8)](#transformation-spec-v38)
+- [Zero-Exception Thread Rule (기본값)](#zero-exception-thread-rule-기본값)
+- [검증 체크리스트](#검증-체크리스트)
+- [Swift 변환 규칙](#swift-변환-규칙)
+- [마찰 신호 (fz-code, fz-fix 공통)](#마찰-신호-fz-code-fz-fix-공통)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## 트리거 조건
 
 - 비동기 패턴 변환 (PromiseKit→async/await, Combine→async, callback→async)

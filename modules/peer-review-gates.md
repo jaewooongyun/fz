@@ -3,6 +3,23 @@
 Synthesize 단계에서 실행하는 9가지 검증 게이트.
 4.4 → 4.4-A → 4.5 → 4.6 → 4.6.5 → 4.7 → 4.7-A (+ Origin Verification) → 4.8 → 4.9 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
 
+## 목차
+
+- [Module Role (UC-12, v4.7.1)](#module-role-uc-12-v471)
+- [Gate 4.4: Factual Claim Verification (Major+ 이슈)](#gate-44-factual-claim-verification-major-이슈)
+- [Gate 4.4-A: Mapping Fidelity Gate (refactoring PR, v4.4.0)](#gate-44-a-mapping-fidelity-gate-refactoring-pr-v440)
+- [Gate 4.5: Line Verification (Major 이슈만)](#gate-45-line-verification-major-이슈만)
+- [Gate 4.6: Compiler-Verifiable Claim Gate](#gate-46-compiler-verifiable-claim-gate)
+- [Gate 4.6.5: Inheritance Chain Impact Gate](#gate-465-inheritance-chain-impact-gate)
+- [Gate 4.7: Behavior-Verifiable Claim Gate](#gate-47-behavior-verifiable-claim-gate)
+- [Gate 4.7-A: Deleted Logic Migration Check](#gate-47-a-deleted-logic-migration-check)
+- [Gate 4.8: Reactive Error Path Gate (RxSwift/Combine)](#gate-48-reactive-error-path-gate-rxswiftcombine)
+- [Gate 4.9: Call-site & Convention Verification](#gate-49-call-site--convention-verification)
+- [Session-added Assets Application (Checkpoint 직전)](#session-added-assets-application-checkpoint-직전)
+- [Checkpoint (Gates 완료 후)](#checkpoint-gates-완료-후)
+
+---
+
 ## Module Role (UC-12, v4.7.1)
 
 - **Role**: **Consumer** (evidence 기반 gate 운영)
