@@ -10,15 +10,11 @@ allowed-tools: >-
   mcp__serena__write_memory,
   mcp__serena__read_memory,
   Bash(codex *), Read, Grep
-composable: true
 provides: [verification]
 needs: [none]
 intent-triggers:
   - "codex|교차검증|GPT"
   - "codex|cross-validate|verify with codex"
-model-strategy:
-  main: null
-  verifier: sonnet
 ---
 
 # /fz-codex - Codex 상호검증 스킬 (Hybrid)
@@ -55,7 +51,7 @@ model-strategy:
 | 모듈 | 용도 |
 |------|------|
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
-| modules/cross-validation.md | 검증 게이트, get_codex_skill() 3-Tier 디스커버리, GIT_ROOT 추출 |
+| modules/cross-validation.md | 검증 게이트, get_codex_skill_path() 3-Tier 디스커버리, GIT_ROOT 추출 |
 
 ## GIT_ROOT 추출
 
@@ -63,7 +59,7 @@ model-strategy:
 
 ## Codex 스킬 3-Tier 디스커버리
 
-> 3-Tier 디스커버리 정의: `modules/cross-validation.md § get_codex_skill()` 참조.
+> 3-Tier 디스커버리 정의: `modules/cross-validation.md § get_codex_skill_path()` 참조.
 
 역할 기반 동적 결정: Tier 1(CLAUDE.md `## Codex Skills` 테이블) → Tier 2(글로벌 `fz-*`) → Tier 3(인라인 프롬프트).
 
@@ -93,19 +89,19 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 | 서브커맨드 | 역할 | 스킬 | 연결 방식 |
 |-----------|------|------|----------|
 | review, check, final, commit | reviewer | fz-reviewer | `codex exec review` — 스킬 자동 트리거 + `--json`/`-o` 구조화 출력 |
-| verify | architect | fz-architect | `codex exec` + `get_codex_skill("architect")` |
-| validate | guardian | fz-guardian | `codex exec` + `get_codex_skill("guardian")` |
-| final (DA 패스) | challenger | fz-challenger | `codex exec` + `get_codex_skill("challenger")` — major 이상 이슈 발견 시 |
-| verify/validate (탐색 보조) | searcher | fz-searcher | `codex exec` + `get_codex_skill("searcher")` — 심볼 탐색 필요 시 |
-| check (수정 제안) | fixer | fz-fixer | `codex exec` + `get_codex_skill("fixer")` — fixable 이슈 존재 시 |
-| drift | drift | fz-drift | `codex exec` + `get_codex_skill("drift")` — 전체 스캔 |
-| plan | planner | fz-planner | `codex exec` + `get_codex_skill("planner")` — 독립 플랜, xhigh effort |
+| verify | architect | fz-architect | `codex exec` + `get_codex_skill_path("architect")` |
+| validate | guardian | fz-guardian | `codex exec` + `get_codex_skill_path("guardian")` |
+| final (DA 패스) | challenger | fz-challenger | `codex exec` + `get_codex_skill_path("challenger")` — major 이상 이슈 발견 시 |
+| verify/validate (탐색 보조) | searcher | fz-searcher | `codex exec` + `get_codex_skill_path("searcher")` — 심볼 탐색 필요 시 |
+| check (수정 제안) | fixer | fz-fixer | `codex exec` + `get_codex_skill_path("fixer")` — fixable 이슈 존재 시 |
+| drift | drift | fz-drift | `codex exec` + `get_codex_skill_path("drift")` — 전체 스캔 |
+| plan | planner | fz-planner | `codex exec` + `get_codex_skill_path("planner")` — 독립 플랜, xhigh effort |
 
 스킬 위치: `~/.codex/skills/` (3-Tier 디스커버리로 결정)
 
 ## 팀 에이전트 모드
 
-참조: `modules/team-core.md` -- Sub Agent 프로토콜 (`composable: true`)
+참조: `modules/team-core.md` -- Sub Agent 프로토콜. ⛔ `composable` frontmatter는 2026-08-09 제거(소비처 0) — 파이프라인 연결은 `provides`/`needs`가 결정한다
 
 ---
 
@@ -139,9 +135,16 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 
 ## ⛔ Bash 호출 Hygiene (29차/30차 교훈, 필수)
 
-> 상세: `modules/fz-codex-bash-hygiene.md` — Stdin 닫기 (§1) / Trusted Dir (§2) / `-o` 버퍼링 (§3) / Background Task (§4) / Trust Level (§5) / Base Verification Gate (§5.5) / Standard Wrapper Template (§6)
+> 상세: `modules/fz-codex-bash-hygiene.md` — Stdin 닫기 (§1) / Trusted Dir (§2) / `-o` 버퍼링 (§3) / Background Task (§4) / Trust Level (§5) / Base Verification Gate (§5.5) / Wrapper 참조 (§6) / `--` 구분자 (§7) / **정본 호출 경로 `scripts/codex-exec.sh` (§8)**
 
-⛔ `codex exec` / `codex review`를 Bash로 호출할 때 본 모듈 *전체 준수* 의무. 미적용 시 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch.
+⛔ **`scripts/codex-exec.sh`를 경유한다** (§8) — 손 조립 금지. 스크립트가 사전 게이트(플래그 상호 배타·필수 인자·경로 실재)와 **사후 게이트(exit≠0 / 빈 출력 / **스키마 계약 위반** → 측정 실패)**를 강제한다.
+
+```bash
+scripts/codex-exec.sh review --cd "$GIT_ROOT" --out "$F" --uncommitted --effort high   # 대상=플래그만
+scripts/codex-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P --schema S     # 커스텀 지시
+```
+
+⛔ **exit 10~14 = 측정 실패**이며 "이슈 0건"이 아니다. ⛔ 게이트 3은 **스키마 계약**(required·type·enum·재귀)을 본다 — `{}`는 통과하지 못한다. ⛔ 스크립트 exit을 뒤 명령이 덮지 않게 하라. 미준수 시 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch / **인자 충돌 exit 2를 정상 결과로 오독**.
 
 ---
 
@@ -185,7 +188,7 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 
 ⛔ **Bash 호출 시 의무**: 모든 서브커맨드 호출은 `modules/fz-codex-bash-hygiene.md` 준수 (stdin close / trusted dir / Base Verification Gate / Wrapper Template).
 
-⛔ **3-Tier 디스커버리**: 각 서브커맨드는 `get_codex_skill()` (cross-validation.md)로 Codex System Skill 우선 사용 → 폴백 인라인 프롬프트.
+⛔ **3-Tier 디스커버리**: 각 서브커맨드는 `get_codex_skill_path()` (cross-validation.md)로 Codex System Skill 우선 사용 → 폴백 인라인 프롬프트.
 
 ---
 

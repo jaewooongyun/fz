@@ -45,15 +45,15 @@ fi
 **/fz-challenger DA 모드**: `final` 완료 후 major 이상 이슈가 발견되면 DA(Devil's Advocate) 패스를 추가 실행하여 false positive를 제거한다.
 
 ```bash
-CHALLENGER_SKILL=$(get_codex_skill "challenger")
-if [ -n "$CHALLENGER_SKILL" ] && [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
+CHALLENGER_SKILL_PATH=$(get_codex_skill_path "challenger" "$FZ_PLUGIN_ROOT")
+if [ -n "$CHALLENGER_SKILL_PATH" ] && [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
   codex exec \
     --output-schema schemas/codex_peer_review_schema.json \
     -c model_reasoning_effort=xhigh \
     --sandbox read-only \
     -o "$DA_REVIEW_FILE" \
     -C "$GIT_ROOT" \
-    "$(cat ~/.codex/skills/${CHALLENGER_SKILL}/SKILL.md)
+    "$(cat "${CHALLENGER_SKILL_PATH}")
 
      아래 리뷰 이슈 목록에 대해 Devil's Advocate 분석을 수행하라.
      각 이슈에 agree|challenge|supplement|reverse 판정과 근거를 제시하라.
@@ -81,10 +81,10 @@ cd "$GIT_ROOT" && codex exec review \
 /codex:adversarial-review --base "$BASE_BRANCH" --json
 
 # CLI 폴백
-SKILL_NAME=$(get_codex_skill "challenger")
+SKILL_PATH=$(get_codex_skill_path "challenger" "$FZ_PLUGIN_ROOT")
 codex exec -c model_reasoning_effort=xhigh \
   --sandbox read-only -o "$DA_REVIEW_FILE" -C "$GIT_ROOT" \
-  "$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)
+  "$(cat "${SKILL_PATH}")
    현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라."
 ```
 
@@ -93,9 +93,9 @@ codex exec -c model_reasoning_effort=xhigh \
 전체 코드베이스를 1M context로 스캔하여 아키텍처 드리프트를 감지합니다.
 
 ```bash
-SKILL_NAME=$(get_codex_skill "drift")
-if [ -n "$SKILL_NAME" ]; then
-  SKILL_PROMPT="$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)"
+SKILL_PATH=$(get_codex_skill_path "drift" "$FZ_PLUGIN_ROOT")
+if [ -n "$SKILL_PATH" ]; then
+  SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
   SKILL_PROMPT="CLAUDE.md를 읽고 아키텍처 규칙을 파악한 후, 전체 코드베이스의 레이어 위반과 RIBs 역할 위반을 감지하라."
 fi
@@ -120,9 +120,9 @@ codex exec \
 
 ```bash
 REQUIREMENTS="$1"
-SKILL_NAME=$(get_codex_skill "planner")
-if [ -n "$SKILL_NAME" ]; then
-  SKILL_PROMPT="$(cat ~/.codex/skills/${SKILL_NAME}/SKILL.md)"
+SKILL_PATH=$(get_codex_skill_path "planner" "$FZ_PLUGIN_ROOT")
+if [ -n "$SKILL_PATH" ]; then
+  SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
   SKILL_PROMPT="CLAUDE.md를 읽고 프로젝트 패턴을 파악한 후, 요구사항에 대한 독립 구현 계획을 수립하라."
 fi

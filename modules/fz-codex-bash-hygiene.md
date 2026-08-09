@@ -12,8 +12,9 @@
 - §4 Background Task 의무 영역
 - §5 ⛔ Trust Level 필수 (30차, Critical)
 - §5.5 Base Verification Gate (git diff 분석 호출 시)
-- §6 Standard Hygiene Wrapper Template (복붙용)
+- §6 Standard Hygiene Wrapper Template (복붙용 — ⛔ §8 스크립트로 대체됨)
 - §7 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자 필수)
+- §8 ⛔ **`scripts/codex-exec.sh` 경유 의무** — 사전 플래그 게이트 + 사후 측정 게이트 (본 절이 정본 호출 경로)
 
 ## 1. Stdin 닫기 의무 (`< /dev/null`)
 
@@ -121,10 +122,13 @@ if echo "$@" | grep -q -- "--base"; then
   }
 fi
 
-CHANGED_FILES=$(git -C "$WORK_DIR" diff --name-only "${BASE:-HEAD~1}"..HEAD 2>/dev/null | head -10)
+# ⛔ 카운트는 **잘리지 않은 전체 집합**에서 센다. 표시만 자른다 (자른 목록으로 세면 카운트가 틀린다)
+CHANGED_FILES=$(git -C "$WORK_DIR" diff --name-only "${BASE:-HEAD~1}"..HEAD 2>/dev/null)
+CHANGED_COUNT=$(printf '%s\n' "$CHANGED_FILES" | grep -c . || true)
 
 echo "▶ Codex 분석 대상 — branch=$CURRENT_BRANCH commit=$HEAD_COMMIT base=${BASE:-HEAD~1}"
-echo "▶ 변경 파일 ($(echo "$CHANGED_FILES" | wc -l)개): $CHANGED_FILES"
+echo "▶ 변경 파일 ${CHANGED_COUNT}개 (앞 10개만 표시):"
+printf '%s\n' "$CHANGED_FILES" | head -10
 ```
 
 **규칙**:
@@ -135,6 +139,8 @@ echo "▶ 변경 파일 ($(echo "$CHANGED_FILES" | wc -l)개): $CHANGED_FILES"
 
 ## 6. Standard Hygiene Wrapper Template
 
+> ⛔ **본 절은 §8 `scripts/codex-exec.sh`로 대체됐다** — 아래 템플릿은 스크립트가 무엇을 하는지 읽기 위한 **참조**로 남긴다. 호출은 §8을 경유한다 (복붙 템플릿은 호출자가 붙이지 않으면 작동하지 않고, 실측상 누락이 재발했다).
+>
 > 6 hygiene rules (1-5 + 7: `--` 구분자) + zsh glob 회피 + output readback 통합.
 
 ```bash
@@ -182,6 +188,60 @@ codex exec ... -- "$(cat /tmp/codex-prompt.txt)" < /dev/null
 ```
 
 **관찰**: 에러 캡처 시 `tail` 파이프 금지(clap 에러 본문 잘림 → 진단 지연), 전체 리다이렉트(`> log 2>&1`) 사용. (2026-07-09 harness-paper 세션 실측 — SKILL.md 주입 시 재현)
+
+## 8. ⛔ `scripts/codex-exec.sh` 경유 의무 (2026-08-09 — **본 절이 정본 호출 경로**)
+
+> §1~§7을 손으로 조립하지 않는다. `guides/skill-authoring.md` §11 판정("결과가 binary(pass/fail)인가? → 스크립트")이 본 모듈 전체에 적용된다 — hygiene 규칙은 전부 binary다.
+
+**신설 근거 (실측 2건, 2026-08-09 세션)**:
+
+| 실패 | 지식은 어디 있었나 | 왜 안 막혔나 |
+|---|---|---|
+`codex exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-codex-subcommands-core.md:36`이 "함께 주면 인자 충돌"을 이미 명시 | 산문 경고는 **호출 시점에 읽혀야** 작동한다. 호출자가 §6 템플릿을 붙이지 않고 손으로 조립했다 |
+래퍼가 `codex exit=2`를 **0으로 보고** | — (규칙 자체가 없었다) | 마지막 문장(`wc \|\| echo`)의 exit이 태스크 exit으로 올라갔다. §1~§7에 **사후 검증 규칙이 없다** |
+
+⛔ 두 번째가 더 위험하다: **측정 실패가 "이슈 0건"으로 읽힌다.** exit≠0 / 빈 출력은 *깨끗한 리뷰*가 아니라 *리뷰 부재*다.
+
+### 인터페이스
+
+```bash
+# review: 대상 선택은 플래그로만 (PROMPT 불가 — 스크립트가 거부한다)
+scripts/codex-exec.sh review --cd "$GIT_ROOT" --out "$F" --uncommitted [--effort high] [--schema S] [--title T] [--ephemeral]
+scripts/codex-exec.sh review --cd "$GIT_ROOT" --out "$F" --base develop [--add-dir D]
+
+# exec: 커스텀 지시가 필요할 때 (diff는 프롬프트에 인라인 — 스코프 플래그 금지)
+scripts/codex-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S]
+```
+
+### 사전 게이트 (호출 전 거부)
+
+1. **플래그 상호 배타** — `review` + `--prompt-file` → exit 10. `exec` + `--base/--uncommitted/--commit` → exit 10
+2. **필수 인자** — `review`는 스코프 1개 필수 · `exec`는 `--prompt-file` 필수 · 양쪽 `--cd`/`--out` 필수
+3. **경로 실재** — `--cd` 디렉토리 · 프롬프트·스키마 파일 비어있지 않음 · `codex` 설치 (exit 11)
+4. **trust_level** — 미설정 시 경고(§5). ⛔ 차단은 아니다 — inline override 경로가 있다
+5. **git repo 판정** → `--skip-git-repo-check` 자동 부착(§2)
+6. **값 옵션 arity** — 값 없는 `--cd`/`--out`/… → exit 10 (⛔ 없으면 `set -u`가 exit **1**로 죽어 문서와 어긋난다)
+7. **스코프 단일성** — `--base`/`--uncommitted`/`--commit` 중복 지정 → exit 10 (배열로 보관해 단어분할·glob 차단)
+8. **§5.5 Base Verification Gate 내장** — ⛔ **`review` 모드 + git repo 일 때만 발동한다.** `exec` 모드는 diff를 프롬프트에 인라인하므로 게이트가 적용되지 않는다 → **호출자가 분석 기준(branch·HEAD·대상 집합)을 프롬프트에 직접 명시할 의무**가 있다 (3라운드 감사 ISSUE-011). ⛔ `--expected-branch` 는 **옵션**이다 — 정본 모듈이 주입을 요구하므로 호출자가 명시해야 하며, 미지정 시 브랜치 검증은 수행되지 않는다. ⛔ `--commit` 의 merge 커밋은 `show --name-only`가 부모 선택에 따라 달라진다 — 정확한 대상이 필요하면 `--base` 를 쓴다.
+   나머지 보장: — `review` + git repo일 때: branch·HEAD 출력 · `--expected-branch` 불일치 → exit 11 · `--base`는 `rev-parse --verify` + **`merge-base --is-ancestor`**(⛔ `merge-base A B`는 공통조상 존재만 증명) · 스코프별 변경 파일 집합 **분리 산출** + ⛔ **잘리기 전에 카운트**
+
+### 사후 게이트 (결과 해석 전 — 신설분)
+
+| 순서 | 검사 | 실패 시 exit | 의미 |
+|:--:|---|:--:|---|
+| 1 | `codex` 종료코드 == 0 | **12** | 측정 실패 |
+| 2 | `-o` 파일 존재 + 비어있지 않음 | **13** | 측정 실패 |
+| 3 | `--schema` 지정 시 **스키마 계약** 충족 (`scripts/validate-codex-output.py`) | **14** | 측정 실패 |
+
+⛔ 게이트 3은 **문법이 아니라 계약**을 본다 — required·type·enum·`additionalProperties`·`$ref`를 재귀 검사한다. 1차 구현은 `json.load` 성공만 봐서 **`{}` 가 `GATE-PASS issues=0` 으로 통과**했다(감사 ISSUE-013). ⛔ `jsonschema` 부재(실측)로 표준 라이브러리 부분집합 구현 — 미지원 키워드(oneOf/allOf/pattern 등)는 검사하지 않고 통과시키며 그 범위를 스크립트 docstring에 명시한다.
+
+- 통과 시 `GATE-PASS json_ok issues=N verdict=V` (또는 `text_ok bytes=N`)를 **stdout에 출력**한다 — 호출자가 결과 유효성을 눈으로 확인할 수 있다
+- ⛔ **exit 10~14는 전부 측정 실패다** — "이슈 0건"·"승인"으로 해석 금지. 실패 시 `${OUT}.stream.log`를 Read
+- ⛔ 호출자는 스크립트 exit을 **마지막 문장으로 두거나 변수에 담아라** — 뒤에 `wc`/`echo`를 붙이면 그 exit이 덮는다 (본 절 신설을 유발한 실패)
+
+### 검증 상태 (양성 대조 — 2026-08-09 실측)
+
+사전 게이트 8종 전부 발화(exit 10×6 / 11×2) + 성공 경로 `GATE-PASS text_ok` exit 0. ⛔ 통과만 확인한 게이트는 무용하므로 **발화 가능성**을 함께 실측했다 (`modules/cross-validation.md` §Negative-Result Gate).
 
 ---
 
