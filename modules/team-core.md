@@ -1,8 +1,29 @@
 # Team Core Protocol
 
-> ⛔ **TEAM 일몰 (Wave 4)**: TeamCreate+SendMessage 실행 경로는 전면 네이티브 Workflow로 대체됨. 본 모듈은 이제 (a) `mode:'fallback'` 시 SOLO 협업 프로토콜 참조 (b) 패턴 라운드 의미론의 역사적 출처로만 유지된다. 실 실행 규약은 `guides/skill-authoring.md` §12 + `workflows/*.js`.
+> ⛔⛔ **본 모듈은 역사적 기록이다 — 실행 절차로 참조하지 않는다** (2026-08-09 강등).
 >
-> 공통 모듈 (2.5-Turn Protocol + 절대 규칙 + 모델 전략 — SOLO 폴백/의미론 참조용).
+> **왜**: 이전 판은 *"`mode:'fallback'` 시 SOLO 협업 프로토콜 참조"* 라고 적었고 5개 스킬이 이 모듈을 폴백 절차로 지목했다. 그런데 본문은 `TeamCreate`·`SendMessage`·`shutdown_request`·`TeamDelete` P2P 절차이고 **이 도구들은 v2.1.178부터 존재하지 않는다** — SOLO에는 에이전트도 없다. 즉 **실행 불가능한 것을 폴백으로 지목한 상태**였다.
+> 실측: 워크플로 실패는 2회 발생했고(`experiment-log.md` §5.7 fz-code #1 · fz-review #8) **두 번 다 재invoke·resume으로 복구**됐다. 본 모듈이 사용된 기록은 **0건**이다.
+>
+> ✅ **실패 복구 정본** = `guides/skill-authoring.md` §12 **실패 복구 사다리**(L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션)
+> ✅ **실 실행 규약** = `guides/skill-authoring.md` §12 + `workflows/*.js`
+> 📚 본 모듈의 잔존 가치: 2.5-Turn Protocol·라운드 의미론의 **설계 출처**(patterns/*.md와 함께) — 새 통신 패턴을 설계할 때 참고.
+
+---
+
+## 목차
+
+- [절대 규칙](#절대-규칙)
+- [파이프라인 간 Handoff Brief](#파이프라인-간-handoff-brief)
+- [2.5-Turn Protocol](#25-turn-protocol)
+- [Session 계층 관리 전략](#session-계층-관리-전략)
+- [모델 전략](#모델-전략)
+- [MCP 접근성](#mcp-접근성)
+- [Agent Frontmatter 고급 필드](#agent-frontmatter-고급-필드)
+- [팀 생성 절차](#팀-생성-절차)
+- [패턴 파일 참조](#패턴-파일-참조)
+- [참조 스킬](#참조-스킬)
+- [설계 원칙](#설계-원칙)
 
 ---
 

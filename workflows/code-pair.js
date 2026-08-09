@@ -8,7 +8,7 @@
 //       estimatedNewBodyLines?: Lead 추정 총 newBody 줄수 — SPLIT_THRESHOLD(600) 초과 시 pre-flight가 스폰 전 split_required 반환(H5). 미제공 시 가드 skip(하위호환).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, residualIssues, metrics }
-//     | { mode:'fallback', reason, splitSuggested?, metrics } → Lead는 SOLO 구현 경로 수행.
+//     | { mode:'fallback', reason, splitSuggested?, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
 //     | { mode:'split_required', reason, metrics } → Lead는 Step 분할 후 재invoke.
 //   ⛔ 책임 재배분 (S0, 사용자 승인 OQ1): 에이전트는 디스크를 수정하지 않는다 — changeset JSON만 반환.
 //     Lead가 적용(replace_symbol_body/Edit) + 빌드 검증 + 다음 Step invoke. 부분 적용 후 빌드 실패 시

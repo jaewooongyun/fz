@@ -6,7 +6,7 @@
 //     args: { query, codeContext } })
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', results:[{file,line,symbol,kind,note,sources,confidence}], metrics }
-//     또는 { mode:'fallback', reason, metrics } → Lead는 SOLO 검색 경로 수행. wall-clock은 Lead 측정.
+//     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후. wall-clock은 Lead 측정.
 //
 // [설계 — modules/patterns/cross-verify.md 평탄화]
 //   Stage1 독립 병렬: search-symbolic(심볼) + search-pattern(텍스트) — Round 1 독립성 구조 보장.

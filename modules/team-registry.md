@@ -57,11 +57,11 @@
 
 ## Truth-of-Source
 
-스킬 YAML의 `team-agents` 필드가 팀 구성의 단일 진실 원천이다.
-이 레지스트리와 `patterns/*.md`는 YAML과 동기화를 유지해야 한다.
-불일치 발견 시 YAML 기준으로 나머지를 수정한다.
+⛔ **팀 구성의 단일 진실 원천은 `workflows/*.js`의 `agentType` 인자다.**
+스킬 YAML `team-agents` 필드는 **2026-08-09 제거**됐다 — Wave 4 전환 후 팀 구성을 결정하지 않는 선언(런타임 효과 0)이었다.
+본 레지스트리와 `patterns/*.md`는 **스크립트와** 동기화를 유지한다. 불일치 발견 시 **스크립트 기준**으로 나머지를 수정한다.
 
-> 참조: `modules/governance.md` — Truth-of-Source 정책
+> 참조: `modules/governance.md` — Truth-of-Source 정책 (모델 배정·팀 구성·상한·필수 필드 4항목 정본)
 
 ## 확장 가이드
 
@@ -73,7 +73,7 @@
 새 도메인 추가:
 1. 에이전트 파일 + 레지스트리 등록
 2. `patterns/` 디렉토리에 통신 패턴 파일 추가
-3. 스킬의 team-agents에 도메인 또는 에이전트 지정
+3. 해당 스킬의 `workflows/{skill}-{pattern}.js`에 `agentType: 'fz:{name}'` 스테이지 추가
 
 ## 참조 스킬
 

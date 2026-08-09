@@ -9,7 +9,7 @@
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
-//     또는 { mode:'fallback', reason, metrics } → Lead는 SOLO 리뷰 경로 수행.
+//     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
 //   Workflow 외부(Lead 책임 유지): L3 통합 / review-correctness(RTM 시 Phase 4.5) / Codex validate(Phase 5.5) / wall-clock.
 //
 // [설계 — modules/patterns/live-review.md 평탄화]
