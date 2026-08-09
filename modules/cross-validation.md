@@ -5,6 +5,33 @@
 > fz Phase 3에서 파이프라인에 검증 게이트를 자동 삽입. 모든 모드에서 최소한의 검증 보장.
 > 핵심 원칙: TEAM = Claude 에이전트(N) + Codex(1). 코드/계획 생산 TEAM에 Codex CLI 필수 참여. 탐색 파이프라인은 --deep만.
 
+## 목차
+
+- [이론 근거 — Heterogeneity + Blind-spot Complementarity (T1-E)](#이론-근거--heterogeneity--blind-spot-complementarity-t1-e)
+- [검증 유형별 전략](#검증-유형별-전략)
+- [검증 게이트 자동 삽입 규칙](#검증-게이트-자동-삽입-규칙)
+- [외부 모델 포함 원칙 (TEAM 필수)](#외부-모델-포함-원칙-team-필수)
+- [Cross-Model Verification (2-Model)](#cross-model-verification-2-model)
+- [경량 검증 게이트](#경량-검증-게이트)
+- [Reflection Rate (Authoritative Source)](#reflection-rate-authoritative-source)
+- [Gate 절차적 강제](#gate-절차적-강제)
+- [품질 에스컬레이션](#품질-에스컬레이션)
+- [검증 게이트 시각화](#검증-게이트-시각화)
+- [공유 유틸리티](#공유-유틸리티)
+- [참조 스킬](#참조-스킬)
+- [Codex 검증 결과 보존 정책](#codex-검증-결과-보존-정책)
+- [Implication Scan 게이트](#implication-scan-게이트)
+- [Follow-up Re-audit Gate (Phase B1/B2 활성 시)](#follow-up-re-audit-gate-phase-b1b2-활성-시)
+- [origin-equivalence 게이트 (revert 전용)](#origin-equivalence-게이트-revert-전용)
+- [외부 피드백 검증 (External Feedback Gate)](#외부-피드백-검증-external-feedback-gate)
+- [런타임 동작 주장 검증 (Runtime Claim Gate) [관찰 모드]](#런타임-동작-주장-검증-runtime-claim-gate-관찰-모드)
+- [SOLO 모드 검증 게이트 요약](#solo-모드-검증-게이트-요약)
+- [Coverage Gate (문서/파일 분석 전수 보장)](#coverage-gate-문서파일-분석-전수-보장)
+- [Negative-Result Gate (0건·부재 주장의 도구 유효성)](#negative-result-gate-0건부재-주장의-도구-유효성)
+- [설계 원칙](#설계-원칙)
+
+---
+
 ## 이론 근거 — Heterogeneity + Blind-spot Complementarity (T1-E)
 
 > fz의 Codex 교차 검증은 "debate / adversarial review" 프레임이 아닌 **"Self-preference bias 상쇄 + 이종 blind spot 보완 + Generator≠Evaluator 강제"** 프레임으로 이해.
@@ -65,7 +92,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | TEAM (diff에 새 타입 정의 포함 시) |
 | code-changes 생산 | SC 빌드 진단 | `/sc:troubleshoot --fix` 자동 | 빌드 2회 연속 실패 시 |
 | planning 생산 | SC 공수 추정 | `/sc:estimate --breakdown` | plan + 복잡도 4+ |
-| review 포함 | L3 결과 팀 피드백 | Lead → Primary SendMessage (team-core.md L3-to-L1) | TEAM (L3 이슈 1건+ AND Round 0.5 전) |
+| review 포함 | L3 결과 반영 | Lead가 **다음 Workflow invoke의 args/브리프에 주입** — ⛔ `SendMessage` 부재(v2.1.178~) + Workflow 워커는 1-shot이라 중간 채널 없음 | Workflow (L3 이슈 1건+, 다음 스테이지 전) |
 | code 포함 | Supporting 진행도 체크 | review-correctness → impl-correctness RTM 체크 | TEAM (3+ Step 50% 시점) |
 | review 시작 전 | Scope Expansion 검증 | plan 영향 범위 ⊇ discover 범위 확인. plan이 더 좁으면 warning | discover 산출물 존재 시 |
 | code 시작 전 | 시야 축소 감지 | plan 영향 범위 vs discover 범위 비교 → 좁으면 마찰 신호 | discover 산출물 존재 시 |
@@ -270,37 +297,80 @@ GIT_ROOT_REL=$(grep -A 5 "^## Directory Structure" CLAUDE.md 2>/dev/null | \
 GIT_ROOT="${GIT_ROOT_REL:-.}"
 ```
 
-### get_codex_skill() — 3-Tier 디스커버리
+### get_codex_skill_path() — 3-Tier 디스커버리
+
+> ⛔ **2026-08-09 계약 변경 — 이름이 아니라 `SKILL.md` 절대경로를 반환한다.**
+> 이전 판(`get_codex_skill()`)은 Tier 2b에서 **플러그인 `codex-skills/`를 확인한 뒤 이름만** 반환했는데, 호출자 8곳은 항상 `cat ~/.codex/skills/${NAME}/SKILL.md` 를 읽었다. 심볼릭이 없으면 `[ -n "$NAME" ]`가 true라 **Tier 3 generic 폴백으로 가지 않고 존재하지 않는 경로를 `cat`** 했다 — 즉 Tier 2b가 파손 상태였다.
+> 부수 정정: `BASH_SOURCE[0]` 의존 제거 — 이 함수는 **마크다운에서 인라인 복사**되어 실행되므로 `dirname "${BASH_SOURCE[0]}"`가 스크립트 위치를 가리키지 않는다. 플러그인 루트를 **인자/환경변수로 명시 전달**한다.
 
 ```bash
-get_codex_skill() {
+# usage: get_codex_skill_path <role> [plugin_root]
+#   반환: SKILL.md 절대경로 (없으면 빈 문자열 → 호출자가 Tier 3 인라인 프롬프트로 폴백)
+get_codex_skill_path() {
   local ROLE=$1
+  local PLUGIN_ROOT="${2:-${FZ_PLUGIN_ROOT:-}}"
   local PROJECT_ROOT="$(pwd)"
+
+  # Tier 1: 프로젝트 CLAUDE.md `## Codex Skills` 테이블
   local SKILL=$(grep -A 20 "^## Codex Skills" "${PROJECT_ROOT}/CLAUDE.md" 2>/dev/null | \
     grep "| $ROLE " | awk -F'|' '{print $3}' | xargs)
-  if [ -n "$SKILL" ] && [ -d "$HOME/.codex/skills/$SKILL" ]; then
-    echo "$SKILL"; return
+  if [ -n "$SKILL" ] && [ -f "$HOME/.codex/skills/$SKILL/SKILL.md" ]; then
+    echo "$HOME/.codex/skills/$SKILL/SKILL.md"; return
   fi
-  # Tier 2a: ~/.codex/skills/ (기존 설치 또는 심볼릭 링크)
-  if [ -d "$HOME/.codex/skills/fz-${ROLE}" ]; then
-    echo "fz-${ROLE}"; return
+  # Tier 2a: ~/.codex/skills/ (setup-codex-skills.sh 심볼릭 또는 기존 설치)
+  if [ -f "$HOME/.codex/skills/fz-${ROLE}/SKILL.md" ]; then
+    echo "$HOME/.codex/skills/fz-${ROLE}/SKILL.md"; return
   fi
-  # Tier 2b: codex-skills/ (플러그인 포함본 — 폴백, 심볼릭 링크 설치 시 Tier 2a에서 해결)
-  local PLUGIN_CODEX="$(cd "$(dirname "${BASH_SOURCE[0]}")/../codex-skills" 2>/dev/null && pwd)"
-  if [ -n "$PLUGIN_CODEX" ] && [ -d "$PLUGIN_CODEX/fz-${ROLE}" ]; then
-    echo "fz-${ROLE}"; return
+  # Tier 2b: 플러그인 번들본 — ⛔ 경로를 반환한다 (이름만 반환하면 호출자가 못 찾는다)
+  if [ -n "$PLUGIN_ROOT" ] && [ -f "$PLUGIN_ROOT/codex-skills/fz-${ROLE}/SKILL.md" ]; then
+    echo "$PLUGIN_ROOT/codex-skills/fz-${ROLE}/SKILL.md"; return
   fi
   echo ""
 }
 ```
 
-Tier 1: CLAUDE.md `## Codex Skills` 테이블 → Tier 2: 글로벌 `fz-*` → Tier 3: 인라인 프롬프트.
+Tier 1: CLAUDE.md `## Codex Skills` 테이블 → Tier 2a: `~/.codex/skills/` 심볼릭 → Tier 2b: 플러그인 번들 → Tier 3: 인라인 프롬프트(빈 문자열 반환).
+
+### ⛔ `FZ_PLUGIN_ROOT` 초기화 (Tier 2b 전제 — 미설정 시 Tier 2b가 성립하지 않는다)
+
+> **신설 근거 (2026-08-09 외부 감사 ISSUE-009)**: 위 함수와 8개 호출부가 `FZ_PLUGIN_ROOT`를 **소비**하는데 레포 어디에도 **할당이 없었다**(실측: 소비 10곳 / 할당 0곳). 전부 빈 문자열이 전달되어 `[ -n "$PLUGIN_ROOT" ]`가 false → **Tier 2b가 항상 건너뛰어졌다.** Tier 2b 파손을 고치려던 변경이 목표를 달성하지 못한 상태였다.
+
+⛔ **`codex exec` 호출 전에 반드시 1회 실행한다.** 절차는 **2단계**다 — ①Lead가 스크립트의 절대경로를 만들고 ②스크립트가 자기 위치에서 루트를 해석한다.
+
+⛔ **부트스트랩 순환 주의**: 셸 스니펫만으로는 해결되지 않는다. `{스킬 base directory}` 같은 토큰은 **치환되지 않는 리터럴**이라 `cd`가 실패한다 (2026-08-09 감사 ISSUE-PLAN-001). 첫 절대경로는 **Lead가 대화 컨텍스트에서** 만든다.
+
+**① Lead 절차 (셸 아님)**: 스킬 주입 헤더 `Base directory for this skill: …/skills/fz-codex` 를 읽고 `../..` 를 적용해 **플러그인 루트 절대경로**를 얻는다. 그 값으로 아래 `<PLUGIN_ROOT_ABS>` 를 채운다.
+
+**② 셸 (실행 가능)**:
+```bash
+# 자기 위치에서 루트를 해석하고 마커로 fail-closed 검증한다 (exit 2 = 루트 아님)
+FZ_PLUGIN_ROOT="$(<PLUGIN_ROOT_ABS>/scripts/resolve-plugin-root.sh)" || {
+  echo "WARN: FZ_PLUGIN_ROOT 해석 실패 — Tier 2b 불가, Tier 2a/3로만 동작" >&2
+  FZ_PLUGIN_ROOT=""
+}
+export FZ_PLUGIN_ROOT
+```
+
+- ⛔ **빈 값으로 조용히 진행하지 말 것**: 위처럼 경고를 내야 "Tier 2b를 썼다"는 오해가 생기지 않는다
+- ⛔ 스크립트는 `BASH_SOURCE[0]`을 쓴다 — `$0`은 `source` 시 **호출자**를 가리켜 오해석된다
+- ✅ Tier 2a(심볼릭)가 있으면 Tier 2b에 닿지 않으므로 미설정이 **무증상**이다 — 그래서 실측 없이는 드러나지 않았다
+- ✅ 이미 스크립트 안에서 호출하는 경우(자기 `dirname`을 아는 경우)는 ①이 불필요하다:
+  `FZ_PLUGIN_ROOT="$("$(dirname "${BASH_SOURCE[0]}")/resolve-plugin-root.sh")"`
+
+**호출 계약** (⛔ 8곳 전부 이 형태로 통일 — 할당 변수와 조건 검사 변수가 **같은 이름**이어야 한다):
+```bash
+SKILL_PATH=$(get_codex_skill_path "architect" "$FZ_PLUGIN_ROOT")
+if [ -n "$SKILL_PATH" ]; then SKILL_PROMPT="$(cat "$SKILL_PATH")"
+else SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."; fi
+```
+
+⛔ **`setup-codex-skills.sh`는 dead가 아니라 load-bearing이다** — Tier 2a를 성립시키는 심볼릭을 만드는 유일한 수단이다. 미실행 시 Tier 2b(번들 경로)로 내려가고, `PLUGIN_ROOT` 미전달이면 Tier 3로 폴백한다.
 
 ## 참조 스킬
 
 | 스킬 | 참조 이유 |
 |------|----------|
-| /fz-codex | 검증 게이트 + get_codex_skill() 3-Tier 디스커버리 |
+| /fz-codex | 검증 게이트 + `get_codex_skill_path()` 3-Tier 디스커버리 |
 | /fz | 파이프라인 검증 게이트 자동 삽입 |
 | modules/lead-reasoning.md | Implication Scan + origin-equivalence 추론 원칙 |
 | modules/system-reminders.md | Instruction fade-out 대응 트리거 정책 |
@@ -476,6 +546,49 @@ GOOD: rg X | wc -l → 11 → 잘림 없이 11줄 직접 확인 후 "사용처 1
 - [ ] scope 판정 산출물이면 기각 항목 수 명시 + 표본(≤3) adversarial 재검 + 분류 단위=site? *[candidate: 1 session evidence]*
 
 > 상시 경량 self-check Q-COVERAGE(lead-reasoning.md §3)는 본 Gate의 미러 — 어휘 변경 시 본 canonical과 동기화.
+
+---
+
+## Negative-Result Gate (0건·부재 주장의 도구 유효성)
+
+> ⛔ **`system-reminders.md` T8이 위임한 수신처다.** T8은 *"정규식 불완전(가짜 교차확인)은 Coverage Gate 검산식 담당"*이라 명시하는데 그 구현이 없었다(2026-08-09 신설). Coverage Gate가 **범위**(N개 중 M개)를 보고, 본 Gate가 **도구 유효성**을 본다.
+> 근거: 단일 세션에서 12 인스턴스 실측 — 그중 *0건 자체를 의심해서* 잡은 건 **0건**이다. 전부 외부 지적·우연한 재측정·도구 에러메시지로 발견됐다. 즉 자기 점검으로는 잡히지 않는다(`guides/harness-engineering.md` H1 자문 NO).
+
+**발동**: "0건" · "부재" · "전부" · "~뿐" 을 **산출물의 결론**으로 쓸 때.
+⛔ **면제**: 탐색 중 중간 grep. (범위를 좁히지 않으면 모든 grep에 붙어 IFScale 과부하가 된다 — Coverage Gate의 "산출물 기준" 트리거 규약과 동형)
+
+### 3요소
+
+**1. Positive control** — 동일 명령이 **반드시 매칭되는 케이스**에서 non-zero를 내는지 먼저 확인한다.
+> 0건은 「대상 부재」와 「도구 고장」을 구별하지 못한다. 도구가 작동함을 먼저 증명하라.
+
+**2. 신호 보존** — 측정 명령을 `>/dev/null 2>&1`로 감싸지 않고 **exit code를 판정에 포함**한다.
+> 스크립트의 fail-closed 거부가 0건으로 오독된다. 선례: `scripts/lint_doc_freshness.py`는 잘못된 루트에서 `⛔ 플러그인 루트가 아님`을 stderr로 내고 **exit 2**로 거부한다 — stderr를 버리면 이 거부가 "0건"이 된다.
+
+**3. 귀속 라벨** — 다중 대상 스캔 출력에 **대상 식별자**를 포함한다.
+> 라벨 없는 집계는 잘못된 사이트에 귀속된다.
+
+### 알려진 함정 (실측된 것만)
+
+| 함정 | 증상 | 기계 검출 |
+|---|---|---|
+| `grep -E` 안의 `\|` | ERE에서 alternation 아님 → **항상 0건**. ⚠️ BRE(`grep` 무옵션)의 `\|`는 정당 | `lint_contracts.py` **#N4** |
+| zsh unquoted `--include=*.md` | 글로빙되어 `no matches found` → 거짓 0건 | — (셸 세션) |
+| macOS `timeout` 부재 | 측정 도구 부재를 대상 실패로 오독 | — |
+| `awk '/A/,/B/'` 범위 | 끝 헤더에서 멈춰 **구간을 못 읽음** | — |
+| 한글/영문 표기 누락 정규식 | `Gate`만 찾고 `게이트`를 놓침 | — |
+| `>/dev/null 2>&1` + exit 무시 | fail-closed 거부를 0건으로 오독 | **#N5** |
+| CWD 의존 상대경로 | 다른 디렉토리에서 다른 결과 | **#N6** |
+
+### Gate 조건
+
+- [ ] "0건/부재/전부"가 산출물 결론에 있는가? (없으면 N/A)
+- [ ] 있으면 **positive control** 수행 + 결과 명시?
+- [ ] 측정 명령의 **exit code**를 판정에 포함? (`2`는 PASS도 SKIP도 아님)
+- [ ] 다중 대상 스캔이면 출력에 **대상 라벨** 포함?
+- [ ] 위 함정 표의 해당 항목을 점검? (기계 검출 가능분은 `lint_contracts.py`가 담당)
+
+> ⛔ **SKIP ≠ PASS**: 스크립트가 판정하지 않은 항목(THRESHOLD·SEMANTIC)은 별도 판정하고 그 사실을 보고에 남긴다.
 
 ---
 
