@@ -8,6 +8,21 @@
 - **Retired citations** (RELEASE_NOTES만 보존): 과거 릴리즈에서 인용했으나 현행 modules에서 인용 없음 — ICLR MAD (2502.08788, v3.0 release). MAST (2503.13657)는 v4.17.0에서 modules 재인용으로 active 환원
 - **정책**: retired citations는 RELEASE_NOTES에 historical reference로 보존 + CHANGELOG에 정리 사유 명시. 신규 modules에 재인용 시 active로 환원.
 
+### v4.23.1 (2026-08-10) — 배선 복구: 정의된 팀의 2/3이 안 돌고 있었다 [PATCH]
+
+> **사건**: Swift `enum` 계산 프로퍼티 `switch`에서 형제 절은 `Metric` 상수인데 한 절만 리터럴로 되돌아갔다. 외부 리뷰의 *"계획서 Descope 위반"* 지적을 Lead가 수용하며 발생. **빌드 통과 · 값 동일 · 테스트 0건**이라 자동 oracle이 전부 침묵했고 사용자가 육안으로 잡았다.
+
+- ⭐ **`code-pair` impl-quality 배선 복구 (본체)**: `agent-team-guide`가 `code-*` 실질 워커를 review-arch·**impl-quality**·review-correctness로 정의하나 Wave 3 전환에서 **arch만 배선**됐다. 대조군 `plan-collaborative`는 정의된 5개를 전수 스폰 [verified: `grep -oE "agentType: 'fz:[a-z-]+'" workflows/*.js`]. `impl-quality`의 "Codebase Pattern Consistency"가 **사건이 정확히 그 렌즈가 봤어야 할 결함**인데 스폰되지 않고 있었다. ⇒ Stage 2를 full 모드에서 **arch + quality 병렬 2렌즈**로 확장, 두 결과를 단일 `review` 객체로 병합해 하류 계약(`s2`·Stage3 조건·`residualIssues`) 보존. light는 arch 단독 유지
+- **검증 4-P 신설 (candidate)** — *"편집 라인이 놓인 자리가 일관적인가"*. 오탐 실측(peer slot 11곳 → emit 9곳 중 **진짜 1곳**)이 절차를 바꿨다: **형제 균일성 게이트**(불균일이면 중단) · **소비처 의존 축 제외**(접근수준·소유권은 정의상 소비처가 결정 → in-block 판정 불가) · 의미 비대칭 면제 · **provenance tie-break**(없으면 사건 당시와 같은 결론에 도달)
+- ⛔ **"축 부재" 진단 철회 — 자기 재현**: 초판은 §5 "원칙 8"로 신설하며 *"형제 관계를 보는 렌즈가 어디에도 없다"* 고 단정했으나 **6개 실재**했다 — 그중 `skill-authoring` §1 **Sibling-Convention Check**는 **동일 실패 모드**로 이미 candidate 등재. 조사 대상을 3개로 스스로 한정하고 커버리지 실측 없이 홀을 선언한 것 자체가 그 관찰이 겨냥한 실패 모드다. 정확한 진단 = **입도 부족 + 소유자 미배선**
+- **§5 원칙 8 → §12 R8-A 강등**: 문서가 *"공식/학술/고품질 출처만 인용"* 을 자기 정책으로 명시하는데 원칙 1~7은 전부 외부 권위, 원칙 8만 **자체 관측 1건**이었다. 번호 점유가 하류의 동급 권위 인용을 유발 → "하네스 홀 candidate" 표로 이동(외부 근거 = **미대조**), 하류 참조 8곳 갱신. 부수: "세 축" → **스코프 × 질문 격자**(직교하지 않음)
+- **ledger 집행 결함 5건**: L-11 동축 판정 **미집행** → 관측 #3 등재(evidence 2→3) · L-1 관측번호 충돌(#2 중복 → **#4**) · L-13에 **회귀 fixture 2개**(TP/FP=0, §5.5 규율 1) · 4-P candidate 문구 누락(⛔ **Sibling-Convention Check 위반**) · 목차/heading/역참조 정합
+- 상세: [docs/releases/v4.23.1.md](docs/releases/v4.23.1.md)
+
+> ⛔ **철회한 자기 주장 2건**: *"in-block 비용 0"* → 접근수준 판정에 타 파일 Read(`BandCell.swift` 프로토콜)·리포 grep 4회가 실제로 필요했다. *"기계 검증 원리적 불가"* → magic-number lint가 잡는 부류이며 **lint 대안 검토가 선행 과제**로 남는다.
+> ⛔ **동종 검증**: Codex probe 실패(`out of credits` — 산출 0 + exit 0이라 규약상 미성립)로 3렌즈 전부 Claude. **cross-model 안전망 부재** — 회복 시 교차 채점 필요(§5.5 규율 2 미충족).
+> ⛔ **미해결 3건**: 이중 등재(`fz-code` 신호 + 4-P + 배선 복구로 **세 겹**) · `fz-review` 검증 4 원문 모순 · `code-pair` S4 결정 근거 미추적.
+
 ### v4.23.0 (2026-08-10) — 누적 통합: 계약 lint 결정화 · 리뷰 구조 판정 축 · llm-references §1.1b [MINOR]
 
 > **누적 통합 릴리즈.** v4.22.0(2026-08-08) 발행 이후 CHANGELOG에 초안 번호 `4.23.0`·`4.24.0`·`4.25.0` 세 섹션이 쌓였고 **셋 다 태그·GitHub Release 어디에도 없다** [verified: `git ls-remote --tags origin | grep -E 'refs/tags/v4\.2[0-9]'` → v4.20.0·v4.21.0·**v4.22.0**뿐 · `gh release list` Latest = **v4.22.0**]. 구간에 `[MAJOR]` 0건이므로 **누적분 전체를 v4.23.0 하나로 발행**하는 것이 semver 정합이다(`4.22.0 → 4.23.0`). 세 초안은 아래 **§A·§B·§C**로 보존한다(최신 먼저 — 본문 삭제 0줄). 매니페스트는 `4.25.0 → 4.23.0` 하향이나 **발행된 적 없는 번호**라 관측하는 소비자가 없다.
