@@ -54,12 +54,21 @@ ITEMS = [
     ("17", "THRESHOLD",     "fz-*",      "Gate Evidence 패턴 — ⛔ 정규식 미정"),
     ("N1", "DETERMINISTIC", "schemas",   "codex_base_issue $defs 값이 소비 스키마와 일치 — severity enum + confidence 경계 (⛔ 값은 **인라인**한다: fz 스키마는 `$ref` 를 쓰지 않는다(실측 0건) — 본 검사가 인라인 정합을 본다)"),
     ("N2", "DETERMINISTIC", "infra",     "CLAUDE.md 인벤토리 선언 ↔ 실측 카운트"),
-    ("N3", "DETERMINISTIC", "all",       "줄번호 인용 — 대상 파일 실재 + 행 범위 내 (⛔ 인용 *내용*의 정합은 검사하지 않는다)"),
+    ("N3", "DETERMINISTIC", "all",       "줄번호 인용 — 대상 파일 실재 + 행 범위 내 + **빈 줄 아님** (⛔ 인용 *내용*의 정합은 여전히 검사하지 않는다 — 빈 줄만이 내용 판단 없이 닫히는 결정론 조각이다)"),
     ("N4", "DETERMINISTIC", "all",       "ERE alternation 오용 — `grep -E` 같은 줄의 `\\|`"),
     ("N5", "DETERMINISTIC", "scripts",   "측정 명령의 신호 폐기 (`>/dev/null 2>&1` + exit 미사용)"),
     ("N6", "DETERMINISTIC", "scripts",   "루트 앵커 — **줄 단위 화이트리스트**(fail-closed). ⛔ 일반 분석 아님: 미지 형태는 거부하고 `ANCHOR_LINES` 에 명시 추가한다. `.sh` 는 첫 `<<` 이후를 데이터로 취급"),
     ("N7", "DETERMINISTIC", "all",       "셸 변수 정의-사용 불일치 — `[ ]`/`[[ ]]` × 인용/비인용 `-n`/`-z` 한정 (⛔ 범위 외: heredoc 내부·멀티라인 테스트·`${VAR:-기본값}`은 의도적 제외)"),
     ("N8", "DETERMINISTIC", "all",       "목차 앵커 해소 — GitHub slug + occupied 충돌 루프 + GFM fence 제외 (⛔ 범위 외: heading 내 inline markup·HTML)"),
+    # ⛔ #N9 신설 근거 (2026-08-20 가이드 전수 감사): `§N.M` 참조 462건 중 어떤 검사도 해소를
+    #    확인하지 않았다. 실측으로 두 형태의 성질이 갈렸다 —
+    #    ⚠️ 아래 수치는 **모집단이 다르다** — (a)/(b)는 도입 판정용 프로브(guides·modules·skills·
+    #       agents·templates 한정)이고, 본 검사의 실제 순회는 `walk_files()` 전체라 seen=149다.
+    #    (a) `` `X.md` §N `` cross-file: 프로브 121건 → 위반 1, 오탐 0  → **본 검사가 담당**
+    #    (b) 파일명 없는 `§N` self-file: 프로브 329건 → 위반 119(36%) → ⛔ **미도입**.
+    #        대부분 다른 문서·논문의 절을 문맥상 축약한 표기(`§2.4`=OpenDev 논문, `§5.7`=experiment-log)라
+    #        정적으로 대상 문서를 특정할 수 없다. 도입하면 오탐률이 #13 강등 선례(89건)를 재현한다.
+    ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
 ]
 DET = {i for i, k, _, _ in ITEMS if k == "DETERMINISTIC"}
 
@@ -96,6 +105,8 @@ MIN_HITS = {
     "N6": 5,     # 스크립트 10개
     "N7": 5,     # 셸 테스트 15건
     "N8": 100,   # 목차 앵커 237건
+    "N9": 50,    # cross-file § 참조 **실측 seen=149** (walk_files 전체) — 34%로 보수적
+                 #   ⛔ 121은 도입 판정 프로브(5개 디렉토리 한정) 값이니 하한 근거로 쓰지 말 것
 }
 
 
@@ -460,7 +471,11 @@ CITE = re.compile(r"([A-Za-z0-9_./\-]+\.(?:md|js|py|sh|json)):(\d+)")
 
 
 def chk_N3():
-    """⛔ 판정은 사람이 한다 — 스크립트는 인용 줄의 실제 내용을 병기해 대조를 가능하게 한다."""
+    """인용의 **구조**만 판정한다 — 파일 실재 · 행 범위 · 빈 줄 여부.
+
+    ⛔ 인용 *내용*의 정합(그 줄이 정말 그 주장을 뒷받침하는가)은 여전히 사람 몫이다.
+       빈 줄만 예외인 이유: 내용을 읽지 않고도 오류임이 확정되는 유일한 조각이다.
+    """
     by_base = defaultdict(list)
     for rel, _ in walk_files():
         by_base[Path(rel).name].append(rel)
@@ -480,6 +495,12 @@ def chk_N3():
                 tl = read(ROOT / target).split("\n")
                 if num > len(tl):
                     v.append(f"{rel}:{i}: → {target}:{num} 범위 초과 (파일 {len(tl)}줄)")
+                elif not tl[num - 1].strip():
+                    # ⛔ 빈 줄 인용 (2026-08-20 신설): 인용 *내용*의 정합은 여전히 사람 몫이나,
+                    #    **빈 줄을 가리키는 인용**은 내용을 읽지 않고도 오류다 — 대상 문서가
+                    #    편집되며 앵커가 공백으로 흘러간 상태다. 이것이 이 검사에서 내용 판단
+                    #    없이 닫히는 유일한 결정론 조각이라 여기까지만 자동화한다.
+                    v.append(f"{rel}:{i}: → {target}:{num} 은 **빈 줄** — 앵커가 밀렸다")
     return v, seen
 
 
@@ -894,6 +915,11 @@ INTEG_TREE = {
     "worktrees/decoy/modules/bad_n4.md": 'run: grep -E "^(a\\|b)" f\n',
     "node_modules/decoy_n4.md": 'run: grep -E "^(c\\|d)" f\n',
     "docs/releases/decoy_n7.md": '```bash\nif [ -n "$GONE" ]; then echo x; fi\n```\n',
+    # #N9: cross-file § 앵커. 대상에 §1(번호형)·§5.7(§ 접두형)을 **둘 다** 두는 것이 핵심이다 —
+    #      `re.M` 누락(앵커 전멸)·`§?` 누락(§ 접두 미인식) 회귀를 **정상 대조군 2건이** 잡는다
+    #      (구현 중 실측: 두 결함이 각각 142/142·11/12 오탐을 냈고 fixture 없이는 조용히 통과했다)
+    "modules/target_n9.md": '# T\n\n## 1. 정상절\n\n본문\n\n## §5.7 § 접두절\n\n본문\n\n### 3) 괄호형 절\n\n본문\n',
+    "modules/bad_n9.md": '`target_n9.md` §1 정상\n`target_n9.md` §5.7 § 접두 정상\n`target_n9.md` §3 괄호형 정상\n`target_n9.md` §9 부재\n',
     # 정상 대조군 — 위반 0이어야 한다
     "modules/ok.md": '# T\n\n## 목차\n\n- [실제절](#실제절)\n\n## 실제절\n\n본문\n',
     "scripts/ok.py": 'from pathlib import Path\nroot = Path(__file__).resolve().parent\n',
@@ -906,6 +932,7 @@ INTEG_EXPECT = {
     "N6": ["scripts/bad_n6.py", "scripts/bad_n6.sh"],
     "N7": ["modules/bad_n7.md:2"],
     "N8": ["modules/bad_n8.md"],
+    "N9": ["modules/bad_n9.md:4"],
 }
 
 
@@ -1029,11 +1056,58 @@ def run_self_tests() -> list[str]:
     return fails
 
 
+# ⛔ #N9 — cross-file 섹션 앵커. 파일명이 **명시된** `§N` 만 본다 (ITEMS 주석의 (a)/(b) 구분 참조).
+SECREF = re.compile(r"`([A-Za-z0-9_./\-]+\.md)`\s*§([0-9]+(?:\.[0-9]+)*)")
+# heading 앞머리의 번호 토큰: `## 5. fz…` → '5' · `### 1.2 Harness…` → '1.2'
+# ⛔ `re.M` 필수 — 없으면 `^`가 문자열 시작으로만 해석돼 첫 줄만 보고, 앵커 집합이 비어
+#    **검사 대상 전건이 FAIL** 한다 (구현 중 실측: 당시 순회 기준 142/142 오탐 — 현행 seen=149).
+# ⛔ `§?` 필수 — fz 문서는 번호 heading 두 형식이 공존한다: `## 5.1 JSON Plan 실험`(번호만)과
+#    `## §5.7 Workflow Tracing`(§ 접두, experiment-log.md). 후자를 놓치면 그 문서를 가리키는
+#    참조 11건이 통째로 오탐이 된다 (구현 중 실측).
+# ⛔ 구분자는 `.` `공백` `)` **셋만**이다. 실측(2026-08-20) 구분자 분포:
+#      `.` 202 · 공백 59 · `-` 13 · `차` 7 · `)` 5 · `b` 4 · `가` 2 · 기타 4
+#    `-`/`차`/`가`/`대`/`런`/`요`/`단`은 번호가 아니라 **낱말의 일부**다
+#    (`2.5-Turn Protocol` · `1차 트리거` · `3가지 실행 모드` · `10대 원칙` · `6런타임책임`).
+#    이들까지 허용하면 `## 3가지 실행 모드`가 §3 앵커로 등록돼 **없는 절이 해소된다** — 확장 금지.
+#    `b`(`## 1b.` `## 3b.`)는 조치 불요: SECREF가 `§1b`에서 `1`만 캡처하고 `## 1.`이 공존한다.
+HEADNUM = re.compile(r"^#{1,6}\s+§?\s*([0-9]+(?:\.[0-9]+)*)[.)\s]", re.M)
+
+
+def chk_N9(root: Path | None = None):
+    base = root or ROOT
+    by_base = defaultdict(list)
+    for rel, _ in walk_files(root=root):
+        by_base[Path(rel).name].append(rel)
+    existing = {rel for rel, _ in walk_files(root=root)}
+    anchors: dict[str, set[str]] = {}
+
+    def nums(target: str) -> set[str]:
+        if target not in anchors:
+            anchors[target] = {m.group(1) for m in HEADNUM.finditer(read(base / target))}
+        return anchors[target]
+
+    v, seen = [], 0
+    for rel, p in walk_files(".md", root=root):
+        if rel == "CHANGELOG.md":
+            continue
+        for i, line in enumerate(read(p).split("\n"), 1):
+            for m in SECREF.finditer(line):
+                raw, sec = m.group(1).lstrip("./"), m.group(2)
+                cands = by_base.get(Path(raw).name, [])
+                target = raw if raw in existing else (cands[0] if len(cands) == 1 else None)
+                if target is None:
+                    continue
+                seen += 1
+                if sec not in nums(target):
+                    v.append(f"{rel}:{i}: → `{target}` §{sec} — 대상 문서에 해당 번호 heading 부재")
+    return v, seen
+
+
 CHECKS = {
     "1": chk_1, "3": chk_3, "5": chk_5, "6": chk_6, "7": chk_7,
     "14": chk_14, "16": chk_16,
     "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
-    "N7": chk_N7, "N8": chk_N8,
+    "N7": chk_N7, "N8": chk_N8, "N9": chk_N9,
 }
 
 
