@@ -138,6 +138,7 @@ fz는 항상 최신 모델(현재 **Opus 5**, `claude-opus-5`, 2026-07-24)만 �
 | 가이드 | 관련 §·출처 |
 |--------|------------|
 | harness-engineering | §4(원칙) · O1·O2·O3 · P1 |
+| **clean-architecture** | (외부 LLM 출처 없음 — Robert C. Martin 원전 교리) |
 | prompt-optimization | §5(구버전) · §4(anti-패턴) · P2·P3 |
 | agent-team-guide | MAST(2503.13657) · O4 · P4 |
 | skill-authoring · skill-troubleshooting | O5 · O4 · O3 · **O12(§12 Workflow 규약) · O14(`fz:` 네임스페이스)** |

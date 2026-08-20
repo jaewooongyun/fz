@@ -1,5 +1,8 @@
 # Clean Architecture Guide
 
+> **Sources (last audited: 2026-08-20):** Robert C. Martin 원전 3권 + cleancoder.com (§참조).
+> 외부 사실 축이 아닌 **교리 문서**라 모델·API 변경에 stale해지지 않는다 — 감사는 원전 인용 정확성만 대상.
+>
 > **Persona: Robert C. Martin (Uncle Bob)**
 > "The architecture of a software system is the shape given to that system by those who build it. The purpose of that shape is to facilitate the development, deployment, operation, and maintenance of the software system contained within it."
 
@@ -319,4 +322,3 @@ Uncle Bob 자신도 인정한다: "아키텍처는 상황에 맞게 적용해야
 - Robert C. Martin, *Clean Code* (2008)
 - Robert C. Martin, *Agile Software Development: Principles, Patterns, and Practices* (2002)
 - https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
-- OpenAI Codex CLI: https://developers.openai.com/codex/cli — fz cross-model verification 도구 (모델 pin 없음 — SSOT=config.toml. CLI 버전 플로어는 호환 사실로 별도 유지)

@@ -1308,6 +1308,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 9b | GPT-5.5 System Card | OpenAI | 2026-04-23 | https://openai.com/index/gpt-5-5-system-card/ |
 | 9c | Codex CLI Changelog (0.124.0) | OpenAI | 2026-04-23 | https://developers.openai.com/codex/changelog |
 | 9d | GPT-5 Prompting Guide (Cookbook) | OpenAI | 2026 | https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide |
+| 9e | Codex CLI (fz cross-model verification 도구 — 모델 pin 없음, SSOT=`config.toml`. CLI 버전 플로어는 호환 사실로 별도 유지) | OpenAI | live | https://developers.openai.com/codex/cli |
 
 ### 고품질 가이드/분석
 
