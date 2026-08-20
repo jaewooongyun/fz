@@ -160,7 +160,7 @@
 ## ASD-1794 회고 후보 (시청내역 v3 마이그레이션, 관측 #1)
 
 > 출처: `TVING/fz-asd1794-migration-retro/README.md` (실수 10건 + G1~G8) + `plan/plan-v2.md`
-> ⛔ **회고 자체 오류 정정**: 회고 §6/§9 "evidence ≥ 3 sessions"는 오류 — Track A 활성 임계 = **5 sessions** [verified: promotion-ledger.md:74 + memory-guide.md:45]. ≥3은 별도 모듈 분리 자격이지 active 임계 아님. (P-track P2→P1=1 / P1→P0=2는 별도 — ledger:33-45.)
+> ⛔ **회고 자체 오류 정정**: 회고 §6/§9 "evidence ≥ 3 sessions"는 오류 — Track A 활성 임계 = **5 sessions** [verified: promotion-ledger.md 트랙 A 정의 + memory-guide.md:45]. ≥3은 별도 모듈 분리 자격이지 active 임계 아님. (P-track P2→P1=1 / P1→P0=2는 별도 — ledger:33-45.)
 > **카운트 기준** (본 세션 채택): Track A friction 신호 = memory-guide:47 "별개 세션 관측" (L-1 #2 선례 ledger:91). Eligible (a)+(b)는 P-track 승격 전용으로 구분.
 > **dedup**: 회고 G6→기존 L-3(표면 churn), G8→기존 L-2(helper reuse). 신규 = G1·G2·G3·G4·G5 → L-6~L-10. G7(툴링 문서)은 friction 신호 아님 → ledger 미등록.
 > ⛔ **소급 카운트 불인정**: 회고 §5 "45차 근접"은 과거 세션 소급 아님 — L-6~L-10 전부 관측 #1부터 보수 시작.
@@ -193,7 +193,7 @@
 - 관측 #1: ASD-1794 | Date: 2026-07-02 | finding-source: internal (사용자 catch)
 - 내용: "미사용/dead" 판정을 레이어별로 구분: DTO(Decodable payload 미러)에서 서버 실필드 제거 = 갭(#6 lastPlayTime), Entity(화면 사용분)에서 미사용 필드 제거 = OK. 한 레이어 판정을 다른 레이어에 오투영.
 - generalize: narrow (DTO/Entity 레이어) | 과적합 위험: 中 | 트리거=축1(레이어 식별)/해소=축2(서버 계약) 하이브리드. G1(#6)과 관점 공유.
-- 근거: [verified: README.md:22 #6·§2 P2].
+- 근거: [verified: ASD-1794 리뷰 README #6·§2 P2].
 - ⛔ 활성 차단: evidence 1 session → candidate.
 - 승격 목표 (Track A): 5 sessions + Codex verify.
 
@@ -209,7 +209,7 @@
 - 관측: ASD-1794 (#10 WatchLabel 자작 — 공용 `ContentLabelDTO`→`ContentLabel` 미탐색) | finding-source: internal (사용자 2턴 지적)
 - ⚠️ **카운트 보류**: eligible session (a)fz-plan Phase0.5~3 형식 증거 0건 + (b)Codex quota 생략 [verified: ASD-1794-work/review/self-review.md:3] → 둘 다 미확증. 관측만 등록, 5-session 카운트 미반영.
 - 확장 관측: L-2 검출법=util 3영역 grep이나 G8 실패(`ContentLabelDTO` 도메인 모델)는 3영역 밖 → **사용처 기반** 보강 필요(S3). memory-guide "same failure mode → merge"로 L-2 흡수 판정.
-- 근거: [verified: README.md:26 #10].
+- 근거: [verified: ASD-1794 리뷰 README #10].
 
 ### L-3 관측 #2 (G6 — ASD-1794, ⚠️ 카운트 보류)
 - 관측: ASD-1794 (#9 flip-flop: mediaType 확장→축소→재확장, lastPlayTime 유지→제거→복원) | finding-source: internal (사용자 매 flip)

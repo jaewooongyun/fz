@@ -68,7 +68,7 @@ Harness H = (C, R, S, A, Σ, F) where:
 ### 1.2.1 NLAH 6요소 ↔ H1-H6 매핑 (UC-4, v4.8.0)
 
 > H1-H6은 design principles, NLAH 6요소는 harness 형식 정의. 매핑은 one-to-one이 아닌 semantic correspondence.
-> [verified: harness-engineering.md L33-L38 NLAH 정의 + prompt-optimization.md L598-L673 H1-H6 정의]
+> [verified: `harness-engineering.md` §1.2 NLAH 형식 정의 + `prompt-optimization.md` §3b 하네스 엔지니어링 원칙(H1-H6)]
 
 | NLAH 6요소 | 정의 | 주요 H1-H6 매핑 | 매핑 근거 |
 |-----------|------|--------------|----------|

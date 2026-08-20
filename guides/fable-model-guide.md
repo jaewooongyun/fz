@@ -1,6 +1,6 @@
 # Model Guide — Fable 5 (Lead 운용) · Opus 5 (수행)
 
-> ✅ **운용 상태 (2026-07-06)**: 2026-07-05 제재 해제 + 사용자 `/model fable`(max) 전환으로 **B안(Lead=Fable 5) 가동**. 2026-07-06 **재배선 완료** — 판단 지점 3곳 explicit `'fable'`: `search-cross-verify.js:166` merge + `plan-collaborative.js:154`/`:167` direction (§5.8 ④ 재개·⑤ 신설), `scripts/lint-model-explicit.sh` 기계 감시. effort는 **세션 레벨 max(기본)/ultracode** 운용 유지 — frontmatter 재배선 없음 (§5.8 ① 철회 유지).
+> ✅ **운용 상태 (2026-07-06)**: 2026-07-05 제재 해제 + 사용자 `/model fable`(max) 전환으로 **B안(Lead=Fable 5) 가동**. 2026-07-06 **재배선 완료** — 판단 지점 3곳 explicit `'fable'`: `search-cross-verify.js:166` merge + `plan-collaborative.js:154`/`:167` direction (§재배선 확정 배선), `scripts/lint-model-explicit.sh` 기계 감시. effort는 **세션 레벨 max(기본)/ultracode** 운용 유지 — frontmatter 재배선 없음 (§effort frontmatter 배선 철회 유지).
 >
 > Claude Fable 5 / Claude Mythos 5의 사양 · API 동작 차이 · Claude Code 통합 · fz 생태계 적용 전략의 단일 참조.
 > 모델 무관 프롬프팅 원칙은 `prompt-optimization.md`, 하네스 설계는 `harness-engineering.md` 참조.
@@ -56,7 +56,7 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 
 ⛔ **Fable 5는 기본 업그레이드 경로가 아니다**: "Migrate to Claude Fable 5 only when the user explicitly chose it. It is not the default Opus upgrade path" [verified: claude-api 번들 스킬 model-migration]. 일반 작업의 기본은 **Opus 5**.
 
-> ⚠️ **2026-07-24 이후 tier 격차 재검토 필요**: Opus 5 발표문은 "a thoughtful and proactive model that comes close to the **frontier intelligence of Claude Fable 5 at half the price**" [verified: anthropic.com/news/claude-opus-5]. *근접*이지 동급은 아니나(발표문 자체가 생물학·공격적 사이버보안에서 Mythos 5에 뒤진다고 명시), **"Fable=최상위, Opus=수행"이라는 fz의 2-tier 전제는 비용·성능 근거가 이전만큼 자명하지 않다.** 판단 지점 fable 배선(§5.8 ④⑤)은 **측정 데이터로 재확인 후 결정** — 이 문서만으로 배선을 바꾸지 말 것.
+> ⚠️ **2026-07-24 이후 tier 격차 재검토 필요**: Opus 5 발표문은 "a thoughtful and proactive model that comes close to the **frontier intelligence of Claude Fable 5 at half the price**" [verified: anthropic.com/news/claude-opus-5]. *근접*이지 동급은 아니나(발표문 자체가 생물학·공격적 사이버보안에서 Mythos 5에 뒤진다고 명시), **"Fable=최상위, Opus=수행"이라는 fz의 2-tier 전제는 비용·성능 근거가 이전만큼 자명하지 않다.** 판단 지점 fable 배선(§재배선 확정 배선)은 **측정 데이터로 재확인 후 결정** — 이 문서만으로 배선을 바꾸지 말 것.
 
 ## 2. Opus 5 대비 API 동작 차이
 
@@ -100,7 +100,7 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 | 레벨 | fz 사용 시점 | 배선 상태 |
 |------|------------|----------|
 | `high` | 루틴 작업 기본 — 별도 설정 불요 (Fable 기본값) | 기본 (미배선) |
-| `xhigh` | capability-sensitive: 아키텍처 결정·복잡 디버깅·심층 plan/review/search | **frontmatter 배선 철회 (2026-06-14)** — 4스킬 `effort: xhigh` 제거. 사용자 운용 = 세션 max/ultracode, plain xhigh 미사용 (§5.8 ① 철회) |
+| `xhigh` | capability-sensitive: 아키텍처 결정·복잡 디버깅·심층 plan/review/search | **frontmatter 배선 철회 (2026-06-14)** — 4스킬 `effort: xhigh` 제거. 사용자 운용 = 세션 max/ultracode, plain xhigh 미사용 (§effort frontmatter 배선 철회) |
 | `max` | 단발 최고난도 — 세션 한정(`/effort`), overthinking 경향 주의. frontmatter 값 허용 여부 [미검증] → 배선 금지 | 미배선 (세션 레벨만) |
 | `ultracode` | dynamic workflow 오케스트레이션이 필요한 substantive 작업 세션 — `/effort` 메뉴에서 활성 (frontmatter/settings 불가, 세션 한정) | 배선 불가 (사용 가이드만) |
 | `medium`/`low` | 루틴·경량 작업 — fz-commit·fz-pr 등 경량 스킬 후보이나 **측정 전 선제 강등 금지** (31차) | deferred 큐 |
@@ -209,7 +209,7 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 ### effort frontmatter 배선 — **2026-06-14 철회 (세션 운용 전환)** · 잔여 후보 기록
 
 스킬/서브에이전트 frontmatter `effort` 필드로 실행 중 override 가능 [verified: code.claude.com/docs/en/model-config]:
-- ~~적용: fz-plan·fz-review·fz-discover·fz-search `effort: xhigh` (4스킬)~~ → **철회 (2026-06-14)**: frontmatter 4건 제거. 사용자 effort 운용 = 세션 max(기본)/ultracode 확정 → frontmatter 배선 불요 (§5.8 ① 철회, §3 표 참조)
+- ~~적용: fz-plan·fz-review·fz-discover·fz-search `effort: xhigh` (4스킬)~~ → **철회 (2026-06-14)**: frontmatter 4건 제거. 사용자 effort 운용 = 세션 max(기본)/ultracode 확정 → frontmatter 배선 불요 (§effort frontmatter 배선 철회, §3 표 참조)
 - 잔여 후보: fz-commit·fz-pr 등 경량 스킬 `effort: medium` — 공식 기본값(high)이 대부분 작업에 적정이므로 **측정 없이 선제 강등 금지** (31차 Plan-before-Probe / 35차 Calibrate-from-Real)
 
 ### De-prescription 긴장 — fz Gate 체계와의 관계
