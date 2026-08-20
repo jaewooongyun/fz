@@ -240,7 +240,7 @@ Step 1: ContentDetailBuilder 생성 (DI: ContentRepository, ImageCacheUseCase)
 - **Gate는 절차적 강제**: 스킵 불가. 실패 시 해당 단계를 "완료"로 표시할 수 없다 (`modules/cross-validation.md` 참조)
 - **Evaluator-Optimizer 패턴**: stress-test 등에서 Critical 2개+ 발견 시 자동 재작성 (최대 2회). 초과 시 사용자 에스컬레이션
 
-### 원칙 8: 과격 표현 제거 (Claude 4.8 instruction-following)
+### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
 Claude 4.8은 지시를 일관되게 따른다 ("follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]) → 과격·모호한 지시가 그대로 적용될 위험. **GPT-5.5 (2026-04-23 GA)** 도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]. **Fable 5 (2026-06-09 GA)** 는 한층 더 — 짧은 지시로 대부분 행동 조향 가능하며, 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]). **Opus 5 (2026-07-24 GA)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5].
 
@@ -251,7 +251,7 @@ GOOD: "Use this tool when reading or modifying files"
 
 - "CRITICAL", "MUST ALWAYS", "NEVER EVER" → 자연스러운 표현으로 대체
 - Anti-laziness가 필요하면 SKILL.md가 아닌 user prompt 쪽에 배치
-- 참조: `guides/prompt-optimization.md` 동일 원칙 8 (Claude 4.8 instruction-following 상세)
+- 참조: `guides/prompt-optimization.md` 동일 원칙 8 (instruction-following 일관성 상세)
 
 ---
 
