@@ -315,7 +315,7 @@ Fallback:   대안 도구 (Primary 실패 시 사용)
 
 ---
 
-### 원칙 8: 과격 표현 제거 (Claude 4.8 instruction-following)
+### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
 **근거:** Anthropic Claude 4 Best Practices + **Opus 4.8은 지시를 일관되게 따른다** ("uses tools cleanly and follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]). 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — Codex 측 동일 가드.) **Fable 5는 한층 강화** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5].
 
@@ -343,7 +343,7 @@ GOOD: "Check the relevant files before making changes"
 ```
 
 **Why this matters:**
-- Claude 4.8은 지시를 일관되게(consistency) 따르려는 경향이 강함
+- 최신 모델일수록 지시를 일관되게(consistency) 따른다 — 세대별 근거는 위 본문 `[verified:]` 참조
 - 과격한 표현은 불필요한 상황에서도 해당 행동을 트리거함
 - 결과: 과도한 도구 호출, 불필요한 검증 반복, 서브에이전트 남용
 - 자연스럽고 구체적인 표현이 더 정확한 행동을 유도함
@@ -713,7 +713,7 @@ fz 적용:
 | 시간 의존 정보 ("2026년 3월 기준") | 곧 오래된 정보가 됨 | 상대 표현 또는 버전 기반 표현 사용 |
 | 비일관적 용어 사용 | 같은 개념에 다른 이름 -> 혼동 | 용어를 하나로 통일, 용어집 관리 |
 | 깊은 참조 중첩 (A -> B -> C -> D) | Context Rot 가속, 정보 손실 | 최대 1단계 깊이만 허용 |
-| "CRITICAL / MUST ALWAYS" 남용 | Claude 4.8 instruction-following에서 과격 지시 그대로 적용 위험 | 자연스럽고 구체적인 표현 사용 |
+| "CRITICAL / MUST ALWAYS" 남용 | instruction-following 일관성이 높은 모델에서 과격 지시가 그대로 적용될 위험 | 자연스럽고 구체적인 표현 사용 |
 | 단순 작업에 서브에이전트 과다 위임 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율) | 단순 작업은 직접 실행하도록 지시 |
 | Claude가 아는 것을 다시 설명 | 토큰 낭비, Context Rot 가속 | 프로젝트 고유 정보만 포함 |
 | 실패에서 체크리스트 행 추가 반사 | 규칙 수 증가→준수율 저하, Claude 추론 억압 | 원칙+이유 한 줄로 대체 (보충 4a) |

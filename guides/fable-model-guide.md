@@ -250,4 +250,6 @@ fz 기본 운용 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides
 ## 설계 원칙
 
 - Progressive Disclosure: 이 가이드는 Fable 관련 결정 시에만 로드
-- 500줄 이하 유지 · Tier 1 인용 원칙 (`prompt-optimization.md` 출처 표기 규약 준수)
+- Tier 1 인용 원칙 (`prompt-optimization.md` 출처 표기 규약 준수)
+  - ⛔ **줄 수 제한 없음** — 500줄 한도는 SKILL.md 본문 전용이다. 가이드·모듈은 대상 아님
+    (정본: `prompt-optimization.md` §2 Scope Clarification · `harness-engineering.md` §설계 원칙)
