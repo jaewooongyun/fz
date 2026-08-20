@@ -9,7 +9,10 @@
 ## Git Workflow
 
 ### 릴리즈 (변경사항 배포)
-1. `.claude-plugin/plugin.json` version bump (semver patch: +0.0.1)
+1. `.claude-plugin/plugin.json` version bump — **변경 성격에 따른다**
+   - `[MINOR]` = 새 검사·스킬·모듈 추가 등 기능 증가 (실측: v4.15.0~v4.23.0 전부 MINOR)
+   - `[PATCH]` = 배선 복구·문구 정정 등 (예: v4.23.1)
+   - ⛔ 구판은 "semver patch: +0.0.1" 고정이라 적었으나 **실제 이력과 어긋났다** (2026-08-20 실측 정정)
 2. `.claude-plugin/marketplace.json` version bump (동일 버전)
 3. `git commit` + `git push origin main`
 4. `git tag vX.Y.Z` + `git push origin --tags`
