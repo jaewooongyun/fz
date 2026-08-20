@@ -132,7 +132,7 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 
 **비용**: mapping row당 ~10초 (git show + atom 비교). 전체 리뷰에 N×10초 추가.
 
-**참조**: `modules/evidence-collection.md` a2 절차, `modules/uncertainty-verification.md` Default-Deny mapping claim, `agents/review-quality.md:60-64` Source Fidelity (mapping atom 검증).
+**참조**: `modules/evidence-collection.md` a2 절차, `modules/uncertainty-verification.md` Default-Deny mapping claim, `agents/review-quality.md` §7 Source Fidelity (mapping atom 검증).
 
 ---
 

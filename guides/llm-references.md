@@ -32,7 +32,7 @@
 
 ### 1.1b Claude Code 운용 — fz 의존 기능 (verified 2026-08-08)
 
-> 신설 정당화 (DELETE/MERGE-default): **순수 additive가 아니라 산재 인용의 통합**이다. `/model-config`은 이미 `fable-model-guide.md`·`skill-testing.md:422`·`harness-engineering.md:1227`·`CHANGELOG` 등 **12개 지점에서 1차 출처로 인용**되는데 색인 행이 없어 참조점이 분산돼 있었다. 나머지 6개도 fz가 실행 경로에서 의존하는 기능인데 근거 행이 0이었다. ⛔ 후속: `harness-engineering.md:1227` 참고문헌 행을 본 표로 리다이렉트 (별건).
+> 신설 정당화 (DELETE/MERGE-default): **순수 additive가 아니라 산재 인용의 통합**이다. `/model-config`은 이미 `fable-model-guide.md`·`skill-testing.md:422`·`harness-engineering.md` §참고 문헌·`CHANGELOG` 등 **12개 지점에서 1차 출처로 인용**되는데 색인 행이 없어 참조점이 분산돼 있었다. 나머지 6개도 fz가 실행 경로에서 의존하는 기능인데 근거 행이 0이었다. ⛔ 후속: `harness-engineering.md` §참고 문헌 참고문헌 행을 본 표로 리다이렉트 (별건).
 
 | 페이지 | 핵심 (verified 2026-08-08) |
 |--------|---------------------------|
