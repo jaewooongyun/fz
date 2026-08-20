@@ -17,9 +17,13 @@ SSOT:
 ⛔ 한계 (정직성):
   1. 최신성 ≠ 정확성. `last audited`가 오늘이어도 내용이 틀릴 수 있다. 본 도구는
      "언제 확인했는지 모르는 문서"를 찾을 뿐, 내용 검증은 하지 않는다.
-  2. 모델명 검사는 **파일 단위 휴리스틱**이다. 구세대 모델명이 인용/비교 맥락으로
-     쓰이는 것은 정상이므로(예: `[verified: anthropic.com/news/claude-opus-4-8]`),
-     "구세대만 있고 현행이 없는 파일"만 신고한다. 라인 단위 판정은 하지 않는다.
+  2. 모델명 검사는 규칙마다 입도가 다르다.
+     - `stale-model-ref` = **파일 단위 휴리스틱**. 구세대 모델명이 인용/비교 맥락으로
+       쓰이는 것은 정상이므로(예: `[verified: anthropic.com/news/claude-opus-4-8]`),
+       "구세대만 있고 현행이 없는 파일"만 신고한다. 본문 라인 판정은 하지 않는다.
+     - `stale-model-heading` = **heading 라인 단위**(2026-08-20 신설). 본문과 달리
+       섹션 제목에 모델명이 박히면 그 절 전체가 그 모델에 종속돼 읽히므로 형식만으로
+       판정이 닫힌다. ⛔ 본문 라인 전체 검사는 여전히 하지 않는다 — 실측상 오탐 24건.
   3. 대상은 **외부 URL을 인용하는 문서**로 한정한다. 내부 근거만 인용하는 문서는
      외부가 바뀌어도 stale해지지 않는다.
 
@@ -56,7 +60,15 @@ LEGACY_MODELS = [
     "Opus 4.8", "opus-4-8", "Opus 4.7", "opus-4-7",
     "Opus 4.6", "opus-4-6", "Opus 4.5", "opus-4-5",
     "Sonnet 4.6", "sonnet-4-6", "Sonnet 4.5", "sonnet-4-5",
+    # ⛔ `Claude N` 표기 (2026-08-20 신설): 어휘가 `Opus`/`Sonnet` 접두만 담고 있어
+    #    `Claude 4.8` 형태가 통째로 빠져 있었다 — 실측 7곳(guides/ 3파일).
+    "Claude 4.8", "Claude 4.7", "Claude 4.6",
 ]
+
+# heading 판별 — `stale-model-heading` 전용 (아래 lint() 참조)
+HEADING = re.compile(r"^#{1,6}\s")
+# GFM fence 여닫이 — `iter_headings()`(lint_contracts.py #N8)와 같은 형태를 좁게 재현한다
+FENCE = re.compile(r"^( {0,3})(`{3,}|~{3,})")
 
 
 def find_docs(root: Path) -> list[Path]:
@@ -141,6 +153,40 @@ def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
                     "file": rel, "rule": "stale-model-ref", "severity": "warn",
                     "detail": f"구세대 모델명 {sorted(set(legacy_hits))} 언급, 현행 '{cur}' 미언급",
                 })
+
+        # 구세대 모델명이 **섹션 제목**에 박힌 경우 (2026-08-20 신설)
+        #
+        # ⛔ 본문 잔존은 검사하지 않는다. 세대 비교표·역사 서술은 구모델명을 *써야* 한다 —
+        #    실측: 라인 전면 검사 시 24건 발화, 다수가 `| Sonnet 4.5 시절 | Opus 4.6 이후 |`
+        #    같은 정상 문서였다. 정상/결함 구분에 의미 판단이 필요해 결정론이 성립하지 않는다.
+        # ✅ heading은 다르다. 섹션 제목에 모델명이 박히면 그 절 전체가 그 모델에 종속된 것으로
+        #    읽히므로 **형식만으로 판정이 닫힌다** (실측 2건, 오탐 0).
+        # ⚠️ 같은 heading에 현행 모델도 있으면 면제 — `### Opus 4.8 → Opus 5 마이그레이션`
+        #    같은 정당한 비교 제목을 잡지 않기 위해서다.
+        if cur_toks:
+            # ⛔ fenced code 안의 `## …` 는 heading이 아니다 (CommonMark).
+            #    실측(2026-08-20): 스캔셋에 fence 내 ATX 222건 — 그중 구세대 모델명 포함은
+            #    **0건**이라 현재 오탐은 발화하지 않으나, 형태상 오탐이므로 차단한다.
+            #    ⚠️ 범위 밖(실측 0건이라 미처리): 들여쓴 ATX 0건 · setext heading 중 모델명 0건.
+            fence = None
+            for ln, line in enumerate(text.split("\n"), 1):
+                fm = FENCE.match(line)
+                if fence is None:
+                    if fm:
+                        fence = fm.group(2)[0]
+                        continue
+                else:
+                    if fm and fm.group(2)[0] == fence:
+                        fence = None
+                    continue
+                if not HEADING.match(line):
+                    continue
+                hits = [t for t in LEGACY_MODELS if t in line]
+                if hits and not any(t in line for t in cur_toks):
+                    findings.append({
+                        "file": f"{rel}:{ln}", "rule": "stale-model-heading", "severity": "warn",
+                        "detail": f"섹션 제목에 구세대 모델명 {sorted(set(hits))} — 절 전체가 그 모델에 종속돼 읽힌다",
+                    })
 
     summary = {
         "current_model": cur, "current_model_source": cur_src,
