@@ -48,7 +48,7 @@ intent-triggers:
 | 1.5 | 리베이스 직전 스냅샷 + 롤백 앵커 + 위험 브리핑 (`snapshot`) | 분기점·이동/삭제·수동해결 머지 기록 |
 | 2 | base 위로 `rebase --rebase-merges` | 리베이스 완료 (충돌 시 Step 3-C) |
 | 3 | 형태 게이트 (`check`) | 커밋/머지 수 + base 조상 + tree clean |
-| 3.5 | 내용 게이트 (`audit`) — **경로 전량 분할 판정** | 세 버킷 불변식 + 머지 해결 재적용 |
+| 3.5 | 내용 게이트 (`audit`) — **경로 전량 분할 판정** | 세 버킷 불변식 + 머지 건수 + 사라진 라인의 위치 후보 |
 | 4 | 원격 파괴 게이트 (`prepush`) → force-push(`--force-with-lease`) | 파괴될 팀원 커밋 0건 → 확인 게이트 → 0/0 |
 
 ### 변수 해석 (Step 0 진입 시)
@@ -131,13 +131,21 @@ bash "$VR" snapshot "${BASE}" "${LTB}"
 ```
 
 브리핑에서 반드시 사용자에게 전달할 것:
-- **겹침 파일 수** — 사람 판정이 필요한 유일한 집합. 0이면 양방향 유실의 여지가 구조적으로 없다.
-- **팀원 이동/삭제 ∩ 내 변경** — 있으면 L3 1순위.
+- **겹침 파일 수** — 사람 판정이 필요한 유일한 집합. 0이면 *경로별 내용 보존* 관점의 유실 여지가 없다 (⛔ 팀원이 같은 로직을 다른 경로에 새로 만든 경우는 이 판정 밖 — 경로 분할이 답하는 질문이 아니다).
+- **팀원 이동/삭제 ∩ 내 변경** — 있으면 L3 1순위. 두 종류의 후보가 함께 나온다.
+  - **이동 후보(유사도 낮아 확정 아님)**: 기본 `-M`(50%)이 놓친 이동을 `-M30%`로 한 번 더 본다.
+    ⛔ 후보는 `rename-candidates.tsv`에 따로 담기고 **판정에는 쓰지 않는다** — 낮은 임계의
+    오매핑이 경로 분할에 섞이면 버킷이 흔들린다.
+  - **삭제된 파일의 대체 후보**: 그 파일을 지운 커밋이 함께 추가한 파일을 보여준다.
+    ⛔ 같은 커밋이라는 provenance일 뿐 대체의 증거가 아니다. 삭제 커밋이 여럿이거나
+    머지로 들어왔으면 후보를 내지 않는다. 표시 개수는 `FZ_REBASE_RELOCATE_SHOW`(기본 5).
 - **수동 해결을 품은 머지** — 있으면 L2 대상. `--rebase-merges`가 재적용하지 않는다.
 
 롤백 앵커는 `refs/fz-rebase/pre/<branch>-<shorthash>` ref로 남는다. 이름에 해시가 들어가므로 **snapshot 재실행이 이전 앵커를 덮어쓰지 못하고**, ref이므로 GC 대상에서도 벗어난다(audit이 PRE 트리를 계속 읽을 수 있는 근거). 완료 후 정리: `git for-each-ref refs/fz-rebase/`로 확인 → `git update-ref -d <ref>`.
 
 머지가 매우 많은 브랜치에서 스냅샷이 오래 걸리면 `FZ_REBASE_SKIP_REMERGE=1`로 머지 스캔만 생략할 수 있다 — 단 그 경우 L2 검출이 꺼진다는 것을 사용자에게 알린다.
+`FZ_REBASE_RELOCATE_SHOW=N`은 대체 후보를 몇 개까지 나열할지 정한다(기본 5). ⛔ 표시량만
+자르는 값이고 후보 특정 가능성을 판정하지 않는다 — 전체 개수와 커밋은 항상 출력된다.
 
 ### Step 2 — 리베이스 (머지 커밋 보존)
 
@@ -168,16 +176,85 @@ exit 0이 아니면 force-push하지 않는다. 커밋 수 감소는 **그 자�
 BAD:  git checkout --ours <file>
       → "내 변경을 유지"로 읽고 실행하지만, 실제로는 내 커밋을 버리고 base(팀원) 쪽을 남긴다.
 
-GOOD: 충돌 파일마다 어느 쪽이 누구 것인지 먼저 명시한다.
-      --ours   = 리베이스된 base 측 = 팀원 최신
-      --theirs = 지금 replay 중인 내 커밋
+GOOD: 충돌 파일마다 **조회로** 어느 쪽이 무엇인지 확정한 뒤 제시한다.
+      git ls-files --unmerged -- <file>   # stage 2·3 존재 여부 = 각 측의 수정/삭제
+      git show :2:<file> · :3:<file>      # 각 측의 실제 내용
+      ⛔ "--ours = 팀원"처럼 고정 라벨로 외우지 않는다 (아래 § 참조).
       그 뒤 양쪽 변경의 의미를 설명하고, 합칠 방향을 사용자와 정한다.
 ```
 
 - `-X ours` / `-X theirs` 자동 해결은 하지 않는다 (같은 역전이 전 파일에 일괄 적용된다).
-- modify/delete 충돌에서 `git add`(파일 유지)와 `git rm`(삭제 수용)은 **각각 반대쪽의 삭제/수정을 버린다**. 어느 쪽을 버리는지 사용자에게 말하고 정한다.
-- 해결이 불확실하면 지어내지 말고 사용자에게 판단을 넘긴다. 언제든 `git rebase --abort`로 원상 복구 가능함을 안내한다.
 - 같은 충돌이 반복돼 `git rerere`를 고려한다면 `--no-rerere-autoupdate`와 함께 쓴다 — 과거 해결의 무언 재적용은 이 스킬이 막으려는 것과 같은 종류의 조용한 변경이다.
+
+#### 귀속은 라벨로 외우지 말고 파일마다 조회한다
+
+⛔ 위 `--ours`/`--theirs` 대응은 **설명용 근사이지 계약이 아니다.** ours는 base에 앞서
+replay된 커밋이 누적된 **현재 HEAD**이고, 이 브랜치에는 팀원도 직접 push하므로(규칙 참조 3행)
+지금 replay 중인 커밋이 팀원 것일 수 있다. `--rebase-merges`가 머지를 재생성하다 난 충돌은
+양쪽 모두 재작성된 tip일 수도 있다. 고정 라벨을 그대로 제시하면 막으려던 L4·L5를 다시 만든다.
+
+```bash
+git ls-files --unmerged -- <file>          # stage 2 = ours 측 · stage 3 = theirs 측
+git log -1 --format='%an  %s' REBASE_HEAD  # 지금 replay 중인 커밋의 author와 subject
+```
+
+stage 3이 없으면 theirs 측이 지운 것이고, stage 2가 없으면 ours 측이 지운 것이다.
+내용이 필요하면 `git show :2:<file>` · `:3:<file>`로 직접 읽는다.
+⛔ `REBASE_HEAD`는 **지금 replay 중인 커밋**의 정보일 뿐, 각 stage 전체의 소유자를
+증명하지 않는다 — ours 측은 앞서 replay된 커밋들이 누적된 결과다.
+modify/delete에서 `git add`와 `git rm`이 각각 무엇을 버리는지는 **이 조회로 확정**한다 —
+삭제 주체가 어느 쪽이냐에 따라 방향이 뒤집히므로 미리 정해둘 수 없다.
+
+#### 확인 절차 (soft gate)
+
+⛔ **이것은 soft gate다.** `AskUserQuestion`이 실제로 호출되면 응답 전까지 진행이 멈추지만,
+호출을 생략하는 것 자체는 프롬프트로 막지 못한다. 결정적 차단이 필요하면 PreToolUse hook이
+필요하고 그것은 사용자 합의 사항이다. 여기서 얻는 것은 준수율과 개입 지점의 명시성이다.
+
+충돌 파일마다 아래를 제시하고 `AskUserQuestion`으로 방향을 받는다.
+⛔ 답을 받기 전에는 **충돌 경로의 워킹트리·인덱스를 어떤 도구로도 바꾸지 않는다** —
+`git add`/`git rm`/`git checkout`/`git restore`/`git mergetool`/`git rebase --continue`/`--skip`,
+그리고 Edit·Write·셸 리다이렉션도 같다. 명령 이름이 아니라 *상태를 바꾸는 행위*가 기준이다.
+
+제시 항목: 파일 경로 · 충돌 종류(내용 / modify-delete, 위 조회로 판별) ·
+각 측이 담은 변경과 귀속(`REBASE_HEAD` author·subject) ·
+"어느 선택도 확신이 없으면 중단을 고른다. `--abort`는 리베이스 전 상태로 되돌린다."
+
+선택지는 조회 결과에 맞춰 만든다. 내용 충돌이면 양쪽 병합 / 한쪽 채택(어느 쪽인지 명시) /
+전체 리베이스 중단. modify-delete면 파일 유지 / 삭제 수용 / 전체 리베이스 중단이고,
+각 라벨에 **무엇을 버리는지** 조회 결과대로 적는다.
+
+⛔ 중단 선택지는 "이 파일만 빼기"가 아니라 **전체 리베이스 중단**이다. git에는 파일 단위
+abort가 없고 `--skip`은 현재 커밋을 통째로 버린다. 라벨이 이를 오해시키면 안 된다.
+
+#### 배치 루프
+
+`AskUserQuestion`은 한 번에 질문 4개가 상한이므로 충돌이 그보다 많으면 나눠 묻는다 [verified: AskUserQuestion 도구 스키마 `questions` maxItems=4].
+
+```
+리베이스 진행 중인 동안 반복:
+  a. RM="$(git rev-parse --git-path rebase-merge)"; RA="$(git rev-parse --git-path rebase-apply)"
+     둘 다 없으면 완료 — 루프 종료
+     ⛔ `.git/rebase-merge`를 리터럴로 쓰지 않는다. linked worktree에서 .git은 파일이다 [verified: `verify-rebase.sh:53` 주석이 같은 이유로 `git rev-parse --git-dir`을 쓴다]
+  b. `git diff --name-only --diff-filter=U -z` — 지금 replay 중인 커밋의 미해결 충돌
+  c. 목록이 비어 있으면 `git rebase --continue`
+     → exit 0이면 a로 (다음 커밋 replay에서 새 충돌이 날 수 있다 — continue는 종료가 아니다)
+     → exit≠0이면 루프를 멈추고 원인을 사용자에게 제시한다 (편집기 대기 · hook 실패 ·
+       빈 커밋 등). ⛔ `--skip`을 자동 폴백으로 쓰지 않는다 — 커밋 전체를 버리는 일이라
+       그것도 물어야 한다
+  d. 4개씩 묶어 AskUserQuestion 호출 (파일 하나당 질문 하나).
+     매 배치에 "이번 stop 총 N개 · 처리 M개 · 남은 K개"를 함께 보인다
+  e. 답 중에 중단이 하나라도 있으면 `git rebase --abort` 후 루프 전체 종료
+  f. 나머지 답대로 해당 파일만 해소 → a로
+```
+
+한 stop의 충돌이 12개를 넘으면 첫 배치 전에 한 번 묻는다 — 전수 검토를 계속할지,
+`--abort` 후 리베이스 범위를 나눌지. ⛔ 일괄 자동 해결 선택지는 만들지 않는다.
+같은 파일이 다음 커밋에서 다시 충돌하면 **새 replay 커밋이므로 다시 묻는다**.
+
+- 사용자 선택을 받은 뒤에도 구체적인 병합 결과나 어느 쪽이 누구 것인지가 불확실하면
+  적용·stage하지 말고 다시 묻거나 전체 중단을 제안한다. 선택을 받았다는 것이 구현
+  불확실성까지 해소했다는 뜻은 아니다.
 
 ### Step 3.5 — 내용 게이트 (경로 전량 분할)
 
@@ -185,7 +262,7 @@ GOOD: 충돌 파일마다 어느 쪽이 누구 것인지 먼저 명시한다.
 bash "$VR" audit "${BASE}" "${LTB}"
 ```
 
-세 버킷 불변식을 검사하고 위반을 등급별로 보고한다. `INFO`는 정상(흡수·이동), `WARN`은 사람 확인 필요(OVERLAP 바이너리), `HALT`만 유실이다. OVERLAP 라인 검사는 POST 트리 전역 라인 집합과 대조해 코드 이동을 유실로 오판하지 않으며, 확인 상한(cap) 없이 전량 판정한다.
+세 버킷 불변식을 검사하고 위반을 등급별로 보고한다. `INFO`는 정상(흡수·이동), `WARN`은 사람 확인 필요(OVERLAP 바이너리 · **사라진 라인의 위치 후보** · 머지 해결 축소), `HALT`만 유실이다. OVERLAP 라인 검사는 POST 트리 전역 라인 집합과 대조해 코드 이동을 유실로 오판하지 않으며, 확인 상한(cap) 없이 전량 판정한다.
 
 audit은 **리베이스 후**에만 유효하다. base가 아직 POST의 조상이 아니면 base의 신규 라인이 "내가 지운 것"처럼 보여 판정이 통째로 뒤집히므로, 스크립트가 조상 조건을 먼저 확인하고 중단한다.
 
@@ -214,7 +291,7 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 ## TVING/Tuist 고유 지식
 
 - develop은 Tuist 전환됨 — githooks가 리베이스 중 구조 변경 감지 시 `tuist generate`를 자동 실행한다(정상 동작). 이 출력이 L1의 드롭 경고를 가리므로 로그를 흘려보내지 않는다.
-- pbxproj는 git 미추적(Tuist 생성)이라 구브랜치 리베이스 시 modify/delete 충돌이 반복될 수 있다 → 해당 pbxproj/Package.resolved는 `git rm`(삭제 수용) 후 continue.
+- pbxproj는 git 미추적(Tuist 생성)이라 구브랜치 리베이스 시 modify/delete 충돌이 반복될 수 있다 → 해당 pbxproj/Package.resolved는 **삭제 수용을 권고**한다. ⛔ 다만 3-C의 확인 절차를 건너뛰지 않는다 — 그 파일의 질문에서 대가를 밝히고 사용자가 고른 뒤에 `git rm`하며, 그 stop의 U 목록이 모두 해소된 뒤에만 continue한다.
 - ⚠️ 위 `git rm` 습관은 **L3/L5의 발생 경로**이기도 하다 — 생성물이 아닌 파일에 같은 해소를 적용하면 내 변경이나 팀원 변경이 조용히 사라진다. 삭제 수용은 Tuist 생성물에 한정하고, 나머지는 Step 3.5가 판정한다. xcstrings는 우리 추가와 타 기능 삭제가 라인 단위로 섞이므로 충돌 해결 후 중복 키 검사가 필요하다.
 
 ## 테스트 케이스
@@ -235,7 +312,9 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 
 ### Functional
 
-회귀 oracle: `bash <FZ_ROOT>/skills/fz-rebase/scripts/test-gates.sh` (20 assertion, 유실 검출 10 + 오경보 방지 10).
+회귀 oracle: `bash <FZ_ROOT>/skills/fz-rebase/scripts/test-gates.sh` (65 assertion).
+구성은 유실 검출 · 오경보 방지 · **SKILL 정적 계약**(K1~K8) 셋이다. 셋째는 충돌 확인 절차가
+문서에서 사라지는 것을 잡는다 — 그 절차는 스크립트가 아니라 프롬프트라 동작 oracle이 없다.
 
 | Given | When | Then |
 |-------|------|------|
@@ -265,12 +344,14 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 - 리베이스 직전 스냅샷 + 롤백 앵커 ref + 위험 브리핑
 - base 위로 `--rebase-merges` 리베이스 (머지 커밋 보존)
 - 형태 게이트 + 경로 전량 분할 내용 게이트 + 원격 파괴 게이트
-- 충돌을 사용자와 하나씩 해결하며 `ours`/`theirs` 역전을 매번 명시
+- 충돌을 파일마다 `AskUserQuestion`으로 확인하며 해결 — 귀속은 `git ls-files --unmerged`로 매번 조회 (soft gate)
 - 확인 게이트 후 실측 해시로 pin한 `--force-with-lease` push
 
 **Will Not**:
 - diverged 상태 자동 병합/리베이스 → 사용자 판단
 - 충돌 자동 해결(`-X ours/theirs`) → 사용자와 해결
+- 사용자 응답 전 충돌 경로의 워킹트리·인덱스 변경 → 확인 후에만 (도구 종류 무관)
+- `git rebase --skip` 자동 폴백 → 커밋 전체를 버리는 일이라 이것도 확인 대상
 - 내용 게이트·원격 게이트를 건너뛴 force-push → 항상 게이트
 - 개수만 보고 "유실 없음" 판정 → 분할 불변식이 정본
 - 커밋 메타데이터·stash 유실 검증 → 비대상(위 커버리지 참조)
@@ -283,13 +364,18 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | `merge --ff-only` 실패 | ff 불가 = 조용한 merge 아님, 중단 신호 → 상태 재확인 | diverged면 Step 0 분기로 |
-| 리베이스 충돌 | 중단 → `--ours`=팀원/`--theirs`=내 커밋 명시 후 사용자와 해결 | `git rebase --abort` |
+| 리베이스 충돌 | 배치 루프 — 파일별 귀속 조회 → AskUserQuestion → 해소 → U 목록 빌 때만 continue | `git rebase --abort` |
+| `rebase --continue` 실패 | 루프 중단 + 원인 제시 (편집기 대기·hook 실패·빈 커밋) | `--skip`은 자동 금지 — 확인 후 |
 | check HALT: 커밋/머지 감소 | **audit으로 판정** — 버킷 불변식 통과면 base 흡수(진행 가능, 사용자 승인), 위반이면 유실(롤백) | `git reset --hard refs/fz-rebase/pre/<branch>-<hash>` |
 | check HALT: key path 부재 | coarse smoke test — 팀원의 정당한 이동일 수 있다 | audit의 분할 판정으로 결론 |
 | audit HALT: 버킷① 위반 | base가 손대지 않은 파일이 변형됨 → 충돌 해결이 무관 파일로 번졌는지 확인 | 롤백 후 재리베이스 |
 | audit HALT: 버킷② 위반 | 팀원 변경 덮어쓰기 — 제시된 귀속 커밋 확인 후 내 의도인지 사용자 판정 | 실수면 해당 파일을 base 내용으로 복원 |
 | audit HALT: OVERLAP 라인 위반 | 4방향 중 어느 것인지 확인 → `range-diff`로 커밋 귀속 → 해당 hunk 재적용 | 롤백 후 충돌 재해결 |
 | audit HALT: 머지 해결 유실 | `git log -1 --remerge-diff <원래 머지 해시>`로 해결 내용 확인 → 수동 재적용 | 롤백 후 별도 커밋으로 분리 |
+| 브리핑: 이동 후보 / 대체 후보 | 확정이 아니라 참고다 — 충돌 해결 시 그 파일을 함께 열어 판단 | 후보가 틀리면 무시. 커밋을 직접 확인 |
+| audit WARN: 동일 라인 위치 후보 | 내 라인이 이 파일에 없고 다른 경로에 같은 문자열 존재 — 팀원의 이동/리팩토링인지 확인 | 의도된 이동이면 진행, 아니면 해당 hunk 재적용 |
+| audit HALT: base 이동 | snapshot 이후 base가 움직여 기준선이 둘 — 판정 불가 | 재-snapshot 후 리베이스 재수행 |
+| audit WARN: 머지 해결 축소 | 건수는 유지됐으나 remerge 줄 수 감소 — 재생성 변동일 수 있음 | `--remerge-diff`로 내용 대조 |
 | audit WARN: OVERLAP 바이너리 | 라인 판정 불가 — 해당 파일을 사람이 열어 확인 | 확인 결과를 사용자에게 보고 후 진행 여부 결정 |
 | audit HALT: 리베이스 미완료 | 실행 시점 오류 — 리베이스 완료 후 재실행 | 중단 상태면 3-C 해결 또는 `--abort` |
 | audit: snapshot 상태 없음 | 내용 검증 불가 — 형태 게이트만 유효함을 명시 | 다음 리베이스부터 Step 1.5 선행 |
@@ -297,7 +383,7 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 | prepush HALT: 파괴될 커밋/머지 | push 금지 → ff-merge 또는 리베이스로 반영 | 반영 후 재검사 |
 | prepush WARN: 평범한 머지 소실 | 내용은 부모에 보존 — 히스토리 구조 소실을 사용자에게 알리고 진행 판단 | 구조 보존이 필요하면 머지 방식 재검토 |
 | `--force-with-lease` 거부 | remote가 lease 기대 해시와 다름(타인 push) → 재fetch | 변경 검토 후 재시도 판단 |
-| pbxproj modify/delete 충돌 | `git rm` (Tuist 생성물, 삭제 수용) → continue | 생성물이 아니면 삭제 수용 금지 |
+| pbxproj modify/delete 충돌 | 삭제 수용 권고 — 단 3-C 확인 후 `git rm`, U 목록 해소 후 continue | 생성물이 아니면 삭제 수용 금지 |
 | dirty 워킹 트리 | 리베이스 전 중단 | stash 또는 commit 후 재실행 |
 
 ## Completion → Next
@@ -313,5 +399,5 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 - 커밋 수·버킷 판정·경로 착지 등 사실 주장 전 `verify-rebase.sh` 또는 `git` 실측 결과를 근거로 제시한다. 스냅샷 없이 "유실 없음"을 말하지 않는다 — 기준선이 없으면 판정 자체가 불가하다.
 - "누락 없음"은 분할이 경로 합집합을 덮는다는 **구조**로 말하고, 커버리지는 13/15 + 비대상 2건 명시로 말한다. 열거식 "다 확인했다"는 쓰지 않는다.
 - force-push 완료를 보고하기 전 `git rev-list --left-right --count`로 동기화(0/0)를 확인한다.
-- 게이트 자체의 회귀 검증: `bash <FZ_ROOT>/skills/fz-rebase/scripts/test-gates.sh` (스크립트 수정 시 실행). 유실 검출과 **오경보 방지**를 동등하게 검사한다 — 후자가 깨지면 게이트는 노이즈가 되어 무시된다.
+- 게이트 자체의 회귀 검증: `bash <FZ_ROOT>/skills/fz-rebase/scripts/test-gates.sh` (스크립트 **또는 SKILL.md** 수정 시 실행). 유실 검출과 **오경보 방지**를 동등하게 검사한다 — 후자가 깨지면 게이트는 노이즈가 되어 무시된다. ⛔ `assert()`는 exit code만 보므로 새 WARN 경로는 `assert_no_warn`으로 따로 검사해야 한다.
 - 참조: `modules/uncertainty-verification.md` (Default-Deny).
