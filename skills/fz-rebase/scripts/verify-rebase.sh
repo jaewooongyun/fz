@@ -207,6 +207,30 @@ case "$cmd" in
     [ -n "$base_hash" ] || die "base ref를 해석할 수 없다: ${base}. fetch 여부와 철자를 확인할 것."
     pre="$(git rev-parse -q --verify "$branch" 2>/dev/null || true)"
     [ -n "$pre" ] || die "branch ref를 해석할 수 없다: ${branch}."
+    # base가 원격 추적 ref이면 원격 실측과 대조한다. `git fetch --all`은 일부 원격이
+    # 실패해도 exit 0일 수 있어(IP allow list·인증 등), stale한 base 위로 리베이스하면
+    # 게이트가 전부 통과한다 — 게이트는 "base 대비 보존"을 볼 뿐 "base가 최신인지"는 안 본다.
+    # ⛔ 오프라인에서 막히지 않도록 실패는 WARN이다. 판정 자체를 바꾸지는 않기 때문이다.
+    # ⛔ `/` 유무로 원격 추적 여부를 판별하지 않는다 — 동명 로컬 브랜치·태그·`origin/HEAD`를
+    #    오분류한다. canonical ref를 물어 `refs/remotes/`인 것만 대상으로 한다.
+    _full="$(git rev-parse --symbolic-full-name "$base" 2>/dev/null || true)"
+    if [ "${FZ_REBASE_SKIP_LSREMOTE:-0}" != "1" ] && [ "${_full#refs/remotes/}" != "$_full" ]; then
+      _rest="${_full#refs/remotes/}"
+      _rmt="${_rest%%/*}"; _rbr="${_rest#*/}"
+      if [ "$_rbr" != "HEAD" ] && git remote get-url "$_rmt" >/dev/null 2>&1; then
+        # ⛔ command substitution 실패가 `set -e`로 즉시 종료된다. status를 명시 처리한다.
+        #    GIT_TERMINAL_PROMPT=0 — 인증 프롬프트로 멈추지 않게 한다.
+        if ! _tip="$(GIT_TERMINAL_PROMPT=0 git ls-remote "$_rmt" "refs/heads/${_rbr}" 2>/dev/null | awk 'NR==1{print $1}')"; then
+          _tip=""
+        fi
+        if [ -z "$_tip" ]; then
+          warn "base 원격 상태를 확인하지 못했다 (${_rmt} ${_rbr}) — 네트워크·권한 문제일 수 있다. stale한 base 위로 리베이스하면 게이트가 그것을 잡지 못한다."
+        elif [ "$_tip" != "$base_hash" ]; then
+          warn "base가 원격보다 뒤처져 있다 (로컬 ${base_hash} vs 원격 ${_tip}). fetch가 부분 실패했을 수 있다 — 다시 fetch한 뒤 진행할 것."
+        fi
+      fi
+    fi
+
     old_mb="$(git merge-base "$base" "$branch" 2>/dev/null || true)"
     [ -n "$old_mb" ] || die "${base}와 ${branch}에 공통 조상이 없다. 히스토리가 재작성됐거나 base 지정이 잘못됐다 — 리베이스하면 전체 히스토리가 대상이 되므로 진행하지 않는다. base를 재확인할 것."
     commits="$(git rev-list --count "${base}..${branch}")"
