@@ -156,12 +156,30 @@ relocate_hint() {   # $1=삭제 경로  $2=old_mb  $3=base
 # 리베이스가 머지를 재생성하면 해시가 바뀌므로 대조 키는 subject다.
 scan_manual_merges() {
   if [ "${FZ_REBASE_SKIP_REMERGE:-0}" = "1" ]; then return 0; fi
-  local m n s
+  local m d n s h _plus
   for m in $(git rev-list --merges "$1"); do
-    n="$(git log -1 --remerge-diff --format='' -p "$m" 2>/dev/null | wc -l | tr -d ' ')"
+    d="$(git log -1 --remerge-diff --format='' -p "$m" 2>/dev/null)"
+    n="$(printf '%s' "$d" | grep -c . || true)"
     [ "${n:-0}" -gt 0 ] || continue
     s="$(git log -1 --format=%s "$m")"
-    printf '%s\t%s\n' "$s" "$n"
+    # 해결 **결과**(추가된 라인)만 해시한다. subject와 줄 수만으로는 같은 subject에서
+    # 해결이 다른 해결로 바뀐 것을 구분하지 못한다 [실측: 서로 다른 두 evil merge가
+    # subject·줄수 모두 동일].
+    # ⛔ `-` 라인을 넣으면 안 된다 — 충돌 마커에 커밋 해시가 박혀 있어(`<<<<<<< 8ebbbea`)
+    #    리베이스로 해시가 바뀌면 같은 해결인데도 값이 달라진다 [실측: raw·마커포함 둘 다 불안정].
+    #    `+` 라인만 쓰면 리베이스 전후가 같다 [실측: 768c8564e4be 동일].
+    # ⛔ `grep`은 0매치에서 exit 1이다. `set -e` 아래 파이프라인이 죽으면 호출부의
+    #    `|| true`가 그것을 삼켜 **이후 머지 스캔이 통째로 잘린다**. 반드시 || true.
+    _plus="$(printf '%s' "$d" | grep '^+' | grep -v '^+++' || true)"
+    if [ -n "$_plus" ]; then
+      h="$(printf '%s' "$_plus" | shasum | cut -c1-12)"
+    else
+      # 추가 라인이 없는 해결(한쪽 통째 선택·삭제로 해소·바이너리)은 내용 해시로
+      # 구분할 수 없다. 같은 값으로 뭉뚱그리지 않고 명시적 마커를 둬서
+      # audit이 "내용 비교 불가"임을 알게 한다.
+      h="NOPLUS"
+    fi
+    printf '%s\t%s\t%s\n' "$s" "$h" "$n"
   done
 }
 
@@ -267,7 +285,7 @@ case "$cmd" in
 
     if [ -s "$STATE_DIR/manual-merges.tsv" ]; then
       warn "수동 해결을 품은 머지 $(wc -l < "$STATE_DIR/manual-merges.tsv" | tr -d ' ')건 — --rebase-merges는 이 해결을 재적용하지 않는다(git 원문). 리베이스 후 audit이 대조한다:"
-      awk -F'\t' '{print "  " $1 "  (remerge " $2 "줄)"}' "$STATE_DIR/manual-merges.tsv"
+      awk -F'\t' '{print "  " $1 "  (remerge " $3 "줄, 해결 " $2 ")"}' "$STATE_DIR/manual-merges.tsv"
     else
       info "수동 해결을 품은 머지: 없음${FZ_REBASE_SKIP_REMERGE:+ (스캔 생략됨)}"
     fi
@@ -519,25 +537,35 @@ case "$cmd" in
       #    재생성하며 정상적으로 생길 수 있으므로 HALT가 아니라 WARN이다.
       #    ⛔ `FILENAME == ARGV[1]`로 파일을 구분한다 — `NR==FNR`은 첫 파일이 비면
       #    무너지고, 수동 해결 머지가 0건인 경우가 대다수다(같은 함정이 위 파티션에도 있다).
+      # 대조 키는 (subject, 해결내용 해시)다. subject만 보면 같은 제목의 머지 하나가
+      # 남았을 때 나머지 유실이 가려지고, 건수만 더하면 해결이 **다른 해결로 대체된**
+      # 경우를 놓친다. 해시는 `+` 라인만 담아 리베이스 전후로 안정적이다.
       awk -F'\t' '
-        FILENAME == ARGV[1] { pre[$1]++;  pre_lines[$1]  += $2; next }
-                            { post[$1]++; post_lines[$1] += $2 }
+        FILENAME == ARGV[1] { pre[$1 "\t" $2]++;  pre_subj[$1]++;  pre_lines[$1] += $3; next }
+                            { post[$1 "\t" $2]++; post_subj[$1]++; post_lines[$1] += $3 }
         END {
-          for (subj in pre) {
-            pc = (subj in post) ? post[subj] : 0
-            if (pre[subj] > pc)
-              printf "LOST\t%s\t(PRE %d건 → POST %d건)\n", subj, pre[subj], pc
-            else if ((subj in post) && post_lines[subj] < pre_lines[subj])
-              printf "SHRUNK\t%s\t(remerge %d줄 → %d줄)\n", subj, pre_lines[subj], post_lines[subj]
+          for (k in pre) {
+            split(k, a, "\t"); subj = a[1]
+            pc = (k in post) ? post[k] : 0
+            if (pre[k] > pc) {
+              if (post_subj[subj] >= pre_subj[subj])
+                printf "CHANGED\t%s\t(같은 subject의 머지 수는 유지됐으나 해결 내용이 다르다 — 해시 %s)\n", subj, a[2]
+              else
+                printf "LOST\t%s\t(PRE %d건 → POST %d건)\n", subj, pre_subj[subj], post_subj[subj]
+            }
           }
+          for (subj in pre_subj)
+            if ((subj in post_subj) && post_subj[subj] == pre_subj[subj] && post_lines[subj] < pre_lines[subj])
+              printf "SHRUNK\t%s\t(remerge %d줄 → %d줄)\n", subj, pre_lines[subj], post_lines[subj]
         }
-      ' "$STATE_DIR/manual-merges.tsv" "$W/post-manual.tsv" | sort > "$W/merge-delta"
+      ' "$STATE_DIR/manual-merges.tsv" "$W/post-manual.tsv" | sort -u > "$W/merge-delta"
 
       grep '^LOST' "$W/merge-delta" > "$W/merge-lost" || : > "$W/merge-lost"
+      grep '^CHANGED' "$W/merge-delta" >> "$W/merge-lost" || true
       grep '^SHRUNK' "$W/merge-delta" > "$W/merge-shrunk" || : > "$W/merge-shrunk"
 
       if [ -s "$W/merge-lost" ]; then
-        halt "수동 해결을 품었던 머지 $(wc -l < "$W/merge-lost" | tr -d ' ')종이 리베이스 후 건수가 줄었다 — --rebase-merges는 해결을 재적용하지 않는다:"
+        halt "수동 해결을 품었던 머지 $(wc -l < "$W/merge-lost" | tr -d ' ')종이 리베이스 후 사라졌거나 내용이 바뀌었다 — --rebase-merges는 해결을 재적용하지 않는다:"
         awk -F'\t' '{print "  " $2 "  " $3}' "$W/merge-lost"
         info "복구: git log -1 --remerge-diff <원래 머지 해시>로 해결 내용을 확인해 수동 재적용."
       fi
