@@ -43,9 +43,9 @@ cat "$URLS_FILE" | xargs -I {} -P "$PARALLEL" sh -c \
 # 3. 결과 분류
 echo "[3/3] Analyzing results..."
 TOTAL=$(wc -l < "$RESULTS_FILE" | tr -d ' ')
-OK=$(grep -cE "^(2|3)" "$RESULTS_FILE" || echo 0)
-FORBIDDEN_403=$(grep -cE "^403" "$RESULTS_FILE" || echo 0)
-BROKEN=$(grep -cvE "^(2|3|403)" "$RESULTS_FILE" || echo 0)
+OK=$(grep -cE "^(2|3)" "$RESULTS_FILE" || true)
+FORBIDDEN_403=$(grep -cE "^403" "$RESULTS_FILE" || true)
+BROKEN=$(grep -cvE "^(2|3|403)" "$RESULTS_FILE" || true)
 
 echo ""
 echo "============================================"

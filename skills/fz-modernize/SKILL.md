@@ -343,7 +343,7 @@ codex exec \
 2. **Impact Scan** (line 번호 deep-link 의존 모듈 확인):
    ```bash
    # ⛔ Gate 6의 "deep-link 0건?" 판정 근거이므로 **총계를 먼저** 센다 (자른 목록으로 판정하면 틀린다)
-   grep -rnE "guides/\{filename\}:L[0-9]+" modules/ skills/ 2>/dev/null | grep -c . || echo 0
+   grep -rnE "guides/\{filename\}:L[0-9]+" modules/ skills/ 2>/dev/null | grep -c . || true
    grep -rnE "guides/\{filename\}:L[0-9]+" modules/ skills/ 2>/dev/null | head -20   # 표시만 자름
    # line 번호 deep-link 발견 시 → 깨질 위험. path/section 참조만이 안전
    ```
