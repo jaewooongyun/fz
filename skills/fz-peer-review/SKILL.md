@@ -186,9 +186,12 @@ Key Facts + **Mapping Facts** (v4.4.0)를 Analyze 전달 전에 **수집과 다�
 1. Key Facts + Mapping Facts 작성 (refactoring 시 evidence/semantic-mapping.md atom decomposition 포함, v4.4.0)
 2. 각 Fact를 다른 방법으로 재확인. Mapping Fact는 ground truth source 직접 read로 atom-level 재검증 (Mapping Layer SPOF 방어)
 3. 불일치 발견 시 수정
+4. ⛔ Fact 중 **"0건·부재·전부·~뿐"이 결론인 것**은 `modules/cross-validation.md` §Negative-Result Gate를 **Read 후 적용** — positive control(선언이 실재하는 ref에서 같은 패턴이 non-zero를 내는가) + exit code 판정 + 다중 대상이면 라벨. **0건은 「대상 부재」와 「도구 고장」을 구별하지 못한다.**
 ```
 
 원칙: **"Cross-model 검증은 cross-data일 때만 작동한다."** (예: grep -A2로 잘린 결과 → 3-Model 전원 오탐)
+
+> ⛔ **절차 4가 왜 별도 항목인가**: 절차 2의 "다른 방법으로 재확인"은 *매치가 있는* Fact에는 작동하나 **0건에는 발화 조건이 없었다.** 실측 — `git grep -nE '\bSym\b'` 가 ERE `\b` 미지원으로 **에러 없이 0건**을 반환했고, 그 "잔존 소비자 0건"이 evidence에 실려 세 렌즈 전원에게 배포될 뻔했다. 렌즈는 Bash 미보유라 재측정이 불가능하므로 cross-model 이 cross-data 가 아니게 된다. §Negative-Result Gate 는 2026-08-10 부터 존재했고 6곳에서 트리거되나(`lead-reasoning:183` · `system-reminders:24` · `fz-discover:231` · `fz-search:343` · `fz-manage:178,195`) **본 스킬에만 연결이 없었다** — 신설이 아니라 배선 복구다.
 
 ### 4.5. ⛔ 패턴 변환 감지 (diff에 비동기/네트워크/UI 패턴 변경 포함 시)
 
@@ -371,7 +374,7 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 
 > Origin 열: `R`(regression), `P`(pre-existing), `I`(improvement). pre-existing → severity cap: suggestion. **`I`는 cap 없음 — `Sev` 열에 `raw→adj` 병기(⛔ `Final` 열은 confidence이므로 어휘 구분), non-blocking**.
 > Basis 열: `CV`(code-verified), `IO`(inference-only). IO + 3/3 → [correlated] 태그.
-> ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를 **Read 후 실행** — 전체 N / 분석 M 비율 보고. Codex 호출 시 같은 파일 §Reflection Rate도 산출(반영률 = Codex finding 중 최종 리포트 채택 / N · `N<10`은 preliminary·verdict 보류). same-model 교차(Stage 2 arch↔quality)는 `guides/agent-team-guide.md` §Same-model Cross-Verify Reflection Rate 정책대로 headline 제외.
+> ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를 **Read 후 실행** — 전체 N / 분석 M 비율 보고. ⛔ 그중 **부정 주장(0건·부재)** 은 같은 파일 **§Negative-Result Gate**도 함께 적용한다 — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. N 자체가 오측정이면 0/0 으로 통과한다. Codex 호출 시 같은 파일 §Reflection Rate도 산출(반영률 = Codex finding 중 최종 리포트 채택 / N · `N<10`은 preliminary·verdict 보류). same-model 교차(Stage 2 arch↔quality)는 `guides/agent-team-guide.md` §Same-model Cross-Verify Reflection Rate 정책대로 headline 제외.
 
 ### 4.4-4.9. Verification Gates
 
