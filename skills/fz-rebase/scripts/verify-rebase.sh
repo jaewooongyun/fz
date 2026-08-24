@@ -46,9 +46,15 @@
 # 환경변수:
 #   FZ_REBASE_SKIP_REMERGE=1  수동해결 머지 스캔 생략 (머지가 매우 많은 브랜치의 시간 절약)
 #   FZ_REBASE_SKIP_LSREMOTE=1 prepush의 원격 실측 생략 (오프라인 — 보호가 약해진다)
+#   FZ_REBASE_RELOCATE_SHOW=N  삭제 파일의 대체 후보를 몇 개까지 나열할지 (기본 5).
+#                              ⛔ 표시량만 자른다 — 후보 특정 가능성을 판정하는 값이 아니다.
 
 set -euo pipefail
 export LC_ALL=C   # sort/comm 집합 연산의 collation 일치
+
+# 표시 상한: 양의 정수가 아니면 기본값으로 되돌린다 (foo·0·-1 방어)
+RELOCATE_SHOW="${FZ_REBASE_RELOCATE_SHOW:-5}"
+[ "$RELOCATE_SHOW" -gt 0 ] 2>/dev/null || RELOCATE_SHOW=5
 
 STATE_DIR="$(git rev-parse --git-dir)/fz-rebase-state"   # 워크트리에서 .git은 파일 → 리터럴 금지
 HALT_COUNT=0
@@ -99,6 +105,53 @@ diff_lines() {
   '
 }
 
+# 사라진 라인이 트리 다른 경로에 같은 문자열로 존재할 때 후보를 보고한다.
+# ⛔ "착지"가 아니라 "위치 후보"다 — 문자열 일치는 이동의 증거가 아니다.
+# 목적지 파일로 집계해 쌍당 한 줄만 낸다(라인마다 내면 50줄 이동이 WARN 50건이 된다).
+report_moved() {   # $1=출발 경로  $2=사라진 라인 파일  $3=주체 라벨
+  local src="$1" f="$2" who="$3" lines dests
+  [ -s "$f" ] || return 0
+  join -t"$(printf '\t')" -1 1 -2 1 "$f" "$W/tree-index" \
+    | cut -f2 | sort | uniq -c | sort -rn > "$W/.moved-agg"
+  [ -s "$W/.moved-agg" ] || return 0
+  # ⛔ 두 수를 구분한다 — 사라진 라인 수와 그 문자열이 나타나는 목적지 파일 수는 다르다.
+  #    (라인 1줄이 파일 250곳에 있으면 "250건"이 아니라 "1줄 · 250곳"이다)
+  lines="$(wc -l < "$f" | tr -d ' ')"
+  dests="$(wc -l < "$W/.moved-agg" | tr -d ' ')"
+  warn "동일 라인 위치 후보: ${src}에서 ${who} 라인 ${lines}줄이 사라졌고, 같은 문자열이 다른 경로 ${dests}곳에 있다 — 이동/리팩토링에 따른 것인지 사람이 확인할 것"
+  # ⛔ 임시 파일 경로를 안내하지 않는다. $W는 audit마다 rm -rf되고 .moved-agg는 고정
+  #    이름이라 같은 실행 안에서도 다음 호출이 덮어쓴다 — 사용자가 열면 없거나 남의 결과다.
+  head -10 "$W/.moved-agg" | awk '{ print "    " $2 "  (" $1 "줄)" }'
+  [ "$dests" -le 10 ] || echo "    … 외 $((dests - 10))곳 (같은 문자열이 그만큼 흔하다는 뜻이므로 이동 판정에 쓰기 어렵다)"
+}
+
+# 삭제된 경로의 대체 후보를 그 삭제 커밋의 동시 추가에서 찾는다.
+# ⛔ 대체 관계의 증거가 아니라 **같은 커밋이라는 provenance**만 준다.
+#    squash·revert·기능제거와 신규추가 동시 착지에서는 틀린다. 문구도 확정으로 쓰지 않는다.
+relocate_hint() {   # $1=삭제 경로  $2=old_mb  $3=base
+  local p="$1" mb="$2" base="$3" dels ndel c added n
+  # ⛔ `-1`을 쓰지 않는다. 경로 제한 log는 history simplification을 적용해 반환 커밋이
+  #    인과적으로 유일한 삭제라는 보장이 없다 [실측: 병렬 삭제·재추가에서 2건 반환].
+  #    범위를 분기점 이후로 좁히고 --full-history로 전 edge를 본 뒤,
+  #    non-merge 삭제가 정확히 하나일 때만 후보를 낸다.
+  dels="$(git log --full-history --no-merges --diff-filter=D --format=%H "${mb}..${base}" -- "$p" 2>/dev/null || true)"
+  ndel="$(printf '%s\n' "$dels" | grep -c . || true)"
+  if [ "${ndel:-0}" -ne 1 ]; then
+    [ "${ndel:-0}" -le 1 ] || echo "      └ 삭제 커밋이 ${ndel}개라 후보를 특정하지 않는다 (삭제·재추가 반복 또는 머지 해결)"
+    return 0
+  fi
+  c="$(printf '%s\n' "$dels" | head -1)"
+  # ⛔ --no-renames: diff.renames 기본이 true라 D/A 쌍이 R로 재분류될 수 있다.
+  #    literal 추가 목록이 필요하므로 rename 감지를 끈다. -z로 경로 인코딩도 지킨다.
+  added="$(git show --no-renames --name-status --diff-filter=A --format='' -z "$c" 2>/dev/null \
+           | tr '\0' '\n' | awk 'NR%2==0' | grep . || true)"
+  n="$(printf '%s\n' "$added" | grep -c . || true)"
+  [ "${n:-0}" -gt 0 ] || return 0
+  echo "      └ 같은 커밋에서 추가된 파일 ${n}개 — 대체 후보일 수 있으나 확정 아님 ($(git log -1 --format='%h %s' "$c"))"
+  printf '%s\n' "$added" | head -"$RELOCATE_SHOW" | sed 's|^|         |'
+  [ "$n" -le "$RELOCATE_SHOW" ] || echo "         … 외 $((n - RELOCATE_SHOW))개 (전체는 위 커밋에서 확인)"
+}
+
 # 수동 해결(evil merge)을 품은 머지 목록 → "subject<TAB>remerge라인수"
 # 리베이스가 머지를 재생성하면 해시가 바뀌므로 대조 키는 subject다.
 scan_manual_merges() {
@@ -124,9 +177,20 @@ case "$cmd" in
   snapshot)
     base="${2:?snapshot requires <base-ref>}"
     branch="${3:?snapshot requires <branch-ref>}"
-    base_hash="$(git rev-parse "$base")"
-    pre="$(git rev-parse "$branch")"
-    old_mb="$(git merge-base "$base" "$branch")"
+
+    # ⛔ 진입 즉시 이전 상태를 버린다. 아래 해석이 실패하면 스크립트가 종료되는데,
+    #    그때 이전 실행의 meta.env가 남아 있으면 다음 audit이 그것을 정상 snapshot으로
+    #    읽는다(기준선이 어긋난 채 판정). 성공 경로에서만 다시 만든다.
+    rm -rf "$STATE_DIR"
+
+    # `set -e` 하에서 rev-parse/merge-base가 실패하면 die 없이 무음 종료한다 —
+    # 사용자는 아무 메시지도 못 받고, 내용 게이트가 통째로 비활성화된다.
+    base_hash="$(git rev-parse -q --verify "$base" 2>/dev/null || true)"
+    [ -n "$base_hash" ] || die "base ref를 해석할 수 없다: ${base}. fetch 여부와 철자를 확인할 것."
+    pre="$(git rev-parse -q --verify "$branch" 2>/dev/null || true)"
+    [ -n "$pre" ] || die "branch ref를 해석할 수 없다: ${branch}."
+    old_mb="$(git merge-base "$base" "$branch" 2>/dev/null || true)"
+    [ -n "$old_mb" ] || die "${base}와 ${branch}에 공통 조상이 없다. 히스토리가 재작성됐거나 base 지정이 잘못됐다 — 리베이스하면 전체 히스토리가 대상이 되므로 진행하지 않는다. base를 재확인할 것."
     commits="$(git rev-list --count "${base}..${branch}")"
     merges="$(git rev-list --merges --count "${base}..${branch}")"
 
@@ -135,7 +199,6 @@ case "$cmd" in
     anchor="refs/fz-rebase/pre/${branch}-$(echo "$pre" | cut -c1-8)"
     git update-ref "$anchor" "$pre"
 
-    rm -rf "$STATE_DIR"
     mkdir -p "$STATE_DIR"
     {
       echo "FZ_BASE_REF=$base"
@@ -151,7 +214,19 @@ case "$cmd" in
     # base 측 이동/삭제 — 내 hunk의 착지 지점 판정(audit 파티션의 rename 매핑)에 사용
     git -c core.quotePath=false diff -M --diff-filter=R --name-status "$old_mb" "$base" \
       | awk -F'\t' '{print $2 "\t" $3}' | sort -u > "$STATE_DIR/renames.tsv"
+
+    # 기본 임계(50%)에서 놓친 이동을 낮은 임계로 한 번 더 본다.
+    # ⛔ 판정에 쓰지 않는다 — 브리핑 전용이다. 낮은 임계는 오매핑을 만들 수 있어
+    #    audit의 경로 분할에 섞으면 버킷 판정이 흔들린다. 파일을 물리적으로 분리한다.
+    git -c core.quotePath=false diff -M30% --diff-filter=R --name-status "$old_mb" "$base" \
+      | awk -F'\t' '{print $2 "\t" $3}' | sort -u > "$STATE_DIR/.rn-low"
+    comm -13 "$STATE_DIR/renames.tsv" "$STATE_DIR/.rn-low" > "$STATE_DIR/rename-candidates.tsv" || : > "$STATE_DIR/rename-candidates.tsv"
+    rm -f "$STATE_DIR/.rn-low"
+
     git -c core.quotePath=false diff --diff-filter=D --name-only "$old_mb" "$base" | sort -u > "$STATE_DIR/base-deleted.txt"
+    # relocate 조회 전용 — NUL 구분. 위 표시용 목록은 큰따옴표·역슬래시를 C quoting하므로
+    # 그 문자열을 pathspec으로 넘기면 조회가 실패한다 (기존 판정 파일은 그대로 둔다).
+    git -c core.quotePath=false diff --diff-filter=D --name-only -z "$old_mb" "$base" > "$STATE_DIR/base-deleted-z"
 
     changed_paths "$old_mb" "$pre"  > "$STATE_DIR/mine-files.txt"
     changed_paths "$old_mb" "$base" > "$STATE_DIR/incoming-files.txt"
@@ -166,10 +241,25 @@ case "$cmd" in
 
     awk -F'\t' 'FILENAME==ARGV[1]{mine[$0]=1; next} ($1 in mine){print "  이동: " $1 " → " $2}' \
       "$STATE_DIR/mine-files.txt" "$STATE_DIR/renames.tsv" > "$STATE_DIR/.risk" || true
-    awk 'FILENAME==ARGV[1]{mine[$0]=1; next} ($0 in mine){print "  삭제: " $0}' \
-      "$STATE_DIR/mine-files.txt" "$STATE_DIR/base-deleted.txt" >> "$STATE_DIR/.risk" || true
+    awk -F'\t' 'FILENAME==ARGV[1]{mine[$0]=1; next} ($1 in mine){print "  이동 후보(유사도 낮아 확정 아님): " $1 " → " $2}' \
+      "$STATE_DIR/mine-files.txt" "$STATE_DIR/rename-candidates.tsv" >> "$STATE_DIR/.risk" || true
+    # ⛔ NUL 구분 목록을 읽는다. 표시용 base-deleted.txt는 큰따옴표·역슬래시를
+    #    C quoting하므로 그 문자열로는 git 조회가 실패한다.
+    while IFS= read -r -d '' dp; do
+      grep -qxF "$dp" "$STATE_DIR/mine-files.txt" 2>/dev/null || continue
+      echo "  삭제: $dp" >> "$STATE_DIR/.risk"
+      relocate_hint "$dp" "$old_mb" "$base" >> "$STATE_DIR/.risk"
+    done < "$STATE_DIR/base-deleted-z"
+
+    # ⛔ 헤더 건수는 표시 줄 수가 아니라 **unique 원본 경로 수**로 센다.
+    #    한 파일이 이동 후보와 삭제 양쪽에 걸리면 줄은 둘이지만 위험 파일은 하나다.
+    {
+      awk -F'\t' 'FILENAME==ARGV[1]{m[$0]=1; next} ($1 in m){print $1}' "$STATE_DIR/mine-files.txt" "$STATE_DIR/renames.tsv"
+      awk -F'\t' 'FILENAME==ARGV[1]{m[$0]=1; next} ($1 in m){print $1}' "$STATE_DIR/mine-files.txt" "$STATE_DIR/rename-candidates.tsv"
+      awk 'FILENAME==ARGV[1]{m[$0]=1; next} ($0 in m){print $0}' "$STATE_DIR/mine-files.txt" "$STATE_DIR/base-deleted.txt"
+    } 2>/dev/null | sort -u > "$STATE_DIR/.risk-paths" || : > "$STATE_DIR/.risk-paths"
     if [ -s "$STATE_DIR/.risk" ]; then
-      warn "팀원이 이동/삭제한 파일 중 내가 만진 것 $(wc -l < "$STATE_DIR/.risk" | tr -d ' ')건 — 충돌로 표면화되지 않으면 내 변경이 옛 경로에 잔존할 수 있다:"
+      warn "팀원이 이동/삭제한 파일 중 내가 만진 것 $(wc -l < "$STATE_DIR/.risk-paths" | tr -d ' ')건 — 충돌로 표면화되지 않으면 내 변경이 옛 경로에 잔존할 수 있다:"
       cat "$STATE_DIR/.risk"
     else
       info "팀원 이동/삭제 ∩ 내 변경: 없음"
@@ -229,12 +319,36 @@ case "$cmd" in
     base="${2:?audit requires <base-ref>}"
     branch="${3:?audit requires <branch-ref>}"
     [ -f "$STATE_DIR/meta.env" ] || die "snapshot 상태 없음 (${STATE_DIR}). 리베이스 전 snapshot을 실행해야 내용 검증이 가능하다 — 지금은 형태 게이트(check)만 유효."
-    # shellcheck disable=SC1090
-    . "$STATE_DIR/meta.env"
+
+    # ⛔ `. meta.env`로 source하지 않는다. 저장되는 값에 **ref 이름이 들어가고**,
+    #    git은 ref 이름에 `$(...)`·백틱·`|`·`&`를 허용한다(`;`만 거부) — 실측 확인.
+    #    source하면 조작된 브랜치 이름이 audit 시점에 명령으로 실행된다.
+    #    값만 뽑는 파서를 쓴다 (셸 해석 없음).
+    meta_get() { sed -n "s/^$1=//p" "$STATE_DIR/meta.env" | head -1; }
+    FZ_BASE_REF="$(meta_get FZ_BASE_REF)"
+    FZ_BASE_HASH="$(meta_get FZ_BASE_HASH)"
+    FZ_BRANCH_REF="$(meta_get FZ_BRANCH_REF)"
+    FZ_PRE="$(meta_get FZ_PRE)"
+    FZ_OLD_MB="$(meta_get FZ_OLD_MB)"
+    FZ_COMMITS="$(meta_get FZ_COMMITS)"
+    FZ_MERGES="$(meta_get FZ_MERGES)"
+    FZ_ANCHOR="$(meta_get FZ_ANCHOR)"
+    [ -n "$FZ_PRE" ] && [ -n "$FZ_OLD_MB" ] || die "meta.env 파싱 실패 — snapshot 상태가 손상됐다. 재-snapshot 필요."
+
+    # snapshot이 기록한 대상과 지금 판정하려는 대상이 같아야 한다. 다르면 renames·
+    # manual-merges(옛 대상 기준)와 base.map(현 대상)이 섞여 판정이 무의미해진다.
+    [ "$FZ_BASE_REF" = "$base" ] || die "snapshot은 base=${FZ_BASE_REF}로 기록됐는데 audit은 ${base}로 호출됐다 — 같은 대상으로 재-snapshot 후 리베이스할 것."
+    [ "$FZ_BRANCH_REF" = "$branch" ] || die "snapshot은 branch=${FZ_BRANCH_REF}로 기록됐는데 audit은 ${branch}로 호출됐다."
+
     post="$(git rev-parse "$branch")"
 
+    # ⛔ WARN이 아니라 die다. renames.tsv·manual-merges.tsv는 snapshot 시점 base 기준인데
+    #    base.map·base-changed는 지금 base를 읽는다. base가 움직이면 한 판정 안에 기준선이
+    #    둘이 되어 통과든 실패든 신뢰할 수 없다 — 거짓 통과를 남기느니 멈춘다.
     if [ "$(git rev-parse "$base")" != "$FZ_BASE_HASH" ]; then
-      warn "base가 snapshot 이후 이동했다 (${FZ_BASE_HASH} → $(git rev-parse "$base")). 중간 fetch가 끼어들었는지 확인 — 비교 기준이 흔들린다."
+      die "base가 snapshot 이후 이동했다 (${FZ_BASE_HASH} → $(git rev-parse "$base")). renames·manual-merges는 옛 base 기준이고 base.map은 현재 base라 판정이 두 기준선에 걸친다.
+  ⛔ 지금 상태에서 재-snapshot하지 말 것 — 이미 유실됐을 수 있는 POST가 새 PRE가 되어 원래 기준선을 잃는다.
+  복구: 리베이스 진행 중이면 'git rebase --abort'. 완료 후면 'git reset --hard ${FZ_ANCHOR:-$FZ_PRE}'로 되돌린 뒤 새 base에서 snapshot → rebase를 다시 시작한다."
     fi
 
     # 전제: 리베이스가 완료돼 base가 POST의 조상이어야 한다. 미완료 상태에서 판정하면
@@ -316,7 +430,28 @@ case "$cmd" in
     : > "$W/ov-bin"
     if [ -s "$W/overlap" ]; then
       # 트리 전역 라인 집합 1패스 — 코드가 다른 파일로 이동한 경우를 유실로 오판하지 않기 위해
-      git grep -h -I -a -e '' "$post" -- 2>/dev/null | norm_stream | sort -u > "$W/tree-all" || true
+      # ⛔ `-h`를 쓰지 않는다. 같은 1회 스캔에서 경로를 함께 보존하면 "내 라인이 어디로
+      #    갔는가"를 추가 비용 없이 답할 수 있다. tree-all은 여기서 파생한다(소비부 무변경).
+      #    통짜 `sort -u` — `-k1,1`을 붙이면 `-u`가 첫 필드 기준으로 중복을 지워
+      #    같은 라인이 여러 경로에 있을 때 두 번째 경로가 사라진다. TAB 구분에서 1열이
+      #    같으면 2열로 tie-break되므로 join이 요구하는 1열 정렬은 이미 만족한다.
+      # ⛔ 경로에 `:`가 있으면 아래 `-F:` 분리가 경로 일부를 내용으로 오인한다.
+      #    그 오인이 tree-index에 가짜 라인을 넣으면 **원래 HALT였을 유실이 WARN으로
+      #    낮아진다** — 검출 완화는 이 변경의 금지 사항이므로 해당 경로를 아예 제외한다.
+      #    (제외는 tree-all을 줄이므로 판정이 엄격해지는 방향이다.)
+      git grep -I -a -e '' "$post" -- 2>/dev/null \
+        | sed "s|^${post}:||" \
+        | awk -F: -v OFS='\t' '{ pth = $1; ln = substr($0, length(pth) + 2)
+            gsub(/^[ \t]+/, "", ln); gsub(/[ \t]+$/, "", ln)
+            if (length(ln) > 3 && ln !~ /^[[:punct:]]+$/) print ln, pth }' \
+        | sort -u > "$W/tree-index" || true
+      # 콜론 포함 경로 실재 여부를 별도로 확인해 알린다 (인덱스 신뢰 구간 명시)
+      if git ls-tree -r --name-only "$post" | grep -q ':'; then
+        warn "경로에 ':'가 든 파일이 있다 — 위치 후보 인덱스는 그 경로들을 신뢰할 수 없어 제외했다. 해당 파일의 라인은 위치 후보 대신 HALT로 판정된다(엄격 방향)."
+        git ls-tree -r --name-only "$post" | grep ':' | sed 's/^/    /' | head -5
+        awk -F'\t' 'index($2, ":") == 0' "$W/tree-index" > "$W/.ti2" && mv "$W/.ti2" "$W/tree-index"
+      fi
+      cut -f1 "$W/tree-index" | uniq > "$W/tree-all" || true
       : > "$W/l1"; : > "$W/l2"; : > "$W/l3"; : > "$W/l4"
       while IFS= read -r q; do
         [ -n "$q" ] || continue
@@ -335,12 +470,19 @@ case "$cmd" in
         # 경로 접두는 awk로 붙인다 — BSD sed는 치환부 `\t`를 탭으로 해석하지 않고,
         # 경로에 구분자 문자가 있으면 sed 표현식이 깨진다.
         # ①내 추가가 트리에 없음 = 내 변경 유실
-        comm -23 "$W/.myadd" "$W/tree-all" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l1"
+        # 트리 전역에만 없으면 유실(HALT). 이 파일에는 없는데 트리엔 있으면 위치 후보(WARN).
+        comm -23 "$W/.myadd" "$W/.postfile" > "$W/.gone1"
+        comm -23 "$W/.gone1" "$W/tree-all" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l1"
+        comm -12 "$W/.gone1" "$W/tree-all" > "$W/.moved1"
+        report_moved "$q" "$W/.moved1" "내"
         # ②내 삭제가 이 파일에 되살아남 (base가 다시 추가한 것은 제외 — base의 결정)
         comm -23 "$W/.mydel" "$W/.baseadd" | sort -u > "$W/.mydel2"
         comm -12 "$W/.mydel2" "$W/.postfile" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l2"
         # ③팀원 추가가 트리에 없음 = 팀원 변경 덮어쓰기
-        comm -23 "$W/.baseadd" "$W/tree-all" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l3"
+        comm -23 "$W/.baseadd" "$W/.postfile" > "$W/.gone3"
+        comm -23 "$W/.gone3" "$W/tree-all" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l3"
+        comm -12 "$W/.gone3" "$W/tree-all" > "$W/.moved3"
+        report_moved "$q" "$W/.moved3" "팀원"
         # ④팀원 삭제가 되살아남 (내가 다시 추가한 것은 제외 — 내 의도)
         comm -23 "$W/.basedel" "$W/.myadd" | sort -u > "$W/.basedel2"
         comm -12 "$W/.basedel2" "$W/.postfile" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l4"
@@ -363,24 +505,47 @@ case "$cmd" in
       }
       info "버킷③ OVERLAP 텍스트 ${ov_text}개 · 바이너리 ${ov_bin}개 검사 완료."
     else
-      info "버킷③ OVERLAP 없음 — 양방향 조용한 유실의 여지가 구조적으로 없다."
+      info "버킷③ OVERLAP 없음 — 경로별 내용 보존 관점의 유실 여지는 없다 (⛔ 팀원이 같은 로직을 다른 경로에 새로 만든 경우는 이 판정 밖)."
     fi
 
     # ─── 머지 커밋의 수동 해결이 재적용됐는가 ──────────────────────────
     if [ -s "$STATE_DIR/manual-merges.tsv" ]; then
       scan_manual_merges "${base}..${post}" > "$W/post-manual.tsv" || true
-      : > "$W/merge-lost"
-      while IFS="$(printf '\t')" read -r s n; do
-        [ -n "$s" ] || continue
-        if ! awk -F'\t' -v x="$s" '$1 == x { found = 1 } END { exit !found }' "$W/post-manual.tsv" 2>/dev/null; then
-          printf '%s\t%s\n' "$s" "$n" >> "$W/merge-lost"
-        fi
-      done < "$STATE_DIR/manual-merges.tsv"
+
+      # ⛔ subject 하나만 대조하면 같은 subject의 머지가 하나라도 남을 때 나머지 유실이
+      #    통째로 가려진다. 롱텀 브랜치는 "Merge branch 'develop' into ..." 같은 자동
+      #    subject가 반복되므로 이 마스킹이 예외가 아니라 기본이다.
+      #    subject별 **건수 감소**를 유실로 본다. remerge 줄 수 변동은 리베이스가 머지를
+      #    재생성하며 정상적으로 생길 수 있으므로 HALT가 아니라 WARN이다.
+      #    ⛔ `FILENAME == ARGV[1]`로 파일을 구분한다 — `NR==FNR`은 첫 파일이 비면
+      #    무너지고, 수동 해결 머지가 0건인 경우가 대다수다(같은 함정이 위 파티션에도 있다).
+      awk -F'\t' '
+        FILENAME == ARGV[1] { pre[$1]++;  pre_lines[$1]  += $2; next }
+                            { post[$1]++; post_lines[$1] += $2 }
+        END {
+          for (subj in pre) {
+            pc = (subj in post) ? post[subj] : 0
+            if (pre[subj] > pc)
+              printf "LOST\t%s\t(PRE %d건 → POST %d건)\n", subj, pre[subj], pc
+            else if ((subj in post) && post_lines[subj] < pre_lines[subj])
+              printf "SHRUNK\t%s\t(remerge %d줄 → %d줄)\n", subj, pre_lines[subj], post_lines[subj]
+          }
+        }
+      ' "$STATE_DIR/manual-merges.tsv" "$W/post-manual.tsv" | sort > "$W/merge-delta"
+
+      grep '^LOST' "$W/merge-delta" > "$W/merge-lost" || : > "$W/merge-lost"
+      grep '^SHRUNK' "$W/merge-delta" > "$W/merge-shrunk" || : > "$W/merge-shrunk"
+
       if [ -s "$W/merge-lost" ]; then
-        halt "수동 해결을 품었던 머지 $(wc -l < "$W/merge-lost" | tr -d ' ')건이 리베이스 후 그 내용을 잃었다 — --rebase-merges는 재적용하지 않는다:"
-        awk -F'\t' '{print "  " $1 "  (원래 remerge " $2 "줄)"}' "$W/merge-lost"
+        halt "수동 해결을 품었던 머지 $(wc -l < "$W/merge-lost" | tr -d ' ')종이 리베이스 후 건수가 줄었다 — --rebase-merges는 해결을 재적용하지 않는다:"
+        awk -F'\t' '{print "  " $2 "  " $3}' "$W/merge-lost"
         info "복구: git log -1 --remerge-diff <원래 머지 해시>로 해결 내용을 확인해 수동 재적용."
-      else
+      fi
+      if [ -s "$W/merge-shrunk" ]; then
+        warn "머지 건수는 유지됐으나 해결 내용이 줄어든 subject $(wc -l < "$W/merge-shrunk" | tr -d ' ')종 — 재생성에 따른 정상 변동일 수 있으니 사람이 확인할 것:"
+        awk -F'\t' '{print "  " $2 "  " $3}' "$W/merge-shrunk"
+      fi
+      if [ ! -s "$W/merge-lost" ] && [ ! -s "$W/merge-shrunk" ]; then
         info "수동 해결 머지 $(wc -l < "$STATE_DIR/manual-merges.tsv" | tr -d ' ')건 모두 리베이스 후에도 내용 보유."
       fi
     fi
