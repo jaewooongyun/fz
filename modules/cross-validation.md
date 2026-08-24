@@ -573,6 +573,8 @@ GOOD: rg X | wc -l → 11 → 잘림 없이 11줄 직접 확인 후 "사용처 1
 | 함정 | 증상 | 기계 검출 |
 |---|---|---|
 | `grep -E` 안의 `\|` | ERE에서 alternation 아님 → **항상 0건**. ⚠️ BRE(`grep` 무옵션)의 `\|`는 정당 | `lint_contracts.py` **#N4** |
+| `git grep -E` 안의 `\b` | git 의 기본 정규식 엔진은 GNU grep 처럼 `\b`를 처리하지 않는다 → **에러·경고 없이 0건**. 단어 경계가 필요하면 plain 패턴으로 뽑고 눈으로 거른다 | — |
+| 파일명으로 심볼 grep | `AdaptiveSheetOptions.swift` 의 *파일명*으로 타입을 찾으면 0건이 **보장**된다. 삭제 대상이 파일명인지 타입명인지 먼저 구분하고, `git show <ref>:<file> \| grep -E '^\s*(public\|open)'` 로 선언 심볼을 추출한다 | — |
 | zsh unquoted `--include=*.md` | 글로빙되어 `no matches found` → 거짓 0건 | — (셸 세션) |
 | macOS `timeout` 부재 | 측정 도구 부재를 대상 실패로 오독 | — |
 | `awk '/A/,/B/'` 범위 | 끝 헤더에서 멈춰 **구간을 못 읽음** | — |
