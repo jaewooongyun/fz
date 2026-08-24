@@ -95,7 +95,7 @@ covered: 텍스트 라인 추가/삭제(양방향) · 파일 추가 · 파일 �
 | # | 조용한 유실 | 메커니즘 | 판정 |
 |---|------------|---------|------|
 | **L1** | 내 커밋이 통째로 사라짐 | `--empty=drop`이 기본이고, upstream과 동일 패치는 선제 드롭된다 — "commits which are clean cherry-picks ... are detected and dropped as a preliminary step". merge backend는 경고를 내지만 리베이스 로그(+githooks `tuist generate` 출력)에 묻힌다 | Step 3 개수 감소 → 버킷①②③이 흡수 vs 유실 판정 |
-| **L2** | 머지 커밋의 수동 해결이 사라짐 | `--rebase-merges`는 머지를 재생성한다 — "Any resolved merge conflicts or manual amendments in these merge commits will have to be resolved/re-applied manually". **머지 개수는 보존**된다. `rerere` 미설정이면 자동 재사용도 없다 | Step 1.5가 `--remerge-diff`로 사전 목록화 → Step 3.5가 subject로 대조(재생성 머지는 해시가 바뀜) + 버킷① |
+| **L2** | 머지 커밋의 수동 해결이 사라짐 | `--rebase-merges`는 머지를 재생성한다 — "Any resolved merge conflicts or manual amendments in these merge commits will have to be resolved/re-applied manually". **머지 개수는 보존**된다. `rerere` 미설정이면 자동 재사용도 없다 | Step 1.5가 `--remerge-diff`로 사전 목록화 → Step 3.5가 **(subject, 해결내용 해시)** 로 대조 + 버킷①. ⛔ 추가 라인 없는 해결(한쪽 선택·삭제·바이너리)은 해시로 구분되지 않아 `NOPLUS`로 표기하고 건수로만 판정한다 |
 | **L3** | 내 hunk가 옛 경로에 잔존 | 팀원이 옮기거나 지웠고 rename 감지가 실패 — 유사도 미달·파일 분할·`merge.renameLimit` 기본 7000 초과 | rename 매핑 + 버킷②("옛 경로는 부재여야 함") |
 | **L4** | 팀원 변경을 내가 버림 (충돌 해결) | 리베이스에서 `ours`는 base 측, `theirs`가 내 커밋 — "In other words, the sides are swapped". 직관과 반대라 해결 방향이 뒤집힌다 | Step 3-C 역전 명시 + 버킷②③ |
 | **L5** | 팀원 변경을 내가 버림 (무충돌) | 3-way merge는 겹치지 않는 hunk를 조용히 병합한다 → 전체 재작성 커밋이나 생성물(xcstrings·Package.resolved·Secrets)이 base 최신을 되돌린다 | 버킷② + 귀속 커밋 제시 |

@@ -260,7 +260,7 @@ else
 fi
 assert "S23b 중복 subject 머지 감소 검출" HALT "$CODE" "$OUT"
 # ⛔ 다른 이유의 HALT(리베이스 미완료 등)를 감소 검출로 오인하지 않도록 사유를 확인한다.
-assert_has "S23c HALT 사유가 머지 건수 감소" "건수가 줄었다" "$OUT"
+assert_has "S23c HALT 사유가 머지 유실/변경" "사라졌거나 내용이 바뀌었다" "$OUT"
 assert_has "S23d PRE→POST 건수 명시" "PRE 2건 → POST 1건" "$OUT"
 
 echo "── S7: 내가 지운 파일 + 팀원이 수정 → 팀원 것 유지로 해소 → 내 삭제 유실"
@@ -469,6 +469,54 @@ cd "$D/work" || exit 1; g fetch -q origin
 OUT=$(bash "$VR" prepush feature origin feature 2>&1); assert "S14 원격 evil merge 파괴 검출" HALT "$?" "$OUT"
 
 echo ""
+echo "── S38: 추가 라인 없는 해결이 있어도 머지 스캔이 잘리지 않는다"
+# grep '^+' 0매치가 set -e 하에서 파이프라인을 죽이면 호출부 `|| true`가 삼켜
+# 이후 머지가 통째로 누락된다. 삭제로 해소한 머지 뒤에 정상 evil merge를 둬서 확인한다.
+newrepo s38
+g checkout -q feature
+printf 'x1\nx2\nx3\n' > src/C38.swift; g add -A; g commit -qm "add C38"
+g checkout -q -b side38a feature
+printf 'x1\nSIDE\nx3\n' > src/C38.swift; g add -A; g commit -qm side38a
+g checkout -q feature; printf 'x1\nFEAT\nx3\n' > src/C38.swift; g add -A; g commit -qm featchg38
+g merge --no-ff side38a >/dev/null 2>&1 || true
+g rm -q src/C38.swift >/dev/null 2>&1; g -c core.editor=true commit -qm "Merge side38a (delete)" >/dev/null 2>&1
+g checkout -q -b side38b feature
+printf 'y1\nSIDE2\ny3\n' > src/D38.swift; g add -A; g commit -qm side38b
+g checkout -q feature; printf 'y1\nFEAT2\ny3\n' > src/D38.swift; g add -A; g commit -qm featchg38b
+g merge --no-ff side38b >/dev/null 2>&1 || true
+printf 'y1\nRESOLVED2\ny3\n' > src/D38.swift; g add -A
+g -c core.editor=true commit -qm "Merge side38b" >/dev/null 2>&1
+g checkout -q develop; printf 'u38\n' > src/U38.swift; g add -A; g commit -qm team38
+g checkout -q feature
+OUT=$(bash "$VR" snapshot develop feature 2>&1)
+assert_has "S38 스캔이 잘리지 않아 머지 2건 모두 기록" "머지 2건" "$OUT"
+assert_has "S38b 추가 라인 없는 해결은 NOPLUS로 표기" "NOPLUS" "$OUT"
+
+echo "── S36: 머지 해결이 다른 해결로 대체되면 검출 (subject·건수 근사가 놓치던 것)"
+# subject도 같고 머지 수도 같은데 해결 내용만 바뀐 경우. 해결 결과(+ 라인) 해시로 구분한다.
+newrepo s36
+g checkout -q feature
+printf 'x1\nx2\nx3\n' > src/B36.swift; g add -A; g commit -qm "feature: add B36"
+g checkout -q -b side36 feature
+printf 'x1\nSIDE36\nx3\n' > src/B36.swift; g add -A; g commit -qm side36
+g checkout -q feature
+printf 'x1\nFEAT36\nx3\n' > src/B36.swift; g add -A; g commit -qm "feature change 36"
+g merge --no-ff side36 >/dev/null 2>&1 || true
+printf 'x1\nRESOLUTION_ORIGINAL\nx3\n' > src/B36.swift; g add -A
+g -c core.editor=true commit -qm "Merge side36 into feature" >/dev/null 2>&1
+g checkout -q develop; printf 'u36\n' > src/U36.swift; g add -A; g commit -qm "team: unrelated"
+g checkout -q feature
+bash "$VR" snapshot develop feature >/dev/null 2>&1
+g rebase --rebase-merges develop >/dev/null 2>&1
+i=0
+while { [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; } && [ "$i" -lt 12 ]; do
+  i=$((i+1))
+  printf 'x1\nRESOLUTION_DIFFERENT\nx3\n' > src/B36.swift 2>/dev/null; g add -A >/dev/null 2>&1
+  g -c core.editor=true rebase --continue >/dev/null 2>&1 || g rebase --skip >/dev/null 2>&1 || break
+done
+OUT=$(bash "$VR" audit develop feature 2>&1)
+assert_has "S36 해결 내용 대체를 검출" "해결 내용이 다르다" "$OUT"
+
 echo "── S26: ref 이름에 든 셸 메타문자가 audit에서 실행되지 않는다 (인젝션 방어)"
 # git은 ref 이름에 `$(...)`·백틱·`|`·`&`를 허용한다(`;`만 거부 — 실측).
 # meta.env를 source하면 그 이름이 audit 시점에 명령으로 실행된다.
@@ -653,6 +701,7 @@ skill_lacks() {  # $1=라벨 $2=있으면 안 되는 패턴
 skill_lacks "K3b 고정 귀속 라벨 부재"                 "ours   = 리베이스된 base 측"
 skill_has "K9 대체 후보 안내 존재"                    "대체의 증거가 아니다"
 skill_has "K9c 후보와 확정 매핑의 분리 명시"           "판정에는 쓰지 않는다"
+skill_has "K10 머지 대조가 해결 내용 해시 기반"         "해결내용 해시"
 # ⛔ F-025: 존재만 검사하면 확정 어휘가 병존해도 통과한다. 금지 literal을 함께 본다.
 skill_lacks "K9b 후보를 확정으로 쓰는 어휘 부재"        "대체됨"
 skill_has "K4 배치 상한 4개 명시"                    "한 번에 질문 4개가 상한"
