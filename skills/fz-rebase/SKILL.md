@@ -140,6 +140,12 @@ bash "$VR" snapshot "${BASE}" "${LTB}"
     ⛔ 같은 커밋이라는 provenance일 뿐 대체의 증거가 아니다. 삭제 커밋이 여럿이거나
     머지로 들어왔으면 후보를 내지 않는다. 표시 개수는 `FZ_REBASE_RELOCATE_SHOW`(기본 5).
 - **수동 해결을 품은 머지** — 있으면 L2 대상. `--rebase-merges`가 재적용하지 않는다.
+- **base 신선도** — base가 원격 추적 ref이면 `ls-remote`로 대조한다. `fetch --all`은 일부
+  원격이 실패해도 exit 0일 수 있어(권한·네트워크), stale한 base 위로 리베이스하면 게이트가
+  전부 통과한다. 게이트는 "base 대비 보존"을 볼 뿐 "base가 최신인지"는 보지 않는다.
+  ⛔ 확인 실패는 WARN이다 — 오프라인에서 판정을 막지 않는다. `FZ_REBASE_SKIP_LSREMOTE=1`로 끌 수 있다.
+  ⛔ stale의 실제 원인은 `remote.<name>.skipFetchAll`·fetch refspec 제외·호출자의 오류 무시다
+  (`fetch --all`은 child 실패 시 nonzero를 반환한다).
 
 롤백 앵커는 `refs/fz-rebase/pre/<branch>-<shorthash>` ref로 남는다. 이름에 해시가 들어가므로 **snapshot 재실행이 이전 앵커를 덮어쓰지 못하고**, ref이므로 GC 대상에서도 벗어난다(audit이 PRE 트리를 계속 읽을 수 있는 근거). 완료 후 정리: `git for-each-ref refs/fz-rebase/`로 확인 → `git update-ref -d <ref>`.
 
