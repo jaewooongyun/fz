@@ -232,6 +232,16 @@ scripts/codex-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effo
 | 1 | `codex` 종료코드 == 0 | **12** | 측정 실패 |
 | 2 | `-o` 파일 존재 + 비어있지 않음 | **13** | 측정 실패 |
 | 3 | `--schema` 지정 시 **스키마 계약** 충족 (`scripts/validate-codex-output.py`) | **14** | 측정 실패 |
+| 4 | **cwd 오염 없음** — 호출 전후 `git status --porcelain` 동일 | 경고 | 위임 프로세스가 대상 repo에 파일을 남겼다 |
+
+⛔ **게이트 4의 근거**: `--cd`로 지정한 디렉토리는 위임 프로세스의 **쓰기 대상**이기도 하다. 팀 레포를 `--cd`로 준 호출이 산출물 17개를 그 안에 남긴 실측이 있다(gitignore 미적용). 읽기 전용이라는 가정은 **호출자의 것이지 도구의 계약이 아니다**.
+
+```bash
+BEFORE="$(git -C "$CD" status --porcelain 2>/dev/null)"
+scripts/codex-exec.sh ... ; RC=$?
+AFTER="$(git -C "$CD" status --porcelain 2>/dev/null)"
+[ "$BEFORE" = "$AFTER" ] || echo "WARN: cwd 오염 — 새 파일을 개인 경로로 옮겨라: $(diff <(printf '%s' "$BEFORE") <(printf '%s' "$AFTER") | grep '^>')" >&2
+```
 
 ⛔ 게이트 3은 **문법이 아니라 계약**을 본다 — required·type·enum·`additionalProperties`·`$ref`를 재귀 검사한다. 1차 구현은 `json.load` 성공만 봐서 **`{}` 가 `GATE-PASS issues=0` 으로 통과**했다(감사 ISSUE-013). ⛔ `jsonschema` 부재(실측)로 표준 라이브러리 부분집합 구현 — 미지원 키워드(oneOf/allOf/pattern 등)는 검사하지 않고 통과시키며 그 범위를 스크립트 docstring에 명시한다.
 
