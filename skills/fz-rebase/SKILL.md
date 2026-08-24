@@ -86,6 +86,14 @@ PUSH_REMOTE=<TRACK의 원격 부분>
 
 covered: 텍스트 라인 추가/삭제(양방향) · 파일 추가 · 파일 삭제 · 파일 이동 · 바이너리 내용 · 파일 mode · symlink 대상 · gitlink(submodule) · 머지 커밋 수동 해결 · 커밋 드롭 · force-push non-merge 파괴 · force-push 머지 파괴.
 
+### 의도적으로 다루지 않는 것 3건
+
+| 항목 | 이유 |
+|------|------|
+| 팀원이 같은 로직을 **다른 경로에 신설**(옛 파일 유지) | 삭제가 없어 신호가 성립하지 않는다. 세 버킷 모두 통과하고 충돌도 나지 않는다 |
+| 라인 겹침 기반 relocate 검출 | 재작성 대역에서 겹침이 **구조적으로 0**이다 [실측]. 임계값을 어떻게 잡아도 닿지 않는다 |
+| `capture` 서브커맨드 제거 | 내부 호출 0건이나 외부 소비자는 원리적으로 관측 불가. 기능 이득이 없어 major 전까지 둔다 |
+
 ⛔ **비대상 2건**: **커밋 메타데이터**(author·메시지·trailer 변형 — `--rebase-merges`가 committer를 바꾸는 것은 정상) · **워킹트리 dirty/stash 유실**(Step 0이 dirty를 중단시키지만, 사용자가 stash한 뒤 잊는 경로는 이 게이트 밖). 둘은 리베이스 *내용* 유실이 아니라 워크플로 인접 문제다.
 
 ## 조용한 유실 6종 — 왜 조용한가
@@ -321,8 +329,8 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 
 ### Functional
 
-회귀 oracle: `bash <FZ_ROOT>/skills/fz-rebase/scripts/test-gates.sh` (65 assertion).
-구성은 유실 검출 · 오경보 방지 · **SKILL 정적 계약**(K1~K8) 셋이다. 셋째는 충돌 확인 절차가
+회귀 oracle: `bash <FZ_ROOT>/skills/fz-rebase/scripts/test-gates.sh` (73 assertion).
+구성은 유실 검출 · 오경보 방지 · **SKILL 정적 계약**(K 계열) 셋이다. 셋째는 충돌 확인 절차가
 문서에서 사라지는 것을 잡는다 — 그 절차는 스크립트가 아니라 프롬프트라 동작 oracle이 없다.
 
 | Given | When | Then |
