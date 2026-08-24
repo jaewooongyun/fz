@@ -13,7 +13,8 @@
 #
 # usage:
 #   codex-exec.sh review --cd DIR --out FILE (--base BR | --uncommitted | --commit SHA)
-#                        [--effort E] [--schema F] [--title T] [--add-dir D] [--ephemeral]
+#                        [--effort E] [--schema F] [--title T] [--ephemeral]
+#                        ⛔ review 는 --add-dir 미지원 (codex exec review 가 거부) — exec 모드를 쓸 것
 #                        [--expected-branch B]
 #   codex-exec.sh exec   --cd DIR --out FILE --prompt-file F
 #                        [--effort E] [--schema F] [--add-dir D]
@@ -77,6 +78,9 @@ fi
 
 # ── 사전 게이트 2: 경로·파일 존재
 [ -n "$CD" ] || die 10 "--cd 필수"
+# ⛔ review 는 `--add-dir` 를 받지 않는다 (F-015) — 조용히 무시하면 "컨텍스트 확장됨"으로 오인된다.
+[ "$MODE" = "review" ] && [ "${#ADD_DIRS[@]}" -gt 0 ] \
+  && die 10 "review 모드는 --add-dir 미지원 (codex exec review 가 거부). exec 모드를 쓰거나 --add-dir 를 빼라"
 [ -d "$CD" ] || die 11 "--cd 디렉토리 없음: $CD"
 [ -n "$OUT" ] || die 10 "--out 필수"
 [ -n "$PROMPT_FILE" ] && { [ -s "$PROMPT_FILE" ] || die 11 "프롬프트 파일 없음/빈 파일: $PROMPT_FILE"; }
@@ -125,11 +129,13 @@ if [ "$MODE" = "review" ] && [ "$IS_REPO" -eq 1 ]; then
   [ "$N_FILES" -gt 0 ] || echo "WARN: 변경 파일 0개 — 리뷰 대상이 비어 있다" >&2
 fi
 
-ARGS=(-C "$CD" -c "sandbox_permissions=[\"disk-full-read-access\"]" -c "model_reasoning_effort=$EFFORT")
+# ⛔ 공용 ARGS에는 **review·exec 양쪽이 수용하는 플래그만** 넣는다 (F-015).
+#    `-C/--cd` 와 `--add-dir` 는 `codex exec review` 가 거부한다 → exec 전용 배열로 분리.
+#    검증: scripts/check-codex-flags.sh (양 서브커맨드 --help 전수 대조)
+ARGS=(-c "sandbox_permissions=[\"disk-full-read-access\"]" -c "model_reasoning_effort=$EFFORT")
 [ -n "$SKIP_FLAG" ] && ARGS+=("$SKIP_FLAG")
 [ -n "$SCHEMA" ] && ARGS+=(--output-schema "$SCHEMA")
 [ -n "$EPHEMERAL" ] && ARGS+=("$EPHEMERAL")
-for d in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do ARGS+=(--add-dir "$d"); done
 ARGS+=(-o "$OUT")
 
 LOG="${OUT}.stream.log"
@@ -138,9 +144,13 @@ rm -f "$OUT"
 # ── 호출 (hygiene §1 stdin close · §3 -o · §7 `--` 구분자)
 if [ "$MODE" = "review" ]; then
   [ -n "$TITLE" ] && ARGS+=(--title "$TITLE")
-  codex exec review "${ARGS[@]}" "${SCOPE_ARGS[@]}" < /dev/null > "$LOG" 2>&1
+  # ⛔ review 는 `-C` 를 받지 않는다 → 서브셸 cwd 전환으로 작업 디렉토리를 확보한다.
+  #    ( ) 안에서만 cd 하므로 호출자 cwd 는 불변이다.
+  ( cd "$CD" && codex exec review "${ARGS[@]}" "${SCOPE_ARGS[@]}" < /dev/null ) > "$LOG" 2>&1
 else
-  codex exec "${ARGS[@]}" -- "$(cat "$PROMPT_FILE")" < /dev/null > "$LOG" 2>&1
+  EXEC_ARGS=(-C "$CD")
+  for d in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do EXEC_ARGS+=(--add-dir "$d"); done
+  codex exec "${EXEC_ARGS[@]}" "${ARGS[@]}" -- "$(cat "$PROMPT_FILE")" < /dev/null > "$LOG" 2>&1
 fi
 CODEX_EXIT=$?
 
