@@ -517,6 +517,19 @@ done
 OUT=$(bash "$VR" audit develop feature 2>&1)
 assert_has "S36 해결 내용 대체를 검출" "해결 내용이 다르다" "$OUT"
 
+echo "── S37: 롤백 앵커가 남아 있으면 prepush가 정리를 알린다"
+newrepo s37
+g checkout -q feature
+printf 'line1\nline2\nMINE37\nline4\nline5\n' > src/A.swift
+g add -A; g commit -qm mine37
+REMOTE37="$ROOT/remote37.git"; git init -q --bare "$REMOTE37"
+g remote add origin "$REMOTE37"; g push -q origin feature 2>/dev/null
+g branch --set-upstream-to=origin/feature feature >/dev/null 2>&1
+bash "$VR" snapshot develop feature >/dev/null 2>&1
+OUT=$(bash "$VR" prepush feature origin feature 2>&1)
+assert_has "S37 앵커 정리 안내" "롤백 앵커" "$OUT"
+assert_has "S37b 정리 명령 제시" "update-ref -d" "$OUT"
+
 echo "── S26: ref 이름에 든 셸 메타문자가 audit에서 실행되지 않는다 (인젝션 방어)"
 # git은 ref 이름에 `$(...)`·백틱·`|`·`&`를 허용한다(`;`만 거부 — 실측).
 # meta.env를 source하면 그 이름이 audit 시점에 명령으로 실행된다.

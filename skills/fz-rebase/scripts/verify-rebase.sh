@@ -662,6 +662,22 @@ case "$cmd" in
       echo "HALT 총 ${HALT_COUNT}건 — force-push 금지."
       exit 1
     fi
+    # 롤백 앵커는 ref라 GC를 면한다 — 정리하지 않으면 계속 쌓인다 [실측: 6건 잔존].
+    # push 직전이 정리 시점을 알리기 좋은 자리다. ⛔ 자동 삭제는 하지 않는다 —
+    # 사용자가 결과를 확인하기 전에 복구점을 지우면 안 된다.
+    _anchors="$(git for-each-ref --format='%(refname)' refs/fz-rebase/ 2>/dev/null | grep -c . || true)"
+    if [ "${_anchors:-0}" -gt 0 ]; then
+      # prepush 절은 meta.env를 source하지 않으므로 이번 앵커를 직접 읽는다.
+      _this_anchor="$(sed -n 's/^FZ_ANCHOR=//p' "$STATE_DIR/meta.env" 2>/dev/null | head -1 || true)"
+      info "롤백 앵커 ${_anchors}건이 남아 있다. push 후 결과를 확인했으면 이번 것만 지운다:"
+      if [ -n "$_this_anchor" ]; then
+        info "  git update-ref -d ${_this_anchor}"
+      else
+        info "  git for-each-ref --format='%(refname)' refs/fz-rebase/ 로 확인 후 git update-ref -d <ref>"
+      fi
+      info "  ⛔ 전체 삭제는 피한다 — 다른 브랜치의 진행 중 앵커가 섞여 있을 수 있다."
+    fi
+
     info "lease pin 권장: git push ${remote} ${branch} --force-with-lease=${rbranch}:${local_track}"
     echo "OK: prepush 게이트 통과 (원격 ${local_track} → 로컬 $(git rev-parse "$branch"))."
     ;;
