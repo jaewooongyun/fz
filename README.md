@@ -183,6 +183,12 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 v4.22.0에서 **일몰 완료** — 실제 TeamCreate 호출부 0건. `patterns/*.md`는 canonical 라운드 의미론으로 보존. 규약: `guides/skill-authoring.md` §12.
 
+### What's New (v4.24.0) — 게이트가 조용히 꺼져 있던 자리를 닫았다 [MINOR]
+
+`codex exec review`가 거부하는 플래그를 wrapper가 공용 배열로 넘겨 **교차검증 네 경로(review·check·final·commit)가 exit 2**였다. 비정상 종료라 "이슈 0건"으로 오독될 위험이 상시였다. 같은 축으로 `grep -c … || echo 0`이 정수 비교를 죽여 risk escalation이 무발화했고, `Negative-Result Gate`는 6곳에서 트리거되면서 정작 `fz-peer-review`에만 연결이 없었다 — **신설이 아니라 배선 복구**가 처방이었다.
+
+발견 큐와 승격 원장이 서로를 모르던 것도 닫았다(상호 참조 0건 → 진입 절차 정의 + 트랙 D). P-track 재평가에서 5건 중 3건이 이미 구현돼 있어 관측 대상이 6항목에서 1항목으로 줄었다.
+
 ### What's New (v4.23.1) — 배선 복구: 정의된 팀의 2/3이 안 돌고 있었다 [PATCH]
 
 `agent-team-guide`는 code-* 실질 워커를 **review-arch·impl-quality·review-correctness**로 정의하지만 Wave 3 Workflow 전환에서 **arch만 배선**됐다. 대조군 `plan-collaborative`는 정의된 5개를 전수 스폰한다 — `code-pair`만 "Codebase Pattern Consistency" 전담 렌즈가 빠져 있었고, 그래서 *같은 블록 형제 슬롯*의 표현 비대칭(상수 vs 리터럴)이 무방비였다.
