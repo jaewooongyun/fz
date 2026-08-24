@@ -99,7 +99,7 @@ else
 
   # Risk-based escalation (auto일 때만 적용. 6 카테고리 → cap=Tier 2)
   RISK_PATTERN='auth|token|secret|credential|authorization|permission|role|admin|session|keychain|crypto|certificate|privacy|payment|billing|refund|IAP|InAppPurchase|StoreKit|migration|schema|CoreData|database|sql|public func|public class|public protocol|deinit|removeFromSuperview|deleteAll|@MainActor|actor |async |Task \{|withCheckedContinuation|xcconfig|Package\.swift|ci_scripts'
-  RISK_MATCHES=$(grep -cE "$RISK_PATTERN" "${WORK_DIR}/diff.patch" 2>/dev/null || echo 0)
+  RISK_MATCHES=$(grep -cE "$RISK_PATTERN" "${WORK_DIR}/diff.patch" 2>/dev/null || true)
   if [ "$RISK_MATCHES" -ge 2 ]; then TIER=$((TIER + 2))
   elif [ "$RISK_MATCHES" -ge 1 ]; then TIER=$((TIER + 1))
   fi
