@@ -135,15 +135,15 @@ echo 'alias cfz="claude --plugin-dir ~/dev/fz-plugin"' >> ~/.zshrc
 ```
 fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
-├── skills/          20개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
+├── skills/          21개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
 ├── agents/          13개 — plan-structure, impl-correctness, review-arch ...
-├── workflows/       5개 — 네이티브 Workflow 결정적 스크립트 (discover-adversarial, plan-collaborative, code-pair ...)
-├── modules/         37개 — team-core, pipelines, cross-validation, lead-action-default, codex-strategy, memory-guide, fz-codex-bash-hygiene, fz-codex-subcommands-core/aux, swift-anti-pattern-preblock ...
+├── workflows/       6개 — 네이티브 Workflow 결정적 스크립트 (discover-adversarial, plan-collaborative, code-pair ...)
+├── modules/         41개 — team-core, pipelines, cross-validation, lead-action-default, codex-strategy, memory-guide, fz-codex-bash-hygiene, fz-codex-subcommands-core/aux, swift-anti-pattern-preblock ...
 │   └── patterns/    5개 — adversarial, collaborative, pair-programming ...
-├── guides/          7개 — prompt-optimization, skill-authoring, harness-engineering ...
+├── guides/          9개 — prompt-optimization, skill-authoring, harness-engineering, agent-team-guide, skill-testing, fable-model-guide, llm-references ...
 ├── codex-skills/    8개 — Codex 네이티브 스킬 + Authority 인용 + Memory Lesson inline (fz-reviewer, fz-architect ...)
 ├── schemas/         5개 — Codex JSON 응답 스키마 (MAST/LLM-PeerReview/VeriGuard/CoVe 권위 출처)
-├── scripts/         setup-codex-skills.sh
+├── scripts/         11개 — lint 3(contracts·doc_freshness·model-explicit) · codex-exec · check-codex-flags · health-check ...
 └── templates/       스킬/에이전트/CLAUDE.md 생성 템플릿
 ```
 
@@ -188,41 +188,6 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 `codex exec review`가 거부하는 플래그를 wrapper가 공용 배열로 넘겨 **교차검증 네 경로(review·check·final·commit)가 exit 2**였다. 비정상 종료라 "이슈 0건"으로 오독될 위험이 상시였다. 같은 축으로 `grep -c … || echo 0`이 정수 비교를 죽여 risk escalation이 무발화했고, `Negative-Result Gate`는 6곳에서 트리거되면서 정작 `fz-peer-review`에만 연결이 없었다 — **신설이 아니라 배선 복구**가 처방이었다.
 
 발견 큐와 승격 원장이 서로를 모르던 것도 닫았다(상호 참조 0건 → 진입 절차 정의 + 트랙 D). P-track 재평가에서 5건 중 3건이 이미 구현돼 있어 관측 대상이 6항목에서 1항목으로 줄었다.
-
-### What's New (v4.23.1) — 배선 복구: 정의된 팀의 2/3이 안 돌고 있었다 [PATCH]
-
-`agent-team-guide`는 code-* 실질 워커를 **review-arch·impl-quality·review-correctness**로 정의하지만 Wave 3 Workflow 전환에서 **arch만 배선**됐다. 대조군 `plan-collaborative`는 정의된 5개를 전수 스폰한다 — `code-pair`만 "Codebase Pattern Consistency" 전담 렌즈가 빠져 있었고, 그래서 *같은 블록 형제 슬롯*의 표현 비대칭(상수 vs 리터럴)이 무방비였다.
-
-- ⭐ **`code-pair` Stage 2 → arch + impl-quality 병렬 2렌즈**(full 모드). 두 렌즈 결과를 단일 `review` 객체로 병합해 하류 계약(`s2` 완주 판정·Stage3 조건·`residualIssues`)을 보존한다. light는 arch 단독 유지(비용 보존) · opus 동시 ≤2
-- **검증 4-P 신설**(candidate) — "편집 라인이 놓인 *자리*가 일관적인가". 오탐 실측(peer slot 11곳 → emit 9곳 중 **진짜 1곳**)을 절차에 반영: **형제 균일성 게이트**(형제가 애초에 불균일하면 중단) · **소비처 의존 축 제외**(접근수준·소유권은 정의상 소비처가 결정 → in-block 판정 불가) · 의미 비대칭 면제 · provenance tie-break
-- ⛔ **"축 부재" 진단 철회 — 자기 재현 기록**: 초판은 이 관찰을 §5 "원칙 8"로 신설하며 *"형제 관계를 보는 렌즈가 어디에도 없다"* 고 단정했으나 **6개 실재**했다(그중 `skill-authoring` §1 Sibling-Convention Check는 **동일 실패 모드**로 이미 candidate 등재). 조사 대상을 3개로 스스로 한정하고 커버리지 실측 없이 홀을 선언한 것 자체가 그 관찰이 겨냥한 실패 모드다. 정확한 진단 = **입도 부족 + 소유자 미배선**
-- **§5 원칙 8 → §12 R8-A 강등**: 문서는 헤더·§설계원칙에서 *"공식/학술/고품질 출처만 인용"* 을 자기 정책으로 명시하는데, 원칙 1~7은 전부 외부 권위인 반면 원칙 8만 **자체 세션 관측 1건**이었다. 원칙 번호를 점유하면 하류가 동급 권위로 인용한다 → "하네스 홀 candidate" 표로 이동(외부 근거 = **미대조**), 하류 참조 8곳 갱신
-- **ledger 집행 결함 시정**: L-11 동축 판정을 선언만 하고 미집행 → 관측 #3 등재(evidence 2→3) · L-1 관측번호 충돌(#2 중복 → #4) · L-13 승격 조건에 **회귀 fixture 2개**(§5.5 규율 1) 추가
-- 상세: [docs/releases/v4.23.1.md](docs/releases/v4.23.1.md)
-
-> ⛔ **철회한 자기 주장 2건**: *"in-block 비용 0"* → 접근수준 판정에 타 파일 Read·리포 grep이 실제로 필요했다. *"기계 검증 원리적 불가"* → magic-number lint가 잡는 부류이며 lint 대안 검토는 선행 과제로 남는다.
-> ⛔ **미해결 3건**: 이중 등재(`fz-code` 신호 + 4-P) · `fz-review` 검증 4 원문 모순(*"유일하게 diff 밖"* vs *"검증 4는 diff 안"*) · `code-pair` S4 결정 근거 미추적.
-
----
-
-### What's New (v4.23.0) — 누적 통합: 계약 lint 결정화 · 리뷰 구조 판정 축 · llm-references §1.1b [MINOR]
-
-v4.22.0 이후 누적된 23커밋(**138자산 전수 자기 감사** 기반)을 하나로 발행. 초안 번호 4.23.0~4.25.0은 태그·Release 어디에도 없어 폐기하고 v4.23.0으로 통합했다(구간 `[MAJOR]` 0건 → semver 정합).
-
-- ⭐ **`scripts/lint_contracts.py` 신설 — `/fz-manage check` 17항목의 결정화**: 항목이 **전부 언어 지시**였고 check용 스크립트가 0개였다 → 정의된 검사(깨진 참조·모듈 목차)가 있는데도 위반이 생존했다. 현재 **24항목**(DETERMINISTIC 15 / THRESHOLD 3 / SEMANTIC 6, ⛔ 손으로 세지 말고 `--list` 전사). 첫 실행 129건 → 탐지기 교정 4회 → 위반 0건
-- ⭐ **계측기가 자기 유효성을 증명한다 — 양성 대조 하네스**: `hits`는 *본 후보 수*라 패턴이 고장나도 0이 아니다 → "위반 0건 exit 0"이 깨끗함의 증거가 아니었다. fixture **46건 + 통합 5검사(9 위치)** 가 매 실행 선행하고, 실패는 **exit 2(configuration error)** 로 분리된다(PASS·SKIP 아님). 의도적 회귀 5종(무조건 `[]`·판정 반전·확장자 오필터·디렉토리 오제외·그럴듯한 가짜 히트) 전부 exit 2로 검출
-- **inert frontmatter 3종 51선언 제거**: `team-agents`(9)·`composable`(21)·`model-strategy`(21) — 전부 **런타임 효과 0**인 fz 자작 필드였고 형제 간 불일치가 stale 위험을 실증했다. 실효 결정자(`workflows/*.js` / `provides`·`needs`)를 `governance.md §Truth-of-Source`에 **4항목 정본 지정**
-- ⭐ **`cross-validation.md` §Negative-Result Gate 신설**: 신규 규칙이 아니라 **수신처에 구현이 없던 위임**을 채운 것. positive control · 신호 보존(`>/dev/null` 금지) · 귀속 라벨. 근거는 단일 세션 **12 인스턴스** 실측 — 그중 *0건 자체를 의심해서* 잡은 건 **0건**
-- ⭐ **리뷰의 구조 판정 축 신설**(`review-structural-axes.md`, peer-review ↔ fz-review 공유): 리뷰가 결함은 잘 찾고 **더 나은 구조는 못 찾던** 문제. **통제 A/B**(스키마·cap·에이전트·모델 고정, 브리프만 교체)에서 1콜이 대안 9/10 · 기존 3-렌즈 24건 미포착 **신규 6건** · 삭제가능 95줄을 냈다 — 능력이 아니라 **하네스가 묻지 않았다**
-- **실패 복구 사다리 L1~L4 정본화**(`skill-authoring.md` §12): 5개 스킬이 `fallback` 절차로 679줄을 지목했으나 내용은 **부재 도구**(`TeamCreate`·`SendMessage`) 기반이었다 — 가장 필요한 순간의 지침이 실행 불가. 실측(실패 2회 전부 재invoke·resume으로 복구, `team-core` 사용 0건)이 처방을 바꿨다. 동반: `impl-correctness`에서 **쓰기 7종 제거**(프롬프트 금지만이 방어였던 것 → 시도 자체 불가)
-- **codex 호출 정본 경로 신설**(`scripts/codex-exec.sh`): 사전 게이트 8종 + **사후 게이트**(exit≠0 → 12 / 빈 출력 → 13 / JSON 실패 → 14). ⛔ 10~14는 전부 **측정 실패**이며 "이슈 0건"이 아니다 — 래퍼 마지막 문장의 exit이 codex exit 2를 0으로 보고한 실측 실패가 신설을 유발했다
-- 상세: [docs/releases/v4.23.0.md](docs/releases/v4.23.0.md)
-
-> ⛔ **4라운드 자기 감사 → `NOT CONVERGING` 판정 → 감산 전환**: 교차검증이 R1=15(critical 3) → R2=15(**11건이 R1 수정에서 발생**) → R3=14 → R4=10으로 줄지 않았고, 외부 판정이 원인을 *"독자 부분 해석기의 반응적 확장 + 같은 가정에서 파생된 self-test"* 로 지목했다. 그래서 패치를 멈추고 **삭제·비일반화**했다 — 검사 1개 삭제 · 출력 검증기 전면 재작성(실측: 스키마가 `$ref` **0건**·`pattern` **7건**인데 가장 어려운 `$ref` 해소를 자작하고 있었다) · `ast` 일반 분석 → 줄 화이트리스트. **순감 −132줄**로 예산 초과를 되돌렸다.
->
-> ⛔ **기계 검사 사각지대 (다음 사이클)**: CHANGELOG의 **레지스트리 항목 카운트**는 어떤 lint도 보지 않는다(`#N2`는 디렉토리 *파일 수*만). 이번 사이클에 두 번 stale했다 — 항목 추가·삭제 시 `--list` 수동 전사 의무. 검증 라운드 직전에 새 표면을 만들지 않기 위해 신설을 보류했다.
-
-> 📦 이전 릴리즈 노트: [docs/releases/](docs/releases/) · 전체 변경 이력 [CHANGELOG.md](CHANGELOG.md)
 
 ## Skills
 
