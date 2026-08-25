@@ -47,7 +47,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -63,6 +63,43 @@ esac
 # ── 2. workflow model·effort 명시
 MODEL_OUT="$(bash "$ROOT/scripts/lint-model-explicit.sh" 2>&1)"; MODEL_CODE=$?
 record "model·effort 명시" "$MODEL_CODE" "$(printf '%s\n' "$MODEL_OUT" | tail -1)"
+
+# ── 2.5 게이트 판정기 self-test (⛔ 0/1/2 구분 — 2는 매니페스트·fixture 부재)
+#    이 검사가 없으면 gate_check.py 가 회귀해도 통합 건강 체크가 통과한다.
+GATE_OUT="$(cd "$ROOT" && python3 scripts/gate_check.py --self-test 2>&1)"; GATE_CODE=$?
+GATE_LAST="$(printf '%s\n' "$GATE_OUT" | tail -1)"
+case "$GATE_CODE" in
+  0) record "게이트 self-test"      0 "$GATE_LAST" ;;
+
+  1) record "게이트 self-test"      1 "$GATE_LAST — 아래 상세" ;;
+  *) record "게이트 self-test" "$GATE_CODE" "⛔ 매니페스트·fixture 부재 (PASS도 SKIP도 아님)" ;;
+esac
+
+# ── 2.6 Stop hook 계약 (게이트 2차 계층) ─────────────────────────────
+# ⛔ hook 은 등록해야 발동하지만 계약(stdin JSON → exit + stderr)은 **등록 없이**
+#    검증된다. 등록은 사용자 소관이므로 여기까지가 닫을 수 있는 경계다.
+HOOK_OUT="$(cd "$ROOT" && python3 scripts/gate_stop_hook.py --self-test 2>&1)"; HOOK_CODE=$?
+HOOK_LAST="$(printf '%s\n' "$HOOK_OUT" | tail -1)"
+case "$HOOK_CODE" in
+  0) record "Stop hook 계약"      0 "$HOOK_LAST" ;;
+  1) record "Stop hook 계약"      1 "$HOOK_LAST — 차단이 발화하지 않을 수 있다" ;;
+  *) record "Stop hook 계약" "$HOOK_CODE" "⛔ self-test 실행 불가 (PASS도 SKIP도 아님)" ;;
+esac
+
+# ── 2.7 게이트 원장 상태 (hook 미설치 머신의 유일한 노출 경로) ──────────
+# ⛔ 미충족은 **실패가 아니다** — 작업 중 원장이 미충족인 것은 정상 상태다. exit 에
+#    반영하면 원장 있는 모든 세션에서 이 검사가 빨개져 사람이 health-check 를 안 돌리게
+#    된다(`lint_doc_freshness` 선례: findings 가 있어도 exit 0, 건수만 보고).
+#    ⛔ 원장 **계약 위반**(exit 3)만 실패다 — fz 가 만든 원장이 자기 계약을 어긴 것은
+#    plugin 자산 결함이고 그것이 health-check 의 관심사다.
+# ⛔ 탐색 기준은 호출 CWD 다(플러그인 루트가 아니다) — 작업 트리에 원장이 있다.
+LEDGER_OUT="$(python3 "$ROOT/scripts/gate_check.py" --discover "$PWD" 2>&1)"; LEDGER_CODE=$?
+LEDGER_LAST="$(printf '%s\n' "$LEDGER_OUT" | tail -1)"
+case "$LEDGER_CODE" in
+  0) record "게이트 원장 상태"      0 "$LEDGER_LAST" ;;
+  3) record "게이트 원장 상태"      1 "$LEDGER_LAST — 원장이 계약을 위반한다" ;;
+  *) record "게이트 원장 상태" "$LEDGER_CODE" "⛔ 탐색 실행 불가 (PASS도 SKIP도 아님)" ;;
+esac
 
 # ── 3. 외부 출처 최신성 (⛔ 기본은 경고 — findings 가 있어도 exit 0 이므로 건수를 따로 본다)
 FRESH_OUT="$(cd "$ROOT" && python3 scripts/lint_doc_freshness.py 2>&1)"; FRESH_CODE=$?
