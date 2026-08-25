@@ -4,7 +4,9 @@
 //   표준 패턴 3종 적용. Step당 1회 invoke — 빌드 oracle은 Lead 전용이므로 분할 invoke 구조.
 //   호출(Lead, SKILL.md 절차 — Step 루프는 Lead 소유):
 //     Workflow({ scriptPath: '{plugin_root}/workflows/code-pair.js',
-//       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify,complexity, estimatedNewBodyLines?}, contextPath, buildFeedback?, changesetTarget } })
+//   ⛔ verify 는 VerifySpec 객체다 ({kind:'command'|'manual', …} — plan-collaborative.js 정의).
+//      본 스크립트는 stepSpec 을 **해석하지 않고** 프롬프트에 통째 전달하므로 형태 변경에 무관하다.
+//       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify:VerifySpec, complexity, estimatedNewBodyLines?}, contextPath, buildFeedback?, changesetTarget } })
 //       estimatedNewBodyLines?: Lead 추정 총 newBody 줄수 — SPLIT_THRESHOLD(600) 초과 시 pre-flight가 스폰 전 split_required 반환(H5). 미제공 시 가드 skip(하위호환).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, residualIssues, metrics }
