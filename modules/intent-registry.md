@@ -3,28 +3,45 @@
 > /fz Phase 1에서 참조. 스킬별 트리거 패턴 + Confidence 판정 규칙.
 > Progressive Disclosure Level 3 (/fz Phase 1에서만 로드).
 
+## 목차
+
+- [스킬별 intent-triggers 레지스트리](#스킬별-intent-triggers-레지스트리)
+- [파이프라인 전용 트리거](#파이프라인-전용-트리거)
+- [구어체 보강 트리거](#구어체-보강-트리거)
+- [Confidence 판정 규칙](#confidence-판정-규칙)
+
 ## 스킬별 intent-triggers 레지스트리
 
 | 스킬 | 한국어 패턴 | 영문 패턴 |
 |------|-----------|----------|
-| fz-discover | `어떻게.*좋을까\|어디에.*좋을까\|뭐가.*맞을까\|괜찮을까\|트레이드오프\|맞는지\|차이점\|놓치고\|어떻게.*생각\|이렇게.*해도` | `how.*should\|where.*should\|what.*best\|trade.?off\|difference\|missing\|what.*think` |
-| fz-plan | `계획\|설계\|아키텍처\|요구사항` | `plan\|design\|architect` |
-| fz-code | `구현\|코드\|만들어\|개발` | `implement\|code\|develop` |
+| fz-discover | `어떻게.*좋을까\|어디에.*좋을까\|뭐가.*맞을까\|괜찮을까\|트레이드오프\|맞는지\|차이점\|놓치고\|어떻게.*생각\|이렇게.*해도\|방법.*찾\|최적.*찾\|요구.*조건\|제약\|이게.*맞아\|어떤.*방식\|비교.*해줘` | `how.*should\|where.*should\|what.*best\|trade.?off\|difference\|missing\|what.*think` |
+| fz-plan | `계획\|설계\|아키텍처\|요구사항\|리팩토링\|치환\|흡수` | `plan\|design\|architect\|requirement\|migration\|refactor` |
+| fz-code | `구현\|코드\|만들어\|개발` | `implement\|code\|develop\|build` |
 | fz-review | `리뷰\|검증\|품질\|검토` | `review\|validate\|quality` |
-| fz-fix | `수정\|고쳐\|버그\|크래시\|에러\|되돌리기\|revert\|원상복구` | `fix\|bug\|crash\|error\|revert\|undo\|rollback` |
-| fz-search | `찾아\|탐색\|구조\|영향\|의존성` | `search\|explore\|structure` |
-| fz-codex | `codex\|교차검증` | `codex\|cross-validate` |
+| fz-fix | `수정\|고쳐\|변경\|바꿔\|버그\|크래시\|에러\|되돌리기\|revert\|원상복구` | `fix\|bug\|crash\|error\|revert\|undo\|rollback\|patch` |
+| fz-search | `찾아\|탐색\|구조\|영향\|의존성` | `search\|explore\|structure\|impact\|dependency` |
+| fz-codex | `codex\|교차검증` | `codex\|cross-validate\|verify with codex` |
 | fz-commit | `커밋` | `commit` |
 | fz-pr | `PR\|풀리퀘스트` | `PR\|pull.?request` |
-| fz-rebase | `리베이스\|브랜치.*최신화\|브랜치.*동기화\|브랜치.*업데이트\|develop.*위로\|롱텀.*브랜치` | `rebase\|sync.*branch\|refresh.*branch\|update.*branch` |
-| fz-peer-review | `피어리뷰\|팀원\|PR.*리뷰` | `peer.?review\|teammate` |
-| fz-pr-digest | `설명\|해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선` | `explain\|digest\|understand\|what.*changed` |
+| fz-rebase | `리베이스\|브랜치.*최신화\|브랜치.*동기화\|브랜치.*업데이트\|develop.*위로\|롱텀.*브랜치\|리베이스.*(사라\|누락\|덮어)\|(리베이스\|force.?push).*(유실\|덮어씌)` | `rebase\|sync.*branch\|refresh.*branch\|update.*branch` |
+| fz-peer-review | `피어리뷰\|팀원\|PR.*리뷰` | `peer.?review\|teammate\|PR.*review` |
+| fz-pr-digest | `설명\|해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선` | `explain\|digest\|understand\|what.*changed\|learn\|walkthrough` |
 | fz-skill | `스킬.*만들\|스킬.*생성\|스킬.*수정\|스킬.*삭제\|에이전트.*만들\|에이전트.*생성\|스킬.*평가\|스킬.*최적화\|description.*최적화\|트리거.*테스트\|트리거.*정확도\|문서.*작성\|글쓰기\|프롬프트.*최적화\|description.*개선\|가이드.*작성` | `create.*skill\|new.*skill\|update.*skill\|delete.*skill\|create.*agent\|new.*agent\|eval.*skill\|optimize.*skill\|optimize.*description\|trigger.*test\|trigger.*accuracy\|document\|write.*skill\|improve.*description\|optimize.*prompt` |
-| fz-manage | `관리\|스킬.*목록\|의존성\|체크\|벤치마크\|일괄.*평가\|건강.*체크\|생태계.*점검\|트리거.*벤치마크` | `manage\|skill.*list\|depend\|check\|benchmark\|batch.*eval\|health.*check\|trigger.*benchmark` |
-| fz-codex (drift) | `드리프트\|아키텍처.*점검\|레이어.*위반\|전체.*스캔\|점검해줘\|훑어봐\|전체.*봐줘\|전체.*확인해줘` | `drift\|arch.*check\|full.*scan` |
-| fz-codex (plan) | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` | `independent.*plan\|parallel.*plan\|cross.*plan` |
+| fz-manage | `관리\|스킬.*목록\|의존성\|체크\|벤치마크\|일괄.*평가\|건강.*체크\|생태계.*점검\|트리거.*벤치마크\|메모리.*반영\|교훈.*반영` | `manage\|skill.*list\|depend\|check\|benchmark\|batch.*eval\|health.*check\|trigger.*benchmark\|reflect.*module\|lessons.*module` |
+| fz-modernize | `최신화\|모더나이제이션\|모더나이즈\|가이드 업데이트\|문서 갱신\|문서 업데이트\|stale 정리\|deprecated 정리\|구버전 정리\|새 모델 출시\|최신 모델` | `modernize\|reference 업데이트\|[Oo]pus ?-?5\|[Ss]onnet ?-?5\|[Ff]able ?-?5\|GPT.*5\.\d\|[Oo]pus.*4\\.\\d` |
+| fz-recording | `녹음\|회의록\|녹취\|(화자\|음성\|오디오\|파일\|m4a\|mp3\|wav).*분리\|화자\|STT\|음성` | `recording\|meeting.*notes\|transcri\|diariz\|speaker` |
 | fz-memory | `메모리.*정리\|메모리.*관리\|메모리.*감사\|교훈.*회상\|기억.*떠올려` | `memory.*audit\|memory.*gc\|memory.*recall\|memory.*organize\|cleanup.*memory` |
-| fz — pipeline: pr-comment-review | `코드레빗\|PR.*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` | `coderabbit\|PR.*comment.*analysis\|external.*review.*comment\|review.*comment\|feedback.*check` |
+
+## 파이프라인 전용 트리거
+
+⛔ 아래는 **스킬이 아니라 파이프라인**이다. 스킬 YAML 에 자리가 없으므로 이 파일이 유일한 정본이다.
+
+| 파이프라인 | 한국어 패턴 | 영문 패턴 |
+|-----------|-----------|----------|
+| full-cycle | `처음부터.*끝까지\|계획부터.*PR\|전체.*사이클` | `full.*cycle\|end.*to.*end` |
+| drift-check | `드리프트\|아키텍처.*점검\|레이어.*위반\|전체.*스캔\|점검해줘\|훑어봐\|전체.*봐줘\|전체.*확인해줘` | `drift\|arch.*check\|full.*scan` |
+| plan-parallel | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` | `independent.*plan\|parallel.*plan\|cross.*plan` |
+| pr-comment-review | `코드레빗\|PR.*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` | `coderabbit\|PR.*comment.*analysis\|external.*review.*comment\|review.*comment\|feedback.*check` |
 
 ## 구어체 보강 트리거
 
