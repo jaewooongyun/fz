@@ -41,13 +41,13 @@ disable-model-invocation: false          # true: 사용자 명시 호출만 허�
 | Field | Req? | Purpose | Tips |
 |-------|------|---------|------|
 | `name` | required | Unique skill identifier | `fz-` prefix, lowercase+hyphen only |
-| `description` | required | LLM selection signal | **The most critical field.** Claude picks skills by reasoning over this text — there is no algorithmic router. Write in 3rd person ("Processes files" not "I can help you"). Include what + when + when-not + bilingual keywords. |
+| `description` | required | LLM selection signal | **The most critical field.** Claude picks skills by reasoning over this text — there is no algorithmic router *for Claude's own skill selection*. ⛔ `/fz` is different: it **does** route algorithmically, by matching `modules/intent-registry.md` patterns in Phase 1. Both paths matter — `description` drives Claude, registry patterns drive `/fz`. Write in 3rd person ("Processes files" not "I can help you"). Include what + when + when-not + bilingual keywords. |
 | `user-invocable` | required | Whether users can call directly | `false` for sub-skills called only by orchestrators |
 | `argument-hint` | optional | Usage hint shown to user | Keep concise: `"[file] [--strict]"` |
 | `allowed-tools` | required (L1) | Tools this skill may use | List only what is needed. Bash can be pattern-restricted: `Bash(xcodebuild *)`, `Bash(git *)` |
 | `provides` | **required (L2 fz)** | Capability tokens this skill outputs | See registry below. `/fz` §3.2 동적 파이프라인이 실제 소비한다 |
 | `needs` | **required (L2 fz)** | Capability tokens required as input | Use `[none]` if self-contained |
-| `intent-triggers` | optional | Patterns for `/fz` orchestrator | Korean and English trigger phrases |
+| `intent-triggers` | **required if `user-invocable: true`** (except `fz` itself) | Patterns for `/fz` orchestrator | Korean and English trigger phrases. ⛔ **`/fz` Phase 1 reads `modules/intent-registry.md`, not this field** — add the pattern there too, or `/fz` will never route to this skill. This field documents the skill and feeds `fz-skill eval`. |
 | `disable-model-invocation` | optional | Claude의 자동 스킬 호출 방지 | `true` 설정 시 사용자 명시 호출만 허용 |
 | `compatibility` | optional | 환경 요구사항 | OS, 패키지, 네트워크 접근 등 |
 

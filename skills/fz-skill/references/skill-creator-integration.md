@@ -17,7 +17,7 @@
 
 **fz 스킬에 더 유효한 검증**:
 - 정적 eval (fz-skill eval 기존 Static Analysis 8항목)
-- intent-registry 매칭 테스트 (/fz Phase 1 시뮬레이션)
+- intent-registry 매칭 테스트 (/fz Phase 1 시뮬레이션) — ⛔ `/fz` Phase 1 은 `modules/intent-registry.md` 를 읽는다 — 스킬 YAML 만 고치면 `/fz` 가 못 본다
 - provides/needs 체인 정합성 (fz-manage check)
 
 ## skill-creator 경로 탐색
