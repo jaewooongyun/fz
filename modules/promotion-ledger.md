@@ -78,7 +78,7 @@
 
 ### ~~P2-A: Q-S5 Decision Re-open Gate~~ — ✅ **구현 완료 종결 (2026-08-24)**
 - 관측 #0: ASD-1136 (Decision-Lock 패턴 단독 관측)
-- ⛔ 구현이 먼저 됐다 — `modules/scope-challenge.md:104` Appendix + `:56` `parent-reopen` 배선 + `skills/fz-plan/SKILL.md:388` 발동 조건
+- ⛔ 구현이 먼저 됐다 — `modules/scope-challenge.md:104` Appendix + `:56` `parent-reopen` 배선 + `skills/fz-plan/SKILL.md:411` 발동 조건
 - 처분: **종결**. 사용자 결정 2026-08-24
 
 ### ~~P2-B: fz-fix 자동 전환 + complexity.md 보정~~ — ✅ **구현 완료 종결 (2026-08-24)**
@@ -346,7 +346,7 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 | 항목 | 구현 상태 | 근거 |
 |---|:--:|---|
 | **P1-B** Generator≠Evaluator Lead 독립 절차 | ✅ **구현됨** | `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:64` 참조 |
-| **P2-A** Q-S5 Decision Re-open Gate | ✅ **구현됨** | `modules/scope-challenge.md:104` Appendix + `:56` `parent-reopen` 배선 + `skills/fz-plan/SKILL.md:388` 발동 조건 |
+| **P2-A** Q-S5 Decision Re-open Gate | ✅ **구현됨** | `modules/scope-challenge.md:104` Appendix + `:56` `parent-reopen` 배선 + `skills/fz-plan/SKILL.md:411` 발동 조건 |
 | **P2-B** fz-fix 자동 전환 + complexity 보정 | ✅ **구현됨** | `skills/fz-fix/SKILL.md:41 · 216 · 299`(테스트 케이스 포함) |
 | **P1-C** Drift telemetry (AskUserQuestion) | ⛔ **미구현** | 본 파일 밖 참조 **0건** |
 | **P1-D** Q4 재구성 + rule 11차 컴파일 가능 기준 | ⛔ **미구현** | 본 파일 밖 참조 **0건** |

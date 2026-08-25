@@ -349,6 +349,24 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
 - Issue Tracker에 이슈 자동 기록
 - 이슈 요약 반환
 
+3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 + full 모드 — `modules/gates.md` 배선 1):
+   Phase 1 반환의 `steps[]`를 JSON으로 임시 기록한 뒤 변환한다. ⛔ **이 단계가 없으면 원장이 생기지 않아 배선 2·3이 전부 no-op이다.**
+   ```bash
+   python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" \
+     --from-plan {WORK_DIR}/plan/steps.json --root {WORK_DIR} --out {WORK_DIR}/gates/plan.draft.md
+   ```
+   `FZ_PLUGIN_ROOT`는 `scripts/resolve-plugin-root.sh`로 해석한다 — ⛔ 상대 경로(`scripts/…`)는 대상 레포에 그 파일이 없어 exit 2(인프라 통과)로 **조용히 강제력이 사라진다**.
+
+3.2. **⛔ 게이트 판정** (draft 원장이 있을 때 — `modules/gates.md` 배선 1):
+   Phase 1에서 만든 `{WORK_DIR}/gates/plan.draft.md`를 검증 입력에 **포함**한다. 원장이 Phase 3에서 만들어지면 Phase 2 평가자가 볼 `CHECK:`가 없다 — draft가 먼저인 이유다.
+   ⛔ **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하면 Issue Tracker·scope challenge·Gate 2 입력이 사라진다. 절차: `modules/fz-codex-subcommands-core.md` § verify-gates
+   - 요구: 게이트마다 판정 1행. ⛔ **통과한 게이트도 표현**해야 N/N 대조가 성립한다
+   - ⛔ **사후 대조 의무** — 눈으로 하지 않는다: `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check {응답.json} {WORK_DIR}/gates/plan.draft.md`
+     게이트 수·id 집합·중복·summary 합계를 판정한다. exit 1이면 재호출 1회 후 **미판정으로 기록** — 조용히 통과시키지 않는다
+   - 판정 축: measurement_fit(제목이 말하는 걸 측정하나) · noninteractive · rerunnable · determinism · side_effects
+   - `verdict: revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 명령 판정 불가 — 억지 command보다 정직하다
+   - 게이트 수 ≠ 판정 수이면 **미판정**이며 통과가 아니다
+
 3.5. **⛔ 검증 결과 기록** (항상):
    - ASD 활성: `{WORK_DIR}/plan/verify-result.md`에 verdict + 이슈 요약 기록
    - 비ASD: `write_memory("fz:checkpoint:plan-verify", "verdict: {approved/rejected}. 이슈: {N}개. Critical: {요약}")`
@@ -383,7 +401,12 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
    - **WORK_DIR 존재(ASD 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` 복사 + `index.md` 업데이트
    - **Serena fallback**: `write_memory("fz:checkpoint:plan-final", …)` — ⛔ 요약 문자열이 아니라 **계약 필드**를 담는다:
      `{steps:[{id,title,files,verify}], swiftDecisions:{swiftUI,isolation,transform}, rtm:[…], verdict}`
+     — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?}` 또는 `{kind:'manual', criterion}` (정의: `workflows/plan-collaborative.js` VerifySpec · 배선: `modules/gates.md`)
      (요약만 저장하면 `/fz-code` Phase 0.4의 구조 검사가 판정 불가)
+
+4.5. **⛔ 원장 확정** (draft 원장이 있을 때): Phase 2 판정(3.2)을 반영해 `gates/plan.draft.md` → `gates/plan.md` 로 복사한 뒤 **`--finalize`** 를 돌린다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 도장을 찍고 `APPROVED: yes` 를 남긴다. ⛔ 도장이 없으면 승인 계약이 존재하지 않는다(검사는 있으나 발급이 없어 한 번도 발화하지 않았다). `revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 `MANUAL:`로 전환. 확정 후 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status {WORK_DIR}/gates/plan.md`.
+   exit별 행동 — `0` 진행 · `1` 미충족 보고 후 진행(작업 중 정상 상태) · `2` **인프라 경고 후 진행**(경로·인터프리터 문제이지 원장 결함이 아니다) · `3` **미통과 차단**(확정 원장이 계약을 위반하면 안 된다).
+   ⛔ 상대 경로 금지 — 설치된 플러그인에서 대상 레포에 파일이 없어 exit 2로 떨어지고, exit 3만 차단하는 규칙 하에서 **invalid ledger 검증이 fail-open** 된다. 절차 정본: `modules/gates.md`
 
 5. **Refactoring Mode 감지 (P0-light)**: intent-triggers에 리팩토링/치환/흡수/migration 매칭 시 AskUserQuestion 1회 — "이 작업은 리팩토링 감지. refactoring-aware 분류(Q-S5 Appendix 활성)를 적용할까요?" 사용자 예 시 Q-S5 활성, 아니오 시 기존 flow.
 
