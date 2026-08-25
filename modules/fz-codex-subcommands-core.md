@@ -6,7 +6,7 @@
 
 ## 목차
 
-**review** (주력, fz-review P5) · **verify** (Q1-Q8, fz-plan P2) · **validate** (역검증, fz-review P5.5) · **check** (verdict contract: pass/warn/fail)
+**review** (주력, fz-review P5) · **verify** (Q1-Q8, fz-plan P2) · **verify-gates** (게이트 원장 판정, fz-plan P2 **추가** 호출) · **validate** (역검증, fz-review P5.5) · **check** (verdict contract: pass/warn/fail)
 
 > ⛔ **아래 codex exec 예시는 축약형** (서브커맨드별 *차이점*만 표시 — 가독성 우선). **raw 복붙 금지**.
 > 실제 실행 시 반드시 `modules/fz-codex-bash-hygiene.md` §6 Standard Wrapper Template 적용:
@@ -82,6 +82,62 @@ codex exec \
    계획의 리스크 매트릭스가 빈약하거나 누락된 경우 반드시 지적하라.
    Anti-Pattern Constraints가 있으면 각 금지 패턴의 실효성을 검증하라."
 ```
+
+## verify-gates -- 게이트 원장 판정 (fz-plan Phase 2 추가 호출)
+
+⛔ **`verify`를 대체하지 않는다 — 별도 호출로 추가한다.** `codex_gate_verdict_schema`에는 `issues`·`verdict`가 없어, 교체하면 fz-plan의 Issue Tracker 기록·scope challenge·Gate 2 승인 입력이 사라진다.
+
+발동: 원장이 있을 때만. 원장이 없으면 게이트 판정이 무의미하다.
+
+⛔ **대상 원장은 호출자가 정한다** — 특정 파일명에 묶지 않는다.
+
+| 호출자 | 원장 | 시점 |
+|---|---|---|
+| fz-plan Phase 2 | `{WORK_DIR}/gates/plan.draft.md` | 확정 **전** — 판정을 반영해 확정한다 |
+| fz-review Phase 5.5 | `{WORK_DIR}/gates/plan.md` | 확정 **후** — 변경된 코드 기준 재판정 |
+
+```bash
+LEDGER="{호출자가 정한 원장}"          # plan: gates/plan.draft.md · review: gates/plan.md
+[ -f "$LEDGER" ] || exit 0   # 원장 없으면 이 호출 자체를 생략
+
+scripts/codex-exec.sh exec \
+  --cd "$GIT_ROOT" \
+  --out "$GATE_VERDICT_FILE" \
+  --prompt-file "$PROMPT" \
+  --schema schemas/codex_gate_verdict_schema.json \
+  --effort high
+```
+
+프롬프트에 **원장 경로와 내용을 함께** 넣는다. 현재 `verify` 템플릿에는 WORK_DIR·ledger 변수가 없어 그대로는 게이트를 볼 수 없다.
+
+```
+[원장 경로] {LEDGER 절대경로}
+[원장 내용]
+{cat "$LEDGER"}
+
+각 게이트마다 판정 1행. ⛔ 통과한 게이트도 표현하라 — 누락은 미판정이며 통과가 아니다.
+축: measurement_fit(CHECK 가 제목이 말하는 것을 측정하는가) · noninteractive · rerunnable ·
+    determinism · side_effects(서술)
+```
+
+### ⛔ 사후 검증 (스키마만으로는 보장되지 않는다)
+
+`codex_gate_verdict_schema`는 `gates: []`(빈 배열)·중복 id·원장에 없는 id·거짓 `summary` 합계를 **전부 통과시킨다.** 호출자가 대조한다.
+
+이 대조는 **눈으로 하지 않는다** — 판정기가 한다.
+
+```bash
+python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check "$GATE_VERDICT_FILE" "$LEDGER"
+```
+
+| 검사 | 왜 필요한가 |
+|------|------------|
+| 게이트 수 == 원장 게이트 수 | 빈 배열이 "문제 없음"으로 읽히면 판정 자체가 사라진다 |
+| id 집합 일치 + 중복 없음 | ⛔ 개수만 세면 중복이 누락을 가린다 — `G1` 두 번 + `G3` 없음이 3개로 보인다 |
+| `(id, title, kind)` 일치 | ⛔ id 만 보면 **stale 응답**이 통과한다. 제목이 바뀌어도 id 는 그대로여서 옛 oracle 판정이 새 oracle 에 붙는다 |
+| `summary` 를 배열에서 **재계산**해 비교 | 신고값을 믿으면 보고가 거짓이 된다. 음수끼리 상쇄해 합계만 맞추는 것도 막는다 |
+
+exit 1 이면 재호출 1회 후 **미판정으로 기록**하고 Lead가 판단한다 — 조용히 통과시키지 않는다.
 
 ## validate -- 피드백 역검증
 

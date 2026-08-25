@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Codex Gate Verdict",
+  "description": "게이트 원장의 각 게이트에 대한 독립 판정. ⛔ 게이트당 정확히 1행 — 통과한 게이트도 표현해야 N/N 대조가 성립한다(codex_review_schema 의 issues 배열은 문제만 담아 전수 확인 불가). 소비: fz-plan Phase 2(architect, 생성 시점) · fz-review Phase 5.5(guardian, 변경 후).",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "ledger",
+    "gates",
+    "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": [
+        "1.0"
+      ]
+    },
+    "ledger": {
+      "type": "string",
+      "description": "판정 대상 원장의 경로"
+    },
+    "gates": {
+      "type": "array",
+      "description": "⛔ 원장의 게이트 수와 같아야 한다. 누락은 미판정이며 통과가 아니다.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "measurement_fit",
+          "noninteractive",
+          "rerunnable",
+          "determinism",
+          "side_effects",
+          "verdict",
+          "reason",
+          "suggestion"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "원장의 게이트 id"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "command",
+              "manual"
+            ]
+          },
+          "measurement_fit": {
+            "type": "string",
+            "enum": [
+              "fit",
+              "partial",
+              "unfit"
+            ],
+            "description": "CHECK 가 제목이 말하는 것을 실제로 측정하는가. unfit 예: 'G1: 결제가 정산된다' + CHECK 'echo ok' — 문법상 유효하고 의미상 무용하다."
+          },
+          "noninteractive": {
+            "type": "boolean",
+            "description": "stdin·TTY·네트워크 승인 없이 끝나는가. false 면 hook·워커 환경에서 매달린다."
+          },
+          "rerunnable": {
+            "type": "boolean",
+            "description": "같은 CHECK 를 fz-code·fz-review·hook 이 반복 실행해도 결과가 유지되는가. 마이그레이션·시퀀스 소비 등은 false."
+          },
+          "determinism": {
+            "type": "string",
+            "enum": [
+              "deterministic",
+              "flaky",
+              "unknown"
+            ],
+            "description": "같은 입력에 같은 판정이 나오는가. flaky 는 강등을 무의미하게 만든다."
+          },
+          "side_effects": {
+            "type": "string",
+            "description": "⛔ 유일한 서술형 축 — 기계 검증 대상이 아니다. CHECK 가 남기는 흔적을 적는다. 없으면 'none'."
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "revise",
+              "demote_to_manual"
+            ],
+            "description": "accept=그대로 · revise=CHECK/EXPECT 수정 필요 · demote_to_manual=명령으로 판정할 수 없다(억지 command 보다 정직하다)"
+          },
+          "reason": {
+            "type": "string",
+            "description": "판정 근거 1-2문장"
+          },
+          "suggestion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "revise 일 때 대체 CHECK/EXPECT. accept 면 null"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "total",
+        "accept",
+        "revise",
+        "demote_to_manual"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "total": {
+          "type": "integer"
+        },
+        "accept": {
+          "type": "integer"
+        },
+        "revise": {
+          "type": "integer"
+        },
+        "demote_to_manual": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
