@@ -19,12 +19,19 @@
 | 도구 | 없으면 | 사용처 | 설치 |
 |------|--------|:------:|------|
 | **Claude Node CLI** | 동작 불가 | 전부 | `npm install -g @anthropic-ai/claude-code` |
-| **Serena MCP** | 심볼 탐색이 Grep 폴백으로 내려간다 | 13/21 스킬 | fz 설치 시 `.mcp.json` 으로 자동 등록. 런타임 `uv` 필수 — `brew install uv` |
-| **Codex CLI** | 교차 검증 스킬이 `sc:analyze` 단독으로 폴백 | 11/21 스킬 | `npm install -g @openai/codex` · **0.124.0+** (gpt-5.5 지원) |
-| **SuperClaude** | `sc:` 명령이 매칭되지 않는다 | 15/21 스킬 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
-| Context7 MCP | 라이브러리 문서를 WebSearch 로 대체 | 8/21 스킬 | [GitHub](https://github.com/upstash/context7) |
+| **SuperClaude** | `sc:` 명령이 매칭되지 않는다 (폴백 0) | 15/21 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
+| **Serena MCP** | 심볼 탐색이 Grep 으로 내려간다 (13 중 7 폴백) | 13/21 | fz 가 `.mcp.json` 으로 자동 등록. 런타임 `uv` 필수 — `brew install uv` |
+| **Codex CLI** | 교차 검증이 `sc:analyze` 단독이 된다 (11 중 3 폴백) | 11/21 | `npm install -g @openai/codex` |
+| **sequential-thinking MCP** | 구조화 추론 호출이 실패한다 (폴백 0) | 9/21 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
+| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 대체된다 (8 중 1 폴백) | 8/21 | `claude mcp add context7 -- npx -y @upstash/context7-mcp` |
 
-⛔ 위 판정은 **사용처 수와 폴백 선언 유무**로 실측했다. Serena·Codex·Context7 은 에러 대응표에 폴백이 있어 없어도 돌아가고(각 10·6·1건), `sc:` 는 폴백이 2건뿐이라 15개 스킬에서 명령이 그냥 매칭되지 않는다.
+⛔ 위 판정의 눈금 두 개. **사용처** = 스킬 21개 중 그 도구의 *호출*이 있는 파일 수다 — MCP 는 `mcp__…` 전체 접두사, Codex 는 `fz-codex`, SuperClaude 는 `sc:` 로 센다. 단어가 언급만 된 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. **폴백** = 각 스킬 `## 에러 대응` 표에 그 도구가 없을 때의 대체 경로가 적힌 스킬 수다.
+
+`sc:` 는 자체 폴백이 없을 뿐 아니라 다른 도구들이 떨어지는 *목적지*(`/sc:analyze 단독`)이기도 하다. 없으면 폴백 사슬의 끝이 사라진다.
+
+⛔ fz 가 번들하는 MCP 는 Serena 하나다. sequential-thinking 과 Context7 은 위 명령으로 직접 등록해야 한다.
+
+스킬이 호출하지만 위 표에 없는 MCP 가 셋 더 있다. 상시가 아니라 특정 기능에서만 쓰기 때문이다 — `lsp`(4 스킬: fz-code·fz-fix·fz-search·fz-review 의 정의·참조 조회) · `github`(3: fz-pr·fz-peer-review·fz-pr-digest) · `atlassian`(3: fz-commit·fz-plan·fz-pr 의 JIRA 연동). 셋 다 폴백 선언이 0건이라, 없으면 그 기능이 그대로 멈춘다.
 
 런타임 — `python3` **3.9+**(판정기·lint 가 3.9 문법으로 고정), `git`, `node`. `jq` 는 hook 템플릿 예시에서만 쓴다.
 
@@ -40,6 +47,8 @@ claude
 
 iOS 프로젝트는 XcodeBuildMCP 와 SwiftUI Expert·Swift Concurrency 플러그인을 추가한다. 웹은 기본 구성으로 충분하다.
 
+Codex CLI 는 모델을 README 가 고정하지 않는다. `/fz-codex` 가 `~/.codex/config.toml` 의 `model` 을 SSOT 로 위임하므로 최신 frontier 로 옮기는 것은 그 파일 한 줄이다. 구버전 CLI 가 config 의 모델을 못 읽으면 `/fz-codex` 에러 대응표가 CLI 업데이트를 권고한다 — 그래서 여기에 버전 하한을 적지 않는다.
+
 Codex CLI 를 쓰면 네이티브 스킬을 심볼릭으로 연결한다.
 
 ```bash
@@ -50,14 +59,16 @@ bash ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/setup-codex-skills.sh
 
 ```bash
 claude plugin marketplace update fz-orchestrator
-claude plugin update fz
+claude plugin update fz@fz-orchestrator
 ```
+
+⛔ 접미사 없는 `claude plugin update fz` 는 `Plugin "fz" not found` 로 실패한다. 설치할 때는 마켓플레이스가 하나뿐이라 `fz` 로 통하지만, 설치된 이름은 `fz@fz-orchestrator` 이고 갱신은 그 이름으로 찾는다. 그리고 버전 문자열이 같으면 캐시를 갱신하지 않으니, 소스만 고치고 버전을 안 올리면 반영되지 않는다.
 
 ---
 
 ## Skills
 
-사용자가 직접 부르는 스킬 18개. 나머지 3개(`arch-critic`, `code-auditor`, `fz-new-file`)는 `user-invocable: false` 인 내부 도구로, `/fz-peer-review` 가 렌즈로 쓴다.
+사용자가 직접 부르는 스킬 18개. 나머지 3개는 `user-invocable: false` 인 내부 도구다 — `arch-critic` 과 `code-auditor` 는 `/fz-peer-review` 가 렌즈로 쓰고, `fz-new-file` 은 `/fz-code` 가 파일을 만들 때 헤더를 붙이는 데 쓴다.
 
 | 카테고리 | 스킬 | 설명 |
 |---------|------|------|
@@ -73,7 +84,7 @@ claude plugin update fz
 | **검증** | `/fz-codex` | Codex CLI 교차 검증 (모델은 `config.toml` SSOT 위임 = 항상 최신 frontier) + `micro-eval` 단일 주장 재평가 |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
 | **문서/시스템** | `/fz-memory`, `/fz-skill`, `/fz-manage`, `/fz-modernize` | 메모리, 스킬 관리 (`write` 서브커맨드 = 문서 작성 + 글쓰기 + 프롬프트 최적화), 가이드 modernization |
-| **보조** | `/fz-new-file`, `/fz-recording`, `/fz-pr-digest` | 파일 헤더, 회의록, PR 요약 |
+| **보조** | `/fz-recording`, `/fz-pr-digest` | 회의록, PR 요약 |
 
 ---
 
@@ -95,12 +106,14 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 | 파이프라인 | 트리거 | 체인 |
 |-----------|-------|------|
-| **quick-fix** | "타임아웃 변경" | fz-fix → build |
+| **quick-fix** | "타임아웃 변경" | fz-fix |
 | **bug-hunt** | "크래시 버그 찾아줘" | fz-search → fz-fix |
-| **plan-to-code** | "계획하고 구현" | fz-plan → fz-code → build |
-| **code-to-review** | "구현하고 리뷰" | fz-code → build → fz-review |
-| **review-to-ship** | "리뷰하고 커밋" | fz-review → fz-commit |
-| **full-cycle** | "처음부터 끝까지" | fz-plan → fz-code → fz-review → fz-commit |
+| **plan-to-code** | "계획하고 구현" | fz-plan → fz-code |
+| **code-to-review** | "구현하고 리뷰" | fz-code → fz-review |
+| **review-to-ship** | "리뷰하고 커밋" | fz-review → fz-commit → fz-pr |
+| **full-cycle** | "처음부터 끝까지" | fz-plan → fz-code → fz-review → fz-commit → fz-pr |
+
+체인 칸에는 스킬만 적었다. 빌드와 Codex 교차 검증 게이트는 파이프라인마다 자동으로 끼워 넣으므로 여기 나오지 않는다 — 어느 지점에 무엇이 들어가는지는 `modules/pipelines.md` 각 항목의 `게이트` 행에 있다.
 
 전체 19개: `modules/pipelines.md`
 
@@ -117,23 +130,19 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ### 작성·설계 가이드
 
-`guides/` 아래 9개. 스킬·에이전트·모듈을 만들거나 고칠 때 참조한다.
+`guides/` 아래 9개. 스킬·에이전트·모듈을 만들거나 고칠 때 참조한다. 줄 수는 `wc -l` 기준이다.
 
 | 가이드 | 줄 | 내용 |
 |--------|---:|------|
-| [`llm-references.md`](guides/llm-references.md) | 148 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
-| [`prompt-optimization.md`](guides/prompt-optimization.md) | 756 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 581 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
-| [`skill-testing.md`](guides/skill-testing.md) | 471 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
-| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 293 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
-| [`agent-team-guide.md`](guides/agent-team-guide.md) | 494 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
-| [`fable-model-guide.md`](guides/fable-model-guide.md) | 256 | 모델 운용 — Lead 는 Fable 5, 실질 생산 워커는 Opus 5. effort 배정 기준 |
-| [`clean-architecture.md`](guides/clean-architecture.md) | 325 | Dependency Rule 과 SOLID — 레이어 판정 기준 |
-| [`harness-engineering.md`](guides/harness-engineering.md) | 1,335 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
-
-| **prompt-optimization.md** | 10대 프롬프트 원칙 + Context Rot 대응 |
-| **agent-team-guide.md** | 에이전트 팀 (2.5-Turn, Task Brief, 모델 전략) |
-| **harness-engineering.md** | AI 에이전트 하네스 설계 + NLAH Gap 분석 (1046줄) |
+| [`llm-references.md`](guides/llm-references.md) | 147 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
+| [`prompt-optimization.md`](guides/prompt-optimization.md) | 755 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
+| [`skill-authoring.md`](guides/skill-authoring.md) | 580 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
+| [`skill-testing.md`](guides/skill-testing.md) | 470 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
+| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 292 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
+| [`agent-team-guide.md`](guides/agent-team-guide.md) | 493 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
+| [`fable-model-guide.md`](guides/fable-model-guide.md) | 255 | 모델 운용 — Lead 는 Fable 5, 실질 생산 워커는 Opus 5. effort 배정 기준 |
+| [`clean-architecture.md`](guides/clean-architecture.md) | 324 | Dependency Rule 과 SOLID — 레이어 판정 기준 |
+| [`harness-engineering.md`](guides/harness-engineering.md) | 1,334 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
 
 ---
 
