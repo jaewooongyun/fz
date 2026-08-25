@@ -296,6 +296,7 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 - `schemas/codex_review_schema.json` -- review/verify/validate/check/final/commit 응답
 - `schemas/codex_verification_schema.json` -- validate 역검증 응답
 - `schemas/codex_peer_review_schema.json` -- peer-review 에이전트 응답
+- `schemas/codex_gate_verdict_schema.json` -- 게이트 원장의 게이트별 판정 (fz-plan Phase 2 architect · fz-review Phase 5.5 guardian). ⛔ 게이트 수 = 판정 수 대조용 — `codex_review_schema` 의 issues 배열은 문제만 담아 전수 확인 불가
 
 ## 관련 Codex 스킬
 
