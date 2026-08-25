@@ -920,6 +920,7 @@
   "_expect_stdout": "선택 필드 — stdout 에 문자열이 나타나는가. ⛔ exit code 가 같은 두 방어선을 구분한다 (인접전이 거부와 미충족 거부는 둘 다 exit 1 이다).",
   "_notes": {
     "recheck-unobserved": "⛔ evaluate() 의 사후 재확인(쓴 것을 디스크에서 다시 읽어 met 판정)은 회귀 fixture 가 없다. 관측하려면 writeback 이 잘못 쓰는 상태를 만들어야 하는데, 그 경로들(EVIDENCE 미삽입·스팬 오류)은 각각 별도 fixture 로 이미 닫혀 있어 재현 입력이 없다. 방어 심층화(defense in depth)로 유지하고 미관측임을 여기 명시한다 — '통과했다'가 '관측됐다'를 뜻하지 않는다",
-    "discover-mode": "⛔ `--discover` 는 **디렉토리**를 받으므로 `mode: \"discover\"` 케이스가 `tests/fixtures/gates/discover/` 를 대상으로 돌린다. 그 하위에 충족·미충족·계약위반 세 트리가 `<sub>/gates/plan.md` 배치로 있다. ⛔ 다른 fixture 원장은 파일명이 `plan.md` 가 아니라 탐색 대상이 아니다 — sandbox 전체를 대상으로 돌리려던 첫 시도가 0건이었던 이유다"
+    "discover-mode": "⛔ `--discover` 는 **디렉토리**를 받으므로 `mode: \"discover\"` 케이스가 `tests/fixtures/gates/discover/` 를 대상으로 돌린다. 그 하위에 충족·미충족·계약위반 세 트리가 `<sub>/gates/plan.md` 배치로 있다. ⛔ 다른 fixture 원장은 파일명이 `plan.md` 가 아니라 탐색 대상이 아니다 — sandbox 전체를 대상으로 돌리려던 첫 시도가 0건이었던 이유다",
+    "fixture-portability": "⛔ fixture 원장의 `ROOT:`·`CWD:` 는 **커밋한 사람의 클론 경로**다. self-test 가 sandbox 로 재작성하는데, `replace(str(FIXTURES), …)` 만 쓰면 다른 클론이나 플러그인 캐시에서 매칭 0건이 되어 ROOT 가 남의 경로를 가리키고 소유 검사에서 전부 exit 3 이 된다 (2026-08-25 실측: 캐시에서 19/66). 그래서 **경로 모양**(`…/tests/fixtures/gates` 로 끝나는 절대 경로)으로 재작성한다. 회귀 확인 = 저장소를 임의 위치로 복사해 self-test 를 돌린다"
   }
 }

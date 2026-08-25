@@ -1012,11 +1012,23 @@ def self_test() -> int:
         with tempfile.TemporaryDirectory(prefix="fz-gate-selftest-") as tmp:
             sandbox = Path(tmp) / "gates"
             shutil.copytree(FIXTURES, sandbox)
-            # fixture 원장의 ROOT/CWD 는 원본 경로를 가리키므로 sandbox 로 재작성
+            # fixture 원장의 ROOT/CWD 는 절대 경로이므로 sandbox 로 재작성한다.
+            #
+            # ⛔ `replace(str(FIXTURES), …)` 만으로는 부족하다. fixture 파일에 박힌
+            #    경로는 **커밋한 사람의 클론 위치**이고, 플러그인 캐시나 다른 클론에서
+            #    돌리면 `FIXTURES` 와 달라 매칭이 0건이 된다. 그러면 ROOT 가 남의
+            #    경로를 가리켜 소유 검사에서 전부 exit 3 이 된다
+            #    (2026-08-25 실측: 캐시에서 self-test 19/66).
+            #
+            #    그래서 **경로 모양**으로 재작성한다 — `…/tests/fixtures/gates` 로
+            #    끝나는 절대 경로를 sandbox 로 바꾼다. 어느 클론에서 커밋했든 동작한다.
+            marker = "/tests/fixtures/gates"
+            pat = re.compile(r"(/[^\s:]*" + re.escape(marker) + r")")
             for md in sandbox.rglob("*.md"):
-                md.write_text(
-                    md.read_text(encoding="utf-8").replace(str(FIXTURES), str(sandbox)),
-                    encoding="utf-8")
+                body = md.read_text(encoding="utf-8")
+                body = pat.sub(str(sandbox), body)
+                body = body.replace(str(FIXTURES), str(sandbox))
+                md.write_text(body, encoding="utf-8")
 
             ledger_path = sandbox / case["ledger"]
             before = ledger_path.read_text(encoding="utf-8") if ledger_path.exists() else None
