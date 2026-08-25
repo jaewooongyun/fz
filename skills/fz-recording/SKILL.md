@@ -10,7 +10,7 @@ allowed-tools: >-
 provides: [documentation]
 needs: [none]
 intent-triggers:
-  - "녹음|회의록|녹취|화자|분리|STT|음성"
+  - "녹음|회의록|녹취|(화자|음성|오디오|파일|m4a|mp3|wav).*분리|화자|STT|음성"
   - "recording|meeting.*notes|transcri|diariz|speaker"
 compatibility: >-
   macOS, AssemblyAI API key (무료 185시간), jq, curl
