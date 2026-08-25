@@ -208,7 +208,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 
 `scripts/gate_stop_hook.py`. 세션 종료 시 `cwd` 하위 확정 원장을 찾아 미충족이면 종료를 막는다. **1차 배선 1~3은 SKILL.md 산문이라 Lead가 건너뛰어도 신호가 없다 — 그 재귀를 끊는 것은 이 hook 하나뿐이다.**
 
-⛔ **자동 배선하지 않는다.** `examples/hooks.json.example`에 템플릿만 두고 사용자가 `.claude/settings.json`으로 복사한다 — `modules/governance.md` "Claude는 훅 설치·설정 변경을 명시 합의 없이 지시·실행하지 않는다"와 같은 파일 `_note`의 "자동 배선 금지". 따라서 **기계적 차단은 설치한 머신에만 존재한다.** 원장·판정기·1~3번 배선은 어디서나 동작한다.
+⛔ **자동 배선하지 않는다.** `examples/hooks.json.example`에 템플릿만 두고 사용자가 `.claude/settings.json`의 `hooks.Stop` **배열에 추가**한다 (통째 복사하면 기존 항목이 사라진다) — `modules/governance.md` "Claude는 훅 설치·설정 변경을 명시 합의 없이 지시·실행하지 않는다"와 같은 파일 `_note`의 "자동 배선 금지". 따라서 **기계적 차단은 설치한 머신에만 존재한다.** 원장·판정기·1~3번 배선은 어디서나 동작한다.
 
 #### 차단 계약 (실측 출처)
 
@@ -240,6 +240,8 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 ⛔ **"찾지 못함"은 조용하지 않다.** `gates/` 디렉토리가 아예 없으면 게이트 미사용 세션이므로 조용히 통과하지만, `gates/`는 있는데 확정 원장이 없으면(draft 단계이거나 `--finalize`가 빠졌으면) stderr로 남긴다. 미사용과 미발견이 같은 침묵이면 놓친 원장이 통과로 보인다.
 
 `.git`·`node_modules`·`.venv`·`__pycache__`·`.build`는 건너뛴다.
+
+⛔ **설치 주의 6항은 `docs/completion-gates.md`가 정본이다** — 배열 추가 · hook 병렬 실행 · 캐시 경로의 버전(하드코딩하면 업데이트 후 조용히 꺼진다) · `python3` 3.9+ 부재 시 fail-open · `~/.fz/stop-hook-state.json` 생성 · 탐색 깊이 3 한계.
 
 검증: `python3 scripts/gate_stop_hook.py --self-test` (**14케이스** — 깊이 1~4 · draft-only · skip-git · approved · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
 
