@@ -90,11 +90,42 @@ const CrossSchema = {
   },
 }
 
+// VerifySpec — step 완료를 무엇으로 판정하는가.
+// ⛔ `verify: string` 자유 서술에서 승격한 것 (v4.26.0). 문자열은 사람만 읽을 수 있어
+//    `scripts/gate_check.py` 가 판정할 수 없었다. oneOf 분기는 Workflow structured output 에서
+//    동작함을 실측 확인 (2026-08-24 격리 프로브 — fz 내 oneOf 선례 0건이었다).
+// 소비: modules/gates.md 배선 1(fz-plan 원장 생성) · workflows/code-pair.js stepSpec
+const VerifySpec = {
+  oneOf: [
+    {
+      type: 'object',
+      required: ['kind', 'criterion', 'command', 'expect'],
+      properties: {
+        kind: { const: 'command' },
+        criterion: { type: 'string', description: '사람이 읽는 성공 조건' },
+        command: { type: 'string', description: '실행할 셸 명령 — 제목이 말하는 것을 실제로 측정할 것' },
+        expect: { type: 'string', description: '결합 출력에 포함될 부분 문자열 (⛔ 정규식 아님)' },
+        cwd: { type: 'string', description: '절대경로만. 생략 시 WORK_DIR' },
+      },
+      additionalProperties: false,
+    },
+    {
+      type: 'object',
+      required: ['kind', 'criterion'],
+      properties: {
+        kind: { const: 'manual' },
+        criterion: { type: 'string', description: '사람이 확인할 조건 — 명령으로 판정 불가한 것' },
+      },
+      additionalProperties: false,
+    },
+  ],
+}
+
 const PlanSchema = {
   type: 'object',
   required: ['steps', 'readScope', 'writeScope', 'acceptanceCriteria', 'riskMatrix', 'rtm', 'openQuestions'],
   properties: {
-    steps: { type: 'array', items: { type: 'object', required: ['id', 'title', 'files', 'verify'], properties: { id: { type: 'string' }, title: { type: 'string' }, files: { type: 'array', items: { type: 'string' } }, verify: { type: 'string' } } } },
+    steps: { type: 'array', items: { type: 'object', required: ['id', 'title', 'files', 'verify'], properties: { id: { type: 'string' }, title: { type: 'string' }, files: { type: 'array', items: { type: 'string' } }, verify: VerifySpec } } },
     readScope: { type: 'array', items: { type: 'string' }, description: '§X — 영향 스캔 전체' },
     writeScope: { type: 'array', items: { type: 'object', required: ['file', 'rationale'], properties: { file: { type: 'string' }, rationale: { type: 'string' } } }, description: '§Y — 실제 변경 + 근거 (Read→Write 자동 번역 금지)' },
     acceptanceCriteria: { type: 'array', items: { type: 'string' }, description: '§Z — Step 완료 기준' },
@@ -261,7 +292,11 @@ const plan = await callAgent(
   `1. §X readScope(영향 스캔 전체) / §Y writeScope(실제 변경 파일 + 각 근거 — readScope에서 자동 복사 금지, 변경 정당화 있는 파일만) / §Z acceptanceCriteria 3-섹션 분리\n` +
   `2. rtm: 요구사항을 분해해 각 행 {reqId, requirement 원문, stepId, verify, status:'pending'}\n` +
   `3. implicationRegister: 제거/리팩토링 함의 발견 시 {type: exec(계획 내 실행)|obs(관찰 보고)} — 없으면 빈 배열\n` +
-  `4. 각 step에 검증 가능한 verify. 리스크 매트릭스 + openQuestions(사용자 결정 필요만).`,
+  `4. 각 step의 verify는 **판정 방식을 고른다** — 명령으로 판정 가능하면 {kind:'command', criterion, command, expect}, 사람 확인만 가능하면 {kind:'manual', criterion}.\n` +
+  `   ⛔ command 는 제목이 말하는 것을 **실제로 측정**해야 한다. \`echo ok\` 류의 무의미한 통과 명령 금지.\n` +
+  `   ⛔ expect 는 **모든 단언이 통과한 뒤에만** 나오는 성공 토큰이어야 한다 (\`cmd; echo ok\` 는 cmd 실패해도 ok 가 찍힌다 — \`&&\` 를 쓸 것). 정규식 아닌 부분 문자열.\n` +
+  `   ⛔ 판정 불가한 것을 억지로 command 로 만들지 말 것 — manual 이 정직하다.\n` +
+  `5. 리스크 매트릭스 + openQuestions(사용자 결정 필요만).`,
   { label: 'stage4-integrate', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: PlanSchema })
 if (!plan) { fallbackCount += 1; return { mode: 'fallback', reason: 'integrate null', metrics: metrics(3) } }
 
