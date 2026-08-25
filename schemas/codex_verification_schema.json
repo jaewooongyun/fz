@@ -4,7 +4,18 @@
   "title": "Codex Verification Response Schema",
   "description": "Codex가 피드백 반영 여부를 검증한 후 반환하는 구조화된 응답 형식. VeriGuard dual-stage verification (arXiv 2510.05156, Pre-action Gate + Runtime Gate) + Chain-of-Verification (CoVe, arXiv 2309.11495) 패턴 기반. issue_resolutions가 Pre-action Gate, feedback_reflection_rate가 Runtime Gate에 대응. OpenAI Structured Outputs 규격 준수.",
   "type": "object",
-  "required": ["verification_id", "original_review_id", "issue_resolutions", "feedback_reflection_rate", "verdict"],
+  "required": [
+    "verification_id",
+    "original_review_id",
+    "issue_resolutions",
+    "feedback_reflection_rate",
+    "verdict",
+    "timestamp",
+    "iteration",
+    "new_issues_found",
+    "verification_summary",
+    "recommendations"
+  ],
   "properties": {
     "verification_id": {
       "type": "string",
@@ -12,7 +23,10 @@
       "description": "검증 고유 식별자 (예: VER-001)"
     },
     "timestamp": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "date-time",
       "description": "검증 생성 시각 (ISO 8601)"
     },
@@ -22,7 +36,10 @@
       "description": "검증 대상 원본 리뷰 ID"
     },
     "iteration": {
-      "type": "integer",
+      "type": [
+        "integer",
+        "null"
+      ],
       "minimum": 1,
       "description": "현재 반복 횟수"
     },
@@ -31,7 +48,12 @@
       "description": "각 이슈별 해결 상태",
       "items": {
         "type": "object",
-        "required": ["issue_id", "resolution_status"],
+        "required": [
+          "issue_id",
+          "resolution_status",
+          "verification_notes",
+          "remaining_work"
+        ],
         "properties": {
           "issue_id": {
             "type": "string",
@@ -40,26 +62,48 @@
           },
           "resolution_status": {
             "type": "string",
-            "enum": ["resolved", "partially_resolved", "unresolved", "regressed"],
+            "enum": [
+              "resolved",
+              "partially_resolved",
+              "unresolved",
+              "regressed"
+            ],
             "description": "해결 상태: resolved(완전 해결), partially_resolved(부분 해결), unresolved(미해결), regressed(악화)"
           },
           "verification_notes": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "검증 상세 노트"
           },
           "remaining_work": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "남은 작업 설명 (partially_resolved/unresolved 시)"
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "new_issues_found": {
-      "type": "array",
+      "type": [
+        "array",
+        "null"
+      ],
       "description": "검증 중 새로 발견된 이슈 (codex_review_schema의 issues 형식과 동일)",
       "items": {
         "type": "object",
-        "required": ["id", "severity", "category", "description"],
+        "required": [
+          "id",
+          "severity",
+          "category",
+          "description",
+          "location",
+          "suggestion"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -67,7 +111,12 @@
           },
           "severity": {
             "type": "string",
-            "enum": ["critical", "major", "minor", "suggestion"]
+            "enum": [
+              "critical",
+              "major",
+              "minor",
+              "suggestion"
+            ]
           },
           "category": {
             "type": "string"
@@ -76,17 +125,45 @@
             "type": "string"
           },
           "location": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
-              "file": { "type": "string" },
-              "symbol": { "type": "string" },
-              "line_range": { "type": "string" }
-            }
+              "file": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "line_range": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "file",
+              "symbol",
+              "line_range"
+            ]
           },
           "suggestion": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "feedback_reflection_rate": {
@@ -97,17 +174,30 @@
     },
     "verdict": {
       "type": "string",
-      "enum": ["pass", "needs_work", "fail"],
+      "enum": [
+        "pass",
+        "needs_work",
+        "fail"
+      ],
       "description": "검증 결과: pass(통과, Rate≥80%), needs_work(추가 작업 필요), fail(실패)"
     },
     "verification_summary": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "검증 결과 요약"
     },
     "recommendations": {
-      "type": "array",
-      "items": { "type": "string" },
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      },
       "description": "추가 권장 사항"
     }
-  }
+  },
+  "additionalProperties": false
 }
