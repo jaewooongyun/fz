@@ -1,6 +1,6 @@
 {
   "_note": "OPT-IN TEMPLATE — 런타임 미적용. 설치는 팀합의 후 .claude/settings.json 의 hooks 로 복사. 자동 배선 금지(팀 공유 영역). harness-engineering.md Defense-in-Depth + llm-references §1.1 /hooks(O3) 참조.",
-  "_why": "신뢰성 필수 동작(protected-folder write 차단, 편집 후 lint)은 advisory SKILL.md 텍스트가 아니라 결정론적 hook로 강제. exit 2=차단(stderr가 Claude에 피드백), exit 0=success.",
+  "_why": "신뢰성 필수 동작(protected-folder write 차단, 편집 후 lint, 미충족 게이트로 세션 종료 차단)은 advisory SKILL.md 텍스트가 아니라 결정론적 hook로 강제. exit 2=차단(stderr가 Claude에 피드백), exit 0=success.",
   "hooks": {
     "PreToolUse": [
       {
@@ -23,6 +23,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 {PLUGIN_ROOT}/scripts/gate_stop_hook.py"
+          }
+        ]
+      }
     ]
-  }
+  },
+  "_stop_gate": "Stop 항목은 완료 게이트 2차 계층이다. 1차(fz-plan/fz-code/fz-review 배선)는 SKILL.md 산문이라 Lead가 건너뛰어도 신호가 없다 — 그 재귀를 끊는 것은 이 hook 하나뿐이다. ⛔ 설치하지 않으면 기계적 차단이 없다(원장·판정기·1차 배선은 어디서나 동작). ⛔ {PLUGIN_ROOT} 를 실제 경로로 바꿔라 — scripts/resolve-plugin-root.sh 로 확인. 계약: 미충족 원장이 있으면 {\"decision\":\"block\",\"reason\":…} 를 stderr 로 내고 exit 2. 같은 상태로 2회 막은 뒤에는 통과한다(무한 루프 방어). 어떤 오류든 통과한다(세션 감금 금지). ⛔ 원장 발견은 cwd 하위 깊이 0~3 이다 — 워크트리에서 작업하고 원장이 리포 루트에 있으면 FZ_GATES_LEDGER 로 명시 지정한다(os.pathsep 구분). 검증: python3 {PLUGIN_ROOT}/scripts/gate_stop_hook.py --self-test (14케이스)"
 }
