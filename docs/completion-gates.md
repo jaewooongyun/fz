@@ -126,7 +126,18 @@ H="$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.p
 exec python3 "$H"
 ```
 
-개발 모드(`claude --plugin-dir ~/dev/fz-plugin`)로 쓰면 고정 경로라 이 문제가 없다.
+⛔ **개발 모드(`claude --plugin-dir …`)를 쓰면 위 형태로는 hook 이 절대 돌지 않는다.** 캐시에는 옛 버전이 남아 있고 새 스크립트가 없기 때문이다 — 실측: 캐시가 `fz/4.12.0` 인데 소스는 4.25.0 이고, `gate_stop_hook.py` 는 캐시에 존재하지 않는다. glob 이 빈 값이 되어 `exit 0` 으로 조용히 통과한다.
+
+개발 모드에서는 소스를 먼저 보고 캐시로 폴백한다.
+
+```bash
+H="$HOME/dev/fz-plugin/scripts/gate_stop_hook.py"
+[ -f "$H" ] || H="$(ls -d "$HOME"/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | tail -1)"
+[ -n "$H" ] || exit 0
+exec python3 "$H"
+```
+
+⚠️ `~/dev/fz-plugin` 은 각자의 클론 경로로 바꾼다. 이 형태는 소스가 있으면 소스를, 없으면 캐시 최신을 쓴다.
 
 ### 4. `python3` 3.9+ 가 PATH 에 있어야 한다
 
