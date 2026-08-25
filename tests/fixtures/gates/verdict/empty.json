@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "ledger": "/Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates/verdict/ledger.md",
+  "gates": [],
+  "summary": {
+    "total": 0,
+    "accept": 0,
+    "revise": 0,
+    "demote_to_manual": 0
+  }
+}

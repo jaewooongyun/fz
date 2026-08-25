@@ -1,0 +1,13 @@
+{
+  "_note": "--from-plan 회귀 입력. VerifySpec command/manual + 구 계약 문자열(강등 대상) 3형태를 모두 담는다.",
+  "title": "from-plan 회귀",
+  "scope": "VerifySpec 3형태가 원장으로 정확히 변환되는지",
+  "steps": [
+    { "id": "G1", "title": "command 형태",
+      "verify": { "kind": "command", "criterion": "성공 토큰 출력",
+                  "command": "echo probe verification passed", "expect": "probe verification passed" } },
+    { "id": "G2", "title": "manual 형태",
+      "verify": { "kind": "manual", "criterion": "사람이 눈으로 확인" } },
+    { "id": "G3", "title": "구 계약 문자열", "verify": "빌드 성공" }
+  ]
+}

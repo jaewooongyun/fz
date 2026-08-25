@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0",
+  "ledger": "/Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates/verdict/ledger.md",
+  "gates": [
+    {
+      "id": "G1",
+      "title": "첫째",
+      "kind": "command",
+      "measurement_fit": "fit",
+      "noninteractive": true,
+      "rerunnable": true,
+      "determinism": "deterministic",
+      "side_effects": "none",
+      "verdict": "accept",
+      "reason": "판정 근거",
+      "suggestion": null
+    },
+    {
+      "id": "G2",
+      "title": "둘째",
+      "kind": "command",
+      "measurement_fit": "fit",
+      "noninteractive": true,
+      "rerunnable": true,
+      "determinism": "deterministic",
+      "side_effects": "none",
+      "verdict": "accept",
+      "reason": "판정 근거",
+      "suggestion": null
+    },
+    {
+      "id": "G9",
+      "title": "알 수 없음",
+      "kind": "command",
+      "measurement_fit": "fit",
+      "noninteractive": true,
+      "rerunnable": true,
+      "determinism": "deterministic",
+      "side_effects": "none",
+      "verdict": "accept",
+      "reason": "판정 근거",
+      "suggestion": null
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "accept": 3,
+    "revise": 0,
+    "demote_to_manual": 0
+  }
+}
