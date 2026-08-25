@@ -130,7 +130,7 @@ echo 'alias cfz="claude --plugin-dir ~/dev/fz-plugin"' >> ~/.zshrc
 
 ---
 
-## 완료 게이트 (v4.25+)
+## 완료 게이트 (v4.25.0+)
 
 작업이 끝났는지를 모델의 자기보고 대신 **실제로 돌아가는 명령**으로 판정한다.
 
@@ -298,7 +298,7 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 v4.22.0에서 **일몰 완료** — 실제 TeamCreate 호출부 0건. `patterns/*.md`는 canonical 라운드 의미론으로 보존. 규약: `guides/skill-authoring.md` §12.
 
-### What's New (v4.25 ~ v4.26) — 완료 판정을 산문에서 exit code 로
+### What's New (v4.25.0) — 완료 판정을 산문에서 exit code 로
 
 완료 기준이 SKILL.md 산문 1,723줄에 적혀 있었고 그것을 검사하는 코드는 0줄이었다. 모델이 "다 했습니다"라고 말하면 그게 곧 완료였다.
 
@@ -308,7 +308,7 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 
 두 번째는 테스트가 자기 이름의 축을 못 보는 것이었다(열 번). `writeback-sibling-edited` 는 이름이 "형제 편집"인데 `sed` 패턴이 자기 명령 줄에도 있어 자기를 고쳤다. 그래서 방어를 하나씩 지워 보고 어느 테스트가 실패하는지 확인하는 절차를 세웠다 — 전부 한꺼번에 지우면 총계만 보이고 "여섯 종 중 두 종만 관측된다"가 숨는다.
 
-사용법은 [완료 게이트](#완료-게이트-v425) 절을 본다.
+사용법은 [완료 게이트](#완료-게이트-v4250) 절을 본다.
 
 ## Skills
 
