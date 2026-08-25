@@ -323,6 +323,23 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 >
 > 요약: `/fz-codex validate "피드백 반영 검증"` 실행 → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
 
+### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
+
+Lead가 Workflow 반환을 통합할 때 **워커 자기보고 대신 게이트를 재실행**한다.
+
+```bash
+python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --reverify {WORK_DIR}/gates/plan.md
+```
+⛔ `FZ_PLUGIN_ROOT`는 `scripts/resolve-plugin-root.sh`로 해석한다 — 상대 경로는 대상 레포에서 exit 2로 조용히 통과한다.
+
+- `--reverify`는 이미 `- [x]`인 게이트도 실행하고, 통과 못 하면 `- [ ]` + `EVIDENCE: pending`으로 **강등**한다
+- ⛔ `--status`는 재검증이 아니다 — 파싱만 하고 과거 증거를 그대로 읽는다
+- `/fz-codex validate`(fz-guardian)의 `resolved/partially_resolved/unresolved/**regressed**` 4축에서 `regressed`가 0이 아니면 통합 차단 — 기존 `codex_verification_schema` 유지
+- 원장이 있으면 **`verify-gates`를 추가 호출**해 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산출물이다). 절차: `modules/fz-codex-subcommands-core.md` § verify-gates
+- ⛔ 응답은 `--verdict-check {응답.json} {WORK_DIR}/gates/plan.md` 로 전수 판정을 확인한다. exit 1이면 재호출 1회 후 **미판정으로 기록**
+- ⛔ validate를 대체하지 않는다 — 4축 역검증과 게이트 판정은 관심사가 다르다
+- 전 게이트 충족 시 `--set-state closed` (전진은 조건부 — 미충족이면 거부된다)
+
 ## Phase 6: Iterative Improvement
 ### 반복 조건
 

@@ -110,7 +110,7 @@ intent-triggers:
 각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
 
 1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
-2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify,complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
+2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 참조),complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })`
    - Stage 1 impl(opus) changeset → Stage 2 **검토**(full: review-arch + impl-quality **병렬 2렌즈**, opus / light: arch 단독) → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, full 3-4 call · light 1-2 call)
 4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유)
@@ -320,6 +320,17 @@ intent-triggers:
    - ⛔ Spec "실행 스레드" ↔ @MainActor: Zero-Exception 기계적 확인. 원본 main queue → After @MainActor 보장 (범위는 필요 문장에만 한정 — `code-transform-validation.md` Scope Minimality 단서)
    - ⛔ Spec "요청 파라미터" ↔ 키 목록: 추가/삭제 0건 확인
    - ⛔ [verified] 태그 확인 (fail-closed): Spec에 [verified] 없는 주장 → 구현 전 검증 강제 (uncertainty-verification.md)
+
+6.4. **⛔ 게이트 판정** (원장이 있을 때 — `modules/gates.md` 배선 2):
+   Step 완료 선언 **전** 해당 Step 게이트를 실행한다. 실패면 다음 Step으로 진행하지 않는다.
+   ```bash
+   G="${FZ_PLUGIN_ROOT}/scripts/gate_check.py"                     # resolve-plugin-root.sh 로 해석
+   python3 "$G" --only {StepID} {WORK_DIR}/gates/plan.md            # ⛔ 해당 Step 게이트만
+   python3 "$G" --set-state ready_for_review {WORK_DIR}/gates/plan.md   # 전 Step 완료 시
+   ```
+   ⛔ **상대 경로 금지** — 설치된 플러그인에서는 대상 레포에 `scripts/gate_check.py`가 없다. exit 2(인프라 통과)로 떨어져 강제력이 조용히 사라진다.
+   - 원장 부재 · `ROOT:` 불일치 · `STATE: closed` → no-op (기존 경로 무회귀)
+   - `--set-state`는 **전 게이트 충족 시만** 전진한다 — 실행 게이트만 통과하고 MANUAL이 미확인이면 거부된다
 
 6.5. **⛔ 아티팩트 기록** (항상 — compact recovery 필수):
    각 구현 Step 완료 후 진행 상태를 기록한다.
