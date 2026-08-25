@@ -137,10 +137,10 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.25.0
+## What's New — v4.25.1
 
 **완료 판정을 산문에서 exit code 로.** 완료 기준이 SKILL.md 산문에 있었고 그것을 검사하는 코드는 없었다. 이제 계획의 각 Step 이 실행 가능한 오라클을 갖고, 계획 확정·Step 종료·리뷰 재검증·세션 종료·health-check 다섯 지점에서 판정된다.
 
 통과할 수 없는 게이트는 `ABANDON:` 으로 흔적을 남기고 넘어간다. 세션 종료 차단은 hook 을 설치한 머신에만 적용된다.
 
-→ [완료 게이트 가이드](docs/completion-gates.md) · [릴리즈 노트](docs/releases/v4.25.0.md)
+→ [완료 게이트 가이드](docs/completion-gates.md) · [릴리즈 노트](docs/releases/v4.25.1.md)
