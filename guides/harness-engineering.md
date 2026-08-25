@@ -1156,7 +1156,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Cross-model Verification | fz-codex (Claude + Codex; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
 | Lazy Tool Discovery | modules/ Progressive Disclosure Level 3 | 필요 시에만 로드 |
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
-| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Team + Codex. **Hooks는 opt-in·런타임 미적용** (현재 `.githooks` commit-msg dev-time만 — Claude Code lifecycle hook 0건. 활성 hook 템플릿: `examples/hooks.json.example`, 설치는 팀합의) | 다중 검증 레이어 |
+| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Team + Codex. **Hooks는 opt-in** — 플러그인은 hook을 자동 등록하지 않는다(`hooks/` 없음, `plugin.json`에 `hooks` 키 없음). 실행체는 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 6케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **등록은 사용자가 `.claude/settings.json`으로 복사**한다. `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
 
 ### Gap 분석 (NLAH 기반, 2026-04-14)
 

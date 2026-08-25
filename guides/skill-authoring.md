@@ -480,6 +480,8 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 ### scripts/ 디렉토리 규칙
 
 - `skills/{name}/scripts/`에 배치한다
+
+> **예외 — 소비자가 여럿인 결정론적 검사.** 스킬 2개 이상이 같은 스크립트를 부르면 리포 루트 `scripts/`에 둔다. 스킬 하위에 두면 나머지 소비자가 형제 스킬의 내부를 가로질러 참조하고, 그 스킬을 지우면 무관한 스킬이 깨진다. 예: `scripts/gate_check.py`(fz-plan·fz-code·fz-review) · `scripts/codex-exec.sh`.
 - 스크립트 자체는 토큰을 소비하지 않는다 (실행 결과만 소비)
 - SKILL.md에서 명시적 경로로 참조한다
 - JSON 스키마는 `schemas/`에 배치한다 (fz-codex의 `--output-schema` 활용)
