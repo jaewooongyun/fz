@@ -1,5 +1,439 @@
 # Changelog
 
+### v4.25.0 (2026-08-25) — 완료 판정을 산문에서 exit code 로 [MINOR]
+
+완료 기준이 SKILL.md 산문 1,723줄에 있었고 그것을 검사하는 코드는 0줄이었다. 모델이 "다 했습니다"라고 말하면 그게 완료였다. 이제 계획의 각 Step 이 실행 가능한 오라클을 갖고 다섯 지점에서 판정된다.
+
+⛔ **여섯 라운드의 작업을 한 릴리즈로 발행한다.** 아래 소절이 그 라운드들이고, 각 소절은 앞 라운드가 못 본 것을 다음 라운드가 찾은 기록이다. 발행 단위는 하나이므로 버전도 하나다.
+
+상세: `docs/releases/v4.25.0.md`
+
+#### 완료 판정을 산문에서 exit code로
+
+18파일(신규 4 · 수정 14) + 신규 `scripts/gate_check.py` 1018줄 · `modules/gates.md` 181줄 · fixture 원장 30개 / 매니페스트 34케이스.
+
+fz는 완료 강제 규칙을 **문서 1,723줄**로 갖고 있으나 그 규칙이 지켜졌는지 판정하는 실행 코드가 **0줄**이었다. 모델이 "Gate 통과"라고 쓰면 그것이 통과였다. 같은 저장소가 `feedback_fail_open_safety_judgment`에 "산문 규칙은 가드 아님"이라 적어 두고도 자기 완료 판정에는 적용하지 않은 자리다.
+
+본 릴리즈는 그 한 칸을 채운다 — **어디서나 동작하는 1차 계층**이다. 세션 종료를 기계적으로 막는 Stop hook은 사용자 설치 대상이라 2차로 분리했다(`modules/governance.md` "훅 설치·설정 변경을 명시 합의 없이 지시·실행하지 않는다" + `examples/hooks.json.example` "자동 배선 금지").
+
+##### 판정기 — `scripts/gate_check.py` (신규)
+
+- **exit 0 AND EXPECT 매치**를 둘 다 요구한다. exit 0만 보면 "실행됐다"만 증명하고, EXPECT만 보면 실패한 프로세스가 에러 텍스트에 성공 토큰을 담았을 때 통과한다
+- **exit 4분** — `0` 충족 / `1` 미충족 / `3` invalid-ledger(차단) / `2` 인프라(통과+진단). ⛔ 판정의 fail-open은 금지하고 인프라 부재의 fail-open만 허용한다. `lint_contracts.py`의 3분 구조를 확장한 것
+- **정규식 미지원** — Python `re`에 타임아웃이 없어 파멸적 백트래킹을 막을 수 없다. 원장을 fz가 생성하므로 필요가 없고, 지원하지 않으면 그 실패 유형이 통째로 사라진다
+- **프로세스 그룹 종료** — 셸을 벗어난 손자가 상속 파이프를 붙잡으면 정산이 안 온다. 실측에서 `(sleep 30 &)` 형태가 **exit 1로 정상인데 30.1초**를 소모했다. pgid를 스폰 직후에 확보(종료 후엔 `getpgid`가 `ProcessLookupError`)해 killpg → **2.1초**
+- **CAS writeback** — 최신 재파싱 + 원본 hash 대조 + temp/fsync/atomic replace. 경쟁 writer는 워커가 아니라 **실행 중 원장을 편집하는 사용자**다
+- **`APPROVED_ORACLE_HASH`** — 승인 시점의 CHECK/EXPECT/CWD/criterion/timeout/shell/PATH를 묶는다. 없으면 실행 *사이에* CHECK를 쉬운 명령으로 바꿔 **모델이 자기 게이트를 완화**할 수 있다
+- **`--confirm`** — MANUAL 게이트는 사용자 stdin 응답이 발급한 토큰이 있어야 충족이다. 비대화형(hook·워커)에서는 exit 2로 거부한다
+
+##### 원장 — `modules/gates.md` (신규)
+
+`{WORK_DIR}/gates/plan.md`에 Markdown으로 산다. `ROOT:`가 소유 디렉토리를, `STATE: active|ready_for_review|closed`가 수명을 표시한다.
+
+⛔ `ready_for_review`가 없으면 fz-code가 원장을 닫아 fz-review의 강등이 영원히 발화하지 못한다. `--set-state`는 **전진만 조건부**다 — 전 게이트 충족 시에만 나아가고, 역행은 증명 없이 허용한다(막으면 재작업이 막힌다).
+
+##### 계약 — `verify: string` → VerifySpec
+
+`workflows/plan-collaborative.js`의 `steps[].verify`를 `oneOf(command, manual)`로 승격했다. 자유 서술 문자열은 사람만 읽을 수 있어 기계가 판정할 수 없었다.
+
+⛔ **fz 전체에 `oneOf` 선례가 0건**이라 Workflow structured output이 수용하는지 몰랐다 — 41줄 격리 프로브로 실측 확인 후 적용했다. 구 계약 문자열은 **manual로 강등**한다(자연어에서 명령을 지어내면 제목과 무관한 oracle이 생긴다).
+
+Stage 4 프롬프트에 oracle 의미 갭 방어 3항목을 넣었다 — `echo ok` 류 금지 · `cmd; echo ok`는 cmd 실패해도 ok가 찍히니 `&&` 사용 · 판정 불가면 억지 command 대신 manual.
+
+##### 배선 3지점 + 검사 2개
+
+| 지점 | 동작 |
+|---|---|
+| fz-plan Phase 1·2·3 | draft 생성 → 게이트별 Codex 판정 → 확정 |
+| fz-code 절차 6.4 | Step 게이트 실행 + STATE 전진 |
+| fz-review Phase 5.5 | `--reverify` 강등 + guardian `regressed` 차단 |
+
+- `scripts/health-check.sh`에 self-test 배선 — 없으면 판정기가 회귀해도 `/fz-manage check`가 통과한다
+- `schemas/codex_gate_verdict_schema.json` 신규 — 게이트당 판정 1행(통과분 포함)이라야 N/N 대조가 성립한다. `codex_review_schema`의 issues 배열은 문제만 담아 전수 확인이 불가능하다
+
+##### lint 정정 2건
+
+- **#N1이 비-issue 스키마를 오분류** — `schemas/*.json` 전부를 issue로 가정해, 게이트 처분(`accept/revise/demote_to_manual`)을 담는 새 스키마를 "severity 부재"로 잡았다. severity(문제 심각도)와 verdict(게이트 처분)는 축이 다르다. 억지 필드를 넣는 대신 검사 범위를 정정했다
+- **#N3이 밀린 인용을 잡았다** — 편집으로 줄이 1줄 밀려 `promotion-ledger.md`의 `fz-plan/SKILL.md:388` 2건이 빈 줄을 가리켰다. 이 검사가 존재하는 이유 그대로다
+
+##### 리뷰 후 수정 — critical 10건
+
+첫 구현은 Codex 코드 리뷰에서 **rejected**(critical 10)를 받았다. 중앙 주장이 성립하지 않았다 — `CHECK: false` + 손으로 쓴 `EVIDENCE: forged`가 `ALL MET`을 받고 전진까지 성공했다.
+
+- **증거를 oracle에 묶었다** — `EVIDENCE:`의 `sig=`가 `oracle_hash + exit + output`에 결속된다. 검사 위치를 `evaluate`(실행 경로)에서 `gate_state`(판정 함수)로 옮겨 `--status`도 도달한다. ⛔ 암호학적 위조 방지가 아니라 *우연한* false-green 차단이다
+- **MANUAL 토큰 재계산** — `CRITERION_HASH`는 원장에 적힌 공개값이라 복사 가능했다
+- **수명주기 가드를 실행체에 넣었다** — 문서가 선언한 `STATE: closed` no-op와 `FZ_GATES_OFF` kill-switch를 `evaluate()`가 전혀 보지 않았다
+- **인접 전이 강제 + fresh 파스** — `active → closed` 직행이 fz-review를 건너뛰었고, `set_state`가 호출 전 파스로 판정했다
+- **`--from-plan`을 fz-plan Phase 3.1에 배선** — 만들어 놓고 아무도 호출하지 않아 원장이 생기지 않았다. 원장이 없으면 배선 2·3이 전부 no-op이다
+- **절대 경로 강제** — `python3 scripts/gate_check.py`는 설치된 플러그인에서 대상 레포에 없어 exit 2(인프라 통과)로 강제력이 조용히 사라진다
+- **`--only` 게이트 선택자** — 전 게이트를 돌리면 미래 Step이 실패해 첫 Step에서 영구 정지한다
+- **개행 인젝션 차단** — plan의 command에 `\nABANDON: G1 …`을 넣으면 포기된 게이트로 파싱됐다
+- **`OSError` → exit 2** — 파일시스템 오류가 traceback으로 새어 "미충족(차단)"으로 오독됐다
+- **`--help` exit 0** — argparse의 `SystemExit(0)`까지 인프라 오류로 변환하고 있었다
+
+##### 검증
+
+self-test **34/34** · health-check 전 검사 통과 · lint 위반 0건 · workflow 문법 6개 OK · `--help` exit 0.
+
+⛔ **음성 대조를 매번 돌렸다** — 회귀를 주입해 게이트가 실제로 실패하는지 확인했다. pgid 수정 제거 → `30.0초 (한도 6초)` 검출 / `gate_check.py` 제거 → health-check exit 2 / 문자열 강등 제거 → `exit 2 (기대 0)` / issue 스키마 severity 제거 → #N1 발화.
+
+⛔ **self-test가 놓친 것이 두 번 있었다.** ① 손자 프로세스 hang은 exit code로는 정상이었다(30.1초 소요) — `max_seconds` 추가. ② forgery fixture 4개가 음성 대조를 통과하지 못했다 — `exit`/`mutates` 두 축으로는 같은 exit을 내는 방어선이 구분되지 않는다. `expect_contains`(산출물 내용)와 `expect_stdout`(거부 사유)를 추가해 **4종 주입 → 4건 검출**로 만들었다.
+
+게이트 도입이 게이트 품질을 보장하지 않는다. 관측 축이 없으면 게이트는 자기 대상의 실패를 못 본다.
+
+#### 게이트가 자기 대상을 못 보던 자리
+
+`/fz-codex verify`가 개선 플랜을 **rejected**(critical 3 · major 8 · minor 2)로 판정했다. 재분석의 두 핵심 사실은 확인됐고(gate verdict 스키마의 실행 경로 0건 · wiring 생략을 검출하는 장치 0건) **해결책이 반박됐다**.
+
+##### 계약 보존 — `verify-gates` 신설
+
+`verify`의 스키마를 바꿔치기하려 했는데, `codex_gate_verdict_schema`에는 `issues`·`verdict`가 없다. 교체하면 fz-plan의 Issue Tracker 기록·scope challenge·Gate 2 승인 입력이 **사라진다**. 별도 호출로 분리했다 — 계획이 옳은가(`verify`)와 게이트가 그 계획을 측정하는가(`verify-gates`)는 관심사가 다르다.
+
+스키마 선택만으로는 N/N이 보장되지 않는다. 스키마는 `gates: []`·중복 id·원장에 없는 id·거짓 `summary` 합계를 전부 통과시킨다 → 호출자 사후 대조를 계약으로 넣었다.
+
+##### 같은 파일의 형제를 놓쳤다
+
+fz-plan **3.1만 고치고 4.5의 상대 경로를 남겼다.** 설치된 플러그인에서 exit 2로 떨어져 invalid-ledger 검증이 fail-open 된다. exit 0/1/2/3별 호출자 행동도 명시했다.
+
+##### 실행 환경
+
+- **`stdin=DEVNULL`** — 미지정이면 터미널·상위 파이프를 상속해 CHECK가 입력을 기다리면 게이트당 120초를 잡아먹는다. 직전 라운드에서 "2차 계층 의존"으로 내렸던 판단을 **철회**했다. 1차 실행 경로에서 발현한다
+- **`ROOT:` 소유 판정** — 문서가 "realpath 절대경로"를 선언하는데 코드는 존재만 봤다. ⛔ realpath **일치**는 요구하지 않는다. macOS의 `/var → /private/var`처럼 정상 경로도 심볼릭을 거쳐 fixture 21건이 깨졌다 — 필요한 건 정규형 강요가 아니라 소유 판정이다
+- **drain을 게이트 deadline과 공유** — 고정 1초 grace가 정상적인 지연 출력을 잘랐다. ⛔ 계획의 `min(DRAIN_GRACE_S, 잔여)`는 상수가 1.0이라 **산술적으로** 3초 출력에 도달 불가였다. 기준은 "더 기다려서 판정이 바뀔 수 있는가" 하나 — EXPECT가 이미 매칭됐으면 끊는다
+- **강제 종료 기록** — exit 0 + EXPECT 매칭이어도 손자를 죽였으면 증거에 `killed=descendant`. 판정은 뒤집지 않는다(서버를 띄우는 정당한 CHECK를 실패시키면 안 된다)
+
+##### 실패의 방향을 골랐다
+
+`EXPECT:`의 `startswith("/")` 검사가 `/tmp/result` 같은 경로 리터럴까지 거부했다. `/var/log/`처럼 애매한 형태는 **거부가 아니라 리터럴 + 경고**다 — 정규식을 리터럴로 취급하면 게이트가 빨갛게 실패해 저자가 알아채지만, 경로를 거부하면 정당한 게이트가 원장 검증에서 통째로 막힌다.
+
+writeback CAS도 같은 축이다. 전체 파일 해시는 **무관한 형제 편집**에도 exit 3으로 죽어 실행 결과를 잃었다 — 판정을 지키려고 판정을 버린다. 대상 게이트 블록으로 좁혔고, 제목을 범위에 넣었다(제목이 바뀌면 같은 증거가 다른 주장에 붙는다).
+
+##### ⛔ fixture 4건이 자기 대상을 못 보고 있었다
+
+이번 라운드에서 가장 값진 발견이다.
+
+| fixture | 무엇을 못 봤나 |
+|---|---|
+| `root-relative` | 절대경로 검사를 제거해도 뒤의 `is_dir`가 같은 exit 3을 내서 통과했다 → **`expect_stderr` 축 신설** (거부 **사유**는 stderr로 나간다) |
+| 소유 검사 | 어떤 fixture도 관측하지 않았다(제거해도 37/37) → `root-foreign`(ROOT=/usr) 신설 |
+| `writeback-sibling-edited` | sed 패턴이 **자기 CHECK 줄에도 있어** 자기를 고쳤다. 이름은 sibling인데 `oracle-changed`와 같은 축을 봤다 → 새 형제를 append하도록 재작성 |
+| `exec-late-descendant` | 지연 2초일 때 옛 코드가 **타이밍으로 통과**했다(스레드 2개 × 1초 join = 2초) → 4초로 늘려 여유 제거 |
+
+##### 실사용 검증 + `FZ_GATES_TRACE`
+
+SKILL.md에 적힌 명령을 그대로 뽑아 실행했다. 배선 3종 전부 발화하고 전 수명주기(draft → 확정 → Step 판정 → 강등 → ABANDON → ready_for_review → closed → no-op)가 동작했다. **001 재발이 아니다.**
+
+⛔ 관측을 **플래그가 아니라 환경변수**로 만들었다. 플래그면 SKILL.md 호출 줄을 고쳐야 하고, 그러면 관측이 관측 대상(배선)에 의존해 순환한다.
+
+⛔ trace가 보이는 것은 "명령이 동작한다"이고 "미래의 Lead가 산문 지시를 읽고 실행한다"가 아니다. 그 재귀를 끊는 것은 Stop hook뿐이고 사용자 설치다. health-check 배선은 WORK_DIR discovery가 미설계라 2차와 함께 정한다.
+
+##### ⛔ 배선을 고쳐도 스키마가 로드되지 않았다
+
+`verify-gates` 배선을 `grep -c`(언급 수 2/1/1)로 완료 판정했다. **1회 실행하니 API가 거부했다.**
+
+```
+invalid_json_schema: 'required' is required to be ... including every key in properties. Missing 'suggestion'
+```
+
+011을 유죄로 만든 기준이 **"실행 경로 0건"**인데 내 수정에는 *언급 수*라는 더 약한 오라클을 썼다. 같은 라운드의 다른 방어선 11종은 전부 개별 제거 probe로 확인했는데 이것만 오라클이 없었다.
+
+strict 모드 관례를 형제 스키마에서 실측했다 — **전 필드 `required` + optional은 nullable + 전 객체 `additionalProperties: false`**(`codex_review_schema.json` 6/6). 수정 후 실행 성공: 3게이트 in / 3판정 out, id 집합·summary 합계 일치, MANUAL이 `noninteractive=False`로 분류.
+
+⚠️ **`schemas/codex_verification_schema.json`이 같은 위반을 갖는다** — 실제 호출로 같은 400을 확인했다. `validate`(fz-review Phase 5.5)가 이 스키마를 쓰므로 그 경로는 구조적으로 실행 불가다. **범위 밖이라 고치지 않았다** — 어느 필드를 nullable로 둘지가 validate 계약의 의미 판단이고, lint 스키마 구조 검사 추가와 한 쌍으로 결정해야 한다(검사만 넣으면 lint가 즉시 막힌다).
+
+##### N/N 대조를 산문에서 코드로 — `--verdict-check`
+
+스키마는 `gates: []`·중복 id·원장에 없는 id·거짓 `summary` 합계를 전부 통과시킨다. 대조를 산문 지시로 두면 **이 계층이 없애려는 것과 같아진다** → `--verdict-check <응답.json>`이 4축을 판정한다.
+
+⛔ 개수만 세면 안 된다 — 중복 id가 누락을 가린다(`G1` 두 번 + `G3` 없음이 3개로 보인다). fixture 6종 + 4축 개별 제거 관측.
+
+##### ⛔ 명시한 교환 — 블록 CAS는 단일 writer를 가정한다
+
+전체 파일 CAS는 형제 편집 위양성을 만드는 대신 *다른* 것을 막고 있었다: 게이트 A·B의 writeback이 겹치면 `write_atomic`이 파일 전체를 replace하므로 나중 쓰기가 앞 쓰기를 **덮는다**. 블록 CAS는 그 충돌을 못 본다.
+
+설계된 흐름(Lead 순차)에서는 창이 없고, 열리는 것은 **Stop hook이 Lead 호출과 동시에 도는 경우**뿐이므로 파일 lock을 2차 계층 선행 조건으로 뒀다. 지금 안 넣은 이유 — `write_atomic`이 `os.replace`로 inode를 바꿔 대상 파일 `flock`이 옛 inode에 남는다. 별도 lock 파일의 수명·정리·stale 처리를 설계해야 한다.
+
+##### 검증
+
+self-test **49/49** · health-check 전 검사 통과 · lint 위반 0건 · workflow 문법 6개 OK · `--help` exit 0. 방어선 7종을 **개별 제거**해 각각 독립 관측을 확인했다. `scripts/gate_check.py`     1216줄 · `modules/gates.md`      238줄 · fixture 49케이스.
+
+#### 검사는 있는데 발화하지 않던 계약
+
+구현 리뷰가 **rejected**(critical 4 · major 3 · minor 2 · suggestion 1). 네 critical 전부 독립적인 false-green 경로였고, 전부 재현 확인 후 수정했다.
+
+##### ⛔ 승인 계약이 한 번도 발화하지 않았다
+
+`APPROVED_ORACLE_HASH` 검사는 코드 **3곳**에 있었는데 **발급하는 곳이 없었다.** 그래서 필드가 원장에 들어가지 않고, `gate_state`·`evaluate` 는 "있을 때만" 대조하므로 검사가 영원히 잠들어 있었다. 실측: 승인된 lint 실행을 `echo <기대문자열>` 로 바꿔도 PASS.
+
+⛔ 011(스키마 실행 경로 0건)과 **같은 부류**다 — 검사가 존재하는 것과 발화하는 것은 다르다.
+
+- `render_ledger` 가 command 게이트의 `criterion` 을 **버리고 있었다.** VerifySpec 이 요구하는 필드인데 원장에 안 남기면 승인받은 "무엇을 재는가"가 사라지고 CHECK 만 남는다 → `CRITERION:` 보존 + `oracle_hash` 에 포함(제목도 함께)
+- **`--finalize`** 신설 — 실행 게이트마다 도장을 찍고 `APPROVED: yes` 를 남긴다. fz-plan 4.5가 호출한다
+- 확정본에 **부분 도장은 exit 3** — 도장이 있으니 보호받는다고 읽히는데 안 찍힌 게이트는 CHECK 를 바꿔도 통과한다. 무도장보다 위험하다
+- draft 는 경고만 — 도장을 요구하면 순서가 뒤집힌다(Phase 2 평가자가 볼 CHECK 가 도장보다 먼저 있어야 한다)
+
+##### 파서와 writeback 이 문법을 공유하지 않았다
+
+`gate_block_hash`·`apply_result` 가 **자체 스캐너**로 라인을 다시 찾아, 파서가 건너뛰는 **펜스(```) 내부**를 몰랐다. 실측: 문서 예시의 `- [ ] G1:` 이 `- [x]` 로 고쳐지고 **증거까지 박혔다** — 같은 서명이 두 주장에 붙었다.
+
+→ 파서가 게이트별 라인 스팬을 기록하고 hashing·editing 이 그것만 쓴다. **파서가 SSOT다.** CRLF 정규화도 한 곳으로 모였다. 쓴 결과를 디스크에서 다시 읽어 met 을 판정한다.
+
+##### ROOT 를 검증한 경로와 실행한 경로가 달랐다
+
+검증은 realpath 로 하고 실행은 헤더 **원문**을 썼다. 그 사이 심볼릭을 다른 디렉토리로 돌리면 CHECK 가 딴 곳에서 돌고, 증거 서명은 바뀌지 않은 *표기*에만 묶여 나중 `--status` 는 met 으로 읽는다(TOCTOU). → 검증된 정규 경로를 저장해 실행·해시·증거 전부 그것을 쓴다.
+
+##### `--verdict-check` 가 거짓 응답을 통과시켰다
+
+id 집합·개수·합계만 봤다. 필수 필드·enum 미확인, `summary` 를 배열과 대조하지 않아 음수 상쇄가 가능했고, **제목이 바뀌어도 id 는 같으므로 stale 응답이 통과**했다.
+
+→ 필수 10필드 + verdict enum 확인 · `(id, title, kind)` 삼중 결속 · `summary` 를 배열에서 **재계산**해 비교 · 음이 아닌 정수 요구.
+
+##### ⛔ "streaming capture" 가 사실이 아니었다
+
+`stream.read(8192)` 은 **8192바이트가 모이거나 EOF 까지 블록**한다. docstring 이 실행 중 capture 라 썼지만 짧은 출력은 프로세스 종료 시 한꺼번에 도착했다 — EXPECT 조기 매칭(v4.25.1 의 S6)도 출력 상한 감지도 실행 중에 발화하지 못했다.
+
+**음성 대조가 이걸 잡았다.** 경계 fixture 를 주입 전후로 돌렸는데 둘 다 3.1초로 동일했다. `read1` 로 고치자 비로소 판별됐다.
+
+- `_matched()` 가 stdout·stderr 를 **개행 없이** 이어 붙여 경계에서 needle 을 합성했다 — stdout=`he` + stderr=`llo` 가 EXPECT=`hello` 에 걸려 조기 kill 을 유발하고 뒤에 오는 진짜 출력을 잃는다. EXPECT 는 개행을 담을 수 없으므로 **스트림별 검색**이 최종 판정과 정확히 같은 의미다
+- decode 도 없애 bytes 로 찾는다(1MiB 를 50ms 마다 디코딩하면 120초 대기에서 누적 2.4GiB)
+
+##### 증거가 왕복하지 않았다
+
+정상 출력에 `;` 가 있으면(`echo "done; cleanup=ok"`) `parse_evidence` 의 분해가 잘려 재계산 서명이 어긋나고 **통과한 게이트가 unmet 으로 읽혔다**(fail-red). `ev_enc`/`ev_dec` 역함수 쌍으로 `%`·`;` 를 escape 하고 서명을 escape 된 값 위에서 계산한다.
+
+##### 나머지
+
+- `verify-gates` 절이 `plan.draft.md` 를 하드코딩해 fz-review(확정 원장 대상)가 쓸 수 없었다 → 원장을 호출자 파라미터로. fz-review 에 `--verdict-check` 후속도 명시
+- EXPECT 판별에 메타문자 경고 추가(`/foo/g`·`/^ok$/`). **알려진 오거부**(`/tmp/i`)를 문서화 — 완전한 판별자는 존재하지 않는다
+- lint `#N1` 이 파일명 목록으로 non-issue 스키마를 걸렀다(주석이 거부한 바로 그 결합) → `issues` 배열 유무로 **의미 판정**. 새 스키마를 넣어도 린터를 안 고친다
+- `guides/skill-authoring.md` §11 에 **공유 스크립트 예외** 추가 — 소비자가 2개 이상이면 리포 루트 `scripts/`
+
+##### 검증
+
+self-test **61/61** · health-check · lint 위반 0건 · workflow 6개 · `--help` exit 0.
+
+방어선 9종을 개별 제거해 **8종 관측**을 확인했다. 미관측 1종(`evaluate` 사후 재확인)은 재현 입력이 없어 매니페스트 `_notes` 에 **미관측임을 명시**했다 — "통과했다"가 "관측됐다"를 뜻하지 않는다.
+
+⛔ `oracle_hash` 민감도는 원장 fixture 로 볼 수 없다(`path_fingerprint`·`SHELL` 이 머신마다 다르다) → `--oracle-fields` 순수 함수 매트릭스로 관측한다.
+
+`scripts/gate_check.py` 1461줄 · `modules/gates.md` 265줄 · fixture 61케이스.
+
+#### 스키마가 API 에 로드되지 않던 자리
+
+##### `validate` 경로가 구조적으로 실행 불가였다
+
+`schemas/codex_verification_schema.json` 이 structured output strict 모드를 위반해 `invalid_json_schema` 400 을 받는다 — **스키마가 로드조차 되지 않는다.** 이 스키마는 `validate`(fz-review Phase 5.5 역방향 검증)가 쓰므로 그 경로 전체가 죽어 있었다. 파일이 존재하고 JSON 으로 파싱되면 통과했으므로 어느 검사도 잡지 못했다.
+
+전 스키마를 스캔했다 — 6개 중 `--output-schema` 로 **실제 전달되는** 것은 4개이고, 그중 1개가 위반이었다. `issue_tracker_schema.json` 은 Issue Tracker 산출물 형식(`modules/session.md:126`)이고 codex 응답이 아니라 대상이 아니다. `codex_base_issue_schema.json` 은 `$defs` 참조용이다.
+
+변환은 기계적이다 — `required` 에 없던 필드(작성자가 optional 로 의도한 것)를 **nullable 타입 + required** 로 바꾼다. `codex_review_schema.json`(6/6 준수)의 선례이고 의미가 보존된다. 소비처가 읽는 `resolution_status` 4축은 이미 required 였고, `validate-codex-output.py` 가 `"null"` 타입을 지원한다.
+
+⛔ **실행으로 확인했다** — `GATE-PASS`, nullable 필드가 `null` 로 정상 반환. F-040("선언된 산출물은 1회 실행이 완료 조건")을 적용했다.
+
+##### ⛔ 수정 스크립트가 자기 blind spot 을 재검산과 공유했다
+
+`location` 을 nullable 로 만들면 `type` 이 `"object"` → `["object","null"]` 이 된다. 그러면 `type == "object"` 조건에서 빠지는데, **재검산도 같은 조건을 써서 함께 놓쳤다.** "위반 0건"을 보고했지만 한 객체가 남아 있었다.
+
+`type` 리스트를 포함하도록 고치고, 고정점까지 반복하게 만들었다(한 라운드가 새 nullable 객체를 만들면 다음 라운드 대상이 된다).
+
+##### lint `#N10` — structured-output strict 준수
+
+⛔ **대상은 사용처가 정한다.** 파일명 목록(#N1 의 과거 결합)도, top-level `properties` 유무도 기준이 아니다 — `--output-schema`/`--schema` 로 전달되는 것만 검사하고, 미배선 스키마는 위반이 아니라 정보로 알린다. 새 스키마를 추가하면 **배선하는 순간** 검사에 들어온다.
+
+음성 대조 3축: required 누락 · `additionalProperties` 누락 · **nullable object 안쪽**(type 리스트 blind spot) 각각 검출.
+
+##### 원장 파서 fail-closed
+
+- **헤더 중복 선언 거부** — ⛔ 실질 false-green 이었다. 마지막이 이기는 규칙이라 `STATE: closed` 를 한 줄 append 하면 원장 전체가 no-op 이 된다. `ABANDON:` 처럼 흔적이 남는 이탈로가 아니라 **조용한 무력화**다. `ROOT:` 중복은 실행 디렉토리를 바꾼다
+- **게이트 밖 들여쓰기 속성 거부** — 오타로 게이트 줄이 빠지면 그 CHECK 가 통째로 사라지는데 파서가 아무 말도 하지 않았다. 게이트 수 감소를 알아챌 오라클이 없다
+
+
+##### ⛔ 승인 도장이 환경에 흔들려 cross-session 파이프라인을 막았다
+
+외부 검토가 잡았다. `oracle_hash` 에 `SHELL` 과 `path_fingerprint()` 가 들어 있고, 그 해시가 **승인 도장의 비교 대상**이었다.
+
+```
+fz-plan  세션 A: --finalize → APPROVED_ORACLE_HASH = sha(… | PATH_A | SHELL_A)
+fz-code  세션 B: --only S1  → oracle_hash          = sha(… | PATH_B | SHELL_B)   → exit 3
+```
+
+실측 — PATH 만 바꿔도, SHELL 만 바꿔도 각각 **exit 3(차단)**. 메시지는 "승인 후 oracle 이 바뀌었다. 재승인이 필요하다"라며 원인을 잘못 지목한다. oracle 은 안 바뀌었고 환경이 바뀐 것이다.
+
+⛔ **추가 발견** — 증거 서명도 같은 병이었다. `--status` 를 다른 PATH 로 돌리면 통과한 게이트가 **UNMET** 으로 읽혔다.
+
+fz-plan → fz-code 가 별 세션인 것은 예외가 아니라 설계된 흐름이다(compact · 다음 날 · 다른 터미널 · direnv/nvm shim). 같은 세션 안에서만 검증했기 때문에 probe 가 통과했다 — **cross-session 을 건드리는 검증이 하나도 없었다.**
+
+두 해시의 목적을 분리했다.
+
+| 해시 | 무엇을 묶나 | 환경 |
+|---|---|:---:|
+| 승인 도장 | 사람·Codex 가 승인한 oracle | ⛔ 제외 |
+| 증거 서명 | 이 결과가 어느 환경에서 나왔나 | ✅ 포함 (**기록된** 값으로 재계산) |
+
+증거 필드 `path=` 를 `env=` 로 바꾸고 **서명에 묶었다.** 이전엔 기록만 되고 서명 밖이라 provenance 가 실제로 보호되지 않았다.
+
+⭐ **부수 이득** — 승인 해시가 머신 독립이 되어 `CWD:` 고정 시 결정론적이다. `approved-oracle-swapped` fixture 의 도장을 더미 `000000000000` 에서 **실제 계산값**으로 바꿨다. 이전엔 "불일치"가 아니라 "아무 값과도 불일치"를 보고 있었다 — 대조 로직을 실제로 관측하지 못했다.
+
+`--cross-session` 하네스 모드 신설 — 한 프로세스 안에서 환경을 바꿔야 하므로 원장 fixture 로는 볼 수 없다.
+
+##### `--finalize` 가 CAS 규율 밖에 있었다
+
+다른 모든 쓰기 경로가 블록 해시를 대조하는데 확정만 baseline 비교가 없었다. 단일 writer 가정으로 덮이지만 "가정으로 보호된다"와 "규율 밖에 있다"는 다르다.
+
+##### `#N10` 스캔 범위 한정
+
+전 트리를 훑으면 `docs/releases/`·`CHANGELOG.md` 의 **산문**이 배선으로 오인된다 — "`--schema schemas/foo.json` 이 깨져 있었다" 같은 문장 하나로 은퇴한 스키마가 검사 대상에 편입된다. `MIN_HITS` 는 축소만 잡고 확대는 못 잡는다. 배선 디렉토리(`modules`·`skills`·`scripts`·`workflows`·`agents`·`codex-skills`)로 한정했다.
+
+##### 검증
+
+self-test **65/65** · health-check · lint 위반 0건(`#N10` 검사 대상 17객체) · workflow 6개 · `--help` exit 0. `scripts/gate_check.py` 1554줄 · `modules/gates.md` 274줄.
+
+##### 보류 (이유 명시)
+
+- **파일 lock** — 블록 CAS 의 단일 writer 가정. 창이 열리는 것은 Stop hook 이 Lead 호출과 동시에 도는 경우뿐이므로 **소비자(2차 계층)와 함께** 만든다. 지금 만들면 소비자 없는 방어다
+- **2차 계층(Stop hook)** — 차단 형식 probe 가 live 세션을 필요로 하고(백그라운드에서 세션 종료를 관측할 수단이 없다) hook 설치는 사용자 합의 사항이다. probe 없이 hook 을 쓰면 "검증 안 된 산출물"이 되어 이번에 세 번 만난 실패 모드의 재발이다
+
+#### 2차 계층: 산문 배선의 재귀를 끊는다
+
+1차 계층(fz-plan·fz-code·fz-review 배선)은 **SKILL.md 산문**이다. Lead가 건너뛰어도 아무 신호가 없다 — 이 도구가 대체하려던 것이 산문 강제인데, 그 도구를 부르는 것 자체가 산문이었다. 재귀가 한 층 위로 올라갔을 뿐이다.
+
+`scripts/gate_stop_hook.py` (324줄)가 그 재귀를 끊는다. 세션 종료 시 `cwd` 하위 확정 원장을 찾아 미충족이면 종료를 막는다.
+
+##### ⛔ probe 없이 차단 계약을 확정했다
+
+"live 세션이 필요하다"고 판단해 보류했던 항목이다. 실제로는 **공식 문서가 답을 갖고 있었다** — `~/.claude/plugins/marketplaces/claude-plugins-official/plugins/plugin-dev/skills/hook-development/`.
+
+```
+입력 (stdin JSON): {"session_id":…, "transcript_path":…, "cwd":…, "hook_event_name":"Stop"}
+차단:              stderr ← {"decision":"block","reason":"…"}  +  exit 2
+```
+
+⛔ 세 후보 중 `hookSpecificOutput.decision` 도 `{"continue": false}` 도 아니고 **top-level `decision`** 이다. 세션 감금 위험도, hook 등록도 필요하지 않았다.
+
+부수 확인 — 사용자 환경에 이미 Stop hook 17종이 배선돼 있었다. `guides/harness-engineering.md:1159` 의 "Claude Code lifecycle hook 0건"이 stale이었고 정정했다.
+
+##### 설계 결정 3가지
+
+| 결정 | 이유 |
+|---|---|
+| 원장 발견 = `cwd` 하위 glob | `session_id`가 오므로 세션 바인딩도 가능하지만 **쓰는 쪽 배선**이 필요하고, 그 배선이 빠지면 hook이 원장을 못 찾아 조용히 무력화된다 — 이번 작업에서 다섯 번 만난 축이다. glob은 배선이 0이고 여러 원장을 전부 본다 |
+| 판정 = `--status` (재실행 없음) | 재실행은 게이트당 기본 120초여서 hook에 부적합. 기록된 증거는 서명으로 oracle에 묶여 있다 |
+| 전면 fail-open | "세션 감금이 게이트 누락보다 나쁘다"가 가장 날카롭게 적용되는 자리다 |
+
+⛔ **무한 루프 방어** — Stop을 막으면 Claude가 계속하고 다시 Stop에 도달한다. 원장 상태가 그대로면 같은 이유로 또 막혀 세션이 끝나지 않는다. 같은 상태(원장 해시)로 **2회**까지만 막는다. 상태를 못 쓰면 즉시 통과 — 방어 없이 막으면 무한 block이다. 공식 문서에 `stop_hook_active` 같은 필드가 없어(grep 0건) 스크립트가 직접 방어한다.
+
+##### ⛔ 차단이 영원히 발화하지 않던 버그
+
+첫 격리 테스트에서 `decision=block` JSON은 stderr로 나갔는데 **exit이 0**이었다.
+
+```python
+try:
+    sys.exit(main())              # SystemExit 을 던진다
+except BaseException as exc:      # ⛔ SystemExit 도 BaseException 이다
+    sys.exit(EXIT_PASS)           # → 항상 0
+```
+
+최후 방어가 자기 exit을 삼켰다. **차단 코드가 있는데 발화하지 않는 것** — 이 작업에서 다섯 번째로 만난 축이다(011 스키마 · verification 스키마 · 승인 도장 발급 · N10 부재 · 이번). `sys.exit()`을 try 밖으로 빼고 `except Exception`으로 좁혔다.
+
+##### 검증 — 등록 없이 계약까지
+
+`--self-test` 6케이스를 내장하고 health-check 2.6에 배선했다. hook 등록은 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
+
+```
+no-gates-dir · depth1~4 · draft-only · skip-git · closed-passes
+approved-unmet · kill-switch · wrong-event · bad-cwd · env-missing · loop-guard
+```
+
+린터가 새 스크립트의 두 계약 위반을 즉시 잡았다 — `#N2`(인벤토리 12≠13)와 `#N6`(루트 앵커 화이트리스트). 형제 `gate_check.py`와 동일한 앵커 형태로 맞췄다.
+
+
+##### ⛔ 원장 발견 glob이 실사용 경로를 놓쳤다
+
+외부 검토가 잡았다. `*/gates/plan.md` — 깊이 정확히 2다. 실측하니 4종 중 **1종만** 발견됐다.
+
+```
+{CWD}/gates/plan.md          깊이 1  → ⛔ 미발견 (조용히 통과)
+{CWD}/ASD-1/gates/plan.md    깊이 2  → ✅ 발견
+{CWD}/a/b/gates/plan.md      깊이 3  → ⛔ 미발견
+{CWD}/a/b/c/gates/plan.md    깊이 4  → ⛔ 미발견
+```
+
+self-test fixture가 **정확히 깊이 2로만** 원장을 만들었기 때문에 관측되지 않았다 — 이 작업에서 여덟 번 만난 "fixture가 자기 이름의 축을 못 본다"의 아홉 번째다.
+
+깊이 0~3 명시 목록으로 넓혔다(`rglob`은 큰 트리에서 hook을 늘어지게 만든다). `.git`·`node_modules` 등은 건너뛴다.
+
+⛔ **`cwd` 밖은 설계 한계다.** 워크트리에서 작업하고 원장이 리포 루트에 있으면 어떤 glob으로도 못 찾는다 — hook은 `cwd`만 받는다. `FZ_GATES_LEDGER`로 명시 지정하는 탈출로를 뒀다.
+
+⛔ **"찾지 못함"이 조용했다.** 게이트 미사용 세션과 미발견이 둘 다 침묵이라 놓친 원장이 통과로 보였다. `gates/`가 아예 없으면 조용히 통과하고, `gates/`는 있는데 확정 원장이 없으면 stderr로 남긴다.
+
+self-test를 6 → **14케이스**로 늘렸다. 방어 7종을 개별 제거해 **7종 전부 관측**했다 — 깊이·미발견 진단·SKIP_DIRS·탈출로·`SystemExit` 포획·차단 자체·**무한 루프 방어**.
+
+⚠️ `loop-guard`는 처음에 미관측이었다. 방어를 제거해도 통과했다 — 같은 상태로 **반복 발사**하는 케이스가 없었기 때문이다. `REPEAT_CASES`를 추가해 `MAX_BLOCKS+1`회 쏜 뒤 마지막을 본다.
+
+⚠️ `approved` fixture를 만들 때 닭-달걀을 만났다 — 도장을 계산하려면 파싱해야 하는데 `APPROVED: yes`면 파싱이 전수 도장을 요구한다. draft로 쓰고 `--finalize`에 맡기는 것이 정답이었다.
+
+##### 검증 (전체)
+
+gate self-test **65/65** · stop-hook self-test **14/14** · health-check 전 검사 통과 · lint 위반 0건 · workflow 6개 · `--help` exit 0.
+
+`scripts/gate_check.py` 1554줄 · `scripts/gate_stop_hook.py` 435줄 · `modules/gates.md` 306줄.
+
+##### 남은 것
+
+**파일 lock** — 블록 CAS의 단일 writer 가정. 2차 계층이 생겼으므로 이제 창이 열린다(hook이 Lead 호출과 동시에 돌 수 있다). 다만 hook은 `--status`만 쓰고 **쓰기를 하지 않으므로** 실제 경합은 여전히 없다 — 판정기 두 프로세스가 동시에 쓰는 경우만 남는다.
+
+#### hook 미설치 머신의 노출 경로
+
+##### S16(`--merge` + BATCH manifest) 폐기
+
+원 플랜의 마지막 미결 항목이었다. 실측하니 전제가 바뀌어 있었다.
+
+```
+execution-modes.md BATCH 절     10건
+experiment-log BATCH 기록         0건   ← 실사용 흔적 없음
+/batch 스킬                       0개
+BATCH 경로의 게이트 배선           0건
+```
+
+⛔ **소비자가 없다.** hook 은 각 worktree 에서 그 안의 원장을 이미 찾으므로(깊이 0~3) 병합 없이도 독립 판정된다. `--merge` 는 종합 보고 편의이지 기능 요건이 아니고, BATCH 자체가 안 쓰이므로 거기에 배선을 넣으면 **미사용 위에 미사용을 얹는다.**
+
+이 작업이 15회 만난 지배 축이 "선언·구현했는데 소비자·발화가 없다"였다. 그 축의 16번째가 되지 않게 폐기한다.
+
+##### 대신 — health-check 원장 노출 (배선 5지점)
+
+`plan-v5` 에서 이 사유로 보류했던 항목이다.
+
+> `health-check.sh` 는 자기 위치에서 **plugin ROOT만** 안다. 외부 WORK_DIR 을 찾는 기전이 없다
+
+⭐ **그 기전이 2차 계층에서 생겼다.** `find_ledgers()`(깊이 0~3 + `SKIP_DIRS` + `FZ_GATES_LEDGER`). 보류의 전제가 사라졌다.
+
+이것이 **hook 미설치 머신의 유일한 노출 경로**다 — 배선 1~3은 산문이고 `FZ_GATES_TRACE` 는 환경변수 opt-in 이다.
+
+| 상태 | exit | 이유 |
+|---|:---:|---|
+| 미충족 | **0** | 작업 중 정상 상태. exit 에 반영하면 사람이 health-check 를 안 돌린다 (`lint_doc_freshness` 선례) |
+| 계약 위반 | **3** | plugin 자산 결함 — health-check 의 관심사 |
+
+##### ⛔ discovery 를 판정기로 옮겼다 — 두 구현이 갈리지 않게
+
+`find_ledgers` 가 hook 에만 있었다. health-check 가 자체 구현을 가지면 한쪽이 놓치는 배치가 생긴다 — **깊이 2만 보던 결함이 정확히 그것이었다.** 판정기로 옮기고 hook 이 `importlib` 로 빌려 쓴다. 린터의 선례와 같은 원칙이다(`lint_contracts.py:804` "chk_N6 와 self-test 가 **같은 함수**를 쓴다").
+
+⛔ 이동 중 `LEDGER_ENV` 정의를 hook 에 남기지 않아 `NameError` 가 났고, hook 의 전면 fail-open 이 그것을 **조용한 통과**로 바꿨다 — self-test 가 14 → 6/14 로 잡았다. fail-open 의 대가이고, 그래서 self-test 가 필요하다.
+
+##### 검증
+
+gate self-test **66/66** · stop-hook self-test **14/14** · health-check 전 검사 통과 · lint 위반 0건.
+
+discover 방어 3종 개별 제거 → **3종 전부 관측**: 계약위반 exit 반영 · 미충족 상세 보고 · **discovery 함수 공유**(hook 이 자체 구현을 쓰면 hook FAIL 6건).
+
+⚠️ `미충족` 기대 문자열 하나로는 상세 줄 제거를 관측하지 못했다 — 요약줄에도 `미충족 0` 이 나오기 때문이다. 상세 줄 형태(`  미충족 <경로> — ['G1']`)와 요약 수치(`미충족 1`)를 나눠서 본다.
+
+⚠️ fixture 원장을 sandbox 전체에서 찾으려던 첫 시도가 0건이었다 — 다른 fixture 는 파일명이 `plan.md` 가 아니다(`pass.md`·`ledger.md` …). `discover/` 하위에 충족·미충족·계약위반 세 트리를 `<sub>/gates/plan.md` 배치로 새로 만들었다.
+
+`tests` 를 탐색에서 제외했다 — fixture 원장은 테스트 자산이고 작업 원장이 아니다.
+
+`scripts/gate_check.py` 1689줄 · `modules/gates.md` 316줄 · fixture 66케이스.
+
 ### v4.24.0 (2026-08-24) — 게이트가 조용히 꺼져 있던 자리를 닫았다 [MINOR]
 
 18커밋 · 23파일 `+1,215 −112`. 직전 릴리즈 v4.23.1(2026-08-10) 이후 14일치를 한 번에 발행한다.
