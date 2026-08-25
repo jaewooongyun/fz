@@ -180,7 +180,10 @@ intent-triggers: []
 | `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — Codex MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (Codex 검증 §추가 발견 1). 단 산출물이 전수/카운트/부정 주장이면 light라도 Coverage Gate 유지, 외부 피드백 수용/기각 판정이면 External Feedback Gate 유지 (검증 경계 — cross-validation.md §Coverage Gate·§External Feedback Gate) |
 
 ### Gate 1: Intent Resolved
-- [ ] 1개 이상의 스킬이 매칭되었는가?
+- [ ] 1개 이상의 스킬이 매칭되었는가? — **0개면 Phase 3.1 을 resolver-only 로 호출했는가?**
+      (⛔ `guides/skill-authoring.md` § 파이프라인 매칭 흐름이 규정한 3단 폴백이다.
+       Gate 1 에서 바로 질문으로 빠지면 `pipelines.md` 가 잡을 요청까지 막힌다 —
+       실측 예 `타임아웃 30초로 변경` 은 quick-fix 트리거에 있으나 스킬 매칭은 0이었다)
 - [ ] Confidence 판정 완료? (Medium/Low이면 AskUserQuestion 실행했는가?)
 - [ ] 동점 파이프라인 있으면 사용자 선택 완료?
 - [ ] 매칭된 스킬 간 의존성이 파악되었는가?
@@ -223,6 +226,21 @@ intent-triggers: []
 
 의도 키워드와 사전 정의 파이프라인의 트리거를 대조하여 최적 매칭합니다.
 매칭되지 않으면 3.2 동적 파이프라인으로 폴백.
+
+#### resolver-only 호출 (Phase 1 매칭 0개일 때)
+
+Gate 1 에서 스킬 매칭이 0이면 3.1 을 **먼저** 호출한다. 두 갈래로 끝난다.
+
+```
+Phase 1 매칭 0  →  3.1 트리거 대조
+                   ├─ pipeline-hit : 체인의 스킬을 Phase 1 결과로 채우고 **Phase 2 로 복귀**
+                   │                 (복잡도·모드가 비면 파이프라인이 모드 없이 제안된다)
+                   └─ total-miss   : ⛔ AskUserQuestion. 3.2 를 실행하지 않는다 —
+                                     3.2 는 "최종 목표 스킬"을 입력으로 요구하는데 그것이 없다
+```
+
+⛔ **total-miss 에서 3.2 로 내려가지 않는다.** 목표 스킬 없이 `provides`/`needs` 역추적을
+시작하면 임의 파이프라인이 구성된다 — `references/test-spec.md` 가 그것을 0건으로 못 박는다.
 
 ### 3.2 동적 파이프라인 구성 (폴백)
 
@@ -434,7 +452,8 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 
 | 에러 | 대응 | 폴백 |
 |------|------|------|
-| intent-triggers 매칭 0개 | AskUserQuestion | 사용자에게 스킬 직접 선택 요청 |
+| intent-triggers 매칭 0개 (pipeline-hit) | 3.1 resolver-only → 체인 스킬로 Phase 1 채우고 Phase 2 복귀 | 실패 시 total-miss 처리 |
+| intent-triggers 매칭 0개 (total-miss) | AskUserQuestion | 사용자에게 스킬 직접 선택 요청 (⛔ 3.2 임의 실행 금지) |
 | 스킬 SKILL.md 누락 | 해당 단계 스킵 제안 | 남은 파이프라인 계속 |
 | Gate 실패 (SOLO) | 재시도/스킵/중단 선택 | 사용자 에스컬레이션 |
 | Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | SOLO 폴백 |
