@@ -68,6 +68,7 @@ ITEMS = [
     #    (b) 파일명 없는 `§N` self-file: 프로브 329건 → 위반 119(36%) → ⛔ **미도입**.
     #        대부분 다른 문서·논문의 절을 문맥상 축약한 표기(`§2.4`=OpenDev 논문, `§5.7`=experiment-log)라
     #        정적으로 대상 문서를 특정할 수 없다. 도입하면 오탐률이 #13 강등 선례(89건)를 재현한다.
+    ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 codex 응답이 아니다)"),
     ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
 ]
 DET = {i for i, k, _, _ in ITEMS if k == "DETERMINISTIC"}
@@ -106,6 +107,7 @@ MIN_HITS = {
     "N7": 5,     # 셸 테스트 15건
     "N8": 100,   # 목차 앵커 237건
     "N9": 50,    # cross-file § 참조 **실측 seen=149** (walk_files 전체) — 34%로 보수적
+    "N10": 10,   # 배선된 응답 스키마 4개 × 객체 3~6 = 17 (실측) — 보수적으로 10
                  #   ⛔ 121은 도입 판정 프로브(5개 디렉토리 한정) 값이니 하한 근거로 쓰지 말 것
 }
 
@@ -387,6 +389,18 @@ def chk_N1():
     sev = bd.get("$defs", {}).get("severity", {}).get("enum")
     if not sev:
         raise ParseError("base 스키마에 $defs.severity.enum 부재")
+    # ⛔ 대상은 **issue 스키마**다 — base 의 severity/confidence 를 소비하는 것들.
+    #    2026-08-24 정정: 본 검사가 `schemas/*.json` 전부를 issue 로 가정해,
+    #    게이트 처분(accept/revise/demote_to_manual)을 담는 `codex_gate_verdict_schema` 를
+    #    "severity 부재" 위반으로 만들었다. severity(문제 심각도)와 verdict(게이트 처분)는 축이 다르다.
+    #    비-issue 스키마는 **파일명으로 제외하지 않는다** — 새 issue 스키마가 severity 를 빠뜨리면
+    #    여전히 잡아야 하므로, `issues` 배열 보유 여부로 판별한다.
+    # issue 스키마인지 **내용으로** 판정한다 — 파일명 목록은 새 스키마마다
+    # 린터를 고치게 만든다(주석이 거부한 바로 그 결합).
+    def _is_issue_schema(doc) -> bool:
+        props = (doc.get("properties") or {})
+        node = props.get("issues") or props.get("new_issues_found")
+        return isinstance(node, dict) and node.get("type") == "array"
     v, seen = [], 0
     for f in sorted(sd.glob("*.json")):
         if f.name == base.name:
@@ -397,6 +411,8 @@ def chk_N1():
             raise ParseError(f"{f.name} JSON 파싱 실패: {e}")
         defs = find_severity_defs(doc)
         if not defs:
+            if not _is_issue_schema(doc):
+                continue  # issue 스키마가 아니다 — 대조 대상 자체가 없다
             seen += 1
             v.append(f"schemas/{f.name}: severity 정의 부재 — base와 대조 불가 (⛔ skip 아님)")
             continue
@@ -1073,6 +1089,97 @@ SECREF = re.compile(r"`([A-Za-z0-9_./\-]+\.md)`\s*§([0-9]+(?:\.[0-9]+)*)")
 HEADNUM = re.compile(r"^#{1,6}\s+§?\s*([0-9]+(?:\.[0-9]+)*)[.)\s]", re.M)
 
 
+def chk_N10(root: Path | None = None):
+    """structured-output strict 준수.
+
+    OpenAI structured output 은 두 조건을 요구한다 — 모든 object 노드에
+    `additionalProperties: false`, 그리고 `required` 가 `properties` 의 **전 키**를 포함.
+    optional 필드는 nullable 타입(`["string","null"]`)으로 표현한다.
+
+    ⛔ 하나라도 어기면 API 가 `invalid_json_schema` 400 을 낸다 — 스키마가 **로드조차
+       되지 않는다.** 실측(2026-08-25): `codex_gate_verdict_schema` 와
+       `codex_verification_schema` 가 이 상태였고, 후자는 `validate`(fz-review Phase 5.5)
+       가 쓰는 스키마라 그 경로가 구조적으로 실행 불가였다. 파일이 존재하고 JSON 으로
+       파싱되면 통과했으므로 어느 검사도 잡지 못했다.
+
+    ⛔ **대상은 사용처가 정한다.** 파일명 목록(#N1 의 과거 결합)도, top-level
+       `properties` 유무도 기준이 아니다 — `issue_tracker_schema.json` 은 top-level
+       properties 를 갖지만 Issue Tracker **산출물** 형식이고 codex 응답이 아니다.
+       `codex_base_issue_schema.json` 은 `$defs` 참조용이다. 실제 전달되는 것만 본다.
+
+    ⛔ `type` 이 리스트인 객체도 대상이다. nullable 로 만들면 `"object"` →
+       `["object","null"]` 이 되므로 `== "object"` 로 판정하면 **자기가 nullable 로
+       만든 노드를 놓친다** (실측: `new_issues_found.items.properties.location`).
+    """
+    root = root or ROOT
+    sd = root / "schemas"
+    if not sd.is_dir():
+        raise ParseError("schemas/ 디렉토리 부재")
+
+    # 사용처 수집 — 마크다운·셸·JS 전체에서 스키마 인자를 찾는다
+    used = set()
+    pat = re.compile(r"(?:--output-schema|--schema)\s+[\"']?(?:[^\s\"']*/)?([a-z_]+\.json)")
+    # ⛔ 배선처만 훑는다. 전 트리를 훑으면 `docs/releases/`·`CHANGELOG.md` 의 **산문**이
+    #    배선으로 오인된다 — "`--schema schemas/foo.json` 이 깨져 있었다" 같은 문장 하나로
+    #    은퇴한 스키마가 검사 대상에 편입된다. MIN_HITS 는 축소만 잡고 확대는 못 잡는다.
+    WIRING_DIRS = ("modules", "skills", "scripts", "workflows", "agents", "codex-skills")
+    candidates = []
+    for sub in WIRING_DIRS:
+        base = root / sub
+        if base.is_dir():
+            candidates += [f for f in base.rglob("*") if f.is_file()]
+    for f in candidates:
+        if f.suffix not in (".md", ".sh", ".js", ".py"):
+            continue
+        if "/node_modules/" in str(f) or "/.git/" in str(f):
+            continue
+        try:
+            body = read(f)
+        except (OSError, UnicodeDecodeError):
+            continue
+        used.update(pat.findall(body))
+
+    def is_object(node) -> bool:
+        ty = node.get("type")
+        return ty == "object" or (isinstance(ty, list) and "object" in ty)
+
+    v, seen, skipped = [], 0, []
+    for f in sorted(sd.glob("*.json")):
+        if f.name not in used:
+            skipped.append(f.name)
+            continue
+        try:
+            doc = json.loads(read(f))
+        except json.JSONDecodeError as e:
+            raise ParseError(f"{f.name} JSON 파싱 실패: {e}")
+
+        def walk(node, path="$"):
+            nonlocal seen
+            if isinstance(node, dict):
+                if is_object(node) and isinstance(node.get("properties"), dict):
+                    seen += 1
+                    if node.get("additionalProperties") is not False:
+                        v.append(f"schemas/{f.name} {path}: additionalProperties 가 false 가 아니다 "
+                                 f"({node.get('additionalProperties')!r}) — strict 모드 거부")
+                    gap = sorted(set(node["properties"]) - set(node.get("required") or []))
+                    if gap:
+                        v.append(f"schemas/{f.name} {path}: required 에 없는 properties {gap} — "
+                                 "optional 은 nullable 타입 + required 로 표현한다")
+                for k, val in node.items():
+                    walk(val, f"{path}.{k}")
+            elif isinstance(node, list):
+                for i, val in enumerate(node):
+                    walk(val, f"{path}[{i}]")
+        walk(doc)
+
+    # ⛔ 반환 계약은 `(violations, hits:int)` 다 — 형제 검사 전부 그렇고 main 이 hits 를
+    #    MIN_HITS 와 **수치 비교**한다. 문자열을 넣으면 TypeError 로 exit 2 가 된다(실측).
+    #    미배선 정보는 위반이 아니므로 stderr 로 따로 알린다.
+    if skipped:
+        print(f"   ℹ️  #N10 배선 없어 미검사: {', '.join(skipped)}", file=sys.stderr)
+    return v, seen
+
+
 def chk_N9(root: Path | None = None):
     base = root or ROOT
     by_base = defaultdict(list)
@@ -1107,7 +1214,7 @@ CHECKS = {
     "1": chk_1, "3": chk_3, "5": chk_5, "6": chk_6, "7": chk_7,
     "14": chk_14, "16": chk_16,
     "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
-    "N7": chk_N7, "N8": chk_N8, "N9": chk_N9,
+    "N7": chk_N7, "N8": chk_N8, "N9": chk_N9, "N10": chk_N10,
 }
 
 
