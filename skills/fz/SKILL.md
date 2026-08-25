@@ -92,6 +92,12 @@ intent-triggers: []
 | modules/pipelines.md | 19개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
 | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
 | modules/plugin-refs.md | SwiftUI + Concurrency 플러그인 참조 가이드 |
+| modules/intent-registry.md | Phase 1 이 읽는 트리거 소스 — 스킬·파이프라인 트리거 + 구어체 보강 + Confidence 판정 |
+| modules/lead-action-default.md | 교훈 사전 로드 Trigger Matrix (Phase 0 Step 4) |
+| modules/fz-pipeline-proposal.md | 파이프라인 시각화 + AskUserQuestion 형식 (Phase 4) |
+| modules/uncertainty-verification.md | Default-Deny — 미검증 주장 차단 (Phase 5 Brief) |
+| modules/lead-reasoning.md | Speculation-to-Fact Fallacy 방어 (Phase 5 Brief) |
+| modules/system-reminders.md | T6/T7 트리거 리마인더 (Phase 5 Brief) |
 
 ---
 
@@ -166,7 +172,11 @@ intent-triggers: []
 3. **후보 스킬 목록 생성**: 매칭된 스킬 + confidence 점수
 4. **추가 신호 추출**: 복잡도 평가를 위한 부가 정보
 
-> 스킬별 intent-triggers + 구어체 보강 패턴 + Confidence 판정 규칙: `modules/intent-registry.md`
+> ⛔ **Phase 1 이 읽는 트리거 소스는 `modules/intent-registry.md` 다.** 스킬 YAML 의
+> `intent-triggers` 는 스킬 자체 문서이며 `fz-skill` eval 이 소비한다 — 두 곳이 어긋나면
+> `/fz` 는 registry 만 보므로, **스킬을 추가·수정할 때 registry 도 함께 고쳐야 한다**.
+> 담긴 것: 스킬 트리거 · 파이프라인 전용 트리거 · 구어체 보강 · Confidence 판정.
+> ⛔ 현재 이 동기화를 강제하는 기계 검사는 없다 (2026-08-25 시도했으나 오라클이 부정확해 철회).
 
 ### 추가 신호 추출
 
