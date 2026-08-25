@@ -87,22 +87,92 @@ python3 "$G" --discover .                          # 하위 원장 상태 요약
 
 ## 세션 종료 차단 (선택 설치)
 
-기계적 차단은 hook 을 설치한 머신에만 있다. 원장과 판정기, 그리고 위 배선 중 넷은 어디서나 돈다.
+기계적 차단은 hook 을 설치한 머신에만 있다. 원장과 판정기, 그리고 나머지 배선 넷은 어디서나 돈다.
 
-`examples/hooks.json.example` 의 `Stop` 항목을 `.claude/settings.json` 으로 복사하고 `{PLUGIN_ROOT}` 를 실제 경로로 바꾼다.
+⛔ **설치 전에 읽어야 하는 것 여섯 가지가 있다.** 잘못 넣으면 기존 hook 이 사라지거나, 플러그인을 업데이트한 뒤 조용히 꺼진다.
 
-```bash
-bash scripts/resolve-plugin-root.sh          # 경로 확인
-python3 scripts/gate_stop_hook.py --self-test # 계약 검증 (14케이스)
-```
+### 1. 기존 `Stop` 항목을 덮어쓰지 않는다
 
-원장 탐색은 세션 CWD 하위 깊이 3까지다. 워크트리에서 작업하고 원장이 리포 루트에 있으면 찾지 못하므로 경로를 명시한다.
+`.claude/settings.json` 의 `hooks.Stop` 은 **배열**이다. 이미 항목이 있으면 거기에 **추가**한다. 템플릿을 통째로 복사하면 기존 것이 사라진다.
 
 ```bash
-export FZ_GATES_LEDGER=/path/to/ASD-1234/gates/plan.md
+python3 -c "
+import json, pathlib
+p = pathlib.Path.home()/'.claude/settings.json'
+d = json.loads(p.read_text())
+print('현재 Stop 항목:', len(d.get('hooks', {}).get('Stop', [])))"
 ```
 
-같은 상태로 두 번 막은 뒤에는 통과시킨다. 원장이 그대로면 같은 이유로 계속 막혀 세션이 끝나지 않기 때문이다.
+### 2. hook 은 **병렬**로 돈다
+
+공식 문서가 "hooks run in parallel" 이라 명시한다. 기존 `Stop` hook 이 알림이나 기록 용도면 충돌하지 않지만, **서로의 결과에 의존하는 hook 을 만들지 않는다.**
+
+⚠️ 여러 `Stop` hook 중 하나가 `block` 을 냈을 때 어떻게 합산되는지는 공식 문서에 명시가 없다 `[미검증]`. 이 hook 은 자기 판정만 낸다.
+
+### 3. 플러그인 캐시 경로에 **버전이 들어간다**
+
+```
+~/.claude/plugins/cache/fz-orchestrator/fz/4.25.0/scripts/gate_stop_hook.py
+                                           ^^^^^^ 업데이트마다 바뀐다
+```
+
+⛔ 이 경로를 하드코딩하면 **다음 업데이트에 hook 이 조용히 꺼진다.** 파일이 없으면 hook 이 fail-open 으로 통과하므로 에러도 안 난다.
+
+아래 형태를 쓴다. 캐시에서 최신 하나를 고르고, 없으면 통과한다.
+
+```bash
+H="$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | tail -1)"
+[ -n "$H" ] || exit 0
+exec python3 "$H"
+```
+
+개발 모드(`claude --plugin-dir ~/dev/fz-plugin`)로 쓰면 고정 경로라 이 문제가 없다.
+
+### 4. `python3` 3.9+ 가 PATH 에 있어야 한다
+
+없으면 hook 이 통과한다(fail-open). 차단이 조용히 사라지므로 설치 후 한 번 확인한다.
+
+```bash
+python3 --version
+python3 <플러그인>/scripts/gate_stop_hook.py --self-test   # 14/14 passed
+```
+
+### 5. 상태 파일을 홈에 만든다
+
+`~/.fz/stop-hook-state.json` — 무한 루프 방어용 카운터다. 같은 원장 상태로 두 번 막은 뒤에는 통과시킨다. 쓰기에 실패하면 즉시 통과한다(방어 없이 막으면 무한 block 이 된다).
+
+### 6. 원장을 못 찾으면 차단도 없다
+
+탐색은 세션 CWD 하위 **깊이 3까지**다. 워크트리에서 작업하고 원장이 리포 루트에 있으면 찾지 못한다.
+
+```bash
+export FZ_GATES_LEDGER=/path/to/ASD-1234/gates/plan.md    # 여러 개는 : 로 구분
+```
+
+`gates/` 디렉토리는 있는데 확정 원장(`plan.md`)이 없으면 그 사실을 stderr 로 알린다. `gates/` 자체가 없으면 게이트 미사용 세션이므로 조용히 통과한다.
+
+### 설치
+
+`examples/hooks.json.example` 의 `Stop` 항목을 참고해 `.claude/settings.json` 의 `hooks.Stop` 배열에 추가한다.
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "H=\"$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | tail -1)\"; [ -n \"$H\" ] || exit 0; exec python3 \"$H\""
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+끄려면 그 항목을 지우거나 세션에서 `FZ_GATES_OFF=1` 을 쓴다.
 
 ## 원장이 지키는 것
 
