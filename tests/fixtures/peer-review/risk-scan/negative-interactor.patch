@@ -1,0 +1,13 @@
+diff --git a/Sources/SampleInteractor.ext b/Sources/SampleInteractor.ext
+index 1111111..2222222 100644
+--- a/Sources/SampleInteractor.ext
++++ b/Sources/SampleInteractor.ext
+@@ -10,7 +10,9 @@ final class SampleInteractor: Interactable {
+     private let router: SampleRouting
+ 
++    func attachChild(_ child: Interactor) {
++        router.attach(child)
++    }
+-    func legacyAttach(_ child: Interactor) {
+-        Task { await router.attach(child) }
+-    }

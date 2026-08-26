@@ -1,0 +1,51 @@
+{
+ "note": "risk_scan.py 회귀 기대값. ⛔ 눈으로 확인하지 말고 run.sh 로 판정한다.",
+ "cases": {
+  "negative-interactor": {
+   "risk": 0,
+   "why": "`actor` 가 `Interactor` 부분 문자열 + 삭제된 `Task {}` — 둘 다 이 PR 의 위험이 아니다"
+  },
+  "negative-doc-only": {
+   "risk": 0,
+   "added_lines": 0,
+   "why": "문서에 적힌 auth·token·public func 는 런타임 위험이 아니다. 파일 자체를 수집에서 뺀다"
+  },
+  "negative-local-var": {
+   "risk": 0,
+   "why": "싱글톤은 있으나 `var` 가 메서드 로컬이다 — 공유 가변 상태가 아니다"
+  },
+  "positive-actor": {
+   "risk": 1,
+   "why": "실제 `actor` 선언 + `@MainActor` + `async`"
+  },
+  "positive-concurrency": {
+   "risk": 1,
+   "why": "역방향 신호 — 키워드 없이 `static let shared` + 저장 `var`"
+  },
+  "positive-identifier-substring": {
+   "risk": 1,
+   "why": "⛔ 회귀 방지: `authManager`·`tokenProvider`·`sessionStore` 는 식별자 **내부** 등장이 신호다. 일괄 단어경계를 걸면 이 셋을 통째로 놓친다"
+  },
+  "positive-hunk-plus-no-loss": {
+   "risk": 1,
+   "added_lines": 2,
+   "why": "⛔ 회귀 방지: hunk 안의 `++ actor` 를 파일 헤더로 오인하면 추가 행을 잃는다. `added_lines` 가 핵심 — risk 보다 손실 여부를 본다"
+  },
+  "negative-rename-pair": {
+   "risk": 0,
+   "why": "⛔ 회귀 방지: `-@MainActor var isExtendedLayout` / `+@MainActor var supportsSplitLayout` 는 개명 짝이다. 추가 라인만 보면 concurrency 1건 — 실측 #4766 에서 166줄 PR 을 Tier 1→2 로 올렸다(agent 0콜→3콜). net 증가 0 이면 이 PR 이 만든 위험이 아니다"
+  },
+  "negative-rename-singleton": {
+   "risk": 0,
+   "why": "⛔ 회귀 방지: 역방향 신호(`static let shared` + 저장 `var`)가 **삭제 쪽에도** 있다 — 프로퍼티 개명이지 새 공유 가변 상태가 아니다"
+  },
+  "positive-net-new-concurrency": {
+   "risk": 1,
+   "why": "net 판정이 정탐을 죽이지 않는지 — `@MainActor` 는 1:1 개명이지만 `async`·`await` 가 **순증**이므로 승격한다"
+  },
+  "positive-intra-category-substitution": {
+   "risk": 1,
+   "why": "⛔ 회귀 방지: `-await other()` / `+Task { detached() }` 는 concurrency **합계**가 1:1 이라 카테고리 단위 net 으로는 미발화했다. 구조적 동시성 → 비구조적 전환은 **새 위험**이다. 토큰별로 세면 `task {` 가 1>0 이라 잡힌다"
+  }
+ }
+}

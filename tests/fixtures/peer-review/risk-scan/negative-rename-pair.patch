@@ -1,0 +1,12 @@
+diff --git a/Sources/Proto.ext b/Sources/Proto.ext
+--- a/Sources/Proto.ext
++++ b/Sources/Proto.ext
+@@ -1,5 +1,5 @@
+ protocol P {
+-    @MainActor var isExtendedLayout: Bool { get }
++    @MainActor var supportsSplitLayout: Bool { get }
+ }
+ protocol Q {
+-    @MainActor var isExtendedLayout: Bool? { get }
++    @MainActor var supportsSplitLayout: Bool? { get }
+ }

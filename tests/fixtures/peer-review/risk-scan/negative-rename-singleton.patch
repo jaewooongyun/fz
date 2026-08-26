@@ -1,0 +1,10 @@
+diff --git a/Sources/Store.ext b/Sources/Store.ext
+--- a/Sources/Store.ext
++++ b/Sources/Store.ext
+@@ -1,4 +1,4 @@
+ final class Store {
+-    static let shared = Store()
+-    var oldName: [String] = []
++    static let shared = Store()
++    var newName: [String] = []
+ }
