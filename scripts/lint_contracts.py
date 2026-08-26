@@ -68,6 +68,7 @@ ITEMS = [
     #    (b) 파일명 없는 `§N` self-file: 프로브 329건 → 위반 119(36%) → ⛔ **미도입**.
     #        대부분 다른 문서·논문의 절을 문맥상 축약한 표기(`§2.4`=OpenDev 논문, `§5.7`=experiment-log)라
     #        정적으로 대상 문서를 특정할 수 없다. 도입하면 오탐률이 #13 강등 선례(89건)를 재현한다.
+    ("N11", "DETERMINISTIC", "skills", "경량 경로 검증 계약 — light/tier 경로를 가진 스킬은 **그 경로 절차가 있는 문서**에 어떤 검증이 살아남는지 선언한다. ⛔ 절차를 모듈로 위임하면 그 모듈에도 있어야 한다 — SKILL.md 에만 적으면 위임 절차를 따르는 Lead 가 못 본다 (실측: Coverage Gate 가 `### 4. Confidence Matrix 출력` 안에 있는데 Tier 0 은 그 섹션을 건너뛴다)"),
     ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 codex 응답이 아니다)"),
     ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
 ]
@@ -108,6 +109,8 @@ MIN_HITS = {
     "N8": 100,   # 목차 앵커 237건
     "N9": 50,    # cross-file § 참조 **실측 seen=149** (walk_files 전체) — 34%로 보수적
     "N10": 10,   # 배선된 응답 스키마 4개 × 객체 3~6 = 17 (실측) — 보수적으로 10
+    "N11": 3,    # 경량 경로 보유 스킬 **실측 5**(fz-code·fz-plan·fz-review·fz-modernize·fz-peer-review)
+                 #   ⛔ 0 으로 두면 walk 실패 시 대상 0개로 조용히 통과한다(fail-open)
                  #   ⛔ 121은 도입 판정 프로브(5개 디렉토리 한정) 값이니 하한 근거로 쓰지 말 것
 }
 
@@ -1180,6 +1183,50 @@ def chk_N10(root: Path | None = None):
     return v, seen
 
 
+# ⛔ 경량 경로 **식별**은 추측하지 않는다. 실측으로 두 형태만 인정한다:
+#   (a) `### light 모드` / `## light 모드` 섹션 — fz-code·fz-plan·fz-review·fz-modernize
+#   (b) 실행 절차를 `*-tiers.md` 모듈로 위임 — fz-peer-review
+# ⛔ 단순히 "Tier" 를 **언급**하는 것은 경로가 아니다. 실측 오탐 2건:
+#   `code-auditor` "Tier 1 — 필수(위반 시 반드시 지적)" = 심각도 등급
+#   `fz-codex` "Tier 1(CLAUDE.md 테이블) → Tier 2" = 디스커버리 등급
+# ⛔ 헤딩만 보면 미탐이 난다 — `fz-modernize` 는 `- **light 모드 (40차)**:` 불릿로 적는다
+#    (`## Boundaries` 안). 헤딩·볼드 라벨 둘 다 인정한다.
+LIGHT_SECTION = re.compile(r"^#{2,3} +light 모드|^\s*[-*] +\*\*light 모드", re.M)
+TIERS_DELEGATE = re.compile(r"modules/([a-z0-9-]*tiers)\.md")
+# 선언 형식은 **관례를 따른다** — 형제 4스킬이 이미 쓰는 문구다. 새 마커를 발명하지 않는다.
+LIGHT_CONTRACT = re.compile(r"생략 불가")
+
+
+def light_path_of(text: str) -> tuple[bool, str | None]:
+    """(경량 경로 보유 여부, 위임 모듈 상대경로 또는 None)"""
+    delegated = TIERS_DELEGATE.search(text)
+    if delegated:
+        return True, f"modules/{delegated.group(1)}.md"
+    return bool(LIGHT_SECTION.search(text)), None
+
+
+def chk_N11(root: Path | None = None):
+    base = root or ROOT
+    v, seen = [], 0
+    for rel, p in walk_files(".md", root=root):
+        if not (rel.startswith("skills/") and rel.endswith("SKILL.md")):
+            continue
+        text = read(p)
+        has_light, delegate = light_path_of(text)
+        if not has_light:
+            continue
+        seen += 1
+        # 위임이 있으면 **위임 대상**이 선언을 져야 한다. SKILL.md 만으로는 부족하다 —
+        # Lead 가 위임 절차를 따를 때 SKILL.md 의 그 줄에 도달하지 않는다.
+        target_rel = delegate or rel
+        target_text = read(base / target_rel) if delegate else text
+        if not LIGHT_CONTRACT.search(target_text):
+            where = f"{target_rel} (위임 대상)" if delegate else rel
+            v.append(f"{rel}: 경량 경로를 갖는데 검증 계약 선언이 없다 → {where}"
+                     f" 에 `…는 경량 경로에서도 생략 불가` 1줄")
+    return v, seen
+
+
 def chk_N9(root: Path | None = None):
     base = root or ROOT
     by_base = defaultdict(list)
@@ -1215,6 +1262,7 @@ CHECKS = {
     "14": chk_14, "16": chk_16,
     "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
     "N7": chk_N7, "N8": chk_N8, "N9": chk_N9, "N10": chk_N10,
+    "N11": chk_N11,
 }
 
 
