@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# diff-parse: hunk-state — `header_done` 로 헤더 구간을 닫고, 내용 라인 `-- x` 가
+#   `--- x` 로 보이는 것을 `startswith("---- ")` 로 배제한다.
 """diff_anchors.py — 지적 구간이 GitHub 인라인 코멘트로 앵커 가능한지 판정한다.
 
 계약·테스트 케이스: skills/fz-peer-review/references/test-spec.md "인라인 앵커 계산"
