@@ -106,18 +106,21 @@ gh auth status  # 성공→gh 사용, 실패→git 폴백 (git fetch upstream + 
 git fetch upstream pull/{PR_NUMBER}/head:pr-{PR_NUMBER}
 ```
 
-### 1. 입력 파싱 + diff 수집
+### 1. 입력 파싱 + diff 수집 — ⛔ 스크립트 1회
 
+```bash
+bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/gather.sh" \
+  --work-dir "${WORK_DIR}" --target {PR번호|브랜치} [--base BRANCH]
 ```
-PR 번호 입력:
-  gh pr view {PR_NUMBER} --json baseRefName,headRefName,title,body,files,additions,deletions
-  gh pr diff {PR_NUMBER} > ${WORK_DIR}/diff.patch
-  [gh 실패 시] git fetch upstream && git diff upstream/{base}...FETCH_HEAD > ${WORK_DIR}/diff.patch
 
-branch 입력: 베이스 자동 결정
-  ├─ feature/* → develop │ hotfix/* → main │ else → AskUserQuestion
-  └─ git diff {base}...{target} > ${WORK_DIR}/diff.patch
-```
+산출: `diff.patch` · `requirements.md` · `base-behavior.md` + `base/` · `base-manifest.tsv` · **`review-surface.md`** · `numstat.txt` · `risk.json`
+
+
+⛔ **손으로 나눠 호출하지 않는다.** 병목은 fan-out 이 아니라 Lead 의 순차 도구 호출이다 — 결정론 구간을 한 번에 끝낸다. exit `2` 사용법 · `3` 대상 해석 실패 · `4` 수집 실패 — 셋 다 **산출물을 남기지 않는다**(staging 경유). ⛔ exit **`5`** 는 다르다: **base 원본 전건 실패**이고 **산출물을 남긴다**(diff 는 유효하고 origin 근거만 없다). 진행 여부는 Lead 판단, 진행하면 전 issue `origin` 을 `미지정` 으로 둔다 — 2·3·4 처럼 지우지 않는다.
+
+⛔ **`review-surface.md` 를 먼저 읽는다.** base 가 분기점보다 앞서 있으면 이미 base 에 있는 커밋이 diff 에 다시 나타나 Tier 와 리뷰 표면이 함께 부풀려진다(실측 #4766: 2.9배). `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다. 상세·한계: `modules/peer-review-tiers.md` § 리뷰 표면 진단
+
+⚠️ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-mapping` 은 Lead 가 채운다 (`modules/peer-review-tiers.md` § canonical set). ⛔ **패턴·일관성 이슈를 낼 때 `convention-samples` 를 건너뛰지 않는다** — 관례를 위반으로 판정하는 것도, 관례 이탈을 지적하는 것도 같은 N:M 카운트를 요구한다(실측: "형제 2곳이 다르다"로 적었는데 전수는 4:1이었다).
 
 ### 2. Serena Pre-caching → `${WORK_DIR}/symbols.json`
 

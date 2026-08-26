@@ -98,10 +98,18 @@ else
   fi
 
   # Risk-based escalation (auto일 때만 적용. 6 카테고리 → cap=Tier 2)
-  RISK_PATTERN='auth|token|secret|credential|authorization|permission|role|admin|session|keychain|crypto|certificate|privacy|payment|billing|refund|IAP|InAppPurchase|StoreKit|migration|schema|CoreData|database|sql|public func|public class|public protocol|deinit|removeFromSuperview|deleteAll|@MainActor|actor |async |Task \{|withCheckedContinuation|xcconfig|Package\.swift|ci_scripts'
-  RISK_MATCHES=$(grep -cE "$RISK_PATTERN" "${WORK_DIR}/diff.patch" 2>/dev/null || true)
-  if [ "$RISK_MATCHES" -ge 2 ]; then TIER=$((TIER + 2))
-  elif [ "$RISK_MATCHES" -ge 1 ]; then TIER=$((TIER + 1))
+  # ⛔ 인라인 grep 금지 — 오탐 실측 후 스크립트로 이관 (§ 위험 판정 참조).
+  #    경로는 절대경로로 해석한다. 상대 경로는 대상 레포에 파일이 없어 조용히 통과한다.
+  RISK_JSON=$(python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/risk_scan.py" \
+                "${WORK_DIR}/diff.patch" --json)
+  RISK_STATUS=$?
+  if [ $RISK_STATUS -ne 0 ]; then
+    echo "⚠️ risk_scan 실패 (exit $RISK_STATUS) — 승격 없이 진행. 근거 부재를 tier.txt 에 기록한다"
+    RISK_MATCHES=0; TIER_DELTA=0
+  else
+    RISK_MATCHES=$(printf '%s' "$RISK_JSON" | jq -r '.risk')
+    TIER_DELTA=$(printf '%s' "$RISK_JSON" | jq -r '.tier_delta')
+    TIER=$((TIER + TIER_DELTA))
   fi
   [ "$TIER" -gt 2 ] && TIER=2  # cap (--deep 명시 시에만 Tier 3 진입)
 fi
@@ -115,6 +123,54 @@ fi
 echo "$TIER" > ${WORK_DIR}/tier.txt
 echo "rationale: SIGNIFICANT=$SIGNIFICANT_LINES (added=$ADDED+del=$DELETED-gen=$GENERATED_LINES), risk=$RISK_MATCHES, override=${TIER_OPT:-auto}, deep=${OPTS}" >> ${WORK_DIR}/tier.txt
 ```
+
+### 리뷰 표면 진단 — stale merge-base
+
+⛔ **diff 는 merge-base 기준이다.** base 가 분기 후 앞서 나가면 **이미 base 에 있는 변경**이
+diff 에 다시 나타난다. 그러면 두 가지가 함께 틀린다 — Tier 판정이 위로 틀려 리뷰 예산이 낭비되고,
+리뷰어는 이미 리뷰·머지된 코드를 다시 본다.
+
+**실측 (#4766, 2026-08-25)**
+
+| 축 | 값 |
+|---|---|
+| base 팁이 분기점보다 | **39커밋 앞** |
+| head 커밋 | 3개 — 그중 **2개가 이미 base 에 있다**(patch-id 일치) |
+| diff 가 보여준 것 | 26파일 +304/−182 |
+| 실제 리뷰 표면 | **18파일 +83/−83** (2.9배 차이) |
+| Tier 오판 | 486줄 → Tier 2 (실제 166줄 → Tier 1) = agent **0콜이 3콜**로 |
+
+`gather.sh` 가 `review-surface.md` 에 `git cherry` 판정을 적는다. `-` 는 이미 base 에 있는 커밋,
+`+` 는 신규다. Lead 는 `-` 커밋을 리뷰 대상에서 빼고 **Tier 를 재계산**한다.
+
+⚠️ **`git cherry` 의 한계**: patch-id 로 판정하며 **머지 커밋을 제외**한다. 스쿼시·리베이스로
+해시가 바뀐 동일 패치는 잡지만, 내용이 조금이라도 다르면 `+` 로 남는다 — **놓침이 있는 도구다.**
+`-` 가 0건인 것을 "중복 없음" 의 증명으로 쓰지 않는다.
+
+⛔ **자동 보정하지 않는 이유**: 무엇이 리뷰 대상인지는 판단이다. GitHub 은 merge-base 기준 전체를
+보여주므로 다른 리뷰어는 26파일을 본다 — 스크립트가 조용히 범위를 줄이면 리뷰가 서로 어긋난다.
+진단만 내고 범위 결정은 Lead 에게 남긴다.
+
+### 위험 판정 — 카테고리 단위
+
+판정체는 `skills/fz-peer-review/scripts/risk_scan.py` 다. 인라인 `grep -cE` 를 대체했다.
+
+**무엇이 달라졌나**
+
+| 축 | 기존 | 현행 |
+|---|---|---|
+| 대상 | diff 전체 (hunk 헤더·context·삭제 라인 포함) | **추가된 코드 라인만** |
+| 경계 | 없음 | 토큰 경계 — `actor` 가 `Interactor` 에 매칭되지 않는다 |
+| 단위 | 매칭 **행 수** | **카테고리 수** (같은 위험이 20줄에 걸쳐도 1) |
+| 역방향 | 없음 | `static let shared` + `var` 를 같은 파일에서 보면 동시성 위험 |
+
+⛔ **임계는 그대로다** — `≥2 → +2` · `==1 → +1`. 세는 단위만 바뀌었다.
+
+**왜 바꿨나**: 한 리뷰에서 4건이 매칭됐는데 전부 오탐이었다. `Interactor` substring 매칭 + 전부 `@@` 헤더였고, Lead 가 수동으로 0 으로 내렸다. 자동 판정 그대로면 114줄 PR 이 상위 Tier 로 올라가 3~6 agent call 을 유발한다 — **시간 목표를 직접 악화시킨다.**
+
+⛔ **실패 시 승격하지 않는다.** 스크립트가 비정상 종료하면 근거가 없는 것이므로 Tier 를 올리지 않고, 그 사실을 `tier.txt` 에 남긴다. 근거 없이 올리면 비용만 늘고, 조용히 넘어가면 판정이 있었던 것처럼 보인다.
+
+회귀 자료: `tests/fixtures/peer-review/risk-scan/` — 음성 1(오탐 유발 형태) · 양성 2(직접 신호·역방향 신호).
 
 ### 옵션 precedence
 1. `--tier N` (최우선, auto 무효화). invalid 값 → auto fallback + error log
