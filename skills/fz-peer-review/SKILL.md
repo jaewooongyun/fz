@@ -39,7 +39,7 @@ intent-triggers:
 > Gather → Analyze → Challenge → Synthesize → Deliver
 
 - **9개 관점**: Architecture Decision, Extensibility, Over-Engineering, Functional Decomposition, Modern API, Dependency Impact, **Refactoring Completeness**, **Concurrency Safety** (동시성 코드 포함 시), **Requirements Alignment**
-- **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 single source) + Codex challenger(조건부: `--codex` 또는 Tier 3)
+- **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 single source) + Codex challenger(**Tier 1·2·3 상시** — SSOT는 `modules/peer-review-tiers.md` § Tier 구성 표. Tier 0은 `--codex` 시 Tier 1 전환)
 - **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정
 - **4-Tier Graceful Degradation**: diff 크기 기반 자동 Tier 선택 (Tier 0/1/2/3) + 폴백 체인
 
@@ -140,8 +140,7 @@ PR title/body에서 JIRA 티켓 ID 추출 + acceptance criteria 수집. JIRA 연
 
 ### 2.5. 판별 방법(oracle) 명시
 
-코드로 확정할 수 없는 주장에는 "무엇을 보면 판별되는지"를 함께 적는다.
-이유: 리뷰어가 확인하려 해도 방법을 모르면 그 지적은 판정 불가 상태로 남는다.
+코드로 확정할 수 없는 주장에는 "무엇을 보면 판별되는지"를 함께 적는다 — 방법을 모르면 그 지적은 판정 불가로 남는다.
 
 - View 변경 → 시뮬레이터/실기기(+review-quality 집중 지시) · 런타임 순서·타이밍 → DEBUG 로그 캡처 지점 · 서버 계약 → curl 재현
 
@@ -189,7 +188,6 @@ Key Facts + **Mapping Facts** (v4.4.0)를 Analyze 전달 전에 **수집과 다�
 4. ⛔ Fact 중 **"0건·부재·전부·~뿐"이 결론인 것**은 `modules/cross-validation.md` §Negative-Result Gate를 **Read 후 적용** — positive control(선언이 실재하는 ref에서 같은 패턴이 non-zero를 내는가) + exit code 판정 + 다중 대상이면 라벨. **0건은 「대상 부재」와 「도구 고장」을 구별하지 못한다.**
 ```
 
-원칙: **"Cross-model 검증은 cross-data일 때만 작동한다."** (예: grep -A2로 잘린 결과 → 3-Model 전원 오탐)
 
 > ⛔ **절차 4가 왜 별도 항목인가**: 절차 2의 "다른 방법으로 재확인"은 *매치가 있는* Fact에는 작동하나 **0건에는 발화 조건이 없었다.** 실측 — `git grep -nE '\bSym\b'` 가 ERE `\b` 미지원으로 **에러 없이 0건**을 반환했고, 그 "잔존 소비자 0건"이 evidence에 실려 세 렌즈 전원에게 배포될 뻔했다. 렌즈는 Bash 미보유라 재측정이 불가능하므로 cross-model 이 cross-data 가 아니게 된다. §Negative-Result Gate 는 2026-08-10 부터 존재했고 6곳에서 트리거되나(`lead-reasoning:183` · `system-reminders:24` · `fz-discover:231` · `fz-search:343` · `fz-manage:178,195`) **본 스킬에만 연결이 없었다** — 신설이 아니라 배선 복구다.
 
