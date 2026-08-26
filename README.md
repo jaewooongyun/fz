@@ -16,25 +16,6 @@
 
 ## 설치
 
-| 도구 | 없으면 | 사용처 | 설치 |
-|------|--------|:------:|------|
-| **Claude Node CLI** | 동작 불가 | 전부 | `npm install -g @anthropic-ai/claude-code` |
-| **SuperClaude** | `sc:` 명령이 매칭되지 않는다 (폴백 0) | 15/21 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
-| **Serena MCP** | 심볼 탐색이 Grep 으로 내려간다 (13 중 7 폴백) | 13/21 | fz 가 `.mcp.json` 으로 자동 등록. 런타임 `uv` 필수 — `brew install uv` |
-| **Codex CLI** | 교차 검증이 `sc:analyze` 단독이 된다 (11 중 3 폴백) | 11/21 | `npm install -g @openai/codex` |
-| **sequential-thinking MCP** | 구조화 추론 호출이 실패한다 (폴백 0) | 9/21 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
-| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 대체된다 (8 중 1 폴백) | 8/21 | `claude mcp add context7 -- npx -y @upstash/context7-mcp` |
-
-⛔ 위 판정의 눈금 두 개. **사용처** = 스킬 21개 중 그 도구의 *호출*이 있는 파일 수다 — MCP 는 `mcp__…` 전체 접두사, Codex 는 `fz-codex`, SuperClaude 는 `sc:` 로 센다. 단어가 언급만 된 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. **폴백** = 각 스킬 `## 에러 대응` 표에 그 도구가 없을 때의 대체 경로가 적힌 스킬 수다.
-
-`sc:` 는 자체 폴백이 없을 뿐 아니라 다른 도구들이 떨어지는 *목적지*(`/sc:analyze 단독`)이기도 하다. 없으면 폴백 사슬의 끝이 사라진다.
-
-⛔ fz 가 번들하는 MCP 는 Serena 하나다. sequential-thinking 과 Context7 은 위 명령으로 직접 등록해야 한다.
-
-스킬이 호출하지만 위 표에 없는 MCP 가 셋 더 있다. 상시가 아니라 특정 기능에서만 쓰기 때문이다 — `lsp`(4 스킬: fz-code·fz-fix·fz-search·fz-review 의 정의·참조 조회) · `github`(3: fz-pr·fz-peer-review·fz-pr-digest) · `atlassian`(3: fz-commit·fz-plan·fz-pr 의 JIRA 연동). 셋 다 폴백 선언이 0건이라, 없으면 그 기능이 그대로 멈춘다.
-
-런타임 — `python3` **3.9+**(판정기·lint 가 3.9 문법으로 고정), `git`, `node`. `jq` 는 hook 템플릿 예시에서만 쓴다.
-
 ```bash
 claude plugin marketplace add jaewooongyun/fz   # 최초 1회
 claude plugin install fz
@@ -43,17 +24,35 @@ claude
 > /fz "안녕"                                     # 응답하면 정상
 ```
 
-프로젝트 루트에 `CLAUDE.md` 를 둔다. 모든 스킬과 에이전트가 이 파일을 참조한다. 필수 섹션은 `## Architecture`·`## Build`·`## Code Conventions` 이고, 템플릿은 `templates/CLAUDE.md.template` 에 있다.
+프로젝트 루트에 `CLAUDE.md` 를 둔다 — 필수 섹션 `## Architecture`·`## Build`·`## Code Conventions`, 템플릿은 `templates/CLAUDE.md.template`.
+런타임: `python3` **3.9+**(판정기·lint 가 3.9 문법 고정) · `git` · `node`.
 
-iOS 프로젝트는 XcodeBuildMCP 와 SwiftUI Expert·Swift Concurrency 플러그인을 추가한다. 웹은 기본 구성으로 충분하다.
+### 함께 쓰는 도구
 
-Codex CLI 는 모델을 README 가 고정하지 않는다. `/fz-codex` 가 `~/.codex/config.toml` 의 `model` 을 SSOT 로 위임하므로 최신 frontier 로 옮기는 것은 그 파일 한 줄이다. 구버전 CLI 가 config 의 모델을 못 읽으면 `/fz-codex` 에러 대응표가 CLI 업데이트를 권고한다 — 그래서 여기에 버전 하한을 적지 않는다.
+fz 가 번들하는 MCP 는 **Serena 하나**다. 나머지는 직접 등록한다.
+
+| 도구 | 없으면 | 사용처 | 설치 |
+|------|--------|:------:|------|
+| **Claude Node CLI** | 동작 불가 | 전부 | `npm install -g @anthropic-ai/claude-code` |
+| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 15/21 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
+| **Serena MCP** | 심볼 탐색이 Grep 으로 (13 중 7 폴백) | 13/21 | 자동 등록 · `uv` 필수 (`brew install uv`) |
+| **Codex CLI** | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/21 | `npm install -g @openai/codex` |
+| **sequential-thinking** | 구조화 추론 실패 (폴백 0) | 9/21 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
+| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (8 중 1 폴백) | 8/21 | `claude mcp add context7 -- npx -y @upstash/context7-mcp` |
+
+⛔ `sc:` 는 자체 폴백이 없을 뿐 아니라 다른 도구가 떨어지는 **목적지**(`/sc:analyze 단독`)다 — 없으면 폴백 사슬의 끝이 사라진다.
+표 밖에서 특정 기능만 쓰는 MCP 셋: `lsp`(4 스킬, 정의·참조) · `github`(3, PR) · `atlassian`(3, JIRA). **폴백 0건**이라 없으면 그 기능이 멈춘다.
+프로젝트별 추가 — iOS 는 XcodeBuildMCP + SwiftUI Expert·Swift Concurrency. 웹은 기본 구성으로 충분하다.
 
 Codex CLI 를 쓰면 네이티브 스킬을 심볼릭으로 연결한다.
 
 ```bash
 bash ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/setup-codex-skills.sh
 ```
+
+⛔ Codex 모델·버전 하한은 README 가 고정하지 않는다 — `/fz-codex` 가 `~/.codex/config.toml` 의 `model` 을 SSOT 로 위임한다(구버전이면 에러 대응표가 업데이트를 권고).
+
+> **표의 수치** — **사용처** = 스킬 21개 중 그 도구의 *호출*이 있는 파일 수(MCP 는 `mcp__…`, Codex 는 `fz-codex`, SuperClaude 는 `sc:` 로 센다). 언급만 된 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. **폴백** = 각 스킬 `## 에러 대응` 표에 대체 경로가 적힌 스킬 수.
 
 ### 업데이트
 
@@ -62,7 +61,7 @@ claude plugin marketplace update fz-orchestrator
 claude plugin update fz@fz-orchestrator
 ```
 
-⛔ 접미사 없는 `claude plugin update fz` 는 `Plugin "fz" not found` 로 실패한다. 설치할 때는 마켓플레이스가 하나뿐이라 `fz` 로 통하지만, 설치된 이름은 `fz@fz-orchestrator` 이고 갱신은 그 이름으로 찾는다. 그리고 버전 문자열이 같으면 캐시를 갱신하지 않으니, 소스만 고치고 버전을 안 올리면 반영되지 않는다.
+⛔ 접미사 없는 `claude plugin update fz` 는 `Plugin "fz" not found` 로 실패한다 — 설치할 땐 `fz` 로 통하지만 **설치된 이름은 `fz@fz-orchestrator`** 다. 버전 문자열이 같으면 캐시를 갱신하지 않으니, 소스만 고치고 버전을 안 올리면 반영되지 않는다.
 
 ---
 
