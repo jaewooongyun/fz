@@ -1,0 +1,15 @@
+diff --git a/A.ext b/A.ext
+--- a/A.ext
++++ b/A.ext
+@@ -1,1 +1,4 @@
+ keep
++
++added
++
+diff --git a/B.ext b/B.ext
+--- a/B.ext
++++ b/B.ext
+@@ -1,3 +1,1 @@
+ keep
+-gone one
+-gone two

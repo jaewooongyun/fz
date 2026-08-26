@@ -1,0 +1,10 @@
+diff --git a/Sources/SampleActor.ext b/Sources/SampleActor.ext
+index 5555555..6666666 100644
+--- a/Sources/SampleActor.ext
++++ b/Sources/SampleActor.ext
+@@ -1,3 +1,7 @@
++actor SampleCoordinator {
++    @MainActor func present() async {
++        await run()
++    }
++}

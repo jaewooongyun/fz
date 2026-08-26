@@ -1,0 +1,13 @@
+diff --git a/Sources/SampleStore.ext b/Sources/SampleStore.ext
+index 3333333..4444444 100644
+--- a/Sources/SampleStore.ext
++++ b/Sources/SampleStore.ext
+@@ -1,5 +1,9 @@
+ final class SampleStore {
++    static let shared = SampleStore()
++    var cachedItems: [String] = []
++
++    func refresh() {
++        cachedItems = []
++    }
+ }

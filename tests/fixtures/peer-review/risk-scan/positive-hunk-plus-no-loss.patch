@@ -1,0 +1,7 @@
+diff --git a/Sources/Diff.ext b/Sources/Diff.ext
+--- a/Sources/Diff.ext
++++ b/Sources/Diff.ext
+@@ -1,2 +1,4 @@
+ let sample = 1
+++ actor
++let after = 2
