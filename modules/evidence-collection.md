@@ -2,7 +2,7 @@
 
 > Gather Phase에서 에이전트에게 전달할 실제 코드를 수집하는 모듈.
 > 에이전트는 Bash/git show 접근 불가이므로 Orchestrator가 사전 수집한다.
-> PR #3639 교훈: diff만으로는 producer site, 삭제 심볼 잔존 여부를 확인할 수 없어 추론→환각→오탐 발생.
+> 관측 사례: diff만으로는 producer site 와 삭제 심볼의 잔존 여부를 확인할 수 없어 추론이 환각으로 이어지고 오탐이 났다.
 
 ## 목차
 
@@ -124,7 +124,7 @@ Count == 0이면 "✅ 완전 제거", > 0이면 "⚠️ 잔존 {N}건"
 
 ### e. Caller Analysis → `evidence/caller-analysis.md`
 
-> PR #3646 교훈: EpisodeUseCase init 선언만 보고 "올바른 패턴" 판정. 실제 caller(ViewModel)가
+> 관측 사례: UseCase init 선언만 보고 "올바른 패턴" 판정. 실제 caller(ViewModel)가
 > `DefaultEpisodeUseCase(repository: DefaultEpisodeRepository())` full chain을 하드코딩하는 것을 3개 모델 모두 놓침.
 
 PR에서 새로 생성/변경된 init, protocol, public API의 **호출자 코드**를 수집한다.
@@ -149,7 +149,7 @@ Orchestrator가 사전에 제공해야 한다.
 
 ### f. Convention Sampling → `evidence/convention-samples.md`
 
-> PR #3646 교훈: 3/3 모델이 "UseCase default param = DIP 위반"을 major로 판정.
+> 관측 사례: 3/3 모델이 "UseCase default param = DIP 위반"을 major로 판정.
 > 실제: AppComponent, Event/Notice/Favorites Builder 등 프로젝트 전체에 같은 패턴.
 
 PR의 핵심 패턴과 **같은 패턴의 다른 모듈** 코드를 수집한다.
@@ -187,3 +187,45 @@ PR의 핵심 패턴과 **같은 패턴의 다른 모듈** 코드를 수집한다
 
 - Progressive Disclosure Level 3 (필요 시에만 로드)
 - 500줄 이하 유지
+
+
+---
+
+## InputHygiene — 무엇을 전달하지 않는가
+
+> `skills/fz-peer-review/SKILL.md` § Orchestrator Bias 방지 규칙의 상세. 수집한 것을 **어떻게 포장하는가**를 정한다.
+
+**보장**: Lead 의 가설이 판정 근거로 되돌아오지 않는다.
+
+### `intentContext` 허용/금지
+
+| ✅ 넣는다 | ⛔ 넣지 않는다 |
+|---|---|
+| PR 제목·본문·티켓 수용 기준 | 결함 가설 ("~가 빠진 것 같다") |
+| 변경 대상과 대체 관계 (무엇이 무엇을 대체하는가) | 예상 영향 파일·화면 목록 |
+| 참조할 가이드·컨벤션 경로 | 심각도 예단 ("이건 major 일 것") |
+
+⛔ **가운데 열이 가장 새기 쉽다.** 영향 범위를 목록으로 적어 주면 렌즈가 그 목록을 되돌려주고, Lead 는 그것을 합의로 읽는다. 관측에서 렌즈 둘이 브리프에 있던 후보를 그대로 반환했고 3렌즈 동의처럼 집계될 뻔했다.
+
+### 경로별 구현
+
+| 경로 | 무엇을 하는가 |
+|---|---|
+| **Tier 2/3** | 위 표로 브리프를 검사한다. 금지 항목이 있으면 다시 쓴다 |
+| **Tier 0/1** | 렌즈가 없어 오염을 *막을* 수단이 없다 → **탐지·표시**로 낮춘다 |
+
+### Tier 0/1 — 탐지·표시
+
+Lead 혼자 분석하므로 파일을 나눠 적어도 **같은 사람이 기억한 채 본다**. 분리는 blind holdout 이 아니라 **출처 기록**이다. 막는 대신 표시한다.
+
+1. 분석 **전** 자신의 가설을 `${WORK_DIR}/lead-hypotheses.md` 에 적는다
+2. 분석 **후** 각 발견을 그 파일과 대조한다
+3. ⛔ **강등 결정식** — 가설과 겹치는 발견은 **독립 코드 증거가 없으면** `include` 로 올리지 않는다. `question` 또는 `observation` 으로 내린다
+
+> 독립 코드 증거 = 가설에 없던 파일·심볼을 직접 읽어 확인한 것. 가설이 지목한 자리를 확인한 것은 해당하지 않는다.
+
+### 회귀 fixture 예외
+
+`tests/fixtures/peer-review/tier2-merge/` 는 오염된 브리프로 실행된 자료다. 병합 계약 회귀 검증에 원본 입력이 필요하므로 **이 게이트의 명시적 예외**로 둔다.
+
+⛔ 예외는 그 하나뿐이다. 늘면 게이트가 무력해진다. fixture 의 seed 파생 항목은 `include` 가 아니라 `question`/`observation` 이 기대값이다.

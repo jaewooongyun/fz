@@ -409,3 +409,165 @@ ${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+게이�
 ${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix
 ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리포인트
 ```
+
+
+---
+
+## MergeContract — 발견을 어떻게 병합·판정하는가
+
+**보장**: 최종 판정 규칙이 문서에 있고 Lead 의 즉흥 판단에 의존하지 않는다.
+
+⛔ **이 절이 병합의 SSOT 다.** 다른 문서와 어긋나면 여기가 이긴다 — 특히 두 지점:
+- `SKILL.md` § Synthesize 의 dedup·투표 서술은 **Tier 3 전용**이다. 전 경로 dedup 키는 §3(`discoveryAxis` 포함)을 따른다
+- Codex `reverse` 는 §6 대로 **`question` 전환**이다 — 이종 검증에 삭제 권한을 주지 않는다. `peer-review-tiers.md` § Codex Devil's Advocate 도 같은 규칙을 적고 여기를 가리킨다
+
+> 배경: 한 Tier 2 실행에서 Lead 가 문서에 없는 `[L실측] 우선` 규칙을 그 자리에서 만들어 썼다. 그것으로 3건이 살아났고 렌즈가 못 찾아 Lead 가 직접 발굴한 2건도 들어갔다 — 최종 14건 중 5건이 **문서화되지 않은 판단**에 의존했다. 계약을 세우는 목적은 그 5건을 죽이는 것이 아니라 **정식 경로로 살리는 것**이다.
+
+### 1. 입력원
+
+| 입력원 | Tier 0 | Tier 1 | Tier 2 | Tier 3 |
+|---|:---:|:---:|:---:|:---:|
+| 렌즈 (arch·quality·correctness) | — | — | 3 | 3 |
+| Codex challenger | `--codex` 시 | ✓ | ✓ | ✓✓ |
+| Lead 실측 | ✓ | ✓ | ✓ | ✓ |
+
+⛔ SSOT 는 `modules/peer-review-tiers.md` § Tier 구성 표다. 여기 표는 그것을 병합 관점으로 다시 쓴 것이며 **수치가 어긋나면 tiers 표가 이긴다**.
+
+### 2. 렌즈 상태 — 3분한다
+
+`scheduled`(예정대로 실행) · `skipped`(Tier 설계상 없음) · `failed`(실행 실패)
+
+⛔ **`skipped` 와 `failed` 를 같은 "결측"으로 묶지 않는다.** Tier 0 에 렌즈가 없는 것은 설계이고, Tier 2 에서 렌즈가 null 인 것은 장애다. 판정이 달라야 한다 — 전자는 정상 경로, 후자는 신뢰도 감쇠 대상이다.
+
+### 3. dedup 키
+
+`파일` + `line_range 겹침` + `discoveryAxis`. 축이 다르면 같은 자리라도 별건이다 — 한 줄이 구조 문제이면서 동시성 문제일 수 있다.
+
+⛔ **같은 키를 `stage2Trigger` 의 `severityConflicts` 도 쓴다**(`peer-review.js` 의 `sameAxis`) — 트리거가 축을 무시하면
+이 규칙과 모순된다. 실측(PR #4774): 축 미반영 시 충돌 7건 중 **5건이 교차축 별건**이었다(세 렌즈가 신규 파일
+헤더 라인에 서로 다른 주제를 앵커해 위치만 겹쳤다).
+⚠️ 단 `unpairedMajor` 는 축을 보지 않는다 — 단독 major 는 축과 무관하게 교차가 필요하다.
+
+### 4. Lead 실측의 자격
+
+Lead 발견이 렌즈 판정을 이기려면 **증거 형식**을 갖춰야 한다.
+
+| 요건 | 내용 |
+|---|---|
+| 대상 | 렌즈가 받은 입력 **밖**의 파일·심볼 |
+| 방법 | 직접 Read 또는 결정론 명령(grep·git show)의 실제 출력 |
+| 기록 | 리포트에 `[L실측]` 표기 + 무엇을 어떻게 확인했는지 1줄 |
+
+⛔ 렌즈가 이미 본 자리를 다시 본 것은 자격이 없다. 그것은 재확인이지 독립 증거가 아니다.
+
+### 5. Lead 단독 발견 (렌즈 0건)
+
+§4 자격을 갖추면 **입장한다**. 렌즈가 못 찾았다는 사실은 기각 사유가 아니다 — 렌즈에 없는 축이거나 입력 밖이었을 수 있다.
+
+⚠️ 단 `discoveryAxis` 를 반드시 부여한다. 그래야 "어느 축이 렌즈에서 비어 있었나"가 집계에 남는다.
+
+### 6. Codex verdict 처리
+
+| verdict | 처리 |
+|---|---|
+| `agree` | found_by 에 추가 |
+| `supplement` | 근거 보강, 판정 유지 |
+| `challenge` | Lead 가 실측으로 판정. 기각하면 사유 기록 |
+| `reverse` | ⛔ 자동 제거 금지 — **`question` 으로 전환**하고 판별 방법(oracle)을 적는다 |
+
+⛔ `reverse` 를 자동 제거로 만들면 이종 검증이 **삭제 권한**을 갖는다. 코드로 결판나지 않는 사안이 조용히 사라진다.
+
+### 7. origin·severity 보정 순서
+
+`origin 판정` → `pre-existing 이면 suggestion 으로 cap` → `improvement 는 cap 없이 non-blocking 표기` → `Codex verdict 반영` → `disposition 결정`
+
+순서를 지킨다. severity 를 먼저 정하면 origin 이 그것을 못 내린다.
+
+### 8. disposition
+
+`include` · `question` · `observation` · `exclude`
+
+| 값 | 언제 |
+|---|---|
+| `include` | 코드 증거로 확정. 수정 요청 |
+| `question` | 코드로 결판나지 않음. 판별 oracle 을 함께 적는다 |
+| `observation` | 사실이나 이 PR 의 책임이 아님 |
+| `exclude` | 실측으로 기각. 사유 기록 |
+
+### 9. confidence 산식 — ⛔ Tier 별로 다르다
+
+| Tier | 산식 |
+|---|---|
+| 0 | 투표 없음 (렌즈 0) — Lead 판정 + §4 자격 |
+| 1 | **2-vote** (Lead + Codex) |
+| **2** | ⛔ **투표 없음 — 단순 병합.** Matrix 를 만들지 않는다 |
+| 3 | **3-vote** + Stage2 교차 + Stage3 DA 반영 |
+
+⛔ **"미투표"는 Tier 2 에만 해당한다.** Tier 1 은 2-vote 를, Tier 3 은 3-vote 를 쓴다. 전역 미투표로 구현하면 그 둘이 깨진다.
+
+⛔ **Tier 2 반환 필드는 트리거 발화 여부로 갈린다** (D1 조건부 Stage 2):
+
+| 필드 | 미발화 | 발화 | Tier 3 |
+|---|:---:|:---:|:---:|
+| `crossVerdict`·`crossSeverity` | 없음 | **있음** | 있음 |
+| `finalSeverity`·`counterVerdict` | 없음 | **없음** | 있음 |
+
+발화 시 `crossSeverity` 는 **조정 제안**이지 확정이 아니다 — Tier 2 는 투표하지 않으므로 최종 판정은 이 계약이 한다. 필드 유무는 반환 `stage2Ran` 으로 판별한다(하드코딩 아님 — 실제 응답 존재로 계산).
+
+⛔ 미발화 경로에서는 원본 `severity` 를 쓰고 교차·DA 열을 "미수행"으로 표기한다. 필드를 찾다 실패하면 병합이 멈춘다.
+
+⛔ **한 finding 이 판정을 두 개 받을 수 있다** — `correctness` issue 는 arch·quality **양쪽**
+교차 입력에 들어간다(발화 원인이 검증을 받게 하려고). 그래서 판정 개수는 finding 종류에 따라 다르다.
+
+| 판정 수 | `crossVerdict` | `crossSeverity` | `crossVerdicts[]` |
+|---|---|---|---|
+| 0 | `unreviewed` | 없음 | 없음 |
+| 1 | 그 verdict | `adjust` 일 때만 | 없음 |
+| 2 · 판정 일치 | 그 verdict | 제안 중 **더 심한 쪽** | 없음 |
+| 2 · 판정 갈림 | **`contested`** | **없음** (원본 severity 유지) | **있음** — 렌즈별 원본 판정 |
+
+⛔ **갈렸을 때 스크립트가 고르지 않는다.** § 9 가 "Tier 2 는 투표하지 않는다"고 한 이상,
+승자를 정하는 코드는 계약 밖에서 투표하는 것이다. `contested` 는 **판정 유보**이지 기각이 아니다 —
+Lead 가 `crossVerdicts[]` 를 읽고 § 4(Lead 실측의 자격)로 판정한다.
+
+⛔ id 로 덮어쓰지 않는다. 덮어쓰면 **concat 순서가 판정을 정한다** — 뒤에 온 렌즈가
+앞의 판정을 조용히 지우고, 같은 입력이 순서만 달라도 결과가 바뀐다.
+(`correctness` 를 교차 입력에 넣기 전에는 두 렌즈가 서로 다른 id 만 봐서 충돌이 없었다.)
+
+⛔ `contested` 는 `distribution.fpFlagged` 에 **안 들어간다.** 한 렌즈가 `false_positive` 라 해도
+다른 렌즈가 갈렸으면 깨끗한 오탐이 아니다. 대신 `distribution.contested` 로 건수가 보인다 —
+0 이 아니면 `crossVerdicts[]` 를 읽어야 한다는 신호다.
+
+회귀: `tests/workflows/s2-cross-merge.js` (원본 `>>> PURE:cross-merge` 블록 추출 실행)
+
+### 회귀 검증
+
+`tests/fixtures/peer-review/tier2-merge/` — 24건 입력 → 14건 기대. 계약을 바꿀 때 이 입력으로 같은 disposition 이 나오는지 본다.
+
+⛔ 그 fixture 는 **오염된 브리프**로 실행된 자료다. seed 파생 항목의 기대값은 `include` 가 아니라 `question`/`observation` 이다 (`modules/evidence-collection.md` § InputHygiene 참조).
+
+---
+
+## 경량 경로에서 무엇이 살아남는가 (Tier 0/1)
+
+⛔ **경량은 절차 생략이지 검증 생략이 아니다** — 형제 4스킬(`fz-plan`·`fz-review`·`fz-code`·`fz-modernize`)이 쓰는 같은 규율이다.
+
+> 신설 근거(S8 파일럿): Coverage Gate 가 `### 4. Confidence Matrix 출력` 안에 있는데 Tier 0 은 그
+> Matrix 를 건너뛴다 — **게이트가 경량 경로가 지나가지 않는 자리에 있었다.** 실제로 미발화해 이슈 2건이 분모 없이 나갔다("형제 2곳"→실제 4:1 · "PR 구성 문제"→최근 20건 중 16건 동일).
+
+| 게이트 | Tier 0/1 | 근거 |
+|---|:---:|---|
+| **Coverage Gate** | **생존** | 전수·카운트·부정 주장의 분모는 경로와 무관하게 필요하다 |
+| **Negative-Result Gate** | **생존** | "0건" 이 도구 고장인지 대상 부재인지는 경로와 무관 |
+| **InputHygiene (C3)** | **생존 — 형태 변경** | Tier 0/1 은 차단이 아니라 **탐지·표시 + 강등**(§ InputHygiene 이 규정) |
+| **MergeContract (C1)** | **생존** | § MergeContract 가 전 경로 SSOT |
+| **Reflection Rate** | **조건부** | Codex 호출이 있을 때만(Tier 1). `N<10` 은 preliminary — verdict 보류 |
+| Confidence Matrix | **미적용** | Tier 0 은 simple checklist · Tier 2 는 미투표 — **설계상 부재** |
+| Stage 2 교차 조정 | **미적용** | Workflow 미사용 경로 |
+
+⛔ **"미적용"과 "생략"을 구분한다** — 전자는 설계, 후자는 누락(§ MergeContract § 2 `skipped`/`failed` 와 같은 규율). "미수행" 으로 뭉뚱그리면 빠뜨린 것인지 원래 없는 것인지 알 수 없다.
+
+**값싼 자가 점검** — 리포트 전에 자기 서술을 훑는다. 아래가 있으면 분모를 댄다:
+`N곳` · `N개` · `전부` · `나머지는` · `~뿐` · `0건` · `형제 N/N` · `유일` · `이것만`
+⚠️ `cross-validation.md` § Coverage Gate 트리거 어휘의 **미러** — 재정의하지 않는다.
+

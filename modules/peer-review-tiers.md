@@ -134,20 +134,41 @@ echo "rationale: SIGNIFICANT=$SIGNIFICANT_LINES (added=$ADDED+del=$DELETED-gen=$
   - `${WORK_DIR}/evidence/old-new-pairs.md` (변경 함수 페어)
   - `${WORK_DIR}/base-behavior.md` (base 코드, origin 판정 근거)
 - 생략: producer-consumer, base-patterns, convention-samples, caller-analysis, semantic-mapping
-- Fact Verification Gate 유지 (SKILL.md Gather Step 4)
+- Fact Verification Gate **전건 유지** (SKILL.md Gather Step 4)
+  > ⛔ 경로가 가볍다고 약화하지 않는다. 렌즈가 없어 배포 반경은 작지만 **틀린 Fact 를 반박할 주체도 없다** — 교정 기회가 0 이라 오히려 더 필요하다. 부담도 작다: 상시 evidence 가 3~4종이라 Fact 수 자체가 적다.
 
 ### Analyze
-Lead 단독으로 다음 4 perspectives 검토 (9 perspectives 중 핵심만):
+Lead 단독으로 아래 perspectives 를 검토한다 (9 perspectives 중 선별 — 근거는 § DiscoveryContract).
+
+**상시 5**
 1. Architecture Decision
 2. Functional Decomposition
 3. Modern API
 4. Requirements Alignment
+5. ⭐ **Concurrency Safety — Level 1(트리거 스캔)**
 
-⛔ **구조 축은 Lead가 직접 적용한다** — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 위 4 perspectives와 **함께** 검토한다. Tier 0/1은 Workflow를 호출하지 않으므로 `args.structuralContext` 경로가 **존재하지 않는다**. 여기서 직접 적용하지 않으면 `<100줄` PR — 실무에서 가장 흔한 규모 — 은 구조 판정이 영구히 0건이다. (Tier 1도 "Tier 0와 동일 4 perspectives"이므로 본 항목을 승계한다.)
+**조건부 2**
+6. Refactoring Completeness — 리팩토링·치환·제거가 diff 에 있을 때
+7. Dependency Impact — import·DI·초기화 경로가 바뀔 때
+
+⛔ **Concurrency Safety 가 상시인 이유**: `<100줄` 이라도 `Task {}` 하나로 data race 가 생기고 크래시로 이어진다. 그런데 auto-tier 의 `RISK_PATTERN` 은 **키워드가 보일 때만** 승격시킨다 — `static let shared` + `var` 같은 **역방향 신호는 그 패턴에 없다**. 즉 키워드 없는 동시성 위험은 Tier 0 에 남고, 여기서 보지 않으면 아무도 보지 않는다.
+
+⛔ **Level 1 과 Level 2 를 나눈다** — Level 1 은 트리거 스캔이다(공유 가변 상태·비동기 진입점·콜백 스레드를 diff 에서 훑는다). **양성일 때만** Level 2 로 올라가 `modules/safety-audit.md` 의 참조 추적·API 확인까지 수행한다. Level 2 를 상시로 두면 Lead 순차 작업이 늘어 시간 목표와 충돌한다.
+
+⛔ **구조 축은 Lead가 직접 적용한다** — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 위 perspectives 와 **함께** 검토한다. Tier 0/1은 Workflow를 호출하지 않으므로 `args.structuralContext` 경로가 **존재하지 않는다**. 여기서 직접 적용하지 않으면 `<100줄` PR — 실무에서 가장 흔한 규모 — 은 구조 판정이 영구히 0건이다. (Tier 1도 Tier 0와 동일 perspectives 를 쓰므로 본 항목을 승계한다.)
 
 sub-agent spawn 없음. Codex 호출 없음 (`--codex` 옵션 시 Tier 1 절차로 자동 전환).
 
 ### Synthesize
+⛔ 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계) — 목록: `modules/peer-review-gates.md` § 경량 경로.
+
+⛔ `${WORK_DIR}/evidence-move-drift.md` 가 있으면 **읽는다** — 이동 리팩토링이라는 뜻이고,
+동등성 통과가 "이동 완료" 를 뜻하지 않는다(실측 #4774: 동등성 통과 후 단독 리뷰 0건 · 3렌즈 regression 3건).
+
+⛔ **병합·판정 규칙은 `modules/peer-review-gates.md` § MergeContract 를 따른다** — Tier 0 도 예외가 아니다.
+경량 경로라고 즉흥 판단을 허용하면, 렌즈가 없어 Lead 실측이 유일한 입력원인 Tier 0 에서
+"무엇을 근거로 인정했는지"가 아무데도 남지 않는다. 특히 § 4 Lead 실측의 자격 · § 9 confidence(Tier 0 = 투표 없음).
+
 Single-reviewer mode. Confidence Matrix 대신 simple checklist:
 
 ```markdown
@@ -161,6 +182,22 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - `${WORK_DIR}/review-report.md` 작성 (의무)
 - `${WORK_DIR}/pr-comments.md` 작성 (선택)
 - `${WORK_DIR}/cost-log.json` 자동 작성 (아래 §비용 로깅 참조)
+- ⛔ **축별 집계** — review-report.md 끝에 아래 표를 붙인다.
+
+```markdown
+## 발견 축 집계
+| 축 | 건수 | 비고 |
+|---|---:|---|
+| code_quality | {n} | |
+| structure | {n} | |
+| correctness | {n} | |
+| runtime_safety | {n} | |
+| direction | {n} | |
+| other | {n} | 어디에도 안 맞은 것 |
+```
+
+> Tier 2/3은 `PeerReviewSchema.discoveryAxis` 가 이 집계를 담지만 Tier 0/1은 스키마가 없다. **이 표가 그 자리를 대신한다** — 축 이름을 그대로 써야 경로 간 비교가 성립한다.
+> ⛔ 0건인 축도 행을 지우지 않는다. **0이 관측인지 미탐색인지** 구별하려면 자리가 남아 있어야 한다.
 
 ---
 
@@ -173,7 +210,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - 합 4개 (requirements + old-new-pairs + base-behavior + base-patterns)
 
 ### Analyze
-- Lead 단독 분석 (Tier 0와 동일 4 perspectives)
+- Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2)
 - + Codex challenger 1회 호출 (`< /dev/null` redirect 필수 — background 호출 시 stdin lock 방지):
   ```bash
   codex exec --skip-git-repo-check --sandbox read-only "$(cat /tmp/codex-challenger-prompt.txt)" \
@@ -182,23 +219,131 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - Codex prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
 
 ### Synthesize
-- Lead + Codex 결과 dedup
-- 2-vote Confidence Matrix (3-vote 대비 단순화)
+⛔ **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계). Codex 호출이 있으므로 **Reflection Rate** 도 산출 — ⛔ `N<10` 은 preliminary, verdict 없음. 목록: `gates.md` § 경량 경로.
+
+⛔ **병합·판정 규칙은 `modules/peer-review-gates.md` § MergeContract 를 따른다.**
+아래는 그 계약의 Tier 1 적용 요약이며, 어긋나면 계약이 이긴다.
+
+- Lead + Codex 결과 dedup — 키는 § 3 (`파일` + `line_range` 겹침 + `discoveryAxis`)
+- 2-vote Confidence Matrix (3-vote 대비 단순화) — § 9 Tier 1 행
+- Codex verdict 처리는 § 6 — ⛔ `reverse` 는 제거가 아니라 `question` 전환
 - Independence: Codex sandbox 독립 = HIGH
 
 ### Deliver
 - review-report.md + pr-comments.md + cost-log.json
+- ⛔ **축별 집계** — review-report.md 끝에 아래 표를 붙인다.
+
+```markdown
+## 발견 축 집계
+| 축 | 건수 | 비고 |
+|---|---:|---|
+| code_quality | {n} | |
+| structure | {n} | |
+| correctness | {n} | |
+| runtime_safety | {n} | |
+| direction | {n} | |
+| other | {n} | 어디에도 안 맞은 것 |
+```
+
+> Tier 2/3은 `PeerReviewSchema.discoveryAxis` 가 이 집계를 담지만 Tier 0/1은 스키마가 없다. **이 표가 그 자리를 대신한다** — 축 이름을 그대로 써야 경로 간 비교가 성립한다.
+> ⛔ 0건인 축도 행을 지우지 않는다. **0이 관측인지 미탐색인지** 구별하려면 자리가 남아 있어야 한다.
 
 ---
 
+## DiscoveryContract — 무엇을 찾는가
+
+**보장**: 축이 **모든 경로에서 같은 이름으로** 집계된다 — 경로에 따라 이름이 바뀌거나 사라지지 않는다.
+
+⛔ **`direction` 은 아직 배선되지 않았다.** 다섯 축 중 넷(`code_quality`·`structure`·`correctness`·`runtime_safety`)만 owner 가 있다. `direction` 은 집계 자리만 있고 발화 경로가 없으므로 **0 건이 "탐색했으나 없음"이 아니라 "탐색 안 함"** 이다. 리포트에 그렇게 표기한다 — 미탐색을 0 으로 읽으면 커버리지를 과대평가한다.
+
+### 축 정의
+
+| 축 | 무엇을 묻는가 | Tier 0/1 | Tier 2/3 |
+|---|---|---|---|
+| `code_quality` | 품질·dead code·성능 | perspectives 2·3 | review-quality |
+| `structure` | 설계·레이어·확장성 | perspective 1 + 구조 축 5개 | review-arch + `structuralContext` |
+| `correctness` | 로직·요구사항·엣지 | perspective 4 | review-correctness |
+| `runtime_safety` | 동시성·메모리·크래시 | perspective 5 (Level 1 상시) | review-quality 역방향 트리거 + review-correctness race 검사 |
+| `direction` | 접근 방향 자체의 대안 | 조건부 — 대안이 명백할 때 | 조건부 |
+
+⛔ **`runtime_safety` 는 새 축이 아니라 배선이다.** owner 가 이미 있다 — `agents/review-quality.md` 가 *"동시성 코드 포함 시 **또는 역방향 감지 트리거 활성 시**"* 로 Concurrency Safety 를 소유하고, `agents/review-correctness.md` 도 race 를 검사한다. 부족한 것은 **발화 조건과 입력의 배선**이지 축 자체가 아니다.
+
+⚠️ **`direction` 은 그대로 붙일 수 없다.** `agents/review-direction.md` 는 *계획·구현 전* 전용이다. 코드 리뷰에 쓰려면 입력과 판정 스키마를 따로 정의하거나 arch 렌즈의 조건부 질문으로 넣는다. **미해결로 남긴다** — 과장하지 않는다.
+
+### 9 perspectives → 5축 매핑
+
+⛔ `perspective` 를 이 축으로 **대체하지 않는다**. 소비 스키마가 9관점 어휘를 쓴다. 두 필드는 목적이 다르다 — `perspective` 는 어느 렌즈가 봤나, `discoveryAxis` 는 어떤 축의 발견인가.
+
+| perspective | discoveryAxis |
+|---|---|
+| Architecture Decision · Extensibility · Over-Engineering | `structure` |
+| Functional Decomposition · Modern API | `code_quality` |
+| Dependency Impact · Refactoring Completeness | `code_quality` (구조 결정이면 `structure`) |
+| Requirements Alignment | `correctness` |
+| Concurrency Safety | `runtime_safety` |
+
+한 발견이 여러 축에 걸치면 **1차 원인** 쪽을 고른다. 어디에도 안 맞으면 `other` — 억지로 맞추면 집계가 오염된다.
+
+### 관점 선별 근거 (Tier 0/1)
+
+9개를 다 올리면 Tier 0 이 Tier 2 가 되어 계층이 무의미해진다. 손실과 Lead 비용 두 축으로 갈랐다.
+
+| 관점 | 판정 | 근거 |
+|---|---|---|
+| Concurrency Safety | **상시 (Level 1)** | 작은 diff 에서도 손실이 크고, 트리거 스캔은 비용이 낮다 |
+| Refactoring Completeness | 조건부 | diff 밖을 보는 유일한 축이나 리팩토링이 아니면 무의미 |
+| Dependency Impact | 조건부 | import·DI 변경 시에만 의미 |
+| Extensibility · Over-Engineering | **Tier 2 유지 ⚠️ provisional** | 작은 변경에서 우선순위가 낮고 판단 비용이 높다. ⛔ 단 `modules/review-structural-axes.md` 의 구조 축(대안 ≥2·스레드 가정·public API 모양)이 이미 일부를 커버한다 — **관점 이름을 세어 '빠졌다'고 한 것이지 질문 커버리지를 분석한 것이 아니다.** N 누적까지 잠정 |
+
+### 축이 실제로 배선됐는지 검사
+
+각 축은 아래 6개가 **전부** 있어야 한다. 표가 채워졌는지만 보면 placeholder 도 통과한다.
+
+`trigger`(무엇이 발화시키나) · `owner`(누가 보나) · `input`(무엇을 읽나) · `output`(어느 필드로 나오나) · `fallback`(owner 부재 시) · `fixture`(발화를 증명하는 회귀 자료)
+
+⛔ **조건부 발화를 유지한다.** 축을 늘리면 오탐이 는다 — 내부 관측에서 한 축을 11곳에 적용해 9곳이 발화했으나 진짜 결함은 1곳이었다. Lead 에게 20건 넘게 도착하는 문제도 별도로 기록돼 있다.
+
 ## Tier-Adaptive Evidence
 
-| Tier | requirements | old-new-pairs | base-behavior | producer-consumer | base-patterns | convention-samples | caller-analysis | semantic-mapping |
-|------|:------------:|:-------------:|:-------------:|:-----------------:|:-------------:|:------------------:|:---------------:|:----------------:|
-| 0    | ✓            | ✓             | ✓             | —                 | —             | —                  | —               | —                |
-| 1    | ✓            | ✓             | ✓             | —                 | ✓             | —                  | —               | —                |
-| 2    | ✓            | ✓             | ✓             | ✓                 | ✓             | ✓                  | (init 변경 시) | (refactoring 시) |
-| 3    | ✓            | ✓             | ✓             | ✓                 | ✓             | ✓                  | ✓               | ✓                |
+> ⛔ **canonical set** — 수집 항목의 정본 목록이다. 행 수가 아니라 **ID 집합**으로 대조한다. 행만 세면 빠진 항목 대신 중복이 들어가도 통과한다.
+
+**evidence 9종**
+
+| ID | Tier 0 | Tier 1 | Tier 2 | Tier 3 | 조건부 발화 |
+|---|:---:|:---:|:---:|:---:|---|
+| `requirements` | ✓ | ✓ | ✓ | ✓ | 상시 |
+| `old-new-pairs` | ✓ | ✓ | ✓ | ✓ | 상시 |
+| `base-behavior` | ✓ | ✓ | ✓ | ✓ | 상시 |
+| `base-patterns` | — | ✓ | ✓ | ✓ | — |
+| `producer-consumer` | — | — | ✓ | ✓ | — |
+| `convention-samples` | — | — | ✓ | ✓ | — |
+| `caller-analysis` | ⊕ | ⊕ | ⊕ | ✓ | init·DI·초기화 경로 변경 |
+| `semantic-mapping` | ⊕ | ⊕ | ⊕ | ✓ | 리팩토링·치환·마이그레이션 |
+| `deletion-verification` | ⊕ | ⊕ | ⊕ | ✓ | 심볼·함수 제거 |
+
+`✓` 상시 · `⊕` 조건부 · `—` 미수집
+
+⛔ **`deletion-verification` 은 이 표에 없었다** — `skills/fz-peer-review/SKILL.md` § Code Evidence Collection 에는 있는데 여기 열이 빠져 SSOT 가 갈라져 있었다. 두 곳의 ID 집합이 같아야 한다.
+
+⛔ **Tier 0/1 의 상시 3종은 축소 대상이 아니다.** 이미 최소다 — 여기서 더 줄이면 origin 판정 근거가 사라진다.
+
+⭐ **조건부는 Tier 0/1 에도 열려 있다.** C2 가 Refactoring Completeness · Dependency Impact 를 Tier 0/1 조건부 관점으로 올렸는데, 그 관점은 위 `⊕` 3종을 입력으로 요구한다. **관점만 켜고 입력을 막으면 부분 분석이 된다.**
+
+**pre-cache 7종** — ⛔ 지금까지 Tier 차등 없이 전부 수집했다. Tier 0 Gather 가 *"SKILL.md Gather Step 0-5 그대로"* 라서 작은 PR 에서도 전량이 돈다.
+
+| ID | 발화 조건 |
+|---|---|
+| `arch_layer_map` | 상시 (구조 축 입력) |
+| `import_graph` | import·의존 방향 변경 |
+| `protocol_conformers` | protocol 선언·conformance 변경 |
+| `deprecated_symbols` | 상시 (저비용 grep) |
+| `stream_paradigms` | 리액티브·비동기 패턴 등장 |
+| `existing_utilities` | 신규 타입·헬퍼 추가 |
+| `base_class_hierarchy` | class init·willSet 변경 |
+
+⛔ **신호가 애매하면 켠다.** 과수집은 시간을 쓰고 누락은 판정을 망친다 — 비용이 대칭이 아니다.
+
+⛔ **스킵은 기록한다.** 무엇을 건너뛰었는지 리포트에 남기지 않으면 "수집했는데 없었다"와 "안 봤다"를 구별할 수 없다.
 
 > evidence 수집 절차 본문: `modules/evidence-collection.md` 참조. Tier-adaptive는 본 모듈 단일 정의.
 
@@ -220,12 +365,22 @@ Synthesize 단계 직전 (Lead가 모든 agent/Codex 응답 합류 후).
 
 ```markdown
 ## 실측 비용
-- Tier: {0|1|2|3}
+- Tier: {0|1|2|3}  ·  Stage2 발화: {true|false}
 - Total tokens: {N}K (Lead {a}K + Agents {b}K + Codex {c}K)
-- Duration: {N}분 {M}초
+- Duration: {N}분 {M}초  ← ⛔ **구간 분해**: Gather {x}분 / Analyze {y}분 / Synthesize·Deliver {z}분
+- 필수 read-set: {N}줄  (`python3 scripts/hydration_manifest.py`)
 - 이슈 발견 수: Critical {n} / Major {m} / Minor {l} / Suggestion {p}
+- 축별 발견: code_quality {n} / structure {n} / correctness {n} / runtime_safety {n} / direction {n} / other {n}
 - cost-log.json: ${WORK_DIR}/cost-log.json
 ```
+
+⛔ **구간 분해가 없으면 판정이 불가능하다.** 계약 도입으로 Lead 가 읽는 양이 늘었고(필수 read-set 증가) 동시에 교차·DA 가 워크플로로 넘어가 Lead 수동 작업이 줄었다. **두 변화가 반대 방향**이라 총 duration 하나로는 어느 쪽이 이겼는지 알 수 없다.
+
+- Gather 가 늘었으면 → 수집 게이팅이 덜 먹혔거나 read-set 증가가 원인
+- Synthesize·Deliver 가 줄었으면 → 교차·DA 이관이 먹힌 것
+- ⛔ 둘 다 늘었으면 **되돌릴 후보를 지목**한다 (계약 압축 · 게이팅 강화)
+
+⚠️ 구간 경계는 산출물 생성 시각으로 근사한다 — 정밀 계측이 아니다. 턴 사이 대기가 섞이므로 **같은 방식으로 잰 값끼리만** 비교한다.
 
 쓰기 실패 시: 본 섹션에 `"⚠️ 비용 로깅 실패 ({reason}). 토큰 추정만 가능 (~{est}K)."` 명시 (silent skip 금지).
 
@@ -287,7 +442,19 @@ jq -e '
 4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
 ```
 
-⛔ **Tier 2 반환 계약 — Lead가 알아야 하는 필드 부재**: Tier 2는 `mergedIssues` 경로를 타지 않으므로(`peer-review.js:173-177`) 반환 `issues`에 **`finalSeverity`·`crossVerdict`·`counterVerdict`가 없다**. Tier 3에만 있다. Confidence Matrix를 만들 때 `severity`(원본)를 쓰고, 교차·DA 열은 "미수행"으로 표기한다 — 필드를 찾다 실패하면 Matrix가 판정 불가로 멈춘다.
+⛔ **Tier 2 반환 계약 — 트리거 발화 여부로 필드가 달라진다** (D1):
+
+| 필드 | 미발화 (3-call) | 발화 (5-call) | Tier 3 |
+|---|:---:|:---:|:---:|
+| `stage2Ran` | `false` | `true` | `true`/`false` |
+| `stage2Trigger` | ✓ (판정 근거) | ✓ | ✓ |
+| `crossVerdict`·`crossNote` | — | ✓ | ✓ |
+| `crossSeverity` | — | ✓ (조정 제안) | — |
+| `crossAdjustments` | — | ✓ | ✓ |
+| `finalSeverity`·`counterVerdict` | — | — | ✓ (Stage 3) |
+
+⛔ Tier 2 는 발화해도 **`finalSeverity` 를 만들지 않는다.** 교차 조정은 `crossSeverity` 에 **제안으로** 싣고 최종 판정은 Lead 병합 계약이 한다 — Tier 2 미투표(Wave 4 확정)를 스크립트가 지키는 방식이다.
+⛔ `stage2Ran` 은 **조용한 off 방어**다. 필드가 없으면 트리거가 안 걸린 것인지 스크립트가 옛 버전인지 구별할 수 없다. Confidence Matrix를 만들 때 `severity`(원본)를 쓰고, 교차·DA 열은 "미수행"으로 표기한다 — 필드를 찾다 실패하면 Matrix가 판정 불가로 멈춘다.
 
 에이전트 브리프는 스크립트가 조립한다 (OVERRIDE 블록 + TARGET). Lead가 args로 넘길 것:
 - `diffPath` / `basePath`(base 원본 prefetch — 에이전트가 요청하지 않는다) / `evidencePaths`
@@ -352,7 +519,9 @@ DA 판정:
 - `agree` → flagged_by 추가
 - `challenge` → confidence -20%
 - `supplement` → 보완
-- `reverse` → EXCLUDE + 새 이슈(confidence 70). reverse 시 PR 브랜치 코드로 교차 확인.
+- `reverse` → ⛔ **EXCLUDE 아님.** `question` 으로 전환하고 판별 oracle 을 적는다
+  (정본: `modules/peer-review-gates.md` § MergeContract § 6). 이종 검증에 삭제 권한을 주면
+  코드로 결판나지 않는 사안이 조용히 사라진다. reverse 시 PR 브랜치 코드로 교차 확인.
 
 ---
 

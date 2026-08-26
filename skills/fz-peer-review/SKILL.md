@@ -170,7 +170,7 @@ mkdir -p ${WORK_DIR}/evidence
 > 참조: `modules/evidence-collection.md` — 섹션 e (Caller Analysis), 섹션 f (Convention Sampling)
 >
 > ⛔ init/DI 패턴 변경이 있는 PR에서 필수. "선언부만 보고 판단" 방지.
-> PR #3646 교훈: 선언이 깔끔해도 caller가 더러우면 의미 없다. convention 패턴을 위반으로 지적하면 안 된다.
+> 관측 사례: 선언부가 깔끔해도 caller 가 더러우면 의미가 없다. convention 패턴을 위반으로 지적하면 안 된다.
 
 ### 3. 원본 동작 수집 → `${WORK_DIR}/base-behavior.md`
 
@@ -235,74 +235,28 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 - **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + Codex challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip.
 - **Tier 2/3** → 아래 기존 시퀀스 실행.
 
-### Orchestrator Bias 방지 규칙
+### Orchestrator Bias 방지 규칙 (InputHygiene 계약)
 
-에이전트에게 **가설이 아닌 데이터만** 전달한다. Orchestrator의 해석/추측은 에이전트의 독립성을 파괴한다.
+**보장**: Lead의 가설이 판정 근거로 되돌아오지 않는다.
 
-> PR #3639 교훈: "server-provided button titles" 가설 주입 → 2/3 에이전트가 사실로 수용 → 오탐. 실제: 클라이언트 하드코딩.
+에이전트에게 **가설이 아닌 데이터만** 전달한다. Orchestrator의 해석·추측은 렌즈의 독립성을 파괴한다.
+
+> 관측 사례: Lead가 "이 값은 서버가 준다"는 추정을 브리프에 적었고 렌즈 2/3이 그것을 사실로 받아 오탐을 냈다. 실제로는 클라이언트 하드코딩이었다.
+> 다른 사례: Lead가 영향 범위 후보를 목록으로 적어 넣자 렌즈 둘이 **같은 목록을 되돌려줬다**. 3렌즈 합의처럼 보이지만 독립 확증이 아니다.
 
 ```
-⛔ 금지: "old code used server-provided titles" / "X가 누락된 것 같습니다"
-✅ 허용: "forceUpdate에서 _, _ destructuring. evidence/producer-consumer.md 참조"
+⛔ 금지: "이 값은 원래 서버가 주던 것" / "X가 누락된 것 같습니다" / "A·B·C가 영향받을 것"
+✅ 허용: "forceUpdate 에서 `_, _` destructuring. evidence/producer-consumer.md 참조"
 ```
 
-**Evidence-Only Brief Template**:
-```
-[Goal] {관점}에서 독립 이슈 발굴
-[Data] diff.patch + evidence/*.md + symbols.json + requirements.md + base-behavior.md
-[Constraints]
-- 피어 참조 금지, max 10, origin 필수, 추론 아닌 코드 증거 기반만
-- ⛔ init/DI 이슈 시: evidence/caller-analysis.md 필수 확인 — "호출자가 어떤 타입을 알아야 하는가?"
-- ⛔ 패턴 이슈 시: evidence/convention-samples.md 필수 확인 — "프로젝트 convention과 일치하는가?"
-- ⛔ mapping/equivalence claim (v4.4.0): evidence/semantic-mapping.md 필수 입력 — Lead 요약 문장이 아닌 raw source + atom table을 직접 read. mapping_status가 lossy/unverified인 항목은 별도 highlight
-- Convention 패턴(3+ 모듈 동일)을 위반으로 판정하지 않는다 (suggestion까지만 허용)
-```
+> ⛔ **경로별 구현**(Tier 2/3 브리프 검사 · Tier 0/1 탐지·표시 + 강등 결정식) + `intentContext` 허용/금지 표: `modules/evidence-collection.md` § InputHygiene 참조
 
 **Self-Check**: 프롬프트에 "~인 것 같다" / 내 의견 / 사실 단정 포함 시 → 제거 후 데이터로 대체.
 
-### Tier 2/3 실행 시퀀스 (Workflow)
-
-> TEAM(TeamCreate+SendMessage) → 네이티브 Workflow 전환 (Wave 4). Analyze 코어는 `workflows/peer-review.js`가 소유한다 (결정적 스크립트 — P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
-
-1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, evidencePaths, basePath, deep, structuralContext } })` — `structuralContext`는 `modules/review-structural-axes.md`를 Read해 §3 축 + §4 경계 문구를 담는다 (미전달 시 구조 축 미적용)
-   - `deep=false` → **Tier 2 (Lite)**: Stage1 3-병렬(arch+quality+correctness), **기본 3-call**(null 재시도 시 최대 6), Confidence Matrix 미투표(Lead 단순 병합)
-   - `deep=true` → **Tier 3 (Full)**: +Stage2 교차(arch↔quality) +Stage3 counter DA, **기본 6-call**(부분 실패로 Stage2 생략 시 5, 재시도 시 최대 9). 권위 수치는 `metrics.agentCalls`
-   - base 원본은 Gather에서 prefetch하여 `basePath`로 전달 — 에이전트가 SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `agent-team-guide.md` §2)
-2. **반환 처리**: `mode:'workflow'` → reviews/issues를 Synthesize Step 입력으로. `mode:'fallback'` → Lead SOLO 리뷰 폴백.
-3. **Codex Analyze** (out-of-band, `--codex`/Tier3): Lead가 `/fz-codex` 경유 challenger 호출 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과는 Synthesize Confidence Matrix의 Codex 열로 주입.
-
-> 산출물 계약(Confidence Matrix, origin severity 보정, confidence<80 미보고, dedup+투표)은 Synthesize Step에 보존. metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록.
-> ⚠️ **§5.7에 fz-peer-review 테이블이 아직 없다** (Wave 4가 `[Unreleased]` + 실 invoke 캘리브레이션 pending). 확산 임계 사전등록과 테이블 생성은 **별건** — 실 invoke 전에 처리해야 `확증 편향 방어`가 유지된다.
-
-### 에이전트 출력 스키마
-
-`{issues[], strengths[], overall_assessment}` — `workflows/peer-review.js`의 `PeerReviewSchema` required와 동일. 상세 필드는 arch-critic/code-auditor SKILL.md 참조.
-스크립트가 반환 시 `agent` 키를 주입하므로 Lead가 받는 형태는 `{agent, issues[], strengths[], overall_assessment}`이다.
-
-**Per-Agent 품질 원칙**: 시니어 엔지니어가 PR 코멘트로 달 만한 이슈만 보고한다. 이슈 0개도 유효한 결과다.
-자체 confidence 80% 미만이면 보고하지 않는다. description ≤400chars (WHY 필수), suggestion ≤300chars, strengths ≤3. `challenges` 키는 Codex DA 전용 (기본값 `[]`).
-WHY: 이슈 수가 많으면 리뷰어 피로가 증가하고, 진짜 문제가 marginal finding에 묻힌다.
+> ⛔ **Tier 2/3 실행 상세**(Workflow 시퀀스 · 에이전트 출력 스키마 · Evidence-Only Brief · 병합 방법 A/B):
+> `modules/peer-review-workflow.md`. Tier 0/1 은 sub-agent·Codex 가 없어 **읽지 않는다**.
 
 ## Step: Challenge (상호 비판)
-
-### 방법 A — 기본 (Orchestrator 합성)
-
-```
-├─ 3개 결과 JSON 로드 (review-arch + review-quality + codex-challenger)
-├─ 이슈 중복 제거 (파일 + line_range overlap + perspective fuzzy match)
-├─ 이슈 간 충돌 식별 ("확장성 부족" vs "오버엔지니어링")
-└─ 초기 Confidence Matrix 생성
-```
-
-### 방법 B — `--deep` Cross-Critique (Tier 3 Workflow)
-
-> ⚠️ 추가 ~$0.5-1.5, 시간 2-5분. `--deep`(=Tier 3) 시 사전 비용/시간 경고 표시.
-
-`deep=true`로 `peer-review.js` 호출 → Stage2(arch↔quality id-기반 교차 severity 조정 — correctness 불참, false_positive는 실측 인용 필수) + Stage3(review-counter DA — issues 반론 + strengths 도전)이 실행된다. SendMessage 실시간 멀티턴 수렴은 고정 1-pass 교차로 대체됨(충실도 trade-off — 은폐 말고 명시).
-
-**반환 소비 (Tier 3)**: `{ tier, reviews, issues, crossAdjustments, strengthChallenges, distribution, metrics }` — ⛔ `counter` 키는 **없다**(`peer-review.js:13`). DA 산출은 `strengthChallenges`로 온다
-- `crossAdjustments{archOnQuality,qualityOnArch}` → 교차 severity 조정을 Confidence Matrix에 반영
-- **`strengthChallenges`** → counter의 strengths 반례. `target`이 가리키는 "정상 판정"을 재검토 → 유효하면 신규 이슈 승격(confidence 70) 또는 해당 strength 제거. ⛔ 생략하면 `--deep`이 청구한 ~$0.5-1.5의 Stage3 산출이 버려진다
 
 ### Cross-Critique Anti-Sycophancy Rule + Codex Devil's Advocate
 
@@ -316,7 +270,7 @@ sequential-thinking으로 Confidence Matrix를 계산한다.
 
 ### 1. 결측 에이전트 처리
 
-Lead 보정 **불필요** — `peer-review.js`가 `reviews`를 `.filter(Boolean)`으로 구성해 실패 에이전트는 이미 빠져 있고, `PeerReviewSchema`에 `agent_status`가 없어 `partial`은 표현되지 않는다. Lead가 볼 것은 `reviews.length`뿐 — ⛔ 스크립트는 **전부 null일 때만** fallback을 반환하므로(`peer-review.js:158`) 1-review 경로가 실재한다:
+Lead 보정 **불필요** — `peer-review.js`가 `reviews`를 `.filter(Boolean)`으로 구성해 실패 에이전트는 이미 빠져 있고, `PeerReviewSchema`에 `agent_status`가 없어 `partial`은 표현되지 않는다. Lead가 볼 것은 `reviews.length`뿐 — ⛔ 스크립트는 **전부 null일 때만** fallback을 반환하므로(`peer-review.js`의 `reason: 'stage1 all null'` 분기) 1-review 경로가 실재한다:
 3 → 3-vote / 2 → 2-vote 모드(§3) / **1 → 투표 불가. 단독 렌즈 결과이므로 Confidence Matrix를 만들지 않고 `[단일 렌즈 — 교차검증 없음]` 태그와 함께 보고하며, 이슈 confidence는 ×0.7 감쇠** / 0 → `mode:'fallback'`(Tier 하위 전환)
 
 ### 2. Origin 기반 Severity 보정
@@ -489,7 +443,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 - ⛔ **standalone Agent() 호출 금지** — Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응
 
-`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, Codex 실패→2-agent 투표, Codex timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
+`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **Codex 실패→(Tier 2/3) 2-agent 투표 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (codex 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다**, Codex timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
 
 ## Completion → Next
 `--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계.
