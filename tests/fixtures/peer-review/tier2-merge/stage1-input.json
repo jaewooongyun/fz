@@ -1,0 +1,239 @@
+{
+ "note": "Stage 1 3-lens raw findings — judgement fields only (descriptions/evidence stripped)",
+ "reviews": [
+  {
+   "agent": "review-arch",
+   "strengths_count": 3,
+   "issues": [
+    {
+     "id": "A:A1",
+     "severity": "major",
+     "perspective": "architecture",
+     "origin": "regression",
+     "confidence": 88,
+     "file": "SourceFile1.ext",
+     "line_range": "232-243"
+    },
+    {
+     "id": "A:A2",
+     "severity": "major",
+     "perspective": "architecture",
+     "origin": "regression",
+     "confidence": 85,
+     "file": "SourceFile1.ext",
+     "line_range": "673-683"
+    },
+    {
+     "id": "A:A3",
+     "severity": "minor",
+     "perspective": "architecture",
+     "origin": "regression",
+     "confidence": 86,
+     "file": "SourceFile1.ext",
+     "line_range": "276-320, 630-647"
+    },
+    {
+     "id": "A:A4",
+     "severity": "minor",
+     "perspective": "architecture",
+     "origin": "regression",
+     "confidence": 94,
+     "file": "SourceFile1.ext",
+     "line_range": "79"
+    },
+    {
+     "id": "A:A5",
+     "severity": "minor",
+     "perspective": "extensibility",
+     "origin": "regression",
+     "confidence": 90,
+     "file": "SourceFile2.ext",
+     "line_range": "991-1036"
+    },
+    {
+     "id": "A:A6",
+     "severity": "minor",
+     "perspective": "architecture",
+     "origin": "regression",
+     "confidence": 84,
+     "file": "SourceFile1.ext",
+     "line_range": "299-303"
+    },
+    {
+     "id": "A:A7",
+     "severity": "suggestion",
+     "perspective": "architecture",
+     "origin": "regression",
+     "confidence": 90,
+     "file": "SourceFile3.ext",
+     "line_range": "41, 99-101, 152, 293-295"
+    }
+   ]
+  },
+  {
+   "agent": "review-quality",
+   "strengths_count": 3,
+   "issues": [
+    {
+     "id": "Q:Q1",
+     "severity": "major",
+     "perspective": "decomposition",
+     "origin": "regression",
+     "confidence": 85,
+     "file": "SourceFile1.ext",
+     "line_range": "229-252"
+    },
+    {
+     "id": "Q:Q2",
+     "severity": "major",
+     "perspective": "dependency",
+     "origin": "regression",
+     "confidence": 92,
+     "file": "SourceFile1.ext",
+     "line_range": "79"
+    },
+    {
+     "id": "Q:Q3",
+     "severity": "major",
+     "perspective": "dependency",
+     "origin": "regression",
+     "confidence": 85,
+     "file": "SourceFile1.ext",
+     "line_range": "673-741"
+    },
+    {
+     "id": "Q:Q4",
+     "severity": "minor",
+     "perspective": "refactoring_completeness",
+     "origin": "regression",
+     "confidence": 88,
+     "file": "SourceFile2.ext",
+     "line_range": "376-388"
+    },
+    {
+     "id": "Q:Q5",
+     "severity": "minor",
+     "perspective": "decomposition",
+     "origin": "regression",
+     "confidence": 82,
+     "file": "SourceFile1.ext",
+     "line_range": "650-671"
+    },
+    {
+     "id": "Q:Q6",
+     "severity": "minor",
+     "perspective": "decomposition",
+     "origin": "regression",
+     "confidence": 83,
+     "file": "SourceFile1.ext",
+     "line_range": "308-313"
+    },
+    {
+     "id": "Q:Q7",
+     "severity": "minor",
+     "perspective": "refactoring_completeness",
+     "origin": "regression",
+     "confidence": 85,
+     "file": "SourceFile3.ext",
+     "line_range": "41, 99-101, 122-165, 293-295"
+    },
+    {
+     "id": "Q:Q8",
+     "severity": "suggestion",
+     "perspective": "decomposition",
+     "origin": "improvement",
+     "confidence": 85,
+     "file": "SourceFile2.ext",
+     "line_range": "983-1036"
+    }
+   ]
+  },
+  {
+   "agent": "review-correctness",
+   "strengths_count": 3,
+   "issues": [
+    {
+     "id": "C:C1",
+     "severity": "major",
+     "perspective": "Logic Correctness / 미검증 가정",
+     "origin": "regression",
+     "confidence": 88,
+     "file": "SourceFile4.ext",
+     "line_range": "673-686 (didToggleChannelBookmark)"
+    },
+    {
+     "id": "C:C2",
+     "severity": "major",
+     "perspective": "Edge Case Coverage / 영향 반경",
+     "origin": "regression",
+     "confidence": 85,
+     "file": "SourceFile4.ext",
+     "line_range": "229-252 (didSelectItem)"
+    },
+    {
+     "id": "C:C3",
+     "severity": "minor",
+     "perspective": "Edge Case Coverage",
+     "origin": "regression",
+     "confidence": 88,
+     "file": "SourceFile4.ext",
+     "line_range": "714-724 (updateBookmark) / 631-647 (contentAndIndexPath)"
+    },
+    {
+     "id": "C:C4",
+     "severity": "minor",
+     "perspective": "Requirement Coverage (analytics 누락)",
+     "origin": "regression",
+     "confidence": 85,
+     "file": "SourceFile4.ext",
+     "line_range": "743-772 (trackClickBookmark / trackClickShare)"
+    },
+    {
+     "id": "C:C5",
+     "severity": "minor",
+     "perspective": "Requirement Coverage (analytics 누락)",
+     "origin": "regression",
+     "confidence": 85,
+     "file": "SourceFile4.ext",
+     "line_range": "308-313 (onContentDetail)"
+    },
+    {
+     "id": "C:C6",
+     "severity": "minor",
+     "perspective": "Logic Correctness (silent no-op)",
+     "origin": "pre-existing",
+     "confidence": 88,
+     "file": "SourceFile4.ext",
+     "line_range": "650-671 (presentBookmarkAuthGateIfNeeded)"
+    },
+    {
+     "id": "C:C7",
+     "severity": "minor",
+     "perspective": "Requirement Coverage (의존성 주입 이탈)",
+     "origin": "regression",
+     "confidence": 92,
+     "file": "SourceFile4.ext",
+     "line_range": "79"
+    },
+    {
+     "id": "C:C8",
+     "severity": "suggestion",
+     "perspective": "일관성 (선언된 의도 내 변경)",
+     "origin": "regression",
+     "confidence": 90,
+     "file": "SourceFile4.ext",
+     "line_range": "236-241"
+    },
+    {
+     "id": "C:C9",
+     "severity": "suggestion",
+     "perspective": "Surgical Changes",
+     "origin": "regression",
+     "confidence": 90,
+     "file": "SourceFile5.ext",
+     "line_range": "41, 293-295"
+    }
+   ]
+  }
+ ]
+}
