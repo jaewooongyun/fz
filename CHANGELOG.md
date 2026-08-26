@@ -1,5 +1,29 @@
 # Changelog
 
+### v4.26.0 (2026-08-26) — peer-review 의 병목은 fan-out 이 아니었다 [MINOR]
+
+`/fz-peer-review` 가 오래 걸리는데 품질이 그만큼 오르지 않는 문제. 진단이 짚은 것은 예상과 달랐다 — **에이전트를 하나도 스폰하지 않은 실행도 분 단위가 걸렸다.** wall-clock 의 바닥은 병렬 구조가 아니라 Lead 의 순차 작업이었고, 한 실행(51분)을 mtime 으로 복원하니 **35분가량에 Lead 외에 일하는 주체가 없었다.**
+
+**시간** — Gather 를 배치 스크립트로 옮겼다. 실측 약 20분 → **2초**. 렌즈는 Bash 에 접근할 수 없어(Workflow 워커는 `acceptEdits` 강제, `tools:` 제거가 유일한 방어) 병렬화가 아니라 Lead 쪽 호출 횟수를 줄이는 것이 남은 레버였다.
+
+**품질** — 판정 규칙을 계약 3종(MergeContract · DiscoveryContract · InputHygiene)으로 세웠다. 한 실행에서 최종 14건 중 5건이 문서화되지 않은 판단에 기댔다.
+
+⛔ **가장 값이 큰 발견**: Coverage Gate 가 `### 4. Confidence Matrix 출력` 안에 있는데 Tier 0 은 그 Matrix 를 건너뛴다 — **게이트가 경량 경로가 지나가지 않는 자리에 붙어 있었다.** `peer-review-tiers.md` 의 게이트 참조 실측: Coverage 0 · Negative-Result 0 · InputHygiene 0 · Reflection Rate 0. 형제 4스킬은 이미 "light 에서도 생략 불가" 를 쓰고 있었다 — 발명이 아니라 복사였다.
+
+Workflow 판정 결함 넷을 고쳤다 — Stage 2 무조건 실행 · `stage2Ran` 하드코딩 `true`(0콜이어도 true 를 반환해 "조용한 off 방어" 목적을 배반) · 범위 min-max 병합 · 교차 병합의 덮어쓰기(concat 순서가 결과를 정했다).
+
+위험 판정은 오탐 4건 전수로 이관 근거를 삼았다(`actor` 가 `Interactor` 에 걸리고 전부 hunk 헤더). net 판정으로 개명·이동을 거른다 — 코드 이동 PR 이 모든 토큰 정확히 균형인데 구 로직은 +2 승격했다.
+
+lint 2종 신설. `#N11`(경량 경로 검증 계약 선언) 은 게이트 5건 중 지적받은 1건만 고쳐진 것(1/5)이 근거다. diff 파서 hunk 상태 선언은 같은 결함이 네 번 나서 만들었다 — ⛔ **정답은 같은 디렉터리에 이미 있었다**(`header_done`·`inhdr`).
+
+`review-surface.md` 가 stale merge-base 로 부풀려진 diff 를 지목한다(실측 2.9배). `move_drift.py` 는 이동 리팩토링에서 **동등성이 못 보는 드리프트**를 데이터로 만든다 — 동등성 통과 후에도 3렌즈가 `origin: regression` 3건을 찾았다.
+
+read-set: Tier 0/1 2,015 → **2,004**(계약 배선 증가분을 Tier 2/3 전용 블록 추출이 상쇄) · `SKILL.md` 500 → 451줄.
+
+⚠️ **확산 임계는 판정 불가**다 — 사전등록이 요구하는 `3건 전수` + 경로별 최소 1건 + paired replay 를 채우지 못했다. Tier 0/1·Tier 3 실전 검증 0회, Codex 교차검증은 spend cap 으로 두 번 다 실패했다.
+
+상세: [docs/releases/v4.26.0.md](docs/releases/v4.26.0.md)
+
 ### v4.25.1 (2026-08-25) — fixture 가 클론 위치에 묶여 있었다 [PATCH]
 
 fixture 원장의 `ROOT:`·`CWD:` 는 **커밋한 사람의 클론 경로**다. self-test 가 sandbox 로 재작성하는데 `replace(str(FIXTURES), …)` 만 썼다. 다른 클론이나 플러그인 캐시에서는 `FIXTURES` 가 그 경로와 달라 **매칭이 0건**이 되고, ROOT 가 남의 경로를 가리켜 소유 검사에서 전부 exit 3 이 된다.
