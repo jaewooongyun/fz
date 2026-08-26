@@ -28,11 +28,11 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 |------|------------|----------------|-------|---------------|-----------|
 | **0 (Solo)** | Orchestrator 직접 | — | — | None | 0 |
 | **1 (Solo+Codex)** | Orchestrator 직접 | — | Lead /fz-codex ×1 | None | 0 (+Codex 1) |
-| **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-codex ×1 | 미투표 (Lead 병합) | **3** (전부 opus) |
+| **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-codex ×1 | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
 | **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-codex ×2 | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
 
-> ⛔ **모델은 스크립트가 single source** — `peer-review.js:147·151·156`(Stage1) · `:188·192`(Stage2) · `:211`(Stage3)이 전 호출 `model:'opus'`다. 에이전트 frontmatter(`review-quality`·`review-correctness`·`review-counter` = `sonnet`)와 `code-auditor/SKILL.md` `main: sonnet`은 **스크립트에 의해 override된다** — 실행 경로는 스크립트다.
-> ⛔ **재시도 포함 실제 호출 수는 더 클 수 있다** — `parallelWithRetry`가 Stage1 null 항목마다 1회 재호출하므로 **Tier 2는 3~6, Tier 3는 6~9**다(`peer-review.js:119-125`). 부분 실패로 Stage2가 생략되면 Tier 3가 6보다 적을 수도 있다. **권위 있는 수치는 반환값 `metrics.agentCalls`뿐이다.**
+> ⛔ **모델은 스크립트가 single source** — `peer-review.js`의 `label: 'stage1-arch'`·`'stage1-quality'`·`'stage1-correctness'`(Stage1) · `'stage2-arch-on-quality'`·`'stage2-quality-on-arch'`(Stage2) · `'stage3-counter'`(Stage3) 전 호출이 `model:'opus'`다. 에이전트 frontmatter(`review-quality`·`review-correctness`·`review-counter` = `sonnet`)와 `code-auditor/SKILL.md` `main: sonnet`은 **스크립트에 의해 override된다** — 실행 경로는 스크립트다.
+> ⛔ **재시도 포함 실제 호출 수는 더 클 수 있다** — `parallelWithRetry`가 Stage1 null 항목마다 1회 재호출하므로 **Tier 2는 3~6, Tier 3는 6~9**다(`peer-review.js`의 `parallelWithRetry`). 부분 실패로 Stage2가 생략되면 Tier 3가 6보다 적을 수도 있다. **권위 있는 수치는 반환값 `metrics.agentCalls`뿐이다.**
 > ⛔ **비용 상한 수치 열을 제거했다.** 기존 `~$2.00`/`~$3.50`은 "opus 1 + sonnet 1" 전제로 산정된 값이라 실제(opus 3 / opus 6)와 맞지 않았다. 추정치를 다른 추정치로 바꾸는 대신 **검증 가능한 call 수**로 대체한다 — 실제 비용은 `cost-log.json`이 invoke마다 실측으로 남긴다. [참고 실측: PR #4655 Tier 2 = 448K tokens]
 
 ## 자동 휴리스틱 (단일 진실 원천)
@@ -122,6 +122,48 @@ echo "rationale: SIGNIFICANT=$SIGNIFICANT_LINES (added=$ADDED+del=$DELETED-gen=$
 3. `--codex` (Tier 0 → Tier 1 효과: Codex challenger 1회 추가)
 
 ---
+
+### effort 배정 — 왜 전 스테이지 `xhigh` 인가
+
+⛔ **차등하지 않는다.** 계획 단계의 가정("Stage 2 는 판정 출력이라 가볍다")이 실측으로 반증됐다.
+
+**Tier 3 실행 1건 측정**
+
+| Stage | 출력량 | 새 발견 |
+|---|---:|---|
+| Stage 1 (3렌즈) | 27,033자 | issues 14건 |
+| **Stage 2 (교차)** | **18,758자 — Stage1 의 69%** | **additions 5건, 최종 리포트에 전부 생존** |
+| Stage 3 (counter) | 2,017자 — 7% | missedIssues 4건 |
+
+Stage 2 는 상대 렌즈 issue 에 `agree`/`adjust`/`false_positive` 를 매기는 **판정**만 하는 것이 아니라, 교차하며 **새 발견을 만든다**. 그 5건이 최종에 `XA:`·`XQ:` 로 남았다. Stage 3 도 출력은 작지만 `missedIssues` 4건을 냈다.
+
+⭐ **어느 스테이지도 순수 판정이 아니다.** effort 차등의 전제(일부는 판정만 하니 낮춰도 된다)가 이 워크플로에서는 성립하지 않는다.
+
+⛔ `xhigh` 는 관성이 아니라 **결정된 값**이다 — `ultracode` 가 effort arm 으로 무효라는 실측 뒤 사용자가 유지를 택했다(CHANGELOG v4.14.0 T0). 근거 없이 되돌리지 않는다.
+
+**언제 다시 볼 것인가**: 위 표는 **N=1** 이다. Tier 3 실행이 3건 누적되면 아래를 본다.
+
+- Stage 2 의 `additions` 가 계속 최종에 생존하는가 → 생존하면 `xhigh` 정당
+- 특정 스테이지의 출력량·기여가 일관되게 낮은가 → 그 스테이지만 `high` 로 ablation
+- ⛔ 짝 비교로 잰다: 같은 입력에 `xhigh`/`high` 각 1회, **검증된 critical·major 손실 0** 이 통과 기준
+
+### 수집 축소의 검증 계약 (ablation)
+
+⛔ **켜짐/꺼짐만 확인하면 무엇을 잃었는지 모른다.** 게이팅이 트리거 표대로 동작해도 그 결과 발견이 줄었는지는 별개 질문이다.
+
+**절차**: 같은 diff 를 **두 번** 돌린다 — 전량 수집 1회, 게이팅 1회. 두 산출을 짝으로 비교한다.
+
+**사전등록 기준** (⛔ 사후 변경 금지)
+
+| 축 | 허용 |
+|---|---|
+| 검증된 `critical`·`major` 고유 발견 | **손실 0** |
+| `minor`·`suggestion` | 손실 허용 — 단 건수를 기록 |
+| 축별 커버리지 (`discoveryAxis`) | 전량 대비 **빈 축이 늘지 않을 것** |
+
+**위반 시**: 해당 수집 항목을 **즉시 상시로 되돌린다.** 조정이 아니라 원복이다 — 임계를 낮춰 통과시키면 기준이 사후 변경된다.
+
+⚠️ 짝 비교는 비싸다(같은 입력 2회). 게이팅을 **랜딩하기 전에** 하고, 이후에는 `stage2Ran` 처럼 반환 필드로 관측한다.
 
 ## Tier 0 (Solo) 절차
 
