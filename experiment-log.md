@@ -504,12 +504,38 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 > ⛔ **신설 사유**: `skills/fz-peer-review/SKILL.md`가 *"metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록"* 이라 지시하는데 **테이블이 존재하지 않았다**(F-12). 지시가 없는 대상을 가리키고 있었다.
 > ⛔ 기존 §5.7 freeze 블록(확산 판정 임계)은 **불가침** — `experiment-log.md` §5.8 "freeze 범위 주석" 선례대로 **신설만** 허용한다.
 >
-> **임계 (사전 등록 — 변경 금지)**: 3건 전수 · `nullCount` 0 · stage 완주(**tier별 기대값 다름**: Tier 2 = Stage1+Stage2, Tier 3 = Stage1+Stage2+Stage3) · fallback 0 **단 `invalid-args`는 제외**(스크립트 fail-fast = 설계된 가드이지 워크플로 실패가 아님 — fz-code 2026-07-10 시리즈 선례 승계).
+> **임계 (사전 등록 — 변경 금지)**: 3건 전수 · `nullCount` 0 · stage 완주(**tier별 기대값 다름**: Tier 2 = Stage1 + **(트리거 발화 시 Stage2)**, Tier 3 = Stage1+Stage2+Stage3) · fallback 0 **단 `invalid-args`는 제외**(스크립트 fail-fast = 설계된 가드이지 워크플로 실패가 아님 — fz-code 2026-07-10 시리즈 선례 승계).
+> ⛔ **임계 개정 이력 (2026-08-25, 사용자 승인 D4)**: `Tier 2 = Stage1+Stage2` → `Tier 2 = Stage1 + (트리거 발화 시 Stage2)`. 사유 = Stage 2 조건부 실행(D1) 도입으로 미발화 실행이 전부 '미완주'로 집계되던 문제. ⛔ **개정 범위는 이 조항 1곳** — `3건 전수`·`nullCount 0`·`fallback 0`은 불변이다. `nullCount`는 임계가 아니라 **코드(카운터 시점)**를 고쳐 의미를 맞췄다(D6, `peer-review.js` parallelWithRetry).
 > **G2-peer 품질 관찰축**: 렌즈별 발견 실효성 / cross severity 조정 근거 인용 / counter refute의 실측 근거 / Origin 보정 작동 / 구조 축(structuralAxes) 발견 신규성.
 > ⚠️ **열 설계 근거**: 단순 `null률·완주·fallback`만으로는 **신뢰성 실패와 입력 오류를 구별할 수 없다** — Tier·mode·fallback 사유를 분리 기록한다(Codex verify ISSUE-008).
 
+
+> ⛔ **백필 (2026-08-25)** — 아래 10행은 실행 당시 기록한 것이 아니라 **사후 수집**이다. 소스가 셋이라 필드 가용성이 다르다: `cost-log.json`(4건) · `tier.txt`(4건) · `review-report.md`(2건). ⛔ **없는 값은 추정하지 않고 `unavailable`로 둔다** — 추정치를 실측 자리에 넣으면 이 표가 baseline 구실을 못 한다.
+> ⛔ Tier 0/1은 Workflow를 호출하지 않으므로 `nullCount`·`stages`·`fallback`이 **개념상 부재**다(`n/a`). 실패해서 0인 것과 구분한다.
+
 | # | date | tier | mode | agentCalls | nullCount | stages(기대/실제) | fallback (사유) | wall-clock | structuralAxes | G2-peer 관찰 |
 |---|------|:----:|------|-----------:|----------:|-------------------|-----------------|-----------:|:--------------:|--------------|
+| 1 | 2026-08-07 | 2 | workflow | 3 | 0 | 2/1 (Stage2 미실행) | 0 | 757s | unavailable | 3렌즈 24 findings → Matrix 15행 → 최종 14건. **1/3 단독 3건이 투표 산식상 전멸해야 했으나 Lead가 `[L실측]` 예외를 즉석 신설해 생존**(F-038 근거). 렌즈 0/3 발견 2건 = Lead 단독 발굴. Codex가 3렌즈 합의 1건을 reverse |
+| 2 | 2026-08-10 | 1 | solo+codex | 0 | n/a | n/a | n/a | unavailable | n/a | ⛔ **RISK_PATTERN 오탐 4건 전수** — `actor `가 `Interactor `에 substring 매칭 + 전부 `@@` hunk 헤더(변경 코드 아님). Lead가 수동으로 risk=0 판정. **자동 판정대로였으면 Tier 2 승격**(S10 근거) |
+| 3 | 2026-08-10 | 0 | solo | 0 | n/a | n/a | n/a | 480s (`method:estimated`) | n/a | agent 0콜인데 분 단위 소요 — **병목이 fan-out이 아니라 Lead 순차 작업**임을 보여주는 행. 산출 suggestion 3건뿐 |
+| 4 | 2026-08-12 | 0 | solo | 0 | n/a | n/a | n/a | unavailable | n/a | 실범위 57줄 — Lead 단독, 교차검증 에이전트 미사용 |
+| 5 | 2026-08-12 | 1 | solo+codex | 0 | n/a | n/a | n/a | unavailable | n/a | auto는 Tier 2였으나 **사용자가 '경량' 명시해 하향**. 토큰 실측 불가로 cost-log `method:unavailable` 기록(추정치 날조 대신 부재 표기 — 정직 처리 선례) |
+| 6 | 2026-08-13 | 2 | workflow | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | 원시 13건 → dedup·표결 후 7건 → 재검증 후 Critical 0 / Major 0 / Minor 2 / Suggestion 5 |
+| 7 | 2026-08-20 | 2 | workflow | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | SIGNIFICANT 1130줄, risk=10 → auto Tier2 (**cap이 escalation을 2에서 막음**). 판정 Approve, 재검증 후 코멘트 가치 3건 |
+| 8 | 2026-08-24 | 3 | workflow(deep) | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | 737줄/18파일. 앱 전역 정책 전환 3종 + 사용자 '다각도' 명시로 deep 진입 — **유일한 Tier 3 관측** |
+| 9 | 2026-08-24 | 0 | solo | 0 | n/a | n/a | n/a | unavailable | n/a | 사용자 경량 요청. merge-base 명시 리뷰 |
+| 10 | 2026-08-25 | 1 | solo+codex | 0 | n/a | n/a | n/a | unavailable | n/a | 경량(Tier 1 상당) — Lead 단독 분석 `[단일 렌즈 — 교차검증 없음]` 태그 부착 |
+
+| 11 | 2026-08-25 | 1 | solo (codex 실패) | 0 | n/a | n/a | n/a | **1320s (실측)** | n/a | ⭐ **개선본으로 잰 첫 행** (1~10은 백필 baseline). PR #4766 · 리뷰 표면 18파일 +83/−83. **도구 결함 3건 발견** — ① PR 경로 `baseRefName` 이 원격 이름이라 로컬 부재 → `git show` 25건 전패 → base 원본 **0/25 인데 exit 0** ② PR 경로에 merge-base 미적용(base 팁 ≠ 분기점) ③ risk_scan 이 `-@MainActor…isExtendedLayout`/`+@MainActor…supportsSplitLayout` **개명 짝**을 위험으로 세어 166줄 PR 을 Tier 1→2 로 승격(agent 0→3콜). ③은 net-new 판정으로 수정+fixture 3건. 산출 major 1(PR 에 이미 머지된 커밋 포함) + suggestion 1(형제 Interactor 계약 비대칭, pre-existing) |
+
+| 12 | 2026-08-26 | 2 | solo (workflow 미호출 · codex 실패) | 0 | n/a | n/a | n/a | **360s (실측)** | n/a | ⭐ **개선본 2회차 — 결함 0건**. PR #4774(파일 분리 리팩토링, 872줄). 11행에서 잡은 결함 3종이 **전부 재발 없음**: base 원본 **2/2**(① remote 접두 자동 해석 발화) · `review-surface.md` **중복 0 정확 보고**(②, #4766 에선 2건 검출 — 오경보 아님) · risk **0**(③ net-new; 구 로직은 코드 이동에 risk=2). Gather **2초**. ⛔ **이슈 0건** — 대신 `checked_but_not_reported` **4건**을 산출물에 남겼다(관례 74% 실측으로 지적 철회 · import 판정은 측정 도구 무효로 보류 · `#if Lab` 비대칭은 오탐 · 중복커밋 0). ⭐ **Negative-Result Gate 가 실제로 발화**해 "import 사용 0건" 주장을 철회시켰다(도구가 앱/모듈 심볼 미구별). ⚠️ Tier 2 인데 Workflow 미호출 — Lead 단독 분석으로 종결했다(agentCalls 0) |
+
+> **경로 분포 (N=12)**: Tier 0 ×3 · Tier 1 ×4 · Tier 2 ×4 · Tier 3 ×1 → **경량 경로(0·1)가 58%**이고 그중 3건은 사용자가 '경량'을 명시 요청했다. 경량은 auto-tier의 부산물이 아니라 **반복 선택되는 경로**다.
+> ⛔ **임계 판정 불가**: 사전등록 임계는 `3건 전수`를 요구하나 위 10행은 **백필이라 그 3건에 해당하지 않는다**(사전등록은 전환 후 실 invoke 기준). 이 표는 **before baseline**이며 확산 판정 입력이 아니다.
+>
+> ⛔ **11행도 확산 판정 입력이 아니다** (2026-08-25 S8 pilot). 사전등록은 `3건 전수` + **경로별 최소 1건** + 권장 **paired replay**(old/new 동일 입력 재생)를 요구하는데, 이 실행은 **Tier 1 단건**이고 짝 비교가 없다. ⛔ 또 Codex 가 credit 소진으로 실패해 Tier 1 의 이종 검증이 빠졌다 — `solo+codex` 가 아니라 `solo (codex 실패)` 로 적는다. **GATE-FAIL(12)은 측정 실패이지 '이슈 0건'이 아니다.**
+>
+> ⚠️ **wall-clock 1320s 를 baseline 과 비교하지 말 것**: 22분 중 상당분이 **도구 결함 3건의 진단·수정**이다 (재실행 1회 + risk_scan 수정 + fixture 3건 추가). 순수 리뷰 시간이 아니다. D8 이 요구한 '문서 읽기 증가 vs Lead 수동 작업 감소' 대조는 **결함이 수정된 상태로 다시 재야** 성립한다.
 
 ## §5.8 Fable 5 효율 배선 측정 큐 (시작: 2026-06-12)
 
