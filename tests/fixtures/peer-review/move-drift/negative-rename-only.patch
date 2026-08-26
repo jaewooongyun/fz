@@ -1,0 +1,642 @@
+commit b46f30b0d3dda8780f000a98c75f67e5f1e7b354
+Author: 이민혁 <minhyeok.lee1@tving.com>
+Date:   Mon Aug 24 17:40:34 2026 +0900
+
+    [TVG-5221] refactor(content-detail): 좌우 분할 배치 명명을 UIKit 용어와 분리
+    
+    - UIKit edgesForExtendedLayout의 extended layout은 콘텐츠를 바 아래까지 늘린다는 다른 뜻이라 UISplitViewController가 쓰는 split으로 옮김
+    - is는 대상 자신의 상태를 뜻하는데 이 값이 답하는 것은 화면 조건이라, SDK에서 읽기 전용 능력 질의에만 쓰이는 supports로 교체
+    - allows는 UIKit에서 설정 가능한 정책 스위치에만 쓰여 get-only 파생값을 설정값으로 오독시키므로 탈락
+    - 화면 조건을 답하는 값을 isExtendedLayout에서 supportsSplitLayout으로 변경
+    - 제약을 세우는 헬퍼 파라미터는 usesSplitLayout으로 둬서 적용 여부를 따로 드는 값이 생기면 인자만 바뀌게 함
+    - LiveDetail·TV·VOD·영화 상세의 리스너 체인과 뷰 모델 호출처를 새 이름으로 이관
+    - LiveDetailExtendedLayout을 LiveDetailSplitLayout으로, canUseExtendedLayout을 hasRegularSizeClasses로 변경
+    - extended로 서술한 주석과 지역변수를 분할 용어로 정정
+    
+    🤖 Generated with Claude Code
+
+diff --git a/Apps/Sources/iOS/Classes/View/ETC/MOVIE/MovieDetailViewController.swift b/Apps/Sources/iOS/Classes/View/ETC/MOVIE/MovieDetailViewController.swift
+index d1778514a8..5973ddf104 100644
+--- a/Apps/Sources/iOS/Classes/View/ETC/MOVIE/MovieDetailViewController.swift
++++ b/Apps/Sources/iOS/Classes/View/ETC/MOVIE/MovieDetailViewController.swift
+@@ -51,7 +51,7 @@ class MovieDetailViewController: BaseViewController, ScrollViewInsetAdjustable,
+ 
+     private func updateHeaderViewIfIpad(coordinator: any UIViewControllerTransitionCoordinator) {
+         guard isIPAD else { return }
+-        // alongside엔 isExtendedLayout(stream)이 stale → completion(stream fresh)에서 헤더 재구성.
++        // alongside엔 supportsSplitLayout(stream)이 stale → completion(stream fresh)에서 헤더 재구성.
+         coordinator.animate(
+             alongsideTransition: nil,
+             completion: { [weak self] _ in
+@@ -83,7 +83,7 @@ class MovieDetailViewController: BaseViewController, ScrollViewInsetAdjustable,
+     }
+ 
+     private func listHeaderView() -> UIView? {
+-        guard let isExtendedLayout = listener?.isExtendedLayout, !isExtendedLayout else { return nil }
++        guard let supportsSplitLayout = listener?.supportsSplitLayout, !supportsSplitLayout else { return nil }
+         let tableHeaderView = UIView()
+         let contentDetailHeaderViewHeight = listener?.headerHeight ?? .zero
+         tableHeaderView.frame = CGRect(
+diff --git a/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailBoardView.swift b/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailBoardView.swift
+index 41bea63e40..94589f74cc 100644
+--- a/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailBoardView.swift
++++ b/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailBoardView.swift
+@@ -27,7 +27,7 @@ struct VodDetailBoardView: View {
+                 isVisible: $boardViewModel.isVisible
+             ) {
+                 LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+-                    if !vodDetailViewModel.isExtendedLayout {
++                    if !vodDetailViewModel.usesSplitLayout {
+                         VodHeaderView(viewModel: headerViewModel, vodHeader: vodHeader)
+                     }
+ 
+diff --git a/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailViewController.swift b/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailViewController.swift
+index 54609dd1f9..f2c01003e5 100644
+--- a/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailViewController.swift
++++ b/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailViewController.swift
+@@ -115,7 +115,7 @@ class VodDetailViewController: BaseViewController, ScrollViewInsetAdjustable,
+ 
+     override func viewDidLoad() {
+         super.viewDidLoad()
+-        viewModel.isExtendedLayout = listener?.isExtendedLayout ?? false
++        viewModel.usesSplitLayout = listener?.supportsSplitLayout ?? false
+         Task {
+             await viewModel.loadInitialTabsAndList()
+             await MainActor.run {
+@@ -131,7 +131,7 @@ class VodDetailViewController: BaseViewController, ScrollViewInsetAdjustable,
+         with coordinator: any UIViewControllerTransitionCoordinator
+     ) {
+         super.viewWillTransition(to: size, with: coordinator)
+-        // alongside엔 isExtendedLayout(stream)이 stale → completion(stream fresh)에서 헤더 재구성.
++        // alongside엔 supportsSplitLayout(stream)이 stale → completion(stream fresh)에서 헤더 재구성.
+         coordinator.animate(
+             alongsideTransition: nil,
+             completion: { [weak self] _ in
+@@ -149,7 +149,7 @@ class VodDetailViewController: BaseViewController, ScrollViewInsetAdjustable,
+ 
+     // MARK: ContentDetailHeaderControllable
+     func refreshHeaderForOrientationChange() {
+-        viewModel.isExtendedLayout = listener?.isExtendedLayout ?? false
++        viewModel.usesSplitLayout = listener?.supportsSplitLayout ?? false
+         viewModel.adjustBoardLayout()
+         currentTableView()?.tableHeaderView = headerView()
+         episodeListView.reloadData()
+@@ -157,8 +157,8 @@ class VodDetailViewController: BaseViewController, ScrollViewInsetAdjustable,
+     }
+ 
+     func updateScrollViewHeaderHeight(_ height: CGFloat) {
+-        guard let isExtendedLayout = listener?.isExtendedLayout,
+-            !isExtendedLayout,
++        guard let supportsSplitLayout = listener?.supportsSplitLayout,
++            !supportsSplitLayout,
+             let currentTableView = currentTableView()
+         else { return }
+         setUpdatedTableHeaderView(currentTableView, height: height)
+@@ -385,7 +385,7 @@ class VodDetailViewController: BaseViewController, ScrollViewInsetAdjustable,
+     }
+ 
+     func headerView() -> UIView? {
+-        guard let isExtendedLayout = listener?.isExtendedLayout, !isExtendedLayout else { return nil }
++        guard let supportsSplitLayout = listener?.supportsSplitLayout, !supportsSplitLayout else { return nil }
+         let tableHeaderView = UIView()
+         let contentDetailHeaderViewHeight = listener?.headerHeight ?? .zero
+         tableHeaderView.frame = CGRect(
+diff --git a/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailViewModel.swift b/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailViewModel.swift
+index eabe7f23b2..d58f749b42 100644
+--- a/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailViewModel.swift
++++ b/Apps/Sources/iOS/Classes/View/ETC/VOD/VodDetailViewModel.swift
+@@ -43,7 +43,7 @@ class VodDetailViewModel: NSObject, ObservableObject {
+     let orderType: BehaviorRelay<String>
+     let isContinousPlayOn: BehaviorRelay<Bool>
+ 
+-    @Published var isExtendedLayout: Bool = false
++    @Published var usesSplitLayout: Bool = false
+     @Published var tabs: [TopTab] = []
+     @Published var selectedTabId: TopTab.ID? = nil
+     var selectedTab: TopTab? {
+@@ -167,7 +167,7 @@ class VodDetailViewModel: NSObject, ObservableObject {
+             self.shortsNextApiUrl = shorts.nextApiUrl
+             self.shorts.accept(
+                 TvingUI.Band(
+-                    bandType: shortsBandType(isExtendedLayout: isExtendedLayout),
++                    bandType: shortsBandType(usesSplitLayout: usesSplitLayout),
+                     bandItems: bandItems,
+                     amplitude: nil
+                 )
+@@ -180,7 +180,7 @@ class VodDetailViewModel: NSObject, ObservableObject {
+             self.clipsNextApiUrl = clips.nextApiUrl
+             self.clips.accept(
+                 TvingUI.Band(
+-                    bandType: clipsBandType(isExtendedLayout: isExtendedLayout),
++                    bandType: clipsBandType(usesSplitLayout: usesSplitLayout),
+                     bandItems: bandItems,
+                     amplitude: nil
+                 )
+@@ -222,22 +222,22 @@ class VodDetailViewModel: NSObject, ObservableObject {
+ 
+     func adjustBoardLayout() {
+         if let currentShorts = shorts.value {
+-            shorts.accept(adjustedBandForLayoutChange(shortsBandType(isExtendedLayout: isExtendedLayout), band: currentShorts))
++            shorts.accept(adjustedBandForLayoutChange(shortsBandType(usesSplitLayout: usesSplitLayout), band: currentShorts))
+         }
+ 
+         if let currentClips = clips.value {
+-            clips.accept(adjustedBandForLayoutChange(clipsBandType(isExtendedLayout: isExtendedLayout), band: currentClips))
++            clips.accept(adjustedBandForLayoutChange(clipsBandType(usesSplitLayout: usesSplitLayout), band: currentClips))
+         }
+     }
+ 
+-    private func shortsBandType(isExtendedLayout: Bool) -> TvingUIBandType {
++    private func shortsBandType(usesSplitLayout: Bool) -> TvingUIBandType {
+         if isIPHONE { return .shorts_grid_column_two }
+-        return isExtendedLayout ? .shorts_grid_column_two : .shorts_grid_column_five
++        return usesSplitLayout ? .shorts_grid_column_two : .shorts_grid_column_five
+     }
+ 
+-    private func clipsBandType(isExtendedLayout: Bool) -> TvingUIBandType {
++    private func clipsBandType(usesSplitLayout: Bool) -> TvingUIBandType {
+         if isIPHONE { return .clip_grid_column_two }
+-        return isExtendedLayout ? .clip_grid_column_two : .clip_grid_column_four
++        return usesSplitLayout ? .clip_grid_column_two : .clip_grid_column_four
+     }
+ 
+     private func adjustedBandForLayoutChange(_ newBandType: TvingUIBandType, band: TvingUI.Band) -> TvingUI.Band {
+diff --git a/Apps/Sources/iOS/ContentDetail/ContentDetailHeader/Components/ContentDetailHeaderHostingController.swift b/Apps/Sources/iOS/ContentDetail/ContentDetailHeader/Components/ContentDetailHeaderHostingController.swift
+index 7f4e6d6926..1dd412e313 100644
+--- a/Apps/Sources/iOS/ContentDetail/ContentDetailHeader/Components/ContentDetailHeaderHostingController.swift
++++ b/Apps/Sources/iOS/ContentDetail/ContentDetailHeader/Components/ContentDetailHeaderHostingController.swift
+@@ -24,7 +24,7 @@ final class ContentDetailHeaderHostingController: UIHostingController<ContentDet
+     override func viewDidLayoutSubviews() {
+         super.viewDidLayoutSubviews()
+         // 툴팁 클램핑 기준이 되는 컨테이너 글로벌 frame을 SwiftUI에 주입.
+-        // iPad 가로(isExtendedLayout)에선 헤더가 화면 일부만 차지하므로 UIScreen 기준 클램핑이 부정확.
++        // iPad 가로(supportsSplitLayout)에선 헤더가 화면 일부만 차지하므로 UIScreen 기준 클램핑이 부정확.
+         let globalBounds = view.convert(view.bounds, to: nil)
+         if rootView.containerSize.bounds != globalBounds {
+             rootView.containerSize.bounds = globalBounds
+diff --git a/Apps/Sources/iOS/ContentDetail/ContentDetailHeader/Components/ToolTipView_SwiftUI.swift b/Apps/Sources/iOS/ContentDetail/ContentDetailHeader/Components/ToolTipView_SwiftUI.swift
+index a50a1ec6cd..420e827d20 100644
+--- a/Apps/Sources/iOS/ContentDetail/ContentDetailHeader/Components/ToolTipView_SwiftUI.swift
++++ b/Apps/Sources/iOS/ContentDetail/ContentDetailHeader/Components/ToolTipView_SwiftUI.swift
+@@ -10,7 +10,7 @@ import SwiftUI
+ import UIKit
+ 
+ /// 호스팅 컨테이너(UIKit)가 자기 view.bounds를 글로벌 좌표로 변환해 publish하는 채널.
+-/// iPad 가로(isExtendedLayout)처럼 헤더가 화면 일부만 차지하는 경우, 윈도우(UIScreen) 기준
++/// iPad 가로(supportsSplitLayout)처럼 헤더가 화면 일부만 차지하는 경우, 윈도우(UIScreen) 기준
+ /// 클램핑이 컨테이너 우측을 침범한다. SwiftUI 내부 측정(PreferenceKey/GeometryReader)은
+ /// reparent/회전 직후 timing이 일정치 않아, UIKit `viewDidLayoutSubviews`에서 직접 갱신한다.
+ final class TooltipContainerSize: ObservableObject {
+diff --git a/Apps/Sources/iOS/ContentDetail/ContentDetailInteractor.swift b/Apps/Sources/iOS/ContentDetail/ContentDetailInteractor.swift
+index 69d0ae4edc..83e321fcef 100644
+--- a/Apps/Sources/iOS/ContentDetail/ContentDetailInteractor.swift
++++ b/Apps/Sources/iOS/ContentDetail/ContentDetailInteractor.swift
+@@ -67,7 +67,7 @@ protocol ContentDetailPresentable: Presentable, DialogPresentable, ToastPresenta
+     var isActivityViewControllerPresented: Bool { get }
+     var playerBandView: PlayerBandView? { get }
+     var headerViewController: UIViewController? { get }
+-    @MainActor var isExtendedLayout: Bool { get }
++    @MainActor var supportsSplitLayout: Bool { get }
+     func resetTransform()
+     func updateLayouts(
+         isFullView: Bool,
+@@ -654,8 +654,8 @@ WebLinkActivitySyncable
+     }
+ 
+     // MARK: ContentDetailListListener
+-    var isExtendedLayout: Bool {
+-        presenter.isExtendedLayout
++    var supportsSplitLayout: Bool {
++        presenter.supportsSplitLayout
+     }
+ 
+     var headerViewController: UIViewController? {
+diff --git a/Apps/Sources/iOS/ContentDetail/ContentDetailList/ContentDetailListInteractor.swift b/Apps/Sources/iOS/ContentDetail/ContentDetailList/ContentDetailListInteractor.swift
+index f0ff55a8e9..58bb2a915e 100644
+--- a/Apps/Sources/iOS/ContentDetail/ContentDetailList/ContentDetailListInteractor.swift
++++ b/Apps/Sources/iOS/ContentDetail/ContentDetailList/ContentDetailListInteractor.swift
+@@ -41,7 +41,7 @@ protocol ContentDetailListListener: AnyObject, ContentSelectableListener,
+     )
+     var analyticsContentProperty: AnalyticsContentProperty? { get }
+     var headerViewController: UIViewController? { get }
+-    @MainActor var isExtendedLayout: Bool { get }
++    @MainActor var supportsSplitLayout: Bool { get }
+ 
+     func routeToPurchase()
+     func routeToMyProductList()
+@@ -110,8 +110,8 @@ final class ContentDetailListInteractor: PresentableInteractor<
+     }
+ 
+     // MARK: - ContentDetailListPresentableListener
+-    var isExtendedLayout: Bool {
+-        listener?.isExtendedLayout ?? false
++    var supportsSplitLayout: Bool {
++        listener?.supportsSplitLayout ?? false
+     }
+ 
+     var isLoggedIn: Bool {
+diff --git a/Apps/Sources/iOS/ContentDetail/ContentDetailList/ContentDetailListViewController.swift b/Apps/Sources/iOS/ContentDetail/ContentDetailList/ContentDetailListViewController.swift
+index d8b6430f8d..f49c186a9a 100644
+--- a/Apps/Sources/iOS/ContentDetail/ContentDetailList/ContentDetailListViewController.swift
++++ b/Apps/Sources/iOS/ContentDetail/ContentDetailList/ContentDetailListViewController.swift
+@@ -20,7 +20,7 @@ protocol ContentDetailListPresentableListener: AnyObject,
+     var headerViewController: UIViewController? { get }
+     var headerHeight: CGFloat { get }
+     var tabView: CTTabBarView? { get }
+-    @MainActor var isExtendedLayout: Bool { get }
++    @MainActor var supportsSplitLayout: Bool { get }
+     var isAutoPlay: Bool { get }
+     var isLoggedIn: Bool { get }
+     func presentSeasonList(viewController: UIViewController)
+diff --git a/Apps/Sources/iOS/ContentDetail/ContentDetailViewController.swift b/Apps/Sources/iOS/ContentDetail/ContentDetailViewController.swift
+index d5b3833308..869bd7b1c6 100644
+--- a/Apps/Sources/iOS/ContentDetail/ContentDetailViewController.swift
++++ b/Apps/Sources/iOS/ContentDetail/ContentDetailViewController.swift
+@@ -361,7 +361,7 @@ final class ContentDetailViewController: CommonViewController, ContentDetailPres
+ 
+     var liveDetailView: UIViewController?
+ 
+-    var isExtendedLayout: Bool {
++    var supportsSplitLayout: Bool {
+         let isLandscape = listener?.isLandscape ?? false
+         let isRegularSize = traitCollection.horizontalSizeClass == .regular
+ 
+@@ -489,7 +489,7 @@ final class ContentDetailViewController: CommonViewController, ContentDetailPres
+     }
+ 
+     func updateHeaderConstraints(isFullView: Bool) {
+-        guard isExtendedLayout && !isFullView else {
++        guard supportsSplitLayout && !isFullView else {
+             padLandscapeHeaderScrollView.isHidden = true
+             headerContainer.isHidden = true
+             return
+@@ -537,7 +537,7 @@ final class ContentDetailViewController: CommonViewController, ContentDetailPres
+ 
+         guard listContainer.superview != nil else { return }
+         listContainer.isHidden = false
+-        if isExtendedLayout {
++        if supportsSplitLayout {
+             listContainer.snp.remakeConstraints { make in
+                 make.top.right.bottom.equalToSuperview()
+                 make.left.equalTo(playerContainer.snp.right)
+@@ -551,7 +551,7 @@ final class ContentDetailViewController: CommonViewController, ContentDetailPres
+     }
+ 
+     func updateTvingTalkConstraints(isFullView: Bool, isTvingTalkAttached: Bool) {
+-        prepareTvingTalkContainer(isFullView: isFullView, isExtendedLayout: isExtendedLayout)
++        prepareTvingTalkContainer(isFullView: isFullView, usesSplitLayout: supportsSplitLayout)
+         updateTvingTalkTopConstraints(
+             isFullView: isFullView,
+             isTvingTalkAttached: isTvingTalkAttached
+@@ -572,7 +572,7 @@ final class ContentDetailViewController: CommonViewController, ContentDetailPres
+             return
+         }
+ 
+-        if isExtendedLayout {
++        if supportsSplitLayout {
+             playerPreview.snp.remakeConstraints { make in
+                 make.top.left.equalToSuperview()
+                 make.width.equalTo(contentView).offset(-Constant.padLandscapeRightWidth)
+@@ -699,15 +699,15 @@ final class ContentDetailViewController: CommonViewController, ContentDetailPres
+ 
+         return playerView.snp.prepareConstraints { make in
+             make.width.equalTo(contentView).offset(
+-                isExtendedLayout ? -Constant.tvingTalkSize : 0
++                supportsSplitLayout ? -Constant.tvingTalkSize : 0
+             )
+             make.height.equalTo(playerView.snp.width).multipliedBy(Constant.playerRatio)
+         }
+     }
+ 
+-    private func prepareTvingTalkContainer(isFullView: Bool, isExtendedLayout: Bool) {
++    private func prepareTvingTalkContainer(isFullView: Bool, usesSplitLayout: Bool) {
+         guard tvingTalkContainer.superview != nil else { return }
+-        if isExtendedLayout || isFullView {
++        if usesSplitLayout || isFullView {
+             tvingTalkContainer.snp.remakeConstraints { make in
+                 make.left.equalTo(playerContainer.snp.right)
+                 make.height.equalToSuperview()
+@@ -735,7 +735,7 @@ final class ContentDetailViewController: CommonViewController, ContentDetailPres
+                 }
+             }
+ 
+-            if isExtendedLayout {
++            if supportsSplitLayout {
+                 return tvingTalkContainer.snp.prepareConstraints { $0.top.equalTo(contentView) }
+             }
+             return tvingTalkContainer.snp.prepareConstraints {
+diff --git a/Apps/Sources/iOS/ContentDetail/LiveDetail/LiveDetailInteractor.swift b/Apps/Sources/iOS/ContentDetail/LiveDetail/LiveDetailInteractor.swift
+index 7e06910a79..533c145176 100644
+--- a/Apps/Sources/iOS/ContentDetail/LiveDetail/LiveDetailInteractor.swift
++++ b/Apps/Sources/iOS/ContentDetail/LiveDetail/LiveDetailInteractor.swift
+@@ -51,7 +51,7 @@ protocol LiveDetailPresentable: Presentable, ToastPresentable {
+ }
+ 
+ protocol LiveDetailListener: AnyObject, ContentSelectableListener, FloatingWebViewPresentable {
+-    @MainActor var isExtendedLayout: Bool { get }
++    @MainActor var supportsSplitLayout: Bool { get }
+     var analyticsContentProperty: AnalyticsContentProperty? { get }
+ 
+     @MainActor
+@@ -200,8 +200,8 @@ final class LiveDetailInteractor: PresentableInteractor<LiveDetailPresentable>,
+ 
+     // MARK: - LiveDetailPresentableListener
+ 
+-    var isExtendedLayout: Bool? {
+-        listener?.isExtendedLayout
++    var supportsSplitLayout: Bool? {
++        listener?.supportsSplitLayout
+     }
+ 
+     /// 회전 중에는 interfaceOrientation(SSoT)이 아직 새 방향 적용 전이므로, 목표 방향을 먼저 반영하는 sensor 기반 deviceOrientation을 그대로 노출.
+diff --git a/Apps/Sources/iOS/ContentDetail/LiveDetail/LiveDetailViewController.swift b/Apps/Sources/iOS/ContentDetail/LiveDetail/LiveDetailViewController.swift
+index 0c313f6376..d7195b0988 100644
+--- a/Apps/Sources/iOS/ContentDetail/LiveDetail/LiveDetailViewController.swift
++++ b/Apps/Sources/iOS/ContentDetail/LiveDetail/LiveDetailViewController.swift
+@@ -18,7 +18,7 @@ import TvingUI
+ import UIKit
+ 
+ protocol LiveDetailPresentableListener: AnyObject, LiveHeaderViewDelegate, TopTabDelegate, LiveListViewDelegate, LiveListOverlayDelegate {
+-    @MainActor var isExtendedLayout: Bool? { get }
++    @MainActor var supportsSplitLayout: Bool? { get }
+     /// 회전 중에는 interfaceOrientation(SSoT)이 아직 새 방향 적용 전(전환 완료 시 broadcast)이라,
+     /// 목표 방향을 먼저 반영하는 sensor 기반 device orientation을 사용한다.
+     @MainActor var deviceOrientation: UIDeviceOrientation { get }
+@@ -37,12 +37,12 @@ final class LiveDetailViewController: UIViewController, LiveDetailPresentable, L
+     private let viewModel: LiveDetailViewModel
+     private var overlayViewModel: LiveListOverlayContentViewModel
+ 
+-    private var isExtendedLayout: Bool {
+-        listener?.isExtendedLayout ?? false
++    private var supportsSplitLayout: Bool {
++        listener?.supportsSplitLayout ?? false
+     }
+ 
+-    private func playerWidthOffset(isExtendedLayout: Bool) -> CGFloat {
+-        isExtendedLayout ? -playerRightViewWidth : .zero
++    private func playerWidthOffset(usesSplitLayout: Bool) -> CGFloat {
++        usesSplitLayout ? -playerRightViewWidth : .zero
+     }
+ 
+     init() {
+@@ -87,7 +87,7 @@ final class LiveDetailViewController: UIViewController, LiveDetailPresentable, L
+         playerContainer.snp.makeConstraints { make in
+             make.top.leading.equalToSuperview()
+             make.height.equalTo(playerContainer.snp.width).multipliedBy(playerRatio)
+-            make.width.equalToSuperview().offset(playerWidthOffset(isExtendedLayout: isExtendedLayout))
++            make.width.equalToSuperview().offset(playerWidthOffset(usesSplitLayout: supportsSplitLayout))
+         }
+         playerBottomView.snp.makeConstraints { make in
+             make.top.equalTo(playerContainer.snp.bottom)
+@@ -391,12 +391,12 @@ final class LiveDetailViewController: UIViewController, LiveDetailPresentable, L
+         self.view.addSubview(channelSchedule.view)
+         self.channelScheduleViewController = channelSchedule
+         // 등장 animation을 위한 위치 초기 세팅
+-        prepareChannelScheduleLayout(isExtendedLayout: isExtendedLayout)
+-        updateChannelScheduleTopConstraints(isExtendedLayout: isExtendedLayout, isAttached: false)
++        prepareChannelScheduleLayout(usesSplitLayout: supportsSplitLayout)
++        updateChannelScheduleTopConstraints(usesSplitLayout: supportsSplitLayout, isAttached: false)
+         self.view.layoutIfNeeded()
+ 
+         // 등장 animation 처리
+-        updateChannelScheduleTopConstraints(isExtendedLayout: isExtendedLayout, isAttached: true)
++        updateChannelScheduleTopConstraints(usesSplitLayout: supportsSplitLayout, isAttached: true)
+         UIView.animate(withDuration: 0.2) { [weak self] in
+             self?.view.layoutIfNeeded()
+         }
+@@ -416,7 +416,7 @@ final class LiveDetailViewController: UIViewController, LiveDetailPresentable, L
+ 
+     func removeChannelSchedule(animated: Bool, completion: @escaping () -> Void) {
+         guard let channelScheduleViewController else { return }
+-        updateChannelScheduleTopConstraints(isExtendedLayout: isExtendedLayout, isAttached: false)
++        updateChannelScheduleTopConstraints(usesSplitLayout: supportsSplitLayout, isAttached: false)
+ 
+         let cleanUp = { [weak self] in
+             self?.remove(childViewController: channelScheduleViewController)
+@@ -483,31 +483,31 @@ final class LiveDetailViewController: UIViewController, LiveDetailPresentable, L
+ 
+     /// 레이아웃 재적용 진입점. 내부 회전 경로(viewWillTransition/viewWillAppear)와
+     /// 인터랙터의 orientation 구독(viewWillTransition 미발생 wake/복귀 케이스) 양쪽에서 호출(LiveDetailPresentable).
+-    /// isLandscape == nil이면 기존 stream 기반 isExtendedLayout 사용(비-회전 경로). 값이 주어지면 그 값을 extended로 사용.
+-    /// extended는 regular+regular(iPad 풀스크린)에서만 가능하며, 그 조건에서 isExtendedLayout 정의
++    /// isLandscape == nil이면 기존 stream 기반 supportsSplitLayout 사용(비-회전 경로). 값이 주어지면 그 값을 분할 여부로 사용.
++    /// 분할은 regular+regular(iPad 풀스크린)에서만 가능하며, 그 조건에서 supportsSplitLayout 정의
+     ///   (idiom != .phone && isLandscape && h==.regular)는 isLandscape로 환원된다.
+-    /// regular+regular가 아니면(향후 iPad 멀티태스킹 Split View, iPhone 등) extended=false로 초기화해 stale 레이아웃을 막는다.
++    /// regular+regular가 아니면(향후 iPad 멀티태스킹 Split View, iPhone 등) 분할을 끄고 초기화해 stale 레이아웃을 막는다.
+     func updateLayouts(isLandscape: Bool? = nil) {
+-        let canUseExtendedLayout =
++        let hasRegularSizeClasses =
+             view.traitCollection.horizontalSizeClass == .regular && view.traitCollection.verticalSizeClass == .regular
+ 
+-        let extended = canUseExtendedLayout ? (isLandscape ?? isExtendedLayout) : false
+-        updatePlayerConstraints(isExtendedLayout: extended)
+-        updateChannelScheduleConstraints(isExtendedLayout: extended)
+-        viewModel.isExtendedLayout = extended
++        let usesSplitLayout = hasRegularSizeClasses ? (isLandscape ?? supportsSplitLayout) : false
++        updatePlayerConstraints(usesSplitLayout: usesSplitLayout)
++        updateChannelScheduleConstraints(usesSplitLayout: usesSplitLayout)
++        viewModel.usesSplitLayout = usesSplitLayout
+     }
+ 
+-    private func updatePlayerConstraints(isExtendedLayout: Bool) {
++    private func updatePlayerConstraints(usesSplitLayout: Bool) {
+         guard playerContainer.superview != nil else { return }
+         playerContainer.snp.updateConstraints { make in
+-            make.width.equalToSuperview().offset(playerWidthOffset(isExtendedLayout: isExtendedLayout))
++            make.width.equalToSuperview().offset(playerWidthOffset(usesSplitLayout: usesSplitLayout))
+         }
+     }
+ 
+-    private func prepareChannelScheduleLayout(isExtendedLayout: Bool) {
++    private func prepareChannelScheduleLayout(usesSplitLayout: Bool) {
+         guard let channelScheduleView = channelScheduleViewController?.view, channelScheduleView.superview != nil else { return }
+ 
+-        if isExtendedLayout {
++        if usesSplitLayout {
+             channelScheduleView.snp.remakeConstraints { make in
+                 make.leading.height.width.equalTo(playerRightView)
+             }
+@@ -519,7 +519,7 @@ final class LiveDetailViewController: UIViewController, LiveDetailPresentable, L
+         }
+     }
+ 
+-    private func updateChannelScheduleTopConstraints(isExtendedLayout: Bool, isAttached: Bool) {
++    private func updateChannelScheduleTopConstraints(usesSplitLayout: Bool, isAttached: Bool) {
+         guard let channelScheduleView = channelScheduleViewController?.view, channelScheduleView.superview != nil else { return }
+         channelScheduleTopConstraints.forEach { $0.deactivate() }
+         channelScheduleTopConstraints = {
+@@ -529,7 +529,7 @@ final class LiveDetailViewController: UIViewController, LiveDetailPresentable, L
+                 }
+             }
+ 
+-            if isExtendedLayout {
++            if usesSplitLayout {
+                 return channelScheduleView.snp.prepareConstraints { $0.top.equalTo(playerRightView) }
+             }
+             return channelScheduleView.snp.prepareConstraints {
+@@ -540,8 +540,8 @@ final class LiveDetailViewController: UIViewController, LiveDetailPresentable, L
+         channelScheduleTopConstraints.forEach { $0.activate() }
+     }
+ 
+-    private func updateChannelScheduleConstraints(isExtendedLayout: Bool) {
+-        prepareChannelScheduleLayout(isExtendedLayout: isExtendedLayout)
+-        updateChannelScheduleTopConstraints(isExtendedLayout: isExtendedLayout, isAttached: channelScheduleViewController != nil)
++    private func updateChannelScheduleConstraints(usesSplitLayout: Bool) {
++        prepareChannelScheduleLayout(usesSplitLayout: usesSplitLayout)
++        updateChannelScheduleTopConstraints(usesSplitLayout: usesSplitLayout, isAttached: channelScheduleViewController != nil)
+     }
+ }
+diff --git a/Apps/Sources/iOS/ContentDetail/LiveDetail/View/LiveDetailView.swift b/Apps/Sources/iOS/ContentDetail/LiveDetail/View/LiveDetailView.swift
+index 65ef7931ef..92215d0db0 100644
+--- a/Apps/Sources/iOS/ContentDetail/LiveDetail/View/LiveDetailView.swift
++++ b/Apps/Sources/iOS/ContentDetail/LiveDetail/View/LiveDetailView.swift
+@@ -43,7 +43,7 @@ struct LiveDetailView: View {
+ 
+     var body: some View {
+         Group {
+-            if !viewModel.isExtendedLayout {
++            if !viewModel.usesSplitLayout {
+                 LiveDetailCompactLayout(
+                     viewModel: viewModel,
+                     delegate: delegate,
+@@ -52,7 +52,7 @@ struct LiveDetailView: View {
+                     namespace: namespace
+                 )
+             } else {
+-                LiveDetailExtendedLayout(
++                LiveDetailSplitLayout(
+                     viewModel: viewModel,
+                     delegate: delegate,
+                     bandScopeListener: bandScopeListener,
+@@ -64,7 +64,7 @@ struct LiveDetailView: View {
+         }
+         .animation(nil, value: isSkeletonOn)
+         .overlay {
+-            isSkeletonOn ? SkeletonLiveDetailView(isExtendedLayout: viewModel.isExtendedLayout) : nil
++            isSkeletonOn ? SkeletonLiveDetailView(usesSplitLayout: viewModel.usesSplitLayout) : nil
+         }
+         .transition(.opacity)
+         .animation(.easeInOut(duration: 0.3), value: isSkeletonOn)
+@@ -252,9 +252,9 @@ private struct LiveDetailCompactLayout: View, LiveDetailLayoutContent {
+     }
+ }
+ 
+-// MARK: - Extended Layout
++// MARK: - Split Layout
+ 
+-private struct LiveDetailExtendedLayout: View, LiveDetailLayoutContent {
++private struct LiveDetailSplitLayout: View, LiveDetailLayoutContent {
+     @ObservedObject var viewModel: LiveDetailViewModel
+     weak var delegate: LiveDetailPresentableListener?
+     weak var bandScopeListener: BandScopeListener?
+diff --git a/Apps/Sources/iOS/ContentDetail/LiveDetail/View/LiveDetailViewModel.swift b/Apps/Sources/iOS/ContentDetail/LiveDetail/View/LiveDetailViewModel.swift
+index d6538ded6c..177327ab77 100644
+--- a/Apps/Sources/iOS/ContentDetail/LiveDetail/View/LiveDetailViewModel.swift
++++ b/Apps/Sources/iOS/ContentDetail/LiveDetail/View/LiveDetailViewModel.swift
+@@ -29,7 +29,7 @@ protocol LiveListViewDelegate: AnyObject {
+ final class LiveDetailViewModel: ObservableObject {
+     typealias OutlinkButtons = (secondaryButtons: [OutlinkSecondaryButton], primaryButton: OutlinkPrimaryButton)
+ 
+-    @Published var isExtendedLayout: Bool = false
++    @Published var usesSplitLayout: Bool = false
+     @Published var tabs: [TopTab] = []
+     @Published var selectedTabId: TopTab.ID? = nil
+     @Published var liveHeader: LiveHeader?
+diff --git a/Apps/Sources/iOS/ContentDetail/LiveDetail/View/SkeletonLiveDetailView.swift b/Apps/Sources/iOS/ContentDetail/LiveDetail/View/SkeletonLiveDetailView.swift
+index 5c43d6ee24..7eba6dd4bf 100644
+--- a/Apps/Sources/iOS/ContentDetail/LiveDetail/View/SkeletonLiveDetailView.swift
++++ b/Apps/Sources/iOS/ContentDetail/LiveDetail/View/SkeletonLiveDetailView.swift
+@@ -36,7 +36,7 @@ struct LiveListSkeletonView: View {
+ }
+ 
+ struct SkeletonLiveDetailView: View {
+-    let isExtendedLayout: Bool
++    let usesSplitLayout: Bool
+ 
+     var headerView: some View {
+         VStack(alignment: .leading, spacing: 8) {
+@@ -78,7 +78,7 @@ struct SkeletonLiveDetailView: View {
+ 
+     var body: some View {
+         Group {
+-            if !isExtendedLayout {
++            if !usesSplitLayout {
+                 VStack(spacing: 0) {
+                     PlayerSkeletonView(contentMode: .fit)
+ 
+diff --git a/Apps/Sources/iOS/MainTab/Live/TV/TVInteractor.swift b/Apps/Sources/iOS/MainTab/Live/TV/TVInteractor.swift
+index 342ab60724..56878a7cfd 100644
+--- a/Apps/Sources/iOS/MainTab/Live/TV/TVInteractor.swift
++++ b/Apps/Sources/iOS/MainTab/Live/TV/TVInteractor.swift
+@@ -95,7 +95,7 @@ protocol TVPresentable: Presentable, ToastPresentable, Reloadable {
+     func updateLastVisibleBands()
+ 
+     /// 회전 stream 등 viewWillTransition 미발생 경로(슬립→회전→wake, 백그라운드 복귀)에서 호출.
+-    /// isLandscape == nil이면 ViewController의 stream 기반 isExtendedLayout 사용.
++    /// isLandscape == nil이면 ViewController의 stream 기반 supportsSplitLayout 사용.
+     func updateLayouts(isLandscape: Bool?)
+ 
+     var verticalScrollStoppedSubject: PublishSubject<Void> { get }
+diff --git a/Apps/Sources/iOS/MainTab/Live/TV/TVViewController.swift b/Apps/Sources/iOS/MainTab/Live/TV/TVViewController.swift
+index 0e6ec8a3fb..8da58a91af 100644
+--- a/Apps/Sources/iOS/MainTab/Live/TV/TVViewController.swift
++++ b/Apps/Sources/iOS/MainTab/Live/TV/TVViewController.swift
+@@ -127,7 +127,7 @@ final class TVViewController: UIViewController, TVPresentable, TVViewControllabl
+     }
+ 
+     // MARK: - TVPresentable
+-    var isExtendedLayout: Bool {
++    var supportsSplitLayout: Bool {
+         let isLandscape = listener?.isLandscape ?? false
+         let isRegularSize = traitCollection.horizontalSizeClass == .regular
+ 
+@@ -399,13 +399,13 @@ final class TVViewController: UIViewController, TVPresentable, TVViewControllabl
+ 
+     /// 레이아웃 재적용 진입점. viewWillTransition(회전 경로), viewDidLoad/viewWillAppear(비-회전 경로),
+     /// 인터랙터 orientation 구독(viewWillTransition 미발생 wake/복귀 케이스) 양쪽에서 호출(TVPresentable).
+-    /// isLandscape == nil이면 stream 기반 `isExtendedLayout`(기존 동작), 값이 주어지면 그 값을 extended 판정에 사용.
++    /// isLandscape == nil이면 stream 기반 `supportsSplitLayout`(기존 동작), 값이 주어지면 그 값을 분할 판정에 사용.
+     /// 근거: 이 gate(h==.regular && v==.regular)는 iPad 풀스크린에서만 통과하며, 그 조건에서
+-    ///   `isExtendedLayout` 정의(idiom != .phone && isLandscape && h==.regular)는 isLandscape로 환원된다.
++    ///   `supportsSplitLayout` 정의(idiom != .phone && isLandscape && h==.regular)는 isLandscape로 환원된다.
+     func updateLayouts(isLandscape: Bool? = nil) {
+         if view.traitCollection.horizontalSizeClass == .regular && view.traitCollection.verticalSizeClass == .regular {
+-            let extended = isLandscape ?? isExtendedLayout
+-            tvViewModel.isExtendedLayout = extended
++            let usesSplitLayout = isLandscape ?? supportsSplitLayout
++            tvViewModel.usesSplitLayout = usesSplitLayout
+         }
+     }
+ 
+diff --git a/Apps/Sources/iOS/MainTab/Live/TV/View/TVView.swift b/Apps/Sources/iOS/MainTab/Live/TV/View/TVView.swift
+index 785607e352..8d741cc291 100644
+--- a/Apps/Sources/iOS/MainTab/Live/TV/View/TVView.swift
++++ b/Apps/Sources/iOS/MainTab/Live/TV/View/TVView.swift
+@@ -27,7 +27,7 @@ protocol TVViewModelDelegate: AnyObject {
+ }
+ 
+ final class TVViewModel: ObservableObject {
+-    @Published var isExtendedLayout: Bool = false
++    @Published var usesSplitLayout: Bool = false
+     @Published var categories: [ChipCategoryFilterItem] = []
+     @Published var bandType: BandType?
+     @Published var playerAdapter: PlayerAdapter?
+@@ -465,7 +465,7 @@ struct TVView: View {
+                         emptyView
+                     } else {
+                         if viewModel.bandType == .live_list {
+-                            if viewModel.isExtendedLayout {
++                            if viewModel.usesSplitLayout {
+                                 HStack(alignment: .top) {
+                                     listPlayerOverlayView
+                                     liveListBoard
+@@ -644,7 +644,7 @@ extension TVView {
+             if viewModel.bandType == .live_list {
+                 LiveListSkeletonView(listCount: 20)
+                     .apply({ view in
+-                        if viewModel.isExtendedLayout {
++                        if viewModel.usesSplitLayout {
+                             view
+                                 .frame(width: 390)
+                                 .frame(maxHeight: .infinity)
