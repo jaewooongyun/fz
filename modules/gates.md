@@ -256,7 +256,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 | 미충족 있음 | **0** | 작업 중 원장이 미충족인 것은 **정상 상태**다. exit 에 반영하면 원장 있는 모든 세션에서 검사가 빨개져 사람이 health-check 를 안 돌리게 된다(`lint_doc_freshness` 선례 — findings 가 있어도 exit 0, 건수만 보고) |
 | 원장 계약 위반 | **3** | fz 가 만든 원장이 자기 계약을 어긴 것은 plugin 자산 결함이고, 그것이 health-check 의 관심사다 |
 
-⛔ **원장 발견은 판정기가 소유한다** — `find_ledgers()`. hook 과 health-check 가 **같은 함수**를 쓴다. 두 곳이 각자 찾으면 한쪽이 놓치는 배치가 생긴다(깊이 2만 보던 결함이 정확히 그것이었다). 린터의 선례와 같은 원칙이다(`lint_contracts.py:804`).
+⛔ **원장 발견은 판정기가 소유한다** — `find_ledgers()`. hook 과 health-check 가 **같은 함수**를 쓴다. 두 곳이 각자 찾으면 한쪽이 놓치는 배치가 생긴다(깊이 2만 보던 결함이 정확히 그것이었다). 린터의 선례와 같은 원칙이다(`lint_contracts.py` 의 `n6_ok()` — chk_N6 와 self-test 가 같은 함수를 쓴다).
 
 `tests` 는 탐색에서 제외한다 — fixture 원장은 테스트 자산이고 작업 원장이 아니다.
 

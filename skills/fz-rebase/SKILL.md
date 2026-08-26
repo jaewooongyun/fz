@@ -249,7 +249,7 @@ abort가 없고 `--skip`은 현재 커밋을 통째로 버린다. 라벨이 이�
 리베이스 진행 중인 동안 반복:
   a. RM="$(git rev-parse --git-path rebase-merge)"; RA="$(git rev-parse --git-path rebase-apply)"
      둘 다 없으면 완료 — 루프 종료
-     ⛔ `.git/rebase-merge`를 리터럴로 쓰지 않는다. linked worktree에서 .git은 파일이다 [verified: `verify-rebase.sh:53` 주석이 같은 이유로 `git rev-parse --git-dir`을 쓴다]
+     ⛔ `.git/rebase-merge`를 리터럴로 쓰지 않는다. linked worktree에서 .git은 파일이다 [verified: `verify-rebase.sh` 의 `STATE_DIR=` 줄 주석이 같은 이유로 `git rev-parse --git-dir`을 쓴다]
   b. `git diff --name-only --diff-filter=U -z` — 지금 replay 중인 커밋의 미해결 충돌
   c. 목록이 비어 있으면 `git rebase --continue`
      → exit 0이면 a로 (다음 커밋 replay에서 새 충돌이 날 수 있다 — continue는 종료가 아니다)

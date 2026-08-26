@@ -47,7 +47,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -59,6 +59,25 @@ case "$LINT_CODE" in
   1) record "계약 lint"      1 "위반 있음 — 아래 상세" ;;
   *) record "계약 lint" "$LINT_CODE" "⛔ configuration/parse error — 검사기 자체 고장 (PASS도 SKIP도 아님)" ;;
 esac
+
+# ── 1.5 diff 파서 hunk 상태 선언
+#    ⛔ 신설 근거: 같은 결함이 한 세션에 4번 났다 — hunk 안팎에서 뜻이 다른 `+`/`-` 접두사를
+#       상태 없이 판정. 정답이 같은 디렉터리에 이미 있었는데 3곳이 각자 다시 틀렸다.
+#       변경 규모가 auto-tier 입력이라 유실은 **낮은 Tier 로 기우는** 형태로 조용히 나타난다.
+#    ⛔ self-test 선행 — 검사기 고장(exit≠0)을 "위반 0건"으로 읽지 않는다.
+DP_SELF="$(python3 "$ROOT/scripts/lint_diff_parsers.py" --self-test 2>&1)"; DP_SELF_CODE=$?
+if [ "$DP_SELF_CODE" -ne 0 ]; then
+  record "diff 파서 선언" 2 "⛔ 검사기 self-test 실패 — 판정 불가 ($(printf '%s\n' "$DP_SELF" | tail -1))"
+  UNRUN=$((UNRUN+1))
+else
+  DP_OUT="$(python3 "$ROOT/scripts/lint_diff_parsers.py" 2>&1)"; DP_CODE=$?
+  DP_N="$(printf '%s\n' "$DP_OUT" | grep -c '  ⛔ ' || true)"
+  case "$DP_CODE" in
+    0) record "diff 파서 선언" 0 "선언 누락 0건 · self-test $(printf '%s\n' "$DP_SELF" | tail -1)" ;;
+    1) record "diff 파서 선언" 1 "⛔ 선언 누락 ${DP_N}건 — 첫 40행에 \`# diff-parse:\` 1줄" ;;
+    *) record "diff 파서 선언" "$DP_CODE" "⛔ UNKNOWN(읽기 실패) 포함 — 통과로 읽지 않는다" ;;
+  esac
+fi
 
 # ── 2. workflow model·effort 명시
 MODEL_OUT="$(bash "$ROOT/scripts/lint-model-explicit.sh" 2>&1)"; MODEL_CODE=$?
