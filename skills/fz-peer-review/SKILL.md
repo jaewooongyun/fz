@@ -115,6 +115,7 @@ bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/gather.sh" \
 
 산출: `diff.patch` · `requirements.md` · `base-behavior.md` + `base/` · `base-manifest.tsv` · **`review-surface.md`** · `numstat.txt` · `risk.json`
 
+⭐ 이동 리팩토링(신규 파일 + 그만큼의 삭제)이면 **`evidence-move-drift.md`** 가 함께 나온다 — ⛔ **동등성과 별개 축**이다. 다중집합 차가 "값 표현식 변화 0" 을 보여도 이동이 만든 문서·구조 드리프트는 거기 없다(실측 #4774: 동등성 통과 후 단독 리뷰 0건 · 3렌즈가 regression 3건).
 
 ⛔ **손으로 나눠 호출하지 않는다.** 병목은 fan-out 이 아니라 Lead 의 순차 도구 호출이다 — 결정론 구간을 한 번에 끝낸다. exit `2` 사용법 · `3` 대상 해석 실패 · `4` 수집 실패 — 셋 다 **산출물을 남기지 않는다**(staging 경유). ⛔ exit **`5`** 는 다르다: **base 원본 전건 실패**이고 **산출물을 남긴다**(diff 는 유효하고 origin 근거만 없다). 진행 여부는 Lead 판단, 진행하면 전 issue `origin` 을 `미지정` 으로 둔다 — 2·3·4 처럼 지우지 않는다.
 
