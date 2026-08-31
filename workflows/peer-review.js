@@ -268,7 +268,7 @@ function crossIndex(sources) {
   return byId
 }
 
-// ⛔ 갈리면 **고르지 않는다.** Tier 2 는 투표하지 않으므로(gates.md § MergeContract § 9)
+// ⛔ 갈리면 **고르지 않는다.** Tier 2 는 투표하지 않으므로(modules/peer-review-gates.md § MergeContract § 9)
 //    여기서 승자를 정하면 계약 밖에서 투표하는 셈이다 — `contested` 로 표시해 Lead 에 넘긴다.
 function crossFields(entries) {
   if (!entries || entries.length === 0) return { crossVerdict: 'unreviewed' }
