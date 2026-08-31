@@ -4,7 +4,7 @@ description: >-
   롱텀 브랜치 리베이스 최신화. tracking remote pull(ff) → base 리베이스(머지 커밋 보존) → force-push(lease).
   양방향 조용한 유실 게이트 포함 — 내 변경 소실(커밋 드롭·머지 해결 미재적용·파일 이동·삭제 되살아남) / 팀원 변경 덮어쓰기(충돌 해결 역전·무충돌 적용·force-push 파괴).
   예: 브랜치 최신화, feature 브랜치 develop 위로 리베이스, 롱텀 브랜치 동기화, 리베이스 후 변경 사라짐
-  (비사용: 일반 커밋 →fz-commit / PR 생성 →fz-pr / 코드 되돌리기 →fz-fix)
+  (비사용: 일반 커밋 · PR 생성 · 코드 되돌리기 — 이 스킬은 리베이스 최신화 전용)
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[--onto <base>] [--branch <name>]"
@@ -27,16 +27,16 @@ intent-triggers:
 
 ## 규칙 참조
 
-- CLAUDE.md `## Git & PR Conventions` — fork 기반(origin=개인 fork, upstream=회사 repo). 이 스킬 호출 자체가 "git 작업 명시 요청"이지만, force-push는 그 안에서도 추가 확인을 받는다.
-- 롱텀 브랜치는 소유자가 유지하는 브랜치다 — 예: `feature/tvod`는 사용자 소유 롱텀 브랜치라 `upstream`으로의 force-push가 예외적으로 허용된다. 이는 **default가 아니라 소유 브랜치 예외**다.
+- 프로젝트에 지침 파일(`CLAUDE.md`·`AGENTS.md` 등)이 있으면 그 git 규약을 따른다 — 특히 fork 기반인지(origin=개인 fork, upstream=공유 repo) 확인한다. 이 스킬 호출 자체가 "git 작업 명시 요청"이지만, force-push는 그 안에서도 추가 확인을 받는다.
+- 롱텀 브랜치의 force-push 대상은 기본적으로 `origin`(개인 fork)이다. 공유 원격(팀 repo)으로의 force-push는 **그 브랜치의 소유자가 명시적으로 승인한 경우에만** 한다 — 이 스킬은 그 승인을 확인하지 않으므로, 대상 원격이 공유 repo이면 소유권을 사용자에게 되묻는다.
 - 롱텀 브랜치에는 **팀원도 직접 push한다**. 즉 내 리베이스는 남의 커밋을 지날 수 있고, 내 force-push는 남의 커밋을 지울 수 있다 — 양방향 게이트가 필요한 이유.
 
 ## 사용 시점
 
 ```bash
-/fz-rebase                       # 현재 브랜치를 tracking remote pull → 기본 base(develop) 리베이스 → force-push
-/fz-rebase --onto release/26.31  # develop 대신 release 브랜치 위로 리베이스
-/fz-rebase --branch feature/tvod # 다른 롱텀 브랜치 지정 (체크아웃 상태여야 함)
+/fz-rebase                       # 현재 브랜치를 tracking remote pull → base 리베이스(아래 사다리로 해석) → force-push
+/fz-rebase --onto release/1.2    # 해석된 base 대신 release 브랜치 위로 리베이스
+/fz-rebase --branch feature/foo  # 다른 롱텀 브랜치 지정 (체크아웃 상태여야 함)
 ```
 
 ## 워크플로우
@@ -56,14 +56,34 @@ intent-triggers:
 ```bash
 git fetch --all --prune                                  # fetch-first (항상)
 LTB=<--branch 또는 현재 브랜치>                          # long-term branch
-TRACK=$(git rev-parse --abbrev-ref "${LTB}@{upstream}")  # 예: upstream/feature/tvod → 원격=upstream
+TRACK=$(git rev-parse --abbrev-ref "${LTB}@{upstream}")  # 예: upstream/feature/foo → 원격=upstream
 PRIMARY=<upstream 원격 존재 시 upstream, 아니면 origin>
-BASE=<--onto 또는 기본 "${PRIMARY}/develop">
+BASE=<--onto 또는 아래 사다리>
 PUSH_REMOTE=<TRACK의 원격 부분>
 ```
 
-> 표기 규약: `<FZ_ROOT>` = fz-plugin 루트 (예: `claude plugin path fz` 결과). 사용자가 본인 설치 경로로 치환.
-> 스크립트 경로: `<FZ_ROOT>/skills/fz-rebase/scripts/verify-rebase.sh` (이하 `$VR`)
+`--onto`가 없을 때 BASE는 **ref가 실재하는지**로 정한다.
+
+```bash
+BASE="$(git config --get fz-rebase.base || true)"          # ① 프로젝트가 정한 값
+if [ -z "$BASE" ]; then
+  if git rev-parse --verify -q "${PRIMARY}/develop" >/dev/null; then
+    BASE="${PRIMARY}/develop"                               # ② 실재하면 사용
+  else
+    BASE=""                                                 # ③ 사용자에게 확인
+  fi
+fi
+```
+
+③에서는 `git branch -r` 목록을 보이고 `AskUserQuestion`으로 받는다. 두 가지를 지킨다.
+
+- ⛔ **remote HEAD(`git symbolic-ref refs/remotes/*/HEAD`)를 정답으로 쓰지 않는다.** 기본 선택으로도 두지 않는다 — 배포 전용 브랜치를 가리키는 리포가 있고, 그 위로 리베이스하면 개발 브랜치의 커밋이 base에서 빠진 채 **게이트가 전부 통과한다**. 세 버킷은 "base 대비 보존"만 보고 "base가 옳은가"는 보지 않는다.
+- 이름이 `main`·`master`·`release/*`인 후보에는 배포 브랜치일 수 있다고 표시한다. ⛔ 자동 배제는 하지 않는다 — 팀마다 브랜치 운용이 달라 이름 기반 판정은 또 다른 오판이 된다.
+
+> 스크립트 경로: 스킬 주입 헤더 `Base directory for this skill: <경로>` 의 그 경로가 이 스킬의 디렉토리다.
+> `$VR` = `<그 경로>/scripts/verify-rebase.sh` 로 **절대경로를 1회 확정**한 뒤 쓴다.
+> ⛔ 헤더가 없으면 추측하지 않는다 — 사용자에게 설치 경로를 묻는다. 잘못된 경로로 진행하면 게이트 없는 리베이스가 된다.
+> 흔한 두 곳: `~/.claude/skills/fz-rebase/scripts/` (스킬 단독 설치) · `$(claude plugin path fz)/skills/fz-rebase/scripts/` (플러그인 경유).
 
 ---
 
@@ -79,7 +99,7 @@ PUSH_REMOTE=<TRACK의 원격 부분>
 
 - 세 버킷이 모든 경로를 덮으므로 **텍스트·바이너리·mode·symlink·gitlink·추가·삭제·이동**이 열거 없이 판정 범위에 들어온다.
 - base 측 이동(A→B)은 분할 **전에** 매핑한다. 안 하면 팀원의 정당한 rename에서 내 hunk가 새 경로에 착지한 것을 위반으로 오판한다. 매핑 후 옛 경로 A는 버킷②로 떨어져 "부재여야 함"이 되므로 **옛 경로 dead code 부활**이 자동으로 잡힌다.
-- OVERLAP만이 사람 판정 대상이고, 그 크기는 작다 [실측 `feature/tvod`: 내 변경 300파일 중 OVERLAP 0~4개].
+- OVERLAP만이 사람 판정 대상이고, 그 크기는 작다 [실측: 내 변경 300파일 규모의 롱텀 브랜치에서 OVERLAP 0~4개].
 - 버킷③ 라인 4방향: ①내 추가가 트리에 없음 ②내 삭제가 되살아남 ③팀원 추가가 트리에 없음 ④팀원 삭제가 되살아남. ②는 base가 다시 추가한 라인을, ④는 내가 다시 추가한 라인을 제외한다 — 그건 상대의 결정이지 유실이 아니다.
 
 ### 커버리지 (13/15) — 비대상 2건 명시
@@ -282,7 +302,7 @@ audit은 **리베이스 후**에만 유효하다. base가 아직 POST의 조상�
 
 실규모 참고 [실측: 커밋 142 · 변경 300파일 · 추적 3,214파일]: `snapshot` 0.4s / `audit` 0.4s.
 
-git 레벨 검증은 **내용 동일성**까지다. 내 변경이 살아있으나 의미상 죽은 코드가 된 경우(예: 팀원이 호출부를 제거)는 잡지 못한다 — OVERLAP이 있거나 팀원이 구조를 바꿨다면 빌드/실행 확인을 사용자에게 권한다. ⛔ 이때 plain CLI `xcodebuild`는 쓰지 않는다 (Package.resolved churn·의존성 실패 유발) — Xcode 또는 워크트리 빌드 레시피로 안내한다.
+git 레벨 검증은 **내용 동일성**까지다. 내 변경이 살아있으나 의미상 죽은 코드가 된 경우(예: 팀원이 호출부를 제거)는 잡지 못한다 — OVERLAP이 있거나 팀원이 구조를 바꿨다면 빌드/실행 확인을 사용자에게 권한다. ⛔ 빌드 방법은 **그 프로젝트의 규칙을 따른다** — 프로젝트가 특정 빌드 경로를 금지하면(예: iOS 레포에서 plain CLI `xcodebuild`가 Package.resolved churn을 만드는 경우) 그 규칙이 우선이다.
 
 ### Step 4 — 원격 파괴 게이트 + force-push (확인 게이트)
 
@@ -301,13 +321,13 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 
 게이트 통과 후 아래를 제시하고 승인받는다:
 - 대상: `${PUSH_REMOTE} ${LTB}` / lease 타겟 해시와 로컬 HEAD / 덮어써지는 커밋 수(양방향)
-- `${PUSH_REMOTE}`가 `upstream`(회사 repo)이면 소유 롱텀 브랜치 예외임을 명시 — 일반 브랜치라면 force-push 대상이 origin(fork)이어야 한다.
+- `${PUSH_REMOTE}`가 공유 원격(팀 repo)이면 그 브랜치의 소유자 승인이 있는지 사용자에게 확인한다 — 승인이 없으면 force-push 대상은 `origin`(개인 fork)이어야 한다.
 
 승인 후: `git push "${PUSH_REMOTE}" "${LTB}" --force-with-lease=<원격브랜치>:<실측 해시>` → 완료 시 `git rev-list --left-right --count ${LTB}...${TRACK}`이 `0  0`인지 확인. lease를 실측 해시로 명시 pin하는 이유: 기본 lease는 로컬 tracking ref를 신뢰하므로, 그 ref가 stale이면 보호가 무력하다.
 
-## TVING/Tuist 고유 지식
+## Tuist 프로젝트 주의사항
 
-- develop은 Tuist 전환됨 — githooks가 리베이스 중 구조 변경 감지 시 `tuist generate`를 자동 실행한다(정상 동작). 이 출력이 L1의 드롭 경고를 가리므로 로그를 흘려보내지 않는다.
+- Tuist 를 쓰는 프로젝트에서는 githooks 가 리베이스 중 구조 변경 감지 시 `tuist generate`를 자동 실행한다(정상 동작). 이 출력이 L1의 드롭 경고를 가리므로 로그를 흘려보내지 않는다.
 - pbxproj는 git 미추적(Tuist 생성)이라 구브랜치 리베이스 시 modify/delete 충돌이 반복될 수 있다 → 해당 pbxproj/Package.resolved는 **삭제 수용을 권고**한다. ⛔ 다만 3-C의 확인 절차를 건너뛰지 않는다 — 그 파일의 질문에서 대가를 밝히고 사용자가 고른 뒤에 `git rm`하며, 그 stop의 U 목록이 모두 해소된 뒤에만 continue한다.
 - ⚠️ 위 `git rm` 습관은 **L3/L5의 발생 경로**이기도 하다 — 생성물이 아닌 파일에 같은 해소를 적용하면 내 변경이나 팀원 변경이 조용히 사라진다. 삭제 수용은 Tuist 생성물에 한정하고, 나머지는 Step 3.5가 판정한다. xcstrings는 우리 추가와 타 기능 삭제가 라인 단위로 섞이므로 충돌 해결 후 중복 키 검사가 필요하다.
 
@@ -329,7 +349,7 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 
 ### Functional
 
-회귀 oracle: `bash <FZ_ROOT>/skills/fz-rebase/scripts/test-gates.sh` (73 assertion).
+회귀 oracle: `bash <스킬 디렉토리>/scripts/test-gates.sh` (78 assertion).
 구성은 유실 검출 · 오경보 방지 · **SKILL 정적 계약**(K 계열) 셋이다. 셋째는 충돌 확인 절차가
 문서에서 사라지는 것을 잡는다 — 그 절차는 스크립트가 아니라 프롬프트라 동작 oracle이 없다.
 
@@ -372,9 +392,9 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 - 내용 게이트·원격 게이트를 건너뛴 force-push → 항상 게이트
 - 개수만 보고 "유실 없음" 판정 → 분할 불변식이 정본
 - 커밋 메타데이터·stash 유실 검증 → 비대상(위 커버리지 참조)
-- CLI `xcodebuild`로 빌드 검증 → Xcode/워크트리 레시피 안내만
-- 일반 브랜치를 `upstream`(회사 repo)에 force-push → origin(fork) 대상 (upstream은 소유 롱텀 브랜치 예외)
-- 커밋 생성 → `/fz-commit` · PR 생성 → `/fz-pr` · 코드/커밋 되돌리기 → `/fz-fix`
+- 프로젝트가 금지한 빌드 경로로 검증 → 그 프로젝트의 빌드 레시피 안내만
+- 소유자 승인이 확인되지 않은 브랜치를 공유 원격(팀 repo)에 force-push → `origin`(fork) 대상
+- 커밋 생성 · PR 생성 · 코드/커밋 되돌리기 — 이 스킬의 범위 밖이다 (fz 플러그인 환경이면 `/fz-commit`·`/fz-pr`·`/fz-fix`)
 
 ## 에러 대응
 
@@ -416,5 +436,5 @@ bash "$VR" prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 - 커밋 수·버킷 판정·경로 착지 등 사실 주장 전 `verify-rebase.sh` 또는 `git` 실측 결과를 근거로 제시한다. 스냅샷 없이 "유실 없음"을 말하지 않는다 — 기준선이 없으면 판정 자체가 불가하다.
 - "누락 없음"은 분할이 경로 합집합을 덮는다는 **구조**로 말하고, 커버리지는 13/15 + 비대상 2건 명시로 말한다. 열거식 "다 확인했다"는 쓰지 않는다.
 - force-push 완료를 보고하기 전 `git rev-list --left-right --count`로 동기화(0/0)를 확인한다.
-- 게이트 자체의 회귀 검증: `bash <FZ_ROOT>/skills/fz-rebase/scripts/test-gates.sh` (스크립트 **또는 SKILL.md** 수정 시 실행). 유실 검출과 **오경보 방지**를 동등하게 검사한다 — 후자가 깨지면 게이트는 노이즈가 되어 무시된다. ⛔ `assert()`는 exit code만 보므로 새 WARN 경로는 `assert_no_warn`으로 따로 검사해야 한다.
-- 참조: `modules/uncertainty-verification.md` (Default-Deny).
+- 게이트 자체의 회귀 검증: `bash <스킬 디렉토리>/scripts/test-gates.sh` (스크립트 **또는 SKILL.md** 수정 시 실행). 유실 검출과 **오경보 방지**를 동등하게 검사한다 — 후자가 깨지면 게이트는 노이즈가 되어 무시된다. ⛔ `assert()`는 exit code만 보므로 새 WARN 경로는 `assert_no_warn`으로 따로 검사해야 한다.
+- 미검증 주장은 기본적으로 거부한다(Default-Deny) — 근거를 지목할 수 없는 항목은 `[미검증: 이유]`로 표기하고 사실처럼 쓰지 않는다.
