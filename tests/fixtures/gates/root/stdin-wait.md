@@ -1,5 +1,5 @@
 # Gates: stdin 대기
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: CHECK 가 stdin 을 읽으려 하면 즉시 끝나야 한다
 

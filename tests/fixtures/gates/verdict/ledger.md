@@ -1,5 +1,5 @@
 # Gates: 판정 대조 대상
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 게이트 3개 — 응답이 전수 판정했는지 본다
 

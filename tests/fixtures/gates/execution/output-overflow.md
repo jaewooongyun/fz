@@ -1,5 +1,5 @@
 # Gates: 출력 상한 초과
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 앞부분에 실패 진단이 있고 뒤로 대량 출력이 이어진다
 

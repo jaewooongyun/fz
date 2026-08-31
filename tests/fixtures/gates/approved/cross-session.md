@@ -1,5 +1,5 @@
 # Gates: 환경 안정성
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 승인 도장은 환경에 흔들리지 않고 증거 서명은 환경을 반영해야 한다
 

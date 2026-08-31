@@ -1,5 +1,5 @@
 # Gates: 손자 프로세스 잔존
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 부모가 먼저 끝나고 손자가 파이프를 붙잡는다
 

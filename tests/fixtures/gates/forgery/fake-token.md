@@ -1,5 +1,5 @@
 # Gates: MANUAL 토큰 위조
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: CRITERION_HASH 는 원장에 적힌 공개값이라 복사할 수 있다
 

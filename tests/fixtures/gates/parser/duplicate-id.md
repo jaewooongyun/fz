@@ -1,5 +1,5 @@
 # Gates: 중복 id
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 같은 id 가 두 번 나온다
 

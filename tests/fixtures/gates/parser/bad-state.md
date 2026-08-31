@@ -1,5 +1,5 @@
 # Gates: 미지 STATE
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: in_progress
 Scope: 셋 중 하나가 아닌 상태값
 

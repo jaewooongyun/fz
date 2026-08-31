@@ -1,5 +1,5 @@
 # Gates: 승인 후 oracle 교체
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 APPROVED: yes
 Scope: 도장을 받은 뒤 CHECK 를 쉬운 것으로 바꿨다

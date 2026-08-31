@@ -1,5 +1,5 @@
 # Gates: 경계 합성으로 인한 조기 kill
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: stdout=he · stderr=llo 가 먼저 나오고 3초 뒤 진짜 hello 가 stderr 로 온다
 

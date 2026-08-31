@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "ledger": "/Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates/verdict/ledger.md",
+  "ledger": "/Users/example/dev/fz-plugin/tests/fixtures/gates/verdict/ledger.md",
   "gates": [
     {
       "id": "G1",

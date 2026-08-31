@@ -1,5 +1,5 @@
 # Gates: 정규식 기대값
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 지원하지 않는 정규식 문법
 

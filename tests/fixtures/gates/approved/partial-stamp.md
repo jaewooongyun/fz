@@ -1,5 +1,5 @@
 # Gates: 부분 도장
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 APPROVED: yes
 Scope: 확정본인데 한 게이트만 도장이 있다

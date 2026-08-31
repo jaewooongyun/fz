@@ -1,5 +1,5 @@
 # Gates: 실행 cwd 가 정규 경로인가
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 검증은 realpath 로 하고 실행은 헤더 원문으로 하면 그 사이 심볼릭을 돌릴 수 있다
 

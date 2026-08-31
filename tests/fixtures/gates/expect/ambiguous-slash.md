@@ -1,5 +1,5 @@
 # Gates: 양끝 슬래시 EXPECT
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 디렉토리 경로와 무플래그 정규식이 같은 모양이다
 

@@ -1,5 +1,5 @@
 # Gates: 게이트 밖 속성
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 게이트 줄이 빠져 속성만 떠 있다
 

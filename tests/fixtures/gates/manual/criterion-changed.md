@@ -1,5 +1,5 @@
 # Gates: 확인 조건 변경
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 48pt 로 확인받은 뒤 조건이 64pt 로 바뀌었다
 

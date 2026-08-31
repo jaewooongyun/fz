@@ -1,5 +1,5 @@
 # Gates: 정상 통과
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: exit 0 이고 EXPECT 가 매치한다
 

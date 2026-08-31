@@ -1,5 +1,5 @@
 # Gates: 통과하면서 프로세스를 남긴다
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: exit 0 + EXPECT 매칭인데 손자가 계속 산다
 

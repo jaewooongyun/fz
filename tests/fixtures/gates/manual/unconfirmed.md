@@ -1,5 +1,5 @@
 # Gates: 미확인 MANUAL
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 체크는 됐으나 사용자 확인 토큰이 없다
 

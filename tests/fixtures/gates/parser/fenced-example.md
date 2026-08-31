@@ -1,5 +1,5 @@
 # Gates: 펜스 안의 게이트 모양
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 원장이 자기 문법을 문서 예시로 담는다
 

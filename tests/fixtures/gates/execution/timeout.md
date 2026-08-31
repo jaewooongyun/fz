@@ -1,5 +1,5 @@
 # Gates: 타임아웃
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: deadline 을 넘긴다
 

@@ -1,5 +1,5 @@
 # Gates: closed 원장
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: closed
 Scope: 닫힌 원장은 실행되지 않는다
 

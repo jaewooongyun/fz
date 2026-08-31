@@ -1,5 +1,5 @@
 # Gates: ROOT 중복 선언
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 ROOT: /etc
 STATE: active
 Scope: 실행 디렉토리를 바꾸려는 시도

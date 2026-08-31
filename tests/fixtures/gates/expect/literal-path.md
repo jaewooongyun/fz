@@ -1,5 +1,5 @@
 # Gates: 경로 리터럴 EXPECT
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: /tmp/result 같은 절대경로 문자열을 기대하는 정당한 게이트
 

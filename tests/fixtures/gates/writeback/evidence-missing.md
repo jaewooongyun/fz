@@ -1,5 +1,5 @@
 # Gates: EVIDENCE 라인 부재
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: EVIDENCE 라인이 없는 게이트를 통과시켰을 때 삽입되는가
 

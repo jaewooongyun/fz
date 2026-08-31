@@ -1,5 +1,5 @@
 # Gates: 미충족 원장
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates/discover/unmet-work
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates/discover/unmet-work
 STATE: active
 Scope: 진행 중 — 미충족은 정상 상태다
 

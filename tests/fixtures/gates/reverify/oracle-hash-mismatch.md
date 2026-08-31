@@ -1,5 +1,5 @@
 # Gates: 승인 후 oracle 변조
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 문법은 유효하나 APPROVED_ORACLE_HASH 가 현재 oracle 과 어긋난다
 

@@ -1,5 +1,5 @@
 # Gates: EXPECT 누락
-ROOT: /Users/jaewoongyun/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: 실행 게이트인데 기대값이 없다
 
