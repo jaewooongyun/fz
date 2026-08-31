@@ -117,6 +117,8 @@ const input = (() => {
   return null
 })()
 
+// >>> PURE:null-count — 아래 블록은 `tests/workflows/d6-null-count-semantics.js` 가 런타임 추출한다.
+//     외부 의존은 주입 가능한 agent·log·parallel 셋뿐이다. 마커를 지우면 그 테스트가 죽는다.
 let agentCalls = 0
 let nullCalls = 0
 let fallbackCount = 0
@@ -149,6 +151,7 @@ async function parallelWithRetry(thunks) {
   }
   return out
 }
+// <<< PURE:null-count
 
 // ── Stage 2 트리거 (D1 조건부 실행) ─────────────────────────────────────
 // ⛔ 스키마를 늘리지 않는다. 렌즈는 자기 관점만 보므로 "전체 verdict" 를 요구하는 것은
