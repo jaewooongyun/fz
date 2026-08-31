@@ -317,7 +317,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - Codex prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
 
 ### Synthesize
-⛔ **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계). Codex 호출이 있으므로 **Reflection Rate** 도 산출 — ⛔ `N<10` 은 preliminary, verdict 없음. 목록: `gates.md` § 경량 경로.
+⛔ **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계). Codex 호출이 있으므로 **Reflection Rate** 도 산출 — ⛔ `N<10` 은 preliminary, verdict 없음. 목록: `modules/peer-review-gates.md` § 경량 경로.
 
 ⛔ **병합·판정 규칙은 `modules/peer-review-gates.md` § MergeContract 를 따른다.**
 아래는 그 계약의 Tier 1 적용 요약이며, 어긋나면 계약이 이긴다.
