@@ -287,6 +287,22 @@ if [ -n "$DRIFT_RANGE" ] && git show "$DRIFT_RANGE" >/dev/null 2>&1; then
   rm -f "$STAGE_DIR/.drift-src.patch"
 fi
 
+# ── 리뷰 표면 patch (중복 커밋 제외) ────────────────────────────
+# ⛔ 신설 근거: `review-surface.md` 는 중복 커밋을 **진단**하지만 커밋 해시·제목만 담는다.
+#    렌즈는 Bash·git 이 없어(`peer-review.js` OVERRIDE) 그 해시로 hunk 를 필터할 수 없다 —
+#    판정을 넘겨도 렌즈 입력은 부풀려진 `diff.patch` 그대로였다.
+#    ⭐ 조언("`git show <+ 커밋>` 또는 rebase 후 재수집")도 렌즈가 할 수 없는 일이다.
+# ⛔ 신규 로직 0 — 위 DRIFT_RANGE(= `+` 커밋 범위)를 그대로 재사용한다.
+# ⛔ diff.patch 를 덮지 않는다 — 원본은 Tier·numstat·risk_scan 의 입력이고 그 판정은 별 축이다.
+if [ -n "$DRIFT_RANGE" ] && [ "${dup:-0}" -gt 0 ]; then
+  if git diff "$DRIFT_RANGE" > "$STAGE_DIR/review-surface.patch" 2>/dev/null      && [ -s "$STAGE_DIR/review-surface.patch" ]; then
+    echo "  review-surface.patch — 중복 ${dup}커밋 제외한 리뷰 표면 ($(command grep -c '^diff --git' "$STAGE_DIR/review-surface.patch" 2>/dev/null || echo '?')파일)"
+  else
+    rm -f "$STAGE_DIR/review-surface.patch"
+    echo "⚠️  review-surface.patch 생성 실패 — 렌즈는 diff.patch 전량을 받는다(부풀림 잔존)"
+  fi
+fi
+
 saved=0 expected=0 missing=""
 # ⛔ `IFS=$'\t' read -r a b c` 를 쓰지 않는다 — **탭은 IFS 공백**이라 연속 탭이 하나로
 #    합쳐진다. `added\t\tfresh.txt` 가 `old=fresh.txt` 로 읽혀 신규 파일이 전부
@@ -373,7 +389,7 @@ rm -rf "$STAGE_DIR"
 added=$(awk '{a+=$1} END{print a+0}' "$WORK_DIR/numstat.txt")
 deleted=$(awk '{d+=$2} END{print d+0}' "$WORK_DIR/numstat.txt")
 echo "수집 완료 — base=$BASE / +$added −$deleted / base 원본 ${saved}/${expected}개"
-echo "  diff.patch · requirements.md · base-behavior.md · base/ · base-manifest.tsv · review-surface.md · numstat.txt · risk.json"
+echo "  diff.patch · requirements.md · base-behavior.md · base/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json"
 [ -f "$WORK_DIR/evidence-move-drift.md" ] && echo "  ⭐ evidence-move-drift.md — 이동 리팩토링 감지. 동등성과 **별개 축**이다"
 grep -q '⛔ \*\*head 커밋' "$WORK_DIR/review-surface.md" 2>/dev/null && \
   echo "⚠️  중복 커밋 감지 — review-surface.md 를 먼저 읽어라. Tier 판정이 부풀려져 있다"

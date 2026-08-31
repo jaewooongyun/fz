@@ -13,13 +13,16 @@
 
 > TEAM(TeamCreate+SendMessage) → 네이티브 Workflow 전환 (Wave 4). Analyze 코어는 `workflows/peer-review.js`가 소유한다 (결정적 스크립트 — P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
 
-1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, reviewSurfacePath, evidencePaths, basePath, deep, structuralContext } })` — `structuralContext`는 `modules/review-structural-axes.md`를 Read해 §3 축 + §4 경계 문구를 담는다 (미전달 시 구조 축 미적용)
+1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, reviewSurfacePatchPath, reviewSurfacePath, evidencePaths, basePath, deep, structuralContext } })` — `structuralContext`는 `modules/review-structural-axes.md`를 Read해 §3 축 + §4 경계 문구를 담는다 (미전달 시 구조 축 미적용)
    - `deep=false` → **Tier 2 (Lite)**: Stage1 3-병렬(arch+quality+correctness) → **트리거 발화 시에만 Stage2 교차**. **3 또는 5-call**(null 재시도 시 최대 6/10). 발화 여부는 반환 `stage2Ran`·`stage2Trigger`. Confidence Matrix 미투표(Lead 단순 병합)
    - `deep=true` → **Tier 3 (Full)**: +Stage2 교차(arch↔quality) +Stage3 counter DA, **기본 6-call**(부분 실패로 Stage2 생략 시 5, 재시도 시 최대 9). 권위 수치는 `metrics.agentCalls`
-   - ⛔ **`reviewSurfacePath` 는 `review-surface.md` 가 존재하면 반드시 넘긴다.** base 가 분기점보다 앞서면
-     이미 머지된 커밋이 diff 에 다시 나타난다(실측 2.9배). gather 가 그 판정을 파일에 적고 Lead 는 Tier 를
-     고치지만, **판정이 렌즈에 닿지 않으면 diff 는 원본 그대로**다 — 렌즈가 stale 분량을 새 변경으로 읽는다.
-     미제공 시 스크립트가 프롬프트에 경고를 넣지만 그것은 대체물이 아니다.
+   - ⛔ **`reviewSurfacePatchPath` 가 1차다.** `review-surface.patch`(gather 가 만드는 중복 커밋 제외분)가
+     있으면 그것을 넘긴다 — 스크립트가 이를 **리뷰 대상**으로 쓰고 `diffPath` 를 부풀림 확인용 보조로 내린다.
+     ⛔ **진단 파일만 넘기면 무력하다** — 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없고,
+     `review-surface.md` 의 조언("`git show <+ 커밋>`")도 실행할 수 없다 [외부: codex 리뷰 2026-09-01].
+   - `reviewSurfacePath`(`review-surface.md`)는 patch 와 **함께** 넘긴다 — 부풀림 규모를 렌즈가 알면
+     전량 diff 에서 나온 발견을 스스로 걸러낼 수 있다. patch 없이 이것만 넘기면 스크립트가 경고를 붙이지만
+     그것은 대체물이 아니다.
    - ⛔ **`evidencePaths` 는 파일명 하나가 아니라 gather 산출물 목록에서 조달한다** — 존재하는 것을 전부 넘긴다.
      최소 `evidence-move-drift.md`(이동 리팩토링에서 동등성 데이터 `old-new-pairs.md` 와 **다른 축**) ·
      `old-new-pairs.md` · `convention-samples.md` · `caller-analysis.md`.
