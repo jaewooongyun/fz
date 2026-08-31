@@ -123,7 +123,7 @@ v3 "SCNetworkReachability bootstrap" 결정 후 v3.1에서 Codex가 "flag 정확
 
 ## Acceptance Criteria (P0-C 구현 완료 기준)
 
-- [ ] `fz-plan/SKILL.md` Phase 3에 본 모듈 참조 1줄 추가
+- [ ] `skills/fz-plan/SKILL.md` Phase 3에 본 모듈 참조 1줄 추가
 - [ ] 본 모듈이 자체 완결 (다른 `modules/` 재참조 없음)
 - [ ] Q-S1~S4 + Lead 독립 절차 + disposition 매핑 전부 포함
 - [ ] Q-S5는 Appendix (P2-A 상태)로만 표기

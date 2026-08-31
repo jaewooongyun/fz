@@ -464,7 +464,7 @@ PY
 - 트러블슈팅: `guides/skill-troubleshooting.md`
 - 프롬프트 최적화: `guides/prompt-optimization.md`
 - Codex 교차검증: `skills/fz-codex/SKILL.md`
-- 스킬 품질 평가: `/fz-skill eval` (`fz-skill/SKILL.md`)
-- 일괄 벤치마크: `/fz-manage benchmark` (`fz-manage/SKILL.md`)
+- 스킬 품질 평가: `/fz-skill eval` (`skills/fz-skill/SKILL.md`)
+- 일괄 벤치마크: `/fz-manage benchmark` (`skills/fz-manage/SKILL.md`)
 - Anthropic 공식 평가: `/skill-creator` (Eval/Improve/Benchmark 모드)
 - Tier 1 출처: code.claude.com/docs/en/{skills, sub-agents, best-practices}
