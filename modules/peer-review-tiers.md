@@ -57,7 +57,30 @@ CHANGED_LINES > 2000  → AskUserQuestion ($3+ 예상)
 
 ```bash
 # 1. Changed lines 측정 (PR 또는 branch). gh CLI는 .previous_filename (snake_case) 반환
-if [[ "$INPUT" =~ ^[0-9]+$ ]]; then
+# ⛔ **snapshot 우선** — `gather.sh` 가 이미 `pr-meta.json` 에 `additions,deletions,files` 를
+#    한 번에 받아 저장한다(`gh pr view "$TARGET" --json baseRefName,headRefName,title,body,additions,deletions,files`).
+#    같은 값을 다시 받으면 네트워크 4회 + **드리프트 표면**이 늘어난다 — gather 시점과 Tier 시점
+#    사이에 force-push 가 나면 두 값이 갈린다.
+#    회귀 고정: `tests/fixtures/peer-review/tier-input-single-source/run.sh`
+META="${WORK_DIR:-$STAGE_DIR}/pr-meta.json"
+if [ -f "$META" ]; then
+  ADDED=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('additions',0))" "$META" 2>/dev/null || echo 0)
+  DELETED=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('deletions',0))" "$META" 2>/dev/null || echo 0)
+  GENERATED_LINES=$(python3 -c "
+import json,re,sys
+d=json.load(open(sys.argv[1]))
+pat=re.compile(r'(package-lock|pnpm-lock|yarn-lock|Package\\.resolved|Gemfile\\.lock|Cargo\\.lock|\\.pbxproj|\\.storyboard)$')
+print(sum(f.get('additions',0)+f.get('deletions',0) for f in d.get('files',[]) if pat.search(f.get('path',''))))
+" "$META" 2>/dev/null || echo 0)
+  RENAMED_LINES=$(python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1]))
+print(sum(f.get('additions',0)+f.get('deletions',0) for f in d.get('files',[])
+          if f.get('previous_filename') or f.get('previousFilename')))
+" "$META" 2>/dev/null || echo 0)
+  echo "▶ Tier 입력 = gather snapshot (pr-meta.json) — gh 재조회 0회"
+elif [[ "$INPUT" =~ ^[0-9]+$ ]]; then
+  # ⚠️ snapshot 부재 폴백 — gather 를 거치지 않은 직접 호출 경로다
   ADDED=$(gh pr view "$INPUT" --json additions -q '.additions' 2>/dev/null || echo 0)
   DELETED=$(gh pr view "$INPUT" --json deletions -q '.deletions' 2>/dev/null || echo 0)
   GENERATED_LINES=$(gh pr view "$INPUT" --json files -q '[.files[] | select(.path | test("(package-lock|pnpm-lock|yarn-lock|Package\\.resolved|Gemfile\\.lock|Cargo\\.lock|\\.pbxproj|\\.storyboard)$")) | .additions + .deletions] | add // 0' 2>/dev/null || echo 0)
