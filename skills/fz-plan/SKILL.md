@@ -104,6 +104,7 @@ intent-triggers:
    - Stage 0 direction(fable, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2 — 반박은 opus) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(opus) → Stage 3 CC 교차(edge↔impact, opus) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증(opus). 9-11 call
 4. **반환 처리**:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
+   - ⛔ `impactRequests` 가 비어 있지 않으면 **Lead 가 resolve 한다** — impact 렌즈는 Bash 가 없어 base 원본·이전 호출자 수를 직접 못 얻는다(`agents/plan-impact.md`). 요청을 무시하면 영향 분석이 그만큼 비어 있는 채로 plan 에 들어간다
    - `mode:'direction_escalation'` → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용)
    - `mode:'fallback'` → SOLO 계획 수립 수행 + 사유 experiment-log 기록
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(Codex 회복 시) + Codex verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체

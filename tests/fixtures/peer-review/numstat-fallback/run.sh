@@ -14,12 +14,17 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ⛔ 저장소에 쓰지 않는다 — fixture 가 실행마다 자기 입력을 재작성하면 커밋본과 heredoc 중
+#   어느 쪽이 SSOT 인지 모호해지고, 실행이 워킹트리를 더럽힌다(F-024 축).
+#   커밋된 `blank-and-delete-only.patch` 는 **참조용 기록**이고 판정 입력은 tmp 에서 만든다.
+TMPD="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }
+trap 'rm -rf "$TMPD"' EXIT
 AWKF="$HERE/../../../../skills/fz-peer-review/scripts/numstat_fallback.awk"
 PATCHES="$HERE/../risk-scan"
 [ -f "$AWKF" ] || { echo "numstat_fallback.awk 없음: $AWKF" >&2; exit 2; }
 
 # 이 fixture 고유 케이스 — 빈 추가 행 + 삭제만 있는 파일
-cat > "$HERE/blank-and-delete-only.patch" <<'PATCH'
+cat > "$TMPD/blank-and-delete-only.patch" <<'PATCH'
 diff --git a/A.ext b/A.ext
 --- a/A.ext
 +++ b/A.ext
@@ -89,7 +94,7 @@ pin() {
 }
 pin "$PATCHES/positive-hunk-plus-no-loss.patch" 2   # `++ actor` 를 잃으면 1
 pin "$PATCHES/positive-concurrency.patch" 6         # 빈 추가 행을 잃으면 5
-pin "$HERE/blank-and-delete-only.patch" 3           # 빈 행 2개 포함
+pin "$TMPD/blank-and-delete-only.patch" 3           # 빈 행 2개 포함
 
 echo
 echo "$fail 건 실패"
