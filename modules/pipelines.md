@@ -21,6 +21,10 @@
 
 ## 파이프라인 목록
 
+> ⛔ `TEAM 모드` 열은 **실행 스크립트만** 적는다. 에이전트 구성은 그 스크립트가 소유한다 —
+> 정본 `modules/governance.md` § Truth-of-Source · 에이전트 목록은 `modules/team-registry.md`.
+> 이전 판은 에이전트를 열거해 실제 스폰과 어긋났다(code-only 에 `impl-quality` 누락 · peer-review 가 다른 스크립트를 지목).
+
 ### 1. explore
 
 | 항목 | 값 |
@@ -28,7 +32,7 @@
 | 트리거 | `찾아, 탐색, 구조, 영향, 의존성` |
 | 체인 | fz-search |
 | 기본 모드 | SOLO |
-| TEAM 모드 | search-symbolic + search-pattern (cross-verify) — (Wave 1: `workflows/search-cross-verify.js` Workflow 대체 실행) |
+| TEAM 모드 | `workflows/search-cross-verify.js` |
 
 ### 2. explore-plan
 
@@ -46,7 +50,7 @@
 | 트리거 | `어떻게.*좋을까, 트레이드오프, 뭐가.*맞을까` |
 | 체인 | fz-discover |
 | 기본 모드 | SOLO |
-| TEAM 모드 | plan-structure(★O) + review-arch (adversarial) — (pilot: `workflows/discover-adversarial.js` Workflow 대체 실행) |
+| TEAM 모드 | `workflows/discover-adversarial.js` |
 | SC 연계 | `--business` 시 `/sc:business-panel` (UX/전략 분석) |
 
 ### 4. bug-hunt
@@ -74,7 +78,7 @@
 | 트리거 | `계획, 설계, 아키텍처` |
 | 체인 | fz-plan |
 | 기본 모드 | SOLO |
-| TEAM 모드 | plan-structure(★O) + plan-edge-case + plan-impact + review-arch + review-direction (collaborative) — (Wave 2: `workflows/plan-collaborative.js` Workflow 대체 실행) |
+| TEAM 모드 | `workflows/plan-collaborative.js` |
 | 게이트 | ✓ direction-challenge (Phase 0.5) + ✓ stress-test(Q1-Q6) |
 
 ### 7. plan-to-code
@@ -84,7 +88,7 @@
 | 트리거 | `계획.*구현, 설계.*개발, 만들어줘` |
 | 체인 | fz-plan → fz-code |
 | 기본 모드 | TEAM |
-| TEAM 모드 | plan 팀 (plan-edge-case 포함) → impl-correctness(★O) + review-arch — (plan 단계는 Wave 2 Workflow 대체, code 단계도 Wave 3: `workflows/code-pair.js` 대체) |
+| TEAM 모드 | `workflows/plan-collaborative.js` → `workflows/code-pair.js` (순차) |
 | 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ implication-scan (조건부) + ✓ codex check |
 
 ### 8. code-only
@@ -94,7 +98,7 @@
 | 트리거 | `구현, 코드, 개발` (계획 이미 있을 때) |
 | 체인 | fz-code |
 | 기본 모드 | SOLO |
-| TEAM 모드 | impl-correctness(★O) + review-arch (pair-programming) — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
+| TEAM 모드 | `workflows/code-pair.js` |
 | 게이트 | ✓ build + ✓ friction-detect |
 
 ### 9. code-to-review
@@ -104,7 +108,7 @@
 | 트리거 | `구현.*리뷰, 만들고.*검토` |
 | 체인 | fz-code → fz-review |
 | 기본 모드 | TEAM |
-| TEAM 모드 | impl-correctness(★O) → review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) |
+| TEAM 모드 | `workflows/code-pair.js` → `workflows/review-live.js` (순차) + Lead 후속(Phase 4.5 correctness · memory recall) |
 | 게이트 | ✓ build + ✓ implication-scan (조건부) + ✓ codex check |
 
 ### 10. review-only
@@ -114,7 +118,7 @@
 | 트리거 | `리뷰, 검증, 품질` |
 | 체인 | fz-review |
 | 기본 모드 | SOLO |
-| TEAM 모드 | review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) — (Wave 1: `workflows/review-live.js` Workflow 대체, correctness·curator는 Lead 경로) |
+| TEAM 모드 | `workflows/review-live.js` + Lead 후속(Phase 4.5 correctness · memory recall) |
 
 ### 11. review-to-ship
 
@@ -142,7 +146,7 @@
 | 트리거 | `처음부터.*끝까지, 계획부터.*PR` |
 | 체인 | fz-plan → fz-code → fz-review → fz-commit → fz-pr |
 | 기본 모드 | TEAM |
-| TEAM 모드 | 각 단계별 Primary 승격 (plan-structure → impl-correctness → review-arch) |
+| TEAM 모드 | 단계별 스크립트 순차 — `workflows/plan-collaborative.js` → `code-pair.js` → `review-live.js` |
 | 게이트 | 전체 게이트 자동 삽입 |
 | 특수 | opus Primary 2개 원칙 예외 (단계별 순차이므로 동시 아님) |
 
@@ -153,7 +157,7 @@
 | 트리거 | `피어리뷰, PR.*리뷰, 팀원.*코드` |
 | 체인 | fz-peer-review |
 | 기본 모드 | SOLO |
-| TEAM 모드 | review-arch(★O) + review-quality + review-correctness(Phase4.5) + memory-curator (live-review) — (Wave 1: `workflows/review-live.js` Workflow 대체, correctness·curator는 Lead 경로) |
+| TEAM 모드 | `workflows/peer-review.js` (Tier 2/3 Analyze) |
 
 ### 15. drift-check
 
