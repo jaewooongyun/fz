@@ -56,7 +56,7 @@ bash scripts/setup-hooks.sh
 - `templates/` — 스킬/에이전트/모듈/CLAUDE.md 템플릿
 - `codex-skills/` — Codex 네이티브 스킬 (8개)
 - `schemas/` — Codex JSON 스키마 (6개)
-- `scripts/` — lint·설치·호출·검증 스크립트 (15개). ⛔ diff 라인 접두사(`+`/`-`)로 판정하는 새 파일은 `# diff-parse: hunk-state | not-a-diff | waived` 선언 1줄이 없으면 `health-check` 가 막는다 (`lint_diff_parsers.py` — hunk 안팎에서 접두사 뜻이 달라 같은 결함이 4회 재발했다). ⛔ `setup-codex-skills.sh`는 **load-bearing** — `~/.codex/skills/` 심볼릭이 `get_codex_skill_path()` Tier 2a를 성립시킨다. ⛔ codex 호출은 `codex-exec.sh` 경유 의무 (`modules/fz-codex-bash-hygiene.md` §8) · `FZ_PLUGIN_ROOT`는 `resolve-plugin-root.sh`로 해석 (Tier 2b 전제)
+- `scripts/` — lint·설치·호출·검증 스크립트 (16개). ⛔ diff 라인 접두사(`+`/`-`)로 판정하는 새 파일은 `# diff-parse: hunk-state | not-a-diff | waived` 선언 1줄이 없으면 `health-check` 가 막는다 (`lint_diff_parsers.py` — hunk 안팎에서 접두사 뜻이 달라 같은 결함이 4회 재발했다). ⛔ `setup-codex-skills.sh`는 **load-bearing** — `~/.codex/skills/` 심볼릭이 `get_codex_skill_path()` Tier 2a를 성립시킨다. ⛔ codex 호출은 `codex-exec.sh` 경유 의무 (`modules/fz-codex-bash-hygiene.md` §8) · `FZ_PLUGIN_ROOT`는 `resolve-plugin-root.sh`로 해석 (Tier 2b 전제)
 - `.claude-plugin/` — plugin.json + marketplace.json
 
 ## Verification Discipline (v3.11+)
