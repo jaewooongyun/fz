@@ -41,7 +41,7 @@
 | 트리거 | `찾아.*계획, 분석.*설계, 탐색.*후.*계획` |
 | 체인 | fz-search → fz-plan |
 | 기본 모드 | SOLO |
-| TEAM 모드 | search 팀 → plan 팀 (순차) |
+| TEAM 모드 | `workflows/search-cross-verify.js` → `workflows/plan-collaborative.js` (순차) |
 
 ### 3. discover
 
@@ -127,7 +127,7 @@
 | 트리거 | `리뷰.*커밋, 검토.*PR` |
 | 체인 | fz-review → fz-commit → fz-pr |
 | 기본 모드 | TEAM |
-| TEAM 모드 | review 팀 → Lead 커밋/PR |
+| TEAM 모드 | `workflows/review-live.js` → Lead 커밋/PR (fz-commit·fz-pr 은 Workflow 없음) |
 | 게이트 | ✓ codex check (커밋 전) |
 
 ### 12. fix-to-ship
