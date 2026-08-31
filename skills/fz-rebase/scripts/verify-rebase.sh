@@ -156,6 +156,15 @@ relocate_hint() {   # $1=삭제 경로  $2=old_mb  $3=base
 
 # 수동 해결(evil merge)을 품은 머지 목록 → "subject<TAB>remerge라인수"
 # 리베이스가 머지를 재생성하면 해시가 바뀌므로 대조 키는 subject다.
+# `--remerge-diff`(git 2.35+) 미지원이면 L2 검출이 **조용히** 꺼진다 — 옵션 실패의 빈 출력이
+# "수동 해결이 없다"와 구분되지 않기 때문(아래 두 호출부가 stderr를 버린다).
+# ⛔ HALT로 올리지 않는다: 버킷 분할과 형태 게이트는 그대로 작동하므로, 구버전 git 사용자의
+#    나머지 방어까지 막을 이유가 없다. 꺼졌다는 사실만 알린다.
+probe_remerge() {
+  git log -1 --remerge-diff --format='' -p HEAD >/dev/null 2>&1 \
+    || warn "이 git은 --remerge-diff 미지원 — L2(머지 해결 유실) 검출이 꺼진다. git 갱신 권장."
+}
+
 scan_manual_merges() {
   if [ "${FZ_REBASE_SKIP_REMERGE:-0}" = "1" ]; then return 0; fi
   local m d n s h _plus
@@ -201,6 +210,7 @@ case "$cmd" in
   snapshot)
     base="${2:?snapshot requires <base-ref>}"
     branch="${3:?snapshot requires <branch-ref>}"
+    probe_remerge
 
     # ⛔ 진입 즉시 이전 상태를 버린다. 아래 해석이 실패하면 스크립트가 종료되는데,
     #    그때 이전 실행의 meta.env가 남아 있으면 다음 audit이 그것을 정상 snapshot으로
@@ -622,6 +632,7 @@ case "$cmd" in
     rbranch="${4:-$(git config --get "branch.${branch}.merge" | sed 's#^refs/heads/##' || true)}"
     [ -n "$remote" ] || die "push 원격을 알 수 없다. prepush <branch> <remote> <remote-branch> 형태로 지정할 것."
     [ -n "$rbranch" ] || rbranch="$branch"
+    probe_remerge
     track="refs/remotes/${remote}/${rbranch}"
     local_track="$(git rev-parse --verify -q "$track" || true)"
     [ -n "$local_track" ] || die "tracking ref 없음: ${track}. fetch 후 재실행."

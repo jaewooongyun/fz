@@ -724,6 +724,12 @@ skill_has "K5 git-path로 리베이스 상태 해석"          "git rev-parse --
 skill_has "K6 continue가 종료가 아님을 명시"          "continue는 종료가 아니다"
 skill_has "K7 soft gate임을 명시"                    "soft gate"
 skill_has "K8 pbxproj 지시가 확인 절차와 정합"        "3-C의 확인 절차를 건너뛰지 않는다"
+# ⛔ 이식성 계약 (단독 배포/플러그인 경유 양쪽에서 통과해야 한다 — 같은 파일이 둘 다로 나간다)
+skill_has "K13 경로를 스킬 주입 헤더로 확정"          "Base directory for this skill"
+skill_lacks "K13b 플러그인 루트 치환 잔존 부재"        "<FZ_ROOT>"
+skill_has "K14 공유 원격은 소유자 승인 확인"          "소유자가 명시적으로 승인"
+skill_has "K15 base는 ref 실재로 판정"               "rev-parse --verify -q"
+skill_has "K16 remote HEAD 자동 해석 금지"           "정답으로 쓰지 않는다"
 
 echo "════ 결과: PASS=${PASS} FAIL=${FAIL} ════"
 [ "$FAIL" -eq 0 ]
