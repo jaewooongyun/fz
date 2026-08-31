@@ -432,6 +432,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 - 사용자 합의 기반 깊이 제한
 - **light 모드 (40차)**: 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 시 Phase 1+2 + Codex micro-eval만 실행 (카운터 1 소비)
   - ⛔ 단 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**(`modules/cross-validation.md §Coverage Gate`)는 light에서도 **생략 불가** — light는 절차 생략이지 검증 생략이 아니다. 본 스킬은 *최신성 전수 판정*을 산출하므로 특히 해당한다. ⛔ **부정 주장(0건·부재)은 §Negative-Result Gate 도 함께** — Coverage 는 범위, Negative-Result 는 도구 유효성이며 N 오측정 시 0/0 으로 통과한다
+  - ⛔ **AC5·AC9 는 light 에서도 적용한다.** 나머지 AC 는 Phase 5 Execute 의 편집을 제약하므로 편집이 0인 light 에서 공허하지만, 이 둘은 **출처 표기**를 제약하고 그 표기를 만드는 것은 light 가 실제로 도는 Phase 1(Probe)·2(Audit) 다. AC 선언이 Phase 3, 집행이 Phase 5 에 있어 light 가 둘 다 건너뛰면 Tier 3 단독 발견이 `[verified]` 로 남는다 — `[partially-verified: A5; …]` 격하(AC9)와 미검증 사유 보존(AC5)은 Phase 2 산출 시점에 적용한다.
 
 **Will Not**:
 - 본문 단락 통째 재구성 (AC1 위반)
