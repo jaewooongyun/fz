@@ -25,7 +25,8 @@
 | fz-pr | `PR\|풀리퀘스트` | `PR\|pull.?request` |
 | fz-rebase | `리베이스\|브랜치.*최신화\|브랜치.*동기화\|브랜치.*업데이트\|develop.*위로\|롱텀.*브랜치\|리베이스.*(사라\|누락\|덮어)\|(리베이스\|force.?push).*(유실\|덮어씌)` | `rebase\|sync.*branch\|refresh.*branch\|update.*branch` |
 | fz-peer-review | `피어리뷰\|팀원\|PR.*리뷰` | `peer.?review\|teammate\|PR.*review` |
-| fz-pr-digest | `설명\|해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선` | `explain\|digest\|understand\|what.*changed\|learn\|walkthrough` |
+| fz-pr-digest | `해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선\|PR.*설명\|변경.*설명` | `digest\|what.*changed\|learn` |
+| fz-explain | `구조.*설명\|코드.*설명\|어떻게.*동작\|어떤.*역할\|전체.*흐름\|과외\|처음.*보는.*사람` | `explain.*structure\|how.*work\|walkthrough\|tutor\|onboard` |
 | fz-skill | `스킬.*만들\|스킬.*생성\|스킬.*수정\|스킬.*삭제\|에이전트.*만들\|에이전트.*생성\|스킬.*평가\|스킬.*최적화\|description.*최적화\|트리거.*테스트\|트리거.*정확도\|문서.*작성\|글쓰기\|프롬프트.*최적화\|description.*개선\|가이드.*작성` | `create.*skill\|new.*skill\|update.*skill\|delete.*skill\|create.*agent\|new.*agent\|eval.*skill\|optimize.*skill\|optimize.*description\|trigger.*test\|trigger.*accuracy\|document\|write.*skill\|improve.*description\|optimize.*prompt` |
 | fz-manage | `관리\|스킬.*목록\|의존성\|체크\|벤치마크\|일괄.*평가\|건강.*체크\|생태계.*점검\|트리거.*벤치마크\|메모리.*반영\|교훈.*반영` | `manage\|skill.*list\|depend\|check\|benchmark\|batch.*eval\|health.*check\|trigger.*benchmark\|reflect.*module\|lessons.*module` |
 | fz-modernize | `최신화\|모더나이제이션\|모더나이즈\|가이드 업데이트\|문서 갱신\|문서 업데이트\|stale 정리\|deprecated 정리\|구버전 정리\|새 모델 출시\|최신 모델` | `modernize\|reference 업데이트\|[Oo]pus ?-?5\|[Ss]onnet ?-?5\|[Ff]able ?-?5\|GPT.*5\.\d\|[Oo]pus.*4\\.\\d` |
