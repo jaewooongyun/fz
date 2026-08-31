@@ -110,6 +110,10 @@ intent-triggers:
 각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
 
 1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
+   ⛔ 아래 넷도 **같은 파일에 요약해 넣는다** — 별도 arg 를 만들지 않고 기존 `contextPath` 하나로 전달한다:
+   `code/phase-0.5-detection.md`(Swift token 검출 + 대응 step) · `discover/discover-journal.md` 의 🔒 불변 제약 ·
+   `plan/direction-challenge.md` 의 방향 판정 · `plan/verify-result.md` 의 미해소 이슈(있으면).
+   ⚠️ 만들기만 하고 넘기지 않으면 무력하다 — 렌즈는 `contextPath` 밖 파일을 열 수 없다.
 2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 참조),complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })`
    - Stage 1 impl(opus) changeset → Stage 2 **검토**(full: review-arch + impl-quality **병렬 2렌즈**, opus / light: arch 단독) → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, full 3-4 call · light 1-2 call)
@@ -152,7 +156,7 @@ intent-triggers:
    | 모드 | 소스 |
    |------|------|
    | 동일 세션 연속 | 대화 컨텍스트 (별도 로드 불요) |
-   | ASD / NOTASK | `{WORK_DIR}/plan/plan-final.md` (WORK_DIR은 Gate 0에서 결정) |
+   | ASD / NOTASK | `{WORK_DIR}/plan/plan-final.md` → 없으면 `{WORK_DIR}/plan/plan-light.md` (WORK_DIR은 Gate 0에서 결정) |
    | Serena fallback | `read_memory("fz:checkpoint:plan-final")` |
 
    전 소스 실패 시 → plan 없는 구현으로 진행하되 **그 사실을 보고**한다 (차단 아님).

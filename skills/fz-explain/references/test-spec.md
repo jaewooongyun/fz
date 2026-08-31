@@ -87,7 +87,7 @@ SKILL.md 크기            ≤500줄
 
 | 파일 | 방향 | 기대 |
 |------|:----:|------|
-| `fixtures/positive-defects.md` | 검출력 | 결함 7종 전부 검출 |
+| `fixtures/positive-defects.md` | 검출력 | 결함 11종(D1~D11) 전부 검출 |
 | `fixtures/negative-clean.md` | 과잉 검출 | 오검출 0건 |
 
 ⛔ 한쪽만으로는 판정이 서지 않는다. positive 만 있으면 과잉 검출을 못 재고,
