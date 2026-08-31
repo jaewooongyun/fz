@@ -288,15 +288,27 @@ if [ -n "$DRIFT_RANGE" ] && git show "$DRIFT_RANGE" >/dev/null 2>&1; then
 fi
 
 # ── 리뷰 표면 patch (중복 커밋 제외) ────────────────────────────
-# ⛔ 신설 근거: `review-surface.md` 는 중복 커밋을 **진단**하지만 커밋 해시·제목만 담는다.
-#    렌즈는 Bash·git 이 없어(`peer-review.js` OVERRIDE) 그 해시로 hunk 를 필터할 수 없다 —
-#    판정을 넘겨도 렌즈 입력은 부풀려진 `diff.patch` 그대로였다.
-#    ⭐ 조언("`git show <+ 커밋>` 또는 rebase 후 재수집")도 렌즈가 할 수 없는 일이다.
-# ⛔ 신규 로직 0 — 위 DRIFT_RANGE(= `+` 커밋 범위)를 그대로 재사용한다.
-# ⛔ diff.patch 를 덮지 않는다 — 원본은 Tier·numstat·risk_scan 의 입력이고 그 판정은 별 축이다.
-if [ -n "$DRIFT_RANGE" ] && [ "${dup:-0}" -gt 0 ]; then
-  if git diff "$DRIFT_RANGE" > "$STAGE_DIR/review-surface.patch" 2>/dev/null      && [ -s "$STAGE_DIR/review-surface.patch" ]; then
-    echo "  review-surface.patch — 중복 ${dup}커밋 제외한 리뷰 표면 ($(command grep -c '^diff --git' "$STAGE_DIR/review-surface.patch" 2>/dev/null || echo '?')파일)"
+# ⛔ DRIFT_RANGE 를 그대로 쓰면 안 된다 — `cnt>=2` 일 때 그 값은 `merge-base..head` 이고
+#    이는 `git diff base...head`(:78)와 **정의상 같은 범위**다(3-dot = merge-base..B).
+#    필터가 0인데 "중복 제외" 라 라벨하면 렌즈가 이미 머지된 변경을 **신규로 확신**한다.
+#    ⭐ `+` 커밋만 골라 각각의 patch 를 잇는다 — 그것이 실제 리뷰 표면이다.
+#    실증: 자체 리뷰 반론자가 독립 프로브로 `cmp -s diff.patch review-surface.patch` = IDENTICAL 재현(2026-09-01).
+if [ "${dup:-0}" -gt 0 ] && [ -n "${plus:-}" ]; then
+  : > "$STAGE_DIR/review-surface.patch"
+  rs_ok=1
+  while IFS= read -r sha; do
+    [ -n "$sha" ] || continue
+    git diff "${sha}^!" >> "$STAGE_DIR/review-surface.patch" 2>/dev/null || { rs_ok=0; break; }
+  done <<< "$plus"
+  if [ "$rs_ok" -eq 1 ] && [ -s "$STAGE_DIR/review-surface.patch" ]; then
+    # ⛔ 필터가 실제로 걸렸는지 검산한다 — 동일하면 라벨이 거짓이 된다
+    if cmp -s "$STAGE_DIR/diff.patch" "$STAGE_DIR/review-surface.patch"; then
+      rm -f "$STAGE_DIR/review-surface.patch"
+      echo "⚠️  review-surface.patch 가 diff.patch 와 동일 — 필터 0건이라 만들지 않았다(전량이 리뷰 표면)"
+    else
+      rs_files=$(command grep -c '^diff --git' "$STAGE_DIR/review-surface.patch" 2>/dev/null || echo '?')
+      echo "  review-surface.patch — 중복 ${dup}커밋 제외, 신규 ${cnt:-?}커밋분 (${rs_files}파일)"
+    fi
   else
     rm -f "$STAGE_DIR/review-surface.patch"
     echo "⚠️  review-surface.patch 생성 실패 — 렌즈는 diff.patch 전량을 받는다(부풀림 잔존)"
