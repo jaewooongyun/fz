@@ -64,6 +64,9 @@ const ImpactSchema = {
     impactFiles: { type: 'array', items: { type: 'object', required: ['file', 'kind', 'evidence'], properties: { file: { type: 'string' }, kind: { type: 'string', enum: ['direct', 'consumer', 'config', 'doc', 'latent'] }, evidence: { type: 'string' } } } },
     hiddenDependencies: { type: 'array', items: { type: 'string' } },
     deadCode: { type: 'array', items: { type: 'string' } },
+    // ⛔ 렌즈는 Bash 가 없어 git 비교를 못 한다(`agents/plan-impact.md` — 1-shot, 중간 요청 채널 없음).
+    //   필요를 반환 필드로 명시하면 Lead 가 resolve 한다. 슬롯이 없으면 그 지시가 갈 곳이 없다.
+    originBodyRequests: { type: 'array', items: { type: 'string' }, description: '렌즈가 직접 못 얻은 base 원본·호출자 수 등의 요청. Lead 가 resolve' },
   },
 }
 
@@ -309,6 +312,8 @@ const recheck = await callAgent(
 if (!recheck) log('WARN stage5 null — 재검증 미수행 (unresolvedPeerIssues 빈 채 반환)')
 
 const s1 = !!draft
+const impactRequests = (impact && impact.originBodyRequests) || []
+if (impactRequests.length) log(`impact 렌즈 요청 ${impactRequests.length}건 — Lead resolve 대상`)
 const s2 = !!(impact && edge && arch)
 const s3 = !!(impactOnEdge && edgeOnImpact)
 const s4 = !!plan
@@ -322,5 +327,6 @@ return {
   directionAlternatives: direction.alternatives,
   plan: { ...plan, unresolvedPeerIssues: recheck ? recheck.remainingIssues : [] },
   recheckVerdict: recheck ? recheck.verdict : 'skipped',
+  impactRequests, // ⛔ impact 렌즈가 Bash 부재로 못 얻은 것 — Lead 가 resolve 후 plan 에 반영한다
   metrics: metrics(stagesCompleted), // Lead가 experiment-log §5.7 fz-plan 테이블 기록 + stress-test/RTM 검증/plan-v{N}.md 기록 실수행 (회귀 확인 의무)
 }
