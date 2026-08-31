@@ -193,7 +193,7 @@
 - 내용: 도메인 타입/메서드/주석에 API 버전(v2/v3) 또는 transport 세부가 박힘(#1 `WatchHistoryV3Response`·`watchedHistoryV3Page`·"v3" 주석). 버전 공존은 파라미터 오버로드로, 도메인 심볼은 무버전.
 - generalize: narrow (Swift 심볼 네이밍) | 과적합 위험: 中 (grep FP — 버전 토큰 정교화)
 - 근거: [verified: README.md:17 #1] + [verified: 도메인 심볼 API 버전 금지 교훈 — 신규 생성].
-- ⛔ 활성 차단: evidence 1 session → candidate. 기존 fz-code "Swift Naming"(축a~e, OBS-06) + 4-N에 축(f)로 추가 — ⚠️ **evidence 카운트 분리**(축f=ASD-1794는 축a~e=ASD-1366과 이질).
+- ⛔ 활성 차단: evidence 1 session → candidate. 기존 fz-code "Swift Naming"(축a~e, OBS-06) + 4-N에 축(f)로 추가 — ⚠️ **evidence 카운트 분리**(축f=OBS-11은 축a~e=OBS-06과 이질).
 - 승격 목표 (Track A): 5 sessions + Codex verify.
 
 ### L-9: DTO(계약 미러) vs Entity(사용분) 레이어 책임 (G4)

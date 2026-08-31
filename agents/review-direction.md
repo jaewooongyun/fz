@@ -38,7 +38,7 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 #### 구조 결정 3축 Quick-Check — 템플릿/형제 답습 시에도 의무
 
 참고 템플릿·형제 코드를 미러링하는 계획이라도 아래 3축은 "이미 결정됨"이 아니라 **결정 대상**이다.
-각 축에 대안 ≥2 + 1줄 trade-off를 판정 산출물에 기록한다 (Template Authority Bias 방어 — ASD-1802에서 3축 전부 외부 리뷰어에게 선행 포착당한 실패 사례).
+각 축에 대안 ≥2 + 1줄 trade-off를 판정 산출물에 기록한다 (Template Authority Bias 방어 — 한 회고 세션에서 3축 전부 외부 리뷰어에게 선행 포착당한 실패 사례).
 
 | 축 | 질문 | 최소 대안 |
 |---|---|---|
