@@ -48,9 +48,9 @@ bash scripts/setup-hooks.sh
 ## Directory Structure
 > ⛔ 아래 카운트는 `scripts/lint_contracts.py` **#N2가 실측과 대조**한다 — 손으로 세지 말고 lint를 돌려라 (2026-08-09까지 modules 20/guides 7로 stale했다).
 > ⛔ **형식 고정**: `` - `dir/` — 설명 (N개) `` — #N2는 백틱 경로 뒤의 `(N개` 를 찾는다. 형식이 다르면 **그 카테고리가 조용히 검사에서 빠진다** (2026-08-09 감사 ISSUE-002: `agents/`는 괄호 없어 미검사, `workflows/`는 선언 자체가 없었다).
-- `skills/` — fz 스킬 SKILL.md (21개)
+- `skills/` — fz 스킬 SKILL.md (22개)
 - `agents/` — fz 에이전트 (13개)
-- `modules/` — 공유 모듈 (48개 — 루트 43 + patterns/ 5)
+- `modules/` — 공유 모듈 (50개 — 루트 45 + patterns/ 5)
 - `guides/` — 가이드 문서 (9개)
 - `workflows/` — 결정적 멀티에이전트 스크립트 (6개)
 - `templates/` — 스킬/에이전트/모듈/CLAUDE.md 템플릿

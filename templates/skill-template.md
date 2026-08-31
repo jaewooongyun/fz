@@ -74,6 +74,7 @@ Tokens used in `provides` / `needs` fields across existing skills:
 | `skill-management` | Skill CRUD operations |
 | `pr-digest` | PR summary digest |
 | `code-understanding` | Deep code comprehension |
+| `structure-explanation` | Feature-level structure walkthrough with 1:1 behavior-to-code mapping |
 | `refined-requirements` | Clarified requirements |
 | `constraint-matrix` | Constraint analysis output |
 | `memory-management` | Memory lifecycle operations (audit, gc, organize) |
