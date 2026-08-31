@@ -146,7 +146,7 @@
 | 트리거 | `처음부터.*끝까지, 계획부터.*PR` |
 | 체인 | fz-plan → fz-code → fz-review → fz-commit → fz-pr |
 | 기본 모드 | TEAM |
-| TEAM 모드 | 단계별 스크립트 순차 — `workflows/plan-collaborative.js` → `code-pair.js` → `review-live.js` |
+| TEAM 모드 | 단계별 스크립트 순차 — `workflows/plan-collaborative.js` → `workflows/code-pair.js` → `workflows/review-live.js` |
 | 게이트 | 전체 게이트 자동 삽입 |
 | 특수 | opus Primary 2개 원칙 예외 (단계별 순차이므로 동시 아님) |
 
