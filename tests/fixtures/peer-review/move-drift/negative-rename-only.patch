@@ -1,0 +1,31 @@
+commit 0000000000000000000000000000000000000000
+Author: Example Dev <dev@example.com>
+Date:   Mon Aug 24 17:40:34 2026 +0900
+
+    refactor(detail): 좌우 분할 배치 명명을 프레임워크 용어와 분리
+
+    - 화면 조건을 답하는 값을 isExtendedLayout 에서 supportsSplitLayout 으로 변경
+    - 제약을 세우는 헬퍼 파라미터는 usesSplitLayout 으로 둔다
+
+diff --git a/Sources/Detail/DetailViewController.ext b/Sources/Detail/DetailViewController.ext
+index aaaaaaa..bbbbbbb 100644
+--- a/Sources/Detail/DetailViewController.ext
++++ b/Sources/Detail/DetailViewController.ext
+@@ -5,7 +5,7 @@ final class DetailViewController {
+-    var isExtendedLayout: Bool {
++    var supportsSplitLayout: Bool {
+         traitCollection.horizontalSizeClass == .regular
+     }
+ 
+-    func applyConstraints(isExtendedLayout: Bool) {
++    func applyConstraints(usesSplitLayout: Bool) {
+         layoutGuide.activate()
+     }
+diff --git a/Sources/Detail/DetailPresenter.ext b/Sources/Detail/DetailPresenter.ext
+index ccccccc..ddddddd 100644
+--- a/Sources/Detail/DetailPresenter.ext
++++ b/Sources/Detail/DetailPresenter.ext
+@@ -3,5 +3,5 @@ protocol DetailPresentable {
+-    var isExtendedLayout: Bool { get }
++    var supportsSplitLayout: Bool { get }
+ }
