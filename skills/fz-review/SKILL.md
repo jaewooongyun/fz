@@ -159,7 +159,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 판단 날짜 + 근거 유형(실측/추정/외부 리뷰) 분류
 - [ ] 추정/외부 리뷰 기반 → 현재 시점 재실측 (`git show`/`Read`/`grep`)
 - [ ] 재실측 결과 ≠ 아티팩트 → 업데이트 이슈 생성 (category: artifact_stale)
-- [ ] 참조: `${CLAUDE_PROJECT_DIR}/memory/feedback_followup_artifact_reaudit.md`, `cross-validation.md § Follow-up Re-audit Gate` (Phase B1/B2 후 활성)
+- [ ] 참조: `${CLAUDE_PROJECT_DIR}/memory/<교훈>.md`, `cross-validation.md § Follow-up Re-audit Gate` (Phase B1/B2 후 활성)
 
 **Phase A 효과 측정** (B1/B2 진입 조건 5개 지표 1:1 매핑):
 - [ ] 지표①: T6/T7 발동 건수 + Speculation-to-Fact Fallacy 차단 사례 (세션당)
@@ -275,7 +275,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - SwiftUI View body 구조 변경 → 레이아웃 영향
 - @State/@Binding 변경 → 데이터 흐름 무결성
 - Listener/Delegate 변경 → 메모리 누수 패턴 (CLAUDE.md 금지 패턴)
-- **완료기준 (UI/제스처/애니메이션 동작 변경 시)**: 빌드 통과 ≠ 완료. visual oracle(launch_app_sim + screenshot · 실기기 시각 확인) 미충족 시 "완료" 선언 지양 — fz는 런타임 동작을 정적으로 못 봄(자동 실행 불가 = 사람 영역, 🔒 강제 게이트 불가). 기존 'screenshot 권고'를 evidence 3 sessions(38차 ASD-1398 · user_spec ASD-1793 · TVG-1219) 기반으로 강화.
+- **완료기준 (UI/제스처/애니메이션 동작 변경 시)**: 빌드 통과 ≠ 완료. visual oracle(launch_app_sim + screenshot · 실기기 시각 확인) 미충족 시 "완료" 선언 지양 — fz는 런타임 동작을 정적으로 못 봄(자동 실행 불가 = 사람 영역, 🔒 강제 게이트 불가). 기존 'screenshot 권고'를 evidence 3 sessions(38차 OBS-07 · user_spec OBS-10 · OBS-16) 기반으로 강화.
 ```
 
 ### 검증 6: Spec Panel 스펙 부합 (조건부)

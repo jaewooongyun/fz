@@ -48,7 +48,7 @@ g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필�
    4. 대응 없는 책임 → "responsibility_gap" 플래그 (severity: Critical)
 
    **원칙**: 함수명(예: `extractBody`)이 아닌 body의 실질 책임 목록이 기준.
-   **근거**: ASD-1111 회귀 — D2 fix `ceb1666b5`에서 extractBody 호출 중단 시 header.status 검사 책임이 Serializer로 이전되지 않아 18+ 소비자 silent 회귀.
+   **근거**: 실측 회귀 사례 — 호출을 중단하면서 그 함수 본문의 상태 코드 검사 책임이 상위 계층으로 이전되지 않아, 다수 소비자가 실패 응답을 성공으로 처리했다.
 
 ## 프로젝트 규칙
 

@@ -40,7 +40,7 @@ Verifies that the implementation matches the stated requirements and plan.
   6. 대응 없는 책임 → "missing_responsibility" (severity: Critical)
   - Baseline 결정 실패 시: `[baseline: unknown]` 태그 → Gate skip + 사유 기록
   - **원칙**: 함수명이 helper-like(`extractBody`, `parseHeader`)여도 body 실질 책임 목록이 기준. "이 함수가 수행하던 모든 책임이 어디로 이전됐는가?"
-  - **근거**: ASD-1111 회귀 — D2 fix `ceb1666b5`에서 extractBody 호출 중단 시 header.status 검사 책임이 Serializer로 이전되지 않아 18+ 소비자 silent 회귀.
+  - **근거**: 실측 회귀 사례 — 호출을 중단하면서 그 함수 본문의 상태 코드 검사 책임이 상위 계층으로 이전되지 않아, 다수 소비자가 실패 응답을 성공으로 처리했다.
 
 ### 3. Edge Case Coverage (Layer 1 - generic)
 

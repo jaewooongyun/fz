@@ -80,7 +80,7 @@ fz-peer-review는 ASD 폴더와 별도 WORK_DIR을 사용:
 
 > ASD 트리 내 중첩하지 않는 이유: peer-review는 PR 단위로 독립 실행되며, ASD 티켓 작업과 무관할 수 있다.
 
-> `{CWD}` = PROJECT_ROOT (CLAUDE.md가 위치한 디렉토리). GIT_ROOT(app-iOS/)와 다를 수 있음. 개인 산출물은 PROJECT_ROOT에만 생성.
+> `{CWD}` = PROJECT_ROOT (CLAUDE.md가 위치한 디렉토리). GIT_ROOT 와 다를 수 있음. 개인 산출물은 PROJECT_ROOT에만 생성.
 
 ## Work Dir 결정
 
@@ -112,7 +112,7 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 
 > **핵심**: `## Essential Context`는 /fz가 단독 관리하는 **덮어쓰기** 섹션. 서브스킬은 Essential 항목을 반환하고 /fz가 기록한다.
 
-### plan-final.md 템플릿 (ASD-1136 v2.2 P0-A)
+### plan-final.md 템플릿 (OBS-03 v2.2 P0-A)
 
 `plan-final.md`는 다음 3개 섹션을 분리 명시 (scope creep 차단):
 
@@ -120,7 +120,7 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 - **§Y Write Scope (Implementation)**: §X 중 실제 변경하는 항목만 (`write-in` 판정). 각 항목에 근거 명시 — (1) 요구사항 직접 충족 / (2) obstacle 해제 / (3) Q0 Behavior Preservation 예외.
 - **§Z Acceptance Criteria**: §Y 각 항목의 검증 가능한 완료 기준 (컴파일 가능 / test 통과 / grep 패턴 매칭). criteria 미명시 항목은 §Y 포함 불가 (→ §X 이동 + 후속 ticket).
 
-**handoff 계약**: fz-code는 §Y + §Z만 참조 (Read Scope 무관). fz-review Phase 4.5는 §Y 기준으로 scope_creep 판정. 이 구조로 "Read Scope = Write Scope" 자동 번역 차단 (ASD-1136 RC4 해소).
+**handoff 계약**: fz-code는 §Y + §Z만 참조 (Read Scope 무관). fz-review Phase 4.5는 §Y 기준으로 scope_creep 판정. 이 구조로 "Read Scope = Write Scope" 자동 번역 차단 (OBS-03 RC4 해소).
 
 ## Compact Recovery Protocol
 

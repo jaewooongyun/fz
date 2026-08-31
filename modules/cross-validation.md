@@ -427,12 +427,12 @@ code-changes 후 → build → [implication-scan] → codex check
 `memory/feedback_*.md` 류 외부 아티팩트 참조 시 `${CLAUDE_PROJECT_DIR}/memory/...` 변수형 절대 경로만 허용. glob (`*`) 사용 금지.
 
 ```
-✅ ${CLAUDE_PROJECT_DIR}/memory/feedback_followup_artifact_reaudit.md
+✅ ${CLAUDE_PROJECT_DIR}/memory/<교훈>.md
 ❌ ~/.claude/projects/*/memory/feedback_*.md  (glob 사용)
-❌ memory/feedback_followup_artifact_reaudit.md  (상대 경로)
+❌ memory/<교훈>.md  (상대 경로)
 ```
 
-참조: `${CLAUDE_PROJECT_DIR}/memory/feedback_followup_artifact_reaudit.md` (Follow-up 재감사 교훈)
+참조: `${CLAUDE_PROJECT_DIR}/memory/<교훈>.md` (Follow-up 재감사 교훈)
 
 ---
 
@@ -465,7 +465,7 @@ code-changes 후 → build → [implication-scan] → codex check
 2. 기존 동일 패턴(이전 PR, 같은 시리즈 이전 커밋) 대조
 3. 판정: valid / invalid / needs-investigation + 근거 1줄
 
-**Why:** ASD-1002 세션에서 CodeRabbit이 "includeGradeCode: false 누락" 지적 → diff만 보고 수긍 → 실제로 LegacyResponse 오버로드에 해당 파라미터가 존재하지 않았음. 같은 세션에서 2건 발생.
+**Why:** OBS-01 세션에서 CodeRabbit이 "includeGradeCode: false 누락" 지적 → diff만 보고 수긍 → 실제로 LegacyResponse 오버로드에 해당 파라미터가 존재하지 않았음. 같은 세션에서 2건 발생.
 
 ---
 
@@ -480,7 +480,7 @@ code-changes 후 → build → [implication-scan] → codex check
 1. 가능하면 Bash Swift 스크립트로 실제 실행하여 확인
 2. 실행 불가능하면 → "미검증 (추론)" 표기 후 사용자에게 고지
 
-> [관찰 모드]: 단일 사건(ASD-1002 castToSendable)에서 도출. 하네스 과적합 방지 원칙에 따라 2건+ 재발 시 lead-reasoning.md로 강화.
+> [관찰 모드]: 단일 사건(OBS-01 castToSendable)에서 도출. 하네스 과적합 방지 원칙에 따라 2건+ 재발 시 lead-reasoning.md로 강화.
 
 **Why:** castToSendable의 Bool/Int 변환 안전성을 직관으로 "안전하다" 판단 → 취소 → Bash 테스트로 위험 확인. 실행 검증이 있었으면 1번에 끝났음.
 
@@ -530,7 +530,7 @@ SOLO 모드에서는 에이전트 스폰/Codex 교차 검증 없이, 결정론�
 4. 비율 < 100% → 누락 사유 명시 필수
 5. **명령 출력 커버리지** (파일 분석 없는 순수 grep/rg 조사는 1-4항 대신 본 항부터 적용): 근거 수집 명령에 `head`/`tail` 잘림 금지. 출력이 길면 자르지 말고 `wc -l` 총계 병기 + "잘림" 명시.
 6. **집계 검산식**: 분할 합계 주장(부분합 존재)은 검산식 명시·일치 의무 (예: `80 = 58 + 6 + 14 + 2`). 단순 단일 카운트는 head 없는 재실행(`rg X | wc -l`)으로 대체. 정규식/쿼리 불완전로 인한 가짜 교차확인도 검산 불일치로 탐지 — T8 리마인더 범위 밖, 본 항이 담당.
-7. **분류 완전성** *[candidate: 1 session evidence]* (scope 판정이 산출물에 포함될 때 — sweep/discovery가 항목을 in_scope/out_of_scope/migrated 분류): 기각(out_of_scope/migrated) 항목 수 명시 + 무작위 N=min(3, 전체기각수) 표본 adversarial 재검(반례 탐색 → 발견 시 재분류). **분류 단위 = 사용 site(call/usage site), file 전체 아님** — 혼재 파일(in-scope+out-scope site 공존) 허용. (BAD: 파일 통째 out 판정 → 내부 in-scope site 폐기 / GOOD: site별 분리 판정). [evidence:1 TVG-1164, active:5세션(트랙 A — promotion-ledger.md canonical) — `project_fz_harness_holes.md`]
+7. **분류 완전성** *[candidate: 1 session evidence]* (scope 판정이 산출물에 포함될 때 — sweep/discovery가 항목을 in_scope/out_of_scope/migrated 분류): 기각(out_of_scope/migrated) 항목 수 명시 + 무작위 N=min(3, 전체기각수) 표본 adversarial 재검(반례 탐색 → 발견 시 재분류). **분류 단위 = 사용 site(call/usage site), file 전체 아님** — 혼재 파일(in-scope+out-scope site 공존) 허용. (BAD: 파일 통째 out 판정 → 내부 in-scope site 폐기 / GOOD: site별 분리 판정). [evidence:1 OBS-15, active:5세션(트랙 A — promotion-ledger.md canonical) — `project_fz_harness_holes.md`]
 
 ```
 BAD:  rg X | head -5 → "사용처 2곳뿐"   (잘린 5줄을 전수로 단정)

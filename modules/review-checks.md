@@ -45,7 +45,7 @@
      - diff의 각 구조 결정(DI 획득 방식·상태 보관 위치·public API 모양)에 대해 **같은 역할의 형제 심볼**을 Grep으로 수집한다. 예: `Grep("BookmarkUseCaseImpl(")` → 형제 Interactor N곳이 어떤 방식을 쓰는지
      - 수집 결과는 판정의 **양방향 입력**이다:
        · 관례와 **같음**(3+ 형제 동일) → severity 하향 (교과서 기준만으로 위반 판정 금지)
-       · 관례와 **다름** → *"형제 N곳이 X 형태"*를 근거로 제시. ⚠️ N의 강도 임계(N≥? → 어느 severity)는 **미정**이므로 현재는 **관찰 보고까지만** — 처방 severity는 부여하지 않는다 *[candidate: 표본 1건 — PR #4679 I3, N=5. 3 표본 후 임계 결정]*
+       · 관례와 **다름** → *"형제 N곳이 X 형태"*를 근거로 제시. ⚠️ N의 강도 임계(N≥? → 어느 severity)는 **미정**이므로 현재는 **관찰 보고까지만** — 처방 severity는 부여하지 않는다 *[candidate: 표본 1건 — PR I3, N=5. 3 표본 후 임계 결정]*
      - ⛔ 수집 없이 관례를 논하지 않는다. `arch-critic`이 review-arch에 함께 로드되어 "Convention 3+ 모듈은 suggestion 이하" 억제 규칙을 주입하므로, **수집이 없으면 억제 기준만 있고 근거가 없는 상태**가 된다
 ```
 
@@ -106,9 +106,9 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
 
 ### 검증 4-N: Swift Naming Compliance (Swift/iOS 프로젝트 한정) — **CANDIDATE (Lesson Intake Decision Tree)**
 
-> ⚠️ **Candidate 상태**: 축(a~e) evidence 1 session (ASD-1366). 축(f) evidence 1 session (ASD-1794, promotion-ledger L-8) — **축별 evidence 분리, 카운트 혼합 금지**. `modules/memory-guide.md` Lesson Intake Decision Tree 명시 — *evidence < 3 sessions → candidate*. 활성 강제 X. 본 검증은 *권장 self-check*이지 *Gate 차단*이 아님. 각 축 5 sessions 관측 후 활성화 결정.
+> ⚠️ **Candidate 상태**: 축(a~e) evidence 1 session (OBS-06). 축(f) evidence 1 session (OBS-11, promotion-ledger L-8) — **축별 evidence 분리, 카운트 혼합 금지**. `modules/memory-guide.md` Lesson Intake Decision Tree 명시 — *evidence < 3 sessions → candidate*. 활성 강제 X. 본 검증은 *권장 self-check*이지 *Gate 차단*이 아님. 각 축 5 sessions 관측 후 활성화 결정.
 > 발동: Swift/iOS 프로젝트 + diff에 새 식별자(helper/method/type/property) 발견 시 권장. 축(f)는 주석도 대상.
-> 참조: 메모리 `feedback_swift_naming_conventions.md` — Apple Swift API Design Guidelines 5축 self-check.
+> 참조: 메모리 `Swift API Design Guidelines 교훈` — Apple Swift API Design Guidelines 5축 self-check.
 
 ```
 절차:
@@ -130,11 +130,11 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
 - [ ] 위반 발견 시 권고 대안 명시?
 ```
 
-> ASD-1366 사례: helper naming 4회 iteration(`withApp` → `appOrLog` → `verifiedApp`) — 사용자 지적으로 catch. fz-review 자체 검증으로 *사전 catch 가능*해야 함.
+> OBS-06 사례: helper naming 4회 iteration(`withApp` → `appOrLog` → `verifiedApp`) — 사용자 지적으로 catch. fz-review 자체 검증으로 *사전 catch 가능*해야 함.
 
 ### 검증 4-O: Session-added Assets Application (세션 중 추가 자산 적용) — **CANDIDATE (Lesson Intake Decision Tree)**
 
-> ⚠️ **Candidate 상태**: evidence 1 session (ASD-1366). `modules/memory-guide.md` Lesson Intake Decision Tree 명시. 활성 강제 X. 5 sessions 관측 후 활성화 결정. 또한 *기존 principle (메모리 41차 External Authority Bias)와 same failure mode 가능* — merge 후보로도 검토.
+> ⚠️ **Candidate 상태**: evidence 1 session (OBS-06). `modules/memory-guide.md` Lesson Intake Decision Tree 명시. 활성 강제 X. 5 sessions 관측 후 활성화 결정. 또한 *기존 principle (메모리 41차 External Authority Bias)와 same failure mode 가능* — merge 후보로도 검토.
 > 발동: 본 세션에서 메모리/스킬/가이드를 *추가 또는 수정*한 경우 권장.
 > 목적: 추가 자산이 *현재 작업 검증에 적용*되었는지 명시 확인.
 
@@ -156,19 +156,19 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
 - [ ] 보고에 "어떤 자산을 어떻게 적용했는가" 명시?
 ```
 
-> ASD-1366 사례: `feedback_swift_naming_conventions.md` + fz-code "Swift Naming 위반" 신호 추가 후 *self-review에서 미적용* — 사용자 지적으로 catch. *작성 + 적용이 비대칭*인 메타 패턴 (메모리 41차 재현).
+> OBS-06 사례: `Swift API Design Guidelines 교훈` + fz-code "Swift Naming 위반" 신호 추가 후 *self-review에서 미적용* — 사용자 지적으로 catch. *작성 + 적용이 비대칭*인 메타 패턴 (메모리 41차 재현).
 
 ---
 
 ### 검증 4-P: Post-State Consistency (편집 지점 일관성) *[candidate: 1 session evidence]*
 
-> ⚠️ **Candidate 상태**: evidence 1 session (TVG-4099, `promotion-ledger` **L-13**). `modules/memory-guide.md` Lesson Intake Decision Tree 명시. **활성 강제 X.** 5 sessions 관측 + 외부 채점 1회 후 활성화 결정.
+> ⚠️ **Candidate 상태**: evidence 1 session (OBS-24, `promotion-ledger` **L-13**). `modules/memory-guide.md` Lesson Intake Decision Tree 명시. **활성 강제 X.** 5 sessions 관측 + 외부 채점 1회 후 활성화 결정.
 > **발동**: 편집이 **동종 슬롯이 열거된 구조**(아래 peer slot taxonomy)에 닿을 때만. 전 hunk 상시 적용 아님.
 >
 > ⛔ **진단 정정 (2026-08-10, 외부 검증 반영)**: 최초 서술은 *"post-state 축이 부재"* 였으나 **오진**이다 — 형제 렌즈가 실재한다: `skill-authoring.md` §1 **Sibling-Convention Check**(동류 항목 표기 grep — **본 검사와 같은 실패 모드**) · `fz-review` §검증 1("Grep → 변경 후 패턴 일관성") · `agents/impl-quality.md`("Codebase Pattern Consistency"). 정확한 진술은 **"존재하는 축의 (a) 입도 부족(같은 블록 형제 단위 없음) + (b) 소유자 미배선(`workflows/code-pair.js`가 impl-quality를 '미포함 기본값'으로 둠)"**.
 > ⇒ 본 검사를 확정하기 전에 **대안 A(impl-quality 배선 복구)** · **대안 B(Lead 책임 체크리스트 1줄)** 와의 비용·발화율 비교가 선행돼야 한다(`harness-engineering` 원칙 1 — 가장 단순한 해결책 먼저).
 >
-> ⛔ **오탐 실측 (표본 소, 일반화 금지)**: TVG-4099 워크트리 peer slot 11곳 적용 → emit 9곳 중 **진짜 결함 1곳**. 오탐의 공통 형태 = *표현 비대칭이 **의미 비대칭**(소비처 범위·값 결정 규칙·조건부 포함)을 정확히 반영*하는데 본 검사에 그 구분 축이 없음.
+> ⛔ **오탐 실측 (표본 소, 일반화 금지)**: OBS-24 워크트리 peer slot 11곳 적용 → emit 9곳 중 **진짜 결함 1곳**. 오탐의 공통 형태 = *표현 비대칭이 **의미 비대칭**(소비처 범위·값 결정 규칙·조건부 포함)을 정확히 반영*하는데 본 검사에 그 구분 축이 없음.
 > ⛔ **"비용 0" 주장 철회**: 접근 수준·상수 소유권은 **정의상 소비처가 결정**하므로 in-block 판정 불가 [실측: `liveIcon` non-private 근거가 `BandCell.swift` 프로토콜에 있음 / `Metric` public 정당성 판정에 리포 grep 4회 필요].
 > ⛔ **diff 앵커링 상속**: 절차가 "편집 hunk"에서 출발하므로 **편집이 닿지 않은 기존 비대칭은 보이지 않는다** — 본 검사가 극복하려던 한계를 그대로 물려받았다.
 >
@@ -231,4 +231,4 @@ GOOD (post-state 검증):
 ```
 
 > ⚠️ **표면 churn과 별개** (`fz-code` friction-detect): 표면 churn은 *시간축*(동일 대상 2회+ 변경), 4-P는 *공간축*(형제 슬롯 비대칭). `memory-guide` "same failure mode → merge" 기준상 병합 부적합.
-> TVG-4099 사례: 세션 오류 6건 중 4건이 "대상을 격리해 보고 그것이 속한 구조를 안 봄"이라는 동일 뿌리. 관측 기록 = `modules/promotion-ledger.md` **L-13** (세션 회고 원문은 ledger에서 링크).
+> OBS-24 사례: 세션 오류 6건 중 4건이 "대상을 격리해 보고 그것이 속한 구조를 안 봄"이라는 동일 뿌리. 관측 기록 = `modules/promotion-ledger.md` **L-13** (세션 회고 원문은 ledger에서 링크).

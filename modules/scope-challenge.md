@@ -1,7 +1,7 @@
 # Scope Challenge — Phase 3 Codex 이슈 분류 + Lead 독립 판정
 
 > 참조: `skills/fz-plan/SKILL.md` Phase 3, `skills/fz-codex/SKILL.md` verify 응답, `schemas/codex_review_schema.json`
-> 원본 근거: ASD-1136 plan iteration 4회 (26시간, 40% 롤백) — 과잉 확장 방지
+> 원본 근거: OBS-03 plan iteration 4회 (26시간, 40% 롤백) — 과잉 확장 방지
 > **1단계 깊이 원칙**: 본 모듈은 자체 완결. 다른 `modules/` 재참조 금지 (skill-authoring §3)
 
 ## 목차
@@ -103,21 +103,21 @@ Phase 3.2 Lead 독립 판정:
 
 ## Appendix: Q-S5 Decision Re-open Gate (P2-A, 관측 중)
 
-> **현 상태**: P2 (Decision-Lock 패턴 1회 관측, ASD-1136 유일). 본 Phase 3 체크리스트에는 **미포함**.
-> **승격 조건**: ASD-1137+ eligible session 1건에서 재현 시 P1 승격. 자동 자동 확장 없음.
+> **현 상태**: P2 (Decision-Lock 패턴 1회 관측, OBS-03 유일). 본 Phase 3 체크리스트에는 **미포함**.
+> **승격 조건**: OBS-04+ eligible session 1건에서 재현 시 P1 승격. 자동 자동 확장 없음.
 
 ### Q-S5: 이 Codex 이슈가 **부모 결정 자체**를 재검토할 근거인가?
 
 - Yes → scope_disposition = `parent-reopen` + AskUserQuestion
 - No → Q-S1~S4 통상 진행
 
-### 발동 예시 (ASD-1136)
+### 발동 예시 (OBS-03)
 
 v3 "SCNetworkReachability bootstrap" 결정 후 v3.1에서 Codex가 "flag 정확 복제" 이슈 제기. 이 이슈가 bootstrap **자체**를 재평가할 근거라면 Q-S5 발동 → 사용자 확인 → Q0 Required 기준 재평가.
 
 ### 승격 조건 (P2 → P1)
 
-1. ASD-1137+ eligible session 1건에서 parent-reopen disposition 발동
+1. OBS-04+ eligible session 1건에서 parent-reopen disposition 발동
 2. 발동 결과는 승격 관리 정책에 따라 기록 (본 모듈 범위 밖)
 3. 누적 후 Codex adversarial 검증 → approved 시 P1 승격
 

@@ -10,7 +10,7 @@
     "schemaVersion": {
       "type": "string",
       "enum": ["1.0", "1.1"],
-      "description": "스키마 버전. v1.1에서 issues[].scope_disposition 추가 (ASD-1136 v2.2)"
+      "description": "스키마 버전. v1.1에서 issues[].scope_disposition 추가 (OBS-03 v2.2)"
     },
     "agent": {
       "type": "string",

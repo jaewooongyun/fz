@@ -30,7 +30,7 @@
 //     review-arch·impl-quality·review-correctness로 정의하나 Wave 3 전환 시 arch만 배선됐다
 //     (구 주석 "S4 결정 — 미포함 기본값", 근거 문서 미추적). 대조군 plan-collaborative는 정의된 5개 전수 스폰.
 //     impl-quality의 "Codebase Pattern Consistency" 부재로 형제 슬롯 비대칭이 무방비였다
-//     [verified: TVG-4099 R8 — promotion-ledger L-13]. review-correctness/memory-curator는 여전히 Lead 경로.
+//     [verified: OBS-24 R8 — promotion-ledger L-13]. review-correctness/memory-curator는 여전히 Lead 경로.
 
 export const meta = {
   name: 'code-pair',
@@ -172,7 +172,7 @@ if (actualNewBodyLines > SPLIT_THRESHOLD) log(`WARN changeset ~${actualNewBodyLi
 // ⚠️ 배선 복구 (2026-08-10): agent-team-guide §팀 구성이 code-* 실질 워커를 review-arch·impl-quality·review-correctness로
 //   정의하나 Wave 3 전환 시 arch만 배선됐다("S4 결정 — 미포함 기본값", 근거 문서 미추적). 대조군 plan-collaborative는
 //   정의된 5개를 전수 스폰. impl-quality의 "Codebase Pattern Consistency"(기존 구현과 비교·패턴 충돌 확인)가
-//   부재해 형제 슬롯 비대칭이 무방비였다 [verified: TVG-4099 R8 — promotion-ledger L-13].
+//   부재해 형제 슬롯 비대칭이 무방비였다 [verified: OBS-24 R8 — promotion-ledger L-13].
 //   full만 추가(light는 비용 유지). opus 동시 ≤2 (+Lead=3) — governance 상한 내.
 let review = null
 const c = input.stepSpec.complexity

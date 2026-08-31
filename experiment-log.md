@@ -64,7 +64,7 @@
 | # | 날짜 | 스킬 | Gate | Evidence 채워짐? | 유용했나? | 비고 |
 |---|------|------|------|:---------------:|:--------:|------|
 | | | | | | | |
-| 1 | 2026-06-11 | fz-plan (SOLO --deep) | Gate 1 Exhaustive Impact Scan | ✅ 앵커 4/4 grep + pre-state 0 hit + 내장 self-test 비파괴 | ✅ F4 앵커 이중 후보를 Tuning History 자체 게이트 실측으로 해소 → counter approve | ASD-1802 fz gap fix plan-v2 |
+| 1 | 2026-06-11 | fz-plan (SOLO --deep) | Gate 1 Exhaustive Impact Scan | ✅ 앵커 4/4 grep + pre-state 0 hit + 내장 self-test 비파괴 | ✅ F4 앵커 이중 후보를 Tuning History 자체 게이트 실측으로 해소 → counter approve | OBS-12 fz gap fix plan-v2 |
 
 ---
 
@@ -407,7 +407,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 ## §5.7 Workflow Tracing (TEAM→Workflow pilot, fz-discover)
 
 > Lead가 invoke마다 수동 append (hook 비의존 — §5.5 hook은 TaskCreated/TeammateIdle/TeamDeleted 의존, Workflow 모드 미발생).
-> 계획: TVING 워크스페이스 `fz-teams-workflow-migration/plan/plan-final.md` (계획 표기 §5.8은 실측 §5.6 다음 번호인 §5.7로 교정).
+> 계획: 작업 워크스페이스 `fz-teams-workflow-migration/plan/plan-final.md` (계획 표기 §5.8은 실측 §5.6 다음 번호인 §5.7로 교정).
 
 ### 확산 판정 임계 (사전 등록 — 변경 금지, 확증 편향 방어)
 
@@ -432,8 +432,8 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 3 | 2026-06-05 | lean | 5 | 0 | 2 | 0 | 492s | ✅ **첫 clean 통과** — 정주제 6경로 landscape, §5.7 기존재 실측 발견 + Phase B 표 semantics 충돌 발견 + traces.jsonl 선례 반박(L69). evidence [verified Lxx] 인용 준수, 결론 미산출 ✓. G2: 경로 6/evidence 충실/openQ 5건 실질 |
 | 4 | 2026-06-05 | **deep** | 9 | 0 | 2 | 0 | 404s | ✅ clean — 렌즈 12 원천→4 병합그룹(mergedFrom 추적 정상), lean 미발견 D경로 발굴 + false prereq 실측 반박 2건. **다양성 지표 판정 보류**: 사전등록 문구 "merged 고유 경로 수 > default 단일 생성 경로 수"가 양의적 — (a) 병합그룹 4 vs lean 최종 6 → 미충족 / (b) 원천 렌즈경로 12 vs lean 6 → 충족. 지표 정의 모호 자체가 calibration 발견 — 5건 시점 판정 전 정의 확정 필요. wall-clock은 deep(404s) < lean#3(492s) — 병렬 효과 |
 | 5 | 2026-06-05 | **deep** | 10 | 0 | 2 | 0 | 482s | ✅ clean — **merge 수정 검증**: MergedPathSetSchema(maxItems 12) 적용 후 병합 5그룹 (이전 상한 4 돌파 — 스키마 탈락 강제 해소 실증). 신규: 입력 경로 오류를 Grep 실측으로 자가 교정 + freeze 블록 canonical 식별. ts 제거 계약 정상 동작 |
-| 6 | 2026-07-09 | lean | 5 | 0 | 2 | 0 | 1724s | ✅ clean — 실사용 (TVG-2134 레이어 분리 landscape). 경로 5 (mergedFrom 8 원천 추적 정상), openQ 6건 실질, [미검증] 태깅 준수(토글 인프라·F7 — 전자는 Lead 후속 grep으로 해소: RemoteConfigStream 존재). 결론 미산출 ✓. wall-clock 1724s로 #1-5(404-492s) 대비 3.5x↑ (Fable 세션 + 5축 문제 복잡도 — 비교 시 참고) |
-| 7 | 2026-07-20 | lean | 5 | 0 | 2 | 0 | 3204s | ✅ clean — 실사용 (TVG-2906 홀 문서 → fz 반영 경로 landscape, 플러그인 메타). 경로 6(net-zero-floor 공통바닥 식별 + 직교 게이트 1), openQ 6건 실질. 특기: 라운드 간 인용 줄번호 불일치를 에이전트들이 상호 적발(r1cost 3/3 정확 vs 경로 저자 인용 14-23행 어긋남 — recheck 규율 가치는 OQ5로 이관, 결론 미산출 ✓). 워커의 홀 문서 Read는 OVERRIDE로 차단됨 — dedup 판별은 Lead codeContext 요약 경유(한계 명시, plan이 in-scope 반입) |
+| 6 | 2026-07-09 | lean | 5 | 0 | 2 | 0 | 1724s | ✅ clean — 실사용 (OBS-17 레이어 분리 landscape). 경로 5 (mergedFrom 8 원천 추적 정상), openQ 6건 실질, [미검증] 태깅 준수(토글 인프라·F7 — 전자는 Lead 후속 grep으로 해소: RemoteConfigStream 존재). 결론 미산출 ✓. wall-clock 1724s로 #1-5(404-492s) 대비 3.5x↑ (Fable 세션 + 5축 문제 복잡도 — 비교 시 참고) |
+| 7 | 2026-07-20 | lean | 5 | 0 | 2 | 0 | 3204s | ✅ clean — 실사용 (OBS-20 홀 문서 → fz 반영 경로 landscape, 플러그인 메타). 경로 6(net-zero-floor 공통바닥 식별 + 직교 게이트 1), openQ 6건 실질. 특기: 라운드 간 인용 줄번호 불일치를 에이전트들이 상호 적발(r1cost 3/3 정확 vs 경로 저자 인용 14-23행 어긋남 — recheck 규율 가치는 OQ5로 이관, 결론 미산출 ✓). 워커의 홀 문서 Read는 OVERRIDE로 차단됨 — dedup 판별은 Lead codeContext 요약 경유(한계 명시, plan이 in-scope 반입) |
 
 ### fz-search (cross-verify) — Wave 1 전환 (시작: 2026-06-05)
 
@@ -450,7 +450,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-review (finding/counter/severity) |
 |---|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
 | 1 | 2026-06-05 | 5 | 0 | 3 | 0 | 661s | ✅ clean — Wave 1 변경분 self-review: findings 11(실질 8, critical/major 0), okAreas 18, counter가 3건 추가 발견(C-1 okArea도전 소실/C-2 하드코딩/C-3 id중복=실버그) — DA 가치 실증. 8건 전부 즉시 수정 반영. 전환 직후 검증 invoke (임계 3건 중 1) |
-| 2 | 2026-06-11 | 5 | 0 | 3 | 0 | 728s | ✅ clean — ASD-1889 미러 리팩토링 리뷰 (실사용): findings 8 (critical/major 0), counter가 XQ:Q-1 refute(현 브랜치에 없는 중복을 ASD-1802 워크트리 cross-worktree 혼동으로 주장 — FP 실증 기각) + okArea 1건 반박(미러 비교 기준 라벨 명확화) + C-1/C-2 추가 발견. cross가 [verified] 실측 인용 충실. Lead 판정: 코드 변경 0건(전부 pre-existing/미러 의도), 후속 후보 2건. 임계 3건 중 2 |
+| 2 | 2026-06-11 | 5 | 0 | 3 | 0 | 728s | ✅ clean — OBS-13 미러 리팩토링 리뷰 (실사용): findings 8 (critical/major 0), counter가 XQ:Q-1 refute(현 브랜치에 없는 중복을 OBS-12 워크트리 cross-worktree 혼동으로 주장 — FP 실증 기각) + okArea 1건 반박(미러 비교 기준 라벨 명확화) + C-1/C-2 추가 발견. cross가 [verified] 실측 인용 충실. Lead 판정: 코드 변경 0건(전부 pre-existing/미러 의도), 후속 후보 2건. 임계 3건 중 2 |
 | 3 | 2026-06-11 | 5 | 0 | 3 | 0 | 715s | ✅ clean — **plan 문서 리뷰 (비-diff 신규 사용례)**: fz-gap-fix-plan-final(v3.1) 사용자 3축(가이드 준수/과적합/일반화). findings 14 (critical 0/major 2/minor 12, FP 0), counter가 okArea 4건 도전(완화 편향 1건 적발) + C-1~C-3 추가. 전 finding [verified] 인용. Lead 처분: 15건(Lead 자체 발견 L1 §12 oracle 포함) → plan v3.2 반영 13 + 의도 유지·O7 기록 2. Codex 차단 대체 한계(RC4) 명시. **임계 3건 전수 달성 — null 0%·완주 100%·fallback 0** |
 | 4 | 2026-06-11 | 5 | 0 | 3 | 0 | 920s | ✅ clean — gap fix **적용 diff 리뷰** (8파일 179줄+메모리 3): findings 11 (critical/major 0, FP 0) — 9건은 O1·O7 기록 완비/의도 결정 재확인, 1건 즉시 반영(Gate 0.5 SOLO 맥락 명시), counter가 okArea refute 1건("§12 정확히 일치" 과장 — full-path 미검증 사실 재명시) + 리뷰어 evidence 라인 오류 1건(C-1) 적발. okAreas 25 — F1~F4·G1·G3 발화 체인 정적 도달 전부 확인. 4-F 7/7 기계 PASS |
 | 5 | 2026-06-12 | 5 | 0 | 3 | 0 | 724s | ✅ clean — **plan 문서 리뷰** (전수 주장 오판 방어 plan-v1, #3 선례 동형·적용 전): findings 18 (critical 0/major 8/minor 10, FP 0) — 적용 전 리뷰가 plan 구조 결함 2건 포착(:436 트리거 요청 어휘 잔존=RC1 미해소 / 에이전트 행동 규율 행 T8=dead rule 12곳 재생산 위험). counter가 okArea 2건 refute(S7 verify 과잉 교체 미탐지 / 줄번호 신뢰 과대) + C-1~C-3. Lead 처분: 18건 전원 수용 → plan-v2 + 적용 반영. 실사용 표본 |
@@ -468,7 +468,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 2 | 2026-06-12 | 9 | 0 | 5 | 0 | 1327s | ✅ clean — 전수 주장 오판 재발 방지 plan(자가 개선 dogfooding 2, G1 배선 후 첫 실사용). G2 5축 PASS: direction PROCEED+`directionAlternatives` 3건 실반환(G1 full-path 확인 — A채택/B·C 부분 흡수)/렌즈·CC 실측 신규 발견 4건(fz SKILL :136 사문화·Q-COVERAGE 이중 진입점·12에이전트 T8 dead rule·memory-guide :30 충돌)→S3/S5/S7/S8 신설/verify 11·11/§Y 19 rationale 분리/Lead 회귀(Q1-Q6+RTM 11+peer issue 실측 해소 1건) 실수행. 임계 3건 중 2 |
 | 3 | 2026-06-12 | 9 | 0 | 5 | 0 | 1300s | ✅ clean — Fable 5 고도화 플랜(v4.14.0 대상, Fable 세션 첫 invoke). G2 5축 PASS: direction PROCEED+directionAlternatives 3건(A채택/C S6흡수)/렌즈·CC 신규 발견 3건(STALE 6→4 정정·R8 검증지시 86→12 over-count 정정·S7 비용 baseline 3-state 의무)/verify 8 Steps 전부/§Y 13 rationale 분리/Lead 회귀(Q1-Q6+RTM 12) 실수행. 특기: Phase 2 fresh-context 검증(Codex quota 폴백)이 M1(S3 직교 폴백 혼동 — Workflow 산출 결함)+L2(docs/releases Glob 오측, "[verified]" 표기 포함) 추가 발견 → plan-v2 정정. Workflow [verified] 태그 신뢰 한계 관찰(16차 레이어 재현). 임계 3건 중 3 |
 
-> 2026-06-11 **G1 배선 적용** (반환 `directionAlternatives` + 헤더 계약 주석 동기화, ASD-1802 gap fix): §12 oracle — ①래핑 node --check PASS ②스모크 invoke 1회 = fail-fast 경로 정상(`mode:'fallback'`, 0 agent, 3ms — 위 누적 테이블 분모 **비포함**, 스모크는 실사용 아님) ③full-path 필드 실반환은 다음 실사용 invoke에서 확인.
+> 2026-06-11 **G1 배선 적용** (반환 `directionAlternatives` + 헤더 계약 주석 동기화, OBS-12 gap fix): §12 oracle — ①래핑 node --check PASS ②스모크 invoke 1회 = fail-fast 경로 정상(`mode:'fallback'`, 0 agent, 3ms — 위 누적 테이블 분모 **비포함**, 스모크는 실사용 아님) ③full-path 필드 실반환은 다음 실사용 invoke에서 확인.
 
 ### fz-code (pair-programming full) — Wave 3 전환 (시작: 2026-06-05)
 
@@ -496,8 +496,8 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 
 | # | date | steps | invokes | agentCalls | nullCount | fallback | 빌드 1회 통과 | G2-code 관찰 |
 |---|------|-------|---------|-----------|-----------|----------|--------------|--------------|
-| 1 | 2026-07-10 | B2·B3 (TVG-2134 찜내역 Fan 편입) | 3 (유효 2 + args 오류 즉시 fallback 1 — Lead args의 깨진 유니코드 이스케이프, 스크립트 fail-fast 정상 동작) | 5 (B2: impl+review pass 2 / B3: impl+review issues+revise 3) | 0 | 1 (입력 오류 — 수정 후 재invoke 회복) | 2/2 (적용 후 각 1회 통과, anchor 불일치 0) | ✅ changeset 19파일 전건 적용, Stage2 리뷰가 B3에서 이슈 검출→Stage3 반영. Codex check가 defer 가드 누락(plan 반영 유실분) major 1건 검출 → Lead 실측 확인 후 2파일 정합화 |
-| 2 | 2026-07-20 | TVG-2906 홀 반영(S1·S2·S5·S6 편집 + S4 등재, S3 보류) | 1 (SOLO Lead 직접 — 마크다운 국소편집, changeset=plan 명세, code-pair 과잉) | 0 | 0 | 0 | validate 1회 통과(빌드 대체) | ✅ 7파일 편집, grep 7/7·plugin validate·500줄·참조 회귀 무손상. Lead 판정 3건(OQ-c 카운트보류·OQ-d S3보류·H-P2 독립등재). Codex 불능 — 후속 fz-review 이관 |
+| 1 | 2026-07-10 | B2·B3 (OBS-17 즐겨찾기 편입) | 3 (유효 2 + args 오류 즉시 fallback 1 — Lead args의 깨진 유니코드 이스케이프, 스크립트 fail-fast 정상 동작) | 5 (B2: impl+review pass 2 / B3: impl+review issues+revise 3) | 0 | 1 (입력 오류 — 수정 후 재invoke 회복) | 2/2 (적용 후 각 1회 통과, anchor 불일치 0) | ✅ changeset 19파일 전건 적용, Stage2 리뷰가 B3에서 이슈 검출→Stage3 반영. Codex check가 defer 가드 누락(plan 반영 유실분) major 1건 검출 → Lead 실측 확인 후 2파일 정합화 |
+| 2 | 2026-07-20 | OBS-20 홀 반영(S1·S2·S5·S6 편집 + S4 등재, S3 보류) | 1 (SOLO Lead 직접 — 마크다운 국소편집, changeset=plan 명세, code-pair 과잉) | 0 | 0 | 0 | validate 1회 통과(빌드 대체) | ✅ 7파일 편집, grep 7/7·plugin validate·500줄·참조 회귀 무손상. Lead 판정 3건(OQ-c 카운트보류·OQ-d S3보류·H-P2 독립등재). Codex 불능 — 후속 fz-review 이관 |
 
 ### fz-peer-review (live-review) — Wave 4 전환 (시작: 2026-08-09)
 
@@ -526,11 +526,13 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 9 | 2026-08-24 | 0 | solo | 0 | n/a | n/a | n/a | unavailable | n/a | 사용자 경량 요청. merge-base 명시 리뷰 |
 | 10 | 2026-08-25 | 1 | solo+codex | 0 | n/a | n/a | n/a | unavailable | n/a | 경량(Tier 1 상당) — Lead 단독 분석 `[단일 렌즈 — 교차검증 없음]` 태그 부착 |
 
-| 11 | 2026-08-25 | 1 | solo (codex 실패) | 0 | n/a | n/a | n/a | **1320s (실측)** | n/a | ⭐ **개선본으로 잰 첫 행** (1~10은 백필 baseline). PR #4766 · 리뷰 표면 18파일 +83/−83. **도구 결함 3건 발견** — ① PR 경로 `baseRefName` 이 원격 이름이라 로컬 부재 → `git show` 25건 전패 → base 원본 **0/25 인데 exit 0** ② PR 경로에 merge-base 미적용(base 팁 ≠ 분기점) ③ risk_scan 이 `-@MainActor…isExtendedLayout`/`+@MainActor…supportsSplitLayout` **개명 짝**을 위험으로 세어 166줄 PR 을 Tier 1→2 로 승격(agent 0→3콜). ③은 net-new 판정으로 수정+fixture 3건. 산출 major 1(PR 에 이미 머지된 커밋 포함) + suggestion 1(형제 Interactor 계약 비대칭, pre-existing) |
+| 11 | 2026-08-25 | 1 | solo (codex 실패) | 0 | n/a | n/a | n/a | **1320s (실측)** | n/a | ⭐ **개선본으로 잰 첫 행** (1~10은 백필 baseline). PR · 리뷰 표면 18파일 +83/−83. **도구 결함 3건 발견** — ① PR 경로 `baseRefName` 이 원격 이름이라 로컬 부재 → `git show` 25건 전패 → base 원본 **0/25 인데 exit 0** ② PR 경로에 merge-base 미적용(base 팁 ≠ 분기점) ③ risk_scan 이 `-@MainActor…isExtendedLayout`/`+@MainActor…supportsSplitLayout` **개명 짝**을 위험으로 세어 166줄 PR 을 Tier 1→2 로 승격(agent 0→3콜). ③은 net-new 판정으로 수정+fixture 3건. 산출 major 1(PR 에 이미 머지된 커밋 포함) + suggestion 1(형제 Interactor 계약 비대칭, pre-existing) |
 
-| 12 | 2026-08-26 | 2 | solo (workflow 미호출 · codex 실패) | 0 | n/a | n/a | n/a | **360s (실측)** | n/a | ⭐ **개선본 2회차 — 결함 0건**. PR #4774(파일 분리 리팩토링, 872줄). 11행에서 잡은 결함 3종이 **전부 재발 없음**: base 원본 **2/2**(① remote 접두 자동 해석 발화) · `review-surface.md` **중복 0 정확 보고**(②, #4766 에선 2건 검출 — 오경보 아님) · risk **0**(③ net-new; 구 로직은 코드 이동에 risk=2). Gather **2초**. ⛔ **이슈 0건** — 대신 `checked_but_not_reported` **4건**을 산출물에 남겼다(관례 74% 실측으로 지적 철회 · import 판정은 측정 도구 무효로 보류 · `#if Lab` 비대칭은 오탐 · 중복커밋 0). ⭐ **Negative-Result Gate 가 실제로 발화**해 "import 사용 0건" 주장을 철회시켰다(도구가 앱/모듈 심볼 미구별). ⚠️ Tier 2 인데 Workflow 미호출 — Lead 단독 분석으로 종결했다(agentCalls 0) |
+| 12 | 2026-08-26 | 2 | solo (workflow 미호출 · codex 실패) | 0 | n/a | n/a | n/a | **360s (실측)** | n/a | ⭐ **개선본 2회차 — 결함 0건**. PR(파일 분리 리팩토링, 872줄). 11행에서 잡은 결함 3종이 **전부 재발 없음**: base 원본 **2/2**(① remote 접두 자동 해석 발화) · `review-surface.md` **중복 0 정확 보고**(②, #4766 에선 2건 검출 — 오경보 아님) · risk **0**(③ net-new; 구 로직은 코드 이동에 risk=2). Gather **2초**. ⛔ **이슈 0건** — 대신 `checked_but_not_reported` **4건**을 산출물에 남겼다(관례 74% 실측으로 지적 철회 · import 판정은 측정 도구 무효로 보류 · `#if Lab` 비대칭은 오탐 · 중복커밋 0). ⭐ **Negative-Result Gate 가 실제로 발화**해 "import 사용 0건" 주장을 철회시켰다(도구가 앱/모듈 심볼 미구별). ⚠️ Tier 2 인데 Workflow 미호출 — Lead 단독 분석으로 종결했다(agentCalls 0) |
 
-> **경로 분포 (N=12)**: Tier 0 ×3 · Tier 1 ×4 · Tier 2 ×4 · Tier 3 ×1 → **경량 경로(0·1)가 58%**이고 그중 3건은 사용자가 '경량'을 명시 요청했다. 경량은 auto-tier의 부산물이 아니라 **반복 선택되는 경로**다.
+| 13 | 2026-08-27 | 2 | workflow | **5 (실측)** | **0** | **2/2** (Stage2 트리거 발화 — severityConflicts=4) | **0** | **1953s** (Workflow 구간 실측 · subagent 914,183 tok) | structure **8건** | ⭐ **Stage2 조건부가 신규 11건 산출, 최종 5건 생존**(XA:A3·XQ:Q3 스켈레톤 높이 · XQ:Q5 VoiceOver · XA:A6 prepareForReuse · XA:A4 마키) — "어느 스테이지도 순수 판정이 아니다"의 3번째 관측. ⭐ **Codex 독립성 실증**: Lead 발견을 미공유한 상태로 같은 컴파일 이슈에 confidence 99 도달 + 추가 2건(DTO guard · 미사용 API). Reflection 3/3. ⛔ **3렌즈 합의가 오판한 1건** — "요구사항 무관 주석 삭제"를 arch·quality·correctness 전원이 지적했으나 실측은 **+56/−29로 주석이 늘었고** 삭제 다수가 이 PR이 구현을 끝낸 TODO였다(분모 미확인 합의). ⛔ **재검증에서 2건 하향** — 프리페치 임계(테스트 이름·경계값 동반 갱신 = 의도적) · 마키 게이팅(요구사항 5의 주체가 데일리 밴드) → **F-067**(렌즈 함의 무검증). ⛔ **Gate 4.5 범위 갭** — minor 라인 2건이 미검증으로 게시 직전까지(실제 18 vs 보고 14-24 / 실제 3065 vs 보고 3063) → **F-069**. ⛔ **Tier 2 미투표 규정 위반** — Lead가 Votes/Final 19행 Matrix 작성 + 규정 공식(×0.85)도 미적용 → **F-070**. `--post` APPROVE + 인라인 7건 게시, 착지 검증 **7/7**. `path_not_in_diff` 1건은 원인 지점 앵커로 대체(코드블록 인용 누락 → **F-073**). `cost-log.json` 미생성 → **F-072** |
+
+> **경로 분포 (N=13)**: Tier 0 ×3 · Tier 1 ×4 · Tier 2 ×5 · Tier 3 ×1 → **경량 경로(0·1)가 54%**이고 그중 3건은 사용자가 '경량'을 명시 요청했다. 경량은 auto-tier의 부산물이 아니라 **반복 선택되는 경로**다.
 > ⛔ **임계 판정 불가**: 사전등록 임계는 `3건 전수`를 요구하나 위 10행은 **백필이라 그 3건에 해당하지 않는다**(사전등록은 전환 후 실 invoke 기준). 이 표는 **before baseline**이며 확산 판정 입력이 아니다.
 >
 > ⛔ **11행도 확산 판정 입력이 아니다** (2026-08-25 S8 pilot). 사전등록은 `3건 전수` + **경로별 최소 1건** + 권장 **paired replay**(old/new 동일 입력 재생)를 요구하는데, 이 실행은 **Tier 1 단건**이고 짝 비교가 없다. ⛔ 또 Codex 가 credit 소진으로 실패해 Tier 1 의 이종 검증이 빠졌다 — `solo+codex` 가 아니라 `solo (codex 실패)` 로 적는다. **GATE-FAIL(12)은 측정 실패이지 '이슈 0건'이 아니다.**

@@ -2,7 +2,7 @@
 """
 Memory Parser (Lessons-to-Module Pipeline D+2 component)
 
-Phase 3 fz-cargo-cult-defense Pilot 산출물.
+Phase 3 Pilot 산출물.
 입력: memory/feedback_*.md (frontmatter + 본문)
 출력: JSON (id, frontmatter, core_lesson, applied_location_*, meta_family, signals)
 
@@ -16,7 +16,7 @@ Usage:
 기대 출력 형식 (기대 정답: manual-pattern-extraction.md §4.1):
 {
   "id": "19차",
-  "source_file": "feedback_import_copy_without_verification.md",
+  "source_file": "<교훈파일>.md",
   "frontmatter": {...},
   "core_lesson": "...",
   "applied_location_explicit": [...],
@@ -48,7 +48,7 @@ FRONTMATTER_PATTERN = re.compile(
     r"^---\s*\n(.*?)\n---\s*\n(.*)", re.DOTALL
 )
 
-# id 추출: "ASD-1260", "X차", "feedback_..." 변형 모두 수용
+# id 추출: "ASD-1234", "X차", "feedback_..." 변형 모두 수용
 ID_FROM_FILENAME_PATTERN = re.compile(r"feedback_(.+?)\.md$")
 
 # meta_family 차수 추출: "16차/23차/33차/34차" 또는 "16차 / 23차 / ..."
@@ -107,7 +107,7 @@ META_PATTERN_HINTS = [
 TRIGGER_CASE_PATTERN = re.compile(
     r"\b(ASD-\d{2,5}|PR\s*#\d{2,5}|D\d+\s*회귀|"
     r"이번\s*PR\s*\d+|PR\d+|이번\s*세션|"
-    r"22\s*catch|fz-meta-\d{4}-\d{2}-\d{2})"
+    r"22\s*catch)"
 )
 
 # severity 휴리스틱
