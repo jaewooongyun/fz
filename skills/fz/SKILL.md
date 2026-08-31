@@ -137,7 +137,7 @@ intent-triggers: []
    - TEAM: memory-curator 에이전트 **모든 TEAM 모드**에서 포함
    - **의무 출력 형식**: `Active Recall: [ID-N차] → {매칭 패턴} → {추론된 행동}` (3-step chain)
      - 예: `Active Recall: [40차] → "확인해줘" + 검토 산출물 존재 → full 파이프라인 차단, light mode`
-   - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄). 단, 산출물이 전수/카운트/부정 주장 예정이면 abbreviated여도 `Read(modules/cross-validation.md §Coverage Gate)` 후 적용 (light = 절차 생략이지 검증 생략 아님)
+   - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄). 단, 산출물이 전수/카운트/부정 주장 예정이면 abbreviated여도 `Read(modules/cross-validation.md §Coverage Gate)` 후 적용 (light = 절차 생략이지 검증 생략 아님). ⛔ **부정 주장이면 §Negative-Result Gate 도 함께** — 범위 대 도구 유효성은 다른 축이다
    - ⛔ 선언만으로는 Gate 0 통과 불가 — 3-step chain 명시 의무 (edge-cases Failure 1-1 완화)
 
 5. **핵심 모듈 선로드** (6+ 스텝 또는 TEAM):

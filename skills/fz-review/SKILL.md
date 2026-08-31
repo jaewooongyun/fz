@@ -460,7 +460,7 @@ Gate 5 통과 후:
 - Codex 교차 검증 생략 (3중 → 1중)
 - 역방향 검증 (Phase 5.5) 생략
 - Reflection Rate 추적 생략
-- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계)
+- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
 - 산출물: `{WORK_DIR}/review/review-light.md` (간소화)
 
 조건: 메모리 40차 trigger 키워드 + 소규모 변경(5 파일 미만 + 100 LOC 미만)에만. 리팩토링/모듈화/시그니처 변경 시 full 모드 강제.
