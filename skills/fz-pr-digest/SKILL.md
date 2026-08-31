@@ -428,7 +428,7 @@ Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체
 
 ### peer-review 연계
 - fz-peer-review Tier 3 + `--explain --deep` 시: Lead가 `workflows/peer-review.js`(`deep:true`) 실행 → reviews/issues 수신 → pr-digest Deep 해설과 결합. 각 스킬이 자신의 Workflow를 소유하므로 별도 TeamCreate 불필요.
-- `--explain` 단독(티어 플래그 없음)은 **Tutor**로 진입한다 — Deep Workflow를 타지 않고 §7-A~§7-E 폐포 탐색을 수행한다. 판별표: `fz-peer-review/SKILL.md` §플래그 해석 규칙.
+- `--explain` 단독(티어 플래그 없음)은 **Tutor**로 진입한다 — Deep Workflow를 타지 않고 §7-A~§7-E 폐포 탐색을 수행한다. 판별표: `skills/fz-peer-review/SKILL.md` §플래그 해석 규칙.
 
 ---
 
