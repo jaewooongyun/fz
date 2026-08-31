@@ -1,39 +1,39 @@
-diff --git a/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsCore.swift b/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsCore.swift
+diff --git a/Packages/PlayerKit/Sources/PlayerKit/Player/PlayerCore.swift b/Packages/PlayerKit/Sources/PlayerKit/Player/PlayerCore.swift
 index db8913515..22ef8b160 100644
---- a/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsCore.swift
-+++ b/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsCore.swift
-@@ -66,10 +66,9 @@ public final class ShortsCore: @preconcurrency ShortsPresentableListener {
+--- a/Packages/PlayerKit/Sources/PlayerKit/Player/PlayerCore.swift
++++ b/Packages/PlayerKit/Sources/PlayerKit/Player/PlayerCore.swift
+@@ -66,10 +66,9 @@ public final class PlayerCore: @preconcurrency PresentableListener {
  
-     public var configuration = ShortsConfiguration()
+     public var configuration = PlayerConfiguration()
  
--    let controller: ShortFormPlayerController<ShortsContent, ShortsPlayerContext, ShortsCore>
-+    let controller: ShortFormPlayerControllerTemp<ShortsContent, ShortsPlayerContext, ShortsCore>
+-    let controller: MediaController<MediaItem, PlayerContext, PlayerCore>
++    let controller: MediaControllerTemp<MediaItem, PlayerContext, PlayerCore>
  
      private var cancellables = Set<AnyCancellable>()
 -    private var previewPeekTriggeredIndices = Set<Int>()
  
-     private var contents: [ShortsContent] = []
-     // FIXME: 별도 서비스(e.g. ShortsFilterStateManager)로 분리 후 DI 적용 검토
-@@ -81,6 +80,9 @@ public final class ShortsCore: @preconcurrency ShortsPresentableListener {
+     private var contents: [MediaItem] = []
+     // FIXME: 별도 서비스(e.g. PlayerFilterStateManager)로 분리 후 DI 적용 검토
+@@ -81,6 +80,9 @@ public final class PlayerCore: @preconcurrency PresentableListener {
  
      private var hasSentEndLogForCurrentSession: Bool = false
  
 +    /// 체인 자동 전환이 유발한 pause 상태 변화는 사용자 일시정지가 아니므로 shortsPause 시청 로그를 1회 억제한다.
 +    private var suppressesNextPauseWatchLog = false
 +
-     private var chainWatchTracker = ShortsChainWatchTracker()
+     private var chainWatchTracker = ChainWatchTracker()
  
-     private let isMainShorts: Bool
-@@ -108,7 +110,7 @@ public final class ShortsCore: @preconcurrency ShortsPresentableListener {
-         self.isMainShorts = isMainShorts
+     private let isMainPlayer: Bool
+@@ -108,7 +110,7 @@ public final class PlayerCore: @preconcurrency PresentableListener {
+         self.isMainPlayer = isMainPlayer
          self.logging = logging
  
--        controller = ShortFormPlayerController(prevThreshold: 1, nextThreshold: 1)
-+        controller = ShortFormPlayerControllerTemp(prevThreshold: 1, nextThreshold: 1)
+-        controller = MediaController(prevThreshold: 1, nextThreshold: 1)
++        controller = MediaControllerTemp(prevThreshold: 1, nextThreshold: 1)
  
          controller.dataSource = self
          controller.delegate = self
-@@ -723,7 +725,6 @@ public final class ShortsCore: @preconcurrency ShortsPresentableListener {
+@@ -723,7 +725,6 @@ public final class PlayerCore: @preconcurrency PresentableListener {
      func clearAllData() {
  
          contents.removeAll()
@@ -41,7 +41,7 @@ index db8913515..22ef8b160 100644
          presenter.applyEmptySnapshot()
      }
  
-@@ -1252,19 +1253,17 @@ extension ShortsCore: @preconcurrency ShortsPlayerUIDelegate {
+@@ -1252,19 +1253,17 @@ extension PlayerCore: @preconcurrency PlayerUIDelegate {
              )
              self.presenter.scrollToItem(at: next, animated: true)
          } else {
@@ -67,33 +67,33 @@ index db8913515..22ef8b160 100644
 -    }
 -
      func updateItems(
-         filterStatus: ShortsContent.FilterStatus,
-         for origin: ShortsContent
-@@ -1369,10 +1368,10 @@ struct ShortsChainWatchTracker {
+         filterStatus: MediaItem.FilterStatus,
+         for origin: MediaItem
+@@ -1369,10 +1368,10 @@ struct ChainWatchTracker {
      }
  }
  
--extension ShortsCore: ShortFormPlayerControllerDelegate {
-+extension ShortsCore: ShortFormPlayerControllerDelegateTemp {
+-extension PlayerCore: MediaControllerDelegate {
++extension PlayerCore: MediaControllerDelegateTemp {
  
      public func controller(
--        _ controller: any ShortFormPlayerControllerType,
-+        _ controller: any ShortFormPlayerControllerTypeTemp,
+-        _ controller: any MediaControllerType,
++        _ controller: any MediaControllerTypeTemp,
          didChangePlayingIndex verticalIndex: Int,
          horizontalIndex: Int,
          from previousVerticalIndex: Int,
-@@ -1410,8 +1409,8 @@ extension ShortsCore: ShortFormPlayerControllerDelegate {
+@@ -1410,8 +1409,8 @@ extension PlayerCore: MediaControllerDelegate {
      }
  
      public func controller(
--        _ controller: any ShortFormPlayerControllerType,
--        player: ShortFormPlayer,
-+        _ controller: any ShortFormPlayerControllerTypeTemp,
-+        player: ShortFormPlayerTemp,
+-        _ controller: any MediaControllerType,
+-        player: MediaPlayer,
++        _ controller: any MediaControllerTypeTemp,
++        player: MediaPlayerTemp,
          didChangeStatus status: PlayerStatus
      ) {
  
-@@ -1451,30 +1450,30 @@ extension ShortsCore: ShortFormPlayerControllerDelegate {
+@@ -1451,30 +1450,30 @@ extension PlayerCore: MediaControllerDelegate {
  
          if configuration.draggingState == .ready, configuration.progress > .zero {
              if oldStatus == .play, status == .pause {
@@ -111,10 +111,10 @@ index db8913515..22ef8b160 100644
      }
  
      public func controller(
--        _ controller: any ShortFormPlayerControllerType,
--        player: ShortFormPlayer,
-+        _ controller: any ShortFormPlayerControllerTypeTemp,
-+        player: ShortFormPlayerTemp,
+-        _ controller: any MediaControllerType,
+-        player: MediaPlayer,
++        _ controller: any MediaControllerTypeTemp,
++        player: MediaPlayerTemp,
          didUpdateTime time: Double,
          progress: Double
      ) {
@@ -128,21 +128,21 @@ index db8913515..22ef8b160 100644
      }
  
      public func controller(
--        _ controller: any ShortFormPlayerControllerType,
-+        _ controller: any ShortFormPlayerControllerTypeTemp,
+-        _ controller: any MediaControllerType,
++        _ controller: any MediaControllerTypeTemp,
          canPlayAt verticalIndex: Int
      ) -> Bool {
          guard shortsPlayer(canPlayItem: nil) else { return false }
-@@ -1483,8 +1482,40 @@ extension ShortsCore: ShortFormPlayerControllerDelegate {
+@@ -1483,8 +1482,40 @@ extension PlayerCore: MediaControllerDelegate {
      }
  
      public func controller(
--        _ controller: any ShortFormPlayerControllerType,
--        player: ShortFormPlayer,
-+        _ controller: any ShortFormPlayerControllerTypeTemp,
-+        player: ShortFormPlayerTemp,
+-        _ controller: any MediaControllerType,
+-        player: MediaPlayer,
++        _ controller: any MediaControllerTypeTemp,
++        player: MediaPlayerTemp,
 +        didPlayToEndAt verticalIndex: Int
-+    ) -> ShortFormPlayerEndActionTemp {
++    ) -> MediaPlayerEndActionTemp {
 +
 +        let isActiveChainItem =
 +            verticalIndex == controller.playingIndex
@@ -171,64 +171,64 @@ index db8913515..22ef8b160 100644
 +    }
 +
 +    public func controller(
-+        _ controller: any ShortFormPlayerControllerTypeTemp,
-+        player: ShortFormPlayerTemp,
++        _ controller: any MediaControllerTypeTemp,
++        player: MediaPlayerTemp,
          didRepeatItemAt verticalIndex: Int
      ) {
          if verticalIndex == controller.playingIndex {
-@@ -1493,7 +1524,7 @@ extension ShortsCore: ShortFormPlayerControllerDelegate {
+@@ -1493,7 +1524,7 @@ extension PlayerCore: MediaControllerDelegate {
      }
  }
  
--extension ShortsCore: ShortFormPlayerDataSource {
-+extension ShortsCore: ShortFormPlayerDataSourceTemp {
+-extension PlayerCore: MediaPlayerDataSource {
++extension PlayerCore: MediaPlayerDataSourceTemp {
  
-     public typealias Item = ShortsContent
-     public typealias Context = ShortsPlayerContext
-@@ -1518,14 +1549,14 @@ extension ShortsCore: ShortFormPlayerDataSource {
+     public typealias Item = MediaItem
+     public typealias Context = PlayerContext
+@@ -1518,14 +1549,14 @@ extension PlayerCore: MediaPlayerDataSource {
          return context
      }
  
--    public func playerConfiguration(at verticalIndex: Int) -> ShortFormPlayerConfiguration {
-+    public func playerConfiguration(at verticalIndex: Int) -> ShortFormPlayerConfigurationTemp {
+-    public func playerConfiguration(at verticalIndex: Int) -> MediaPlayerConfiguration {
++    public func playerConfiguration(at verticalIndex: Int) -> MediaPlayerConfigurationTemp {
  
-         let environment = ShortsExternalDependencies.environment
+         let environment = PlayerExternalDependencies.environment
          guard verticalIndex < items.count, items[verticalIndex].isConvivaEnabled, environment.isServerProduct else {
              return .default
          }
  
--        return ShortFormPlayerConfiguration(
-+        return ShortFormPlayerConfigurationTemp(
+-        return MediaPlayerConfiguration(
++        return MediaPlayerConfigurationTemp(
              gsmoProfileKey: environment.gsmoProfileKey,
              convivaCustomerKey: environment.convivaCustomerKey,
              convivaGatewayUrl: environment.convivaGatewayUrl
-diff --git a/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsPlayerContext.swift b/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsPlayerContext.swift
+diff --git a/Packages/PlayerKit/Sources/PlayerKit/Player/PlayerContext.swift b/Packages/PlayerKit/Sources/PlayerKit/Player/PlayerContext.swift
 index aca94908b..6cffce113 100644
---- a/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsPlayerContext.swift
-+++ b/Packages/TvingShorts/Sources/TvingShorts/Shorts/ShortsPlayerContext.swift
+--- a/Packages/PlayerKit/Sources/PlayerKit/Player/PlayerContext.swift
++++ b/Packages/PlayerKit/Sources/PlayerKit/Player/PlayerContext.swift
 @@ -14,7 +14,7 @@ import UIKit
  
- // MARK: - ShortsPlayerContext
+ // MARK: - PlayerContext
  
--public class ShortsPlayerContext: ObservableObject, ShortFormPlayerContext {
-+public class ShortsPlayerContext: ObservableObject, ShortFormPlayerContextTemp {
+-public class PlayerContext: ObservableObject, MediaPlayerContext {
++public class PlayerContext: ObservableObject, MediaPlayerContextTemp {
  
-     public typealias Item = ShortsContent
+     public typealias Item = MediaItem
  
-@@ -30,7 +30,7 @@ public class ShortsPlayerContext: ObservableObject, ShortFormPlayerContext {
-     public var playableContentProvider: ((ShortsContent) -> PlayableAsset?)?
+@@ -30,7 +30,7 @@ public class PlayerContext: ObservableObject, MediaPlayerContext {
+     public var playableContentProvider: ((MediaItem) -> PlayableAsset?)?
  
-     /// Protocol 요구사항: player (ShortFormPlayer)
--    public weak var player: ShortFormPlayer? {
-+    public weak var player: ShortFormPlayerTemp? {
+     /// Protocol 요구사항: player (MediaPlayer)
+-    public weak var player: MediaPlayer? {
++    public weak var player: MediaPlayerTemp? {
          didSet {
              guard player !== oldValue else { return }
              player?.playableContent = playableContentProvider?(item)
-diff --git a/Packages/TvingShorts/Sources/TvingShorts/Shorts/Views/ShortsChainView.swift b/Packages/TvingShorts/Sources/TvingShorts/Shorts/Views/ShortsChainView.swift
+diff --git a/Packages/PlayerKit/Sources/PlayerKit/Player/Views/ChainView.swift b/Packages/PlayerKit/Sources/PlayerKit/Player/Views/ChainView.swift
 index 0c64c68ea..ba7d6bc8a 100644
---- a/Packages/TvingShorts/Sources/TvingShorts/Shorts/Views/ShortsChainView.swift
-+++ b/Packages/TvingShorts/Sources/TvingShorts/Shorts/Views/ShortsChainView.swift
-@@ -77,6 +77,14 @@ public struct ShortsPageScrollViewRepresentable: UIViewRepresentable {
+--- a/Packages/PlayerKit/Sources/PlayerKit/Player/Views/ChainView.swift
++++ b/Packages/PlayerKit/Sources/PlayerKit/Player/Views/ChainView.swift
+@@ -77,6 +77,14 @@ public struct PageScrollViewRepresentable: UIViewRepresentable {
              containerViewControllerRef
          }
  
@@ -241,17 +241,17 @@ index 0c64c68ea..ba7d6bc8a 100644
 +        }
 +
          public var numberOfItems: Int {
-             if let grouped = context.item.groupedShortsContents, grouped.count > 0 {
+             if let grouped = context.item.groupedMediaItems, grouped.count > 0 {
                  return grouped.count
-@@ -131,7 +139,6 @@ public struct ShortsPageScrollViewRepresentable: UIViewRepresentable {
+@@ -131,7 +139,6 @@ public struct PageScrollViewRepresentable: UIViewRepresentable {
  
- public final class ShortsPageScrollView: UIScrollView {
+ public final class PageScrollView: UIScrollView {
      private var chainScrollObserver: NSObjectProtocol?
 -    private var chainPreviewObserver: NSObjectProtocol?
  
      enum ScrollDirectionOffset: Int {
          case none = 0
-@@ -139,20 +146,12 @@ public final class ShortsPageScrollView: UIScrollView {
+@@ -139,20 +146,12 @@ public final class PageScrollView: UIScrollView {
          case previous = -1
      }
  
@@ -272,10 +272,10 @@ index 0c64c68ea..ba7d6bc8a 100644
      deinit {
          stopObservingChainScroll()
          if !pageControllers.isEmpty, let container = pageDelegate?.containerViewController {
-@@ -166,9 +165,11 @@ public final class ShortsPageScrollView: UIScrollView {
+@@ -166,9 +165,11 @@ public final class PageScrollView: UIScrollView {
      private var offset: ScrollDirectionOffset = .none
  
-     private var pageControllers = [ShortsPageItemController<ShortsContentView>]()
+     private var pageControllers = [PlayerPageItemController<ContentView>]()
 -    private var peekAnimator: UIViewPropertyAnimator?
      public var isPrepared: Bool { !pageControllers.isEmpty }
  
@@ -285,7 +285,7 @@ index 0c64c68ea..ba7d6bc8a 100644
      private lazy var viewportTapGesture: UITapGestureRecognizer = {
          let gesture = UITapGestureRecognizer(target: self, action: #selector(handleViewportTap(_:)))
          gesture.numberOfTapsRequired = 1
-@@ -192,19 +193,20 @@ public final class ShortsPageScrollView: UIScrollView {
+@@ -192,19 +193,20 @@ public final class PageScrollView: UIScrollView {
              forName: .chainScrollToNext,
              object: nil,
              queue: .main
@@ -319,7 +319,7 @@ index 0c64c68ea..ba7d6bc8a 100644
          }
      }
  
-@@ -214,87 +216,6 @@ public final class ShortsPageScrollView: UIScrollView {
+@@ -214,87 +216,6 @@ public final class PageScrollView: UIScrollView {
              NotificationCenter.default.removeObserver(obs)
              chainScrollObserver = nil
          }
@@ -407,7 +407,7 @@ index 0c64c68ea..ba7d6bc8a 100644
      }
  
      override init(frame: CGRect) {
-@@ -314,14 +235,10 @@ public final class ShortsPageScrollView: UIScrollView {
+@@ -314,14 +235,10 @@ public final class PageScrollView: UIScrollView {
          self.showsHorizontalScrollIndicator = false
          addGestureRecognizer(viewportTapGesture)
          startObservingChainScroll()
@@ -422,7 +422,7 @@ index 0c64c68ea..ba7d6bc8a 100644
          stopObservingChainScroll()
          if !pageControllers.isEmpty, let container = pageDelegate?.containerViewController {
              pageControllers.forEach { $0.pageItemController(willUnload: container) }
-@@ -368,7 +285,6 @@ public final class ShortsPageScrollView: UIScrollView {
+@@ -368,7 +285,6 @@ public final class PageScrollView: UIScrollView {
      @objc private func handleViewportTap(_ gestureRecognizer: UITapGestureRecognizer) {
  
          guard gestureRecognizer.state == .ended else { return }
@@ -430,7 +430,7 @@ index 0c64c68ea..ba7d6bc8a 100644
  
          let width = max(bounds.width, 1)
          let x = max(0, min(gestureRecognizer.location(in: self).x - contentOffset.x, width))
-@@ -504,8 +420,9 @@ public final class ShortsPageScrollView: UIScrollView {
+@@ -504,8 +420,9 @@ public final class PageScrollView: UIScrollView {
      private var scrollCooldownUntil: Date = .distantPast
      private let scrollToCooldown: TimeInterval = 0.5
  
@@ -442,7 +442,7 @@ index 0c64c68ea..ba7d6bc8a 100644
          let now = Date()
          guard now >= scrollCooldownUntil else { return }
          guard pageControllers.count >= 3 else { return }
-@@ -514,7 +431,10 @@ public final class ShortsPageScrollView: UIScrollView {
+@@ -514,7 +431,10 @@ public final class PageScrollView: UIScrollView {
          } else if offset == .previous {
              scrollRectToVisible(pageControllers[0].view.frame, animated: true)
          }
@@ -454,8 +454,8 @@ index 0c64c68ea..ba7d6bc8a 100644
          scrollCooldownUntil = now.addingTimeInterval(scrollToCooldown)
      }
  
-@@ -549,13 +469,10 @@ public final class ShortsPageScrollView: UIScrollView {
- extension ShortsPageScrollView: UIScrollViewDelegate {
+@@ -549,13 +469,10 @@ public final class PageScrollView: UIScrollView {
+ extension PageScrollView: UIScrollViewDelegate {
  
      public func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
 -        peekAnimator?.stopAnimation(true)
@@ -469,7 +469,7 @@ index 0c64c68ea..ba7d6bc8a 100644
          guard scrollView.contentSize.width > 0.0 else { return }
          guard pageControllers.count >= 3 else { return }
  
-@@ -587,12 +504,13 @@ extension ShortsPageScrollView: UIScrollViewDelegate {
+@@ -587,12 +504,13 @@ extension PageScrollView: UIScrollViewDelegate {
      }
  
      private func scrollDidFinished(with animating: Bool) {
@@ -485,7 +485,7 @@ index 0c64c68ea..ba7d6bc8a 100644
          index = nextIndex
          offset = .none
          guard let delegate = pageDelegate else { return }
-@@ -656,6 +574,12 @@ public protocol ShortsPageScrollViewDelegate: UIScrollViewDelegate {
+@@ -656,6 +574,12 @@ public protocol PageScrollViewDelegate: UIScrollViewDelegate {
  
      var containerViewController: UIViewController? { get }
  
@@ -497,4 +497,4 @@ index 0c64c68ea..ba7d6bc8a 100644
 +
      var numberOfItems: Int { get }
  
-     func scrollView(_ scrollView: ShortsPageScrollView, view at: Int) -> ShortsContentView?
+     func scrollView(_ scrollView: PageScrollView, view at: Int) -> ContentView?

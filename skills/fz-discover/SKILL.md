@@ -235,7 +235,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 
 ## Phase 1.5: Constraint Probe (Plan-Before-Probe 방어)
 
-> Phase 1 제약 매트릭스에서 primitive 의존 가정(CLI flag / config key / value enum / env)은 실측으로 검증. 추측된 제약 위에 Plan 작성 시 실측마다 Plan 무력화. 참조: `feedback_plan_before_probe.md`.
+> Phase 1 제약 매트릭스에서 primitive 의존 가정(CLI flag / config key / value enum / env)은 실측으로 검증. 추측된 제약 위에 Plan 작성 시 실측마다 Plan 무력화. 참조: `Plan-before-Probe 교훈`.
 
 ### 절차
 

@@ -279,7 +279,7 @@ Lead가 보고에 추가할 것:
 ## reflect-to-module — 메모리 교훈 → fz 모듈 자동 반영
 
 > **도구화**: 메모리 17차(Reflection Gap) 해소 — 누적된 교훈을 *수동으로* fz 모듈에 반영하는 lag 제거.
-> **Pilot 기원**: fz-cargo-cult-defense P3 (2026-05-06, 19차 메모리 회귀 테스트 PASS).
+> **Pilot 기원**: cargo-cult 방어 Pilot P3 (2026-05-06, 19차 메모리 회귀 테스트 PASS).
 > **MUST 조건**: O3 (Generator ≠ Evaluator) + O9 (Cross-Model Verification) — Codex 외부 검증 필수.
 
 ### 사용법
@@ -369,7 +369,7 @@ verdict: agree / disagree / partial / needs_verification
 
 ### 19차 회귀 테스트 (Pilot 검증)
 
-본 서브커맨드를 19차 메모리(`feedback_import_copy_without_verification.md`) 입력 시:
+본 서브커맨드를 19차 메모리(`형제 import 답습 금지 교훈`) 입력 시:
 
 | 단계 | 결과 |
 |------|------|
@@ -393,7 +393,7 @@ verdict: agree / disagree / partial / needs_verification
 ### 산출물
 
 ```
-{CWD}/fz-cargo-cult-defense/  (또는 사용자 ASD 폴더)
+{CWD}/<작업폴더>/  (또는 사용자 ASD 폴더)
 ├── parsed/          ← parse_memory.py 출력 JSON
 ├── scored/          ← score_relevance.py 출력 JSON
 ├── suggestions/     ← Generator yaml diff

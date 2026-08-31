@@ -33,7 +33,7 @@
 ## 인라인 앵커 계산 (`skills/fz-peer-review/scripts/diff_anchors.py`)
 
 > 근거: `guides/skill-authoring.md` §11 — "결과가 binary(pass/fail)인가? → 스크립트". 앵커 가능 여부는 binary이므로 언어 지시가 아닌 스크립트가 판정한다.
-> fixture: `skills/fz-peer-review/references/fixtures/pr4655-sample.patch` (PR #4655 축약본 — 3파일 26 hunk). ⛔ 플러그인 **안**에 둔다 — 외부 폴더는 정리되면 테스트가 깨진다.
+> fixture: `skills/fz-peer-review/references/fixtures/pr4655-sample.patch` (PR 축약본 — 3파일 26 hunk). ⛔ 플러그인 **안**에 둔다 — 외부 폴더는 정리되면 테스트가 깨진다.
 
 ### I/O 계약
 
@@ -62,13 +62,13 @@ exit 0 = 계산 성공 (앵커 0건이어도 0) / exit 1 = 입력 오류
 
 | # | Given (targets) | Then (oracle) | 유형 |
 |---|-----------------|---------------|------|
-| A1 | `ShortsChainView.swift` 423–439 | `anchorable` **2건** — `423–428`(hunk 420–428) + `431–439`(hunk 431–440). ⛔ 한쪽만 반환하면 fail | normal |
-| A2 | `ShortsPlayerContext.swift` 122–140 | `anchorable` 0건 + `non_anchorable` 1건(`reason=outside_diff`). 이 파일 hunk는 14–20·30–36뿐 | edge-case |
-| A3 | `ShortsCore.swift` 1484–1513 | `anchorable` **1건** — `1484–1513`(hunk 1482–1521 내부에 완전 포함) | normal |
+| A1 | `ChainView.swift` 423–439 | `anchorable` **2건** — `423–428`(hunk 420–428) + `431–439`(hunk 431–440). ⛔ 한쪽만 반환하면 fail | normal |
+| A2 | `PlayerContext.swift` 122–140 | `anchorable` 0건 + `non_anchorable` 1건(`reason=outside_diff`). 이 파일 hunk는 14–20·30–36뿐 | edge-case |
+| A3 | `PlayerCore.swift` 1484–1513 | `anchorable` **1건** — `1484–1513`(hunk 1482–1521 내부에 완전 포함) | normal |
 | A4 | 존재하지 않는 경로 `NoSuchFile.swift` 1–10 | `non_anchorable` 1건(`reason=path_not_in_diff`) — 예외 없이 종료(exit 0) | failure |
 | A5 | `start > end` 인 입력 | exit 1 + **stdout 부분 출력 0바이트**(사유는 stderr) | failure |
-| **A6** | `ShortsCore.swift` 1484–1513 (side 생략) | `anchorable[0].side == "RIGHT"` — 기본값 | normal |
-| **A7** | `ShortsCore.swift` 1451–1470 `side=LEFT` | `anchorable` 1건 `LEFT:1451–1470` — 변경 전 좌표계로 계산 | normal |
+| **A6** | `PlayerCore.swift` 1484–1513 (side 생략) | `anchorable[0].side == "RIGHT"` — 기본값 | normal |
+| **A7** | `PlayerCore.swift` 1451–1470 `side=LEFT` | `anchorable` 1건 `LEFT:1451–1470` — 변경 전 좌표계로 계산 | normal |
 | **A8** | hunk 본문에 `+++ b/fake.txt` 추가 라인이 있는 diff → `real.txt` 조회 | `real.txt`의 hunk가 유지되고 `fake.txt`는 **미등록**(`path_not_in_diff`). ⛔ 오귀속되면 엉뚱한 파일에 코멘트가 달린다 | failure |
 | **A9** | `"b/dir/file name.txt"` quoted path diff → `dir/file name.txt` 조회 | `anchorable` 1건 — quote 해제 | edge-case |
 | **A10** | 신규 파일(`--- /dev/null`)에 `side=LEFT` · `side` 값이 `UP` | 전자 `reason=no_hunks_on_side` / 후자 **exit 1** | failure |

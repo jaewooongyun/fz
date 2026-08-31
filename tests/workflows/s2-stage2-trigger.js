@@ -87,7 +87,7 @@ push('hasLocation — file·line_range 둘 다 필요',
   && hasLocation({ file: 'F' }) === false
   && hasLocation({ line_range: '1' }) === false, 'ok')
 
-// ⛔ 축 비교 회귀 — 실전 데이터(PR #4774)에서 역산했다.
+// ⛔ 축 비교 회귀 — 실전 데이터(PR)에서 역산했다.
 //    세 렌즈가 같은 자리에 **다른 축**으로 앵커하면 위치만 겹칠 뿐 의견 충돌이 아니다.
 //    이 케이스가 없으면 트리거가 교차축 공존을 "불일치" 로 세어 opus 2콜을 낭비한다.
 const CROSS_AXIS = [

@@ -195,7 +195,7 @@ function hasLocation(x) {
 // ⛔ `sameAxis` 는 **severityConflicts 에만** 쓴다. `MergeContract § 3` 이 dedup 키를
 //    `파일 + line_range 겹침 + discoveryAxis` 로 규정하고 **"축이 다르면 같은 자리라도 별건"** 이라
 //    못박는데, 트리거가 축을 안 보면 같은 세션의 두 규칙이 모순이 된다.
-//    실측(PR #4774): severityConflicts 7건 중 **5건(71%)이 축이 다른 별건**이었다 —
+//    실측(PR): severityConflicts 7건 중 **5건(71%)이 축이 다른 별건**이었다 —
 //    세 렌즈가 신규 파일 **헤더 라인(23-27)** 에 서로 다른 주제를 앵커해 위치만 겹쳤다.
 // ⚠️ 축이 **없으면** 비교를 건너뛴다(= 현행 동작). fail-close 하면 "덜 발화" 쪽이고,
 //    아래 임계 주석대로 놓치는 쪽이 더 비싸다. 스키마상 required 지만 방어적으로 둔다.

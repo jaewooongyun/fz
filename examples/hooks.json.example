@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "path=$(jq -r '.tool_input.file_path // empty'); case \"$path\" in */app-iOS/*) echo 'Blocked: app-iOS/ 는 팀 공유 영역 — 개인 작업 파일 생성 금지(CLAUDE.md)' >&2; exit 2;; esac; exit 0"
+            "command": "path=$(jq -r '.tool_input.file_path // empty'); case \"$path\" in */team-shared/*) echo 'Blocked: team-shared/ 는 팀 공유 영역 — 개인 작업 파일 생성 금지(CLAUDE.md)' >&2; exit 2;; esac; exit 0"
           }
         ]
       }

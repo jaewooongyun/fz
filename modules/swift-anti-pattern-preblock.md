@@ -119,14 +119,15 @@ GOOD:
 ## 검증 명령 (외부 grep용)
 
 ```bash
-F=~/dev/fz-plugin/skills/fz-plan/SKILL.md
+R="$(bash scripts/resolve-plugin-root.sh)"   # 플러그인 루트 해석 (자기 위치 기준)
+F="$R/skills/fz-plan/SKILL.md"
 # Phase 1.5 reference 존재
 grep -q 'Phase 1\.5.*Swift Anti-Pattern Pre-block' "$F"
 grep -q 'modules/swift-anti-pattern-preblock\.md' "$F"
 # Gate 1.5 존재
 grep -q 'Gate 1\.5' "$F"
 # 본 모듈 자체에 3 원칙 + Few-shot 존재
-M=~/dev/fz-plugin/modules/swift-anti-pattern-preblock.md
+M="$R/modules/swift-anti-pattern-preblock.md"
 test "$(grep -Ec '원칙 P1|원칙 P2|원칙 P3' "$M")" -ge 3
 grep -q 'BAD:' "$M" && grep -q 'GOOD:' "$M"
 ```

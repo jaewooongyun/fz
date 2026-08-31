@@ -111,7 +111,7 @@ GOOD: | 순서 | 무슨 일 | 플래그 |
 BAD:  오타 하나에 소진 증명표 3행 + 대안 라벨 2개
       → 형식이 내용을 압도한다. 리뷰어 피로가 늘고 진짜 문제가 묻힌다
 
-GOOD: "ShortsCore.swift:83 — `isChanining` 오타. `isChaining`으로 수정 (Origin: regression)"
+GOOD: "PlayerCore.swift:83 — `isChanining` 오타. `isChaining`으로 수정 (Origin: regression)"
       → 한 줄로 끝나는 결함은 한 줄로 쓴다
 ```
 

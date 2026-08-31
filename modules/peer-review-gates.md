@@ -27,7 +27,7 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 - **Direction**: producer ← consumer
 - **Note**: a2 절차에서 evidence-collection을 참조하는 것은 procedure cross-reference (dependency edge 아님). 합병 ❌ (Progressive Disclosure 보호).
 
-> Gate 4.4 (Factual Claim Verification)는 PR #3639에서 발견된 3건의 오탐을 방지하기 위해 추가.
+> Gate 4.4 (Factual Claim Verification)는 PR에서 발견된 3건의 오탐을 방지하기 위해 추가.
 > 에이전트의 사실적 주장(existence/source/behavior/origin)을 Orchestrator가 기계적으로 검증한다.
 > Gate 4.4-A (Mapping Fidelity Gate, v4.4.0)는 Mapping Layer SPOF 방어. evidence 매핑이 ground truth와 atom-level 동등인지 검증한다.
 
@@ -38,7 +38,7 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 > **핵심 원칙**: 에이전트의 "파일 X에 심볼 Y가 있다/없다" 주장은 empirical fact이다.
 > Orchestrator가 git grep/git show로 기계적으로 확인한다. 에이전트 합의(3/3)는 사실을 보장하지 않는다.
 >
-> PR #3639 교훈 3건:
+> PR 교훈 3건:
 > - Sonnet "ChromecastManager.swift (L365)에서 BDCustomAlertView 호출" 주장 → git grep 결과 0건 (환각)
 > - 2/3 모델 "서버 제공 타이틀 무시" 주장 → throw site 확인 시 클라이언트 하드코딩 (부분 코드 읽기)
 > - 3/3 모델 "새로운 continuation hang 위험" 주장 → base 코드에도 동일 패턴 (origin 오판)
@@ -93,7 +93,7 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 > **핵심 원칙**: refactoring PR의 API/condition mapping이 ground truth와 atom-level 동등인지 검증한다.
 > Mapping Layer SPOF 방어 — 6-Layer LLM 검증이 같은 evidence 매핑 base를 공유하면 매핑 오류는 layer 수와 무관하게 통과한다.
 >
-> PR #3796 교훈 `[미검증: 사용자 제공]`:
+> PR 교훈 `[미검증: 사용자 제공]`:
 > - `ReachabilityManager.isReachableViaWWAN() = (Reachable AND IsWWAN)` 이중 게이트
 > - evidence 매핑이 `→ isReachableViaCellular`로 simplify되어 reachable 게이트 누락
 > - 6-Layer 검증 (boolean equiv + Opus + Sonnet + Codex + Lead self + DA) 모두 통과 → CodeRabbit (rule-based) 단독 발견
@@ -150,7 +150,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 
 > **핵심 원칙**: "컴파일러 경고/에러가 발생한다/않는다"는 에이전트가 추론할 수 없는 empirical fact. 컴파일러가 final judge.
 >
-> PR #3434 교훈: 3/3 에이전트 "UITabBarItem Sendable 경고 발생" 주장 → 실제: 경고 없음, 제안 코드(@MainActor 추가) 오히려 경고 발생. Swift 5.10 sending semantics를 아무도 컴파일러로 확인하지 않았음.
+> 사례 교훈: 3/3 에이전트 "UITabBarItem Sendable 경고 발생" 주장 → 실제: 경고 없음, 제안 코드(@MainActor 추가) 오히려 경고 발생. Swift 5.10 sending semantics를 아무도 컴파일러로 확인하지 않았음.
 
 **4.6 gate 실행 전**: 현재 Synthesize 중간 상태를 `synthesized-issues-partial.json`으로 저장할 것.
 
@@ -180,7 +180,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 
 ## Gate 4.6.5: Inheritance Chain Impact Gate
 
-> PR #3478 교훈: Base class init에 optional DI 파라미터 추가 시, 3/3 Claude 에이전트가 미탐지. Codex(gpt-5.4)만 발견.
+> PR 교훈: Base class init에 optional DI 파라미터 추가 시, 3/3 Claude 에이전트가 미탐지. Codex(gpt-5.4)만 발견.
 > 원인: diff에 subclass init 변경이 없어 분석 대상에서 제외됨. 컴파일러도 default value 존재로 미탐지.
 
 **감지 조건** (하나라도):
@@ -216,7 +216,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 
 > **핵심 원칙**: "이 상태가 런타임에 실제로 발생할 수 있다"는 에이전트가 패턴으로 추론할 수 없는 empirical fact. 상태 할당 경로를 추적해야 한다.
 >
-> PR #3449 교훈: 3/3 에이전트가 `isTimeMachineAvailable` guard 누락을 major로 판정(confidence 90). 실제: `isAtLiveEdge = false`는 `setTimeShift()` 안에서만 할당되고, 모든 `setTimeShift()` 호출부는 이미 가드를 갖고 있음 → 불변식 성립 → false positive. 3/3 동의가 false confidence를 증폭.
+> 사례 교훈: 3/3 에이전트가 `isSeekAvailable` guard 누락을 major로 판정(confidence 90). 실제: `isAtStreamEdge = false`는 `setSeekOffset()` 안에서만 할당되고, 모든 `setSeekOffset()` 호출부는 이미 가드를 갖고 있음 → 불변식 성립 → false positive. 3/3 동의가 false confidence를 증폭.
 
 **감지 조건** (하나라도 해당하면):
 - 이슈 유형: "missing guard condition"
@@ -246,7 +246,7 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
 
 > **핵심 원칙**: "diff에서 코드 삭제 = 로직 누락"이라고 단정할 수 없다. 모듈화/리팩토링 PR에서는 로직이 다른 파일로 이동하는 것이 일반적이다. 삭제를 발견하면 "PR 전체에서 동일 로직이 다른 위치로 이동했는지"를 먼저 확인해야 한다.
 >
-> PR #3473 교훈: review-quality가 Interactor의 `guard getConnectState() != .open` 삭제를 "연결 상태 체크 누락 (minor regression)"으로 판정. 실제: guard가 `SendbirdTvingTalkChatUseCase.connect()` 내부로 이동한 것. diff는 파일 A의 `-guard`와 파일 B의 `+guard`를 별개 이벤트로 보여주므로 이동을 자동 연결하지 않는다.
+> 사례 교훈: review-quality가 Interactor의 `guard getConnectState() != .open` 삭제를 "연결 상태 체크 누락 (minor regression)"으로 판정. 실제: guard가 `ChatConnectionUseCase.connect()` 내부로 이동한 것. diff는 파일 A의 `-guard`와 파일 B의 `+guard`를 별개 이벤트로 보여주므로 이동을 자동 연결하지 않는다.
 
 **감지 조건** (하나라도 해당하면):
 - origin이 `regression`이고 설명에 `삭제`, `누락`, `제거`, `없음`, `빠짐`, `removed`, `missing`, `deleted` 포함
@@ -270,20 +270,20 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
 **Few-shot 예시**:
 ```swift
 // BAD: diff에서 삭제만 보고 즉단
-// Interactor diff: -guard SendbirdChat.getConnectState() != .open else { return }
+// Interactor diff: -guard ChatSDK.getConnectState() != .open else { return }
 // → "연결 상태 체크 누락 (regression)" 판정
 // (UseCase에 이동한 것을 확인하지 않음)
 
 // GOOD: 삭제 발견 → PR 전체에서 핵심 패턴 검색
 // 1. 삭제된 패턴: "getConnectState() != .open"
 // 2. Grep 검색: git show pr-3473 전체에서 "getConnectState" 검색
-// 3. 발견: SendbirdTvingTalkChatUseCase.swift:57에 동일 guard
+// 3. 발견: ChatConnectionUseCase.swift:57에 동일 guard
 // 4. 판정: relocated → 이슈 DROP
 ```
 
 ### Gate 4.7-A 확장: Origin Verification (모든 regression 이슈)
 
-> PR #3639 교훈: 3/3 모델이 "새로운 continuation hang 위험" → regression 판정(confidence 88).
+> PR 교훈: 3/3 모델이 "새로운 continuation hang 위험" → regression 판정(confidence 88).
 > 실제: base 코드의 `BDCustomAlertView.instantiateAlert()` guard에서도 동일한 continuation leak 패턴 존재.
 > base 코드와 비교하지 않고 새 코드만 분석하면 pre-existing 패턴을 regression으로 오판한다.
 
@@ -311,7 +311,7 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
 
 > **핵심 원칙**: "Observable/Single이 에러를 emit한다"는 에이전트가 시그니처만으로 추론할 수 없다. 에러 경로를 추적해야 한다.
 >
-> PR #3457 교훈: 3/3 에이전트가 "flatMapLatest onError 누락 → 스트림 영구 종료" 주장(confidence 88). 실제: `updateTabBarItem`이 `async`(non-throws)이고 내부 모든 에러를 `try?`로 흡수 → Single은 error emit 불가 → false positive.
+> 사례 교훈: 3/3 에이전트가 "flatMapLatest onError 누락 → 스트림 영구 종료" 주장(confidence 88). 실제: `updateTabItem`이 `async`(non-throws)이고 내부 모든 에러를 `try?`로 흡수 → Single은 error emit 불가 → false positive.
 
 **감지 조건** (하나라도 해당하면):
 - perspective: `rx-error-propagation`, `stream-lifecycle`
@@ -340,7 +340,7 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
 
 ## Gate 4.9: Call-site & Convention Verification
 
-> PR #3646 교훈: 3/3 모델이 "UseCase default param이 DIP 위반"을 major로 판정.
+> 사례 교훈: 3/3 모델이 "UseCase default param이 DIP 위반"을 major로 판정.
 > 실제: (1) AppComponent가 이미 같은 패턴 사용 (convention), (2) default 없는 UseCase의
 > caller(ViewModel)가 오히려 더 많은 concrete 타입을 참조 (역방향 문제).
 > 선언부 분석만으로는 실제 영향을 알 수 없다.
@@ -444,7 +444,7 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리포인트
 `파일` + `line_range 겹침` + `discoveryAxis`. 축이 다르면 같은 자리라도 별건이다 — 한 줄이 구조 문제이면서 동시성 문제일 수 있다.
 
 ⛔ **같은 키를 `stage2Trigger` 의 `severityConflicts` 도 쓴다**(`peer-review.js` 의 `sameAxis`) — 트리거가 축을 무시하면
-이 규칙과 모순된다. 실측(PR #4774): 축 미반영 시 충돌 7건 중 **5건이 교차축 별건**이었다(세 렌즈가 신규 파일
+이 규칙과 모순된다. 실측(PR): 축 미반영 시 충돌 7건 중 **5건이 교차축 별건**이었다(세 렌즈가 신규 파일
 헤더 라인에 서로 다른 주제를 앵커해 위치만 겹쳤다).
 ⚠️ 단 `unpairedMajor` 는 축을 보지 않는다 — 단독 major 는 축과 무관하게 교차가 필요하다.
 

@@ -34,7 +34,7 @@ intent-triggers:
 - **Codex 3회 한도** (18차 교훈): 누적 needs_revision 3회 시 사용자 에스컬레이션
 - **Cross-model 안전망** (17차/16차 교훈): 분석자가 분석 대상의 실수를 재현하는 메타 패턴 방지
 - **AC1-AC9 Anti-Pattern Constraints**: 본문 재구성 금지, Tier 3 단독 verified 금지 등
-- **AC8 link 자동 검증**: xargs 병렬 패턴 (sequential while loop 금지 — feedback_bash_background_redirect_capture.md)
+- **AC8 link 자동 검증**: xargs 병렬 패턴 (sequential while loop 금지 — Bash background+redirect 교훈)
 
 ## 사용 시점
 
@@ -64,7 +64,7 @@ intent-triggers:
 | modules/cross-validation.md | Codex 3회 한도 + Reflection Rate |
 | modules/context-artifacts.md | ASD 폴더 + 산출물 보존 |
 | modules/memory-guide.md | feedback_* 교훈 태깅 규칙 |
-| feedback_bash_background_redirect_capture.md | xargs 병렬 패턴 (AC8 enforcement) |
+| Bash background+redirect 교훈 | xargs 병렬 패턴 (AC8 enforcement) |
 
 ## 출처 표기 규약 (Tier 분류)
 
@@ -222,7 +222,7 @@ intent-triggers:
 | AC8 | broken link 미감지 | 다음 스크립트 (Rust regex 호환) |
 | AC9 | Tier 3 단독 verified | A5 단독 발견 시 → `[partially-verified]` 격하 |
 
-### AC8 스크립트 (xargs 병렬, feedback_bash_background_redirect_capture.md)
+### AC8 스크립트 (xargs 병렬, Bash background+redirect 교훈)
 
 ```bash
 # 1. URL 추출 (Rust regex 호환, POSIX class 회피)
@@ -368,7 +368,7 @@ codex exec \
 | Speculation Fallacy | "원본/기존/이전" 표현 사용 | git show / Read 실측 후 진술 | CLAUDE.md Verification Discipline |
 | Reflection Gap | Plan 자체 stale 가능 | 5d 시작 전 plan 재검토 1회 | 17차 |
 | Cross-model 안전망 | self-review로 발견 못한 사실 오류 | Codex 단독 발견 우선 적용 | 17차/16차 |
-| Bash background redirect | while loop + redirect 시 0 bytes | xargs 병렬 패턴 | feedback_bash_background_redirect_capture.md |
+| Bash background redirect | while loop + redirect 시 0 bytes | xargs 병렬 패턴 | Bash background+redirect 교훈 |
 | Plan-before-Probe | 외부 실측 없이 Plan 작성 | Probe → Audit → Plan 순서 강제 | 31차 |
 
 ---
@@ -474,6 +474,6 @@ Phase 6 통과 후:
 - **34차** (첫 round 옵션 시각화 — 4-axes table)
 - **36차** (팀 공유 영역 자동 변경 금지 — 외부 reference URL 변경 시 합의 의무)
 - **40차** (단순 요청 over-engineering 방지 — simplified mode trigger)
-- **feedback_bash_background_redirect_capture.md** (xargs 병렬 패턴 강제)
+- **Bash background+redirect 교훈** (xargs 병렬 패턴 강제)
 
 각 Phase의 Gate가 위 교훈을 enforcement한다.

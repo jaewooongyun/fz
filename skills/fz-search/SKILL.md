@@ -318,7 +318,7 @@ PlayerInteractor 찾음. 3개 파일에서 사용됨.
 GOOD:
 ## 탐색: PlayerInteractor 의존성 분석
 ### 심볼
-- 정의: app-iOS/Player/PlayerInteractor.swift:15
+- 정의: Sources/Player/PlayerInteractor.swift:15
 - 프로토콜: PlayerInteractable (Router listener)
 ### 의존성 체인
 PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → NetworkService

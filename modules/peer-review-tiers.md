@@ -33,7 +33,7 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 
 > ⛔ **모델은 스크립트가 single source** — `peer-review.js`의 `label: 'stage1-arch'`·`'stage1-quality'`·`'stage1-correctness'`(Stage1) · `'stage2-arch-on-quality'`·`'stage2-quality-on-arch'`(Stage2) · `'stage3-counter'`(Stage3) 전 호출이 `model:'opus'`다. 에이전트 frontmatter(`review-quality`·`review-correctness`·`review-counter` = `sonnet`)와 `code-auditor/SKILL.md` `main: sonnet`은 **스크립트에 의해 override된다** — 실행 경로는 스크립트다.
 > ⛔ **재시도 포함 실제 호출 수는 더 클 수 있다** — `parallelWithRetry`가 Stage1 null 항목마다 1회 재호출하므로 **Tier 2는 3~6, Tier 3는 6~9**다(`peer-review.js`의 `parallelWithRetry`). 부분 실패로 Stage2가 생략되면 Tier 3가 6보다 적을 수도 있다. **권위 있는 수치는 반환값 `metrics.agentCalls`뿐이다.**
-> ⛔ **비용 상한 수치 열을 제거했다.** 기존 `~$2.00`/`~$3.50`은 "opus 1 + sonnet 1" 전제로 산정된 값이라 실제(opus 3 / opus 6)와 맞지 않았다. 추정치를 다른 추정치로 바꾸는 대신 **검증 가능한 call 수**로 대체한다 — 실제 비용은 `cost-log.json`이 invoke마다 실측으로 남긴다. [참고 실측: PR #4655 Tier 2 = 448K tokens]
+> ⛔ **비용 상한 수치 열을 제거했다.** 기존 `~$2.00`/`~$3.50`은 "opus 1 + sonnet 1" 전제로 산정된 값이라 실제(opus 3 / opus 6)와 맞지 않았다. 추정치를 다른 추정치로 바꾸는 대신 **검증 가능한 call 수**로 대체한다 — 실제 비용은 `cost-log.json`이 invoke마다 실측으로 남긴다. [참고 실측: PR Tier 2 = 448K tokens]
 
 ## 자동 휴리스틱 (단일 진실 원천)
 
@@ -166,7 +166,7 @@ diff 에 다시 나타난다. 그러면 두 가지가 함께 틀린다 — Tier 
 
 ⛔ **임계는 그대로다** — `≥2 → +2` · `==1 → +1`. 세는 단위만 바뀌었다.
 
-**왜 바꿨나**: 한 리뷰에서 4건이 매칭됐는데 전부 오탐이었다. `Interactor` substring 매칭 + 전부 `@@` 헤더였고, Lead 가 수동으로 0 으로 내렸다. 자동 판정 그대로면 114줄 PR 이 상위 Tier 로 올라가 3~6 agent call 을 유발한다 — **시간 목표를 직접 악화시킨다.**
+**왜 바꿨나**: 한 리뷰에서 4건이 매칭됐는데 전부 오탐이었다. `Interactor` substring 매칭 + 전부 `` 헤더였고, Lead 가 수동으로 0 으로 내렸다. 자동 판정 그대로면 114줄 PR 이 상위 Tier 로 올라가 3~6 agent call 을 유발한다 — **시간 목표를 직접 악화시킨다.**
 
 ⛔ **실패 시 승격하지 않는다.** 스크립트가 비정상 종료하면 근거가 없는 것이므로 Tier 를 올리지 않고, 그 사실을 `tier.txt` 에 남긴다. 근거 없이 올리면 비용만 늘고, 조용히 넘어가면 판정이 있었던 것처럼 보인다.
 
@@ -595,7 +595,7 @@ Codex challenger 프롬프트에 필수 포함:
 
 ## Cross-Critique Anti-Sycophancy Rule
 
-> PR #3646 교훈: Sonnet(QUAL-4)이 코드 증거 있는 정답을 제시했으나, Opus(ARCH-1)의 "아키텍처 원칙상" 이론적 주장에 self-reverse. 유일하게 맞는 판단이 탈락.
+> PR 교훈: Sonnet(QUAL-4)이 코드 증거 있는 정답을 제시했으나, Opus(ARCH-1)의 "아키텍처 원칙상" 이론적 주장에 self-reverse. 유일하게 맞는 판단이 탈락.
 
 ⛔ **코드 증거 없이 피어의 이론적 주장에 self-reverse 금지.**
 

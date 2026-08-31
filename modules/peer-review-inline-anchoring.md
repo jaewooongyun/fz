@@ -25,7 +25,7 @@ GitHub에는 코멘트를 다는 자리가 둘이다.
 ② 코드 라인 옆 (Files changed) — 그 줄이 하이라이트되고 코드와 나란히 보인다
 ```
 
-①만 쓰면 리포트에 `ShortsCore.swift:1484-1513`이라 적어도 리뷰어가 **직접 파일을 열어 그 줄을 찾아가야** 한다. 지적의 근거가 코드인데 코드에서 멀어지면 확인 비용이 리뷰어에게 전가된다.
+①만 쓰면 리포트에 `PlayerCore.swift:1484-1513`이라 적어도 리뷰어가 **직접 파일을 열어 그 줄을 찾아가야** 한다. 지적의 근거가 코드인데 코드에서 멀어지면 확인 비용이 리뷰어에게 전가된다.
 
 ## 2. 사전 조건
 
@@ -52,7 +52,7 @@ GitHub에는 코멘트를 다는 자리가 둘이다.
 ```bash
 python3 skills/fz-peer-review/scripts/diff_anchors.py \
   --diff "${WORK_DIR}/diff.patch" \
-  --targets '[{"path":"ShortsCore.swift","start":1484,"end":1513,"side":"RIGHT"},
+  --targets '[{"path":"PlayerCore.swift","start":1484,"end":1513,"side":"RIGHT"},
               {"path":"Old.swift","start":40,"end":52,"side":"LEFT"}]'
 ```
 
@@ -68,7 +68,7 @@ python3 skills/fz-peer-review/scripts/diff_anchors.py \
 GitHub는 `start_line`~`line`이 **같은 hunk 안**일 것을 요구한다. 지적 구간이 hunk 경계를 넘으면 스크립트는 겹치는 후보를 **모두** 돌려준다.
 
 ```
-지적:  ShortsChainView.swift 423-439
+지적:  ChainView.swift 423-439
 hunk:  420-428 / 431-440        ← 429-430이 미변경이라 갈라짐
 반환:  [423-428, 431-439]        ← 둘 다
 ```
@@ -83,12 +83,12 @@ hunk:  420-428 / 431-440        ← 429-430이 미변경이라 갈라짐
   "event": "COMMENT",
   "body": "<review-report.md 전문>",
   "comments": [
-    { "path": "Packages/.../ShortsCore.swift",
+    { "path": "Packages/.../PlayerCore.swift",
       "start_line": 1484, "start_side": "RIGHT",
       "line": 1513,       "side": "RIGHT",
       "body": "<이슈 본문 — pr-comments.md 톤>" },
 
-    { "path": "Packages/.../ShortsCore.swift",
+    { "path": "Packages/.../PlayerCore.swift",
       "line": 83, "side": "RIGHT",
       "body": "<단일 줄은 start_* 생략>" }
   ]
@@ -117,7 +117,7 @@ gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST --input payload.json
 
 ### 7) 착지 검증 — ⛔ **방금 만든 리뷰만** 대조한다
 
-게시했다고 원하는 줄에 달린 것은 아니다. 재조회해서 대조하되, **PR 전체 코멘트를 조회하면 안 된다** — 기존 코멘트를 새 것으로 오인하고, 실패 시 삭제 대상도 특정할 수 없다(PR #4655는 이미 39건이 있었다).
+게시했다고 원하는 줄에 달린 것은 아니다. 재조회해서 대조하되, **PR 전체 코멘트를 조회하면 안 된다** — 기존 코멘트를 새 것으로 오인하고, 실패 시 삭제 대상도 특정할 수 없다(PR는 이미 39건이 있었다).
 
 ```bash
 # 6단계 POST 응답에서 review id를 잡아 둔다
@@ -158,7 +158,7 @@ diff 밖(변경되지 않은 줄)은 인라인이 **불가능**하다. 그 지�
 ````markdown
 관련 코드가 이 PR의 diff 밖이라 인라인으로 달지 못해 인용합니다.
 
-`ShortsPlayerContext.swift:122-140`
+`PlayerContext.swift:122-140`
 ```swift
 // 해당 코드
 ```
@@ -173,9 +173,9 @@ diff 밖(변경되지 않은 줄)은 인라인이 **불가능**하다. 그 지�
 결함 하나가 N개 지점에 걸치면 `[1/N]…[N/N]`으로 나눠 **각 지점에 따로 앵커**하고, 본문에서 서로를 참조한다.
 
 ```
-[1/4] ShortsCore.swift:1484        — 자동 전환 트리거. → [2/4]에서 취소됨
+[1/4] PlayerCore.swift:1484        — 자동 전환 트리거. → [2/4]에서 취소됨
 [2/4] ShortFormPlayerTemp.swift:349 — 취소 지점
-[3/4] ShortsChainView.swift:423    — 복구 경로 부재 ①
+[3/4] ChainView.swift:423    — 복구 경로 부재 ①
 [4/4] ShortFormPlayerControllerTemp.swift:353 — 복구 경로 부재 ②
 ```
 

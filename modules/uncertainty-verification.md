@@ -63,7 +63,7 @@ Heavy 트리거: Transformation Spec의 "실행 스레드" 또는 "요청 파라
 | **`@MainActor` / actor isolation 동작** | Heavy | swift-concurrency 플러그인 OR Apple Concurrency 가이드 |
 | **Sendable conformance 안전성** | Heavy | Swift 컴파일러 경고/에러 OR 컴파일러 진단 (strict concurrency check) |
 | **SwiftUI re-render 동작** | Light | swiftui-expert 플러그인 OR Apple SwiftUI 가이드 |
-| **RIBs 역할 위반** (Router/Interactor 책임) | Light | CLAUDE.md `## Architecture` OR `app-iOS/AI/ai-guidelines.md` |
+| **RIBs 역할 위반** (Router/Interactor 책임) | Light | CLAUDE.md `## Architecture` |
 
 **Heavy** = `[verified: Context7]` 또는 `[verified: 빌드]` 또는 `[verified: 코드 L{N}]` 태그 의무 (Mandatory Source 인용 포함).
 **Light** = 1개 신뢰 소스 인용 (Mandatory Source 중 하나).
@@ -73,7 +73,7 @@ Heavy 트리거: Transformation Spec의 "실행 스레드" 또는 "요청 파라
 
 - "이 콜백은 main에서 호출됩니다" → Heavy. Context7 query-docs로 SDK 문서 확인 + plugin-refs.md 역방향 트리거 매칭 의무. 둘 다 부재면 `[미검증: 콜백 스레드 미확인]` 태그 후 default `@MainActor` 보호 적용.
 - "@Observable은 iOS 17+ 필수" → Heavy (iOS 버전 가드 검증). Apple 공식 `@available(iOS 17.0, *)` 헤더 인용 의무.
-- "RIBs Router는 navigation만" → Light. `app-iOS/AI/ai-guidelines.md` 또는 CLAUDE.md `## Architecture` 인용.
+- "RIBs Router는 navigation만" → Light. CLAUDE.md `## Architecture` 인용.
 
 ## Evidence Source Priority
 

@@ -168,7 +168,7 @@ intent-triggers:
 
 ## Phase 0c: Constraint Probe Pre-flight (31차 방어)
 
-> Plan 핵심 차원이 primitive(CLI flag / config key / value enum / env precondition)에 의존하면 추측 위에 작성하지 않는다. 실측으로 가정 검증 후 차원 포함. 참조: `feedback_plan_before_probe.md`.
+> Plan 핵심 차원이 primitive(CLI flag / config key / value enum / env precondition)에 의존하면 추측 위에 작성하지 않는다. 실측으로 가정 검증 후 차원 포함. 참조: `Plan-before-Probe 교훈`.
 
 발동: 외부 primitive 의존 시 필수. 코드베이스 내부 패턴만 의존하면 스킵.
 

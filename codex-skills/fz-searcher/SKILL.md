@@ -69,10 +69,10 @@ GOOD:
 ### Search: "PlayerInteractor 의존성 추적"
 - Found: 4 results
 - Key Findings:
-  1. app-iOS/Player/PlayerInteractor.swift:1 — 심볼 정의, VideoRepository 의존
-  2. app-iOS/Player/PlayerBuilder.swift:28 — 생성 및 VideoRepository DI 주입
-  3. app-iOS/Player/PlayerRouter.swift:15 — listener로 참조
-  4. app-iOS/PlayerTests/PlayerInteractorTests.swift:10 — 테스트 대상
+  1. Sources/Player/PlayerInteractor.swift:1 — 심볼 정의, VideoRepository 의존
+  2. Sources/Player/PlayerBuilder.swift:28 — 생성 및 VideoRepository DI 주입
+  3. Sources/Player/PlayerRouter.swift:15 — listener로 참조
+  4. Tests/PlayerTests/PlayerInteractorTests.swift:10 — 테스트 대상
 - Dependency Chain: PlayerBuilder → PlayerInteractor → VideoRepository → VideoNetworkService
 - Impact Scope: PlayerInteractor 수정 시 PlayerBuilder, PlayerRouter, PlayerInteractorTests 영향
 ```

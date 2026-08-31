@@ -113,7 +113,7 @@ Lead: Read(modules/review-structural-axes.md) → §3 축 + §4 경계 문구를
 표기 규약 (⛔ 축을 묶어서 세면 어느 축이 일하는지 알 수 없다):
 
 ```
-축A: evidence 2 sessions (PR #4679, PR #4712) / 축B: evidence 1 session (PR #4679)
+축A: evidence 2 sessions (PR, PR) / 축B: evidence 1 session (PR)
 ```
 
 **축별로 분리해 세고, 카운트를 혼합하지 않는다.** — 이 형식이 필요한 전부다 (`modules/review-checks.md` 4-N과 동형이지만 그 파일을 Read할 필요는 없다).

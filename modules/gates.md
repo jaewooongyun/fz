@@ -62,10 +62,10 @@ WORK_DIR 결정은 `modules/context-artifacts.md` Work Dir Resolution을 따른�
 ## 원장 문법 (요약)
 
 ```markdown
-# Gates: 시청내역 서버 재정비
+# Gates: 사용자 이력 API 재정비
 ROOT: {WORK_DIR}
 STATE: active
-Scope: 시청내역 API를 v4로 이관하고 기존 소비자 3곳을 무중단 전환한다
+Scope: 이력 조회 API를 v2로 이관하고 기존 소비자 3곳을 무중단 전환한다
 
 - [x] G1: 빌드 성공
   CHECK: xcodebuild -workspace app.xcworkspace -scheme app build
