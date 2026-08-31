@@ -5,7 +5,7 @@ description: >-
   예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토 (비사용: 자기 코드 →fz-review, PR 해설 →fz-pr-digest)
 user-invocable: true
 disable-model-invocation: true
-argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--codex] [--deep] [--post] [--explain]"
+argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--codex] [--deep] [--post] [--explain [--light|--deep]]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
@@ -49,9 +49,27 @@ intent-triggers:
 /fz-peer-review 123 --deep            # Cross-Critique 활성화 (추가 ~$0.5-1.5)
 /fz-peer-review 123 --post            # 인라인 라인 앵커로 리뷰 게시
 /fz-peer-review 123 --tier 2          # Tier 강제 지정
-/fz-peer-review 123 --explain         # 리뷰 후 변경사항 해설 (fz-pr-digest 연계)
-/fz-peer-review 123 --explain --deep  # 리뷰 후 기술 해설까지 포함
+/fz-peer-review 123 --explain         # 리뷰 후 해설 — 기능 흐름 + 동작↔코드 1:1 (Tutor, ~20-30K)
+/fz-peer-review 123 --explain --light # 리뷰 후 해설 — Before/After 중심 (Standard, ~5-8K)
+/fz-peer-review 123 --explain --deep  # 리뷰 후 해설 — 기술 원리 + 학습 포인트 (Deep, ~10-15K)
 ```
+
+### 플래그 해석 규칙 (--explain 동반 시)
+
+`--explain` 뒤에 오는 `--light` · `--deep`은 **해설 티어**를 지정한다. 리뷰 깊이가 아니다.
+
+| 입력 | 리뷰 깊이 | 해설 티어 |
+|------|----------|----------|
+| `--explain` | 기본 (Auto-Tier) | Tutor |
+| `--explain --light` | 기본 (Auto-Tier) | Standard |
+| `--explain --deep` | Cross-Critique 활성 | Deep |
+| `--deep` (explain 없음) | Cross-Critique 활성 | 해설 없음 |
+
+⛔ `--explain --light`의 `--light`는 **해설만** Standard로 내린다. peer-review 자체를 경량 모드로 바꾸지 않는다
+— 리뷰 깊이를 낮추려면 `--tier`를 쓴다. `/fz`의 simplified 키워드("가볍게", "light")가 이 자리의 `--light`와
+같은 뜻으로 읽히면 리뷰가 조용히 축소되므로, 이 표가 유일한 판별 근거다.
+
+`--deep`은 두 축을 동시에 켠다(리뷰 Cross-Critique + 해설 Deep). 기존 배선이며 변경하지 않았다.
 
 ## Prerequisites
 
