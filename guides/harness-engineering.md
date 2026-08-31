@@ -1186,7 +1186,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 ### 하네스 홀 candidate ↔ 외부 수렴 근거 (2026-07 추가)
 
-> fz 하네스 홀 candidate(`project_fz_harness_holes.md`, H1~H5/F5/F6)에 대한 서베이 교차검증. **외부 정황 근거이지 evidence 카운터 증가·candidate→active 승격이 아니다** — 승격 규칙(독립세션 카운팅)은 `modules/promotion-ledger.md`가 canonical. 서베이는 census 아닌 arXiv 편중 에이전트 생성물([외부: harness-paper §요약]).
+> fz 하네스 홀 candidate(H1~H5/F5/F6 — F5·F6 는 `modules/promotion-ledger.md` **L-14** 로 통합, H1~H5 는 작성자 로컬 관측)에 대한 서베이 교차검증. **외부 정황 근거이지 evidence 카운터 증가·candidate→active 승격이 아니다** — 승격 규칙(독립세션 카운팅)은 `modules/promotion-ledger.md`가 canonical. 서베이는 census 아닌 arXiv 편중 에이전트 생성물([외부: harness-paper §요약]).
 
 | 홀 | 서베이 판정 | 근거 arXiv | 매핑 강도 |
 |----|-----------|-----------|----------|
