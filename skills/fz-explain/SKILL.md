@@ -48,6 +48,8 @@ intent-triggers:
 
 ## 모듈 참조
 
+> ⛔ 아래 경로는 **플러그인 루트 기준**이다 — 스킬 폴더 기준이 아니다.
+
 | 모듈 | 용도 |
 |------|------|
 | `modules/explanation-protocol.md` | 폐포 5축 · 어휘 등급 · 게이트 G1~G8 · 층위의 **정본** |
@@ -85,7 +87,7 @@ intent-triggers:
 
 ## Phase 2: 프로토콜 실행
 
-`modules/explanation-protocol.md` 를 Read 한 뒤 §9 실행 절차 T2~T6 을 수행한다.
+`{플러그인 루트}/modules/explanation-protocol.md` 를 Read 한 뒤 §9 실행 절차 T2~T6 을 수행한다.
 
 ### 스킬이 채우는 값
 

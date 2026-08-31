@@ -62,7 +62,7 @@ seed = diff의 변경 심볼 (추가·수정·삭제된 함수·타입·프로�
 
 ```
 1. diff에서 변경 심볼 추출 → seed (§2)
-2. `modules/explanation-protocol.md` + `modules/explanation-output.md` Read → §9 절차 T2~T6 수행
+2. `{플러그인 루트}/modules/explanation-protocol.md` + `{플러그인 루트}/modules/explanation-output.md` Read → §9 절차 T2~T6 수행
 3. 출력 시 §3의 슬롯 값 채움
 4. 저장: ${WORK_DIR}/pr-digest-tutor.md
 ```
