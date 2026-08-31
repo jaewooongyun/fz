@@ -139,6 +139,8 @@ bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/gather.sh" \
 
 ⛔ **`review-surface.md` 를 먼저 읽는다.** base 가 분기점보다 앞서 있으면 이미 base 에 있는 커밋이 diff 에 다시 나타나 Tier 와 리뷰 표면이 함께 부풀려진다(실측 #4766: 2.9배). `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다. 상세·한계: `modules/peer-review-tiers.md` § 리뷰 표면 진단
 
+⛔ **읽고 끝내지 않는다 — `reviewSurfacePath` 로 렌즈에 넘긴다.** Lead 가 Tier 만 고치고 `diffPath` 는 원본을 넘기면 렌즈 셋이 부풀려진 diff 를 전량 새 변경으로 읽는다. 판정과 전달은 다른 축이다 (`modules/peer-review-workflow.md` 절차 1).
+
 ⚠️ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-mapping` 은 Lead 가 채운다 (`modules/peer-review-tiers.md` § canonical set). ⛔ **패턴·일관성 이슈를 낼 때 `convention-samples` 를 건너뛰지 않는다** — 관례를 위반으로 판정하는 것도, 관례 이탈을 지적하는 것도 같은 N:M 카운트를 요구한다(실측: "형제 2곳이 다르다"로 적었는데 전수는 4:1이었다).
 
 ### 2. Serena Pre-caching → `${WORK_DIR}/symbols.json`
