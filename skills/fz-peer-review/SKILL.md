@@ -162,7 +162,7 @@ mcp__serena__find_symbol                → Protocol 정의, conformer
 
 PR title/body에서 JIRA 티켓 ID 추출 + acceptance criteria 수집. JIRA 연동 시 Atlassian MCP 활용.
 
-### 2.5. 판별 방법(oracle) 명시
+### 2.5. 판별 방법(oracle) 명시  ⛔ **Gather 2.5** — Synthesize 의 `2.5 PR Intent Alignment` 와 다른 절이다
 
 코드로 확정할 수 없는 주장에는 "무엇을 보면 판별되는지"를 함께 적는다 — 방법을 모르면 그 지적은 판정 불가로 남는다.
 
@@ -317,7 +317,7 @@ GOOD: Interactor guard 삭제 발견 → PR diff 전체 Grep("getConnectState")
      → UseCase.connect()에 동일 guard 이동 확인 → origin: relocated → 이슈 DROP
 ```
 
-### 2.5. PR Intent Alignment Check
+### 2.5. PR Intent Alignment Check  ⛔ **Synthesize 2.5** — Gather 의 `2.5 판별 방법(oracle)` 과 다른 절이다
 
 PR title/body/requirements.md의 핵심 의도를 각 regression 이슈와 교차 확인한다. PR이 "기능 제거/전환"을 명시한 경우, 해당 기능의 부수효과(이벤트, 상태 초기화 등) 제거는 의도적일 수 있다.
 - 의도적 제거 가능성이 있으면: severity 유지하되 `"[의도 확인 필요]"` 태그 추가

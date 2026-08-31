@@ -49,7 +49,7 @@
 │   ├── plan-v1.md ~ plan-vN.md
 │   ├── plan-final.md
 │   ├── direction-challenge.md  # Phase 0.5 방향성 도전 결과 (PROCEED/RECONSIDER/REDIRECT)
-│   ├── plan-team.md            # TEAM 모드 collaborative design 통신 기록
+│   ├── plan-team.md            # TEAM 모드 collaborative design 통신 기록 (Workflow 전환 후 미생성 — transcript가 대체)
 │   └── verify-result.md        # Phase 2 검증 verdict + 이슈 요약
 ├── code/
 │   ├── step-1.md ~ step-N.md
@@ -61,7 +61,7 @@
 │   └── search-result.md  # fz-search 탐색 결과
 └── review/
     ├── self-review.md     # fz-review 자기 리뷰 결과
-    └── review-team.md     # TEAM 모드 live review 핵심 통신 기록
+    └── review-team.md     # TEAM 모드 live review 핵심 통신 기록 (Workflow 전환 후 미생성 — transcript가 대체)
 ```
 
 ### Standalone Work Dir (peer-review)
@@ -170,8 +170,8 @@ Disposable: "Grep 결과 42개 파일 매칭. find_referencing_symbols 호출 3�
 | discover | (없음 — 첫 진입점) |
 | discover (mid-pipeline) | `index.md` → Active Phase 판별 |
 | plan | `discover/discover-journal.md` (있으면), `discover/discover-plan.md` (있으면) |
-| code | `plan/plan-final.md`, `discover/discover-journal.md`, `discover/discover-code.md` (있으면), `code/progress.md`, 최신 `code/step-N.md` |
-| review | `plan/plan-final.md`, `code/progress.md`, 최신 `code/step-N.md`, `discover/discover-review.md` (있으면) |
+| code | `plan/plan-final.md` (없으면 `plan/plan-light.md`), `plan/verify-result.md` (있으면), `discover/discover-journal.md`, `discover/discover-code.md` (있으면), `code/progress.md`, 최신 `code/step-N.md` |
+| review | `plan/plan-final.md` (없으면 `plan/plan-light.md`), `plan/verify-result.md` (있으면), `code/progress.md`, 최신 `code/step-N.md`, `discover/discover-review.md` (있으면) |
 | fix | `fix/fix-analysis.md` (있으면), `search/` 결과 (있으면) |
 | search | (없음 — 독립 탐색) |
 
