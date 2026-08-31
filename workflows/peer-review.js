@@ -4,7 +4,9 @@
 //   표준 패턴 3종 적용. 대형 입력(diff/evidence)은 args가 아닌 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md Analyze Step): Lead가 Gather 산출물(diff/evidence/base-behavior)을 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/peer-review.js',
-//       args: { diffPath, intentContext, evidencePaths?, basePath?, deep?, structuralContext? } })
+//       args: { diffPath, intentContext, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext? } })
+//   reviewSurfacePath: gather 가 만든 review-surface.md 경로. base 가 분기점보다 앞서면 diff 가 부풀려지므로
+//     ⛔ **세 렌즈 전부**에 주입한다 — 리뷰 범위는 렌즈별로 다르지 않다. 누락 시 렌즈가 stale diff 를 전량 새 변경으로 읽는다.
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality/correctness는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
@@ -312,7 +314,13 @@ if (!input || !input.diffPath || !input.intentContext) {
 const deep = input.deep === true || input.deep === 'true'  // Tier 3 = full (교차+counter)
 const evidenceLine = input.evidencePaths ? `\n[증거] ${input.evidencePaths}` : ''
 const baseLine = input.basePath ? `\n[증거] base 원본(prefetch): ${input.basePath} (Read로 로드)` : ''
-const TARGET = `[리뷰 대상] diff 파일: ${input.diffPath} (Read로 로드)\n[변경 의도] ${input.intentContext}${evidenceLine}${baseLine}`
+// 리뷰 범위 — ⛔ 세 렌즈 전부에 주입한다. base 가 분기점보다 앞서면 이미 머지된 커밋이 diff 에
+// 다시 나타나고(실측 2.9배), 렌즈는 그것을 새 변경으로 읽는다. gather 가 review-surface.md 에
+// 판정을 적고 Lead 는 Tier 를 고치지만, 그 판정이 렌즈에 닿지 않으면 diff 는 원본 그대로다.
+const surfaceLine = input.reviewSurfacePath
+  ? `\n[리뷰 범위] ${input.reviewSurfacePath} (Read로 로드 — 중복 커밋·stale base 판정. diff 전체가 리뷰 대상이 아닐 수 있다)`
+  : '\n[리뷰 범위] ⚠️ 미제공 — diff 전체를 리뷰 대상으로 가정한다. base 가 stale 하면 이미 머지된 변경이 섞인다.'
+const TARGET = `[리뷰 대상] diff 파일: ${input.diffPath} (Read로 로드)\n[변경 의도] ${input.intentContext}${surfaceLine}${evidenceLine}${baseLine}`
 // 구조 축 브리프 — arch 렌즈에만 주입 (modules/review-structural-axes.md §2).
 // quality/correctness는 결함 축을 유지해야 하고, A/B 검증도 review-arch 1개로만 이뤄졌다.
 const structuralLine = input.structuralContext ? `\n[구조 축 — 이 렌즈 전용] ${input.structuralContext}` : ''
