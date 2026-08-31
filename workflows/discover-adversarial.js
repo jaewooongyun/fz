@@ -14,7 +14,7 @@
 //   반환 계약: { mode: 'workflow', landscape, paths, costs, metrics } 또는 { mode: 'fallback', reason }
 //     → mode='fallback'이면 Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후. wall-clock 측정은 Lead 책임(스크립트는 시각 API 불가).
 //
-// [설계 근거 — TVING/fz-teams-workflow-migration/plan/plan-final.md]
+// [설계 근거 — 내부 마이그레이션 계획]
 //   default = lean 5-call (TEAM 2-agent 비용 동급). --deep = 렌즈 3 fan-out → merge(opus 언어 지시) →
 //   경로별 평가 chunk ≤4 (agent-team-guide L222 거버넌스 정합) → 합성. refuter 없음 (harness-engineering
 //   L623 Verifier -0.8% 존중). 산출물 계약: LandscapeSchema → discover-journal.md 4섹션 (Lead 기록, 경로 무변경).

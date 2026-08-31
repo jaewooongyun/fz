@@ -11,14 +11,14 @@
 `/fz-plan` 이 계획을 세우면 `{WORK_DIR}/gates/plan.md` 가 만들어진다.
 
 ```
-# Gates: 시청내역 서버 재정비
+# Gates: 사용자 이력 API 재정비
 ROOT: {WORK_DIR}
 STATE: active
 APPROVED: yes
 
 - [ ] S1: 빌드가 통과한다
   CRITERION: 시뮬레이터 빌드가 성공해야 한다
-  CHECK: xcodebuild -workspace app-iOS/tving.xcworkspace -scheme tving build
+  CHECK: xcodebuild -workspace App.xcworkspace -scheme App build
   EXPECT: BUILD SUCCEEDED
   CWD: {GIT_ROOT}
   APPROVED_ORACLE_HASH: 4e7e65bdc54c

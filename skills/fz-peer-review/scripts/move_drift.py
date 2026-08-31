@@ -5,7 +5,7 @@
 ⛔ 동등성과 드리프트는 다른 축이다. 추가·삭제 라인의 다중집합 차가 "값 표현식 변화 0" 을
 보여도, 이동이 만든 **문서·구조 드리프트**는 거기 나타나지 않는다.
 
-실측 근거 (PR #4774): 동등성 대조를 통과한 뒤 Lead 단독 리뷰가 이슈 **0건**을 냈으나
+실측 근거 (PR): 동등성 대조를 통과한 뒤 Lead 단독 리뷰가 이슈 **0건**을 냈으나
 3렌즈가 `origin: regression` 3건을 찾았다. 아래 3축은 그 3건을 역산한 것이다.
 
   A. 헤더 주석이 가리키는 심볼이 그 파일에 있는가   (렌즈 A4)
@@ -60,7 +60,7 @@ def parse(text):
 #    `Copyright`·`Created`·작성자명이 전부 "본문에 없는 심볼" 로 잡혀 노이즈가 된다.
 BOILERPLATE = re.compile(r"Created by|Copyright|All rights reserved|^\s*//\s*$|\.swift\s*$")
 # ⛔ `MARK`·`TODO` 는 Xcode 지시자이지 심볼이 아니다.
-NOISE_WORDS = {"Copyright", "Created", "TVING", "Release", "Debug", "MARK", "TODO", "FIXME", "NOTE"}
+NOISE_WORDS = {"Copyright", "Created", "Release", "Debug", "MARK", "TODO", "FIXME", "NOTE"}
 
 
 # ⛔ 첫 **선언** 전까지가 서문이다. "파일 최상단" 으로 잡으면 안 된다 —
