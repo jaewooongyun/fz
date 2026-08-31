@@ -92,6 +92,7 @@
 - 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. Codex `codex-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/Codex 비대칭).
 - generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
 - ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
+- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:213` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(Codex 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
 - 승격 목표 (트랙 C → 트랙 A): 별개 세션 추가 관측 후 safety-audit §확장 active 전환.
 
 ## OBS-08 회고 후보 (P2, 관측 #1)
@@ -347,6 +348,24 @@ findings 22건 전수 분류 결과 **대다수가 E**다. 현행 4트랙 어디
 ### 배출 기록
 
 A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIED.md` 에 1행을 남긴다(반영처 = 파일:섹션 + 버전 + oracle 결과). 본 원장에는 등재하지 않는다 — 승격이 아니라 수리이기 때문이다.
+
+### ⛔ 역방향 고아 — 앵커 배선 실측 (2026-08-31)
+
+원장에 항목이 있는데 자산에 앵커가 없어 관측이 카운트되지 못하는 항목을 실측했다. **MERGE 대상 존재 여부가 갈렸다.**
+
+| 항목 | 자산의 기존 방어 | 조치 |
+|---|---|---|
+| **P2-C** | ✅ `fz-review/SKILL.md:213` retain cycle 점검 | 앵커 부착 완료 |
+| D-1 | ⛔ **0건** — `catch` 본문 인용 강제 방어 없음(`evidence-collection.md:117` 은 base 대조 축) | **보류** |
+| L-5 | ⛔ **0건** — 상보 연산 쌍(expand↔collapse) 방어 없음 | **보류** |
+| L-10 | ⛔ **0건** — path prefix 실측 대조 방어 없음 | **보류** |
+| L-12 | ⛔ **0건** — 규칙 이식 근거 태깅 방어 없음(`pre-existing` origin 은 다른 축) | **보류** |
+
+⛔ **보류 4건은 앵커를 달 자리가 없다.** 자산에 방어가 아예 없어서 역방향 고아가 된 것이고, 앵커를 만들려면 **신규 행을 신설**해야 한다 — 그것은 관측이 아니라 규칙 추가이며 `guides/prompt-optimization.md:719`(체크리스트 행 추가 반사 금지) 대상이다.
+
+⭐ 판별 기준: **기존 방어가 있으면 앵커(배선 복구), 없으면 보류(규칙 신설은 별개 판정)**. P2-C 는 전자이고 4건은 후자다. 4건의 승격 조건은 그대로 유지되며, 관측이 발생하면 그때 "신규 행이 정당한가" 를 별도로 묻는다.
+
+⚠️ **ID 기반 검사는 이 원장에서 위양성을 낸다** — `D-1` 이 `ASD-1234` 류 문자열에 부분 매치한다(fz-findings F-032 가 예고한 번호 충돌의 실현). 앵커 존재 확인은 **단어 경계**(`(^|[^A-Za-z0-9-])ID([^0-9]|$)`) 또는 문맥 문구로 검사한다.
 
 ---
 
