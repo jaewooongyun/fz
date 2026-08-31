@@ -531,7 +531,7 @@ SOLO 모드에서는 에이전트 스폰/Codex 교차 검증 없이, 결정론�
    ```
 4. 비율 < 100% → 누락 사유 명시 필수
 5. **명령 출력 커버리지** (파일 분석 없는 순수 grep/rg 조사는 1-4항 대신 본 항부터 적용): 근거 수집 명령에 `head`/`tail` 잘림 금지. 출력이 길면 자르지 말고 `wc -l` 총계 병기 + "잘림" 명시.
-6. **집계 검산식**: 분할 합계 주장(부분합 존재)은 검산식 명시·일치 의무 (예: `80 = 58 + 6 + 14 + 2`). 단순 단일 카운트는 head 없는 재실행(`rg X | wc -l`)으로 대체. 정규식/쿼리 불완전로 인한 가짜 교차확인도 검산 불일치로 탐지 — T8 리마인더 범위 밖, 본 항이 담당.
+6. **집계 검산식**: 분할 합계 주장(부분합 존재)은 검산식 명시·일치 의무 (예: `80 = 58 + 6 + 14 + 2`). 단순 단일 카운트는 head 없는 재실행(`rg X | wc -l`)으로 대체. ⛔ **정규식·쿼리 불완전로 인한 가짜 교차확인은 본 항이 담당하지 않는다** — 수신처는 `§ Negative-Result Gate`(2026-08-09 신설)다. 이전 문구는 *"T8 리마인더 범위 밖, 본 항이 담당"* 이라 적었으나 그 구현은 **존재한 적이 없고**, `system-reminders.md` T8 도 이미 Negative-Result Gate 를 지목한다(*"도구 유효성…은 §Negative-Result Gate"*). 본 항은 **범위**(분모·부분합)를, Negative-Result Gate 가 **도구 유효성**을 본다.
 7. **분류 완전성** *[candidate: 1 session evidence]* (scope 판정이 산출물에 포함될 때 — sweep/discovery가 항목을 in_scope/out_of_scope/migrated 분류): 기각(out_of_scope/migrated) 항목 수 명시 + 무작위 N=min(3, 전체기각수) 표본 adversarial 재검(반례 탐색 → 발견 시 재분류). **분류 단위 = 사용 site(call/usage site), file 전체 아님** — 혼재 파일(in-scope+out-scope site 공존) 허용. (BAD: 파일 통째 out 판정 → 내부 in-scope site 폐기 / GOOD: site별 분리 판정). [evidence:1 OBS-15, active:5세션(트랙 A — promotion-ledger.md canonical) — `project_fz_harness_holes.md`]
 
 ```

@@ -339,7 +339,7 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 - [ ] 대상 심볼/패턴 파악 완료?
 - [ ] 영향 범위 식별?
 - [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
-- [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (canonical: `modules/cross-validation.md` § Coverage Gate — ⛔ 어휘 9개 동기)
+- [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (단위 U 확정 후 M/`N_U` 보고 — canonical: `modules/cross-validation.md` § Coverage Gate 절차 0, ⛔ 어휘 9개 동기)
 - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
 
 ---

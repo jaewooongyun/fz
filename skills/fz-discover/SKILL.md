@@ -227,7 +227,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 - [ ] 핵심 결정 사항이 명확하게 식별되었는가?
 - [ ] 관련 코드 구조를 탐색했는가?
 - [ ] 초기 제약이 1개 이상 식별되었는가?
-- [ ] "전체/모든/생태계/전수" 분석 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (대상 N개, 분석 M개, M/N = {비율}% — canonical: `modules/cross-validation.md` § Coverage Gate, ⛔ 어휘 9개 동기)
+- [ ] "전체/모든/생태계/전수" 분석 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (단위 U 확정 후 대상 `N_U`개, 분석 M개, M/`N_U` = {비율}% — canonical: `modules/cross-validation.md` § Coverage Gate 절차 0, ⛔ 어휘 9개 동기)
 - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
 - [ ] scope 판정(in/out 분류) 포함 시: 기각 표본 adversarial 재검 + site 단위 분류 — Coverage Gate § 절차 **step 7** 통과? (위 일반 커버리지 항목과 별개) *[candidate: 1 session evidence]*
 
