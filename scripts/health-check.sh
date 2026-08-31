@@ -189,6 +189,25 @@ else
   record "회귀 오라클" UNRUN "미실행 — node 부재 (⛔ PASS 아님)"
 fi
 
+# ── 4.7 G8 문체 게이트 fixture 계약 ────────────────────────────
+# ⛔ 신설 근거: `negative-clean.md` 가 "오검출 0/8" 을 기대값으로 적어 두고 **한 번도
+#    실행된 적이 없었다**. 기대값은 실행돼야 오라클이다.
+# ⛔ 원시 위반 수가 아니라 **계약**을 본다: clean 은 0, defect 는 1건 이상.
+#    defect 가 0 이면 검사기가 죽은 것이므로 그것도 실패다(positive control).
+G8_SELF="$(cd "$ROOT" && python3 scripts/check_g8_style.py --self-test 2>&1)"; G8_SELF_CODE=$?
+if [ "$G8_SELF_CODE" -ne 0 ]; then
+  UNRUN=$((UNRUN + 1))
+  record "G8 문체 fixture" UNRUN "⛔ 검사기 self-test 실패 — 판정 불가 (PASS 아님)"
+else
+  G8_OUT="$(cd "$ROOT" && python3 scripts/check_g8_style.py --fixture-check 2>&1)"; G8_CODE=$?
+  case "$G8_CODE" in
+    0) record "G8 문체 fixture" 0 "$(printf '%s\n' "$G8_OUT" | tail -1) · self-test $(printf '%s\n' "$G8_SELF" | tail -1)" ;;
+    1) record "G8 문체 fixture" 1 "⛔ $(printf '%s\n' "$G8_OUT" | tail -1)" ;;
+    *) UNRUN=$((UNRUN + 1))
+       record "G8 문체 fixture" UNRUN "미실행 — fixture 부재 (⛔ PASS 아님)" ;;
+  esac
+fi
+
 # ── 5. 플러그인 매니페스트
 # ⛔ ISSUE-001 (CRITICAL) 정정: 이전 판은 `claude` 부재를 **exit 0으로 기록**해
 #    표에 ✅가 찍히고 총평이 "전 검사 통과"로 나왔다 — 플러그인 로딩이 **검증되지 않았는데도**.
