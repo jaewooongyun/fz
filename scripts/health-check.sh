@@ -157,6 +157,38 @@ case "$CF_CODE" in
      record "codex 플래그 호환성" UNRUN "미실행 — codex CLI 부재·help 파싱 실패 (⛔ PASS 아님)" ;;
 esac
 
+# ── 4.6 회귀 오라클 실행 (tests/) ─────────────────────────────────
+# ⛔ 신설 근거: 오라클이 **아무 자동 경로에도 없었다**. `tests/workflows/*.js` 3종 중
+#    참조 1곳(s2-cross-merge)뿐이고 d6·s2-stage2-trigger 는 0곳, `tests/fixtures/*/run.sh`
+#    7종도 health-check 가 보지 않았다. 아무도 안 돌리는 오라클은 오라클이 아니다 —
+#    회귀가 나도 통합 건강 체크가 초록으로 통과한다.
+# ⛔ 러너를 **0개 발견**한 경우는 PASS 가 아니라 미실행이다: 경로 오타·디렉터리 이동이
+#    "전건 통과" 로 인쇄되는 것이 정확히 막으려는 실패다(0건은 측정 실패를 먼저 의심).
+if command -v node >/dev/null 2>&1; then
+  T_TOTAL=0 T_FAIL=0 T_BAD=""
+  for f in "$ROOT"/tests/workflows/*.js; do
+    [ -f "$f" ] || continue
+    T_TOTAL=$((T_TOTAL + 1))
+    (cd "$ROOT" && node "$f" >/dev/null 2>&1) || { T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $(basename "$f")"; }
+  done
+  for r in "$ROOT"/tests/fixtures/*/*/run.sh; do
+    [ -f "$r" ] || continue
+    T_TOTAL=$((T_TOTAL + 1))
+    (cd "$ROOT" && bash "$r" >/dev/null 2>&1) || { T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $(basename "$(dirname "$r")")"; }
+  done
+  if [ "$T_TOTAL" -eq 0 ]; then
+    UNRUN=$((UNRUN + 1))
+    record "회귀 오라클" UNRUN "미실행 — 러너 0개 발견 (경로 오타 의심, ⛔ PASS 아님)"
+  elif [ "$T_FAIL" -eq 0 ]; then
+    record "회귀 오라클" 0 "${T_TOTAL}개 전건 통과"
+  else
+    record "회귀 오라클" 1 "⛔ ${T_FAIL}/${T_TOTAL} 실패 —$T_BAD"
+  fi
+else
+  UNRUN=$((UNRUN + 1))
+  record "회귀 오라클" UNRUN "미실행 — node 부재 (⛔ PASS 아님)"
+fi
+
 # ── 5. 플러그인 매니페스트
 # ⛔ ISSUE-001 (CRITICAL) 정정: 이전 판은 `claude` 부재를 **exit 0으로 기록**해
 #    표에 ✅가 찍히고 총평이 "전 검사 통과"로 나왔다 — 플러그인 로딩이 **검증되지 않았는데도**.
