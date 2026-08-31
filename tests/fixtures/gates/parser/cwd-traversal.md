@@ -1,5 +1,5 @@
 # Gates: CWD traversal
-ROOT: ~/dev/fz-plugin/tests/fixtures/gates
+ROOT: /Users/example/dev/fz-plugin/tests/fixtures/gates
 STATE: active
 Scope: WORK_DIR 밖으로 탈출하는 CWD
 
