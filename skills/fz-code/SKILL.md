@@ -121,6 +121,8 @@ intent-triggers:
 7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + Codex 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
 8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → `experiment-log.md` §5.7 fz-code 테이블(**2026-07-10 시리즈 — 현행**; 2026-06-05 표는 사료). Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
 
+> 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰은 확산 판정 시 결정.
+
 ---
 
 ## ⛔ Phase 0: ASD Pre-flight

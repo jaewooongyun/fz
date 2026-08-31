@@ -103,7 +103,7 @@ intent-triggers:
 - `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
 - `{WORK_DIR}/code/step-*.md` 읽기 → 전체 구현 Step 상세 (1M context 활용)
 - `{WORK_DIR}/discover/discover-review.md` 읽기 → mid-pipeline discover 결과 (있으면)
-- `{WORK_DIR}/code/code-team.md` 읽기 → 구현 팀 통신 요약 (있으면)
+- ~~`{WORK_DIR}/code/code-team.md`~~ ⛔ **Workflow 모드에서 미생성** — transcript(runId)가 대체한다(`skills/fz-code/SKILL.md` 통신 기록). 읽을 파일이 없다
 
 ### ⛔ 모듈화 리뷰 원칙 (Modularization Review Scope)
 
