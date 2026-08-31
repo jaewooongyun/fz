@@ -54,7 +54,7 @@
 ├── code/
 │   ├── step-1.md ~ step-N.md
 │   ├── progress.md       # 전체 진행 상태 (누적형 — 이전 Step 핵심 결정 한 줄씩 유지)
-│   └── code-team.md      # TEAM 모드 pair programming 통신 기록
+│   └── code-team.md      # TEAM 모드 pair programming 통신 기록 (Workflow 전환 후 미생성 — transcript가 대체)
 ├── fix/
 │   └── fix-analysis.md   # fz-fix 원인 분석 + 수정 기록
 ├── search/
