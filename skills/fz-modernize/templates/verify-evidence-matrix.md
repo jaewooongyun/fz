@@ -16,7 +16,7 @@
 
 ## 자동 실행 스크립트
 
-> ⛔ Bash background + while loop + redirect 금지 (feedback_bash_background_redirect_capture.md). xargs -P 5 패턴 사용.
+> ⛔ Bash background + while loop + redirect 금지 (Bash background+redirect 교훈). xargs -P 5 패턴 사용.
 
 ```bash
 #!/bin/bash

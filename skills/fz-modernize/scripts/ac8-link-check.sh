@@ -2,7 +2,7 @@
 # AC8 Link Validity Auto-Check (xargs 병렬 패턴)
 # 본 스크립트는 fz-modernize Phase 6-1 게이트.
 #
-# ⛔ feedback_bash_background_redirect_capture.md (2026-05-02 교훈):
+# ⛔ Bash background+redirect 교훈 (2026-05-02 교훈):
 #    bash while loop + redirect를 background로 실행하면 결과 0 bytes.
 #    반드시 xargs -P N 병렬 패턴 사용.
 #

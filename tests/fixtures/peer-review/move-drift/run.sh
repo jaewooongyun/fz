@@ -28,8 +28,8 @@ check "개명 → 미발동(오탐 방어)" negative-rename-only.patch 1
 
 # A축이 실제로 드리프트를 잡는가 — 헤더가 그 파일에 없는 심볼을 가리킨다
 python3 "$MD" "$HERE/positive-file-split.patch" test 2>/dev/null > "$HERE/.out"
-if grep -q 'Presentable' "$HERE/.out" && grep -q '못 찾음' "$HERE/.out"; then
-  echo "PASS  $(printf '%-34s' "A축: 헤더가 없는 심볼 지목") Presentable 포착"
+if grep -q 'DetailPresentable' "$HERE/.out" && grep -q '못 찾음' "$HERE/.out"; then
+  echo "PASS  $(printf '%-34s' "A축: 헤더가 없는 심볼 지목") DetailPresentable 포착"
 else
   echo "FAIL  A축: 헤더 심볼 미포착 — 렌즈 A4 와 같은 자리를 놓쳤다"; fail=$((fail+1))
 fi

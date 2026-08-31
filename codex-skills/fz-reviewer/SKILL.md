@@ -207,9 +207,9 @@ Package AppDebugTools: LGTM — 내부 구현 깔끔함.
 
 GOOD (패키지 + 소비자):
 Package AppDebugTools: LGTM.
-Consumer (Extensions.swift:343): UIWindow.motionBegan에 isShowing guard 필요.
-  - Issue: AppDebugMenuPresenter.makeController() 호출 시 이미 표시 중인 모달 체크 없음.
-  - Suggestion: guard !AppDebugMenuPresenter.isShowing 추가.
+Consumer (Extensions.swift:120): UIWindow.motionBegan에 isShowing guard 필요.
+  - Issue: DebugMenuPresenter.makeController() 호출 시 이미 표시 중인 모달 체크 없음.
+  - Suggestion: guard !DebugMenuPresenter.isShowing 추가.
 ```
 
 ## When CLAUDE.md Is Absent

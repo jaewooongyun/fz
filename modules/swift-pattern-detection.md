@@ -175,14 +175,15 @@ GOOD:
 ## 검증 명령 (외부 grep용)
 
 ```bash
-F=~/dev/fz-plugin/skills/fz-code/SKILL.md
+R="$(bash scripts/resolve-plugin-root.sh)"   # 플러그인 루트 해석 (자기 위치 기준)
+F="$R/skills/fz-code/SKILL.md"
 # Phase 0.5 reference 존재
 grep -q 'Phase 0\.5.*Swift Pattern Pre-detection' "$F"
 grep -q 'modules/swift-pattern-detection\.md' "$F"
 # Gate 0.5 존재
 grep -q 'Gate 0\.5' "$F"
 # 본 모듈에 5 원칙 (D/E/F/G/H) + Few-shot 존재
-M=~/dev/fz-plugin/modules/swift-pattern-detection.md
+M="$R/modules/swift-pattern-detection.md"
 test "$(grep -Ec '^### 원칙 [DEFGH]' "$M")" -eq 5
 grep -q 'BAD:' "$M" && grep -q 'GOOD:' "$M"
 # Phase 1.5 P3와 mirror — 패턴 변환 trigger 명시 (F3 fix)

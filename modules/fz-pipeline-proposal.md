@@ -117,7 +117,7 @@ Q: "이 작업의 범위를 확인합니다"
 | verify `needs_revision` | Plan v{N+1} (18차 3회 한도) | 사용자 에스컬레이션 |
 | 연속 메타 작업 ≥ 2회 (학습/정식화/SKILL.md 강화) | **Implementation 사이클로 복귀** | 사용자 명시 메타 작업 결정 시 |
 
-> 33차 출처: `feedback_recommendation_default_bias.md` (Recommendation Default Bias)
+> 33차 출처: `Recommendation Default Bias 교훈` (Recommendation Default Bias)
 
 ---
 

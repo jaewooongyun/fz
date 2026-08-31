@@ -161,7 +161,7 @@ confidence: 0.92
 
 ```
 이 제안이 다음 두 출처에 부합하는가?
-1. 메모리 19차: feedback_import_copy_without_verification.md (전문 첨부)
+1. 메모리 19차: 형제 import 답습 금지 교훈 (전문 첨부)
 2. 모듈의 *현재 내용* (전문 첨부)
 
 verdict: agree / disagree / partial / needs_verification
