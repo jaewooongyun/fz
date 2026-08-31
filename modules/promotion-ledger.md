@@ -373,12 +373,14 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 
 ### ⛔ 역방향 고아 — 앵커 배선 실측 (2026-08-31)
 
+> **신설 정당화 (DELETE/MERGE-default)**: 순수 additive 가 아니라 **판별 기준의 정의**다. 실측 — 기존 § 미달 조치 정책은 *제거·보류* 방향(DEFERRED/REMOVED)만 다루고 그 반대편(앵커를 달 것인가 보류할 것인가)의 기준이 **0건**이었다(positive control: 같은 파일이 `배출 기록`·`미달 조치 정책`으로 다른 처분 축을 17회 규정한다). 판별 없이 5건을 일괄 처리하면 방어가 없는 4건에 **신규 행을 신설**하게 되고 그것은 `guides/prompt-optimization.md` § Anti-Patterns(체크리스트 행 추가 반사 금지) 대상이다.
+
 원장에 항목이 있는데 자산에 앵커가 없어 관측이 카운트되지 못하는 항목을 실측했다. **MERGE 대상 존재 여부가 갈렸다.**
 
 | 항목 | 자산의 기존 방어 | 조치 |
 |---|---|---|
 | **P2-C** | ✅ `fz-review/SKILL.md:213` retain cycle 점검 | 앵커 부착 완료 |
-| D-1 | ⛔ **0건** — `catch` 본문 인용 강제 방어 없음(`evidence-collection.md:117` 은 base 대조 축) | **보류** |
+| D-1 | ⛔ **0건** — `catch` 본문 인용 강제 방어 없음(`modules/evidence-collection.md:117` 은 base 대조 축) | **보류** |
 | L-5 | ⛔ **0건** — 상보 연산 쌍(expand↔collapse) 방어 없음 | **보류** |
 | L-10 | ⛔ **0건** — path prefix 실측 대조 방어 없음 | **보류** |
 | L-12 | ⛔ **0건** — 규칙 이식 근거 태깅 방어 없음(`pre-existing` origin 은 다른 축) | **보류** |
