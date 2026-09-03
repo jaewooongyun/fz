@@ -135,7 +135,7 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 |--------|---:|------|
 | [`llm-references.md`](guides/llm-references.md) | 147 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
 | [`prompt-optimization.md`](guides/prompt-optimization.md) | 755 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 580 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
+| [`skill-authoring.md`](guides/skill-authoring.md) | 629 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
 | [`skill-testing.md`](guides/skill-testing.md) | 470 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
 | [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 292 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
 | [`agent-team-guide.md`](guides/agent-team-guide.md) | 493 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
@@ -145,29 +145,30 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.28.0
+## What's New — v4.29.0
 
-**게이트가 없던 게 아니라 헛돌고 있었다.** 자기 규칙과 자기 코드를 검사하던 자리 여덟 곳이
-통과를 인쇄하면서 실제로는 아무것도 재지 않았다. 실패가 빨간불이 아니라 **초록불로 나타난다.**
+**승인 도장이 남의 줄에 박혔다.** `scripts/gate_check.py` 의 `finalize()` 가 게이트마다 도장
+한 줄을 삽입하면서 시작 시점의 스팬을 계속 썼다. n번째 도장은 (n−1)줄 앞에 박히고, 게이트가
+늘면 도장이 자기 블록을 벗어나 확정본이 자기 파서에 거부된다 — 실행 게이트 7개가 넘는 원장이
+exit 3 이었다. ⭐ 그리고 **그 경로를 실행하는 fixture 가 0건이었다.** 신설했다.
 
-Coverage Gate 는 분모를 파일로 고정해, 파일 안의 절을 세는 주장이 1/1 = 100% 로 통과했다.
-전수 주장이 겨누는 **대상 단위 U** 와 읽어야 할 파일 수 F 를 분리하고 절차 0 을 신설했다.
-⛔ 결과 건수("위반 0건")를 단위로 삼지 않는다 — 그러면 violation 이 단위가 되어 같은 붕괴가
-재발한다. 외부 채점이 이 대목을 한 번 더 좁혔다.
+Tier 2 투표 계약은 문서 59곳이 세 갈래로 갈려 있었다. 값을 복사해 맞추지 않고 정본을 지목하는
+방식으로 정합화했고, 전수 감사표를 grep 과 대조해 닫았다 —
+`grep=59 audit=59 dup=0 missing=0 extra=0`.
 
-d6 오라클은 워크플로 함수를 **복사해 두고 복사본을 검사**했다. 원본의 카운터 취소 연산을 지워도
-네 케이스가 전부 통과한다. 형제 테스트 둘이 이미 쓰던 `>>> PURE:` 마커 방식으로 바꿔 원본을
-런타임 추출한다. 뮤테이션 네 종이 전부 잡힌다.
+⭐ G8 줄표 게이트는 **매핑 블록 정본을 위반으로 세고 있었다** — 정본을 지킬수록 걸린다. 담당
+코드 줄 형태에 한해 줄표 1개를 뺐다. ⛔ 라벨 줄 전부에서 빼면 산문 줄표가 통째로 면제된다.
 
-그리고 그 오라클들은 **어느 자동 경로에도 없었다.** 10개 중 참조가 있는 것은 하나였다. 검사
-4.6·4.7 을 신설해 전부 돌린다. 러너를 0개 찾으면 통과가 아니라 미실행이다.
+Workflow `scriptPath` 거부에 우회 계약(판별·복사·검증·재시도)을 신설했다. ⛔ 이 실패는
+`mode:'fallback'` 이 아니라 **SOLO 오강등**을 낳는다 — 스크립트가 실행되지 않아 반환에 `mode`
+자체가 없다. `Workflow` 를 가진 소비자 SKILL.md 아홉 **전부에** `Bash(grep *)`·`Bash(cp *)` 가
+0이어서 우회가 필요한 순간에 죽는 상태였다.
 
-⭐ 정본 둘이 서로를 위반하고 있었다. 매핑 블록 정본은 볼드 라벨 다섯을 한 문단에 두라고
-규정하는데 G8 은 볼드 셋 이상을 과잉으로 봤다 — **정본을 지킬수록 게이트에 걸린다.** 줄머리
-라벨을 강조에서 빼고, 기대값만 적혀 있던 fixture 를 실행 가능한 검사기로 만들었다.
+evidence 수집 대상은 작업 트리가 아니라 **ref** 다. 빈 ref 는 작업 트리를 grep 하고 exit 0 을
+내므로 fail-closed 로 막았다.
 
-감사 판정 두 건은 뒤집혔다. "파이프라인 15종 미등재" 는 실제로 선언 한 문장 문제였고, 판정대로
-15행을 옮겼다면 트리거가 두 파일에 중복돼 서서히 어긋난다. 배포 가능하도록 개인 경로·티켓·조직
-어휘도 걷어냈다.
+⛔ 솔직히 적는다. 이 수리들이 **결함 7건을 새로 만들었고 교차검증이 잡았다.** 마지막 두 Step 은
+Codex spend cap 으로 이종 검증 없이 동종(fresh-context Claude)으로만 봤고, 그 폴백 검증자가
+미커밋 변경을 삭제했다(복구 완료 · 유실 0 확증).
 
-→ [릴리즈 노트](docs/releases/v4.28.0.md)
+→ [릴리즈 노트](docs/releases/v4.29.0.md)
