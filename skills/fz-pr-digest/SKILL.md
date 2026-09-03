@@ -16,7 +16,7 @@ allowed-tools: >-
   mcp__github__get_pull_request_comments,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Read, Grep, Glob, Workflow
+  Bash(git *), Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
 provides: [pr-digest, code-understanding]
 needs: [none]
 intent-triggers:
@@ -424,7 +424,7 @@ peer-review WORK_DIR: ${PROJECT_ROOT}/peer-review-{PR_NUMBER}/
 Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체, Wave 4 — 결정적 스크립트, P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
 
 ### 심층 탐색
-- `Workflow({ scriptPath: '{플러그인 루트}/workflows/search-cross-verify.js', args })` — search-symbolic(심볼/Before-After 구조) ↔ search-pattern(아키텍처 패턴/기술 배경) 교차 검증. 반환을 digest 입력으로 결합.
+- `Workflow({ scriptPath: '{플러그인 루트}/workflows/search-cross-verify.js', args })` — search-symbolic(심볼/Before-After 구조) ↔ search-pattern(아키텍처 패턴/기술 배경) 교차 검증. 반환을 digest 입력으로 결합. ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
 
 ### peer-review 연계
 - fz-peer-review Tier 3 + `--explain --deep` 시: Lead가 `workflows/peer-review.js`(`deep:true`) 실행 → reviews/issues 수신 → pr-digest Deep 해설과 결합. 각 스킬이 자신의 Workflow를 소유하므로 별도 TeamCreate 불필요.

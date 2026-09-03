@@ -541,6 +541,34 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
   - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [미검증: per-call `opts.effort` vs settings.json `effortLevel` 우선순위. 문서화된 체인은 `env var > frontmatter > 세션`이며 per-call opts는 미명시]
   - ⛔ **effort로 응답 길이를 줄이려 하지 말 것** — Opus 5에서 effort는 사고량을 조절할 뿐 가시 응답 길이를 신뢰성 있게 줄이지 못한다. 길이는 프롬프트로. [verified: 동 effort 문서]
 
+#### ⛔ scriptPath 거부 우회 계약 (도구 경로 게이트)
+
+> 신설 정당화 (DELETE/MERGE-default): 위 배치·호출 규약 bullet 들은 *스크립트가 어디에 사는가*(플러그인 루트 절대경로)를 정한다 — 표기가 옳은데도 **도구가 그 경로 읽기를 거부하는** 경우는 다루지 않아 기존 bullet 흡수 불가.
+> ⛔ **근본 해결이 아니다.** fz 가 고칠 수 있는 결함이 아니라 **도구별 경로 게이트**다 — 같은 경로를 `Bash`·`Read` 는 읽는다. 플러그인 루트가 세션 working directory 이거나 additional directory 면 애초에 발생하지 않는다. 아래는 그 조건이 아닐 때의 **세션 한정 우회**이며, 조건이 사라지면 이 블록도 함께 삭제한다.
+
+`Workflow` 호출이 스크립트를 실행하지 못하고 이렇게 거부될 수 있다:
+
+```
+scriptPath must be a script path this tool returned, or a file you can already read
+  (the working directory or a directory you have added): {플러그인 루트}/workflows/peer-review.js
+```
+
+> 콜론 뒤에는 실제 절대경로가 온다 — 여기서는 이식성 때문에 치환했다(§ 이식성).
+
+⛔ **이 거부는 `mode:'fallback'` 이 아니다.** 스크립트가 시작조차 못 한 상태라 **반환에 `mode` 필드 자체가 없다**(에이전트 0 · 산출 0). `fallback` 으로 읽어 SOLO 로 강등하면 멀티에이전트 경로가 조용히 사라진다 — 아래 실패 복구 사다리 L1~L4 어디에도 해당하지 않는다.
+
+**우회 4단계** (⛔ 순서 고정 — 2를 건너뛰면 의존이 끊긴 복사본을 실행한다):
+
+1. **판별** — 에러가 `scriptPath must be a script path this tool returned, or a file you can already read` 로 시작하면 이 케이스다. 표기 문제가 아니므로 경로 표기를 고쳐 쓰는 것으로는 통과하지 않는다.
+2. **self-contained 확인** — `grep -c '^import\|require(' {플러그인 루트}/workflows/{파일}.js` 가 `0` 이어야 복사가 안전하다. ⛔ 이 식이 보는 것은 **모듈 import 부재 하나**다 — `__dirname` 기준 경로·상대 파일 읽기는 걸리지 않으니 눈으로 함께 본다. ⛔ 무출력은 `0` 이 아니라 경로 오류(측정 실패)다. 0 이 아니거나 상대 접근이 보이면 **복사하지 말고** L4(사용자 에스컬레이션)로 간다.
+3. **검증 후 복사** — 먼저 목적지를 본다: `{WORK_DIR}` 의 절대경로가 세션 working directory(또는 additional directory)의 절대경로를 **접두사로 가져야** 한다 — 위 거부 메시지가 읽을 수 있다고 말하는 범위가 그 둘뿐이다. 두 값 모두 `~`·상대 표기를 편 뒤 비교한다. ⛔ 둘 중 하나라도 확정하지 못하면 **'하위 아님' 으로 처리한다** — 미확정을 '하위' 로 읽으면 어차피 거부될 복사를 그대로 진행한다(측정 실패는 통과가 아니다). `/tmp/fz-peer-review/` 같은 폴백 WORK_DIR [실측: `skills/fz-peer-review/SKILL.md` L101 "쓰기 불가 시 `/tmp/fz-peer-review/` 폴백"]은 그 밖이라 **복사본도 같은 게이트에 걸린다** — 복사하지 말고 L4(사용자 에스컬레이션)로 간다. 접두사를 확인했을 때만 `cp {플러그인 루트}/workflows/{파일}.js {WORK_DIR}/{파일}.js` — 그 목적지라야 도구가 읽는다. ⛔ **목적지는 `{WORK_DIR}` 루트다 — 하위 디렉터리를 만들지 않는다.** `cp` 는 부모 디렉터리를 만들지 못하는데 아래 권한 bullet 이 요구하는 것은 `Bash(grep *)`·`Bash(cp *)` 뿐이라 `mkdir` 을 가정할 수 없다 — 없는 하위 경로로 복사하면 4단계 재시도 **전에** `No such file or directory` 로 죽는다. 평탄화의 이름 충돌 위험은 워크플로 스크립트명이 고유해(`code-pair.js` 등) 낮다.
+4. **재시도** — `Workflow({ scriptPath: '{WORK_DIR}/{파일}.js', args })`. 복사본이 원본과 같으면 resume·캐시도 그대로 동작한다.
+
+[실측: 2026-09-03 세션 — 플러그인 루트 경로는 거부되고 `{WORK_DIR}/code/code-pair.js` 복사본 경로는 **6 invoke 전부 성공**(agent 17 · error 0 · resume 정상)] ⛔ 그 경로의 `code/` 는 복사 **이전에 이미 존재했다** — `cp` 가 부모를 만든 증거가 아니다. 계약이 `{WORK_DIR}` 루트를 쓰는 이유다.
+
+- ⛔ **복사본은 산출물이 아니다** — 원본이 바뀌면 stale 이 된다. WORK_DIR 밖으로 옮기거나 커밋하지 않고, 원본을 고쳤으면 3단계부터 수행한다.
+- ⛔ **소비자 SKILL.md 에 권한이 없으면 2·3 단계가 실행되지 않는다** — `allowed-tools` 에 `Bash(grep *)`·`Bash(cp *)` 를 둔다. 위 배치·호출 규약의 `Workflow` 추가 의무와 같은 계약이며, 없으면 우회는 정확히 그것이 필요한 상황에서 죽는다. [실측: 2026-09-03 — `Workflow` 를 가진 소비자 9곳 전부에 두 권한이 0이었다]
+
 ### resume 계약 + advisor 상속 (2026-08-08 신설)
 
 > 신설 정당화 (DELETE/MERGE-default): 본 §12는 배치·호출·model/effort·산출물·intentContext를 이미 소유하나 **중단 후 재개**와 **워커가 상속하는 세션 설정**을 다루지 않았다 — 기존 하위절 흡수 불가. 둘 다 실측으로 확인된 계약만 수록.
@@ -578,6 +606,7 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 | **L3** | 스테이지 스톨·일시 장애(세션/rate limit) | **`resume` 우선** — `Workflow({ scriptPath, resumeFromRunId })`. 변경 없는 agent()의 최장 prefix가 캐시 재생된다 | §5.7 fz-review #8 (2026-07-20, 초회 7287s 스톨 → resume 부분 재시도 성공) |
 | **L4** | L1~L3 미해소 | **사용자 에스컬레이션** — 선택지(재시도/범위축소/중단) 제시. ⛔ **Lead 단독 SOLO 수행은 사용자 승인 후에만** (Lead=fable 자동 SOLO 금지) | — |
 
+- ⛔ **호출 자체가 거부된 경우는 이 사다리가 아니다** — 반환에 `mode` 가 없다(스크립트 미실행). § scriptPath 거부 우회 계약으로 간다. `mode:'fallback'` 으로 읽어 SOLO 로 강등하는 것이 정확히 막으려는 실패다
 - ⛔ **`resume`은 동일 Claude Code 세션 내에서만** 동작한다 — 세션이 끝났으면 L3를 건너뛰고 ASD 아티팩트로 복원한다
 - ⛔ **재시도는 `buildFeedback` 등을 args에 넣어 캐시 키를 바꾼다** (resume 비의존 경로)
 - ⛔ **진단은 추측 금지** — `<transcriptDir>/journal.jsonl`이 agent별 실제 반환값을 기록한다. 빈 결과·이상 결과는 journal을 먼저 Read

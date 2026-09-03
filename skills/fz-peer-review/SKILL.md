@@ -22,7 +22,7 @@ allowed-tools: >-
   mcp__github__add_issue_comment,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Bash(codex *), Bash(gh *), Read, Grep, Glob, Workflow, Write
+  Bash(git *), Bash(codex *), Bash(gh *), Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow, Write
 provides: [peer-review]
 needs: [none]
 intent-triggers:
