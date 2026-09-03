@@ -13,6 +13,16 @@
 #    형태의 볼드 라벨 5개를 한 문단에 두라고 규정한다. 그것을 강조로 세면 **정본을 지킬수록
 #    게이트에 걸린다**. 줄머리 `**라벨**:` 은 구조 표시이지 강조가 아니므로 세지 않는다.
 #
+# ⛔ 라벨 줄표 예외: 그 정본은 담당 코드 줄에서 경로와 심볼을 줄표로 가른다
+#    (`**담당 코드**: path:120 — Symbol`, modules/explanation-output.md:65). 블록이 늘면
+#    줄표도 함께 늘어 같은 충돌이 줄표 축에서 되풀이된다. 그 줄에서 줄표 **1개**만 뺀다 —
+#    둘이면 나머지 하나는 산문 줄표로 남는다(전량 면제가 아니다).
+#    ⛔ 예외는 담당 코드 줄의 **형태**(CODE_LABEL_LINE)에만 건다. 라벨 줄 전부에서 빼면
+#    `**하는 일**: A — B` 같은 산문 줄표가 면제된다 — 2026-09-03 에 그렇게 회귀했다.
+#    판정 축은 라벨 이름이 아니라 값의 형태다: `**담당 코드**: 없음 — 신규 파일` 은
+#    산문이므로 면제하지 않는다. 형태 경계에 걸리는 정본이 새로 생기면 CODE_LABEL_LINE 을
+#    그 형태로 좁혀 고치고 LABEL_LINE 으로 되돌리지 않는다 — 그 되돌림이 위 회귀다.
+#
 # diff-parse: not-a-diff — 이 파일의 `startswith("-")` 는 argv 플래그 판별이다.
 #   diff 를 읽지 않으므로 hunk 안팎 구분이 필요 없다.
 #
@@ -30,6 +40,10 @@ ROOT = os.path.dirname(HERE)
 BOLD = re.compile(r"\*\*[^*\n]+\*\*")
 LABEL_LINE = re.compile(r"^\s*\*\*[^*\n]+\*\*\s*:")   # 줄머리 라벨 — 강조 아님
 DASH = "—"                                        # 줄표(em dash)
+# 담당 코드 줄의 정본 형태 — 백틱 경로 + 줄표 + 백틱 심볼 (modules/explanation-output.md:65).
+# ⛔ 줄표는 DASH 를 재사용한다. 리터럴로 복제하면 한 문자에 정본이 둘이 된다.
+CODE_LABEL_LINE = re.compile(
+    r"^\s*\*\*[^*\n]+\*\*\s*:\s*`[^`\n]+`\s*" + re.escape(DASH) + r"\s*`[^`\n]+`")
 
 BOLD_MAX = 2      # "셋 이상" 이 위반 → 2 까지 허용
 DASH_MAX = 1      # "둘 이상" 이 위반 → 1 까지 허용
@@ -65,16 +79,20 @@ def check(path):
     hits = []
     for start, buf in paragraphs(text):
         emphasis = 0
+        dashes = 0
         for line in buf:
             n = len(BOLD.findall(line))
+            d = line.count(DASH)
             if LABEL_LINE.match(line):
-                n -= 1            # 줄머리 라벨 1개는 구조 표시로 제외
+                n -= 1            # 줄머리 라벨 1개는 구조 표시로 제외 (라벨 5종 전부 구조)
+            if CODE_LABEL_LINE.match(line):
+                d -= 1            # `경로` — `심볼` 줄표 1개만 구조 — ⛔ 라벨 줄 전체가 아니다
             emphasis += max(n, 0)
+            dashes += max(d, 0)
         if emphasis > BOLD_MAX:
             hits.append((start, "과잉 볼드", "%d개(강조 기준)" % emphasis))
-        dashes = sum(line.count(DASH) for line in buf)
         if dashes > DASH_MAX:
-            hits.append((start, "줄표 남용", "%d개" % dashes))
+            hits.append((start, "줄표 남용", "%d개(산문 기준)" % dashes))
     return hits
 
 
@@ -89,6 +107,12 @@ SELF_TESTS = (
      "```\n**a** **b** **c** **d**\n```\n", 0),
     ("줄표 2개 → 위반", "문장 — 다음 — 또\n", 1),
     ("줄표 1개 → 통과", "문장 — 다음\n", 0),
+    ("매핑 라벨 줄표 2개 → 통과(라벨 줄 제외)",
+     "**담당 코드**: `Sample/ListRouter.ext:88` — `routeToDetail`\n**왜 여기인가**: [실측: 채택자 3] 붙이고 떼는 책임 — 라우터에 모여 있다\n", 0),
+    ("라벨 1줄에 줄표 2개 → 위반",
+     "**담당 코드**: `Sample/ListRouter.ext:88` — `routeToDetail` — 보조 설명\n잔여 1개에 산문 줄표 1개를 더해 임계를 넘긴다 — 전량 면제면 넘지 못한다\n", 1),
+    ("라벨 2줄의 산문 줄표 2개 → 위반(담당 코드 형태 아님)",
+     "**하는 일**: 목록을 만든다 — 캐시도 함께 채운다\n**없으면**: [추론] 목록이 비어 보인다 — 원인 추적이 어렵다\n", 1),
     ("빈 줄이 문단을 가른다",
      "**a** **b**\n\n**c** **d**\n", 0),
 )
