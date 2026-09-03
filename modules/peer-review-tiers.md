@@ -554,7 +554,7 @@ jq -e '
 > ⛔ **standalone Agent() 금지** — Analyze는 `workflows/peer-review.js` Workflow가 소유한다 (결정적 스크립트, P2P SendMessage 없음). `SKILL.md` Boundaries와 동일 지시.
 
 ```
-1. Lead: Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js',
+1. Lead: Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js',   // ⛔ 거부 시 정본 = guides/skill-authoring.md §12 우회 계약 (SOLO 폴백 아님)
                     args: { diffPath, intentContext, evidencePaths, basePath, deep: false,
                             structuralContext } })   // ⛔ 누락 시 에러 없이 구조 축이 꺼진다
 2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
@@ -575,7 +575,7 @@ jq -e '
 | `finalSeverity`·`counterVerdict` | — | — | ✓ (Stage 3) |
 
 ⛔ Tier 2 는 발화해도 **`finalSeverity` 를 만들지 않는다.** 교차 조정은 `crossSeverity` 에 **제안으로** 싣고 최종 판정은 Lead 병합 계약이 한다 — Tier 2 미투표(Wave 4 확정)를 스크립트가 지키는 방식이다.
-⛔ `stage2Ran` 은 **조용한 off 방어**다. 필드가 없으면 트리거가 안 걸린 것인지 스크립트가 옛 버전인지 구별할 수 없다. Confidence Matrix를 만들 때 `severity`(원본)를 쓰고, 교차·DA 열은 "미수행"으로 표기한다 — 필드를 찾다 실패하면 Matrix가 판정 불가로 멈춘다.
+⛔ `stage2Ran` 은 **조용한 off 방어**다. 필드가 없으면 트리거가 안 걸린 것인지 스크립트가 옛 버전인지 구별할 수 없다. 미발화 경로의 `severity`·교차·DA 열 표기와 병합 중단 규칙은 정본을 따른다 (정본: `modules/peer-review-gates.md` § MergeContract § 9 — Confidence Matrix 생성 여부 포함).
 
 에이전트 브리프는 스크립트가 조립한다 (OVERRIDE 블록 + TARGET). Lead가 args로 넘길 것:
 - `diffPath` / `basePath`(base 원본 prefetch — 에이전트가 요청하지 않는다) / `evidencePaths`

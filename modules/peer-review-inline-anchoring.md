@@ -105,7 +105,7 @@ hunk:  420-428 / 431-440        ← 429-430이 미변경이라 갈라짐
 - `side`/`start_side`: `RIGHT`=변경 후 / `LEFT`=변경 전(삭제된 코드 지적)
 - 스크립트가 `side`를 그대로 돌려주므로 `anchorable[].side`를 두 필드에 함께 넣는다 (한 구간이 side를 섞을 수는 없다)
 
-> ⛔ **top-level `body`에는 `review-report.md` 전문을 넣는다** — 요약이 아니다. 인라인 전환 이전의 `--post`는 `gh pr comment`로 리포트 전문을 대화창에 올렸다. 인라인만 달고 `body`를 요약으로 줄이면 **Confidence Matrix·origin 보정 근거·긍정적 측면이 PR에서 사라지는 회귀**가 된다. 리뷰 body는 리뷰 헤더로 남으므로 전문을 담기에 적절하다(GitHub 상한 65,536자 — 초과 시에만 Matrix를 남기고 이슈 상세를 인라인에 위임).
+> ⛔ **top-level `body`에는 `review-report.md` 전문을 넣는다** — 요약이 아니다. 인라인 전환 이전의 `--post`는 `gh pr comment`로 리포트 전문을 대화창에 올렸다. 인라인만 달고 `body`를 요약으로 줄이면 **Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9)·origin 보정 근거·긍정적 측면이 PR에서 사라지는 회귀**가 된다. 리뷰 body는 리뷰 헤더로 남으므로 전문을 담기에 적절하다(GitHub 상한 65,536자 — 초과 시에만 Matrix(있는 경로에 한한다)를 남기고 이슈 상세를 인라인에 위임).
 
 ### 6) 게시 실행
 

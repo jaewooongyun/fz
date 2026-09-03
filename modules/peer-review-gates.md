@@ -405,8 +405,8 @@ GOOD (Gate 4.9 적용):
 게이트 실행 완료 후 반드시 파일로 저장:
 
 ```
-${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+게이트 검증 결과)
-${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix
+${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+게이트 검증 결과 — 투표 적용 Tier 는 § MergeContract § 9)
+${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (Tier 별 생성 여부는 § MergeContract § 9)
 ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리포인트
 ```
 

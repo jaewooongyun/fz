@@ -32,7 +32,7 @@ intent-triggers:
 
 # /fz-peer-review - 팀원 코드 피어 리뷰
 
-> **행동 원칙**: 팀원의 PR/브랜치를 3-렌즈 독립 분석 + Codex 교차검증으로 리뷰하고, Confidence Matrix 투표로 객관적 이슈를 도출한다. 칭찬할 건 칭찬하고, 지적할 건 근거와 대안을 함께 제시한다.
+> **행동 원칙**: 팀원의 PR/브랜치를 3-렌즈 독립 분석 + Codex 교차검증으로 리뷰하고, Confidence Matrix 투표(적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)로 객관적 이슈를 도출한다. 칭찬할 건 칭찬하고, 지적할 건 근거와 대안을 함께 제시한다.
 
 ## 개요
 
@@ -40,7 +40,7 @@ intent-triggers:
 
 - **9개 관점**: Architecture Decision, Extensibility, Over-Engineering, Functional Decomposition, Modern API, Dependency Impact, **Refactoring Completeness**, **Concurrency Safety** (동시성 코드 포함 시), **Requirements Alignment**
 - **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 single source) + Codex challenger(**Tier 1·2·3 상시** — SSOT는 `modules/peer-review-tiers.md` § Tier 구성 표. Tier 0은 `--codex` 시 Tier 1 전환)
-- **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정
+- **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정 (적용 Tier·산식은 `modules/peer-review-gates.md` § MergeContract § 9)
 - **4-Tier Graceful Degradation**: diff 크기 기반 자동 Tier 선택 (Tier 0/1/2/3) + 폴백 체인
 
 ```bash
@@ -288,12 +288,12 @@ Anti-Sycophancy 규칙(코드 증거 없는 self-reverse 금지), reverse 판정
 
 ## Step: Synthesize (종합)
 
-sequential-thinking으로 Confidence Matrix를 계산한다.
+sequential-thinking으로 Confidence Matrix를 계산한다 (Tier 별 생성 여부·산식은 `modules/peer-review-gates.md` § MergeContract § 9 — 이 절의 dedup·투표 서술 적용 범위는 같은 계약 서두).
 
 ### 1. 결측 에이전트 처리
 
 Lead 보정 **불필요** — `peer-review.js`가 `reviews`를 `.filter(Boolean)`으로 구성해 실패 에이전트는 이미 빠져 있고, `PeerReviewSchema`에 `agent_status`가 없어 `partial`은 표현되지 않는다. Lead가 볼 것은 `reviews.length`뿐 — ⛔ 스크립트는 **전부 null일 때만** fallback을 반환하므로(`peer-review.js`의 `reason: 'stage1 all null'` 분기) 1-review 경로가 실재한다:
-3 → 3-vote / 2 → 2-vote 모드(§3) / **1 → 투표 불가. 단독 렌즈 결과이므로 Confidence Matrix를 만들지 않고 `[단일 렌즈 — 교차검증 없음]` 태그와 함께 보고하며, 이슈 confidence는 ×0.7 감쇠** / 0 → `mode:'fallback'`(Tier 하위 전환)
+3 → 3-vote / 2 → 2-vote 모드(§3) / **1 → 투표 불가. 단독 렌즈 결과이므로 Confidence Matrix를 만들지 않고 `[단일 렌즈 — 교차검증 없음]` 태그와 함께 보고하며, 이슈 confidence는 ×0.7 감쇠** / 0 → `mode:'fallback'`(Tier 하위 전환) — ⛔ 이 투표 산식은 Tier 3 기준이다(`modules/peer-review-gates.md` § MergeContract § 9)
 
 ### 2. Origin 기반 Severity 보정
 
@@ -325,6 +325,8 @@ PR title/body/requirements.md의 핵심 의도를 각 regression 이슈와 교�
 
 ### 3. Dedup + 투표
 
+> ⛔ **Tier 3 전용** — 그 외 Tier 의 병합·판정 산식은 `modules/peer-review-gates.md` § MergeContract § 9 가 정본이다.
+
 ```
 Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 
@@ -342,6 +344,8 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 **독립성 원칙**: 에이전트가 Gather의 Key Facts를 기반으로 판단하면 독립성 LOW. 에이전트가 직접 파일을 Read하여 판단하면 독립성 HIGH. Codex가 sandbox에서 독립 분석하면 독립성 HIGH. 독립성 LOW 에이전트의 동의는 confidence를 증폭하지 않는다.
 
 ### 4. Confidence Matrix 출력
+
+> ⛔ **적용 Tier** — 이 절 산출물의 Tier 별 생성 여부는 `modules/peer-review-gates.md` § MergeContract § 9, 절 안 Coverage·Negative-Result Gate 의 경량 경로 적용은 같은 파일 § 경량 경로 표가 정본이다.
 
 ```markdown
 | # | Issue | Origin | Sev | Arch | Auditor | Codex | DA | Votes | Basis | Final | Decision |
@@ -365,8 +369,8 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 Synthesize 결과를 파일로 영속화한다. 대화 컨텍스트가 compact되어도 Read로 복원 가능.
 
 ```
-${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 라인)
-${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (마크다운)
+${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 라인 — 투표 적용 Tier 는 modules/peer-review-gates.md § MergeContract § 9)
+${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (마크다운 — Tier 별 생성 여부는 modules/peer-review-gates.md § MergeContract § 9)
 ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 ```
 
@@ -396,7 +400,7 @@ write_memory("fz:checkpoint:peer-review-synthesize", "PR#{number}: 이슈 {N}개
 
 #### 대화 출력 (항상)
 
-Confidence Matrix → Major 이슈(file:line + What/Impact/Evidence/Suggestion) → Minor(2-3줄) → 긍정적 측면(3-5줄) → 최종 판정 + Severity 보정 근거
+Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9) → Major 이슈(file:line + What/Impact/Evidence/Suggestion) → Minor(2-3줄) → 긍정적 측면(3-5줄) → 최종 판정 + Severity 보정 근거
 
 #### ⛔ CHECKPOINT — 문서 출력 (Deliver 완료 전 반드시 저장)
 
@@ -453,7 +457,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 
 **Will**:
 - 팀원 PR/브랜치의 9개 관점 피어 리뷰
-- 3-Model Cross-Review + Confidence Matrix 투표
+- 3-Model Cross-Review + Confidence Matrix 투표 (적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)
 - Codex Devil's Advocate로 편향 보정
 - 인라인 라인 앵커 리뷰 게시 (`--post` — `gh api …/pulls/{N}/reviews`)
 - 4-Tier Graceful Degradation + 자동 폴백
@@ -465,7 +469,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 - ⛔ **standalone Agent() 호출 금지** — Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응
 
-`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **Codex 실패→(Tier 2/3) 2-agent 투표 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (codex 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다**, Codex timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
+`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **Codex 실패→(Tier 3) Codex 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (codex 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다**, Codex timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
 
 ## Completion → Next
 `--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계.

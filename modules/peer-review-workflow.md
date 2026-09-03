@@ -13,7 +13,7 @@
 
 > TEAM(TeamCreate+SendMessage) → 네이티브 Workflow 전환 (Wave 4). Analyze 코어는 `workflows/peer-review.js`가 소유한다 (결정적 스크립트 — P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
 
-1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, reviewSurfacePatchPath, reviewSurfacePath, evidencePaths, basePath, deep, structuralContext } })` — `structuralContext`는 `modules/review-structural-axes.md`를 Read해 §3 축 + §4 경계 문구를 담는다 (미전달 시 구조 축 미적용)
+1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, reviewSurfacePatchPath, reviewSurfacePath, evidencePaths, basePath, deep, structuralContext } })` — `structuralContext`는 `modules/review-structural-axes.md`를 Read해 §3 축 + §4 경계 문구를 담는다 (미전달 시 구조 축 미적용) ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - `deep=false` → **Tier 2 (Lite)**: Stage1 3-병렬(arch+quality+correctness) → **트리거 발화 시에만 Stage2 교차**. **3 또는 5-call**(null 재시도 시 최대 6/10). 발화 여부는 반환 `stage2Ran`·`stage2Trigger`. Confidence Matrix 미투표(Lead 단순 병합)
    - `deep=true` → **Tier 3 (Full)**: +Stage2 교차(arch↔quality) +Stage3 counter DA, **기본 6-call**(부분 실패로 Stage2 생략 시 5, 재시도 시 최대 9). 권위 수치는 `metrics.agentCalls`
    - ⛔ **`reviewSurfacePatchPath` 가 1차다.** `review-surface.patch`(gather 가 만드는 중복 커밋 제외분)가
@@ -31,9 +31,9 @@
      가 정확히 그렇게 누락돼 있었다.
    - base 원본은 Gather에서 prefetch하여 `basePath`로 전달 — 에이전트가 SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `agent-team-guide.md` §2)
 2. **반환 처리**: `mode:'workflow'` → reviews/issues를 Synthesize Step 입력으로. `mode:'fallback'` → Lead SOLO 리뷰 폴백.
-3. **Codex Analyze** (out-of-band, `--codex`/Tier3): Lead가 `/fz-codex` 경유 challenger 호출 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과는 Synthesize Confidence Matrix의 Codex 열로 주입.
+3. **Codex Analyze** (out-of-band, `--codex`/Tier3): Lead가 `/fz-codex` 경유 challenger 호출 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과는 Synthesize Confidence Matrix의 Codex 열로 주입 — Matrix 생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9.
 
-> 산출물 계약(Confidence Matrix, origin severity 보정, confidence<80 미보고, dedup+투표)은 Synthesize Step에 보존. metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록.
+> 산출물 계약(Confidence Matrix, origin severity 보정, confidence<80 미보고, dedup+투표)은 Synthesize Step에 보존 — Matrix·투표의 적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9. metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록.
 > ⚠️ **§5.7에 fz-peer-review 테이블이 아직 없다** (Wave 4가 `[Unreleased]` + 실 invoke 캘리브레이션 pending). 확산 임계 사전등록과 테이블 생성은 **별건** — 실 invoke 전에 처리해야 `확증 편향 방어`가 유지된다.
 
 ### 에이전트 출력 스키마
@@ -51,7 +51,7 @@ WHY: 이슈 수가 많으면 리뷰어 피로가 증가하고, 진짜 문제가 
 ├─ 3개 결과 JSON 로드 (review-arch + review-quality + codex-challenger)
 ├─ 이슈 중복 제거 (파일 + line_range overlap + perspective fuzzy match)
 ├─ 이슈 간 충돌 식별 ("확장성 부족" vs "오버엔지니어링")
-└─ 초기 Confidence Matrix 생성
+└─ (Tier 3) 초기 Confidence Matrix 생성 / (Tier 2) modules/peer-review-gates.md § MergeContract § 9 Tier 2 행 대로 Lead 병합
 ```
 
 ### 방법 B — `--deep` Cross-Critique (Tier 3 Workflow)
