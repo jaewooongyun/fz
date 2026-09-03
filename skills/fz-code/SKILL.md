@@ -20,7 +20,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__lsp__diagnostics_delta,
   mcp__lsp__hover,
-  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Workflow
+  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Workflow
 provides: [code-changes]
 needs: [planning]
 intent-triggers:
@@ -115,7 +115,7 @@ intent-triggers:
    `plan/direction-challenge.md` 의 방향 판정 · `plan/verify-result.md` 의 미해소 이슈(있으면).
    ⚠️ 만들기만 하고 넘기지 않으면 무력하다 — 렌즈는 `contextPath` 밖 파일을 열 수 없다.
 2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 참조),complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
-3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })`
+3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - Stage 1 impl(opus) changeset → Stage 2 **검토**(full: review-arch + impl-quality **병렬 2렌즈**, opus / light: arch 단독) → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, full 3-4 call · light 1-2 call)
 4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유)
 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
@@ -484,6 +484,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 | XcodeBuildMCP 실패 | Bash로 xcodebuild 직접 | 수동 빌드 |
 | Serena 연결 실패 | Edit + Write 직접 수정 | 수동 편집 |
 | 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
+| Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
 
 ## Completion → Next
 

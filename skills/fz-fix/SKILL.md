@@ -19,7 +19,7 @@ allowed-tools: >-
   mcp__lsp__diagnostics_delta,
   mcp__lsp__hover,
   mcp__lsp__peek_definition,
-  Edit, Read, Bash(xcodebuild *), Bash(cd *), Workflow
+  Edit, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Workflow
 provides: [code-changes]
 needs: [none]
 intent-triggers:
@@ -203,7 +203,7 @@ intent-triggers:
 
 1. **args 조립**: `mode:'light'` / `stepSpec`={id,title,goal,files,verify,**complexity**, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 시 `split_required`. 임계값 single source=상수)} / `contextPath`(버그 분석 요약 파일) / `changesetTarget` / `buildFeedback`(재시도 시)
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
-2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus). 1-2 call
+2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus). 1-2 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
 3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke
 4. **`mode:'fallback'` 반환 시**: SOLO 폴백 = Mode A Bug Fix Step 1-4 진입 — **--codex 처리 책임도 fallback 경로에서 유효** + 사유 experiment-log 기록
    - **`mode:'split_required'`(또는 `splitSuggested:true`) 우선**: SOLO 폴백 전에 **Step 분할 후 재invoke** (H5 크기 가드 — fz-code 절차 6 사다리 동형). ⛔ Lead=fable 자동 SOLO 금지 — 직접 구현은 사용자 승인 후

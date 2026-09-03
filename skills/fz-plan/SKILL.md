@@ -19,7 +19,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__atlassian__get-issue,
   mcp__atlassian__search-issues,
-  Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
 provides: [planning, architecture-analysis]
 needs: [none]
 intent-triggers:
@@ -100,7 +100,7 @@ intent-triggers:
    - 미확정 축 → `null`. 코드 실측(grep) 1회로 보완 시도하고, 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
    - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / Codex)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
-3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/plan-collaborative.js', args })`
+3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/plan-collaborative.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - Stage 0 direction(fable, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2 — 반박은 opus) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(opus) → Stage 3 CC 교차(edge↔impact, opus) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증(opus). 9-11 call
 4. **반환 처리**:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
@@ -488,6 +488,7 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 | Serena 연결 실패 | Grep + Glob 폴백 | 수동 탐색 |
 | Context7 실패 | WebSearch 폴백 | 문서 직접 검색 |
 | 검증 실패 | /sc:analyze 단독 검증 | Claude 자체 판단 |
+| Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
 
 ## Completion → Next
 

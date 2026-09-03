@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__serena__delete_memory,
   mcp__serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
-  Read, Grep, Glob
+  Bash(grep *), Bash(cp *), Read, Grep, Glob
 provides: []
 needs: []
 intent-triggers: []
@@ -344,7 +344,7 @@ commit/pr 전 → ✓ codex check (TEAM)
 각 스킬은 자신의 `workflows/{skill}-{pattern}.js`를 소유한다. Lead는 스킬의 Workflow를 호출하고 반환(구조화 출력)을 통합한다. Lead는 퍼실리테이터 (호출 + 게이트 실행 + 통합).
 
 ```
-1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{플러그인 루트}/workflows/{skill}-{pattern}.js', args })
+1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{플러그인 루트}/workflows/{skill}-{pattern}.js', args })   → ⛔ 거부 시 정본 = `guides/skill-authoring.md` §12 우회 계약 (SOLO 폴백 아님)
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
 3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/Codex) + 통합
 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
