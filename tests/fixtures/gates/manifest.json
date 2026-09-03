@@ -23,7 +23,8 @@
     "expect": "EXPECT 문법 판별 — 경로 리터럴 vs 정규식",
     "verdict": "verify-gates 응답의 전수 판정 대조 (--verdict-check)",
     "approved": "승인 도장 (APPROVED_ORACLE_HASH) 계약",
-    "discover": "원장 탐색 (--discover) — health-check 노출 경로"
+    "discover": "원장 탐색 (--discover) — health-check 노출 경로",
+    "finalize": "확정 도장 발급 (--finalize) — 도장이 자기 게이트 블록에 박히는가"
   },
   "cases": [
     {
@@ -913,6 +914,25 @@
         ]
       },
       "why": "hook 미설치 머신에서 미충족 원장이 보이는 **유일한 경로**다. 충족(closed)·미충족(active)·계약위반(헤더 중복) 세 트리를 함께 두어 세 분류가 다 발화하는지 본다. ⛔ 미충족은 exit 에 반영되지 않는다(작업 중 정상 상태) — 계약 위반만 exit 3. `lint_doc_freshness` 선례: findings 가 있어도 exit 0, 건수만 보고 ⛔ 기대 문자열이 `\"미충족\"` 하나였을 때는 상세 줄 제거를 관측하지 못했다 — 요약줄에도 `미충족 0` 이 나오기 때문이다(2026-08-25 실측). 상세 줄에만 있는 형태(`  미충족 <경로> — ['G1']`)와 요약 수치(`미충족 1`)를 나눠서 본다"
+    },
+    {
+      "id": "finalize-stamp-placement",
+      "category": "finalize",
+      "ledger": "finalize/eight-gates.md",
+      "mode": "finalize",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "실행 게이트 8개에 승인 도장, manual 1개 제외"
+        ],
+        "expect_contains": {
+          "APPROVED_ORACLE_HASH: ": 8,
+          "APPROVED: yes": 1
+        }
+      },
+      "why": "⛔ `--finalize` 를 실행하는 케이스가 **0건**이었다 — mode 분포가 기본 62 · from-plan 1 · oracle-fields 1 · cross-session 1 · discover 1 이라 도장 발급 경로 자체가 회귀 없이 방치됐다. 도장은 한 줄씩 삽입되는데 루프가 시작 시점 `Gate` 객체의 줄 번호를 계속 쓰면 n번째 도장이 (n−1)줄 앞에 박힌다. ⛔ 블록을 벗어나는 조건은 **n > 그 게이트의 속성 수 + 1** 이다 — 그 전까지는 자기 블록 안에 떨어져 exit·건수 어느 축에도 나타나지 않는다. 이 fixture 는 실행 8 + manual 1 이고, 속성 4개짜리 G6 이 6번째 실행 게이트(n=6 > 4+1)라 여기서 처음 블록을 벗어난다. ⛔ **깨질 수 있는 쌍은 G6 의 속성 수와 실행 게이트 중 서수(序數)** 이지 헤더 배치가 아니다 — anchor 와 삽입 index 가 함께 밀리므로 관측은 절대 줄 번호에 무관하다. G6 에 `TIMEOUT:` 등을 더해 속성을 늘리면 관측 지점이 뒤로 밀리고, 실행 게이트를 **5개 이하**로 줄이면 관측이 사라진다(6개까지는 G6 이 여전히 6번째 실행 게이트라 그대로 관측된다). 실전 관측(2026-09-02): 실행 게이트 10개 원장에서 `게이트에 속하지 않은 속성 APPROVED_ORACLE_HASH (line 69)` exit 3. manual 을 중간에 둔 것은 건너뛴 게이트가 밀림에 기여하지 않는 것까지 함께 재기 위함이다. 파일명의 eight 는 **실행** 게이트 수다"
     }
   ],
   "_max_seconds": "선택 필드 — 벽시계 상한(초). ⛔ exit code 만으로는 hang 을 못 잡는다: 손자 프로세스가 파이프를 붙잡아 30초 걸렸는데 exit 는 1로 정상이었다(2026-08-24 실측).",
@@ -920,6 +940,7 @@
   "_expect_stdout": "선택 필드 — stdout 에 문자열이 나타나는가. ⛔ exit code 가 같은 두 방어선을 구분한다 (인접전이 거부와 미충족 거부는 둘 다 exit 1 이다).",
   "_notes": {
     "recheck-unobserved": "⛔ evaluate() 의 사후 재확인(쓴 것을 디스크에서 다시 읽어 met 판정)은 회귀 fixture 가 없다. 관측하려면 writeback 이 잘못 쓰는 상태를 만들어야 하는데, 그 경로들(EVIDENCE 미삽입·스팬 오류)은 각각 별도 fixture 로 이미 닫혀 있어 재현 입력이 없다. 방어 심층화(defense in depth)로 유지하고 미관측임을 여기 명시한다 — '통과했다'가 '관측됐다'를 뜻하지 않는다",
+    "finalize-manual-stamp-unobserved": "⛔ self_test 의 finalize 사후 검사에 있는 `manual 인데 도장이 박혔다` 분기는 이 fixture 로 발화하지 않는다. 결함 코드에서도 M1 블록에는 도장이 들어가지 않기 때문이다 — M1 직전인 G5(5번째 실행 게이트, 밀림 4줄)의 도장은 자기 CRITERION 줄 뒤에 떨어지고, 다음 삽입인 G6 은 M1 을 지나친 뒤쪽에서 블록을 벗어난다. 수정 코드에서는 manual 이 애초에 skipped 로 건너뛰어져 도장 대상이 아니다. 방어 심층화(defense in depth)로 유지하고 미관측임을 여기 명시한다 — `recheck-unobserved` 와 같은 부류다",
     "discover-mode": "⛔ `--discover` 는 **디렉토리**를 받으므로 `mode: \"discover\"` 케이스가 `tests/fixtures/gates/discover/` 를 대상으로 돌린다. 그 하위에 충족·미충족·계약위반 세 트리가 `<sub>/gates/plan.md` 배치로 있다. ⛔ 다른 fixture 원장은 파일명이 `plan.md` 가 아니라 탐색 대상이 아니다 — sandbox 전체를 대상으로 돌리려던 첫 시도가 0건이었던 이유다",
     "fixture-portability": "⛔ fixture 원장의 `ROOT:`·`CWD:` 는 **커밋한 사람의 클론 경로**다. self-test 가 sandbox 로 재작성하는데, `replace(str(FIXTURES), …)` 만 쓰면 다른 클론이나 플러그인 캐시에서 매칭 0건이 되어 ROOT 가 남의 경로를 가리키고 소유 검사에서 전부 exit 3 이 된다 (2026-08-25 실측: 캐시에서 19/66). 그래서 **경로 모양**(`…/tests/fixtures/gates` 로 끝나는 절대 경로)으로 재작성한다. 회귀 확인 = 저장소를 임의 위치로 복사해 self-test 를 돌린다"
   }

@@ -1037,6 +1037,9 @@ def self_test() -> int:
                 # 변환 케이스 — 입력은 plan JSON 이고 산출물은 새 원장이다.
                 out = sandbox / "fromplan" / "generated.md"
                 argv = ["--from-plan", str(ledger_path), "--root", str(sandbox), "--out", str(out)]
+            elif case.get("mode") == "finalize":
+                # 확정 경로 — 입력 원장이 그대로 산출물이다(제자리 도장).
+                argv = ["--finalize"]
             elif case.get("mode") == "oracle-fields":
                 argv = ["--oracle-fields"]
             elif case.get("mode") == "cross-session":
@@ -1098,6 +1101,33 @@ def self_test() -> int:
                 got = target.read_text(encoding="utf-8").count(needle) if target.exists() else 0
                 if got != count:
                     reasons.append(f"{needle!r} {got}회 (기대 {count}회)")
+            # ⛔ finalize 는 **도장이 자기 게이트 블록 안에** 박혔는지가 판별 축이다.
+            #    개수만 세면 밀린 도장도 통과한다 — 삽입 한 줄마다 뒤쪽 스팬이 밀리는
+            #    결함은 블록이 그 폭을 흡수하는 동안 exit·건수 어느 축에도 나타나지
+            #    않았고, 폭을 넘어선 뒤에야 exit 3 으로 드러났다 (2026-09-02 실측).
+            #    재파싱한 확정본에서 각 도장이 **자기 oracle 값**인지 대조한다.
+            # ⛔ **성공을 기대하는 케이스에만** 건다 — from-plan 이 산출물 존재로 가드하는
+            #    것과 같은 축이다. 무조건 재파싱하면 거부(exit 3)를 기대하는 케이스는
+            #    확정본이 없는 것이 정상인데도 사유가 붙어 통과할 수 없다.
+            if case.get("mode") == "finalize" and want["exit"] == EXIT_OK:
+                try:
+                    final_ledger = load(ledger_path)
+                except (LedgerError, InfraError) as e:
+                    reasons.append(f"확정본 재파싱 실패 — {e}")
+                else:
+                    for g in final_ledger.gates:
+                        got_stamp = g.attrs.get("APPROVED_ORACLE_HASH")
+                        if not g.is_runnable:
+                            # ⛔ 미관측 방어선 — manifest `_notes.finalize-manual-stamp-unobserved`
+                            if got_stamp is not None:
+                                reasons.append(f"{g.id}: manual 인데 도장이 박혔다")
+                            continue
+                        want_stamp = oracle_hash(g, resolve_cwd(g, final_ledger))
+                        if got_stamp is None:
+                            reasons.append(f"{g.id}: 자기 블록에 도장이 없다")
+                        elif got_stamp != want_stamp:
+                            reasons.append(
+                                f"{g.id}: 도장이 자기 oracle 과 다르다 ({got_stamp} != {want_stamp})")
             if not reasons:
                 passed += 1
             else:
@@ -1218,13 +1248,27 @@ def finalize(ledger: Ledger) -> int:
     ⛔ 도장은 `verify-gates` 판정을 **반영한 뒤** 찍는다. 찍고 나면 CHECK·EXPECT·CWD·
        TIMEOUT·CRITERION·제목 중 하나라도 바뀌면 실행이 거부된다(재승인 필요).
 
+    ⛔ 삽입 위치는 **매 반복 재로드본에서 다시 찾는다.** 도장 한 줄이 들어갈 때마다
+       뒤쪽 게이트의 스팬이 1씩 밀리는데, 루프가 시작 시점의 `Gate` 객체를 계속 내면
+       n번째 도장이 (n−1)줄 앞에 박힌다. 벗어나는 조건은 **n > 그 게이트의 속성 수 + 1**
+       이고, 그 전까지는 자기 블록 안에 떨어져 조용히 통과한다 — 넘어서는 순간 도장이
+       게이트 줄 앞으로 나가 확정본이 자기 파서에 거부된다 (2026-09-02 실측: 실행
+       게이트 10개 원장에서 `게이트에 속하지 않은 속성 APPROVED_ORACLE_HASH (line 69)`
+       — exit 3).
+
     헤더 `APPROVED:` 는 "이 원장은 확정본"이라는 표식이다. 없으면 draft 로 보고
     경고만 낸다 — draft 단계에서 도장을 요구하면 순서가 뒤집힌다(Phase 2 평가자가
     볼 CHECK 가 도장보다 먼저 있어야 한다).
     """
     lines = ledger_lines(ledger)
+    gate_ids = [g.id for g in ledger.gates]
     stamped, skipped = 0, 0
-    for gate in ledger.gates:
+    for gid in gate_ids:
+        # ⛔ 재로드본에서 id 로 다시 찾는다 — 옛 `Gate` 객체의 `attr_lines` 는 앞선
+        #    삽입만큼 낡아 있어 도장이 남의 줄에 박힌다.
+        gate = next((g for g in ledger.gates if g.id == gid), None)
+        if gate is None:
+            raise LedgerError(f"{gid}: 확정 중 게이트가 사라졌다 — 도장 위치를 정할 수 없다")
         if not gate.is_runnable:
             skipped += 1
             continue
