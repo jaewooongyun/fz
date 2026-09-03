@@ -72,7 +72,7 @@ fz-peer-review는 ASD 폴더와 별도 WORK_DIR을 사용:
 {PROJECT_ROOT}/peer-review-{PR_NUMBER}/
 ├── review-index.md
 ├── synthesized-issues.json
-├── confidence-matrix.md
+├── confidence-matrix.md       # 생성 경로는 modules/peer-review-gates.md § MergeContract § 9
 ├── review-report.md
 ├── pr-comments.md
 └── {agent}-result.json        # raw 에이전트 결과 (arch, quality, codex)
@@ -378,7 +378,7 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 | /fz-plan | plan 버전 기록 |
 | /fz-code | step/progress 기록 |
 | /fz-review | self-review 기록 |
-| /fz-peer-review | review-index.md + 파일 산출물 (synthesized-issues.json, confidence-matrix.md, pr-comments.md, cost-log.json, tier.txt) — Serena checkpoint 미사용 |
+| /fz-peer-review | review-index.md + 파일 산출물 (synthesized-issues.json, confidence-matrix.md, pr-comments.md, cost-log.json, tier.txt) — Serena checkpoint 미사용. confidence-matrix.md 생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9 |
 
 ## ⛔ Work Dir Resolution (모든 fz-* 스킬 필수)
 
