@@ -105,7 +105,7 @@ intent-triggers:
 WORK_DIR이 없으면 이후 모든 산출물 저장이 실패한다. Gather 시작 시 반드시 첫 번째로 실행.
 
 ```bash
-mkdir -p ${WORK_DIR}
+mkdir -p "${WORK_DIR}" && WORK_DIR="$(cd "${WORK_DIR}" && pwd)" && echo "${WORK_DIR}"   # ⛔ 절대경로로 확정 — cwd 는 도구 호출 사이에 리셋된다
 ```
 
 확인: `WORK_DIR` 경로를 대화 컨텍스트에 명시적으로 기록한다. 이후 모든 파일 저장은 이 경로를 사용한다.
@@ -404,7 +404,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 
 #### ⛔ CHECKPOINT — 문서 출력 (Deliver 완료 전 반드시 저장)
 
-> **⛔ 대화 출력 전에 반드시 Write 도구로 아래 파일들을 저장하세요. 저장 완료 후 사용자에게 경로를 안내합니다.**
+> **⛔ 대화 출력 전에 반드시 Write 도구로 아래 파일들을 저장하세요. 저장 완료 후 사용자에게 경로를 안내합니다.** ⛔ 쓰기 경로는 **항상 절대경로**다 — cwd 는 도구 호출 사이에 리셋되므로 상대경로는 그때의 cwd(팀 레포·PR 워크트리)에 착지한다. ⛔ **종료 전** 리뷰에 쓴 레포와 PR 워크트리 각각에 `git -C <절대경로> status --porcelain` 을 1회 실행한다 — 경로는 `git rev-parse --show-toplevel` 로 얻은 절대값이어야 하고, ⛔ **이 검사에는** `${GIT_ROOT}` 를 쓰지 않는다(공유 유틸은 추출 실패 시 `.` 로 떨어져 검사 자체가 cwd 의존이 된다). `??` 에 `review-report.md`·`pr-comments.md`·`*-result.json` 이 보이면 산출물 오착지다. ⛔ 출력이 비어도 **exit code 를 본다** — `fatal: not a git repository` 는 clean 이 아니라 측정 실패다(`modules/cross-validation.md` § Negative-Result Gate).
 > ```
 > 📁 산출물 저장: ${WORK_DIR}/
 >    ├── review-report.md

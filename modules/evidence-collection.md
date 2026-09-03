@@ -36,6 +36,10 @@ ${WORK_DIR}/evidence/
 
 ## 수집 절차
 
+⛔ **evidence 의 기본 대상은 ref 다** — `git grep <pattern> ${HEAD_REF} -- <glob>`. **작업 트리는 PR이 아니다**: 리뷰어의 트리가 PR base 와 같을 이유가 없고, 트리에 파일 자체가 없으면 grep 은 조용히 0건을 돌려준다(0건 = "없다"가 아니라 **대상 불일치**). ⛔ **ref 이름을 하드코딩하지 않는다 — Gather 가 해석한 값을 쓴다**: `${HEAD_REF}` 는 PR 리뷰면 `skills/fz-peer-review/SKILL.md` §0.5 가 fetch 한 `pr-{PR}`, 브랜치 리뷰면 그 브랜치 자체다 — `skills/fz-peer-review/scripts/gather.sh` 는 `--target (PR번호|브랜치)` 를 받고 **브랜치 모드에는 `pr-{PR}` 이 없다**. ⛔ **head 해석값은 산출물에 기록되지 않는다** — `${WORK_DIR}/base-behavior.md` 는 **base 전용**이라 거기에 head 는 없다. head 는 **Lead 가 Gather 에 넘긴 target 그 자체**이므로 호출 시점에 이미 아는 값이다 — 산출물에서 읽는 것이 아니라 그 이름을 그대로 쓴다. `${BASE_REF}` 도 `upstream/` 고정이 아니다 — `--base` 인자·PR `baseRefName`·브랜치 폴백(`feature/*`→`develop`·`hotfix/*`→`main`)으로 정해지고, PR 경로에서 로컬에 없으면 `upstream`→`origin` 순 접두가 붙고, 해석되면 merge-base 로 대체된다. **base 해석값**은 `${WORK_DIR}/base-behavior.md` 첫머리(`대상 base: …`)에 남으니 추측하지 말고 거기서 읽는다 — **merge-base 가 병기돼 있으면 그쪽**이 diff 가 비교한 원본이다(팁을 읽으면 regression↔pre-existing 이 뒤집힌다). base 대조·관례 표본이 필요한 §a·§d·§f 는 `${BASE_REF}`, 잔존 참조·호출자를 보는 §c·§e 는 `${HEAD_REF}` 다 — 아래 블록의 `pr-${PR_NUMBER}`·`upstream/${BASE_BRANCH}` 표기는 그 **자리표시자**이지 문자 그대로 쓰는 이름이 아니다. ⛔ **`${HEAD_REF}`·`${BASE_REF}` 표기 자체도 글로 쓴 자리표시자다 — 셸 변수가 아니다**: Bash 도구는 호출 사이에 셸 상태를 유지하지 않으므로 그대로 붙여넣으면 **빈 문자열로 전개**된다. ⛔ **넣을 이름이 없으면 grep 하지 않는다(fail-closed)** — 빈 ref 는 fatal 이 아니라 **작업 트리를 grep 하고 exit 0** 을 내므로 exit code 로는 잡히지 않는다(Gather 스크립트도 빈 `HEAD_REF` 를 실재하는 상태로 다뤄 `[ -n "$HEAD_REF" ]` 가드를 세 곳에 둔다). 실제 이름으로 치환한 뒤 `git rev-parse --verify <ref>` 가 통과할 때만 돌리고, 통과 못 하면 §0.5 fetch 를 먼저 하거나 사용자 에스컬레이션(`guides/skill-authoring.md` §12 L4) — 미해석 ref 로 얻은 0건은 증거가 아니다. 치환한 뒤에도 미fetch 이름은 `git grep` 이 fatal 로 0건을 내므로 **exit code 도 함께 본다** — 어느 쪽이든 **ref** 이고 작업 트리가 아니다.
+
+⛔ **glob 은 따옴표로 감싼다** — `git grep … -- '*.swift'` · GNU `grep -r … --include="*.swift"`. zsh 는 unquoted glob 을 셸이 먼저 확장하고, 매칭 파일이 없으면 `no matches found` 로 **명령 실행 전에 중단**한다 — 출력이 비어 "0건"으로 읽히지만 grep 은 돌지도 않았다. 함정 표 정본은 `modules/cross-validation.md` § Negative-Result Gate 다.
+
 ```bash
 mkdir -p ${WORK_DIR}/evidence
 ```
@@ -163,7 +167,7 @@ PR의 핵심 패턴과 **같은 패턴의 다른 모듈** 코드를 수집한다
 
 수집:
 1. PR의 핵심 아키텍처 패턴 식별 (max 3)
-2. 각 패턴에 대해 Grep → 같은 프로젝트의 다른 모듈에서 동일 패턴 2-3개 수집
+2. 각 패턴에 대해 `git grep <pattern> ${BASE_REF} -- '*.swift'` → 같은 프로젝트의 다른 모듈에서 동일 패턴 2-3개 수집 (⛔ PR head 가 아니라 **base** 다 — PR 이 바꾼 파일이 표본에 들어가면 PR 이 자기 관례의 증거가 된다. `${BASE_REF}` 는 Gather 가 해석한 base 이고 `upstream/` 접두를 고정하지 않는다)
 3. 패턴 일관성 판정:
    - 3+ 모듈이 동일 → "Convention" (에이전트에 전달)
    - 1-2 모듈만 → "Minority"
