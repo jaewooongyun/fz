@@ -52,7 +52,7 @@ intent-triggers:
 ## Prerequisites
 
 - **외부 자료 접근**: WebSearch + WebFetch + Codex CLI (cross-model verify)
-- **Codex CLI 0.124.0+**: cross-model 검증(모델=config SSOT). trust_level="trusted" 설정 필요 (30차 교훈)
+- **Codex CLI**: cross-model 검증(모델=config SSOT — 버전 플로어는 `modules/gpt-strategy.md`). trust_level="trusted" 설정 필요 (30차 교훈)
 - **6+ 스텝 자동 ASD 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 ASD ticket ID
 
 ## 모듈 참조
@@ -264,7 +264,7 @@ done
 
 ### 절차
 
-1. **Skill 호출**: `/fz-codex verify {PLAN_PATH}`
+1. **Skill 호출**: `/fz-gpt verify {PLAN_PATH}`
 2. **5 Q 검증 관점** (Plan-specific):
    - Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류)
    - Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜)
@@ -279,7 +279,7 @@ done
 ### 권장 — Codex 호출 환경
 
 ```bash
-# fz-codex SKILL.md hygiene 적용
+# fz-gpt SKILL.md hygiene 적용
 # 1. Stdin close (29차)
 # 2. trust_level="trusted" 등록 (30차)
 # 3. -o flag 작동 안 할 시 stdout > file redirect 사용

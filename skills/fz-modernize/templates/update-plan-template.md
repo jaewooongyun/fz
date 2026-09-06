@@ -135,6 +135,6 @@ Phase 5d-final: AC8 link + Impact Scan + 최종 검토
 
 ## 8. 다음 단계
 
-→ Phase 4 (Codex Verify): `/fz-codex verify {plan}`
+→ Phase 4 (Codex Verify): `/fz-gpt verify {plan}`
 → approved → Phase 5 (Execute)
 → needs_revision → v{N+1} 작성 (카운터 +1)

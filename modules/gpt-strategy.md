@@ -1,11 +1,12 @@
 # Codex 실행 전략
 
-> fz-codex SKILL.md 서브커맨드에서 참조. 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드).
+> fz-gpt SKILL.md 서브커맨드에서 참조. 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드).
 
 > **Authority Sources** (Cgap-1 보강, 2026-05-16):
 > - **Reasoning Effort 정책**: Anthropic "Harness Design for Long-Running Apps" (2026-03) [verified: A2] — effort 파라미터를 작업 복잡도에 매칭. "Self-evaluation is unreliable" → cross-model verify 시 effort 정밀 설정 필요
 > - **Diff 크기 정책**: Context Rot (Chroma Research, 18 frontier models) [verified: empirical study] — focused 300 tokens > unfocused 113K tokens. Small (<2000) full diff / Medium (2000-8000) file-split / Large (>8000) key files + summary
-> - **CLI Mode 라우팅**: Codex CLI Changelog 0.124.0 (OpenAI 2026-04-23) [verified: official] — Hybrid mode (0.118.0+ Plugin + CLI fallback), gpt-5.5 (0.124.0+)
+> - **CLI Mode 라우팅**: Codex CLI Changelog [verified: official] — Hybrid mode (0.118.0+ Plugin + CLI fallback) · gpt-5.5 (0.124.0+) · **gpt-6-astra (0.153.1+, 0.153.4에서 bundled default)**
+>   출처: https://learn.chatgpt.com/docs/changelog (구 `developers.openai.com/codex/changelog` 는 여기로 308)
 
 ## 목차
 
@@ -13,7 +14,7 @@
 - [Reasoning Effort 전략 (사용자 명시 호출 기반)](#reasoning-effort-전략-사용자-명시-호출-기반)
 - [Diff 크기 적응 전략](#diff-크기-적응-전략)
 - [장기 불능 인지 (기간 조건부)](#장기-불능-인지-기간-조건부)
-- [CLI 모드 선택 전략 (0.124.0+, Hybrid)](#cli-모드-선택-전략-01240-hybrid)
+- [CLI 모드 선택 전략 (Hybrid)](#cli-모드-선택-전략-hybrid)
 - [Sandbox Permissions](#sandbox-permissions)
 - [GPT-5.5 Preamble 표준 (Cnew-3, 2026-05-16)](#gpt-55-preamble-표준-cnew-3-2026-05-16)
 
@@ -39,7 +40,7 @@ Codex 교차 검증은 **사용자가 필요할 때 명시적으로 호출**한�
 | **Deep** | final, adversarial, plan, critical 재검증, --deep | config 기본값 | `xhigh` | ~8-10분 |
 | **Light** | micro-eval (단일 주장 재평가) | config 기본값 | `medium` | ~1-2분 |
 
-> Subcommand별 정확한 매핑은 `skills/fz-codex/SKILL.md § Effort Routing (δ-2)` 표 참조 (authoritative). adversarial=xhigh로 정합화 (2026-04-25, codex-utilization plan v1 Step 2 inline action).
+> Subcommand별 정확한 매핑은 `skills/fz-gpt/SKILL.md § Effort Routing (δ-2)` 표 참조 (authoritative). adversarial=xhigh로 정합화 (2026-04-25, codex-utilization plan v1 Step 2 inline action).
 
 **결정 규칙**:
 - 기본: 모델=`config.toml` `model`(SSOT — 값 인라인 표기 금지, 항상 최신 frontier) + effort=`high`
@@ -81,7 +82,7 @@ DIFF_LINES=$(cd "$GIT_ROOT" && git diff --base "$BASE_BRANCH" --stat | awk 'END{
 
 > Codex가 **장기 불능** 상태(현재: spend cap 2026-07-16~, 해제 시점 미상 — 재확인 앵커 2026-08-18)일 때: 서브커맨드 호출 전 재시도를 생략하고 각 스킬의 Codex 불능 분기(fz-review Phase 5 검증 2 불능 분기 등)로 직행한다 — 매 호출 재시도 1회 오버헤드 방지. ⛔ 상태 표기에는 시작일 + 원복 트리거 명시 의무(만료일 미상이면 "해제 확인 시 원복"으로) — 정리 주체 없는 무기한 잔존 방지. **해제 확인 시 이 노트의 "현재:" 상태 제거 + 원경로 복원** (동기화 단일 포인트: MEMORY.md Codex 줄). 이종 blind-spot 안전망 상실은 폴백 산출물에 명시 의무 (15/23차).
 
-## CLI 모드 선택 전략 (0.124.0+, Hybrid)
+## CLI 모드 선택 전략 (Hybrid)
 
 `codex exec review`가 git diff + 구조화 출력을 통합. Plugin 설치 시 review/check/adversarial은 `/codex:*` 우선.
 Plugin 미설치 시 모든 서브커맨드가 CLI로 동작 (폴백 투명).
@@ -137,7 +138,7 @@ Codex 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 rea
 ```
 
 **적용 위치**:
-- `fz-codex` SKILL.md verify/validate/plan 서브커맨드 prompt template
+- `fz-gpt` SKILL.md verify/validate/plan 서브커맨드 prompt template
 - codex 네이티브 스킬 (`~/.codex/skills/.system/openai-docs` 활용 가능)
 
 **Few-shot 예시**:
