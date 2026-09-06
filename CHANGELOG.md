@@ -1,5 +1,69 @@
 # Changelog
 
+### v4.31.0 (2026-09-06) — 정본이 자기 Lead 모델을 몰랐고, 하네스는 자기 무게를 재는 눈이 없었다 [MINOR]
+
+두 갈래를 한 릴리즈로 낸다. **가이드 갱신** — 감사가 "하네스가 해롭다는 외부 근거는 확실하고 fz 가 그
+조건을 갖고 있지만 실제로 성능이 떨어졌다는 근거는 0건"으로 끝났는데, 그 결론을 옮기려 가이드를 열자
+Fable 5.1 언급이 0건이었다. **계측** — 그 0건을 데이터로 채울 수 있게 눈을 심는다.
+
+#### 가이드 갱신
+가이드 9개 중 Fable 5.1 언급이 **0건**이었고, 그중 정본인 `guides/fable-model-guide.md` 는 Fable 5
+기준으로 서 있었다 — 캐시 읽기 $1 · 폴백 Opus 4.8 · 동시 1개 상한의 근거 "fable 1 ≈ opus 2 비용
+등가". **이 문서를 읽고 고도화하면 틀린 방향으로 간다.** Fable 5.1 캐시 읽기는 $0.25 로 Opus
+5($0.50)의 **절반**이라, 같은 트래픽을 환산하면 비용은 2배가 아니라 **+9%** 다. `model-guide.md`
+로 개명하고 255줄을 304줄로 재작성하면서 "판단은 Fable, 생산은 Opus" 원칙과 동시 상한 수치
+(`opus ≤3 / fable 1 / 총 ≤4`)·워커 36콜 `xhigh` 는 그대로 두고 **근거만 바꿨다** — 실제로 남는 차이는
+호출당 시간 **+49%**(중앙값 10.5s → 15.6s)와 출력·캐시쓰기 단가 2배다. 재산정은 sweep 후다.
+
+⭐ 값이 더 큰 것은 그 stale 을 감시해야 할 lint 쪽에서 나왔다. `scripts/lint_doc_freshness.py` 의
+SSOT 파서가 `모델 정책: <X> only` 를 읽는데 문자 클래스가 `(`·`)`·`·` 를 먹지 못해, 2-역할 표기
+(`Fable 5.1 (Lead) · Opus 5 (worker)`)를 넣는 순간 **매치가 실패하고 모델 검사가 전면 무효화**된다 —
+위반 0건이 아니라 검사 0건인데 출력은 똑같이 초록이다. 감사 시점의 `stale-model-ref 0건` 도 같은
+성질이었다(SSOT 가 `Opus 5 only` 라 Fable 5.1 을 stale 로 볼 수가 없었다). 파서를 열고 뮤테이션으로
+판별했다 — 옛 정규식은 새 줄에 `None`, 새 정규식은 `['Fable 5.1', 'Opus 5']`.
+
+`llm-references.md` 는 SSOT 2-역할 + Fable 5.1 3행 + arXiv 5행(1저자는 abstract `citation_author`
+meta 실측), `harness-engineering.md` 는 §5·§6·§10 Fable 5.1 행 + 8z·8aa 를 abstract 대조 완료로 승격
+(Claude 5세대 미포함 명시) + 참고문헌 번호 중복 정리다. `modules/governance.md:50` 의 폐기된 산식은
+값 복사가 아니라 **정본 지목**으로 교체했다. 삭제 5건 중 둘은 부분 이행 — `:98-112` 는 `:98-106`
+으로 좁혔고(불릿 재배치·T1 긴장 보존), `claude-code-harness` 는 §4 패턴 C 가 인용해 존치했다.
+
+⛔ **솔직하게 적는다.** 이 갱신은 `/fz-modernize` Phase 3 플랜 없이 감사서를 플랜 대용으로 삼아
+실행됐고(F-140), 사용자 지적 후 플랜·AC1~AC9 검사·evidence matrix 34행을 **사후에** 작성했다.
+이종 검증은 없다 — Codex 는 사용자 지시로 보류, fresh-context Claude 2렌즈는 세션 한도로 실패해
+결과가 **비었다**. `scripts/lint_doc_freshness.py`·`skills/fz/SKILL.md`·`guides/skill-testing.md`·
+`modules/native-agents.md` 네 파일의 P5 변경은 다른 세션의 `361e512` 에 잡혀 **v4.30.0 에 선반영**
+됐다.
+
+#### 계측
+v4.31.0 감사는 "하네스가 해롭다는 외부 근거는 확실하고 fz 가 그 조건을 갖고 있지만, **실제로 성능이
+떨어졌다는 근거는 0건**"으로 끝났다 — 비용·지연은 재는데 **품질**과 **어느 게이트가 무엇을 잡았나**가
+어디에도 없었다. 이 릴리즈는 그 눈을 심는다. ⛔ 새 로거는 없다 — 트랜스크립트(`usage`·`effort`·
+`attributionSkill`)·워크플로 journal(스테이지 `result`)·fz-findings(131건)가 이미 기록하므로, 없던
+**결합 키·정기 집계·릴리즈 스냅샷**만 더했다: `fz_telemetry_report.py`(기간 집계) ·
+`fz_snapshot.py`(릴리즈마다 floor·`⛔`·effort 1행, `--diff`) · `fz_stop_telemetry.py`(Stop 훅,
+**stdout 0B·exit 0**, 턴당 도구 수·게이트 발화 수·정정 신호). 모델에게 **매 턴 계측 기록을 요구하는** 신규 지시는 **0줄** —
+규칙을 더 얹어 규칙 수 문제를 재는 모순을 피했다(§8.2 의 조인·판독 절차 서술은 검증 절차 문서이지 턴당 행동 지시가 아니다). 훅 등록은 `examples/hooks.json.example` 에만
+(governance: 자동 배선 금지).
+
+⭐ 값이 더 큰 것은 두 번의 "0" 이다. 구현 워커 self-test 25/25 뒤에 fresh-context 검증이 **실제
+트랜스크립트 A/B** 로 잡았다 — 훅이 assistant 를 `promptId` 로 거르는데 실데이터 assistant 에는 그
+필드가 없어(0/415) 핵심 5필드가 전부 0 이었고, fixture 가 실데이터와 다른 형식을 인코딩해 self-test
+로는 영원히 안 드러났다. user 엔트리의 promptId 를 상태로 들고 가는 방식으로 고쳤다(415/415). 그 다음
+첫 리포트의 peer-review `refuted=true 0` 을 내가 의심했다 — 어댑터가 최상위 `refuted` 만 보는데 counter
+는 `challenges[].verdict`(uphold/refute) 에, 교차는 `adjustments[].verdict` 에 판정을 **중첩**한다.
+판정 어휘 4형태를 실측(33·23·226)하고 트리를 걷는 `count_verdicts` 로 바꾸니 peer-review 16회에서
+**overturn 5 · uphold 203 · adjust 41** 이 나왔다. ⛔ 이 2% 는 "counter 무용"의 증거가 아니다 — N=16
+으로 임계(N≥20) 미달이고 판정 건수일 뿐이다. 판정 기준은 `guides/skill-testing.md §8.2` 표에 **먼저** 박아
+두었다 — 기준 없는 데이터는 쌓여도 결론이 안 나온다.
+
+리포트는 감사 수치를 재현한다(444K·10.6s·11). health-check 에 "정적 부하 추세" 검사가 붙었다(floor
++10% 경고, 실패 아님). ⛔ `/context` 불변 실측은 훅 등록이 사용자 몫이라 못 했다 — 계약(stdout 0B)까지
+닫았다. ⛔ 계약 Step 3 의 4필드(`skill·effort·permission_mode·stop_reason`)가 플랜 T3 와 어긋난다 —
+릴리즈 노트 § 남은 것.
+
+→ [릴리즈 노트](docs/releases/v4.31.0.md)
+
 ### v4.30.0 (2026-09-06) — codex 라는 이름이 두 가지를 가리키고 있었다 [MINOR]
 
 `codex` 는 **벤더 CLI 실행 파일**이면서 동시에 **fz 스킬 이름**이었다. 전자는 바꿀 권한이 없고
