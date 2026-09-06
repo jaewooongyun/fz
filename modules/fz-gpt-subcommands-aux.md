@@ -1,21 +1,22 @@
-# fz-codex 서브커맨드 (Aux 7개) — final / commit / adversarial / drift / plan / micro-eval / config
+# fz-gpt 서브커맨드 (Aux 5개) — final / adversarial / drift / plan / micro-eval
 
-> **Scope of Applicability**: `fz-codex` SKILL.md의 보조 서브커맨드 7개. PR 전 최종 리뷰 (final), 단일 커밋 검증 (commit), Devil's Advocate (adversarial), 아키텍처 드리프트 (drift), 독립 플랜 (plan), 단일 주장 재평가 (micro-eval), 설정 조회 (config).
+> **Scope of Applicability**: `fz-gpt` SKILL.md의 보조 서브커맨드 5개. PR 전 최종 리뷰 (final), Devil's Advocate (adversarial), 아키텍처 드리프트 (drift), 독립 플랜 (plan), 단일 주장 재평가 (micro-eval).
 >
-> **Purpose**: Core 4개(`modules/fz-codex-subcommands-core.md` — review/verify/validate/check) 외의 보조 서브커맨드 정의.
+> ⛔ `commit`·`config` 는 2026-09-06 제거됐다 — 정의만 있고 호출 배선이 0건이었다(전수 대조, positive control `drift` 4곳으로 패턴 생존 확인).
+> 단일 커밋 검증 기능 자체는 `scripts/gpt-exec.sh review --commit SHA` 로 살아 있다.
+>
+> **Purpose**: Core 4개(`modules/fz-gpt-subcommands-core.md` — review/verify/validate/check) 외의 보조 서브커맨드 정의.
 
 ## 목차
 
 - **final** — PR 전 최종 리뷰 (resume --last 심화)
-- **commit** — 특정 커밋 검증
 - **adversarial** — Devil's Advocate 리뷰
 - **drift** — 아키텍처 드리프트 전체 스캔
 - **plan** — 독립 플랜 생성 (C4 원칙)
 - **micro-eval** — 단일 주장 독립 재평가 (claim-type 라우팅)
-- **config** — 설정 조회
 
 > ⛔ **아래 codex exec 예시는 축약형** (서브커맨드별 *차이점*만 표시 — 가독성 우선). **raw 복붙 금지**.
-> 실제 실행 시 반드시 `modules/fz-codex-bash-hygiene.md` §6 Standard Wrapper Template 적용:
+> 실제 실행 시 반드시 `modules/fz-gpt-bash-hygiene.md` §6 Standard Wrapper Template 적용:
 > `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `-o` readback + (git diff 분석 시) §5.5 Base Verification Gate.
 > 예시의 `codex exec ...`는 *wrapper의 §3 표준 호출 부분*에 해당하는 차이점만 보여준다 (29/30차 hang/sandbox 재발 차단 — Codex 검증 §Blind Spot 1).
 
@@ -45,10 +46,10 @@ fi
 **/fz-challenger DA 모드**: `final` 완료 후 major 이상 이슈가 발견되면 DA(Devil's Advocate) 패스를 추가 실행하여 false positive를 제거한다.
 
 ```bash
-CHALLENGER_SKILL_PATH=$(get_codex_skill_path "challenger" "$FZ_PLUGIN_ROOT")
+CHALLENGER_SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
 if [ -n "$CHALLENGER_SKILL_PATH" ] && [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
   codex exec \
-    --output-schema schemas/codex_peer_review_schema.json \
+    --output-schema schemas/gpt_peer_review_schema.json \
     -c model_reasoning_effort=xhigh \
     --sandbox read-only \
     -o "$DA_REVIEW_FILE" \
@@ -62,16 +63,6 @@ if [ -n "$CHALLENGER_SKILL_PATH" ] && [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
 fi
 ```
 
-## commit -- 특정 커밋 검증
-
-```bash
-cd "$GIT_ROOT" && codex exec review \
-  --commit "${COMMIT_SHA:-HEAD}" \
-  -c model_reasoning_effort=high \
-  --ephemeral \
-  -o "$REVIEW_FILE"
-```
-
 ## adversarial -- Devil's Advocate 리뷰
 
 설계 결정에 도전하는 적대적 리뷰. final의 DA 패스를 독립 실행 가능.
@@ -81,7 +72,7 @@ cd "$GIT_ROOT" && codex exec review \
 /codex:adversarial-review --base "$BASE_BRANCH" --json
 
 # CLI 폴백
-SKILL_PATH=$(get_codex_skill_path "challenger" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
 codex exec -c model_reasoning_effort=xhigh \
   --sandbox read-only -o "$DA_REVIEW_FILE" -C "$GIT_ROOT" \
   "$(cat "${SKILL_PATH}")
@@ -93,7 +84,7 @@ codex exec -c model_reasoning_effort=xhigh \
 전체 코드베이스를 1M context로 스캔하여 아키텍처 드리프트를 감지합니다.
 
 ```bash
-SKILL_PATH=$(get_codex_skill_path "drift" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "drift" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
@@ -120,7 +111,7 @@ codex exec \
 
 ```bash
 REQUIREMENTS="$1"
-SKILL_PATH=$(get_codex_skill_path "planner" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "planner" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
@@ -172,23 +163,16 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 > **사용 시점**: 단일 심각도/분류 주장 → full review 대신 경량 호출로 교차 검증.
 > **비용**: `[미검증: 운영 초기 호출 후 기준선 설정]` — Phase A 운영 후 실측.
 
-## config -- 설정 조회
-
-`codex --version`, `~/.codex/config.toml`, `codex features list`, `ls ~/.codex/skills/`, `codex mcp list` 조회.
-Plugin 상태 (Cbug-1 수정): `grep '^\[plugins\.' ~/.codex/config.toml && ls ~/.codex/plugins/cache/*/`. MCP server (`codex mcp list`)는 plugin과 다른 계층이므로 config.toml + cache 동시 확인.
-
----
-
 ## 참조 스킬
 
 | 스킬 | 사용 서브커맨드 |
 |------|----------------|
-| /fz-review | Phase 5 → final (PR 전), commit (단일 커밋) |
+| /fz-review | Phase 5 → final (PR 전) |
 | /fz-pr | PR 생성 전 → final |
 | /fz-plan | TEAM 모드 → plan (독립 비교), micro-eval (claim 재평가) |
-| /fz-manage | drift (전체 스캔), config (설정 조회) |
+| /fz-manage | drift (전체 스캔) |
 
 ## 설계 원칙
 
-- Progressive Disclosure Level 3 (fz-codex 호출 시 *명시 Read*. 자동 로드 X — Codex 검증 §추가 발견 정정)
+- Progressive Disclosure Level 3 (fz-gpt 호출 시 *명시 Read*. 자동 로드 X — Codex 검증 §추가 발견 정정)
 - 200줄 한도 — 본 모듈은 7개 서브커맨드 + 보조 자료로 한도 약간 초과 가능
