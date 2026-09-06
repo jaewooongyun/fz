@@ -1,5 +1,42 @@
 # Changelog
 
+### v4.30.0 (2026-09-06) — codex 라는 이름이 두 가지를 가리키고 있었다 [MINOR]
+
+`codex` 는 **벤더 CLI 실행 파일**이면서 동시에 **fz 스킬 이름**이었다. 전자는 바꿀 권한이 없고
+후자는 우리 것인데, 같은 토큰이라 40개 파일에서 뒤섞여 있었다. 전역 치환을 돌리면 `codex exec`
+348 곳이 깨진다. 그래서 **하이픈·언더스코어로 연결된 복합어만** 규칙 아홉 개로 나눠 치환했다 —
+보존 대상은 전부 공백이나 슬래시로 분리돼 있어 구조적으로 겹치지 않는다.
+
+67 파일 · 357 회를 바꾸고, 보존 대상 일곱 종의 개수가 **치환 전후로 정확히 같은지** 대조했다:
+`codex exec` 108 · `Codex CLI` 53 · `~/.codex/` 26 · `.codex/skills` 20 · `codex mcp` 7 ·
+`Bash(codex *)` 3 · `codex --version` 2. 하나라도 줄면 CLI 계약이 훼손된 것이다.
+
+⭐ 값이 더 큰 것은 **검사기의 대상 목록**이 따로 있었다는 발견이다. `.githooks/pre-commit` 의
+`SCOPED_RE` 와 `CLAUDE.md` 의 In-scope 목록은 개명 후 고치지 않으면 새 디렉토리가 검사에서
+**조용히 빠진다**. 코드 참조는 깨지면 소리가 나지만 검사기 목록은 검사가 정상적으로 돌면서
+대상만 비어 있다. `health-check exit 0` 으로는 잡히지 않는다.
+
+- `codex-skills/` → `gpt-skills/` · `skills/fz-codex/` → `skills/fz-gpt/` · modules 4 · scripts 4 · schemas 5
+- `commit`·`config` 서브커맨드 **제거** — 정의만 있고 호출 배선이 0건이었다(전수 대조,
+  positive control `drift` 4곳으로 패턴 생존 확인). 단일 커밋 검증은 `gpt-exec.sh review --commit SHA` 로 유지
+- `argument-hint` 를 6 → **10** 개로 확장 — `verify-gates`·`drift`·`plan`·`micro-eval` 이 배선은
+  있는데 선언에 없었다. `verify-gates` 는 effort 표에도 빠져 있어 기본값으로 흐르고 있었다
+- **`--effort` 화이트리스트 신설** — CLI 는 무효 effort 를 로컬에서 거부하지 않는다(실측:
+  `model_reasoning_effort=bogus` 가 서버까지 왕복한 뒤 실패). 오타가 조용히 통과하면 "올렸다고
+  믿는데 무효"가 된다. 값은 `low|medium|high|xhigh|max` — 공식 Model guidance 기준이고,
+  `ultra` 는 CLI 릴리즈 노트에만 있고 모델 페이지에 없어 넣지 않았다
+- `setup-gpt-skills.sh` 에 **prune** 추가 — 링크 생성 루프가 소스를 순회하므로 이름이 바뀐 스킬의
+  옛 심볼릭은 영원히 남는다. dangling 만 지우고 유효 링크·실제 디렉토리·`fz-` 아닌 링크는 건드리지
+  않는다(임시 `FZ_SKILL_TARGET` 으로 4 케이스 회귀 검증)
+- 버전 플로어 갱신 — `gpt-5.5` 는 0.124.0+, **`gpt-6-astra` 는 0.153.1+** (0.153.4 에서 bundled
+  default). effort 출처를 GPT-5 Prompting Guide 에서 Model guidance 로 교체했다 — 전자는
+  `gpt-5.3-codex` 대상이라 Astra 를 다루지 않는다
+
+계획은 Codex 교차검증에서 `needs_revision` 과 MAJOR 일곱 건을 받았고 전부 실측으로 확인됐다.
+가장 컸던 것은 대상 파일 수를 **29 로 세고 있었다**는 것이다(실측 67). 앵커 필터가 무효라
+`docs/releases/` 열아홉 개가 섞여 88 로 세지기도 했다 — 필터 세 개가 각각 다른 방식으로
+대상을 잘랐고, 그 셋이 오라클·대상목록·집합산출에 하나씩 있었다.
+
 ### v4.29.0 (2026-09-03) — 승인 도장이 남의 줄에 박혔다 [MINOR]
 
 `scripts/gate_check.py` 의 `finalize()` 가 실행 게이트마다 `APPROVED_ORACLE_HASH` 한 줄을
