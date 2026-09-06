@@ -66,7 +66,7 @@ Independently verify each design decision against:
 
 ## Output Format
 
-Matches `codex_review_schema.json`. Key enum values:
+Matches `gpt_review_schema.json`. Key enum values:
 - `verdict`: `approved` | `needs_revision` | `rejected`
 - `severity`: `critical` | `major` | `minor` | `suggestion`
 - `review_type`: `plan_validation` (for architecture validation)

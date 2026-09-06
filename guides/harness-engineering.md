@@ -778,7 +778,7 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 - → SOLO 게이팅으로는 overthinking(추론 깊이)을 못 막는다. 게이팅이 줄이는 것은 fan-out 비용·MAST 실패다.
 
 **max + ultracode 운영점의 함의**:
-- (a) token 비용은 *세션* binding 제약이 아니다 → 세션은 품질 최적화. 단 Codex/subagent leg의 per-call effort·비용은 fz가 여전히 소유한다 (`modules/codex-strategy.md` Standard/Deep/Light 티어 — 회귀시키지 않는다).
+- (a) token 비용은 *세션* binding 제약이 아니다 → 세션은 품질 최적화. 단 Codex/subagent leg의 per-call effort·비용은 fz가 여전히 소유한다 (`modules/gpt-strategy.md` Standard/Deep/Light 티어 — 회귀시키지 않는다).
 - (b) max는 단순 작업도 깊게 추론한다(overthinking 가능). 세션 추론 깊이를 못 낮추므로, fz는 *task surface 축소*(light/simplified 모드 = 로드 instruction 감소)로 "무엇을 생각하는가"를 좁힌다 — 추론 깊이가 아니라 추론 *대상*을 줄이는 접근.
 - (c) ultracode는 workflow를 기본화하나 coupled 작업의 결합도는 바뀌지 않는다(§8 multi-agent 통신 + `guides/agent-team-guide.md` 참조). 비용 반론만 제거할 뿐 fan-out 정당화가 아니다.
 
@@ -797,7 +797,7 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 **핵심 규율 3개** (fz는 이미 fz-skill/fz-memory/Lesson Intake로 부분 자기수정 수행 — 수동 검토 기반이라 아래 가드레일과 이미 정합):
 
 1. **회귀 게이트 / falsification 통과분만 수용**: 자기수정 제안은 회귀 테스트·반증 게이트를 통과한 것만 채택 — "3단계 루프: Weakness Mining → Harness Proposal(다양하되 최소의 수정 생성) → Proposal Validation(회귀 테스트 통과분만 수용)." [외부: harness-paper §4-B, Self-Harness arXiv 2606.09498 — 원 논문 미대조] / "자기진화가 요행·거짓 설명을 정책으로 굳히지 않도록 held-out acceptance gate·variance-aware credit·insight falsification·structural dedup을 도입." [외부: harness-paper §4-B, QueenBee arXiv 2606.27492 — 원 논문 미대조]
-2. **self-preference 단독 채택 금지**: 검증셋 없는 self-preference/self-consistency 신호만으로 스킬·메모리 변경을 확정하지 않는다 — 외부 채점(fz-codex 교차검증)을 병행.
+2. **self-preference 단독 채택 금지**: 검증셋 없는 self-preference/self-consistency 신호만으로 스킬·메모리 변경을 확정하지 않는다 — 외부 채점(fz-gpt 교차검증)을 병행.
 3. **잦은 갱신 균형추 (SEAGym)**: "잦은 업데이트가 held-out 개선에 실패하거나 유용한 중간 스냅샷이 나중에 붕괴할 수 있음." [외부: harness-paper §4-B, SEAGym arXiv 2606.17546 — 원 논문 미대조] → fz의 candidate 유지 규율(즉시 active 승격 안 함)·Lesson Intake evidence 카운팅·메모리 GC가 이미 이 붕괴 방어와 정합 — **현행 유지가 정답**(재설계 유발 금지).
 
 > **경계**: 본 절은 "프레임+가드레일" 서술이지 완전자동 self-evolution 이식 제안이 아니다(fz는 "임의 판단 금지·AskUserQuestion" 규율 유지). falsification의 일반 이론은 서베이가 미해결로 남긴 과제 — "'요행을 정책으로 굳히지 않는' falsification 게이트의 일반 이론이 필요." [외부: harness-paper §6 미해결과제3 — 원 논문 미대조]. fz의 부분 자기수정을 "이 문제 해결"로 격상 금지.
@@ -1153,7 +1153,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Sprint Contract | Plan의 Anti-Pattern Constraints | 금지 패턴 + Grep 자동 검증 |
 | Evaluator Tuning | 반성 기록 (1-10차) + 교훈 topic file | 실패에서 학습 |
 | Implication Reasoning | lead-reasoning.md (2026.04 추가) | 표면→의미론 추론 |
-| Cross-model Verification | fz-codex (Claude + Codex; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
+| Cross-model Verification | fz-gpt (Claude + Codex; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
 | Lazy Tool Discovery | modules/ Progressive Disclosure Level 3 | 필요 시에만 로드 |
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
 | Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Team + Codex. **Hooks는 opt-in** — 플러그인은 hook을 자동 등록하지 않는다(`hooks/` 없음, `plugin.json`에 `hooks` 키 없음). 실행체는 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 6케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **등록은 사용자가 `.claude/settings.json`으로 복사**한다. `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
@@ -1180,7 +1180,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | control (제어) | orchestrator 위임 로직 | 강 |
 | action (행동) | code/fix 스킬 · Adapters(Grep/git/빌드) | 강 |
 | state (상태) | 세션/워크트리 관리 · ASD 폴더 | 중~강 |
-| verification (검증) | review/fz-codex 게이트 | 강 |
+| verification (검증) | review/fz-gpt 게이트 | 강 |
 
 > 용도: fz의 상대적 약한 책임(observation 관측성)이 격자로 드러남. 서베이 스스로 표준 없음을 인정하므로 권위 채택 금지 — 참고 축으로만. [외부: harness-paper §4-A, arXiv 2606.20683 — 원 논문 미대조]
 
@@ -1306,7 +1306,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 |---|------|------|------|-----|
 | 9a | Introducing GPT-5.5 | OpenAI | 2026-04-23 | https://openai.com/index/introducing-gpt-5-5/ |
 | 9b | GPT-5.5 System Card | OpenAI | 2026-04-23 | https://openai.com/index/gpt-5-5-system-card/ |
-| 9c | Codex CLI Changelog (0.124.0) | OpenAI | 2026-04-23 | https://developers.openai.com/codex/changelog |
+| 9c | Codex CLI Changelog | OpenAI | 상시 갱신 | https://learn.chatgpt.com/docs/changelog |
 | 9d | GPT-5 Prompting Guide (Cookbook) | OpenAI | 2026 | https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide |
 | 9e | Codex CLI (fz cross-model verification 도구 — 모델 pin 없음, SSOT=`config.toml`. CLI 버전 플로어는 호환 사실로 별도 유지) | OpenAI | live | https://developers.openai.com/codex/cli |
 

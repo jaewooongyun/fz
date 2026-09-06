@@ -52,7 +52,7 @@ ITEMS = [
     ("14", "DETERMINISTIC", "modules",   "100줄+ 모듈의 목차 존재"),
     ("16", "DETERMINISTIC", "agents",    "team-registry ↔ agents/ 양방향 일치"),
     ("17", "THRESHOLD",     "fz-*",      "Gate Evidence 패턴 — ⛔ 정규식 미정"),
-    ("N1", "DETERMINISTIC", "schemas",   "codex_base_issue $defs 값이 소비 스키마와 일치 — severity enum + confidence 경계 (⛔ 값은 **인라인**한다: fz 스키마는 `$ref` 를 쓰지 않는다(실측 0건) — 본 검사가 인라인 정합을 본다)"),
+    ("N1", "DETERMINISTIC", "schemas",   "gpt_base_issue $defs 값이 소비 스키마와 일치 — severity enum + confidence 경계 (⛔ 값은 **인라인**한다: fz 스키마는 `$ref` 를 쓰지 않는다(실측 0건) — 본 검사가 인라인 정합을 본다)"),
     ("N2", "DETERMINISTIC", "infra",     "CLAUDE.md 인벤토리 선언 ↔ 실측 카운트"),
     ("N3", "DETERMINISTIC", "all",       "줄번호 인용 — 대상 파일 실재 + 행 범위 내 + **빈 줄 아님** (⛔ 인용 *내용*의 정합은 여전히 검사하지 않는다 — 빈 줄만이 내용 판단 없이 닫히는 결정론 조각이다)"),
     ("N4", "DETERMINISTIC", "all",       "ERE alternation 오용 — `grep -E` 같은 줄의 `\\|`"),
@@ -295,7 +295,7 @@ def chk_5():
 
 
 PATHREF = re.compile(
-    r"`((?:guides|modules|skills|workflows|agents|scripts|schemas|examples|templates|codex-skills)"
+    r"`((?:guides|modules|skills|workflows|agents|scripts|schemas|examples|templates|gpt-skills)"
     r"/[A-Za-z0-9_./\-]+\.(?:md|js|py|sh|json))`"
 )
 # 의도된 플레이스홀더·예시 (본 감사에서 FP로 판정된 것 — 근거는 plan/plan-final.md S9)
@@ -382,19 +382,19 @@ def chk_16():
 
 def chk_N1():
     sd = ROOT / "schemas"
-    base = sd / "codex_base_issue_schema.json"
+    base = sd / "gpt_base_issue_schema.json"
     if not base.exists():
-        raise ParseError("schemas/codex_base_issue_schema.json 부재")
+        raise ParseError("schemas/gpt_base_issue_schema.json 부재")
     try:
         bd = json.loads(read(base))
     except json.JSONDecodeError as e:
-        raise ParseError(f"codex_base_issue_schema.json JSON 파싱 실패: {e}")
+        raise ParseError(f"gpt_base_issue_schema.json JSON 파싱 실패: {e}")
     sev = bd.get("$defs", {}).get("severity", {}).get("enum")
     if not sev:
         raise ParseError("base 스키마에 $defs.severity.enum 부재")
     # ⛔ 대상은 **issue 스키마**다 — base 의 severity/confidence 를 소비하는 것들.
     #    2026-08-24 정정: 본 검사가 `schemas/*.json` 전부를 issue 로 가정해,
-    #    게이트 처분(accept/revise/demote_to_manual)을 담는 `codex_gate_verdict_schema` 를
+    #    게이트 처분(accept/revise/demote_to_manual)을 담는 `gpt_gate_verdict_schema` 를
     #    "severity 부재" 위반으로 만들었다. severity(문제 심각도)와 verdict(게이트 처분)는 축이 다르다.
     #    비-issue 스키마는 **파일명으로 제외하지 않는다** — 새 issue 스키마가 severity 를 빠뜨리면
     #    여전히 잡아야 하므로, `issues` 배열 보유 여부로 판별한다.
@@ -435,7 +435,7 @@ def chk_N1():
                 v.append(f"schemas/{f.name}{path}: severity enum {got} ≠ base {sev}")
 
         # ⛔ 2026-08-10 확장 (4라운드 감사 ISSUE-004): severity **만** 보던 탓에
-        #    `codex_review_schema` 의 `confidence` 가 base 의 `minimum/maximum` 을 잃은 채
+        #    `gpt_review_schema` 의 `confidence` 가 base 의 `minimum/maximum` 을 잃은 채
         #    통과했고 → `confidence: 101` 이 검증기를 통과했다. **경계도 정합 대상**이다.
         base_doc = json.loads(read(base))
         for cname, keys in (("confidence", ("minimum", "maximum")),):
@@ -630,7 +630,7 @@ def chk_N8(root: Path | None = None):
     return v, seen
 
 
-# ⛔ #N7 신설 근거 (2026-08-09 외부 감사 ISSUE-008): `get_codex_skill()` → `get_codex_skill_path()`
+# ⛔ #N7 신설 근거 (2026-08-09 외부 감사 ISSUE-008): `get_codex_skill()` → `get_gpt_skill_path()`
 #    전환에서 **할당은 `_SKILL_PATH`로 바뀌고 조건문은 옛 `_SKILL`을 검사**하는 스니펫이 3곳 남았다
 #    (`SEARCHER_SKILL`·`FIXER_SKILL`·`CHALLENGER_SKILL`). `[ -n "$미정의" ]`는 false라 searcher 보조·
 #    fixer 보조·final DA가 **조용히 실행되지 않았다.** 사람 눈으로 한 번 잡고도 3곳을 놓쳤으므로 기계화한다.
@@ -778,9 +778,9 @@ ANCHOR_LINES = [
     re.compile(r'^(cd\s+|[A-Z_]\w*=)"\$\(\s*git rev-parse --show-toplevel\s*\)"\s*$'),
 ]
 # CWD·인수 루트를 쓰되 **마커로 fail-closed 검증**하는 형태 (형태 b)
-ROOT_MARKER = re.compile(r'["\']?(guides|skills|codex-skills)["\']?\s*\)?\s*(?:/|\)\s*)?'
+ROOT_MARKER = re.compile(r'["\']?(guides|skills|gpt-skills)["\']?\s*\)?\s*(?:/|\)\s*)?'
                          r'\.?(?:is_dir|exists)\(\)'
-                         r'|-d\s+"?\$?\{?\w*(?:ROOT|root)\w*\}?/(guides|skills|codex-skills)')
+                         r'|-d\s+"?\$?\{?\w*(?:ROOT|root)\w*\}?/(guides|skills|gpt-skills)')
 NONZERO_EXIT = re.compile(r"return\s+[1-9]|exit\s+[1-9]|sys\.exit\(\s*[1-9]")
 # 명시 면제 — 루트를 아예 참조하지 않는 스크립트. 상단 20줄 + 사유 10자+
 WAIVER = re.compile(r"lint:no-root-anchor\s*[—:-]\s*(\S.{9,})")
@@ -808,7 +808,7 @@ def n6_ok(txt: str, suffix: str) -> bool:
 
     허용 3형태:
       (a) `ANCHOR_LINES` 중 하나와 **정확히 일치하는 줄** (주석·문자열·heredoc 은 제외됨)
-      (b) 마커(`guides`/`skills`/`codex-skills`) 검사 + 3줄 내 비0 종료
+      (b) 마커(`guides`/`skills`/`gpt-skills`) 검사 + 3줄 내 비0 종료
       (c) 상단 20줄 내 `# lint:no-root-anchor — 사유(10자+)`
     """
     if anchored_line(txt, suffix):
@@ -1011,15 +1011,15 @@ def run_self_tests() -> list[str]:
         if item == "N1":
             base_doc = {"$defs": {"severity": {"enum": ["critical", "major", "minor", "suggestion"]}}}
             if src == "REF_OK":
-                enum, err = resolve_ref("codex_base_issue_schema.json#/$defs/severity",
-                                        base_doc, "codex_base_issue_schema.json")
+                enum, err = resolve_ref("gpt_base_issue_schema.json#/$defs/severity",
+                                        base_doc, "gpt_base_issue_schema.json")
                 got = err is None and enum == ["critical", "major", "minor", "suggestion"]
             elif src == "REF_WRONG_PATH":
-                enum, err = resolve_ref("#/$defs/nope", base_doc, "codex_base_issue_schema.json")
+                enum, err = resolve_ref("#/$defs/nope", base_doc, "gpt_base_issue_schema.json")
                 got = enum is None and err is not None
             else:                                     # REF_WRONG_FILE
                 enum, err = resolve_ref("other.json#/$defs/severity",
-                                        base_doc, "codex_base_issue_schema.json")
+                                        base_doc, "gpt_base_issue_schema.json")
                 got = enum is None and err is not None
         elif item == "N4":
             got = bool(ERE_BAD.search(src)) and "\\|" in src
@@ -1100,15 +1100,15 @@ def chk_N10(root: Path | None = None):
     optional 필드는 nullable 타입(`["string","null"]`)으로 표현한다.
 
     ⛔ 하나라도 어기면 API 가 `invalid_json_schema` 400 을 낸다 — 스키마가 **로드조차
-       되지 않는다.** 실측(2026-08-25): `codex_gate_verdict_schema` 와
-       `codex_verification_schema` 가 이 상태였고, 후자는 `validate`(fz-review Phase 5.5)
+       되지 않는다.** 실측(2026-08-25): `gpt_gate_verdict_schema` 와
+       `gpt_verification_schema` 가 이 상태였고, 후자는 `validate`(fz-review Phase 5.5)
        가 쓰는 스키마라 그 경로가 구조적으로 실행 불가였다. 파일이 존재하고 JSON 으로
        파싱되면 통과했으므로 어느 검사도 잡지 못했다.
 
     ⛔ **대상은 사용처가 정한다.** 파일명 목록(#N1 의 과거 결합)도, top-level
        `properties` 유무도 기준이 아니다 — `issue_tracker_schema.json` 은 top-level
        properties 를 갖지만 Issue Tracker **산출물** 형식이고 codex 응답이 아니다.
-       `codex_base_issue_schema.json` 은 `$defs` 참조용이다. 실제 전달되는 것만 본다.
+       `gpt_base_issue_schema.json` 은 `$defs` 참조용이다. 실제 전달되는 것만 본다.
 
     ⛔ `type` 이 리스트인 객체도 대상이다. nullable 로 만들면 `"object"` →
        `["object","null"]` 이 되므로 `== "object"` 로 판정하면 **자기가 nullable 로
@@ -1125,7 +1125,7 @@ def chk_N10(root: Path | None = None):
     # ⛔ 배선처만 훑는다. 전 트리를 훑으면 `docs/releases/`·`CHANGELOG.md` 의 **산문**이
     #    배선으로 오인된다 — "`--schema schemas/foo.json` 이 깨져 있었다" 같은 문장 하나로
     #    은퇴한 스키마가 검사 대상에 편입된다. MIN_HITS 는 축소만 잡고 확대는 못 잡는다.
-    WIRING_DIRS = ("modules", "skills", "scripts", "workflows", "agents", "codex-skills")
+    WIRING_DIRS = ("modules", "skills", "scripts", "workflows", "agents", "gpt-skills")
     candidates = []
     for sub in WIRING_DIRS:
         base = root / sub
@@ -1188,7 +1188,7 @@ def chk_N10(root: Path | None = None):
 #   (b) 실행 절차를 `*-tiers.md` 모듈로 위임 — fz-peer-review
 # ⛔ 단순히 "Tier" 를 **언급**하는 것은 경로가 아니다. 실측 오탐 2건:
 #   `code-auditor` "Tier 1 — 필수(위반 시 반드시 지적)" = 심각도 등급
-#   `fz-codex` "Tier 1(CLAUDE.md 테이블) → Tier 2" = 디스커버리 등급
+#   `fz-gpt` "Tier 1(CLAUDE.md 테이블) → Tier 2" = 디스커버리 등급
 # ⛔ 헤딩만 보면 미탐이 난다 — `fz-modernize` 는 `- **light 모드 (40차)**:` 불릿로 적는다
 #    (`## Boundaries` 안). 헤딩·볼드 라벨 둘 다 인정한다.
 LIGHT_SECTION = re.compile(r"^#{2,3} +light 모드|^\s*[-*] +\*\*light 모드", re.M)

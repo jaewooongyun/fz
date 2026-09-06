@@ -1,6 +1,6 @@
 # Scope Challenge — Phase 3 Codex 이슈 분류 + Lead 독립 판정
 
-> 참조: `skills/fz-plan/SKILL.md` Phase 3, `skills/fz-codex/SKILL.md` verify 응답, `schemas/codex_review_schema.json`
+> 참조: `skills/fz-plan/SKILL.md` Phase 3, `skills/fz-gpt/SKILL.md` verify 응답, `schemas/gpt_review_schema.json`
 > 원본 근거: OBS-03 plan iteration 4회 (26시간, 40% 롤백) — 과잉 확장 방지
 > **1단계 깊이 원칙**: 본 모듈은 자체 완결. 다른 `modules/` 재참조 금지 (skill-authoring §3)
 
@@ -58,7 +58,7 @@ Q-S1~S4 결과를 다음 5개 중 하나로 매핑:
 
 ## origin ↔ scope_disposition 매핑
 
-기존 `codex_peer_review_schema.json`의 `origin` 필드와 매핑:
+기존 `gpt_peer_review_schema.json`의 `origin` 필드와 매핑:
 
 | origin | scope_disposition | 근거 |
 |--------|-------------------|------|

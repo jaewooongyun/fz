@@ -9,7 +9,7 @@ set -euo pipefail
 
 # In-scope 패턴 (CHANGELOG/docs/releases는 historical reference 보존)
 # Round 3 U3 fix: README.md + CLAUDE.md root docs 포함 (v4.5.1 root cause)
-SCOPED_RE='^(README\.md|CLAUDE\.md|skills|agents|modules|codex-skills|schemas|templates|guides|\.claude-plugin)'
+SCOPED_RE='^(README\.md|CLAUDE\.md|skills|agents|modules|gpt-skills|schemas|templates|guides|\.claude-plugin)'
 
 # 차단 패턴: user-specific 절대 경로
 USER_PATH_RE='/Users/[a-zA-Z0-9_-]+/|~/dev/[a-zA-Z0-9_-]+/'

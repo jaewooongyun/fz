@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "codex_verification_schema.json",
+  "$id": "gpt_verification_schema.json",
   "title": "Codex Verification Response Schema",
   "description": "Codex가 피드백 반영 여부를 검증한 후 반환하는 구조화된 응답 형식. VeriGuard dual-stage verification (arXiv 2510.05156, Pre-action Gate + Runtime Gate) + Chain-of-Verification (CoVe, arXiv 2309.11495) 패턴 기반. issue_resolutions가 Pre-action Gate, feedback_reflection_rate가 Runtime Gate에 대응. OpenAI Structured Outputs 규격 준수.",
   "type": "object",
@@ -93,7 +93,7 @@
         "array",
         "null"
       ],
-      "description": "검증 중 새로 발견된 이슈 (codex_review_schema의 issues 형식과 동일)",
+      "description": "검증 중 새로 발견된 이슈 (gpt_review_schema의 issues 형식과 동일)",
       "items": {
         "type": "object",
         "required": [

@@ -34,10 +34,10 @@ intent-triggers: []
 - **6-Phase 오케스트레이션**: 세션 부트스트랩 → 의도 분석 → 복잡도 평가 → 파이프라인+팀 결정 → 확인 → 실행
 - **사전 정의 파이프라인** (19개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
 - **동적 파이프라인**: `provides`/`needs` 그래프 기반 자동 구성 (폴백)
-- **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(fable) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
+- **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(Fable 5.1) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
 - **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 현행 `xhigh`) — fable 판단 지점 3곳과 별개
-- **3-Tier 모델**: fable(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
-  > ℹ️ **effort (2026-07-25, Opus 5)**: 현행 배선은 전 호출 `xhigh` 단일값. Opus 5 공식 출발점은 **`high`(기본)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
+- **3-Tier 모델**: **Fable 5.1**(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
+  > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `xhigh` 단일값. 공식 출발점은 Opus 5·Fable 5.1 모두 **`high`(기본)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
 - **Codex 필수 참여**: 모든 TEAM 스킬에 Codex CLI 포함 → cross-model 상호검증
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
 - **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + Codex 교차검증
@@ -54,8 +54,8 @@ intent-triggers: []
 /fz "모듈 12개 용어 통일" --batch              # → BATCH (worktree 병렬)
 /fz "빌드 실패 반복" --loop                    # → LOOP (자동 반복)
 /fz "스킬 트리거 최적화해줘"                    # → skill-optimize (SOLO)
-/fz "드리프트 체크해줘"                        # → drift-check (SOLO, fz-codex drift)
-/fz "독립 플랜 만들어줘"                       # → plan-parallel (SOLO, fz-codex plan)
+/fz "드리프트 체크해줘"                        # → drift-check (SOLO, fz-gpt drift)
+/fz "독립 플랜 만들어줘"                       # → plan-parallel (SOLO, fz-gpt plan)
 /fz "전체 봐줘"                               # → Medium confidence → AskUserQuestion 먼저
 /fz "안됨"                                    # → Low confidence → AskUserQuestion 먼저
 ```

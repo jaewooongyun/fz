@@ -91,7 +91,7 @@ For each identified issue, assign one verdict:
 
 ## Output Format
 
-Matches `schemas/codex_peer_review_schema.json`. Key enum values:
+Matches `schemas/gpt_peer_review_schema.json`. Key enum values:
 - `action` (challenge verdict): `agree` | `challenge` | `supplement` | `reverse`
 - `severity`: `critical` | `major` | `minor` | `suggestion`
 - `origin`: `regression` | `pre-existing` | `improvement`

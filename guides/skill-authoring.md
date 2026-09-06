@@ -468,9 +468,9 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 
 | 패턴 | 적용 시점 | fz 적용 예시 |
 |------|----------|-------------|
-| Cross-Model Verification | 독립 모델 교차검증 | fz-codex (Codex CLI로 독립 검증) |
+| Cross-Model Verification | 독립 모델 교차검증 | fz-gpt (Codex CLI로 독립 검증) |
 
-fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --output-schema`)과
+fz-gpt는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --output-schema`)과
 3-Tier 디스커버리 스킬 체인(fz-reviewer, fz-architect, fz-guardian, fz-challenger, fz-searcher, fz-fixer)을
 결합하여 Main Agent와 독립된 교차검증을 수행한다.
 
@@ -479,7 +479,7 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 ```
 스킬 설계 패턴 (§10)    = "스킬이 무엇을 하는가"의 아키타입
 팀 통신 패턴 (§7)       = "에이전트가 어떻게 협업하는가"의 프로토콜
-교차모델 검증 (fz-codex) = "독립 모델이 어떻게 상호검증하는가"의 프로토콜
+교차모델 검증 (fz-gpt) = "독립 모델이 어떻게 상호검증하는가"의 프로토콜
 ```
 
 ---
@@ -495,23 +495,23 @@ fz-codex는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --outpu
 | 데이터 형식 검증 | `scripts/validate.py --input {file}` |
 | 빌드 결과 파싱 | `scripts/parse_build_log.sh` |
 | 패턴 검증 (Anti-Pattern Constraints) | `scripts/check_patterns.sh` |
-| Codex 응답 스키마 검증 | `schemas/codex_review_schema.json` |
+| Codex 응답 스키마 검증 | `schemas/gpt_review_schema.json` |
 
 ### scripts/ 디렉토리 규칙
 
 - `skills/{name}/scripts/`에 배치한다
 
-> **예외 — 소비자가 여럿인 결정론적 검사.** 스킬 2개 이상이 같은 스크립트를 부르면 리포 루트 `scripts/`에 둔다. 스킬 하위에 두면 나머지 소비자가 형제 스킬의 내부를 가로질러 참조하고, 그 스킬을 지우면 무관한 스킬이 깨진다. 예: `scripts/gate_check.py`(fz-plan·fz-code·fz-review) · `scripts/codex-exec.sh`.
+> **예외 — 소비자가 여럿인 결정론적 검사.** 스킬 2개 이상이 같은 스크립트를 부르면 리포 루트 `scripts/`에 둔다. 스킬 하위에 두면 나머지 소비자가 형제 스킬의 내부를 가로질러 참조하고, 그 스킬을 지우면 무관한 스킬이 깨진다. 예: `scripts/gate_check.py`(fz-plan·fz-code·fz-review) · `scripts/gpt-exec.sh`.
 - 스크립트 자체는 토큰을 소비하지 않는다 (실행 결과만 소비)
 - SKILL.md에서 명시적 경로로 참조한다
-- JSON 스키마는 `schemas/`에 배치한다 (fz-codex의 `--output-schema` 활용)
+- JSON 스키마는 `schemas/`에 배치한다 (fz-gpt의 `--output-schema` 활용)
 
 ### 스크립트 vs 언어 지시 판단 기준
 
 ```
 결과가 binary(pass/fail)인가? → 스크립트
 결과가 해석이 필요한가?       → 언어 지시
-결과가 구조화된 JSON인가?     → --output-schema (fz-codex 패턴)
+결과가 구조화된 JSON인가?     → --output-schema (fz-gpt 패턴)
 ```
 
 > §12와의 경계: 본 §11은 *스킬 내부 binary 검증 보조* 스크립트를 다룬다. 에이전트를 스폰하는 *오케스트레이션* 스크립트는 §12 참조.

@@ -2,7 +2,7 @@
 
 diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 
-> ⛔ **TEAM 일몰 재매핑 (Wave 4)**: Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행된다 (TeamCreate 아님). Tier 0/1은 이미 Lead-solo. 폴백 체인 Tier3→2→1→0은 `mode:'workflow'` → `mode:'fallback'` → Lead SOLO로 매핑. Codex는 out-of-band (Lead `/fz-codex`, 스크립트 내 스폰 금지).
+> ⛔ **TEAM 일몰 재매핑 (Wave 4)**: Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행된다 (TeamCreate 아님). Tier 0/1은 이미 Lead-solo. 폴백 체인 Tier3→2→1→0은 `mode:'workflow'` → `mode:'fallback'` → Lead SOLO로 매핑. Codex는 out-of-band (Lead `/fz-gpt`, 스크립트 내 스폰 금지).
 
 ---
 
@@ -27,9 +27,9 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 | Tier | review-arch | review-quality/correctness | Codex | Cross-Critique | 기본 agent call |
 |------|------------|----------------|-------|---------------|-----------|
 | **0 (Solo)** | Orchestrator 직접 | — | — | None | 0 |
-| **1 (Solo+Codex)** | Orchestrator 직접 | — | Lead /fz-codex ×1 | None | 0 (+Codex 1) |
-| **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-codex ×1 | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
-| **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-codex ×2 | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
+| **1 (Solo+Codex)** | Orchestrator 직접 | — | Lead /fz-gpt ×1 | None | 0 (+Codex 1) |
+| **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-gpt ×1 | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
+| **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-gpt ×2 | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
 
 > ⛔ **모델은 스크립트가 single source** — `peer-review.js`의 `label: 'stage1-arch'`·`'stage1-quality'`·`'stage1-correctness'`(Stage1) · `'stage2-arch-on-quality'`·`'stage2-quality-on-arch'`(Stage2) · `'stage3-counter'`(Stage3) 전 호출이 `model:'opus'`다. 에이전트 frontmatter(`review-quality`·`review-correctness`·`review-counter` = `sonnet`)와 `skills/code-auditor/SKILL.md` `main: sonnet`은 **스크립트에 의해 override된다** — 실행 경로는 스크립트다.
 > ⛔ **재시도 포함 실제 호출 수는 더 클 수 있다** — `parallelWithRetry`가 Stage1 null 항목마다 1회 재호출하므로 **Tier 2는 3~6, Tier 3는 6~9**다(`peer-review.js`의 `parallelWithRetry`). 부분 실패로 Stage2가 생략되면 Tier 3가 6보다 적을 수도 있다. **권위 있는 수치는 반환값 `metrics.agentCalls`뿐이다.**
@@ -559,7 +559,7 @@ jq -e '
                             structuralContext } })   // ⛔ 누락 시 에러 없이 구조 축이 꺼진다
 2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
              → parallelWithRetry (null 항목 1회 순차 재시도 = rate-limit 폴백 계약)
-3. Lead: /fz-codex 경유 Codex challenger ×1  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
+3. Lead: /fz-gpt 경유 Codex challenger ×1  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
 4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
 ```
 
@@ -594,7 +594,7 @@ Stage 2: arch ↔ quality id-기반 교차 severity 조정 (correctness 불참)
          false_positive 판정은 실측 인용 필수
 Stage 3: review-counter DA — issues 반론 + strengths 도전
 → 반환 { …, crossAdjustments, strengthChallenges, distribution } → Lead가 Matrix에 반영
-→ Lead: Codex DA ×1 추가 (/fz-codex)
+→ Lead: Codex DA ×1 추가 (/fz-gpt)
 ```
 
 > SendMessage 실시간 멀티턴 수렴은 **고정 1-pass 교차로 대체**됐다 (충실도 trade-off — 은폐하지 않고 명시). 라운드 의미론 canonical은 `patterns/live-review.md`에 보존.
@@ -603,12 +603,12 @@ Stage 3: review-counter DA — issues 반론 + strengths 도전
 
 ## Codex Analyze 호출
 
-> `get_codex_skill_path()` 3-Tier 디스커버리 + codex exec 패턴: `modules/cross-validation.md` 참조.
+> `get_gpt_skill_path()` 3-Tier 디스커버리 + codex exec 패턴: `modules/cross-validation.md` 참조.
 
 Codex challenger 프롬프트에 필수 포함:
 - Origin Classification(regression/pre-existing/improvement)
 - Inheritance Chain(base class init/willSet 변경 시 subclass 검색)
-- `schemas/codex_peer_review_schema.json` 스키마 사용
+- `schemas/gpt_peer_review_schema.json` 스키마 사용
 
 결과: `${WORK_DIR}/codex-challenger-result.json`
 

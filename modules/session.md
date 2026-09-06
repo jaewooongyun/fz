@@ -130,7 +130,7 @@ jq '[.issues[] | select(.status != "resolved" and .status != "deferred")]' "$TRA
 | 스킬 | 참조 이유 |
 |------|----------|
 | /fz | 세션 초기화 + 복원 |
-| /fz-codex | Issue Tracker 연동 (검증 결과 기록) |
+| /fz-gpt | Issue Tracker 연동 (검증 결과 기록) |
 
 ## 설계 원칙
 

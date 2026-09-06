@@ -52,7 +52,7 @@ SKILL_TO_AGENTS = {
     "fz-fix": ["impl-correctness"],
     # v3.3 (A3 옵션 A, 2026-05-26): 17차 false negative 해결 — fz-manage SKILL.md L287 "메모리 17차" 명시 catch
     "fz-manage": [],       # Lead 작업 (에이전트 매핑 X)
-    "fz-codex": [],        # Codex 외부 검증 (에이전트 매핑 X)
+    "fz-gpt": [],        # Codex 외부 검증 (에이전트 매핑 X)
     "fz-modernize": ["impl-correctness", "review-arch"],
 }
 

@@ -47,7 +47,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-codex-flags.sh; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -144,12 +144,12 @@ else
 fi
 
 # ── 4.5 codex 플래그 호환성
-# ⛔ 신설 근거: `check-codex-flags.sh` 는 review 경로가 거부하는 플래그를 잡는 회귀 게이트인데
-#    어느 자동 실행 경로에도 없었다(health-check 참조 0건 · codex-exec.sh 는 주석만).
+# ⛔ 신설 근거: `check-gpt-flags.sh` 는 review 경로가 거부하는 플래그를 잡는 회귀 게이트인데
+#    어느 자동 실행 경로에도 없었다(health-check 참조 0건 · gpt-exec.sh 는 주석만).
 #    막으려던 실패 = 공용 인자 배열이 `codex exec review` 에 거부돼 exit 2 를 내고
 #    호출부가 그것을 "이슈 0건" 으로 읽는 것. CLI 가 플래그 집합을 바꾸면 침묵한다.
 # ⛔ exit 2(codex CLI 부재·help 파싱 실패)는 **PASS 가 아니라 미실행**이다 — §4 와 같은 클래스.
-CF_OUT="$(bash "$ROOT/scripts/check-codex-flags.sh" 2>&1)"; CF_CODE=$?
+CF_OUT="$(bash "$ROOT/scripts/check-gpt-flags.sh" 2>&1)"; CF_CODE=$?
 case "$CF_CODE" in
   0) record "codex 플래그 호환성" 0 "review 미지원 플래그 0건" ;;
   1) record "codex 플래그 호환성" 1 "⛔ review 경로에 미지원 플래그 — $(printf '%s\n' "$CF_OUT" | tail -1)" ;;

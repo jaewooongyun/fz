@@ -151,7 +151,7 @@ TeamCreate("{skill}-{feature}")
 +-- Lead (Opus): 오케스트레이션 + 게이트 실행 + 중재
 +-- Primary Worker (Opus): 핵심 생산 (plan-structure 또는 impl-correctness)
 +-- Supporting N (Sonnet): 검증/비평 (review-arch, review-quality 등)
-+-- Codex CLI: cross-model 검증 (Lead가 fz-codex 실행)
++-- Codex CLI: cross-model 검증 (Lead가 fz-gpt 실행)
 ```
 
 팀 이름은 `{skill}-{feature}` 형식을 따른다 (예: `plan-auth-refactor`, `code-player-fix`).
@@ -273,21 +273,21 @@ Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워�
 ### cross-model 상호검증 원칙
 
 - 모든 TEAM 구성에 Codex CLI가 포함된다.
-- **Lead가 직접** `/fz-codex`를 실행한다 (에이전트가 Codex를 직접 호출하지 않음).
+- **Lead가 직접** `/fz-gpt`를 실행한다 (에이전트가 Codex를 직접 호출하지 않음).
 - Claude (opus/sonnet) + Codex (다른 모델)의 교차 검증으로 blind spot을 보완한다.
 
 ### 검증 게이트 삽입 위치
 
 | 시점 | Codex 명령 | 대상 |
 |------|-----------|------|
-| plan 완료 후 | `/fz-codex verify` | 설계 검증: 제약 위반, 누락 확인 |
-| code 완료 후 | `/fz-codex check` | 코드 검증: 구현 품질, 패턴 준수 |
-| commit 전 | `/fz-codex check` | 최종 검증: 빌드 가능성, 회귀 위험 |
+| plan 완료 후 | `/fz-gpt verify` | 설계 검증: 제약 위반, 누락 확인 |
+| code 완료 후 | `/fz-gpt check` | 코드 검증: 구현 품질, 패턴 준수 |
+| commit 전 | `/fz-gpt check` | 최종 검증: 빌드 가능성, 회귀 위험 |
 
 ### Codex 결과 처리 흐름
 
 ```
-Lead --> /fz-codex verify --> Codex 결과 수신
+Lead --> /fz-gpt verify --> Codex 결과 수신
   결과가 PASS --> 다음 단계 진행
   결과가 FAIL --> Lead가 buildFeedback 포함해 해당 Step 재invoke (⛔ SendMessage 아님)
     --> 수정 후 재검증
@@ -483,7 +483,7 @@ isolation: worktree
   (구) 에이전트 --> SendMessage(에이전트)  (직접)
   (구) 합의 --> SendMessage(lead)          (보고)
   현행: 에이전트 --> 구조화 반환(schema) --> Lead가 통합
-  Lead --> /fz-codex                  (검증 게이트)
+  Lead --> /fz-gpt                  (검증 게이트)
 
 고급 (§8):
   memory: project → 세션 간 학습

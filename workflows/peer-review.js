@@ -18,7 +18,7 @@
 //                  strengthChallenges, distribution, metrics }  또는 { mode:'fallback', reason, metrics }.
 //     ⛔ `counter` 키는 없다 — counter DA 산출은 `strengthChallenges`로 반환된다.
 //   Workflow 외부(Lead 책임 유지): Confidence Matrix 계산(독립성 가중=판단) / origin severity 보정 /
-//     Codex DA(스크립트 밖 — Lead가 /fz-codex, cross-provider 스폰 금지 — 마이그레이션 결정) / dedup+투표 / wall-clock.
+//     Codex DA(스크립트 밖 — Lead가 /fz-gpt, cross-provider 스폰 금지 — 마이그레이션 결정) / dedup+투표 / wall-clock.
 //   base 원본은 Lead가 Gather에서 prefetch하여 basePath로 전달 (LB1 — 에이전트가 SendMessage로 요청하지 않음).
 //   budget 가드: 해당 없음 — 고정 3(Tier2)/6(Tier3) call (가변 fan-out 없음). §12 거버넌스 단서.
 

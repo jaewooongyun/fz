@@ -15,7 +15,7 @@
 
 > 위치: Phase 0.5 (Direction Challenge) 이후, Phase 1 (Deep Planning) 이전.
 
-1. **Lead 컨텍스트 전달**: Phase 0.5 verdict (PROCEED/RECONSIDER) + discover 산출물 + 요구사항 → Codex (`/fz-codex` plan 또는 verify pre-mode)
+1. **Lead 컨텍스트 전달**: Phase 0.5 verdict (PROCEED/RECONSIDER) + discover 산출물 + 요구사항 → Codex (`/fz-gpt` plan 또는 verify pre-mode)
 
 2. **Codex Sprint Contract 작성** (`codex exec` skill: `architect`):
    - 출력: `{WORK_DIR}/plan/sprint-contract-codex.md` 또는 `fz:checkpoint:sprint-contract`
@@ -89,5 +89,5 @@ scope_boundary:
 ## fz 통합
 
 - `fz-plan` Phase 0.7로 진입 (TEAM mode + 5+ Step or Cross-skill)
-- `fz-codex plan` (또는 `verify pre-mode`)에서 Codex Sprint Contract 작성 호출
+- `fz-gpt plan` (또는 `verify pre-mode`)에서 Codex Sprint Contract 작성 호출
 - `experiment-log.md §5.5`에 sprint_contract 메타 기록 (Reflection Rate 측정의 baseline)

@@ -44,7 +44,7 @@ Explore codebase structure, trace dependencies, and analyze impact scope.
 - Flag public API surface changes that affect consumers.
 
 ## Linkage
-- When invoked via `fz-codex`, results feed into the `search` subcommand for structured codebase exploration.
+- When invoked via `fz-gpt`, results feed into the `search` subcommand for structured codebase exploration.
 
 ## Output Format
 ```

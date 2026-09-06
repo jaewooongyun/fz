@@ -40,7 +40,7 @@
    ```
    에이전트 "Step N 완료" 보고 수신
    → ⛔ 체크포인트 기록 (ASD: 파일, 비ASD: write_memory)
-   → ⛔ Codex 교차 검증 (/fz-codex check — 코드/계획 생산 TEAM 필수, 탐색은 --deep만)
+   → ⛔ Codex 교차 검증 (/fz-gpt check — 코드/계획 생산 TEAM 필수, 탐색은 --deep만)
    → [제거/리팩토링 시] Implication Scan (modules/lead-reasoning.md + cross-validation.md)
    → 빌드 검증 (modules/build.md)
    → 다음 Step 배정 또는 Gate 판정

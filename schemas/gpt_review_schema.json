@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "codex_review_schema.json",
+  "$id": "gpt_review_schema.json",
   "title": "Codex Review Response Schema",
   "description": "Codex review/verify/validate/check/final/commit 응답 형식. OpenAI Structured Outputs 규격 준수.",
   "type": "object",
@@ -160,7 +160,7 @@
             "type": "integer",
             "description": "이슈 신뢰도 0-100",
             "minimum": 0,
-            "$comment": "→ codex_base_issue_schema.json#/$defs/confidence (값 인라인 — lint #N1 이 정합 검사)",
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/confidence (값 인라인 — lint #N1 이 정합 검사)",
             "maximum": 100
           },
           "code_snippet": {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # lint:no-root-anchor — 플러그인 루트를 참조하지 않는다. 검사 대상과 스키마를 모두 **인자로** 받고
 #   로드 실패는 exit 1/2로 낸다 (lint #N6 면제 형태 c).
-"""codex 출력이 **fz 스키마 계약**을 지키는지 검사한다 (codex-exec.sh 사후 게이트).
+"""codex 출력이 **fz 스키마 계약**을 지키는지 검사한다 (gpt-exec.sh 사후 게이트).
 
 ⛔ 설계 전환 (2026-08-10, 4라운드 감사 ISSUE-002·003·004 + Codex C3 권고):
    1·2차 구현은 **범용 JSON Schema 검증기를 자작**했고 그 방향은 실패했다 —
@@ -130,7 +130,7 @@ def validate(value, spec: dict, path: str) -> list[str]:
 
 def main() -> int:
     if len(sys.argv) != 3:
-        print("usage: validate-codex-output.py <output.json> <schema.json>", file=sys.stderr)
+        print("usage: validate-gpt-output.py <output.json> <schema.json>", file=sys.stderr)
         return 2
     out_p, schema_p = Path(sys.argv[1]), Path(sys.argv[2])
     try:

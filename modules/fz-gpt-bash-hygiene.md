@@ -1,6 +1,6 @@
-# fz-codex Bash 호출 Hygiene (29차/30차 교훈)
+# fz-gpt Bash 호출 Hygiene (29차/30차 교훈)
 
-> **Scope of Applicability**: `fz-codex` SKILL.md의 모든 Bash 예시 (review/verify/validate/check/final/commit/adversarial/drift/plan/micro-eval). 다른 스킬은 본 모듈을 직접 참조하지 않으며, fz-codex 위임을 통해 간접 적용된다.
+> **Scope of Applicability**: `fz-gpt` SKILL.md의 모든 Bash 예시 (review/verify/validate/check/final/commit/adversarial/drift/plan/micro-eval). 다른 스킬은 본 모듈을 직접 참조하지 않으며, fz-gpt 위임을 통해 간접 적용된다.
 >
 > **Purpose**: `codex exec` / `codex review`를 Bash 도구로 호출할 때 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch 등을 방지하는 표준 절차.
 
@@ -14,7 +14,7 @@
 - §5.5 Base Verification Gate (git diff 분석 호출 시)
 - §6 Standard Hygiene Wrapper Template (복붙용 — ⛔ §8 스크립트로 대체됨)
 - §7 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자 필수)
-- §8 ⛔ **`scripts/codex-exec.sh` 경유 의무** — 사전 플래그 게이트 + 사후 측정 게이트 (본 절이 정본 호출 경로)
+- §8 ⛔ **`scripts/gpt-exec.sh` 경유 의무** — 사전 플래그 게이트 + 사후 측정 게이트 (본 절이 정본 호출 경로)
 
 ## 1. Stdin 닫기 의무 (`< /dev/null`)
 
@@ -83,7 +83,7 @@ trust_level = "trusted"
 trust_level = "trusted"
 ```
 
-**fz-codex 호출 시 적용 범위**:
+**fz-gpt 호출 시 적용 범위**:
 - **Profile 사용 시 (--profile)**: trust_level 없으면 sandbox 무효화
 - **Profile 미사용 시 (-c 'sandbox_permissions=...')**: trust_level 없어도 inline override 가능 [미검증]
 - **대안 폴백**: `-c 'projects."<path>".trust_level="trusted"'` inline override
@@ -139,7 +139,7 @@ printf '%s\n' "$CHANGED_FILES" | head -10
 
 ## 6. Standard Hygiene Wrapper Template
 
-> ⛔ **본 절은 §8 `scripts/codex-exec.sh`로 대체됐다** — 아래 템플릿은 스크립트가 무엇을 하는지 읽기 위한 **참조**로 남긴다. 호출은 §8을 경유한다 (복붙 템플릿은 호출자가 붙이지 않으면 작동하지 않고, 실측상 누락이 재발했다).
+> ⛔ **본 절은 §8 `scripts/gpt-exec.sh`로 대체됐다** — 아래 템플릿은 스크립트가 무엇을 하는지 읽기 위한 **참조**로 남긴다. 호출은 §8을 경유한다 (복붙 템플릿은 호출자가 붙이지 않으면 작동하지 않고, 실측상 누락이 재발했다).
 >
 > 6 hygiene rules (1-5 + 7: `--` 구분자) + zsh glob 회피 + output readback 통합.
 
@@ -173,7 +173,7 @@ codex exec \
 # 5. Background mode (rule 4): high effort + 300줄+ 시 run_in_background=true
 ```
 
-**적용 권고**: fz-codex/SKILL.md의 모든 서브커맨드 예시는 본 wrapper 패턴을 따른다.
+**적용 권고**: fz-gpt/SKILL.md의 모든 서브커맨드 예시는 본 wrapper 패턴을 따른다.
 
 ## 7. 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자)
 
@@ -189,7 +189,7 @@ codex exec ... -- "$(cat /tmp/codex-prompt.txt)" < /dev/null
 
 **관찰**: 에러 캡처 시 `tail` 파이프 금지(clap 에러 본문 잘림 → 진단 지연), 전체 리다이렉트(`> log 2>&1`) 사용. (2026-07-09 harness-paper 세션 실측 — SKILL.md 주입 시 재현)
 
-## 8. ⛔ `scripts/codex-exec.sh` 경유 의무 (2026-08-09 — **본 절이 정본 호출 경로**)
+## 8. ⛔ `scripts/gpt-exec.sh` 경유 의무 (2026-08-09 — **본 절이 정본 호출 경로**)
 
 > §1~§7을 손으로 조립하지 않는다. `guides/skill-authoring.md` §11 판정("결과가 binary(pass/fail)인가? → 스크립트")이 본 모듈 전체에 적용된다 — hygiene 규칙은 전부 binary다.
 
@@ -197,7 +197,7 @@ codex exec ... -- "$(cat /tmp/codex-prompt.txt)" < /dev/null
 
 | 실패 | 지식은 어디 있었나 | 왜 안 막혔나 |
 |---|---|---|
-`codex exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-codex-subcommands-core.md:36`이 "함께 주면 인자 충돌"을 이미 명시 | 산문 경고는 **호출 시점에 읽혀야** 작동한다. 호출자가 §6 템플릿을 붙이지 않고 손으로 조립했다 |
+`codex exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-subcommands-core.md:36`이 "함께 주면 인자 충돌"을 이미 명시 | 산문 경고는 **호출 시점에 읽혀야** 작동한다. 호출자가 §6 템플릿을 붙이지 않고 손으로 조립했다 |
 래퍼가 `codex exit=2`를 **0으로 보고** | — (규칙 자체가 없었다) | 마지막 문장(`wc \|\| echo`)의 exit이 태스크 exit으로 올라갔다. §1~§7에 **사후 검증 규칙이 없다** |
 
 ⛔ 두 번째가 더 위험하다: **측정 실패가 "이슈 0건"으로 읽힌다.** exit≠0 / 빈 출력은 *깨끗한 리뷰*가 아니라 *리뷰 부재*다.
@@ -206,11 +206,11 @@ codex exec ... -- "$(cat /tmp/codex-prompt.txt)" < /dev/null
 
 ```bash
 # review: 대상 선택은 플래그로만 (PROMPT 불가 — 스크립트가 거부한다)
-scripts/codex-exec.sh review --cd "$GIT_ROOT" --out "$F" --uncommitted [--effort high] [--schema S] [--title T] [--ephemeral]
-scripts/codex-exec.sh review --cd "$GIT_ROOT" --out "$F" --base develop [--add-dir D]
+scripts/gpt-exec.sh review --cd "$GIT_ROOT" --out "$F" --uncommitted [--effort high] [--schema S] [--title T] [--ephemeral]
+scripts/gpt-exec.sh review --cd "$GIT_ROOT" --out "$F" --base develop [--add-dir D]
 
 # exec: 커스텀 지시가 필요할 때 (diff는 프롬프트에 인라인 — 스코프 플래그 금지)
-scripts/codex-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S]
+scripts/gpt-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S]
 ```
 
 ### 사전 게이트 (호출 전 거부)
@@ -231,14 +231,14 @@ scripts/codex-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effo
 |:--:|---|:--:|---|
 | 1 | `codex` 종료코드 == 0 | **12** | 측정 실패 |
 | 2 | `-o` 파일 존재 + 비어있지 않음 | **13** | 측정 실패 |
-| 3 | `--schema` 지정 시 **스키마 계약** 충족 (`scripts/validate-codex-output.py`) | **14** | 측정 실패 |
+| 3 | `--schema` 지정 시 **스키마 계약** 충족 (`scripts/validate-gpt-output.py`) | **14** | 측정 실패 |
 | 4 | **cwd 오염 없음** — 호출 전후 `git status --porcelain` 동일 | 경고 | 위임 프로세스가 대상 repo에 파일을 남겼다 |
 
 ⛔ **게이트 4의 근거**: `--cd`로 지정한 디렉토리는 위임 프로세스의 **쓰기 대상**이기도 하다. 팀 레포를 `--cd`로 준 호출이 산출물 17개를 그 안에 남긴 실측이 있다(gitignore 미적용). 읽기 전용이라는 가정은 **호출자의 것이지 도구의 계약이 아니다**.
 
 ```bash
 BEFORE="$(git -C "$CD" status --porcelain 2>/dev/null)"
-scripts/codex-exec.sh ... ; RC=$?
+scripts/gpt-exec.sh ... ; RC=$?
 AFTER="$(git -C "$CD" status --porcelain 2>/dev/null)"
 [ "$BEFORE" = "$AFTER" ] || echo "WARN: cwd 오염 — 새 파일을 개인 경로로 옮겨라: $(diff <(printf '%s' "$BEFORE") <(printf '%s' "$AFTER") | grep '^>')" >&2
 ```
@@ -259,7 +259,7 @@ AFTER="$(git -C "$CD" status --porcelain 2>/dev/null)"
 
 | 스킬 | 참조 이유 |
 |------|----------|
-| /fz-codex | 본 모듈의 직접 소비자 — 모든 서브커맨드가 본 hygiene 준수 |
+| /fz-gpt | 본 모듈의 직접 소비자 — 모든 서브커맨드가 본 hygiene 준수 |
 | /fz | Codex 호출 게이트 주입 시 본 hygiene 인용 |
 | /fz-plan | TEAM 모드 Codex verify 호출 시 본 hygiene 준수 |
 | /fz-review | TEAM 모드 Codex check 호출 시 본 hygiene 준수 |

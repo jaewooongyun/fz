@@ -74,7 +74,7 @@ intent-triggers:
 | Phase 1 | `/sc:research` | 외부 기술/라이브러리 조사 |
 | Phase 1 | `/sc:workflow` | PRD → 구현 워크플로우 자동 생성 (5+ Step 시) |
 | Phase 1 | `/sc:spec-panel` | 아키텍처 스펙 전문가 패널 리뷰 (새 모듈 시, --deep 시) |
-| Phase 2 | `/fz-codex verify` | 계획 검증 (독립 스킬 — Codex 교차 검증, `modules/fz-codex-subcommands-core.md § verify`) |
+| Phase 2 | `/fz-gpt verify` | 계획 검증 (독립 스킬 — Codex 교차 검증, `modules/fz-gpt-subcommands-core.md § verify`) |
 | Phase 2 | `/sc:estimate` | 공수 추정 (복잡도 4+ 시, 조건부) |
 | Phase 3 | `/sc:reflect` | 피드백 반영 후 자체 검증 |
 
@@ -119,7 +119,7 @@ intent-triggers:
 | plan-edge-case (경계) | Stage 2 + Stage 3 CC | "어디서 깨지는가?" |
 | review-arch (아키 일관성) | Stage 2 + Stage 5 재검증 | "기존 패턴/규칙과 맞는가?" |
 | review-direction (방향 도전) | Stage 0 | "근본적으로 다른 접근은?" |
-| Codex verify (독립 검증) | Workflow 외부 — Lead가 /fz-codex verify (Phase 2) | "이 계획에 빠진 것은?" |
+| Codex verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |
 
 > 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰은 확산 판정 시 결정.
 
@@ -185,7 +185,7 @@ intent-triggers:
    - 이미 verified → `[verified: source]` 태그 보유 (코드/문서/명령어 출력)
    - 미검증 → `[미검증: 이유]` 태그 + Plan 차원에서 제외
    - probe 필요 → `/fz-discover` Phase 1.5 (Constraint Probe) 호출
-   - **Codex Micro-Eval Assist (optional)**: 핵심 가정 + `[verified: source]` 부재 + primitive/contract 확인 비용 높음 시 → `/fz-codex micro-eval "이 가정 검증"` (effort=medium, 1-shot). Lead 판단으로 호출, 자동 발동 ❌ — 새 Phase/Gate 신설 ❌ (33차 default = action 정합).
+   - **Codex Micro-Eval Assist (optional)**: 핵심 가정 + `[verified: source]` 부재 + primitive/contract 확인 비용 높음 시 → `/fz-gpt micro-eval "이 가정 검증"` (effort=medium, 1-shot). Lead 판단으로 호출, 자동 발동 ❌ — 새 Phase/Gate 신설 ❌ (33차 default = action 정합).
 3. **probe 결과 통합**: discover 산출물에서 3 axes 모두 verified 가정만 Plan 차원에 포함
 
 ### Gate 0c: Constraints Verified for Plan
@@ -360,7 +360,7 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
 
 3.2. **⛔ 게이트 판정** (draft 원장이 있을 때 — `modules/gates.md` 배선 1):
    Phase 1에서 만든 `{WORK_DIR}/gates/plan.draft.md`를 검증 입력에 **포함**한다. 원장이 Phase 3에서 만들어지면 Phase 2 평가자가 볼 `CHECK:`가 없다 — draft가 먼저인 이유다.
-   ⛔ **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하면 Issue Tracker·scope challenge·Gate 2 입력이 사라진다. 절차: `modules/fz-codex-subcommands-core.md` § verify-gates
+   ⛔ **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하면 Issue Tracker·scope challenge·Gate 2 입력이 사라진다. 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates
    - 요구: 게이트마다 판정 1행. ⛔ **통과한 게이트도 표현**해야 N/N 대조가 성립한다
    - ⛔ **사후 대조 의무** — 눈으로 하지 않는다: `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check {응답.json} {WORK_DIR}/gates/plan.draft.md`
      게이트 수·id 집합·중복·summary 합계를 판정한다. exit 1이면 재호출 1회 후 **미판정으로 기록** — 조용히 통과시키지 않는다

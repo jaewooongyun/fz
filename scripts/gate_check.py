@@ -1614,7 +1614,7 @@ def discover(root_dir: str) -> int:
 def verdict_check(ledger: Ledger, response_path: str) -> int:
     """`verify-gates` 응답이 **현재** 원장을 전수 판정했는지 대조한다.
 
-    ⛔ **스키마만으로는 보장되지 않는다.** `codex_gate_verdict_schema` 는
+    ⛔ **스키마만으로는 보장되지 않는다.** `gpt_gate_verdict_schema` 는
     `gates: []`(빈 배열)·중복 id·원장에 없는 id·거짓 `summary` 합계를 전부 통과시킨다.
     누락은 미판정이며 통과가 아니므로 호출자가 대조해야 한다.
 

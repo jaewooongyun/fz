@@ -1,7 +1,7 @@
 # Lead Implication Reasoning
 
 > Lead가 작업 결과를 보고하기 전에 "표면 처리를 넘는 추론"을 수행하는 공통 모듈.
-> 참조: fz-code(마찰 감지), fz-review(검증 4-I), fz-plan(Register 출력), fz-codex(Q8), cross-validation.md(게이트 삽입)
+> 참조: fz-code(마찰 감지), fz-review(검증 4-I), fz-plan(Register 출력), fz-gpt(Q8), cross-validation.md(게이트 삽입)
 
 ## 목차
 
@@ -280,5 +280,5 @@ plan의 Anti-Pattern Constraints 작성 시 참조.
 | fz-code | 마찰 감지 테이블 — 구조적 잔존물 + 관찰 보고 의무 |
 | fz-review | 검증 4-I + 완료 보고 관찰 섹션 |
 | fz-plan | Implication Register 출력 + Anti-Pattern 가이드 참조 |
-| fz-codex | Q8 함의 커버리지 |
+| fz-gpt | Q8 함의 커버리지 |
 | cross-validation.md | Implication Scan 게이트 + origin-equivalence |

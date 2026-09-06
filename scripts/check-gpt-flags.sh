@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# check-codex-flags.sh — `codex exec` 와 `codex exec review` 의 플래그 집합 차이를 실측하고
-# codex-exec.sh 가 review 경로로 넘기는 플래그가 그 차집합에 들어 있지 않은지 검사한다.
+# check-gpt-flags.sh — `codex exec` 와 `codex exec review` 의 플래그 집합 차이를 실측하고
+# gpt-exec.sh 가 review 경로로 넘기는 플래그가 그 차집합에 들어 있지 않은지 검사한다.
 #
 # 왜 필요한가 (F-015): 두 서브커맨드는 플래그 집합이 다르다. 공용 배열로 넘기면
 # review 가 `-C`/`--add-dir` 를 거부해 exit 2 를 내는데, 호출부는 이를 "이슈 0건"으로 오독하기 쉽다.
@@ -10,7 +10,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET="${1:-$SCRIPT_DIR/codex-exec.sh}"
+TARGET="${1:-$SCRIPT_DIR/gpt-exec.sh}"
 
 command -v codex >/dev/null 2>&1 || { echo "SKIP: codex CLI 없음 (검사 불가 — PASS 아님)" >&2; exit 2; }
 
@@ -34,7 +34,7 @@ ONLY_EXEC="$(comm -23 <(printf '%s\n' "$EXEC_F") <(printf '%s\n' "$REVIEW_F"))"
 echo "▶ exec 전용 (review 가 거부하는) 플래그 $(printf '%s\n' "$ONLY_EXEC" | grep -c . || true)개:"
 printf '   %s\n' $ONLY_EXEC
 
-# codex-exec.sh 의 review 호출 경로가 넘기는 플래그 추출:
+# gpt-exec.sh 의 review 호출 경로가 넘기는 플래그 추출:
 #   공용 ARGS 블록 + review 분기에서 ARGS 에 추가되는 것
 #   ⛔ 주석 라인은 제외한다 — 설명문에 등장하는 플래그 이름을 코드로 오인하면
 #      수정이 끝난 파일도 위반으로 찍힌다 (본 스크립트 최초판의 실제 위양성).

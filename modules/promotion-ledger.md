@@ -24,7 +24,7 @@
 다음 두 조건을 모두 충족하는 ASD-{번호} 세션:
 
 (a) `/fz-plan` Phase 0.5 ~ Phase 3 중 하나 이상 실행
-(b) `/fz-codex verify` 또는 `/fz-review --deep` 실행
+(b) `/fz-gpt verify` 또는 `/fz-review --deep` 실행
 
 **또는 트랙 C (외부 리뷰어 catch — 별도 경로, a+b와 무관)**:
 
@@ -49,14 +49,14 @@
 
 1. Eligible session 2건 누적 (동일 P-ID)
 2. 2건 모두 [verified] 근거 첨부
-3. 2건 누적 후 `/fz-codex adversarial` 실행 → approved
+3. 2건 누적 후 `/fz-gpt adversarial` 실행 → approved
 4. 사용자 최종 승인 → v{N+1} 릴리스에 P0 반영
 
 ## P2 → P1 승격 조건
 
 1. Eligible session 1건 누적 (동일 P-ID)
 2. [verified] 근거 첨부
-3. `/fz-codex verify` 실행 → approved
+3. `/fz-gpt verify` 실행 → approved
 4. 사용자 최종 승인 → v{N+1} 릴리스에 P1 반영
 
 ## 현재 관측 대상 (v2.2 기준)
@@ -89,7 +89,7 @@
 ### P2-C: general closure-capture retain cycle lens (Claude 경로) — 트랙 C
 - 관측 #0: OBS-10 (CodeRabbit Major1 — sheetRef 강한 캡처 cycle, fz-review 6-Layer 통과)
 - finding-source: external(CodeRabbit) — 4-classify: valid-suggestion
-- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. Codex `codex-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/Codex 비대칭).
+- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. Codex `gpt-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/Codex 비대칭).
 - generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
 - ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
 - ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:213` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(Codex 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
@@ -98,7 +98,7 @@
 ## OBS-08 회고 후보 (P2, 관측 #1)
 
 > 출처: 내부 회고 기록 (20 catches) + 개선 분석 (분류)
-> Eligible session 확인: OBS-08 = fz-plan Phase 0.5~3 (plan v1~v5) + fz-codex verify 2건 → 기준 (a)+(b) 충족 [verified: plan/codex-verify-output.md, codex-verify-v3-output.md 존재]
+> Eligible session 확인: OBS-08 = fz-plan Phase 0.5~3 (plan v1~v5) + fz-gpt verify 2건 → 기준 (a)+(b) 충족 [verified: plan/codex-verify-output.md, codex-verify-v3-output.md 존재]
 > ⛔ **승격 차단**: 2026-06-01 세션 Codex 한도 초과 → P2→P1 조건의 "Codex verify → approved" 미충족. 관측 #1 등록까지만. cross-model 검증 PENDING.
 >
 > **⛔ 2-트랙 구분 (모순 해소 2026-06-01)**: L-1~L-3은 friction 신호를 보유 → 두 lifecycle이 분리된다.
@@ -249,7 +249,7 @@
 - generalize: narrow (규칙 이식) | 과적합 위험: 中 | 트리거=이식 감지(코드)/해소=근거 분류(도메인 지식) 하이브리드
 - 근거: [verified: 내부 홀 인벤토리 I3·H-P2·G6("종류: 신규")]
 - ⛔ 활성 차단: evidence 1 session → candidate. ⚠️ **L-7과 별개**: 상위 축(template-authority-bias)은 공유하나 해소 방식 상이(L-7=값 발생 여부 확인/default, L-12=근거 축 분류) + 홀 문서 G6가 "신규" 자체분류 → same-failure-mode 미성립으로 독립 등재. cross-link: [[L-7]]
-- ⚠️ **카운트 보류** (OQ-c): OBS-20 회고 세션의 eligibility (a)fz-plan Phase0.5~3 + (b)fz-codex verify/fz-review --deep 미확증(§meta light/solo 라우팅) → L-2/L-3 관측#2 선례대로 5-session 카운트 미반영. ⚠️ **근본 모순**: 본 파일 "별개 세션 관측 카운트"(§카운트 기준) vs L-2/L-3/L-12 보류 관행이 상충 — Wave 3-1 ledger 재평가에서 reconcile 대상.
+- ⚠️ **카운트 보류** (OQ-c): OBS-20 회고 세션의 eligibility (a)fz-plan Phase0.5~3 + (b)fz-gpt verify/fz-review --deep 미확증(§meta light/solo 라우팅) → L-2/L-3 관측#2 선례대로 5-session 카운트 미반영. ⚠️ **근본 모순**: 본 파일 "별개 세션 관측 카운트"(§카운트 기준) vs L-2/L-3/L-12 보류 관행이 상충 — Wave 3-1 ledger 재평가에서 reconcile 대상.
 - 승격 목표 (Track A): 5 sessions + Codex verify.
 
 ### L-13: post-state 일관성 (peer slot 비대칭 — OBS-24 R8)
@@ -262,7 +262,7 @@
 - ⚠️ **파생 규율은 L-11과 동축**: 본 사건의 2차 원인(외부 지적의 provenance 미분류 — 자작 계획서 권위를 코드 근거 위에 둠)은 L-11(검증자가 finder와 **권위 전제** 공유 → plan-authority 오판)과 같은 축이며 **발동 지점만 다름**(L-11=검증자 프롬프트 / 본건=Lead의 피드백 수용). ⇒ provenance 랭킹은 **독립 등재하지 않고** `fz-code` External Feedback Gate 행 보강 + `harness-engineering` §12 R8-A 파생규율로 흡수. cross-link: [[L-11]]
 - ⛔ 활성 차단: evidence 1 session → **candidate**. active 전환 = 트랙 A **5 sessions**.
 - ⛔ **외부 채점 미이행 (§5.5 규율 2 미충족)**: 본 항목은 등재 세션에 Codex 한도 소진으로 **cross-model 채점 없이** 자기 관측만으로 기술됐다. `harness-engineering.md` §5.5 규율 2("self-preference 단독 채택 금지 — 외부 채점 병행")상 **승격 조건에 5 sessions + 외부 채점 1회를 함께 요구**한다. 개념 정본 `§12 R8-A`에도 동일 경고 병기(출처 성격이 원칙 1~7과 다름 — 외부 권위 vs 자체 관측).
-- ⛔ **진단 정정 (2026-08-10, 3-렌즈 외부 검증)**: 최초 "post-state 축 부재" 판정은 **오진**. 형제 렌즈 6개 실재 [verified: `skill-authoring.md` §1 Sibling-Convention Check(**동일 실패 모드**) · `fz-review` §검증 1 "Grep → 변경 후 패턴 일관성" · `agents/impl-quality.md` "Codebase Pattern Consistency" · `codex-skills/fz-reviewer` · `evidence-collection.md` · `agents/review-direction.md`]. 정확한 진술 = **입도 부족(같은 블록 형제 단위 없음) + 소유자 미배선(`workflows/code-pair.js`가 impl-quality를 "미포함 기본값")**. ⇒ **선행 과제**: 대안 A(impl-quality 배선 복구)·B(Lead 체크리스트 1줄) vs C(현행 신설) 비용·발화율 비교 **미수행**.
+- ⛔ **진단 정정 (2026-08-10, 3-렌즈 외부 검증)**: 최초 "post-state 축 부재" 판정은 **오진**. 형제 렌즈 6개 실재 [verified: `skill-authoring.md` §1 Sibling-Convention Check(**동일 실패 모드**) · `fz-review` §검증 1 "Grep → 변경 후 패턴 일관성" · `agents/impl-quality.md` "Codebase Pattern Consistency" · `gpt-skills/fz-reviewer` · `evidence-collection.md` · `agents/review-direction.md`]. 정확한 진술 = **입도 부족(같은 블록 형제 단위 없음) + 소유자 미배선(`workflows/code-pair.js`가 impl-quality를 "미포함 기본값")**. ⇒ **선행 과제**: 대안 A(impl-quality 배선 복구)·B(Lead 체크리스트 1줄) vs C(현행 신설) 비용·발화율 비교 **미수행**.
 - ⛔ **실효성 실측 (오탐 8/9)**: OBS-24 워크트리 peer slot 11곳 적용 → emit 9곳 중 진짜 1곳. "in-block 비용 0" 주장 **철회**(접근 수준·소유권은 소비처 결정 → 타 파일 Read + 리포 grep 필요). diff 앵커링 상속으로 **기존 비대칭 불가시**. ⇒ 4-P에 **형제 균일성 게이트 + 의미 비대칭 면제 + 소비처 의존 축 제외** 반영. 표본 소 — 일반화 금지.
 - ⛔ **활성 전 필수 (§5.5 규율 1 — 회귀·반증 게이트)**: 회귀 fixture 2개 — ① 형제 3절 중 1절만 리터럴인 switch에서 **검출**(TP) ② 형제가 정당한 의미 비대칭인 블록에서 **미검출**(FP=0). **현재 oracle 0개** [L-1 선례 형식 차용].
 - ⚡ 조치 (2026-08-10): `harness-engineering` §12 R8-A 신설(candidate) + 진단 정정 · `review-checks` 검증 4-P 신설 + 균일성 게이트 · `fz-code` friction-detect "peer slot 비대칭" 신호 + External Feedback Gate 행 provenance 보강 · `fz-review` 4-P 참조/체크리스트.
@@ -318,7 +318,7 @@ E 성격(하네스 결함 · 측정 실패 · 판정 오류 · 게이트 위음�
 
 - **2세션**: 트랙 A 의 5세션은 *friction 신호*(편집 중 감지되는 코드 패턴)를 전제로 정해졌다. 하네스 결함은 성격이 다르다 — **재발 자체가 구조적 신호**이고, 같은 게이트가 두 번 뚫리면 그 게이트의 가정이 틀렸다는 뜻이다. P1→P0 의 2건과 값을 맞춰 정합성을 둔다.
 - **회귀 fixture 1개**: `guides/harness-engineering.md` §5.5 규율 1 — *"자기수정 제안은 회귀 테스트·반증 게이트를 통과한 것만 채택"*. 본 원장 실측에서 **활성 차단 사유 1위가 회귀 fixture 부재(3건)** 였다. 세션 수보다 이쪽이 실질 게이트다.
-  - ⭐ 실증: 2026-08-24 `scripts/check-codex-flags.sh` 가 뮤테이션 테스트에서 **자기 위양성을 2회 검출**했다(주석 오인 · awk 범위 과다). fixture 없이 "게이트가 잘 잡네"로 통과할 뻔했다.
+  - ⭐ 실증: 2026-08-24 `scripts/check-gpt-flags.sh` 가 뮤테이션 테스트에서 **자기 위양성을 2회 검출**했다(주석 오인 · awk 범위 과다). fixture 없이 "게이트가 잘 잡네"로 통과할 뻔했다.
 - **외부 채점 1회**: `prompt-optimization.md` §3b H2 — self-evaluation 은 unreliable.
 
 ⛔ **이 임계값은 실측 근거가 아직 얇다.** 트랙 A 의 5세션처럼 누적 관측에서 도출된 값이 아니라 인접 트랙과의 정합성으로 정했다. **트랙 D 승격이 3건 누적되면 값을 재검토**한다 — 너무 헐거우면 게이트가 단조 증가하고(IFScale), 너무 빡빡하면 지금과 같은 적체가 재현된다.

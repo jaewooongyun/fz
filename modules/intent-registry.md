@@ -20,7 +20,7 @@
 | fz-review | `리뷰\|검증\|품질\|검토` | `review\|validate\|quality` |
 | fz-fix | `수정\|고쳐\|변경\|바꿔\|버그\|크래시\|에러\|되돌리기\|revert\|원상복구` | `fix\|bug\|crash\|error\|revert\|undo\|rollback\|patch` |
 | fz-search | `찾아\|탐색\|구조\|영향\|의존성` | `search\|explore\|structure\|impact\|dependency` |
-| fz-codex | `codex\|교차검증` | `codex\|cross-validate\|verify with codex` |
+| fz-gpt | `codex\|교차검증` | `codex\|cross-validate\|verify with codex` |
 | fz-commit | `커밋` | `commit` |
 | fz-pr | `PR\|풀리퀘스트` | `PR\|pull.?request` |
 | fz-rebase | `리베이스\|브랜치.*최신화\|브랜치.*동기화\|브랜치.*업데이트\|develop.*위로\|롱텀.*브랜치\|리베이스.*(사라\|누락\|덮어)\|(리베이스\|force.?push).*(유실\|덮어씌)` | `rebase\|sync.*branch\|refresh.*branch\|update.*branch` |

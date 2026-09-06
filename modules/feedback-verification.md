@@ -10,13 +10,13 @@
 
 ```bash
 # 독립 스킬로 위임
-/fz-codex validate "피드백 반영 검증"
+/fz-gpt validate "피드백 반영 검증"
 ```
 
-`/fz-codex validate`가 수행하는 작업:
+`/fz-gpt validate`가 수행하는 작업:
 - 이전 이슈 목록 + Claude 수정 내용 → Codex에 전송
 - 이슈별 해결 상태 검증 (`resolved` / `partially_resolved` / `unresolved` / `regressed`)
-- Reflection Rate 계산 (계산식 canonical: `schemas/codex_verification_schema.json`; threshold/gating 정책: `modules/cross-validation.md § Reflection Rate`):
+- Reflection Rate 계산 (계산식 canonical: `schemas/gpt_verification_schema.json`; threshold/gating 정책: `modules/cross-validation.md § Reflection Rate`):
   `(resolved × 1.0 + partially_resolved × 0.5) / total_issues`
 - Issue Tracker 상태 업데이트
 
@@ -45,4 +45,4 @@
 
 - `modules/cross-validation.md` — cross-model 검증 원칙
 - `modules/peer-review-tiers.md` — 이슈 severity 티어
-- `modules/fz-codex-subcommands-core.md` — `validate` 서브커맨드 상세 (2026-05-27 모듈 분리로 경로 갱신)
+- `modules/fz-gpt-subcommands-core.md` — `validate` 서브커맨드 상세 (2026-05-27 모듈 분리로 경로 갱신)
