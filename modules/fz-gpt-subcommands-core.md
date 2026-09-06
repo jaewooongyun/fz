@@ -1,15 +1,15 @@
-# fz-codex 서브커맨드 (Core 4개) — review / verify / validate / check
+# fz-gpt 서브커맨드 (Core 4개) — review / verify / validate / check
 
-> **Scope of Applicability**: `fz-codex` SKILL.md의 주력 서브커맨드 4개. fz-review Phase 5 (review/check), fz-plan Phase 2 (verify), fz-review Phase 5.5 (validate) 위임 시 본 모듈 참조.
+> **Scope of Applicability**: `fz-gpt` SKILL.md의 주력 서브커맨드 4개. fz-review Phase 5 (review/check), fz-plan Phase 2 (verify), fz-review Phase 5.5 (validate) 위임 시 본 모듈 참조.
 >
-> **Purpose**: 가장 자주 사용되는 4개 서브커맨드(주력) 정의 + verdict contract + 후속 fz-fixer 연결. 보조 7개는 `modules/fz-codex-subcommands-aux.md` 참조.
+> **Purpose**: 가장 자주 사용되는 4개 서브커맨드(주력) 정의 + verdict contract + 후속 fz-fixer 연결. 보조 7개는 `modules/fz-gpt-subcommands-aux.md` 참조.
 
 ## 목차
 
 **review** (주력, fz-review P5) · **verify** (Q1-Q8, fz-plan P2) · **verify-gates** (게이트 원장 판정, fz-plan P2 **추가** 호출) · **validate** (역검증, fz-review P5.5) · **check** (verdict contract: pass/warn/fail)
 
 > ⛔ **아래 codex exec 예시는 축약형** (서브커맨드별 *차이점*만 표시 — 가독성 우선). **raw 복붙 금지**.
-> 실제 실행 시 반드시 `modules/fz-codex-bash-hygiene.md` §6 Standard Wrapper Template 적용:
+> 실제 실행 시 반드시 `modules/fz-gpt-bash-hygiene.md` §6 Standard Wrapper Template 적용:
 > `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `-o` readback + (git diff 분석 시) §5.5 Base Verification Gate.
 > 예시의 `codex exec ...`는 *wrapper의 §3 표준 호출 부분*에 해당하는 차이점만 보여준다 (29/30차 hang/sandbox 재발 차단 — Codex 검증 §Blind Spot 1).
 
@@ -40,7 +40,7 @@ cd "$GIT_ROOT" && codex exec review \
 fz-plan의 Phase 2. **`codex exec` + `--output-schema` 사용.**
 
 ```bash
-SKILL_PATH=$(get_codex_skill_path "architect" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
@@ -48,10 +48,9 @@ else
 fi
 
 codex exec \
-  -m "$(config.toml 모델)" \
   -c model_reasoning_effort=high \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
-  --output-schema schemas/codex_review_schema.json \
+  --output-schema schemas/gpt_review_schema.json \
   -o "$REVIEW_FILE" \
   -C "$GIT_ROOT" \
   "${SKILL_PROMPT}
@@ -85,7 +84,7 @@ codex exec \
 
 ## verify-gates -- 게이트 원장 판정 (fz-plan Phase 2 추가 호출)
 
-⛔ **`verify`를 대체하지 않는다 — 별도 호출로 추가한다.** `codex_gate_verdict_schema`에는 `issues`·`verdict`가 없어, 교체하면 fz-plan의 Issue Tracker 기록·scope challenge·Gate 2 승인 입력이 사라진다.
+⛔ **`verify`를 대체하지 않는다 — 별도 호출로 추가한다.** `gpt_gate_verdict_schema`에는 `issues`·`verdict`가 없어, 교체하면 fz-plan의 Issue Tracker 기록·scope challenge·Gate 2 승인 입력이 사라진다.
 
 발동: 원장이 있을 때만. 원장이 없으면 게이트 판정이 무의미하다.
 
@@ -100,11 +99,11 @@ codex exec \
 LEDGER="{호출자가 정한 원장}"          # plan: gates/plan.draft.md · review: gates/plan.md
 [ -f "$LEDGER" ] || exit 0   # 원장 없으면 이 호출 자체를 생략
 
-scripts/codex-exec.sh exec \
+scripts/gpt-exec.sh exec \
   --cd "$GIT_ROOT" \
   --out "$GATE_VERDICT_FILE" \
   --prompt-file "$PROMPT" \
-  --schema schemas/codex_gate_verdict_schema.json \
+  --schema schemas/gpt_gate_verdict_schema.json \
   --effort high
 ```
 
@@ -122,7 +121,7 @@ scripts/codex-exec.sh exec \
 
 ### ⛔ 사후 검증 (스키마만으로는 보장되지 않는다)
 
-`codex_gate_verdict_schema`는 `gates: []`(빈 배열)·중복 id·원장에 없는 id·거짓 `summary` 합계를 **전부 통과시킨다.** 호출자가 대조한다.
+`gpt_gate_verdict_schema`는 `gates: []`(빈 배열)·중복 id·원장에 없는 id·거짓 `summary` 합계를 **전부 통과시킨다.** 호출자가 대조한다.
 
 이 대조는 **눈으로 하지 않는다** — 판정기가 한다.
 
@@ -144,7 +143,7 @@ exit 1 이면 재호출 1회 후 **미판정으로 기록**하고 Lead가 판단
 fz-review의 Phase 5.5. **`codex exec` + `--output-schema` 사용.**
 
 ```bash
-SKILL_PATH=$(get_codex_skill_path "guardian" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "guardian" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
@@ -152,10 +151,9 @@ else
 fi
 
 codex exec \
-  -m "$(config.toml 모델)" \
   -c model_reasoning_effort=high \
   -c 'sandbox_permissions=["disk-full-read-access"]' \
-  --output-schema schemas/codex_verification_schema.json \
+  --output-schema schemas/gpt_verification_schema.json \
   -o "$VERIFICATION_FILE" \
   -C "$GIT_ROOT" \
   "${SKILL_PROMPT}
@@ -175,7 +173,7 @@ codex exec \
 **/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.
 
 ```bash
-SEARCHER_SKILL_PATH=$(get_codex_skill_path "searcher" "$FZ_PLUGIN_ROOT")
+SEARCHER_SKILL_PATH=$(get_gpt_skill_path "searcher" "$FZ_PLUGIN_ROOT")
 if [ -n "$SEARCHER_SKILL_PATH" ] && [ -z "$AFFECTED_SYMBOLS" ]; then
   codex exec \
     -c model_reasoning_effort=high \
@@ -205,7 +203,7 @@ cd "$GIT_ROOT" && codex exec review \
 
 ### check verdict contract (호출자 분기 규칙)
 
-`/fz-codex check` 결과는 다음 verdict 중 하나로 분류 (호출자 SKILL — fz-fix 등 — 이 분기 처리):
+`/fz-gpt check` 결과는 다음 verdict 중 하나로 분류 (호출자 SKILL — fz-fix 등 — 이 분기 처리):
 
 | verdict | 조건 | 호출자 권장 행동 |
 |---------|------|----------------|
@@ -224,7 +222,7 @@ cd "$GIT_ROOT" && codex exec review \
 **/fz-fixer 연결**: 리뷰 결과에 수정 제안이 포함된 경우(issues with suggestion 필드 비어있지 않음), /fz-fixer 스킬을 참조하여 수정 전략을 제시한다.
 
 ```bash
-FIXER_SKILL_PATH=$(get_codex_skill_path "fixer" "$FZ_PLUGIN_ROOT")
+FIXER_SKILL_PATH=$(get_gpt_skill_path "fixer" "$FZ_PLUGIN_ROOT")
 if [ -n "$FIXER_SKILL_PATH" ] && [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
   codex exec \
     -c model_reasoning_effort=high \
@@ -251,5 +249,5 @@ fi
 
 ## 설계 원칙
 
-- Progressive Disclosure Level 3 (fz-codex 호출 시 *명시 Read*. 자동 로드 X — Codex 검증 §추가 발견 정정)
+- Progressive Disclosure Level 3 (fz-gpt 호출 시 *명시 Read*. 자동 로드 X — Codex 검증 §추가 발견 정정)
 - 200줄 한도 — 본 모듈은 verify Q1-Q8 + verdict contract 포함으로 약간 초과 가능
