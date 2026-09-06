@@ -29,7 +29,7 @@
 2. **실질 scope 변경** — 승인된 outcome 범위를 벗어남
 3. **사용자만 줄 수 있는 입력** — 제품·디자인·팀 컨벤션 소유 / 코드 사실로 좁혀지지 않는 결단
 
-그 외에는 승인된 outcome 위임 범위 내에서 진행한다 (act when you have enough info). 출처: 공식 Prompting Claude Fable 5 checkpoint 스니펫 — "Pause only when [the decision] genuinely requires the user; otherwise proceed." (스니펫 원문·채택 근거: `guides/fable-model-guide.md` § 프롬프트 패턴 / 채택 현황).
+그 외에는 승인된 outcome 위임 범위 내에서 진행한다 (act when you have enough info). 출처: 공식 Prompting Claude Fable 5 checkpoint 스니펫 — "Pause only when [the decision] genuinely requires the user; otherwise proceed." (스니펫 원문·채택 근거: `guides/model-guide.md` § 프롬프트 패턴 / 채택 현황).
 
 ### non-overridable allowlist (본 기준으로 우회 불가)
 
