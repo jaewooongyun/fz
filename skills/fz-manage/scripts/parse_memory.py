@@ -60,7 +60,7 @@ META_FAMILY_PATTERN = re.compile(r"\b(\d{1,3})차")
 SELF_ID_FROM_NAME = re.compile(r"\((\d+)차\b")
 
 # v2 (Sanity Check 18차 반영): [skill: X, Y, Z] 태그 인식
-# 18차 메모리 본문에 `[skill: fz-plan, fz-review, fz-codex] [status: ...] [priority: ...]`
+# 18차 메모리 본문에 `[skill: fz-plan, fz-review, fz-gpt] [status: ...] [priority: ...]`
 # 형식의 명시적 모듈 태깅이 있음을 발견 (19차에는 없음)
 SKILL_TAG_PATTERN = re.compile(r"\[skill:\s*([^\]]+)\]", re.IGNORECASE)
 
@@ -77,7 +77,7 @@ APPLIED_LOCATION_HINTS = [
     # v5 (2026-05-26 P6 개선): 한국어 cross-ref 패턴 추가 (dogfood 40차/41차 매칭 회복)
     (r"lead-action-default\.md", "lead-action-default.md (Trigger Matrix)"),
     (r"fz-pipeline-proposal\.md", "fz-pipeline-proposal.md (Phase 4 Default)"),
-    (r"fz-codex(?:/SKILL\.md)?", "fz-codex 스킬"),
+    (r"fz-gpt(?:/SKILL\.md)?", "fz-gpt 스킬"),
     (r"fz-plan(?:/SKILL\.md)?", "fz-plan 스킬"),
     (r"fz/SKILL\.md|fz\s*오케스트레이터", "fz 오케스트레이터"),
     (r"memory-guide\.md", "memory-guide.md (Lesson Intake)"),
@@ -212,7 +212,7 @@ def extract_applied_location(body: str, fm: dict[str, str] | None = None) -> tup
 
     # v2: [skill: X, Y, Z] 태그
     # v4.1 (P4 D+9 34차 fix): 쉼표 또는 공백 모두 구분자로 처리
-    # 18차: [skill: fz-plan, fz-review, fz-codex] (쉼표)
+    # 18차: [skill: fz-plan, fz-review, fz-gpt] (쉼표)
     # 34차: [skill: fz-review fz-discover fz-plan] (공백)
     skill_tag_match = SKILL_TAG_PATTERN.search(body)
     if skill_tag_match:

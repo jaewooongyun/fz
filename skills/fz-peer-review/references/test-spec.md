@@ -12,7 +12,7 @@
 | "동료가 올린 PR 리뷰 부탁해" | trigger | intent-trigger `팀원\|PR.*리뷰` (동료=팀원) |
 | "내가 방금 작성한 코드 리뷰해줘" | NOT trigger | → fz-review (description '비사용: 자기 코드', Will Not '자기 코드 리뷰') |
 | "이 PR 변경 내용 해설해줘" | NOT trigger | → fz-pr-digest (description '비사용: PR 해설') |
-| "codex로 이 변경 교차검증해줘" | NOT trigger | → fz-codex (Will Not 'Codex 위임 → /fz-codex') |
+| "codex로 이 변경 교차검증해줘" | NOT trigger | → fz-gpt (Will Not 'Codex 위임 → /fz-gpt') |
 | "이 PR의 버그 직접 고쳐줘" | NOT trigger | → fz-fix (Will Not '코드를 직접 수정하지 않음, 리뷰만 수행') |
 
 ### Functional Test (Given/When/Then)

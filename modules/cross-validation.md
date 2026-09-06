@@ -40,7 +40,7 @@
 
 | 메커니즘 | 출처 | fz 적용 |
 |---------|------|--------|
-| **Self-preference bias 상쇄** | 2025 LLM-as-Judge 연구 다수 — 같은 모델이 자기 출력을 우호적으로 평가 (메모리 23차 Self-review blind spot 메커니즘) | Generator (Claude) ≠ Evaluator (Codex) 강제. fz-codex `verify`/`check`가 이 분리의 구체화 |
+| **Self-preference bias 상쇄** | 2025 LLM-as-Judge 연구 다수 — 같은 모델이 자기 출력을 우호적으로 평가 (메모리 23차 Self-review blind spot 메커니즘) | Generator (Claude) ≠ Evaluator (Codex) 강제. fz-gpt `verify`/`check`가 이 분리의 구체화 |
 | **이종 blind spot 보완** | MoA "collaborativeness" (Wang 2024, ICLR 2025 Spotlight, +7.6pp AlpacaEval) | Claude family blind spot을 GPT family가 catch (15차/23차 패턴 — Codex 단독 발견 누적 사례) |
 | **Generator≠Evaluator 강제** | Anthropic Harness Engineering H2 (2026-03) — "Self-evaluation is unreliable"; fresh-context verifier > self-critique [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents] | TEAM 모드에 Codex 필수 참여. SOLO에서도 결정론적 도구 호출 (Q-OBSERVE 경량). Codex 불능 시 fresh-context Claude 검증자가 self-review blind spot(23차)을 부분 보강 — 동종 한계 명시 |
 | **Position bias 회피** | Order effect on judgment (LLM-Judge 연구) | T1-G ensemble: 출력 randomize + Source label anonymize (CP-1 Step 3 규칙 5/6/7) |
@@ -51,7 +51,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 
 ### 적용 가이드
 
-- **fz-codex 모든 서브커맨드** = Generator≠Evaluator 분리 구현체
+- **fz-gpt 모든 서브커맨드** = Generator≠Evaluator 분리 구현체
 - **T1-G ensemble** = MoA-Lite 2-layer 구현 (cross-agent diversity 강화)
 - **η-1** = Position bias 회피의 prompt-level 강화 (team-core.md Gate 1.0 Independence Verified로 구현)
 - **Reflection Rate 측정** = 이종 blind spot 보완 효과 정량화 (T1-B §5.5 schema)
@@ -71,7 +71,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 |-------------------|----------|---------|----------|
 | code-changes 생산 | 빌드 검증 | modules/build.md 절차 | 모든 모드 |
 | code-changes 생산 | simplify check (선택) | /simplify | 모든 모드 |
-| code-changes 생산 | Codex check | `fz-codex check` (팀 내 병렬) | TEAM |
+| code-changes 생산 | Codex check | `fz-gpt check` (팀 내 병렬) | TEAM |
 | code-changes 생산 (리팩토링) | enforcement 검증 | Anti-Pattern Grep + Module Boundary | 모든 모드 (Plan에 Constraints 있을 때) |
 | code-changes 생산 (모듈화/캡슐화) | consumer quality 검증 | 소비자 파일 전수 수집 + 사용 패턴 + 진입점 검증 | 모든 모드 (모듈화 작업 시) |
 | code-changes 생산 (시그니처 변경) | protocol conformance 검증 | find_referencing_symbols → 프로토콜 요구사항 양방향 확인 | 모든 모드 |
@@ -83,11 +83,11 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | planning 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
 | code-changes 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
 | review 시작 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
-| planning 생산 | 계획 검증 | `fz-codex verify` (팀 내 병렬) | TEAM |
+| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬) | TEAM |
 | review 포함 | 다관점 리뷰 | review-arch + review-quality + Codex (팀 내 병렬) | TEAM |
 | search 포함 | 교차 검증 | search-symbolic + search-pattern + Codex (팀 내 병렬) | TEAM(--deep) |
-| commit/pr 포함 | Pre-ship gate | `fz-codex check` | TEAM |
-| fix 포함 | 수정 검증 | `fz-codex check` (팀 내 병렬) | TEAM |
+| commit/pr 포함 | Pre-ship gate | `fz-gpt check` | TEAM |
+| fix 포함 | 수정 검증 | `fz-gpt check` (팀 내 병렬) | TEAM |
 | review 포함 | L3 에러 처리 스캔 | silent-failure-hunter (Agent background) | TEAM (diff에 에러처리 코드 포함 시) |
 | review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | TEAM (diff에 새 타입 정의 포함 시) |
 | code-changes 생산 | SC 빌드 진단 | `/sc:troubleshoot --fix` 자동 | 빌드 2회 연속 실패 시 |
@@ -157,11 +157,11 @@ TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 �
 
 | 스킬 | Codex | Codex 스킬 |
 |------|-------|-----------|
-| /fz-plan | `fz-codex verify` | architect |
-| /fz-code | `fz-codex check` | reviewer |
-| /fz-review | `fz-codex validate` | guardian |
-| /fz-fix | `fz-codex check` | reviewer |
-| /fz-search | `fz-codex` | searcher |
+| /fz-plan | `fz-gpt verify` | architect |
+| /fz-code | `fz-gpt check` | reviewer |
+| /fz-review | `fz-gpt validate` | guardian |
+| /fz-fix | `fz-gpt check` | reviewer |
+| /fz-search | `fz-gpt` | searcher |
 
 > Codex 3-Tier 디스커버리: CLAUDE.md `## Codex Skills`(Tier 1) → 글로벌 fz-*(Tier 2) → 인라인(Tier 3).
 
@@ -194,13 +194,13 @@ Claude + Codex(GPT-5.5) 교차 검증:
 | TEAM | 빌드 + Codex check (config 모델+high) + 에이전트 확인 | Codex verify (config 모델+high) |
 | TEAM --deep | 빌드 + Codex (config 모델+xhigh) | Codex verify (xhigh) |
 
-> Effort 정의: `modules/codex-strategy.md` 참조. 기본 high, final/--deep은 xhigh. Review Gate OFF.
+> Effort 정의: `modules/gpt-strategy.md` 참조. 기본 high, final/--deep은 xhigh. Review Gate OFF.
 
 ---
 
 ### micro-eval 호출 트리거 (공통)
 
-다음 조건 중 하나 충족 시 `/fz-codex micro-eval` 자동 호출 후보:
+다음 조건 중 하나 충족 시 `/fz-gpt micro-eval` 자동 호출 후보:
 
 - 단일 사실 주장에 `[verified]`/`[미검증]` 태그 명시 불가 (검증 도구 즉시 사용 불가)
 - Claim-Type이 factual / tool-behavior / external-state 분류 (즉, 코드/문서/외부 상태 사실 주장)
@@ -208,10 +208,10 @@ Claude + Codex(GPT-5.5) 교차 검증:
 
 명령 형식:
 ```bash
-/fz-codex micro-eval "주장 원문" [컨텍스트]
+/fz-gpt micro-eval "주장 원문" [컨텍스트]
 ```
 
-응답: `verdict: agree | disagree | partial | needs_verification` (참조: `modules/fz-codex-subcommands-aux.md § micro-eval` 섹션 — 2026-05-27 모듈 분리로 경로 갱신)
+응답: `verdict: agree | disagree | partial | needs_verification` (참조: `modules/fz-gpt-subcommands-aux.md § micro-eval` 섹션 — 2026-05-27 모듈 분리로 경로 갱신)
 
 `needs_verification` 시: `modules/uncertainty-verification.md` Default-Deny 차단으로 연계.
 
@@ -219,9 +219,9 @@ Claude + Codex(GPT-5.5) 교차 검증:
 
 ## Reflection Rate (Authoritative Source)
 
-> 본 섹션이 fz 생태계 Reflection Rate **threshold/gating 정책**의 **단일 진실 원천**(authoritative source)입니다. 계산식 정밀 정의(partially_resolved 0.5 가중치 포함)는 `schemas/codex_verification_schema.json`이 canonical. 다른 모듈/SKILL.md는 본 섹션으로 backlink만 허용 (history rewrite 금지, 기존 본문은 유지).
+> 본 섹션이 fz 생태계 Reflection Rate **threshold/gating 정책**의 **단일 진실 원천**(authoritative source)입니다. 계산식 정밀 정의(partially_resolved 0.5 가중치 포함)는 `schemas/gpt_verification_schema.json`이 canonical. 다른 모듈/SKILL.md는 본 섹션으로 backlink만 허용 (history rewrite 금지, 기존 본문은 유지).
 
-**계산식**: Reflection Rate = (Codex가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100% (정밀 계산식 — `partially_resolved`에 0.5 가중 — 은 `schemas/codex_verification_schema.json` canonical). **N=0 (Codex가 이슈 0개 제기) 시 `N/A`로 기록** — division-by-zero 방지 + 기준 미달 판정 아님 (vacuously passes).
+**계산식**: Reflection Rate = (Codex가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100% (정밀 계산식 — `partially_resolved`에 0.5 가중 — 은 `schemas/gpt_verification_schema.json` canonical). **N=0 (Codex가 이슈 0개 제기) 시 `N/A`로 기록** — division-by-zero 방지 + 기준 미달 판정 아님 (vacuously passes).
 
 ### Reflection Rate threshold (Sample Size Confidence Gate)
 
@@ -297,16 +297,16 @@ GIT_ROOT_REL=$(grep -A 5 "^## Directory Structure" CLAUDE.md 2>/dev/null | \
 GIT_ROOT="${GIT_ROOT_REL:-.}"
 ```
 
-### get_codex_skill_path() — 3-Tier 디스커버리
+### get_gpt_skill_path() — 3-Tier 디스커버리
 
 > ⛔ **2026-08-09 계약 변경 — 이름이 아니라 `SKILL.md` 절대경로를 반환한다.**
-> 이전 판(`get_codex_skill()`)은 Tier 2b에서 **플러그인 `codex-skills/`를 확인한 뒤 이름만** 반환했는데, 호출자 8곳은 항상 `cat ~/.codex/skills/${NAME}/SKILL.md` 를 읽었다. 심볼릭이 없으면 `[ -n "$NAME" ]`가 true라 **Tier 3 generic 폴백으로 가지 않고 존재하지 않는 경로를 `cat`** 했다 — 즉 Tier 2b가 파손 상태였다.
+> 이전 판(`get_codex_skill()`)은 Tier 2b에서 **플러그인 `gpt-skills/`를 확인한 뒤 이름만** 반환했는데, 호출자 8곳은 항상 `cat ~/.codex/skills/${NAME}/SKILL.md` 를 읽었다. 심볼릭이 없으면 `[ -n "$NAME" ]`가 true라 **Tier 3 generic 폴백으로 가지 않고 존재하지 않는 경로를 `cat`** 했다 — 즉 Tier 2b가 파손 상태였다.
 > 부수 정정: `BASH_SOURCE[0]` 의존 제거 — 이 함수는 **마크다운에서 인라인 복사**되어 실행되므로 `dirname "${BASH_SOURCE[0]}"`가 스크립트 위치를 가리키지 않는다. 플러그인 루트를 **인자/환경변수로 명시 전달**한다.
 
 ```bash
-# usage: get_codex_skill_path <role> [plugin_root]
+# usage: get_gpt_skill_path <role> [plugin_root]
 #   반환: SKILL.md 절대경로 (없으면 빈 문자열 → 호출자가 Tier 3 인라인 프롬프트로 폴백)
-get_codex_skill_path() {
+get_gpt_skill_path() {
   local ROLE=$1
   local PLUGIN_ROOT="${2:-${FZ_PLUGIN_ROOT:-}}"
   local PROJECT_ROOT="$(pwd)"
@@ -317,13 +317,13 @@ get_codex_skill_path() {
   if [ -n "$SKILL" ] && [ -f "$HOME/.codex/skills/$SKILL/SKILL.md" ]; then
     echo "$HOME/.codex/skills/$SKILL/SKILL.md"; return
   fi
-  # Tier 2a: ~/.codex/skills/ (setup-codex-skills.sh 심볼릭 또는 기존 설치)
+  # Tier 2a: ~/.codex/skills/ (setup-gpt-skills.sh 심볼릭 또는 기존 설치)
   if [ -f "$HOME/.codex/skills/fz-${ROLE}/SKILL.md" ]; then
     echo "$HOME/.codex/skills/fz-${ROLE}/SKILL.md"; return
   fi
   # Tier 2b: 플러그인 번들본 — ⛔ 경로를 반환한다 (이름만 반환하면 호출자가 못 찾는다)
-  if [ -n "$PLUGIN_ROOT" ] && [ -f "$PLUGIN_ROOT/codex-skills/fz-${ROLE}/SKILL.md" ]; then
-    echo "$PLUGIN_ROOT/codex-skills/fz-${ROLE}/SKILL.md"; return
+  if [ -n "$PLUGIN_ROOT" ] && [ -f "$PLUGIN_ROOT/gpt-skills/fz-${ROLE}/SKILL.md" ]; then
+    echo "$PLUGIN_ROOT/gpt-skills/fz-${ROLE}/SKILL.md"; return
   fi
   echo ""
 }
@@ -339,7 +339,7 @@ Tier 1: CLAUDE.md `## Codex Skills` 테이블 → Tier 2a: `~/.codex/skills/` �
 
 ⛔ **부트스트랩 순환 주의**: 셸 스니펫만으로는 해결되지 않는다. `{스킬 base directory}` 같은 토큰은 **치환되지 않는 리터럴**이라 `cd`가 실패한다 (2026-08-09 감사 ISSUE-PLAN-001). 첫 절대경로는 **Lead가 대화 컨텍스트에서** 만든다.
 
-**① Lead 절차 (셸 아님)**: 스킬 주입 헤더 `Base directory for this skill: …/skills/fz-codex` 를 읽고 `../..` 를 적용해 **플러그인 루트 절대경로**를 얻는다. 그 값으로 아래 `<PLUGIN_ROOT_ABS>` 를 채운다.
+**① Lead 절차 (셸 아님)**: 스킬 주입 헤더 `Base directory for this skill: …/skills/fz-gpt` 를 읽고 `../..` 를 적용해 **플러그인 루트 절대경로**를 얻는다. 그 값으로 아래 `<PLUGIN_ROOT_ABS>` 를 채운다.
 
 **② 셸 (실행 가능)**:
 ```bash
@@ -359,18 +359,18 @@ export FZ_PLUGIN_ROOT
 
 **호출 계약** (⛔ 8곳 전부 이 형태로 통일 — 할당 변수와 조건 검사 변수가 **같은 이름**이어야 한다):
 ```bash
-SKILL_PATH=$(get_codex_skill_path "architect" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."; fi
 ```
 
-⛔ **`setup-codex-skills.sh`는 dead가 아니라 load-bearing이다** — Tier 2a를 성립시키는 심볼릭을 만드는 유일한 수단이다. 미실행 시 Tier 2b(번들 경로)로 내려가고, `PLUGIN_ROOT` 미전달이면 Tier 3로 폴백한다.
+⛔ **`setup-gpt-skills.sh`는 dead가 아니라 load-bearing이다** — Tier 2a를 성립시키는 심볼릭을 만드는 유일한 수단이다. 미실행 시 Tier 2b(번들 경로)로 내려가고, `PLUGIN_ROOT` 미전달이면 Tier 3로 폴백한다.
 
 ## 참조 스킬
 
 | 스킬 | 참조 이유 |
 |------|----------|
-| /fz-codex | 검증 게이트 + `get_codex_skill_path()` 3-Tier 디스커버리 |
+| /fz-gpt | 검증 게이트 + `get_gpt_skill_path()` 3-Tier 디스커버리 |
 | /fz | 파이프라인 검증 게이트 자동 삽입 |
 | modules/lead-reasoning.md | Implication Scan + origin-equivalence 추론 원칙 |
 | modules/system-reminders.md | Instruction fade-out 대응 트리거 정책 |

@@ -58,7 +58,7 @@ Perform thorough code review based on project conventions and architecture rules
 
 ## Output Format
 
-Matches `codex_review_schema.json`. Key enum values:
+Matches `gpt_review_schema.json`. Key enum values:
 - `severity`: `critical` | `major` | `minor` | `suggestion`
 - `verdict`: `approved` | `needs_revision` | `rejected`
 - `category`: one of `architecture`, `extensibility`, `over_engineering`, `decomposition`, `modern_api`, `dependency`, `performance`, `refactoring_completeness`, `concurrency_safety`, `requirements_alignment`, `logic_error`, `security`, `memory`, `thread_safety`, `style`, `documentation`, `testing`, `scope_creep`, `other`

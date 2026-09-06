@@ -82,7 +82,7 @@ intent-triggers:
 |------|------|
 | `guides/skill-authoring.md` §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본). ⛔ `team-core.md`·`patterns/`는 역사적 출처 — 실행 절차 아님 |
 | `modules/patterns/live-review.md` | Live Review (peer-review 공유 패턴, fz-review 동일) (UC-11, v4.7.1) |
-| `modules/cross-validation.md` | get_codex_skill_path() 3-Tier 디스커버리, GIT_ROOT 추출 |
+| `modules/cross-validation.md` | get_gpt_skill_path() 3-Tier 디스커버리, GIT_ROOT 추출 |
 | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
 | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
 | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |
@@ -94,7 +94,7 @@ intent-triggers:
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
 | Codex challenger 스킬 | 관점 3(Over-Engineering) + 관점 7 보조 + Devil's Advocate |
-| `schemas/codex_peer_review_schema.json` | Codex 응답 JSON 구조 |
+| `schemas/gpt_peer_review_schema.json` | Codex 응답 JSON 구조 |
 
 ## Step: Gather (컨텍스트 수집)
 
@@ -464,7 +464,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 **Will Not**:
 - 코드를 직접 수정하지 않음 (리뷰만 수행)
 - 자기 코드 리뷰 (→ `/fz-review`)
-- Codex 위임 (→ `/fz-codex`) — codex exec 직접 호출
+- Codex 위임 (→ `/fz-gpt`) — codex exec 직접 호출
 - Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Code Conventions` 위임)
 - ⛔ **standalone Agent() 호출 금지** — Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응

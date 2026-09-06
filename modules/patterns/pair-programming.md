@@ -82,7 +82,7 @@ review-correctness: RTM 대비 진행도 확인
 - 매 Step 완료 후 빌드 검증 수행
 - 빌드 실패 시 에러 정보를 impl-correctness에 전달
 - L3 에이전트 결과 도착 시 팀 피드백 (team-core.md L3-to-L1)
-- Codex 검증 위임 (fz-codex check)
+- Codex 검증 위임 (fz-gpt check)
 
 ## 참조 스킬
 

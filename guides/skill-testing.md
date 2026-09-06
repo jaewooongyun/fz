@@ -2,7 +2,7 @@
 
 > fz-* 스킬의 품질을 측정 가능하게 보장하는 테스트 방법론.
 > **근거**: Anthropic Agent Skills 공식 + 검증 기반 테스트 원칙(verifier oracle · fresh-context 검증).
-> **Sources (last audited: 2026-07-25) — Tier 1:** code.claude.com/docs/en/{skills, sub-agents, best-practices, changelog} · platform.claude.com/.../prompting-claude-opus-5 · .../effort. 권위 자료 단일 참조점: `guides/llm-references.md`.
+> **Sources (last audited: 2026-09-06) — Tier 1:** code.claude.com/docs/en/{skills, sub-agents, best-practices, changelog} · platform.claude.com/.../prompting-claude-opus-5 · .../effort. 권위 자료 단일 참조점: `guides/llm-references.md`.
 
 ---
 
@@ -43,7 +43,7 @@
 | "코드 리뷰해줘" | NOT trigger | → fz-review |
 | "아키텍처 설계해줘" | NOT trigger | → fz-plan |
 
-**Few-shot: fz-codex 트리거 테스트**
+**Few-shot: fz-gpt 트리거 테스트**
 
 | 쿼리 | 예상 | 비고 |
 |------|------|------|
@@ -73,14 +73,14 @@
 | 계획 없이 호출 | `/fz-code "구현해줘"` | 계획 부재 경고 + fz-plan 안내 |
 | 빌드 실패 발생 | 구현 중 컴파일 에러 | 에러 분석 + 자동 수정 시도 (최대 3회) |
 
-**Few-shot: fz-codex Functional Test**
+**Few-shot: fz-gpt Functional Test**
 
 | Given | When | Then |
 |-------|------|------|
-| Git diff 존재 | `/fz-codex review` | `codex review --base` 실행 + 이슈 보고 |
-| Codex CLI 미설치 | `/fz-codex review` | 에러 감지 + sc:analyze 폴백 |
-| Critical 이슈 발견 | `/fz-codex final` | xhigh 에스컬레이션 + DA 패스 자동 실행 |
-| 3-Tier 스킬 부재 | `/fz-codex verify` | Tier 3 인라인 프롬프트로 폴백 |
+| Git diff 존재 | `/fz-gpt review` | `codex review --base` 실행 + 이슈 보고 |
+| Codex CLI 미설치 | `/fz-gpt review` | 에러 감지 + sc:analyze 폴백 |
+| Critical 이슈 발견 | `/fz-gpt final` | xhigh 에스컬레이션 + DA 패스 자동 실행 |
+| 3-Tier 스킬 부재 | `/fz-gpt verify` | Tier 3 인라인 프롬프트로 폴백 |
 
 ### 1.3 Performance Comparison — Before/After 비교
 
@@ -122,7 +122,7 @@
 | 사용자 개입 불필요 | 정상 케이스에서 추가 질문 없이 완료 |
 | 세션 간 일관성 | 동일 입력에 대해 3회 실행 시 동일 결과 구조 |
 | 올바른 스킬 위임 | Will Not 영역 요청 시 정확한 대안 스킬 안내 |
-| Codex 검증 일관성 | fz-codex 교차검증 결과와 fz-review 결과 일치도 ≥80% |
+| Codex 검증 일관성 | fz-gpt 교차검증 결과와 fz-review 결과 일치도 ≥80% |
 
 ---
 
@@ -148,10 +148,10 @@
 
 4. description을 조정하고 재테스트한다
 
-### Few-shot: fz-codex Ask Claude 디버깅
+### Few-shot: fz-gpt Ask Claude 디버깅
 
 ```
-Q: "fz-codex 스킬은 언제 쓰는 거야?"
+Q: "fz-gpt 스킬은 언제 쓰는 거야?"
 A (기대): "Codex CLI를 통한 독립적 코드/계획 검증... codex review, codex exec..."
 A (문제): "코드를 수정할 때 쓰는 스킬입니다" ← 잘못된 인식!
 → description에 "검증만 수행, 코드 수정 안 함" 강화 필요
@@ -223,7 +223,7 @@ test-spec:
 
 ```yaml
 test-spec:
-  name: fz-codex
+  name: fz-gpt
   version: 1.0
 
   triggering:
@@ -241,17 +241,17 @@ test-spec:
 
   functional:
     - given: "Git diff 존재, Codex CLI 설치됨"
-      when: "/fz-codex review"
+      when: "/fz-gpt review"
       then: "codex review 실행 + 이슈 리포트 생성"
       type: normal
 
     - given: "Codex CLI 미설치"
-      when: "/fz-codex review"
+      when: "/fz-gpt review"
       then: "에러 메시지 + sc:analyze 폴백"
       type: failure
 
     - given: "3-Tier 디스커버리에서 Tier 1 부재"
-      when: "/fz-codex verify"
+      when: "/fz-gpt verify"
       then: "Tier 2 → Tier 3 순차 폴백"
       type: edge-case
 ```
@@ -272,8 +272,8 @@ test-spec:
 3. Performance Comparison 실행
    → 개선 미달 → 스킬 구조 재검토
 
-4. Codex 교차검증 (fz-codex 대상 스킬인 경우)
-   → /fz-codex verify로 스킬 로직 독립 검증
+4. Codex 교차검증 (fz-gpt 대상 스킬인 경우)
+   → /fz-gpt verify로 스킬 로직 독립 검증
 ```
 
 ### 회귀 테스트
@@ -331,7 +331,7 @@ YAML + 본문 구조를 자동 검증합니다. `/fz-skill eval`의 8항목 체�
 
 ### 6.4 리뷰형 스킬 Eval — coverage / verification 2단계 분리 (verified)
 
-fz-review·fz-codex처럼 *스스로 finding을 내는* 스킬은 단일 점수로 평가하면 recall과 precision이 뒤섞인다. 2단계로 분리한다 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — "Code review harnesses" 섹션 · **Opus 5에서도 동일 유지**: "If your review prompt says 'only report high-severity issues' or 'be conservative,' the model may follow that instruction literally and report less; ask it to report everything and filter in a separate pass instead" — prompting-claude-opus-5]:
+fz-review·fz-gpt처럼 *스스로 finding을 내는* 스킬은 단일 점수로 평가하면 recall과 precision이 뒤섞인다. 2단계로 분리한다 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — "Code review harnesses" 섹션 · **Opus 5에서도 동일 유지**: "If your review prompt says 'only report high-severity issues' or 'be conservative,' the model may follow that instruction literally and report less; ask it to report everything and filter in a separate pass instead" — prompting-claude-opus-5]:
 
 1. **coverage 단계**: 스킬이 *모든* 후보 finding을 보고하는지 (불확실·저severity 포함). "be conservative/don't nitpick" 지시를 너무 충실히 따르면 recall이 떨어진다 — coverage 단계에선 필터링 금지.
 2. **verification 단계**: 별도 fresh-context 검증자(§0-2)가 각 finding의 실재성·severity를 판정해 선별. recall(coverage)과 precision(verification)을 *다른 단계*에서 측정.
@@ -424,7 +424,7 @@ A/B 비교 시 `/skill-creator`의 제안을 B 버전으로 테스트하면 효�
 | Workflow `agent()` per-call `opts.effort` | **`[미검증]`** | 공식이 per-invocation **`model`** 파라미터는 실재 레이어로 명시하나(`CLAUDE_CODE_SUBAGENT_MODEL`이 "overrides the per-invocation `model` parameter"), **effort는 동일 서술이 없다** |
 | `settings.json` `effortLevel` (세션) | 기본 | *"a starting default, not enforcement"* [verified: 동] |
 
-> **이유**: per-call `opts.effort`의 지위가 미확정이므로, 그것으로 arm을 가르면 **arm이 실제로 갈렸는지 알 수 없다**. 미검증 메커니즘 위에 측정을 세우지 않는다. 현행 fz는 `.js` 36곳과 `settings.json:409`가 **모두 `xhigh`** 라 어느 쪽이 이기든 결과가 같아 이 모호성이 드러나지 않았다.
+> **이유**: per-call `opts.effort`의 지위가 미확정이므로, 그것으로 arm을 가르면 **arm이 실제로 갈렸는지 알 수 없다**. 미검증 메커니즘 위에 측정을 세우지 않는다. 현행 fz는 `.js` 36곳과 `settings.json:464/467`이 **모두 `xhigh`** 라 어느 쪽이 이기든 결과가 같아 이 모호성이 드러나지 않았다. ⚠️ 2026-09-06 정정: 줄번호 `:409`는 stale — 실측 `:464`(`effortLevel`)·`:467`(중첩 키).
 
 **⛔ arm 적용 검증 (필수 — 매 run)**: Claude Code는 트랜스크립트 최상위에 `effort` 필드를 기록한다(v2.1.212+). run 직후 확인해 **의도한 arm이 실제 적용됐는지** 대조한다. 불일치 pair는 §8 오염 규칙에 따라 `invalid`로 **제외**.
 
@@ -463,7 +463,7 @@ PY
 - 스킬 작성법: `guides/skill-authoring.md`
 - 트러블슈팅: `guides/skill-troubleshooting.md`
 - 프롬프트 최적화: `guides/prompt-optimization.md`
-- Codex 교차검증: `skills/fz-codex/SKILL.md`
+- Codex 교차검증: `skills/fz-gpt/SKILL.md`
 - 스킬 품질 평가: `/fz-skill eval` (`skills/fz-skill/SKILL.md`)
 - 일괄 벤치마크: `/fz-manage benchmark` (`skills/fz-manage/SKILL.md`)
 - Anthropic 공식 평가: `/skill-creator` (Eval/Improve/Benchmark 모드)

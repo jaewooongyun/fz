@@ -77,7 +77,7 @@
 | /fz-review | O | O | O | - | O |
 | /fz-fix | O | O | - | - | - |
 | /fz-search | O | O | - | - | - |
-| /fz-codex | O | O | - | - | - |
+| /fz-gpt | O | O | - | - | - |
 | /fz-discover | O | O | O | - | O |
 | /fz-memory | O | O | O | O | O |
 | /fz-manage | O | - | - | - | O |
@@ -121,7 +121,7 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 | /fz-review | checkpoint:review-issues 쓰기 |
 | /fz-fix | checkpoint:fix-{bug} + pattern 키 쓰기 |
 | /fz-search | checkpoint:search 쓰기 |
-| /fz-codex | session 키 읽기 |
+| /fz-gpt | session 키 읽기 |
 | /fz-discover | checkpoint:discover-{tag} 쓰기 + 결정사항 영속화 |
 | /fz-manage | session/checkpoint 읽기 + list (관리 조회) |
 | /fz-peer-review | checkpoint:peer-review-synthesize/deliver 쓰기 |

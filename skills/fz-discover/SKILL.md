@@ -109,7 +109,7 @@ intent-triggers:
    - `mode: 'workflow'` → `landscape`(Trade-off Table + Open Questions)를 Phase 2/3 사용자 대화 입력으로 사용. Lead가 `discover-journal.md` 기록 (canonical 경로 무변경)
    - `mode: 'fallback'` → 아래 에러 대응 표의 SOLO 폴백(Lead 단독 REP) 수행 + 사유를 experiment-log에 기록
 5. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `experiment-log.md` Workflow tracing 섹션에 수동 append
-6. **--deep cross-model**: Workflow 완료 후 Lead가 `/fz-codex verify` 별도 실행 (스크립트 내 cross-provider 스폰 금지)
+6. **--deep cross-model**: Workflow 완료 후 Lead가 `/fz-gpt verify` 별도 실행 (스크립트 내 cross-provider 스폰 금지)
 
 ### TEAM 추론 품질 3원칙 보존 (guides/prompt-optimization.md §다양성 매핑)
 

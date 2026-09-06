@@ -324,7 +324,7 @@ python3 <FZ_ROOT>/skills/fz-manage/scripts/score_relevance.py parsed.json \
 
 #### Step 4: Reviewer (D+5 component, Codex 외부 검증) ⛔ MUST
 
-각 제안에 대해 `/fz-codex` 호출 (effort=medium):
+각 제안에 대해 `/fz-gpt` 호출 (effort=medium):
 
 ```
 이 제안이 다음 두 출처에 부합하는가?

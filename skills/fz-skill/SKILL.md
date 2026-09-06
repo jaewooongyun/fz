@@ -234,7 +234,7 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
    - 각 쿼리에 대해 트리거 적합성 자체 판단
    - 결과를 사용자에게 확인 요청
 
-4.5. **리뷰형 스킬 2단계 eval** (출력이 리뷰/검증/verdict인 스킬 — fz-review·fz-peer-review·fz-codex 류):
+4.5. **리뷰형 스킬 2단계 eval** (출력이 리뷰/검증/verdict인 스킬 — fz-review·fz-peer-review·fz-gpt 류):
    단일 트리거 정확도로는 리뷰 품질을 못 잡는다. `guides/skill-testing.md` §6.4 적용.
    - (1) **Coverage**: 심은(planted) 이슈를 리뷰가 탐지한 비율 — PASS ≥90%
    - (2) **Verification (precision)**: 보고한 이슈 중 실재(정탐) 비율 — PASS ≥80% (운영 임계 — §6.4는 precision 정의만 제공, 임계는 본 스킬 추가)

@@ -288,5 +288,5 @@ User prompt에 추가:
 - 테스트 방법론: `guides/skill-testing.md`
 - 스킬 작성법: `guides/skill-authoring.md`
 - 프롬프트 최적화: `guides/prompt-optimization.md`
-- Codex 교차검증: `skills/fz-codex/SKILL.md`
+- Codex 교차검증: `skills/fz-gpt/SKILL.md`
 - 건강 체크: `/fz-manage check`

@@ -31,7 +31,7 @@
 > - **Using GPT-5.5 (OpenAI 2026-04-23)** — GPT-5.5 prompting (literal and thorough manner)
 > - **Introducing GPT-5.5 (OpenAI 2026-04-23)** — release announcement
 > - **GPT-5.5 System Card (OpenAI 2026-04-23)** — 안전 평가
-> - **Codex CLI Changelog 0.124.0 (OpenAI 2026-04-23)** — Browser + Auto Review Agent + GPT-5.5 통합
+> - **Codex CLI Changelog (OpenAI)** — Browser + Auto Review Agent + GPT-5.5(0.124.0) · GPT-6 Astra(0.153.1) 통합. https://learn.chatgpt.com/docs/changelog
 >
 > **Tier 2 — Academic (peer-reviewed + arxiv preprint):**
 > - ACE: Agentic Context Engineering v3 (Stanford, ICLR 2026, arXiv 2510.04618) — context collapse, brevity bias

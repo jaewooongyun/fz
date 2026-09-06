@@ -74,7 +74,7 @@ These look like fixes but introduce new violations or suppress symptoms without 
 - ❌ Adding `try?` to swallow errors that the original code propagated — preserve original error semantics (catch + handle, not silence).
 
 ## Linkage
-- When invoked via `fz-codex`, results feed into the `check` subcommand for iterative fix-verify cycles.
+- When invoked via `fz-gpt`, results feed into the `check` subcommand for iterative fix-verify cycles.
 
 ## Output Format
 ```

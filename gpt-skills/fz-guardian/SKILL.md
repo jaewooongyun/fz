@@ -63,7 +63,7 @@ Verify that feedback has been fully applied and no regressions are introduced.
 
 ## Output Format
 
-Matches `schemas/codex_verification_schema.json`. Key enum values:
+Matches `schemas/gpt_verification_schema.json`. Key enum values:
 - `resolution_status`: `resolved` | `partially_resolved` | `unresolved` | `regressed`
 - `verdict`: `pass` | `needs_work` | `fail`
 - Feedback reflection rate: `(resolved*1.0 + partially_resolved*0.5) / total_issues`

@@ -354,7 +354,7 @@ intent-triggers:
 8.5. **⛔ Codex 교차 검증** (TEAM 모드 — 생략 금지):
    모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 실행한다.
    ```bash
-   /fz-codex check "구현 코드 교차 검증"
+   /fz-gpt check "구현 코드 교차 검증"
    ```
    - 에이전트 구현 결과를 cross-model로 검증
    - 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백
@@ -380,7 +380,7 @@ intent-triggers:
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
 - [ ] SOLO + 3+ 파일 변경이면 `/sc:reflect` 실행했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
-- [ ] ⛔ Codex 교차 검증 완료? (TEAM 모드 — Lead가 /fz-codex check 실행)
+- [ ] ⛔ Codex 교차 검증 완료? (TEAM 모드 — Lead가 /fz-gpt check 실행)
 
 ---
 

@@ -11,7 +11,10 @@
   기계가 검출한다. 따라서 adherence tax가 없다.
 
 SSOT:
-  현행 모델명은 `guides/llm-references.md` 의 `모델 정책: <X> only` 한 줄에서 읽는다.
+  현행 모델명은 `guides/llm-references.md` 의 `모델 정책: … only` 한 줄에서 읽는다.
+  단일 표기 `모델 정책: <X> only` 와 역할별 다중 표기
+  `모델 정책: <A> (Lead) · <B> (worker) only` 를 모두 파싱하며, 열거된 모델은
+  **전부 현행**으로 취급한다(2026-09-06 신설 — Lead=Fable 5.1 / worker=Opus 5).
   모델이 바뀌면 그 파일 한 곳만 고치면 본 lint가 따라온다.
 
 ⛔ 한계 (정직성):
@@ -48,12 +51,14 @@ EXTERNAL_URL = re.compile(
     r"platform\.claude\.com|code\.claude\.com|anthropic\.com|arxiv|developers\.openai\.com"
 )
 AUDIT_DATE = re.compile(r"last audited:\s*(\d{4}-\d{2}-\d{2})")
-MODEL_POLICY = re.compile(r"모델 정책:\s*\*{0,2}([A-Za-z0-9. ]+?)\*{0,2}\s*only")
+MODEL_POLICY = re.compile(r"모델 정책:\s*\*{0,2}(.+?)\*{0,2}\s*only")
+# 역할 표기 제거 — `Fable 5.1 (Lead)` → `Fable 5.1`
+MODEL_ROLE = re.compile(r"\s*\([^)]*\)\s*$")
 
 # 스캔 루트 (역사 기록·타 벤더 스킬·과거 산출물 제외)
 SCAN_DIRS = ["guides", "modules", "skills", "agents", "templates"]
 SCAN_FILES = ["CLAUDE.md"]
-EXCLUDE_PARTS = {".claude", "node_modules", "docs", ".fz-work", "codex-skills"}
+EXCLUDE_PARTS = {".claude", "node_modules", "docs", ".fz-work", "gpt-skills"}
 
 # 구세대 모델명 (현행이 없을 때만 신고)
 LEGACY_MODELS = [
@@ -88,27 +93,50 @@ def find_docs(root: Path) -> list[Path]:
     return sorted(out)
 
 
-def current_model(root: Path) -> tuple[str, str]:
-    """정본 문서에서 현행 모델명을 읽는다. (모델명, 출처) 반환."""
+def current_model(root: Path) -> tuple[list[str], str]:
+    """정본 문서에서 현행 모델명을 읽는다. (모델명 목록, 출처) 반환.
+
+    표기 2종을 모두 파싱한다 (하위 호환):
+      - 단일: `모델 정책: Opus 5 only`                        -> ['Opus 5']
+      - 다중: `모델 정책: Fable 5.1 (Lead) · Opus 5 (worker) only`
+                                                             -> ['Fable 5.1', 'Opus 5']
+    괄호 안 역할 표기는 이름에서 떼어낸다. 목록의 모델은 **전부 현행**이므로
+    `stale-model-ref`·`stale-model-heading`은 그중 하나라도 있으면 면제한다.
+    """
     canon = root / "guides" / "llm-references.md"
     if canon.is_file():
         m = MODEL_POLICY.search(canon.read_text(encoding="utf-8", errors="replace"))
         if m:
-            return m.group(1).strip(), "guides/llm-references.md"
-    return "", "(정본 미검출)"
+            names = []
+            for part in re.split(r"[·,]", m.group(1)):
+                name = MODEL_ROLE.sub("", part).strip().strip("*").strip()
+                if name:
+                    names.append(name)
+            if names:
+                return names, "guides/llm-references.md"
+    return [], "(정본 미검출)"
 
 
-def model_tokens(name: str) -> list[str]:
-    """'Opus 5' -> ['Opus 5', 'opus-5', 'opus5'] 형태 변형 생성."""
-    if not name:
-        return []
-    low = name.lower()
-    return [name, low, low.replace(" ", "-"), low.replace(" ", "")]
+def model_tokens(names: list[str] | str) -> list[str]:
+    """'Opus 5' -> ['Opus 5', 'opus-5', 'opus5'] 형태 변형 생성 (목록 입력 허용).
+
+    ⛔ 점을 대시로 바꾼 변형(`fable-5-1`)을 포함한다 — 모델 ID가 `claude-fable-5-1`
+       형태라 `fable-5.1`만으로는 ID 표기를 놓친다 ('Opus 5'->'opus-5' 매칭과 같은 목적).
+    """
+    if isinstance(names, str):
+        names = [names] if names else []
+    out: list[str] = []
+    for name in names:
+        low = name.lower()
+        out += [name, low, low.replace(" ", "-"),
+                low.replace(" ", "-").replace(".", "-"), low.replace(" ", "")]
+    return list(dict.fromkeys(out))
 
 
 def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
     today = date.today()
     cur, cur_src = current_model(root)
+    cur_label = " · ".join(cur)
     cur_toks = model_tokens(cur)
 
     findings: list[dict] = []
@@ -151,7 +179,7 @@ def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
             if legacy_hits and not has_current:
                 findings.append({
                     "file": rel, "rule": "stale-model-ref", "severity": "warn",
-                    "detail": f"구세대 모델명 {sorted(set(legacy_hits))} 언급, 현행 '{cur}' 미언급",
+                    "detail": f"구세대 모델명 {sorted(set(legacy_hits))} 언급, 현행 '{cur_label}' 미언급",
                 })
 
         # 구세대 모델명이 **섹션 제목**에 박힌 경우 (2026-08-20 신설)
@@ -189,7 +217,7 @@ def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
                     })
 
     summary = {
-        "current_model": cur, "current_model_source": cur_src,
+        "current_model": cur_label, "current_model_source": cur_src,
         "target_files": scanned, "with_audit_date": audited,
         "findings": len(findings), "max_days": max_days,
         "checked_on": today.isoformat(),

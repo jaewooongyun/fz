@@ -65,7 +65,7 @@ intent-triggers:
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
 | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
-| skills/fz-codex/SKILL.md | --codex 옵션: cross-model 검증 위임 (check verdict contract) |
+| skills/fz-gpt/SKILL.md | --codex 옵션: cross-model 검증 위임 (check verdict contract) |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 
@@ -186,7 +186,7 @@ intent-triggers:
 - `/sc:analyze` → 빠른 품질 체크
 - `/sc:reflect --type task` → 수정이 근본 원인을 해결했는지 자체 검증
   (트리거: 복잡한 버그 수정 완료 후, 단순 수정은 스킵)
-- (옵션 `--codex`) `/fz-codex check` 호출 → cross-model 검증
+- (옵션 `--codex`) `/fz-gpt check` 호출 → cross-model 검증
   - verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
 - 또는 `/fz-review`로 전환
 
@@ -223,7 +223,7 @@ intent-triggers:
 | 코드 탐색/구조 분석 | `/fz-search` |
 | 리뷰 검증 원하는 경우 | `/fz-review` |
 | 3회 이상 수정 반복 | /simplify 시도 → `/fz-plan` 전환 |
-| 빌드 3회 실패 (LOOP 한도) | `/fz-codex check` 보조 진단 1회 → 결과 보고 → AskUser |
+| 빌드 3회 실패 (LOOP 한도) | `/fz-gpt check` 보조 진단 1회 → 결과 보고 → AskUser |
 
 ---
 
@@ -268,8 +268,8 @@ BAD (Codex 직접 호출):
 → fz-fix allowed-tools에 Bash(codex *) 없음. 권한 에러.
 
 GOOD (--codex 위임 패턴):
-수정: --codex 옵션 + /fz-codex check 위임
-→ fz-codex가 Hybrid Routing/Bash Hygiene/severity 파싱 처리. fz-fix는 verdict 분기만.
+수정: --codex 옵션 + /fz-gpt check 위임
+→ fz-gpt가 Hybrid Routing/Bash Hygiene/severity 파싱 처리. fz-fix는 verdict 분기만.
 ```
 
 ---
@@ -288,18 +288,18 @@ GOOD (--codex 위임 패턴):
 | "플레이어 모듈 아키텍처 설계해줘" | NOT trigger | → /fz-plan (계획·설계) |
 | "이 함수 누가 호출하는지 찾아줘" | NOT trigger | → /fz-search (코드 탐색·구조 분석) |
 | "내가 짠 코드 리뷰해줘" | NOT trigger | → /fz-review (풀 코드 리뷰) |
-| "codex exec로 직접 검증 돌려줘" | NOT trigger | → /fz-codex (Codex CLI 직접 호출 금지·위임) |
+| "codex exec로 직접 검증 돌려줘" | NOT trigger | → /fz-gpt (Codex CLI 직접 호출 금지·위임) |
 
 ### Functional Test — Given / When / Then
 
 | Given | When | Then | type |
 |-------|------|------|------|
 | 크래시 재현 경로 확인됨, 단일 파일 수정 | `/fz-fix "탭 전환 시 listener nil 크래시"` | Step 1c에서 root-cause 식별 → Step 3 빌드 성공(xcodebuild exit 0) → Gate Bug Fix Complete 체크리스트 5/5 통과 | normal |
-| 단순 상수 수정, `--codex` 옵션 지정 | `/fz-fix "타임아웃 30초로 변경" --codex` | Step 4에서 `/fz-codex check` 호출 → verdict=pass 분기로 완료 보고 | normal |
+| 단순 상수 수정, `--codex` 옵션 지정 | `/fz-fix "타임아웃 30초로 변경" --codex` | Step 4에서 `/fz-gpt check` 호출 → verdict=pass 분기로 완료 보고 | normal |
 | 분석 결과 수정 대상이 3개+ 파일 | `/fz-fix "여러 모듈 상태 불일치"` | 자동 전환 트리거 발동 → 코드 수정 0줄 + `/fz-code` 전환 제안 보고 | edge-case |
 | 수정 대상이 `static let shared` + 가변 `var`, 동기화 메커니즘 부재 (동시성 키워드 없음) | `/fz-fix "공유 인스턴스 값 깨짐"` | 역방향 트리거 발동 → 수정 전 3패턴 점검 + 동시성 안전성 검증 섹션 활성 | edge-case |
 | Step 1c에서 root-cause 불명확 | `/fz-fix "가끔 화면 멈춤"` | 코드 수정 0줄 + AskUserQuestion 발생 (Step 1c 완료 전 수정 금지) | failure |
-| 빌드 3회 연속 실패 (LOOP 한도 도달) | 수정-빌드 사이클 반복 | 4회차 자동 재시도 중단 + `/fz-codex check` 보조 진단 1회 → 결과 보고 → AskUser | failure |
+| 빌드 3회 연속 실패 (LOOP 한도 도달) | 수정-빌드 사이클 반복 | 4회차 자동 재시도 중단 + `/fz-gpt check` 보조 진단 1회 → 결과 보고 → AskUser | failure |
 | Serena 연결 실패 | `/fz-fix` 탐색 단계(Step 1b) | Grep + Glob 폴백으로 탐색 계속 진행 (중단 없음) | failure |
 
 ## Boundaries
@@ -311,14 +311,14 @@ GOOD (--codex 위임 패턴):
 **Will**:
 - 빠른 버그 수정 + 빌드 검증
 - 복잡도 초과 시 적절한 스킬 전환 제안
-- (옵션 --codex) /fz-codex check 호출 위임 (cross-model 검증)
+- (옵션 --codex) /fz-gpt check 호출 위임 (cross-model 검증)
 
 **Will Not**:
 - 코드 탐색/구조 분석 (→ /fz-search)
 - 새 기능 구현 (→ /fz-plan + /fz-code)
 - 대규모 리팩토링 (→ /fz-plan)
 - 풀 코드 리뷰 (→ /fz-review)
-- Codex CLI 직접 호출 (→ /fz-codex 위임)
+- Codex CLI 직접 호출 (→ /fz-gpt 위임)
 - **팀 공유 영역 자동 변경 (36차)**: fast fix 시에도 `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` 등 팀 영역 보호. 사용자 명시 합의 없이 자동 변경 금지
 
 ## 에러 대응
@@ -329,7 +329,7 @@ GOOD (--codex 위임 패턴):
 | 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
 | 심볼 못 찾음 | 패턴 검색 전환 | Grep 폴백 |
 | 복잡도 초과 | /fz-plan 전환 | 사용자 상담 |
-| /fz-codex check verdict 미반환 (--codex 옵션 시) | warning 처리 + 빌드 검증 결과로 진행 | 사용자 보고 |
+| /fz-gpt check verdict 미반환 (--codex 옵션 시) | warning 처리 + 빌드 검증 결과로 진행 | 사용자 보고 |
 
 ## Completion → Next
 

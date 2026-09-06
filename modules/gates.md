@@ -174,7 +174,7 @@ Phase 1 산출 시 `steps[].verify`를 읽어 `{WORK_DIR}/gates/plan.draft.md`�
 
 Phase 2의 `verify-gates`가 **게이트마다 판정 1개**를 낸다 — "이 `CHECK:`가 제목이 말하는 것을 측정하는가" + noninteractive·rerunnable·side-effect·determinism. Phase 3에서 판정을 반영해 `plan.md`로 확정한다.
 
-⛔ **`verify`를 대체하지 않고 추가한다.** `codex_gate_verdict_schema`에는 `issues`·`verdict`가 없어서, 스키마를 바꿔치기하면 fz-plan의 Issue Tracker 기록·scope challenge·Gate 2 승인 입력이 사라진다. 두 호출은 관심사가 다르다 — 계획이 옳은가(`verify`)와 게이트가 그 계획을 측정하는가(`verify-gates`).
+⛔ **`verify`를 대체하지 않고 추가한다.** `gpt_gate_verdict_schema`에는 `issues`·`verdict`가 없어서, 스키마를 바꿔치기하면 fz-plan의 Issue Tracker 기록·scope challenge·Gate 2 승인 입력이 사라진다. 두 호출은 관심사가 다르다 — 계획이 옳은가(`verify`)와 게이트가 그 계획을 측정하는가(`verify-gates`).
 
 ⛔ **스키마 선택만으로는 N/N이 보장되지 않는다.** 스키마는 `gates: []`(빈 배열)·중복 id·원장에 없는 id·거짓 `summary` 합계를 전부 통과시킨다.
 
@@ -202,7 +202,7 @@ Step 완료 선언 전 `--only {StepID}`로 **해당 Step 게이트만** 실행�
 
 Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를 재실행한다(`--reverify`). 통과 못 하면 `- [x]` → `- [ ]` + `EVIDENCE: pending`으로 **강등**한다.
 
-`/fz-codex validate`(fz-guardian)가 각 게이트를 `resolved / partially_resolved / unresolved / regressed` 4축으로 분류한다. `regressed`가 0이 아니면 통합을 차단한다.
+`/fz-gpt validate`(fz-guardian)가 각 게이트를 `resolved / partially_resolved / unresolved / regressed` 4축으로 분류한다. `regressed`가 0이 아니면 통합을 차단한다.
 
 ### 4. Stop hook — 차단 (2차 계층, 사용자 설치)
 
@@ -313,7 +313,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 | /fz-plan | Phase 1 draft 생성 · Phase 2 게이트별 판정 · Phase 3 확정 (배선 1) |
 | /fz-code | 절차 6.4에서 Step 게이트 실행 + STATE 전진 (배선 2) |
 | /fz-review | Phase 5.5에서 `--reverify` 강등 + guardian 4축 (배선 3) |
-| /fz-codex | `verify-gates`(architect, plan 시점 — `verify`에 **추가**) · `validate`(guardian, 변경 후) — `schemas/codex_gate_verdict_schema.json` |
+| /fz-gpt | `verify-gates`(architect, plan 시점 — `verify`에 **추가**) · `validate`(guardian, 변경 후) — `schemas/gpt_gate_verdict_schema.json` |
 | modules/context-artifacts.md | WORK_DIR 결정 — 원장 경로의 전제 |
 | modules/governance.md | 이탈 경로 2종 (`ABANDON:` · `FZ_GATES_OFF`) |
 
