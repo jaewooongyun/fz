@@ -2,7 +2,7 @@
 # lint:no-root-anchor — 플러그인 루트를 참조하지 않는다. 작업 대상은 `--cd`로 받아 게이트 11에서
 #   존재를 검증하고, 스키마·프롬프트도 호출자가 절대경로로 넘긴다 (lint #N6 면제 형태 c).
 #
-# codex 호출 hygiene 실행체 — modules/fz-codex-bash-hygiene.md §8의 구현
+# codex 호출 hygiene 실행체 — modules/fz-gpt-bash-hygiene.md §8의 구현
 #
 # 왜 스크립트인가: hygiene 규칙은 전부 binary(pass/fail)다
 #   (guides/skill-authoring.md §11 "결과가 binary인가? → 스크립트").
@@ -12,11 +12,11 @@
 #   본 스크립트는 ①을 구조적으로 거부하고 ②를 게이트로 차단한다.
 #
 # usage:
-#   codex-exec.sh review --cd DIR --out FILE (--base BR | --uncommitted | --commit SHA)
+#   gpt-exec.sh review --cd DIR --out FILE (--base BR | --uncommitted | --commit SHA)
 #                        [--effort E] [--schema F] [--title T] [--ephemeral]
 #                        ⛔ review 는 --add-dir 미지원 (codex exec review 가 거부) — exec 모드를 쓸 것
 #                        [--expected-branch B]
-#   codex-exec.sh exec   --cd DIR --out FILE --prompt-file F
+#   gpt-exec.sh exec   --cd DIR --out FILE --prompt-file F
 #                        [--effort E] [--schema F] [--add-dir D]
 #
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건 / 12=codex 비정상종료
@@ -67,10 +67,25 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# ── 사전 게이트 0: effort 화이트리스트 (2026-09-06 신설)
+# ⛔ 왜: Codex CLI 는 무효 effort 를 **로컬에서 거부하지 않는다**. 실측 —
+#    `codex exec -c model_reasoning_effort=bogus` 가 배너에 `reasoning effort: bogus` 를 찍고
+#    서버까지 왕복한 뒤에야 실패한다. 오타가 조용히 통과하면 "올렸다고 믿는데 무효"가 된다.
+# 값 출처 ① [verified: official, raw] OpenAI Model guidance — API 는 low/medium/high/xhigh/max (`none` 은 HTTP 400)
+#          ② [verified: measured] `~/.codex/models_cache.json` (CLI 0.153.4 가 서버에서 받은 목록) —
+#             `gpt-6-astra` 의 supported_reasoning_levels 에 **`ultra` 실재**
+#             ("Maximum reasoning with automatic task delegation"). gpt-5.6 계열도 동일, gpt-5.5 는 xhigh 까지.
+# ⛔ 최초판은 문서에 `ultra` 가 없다는 이유로 제외했으나 **캐시 실측이 그것을 뒤집었다** — 문서보다 캐시가 최신이다.
+# ⚠️ 구버전 CLI 나 ultra 미지원 모델에서는 서버가 거부한다(로컬 게이트가 아니라 호출 시점에 드러남).
+case "$EFFORT" in
+  low|medium|high|xhigh|max|ultra) ;;
+  *) die 10 "--effort 는 low|medium|high|xhigh|max|ultra 중 하나 — 받은 값: '$EFFORT'" ;;
+esac
+
 # ── 사전 게이트 1: 플래그 상호 배타 (실측 근거: codex 0.144.1)
 #    `codex exec review`는 flag-only — PROMPT positional과 --uncommitted/--base가 충돌한다.
 if [ "$MODE" = "review" ] && [ -n "$PROMPT_FILE" ]; then
-  die 10 "review 모드는 PROMPT를 받지 않는다 (flag-only). 커스텀 지시가 필요하면 mode=exec 사용 — modules/fz-codex-subcommands-core.md §review"
+  die 10 "review 모드는 PROMPT를 받지 않는다 (flag-only). 커스텀 지시가 필요하면 mode=exec 사용 — modules/fz-gpt-subcommands-core.md §review"
 fi
 [ "$MODE" = "review" ] && [ -z "$SCOPE_KIND" ] && die 10 "review 모드는 --base|--uncommitted|--commit 중 하나 필수"
 [ "$MODE" = "exec" ] && [ -z "$PROMPT_FILE" ] && die 10 "exec 모드는 --prompt-file 필수"
@@ -131,7 +146,7 @@ fi
 
 # ⛔ 공용 ARGS에는 **review·exec 양쪽이 수용하는 플래그만** 넣는다 (F-015).
 #    `-C/--cd` 와 `--add-dir` 는 `codex exec review` 가 거부한다 → exec 전용 배열로 분리.
-#    검증: scripts/check-codex-flags.sh (양 서브커맨드 --help 전수 대조)
+#    검증: scripts/check-gpt-flags.sh (양 서브커맨드 --help 전수 대조)
 ARGS=(-c "sandbox_permissions=[\"disk-full-read-access\"]" -c "model_reasoning_effort=$EFFORT")
 [ -n "$SKIP_FLAG" ] && ARGS+=("$SKIP_FLAG")
 [ -n "$SCHEMA" ] && ARGS+=(--output-schema "$SCHEMA")
@@ -162,7 +177,7 @@ if [ -n "$SCHEMA" ]; then
   #    `jsonschema` 는 부재하므로(표준 라이브러리 전용) required·타입·enum을 **직접** 검사한다.
   # ⛔ validator 의 exit 1(출력 계약 위반) 과 2(스키마·사용법 실패)를 **구별**한다 (ISSUE-014).
   #    합치면 스키마가 깨진 것을 "출력이 나쁘다"로 오귀속한다.
-  python3 "$(dirname "$0")/validate-codex-output.py" "$OUT" "$SCHEMA"; VAL_RC=$?
+  python3 "$(dirname "$0")/validate-gpt-output.py" "$OUT" "$SCHEMA"; VAL_RC=$?
   case "$VAL_RC" in
     0) ;;
     1) die 14 "출력이 스키마 계약 위반 (측정 실패)" ;;
