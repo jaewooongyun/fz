@@ -455,6 +455,35 @@ PY
 
 ⛔ **sweep 결과로 곧바로 `.js`를 고치지 말 것**: arm이 세션 레벨이었으므로 결론도 세션/frontmatter 레벨에 적용한다. per-call 배선 변경은 위 `[미검증]` 해소가 **선행**이다.
 
+### 8.2 계측 데이터와 짝 맞추기
+
+§8의 arm 비교는 **run 밖에 남은 기록**으로 검산한다. 데이터 위치 3종:
+
+| 소스 | 경로 | 담는 것 |
+|---|---|---|
+| 트랜스크립트 | `~/.claude/projects/**/*.jsonl` | `usage`·`timestamp`·`effort`·`attributionSkill`·`isSidechain` |
+| 워크플로 journal | `…/<session>/subagents/workflows/wf_*/journal.jsonl` | 스테이지별 `result`(findings·verdict) |
+| Stop 훅 이벤트 | `$FZ_TELEMETRY_DIR/events.jsonl` (기본 `~/.fz/telemetry`) | 턴당 도구 수·문구 발화 수·정정 신호(**약한 신호**) |
+
+```bash
+python3 scripts/fz_telemetry_report.py --since YYYY-MM-DD --until YYYY-MM-DD   # 집계 리포트
+python3 scripts/fz_snapshot.py                                                  # 정적 부하 1행 기록
+python3 scripts/fz_snapshot.py --diff                                           # 직전 대비 floor 증감
+```
+
+- **조인 키는 `prompt_id`** 다. events.jsonl 의 한 줄이 트랜스크립트의 어느 턴인지는 `prompt_id`로만 확정된다(`session_id`는 여러 턴을 묶는다). arm 짝을 맞출 때 이 키로 붙인다.
+- ⛔ **arm 적용 검증(§8.1)을 대체하지 않는다.** 계측은 사후 기록이고, arm 이 실제로 갈렸는지는 여전히 트랜스크립트 `effort` 필드 대조로 확인한다.
+- ⛔ **분모 0건은 "부하 없음"이 아니라 측정 실패다.** 리포트 부록이 분모(세션·메시지·journal·findings 수)를 함께 인쇄하므로 그 줄을 먼저 본다.
+- **판정 기준표 (정본 — 이 표가 배포물이다)**. 데이터는 이 기준을 만족할 때만 결론을 낸다:
+
+| 질문 | 지표 | 판정 |
+|---|---|---|
+| 워커 effort `xhigh`→`high` 해도 되나 | 같은 입력 짝 비교(§8.1): critical·major 손실 0 AND (시간 or 토큰) ≥10%↓ | `modules/peer-review-tiers.md` 짝 비교 절차 그대로 |
+| 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) 수, 워크플로 **N≥20** 실행 | 0~1건이면 제거 A/B 후보 — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
+| 규칙 감량이 품질을 떨어뜨렸나 | 감량 전후 fz-findings `detector: user` 월별 건수 + events `user_correction_signal` 비율 | 증가하면 되돌림 |
+| floor 성장이 지연을 늘리나 | `snapshots.tsv` floor × 스킬별 지연 중앙값 상관 | 상관 없으면 감량 우선순위 ↓ |
+| events 의 0 은 저부하인가 | `measurement` 필드 — `complete` 만 카운트로 읽는다 | `incomplete`·`unattributable`·`no_transcript` 는 분모에서 뺀다 |
+
 ---
 
 ## 참조

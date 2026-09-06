@@ -208,6 +208,31 @@ else
   esac
 fi
 
+# ── 4.8 하네스 정적 부하 추세 (경고 전용) ─────────────────────────
+# ⛔ 실패가 아니다. floor 성장은 "고쳐야 할 위반"이 아니라 **관측**이고, exit 에 반영하면
+#    릴리즈마다 빨개져 사람이 health-check 자체를 안 돌리게 된다(§3 freshness 와 같은 클래스).
+# ⛔ 스크립트 부재·행 2개 미만은 미실행이 아니라 **비교 대상 없음**이다 — 아직 스냅샷을
+#    안 찍은 정상 상태이므로 UNRUN 으로 세지 않는다.
+if [ -f "$ROOT/scripts/fz_snapshot.py" ]; then
+  SNAP_OUT="$(python3 "$ROOT/scripts/fz_snapshot.py" --diff 2>&1)"; SNAP_CODE=$?
+  SNAP_WARN="$(printf '%s\n' "$SNAP_OUT" | grep -c '⚠️' || true)"
+  # ⛔ "비교 대상 없음"(정상, exit 0 + 안내문)과 "검사기 고장"(exit≠0)은 다른 것이다 — Codex 리뷰(2026-09-06)가
+  #    exit 7 이 record 0 으로 덮이는 것을 재현했다. 고장은 §diff 파서와 같은 규약(record 2 + UNRUN)으로 기록한다.
+  if [ "$SNAP_CODE" -ne 0 ]; then
+    record "정적 부하 추세" 2 "⛔ 검사기 비정상 종료 exit $SNAP_CODE — 판정 불가 ($(printf '%s\n' "$SNAP_OUT" | tail -1))"
+    UNRUN=$((UNRUN+1))
+  elif printf '%s\n' "$SNAP_OUT" | grep -q '비교 불가'; then
+    record "정적 부하 추세" 0 "비교 대상 없음 — $(printf '%s\n' "$SNAP_OUT" | tail -1) (스냅샷 2행 미만, 정상)"
+  elif [ "${SNAP_WARN:-0}" -gt 0 ]; then
+    record "정적 부하 추세" 0 "⚠️ floor 10% 이상 증가 ${SNAP_WARN}건 — $(printf '%s\n' "$SNAP_OUT" | tail -1)"
+  else
+    record "정적 부하 추세" 0 "$(printf '%s\n' "$SNAP_OUT" | tail -1)"
+  fi
+else
+  UNRUN=$((UNRUN+1))
+  record "정적 부하 추세" UNRUN "미실행 — fz_snapshot.py 부재 (⛔ PASS 아님)"
+fi
+
 # ── 5. 플러그인 매니페스트
 # ⛔ ISSUE-001 (CRITICAL) 정정: 이전 판은 `claude` 부재를 **exit 0으로 기록**해
 #    표에 ✅가 찍히고 총평이 "전 검사 통과"로 나왔다 — 플러그인 로딩이 **검증되지 않았는데도**.
