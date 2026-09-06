@@ -165,6 +165,7 @@ fz- 스킬 + 에이전트를 일괄 검증합니다.
 ```bash
 {플러그인 루트}/scripts/health-check.sh                 # 전 검사 집계 (exit 0=전부 통과 / 1=실패 있음 / 2=사전조건)
 {플러그인 루트}/scripts/health-check.sh --strict-freshness   # 최신성 findings 도 실패로 취급
+python3 {플러그인 루트}/scripts/fz_telemetry_report.py   # (선택) 기간 계측 리포트 — 판정 아님, 관측용
 ```
 
 ⛔ **인라인 블록으로 조립하지 말 것** (2026-08-09 감사 ISSUE-010, CRITICAL). 이전 판은 ①`FZ_ROOT`를 `$0`에서 유도했고 — **인라인 블록에서 `$0`은 셸**이라 `/` 또는 호출자 CWD로 해석됐다 ②세 명령을 status 캡처 없이 순차 실행해 **마지막 명령의 exit이 앞의 실패를 덮었다**. 특히 최신성 검사는 findings를 출력하며 exit 0을 내므로 **lint 실패가 사라졌다**. ⛔ 본 절이 바로 아래에서 "exit code를 판정에 포함한다"고 규정하면서 그 규칙을 위반하고 있었다.
