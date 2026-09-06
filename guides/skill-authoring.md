@@ -1,6 +1,6 @@
 # 스킬 작성 실전 가이드
 
-> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-09-06 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
 >
 > fz-* 스킬 생태계에서 새 스킬을 설계하고 작성하기 위한 실무 가이드.
 > 이론이 아닌 실행 중심. 모든 예시는 기존 17+ 스킬 생태계 기반.
@@ -242,7 +242,7 @@ Step 1: ContentDetailBuilder 생성 (DI: ContentRepository, ImageCacheUseCase)
 
 ### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
-Claude 4.8은 지시를 일관되게 따른다 ("follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]) → 과격·모호한 지시가 그대로 적용될 위험. **GPT-5.5 (2026-04-23 GA)** 도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]. **Fable 5 (2026-06-09 GA)** 는 한층 더 — 짧은 지시로 대부분 행동 조향 가능하며, 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]). **Opus 5 (2026-07-24 GA)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5].
+**Fable 5 (2026-06-09 GA)** 는 짧은 지시로 대부분 행동을 조향할 수 있다 — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5] → 과격·모호한 지시가 그대로 적용될 위험. **GPT-5.5 (2026-04-23 GA)** 도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]. 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: 동 Fable 5 문서]). **Opus 5 (2026-07-24 GA)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. ⚠️ 2026-09-06 정정: 이전 근거였던 "Claude 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
 
 ```
 BAD:  "CRITICAL: You MUST ALWAYS use this tool"
@@ -373,7 +373,7 @@ await agent(prompt, { label: 'stage1-impl', agentType: 'fz:impl-correctness',
 - SOLO 모드: Lead(세션 모델, 보통 fable) 직접 수행 — 재배선 정책 비적용
 - 워커 모델은 **작업 실질 기준** 배정: 실질 분석·생산 = opus / 단순 retrieval·breadth = sonnet — "Supporting은 항상 sonnet"은 폐기(검증·비평도 실질이면 opus, 예: peer-review CC·review-live counter)
 - 판단 지점(workflow merge·direction)만 fable (정적 3지점 고정, lint `EXPECTED_FABLE=3`)
-- 상세·근거: `guides/fable-model-guide.md` § 5 (fz 생태계 적용 전략)
+- 상세·근거: `guides/model-guide.md` § 5 (fz 생태계 적용 전략)
 
 ---
 
@@ -538,6 +538,7 @@ fz-gpt는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --output-
 - agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정), effort 생략 시 세션 effort 상속. 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 — ⛔ **차단이 아니라 "요청 시 검출"이다.** `/fz-manage check`가 호출할 때만 돌고, 실제 차단은 훅 설치 시에만 성립한다(훅은 `settings.json` = 사용자 소관, `modules/governance.md` § Hook 최소 강제 권고)
 - **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `'xhigh'` 단일값. Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**.
   - ⛔ **상수 일괄 교체 금지**: 공식이 *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* 을 요구. 측정 없이 `xhigh`→`high`로 치환하는 건 근거 없는 값을 근거 없는 값으로 바꾸는 것. **워크로드별 sweep 후** 스테이지 성격(생산/판정/탐색)에 맞춰 차등 배정. 미측정 상태의 기본값 = **현행 유지**.
+  - **[2026-09-06 추가] Fable 5.1 갱신**: 이월 금지가 세대를 건너서도 반복 적용된다 — "Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. Lead(Fable 5.1)에도 동일 적용 — Fable 5·Opus 5에서 측정한 sweep 결과를 그대로 이월하지 않는다.
   - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [미검증: per-call `opts.effort` vs settings.json `effortLevel` 우선순위. 문서화된 체인은 `env var > frontmatter > 세션`이며 per-call opts는 미명시]
   - ⛔ **effort로 응답 길이를 줄이려 하지 말 것** — Opus 5에서 effort는 사고량을 조절할 뿐 가시 응답 길이를 신뢰성 있게 줄이지 못한다. 길이는 프롬프트로. [verified: 동 effort 문서]
 
@@ -590,7 +591,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 ### 산출물·거버넌스 계약
 
 - 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — mode='fallback'이면 Lead가 SOLO 폴백. wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
-- 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / **opus 동시 ≤3** (워커 기준 — Lead는 fable, fan-out은 sonnet. **정본 = `guides/fable-model-guide.md` §5** — ⛔ 여기서 값을 재정의하지 않는다) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
+- 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / **opus 동시 ≤3** (워커 기준 — Lead는 fable, fan-out은 sonnet. **정본 = `guides/model-guide.md` §5** — ⛔ 여기서 값을 재정의하지 않는다) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
 - 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
 - 검증 oracle: 래핑 syntax 검사(`async function wrap(...){...본문...}` 후 node --check — 직접 node --check는 CJS 관대 파싱으로 무효) + **실 invoke ≥1** + experiment-log §5.7 지표 기록
 

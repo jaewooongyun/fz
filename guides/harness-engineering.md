@@ -1,6 +1,6 @@
 # Harness Engineering Guide
 
-> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료 (§1.3 세대 전환 테이블 Opus 5 행 포함). 그 외 인용(arxiv 하네스 논문군)은 §참고문헌 표 + 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-09-06 — 이번 축: Fable 5.1 모델 사실 + §참고 문헌 정리):** `guides/llm-references.md` §1 정본 대조 완료 (§1.3 세대 전환 테이블 Opus 5 행 포함 — 2026-07-25 모델 사실 축은 그대로 유효). 2026-09-06 감사가 실제로 손댄 범위 = §5 원칙 2 · §5 원칙 3 각주 · §6 AP1/AP5 · §10 모델 세대표 + Opus 5 적용 블록 · §참고 문헌(Anthropic 번호 중복 정리 · Fable 5.1 행 · arXiv 2건 출처 등급 승격 · Tier 3 정리). 그 밖의 절은 이번에 재감사하지 않았다. 그 외 인용(arxiv 하네스 논문군)은 §참고문헌 표 + 개별 `[verified:]` 태그 참조.
 >
 > "하네스의 모든 컴포넌트는 모델이 혼자 할 수 없는 것에 대한 가정을 인코딩한다.
 > 그 가정은 스트레스 테스트할 가치가 있다."
@@ -697,6 +697,12 @@ Sprint 구조, 멀티에이전트 평가 등은 모델이 혼자 못 할 때만 
 | Context Reset | 필수 (Compaction 불충분) | **선택** | **유지 (선택) — 1M Compaction 충분** | Compaction 품질 향상 |
 | Evaluator | 항상 실행 | **조건부** | **조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 이종 blind-spot은 cross-model 필요** | 단순 작업 혼자 충분, 단 이종 검증은 별도 가치 |
 
+> **Fable 5.1 (2026-09 GA) 재검토** — 위 표 4개 컴포넌트의 판정은 유지된다(*"Your existing Claude Fable 5 prompts should perform well on Claude Fable 5.1 without changes"* [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]). 새로 갈리는 축은 셋이다:
+>
+> - **effort 운영점** — 공식 default는 `high`. *"Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models."* [verified: 동] ⇒ 이전 모델에서 물려받은 effort 상수는 그 자체로 근거가 아니다. 재sweep 대상이지 하향 대상이 아니다.
+> - **Context Reset / Compaction 시점** — 캐시 읽기 $0.25/MTok(Fable 5 $1의 1/4) [verified: platform.claude.com/docs/en/about-claude/pricing] 때문에 압축 경제학이 뒤집혔다: *"Because cache reads are now cheaper (see Pricing), compacting early to save cost may no longer be the right cost-intelligence tradeoff on Claude Fable 5.1, so experiment with later compaction points."* [verified: …/prompting-claude-fable-5-1] ⇒ "비용을 아끼려면 일찍 compact"는 Fable 5 시절의 논리다.
+> - **도구 배칭** — coding·computer-use 루프처럼 다음 독립 호출이 *암시*될 때 *"it may issue them one per turn instead"*. 품질 문제가 아니라 턴·왕복·시간 비용 문제다 [verified: 동]. ⛔ **fz에 배칭 nudge 문장을 추가하지 말 것** — Claude Code가 동일 문장을 turn-scoped 시스템 메시지로 **이미 주입**하므로 fz가 또 넣으면 중복 주입이다.
+
 > 참고(역사): Length limits 실험(≤25/≤100 words)은 4.7에서 04-16 적용 → 04-20 철회(~3% 성능 저하, "wrong tradeoff") [verified: InfoQ postmortem + The Register] — 과제약이 성능을 저해한 실증. 4.8 effort는 기본 high [verified: anthropic.com/news/claude-opus-4-8].
 
 > "평가자는 고정된 예/아니오 결정이 아니다. 현재 모델이 혼자서 안정적으로 못 하는 작업에서만 비용 대비 가치가 있다."
@@ -714,7 +720,7 @@ BAD:  Verifier (-0.8%) — 평가자와의 정렬 충돌
 교훈: "구조를 추가하기 전에 — 이 구조가 경로를 좁히는가, 넓히는가?"
 ```
 
-> **역도 성립** (2026-07 추가): 구조를 *과하게* 좁혀도 해롭다 — "effective harness는 partial일 수 있다 — 초기 스텝만 지정하고 나머지는 에이전트에 맡기는 편이 완전 구조화 워크플로보다 pass rate가 높을 수 있음 … 실패 모드(over-decomposition·over-pruning·hallucinated execution)." [외부: harness-paper §4-I, arXiv 2605.21516 — 원 논문 미대조]. partial harness가 완전 워크플로를 이길 수 있으므로 Step 세분화(granularity)는 "더 잘게"가 항상 정답이 아니다.
+> **역도 성립** (2026-07 추가): 구조를 *과하게* 좁혀도 해롭다 — "effective harness는 partial일 수 있다 — 초기 스텝만 지정하고 나머지는 에이전트에 맡기는 편이 완전 구조화 워크플로보다 pass rate가 높을 수 있음 … 실패 모드(over-decomposition·over-pruning·hallucinated execution)." [verified: arxiv.org/abs/2605.21516 — abstract 대조 2026-09-06 · ⚠️ 2026-09-06 정정: 이전 "원 논문 미대조" 단서 해제. 인용 두 문장 모두 abstract 원문에 존재. 단 실험 세부(Terminal-Bench v2 · Qwen3.5-plus·GLM-5·GPT-OSS-120B·Gemini-3-flash)는 요약 경로이고 Claude 5세대는 미포함이라, Claude 계열 일반화는 여전히 미검증]. partial harness가 완전 워크플로를 이길 수 있으므로 Step 세분화(granularity)는 "더 잘게"가 항상 정답이 아니다.
 
 ### 원칙 4: 자기 평가를 믿지 마라 — Generator≠Evaluator
 
@@ -818,7 +824,9 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
   → NO → 제거
 ```
 
-> **비단조성 보강** (2026-07 추가): "어설픈 하네스는 오히려 해롭다"는 실증도 있다 — "minimal-shell TSR < model-only TSR(어설픈 하네스는 오히려 해롭다)." [외부: harness-paper §4-A, arXiv 2605.12129 — 원 논문 미대조]. 단 2-3B 소형모델 실증이라 Claude(sonnet/opus) 계열 일반화는 [미검증: 모델 스케일 차이] — 반증 가능 가설로만.
+> **비단조성 보강** (2026-07 추가 · ⚠️ 2026-09-06 정정 — 출처 등급): "어설픈 하네스는 오히려 해롭다"는 실증도 있다 — *"A non-monotonic phenomenon - minimal-shell TSR < model-only TSR - is observed in two models."*(어설픈 하네스가 model-only보다 낮다) [verified: arxiv.org/abs/2605.12129 — abstract 대조 2026-09-06, 이전 "harness-paper 서베이 경유·원 논문 미대조" 단서 해제]. 단 2-3B 소형모델(Gemma4 E2B·Qwen3.5:2B·LLaMA 3.2 3B, 24 tasks) 실증이라 Claude(sonnet/opus) 계열 일반화는 [미검증: 모델 스케일 차이] — 반증 가능 가설로만.
+
+> **반대 방향 병기** (2026-09-06 추가): 같은 축을 프론티어 백엔드에서 잰 결과는 "하네스가 해로워진다"가 아니라 "하네스에 덜 민감해진다"다 — Harness-Bench(8 백엔드 × 6 하네스 × 106 tasks × 5,194 trajectories): *"stronger model backends tend to achieve higher mean scores while exhibiting lower cross-harness variance. This pattern suggests that stronger models may be more tolerant of differences in prompting, tool interfaces, state management, and recovery behavior."* [verified: arxiv.org/abs/2605.27922 — abstract 대조 2026-09-06]. 같은 논문이 하네스 간 **23.8pt 격차**(NanoBot 76.2 ↔ OpenClaw 52.4, 동일 태스크·백엔드 풀)도 보고하므로 **하네스 무용론의 근거가 아니다**. ⇒ AP1의 진단 질문("이 컴포넌트를 제거하면 성능이 떨어지는가")은 그대로 유효하고, 강한 백엔드에서 답이 NO 쪽으로 기울 뿐이다 — 질문을 없애라는 뜻이 아니라 **더 자주 물으라는 뜻**이다.
 
 ### Anti-Pattern 2: 자기 평가 의존
 
@@ -870,6 +878,7 @@ Anthropic 실제 사례:
   Sonnet 4.5: Sprint 분해 필수 → Opus 4.6: Sprint 제거 (2025-11)
   Opus 4.8 (2026-05-28 GA): effort 기본 high + 자기 코드 결함 ~4x↓ + tool-calling 효율↑ [verified: anthropic.com/news/claude-opus-4-8]
   Fable 5 (2026-06-09 GA): 이전 모델용 절차 지시가 품질 저하 요인으로 공식화 ("often too prescriptive... can degrade output quality") + 검증 리마인더 축소 권고 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]
+  Fable 5.1 (2026-09 GA): Fable 5 프롬프트 무변경 호환("should perform well on Claude Fable 5.1 without changes")이나 effort는 재sweep 대상("effort level names don't correspond to the same amount of thinking across models") + 캐시 읽기 $0.25/MTok(1/4)로 "일찍 compact" 전제가 뒤집힘 + 진행보고 억제 문구("hold all findings for the final response")는 제거 대상 [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1 + platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]
   이렇게 제거/추가된 컴포넌트가 "모델이 성장한 증거"
 ```
 
@@ -1086,8 +1095,9 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Sonnet 4.5 | Context Reset 필수, Sprint 분해 필수, Evaluator 필수 | — |
 | Opus 4.6 | Context Reset 선택, Compaction 충분, Evaluator 조건부 | Sprint 분해, 스프린트별 평가 |
 | **Opus 4.8 (2026-05-28 GA)** | effort 기본 **high** (xhigh/max는 더 어려운 작업용), 1M Compaction 충분, tool-calling 효율↑(fewer steps·required-call skip↓), 단일 세션 수백 parallel subagents 지원 [verified: anthropic.com/news/claude-opus-4-8] | Evaluator 조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 *이종 blind-spot*은 여전히 cross-model 필요 [verified: 동] |
-| **Fable 5 (2026-06-09 GA, 옵트인 최상위)** | effort 기본 **high** (xhigh=capability-sensitive, low도 이전 모델 xhigh 상회 가능), thinking 상시 활성(끄기 불가), async parallel subagents 공식 권장, fresh-context verifier > self-critique, 단일 turn 수 분·자율 런 수 시간 전제의 타임아웃/진행표시 설계 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 + code.claude.com/docs/en/model-config] | step-by-step 절차 지시("often too prescriptive... can degrade output quality" — 단 Gate 가드레일 제거는 A/B 후 결정), 검증 리마인더("verifies its own work with less prompting"). 안전 분류기 refusal 시 Opus 자동 폴백 주의. 상세: `guides/fable-model-guide.md` |
-| **Opus 5 (2026-07-24 GA, 현재 default)** | **위임 캡**(모델이 subagent를 과다 스폰 — 하네스측 `MAX_CONCURRENT_SUBAGENTS`=20·`MAX_SUBAGENT_SPAWN_DEPTH`=3 + 프롬프트측 제약 병행. ⛔ 세션 생애 `MAX_SUBAGENTS_PER_SESSION`=200은 **v2.1.224에서 제거**), **길이 통제 프롬프트**(응답·산출물 장문화, effort로는 안 줄어듦), **스코프 제약**(요청 외 단계 추가 경향), `max_tokens` 재점검(thinking 기본 ON → thinking+응답 합산 하드캡) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 + code.claude.com/docs/en/changelog v2.1.219] | **검증 지시·검증 스캐폴딩** — 자체검증 내장, *"removing them reduces wasted tokens with no loss in quality"*. 하네스도 같은 방향으로 이동(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). ⚠️ *외부 oracle·이종 교차검증은 존치* — 제거 대상은 **자기재확인 지시**뿐 |
+| **Fable 5 (2026-06-09 GA, 옵트인 최상위)** | effort 기본 **high** (xhigh=capability-sensitive, low도 이전 모델 xhigh 상회 가능), thinking 상시 활성(끄기 불가), async parallel subagents 공식 권장, fresh-context verifier > self-critique, 단일 turn 수 분·자율 런 수 시간 전제의 타임아웃/진행표시 설계 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 + code.claude.com/docs/en/model-config] | step-by-step 절차 지시("often too prescriptive... can degrade output quality" — 단 Gate 가드레일 제거는 A/B 후 결정), 검증 리마인더("verifies its own work with less prompting"). 안전 분류기 refusal 시 Opus 자동 폴백 주의. 상세: `guides/model-guide.md` |
+| **Opus 5 (2026-07-24 GA — 현행 worker default(생산). 단순 작업은 Sonnet 5)** | **위임 캡**(모델이 subagent를 과다 스폰 — 하네스측 `MAX_CONCURRENT_SUBAGENTS`=20·`MAX_SUBAGENT_SPAWN_DEPTH`=3 + 프롬프트측 제약 병행. ⛔ 세션 생애 `MAX_SUBAGENTS_PER_SESSION`=200은 **v2.1.224에서 제거**), **길이 통제 프롬프트**(응답·산출물 장문화, effort로는 안 줄어듦), **스코프 제약**(요청 외 단계 추가 경향), `max_tokens` 재점검(thinking 기본 ON → thinking+응답 합산 하드캡) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 + code.claude.com/docs/en/changelog v2.1.219] | **검증 지시·검증 스캐폴딩** — 자체검증 내장, *"removing them reduces wasted tokens with no loss in quality"*. 하네스도 같은 방향으로 이동(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). ⚠️ *외부 oracle·이종 교차검증은 존치* — 제거 대상은 **자기재확인 지시**뿐 |
+| **Fable 5.1 (2026-09 GA — 현행 Lead)** | **effort 재sweep**(공식 default `high`. *"Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models"*), **늦은 compaction 실험**(캐시 읽기 $0.25/MTok = Fable 5 $1의 1/4 → *"compacting early to save cost may no longer be the right cost-intelligence tradeoff on Claude Fable 5.1, so experiment with later compaction points"*), **비차단 Lead**(*"letting the lead continue while subagents run lowers average time to completion at similar quality, token usage, and cost"* — 단 *"The model still often chooses to wait"*), **폴백 대상 확인**(허용 대상 = Opus 4.8 · Opus 5), **breaking 3 대비**(forced tool use `tool_choice` 400 · 이전 모델은 5.1 thinking block 못 읽음 · thinking block 앞 턴 편집 시 무효화 — Claude Code는 prefix를 보존해 줌) [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1 + platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1 + platform.claude.com/docs/en/about-claude/pricing] | **진행보고 억제 문구** — *"system prompt lines such as 'hold all findings for the final response'. Remove lines like that before adding anything"*(5.1은 기본적으로 중간 업데이트를 덜 쓴다). **배칭 nudge 추가** — ⛔ Claude Code가 turn-scoped 시스템 메시지로 **이미 주입**하므로 fz가 또 넣으면 중복 주입, **추가 금지**. ⚠️ **2026-09-06 정정**: "fable 1 ≈ opus 2 비용"은 **캐시 읽기에서 성립하지 않는다** — 2배인 것은 **출력·캐시 쓰기 단가**이고($50/$20 vs $25/$10), 캐시 읽기가 지배하는 실사용 세션을 재가격하면 **+9%**에 그친다(fz 실측 2026-09-06). 동시 상한의 실제 근거는 비용이 아니라 **호출당 지연 +49%**(중앙값 10.5s → 15.6s, fz 실측 2026-09-06)와 출력 단가다 |
 | 미래 모델 | ? | Evaluator? 컨텍스트 관리? |
 
 > **4.8 새 기능 → fz 적용** [verified: anthropic.com/news/claude-opus-4-8]:
@@ -1099,10 +1109,10 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 > **Opus 5 (2026-07-24) → fz 적용** [verified: prompting-claude-opus-5 · whats-new-opus-5 · effort · code.claude.com/docs/en/changelog]:
 > - ⛔ **검증 스캐폴딩 제거 방향** — 모델이 시키지 않아도 자기 작업을 검증한다. "final verification step 넣어라"/"subagent로 검증해라" 류 **프롬프트 지시**는 over-verification을 유발하므로 제거 대상. 하네스도 같은 판단(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). **⚠️ 단 fz의 교차검증 스테이지**(plan `stage5-recheck`, review `stage3-counter`, peer-review `stage2` 교차)는 *다른 관점의 검증*이지 *자기재확인*이 아니다 — **일괄 제거 금지, 개별 판단**.
 > - ⚠️ **위임 방향 역전** — 4.8은 subagent를 *덜* 쓰려 해서 유도가 필요했으나, Opus 5는 *과다* 위임한다. 4.8용으로 넣은 "더 위임하라" 문구가 있으면 **제거**하고 캡으로 대체. fz는 Workflow 스크립트가 fan-out을 결정적으로 제어하므로 영향이 제한적이나, `agent()` **내부**에서 Task/Agent 도구를 쓰는 경로가 있으면 캡 필요.
-> - **effort 운용 전환** — 출발점 `xhigh`→**`high`(기본)**, `low`/`medium`이 비용·지연의 **1차 레버**. ⛔ 이전 모델 effort 값 재사용 금지 → **fresh sweep** 후 결정 (§5 원칙 7 운영점과 정합: 운영점은 측정으로 정한다).
+> - **effort 운용 전환** — 출발점 `xhigh`→**`high`(기본)**, `low`/`medium`이 비용·지연의 **1차 레버**. ⛔ 이전 모델 effort 값 재사용 금지 → **fresh sweep** 후 결정 (§5 원칙 7 운영점과 정합: 운영점은 측정으로 정한다). **⚠️ 2026-09-06 보강 (Fable 5.1)** — *"Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models."* [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1] ⇒ 모델을 넘길 때 effort 상수를 그대로 옮기는 것은 근거가 아니다. 현재 fz 워크플로 워커 36콜은 전부 `xhigh`이고(fz 실측 2026-09-06), 이는 **사용자가 유지를 택한 결정된 값**이다 — 공식 default가 `high`라는 사실은 하향 권고가 아니라 **fresh sweep의 출발점**이고, 변경 여부는 `modules/peer-review-tiers.md:225-227`이 규정한 짝 비교(`xhigh`/`high` 각 1회, critical·major 손실 0)로 측정한 뒤 사용자가 결정한다.
 > - **`max_tokens` 재점검** — thinking 기본 ON이라 `max_tokens`가 thinking+응답 **합산** 하드캡. 4.8 기준으로 타이트하게 잡은 경로는 응답 절단 위험. `xhigh`/`max` 운용 시 64k 출발.
 > - **길이는 프롬프트로** — 응답·산출물이 길어졌고 **effort로는 줄지 않는다**. 산출물 길이 계약이 필요한 스킬은 프롬프트에 명시.
-> - **하네스 상수 변경** — nested subagent depth **1→3**, **동시** 스폰 캡 20, dynamic workflow 기본 medium(<15 agents). fz governance 상한(opus 동시 ≤3 — 정본 `guides/fable-model-guide.md` §5)은 **동시 20보다 훨씬 보수적**이므로 상충 없음 — 단 문서상 두 층위를 구분해 기술할 것.
+> - **하네스 상수 변경** — nested subagent depth **1→3**, **동시** 스폰 캡 20, dynamic workflow 기본 medium(<15 agents). fz governance 상한(opus 동시 ≤3 — 정본 `guides/model-guide.md` §5)은 **동시 20보다 훨씬 보수적**이므로 상충 없음 — 단 문서상 두 층위를 구분해 기술할 것.
 >   - ⛔ **v2.1.224(2026-08-07) 갱신**: **세션 생애 200 스폰 캡은 제거**됐다 — *"Removed the 200-subagent-per-session spawn cap; long-running sessions no longer refuse new agents (**concurrency and depth limits still apply**)"*. 즉 남은 하네스 상한은 **동시 20 + depth 3**뿐이다. fz는 동시 ≤3(opus)이라 여전히 훨씬 보수적이므로 **거버넌스 재설계는 불필요**하고, 장기 세션에서 누적 스폰이 거부되던 제약만 사라졌다.
 
 > "하네스 설계자의 일은 '다음 신기한 조합을 계속 찾는 것'이다." — Anthropic
@@ -1247,10 +1257,16 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 6g | Prompting Claude Opus 5 | Anthropic | live | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 |
 | 6h | Effort (per-model 권장) | Anthropic | live | https://platform.claude.com/docs/en/build-with-claude/effort |
 | 6i | Claude Code changelog (v2.1.219 하네스 변경) | Anthropic | 2026-07-24 | https://code.claude.com/docs/en/changelog |
-| 6e | Scaling Managed Agents | Anthropic | 2026-04-08 | https://www.anthropic.com/engineering/managed-agents |
-| 6f | Introducing Claude Fable 5 and Claude Mythos 5 | Anthropic | 2026-06-09 | https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5 |
-| 6g | Prompting Claude Fable 5 | Anthropic | 2026 (live) | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 |
-| 6h | Claude Code: Model configuration | Anthropic | 2026 (live) | https://code.claude.com/docs/en/model-config |
+| 6j | Scaling Managed Agents | Anthropic | 2026-04-08 | https://www.anthropic.com/engineering/managed-agents |
+| 6k | Introducing Claude Fable 5 and Claude Mythos 5 | Anthropic | 2026-06-09 | https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5 |
+| 6l | Prompting Claude Fable 5 | Anthropic | 2026 (live) | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 |
+| 6m | Claude Code: Model configuration | Anthropic | 2026 (live) | https://code.claude.com/docs/en/model-config |
+| 6n | What's new in Claude Fable 5.1 | Anthropic | 2026-09 | https://platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1 |
+| 6o | Prompting Claude Fable 5.1 | Anthropic | live | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1 |
+| 6p | Pricing (모델별 입력·캐시 쓰기/읽기·출력 단가) | Anthropic | live | https://platform.claude.com/docs/en/about-claude/pricing |
+| 6q | Claude model and effort level in Claude Code | Anthropic | 2026 | https://claude.com/blog/claude-model-and-effort-level-in-claude-code |
+
+> ⚠️ 2026-09-06 정정: 위 표에 `6e`~`6h`가 두 벌 존재했다. 뒤 세트를 `6j`~`6m`으로 재번호했고, `6n`~`6q`는 이번 감사에서 신규 등재했다. 인용 시 `6p`(Pricing)와 `6q`(effort 블로그)는 **단가·운영점 주장에만** 쓴다.
 
 ### 학술 논문
 
@@ -1271,7 +1287,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 ### 학술 논문 — 2026-06 wave (harness-paper 서베이 경유)
 
-> 아래는 본 가이드 본문이 실제 인용한 2026-05~06 논문만. 전 항목 **harness-paper 서베이 경유**이며 원 arXiv 논문을 재검증하지 않았다.
+> 아래는 본 가이드 본문이 실제 인용한 2026-05~06 논문만. **8z·8aa·8af·8ag를 제외한** 전 항목은 **harness-paper 서베이 경유**이며 원 arXiv 논문을 재검증하지 않았다. ⚠️ 2026-09-06 정정: 8z(2605.21516)·8aa(2605.12129)는 원 abstract를 `curl` raw로 대조 완료해 승격했고, 8af(2605.27922)·8ag(2604.07236)는 서베이를 거치지 않은 직접 대조분이다.
 
 | # | arXiv | 주제 | 본문 인용 위치 |
 |---|-------|------|--------------|
@@ -1290,12 +1306,14 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 8w | 2606.11686 | Layer-Isolated (집계가 가리는 slice 회귀) | §12 홀표 (H2/H3) |
 | 8x | 2606.17799 | Position: Coding Benchmarks Misaligned (모델/하네스/환경 분리) | §2.2 평가분리 명제 배경 (Position paper — 개별 각주 아님) |
 | 8y | 2606.16591 | SING (intent 동적 툴 검색) | §3 기둥1 Lazy Tool Discovery |
-| 8z | 2605.21516 | Inference-Time Alignment (partial harness·over-decomposition) | §5 원칙3 각주 · §12 홀표 |
-| 8aa | 2605.12129 | It's Not the Size (비단조성·scaffold collapse) | §6 AP1 각주 · §12 홀표 |
+| 8z | 2605.21516 | Inference-Time Alignment (partial harness·over-decomposition·over-pruning·hallucinated execution) | §5 원칙3 각주 · §12 홀표 — **abstract 대조 완료(2026-09-06)**. 실험 세부(Terminal-Bench v2 / Qwen3.5-plus·GLM-5·GPT-OSS-120B·Gemini-3-flash)는 요약 경로, **Claude 5세대 미포함** |
+| 8aa | 2605.12129 | It's Not the Size (비단조성·scaffold collapse) | §6 AP1 각주 · §12 홀표 — **abstract 대조 완료(2026-09-06)**. 실증 범위 = SLM 2-3B(Gemma4 E2B·Qwen3.5:2B·LLaMA 3.2 3B) 24 tasks |
 | 8ab | 2606.08960 | Hardening Agent Benchmarks (hacker-fixer) | §12 홀표 (H1) |
 | 8ac | 2606.27243 | NOVA (L1-L4 risk-tier) | §12 홀표 (F5) |
 | 8ad | 2606.22953 | Plans Don't Persist (계획 신호 감쇠) | §3 기둥3 서브시스템7 |
 | 8ae | 2606.29914 | MemDelta (통제 A/B 프로토콜) | §12 홀표 (H2) |
+| 8af | 2605.27922 | Harness-Bench (8 백엔드 × 6 하네스 × 106 tasks × 5,194 trajectories; 하네스 간 23.8pt 격차, 강한 백엔드일수록 cross-harness variance 낮음, no systematic harness penalty) | §6 AP1 각주 — **abstract 대조 완료(2026-09-06)**, 서베이 미경유 |
+| 8ag | 2604.07236 | How Much Heavy Lifting Can an Agent Harness Do? (결정론적 declarative planning이 belief-only 대비 +24.1pp, LLM 호출 0) | — (2026-09-06 신규 등재, 본문 인용 아직 없음) — **abstract 대조 완료(2026-09-06)**, 서베이 미경유 |
 | 8survey | harness-paper 서베이 본체 | Harness Engineering 2026 (revfactory) | https://revfactory.github.io/harness-paper |
 
 > 단서: harness-paper는 **에이전트 생성 메타분석**이며 서베이 스스로 "완전한 census 아님·arXiv 편중·WebSearch 비활성·Meta/FAIR 부재"를 고지한다. 위 수치·주장은 서베이가 인용 논문에 대해 주장한 내용이고 **원 논문은 미재검증**이다 — 방향성 근거로만 사용, 사실 승격 금지.
@@ -1310,19 +1328,13 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 9d | GPT-5 Prompting Guide (Cookbook) | OpenAI | 2026 | https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide |
 | 9e | Codex CLI (fz cross-model verification 도구 — 모델 pin 없음, SSOT=`config.toml`. CLI 버전 플로어는 호환 사실로 별도 유지) | OpenAI | live | https://developers.openai.com/codex/cli |
 
-### 고품질 가이드/분석
-
-| # | 제목 | 출처 | URL |
-|---|------|------|-----|
-| 8 | What Is Harness Engineering? Complete Guide 2026 | NxCode | https://www.nxcode.io/resources/news/what-is-harness-engineering-complete-guide-2026 |
-| 9 | Anthropic's Three-Agent Harness (InfoQ) | InfoQ | https://www.infoq.com/news/2026/04/anthropic-three-agent-harness-ai/ |
 
 ### 오픈소스 구현체
 
 | # | 프로젝트 | 설명 | URL |
 |---|---------|------|-----|
 | 10 | claude-code-harness | Plan→Work→Review→Release + 13 Guardrail Rules | https://github.com/Chachamaru127/claude-code-harness |
-| 11 | awesome-claude-code-toolkit | 135 agents + 35 skills + 150+ plugins | https://github.com/rohitg00/awesome-claude-code-toolkit |
+
 
 ---
 

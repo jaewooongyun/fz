@@ -47,7 +47,7 @@
 | 모델 비용 상한 초과 | fable 에이전트 동시 2개 이상 (Lead 세션 제외) 또는 opus 에이전트 동시 4개 이상 | 추가 스폰 차단 |
 | 의도 이탈 | 실행 결과가 원래 요청과 무관 | 파이프라인 중단 + 사용자 확인 |
 
-> 모델 비용 상한 근거: 최대 동시 = Lead(fable ≈ opus 2) + opus 3 ≈ **opus 5 equivalent**. 단가: sonnet $3/$15 · opus $5/$25 · fable $10/$50 (per MTok). fable 1 ≈ opus 2 비용 등가. canonical `guides/fable-model-guide.md` §5.
+> 모델 비용 상한 근거: **정본 = `guides/model-guide.md` §5** — 동시 상한 수치(opus ≤3 · fable 1 · 총 ≤4)와 그 근거를 모두 그곳에서 읽는다. ⚠️ 2026-09-06 정정 — 이전에 여기 적혀 있던 "fable 1 ≈ opus 2 비용 등가 → opus 5 equivalent" 산식은 정본이 폐기했다(Fable 5.1 캐시 읽기 $0.25 < Opus 5 $0.50, 남는 차이는 출력·캐시쓰기 단가 2배 + 지연 +49%). 값을 여기 복사하지 않는다.
 > **rate-limit 폴백 계약**: 병렬 opus 스폰이 상한 미달로 실패/429 시 순차화 재시도 1회 → 재실패 시 `mode:'fallback'` 반환. 구현은 workflows 코드(plan-collaborative stage2 · peer-review stage1의 병렬 블록).
 
 ### ⛔ 사각지대 — advisor 도구는 위 상한이 **전혀 보지 못한다**
@@ -153,7 +153,7 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 |------|----------------|------------|
 | **팀 구성 (에이전트 목록)** | **`workflows/*.js`의 `agentType` 인자** | team-registry.md, patterns/*.md — ⛔ 스킬 YAML `team-agents`는 **2026-08-09 제거**(런타임 효과 0이었다) |
 | **모델 배정** | **`workflows/*.js`의 `opts.model`** | agents/*.md(기본값 표기만), team-registry.md `promoted` 열. 감시 = `scripts/lint-model-explicit.sh` · ⛔ 스킬 YAML `model-strategy`는 **제거** |
-| **opus 동시 상한** | **`guides/fable-model-guide.md` §5** | governance.md kill-switch 행, agent-team-guide.md, skill-authoring.md §12 |
+| **opus 동시 상한** | **`guides/model-guide.md` §5** | governance.md kill-switch 행, agent-team-guide.md, skill-authoring.md §12 |
 | **YAML 필수 필드** | **본 문서 § 스킬 최소 기준** (L1 공식 4 + L2 fz 정책 2) | fz-manage check #1, skill-troubleshooting.md #1, templates/skill-template.md |
 | 에이전트 도구 | 에이전트 YAML `tools` | 본문 설명 |
 | 파이프라인 정의 | modules/pipelines.md | fz SKILL.md 인라인 |

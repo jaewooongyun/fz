@@ -1,6 +1,6 @@
 # Agent & Team Configuration Guide
 
-> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용(MAST 등 arxiv)은 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-09-06 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용(MAST 등 arxiv)은 개별 `[verified:]` 태그 참조.
 >
 > fz-* 스킬 생태계에서 에이전트 작성 및 (역사적) 팀 구성을 위한 종합 가이드.
 > 에이전트는 `agents/*.md`에 위치하며, agentType(`fz:`)으로 `workflows/*.js` Workflow가 재사용한다.
@@ -250,7 +250,7 @@ GOOD (Mesh / Peer-to-Peer):
   - **순차 승격** 허용: 병렬 opus 스폰은 순차 승격으로도 상한(≤3)을 넘지 않도록 유지한다.
   - 예외: full-cycle / plan-to-code 파이프라인에서 plan과 code 각각 Primary가 다르므로 순차적으로 opus를 사용한다.
 - **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단.
-- **Fable 5 (2026-06-09 GA)**: 판단 tier 모델, $10/$50 per MTok (opus의 2배). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/fable-model-guide.md` §5.
+- **Fable 5.1 (2026-09-01 GA, Lead 모델)**: 판단 tier 모델, 출력·캐시쓰기 단가는 opus 5의 2배($10/$50 vs $5/$25)나 **캐시 읽기는 $0.25/MTok로 opus 5($0.50)의 절반** — 캐시 지배 세션에서는 "2배" 진술이 성립하지 않는다(fz 실측 2026-09-06: 동일 트래픽을 Fable 5.1 단가로 환산 시 opus 대비 **+9%**). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/model-guide.md` §5. ⚠️ 2026-09-06 정정: "opus의 2배" 단정은 출력·캐시쓰기 단가에만 참이다.
 
 ### 모델 승격 매트릭스
 
@@ -302,7 +302,7 @@ Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 
 | Anti-Pattern | 이유 | 대안 |
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
-| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: **동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217)·**depth 3**(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, v2.1.219) — fz governance(**opus 동시 ≤3** — 정본 `guides/fable-model-guide.md` §5)는 이보다 보수적. ⛔ 세션 생애 200 캡(`…MAX_SUBAGENTS_PER_SESSION`)은 **v2.1.224에서 제거**됐다 — 누적 스폰 제약은 더 이상 없고 **동시·depth만 남는다** |
+| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: **동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217)·**depth 3**(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, v2.1.219) — fz governance(**opus 동시 ≤3** — 정본 `guides/model-guide.md` §5)는 이보다 보수적. ⛔ 세션 생애 200 캡(`…MAX_SUBAGENTS_PER_SESSION`)은 **v2.1.224에서 제거**됐다 — 누적 스폰 제약은 더 이상 없고 **동시·depth만 남는다** |
 | coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) + 동일 토큰예산서 우위 소멸 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
 | standalone Task | 통신 불가, 고립된 작업 | Workflow `agent()` 사용 (`skill-authoring.md` §12) — ⛔ `TeamCreate`는 v2.1.178부터 존재하지 않는다 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |

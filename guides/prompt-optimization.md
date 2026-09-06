@@ -2,7 +2,7 @@
 
 > 실전 최적화 체크리스트. 이론이 아닌 즉시 적용 가능한 가이드.
 >
-> **Sources (last audited: 2026-07-25):**
+> **Sources (last audited: 2026-09-06):**
 >
 > **Tier 1 — Anthropic Official:**
 > - Claude 4 Best Practices (live docs) — prompt-engineering, agentic systems, adaptive thinking
@@ -20,8 +20,10 @@
 > - **Introducing Claude Opus 4.8 (Anthropic 2026-05-28)** — release announcement (effort 기본 high, 자기 코드 결함 ~4x↓, tool-calling 효율↑, 단일 세션 수백 parallel subagents)
 > - **Introducing Claude Opus 5 (Anthropic 2026-07-24)** — release announcement. "comes close to the frontier intelligence of Claude Fable 5 at half the price", $5/$25(4.8 동일), effort dial 강조
 > - **What's new in Claude Opus 5 / Prompting Claude Opus 5 (Anthropic, live)** — **현행 기본 모델 정본**. thinking 기본 ON · thinking disabled는 effort ≤ high(400) · **검증 지시 삭제** · **subagent 위임 캡**(4.8 대비 역방향) · 길이는 프롬프트로(effort 아님) → 상세: `llm-references.md` §1.2
-> - **Introducing Claude Fable 5 and Claude Mythos 5 (Anthropic 2026-06-09 GA)** — Opus 상위 tier ($10/$50), thinking 상시 활성, refusal/fallback/billing → 상세: `fable-model-guide.md`
+> - **Introducing Claude Fable 5 and Claude Mythos 5 (Anthropic 2026-06-09 GA)** — Opus 상위 tier ($10/$50), thinking 상시 활성, refusal/fallback/billing → 상세: `model-guide.md`
 > - **Prompting Claude Fable 5 (Anthropic, live)** — Fable 전용 프롬프팅 (de-prescription, async subagents, grounded progress, reasoning_extraction 주의)
+> - **What's new in Claude Fable 5.1 (Anthropic 2026-09-01)** — 캐시 읽기 $0.25(Opus 5의 절반·Fable 5의 1/4), breaking 3(forced tool use 400 에러·thinking block 단방향·earlier-turn 편집 무효화), 폴백 대상 Opus 4.8·Opus 5 [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1] → 상세: `model-guide.md`
+> - **Prompting Claude Fable 5.1 (Anthropic, live)** — effort **재sweep 필수**("Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]), 코딩 루프 한정 배칭 변동·fewer progress update·append-only 히스토리(compaction 늦게 실험 권고)
 > - **Claude Code: Model configuration (Anthropic, live)** — /model fable, effort 체계(frontmatter effort 포함), 안전 분류기 자동 폴백
 > - **Best Practices for Claude Code (Anthropic, live reference)** — Claude Code 전용 prompt 가이드
 > - **Anthropic Prompting Best Practices (live, `claude-prompting-best-practices`)** — 전 모델 공통 기법 + **모델별 페이지 분기**(`prompting-claude-{opus-5|fable-5|sonnet-5|opus-4-8}`). ⚠️ 모델별 프롬프팅이 1급 문서로 승격돼 세대 간 프롬프트 재사용이 기본 가정이 아니게 됨
@@ -64,7 +66,8 @@
 > - ~~서브에이전트 토큰 연구 (dev.to)~~ → Anthropic Agent Teams 공식 문서로 대체
 > - ~~hyperdev 컨텍스트 보호~~ → Claude Code 네이티브 기능으로 흡수됨
 >
-> **구버전 프롬프팅/API 제거 (Opus 5 only):**
+> **구버전 프롬프팅/API 제거 (Fable 5.1·Opus 5):** ⚠️ 2026-09-06 정정(제목 — 이전엔 Opus 5 only로 한정, Fable 5.1 breaking 변경 미반영)
+> - **[2026-09-06 신설]** Fable 5.1 breaking 3종 — forced tool use(`tool_choice: {"type":"any"|"tool"}`)는 400 에러 · 구모델은 Fable 5.1의 thinking block을 읽지 못함(단방향, "no earlier model reads Claude Fable 5.1's") · thinking block 이전 turn(시스템 프롬프트·tools·이전 메시지) 수정 시 다음 요청에서 에러 또는 블록 드롭 [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1]
 > - ~~manual `budget_tokens` extended thinking~~ → adaptive thinking + effort + `max_tokens` (Opus 4.7+/5/Fable 5에서 400 에러) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices]
 > - ~~prefilled responses (마지막 assistant turn)~~ → structured outputs / user turn 주입 (Claude 4.6+ 미지원) [verified: 동]
 > - ~~`interleaved-thinking-2025-05-14` beta header~~ → 자동 adaptive thinking (4.6+ ignored) [verified: platform.claude.com/docs/en/build-with-claude/extended-thinking]
@@ -317,7 +320,7 @@ Fallback:   대안 도구 (Primary 실패 시 사용)
 
 ### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
-**근거:** Anthropic Claude 4 Best Practices + **Opus 4.8은 지시를 일관되게 따른다** ("uses tools cleanly and follows instructions with the consistency our autonomous engineering workloads need" [verified: anthropic.com/news/claude-opus-4-8]). 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — Codex 측 동일 가드.) **Fable 5는 한층 강화** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5].
+**근거:** Anthropic Claude 4 Best Practices + **Fable 5는 짧은 지시로 대부분 행동을 조향할 수 있다** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]. 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — Codex 측 동일 가드.) ⚠️ 2026-09-06 정정: 이전 근거였던 "Opus 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
 
 > **항목별 범위 명시 원칙**: broad 규칙은 적용 범위를 항목별로 명시하라. [이유] 범위가 명시된 지시가 더 정확히 적용된다. [GOOD] "verify each step, not just the first"  [BAD] "verify the step" (범위 모호). 메모리 8/13/18차(silent disappearance) 증상과 정합하는 일반 원칙 — 모델 버전 무관.
 
