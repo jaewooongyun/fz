@@ -48,7 +48,7 @@ FRONTMATTER_PATTERN = re.compile(
     r"^---\s*\n(.*?)\n---\s*\n(.*)", re.DOTALL
 )
 
-# id 추출: "ASD-1234", "X차", "feedback_..." 변형 모두 수용
+# id 추출: "TVG-1234"(티켓), "X차", "feedback_..." 변형 모두 수용
 ID_FROM_FILENAME_PATTERN = re.compile(r"feedback_(.+?)\.md$")
 
 # meta_family 차수 추출: "16차/23차/33차/34차" 또는 "16차 / 23차 / ..."
@@ -103,9 +103,9 @@ META_PATTERN_HINTS = [
     (r"reflection\s*gap|lessons-to-module|active\s*recall", "reflection gap"),
 ]
 
-# trigger_case 휴리스틱: "ASD-XXXX" or "PR #XXXX" or 세션 기반 (v5)
+# trigger_case 휴리스틱: 티켓 ID(`[A-Z]{2,6}-\d{2,5}`, 예: TVG-1234) or "PR #XXXX" or 세션 기반 (v5)
 TRIGGER_CASE_PATTERN = re.compile(
-    r"\b(ASD-\d{2,5}|PR\s*#\d{2,5}|D\d+\s*회귀|"
+    r"\b((?!PR-)[A-Z]{2,6}-\d{2,5}(?![A-Za-z0-9_])|PR\s*#\d{2,5}|D\d+\s*회귀|"
     r"이번\s*PR\s*\d+|PR\d+|이번\s*세션|"
     r"22\s*catch)"
 )
@@ -314,7 +314,7 @@ def extract_meta_pattern(body: str, fm: dict[str, str] | None = None) -> str | N
 
 def extract_trigger_case(body: str, fm: dict[str, str] | None = None) -> str | None:
     """v5.1 (M7 2026-05-26 P6 정정): 본문 매칭 실패 시 frontmatter `originSessionId` fallback.
-    40차/41차 메모리에 ASD-#### 본문 매칭 없음 → fm `originSessionId` UUID 사용.
+    본문에 티켓 ID 표기가 없는 메모리(40차/41차) → fm `originSessionId` UUID 사용.
     Codex P6 §추가 발견 #3 정정 — TRIGGER_CASE_PATTERN 확장 정량 효과 없음.
     """
     if fm is None:

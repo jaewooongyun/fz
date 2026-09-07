@@ -299,9 +299,9 @@ PROBE_LAYOUT = {
 
 
 def _write_probe_ledger(root, spec):
-    """`spec` = `[배치:]종류`. 배치 미지정이면 깊이 2(`ASD-0000/gates`)."""
+    """`spec` = `[배치:]종류`. 배치 미지정이면 깊이 2(`TICKET-0000/gates`)."""
     layout, _, kind = spec.rpartition(":")
-    rel = PROBE_LAYOUT.get(layout, "ASD-0000/gates")
+    rel = PROBE_LAYOUT.get(layout, "TICKET-0000/gates")
     gates = root / rel
     gates.mkdir(parents=True, exist_ok=True)
     name = "plan.draft.md" if kind == "draft" else "plan.md"
