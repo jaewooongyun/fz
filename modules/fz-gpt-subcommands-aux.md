@@ -31,7 +31,7 @@ cd "$GIT_ROOT" && codex exec review \
   -c model_reasoning_effort=xhigh \
   --add-dir "$SHARED_MODULES" \
   --title "[TICKET] PR 전 최종 리뷰" \
-  -o "$REVIEW_FILE"
+  -o "$REVIEW_FILE"   # 계측: gpt-exec.sh 인자에 --gpt-skill reviewer --gpt-skill-path unknown (자동 트리거 — 로드 확인 불가)
 
 # 2차 (major+ 이슈 존재 시): resume로 심화 검증
 if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
@@ -46,7 +46,7 @@ fi
 **/fz-challenger DA 모드**: `final` 완료 후 major 이상 이슈가 발견되면 DA(Devil's Advocate) 패스를 추가 실행하여 false positive를 제거한다.
 
 ```bash
-CHALLENGER_SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
+CHALLENGER_SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill challenger --gpt-skill-path "$CHALLENGER_SKILL_PATH"
 if [ -n "$CHALLENGER_SKILL_PATH" ] && [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
   codex exec \
     --output-schema schemas/gpt_peer_review_schema.json \
@@ -84,7 +84,7 @@ codex exec -c model_reasoning_effort=xhigh \
 전체 코드베이스를 1M context로 스캔하여 아키텍처 드리프트를 감지합니다.
 
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "drift" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "drift" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill drift --gpt-skill-path "$SKILL_PATH"
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
@@ -111,7 +111,7 @@ codex exec \
 
 ```bash
 REQUIREMENTS="$1"
-SKILL_PATH=$(get_gpt_skill_path "planner" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "planner" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill planner --gpt-skill-path "$SKILL_PATH"
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
