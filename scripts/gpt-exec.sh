@@ -15,9 +15,9 @@
 #   gpt-exec.sh review --cd DIR --out FILE (--base BR | --uncommitted | --commit SHA)
 #                        [--effort E] [--schema F] [--title T] [--ephemeral]
 #                        ⛔ review 는 --add-dir 미지원 (codex exec review 가 거부) — exec 모드를 쓸 것
-#                        [--expected-branch B]
+#                        [--expected-branch B] [--gpt-skill N] [--gpt-skill-path P]
 #   gpt-exec.sh exec   --cd DIR --out FILE --prompt-file F
-#                        [--effort E] [--schema F] [--add-dir D]
+#                        [--effort E] [--schema F] [--add-dir D] [--gpt-skill N] [--gpt-skill-path P]
 #
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건 / 12=codex 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
@@ -35,7 +35,7 @@ case "$MODE" in
   *) die 10 "mode는 review|exec — 받은 값: '${MODE}'" ;;
 esac
 
-CD="" OUT="" PROMPT_FILE="" SCHEMA="" EFFORT="high" TITLE="" EPHEMERAL="" EXPECTED_BRANCH=""
+CD="" OUT="" PROMPT_FILE="" SCHEMA="" EFFORT="high" TITLE="" EPHEMERAL="" EXPECTED_BRANCH="" GPT_SKILL="" GPT_SKILL_PATH=""
 ADD_DIRS=()
 SCOPE_ARGS=()          # ⛔ 문자열이 아니라 **배열** — 비인용 확장의 단어분할·glob를 차단한다
 SCOPE_KIND=""          # base|uncommitted|commit — 중복 지정을 거부하기 위해 기록
@@ -56,6 +56,9 @@ while [ $# -gt 0 ]; do
     --title)           need $# "--title";           TITLE="$2"; shift 2 ;;
     --add-dir)         need $# "--add-dir";         ADD_DIRS+=("$2"); shift 2 ;;
     --expected-branch) need $# "--expected-branch"; EXPECTED_BRANCH="$2"; shift 2 ;;
+    # ⛔ 계측 전용 — codex 에 전달하지 않는다(기록만). resolved 해석은 호출부 get_gpt_skill_path 소관.
+    --gpt-skill)       need $# "--gpt-skill";       GPT_SKILL="$2"; shift 2 ;;
+    --gpt-skill-path)  need $# "--gpt-skill-path";  GPT_SKILL_PATH="$2"; shift 2 ;;
     --base)            need $# "--base";            set_scope base "$2"
                        SCOPE_ARGS=(--base "$2");   shift 2 ;;
     --commit)          need $# "--commit";          set_scope commit "$2"
@@ -168,6 +171,17 @@ else
   codex exec "${EXEC_ARGS[@]}" "${ARGS[@]}" -- "$(cat "$PROMPT_FILE")" < /dev/null > "$LOG" 2>&1
 fi
 CODEX_EXIT=$?
+
+# ── gpt-skill 실사용 계측 (기록 전용) — 열: ts / mode / requested / resolved / fallback / exit (헤더 없음)
+#    resolved = 호출부가 해석한 SKILL.md 경로. 빈 값이면 일반 프롬프트 폴백이므로 fallback=1.
+#    ⛔ exit 열은 **codex 종료코드**다 — 사후 게이트 12~14(측정 실패)는 반영되지 않는다.
+#    ⛔ 로그 실패는 exit 계약(10~14)을 바꾸지 않는다. 디렉토리 부재 시 조용히 건너뛴다.
+TELEMETRY_DIR="${FZ_TELEMETRY_DIR:-${HOME:-}/.fz/telemetry}"   # 기본값 출처: scripts/fz_stop_telemetry.py:32
+if [ -n "$GPT_SKILL" ] && [ -d "$TELEMETRY_DIR" ]; then
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODE" "$GPT_SKILL" \
+    "${GPT_SKILL_PATH:--}" "$([ -n "$GPT_SKILL_PATH" ] && echo 0 || echo 1)" "$CODEX_EXIT" \
+    2>/dev/null >> "$TELEMETRY_DIR/gpt-skill-usage.tsv" || true
+fi
 
 # ── 사후 게이트: exit → 파일 → **계약**. 어느 하나라도 실패면 측정 실패.
 [ "$CODEX_EXIT" -eq 0 ] || { tail -20 "$LOG" >&2; die 12 "codex exit=$CODEX_EXIT (측정 실패 — 리뷰 결과 아님). log: $LOG"; }

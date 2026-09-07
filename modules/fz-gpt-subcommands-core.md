@@ -26,7 +26,7 @@ cd "$GIT_ROOT" && codex exec review \
   --base "$BASE_BRANCH" \
   -c model_reasoning_effort=high \
   --add-dir "$SHARED_MODULES" \
-  -o "$REVIEW_FILE"
+  -o "$REVIEW_FILE"   # 계측: gpt-exec.sh 인자에 --gpt-skill reviewer --gpt-skill-path unknown (자동 트리거 — 로드 확인 불가)
 ```
 
 **CLI 주요 플래그**: `-m`(모델), `-o`(파일 캡처), `--json`(JSONL), `--add-dir`(모노레포), `--ephemeral`(일회성)
@@ -40,7 +40,7 @@ cd "$GIT_ROOT" && codex exec review \
 fz-plan의 Phase 2. **`codex exec` + `--output-schema` 사용.**
 
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
@@ -143,7 +143,7 @@ exit 1 이면 재호출 1회 후 **미판정으로 기록**하고 Lead가 판단
 fz-review의 Phase 5.5. **`codex exec` + `--output-schema` 사용.**
 
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "guardian" "$FZ_PLUGIN_ROOT")
+SKILL_PATH=$(get_gpt_skill_path "guardian" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill guardian --gpt-skill-path "$SKILL_PATH"
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
@@ -173,7 +173,7 @@ codex exec \
 **/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.
 
 ```bash
-SEARCHER_SKILL_PATH=$(get_gpt_skill_path "searcher" "$FZ_PLUGIN_ROOT")
+SEARCHER_SKILL_PATH=$(get_gpt_skill_path "searcher" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill searcher --gpt-skill-path "$SEARCHER_SKILL_PATH"
 if [ -n "$SEARCHER_SKILL_PATH" ] && [ -z "$AFFECTED_SYMBOLS" ]; then
   codex exec \
     -c model_reasoning_effort=high \
@@ -196,7 +196,7 @@ cd "$GIT_ROOT" && codex exec review \
   --uncommitted \
   -c model_reasoning_effort=high \
   --ephemeral \
-  -o "$REVIEW_FILE"
+  -o "$REVIEW_FILE"   # 계측: gpt-exec.sh 인자에 --gpt-skill reviewer --gpt-skill-path unknown (자동 트리거 — 로드 확인 불가)
 ```
 
 > `--ephemeral`: 일회성 검증이므로 세션 미저장. 3-Tier 스킬 자동 트리거.
@@ -222,7 +222,7 @@ cd "$GIT_ROOT" && codex exec review \
 **/fz-fixer 연결**: 리뷰 결과에 수정 제안이 포함된 경우(issues with suggestion 필드 비어있지 않음), /fz-fixer 스킬을 참조하여 수정 전략을 제시한다.
 
 ```bash
-FIXER_SKILL_PATH=$(get_gpt_skill_path "fixer" "$FZ_PLUGIN_ROOT")
+FIXER_SKILL_PATH=$(get_gpt_skill_path "fixer" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill fixer --gpt-skill-path "$FIXER_SKILL_PATH"
 if [ -n "$FIXER_SKILL_PATH" ] && [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
   codex exec \
     -c model_reasoning_effort=high \
