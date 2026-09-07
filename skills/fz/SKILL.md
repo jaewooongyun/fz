@@ -18,9 +18,10 @@ allowed-tools: >-
   mcp__serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   Bash(grep *), Bash(cp *), Read, Grep, Glob
-provides: []
-needs: []
-intent-triggers: []
+metadata:
+  provides: []
+  needs: []
+  intent-triggers: []
 ---
 
 # /fz - 유니버셜 오케스트레이터 (v3)
@@ -254,13 +255,13 @@ Phase 1 매칭 0  →  3.1 트리거 대조
 
 ### 3.2 동적 파이프라인 구성 (폴백)
 
-사전 정의 파이프라인에 매칭되지 않으면 `provides`/`needs` 그래프로 자동 구성합니다.
+사전 정의 파이프라인에 매칭되지 않으면 `metadata.provides`/`metadata.needs` 그래프로 자동 구성합니다.
 
 ```
 알고리즘:
 1. 의도 분석 → 최종 목표 스킬 결정
-2. 해당 스킬의 needs 확인
-3. needs를 provides하는 스킬 역추적 (재귀)
+2. 해당 스킬의 metadata.needs 확인
+3. 그 토큰을 metadata.provides 하는 스킬 역추적 (재귀)
 4. 토폴로지 정렬 → 선형 파이프라인
 5. 끊어진 체인 → 스킬 자동 삽입 or AskUserQuestion
 ```

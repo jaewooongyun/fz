@@ -21,11 +21,12 @@ allowed-tools: >-
   mcp__lsp__diagnostics_delta,
   mcp__lsp__hover,
   Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Workflow
-provides: [code-changes]
-needs: [planning]
-intent-triggers:
-  - "구현|코드|만들어|개발"
-  - "implement|code|develop|build"
+metadata:
+  provides: [code-changes]
+  needs: [planning]
+  intent-triggers:
+    - "구현|코드|만들어|개발"
+    - "implement|code|develop|build"
 ---
 
 # /fz-code - 구현 + 빌드 검증 스킬

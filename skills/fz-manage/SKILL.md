@@ -10,12 +10,13 @@ allowed-tools: >-
   mcp__serena__list_memories,
   mcp__serena__read_memory,
   Read, Grep, Glob, Bash, Edit, Write
-provides: []
-needs: [none]
-intent-triggers:
-  - "관리|스킬|의존성|체크|벤치마크|일괄.*평가"
-  - "manage|skill|depend|check|benchmark|batch.*eval"
-  - "메모리.*반영|교훈.*반영|reflect.*module|lessons.*module"
+metadata:
+  provides: []
+  needs: [none]
+  intent-triggers:
+    - "관리|스킬|의존성|체크|벤치마크|일괄.*평가"
+    - "manage|skill|depend|check|benchmark|batch.*eval"
+    - "메모리.*반영|교훈.*반영|reflect.*module|lessons.*module"
 ---
 
 # /fz-manage - 스킬 시스템 관리
@@ -93,7 +94,7 @@ build.md, governance.md, session.md, skill-template.md, team-core.md, README.md
 ### 절차
 
 1. `Read("skills/fz-{name}/SKILL.md")` → YAML frontmatter + 본문
-2. YAML에서 `allowed-tools`, `provides`, `needs`, `intent-triggers` 추출
+2. YAML에서 `allowed-tools`, `metadata.provides`, `metadata.needs`, `metadata.intent-triggers` 추출
 2b. **실효 모델은 YAML이 아니라 스크립트에서 읽는다** — `Grep("agentType: 'fz:", "workflows/{skill}-*.js")` → `model`/`effort` 인자 표시. ⛔ `model-strategy` frontmatter는 2026-08-09 제거(런타임 효과 0). 정본: `modules/governance.md` § Truth-of-Source
 3. `Grep("fz-{name}", "skills/")` → 역참조 (이 스킬을 참조하는 다른 스킬)
 4. 파일 크기 (줄 수) 계산
@@ -120,7 +121,7 @@ build.md, governance.md, session.md, skill-template.md, team-core.md, README.md
 
 ### 절차
 
-1. 모든 SKILL.md의 `allowed-tools`, `provides`, `needs` 파싱
+1. 모든 SKILL.md의 `allowed-tools`, `metadata.provides`, `metadata.needs` 파싱
 2. provides/needs 체인 그래프 + MCP 의존성 생성
 
 ### provides/needs 체인 그래프
@@ -215,7 +216,7 @@ Lead가 보고에 추가할 것:
    | 검증 항목 | 기준 | 판정 |
    |----------|------|------|
    | Description 품질 | what+when+when-not+한영키워드 | PASS/FAIL |
-   | YAML 완전성 | name, description, allowed-tools, provides, needs | PASS/FAIL |
+   | YAML 완전성 | name, description, allowed-tools, metadata.provides, metadata.needs | PASS/FAIL |
    | 크기 제한 | ≤500줄 | PASS/FAIL |
    | Few-shot 예시 | ≥3개 (BAD/GOOD 쌍 포함) | PASS/WARN |
    | Gate 체크리스트 | 각 Phase에 Gate 존재 | PASS/WARN |

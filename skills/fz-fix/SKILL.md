@@ -20,11 +20,12 @@ allowed-tools: >-
   mcp__lsp__hover,
   mcp__lsp__peek_definition,
   Edit, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Workflow
-provides: [code-changes]
-needs: [none]
-intent-triggers:
-  - "수정|고쳐|버그|크래시|에러"
-  - "fix|bug|crash|error|patch"
+metadata:
+  provides: [code-changes]
+  needs: [none]
+  intent-triggers:
+    - "수정|고쳐|버그|크래시|에러"
+    - "fix|bug|crash|error|patch"
 ---
 
 # /fz-fix - 버그 수정 스킬

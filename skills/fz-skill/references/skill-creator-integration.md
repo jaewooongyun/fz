@@ -18,7 +18,7 @@
 **fz 스킬에 더 유효한 검증**:
 - 정적 eval (fz-skill eval 기존 Static Analysis 8항목)
 - intent-registry 매칭 테스트 (/fz Phase 1 시뮬레이션) — ⛔ `/fz` Phase 1 은 `modules/intent-registry.md` 를 읽는다 — 스킬 YAML 만 고치면 `/fz` 가 못 본다
-- provides/needs 체인 정합성 (fz-manage check)
+- metadata.provides/metadata.needs 체인 정합성 (fz-manage check)
 
 ## skill-creator 경로 탐색
 
@@ -47,7 +47,7 @@ python3 -c "import anthropic" 2>/dev/null || echo "pip install anthropic 필요"
 
 ### should-trigger 쿼리 (10개)
 
-대상 스킬의 `intent-triggers` 정규식에서 추출:
+대상 스킬의 `metadata.intent-triggers` 정규식에서 추출:
 
 1. 각 정규식 패턴에서 **구체적 사용자 발화** 3-4개 생성
 2. **구어체 변형** 포함: "~해줘", "~좀", "~할래", 영어 혼용
@@ -92,7 +92,7 @@ GOOD: "스킬 목록 보여줘" (keyword "스킬" 겹치지만 fz-manage 담당)
 ### Phase 2: Eval 쿼리 생성 + 사용자 검토
 
 ```
-1. 대상 스킬 SKILL.md 읽기 → intent-triggers + Boundaries 추출
+1. 대상 스킬 SKILL.md 읽기 → metadata.intent-triggers + Boundaries 추출
 2. 위 규칙으로 should-trigger 10개 + should-not-trigger 10개 생성
 3. JSON 배열 작성:
    [{"query": "...", "should_trigger": true}, ...]

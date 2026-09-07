@@ -12,12 +12,13 @@ allowed-tools: >-
   Bash(git *),
   Bash(bash *),
   AskUserQuestion
-provides: []
-needs: [none]
-intent-triggers:
-  - "리베이스|브랜치.*최신화|브랜치.*동기화|브랜치.*업데이트|develop.*위로|롱텀.*브랜치"
-  - "리베이스.*(사라|누락|덮어)|(리베이스|force.?push).*(유실|덮어씌)"
-  - "rebase|sync.*branch|refresh.*branch|update.*branch"
+metadata:
+  provides: []
+  needs: [none]
+  intent-triggers:
+    - "리베이스|브랜치.*최신화|브랜치.*동기화|브랜치.*업데이트|develop.*위로|롱텀.*브랜치"
+    - "리베이스.*(사라|누락|덮어)|(리베이스|force.?push).*(유실|덮어씌)"
+    - "rebase|sync.*branch|refresh.*branch|update.*branch"
 ---
 
 # /fz-rebase — 롱텀 브랜치 리베이스 최신화

@@ -4,7 +4,7 @@
 
 ## Triggering Test
 
-**should-trigger** (description '예:' 어휘 + intent-triggers 기반)
+**should-trigger** (description '예:' 어휘 + metadata.intent-triggers 기반)
 
 | 쿼리 | 예상 | 근거 |
 |------|------|------|

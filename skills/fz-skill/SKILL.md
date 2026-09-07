@@ -8,11 +8,12 @@ argument-hint: "[create|update|delete|new-agent|eval|optimize] [대상] [--from-
 allowed-tools: >-
   Read, Write, Edit, Grep, Glob,
   mcp__sequential-thinking__sequentialthinking
-provides: [skill-management]
-needs: [none]
-intent-triggers:
-  - "스킬.*만들|스킬.*생성|스킬.*수정|스킬.*삭제|스킬.*평가|에이전트.*만들|에이전트.*생성"
-  - "create.*skill|new.*skill|update.*skill|delete.*skill|eval.*skill|create.*agent|new.*agent|optimize.*skill|description.*최적화|트리거.*테스트"
+metadata:
+  provides: [skill-management]
+  needs: [none]
+  intent-triggers:
+    - "스킬.*만들|스킬.*생성|스킬.*수정|스킬.*삭제|스킬.*평가|에이전트.*만들|에이전트.*생성"
+    - "create.*skill|new.*skill|update.*skill|delete.*skill|eval.*skill|create.*agent|new.*agent|optimize.*skill|description.*최적화|트리거.*테스트"
 ---
 
 # /fz-skill - 스킬/에이전트 CRUD 스킬
@@ -76,8 +77,8 @@ intent-triggers:
 2. YAML frontmatter 채우기:
    - `name`: fz-{name} 형식
    - `description`: 무엇+언제+언제아닌지+한영키워드
-   - `provides/needs`: 기존 체인과 정합
-   - `intent-triggers`: 중복 없는 한영 패턴
+   - `metadata.provides`/`metadata.needs`: 기존 체인과 정합
+   - `metadata.intent-triggers`: 중복 없는 한영 패턴
    - `allowed-tools`: 필요한 도구만
    - `user-invocable`: 오케스트레이터 전용 하위 스킬이면 `false`
    > ⛔ **필수 필드 정본** = `modules/governance.md` § 스킬 최소 기준 (L1 공식 4 + L2 fz 정책 2). ⛔ `team-agents`·`composable`·`model-strategy`는 **2026-08-09 제거** — 멀티에이전트 구성·모델은 `workflows/{skill}-{pattern}.js`가 소유한다
@@ -212,7 +213,7 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
    | 검증 항목 | 기준 | 판정 |
    |----------|------|------|
    | Description 품질 | what+when+when-not+한영키워드 | PASS/FAIL |
-   | YAML 완전성 | name, description, allowed-tools, provides, needs | PASS/FAIL |
+   | YAML 완전성 | name, description, allowed-tools, metadata.provides, metadata.needs | PASS/FAIL |
    | 크기 제한 | ≤500줄 | PASS/FAIL |
    | Few-shot 예시 | ≥3개 (BAD/GOOD 쌍 포함) | PASS/WARN |
    | Gate 체크리스트 | 각 Phase에 Gate 존재 | PASS/WARN |

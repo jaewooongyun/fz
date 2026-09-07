@@ -20,11 +20,12 @@ argument-hint: "[target] [--options]"     # optional
 allowed-tools: >-                         # required (L1 공식) — comma-separated
   mcp__serena__find_symbol,
   Edit, Read, Grep, Glob, Bash(pattern)
-provides: [capability-tokens]             # required (L2 fz 정책) — /fz 동적 파이프라인이 소비
-needs: [capability-tokens|none]           # required (L2 fz 정책) — 자기완결이면 [none]
-intent-triggers:                          # for /fz orchestrator routing
-  - "한국어|패턴"
-  - "english|pattern"
+metadata:                                 # required (L2 fz 정책) — fz 자작 키 3종은 이 맵 하위
+  provides: [capability-tokens]           # /fz 동적 파이프라인이 소비
+  needs: [capability-tokens|none]         # 자기완결이면 [none]
+  intent-triggers:                        # for /fz orchestrator routing
+    - "한국어|패턴"
+    - "english|pattern"
 compatibility: >-                         # optional, 1-500 chars
   iOS 16+, Xcode 16+, Swift 6
 disable-model-invocation: false          # true: 사용자 명시 호출만 허용

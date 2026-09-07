@@ -12,13 +12,14 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   Task, TaskCreate, TaskUpdate,
   Skill
-provides: [doc-modernization]
-needs: [none]
-intent-triggers:
-  - "최신화|모더나이제이션|모더나이즈|modernize"
-  - "가이드 업데이트|문서 갱신|문서 업데이트|reference 업데이트"
-  - "stale 정리|deprecated 정리|구버전 정리"
-  - "[Oo]pus ?-?5|[Oo]pus.*4\\.\\d|[Ss]onnet ?-?5|[Ff]able ?-?5|GPT.*5\\.\\d|새 모델 출시|최신 모델"
+metadata:
+  provides: [doc-modernization]
+  needs: [none]
+  intent-triggers:
+    - "최신화|모더나이제이션|모더나이즈|modernize"
+    - "가이드 업데이트|문서 갱신|문서 업데이트|reference 업데이트"
+    - "stale 정리|deprecated 정리|구버전 정리"
+    - "[Oo]pus ?-?5|[Oo]pus.*4\\.\\d|[Ss]onnet ?-?5|[Ff]able ?-?5|GPT.*5\\.\\d|새 모델 출시|최신 모델"
 ---
 
 # /fz-modernize - 가이드 모더나이제이션 스킬

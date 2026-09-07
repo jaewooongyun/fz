@@ -17,11 +17,12 @@ allowed-tools: >-
   mcp__lsp__diagnostics_delta,
   mcp__lsp__references,
   Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
-provides: [review-results]
-needs: [code-changes]
-intent-triggers:
-  - "리뷰|검증|품질|검토"
-  - "review|validate|quality|check"
+metadata:
+  provides: [review-results]
+  needs: [code-changes]
+  intent-triggers:
+    - "리뷰|검증|품질|검토"
+    - "review|validate|quality|check"
 ---
 
 # /fz-review - 리뷰 + 품질 보증 스킬

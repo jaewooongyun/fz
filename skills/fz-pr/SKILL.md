@@ -14,11 +14,12 @@ allowed-tools: >-
   mcp__atlassian__transition-issue,
   mcp__atlassian__create-comment,
   Bash(git *)
-provides: [pr]
-needs: [commit]
-intent-triggers:
-  - "PR|풀리퀘스트"
-  - "PR|pull.?request"
+metadata:
+  provides: [pr]
+  needs: [commit]
+  intent-triggers:
+    - "PR|풀리퀘스트"
+    - "PR|pull.?request"
 ---
 
 # PR Creation Skill

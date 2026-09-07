@@ -63,7 +63,7 @@
 
 ### ~~P1-B: Generator≠Evaluator Lead 독립 절차~~ — ✅ **구현 완료 종결 (2026-08-24)**
 - 관측 #0: OBS-03 (원본, 3차 설계 반영)
-- ⛔ **승격 절차를 거치지 않고 구현이 먼저 됐다** — `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:64` 참조. 관측 2건 대기는 무의미해졌다
+- ⛔ **승격 절차를 거치지 않고 구현이 먼저 됐다** — `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:65` 참조. 관측 2건 대기는 무의미해졌다
 - 처분: **종결** (REMOVED 아님 — 폐기가 아니라 반영 확인). 사용자 결정 2026-08-24
 
 ### ~~P1-C: Drift telemetry (AskUserQuestion)~~ — ⛔ **REMOVED (2026-08-24)**
@@ -83,7 +83,7 @@
 
 ### ~~P2-B: fz-fix 자동 전환 + complexity.md 보정~~ — ✅ **구현 완료 종결 (2026-08-24)**
 - 관측 #0: OBS-03 (plan-impact 단독 지적)
-- ⛔ 구현이 먼저 됐다 — `skills/fz-fix/SKILL.md:41 · 216 · 299`(테스트 케이스 포함)
+- ⛔ 구현이 먼저 됐다 — `skills/fz-fix/SKILL.md:42 · 217 · 300`(테스트 케이스 포함)
 - 처분: **종결**. 사용자 결정 2026-08-24
 
 ### P2-C: general closure-capture retain cycle lens (Claude 경로) — 트랙 C
@@ -92,7 +92,7 @@
 - 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. Codex `gpt-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/Codex 비대칭).
 - generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
 - ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
-- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:213` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(Codex 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
+- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:214` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(Codex 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
 - 승격 목표 (트랙 C → 트랙 A): 별개 세션 추가 관측 후 safety-audit §확장 active 전환.
 
 ## OBS-08 회고 후보 (P2, 관측 #1)
@@ -382,7 +382,7 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 
 | 항목 | 처분 | 진입 조건 |
 |---|---|---|
-| registry ↔ SKILL.md `intent-triggers` 드리프트 | **기록 유지** — 저장소가 이미 판단했다 | 정확한 오라클이 생기면. ⛔ 재시도 금지 근거: 2026-08-25 시도 후 *"오라클이 부정확해 철회"*(`skills/fz/SKILL.md` Phase 1 주석 · 커밋 `4717de5`) |
+| registry ↔ SKILL.md `metadata.intent-triggers` 드리프트 | **기록 유지** — 저장소가 이미 판단했다 | 정확한 오라클이 생기면. ⛔ 재시도 금지 근거: 2026-08-25 시도 후 *"오라클이 부정확해 철회"*(`skills/fz/SKILL.md` Phase 1 주석 · 커밋 `4717de5`) |
 | `tier2-merge` 대조 러너 부재 | 관찰 유지 | tier 판정 회귀가 **실제로** 1건 관측되면 러너 신설. 지금은 가설이다 |
 | 조건부 규칙 활성화 마커 부재 | 관찰 유지 (결론은 반증됨 — 범위 축소분만 성립) | candidate 규칙이 5세션 관측을 마치고 활성 판정을 받을 때 함께 |
 | 같은 개념 3중 어휘 | 관찰 유지 | 어휘 불일치가 오독을 만든 사례 1건. 문서 정합만으로는 값이 낮다 |
@@ -426,9 +426,9 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 
 | 항목 | 구현 상태 | 근거 |
 |---|:--:|---|
-| **P1-B** Generator≠Evaluator Lead 독립 절차 | ✅ **구현됨** | `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:64` 참조 |
+| **P1-B** Generator≠Evaluator Lead 독립 절차 | ✅ **구현됨** | `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:65` 참조 |
 | **P2-A** Q-S5 Decision Re-open Gate | ✅ **구현됨** | `modules/scope-challenge.md:104` Appendix + `:56` `parent-reopen` 배선 + `skills/fz-plan/SKILL.md` § Phase 3 절차 5 `Refactoring Mode 감지` 발동 조건 |
-| **P2-B** fz-fix 자동 전환 + complexity 보정 | ✅ **구현됨** | `skills/fz-fix/SKILL.md:41 · 216 · 299`(테스트 케이스 포함) |
+| **P2-B** fz-fix 자동 전환 + complexity 보정 | ✅ **구현됨** | `skills/fz-fix/SKILL.md:42 · 217 · 300`(테스트 케이스 포함) |
 | **P1-C** Drift telemetry (AskUserQuestion) | ⛔ **미구현** | 본 파일 밖 참조 **0건** |
 | **P1-D** Q4 재구성 + rule 11차 컴파일 가능 기준 | ⛔ **미구현** | 본 파일 밖 참조 **0건** |
 

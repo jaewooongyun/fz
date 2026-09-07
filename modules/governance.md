@@ -116,7 +116,7 @@
 
 | 항목 | 기준 | 근거 |
 |------|------|------|
-| YAML 필수 필드 (**정본** — 2층) | **L1 Claude Code 공식**: `name` · `description` · `allowed-tools` · `user-invocable` / **L2 fz 정책**: `provides` · `needs` | L1은 Progressive Disclosure L1, L2는 `/fz` 동적 파이프라인(`skills/fz/SKILL.md` §3.2)이 실제 소비 |
+| YAML 필수 필드 (**정본** — 2층) | **L1 Claude Code 공식**(최상위): `name` · `description` · `allowed-tools` · `user-invocable` / **L2 fz 정책**(`metadata:` 하위): `metadata.provides` · `metadata.needs` | L1은 Progressive Disclosure L1, L2는 `/fz` 동적 파이프라인(`skills/fz/SKILL.md` §3.2)이 실제 소비 |
 | Description 4요소 | what + when + when-not + 한영키워드 | 트리거 정확도 |
 | 크기 제한 | ≤500줄 | Progressive Disclosure L2 |
 | Boundaries | Will/Will Not + 대안 | 범위 명확화 |

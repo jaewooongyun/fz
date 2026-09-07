@@ -248,9 +248,9 @@ User prompt에 추가:
 
 | 항목 | 실패 시 조치 |
 |------|------------|
-| #1 YAML 필수 필드 | 정본 `modules/governance.md` § 스킬 최소 기준 확인 — L1 공식(`name`·`description`·`allowed-tools`·`user-invocable`) + L2 fz 정책(`provides`·`needs`). ⛔ 여기서 목록 재정의 금지 |
+| #1 YAML 필수 필드 | 정본 `modules/governance.md` § 스킬 최소 기준 확인 — L1 공식(`name`·`description`·`allowed-tools`·`user-invocable`) + L2 fz 정책(`metadata.provides`·`metadata.needs`). ⛔ 여기서 목록 재정의 금지 |
 | #2 MCP 유효성 | MCP 서버 상태 확인, allowed-tools에서 무효 도구 제거 |
-| #3 provides/needs 체인 | 누락된 provides 토큰 추가, needs 체인 DAG 검증 |
+| #3 metadata.provides/metadata.needs 체인 | 누락된 metadata.provides 토큰 추가, metadata.needs 체인 DAG 검증 |
 | #4 intent-triggers 중복 | §1.3 절차대로 키워드 분리 |
 | #5 스킬 크기 | 500줄 초과 → 모듈 분리 (Level 3) |
 | #6 깨진 파일 참조 | 경로 오류 수정, 삭제된 파일 참조 제거 |

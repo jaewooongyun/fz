@@ -20,12 +20,13 @@ allowed-tools: >-
   mcp__atlassian__get-issue,
   mcp__atlassian__search-issues,
   Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
-provides: [planning, architecture-analysis]
-needs: [none]
-intent-triggers:
-  - "계획|설계|아키텍처|요구사항"
-  - "plan|design|architect|requirement"
-  - "리팩토링|치환|흡수|이전|migration|refactor"
+metadata:
+  provides: [planning, architecture-analysis]
+  needs: [none]
+  intent-triggers:
+    - "계획|설계|아키텍처|요구사항"
+    - "plan|design|architect|requirement"
+    - "리팩토링|치환|흡수|이전|migration|refactor"
 ---
 
 # /fz-plan - 계획 + 설계 스킬
