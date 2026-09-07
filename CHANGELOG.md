@@ -1,5 +1,70 @@
 # Changelog
 
+### v4.32.0 (2026-09-07) — 배포물이 사용자의 Jira 접두를 알고 있었고, 자작 키는 공식 표 밖에 서 있었다 [MINOR]
+
+이번 대상은 fz 자신이다. `/fz-modernize` 6-Phase 를 fz-plugin 에 그대로 적용해(Self-application) 스킬 22 ·
+에이전트 13 · 워크플로 6 · gpt-skills 8 · 모듈 45 · 스크립트 19 를 전수 판정했다. 입력은 대기열 131건 판정과
+44일 텔레메트리다. Phase 4 Codex 는 self-application 계약상 non-skippable 이라 3회 돌았고(11 → 7 → 4건),
+Gate 3 에서 사용자 결정 6건(UD1~UD6)을 받아 Phase 5 를 5개 Wave 로 실행했다. ⛔ **판정값에 `remove` 는
+없다** — 이 감사가 낼 수 있는 최댓값은 `remove-candidate` 이고 제거는 사용자 결정 + fixture + A/B 뒤의
+일이다. 그래서 스킬 수는 22 그대로다.
+
+#### 티켓 접두 일반화 (H1)
+사용자 지시는 "ASD 티켓은 없어, TVG 로 바뀐지 한참됐어" 였는데 **이걸 치환 과제로 읽으면 틀린다.**
+플러그인은 배포물이고 `TICKET_PREFIX|티켓 접두` 어휘가 0건이었다 — 접두가 낡은 게 아니라 **사용자 한 명의
+Jira 접두를 하드코딩한 것 자체가 결함**이다. `ASD` 208줄 / 38파일을 다른 접두로 바꾸는 대신 **일반화**했다:
+코드 계약은 `\b(?!PR-)[A-Z]{2,6}-\d{2,5}(?![A-Za-z0-9_])`, 산문은 '티켓 폴더(WORK_DIR)' · 'Work Dir
+Pre-flight' · `{TICKET}` 을 포함한 6슬롯 어휘 계약이다. 기본 프로브 레이아웃도 `ASD-0000/gates` →
+`TICKET-0000/gates` 로 접두 중립이 됐다.
+
+⭐ 값이 더 큰 것은 **후행 경계 한 글자**다. 워커가 낸 `(?!\w)` 는 Python `\w` 가 한글 음절을 매치하므로
+`TVG-4442를` 같은 조사 부착형을 떨어뜨린다 — 기존 `ASD` 표기에도 똑같이 적용되는 **하위호환 손실**이다.
+`(?![A-Za-z0-9_])` 로 좁혀 ASCII 접미(`TVG-12suffix`)만 계속 거르게 했다. 조사 부착형은 fixture 케이스 10 이
+`ASD-1234에서`·`TVG-4442를` 의 매치를 단언한다 — 초안이 NOTE 로 유보했던 것을 승격했다.
+
+⛔ **표현 드리프트는 `ASD → 0건` AC 가 못 잡는다.** 워커 둘이 같은 슬롯을 `티켓 폴더 Pre-flight`(4파일)와
+`Work Dir Pre-flight`(3파일)로 갈라 썼는데 두 표현 모두 잔존 grep 을 통과한다. 실제 AC 는 잔존 개수가
+아니라 **표현 분포**였다 — Phase 0 이 티켓 부재 시 NOTASK·Serena 도 포함하므로 `Work Dir Pre-flight`
+1종으로 정규화했다.
+
+#### metadata 이전 (UD6)
+fz 자작 키 6종 72건이 SKILL.md frontmatter **최상위**에 있었다. Probe 가 확인한 공식 사양은 Skills
+frontmatter 공식 표 밖의 키는 `metadata:` 맵이라는 것이다. 그런데 이건 구현 정리가 아니라 **정책 변경**이다
+— `modules/governance.md:119` 가 `provides`·`needs` 를 'L2 fz 정책' 필수 필드 **정본**으로 선언하고 있었기
+때문이다. 그래서 Gate 3 사용자 결정(UD6)으로 올렸고 (a) 이전을 택했다. 정본 1행 · 생성 템플릿 · lint 파서
+(중첩 대응 + 하위호환 창, S7 에서 회수) · 소비자 15파일을 한 사이클에 묶었다 — 템플릿을 안 고치면 그 뒤로
+생성되는 스킬이 새 lint 계약을 위반한다. ⛔ SKILL.md 미인식 키의 **런타임 처리 사양은 여전히 `[미검증]`**
+이다(공식 warning/strict 설명은 plugin.json 문맥). 이전 근거는 공식 metadata 맵이지 strict 실패 가설이 아니다.
+
+⭐ 워커 두 명이 **들여쓰기 관례에서 충돌**했다. Lead 지시는 3칸이었고 한 워커가 그걸 근거로 들었는데,
+실측 frontmatter 연속행은 **272/272 가 2칸**이었다. 3칸의 출처는 `lint_contracts.py:157` docstring 의
+오기였다 — 정본이 아니라 **주석이 관례를 참칭**하고 있었다. 키를 옮기면서 그 docstring 을 같이 고쳤다.
+
+#### 조건부 모듈 · 계측 · 정정 — 그리고 반증된 가설 하나
+UD1(a) 로 `modules/plan-direction-preflight.md` 를 신설해 fz-plan Phase 0c·0.5 **절차 본문 49줄**을 옮겼다
+(헤딩·발동 요약·Gate 체크리스트는 SKILL.md 잔류 — AC1b). ⚠️ **floor 절감은 0이다.** 새 모듈은 조건부로
+분류됐지만(`[로드/조건부] 805tok` 실측) SKILL.md 에서 빠진 **무조건 참조가 없어** floor 19,790 이 그대로다.
+Gate 3 시점의 "줄 수 있다"는 가설이었고 반증됐다(F-151) — 실제 이득은 본문 499 → 457줄뿐이다. 그대로 적는다.
+
+나머지는 셋이다. `skill-testing.md §8.2` 판정표에 **adjust 축**을 넣었다(overturn 0~1 **AND** adjust 0~1 일
+때만 A/B 후보 · 0~1 은 잠정 휴리스틱 · "카운트는 판정 건수이지 옳음이 아니다" 경계 유지). `gpt-exec.sh` 에
+gpt-skill 실사용 3필드(requested / resolved / fallback) tsv 기록을 붙였다 — ⛔ codex 에 전달하지 않고 기록만
+하며 로그 실패가 exit 계약을 바꾸지 않는다. source-pack 인용 줄번호 3건 정정과 Probe ID Tier 접두 도입은
+감사 아티팩트 쪽이다.
+
+준비 Step 4건(UD2~UD5)은 **배포물 0줄**이다 — 결정 기록 · 대체 경로 · 반사실 비교 · fixture 설계 · A/B
+프로토콜만 썼다. ⭐ 그중 하나가 감사 축 자체의 구멍을 드러냈다(F-148): fz-pr-digest 의 attribution 0 을
+"미사용"으로 읽었는데 `disable-model-invocation: true` 라 자동 라우팅이 **닿을 수 없는** 구조였고, 살아 있는
+소비자는 peer-review `--explain` 이었다. 판정 축 10개에 **측정 도달성**이 없었다.
+
+검증은 Codex 3회 전건 수용·적용 · lint 0 · health-check 11/11 · ticket-prefix fixture 16 PASS(10 케이스) ·
+metadata 22/22 · 배포물 `ASD` 0 이다. ⛔ 3회차는 검증을 완주하고도 `--output-schema` 를 내지 않은 채
+5h19m 매달렸다(F-147) — 한도 소진으로 fz-modernize '최소 수정 승인' 모드에서 Gate 3 를 통과시켰다.
+⛔ 신설에 관해 정확히 말하면: **모델 행동을 새로 규정하는 원칙·게이트 신설 0**이고, 모듈 1개(UD1)는 AC6 의
+승인된 예외다.
+
+→ [릴리즈 노트](docs/releases/v4.32.0.md)
+
 ### v4.31.0 (2026-09-06) — 정본이 자기 Lead 모델을 몰랐고, 하네스는 자기 무게를 재는 눈이 없었다 [MINOR]
 
 두 갈래를 한 릴리즈로 낸다. **가이드 갱신** — 감사가 "하네스가 해롭다는 외부 근거는 확실하고 fz 가 그
