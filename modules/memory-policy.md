@@ -24,14 +24,14 @@
 
 | 네임스페이스 | 카테고리 | 예시 | 용도 |
 |------------|---------|------|------|
-| `fz` | `session` | `fz:session:current` | 현재 활성 세션 + ASD WORK_DIR 경로 |
+| `fz` | `session` | `fz:session:current` | 현재 활성 세션 + 티켓 폴더 WORK_DIR 경로 |
 | `fz` | `artifact` | `fz:artifact:step1` | 파이프라인 단계 산출물 |
-| `fz` | `checkpoint` | `fz:checkpoint:{skill}-{phase}` | Phase 완료 또는 의미 있는 결과 시 경량 저장. ASD 미활성 시 유일한 compact recovery 수단. ~3,000자 <!-- 기존: 500자 --> 핵심 결정 요약 (Essential Context 포함) |
+| `fz` | `checkpoint` | `fz:checkpoint:{skill}-{phase}` | Phase 완료 또는 의미 있는 결과 시 경량 저장. 티켓 폴더(WORK_DIR) 미활성 시 유일한 compact recovery 수단. ~3,000자 <!-- 기존: 500자 --> 핵심 결정 요약 (Essential Context 포함) |
 | `fz` | `checkpoint` | `fz:checkpoint:essential` | /fz가 단독 관리. 현재 Active State + Key Decisions + Constraints (~3,000자 <!-- 기존: 500자 -->). 파이프라인 완료 시 삭제 |
 | `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}` | mid-pipeline discover 결과. phase={plan\|code\|review}. 파이프라인 완료 시 삭제 |
 | `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}-final` | discover 수렴 완료 시 최종 결과. `-final` suffix는 동일 phase 키를 덮어쓰지 않고 수렴 상태를 별도 보존 |
-| `fz` | `checkpoint` | `fz:checkpoint:review-issues` | fz-review Phase 5 완료 후 이슈 요약. 비ASD 모드 전용 |
-| `fz` | `checkpoint` | `fz:checkpoint:implication-{skill}` | Implication Scan 결과 (비ASD 시). 실행/관찰 함의 요약. 파이프라인 완료 시 삭제 |
+| `fz` | `checkpoint` | `fz:checkpoint:review-issues` | fz-review Phase 5 완료 후 이슈 요약. 비-티켓 세션 모드 전용 |
+| `fz` | `checkpoint` | `fz:checkpoint:implication-{skill}` | Implication Scan 결과 (비-티켓 세션 시). 실행/관찰 함의 요약. 파이프라인 완료 시 삭제 |
 | `fz` | `checkpoint` | `fz:checkpoint:plan-direction` | 방향 판정 결과 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:plan-v{N}` | 계획 버전 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:plan-verify` | 검증 결과 (임시) |
@@ -134,7 +134,7 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 |------|------|------|
 | L1 Hot | auto-memory (MEMORY.md) | 세션 간 영속. 프로젝트 수준 교훈/패턴/규칙. `modules/memory-guide.md` 정책 준수 |
 | L2 Structured | Serena Memory (`fz:*`) | 세션 내 임시. 파이프라인 진행 상태/체크포인트 (~3,000자 <!-- 기존: 500자 -->). compact recovery 수단 |
-| L3 File Artifact | ASD 폴더 파일 | 세션 내 상세. 무제한 크기 구조화 산출물. L3=canonical, L2=cursor |
+| L3 File Artifact | 티켓 폴더 파일 | 세션 내 상세. 무제한 크기 구조화 산출물. L3=canonical, L2=cursor |
 
 > L1.5: Serena decision/pattern 키는 L2 임시가 아닌 영속. GC 대상 아님.
 
@@ -142,11 +142,11 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 
 > 참조: Anthropic 공식 Memory tool (file-system-based memory, https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool). Opus 4.x는 file-system 기반 메모리 활용도가 높음 — 도구를 새로 추가한 것이 아니라 **활용**이 강함.
 
-공식 Memory tool은 **client-side 도구** — 저장 backend/위치는 **사용자/애플리케이션이 제어**. "across conversations"/"persist between sessions" 지원. 기능적으로 fz의 L3 (ASD 폴더 + `.claude/projects/.../memory/`)와 **중복 가능성** 존재:
+공식 Memory tool은 **client-side 도구** — 저장 backend/위치는 **사용자/애플리케이션이 제어**. "across conversations"/"persist between sessions" 지원. 기능적으로 fz의 L3 (티켓 폴더 + `.claude/projects/.../memory/`)와 **중복 가능성** 존재:
 
 | 관점 | fz 자체 구현 (L1/L3) | Claude Memory tool |
 |------|----------------------|---------------------|
-| 저장소 | `MEMORY.md` + ASD 폴더 + Serena | 클라이언트/애플리케이션 관리 backend |
+| 저장소 | `MEMORY.md` + 티켓 폴더 + Serena | 클라이언트/애플리케이션 관리 backend |
 | 관리 | fz 파이프라인 + memory-guide.md 정책 | 도구 구성 + 모델 사용 패턴 |
 | 세션 | cross-session (파일 기반) | cross-session 가능 (backend 구성에 따름) |
 | 이식성 | Claude Code 독립 | Claude API/Code 공통 |

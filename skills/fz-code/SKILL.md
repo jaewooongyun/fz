@@ -36,7 +36,7 @@ intent-triggers:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → Step N 구현 → 빌드 검증 → (실패: 에러 수정 → 재빌드) → Gate 3 → /fz-review
+> ⛔ Phase 0 (Work Dir Pre-flight) → Step N 구현 → 빌드 검증 → (실패: 에러 수정 → 재빌드) → Gate 3 → /fz-review
 > 루프 프리미티브: Generate-Test-Repair + Plan-Execute (H6, Inside the Scaffold)
 
 - 점진적 구현 + 매 Step 빌드 검증
@@ -67,7 +67,7 @@ intent-triggers:
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-| modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
+| modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
 | modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
@@ -129,19 +129,19 @@ intent-triggers:
 
 ---
 
-## ⛔ Phase 0: ASD Pre-flight
+## ⛔ Phase 0: Work Dir Pre-flight
 
 > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
 
 **Phase 1 시작 전에 반드시 실행:**
 
-1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
 
 ### Gate 0: Work Dir Ready
-- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
@@ -156,7 +156,7 @@ intent-triggers:
    | 모드 | 소스 |
    |------|------|
    | 동일 세션 연속 | 대화 컨텍스트 (별도 로드 불요) |
-   | ASD / NOTASK | `{WORK_DIR}/plan/plan-final.md` → 없으면 `{WORK_DIR}/plan/plan-light.md` (WORK_DIR은 Gate 0에서 결정) |
+   | 티켓 폴더 / NOTASK | `{WORK_DIR}/plan/plan-final.md` → 없으면 `{WORK_DIR}/plan/plan-light.md` (WORK_DIR은 Gate 0에서 결정) |
    | Serena fallback | `read_memory("fz:checkpoint:plan-final")` |
 
    전 소스 실패 시 → plan 없는 구현으로 진행하되 **그 사실을 보고**한다 (차단 아님).
@@ -191,7 +191,7 @@ intent-triggers:
 - [ ] ⚠️ H (figma 대조) 발견 시 축 분류 후 방법 선택? *(candidate — 강제 X, 미충족은 기록만)*
 - 미통과 시 → ⛔ 구현 절차 진입 차단 (H 제외)
 
-발동 시 행동: trigger 매칭 결과를 `{WORK_DIR}/code/phase-0.5-detection.md`에 기록 (ASD 활성 시) 또는 Serena `fz:checkpoint:phase-0.5` (비ASD).
+발동 시 행동: trigger 매칭 결과를 `{WORK_DIR}/code/phase-0.5-detection.md`에 기록 (티켓 폴더(WORK_DIR) 활성 시) 또는 Serena `fz:checkpoint:phase-0.5` (비-티켓 세션).
 
 ---
 
@@ -218,7 +218,7 @@ intent-triggers:
 
 1. **세션 감지**: 참조 `modules/session.md`
 
-1.5. **ASD 컨텍스트 로딩** (ASD 폴더 활성 시):
+1.5. **티켓 폴더 컨텍스트 로딩** (티켓 폴더(WORK_DIR) 활성 시):
    - plan-final: **Phase 0.4에서 복원된 것을 사용** — ⛔ 여기서 다시 로드하지 않는다 (늦은 로드는 Phase 0.4/0.5의 검사를 건너뛴 뒤 plan을 얻는 순서 역전을 만든다)
    - `{WORK_DIR}/plan/direction-challenge.md` 읽기 → 방향 판정 + 대안 비교 (있으면)
    - `{WORK_DIR}/discover/discover-journal.md` 읽기 → 제약 조건 복원 (있으면)
@@ -340,8 +340,8 @@ intent-triggers:
 
 6.5. **⛔ 아티팩트 기록** (항상 — compact recovery 필수):
    각 구현 Step 완료 후 진행 상태를 기록한다.
-   - ASD 활성: `{WORK_DIR}/code/step-{N}.md` + `progress.md` + `index.md` 업데이트
-   - 비ASD: `write_memory("fz:checkpoint:code-step{N}", "Step {N}/{M}: {변경 파일}. 빌드: OK/FAIL. 결정: {요약}")`
+   - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/code/step-{N}.md` + `progress.md` + `index.md` 업데이트
+   - 비-티켓 세션: `write_memory("fz:checkpoint:code-step{N}", "Step {N}/{M}: {변경 파일}. 빌드: OK/FAIL. 결정: {요약}")`
    형식 참조: `modules/context-artifacts.md`
 
 7. **요구사항 부합 검증** (3+ Step 구현에서만):
@@ -370,12 +370,12 @@ intent-triggers:
 
 ## Gate 3: Implementation Complete
 
-- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 모든 Step 구현 완료?
 - [ ] 빌드 성공? (프로젝트 빌드 검증 통과)
 - [ ] 빌드 경고 최소화?
 - [ ] 아키텍처 패턴 준수?
-- [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?

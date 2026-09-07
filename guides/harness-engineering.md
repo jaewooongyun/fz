@@ -55,7 +55,7 @@ Harness H = (C, R, S, A, Σ, F) where:
   R = Roles           — 역할별 책임 분리 (예: Planner, Generator, Evaluator)
   S = Stage Structure — 워크로드 토폴로지 (예: Plan → Code → Review 순차, 또는 병렬 검증)
   A = Adapters        — 결정론적 연산 (예: Grep, git diff, 빌드 명령)
-  Σ = State Semantics — 크로스스텝 영속화 (예: progress.txt, Serena Memory, ASD 폴더)
+  Σ = State Semantics — 크로스스텝 영속화 (예: progress.txt, Serena Memory, 티켓 폴더)
   F = Failure Taxonomy — 복구 분류 (예: 재시도, 에스컬레이션, 롤백, 중단)
 ```
 
@@ -288,7 +288,7 @@ Working Memory (현재 대화 — 빠르지만 휘발적)
 → 토큰 폭발 방지: Episodic 전체를 로드하지 않고 관련성 기반 필터링
 ```
 
-**fz 생태계 대응**: Episodic = ASD 폴더 + Serena Memory, Working = 대화 컨텍스트 + 스킬 로드
+**fz 생태계 대응**: Episodic = 티켓 폴더 + Serena Memory, Working = 대화 컨텍스트 + 스킬 로드
 
 #### 서브시스템 4: System Reminders (Instruction Fade-out 대응)
 
@@ -1153,11 +1153,11 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 | 하네스 패턴 | fz 대응 | 상세 |
 |-----------|---------|------|
-| Initializer 패턴 | ASD 폴더 + index.md + Serena Memory | 세션 간 상태 영속화 |
+| Initializer 패턴 | 티켓 폴더 + index.md + Serena Memory | 세션 간 상태 영속화 |
 | Three-Agent | /fz-plan → /fz-code → /fz-review | 파이프라인 체인 |
 | Generator≠Evaluator | impl-correctness(생산) ↔ review-arch(평가) | TEAM Pair Programming |
-| 파일 기반 핸드오프 | context-artifacts.md + plan-final.md | ASD 산출물 프로토콜 |
-| Context Reset | compact 후 ASD 폴더 Read로 복원 | Essential Context 패턴 |
+| 파일 기반 핸드오프 | context-artifacts.md + plan-final.md | 티켓 폴더 산출물 프로토콜 |
+| Context Reset | compact 후 티켓 폴더 Read로 복원 | Essential Context 패턴 |
 | Guardrail Rules | Gate 체크리스트 + cross-validation.md + 마찰 감지 | Gate 절차적 강제 |
 | Feature List | RTM (Requirements Traceability Matrix) | Req-ID 추적 |
 | Sprint Contract | Plan의 Anti-Pattern Constraints | 금지 패턴 + Grep 자동 검증 |
@@ -1189,7 +1189,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | context (컨텍스트) | fz-memory · context-artifacts | 중~강 |
 | control (제어) | orchestrator 위임 로직 | 강 |
 | action (행동) | code/fix 스킬 · Adapters(Grep/git/빌드) | 강 |
-| state (상태) | 세션/워크트리 관리 · ASD 폴더 | 중~강 |
+| state (상태) | 세션/워크트리 관리 · 티켓 폴더 | 중~강 |
 | verification (검증) | review/fz-gpt 게이트 | 강 |
 
 > 용도: fz의 상대적 약한 책임(observation 관측성)이 격자로 드러남. 서베이 스스로 표준 없음을 인정하므로 권위 채택 금지 — 참고 축으로만. [외부: harness-paper §4-A, arXiv 2606.20683 — 원 논문 미대조]

@@ -145,8 +145,8 @@ f. **⛔ Import Removal Symbol Inventory** (import 제거 작업 시 필수):
 
 ### 절차 9. ⛔ 계획 파일 기록 (항상 — compact recovery 필수)
 
-- ASD 활성: `{WORK_DIR}/plan/plan-v{N}.md` + `{WORK_DIR}/index.md` 업데이트
-- 비ASD: `write_memory("fz:checkpoint:plan-v{N}", "Steps: {N}개. 핵심결정: {요약}. 리스크: {요약}")`
+- 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/plan-v{N}.md` + `{WORK_DIR}/index.md` 업데이트
+- 비-티켓 세션: `write_memory("fz:checkpoint:plan-v{N}", "Steps: {N}개. 핵심결정: {요약}. 리스크: {요약}")`
 형식 참조: `modules/context-artifacts.md`
 
 ---

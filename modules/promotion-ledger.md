@@ -21,7 +21,7 @@
 
 ## Eligible Session 정의
 
-다음 두 조건을 모두 충족하는 ASD-{번호} 세션:
+다음 두 조건을 모두 충족하는 {TICKET} 세션:
 
 (a) `/fz-plan` Phase 0.5 ~ Phase 3 중 하나 이상 실행
 (b) `/fz-gpt verify` 또는 `/fz-review --deep` 실행
@@ -36,7 +36,7 @@
 
 ```markdown
 ### {P-ID}: {조치 이름} — 관측 #{N}
-- Session: ASD-{번호}
+- Session: {TICKET}
 - Date: YYYY-MM-DD
 - 관측 내용: {발동 여부 + 상황}
 - finding-source: internal | external({tool}) — 미기재 시 internal 간주 (기존 L-1~L-4 등). external이면 4-classify 분류 명시 (project-rule|valid-suggestion만 카운트)
@@ -414,7 +414,7 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 
 ⭐ 판별 기준: **기존 방어가 있으면 앵커(배선 복구), 없으면 보류(규칙 신설은 별개 판정)**. P2-C 는 전자이고 4건은 후자다. 4건의 승격 조건은 그대로 유지되며, 관측이 발생하면 그때 "신규 행이 정당한가" 를 별도로 묻는다.
 
-⚠️ **ID 기반 검사는 이 원장에서 위양성을 낸다** — `D-1` 이 `ASD-1234` 류 문자열에 부분 매치한다(fz-findings F-032 가 예고한 번호 충돌의 실현). 앵커 존재 확인은 **단어 경계**(`(^|[^A-Za-z0-9-])ID([^0-9]|$)`) 또는 문맥 문구로 검사한다.
+⚠️ **ID 기반 검사는 이 원장에서 위양성을 낸다** — `L-1` 이 `L-10` 류 문자열에 부분 매치한다(fz-findings F-032 가 예고한 번호 충돌의 실현). 앵커 존재 확인은 **단어 경계**(`(^|[^A-Za-z0-9-])ID([^0-9]|$)`) 또는 문맥 문구로 검사한다.
 
 ---
 

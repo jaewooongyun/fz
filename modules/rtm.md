@@ -44,8 +44,8 @@ Phase 1 산출물의 "구조화된 계획 출력"에 RTM 테이블을 필수 포
 각 Step 구현 + 빌드 성공 후, 해당 Step의 Req-ID 상태를 `implemented`로 갱신한다.
 
 갱신 위치:
-- ASD 활성: `{WORK_DIR}/plan/plan-final.md` 내 RTM 테이블 직접 수정
-- 비ASD: `write_memory("fz:rtm:{Req-ID}", "implemented. Step {N}. 변경: {파일 요약}")`
+- 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/plan-final.md` 내 RTM 테이블 직접 수정
+- 비-티켓 세션: `write_memory("fz:rtm:{Req-ID}", "implemented. Step {N}. 변경: {파일 요약}")`
 
 ### fz-review (검증)
 

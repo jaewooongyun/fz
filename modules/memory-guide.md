@@ -106,7 +106,7 @@ GC 품질은 recall/staleness만이 아니라 다음 2축으로 점검한다:
 | L1 (Auto Memory) | MEMORY.md + topic files | 영속적 사실, 교훈, 패턴 | 영구 (사용자 관리) |
 | L1.5 (Serena Persistent) | `fz:decision:*`, `fz:pattern:*` | 아키텍처 결정, 학습 패턴 | 영속 (GC 미대상) |
 | L2 (Serena Memory) | `fz:checkpoint:*`, `fz:artifact:*` | 파이프라인 내 단기 전달 | 임시 (GC로 정리) |
-| L3 (File Artifact) | ASD 폴더 파일 | 구조화된 상세 산출물 | 세션 내 (Read로 복원) |
+| L3 (File Artifact) | 티켓 폴더 파일 | 구조화된 상세 산출물 | 세션 내 (Read로 복원) |
 
 - L1은 **세션을 넘어 유지**되는 지식 (교훈, 패턴, 결정)
 - L2는 **파이프라인 내에서만** 유효한 상태 (artifact, checkpoint)

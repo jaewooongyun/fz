@@ -16,7 +16,7 @@
 - [Phase-Tagged Discover](#phase-tagged-discover)
 - [Ephemeral vs Persistent (/btw 통합)](#ephemeral-vs-persistent-btw-통합)
 - [Serena Memory와의 관계](#serena-memory와의-관계)
-- [비ASD 모드 (Serena Memory Fallback)](#비asd-모드-serena-memory-fallback)
+- [비-티켓 세션 모드 (Serena Memory Fallback)](#비-티켓-세션-모드-serena-memory-fallback)
 - [Artifact Token Budget](#artifact-token-budget)
 - [TEAM 로깅](#team-로깅)
 - [Few-shot 예시](#few-shot-예시)
@@ -37,7 +37,7 @@
 ## 폴더 구조
 
 ```
-{CWD}/ASD-xxxx/          # 또는 {CWD}/NOTASK-{YYYYMMDD}/
+{CWD}/{TICKET}/          # 예: TVG-1234/ · 또는 {CWD}/NOTASK-{YYYYMMDD}/
 ├── index.md              # Compact recovery 엔트리 포인트 (Essential Context=덮어쓰기, Artifacts=append)
 ├── discover/
 │   ├── discover-journal.md  # plan 전 discover (canonical)
@@ -66,7 +66,7 @@
 
 ### Standalone Work Dir (peer-review)
 
-fz-peer-review는 ASD 폴더와 별도 WORK_DIR을 사용:
+fz-peer-review는 티켓 폴더와 별도 WORK_DIR을 사용:
 
 ```
 {PROJECT_ROOT}/peer-review-{PR_NUMBER}/
@@ -78,20 +78,20 @@ fz-peer-review는 ASD 폴더와 별도 WORK_DIR을 사용:
 └── {agent}-result.json        # raw 에이전트 결과 (arch, quality, codex)
 ```
 
-> ASD 트리 내 중첩하지 않는 이유: peer-review는 PR 단위로 독립 실행되며, ASD 티켓 작업과 무관할 수 있다.
+> 티켓 폴더 트리 내 중첩하지 않는 이유: peer-review는 PR 단위로 독립 실행되며, 티켓 작업과 무관할 수 있다.
 
 > `{CWD}` = PROJECT_ROOT (CLAUDE.md가 위치한 디렉토리). GIT_ROOT 와 다를 수 있음. 개인 산출물은 PROJECT_ROOT에만 생성.
 
 ## Work Dir 결정
 
-우선순위: 명시적 인자 ASD-xxxx > 브랜치명 (`ASD-\d+` 추출) > AskUserQuestion(저장 여부) > Serena Memory fallback
+우선순위: 명시적 인자 {TICKET} > 브랜치명 (`[A-Z]{2,6}-\d{2,5}` 추출) > AskUserQuestion(저장 여부) > Serena Memory fallback
 
 ## index.md 프로토콜
 
 index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `## Artifacts`(append-only).
 
 ```markdown
-# ASD-xxxx Context Index
+# {TICKET} Context Index
 
 ## Active Phase: code
 
@@ -131,7 +131,7 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 4. 상위 Phase 핵심 산출물 로드 (discover→discover-journal.md Current State, plan→plan-final.md)
 5. 컨텍스트 복원 완료 알림
 
-> **추상화 참조**: Anthropic "Scaling Managed Agents: Decoupling the Brain from the Hands" (2026-04) — `emitEvent`/`getEvents` 같은 API contract가 파일 기반 영속화보다 일관성·queryability 우수 [verified: A3]. 현재 fz는 **파일 기반** (index.md + Serena Memory)이고 향후 API 추상화 도입 가능. fz의 ASD 폴더 + Essential Context = Anthropic의 Session event log 개념의 **filesystem 구현체**.
+> **추상화 참조**: Anthropic "Scaling Managed Agents: Decoupling the Brain from the Hands" (2026-04) — `emitEvent`/`getEvents` 같은 API contract가 파일 기반 영속화보다 일관성·queryability 우수 [verified: A3]. 현재 fz는 **파일 기반** (index.md + Serena Memory)이고 향후 API 추상화 도입 가능. fz의 티켓 폴더 + Essential Context = Anthropic의 Session event log 개념의 **filesystem 구현체**.
 
 ## Proactive Context Protocol
 
@@ -196,7 +196,7 @@ Disposable: "Grep 결과 42개 파일 매칭. find_referencing_symbols 호출 3�
    - /fz-code → discover-code.md (있으면)
    - /fz-review → discover-review.md (있으면)
 
-3. 비ASD 모드:
+3. 비-티켓 세션 모드:
    - fz:checkpoint:discover-{phase} 키로 Serena Memory에 저장
 ```
 
@@ -226,15 +226,15 @@ discover-{phase}.md (DISCOVER_TAG=plan|code|review): APPEND + topic header
 | 파이프라인 길이 | 전략 | 이유 |
 |---------------|------|------|
 | 1-3 스텝 | Serena `fz:checkpoint:essential` (3K) | compact 대비 경량 보호 |
-| 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 ASD | compact 위험 낮음. context-heavy 스킬 포함 시 ASD 권장 |
-| 6+ 스텝 또는 context-heavy | ASD 파일 기반 (이 모듈) | compact 후 Read로 복원 <!-- 기존: 4+ 스텝 --> |
-| 10+ 스텝 | ASD 필수 + compact 주의 안내 | 장기 파이프라인 |
+| 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 티켓 폴더 | compact 위험 낮음. context-heavy 스킬 포함 시 티켓 폴더 권장 |
+| 6+ 스텝 또는 context-heavy | 티켓 폴더 파일 기반 (이 모듈) | compact 후 Read로 복원 <!-- 기존: 4+ 스텝 --> |
+| 10+ 스텝 | 티켓 폴더 필수 + compact 주의 안내 | 장기 파이프라인 |
 
 > **context-heavy 스킬**: discover, search --deep, peer-review (대량 context 생산)
 
-## 비ASD 모드 (Serena Memory Fallback)
+## 비-티켓 세션 모드 (Serena Memory Fallback)
 
-ASD 폴더가 없어도 핵심 산출물은 Serena Memory에 경량 저장한다.
+티켓 폴더가 없어도 핵심 산출물은 Serena Memory에 경량 저장한다.
 
 | 항목 | 내용 |
 |------|------|
@@ -247,12 +247,12 @@ ASD 폴더가 없어도 핵심 산출물은 Serena Memory에 경량 저장한다
 ### Checkpoint 저장 패턴 (각 스킬의 ⛔ 기록 섹션에서 사용)
 
 ```
-ASD 활성: Write("{WORK_DIR}/{phase}/{artifact}.md") + index.md 업데이트
-비ASD:    write_memory("fz:checkpoint:{skill}-{phase}", "핵심 결정 ~200자 요약")
-Both:     ASD 파일 + Serena Memory 동시 저장 (이중 안전망)
+티켓 폴더(WORK_DIR) 활성: Write("{WORK_DIR}/{phase}/{artifact}.md") + index.md 업데이트
+비-티켓 세션:            write_memory("fz:checkpoint:{skill}-{phase}", "핵심 결정 ~200자 요약")
+Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이중 안전망)
 ```
 
-### 비ASD Compact Recovery 절차
+### 비-티켓 세션 Compact Recovery 절차
 
 ```
 1. list_memories("fz:checkpoint:*") → 키 목록
@@ -263,7 +263,7 @@ Both:     ASD 파일 + Serena Memory 동시 저장 (이중 안전망)
 
 ## Artifact Token Budget
 
-> 현재 환경: **Fable 5 (Lead 운용, 2026-07-06~)** — 워커(수행 에이전트)는 opus/sonnet. Fable 5·**Opus 5**·Opus 4.8 모두 1M context (Opus 5는 1M이 **기본값이자 최대값**) [verified: platform.claude.com/docs/en/about-claude/models/whats-new-opus-5 + .../introducing-claude-fable-5]. ASD 파일 전략은 모델 무관 유지 (1M에서도 compact 발생).
+> 현재 환경: **Fable 5 (Lead 운용, 2026-07-06~)** — 워커(수행 에이전트)는 opus/sonnet. Fable 5·**Opus 5**·Opus 4.8 모두 1M context (Opus 5는 1M이 **기본값이자 최대값**) [verified: platform.claude.com/docs/en/about-claude/models/whats-new-opus-5 + .../introducing-claude-fable-5]. 티켓 폴더 파일 전략은 모델 무관 유지 (1M에서도 compact 발생).
 > ⚠️ **tokenizer**: 1.00-1.35x 토큰 증가 (pre-4.7 baseline, fz 자체 실측 미완료) `[미검증: fz 자체 count_tokens 측정 대기]`. **Opus 4.7/4.8/5 · Fable 5는 동일 tokenizer** → 이들 간 이전 시 토큰 수 거의 불변 [verified: claude-api 번들 스킬 — "same tokenizer as Opus 4.8"]. 측정 후 하단 테이블 크기 조정 가능.
 > ℹ️ **프롬프트 캐시 최소 prefix**: Opus 5·Fable 5 = **512 tokens**, Opus 4.8 = 1024 [verified: whats-new-opus-5 — "512 tokens, down from 1,024 on Claude Opus 4.8"]. 짧은 artifact도 캐시 대상이 되므로 분할 전략 재검토 여지 있음.
 > 원칙: 전체 artifact 로드 합계 ≤ 100K tokens. 나머지는 실행 working memory.
@@ -287,14 +287,14 @@ Both:     ASD 파일 + Serena Memory 동시 저장 (이중 안전망)
 
 ## TEAM 로깅
 
-ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요약 (5K). 원본 전문은 `*-team-full.md`에 별도 보존 (drill-down용).
+티켓 폴더(WORK_DIR) 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요약 (5K). 원본 전문은 `*-team-full.md`에 별도 보존 (drill-down용).
 
 ## Few-shot 예시
 
 ### 예시 1: index.md
 
 ```markdown
-# ASD-1234 Context Index
+# TVG-1234 Context Index
 
 ## Active Phase: code
 
@@ -350,8 +350,8 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 
 ```
 [Compact 감지] 대화 컨텍스트 손실됨.
-1. fz:session:current → work_dir: "{CWD}/ASD-1234"
-2. ASD-1234/index.md 읽기 → Active Phase: code, Step 1/3 완료
+1. fz:session:current → work_dir: "{CWD}/TVG-1234"
+2. TVG-1234/index.md 읽기 → Active Phase: code, Step 1/3 완료
 3. code/progress.md 로드 → Step 1-2 완료 이력 + Step 3 진행 중
 4. plan/plan-final.md 로드 → 3-Step 계획 확인
 5. 컨텍스트 복원 완료. Step 2부터 재개.
@@ -362,11 +362,11 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 | 상황 | 대응 |
 |------|------|
 | 세션 전환 | `fz:session:current`에 `work_dir` 저장하여 다음 세션에서 복원 |
-| /fz 없이 직접 스킬 호출 | ⛔ Work Dir Resolution 실행: ASD 패턴 → 자동 생성, 없으면 → 사용자 질문 |
+| /fz 없이 직접 스킬 호출 | ⛔ Work Dir Resolution 실행: 티켓 패턴 → 자동 생성, 없으면 → 사용자 질문 |
 | 단일 티켓 제약 | 동시 작업은 1개 티켓만 허용 |
 | Compact 중 파일 쓰기 | Write 완료 후 index.md 업데이트 (atomic ordering) |
 | GC 누락 | /fz Completion에서 `list_memories → fz:artifact:*` 확인 → 있으면 삭제 |
-| 다중 세션 키 충돌 | `fz:session:current`는 단일 값만 유지. 이전 세션 work_dir가 덮어쓰기됨. 복원 필요 시 index.md를 직접 검색 (`Glob("**/ASD-*/index.md")` 또는 `Glob("**/NOTASK-*/index.md")`) |
+| 다중 세션 키 충돌 | `fz:session:current`는 단일 값만 유지. 이전 세션 work_dir가 덮어쓰기됨. 복원 필요 시 index.md를 직접 검색 (`Glob("**/{TICKET_PREFIX}-*/index.md")` — 예: `TVG-*` — 또는 `Glob("**/NOTASK-*/index.md")`) |
 | Orphan checkpoint | Session Bootstrap 시 `fz:checkpoint:essential` 존재 확인 → 이전 중단 세션 감지 → 복원/삭제 선택 제안 |
 
 ## 참조 스킬
@@ -382,28 +382,28 @@ ASD 폴더 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요
 
 ## ⛔ Work Dir Resolution (모든 fz-* 스킬 필수)
 
-> 반성 4차 교훈 + 5차 교훈: 직접 호출 시에도 폴더가 초기화되어야 하며, 비ASD에서도 파일 저장이 가능해야 한다.
+> 반성 4차 교훈 + 5차 교훈: 직접 호출 시에도 폴더가 초기화되어야 하며, 비-티켓 세션에서도 파일 저장이 가능해야 한다.
 
 **모든 fz-* 스킬은 Phase 1 시작 전에 이 체크를 실행한다:**
 
 ```
-1. 인자에서 ASD-\d+ 패턴 추출
+1. 인자에서 [A-Z]{2,6}-\d{2,5} 패턴 추출
 2. 패턴 있으면 → 무조건 자동 저장:
-   a. {CWD}/ASD-xxxx/ 폴더 존재 확인
+   a. {CWD}/{TICKET}/ 폴더 존재 확인
    b. 없으면 즉시 mkdir -p + index.md 생성
-   c. WORK_DIR = {CWD}/ASD-xxxx/
+   c. WORK_DIR = {CWD}/{TICKET}/
 3. 패턴 없으면:
-   a. 브랜치명에서 ASD-\d+ 추출 시도 → 있으면 2번과 동일
+   a. 브랜치명에서 [A-Z]{2,6}-\d{2,5} 추출 시도 → 있으면 2번과 동일
    b. 없으면 → AskUserQuestion: "이 작업의 산출물을 파일로 저장할까요?"
       - 예 → {CWD}/NOTASK-{YYYYMMDD}/ 폴더 생성 + index.md + WORK_DIR 설정
       - 아니오 → Serena Memory fallback (경량)
 ```
 
 **Gate 0 (Work Dir Resolution):**
-- [ ] 인자/브랜치에서 ASD 패턴 체크 완료?
-- [ ] ASD 패턴 있으면 폴더 자동 생성 완료?
+- [ ] 인자/브랜치에서 티켓 패턴 체크 완료?
+- [ ] 티켓 패턴 있으면 폴더 자동 생성 완료?
 - [ ] 패턴 없으면 사용자에게 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD 경로 / NOTASK 경로 / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
 
 ## 사전 예방적 Context 관리
 
@@ -434,7 +434,7 @@ compact 후 복원은 context summary보다 **파일 Read가 더 정확**하다.
 ### 적용 규칙
 
 1. **MCP 출력 격리**: 대용량 결과(Grep, 심볼 분석, Codex)는 파일로 저장 후 Read 참조. context에 raw 출력 남기지 않음
-2. **중간 산출물 즉시 기록**: 분석 결과가 나오면 대화에 축적하지 말고 ASD 파일/Serena에 즉시 기록 → compact 시 Read로 복원
+2. **중간 산출물 즉시 기록**: 분석 결과가 나오면 대화에 축적하지 말고 티켓 폴더 파일/Serena에 즉시 기록 → compact 시 Read로 복원
 3. **에이전트 스폰 최소화**: 스폰마다 ~50K 토큰 재주입. 단순 작업은 직접 실행
 4. **참조 파일 선택적 로드**: 전체 파일 Read 대신 필요 섹션만 (offset/limit). 500줄+ 파일은 분할 읽기
 

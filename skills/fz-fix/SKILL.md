@@ -61,7 +61,7 @@ intent-triggers:
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP 실행 모드 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-| modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
+| modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
 | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
@@ -101,24 +101,24 @@ intent-triggers:
 
 ---
 
-## ⛔ Phase 0: ASD Pre-flight
+## ⛔ Phase 0: Work Dir Pre-flight
 
 > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
 
 **Phase 1 시작 전에 반드시 실행:**
 
-1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
 
 ### Gate 0: Work Dir Ready
-- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
 
-### ASD 컨텍스트 로딩 (ASD 폴더 활성 시):
+### 티켓 폴더 컨텍스트 로딩 (티켓 폴더(WORK_DIR) 활성 시):
 - `{WORK_DIR}/fix/fix-analysis.md` 읽기 → 이전 수정 분석 복원 (있으면)
 - `{WORK_DIR}/search/search-result.md` 읽기 → fz-search 탐색 결과 (있으면)
 
@@ -230,11 +230,11 @@ intent-triggers:
 ---
 
 ## Gate: Bug Fix Complete
-- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
 - [ ] 빌드 성공?
 - [ ] 원인-수정 대응 명확?
-- [ ] 아티팩트 기록 완료? (ASD: `{WORK_DIR}/fix/fix-analysis.md`, 비ASD: `write_memory("fz:checkpoint:fix-{bug}", "원인: {요약}. 수정: {파일}. 빌드: OK")`)
+- [ ] 아티팩트 기록 완료? (티켓 폴더: `{WORK_DIR}/fix/fix-analysis.md`, 비-티켓 세션: `write_memory("fz:checkpoint:fix-{bug}", "원인: {요약}. 수정: {파일}. 빌드: OK")`)
 
 ---
 

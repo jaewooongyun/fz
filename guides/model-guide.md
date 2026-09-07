@@ -244,7 +244,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 > B안 가동 상태에서 fable 강점을 실제로 끌어내는 3패턴. 새 주장 없이 §4 공식 권고를 fz 운용에 대응시킨 것.
 
 - **ⓐ 에스컬레이션 종점**: Gate 반복 실패·디버깅 막다른 길(워커 2사이클 루프)에서만 fable 단발 root-cause 에이전트를 스폰 — 동시 1 상한(위 4-axes C) 내 단발로만, 상시 승격 아님. 공식 "when your evals on Claude Opus 5 at higher effort still fall short"에 정합.
-- **ⓑ long-horizon 세션**: 평소 쪼개던 다중 파이프라인을 한 세션에서 처리 — 공식 §4 "Size up larger tasks: give it work you would normally break into pieces" + 1M 컨텍스트 + ASD 아티팩트 누적의 시너지. 단, 단일 요청이 수 분 소요(§2 Turn 길이)이므로 진행 표시·타임아웃 설계 병행. ℹ️ 5.1은 진행 보고를 **덜** 쓴다(§4 신규 행동) — 진행 표시 설계는 도구·훅 층으로 옮기는 편이 안전하다.
+- **ⓑ long-horizon 세션**: 평소 쪼개던 다중 파이프라인을 한 세션에서 처리 — 공식 §4 "Size up larger tasks: give it work you would normally break into pieces" + 1M 컨텍스트 + 티켓 폴더 아티팩트 누적의 시너지. 단, 단일 요청이 수 분 소요(§2 Turn 길이)이므로 진행 표시·타임아웃 설계 병행. ℹ️ 5.1은 진행 보고를 **덜** 쓴다(§4 신규 행동) — 진행 표시 설계는 도구·훅 층으로 옮기는 편이 안전하다.
 - **ⓒ outcome-delegation**: 승인 후 실행 경로는 Lead 재량에 위임 — 공식 §4 "Describe the outcome, not the steps". 승인 게이트 이후 step 단위 지시 대신 성공 기준만 전달.
 
 ### effort frontmatter 배선 — **2026-06-14 철회 (세션 운용 전환)** · 잔여 후보 기록

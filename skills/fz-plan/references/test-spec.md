@@ -27,7 +27,7 @@
 
 | Given | When | Then | type |
 |-------|------|------|------|
-| 인자에 `ASD-\d+` 패턴이 포함된 요구사항 + Serena 활성 가능 | `/fz-plan "ASD-\d+ 새 화면 계획 세워줘"` | Phase 0에서 `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 → Gate 0(Work Dir Ready) 3/3 통과 → Phase 1 영향 분석 후 Gate 1(Plan Ready) 통과 + plan-v1.md 기록 | normal |
+| 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴이 포함된 요구사항 + Serena 활성 가능 | `/fz-plan "[A-Z]{2,6}-\d{2,5} 새 화면 계획 세워줘"` | Phase 0에서 `{CWD}/{TICKET}/` 폴더 + index.md 생성 → Gate 0(Work Dir Ready) 3/3 통과 → Phase 1 영향 분석 후 Gate 1(Plan Ready) 통과 + plan-v1.md 기록 | normal |
 | SOLO 모드 + 새 아키텍처 결정 요구 | `/fz-plan "새 결제 모듈 설계해줘"` | Phase 0.5에서 6개 관점 검토 + 대안 ≥2 제시 → Gate 0.5(Direction Validated) 통과(판정 PROCEED) + direction-challenge.md 기록 | normal |
 | 계획 핵심 차원이 외부 primitive(CLI flag/config key)에 의존 + 미검증 상태 | `/fz-plan "외부 CLI 옵션 기반으로 계획 세워줘"` | Phase 0c에서 3 axes(존재/권한·경계/결과 contract) 분류 → 미검증 axis는 차원 제외 또는 explicit assumption tag, probe 필요 시 /fz-discover 선행 → Gate 0c 미통과 시 Plan 작성 차단 | edge-case |
 | "그냥/가볍게" 신호 + 단순 추가 작업 | `/fz-plan light "버튼 추가 계획 가볍게"` | Phase 1만 실행, Phase 0.5/2/3 미호출 → plan-light.md 산출 (단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 생략 불가) | edge-case |

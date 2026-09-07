@@ -34,7 +34,7 @@ intent-triggers:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → Phase 0b (Context) → Phase 0c (Constraint Probe Pre-flight) → Phase 0.5 (Direction Challenge) → Phase 0.7 (Sprint Contract, TEAM 5+ Step) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
+> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 0b (Context) → Phase 0c (Constraint Probe Pre-flight) → Phase 0.5 (Direction Challenge) → Phase 0.7 (Sprint Contract, TEAM 5+ Step) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
 > 루프 프리미티브: Plan-Execute + Evaluator-Optimizer (H6, Inside the Scaffold)
 
 요구사항 구조 분해 + 영향 범위 분석. Serena 심볼 도구 기반 정밀 탐색.
@@ -125,16 +125,16 @@ intent-triggers:
 
 ---
 
-## ⛔ Phase 0: ASD Pre-flight
+## ⛔ Phase 0: Work Dir Pre-flight
 > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 0b 전에 반드시 실행.**
 
-1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
 
 ### Gate 0: Work Dir Ready
-- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
@@ -152,7 +152,7 @@ intent-triggers:
    - `mcp__serena__get_symbols_overview` → 작업 대상 파일 심볼 구조
    - `mcp__serena__find_symbol` → 컴포넌트 탐색
 
-5. **이전 Discover 결과 로드** (ASD 폴더 활성 시):
+5. **이전 Discover 결과 로드** (티켓 폴더(WORK_DIR) 활성 시):
    - `{WORK_DIR}/discover/discover-journal.md` 읽기 → Landscape Map + Trade-off Table + Open Questions 복원
    - `{WORK_DIR}/discover/discover-plan.md` 읽기 → mid-pipeline discover 결과 (있으면)
    - **⛔ discover 결과는 "전제"가 아닌 "참고"**: plan은 discover의 경로 중 하나를 선택하거나, 새 경로를 설계할 수 있음
@@ -289,7 +289,7 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
 
 ### Gate 1: Plan Ready
 > **Why (H1)**: 영향 범위가 불완전하면 구현 시 예상 외 파일을 건드리게 되고, 리뷰에서도 범위 밖 변경을 놓친다.
-- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 영향 범위 분석 완료?
 - [ ] ⛔ Exhaustive Impact Scan 4단계 수행 완료? (반성 5차)
   - [ ] 텍스트 전수 검색(Grep)으로 심볼 기반 결과와 대조했는가?
@@ -313,7 +313,7 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
 - [ ] ⛔ "실행 스레드"가 Zero-Exception 규칙을 준수하는가?
 - [ ] ⛔ 요청 파라미터 키 목록이 원본과 일치하는가?
 - [ ] 구조 결정 옵션 테이블 포함 + 사용자 보고 제시? (Workflow 모드면 `directionAlternatives` 병합 확인. 답습/미러링이면 3축 필수 — 45차)
-- [ ] ⛔ 계획 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
+- [ ] ⛔ 계획 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
 
 > **Gate 증거 첨부** (H2 원칙 — self-check 보완): 결정론적 도구 출력이 있는 Gate 항목은
 > `Evidence:` 행에 도구 결과 요약을 기록한다. self-check "완료?"보다 도구 출력이 신뢰할 수 있다.
@@ -369,8 +369,8 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
    - 게이트 수 ≠ 판정 수이면 **미판정**이며 통과가 아니다
 
 3.5. **⛔ 검증 결과 기록** (항상):
-   - ASD 활성: `{WORK_DIR}/plan/verify-result.md`에 verdict + 이슈 요약 기록
-   - 비ASD: `write_memory("fz:checkpoint:plan-verify", "verdict: {approved/rejected}. 이슈: {N}개. Critical: {요약}")`
+   - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/verify-result.md`에 verdict + 이슈 요약 기록
+   - 비-티켓 세션: `write_memory("fz:checkpoint:plan-verify", "verdict: {approved/rejected}. 이슈: {N}개. Critical: {요약}")`
 
 ### Gate 2 전제조건
 - 검증 verdict가 `approved` 또는 사용자 승인
@@ -399,7 +399,7 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
 
 4. **⛔ 계획 기록** (항상 — compact recovery 필수 + `/fz-code` Phase 0.4 핸드오프 소스):
    ⛔ **이슈 0건 승인이어도 이 기록은 발화한다.** `### Gate 2 전제조건`이 본 Phase보다 앞에 있어, 피드백이 없으면 본 Phase를 건너뛰어 `plan-final`이 생성되지 않는 경로가 생긴다.
-   - **WORK_DIR 존재(ASD 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` 복사 + `index.md` 업데이트
+   - **WORK_DIR 존재(티켓 폴더 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` 복사 + `index.md` 업데이트
    - **Serena fallback**: `write_memory("fz:checkpoint:plan-final", …)` — ⛔ 요약 문자열이 아니라 **계약 필드**를 담는다:
      `{steps:[{id,title,files,verify}], swiftDecisions:{swiftUI,isolation,transform}, rtm:[…], verdict}`
      — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?}` 또는 `{kind:'manual', criterion}` (정의: `workflows/plan-collaborative.js` VerifySpec · 배선: `modules/gates.md`)

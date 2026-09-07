@@ -86,7 +86,7 @@ intent-triggers: []
 | modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리 L1~L4) |
 | modules/team-registry.md | 에이전트 + 모델 자동 결정 |
 | modules/cross-validation.md | 검증 게이트 자동 삽입 |
-| modules/context-artifacts.md | ASD 폴더 기반 compact recovery + 산출물 전달 |
+| modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
 | modules/execution-modes.md | BATCH/LOOP/SIMPLIFY 실행 모드 |
 | modules/governance.md | kill-switch |
 | modules/pipelines.md | 19개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
@@ -118,7 +118,7 @@ intent-triggers: []
 
 3. **Work Dir 초기화** (6+ 스텝 또는 context-heavy 스킬 포함 시):
    - Ticket ID 해석 (참조: `modules/context-artifacts.md`)
-   - ASD 패턴 → `{CWD}/ASD-xxxx/` 자동 생성
+   - 티켓 패턴 → `{CWD}/{TICKET}/` 자동 생성
    - 패턴 없음 → AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
    - `fz:session:current`에 `work_dir` 경로 저장
    - context-heavy 스킬: discover, search --deep, peer-review <!-- 기존: 4+ 스텝 -->
@@ -126,7 +126,7 @@ intent-triggers: []
 3b. **이전 중단 세션 감지**:
    - `read_memory("fz:checkpoint:essential")` 확인
    - 존재 시: "이전 중단된 세션이 있습니다. 복원하시겠습니까?" AskUserQuestion
-     - 예 → ASD 폴더의 `index.md` Read → Active Phase + Essential Context 복원 ("Starting fresh + filesystem discovery" 패턴)
+     - 예 → 티켓 폴더의 `index.md` Read → Active Phase + Essential Context 복원 ("Starting fresh + filesystem discovery" 패턴)
      - 아니오 → `delete_memory("fz:checkpoint:essential")` 후 새 세션 시작
    - **essential 미존재 시 폴백**: `list_memories("fz:checkpoint:*")` → phase checkpoint 존재 여부 확인
      - 존재 시: 최신 checkpoint 키를 시간순 정렬 → 마지막 키 read → 해당 phase부터 복원 제안
@@ -146,7 +146,7 @@ intent-triggers: []
 ### Gate 0: Session Ready
 - [ ] 새 세션이면 이전 컨텍스트 복원 시도?
 - [ ] 탐색 파이프라인이면 인덱스 확인?
-- [ ] 6+ 스텝 또는 context-heavy이면 ASD 폴더 초기화?
+- [ ] 6+ 스텝 또는 context-heavy이면 티켓 폴더 초기화?
 - [ ] 6+ 스텝 또는 TEAM이면 핵심 모듈 선로드?
 - [ ] **교훈 사전 로드 완료? Active Recall 3-step chain 출력 확인 (Step 4 의무)**
 
@@ -334,7 +334,7 @@ commit/pr 전 → ✓ codex check (TEAM)
 4. Gate 체크 → 통과 시 다음 단계, 실패 시 중단/계속 선택
 ```
 
-**컨텍스트 패싱**: 대화 기반 (기존 v1과 동일). 4스텝+ 시 /compact 안내 (작업은 중단 없이 계속 — checkpoint/ASD로 복원 가능).
+**컨텍스트 패싱**: 대화 기반 (기존 v1과 동일). 4스텝+ 시 /compact 안내 (작업은 중단 없이 계속 — checkpoint/티켓 폴더로 복원 가능).
 
 ### 5.2 Workflow Execution
 
@@ -393,15 +393,15 @@ Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④�
 | 파이프라인 길이 | 전략 | 이유 |
 |---------------|------|------|
 | 1-3 스텝 | Serena `fz:checkpoint:essential` (3K) | compact 대비 경량 보호 |
-| 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 ASD | compact 위험 낮음 |
-| 6+ 스텝 또는 context-heavy | ASD 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
-| 10+ 스텝 | ASD 필수 + compact 대비 기록 확인(작업은 계속 — 아티팩트로 복원 가능) | 장기 파이프라인 |
+| 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 티켓 폴더 | compact 위험 낮음 |
+| 6+ 스텝 또는 context-heavy | 티켓 폴더 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
+| 10+ 스텝 | 티켓 폴더 필수 + compact 대비 기록 확인(작업은 계속 — 아티팩트로 복원 가능) | 장기 파이프라인 |
 
 ### Essential Context 업데이트 (각 스킬 실행 후)
 
 각 스킬 완료 후 /fz가 중앙 관리:
-- **ASD 활성**: `index.md`의 `## Essential Context` 섹션 **덮어쓰기** (Active Phase + Key Decisions + Constraints + Pending)
-- **비ASD / 1-5 스텝**: `write_memory("fz:checkpoint:essential", "[{skill}] {핵심결정}. Constraints: {C목록}. Pending: {다음}.")` (~3,000자) <!-- 기존: ~500자 -->
+- **티켓 폴더(WORK_DIR) 활성**: `index.md`의 `## Essential Context` 섹션 **덮어쓰기** (Active Phase + Key Decisions + Constraints + Pending)
+- **비-티켓 세션 / 1-5 스텝**: `write_memory("fz:checkpoint:essential", "[{skill}] {핵심결정}. Constraints: {C목록}. Pending: {다음}.")` (~3,000자) <!-- 기존: ~500자 -->
 - **mid-pipeline /fz-discover 호출 시**: index.md Active Phase를 discover에 전달 → Phase-Tagged 저장 지원
 
 ### 단계 완료 보고 (각 단계)

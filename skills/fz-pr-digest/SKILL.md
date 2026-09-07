@@ -37,7 +37,7 @@ intent-triggers:
 /fz-pr-digest 3394 --light      # 요약만 (diff 기반, 빠름)
 /fz-pr-digest 3394 --deep       # 기술 해설 + 학습 포인트까지
 /fz-pr-digest 3394 --tutor      # 기능 전체 흐름 + 동작↔코드 1:1 매핑 (처음 보는 사람용)
-/fz-pr-digest feature/ASD-465   # 브랜치 기반
+/fz-pr-digest feature/TVG-1234  # 브랜치 기반
 ```
 
 ## peer-review와의 차이

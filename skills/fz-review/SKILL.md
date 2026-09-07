@@ -32,7 +32,7 @@ intent-triggers:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → Phase 5 (3중 검증: Serena // /fz-gpt review // /sc:analyze) → Phase 5.5 (/fz-gpt validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
+> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 5 (3중 검증: Serena // /fz-gpt review // /sc:analyze) → Phase 5.5 (/fz-gpt validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
 > 루프 프리미티브: Evaluator-Optimizer + Multi-Attempt Retry (H6, Inside the Scaffold)
 
 3중 검증(Claude+Codex+sc:analyze) + 역방향 검증 + Reflection Rate 정량화.
@@ -98,7 +98,7 @@ intent-triggers:
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → SOLO 3중 검증 수행 + 사유 experiment-log 기록
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + Codex validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
 6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-review 테이블. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
-### ASD 컨텍스트 로딩 (ASD 활성 시):
+### 티켓 폴더 컨텍스트 로딩 (티켓 폴더(WORK_DIR) 활성 시):
 - `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
 - `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
 - `{WORK_DIR}/code/step-*.md` 읽기 → 전체 구현 Step 상세 (1M context 활용)
@@ -118,16 +118,16 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 
 ---
 
-## ⛔ Phase 0: ASD Pre-flight (반성 4차)
+## ⛔ Phase 0: Work Dir Pre-flight (반성 4차)
 > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 1 전에 반드시 실행.**
 
-1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
 
 ### Gate 0: Work Dir Ready
-- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ## Phase 4.5: Requirements Alignment (요구사항 부합)
@@ -167,7 +167,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 지표③: `[verified]` / `[미검증]` 태그 빈도 + 무태그 과거 주장("원본/기존/이전/D{N} 이전") 위반 건수
 - [ ] 지표④: 세션 reversal 횟수 (사용자 판정 뒤집기 — 기준선 4회)
 - [ ] 지표⑤: A5 micro-eval 호출 건수 N + confirmed C + false positive F → precision = C/N
-- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (ASD 세션 임시) 또는 Serena `fz:metrics:phase-a-session-{N}` (비ASD 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함
+- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (티켓 폴더 세션 임시) 또는 Serena `fz:metrics:phase-a-session-{N}` (비-티켓 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함
 - [ ] **canonical sink**: 세션 결과를 `experiment-log.md §5.4 Harness Metrics 누적`에 누적 (5 세션 누적 후 B1/B2 진입 판정). 다른 sink는 backlink만 허용 (3중화 금지).
 
 ## Phase 5: Cross-Review (3중 검증)
@@ -291,7 +291,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - 결과: Issue Tracker에 spec_concern 카테고리로 기록
 
 ### Gate 4: Review Passed
-- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 참조 무결성 확인? (Serena)
 - [ ] ⛔ Codex 리뷰 통과? (**Critical 0건 + Major는 결함(회귀·버그·영향범위)에 한해 차단** — ⛔ 구조 개선 제안은 major여도 **non-blocking**. `ReviewFindingsSchema`에 `origin`이 없어 기계 판별이 불가하므로 **Lead가 결함/개선을 판정**한다. 이 구분이 없으면 "제안"이 강제 수정이 된다. Codex 실행 자체는 필수)
 - [ ] /sc:analyze 통과? (심각한 문제 없음)
@@ -368,10 +368,10 @@ N (Codex 제기 이슈 수) >= 10 ?
 - [ ] 최종 빌드 성공? (modules/build.md 절차)
 - [ ] Reflection Rate — **N≥10이면 ≥80%, N<10이면 `preliminary` 기록 후 N/A** (정본: `cross-validation.md §Reflection Rate threshold`)
 - [ ] 최대 반복 횟수 미초과?
-- [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
 
-### 비ASD Checkpoint (Phase 5 완료 후)
-- 비ASD 모드: `write_memory("fz:checkpoint:review-issues", "이슈 {N}개. Critical: {요약}. Reflection Rate: {X}%")`
+### 비-티켓 세션 Checkpoint (Phase 5 완료 후)
+- 비-티켓 세션 모드: `write_memory("fz:checkpoint:review-issues", "이슈 {N}개. Critical: {요약}. Reflection Rate: {X}%")`
 
 ## Phase 7: Completion (완료 처리)
 
@@ -379,7 +379,7 @@ Gate 5 통과 후:
 1. **잔여 작업 확인**: sequential-thinking → 완료 체크리스트 (Gate 통과, 미해결 이슈, 범위 외 변경)
 2. **Final Issue Report 생성**: `modules/session.md` 참조
 3. **세션 저장**: `write_memory` (작업 요약 + 결정사항 + 변경 심볼)
-4. **아티팩트 기록** (ASD 활성 시): `{WORK_DIR}/review/self-review.md` + `index.md` 업데이트
+4. **아티팩트 기록** (티켓 폴더(WORK_DIR) 활성 시): `{WORK_DIR}/review/self-review.md` + `index.md` 업데이트
 5. **Git 연계** (사용자 확인 후): `/fz-commit` → `/fz-pr`
 
 완료 보고: 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계
@@ -445,7 +445,7 @@ Gate 5 통과 후:
 |-------|------|------|------|
 | 구현된 코드 diff 존재 + Codex CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-gpt review` + `/sc:analyze`) 모두 실행(Codex 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
 | "그냥/가볍게" 신호 + 소규모 변경(5파일 미만 & 100 LOC 미만, 리팩토링/시그니처 변경 아님) | `/fz-review light "그냥 가볍게 봐줘"` | review-arch 단독 실행 + Codex 교차검증/Phase 5.5 역방향/Reflection Rate 추적 생략 + `review-light.md` 산출; 단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 적용(light에서도 생략 불가) | edge-case |
-| 인자에 `ASD-\d+` 패턴 없음 + 브랜치명 없음 | `/fz-review "내 코드 봐줘"` | Phase 0에서 저장 여부 AskUserQuestion 발생 → '예' 시 `NOTASK-{YYYYMMDD}/` + index.md 생성 / '아니오' 시 Serena fallback → WORK_DIR 결정 → Gate 0(Work Dir Ready) 3개 항목 통과 | edge-case |
+| 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴 없음 + 브랜치명 없음 | `/fz-review "내 코드 봐줘"` | Phase 0에서 저장 여부 AskUserQuestion 발생 → '예' 시 `NOTASK-{YYYYMMDD}/` + index.md 생성 / '아니오' 시 Serena fallback → WORK_DIR 결정 → Gate 0(Work Dir Ready) 3개 항목 통과 | edge-case |
 | 코드 diff 존재 + 검증 2에서 fz-gpt 통신 실패 | `/fz-review "리뷰해줘"` | 재시도 1회 후 fresh-context Agent(review-correctness 관점)로 검증 2 대체 + 인용 태그 `[fresh-context: claude]` + 이종 안전망 상실 명시 (Agent 미가용 시 `/sc:analyze` 폴백); 검증 2 미생략 상태로 Gate 4 진행 | failure |
 
 ## Boundaries

@@ -34,7 +34,7 @@ intent-triggers:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → Phase 1 (Problem Framing) → Phase 1.5 (Constraint Probe) → Phase 2 (Landscape Exploration) ↔ 사용자 대화 → Phase 3 (Path Mapping) → Phase 4 (Handoff)
+> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 1 (Problem Framing) → Phase 1.5 (Constraint Probe) → Phase 2 (Landscape Exploration) ↔ 사용자 대화 → Phase 3 (Path Mapping) → Phase 4 (Handoff)
 > 루프 프리미티브: Tree Search (Adversarial Discovery) (H6, Inside the Scaffold)
 
 - 발산 중심 (Fan-out): 가능한 경로를 넓게 탐색
@@ -166,10 +166,10 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 
 **Phase 1 시작 전에 반드시 실행:**
 
-1. 인자에서 `ASD-\d+` 패턴 추출 (예: `[ASD-542]`)
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출 (예: `[TVG-1234]`)
 2. 패턴 있으면 → **무조건 자동 저장**:
-   - `{CWD}/ASD-xxxx/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
-   - `{CWD}/ASD-xxxx/discover/` 서브폴더 생성
+   - `{CWD}/{TICKET}/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
+   - `{CWD}/{TICKET}/discover/` 서브폴더 생성
    - WORK_DIR 설정
 2b. index.md 존재 시 → Active Phase 읽기 → DISCOVER_TAG 설정 (없으면 "journal")
    - Active Phase = "plan" → DISCOVER_TAG = "plan"
@@ -177,16 +177,16 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - Active Phase = "review" → DISCOVER_TAG = "review"
    - Active Phase = "discover" 또는 없음 → DISCOVER_TAG = "journal"
 3. 패턴 없으면:
-   a. 브랜치명에서 `ASD-\d+` 추출 시도 → 있으면 2번과 동일
+   a. 브랜치명에서 `[A-Z]{2,6}-\d{2,5}` 추출 시도 → 있으면 2번과 동일
    b. 없으면 → **AskUserQuestion**: "이 작업의 산출물을 파일로 저장할까요?"
       - 예 → `{CWD}/NOTASK-{YYYYMMDD}/discover/` 생성 + WORK_DIR 설정
       - 아니오 → Serena Memory fallback (경량)
 
 ### Gate 0: Work Dir Ready
-- [ ] ⛔ 인자/브랜치에서 ASD 패턴 체크 완료?
-- [ ] ASD 패턴 있으면 폴더 자동 생성 완료?
+- [ ] ⛔ 인자/브랜치에서 티켓 패턴 체크 완료?
+- [ ] 티켓 패턴 있으면 폴더 자동 생성 완료?
 - [ ] 패턴 없으면 사용자에게 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
 - [ ] DISCOVER_TAG 설정됨? (index.md Active Phase 기반)
 
 ---
@@ -223,7 +223,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    ```
 
 ### Gate 1: Problem Framed
-- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 핵심 결정 사항이 명확하게 식별되었는가?
 - [ ] 관련 코드 구조를 탐색했는가?
 - [ ] 초기 제약이 1개 이상 식별되었는가?
@@ -303,11 +303,11 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    `discover-{DISCOVER_TAG}.md` 갱신:
    - DISCOVER_TAG = "journal" → **전체 덮어쓰기** (매 라운드). compact 후 이 파일 하나만 Read하면 전체 복원.
    - DISCOVER_TAG = plan|code|review → **APPEND** + topic header (동일 phase 다중 discover 지원)
-   - ASD 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` + `{WORK_DIR}/index.md` 업데이트
+   - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` + `{WORK_DIR}/index.md` 업데이트
      - journal: 파일 전체를 매 라운드 갱신 (~2K tokens). 상세하게 기록: 제약 매트릭스, 생존/탈락 후보, 핵심 결정 흐름, 미결 질문.
      - phase: APPEND + `## Topic: {질문 요약}` header. 1K tokens 초과 시 이전 topic 압축.
      - Round History는 유지하지 않음 — 탈락 후보 사유가 롤백 근거 역할.
-   - 비ASD: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}", "제약 {N}개: {C1~CN}. 생존: {후보}. 핵심 추론: {요약}")` (매 라운드 덮어쓰기)
+   - 비-티켓 세션: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}", "제약 {N}개: {C1~CN}. 생존: {후보}. 핵심 추론: {요약}")` (매 라운드 덮어쓰기)
    형식 참조: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)"
 
 ### discover-journal 형식
@@ -355,8 +355,8 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - 코드 탐색으로도 확인하지 못한 것
 
 4. **⛔ 저널 최종 갱신** (항상):
-   - ASD 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` 최종 갱신 + `{WORK_DIR}/index.md` 업데이트
-   - 비ASD: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}-final", "경로 {N}개. 조건: {요약}. 열린질문: {N}개")`
+   - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` 최종 갱신 + `{WORK_DIR}/index.md` 업데이트
+   - 비-티켓 세션: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}-final", "경로 {N}개. 조건: {요약}. 열린질문: {N}개")`
 
 ### Gate 3: Paths Mapped
 - [ ] 경로가 2개 이상 매핑되었는가?
@@ -380,7 +380,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
 | PR 코멘트 작성 | 직접 출력 | 결정 근거를 코멘트 형식으로 가공 |
 | 토론 결과 기록 | Serena memory | 결정사항 + 제약 영속화 |
 
-> ASD 폴더 활성 시: 다음 스킬이 `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md`의 Current State 섹션을 읽어 컨텍스트를 복원한다. (DISCOVER_TAG = index.md Active Phase 기반: journal|plan|code|review)
+> 티켓 폴더(WORK_DIR) 활성 시: 다음 스킬이 `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md`의 Current State 섹션을 읽어 컨텍스트를 복원한다. (DISCOVER_TAG = index.md Active Phase 기반: journal|plan|code|review)
 
 ### 절차
 

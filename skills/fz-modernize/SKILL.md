@@ -27,7 +27,7 @@ intent-triggers:
 
 ## 개요
 
-> Phase 0 (ASD) → Phase 1 (Probe) → Phase 2 (Audit) → Phase 3 (Plan) → Phase 4 (Verify) → Phase 5 (Execute) → Phase 6 (Validate)
+> Phase 0 (티켓 폴더) → Phase 1 (Probe) → Phase 2 (Audit) → Phase 3 (Plan) → Phase 4 (Verify) → Phase 5 (Execute) → Phase 6 (Validate)
 
 - **Probe → Plan 순서 강제** (31차 교훈): 외부 자료 실측 없이 Plan 작성 금지
 - **Tier 1+2 우선** (사용자 합의 시): Tier 3은 supporting only로 격하
@@ -53,7 +53,7 @@ intent-triggers:
 
 - **외부 자료 접근**: WebSearch + WebFetch + Codex CLI (cross-model verify)
 - **Codex CLI**: cross-model 검증(모델=config SSOT — 버전 플로어는 `modules/gpt-strategy.md`). trust_level="trusted" 설정 필요 (30차 교훈)
-- **6+ 스텝 자동 ASD 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 ASD ticket ID
+- **6+ 스텝 자동 티켓 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 티켓 ID
 
 ## 모듈 참조
 
@@ -62,7 +62,7 @@ intent-triggers:
 | guides/prompt-optimization.md | Tier 1+2 인용 정책 + 헤더 갱신 패턴 |
 | guides/skill-authoring.md | 본 스킬 작성 시 표준 |
 | modules/cross-validation.md | Codex 3회 한도 + Reflection Rate |
-| modules/context-artifacts.md | ASD 폴더 + 산출물 보존 |
+| modules/context-artifacts.md | 티켓 폴더 + 산출물 보존 |
 | modules/memory-guide.md | feedback_* 교훈 태깅 규칙 |
 | Bash background+redirect 교훈 | xargs 병렬 패턴 (AC8 enforcement) |
 
@@ -92,11 +92,11 @@ intent-triggers:
 
 ---
 
-## Phase 0: ASD Pre-flight
+## Phase 0: Work Dir Pre-flight
 
 > 참조: `modules/context-artifacts.md` Work Dir Resolution
 
-1. 인자에서 `ASD-\d+` 패턴 추출 → 있으면 `{CWD}/ASD-xxxx/` 사용
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출 → 있으면 `{CWD}/{TICKET}/` 사용
 2. 패턴 없으면 → `fz-modernize-{YYYY-MM-DD}/` 자동 생성 (사용자 확인)
 3. 폴더 구조 자동 생성:
    ```
@@ -378,7 +378,7 @@ codex exec \
 ```
 예시 1 — full 파이프라인:
   /fz-modernize "fz 가이드 8개를 Opus 5 출시 후 최신화"
-  → ASD 폴더 자동 생성
+  → 티켓 폴더 자동 생성
   → Phase 1 (Probe): WebSearch 5건 + Tier 1+2 분류
   → Phase 2 (Audit): grep으로 미검증 8곳 식별
   → Phase 3 (Plan v1): AC1-AC9 + Step 분해
@@ -457,7 +457,7 @@ Phase 6 통과 후:
 - 코드 변경 있음 → `/fz-commit` 제안
 - 가이드 변경만 → 사용자 직접 git commit
 - 교훈 발견 → `/sc:save --type learnings` (feedback_*.md 저장)
-- ASD 산출물 보존 → 새 세션에서 `index.md` Resume Trigger로 복원
+- 티켓 폴더 산출물 보존 → 새 세션에서 `index.md` Resume Trigger로 복원
 
 ---
 

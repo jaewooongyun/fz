@@ -45,7 +45,7 @@ intent-triggers:
 
 ```bash
 /fz-peer-review 123                   # PR #123 리뷰
-/fz-peer-review feature/ASD-456       # 브랜치 리뷰
+/fz-peer-review feature/TVG-1234      # 브랜치 리뷰
 /fz-peer-review 123 --deep            # Cross-Critique 활성화 (추가 ~$0.5-1.5)
 /fz-peer-review 123 --post            # 인라인 라인 앵커로 리뷰 게시
 /fz-peer-review 123 --tier 2          # Tier 강제 지정
@@ -376,7 +376,7 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 
 > review-index.md: Phase + Artifacts 목록 기록. Compact 감지 시 이 파일 읽어 산출물 로드 → 중단 지점 재개.
 
-**비ASD Serena Fallback** (WORK_DIR 없을 때):
+**비-티켓 세션 Serena Fallback** (WORK_DIR 없을 때):
 ```
 write_memory("fz:checkpoint:peer-review-synthesize", "PR#{number}: 이슈 {N}개 (Critical:{c}/Major:{m}/Minor:{n}). Confidence: {avg}%. 핵심: {top3_요약}")
 ```
@@ -426,7 +426,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 > ⛔ **확인 게이트** — 미리보기는 항상 출력하되, 차단은 셋 중 하나일 때만: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 (c) 겹치는 hunk 복수로 Lead가 구간 선택.
 > ⛔ `mcp__github__create_pull_request_review`로 대체 불가 — `comments[]`에 `start_line`·`side`가 없어 범위 하이라이트·LEFT 앵커가 안 된다. 이 스킬만 `Bash(gh *)`를 선언하는 이유.
 
-**비ASD Serena Fallback** (WORK_DIR 없을 때):
+**비-티켓 세션 Serena Fallback** (WORK_DIR 없을 때):
 ```
 write_memory("fz:checkpoint:peer-review-deliver", "PR#{number}: 판정 {verdict}. Critical:{c}/Major:{m}. 핵심이슈: {top3}. --post: {Y/N}")
 ```

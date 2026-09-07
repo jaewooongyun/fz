@@ -29,7 +29,7 @@ intent-triggers:
 > 서브커맨드 선택 → 실행 → 결과 보고
 
 - 5개 서브커맨드: audit, gc, recall, organize, remind
-- 3-Layer 메모리 관리: L1(Auto Memory) + L2(Serena) + L3(ASD 파일)
+- 3-Layer 메모리 관리: L1(Auto Memory) + L2(Serena) + L3(티켓 폴더 파일)
 - topic file 태그 기반 교훈 매칭
 - 코드 유효성 검증 (find_symbol + Grep)
 
@@ -49,7 +49,7 @@ intent-triggers:
 |------|------|
 | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
 | modules/memory-policy.md | L2 Serena Memory 키 네이밍 + GC 정책 |
-| modules/context-artifacts.md | L3 ASD 폴더 관리 |
+| modules/context-artifacts.md | L3 티켓 폴더 관리 |
 
 ## sc: 활용 (SuperClaude 연계)
 
@@ -81,8 +81,8 @@ intent-triggers:
 4. stale persistent 키 (30일+ 미참조) 목록
 
 **L3 검사**:
-1. ASD-*/index.md 존재 + 정합성 확인
-2. 완료된 파이프라인의 잔존 ASD 폴더 감지
+1. {TICKET_PREFIX}-*/index.md 존재 + 정합성 확인 (예: TVG-*)
+2. 완료된 파이프라인의 잔존 티켓 폴더 감지
 
 보고: `sc:analyze` 활용하여 정량 보고서 생성.
 
@@ -94,7 +94,7 @@ intent-triggers:
 
 ## 서브커맨드 2: gc
 
-L2 임시키 삭제 + L1 stale 항목 정리 제안 + L3 잔존 ASD 정리.
+L2 임시키 삭제 + L1 stale 항목 정리 제안 + L3 잔존 티켓 폴더 정리.
 
 ### 절차
 
@@ -112,8 +112,8 @@ L2 임시키 삭제 + L1 stale 항목 정리 제안 + L3 잔존 ASD 정리.
    - 끊어진 링크 보고
    - 삭제/아카이브는 사용자 확인 필수
 
-4. **L3 잔존 ASD 정리**:
-   - 완료된 파이프라인의 ASD 폴더 목록
+4. **L3 잔존 티켓 폴더 정리**:
+   - 완료된 파이프라인의 티켓 폴더 목록
    - 사용자 확인 후 삭제
 
 ### Gate: GC Complete

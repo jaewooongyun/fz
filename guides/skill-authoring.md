@@ -427,8 +427,8 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 - [ ] 팀 에이전트가 필요하면 `agents/`에 에이전트 파일이 존재하는가?
 - [ ] 새 provides 토큰을 정의했으면 `templates/skill-template.md` 레지스트리에 추가했는가?
 - [ ] 500줄을 초과하면 공유 모듈(`modules/`)로 분리했는가?
-- [ ] ⛔ Phase 0 ASD Pre-flight가 포함되어 있는가? (`modules/context-artifacts.md` → Work Dir Resolution)
-- [ ] ASD 컨텍스트 로딩(Hydration Set)이 `modules/context-artifacts.md` Upstream Hydration Sets와 일치하는가?
+- [ ] ⛔ Phase 0 Work Dir Pre-flight가 포함되어 있는가? (`modules/context-artifacts.md` → Work Dir Resolution)
+- [ ] 티켓 폴더 컨텍스트 로딩(Hydration Set)이 `modules/context-artifacts.md` Upstream Hydration Sets와 일치하는가?
 
 ### 프롬프트 최적화 (§4 기반)
 
@@ -524,7 +524,7 @@ fz-gpt는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --output-
 
 ### 표준 패턴 3종 (전 스크립트 의무 — pilot 실측 검증)
 
-1. **OVERRIDE 블록**: agentType 재사용 시 모든 agent() 프롬프트 선두에 — "P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시 미적용. 에이전트 정의의 Phase 절차·ASD 폴더·이전 세션·메모리 컨텍스트 로딩도 미적용 — 이 프롬프트의 입력만이 과제 전부. 무관 작업 폴더 읽기 금지. 최종 텍스트가 반환값(1-shot raw data)." [근거: pilot invoke #1 — 에이전트 정의의 컨텍스트 로딩이 args를 압도해 무관 폴더 anchoring]
+1. **OVERRIDE 블록**: agentType 재사용 시 모든 agent() 프롬프트 선두에 — "P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시 미적용. 에이전트 정의의 Phase 절차·티켓 폴더·이전 세션·메모리 컨텍스트 로딩도 미적용 — 이 프롬프트의 입력만이 과제 전부. 무관 작업 폴더 읽기 금지. 최종 텍스트가 반환값(1-shot raw data)." [근거: pilot invoke #1 — 에이전트 정의의 컨텍스트 로딩이 args를 압도해 무관 폴더 anchoring]
 2. **args 방어 파싱 + fail-fast**: scriptPath 호출 시 args가 JSON **문자열**로 도착한다 [실측: probe wf_89418b73, typeof=string] → `typeof args === 'string' ? JSON.parse(args) : args` + 필수 키 누락 시 에이전트 스폰 전 `{mode:'fallback'}` 즉시 반환 (fabrication 방지)
 3. **agentType 네임스페이스**: 플러그인 에이전트는 `fz:` prefix 필수 [실측: S0 — 'plan-structure' not found / 'fz:plan-structure' 동작]
 
@@ -578,7 +578,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 - `Workflow({ scriptPath, resumeFromRunId })` — 변경되지 않은 `agent()` 호출의 **최장 prefix가 캐시로 즉시 반환**되고 첫 변경 지점부터 재실행된다. 같은 스크립트 + 같은 args = 100% 캐시 히트.
 - ⛔ **재생 순서 규칙**: *"Cached results stop at the first agent that didn't finish, and **every agent that started after that one runs again, even if it completed**."* → 팬아웃 중간에 멈추면 뒤에 시작된 완료분까지 전부 재실행된다.
 - ⚠️ **설계 함의**: 공식 결론은 *"**다수의 작은 에이전트가 하나의 큰 에이전트보다 진행을 더 보존한다**"* 이다. fz의 현행 워크플로는 **소수의 큰 에이전트 + 스테이지 배리어** 구조라 이 방향과 반대다 — 스테이지 세분화의 이득은 **미측정**이며 재검토 대상으로 남긴다.
-- **경계**: resume은 **동일 Claude Code 세션 내에서만** 동작한다. CC를 종료하면 다음 세션은 워크플로를 처음부터 시작한다 → 장기 워크플로는 ASD 아티팩트가 여전히 1차 복원 수단이다.
+- **경계**: resume은 **동일 Claude Code 세션 내에서만** 동작한다. CC를 종료하면 다음 세션은 워크플로를 처음부터 시작한다 → 장기 워크플로는 티켓 폴더 아티팩트가 여전히 1차 복원 수단이다.
 - **진단**: `<transcriptDir>/journal.jsonl`이 agent별 **실제 반환값**을 1줄씩 기록한다. ⛔ 빈 결과·이상 결과 원인 규명 시 **추측 금지, journal 먼저 Read**.
 - ⛔ 스크립트 결정성 요구와 한 세트다 — `Date.now()`/`Math.random()`/무인자 `new Date()`는 **throw**된다(resume을 깨뜨리므로).
 
@@ -608,7 +608,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 | **L4** | L1~L3 미해소 | **사용자 에스컬레이션** — 선택지(재시도/범위축소/중단) 제시. ⛔ **Lead 단독 SOLO 수행은 사용자 승인 후에만** (Lead=fable 자동 SOLO 금지) | — |
 
 - ⛔ **호출 자체가 거부된 경우는 이 사다리가 아니다** — 반환에 `mode` 가 없다(스크립트 미실행). § scriptPath 거부 우회 계약으로 간다. `mode:'fallback'` 으로 읽어 SOLO 로 강등하는 것이 정확히 막으려는 실패다
-- ⛔ **`resume`은 동일 Claude Code 세션 내에서만** 동작한다 — 세션이 끝났으면 L3를 건너뛰고 ASD 아티팩트로 복원한다
+- ⛔ **`resume`은 동일 Claude Code 세션 내에서만** 동작한다 — 세션이 끝났으면 L3를 건너뛰고 티켓 폴더 아티팩트로 복원한다
 - ⛔ **재시도는 `buildFeedback` 등을 args에 넣어 캐시 키를 바꾼다** (resume 비의존 경로)
 - ⛔ **진단은 추측 금지** — `<transcriptDir>/journal.jsonl`이 agent별 실제 반환값을 기록한다. 빈 결과·이상 결과는 journal을 먼저 Read
 - `modules/team-core.md` + `modules/patterns/*.md`는 **라운드 의미론의 역사적 출처**다 — 폴백 실행 절차로 참조하지 않는다
@@ -619,7 +619,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 - **3요소**: (1) larger task — 지금 과제가 속한 상위 작업 · (2) 누구를 위한 것 — 수요자 · (3) 산출물이 가능하게 하는 것 — 이 산출물로 다음에 무엇을 하는가
 - **구현 선례**: review-live·peer-review는 `intentContext`를 **필수 args**로 받아(둘 다 누락 시 fail-fast `mode:'fallback'`) TARGET 문자열에 주입; plan-collaborative는 **선택 args**로 받아 CTX 목적 축에 조건부 주입 (`input.intentContext ? '[과제 목적] …' : ''`)
-- **OVERRIDE 오염 방어와의 관계**: intentContext는 **프롬프트 내부에 포함되는 정보**이지 외부 컨텍스트 pull이 아니다. OVERRIDE 블록(§ 표준 패턴 3종 1)이 금지하는 것은 에이전트 정의의 ASD 폴더·이전 세션·메모리 자동 로딩이며, Lead가 args로 명시 전달한 목적은 이에 해당하지 않는다 — 오염원이 아니라 과제 정의의 일부
+- **OVERRIDE 오염 방어와의 관계**: intentContext는 **프롬프트 내부에 포함되는 정보**이지 외부 컨텍스트 pull이 아니다. OVERRIDE 블록(§ 표준 패턴 3종 1)이 금지하는 것은 에이전트 정의의 티켓 폴더·이전 세션·메모리 자동 로딩이며, Lead가 args로 명시 전달한 목적은 이에 해당하지 않는다 — 오염원이 아니라 과제 정의의 일부
 
 ### TEAM 추론 품질 3원칙 보존 매핑 (prompt-optimization §다양성)
 

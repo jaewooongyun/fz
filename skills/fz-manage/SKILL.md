@@ -394,7 +394,7 @@ verdict: agree / disagree / partial / needs_verification
 ### 산출물
 
 ```
-{CWD}/<작업폴더>/  (또는 사용자 ASD 폴더)
+{CWD}/<작업폴더>/  (또는 사용자 티켓 폴더)
 ├── parsed/          ← parse_memory.py 출력 JSON
 ├── scored/          ← score_relevance.py 출력 JSON
 ├── suggestions/     ← Generator yaml diff

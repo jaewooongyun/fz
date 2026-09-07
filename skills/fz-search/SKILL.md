@@ -33,7 +33,7 @@ intent-triggers:
 
 ## 개요
 
-> ⛔ Phase 0 (ASD Pre-flight) → 4가지 모드: arch | layer | impact | pattern
+> ⛔ Phase 0 (Work Dir Pre-flight) → 4가지 모드: arch | layer | impact | pattern
 > 2가지 실행 방식: 순차(기본) | 병렬 교차 검증(--deep)
 > 루프 프리미티브: ReAct (H6, Inside the Scaffold)
 
@@ -83,19 +83,19 @@ intent-triggers:
 
 ---
 
-## ⛔ Phase 0: ASD Pre-flight (반성 4차 — 누락 방지)
+## ⛔ Phase 0: Work Dir Pre-flight (반성 4차 — 누락 방지)
 
 > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
 
 **Phase 1 시작 전에 반드시 실행:**
 
-1. 인자에서 `ASD-\d+` 패턴 추출
-2. 패턴 있으면 → `{CWD}/ASD-xxxx/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
 
 ### Gate 0: Work Dir Ready
-- [ ] ⛔ ASD 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (ASD / NOTASK / Serena fallback)
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
@@ -331,14 +331,14 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 ### ⛔ 아티팩트 기록 (항상)
 
 탐색 완료 후 결과를 기록한다.
-- ASD 활성: `{WORK_DIR}/search/search-result.md` + `index.md` 업데이트
-- 비ASD: `write_memory("fz:checkpoint:search", "모드: {mode}. 발견: {N}개 심볼. 핵심: {요약}")`
+- 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/search/search-result.md` + `index.md` 업데이트
+- 비-티켓 세션: `write_memory("fz:checkpoint:search", "모드: {mode}. 발견: {N}개 심볼. 핵심: {요약}")`
 
 ## Gate: Search Complete
-- [ ] ⛔ Gate 0 (ASD Pre-flight) 통과했는가?
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 대상 심볼/패턴 파악 완료?
 - [ ] 영향 범위 식별?
-- [ ] ⛔ 아티팩트 기록 완료? (ASD: 파일, 비ASD: Serena checkpoint)
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
 - [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (단위 U 확정 후 M/`N_U` 보고 — canonical: `modules/cross-validation.md` § Coverage Gate 절차 0, ⛔ 어휘 9개 동기)
 - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
 
@@ -370,8 +370,8 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 
 | Type | Given | When | Then (pass/fail oracle) |
 |------|-------|------|--------------------------|
-| normal | 비ASD 컨텍스트, Serena 연결됨, 질의에 "모듈/구조" 키워드 | `/fz-search "ContentDetail 모듈 구조"` | arch 모드 자동 선택(모드 판별 표) + Gate: Search Complete 5/5 통과 (비ASD 분기 → `write_memory("fz:checkpoint:search", ...)` 기록 완료) |
-| normal | 인자에 `ASD-\d+` 패턴, "누가 쓰는"·"전수" 키워드, Serena 연결됨 | `/fz-search "ASD-1234 AuthRepository 누가 쓰는지 전수"` | Gate 0 (Work Dir Ready) 3/3 통과 (`{CWD}/ASD-1234/` + index.md 생성) + impact depth 2 추적 + Coverage Gate 통과(전수 주장) + `{WORK_DIR}/search/search-result.md` 기록 |
+| normal | 비-티켓 세션 컨텍스트, Serena 연결됨, 질의에 "모듈/구조" 키워드 | `/fz-search "ContentDetail 모듈 구조"` | arch 모드 자동 선택(모드 판별 표) + Gate: Search Complete 5/5 통과 (비-티켓 세션 분기 → `write_memory("fz:checkpoint:search", ...)` 기록 완료) |
+| normal | 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴, "누가 쓰는"·"전수" 키워드, Serena 연결됨 | `/fz-search "TVG-1234 AuthRepository 누가 쓰는지 전수"` | Gate 0 (Work Dir Ready) 3/3 통과 (`{CWD}/TVG-1234/` + index.md 생성) + impact depth 2 추적 + Coverage Gate 통과(전수 주장) + `{WORK_DIR}/search/search-result.md` 기록 |
 | edge-case | `--deep` 플래그 + 네이티브 Workflow 도구 가용 | `/fz-search --deep "Player 모듈 구조"` | `mode:'workflow'` 반환 → 출력에 신뢰도 등급 열(★★★/★★/★) 표시 + `return.metrics`(agentCalls/nullCount/stages/fallback) → experiment-log §5.7 기록 |
 | edge-case | 모드 트리거 키워드가 복수/모호한 질의 | `/fz-search "Player 관련된 거"` | AskUserQuestion으로 모드 확인 (임의 모드 선택 금지) → 사용자가 선택한 모드로 실행 |
 | failure | `--deep` 플래그 + Workflow 도구 미가용 | `/fz-search --deep "Auth 데이터 흐름"` | `mode:'fallback'` → 기본 순차 모드 자동 전환 + 폴백 사유 experiment-log 기록 (중단/크래시 없이 결과 반환) |

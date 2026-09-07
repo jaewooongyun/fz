@@ -35,11 +35,11 @@
 2. 모든 파일 경로는 절대 경로 사용 (에이전트는 홈 디렉토리에서 시작).
 3. 완료 시: `shutdown_request` → 프로세스 종료 확인 → `TeamDelete`.
 4. Lead는 별도 에이전트 파일이 아닌 역할 모드 (스킬별 전환).
-5. ASD 폴더 활성 시: `{phase}/*-team.md`에 통신 요약 (5K)을 기록한다. 원본 전문은 `*-team-full.md`에 별도 보존 (drill-down용, Hydration 대상 아님). 참조: `modules/context-artifacts.md` <!-- 기존: 핵심 통신만 -->
+5. 티켓 폴더(WORK_DIR) 활성 시: `{phase}/*-team.md`에 통신 요약 (5K)을 기록한다. 원본 전문은 `*-team-full.md`에 별도 보존 (drill-down용, Hydration 대상 아님). 참조: `modules/context-artifacts.md` <!-- 기존: 핵심 통신만 -->
 6. **⛔ Lead Checkpoint Protocol**: 에이전트 완료 보고 수신 후, Lead는 반드시 아래 순서를 실행한다. 순서 건너뛰기 금지.
    ```
    에이전트 "Step N 완료" 보고 수신
-   → ⛔ 체크포인트 기록 (ASD: 파일, 비ASD: write_memory)
+   → ⛔ 체크포인트 기록 (티켓 폴더: 파일, 비-티켓 세션: write_memory)
    → ⛔ Codex 교차 검증 (/fz-gpt check — 코드/계획 생산 TEAM 필수, 탐색은 --deep만)
    → [제거/리팩토링 시] Implication Scan (modules/lead-reasoning.md + cross-validation.md)
    → 빌드 검증 (modules/build.md)
@@ -75,7 +75,7 @@
 [RTM]: {pending Req-ID 목록}
 ```
 
-소스: ASD 활성 → 이전 Phase 산출물에서 추출. 비ASD → Serena checkpoint.
+소스: 티켓 폴더(WORK_DIR) 활성 → 이전 Phase 산출물에서 추출. 비-티켓 세션 → Serena checkpoint.
 전달 시점: 다음 TeamCreate 직후, Primary에게 Task Brief와 함께.
 
 ---
@@ -160,7 +160,7 @@
 
 | 컴포넌트 | 역할 | fz 대응 |
 |---------|------|---------|
-| **Session** | 상태 추적 + 이벤트 로그 | ASD 폴더 + Serena Memory (context window **밖**) |
+| **Session** | 상태 추적 + 이벤트 로그 | 티켓 폴더 + Serena Memory (context window **밖**) |
 
 핵심: Session을 context window 밖의 조회 가능한 이벤트 로그로 관리한다. context window 안에 모든 상태를 유지하려 하면 Context Rot이 가속된다.
 

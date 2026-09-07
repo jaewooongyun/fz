@@ -547,7 +547,7 @@ GOOD: head_limit 설정 + 필요한 파일만 선별 Read
 ```
 
 **B. 중간 데이터 격리** — "결과만 context에, 과정은 파일로"
-- Codex 결과: `-o` 옵션으로 파일 출력 (ASD 폴더 또는 WORK_DIR)
+- Codex 결과: `-o` 옵션으로 파일 출력 (티켓 폴더 또는 WORK_DIR)
 - 에이전트 분석 결과: JSON 파일로 저장 후 Lead가 Read
 - 긴 diff/심볼 데이터: 파일로 저장 후 참조
 
@@ -570,7 +570,7 @@ GOOD: head_limit 설정 + 필요한 파일만 선별 Read
 - [ ] 대용량 MCP 결과를 파일로 격리했는가? (context에 raw 출력 남기지 않음)
 - [ ] 에이전트 tools 필드가 최소한으로 설정되어 있는가?
 - [ ] 서브에이전트 없이 직접 해결할 수 있는 작업을 위임하고 있지 않은가?
-- [ ] 4+ 스텝 파이프라인에서 ASD 파일 기반 전략을 사용하고 있는가?
+- [ ] 4+ 스텝 파이프라인에서 티켓 폴더 파일 기반 전략을 사용하고 있는가?
 
 ---
 
@@ -646,11 +646,11 @@ fz 적용:
 > "Filesystem discovery > compaction" — Anthropic Claude Code Best Practices
 
 긴 세션에서 auto-compact에 의존하면 맥락이 손실된다. 대신:
-1. 핵심 결정사항을 **파일 시스템에 기록** (ASD 폴더, index.md)
+1. 핵심 결정사항을 **파일 시스템에 기록** (티켓 폴더, index.md)
 2. 새 컨텍스트에서 **파일을 Read**하여 복원 (structured handoff)
 3. 이 방식이 compact된 요약보다 정확한 복원을 보장
 
-fz 적용: `modules/context-artifacts.md`의 ASD 폴더 전략이 이 원칙의 구현. `fz:checkpoint:essential`은 경량 버전.
+fz 적용: `modules/context-artifacts.md`의 티켓 폴더 전략이 이 원칙의 구현. `fz:checkpoint:essential`은 경량 버전.
 
 ### 원칙 H4: Session 계층 관리 전략
 
@@ -663,7 +663,7 @@ fz 적용: `modules/context-artifacts.md`의 ASD 폴더 전략이 이 원칙의 
 
 | 컴포넌트 | 역할 | fz 대응 |
 |---------|------|---------|
-| **Session** | 상태 추적 + 이벤트 로그 | ASD 폴더 + Serena Memory |
+| **Session** | 상태 추적 + 이벤트 로그 | 티켓 폴더 + Serena Memory |
 
 핵심: Session을 context window **밖**의 조회 가능한 이벤트 로그로 관리한다. context window 안에 모든 상태를 유지하려 하면 Context Rot이 가속된다.
 

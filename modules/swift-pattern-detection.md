@@ -169,8 +169,8 @@ GOOD:
 
 ## 발동 결과 기록
 
-- ASD 활성: `{WORK_DIR}/code/phase-0.5-detection.md`에 발견된 token + 대응 step 매핑
-- 비ASD: `write_memory("fz:checkpoint:phase-0.5", "trigger: {tokens}. 대응: {steps}")`
+- 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/code/phase-0.5-detection.md`에 발견된 token + 대응 step 매핑
+- 비-티켓 세션: `write_memory("fz:checkpoint:phase-0.5", "trigger: {tokens}. 대응: {steps}")`
 
 ## 검증 명령 (외부 grep용)
 

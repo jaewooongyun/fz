@@ -48,4 +48,4 @@
 | architect | (스킬명) |
 
 ## Compact Recovery
-- ASD 폴더 작업 중 compact 발생 시: `fz:session:current` 읽기 → `work_dir` → `index.md` 읽기 → Active Phase 복원
+- 티켓 폴더 작업 중 compact 발생 시: `fz:session:current` 읽기 → `work_dir` → `index.md` 읽기 → Active Phase 복원
