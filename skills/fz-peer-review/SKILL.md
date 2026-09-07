@@ -23,11 +23,12 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   Bash(git *), Bash(codex *), Bash(gh *), Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow, Write
-provides: [peer-review]
-needs: [none]
-intent-triggers:
-  - "피어리뷰|팀원|PR.*리뷰"
-  - "peer.?review|teammate|PR.*review"
+metadata:
+  provides: [peer-review]
+  needs: [none]
+  intent-triggers:
+    - "피어리뷰|팀원|PR.*리뷰"
+    - "peer.?review|teammate|PR.*review"
 ---
 
 # /fz-peer-review - 팀원 코드 피어 리뷰

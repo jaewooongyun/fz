@@ -1,6 +1,6 @@
 # 테스트 케이스 (fz-peer-review)
 
-> 근거: `guides/skill-testing.md` §1(3단계 프레임워크)·§4(test-spec 템플릿). 트리거 어휘는 description '예:'/'비사용:' + `intent-triggers`, Functional oracle은 본 스킬의 Phase(Gather→Analyze→Challenge→Synthesize→Deliver)·Gate 5.5·Synthesize 투표/Origin 보정·CHECKPOINT·에러 대응에서 도출.
+> 근거: `guides/skill-testing.md` §1(3단계 프레임워크)·§4(test-spec 템플릿). 트리거 어휘는 description '예:'/'비사용:' + `metadata.intent-triggers`, Functional oracle은 본 스킬의 Phase(Gather→Analyze→Challenge→Synthesize→Deliver)·Gate 5.5·Synthesize 투표/Origin 보정·CHECKPOINT·에러 대응에서 도출.
 
 ### Triggering Test
 

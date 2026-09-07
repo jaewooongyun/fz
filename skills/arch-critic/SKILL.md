@@ -4,13 +4,14 @@ description: >
   Architecture critic for peer review. Evaluates design decisions and extensibility.
   Use when analyzing architecture quality in peer review context.
 user-invocable: false
-category: tool
-requires: []
+metadata:
+  category: tool
+  requires: []
+  sc-commands: [sc:analyze, sc:design]
+  provides: [architecture-analysis]
+  needs: [none]
+  intent-triggers: []
 allowed-tools: []
-sc-commands: [sc:analyze, sc:design]
-provides: [architecture-analysis]
-needs: [none]
-intent-triggers: []
 ---
 
 # Arch Critic — Architecture & Extensibility Reviewer

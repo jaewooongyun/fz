@@ -5,13 +5,14 @@ description: >
   modern API usage, and dependency impact.
   Use when analyzing code quality in peer review context.
 user-invocable: false
-category: tool
-requires: []
+metadata:
+  category: tool
+  requires: []
+  sc-commands: [sc:analyze, sc:reflect]
+  provides: [code-quality-analysis]
+  needs: [none]
+  intent-triggers: []
 allowed-tools: []
-sc-commands: [sc:analyze, sc:reflect]
-provides: [code-quality-analysis]
-needs: [none]
-intent-triggers: []
 ---
 
 # Code Auditor — Quality, Modern API & Dependency Reviewer

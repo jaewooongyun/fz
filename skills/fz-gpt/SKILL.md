@@ -10,11 +10,12 @@ allowed-tools: >-
   mcp__serena__write_memory,
   mcp__serena__read_memory,
   Bash(codex *), Read, Grep
-provides: [verification]
-needs: [none]
-intent-triggers:
-  - "codex|교차검증|GPT"
-  - "codex|cross-validate|verify with codex"
+metadata:
+  provides: [verification]
+  needs: [none]
+  intent-triggers:
+    - "codex|교차검증|GPT"
+    - "codex|cross-validate|verify with codex"
 ---
 
 # /fz-gpt - Codex 상호검증 스킬 (Hybrid)

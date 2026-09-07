@@ -10,11 +10,12 @@ allowed-tools: >-
   mcp__atlassian__get-issue,
   mcp__atlassian__search-issues,
   Bash(git *)
-provides: [commit]
-needs: [code-changes]
-intent-triggers:
-  - "커밋"
-  - "commit"
+metadata:
+  provides: [commit]
+  needs: [code-changes]
+  intent-triggers:
+    - "커밋"
+    - "commit"
 ---
 
 # Git Commit Skill

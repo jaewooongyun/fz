@@ -146,8 +146,19 @@ def read(p: Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace")
 
 
+NESTED_KEY = "_metadata"   # ⛔ `_` 시작 — frontmatter 키 정규식(`[A-Za-z]…`)과 충돌 불가
+NESTED_SUB = re.compile(r"^ {2,}([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$")
+
+
 def frontmatter(p: Path):
-    """(dict, 본문줄수). frontmatter 미존재/미종료는 None 반환 → 호출자가 parse error 처리."""
+    """(dict, 본문줄수). frontmatter 미존재/미종료는 None 반환 → 호출자가 parse error 처리.
+
+    ⛔ `metadata:` 블록의 **1단계 하위 키**는 별도 dict 로 모아 `d[NESTED_KEY]` 에 담는다
+       (조회는 `fm_get()` 경유 — S7 에서 최상위 폴백 회수). 표준 들여쓰기는 **2-스페이스**이고
+       [실측 272/272], `^ {2,}` 는 더 깊은 `key:` 줄도 1단계로 받아 폭 차이에 깨지지 않는다.
+    ⛔ 분기는 **`metadata` 블록 안에서만** 갈린다 — 그 밖의 연속행 접기는 종전과 같은 경로를
+       탄다(REQ_L1·에이전트 frontmatter·#N* 검사의 입력 불변).
+    """
     lines = read(p).split("\n")
     if not lines or lines[0].strip() != "---":
         return None, len(lines)
@@ -155,15 +166,35 @@ def frontmatter(p: Path):
     if end is None:
         return None, len(lines)
     d, key = {}, None
+    nested, nkey = {}, None
     for l in lines[1:end]:
         m = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$", l)
+        sub = NESTED_SUB.match(l) if key == "metadata" else None
         if m:
-            key = m.group(1)
+            key, nkey = m.group(1), None
             d[key] = m.group(2).strip()
+        elif sub:
+            nkey = sub.group(1)
+            nested[nkey] = sub.group(2).strip()
+        elif key == "metadata" and nkey and l.strip():
+            nested[nkey] += " " + l.strip()
         elif key and l.strip():
             d[key] += " " + l.strip()
+    if nested:
+        d[NESTED_KEY] = nested
     n = len(lines) - (1 if lines and lines[-1] == "" else 0)
     return d, n
+
+
+def fm_get(fm: dict, key: str, default=None):
+    """frontmatter 조회 — **`metadata:` 하위만** (S4 하위호환 창은 S7 에서 회수).
+
+    ⛔ 최상위 폴백을 지웠다: L2 fz 정책 키(`provides`·`needs`·`intent-triggers`)의 정본
+       위치는 `metadata:` 하위 하나뿐이며, 최상위에 남은 키는 #1 에서 누락으로 잡힌다.
+       정본 선언 = `modules/governance.md` § 스킬 최소 기준.
+    ⛔ L1 공식 4키는 이 함수를 거치지 않는다 — `chk_1` 이 `fm` 최상위를 직접 본다.
+    """
+    return fm.get(NESTED_KEY, {}).get(key, default)
 
 
 def find_named_defs(node, name: str, path: str = "") -> list[tuple[str, dict]]:
@@ -239,7 +270,8 @@ def chk_1():
         if fm is None:
             raise ParseError(f"skills/{name}/SKILL.md: frontmatter 파싱 실패")
         seen += 1
-        miss = [f for f in REQ_L1 + REQ_L2 if f not in fm]
+        miss = ([f for f in REQ_L1 if f not in fm]
+                + [f for f in REQ_L2 if fm_get(fm, f) is None])   # ⛔ L2 는 `metadata:` 하위**만** (S7 창 회수)
         if miss:
             v.append(f"skills/{name}/SKILL.md: 필수 필드 누락 {miss}")
     return v, seen
@@ -253,8 +285,8 @@ def chk_3():
         if fm is None:
             raise ParseError(f"skills/{name}: frontmatter 파싱 실패")
         seen += 1
-        prov[name] = re.findall(r"[A-Za-z][A-Za-z0-9_-]*", fm.get("provides", ""))
-        need[name] = [t for t in re.findall(r"[A-Za-z][A-Za-z0-9_-]*", fm.get("needs", "")) if t != "none"]
+        prov[name] = re.findall(r"[A-Za-z][A-Za-z0-9_-]*", fm_get(fm, "provides", ""))
+        need[name] = [t for t in re.findall(r"[A-Za-z][A-Za-z0-9_-]*", fm_get(fm, "needs", "")) if t != "none"]
     producer = defaultdict(set)
     for s, ts in prov.items():
         for t in ts:

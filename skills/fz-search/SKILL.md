@@ -20,11 +20,12 @@ allowed-tools: >-
   mcp__lsp__peek_definition,
   Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
 
-provides: [search-results, architecture-analysis]
-needs: [none]
-intent-triggers:
-  - "찾아|탐색|구조|영향|의존성"
-  - "search|explore|structure|impact|dependency"
+metadata:
+  provides: [search-results, architecture-analysis]
+  needs: [none]
+  intent-triggers:
+    - "찾아|탐색|구조|영향|의존성"
+    - "search|explore|structure|impact|dependency"
 ---
 
 # /fz-search - 코드 탐색 & 구조 분석 스킬

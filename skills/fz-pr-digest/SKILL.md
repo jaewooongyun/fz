@@ -17,11 +17,12 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   Bash(git *), Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
-provides: [pr-digest, code-understanding]
-needs: [none]
-intent-triggers:
-  - "해설|이해|학습|뭐가.*바뀐|어떻게.*개선|PR.*설명|변경.*설명"
-  - "digest|what.*changed|learn"
+metadata:
+  provides: [pr-digest, code-understanding]
+  needs: [none]
+  intent-triggers:
+    - "해설|이해|학습|뭐가.*바뀐|어떻게.*개선|PR.*설명|변경.*설명"
+    - "digest|what.*changed|learn"
 ---
 
 # /fz-pr-digest - PR 변경사항 해설 (코드 학습용)

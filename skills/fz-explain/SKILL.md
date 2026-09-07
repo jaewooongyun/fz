@@ -15,11 +15,12 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   Read, Grep, Glob
-provides: [structure-explanation, code-understanding]
-needs: [none]
-intent-triggers:
-  - "구조.*설명|코드.*설명|어떻게.*동작|어떤.*역할|전체.*흐름|과외|처음.*보는.*사람"
-  - "explain.*structure|how.*work|walkthrough|tutor|onboard"
+metadata:
+  provides: [structure-explanation, code-understanding]
+  needs: [none]
+  intent-triggers:
+    - "구조.*설명|코드.*설명|어떻게.*동작|어떤.*역할|전체.*흐름|과외|처음.*보는.*사람"
+    - "explain.*structure|how.*work|walkthrough|tutor|onboard"
 ---
 
 # /fz-explain — 코드·구조를 처음 보는 사람에게 설명한다

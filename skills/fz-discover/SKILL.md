@@ -18,14 +18,15 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
   Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
-provides: [landscape-map, trade-off-table, open-questions]
-needs: [none]
-intent-triggers:
-  - "어떻게.*좋을까|어디에.*좋을까|뭐가.*맞을까|괜찮을까"
-  - "방법.*찾|최적.*찾|요구.*조건|제약|트레이드오프"
-  - "이게.*맞아|이렇게.*해도|어떤.*방식|비교.*해줘"
-  - "맞는지|차이점|놓치고|어떻게.*생각"
-  - "how.*should|where.*should|what.*best|trade.?off|difference|missing|what.*think"
+metadata:
+  provides: [landscape-map, trade-off-table, open-questions]
+  needs: [none]
+  intent-triggers:
+    - "어떻게.*좋을까|어디에.*좋을까|뭐가.*맞을까|괜찮을까"
+    - "방법.*찾|최적.*찾|요구.*조건|제약|트레이드오프"
+    - "이게.*맞아|이렇게.*해도|어떤.*방식|비교.*해줘"
+    - "맞는지|차이점|놓치고|어떻게.*생각"
+    - "how.*should|where.*should|what.*best|trade.?off|difference|missing|what.*think"
 ---
 
 # /fz-discover - 풍경 탐색 + 경로 매핑 스킬

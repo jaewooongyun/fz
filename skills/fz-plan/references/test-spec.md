@@ -12,7 +12,7 @@
 | "이 화면 설계해줘" | trigger | 예: "설계해줘" |
 | "아키텍처 잡아줘" | trigger | 예: "아키텍처 잡아줘" |
 | "이 요구사항 분석해줘" | trigger | 예: "요구사항 분석" |
-| "이 모듈 리팩토링 계획 세워줘" | trigger | intent-triggers: 리팩토링/refactor |
+| "이 모듈 리팩토링 계획 세워줘" | trigger | metadata.intent-triggers: 리팩토링/refactor |
 
 #### should-NOT-trigger (Boundaries Will Not / description '비사용' 기반)
 

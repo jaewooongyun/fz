@@ -296,17 +296,19 @@ GOOD: "Use this tool when reading or modifying files"
 ### 예시
 
 ```yaml
-intent-triggers:
-  - "계획|설계|아키텍처|요구사항"     # 한국어
-  - "plan|design|architect"            # 영어
+metadata:
+  intent-triggers:
+    - "계획|설계|아키텍처|요구사항"     # 한국어
+    - "plan|design|architect"            # 영어
 ```
 
 ### 나쁜 예시
 
 ```yaml
-intent-triggers:
-  - "코드|개발"        # 너무 광범위 — fz-code, fz-fix, fz-review 모두 해당
-  - "help|do"          # 의미 없음 — 모든 요청에 매칭
+metadata:
+  intent-triggers:
+    - "코드|개발"        # 너무 광범위 — fz-code, fz-fix, fz-review 모두 해당
+    - "help|do"          # 의미 없음 — 모든 요청에 매칭
 ```
 
 ### 중복 체크 방법

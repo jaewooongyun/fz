@@ -25,6 +25,6 @@
 | Given | When | Then (pass/fail oracle) | type |
 |-------|------|--------------------------|------|
 | `skills/*/SKILL.md`에 fz-* 스킬 전부 존재 | `/fz-manage benchmark` | 전체 fz-* Static Analysis 8항목 실행 + 스킬별 점수(80점 만점) 산출·정렬 + 하위 3개 개선 제안 출력 → Gate: Benchmark Complete 3/3 통과 | normal |
-| `skills/*/SKILL.md` + `agents/*.md` 존재 | `/fz-manage check` | 17개 검증 항목 전부 판정 출력 + "총 점수: N%" 산출 (YAML 필수 필드·MCP 유효성·provides/needs 체인·크기·깨진 참조 등 각 항목 OK/WARN/FAIL) | normal |
+| `skills/*/SKILL.md` + `agents/*.md` 존재 | `/fz-manage check` | 17개 검증 항목 전부 판정 출력 + "총 점수: N%" 산출 (YAML 필수 필드·MCP 유효성·metadata.provides/metadata.needs 체인·크기·깨진 참조 등 각 항목 OK/WARN/FAIL) | normal |
 | Relevance Scorer 결과 ≥ 0.70 모듈이 5개 미만 | `/fz-manage reflect-to-module <feedback_file>` | Gate 발동 → "threshold 낮춰서 재실행?" 사용자 확인 요청, 자동 적용 0건 (사용자 명시 승인 전 Edit 차단) | edge-case |
 | 한 SKILL.md의 YAML frontmatter 손상 | `/fz-manage list` | YAML 파싱 실패 보고 + 수동 확인 폴백 안내 (에러 대응 테이블) | failure |

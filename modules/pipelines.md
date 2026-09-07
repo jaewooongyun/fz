@@ -230,8 +230,8 @@ needs=commit:        fz-pr
 ```
 
 알고리즘:
-1. 최종 목표 스킬의 needs 확인
-2. needs를 provides하는 스킬 역추적 (재귀)
+1. 최종 목표 스킬의 metadata.needs 확인
+2. 그 토큰을 metadata.provides 하는 스킬 역추적 (재귀)
 3. 토폴로지 정렬 → 선형 파이프라인
 4. 끊어진 체인 → AskUserQuestion
 
