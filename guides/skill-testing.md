@@ -474,12 +474,13 @@ python3 scripts/fz_snapshot.py --diff                                           
 - **조인 키는 `prompt_id`** 다. events.jsonl 의 한 줄이 트랜스크립트의 어느 턴인지는 `prompt_id`로만 확정된다(`session_id`는 여러 턴을 묶는다). arm 짝을 맞출 때 이 키로 붙인다.
 - ⛔ **arm 적용 검증(§8.1)을 대체하지 않는다.** 계측은 사후 기록이고, arm 이 실제로 갈렸는지는 여전히 트랜스크립트 `effort` 필드 대조로 확인한다.
 - ⛔ **분모 0건은 "부하 없음"이 아니라 측정 실패다.** 리포트 부록이 분모(세션·메시지·journal·findings 수)를 함께 인쇄하므로 그 줄을 먼저 본다.
+- ⛔ **adjust 가 많아도 A/B 필요성은 사라지지 않는다.** 실측 peer-review `cross`(N=20 · overturn 1 · adjust 41 — 감사 아티팩트 audit-report §5)는 후보 *제외* 근거가 아니라 후속 검증 대상이다. adjust 는 `newSeverity` 를 필수로 요구하지 않아 건수가 유효 조정과 1:1 이 아니다 [verified: `workflows/peer-review.js:71,75`].
 - **판정 기준표 (정본 — 이 표가 배포물이다)**. 데이터는 이 기준을 만족할 때만 결론을 낸다:
 
 | 질문 | 지표 | 판정 |
 |---|---|---|
 | 워커 effort `xhigh`→`high` 해도 되나 | 같은 입력 짝 비교(§8.1): critical·major 손실 0 AND (시간 or 토큰) ≥10%↓ | `modules/peer-review-tiers.md` 짝 비교 절차 그대로 |
-| 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) 수, 워크플로 **N≥20** 실행 | 0~1건이면 제거 A/B 후보 — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
+| 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) **과 `adjust`**(어댑터 `verdict adjust` [verified: `scripts/fz_telemetry_report.py:328,398`]) 수, 워크플로 **N≥20** 실행 | overturn 0~1 **AND** adjust 0~1 이면 제거 A/B 후보(0~1 임계는 **잠정 휴리스틱**) — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
 | 규칙 감량이 품질을 떨어뜨렸나 | 감량 전후 fz-findings `detector: user` 월별 건수 + events `user_correction_signal` 비율 | 증가하면 되돌림 |
 | floor 성장이 지연을 늘리나 | `snapshots.tsv` floor × 스킬별 지연 중앙값 상관 | 상관 없으면 감량 우선순위 ↓ |
 | events 의 0 은 저부하인가 | `measurement` 필드 — `complete` 만 카운트로 읽는다 | `incomplete`·`unattributable`·`no_transcript` 는 분모에서 뺀다 |
