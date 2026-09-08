@@ -5,7 +5,7 @@ description: >-
   예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토 (비사용: 자기 코드 →fz-review, PR 해설 →fz-pr-digest)
 user-invocable: true
 disable-model-invocation: true
-argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--codex] [--deep] [--post] [--explain [--light|--deep]]"
+argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--deep] [--post] [--explain [--light|--deep]]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
@@ -33,14 +33,14 @@ metadata:
 
 # /fz-peer-review - 팀원 코드 피어 리뷰
 
-> **행동 원칙**: 팀원의 PR/브랜치를 3-렌즈 독립 분석 + Codex 교차검증으로 리뷰하고, Confidence Matrix 투표(적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)로 객관적 이슈를 도출한다. 칭찬할 건 칭찬하고, 지적할 건 근거와 대안을 함께 제시한다.
+> **행동 원칙**: 팀원의 PR/브랜치를 3-렌즈 독립 분석 + GPT 교차검증으로 리뷰하고, Confidence Matrix 투표(적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)로 객관적 이슈를 도출한다. 칭찬할 건 칭찬하고, 지적할 건 근거와 대안을 함께 제시한다.
 
 ## 개요
 
 > Gather → Analyze → Challenge → Synthesize → Deliver
 
 - **9개 관점**: Architecture Decision, Extensibility, Over-Engineering, Functional Decomposition, Modern API, Dependency Impact, **Refactoring Completeness**, **Concurrency Safety** (동시성 코드 포함 시), **Requirements Alignment**
-- **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 single source) + Codex challenger(**Tier 1·2·3 상시** — SSOT는 `modules/peer-review-tiers.md` § Tier 구성 표. Tier 0은 `--codex` 시 Tier 1 전환)
+- **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 single source) + GPT challenger(**Tier 1·2·3 상시** — SSOT는 `modules/peer-review-tiers.md` § Tier 구성 표. Tier 0은 `--gpt` 시 Tier 1 전환)
 - **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정 (적용 Tier·산식은 `modules/peer-review-gates.md` § MergeContract § 9)
 - **4-Tier Graceful Degradation**: diff 크기 기반 자동 Tier 선택 (Tier 0/1/2/3) + 폴백 체인
 
@@ -94,8 +94,8 @@ metadata:
 | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
-| Codex challenger 스킬 | 관점 3(Over-Engineering) + 관점 7 보조 + Devil's Advocate |
-| `schemas/gpt_peer_review_schema.json` | Codex 응답 JSON 구조 |
+| GPT challenger 스킬 | 관점 3(Over-Engineering) + 관점 7 보조 + Devil's Advocate |
+| `schemas/gpt_peer_review_schema.json` | GPT 응답 JSON 구조 |
 
 ## Step: Gather (컨텍스트 수집)
 
@@ -120,7 +120,7 @@ gh auth status  # 성공→gh 사용, 실패→git 폴백 (git fetch upstream + 
 
 ### 0.5. PR 브랜치 fetch
 
-`git show pr-{PR}:{FILE}` 직접 참조 및 Codex DA sandbox 제약 우회를 위해 필수.
+`git show pr-{PR}:{FILE}` 직접 참조 및 GPT DA sandbox 제약 우회를 위해 필수.
 ```bash
 git fetch upstream pull/{PR_NUMBER}/head:pr-{PR_NUMBER}
 ```
@@ -255,7 +255,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 
 ### Tier 0/1 분기
 - **Tier 0** → `modules/peer-review-tiers.md` §Tier 0 절차로 위임. 본 SKILL.md Analyze 후속 섹션(Gate 0 / Tier 2 / Tier 3) 모두 skip.
-- **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + Codex challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip.
+- **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip.
 - **Tier 2/3** → 아래 기존 시퀀스 실행.
 
 ### Orchestrator Bias 방지 규칙 (InputHygiene 계약)
@@ -277,11 +277,11 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 **Self-Check**: 프롬프트에 "~인 것 같다" / 내 의견 / 사실 단정 포함 시 → 제거 후 데이터로 대체.
 
 > ⛔ **Tier 2/3 실행 상세**(Workflow 시퀀스 · 에이전트 출력 스키마 · Evidence-Only Brief · 병합 방법 A/B):
-> `modules/peer-review-workflow.md`. Tier 0/1 은 sub-agent·Codex 가 없어 **읽지 않는다**.
+> `modules/peer-review-workflow.md`. Tier 0/1 은 sub-agent·GPT 가 없어 **읽지 않는다**.
 
 ## Step: Challenge (상호 비판)
 
-### Cross-Critique Anti-Sycophancy Rule + Codex Devil's Advocate
+### Cross-Critique Anti-Sycophancy Rule + GPT Devil's Advocate
 
 Anti-Sycophancy 규칙(코드 증거 없는 self-reverse 금지), reverse 판정 절차, DA 호출 패턴: `modules/peer-review-tiers.md` §Cross-Critique 참조.
 
@@ -342,20 +342,20 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 └─ 0/3: EXCLUDE
 ```
 
-**독립성 원칙**: 에이전트가 Gather의 Key Facts를 기반으로 판단하면 독립성 LOW. 에이전트가 직접 파일을 Read하여 판단하면 독립성 HIGH. Codex가 sandbox에서 독립 분석하면 독립성 HIGH. 독립성 LOW 에이전트의 동의는 confidence를 증폭하지 않는다.
+**독립성 원칙**: 에이전트가 Gather의 Key Facts를 기반으로 판단하면 독립성 LOW. 에이전트가 직접 파일을 Read하여 판단하면 독립성 HIGH. GPT가 sandbox에서 독립 분석하면 독립성 HIGH. 독립성 LOW 에이전트의 동의는 confidence를 증폭하지 않는다.
 
 ### 4. Confidence Matrix 출력
 
 > ⛔ **적용 Tier** — 이 절 산출물의 Tier 별 생성 여부는 `modules/peer-review-gates.md` § MergeContract § 9, 절 안 Coverage·Negative-Result Gate 의 경량 경로 적용은 같은 파일 § 경량 경로 표가 정본이다.
 
 ```markdown
-| # | Issue | Origin | Sev | Arch | Auditor | Codex | DA | Votes | Basis | Final | Decision |
+| # | Issue | Origin | Sev | Arch | Auditor | GPT | DA | Votes | Basis | Final | Decision |
 |---|-------|--------|-----|------|---------|-------|----|-------|-------|-------|----------|
 ```
 
 > Origin 열: `R`(regression), `P`(pre-existing), `I`(improvement). pre-existing → severity cap: suggestion. **`I`는 cap 없음 — `Sev` 열에 `raw→adj` 병기(⛔ `Final` 열은 confidence이므로 어휘 구분), non-blocking**.
 > Basis 열: `CV`(code-verified), `IO`(inference-only). IO + 3/3 → [correlated] 태그.
-> ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를 **Read 후 실행** — 전체 N / 분석 M 비율 보고. ⛔ 그중 **부정 주장(0건·부재)** 은 같은 파일 **§Negative-Result Gate**도 함께 적용한다 — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. N 자체가 오측정이면 0/0 으로 통과한다. Codex 호출 시 같은 파일 §Reflection Rate도 산출(반영률 = Codex finding 중 최종 리포트 채택 / N · `N<10`은 preliminary·verdict 보류). same-model 교차(Stage 2 arch↔quality)는 `guides/agent-team-guide.md` §Same-model Cross-Verify Reflection Rate 정책대로 headline 제외.
+> ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를 **Read 후 실행** — 전체 N / 분석 M 비율 보고. ⛔ 그중 **부정 주장(0건·부재)** 은 같은 파일 **§Negative-Result Gate**도 함께 적용한다 — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. N 자체가 오측정이면 0/0 으로 통과한다. GPT 호출 시 같은 파일 §Reflection Rate도 산출(반영률 = GPT finding 중 최종 리포트 채택 / N · `N<10`은 preliminary·verdict 보류). same-model 교차(Stage 2 arch↔quality)는 `guides/agent-team-guide.md` §Same-model Cross-Verify Reflection Rate 정책대로 headline 제외.
 
 ### 4.4-4.9. Verification Gates
 
@@ -416,7 +416,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
   서술 형태(인과가 한 문장으로 안 끝나는 결함): `modules/peer-review-finding-anatomy.md` — 필드 나열이 아니라 원칙. 결함마다 인과의 모양이 다르다
 
 - `${WORK_DIR}/pr-comments.md` — 이슈별 부드러운 톤 PR 코멘트 모음 (복사/붙여넣기용)
-- `${WORK_DIR}/*-result.json` — 에이전트/Codex 원본 결과
+- `${WORK_DIR}/*-result.json` — 에이전트/GPT 원본 결과
 
 #### --post 시 — 인라인 앵커 게시
 
@@ -459,18 +459,18 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 **Will**:
 - 팀원 PR/브랜치의 9개 관점 피어 리뷰
 - 3-Model Cross-Review + Confidence Matrix 투표 (적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)
-- Codex Devil's Advocate로 편향 보정
+- GPT Devil's Advocate로 편향 보정
 - 인라인 라인 앵커 리뷰 게시 (`--post` — `gh api …/pulls/{N}/reviews`)
 - 4-Tier Graceful Degradation + 자동 폴백
 **Will Not**:
 - 코드를 직접 수정하지 않음 (리뷰만 수행)
 - 자기 코드 리뷰 (→ `/fz-review`)
-- Codex 위임 (→ `/fz-gpt`) — codex exec 직접 호출
+- GPT 위임 (→ `/fz-gpt`) — codex exec 직접 호출
 - Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Code Conventions` 위임)
 - ⛔ **standalone Agent() 호출 금지** — Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응
 
-`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **Codex 실패→(Tier 3) Codex 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (codex 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다**, Codex timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
+`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (gpt 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다**, GPT timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
 
 ## Completion → Next
 `--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계.

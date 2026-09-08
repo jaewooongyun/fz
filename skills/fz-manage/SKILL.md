@@ -282,7 +282,7 @@ Lead가 보고에 추가할 것:
 
 > **도구화**: 메모리 17차(Reflection Gap) 해소 — 누적된 교훈을 *수동으로* fz 모듈에 반영하는 lag 제거.
 > **Pilot 기원**: cargo-cult 방어 Pilot P3 (2026-05-06, 19차 메모리 회귀 테스트 PASS).
-> **MUST 조건**: O3 (Generator ≠ Evaluator) + O9 (Cross-Model Verification) — Codex 외부 검증 필수.
+> **MUST 조건**: O3 (Generator ≠ Evaluator) + O9 (Cross-Model Verification) — GPT 외부 검증 필수.
 
 ### 사용법
 
@@ -290,7 +290,7 @@ Lead가 보고에 추가할 것:
 /fz-manage reflect-to-module <feedback_file_path>     # 단일 메모리 처리
 /fz-manage reflect-to-module --batch <directory>       # 여러 메모리 일괄
 /fz-manage reflect-to-module --threshold 0.65          # threshold 조정 (기본 0.70)
-/fz-manage reflect-to-module --skip-codex              # Codex 검증 건너뛰기 (DRY-RUN, 위험)
+/fz-manage reflect-to-module --skip-gpt              # GPT 검증 건너뛰기 (DRY-RUN, 위험)
 ```
 
 ### 5-Step 절차
@@ -324,7 +324,7 @@ python3 <FZ_ROOT>/skills/fz-manage/scripts/score_relevance.py parsed.json \
 - 출력: 모듈별 yaml diff (5 type 분류: catalog_addition / section_add+procedural_call / bidirectional_extension / perspective_addition / file_creation)
 - 자기 검증 (5 체크리스트) 통과한 제안만 출력
 
-#### Step 4: Reviewer (D+5 component, Codex 외부 검증) ⛔ MUST
+#### Step 4: Reviewer (D+5 component, GPT 외부 검증) ⛔ MUST
 
 각 제안에 대해 `/fz-gpt` 호출 (effort=medium):
 
@@ -342,14 +342,14 @@ verdict: agree / disagree / partial / needs_verification
 - 제안된 type 분류의 정확성
 ```
 
-⛔ `--skip-codex`로 건너뛰면 메모리 23차 (self-review blind spot) 재현 위험 — DRY-RUN 한정.
+⛔ `--skip-gpt`로 건너뛰면 메모리 23차 (self-review blind spot) 재현 위험 — DRY-RUN 한정.
 
 #### Step 5: 사용자 승인 + 적용
 
 ```markdown
 ## 제안 요약
 
-| Module | Type | Confidence | Codex Verdict |
+| Module | Type | Confidence | GPT Verdict |
 |--------|------|:----------:|:-------------:|
 | skills/fz-code/SKILL.md | catalog_addition | 0.95 | agree |
 | agents/impl-correctness.md | section_add+procedural_call | 0.92 | agree |
@@ -365,7 +365,7 @@ verdict: agree / disagree / partial / needs_verification
 - [ ] Memory Parser 출력 12 필드 모두 추출?
 - [ ] Relevance Scorer threshold 명시 + ≥ 0.70 모듈 < 5개면 사용자 확인 ("threshold 낮춰서 재실행?")
 - [ ] Suggestion Generator self-check 5 체크리스트 통과?
-- [ ] Codex 외부 검증 *모든 제안*에 적용? (O3+O9 MUST)
+- [ ] GPT 외부 검증 *모든 제안*에 적용? (O3+O9 MUST)
 - [ ] meta_family ≥ 3 메모리 → A4 P5 후보로 분리 (개별 모듈 변경 보류)
 - [ ] 사용자 명시 승인 후만 적용?
 
@@ -379,7 +379,7 @@ verdict: agree / disagree / partial / needs_verification
 | Scorer trigger skills | `["fz-code", "fz-review"]` (direct + symmetry-extended) |
 | Scorer selected ≥ 0.70 | 5 modules: fz-code/SKILL.md (0.86), review-quality.md (0.925), fz-review/SKILL.md (0.805), impl-correctness.md (0.77), .swiftlint.yml (0.725) |
 | Generator | 5 type 분류 정확 (Phase 1 결과와 1:1 매핑) |
-| Reviewer (Codex) | 5/5 agree (사용자 검증 시) |
+| Reviewer (GPT) | 5/5 agree (사용자 검증 시) |
 | **Pilot recall** | **100%** (Phase 1 변경 5건 모두 catch) |
 | **Pilot precision** | **100%** (false positive 0) |
 
@@ -387,7 +387,7 @@ verdict: agree / disagree / partial / needs_verification
 
 ### 위험
 
-- ⛔ **Self-review blind spot 메타 재현**: Generator(Claude)가 자기 제안 self-eval하면 Pilot 자체가 cargo-cult. *반드시 Codex 외부 검증* (Step 4).
+- ⛔ **Self-review blind spot 메타 재현**: Generator(Claude)가 자기 제안 self-eval하면 Pilot 자체가 cargo-cult. *반드시 GPT 외부 검증* (Step 4).
 - ⛔ **Threshold 임의**: 19차 외 메모리 적용 시 0.70이 안 맞으면 P4 확장에서 튜닝.
 - ⛔ **Score weight 임의**: calibration 19차 e2e 결과 기반. P4 확장 시 다른 메모리로 재검증 (overfit 방지).
 - ⛔ **자동 적용 금지**: 23차 재현 방지 — 사용자 Final Authority 의무.
@@ -399,7 +399,7 @@ verdict: agree / disagree / partial / needs_verification
 ├── parsed/          ← parse_memory.py 출력 JSON
 ├── scored/          ← score_relevance.py 출력 JSON
 ├── suggestions/     ← Generator yaml diff
-├── codex-verdicts/  ← Codex 검증 결과
+├── gpt-verdicts/  ← GPT 검증 결과
 └── applied/         ← 적용된 변경 + grep 검증
 ```
 
@@ -443,7 +443,7 @@ verdict: agree / disagree / partial / needs_verification
 - 워크플로우 가이드 (→ `/fz`)
 - 팀 에이전트 생성 (→ 각 스킬의 `workflows/*.js`, 규약은 `guides/skill-authoring.md` §12)
 - 코드 수정 (→ 각 워크플로우 스킬)
-- 자동 적용 (`reflect-to-module`도 사용자 승인 필수, Codex 외부 검증 의무)
+- 자동 적용 (`reflect-to-module`도 사용자 승인 필수, GPT 외부 검증 의무)
 
 ## 에러 대응
 

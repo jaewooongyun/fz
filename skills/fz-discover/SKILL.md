@@ -120,7 +120,7 @@ metadata:
 | Task Brief 5요소 | agent() 프롬프트 = [역할][문제/컨텍스트][목표] + schema(=Deliverable) + OVERRIDE(=Constraints) |
 | 합의/불합의 명시 | `conditions[].mutability`(locked/unlocked) + evidence·confidence로 표현 |
 
-> Workflow 추가 보장: 실패 에이전트 = null 명시(silent fail 불가) · 출력 스키마 강제 · resume 캐시 · 종료 핸드셰이크 부재(자동 정리). Reflection Rate는 cross-check 포함 시만 해당(--deep Codex 후행 검증).
+> Workflow 추가 보장: 실패 에이전트 = null 명시(silent fail 불가) · 출력 스키마 강제 · resume 캐시 · 종료 핸드셰이크 부재(자동 정리). Reflection Rate는 cross-check 포함 시만 해당(--deep GPT 후행 검증).
 > 통신 기록: `discover-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰 여부는 확산 판정 시 결정.
 
 ---

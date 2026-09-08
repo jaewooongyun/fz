@@ -1,7 +1,7 @@
 ---
 name: fz-modernize
 description: >-
-  가이드/문서 모더나이제이션 — 외부 최신 자료(Tier 1+2)로 갱신 + stale 항목 정리 + 정량 검증 (Codex 3회 + AC8 link).
+  가이드/문서 모더나이제이션 — 외부 최신 자료(Tier 1+2)로 갱신 + stale 항목 정리 + 정량 검증 (GPT 3회 + AC8 link).
   예: 최신화, 가이드 업데이트, 모더나이제이션, 문서 갱신, stale 정리 (비사용: 코드 구현 →fz-code, 스킬 구조 →fz-skill)
 user-invocable: true
 argument-hint: "[probe|audit|plan|verify|execute|validate|full|light] [target]"
@@ -32,7 +32,7 @@ metadata:
 
 - **Probe → Plan 순서 강제** (31차 교훈): 외부 자료 실측 없이 Plan 작성 금지
 - **Tier 1+2 우선** (사용자 합의 시): Tier 3은 supporting only로 격하
-- **Codex 3회 한도** (18차 교훈): 누적 needs_revision 3회 시 사용자 에스컬레이션
+- **GPT 3회 한도** (18차 교훈): 누적 needs_revision 3회 시 사용자 에스컬레이션
 - **Cross-model 안전망** (17차/16차 교훈): 분석자가 분석 대상의 실수를 재현하는 메타 패턴 방지
 - **AC1-AC9 Anti-Pattern Constraints**: 본문 재구성 금지, Tier 3 단독 verified 금지 등
 - **AC8 link 자동 검증**: xargs 병렬 패턴 (sequential while loop 금지 — Bash background+redirect 교훈)
@@ -41,11 +41,11 @@ metadata:
 
 ```bash
 /fz-modernize "fz 가이드 8개를 Opus 5 출시 후 최신화"          # → full 파이프라인
-/fz-modernize light "그냥 가볍게 최신화"                       # → Phase 1+2 + Codex micro-eval (40차 simplified mode, 카운터 1 소비)
+/fz-modernize light "그냥 가볍게 최신화"                       # → Phase 1+2 + GPT micro-eval (40차 simplified mode, 카운터 1 소비)
 /fz-modernize probe "guides/harness-engineering.md"           # → Phase 1만
 /fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
 /fz-modernize plan "audit 결과 기반 update-plan v1 작성"       # → Phase 3만
-/fz-modernize verify "Plan v1 검증 (Codex)"                  # → Phase 4만
+/fz-modernize verify "Plan v1 검증 (GPT)"                  # → Phase 4만
 /fz-modernize execute "Plan v3.1 inline 정정 적용"            # → Phase 5만
 /fz-modernize validate "AC8 link 자동 검증"                   # → Phase 6만
 ```
@@ -62,7 +62,7 @@ metadata:
 |----|------|
 | guides/prompt-optimization.md | Tier 1+2 인용 정책 + 헤더 갱신 패턴 |
 | guides/skill-authoring.md | 본 스킬 작성 시 표준 |
-| modules/cross-validation.md | Codex 3회 한도 + Reflection Rate |
+| modules/cross-validation.md | GPT 3회 한도 + Reflection Rate |
 | modules/context-artifacts.md | 티켓 폴더 + 산출물 보존 |
 | modules/memory-guide.md | feedback_* 교훈 태깅 규칙 |
 | Bash background+redirect 교훈 | xargs 병렬 패턴 (AC8 enforcement) |
@@ -193,7 +193,7 @@ metadata:
 
 ## Phase 3: Plan (변경 사항 + Anti-Pattern Constraints)
 
-**핵심 원칙**: probe + audit 결과를 반영한 변경 plan을 작성. Plan은 v1→v2→v3로 진화 가능 (Codex verify 후 inline 정정).
+**핵심 원칙**: probe + audit 결과를 반영한 변경 plan을 작성. Plan은 v1→v2→v3로 진화 가능 (GPT verify 후 inline 정정).
 
 ### 절차
 
@@ -206,8 +206,8 @@ metadata:
    - 범위 (전체 vs 핵심 1-2개)
    - 깊이 (Reference + 미검증 태그 해소 vs 본문 재구성 vs 새 원칙 추가)
    - Work Dir 위치
-3. **Codex verify 후 v1 → v2 정정** (Phase 4 결과 반영)
-4. **Codex verify 후 v2 → v3.1 정정** (마지막 사이클)
+3. **GPT verify 후 v1 → v2 정정** (Phase 4 결과 반영)
+4. **GPT verify 후 v2 → v3.1 정정** (마지막 사이클)
 
 ### Anti-Pattern Constraints (AC1-AC9)
 
@@ -255,11 +255,11 @@ done
 ### Gate 3: Plan Approved
 - [ ] AC1-AC9 명시?
 - [ ] 사용자 Phase 4 합의 (범위/깊이/Work Dir)?
-- [ ] Codex verify 통과 또는 needs_revision 후 정정?
+- [ ] GPT verify 통과 또는 needs_revision 후 정정?
 
 ---
 
-## Phase 4: Verify (Codex Cross-Model 검증)
+## Phase 4: Verify (GPT Cross-Model 검증)
 
 **핵심 원칙**: Plan을 GPT-5.5 (또는 사용 가능한 cross-model)로 독립 검증. **누적 한도 3회**.
 
@@ -274,10 +274,10 @@ done
    - Q5: 실행 순서 안전성 (impact-scan 사전 확인)
 3. **결과 분기**:
    - approved → Phase 5 진행
-   - needs_revision → v{N+1} 작성 (Codex 카운터 +1)
+   - needs_revision → v{N+1} 작성 (GPT 카운터 +1)
 4. **누적 한도 도달 (3/3)**: 사용자 에스컬레이션 의무 (18차 교훈)
 
-### 권장 — Codex 호출 환경
+### 권장 — GPT 호출 환경
 
 ```bash
 # fz-gpt SKILL.md hygiene 적용
@@ -290,11 +290,11 @@ codex exec \
   --skip-git-repo-check \
   -C "{WORK_DIR}" \
   "$(cat /tmp/verify-prompt.txt)" < /dev/null \
-  > {WORK_DIR}/verify/codex-verify-v{N}-result.md 2>&1
+  > {WORK_DIR}/verify/gpt-verify-v{N}-result.md 2>&1
 ```
 
 ### Gate 4: Cross-Verify Complete
-- [ ] Codex verify 1+ 회 실행?
+- [ ] GPT verify 1+ 회 실행?
 - [ ] 누적 카운터 한도 미초과 (≤3)?
 - [ ] approved 또는 사용자 에스컬레이션?
 
@@ -363,12 +363,12 @@ codex exec \
 
 | 장치 | 트리거 | 대응 | 출처 |
 |------|------|------|-----|
-| Codex 3회 한도 | needs_revision 누적 3 | 사용자 에스컬레이션 의무 | 18차 |
-| Self-application contract | 대상이 fz-modernize/* 자체 | Phase 4 Codex 검증 non-skippable + 사용자 ASR 의무 | 23차 (16차 meta) |
+| GPT 3회 한도 | needs_revision 누적 3 | 사용자 에스컬레이션 의무 | 18차 |
+| Self-application contract | 대상이 fz-modernize/* 자체 | Phase 4 GPT 검증 non-skippable + 사용자 ASR 의무 | 23차 (16차 meta) |
 | Scope Inflation | 변경 LOC > Plan 예상 1.5x | 즉시 중단, 사용자 확인 | 18차 |
 | Speculation Fallacy | "원본/기존/이전" 표현 사용 | git show / Read 실측 후 진술 | CLAUDE.md Verification Discipline |
 | Reflection Gap | Plan 자체 stale 가능 | 5d 시작 전 plan 재검토 1회 | 17차 |
-| Cross-model 안전망 | self-review로 발견 못한 사실 오류 | Codex 단독 발견 우선 적용 | 17차/16차 |
+| Cross-model 안전망 | self-review로 발견 못한 사실 오류 | GPT 단독 발견 우선 적용 | 17차/16차 |
 | Bash background redirect | while loop + redirect 시 0 bytes | xargs 병렬 패턴 | Bash background+redirect 교훈 |
 | Plan-before-Probe | 외부 실측 없이 Plan 작성 | Probe → Audit → Plan 순서 강제 | 31차 |
 
@@ -383,9 +383,9 @@ codex exec \
   → Phase 1 (Probe): WebSearch 5건 + Tier 1+2 분류
   → Phase 2 (Audit): grep으로 미검증 8곳 식별
   → Phase 3 (Plan v1): AC1-AC9 + Step 분해
-  → Phase 4 (Codex verify v1): needs_revision (R1: A5 과승격)
-  → Plan v2 작성 → Codex verify v2: needs_revision (Q4: G1 NeurIPS 2025 단독 발견)
-  → Plan v3 작성 → Codex verify v3: needs_revision (F2 Khattab 공저자 정정)
+  → Phase 4 (GPT verify v1): needs_revision (R1: A5 과승격)
+  → Plan v2 작성 → GPT verify v2: needs_revision (Q4: G1 NeurIPS 2025 단독 발견)
+  → Plan v3 작성 → GPT verify v3: needs_revision (F2 Khattab 공저자 정정)
   → Plan v3.1 점 수정 4건 → Phase 5d 실행
   → Phase 6: AC8 link 검증 (29 URL, 27 OK + 2 bot-block)
 
@@ -395,7 +395,7 @@ codex exec \
 
 예시 3 — BAD vs GOOD:
   BAD:  Plan 먼저 작성 후 외부 자료 검색 (31차 위반) → Plan 재작성 사이클 폭주
-  GOOD: Probe 먼저 → Audit → Plan v1 (Probe 실측 기반) → Codex verify
+  GOOD: Probe 먼저 → Audit → Plan v1 (Probe 실측 기반) → GPT verify
 ```
 
 ```
@@ -426,19 +426,19 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 **Will**:
 - 외부 자료 리서치 (Tier 1+2 우선)
 - 가이드/문서의 line-level stale 식별
-- Plan v1→v2→v3 진화 (Codex 3회 한도)
+- Plan v1→v2→v3 진화 (GPT 3회 한도)
 - AC1-AC9 enforcement
 - AC8 link 자동 검증 (xargs 병렬)
 - verify-evidence-matrix.md 갱신
 - 사용자 합의 기반 깊이 제한
-- **light 모드 (40차)**: 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 시 Phase 1+2 + Codex micro-eval만 실행 (카운터 1 소비)
+- **light 모드 (40차)**: 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 시 Phase 1+2 + GPT micro-eval만 실행 (카운터 1 소비)
   - ⛔ 단 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**(`modules/cross-validation.md §Coverage Gate`)는 light에서도 **생략 불가** — light는 절차 생략이지 검증 생략이 아니다. 본 스킬은 *최신성 전수 판정*을 산출하므로 특히 해당한다. ⛔ **부정 주장(0건·부재)은 §Negative-Result Gate 도 함께** — Coverage 는 범위, Negative-Result 는 도구 유효성이며 N 오측정 시 0/0 으로 통과한다
   - ⛔ **AC5·AC9 는 light 에서도 적용한다.** 나머지 AC 는 Phase 5 Execute 의 편집을 제약하므로 편집이 0인 light 에서 공허하지만, 이 둘은 **출처 표기**를 제약하고 그 표기를 만드는 것은 light 가 실제로 도는 Phase 1(Probe)·2(Audit) 다. AC 선언이 Phase 3, 집행이 Phase 5 에 있어 light 가 둘 다 건너뛰면 Tier 3 단독 발견이 `[verified]` 로 남는다 — `[partially-verified: A5; …]` 격하(AC9)와 미검증 사유 보존(AC5)은 Phase 2 산출 시점에 적용한다.
 
 **Will Not**:
 - 본문 단락 통째 재구성 (AC1 위반)
 - Tier 3 단독 verified 처리 (AC9 위반)
-- Codex 한도 초과 자율 반복 (18차 위반)
+- GPT 한도 초과 자율 반복 (18차 위반)
 - 사용자 합의 없이 새 원칙/섹션 추가 (AC7 위반)
 - Plan-before-Probe (31차 위반)
 
@@ -448,7 +448,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 |------|------|------|
 | Probe WebSearch 실패 | 재시도 1회 → 사용자에게 직접 자료 요청 | manual probe |
 | Codex CLI 통신 실패 | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
-| Codex 누적 한도 도달 | 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (Codex 권고 점 수정 N건만) |
+| GPT 누적 한도 도달 | 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (GPT 권고 점 수정 N건만) |
 | AC8 broken link 발견 | archive.org 폴백 또는 인용 제거 | 사용자 결정 |
 | Impact Scan line 번호 깨짐 | 모듈에서 path/section 참조로 변경 권고 | 영향 모듈 목록 보고 |
 
@@ -466,8 +466,8 @@ Phase 6 통과 후:
 
 이 스킬은 다음 교훈을 핵심 작동 원리로 사용한다:
 
-- **17차** (메타 분석 TEAM에도 Codex 교차 검증 자동 삽입 필수)
-- **18차** (Codex 3회 한도, 누적 시 사용자 에스컬레이션)
+- **17차** (메타 분석 TEAM에도 GPT 교차 검증 자동 삽입 필수)
+- **18차** (GPT 3회 한도, 누적 시 사용자 에스컬레이션)
 - **16차** (분석자가 분석 대상의 실수를 재현하는 메타 패턴)
 - **23차** (Self-review blind spot — Cross-model이 마지막 안전망)
 - **31차** (Plan-before-Probe Anti-Pattern 금지)

@@ -4,7 +4,7 @@ description: >-
   버그 수정 + 에러 해결. 빠른 원인 분석과 수정-빌드 사이클.
   예: 고쳐줘, 버그 있어, 크래시 나, 에러 떠, 안 돼 (비사용: 신규 기능 →fz-code, 계획 →fz-plan)
 user-invocable: true
-argument-hint: "[버그/에러 설명] [--codex]"
+argument-hint: "[버그/에러 설명] [--gpt]"
 allowed-tools: >-
   mcp__serena__find_symbol,
   mcp__serena__get_symbols_overview,
@@ -66,7 +66,7 @@ metadata:
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
 | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
-| skills/fz-gpt/SKILL.md | --codex 옵션: cross-model 검증 위임 (check verdict contract) |
+| skills/fz-gpt/SKILL.md | --gpt 옵션: cross-model 검증 위임 (check verdict contract) |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 
@@ -187,7 +187,7 @@ metadata:
 - `/sc:analyze` → 빠른 품질 체크
 - `/sc:reflect --type task` → 수정이 근본 원인을 해결했는지 자체 검증
   (트리거: 복잡한 버그 수정 완료 후, 단순 수정은 스킵)
-- (옵션 `--codex`) `/fz-gpt check` 호출 → cross-model 검증
+- (옵션 `--gpt`) `/fz-gpt check` 호출 → cross-model 검증
   - verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
 - 또는 `/fz-review`로 전환
 
@@ -206,7 +206,7 @@ metadata:
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
 2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus). 1-2 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
 3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke
-4. **`mode:'fallback'` 반환 시**: SOLO 폴백 = Mode A Bug Fix Step 1-4 진입 — **--codex 처리 책임도 fallback 경로에서 유효** + 사유 experiment-log 기록
+4. **`mode:'fallback'` 반환 시**: SOLO 폴백 = Mode A Bug Fix Step 1-4 진입 — **--gpt 처리 책임도 fallback 경로에서 유효** + 사유 experiment-log 기록
    - **`mode:'split_required'`(또는 `splitSuggested:true`) 우선**: SOLO 폴백 전에 **Step 분할 후 재invoke** (H5 크기 가드 — fz-code 절차 6 사다리 동형). ⛔ Lead=fable 자동 SOLO 금지 — 직접 구현은 사용자 승인 후
 5. **지표 기록**: 세션당 1행 → `experiment-log.md` §5.7 fz-fix 테이블. 단일 Step 다수 — Step 루프 1회면 invoke 1회로 종료. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
 
@@ -264,12 +264,12 @@ Phase 1 분석 후 영향 범위 3개 모듈+ → "복잡도 초과. /fz-search�
 ```
 
 ```
-BAD (Codex 직접 호출):
+BAD (GPT 직접 호출):
 수정: codex exec review --uncommitted ... 직접 호출
 → fz-fix allowed-tools에 Bash(codex *) 없음. 권한 에러.
 
-GOOD (--codex 위임 패턴):
-수정: --codex 옵션 + /fz-gpt check 위임
+GOOD (--gpt 위임 패턴):
+수정: --gpt 옵션 + /fz-gpt check 위임
 → fz-gpt가 Hybrid Routing/Bash Hygiene/severity 파싱 처리. fz-fix는 verdict 분기만.
 ```
 
@@ -296,7 +296,7 @@ GOOD (--codex 위임 패턴):
 | Given | When | Then | type |
 |-------|------|------|------|
 | 크래시 재현 경로 확인됨, 단일 파일 수정 | `/fz-fix "탭 전환 시 listener nil 크래시"` | Step 1c에서 root-cause 식별 → Step 3 빌드 성공(xcodebuild exit 0) → Gate Bug Fix Complete 체크리스트 5/5 통과 | normal |
-| 단순 상수 수정, `--codex` 옵션 지정 | `/fz-fix "타임아웃 30초로 변경" --codex` | Step 4에서 `/fz-gpt check` 호출 → verdict=pass 분기로 완료 보고 | normal |
+| 단순 상수 수정, `--gpt` 옵션 지정 | `/fz-fix "타임아웃 30초로 변경" --gpt` | Step 4에서 `/fz-gpt check` 호출 → verdict=pass 분기로 완료 보고 | normal |
 | 분석 결과 수정 대상이 3개+ 파일 | `/fz-fix "여러 모듈 상태 불일치"` | 자동 전환 트리거 발동 → 코드 수정 0줄 + `/fz-code` 전환 제안 보고 | edge-case |
 | 수정 대상이 `static let shared` + 가변 `var`, 동기화 메커니즘 부재 (동시성 키워드 없음) | `/fz-fix "공유 인스턴스 값 깨짐"` | 역방향 트리거 발동 → 수정 전 3패턴 점검 + 동시성 안전성 검증 섹션 활성 | edge-case |
 | Step 1c에서 root-cause 불명확 | `/fz-fix "가끔 화면 멈춤"` | 코드 수정 0줄 + AskUserQuestion 발생 (Step 1c 완료 전 수정 금지) | failure |
@@ -312,7 +312,7 @@ GOOD (--codex 위임 패턴):
 **Will**:
 - 빠른 버그 수정 + 빌드 검증
 - 복잡도 초과 시 적절한 스킬 전환 제안
-- (옵션 --codex) /fz-gpt check 호출 위임 (cross-model 검증)
+- (옵션 --gpt) /fz-gpt check 호출 위임 (cross-model 검증)
 
 **Will Not**:
 - 코드 탐색/구조 분석 (→ /fz-search)
@@ -330,7 +330,7 @@ GOOD (--codex 위임 패턴):
 | 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
 | 심볼 못 찾음 | 패턴 검색 전환 | Grep 폴백 |
 | 복잡도 초과 | /fz-plan 전환 | 사용자 상담 |
-| /fz-gpt check verdict 미반환 (--codex 옵션 시) | warning 처리 + 빌드 검증 결과로 진행 | 사용자 보고 |
+| /fz-gpt check verdict 미반환 (--gpt 옵션 시) | warning 처리 + 빌드 검증 결과로 진행 | 사용자 보고 |
 
 ## Completion → Next
 

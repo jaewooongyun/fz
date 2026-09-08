@@ -62,7 +62,7 @@ metadata:
 | modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
 | modules/code-transform-validation.md | 코드 변환 동등성 — Transformation Spec + 검증 체크리스트 (패턴 변환 시) |
 | modules/uncertainty-verification.md | 기술적 주장 → Default-Deny 검증 (하네스 원칙, Transformation Spec Pilot) |
-| modules/scope-challenge.md | Phase 3 Codex 이슈 scope_disposition 분류 + Lead 독립 판정 (additive 자동 번역 차단) |
+| modules/scope-challenge.md | Phase 3 GPT 이슈 scope_disposition 분류 + Lead 독립 판정 (additive 자동 번역 차단) |
 | modules/promotion-ledger.md | P1/P2 조치 eligible session 관측 기록 (학습 승격 금지) |
 | modules/plan-direction-preflight.md | Phase 0c·0.5 절차 본문 (Phase 0c·0.5 진입 시 Read — 조건부) |
 
@@ -76,7 +76,7 @@ metadata:
 | Phase 1 | `/sc:research` | 외부 기술/라이브러리 조사 |
 | Phase 1 | `/sc:workflow` | PRD → 구현 워크플로우 자동 생성 (5+ Step 시) |
 | Phase 1 | `/sc:spec-panel` | 아키텍처 스펙 전문가 패널 리뷰 (새 모듈 시, --deep 시) |
-| Phase 2 | `/fz-gpt verify` | 계획 검증 (독립 스킬 — Codex 교차 검증, `modules/fz-gpt-subcommands-core.md § verify`) |
+| Phase 2 | `/fz-gpt verify` | 계획 검증 (독립 스킬 — GPT 교차 검증, `modules/fz-gpt-subcommands-core.md § verify`) |
 | Phase 2 | `/sc:estimate` | 공수 추정 (복잡도 4+ 시, 조건부) |
 | Phase 3 | `/sc:reflect` | 피드백 반영 후 자체 검증 |
 
@@ -100,7 +100,7 @@ metadata:
 1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**):
    프로젝트 지침 전체(CLAUDE.md·AGENTS.md 등 peer 파일 **모두**)에서 4축을 추출한다 — `architecturePattern` / `uiStack` / `dependencyDirection` / `naming`.
    - 미확정 축 → `null`. 코드 실측(grep) 1회로 보완 시도하고, 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
-   - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / Codex)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
+   - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / GPT)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/plan-collaborative.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - Stage 0 direction(fable, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2 — 반박은 opus) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(opus) → Stage 3 CC 교차(edge↔impact, opus) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증(opus). 9-11 call
@@ -109,7 +109,7 @@ metadata:
    - ⛔ `impactRequests` 가 비어 있지 않으면 **Lead 가 resolve 한다** — impact 렌즈는 Bash 가 없어 base 원본·이전 호출자 수를 직접 못 얻는다(`agents/plan-impact.md`). 요청을 무시하면 영향 분석이 그만큼 비어 있는 채로 plan 에 들어간다
    - `mode:'direction_escalation'` → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용)
    - `mode:'fallback'` → SOLO 계획 수립 수행 + 사유 experiment-log 기록
-5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(Codex 회복 시) + Codex verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
+5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(GPT 회복 시) + GPT verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
 6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-plan 테이블
 
 **6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거. Workflow stage에 동일 적용):
@@ -121,7 +121,7 @@ metadata:
 | plan-edge-case (경계) | Stage 2 + Stage 3 CC | "어디서 깨지는가?" |
 | review-arch (아키 일관성) | Stage 2 + Stage 5 재검증 | "기존 패턴/규칙과 맞는가?" |
 | review-direction (방향 도전) | Stage 0 | "근본적으로 다른 접근은?" |
-| Codex verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |
+| GPT verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |
 
 > 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰은 확산 판정 시 결정.
 
@@ -208,15 +208,15 @@ metadata:
 
 > 발동: **TEAM mode + (5+ Step Plan 또는 Cross-skill 변경)**. 단순 수정/탐색 스킵.
 
-Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude 동의/수정 → Phase 1 진입. 사후 수정 비용 감소.
+GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude 동의/수정 → Phase 1 진입. 사후 수정 비용 감소.
 
 - 절차: `modules/sprint-contract.md` §절차 (4-step)
 - Schema: `modules/sprint-contract.md` §Schema (yaml: success_criteria + anti_criteria + scope_boundary)
-- Lead Decision: **agree** → Phase 1 / **modify** → Codex re-verify 1회 (한도) / **reject** → Phase 0.5 재진입
+- Lead Decision: **agree** → Phase 1 / **modify** → GPT re-verify 1회 (한도) / **reject** → Phase 0.5 재진입
 
 ### Gate 0.7: Sprint Contract Agreed
 
-- [ ] Codex Sprint Contract 작성 완료? (`sprint-contract-codex.md` 또는 `fz:checkpoint:sprint-contract`)
+- [ ] GPT Sprint Contract 작성 완료? (`sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`)
 - [ ] 모든 SC가 measurable + binary 판정 가능?
 - [ ] anti_criteria 명시? (제거/리팩토링 작업 시)
 - [ ] Lead 동의 (agree) 또는 modify 후 합의?
@@ -345,7 +345,7 @@ Codex가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude
      - **Major**: 수정 권장
      - **Minor**: 선택적 수정
 
-1b. **⛔ Scope Challenge (이슈당 필수)**: 각 Codex 이슈를 플랜에 반영 전 `modules/scope-challenge.md` Q-S1~S4 실행 → `scope_disposition` 분류. Lead는 Codex 결과를 **읽기 전** 독립 판정 후 비교 (Generator≠Evaluator).
+1b. **⛔ Scope Challenge (이슈당 필수)**: 각 GPT 이슈를 플랜에 반영 전 `modules/scope-challenge.md` Q-S1~S4 실행 → `scope_disposition` 분류. Lead는 GPT 결과를 **읽기 전** 독립 판정 후 비교 (Generator≠Evaluator).
 
 2. **요구사항 일치 검증**:
    - `mcp__sequential-thinking__sequentialthinking` → 수정 전후 요구사항 부합도 단계별 비교
@@ -432,7 +432,7 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-plan light "..."` 호출 시:
 - Phase 1 (Deep Planning)만 실행 — 구조 분해 + 영향 분석 + Step 출력
 - Phase 0.5 (Direction Challenge) 생략 (단순 수정 patterns 대상)
-- Phase 2 (Validation) + Phase 3 (Feedback) 생략 (Codex verify 미호출)
+- Phase 2 (Validation) + Phase 3 (Feedback) 생략 (GPT verify 미호출)
 - Stress Test Q1-Q6 생략, 리스크 매트릭스 간소화
 - Anti-Pattern Constraints 작성 생략 (리팩토링 작업 외)
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)

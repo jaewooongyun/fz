@@ -52,7 +52,7 @@ SKILL_TO_AGENTS = {
     "fz-fix": ["impl-correctness"],
     # v3.3 (A3 옵션 A, 2026-05-26): 17차 false negative 해결 — fz-manage SKILL.md L287 "메모리 17차" 명시 catch
     "fz-manage": [],       # Lead 작업 (에이전트 매핑 X)
-    "fz-gpt": [],        # Codex 외부 검증 (에이전트 매핑 X)
+    "fz-gpt": [],        # GPT 외부 검증 (에이전트 매핑 X)
     "fz-modernize": ["impl-correctness", "review-arch"],
 }
 
@@ -146,10 +146,10 @@ def has_symmetry_in_module(text: str, parsed: dict[str, Any]) -> str | None:
     # ⛔ ordinal 단독 매칭 제거 (fz-review "41차 External Authority Bias" collision 차단)
     # ⛔ `reflection` 단일 단어 매칭 제거 (17차 false trigger 차단)
 
-    # 5a: recommendation default bias (33차) — v3.5 (2026-05-27 Codex 잔여 권고)
+    # 5a: recommendation default bias (33차) — v3.5 (2026-05-27 GPT 잔여 권고)
     # v3.4: context-anchored core (specific pattern만)
     # v3.5: implementation-ready 단독 → context 결합 (recommendation|default|verify|권고 근처만)
-    #       Codex "implementation-ready 단독은 약간 넓다" 잔여 권고 반영
+    #       GPT "implementation-ready 단독은 약간 넓다" 잔여 권고 반영
     if re.search(
         r"recommendation\s*default|verify\s*default|verify\s*approved|"
         r"recommendation\s*default\s*bias|권고\s*default|"

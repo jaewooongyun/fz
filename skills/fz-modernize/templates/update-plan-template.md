@@ -1,16 +1,16 @@
 # Update Plan v{N} Template (Phase 3)
 
 > **사용법**: 본 템플릿을 `{WORK_DIR}/plan/update-plan.md` (v1) 또는 `update-plan-v{N}.md` (v2+)로 복사.
-> **버전 패키징**: v1 → v2 (보강 + Codex risk 해소) → v3.1 (점 수정 inline)
-> **승인 요건**: 사용자 Phase 4 합의 + Codex verify (한도 3회).
+> **버전 패키징**: v1 → v2 (보강 + GPT risk 해소) → v3.1 (점 수정 inline)
+> **승인 요건**: 사용자 Phase 4 합의 + GPT verify (한도 3회).
 
 ## 0. 메타데이터 + 버전 진화
 
 | 항목 | 값 |
 |------|-----|
 | 계획 일시 | YYYY-MM-DD |
-| 버전 | v1 / v2 / v3.1 (Codex 정정 inline 반영본) |
-| 변경 trigger | (probe + audit 결과 / 보강 / Codex risk 해소) |
+| 버전 | v1 / v2 / v3.1 (GPT 정정 inline 반영본) |
+| 변경 trigger | (probe + audit 결과 / 보강 / GPT risk 해소) |
 
 ### v{N-1} → v{N} 변경 요약 (해당 시)
 
@@ -92,7 +92,7 @@
 | Q4 | 경계 (Tier 1+2 합의 준수?) | Tier grep |
 | Q5 | 접근 경계 (의도된 차단 실효성?) | enforcement grep |
 
-### Gate 5c-2: Codex Verify
+### Gate 5c-2: GPT Verify
 
 ```
 Plan v{N}을 GPT-5.5로 검증
@@ -117,8 +117,8 @@ grep -rn "guides/{filename}:L\d+" modules/ skills/ docs/ 2>&1
 ## 6. 실행 순서 (Phase 5)
 
 ```
-Phase 5d-1: Step 1 → Codex check + 사용자 검토
-Phase 5d-2: Step 2 → Codex check + 사용자 검토
+Phase 5d-1: Step 1 → GPT check + 사용자 검토
+Phase 5d-2: Step 2 → GPT check + 사용자 검토
 Phase 5d-N: Step N → 가벼운 검토
 Phase 5d-final: AC8 link + Impact Scan + 최종 검토
 ```
@@ -127,14 +127,14 @@ Phase 5d-final: AC8 link + Impact Scan + 최종 검토
 
 | 장치 | 트리거 | 대응 |
 |------|------|------|
-| Codex 3회 한도 (18차) | needs_revision 누적 3 | 사용자 에스컬레이션 |
+| GPT 3회 한도 (18차) | needs_revision 누적 3 | 사용자 에스컬레이션 |
 | Scope Inflation (18차) | LOC > Plan 예상 1.5x | 즉시 중단 |
 | Speculation 감지 | "원본/기존/이전" | git show / Read 실측 |
 | Reflection Gap (17차) | Plan stale | 5d 시작 전 plan 재검토 |
-| Cross-model 안전망 (17차/16차) | self-review 사실 오류 | Codex 단독 발견 우선 적용 |
+| Cross-model 안전망 (17차/16차) | self-review 사실 오류 | GPT 단독 발견 우선 적용 |
 
 ## 8. 다음 단계
 
-→ Phase 4 (Codex Verify): `/fz-gpt verify {plan}`
+→ Phase 4 (GPT Verify): `/fz-gpt verify {plan}`
 → approved → Phase 5 (Execute)
 → needs_revision → v{N+1} 작성 (카운터 +1)

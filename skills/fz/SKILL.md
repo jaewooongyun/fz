@@ -39,9 +39,9 @@ metadata:
 - **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 현행 `xhigh`) — fable 판단 지점 3곳과 별개
 - **3-Tier 모델**: **Fable 5.1**(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
   > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `xhigh` 단일값. 공식 출발점은 Opus 5·Fable 5.1 모두 **`high`(기본)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
-- **Codex 필수 참여**: 모든 TEAM 스킬에 Codex CLI 포함 → cross-model 상호검증
+- **GPT 필수 참여**: 모든 TEAM 스킬에 Codex CLI 포함 → cross-model 상호검증
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
-- **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + Codex 교차검증
+- **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + GPT 교차검증
 
 ## 사용 시점
 
@@ -188,7 +188,7 @@ metadata:
 | `target_count` | 언급된 대상 파일/모듈 수 | Complexity Scope 차원 |
 | `cross_concern` | 여러 관심사가 교차하는지 | Complexity Risk 차원 |
 | `override_flags` | --solo, --team, --deep | 모드 Override |
-| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — Codex MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (Codex 검증 §추가 발견 1). 단 산출물이 전수/카운트/부정 주장이면 light라도 Coverage Gate 유지, 외부 피드백 수용/기각 판정이면 External Feedback Gate 유지 (검증 경계 — cross-validation.md §Coverage Gate·§External Feedback Gate) |
+| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — GPT MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (GPT 검증 §추가 발견 1). 단 산출물이 전수/카운트/부정 주장이면 light라도 Coverage Gate 유지, 외부 피드백 수용/기각 판정이면 External Feedback Gate 유지 (검증 경계 — cross-validation.md §Coverage Gate·§External Feedback Gate) |
 
 ### Gate 1: Intent Resolved
 - [ ] 1개 이상의 스킬이 매칭되었는가? — **0개면 Phase 3.1 을 resolver-only 로 호출했는가?**
@@ -290,10 +290,10 @@ Phase 1 매칭 0  →  3.1 트리거 대조
 
 ```
 planning 생산 전 → ✓ direction-challenge (review-direction, TEAM fz-plan Phase 0.5)
-planning 생산 후 → ✓ stress-test(Q1-Q5) + ✓ codex verify (TEAM)
+planning 생산 후 → ✓ stress-test(Q1-Q5) + ✓ gpt verify (TEAM)
 code-changes 생산 중 → ✓ friction-detect (매 Step, fz-code 내장)
-code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ implication-scan (제거/리팩 시) + ✓ codex check (TEAM)
-commit/pr 전 → ✓ codex check (TEAM)
+code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ implication-scan (제거/리팩 시) + ✓ gpt check (TEAM)
+commit/pr 전 → ✓ gpt check (TEAM)
 ```
 
 > **direction-challenge**: review-direction 에이전트가 접근 방향 자체를 도전 (PROCEED/RECONSIDER/REDIRECT 판정). fz-plan TEAM Phase 0.5.
@@ -347,7 +347,7 @@ commit/pr 전 → ✓ codex check (TEAM)
 ```
 1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{플러그인 루트}/workflows/{skill}-{pattern}.js', args })   → ⛔ 거부 시 정본 = `guides/skill-authoring.md` §12 우회 계약 (SOLO 폴백 아님)
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
-3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/Codex) + 통합
+3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/GPT) + 통합
 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
    **L1** split_required/splitSuggested → Step 분할 후 재invoke · **L2** 입력 오류 → 수정 후 재invoke(설계된 fail-fast) · **L3** 스톨·일시 장애 → **`resume` 우선**(동일 세션 한정) · **L4** 미해소 → 사용자 에스컬레이션
    ⛔ Lead 단독 SOLO 수행은 **사용자 승인 후에만** (Lead=fable 자동 SOLO 금지)

@@ -105,7 +105,7 @@ module: skills/fz-code/SKILL.md
 type: catalog_addition
 position: 마찰 신호 카탈로그 끝 (line 270 다음)
 diff: |
-  + | Redundant Import | 새 파일 작성 시 추가하는 각 `import {Module}` 문에 대해 그 모듈의 알려진 심볼이 파일 내에서 grep 0건 | 형제 파일 패턴 답습 의혹 (cargo-cult). 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과이며, 새 파일은 *자신의 사용 심볼*로 자체 정당화 필요. 검증: 새 파일 작성 후 각 import에 대해 `Grep("ModuleName\\.\\w+\\|<known_typealias>")` 실행 → 0건이면 마찰 보고 (제거/유지 결정은 사용자/Codex 최종) |
+  + | Redundant Import | 새 파일 작성 시 추가하는 각 `import {Module}` 문에 대해 그 모듈의 알려진 심볼이 파일 내에서 grep 0건 | 형제 파일 패턴 답습 의혹 (cargo-cult). 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과이며, 새 파일은 *자신의 사용 심볼*로 자체 정당화 필요. 검증: 새 파일 작성 후 각 import에 대해 `Grep("ModuleName\\.\\w+\\|<known_typealias>")` 실행 → 0건이면 마찰 보고 (제거/유지 결정은 사용자/GPT 최종) |
 rationale: parsed.applied_location_explicit 직접 명시 + parsed.core_lesson "각 import의 실제 사용 심볼을 verify"
 confidence: 0.95
 
@@ -124,7 +124,7 @@ diff: |
   + 절차 (마찰 신호 카탈로그 "Redundant Import" 항목과 정렬):
   + 1. 새 파일 작성 후 각 `import {Module}` 문에 대해 `Grep("ModuleName\\.\\w+\\|<known_typealias>")` 실행
   + 2. 0건이면 → "Redundant Import" 마찰 신호로 보고
-  + 3. 제거/유지 결정은 사용자/Codex 최종 판정
+  + 3. 제거/유지 결정은 사용자/GPT 최종 판정
   + 
   + Implementation Workflow:
   + 4. **새 파일 작성 시**: Cargo-Cult Detection 절차 실행 (위 섹션 참조)
@@ -147,15 +147,15 @@ confidence: 0.92
 # 3. Pipe to fz-manage apply: cat suggestions.yaml | fz-manage apply --review
 ```
 
-⛔ **자동 적용 금지** — Codex micro-eval (D+5 Reviewer) 검증 통과 + 사용자 명시 승인 필수.
+⛔ **자동 적용 금지** — GPT micro-eval (D+5 Reviewer) 검증 통과 + 사용자 명시 승인 필수.
 
 이는 메모리 23차 (self-review blind spot) 방어:
 - Generator (현재): 제안만, 적용 X
-- Evaluator (Codex): 외부 검증
+- Evaluator (GPT): 외부 검증
 - Final Authority (사용자): 적용 결정
 ```
 
-## Codex micro-eval 입력 (D+5 Reviewer로 전달)
+## GPT micro-eval 입력 (D+5 Reviewer로 전달)
 
 각 제안에 대해 다음 평가:
 
