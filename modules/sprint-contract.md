@@ -1,6 +1,6 @@
-# Sprint Contract — Codex 사전 성공 기준 (T2-B)
+# Sprint Contract — GPT 사전 성공 기준 (T2-B)
 
-> Plan v3.1.3 §T2-B + harness-engineering.md 패턴 B 구현. Codex가 구현 시작 **전** "성공 기준"을 작성 → Claude 동의/수정 → 구현 진입. 사후 수정 비용 감소.
+> Plan v3.1.3 §T2-B + harness-engineering.md 패턴 B 구현. GPT가 구현 시작 **전** "성공 기준"을 작성 → Claude 동의/수정 → 구현 진입. 사후 수정 비용 감소.
 
 ## 발동 조건
 
@@ -15,15 +15,15 @@
 
 > 위치: Phase 0.5 (Direction Challenge) 이후, Phase 1 (Deep Planning) 이전.
 
-1. **Lead 컨텍스트 전달**: Phase 0.5 verdict (PROCEED/RECONSIDER) + discover 산출물 + 요구사항 → Codex (`/fz-gpt` plan 또는 verify pre-mode)
+1. **Lead 컨텍스트 전달**: Phase 0.5 verdict (PROCEED/RECONSIDER) + discover 산출물 + 요구사항 → GPT (`/fz-gpt` plan 또는 verify pre-mode)
 
-2. **Codex Sprint Contract 작성** (`codex exec` skill: `architect`):
-   - 출력: `{WORK_DIR}/plan/sprint-contract-codex.md` 또는 `fz:checkpoint:sprint-contract`
+2. **GPT Sprint Contract 작성** (`codex exec` skill: `architect`):
+   - 출력: `{WORK_DIR}/plan/sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`
    - 형식: 아래 schema 참조
 
 3. **Claude 동의/수정** (Lead):
    - **agree** → Phase 1 진입
-   - **modify** → Sprint Contract 수정안 작성 + Codex re-verify 1회 (한도)
+   - **modify** → Sprint Contract 수정안 작성 + GPT re-verify 1회 (한도)
    - **reject** → Phase 0.5 재진입 (RECONSIDER 다시) 또는 사용자 에스컬레이션
 
 4. **Phase 1 진입**: 합의된 Sprint Contract가 Plan v1의 Success Criteria로 직접 import
@@ -33,7 +33,7 @@
 ```yaml
 sprint_id: <task-id or T1-X / T2-X>
 date: YYYY-MM-DD
-contract_owner: codex_architect
+contract_owner: gpt_architect
 context:
   intent: <Phase 0.5 verdict 채택 의도 1줄>
   scope: <변경 대상 파일/모듈 목록>
@@ -64,7 +64,7 @@ scope_boundary:
 
 ## Lead Decision Matrix
 
-| Codex Sprint Contract 평가 | Lead 결정 |
+| GPT Sprint Contract 평가 | Lead 결정 |
 |--------------------------|----------|
 | 모든 SC가 measurable + binary | **agree** → Phase 1 진입 |
 | SC 1개+ ambiguous (e.g., "잘 작동") | **modify** → 측정 가능하게 재작성 |
@@ -83,11 +83,11 @@ scope_boundary:
 ## 학술 근거
 
 - Anthropic Harness Engineering 패턴 B (2026-03): "Sprint Contract" — 구현 전 성공 기준 작성
-- LLM-as-Judge self-preference: Codex contract 작성 → Claude (Generator) 미리 commit하면 self-preference 우회
-- MoA collaborativeness (Wang 2024): 이종 모델이 서로의 출력을 보완 — Codex contract + Claude implementation의 분리
+- LLM-as-Judge self-preference: GPT contract 작성 → Claude (Generator) 미리 commit하면 self-preference 우회
+- MoA collaborativeness (Wang 2024): 이종 모델이 서로의 출력을 보완 — GPT contract + Claude implementation의 분리
 
 ## fz 통합
 
 - `fz-plan` Phase 0.7로 진입 (TEAM mode + 5+ Step or Cross-skill)
-- `fz-gpt plan` (또는 `verify pre-mode`)에서 Codex Sprint Contract 작성 호출
+- `fz-gpt plan` (또는 `verify pre-mode`)에서 GPT Sprint Contract 작성 호출
 - `experiment-log.md §5.5`에 sprint_contract 메타 기록 (Reflection Rate 측정의 baseline)

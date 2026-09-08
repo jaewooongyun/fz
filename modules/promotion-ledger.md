@@ -28,7 +28,7 @@
 
 **또는 트랙 C (외부 리뷰어 catch — 별도 경로, a+b와 무관)**:
 
-(c) 외부 도구(CodeRabbit/팀원/Codex)가 `/fz-review --deep` 이후에도 actionable Major+ 이슈를 1건 이상 발견한 세션. 단 4-classify(`feedback_review_trust_verification`)에서 `project-rule`/`valid-suggestion`으로 분류된 항목만 카운트 — `preference`/`needs-review`는 제외 (CodeRabbit precision ~55% 대응).
+(c) 외부 도구(CodeRabbit/팀원/GPT)가 `/fz-review --deep` 이후에도 actionable Major+ 이슈를 1건 이상 발견한 세션. 단 4-classify(`feedback_review_trust_verification`)에서 `project-rule`/`valid-suggestion`으로 분류된 항목만 카운트 — `preference`/`needs-review`는 제외 (CodeRabbit precision ~55% 대응).
 
 ## 관측 기록 형식
 
@@ -42,7 +42,7 @@
 - finding-source: internal | external({tool}) — 미기재 시 internal 간주 (기존 L-1~L-4 등). external이면 4-classify 분류 명시 (project-rule|valid-suggestion만 카운트)
 - disposition 결과: {채택된 disposition}
 - 근거: [verified: {file}:{line}] 인용
-- Lead/Codex 일치 여부: agreed | user_decided
+- Lead/GPT 일치 여부: agreed | user_decided
 ```
 
 ## P1 → P0 승격 조건
@@ -89,66 +89,66 @@
 ### P2-C: general closure-capture retain cycle lens (Claude 경로) — 트랙 C
 - 관측 #0: OBS-10 (CodeRabbit Major1 — sheetRef 강한 캡처 cycle, fz-review 6-Layer 통과)
 - finding-source: external(CodeRabbit) — 4-classify: valid-suggestion
-- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. Codex `gpt-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/Codex 비대칭).
+- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. GPT `gpt-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/GPT 비대칭).
 - generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
 - ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
-- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:214` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(Codex 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
+- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:214` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(GPT 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
 - 승격 목표 (트랙 C → 트랙 A): 별개 세션 추가 관측 후 safety-audit §확장 active 전환.
 
 ## OBS-08 회고 후보 (P2, 관측 #1)
 
 > 출처: 내부 회고 기록 (20 catches) + 개선 분석 (분류)
 > Eligible session 확인: OBS-08 = fz-plan Phase 0.5~3 (plan v1~v5) + fz-gpt verify 2건 → 기준 (a)+(b) 충족 [verified: plan/codex-verify-output.md, codex-verify-v3-output.md 존재]
-> ⛔ **승격 차단**: 2026-06-01 세션 Codex 한도 초과 → P2→P1 조건의 "Codex verify → approved" 미충족. 관측 #1 등록까지만. cross-model 검증 PENDING.
+> ⛔ **승격 차단**: 2026-06-01 세션 GPT 한도 초과 → P2→P1 조건의 "GPT verify → approved" 미충족. 관측 #1 등록까지만. cross-model 검증 PENDING.
 >
 > **⛔ 2-트랙 구분 (모순 해소 2026-06-01)**: L-1~L-3은 friction 신호를 보유 → 두 lifecycle이 분리된다.
-> - **트랙 A (신호 활성 — ⛔ 본 항이 임계의 canonical)**: candidate friction 신호 → active 전환. 기준 = **독립 세션 5회 관측**. `modules/memory-guide.md` § Lesson Intake는 본 항을 링크하며 값을 재정의하지 않는다. Codex verify = 활성 전 *권장 품질 게이트*(복구 시).
+> - **트랙 A (신호 활성 — ⛔ 본 항이 임계의 canonical)**: candidate friction 신호 → active 전환. 기준 = **독립 세션 5회 관측**. `modules/memory-guide.md` § Lesson Intake는 본 항을 링크하며 값을 재정의하지 않는다. GPT verify = 활성 전 *권장 품질 게이트*(복구 시).
 >   - ⛔ 이전 판은 *"기준 = memory-guide line 43"* 이라 적었다 — (a) **순환**(memory-guide는 여기를 canonical로 지목) (b) 줄번호가 실제와 2~4행 어긋남. heading anchor로 교체(2026-08-09).
 > - **트랙 B (메모리 승격)**: lesson → MEMORY.md 항목/별도 모듈. ⛔ MEMORY.md 252줄 한도초과로 **현재 비권장**.
 > - L-1~L-3 1차 경로 = **트랙 A**. L-4(friction 신호 없음) = 트랙 B(ledger-only).
-> - **트랙 C (외부 리뷰어 catch, 2026-06-18 신설)**: 외부 도구(CodeRabbit/팀원/Codex)가 fz 미탐 이슈를 발견 → ledger 관측 진입. finding-source: external. 입구 = `pipelines.md` #19 pr-comment-review 절차 4(import-to-ledger). 활성(active) 전환은 트랙 A 기준(5 sessions) 준용 + 4-classify 통과분만 카운트.
+> - **트랙 C (외부 리뷰어 catch, 2026-06-18 신설)**: 외부 도구(CodeRabbit/팀원/GPT)가 fz 미탐 이슈를 발견 → ledger 관측 진입. finding-source: external. 입구 = `pipelines.md` #19 pr-comment-review 절차 4(import-to-ledger). 활성(active) 전환은 트랙 A 기준(5 sessions) 준용 + 4-classify 통과분만 카운트.
 
 ### L-1: figma 토큰 테이블 exhaustiveness (23차 강화)
 - 관측 #1: OBS-08 (catch #1,2,4,8,17,19,20 — figma 토큰 7건)
-- 관측 #2: OBS-09, 2026-06-02 (catch #1~#9 + self-catch — figma 측정 미실시·color/style-run/정렬·data>render). 트랙 A 2/5 (figma 작업 세션, memory-guide:43). active 미전환: 5세션 미달 + Codex 활성 게이트 PENDING. 근거: [verified: retrospective:9,28,53,130 + ledger:81 트랙 A 카운트 기준]. Lead/Codex 일치 여부: user_decided (cross-model PENDING — 2026-06-01 한도초과)
+- 관측 #2: OBS-09, 2026-06-02 (catch #1~#9 + self-catch — figma 측정 미실시·color/style-run/정렬·data>render). 트랙 A 2/5 (figma 작업 세션, memory-guide:43). active 미전환: 5세션 미달 + GPT 활성 게이트 PENDING. 근거: [verified: retrospective:9,28,53,130 + ledger:81 트랙 A 카운트 기준]. Lead/GPT 일치 여부: user_decided (cross-model PENDING — 2026-06-01 한도초과)
 - 관측 #3: OBS-23 | Date: 2026-07-29 | finding-source: internal (사용자 시각확인)
   - 관측 내용: 1:1 문의 화면 — 최초 구현 후 Figma 정정 커밋 4건. **그중 수치 정정은 3건**(`825d4e9ee` 여백·폰트 / `ccab43059` 동의항목 간격 / `33a5bf2bf` 닷 크기·색·간격), `bbdd88f29`는 **문구·노출 분기**(수치 아님) [verified: `git show bbdd88f29` — `showsContentWritingGuideNotice` 분기 추가 + 문구 텍스트 변경, spacing/size 변경 0건]
   - disposition 결과: 신호 확장 채택 (direct/composed 축 분리)
   - 근거: [verified: 내부 figma 대조 기록]
-  - Lead/Codex 일치 여부: user_decided
+  - Lead/GPT 일치 여부: user_decided
   - **트랙 A 3/5**. 카운트 근거: `memory-guide.md` §Evidence 출처 *"동일 failure mode가 **별개 세션**에서 관찰돼야 1 count"* + 본 파일 §"카운트 기준 (본 세션 채택)" (Eligible `(a)+(b)`는 **P-track 승격 전용** — 트랙 A friction 신호에 비적용). ⚠️ heading 앵커로 인용 — 줄번호는 본 엔트리 추가로 이동함
 - ⚠️ **관측 후보 (카운트 제외)**: OBS-22 | Date: 2026-07-30 | finding-source: **external**(QA 팀원 + CodeRabbit 2건) — 이력/구매 화면 디자인 검수 버그 티켓(Highest), M1~M7·P1~P3 중 P3 철회·M3 3차 전환. ⛔ **트랙 C 진입 조건 3개 중 어느 것도 미증명**: ① `/fz-review --deep` **이후** 발견인가 — QA 티켓은 작업을 *시작시킨 선행 입력*이라 아님 ② actionable Major+ 근거 미기재 ③ **4-classify 분류 미실행**(`project-rule|valid-suggestion`만 카운트, `:16`). → **카운트 제외**. CodeRabbit 건만 분리해 review 실행 시점·Major+ 근거·4-classify를 명시하면 별도 트랙 C 관측으로 재등록 가능. [외부: Codex review — `fz-h11-design-coverage/review/codex-review-out.md:10038-10048`]
 - 내용: figma 토큰 테이블 작성 시 변경 코드의 *모든 수치* enumerate 또는 non-exhaustive 마킹 + code 시점 per-value MCP 측정. **⊕ 확장 축 2개 (2026-08-03)**: (i) **합성 실효값** — 요소 간 렌더 간격은 단일 노드의 padding/gap이 아니라 **두 요소 경계 사이를 실제로 통과하는 gap·padding의 합**이다(⚠️ flexible spacer·절대배치·음수 간격·modifier 순서 개재 시 단순 합 불성립 → 렌더 판정. 상세 `swift-pattern-detection.md` 원칙 H) [verified: 내부 figma 대조 기록 — `root gap 12 + section padding 24 = 36`인데 코드 24] (ii) **표 값의 정확성** — 표 작성은 *완전성*만 보증하고 채워진 *값의 정확성*은 보증하지 않는다 (빈 칸 카운터가 원리적으로 미탐지하는 영역)
 - generalize: **narrow** (figma/UI 전용) | 과적합 위험: 中
 - 근거: [verified: index.md — 23차로 figma-tokens.md 작성됐으나 §5 갭 테이블이 간격/마진 누락 → exhaustiveness 보증 부재]
-- ⚡ 조치 (2026-06-01): *code 시점* 부분(개별 수치 figma 대조)을 fz-code friction-detect에 **candidate 마찰 신호 추가** (active). *plan 시점* 부분(토큰 테이블 exhaustiveness, fz-plan §F) + broad CLAUDE.md 1줄은 **보류** (narrow + 42차 frame 한계 + 23차 중복 → Codex/사용자 판단)
+- ⚡ 조치 (2026-06-01): *code 시점* 부분(개별 수치 figma 대조)을 fz-code friction-detect에 **candidate 마찰 신호 추가** (active). *plan 시점* 부분(토큰 테이블 exhaustiveness, fz-plan §F) + broad CLAUDE.md 1줄은 **보류** (narrow + 42차 frame 한계 + 23차 중복 → GPT/사용자 판단)
 - ⚡ 조치 (2026-06-02, OBS-09 관측 #2): fz-code:277 신호에 **색/style-run/정렬 enumeration + data>render(childOrder) clause 확장** + **`figma 텍스트 미대조` candidate 신호 신설**(text-content 2세션, candidate 유지). plan 시점 Node Inventory(회고 §5-A)는 **DEFERRED 유지** — code 시점 enumeration gap은 277의 '사전 토큰 테이블 exhaustive 신뢰 → 누락 항목 답습' clause로 cover. 42차 caveat는 *구조 데이터 부재(flattened IMAGE)* 한정으로 재범위화 (구조 데이터 존재 노드값 읽기는 결정론적). 적용: TVOD/OBS-09/fz-enhancement/plan.md (TEAM plan+review)
 - ⚡ 조치 (2026-08-03, 관측 #3): ① fz-code:276의 blanket 문장("raw 노드값 그대로 적용")을 **축별 분기로 대체** — direct property는 raw 직접 / 요소 간 실효 거리는 경계 사이 gap·padding 합산(⚠️ spacer·절대배치·음수간격·modifier 순서 개재 시 단순 합 불성립 → 렌더 판정) / raw 미표현 축은 렌더 스냅샷. ② **측정 아티팩트 provenance 3필드 표준** — figma 측정 산출물 헤더에 `file key` + `node ID` + `실측일` 고정. 선례 `OBS-23-work/figma-code-diff-01:3`은 기재, `OBS-18-work/figma-measure-exhaustive.md:3`은 미기재 → **후속 세션이 동일 스냅샷 여부를 판정 불가**(본 세션 실측 실패로 확인). ③ **Adapter(합성값 자동 diff)는 미착수** — figma node ↔ SwiftUI expression 매핑 계약 부재 [외부: Codex verify rejected — `내부 Codex 검증 기록`]. 재설계(figma calculator + mapping manifest 2단 분리) 후 재제안.
 - ⚠️ **경합 가설 미해소 (2026-08-03)**: `figma-measure-exhaustive.md`(07-24 16:08)가 정정(07-29 04:10)보다 앞서 존재했으나, 두 산출물의 node 집합이 다르다(`114292…` vs file `6T8hjmMGw8xKd95NC32yKg` node `6725-121653`). **(가) 표가 stale 스펙 / (나) 합성 누락** 중 판정 불가 — provenance 부재가 원인. Figma `/design/` URL 확보 시 결판 가능. ⛔ 어느 쪽도 확정 서술 금지.
-- 승격 목표 (트랙 A): figma 작업 세션 5회 관측 후 신호 활성 (memory-guide line 43). Codex verify = 활성 전 권장 게이트. **현재 3/5 — 2건 남음.** ⛔ **활성 전 필수**: 회귀 fixture 1개(`parent gap 12 + child padding 24 → effective 36` 검출 / direct property는 직접 비교 / raw 미표현 축은 render-required / external 관측에 4-classify 없으면 lint 실패) — `harness-engineering.md:799` 규율1(회귀·반증 게이트 통과분만 수용). 현재 **oracle 0개** [외부: Codex review `codex-review-out.md:10091-10100`].
+- 승격 목표 (트랙 A): figma 작업 세션 5회 관측 후 신호 활성 (memory-guide line 43). GPT verify = 활성 전 권장 게이트. **현재 3/5 — 2건 남음.** ⛔ **활성 전 필수**: 회귀 fixture 1개(`parent gap 12 + child padding 24 → effective 36` 검출 / direct property는 직접 비교 / raw 미표현 축은 render-required / external 관측에 4-classify 없으면 lint 실패) — `harness-engineering.md:799` 규율1(회귀·반증 게이트 통과분만 수용). 현재 **oracle 0개** [외부: Codex review `codex-review-out.md:10091-10100`].
 
 ### L-2: fz-code 구현시점 reuse 게이트 (41차 enforcement plan→code 이동)
 - 관측 #1: OBS-08 (catch #3,6,7 — helper 중복 작성)
 - 내용: fz-code 구현 *전* **공유 인프라 영역**(`CLAUDE.md ## Shared Modules`) grep 게이트 (현재 41차는 fz-plan에만 enforce)
 - generalize: **broad** (모든 helper 작성) | 과적합 위험: 低 (기존 방어 이동, 신규 규칙 아님)
 - 근거: [verified: fz-code/SKILL.md friction-detect에 reuse 항목 0건 — grep "reuse|코드반복|기존 helper" 결과]
-- ⚡ 조치 (2026-06-01): fz-code friction-detect에 **candidate 마찰 신호 추가**. candidate *추가*엔 Codex 불요 (41차 구조적 grep 검증 + 사용자 catch #3/#7 권위). 단 candidate→active *전환*엔 Codex verify 권장 (트랙 A). ledger=메모리 승격(트랙 B) 추적, friction 신호=code 시점 발화 (별개 레이어)
-- 승격 목표 (트랙 A): 5 sessions 관측 후 신호 활성 (memory-guide line 43). Codex verify = 활성 전 권장 게이트.
+- ⚡ 조치 (2026-06-01): fz-code friction-detect에 **candidate 마찰 신호 추가**. candidate *추가*엔 GPT 불요 (41차 구조적 grep 검증 + 사용자 catch #3/#7 권위). 단 candidate→active *전환*엔 GPT verify 권장 (트랙 A). ledger=메모리 승격(트랙 B) 추적, friction 신호=code 시점 발화 (별개 레이어)
+- 승격 목표 (트랙 A): 5 sessions 관측 후 신호 활성 (memory-guide line 43). GPT verify = 활성 전 권장 게이트.
 
 ### L-3: analysis-deferred-churning (31/33/40차 복합 신규 트리거)
 - 관측 #1: OBS-08 (catch #13 — 위치 정렬 11-iteration churn)
 - 내용: 단일 UI/설계 문제 *2회+ 변경* 시 self-stop + trade-off table 먼저 + 사용자 결정 후 1회 구현
 - generalize: **broad (강)** (모든 반복 수정 상황) | 과적합 위험: 低
 - 근거: [verified: retrospective §7-8 — 11회 변경 기록 + 사용자 "계속 바꾸지 말고 객관 분석하라"]
-- ⚡ 조치 (2026-06-01): fz-code friction-detect에 **candidate 마찰 신호 추가** (memory-guide 5-session intake 대상). 사용자 catch #13 권위. broad. ⚠️ 단 churn은 31/33/40 *파생 new-trigger*(순수 enforcement-gap 아님) — 트랙 A 활성 전 Codex 재검토 권장 (#4 교정)
-- 승격 목표 (트랙 A): 5 sessions 관측 후 신호 활성 (memory-guide line 43). Codex verify = 활성 전 권장 게이트.
+- ⚡ 조치 (2026-06-01): fz-code friction-detect에 **candidate 마찰 신호 추가** (memory-guide 5-session intake 대상). 사용자 catch #13 권위. broad. ⚠️ 단 churn은 31/33/40 *파생 new-trigger*(순수 enforcement-gap 아님) — 트랙 A 활성 전 GPT 재검토 권장 (#4 교정)
+- 승격 목표 (트랙 A): 5 sessions 관측 후 신호 활성 (memory-guide line 43). GPT verify = 활성 전 권장 게이트.
 
 ### L-4: skill-procedure-default (team-core 보강)
 - 관측 #1: OBS-08 (catch #9,11 — 팀 gc 스킬 미사용 + index 갱신 누락)
 - 내용: 스킬 호출 시 본문 절차 따르기 + CLAUDE.md 권장 팀 스킬(gc/pr 등) 우선
 - generalize: **broad** | 과적합 위험: 中
 - 근거: [verified: retrospective catch #9 — fz-commit 본문 /sc:git 미사용 + Bash git commit 직접]
-- 승격 목표 (트랙 B, ledger-only — friction 신호 없음): P2→P1 = 세션 1건 + Codex verify + 사용자 승인.
+- 승격 목표 (트랙 B, ledger-only — friction 신호 없음): P2→P1 = 세션 1건 + GPT verify + 사용자 승인.
 
 ### L-5: 대칭/짝 경로 동시 수정 (③ OBS-16 메타패턴)
 - 관측 #1: OBS-16 (Date: 2026-06-27, fz 환류 세션) | finding-source: internal (사용자 catch)
@@ -178,7 +178,7 @@
 - generalize: narrow (DTO/Entity 미러링) | 과적합 위험: 中
 - 근거: [verified: README.md:19,22 #3·#6]. ⚠️ 경계: fz-code:227 "파라미터 키 불일치"는 *요청* 키 대상 — 본 신호는 *응답* DTO 필드로 구분.
 - ⛔ 활성 차단: evidence 1 session → candidate. 축2(계약 지식) 성격 — 순수 friction 질문만으론 약함, apidog OAS 주입(Track3 pilot S6)이 진짜 레버.
-- 승격 목표 (Track A): 5 sessions + Codex verify.
+- 승격 목표 (Track A): 5 sessions + GPT verify.
 
 ### L-7: canonical 값-매핑 전량 복사 (G2)
 - 관측 #1: OBS-11 | Date: 2026-07-02 | finding-source: internal (사용자 catch)
@@ -186,7 +186,7 @@
 - generalize: narrow (값 매핑 복사) | 과적합 위험: 中 | 트리거=축1(복사 감지 코드판정)/해소=축2(값 유효성 도메인 지식) 하이브리드
 - 근거: [verified: README.md:20 #4] + [verified: 템플릿 권위 편향 교훈 — 4th vector].
 - ⛔ 활성 차단: evidence 1 session → candidate.
-- 승격 목표 (Track A): 5 sessions + Codex verify.
+- 승격 목표 (Track A): 5 sessions + GPT verify.
 
 ### L-8: 도메인 심볼에 API 버전/transport (G3)
 - 관측 #1: OBS-11 | Date: 2026-07-02 | finding-source: internal (사용자 catch)
@@ -194,7 +194,7 @@
 - generalize: narrow (Swift 심볼 네이밍) | 과적합 위험: 中 (grep FP — 버전 토큰 정교화)
 - 근거: [verified: README.md:17 #1] + [verified: 도메인 심볼 API 버전 금지 교훈 — 신규 생성].
 - ⛔ 활성 차단: evidence 1 session → candidate. 기존 fz-code "Swift Naming"(축a~e, OBS-06) + 4-N에 축(f)로 추가 — ⚠️ **evidence 카운트 분리**(축f=OBS-11은 축a~e=OBS-06과 이질).
-- 승격 목표 (Track A): 5 sessions + Codex verify.
+- 승격 목표 (Track A): 5 sessions + GPT verify.
 
 ### L-9: DTO(계약 미러) vs Entity(사용분) 레이어 책임 (G4)
 - 관측 #1: OBS-11 | Date: 2026-07-02 | finding-source: internal (사용자 catch)
@@ -202,7 +202,7 @@
 - generalize: narrow (DTO/Entity 레이어) | 과적합 위험: 中 | 트리거=축1(레이어 식별)/해소=축2(서버 계약) 하이브리드. G1(#6)과 관점 공유.
 - 근거: [verified: OBS-11 리뷰 README #6·§2 P2].
 - ⛔ 활성 차단: evidence 1 session → candidate.
-- 승격 목표 (Track A): 5 sessions + Codex verify.
+- 승격 목표 (Track A): 5 sessions + GPT verify.
 
 ### L-10: 신규 엔드포인트 prefix/컨벤션 사전 체크 (G5)
 - 관측 #1: OBS-11 | Date: 2026-07-02 | finding-source: internal (사용자 런타임 catch)
@@ -210,11 +210,11 @@
 - generalize: narrow (신규 엔드포인트) | 과적합 위험: 中 | 축2(계약 지식). 13차 server-contract 강화.
 - 근거: [verified: README.md:21 #5].
 - ⛔ 활성 차단: evidence 1 session → candidate. fz-plan Phase 0c Constraint Probe 확장(Track3 pilot S6, 별도 세션).
-- 승격 목표 (Track A): 5 sessions + Codex verify.
+- 승격 목표 (Track A): 5 sessions + GPT verify.
 
 ### L-2 관측 #2 (G8 — OBS-11, ⚠️ 카운트 보류)
 - 관측: OBS-11 (#10 WatchLabel 자작 — 공용 `ContentLabelDTO`→`ContentLabel` 미탐색) | finding-source: internal (사용자 2턴 지적)
-- ⚠️ **카운트 보류**: eligible session (a)fz-plan Phase0.5~3 형식 증거 0건 + (b)Codex quota 생략 [verified: OBS-11-work/review/self-review.md:3] → 둘 다 미확증. 관측만 등록, 5-session 카운트 미반영.
+- ⚠️ **카운트 보류**: eligible session (a)fz-plan Phase0.5~3 형식 증거 0건 + (b)GPT quota 생략 [verified: OBS-11-work/review/self-review.md:3] → 둘 다 미확증. 관측만 등록, 5-session 카운트 미반영.
 - 확장 관측: L-2 검출법=util 3영역 grep이나 G8 실패(`ContentLabelDTO` 도메인 모델)는 3영역 밖 → **사용처 기반** 보강 필요(S3). memory-guide "same failure mode → merge"로 L-2 흡수 판정.
 - 근거: [verified: OBS-11 리뷰 README #10].
 
@@ -236,7 +236,7 @@
 ### L-11: 검증자 premise-challenge (전제 도전 지시)
 - 관측 #1: OBS-19 (Date: 2026-07-15~16) | finding-source: internal (사용자 catch → 회고 E3/INC-9 — 미포함 실패 관측)
 - 관측 #2: fz-improvement-strategy plan 검증 (Date: 2026-07-18) | finding-source: internal (포함 실효 관측 — 지시가 작동)
-- 관측 #3: OBS-24 R8 (Date: 2026-08-10) | finding-source: internal (사용자 catch) — **발동 지점이 다름**: #1·#2는 *검증자 프롬프트*, 본 관측은 **Lead의 외부 피드백 수용 시점**. Codex가 "plan Descope 위반"(자작 초안 문서 근거)을 지적하자 Lead가 코드 근거(같은 switch 내 형제 비대칭)보다 **문서 권위를 위에 두고** 수용 → 국소 되돌리기로 결함 유발. 처방은 provenance 랭킹((i)코드/런타임 (ii)사용자·팀 승인(권한) > (iii)자작 문서 > (iv)선호)이며 `fz-code` External Feedback Gate 행 + `harness-engineering` §12 R8-A 파생규율에 반영 [[L-13]]
+- 관측 #3: OBS-24 R8 (Date: 2026-08-10) | finding-source: internal (사용자 catch) — **발동 지점이 다름**: #1·#2는 *검증자 프롬프트*, 본 관측은 **Lead의 외부 피드백 수용 시점**. GPT가 "plan Descope 위반"(자작 초안 문서 근거)을 지적하자 Lead가 코드 근거(같은 switch 내 형제 비대칭)보다 **문서 권위를 위에 두고** 수용 → 국소 되돌리기로 결함 유발. 처방은 provenance 랭킹((i)코드/런타임 (ii)사용자·팀 승인(권한) > (iii)자작 문서 > (iv)선호)이며 `fz-code` External Feedback Gate 행 + `harness-engineering` §12 R8-A 파생규율에 반영 [[L-13]]
 - 내용: adversarial/fresh-context 검증자 프롬프트에 "발견의 결론뿐 아니라 **전제**(위반 대상 문서/규칙/계획 자체의 결함 가능성)를 반증 범위에 명시 포함". 미포함 시 동종 검증자가 finder와 같은 권위 전제를 공유해 오판을 CONFIRMED(#1: plan-authority 오판 유지). 포함 시 검증자가 플랜의 핵심 전제 오진단("관측 수집 병목")을 반증(#2).
 - generalize: broad (모든 검증자 프롬프트) | 과적합 위험: 低 (프롬프트 1문장 — Gate/절차 신설 아님)
 - 근거: [verified: 내부 오류 분류 기록 E3 + 인시던트 INC-9] + [verified: 내부 개선 계획 검증 결과 특기]
@@ -250,23 +250,23 @@
 - 근거: [verified: 내부 홀 인벤토리 I3·H-P2·G6("종류: 신규")]
 - ⛔ 활성 차단: evidence 1 session → candidate. ⚠️ **L-7과 별개**: 상위 축(template-authority-bias)은 공유하나 해소 방식 상이(L-7=값 발생 여부 확인/default, L-12=근거 축 분류) + 홀 문서 G6가 "신규" 자체분류 → same-failure-mode 미성립으로 독립 등재. cross-link: [[L-7]]
 - ⚠️ **카운트 보류** (OQ-c): OBS-20 회고 세션의 eligibility (a)fz-plan Phase0.5~3 + (b)fz-gpt verify/fz-review --deep 미확증(§meta light/solo 라우팅) → L-2/L-3 관측#2 선례대로 5-session 카운트 미반영. ⚠️ **근본 모순**: 본 파일 "별개 세션 관측 카운트"(§카운트 기준) vs L-2/L-3/L-12 보류 관행이 상충 — Wave 3-1 ledger 재평가에서 reconcile 대상.
-- 승격 목표 (Track A): 5 sessions + Codex verify.
+- 승격 목표 (Track A): 5 sessions + GPT verify.
 
 ### L-13: post-state 일관성 (peer slot 비대칭 — OBS-24 R8)
 - 관측 #1: OBS-24 | Date: 2026-08-10 | finding-source: **internal(사용자 catch)** — "상수로 해야지 거기만 하드코딩으로 하면 어떻게 해"
 - 내용: fz 검증이 **diff 안**(3중 리뷰)·**diff 밖**(검증 4·4-I) 두 축뿐이고, **"편집 라인이 놓인 자리가 일관적인가"(post-state)** 를 묻는 축이 부재. 편집한 라인이 peer slot 집합(같은 switch case 절·리터럴 컬렉션·초기화 목록·같은 레벨 분기)에 속하면 형제 슬롯을 읽고 표현 방식(상수 vs 리터럴·헬퍼 vs 인라인·네이밍) 대조 필요. ⛔ **빌드·테스트가 원리적으로 침묵**(문법 정상 + 값 동일)하는 구간이라 절차로만 검출.
-- 발현: `Style` enum 계산 프로퍼티 switch에서 `.poster`/`.mainBanner`는 `Metric` 상수, `.meta`만 리터럴 15/4/3. 외부 리뷰(Codex)의 "plan Descope 위반" 지적을 수용해 국소 되돌리기를 하며 발생.
+- 발현: `Style` enum 계산 프로퍼티 switch에서 `.poster`/`.mainBanner`는 `Metric` 상수, `.meta`만 리터럴 15/4/3. 외부 리뷰(GPT)의 "plan Descope 위반" 지적을 수용해 국소 되돌리기를 하며 발생.
 - generalize: **broad** (언어·도메인 무관 — 동종 슬롯이 열거된 모든 구조) | 과적합 위험: 低~中 (체크 절차 1개, 같은 블록 Read라 비용 0)
 - 근거: [verified: 내부 회고 R8 — 세션 오류 6건 중 **4건이 "대상을 격리해 보고 그것이 속한 구조를 안 봄"** 동일 뿌리] + [verified: `fz-review:224` "3중 리뷰가 모두 diff 기반" 자인 · `fz-review:240` "검증 4는 diff 안, 4-I는 diff 밖" 축 명시 → 세 번째 축 공백 확인]
 - ⚠️ **표면 churn(L-3)과 별개**: L-3=*시간축*(동일 대상 2회+ 변경), L-13=*공간축*(형제 슬롯 비대칭). `memory-guide` "same failure mode → merge" 미성립. cross-link: [[L-3]]
 - ⚠️ **파생 규율은 L-11과 동축**: 본 사건의 2차 원인(외부 지적의 provenance 미분류 — 자작 계획서 권위를 코드 근거 위에 둠)은 L-11(검증자가 finder와 **권위 전제** 공유 → plan-authority 오판)과 같은 축이며 **발동 지점만 다름**(L-11=검증자 프롬프트 / 본건=Lead의 피드백 수용). ⇒ provenance 랭킹은 **독립 등재하지 않고** `fz-code` External Feedback Gate 행 보강 + `harness-engineering` §12 R8-A 파생규율로 흡수. cross-link: [[L-11]]
 - ⛔ 활성 차단: evidence 1 session → **candidate**. active 전환 = 트랙 A **5 sessions**.
-- ⛔ **외부 채점 미이행 (§5.5 규율 2 미충족)**: 본 항목은 등재 세션에 Codex 한도 소진으로 **cross-model 채점 없이** 자기 관측만으로 기술됐다. `harness-engineering.md` §5.5 규율 2("self-preference 단독 채택 금지 — 외부 채점 병행")상 **승격 조건에 5 sessions + 외부 채점 1회를 함께 요구**한다. 개념 정본 `§12 R8-A`에도 동일 경고 병기(출처 성격이 원칙 1~7과 다름 — 외부 권위 vs 자체 관측).
+- ⛔ **외부 채점 미이행 (§5.5 규율 2 미충족)**: 본 항목은 등재 세션에 GPT 한도 소진으로 **cross-model 채점 없이** 자기 관측만으로 기술됐다. `harness-engineering.md` §5.5 규율 2("self-preference 단독 채택 금지 — 외부 채점 병행")상 **승격 조건에 5 sessions + 외부 채점 1회를 함께 요구**한다. 개념 정본 `§12 R8-A`에도 동일 경고 병기(출처 성격이 원칙 1~7과 다름 — 외부 권위 vs 자체 관측).
 - ⛔ **진단 정정 (2026-08-10, 3-렌즈 외부 검증)**: 최초 "post-state 축 부재" 판정은 **오진**. 형제 렌즈 6개 실재 [verified: `skill-authoring.md` §1 Sibling-Convention Check(**동일 실패 모드**) · `fz-review` §검증 1 "Grep → 변경 후 패턴 일관성" · `agents/impl-quality.md` "Codebase Pattern Consistency" · `gpt-skills/fz-reviewer` · `evidence-collection.md` · `agents/review-direction.md`]. 정확한 진술 = **입도 부족(같은 블록 형제 단위 없음) + 소유자 미배선(`workflows/code-pair.js`가 impl-quality를 "미포함 기본값")**. ⇒ **선행 과제**: 대안 A(impl-quality 배선 복구)·B(Lead 체크리스트 1줄) vs C(현행 신설) 비용·발화율 비교 **미수행**.
 - ⛔ **실효성 실측 (오탐 8/9)**: OBS-24 워크트리 peer slot 11곳 적용 → emit 9곳 중 진짜 1곳. "in-block 비용 0" 주장 **철회**(접근 수준·소유권은 소비처 결정 → 타 파일 Read + 리포 grep 필요). diff 앵커링 상속으로 **기존 비대칭 불가시**. ⇒ 4-P에 **형제 균일성 게이트 + 의미 비대칭 면제 + 소비처 의존 축 제외** 반영. 표본 소 — 일반화 금지.
 - ⛔ **활성 전 필수 (§5.5 규율 1 — 회귀·반증 게이트)**: 회귀 fixture 2개 — ① 형제 3절 중 1절만 리터럴인 switch에서 **검출**(TP) ② 형제가 정당한 의미 비대칭인 블록에서 **미검출**(FP=0). **현재 oracle 0개** [L-1 선례 형식 차용].
 - ⚡ 조치 (2026-08-10): `harness-engineering` §12 R8-A 신설(candidate) + 진단 정정 · `review-checks` 검증 4-P 신설 + 균일성 게이트 · `fz-code` friction-detect "peer slot 비대칭" 신호 + External Feedback Gate 행 provenance 보강 · `fz-review` 4-P 참조/체크리스트.
-- 승격 목표 (트랙 A): **5 sessions 관측 + Codex(또는 이종) 교차 채점 1회 + 회귀 fixture 2개** 후 `fz-code` friction-detect "peer slot 비대칭" + `fz-review` 4-P 활성 판정. ⚠️ 그 전에 **대안 A/B 비교** 결론이 선행돼야 한다(원칙 1).
+- 승격 목표 (트랙 A): **5 sessions 관측 + GPT(또는 이종) 교차 채점 1회 + 회귀 fixture 2개** 후 `fz-code` friction-detect "peer slot 비대칭" + `fz-review` 4-P 활성 판정. ⚠️ 그 전에 **대안 A/B 비교** 결론이 선행돼야 한다(원칙 1).
 - ⚠️ **등재 절차 하자 (자기고발)**: 본 항목은 `fz-plan` 미경유 즉시 구현으로 작성됐다(`설계 답변 ≠ 구현 승인 교훈` "설계 결정 답변 ≠ 구현 승인" 위반). 사용자에게 "전체 재설계" 선택지를 제시할 때 **§5.5 규율 3("현행 유지가 정답 — 재설계 유발 금지")과 충돌한다는 사실을 고지하지 않았다.** 내용 자체의 타당성과 별개로 절차 하자를 기록에 남긴다. (세션 회고 원문 = OBS-24 워크스페이스 `fz-retrospective/R8-review/`)
 
 ### L-14: Decision-Type + Boundary (구조/경계 포크 결단 — 구 F5·F6)
@@ -301,7 +301,7 @@
 | **A. 작동하지 않는 코드 / 외부 상태 오염** | 공용 인자 배열이 서브커맨드에 거부됨 · fail-open 카운터 · 위임 프로세스가 팀 repo에 쓰기 | **즉시 조치** (승격 정책 비적용 — 규칙이 아니라 버그) | ⛔ 불요 |
 | **B. 기존 게이트의 배선 누락** | 게이트가 N곳에서 발화하나 특정 스킬에만 미연결 | **배선 복구** (새 규칙 0개) | ⛔ 불요 |
 | **C. 구현 마찰 신호** | 편집 중 감지 가능한 코드 패턴 (분기 폭증·형제 비대칭·reuse 미확인) | **트랙 A** — 5 sessions | ✅ candidate |
-| **D. 외부 도구가 `/fz-review --deep` 이후 잡은 Major+** | CodeRabbit·팀원·Codex catch | **트랙 C** — 4-classify 통과분만 | ✅ 관측 |
+| **D. 외부 도구가 `/fz-review --deep` 이후 잡은 Major+** | CodeRabbit·팀원·GPT catch | **트랙 C** — 4-classify 통과분만 | ✅ 관측 |
 | **E. 그 외** | 하네스 결함 · 측정 실패 · 판정 오류 · 게이트 위음성 | **트랙 D** — 2 sessions + 회귀 fixture + 외부 채점 | ✅ candidate |
 
 ### 트랙 D — 하네스 결함 (2026-08-24 신설, 사용자 결정)

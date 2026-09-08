@@ -17,7 +17,7 @@
 | T1 | 파일 수정 **5개+** 도달 | "CLAUDE.md Architecture 규칙: 상위→하위만 참조. 현재 변경 범위가 넓어지고 있습니다." | 반성 5차: 영향 분석 불완전 |
 | T2 | Gate 실패 **1회+** | "Gate 체크리스트 전체 재확인. 실패 항목: {항목명}" | 반성 4차: Gate 바이패스 |
 | T3 | 제거/리팩토링 작업 중 **10턴+** | "Implication Scan 수행했는가? Q-WHY: 이 코드가 존재하게 된 이유가 해소됐는가?" | lead-reasoning.md |
-| T4 | Workflow 반환 수신 (또는 서브에이전트 완료 보고) | "Lead Checkpoint 순서: 체크포인트 → Codex → [Implication] → 빌드 → 다음. 반환 mode가 fallback/split_required면 **실패 복구 사다리**(guides/skill-authoring.md §12 L1~L4)로 분기" | guides/skill-authoring.md §12 (⛔ team-core.md Rule 6은 역사적 출처) |
+| T4 | Workflow 반환 수신 (또는 서브에이전트 완료 보고) | "Lead Checkpoint 순서: 체크포인트 → GPT → [Implication] → 빌드 → 다음. 반환 mode가 fallback/split_required면 **실패 복구 사다리**(guides/skill-authoring.md §12 L1~L4)로 분기" | guides/skill-authoring.md §12 (⛔ team-core.md Rule 6은 역사적 출처) |
 | T5 | diff에 `static let shared` 타입의 `var` property 변경 감지 | "싱글톤 가변 상태 수정 감지. 확인: (1) 동기화 보호 (@MainActor/actor/lock) (2) deinit dead code (3) 기본값 소비자 영향. 참조: plugin-refs.md 역방향 트리거, modules/safety-audit.md" | PR#3665: plugin 미활성으로 data race 미감지 |
 | T6 | 과거 상태 주장 키워드("원본은", "기존은", "이전은", "D{N} 이전") 감지 + 직전 5턴 내 `git show`/`Read`/`grep`/`find_referencing_symbols` 호출 흔적 없음 | "과거 상태 주장 감지 + 검증 도구 호출 흔적 없음. Fail-Closed: `git show {SHA}:{path}` 또는 `Read` 실행 후 주장하거나 `[미검증: 실측 없음]` 태그 부착. 참조: ${CLAUDE_PROJECT_DIR}/memory/사실 주장 전 실측 교훈, lead-reasoning.md §1.5 Speculation-to-Fact" | OBS-14 F-7: 원본 추정으로 4회 reversal |
 | T7 | 과거 판단 아티팩트(`follow-up-tasks.md`, `codex-review*.md`, `plan-v*.md`) 인용 감지 | "과거 판단 아티팩트 인용 감지. 작성 시점 판단이므로 현재 시점 재실측 필수. 재검증 불가 시 `[아카이브: 재실측 불가, 작성 시점 {YYYY-MM-DD}]` 태그. 참조: ${CLAUDE_PROJECT_DIR}/memory/<교훈>.md" | OBS-14: follow-up-tasks.md 맹목 인용으로 재작업 |

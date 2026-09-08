@@ -1,4 +1,4 @@
-# Codex 실행 전략
+# GPT 실행 전략
 
 > fz-gpt SKILL.md 서브커맨드에서 참조. 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드).
 
@@ -32,7 +32,7 @@ review, final 서브커맨드에서 `--base` 브랜치가 필요합니다.
 
 ## Reasoning Effort 전략 (사용자 명시 호출 기반)
 
-Codex 교차 검증은 **사용자가 필요할 때 명시적으로 호출**한다. 자동 경량 게이트 없음.
+GPT 교차 검증은 **사용자가 필요할 때 명시적으로 호출**한다. 자동 경량 게이트 없음.
 
 | Tier | 맥락 | 모델 | Effort | 예상 시간 |
 |------|------|------|--------|----------|
@@ -48,7 +48,7 @@ Codex 교차 검증은 **사용자가 필요할 때 명시적으로 호출**한�
 - 사용자가 `--deep` 플래그 사용 → **Deep**
 - **`/fz` Phase 1 `simplified_keywords` 감지 시 → Light** (Cnew-2 자동 라우팅, 2026-05-16):
   - 사용자 신호: "그냥/가볍게/단순/빠르게/light" 키워드
-  - Codex 호출: `effort=medium` + micro-eval 패턴 적용
+  - GPT 호출: `effort=medium` + micro-eval 패턴 적용
   - 적용 서브커맨드: review/verify/check (light variant)
   - Claude light 모드 (fz-plan/code/review)와 정합 — 같은 simplified signal로 양쪽 동시 라우팅
 
@@ -56,7 +56,7 @@ Codex 교차 검증은 **사용자가 필요할 때 명시적으로 호출**한�
 
 ## Diff 크기 적응 전략
 
-diff 크기에 따라 Codex 호출 전략을 자동 선택합니다.
+diff 크기에 따라 GPT 호출 전략을 자동 선택합니다.
 
 **크기 측정**:
 ```bash
@@ -80,7 +80,7 @@ DIFF_LINES=$(cd "$GIT_ROOT" && git diff --base "$BASE_BRANCH" --stat | awk 'END{
 
 ## 장기 불능 인지 (기간 조건부)
 
-> Codex가 **장기 불능** 상태(현재: spend cap 2026-07-16~, 해제 시점 미상 — 재확인 앵커 2026-08-18)일 때: 서브커맨드 호출 전 재시도를 생략하고 각 스킬의 Codex 불능 분기(fz-review Phase 5 검증 2 불능 분기 등)로 직행한다 — 매 호출 재시도 1회 오버헤드 방지. ⛔ 상태 표기에는 시작일 + 원복 트리거 명시 의무(만료일 미상이면 "해제 확인 시 원복"으로) — 정리 주체 없는 무기한 잔존 방지. **해제 확인 시 이 노트의 "현재:" 상태 제거 + 원경로 복원** (동기화 단일 포인트: MEMORY.md Codex 줄). 이종 blind-spot 안전망 상실은 폴백 산출물에 명시 의무 (15/23차).
+> GPT가 **장기 불능** 상태(현재: spend cap 2026-07-16~, 해제 시점 미상 — 재확인 앵커 2026-08-18)일 때: 서브커맨드 호출 전 재시도를 생략하고 각 스킬의 GPT 불능 분기(fz-review Phase 5 검증 2 불능 분기 등)로 직행한다 — 매 호출 재시도 1회 오버헤드 방지. ⛔ 상태 표기에는 시작일 + 원복 트리거 명시 의무(만료일 미상이면 "해제 확인 시 원복"으로) — 정리 주체 없는 무기한 잔존 방지. **해제 확인 시 이 노트의 "현재:" 상태 제거 + 원경로 복원** (동기화 단일 포인트: MEMORY.md GPT 줄). 이종 blind-spot 안전망 상실은 폴백 산출물에 명시 의무 (15/23차).
 
 ## CLI 모드 선택 전략 (Hybrid)
 
@@ -92,7 +92,7 @@ Plugin 미설치 시 모든 서브커맨드가 CLI로 동작 (폴백 투명).
 | **diff 입력** | Git 자동 감지 (--base/--uncommitted/--commit) | 수동 주입 (프롬프트에 인라인) |
 | **출력 형식** | `--json`(JSONL) + `-o`(최종 메시지 파일) | `--output-schema` JSON 강제 |
 | **모델 명시** | `-m` 생략 → config `model` 기본값 사용(권장, 항상 최신) | 동일 |
-| **Codex 스킬** | 3-Tier 디스커버리 자동 트리거 | 스킬 내용 수동 주입 필요 |
+| **GPT 스킬** | 3-Tier 디스커버리 자동 트리거 | 스킬 내용 수동 주입 필요 |
 | **모노레포 컨텍스트** | `--add-dir` (공유 모듈 접근) | `-C` + `--add-dir` |
 
 **서브커맨드별 매핑**:
@@ -116,11 +116,11 @@ Codex CLI의 `sandbox_permissions` 설정:
 |------|------|----------|
 | `disk-full-read-access` | 전체 코드베이스 읽기 (drift 스캔, 독립 플랜) | fz-drift, fz-planner |
 | `read-only` (기본) | 변경 없이 읽기만 | fz-challenger, fz-searcher |
-| (미지정) | Codex 기본 샌드박스 | fz-reviewer, fz-guardian, fz-fixer |
+| (미지정) | GPT 기본 샌드박스 | fz-reviewer, fz-guardian, fz-fixer |
 
 설정 방법: `codex exec -c 'sandbox_permissions=["disk-full-read-access"]'`
 
-> `disk-full-read-access`는 Codex가 프로젝트 디렉토리 전체를 읽을 수 있게 허용한다.
+> `disk-full-read-access`는 GPT가 프로젝트 디렉토리 전체를 읽을 수 있게 허용한다.
 > 쓰기 권한은 부여하지 않으므로 코드 수정 위험 없음.
 
 ---
@@ -129,7 +129,7 @@ Codex CLI의 `sandbox_permissions` 설정:
 
 > **Authority**: GPT-5 Prompting Guide (OpenAI Cookbook 2026) [verified: official] — "rephrase goal → outline plan → narrate" preamble 패턴 권장.
 
-Codex 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 reasoning 품질 + 일관성 향상:
+GPT 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 reasoning 품질 + 일관성 향상:
 
 ```
 1. Rephrase Goal: 작업 목표를 자기 언어로 1-2문장 재기술
@@ -149,7 +149,7 @@ BAD (preamble 없음):
 GOOD (3-step preamble):
 "
 [Rephrase] Plan v1을 GPT-5.5로 cross-model verify. 5 Q 평가 + verdict.
-[Outline] (a) 6 가설 grep 재현 (b) Tier 우선순위 평가 (c) false positive 식별 (d) Codex 단독 발견 (e) 최종 verdict.
+[Outline] (a) 6 가설 grep 재현 (b) Tier 우선순위 평가 (c) false positive 식별 (d) GPT 단독 발견 (e) 최종 verdict.
 [Narrate] 각 Q마다 verdict (pass/warn/fail) + reasoning + 파일:line 인용.
 "
 ```

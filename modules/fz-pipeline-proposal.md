@@ -30,7 +30,7 @@
 |---|------|------|--------|------|
 | 1 | /fz-code | 점진적 구현 | impl-correctness ★ | opus |
 | 2 | ✓ build | 빌드 검증 | Lead | — |
-| 3 | ✓ codex check | 교차 검증 | Lead | codex |
+| 3 | ✓ gpt check | 교차 검증 | Lead | gpt |
 | 4 | /fz-review | 아키텍처 리뷰 | review-arch | opus |
 | 5 | /fz-review | 품질 리뷰 | review-quality | opus |
 | 6 | /fz-commit | 커밋 | Lead | fable |
@@ -44,7 +44,7 @@
 
 ## AskUserQuestion 선택지
 
-> **Default 결정 알고리즘** (review-arch MUST-1 + Codex 검증 §5 MUST-1 합의):
+> **Default 결정 알고리즘** (review-arch MUST-1 + GPT 검증 §5 MUST-1 합의):
 > Phase 4가 Phase 3 결정을 *역전하지 않는다*. Phase 4는 *추가 선택지 제시*만.
 
 ### Phase 4 Default 결정 알고리즘

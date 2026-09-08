@@ -40,7 +40,7 @@
   6. ⛔ 타입 소속 검증 (모듈화 작업 시): 각 public type에 대해 "이 타입의 관심사 = 이 모듈의 관심사?" 도메인 특화 필드/비즈니스 로직/하드코딩 UI 문자열 포함 시 모듈 경계 위반
   7. ⛔ Symbol Coverage 검증 (양방향):
      - **제거 방향** (import 변경 작업): diff에서 `import X` → `import Y`로 변경된 파일에서 X 모듈의 심볼(typealias, utility 타입 등)이 잔존하는지 grep. 잔존 시 → "symbol_orphan" 이슈
-     - **추가 방향** (신규 import 추가 작업, P1 A2 추가 — cargo-cult 방어): 새로 추가된 `import X`에 대해 X 모듈의 알려진 심볼이 파일에서 사용되는지 grep. 0건이면 → "redundant_import" 이슈 (severity: minor — false positive 가능: typealias 간접 참조 등. 사용자/Codex 최종 판정)
+     - **추가 방향** (신규 import 추가 작업, P1 A2 추가 — cargo-cult 방어): 새로 추가된 `import X`에 대해 X 모듈의 알려진 심볼이 파일에서 사용되는지 grep. 0건이면 → "redundant_import" 이슈 (severity: minor — false positive 가능: typealias 간접 참조 등. 사용자/GPT 최종 판정)
   8. ⛔ 형제 샘플(convention) 수집 — 4번 소비자 전수 수집과 같은 Grep 패스에서 함께 한다:
      - diff의 각 구조 결정(DI 획득 방식·상태 보관 위치·public API 모양)에 대해 **같은 역할의 형제 심볼**을 Grep으로 수집한다. 예: `Grep("BookmarkUseCaseImpl(")` → 형제 Interactor N곳이 어떤 방식을 쓰는지
      - 수집 결과는 판정의 **양방향 입력**이다:

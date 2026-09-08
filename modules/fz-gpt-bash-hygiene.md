@@ -101,7 +101,7 @@ fi
 
 ## 5.5 Base Verification Gate (pre-flight, git diff 분석 포함 호출 시)
 
-> Codex 메타 분석 발견: branch/HEAD 출력만으로 부족, 변경 파일 목록까지 포함 필수.
+> GPT 메타 분석 발견: branch/HEAD 출력만으로 부족, 변경 파일 목록까지 포함 필수.
 
 ```bash
 # Pre-flight: branch / HEAD / base 확인
@@ -126,14 +126,14 @@ fi
 CHANGED_FILES=$(git -C "$WORK_DIR" diff --name-only "${BASE:-HEAD~1}"..HEAD 2>/dev/null)
 CHANGED_COUNT=$(printf '%s\n' "$CHANGED_FILES" | grep -c . || true)
 
-echo "▶ Codex 분석 대상 — branch=$CURRENT_BRANCH commit=$HEAD_COMMIT base=${BASE:-HEAD~1}"
+echo "▶ GPT 분석 대상 — branch=$CURRENT_BRANCH commit=$HEAD_COMMIT base=${BASE:-HEAD~1}"
 echo "▶ 변경 파일 ${CHANGED_COUNT}개 (앞 10개만 표시):"
 printf '%s\n' "$CHANGED_FILES" | head -10
 ```
 
 **규칙**:
 - ⛔ 위 Gate 통과 후에만 `codex exec` 호출
-- ⛔ Codex 결과 인용 시 `[분석 기준: branch=X, HEAD=Y, base=Z, changed_files=N개]` 태그 의무
+- ⛔ GPT 결과 인용 시 `[분석 기준: branch=X, HEAD=Y, base=Z, changed_files=N개]` 태그 의무
 - ⛔ EXPECTED_BRANCH 주입: 호출자가 *명시 환경변수 설정 필수*
 - ⛔ 단순 파일 분석 (git diff 미포함) 호출에는 Gate 적용 **제외**
 
@@ -145,7 +145,7 @@ printf '%s\n' "$CHANGED_FILES" | head -10
 
 ```bash
 # 0. 프롬프트 파일화 (zsh glob 회피)
-cat > /tmp/codex-prompt.txt << 'EOF'
+cat > /tmp/gpt-prompt.txt << 'EOF'
 ...your prompt with regex/quotes/multiline...
 EOF
 
@@ -167,7 +167,7 @@ codex exec \
   $SKIP_FLAG \
   -o "$RESULT_FILE" \
   -C "$WORK_DIR" \
-  -- "$(cat /tmp/codex-prompt.txt)" < /dev/null
+  -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
 
 # 4. 결과 읽기: Read tool로 $RESULT_FILE
 # 5. Background mode (rule 4): high effort + 300줄+ 시 run_in_background=true
@@ -184,7 +184,7 @@ codex exec \
 **필수 패턴**: `codex exec [flags]` 뒤에 `--`를 넣고 그 뒤에 프롬프트 인자.
 
 ```bash
-codex exec ... -- "$(cat /tmp/codex-prompt.txt)" < /dev/null
+codex exec ... -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
 ```
 
 **관찰**: 에러 캡처 시 `tail` 파이프 금지(clap 에러 본문 잘림 → 진단 지연), 전체 리다이렉트(`> log 2>&1`) 사용. (2026-07-09 harness-paper 세션 실측 — SKILL.md 주입 시 재현)
@@ -217,7 +217,7 @@ scripts/gpt-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort
 
 1. **플래그 상호 배타** — `review` + `--prompt-file` → exit 10. `exec` + `--base/--uncommitted/--commit` → exit 10
 2. **필수 인자** — `review`는 스코프 1개 필수 · `exec`는 `--prompt-file` 필수 · 양쪽 `--cd`/`--out` 필수
-3. **경로 실재** — `--cd` 디렉토리 · 프롬프트·스키마 파일 비어있지 않음 · `codex` 설치 (exit 11)
+3. **경로 실재** — `--cd` 디렉토리 · 프롬프트·스키마 파일 비어있지 않음 · `gpt` 설치 (exit 11)
 4. **trust_level** — 미설정 시 경고(§5). ⛔ 차단은 아니다 — inline override 경로가 있다
 5. **git repo 판정** → `--skip-git-repo-check` 자동 부착(§2)
 6. **값 옵션 arity** — 값 없는 `--cd`/`--out`/… → exit 10 (⛔ 없으면 `set -u`가 exit **1**로 죽어 문서와 어긋난다)
@@ -229,7 +229,7 @@ scripts/gpt-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort
 
 | 순서 | 검사 | 실패 시 exit | 의미 |
 |:--:|---|:--:|---|
-| 1 | `codex` 종료코드 == 0 | **12** | 측정 실패 |
+| 1 | `gpt` 종료코드 == 0 | **12** | 측정 실패 |
 | 2 | `-o` 파일 존재 + 비어있지 않음 | **13** | 측정 실패 |
 | 3 | `--schema` 지정 시 **스키마 계약** 충족 (`scripts/validate-gpt-output.py`) | **14** | 측정 실패 |
 | 4 | **cwd 오염 없음** — 호출 전후 `git status --porcelain` 동일 | 경고 | 위임 프로세스가 대상 repo에 파일을 남겼다 |
@@ -260,11 +260,11 @@ AFTER="$(git -C "$CD" status --porcelain 2>/dev/null)"
 | 스킬 | 참조 이유 |
 |------|----------|
 | /fz-gpt | 본 모듈의 직접 소비자 — 모든 서브커맨드가 본 hygiene 준수 |
-| /fz | Codex 호출 게이트 주입 시 본 hygiene 인용 |
-| /fz-plan | TEAM 모드 Codex verify 호출 시 본 hygiene 준수 |
-| /fz-review | TEAM 모드 Codex check 호출 시 본 hygiene 준수 |
+| /fz | GPT 호출 게이트 주입 시 본 hygiene 인용 |
+| /fz-plan | TEAM 모드 GPT verify 호출 시 본 hygiene 준수 |
+| /fz-review | TEAM 모드 GPT check 호출 시 본 hygiene 준수 |
 
 ## 설계 원칙
 
-- Progressive Disclosure Level 3 (필요 시 *명시 Read* — 자동 로드 X. Codex 검증 §추가 발견 정정)
+- Progressive Disclosure Level 3 (필요 시 *명시 Read* — 자동 로드 X. GPT 검증 §추가 발견 정정)
 - 200줄 한도 — 본 모듈은 *실용 wrapper 포함*으로 약간 초과 가능
