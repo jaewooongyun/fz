@@ -1,7 +1,7 @@
 ---
 name: fz-review
 description: >-
-  자기 코드 3중 검증(Claude+Codex+sc:analyze) + 역방향 검증.
+  자기 코드 3중 검증(Claude+GPT+sc:analyze) + 역방향 검증.
   예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR →fz-peer-review, 직접 수정 →fz-fix)
 user-invocable: true
 argument-hint: "[리뷰 대상 설명] [light]"
@@ -27,7 +27,7 @@ metadata:
 
 # /fz-review - 리뷰 + 품질 보증 스킬
 
-> **행동 원칙**: 3중 검증(Claude+Codex+sc:analyze)으로 코드 품질을 확보하고, Codex 역방향 검증으로 피드백 반영을 정량화한다. 검증 결과가 기준 미달이면 반복 개선한다.
+> **행동 원칙**: 3중 검증(Claude+GPT+sc:analyze)으로 코드 품질을 확보하고, GPT 역방향 검증으로 피드백 반영을 정량화한다. 검증 결과가 기준 미달이면 반복 개선한다.
 >
 > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.md` 사전 참조. **Decision Tree (evidence ≥ 3 sessions) + 태깅 (`[skill:][status:][priority:]`) + MEMORY.md 200줄 한도** 모두 검증. 사후 catch 방지 (Layer 1+2+3 systematic weakness 차단).
 
@@ -36,14 +36,14 @@ metadata:
 > ⛔ Phase 0 (Work Dir Pre-flight) → Phase 5 (3중 검증: Serena // /fz-gpt review // /sc:analyze) → Phase 5.5 (/fz-gpt validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
 > 루프 프리미티브: Evaluator-Optimizer + Multi-Attempt Retry (H6, Inside the Scaffold)
 
-3중 검증(Claude+Codex+sc:analyze) + 역방향 검증 + Reflection Rate 정량화.
+3중 검증(Claude+GPT+sc:analyze) + 역방향 검증 + Reflection Rate 정량화.
 ⛔ **threshold gating은 `N≥10`에서만** — `N<10`은 `preliminary`(measurement only, verdict 보류)다. **정본 = `modules/cross-validation.md §Reflection Rate threshold`** (`:203` `N<10 → verdict 보류` · `:212` `N≥10에서만 ≥80% gating, N=0이면 vacuous pass`). 본 스킬은 정본을 인용하며 자체 임계를 정의하지 않는다.
 
-> 이론 근거: MAR — Multi-Agent Reflexion (arxiv 2512.20845) — **acting/diagnosing/critiquing/aggregating 역할 분리**가 단일 에이전트 self-review보다 정확도 높음. fz의 Claude(acting) + Codex(critiquing/diagnosing) + Lead(aggregating) 역할 분리와 구조적 정합.
+> 이론 근거: MAR — Multi-Agent Reflexion (arxiv 2512.20845) — **acting/diagnosing/critiquing/aggregating 역할 분리**가 단일 에이전트 self-review보다 정확도 높음. fz의 Claude(acting) + GPT(critiquing/diagnosing) + Lead(aggregating) 역할 분리와 구조적 정합.
 
 ```bash
 /fz-review "구현한 코드 리뷰해줘"     /fz-review "현재 Reflection Rate 얼마야?"
-/fz-review "Codex 피드백 반영, 재검증" /fz-review "Gate 5 통과 확인해줘"
+/fz-review "GPT 피드백 반영, 재검증" /fz-review "Gate 5 통과 확인해줘"
 ```
 
 ## Prerequisites
@@ -78,7 +78,7 @@ metadata:
 
 | Phase | sc: 명령어 | 용도 |
 |-------|-----------|------|
-| 5 | `/sc:analyze`, `/fz-gpt review`, `/sc:spec-panel` | 품질분석, Codex 리뷰, 스펙 패널 |
+| 5 | `/sc:analyze`, `/fz-gpt review`, `/sc:spec-panel` | 품질분석, GPT 리뷰, 스펙 패널 |
 | 5.5 | `/fz-gpt validate` | 역검증 |
 | 6 | `/sc:improve`, `/sc:cleanup`, `/sc:reflect` | 개선, 정리, 자체검증 |
 | 7 | `/sc:test` | 최종 테스트 검증 |
@@ -97,7 +97,7 @@ metadata:
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → SOLO 3중 검증 수행 + 사유 experiment-log 기록
-5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + Codex validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
+5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + GPT validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
 6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-review 테이블. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
 ### 티켓 폴더 컨텍스트 로딩 (티켓 폴더(WORK_DIR) 활성 시):
 - `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
@@ -179,7 +179,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 ```
 Phase 5: Cross-Review (5+2 검증)
 ├─ [병렬 1] Claude + Serena: 참조 무결성 검증
-├─ [병렬 2] → /fz-gpt review: Codex 코드 리뷰
+├─ [병렬 2] → /fz-gpt review: GPT 코드 리뷰
 ├─ [병렬 3] /sc:analyze: 정적 분석
 ├─ [병렬 4] L3 silent-failure-hunter: 에러 처리 스캔 (조건부 — modules/native-agents.md)
 └─ [병렬 5] L3 type-design-analyzer: 타입 설계 평가 (조건부 — modules/native-agents.md)
@@ -197,7 +197,7 @@ Grep → 변경 후 패턴 일관성
 mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분석 (요구사항별 충족 여부 단계별 검증)
 ```
 
-### ⛔ 검증 2: Codex 코드 리뷰 (필수 — 생략 금지)
+### ⛔ 검증 2: GPT 코드 리뷰 (필수 — 생략 금지)
 
 ```bash
 # 독립 스킬로 위임
@@ -209,9 +209,9 @@ fz-gpt가 수행하는 작업:
 - JSON 응답 파싱 → Issue Tracker 자동 기록
 - 이슈 요약 반환
 
-> **Codex 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=Fable 5) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ Codex 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
+> **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=Fable 5) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
 >
-> **⛔ retain cycle 점검 (rank3b, 2026-06-18 · 원장 `promotion-ledger.md` **P2-C** candidate `active=false`)**: fresh-context 검증자는 retain cycle 검사 시 `gpt-skills/fz-reviewer/SKILL.md` Memory Management(closures capturing `self` without `[weak self]`)를 명시 적용한다 — Codex 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
+> **⛔ retain cycle 점검 (rank3b, 2026-06-18 · 원장 `promotion-ledger.md` **P2-C** candidate `active=false`)**: fresh-context 검증자는 retain cycle 검사 시 `gpt-skills/fz-reviewer/SKILL.md` Memory Management(closures capturing `self` without `[weak self]`)를 명시 적용한다 — GPT 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
 > **보조 이종 소스 (rank6)**: PR이 열려 있으면 `/fz` pr-comment-review로 CodeRabbit 코멘트를 보조 이종 소스로 활용 가능 (강제 아닌 Lead 판단).
 
 ### 검증 3: SuperClaude 정적 분석
@@ -294,7 +294,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 ### Gate 4: Review Passed
 - [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 참조 무결성 확인? (Serena)
-- [ ] ⛔ Codex 리뷰 통과? (**Critical 0건 + Major는 결함(회귀·버그·영향범위)에 한해 차단** — ⛔ 구조 개선 제안은 major여도 **non-blocking**. `ReviewFindingsSchema`에 `origin`이 없어 기계 판별이 불가하므로 **Lead가 결함/개선을 판정**한다. 이 구분이 없으면 "제안"이 강제 수정이 된다. Codex 실행 자체는 필수)
+- [ ] ⛔ GPT 리뷰 통과? (**Critical 0건 + Major는 결함(회귀·버그·영향범위)에 한해 차단** — ⛔ 구조 개선 제안은 major여도 **non-blocking**. `ReviewFindingsSchema`에 `origin`이 없어 기계 판별이 불가하므로 **Lead가 결함/개선을 판정**한다. 이 구분이 없으면 "제안"이 강제 수정이 된다. GPT 실행 자체는 필수)
 - [ ] /sc:analyze 통과? (심각한 문제 없음)
 - [ ] Constraint Matrix Compliance 통과? (제약 매트릭스 부합, /fz-discover 산출물 있을 때)
 - [ ] Refactoring Completeness 통과? (deprecated dead code 없음)
@@ -345,7 +345,7 @@ python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --reverify {WORK_DIR}/gates/pl
 ### 반복 조건
 
 ```
-N (Codex 제기 이슈 수) >= 10 ?
+N (GPT 제기 이슈 수) >= 10 ?
 ├─ NO  → preliminary — Rate는 measurement only, verdict 보류 → Gate 5의 Rate 항목 N/A 처리
 └─ YES → Reflection Rate >= 80%?
          ├─ YES → Gate 5 통과 (완료)
@@ -400,7 +400,7 @@ Gate 5 통과 후:
 | Parameter Presence | {N} | {요약} |
 | Wrapper Scope Minimality | {N} | {요약} |
 | Default-Deny violation | {N} | {요약} |
-| Confident Error (cross-model 불일치) | {N} | Claude {판정} vs Codex {판정} |
+| Confident Error (cross-model 불일치) | {N} | Claude {판정} vs GPT {판정} |
 ```
 
 ---
@@ -410,7 +410,7 @@ Gate 5 통과 후:
 ```
 예시 1 — 리뷰 완료 보고:
   BAD:  "리뷰 완료. 문제 없음." → 근거 없음, Rate 없음
-  GOOD: 이슈 N개 + Reflection Rate: X/Y (ZZ%) + Codex 교차 검증 결과
+  GOOD: 이슈 N개 + Reflection Rate: X/Y (ZZ%) + GPT 교차 검증 결과
 
 예시 2 — Anti-Pattern 잔존 검증 (검증 4-F → 절차: modules/review-checks.md):
   BAD:  diff 삭제 라인만 확인 → "패턴 제거" 판정 (다른 파일에 잔존)
@@ -437,28 +437,28 @@ Gate 5 통과 후:
 | "팀원 PR 리뷰해줘" | NOT trigger | → fz-peer-review ('리뷰' 겹쳐도 팀원 PR은 범위 밖, '비사용:') |
 | "이 버그 직접 고쳐줘" | NOT trigger | → fz-fix (직접 수정, '비사용:') |
 | "이 기능 새로 구현해줘" | NOT trigger | → fz-code (대규모 구현, Will Not) |
-| "codex로 검증해줘" | NOT trigger | → fz-gpt ('검증' 겹쳐도 Codex 직접 호출은 Will Not) |
+| "codex로 검증해줘" | NOT trigger | → fz-gpt ('검증' 겹쳐도 GPT 직접 호출은 Will Not) |
 | "아키텍처 계획 세워줘" | NOT trigger | → fz-plan (계획 수립, Will Not) |
 
 ### Functional Test
 
 | Given | When | Then | type |
 |-------|------|------|------|
-| 구현된 코드 diff 존재 + Codex CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-gpt review` + `/sc:analyze`) 모두 실행(Codex 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
-| "그냥/가볍게" 신호 + 소규모 변경(5파일 미만 & 100 LOC 미만, 리팩토링/시그니처 변경 아님) | `/fz-review light "그냥 가볍게 봐줘"` | review-arch 단독 실행 + Codex 교차검증/Phase 5.5 역방향/Reflection Rate 추적 생략 + `review-light.md` 산출; 단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 적용(light에서도 생략 불가) | edge-case |
+| 구현된 코드 diff 존재 + Codex CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-gpt review` + `/sc:analyze`) 모두 실행(GPT 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
+| "그냥/가볍게" 신호 + 소규모 변경(5파일 미만 & 100 LOC 미만, 리팩토링/시그니처 변경 아님) | `/fz-review light "그냥 가볍게 봐줘"` | review-arch 단독 실행 + GPT 교차검증/Phase 5.5 역방향/Reflection Rate 추적 생략 + `review-light.md` 산출; 단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 적용(light에서도 생략 불가) | edge-case |
 | 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴 없음 + 브랜치명 없음 | `/fz-review "내 코드 봐줘"` | Phase 0에서 저장 여부 AskUserQuestion 발생 → '예' 시 `NOTASK-{YYYYMMDD}/` + index.md 생성 / '아니오' 시 Serena fallback → WORK_DIR 결정 → Gate 0(Work Dir Ready) 3개 항목 통과 | edge-case |
 | 코드 diff 존재 + 검증 2에서 fz-gpt 통신 실패 | `/fz-review "리뷰해줘"` | 재시도 1회 후 fresh-context Agent(review-correctness 관점)로 검증 2 대체 + 인용 태그 `[fresh-context: claude]` + 이종 안전망 상실 명시 (Agent 미가용 시 `/sc:analyze` 폴백); 검증 2 미생략 상태로 Gate 4 진행 | failure |
 
 ## Boundaries
 
-**Will**: 3중 검증(Claude+Codex+sc:analyze), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리
-**Will Not**: 대규모 구현 (→ /fz-code), Codex 직접 호출 (→ /fz-gpt), 계획 수립 (→ /fz-plan)
+**Will**: 3중 검증(Claude+GPT+sc:analyze), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리
+**Will Not**: 대규모 구현 (→ /fz-code), GPT 직접 호출 (→ /fz-gpt), 계획 수립 (→ /fz-plan)
 
 ### light 모드 (40차 simplified mode)
 
 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-review light "..."` 호출 시:
 - review-arch 단독 (review-quality 생략) — 아키텍처 적합성만 평가. ⛔ **구조 축은 Lead가 직접 적용** — light는 Workflow 미호출이라 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read)
-- Codex 교차 검증 생략 (3중 → 1중)
+- GPT 교차 검증 생략 (3중 → 1중)
 - 역방향 검증 (Phase 5.5) 생략
 - Reflection Rate 추적 생략
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)

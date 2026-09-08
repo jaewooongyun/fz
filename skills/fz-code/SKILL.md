@@ -123,7 +123,7 @@ metadata:
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead
    - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). ⛔ 여기서 사다리를 재정의하지 않는다
    - **code-pair 고유분만**: ① H5 크기 가드 — `split_required`/`splitSuggested` 시 Step 분할(과대 changeset scaffold collapse 방지) ② 재시도는 `buildFeedback` 포함 **새 invoke**(캐시 키 변경 → resume 비의존) ③ Stage1 null 재시도는 **1회 한정**·일시 장애 의심 시만
-7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + Codex 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
+7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
 8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → `experiment-log.md` §5.7 fz-code 테이블(**2026-07-10 시리즈 — 현행**; 2026-06-05 표는 사료). Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
 
 > 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰은 확산 판정 시 결정.
@@ -273,7 +273,7 @@ metadata:
    | SDK 래퍼 부분 분석 | 외부 SDK 객체의 `?.` 메서드 중 일부만 nil 동작 분석하고 나머지 건너뜀. "안전" 결론으로 추가 분석 중단 | 같은 객체의 모든 `?.` 메서드 nil 동작 + 서버 관점 전수 분석. 참조: `modules/lead-reasoning.md` §1.5 |
    | Task 내부 프로퍼티 쓰기 | `Task { }` 블록 내에서 `self.property = value`를 `MainActor.run` 밖에서 실행. 특히 리뷰어 조언으로 MainActor 범위를 줄일 때 순수 연산과 side effect를 분류하지 않고 함께 밖으로 이동 | 각 문장을 순수 연산(파싱, 변환)과 side effect(프로퍼티 할당, UI)로 분류. side effect는 소비자 스레드 확인 후 배치. 참조: `modules/lead-reasoning.md` §1.5 |
    | 핵심 시나리오 보류 | PR이 해결하려는 원래 문제(버그, 크래시)의 재현 시나리오 중 하나가 "다음 PR에서 수정"으로 보류됨. 특히 race condition 수정에서 경합 시나리오 일부만 해결 | PR 목표와 보류 시나리오를 대조. 원래 버그가 보류 시나리오에서 재현 가능하면 → 현재 PR에서 해결 필수 또는 AskUserQuestion |
-   | Redundant Import | 새 파일 작성 시 추가하는 각 `import {Module}` 문에 대해 그 모듈의 알려진 심볼이 파일 내에서 grep 0건 | 형제 파일 패턴 답습 의혹 (cargo-cult). 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과이며, 새 파일은 *자신의 사용 심볼*로 자체 정당화 필요. 검증: 새 파일 작성 후 각 import에 대해 `Grep("ModuleName\.\w+\|<known_typealias>")` 실행 → 0건이면 마찰 보고 (제거/유지 결정은 사용자/Codex 최종) |
+   | Redundant Import | 새 파일 작성 시 추가하는 각 `import {Module}` 문에 대해 그 모듈의 알려진 심볼이 파일 내에서 grep 0건 | 형제 파일 패턴 답습 의혹 (cargo-cult). 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과이며, 새 파일은 *자신의 사용 심볼*로 자체 정당화 필요. 검증: 새 파일 작성 후 각 import에 대해 `Grep("ModuleName\.\w+\|<known_typealias>")` 실행 → 0건이면 마찰 보고 (제거/유지 결정은 사용자/GPT 최종) |
    | Swift Naming 위반 *[candidate: 1 session evidence]* | Swift/iOS 프로젝트에서 새 helper/method/type 이름 또는 주석이 (a) 반환값 있는데 동사형 (b) `X or Y` 형태 (예: `appOrLog`, `getOrCreate`) (c) 부수 효과(log/persist/dispatch)를 이름에 포함 (d) `-ed/-ing` rule 위반 (mutating ↔ non-mutating 짝 부재) (e) 사용자 표현 어휘 무시 (f) 도메인 타입/메서드/주석에 API 버전(v2/v3)·transport 세부 박힘 (예: `WatchHistoryV3Response`·"v3" 주석) | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). Apple Swift API Design Guidelines 미준수 후보 시그널. 검증: 작성 *전* self-check — 축(a~e)는 helper/method 이름, 축(f)는 타입/주석까지(주석은 `Grep "[vV][0-9]"` 병행). 위반 시 noun phrase + 단일 의미로 재명명(`appOrLog`→`verifiedApp`), 축(f)는 버전 제거(오버로드로 공존). ⚠️ **evidence 분리**: 축(a~e)=OBS-06, 축(f)=OBS-11 (카운트 혼합 금지). 동기 편집: `modules/review-checks.md` 4-N. 참조: `Swift API Design Guidelines 교훈` + `도메인 심볼 API 버전 금지 교훈` + promotion-ledger L-8 |
    | 기존 인프라 미확인 helper/공용모델 *[candidate: 1 session evidence]* | (helper) 새 helper(포맷/변환/날짜·시간·숫자→문자열 류) 작성 *전* **공유 인프라 영역**(프로젝트 `CLAUDE.md` `## Shared Modules` 지정 — 미정의 시 리포 루트에서 공용 유틸 디렉토리 후보를 grep으로 탐색) grep/symbol search 미실행 · (공유 도메인 모델) 공유 개념 필드(라벨/배지/가격/등급 등 여러 화면이 공유하는 개념)를 DTO/Entity에 추가하며 형제의 flat 로컬 복사본을 쓰기 *전* **대표 소비자**가 그 개념을 어떤 공용 타입으로 쓰는지 grep 미실행 | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). 41차 Reuse-First가 *plan 시점*엔 발화하나 *code 시점*엔 무방비. ⚠️ 41차 신호는 **명명 기반**(`universal*/generic*/common*`)이라 `ContentLabelDTO`처럼 명명은 평범하나 실제 공용인 모델을 놓침 → **사용처 기반** 보강("대표 소비자가 이 개념을 어떤 타입으로 쓰나" grep). thought-terminator("그 공용 타입은 쓰기 불편/취약") 발생 시 실제 사용 경로(`.toEntity()` 등) 확인 후에만 기각. ⚠️ **evidence 분리**: helper=OBS-08(#3/#7), 공용모델=OBS-11(#10 — 카운트는 ledger L-2 판정, 현재 보류). memory-guide "same failure mode → merge"로 단일 신호 유지. 참조: `modules/promotion-ledger.md` L-2 |
    | **peer slot 비대칭 (post-state)** *[candidate: 1 session evidence]* | 편집한 라인이 **동종 슬롯 집합**(같은 `switch`의 case 절 · 리터럴 컬렉션 항목 · 구조체 초기화 목록 · 같은 레벨 분기 · enum 케이스별 값 테이블)에 속하는데, 편집 **후** 형제 슬롯과 **표현 방식이 어긋남** (상수 vs 리터럴 · 헬퍼 호출 vs 인라인 · 옵셔널 처리 · 네이밍). 예: `case .poster: Metric.posterHeight` / `case .meta: 15` / `case .mainBanner: Metric.mainBannerHeight` — 한 절만 리터럴 | **Candidate 마찰 신호** (memory-guide Lesson Intake — 5 sessions 관측 후 활성 결정). ⛔ **빌드·테스트가 원리적으로 못 잡는다**(문법 정상 + 값 동일) → 절차로만 검출. 검증: 편집 **직후** 그 슬롯 집합 전체를 Read하고 표현 방식 대조(같은 파일·같은 블록이라 비용 낮음). 불일치면 → 국소 되돌리기가 아니라 **전체를 보고 알맞은 형태 선택**. ⚠️ 표면 churn(*시간축* 2회+ 변경)과 별개 — 본 신호는 *공간축* 형제 비대칭. 근거: `guides/harness-engineering.md` §12 **R8-A**(delta-oracle vs post-state-oracle) + `promotion-ledger` L-13 |
@@ -352,7 +352,7 @@ metadata:
 
 8. **Issue Tracker에 빌드 이슈 기록** (실패 시)
 
-8.5. **⛔ Codex 교차 검증** (TEAM 모드 — 생략 금지):
+8.5. **⛔ GPT 교차 검증** (TEAM 모드 — 생략 금지):
    모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 실행한다.
    ```bash
    /fz-gpt check "구현 코드 교차 검증"
@@ -381,7 +381,7 @@ metadata:
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
 - [ ] SOLO + 3+ 파일 변경이면 `/sc:reflect` 실행했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
-- [ ] ⛔ Codex 교차 검증 완료? (TEAM 모드 — Lead가 /fz-gpt check 실행)
+- [ ] ⛔ GPT 교차 검증 완료? (TEAM 모드 — Lead가 /fz-gpt check 실행)
 
 ---
 
@@ -448,7 +448,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 |-------|------|------|------|
 | 승인된 `{WORK_DIR}/plan/plan-final.md`가 존재 | `/fz-code "검증된 계획대로 구현해줘"` | Plan의 모든 Step을 순차 구현 + 매 Step 빌드 성공 + Gate 3 체크리스트 전 항목 통과(모든 Step 완료·빌드 성공·아티팩트 기록 완료) | normal |
 | 구현 중 같은 대상에 switch/if/enum case 3개+ 발생 | Step N 구현 진행 | "분기 폭증" 마찰 신호를 보고 형식(신호/위치/현상/플랜 재검토)으로 출력 + 사용자 "계속" 응답 전까지 구현 진행 중단(무시 강행 없음) | edge-case |
-| Plan 존재 + 단일 파일/심볼 변경 + "가볍게" 신호 | `/fz-code light "이 변경만 빠르게 구현해줘"` | Plan 첫 Step(단일 변경)만 구현 + Codex 교차 검증 생략 + 매 Step 빌드 성공 유지 + `{WORK_DIR}/code/step-light.md` 산출 | edge-case |
+| Plan 존재 + 단일 파일/심볼 변경 + "가볍게" 신호 | `/fz-code light "이 변경만 빠르게 구현해줘"` | Plan 첫 Step(단일 변경)만 구현 + GPT 교차 검증 생략 + 매 Step 빌드 성공 유지 + `{WORK_DIR}/code/step-light.md` 산출 | edge-case |
 | Step 구현 중 컴파일 에러로 빌드 2회 연속 실패 | Step N 빌드 검증 | `/sc:troubleshoot --fix` 자동 트리거 후 재빌드, 반복 실패 시 `/ralph-loop` 래더로 에스컬레이션 — 빌드 성공 확인 전 다음 Step 진입 안 함(silent fail 없음) | failure |
 
 ## Boundaries
@@ -471,7 +471,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-code light "..."` 호출 시:
 - Step 1 (incremental, 단일 변경)만 실행 — Plan의 첫 Step 또는 가장 작은 단위
 - Stress Test / 마찰 감지 간소화 (분기 폭증 / 잔존 패턴만 유지)
-- Codex 교차 검증 생략 (TEAM 모드라도 light 우선)
+- GPT 교차 검증 생략 (TEAM 모드라도 light 우선)
 - 매 Step 후 빌드 검증은 유지 (build 안전성은 필수)
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
 - 산출물: `{WORK_DIR}/code/step-light.md` (간소화)

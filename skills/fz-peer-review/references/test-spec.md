@@ -12,7 +12,7 @@
 | "동료가 올린 PR 리뷰 부탁해" | trigger | intent-trigger `팀원\|PR.*리뷰` (동료=팀원) |
 | "내가 방금 작성한 코드 리뷰해줘" | NOT trigger | → fz-review (description '비사용: 자기 코드', Will Not '자기 코드 리뷰') |
 | "이 PR 변경 내용 해설해줘" | NOT trigger | → fz-pr-digest (description '비사용: PR 해설') |
-| "codex로 이 변경 교차검증해줘" | NOT trigger | → fz-gpt (Will Not 'Codex 위임 → /fz-gpt') |
+| "codex로 이 변경 교차검증해줘" | NOT trigger | → fz-gpt (Will Not 'GPT 위임 → /fz-gpt') |
 | "이 PR의 버그 직접 고쳐줘" | NOT trigger | → fz-fix (Will Not '코드를 직접 수정하지 않음, 리뷰만 수행') |
 
 ### Functional Test (Given/When/Then)
@@ -23,7 +23,7 @@
 | 변경 13줄 소규모 PR, `--tier` 미지정 | `/fz-peer-review 45` | Gate 5.5에서 auto Tier 0 결정 → `tier.txt == "0"` 기록 + **Workflow 미호출**(Lead 단독 분석 — `workflows/peer-review.js` invoke 0회) = pass | normal |
 | 지적 패턴이 base 브랜치에 이미 존재(`base-behavior.md`상 pre-existing), 에이전트가 `origin=pre-existing` 보고 | `/fz-peer-review 123` | Synthesize Origin 보정으로 해당 이슈 severity가 `suggestion`으로 cap + Confidence Matrix Origin 열 `P`(형태·생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9) + 리포트 `[기존 동작 동일]` 태그 부착 = pass | edge-case |
 | `gh auth status` 실패 | `/fz-peer-review 123` | git 폴백 경로(`git fetch upstream` + `git diff`)로 `${WORK_DIR}/diff.patch` 생성(비어있지 않음) → 리뷰 파이프라인 계속 진행 = pass | failure |
-| Tier 2 결정, Codex challenger 호출 실패 | `/fz-peer-review 123` | **3-렌즈**(review-arch + review-quality + review-correctness — `peer-review.js`의 Stage 1 `parallelWithRetry` 호출) 결과를 Codex 열 없이 `modules/peer-review-gates.md` § MergeContract § 9 **Tier 2 행** 산식대로 Lead 가 병합 → 최종 verdict 산출(리뷰 비중단) = pass. Confidence Matrix 산출 여부도 그 행이 정본 | failure |
+| Tier 2 결정, GPT challenger 호출 실패 | `/fz-peer-review 123` | **3-렌즈**(review-arch + review-quality + review-correctness — `peer-review.js`의 Stage 1 `parallelWithRetry` 호출) 결과를 GPT 열 없이 `modules/peer-review-gates.md` § MergeContract § 9 **Tier 2 행** 산식대로 Lead 가 병합 → 최종 verdict 산출(리뷰 비중단) = pass. Confidence Matrix 산출 여부도 그 행이 정본 | failure |
 | Tier 2 실행, 리포트에 전수·부정 주장 포함("사용처 0건") | `/fz-peer-review 123` | Synthesize §4에서 `cross-validation.md` §Coverage Gate Read 후 **전체 N / 분석 M 비율 보고** = pass (미보고면 fail) | normal |
 | Tier 3 실행, suggestion 등급 이슈 존재 | `/fz-peer-review 123 --deep` | 반환 `distribution.suggestion` 이 실제 suggestion 이슈 수와 일치 + log에 표기 = pass (H24 회귀 방어) | normal |
 | Tier 2/3 실행 | `/fz-peer-review 123` | `args.structuralContext` 가 전달되고 **arch 프롬프트에만** `[구조 축 — 이 렌즈 전용]` 이 포함 = pass. ⛔ `structuralLine` 이 조건부라 args 누락 시 **에러 없이 구조 축이 꺼진다** — quality/correctness 프롬프트에 포함되면 fail(결함 축 오염) | normal |

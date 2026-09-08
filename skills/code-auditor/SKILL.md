@@ -290,7 +290,7 @@ major 이상 이슈에는 suggestion에 "현재 vs 추천" 형식 사용:
 "현재: [코드 패턴 한 줄]\n추천: [대안 패턴 한 줄]\n근거: [이유]"
 ```
 
-⛔ severity major 이상의 대안 비교는 **`description` 안에** 인코딩한다 — `alternatives` 배열 필드는 `PeerReviewSchema`에 없다(과거 `peer_review_schema` 참조는 **Codex 전용 스키마 오참조**였다). 형식은 `arch-critic` §Alternative Design과 동일.
+⛔ severity major 이상의 대안 비교는 **`description` 안에** 인코딩한다 — `alternatives` 배열 필드는 `PeerReviewSchema`에 없다(과거 `peer_review_schema` 참조는 **GPT 전용 스키마 오참조**였다). 형식은 `arch-critic` §Alternative Design과 동일.
 
 ---
 
