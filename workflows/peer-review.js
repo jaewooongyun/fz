@@ -7,7 +7,7 @@
 //       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext? } })
 //   reviewSurfacePatchPath: gather 가 만든 `review-surface.patch`(중복 커밋 제외분). 있으면 **이것이 1차 리뷰 대상**이 되고
 //     `diffPath` 는 부풀림 확인용 보조로 내려간다. ⛔ 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없다 —
-//     진단 파일만 넘기면 무력하다(Codex 리뷰 지적, 2026-09-01).
+//     진단 파일만 넘기면 무력하다(GPT 리뷰 지적, 2026-09-01).
 //   reviewSurfacePath: `review-surface.md`(진단 산문). patch 와 함께 넘기면 렌즈가 부풀림 규모를 안다.
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality/correctness는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
@@ -18,7 +18,7 @@
 //                  strengthChallenges, distribution, metrics }  또는 { mode:'fallback', reason, metrics }.
 //     ⛔ `counter` 키는 없다 — counter DA 산출은 `strengthChallenges`로 반환된다.
 //   Workflow 외부(Lead 책임 유지): Confidence Matrix 계산(독립성 가중=판단) / origin severity 보정 /
-//     Codex DA(스크립트 밖 — Lead가 /fz-gpt, cross-provider 스폰 금지 — 마이그레이션 결정) / dedup+투표 / wall-clock.
+//     GPT DA(스크립트 밖 — Lead가 /fz-gpt, cross-provider 스폰 금지 — 마이그레이션 결정) / dedup+투표 / wall-clock.
 //   base 원본은 Lead가 Gather에서 prefetch하여 basePath로 전달 (LB1 — 에이전트가 SendMessage로 요청하지 않음).
 //   budget 가드: 해당 없음 — 고정 3(Tier2)/6(Tier3) call (가변 fan-out 없음). §12 거버넌스 단서.
 

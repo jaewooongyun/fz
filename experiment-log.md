@@ -83,10 +83,10 @@
 ```yaml
 session: <session-id>
 date: YYYY-MM-DD
-codex_unique_findings: <int>      # Codex만 catch한 critical/major findings
+gpt_unique_findings: <int>        # GPT만 catch한 critical/major findings
 claude_unique_findings: <int>     # Claude self-review만 catch한 findings  
 convergent_findings: <int>        # 양측 일치 findings
-total_findings: <int>             # codex_unique + claude_unique + convergent
+total_findings: <int>             # gpt_unique + claude_unique + convergent
 ```
 
 > 목적: Cross-model verify 가치를 정량 evidence로 누적. 본 세션(2026-04-25 codex-utilization)에서 Codex unique 2건 (Step 1 readback, codex-strategy 충돌) 발견 — 활용 가치 정당화.

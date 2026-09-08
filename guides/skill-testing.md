@@ -122,7 +122,7 @@
 | 사용자 개입 불필요 | 정상 케이스에서 추가 질문 없이 완료 |
 | 세션 간 일관성 | 동일 입력에 대해 3회 실행 시 동일 결과 구조 |
 | 올바른 스킬 위임 | Will Not 영역 요청 시 정확한 대안 스킬 안내 |
-| Codex 검증 일관성 | fz-gpt 교차검증 결과와 fz-review 결과 일치도 ≥80% |
+| GPT 검증 일관성 | fz-gpt 교차검증 결과와 fz-review 결과 일치도 ≥80% |
 
 ---
 
@@ -219,7 +219,7 @@ test-spec:
     failure-rate: "≤10%"
 ```
 
-### Codex 스킬 테스트 스펙 예시
+### GPT 스킬 테스트 스펙 예시
 
 ```yaml
 test-spec:
@@ -272,7 +272,7 @@ test-spec:
 3. Performance Comparison 실행
    → 개선 미달 → 스킬 구조 재검토
 
-4. Codex 교차검증 (fz-gpt 대상 스킬인 경우)
+4. GPT 교차검증 (fz-gpt 대상 스킬인 경우)
    → /fz-gpt verify로 스킬 로직 독립 검증
 ```
 
@@ -493,7 +493,7 @@ python3 scripts/fz_snapshot.py --diff                                           
 - 스킬 작성법: `guides/skill-authoring.md`
 - 트러블슈팅: `guides/skill-troubleshooting.md`
 - 프롬프트 최적화: `guides/prompt-optimization.md`
-- Codex 교차검증: `skills/fz-gpt/SKILL.md`
+- GPT 교차검증: `skills/fz-gpt/SKILL.md`
 - 스킬 품질 평가: `/fz-skill eval` (`skills/fz-skill/SKILL.md`)
 - 일괄 벤치마크: `/fz-manage benchmark` (`skills/fz-manage/SKILL.md`)
 - Anthropic 공식 평가: `/skill-creator` (Eval/Improve/Benchmark 모드)

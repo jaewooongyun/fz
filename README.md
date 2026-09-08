@@ -50,9 +50,9 @@ Codex CLI 를 쓰면 네이티브 스킬을 심볼릭으로 연결한다.
 bash ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/setup-gpt-skills.sh
 ```
 
-⛔ Codex 모델·버전 하한은 README 가 고정하지 않는다 — `/fz-gpt` 가 `~/.codex/config.toml` 의 `model` 을 SSOT 로 위임한다(구버전이면 에러 대응표가 업데이트를 권고).
+⛔ GPT 모델·버전 하한은 README 가 고정하지 않는다 — `/fz-gpt` 가 `~/.codex/config.toml` 의 `model` 을 SSOT 로 위임한다(구버전이면 에러 대응표가 업데이트를 권고).
 
-> **표의 수치** — **사용처** = 스킬 22개 중 그 도구의 *호출*이 있는 파일 수(MCP 는 `mcp__…`, Codex 는 `fz-gpt`, SuperClaude 는 `sc:` 로 센다). 언급만 된 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. **폴백** = 각 스킬 `## 에러 대응` 표에 대체 경로가 적힌 스킬 수.
+> **표의 수치** — **사용처** = 스킬 22개 중 그 도구의 *호출*이 있는 파일 수(MCP 는 `mcp__…`, GPT 는 `fz-gpt`, SuperClaude 는 `sc:` 로 센다). 언급만 된 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. **폴백** = 각 스킬 `## 에러 대응` 표에 대체 경로가 적힌 스킬 수.
 
 ### 업데이트
 
@@ -75,7 +75,7 @@ claude plugin update fz@fz-orchestrator
 | **개발** | `/fz-plan` | 요구사항 분석 + 영향 범위 + RTM |
 | | `/fz-code` | 계획 기반 점진적 구현 + 빌드 검증 |
 | | `/fz-fix` | 버그 수정 (4-Phase 디버깅) |
-| | `/fz-review` | 3중 검증 (Claude + Codex + sc:analyze) |
+| | `/fz-review` | 3중 검증 (Claude + GPT + sc:analyze) |
 | | `/fz-commit`, `/fz-pr` | 커밋 + Fork 기반 PR |
 | | `/fz-rebase` | 리베이스 조용한 유실 게이트 (경로 단위 배타 분할 + prepush 원격 실측) |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
@@ -112,7 +112,7 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 | **review-to-ship** | "리뷰하고 커밋" | fz-review → fz-commit → fz-pr |
 | **full-cycle** | "처음부터 끝까지" | fz-plan → fz-code → fz-review → fz-commit → fz-pr |
 
-체인 칸에는 스킬만 적었다. 빌드와 Codex 교차 검증 게이트는 파이프라인마다 자동으로 끼워 넣으므로 여기 나오지 않는다 — 어느 지점에 무엇이 들어가는지는 `modules/pipelines.md` 각 항목의 `게이트` 행에 있다.
+체인 칸에는 스킬만 적었다. 빌드와 GPT 교차 검증 게이트는 파이프라인마다 자동으로 끼워 넣으므로 여기 나오지 않는다 — 어느 지점에 무엇이 들어가는지는 `modules/pipelines.md` 각 항목의 `게이트` 행에 있다.
 
 전체 19개: `modules/pipelines.md`
 

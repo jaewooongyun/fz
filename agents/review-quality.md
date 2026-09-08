@@ -69,7 +69,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - 새로 추가된 `import X`에 대해 X 모듈의 알려진 심볼이 파일에서 사용되는가? (`modules/review-checks.md` 검증 4-E 항목 7 *추가 방향* 양방향 Symbol Coverage)
 - 0건이면 → "redundant_import" 이슈 (severity: **minor**) 보고
 - false positive 가능성 인지: typealias 간접 참조, 타입 추론에 의한 Module 의존, generic constraint 등
-- 판정: agree(removal) / maintain(retain) — 사용자/Codex 최종
+- 판정: agree(removal) / maintain(retain) — 사용자/GPT 최종
 - 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과. 새 파일은 자체 정당화 필요. cargo-cult 패턴(문화로서 답습되는 *맥락 분리된* 패턴 모방) 차단
 
 ## Output Format

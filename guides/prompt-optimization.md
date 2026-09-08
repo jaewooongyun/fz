@@ -294,7 +294,7 @@ Output: 빈 배열 []은 정상 응답. 404와 구분 필요 → /src/api/errorH
 BAD:  "코드를 작성하라"
 BAD:  "코드를 작성하고 스스로 리뷰하라" → self-evaluation은 unreliable (Anthropic 2026-03)
 GOOD: "코드를 작성하라. 완료 후 typecheck를 실행하고, 실패 시 수정하라. 3회 반복 후에도 실패하면 보고하라."
-BEST: "코드를 작성하라. Codex로 교차 검증 후, 불일치 시 수정. 3회 반복 후 에스컬레이션."
+BEST: "코드를 작성하라. GPT로 교차 검증 후, 불일치 시 수정. 3회 반복 후 에스컬레이션."
 ```
 
 ---
@@ -320,7 +320,7 @@ Fallback:   대안 도구 (Primary 실패 시 사용)
 
 ### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
-**근거:** Anthropic Claude 4 Best Practices + **Fable 5는 짧은 지시로 대부분 행동을 조향할 수 있다** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]. 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — Codex 측 동일 가드.) ⚠️ 2026-09-06 정정: 이전 근거였던 "Opus 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
+**근거:** Anthropic Claude 4 Best Practices + **Fable 5는 짧은 지시로 대부분 행동을 조향할 수 있다** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]. 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — GPT 측 동일 가드.) ⚠️ 2026-09-06 정정: 이전 근거였던 "Opus 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
 
 > **항목별 범위 명시 원칙**: broad 규칙은 적용 범위를 항목별로 명시하라. [이유] 범위가 명시된 지시가 더 정확히 적용된다. [GOOD] "verify each step, not just the first"  [BAD] "verify the step" (범위 모호). 메모리 8/13/18차(silent disappearance) 증상과 정합하는 일반 원칙 — 모델 버전 무관.
 
@@ -445,18 +445,18 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 
 ### 측정 (Measurement)
 
-**Reflection Rate**: Codex가 제기한 이슈 N개 중 Claude가 수정 반영한 수 / N × 100%
+**Reflection Rate**: GPT가 제기한 이슈 N개 중 Claude가 수정 반영한 수 / N × 100%
 - Gate: ≥80% (TEAM review). SOLO는 추적 없음.
 - 정량 계산식이 있어야 "얼마나 잘 반영했는가"를 측정할 수 있다.
 
 **체크리스트:**
-- [ ] Codex 교차검증 결과에 이슈 수와 반영 수가 명시되어 있는가?
+- [ ] GPT 교차검증 결과에 이슈 수와 반영 수가 명시되어 있는가?
 - [ ] Reflection Rate가 Gate 조건으로 적용되고 있는가?
 
 ### 강제 (Enforcement)
 
 **Gate 절차적 강제**: 검증 게이트는 "권고"가 아닌 **절차적 강제**. 스킵 불가.
-- build, codex check, stress-test, Reflection Rate — 각각 스킵 조건이 정의됨
+- build, gpt check, stress-test, Reflection Rate — 각각 스킵 조건이 정의됨
 - Gate 실패 시 해당 단계를 "완료"로 표시할 수 없다
 
 **Evaluator-Optimizer 패턴**: fz-plan stress-test에서 Critical 리스크 2개+ 발견 시 자동 재작성 (최대 2회).
@@ -547,7 +547,7 @@ GOOD: head_limit 설정 + 필요한 파일만 선별 Read
 ```
 
 **B. 중간 데이터 격리** — "결과만 context에, 과정은 파일로"
-- Codex 결과: `-o` 옵션으로 파일 출력 (티켓 폴더 또는 WORK_DIR)
+- GPT 결과: `-o` 옵션으로 파일 출력 (티켓 폴더 또는 WORK_DIR)
 - 에이전트 분석 결과: JSON 파일로 저장 후 Lead가 Read
 - 긴 diff/심볼 데이터: 파일로 저장 후 참조
 
@@ -636,8 +636,8 @@ GOOD: "이 실패가 반복되는가?" → Yes: 원칙+이유 1줄 → No: 일�
 같은 모델이 생성하고 같은 모델이 평가하면 동일한 맹점을 공유한다. Planner/Generator/Evaluator 3-agent GAN 패턴에서 독립 Evaluator가 self-grading 대비 유의미하게 높은 정확도를 보임.
 
 fz 적용:
-- Claude(생성) + Codex/GPT(검증)의 cross-model 패턴이 이 원칙의 직접 구현
-- `/fz-review`의 3중 검증(Claude + Codex + sc:analyze)이 Evaluator 다양성 확보
+- Claude(생성) + GPT/GPT(검증)의 cross-model 패턴이 이 원칙의 직접 구현
+- `/fz-review`의 3중 검증(Claude + GPT + sc:analyze)이 Evaluator 다양성 확보
 - SOLO 모드에서도 `/sc:reflect`가 최소한의 self-check를 제공하지만, TEAM의 cross-model이 더 신뢰성 높음
 
 ### 원칙 H3: Context reset + structured handoff > compaction

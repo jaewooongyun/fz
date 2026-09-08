@@ -47,7 +47,7 @@ Primary code implementer. Implements code step by step based on plans, writes te
 ⛔ **디스크가 아니라 자기 `newBody`를 검사한다** — 나는 changeset만 반환하므로 새 파일이 파일시스템에 없다.
 1. 작성한 `newBody` 문자열 안에서 각 `import {Module}` 문에 대해, 그 모듈의 알려진 심볼(`ModuleName.멤버` 또는 알려진 typealias)이 **같은 newBody에 등장하는지** 확인
 2. 0건이면 → changeset의 `openQuestions`(또는 마찰 보고 필드)에 "Redundant Import" 신호로 **명시 반환** (`fz-code/SKILL.md` 마찰 신호 카탈로그)
-3. **디스크 대조가 필요한 판정은 Lead 소관**: 형제 파일의 실제 사용처·typealias 간접 참조는 changeset 적용 후 Lead가 `Grep`으로 확인한다. 제거/유지 최종 판정은 사용자/Codex
+3. **디스크 대조가 필요한 판정은 Lead 소관**: 형제 파일의 실제 사용처·typealias 간접 참조는 changeset 적용 후 Lead가 `Grep`으로 확인한다. 제거/유지 최종 판정은 사용자/GPT
 
 > 정정 근거(2026-08-09 외부 감사 ISSUE-012): 이전 절차는 "새 파일 작성 후 `Grep` 실행"을 지시했다 — 쓰기 도구 제거(2026-08-09) 후에는 **새 파일이 디스크에 존재하지 않아 수행 자체가 불가능**했다.
 
