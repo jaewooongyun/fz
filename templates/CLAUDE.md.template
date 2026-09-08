@@ -41,7 +41,7 @@
 |------|--------|------|
 | (Codex CLI 등) | (실행 명령) | (교차 검증 등) |
 
-## Codex Skills (선택 — Codex CLI 사용 시)
+## GPT Skills (선택 — Codex CLI 사용 시)
 | 역할 | 스킬명 |
 |------|--------|
 | reviewer | (스킬명) |

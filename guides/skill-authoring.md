@@ -497,7 +497,7 @@ fz-gpt는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --output-
 | 데이터 형식 검증 | `scripts/validate.py --input {file}` |
 | 빌드 결과 파싱 | `scripts/parse_build_log.sh` |
 | 패턴 검증 (Anti-Pattern Constraints) | `scripts/check_patterns.sh` |
-| Codex 응답 스키마 검증 | `schemas/gpt_review_schema.json` |
+| GPT 응답 스키마 검증 | `schemas/gpt_review_schema.json` |
 
 ### scripts/ 디렉토리 규칙
 

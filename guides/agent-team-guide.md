@@ -97,7 +97,7 @@ await agent(prompt, { agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh
 - **동종 모델 cross-verify** (search-symbolic ↔ search-pattern 양쪽 sonnet, review-arch ↔ review-quality 양쪽 opus 등):
   - **Headline Reflection Rate에서 제외**
   - 이유: 같은 모델은 같은 지식 갭 공유 → false high reflection rate 방지
-- **이종 모델 cross-verify** (Claude ↔ Codex/GPT, sonnet ↔ opus):
+- **이종 모델 cross-verify** (Claude ↔ GPT/GPT, sonnet ↔ opus):
   - Headline Reflection Rate에 포함 (full credit, weight 1.0)
 
 **Auxiliary Weighted Rate (별도 보고)**:
@@ -196,7 +196,7 @@ GOOD (Mesh / Peer-to-Peer):
 1. **퍼실리테이터**: 문제 전파, 컨텍스트 공유, 작업 시작 지시
 2. **모니터링**: 에이전트 진행 상황 추적
 3. **중재**: 교착 상태 해소 (3라운드 초과 시 개입)
-4. **게이트 실행**: 빌드 검증, Codex 검증 등 Lead-only 작업
+4. **게이트 실행**: 빌드 검증, GPT 검증 등 Lead-only 작업
 5. **사용자 소통**: 결과 보고, 승인 요청
 
 ### Lead가 하지 않는 것
@@ -268,32 +268,32 @@ Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워�
 
 ---
 
-## 5. Codex 통합
+## 5. GPT 통합
 
 ### cross-model 상호검증 원칙
 
 - 모든 TEAM 구성에 Codex CLI가 포함된다.
-- **Lead가 직접** `/fz-gpt`를 실행한다 (에이전트가 Codex를 직접 호출하지 않음).
-- Claude (opus/sonnet) + Codex (다른 모델)의 교차 검증으로 blind spot을 보완한다.
+- **Lead가 직접** `/fz-gpt`를 실행한다 (에이전트가 GPT를 직접 호출하지 않음).
+- Claude (opus/sonnet) + GPT (다른 모델)의 교차 검증으로 blind spot을 보완한다.
 
 ### 검증 게이트 삽입 위치
 
-| 시점 | Codex 명령 | 대상 |
+| 시점 | GPT 명령 | 대상 |
 |------|-----------|------|
 | plan 완료 후 | `/fz-gpt verify` | 설계 검증: 제약 위반, 누락 확인 |
 | code 완료 후 | `/fz-gpt check` | 코드 검증: 구현 품질, 패턴 준수 |
 | commit 전 | `/fz-gpt check` | 최종 검증: 빌드 가능성, 회귀 위험 |
 
-### Codex 결과 처리 흐름
+### GPT 결과 처리 흐름
 
 ```
-Lead --> /fz-gpt verify --> Codex 결과 수신
+Lead --> /fz-gpt verify --> GPT 결과 수신
   결과가 PASS --> 다음 단계 진행
   결과가 FAIL --> Lead가 buildFeedback 포함해 해당 Step 재invoke (⛔ SendMessage 아님)
     --> 수정 후 재검증
 ```
 
-Codex 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 사용자에게 보고한다.
+GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 사용자에게 보고한다.
 
 ---
 
@@ -475,7 +475,7 @@ isolation: worktree
 
 팀 구성 (⛔ 역사 — 현행은 workflows/*.js agent()):
   1. (구) TeamCreate("{skill}-{feature}")
-  2. Lead(fable) + Primary(opus) + 실질 워커(opus, 동시 ≤3) + 단순 워커(sonnet) + Codex
+  2. Lead(fable) + Primary(opus) + 실질 워커(opus, 동시 ≤3) + 단순 워커(sonnet) + GPT
   3. (구) Mesh topology — 현행 Workflow는 P2P 없음
   4. Lead = 퍼실리테이터/게이트/중재자
 

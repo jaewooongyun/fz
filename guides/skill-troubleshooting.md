@@ -214,7 +214,7 @@ User prompt에 추가:
 | 위반 | 원인 | 대응 |
 |------|------|------|
 | 동조 수렴 (모든 에이전트 동일 의견) | Round 1 독립성 미준수 | Task Brief에 "Round 1: 다른 에이전트 초안 참조 금지" 명시 |
-| **동종 모델 맹점** (3/3 동일 모델이 동일 이슈 미탐지) | 같은 모델은 같은 지식 갭 공유 | Codex(이종 모델) cross-validation 필수. "diff에 부재가 나타나지 않는" 패턴(상속 체인, optional DI, willSet 연쇄)에서 발생. PR#3478 교훈 참조 |
+| **동종 모델 맹점** (3/3 동일 모델이 동일 이슈 미탐지) | 같은 모델은 같은 지식 갭 공유 | GPT(이종 모델) cross-validation 필수. "diff에 부재가 나타나지 않는" 패턴(상속 체인, optional DI, willSet 연쇄)에서 발생. PR#3478 교훈 참조 |
 | Gate 스킵 | Lead가 Gate를 "선택"으로 인식 | cross-validation.md Gate 절차적 강제 참조 |
 | 합의/불합의 미보고 | Round 0.5 규칙 누락 | Task Brief에 "[합의]/[불합의] 마커 필수" 포함 |
 | Task Brief 미구조화 | 역할/목표/제약 모호 | 5요소 형식 적용: [Role] [Context] [Goal] [Constraints] [Deliverable] |
@@ -229,7 +229,7 @@ User prompt에 추가:
 | `codex review` 네트워크 에러 | `codex exec` + diff 인라인 | 수동 리뷰 |
 | `--output-schema` 파싱 실패 | 스키마 검증 | Claude 직접 파싱 |
 | 3-Tier 스킬 디스커버리 실패 | Tier 순차 폴백 | 인라인 프롬프트 (Tier 3) |
-| Codex 응답 토큰 제한 초과 | diff 분할 전략 (Medium/Large) | 핵심 파일만 리뷰 |
+| GPT 응답 토큰 제한 초과 | diff 분할 전략 (Medium/Large) | 핵심 파일만 리뷰 |
 
 ---
 
@@ -288,5 +288,5 @@ User prompt에 추가:
 - 테스트 방법론: `guides/skill-testing.md`
 - 스킬 작성법: `guides/skill-authoring.md`
 - 프롬프트 최적화: `guides/prompt-optimization.md`
-- Codex 교차검증: `skills/fz-gpt/SKILL.md`
+- GPT 교차검증: `skills/fz-gpt/SKILL.md`
 - 건강 체크: `/fz-manage check`

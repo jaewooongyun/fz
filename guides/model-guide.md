@@ -290,7 +290,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 ### 점검 항목 (후속 작업 후보)
 
 - [x] fz 스킬/모듈 중 "사고 과정·추론을 출력하라" 류 지시 전수 grep → `reasoning_extraction` refusal 위험 평가 — **실측 0건** (2026-06-12, skills/·modules/·agents/·workflows/ 전수. `reasoning`/`사고` 매치는 전부 추론 품질·모듈명 등 정상 용법)
-- [ ] Fable 세션에서 fz-review self-review 품질 재측정 → Codex cross-model 의존도 재조정 (단, 이종 blind-spot 안전망 자체는 유지 — 15차/23차). **→ 본 감사의 P1 sweep에 연결**: 짝 비교 절차는 `modules/peer-review-tiers.md:225-227`
+- [ ] Fable 세션에서 fz-review self-review 품질 재측정 → GPT cross-model 의존도 재조정 (단, 이종 blind-spot 안전망 자체는 유지 — 15차/23차). **→ 본 감사의 P1 sweep에 연결**: 짝 비교 절차는 `modules/peer-review-tiers.md:225-227`
 - [ ] **P1 effort sweep (신설)** — 36콜 `xhigh` ↔ `high` 짝 비교. 공식 근거 "Re-run the sweep even if you already ran one on Claude Fable 5". ⛔ 결과 전까지 하향 금지
 - [ ] **Compaction 임계 재측정 (신설)** — `skills/fz/SKILL.md:338` 4스텝+ `/compact` 안내가 캐시 읽기 $0.25 하에서 적정한지
 - [x] `/model` effort 세션 지속성 실측 — **해소** (2026-07-05 `/model` 피커 stdout 실측). ⚠️ 현행 값은 `xhigh` (2026-09-06)

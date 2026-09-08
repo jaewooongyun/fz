@@ -1,7 +1,7 @@
 # Design: Lessons-to-Module Pipeline
 
 > **Status**: **Active (Partial)** — Pilot dogfood 완료 (2026-05-26, `~/dev/TVING/fz-meta-2026-05-26/p6-dogfood-result.md` 참조). Parser/Scorer 작동 ✓ 하지만 한국어 키워드 매칭 한계 + 12 필드 중 5 누락 → Parser 개선 후속 필요. 다음 세션 첫 항목으로 *Parser 개선* 고정.
-> **Author**: Claude (fz-plan / fz-code cycle, 2026-04-24) + 2026-05-26 Active 전환 (Codex MUST 4 + 사용자 메타 분석)
+> **Author**: Claude (fz-plan / fz-code cycle, 2026-04-24) + 2026-05-26 Active 전환 (GPT MUST 4 + 사용자 메타 분석)
 > **Source**: MEMORY.md 17차 (Pre-Gate Failure + Reflection Gap) + 18차 (Scope Inflation Defense)
 > **Scope**: 설계 + 부분 작동 — 본 문서의 §4.4 Scope Inflation Detector가 *Priority 5 (Scope Drift Monitor)와 통합* (아래 §9 참조).
 
@@ -172,12 +172,12 @@ Plan v{N}에서 v{N+1}로 진화할 때 복잡도 5차원(Scope/Depth/Risk/Novel
 
 ## 9. Priority 5 (Scope Drift Monitor) 통합 결정 — 2026-05-26 (review-arch MUST-2)
 
-> **출처**: `~/dev/TVING/fz-meta-2026-05-26/arch-review.md` MUST-2 + `codex-verdict.md` §5 MUST-2 (review-arch와 Codex 합의)
+> **출처**: `~/dev/TVING/fz-meta-2026-05-26/arch-review.md` MUST-2 + `codex-verdict.md` §5 MUST-2 (review-arch와 GPT 합의)
 
 ### 문제
 
 세 곳에서 동일 기능 (Scope Inflation 감지) 중복 위험:
-1. `modules/scope-challenge.md` (Phase 3 Codex 이슈 분류 전용, 현존)
+1. `modules/scope-challenge.md` (Phase 3 GPT 이슈 분류 전용, 현존)
 2. **본 문서 §4.4 Scope Inflation Detector** (Draft, Priority 6 활성화 시)
 3. 신규 `modules/scope-drift-monitor.md` (Priority 5 제안)
 
@@ -203,9 +203,9 @@ Plan v{N}에서 v{N+1}로 진화할 때 복잡도 5차원(Scope/Depth/Risk/Novel
 
 ### Cross-validation
 
-- review-arch MUST-2 ↔ Codex 검증 §5 MUST-2 *합의*
+- review-arch MUST-2 ↔ GPT 검증 §5 MUST-2 *합의*
 - review-arch는 "통합 결정 기록 필수" 명시 (~/dev/TVING/fz-meta-2026-05-26/arch-review.md)
-- Codex는 "통합 결정 후 신규 모듈 *생성 금지*" 명시 (~/dev/TVING/fz-meta-2026-05-26/codex-verdict.md §5)
+- GPT는 "통합 결정 후 신규 모듈 *생성 금지*" 명시 (~/dev/TVING/fz-meta-2026-05-26/codex-verdict.md §5)
 - 본 §9가 양측 권고를 *기존 파일 안에* 통합 (메모리 36차 + Surgical Changes 준수)
 - **대안 3**: 완전 자동 + 자동 Edit
   - 거부 사유: 실수 발생 시 되돌리기 어려움, 18차 Scope Inflation 위험

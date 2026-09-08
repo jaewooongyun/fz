@@ -38,7 +38,7 @@ APPROVED: yes
 
 | 시점 | 하는 일 |
 |------|--------|
-| `/fz-plan` | 계획의 Step 에서 원장을 만들고, Codex 판정을 받아 확정 |
+| `/fz-plan` | 계획의 Step 에서 원장을 만들고, GPT 판정을 받아 확정 |
 | `/fz-code` | Step 완료 선언 전에 그 Step 게이트만 실행. 실패하면 다음 Step 으로 안 간다 |
 | `/fz-review` | 기록된 증거를 믿지 않고 다시 돌린다. 통과 못 하면 체크를 푼다 |
 | 세션 종료 | 미충족 원장이 있으면 종료를 막는다 (hook 설치한 머신만) |
@@ -191,7 +191,7 @@ export FZ_GATES_LEDGER=/path/to/ASD-1234/gates/plan.md    # 여러 개는 : 로 
 
 ⛔ 암호학적 위조 방지는 아니다. 알고리즘이 공개돼 있어 작정하면 재계산할 수 있다. 막는 것은 실수로 생기는 통과다.
 
-승인 도장(`APPROVED_ORACLE_HASH`)은 Codex 가 "이 `CHECK` 가 제목이 말하는 것을 재는가"를 판정한 뒤 `--finalize` 가 찍는다. 그 뒤 `CHECK`·`EXPECT`·`CWD`·`TIMEOUT`·`CRITERION`·제목 중 하나라도 바뀌면 실행이 거부된다.
+승인 도장(`APPROVED_ORACLE_HASH`)은 GPT 가 "이 `CHECK` 가 제목이 말하는 것을 재는가"를 판정한 뒤 `--finalize` 가 찍는다. 그 뒤 `CHECK`·`EXPECT`·`CWD`·`TIMEOUT`·`CRITERION`·제목 중 하나라도 바뀌면 실행이 거부된다.
 
 상세는 `modules/gates.md` 를 본다.
 

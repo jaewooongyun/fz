@@ -165,7 +165,7 @@ GOOD: 도구 자체가 스키마에 없음 → 에이전트가 존재를 모르�
 
 **Lazy Tool Discovery**: MCP 도구를 사전에 모두 로드하지 않고 필요할 때만 발견한다. 프롬프트 버짓 절약 + 불필요한 도구 노출 방지.
 
-> 업계·학술 수렴 (2026-07 추가): intent 기반 동적 툴 검색이 대규모에서 실증 — "7,471 툴에서 full-corpus schema 노출 99.8% 감소" [외부: harness-paper §4-G, SING arXiv 2606.16591 — 대규모 세팅 결과, fz 규모(수십)엔 방향 지지로만]. OpenAI Codex도 MCP 툴검색 기본화 [외부: harness-paper §4-K]. 스킬/MCP 30+ 임계 초과 시 intent 동적 검색 전환 검토 — 임계 도달 전 구현 금지(원칙 1).
+> 업계·학술 수렴 (2026-07 추가): intent 기반 동적 툴 검색이 대규모에서 실증 — "7,471 툴에서 full-corpus schema 노출 99.8% 감소" [외부: harness-paper §4-G, SING arXiv 2606.16591 — 대규모 세팅 결과, fz 규모(수십)엔 방향 지지로만]. OpenAI GPT도 MCP 툴검색 기본화 [외부: harness-paper §4-K]. 스킬/MCP 30+ 임계 초과 시 intent 동적 검색 전환 검토 — 임계 도달 전 구현 금지(원칙 1).
 
 ### 기둥 2: Guardrails & Safety (안전 제약)
 
@@ -610,7 +610,7 @@ QA가 발견한 개선 사항:
 ```bash
 /harness-work breezing all                    # 계획 리뷰 + 병렬 구현
 /harness-work breezing --no-discuss all       # 계획 리뷰 스킵, 바로 구현
-/harness-work breezing --codex all            # Codex 엔진에 위임
+/harness-work breezing --gpt all            # GPT 엔진에 위임
 ```
 
 **2-Agent 모드 (Cursor 연동)**:
@@ -737,7 +737,7 @@ Level 2 (권장): Generator ≠ Evaluator (별도 프롬프트 + 채점 기준)
 
 Level 3 (강력): Generator ≠ Evaluator + 다른 모델
   장점: 이종 모델 blind spot 보완. 단점: 비용 + 통합 복잡도.
-  예: fz의 Cross-model Verification (Claude + Codex). cross-provider 확장 (Gemini 등)은 측정 데이터 누적 후 결정 (현재 비채택).
+  예: fz의 Cross-model Verification (Claude + GPT). cross-provider 확장 (Gemini 등)은 측정 데이터 누적 후 결정 (현재 비채택).
 ```
 
 ### 원칙 5: 점진적 진행이 일발 완성보다 낫다
@@ -784,11 +784,11 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 - → SOLO 게이팅으로는 overthinking(추론 깊이)을 못 막는다. 게이팅이 줄이는 것은 fan-out 비용·MAST 실패다.
 
 **max + ultracode 운영점의 함의**:
-- (a) token 비용은 *세션* binding 제약이 아니다 → 세션은 품질 최적화. 단 Codex/subagent leg의 per-call effort·비용은 fz가 여전히 소유한다 (`modules/gpt-strategy.md` Standard/Deep/Light 티어 — 회귀시키지 않는다).
+- (a) token 비용은 *세션* binding 제약이 아니다 → 세션은 품질 최적화. 단 GPT/subagent leg의 per-call effort·비용은 fz가 여전히 소유한다 (`modules/gpt-strategy.md` Standard/Deep/Light 티어 — 회귀시키지 않는다).
 - (b) max는 단순 작업도 깊게 추론한다(overthinking 가능). 세션 추론 깊이를 못 낮추므로, fz는 *task surface 축소*(light/simplified 모드 = 로드 instruction 감소)로 "무엇을 생각하는가"를 좁힌다 — 추론 깊이가 아니라 추론 *대상*을 줄이는 접근.
 - (c) ultracode는 workflow를 기본화하나 coupled 작업의 결합도는 바뀌지 않는다(§8 multi-agent 통신 + `guides/agent-team-guide.md` 참조). 비용 반론만 제거할 뿐 fan-out 정당화가 아니다.
 
-> 이유: 운영 설정을 하네스 가정으로 명시하면, 못 바꾸는 레버(세션 effort)에 헛된 게이팅을 걸지 않고 바꿀 수 있는 레버(surface·Codex effort·fan-out)에 집중하게 된다.
+> 이유: 운영 설정을 하네스 가정으로 명시하면, 못 바꾸는 레버(세션 effort)에 헛된 게이팅을 걸지 않고 바꿀 수 있는 레버(surface·GPT effort·fan-out)에 집중하게 된다.
 > [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — `max`는 "prone to overthinking" + "diminishing returns from increased token usage"; 학술 보강 arxiv 2502.08235(overthinking↑→성능↓)·2604.10739]
 > ⚠️ **Opus 5 보정 (2026-07-25)**: 위 `max` 부정 평가는 **Opus 4.7/4.8 페이지의 문구**다. Opus 5 공식 문구는 톤이 다르다 — `max`는 *"when a task justifies unconstrained token spending"*, 그리고 Opus 5는 *"converts additional effort into better results more reliably than any earlier Opus model"* [verified: platform.claude.com/docs/en/build-with-claude/effort · about-claude/models/whats-new-opus-5]. 즉 **overthinking 경계는 여전히 유효한 운영 원칙이나, 근거를 4.8 문구에만 매달면 안 된다** — Opus 5에서는 측정(sweep)으로 운영점을 정할 것.
 
@@ -1102,7 +1102,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 > **4.8 새 기능 → fz 적용** [verified: anthropic.com/news/claude-opus-4-8]:
 > - **effort 기본 high** (xhigh/max는 더 어려운 작업). fz는 못 낮추는 *세션* effort에 게이팅 걸지 않음 (§5 원칙 7 운영점).
-> - **자기 코드 결함 통과 ~4x↓** → fz-review: self-eval 개선분 인정, cross-model(Codex)은 *이종 blind-spot* 보완으로 재포지션 (과대확신 방어가 주목적 아님).
+> - **자기 코드 결함 통과 ~4x↓** → fz-review: self-eval 개선분 인정, cross-model(GPT)은 *이종 blind-spot* 보완으로 재포지션 (과대확신 방어가 주목적 아님).
 > - **tool-calling 효율↑ (fewer steps·required-call skip↓)** → 강제 tool 호출 게이트 완화 가능. 단 breadth fan-out엔 명시 기준 유지.
 > - **단일 세션 수백 parallel subagents 지원** → breadth/read-heavy 작업의 대규모 fan-out 공식 지지 (`modules/complexity.md` parallelizable modifier 정합).
 
@@ -1163,10 +1163,10 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Sprint Contract | Plan의 Anti-Pattern Constraints | 금지 패턴 + Grep 자동 검증 |
 | Evaluator Tuning | 반성 기록 (1-10차) + 교훈 topic file | 실패에서 학습 |
 | Implication Reasoning | lead-reasoning.md (2026.04 추가) | 표면→의미론 추론 |
-| Cross-model Verification | fz-gpt (Claude + Codex; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
+| Cross-model Verification | fz-gpt (Claude + GPT; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
 | Lazy Tool Discovery | modules/ Progressive Disclosure Level 3 | 필요 시에만 로드 |
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
-| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Team + Codex. **Hooks는 opt-in** — 플러그인은 hook을 자동 등록하지 않는다(`hooks/` 없음, `plugin.json`에 `hooks` 키 없음). 실행체는 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 6케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **등록은 사용자가 `.claude/settings.json`으로 복사**한다. `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
+| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Team + GPT. **Hooks는 opt-in** — 플러그인은 hook을 자동 등록하지 않는다(`hooks/` 없음, `plugin.json`에 `hooks` 키 없음). 실행체는 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 6케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **등록은 사용자가 `.claude/settings.json`으로 복사**한다. `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
 
 ### Gap 분석 (NLAH 기반, 2026-04-14)
 
@@ -1318,7 +1318,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 > 단서: harness-paper는 **에이전트 생성 메타분석**이며 서베이 스스로 "완전한 census 아님·arXiv 편중·WebSearch 비활성·Meta/FAIR 부재"를 고지한다. 위 수치·주장은 서베이가 인용 논문에 대해 주장한 내용이고 **원 논문은 미재검증**이다 — 방향성 근거로만 사용, 사실 승격 금지.
 
-### OpenAI / Codex 공식
+### OpenAI / GPT 공식
 
 | # | 제목 | 저자 | 날짜 | URL |
 |---|------|------|------|-----|
