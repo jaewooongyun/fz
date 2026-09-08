@@ -1,5 +1,53 @@
 # Changelog
 
+### v4.32.1 (2026-09-08) — 모델은 gpt 인데 문서는 실행 파일 이름을 부르고 있었고, 게이트는 여섯 번 조용히 통과했다 [PATCH]
+
+2026-09-06 `fz-codex` → `fz-gpt` 개명(72파일 · 357치환) 뒤에도 세션에 `codex` 표기가 남아
+있었다. 잔재를 전수 실측해 **활성 810 occurrence 중 546 을 옮기고 268 을 보존**했다 —
+84파일 482 insertions / 482 deletions.
+
+#### 두 층위 — 모델과 실행 파일
+`~/.codex/config.toml` 의 `model` 은 `gpt-6-astra` 이고, `codex` 는 그 모델을 호출하는 실행
+파일 이름(`codex-cli 0.153.4`)이다. 문서가 모델의 판단을 도구 이름으로 부르고 있었다.
+판정 축은 하나다 — **이름을 바꾸면 벤더 계약(바이너리·경로·플래그·네임스페이스·intent
+trigger)이 깨지는가, 사실이 거짓이 되는가.**
+
+⛔ **`gpt` 명령은 이미 존재한다** — `/usr/sbin/gpt` 는 GUID partition table maintenance
+utility 다. `codex exec` 를 `gpt exec` 로 바꾸면 파티션 도구가 실행된다.
+
+#### 보존의 근거를 세어 보지 않았다
+첫 판정은 치환 130 · 보존 680 이었다. 사용자 지적("애초에 codex 를 안 쓰고 gpt 모델을
+쓰는데 왜 codex 를 남기냐")으로 재실측한 결과 **보존 대부분에 근거가 없었다.** "실행되는
+도구가 Codex CLI 이므로" 라는 근거 하나를 458건에 일괄 적용했는데 CLI 동작 12건에만 참이었다.
+기본값을 MOVE 로 뒤집고 KEEP 을 11종으로 열거했다. `Codex CLI` 를 남긴 근거는 리포 자신에게
+있다 — `setup-gpt-skills.sh` 가 "개명 금지 — CLI 소유 경로다" 라고 적어 두었다.
+
+#### ⭐ 게이트가 여섯 번 조용히 통과했다
+전부 정상 종료 + 빈 결과였다. `codex $1 --help` → `gpt $1`(변수 인자 미매치) ·
+`codex 0.144.1` → `gpt 0.144.1`(대소문자) · `codex→gpt` → `gpt→gpt`(개명 이력 보호 부재) ·
+**사후 게이트 자신의 실패**(`git grep -E` 는 `\b` 를 지원하지 않아 조용히 0건) · 정상 표기
+오탐 · positive control 을 `git checkout` 으로 지울 때 정당한 변경 동반 유실. 4번이 나머지
+다섯을 전부 통과시켰을 것이고 positive control 이 그것을 잡았다.
+
+#### 이종 모델이 규칙 밖을 봤다
+Claude 자체 검증 4층이 전부 통과한 뒤 GPT 교차검증이 3건을 더 잡았고 전부 실측 확정됐다 —
+**벤더 공식 URL 이 깨져 있었고**(`developers.openai.com/codex/cli` → `/gpt/cli`, 규칙에 URL
+보호 축이 없었다), **출처 태그가 재포장됐고**(판정 window ±60자를 넘는 긴 태그의 닫는 괄호가
+범위를 벗어났다), **현행 기록 스키마가 누락됐다**(`experiment-log.md` 를 통째로 아카이브
+판정). URL 집합 불변 검사와 라인 전체 스캔을 배선했다.
+
+#### 검증
+`git archive HEAD` 로 원본을 추출해 검사 대상 건수를 전후 대조했다 — `#6` 753 · `#N8` 259 ·
+`#N9` 173 · `#N3` 44, 18규칙 전부 동일. 보존 7종 개수 감소 0. `health-check.sh` 13검사 exit 0 ·
+회귀 오라클 11/11. `gpt-exec.sh` 는 실제 실행으로 검증(`GATE-PASS text_ok bytes=1092`).
+
+#### ⚠️ 알려진 breaking change 가능성
+`## Codex Skills` → `## GPT Skills` 는 내부 5곳이 일관되나, 프로젝트 CLAUDE.md 에 옛 제목을
+쓰면 Tier 1 디스커버리가 Tier 2/3 으로 폴백한다. 검증 시점 실측 영향 0.
+
+CHANGELOG 항목 · docs/releases/v4.32.1.md · README What's New + stale 수치 9건 ·
+plugin.json / marketplace.json 4.32.0 → 4.32.1.
+
 ### v4.32.0 (2026-09-07) — 배포물이 사용자의 Jira 접두를 알고 있었고, 자작 키는 공식 표 밖에 서 있었다 [MINOR]
 
 이번 대상은 fz 자신이다. `/fz-modernize` 6-Phase 를 fz-plugin 에 그대로 적용해(Self-application) 스킬 22 ·

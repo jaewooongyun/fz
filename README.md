@@ -34,14 +34,14 @@ fz 가 번들하는 MCP 는 **Serena 하나**다. 나머지는 직접 등록한�
 | 도구 | 없으면 | 사용처 | 설치 |
 |------|--------|:------:|------|
 | **Claude Node CLI** | 동작 불가 | 전부 | `npm install -g @anthropic-ai/claude-code` |
-| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 15/21 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
-| **Serena MCP** | 심볼 탐색이 Grep 으로 (13 중 7 폴백) | 13/21 | 자동 등록 · `uv` 필수 (`brew install uv`) |
-| **Codex CLI** | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/21 | `npm install -g @openai/codex` |
-| **sequential-thinking** | 구조화 추론 실패 (폴백 0) | 9/21 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
-| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (8 중 1 폴백) | 8/21 | `claude mcp add context7 -- npx -y @upstash/context7-mcp` |
+| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 15/22 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
+| **Serena MCP** | 심볼 탐색이 Grep 으로 (14 중 7 폴백) | 14/22 | 자동 등록 · `uv` 필수 (`brew install uv`) |
+| **Codex CLI** | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` |
+| **sequential-thinking** | 구조화 추론 실패 (폴백 0) | 10/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
+| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (10 중 1 폴백) | 10/22 | `claude mcp add context7 -- npx -y @upstash/context7-mcp` |
 
 ⛔ `sc:` 는 자체 폴백이 없을 뿐 아니라 다른 도구가 떨어지는 **목적지**(`/sc:analyze 단독`)다 — 없으면 폴백 사슬의 끝이 사라진다.
-표 밖에서 특정 기능만 쓰는 MCP 셋: `lsp`(4 스킬, 정의·참조) · `github`(3, PR) · `atlassian`(3, JIRA). **폴백 0건**이라 없으면 그 기능이 멈춘다.
+표 밖에서 특정 기능만 쓰는 MCP 셋: `lsp`(4 스킬, 정의·참조) · `github`(3, PR) · `atlassian`(4, JIRA). **폴백 0건**이라 없으면 그 기능이 멈춘다.
 프로젝트별 추가 — iOS 는 XcodeBuildMCP + SwiftUI Expert·Swift Concurrency. 웹은 기본 구성으로 충분하다.
 
 Codex CLI 를 쓰면 네이티브 스킬을 심볼릭으로 연결한다.
@@ -133,42 +133,46 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 | 가이드 | 줄 | 내용 |
 |--------|---:|------|
-| [`llm-references.md`](guides/llm-references.md) | 147 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
-| [`prompt-optimization.md`](guides/prompt-optimization.md) | 755 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 629 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
-| [`skill-testing.md`](guides/skill-testing.md) | 470 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
+| [`llm-references.md`](guides/llm-references.md) | 159 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
+| [`prompt-optimization.md`](guides/prompt-optimization.md) | 758 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
+| [`skill-authoring.md`](guides/skill-authoring.md) | 632 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
+| [`skill-testing.md`](guides/skill-testing.md) | 500 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
 | [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 292 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
 | [`agent-team-guide.md`](guides/agent-team-guide.md) | 493 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
 | [`model-guide.md`](guides/model-guide.md) | 304 | 모델 운용 — Lead 는 Fable 5.1, 실질 생산 워커는 Opus 5. effort 배정 기준 |
 | [`clean-architecture.md`](guides/clean-architecture.md) | 324 | Dependency Rule 과 SOLID — 레이어 판정 기준 |
-| [`harness-engineering.md`](guides/harness-engineering.md) | 1,334 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
+| [`harness-engineering.md`](guides/harness-engineering.md) | 1,346 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
 
 ---
 
-## What's New — v4.32.0
+## What's New — v4.32.1
 
-**배포물이 사용자 한 명의 Jira 접두를 하드코딩하고 있었다.** `/fz-modernize` 6-Phase 를 fz
-자신에게 적용해(Self-application) 스킬 22 · 에이전트 13 · 워크플로 6 을 전수 판정한 결과다.
-접두가 낡은 게 아니라 박아 둔 것 자체가 결함이라, `ASD` 208줄 / 38파일을 치환하는 대신
-**일반화**했다. ⛔ 판정값에 `remove` 는 없다 — 최댓값이 `remove-candidate` 라 스킬 수는 22 그대로다.
+**스킬 이름은 `fz-gpt` 였고 문서는 `codex` 를 부르고 있었다.** `~/.codex/config.toml` 의
+`model` 은 `gpt-6-astra` 다 — 교차검증을 수행하는 모델은 GPT 이고 `codex` 는 그 모델을
+호출하는 **실행 파일 이름**이다. 문서가 이 둘을 뭉뚱그려 모델의 판단을 도구 이름으로
+부르고 있었다. 활성 810 occurrence 중 **546 을 옮기고 268 을 보존**했다.
 
-⭐ 값이 더 큰 것은 **후행 경계 한 글자**다. 워커가 낸 `(?!\w)` 는 Python `\w` 가 한글 음절을
-매치하므로 `TVG-4442를` 같은 조사 부착형을 떨어뜨린다 — 기존 `ASD` 표기에도 똑같이 걸리는
-**하위호환 손실**이다. `(?![A-Za-z0-9_])` 로 좁혀 ASCII 접미만 계속 거르게 했고, fixture
-케이스 10 이 조사 부착형의 매치를 단언한다.
+⛔ **`gpt` 명령은 이미 존재한다.** `/usr/sbin/gpt` 는 GUID partition table maintenance
+utility 다. `codex exec` 를 `gpt exec` 로 바꾸면 `command not found` 로 실패하는 게 아니라
+**파티션 도구가 실행된다** — 조용히 다른 프로그램이 도는 쪽이 에러보다 나쁘다.
 
-**fz 자작 키 6종 72건이 공식 표 밖에 서 있었다.** frontmatter 최상위가 아니라 `metadata:` 맵이
-그 자리라는 것은 Probe 가 확인했다. 그런데 이건 구현 정리가 아니라 **정책 변경**이다 —
-`modules/governance.md` 가 `provides`·`needs` 를 필수 필드 정본으로 선언하고 있었기 때문이다.
-사용자 결정으로 올려 정본 · 생성 템플릿 · lint 파서 · 소비자 15파일을 한 사이클에 묶었다.
+**보존의 근거를 세어 보지 않았다.** 첫 판정은 치환 130 · 보존 680 이었다. 사용자 지적으로
+재실측하니 "실행되는 도구가 Codex CLI 이므로" 라는 근거 하나를 458건에 일괄 적용한 것이었고
+CLI 동작 12건에만 참이었다. 기본값을 MOVE 로 뒤집고 KEEP 을 11종으로 열거했다. `Codex CLI`
+를 남긴 근거는 리포 자신에게 있다 — `setup-gpt-skills.sh` 가 "개명 금지 — CLI 소유 경로다"
+라고 적어 두었다.
 
-⭐ 그 과정에서 워커 둘이 **들여쓰기 관례로 충돌**했다. Lead 지시는 3칸이었고 한 워커가 그걸
-근거로 들었는데, 실측 frontmatter 연속행은 **272/272 가 2칸**이었다. 3칸의 출처는 lint
-스크립트 docstring 의 오기였다 — 정본이 아니라 **주석이 관례를 참칭**하고 있었다.
+⭐ 값이 더 큰 것은 **무성 실패 6건**이다. 전부 정상 종료 + 빈 결과였다. 그중 하나는 사후
+게이트 **자신**의 실패였다 — `git grep -E` 는 `\b`(단어 경계)를 지원하지 않아 정규식이
+조용히 0건을 낸다. 그것이 나머지 다섯을 전부 통과시켰을 것이고, positive control 이 잡았다.
 
-⚠️ 조건부 모듈 신설로 기대했던 **floor 절감은 0이었다.** fz-plan 절차 본문 49줄을 옮겼지만
-SKILL.md 에서 빠진 무조건 참조가 없어 floor 19,790 이 그대로다 — 승인 시점의 가설이 반증됐다
-(F-151). 준비 Step 하나는 판정 축 10개에 **측정 도달성**이 빠졌음을 드러냈고(F-148), 템플릿
-AC 의 거짓 FAIL 은 변경 전 대조가 갈랐다(F-150).
+Claude 자체 검증 4층(분류기 · 역방향 KEEP 검증 · 사후 유출 게이트 · health-check)이 전부
+통과한 뒤 **GPT 교차검증이 3건을 더 잡았고 전부 실측 확정됐다** — 벤더 공식 URL 이 깨져
+있었고(규칙에 URL 보호 축이 아예 없었다), 출처 태그가 재포장됐고(판정 window ±60자를 넘는
+긴 태그의 닫는 괄호가 범위를 벗어났다), 현행 기록 스키마가 누락됐다. 4층이 모두 "내가 세운
+규칙" 을 검사하므로 규칙 자체의 공백은 그 안에서 보이지 않는다.
 
-→ [릴리즈 노트](docs/releases/v4.32.0.md)
+⚠️ `## Codex Skills` → `## GPT Skills` 는 내부 5곳이 일관되나, 프로젝트 `CLAUDE.md` 에 옛
+제목을 쓰면 Tier 1 디스커버리가 미스하고 Tier 2/3 으로 폴백한다. 검증 시점 실측 영향은 0이다.
+
+→ [릴리즈 노트](docs/releases/v4.32.1.md)
