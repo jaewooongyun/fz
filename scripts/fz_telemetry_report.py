@@ -1041,7 +1041,7 @@ def _write_selftest_tree(base):
     with open(os.path.join(findings_dir, "F-001-x.md"), "w") as handle:
         handle.write("---\nid: F-001\ndate: 2026-08-12\nstatus: open\nstage: [discover, plan]\ngap_type: scope-gap\ndetector: user\n---\n\n# F-001\n")
     with open(os.path.join(findings_dir, "F-002-y.md"), "w") as handle:
-        handle.write("---\nid: F-002\ndate: 2026-08-13\nstatus: open\nstage: [review]\ngap_type: not-fired\ndetector: codex 교차검증\nharness_verdict: caught\n---\n\n# F-002\n")
+        handle.write("---\nid: F-002\ndate: 2026-08-13\nstatus: open\nstage: [review]\ngap_type: not-fired\ndetector: gpt 교차검증\nharness_verdict: caught\n---\n\n# F-002\n")
     return os.path.join(base, "projects"), findings_dir
 
 
@@ -1105,7 +1105,7 @@ def self_test():
     findings = collect_findings(findings_dir, since, until)
     check("findings 2건", findings["n"], 2)
     check("detector user", findings["detector"]["user"], 1)
-    check("detector 첫 토큰만", findings["detector"]["codex"], 1)
+    check("detector 첫 토큰만", findings["detector"]["gpt"], 1)
     check("stage 리스트 분해", findings["stage"]["discover"], 1)
     check("harness_verdict 읽기", findings["verdict"]["caught"], 1)
     check("harness_verdict 추정", findings["verdict"]["missed(추정)"], 1)

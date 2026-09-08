@@ -25,7 +25,7 @@ TIERS = "modules/peer-review-tiers.md"
 AXES = "modules/review-structural-axes.md"
 EVIDENCE = "modules/evidence-collection.md"
 GATES = "modules/peer-review-gates.md"
-# ⛔ Tier 2/3 전용 — Tier 0/1 은 sub-agent·Codex 가 없어 읽지 않는다 (2026-08-26 추출)
+# ⛔ Tier 2/3 전용 — Tier 0/1 은 sub-agent·GPT 가 없어 읽지 않는다 (2026-08-26 추출)
 WORKFLOW = "modules/peer-review-workflow.md"
 
 # ⛔ Tier 0/1 도 GATES·EVIDENCE 를 읽는다. 경량 경로라고 빼면 측정이 거짓이 된다:

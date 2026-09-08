@@ -2,7 +2,7 @@
 # lint:no-root-anchor — 플러그인 루트를 참조하지 않는다. 작업 대상은 `--cd`로 받아 게이트 11에서
 #   존재를 검증하고, 스키마·프롬프트도 호출자가 절대경로로 넘긴다 (lint #N6 면제 형태 c).
 #
-# codex 호출 hygiene 실행체 — modules/fz-gpt-bash-hygiene.md §8의 구현
+# gpt 호출 hygiene 실행체 — modules/fz-gpt-bash-hygiene.md §8의 구현
 #
 # 왜 스크립트인가: hygiene 규칙은 전부 binary(pass/fail)다
 #   (guides/skill-authoring.md §11 "결과가 binary인가? → 스크립트").
@@ -19,7 +19,7 @@
 #   gpt-exec.sh exec   --cd DIR --out FILE --prompt-file F
 #                        [--effort E] [--schema F] [--add-dir D] [--gpt-skill N] [--gpt-skill-path P]
 #
-# exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건 / 12=codex 비정상종료
+# exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건 / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
 #   ⛔ 10~14는 전부 **측정 실패**다 — "이슈 0건"으로 해석하면 안 된다.
 set -u
@@ -56,7 +56,7 @@ while [ $# -gt 0 ]; do
     --title)           need $# "--title";           TITLE="$2"; shift 2 ;;
     --add-dir)         need $# "--add-dir";         ADD_DIRS+=("$2"); shift 2 ;;
     --expected-branch) need $# "--expected-branch"; EXPECTED_BRANCH="$2"; shift 2 ;;
-    # ⛔ 계측 전용 — codex 에 전달하지 않는다(기록만). resolved 해석은 호출부 get_gpt_skill_path 소관.
+    # ⛔ 계측 전용 — gpt 에 전달하지 않는다(기록만). resolved 해석은 호출부 get_gpt_skill_path 소관.
     --gpt-skill)       need $# "--gpt-skill";       GPT_SKILL="$2"; shift 2 ;;
     --gpt-skill-path)  need $# "--gpt-skill-path";  GPT_SKILL_PATH="$2"; shift 2 ;;
     --base)            need $# "--base";            set_scope base "$2"
@@ -170,21 +170,21 @@ else
   for d in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do EXEC_ARGS+=(--add-dir "$d"); done
   codex exec "${EXEC_ARGS[@]}" "${ARGS[@]}" -- "$(cat "$PROMPT_FILE")" < /dev/null > "$LOG" 2>&1
 fi
-CODEX_EXIT=$?
+GPT_EXIT=$?
 
 # ── gpt-skill 실사용 계측 (기록 전용) — 열: ts / mode / requested / resolved / fallback / exit (헤더 없음)
 #    resolved = 호출부가 해석한 SKILL.md 경로. 빈 값이면 일반 프롬프트 폴백이므로 fallback=1.
-#    ⛔ exit 열은 **codex 종료코드**다 — 사후 게이트 12~14(측정 실패)는 반영되지 않는다.
+#    ⛔ exit 열은 **gpt 종료코드**다 — 사후 게이트 12~14(측정 실패)는 반영되지 않는다.
 #    ⛔ 로그 실패는 exit 계약(10~14)을 바꾸지 않는다. 디렉토리 부재 시 조용히 건너뛴다.
 TELEMETRY_DIR="${FZ_TELEMETRY_DIR:-${HOME:-}/.fz/telemetry}"   # 기본값 출처: scripts/fz_stop_telemetry.py:32
 if [ -n "$GPT_SKILL" ] && [ -d "$TELEMETRY_DIR" ]; then
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODE" "$GPT_SKILL" \
-    "${GPT_SKILL_PATH:--}" "$([ -n "$GPT_SKILL_PATH" ] && echo 0 || echo 1)" "$CODEX_EXIT" \
+    "${GPT_SKILL_PATH:--}" "$([ -n "$GPT_SKILL_PATH" ] && echo 0 || echo 1)" "$GPT_EXIT" \
     2>/dev/null >> "$TELEMETRY_DIR/gpt-skill-usage.tsv" || true
 fi
 
 # ── 사후 게이트: exit → 파일 → **계약**. 어느 하나라도 실패면 측정 실패.
-[ "$CODEX_EXIT" -eq 0 ] || { tail -20 "$LOG" >&2; die 12 "codex exit=$CODEX_EXIT (측정 실패 — 리뷰 결과 아님). log: $LOG"; }
+[ "$GPT_EXIT" -eq 0 ] || { tail -20 "$LOG" >&2; die 12 "codex exit=$GPT_EXIT (측정 실패 — 리뷰 결과 아님). log: $LOG"; }
 [ -s "$OUT" ] || { tail -20 "$LOG" >&2; die 13 "출력 파일 없음/빈 파일 (측정 실패). log: $LOG"; }
 if [ -n "$SCHEMA" ]; then
   # ⛔ 문법만 보면 `{}` 가 `issues=0 verdict=None` 으로 GATE-PASS 된다 (감사 ISSUE-013).

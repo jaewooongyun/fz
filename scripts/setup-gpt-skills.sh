@@ -1,6 +1,6 @@
 #!/bin/bash
 # setup-gpt-skills.sh
-# Codex 네이티브 스킬과 fz 플러그인 스킬을 ~/.codex/skills/에 심볼릭 링크로 등록합니다.
+# GPT 네이티브 스킬과 fz 플러그인 스킬을 ~/.codex/skills/에 심볼릭 링크로 등록합니다.
 # fz 생태계를 clone한 후 1회 실행하면 됩니다.
 #
 # Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh

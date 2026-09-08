@@ -143,7 +143,7 @@ else
   record "workflow 문법" UNRUN "미실행 — node 부재 (⛔ PASS 아님)"
 fi
 
-# ── 4.5 codex 플래그 호환성
+# ── 4.5 gpt 플래그 호환성
 # ⛔ 신설 근거: `check-gpt-flags.sh` 는 review 경로가 거부하는 플래그를 잡는 회귀 게이트인데
 #    어느 자동 실행 경로에도 없었다(health-check 참조 0건 · gpt-exec.sh 는 주석만).
 #    막으려던 실패 = 공용 인자 배열이 `codex exec review` 에 거부돼 exit 2 를 내고
@@ -151,10 +151,10 @@ fi
 # ⛔ exit 2(codex CLI 부재·help 파싱 실패)는 **PASS 가 아니라 미실행**이다 — §4 와 같은 클래스.
 CF_OUT="$(bash "$ROOT/scripts/check-gpt-flags.sh" 2>&1)"; CF_CODE=$?
 case "$CF_CODE" in
-  0) record "codex 플래그 호환성" 0 "review 미지원 플래그 0건" ;;
-  1) record "codex 플래그 호환성" 1 "⛔ review 경로에 미지원 플래그 — $(printf '%s\n' "$CF_OUT" | tail -1)" ;;
+  0) record "gpt 플래그 호환성" 0 "review 미지원 플래그 0건" ;;
+  1) record "gpt 플래그 호환성" 1 "⛔ review 경로에 미지원 플래그 — $(printf '%s\n' "$CF_OUT" | tail -1)" ;;
   *) UNRUN=$((UNRUN + 1))
-     record "codex 플래그 호환성" UNRUN "미실행 — codex CLI 부재·help 파싱 실패 (⛔ PASS 아님)" ;;
+     record "gpt 플래그 호환성" UNRUN "미실행 — codex CLI 부재·help 파싱 실패 (⛔ PASS 아님)" ;;
 esac
 
 # ── 4.6 회귀 오라클 실행 (tests/) ─────────────────────────────────

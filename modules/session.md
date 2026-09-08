@@ -84,8 +84,8 @@ init_or_use_session() {
 EOF
   fi
 
-  export CODEX_SESSION_ID="$SESSION_ID"
-  export CODEX_TRACKER_FILE="$TRACKER_FILE"
+  export GPT_SESSION_ID="$SESSION_ID"
+  export GPT_TRACKER_FILE="$TRACKER_FILE"
 }
 
 init_or_use_session
