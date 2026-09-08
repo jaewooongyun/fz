@@ -25,7 +25,7 @@ CLAUDE.md `## Architecture`가 Swift/iOS 프로젝트 + Plan에 다음 중 하�
 ## 행동 원칙 (원칙+이유 형태)
 
 > 본 모듈은 9개 if-then 체크리스트가 아닌 **3개 원칙**으로 구성된다.
-> 각 원칙은 구체적 token (Claude/Codex가 검색해 사전 차단할 패턴)을 제공한다.
+> 각 원칙은 구체적 token (Claude/GPT가 검색해 사전 차단할 패턴)을 제공한다.
 > 출처: `guides/prompt-optimization.md` 원칙 4a (원칙+이유 > if-then 테이블).
 
 ---
@@ -149,5 +149,5 @@ grep -q 'BAD:' "$M" && grep -q 'GOOD:' "$M"
 - Progressive Disclosure Level 3 (필요 시에만 로드)
 - 가이드 문서이므로 줄 수 제한 없음
 - 9 if-then 항목 → 3 원칙+이유로 압축 (출처: prompt-optimization.md 원칙 4a)
-- 각 원칙당 구체적 token (Claude/Codex가 검색해 차단할 패턴) 제공
+- 각 원칙당 구체적 token (Claude/GPT가 검색해 차단할 패턴) 제공
 - BAD/GOOD Few-shot 1쌍 의무 (출처: prompt-optimization.md 원칙 5)

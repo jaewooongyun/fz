@@ -89,7 +89,7 @@
 | 체인 | fz-plan → fz-code |
 | 기본 모드 | TEAM |
 | TEAM 모드 | `workflows/plan-collaborative.js` → `workflows/code-pair.js` (순차) |
-| 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ implication-scan (조건부) + ✓ codex check |
+| 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ implication-scan (조건부) + ✓ gpt check |
 
 ### 8. code-only
 
@@ -109,7 +109,7 @@
 | 체인 | fz-code → fz-review |
 | 기본 모드 | TEAM |
 | TEAM 모드 | `workflows/code-pair.js` → `workflows/review-live.js` (순차) + Lead 후속(Phase 4.5 correctness · memory recall) |
-| 게이트 | ✓ build + ✓ implication-scan (조건부) + ✓ codex check |
+| 게이트 | ✓ build + ✓ implication-scan (조건부) + ✓ gpt check |
 
 ### 10. review-only
 
@@ -128,7 +128,7 @@
 | 체인 | fz-review → fz-commit → fz-pr |
 | 기본 모드 | TEAM |
 | TEAM 모드 | `workflows/review-live.js` → Lead 커밋/PR (fz-commit·fz-pr 은 Workflow 없음) |
-| 게이트 | ✓ codex check (커밋 전) |
+| 게이트 | ✓ gpt check (커밋 전) |
 
 ### 12. fix-to-ship
 
@@ -137,7 +137,7 @@
 | 트리거 | `고쳐서.*커밋, 수정.*PR` |
 | 체인 | fz-fix → fz-review → fz-commit |
 | 기본 모드 | SOLO |
-| 게이트 | ✓ build + ✓ codex check |
+| 게이트 | ✓ build + ✓ gpt check |
 
 ### 13. full-cycle
 
@@ -166,7 +166,7 @@
 | 트리거 | `드리프트\|아키텍처.*점검\|레이어.*위반\|전체.*스캔\|점검해줘\|훑어봐\|전체.*봐줘\|전체.*확인해줘` |
 | 체인 | fz-gpt drift |
 | 기본 모드 | SOLO |
-| 실행자 | Lead → Codex drift (fz-drift 스킬) |
+| 실행자 | Lead → GPT drift (fz-drift 스킬) |
 | 권장 시점 | PR 전, 대규모 리팩토링 후 |
 
 ### 16. plan-parallel
@@ -176,7 +176,7 @@
 | 트리거 | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` |
 | 체인 | fz-gpt plan |
 | 기본 모드 | SOLO |
-| 실행자 | Lead → Codex plan (fz-planner 스킬) |
+| 실행자 | Lead → GPT plan (fz-planner 스킬) |
 | 주의 | **C4 원칙**: Claude 계획 텍스트 전달 금지. 요구사항만 공유 |
 | 출력 | Claude 계획과 교차 비교용 독립 계획서 |
 

@@ -18,7 +18,7 @@
 > ⛔ **아래 codex exec 예시는 축약형** (서브커맨드별 *차이점*만 표시 — 가독성 우선). **raw 복붙 금지**.
 > 실제 실행 시 반드시 `modules/fz-gpt-bash-hygiene.md` §6 Standard Wrapper Template 적용:
 > `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `-o` readback + (git diff 분석 시) §5.5 Base Verification Gate.
-> 예시의 `codex exec ...`는 *wrapper의 §3 표준 호출 부분*에 해당하는 차이점만 보여준다 (29/30차 hang/sandbox 재발 차단 — Codex 검증 §Blind Spot 1).
+> 예시의 `codex exec ...`는 *wrapper의 §3 표준 호출 부분*에 해당하는 차이점만 보여준다 (29/30차 hang/sandbox 재발 차단 — GPT 검증 §Blind Spot 1).
 
 ## final -- PR 전 최종 리뷰
 
@@ -138,12 +138,12 @@ codex exec \
 
 ## micro-eval -- 단일 주장 독립 재평가 (Claim-Type 라우팅)
 
-단일 주장(severity 판단, 분류, 사실 주장 등)을 Codex로 빠르게 독립 재평가합니다.
+단일 주장(severity 판단, 분류, 사실 주장 등)을 GPT로 빠르게 독립 재평가합니다.
 Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-Type 라우팅의 "분류/심각도 판단" 카테고리를 처리.
 
 **사용 시점**:
 - Claude가 Critical/Major로 판정한 이슈가 실제 그 심각도인지 재확인
-- 외부(팀원/Codex 이전 응답) 지적의 유효성 빠른 확인
+- 외부(팀원/GPT 이전 응답) 지적의 유효성 빠른 확인
 - "이 주장이 맞는가?" 형태의 단일 이슈 검증
 - cross-validation.md Claim-Type 라우팅에서 분류/심각도 판단 → micro-eval로 흐름
 
@@ -174,5 +174,5 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 
 ## 설계 원칙
 
-- Progressive Disclosure Level 3 (fz-gpt 호출 시 *명시 Read*. 자동 로드 X — Codex 검증 §추가 발견 정정)
+- Progressive Disclosure Level 3 (fz-gpt 호출 시 *명시 Read*. 자동 로드 X — GPT 검증 §추가 발견 정정)
 - 200줄 한도 — 본 모듈은 7개 서브커맨드 + 보조 자료로 한도 약간 초과 가능

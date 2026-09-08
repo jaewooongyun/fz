@@ -75,7 +75,7 @@ review-arch → SendMessage(Lead):
 
 - Direction Challenge 결과 확인 (RECONSIDER/REDIRECT 시 사용자 에스컬레이션)
 - 설계 스트레스 테스트 (Q1-Q5) 수행
-- Codex 검증 위임 (fz-gpt verify)
+- GPT 검증 위임 (fz-gpt verify)
 - 최종 계획 통합 + 구조화된 출력 생성
 
 ## adversarial과의 차이

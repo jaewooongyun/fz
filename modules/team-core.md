@@ -40,12 +40,12 @@
    ```
    에이전트 "Step N 완료" 보고 수신
    → ⛔ 체크포인트 기록 (티켓 폴더: 파일, 비-티켓 세션: write_memory)
-   → ⛔ Codex 교차 검증 (/fz-gpt check — 코드/계획 생산 TEAM 필수, 탐색은 --deep만)
+   → ⛔ GPT 교차 검증 (/fz-gpt check — 코드/계획 생산 TEAM 필수, 탐색은 --deep만)
    → [제거/리팩토링 시] Implication Scan (modules/lead-reasoning.md + cross-validation.md)
    → 빌드 검증 (modules/build.md)
    → 다음 Step 배정 또는 Gate 판정
    ```
-   - Codex 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백
+   - GPT 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백
    - compact 전에 체크포인트가 없으면 복원 불가 — **기록이 검증보다 선행**
 
 7. **⛔ L3 결과 팀 피드백** (L3-to-L1 Feedback):
@@ -168,7 +168,7 @@
 
 ## 모델 전략
 
-판단=Fable · 실질 분석·생산 워커=opus · 단순(retrieval·breadth)=sonnet · external(검증)=Codex. haiku 사용하지 않음.
+판단=Fable · 실질 분석·생산 워커=opus · 단순(retrieval·breadth)=sonnet · external(검증)=GPT. haiku 사용하지 않음.
 
 > 근거: 같은 모델 N개는 비효과적(ICLR 2025). 이종 모델 조합이 핵심(X-MAS). 역할 분리(MAR, arxiv 2512.20845)는 multi-agent 안정성을 보장.
 
@@ -178,11 +178,11 @@
 | Primary Worker | opus | 팀 내 핵심 산출물 생산자 (도메인당 1명) |
 | Supporting (실질 분석·생산) | opus | 계획·구현·리뷰 산출물을 직접 생산·분석하는 에이전트 |
 | Supporting (retrieval·breadth) | sonnet | search 심볼/패턴 탐색, discover lens fan-out, recall 성격 |
-| External 1 (Codex) | config 기본값 (최신 frontier) | cross-model 검증 (Lead가 CLI 직접 실행) |
+| External 1 (GPT) | config 기본값 (최신 frontier) | cross-model 검증 (Lead가 CLI 직접 실행) |
 
 외부 모델 실행 규칙:
 - Lead가 Codex CLI를 직접 실행하고, 결과를 팀에 SendMessage로 공유
-- Codex: TEAM 모드에서 필수 (cross-validation.md 참조)
+- GPT: TEAM 모드에서 필수 (cross-validation.md 참조)
 
 승격 원칙:
 - **동시 opus ≤3** (Lead 세션 fable은 별도 카운트). 실질 분석·생산 워커는 opus, retrieval·breadth 성격의 단순 워커는 sonnet.

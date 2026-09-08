@@ -43,7 +43,7 @@ review-arch → SendMessage(Lead): "조건 불변성 판별 완료. 🔒 3개, �
 
 - 사용자 대화 관리 (질문 수집 → 새 **조건**으로 변환, 제약이 아님)
 - Landscape Map 최종 통합
-- 외부 모델 실행 (TEAM --deep 시): Codex에게 "완전히 다른 경로" 탐색 요청
+- 외부 모델 실행 (TEAM --deep 시): GPT에게 "완전히 다른 경로" 탐색 요청
 - 교착 시: Trade-off Table 제시 + "plan이 판단합니다" 안내
 
 ## 핵심 원칙

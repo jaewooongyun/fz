@@ -11,11 +11,11 @@
 > ⛔ **아래 codex exec 예시는 축약형** (서브커맨드별 *차이점*만 표시 — 가독성 우선). **raw 복붙 금지**.
 > 실제 실행 시 반드시 `modules/fz-gpt-bash-hygiene.md` §6 Standard Wrapper Template 적용:
 > `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `-o` readback + (git diff 분석 시) §5.5 Base Verification Gate.
-> 예시의 `codex exec ...`는 *wrapper의 §3 표준 호출 부분*에 해당하는 차이점만 보여준다 (29/30차 hang/sandbox 재발 차단 — Codex 검증 §Blind Spot 1).
+> 예시의 `codex exec ...`는 *wrapper의 §3 표준 호출 부분*에 해당하는 차이점만 보여준다 (29/30차 hang/sandbox 재발 차단 — GPT 검증 §Blind Spot 1).
 
 ## review -- 코드 리뷰 (주력)
 
-fz-review의 Phase 5 Codex 부분. **Plugin 우선 → CLI 폴백.**
+fz-review의 Phase 5 GPT 부분. **Plugin 우선 → CLI 폴백.**
 
 ```bash
 # Plugin 모드 (우선 — --add-dir 불필요 시)
@@ -249,5 +249,5 @@ fi
 
 ## 설계 원칙
 
-- Progressive Disclosure Level 3 (fz-gpt 호출 시 *명시 Read*. 자동 로드 X — Codex 검증 §추가 발견 정정)
+- Progressive Disclosure Level 3 (fz-gpt 호출 시 *명시 Read*. 자동 로드 X — GPT 검증 §추가 발견 정정)
 - 200줄 한도 — 본 모듈은 verify Q1-Q8 + verdict contract 포함으로 약간 초과 가능

@@ -2,7 +2,7 @@
 
 diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 
-> ⛔ **TEAM 일몰 재매핑 (Wave 4)**: Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행된다 (TeamCreate 아님). Tier 0/1은 이미 Lead-solo. 폴백 체인 Tier3→2→1→0은 `mode:'workflow'` → `mode:'fallback'` → Lead SOLO로 매핑. Codex는 out-of-band (Lead `/fz-gpt`, 스크립트 내 스폰 금지).
+> ⛔ **TEAM 일몰 재매핑 (Wave 4)**: Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행된다 (TeamCreate 아님). Tier 0/1은 이미 Lead-solo. 폴백 체인 Tier3→2→1→0은 `mode:'workflow'` → `mode:'fallback'` → Lead SOLO로 매핑. GPT는 out-of-band (Lead `/fz-gpt`, 스크립트 내 스폰 금지).
 
 ---
 
@@ -11,12 +11,12 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 - [Tier 구성](#tier-구성)
 - [자동 휴리스틱 (단일 진실 원천)](#자동-휴리스틱-단일-진실-원천)
 - [Tier 0 (Solo) 절차](#tier-0-solo-절차)
-- [Tier 1 (Solo + Codex) 절차](#tier-1-solo--codex-절차)
+- [Tier 1 (Solo + GPT) 절차](#tier-1-solo--gpt-절차)
 - [Tier-Adaptive Evidence](#tier-adaptive-evidence)
 - [비용 로깅 (모든 Tier)](#비용-로깅-모든-tier)
 - [Tier 2: Lite — 실행 시퀀스](#tier-2-lite--실행-시퀀스)
 - [Tier 3: Full (--deep) — 추가 시퀀스](#tier-3-full---deep--추가-시퀀스)
-- [Codex Analyze 호출](#codex-analyze-호출)
+- [GPT Analyze 호출](#gpt-analyze-호출)
 - [Cross-Critique Anti-Sycophancy Rule](#cross-critique-anti-sycophancy-rule)
 - [타임아웃 + 폴백](#타임아웃--폴백)
 
@@ -24,10 +24,10 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 
 ## Tier 구성
 
-| Tier | review-arch | review-quality/correctness | Codex | Cross-Critique | 기본 agent call |
+| Tier | review-arch | review-quality/correctness | GPT | Cross-Critique | 기본 agent call |
 |------|------------|----------------|-------|---------------|-----------|
 | **0 (Solo)** | Orchestrator 직접 | — | — | None | 0 |
-| **1 (Solo+Codex)** | Orchestrator 직접 | — | Lead /fz-gpt ×1 | None | 0 (+Codex 1) |
+| **1 (Solo+GPT)** | Orchestrator 직접 | — | Lead /fz-gpt ×1 | None | 0 (+GPT 1) |
 | **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-gpt ×1 | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
 | **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-gpt ×2 | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
 
@@ -42,7 +42,7 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 ```
 CHANGED_LINES = additions + deletions  (gh pr view --json additions,deletions 또는 git diff --numstat)
 
-CHANGED_LINES <  100  → Tier 0 (base), Tier 1 (--codex 옵션 시)
+CHANGED_LINES <  100  → Tier 0 (base), Tier 1 (--gpt 옵션 시)
 CHANGED_LINES 100-200 → Tier 1 (base), Tier 2 (--deep 옵션 시)
 CHANGED_LINES 200-500 → Tier 2 (base), Tier 3 (--deep 옵션 시)
 CHANGED_LINES 500-2000 → Tier 2 + 비용 경고 ($2+ 예상)
@@ -198,7 +198,7 @@ diff 에 다시 나타난다. 그러면 두 가지가 함께 틀린다 — Tier 
 ### 옵션 precedence
 1. `--tier N` (최우선, auto 무효화). invalid 값 → auto fallback + error log
 2. `--deep` (auto Tier 2/3 시 Cross-Critique 활성화. auto Tier 0/1 시 warning + Tier 2 강제)
-3. `--codex` (Tier 0 → Tier 1 효과: Codex challenger 1회 추가)
+3. `--gpt` (Tier 0 → Tier 1 효과: GPT challenger 1회 추가)
 
 ---
 
@@ -246,7 +246,7 @@ Stage 2 는 상대 렌즈 issue 에 `agree`/`adjust`/`false_positive` 를 매기
 
 ## Tier 0 (Solo) 절차
 
-> Orchestrator(Lead) 단독 분석. sub-agent + Codex 호출 없음. 작은 PR(<100 changed lines) 디폴트.
+> Orchestrator(Lead) 단독 분석. sub-agent + GPT 호출 없음. 작은 PR(<100 changed lines) 디폴트.
 
 ### Gather
 - WORK_DIR 초기화 + diff 수집 (SKILL.md Gather Step 0-5 그대로)
@@ -278,7 +278,7 @@ Lead 단독으로 아래 perspectives 를 검토한다 (9 perspectives 중 선�
 
 ⛔ **구조 축은 Lead가 직접 적용한다** — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 위 perspectives 와 **함께** 검토한다. Tier 0/1은 Workflow를 호출하지 않으므로 `args.structuralContext` 경로가 **존재하지 않는다**. 여기서 직접 적용하지 않으면 `<100줄` PR — 실무에서 가장 흔한 규모 — 은 구조 판정이 영구히 0건이다. (Tier 1도 Tier 0와 동일 perspectives 를 쓰므로 본 항목을 승계한다.)
 
-sub-agent spawn 없음. Codex 호출 없음 (`--codex` 옵션 시 Tier 1 절차로 자동 전환).
+sub-agent spawn 없음. GPT 호출 없음 (`--gpt` 옵션 시 Tier 1 절차로 자동 전환).
 
 ### Synthesize
 ⛔ 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계) — 목록: `modules/peer-review-gates.md` § 경량 경로.
@@ -322,9 +322,9 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 ---
 
-## Tier 1 (Solo + Codex) 절차
+## Tier 1 (Solo + GPT) 절차
 
-> Tier 0 + Codex challenger 1회. 100-200 changed lines 또는 `--codex` 옵션.
+> Tier 0 + GPT challenger 1회. 100-200 changed lines 또는 `--gpt` 옵션.
 
 ### Gather
 - Tier 0 + 추가 evidence 1개: `${WORK_DIR}/evidence/base-patterns.md`
@@ -332,23 +332,23 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 ### Analyze
 - Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2)
-- + Codex challenger 1회 호출 (`< /dev/null` redirect 필수 — background 호출 시 stdin lock 방지):
+- + GPT challenger 1회 호출 (`< /dev/null` redirect 필수 — background 호출 시 stdin lock 방지):
   ```bash
-  codex exec --skip-git-repo-check --sandbox read-only "$(cat /tmp/codex-challenger-prompt.txt)" \
-    < /dev/null > ${WORK_DIR}/codex-challenger-raw.txt 2>&1
+  codex exec --skip-git-repo-check --sandbox read-only "$(cat /tmp/gpt-challenger-prompt.txt)" \
+    < /dev/null > ${WORK_DIR}/gpt-challenger-raw.txt 2>&1
   ```
-- Codex prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
+- GPT prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
 
 ### Synthesize
-⛔ **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계). Codex 호출이 있으므로 **Reflection Rate** 도 산출 — ⛔ `N<10` 은 preliminary, verdict 없음. 목록: `modules/peer-review-gates.md` § 경량 경로.
+⛔ **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계). GPT 호출이 있으므로 **Reflection Rate** 도 산출 — ⛔ `N<10` 은 preliminary, verdict 없음. 목록: `modules/peer-review-gates.md` § 경량 경로.
 
 ⛔ **병합·판정 규칙은 `modules/peer-review-gates.md` § MergeContract 를 따른다.**
 아래는 그 계약의 Tier 1 적용 요약이며, 어긋나면 계약이 이긴다.
 
-- Lead + Codex 결과 dedup — 키는 § 3 (`파일` + `line_range` 겹침 + `discoveryAxis`)
+- Lead + GPT 결과 dedup — 키는 § 3 (`파일` + `line_range` 겹침 + `discoveryAxis`)
 - 2-vote Confidence Matrix (3-vote 대비 단순화) — § 9 Tier 1 행
-- Codex verdict 처리는 § 6 — ⛔ `reverse` 는 제거가 아니라 `question` 전환
-- Independence: Codex sandbox 독립 = HIGH
+- GPT verdict 처리는 § 6 — ⛔ `reverse` 는 제거가 아니라 `question` 전환
+- Independence: GPT sandbox 독립 = HIGH
 
 ### Deliver
 - review-report.md + pr-comments.md + cost-log.json
@@ -475,11 +475,11 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 > 측정 없이 검증 불가. Tier별 토큰/duration/이슈 발견 수를 기록하여 사용자가 before/after 비교.
 
 ### 수집 시점
-Synthesize 단계 직전 (Lead가 모든 agent/Codex 응답 합류 후).
+Synthesize 단계 직전 (Lead가 모든 agent/GPT 응답 합류 후).
 
 ### 수집 소스
 - **Agent <usage> 블록**: Agent tool 응답에 포함된 `<usage>total_tokens: N tool_uses: M duration_ms: T</usage>`
-- **Codex output**: `codex exec` stdout 마지막 부분 `tokens used N`
+- **GPT output**: `codex exec` stdout 마지막 부분 `tokens used N`
 - **Lead 추정**: tool_use 횟수 × 평균 (보수적)
 
 ### 출력 형식 1 — review-report.md 안
@@ -487,7 +487,7 @@ Synthesize 단계 직전 (Lead가 모든 agent/Codex 응답 합류 후).
 ```markdown
 ## 실측 비용
 - Tier: {0|1|2|3}  ·  Stage2 발화: {true|false}
-- Total tokens: {N}K (Lead {a}K + Agents {b}K + Codex {c}K)
+- Total tokens: {N}K (Lead {a}K + Agents {b}K + GPT {c}K)
 - Duration: {N}분 {M}초  ← ⛔ **구간 분해**: Gather {x}분 / Analyze {y}분 / Synthesize·Deliver {z}분
 - 필수 read-set: {N}줄  (`python3 scripts/hydration_manifest.py`)
 - 이슈 발견 수: Critical {n} / Major {m} / Minor {l} / Suggestion {p}
@@ -521,7 +521,7 @@ Synthesize 단계 직전 (Lead가 모든 agent/Codex 응답 합류 후).
   "tokens": {
     "lead": 30000,
     "agents": {},
-    "codex": 0,
+    "gpt": 0,
     "total": 30000,
     "method": "actual"
   },
@@ -559,7 +559,7 @@ jq -e '
                             structuralContext } })   // ⛔ 누락 시 에러 없이 구조 축이 꺼진다
 2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
              → parallelWithRetry (null 항목 1회 순차 재시도 = rate-limit 폴백 계약)
-3. Lead: /fz-gpt 경유 Codex challenger ×1  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
+3. Lead: /fz-gpt 경유 GPT challenger ×1  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
 4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
 ```
 
@@ -594,23 +594,23 @@ Stage 2: arch ↔ quality id-기반 교차 severity 조정 (correctness 불참)
          false_positive 판정은 실측 인용 필수
 Stage 3: review-counter DA — issues 반론 + strengths 도전
 → 반환 { …, crossAdjustments, strengthChallenges, distribution } → Lead가 Matrix에 반영
-→ Lead: Codex DA ×1 추가 (/fz-gpt)
+→ Lead: GPT DA ×1 추가 (/fz-gpt)
 ```
 
 > SendMessage 실시간 멀티턴 수렴은 **고정 1-pass 교차로 대체**됐다 (충실도 trade-off — 은폐하지 않고 명시). 라운드 의미론 canonical은 `patterns/live-review.md`에 보존.
 
 ---
 
-## Codex Analyze 호출
+## GPT Analyze 호출
 
 > `get_gpt_skill_path()` 3-Tier 디스커버리 + codex exec 패턴: `modules/cross-validation.md` 참조.
 
-Codex challenger 프롬프트에 필수 포함:
+GPT challenger 프롬프트에 필수 포함:
 - Origin Classification(regression/pre-existing/improvement)
 - Inheritance Chain(base class init/willSet 변경 시 subclass 검색)
 - `schemas/gpt_peer_review_schema.json` 스키마 사용
 
-결과: `${WORK_DIR}/codex-challenger-result.json`
+결과: `${WORK_DIR}/gpt-challenger-result.json`
 
 ⛔ codex exec background 호출 시 stdin lock 회피: `< /dev/null` redirect 필수.
 
@@ -632,7 +632,7 @@ GOOD: ARCH-1 "DIP 위반" → QUAL-4 "caller-analysis.md를 보면 default 없�
       오히려 ViewModel에서 더 많은 concrete 타입을 참조합니다" (증거 기반 보완)
 ```
 
-### Codex Devil's Advocate (공통, 1회 추가 호출)
+### GPT Devil's Advocate (공통, 1회 추가 호출)
 
 DA 사전 검증: 현재 브랜치 ≠ PR head이면 "diff 기준" 경고 삽입. reverse 판정은 `git show pr-{PR}:{file}`로 교차 확인.
 
@@ -648,6 +648,6 @@ DA 판정:
 
 ## 타임아웃 + 폴백
 
-에이전트별 타임아웃 수치(review-arch/quality 5분, Codex 3분, 전체 15분)는 **운영 목표이지 배선이 아니다** — `workflows/peer-review.js`에 timeout 구현이 없다(grep 0건). 스톨은 Lead가 관측해 판단한다.
+에이전트별 타임아웃 수치(review-arch/quality 5분, GPT 3분, 전체 15분)는 **운영 목표이지 배선이 아니다** — `workflows/peer-review.js`에 timeout 구현이 없다(grep 0건). 스톨은 Lead가 관측해 판단한다.
 타임아웃 항목은 `parallelWithRetry`가 1회 순차 재시도하고, 그래도 null이면 `reviews`에서 제외된다 — ⛔ `agent_status` 필드는 `PeerReviewSchema`에 없으므로 Lead 보정 대상이 아니다.
 폴백 체인: Tier 3→2→1→0 자동 전환.

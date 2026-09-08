@@ -1,6 +1,6 @@
 # Peer Review — Tier 2/3 Workflow 실행
 
-> ⛔ **Tier 2/3 전용.** `peer-review-tiers.md` 가 명시하듯 Tier 0/1 은 **sub-agent · Codex 호출이 없다** —
+> ⛔ **Tier 2/3 전용.** `peer-review-tiers.md` 가 명시하듯 Tier 0/1 은 **sub-agent · GPT 호출이 없다** —
 > 여기 있는 것을 한 번도 쓰지 않는다. `SKILL.md` 에 두면 경량 경로가 매 리뷰마다 읽고 버린다.
 >
 > 추출 근거(2026-08-26): S8 파일럿에서 경량 경로 비용이 병목으로 지목됐고, Tier 0/1 필수 read-set 이
@@ -31,7 +31,7 @@
      가 정확히 그렇게 누락돼 있었다.
    - base 원본은 Gather에서 prefetch하여 `basePath`로 전달 — 에이전트가 SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `agent-team-guide.md` §2)
 2. **반환 처리**: `mode:'workflow'` → reviews/issues를 Synthesize Step 입력으로. `mode:'fallback'` → Lead SOLO 리뷰 폴백.
-3. **Codex Analyze** (out-of-band, `--codex`/Tier3): Lead가 `/fz-gpt` 경유 challenger 호출 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과는 Synthesize Confidence Matrix의 Codex 열로 주입 — Matrix 생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9.
+3. **GPT Analyze** (out-of-band, `--gpt`/Tier3): Lead가 `/fz-gpt` 경유 challenger 호출 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과는 Synthesize Confidence Matrix의 GPT 열로 주입 — Matrix 생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9.
 
 > 산출물 계약(Confidence Matrix, origin severity 보정, confidence<80 미보고, dedup+투표)은 Synthesize Step에 보존 — Matrix·투표의 적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9. metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록.
 > ⚠️ **§5.7에 fz-peer-review 테이블이 아직 없다** (Wave 4가 `[Unreleased]` + 실 invoke 캘리브레이션 pending). 확산 임계 사전등록과 테이블 생성은 **별건** — 실 invoke 전에 처리해야 `확증 편향 방어`가 유지된다.
@@ -42,13 +42,13 @@
 스크립트가 반환 시 `agent` 키를 주입하므로 Lead가 받는 형태는 `{agent, issues[], strengths[], overall_assessment}`이다.
 
 **Per-Agent 품질 원칙**: 시니어 엔지니어가 PR 코멘트로 달 만한 이슈만 보고한다. 이슈 0개도 유효한 결과다.
-자체 confidence 80% 미만이면 보고하지 않는다. description ≤400chars (WHY 필수), suggestion ≤300chars, strengths ≤3. `challenges` 키는 Codex DA 전용 (기본값 `[]`).
+자체 confidence 80% 미만이면 보고하지 않는다. description ≤400chars (WHY 필수), suggestion ≤300chars, strengths ≤3. `challenges` 키는 GPT DA 전용 (기본값 `[]`).
 WHY: 이슈 수가 많으면 리뷰어 피로가 증가하고, 진짜 문제가 marginal finding에 묻힌다.
 
 ### 방법 A — 기본 (Orchestrator 합성)
 
 ```
-├─ 3개 결과 JSON 로드 (review-arch + review-quality + codex-challenger)
+├─ 3개 결과 JSON 로드 (review-arch + review-quality + gpt-challenger)
 ├─ 이슈 중복 제거 (파일 + line_range overlap + perspective fuzzy match)
 ├─ 이슈 간 충돌 식별 ("확장성 부족" vs "오버엔지니어링")
 └─ (Tier 3) 초기 Confidence Matrix 생성 / (Tier 2) modules/peer-review-gates.md § MergeContract § 9 Tier 2 행 대로 Lead 병합

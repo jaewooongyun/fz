@@ -1,4 +1,4 @@
-# Scope Challenge — Phase 3 Codex 이슈 분류 + Lead 독립 판정
+# Scope Challenge — Phase 3 GPT 이슈 분류 + Lead 독립 판정
 
 > 참조: `skills/fz-plan/SKILL.md` Phase 3, `skills/fz-gpt/SKILL.md` verify 응답, `schemas/gpt_review_schema.json`
 > 원본 근거: OBS-03 plan iteration 4회 (26시간, 40% 롤백) — 과잉 확장 방지
@@ -18,11 +18,11 @@
 
 ## 목적
 
-Codex verify 응답의 각 이슈를 `scope_disposition`으로 분류하여 fz-plan Phase 3에서 additive 자동 번역을 차단한다. Claude(Lead)와 Codex는 독립적으로 분류하며 불일치 시 사용자에게 에스컬레이션한다.
+GPT verify 응답의 각 이슈를 `scope_disposition`으로 분류하여 fz-plan Phase 3에서 additive 자동 번역을 차단한다. Claude(Lead)와 GPT는 독립적으로 분류하며 불일치 시 사용자에게 에스컬레이션한다.
 
 ## Q-S1 ~ Q-S4 체크포인트
 
-각 Codex 이슈를 fz-plan Phase 3에서 처리하기 전 필수 실행:
+각 GPT 이슈를 fz-plan Phase 3에서 처리하기 전 필수 실행:
 
 ### Q-S1: 요구사항 최소 집합 속하는가?
 - Yes → scope-in 후보
@@ -72,54 +72,54 @@ Q-S1~S4 결과를 다음 5개 중 하나로 매핑:
 
 ## Lead 독립 scope_disposition 절차 (P1-B Generator≠Evaluator)
 
-Codex(Generator) 판정을 Lead가 단순 수용하지 않도록 독립 판정 의무:
+GPT(Generator) 판정을 Lead가 단순 수용하지 않도록 독립 판정 의무:
 
 ```
 Phase 3.2 Lead 독립 판정:
 
-1. Codex verify 응답 수신. Codex_disposition 값을 **읽기 전** 다음 실행:
+1. GPT verify 응답 수신. GPT_disposition 값을 **읽기 전** 다음 실행:
 
 2. Lead 자체 Q-S1~S4 실행:
    - 이 이슈의 원문 및 위치만 참조
-   - Codex 분류 결과를 참조하지 않음 (독립성 보장)
+   - GPT 분류 결과를 참조하지 않음 (독립성 보장)
    - Lead_disposition 결정
 
 3. 비교:
-   - Lead_disposition == Codex_disposition → 채택
+   - Lead_disposition == GPT_disposition → 채택
    - 불일치 → AskUserQuestion (사용자 판정 + 근거)
 
 4. 기록: schema에 disposition 값 + 메타데이터:
    {
      "scope_disposition": "<채택된 값>",
      "meta": {
-       "codex_verdict": "<Codex 분류>",
+       "gpt_verdict": "<GPT 분류>",
        "lead_verdict": "<Lead 분류>",
        "resolution": "agreed | user_decided"
      }
    }
 ```
 
-**근거**: Generator≠Evaluator 원칙. Claude가 Codex 결과를 자동 수용하면 분류 자체가 single-model bias. 독립 판정 후 비교로 bias 차단.
+**근거**: Generator≠Evaluator 원칙. Claude가 GPT 결과를 자동 수용하면 분류 자체가 single-model bias. 독립 판정 후 비교로 bias 차단.
 
 ## Appendix: Q-S5 Decision Re-open Gate (P2-A, 관측 중)
 
 > **현 상태**: P2 (Decision-Lock 패턴 1회 관측, OBS-03 유일). 본 Phase 3 체크리스트에는 **미포함**.
 > **승격 조건**: OBS-04+ eligible session 1건에서 재현 시 P1 승격. 자동 자동 확장 없음.
 
-### Q-S5: 이 Codex 이슈가 **부모 결정 자체**를 재검토할 근거인가?
+### Q-S5: 이 GPT 이슈가 **부모 결정 자체**를 재검토할 근거인가?
 
 - Yes → scope_disposition = `parent-reopen` + AskUserQuestion
 - No → Q-S1~S4 통상 진행
 
 ### 발동 예시 (OBS-03)
 
-v3 "SCNetworkReachability bootstrap" 결정 후 v3.1에서 Codex가 "flag 정확 복제" 이슈 제기. 이 이슈가 bootstrap **자체**를 재평가할 근거라면 Q-S5 발동 → 사용자 확인 → Q0 Required 기준 재평가.
+v3 "SCNetworkReachability bootstrap" 결정 후 v3.1에서 GPT가 "flag 정확 복제" 이슈 제기. 이 이슈가 bootstrap **자체**를 재평가할 근거라면 Q-S5 발동 → 사용자 확인 → Q0 Required 기준 재평가.
 
 ### 승격 조건 (P2 → P1)
 
 1. OBS-04+ eligible session 1건에서 parent-reopen disposition 발동
 2. 발동 결과는 승격 관리 정책에 따라 기록 (본 모듈 범위 밖)
-3. 누적 후 Codex adversarial 검증 → approved 시 P1 승격
+3. 누적 후 GPT adversarial 검증 → approved 시 P1 승격
 
 ## Acceptance Criteria (P0-C 구현 완료 기준)
 

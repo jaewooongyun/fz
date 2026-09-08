@@ -75,7 +75,7 @@ fz-peer-review는 티켓 폴더와 별도 WORK_DIR을 사용:
 ├── confidence-matrix.md       # 생성 경로는 modules/peer-review-gates.md § MergeContract § 9
 ├── review-report.md
 ├── pr-comments.md
-└── {agent}-result.json        # raw 에이전트 결과 (arch, quality, codex)
+└── {agent}-result.json        # raw 에이전트 결과 (arch, quality, gpt)
 ```
 
 > 티켓 폴더 트리 내 중첩하지 않는 이유: peer-review는 PR 단위로 독립 실행되며, 티켓 작업과 무관할 수 있다.
@@ -278,7 +278,7 @@ Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이
 | code/step-{N} | 3K tokens | 구현 결과 + 결정 근거 <!-- 기존: 1.5K --> |
 | code/progress | 5K tokens | 전체 Step 진행 상황 <!-- 기존: 1.5K --> |
 | *-team.md | 5K tokens | 요약 기본. 원본은 *-team-full.md (drill-down용, Hydration 대상 아님) |
-| verify-result.md | 3K tokens | Codex 요약 (원본: verify-result-full.md) |
+| verify-result.md | 3K tokens | GPT 요약 (원본: verify-result-full.md) |
 
 **Eviction 우선순위** (budget 100K 초과 시):
 1. 가장 오래된 discover-{phase}.md (journal은 보존)
@@ -433,7 +433,7 @@ compact 후 복원은 context summary보다 **파일 Read가 더 정확**하다.
 
 ### 적용 규칙
 
-1. **MCP 출력 격리**: 대용량 결과(Grep, 심볼 분석, Codex)는 파일로 저장 후 Read 참조. context에 raw 출력 남기지 않음
+1. **MCP 출력 격리**: 대용량 결과(Grep, 심볼 분석, GPT)는 파일로 저장 후 Read 참조. context에 raw 출력 남기지 않음
 2. **중간 산출물 즉시 기록**: 분석 결과가 나오면 대화에 축적하지 말고 티켓 폴더 파일/Serena에 즉시 기록 → compact 시 Read로 복원
 3. **에이전트 스폰 최소화**: 스폰마다 ~50K 토큰 재주입. 단순 작업은 직접 실행
 4. **참조 파일 선택적 로드**: 전체 파일 Read 대신 필요 섹션만 (offset/limit). 500줄+ 파일은 분할 읽기

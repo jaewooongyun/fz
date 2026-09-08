@@ -96,7 +96,7 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 > PR 교훈 `[미검증: 사용자 제공]`:
 > - `ReachabilityManager.isReachableViaWWAN() = (Reachable AND IsWWAN)` 이중 게이트
 > - evidence 매핑이 `→ isReachableViaCellular`로 simplify되어 reachable 게이트 누락
-> - 6-Layer 검증 (boolean equiv + Opus + Sonnet + Codex + Lead self + DA) 모두 통과 → CodeRabbit (rule-based) 단독 발견
+> - 6-Layer 검증 (boolean equiv + Opus + Sonnet + GPT + Lead self + DA) 모두 통과 → CodeRabbit (rule-based) 단독 발견
 
 ### Pre-Trigger (fail-closed)
 
@@ -180,7 +180,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 
 ## Gate 4.6.5: Inheritance Chain Impact Gate
 
-> PR 교훈: Base class init에 optional DI 파라미터 추가 시, 3/3 Claude 에이전트가 미탐지. Codex(gpt-5.4)만 발견.
+> PR 교훈: Base class init에 optional DI 파라미터 추가 시, 3/3 Claude 에이전트가 미탐지. GPT(gpt-5.4)만 발견.
 > 원인: diff에 subclass init 변경이 없어 분석 대상에서 제외됨. 컴파일러도 default value 존재로 미탐지.
 
 **감지 조건** (하나라도):
@@ -419,7 +419,7 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리포인트
 
 ⛔ **이 절이 병합의 SSOT 다.** 다른 문서와 어긋나면 여기가 이긴다 — 특히 두 지점:
 - `SKILL.md` § Synthesize 의 dedup·투표 서술은 **Tier 3 전용**이다. 전 경로 dedup 키는 §3(`discoveryAxis` 포함)을 따른다
-- Codex `reverse` 는 §6 대로 **`question` 전환**이다 — 이종 검증에 삭제 권한을 주지 않는다. `peer-review-tiers.md` § Codex Devil's Advocate 도 같은 규칙을 적고 여기를 가리킨다
+- GPT `reverse` 는 §6 대로 **`question` 전환**이다 — 이종 검증에 삭제 권한을 주지 않는다. `peer-review-tiers.md` § GPT Devil's Advocate 도 같은 규칙을 적고 여기를 가리킨다
 
 > 배경: 한 Tier 2 실행에서 Lead 가 문서에 없는 `[L실측] 우선` 규칙을 그 자리에서 만들어 썼다. 그것으로 3건이 살아났고 렌즈가 못 찾아 Lead 가 직접 발굴한 2건도 들어갔다 — 최종 14건 중 5건이 **문서화되지 않은 판단**에 의존했다. 계약을 세우는 목적은 그 5건을 죽이는 것이 아니라 **정식 경로로 살리는 것**이다.
 
@@ -428,7 +428,7 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리포인트
 | 입력원 | Tier 0 | Tier 1 | Tier 2 | Tier 3 |
 |---|:---:|:---:|:---:|:---:|
 | 렌즈 (arch·quality·correctness) | — | — | 3 | 3 |
-| Codex challenger | `--codex` 시 | ✓ | ✓ | ✓✓ |
+| GPT challenger | `--gpt` 시 | ✓ | ✓ | ✓✓ |
 | Lead 실측 | ✓ | ✓ | ✓ | ✓ |
 
 ⛔ SSOT 는 `modules/peer-review-tiers.md` § Tier 구성 표다. 여기 표는 그것을 병합 관점으로 다시 쓴 것이며 **수치가 어긋나면 tiers 표가 이긴다**.
@@ -466,7 +466,7 @@ Lead 발견이 렌즈 판정을 이기려면 **증거 형식**을 갖춰야 한�
 
 ⚠️ 단 `discoveryAxis` 를 반드시 부여한다. 그래야 "어느 축이 렌즈에서 비어 있었나"가 집계에 남는다.
 
-### 6. Codex verdict 처리
+### 6. GPT verdict 처리
 
 | verdict | 처리 |
 |---|---|
@@ -479,7 +479,7 @@ Lead 발견이 렌즈 판정을 이기려면 **증거 형식**을 갖춰야 한�
 
 ### 7. origin·severity 보정 순서
 
-`origin 판정` → `pre-existing 이면 suggestion 으로 cap` → `improvement 는 cap 없이 non-blocking 표기` → `Codex verdict 반영` → `disposition 결정`
+`origin 판정` → `pre-existing 이면 suggestion 으로 cap` → `improvement 는 cap 없이 non-blocking 표기` → `GPT verdict 반영` → `disposition 결정`
 
 순서를 지킨다. severity 를 먼저 정하면 origin 이 그것을 못 내린다.
 
@@ -499,7 +499,7 @@ Lead 발견이 렌즈 판정을 이기려면 **증거 형식**을 갖춰야 한�
 | Tier | 산식 |
 |---|---|
 | 0 | 투표 없음 (렌즈 0) — Lead 판정 + §4 자격 |
-| 1 | **2-vote** (Lead + Codex) |
+| 1 | **2-vote** (Lead + GPT) |
 | **2** | ⛔ **투표 없음 — 단순 병합.** Matrix 를 만들지 않는다 |
 | 3 | **3-vote** + Stage2 교차 + Stage3 DA 반영 |
 
@@ -561,7 +561,7 @@ Lead 가 `crossVerdicts[]` 를 읽고 § 4(Lead 실측의 자격)로 판정한�
 | **Negative-Result Gate** | **생존** | "0건" 이 도구 고장인지 대상 부재인지는 경로와 무관 |
 | **InputHygiene (C3)** | **생존 — 형태 변경** | Tier 0/1 은 차단이 아니라 **탐지·표시 + 강등**(§ InputHygiene 이 규정) |
 | **MergeContract (C1)** | **생존** | § MergeContract 가 전 경로 SSOT |
-| **Reflection Rate** | **조건부** | Codex 호출이 있을 때만(Tier 1). `N<10` 은 preliminary — verdict 보류 |
+| **Reflection Rate** | **조건부** | GPT 호출이 있을 때만(Tier 1). `N<10` 은 preliminary — verdict 보류 |
 | Confidence Matrix | **미적용** | Tier 0 은 simple checklist · Tier 2 는 미투표 — **설계상 부재** |
 | Stage 2 교차 조정 | **미적용** | Workflow 미사용 경로 |
 

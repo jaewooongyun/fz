@@ -73,7 +73,7 @@ review-quality → SendMessage(Lead):
 - 리뷰 대상(diff, symbols) 사전 수집 → 에이전트에 전달
 - 2명의 최종 보고 통합 → severity 기반 우선순위 정렬
 - 중복 이슈 병합 + false positive 최종 판정
-- Codex 검증 위임 (fz-gpt validate)
+- GPT 검증 위임 (fz-gpt validate)
 - 이슈 목록 확정 → 수정 또는 리포트 출력
 
 ## fz-review vs fz-peer-review

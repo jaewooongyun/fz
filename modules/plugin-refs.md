@@ -13,7 +13,7 @@
 - [SwiftUI Expert](#swiftui-expert)
 - [Swift Concurrency](#swift-concurrency)
 - [참조 스킬](#참조-스킬)
-- [Codex 스킬용 iOS 지식 임베딩 원칙](#codex-스킬용-ios-지식-임베딩-원칙)
+- [GPT 스킬용 iOS 지식 임베딩 원칙](#gpt-스킬용-ios-지식-임베딩-원칙)
 - [설계 원칙](#설계-원칙)
 
 ---
@@ -140,20 +140,20 @@ diff에 `@MainActor`, `actor`, `async`, `await`, `Task`, `Sendable`, `AsyncStrea
 | /fz-peer-review | SwiftUI/Concurrency 피어 리뷰 |
 | /fz-search | Swift 심볼 탐색 |
 
-## Codex 스킬용 iOS 지식 임베딩 원칙
+## GPT 스킬용 iOS 지식 임베딩 원칙
 
-> GPT Codex는 Claude 플러그인(swiftui-expert, swift-concurrency)에 직접 접근 불가.
-> 대신, 핵심 iOS 지식을 각 Codex 스킬 SKILL.md에 직접 임베딩한다.
+> GPT GPT는 Claude 플러그인(swiftui-expert, swift-concurrency)에 직접 접근 불가.
+> 대신, 핵심 iOS 지식을 각 GPT 스킬 SKILL.md에 직접 임베딩한다.
 
 ### 임베딩 원칙
 1. **핵심 체크포인트만** — 상세 설명이 아닌 체크 항목 형식으로 작성
-2. **iOS 16 최소 타겟 명시** — 모든 Codex 스킬에 `#available` 규칙 포함
-3. **중복 최소화** — Codex 스킬에는 GPT가 즉시 판단 가능한 패턴만 기술
-4. **업데이트 연동** — SwiftUI Expert/Concurrency 플러그인 버전업 시 Codex 스킬도 검토
+2. **iOS 16 최소 타겟 명시** — 모든 GPT 스킬에 `#available` 규칙 포함
+3. **중복 최소화** — GPT 스킬에는 GPT가 즉시 판단 가능한 패턴만 기술
+4. **업데이트 연동** — SwiftUI Expert/Concurrency 플러그인 버전업 시 GPT 스킬도 검토
 
 ### 현재 임베딩 현황
 
-| Codex 스킬 | SwiftUI | Concurrency | RIBs Lifecycle |
+| GPT 스킬 | SwiftUI | Concurrency | RIBs Lifecycle |
 |-----------|:-------:|:-----------:|:--------------:|
 | fz-reviewer | ✅ | ✅ | ✅ |
 | fz-architect | 부분 (1줄) | 부분 (2줄) | ✅ (Q1-Q5) |
