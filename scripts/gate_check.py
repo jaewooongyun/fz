@@ -397,7 +397,7 @@ def env_fingerprint() -> str:
 
     | 해시 | 무엇을 묶나 | 환경 |
     |------|------------|:----:|
-    | 승인 도장 | 사람·Codex 가 승인한 oracle | ⛔ 제외 |
+    | 승인 도장 | 사람·GPT 가 승인한 oracle | ⛔ 제외 |
     | 증거 서명 | 이 결과가 **어느 환경에서** 나왔나 | ✅ 포함 |
     """
     return sha(f"{os.environ.get('SHELL', '/bin/sh')}|{path_fingerprint()}")[:HASH_LEN]

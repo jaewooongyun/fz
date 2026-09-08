@@ -69,7 +69,7 @@ ITEMS = [
     #        대부분 다른 문서·논문의 절을 문맥상 축약한 표기(`§2.4`=OpenDev 논문, `§5.7`=experiment-log)라
     #        정적으로 대상 문서를 특정할 수 없다. 도입하면 오탐률이 #13 강등 선례(89건)를 재현한다.
     ("N11", "DETERMINISTIC", "skills", "경량 경로 검증 계약 — light/tier 경로를 가진 스킬은 **그 경로 절차가 있는 문서**에 어떤 검증이 살아남는지 선언한다. ⛔ 절차를 모듈로 위임하면 그 모듈에도 있어야 한다 — SKILL.md 에만 적으면 위임 절차를 따르는 Lead 가 못 본다 (실측: Coverage Gate 가 `### 4. Confidence Matrix 출력` 안에 있는데 Tier 0 은 그 섹션을 건너뛴다)"),
-    ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 codex 응답이 아니다)"),
+    ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 gpt 응답이 아니다)"),
     ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
 ]
 DET = {i for i, k, _, _ in ITEMS if k == "DETERMINISTIC"}
@@ -1139,7 +1139,7 @@ def chk_N10(root: Path | None = None):
 
     ⛔ **대상은 사용처가 정한다.** 파일명 목록(#N1 의 과거 결합)도, top-level
        `properties` 유무도 기준이 아니다 — `issue_tracker_schema.json` 은 top-level
-       properties 를 갖지만 Issue Tracker **산출물** 형식이고 codex 응답이 아니다.
+       properties 를 갖지만 Issue Tracker **산출물** 형식이고 gpt 응답이 아니다.
        `gpt_base_issue_schema.json` 은 `$defs` 참조용이다. 실제 전달되는 것만 본다.
 
     ⛔ `type` 이 리스트인 객체도 대상이다. nullable 로 만들면 `"object"` →
