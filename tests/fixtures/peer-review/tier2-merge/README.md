@@ -9,7 +9,7 @@ Stage 1 3-렌즈가 낸 원본 findings 24건이 최종 14건으로 병합된 �
 | 파일 | 내용 |
 |---|---|
 | `stage1-input.json` | 3-렌즈 원본 24건 — `id` · `severity` · `perspective` · `origin` · `confidence` |
-| `expected-output.json` | 병합 후 14건 — `votes` · `basis` · `found_by` · `codex_verdict` 포함 |
+| `expected-output.json` | 병합 후 14건 — `votes` · `basis` · `found_by` · `gpt_verdict` 포함 |
 
 ## 왜 판정 필드만 있는가
 
@@ -17,7 +17,7 @@ Stage 1 3-렌즈가 낸 원본 findings 24건이 최종 14건으로 병합된 �
 
 파일명은 `SourceFile{N}.ext`로 치환했다. dedup 키가 `파일 + line_range 겹침`이므로 **동일 파일 여부와 범위 구조는 보존**했고 실제 경로만 지웠다.
 
-`codex_verdict`도 자유 문장에서 종류(`agree` · `challenge` · `reverse` · `supplement`)만 남겼다.
+`gpt_verdict`도 자유 문장에서 종류(`agree` · `challenge` · `reverse` · `supplement`)만 남겼다.
 
 ## 이 실행이 대표하는 것
 
@@ -41,6 +41,6 @@ Stage 1 3-렌즈가 낸 원본 findings 24건이 최종 14건으로 병합된 �
 입력  stage1-input.json  →  병합 계약 적용  →  expected-output.json 과 대조
 ```
 
-대조 대상: 최종 건수 · 각 항목의 `id`·`severity`·`origin` · `votes.count` · `codex_verdict`.
+대조 대상: 최종 건수 · 각 항목의 `id`·`severity`·`origin` · `votes.count` · `gpt_verdict`.
 
 ⚠️ `confidence` 값은 Lead 판정이 반영된 결과라 계약 구현이 달라지면 바뀔 수 있다. 값 자체보다 **어떤 항목이 살아남았는가**를 먼저 본다.

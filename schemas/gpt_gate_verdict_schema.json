@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Codex Gate Verdict",
+  "title": "GPT Gate Verdict",
   "description": "게이트 원장의 각 게이트에 대한 독립 판정. ⛔ 게이트당 정확히 1행 — 통과한 게이트도 표현해야 N/N 대조가 성립한다(gpt_review_schema 의 issues 배열은 문제만 담아 전수 확인 불가). 소비: fz-plan Phase 2(architect, 생성 시점) · fz-review Phase 5.5(guardian, 변경 후).",
   "type": "object",
   "required": [

@@ -24,7 +24,7 @@
     "review-correctness",
     "lead"
    ],
-   "codex_verdict": "challenge"
+   "gpt_verdict": "challenge"
   },
   {
    "id": "I2",
@@ -43,7 +43,7 @@
     "review-quality",
     "review-correctness"
    ],
-   "codex_verdict": "reverse"
+   "gpt_verdict": "reverse"
   },
   {
    "id": "I3",
@@ -61,10 +61,10 @@
     "review-arch",
     "review-quality",
     "review-correctness",
-    "codex-challenger",
+    "gpt-challenger",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I4",
@@ -80,10 +80,10 @@
    "basis": "CV",
    "found_by": [
     "review-quality",
-    "codex-challenger",
+    "gpt-challenger",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I5",
@@ -99,10 +99,10 @@
    "basis": "CV",
    "found_by": [
     "review-arch",
-    "codex-challenger",
+    "gpt-challenger",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I6",
@@ -122,7 +122,7 @@
     "review-correctness",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I7",
@@ -140,7 +140,7 @@
     "review-correctness",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I8",
@@ -158,7 +158,7 @@
     "review-quality",
     "review-correctness"
    ],
-   "codex_verdict": "reverse"
+   "gpt_verdict": "reverse"
   },
   {
    "id": "I9",
@@ -176,10 +176,10 @@
     "review-arch",
     "review-quality",
     "review-correctness",
-    "codex-challenger",
+    "gpt-challenger",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I10",
@@ -197,7 +197,7 @@
     "review-correctness",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I11",
@@ -216,7 +216,7 @@
     "review-quality",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I12",
@@ -234,7 +234,7 @@
     "review-correctness",
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I13",
@@ -251,7 +251,7 @@
    "found_by": [
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   },
   {
    "id": "I14",
@@ -268,7 +268,7 @@
    "found_by": [
     "lead"
    ],
-   "codex_verdict": null
+   "gpt_verdict": null
   }
  ]
 }
