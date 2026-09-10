@@ -87,6 +87,22 @@ MUTABLE = re.compile(
 DOC_SUFFIXES = (".md", ".markdown", ".txt", ".rst", ".adoc")
 
 
+LOW_CONFIDENCE = {
+    # ⛔ 카테고리에 속하지만 **단독으로는 그 카테고리를 성립시키지 못하는** 토큰.
+    #    실측(F-165, PR #4841): 미니플레이어 드래그 PR 이 `session` 을 지역 변수명으로
+    #    48회 써서 auth 48건 → tier_delta +2 가 났다. 인증과 무관한 PR 이다.
+    #    ⛔ 경계(`\bsession\b`)를 더 조여도 못 막는다 — 이미 경계이고 변수명이 정확히 그 단어다.
+    #    처방은 경계 강화가 아니라 **신뢰도 분리**: samples 에는 남겨 사람이 보되,
+    #    같은 hunk 에 고신뢰 토큰이 없으면 risk 계수에서 뺀다.
+    "auth": {"session"},
+}
+
+# 저신뢰 토큰과 동반해야 그 카테고리를 성립시키는 고신뢰 토큰 (카테고리 패턴의 substring 갈래)
+HIGH_CONFIDENCE = {
+    "auth": re.compile(r"(?i)auth|token|secret|credential|permission|keychain|crypto|certificate|privacy"),
+}
+
+
 def _tally(matches):
     """매치를 토큰별로 센다. 대소문자는 무시한다 — `(?i)` 패턴이 `Auth`/`auth` 를
     서로 다른 토큰으로 만들면 net 비교가 어긋난다.
@@ -109,9 +125,10 @@ def added_lines_by_file(diff_text):
        상태 없이 접두사만 보면 그 행을 잃고 뒤따르는 추가 행도 엉뚱한 파일에 붙는다.
     """
     files, removed, current, in_hunk = {}, {}, None, False
+    hunks, cur_hunk = [], None
     for line in diff_text.splitlines():
         if line.startswith("diff --git "):
-            current, in_hunk = None, False
+            current, in_hunk, cur_hunk = None, False, None
         elif not in_hunk and line.startswith("+++ "):
             path = line[4:].strip()
             current = path[2:] if path.startswith("b/") else path
@@ -124,16 +141,22 @@ def added_lines_by_file(diff_text):
             continue
         elif line.startswith("@@"):
             in_hunk = True
+            # ⛔ hunk 단위 묶음 — 저신뢰 토큰의 **동반 판정**에 쓴다. 파일 단위로 보면
+            #    파일 어딘가에 auth 가 있다는 이유로 무관한 hunk 의 session 이 성립한다.
+            cur_hunk = {"path": current, "added": []}
+            hunks.append(cur_hunk)
         elif in_hunk and current is not None:
             if line.startswith("+"):
                 files[current].append(line[1:])
+                if cur_hunk is not None:
+                    cur_hunk["added"].append(line[1:])
             elif line.startswith("-"):
                 removed[current].append(line[1:])
-    return files, removed
+    return files, removed, hunks
 
 
 def scan(diff_text):
-    by_file, removed_by_file = added_lines_by_file(diff_text)
+    by_file, removed_by_file, hunks = added_lines_by_file(diff_text)
     all_added = [ln for lines in by_file.values() for ln in lines]
     all_removed = [ln for lines in removed_by_file.values() for ln in lines]
     blob = "\n".join(all_added)
@@ -164,13 +187,24 @@ def scan(diff_text):
                     for t, c in added_tokens.items() if c > removed_tokens.get(t, 0)}
         if not exceeded:
             continue          # 순증한 토큰이 없다 — 이 PR 이 만든 위험이 아니다
-        hits[name] = {
+        hit = {
             "label": label,
             "samples": sorted(exceeded)[:3],
             "added": sum(added_tokens.values()),
             "removed": sum(removed_tokens.values()),
             "net_tokens": {t: v[0] - v[1] for t, v in exceeded.items()},
         }
+        # ⛔ 저신뢰 토큰만으로 성립한 카테고리는 **같은 hunk** 의 고신뢰 토큰 동반을 요구한다.
+        #    samples 는 그대로 둔다 — 사람이 보고 판정할 근거는 남기고, 자동 승격만 막는다.
+        lo = LOW_CONFIDENCE.get(name)
+        if lo and set(exceeded) <= lo:
+            hi = HIGH_CONFIDENCE[name]
+            lo_re = re.compile(r"(?i)\b(?:%s)\b" % "|".join(sorted(lo)))
+            companion = any(lo_re.search(t) and hi.search(t)
+                            for t in ("\n".join(h["added"]) for h in hunks))
+            if not companion:
+                hit["low_confidence_only"] = True
+        hits[name] = hit
 
     # 역방향: 싱글톤 선언과 가변 프로퍼티가 같은 파일에 있으면 동시성 위험
     for path, lines in by_file.items():
@@ -186,7 +220,8 @@ def scan(diff_text):
 
     return {
         "categories": sorted(hits),
-        "risk": len(hits),
+        # ⛔ 저신뢰 단독 카테고리는 risk 에서 뺀다 — detail/categories 에는 남아 사람이 본다.
+        "risk": sum(1 for h in hits.values() if not h.get("low_confidence_only")),
         "detail": hits,
         "added_lines": len(all_added),
         "files": len(by_file),
