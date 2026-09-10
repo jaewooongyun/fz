@@ -195,6 +195,34 @@ if $is_pr && ! git rev-parse --verify "$BASE" >/dev/null 2>&1; then
   done
 fi
 
+# ── base 신선도 (원격 대조) ──────────────────────────────────
+# ⛔ `remote/branch` 로컬 ref 는 **마지막 fetch 시점**이지 원격의 현재가 아니다.
+#    실측(F-089): 39커밋 stale 인 base 로 "0커밋 앞섬" 이 나왔다 — 리뷰 표면이 통째로 틀린다.
+# ⛔ `git fetch` 는 하지 않는다. 로컬 ref 를 바꾸면 이미 뜬 diff 와 수집 대상이 어긋난다 —
+#    대조만 하고 판단은 읽는 사람에게 넘긴다.
+# ⚠️ 보조 검사다. ls-remote 실패(오프라인·권한)는 GATHER-NOTE 로 남기고 통과시킨다 —
+#    fail-closed 로 만들면 네트워크 없는 환경에서 수집 자체가 죽는다.
+#    `GIT_TERMINAL_PROMPT=0` 은 자격증명 프롬프트로 Gather 가 멈추는 것을 막는다.
+BASE_STALE=0 BASE_REMOTE_SHA="" BASE_LOCAL_SHA=""
+case "$BASE" in
+  */*)
+    base_rem="${BASE%%/*}"
+    base_br="${BASE#*/}"
+    if git config --get "remote.${base_rem}.url" >/dev/null 2>&1; then
+      if ls_heads=$(GIT_TERMINAL_PROMPT=0 git ls-remote --heads "$base_rem" "$base_br" 2>/dev/null) && [ -n "$ls_heads" ]; then
+        # ⛔ `--heads <패턴>` 은 `refs/heads/x/main` 도 물어온다 — 정확히 일치하는 ref 만 고른다.
+        BASE_REMOTE_SHA=$(printf '%s\n' "$ls_heads" | awk -v r="refs/heads/$base_br" '$2==r{print $1; exit}')
+        BASE_LOCAL_SHA=$(git rev-parse "$BASE" 2>/dev/null)
+        if [ -n "$BASE_REMOTE_SHA" ] && [ -n "$BASE_LOCAL_SHA" ] && [ "$BASE_REMOTE_SHA" != "$BASE_LOCAL_SHA" ]; then
+          BASE_STALE=1
+        fi
+      else
+        echo "GATHER-NOTE: '${base_rem}' ls-remote 실패 — 원격 대조 생략" >&2
+      fi
+    fi
+    ;;
+esac
+
 # `git diff A...B` 는 **merge-base** 기준이다. BASE 팁이 앞서 있으면 팁의 내용은
 # diff 가 비교한 원본이 아니다 — 해석되는 경우에만 merge-base 로 바꾼다.
 BASE_REF="$BASE"
@@ -227,6 +255,11 @@ fi
   printf '# 리뷰 표면
 
 '
+  if [ "$BASE_STALE" -eq 1 ]; then
+    printf '⛔ 로컬 base 가 원격보다 뒤다 — 원격 %s · 로컬 %s. fetch 후 재수집을 권한다.
+
+' "${BASE_REMOTE_SHA:0:7}" "${BASE_LOCAL_SHA:0:7}"
+  fi
   if [ "$BASE_REF" != "$BASE" ] && [ -n "$HEAD_REF" ]; then
     ahead=$(git rev-list --count "${BASE_REF}..${BASE}" 2>/dev/null || echo "?")
     printf 'base 팁이 분기점(`%s`)보다 **%s커밋 앞서** 있다.
