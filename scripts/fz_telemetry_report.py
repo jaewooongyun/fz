@@ -487,6 +487,8 @@ def collect_findings(findings_dir, since, until):
     """
     out = {
         "n": 0,
+        "total_files": 0,
+        "skipped_no_frontmatter": 0,
         "by_month": collections.Counter(),
         "detector": collections.Counter(),
         "stage": collections.Counter(),
@@ -496,8 +498,11 @@ def collect_findings(findings_dir, since, until):
         "verdict_estimated": 0,
     }
     for path in sorted(glob.glob(os.path.join(findings_dir, "F-*.md"))):
+        out["total_files"] += 1
         meta = _read_frontmatter(path)
         if meta is None:
+            # ⛔ 읽지 못한 파일을 세지 않으면 분모가 조용히 줄어든다.
+            out["skipped_no_frontmatter"] += 1
             continue
         day = meta.get("date")
         stamp = parse_day(day) if re.match(r"^\d{4}-\d{2}-\d{2}$", str(day or "")) else None
@@ -720,6 +725,8 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
         "effort_all": dict(agg.effort_all),
         "findings": {
             "n": findings["n"],
+            "total_files": findings["total_files"],
+            "skipped_no_frontmatter": findings["skipped_no_frontmatter"],
             "by_month": dict(findings["by_month"]),
             "detector": dict(findings["detector"]),
             "stage": dict(findings["stage"]),
@@ -744,13 +751,15 @@ def render_markdown(payload):
     lines.append("")
     lines.append(
         "집계 대상: 트랜스크립트 %d파일(메시지 있는 파일 %d) · assistant 메시지 %d건 · "
-        "워크플로 journal %d실행 · findings %d건."
+        "워크플로 journal %d실행 · findings %d/%d건 (frontmatter 없음 %d)."
         % (
             payload["denominators"]["transcript_files"],
             payload["denominators"]["transcript_files_with_messages"],
             payload["denominators"]["assistant_messages"],
             payload["denominators"]["journal_runs"],
             payload["denominators"]["findings"],
+            payload["findings"]["total_files"],
+            payload["findings"]["skipped_no_frontmatter"],
         )
     )
     lines.append(
