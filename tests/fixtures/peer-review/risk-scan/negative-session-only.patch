@@ -1,0 +1,6 @@
+diff --git a/A.swift b/A.swift
+--- a/A.swift
++++ b/A.swift
+@@ -1,2 +1,4 @@
++    if case .dragging(let session) = displacement {
++        session.translation = value.translation

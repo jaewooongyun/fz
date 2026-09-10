@@ -55,6 +55,31 @@
       "risk": 1,
       "why": "⛔ 회귀 방지: `-await other()` / `+Task { detached() }` 는 concurrency **합계**가 1:1 이라 카테고리 단위 net 으로는 미발화했다. 구조적 동시성 → 비구조적 전환은 **새 위험**이다. 토큰별로 세면 `task {` 가 1>0 이라 잡힌다",
       "added_lines": 1
+    },
+    "negative-session-only": {
+      "risk": 0,
+      "added_lines": 2,
+      "why": "F-165: `session` 을 지역 변수명으로만 쓴 PR(미니플레이어 드래그 #4841, 실측 48건). 고신뢰 auth 토큰 0 → auth 카테고리 미성립. ⛔ samples 에는 session 이 남아 사람이 판정할 근거가 된다"
+    },
+    "positive-session-with-netnew-auth-same-hunk": {
+      "risk": 1,
+      "added_lines": 2,
+      "why": "같은 hunk 에 net-new `authManager` 동반 → auth 성립. session 이 아니라 auth 토큰이 카테고리를 세운다"
+    },
+    "positive-session-plus-netnew-auth-other-hunk": {
+      "risk": 1,
+      "added_lines": 2,
+      "why": "⛔ 다른 hunk 여도 net-new auth 는 그 자체로 정당한 신호다 — hunk 거리와 무관하게 성립. 저신뢰 판정은 **저신뢰 토큰만 순증했을 때**만 발동한다"
+    },
+    "positive-session-near-renamed-auth": {
+      "risk": 1,
+      "added_lines": 2,
+      "why": "auth 는 개명이라 net 0(순증 아님)이지만 **같은 hunk** 에 있다 → 인증 코드를 편집하는 중의 session 이므로 성립. 여기서 hunk 근접이 갈린다"
+    },
+    "negative-session-far-from-renamed-auth": {
+      "risk": 0,
+      "added_lines": 2,
+      "why": "auth 개명(net 0)이 **다른 hunk** 에 있고 session 만 순증 → 미성립. 위 케이스와 짝이며 hunk 로직이 죽은 코드가 아님을 증명한다"
     }
   }
 }

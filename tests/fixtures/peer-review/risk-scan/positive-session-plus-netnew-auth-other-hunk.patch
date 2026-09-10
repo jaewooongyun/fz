@@ -1,0 +1,7 @@
+diff --git a/A.swift b/A.swift
+--- a/A.swift
++++ b/A.swift
+@@ -1,2 +1,3 @@
++    if case .dragging(let session) = displacement {
+@@ -40,2 +41,3 @@
++    let authManager = AuthManager()
