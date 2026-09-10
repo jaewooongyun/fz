@@ -551,7 +551,7 @@ jq -e '
 
 ## Tier 2: Lite — 실행 시퀀스
 
-> ⛔ **standalone Agent() 금지** — Analyze는 `workflows/peer-review.js` Workflow가 소유한다 (결정적 스크립트, P2P SendMessage 없음). `SKILL.md` Boundaries와 동일 지시.
+> ⛔ **standalone Agent() 금지** — Gather 의 evidence 수집과 Analyze는 `workflows/peer-review.js` Workflow가 소유한다 (결정적 스크립트, P2P SendMessage 없음). `SKILL.md` Boundaries와 동일 지시.
 
 ```
 1. Lead: Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js',   // ⛔ 거부 시 정본 = guides/skill-authoring.md §12 우회 계약 (SOLO 폴백 아님)
