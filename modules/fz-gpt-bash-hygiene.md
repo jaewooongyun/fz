@@ -191,6 +191,8 @@ codex exec ... -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
 
 ## 8. ⛔ `scripts/gpt-exec.sh` 경유 의무 (2026-08-09 — **본 절이 정본 호출 경로**)
 
+> 경로 기준은 **플러그인 루트**다 — `scripts/resolve-plugin-root.sh` 로 해석한 `${FZ_PLUGIN_ROOT}` 를 앞에 붙인다. 스킬 base directory 기준으로 읽으면 `skills/fz-gpt/scripts/` 를 찾다가 파일 없음에서 막힌다.
+
 > §1~§7을 손으로 조립하지 않는다. `guides/skill-authoring.md` §11 판정("결과가 binary(pass/fail)인가? → 스크립트")이 본 모듈 전체에 적용된다 — hygiene 규칙은 전부 binary다.
 
 **신설 근거 (실측 2건, 2026-08-09 세션)**:
@@ -206,11 +208,11 @@ codex exec ... -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
 
 ```bash
 # review: 대상 선택은 플래그로만 (PROMPT 불가 — 스크립트가 거부한다)
-scripts/gpt-exec.sh review --cd "$GIT_ROOT" --out "$F" --uncommitted [--effort high] [--schema S] [--title T] [--ephemeral]
-scripts/gpt-exec.sh review --cd "$GIT_ROOT" --out "$F" --base develop [--add-dir D]
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --uncommitted [--effort high] [--schema S] [--title T] [--ephemeral]
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --base develop [--add-dir D]
 
 # exec: 커스텀 지시가 필요할 때 (diff는 프롬프트에 인라인 — 스코프 플래그 금지)
-scripts/gpt-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S]
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S]
 ```
 
 ### 사전 게이트 (호출 전 거부)
@@ -238,7 +240,7 @@ scripts/gpt-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort
 
 ```bash
 BEFORE="$(git -C "$CD" status --porcelain 2>/dev/null)"
-scripts/gpt-exec.sh ... ; RC=$?
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" ... ; RC=$?
 AFTER="$(git -C "$CD" status --porcelain 2>/dev/null)"
 [ "$BEFORE" = "$AFTER" ] || echo "WARN: cwd 오염 — 새 파일을 개인 경로로 옮겨라: $(diff <(printf '%s' "$BEFORE") <(printf '%s' "$AFTER") | grep '^>')" >&2
 ```
