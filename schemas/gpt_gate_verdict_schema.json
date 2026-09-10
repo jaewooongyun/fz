@@ -46,7 +46,8 @@
             "description": "원장의 게이트 id"
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "원장 줄의 제목을 글자 그대로 복사한다. 축약·요약하면 --verdict-check 의 (id,title,kind) 대조가 stale 로 거부한다."
           },
           "kind": {
             "type": "string",

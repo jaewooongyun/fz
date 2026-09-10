@@ -115,6 +115,7 @@ scripts/gpt-exec.sh exec \
 {cat "$LEDGER"}
 
 각 게이트마다 판정 1행. ⛔ 통과한 게이트도 표현하라 — 누락은 미판정이며 통과가 아니다.
+id·title·kind 는 원장 줄과 **글자 그대로** 복사하라(축약·요약 금지 — `--verdict-check` 가 stale 응답으로 거부한다). title 이 100자를 넘어도 그대로 쓴다.
 축: measurement_fit(CHECK 가 제목이 말하는 것을 측정하는가) · noninteractive · rerunnable ·
     determinism · side_effects(서술)
 ```
