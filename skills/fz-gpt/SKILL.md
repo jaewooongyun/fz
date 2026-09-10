@@ -140,11 +140,11 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 
 > 상세: `modules/fz-gpt-bash-hygiene.md` — Stdin 닫기 (§1) / Trusted Dir (§2) / `-o` 버퍼링 (§3) / Background Task (§4) / Trust Level (§5) / Base Verification Gate (§5.5) / Wrapper 참조 (§6) / `--` 구분자 (§7) / **정본 호출 경로 `scripts/gpt-exec.sh` (§8)**
 
-⛔ **`scripts/gpt-exec.sh`를 경유한다** (§8) — 손 조립 금지. 스크립트가 사전 게이트(플래그 상호 배타·필수 인자·경로 실재)와 **사후 게이트(exit≠0 / 빈 출력 / **스키마 계약 위반** → 측정 실패)**를 강제한다.
+⛔ **`${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh`를 경유한다** (§8 — 경로 기준은 플러그인 루트) — 손 조립 금지. 스크립트가 사전 게이트(플래그 상호 배타·필수 인자·경로 실재)와 **사후 게이트(exit≠0 / 빈 출력 / **스키마 계약 위반** → 측정 실패)**를 강제한다.
 
 ```bash
-scripts/gpt-exec.sh review --cd "$GIT_ROOT" --out "$F" --uncommitted --effort high   # 대상=플래그만
-scripts/gpt-exec.sh exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P --schema S     # 커스텀 지시
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --uncommitted --effort high   # 대상=플래그만
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P --schema S     # 커스텀 지시
 ```
 
 ⛔ **exit 10~14 = 측정 실패**이며 "이슈 0건"이 아니다. ⛔ 게이트 3은 **스키마 계약**(required·type·enum·재귀)을 본다 — `{}`는 통과하지 못한다. ⛔ 스크립트 exit을 뒤 명령이 덮지 않게 하라. 미준수 시 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch / **인자 충돌 exit 2를 정상 결과로 오독**.
