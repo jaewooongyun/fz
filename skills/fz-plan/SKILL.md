@@ -448,7 +448,7 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 | Context7 실패 | WebSearch 폴백 | 문서 직접 검색 |
 | 검증 실패 | /sc:analyze 단독 검증 | Claude 자체 판단 |
 | Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
-| **advisor 스톨** (워커가 advisor 호출 → 3분 무진행 × 런타임 6회 재시도) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분) | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
+| **advisor 스톨** (워커가 advisor 호출 → 3분 무진행 × 런타임 6회 재시도) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분). ⛔ **문구의 효과는 미측정** — 문구 삽입 전 실행에서 advisor 8/8/10회가 관측됐으나 그것은 기준선이지 대조군이 아니다(F-161·F-191). 든 상태의 실행과 비교해 줄지 않으면 **문구를 삭제한다** | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
 
 ## Completion → Next
 
