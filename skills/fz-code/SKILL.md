@@ -486,6 +486,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 | Serena 연결 실패 | Edit + Write 직접 수정 | 수동 편집 |
 | 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
 | Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
+| **advisor 스톨** (워커가 advisor 호출 → 3분 무진행 × 런타임 6회 재시도) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분) | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
 
 ## Completion → Next
 
