@@ -185,6 +185,7 @@ Phase 2의 `verify-gates`가 **게이트마다 판정 1개**를 낸다 — "이 
 ⛔ **draft가 Phase 2보다 먼저다.** Phase 2가 Phase 3보다 앞이므로, 원장을 Phase 3에서 만들면 평가자가 볼 `CHECK:`가 없다.
 
 ℹ️ **세션 바인딩은 만들지 않았다.** Stop hook 입력에 `session_id`가 오므로 `~/.fz/sessions/<id>.json` 바인딩이 가능하지만, 그러면 **쓰는 쪽 배선**이 필요하고 그 배선이 빠지면 hook이 원장을 못 찾아 조용히 무력화된다. `cwd` 하위 glob은 배선이 0이고 여러 원장을 전부 본다 — 배선 4 참조.
+   ⛔ 단 **차단은 이 세션이 쓴 원장만** 한다(2026-09-11, F-188 2회 재관측). 발견은 glob 이지만 소유는 입력의 `transcript_path` 에서 그 원장을 `Write`/`Edit`/`--finalize`/`cp`/`>` 로 쓴 tool_use 가 있는지로 가른다 — 쓰는 쪽 배선 없이 세션 스코프가 된다. 남의 미충족 원장은 경고로만 인쇄하고, transcript 를 못 읽으면 전 원장을 판정한다(fail-closed).
 
 light 모드는 원장을 만들지 않는다.
 
@@ -206,7 +207,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 
 ### 4. Stop hook — 차단 (2차 계층, 사용자 설치)
 
-`scripts/gate_stop_hook.py`. 세션 종료 시 `cwd` 하위 확정 원장을 찾아 미충족이면 종료를 막는다. **1차 배선 1~3은 SKILL.md 산문이라 Lead가 건너뛰어도 신호가 없다 — 그 재귀를 끊는 것은 이 hook 하나뿐이다.**
+`scripts/gate_stop_hook.py`. 세션 종료 시 `cwd` 하위 확정 원장을 찾아, 그중 **이 세션의 transcript 가 쓴 원장**이 미충족이면 종료를 막는다(남의 원장은 경고만 — 병렬 세션이 같은 루트에 있어도 막지 않는다). **1차 배선 1~3은 SKILL.md 산문이라 Lead가 건너뛰어도 신호가 없다 — 그 재귀를 끊는 것은 이 hook 하나뿐이다.**
 
 ⛔ **자동 배선하지 않는다.** `examples/hooks.json.example`에 템플릿만 두고 사용자가 `.claude/settings.json`의 `hooks.Stop` **배열에 추가**한다 (통째 복사하면 기존 항목이 사라진다) — `modules/governance.md` "Claude는 훅 설치·설정 변경을 명시 합의 없이 지시·실행하지 않는다"와 같은 파일 `_note`의 "자동 배선 금지". 따라서 **기계적 차단은 설치한 머신에만 존재한다.** 원장·판정기·1~3번 배선은 어디서나 동작한다.
 
@@ -243,7 +244,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 
 ⛔ **설치 주의 6항은 `docs/completion-gates.md`가 정본이다** — 배열 추가 · hook 병렬 실행 · 캐시 경로의 버전(하드코딩하면 업데이트 후 조용히 꺼진다) · `python3` 3.9+ 부재 시 fail-open · `~/.fz/stop-hook-state.json` 생성 · 탐색 깊이 3 한계.
 
-검증: `python3 scripts/gate_stop_hook.py --self-test` (**14케이스** — 깊이 1~4 · draft-only · skip-git · approved · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
+검증: `python3 scripts/gate_stop_hook.py --self-test` (**23케이스** — 깊이 1~4 · draft-only · skip-git · approved · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard ×2 · **소유 판정 8종**: foreign-ledger·foreign-heredoc-cite 통과 / owned-ledger·owned-redirect·owned-bash·owned-bash-cd·owned-bash-var 차단 / transcript-missing fail-closed 차단). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
 
 ### 5. health-check — 노출 (hook 미설치 머신)
 
