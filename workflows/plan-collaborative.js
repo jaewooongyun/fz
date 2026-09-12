@@ -49,10 +49,14 @@ const RebuttalSchema = {
   properties: { rebuttal: { type: 'string' }, additionalConstraints: { type: 'array', items: { type: 'string' } } },
 }
 
+// ⛔ description 에 이스케이프 규약을 남긴다 — 실측(2026-09-11, d5d9cf9f S1): 20,117 bytes 출력이
+//    `InputValidationError: could not be parsed as JSON` 으로 거부돼 **전량 재출력**했다(178s).
+//    긴 출력일수록 위험이 커지므로 스키마와 프롬프트 **양쪽**에 둔다(한쪽만이면 그 한쪽이 잘릴 때 사라진다).
 const DraftSchema = {
   type: 'object', required: ['steps', 'readScope', 'assumptions'],
+  description: 'StructuredOutput 인자는 유효한 JSON 이어야 한다 — 문자열 안의 백슬래시·따옴표·개행을 직접 이스케이프하지 말고 값을 그대로 쓴다. 코드 조각은 백틱 없이 평문으로, 경로는 한 줄로.',
   properties: {
-    steps: { type: 'array', items: { type: 'object', required: ['id', 'title', 'files', 'approach'], properties: { id: { type: 'string' }, title: { type: 'string' }, files: { type: 'array', items: { type: 'string' } }, approach: { type: 'string' } } } },
+    steps: { type: 'array', items: { type: 'object', required: ['id', 'title', 'files', 'approach'], properties: { id: { type: 'string' }, title: { type: 'string' }, files: { type: 'array', items: { type: 'string' } }, approach: { type: 'string', description: '무엇을 어떻게 바꾸는가 — 300자 이내. 상류 입력(요구사항·코드 컨텍스트)을 재서술하지 말고 이 Step 고유의 판단만.' } } } },
     readScope: { type: 'array', items: { type: 'string' } },
     assumptions: { type: 'array', items: { type: 'string' } },
   },
@@ -61,7 +65,7 @@ const DraftSchema = {
 const ImpactSchema = {
   type: 'object', required: ['impactFiles', 'hiddenDependencies', 'deadCode'],
   properties: {
-    impactFiles: { type: 'array', items: { type: 'object', required: ['file', 'kind', 'evidence'], properties: { file: { type: 'string' }, kind: { type: 'string', enum: ['direct', 'consumer', 'config', 'doc', 'latent'] }, evidence: { type: 'string' } } } },
+    impactFiles: { type: 'array', items: { type: 'object', required: ['file', 'kind', 'evidence'], properties: { file: { type: 'string' }, kind: { type: 'string', enum: ['direct', 'consumer', 'config', 'doc', 'latent'] }, evidence: { type: 'string', description: '이 파일이 영향받는 근거 — 200자 이내. 심볼명·줄번호·grep 건수로 짧게. 파일 내용 인용 금지.' } } } },
     hiddenDependencies: { type: 'array', items: { type: 'string' } },
     deadCode: { type: 'array', items: { type: 'string' } },
     // ⛔ 렌즈는 Bash 가 없어 git 비교를 못 한다(`agents/plan-impact.md` — 1-shot, 중간 요청 채널 없음).
@@ -73,14 +77,14 @@ const ImpactSchema = {
 const EdgeSchema = {
   type: 'object', required: ['edgeCases'],
   properties: {
-    edgeCases: { type: 'array', items: { type: 'object', required: ['id', 'case', 'failureScenario', 'affectedStep'], properties: { id: { type: 'string' }, case: { type: 'string' }, failureScenario: { type: 'string' }, affectedStep: { type: 'string' } } } },
+    edgeCases: { type: 'array', description: '경계 케이스 배열 — ⛔ 항목 수 상한 없음(필수 케이스를 자르지 않는다). 서술만 짧게.', items: { type: 'object', required: ['id', 'case', 'failureScenario', 'affectedStep'], properties: { id: { type: 'string' }, case: { type: 'string' }, failureScenario: { type: 'string', description: '무엇이 언제 깨지는가 — 200자 이내. 재현 조건 + 관측 결과만.' }, affectedStep: { type: 'string' } } } },
   },
 }
 
 const ArchSchema = {
   type: 'object', required: ['patternVerdicts', 'violations'],
   properties: {
-    patternVerdicts: { type: 'array', items: { type: 'object', required: ['topic', 'recommendation', 'rationale'], properties: { topic: { type: 'string' }, recommendation: { type: 'string' }, rationale: { type: 'string' } } } },
+    patternVerdicts: { type: 'array', items: { type: 'object', required: ['topic', 'recommendation', 'rationale'], properties: { topic: { type: 'string' }, recommendation: { type: 'string' }, rationale: { type: 'string', description: '추천 근거 — 300자 이내. 프로젝트 규약 인용 1개 + 왜 대안보다 나은가.' } } } },
     violations: { type: 'array', items: { type: 'string' } },
   },
 }
@@ -88,7 +92,7 @@ const ArchSchema = {
 const CrossSchema = {
   type: 'object', required: ['links', 'additions'],
   properties: {
-    links: { type: 'array', items: { type: 'object', required: ['sourceId', 'finding'], properties: { sourceId: { type: 'string' }, finding: { type: 'string' } } } },
+    links: { type: 'array', items: { type: 'object', required: ['sourceId', 'finding'], properties: { sourceId: { type: 'string' }, finding: { type: 'string', description: '연쇄 발견 — 200자 이내. 어느 파일에서 어떻게 발생하는가. 입력 재서술 금지.' } } } },
     additions: { type: 'array', items: { type: 'string' } },
   },
 }
@@ -238,7 +242,8 @@ if (direction.verdict !== 'PROCEED') {
 phase('Stage 1: 구조 초안')
 const draft = await callAgent(
   `${OVERRIDE}\n[역할] 설계자(plan-structure 렌즈) — 구조 분해 + Step 순서\n${CTX}\n[방향 판정·우려] ${JSON.stringify({ concerns: direction.concerns, alternatives: direction.alternatives })}\n` +
-  `[목표] 구현 계획 초안: Step 분해(id/title/files/approach) + readScope(탐색 범위) + 가정 목록.`,
+  `[목표] 구현 계획 초안: Step 분해(id/title/files/approach) + readScope(탐색 범위) + 가정 목록.\n` +
+  `⛔ 출력 형식: StructuredOutput 인자는 **유효한 JSON** 이어야 한다 — 문자열 값 안의 백슬래시·따옴표를 손으로 이스케이프하지 말 것(실측: 20k 출력이 파싱 거부돼 전량 재출력됐다). 코드·명령은 백틱 없는 평문으로 쓴다.`,
   { label: 'stage1-draft', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: DraftSchema })
 if (!draft) { fallbackCount += 1; return { mode: 'fallback', reason: 'draft null', metrics: metrics(1) } }
 
@@ -286,11 +291,55 @@ if (impact && edge) {
   if (!impactOnEdge || !edgeOnImpact) log('WARN stage3 부분 null — CC 결손 상태로 통합')
 }
 
+// ⛔ 상류 산출물을 S4 에 그대로 `JSON.stringify` 하면 입력이 11만 자까지 커진다(실측 d5d9cf9f).
+//    입력이 크면 S4 가 그것을 **재서술**하며 출력도 함께 커진다(출력 토큰 = 시간).
+//    그래서 **id 는 전건 보존**하고 서술만 줄인 brief 를 넘긴다 — 원문은 반환 `lensOutputs` 로
+//    Lead 에게 가므로 유실이 아니다(S5a). ⛔ 생략이 생기면 텍스트에 건수를 남긴다(silent cap 금지).
+function integrateBrief(impact, edge, arch, impactOnEdge, edgeOnImpact) {
+  const LINE = 200          // 줄당 서술 상한
+  const TOTAL = 40000       // 전체 상한 — 넘으면 뒤를 자르고 건수를 남긴다
+  const cut = (v, n) => {
+    const t = (v === undefined || v === null) ? '' : String(v).replace(/\s+/g, ' ').trim()
+    return t.length > n ? `${t.slice(0, n)}…` : t
+  }
+  const lines = []
+  let omitted = 0
+  const push = (s) => { lines.push(s) }
+  if (impact) {
+    for (const f of impact.impactFiles || []) push(`  IMP ${f.file} [${f.kind}] ${cut(f.evidence, LINE)}`)
+    for (const d of impact.hiddenDependencies || []) push(`  HID ${cut(d, LINE)}`)
+    for (const d of impact.deadCode || []) push(`  DEAD ${cut(d, LINE)}`)
+  }
+  if (edge) for (const e of edge.edgeCases || []) push(`  EDGE ${e.id} ${cut(e.case, LINE)} → step ${cut(e.affectedStep, 40)} | ${cut(e.failureScenario, LINE)}`)
+  if (arch) {
+    for (const v of arch.patternVerdicts || []) push(`  ARCH ${cut(v.topic, 60)} ⇒ ${cut(v.recommendation, 80)} | ${cut(v.rationale, LINE)}`)
+    for (const v of arch.violations || []) push(`  VIOL ${cut(v, LINE)}`)
+  }
+  for (const [tag, cc] of [['CC-IMP', impactOnEdge], ['CC-EDGE', edgeOnImpact]]) {
+    if (!cc) continue
+    for (const l of cc.links || []) push(`  ${tag} ${l.sourceId} → ${cut(l.finding, LINE)}`)
+    for (const a of cc.additions || []) push(`  ${tag}+ ${cut(a, LINE)}`)
+  }
+  let text = lines.join('\n')
+  if (text.length > TOTAL) {
+    const kept = []
+    let size = 0
+    for (const l of lines) {
+      if (size + l.length + 1 > TOTAL) { omitted += 1; continue }
+      kept.push(l); size += l.length + 1
+    }
+    text = `${kept.join('\n')}\n  ⛔ 상한(${TOTAL}자) 초과로 ${omitted}줄 생략 — 원문은 Lead 의 lensOutputs 에 있다`
+  }
+  return { text, omitted, lineCount: lines.length }
+}
+
 // ════════ Stage 4: 통합 (opus — 다운스트림 계약 전체 생산) ════════
 phase('Stage 4: 통합 (PlanSchema)')
+const brief = integrateBrief(impact, edge, arch, impactOnEdge, edgeOnImpact)
+log(`integrateBrief: ${brief.lineCount}줄 → ${brief.text.length}자${brief.omitted ? ` (⛔ ${brief.omitted}줄 생략)` : ''}`)
 const plan = await callAgent(
   `${OVERRIDE}\n[역할] 설계자(plan-structure 렌즈) — 최종 통합\n${CTX}\n` +
-  `[초안] ${JSON.stringify(draft)}\n[영향] ${JSON.stringify(impact)}\n[경계] ${JSON.stringify(edge)}\n[아키] ${JSON.stringify(arch)}\n[CC 교차] ${JSON.stringify({ impactOnEdge, edgeOnImpact })}\n` +
+  `[초안] ${JSON.stringify(draft)}\n[렌즈 산출 요약 — id 는 전건 보존, 서술만 축약]\n${brief.text}\n` +
   `[목표] 전 피드백 반영 최종 계획. 의무 사항:\n` +
   `1. §X readScope(영향 스캔 전체) / §Y writeScope(실제 변경 파일 + 각 근거 — readScope에서 자동 복사 금지, 변경 정당화 있는 파일만) / §Z acceptanceCriteria 3-섹션 분리\n` +
   `2. rtm: 요구사항을 분해해 각 행 {reqId, requirement 원문, stepId, verify, status:'pending'}\n` +
@@ -328,5 +377,9 @@ return {
   plan: { ...plan, unresolvedPeerIssues: recheck ? recheck.remainingIssues : [] },
   recheckVerdict: recheck ? recheck.verdict : 'skipped',
   impactRequests, // ⛔ impact 렌즈가 Bash 부재로 못 얻은 것 — Lead 가 resolve 후 plan 에 반영한다
+  // ⛔ 렌즈 원문 — `scripts/plan_integrity_check.py` 가 rtm/CC 참조를 대조할 입력이다.
+  //    이전 반환에는 plan 만 있어 `links.sourceId ∈ edgeCases.id` 를 **확인할 수단이 없었다**(GPT verify #7).
+  //    S4 brief 가 서술을 줄이므로 원문 보존은 여기서 담당한다(유실 0).
+  lensOutputs: { impact, edge, arch, impactOnEdge, edgeOnImpact, brief: { chars: brief.text.length, lines: brief.lineCount, omitted: brief.omitted } },
   metrics: metrics(stagesCompleted), // Lead가 experiment-log §5.7 fz-plan 테이블 기록 + stress-test/RTM 검증/plan-v{N}.md 기록 실수행 (회귀 확인 의무)
 }
