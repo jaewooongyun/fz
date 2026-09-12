@@ -90,9 +90,17 @@ metadata:
 > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
-> Collaborative Design 패턴 canonical: `modules/patterns/collaborative.md` (보존 — 라운드 의미론은 스크립트가 구현).
-> 스크립트: `workflows/plan-collaborative.js` (플러그인 루트 상대) — agents/의 plan-structure·plan-impact·plan-edge-case·review-arch·review-direction 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
-> 동시 opus ≤3(Lead 세션 fable은 별도)는 `workflows/plan-collaborative.js`가 구조적으로 보장 — Stage 2 병렬 3렌즈(plan-impact·plan-edge-case·review-arch)가 opus로 동시 실행되며 상한 내 유지. rate-limit 시 순차화 폴백(governance.md).
+> Collaborative Design 패턴 canonical: `modules/patterns/collaborative.md` (보존 — 라운드 의미론의 역사적 출처).
+> **스크립트: `workflows/plan-lean2.js`** (플러그인 루트 상대) — **4콜 2단계**: 전체 플랜 ∥ edge 적대 ∥ impact+arch(동시 3) → 델타 병합.
+> agents/의 plan-structure·plan-edge-case·plan-impact 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+> 동시 opus ≤3(Lead 세션 fable은 별도)는 Stage 1 의 3-병렬이 상한을 **정확히** 채워 구조적으로 보장한다. rate-limit 시 순차화 폴백(governance.md).
+>
+> ⛔ **2026-09-12 배선 전환 (6단계 9콜 → 2단계 4콜)** — 근거는 `experiment-log.md` §5.9 (구조 ablation · 노이즈 교정 · 채택 판정):
+> · wall **3,492s → 1,344s (-61.5%)** · 요구 3축 양쪽 closed · 실행 가능 command verify **4 → 5**
+> · ⭐ **노이즈 바닥 교정**: 같은 9콜 구조를 동일 입력·트리로 2회 실행하니 상호 고유 major **5건** · overall `Q-superior`(동등 아님) ·
+>   채택 기전까지 갈렸다. 즉 **run-to-run 분산이 구조 간 차이보다 크다**. D1b 가 9콜과 갈리는 정도(**3**)는 그 바닥(**5**) **이하**다.
+> · ⛔ 근거는 전부 **N=1** 이다. 실사용 3회 관찰 후 재평가한다(`experiment-log.md` §5.9).
+> · **롤백**: 아래 절차 2.5·3 의 스크립트명을 `plan-collaborative.js` 로 되돌리면 끝이다 — 파일은 그대로 남겨 둔다.
 
 ### 실행 절차 (Lead)
 
@@ -102,25 +110,44 @@ metadata:
    - 미확정 축 → `null`. 코드 실측(grep) 1회로 보완 시도하고, 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
    - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / GPT)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
-3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/plan-collaborative.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
-   - Stage 0 direction(fable, PROCEED면 1-call·비-PROCEED만 반박 왕복 +2 — 반박은 opus) → Stage 1 초안(opus) → Stage 2 병렬 3렌즈(opus) → Stage 3 CC 교차(edge↔impact, opus) → Stage 4 통합(opus — 다운스트림 계약 전체) → Stage 5 아키 재검증(opus). 9-11 call
+2.5. **호출 경로 선결정** (⛔ 사전 복사 — 거부 왕복을 없앤다):
+   실측(2026-09-11, 3건 전부): 플러그인 루트 경로로 첫 호출이 거부되고 WORK_DIR 복사본으로 재호출해 성공했다 — 거부 1회가 매번 낭비된다(텔레메트리 `n_workflow=2` 의 정체).
+   `{플러그인 루트}`가 세션 working directory(또는 additional directory) **하위가 아니면** `guides/skill-authoring.md` §12 우회 계약의 2·3단계를 **선행**한다:
+   `grep -c '^import\|require(' {플러그인 루트}/workflows/plan-lean2.js` 가 `0` 임을 확인(⛔ 무출력은 0이 아니라 경로 오류) → 복사 → 그 경로로 **1회** 호출:
+   ```bash
+   cp {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js
+   ```
+   ⛔ 판별이 불확정이면 **원본 경로로 호출한다**(기존 동작) — 미확정을 '하위 아님' 으로 읽어 불필요한 복사를 만들지 않는다. ⛔ 복사본은 산출물이 아니다(원본 변경 시 stale — §12).
+3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+   - **Stage 1 (동시 3, opus)**: 전체 플랜(방향 판정·readScope/writeScope·steps·rtm·antiPattern 포함) ∥ edge 적대 렌즈 ∥ impact+arch 렌즈
+     → **Stage 2 (opus)**: 델타 병합 — ⛔ 병합 콜의 schema 는 **델타 전용**(`stepAmendments`·`addedEdgeCases`·`addedImpact`)이라 본문을 다시 쓸 수 없다. **4 call**
+   - ⛔ 반환의 `delta` 는 plan 에 **자동 병합되지 않는다** — Lead 가 적용 판정을 한다(병합 콜이 본문을 못 쓰게 한 것과 같은 이유)
 4. **반환 처리**:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
+   - ⛔ `delta`(있으면) 처리: `stepAmendments` 를 해당 Step 에 반영하고 `addedEdgeCases`·`addedImpact` 를 plan 에 편입한다. `unresolved` 는 사용자 보고 대상 — 조용히 버리지 않는다
    - ⛔ `impactRequests` 가 비어 있지 않으면 **Lead 가 resolve 한다** — impact 렌즈는 Bash 가 없어 base 원본·이전 호출자 수를 직접 못 얻는다(`agents/plan-impact.md`). 요청을 무시하면 영향 분석이 그만큼 비어 있는 채로 plan 에 들어간다
+     ```bash
+     python3 "${FZ_PLUGIN_ROOT}/scripts/plan_resolve_impact_requests.py" {WORK_DIR}/plan/workflow-result.json --repo {대상 레포}
+     ```
+     심볼 census 는 자동으로 붙고(요청당 상위 3개 · positive control 동반), `UNRESOLVED` 로 남은 항목만 Lead 가 판단한다. ⛔ 미해소 항목은 plan 에 **그 사실을 적는다** — 조용히 비워두지 않는다
    - `mode:'direction_escalation'` → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용)
    - `mode:'fallback'` → SOLO 계획 수립 수행 + 사유 experiment-log 기록
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(GPT 회복 시) + GPT verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
-6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-plan 테이블
+6. **지표 기록**: `return.metrics` + **자동 계측** → `experiment-log.md` §5.7 fz-plan 테이블
+   ```bash
+   python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --wf {runId 폴더명} --row      # §5.7 행 형식
+   python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --wf {runId 폴더명}            # stage 상세(advisor·so_retries·cache)
+   python3 "${FZ_PLUGIN_ROOT}/scripts/fz_telemetry_report.py" --plan-segments {세션 id 앞 8자}   # Lead·GPT 층 분리
+   ```
+   ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 않는다
 
 **6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거. Workflow stage에 동일 적용):
 
 | 렌즈 | 스크립트 위치 | 핵심 질문 |
 |------|--------------|----------|
-| plan-structure (설계+분해) | Stage 1 초안 + Stage 4 통합 | "어떻게 나누고 만들 것인가?" |
-| plan-impact (영향 범위) | Stage 2 + Stage 3 CC | "이 변경이 어디까지 퍼지는가?" |
-| plan-edge-case (경계) | Stage 2 + Stage 3 CC | "어디서 깨지는가?" |
-| review-arch (아키 일관성) | Stage 2 + Stage 5 재검증 | "기존 패턴/규칙과 맞는가?" |
-| review-direction (방향 도전) | Stage 0 | "근본적으로 다른 접근은?" |
+| plan-structure (설계+분해) | Stage 1 전체 플랜 + Stage 2 병합 | "어떻게 나누고 만들 것인가?" · 방향 판정도 이 콜이 함께 낸다 |
+| plan-edge-case (경계) | Stage 1 적대 렌즈 | "어디서 깨지는가?" — ⭐ 측정상 고유 기여가 가장 큰 렌즈 |
+| plan-impact (영향+아키) | Stage 1 통합 렌즈 | "어디까지 퍼지는가 · 기존 패턴과 맞는가?" — `secondaryHosts`·`existingTestSuites` 를 schema 로 명시 요구 |
 | GPT verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |
 
 > 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰은 확산 판정 시 결정.
@@ -296,6 +323,14 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 ---
 
 ## Phase 2: Plan Validation
+
+> **병렬 실행 계약** (⛔ `verify` 와 `verify-gates` 는 서로를 기다리지 않는다 — 실측: 순차 호출 시 고 tier 8~10분/회가 직렬로 누적된다):
+> 1. **불변 입력** — 두 호출은 같은 plan·같은 원장 스냅샷을 읽고 서로의 산출을 입력으로 쓰지 않는다. 입력이 바뀌면 병렬 전제가 깨지므로 호출 전에 파일을 확정한다.
+> 2. **별도 출력** — `plan/gpt-verify.json` · `plan/gpt-verify-gates.json` 으로 파일을 분리한다(같은 파일에 쓰면 뒤 호출이 앞을 덮는다).
+> 3. **양쪽 완료 대기** — 두 로그에 종료 표시가 모두 나온 뒤 판정한다. 한쪽만 보고 진행하면 나머지가 조용히 버려진다.
+> 4. **schema 검증 후 사용** — 각 응답을 `--output-schema` 계약으로 받고, `verify-gates` 는 `gate_check.py --verdict-check` 사후 대조까지 통과해야 판정으로 인정한다(⛔ 게이트 수 ≠ 판정 수이면 미판정).
+> ⛔ 버전 불일치(호출 사이에 plan 이 수정됨) 시 **재검증**한다 — 옛 plan 에 대한 판정을 새 plan 의 승인 근거로 쓰지 않는다.
+
 ### 절차
 
 ```bash
@@ -358,10 +393,12 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 
 4. **⛔ 계획 기록** (항상 — compact recovery 필수 + `/fz-code` Phase 0.4 핸드오프 소스):
    ⛔ **이슈 0건 승인이어도 이 기록은 발화한다.** `### Gate 2 전제조건`이 본 Phase보다 앞에 있어, 피드백이 없으면 본 Phase를 건너뛰어 `plan-final`이 생성되지 않는 경로가 생긴다.
-   - **WORK_DIR 존재(티켓 폴더 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` 복사 + `index.md` 업데이트
+   - **WORK_DIR 존재(티켓 폴더 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` + `index.md` 업데이트
+     ⛔ **`plan-v{N}` 은 변경 이력이고 `plan-final.md` 는 승인본이다 — 승인 시 `plan-final.md`·`plan/steps.json`·`gates/plan.md` 를 같은 버전으로 완전 재생성한다**(해당 구역만 고쳐 쓰는 것도 허용 — 요구는 *결과가 단일 최신 상태*라는 것).
+     이유: `/fz-code` Phase 0.4 는 `plan-final.md` **하나만** 복원하고 RTM 도 그 문서 안에서 갱신된다(`modules/rtm.md`). 이전 본문과 수정 delta 를 나란히 남기면 폐기된 Step·verify 가 함께 복원돼 구현이 무엇을 따라야 할지 갈린다.
    - **Serena fallback**: `write_memory("fz:checkpoint:plan-final", …)` — ⛔ 요약 문자열이 아니라 **계약 필드**를 담는다:
      `{steps:[{id,title,files,verify}], swiftDecisions:{swiftUI,isolation,transform}, rtm:[…], verdict}`
-     — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?}` 또는 `{kind:'manual', criterion}` (정의: `workflows/plan-collaborative.js` VerifySpec · 배선: `modules/gates.md`)
+     — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?}` 또는 `{kind:'manual', criterion}` (정의: `workflows/plan-lean2.js` VerifySpec · 배선: `modules/gates.md`)
      (요약만 저장하면 `/fz-code` Phase 0.4의 구조 검사가 판정 불가)
 
 4.5. **⛔ 원장 확정** (draft 원장이 있을 때): Phase 2 판정(3.2)을 반영해 `gates/plan.draft.md` → `gates/plan.md` 로 복사한 뒤 **`--finalize`** 를 돌린다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 도장을 찍고 `APPROVED: yes` 를 남긴다. ⛔ 도장이 없으면 승인 계약이 존재하지 않는다(검사는 있으나 발급이 없어 한 번도 발화하지 않았다). `revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 `MANUAL:`로 전환. 확정 후 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status {WORK_DIR}/gates/plan.md`.
