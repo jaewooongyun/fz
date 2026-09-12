@@ -274,7 +274,7 @@
 - 관측 #1·#2: 구 `F5`(Decision-Type)·`F6`(Boundary-Sizing) | finding-source: **internal(사용자 catch)** — 구조/경계 포크에서 (가) 코드로 좁혀지는 엔지니어링 판단을 (나) 제품·팀 소유처럼 과잉 위임 · plan 분할 제안을 경계 권위로 답습
 - 내용: 구조/경계 결단 시 유형 분류가 없어 두 방향으로 어긋난다 — (가) `read`/`grep` 으로 정답이 1개로 좁혀지는 엔지니어링 판단인데 옵션 메뉴로 위임(확신 권고+근거+"이의 없으면 진행"이 맞음) (나) 제품·디자인·팀 컨벤션 소유인데 임의 결정. 경계(PR/커밋)에서는 **plan 분할 제안 = 판단 입력이지 경계 권위가 아니다**(1커밋 = 1관심사 + 컴파일 + 1결정 trace)
 - generalize: broad (언어·도메인 무관 — 모든 구조/경계 포크) | 과적합 위험: 中 (판정이 사람 해석에 의존)
-- 근거: [verified: `skills/fz-plan/SKILL.md:202` Gate 0.5 체크 항목 · `modules/lead-action-default.md:16` Trigger Matrix 행 — 두 소비자가 같은 신호를 참조]
+- 근거: [verified: `skills/fz-plan/SKILL.md:230` Gate 0.5 체크 항목 · `modules/lead-action-default.md:16` Trigger Matrix 행 — 두 소비자가 같은 신호를 참조]
 - ⛔ **활성 차단: evidence 2 sessions → candidate.** active 전환 = 트랙 A **5 sessions**
 - ⛔ **본 항목 신설 사유는 새 규칙이 아니라 카운터 귀속 복구다.** 이전에는 두 소비자가 임계 권위를 본 원장으로 지목하면서 실제 관측 카운터는 **플러그인 밖 작성자 로컬 메모리**를 참조했다 — 배포본만 가진 사용자는 그 카운터를 읽을 수 없다. `guides/skill-authoring.md:395-412`(작성자 환경의 개인 메모리 내용은 배포물에 넣지 않는다) 위반이며, 권위와 카운터가 다른 경계에 있으면 관측이 발생해도 카운트가 오르지 않는다
 - ⚠️ 관측 요약만 옮겼다 — 개인 경로·파일명은 옮기지 않는다(같은 규약)

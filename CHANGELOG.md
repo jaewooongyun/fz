@@ -1,5 +1,133 @@
 # Changelog
 
+### v4.35.1 (2026-09-13) — 잘린 측정이 개선처럼 보였다 [PATCH]
+
+v4.35.0 이 남긴 두 게이트(S7 effort sweep · S8a 렌즈 모델)를 실측했다. **둘 다 기각**이다 —
+`plan-lean2.js` 는 그대로다. 이 릴리즈가 고치는 것은 플랜 워크플로가 아니라 **그것을 재는 도구**다.
+
+**실측 결과 (동결 트리 `prefix@938507b13` · arm 은 세션 레벨 env var · 트랜스크립트 `effort` 필드로 매 run 검증)**
+
+| arm | wall | thinking | blind 판정 |
+|---|---|---|---|
+| xhigh · opus렌즈 (control) | 1,079.9s | 86,436 | 기준 |
+| high · opus렌즈 | 1,011.2s (-6.4%) | -15.7% | **`Q-superior`** — xhigh 고유 major **8** |
+| xhigh · sonnet렌즈 | 1,011.8s (-6.3%) | +9.0% | **`Q-superior`** — opus 고유 **critical 1**·major 3 |
+
+⭐ **effort 를 내리면 플랜이 짧아지는 게 아니라 검증이 헐거워진다.** xhigh 만 낸 8건이 한 종류다 —
+public 증가분 수치 단언 · `#if Lab` sha256 고정 · 임계값 불변 · pre-fix 트리 강제 ·
+`safeAreaRegions=.container` 로 좌표 전제가 깨지는 구성 실측. 시간 -6.4% 와 바꿀 것이 아니다.
+⛔ 이 major 8 은 §5.9 행 C 의 **노이즈 바닥 5를 넘는 첫 손실**이라 실행 분산으로 설명되지 않는다.
+
+sonnet 렌즈는 손실 4건이 바닥 미만이지만 **critical 1건**을 잃었고(행 C 에서 critical 은 양쪽 0이었다),
+더 결정적으로 **동결 pre-fix 트리를 "이미 구현됨" 으로 단정**해 `unresolved` 1번에 올렸다(채점자 실측 반증).
+
+**고친 것 ①** `fz_wf_metrics.py --expect-agents N` — 완주 오라클. `agents` 와 `journal_results` 가
+둘 다 N 이 아니면 exit 1 + *"이 run 의 wall 을 기록하지 말 것"*.
+⛔ **필요했던 이유**: `claude -p` 는 백그라운드 작업을 **600초에 끊는데**, 잘린 run 이
+exit 0 · 오류 키워드 0건 · `wall=621.9s` 를 인쇄했다. baseline 대비 **-54%** 라
+그대로 기록했으면 control 을 날조해 비교 전체가 무의미해졌다.
+잡은 단서는 wall 이 아니라 `agents=3` 과 선언 4콜의 불일치였다 (F-203).
+
+**고친 것 ②** `guides/skill-testing.md` §8.1 — arm 설정 예시에 `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`
+를 **같은 줄에** 넣고 완주 오라클 호출을 붙였다. 가이드가 권하던 명령을 그대로 따르면 22분 워크플로가 잘린다.
+arm 검증 스니펫의 `max(…, key=getmtime)` 도 교체했다 — **바로 위 문단이 경고하는 함정을 스니펫 자신이 쓰고 있었다**.
+
+**하지 않은 것**: 채점자 둘이 지목한 *"생성된 verify 가 변경 전에도 통과하는 공허 단언"* 을
+동결 pre-fix 트리에서 12건 전수 실행해 검증했다 — **공허 0건**(정상 9 · S0 베이스라인 의존 3).
+게이트 단위로는 결함이 없어 스키마를 건드리지 않았다.
+
+**검증**: health-check 13검사 exit 0 · 완주 오라클 양성 3·음성 2 · `fz_wf_metrics` self-test 8/8 무회귀.
+
+### v4.35.0 (2026-09-12) — 대조군을 넷 세우고 자기 자신과의 대조를 빠뜨렸다 [MINOR]
+
+`/fz-plan` 의 60분을 구조 문제로 확정한 뒤(v4.34.0), 단계를 줄인 변형을 만들어 동결 워크트리 2종에서
+blind 채점으로 네 번 비교했다. 매번 "9콜이 major N건을 더 찾는다"가 나왔고 그것을 구조 차이로 읽었다.
+
+⛔ **그런데 같은 구조를 두 번 돌려 서로 대조한 적이 없었다.** 뒤늦게 잰 결과 — 같은 입력·같은 스크립트·
+같은 동결 트리로 9콜을 2회 실행하니 **상호 고유 major 5건**, overall **`Q-superior`**(동등 아님), 그리고
+**채택 기전까지 반대**로 갈렸다(1회차: rect 레지스트리+GeometryReader / 2회차: 1회차가 "선례 0건"으로
+기각했던 UIViewRepresentable 마커). 변인은 실행 난수 하나였다.
+
+⇒ 사전등록 임계 *"검증된 critical·major 손실 0"* 은 **도달 불가능한 값**이었고, 앞선 네 판정의 "손실 N"은
+구조 차이의 증거가 아니었다. **run-to-run 분산이 구조 간 차이보다 크다.**
+
+**배선 전환**: fz-plan 기본 워크플로가 `plan-collaborative.js`(6단계 9콜) → **`plan-lean2.js`(2단계 4콜)**.
+전체 플랜 ∥ edge 적대 ∥ impact+arch 를 **동시 3**으로 띄우고 델타 병합 1콜. wall **3,492s → 1,344s(-61.5%)**,
+요구 3축 양쪽 closed, 실행 가능 command verify **4 → 5**, 9콜과의 발산 **3 < 노이즈 바닥 5**.
+⛔ `plan-collaborative.js` 는 **존치** — 롤백은 `skills/fz-plan/SKILL.md` 절차 2.5·3 의 스크립트명 한 줄이다.
+
+⭐ **병합 콜은 본문을 쓸 수 없다** — schema 를 `stepAmendments`·`addedEdgeCases`·`addedImpact` **델타 전용**으로
+좁혀, "다시 쓰지 마라"를 프롬프트로 부탁하는 대신 **쓸 필드를 주지 않았다**(harness-engineering 원칙 3
+"구조가 경로를 좁히는가"의 적용). 렌즈 schema 에는 `secondaryHosts`·`existingTestSuites` 를 명시 요구 —
+찾아야 할 것에 이름을 주니 9콜도 0건이던 자리에서 7건·5건이 나왔다.
+
+**임계 재등록**: "손실 0" → "노이즈 바닥 이하". ⛔ 사후 조정이 아니라 원 임계의 **도달 불가능성이 실측**됐기
+때문이며, 재등록 주체는 사용자다. 근거는 전부 **N=1**(노이즈 1회·채점자 1명·트리당 1회) —
+**실사용 3회 관찰 후 재평가**하고 미달이면 원복한다.
+
+**검증**: health-check 13검사 exit 0 · lint baseline 45콜 전건 일치(기존 배선 불변) · 래핑 syntax ·
+`experiment-log.md` §5.9 행 1~3 + 교정 행 C + 채택 행.
+
+### v4.34.0 (2026-09-11) — 사전등록 표가 두 달간 비어 있었다: 재는 주체가 없었다 [MINOR]
+
+`/fz-plan` 이 75~90분 걸린다는 보고를 실측했다. 원인은 한 층이 아니라 **셋**이다 — Workflow 워커
+(76·75·90분) · Lead 자체 생성(29~45분) · GPT 호출(11회 24분). 45분 넘은 `/fz-plan` 3건 중
+Workflow 를 쓴 건은 **0건**이었다. `--deep` 은 원인이 아니다(스크립트에 분기 0건, 3건 모두 미사용).
+
+⛔ **7/9 `fdcfe56`**(렌즈 6콜 sonnet→opus + 11콜 xhigh)이 22분 → 75분의 전환점인데, 그 커밋이
+신설한 `experiment-log §5.8` 사전등록 표는 **데이터행 0** 이었다. 임계는 등록됐고 재는 주체가 없었다.
+
+**계측 신설**: `scripts/fz_wf_metrics.py` — wf 폴더 → stage별 dur·turns·tools·out_tok·thinking·
+cache r/w·so_retries·**advisor** + 크리티컬 패스 + §5.7 행. ⛔ advisor 는 `advisor_tool_result`
+content block 을 `tool_use_id` 로 중복 제거해 센다 — `usage.iterations` 로 세면 과소 집계된다
+(실측 정정 2→8회, GPT verify #1). `--plan-segments` 로 Lead·GPT 층을 분리한다(9da38828: 초기 생성
+11.9분 · GPT 24.2분 · 통합 6.0분).
+
+**낭비 제거**: S1 draft 의 JSON 이스케이프 지시를 프롬프트·스키마 **양쪽**에(20k 출력이 파싱 거부돼
+전량 재출력된 실측 178s) · scriptPath **사전 복사**로 첫 호출 거부 왕복 제거(3건 전부 반복) ·
+`integrateBrief()` 로 S4 입력을 id 전건 보존 축약(84k자 fixture → ≤40k).
+
+**품질 배선**: `plan_integrity_check.py`(rtm→steps · CC links→edgeCases · writeScope⊆readScope ·
+VerifySpec) — 반환에 `lensOutputs` 를 추가해 대조 입력을 만들었다(이전엔 확인 수단이 없었다).
+⭐ **실데이터가 검사기를 정정했다**: 신규 생성 파일 3건이 위반으로 뜨는 오탐을 TVG-6894 플랜 대조에서
+발견해 면제 규칙을 넣었다 — fixture 만으로는 드러나지 않았다. `plan_resolve_impact_requests.py` 로
+impactRequests 수동 의존을 제거(positive control 동반 — 0건을 부재로 읽지 않는다).
+`lint-model-explicit.sh --baseline` 은 label 별 model/effort 를 대조한다(줄 수 세기는 콜별 변경을
+못 잡는다, GPT verify #12).
+
+**사전등록 신설**: §5.8 **⑥**(세션 effort sweep — ①은 철회된 사료라 별도) · §5.9(구조 ablation,
+S8a 모델·S8b 구조 **분리** 평가). ⛔ 상수는 아직 바꾸지 않았다 — sweep 통과가 근거다.
+
+**검증**: 게이트 원장 17개 중 command 12 전건 PASS · 신규 스크립트 self-test(check_wf_text 10/10 ·
+fz_wf_metrics 7/7 · plan_integrity 7/7 · resolve 4/4) · lint baseline 양성·음성 · health-check exit 0.
+
+### v4.33.1 (2026-09-11) — Stop 훅이 남의 세션 원장으로 내 종료를 막았다 [PATCH]
+
+티켓별 워크트리를 한 루트(`~/dev/TVING`)에 두면 훅의 `cwd` 하위 glob 이 **병렬 세션의 원장**까지
+집는다. 무관한 진단 세션이 TVG-5744·TVG-6894 원장의 미충족 게이트에 두 번 막혔다 — F-188 이
+어제 같은 것을 기록했고 오늘이 2회째다. 게이트는 정상 발화했고 겨눈 대상이 틀렸다.
+
+⛔ 설계 주석은 "세션 바인딩은 쓰는 쪽 배선이 필요해 다섯 번 실패했다"로 세션 판정을 포기했는데,
+입력에 `transcript_path` 가 **이미 온다**. 바인딩 파일 한 방법의 실패를 "세션 판정 불가"로
+일반화한 것이다.
+
+**수리**: `scripts/gate_stop_hook.py` — 발견은 glob 그대로, **차단은 이 세션의 transcript 가
+`Write`/`Edit`/`--finalize`/`cp`/`>` 로 쓴 원장만**. 남의 미충족 원장은 `다른 세션의 원장(막지
+않음)` 경고로 인쇄. transcript 를 못 읽으면 전 원장 판정(fail-closed). `FZ_GATES_LEDGER` 명시는
+소유 판정을 건너뛴다. ⭐ 비교는 **경로 해석 후** — 문자열 포함이면 macOS `/var`→`/private/var`·
+워크트리 심볼릭에서 갈린다(self-test 가 정확히 그 축에서 2/2 실패한 뒤 고쳤다).
+
+⛔ 1차 규칙("쓰기 마커 + 경로 등장")은 발견 레지스트리에 사건을 `cat > "$F" <<EOF` 로 기록할 때
+본문에 **인용한** 원장 2개를 소유로 오탐했다(병렬 세션이 실측·수정) → heredoc 본문 제거 + 리다이렉션·
+출력 인자·복사 대상 **자리**에 온 경로만 인정. 그 파서는 반대로 `cd …/gates` 뒤 `cp plan.draft.md
+plan.md` · `W=/abs; --confirm S1 "$W/gates/plan.md"` 같은 **실제 Lead 형태**(TVG-6894 세션 4회)를 놓쳐
+진짜 소유 세션이 통과했다(오라클 exit 0) → 세그먼트별 `cd`·`NAME=/abs` 추적 + 줄 힌트 `gates/`→`gates`.
+
+**검증**: self-test 14→**23케이스**(foreign · heredoc 인용 통과 / owned Write · redirect · finalize ·
+cd+상대명 · 변수+confirm 차단 / transcript-missing fail-closed) 23/23 · 실세션 오라클 3건(진단 세션
+e7eb15f9 → 통과+경고 2 / TVG-6894 소유 d5d9cf9f → 6894 만 차단 / TVG-6904 세션 dd12601f → 통과) ·
+47MB transcript 0.79s · `modules/gates.md` 배선 4 갱신.
+
 ### v4.33.0 (2026-09-11) — 적용은 했는데 커밋하지 않았고, 나흘 뒤 같은 실패가 다시 왔다 [MINOR]
 
 2026-09-06 에 수리 4건을 적용하고 AC 11개를 통과시킨 뒤 "반영됨" 이라 적었다. 커밋은 하지
