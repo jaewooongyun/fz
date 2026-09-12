@@ -1,0 +1,90 @@
+{
+ "plan": {
+  "steps": [
+   {
+    "id": "S1",
+    "title": "A",
+    "files": [
+     "a.js"
+    ],
+    "verify": {
+     "kind": "command",
+     "criterion": "c",
+     "command": "true"
+    }
+   },
+   {
+    "id": "S2",
+    "title": "B",
+    "files": [
+     "b.js"
+    ],
+    "verify": {
+     "kind": "manual",
+     "criterion": "사람 확인"
+    }
+   }
+  ],
+  "readScope": [
+   "`a.js` — 변경 대상",
+   "b.js",
+   "§X c.md (참고)"
+  ],
+  "writeScope": [
+   {
+    "file": "a.js",
+    "rationale": "요구 충족"
+   },
+   {
+    "file": "./b.js",
+    "rationale": "소비자"
+   }
+  ],
+  "rtm": [
+   {
+    "reqId": "R1",
+    "requirement": "x",
+    "stepId": "S1",
+    "verify": "v",
+    "status": "pending"
+   },
+   {
+    "reqId": "R2",
+    "requirement": "y",
+    "stepId": "S1,S2",
+    "verify": "v",
+    "status": "pending"
+   }
+  ],
+  "acceptanceCriteria": [
+   "ok"
+  ],
+  "riskMatrix": [],
+  "openQuestions": []
+ },
+ "lensOutputs": {
+  "edge": {
+   "edgeCases": [
+    {
+     "id": "E:E1"
+    },
+    {
+     "id": "E:E2"
+    }
+   ]
+  },
+  "impactOnEdge": {
+   "links": [
+    {
+     "sourceId": "E:E1",
+     "finding": "f"
+    }
+   ],
+   "additions": []
+  },
+  "edgeOnImpact": {
+   "links": [],
+   "additions": []
+  }
+ }
+}

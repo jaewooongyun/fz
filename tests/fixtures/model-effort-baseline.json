@@ -1,0 +1,185 @@
+{
+ "calls": {
+  "code-pair.js::stage1-impl": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "code-pair.js::stage2-review": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "code-pair.js::stage2-review-arch": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "code-pair.js::stage2-review-quality": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "code-pair.js::stage3-revise": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "discover-adversarial.js::cost-${lensLabel}": {
+   "effort": "xhigh",
+   "model": "sonnet"
+  },
+  "discover-adversarial.js::landscape": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "discover-adversarial.js::lens-${lens}": {
+   "effort": "xhigh",
+   "model": "sonnet"
+  },
+  "discover-adversarial.js::merge": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "discover-adversarial.js::r1-paths": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "discover-adversarial.js::r2-paths": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "peer-review.js::stage1-arch": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "peer-review.js::stage1-correctness": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "peer-review.js::stage1-quality": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "peer-review.js::stage2-arch-on-peers": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "peer-review.js::stage2-quality-on-peers": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "peer-review.js::stage3-counter": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage0-direction": {
+   "effort": "xhigh",
+   "model": "fable"
+  },
+  "plan-collaborative.js::stage0-final": {
+   "effort": "xhigh",
+   "model": "fable"
+  },
+  "plan-collaborative.js::stage0-rebuttal": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage1-draft": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage2-arch": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage2-edge": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage2-impact": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage3-edge-on-impact": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage3-impact-on-edge": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage4-integrate": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-collaborative.js::stage5-recheck": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-lean.js::lean-edge": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-lean.js::lean-full": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-lean.js::lean-merge": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-lean2.js::lean2-edge": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-lean2.js::lean2-full": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-lean2.js::lean2-impact-arch": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "plan-lean2.js::lean2-merge": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "review-live.js::stage1-arch": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "review-live.js::stage1-quality": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "review-live.js::stage2-arch-on-quality": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "review-live.js::stage2-quality-on-arch": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "review-live.js::stage3-counter": {
+   "effort": "xhigh",
+   "model": "opus"
+  },
+  "search-cross-verify.js::stage1-pattern": {
+   "effort": "xhigh",
+   "model": "sonnet"
+  },
+  "search-cross-verify.js::stage1-symbolic": {
+   "effort": "xhigh",
+   "model": "sonnet"
+  },
+  "search-cross-verify.js::stage2-pat-on-sym": {
+   "effort": "xhigh",
+   "model": "sonnet"
+  },
+  "search-cross-verify.js::stage2-sym-on-pat": {
+   "effort": "xhigh",
+   "model": "sonnet"
+  },
+  "search-cross-verify.js::stage3-merge": {
+   "effort": "xhigh",
+   "model": "fable"
+  }
+ },
+ "note": "label 별 model/effort 고정 baseline (2026-09-12). ⛔ 값 변경은 sweep/ablation 근거(experiment-log §5.8 ⑥·§5.9)와 함께. 2026-09-11 plan-lean.js 3콜(D1) · 2026-09-12 plan-lean2.js 4콜(D1b) 추가 — 기존 배선 불변."
+}
