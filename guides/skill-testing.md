@@ -436,16 +436,30 @@ A/B 비교 시 `/skill-creator`의 제안을 B 버전으로 테스트하면 효�
 
 ```bash
 # arm 설정 (택1) — .js 미변경
-CLAUDE_CODE_EFFORT_LEVEL=medium claude ...   # env var (최상위, 비대화식에 적합)
+# ⛔ 비대화식에서 Workflow 를 돌리면 **천장 해제를 같이 준다**. `claude -p` 는 백그라운드
+#    작업을 600초에 끊고, 잘린 run 은 exit 0 · 오류 키워드 0건으로 짧은 wall 을 인쇄한다
+#    (2026-09-13 실측: 22분 워크플로가 wall=621.9s 로 나와 baseline 의 -54% 로 보였다).
+CLAUDE_CODE_EFFORT_LEVEL=medium CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 claude -p ...
 /effort medium                                # 대화식 세션
+
+# 완주 오라클 (⛔ wall 을 읽기 전에) — 선언 콜 수와 대조한다
+python3 scripts/fz_wf_metrics.py --wf <wf_id> --expect-agents <선언 콜 수>
 
 # arm 적용 검증 (run 직후)
 python3 - <<'PY'
 import json,glob,os,collections
-p=max(glob.glob(os.path.expanduser("~/.claude/projects/*/*.jsonl")), key=os.path.getmtime)
-c=collections.Counter(json.loads(l).get("effort") for l in open(p,errors="replace")
-                      if '"effort"' in l)
-print(p, dict(c))   # 의도한 arm 값만 나와야 정상
+# ⛔ mtime 최댓값은 자기 세션 파일을 집는다 (바로 위 '재현 함정' 그대로다).
+#    run 전후 **파일 집합 diff** + 자기 세션 ID 제외로 신규 파일을 특정한다.
+#    사전:  find ~/.claude/projects -name '*.jsonl' | sort > /tmp/pre.txt
+import subprocess
+pre=set(open("/tmp/pre.txt").read().split())
+now=set(subprocess.run(["find",os.path.expanduser("~/.claude/projects"),"-name","*.jsonl"],
+                       capture_output=True,text=True).stdout.split())
+new=[f for f in now-pre if os.environ.get("SELF_SESSION_ID","\0") not in f]
+for p in new:
+    c=collections.Counter(json.loads(l).get("effort") for l in open(p,errors="replace")
+                          if '"effort"' in l)
+    print(p, dict(c))   # 의도한 arm 값만 나와야 정상 (워커 파일까지 전부)
 PY
 ```
 

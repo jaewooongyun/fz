@@ -1145,6 +1145,107 @@ def self_test():
     return 1 if failed else 0
 
 
+
+# ── /fz-plan Lead 구간 분리 (plan-final S9c) ───────────────────────────────
+# ⛔ 왜 필요한가: 워크플로 wall 만 재면 **Lead 자체 생성 시간이 보이지 않는다.** 실측(2026-09-11):
+#    45분 넘은 `/fz-plan` 3건 중 Workflow 를 쓴 건은 **0건**이었다 — 시간은 Lead 생성(29~45분)과
+#    GPT 호출(11회 24분)에 있었다. 층을 나누지 않으면 어느 레버가 유효한지 판정할 수 없다.
+# ⛔ 구간을 못 가르면 `unavailable` + exit 1 이다 — 0 으로 쓰지 않는다.
+PLAN_DOC_RE = re.compile(r"plan-(?:v\d+|final|light)\.md")
+GPT_CALL_RE = re.compile(r"codex exec|gpt-exec\.sh")
+
+
+def _seg_events(path):
+    """한 트랜스크립트에서 (/fz-plan 시작, plan 문서 기록, GPT 호출 구간) 을 뽑는다."""
+    start = None
+    end = None
+    doc_writes = []
+    gpt_spans = []
+    pending = {}
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if '"type"' not in line:
+                continue
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(ev, dict):
+                continue
+            ts = ev.get("timestamp")
+            when = None
+            if ts:
+                try:
+                    when = datetime.datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                except ValueError:
+                    when = None
+            msg = ev.get("message")
+            if not isinstance(msg, dict):
+                continue
+            content = msg.get("content")
+            if ev.get("type") == "user":
+                if isinstance(content, str) and "<command-name>" in content:
+                    if "/fz:fz-plan" in content:
+                        if start is None and when:
+                            start = when
+                    elif start is not None and end is None and when:
+                        end = when
+                if isinstance(content, list):
+                    for b in content:
+                        if isinstance(b, dict) and b.get("type") == "tool_result":
+                            got = pending.pop(b.get("tool_use_id"), None)
+                            if got and when:
+                                gpt_spans.append((got, when))
+            elif ev.get("type") == "assistant" and isinstance(content, list):
+                if start is None or end is not None:
+                    continue
+                for b in content:
+                    if not (isinstance(b, dict) and b.get("type") == "tool_use"):
+                        continue
+                    blob = json.dumps(b.get("input", {}), ensure_ascii=False)
+                    if PLAN_DOC_RE.search(blob) and when:
+                        doc_writes.append(when)
+                    if GPT_CALL_RE.search(blob) and when:
+                        pending[b.get("id")] = when
+    return start, end, doc_writes, gpt_spans
+
+
+def plan_segments(projects_root, session_prefix):
+    """세션의 `/fz-plan` 1회를 3구간으로 분리해 인쇄한다. 성공 시 LEAD_SEGMENTS_OK."""
+    root = os.path.expanduser(projects_root)
+    hits = sorted(glob.glob(os.path.join(root, "*", f"{session_prefix}*.jsonl")))
+    if not hits:
+        print(f"FAIL: 세션 트랜스크립트를 찾지 못했다: {session_prefix} (root={root}) — unavailable")
+        return 1
+    start, end, docs, gpt = _seg_events(hits[0])
+    if start is None:
+        print(f"FAIL: 이 세션에 /fz-plan 호출이 없다: {session_prefix} — unavailable")
+        return 1
+    if not docs:
+        print("FAIL: plan 문서 기록(plan-v*/final/light.md)을 찾지 못해 구간을 가를 수 없다 — unavailable")
+        return 1
+    first_doc = min(docs)
+    last_doc = max(docs)
+    gpt_total = sum((b - a).total_seconds() for a, b in gpt)
+    last_gpt = max((b for _, b in gpt), default=None)
+    seg1 = (first_doc - start).total_seconds()
+    seg3 = (last_doc - last_gpt).total_seconds() if last_gpt and last_doc > last_gpt else None
+    span = ((end or last_doc) - start).total_seconds()
+    print(f"/fz-plan 구간 분리 — session {session_prefix} (전체 {span / 60:.0f}분)")
+    print(f"  ① Lead 초기 생성 (호출 → 첫 plan 문서): {seg1 / 60:.1f}분")
+    print(f"  ② GPT 호출 대기 합 ({len(gpt)}회): {gpt_total / 60:.1f}분")
+    if seg3 is None:
+        print("  ③ 피드백 통합: unavailable (마지막 GPT 이후 plan 기록 없음)")
+    else:
+        print(f"  ③ 피드백 통합 (마지막 GPT → 마지막 plan 기록): {seg3 / 60:.1f}분")
+    other = span - seg1 - gpt_total - (seg3 or 0)
+    print(f"  ④ 나머지(탐색·게이트·대화): {other / 60:.1f}분")
+    if len(gpt) == 0:
+        print("  ⚠️ GPT 호출 0건 — ② 는 측정값이 아니라 부재다")
+    print(f"LEAD_SEGMENTS_OK ({3 if seg3 is not None else 2}/3 구간 산출)")
+    return 0
+
+
 def main(argv):
     parser = argparse.ArgumentParser(description="fz 하네스 계측 집계기 (기록 없음, 집계만)")
     parser.add_argument("--since", default=None, help="YYYY-MM-DD (기본: until-30일)")
@@ -1160,10 +1261,14 @@ def main(argv):
         help="저장 루트 (env FZ_TELEMETRY_DIR)",
     )
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--plan-segments", metavar="SESSION_PREFIX",
+                        help="세션의 /fz-plan 1회를 Lead 생성·GPT 대기·피드백 통합으로 분리 (plan-final S9c)")
     args = parser.parse_args(argv)
 
     if args.self_test:
         return self_test()
+    if args.plan_segments:
+        return plan_segments(args.projects_root, args.plan_segments)
     if args.until is None:
         args.until = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
     if args.since is None:
