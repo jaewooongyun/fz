@@ -1,6 +1,6 @@
 # Model Guide — Fable 5.1 (Lead) · Opus 5 (worker)
 
-> ✅ **운용 상태 (2026-09-06)**: Lead = **Fable 5.1**(2026-09 출시, 사용자 `/model fable` 세션 · effort **xhigh**), 실질 생산 워커 = **Opus 5**, 단순(retrieval·breadth) 워커 = **Sonnet 5**. 판단 지점 3곳 explicit `'fable'` 배선 유지 — `search-cross-verify.js:166` merge + `plan-collaborative.js:154`/`:167` direction (§재배선 확정 배선), `scripts/lint-model-explicit.sh` 기계 감시. ⚠️ 2026-09-06 정정 — 이전 판의 "세션 레벨 max(기본)/ultracode 운용"은 현행이 아니다(세션 = xhigh, `ultracode`는 effort arm으로 무효).
+> ✅ **운용 상태 (2026-09-06)**: Lead = **Fable 5.1**(2026-09 출시, 사용자 `/model fable` 세션 · effort **xhigh**), 실질 생산 워커 = **Opus 5**, 단순(retrieval·breadth) 워커 = **Sonnet 5**. 판단 지점 3곳 explicit `'fable'` 배선 유지 — `search-cross-verify.js:166` merge + `plan-collaborative.js:220`/`:167` direction (§재배선 확정 배선), `scripts/lint-model-explicit.sh` 기계 감시. ⚠️ 2026-09-06 정정 — 이전 판의 "세션 레벨 max(기본)/ultracode 운용"은 현행이 아니다(세션 = xhigh, `ultracode`는 effort arm으로 무효).
 >
 > Claude Fable 5.1 / Claude Mythos 5.1의 사양 · API 동작 차이 · Claude Code 통합 · fz 생태계 적용 전략의 단일 참조.
 > 모델 무관 프롬프팅 원칙은 `prompt-optimization.md`, 하네스 설계는 `harness-engineering.md` 참조.
@@ -226,14 +226,15 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 - ⛔ **동시 실행 상한 (불변)**: opus 동시 ≤3 · fable 에이전트 **동시 1개**(Lead 세션 제외) · 총 ≤4. ⚠️ 2026-09-06 정정 — 이전 판의 근거였던 "fable 1 ≈ opus 2 비용 등가 → 최대 동시 ≈ opus 5 equivalent"는 **캐시 읽기가 지배하는 세션에서 성립하지 않는다**(Fable 5.1 캐시 읽기 $0.25 < Opus 5 $0.50). 상한 **수치는 유지**하되 근거는 **출력·캐시쓰기 단가 2배 + 호출당 지연 +49%**로 교체한다. 비용 등가 산식 재산정은 P1 sweep 이후 [fz 실측 2026-09-06]
 - ⚠️ **Workflow model 생략 함정**: `opts.model` 생략 시 메인 루프 모델 상속 — Fable 세션에서는 모든 미지정 에이전트가 Fable로 실행됨. fz workflows는 현재 전 호출에 model + `effort: 'xhigh'` 명시(opus/sonnet + 판단 3지점 fable)되어 있어 안전 (workflows/*.js 6파일 전수 명시). `scripts/lint-model-explicit.sh`가 기계 검증 (전 호출 model + effort 명시 + fable=3 고정)
 
-### 재배선 확정 배선 (정적 36콜) — 현행
+### 재배선 확정 배선 (정적 45콜) — 현행
 
 판단 3지점 fable 배선에 이어 비-Lead 워커의 opus/sonnet 분할이 확정됐다. 정적 콜사이트 36개 기준이 현행이다:
 
 - **판단 = fable 3** (불변, Fable 5.1) — search-cross-verify merge + plan-collaborative direction ×2. lint `EXPECTED_FABLE=3` 고정
-- **실질 분석·생산 워커 = opus 27** (Opus 5) — plan/peer-review/review-live/code-pair의 impact·edge·arch·quality·correctness·cross-critique(CC)·counter·recheck·review 등 capability-sensitive 스테이지 (4-axes A의 "워커 전반 sonnet" baseline을 대체)
+- **실질 분석·생산 워커 = opus 36** (Opus 5) — plan/peer-review/review-live/code-pair의 impact·edge·arch·quality·correctness·cross-critique(CC)·counter·recheck·review 등 capability-sensitive 스테이지 (4-axes A의 "워커 전반 sonnet" baseline을 대체)
+- ⛔ **2026-09-12 fz-plan 배선 전환**: 기본 워크플로가 `plan-collaborative.js`(6단계 9콜) → **`plan-lean2.js`(2단계 4콜)**. wall 3,492s→1,344s(-61.5%). ⭐ 근거의 핵심은 **노이즈 바닥 교정** — 같은 9콜 구조를 동일 입력·트리로 2회 실행하니 상호 고유 major 5건·`Q-superior`(동등 아님)였다. run-to-run 분산이 구조 간 차이보다 크므로 "손실 0" 임계는 도달 불가능했고, 새 배선의 발산(3)은 그 바닥(5) 이하다. ⛔ N=1 — 실사용 3회 후 재평가(`experiment-log.md` §5.9). 롤백은 `skills/fz-plan/SKILL.md` 절차 2.5·3 의 스크립트명 원복
 - **단순(retrieval·breadth) = sonnet 6** (Sonnet 5) — search stage1·2 + discover lens fan-out·cost-lens
-- 전 36콜 `effort: 'xhigh'` 명시 — 세션 effort 상속을 차단하는 콜 단위 값. **공식 default는 `high`**이며, 변경 여부는 fresh sweep 후 결정한다 (짝 비교 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0). ⛔ 이 문서는 하향을 권고하지 않는다 — `xhigh`는 사용자가 유지를 택한 결정된 값이다
+- 전 45콜 `effort: 'xhigh'` 명시 — 세션 effort 상속을 차단하는 콜 단위 값. ⛔ 값 변동은 `scripts/lint-model-explicit.sh --baseline tests/fixtures/model-effort-baseline.json` 이 **label 별로** 대조한다(줄 수 세기는 콜별 변경을 못 잡는다). sweep 결과는 `experiment-log.md` §5.8 ⑥ · 구조 ablation 은 §5.9. **공식 default는 `high`**이며, 변경 여부는 fresh sweep 후 결정한다 (짝 비교 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0). ⛔ 이 문서는 하향을 권고하지 않는다 — `xhigh`는 사용자가 유지를 택한 결정된 값이다
 - opus 동시 실행 ≤3 (Lead=fable 제외, 총 ≤4)
 - **runtime fan-out**: discover lens 등 정적 1콜이 런타임 N인스턴스로 전개 — 동시성·비용은 런타임 기준 별도 계산
 
