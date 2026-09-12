@@ -10,7 +10,7 @@
 > **model 컬럼 해석**: `default` = frontmatter 기본값, `promoted` = Lead가 스폰 시 승격하는 모델.
 > 실질 분석·생산 에이전트의 frontmatter는 `model: sonnet`이지만, 스폰 시 Lead가 `model: "opus"`를 명시적으로 전달한다.
 > 이 설계는 "동시 opus ≤3" 거버넌스를 Lead가 직접 제어하기 위함이다.
-> **fable** (운용 — 2026-07-06 해제): Lead 세션이 `/model fable`로 전환해 운용하며, Workflow 판단 지점 3곳(`workflows/search-cross-verify.js:166` merge · `workflows/plan-collaborative.js:154`/`:167` direction)만 explicit `'fable'` 지정. Agent default/promoted 체계(Primary=opus)는 유지. 동시 상한 fable 1(Lead 세션 제외). 감시는 `scripts/lint-model-explicit.sh`. 재배선 상세는 `guides/model-guide.md` §5.
+> **fable** (운용 — 2026-07-06 해제): Lead 세션이 `/model fable`로 전환해 운용하며, Workflow 판단 지점 3곳(`workflows/search-cross-verify.js:166` merge · `workflows/plan-collaborative.js:220`/`:167` direction)만 explicit `'fable'` 지정. Agent default/promoted 체계(Primary=opus)는 유지. 동시 상한 fable 1(Lead 세션 제외). 감시는 `scripts/lint-model-explicit.sh`. 재배선 상세는 `guides/model-guide.md` §5.
 
 | 에이전트 | domain | lens | default | promoted | memory | skills | isolation | 비고 |
 |---------|--------|------|---------|----------|--------|--------|-----------|------|
