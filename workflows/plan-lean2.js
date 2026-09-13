@@ -100,6 +100,8 @@ const ImpactArchSchema = {
     secondaryHosts: { type: 'array', description: '⛔ 같은 타입·뷰를 쓰는 **두 번째 소비자**(다른 화면·다른 진입점). D1 이 이걸 놓쳐 major 를 잃었다.', items: { type: 'string', description: '파일:심볼 + 왜 영향받는가 — 200자 이내' } },
     existingTestSuites: { type: 'array', description: '⛔ 이 변경이 깨뜨릴 수 있는 **기존 자동 테스트** — 회귀 축의 유일한 비수동 oracle 이다.', items: { type: 'string', description: '파일 + 무엇을 지키는가 — 200자 이내' } },
     patternVerdicts: { type: 'array', description: '패턴 선택지 검증 — A vs B + 추천 + 근거. ⛔ **미검증 전제를 설계로 제거할 수 있는지**를 우선 본다(측정으로 미루지 말고).', items: { type: 'object', required: ['topic', 'recommendation', 'rationale'], properties: { topic: { type: 'string' }, recommendation: { type: 'string' }, rationale: { type: 'string', description: '규약 인용 + 대안 대비 우위 — 300자 이내' } } } },
+    deadCode: { type: 'array', description: '⛔ 이 변경으로 **도달 불가**가 되는 코드 — 제거 대상 후보. 빈 배열 허용.', items: { type: 'string', description: '파일:심볼 + 왜 도달 불가인가 — 200자 이내' } },
+    originBodyRequests: { type: 'array', description: '⛔ 이 렌즈가 **직접 못 얻은 것**(Bash 부재 — base 원본 본문·이전 호출자 수 등). Lead 가 resolve 한다. 추측으로 채우지 말고 요청으로 남긴다.', items: { type: 'string', description: '무엇을 알아야 하는가 — 200자 이내' } },
     violations: { type: 'array', items: { type: 'string', description: '기존 규약 위반 — 200자 이내' } },
   },
 }
@@ -187,7 +189,10 @@ const [full, edge, impactArch] = await parallel([
     `2. ⛔ **secondaryHosts** — 변경 대상 타입·뷰를 쓰는 **두 번째 소비자**를 찾는다. 다른 화면·다른 진입점·다른 컨테이너가 같은 것을 쓰고 있는지 전수로 본다. 이것을 놓치면 한 화면만 고치고 끝난다.\n` +
     `3. ⛔ **existingTestSuites** — 이 변경이 깨뜨릴 수 있는 기존 자동 테스트. 회귀 축의 유일한 비수동 oracle 이다.\n` +
     `4. patternVerdicts — 패턴 선택지(A vs B) + 추천 + 근거. ⛔ **미검증 전제가 있으면 "측정 후 판단" 으로 미루지 말고, 그 전제를 설계로 제거할 수 있는지 먼저 본다**(예: 두 좌표계를 비교하는 대신 같은 기준으로 환산). 제거 가능하면 그 방법을 recommendation 으로.\n` +
-    `5. violations — 기존 규약 위반.\n` +
+    `5. hiddenDependencies — 호출 그래프에 안 보이는 의존(문자열 키·리플렉션·설정값·빌드 조건).\n` +
+    `6. deadCode — 이 변경으로 도달 불가가 되는 코드. 없으면 빈 배열.\n` +
+    `7. ⛔ **originBodyRequests** — 네가 직접 못 얻은 것을 여기에 적는다. 너는 Bash 가 없어 base 원본 본문·이전 호출자 수를 못 본다. **추측으로 채우지 말고 요청으로 남긴다** — Lead 가 resolve 한다.\n` +
+    `8. violations — 기존 규약 위반.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.`,
     { label: 'lean2-impact-arch', agentType: 'fz:plan-impact', model: 'opus', effort: 'xhigh', schema: ImpactArchSchema }),
 ])
@@ -231,6 +236,13 @@ return {
     implicationRegister: (merge && merge.implicationRegister) || full.implicationRegister || [],
   }),
   delta: merge ? { addedEdgeCases: merge.addedEdgeCases, addedImpact: merge.addedImpact, stepAmendments: merge.stepAmendments, unresolved: merge.unresolved } : null,
+  // ⛔ 계약 복구 (F-215): collaborative 가 반환하던 것을 lean2 가 빠뜨려 소비처가 영구 no-op 이었다.
+  //    impactRequests → scripts/plan_resolve_impact_requests.py · fz-plan SKILL.md 절차 4 가 소비한다.
+  impactRequests: (impactArch && impactArch.originBodyRequests) || [],
+  //    directionEscalation → SKILL.md 의 RECONSIDER/REDIRECT 분기 신호. ⛔ 반환 모드를 바꾸지 않고 필드로 싣는다.
+  directionEscalation: (full.directionVerdict === 'RECONSIDER' || full.directionVerdict === 'REDIRECT')
+    ? { verdict: full.directionVerdict, alternatives: full.directionAlternatives || [] }
+    : null,
   lensOutputs: { edge, impactArch },
   metrics: { agentCalls, nullCount: nullCalls, fallbackCount: 0, stagesCompleted },
 }
