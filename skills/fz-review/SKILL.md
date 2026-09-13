@@ -14,8 +14,8 @@ allowed-tools: >-
   mcp__plugin_fz_serena__edit_memory,
   mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
-  mcp__lsp__diagnostics_delta,
-  mcp__lsp__references,
+  mcp__plugin_fz_serena__get_diagnostics_for_file,
+  LSP,
   Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
 metadata:
   provides: [review-results]

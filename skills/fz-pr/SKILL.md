@@ -10,9 +10,8 @@ allowed-tools: >-
   mcp__github__create_pull_request,
   mcp__github__get_pull_request,
   mcp__github__list_pull_requests,
-  mcp__atlassian__get-issue,
-  mcp__atlassian__transition-issue,
-  mcp__atlassian__create-comment,
+  mcp__atlassian-jira__jira_get,
+  mcp__atlassian-jira__jira_post,
   Bash(git *)
 metadata:
   provides: [pr]

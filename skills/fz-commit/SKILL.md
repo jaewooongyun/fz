@@ -7,8 +7,7 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[TICKET-ID]"
 allowed-tools: >-
-  mcp__atlassian__get-issue,
-  mcp__atlassian__search-issues,
+  mcp__atlassian-jira__jira_get,
   Bash(git *)
 metadata:
   provides: [commit]
