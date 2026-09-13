@@ -1,6 +1,79 @@
 # Changelog
 
-### v4.35.1 (2026-09-13) — 잘린 측정이 개선처럼 보였다 [PATCH]
+### v4.34.0 (2026-09-13) — 사전등록 표가 두 달간 비어 있었다: 재는 주체가 없었다 [MINOR]
+
+> ⛔ 이 항목은 세 묶음을 합친 것이다. 작업 중 `4.34.0 → 4.35.0 → 4.35.1` 로 올렸다가
+> **커밋 시점에 4.34.0 하나로 되돌렸다** — 세 버전 모두 커밋된 상태였던 적이 없어
+> 태그가 가리킬 트리가 없었다. 아래 세 절이 원래의 경계다.
+
+## 1. 사전등록 표가 두 달간 비어 있었다: 재는 주체가 없었다
+
+`/fz-plan` 이 75~90분 걸린다는 보고를 실측했다. 원인은 한 층이 아니라 **셋**이다 — Workflow 워커
+(76·75·90분) · Lead 자체 생성(29~45분) · GPT 호출(11회 24분). 45분 넘은 `/fz-plan` 3건 중
+Workflow 를 쓴 건은 **0건**이었다. `--deep` 은 원인이 아니다(스크립트에 분기 0건, 3건 모두 미사용).
+
+⛔ **7/9 `fdcfe56`**(렌즈 6콜 sonnet→opus + 11콜 xhigh)이 22분 → 75분의 전환점인데, 그 커밋이
+신설한 `experiment-log §5.8` 사전등록 표는 **데이터행 0** 이었다. 임계는 등록됐고 재는 주체가 없었다.
+
+**계측 신설**: `scripts/fz_wf_metrics.py` — wf 폴더 → stage별 dur·turns·tools·out_tok·thinking·
+cache r/w·so_retries·**advisor** + 크리티컬 패스 + §5.7 행. ⛔ advisor 는 `advisor_tool_result`
+content block 을 `tool_use_id` 로 중복 제거해 센다 — `usage.iterations` 로 세면 과소 집계된다
+(실측 정정 2→8회, GPT verify #1). `--plan-segments` 로 Lead·GPT 층을 분리한다(9da38828: 초기 생성
+11.9분 · GPT 24.2분 · 통합 6.0분).
+
+**낭비 제거**: S1 draft 의 JSON 이스케이프 지시를 프롬프트·스키마 **양쪽**에(20k 출력이 파싱 거부돼
+전량 재출력된 실측 178s) · scriptPath **사전 복사**로 첫 호출 거부 왕복 제거(3건 전부 반복) ·
+`integrateBrief()` 로 S4 입력을 id 전건 보존 축약(84k자 fixture → ≤40k).
+
+**품질 배선**: `plan_integrity_check.py`(rtm→steps · CC links→edgeCases · writeScope⊆readScope ·
+VerifySpec) — 반환에 `lensOutputs` 를 추가해 대조 입력을 만들었다(이전엔 확인 수단이 없었다).
+⭐ **실데이터가 검사기를 정정했다**: 신규 생성 파일 3건이 위반으로 뜨는 오탐을 TVG-6894 플랜 대조에서
+발견해 면제 규칙을 넣었다 — fixture 만으로는 드러나지 않았다. `plan_resolve_impact_requests.py` 로
+impactRequests 수동 의존을 제거(positive control 동반 — 0건을 부재로 읽지 않는다).
+`lint-model-explicit.sh --baseline` 은 label 별 model/effort 를 대조한다(줄 수 세기는 콜별 변경을
+못 잡는다, GPT verify #12).
+
+**사전등록 신설**: §5.8 **⑥**(세션 effort sweep — ①은 철회된 사료라 별도) · §5.9(구조 ablation,
+S8a 모델·S8b 구조 **분리** 평가). ⛔ 상수는 아직 바꾸지 않았다 — sweep 통과가 근거다.
+
+**검증**: 게이트 원장 17개 중 command 12 전건 PASS · 신규 스크립트 self-test(check_wf_text 10/10 ·
+fz_wf_metrics 7/7 · plan_integrity 7/7 · resolve 4/4) · lint baseline 양성·음성 · health-check exit 0.
+
+---
+
+## 2. 대조군을 넷 세우고 자기 자신과의 대조를 빠뜨렸다
+
+`/fz-plan` 의 60분을 구조 문제로 확정한 뒤(v4.34.0), 단계를 줄인 변형을 만들어 동결 워크트리 2종에서
+blind 채점으로 네 번 비교했다. 매번 "9콜이 major N건을 더 찾는다"가 나왔고 그것을 구조 차이로 읽었다.
+
+⛔ **그런데 같은 구조를 두 번 돌려 서로 대조한 적이 없었다.** 뒤늦게 잰 결과 — 같은 입력·같은 스크립트·
+같은 동결 트리로 9콜을 2회 실행하니 **상호 고유 major 5건**, overall **`Q-superior`**(동등 아님), 그리고
+**채택 기전까지 반대**로 갈렸다(1회차: rect 레지스트리+GeometryReader / 2회차: 1회차가 "선례 0건"으로
+기각했던 UIViewRepresentable 마커). 변인은 실행 난수 하나였다.
+
+⇒ 사전등록 임계 *"검증된 critical·major 손실 0"* 은 **도달 불가능한 값**이었고, 앞선 네 판정의 "손실 N"은
+구조 차이의 증거가 아니었다. **run-to-run 분산이 구조 간 차이보다 크다.**
+
+**배선 전환**: fz-plan 기본 워크플로가 `plan-collaborative.js`(6단계 9콜) → **`plan-lean2.js`(2단계 4콜)**.
+전체 플랜 ∥ edge 적대 ∥ impact+arch 를 **동시 3**으로 띄우고 델타 병합 1콜. wall **3,492s → 1,344s(-61.5%)**,
+요구 3축 양쪽 closed, 실행 가능 command verify **4 → 5**, 9콜과의 발산 **3 < 노이즈 바닥 5**.
+⛔ `plan-collaborative.js` 는 **존치** — 롤백은 `skills/fz-plan/SKILL.md` 절차 2.5·3 의 스크립트명 한 줄이다.
+
+⭐ **병합 콜은 본문을 쓸 수 없다** — schema 를 `stepAmendments`·`addedEdgeCases`·`addedImpact` **델타 전용**으로
+좁혀, "다시 쓰지 마라"를 프롬프트로 부탁하는 대신 **쓸 필드를 주지 않았다**(harness-engineering 원칙 3
+"구조가 경로를 좁히는가"의 적용). 렌즈 schema 에는 `secondaryHosts`·`existingTestSuites` 를 명시 요구 —
+찾아야 할 것에 이름을 주니 9콜도 0건이던 자리에서 7건·5건이 나왔다.
+
+**임계 재등록**: "손실 0" → "노이즈 바닥 이하". ⛔ 사후 조정이 아니라 원 임계의 **도달 불가능성이 실측**됐기
+때문이며, 재등록 주체는 사용자다. 근거는 전부 **N=1**(노이즈 1회·채점자 1명·트리당 1회) —
+**실사용 3회 관찰 후 재평가**하고 미달이면 원복한다.
+
+**검증**: health-check 13검사 exit 0 · lint baseline 45콜 전건 일치(기존 배선 불변) · 래핑 syntax ·
+`experiment-log.md` §5.9 행 1~3 + 교정 행 C + 채택 행.
+
+---
+
+## 3. 잘린 측정이 개선처럼 보였다
 
 v4.35.0 이 남긴 두 게이트(S7 effort sweep · S8a 렌즈 모델)를 실측했다. **둘 다 기각**이다 —
 `plan-lean2.js` 는 그대로다. 이 릴리즈가 고치는 것은 플랜 워크플로가 아니라 **그것을 재는 도구**다.
@@ -37,69 +110,6 @@ arm 검증 스니펫의 `max(…, key=getmtime)` 도 교체했다 — **바로 �
 게이트 단위로는 결함이 없어 스키마를 건드리지 않았다.
 
 **검증**: health-check 13검사 exit 0 · 완주 오라클 양성 3·음성 2 · `fz_wf_metrics` self-test 8/8 무회귀.
-
-### v4.35.0 (2026-09-12) — 대조군을 넷 세우고 자기 자신과의 대조를 빠뜨렸다 [MINOR]
-
-`/fz-plan` 의 60분을 구조 문제로 확정한 뒤(v4.34.0), 단계를 줄인 변형을 만들어 동결 워크트리 2종에서
-blind 채점으로 네 번 비교했다. 매번 "9콜이 major N건을 더 찾는다"가 나왔고 그것을 구조 차이로 읽었다.
-
-⛔ **그런데 같은 구조를 두 번 돌려 서로 대조한 적이 없었다.** 뒤늦게 잰 결과 — 같은 입력·같은 스크립트·
-같은 동결 트리로 9콜을 2회 실행하니 **상호 고유 major 5건**, overall **`Q-superior`**(동등 아님), 그리고
-**채택 기전까지 반대**로 갈렸다(1회차: rect 레지스트리+GeometryReader / 2회차: 1회차가 "선례 0건"으로
-기각했던 UIViewRepresentable 마커). 변인은 실행 난수 하나였다.
-
-⇒ 사전등록 임계 *"검증된 critical·major 손실 0"* 은 **도달 불가능한 값**이었고, 앞선 네 판정의 "손실 N"은
-구조 차이의 증거가 아니었다. **run-to-run 분산이 구조 간 차이보다 크다.**
-
-**배선 전환**: fz-plan 기본 워크플로가 `plan-collaborative.js`(6단계 9콜) → **`plan-lean2.js`(2단계 4콜)**.
-전체 플랜 ∥ edge 적대 ∥ impact+arch 를 **동시 3**으로 띄우고 델타 병합 1콜. wall **3,492s → 1,344s(-61.5%)**,
-요구 3축 양쪽 closed, 실행 가능 command verify **4 → 5**, 9콜과의 발산 **3 < 노이즈 바닥 5**.
-⛔ `plan-collaborative.js` 는 **존치** — 롤백은 `skills/fz-plan/SKILL.md` 절차 2.5·3 의 스크립트명 한 줄이다.
-
-⭐ **병합 콜은 본문을 쓸 수 없다** — schema 를 `stepAmendments`·`addedEdgeCases`·`addedImpact` **델타 전용**으로
-좁혀, "다시 쓰지 마라"를 프롬프트로 부탁하는 대신 **쓸 필드를 주지 않았다**(harness-engineering 원칙 3
-"구조가 경로를 좁히는가"의 적용). 렌즈 schema 에는 `secondaryHosts`·`existingTestSuites` 를 명시 요구 —
-찾아야 할 것에 이름을 주니 9콜도 0건이던 자리에서 7건·5건이 나왔다.
-
-**임계 재등록**: "손실 0" → "노이즈 바닥 이하". ⛔ 사후 조정이 아니라 원 임계의 **도달 불가능성이 실측**됐기
-때문이며, 재등록 주체는 사용자다. 근거는 전부 **N=1**(노이즈 1회·채점자 1명·트리당 1회) —
-**실사용 3회 관찰 후 재평가**하고 미달이면 원복한다.
-
-**검증**: health-check 13검사 exit 0 · lint baseline 45콜 전건 일치(기존 배선 불변) · 래핑 syntax ·
-`experiment-log.md` §5.9 행 1~3 + 교정 행 C + 채택 행.
-
-### v4.34.0 (2026-09-11) — 사전등록 표가 두 달간 비어 있었다: 재는 주체가 없었다 [MINOR]
-
-`/fz-plan` 이 75~90분 걸린다는 보고를 실측했다. 원인은 한 층이 아니라 **셋**이다 — Workflow 워커
-(76·75·90분) · Lead 자체 생성(29~45분) · GPT 호출(11회 24분). 45분 넘은 `/fz-plan` 3건 중
-Workflow 를 쓴 건은 **0건**이었다. `--deep` 은 원인이 아니다(스크립트에 분기 0건, 3건 모두 미사용).
-
-⛔ **7/9 `fdcfe56`**(렌즈 6콜 sonnet→opus + 11콜 xhigh)이 22분 → 75분의 전환점인데, 그 커밋이
-신설한 `experiment-log §5.8` 사전등록 표는 **데이터행 0** 이었다. 임계는 등록됐고 재는 주체가 없었다.
-
-**계측 신설**: `scripts/fz_wf_metrics.py` — wf 폴더 → stage별 dur·turns·tools·out_tok·thinking·
-cache r/w·so_retries·**advisor** + 크리티컬 패스 + §5.7 행. ⛔ advisor 는 `advisor_tool_result`
-content block 을 `tool_use_id` 로 중복 제거해 센다 — `usage.iterations` 로 세면 과소 집계된다
-(실측 정정 2→8회, GPT verify #1). `--plan-segments` 로 Lead·GPT 층을 분리한다(9da38828: 초기 생성
-11.9분 · GPT 24.2분 · 통합 6.0분).
-
-**낭비 제거**: S1 draft 의 JSON 이스케이프 지시를 프롬프트·스키마 **양쪽**에(20k 출력이 파싱 거부돼
-전량 재출력된 실측 178s) · scriptPath **사전 복사**로 첫 호출 거부 왕복 제거(3건 전부 반복) ·
-`integrateBrief()` 로 S4 입력을 id 전건 보존 축약(84k자 fixture → ≤40k).
-
-**품질 배선**: `plan_integrity_check.py`(rtm→steps · CC links→edgeCases · writeScope⊆readScope ·
-VerifySpec) — 반환에 `lensOutputs` 를 추가해 대조 입력을 만들었다(이전엔 확인 수단이 없었다).
-⭐ **실데이터가 검사기를 정정했다**: 신규 생성 파일 3건이 위반으로 뜨는 오탐을 TVG-6894 플랜 대조에서
-발견해 면제 규칙을 넣었다 — fixture 만으로는 드러나지 않았다. `plan_resolve_impact_requests.py` 로
-impactRequests 수동 의존을 제거(positive control 동반 — 0건을 부재로 읽지 않는다).
-`lint-model-explicit.sh --baseline` 은 label 별 model/effort 를 대조한다(줄 수 세기는 콜별 변경을
-못 잡는다, GPT verify #12).
-
-**사전등록 신설**: §5.8 **⑥**(세션 effort sweep — ①은 철회된 사료라 별도) · §5.9(구조 ablation,
-S8a 모델·S8b 구조 **분리** 평가). ⛔ 상수는 아직 바꾸지 않았다 — sweep 통과가 근거다.
-
-**검증**: 게이트 원장 17개 중 command 12 전건 PASS · 신규 스크립트 self-test(check_wf_text 10/10 ·
-fz_wf_metrics 7/7 · plan_integrity 7/7 · resolve 4/4) · lint baseline 양성·음성 · health-check exit 0.
 
 ### v4.33.1 (2026-09-11) — Stop 훅이 남의 세션 원장으로 내 종료를 막았다 [PATCH]
 
