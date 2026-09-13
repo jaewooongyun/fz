@@ -18,8 +18,8 @@ allowed-tools: >-
   mcp__plugin_fz_serena__edit_memory,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  mcp__lsp__diagnostics_delta,
-  mcp__lsp__hover,
+  mcp__plugin_fz_serena__get_diagnostics_for_file,
+  LSP,
   Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Workflow
 metadata:
   provides: [code-changes]

@@ -16,9 +16,8 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  mcp__lsp__diagnostics_delta,
-  mcp__lsp__hover,
-  mcp__lsp__peek_definition,
+  mcp__plugin_fz_serena__get_diagnostics_for_file,
+  LSP,
   Edit, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Workflow
 metadata:
   provides: [code-changes]

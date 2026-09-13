@@ -17,8 +17,7 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
-  mcp__atlassian__get-issue,
-  mcp__atlassian__search-issues,
+  mcp__atlassian-jira__jira_get,
   Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
 metadata:
   provides: [planning, architecture-analysis]

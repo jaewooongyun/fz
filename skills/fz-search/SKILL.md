@@ -14,10 +14,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__write_memory,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  mcp__lsp__definition,
-  mcp__lsp__references,
-  mcp__lsp__hover,
-  mcp__lsp__peek_definition,
+  LSP,
   Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
 
 metadata:
