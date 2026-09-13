@@ -6,14 +6,14 @@ description: >-
 user-invocable: true
 argument-hint: "[해결하고 싶은 문제/질문]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__activate_project,
-  mcp__serena__read_memory,
-  mcp__serena__write_memory,
-  mcp__serena__edit_memory,
-  mcp__serena__list_memories,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__activate_project,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__edit_memory,
+  mcp__plugin_fz_serena__list_memories,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
@@ -77,12 +77,12 @@ metadata:
 
 | Phase | sc: 명령어 | 용도 |
 |-------|-----------|------|
-| Phase 1 | `/sc:analyze` | 기존 코드/아키텍처 분석으로 암묵적 제약 사전 식별 |
-| Phase 2 | `/sc:brainstorm` | 후보 옵션 발산이 필요할 때 |
-| Phase 2 | `/sc:business-panel` | UX/전략 관점 분석 (`--business` 시) |
-| Phase 2 | `/sc:explain` | 기존 패턴/규칙의 교육적 설명 |
+| Phase 1 | `/sc:sc-analyze` | 기존 코드/아키텍처 분석으로 암묵적 제약 사전 식별 |
+| Phase 2 | `/sc:sc-brainstorm` | 후보 옵션 발산이 필요할 때 |
+| Phase 2 | `/sc:sc-business-panel` | UX/전략 관점 분석 (`--business` 시) |
+| Phase 2 | `/sc:sc-explain` | 기존 패턴/규칙의 교육적 설명 |
 | Phase 2 | L3 `deep-research-agent` | 외부 기술/라이브러리 조사 (modules/native-agents.md) |
-| Phase 3 | `/sc:reflect` | 수렴된 결과 자체 검증 |
+| Phase 3 | `/sc:sc-reflect` | 수렴된 결과 자체 검증 |
 | Phase 4 | `→ /fz-plan` | 정제된 요구사항으로 구현 계획 수립 |
 
 ## Plugin 참조
@@ -204,9 +204,9 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - "어떤 방식?" → 패턴 선택 결정
 
 2. **관련 코드 탐색**:
-   - `mcp__serena__find_symbol` → 언급된 타입/심볼 구조 확인
-   - `mcp__serena__get_symbols_overview` → 주변 심볼 컨텍스트
-   - `mcp__serena__find_referencing_symbols` → 영향 범위 파악
+   - `mcp__plugin_fz_serena__find_symbol` → 언급된 타입/심볼 구조 확인
+   - `mcp__plugin_fz_serena__get_symbols_overview` → 주변 심볼 컨텍스트
+   - `mcp__plugin_fz_serena__find_referencing_symbols` → 영향 범위 파악
    - `Grep` → 기존 유사 패턴 검색
 
 3. **암묵적 제약 사전 식별**:
@@ -391,7 +391,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - `/fz-plan`으로 전환 시: 정제된 요구사항이 /fz-plan Phase 1의 입력이 됨
      - /fz-plan은 "요구사항 구조 분해" 단계를 건너뛰고 "영향 분석"부터 시작
    - PR 코멘트 시: 제약 매트릭스 + 결정 근거를 읽기 쉬운 형태로 가공
-   - 기록 시: `mcp__serena__write_memory` → 결정사항 영속화
+   - 기록 시: `mcp__plugin_fz_serena__write_memory` → 결정사항 영속화
 
 3. **완료 보고**:
 

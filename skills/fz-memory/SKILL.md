@@ -7,10 +7,10 @@ user-invocable: true
 argument-hint: "[audit|gc|recall|organize|remind] [--skill fz-plan] [--deep]"
 allowed-tools: >-
   Read, Write, Edit, Grep, Glob,
-  mcp__serena__read_memory, mcp__serena__write_memory,
-  mcp__serena__edit_memory, mcp__serena__delete_memory,
-  mcp__serena__list_memories,
-  mcp__serena__find_symbol,
+  mcp__plugin_fz_serena__read_memory, mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__edit_memory, mcp__plugin_fz_serena__delete_memory,
+  mcp__plugin_fz_serena__list_memories,
+  mcp__plugin_fz_serena__find_symbol,
   mcp__context7__resolve-library-id, mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking
 metadata:

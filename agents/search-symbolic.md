@@ -3,7 +3,7 @@ name: search-symbolic
 description: >-
   심볼 기반 코드 탐색 에이전트. LSP/Serena로 심볼 정의/참조/타입 정밀 탐색.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview
 ---
 
 ## Role

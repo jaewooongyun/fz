@@ -18,7 +18,7 @@ description: >-                           # required (L1 공식) — the most im
 user-invocable: true|false               # required (L1 공식)
 argument-hint: "[target] [--options]"     # optional
 allowed-tools: >-                         # required (L1 공식) — comma-separated
-  mcp__serena__find_symbol,
+  mcp__plugin_fz_serena__find_symbol,
   Edit, Read, Grep, Glob, Bash(pattern)
 metadata:                                 # required (L2 fz 정책) — fz 자작 키 3종은 이 맵 하위
   provides: [capability-tokens]           # /fz 동적 파이프라인이 소비

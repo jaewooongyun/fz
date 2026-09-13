@@ -7,8 +7,8 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[list|info|deps|check|benchmark|reflect-to-module|create|edit|delete] [대상]"
 allowed-tools: >-
-  mcp__serena__list_memories,
-  mcp__serena__read_memory,
+  mcp__plugin_fz_serena__list_memories,
+  mcp__plugin_fz_serena__read_memory,
   Read, Grep, Glob, Bash, Edit, Write
 metadata:
   provides: []

@@ -108,8 +108,8 @@ BAD:  "코드를 분석할 때는 먼저 파일 구조를 파악하고, 그 다�
        효과적입니다. 그런 다음..."
 
 GOOD: 1. 파일 구조 파악 (Glob)
-      2. 핵심 함수 탐색 (mcp__serena__find_symbol)
-      3. 의존성 추적 (mcp__serena__find_referencing_symbols)
+      2. 핵심 함수 탐색 (mcp__plugin_fz_serena__find_symbol)
+      3. 의존성 추적 (mcp__plugin_fz_serena__find_referencing_symbols)
 ```
 
 ### 2.2 원인 2: 핵심 지시가 묻힘
@@ -164,7 +164,7 @@ User prompt에 추가:
 
 ### 3.1 MCP 도구 연결 실패
 
-**증상:** `mcp__serena__find_symbol` 등 MCP 도구 호출 시 에러.
+**증상:** `mcp__plugin_fz_serena__find_symbol` 등 MCP 도구 호출 시 에러.
 
 **Fallback 4-tier 전략:**
 
@@ -272,9 +272,9 @@ User prompt에 추가:
 ### Serena Fallback 체인
 
 ```
-1. mcp__serena__find_symbol        → 심볼 정의 탐색
-2. mcp__serena__find_referencing_symbols → 참조 추적
-3. mcp__serena__get_symbols_overview → 파일 심볼 개요
+1. mcp__plugin_fz_serena__find_symbol        → 심볼 정의 탐색
+2. mcp__plugin_fz_serena__find_referencing_symbols → 참조 추적
+3. mcp__plugin_fz_serena__get_symbols_overview → 파일 심볼 개요
    ↓ 실패 시
 4. Grep → 텍스트 패턴 탐색
 5. Glob → 파일 패턴 탐색

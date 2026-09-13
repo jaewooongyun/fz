@@ -6,13 +6,13 @@ description: >-
 user-invocable: true
 argument-hint: "[버그/에러 설명] [--gpt]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__replace_symbol_body,
-  mcp__serena__insert_after_symbol,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__read_memory,
-  mcp__serena__write_memory,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__replace_symbol_body,
+  mcp__plugin_fz_serena__insert_after_symbol,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__write_memory,
   mcp__sequential-thinking__sequentialthinking,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
@@ -93,10 +93,10 @@ metadata:
 
 | Mode/상황 | sc: 명령어 | 용도 |
 |----------|-----------|------|
-| 버그 수정 | `/sc:troubleshoot` | 에러 원인 자동 진단 |
-| 복잡한 에러 | `/sc:explain` | 프레임워크/라이브러리 깊은 에러 교육적 설명 |
-| 수정 후 | `/sc:analyze` | 수정 코드 빠른 품질 체크 |
-| 복잡한 수정 후 | `/sc:reflect --type task` | 근본 원인 해결 여부 자체 검증 |
+| 버그 수정 | `/sc:sc-troubleshoot` | 에러 원인 자동 진단 |
+| 복잡한 에러 | `/sc:sc-explain` | 프레임워크/라이브러리 깊은 에러 교육적 설명 |
+| 수정 후 | `/sc:sc-analyze` | 수정 코드 빠른 품질 체크 |
+| 복잡한 수정 후 | `/sc:sc-reflect --type task` | 근본 원인 해결 여부 자체 검증 |
 | 코드 탐색 필요 | `→ /fz-search` | 전용 탐색 스킬로 전환 |
 | 복잡도 초과 | `→ /fz-plan` 또는 `→ /fz-code` | 스킬 전환 |
 
@@ -149,16 +149,16 @@ metadata:
 
 1. **관련 코드 탐색** (Serena):
    - `Grep` → 에러 메시지/키워드 검색
-   - `mcp__serena__find_symbol` → 의심 심볼 찾기
-   - `mcp__serena__find_referencing_symbols` → 호출 관계 파악
+   - `mcp__plugin_fz_serena__find_symbol` → 의심 심볼 찾기
+   - `mcp__plugin_fz_serena__find_referencing_symbols` → 호출 관계 파악
 2. 원인 후보를 2-3개로 좁힘
 
 ### Step 1c: Root-Cause — 증상이 아닌 원인 추적
 
 1. **구조적 추론** (복잡한 버그):
    - `mcp__sequential-thinking__sequentialthinking` → 5 Whys 기법
-   - `/sc:troubleshoot` → 자동 진단
-   - `/sc:explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명
+   - `/sc:sc-troubleshoot` → 자동 진단
+   - `/sc:sc-explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명
 2. **⛔ Step 1c 완료 전 코드 수정 금지**. root-cause가 불명확하면 AskUserQuestion.
 
 ### Step 2: 수정
@@ -169,10 +169,10 @@ metadata:
 
 | 상황 | 도구 |
 |------|------|
-| 심볼 수정 | `mcp__serena__replace_symbol_body` |
-| 코드 추가 | `mcp__serena__insert_after_symbol` |
+| 심볼 수정 | `mcp__plugin_fz_serena__replace_symbol_body` |
+| 코드 추가 | `mcp__plugin_fz_serena__insert_after_symbol` |
 | 간단 수정 | `Edit` |
-| 복잡한 수정 | `/sc:troubleshoot` |
+| 복잡한 수정 | `/sc:sc-troubleshoot` |
 
 ### Step 3: 빌드 검증
 
@@ -183,9 +183,9 @@ metadata:
 ### Step 4: Verify Fix (필수)
 
 수정이 재현 경로(Step 1a)에서 문제를 해결했는지 확인:
-- `mcp__serena__find_referencing_symbols` → 참조 무결성 확인
-- `/sc:analyze` → 빠른 품질 체크
-- `/sc:reflect --type task` → 수정이 근본 원인을 해결했는지 자체 검증
+- `mcp__plugin_fz_serena__find_referencing_symbols` → 참조 무결성 확인
+- `/sc:sc-analyze` → 빠른 품질 체크
+- `/sc:sc-reflect --type task` → 수정이 근본 원인을 해결했는지 자체 검증
   (트리거: 복잡한 버그 수정 완료 후, 단순 수정은 스킵)
 - (옵션 `--gpt`) `/fz-gpt check` 호출 → cross-model 검증
   - verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입

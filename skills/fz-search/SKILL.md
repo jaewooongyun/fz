@@ -6,12 +6,12 @@ description: >-
 user-invocable: true
 argument-hint: "[검색 대상] [--mode arch|layer|impact|pattern] [--deep]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__activate_project,
-  mcp__serena__read_memory,
-  mcp__serena__write_memory,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__activate_project,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__write_memory,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   mcp__lsp__definition,
@@ -76,9 +76,9 @@ metadata:
 
 | 모드/상황 | sc: 명령어 | 용도 |
 |----------|-----------|------|
-| 탐색 시작 전 | `/sc:index-repo` | 프로젝트 구조 빠른 파악 (3K 토큰, 최초 1회) |
-| 구조 분석 | `/sc:analyze` | 탐색 결과의 아키텍처 품질 분석 |
-| 설명 요청 | `/sc:explain` | 탐색된 코드/구조 교육적 설명 |
+| 탐색 시작 전 | `/sc:sc-index-repo` | 프로젝트 구조 빠른 파악 (3K 토큰, 최초 1회) |
+| 구조 분석 | `/sc:sc-analyze` | 탐색 결과의 아키텍처 품질 분석 |
+| 설명 요청 | `/sc:sc-explain` | 탐색된 코드/구조 교육적 설명 |
 | 복잡한 탐색 후 | `→ /fz-fix` | 수정이 필요한 경우 전환 |
 | 설계 필요 시 | `→ /fz-plan` | 구조 변경 계획 수립 |
 
@@ -109,7 +109,7 @@ metadata:
 
 1. **PROJECT_INDEX.md 확인**:
    - 존재 → 읽기 (3K 토큰으로 프로젝트 전체 구조 파악)
-   - 미존재 → `/sc:index-repo` 실행 제안 (사용자 승인 시 생성)
+   - 미존재 → `/sc:sc-index-repo` 실행 제안 (사용자 승인 시 생성)
 2. **인덱스 기반 탐색 범위 결정**:
    - 모듈/디렉토리 구조를 미리 파악 → 불필요한 전체 탐색 방지
    - 대상 모듈 위치를 빠르게 특정

@@ -6,9 +6,9 @@ description: >-
 user-invocable: true
 argument-hint: "[review|verify|verify-gates|validate|check|final|adversarial|drift|plan|micro-eval] [대상]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__write_memory,
-  mcp__serena__read_memory,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__read_memory,
   Bash(codex *), Read, Grep
 metadata:
   provides: [verification]
@@ -248,7 +248,7 @@ should-NOT-trigger (Boundaries Will Not / '비사용:' 대안 스킬)
 | Claude 계획 초안 존재 | `/fz-gpt verify` | gpt가 plan을 `--output-schema`로 독립 재작성 → Claude 계획과 diff → divergence 기록 + verdict 판정 후 /fz-plan으로 반환 (Gate 3/3 통과) | normal |
 | base branch 후보 불확실(자동 결정 불가) | `/fz-gpt review` | Will Not "Base branch를 추측하지 않음" — 추측 base 실행 0건, 사용자에게 질문 → 확정 후 실행 | edge-case |
 | CLAUDE.md `## GPT Skills` 테이블(Tier 1) 부재 | `/fz-gpt verify` | Tier 2(글로벌 fz-*) → Tier 3(인라인 프롬프트) 순차 폴백으로 서브커맨드 실행 완료 (Gate "서브커맨드 실행 완료" 통과) | edge-case |
-| Codex CLI 통신 실패 | `/fz-gpt review` | 컨텍스트 축소 후 재시도 → 실패 시 Issue Tracker에 기록 + /sc:analyze 단독 폴백 실행 (3회 연속 실패 시 사용자 에스컬레이션) | failure |
+| Codex CLI 통신 실패 | `/fz-gpt review` | 컨텍스트 축소 후 재시도 → 실패 시 Issue Tracker에 기록 + /sc:sc-analyze 단독 폴백 실행 (3회 연속 실패 시 사용자 에스컬레이션) | failure |
 
 ## Boundaries
 
@@ -275,7 +275,7 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 | CLAUDE.md 미발견 | `../CLAUDE.md` → `CLAUDE.md` → `find .. -maxdepth 2` | 경고 후 계속 |
 | Guidelines 미발견 | CLAUDE.md `## Code Conventions` 참조 | 일반 규칙 적용 |
 | Plugin 명령 실패 | CLI 자동 폴백 (`codex exec`) | 경고 없이 진행 |
-| Codex CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:analyze 단독 |
+| Codex CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:sc-analyze 단독 |
 | `codex exec review` 실패 | `codex exec` + diff 인라인 | 수동 분석 |
 | JSON 파싱 실패 | `-o` 파일 캡처 폴백 | Claude 분석 |
 | 모델 미지원 (구버전 CLI가 config 모델 미인식) | CLI 업데이트 권장, 불가 시 config `model`을 호환 모델로 조정 (사용자 소관 — 임시 `-m` pin 금지) | -- |

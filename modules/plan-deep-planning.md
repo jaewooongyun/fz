@@ -30,8 +30,8 @@
 
 ### 절차 2. 코드베이스 영향 분석
 
-- `mcp__serena__find_symbol` → 변경 대상 심볼 확인
-- `mcp__serena__find_referencing_symbols` → 영향받는 심볼/파일
+- `mcp__plugin_fz_serena__find_symbol` → 변경 대상 심볼 확인
+- `mcp__plugin_fz_serena__find_referencing_symbols` → 영향받는 심볼/파일
 - `Grep` → 기존 유사 구현 패턴
 
 #### ⛔ Exhaustive Impact Scan
@@ -76,12 +76,12 @@ f. **⛔ Import Removal Symbol Inventory** (import 제거 작업 시 필수):
 
 ### 절차 5a. SuperClaude 연계 (필요 시)
 
-- `/sc:design` → 새 아키텍처 설계
-- `/sc:brainstorm` → 요구사항 탐색
-- `/sc:analyze` → 기존 코드 심층 분석
-- `/sc:research` → 외부 기술 조사
-- `/sc:workflow` → PRD/요구사항 → 구현 워크플로우 자동 생성 (트리거: 구현 Step이 5개 이상 예상될 때)
-- `/sc:spec-panel` → 아키텍처 스펙 전문가 패널 리뷰 (트리거: 새 모듈 생성 시, --deep 옵션 시) (모드: `--mode critique --focus architecture`)
+- `/sc:sc-design` → 새 아키텍처 설계
+- `/sc:sc-brainstorm` → 요구사항 탐색
+- `/sc:sc-analyze` → 기존 코드 심층 분석
+- `/sc:sc-research` → 외부 기술 조사
+- `/sc:sc-workflow` → PRD/요구사항 → 구현 워크플로우 자동 생성 (트리거: 구현 Step이 5개 이상 예상될 때)
+- `/sc:sc-spec-panel` → 아키텍처 스펙 전문가 패널 리뷰 (트리거: 새 모듈 생성 시, --deep 옵션 시) (모드: `--mode critique --focus architecture`)
 
 ### 절차 5b. 설계 스트레스 테스트 (Design Stress Test)
 

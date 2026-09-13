@@ -638,7 +638,7 @@ GOOD: "이 실패가 반복되는가?" → Yes: 원칙+이유 1줄 → No: 일�
 fz 적용:
 - Claude(생성) + GPT/GPT(검증)의 cross-model 패턴이 이 원칙의 직접 구현
 - `/fz-review`의 3중 검증(Claude + GPT + sc:analyze)이 Evaluator 다양성 확보
-- SOLO 모드에서도 `/sc:reflect`가 최소한의 self-check를 제공하지만, TEAM의 cross-model이 더 신뢰성 높음
+- SOLO 모드에서도 `/sc:sc-reflect`가 최소한의 self-check를 제공하지만, TEAM의 cross-model이 더 신뢰성 높음
 
 ### 원칙 H3: Context reset + structured handoff > compaction
 

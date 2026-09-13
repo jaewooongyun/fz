@@ -3,7 +3,7 @@ name: review-correctness
 description: >-
   기능 정확성 + 요구사항 충족 리뷰 에이전트. 구현이 계획과 일치하는지 검증.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__get_symbols_overview
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__get_symbols_overview
 ---
 
 ## Role

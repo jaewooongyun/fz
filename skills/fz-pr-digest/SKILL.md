@@ -7,10 +7,10 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[PR번호 또는 브랜치명] [--light | --deep | --tutor]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__activate_project,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__activate_project,
   mcp__github__get_pull_request,
   mcp__github__get_pull_request_files,
   mcp__github__get_pull_request_comments,

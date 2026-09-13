@@ -7,13 +7,13 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--deep] [--post] [--explain [--light|--deep]]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__activate_project,
-  mcp__serena__read_memory,
-  mcp__serena__write_memory,
-  mcp__serena__list_memories,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__activate_project,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   mcp__github__get_pull_request,
   mcp__github__get_pull_request_files,
@@ -147,9 +147,9 @@ bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/gather.sh" \
 ### 2. Serena Pre-caching → `${WORK_DIR}/symbols.json`
 
 ```
-mcp__serena__get_symbols_overview       → 변경 파일 심볼 목록
-mcp__serena__find_referencing_symbols   → 변경 심볼의 참조 관계
-mcp__serena__find_symbol                → Protocol 정의, conformer
+mcp__plugin_fz_serena__get_symbols_overview       → 변경 파일 심볼 목록
+mcp__plugin_fz_serena__find_referencing_symbols   → 변경 심볼의 참조 관계
+mcp__plugin_fz_serena__find_symbol                → Protocol 정의, conformer
 ```
 
 **추가 필드**: `arch_layer_map` (아키텍처 컴포넌트 매핑, CLAUDE.md ## Architecture 기반), `import_graph` (의존성 방향), `stream_paradigms` (리액티브 프레임워크 사용 패턴), `protocol_conformers`, `deprecated_symbols`

@@ -4,7 +4,7 @@ description: >-
   영향 범위 + 소비자 변경 추적 에이전트. Exhaustive Impact Scan(a~g) 전담 수행.
   변경의 파급 효과를 심볼 기반 + 텍스트 전수 검색으로 빠짐없이 분석.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview
 ---
 
 ## 역할

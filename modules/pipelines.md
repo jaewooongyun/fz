@@ -51,7 +51,7 @@
 | 체인 | fz-discover |
 | 기본 모드 | SOLO |
 | TEAM 모드 | `workflows/discover-adversarial.js` |
-| SC 연계 | `--business` 시 `/sc:business-panel` (UX/전략 분석) |
+| SC 연계 | `--business` 시 `/sc:sc-business-panel` (UX/전략 분석) |
 
 ### 4. bug-hunt
 
