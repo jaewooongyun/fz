@@ -51,7 +51,7 @@
 1. 프로젝트 전체 빌드 (modules/build.md)
 2. 빌드 실패 시: 충돌 파일 식별 → 수동 해결 → 재빌드
 3. 빌드 성공 → 파이프라인 다음 스킬 진행
-4. (선택) /sc:analyze → merge 후 정적 분석
+4. (선택) /sc:sc-analyze → merge 후 정적 분석
 
 ### BATCH 자동 제안
 
@@ -71,8 +71,8 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 
 | 스킬 | Gate | 1회 실패 | 2회 실패 | 3회 실패 |
 |------|------|---------|---------|---------|
-| fz-code | build | 에러 직접 수정 | /sc:troubleshoot | /simplify → AskUser |
-| fz-fix | build | 에러 직접 수정 | /sc:troubleshoot | /fz-gpt check 보조 진단 1회 → AskUser |
+| fz-code | build | 에러 직접 수정 | /sc:sc-troubleshoot | /simplify → AskUser |
+| fz-fix | build | 에러 직접 수정 | /sc:sc-troubleshoot | /fz-gpt check 보조 진단 1회 → AskUser |
 | fz-review | Reflection | 이슈 재확인 | GPT 검증 | AskUser |
 | fz-plan | Stress Test | 계획 수정 | 계획 재작성 | AskUser |
 

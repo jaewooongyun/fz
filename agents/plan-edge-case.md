@@ -3,7 +3,7 @@ name: plan-edge-case
 description: >-
   엣지 케이스 + 실패 시나리오 발굴 에이전트. 계획의 약점과 누락 탐지.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_referencing_symbols
 ---
 
 ## 역할

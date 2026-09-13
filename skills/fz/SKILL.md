@@ -11,11 +11,11 @@ argument-hint: >-
   [자연어 요청] [--solo] [--team] [--deep]
   예: "버그 찾아줘", "구현하고 리뷰" --team, "PR 리뷰" --deep
 allowed-tools: >-
-  mcp__serena__write_memory,
-  mcp__serena__read_memory,
-  mcp__serena__edit_memory,
-  mcp__serena__delete_memory,
-  mcp__serena__list_memories,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__edit_memory,
+  mcp__plugin_fz_serena__delete_memory,
+  mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   Bash(grep *), Bash(cp *), Read, Grep, Glob
 metadata:
@@ -109,12 +109,12 @@ metadata:
 ### 절차
 
 1. **이전 세션 복원** (새 세션일 때만):
-   - `/sc:load` → Serena 메모리 + SC 체크포인트 복원
-   - 조건: 이전 세션에서 `/sc:save`된 데이터가 있을 때
+   - `/sc:sc-load` → Serena 메모리 + SC 체크포인트 복원
+   - 조건: 이전 세션에서 `/sc:sc-save`된 데이터가 있을 때
 
 2. **프로젝트 인덱스 확인**:
    - `PROJECT_INDEX.md` 존재 확인 → 있으면 읽기 (3K 토큰)
-   - 없고 탐색 파이프라인이면 → `/sc:index-repo` 실행 제안
+   - 없고 탐색 파이프라인이면 → `/sc:sc-index-repo` 실행 제안
    - 조건: explore, explore-plan, bug-hunt 파이프라인에서만
 
 3. **Work Dir 초기화** (6+ 스텝 또는 context-heavy 스킬 포함 시):
@@ -484,8 +484,8 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
    - 참조: `modules/memory-policy.md`
 
 1. **세션 저장** (모든 파이프라인):
-   - `/sc:save --type learnings` → 작업 결과 + 결정사항 영속화
-   - 다음 세션에서 `/sc:load`로 복원 가능
+   - `/sc:sc-save --type learnings` → 작업 결과 + 결정사항 영속화
+   - 다음 세션에서 `/sc:sc-load`로 복원 가능
 
 2. **상황별 안내**:
    - 코드 변경 있음 → `/fz-commit` 제안

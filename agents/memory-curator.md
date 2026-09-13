@@ -5,7 +5,7 @@ description: >-
   교훈/패턴/결정사항을 발굴하여 Primary Worker에게 전달.
   Use in plan/code/review teams for context-aware recall.
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__read_memory, mcp__serena__list_memories, mcp__serena__find_symbol, mcp__context7__resolve-library-id, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__read_memory, mcp__plugin_fz_serena__list_memories, mcp__plugin_fz_serena__find_symbol, mcp__context7__resolve-library-id, mcp__context7__query-docs
 memory: user
 ---
 

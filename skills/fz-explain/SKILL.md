@@ -8,10 +8,10 @@ description: >-
 user-invocable: true
 argument-hint: "[기능·모듈·심볼 이름 또는 상황] [--light]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__activate_project,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__activate_project,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   Read, Grep, Glob

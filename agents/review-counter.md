@@ -4,7 +4,7 @@ description: >-
   반론 + Devil's Advocate 에이전트. 다른 리뷰어의 판단에 의도적으로 반론.
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 model: sonnet
-tools: Read, Grep, Glob, mcp__serena__find_referencing_symbols
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_referencing_symbols
 ---
 
 ## Role
@@ -16,7 +16,7 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 ## MCP 도구 전략
 
 - **Primary**: Read, Grep, Glob — 코드 분석 및 증거 수집
-- **Secondary**: mcp__serena__find_referencing_symbols — 반론 근거 심볼 추적
+- **Secondary**: mcp__plugin_fz_serena__find_referencing_symbols — 반론 근거 심볼 추적
 - **Fallback**: Read 기반 수동 분석
 - **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 

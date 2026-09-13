@@ -76,7 +76,7 @@
 | High (≥80) | 트리거 2개+ 매칭, 단일 파이프라인 | Phase 2로 자동 진행 |
 | Medium (50-79) | 트리거 1개 매칭 or 복수 파이프라인 경쟁 | AskUserQuestion 필수 |
 | Low (<50) | 부분 매칭 or 키워드 1개 | AskUserQuestion 필수 |
-| Zero | 매칭 없음 | `/sc:recommend` → 재매핑 → 여전히 없으면 AskUserQuestion |
+| Zero | 매칭 없음 | `/sc:sc-recommend` → 재매핑 → 여전히 없으면 AskUserQuestion |
 
 **동점 처리**: 파이프라인 점수 차 < 15점 → 동점으로 간주 → AskUserQuestion.
 

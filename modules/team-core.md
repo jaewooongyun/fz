@@ -45,7 +45,7 @@
    → 빌드 검증 (modules/build.md)
    → 다음 Step 배정 또는 Gate 판정
    ```
-   - GPT 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백
+   - GPT 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백
    - compact 전에 체크포인트가 없으면 복원 불가 — **기록이 검증보다 선행**
 
 7. **⛔ L3 결과 팀 피드백** (L3-to-L1 Feedback):

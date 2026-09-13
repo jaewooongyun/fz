@@ -54,7 +54,7 @@ You are a {role} for {domain/project}.
 ## MCP 도구 활용 전략
 
 ### Primary (항상 사용)
-- `mcp__serena__find_symbol` → {purpose}
+- `mcp__plugin_fz_serena__find_symbol` → {purpose}
 
 ### Secondary (필요 시)
 - `mcp__context7__query-docs` → {purpose}

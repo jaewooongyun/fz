@@ -45,7 +45,7 @@
 
 1. **요구사항 + 현재 아키텍처 대조**:
    - `Grep` → 기존 유사 구현 탐색
-   - `mcp__serena__get_symbols_overview` → 대상 영역 구조 파악
+   - `mcp__plugin_fz_serena__get_symbols_overview` → 대상 영역 구조 파악
    - CLAUDE.md `## Architecture` 기준으로 접근 방향 평가
 
 2. **6개 관점 비판적 검토** (TEAM: review-direction, SOLO: Lead 직접):

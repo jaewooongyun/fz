@@ -147,7 +147,7 @@
 - 관측 #1: OBS-08 (catch #9,11 — 팀 gc 스킬 미사용 + index 갱신 누락)
 - 내용: 스킬 호출 시 본문 절차 따르기 + CLAUDE.md 권장 팀 스킬(gc/pr 등) 우선
 - generalize: **broad** | 과적합 위험: 中
-- 근거: [verified: retrospective catch #9 — fz-commit 본문 /sc:git 미사용 + Bash git commit 직접]
+- 근거: [verified: retrospective catch #9 — fz-commit 본문 /sc:sc-git 미사용 + Bash git commit 직접]
 - 승격 목표 (트랙 B, ledger-only — friction 신호 없음): P2→P1 = 세션 1건 + GPT verify + 사용자 승인.
 
 ### L-5: 대칭/짝 경로 동시 수정 (③ OBS-16 메타패턴)

@@ -72,7 +72,7 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
 1. diff에서 시그니처가 변경된 메서드 식별
    - 파라미터 추가/제거/타입 변경/이름 변경
 2. 각 메서드에 대해 프로토콜 요구사항 여부 확인
-   - mcp__serena__find_referencing_symbols → 해당 메서드가 프로토콜에 선언되어 있는지
+   - mcp__plugin_fz_serena__find_referencing_symbols → 해당 메서드가 프로토콜에 선언되어 있는지
 3. 프로토콜 요구사항인 경우:
    - 프로토콜 선언부가 diff에 포함되어 동일하게 변경되었는지 확인
    - 선언부가 diff에 없으면 → "conformance_break" (severity: Critical)

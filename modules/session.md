@@ -24,7 +24,7 @@
 
 ### 세션 시작
 ```
-mcp__serena__write_memory("fz:session:current", {
+mcp__plugin_fz_serena__write_memory("fz:session:current", {
   session_id: "SESSION-{YYYYMMDD_HHMMSS}",
   task_description: "",
   issues: [],
@@ -36,12 +36,12 @@ mcp__serena__write_memory("fz:session:current", {
 
 ### 세션 복원
 ```
-mcp__serena__read_memory("fz:session:current") → 기존 세션 데이터 로드
+mcp__plugin_fz_serena__read_memory("fz:session:current") → 기존 세션 데이터 로드
 ```
 
 ### 이슈 기록/업데이트
 ```
-mcp__serena__edit_memory("fz:session:current", { issues: [...updated] })
+mcp__plugin_fz_serena__edit_memory("fz:session:current", { issues: [...updated] })
 ```
 
 ---

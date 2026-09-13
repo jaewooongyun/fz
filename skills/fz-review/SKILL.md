@@ -6,13 +6,13 @@ description: >-
 user-invocable: true
 argument-hint: "[리뷰 대상 설명] [light]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__write_memory,
-  mcp__serena__read_memory,
-  mcp__serena__edit_memory,
-  mcp__serena__list_memories,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__edit_memory,
+  mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   mcp__lsp__diagnostics_delta,
   mcp__lsp__references,
@@ -33,7 +33,7 @@ metadata:
 
 ## 개요
 
-> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 5 (3중 검증: Serena // /fz-gpt review // /sc:analyze) → Phase 5.5 (/fz-gpt validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
+> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 5 (3중 검증: Serena // /fz-gpt review // /sc:sc-analyze) → Phase 5.5 (/fz-gpt validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
 > 루프 프리미티브: Evaluator-Optimizer + Multi-Attempt Retry (H6, Inside the Scaffold)
 
 3중 검증(Claude+GPT+sc:analyze) + 역방향 검증 + Reflection Rate 정량화.
@@ -78,10 +78,10 @@ metadata:
 
 | Phase | sc: 명령어 | 용도 |
 |-------|-----------|------|
-| 5 | `/sc:analyze`, `/fz-gpt review`, `/sc:spec-panel` | 품질분석, GPT 리뷰, 스펙 패널 |
+| 5 | `/sc:sc-analyze`, `/fz-gpt review`, `/sc:sc-spec-panel` | 품질분석, GPT 리뷰, 스펙 패널 |
 | 5.5 | `/fz-gpt validate` | 역검증 |
-| 6 | `/sc:improve`, `/sc:cleanup`, `/sc:reflect` | 개선, 정리, 자체검증 |
-| 7 | `/sc:test` | 최종 테스트 검증 |
+| 6 | `/sc:sc-improve`, `/sc:sc-cleanup`, `/sc:sc-reflect` | 개선, 정리, 자체검증 |
+| 7 | `/sc:sc-test` | 최종 테스트 검증 |
 ## 팀 에이전트 모드 (Review Squad)
 
 > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
@@ -180,7 +180,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 Phase 5: Cross-Review (5+2 검증)
 ├─ [병렬 1] Claude + Serena: 참조 무결성 검증
 ├─ [병렬 2] → /fz-gpt review: GPT 코드 리뷰
-├─ [병렬 3] /sc:analyze: 정적 분석
+├─ [병렬 3] /sc:sc-analyze: 정적 분석
 ├─ [병렬 4] L3 silent-failure-hunter: 에러 처리 스캔 (조건부 — modules/native-agents.md)
 └─ [병렬 5] L3 type-design-analyzer: 타입 설계 평가 (조건부 — modules/native-agents.md)
 
@@ -192,7 +192,7 @@ Results Merge & Dedup → Issue Tracker 통합
 ### 검증 1: Claude + Serena (참조 무결성)
 
 ```
-mcp__serena__find_referencing_symbols → 변경된 심볼의 모든 참조 확인
+mcp__plugin_fz_serena__find_referencing_symbols → 변경된 심볼의 모든 참조 확인
 Grep → 변경 후 패턴 일관성
 mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분석 (요구사항별 충족 여부 단계별 검증)
 ```
@@ -209,9 +209,9 @@ fz-gpt가 수행하는 작업:
 - JSON 응답 파싱 → Issue Tracker 자동 기록
 - 이슈 요약 반환
 
-> **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=Fable 5) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 미가용 시 /sc:analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
+> **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=Fable 5) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: codex]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 미가용 시 /sc:sc-analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
 >
-> **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. Codex 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(Agent·/sc:analyze)로 **상속되지 않는다**.
+> **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. Codex 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(Agent·/sc:sc-analyze)로 **상속되지 않는다**.
 > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 규모는 그 근거 밖이다.
 > **⛔ retain cycle 점검 (rank3b, 2026-06-18 · 원장 `promotion-ledger.md` **P2-C** candidate `active=false`)**: fresh-context 검증자는 retain cycle 검사 시 `gpt-skills/fz-reviewer/SKILL.md` Memory Management(closures capturing `self` without `[weak self]`)를 명시 적용한다 — GPT 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
 > **보조 이종 소스 (rank6)**: PR이 열려 있으면 `/fz` pr-comment-review로 CodeRabbit 코멘트를 보조 이종 소스로 활용 가능 (강제 아닌 Lead 판단).
@@ -219,7 +219,7 @@ fz-gpt가 수행하는 작업:
 ### 검증 3: SuperClaude 정적 분석
 
 ```
-/sc:analyze → 코드 품질, 보안, 성능, 아키텍처 종합 분석
+/sc:sc-analyze → 코드 품질, 보안, 성능, 아키텍처 종합 분석
 ```
 
 ### 검증 4: Refactoring Completeness (리팩토링 완성도)
@@ -286,7 +286,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 새 모듈 생성이 포함된 변경사항에서만 실행:
 
 ```
-/sc:spec-panel --mode critique --focus requirements|architecture
+/sc:sc-spec-panel --mode critique --focus requirements|architecture
 ```
 
 - 트리거: diff에 새 Router/Interactor/Builder 파일 포함 시
@@ -297,7 +297,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 참조 무결성 확인? (Serena)
 - [ ] ⛔ GPT 리뷰 통과? (**Critical 0건 + Major는 결함(회귀·버그·영향범위)에 한해 차단** — ⛔ 구조 개선 제안은 major여도 **non-blocking**. `ReviewFindingsSchema`에 `origin`이 없어 기계 판별이 불가하므로 **Lead가 결함/개선을 판정**한다. 이 구분이 없으면 "제안"이 강제 수정이 된다. GPT 실행 자체는 필수)
-- [ ] /sc:analyze 통과? (심각한 문제 없음)
+- [ ] /sc:sc-analyze 통과? (심각한 문제 없음)
 - [ ] Constraint Matrix Compliance 통과? (제약 매트릭스 부합, /fz-discover 산출물 있을 때)
 - [ ] Refactoring Completeness 통과? (deprecated dead code 없음)
 - [ ] Module Boundary 통과? (access control이 의도와 일치)
@@ -358,7 +358,7 @@ N (GPT 제기 이슈 수) >= 10 ?
 ### 절차
 
 1. **미해결 이슈 로드**: Issue Tracker에서 미해결 이슈 추출
-2. **이슈 수정** (Lead 직접 — `review-live.js`는 수정 에이전트를 스폰하지 않는다): `mcp__serena__replace_symbol_body` → 심볼 단위 수정, `/sc:improve` → 복잡한 개선
+2. **이슈 수정** (Lead 직접 — `review-live.js`는 수정 에이전트를 스폰하지 않는다): `mcp__plugin_fz_serena__replace_symbol_body` → 심볼 단위 수정, `/sc:sc-improve` → 복잡한 개선
 3. **빌드 재검증**: 참조 `modules/build.md` — 빌드 검증 절차
 4. **Issue Tracker 상태 업데이트**: addressed로 변경
 5. **Phase 5.5로 돌아가 재검증**: `/fz-gpt validate`
@@ -446,10 +446,10 @@ Gate 5 통과 후:
 
 | Given | When | Then | type |
 |-------|------|------|------|
-| 구현된 코드 diff 존재 + Codex CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-gpt review` + `/sc:analyze`) 모두 실행(GPT 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
+| 구현된 코드 diff 존재 + Codex CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-gpt review` + `/sc:sc-analyze`) 모두 실행(GPT 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
 | "그냥/가볍게" 신호 + 소규모 변경(5파일 미만 & 100 LOC 미만, 리팩토링/시그니처 변경 아님) | `/fz-review light "그냥 가볍게 봐줘"` | review-arch 단독 실행 + GPT 교차검증/Phase 5.5 역방향/Reflection Rate 추적 생략 + `review-light.md` 산출; 단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 적용(light에서도 생략 불가) | edge-case |
 | 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴 없음 + 브랜치명 없음 | `/fz-review "내 코드 봐줘"` | Phase 0에서 저장 여부 AskUserQuestion 발생 → '예' 시 `NOTASK-{YYYYMMDD}/` + index.md 생성 / '아니오' 시 Serena fallback → WORK_DIR 결정 → Gate 0(Work Dir Ready) 3개 항목 통과 | edge-case |
-| 코드 diff 존재 + 검증 2에서 fz-gpt 통신 실패 | `/fz-review "리뷰해줘"` | 재시도 1회 후 fresh-context Agent(review-correctness 관점)로 검증 2 대체 + 인용 태그 `[fresh-context: claude]` + 이종 안전망 상실 명시 (Agent 미가용 시 `/sc:analyze` 폴백); 검증 2 미생략 상태로 Gate 4 진행 | failure |
+| 코드 diff 존재 + 검증 2에서 fz-gpt 통신 실패 | `/fz-review "리뷰해줘"` | 재시도 1회 후 fresh-context Agent(review-correctness 관점)로 검증 2 대체 + 인용 태그 `[fresh-context: claude]` + 이종 안전망 상실 명시 (Agent 미가용 시 `/sc:sc-analyze` 폴백); 검증 2 미생략 상태로 Gate 4 진행 | failure |
 
 ## Boundaries
 
@@ -472,7 +472,7 @@ Gate 5 통과 후:
 
 | 에러 | 대응 | 폴백 |
 |------|------|------|
-| fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백 | Claude 자체 판단 |
+| fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백 | Claude 자체 판단 |
 | fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다. probe 성립 = `codex exec`가 **non-empty 산출 + exit 0**(⛔ `--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
