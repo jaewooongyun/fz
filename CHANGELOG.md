@@ -1,5 +1,33 @@
 # Changelog
 
+### v4.36.0 (2026-09-13) — 참조는 있는데 부를 이름이 없었다 [MINOR]
+
+같은 클래스가 세 서버째 나왔다. `/sc:` 와 Serena 를 고친 뒤 남은 둘도 이름이 어긋나
+있었고, Swift 플러그인은 **호출명 자체가 문서에 없었다**.
+
+**LSP 11곳** — 그런 이름의 MCP 서버가 없다. `swift-lsp`·`clangd-lsp` 는 설치·활성이지만
+MCP 를 노출하지 않고, 네이티브 `LSP` 도구가 operation 파라미터로 동작한다.
+넷을 `LSP` 로 수렴하고 `diagnostics_delta` 는 대응이 없어 Serena 로 보냈다.
+⛔ 이쪽은 frontmatter 선언만 있고 **본문 지시 0건**이라 아무도 부르지 않았다 — 거짓 선언이다.
+
+**JIRA 7곳** — 런타임은 `mcp__atlassian-jira__jira_get|jira_post` 다. 액션별 이름이 아니라
+REST path 를 받는 범용 도구로 바뀌어 있었다. `fz-commit`·`fz-pr` 본문이 실제로 쓰려던 자리다.
+
+⛔ **정정**: 앞선 측정에서 `sequential-thinking` 도 끊겼다고 판정했으나 오탐이었다 —
+검색 패턴을 짧게 잘라 이름이 불완전하게 보였다. 그쪽은 정확하고 본문에서도 쓰인다.
+
+**Swift 플러그인 — 자리는 이미 있었다.** discover·plan·code·review·peer-review 다섯이
+전부 `plugin-refs.md` 를 가리키고 발동 조건까지 적어 두었다. 빠진 것은 둘이다.
+① **부를 이름**이 없었다 — 설치 식별자 `swiftui-expert@swiftui-expert-skill` 만 있고
+슬래시 호출명 `/swiftui-expert:swiftui-expert-skill` 이 없다. `/sc:` 와 같은 형태다.
+② **표에 빈 칸**이 있었다 — SwiftUI 는 구현·리뷰만, Concurrency 는 구현·계획만.
+discover 와 peer-review 는 아예 자리가 없었다. 6개 자리를 채웠다.
+
+⛔ 5개 스킬 본문은 건드리지 않았다. 이미 모듈을 가리키므로 같은 내용을 다섯 번 쓰면 순증이다.
+
+**검증**: `mcp__lsp__`·`mcp__atlassian__`·`mcp__serena__` 전부 0건 · health-check exit 0 ·
+게이트 self-test 67/67 · 회귀 오라클 13/13.
+
 ### v4.35.0 (2026-09-13) — 자체 검사가 전부 초록인데 통합 배선 두 곳이 몇 달째 죽어 있었다 [MINOR]
 
 lint 13종·링크 검사·줄번호 검사가 모두 통과한다. 결함은 그 검사들이 "의미 판단" 이라며
