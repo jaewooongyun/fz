@@ -6,14 +6,14 @@ description: >-
 user-invocable: true
 argument-hint: "[기능/요구사항 설명] [light]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__activate_project,
-  mcp__serena__read_memory,
-  mcp__serena__write_memory,
-  mcp__serena__edit_memory,
-  mcp__serena__list_memories,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__activate_project,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__edit_memory,
+  mcp__plugin_fz_serena__list_memories,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
@@ -70,15 +70,15 @@ metadata:
 
 | Phase | sc: 명령어 | 용도 |
 |-------|-----------|------|
-| Phase 1 | `/sc:design` | 아키텍처 설계, API 설계 |
-| Phase 1 | `/sc:analyze` | 기존 코드 분석, 영향 범위 |
-| Phase 1 | `/sc:brainstorm` | 요구사항 탐색 (복잡한 경우) |
-| Phase 1 | `/sc:research` | 외부 기술/라이브러리 조사 |
-| Phase 1 | `/sc:workflow` | PRD → 구현 워크플로우 자동 생성 (5+ Step 시) |
-| Phase 1 | `/sc:spec-panel` | 아키텍처 스펙 전문가 패널 리뷰 (새 모듈 시, --deep 시) |
+| Phase 1 | `/sc:sc-design` | 아키텍처 설계, API 설계 |
+| Phase 1 | `/sc:sc-analyze` | 기존 코드 분석, 영향 범위 |
+| Phase 1 | `/sc:sc-brainstorm` | 요구사항 탐색 (복잡한 경우) |
+| Phase 1 | `/sc:sc-research` | 외부 기술/라이브러리 조사 |
+| Phase 1 | `/sc:sc-workflow` | PRD → 구현 워크플로우 자동 생성 (5+ Step 시) |
+| Phase 1 | `/sc:sc-spec-panel` | 아키텍처 스펙 전문가 패널 리뷰 (새 모듈 시, --deep 시) |
 | Phase 2 | `/fz-gpt verify` | 계획 검증 (독립 스킬 — GPT 교차 검증, `modules/fz-gpt-subcommands-core.md § verify`) |
-| Phase 2 | `/sc:estimate` | 공수 추정 (복잡도 4+ 시, 조건부) |
-| Phase 3 | `/sc:reflect` | 피드백 반영 후 자체 검증 |
+| Phase 2 | `/sc:sc-estimate` | 공수 추정 (복잡도 4+ 시, 조건부) |
+| Phase 3 | `/sc:sc-reflect` | 피드백 반영 후 자체 검증 |
 
 ## Plugin 참조 (Swift Concurrency)
 > 참조: `modules/plugin-refs.md` — Swift Concurrency(계획 시) 섹션
@@ -125,13 +125,17 @@ metadata:
 4. **반환 처리**:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
    - ⛔ `delta`(있으면) 처리: `stepAmendments` 를 해당 Step 에 반영하고 `addedEdgeCases`·`addedImpact` 를 plan 에 편입한다. `unresolved` 는 사용자 보고 대상 — 조용히 버리지 않는다
+   - ⛔ **반환 전체를 `{WORK_DIR}/plan/workflow-result.json` 으로 먼저 기록한다** — 아래 resolve 스크립트와 `plan_integrity_check.py` 가 그 파일을 읽는다. 기록하지 않으면 두 스크립트가 읽을 입력이 없어 계약이 no-op 이 된다(읽는 곳 3 · 쓰는 지시 0 이었다).
    - ⛔ `impactRequests` 가 비어 있지 않으면 **Lead 가 resolve 한다** — impact 렌즈는 Bash 가 없어 base 원본·이전 호출자 수를 직접 못 얻는다(`agents/plan-impact.md`). 요청을 무시하면 영향 분석이 그만큼 비어 있는 채로 plan 에 들어간다
      ```bash
      python3 "${FZ_PLUGIN_ROOT}/scripts/plan_resolve_impact_requests.py" {WORK_DIR}/plan/workflow-result.json --repo {대상 레포}
      ```
      심볼 census 는 자동으로 붙고(요청당 상위 3개 · positive control 동반), `UNRESOLVED` 로 남은 항목만 Lead 가 판단한다. ⛔ 미해소 항목은 plan 에 **그 사실을 적는다** — 조용히 비워두지 않는다
-   - `mode:'direction_escalation'` → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용)
-   - `mode:'fallback'` → SOLO 계획 수립 수행 + 사유 experiment-log 기록
+   - ⛔ `directionEscalation` 이 **null 이 아니면** → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용).
+     `{ verdict, alternatives }` 형태이며 `directionVerdict` 가 `RECONSIDER`·`REDIRECT` 일 때만 실린다.
+     ⛔ **필드다, 반환 모드가 아니다** — 현행 배선(`plan-lean2.js`)은 방향 판정을 full 콜 안에서 하므로 정상 경로와 반환 형태를 가르지 않는다.
+     (롤백해 `plan-collaborative.js` 를 쓰면 그쪽은 `mode:'direction_escalation'` 으로 온다 — 두 형태를 모두 받는다.)
+   - `mode:'fallback'` → SOLO 계획 수립 수행 + 사유 experiment-log 기록 (두 배선 모두 반환한다)
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(GPT 회복 시) + GPT verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
 6. **지표 기록**: `return.metrics` + **자동 계측** → `experiment-log.md` §5.7 fz-plan 테이블
    ```bash
@@ -173,13 +177,13 @@ metadata:
 
 1. **세션 감지**: 참조 `modules/session.md`
 2. **이전 세션 복원**:
-   - `mcp__serena__list_memories` → 관련 이전 세션 검색
-   - `mcp__serena__read_memory` → 결정사항, 잔여 이슈 로드
+   - `mcp__plugin_fz_serena__list_memories` → 관련 이전 세션 검색
+   - `mcp__plugin_fz_serena__read_memory` → 결정사항, 잔여 이슈 로드
 3. **프로젝트 활성화**:
-   - `mcp__serena__activate_project` → LSP 서버 활성화
+   - `mcp__plugin_fz_serena__activate_project` → LSP 서버 활성화
 4. **대상 모듈 심볼 파악**:
-   - `mcp__serena__get_symbols_overview` → 작업 대상 파일 심볼 구조
-   - `mcp__serena__find_symbol` → 컴포넌트 탐색
+   - `mcp__plugin_fz_serena__get_symbols_overview` → 작업 대상 파일 심볼 구조
+   - `mcp__plugin_fz_serena__find_symbol` → 컴포넌트 탐색
 
 5. **이전 Discover 결과 로드** (티켓 폴더(WORK_DIR) 활성 시):
    - `{WORK_DIR}/discover/discover-journal.md` 읽기 → Landscape Map + Trade-off Table + Open Questions 복원
@@ -384,7 +388,7 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 
 2. **요구사항 일치 검증**:
    - `mcp__sequential-thinking__sequentialthinking` → 수정 전후 요구사항 부합도 단계별 비교
-   - `/sc:reflect` → 자체 검증
+   - `/sc:sc-reflect` → 자체 검증
 
 3. **사용자 의사결정** (AskUserQuestion):
    - 수정 후 Phase 2 재검증
@@ -483,7 +487,7 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 |------|------|------|
 | Serena 연결 실패 | Grep + Glob 폴백 | 수동 탐색 |
 | Context7 실패 | WebSearch 폴백 | 문서 직접 검색 |
-| 검증 실패 | /sc:analyze 단독 검증 | Claude 자체 판단 |
+| 검증 실패 | /sc:sc-analyze 단독 검증 | Claude 자체 판단 |
 | Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
 | **advisor 스톨** (워커가 advisor 호출 → 3분 무진행 × 런타임 6회 재시도) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분). ⛔ **문구의 효과는 미측정** — 문구 삽입 전 실행에서 advisor 8/8/10회가 관측됐으나 그것은 기준선이지 대조군이 아니다(F-161·F-191). 든 상태의 실행과 비교해 줄지 않으면 **문구를 삭제한다** | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
 
