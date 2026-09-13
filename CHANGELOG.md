@@ -1,5 +1,46 @@
 # Changelog
 
+### v4.35.0 (2026-09-13) — 자체 검사가 전부 초록인데 통합 배선 두 곳이 몇 달째 죽어 있었다 [MINOR]
+
+lint 13종·링크 검사·줄번호 검사가 모두 통과한다. 결함은 그 검사들이 "의미 판단" 이라며
+건너뛴 자리에 있었고, 둘은 **이름 불일치**였다. 이름이 어긋난 명령을 만난 모델은 오류를
+내지 않고 조용히 대체하거나 건너뛴다 — 그래서 성능 저하가 보이지 않는 형태로 누적됐다.
+
+**배선 수리 (규칙 순증 0)**
+
+- `/sc:X` → `/sc:sc-X` **86곳**. 설치본 `sc@superclaude` 4.3.0 의 명령 파일은 `sc-analyze.md` 형태다.
+  20종 전부 `sc-` 접두로 실존하므로 순수 네임스페이스 불일치였다. 치환 후 구 이름 0건 · 이중 치환 0건 ·
+  신 이름 전건 설치본 실존 확인.
+- 에이전트·스킬·가이드의 `mcp__serena__*` → `mcp__plugin_fz_serena__*` **148곳**.
+  공식 사양이 `mcp__plugin_<plugin>_<server>__<tool>` 를 명시하고 *"a subagent's `tools` field"* 를 직접 지목한다.
+  ⛔ **왜 오류가 안 났나**: `tools:` 는 목록이 **전부** 미해결일 때만 launch 가 실패한다 — `Read, Grep, Glob` 이
+  살아 있으면 Serena 항목만 조용히 빠진다. 워커 251회 실행에서 Serena 호출 0건이었던 이유다.
+  ⛔ `mcp__context7__` 은 사용자 MCP 라 접두가 붙지 않는다 — HEAD 대조로 31건 불변 확인.
+
+**유실 계약 복구 (F-215)**
+
+`plan-collaborative.js` → `plan-lean2.js` 배선 교체 때 반환 계약이 빠져 소비처가 영구 no-op 이었다.
+`impactRequests`·`originBodyRequests`·`deadCode`·`directionEscalation` 을 복구하고, 스키마에만 있고
+**프롬프트가 요청하지 않아** 죽어 있던 `hiddenDependencies` 도 함께 살렸다. ⛔ 에이전트 콜은 늘지 않는다 —
+렌즈는 돌고 있었고 되돌려 보내는 필드만 없었다.
+
+**검증기 fail-open 봉합 (F-216)**
+
+| 대상 | 무엇이 샜나 |
+|---|---|
+| `validate-gpt-output.py` | `json.loads` 가 `NaN` 을 통과시켜 범위 비교가 **둘 다 False** → `GATE-PASS` |
+| 〃 | 미지원 키워드 검사가 **데이터를 따라가** 빈 배열 아래 스키마에 도달하지 않음 |
+| `code-pair.js` | 렌즈 하나가 null 이어도 `verdict:'pass'` + 완주 `3/3` |
+| `fz-modernize` AC9 | `VIOLATION` 을 인쇄하고 **exit 0** |
+| `gpt-strategy.md` | `insertion` 만 추출 → 삭제 전용 diff 가 Small 로 분류 · `git diff --base` 는 무효 옵션 |
+| `swift-pattern-detection.md` | 순차 grep 나열 → **마지막 명령**이 블록 exit 를 결정 |
+
+⛔ **negative fixture 를 함께 넣었다** — fail-open 은 정상 입력으로 검출되지 않는다.
+`tests/fixtures/validate-failopen/` 의 위반 입력 둘이 각각 exit 1·2 로 차단되고 정상 입력은 통과한다.
+
+⭐ 이 7곳은 **opus 워커 10개가 같은 파일을 정독하고 0/7** 을 찾았고 이종 검증기가 전건을 찾았다.
+워커는 *선언된 계약*을 읽었고 검증기는 *그 검사에 실제 입력을 넣어 돌렸다*.
+
 ### v4.34.0 (2026-09-13) — 사전등록 표가 두 달간 비어 있었다: 재는 주체가 없었다 [MINOR]
 
 > ⛔ 이 항목은 세 묶음을 합친 것이다. 작업 중 `4.34.0 → 4.35.0 → 4.35.1` 로 올렸다가
