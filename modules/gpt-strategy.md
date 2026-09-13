@@ -60,7 +60,15 @@ diff 크기에 따라 GPT 호출 전략을 자동 선택합니다.
 
 **크기 측정**:
 ```bash
-DIFF_LINES=$(cd "$GIT_ROOT" && git diff --base "$BASE_BRANCH" --stat | awk 'END{print}' | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+')
+# ⛔ 이전 판의 두 결함(F-216 N6): ① `--base` 는 git diff 의 유효 옵션이 아니다(명령이 실패하는데 $() 가 삼켰다)
+#    ② `insertion` 만 추출해 **삭제 전용 diff 에서 빈 문자열**이 됐다 — "추가 1줄·삭제 9,000줄" 이 Small 로 분류됐다.
+# ⛔ git 을 먼저 돌려 **종료 상태를 잡는다**. awk 로 파이프하면 END 가 입력이 비어도 0 을 찍어
+#    git 실패가 "변경 0줄"(=Small)로 번역된다 — 가드가 구조적으로 발화하지 못한다.
+DIFF_RAW=$(cd "$GIT_ROOT" && git diff --numstat "$BASE_BRANCH"...) \
+  || { echo "⛔ git diff 실패 — base 브랜치·저장소 확인"; exit 1; }
+[ -n "$DIFF_RAW" ] || { echo "⛔ diff 가 비었다 — 정말 변경 0건인지 base 를 확인한다"; exit 1; }
+DIFF_LINES=$(printf '%s\n' "$DIFF_RAW" \
+  | awk '{ a += ($1 == "-" ? 0 : $1); d += ($2 == "-" ? 0 : $2) } END { print a + d }')
 ```
 
 | diff 크기 | 전략 | 실행 방법 |

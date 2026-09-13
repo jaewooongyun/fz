@@ -128,23 +128,58 @@ def validate(value, spec: dict, path: str) -> list[str]:
     return errs
 
 
+def reject_nonfinite(name: str):
+    """⛔ NaN·Infinity 를 파싱 단계에서 거부한다 (F-216 N3).
+
+    `json.loads` 는 표준 밖 리터럴 `NaN`/`Infinity`/`-Infinity` 를 기본으로 **받아들인다**.
+    받아들이면 이후 `value < lo` · `value > hi` 비교가 NaN 에 대해 **둘 다 False** 라
+    범위 위반이 검출되지 않고 `GATE-PASS` 가 인쇄된다 — 통과가 아무것도 보장하지 않는 형태다.
+    ⛔ 파싱 후 재귀 순회로 잡지 않는다: 중첩이 깊고 새 필드가 생기면 다시 샌다. 입구가 좁다.
+    """
+    raise ValueError(f"비유한 수치 리터럴 {name} — JSON 표준 밖이고 범위 비교를 조용히 통과한다")
+
+
+def preflight_schema(spec, path: str = "") -> None:
+    """데이터와 **무관하게** 스키마 전체를 순회해 미지원 키워드를 올린다 (F-216 N2).
+
+    ⛔ `validate()` 안의 `check_supported` 는 **데이터를 따라간다** — 빈 배열·부재 키 아래의
+    하위 스키마에는 한 번도 도달하지 않는다. `issues: []` 인 출력에서는 스키마가 깨져 있어도
+    통과했다. 검사 대상이 스키마이지 데이터가 아니므로 여기서 먼저 본다.
+    """
+    if not isinstance(spec, dict):
+        raise SchemaError(f"{path or '<root>'}: 스키마 노드가 객체가 아니다 ({type(spec).__name__})")
+    check_supported(spec, path)
+    for key, sub in (spec.get("properties") or {}).items():
+        preflight_schema(sub, f"{path}/{key}")
+    items = spec.get("items")
+    if items is not None:
+        if not isinstance(items, dict):
+            raise SchemaError(f"{path or '<root>'}: `items` 는 객체형만 지원 (tuple validation 미지원)")
+        preflight_schema(items, f"{path}[]")
+    for key, sub in (spec.get("$defs") or {}).items():
+        preflight_schema(sub, f"{path}/$defs/{key}")
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         print("usage: validate-gpt-output.py <output.json> <schema.json>", file=sys.stderr)
         return 2
     out_p, schema_p = Path(sys.argv[1]), Path(sys.argv[2])
     try:
-        data = json.loads(out_p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
+        data = json.loads(out_p.read_text(encoding="utf-8"), parse_constant=reject_nonfinite)
+    except (OSError, json.JSONDecodeError, ValueError, RecursionError) as e:
         print(f"⛔ 출력 로드 실패: {e}", file=sys.stderr)
         return 1
     try:
-        schema = json.loads(schema_p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
+        schema = json.loads(schema_p.read_text(encoding="utf-8"), parse_constant=reject_nonfinite)
+    # ⛔ RecursionError 도 잡는다 — 깊은 중첩 스키마는 파싱 단계에서 먼저 터지고,
+    #    그것은 **스키마 문제**(exit 2)이지 출력의 계약 위반(exit 1)이 아니다.
+    except (OSError, json.JSONDecodeError, ValueError, RecursionError) as e:
         print(f"⛔ 스키마 로드 실패: {e}", file=sys.stderr)
         return 2
 
     try:
+        preflight_schema(schema, "")   # ⛔ 데이터 도달과 무관하게 스키마를 먼저 본다
         errs = validate(data, schema, "")
     except SchemaError as e:
         print(f"⛔ 스키마 문제 (출력 탓이 아니다): {e}", file=sys.stderr)

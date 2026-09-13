@@ -6,16 +6,16 @@ description: >-
 user-invocable: true
 argument-hint: "[구현 대상 설명] [light]"
 allowed-tools: >-
-  mcp__serena__find_symbol,
-  mcp__serena__get_symbols_overview,
-  mcp__serena__find_referencing_symbols,
-  mcp__serena__replace_symbol_body,
-  mcp__serena__insert_after_symbol,
-  mcp__serena__insert_before_symbol,
-  mcp__serena__rename_symbol,
-  mcp__serena__write_memory,
-  mcp__serena__read_memory,
-  mcp__serena__edit_memory,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__replace_symbol_body,
+  mcp__plugin_fz_serena__insert_after_symbol,
+  mcp__plugin_fz_serena__insert_before_symbol,
+  mcp__plugin_fz_serena__rename_symbol,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__edit_memory,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   mcp__lsp__diagnostics_delta,
@@ -89,12 +89,12 @@ metadata:
 
 | 조건 | sc: 명령어 | 자동/수동 |
 |------|-----------|----------|
-| 빌드 **2회 연속** 실패 | `/sc:troubleshoot --fix` | **자동** |
-| 5+ 파일 변경한 Step | `/sc:analyze --focus quality` | **자동 제안** |
-| SOLO + 3+ 파일 변경 | `/sc:reflect --type correctness` | **자동** |
-| 3+ Step 구현 중간점 | `/sc:reflect --type task` | **필수** |
-| 복잡한 다중 파일 구현 | `/sc:implement` | 수동 |
-| API 불확실 | Context7 + `/sc:explain` | 수동 |
+| 빌드 **2회 연속** 실패 | `/sc:sc-troubleshoot --fix` | **자동** |
+| 5+ 파일 변경한 Step | `/sc:sc-analyze --focus quality` | **자동 제안** |
+| SOLO + 3+ 파일 변경 | `/sc:sc-reflect --type correctness` | **자동** |
+| 3+ Step 구현 중간점 | `/sc:sc-reflect --type task` | **필수** |
+| 복잡한 다중 파일 구현 | `/sc:sc-implement` | 수동 |
+| API 불확실 | Context7 + `/sc:sc-explain` | 수동 |
 
 ## 팀 에이전트 모드
 
@@ -121,6 +121,8 @@ metadata:
 4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유)
 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead
+   - ⛔ **렌즈 회계를 먼저 본다** (F-216 N1): `lensesCompleted` < `lensesExpected` 면 `reviewVerdict` 가 `'partial'` 로 오고 `residualNote` 에 죽은 렌즈 이름이 담긴다. 이전 판은 렌즈 하나가 죽어도 `'pass'` + 완주 3/3 을 인쇄해 **검토 절반이 빠진 것을 반환값만으로는 알 수 없었다**.
+   - `'partial'` 이면 그 관점(아키텍처 또는 품질)은 **적용되지 않았다** — 다음 Step 으로 넘어가기 전에 재invoke 할지 Lead 가 판정한다
    - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). ⛔ 여기서 사다리를 재정의하지 않는다
    - **code-pair 고유분만**: ① H5 크기 가드 — `split_required`/`splitSuggested` 시 Step 분할(과대 changeset scaffold collapse 방지) ② 재시도는 `buildFeedback` 포함 **새 invoke**(캐시 키 변경 → resume 비의존) ③ Stage1 null 재시도는 **1회 한정**·일시 장애 의심 시만
 7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
@@ -203,12 +205,12 @@ metadata:
 
 | 상황 | 도구 | 비고 |
 |------|------|------|
-| 기존 함수/메서드 수정 | `mcp__serena__replace_symbol_body` | 심볼 단위 정밀 수정 |
-| 새 메서드/프로퍼티 추가 | `mcp__serena__insert_after_symbol` | 기존 심볼 뒤에 삽입 |
-| 파일 시작에 코드 추가 | `mcp__serena__insert_before_symbol` | import 등 |
-| 심볼 이름 변경 | `mcp__serena__rename_symbol` | 참조 자동 업데이트 |
+| 기존 함수/메서드 수정 | `mcp__plugin_fz_serena__replace_symbol_body` | 심볼 단위 정밀 수정 |
+| 새 메서드/프로퍼티 추가 | `mcp__plugin_fz_serena__insert_after_symbol` | 기존 심볼 뒤에 삽입 |
+| 파일 시작에 코드 추가 | `mcp__plugin_fz_serena__insert_before_symbol` | import 등 |
+| 심볼 이름 변경 | `mcp__plugin_fz_serena__rename_symbol` | 참조 자동 업데이트 |
 | 새 파일 생성 | `Write` + `/fz-new-file` | 헤더 규칙 준수 |
-| 복잡한 다중 파일 | `/sc:implement` | SuperClaude 위임 |
+| 복잡한 다중 파일 | `/sc:sc-implement` | SuperClaude 위임 |
 | 단순 텍스트 수정 | `Edit` | 간단한 인라인 수정 |
 
 ---
@@ -311,7 +313,7 @@ metadata:
 
 4. **API 문법 확인** (불확실할 때 + SDK 래퍼 작성 시 필수):
    - `mcp__context7__query-docs` → 정확한 문법/시그니처
-   - `/sc:explain` → API 사용법 설명
+   - `/sc:sc-explain` → API 사용법 설명
    - **SDK 래퍼 원칙**: 래퍼 함수의 모든 파라미터가 내부 SDK 호출에 전달되는지 확인. SDK에 해당 파라미터를 받는 오버로드가 있는지 반드시 검증
 
 5. **(선택) /simplify 게이트**: 코드 변경이 있을 때 `/simplify focus on {step-context}` (참조: modules/execution-modes.md)
@@ -346,7 +348,7 @@ metadata:
    형식 참조: `modules/context-artifacts.md`
 
 7. **요구사항 부합 검증** (3+ Step 구현에서만):
-   - `/sc:reflect --type task` → 현재까지의 구현이 계획에 부합하는지 확인
+   - `/sc:sc-reflect --type task` → 현재까지의 구현이 계획에 부합하는지 확인
    - 조건: 전체 Step이 3개 이상인 구현의 중간 지점에서 실행
    - 목적: 방향 이탈 조기 발견 → 토큰 낭비 방지
 
@@ -358,7 +360,7 @@ metadata:
    /fz-gpt check "구현 코드 교차 검증"
    ```
    - 에이전트 구현 결과를 cross-model로 검증
-   - 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:analyze 폴백
+   - 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백
    - SOLO 모드에서는 선택 (TEAM에서는 필수)
 
 ### 빌드 실패 대응
@@ -380,7 +382,7 @@ metadata:
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
-- [ ] SOLO + 3+ 파일 변경이면 `/sc:reflect` 실행했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
+- [ ] SOLO + 3+ 파일 변경이면 `/sc:sc-reflect` 실행했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
 - [ ] ⛔ GPT 교차 검증 완료? (TEAM 모드 — Lead가 /fz-gpt check 실행)
 
 ---
@@ -449,7 +451,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 | 승인된 `{WORK_DIR}/plan/plan-final.md`가 존재 | `/fz-code "검증된 계획대로 구현해줘"` | Plan의 모든 Step을 순차 구현 + 매 Step 빌드 성공 + Gate 3 체크리스트 전 항목 통과(모든 Step 완료·빌드 성공·아티팩트 기록 완료) | normal |
 | 구현 중 같은 대상에 switch/if/enum case 3개+ 발생 | Step N 구현 진행 | "분기 폭증" 마찰 신호를 보고 형식(신호/위치/현상/플랜 재검토)으로 출력 + 사용자 "계속" 응답 전까지 구현 진행 중단(무시 강행 없음) | edge-case |
 | Plan 존재 + 단일 파일/심볼 변경 + "가볍게" 신호 | `/fz-code light "이 변경만 빠르게 구현해줘"` | Plan 첫 Step(단일 변경)만 구현 + GPT 교차 검증 생략 + 매 Step 빌드 성공 유지 + `{WORK_DIR}/code/step-light.md` 산출 | edge-case |
-| Step 구현 중 컴파일 에러로 빌드 2회 연속 실패 | Step N 빌드 검증 | `/sc:troubleshoot --fix` 자동 트리거 후 재빌드, 반복 실패 시 `/ralph-loop` 래더로 에스컬레이션 — 빌드 성공 확인 전 다음 Step 진입 안 함(silent fail 없음) | failure |
+| Step 구현 중 컴파일 에러로 빌드 2회 연속 실패 | Step N 빌드 검증 | `/sc:sc-troubleshoot --fix` 자동 트리거 후 재빌드, 반복 실패 시 `/ralph-loop` 래더로 에스컬레이션 — 빌드 성공 확인 전 다음 Step 진입 안 함(silent fail 없음) | failure |
 
 ## Boundaries
 
