@@ -76,6 +76,7 @@ Swift Concurrency/SwiftUI 플러그인 활성 여부와 **무관하게** 항상 
 ## SwiftUI Expert
 
 > Plugin: `swiftui-expert@swiftui-expert-skill`
+> **호출**: `/swiftui-expert:swiftui-expert-skill` — ⛔ 설치 식별자(`@마켓플레이스`)와 슬래시 호출명은 다르다. 부를 때는 이 이름이다.
 
 ### 구현 시 (fz-code, fz-fix)
 
@@ -95,9 +96,32 @@ Swift Concurrency/SwiftUI 플러그인 활성 여부와 **무관하게** 항상 
 | view-structure | View body 복잡도, 서브뷰 추출 필요성 |
 | performance-patterns | 불필요한 재렌더링, 과도한 state 변경 |
 
+### 계획 시 (fz-plan)
+
+| 참조 항목 | 적용 시점 |
+|----------|----------|
+| state-management | 상태 소유자(owner) 결정 — 어느 View 가 source of truth 인가 |
+| view-structure | 화면 분할 경계 설계 · 재사용 단위 판별 |
+| latest-apis | 최소 타깃에서 쓸 수 있는 API 확정 (availability 가드 필요 여부) |
+
+### 탐색 시 (fz-discover)
+
+| 참조 항목 | 적용 시점 |
+|----------|----------|
+| state-management | 기존 화면의 상태 흐름 파악 — 제약으로 굳힐 것과 바꿀 수 있는 것 구분 |
+| view-structure | 건드릴 View 의 책임 경계 — 어디까지가 이 화면의 것인가 |
+
+### 교차 리뷰 시 (fz-peer-review)
+
+| 참조 항목 | 체크 항목 |
+|----------|----------|
+| state-management | 상태 소유가 레이어를 넘지 않는가 (View 가 도메인 상태를 들고 있지 않은가) |
+| performance-patterns | diff 가 만든 재렌더 경로 — body 안에서 계산이 늘지 않았는가 |
+
 ## Swift Concurrency
 
 > Plugin: `swift-concurrency@swift-concurrency-agent-skill`
+> **호출**: `/swift-concurrency:swift-concurrency` — ⛔ 마켓플레이스는 `swift-concurrency-agent-skill` 이지만 스킬 이름은 `swift-concurrency` 다.
 
 ### 구현 시 (fz-code)
 
@@ -116,6 +140,29 @@ Swift Concurrency/SwiftUI 플러그인 활성 여부와 **무관하게** 항상 
 | actors | 새 actor 설계 시 isolation 전략 |
 | migration | Swift 6 마이그레이션 작업 계획 시 |
 | performance | 동시성 성능 요구사항 분석 |
+
+### 리뷰 시 (fz-review)
+
+| 참조 항목 | 체크 항목 |
+|----------|----------|
+| actors | isolation 이 선언과 실제 접근 경로에서 일치하는가 |
+| sendable | 경계를 넘는 타입이 Sendable 을 실제로 만족하는가 (컴파일 경고가 아니라 의미로) |
+| tasks | Task 취소 경로가 있는가 · 소유자가 사라질 때 누수하지 않는가 |
+| memory-management | Task 클로저의 self 캡처 — retain cycle |
+
+### 탐색 시 (fz-discover)
+
+| 참조 항목 | 적용 시점 |
+|----------|----------|
+| actors | 건드릴 코드의 현재 isolation — 🔒 불변 제약으로 굳힐 대상 판별 |
+| migration | 이 영역이 Swift 6 mode 인가 5 mode 인가 (제약의 강도가 달라진다) |
+
+### 교차 리뷰 시 (fz-peer-review)
+
+| 참조 항목 | 체크 항목 |
+|----------|----------|
+| actors | diff 가 isolation 경계를 옮겼는가 — 옮겼으면 소비자 전부가 그 경계를 아는가 |
+| sendable | 새로 경계를 넘게 된 타입이 있는가 |
 
 ### 리뷰 시 (fz-review, review-quality)
 
