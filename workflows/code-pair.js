@@ -9,7 +9,11 @@
 //       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify:VerifySpec, complexity, estimatedNewBodyLines?}, contextPath, buildFeedback?, changesetTarget } })
 //       estimatedNewBodyLines?: Lead 추정 총 newBody 줄수 — SPLIT_THRESHOLD(600) 초과 시 pre-flight가 스폰 전 split_required 반환(H5). 미제공 시 가드 skip(하위호환).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
-//   반환: { mode:'workflow', changeset, reviewVerdict, residualIssues, metrics }
+//   반환: { mode:'workflow', changeset, reviewVerdict, lensesExpected, lensesCompleted,
+//            residualIssues, residualNote, metrics }
+//   ⛔ reviewVerdict 는 'pass'|'issues'|'partial'|'skipped'. **'partial' 은 스크립트가 조립한다**
+//      (ReviewSchema enum 은 워커 출력용이라 pass|issues 만 갖는다 — 두 층을 섞지 않는다).
+//      partial = lensesCompleted < lensesExpected. 그 관점은 적용되지 않았으므로 pass 로 읽으면 안 된다.
 //     | { mode:'fallback', reason, splitSuggested?, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
 //     | { mode:'split_required', reason, metrics } → Lead는 Step 분할 후 재invoke.
 //   ⛔ 책임 재배분 (S0, 사용자 승인 OQ1): 에이전트는 디스크를 수정하지 않는다 — changeset JSON만 반환.
@@ -175,8 +179,13 @@ if (actualNewBodyLines > SPLIT_THRESHOLD) log(`WARN changeset ~${actualNewBodyLi
 //   부재해 형제 슬롯 비대칭이 무방비였다 [verified: OBS-24 R8 — promotion-ledger L-13].
 //   full만 추가(light는 비용 유지). opus 동시 ≤2 (+Lead=3) — governance 상한 내.
 let review = null
+// ⛔ 렌즈 회계 (F-216 N1) — 완주 판정이 '객체가 있나' 가 아니라 '기대한 렌즈가 다 돌았나' 를 보게 한다.
+let lensesCompleted = 0
+const deadLenses = []
 const c = input.stepSpec.complexity
 const needReview = input.mode === 'full' || (typeof c === 'number' ? c >= 3 : (log('NOTE complexity 누락 — 안전 default로 review 포함'), true))
+// full=2렌즈(review-arch + impl-quality) · light=1렌즈(arch 단독) · 검토 생략=0
+const lensesExpected = needReview ? (input.mode === 'full' ? 2 : 1) : 0
 if (needReview) {
   phase('Stage 2: 검토')
   const archPrompt =
@@ -199,18 +208,27 @@ if (needReview) {
         { label: 'stage2-review-quality', agentType: 'fz:impl-quality', model: 'opus', effort: 'xhigh', schema: ReviewSchema }),
     ])
     // 하류 계약 보존: review는 단일 객체로 병합 (s2 완주 판정 / Stage3 조건 / residualIssues가 참조)
+    // ⛔ F-216 N1: 이전 판은 렌즈 하나가 null 이어도 verdict:'pass' 를 만들고 완주 3/3 을 인쇄했다.
+    //    full 모드의 차별점이 **두 렌즈**인데 절반이 죽은 것을 Lead 가 반환값만 보고는 알 수 없었다.
+    lensesCompleted = (archReview ? 1 : 0) + (qualityReview ? 1 : 0)
     if (archReview || qualityReview) {
       const issues = [...(archReview?.issues ?? []), ...(qualityReview?.issues ?? [])]
-      review = { verdict: issues.length > 0 ? 'issues' : 'pass', issues }
-      if (!archReview) log('WARN stage2 arch null — quality 단독 결과로 진행')
-      if (!qualityReview) log('WARN stage2 quality null — arch 단독 결과로 진행')
+      const partial = lensesCompleted < lensesExpected
+      // ⛔ partial 에 'pass' 를 쓰지 않는다 — 하류가 pass 를 "검토가 끝났고 문제 없음" 으로 읽는다.
+      review = { verdict: partial ? 'partial' : (issues.length > 0 ? 'issues' : 'pass'), issues }
+      if (!archReview) { deadLenses.push('review-arch'); log('WARN stage2 arch null — quality 단독 결과로 진행') }
+      if (!qualityReview) { deadLenses.push('impl-quality'); log('WARN stage2 quality null — arch 단독 결과로 진행') }
     } else {
+      // ⛔ 가장 나쁜 경우(둘 다 죽음)에 residualNote 가 null 이면 새 채널이 무효다 — 여기서도 채운다.
+      deadLenses.push('review-arch', 'impl-quality')
       log('WARN stage2 양 렌즈 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)')
     }
   } else {
     review = await callAgent(archPrompt,
       { label: 'stage2-review', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewSchema })
-    if (!review) log('WARN stage2 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)')
+    // ⛔ light 도 렌즈 회계에 넣는다 — 빠뜨리면 검토가 성공해도 lensesCompleted 가 0 이라 s2 가 항상 false 다.
+    lensesCompleted = review ? 1 : 0
+    if (!review) { deadLenses.push('review-arch'); log('WARN stage2 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)') }
   }
 } else {
   log(`light + complexity ${c} < 3 — review 생략`)
@@ -218,7 +236,8 @@ if (needReview) {
 
 // ════════ Stage 3: 이슈 반영 수정 (조건부 — issues일 때만. pass면 dead-call 제거) ════════
 let finalChangeset = changeset
-if (review && review.verdict === 'issues' && review.issues.length > 0) {
+// ⛔ verdict 문자열이 아니라 **이슈 존재**로 건다 — partial(렌즈 일부 실패)에서도 나온 이슈는 반영한다.
+if (review && review.issues.length > 0) {
   phase('Stage 3: 이슈 반영 수정')
   const revised = await callAgent(
     `${OVERRIDE}\n[역할] 구현자 — 검토 반영\n${STEP}\n[원 changeset] ${JSON.stringify(changeset)}\n[검토 이슈] ${JSON.stringify(review.issues)}\n` +
@@ -229,8 +248,9 @@ if (review && review.verdict === 'issues' && review.issues.length > 0) {
 }
 
 const s1 = !!changeset
-const s2 = needReview ? !!review : true // 의도적 생략은 완주로 간주 (light 저복잡도)
-const s3 = (review && review.verdict === 'issues') ? (finalChangeset !== changeset) : true // pass/생략 = 해당 없음 완주
+// ⛔ 완주 판정은 객체 존재가 아니라 **렌즈 수**로 한다 (F-216 N1). 의도적 생략은 lensesExpected=0 으로 표현한다.
+const s2 = lensesExpected === 0 ? true : (lensesCompleted === lensesExpected)
+const s3 = (review && review.issues.length > 0) ? (finalChangeset !== changeset) : true // 이슈 없음/생략 = 해당 없음 완주
 const stagesCompleted = [s1, s2, s3].filter(Boolean).length
 log(`완주 ${stagesCompleted}/3 — changeset 파일 ${finalChangeset.files.length}개 / 검토 ${review ? review.verdict : 'skipped'}`)
 
@@ -238,6 +258,14 @@ return {
   mode: 'workflow',
   changeset: finalChangeset,
   reviewVerdict: review ? review.verdict : 'skipped',
-  residualIssues: review ? review.issues.filter(i => review.verdict === 'issues' && finalChangeset === changeset) : [], // stage3 실패/미동의 시 잔존 — Lead 판정
+  // ⛔ 렌즈 회계를 반환에 싣는다 (F-216 N1) — log() 로만 남기면 Lead 가 transcript 를 열지 않는 한 모른다.
+  lensesExpected,
+  lensesCompleted,
+  residualNote: deadLenses.length ? `검토 렌즈 ${deadLenses.join('·')} 미완주 — 그 관점은 적용되지 않았다` : null,
+  // ⛔ verdict 문자열에 걸지 않는다 — F-216 수리가 만든 회귀(이종 검증이 적발).
+  //    'partial' 에서도 살아 있는 렌즈가 낸 이슈는 **반영되지 않았으면 잔존**이다.
+  //    이전 술어는 verdict==='issues' 를 요구해 partial + stage3 실패에서 이슈를 통째로 버렸다.
+  //    ⛔ Stage3 트리거(`review.issues.length > 0`)와 **같은 식**이어야 한다 — 두 곳이 갈린 것이 이 결함의 형태였다.
+  residualIssues: (review && review.issues.length > 0 && finalChangeset === changeset) ? review.issues : [], // 미반영분 — Lead 판정
   metrics: metrics(stagesCompleted), // Lead: 적용 → 빌드 → §5.7 세션당 1행 집계 (invoke당 N행 발산 방지)
 }

@@ -8,7 +8,7 @@ argument-hint: "[probe|audit|plan|verify|execute|validate|full|light] [target]"
 allowed-tools: >-
   Read, Edit, Write, Bash, Grep, Glob,
   WebSearch, WebFetch,
-  mcp__serena__write_memory, mcp__serena__read_memory,
+  mcp__plugin_fz_serena__write_memory, mcp__plugin_fz_serena__read_memory,
   mcp__sequential-thinking__sequentialthinking,
   Task, TaskCreate, TaskUpdate,
   Skill
@@ -241,15 +241,26 @@ cat /tmp/urls.txt | xargs -I {} -P 5 sh -c \
 ### AC9 스크립트 (Tier 3 단독 verified 검증)
 
 ```bash
-# rg -n -e 사용 (rg -nE는 encoding 옵션으로 해석되어 에러)
-rg -n -e '\[verified: [^]]*A5[^]]*\]' guides/*.md | while IFS=: read -r file line content; do
+#!/usr/bin/env bash
+# ⛔ 프로세스 치환을 쓴다 — `rg | while` 는 루프가 서브셸이라 카운터가 밖으로 전파되지 않는다.
+#    이전 판은 VIOLATION 을 **인쇄만 하고 exit 0** 이었다(F-216 N5): 위반을 찾고도 게이트가 통과했다.
+# ⛔ `rg` 를 쓰지 않는다 — 이 환경의 rg 는 **zsh 셸 함수**라 bash 에서 command not found 다.
+#    그러면 while 이 빈 입력을 읽어 violations=0 → 통과. 측정 실패와 위반 0 이 같은 출력이 된다.
+# ⛔ positive control 필수: 검사 대상이 0건인지 도구가 죽은 것인지 구별한다.
+control=$(/usr/bin/grep -hoE '\[verified:' guides/*.md | wc -l | tr -d ' ')
+[ "$control" -gt 0 ] || { echo "AC9 UNRUN — positive control 0건 (경로·도구 확인)"; exit 2; }
+violations=0
+while IFS=: read -r file line content; do
   # 순서 무관: A5 존재 + Tier 1/2 supporting 존재 모두 확인
   has_a5=$(echo "$content" | grep -oE '\[verified: [^]]*\]' | grep -q 'A5' && echo yes || echo no)
   has_tier12=$(echo "$content" | grep -oE '\[verified: [^]]*\]' | grep -qE 'A[1-4]|A6|B[1-9]|C[1-9]|D[1-9]|E[1-9]|F[1-3]' && echo yes || echo no)
   if [ "$has_a5" = "yes" ] && [ "$has_tier12" = "no" ]; then
     echo "VIOLATION: $file:$line — A5 단독 verified"
+    violations=$((violations + 1))
   fi
-done
+done < <(/usr/bin/grep -nE '\[verified: [^]]*A5[^]]*\]' guides/*.md)
+test "$violations" -eq 0 || { echo "AC9 FAIL — A5 단독 verified ${violations}건"; exit 1; }
+echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.md | awk -F: '{s+=$NF} END{print s+0}')건 · control ${control})"
 ```
 
 ### Gate 3: Plan Approved
@@ -457,7 +468,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 Phase 6 통과 후:
 - 코드 변경 있음 → `/fz-commit` 제안
 - 가이드 변경만 → 사용자 직접 git commit
-- 교훈 발견 → `/sc:save --type learnings` (feedback_*.md 저장)
+- 교훈 발견 → `/sc:sc-save --type learnings` (feedback_*.md 저장)
 - 티켓 폴더 산출물 보존 → 새 세션에서 `index.md` Resume Trigger로 복원
 
 ---

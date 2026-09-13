@@ -175,19 +175,27 @@ GOOD:
 ## 검증 명령 (외부 grep용)
 
 ```bash
-R="$(bash scripts/resolve-plugin-root.sh)"   # 플러그인 루트 해석 (자기 위치 기준)
+# ⛔ 각 단언에 `|| exit 1` 을 직접 붙인다. `set -e` 에 의존하지 않는 이유:
+#    ① 이 블록을 도구 셸(zsh)에 붙여넣으면 errexit 이 걸리지 않아 **실패해도 성공 토큰이 찍힌다**
+#    ② 이전 판은 순차 나열이라 **마지막 명령의 종료 상태**가 블록 전체 상태였다(F-216 N7)
+#    ⛔ 부정 단언은 `if grep -q X; then exit 1; fi` — `! grep` 은 errexit 아래 무력하다.
+# ⛔ grep 은 절대경로. 이 환경의 `grep`/`rg` 는 셸 함수일 수 있다.
+R="$(bash scripts/resolve-plugin-root.sh)" || { echo "UNRUN — 루트 해석 실패"; exit 2; }
 F="$R/skills/fz-code/SKILL.md"
-# Phase 0.5 reference 존재
-grep -q 'Phase 0\.5.*Swift Pattern Pre-detection' "$F"
-grep -q 'modules/swift-pattern-detection\.md' "$F"
-# Gate 0.5 존재
-grep -q 'Gate 0\.5' "$F"
-# 본 모듈에 5 원칙 (D/E/F/G/H) + Few-shot 존재
 M="$R/modules/swift-pattern-detection.md"
-test "$(grep -Ec '^### 원칙 [DEFGH]' "$M")" -eq 5
-grep -q 'BAD:' "$M" && grep -q 'GOOD:' "$M"
+test -f "$F" || { echo "UNRUN — $F 없음"; exit 2; }
+test -f "$M" || { echo "UNRUN — $M 없음"; exit 2; }
+# Phase 0.5 reference 존재
+/usr/bin/grep -q 'Phase 0\.5.*Swift Pattern Pre-detection' "$F" || { echo "FAIL: Phase 0.5 참조 없음"; exit 1; }
+/usr/bin/grep -q 'modules/swift-pattern-detection\.md' "$F"      || { echo "FAIL: 모듈 지목 없음"; exit 1; }
+/usr/bin/grep -q 'Gate 0\.5' "$F"                                || { echo "FAIL: Gate 0.5 없음"; exit 1; }
+# 본 모듈에 5 원칙 (D/E/F/G/H) + Few-shot 존재
+N=$(/usr/bin/grep -Ec '^### 원칙 [DEFGH]' "$M"); test "$N" -eq 5 || { echo "FAIL: 원칙 $N/5"; exit 1; }
+/usr/bin/grep -q 'BAD:' "$M"  || { echo "FAIL: BAD Few-shot 없음"; exit 1; }
+/usr/bin/grep -q 'GOOD:' "$M" || { echo "FAIL: GOOD Few-shot 없음"; exit 1; }
 # Phase 1.5 P3와 mirror — 패턴 변환 trigger 명시 (F3 fix)
-grep -qE 'PromiseKit|defer.*await|enum catch' "$M"
+/usr/bin/grep -qE 'PromiseKit|defer.*await|enum catch' "$M" || { echo "FAIL: 변환 trigger 없음"; exit 1; }
+echo "SWIFT_PATTERN_CONTRACT_OK (원칙 ${N}/5)"
 ```
 
 ## 설계 원칙
