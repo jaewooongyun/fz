@@ -8,6 +8,7 @@ argument-hint: "[검색 대상] [--mode arch|layer|impact|pattern] [--deep]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__codegraph__codegraph_explore,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__activate_project,
   mcp__plugin_fz_serena__read_memory,

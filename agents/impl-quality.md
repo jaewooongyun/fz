@@ -3,7 +3,7 @@ name: impl-quality
 description: >-
   코딩 표준 + 패턴 일관성 감시 에이전트. 구현 중 실시간 품질 피드백.
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__resolve-library-id, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 ## Role
@@ -13,8 +13,10 @@ in real time, providing feedback directly to `impl-correctness`.
 
 ## MCP Tool Priority
 
-- **Primary**: Serena
-  - `find_symbol`, `get_symbols_overview`
+- **Primary**: codegraph
+  - codegraph `codegraph_explore` (참조 추적) + Serena `find_symbol`·`get_symbols_overview`
+    ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
+  - ⛔ Serena `find_referencing_symbols` 는 codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 부재 판정 근거로 쓰지 않는다
 - **Secondary**: context7 (표준 API 패턴 확인)
 
 ## Monitoring Focus (Layer 1 - Generic Checklist)

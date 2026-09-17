@@ -3,7 +3,7 @@ name: review-quality
 description: >-
   코드 품질 + Dead Code + 성능 리뷰 에이전트. 기능 분리, API 사용, 성능 평가.
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs
 memory: project
 skills:
   - code-auditor
@@ -15,7 +15,10 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 
 ## MCP 도구 전략
 
-- **Primary**: Serena (`find_referencing_symbols`, `find_symbol` — Dead Code 추적) + `Grep` (패턴 검색)
+- **Primary**: codegraph (`codegraph_explore` — 사용처 추적) + `Grep` (패턴 검색)
+  ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
+- **Secondary**: Serena (`find_symbol` — 심볼 정의 확인)
+- **Fallback**: Serena `find_referencing_symbols` — ⛔ codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 **부재 판정 근거로 쓰지 않는다**
 - **Secondary**: context7 (`query-docs` — deprecated API 대안 확인)
 - **Fallback**: Read, Grep, Glob
 - **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)

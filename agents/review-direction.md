@@ -4,7 +4,7 @@ description: >-
   방향성 적합성 + 대안 제시 + 비판적 평가 에이전트. 접근 방향 자체가 최선인지 도전.
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__get_symbols_overview, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__get_symbols_overview, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs
 ---
 
 ## Role
@@ -16,7 +16,10 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 
 ## MCP 도구 전략
 
-- **Primary**: Serena (`find_symbol`, `get_symbols_overview`, `find_referencing_symbols`)
+- **Primary**: codegraph (`codegraph_explore`) — 참조·conformer·영향 반경
+  ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
+- **Secondary**: Serena (`find_symbol`, `get_symbols_overview`) — 심볼 정의·파일 구조
+- **Fallback**: Serena `find_referencing_symbols` — ⛔ codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 **부재 판정 근거로 쓰지 않는다**
 - **Secondary**: context7 (`query-docs` — 라이브러리/API 대안 확인)
 - **Fallback**: Read, Grep, Glob
 - **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)

@@ -286,7 +286,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 | **Batching nudge** (5.1) | ⛔ **비채택 — fz 추가 금지** | Claude Code가 이 문장을 **turn-scoped 시스템 메시지로 이미 주입**한다 [fz 실측 2026-09-06 — report.md §3]. fz가 다시 넣으면 중복 주입 |
 | **Finish the whole task** (5.1) | 비채택(기존재) | `modules/execution-modes.md` § autonomous-reminder(LOOP 한정)가 동등 — "마지막 문단이 계획·의도·다음 단계 선언이면 해당 tool call을 실제로 실행하고, 종료는 작업 완료 또는 사용자만 줄 수 있는 입력 대기 시에만" [verified: 코드 실측 2026-09-06] |
 | **Compaction preserve** (5.1) | **미판정 (보강 후보)** | 접점은 Context reassurance 채택 행과 `skills/fz/SKILL.md:338` "4스텝+ 시 /compact 안내". 그 트리거는 **스텝 수 기반**이지 비용 기반이 아니므로 5.1의 "later compaction points"와 직접 충돌하지는 않는다. 4스텝+ 임계가 캐시 읽기 $0.25 하에서 여전히 적정인지는 **미측정** → P1 sweep 항목 |
-| **Keep changes to the task** (5.1) | 비채택(기존재) | No-tidying 행과 동일 근거 — `skills/fz-code/SKILL.md:268` 관찰 보고 의무("실행 금지, 범위 외 정리 금지") + `modules/code-transform-validation.md` Scope Minimality [verified: 코드 실측 2026-09-06] |
+| **Keep changes to the task** (5.1) | 비채택(기존재) | No-tidying 행과 동일 근거 — `skills/fz-code/SKILL.md:269` 관찰 보고 의무("실행 금지, 범위 외 정리 금지") + `modules/code-transform-validation.md` Scope Minimality [verified: 코드 실측 2026-09-06] |
 
 ### 점검 항목 (후속 작업 후보)
 

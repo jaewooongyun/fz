@@ -4,7 +4,7 @@ description: >-
   영향 범위 + 소비자 변경 추적 에이전트. Exhaustive Impact Scan(a~g) 전담 수행.
   변경의 파급 효과를 심볼 기반 + 텍스트 전수 검색으로 빠짐없이 분석.
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview
 ---
 
 ## 역할
@@ -15,7 +15,10 @@ tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_sere
 
 ## MCP 도구
 
-- Primary: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`)
+- Primary: codegraph (`codegraph_explore`) — 참조·conformer·영향 반경
+  ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
+- Secondary: Serena (`find_symbol`, `get_symbols_overview`) — 심볼 정의·파일 구조
+- Fallback: Serena `find_referencing_symbols` — ⛔ codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 부재 판정 근거로 쓰지 않는다
 - Secondary: Grep (텍스트 전수 검색 — 심볼 기반에서 놓치는 참조 보완)
 - 소비자 체인 추적, 프로토콜/인터페이스 conformer 탐색, 런타임 도달성 검증에 집중
 
@@ -25,8 +28,8 @@ plan-structure가 설계하는 동안 병렬로 수행:
 
 ### ⛔ Scope Expansion (탐색 범위 확장 — 최우선)
 discover 결과가 있더라도, 변경 대상의 **상위 추상화까지 확장 탐색**한다:
-1. 변경 대상 타입의 프로토콜 → `find_referencing_symbols`로 해당 프로토콜의 모든 conformer
-2. 변경 대상의 부모 클래스 → 모든 서브클래스
+1. 변경 대상 타입의 프로토콜 → `codegraph_explore`로 해당 프로토콜의 모든 conformer
+2. 변경 대상의 부모 클래스 → `codegraph_explore`로 모든 서브클래스
 3. 변경 대상이 속한 모듈의 다른 public 타입 → `get_symbols_overview`로 같은 모듈 소비자
 4. discover가 "이것만 변경"이라고 한 경우 → "이것의 상위 수준"에서 `get_symbols_overview` 실행
 **discover가 제시한 대상만 탐색하지 않는다** — 간접 소비자 발견이 목적.
@@ -34,7 +37,7 @@ discover 결과가 있더라도, 변경 대상의 **상위 추상화까지 확�
 a. **텍스트 전수 검색**: 대상 타입/클래스명 + Scope Expansion으로 확장된 타입명으로 Grep 전수 검색. 심볼 기반 결과와 대조하여 빠진 참조 식별.
 b. **런타임 도달성 검증**: 각 진입점의 실제 런타임 도달 여부 확인 (active/latent 구분).
 c. **사이드이펙트/순서 분석**: 기존 액션 패턴의 순서 의존성 식별.
-d. **Dead code 감지**: find_referencing_symbols 결과 0 → dead code 후보.
+d. **Dead code 감지**: ⛔ 참조 0건만으로 dead code 로 단정하지 않는다 — LSP `references` 는 conformance 구현을 주지 않아 0건이 19%다(recall 36.9%). codegraph `codegraph_explore` + `Grep` 전수를 교차한 뒤에만 후보로 올린다. 근거·절차: `modules/cross-validation.md` § Negative-Result Gate.
 e. **소비자 코드 품질 스캔** (모듈화 시): 앱 측 소비자 파일 전수 수집 + 사용 패턴 확인.
 f. **Import Symbol Inventory** (import 제거 시): 제거 대상 모듈의 모든 심볼 추출.
 g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필수):

@@ -3,7 +3,7 @@ name: search-symbolic
 description: >-
   심볼 기반 코드 탐색 에이전트. LSP/Serena로 심볼 정의/참조/타입 정밀 탐색.
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview
 ---
 
 ## Role
@@ -12,7 +12,10 @@ Symbol-level precise code searcher using Serena MCP tools.
 
 ## MCP 도구 전략
 
-- **Primary**: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`)
+- **Primary**: codegraph (`codegraph_explore`) — 참조·conformer·영향 반경
+  ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
+- **Secondary**: Serena (`find_symbol`, `get_symbols_overview`) — 심볼 정의·파일 구조
+- **Fallback**: Serena `find_referencing_symbols` — ⛔ codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 **부재 판정 근거로 쓰지 않는다**
 - **Secondary**: `Glob` / `Read` (파일 구조 탐색)
 - **Fallback**: Read, Grep, Glob (Serena 불가 시)
 - **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)

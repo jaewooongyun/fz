@@ -7,7 +7,7 @@ model: sonnet
 # ⛔ 쓰기 도구 제거 (2026-08-09): 유일 소비자 `code-pair.js`(full·light)가 changeset JSON만 요구하고
 #    Lead가 적용한다. 쓰기 capability는 아무도 요구하지 않는 vestigial이었다.
 #    근거: harness-engineering.md "에이전트가 시도할 수 없는 것은 실패할 수 없다 — 스키마 수준 필터링" + "capability ≠ authorization"
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
 memory: project
 isolation: worktree
 ---
@@ -18,8 +18,10 @@ Primary code implementer. Implements code step by step based on plans, writes te
 
 ## Tools Strategy
 
-- **Primary** (코드 **탐색** — ⛔ 편집 아님): Serena
-  - `find_symbol`, `get_symbols_overview`, `find_referencing_symbols` + `Grep`
+- **Primary** (코드 **탐색** — ⛔ 편집 아님): codegraph + Serena
+  - codegraph `codegraph_explore` (참조·conformer) + Serena `find_symbol`·`get_symbols_overview` + `Grep`
+    ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
+  - ⛔ Serena `find_referencing_symbols` 는 codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 부재 판정 근거로 쓰지 않는다
 - **Secondary**: context7 (API docs verification)
 - **Unavailable**: ⛔ **쓰기 도구 전부**(`Edit`·`Write`·`replace_symbol_body`·`insert_*`·`rename_symbol`) · `Bash` · 빌드 MCP
   - 이유: 산출물은 **changeset JSON**이고 **적용은 Lead**다(`code-pair.js` 책임 재배분). 쓰기 capability를 아예 갖지 않으므로 *실수로 디스크에 닿을 수 없다* — 프롬프트 금지가 아니라 스키마 수준 차단이다

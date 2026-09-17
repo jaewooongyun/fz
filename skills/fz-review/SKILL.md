@@ -7,6 +7,7 @@ user-invocable: true
 argument-hint: "[리뷰 대상 설명] [light]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
+  mcp__codegraph__codegraph_explore,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__write_memory,

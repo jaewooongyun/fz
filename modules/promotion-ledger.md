@@ -63,7 +63,7 @@
 
 ### ~~P1-B: Generator≠Evaluator Lead 독립 절차~~ — ✅ **구현 완료 종결 (2026-08-24)**
 - 관측 #0: OBS-03 (원본, 3차 설계 반영)
-- ⛔ **승격 절차를 거치지 않고 구현이 먼저 됐다** — `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:65` 참조. 관측 2건 대기는 무의미해졌다
+- ⛔ **승격 절차를 거치지 않고 구현이 먼저 됐다** — `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:66` 참조. 관측 2건 대기는 무의미해졌다
 - 처분: **종결** (REMOVED 아님 — 폐기가 아니라 반영 확인). 사용자 결정 2026-08-24
 
 ### ~~P1-C: Drift telemetry (AskUserQuestion)~~ — ⛔ **REMOVED (2026-08-24)**
@@ -83,7 +83,7 @@
 
 ### ~~P2-B: fz-fix 자동 전환 + complexity.md 보정~~ — ✅ **구현 완료 종결 (2026-08-24)**
 - 관측 #0: OBS-03 (plan-impact 단독 지적)
-- ⛔ 구현이 먼저 됐다 — `skills/fz-fix/SKILL.md:42 · 217 · 300`(테스트 케이스 포함)
+- ⛔ 구현이 먼저 됐다 — `skills/fz-fix/SKILL.md:43 · 217 · 300`(테스트 케이스 포함)
 - 처분: **종결**. 사용자 결정 2026-08-24
 
 ### P2-C: general closure-capture retain cycle lens (Claude 경로) — 트랙 C
@@ -92,7 +92,7 @@
 - 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. GPT `gpt-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/GPT 비대칭).
 - generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
 - ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
-- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:214` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(GPT 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
+- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:215` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(GPT 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
 - 승격 목표 (트랙 C → 트랙 A): 별개 세션 추가 관측 후 safety-audit §확장 active 전환.
 
 ## OBS-08 회고 후보 (P2, 관측 #1)
@@ -274,7 +274,7 @@
 - 관측 #1·#2: 구 `F5`(Decision-Type)·`F6`(Boundary-Sizing) | finding-source: **internal(사용자 catch)** — 구조/경계 포크에서 (가) 코드로 좁혀지는 엔지니어링 판단을 (나) 제품·팀 소유처럼 과잉 위임 · plan 분할 제안을 경계 권위로 답습
 - 내용: 구조/경계 결단 시 유형 분류가 없어 두 방향으로 어긋난다 — (가) `read`/`grep` 으로 정답이 1개로 좁혀지는 엔지니어링 판단인데 옵션 메뉴로 위임(확신 권고+근거+"이의 없으면 진행"이 맞음) (나) 제품·디자인·팀 컨벤션 소유인데 임의 결정. 경계(PR/커밋)에서는 **plan 분할 제안 = 판단 입력이지 경계 권위가 아니다**(1커밋 = 1관심사 + 컴파일 + 1결정 trace)
 - generalize: broad (언어·도메인 무관 — 모든 구조/경계 포크) | 과적합 위험: 中 (판정이 사람 해석에 의존)
-- 근거: [verified: `skills/fz-plan/SKILL.md:230` Gate 0.5 체크 항목 · `modules/lead-action-default.md:16` Trigger Matrix 행 — 두 소비자가 같은 신호를 참조]
+- 근거: [verified: `skills/fz-plan/SKILL.md:231` Gate 0.5 체크 항목 · `modules/lead-action-default.md:16` Trigger Matrix 행 — 두 소비자가 같은 신호를 참조]
 - ⛔ **활성 차단: evidence 2 sessions → candidate.** active 전환 = 트랙 A **5 sessions**
 - ⛔ **본 항목 신설 사유는 새 규칙이 아니라 카운터 귀속 복구다.** 이전에는 두 소비자가 임계 권위를 본 원장으로 지목하면서 실제 관측 카운터는 **플러그인 밖 작성자 로컬 메모리**를 참조했다 — 배포본만 가진 사용자는 그 카운터를 읽을 수 없다. `guides/skill-authoring.md:395-412`(작성자 환경의 개인 메모리 내용은 배포물에 넣지 않는다) 위반이며, 권위와 카운터가 다른 경계에 있으면 관측이 발생해도 카운트가 오르지 않는다
 - ⚠️ 관측 요약만 옮겼다 — 개인 경로·파일명은 옮기지 않는다(같은 규약)
@@ -426,9 +426,9 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 
 | 항목 | 구현 상태 | 근거 |
 |---|:--:|---|
-| **P1-B** Generator≠Evaluator Lead 독립 절차 | ✅ **구현됨** | `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:65` 참조 |
+| **P1-B** Generator≠Evaluator Lead 독립 절차 | ✅ **구현됨** | `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:66` 참조 |
 | **P2-A** Q-S5 Decision Re-open Gate | ✅ **구현됨** | `modules/scope-challenge.md:104` Appendix + `:56` `parent-reopen` 배선 + `skills/fz-plan/SKILL.md` § Phase 3 절차 5 `Refactoring Mode 감지` 발동 조건 |
-| **P2-B** fz-fix 자동 전환 + complexity 보정 | ✅ **구현됨** | `skills/fz-fix/SKILL.md:42 · 217 · 300`(테스트 케이스 포함) |
+| **P2-B** fz-fix 자동 전환 + complexity 보정 | ✅ **구현됨** | `skills/fz-fix/SKILL.md:43 · 217 · 300`(테스트 케이스 포함) |
 | **P1-C** Drift telemetry (AskUserQuestion) | ⛔ **미구현** | 본 파일 밖 참조 **0건** |
 | **P1-D** Q4 재구성 + rule 11차 컴파일 가능 기준 | ⛔ **미구현** | 본 파일 밖 참조 **0건** |
 

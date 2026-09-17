@@ -9,6 +9,7 @@ user-invocable: true
 argument-hint: "[기능·모듈·심볼 이름 또는 상황] [--light]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
+  mcp__codegraph__codegraph_explore,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__activate_project,

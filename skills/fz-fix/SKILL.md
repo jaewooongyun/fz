@@ -10,6 +10,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__replace_symbol_body,
   mcp__plugin_fz_serena__insert_after_symbol,
+  mcp__codegraph__codegraph_explore,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__read_memory,
   mcp__plugin_fz_serena__write_memory,
