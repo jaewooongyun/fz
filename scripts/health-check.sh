@@ -47,7 +47,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -232,6 +232,18 @@ else
   UNRUN=$((UNRUN+1))
   record "정적 부하 추세" UNRUN "미실행 — fz_snapshot.py 부재 (⛔ PASS 아님)"
 fi
+
+# ── 4.9 codegraph stale 검사기 self-test ──────────────────────────
+#    ⛔ 여기서 재는 것은 **검사기의 건강성**이지 인덱스 신선도가 아니다.
+#       인덱스 신선도는 대상 레포에서 `--repo <path>` 로 돌린다 — 플러그인 루트에는
+#       .codegraph/ 가 없어 여기서 돌리면 항상 UNRUN 이고, UNRUN 은 health-check 를
+#       exit 2 로 만들어 릴리즈 경로를 막는다(부재를 실패로 오귀속하는 형태).
+#    ⛔ 등재만으로는 실행되지 않는다 — 0번 사전조건 루프는 `[ -f ]` 존재 확인이다.
+CG_OUT="$(python3 "$ROOT/scripts/check_codegraph_fresh.py" --self-test 2>&1)"; CG_CODE=$?
+case "$CG_CODE" in
+  0) record "codegraph stale 검사기" 0 "$(printf '%s\n' "$CG_OUT" | tail -1) · 인덱스 신선도는 --repo 로 별도" ;;
+  *) record "codegraph stale 검사기" "$CG_CODE" "⛔ self-test 실패 — 판정 불가 ($(printf '%s\n' "$CG_OUT" | tail -1))" ;;
+esac
 
 # ── 5. 플러그인 매니페스트
 # ⛔ ISSUE-001 (CRITICAL) 정정: 이전 판은 `claude` 부재를 **exit 0으로 기록**해
