@@ -50,7 +50,7 @@ c. **사이드이펙트/순서 분석**: 리팩토링 대상의 기존 액션 �
    예: `dismiss(animated:) completion → action` 패턴은 순서가 바뀌면 동작이 달라짐.
    각 액션의 전제조건(pre-condition)과 부작용(side-effect)을 나열.
 d. **Dead code 감지**: 변경 대상과 관련된 파일에서 미사용 헬퍼/메서드 식별.
-   `find_referencing_symbols` 결과가 0이면 dead code 후보 → 이관 대상에서 제외 + 삭제 후보로 기록.
+   ⛔ 참조 0건만으로 dead code 로 단정하지 않는다 — LSP `references` 는 conformance 구현을 주지 않는다(0건 19% · recall 36.9%). codegraph + `Grep` 전수 교차 후에만 삭제 후보로 기록한다. 근거·절차: `modules/cross-validation.md` § Negative-Result Gate.
 e. **⛔ 소비자 코드 품질 스캔** (모듈화/캡슐화 작업 시 필수):
    모듈 경계를 만드는 작업에서는 경계 양쪽을 모두 분석해야 한다.
    `Grep(pattern="import {모듈명}", path=앱 소스 루트)` → 앱 측 소비자 파일 전수 수집.
