@@ -4,7 +4,7 @@ description: >-
   구현 구조 + Step 순서 설계 에이전트. 요구사항 분해, 영향 범위 분석, 구현 전략 수립.
 model: sonnet
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
 memory: project
 ---
 
@@ -14,7 +14,10 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 
 ## MCP 도구
 
-- Primary: Serena (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `activate_project`)
+- Primary: codegraph (`codegraph_explore`) — 참조·conformer·영향 반경
+  ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
+- Secondary: Serena (`find_symbol`, `get_symbols_overview`, `activate_project`) — 심볼 정의·파일 구조
+- Fallback: Serena `find_referencing_symbols` — ⛔ codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 부재 판정 근거로 쓰지 않는다
 - Secondary: sequential-thinking (복잡한 설계 결정), context7 (API 문서)
 - Fallback: Read, Grep, Glob
 - **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
