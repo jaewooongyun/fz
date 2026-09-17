@@ -584,18 +584,38 @@ GOOD: rg X | wc -l → 11 → 잘림 없이 11줄 직접 확인 후 "사용처 1
 | 한글/영문 표기 누락 정규식 | `Gate`만 찾고 `게이트`를 놓침 | — |
 | `>/dev/null 2>&1` + exit 무시 | fail-closed 거부를 0건으로 오독 | **#N5** |
 | CWD 의존 상대경로 | 다른 디렉토리에서 다른 결과 | **#N6** |
+| LSP references 0건 (`textDocument/references`) | Swift 프로토콜 **선언**과 그 **conformance 구현**은 서로 다른 선언이라 참조 관계가 아니다 → 구현체가 안 잡힌다. 전수 실측: recall **36.9%**(N=468 동명이인 배제) · 0건 반환 **19%** · 손검증 `LiveDetailPresentable/bindCategory` 는 구현이 있는데 0건 | — (codegraph `implements` 엣지로 교차) |
+| codegraph 인덱스 stale | 인덱스가 디스크보다 뒤처지면 참조가 조용히 빈다 — 산출물에는 표시가 없다 | `scripts/check_codegraph_fresh.py --repo <레포>` (⛔ exit 2=UNRUN 은 통과가 아니다) |
+| codegraph `explore` 의 blast radius 절단 | `41 callers … +14 more` — **개수는 알려주고 목록은 자른다**. `--max-files` 로 못 푼다(출력 바이트 동일). ⛔ CLI `impact --depth 2` 로 전량을 받는 우회는 **권하지 않는다** — 간접 순회라 무관 항목이 압도한다(실측 precision 4.2% · 거짓 양성 114/119). 부재 판정이 필요하면 `Grep` 전수와 교차한다 | — (Grep 교차) |
+| 흔한 메서드명으로 만든 ground truth | `popViewController`·`evaluateJavaScript`·`detachChild`·`build`·`update`·`present` 처럼 **프레임워크 표준 API 와 동명**이면 텍스트 매칭이 무관한 호출을 전부 긁어 분모가 부푼다 — 정확한 도구가 **낮은 점수로 보인다**. 호출 **수신자 타입**으로 거르거나 동명 정의 개수를 먼저 센다 | — (수신자 분류) |
+| 프로토콜 선언을 구현으로 집계 | `protocol` 블록 안의 `func x()` 는 **선언**이지 구현이 아니다. 파일:줄만 보면 갈리지 않는다 — 직전 최상위 선언(컨테이너)을 함께 확인한다 | — (컨테이너 확인) |
 
 ### Gate 조건
 
 - [ ] "0건/부재/전부"가 산출물 결론에 있는가? (없으면 N/A)
 - [ ] 있으면 **positive control** 수행 + 결과 명시?
 - [ ] 측정 명령의 **exit code**를 판정에 포함? (`2`는 PASS도 SKIP도 아님)
+- [ ] **에이전트·도구가 기대와 어긋나며 *이유*를 적었다면 그 이유를 먼저 검증?** 불일치는 상대의 실패가 아니라 *둘 중 하나가 틀렸다*는 신호다 — 기준(정답표·기대값) 쪽을 먼저 의심한다
 - [ ] 다중 대상 스캔이면 출력에 **대상 라벨** 포함?
 - [ ] 위 함정 표의 해당 항목을 점검? (기계 검출 가능분은 `lint_contracts.py`가 담당)
 
 > ⛔ **SKIP ≠ PASS**: 스크립트가 판정하지 않은 항목(THRESHOLD·SEMANTIC)은 별도 판정하고 그 사실을 보고에 남긴다.
 
 ---
+
+### 경계 — 이 게이트가 닿지 않는 곳 (2026-09-16 결정)
+
+전역 Serena 설정(`~/.serena/serena_config.yml` 의 `excluded_tools`)은 **편집하지 않는다.**
+`find_referencing_symbols` 의 강등은 에이전트 `tools:` 와 스킬 `allowed-tools:` 층에서만 한다.
+
+이유는 둘이다. ① 차단 실효가 이미 그 층에 있다 — 워커와 fz 스킬 활성 세션은 배선만으로 덮인다.
+② 전역 제외는 **폴백 보존 결정과 충돌한다**: 서버가 도구를 노출하지 않으면 frontmatter 에 적어도
+바인딩되지 않으므로, codegraph 인덱스가 없는 워크트리에서 기대던 폴백까지 함께 죽는다.
+2026-09-16 실측에서 살아 있는 워크트리 92곳 중 인덱스 보유는 27곳이었다.
+
+⛔ **따라서 구멍이 남는다** — fz 스킬이 비활성인 Lead 세션과 fz 밖 세션. 그 두 곳에서는
+강등되지 않은 참조 탐색 도구가 그대로 보인다. 거기서의 규율은 설정이 아니라 이 문서다:
+**0건을 부재의 근거로 쓰지 않는다**(recall 36.9% · 전수 N=468). 근거·절차는 위 Gate 조건.
 
 ## 설계 원칙
 
