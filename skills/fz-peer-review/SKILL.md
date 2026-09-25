@@ -168,6 +168,10 @@ PR title/body에서 JIRA 티켓 ID 추출 + acceptance criteria 수집. JIRA 연
 
 코드로 확정할 수 없는 주장에는 "무엇을 보면 판별되는지"를 함께 적는다 — 방법을 모르면 그 지적은 판정 불가로 남는다.
 
+⛔ **"코드로 확정할 수 없다" 는 두 가지다** [F-285 — `major` 6건 전부 철회]. ①배선 미확정(`A→B→C` 를 grep 으로 못 잡음)은 이 규칙이 잡지만, ②**증상 미확정**(배선은 확정되는데 그 귀결이 사용자에게 **무엇으로 보이는지**가 코드에 없음)은 통째로 게이트 밖이다. 배선을 끝까지 따라가면 주장 전체가 확정된 느낌이 들어 oracle 을 적을 필요를 못 느낀다 — 실측 6건이 전부 ②였고, 배선 4단계가 모두 사실인데 **그 값을 그리는 화면이 그 시점에 계층에 없었다**.
+
+⛔ 따라서 `severity` 가 `minor` 이상이면 **증상 관측 지점** 두 칸을 채운다. 비면 `suggestion` 강등 (Gate 4.7-S 가 기계 판정): `symptom_screen` = 증상이 보이는 구체 화면·뷰 이름 / `symptom_reach` = 그 화면이 그 상태로 떠 있게 되는 사용자 동작. ⛔ `화면` 칸은 "값이 흐른다" 가 아니라 **"그 값을 그리는 뷰가 그 시점에 계층에 있는가"** 를 묻는다.
+
 - View 변경 → 시뮬레이터/실기기(+review-quality 집중 지시) · 런타임 순서·타이밍 → DEBUG 로그 캡처 지점 · 서버 계약 → curl 재현
 
 ### 2.6. Code Evidence Collection → `${WORK_DIR}/evidence/`
@@ -360,7 +364,7 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 
 ### 4.4-4.9. Verification Gates
 
-> 참조: `modules/peer-review-gates.md` — Factual Claim (4.4) + Line (4.5) + Compiler (4.6) + Behavior (4.7) + Deleted Logic (4.7-A) + RxSwift Error Path (4.8) + **Call-site & Convention (4.9)** 게이트 전문
+> 참조: `modules/peer-review-gates.md` — Factual Claim (4.4) + Line (4.5) + Compiler (4.6) + Behavior (4.7) + **증상 관측 (4.7-S)** + Deleted Logic (4.7-A) + RxSwift Error Path (4.8) + **Call-site & Convention (4.9)** 게이트 전문
 >
 > 게이트 실행 전: `synthesized-issues-partial.json` 중간 저장 필수 (compact 방지)
 
@@ -375,6 +379,8 @@ ${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 �
 ${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (마크다운 — Tier 별 생성 여부는 modules/peer-review-gates.md § MergeContract § 9)
 ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 ```
+
+⛔ **저장 직후 Gate 4.7-S 를 기계로 돌린다** (F-285 — 문서 규칙만으로는 발화하지 않았다): `python3 "${FZ_PLUGIN_ROOT}/scripts/check_symptom_anchor.py" "${WORK_DIR}/synthesized-issues.json"` → exit 1 이면 그 id 를 `suggestion` 으로 강등하거나 두 칸을 채운다. ⛔ exit 2 는 통과가 아니다(판정 불가). ⛔ `evidence_trace` 가 충실한 것은 통과 근거가 **아니다** — 실측 6건 모두 배선 추적은 완벽했다.
 
 > review-index.md: Phase + Artifacts 목록 기록. Compact 감지 시 이 파일 읽어 산출물 로드 → 중단 지점 재개.
 

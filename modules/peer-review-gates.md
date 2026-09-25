@@ -1,7 +1,7 @@
 # Peer Review Verification Gates
 
 Synthesize 단계에서 실행하는 9가지 검증 게이트.
-4.4 → 4.4-A → 4.5 → 4.6 → 4.6.5 → 4.7 → 4.7-A (+ Origin Verification) → 4.8 → 4.9 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
+4.4 → 4.4-A → 4.5 → 4.6 → 4.6.5 → 4.7 → **4.7-S** → 4.7-A (+ Origin Verification) → 4.8 → 4.9 순서로 적용. 게이트 통과 후 CHECKPOINT 저장.
 
 ## 목차
 
@@ -12,6 +12,7 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 - [Gate 4.6: Compiler-Verifiable Claim Gate](#gate-46-compiler-verifiable-claim-gate)
 - [Gate 4.6.5: Inheritance Chain Impact Gate](#gate-465-inheritance-chain-impact-gate)
 - [Gate 4.7: Behavior-Verifiable Claim Gate](#gate-47-behavior-verifiable-claim-gate)
+- [⛔ 4.7-S: 증상 관측 지점 (F-285 — 6건 전부 철회)](#-47-s-증상-관측-지점-f-285--6건-전부-철회)
 - [Gate 4.7-A: Deleted Logic Migration Check](#gate-47-a-deleted-logic-migration-check)
 - [Gate 4.8: Reactive Error Path Gate (RxSwift/Combine)](#gate-48-reactive-error-path-gate-rxswiftcombine)
 - [Gate 4.9: Call-site & Convention Verification](#gate-49-call-site--convention-verification)
@@ -237,6 +238,64 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
    └─ 추적 불가 → confidence ceiling 70 + "[런타임 검증 필요]" 태그
 6. confidence-matrix.md에 기록: behavior_verified: true/false + trace
 ```
+
+### ⛔ 4.7-S: 증상 관측 지점 (F-285 — 6건 전부 철회)
+
+위 절차는 **배선**만 본다 — setter 를 전수로 찾고 guard 를 확인한다. 그런데 배선이 전부
+사실이어도 발견이 틀릴 수 있다. **그 값을 그리는 뷰가 그 시점에 계층에 없으면** 사용자는
+아무것도 보지 못한다.
+
+실측: `major`·`regression` 6건이 배선 4단계를 전부 확정하고도 전부 철회됐다. 가장 선명한 건
+`currentSeekableRange` → `seekableDuration` → `SeekingBar.trackFill` 까지 다 맞았는데,
+정지 호출부 10곳이 거의 다 포스터로 덮고 미니플레이어는 그 진행바를 아예 그리지 않았다.
+
+**`severity` 가 `minor` 이상인 INCLUDE 이슈는 두 칸을 채운다.**
+
+| 필드 | 묻는 것 | ⛔ 답이 아닌 것 |
+|---|---|---|
+| `symptom_screen` | 그 증상이 보이는 구체 화면·뷰 이름 | "A→B→C 로 값이 흐른다" (배선) |
+| `symptom_reach` | 그 화면이 그 상태로 떠 있게 되는 사용자 동작 | "이론상 가능하다" |
+
+```
+채움 → INCLUDE 유지
+빈칸 → suggestion 으로 강등 (severity 를 지우지 말고 강등 사유를 남긴다)
+```
+
+⛔ **비용이 근거다.** S6 을 죽인 질문("그 진행바가 뜨는 화면이 있나")에 든 비용은 **grep 두 번**이었다.
+배선 4단계를 따라간 비용보다 싸다.
+
+기계 판정 — `synthesized-issues.json` 에서:
+
+```bash
+jq -r '.issues[]
+  | select(.severity_final=="major" or .severity_final=="minor")
+  | select((.symptom_screen // "") == "" or (.symptom_reach // "") == "")
+  | .id' synthesized-issues.json
+```
+
+출력이 비어야 통과. 한 건이라도 나오면 그 id 를 `suggestion` 으로 내리거나 두 칸을 채운다.
+⛔ 배선 추적 기록(`evidence_trace`)이 채워져 있다는 것은 이 게이트의 통과 근거가 **아니다** —
+6건 모두 `evidence_trace` 가 충실했다.
+
+> 인접 메모리 `feedback_static_gates_cannot_replace_running_it` 는 같은 교훈이나 **제스처·UI 구현**
+> 맥락으로 좁게 적혀 있어 리뷰 severity 판정에 연결되지 않았다. 이 게이트가 그 연결이다.
+
+#### 같은 질문을 **방어**에도 한다 (F-291)
+
+증상에 도달 경로를 요구하는 이유가 방어에도 그대로 적용된다. 이슈가 *"여기에 검사가 있다"* 를
+근거로 severity 를 내리거나 올릴 때, 그 검사가 **실제로 차단하는 경로에 있는지**를 묻는다.
+
+판정기가 둘 이상이면 어느 것이 차단하는지 먼저 지목한다.
+
+| 묻는 것 | ⛔ 답이 아닌 것 |
+|---|---|
+| 이 방어가 놓인 경로가 실패를 **막는** 경로인가 | "코드에 존재한다" (grep) |
+| 판정기가 여럿이면 **차단하는** 쪽이 이것을 보는가 | "다른 판정기가 본다" |
+
+실측 근거: 게이트 원장을 재검증하는 경로는 도구 부재를 관측하는데, 세션을 실제로 차단하는
+경로는 원장을 파싱만 해서 같은 순간에 `ALL MET` 을 읽었다. 방어는 존재했고 발화하지 않았다.
+
+---
 
 Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드는지 확인. 아니라면 confidence ceiling 75.
 
@@ -559,6 +618,7 @@ Lead 가 `crossVerdicts[]` 를 읽고 § 4(Lead 실측의 자격)로 판정한�
 |---|:---:|---|
 | **Coverage Gate** | **생존** | 전수·카운트·부정 주장의 분모는 경로와 무관하게 필요하다 |
 | **Negative-Result Gate** | **생존** | "0건" 이 도구 고장인지 대상 부재인지는 경로와 무관 |
+| **4.7-S 증상 관측 지점** | **생존** | `minor` 이상 이슈에 화면·도달을 요구하는 것은 이슈 *내용* 의 문제이므로 tier 와 무관하다. ⛔ 방어 도달 축(판정기가 여럿일 때 **차단하는** 쪽을 지목)도 같이 생존 |
 | **InputHygiene (C3)** | **생존 — 형태 변경** | Tier 0/1 은 차단이 아니라 **탐지·표시 + 강등**(§ InputHygiene 이 규정) |
 | **MergeContract (C1)** | **생존** | § MergeContract 가 전 경로 SSOT |
 | **Reflection Rate** | **조건부** | GPT 호출이 있을 때만(Tier 1). `N<10` 은 preliminary — verdict 보류 |
