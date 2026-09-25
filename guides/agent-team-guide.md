@@ -227,7 +227,7 @@ GOOD (Mesh / Peer-to-Peer):
 | Adversarial Constraint Discovery | fz-discover | plan-structure(생성) 결과를 review-arch(파괴) 가 받아 제약을 드러낸다 — 라운드마다 스크립트가 전달 | `workflows/discover-adversarial.js` |
 | Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ∥ search-pattern(텍스트) → 서로의 결과를 교차 확인 | `workflows/search-cross-verify.js` |
 
-> **실행 전환 (Wave 1-4, 완료)**: 위 5 패턴은 현재 `workflows/{discover-adversarial,plan-collaborative,review-live,code-pair,search-cross-verify}.js` 결정적 Workflow로 실행(P2P SendMessage 아님 — 라운드 의미론은 스크립트가 구현). 규약: `guides/skill-authoring.md` §12.
+> **실행 전환 (Wave 1-4, 완료)**: 위 5 패턴의 구현은 `workflows/{discover-adversarial,plan-collaborative,review-live,code-pair,search-cross-verify}.js` 결정적 Workflow다 — fz-plan 기본 실행은 `plan-lean2.js` 이고 `plan-collaborative.js` 는 롤백 경로다(P2P SendMessage 아님 — 라운드 의미론은 스크립트가 구현). 규약: `guides/skill-authoring.md` §12.
 > - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:78` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — 6개 워크플로가 전 패턴을 덮는다.
 > - `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 **존재하지 않으며**, fz 실행 경로에도 호출부가 **0건**이다 [verified: `grep -rn "TeamCreate(" workflows/ scripts/` → 0]. 본 가이드의 TeamCreate 예시(§2/§3/§7)는 **역사적 의미론 기록**이다 — ⛔ SOLO 폴백 절차로 참조하지 않는다(머리 경고).
 
