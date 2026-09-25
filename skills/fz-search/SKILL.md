@@ -61,8 +61,8 @@ metadata:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
-| modules/patterns/cross-verify.md | Cross-Verify (search-symbolic ↔ search-pattern 교차 확인) (UC-11, v4.7.1) |
+| docs/history/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
+| docs/history/patterns/cross-verify.md | Cross-Verify (search-symbolic ↔ search-pattern 교차 확인) (UC-11, v4.7.1) |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
 
@@ -252,7 +252,7 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 ## 병렬 교차 검증 (`--deep` 모드 — Workflow 오케스트레이션 pilot)
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
-> Cross-Verify 패턴 canonical: `modules/patterns/cross-verify.md` (보존 — 라운드 의미론은 스크립트가 구현).
+> Cross-Verify 패턴 canonical: `docs/history/patterns/cross-verify.md` (보존 — 라운드 의미론은 스크립트가 구현).
 > 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern·**plan-structure** 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > **모델 배정**: Stage 1·2는 `search-*`(sonnet 성격 — retrieval·breadth), **Stage 3 병합은 `plan-structure` 렌즈 + `fable`** — 3-Tier 정책의 *수렴 merge* 판단 지점 3곳 중 하나다(`scripts/lint-model-explicit.sh`의 `fable=3`에 계상).
 

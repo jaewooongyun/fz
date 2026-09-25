@@ -21,7 +21,7 @@
 //     되돌리기/계속은 Lead 절차 (SKILL.md). 재시도 = buildFeedback 포함 새 invoke (resume 비의존 —
 //     buildFeedback이 args를 바꿔 캐시 키 불일치 [선례: ts 제거 — resume 캐시 미스 유발]).
 //
-// [설계 — modules/patterns/pair-programming.md 평탄화]
+// [설계 — docs/history/patterns/pair-programming.md 평탄화]
 //   full(fz-code): Stage1 impl(opus) changeset → Stage2 **병렬 2렌즈**(review-arch + impl-quality, opus) →
 //     Stage3 impl(opus) 이슈 반영 수정 — **조건부**: review pass면 Stage3 생략 (3-call).
 //     계획 표기 '고정 3-call'은 unresolved #2가 잠정 부정확 지적 — pass 경로 dead-call 제거가 정직

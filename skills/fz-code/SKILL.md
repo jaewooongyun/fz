@@ -62,8 +62,8 @@ metadata:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
-| modules/patterns/pair-programming.md | Pair Programming (impl-correctness ↔ review-arch) (UC-11, v4.7.1) |
+| docs/history/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
+| docs/history/patterns/pair-programming.md | Pair Programming (impl-correctness ↔ review-arch) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
@@ -98,10 +98,10 @@ metadata:
 
 ## 팀 에이전트 모드
 
-> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
+> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `docs/history/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 3 전환.
-> Pair Programming 패턴 canonical: `modules/patterns/pair-programming.md` (보존 — Workflow 평탄화 출처).
+> Pair Programming 패턴 canonical: `docs/history/patterns/pair-programming.md` (보존 — Workflow 평탄화 출처).
 > 스크립트: `workflows/code-pair.js` (mode='full') — agents/의 impl-correctness·review-arch 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > ⛔ **책임 재배분 (사용자 승인)**: 에이전트는 디스크를 수정하지 않는다 — changeset JSON(exact syntax) 반환 → **Lead가 적용 + 빌드 검증**. "구현 중 즉석 질문"의 실시간성은 Step 경계로 양자화됨 (수용된 trade-off).
 > ✅ **2026-08-09부터 스키마 수준 보장**: `agents/impl-correctness.md` `tools:`에서 **쓰기 도구를 전부 제거**했다 — 이전에는 프롬프트 금지(OVERRIDE 문구)만이 방어였고 capability는 남아 있었다. 이제 *시도 자체가 불가*하다. 근거: `guides/harness-engineering.md` "에이전트가 시도할 수 없는 것은 실패할 수 없다 — 런타임 체크가 아닌 스키마 수준 필터링" + "capability ≠ authorization".
@@ -128,7 +128,7 @@ metadata:
 7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
 8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → `experiment-log.md` §5.7 fz-code 테이블(**2026-07-10 시리즈 — 현행**; 2026-06-05 표는 사료). Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
 
-> 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰은 확산 판정 시 결정.
+> 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 미결 안건 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
 
 ---
 

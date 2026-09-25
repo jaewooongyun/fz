@@ -8,7 +8,7 @@
 //   반환: { mode:'workflow', results:[{file,line,symbol,kind,note,sources,confidence}], metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후. wall-clock은 Lead 측정.
 //
-// [설계 — modules/patterns/cross-verify.md 평탄화]
+// [설계 — docs/history/patterns/cross-verify.md 평탄화]
 //   Stage1 독립 병렬: search-symbolic(심볼) + search-pattern(텍스트) — Round 1 독립성 구조 보장.
 //   Stage2 교차: 각자 상대 결과를 받아 FP 판정/보완 (cross-verify Round 2 동형).
 //   Stage3 병합: plan-structure 렌즈 + fable (동일성 판정 = 해석 작업 — §11/§12 분류). 3-Tier 수렴 merge 판단 지점.

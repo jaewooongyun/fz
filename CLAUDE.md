@@ -50,7 +50,8 @@ bash scripts/setup-hooks.sh
 > ⛔ **형식 고정**: `` - `dir/` — 설명 (N개) `` — #N2는 백틱 경로 뒤의 `(N개` 를 찾는다. 형식이 다르면 **그 카테고리가 조용히 검사에서 빠진다** (2026-08-09 감사 ISSUE-002: `agents/`는 괄호 없어 미검사, `workflows/`는 선언 자체가 없었다).
 - `skills/` — fz 스킬 SKILL.md (22개)
 - `agents/` — fz 에이전트 (13개)
-- `modules/` — 공유 모듈 (51개 — 루트 46 + patterns/ 5)
+- `modules/` — 공유 모듈 (45개). ⛔ **실행 절차만** 둔다 — 라운드 의미론의 *역사적 출처*(`team-core.md` · `patterns/*.md` 5종)는 2026-09-21 `docs/history/` 로 옮겼다(B9/S13). 사료를 실행 절차와 같은 자리에 두면 읽는 사람이 절차로 오독한다
+- `docs/history/` — **사료**. 현행 절차가 아니다 (`promotion-ledger.md` § 사료 보존이 지정). ⛔ 여기 있는 것을 실행 근거로 인용하지 않는다 — 현행 정본은 `guides/skill-authoring.md` §12
 - `guides/` — 가이드 문서 (9개)
 - `workflows/` — 결정적 멀티에이전트 스크립트 (8개)
 - `templates/` — 스킬/에이전트/모듈/CLAUDE.md 템플릿

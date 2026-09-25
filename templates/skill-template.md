@@ -114,7 +114,7 @@ Input → Phase 1 → Phase 2 → ... → Output
 
 | 모듈 | 용도 |
 |------|------|
-| `guides/skill-authoring.md` §12 | 팀 모드 정본 — Workflow 규약 + 실패 복구 사다리 L1~L4. ⛔ `modules/team-core.md`를 팀 프로토콜로 지목하지 말 것 (역사적 출처) |
+| `guides/skill-authoring.md` §12 | 팀 모드 정본 — Workflow 규약 + 실패 복구 사다리 L1~L4. ⛔ `docs/history/team-core.md`를 팀 프로토콜로 지목하지 말 것 (역사적 출처) |
 | `modules/team-registry.md` | 에이전트 동적 구성 |
 
 ## sc: 활용 (SuperClaude 연계)
