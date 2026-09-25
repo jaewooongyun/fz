@@ -138,7 +138,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 ⚠️ 2026-09-06 정정 — 이전 판의 "사용 시점 가이드 (2026-06-12 배선)" 표는 **배선 상태 열이 전부 철회/미배선**이라 삭제했다. 현행은 3줄이다.
 
 - **세션 effort = `xhigh`** (사용자 `/model` 실측). frontmatter `effort` 배선은 없다 (§effort frontmatter 배선 철회 유지).
-- **워크플로 36콜 = `effort: 'xhigh'` 명시** — 세션 상속을 차단하는 콜 단위 값. 공식 default는 Fable 5.1 `high` · Opus 5.5 `medium`이며, 변경 여부는 **fresh sweep 후 결정**한다 (사용자 결정 2026-09-25: `xhigh` 유지·하향 sweep 종결 · 재개 시 판정 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0이 통과 기준).
+- **워크플로 36콜 = `effort: 'xhigh'` 명시** — 생략하면 세션 값이 아니라 워커 모델 기본(Opus 5.5 `medium`)으로 돌아서(2026-09-25 실측) `xhigh` 를 보장하는 유일한 콜 단위 값. 공식 default는 Fable 5.1 `high` · Opus 5.5 `medium`이며, 변경 여부는 **fresh sweep 후 결정**한다 (사용자 결정 2026-09-25: `xhigh` 유지·하향 sweep 종결 · 재개 시 판정 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0이 통과 기준).
 - **`ultracode`는 effort arm으로 무효** (T0 실측) — 사용 가이드·배선 모두 대상 아님. `ultrathink` 키워드는 해당 turn만 심층 추론(effort 설정 불변)이며 "think hard" 류는 더 이상 키워드가 아니다.
 
 > **T1 긴장 (공식 default vs fz 세션 운용)**: 공식 문서는 `high`를 출발점으로 두고(Opus 5.5 는 `medium`) `xhigh`/`max`는 "measured a quality gain" 이후로 미룬다. fz 세션·워크플로의 `xhigh` 상시 운용은 이 기본에서의 **의식적 이탈**로, 다중 파이프라인 오케스트레이션 난이도에 대한 사용자 결정이다 (공식 default를 몰라서가 아님 — `modules/peer-review-tiers.md`: "`xhigh`는 관성이 아니라 결정된 값이다"). 재판정은 위 짝 비교로만 한다.
@@ -243,7 +243,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 - **실질 분석·생산 워커 = opus 36** (`opus` alias = Opus 5.5 — Claude Code 2.1.280+) — plan/peer-review/review-live/code-pair의 impact·edge·arch·quality·correctness·cross-critique(CC)·counter·recheck·review 등 capability-sensitive 스테이지 (4-axes A의 "워커 전반 sonnet" baseline을 대체)
 - ⛔ **2026-09-12 fz-plan 배선 전환**: 기본 워크플로가 `plan-collaborative.js`(6단계 9콜) → **`plan-lean2.js`(2단계 4콜)**. wall 3,492s→1,344s(-61.5%). ⭐ 근거의 핵심은 **노이즈 바닥 교정** — 같은 9콜 구조를 동일 입력·트리로 2회 실행하니 상호 고유 major 5건·`Q-superior`(동등 아님)였다. run-to-run 분산이 구조 간 차이보다 크므로 "손실 0" 임계는 도달 불가능했고, 새 배선의 발산(3)은 그 바닥(5) 이하다. ⛔ N=1 — 실사용 3회 후 재평가(`experiment-log.md` §5.9). 롤백은 `skills/fz-plan/SKILL.md` 절차 2.5·3 의 스크립트명 원복
 - **단순(retrieval·breadth) = sonnet 6** (Sonnet 5) — search stage1·2 + discover lens fan-out·cost-lens
-- 전 45콜 `effort: 'xhigh'` 명시 — 세션 effort 상속을 차단하는 콜 단위 값. ⛔ 값 변동은 `scripts/lint-model-explicit.sh --baseline tests/fixtures/model-effort-baseline.json` 이 **label 별로** 대조한다(줄 수 세기는 콜별 변경을 못 잡는다). sweep 결과는 `experiment-log.md` §5.8 ⑥ · 구조 ablation 은 §5.9. **공식 default는 Fable 5.1 `high` · Opus 5.5 `medium`**이며, 변경 여부는 fresh sweep 후 결정한다(사용자 결정 2026-09-25: `xhigh` 유지·sweep 종결) (짝 비교 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0). ⛔ 이 문서는 하향을 권고하지 않는다 — `xhigh`는 사용자가 유지를 택한 결정된 값이다
+- 전 45콜 `effort: 'xhigh'` 명시 — 생략하면 워커 모델 기본(Opus 5.5 `medium`)으로 도는 콜 단위 값(2026-09-25 실측). ⛔ 값 변동은 `scripts/lint-model-explicit.sh --baseline tests/fixtures/model-effort-baseline.json` 이 **label 별로** 대조한다(줄 수 세기는 콜별 변경을 못 잡는다). sweep 결과는 `experiment-log.md` §5.8 ⑥ · 구조 ablation 은 §5.9. **공식 default는 Fable 5.1 `high` · Opus 5.5 `medium`**이며, 변경 여부는 fresh sweep 후 결정한다(사용자 결정 2026-09-25: `xhigh` 유지·sweep 종결) (짝 비교 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0). ⛔ 이 문서는 하향을 권고하지 않는다 — `xhigh`는 사용자가 유지를 택한 결정된 값이다
 - opus 동시 실행 ≤3 (Lead=fable 제외, 총 ≤4)
 - **runtime fan-out**: discover lens 등 정적 1콜이 런타임 N인스턴스로 전개 — 동시성·비용은 런타임 기준 별도 계산
 
