@@ -11,6 +11,10 @@ set -euo pipefail
 # Round 3 U3 fix: README.md + CLAUDE.md root docs 포함 (v4.5.1 root cause)
 SCOPED_RE='^(README\.md|CLAUDE\.md|skills|agents|modules|gpt-skills|schemas|templates|guides|\.claude-plugin)'
 
+# ⛔ 원인별 플래그. 하나로 뭉치면 **막은 이유와 안내가 어긋난다** — 버전 불일치로 막고
+#    경로 안내를 인쇄하는 오귀속이 실제로 났다(같은 부류: 도구 부재를 문법 오류로 인쇄).
+PATH_VIOLATION=0
+
 # 차단 패턴: user-specific 절대 경로
 USER_PATH_RE='/Users/[a-zA-Z0-9_-]+/|~/dev/[a-zA-Z0-9_-]+/'
 
@@ -29,10 +33,24 @@ for FILE in $CHANGED; do
     echo "⛔ fz pre-commit: ${FILE}에 user-specific 절대 경로 신규 추가:"
     echo "$ADDED_VIOLATIONS"
     EXIT=1
+    PATH_VIOLATION=1
   fi
 done
 
-if [ "$EXIT" = "1" ]; then
+# ── 버전 선언 3곳 동기 (B1/S7) ──────────────────────────────────────────────
+# ⛔ `--staged` 를 쓴다. 기본 모드는 health-check 를 포함해 **32초** 걸려서 매 커밋에 둘 수 없고,
+#    `--release` 의 커밋 축은 깨끗한 워킹트리를 요구하는데 지금은 커밋하려는 중이다.
+#    이 모드는 버전 선언 파일이 staged 일 때만 발화하고, 아니면 즉시 통과한다.
+if [ -f scripts/check_release_sync.sh ]; then
+  if ! bash scripts/check_release_sync.sh --staged; then
+    EXIT=1
+  fi
+else
+  # ⛔ 검사기 부재를 통과로 세지 않는다 — 배선이 끊긴 것을 알려야 한다.
+  echo "⚠️ fz pre-commit: scripts/check_release_sync.sh 부재 — 버전 동기 미판정"
+fi
+
+if [ "$PATH_VIOLATION" = "1" ]; then
   echo ""
   echo "차단 패턴: /Users/{user}/, ~/dev/{user}/"
   echo "예외: CHANGELOG.md, docs/releases/ (historical reference)"
