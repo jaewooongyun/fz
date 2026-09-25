@@ -1,5 +1,39 @@
 # Changelog
 
+### v4.39.0 (2026-09-25) — 별칭은 새 모델을 따라갔고 단가표는 따라가지 않았다 [MINOR]
+
+2026-09-22 Claude Opus 5.5(`claude-opus-5-5`)·GPT-6 Sol 출시 대응. `opus` 별칭은 Claude Code 2.1.280 에서
+자동으로 5.5 를 가리켰지만, **이름에 기대는 곳**은 따라가지 않았다.
+
+**텔레메트리 단가 결함** — `scripts/fz_telemetry_report.py` 의 `price_for()` 가 `claude-opus-5-5` 를 접두 일치로
+Opus 5 단가에 붙였다(base 실측: `(5.0, 10.0, 0.5, 25.0)`). 2026-09-22 이후 리포트는 입력·출력·1h 쓰기가
+**×1.25**, 캐시 읽기가 **×2.5** 과다 계상됐다. 5.5 행 추가 + 폴백을 날짜·`[1m]` 접미사로 한정 + 미등록 모델을
+`unpriced` 로 집계·경고한다(조용히 옛 단가를 쓰지 않는다). self-test 53/53.
+
+**최신성 lint** — `scripts/lint_doc_freshness.py` 가 `Opus 5` 를 구세대로 센다. `Opus 5` ⊂ `Opus 5.5` 부분문자열
+충돌은 `legacy_hits()`(같은 위치에서 현행 토큰이 시작하면 버림)로 푼다. self-test 22/22 · 레포 stale-model 0.
+
+**문서 (모델 사실 축)** — CLAUDE.md Opus 5.5 Adaptation · model-guide · llm-references · prompt-optimization ·
+harness-engineering · skill-authoring · skill-troubleshooting · skill-testing · cross-validation · agent-team-guide ·
+gpt-strategy · fz-gpt. thinking 끄기 불가(400) · forced `tool_choice` 400 · 기본 effort `medium` · Opus 5 지침 상속.
+GPT effort 는 모델별로 적는다 — CLI `models_cache` 실측과 API 문서가 다르다(`none`).
+
+**Track C — GPT 표면에서 codex 명칭 제거** — raw CLI 예시를 `scripts/gpt-exec.sh` 호출로 전환(`resume --session-file`
+신설 · `--last` 레포 0), 산문·주석은 GPT/GPT CLI. 보존은 도구가 깨지는 것(경로·트리거·`/codex:` 네임스페이스·
+`Bash(codex *)`)과 사실이 거짓이 되는 것뿐. `scripts/check_gpt_surface.py` 신설 — 범주 토큰 + `tests/fixtures/gpt-surface-keep.tsv` 로 재유입 차단, health-check 배선 (이행용 원장 모드는 레포 밖 입력이 필요해 작업 폴더 도구로 분리 — fz-review S1). `--add-dir` 은 **쓰기** 디렉토리 플래그라(CLI help 실측) final·review 는 review 모드 그대로 둔다 — read-only 도 전 디스크를 읽는다.
+
+**GPT 호출 read-only 강제** (GPT 교차검증 P1 · 사용자 결정) — 옛 DA·searcher·fixer 호출의 `--sandbox read-only` 가 래퍼 전환에서
+프롬프트 문구로만 남았다. `gpt-exec.sh` 가 모든 호출에 `-c sandbox_mode="read-only"` 를 강제한다(session 층 — 사용자 config 보다 우선,
+exec·resume·review 라이브 확인). 실패 run 뒤 이전 `${OUT}.session` 이 남던 결함도 고쳤다. ⚠️ CLI 0.157 은 `sandbox_permissions` 를 무시한다.
+
+**advisor 억제** — 워커는 세션 advisor 를 상속하고 끄는 네이티브 수단이 없다. 워크플로 OVERRIDE 에 금지 문구 +
+`scripts/check_wf_advisor_ban.py`(블록 단위 판정). Lead 만 advisor 를 쓴다.
+
+**TEAM 사료 삭제** — 사용자 결정(2026-09-25): `docs/history/` 6파일(701줄) 삭제. 참조 61행을 행별 원장으로
+정리한 뒤 지웠다. `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰.
+
+**Track M** — Opus 5.5 워커 effort sweep 은 **종결**(사용자 정책 2026-09-25: 워크플로 콜 명시 `xhigh` 유지 — 하향 sweep 불필요). ⚠️ 워크플로 `agent()` 의 effort 를 빼면 Lead 세션 값이 아니라 워커 모델 기본(Opus 5.5 = `medium`)으로 떨어진다(실측) — 콜 명시를 유지한다. 비용비(+9%) 5.5 단가 재산정은 선택 과제.
+
 ### v4.38.0 (2026-09-22) — 검사기는 있었고 부르는 곳이 없었다 [MINOR]
 
 계획 v9 의 Wave A~D 를 진행하면서 같은 결함이 **다섯 번** 나왔다. 규칙·검사기·플래그가 존재하고

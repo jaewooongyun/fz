@@ -34,9 +34,9 @@ fz 가 번들하는 MCP 는 **Serena 하나**다. 나머지는 직접 등록한�
 | 도구 | 없으면 | 사용처 | 설치 |
 |------|--------|:------:|------|
 | **Claude Node CLI** | 동작 불가 | 전부 | `npm install -g @anthropic-ai/claude-code` |
-| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 15/22 | [GitHub](https://github.com/JeongJaeSoon/superclaude) |
+| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 15/22 | `superclaude` (GitHub 저장소 404 — 2026-09-25 확인) |
 | **Serena MCP** | 심볼 탐색이 Grep 으로 (14 중 7 폴백) | 14/22 | 자동 등록 · `uv` 필수 (`brew install uv`) |
-| **Codex CLI** | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` |
+| **GPT CLI** (`@openai/codex`) | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` |
 | **sequential-thinking** | 구조화 추론 실패 (폴백 0) | 10/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
 | **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (10 중 1 폴백) | 10/22 | `claude mcp add context7 -- npx -y @upstash/context7-mcp` |
 
@@ -44,7 +44,7 @@ fz 가 번들하는 MCP 는 **Serena 하나**다. 나머지는 직접 등록한�
 표 밖에서 특정 기능만 쓰는 MCP 셋: `lsp`(4 스킬, 정의·참조) · `github`(3, PR) · `atlassian`(4, JIRA). **폴백 0건**이라 없으면 그 기능이 멈춘다.
 프로젝트별 추가 — iOS 는 XcodeBuildMCP + SwiftUI Expert·Swift Concurrency. 웹은 기본 구성으로 충분하다.
 
-Codex CLI 를 쓰면 네이티브 스킬을 심볼릭으로 연결한다.
+GPT CLI 를 쓰면 네이티브 스킬을 심볼릭으로 연결한다.
 
 ```bash
 bash ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/setup-gpt-skills.sh
@@ -80,7 +80,7 @@ claude plugin update fz@fz-orchestrator
 | | `/fz-rebase` | 리베이스 조용한 유실 게이트 (경로 단위 배타 분할 + prepush 원격 실측) |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
-| **검증** | `/fz-gpt` | Codex CLI 교차 검증 (모델은 `config.toml` SSOT 위임 = 항상 최신 frontier) + `micro-eval` 단일 주장 재평가 |
+| **검증** | `/fz-gpt` | GPT CLI 교차 검증 (모델은 `config.toml` SSOT 위임 = 항상 최신 frontier) + `micro-eval` 단일 주장 재평가 |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
 | **문서/시스템** | `/fz-memory`, `/fz-skill`, `/fz-manage`, `/fz-modernize` | 메모리, 스킬 관리 (`write` 서브커맨드 = 문서 작성 + 글쓰기 + 프롬프트 최적화), 가이드 modernization |
 | **보조** | `/fz-recording`, `/fz-pr-digest` | 회의록, PR 요약 |
@@ -133,15 +133,15 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 | 가이드 | 줄 | 내용 |
 |--------|---:|------|
-| [`llm-references.md`](guides/llm-references.md) | 159 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
-| [`prompt-optimization.md`](guides/prompt-optimization.md) | 758 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
+| [`llm-references.md`](guides/llm-references.md) | 170 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
+| [`prompt-optimization.md`](guides/prompt-optimization.md) | 761 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
 | [`skill-authoring.md`](guides/skill-authoring.md) | 651 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
-| [`skill-testing.md`](guides/skill-testing.md) | 500 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
-| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 297 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
-| [`agent-team-guide.md`](guides/agent-team-guide.md) | 493 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
-| [`model-guide.md`](guides/model-guide.md) | 304 | 모델 운용 — Lead 는 Fable 5.1, 실질 생산 워커는 Opus 5. effort 배정 기준 |
+| [`skill-testing.md`](guides/skill-testing.md) | 527 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
+| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 286 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
+| [`agent-team-guide.md`](guides/agent-team-guide.md) | 494 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
+| [`model-guide.md`](guides/model-guide.md) | 314 | 모델 운용 — Lead 는 Fable 5.1, 실질 생산 워커는 Opus 5.5. effort 배정 기준 |
 | [`clean-architecture.md`](guides/clean-architecture.md) | 324 | Dependency Rule 과 SOLID — 레이어 판정 기준 |
-| [`harness-engineering.md`](guides/harness-engineering.md) | 1,351 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
+| [`harness-engineering.md`](guides/harness-engineering.md) | 1,359 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
 
 ---
 
