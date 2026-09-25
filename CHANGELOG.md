@@ -1,5 +1,42 @@
 # Changelog
 
+### v4.38.0 (2026-09-22) — 검사기는 있었고 부르는 곳이 없었다 [MINOR]
+
+계획 v9 의 Wave A~D 를 진행하면서 같은 결함이 **다섯 번** 나왔다. 규칙·검사기·플래그가 존재하고
+**그것을 부르는 자리가 0건**이었다. 존재는 동작의 증거가 아니다.
+
+**배선 0건 5건** — `check_release_sync.sh`(health-check 미등재) · `fz_wf_metrics.py --self-test`
+12케이스(통합 검사 미실행) · `plan_integrity_check.py`(참조 0건) · `4.7-S`(경로별 생존 표 미등재) ·
+`FZ_AUTONOMY`(보유 2파일 · 적용 경로 0건 — 대조 `FZ_GATES_OFF` 는 7파일).
+
+**대리 오라클이 done 을 만들었다** (`F-292`) — `/sc:` 치환의 근거가 `mcp__serena__` 0건이었고
+둘은 다른 대상이다. 올바른 오라클로 재측정하니 86곳 수정이 **1곳을 놓쳤다**. 계약 복구의 근거는
+검사기 *파일 존재* 였고, 그 검사기는 통합 검사에서 한 번도 돌지 않았다.
+
+**대조는 두 방향이다** (`F-293`) — `N차` 를 `(\d{1,2})차` 로 세서 `1차 레버`·`5차원`·`재시도 2차`
+까지 긁었다. 23종/184회로 인쇄된 것이 실제 **18종/91회** 였다. 0건을 의심하는 규율은 있었고
+*큰 수* 를 의심하는 규율이 없었다.
+
+**신설 검사기 15종 · 수정 6종** (실측 — `git status`) — 신설: `eject_findings` ·
+`check_findings_hygiene` · `migrate_findings_frontmatter` · `check_symptom_anchor` ·
+`check_external_commands` · `check_global_budget` · `check_asset_census` · `freeze_baseline` ·
+`report_stale_findings` · `autonomy_decide` · `check_failure_table` · `check_single_source` ·
+`check_k_cluster` · `check_host_census` · `candidate_expiry`.
+수정: `check_release_sync`(`--release`/`--staged`) · `fz_wf_metrics`(`--mcp-audit`/`--sweep-row`) ·
+`gate_check`(`TOOLS`) · `lint_contracts`(`#12` 4축 확대 + `#N12` 신설) · `lint_doc_freshness` · `health-check`.
+전건 self-test + **어블레이션**으로 헛돌이를 걸렀다 — 이 과정에서 픽스처 헛돌이 7건과
+죽은 로직 3건을 제거했다.
+
+**P-ID 매핑** (A5 · 사용자 승인) — `failure_class` 고유 **249/253** 이라 이름 단위로는 승격 임계에
+닿지 않는다. 같은 **수정 계약**을 공유하는 집합에 `P2-D`~`P2-I` 를 부여했다(13엔트리).
+`check_findings_hygiene` 에 `p_id` 형식·원장 소속 2축 신설 — ⛔ `--ledger` 미지정 시 소속은 **미판정**이다.
+
+**candidate 만료 결정표** (D4 · 사용자 승인) — ⛔ 공통 만료로 바꾸지 않았다(3개월 · DEFERRED 6개월).
+⛔ **3개월은 90일이 아니다** — 월말 clamp 를 어블레이션으로 실증했다(90일로 바꾸면 이틀 빨라진다).
+
+**단일 출처** — `schemas/tool-inventory.json` 신설(MCP 서버 6 · retired 3 · 외부 명령 17).
+`#12` 와 `check_external_commands` 가 같은 파일을 읽고, 부재 시 **exit 2** 다.
+
 ### v4.37.0 (2026-09-15) — 참조 탐색이 63%를 놓치고 있었다 [MINOR]
 
 프로토콜 메서드의 구현체를 찾지 못하는 도구를 영향 반경 분석의 Primary 로 쓰고 있었다.
