@@ -495,6 +495,6 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
    - 탐색만 완료 → `/fz-fix` 또는 `/fz-plan` 제안
    - 풍경 탐색 완료 → `/fz-plan` 제안 (landscape-map + trade-off table 기반)
    - 스킬 생성/수정 완료 → `/fz-skill eval` + `/fz-skill optimize` 제안
-   - 생태계 점검 필요 → `/fz-manage benchmark` 제안
+   - 생태계 점검 필요 → `/fz-manage benchmark` 제안. ⛔ **모델 세대가 바뀐 뒤 첫 Workflow 실행이면** `scripts/fz_wf_metrics.py --sweep-row --wf {runId}` 로 `experiment-log.md` §5.8 ⑥ 행을 만든다 — 공식 문서가 세대 간 effort 이월을 금지하고 fresh sweep 을 요구한다. 손으로 옮기지 않는다(이 표가 두 달 비어 있던 원인이 **재는 주체 부재**였다)
    - 전체 사이클 완료 → 완료 보고서 출력
 > 모듈 참조: 상단 "모듈 참조" 섹션 참조
