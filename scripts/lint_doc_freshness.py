@@ -50,6 +50,33 @@ from pathlib import Path
 EXTERNAL_URL = re.compile(
     r"platform\.claude\.com|code\.claude\.com|anthropic\.com|arxiv|developers\.openai\.com"
 )
+# ⛔ 위 패턴은 **문자열 존재**만 본다. 물어야 할 것은 "stale 될 수 있는 **외부 사실을 주장**하는가" 다.
+#    인용을 *다루는 방법*을 설명하는 문서(템플릿 플레이스홀더 · 표 헤더 · fallback 절차 · grep 예시)는
+#    외부 사실이 바뀌어도 낡지 않는다 — 거기에 `last audited:` 를 찍으면 **거짓 감사 기록**이 된다.
+#    실측(2026-09-21): 12건 중 4건이 이 오탐이었다 (fz-modernize SKILL + 템플릿 3종).
+#    ⛔ 같은 술어 결함이 `fz-findings F-285` 에도 있었다 — 술어를 좁히지 않으면 방어가 헛돈다.
+CITATION_SHAPE = re.compile(
+    r"arxiv\s*\d{4}\.\d{4,5}"                    # arxiv 2503.13657
+    r"|\d{4}\.\d{4,5}\s*[,)\]]"                   # (2510.07777)
+    r"|https?://"                                  # 실 URL (치환자 `{}` 는 PLACEHOLDER 가 걸러낸다 — 중복 규칙 제거)
+    r"|\[verified:[^\]]*(?:claude|openai|anthropic)"  # [verified: platform.claude.com/...]
+    r"|\[(?:platform|code)\.claude\.com[^\]]*\]",   # [code.claude.com/docs/...]
+    re.I,
+)
+# 플레이스홀더·절차 표지 — 이 줄은 인용으로 세지 않는다
+PLACEHOLDER = re.compile(r"\{[A-Za-z_]+\}|YYYY-MM|\| *arxiv ID *\||grep\s+-|preprint\]?\s*$", re.I)
+
+
+def cites_external_fact(text: str) -> bool:
+    """**stale 될 수 있는 외부 사실 주장**이 있는가. 플레이스홀더·절차 설명은 제외한다."""
+    for line in text.split("\n"):
+        if not EXTERNAL_URL.search(line):
+            continue
+        if PLACEHOLDER.search(line):
+            continue                      # 템플릿·표 헤더·절차 — 낡지 않는다
+        if CITATION_SHAPE.search(line):
+            return True
+    return False
 AUDIT_DATE = re.compile(r"last audited:\s*(\d{4}-\d{2}-\d{2})")
 MODEL_POLICY = re.compile(r"모델 정책:\s*\*{0,2}(.+?)\*{0,2}\s*only")
 # 역할 표기 제거 — `Fable 5.1 (Lead)` → `Fable 5.1`
@@ -146,8 +173,8 @@ def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
         text = path.read_text(encoding="utf-8", errors="replace")
         rel = str(path.relative_to(root))
 
-        if not EXTERNAL_URL.search(text):
-            continue  # 외부 사실 미인용 → 대상 아님
+        if not cites_external_fact(text):
+            continue  # 외부 **사실** 미인용 → 대상 아님 (문자열 존재만으로는 대상이 아니다)
         scanned += 1
 
         m = AUDIT_DATE.search(text)
@@ -225,13 +252,89 @@ def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
     return findings, summary
 
 
+def self_test():
+    """술어 fixture — 실인용은 잡고 **플레이스홀더·절차는 안 잡는다**.
+
+    ⛔ 신설 근거(2026-09-21): 이 검사기는 self-test 가 **없었다**. 술어가
+    `EXTERNAL_URL.search(text)` — 파일 어딘가에 문자열이 있으면 대상이라 실측 12건 중 **4건이 오탐**이었다
+    (`fz-modernize` 템플릿 3종 + SKILL). 인용을 *다루는 방법*을 설명하는 문서는 외부 사실이 바뀌어도
+    낡지 않는데, 거기에 `last audited:` 를 찍으면 거짓 감사 기록이 된다.
+    """
+    passed, failed, cases = [], [], 0
+
+    def check(name, text, want):
+        nonlocal cases
+        cases += 1
+        got = cites_external_fact(text)
+        if got == want:
+            passed.append(name)
+        else:
+            failed.append(f"{name}: {got} (기대 {want})")
+
+    # ── 실인용 — 잡아야 한다 ──
+    check("arxiv-id", "근거 [verified: arxiv 2503.13657 \"Why Do Multi-Agent LLM Systems Fail?\"]", True)
+    check("arxiv-paren", "Drift No More — Context Equilibria (arxiv 2510.07777) — 효과 실증", True)
+    check("real-url", "참조: Anthropic 공식 Memory tool (https://platform.claude.com/docs/en/tool-use/memory-tool)", True)
+    check("verified-tag", '"Re-run the sweep" [verified: platform.claude.com/docs/en/prompting-claude-fable-5-1]', True)
+    check("bracket-doc", '*"From v2.1.154 …"* [code.claude.com/docs/en/code-review]', True)
+
+    # ── 오탐 — 잡으면 안 된다 (실측 4건의 형태) ──
+    check("placeholder-preprint", "[arxiv preprint, YYYY-MM]                      ← preprint 명시", False)
+    check("table-header", "| # | arxiv ID | 제목 | 저자 | Status | 핵심 |", False)
+    check("fallback-procedure", "| arxiv abs 페이지 변경 | arxiv.org/pdf/{ID} fallback |", False)
+    check("grep-example", 'grep -nE "arxiv|arXiv" guides/*.md', False)
+    check("status-label", "- Status 칼럼 (peer-reviewed / arxiv preprint / official / community)", False)
+    check("no-external", "이 문서는 외부 출처를 인용하지 않는다", False)
+
+    # ── 경계 ──
+    check("mixed-file", "| arxiv ID |\n\n근거 (arxiv 2512.20845) 역할 분리", True)   # 한 줄이라도 실인용이면 대상
+    check("templated-url", "폴백: https://arxiv.org/pdf/{ID}", False)               # {} 치환자 = 절차
+
+    # ── ⛔ 두 방어를 **각각** 격리한다 (한쪽이 다른 쪽에 가려지면 ablation 이 헛돈다) ──
+    # PLACEHOLDER 전용: CITATION_SHAPE 는 매칭되는데(실 arxiv ID) 플레이스홀더 문맥이라 제외돼야 한다
+    check("placeholder-beats-shape",
+          "예시 행: | B1 | arxiv 2510.07777 | 제목 | `[arxiv preprint, YYYY-MM]` |", False)
+    # `{}` 전용: 스킴 있는 URL 이라 https 분기에 닿지만 치환자가 있어 제외돼야 한다
+    check("brace-url-not-citation", "취득 경로: https://platform.claude.com/docs/{section}", False)
+
+    # ── ⛔ 통합 fixture — **호출부**가 새 술어를 쓰는지 본다.
+    #    위 check() 는 `cites_external_fact()` 를 직접 부르므로, 호출부가 구판
+    #    `EXTERNAL_URL.search(text)` 로 되돌아가도 전부 통과한다(실측 헛돌이).
+    #    실제 트리를 스캔해 **대상 수**로 판정한다.
+    import tempfile as _tf
+    cases += 1
+    with _tf.TemporaryDirectory() as _d:
+        root = Path(_d)
+        (root / "modules").mkdir()
+        (root / "modules" / "real.md").write_text(
+            "> 근거 (arxiv 2503.13657) 실증\n", encoding="utf-8")
+        (root / "modules" / "template.md").write_text(
+            "| # | arxiv ID | 제목 |\n| B1 | | `[arxiv preprint, YYYY-MM]` |\n", encoding="utf-8")
+        n_target = sum(1 for q in find_docs(root) if cites_external_fact(q.read_text(encoding="utf-8")))
+        # 호출부가 구판이면 template.md 도 대상이 돼 2가 된다
+        if n_target == 1:
+            passed.append("caller-uses-new-predicate")
+        else:
+            failed.append(f"caller-uses-new-predicate: 대상 {n_target}개 (기대 1 — 템플릿은 제외돼야 한다)")
+
+    print(f"self-test {len(passed)}/{cases} 통과")
+    for x in passed:
+        print(f"  ok   {x}")
+    for x in failed:
+        print(f"  FAIL {x}")
+    return 0 if not failed else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="fz 문서 최신성 lint")
     ap.add_argument("root", nargs="?", default=".", help="플러그인 루트 (기본: .)")
     ap.add_argument("--days", type=int, default=90, help="last audited 허용 경과일 (기본 90)")
     ap.add_argument("--json", action="store_true", help="JSON 출력")
     ap.add_argument("--strict", action="store_true", help="경고 있으면 exit 1")
+    ap.add_argument("--self-test", action="store_true", help="술어 fixture 실행")
     args = ap.parse_args()
+    if args.self_test:
+        return self_test()
 
     root = Path(args.root).resolve()
     if not (root / "guides").is_dir():

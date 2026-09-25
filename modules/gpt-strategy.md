@@ -1,5 +1,7 @@
 # GPT 실행 전략
 
+> **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** `learn.chatgpt.com/docs/changelog` (구 `developers.openai.com` 308 리다이렉트 명시). ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
+
 > fz-gpt SKILL.md 서브커맨드에서 참조. 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드).
 
 > **Authority Sources** (Cgap-1 보강, 2026-05-16):
