@@ -314,7 +314,7 @@ commit/pr 전 → ✓ gpt check (TEAM)
 
 결정된 파이프라인, 팀 구성, 모델 배정을 시각화하고 사용자 승인을 받습니다.
 
-> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조
+> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — `FZ_AUTONOMY` 가 `autonomous` 면 *범위 내 가역* 파이프라인은 자동 진행하고, 그 밖은 여기서 묻는다. 금지 행동(commit·push·외부 발신·삭제)은 **모드와 무관하게 차단**이다 (`scripts/autonomy_decide.py` · 정책 `modules/governance.md` § 자율 모드)
 
 ### Gate 4: Pipeline Approved
 - [ ] 파이프라인 + 팀 구성 시각화 출력 완료?
