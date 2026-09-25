@@ -38,6 +38,7 @@ import tempfile
 PRICES = {
     "claude-fable-5-1": (10.0, 20.0, 0.25, 50.0),
     "claude-fable-5": (10.0, 20.0, 1.0, 50.0),
+    "claude-opus-5-5": (4.0, 8.0, 0.2, 20.0),  # whats-new-opus-5-5 (2026-09-25 대조) — 1h 쓰기 = 입력 ×2
     "claude-opus-5": (5.0, 10.0, 0.5, 25.0),
     "claude-sonnet-5": (2.0, 4.0, 0.2, 10.0),
     "claude-opus-4-8": (5.0, 10.0, 0.5, 25.0),
@@ -104,15 +105,22 @@ def fmt(value, digits=1, dash="n/a"):
     return str(value)
 
 
+_ID_SUFFIX = re.compile(r"(-\d{8})?(\[1m\])?")
+
+
 def price_for(model):
-    """정확 일치 → 최장 접두 일치. 날짜 접미(`-20251001`)가 붙은 id 를 흡수한다."""
+    """정확 일치 → 날짜·`[1m]` 접미만 흡수. 그 외 미등록 id 는 None.
+
+    ⛔ 최장 접두 일치로 되돌리지 말 것 — `claude-opus-5-5` 가 `claude-opus-5` 행($5/$25)에
+       조용히 흡수돼 입력·출력·1h 쓰기 ×1.25, 캐시 읽기 ×2.5 로 과다 계상됐다(2026-09-25 실측).
+       새 자식 모델은 None(단가 미등록)으로 드러나야 PRICES 에 행이 추가된다.
+    """
     if model in PRICES:
         return PRICES[model]
-    best = None
-    for key in PRICES:
-        if model.startswith(key) and (best is None or len(key) > len(best)):
-            best = key
-    return PRICES[best] if best else None
+    for key in sorted(PRICES, key=len, reverse=True):
+        if model.startswith(key) and _ID_SUFFIX.fullmatch(model[len(key):]):
+            return PRICES[key]
+    return None
 
 
 def norm_wf_name(raw):
@@ -153,6 +161,7 @@ class TranscriptAgg(object):
         self.lat = collections.defaultdict(list)
         self.ctx = collections.defaultdict(list)
         self.cost_per_call = collections.defaultdict(list)
+        self.unpriced = collections.Counter()  # 단가 미등록 모델 → 호출 수 (비용 표에서 빠진 몫)
         self.by_skill = collections.defaultdict(lambda: collections.Counter())
         self.skill_lat = collections.defaultdict(list)
         self.skill_effort = collections.defaultdict(lambda: collections.Counter())
@@ -241,6 +250,8 @@ class TranscriptAgg(object):
             cost = (tin * price[0] + cw * price[1] + cr * price[2] + out * price[3]) / 1e6
             counter["cost_micro"] += int(round(cost * 1e6))
             self.cost_per_call[key].append(cost)
+        else:
+            self.unpriced[model] += 1
         latency = None
         if prev_user is not None:
             delta = (stamp - prev_user).total_seconds()
@@ -391,7 +402,7 @@ def collect_journals(projects_root, since, until, wf_id_to_name):
                 "runs": 0,
                 "walls": [],
                 "stages": collections.Counter(),
-                "stage_verdicts": {},  # stage → {overturn, uphold, adjust} — §8.2 "스테이지 X 제거 후보" 판정의 분모 (Codex 리뷰 2026-09-06)
+                "stage_verdicts": {},  # stage → {overturn, uphold, adjust} — §8.2 "스테이지 X 제거 후보" 판정의 분모 (GPT 리뷰 2026-09-06)
                 "issues": 0,
                 "overturn": 0,   # refuted=true · verdict refute · verdict false_positive — 판정 어휘 표준화
                 "uphold": 0,     # verdict uphold · agree
@@ -652,6 +663,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
                 "latency_n": len(lat_sorted),
                 "ctx_median": int(med(ctx_sorted)) if ctx_sorted else None,
                 "ctx_p90": int(pct(ctx_sorted, 0.9)) if ctx_sorted else None,
+                "unpriced": price_for(key[0]) is None,
             }
         )
 
@@ -720,6 +732,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
             "findings": findings["n"],
         },
         "models": models,
+        "unpriced_models": dict(agg.unpriced),
         "skills": skills,
         "workflows": workflows,
         "effort_all": dict(agg.effort_all),
@@ -788,6 +801,11 @@ def render_markdown(payload):
             )
         )
     lines.append("")
+    if payload.get("unpriced_models"):
+        lines.append("⚠️ 단가 미등록 모델: " + " · ".join(
+            "%s×%s" % (m, "{:,}".format(n)) for m, n in sorted(payload["unpriced_models"].items())
+        ) + " — 비용 표에서 빠졌다(n/a). `PRICES` 에 행을 추가하라.")
+        lines.append("")
     lines.append(
         "> 비용은 공식 단가 × usage **계산치이며 실청구가 아니다**. 캐시 쓰기는 1h TTL 단가 고정 가정. "
         "지연은 직전 user 엔트리와의 timestamp 차분(30분 초과 절단)이라 도구 실행 시간을 포함하지 않는다."
@@ -1073,6 +1091,13 @@ def self_test():
     check("이름 정규화 인라인", norm_wf_name("fz-gap-audit-4axes-wf_beb7ee07-261.js"), "fz-gap-audit-4axes")
     check("단가 접두 일치", price_for("claude-opus-5-20260801"), PRICES["claude-opus-5"])
     check("단가 미등록", price_for("claude-unknown-9"), None)
+    for mid in ("claude-opus-5-5", "claude-opus-5-5[1m]", "claude-opus-5-5-20260922", "claude-opus-5-5-20260922[1m]"):
+        check("단가 Opus 5.5 " + mid, price_for(mid), (4.0, 8.0, 0.2, 20.0))
+    check("단가 자식 id 는 부모로 흡수 안 함", price_for("claude-opus-5-6"), None)
+    ua = TranscriptAgg()
+    ua._accumulate("claude-unknown-9", "main", {}, {"input_tokens": 1, "output_tokens": 1}, None, None)
+    ua._accumulate("claude-unknown-9", "main", {}, {"input_tokens": 1, "output_tokens": 1}, None, None)
+    check("단가 미등록 호출 수 집계", dict(ua.unpriced), {"claude-unknown-9": 2})
     check("Fable 5.1 캐시읽기 단가", PRICES["claude-fable-5-1"][2], 0.25)
 
     base = tempfile.mkdtemp(prefix="fz-telemetry-selftest-")
@@ -1130,6 +1155,11 @@ def self_test():
         payload = json.load(handle)
     check("JSON 왕복 — 워크플로 항목", payload["workflows"][0]["workflow"], "code-pair")
     check("JSON 왕복 — 미매치 형태", payload["unknown_result_shapes"][0]["keys"], ["yyy", "zzz"])
+    check("JSON 모델 행 unpriced 필드(등록 모델=False)", payload["models"][0].get("unpriced"), False)
+    check("JSON unpriced_models 필드(fixture=없음)", payload.get("unpriced_models"), {})
+    md = render_markdown(dict(payload, unpriced_models={"claude-unknown-9": 2}))
+    check("단가 미등록 경고 줄", "단가 미등록 모델: claude-unknown-9×2" in md, True)
+    check("단가 미등록 없으면 경고 줄 없음", "단가 미등록 모델" in render_markdown(payload), False)
     check("JSON 왕복 — 분모", payload["denominators"]["assistant_messages"], 1)
 
     with open(args.out) as handle:
