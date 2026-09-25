@@ -1,5 +1,7 @@
 # 실행 모드 확장 (Execution Modes)
 
+> **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** `code.claude.com/docs/en/code-review` — 인용 원문에 `verified 2026-08-08` 표기 승계. ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
+
 > /batch, /simplify, /ralph-loop 통합 정책. 스킬에서 참조.
 
 ## 목차

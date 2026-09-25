@@ -1,5 +1,7 @@
 # System Reminders Policy
 
+> **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2603.05344(OpenDev) · 2510.07777. ⚠️ 이 감사에서 **레지스트리 미등재 4종** 발견 — `2510.05381` · `2510.07777` · `2512.20845` · `2601.15300` (`guides/llm-references.md` · `guides/harness-engineering.md` §참고문헌 둘 다에 없다). ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
+
 > Instruction fade-out 대응. 20-30턴 후 시스템 프롬프트 지침이 약해지는 현상을 완화한다.
 > 출처: OpenDev 논문 (arxiv 2603.05344), Anthropic Harness Design (2026.03), Drift No More — Context Equilibria (arxiv 2510.07777) — reminder injection 효과 실증
 > 참조: `guides/harness-engineering.md` §3 기둥 3
