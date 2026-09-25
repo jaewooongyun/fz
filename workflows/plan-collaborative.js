@@ -113,6 +113,10 @@ const VerifySpec = {
         command: { type: 'string', description: '실행할 셸 명령 — 제목이 말하는 것을 실제로 측정할 것' },
         expect: { type: 'string', description: '결합 출력에 포함될 부분 문자열 (⛔ 정규식 아님)' },
         cwd: { type: 'string', description: '절대경로만. 생략 시 WORK_DIR' },
+        // ⛔ additionalProperties:false 라 여기 없는 필드는 **거부된다** — 원장 쪽에
+        //    TOOLS: 를 읽는 코드가 있어도 생산 경로가 막혀 영원히 비어 온다.
+        tools: { type: 'array', items: { type: 'string' },
+                 description: 'command 가 필요로 하는 외부 명령 (예: ["xcodebuild"]). 부재 시 게이트를 돌리지 않고 미판정으로 남긴다 — 셸 exit 127 을 일반 실패로 오귀속하지 않기 위함' },
       },
       additionalProperties: false,
     },

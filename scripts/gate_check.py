@@ -57,6 +57,34 @@ STATES = ("active", "ready_for_review", "closed")
 EXIT_OK, EXIT_UNMET, EXIT_INFRA, EXIT_INVALID = 0, 1, 2, 3
 
 
+def _path_contains(root_real: str, child_real: str) -> bool:
+    """ROOT 가 child 를 소유하는가. 문자열 비교로 시작하되 실패하면 **inode 로 확인**한다.
+
+    ⛔ 문자열 비교만 하면 대소문자 비구분 파일시스템(macOS APFS 기본)에서 거짓 위반이 난다 —
+    실측: cwd 가 `dev/Tving`, 헤더 ROOT 가 `dev/TVING` 인 원장 7건이 전부 "ROOT 하위에 없다"로
+    차단됐다. `os.path.samefile` 은 True 였다(같은 inode, 다른 철자).
+    `realpath` 는 심볼릭만 풀고 **철자는 보존**하므로 정규화로는 해결되지 않는다.
+
+    보안 성질은 약해지지 않는다 — 양쪽이 이미 realpath 로 심볼릭이 풀린 뒤라
+    `samefile` 은 문자열 조작으로 속일 수 없는 실제 동일성 판정이다.
+    """
+    try:
+        if os.path.commonpath([root_real, child_real]) == root_real:
+            return True
+    except ValueError:          # 드라이브가 다르면 commonpath 가 던진다
+        return False
+    p = Path(child_real).parent
+    while True:
+        try:
+            if p.is_dir() and os.path.samefile(str(p), root_real):
+                return True
+        except OSError:
+            return False
+        if p.parent == p:
+            return False
+        p = p.parent
+
+
 class LedgerError(Exception):
     """원장 계약 위반 → exit 3."""
 
@@ -79,6 +107,11 @@ RUNNABLE_ATTRS = {"CHECK", "EXPECT"}
 KNOWN_ATTRS = {
     "CHECK", "EXPECT", "CWD", "TIMEOUT", "MANUAL", "CRITERION",
     "CRITERION_HASH", "CONFIRMED", "APPROVED_ORACLE_HASH", "EVIDENCE",
+    # ⛔ `TOOLS:` — 이 CHECK 가 필요로 하는 외부 명령 (쉼표 구분). 부재면 **미판정**이다 (S20).
+    #    `shell=True` 라 도구가 없으면 셸이 exit 127 을 내는데, 그것을 **일반 실패로 기록하면
+    #    "게이트가 깨졌다" 고 오귀속**한다 — 실제로는 판정 자체가 불가능했던 것이다.
+    #    같은 오귀속이 `fz-findings F-288`(도구 부재를 문법 오류로 인쇄)에 기록돼 있다.
+    "TOOLS",
 }
 
 
@@ -115,9 +148,15 @@ class Gate:
             raise LedgerError(f"{self.id}: CHECK/EXPECT 도 MANUAL 도 없다")
         if has_check and self.is_manual:
             raise LedgerError(f"{self.id}: CHECK 와 MANUAL 을 함께 쓸 수 없다")
-        for key in ("CHECK", "EXPECT", "MANUAL"):
+        for key in ("CHECK", "EXPECT", "MANUAL", "TOOLS"):
             if key in self.attrs and not self.attrs[key].strip():
                 raise LedgerError(f"{self.id}: {key} 값이 비었다")
+        # ⛔ **선언인데 발화하지 않는 형태를 막는다.** 수동 게이트는 셸 명령을 돌리지
+        #    않으므로 `TOOLS:` 가 아무 일도 하지 않는다 — 사람 눈에는 전제가 선언된
+        #    것처럼 보이는데 실제로는 no-op 이다. 이 플러그인이 반복해서 겪은 부류다
+        #    (검사 코드가 있어도 발급처가 없어 한 번도 발화하지 않은 `CRITERION`).
+        if "TOOLS" in self.attrs and not has_check:
+            raise LedgerError(f"{self.id}: TOOLS 는 CHECK 가 있어야 의미가 있다 — 수동 게이트는 명령을 돌리지 않는다")
         expect = self.attrs.get("EXPECT", "")
         # EXPECT 는 부분 문자열 매칭이다 (Python re 에 타임아웃이 없어 백트래킹을 막을 수 없다).
         # 저자가 정규식으로 착각하면 게이트가 영영 매칭되지 않으므로 알려야 한다.
@@ -262,7 +301,7 @@ class Ledger:
             raise LedgerError(f"ROOT 디렉토리가 존재하지 않는다 — {root!r}")
         # 원장 파일이 그 ROOT 하위여야 한다 (소유 일치)
         ledger_real = os.path.realpath(str(self.path))
-        if os.path.commonpath([real, ledger_real]) != real:
+        if not _path_contains(real, ledger_real):
             raise LedgerError(
                 f"원장이 ROOT 하위에 없다 — ROOT={real} / 원장={ledger_real}")
         # ⛔ 검증한 **정규** 경로를 저장하고 이후 전부 이것을 쓴다.
@@ -500,6 +539,21 @@ def _drain(stream, sink: bytearray, lock: threading.Lock, state: dict) -> None:
                     state["overflow"] = True
     except (OSError, ValueError):
         pass
+
+
+
+def missing_tools(gate) -> list:
+    """`TOOLS:` 로 선언된 명령 중 PATH 에 없는 것.
+
+    ⛔ 선언이 없으면 빈 목록이다 — 이 검사는 **선언한 게이트에만** 발화한다.
+       미선언 게이트까지 추론으로 훑으면 CHECK 문자열 파싱이 되고, 그것은 오탐을 낳는다
+       (실측: 문서 코드블록 첫 토큰 15종 중 3종이 언어 키워드였다 — `check_external_commands.py`).
+    """
+    decl = gate.attrs.get("TOOLS", "").strip()
+    if not decl:
+        return []
+    want = [t.strip() for t in decl.replace(";", ",").split(",") if t.strip()]
+    return [t for t in want if shutil.which(t) is None]
 
 
 def run_check(gate: Gate, cwd: str, budget_s: float) -> Result:
@@ -890,6 +944,18 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
             print(f"  BUDGET {gate.id}: 예산 소진 — 미판정은 통과가 아니다")
             continue
 
+        # ⛔ **도구 부재는 실패가 아니라 미판정이다** (S20). CHECK 를 돌리기 전에 막는다 —
+        #    `shell=True` 라 도구가 없으면 셸이 **exit 127** 을 내고, 그것을 FAIL 로 기록하면
+        #    "게이트가 깨졌다"고 오귀속한다. 사람이 할 일이 다르다(도구를 깔아라 vs 코드를 고쳐라).
+        #    같은 오귀속의 실측 사례가 `fz-findings` F-288 이다.
+        #    ⛔ **원장은 건드리지 않는다** — BUDGET 과 같다. 판정을 못 했을 뿐이므로
+        #       과거 증거를 pending 으로 지우지 않는다. 대신 unmet 이라 통과도 아니다.
+        gone = missing_tools(gate)
+        if gone:
+            unmet.append(gate)
+            print(f"  UNRUN {gate.id}: 필요 도구 부재 — {', '.join(gone)} (⛔ 실패 아님, 미판정)")
+            continue
+
         baseline = gate_block_hash(load(ledger.path), gate.id)
         result = run_check(gate, cwd, remaining)
         ran += 1
@@ -994,6 +1060,11 @@ def confirm(ledger: Ledger, gate_id: str) -> int:
 FIXTURES = ROOT / "tests" / "fixtures" / "gates"
 
 
+def want_exit(case: dict) -> int:
+    """케이스가 기대하는 exit code. 산출물 재파싱 가드가 `want` 정의 전에 필요하다."""
+    return case["expect"]["exit"]
+
+
 def self_test() -> int:
     """⛔ 케이스 목록은 manifest.json 이 SSOT — 여기에 하드코딩하지 않는다.
 
@@ -1064,17 +1135,29 @@ def self_test() -> int:
             stdout_text = captured.getvalue()
             stderr_text = captured_err.getvalue()
 
+            parse_reason = None
             if case.get("mode") == "from-plan":
                 generated = sandbox / "fromplan" / "generated.md"
                 mutated = generated.exists()
-                if mutated:
-                    load(generated)  # ⛔ 산출물이 자기 계약을 만족하는지 파서가 판정한다
+                # ⛔ 산출물이 자기 계약을 만족하는지 파서가 판정한다 —
+                #    단 **성공을 기대하는 케이스에만** 건다. finalize 가 같은 이유로
+                #    같은 가드를 갖고 있다. 거부를 기대하는 케이스는 깨진 산출물이
+                #    남는 것이 정상인데, 그것을 파싱하면 예외가 self_test 를 통째로
+                #    중단시켜 **나머지 픽스처가 측정되지 않는다**. 실측(2026-09-21):
+                #    어블레이션이 요약 줄조차 못 찍어 헛돌이와 구별되지 않았다.
+                if mutated and want_exit(case) == EXIT_OK:
+                    try:
+                        load(generated)
+                    except (LedgerError, InfraError) as e:
+                        parse_reason = f"산출물이 파서를 통과하지 못했다 — {e}"
             else:
                 after = ledger_path.read_text(encoding="utf-8") if ledger_path.exists() else None
                 mutated = (before != after)
 
             want = case["expect"]
             reasons = []
+            if parse_reason:
+                reasons.append(parse_reason)
             if code != want["exit"]:
                 reasons.append(f"exit {code} (기대 {want['exit']})")
             if mutated != want["mutates"]:
@@ -1140,6 +1223,32 @@ def self_test() -> int:
 
 
 # ── --from-plan (plan steps → 원장 생성) ────────────────────────────────
+TOOL_NAME = re.compile(r"[A-Za-z0-9._+-]+\Z")
+
+
+def tools_of(verify: dict, gid: str) -> list:
+    """VerifySpec 의 `tools` 를 정규화한다 — 리스트 또는 쉼표 구분 문자열.
+
+    ⛔ **화이트리스트로 판정한다.** plan 은 모델이 쓰므로 개행 블랙리스트로는 부족하다.
+       명령 이름에 실제로 쓰이는 문자만 허용하면 `x\n  EXPECT: never` 류가 통째로 막힌다
+       (같은 계열의 인젝션이 2026-08-24 에 실측됐다 — 원장이 ABANDON 으로 파싱됐다).
+    """
+    raw = verify.get("tools")
+    if raw in (None, "", []):
+        return []
+    items = raw if isinstance(raw, list) else str(raw).split(",")
+    out = []
+    for it in items:
+        tok = str(it).strip()
+        if not tok:
+            continue
+        if not TOOL_NAME.match(tok):
+            raise InfraError(f"{gid}: verify.tools 항목이 명령 이름이 아니다 — {tok!r}")
+        if tok not in out:
+            out.append(tok)
+    return out
+
+
 def render_ledger(steps, root: str, scope: str, title: str) -> str:
     """plan 의 steps[] 를 원장 Markdown 으로 변환한다.
 
@@ -1199,6 +1308,12 @@ def render_ledger(steps, root: str, scope: str, title: str) -> str:
             cwd = str(verify.get("cwd", "")).strip()
             if cwd:
                 lines.append(f"  CWD: {cwd}")
+            # ⛔ **발급처가 없으면 계약은 죽는다.** CRITERION 이 검사 3곳을 갖고도 한 번도
+            #    발화하지 않았던 것과 같은 실패다 — 원장에 넣는 곳이 없으면 `TOOLS:` 는
+            #    문서에만 존재한다. VerifySpec 의 `tools` 를 여기서 원장으로 옮긴다.
+            decl = tools_of(verify, gid)
+            if decl:
+                lines.append(f"  TOOLS: {', '.join(decl)}")
         else:
             lines.append(f"  MANUAL: {criterion}")
             lines.append(f"  CRITERION_HASH: {sha(criterion)}")
