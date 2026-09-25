@@ -223,7 +223,7 @@ def extract_applied_location(body: str, fm: dict[str, str] | None = None) -> tup
                 if label not in explicit:
                     explicit.append(label)
 
-    # v5.1 (M6 2026-05-26 Codex P6 정정 #1 — MARKDOWN_LINK_PATTERN 사용처 구현):
+    # v5.1 (M6 2026-05-26 GPT P6 정정 #1 — MARKDOWN_LINK_PATTERN 사용처 구현):
     # 본문 markdown link `[label](path)` 형식 cross-ref 자동 추출.
     # fz-plugin 관련 path만 implicit으로 등록 (skills/agents/modules/guides/docs/*.md).
     for m in MARKDOWN_LINK_PATTERN.finditer(body):
@@ -284,11 +284,11 @@ def extract_meta_family(body: str, current_id: str) -> list[str]:
 
 
 def extract_meta_pattern(body: str, fm: dict[str, str] | None = None) -> str | None:
-    """v5 (2026-05-26 P6 개선) + v5.1 (Codex P6 정정 #2): frontmatter 우선 + 첫 문단 fallback.
+    """v5 (2026-05-26 P6 개선) + v5.1 (GPT P6 정정 #2): frontmatter 우선 + 첫 문단 fallback.
     33차 본문에 18차 인용 ("scope inflation") 있어도 frontmatter description의
     "Recommendation Default Bias"가 우선이어야 함.
 
-    v5.1 docstring 정정 (Codex P6 §추가 발견 #2):
+    v5.1 docstring 정정 (GPT P6 §추가 발견 #2):
     실제 구현은 frontmatter 미매칭 시 *항상* 본문 첫 문단 fallback 적용 (조건 없음).
     이전 docstring "description이 짧을 때만 fallback"은 부정확. 첫 문단만 매칭하여
     다른 메모리 인용 (본문 중후반) false positive를 차단하는 것이 실제 동작.
@@ -315,7 +315,7 @@ def extract_meta_pattern(body: str, fm: dict[str, str] | None = None) -> str | N
 def extract_trigger_case(body: str, fm: dict[str, str] | None = None) -> str | None:
     """v5.1 (M7 2026-05-26 P6 정정): 본문 매칭 실패 시 frontmatter `originSessionId` fallback.
     본문에 티켓 ID 표기가 없는 메모리(40차/41차) → fm `originSessionId` UUID 사용.
-    Codex P6 §추가 발견 #3 정정 — TRIGGER_CASE_PATTERN 확장 정량 효과 없음.
+    GPT P6 §추가 발견 #3 정정 — TRIGGER_CASE_PATTERN 확장 정량 효과 없음.
     """
     if fm is None:
         fm = {}

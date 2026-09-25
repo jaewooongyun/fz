@@ -7,7 +7,7 @@
 > **Authority Sources** (Cgap-1 보강, 2026-05-16):
 > - **Reasoning Effort 정책**: Anthropic "Harness Design for Long-Running Apps" (2026-03) [verified: A2] — effort 파라미터를 작업 복잡도에 매칭. "Self-evaluation is unreliable" → cross-model verify 시 effort 정밀 설정 필요
 > - **Diff 크기 정책**: Context Rot (Chroma Research, 18 frontier models) [verified: empirical study] — focused 300 tokens > unfocused 113K tokens. Small (<2000) full diff / Medium (2000-8000) file-split / Large (>8000) key files + summary
-> - **CLI Mode 라우팅**: Codex CLI Changelog [verified: official] — Hybrid mode (0.118.0+ Plugin + CLI fallback) · gpt-5.5 (0.124.0+) · **gpt-6-astra (0.153.1+, 0.153.4에서 bundled default)**
+> - **CLI Mode 라우팅**: GPT CLI Changelog [verified: official] — Hybrid mode (0.118.0+ Plugin + CLI fallback) · gpt-5.5 (0.124.0+) · gpt-6-astra (0.153.1+, 0.153.4에서 bundled default) · **gpt-6-sol (0.156.1 모델 선택기 추가 · 0.157.0 정식 추가 — 현 CLI 기본·bundled default, medium)**. ⚠️ 실제 모델은 CLI 버전과 `config.toml` 에 따른다 — 래퍼는 모델을 pin 하지 않는다
 >   출처: https://learn.chatgpt.com/docs/changelog (구 `developers.openai.com/codex/changelog` 는 여기로 308)
 
 ## 목차
@@ -18,7 +18,7 @@
 - [장기 불능 인지 (기간 조건부)](#장기-불능-인지-기간-조건부)
 - [CLI 모드 선택 전략 (Hybrid)](#cli-모드-선택-전략-hybrid)
 - [Sandbox Permissions](#sandbox-permissions)
-- [GPT-5.5 Preamble 표준 (Cnew-3, 2026-05-16)](#gpt-55-preamble-표준-cnew-3-2026-05-16)
+- [GPT Preamble 표준 (Cnew-3, 2026-05-16)](#gpt-preamble-표준-cnew-3-2026-05-16)
 
 ---
 
@@ -75,11 +75,11 @@ DIFF_LINES=$(printf '%s\n' "$DIFF_RAW" \
 
 | diff 크기 | 전략 | 실행 방법 |
 |-----------|------|----------|
-| **Small** (<2000줄) | Full diff → `codex exec review` | config 모델의 대형 컨텍스트 활용, 구조화 전체 리뷰 (기본) |
-| **Medium** (2000-8000줄) | File-split → `codex exec` xN | 변경 파일을 기능 그룹으로 분할, 그룹별 독립 리뷰 |
+| **Small** (<2000줄) | Full diff → `gpt-exec.sh review` | config 모델의 대형 컨텍스트 활용, 구조화 전체 리뷰 (기본) |
+| **Medium** (2000-8000줄) | File-split → `gpt-exec.sh exec` xN | 변경 파일을 기능 그룹으로 분할, 그룹별 독립 리뷰 |
 | **Large** (>8000줄) | Key files + summary | 핵심 파일만 상세 리뷰 + 나머지 요약 |
 
-**Medium 전략**: 변경 파일을 기능 그룹(Architecture/Data/UI)으로 분할 → 그룹별 `codex exec` 독립 리뷰 → `jq`로 결과 합산.
+**Medium 전략**: 변경 파일을 기능 그룹(Architecture/Data/UI)으로 분할 → 그룹별 `gpt-exec.sh exec` 독립 리뷰 → `jq`로 결과 합산.
 
 **Large 전략**: 변경량 상위 10 파일만 상세 리뷰 + 나머지 요약.
 
@@ -90,37 +90,37 @@ DIFF_LINES=$(printf '%s\n' "$DIFF_RAW" \
 
 ## 장기 불능 인지 (기간 조건부)
 
-> GPT가 **장기 불능** 상태(현재: spend cap 2026-07-16~, 해제 시점 미상 — 재확인 앵커 2026-08-18)일 때: 서브커맨드 호출 전 재시도를 생략하고 각 스킬의 GPT 불능 분기(fz-review Phase 5 검증 2 불능 분기 등)로 직행한다 — 매 호출 재시도 1회 오버헤드 방지. ⛔ 상태 표기에는 시작일 + 원복 트리거 명시 의무(만료일 미상이면 "해제 확인 시 원복"으로) — 정리 주체 없는 무기한 잔존 방지. **해제 확인 시 이 노트의 "현재:" 상태 제거 + 원경로 복원** (동기화 단일 포인트: MEMORY.md GPT 줄). 이종 blind-spot 안전망 상실은 폴백 산출물에 명시 의무 (15/23차).
+> GPT가 **장기 불능** 상태(예: quota·spend cap — 표기할 때는 시작일과 원복 트리거를 함께 적는다)일 때: 서브커맨드 호출 전 재시도를 생략하고 각 스킬의 GPT 불능 분기(fz-review Phase 5 검증 2 불능 분기 등)로 직행한다 — 매 호출 재시도 1회 오버헤드 방지. ⛔ 상태 표기에는 시작일 + 원복 트리거 명시 의무(만료일 미상이면 "해제 확인 시 원복"으로) — 정리 주체 없는 무기한 잔존 방지. **해제 확인 시 이 노트의 "현재:" 상태 제거 + 원경로 복원** (동기화 단일 포인트: MEMORY.md GPT 줄). 이종 blind-spot 안전망 상실은 폴백 산출물에 명시 의무 (15/23차).
 
 ## CLI 모드 선택 전략 (Hybrid)
 
-`codex exec review`가 git diff + 구조화 출력을 통합. Plugin 설치 시 review/check/adversarial은 `/codex:*` 우선.
-Plugin 미설치 시 모든 서브커맨드가 CLI로 동작 (폴백 투명).
+래퍼 review 모드(`gpt-exec.sh review`)가 git diff + 구조화 출력을 통합. Plugin 설치 시 review/check/adversarial은 `/codex:*` 우선.
+Plugin 미설치 시 모든 서브커맨드가 래퍼로 동작 (폴백 투명).
 
-| 기준 | `codex exec review` | `codex exec` |
+| 기준 | `gpt-exec.sh review` | `gpt-exec.sh exec` |
 |------|---------------------|-------------|
 | **diff 입력** | Git 자동 감지 (--base/--uncommitted/--commit) | 수동 주입 (프롬프트에 인라인) |
-| **출력 형식** | `--json`(JSONL) + `-o`(최종 메시지 파일) | `--output-schema` JSON 강제 |
-| **모델 명시** | `-m` 생략 → config `model` 기본값 사용(권장, 항상 최신) | 동일 |
+| **출력 형식** | `--out`(최종 메시지 파일) | `--out` + `--schema` JSON 강제 |
+| **모델 명시** | 래퍼는 모델을 넘기지 않는다 → config `model` 기본값 사용(권장, 항상 최신) | 동일 |
 | **GPT 스킬** | 3-Tier 디스커버리 자동 트리거 | 스킬 내용 수동 주입 필요 |
-| **모노레포 컨텍스트** | `--add-dir` (공유 모듈 접근) | `-C` + `--add-dir` |
+| **모노레포 컨텍스트** | read-only 가 전 디스크 읽기 허용 — 별도 플래그 불필요 | 동일 (필요한 경로는 프롬프트에 적는다) |
 
 **서브커맨드별 매핑**:
 
 | 서브커맨드 | CLI 모드 | 이유 |
 |-----------|----------|------|
-| review | `codex exec review` | Git diff + `-o` 구조화 캡처 + 스킬 자동 |
-| check | `codex exec review` | --uncommitted + `-o` |
-| commit | `codex exec review` | --commit + `-o` |
-| final | `codex exec review` | --base + xhigh + `-o` + resume 심화 |
-| verify | `codex exec` | 계획 텍스트 + `--output-schema` JSON 필요 |
-| validate | `codex exec` | 이슈 목록 + `--output-schema` JSON 필요 |
+| review | `gpt-exec.sh review` | Git diff + `--out` 구조화 캡처 + 스킬 자동 |
+| check | `gpt-exec.sh review` | --uncommitted + `--out` |
+| commit | `gpt-exec.sh review` | --commit + `--out` |
+| final | `gpt-exec.sh review` | --base + xhigh + `--out` + `resume --session-file` 심화 |
+| verify | `gpt-exec.sh exec` | 계획 텍스트 + `--schema` JSON 필요 |
+| validate | `gpt-exec.sh exec` | 이슈 목록 + `--schema` JSON 필요 |
 
-**심화 패턴**: `codex exec review`로 1차 리뷰 → `codex exec resume --last`로 특정 이슈 심화 검증. `final`에서 자동 적용.
+**심화 패턴**: `gpt-exec.sh review`·`exec` 로 1차 리뷰 → `gpt-exec.sh resume --session-file {1차 --out}.session` 으로 특정 이슈 심화 검증. `final`에서 자동 적용. (세션 지정 이유: `modules/fz-gpt-bash-hygiene.md` §8)
 
 ## Sandbox Permissions
 
-Codex CLI의 `sandbox_permissions` 설정:
+GPT CLI의 `sandbox_permissions` 설정 (역할별 의도):
 
 | 권한 | 용도 | 사용 스킬 |
 |------|------|----------|
@@ -128,14 +128,16 @@ Codex CLI의 `sandbox_permissions` 설정:
 | `read-only` (기본) | 변경 없이 읽기만 | fz-challenger, fz-searcher |
 | (미지정) | GPT 기본 샌드박스 | fz-reviewer, fz-guardian, fz-fixer |
 
-설정 방법: `codex exec -c 'sandbox_permissions=["disk-full-read-access"]'`
+설정 위치: 래퍼 `scripts/gpt-exec.sh` 가 **모든** 호출에 `-c sandbox_mode="read-only"` 를 강제한다(session 층 — 사용자 `config.toml` 보다 우선). 위 표는 역할별 옛 설계 의도이며, 현행은 역할과 무관하게 전부 read-only 다. `sandbox_permissions=["disk-full-read-access"]` 도 함께 넘기지만 CLI 0.157 은 이 키를 **무시**한다고 출력한다(2026-09-25 실측).
 
 > `disk-full-read-access`는 GPT가 프로젝트 디렉토리 전체를 읽을 수 있게 허용한다.
 > 쓰기 권한은 부여하지 않으므로 코드 수정 위험 없음.
 
 ---
 
-## GPT-5.5 Preamble 표준 (Cnew-3, 2026-05-16)
+## GPT Preamble 표준 (Cnew-3, 2026-05-16)
+
+> ⚠️ 이 표준은 GPT-5.5 시절(2026-05-16)에 세웠다. 현행 GPT-6 Sol 에서의 유효성은 미측정이다 [미검증: GPT-6 Sol 재측정 없음].
 
 > **Authority**: GPT-5 Prompting Guide (OpenAI Cookbook 2026) [verified: official] — "rephrase goal → outline plan → narrate" preamble 패턴 권장.
 
@@ -149,7 +151,7 @@ GPT 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 reaso
 
 **적용 위치**:
 - `fz-gpt` SKILL.md verify/validate/plan 서브커맨드 prompt template
-- codex 네이티브 스킬 (`~/.codex/skills/.system/openai-docs` 활용 가능)
+- GPT CLI 네이티브 스킬 (`~/.codex/skills/.system/openai-docs` 활용 가능)
 
 **Few-shot 예시**:
 ```
@@ -158,10 +160,10 @@ BAD (preamble 없음):
 
 GOOD (3-step preamble):
 "
-[Rephrase] Plan v1을 GPT-5.5로 cross-model verify. 5 Q 평가 + verdict.
+[Rephrase] Plan v1을 GPT(현행 모델)로 cross-model verify. 5 Q 평가 + verdict.
 [Outline] (a) 6 가설 grep 재현 (b) Tier 우선순위 평가 (c) false positive 식별 (d) GPT 단독 발견 (e) 최종 verdict.
 [Narrate] 각 Q마다 verdict (pass/warn/fail) + reasoning + 파일:line 인용.
 "
 ```
 
-> Codex 네이티브 `openai-docs` system skill로 OpenAI 공식 권장 패턴 추가 확인 가능.
+> GPT CLI 네이티브 `openai-docs` system skill로 OpenAI 공식 권장 패턴 추가 확인 가능.

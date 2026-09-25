@@ -67,7 +67,7 @@ def tail_text(path, limit=TAIL_BYTES, needle=None, max_limit=TAIL_MAX_BYTES):
 def _has_human_prompt(prompt_id):
     """목표 prompt_id 의 **사람 프롬프트**(tool_result 아님) 줄이 창 안에 있는가.
 
-    ⛔ Codex 리뷰(2026-09-06): "아무 user+promptId" 로 멈추면 tool_result 도 promptId 를 갖고 있어
+    ⛔ GPT 리뷰(2026-09-06): "아무 user+promptId" 로 멈추면 tool_result 도 promptId 를 갖고 있어
     긴 턴 중간에서 확장이 멈추고 앞선 도구 호출·사람의 정정 문장이 누락된다(220KB fixture 재현).
     prompt_id 가 없으면 경계를 정의할 수 없으므로 확장하지 않는다(호출부가 측정 불가로 표시).
     """
@@ -151,7 +151,7 @@ def scan_transcript(path, prompt_id):
             continue
         if not prompt_id or current_prompt != prompt_id:
             # ⛔ prompt_id 부재는 "전부 센다"가 아니라 "귀속 불가"다 — 이전 턴이 섞인 값을 턴 측정으로
-            #    내는 것보다 0 + measurement="unattributable" 이 낫다 (Codex 리뷰 2026-09-06)
+            #    내는 것보다 0 + measurement="unattributable" 이 낫다 (GPT 리뷰 2026-09-06)
             continue
         out["matched"] += 1
         # ⛔ 한 메시지가 content 블록마다 한 줄씩 기록된다(같은 `message.id` 공유) —
@@ -255,7 +255,7 @@ def append_event(event, telemetry_dir):
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, EVENTS_FILE)
     # ⛔ Stop 은 한 턴에 여러 번 불릴 수 있다 — gate_stop_hook 이 block 하면 Claude 가 이어가고 Stop 이 다시
-    #    발화한다(Codex 리뷰 2026-09-06). 무조건 append 는 한 턴을 N행으로 부풀린다. append-only 를 지키되
+    #    발화한다(GPT 리뷰 2026-09-06). 무조건 append 는 한 턴을 N행으로 부풀린다. append-only 를 지키되
     #    `attempt` 를 붙여 소비자가 턴당 **마지막 attempt 만** 읽게 한다(각 행은 그 시점까지의 누적치).
     event["attempt"] = _prior_attempts(path, event.get("session_id"), event.get("prompt_id")) + 1
     with open(path, "a") as handle:
@@ -392,7 +392,7 @@ def self_test():
     check("transcript 없음 — result_line", second["result_line"], "failed")
     check("transcript 없음 — 정정 신호 False", second["user_correction_signal"], False)
 
-    # ⛔ Stop 재호출(gate block 후 이어가기) — 같은 (session, prompt) 3회 → attempt 1,2,3 (Codex 리뷰 2026-09-06)
+    # ⛔ Stop 재호출(gate block 후 이어가기) — 같은 (session, prompt) 3회 → attempt 1,2,3 (GPT 리뷰 2026-09-06)
     rep_dir = tempfile.mkdtemp(prefix="fz-hook-attempt-")
     for _ in range(3):
         run_hook(io.StringIO(json.dumps({"session_id": "S", "prompt_id": "P", "cwd": "/x", "hook_event_name": "Stop"})), rep_dir)

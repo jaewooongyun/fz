@@ -58,7 +58,7 @@
 |---|------|-----|------|-----|
 | D1 | | | | |
 
-## E. 도구 / SDK 변경 (Codex CLI, Claude Code, Agent SDK 등)
+## E. 도구 / SDK 변경 (GPT CLI, Claude Code, Agent SDK 등)
 
 > 외부 도구의 버전 변경 / 새 기능 / breaking change.
 

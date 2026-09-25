@@ -19,7 +19,7 @@
    - ⛔ **`reviewSurfacePatchPath` 가 1차다.** `review-surface.patch`(gather 가 만드는 중복 커밋 제외분)가
      있으면 그것을 넘긴다 — 스크립트가 이를 **리뷰 대상**으로 쓰고 `diffPath` 를 부풀림 확인용 보조로 내린다.
      ⛔ **진단 파일만 넘기면 무력하다** — 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없고,
-     `review-surface.md` 의 조언("`git show <+ 커밋>`")도 실행할 수 없다 [외부: codex 리뷰 2026-09-01].
+     `review-surface.md` 의 조언("`git show <+ 커밋>`")도 실행할 수 없다 [외부: GPT 리뷰 2026-09-01].
    - `reviewSurfacePath`(`review-surface.md`)는 patch 와 **함께** 넘긴다 — 부풀림 규모를 렌즈가 알면
      전량 diff 에서 나온 발견을 스스로 걸러낼 수 있다. patch 없이 이것만 넘기면 스크립트가 경고를 붙이지만
      그것은 대체물이 아니다.

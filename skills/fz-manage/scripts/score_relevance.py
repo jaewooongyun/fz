@@ -96,7 +96,7 @@ def label_to_skill_name(label: str) -> str | None:
 def has_symmetry_in_module(text: str, parsed: dict[str, Any]) -> str | None:
     """본 메모리 패턴이 모듈에 대칭으로 존재하는지.
 
-    v3.1 (2026-05-26 Codex P6 정정 반영):
+    v3.1 (2026-05-26 GPT P6 정정 반영):
       - bool → str | None: matched cluster name 반환 (false positive 판별 가능)
       - Cluster 5 4 sub-cluster로 meta_pattern별 분리 (M1 정밀화):
         * ordinal `40차|41차|33차` 단독 매칭 제거 (fz-review "41차 External Authority Bias" collision 차단)
@@ -142,7 +142,7 @@ def has_symmetry_in_module(text: str, parsed: dict[str, Any]) -> str | None:
         if re.search(disappearance_synonyms, body):
             return "silent_disappearance"
 
-    # Cluster 5 (v3.1 — Codex P6 정정): meta_pattern별 분리 (M1 정밀화)
+    # Cluster 5 (v3.1 — GPT P6 정정): meta_pattern별 분리 (M1 정밀화)
     # ⛔ ordinal 단독 매칭 제거 (fz-review "41차 External Authority Bias" collision 차단)
     # ⛔ `reflection` 단일 단어 매칭 제거 (17차 false trigger 차단)
 

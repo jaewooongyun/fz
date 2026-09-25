@@ -50,7 +50,7 @@
 ## Lesson Intake Decision Tree
 
 > 새 교훈 후보 발생 시 기존 principle에 manifestation 추가 vs 새 principle 분리 결정 트리.
-> 목적: 단일 principle에 무관한 manifestation 강제 stuffing 차단 (Codex Q1).
+> 목적: 단일 principle에 무관한 manifestation 강제 stuffing 차단 (GPT Q1).
 > UC-10 (v4.7.0): lesson-intake.md 내용 본 모듈로 흡수(파일 제거됨).
 
 | 신규 교훈 후보 | 판정 | 행동 |

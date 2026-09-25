@@ -8,78 +8,73 @@
 
 **review** (주력, fz-review P5) · **verify** (Q1-Q8, fz-plan P2) · **verify-gates** (게이트 원장 판정, fz-plan P2 **추가** 호출) · **validate** (역검증, fz-review P5.5) · **check** (verdict contract: pass/warn/fail)
 
-> ⛔ **아래 codex exec 예시는 축약형** (서브커맨드별 *차이점*만 표시 — 가독성 우선). **raw 복붙 금지**.
-> 실제 실행 시 반드시 `modules/fz-gpt-bash-hygiene.md` §6 Standard Wrapper Template 적용:
-> `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `-o` readback + (git diff 분석 시) §5.5 Base Verification Gate.
-> 예시의 `codex exec ...`는 *wrapper의 §3 표준 호출 부분*에 해당하는 차이점만 보여준다 (29/30차 hang/sandbox 재발 차단 — GPT 검증 §Blind Spot 1).
+> ⛔ **아래 예시는 전부 래퍼(`scripts/gpt-exec.sh`) 호출이다** — 서브커맨드별 *차이점*(모드·effort·schema·프롬프트)만 보인다. ⛔ GPT CLI 를 직접 부르지 않는다.
+> 래퍼가 `modules/fz-gpt-bash-hygiene.md` 의 교훈을 대신 처리한다: `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `--out` readback + `--` 구분자 + (review 모드) §5.5 Base Verification Gate.
+> 프롬프트는 `--prompt-file` 로만 받는다 — 아래 `P_*` 는 앞 줄에서 heredoc 으로 쓴 임시 파일이다. 읽기 전용은 래퍼가 모든 호출에 `-c sandbox_mode="read-only"` 로 **강제**한다(사용자 config 보다 우선) — 옛 `--sandbox read-only` 플래그는 쓰지 않는다.
 
 ## review -- 코드 리뷰 (주력)
 
 fz-review의 Phase 5 GPT 부분. **Plugin 우선 → CLI 폴백.**
 
 ```bash
-# Plugin 모드 (우선 — --add-dir 불필요 시)
+# Plugin 모드 (우선)
 /codex:review --base "$BASE_BRANCH" --json
 
-# CLI 모드 (폴백 — --add-dir 필요 시 또는 Plugin 미설치)
-cd "$GIT_ROOT" && codex exec review \
-  --base "$BASE_BRANCH" \
-  -c model_reasoning_effort=high \
-  --add-dir "$SHARED_MODULES" \
-  -o "$REVIEW_FILE"   # 계측: gpt-exec.sh 인자에 --gpt-skill reviewer --gpt-skill-path unknown (자동 트리거 — 로드 확인 불가)
+# 래퍼 모드 (폴백 — Plugin 미설치). 공유 모듈도 읽는다(read-only 는 전 디스크 읽기 허용)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH" --effort high \
+  --gpt-skill reviewer --gpt-skill-path unknown   # 자동 트리거 — 로드 확인 불가
 ```
 
-**CLI 주요 플래그**: `-m`(모델), `-o`(파일 캡처), `--json`(JSONL), `--add-dir`(모노레포), `--ephemeral`(일회성)
+**래퍼 주요 옵션**: `--out`(파일 캡처) · `--effort` · `--schema` · `--ephemeral`(일회성). ⛔ 모델은 넘기지 않는다(`config.toml` SSOT)
 
-**`--add-dir` 패턴**: 프로젝트 `CLAUDE.md` `## Shared Modules`에 열거된 공유 모듈 경로를 조립한다 — `SHARED_MODULES="$GIT_ROOT/<모듈A> $GIT_ROOT/<모듈B> …"`. 모듈화 작업 시 **소비자 디렉토리도 포함**(예: 앱 소스 루트). ⛔ 섹션 미정의 시 하드코딩하지 말고 리포 구조에서 후보를 탐색해 사용자에게 확인.
+**공유 모듈**: `--add-dir` 는 **쓰기 가능 디렉토리**를 늘리는 플래그다(CLI help: *"Additional directories that should be writable"*). fz GPT 호출은 read-only 강제라 쓰지 않는다 — read-only 도 전 디스크를 **읽을 수** 있어 공유 모듈을 읽는 데 필요 없다 (2026-09-25 실측). 모듈화 리뷰에서 공유 모듈·소비자 코드를 꼭 보게 하려면 프로젝트 `CLAUDE.md` `## Shared Modules` 경로를 exec 프롬프트에 적는다 — review 모드는 diff 를 기준으로 필요한 파일을 스스로 연다.
 
-**⚠️ `review`는 flag-only** (G7/#7 회고 #8): `codex exec review`는 PROMPT positional을 받지 않는다 — 리뷰 대상 선택은 플래그(`--base`/`--uncommitted`)로만. 프롬프트 주입이 필요하면 `review` 서브커맨드가 아니라 `codex exec ... "PROMPT"`(verify 형식, §verify) 사용. `--uncommitted`와 PROMPT 문자열을 함께 주면 인자 충돌.
+**⚠️ `review`는 flag-only** (G7/#7 회고 #8): GPT CLI review 모드는 PROMPT positional을 받지 않는다 — 리뷰 대상 선택은 플래그(`--base`/`--uncommitted`/`--commit`)로만. 프롬프트 주입이 필요하면 review 모드가 아니라 `gpt-exec.sh exec --prompt-file`(verify 형식, §verify) 사용. 래퍼는 review 에 프롬프트를 넘기지 않아 이 충돌을 구조적으로 막는다.
 
 ## verify -- 계획 검증
 
-fz-plan의 Phase 2. **`codex exec` + `--output-schema` 사용.**
+fz-plan의 Phase 2. **`gpt-exec.sh exec` + `--schema` 사용.**
 
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
+SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
   SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."
 fi
 
-codex exec \
-  -c model_reasoning_effort=high \
-  -c 'sandbox_permissions=["disk-full-read-access"]' \
-  --output-schema schemas/gpt_review_schema.json \
-  -o "$REVIEW_FILE" \
-  -C "$GIT_ROOT" \
-  "${SKILL_PROMPT}
+cat > "$P_VERIFY" <<EOF
+${SKILL_PROMPT}
 
-   이 구현 계획을 검증하라.
-   CLAUDE.md ## Code Conventions 섹션의 가이드라인을 참조하라.
+이 구현 계획을 검증하라.
+CLAUDE.md ## Code Conventions 섹션의 가이드라인을 참조하라.
 
-   ## 계획
-   $PLAN_CONTENT
+## 계획
+$PLAN_CONTENT
 
-   ## 영향 심볼
-   $AFFECTED_SYMBOLS
+## 영향 심볼
+$AFFECTED_SYMBOLS
 
-   ## 설계 스트레스 테스트 독립 검증 (필수)
-   계획의 핵심 설계 결정에 대해 아래 8가지 질문을 독립적으로 평가하라.
-   계획에 이미 리스크 매트릭스가 있더라도, 동의 여부와 무관하게 자체 판단하라.
+## 설계 스트레스 테스트 독립 검증 (필수)
+계획의 핵심 설계 결정에 대해 아래 8가지 질문을 독립적으로 평가하라.
+계획에 이미 리스크 매트릭스가 있더라도, 동의 여부와 무관하게 자체 판단하라.
 
-   Q1 다중성: 제안된 설계가 1개일 때와 N개일 때 동일하게 작동하는가?
-   Q2 소비자 영향: 변경의 소비자(상위 레이어)에 새 분기/타입/프로토콜이 필요한가?
-   Q3 복잡도 이동: 한 레이어의 단순화가 다른 레이어의 복잡도 증가로 이어지는가?
-   Q4 경계 케이스: 이 추상화가 커버하지 못하는 케이스는 무엇이고, 대안은?
-   Q5 접근 경계: '차단/제거/캡슐화'를 의도한 접근 경로가 실제로 차단되는가? access modifier(public/internal/private)가 의도와 일치하는가? 기존 코드가 이벤트 채널을 우회하여 직접 호출하는 경로가 남아있지 않은가?
-   Q6 이벤트 스코프: 이벤트/로그 전송 설계가 포함되어 있다면, 각 이벤트가 측정 목적에 부합하는가? 이벤트 발화 위치의 컨텍스트가 측정 대상과 일치하는가?
-   Q7 소비자 코드 품질: 모듈화/캡슐화 작업인 경우, 앱 측 소비자 코드가 모듈의 public API를 올바르게 사용하는가? 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)의 모듈 연동이 정상인가? 모듈화 이전의 레거시 패턴이 앱에 남아있지 않은가?
-   Q8 함의 커버리지: 계획이 지시의 \"문자적 범위\"뿐 아니라 \"의미론적 범위\"를 커버하는가? 제거/변경 대상이 존재하게 된 이유(원인 코드)까지 범위에 포함됐는가? 지시로 인해 무효화되는 코드(결과 코드)가 처리됐는가? verdict: pass/warn/fail + reasoning. (참조: modules/lead-reasoning.md)
+Q1 다중성: 제안된 설계가 1개일 때와 N개일 때 동일하게 작동하는가?
+Q2 소비자 영향: 변경의 소비자(상위 레이어)에 새 분기/타입/프로토콜이 필요한가?
+Q3 복잡도 이동: 한 레이어의 단순화가 다른 레이어의 복잡도 증가로 이어지는가?
+Q4 경계 케이스: 이 추상화가 커버하지 못하는 케이스는 무엇이고, 대안은?
+Q5 접근 경계: '차단/제거/캡슐화'를 의도한 접근 경로가 실제로 차단되는가? access modifier(public/internal/private)가 의도와 일치하는가? 기존 코드가 이벤트 채널을 우회하여 직접 호출하는 경로가 남아있지 않은가?
+Q6 이벤트 스코프: 이벤트/로그 전송 설계가 포함되어 있다면, 각 이벤트가 측정 목적에 부합하는가? 이벤트 발화 위치의 컨텍스트가 측정 대상과 일치하는가?
+Q7 소비자 코드 품질: 모듈화/캡슐화 작업인 경우, 앱 측 소비자 코드가 모듈의 public API를 올바르게 사용하는가? 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)의 모듈 연동이 정상인가? 모듈화 이전의 레거시 패턴이 앱에 남아있지 않은가?
+Q8 함의 커버리지: 계획이 지시의 "문자적 범위"뿐 아니라 "의미론적 범위"를 커버하는가? 제거/변경 대상이 존재하게 된 이유(원인 코드)까지 범위에 포함됐는가? 지시로 인해 무효화되는 코드(결과 코드)가 처리됐는가? verdict: pass/warn/fail + reasoning. (참조: modules/lead-reasoning.md)
 
-   각 질문에 대해 verdict(pass/warn/fail)와 reasoning을 제시하라.
-   계획의 리스크 매트릭스가 빈약하거나 누락된 경우 반드시 지적하라.
-   Anti-Pattern Constraints가 있으면 각 금지 패턴의 실효성을 검증하라."
+각 질문에 대해 verdict(pass/warn/fail)와 reasoning을 제시하라.
+계획의 리스크 매트릭스가 빈약하거나 누락된 경우 반드시 지적하라.
+Anti-Pattern Constraints가 있으면 각 금지 패턴의 실효성을 검증하라.
+EOF
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$REVIEW_FILE" --prompt-file "$P_VERIFY" \
+  --effort high --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" \
+  --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
 ```
 
 ## verify-gates -- 게이트 원장 판정 (fz-plan Phase 2 추가 호출)
@@ -143,32 +138,31 @@ exit 1 이면 재호출 1회 후 **미판정으로 기록**하고 Lead가 판단
 
 ## validate -- 피드백 역검증
 
-fz-review의 Phase 5.5. **`codex exec` + `--output-schema` 사용.**
+fz-review의 Phase 5.5. **`gpt-exec.sh exec` + `--schema` 사용.**
 
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "guardian" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill guardian --gpt-skill-path "$SKILL_PATH"
+SKILL_PATH=$(get_gpt_skill_path "guardian" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
   SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."
 fi
 
-codex exec \
-  -c model_reasoning_effort=high \
-  -c 'sandbox_permissions=["disk-full-read-access"]' \
-  --output-schema schemas/gpt_verification_schema.json \
-  -o "$VERIFICATION_FILE" \
-  -C "$GIT_ROOT" \
-  "${SKILL_PROMPT}
+cat > "$P_VALIDATE" <<EOF
+${SKILL_PROMPT}
 
-   피드백 반영 여부를 검증하라.
-   CLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.
+피드백 반영 여부를 검증하라.
+CLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.
 
-   ## 원본 이슈
-   $ORIGINAL_ISSUES
+## 원본 이슈
+$ORIGINAL_ISSUES
 
-   ## 적용된 수정
-   $FIXES_APPLIED"
+## 적용된 수정
+$FIXES_APPLIED
+EOF
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE" \
+  --effort high --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_verification_schema.json" \
+  --gpt-skill guardian --gpt-skill-path "$SKILL_PATH"
 ```
 
 **Critical 자동 에스컬레이션**: 이전 검증에서 critical 이슈가 있었으면 자동으로 `xhigh`로 전환.
@@ -176,17 +170,18 @@ codex exec \
 **/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.
 
 ```bash
-SEARCHER_SKILL_PATH=$(get_gpt_skill_path "searcher" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill searcher --gpt-skill-path "$SEARCHER_SKILL_PATH"
+SEARCHER_SKILL_PATH=$(get_gpt_skill_path "searcher" "$FZ_PLUGIN_ROOT")
 if [ -n "$SEARCHER_SKILL_PATH" ] && [ -z "$AFFECTED_SYMBOLS" ]; then
-  codex exec \
-    -c model_reasoning_effort=high \
-    --sandbox read-only \
-    -C "$GIT_ROOT" \
-    "$(cat "${SEARCHER_SKILL_PATH}")
+  { cat "${SEARCHER_SKILL_PATH}"; cat <<EOF
 
-     아래 변경 대상의 영향 심볼과 의존성 체인을 탐색하라.
-     ## 변경 대상
-     $PLAN_CONTENT"
+아래 변경 대상의 영향 심볼과 의존성 체인을 탐색하라.
+## 변경 대상
+$PLAN_CONTENT
+파일을 수정하지 마라(읽기 전용 분석).
+EOF
+  } > "$P_SEARCH"
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$SEARCH_FILE" --prompt-file "$P_SEARCH" --effort high \
+    --gpt-skill searcher --gpt-skill-path "$SEARCHER_SKILL_PATH"
 fi
 ```
 
@@ -195,11 +190,8 @@ fi
 스테이징/언스테이징 변경을 커밋 전에 빠르게 검증합니다.
 
 ```bash
-cd "$GIT_ROOT" && codex exec review \
-  --uncommitted \
-  -c model_reasoning_effort=high \
-  --ephemeral \
-  -o "$REVIEW_FILE"   # 계측: gpt-exec.sh 인자에 --gpt-skill reviewer --gpt-skill-path unknown (자동 트리거 — 로드 확인 불가)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --uncommitted --effort high --ephemeral \
+  --gpt-skill reviewer --gpt-skill-path unknown   # 자동 트리거 — 로드 확인 불가
 ```
 
 > `--ephemeral`: 일회성 검증이므로 세션 미저장. 3-Tier 스킬 자동 트리거.
@@ -225,17 +217,18 @@ cd "$GIT_ROOT" && codex exec review \
 **/fz-fixer 연결**: 리뷰 결과에 수정 제안이 포함된 경우(issues with suggestion 필드 비어있지 않음), /fz-fixer 스킬을 참조하여 수정 전략을 제시한다.
 
 ```bash
-FIXER_SKILL_PATH=$(get_gpt_skill_path "fixer" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill fixer --gpt-skill-path "$FIXER_SKILL_PATH"
+FIXER_SKILL_PATH=$(get_gpt_skill_path "fixer" "$FZ_PLUGIN_ROOT")
 if [ -n "$FIXER_SKILL_PATH" ] && [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
-  codex exec \
-    -c model_reasoning_effort=high \
-    --sandbox read-only \
-    -C "$GIT_ROOT" \
-    "$(cat "${FIXER_SKILL_PATH}")
+  { cat "${FIXER_SKILL_PATH}"; cat <<EOF
 
-     위 리뷰 결과에서 수정이 필요한 이슈에 대해 Root Cause와 Fix Strategy를 제시하라.
-     ## 이슈 목록
-     $FIXABLE_ISSUES"
+위 리뷰 결과에서 수정이 필요한 이슈에 대해 Root Cause와 Fix Strategy를 제시하라.
+## 이슈 목록
+$FIXABLE_ISSUES
+파일을 수정하지 마라(읽기 전용 분석).
+EOF
+  } > "$P_FIX"
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$FIXER_FILE" --prompt-file "$P_FIX" --effort high \
+    --gpt-skill fixer --gpt-skill-path "$FIXER_SKILL_PATH"
 fi
 ```
 

@@ -2,7 +2,7 @@
 
 > **Scope of Applicability**: `fz-gpt` SKILL.md의 모든 Bash 예시 (review/verify/validate/check/final/commit/adversarial/drift/plan/micro-eval). 다른 스킬은 본 모듈을 직접 참조하지 않으며, fz-gpt 위임을 통해 간접 적용된다.
 >
-> **Purpose**: `codex exec` / `codex review`를 Bash 도구로 호출할 때 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch 등을 방지하는 표준 절차.
+> **Purpose**: GPT CLI(`exec`·`review` 서브커맨드)를 Bash 도구로 부를 때의 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch 등을 방지하는 표준 절차. ⛔ **호출은 §8 래퍼(`scripts/gpt-exec.sh`) 경유** — §1~§7 은 래퍼가 내부에서 처리하는 교훈이며, 직접 호출 예시가 아니다.
 
 ## 목차
 
@@ -18,31 +18,21 @@
 
 ## 1. Stdin 닫기 의무 (`< /dev/null`)
 
-**증상**: Codex 0.124.0이 `Reading additional input from stdin...`에서 무한 대기. 13분 hang 후에도 응답 없음.
+**증상**: GPT CLI 0.124.0 이 `Reading additional input from stdin...`에서 무한 대기. 13분 hang 후에도 응답 없음.
 
-**원인**: Bash pipe에 codex exec를 연결하면 stdin이 열린 채 전달됨 → Codex가 대화형 입력을 기대 → 무한 hang.
+**원인**: Bash pipe 로 GPT CLI `exec` 를 부르면 stdin 이 열린 채 전달됨 → CLI 가 대화형 입력을 기대 → 무한 hang.
 
-**필수 패턴**:
-```bash
-# ❌ 잘못된 호출 (hang 발생)
-codex exec ... "prompt" 2>&1 | tail -20
-
-# ✅ 올바른 호출 (stdin 명시 close)
-codex exec ... "prompt" < /dev/null 2>&1 | tail -20
-```
+**래퍼 처리**: `scripts/gpt-exec.sh` 는 review·exec·resume **모든** 호출 끝에 `< /dev/null` 을 붙여 stdin 을 닫는다. ⛔ 파이프로 CLI 를 직접 부르지 않는다(❌ `… "prompt" 2>&1 | tail -20` 은 hang).
 
 ## 2. Trusted Directory 확인 + Skip Flag
 
 **증상**: `Not inside a trusted directory and --skip-git-repo-check was not specified.` 에러로 즉시 종료.
 
-**원인**: PROJECT_ROOT ≠ GIT_ROOT dual-root 구조에서 Codex가 git repo 외부 실행을 거부.
+**원인**: PROJECT_ROOT ≠ GIT_ROOT dual-root 구조에서 GPT CLI 가 git repo 외부 실행을 거부.
 
-**필수 패턴**:
+**래퍼 처리**: `scripts/gpt-exec.sh` 사전 게이트 4 가 `--cd` 가 git repo 밖이면 `--skip-git-repo-check` 를 자동으로 붙인다. 판정 로직:
 ```bash
-# Working dir이 git repo 밖일 때
-codex exec ... --skip-git-repo-check ... "prompt" < /dev/null
-
-# 자동 판정
+# 자동 판정 (래퍼 내부와 같은 로직)
 if git -C "$WORK_DIR" rev-parse --git-dir > /dev/null 2>&1; then
   SKIP_FLAG=""
 else
@@ -54,10 +44,7 @@ fi
 
 **관찰**: `-o /path/to/output.md`로 결과를 파일에 쓰면 stdout에는 진행 stream만 출력. 실제 결과는 `-o` 파일에서 Read.
 
-```bash
-codex exec ... -o "$RESULT_FILE" "prompt" < /dev/null 2>&1 | tail -5
-# 결과 읽기는 별도 도구로 Read("$RESULT_FILE")
-```
+**래퍼 처리**: `--out FILE` 을 CLI 의 `-o` 로 넘기고, 진행 stream 은 `${OUT}.stream.log` 로 분리한다. 결과는 `--out` 파일을 Read 한다.
 
 ## 4. Background Task 의무 영역
 
@@ -67,9 +54,9 @@ codex exec ... -o "$RESULT_FILE" "prompt" < /dev/null 2>&1 | tail -5
 
 ## 5. ⛔ Trust Level 필수 (30차 교훈, Critical)
 
-**증상**: `codex exec --profile <NAME>` 호출 시 `sandbox: read-only`로 force. Profile 설계 전체 무효화.
+**증상**: GPT CLI `exec` 를 `--profile <NAME>` 으로 부르면 `sandbox: read-only`로 force. Profile 설계 전체 무효화.
 
-**원인**: Codex CLI 0.124.0은 실행 path가 `trust_level = "trusted"`로 명시되지 않으면 **"untrusted directory" 취급**.
+**원인**: GPT CLI 0.124.0 은 실행 path가 `trust_level = "trusted"`로 명시되지 않으면 **"untrusted directory" 취급**.
 
 **필수 config** (`~/.codex/config.toml`):
 ```toml
@@ -85,12 +72,12 @@ trust_level = "trusted"
 
 **fz-gpt 호출 시 적용 범위**:
 - **Profile 사용 시 (--profile)**: trust_level 없으면 sandbox 무효화
-- **Profile 미사용 시 (-c 'sandbox_permissions=...')**: trust_level 없어도 inline override 가능 [미검증]
+- **래퍼 경로**: `gpt-exec.sh` 는 `--profile` 을 쓰지 않고 `-c sandbox_mode="read-only"` 를 강제한다 — 이 절은 **`--profile` 을 직접 쓸 때만** 해당한다 (`sandbox_permissions` 는 CLI 0.157 이 무시한다고 출력)
 - **대안 폴백**: `-c 'projects."<path>".trust_level="trusted"'` inline override
 
 **`--skip-git-repo-check` vs trust_level**:
 - `--skip-git-repo-check`: git repo check 우회만
-- `trust_level = "trusted"`: Codex sandbox 정책에 직접 영향
+- `trust_level = "trusted"`: GPT CLI sandbox 정책에 직접 영향
 
 **판정 logic**:
 ```bash
@@ -132,7 +119,7 @@ printf '%s\n' "$CHANGED_FILES" | head -10
 ```
 
 **규칙**:
-- ⛔ 위 Gate 통과 후에만 `codex exec` 호출
+- ⛔ 위 Gate 통과 후에만 GPT 호출 — 래퍼 review 모드는 이 Gate 를 사전 게이트 5 로 **내장**한다
 - ⛔ GPT 결과 인용 시 `[분석 기준: branch=X, HEAD=Y, base=Z, changed_files=N개]` 태그 의무
 - ⛔ EXPECTED_BRANCH 주입: 호출자가 *명시 환경변수 설정 필수*
 - ⛔ 단순 파일 분석 (git diff 미포함) 호출에는 Gate 적용 **제외**
@@ -144,48 +131,22 @@ printf '%s\n' "$CHANGED_FILES" | head -10
 > 6 hygiene rules (1-5 + 7: `--` 구분자) + zsh glob 회피 + output readback 통합.
 
 ```bash
-# 0. 프롬프트 파일화 (zsh glob 회피)
+# 1. 프롬프트 파일화 (zsh glob 회피 — 정규식·따옴표·여러 줄을 셸이 해석하지 않게)
 cat > /tmp/gpt-prompt.txt << 'EOF'
-...your prompt with regex/quotes/multiline...
+...your prompt...
 EOF
-
-# 1. Trust check (rule 5)
-if ! grep -qE "\[projects\." ~/.codex/config.toml; then
-  echo "WARNING: trust_level 미설정"
-fi
-
-# 2. Skip flag 결정 (rule 2)
-if git -C "$WORK_DIR" rev-parse --git-dir > /dev/null 2>&1; then
-  SKIP_FLAG=""
-else
-  SKIP_FLAG="--skip-git-repo-check"
-fi
-
-# 3. 표준 호출 (rule 1: stdin close + rule 3: -o output + rule 7: -- 구분자)
-codex exec \
-  -c 'sandbox_permissions=["disk-full-read-access"]' \
-  $SKIP_FLAG \
-  -o "$RESULT_FILE" \
-  -C "$WORK_DIR" \
-  -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
-
-# 4. 결과 읽기: Read tool로 $RESULT_FILE
-# 5. Background mode (rule 4): high effort + 300줄+ 시 run_in_background=true
+# 2. 래퍼 호출 — stdin close·`-o`·`--` 구분자·skip flag·read-only sandbox 를 래퍼가 조립한다 (§1~§7 의 교훈)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$WORK_DIR" --out "$RESULT_FILE" --prompt-file /tmp/gpt-prompt.txt
+# 3. 결과는 Read 로 $RESULT_FILE · high effort + 300줄 이상이면 run_in_background (§4)
 ```
-
-**적용 권고**: fz-gpt/SKILL.md의 모든 서브커맨드 예시는 본 wrapper 패턴을 따른다.
 
 ## 7. 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자)
 
-**증상**: `codex exec`의 positional 프롬프트가 하이픈으로 시작하면(예: SKILL.md YAML frontmatter의 `---` 3연속) clap이 이를 플래그로 오해석 → usage 에러로 즉시 종료.
+**증상**: GPT CLI `exec` 의 positional 프롬프트가 하이픈으로 시작하면(예: SKILL.md YAML frontmatter의 `---` 3연속) clap이 이를 플래그로 오해석 → usage 에러로 즉시 종료.
 
 **원인**: clap은 end-of-options(`--`) 미지정 시 하이픈 선두 인자를 옵션으로 파싱.
 
-**필수 패턴**: `codex exec [flags]` 뒤에 `--`를 넣고 그 뒤에 프롬프트 인자.
-
-```bash
-codex exec ... -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
-```
+**래퍼 처리**: `exec [flags]` 뒤에 `--` 를 넣고 그 뒤에 프롬프트 인자를 둔다 — `scripts/gpt-exec.sh` 가 exec·resume 호출에서 `-- "$(cat PROMPT_FILE)"` 로 조립한다.
 
 **관찰**: 에러 캡처 시 `tail` 파이프 금지(clap 에러 본문 잘림 → 진단 지연), 전체 리다이렉트(`> log 2>&1`) 사용. (2026-07-09 harness-paper 세션 실측 — SKILL.md 주입 시 재현)
 
@@ -199,8 +160,8 @@ codex exec ... -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
 
 | 실패 | 지식은 어디 있었나 | 왜 안 막혔나 |
 |---|---|---|
-`codex exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-subcommands-core.md:36`이 "함께 주면 인자 충돌"을 이미 명시 | 산문 경고는 **호출 시점에 읽혀야** 작동한다. 호출자가 §6 템플릿을 붙이지 않고 손으로 조립했다 |
-래퍼가 `codex exit=2`를 **0으로 보고** | — (규칙 자체가 없었다) | 마지막 문장(`wc \|\| echo`)의 exit이 태스크 exit으로 올라갔다. §1~§7에 **사후 검증 규칙이 없다** |
+GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-subcommands-core.md` §review "⚠️ `review`는 flag-only" 경고가 (당시 문구) "함께 주면 인자 충돌"을 이미 명시 | 산문 경고는 **호출 시점에 읽혀야** 작동한다. 호출자가 §6 템플릿을 붙이지 않고 손으로 조립했다 |
+래퍼가 GPT CLI exit=2 를 **0으로 보고** | — (규칙 자체가 없었다) | 마지막 문장(`wc \|\| echo`)의 exit이 태스크 exit으로 올라갔다. §1~§7에 **사후 검증 규칙이 없다** |
 
 ⛔ 두 번째가 더 위험하다: **측정 실패가 "이슈 0건"으로 읽힌다.** exit≠0 / 빈 출력은 *깨끗한 리뷰*가 아니라 *리뷰 부재*다.
 
@@ -209,10 +170,13 @@ codex exec ... -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
 ```bash
 # review: 대상 선택은 플래그로만 (PROMPT 불가 — 스크립트가 거부한다)
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --uncommitted [--effort high] [--schema S] [--title T] [--ephemeral]
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --base develop [--add-dir D]
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --base develop
 
 # exec: 커스텀 지시가 필요할 때 (diff는 프롬프트에 인라인 — 스코프 플래그 금지)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S]
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S]   # --add-dir = 쓰기 디렉토리 플래그 — fz(read-only)에선 쓰지 않는다
+
+# resume: 이전 exec·review 가 남긴 `${OUT}.session` 으로 **그 세션**을 잇는다 (⛔ --last 금지 — 사이에 다른 실행이 끼면 엉뚱한 세션)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$F2" --prompt-file P --session-file "$F.session" [--effort xhigh]
 ```
 
 ### 사전 게이트 (호출 전 거부)
@@ -236,7 +200,7 @@ codex exec ... -- "$(cat /tmp/gpt-prompt.txt)" < /dev/null
 | 3 | `--schema` 지정 시 **스키마 계약** 충족 (`scripts/validate-gpt-output.py`) | **14** | 측정 실패 |
 | 4 | **cwd 오염 없음** — 호출 전후 `git status --porcelain` 동일 | 경고 | 위임 프로세스가 대상 repo에 파일을 남겼다 |
 
-⛔ **게이트 4의 근거**: `--cd`로 지정한 디렉토리는 위임 프로세스의 **쓰기 대상**이기도 하다. 팀 레포를 `--cd`로 준 호출이 산출물 17개를 그 안에 남긴 실측이 있다(gitignore 미적용). 읽기 전용이라는 가정은 **호출자의 것이지 도구의 계약이 아니다**.
+⛔ **게이트 4의 근거**: `--cd`로 지정한 디렉토리는 위임 프로세스의 **쓰기 대상**이기도 하다. 팀 레포를 `--cd`로 준 호출이 산출물 17개를 그 안에 남긴 실측이 있다(gitignore 미적용). 2026-09-25 부터 래퍼가 read-only 를 강제해 쓰기는 막힌다 — 게이트 4 는 그 강제가 회귀로 풀렸을 때를 잡는 확인으로 남긴다.
 
 ```bash
 BEFORE="$(git -C "$CD" status --porcelain 2>/dev/null)"

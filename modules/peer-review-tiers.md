@@ -332,10 +332,12 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 ### Analyze
 - Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2)
-- + GPT challenger 1회 호출 (`< /dev/null` redirect 필수 — background 호출 시 stdin lock 방지):
+- + GPT challenger 1회 호출 (래퍼가 stdin 을 닫고 git repo 밖 실행 플래그를 붙인다 — 직접 호출 금지):
   ```bash
-  codex exec --skip-git-repo-check --sandbox read-only "$(cat /tmp/gpt-challenger-prompt.txt)" \
-    < /dev/null > ${WORK_DIR}/gpt-challenger-raw.txt 2>&1
+  # ⛔ 원래 호출은 effort 미지정(= config.toml 기본 xhigh)이었다 → 래퍼 기본(high)으로 바뀌지 않게 xhigh 명시.
+  #    원래의 `--sandbox read-only` 는 래퍼가 모든 호출에 강제하는 `sandbox_mode="read-only"` 로 대체된다.
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "${WORK_DIR}" --out "${WORK_DIR}/gpt-challenger-raw.txt" \
+    --prompt-file /tmp/gpt-challenger-prompt.txt --effort xhigh
   ```
 - GPT prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
 
@@ -479,7 +481,7 @@ Synthesize 단계 직전 (Lead가 모든 agent/GPT 응답 합류 후).
 
 ### 수집 소스
 - **Agent <usage> 블록**: Agent tool 응답에 포함된 `<usage>total_tokens: N tool_uses: M duration_ms: T</usage>`
-- **GPT output**: `codex exec` stdout 마지막 부분 `tokens used N`
+- **GPT output**: 래퍼 스트림 로그(`${OUT}.stream.log`) 마지막 부분 `tokens used N`
 - **Lead 추정**: tool_use 횟수 × 평균 (보수적)
 
 ### 출력 형식 1 — review-report.md 안
@@ -597,13 +599,13 @@ Stage 3: review-counter DA — issues 반론 + strengths 도전
 → Lead: GPT DA ×1 추가 (/fz-gpt)
 ```
 
-> SendMessage 실시간 멀티턴 수렴은 **고정 1-pass 교차로 대체**됐다 (충실도 trade-off — 은폐하지 않고 명시). 라운드 의미론 canonical은 `patterns/live-review.md`에 보존.
+> SendMessage 실시간 멀티턴 수렴은 **고정 1-pass 교차로 대체**됐다 (충실도 trade-off — 은폐하지 않고 명시). 라운드 의미론은 `workflows/review-live.js` 가 구현한다.
 
 ---
 
 ## GPT Analyze 호출
 
-> `get_gpt_skill_path()` 3-Tier 디스커버리 + codex exec 패턴: `modules/cross-validation.md` 참조.
+> `get_gpt_skill_path()` 3-Tier 디스커버리 + `scripts/gpt-exec.sh` 호출 패턴: `modules/cross-validation.md` 참조.
 
 GPT challenger 프롬프트에 필수 포함:
 - Origin Classification(regression/pre-existing/improvement)
@@ -612,7 +614,7 @@ GPT challenger 프롬프트에 필수 포함:
 
 결과: `${WORK_DIR}/gpt-challenger-result.json`
 
-⛔ codex exec background 호출 시 stdin lock 회피: `< /dev/null` redirect 필수.
+⛔ GPT CLI 를 background 로 직접 부르면 stdin lock — 래퍼 `scripts/gpt-exec.sh` 가 `< /dev/null` 로 닫는다(직접 호출 금지).
 
 ---
 

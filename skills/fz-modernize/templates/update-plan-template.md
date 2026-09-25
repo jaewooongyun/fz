@@ -95,7 +95,7 @@
 ### Gate 5c-2: GPT Verify
 
 ```
-Plan v{N}을 GPT-5.5로 검증
+Plan v{N}을 GPT(현행 모델 — `modules/gpt-strategy.md` 정본)로 검증
 누적 카운터: {현재}/3 (한도 도달 시 사용자 에스컬레이션)
 ```
 
