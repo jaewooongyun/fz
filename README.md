@@ -135,45 +135,27 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 |--------|---:|------|
 | [`llm-references.md`](guides/llm-references.md) | 159 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
 | [`prompt-optimization.md`](guides/prompt-optimization.md) | 758 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 632 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
+| [`skill-authoring.md`](guides/skill-authoring.md) | 651 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
 | [`skill-testing.md`](guides/skill-testing.md) | 500 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
-| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 292 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
+| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 297 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
 | [`agent-team-guide.md`](guides/agent-team-guide.md) | 493 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
 | [`model-guide.md`](guides/model-guide.md) | 304 | 모델 운용 — Lead 는 Fable 5.1, 실질 생산 워커는 Opus 5. effort 배정 기준 |
 | [`clean-architecture.md`](guides/clean-architecture.md) | 324 | Dependency Rule 과 SOLID — 레이어 판정 기준 |
-| [`harness-engineering.md`](guides/harness-engineering.md) | 1,346 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
+| [`harness-engineering.md`](guides/harness-engineering.md) | 1,351 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
 
 ---
 
-## What's New — v4.36.0
+## What's New — v4.38.0
 
-**참조는 있는데 부를 이름이 없었다.** 같은 클래스가 세 서버째 나왔다. `/sc:` 와 Serena 를
-고친 뒤 남은 둘도 이름이 어긋나 있었고, Swift 플러그인은 **호출명 자체가 문서에 없었다**.
+**검사기는 있었고 부르는 곳이 없었다.** 호출처가 0건인 검사기·게이트·플래그가 다섯 곳 있었다.
+완료 근거와 측정 대상이 달랐고(`F-292`), 0건만 의심하고 큰 수는 의심하지 않았다(`F-293`).
 
-**LSP 11곳** — 그런 이름의 MCP 서버가 없다. `swift-lsp`·`clangd-lsp` 는 설치·활성이지만
-MCP 를 노출하지 않고 네이티브 `LSP` 도구가 operation 파라미터로 동작한다. 넷을 `LSP` 로
-수렴하고 `diagnostics_delta` 는 대응이 없어 Serena 로 보냈다. ⛔ 이쪽은 frontmatter 선언만
-있고 **본문 지시 0건**이라 아무도 부르지 않았다 — 거짓 선언이다.
+- 검사기 신설 15 · 수정 6, 전부 `health-check` 에 배선
+- Workflow `fallback` 을 SOLO 직행 대신 판별 표 6종으로 분기
+- 리뷰 게이트: 증상 관측(4.7-S) · 형제 관례 양방향 · 단일 도구 0건 삭제 권고 금지
+- 게이트 `TOOLS`: 도구 부재는 UNRUN · 도구 인벤토리 단일 출처
 
-**JIRA 7곳** — 런타임은 `mcp__atlassian-jira__jira_get|jira_post` 다. 액션별 이름이 아니라
-REST path 를 받는 범용 도구로 바뀌어 있었다. 이쪽은 본문이 실제로 쓰려던 자리다.
+→ [릴리즈 노트](docs/releases/v4.38.0.md)
 
-⛔ **정정**: 앞선 측정에서 `sequential-thinking` 도 끊겼다고 판정했으나 **오탐**이었다 —
-검색 패턴을 짧게 잘라 이름이 불완전하게 보였다. 그쪽은 정확하고 본문에서도 쓰인다.
-**부재를 주장하기 전에 패턴이 대상에 recall 을 갖는지 먼저 본다.**
-
-⭐ **Swift 플러그인 — 자리는 이미 있었다.** discover·plan·code·review·peer-review 다섯이
-전부 `plugin-refs.md` 를 가리키고 발동 조건까지 적어 두었다. 빠진 것은 둘이다.
-① **부를 이름**이 없었다 — 설치 식별자만 있고 슬래시 호출명이 없다. `/sc:` 와 같은 형태다.
-⛔ 두 이름이 다르다는 것 자체가 함정이다: Concurrency 는 마켓플레이스가
-`swift-concurrency-agent-skill` 인데 스킬 이름은 `swift-concurrency` 다.
-② **표에 빈 칸**이 있었다 — discover 와 peer-review 는 아예 자리가 없고, plan 은 동시성만,
-review 는 SwiftUI 만 있었다. 6개 자리를 채웠고 각 자리는 그 단계에서 **무엇을 보는가**로 적었다.
-
-⛔ 5개 스킬 본문은 건드리지 않았다. 이미 모듈을 가리키므로 같은 내용을 다섯 번 쓰면 순증이다 —
-단일 출처에 한 번 적는다.
-
-**검증**: `mcp__lsp__`·`mcp__atlassian__`·`mcp__serena__` 전부 0건 · health-check exit 0 ·
-게이트 self-test 67/67 · 회귀 오라클 13/13 · 기능단위 3커밋.
-
-→ [릴리즈 노트](docs/releases/v4.36.0.md)
+**v4.37.0 — 참조 탐색이 63%를 놓치고 있었다.** Swift conformance 구현을 못 찾는 `find_referencing_symbols`(recall 36.9%) 대신 codegraph(88.8%)를 참조 탐색 Primary 로 옮겼다.
+→ [릴리즈 노트](docs/releases/v4.37.0.md)
