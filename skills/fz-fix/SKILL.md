@@ -52,7 +52,7 @@ metadata:
 
 ## Prerequisites
 
-- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -206,7 +206,9 @@ metadata:
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
 2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus). 1-2 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
 3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke
-4. **`mode:'fallback'` 반환 시**: SOLO 폴백 = Mode A Bug Fix Step 1-4 진입 — **--gpt 처리 책임도 fallback 경로에서 유효** + 사유 experiment-log 기록
+4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
+   Mode A Bug Fix Step 1-4 직접 진입은 **L4 사용자 승인 후**다. 어느 경로로 가든 **--gpt 처리 책임은 유효**하고,
+   사유는 experiment-log 에 기록한다
    - **`mode:'split_required'`(또는 `splitSuggested:true`) 우선**: SOLO 폴백 전에 **Step 분할 후 재invoke** (H5 크기 가드 — fz-code 절차 6 사다리 동형). ⛔ Lead=fable 자동 SOLO 금지 — 직접 구현은 사용자 승인 후
 5. **지표 기록**: 세션당 1행 → `experiment-log.md` §5.7 fz-fix 테이블. 단일 Step 다수 — Step 루프 1회면 invoke 1회로 종료. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
 

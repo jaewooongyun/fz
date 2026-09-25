@@ -592,7 +592,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 ### 산출물·거버넌스 계약
 
-- 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — mode='fallback'이면 Lead가 SOLO 폴백. wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
+- 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — ⛔ `mode='fallback'` 이면 **아래 § 실패 복구 사다리의 판별 표로 분기**한다(SOLO 직행 아님 — `fallback` 하나에 분할 요구·입력 오류·실행 실패가 함께 담긴다). wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
 - 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / **opus 동시 ≤3** (워커 기준 — Lead는 fable, fan-out은 sonnet. **정본 = `guides/model-guide.md` §5** — ⛔ 여기서 값을 재정의하지 않는다) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
 - 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
 - 검증 oracle: 래핑 syntax 검사(`async function wrap(...){...본문...}` 후 node --check — 직접 node --check는 CJS 관대 파싱으로 무효) + **실 invoke ≥1** + experiment-log §5.7 지표 기록
@@ -601,6 +601,25 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 > 신설 근거(2026-08-09): 이전에는 5개 스킬이 폴백 절차로 `docs/history/team-core.md` + `docs/history/patterns/`(679줄)를 지목했으나 그 내용은 `TeamCreate`/`SendMessage` **P2P 절차**였다 — SOLO에는 에이전트가 없어 **실행 자체가 불가능**했다. 그런데 실측상 실패는 2회 발생하고 **두 번 다 아래 사다리로 복구**됐다(`experiment-log.md` §5.7 fz-code #1 · fz-review #8). `team-core` 사용 이력은 **0건**이다.
 > 즉 본 절은 새 프로토콜을 발명하는 것이 아니라 **이미 작동한 복구 경로를 성문화**한다.
+
+#### ⛔ 먼저 상태를 판별한다 — 6종 (2026-09-18)
+
+> 신설 근거: 같은 §12 안에서 산출물 계약이 *"`fallback` 이면 SOLO 폴백"* 을 무조건으로 지시하고
+> 사다리는 L1·L2 를 먼저 요구했다 — **문면이 상충했다**. 그리고 소비자(`skills/fz/SKILL.md` 에러표)는
+> 스폰 실패를 SOLO 폴백으로 직행시켰는데 사다리에는 그 상태가 **없었다**. 아래 표가 정본이다.
+> ⛔ 새 단계를 만들지 않는다 — 판별만 더하고 처방은 기존 L1~L4 로 보낸다.
+
+| # | 상태 | 판별 근거 (반환·에러의 관측 가능한 형태) | 처방 |
+|---|---|---|:--:|
+| 1 | **scriptPath 거부** | 에러가 `scriptPath must be a script path this tool returned…` 로 시작 · ⛔ **반환에 `mode` 필드 자체가 없다**(스크립트 미실행 · 에이전트 0 · 산출 0) | § scriptPath 거부 우회 계약 — **사다리 아님** |
+| 2 | **분할 요구** | `mode:'split_required'` · 또는 `mode:'fallback'` + `splitSuggested:true` | **L1** |
+| 3 | **입력 오류** | `mode:'fallback'` + args 파싱 실패·필수 키 누락 (설계된 fail-fast) | **L2** |
+| 4 | **일시 장애** | 스테이지 스톨 · 세션/rate limit · 타임아웃 | **L3** |
+| 5 | **스폰 실패** | agent 스폰 예외 · `metrics.agentCalls` 가 0 인데 `mode` 는 정상 | **L3** 우선(일시 장애 의심) → 미해소 시 **L4** |
+| 6 | **알 수 없는 반환** | 위 다섯 중 어느 판별에도 걸리지 않음 (`mode` 값이 예상 밖이거나 metrics 부재) | **L4 직행** — ⛔ 판정 불가를 추측으로 메우지 않는다 |
+
+⛔ **여섯 중 어느 것도 SOLO 직행이 아니다.** Lead 단독 SOLO 수행은 **L4 에서 사용자 승인 후에만**
+성립한다(Lead=fable 자동 SOLO 금지). 소비자 문서가 이 표와 다르게 적으면 **이 표가 이긴다**.
 
 | 단계 | 조건 | 행동 | 실측 선례 |
 |:--:|---|---|---|

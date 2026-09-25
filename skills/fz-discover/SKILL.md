@@ -59,7 +59,7 @@ metadata:
 
 ## Prerequisites
 
-- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 폴백 (에러 대응 표)
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 폴백 (에러 대응 표) (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (TEAM 공식 사양 — 패턴 canonical 문서용, pilot 기간 실행 경로 아님)
 
 ## 모듈 참조
@@ -109,7 +109,9 @@ metadata:
    - --deep: 렌즈 3 fan-out(sonnet, 독립 생성) → 병합(opus, 탈락 금지) → 경로별 평가(동시 ≤4 chunk) → 합성. budget 가드 내장
 4. **반환 처리**:
    - `mode: 'workflow'` → `landscape`(Trade-off Table + Open Questions)를 Phase 2/3 사용자 대화 입력으로 사용. Lead가 `discover-journal.md` 기록 (canonical 경로 무변경)
-   - `mode: 'fallback'` → 아래 에러 대응 표의 SOLO 폴백(Lead 단독 REP) 수행 + 사유를 experiment-log에 기록
+   - `mode: 'fallback'` → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`(입력 오류)와 `agent null`(일시 장애)에만
+     이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
+     L4 사용자 에스컬레이션). Lead 단독 REP 는 **사용자 승인 후**에만. 사유는 experiment-log 에 기록
 5. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `experiment-log.md` Workflow tracing 섹션에 수동 append
 6. **--deep cross-model**: Workflow 완료 후 Lead가 `/fz-gpt verify` 별도 실행 (스크립트 내 cross-provider 스폰 금지)
 
@@ -484,7 +486,8 @@ GOOD (본질 같은 옵션 합치기):
 | 사용자 응답 없이 수렴 불가 | 현재까지의 제약 매트릭스 출력 + 판단 보류 | AskUserQuestion |
 | 장기 대화 (5라운드+) | context budget 상태 안내 + 아티팩트 기록 확인 | 계속 진행 |
 | Serena 연결 실패 | Grep + Glob 폴백 | 코드 없이 원칙 기반 추론 |
-| Workflow 실행 실패 / `mode: 'fallback'` 반환 | SOLO 폴백 + 사유 experiment-log 기록 | Lead 단독 REP 실행 |
+| Workflow **도구 미가용**(호출 자체 거부) | SOLO REP + 사유 experiment-log 기록 | Lead 단독 REP 실행 |
+| `mode: 'fallback'` 반환(실행 중 실패) | ⛔ SOLO 아님 — `guides/skill-authoring.md` §12 판별 표로 분기 | L1~L3 후 미해소면 L4 |
 | 모든 후보 탈락 | 제약 완화 제안 | 사용자에게 제약 우선순위 질문 |
 
 ## Completion → Next
