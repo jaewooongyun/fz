@@ -54,7 +54,7 @@ metadata:
 | 이전 서브커맨드 | 이동처 | 설명 |
 |---------------|--------|------|
 | `workflow` | `/fz` | 파이프라인 조합은 compositor가 담당 |
-| `team <pattern>` | `workflows/*.js` + `guides/skill-authoring.md` §12 | 각 스킬이 자기 Workflow를 소유. ⛔ `team-core.md`·`patterns/`는 설계 출처 — 실행 절차 아님 |
+| `team <pattern>` | `workflows/*.js` + `guides/skill-authoring.md` §12 | 각 스킬이 자기 Workflow를 소유 |
 | `governance` | `modules/governance.md` | 거버넌스 프레임워크 |
 
 ---
@@ -84,7 +84,7 @@ metadata:
 analyze, brainstorm, build, cleanup, ...
 
 ## 공유 모듈
-build.md, governance.md, session.md, skill-template.md, team-core.md, README.md
+build.md, governance.md, session.md, skill-template.md, README.md
 ```
 
 ---

@@ -1,6 +1,6 @@
 # Agent & Team Configuration Guide
 
-> **Sources (last audited: 2026-09-06 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용(MAST 등 arxiv)은 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-09-25 — 모델 사실 축: :253 Fable 5.1 비용 결론의 Opus 5.5 재산정 포인터 · 서브에이전트 과다 행의 Opus 5.5 caveat 행만 대조. 나머지는 2026-09-06 대조 그대로):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용(MAST 등 arxiv)은 개별 `[verified:]` 태그 참조.
 >
 > fz-* 스킬 생태계에서 에이전트 작성 및 (역사적) 팀 구성을 위한 종합 가이드.
 > 에이전트는 `agents/*.md`에 위치하며, agentType(`fz:`)으로 `workflows/*.js` Workflow가 재사용한다.
@@ -151,7 +151,7 @@ TeamCreate("{skill}-{feature}")
 +-- Lead (Opus): 오케스트레이션 + 게이트 실행 + 중재
 +-- Primary Worker (Opus): 핵심 생산 (plan-structure 또는 impl-correctness)
 +-- Supporting N (Sonnet): 검증/비평 (review-arch, review-quality 등)
-+-- Codex CLI: cross-model 검증 (Lead가 fz-gpt 실행)
++-- GPT CLI: cross-model 검증 (Lead가 fz-gpt 실행)
 ```
 
 팀 이름은 `{skill}-{feature}` 형식을 따른다 (예: `plan-auth-refactor`, `code-player-fix`).
@@ -217,21 +217,21 @@ GOOD (Mesh / Peer-to-Peer):
 
 ## 3. 통신 패턴 5가지
 
-> 상세 구현(pseudocode 흐름)은 `docs/history/patterns/`가 canonical. 아래는 빠른 매핑만 — 중복 pseudocode는 patterns/로 위임 (hot-path 슬림화).
+> 상세 구현은 각 `workflows/*.js`(평탄화 구현)가 정본이다 (사료 2026-09-25 삭제 — 결정: `modules/promotion-ledger.md` § TEAM 일몰). 아래는 빠른 매핑만.
 
-| 패턴 | 스킬 | 핵심 (에이전트 간 직접 대화) | 상세 |
+| 패턴 | 스킬 | 현행 동작 (스크립트가 단계 결과를 다음 단계 입력으로 넘긴다 — 에이전트 간 직접 대화 없음) | 구현 스크립트 |
 |------|------|------------------------------|------|
-| Collaborative Design | fz-plan | plan-structure ↔ review-arch: 설계하며 실현성 즉시 검증, 합의까지 직접 대화 | `patterns/collaborative.md` |
-| Pair Programming | fz-code | impl-correctness ↔ review-arch: 구현 도중 실시간 질문/피드백 (완성 후 리뷰 아님) | `patterns/pair-programming.md` |
-| Live Review | fz-review | review-arch ↔ review-quality: 분석 중 발견 즉시 공유 + 교차 확인으로 FP 감소 | `patterns/live-review.md` |
-| Adversarial Constraint Discovery | fz-discover | plan-structure(생성) ↔ review-arch(파괴): 만들고 부수며 제약 표면화, 수렴까지 반복 | `patterns/adversarial.md` |
-| Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ↔ search-pattern(텍스트): 다른 방법론 교차 확인 | `patterns/cross-verify.md` |
+| Collaborative Design | fz-plan | plan-structure 설계안 → review-arch 검토 → 병합 (다단계 — 롤백 경로) | `workflows/plan-collaborative.js` (fz-plan 기본은 `plan-lean2.js` — 협업 패턴은 롤백 경로) |
+| Pair Programming | fz-code | impl-correctness changeset → review-arch·impl-quality 병렬 검토 → 조건부 수정 (Step 단위 — `skills/fz-code/SKILL.md`) | `workflows/code-pair.js` |
+| Live Review | fz-review | review-arch ∥ review-quality → 교차 severity 조정 → review-counter DA (`skills/fz-review/SKILL.md`) | `workflows/review-live.js` |
+| Adversarial Constraint Discovery | fz-discover | plan-structure(생성) 결과를 review-arch(파괴) 가 받아 제약을 드러낸다 — 라운드마다 스크립트가 전달 | `workflows/discover-adversarial.js` |
+| Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ∥ search-pattern(텍스트) → 서로의 결과를 교차 확인 | `workflows/search-cross-verify.js` |
 
 > **실행 전환 (Wave 1-4, 완료)**: 위 5 패턴은 현재 `workflows/{discover-adversarial,plan-collaborative,review-live,code-pair,search-cross-verify}.js` 결정적 Workflow로 실행(P2P SendMessage 아님 — 라운드 의미론은 스크립트가 구현). 규약: `guides/skill-authoring.md` §12.
 > - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:78` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — 6개 워크플로가 전 패턴을 덮는다.
-> - `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 **존재하지 않으며**, fz 실행 경로에도 호출부가 **0건**이다 [verified: `grep -rn "TeamCreate(" workflows/ scripts/` → 0]. 본 가이드의 TeamCreate 예시(§2/§3/§7)는 **역사적 의미론 기록**이며 SOLO 폴백 프로토콜 참조용으로만 유효하다.
+> - `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 **존재하지 않으며**, fz 실행 경로에도 호출부가 **0건**이다 [verified: `grep -rn "TeamCreate(" workflows/ scripts/` → 0]. 본 가이드의 TeamCreate 예시(§2/§3/§7)는 **역사적 의미론 기록**이다 — ⛔ SOLO 폴백 절차로 참조하지 않는다(머리 경고).
 
-공통: 3명+ Star 토폴로지는 Supporting 발견을 Primary 경유 전달, 합의 후 Lead 보고. 라운드·토폴로지 상세는 `docs/history/team-core.md`.
+공통: 에이전트끼리 직접 대화하지 않는다 — 스크립트가 단계 결과를 다음 단계 입력으로 넘긴다. 병합은 워크플로마다 다르다 — 스크립트 안의 통합 단계(예: plan-collaborative·search-cross-verify)가 하거나, 반환 뒤 Lead 가 한다. 최종 판정은 Lead 가 한다. 옛 P2P 라운드·토폴로지 상세를 담던 TEAM 사료는 삭제됐다(위 "상세 구현은 각 `workflows/*.js`" 인용문).
 
 ---
 
@@ -250,7 +250,7 @@ GOOD (Mesh / Peer-to-Peer):
   - **순차 승격** 허용: 병렬 opus 스폰은 순차 승격으로도 상한(≤3)을 넘지 않도록 유지한다.
   - 예외: full-cycle / plan-to-code 파이프라인에서 plan과 code 각각 Primary가 다르므로 순차적으로 opus를 사용한다.
 - **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단.
-- **Fable 5.1 (2026-09-01 GA, Lead 모델)**: 판단 tier 모델, 출력·캐시쓰기 단가는 opus 5의 2배($10/$50 vs $5/$25)나 **캐시 읽기는 $0.25/MTok로 opus 5($0.50)의 절반** — 캐시 지배 세션에서는 "2배" 진술이 성립하지 않는다(fz 실측 2026-09-06: 동일 트래픽을 Fable 5.1 단가로 환산 시 opus 대비 **+9%**). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/model-guide.md` §5. ⚠️ 2026-09-06 정정: "opus의 2배" 단정은 출력·캐시쓰기 단가에만 참이다.
+- **Fable 5.1 (2026-09-01 GA, Lead 모델)**: 판단 tier 모델, 출력·캐시쓰기 단가는 opus 5의 2배($10/$50 vs $5/$25)나 **캐시 읽기는 $0.25/MTok로 opus 5($0.50)의 절반** — 캐시 지배 세션에서는 "2배" 진술이 성립하지 않는다(fz 실측 2026-09-06: 동일 트래픽을 Fable 5.1 단가로 환산 시 opus 대비 **+9%**). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/model-guide.md` §5. ⚠️ 2026-09-06 정정: "opus의 2배" 단정은 출력·캐시쓰기 단가에만 참이다. 위 비교는 Opus 5 단가 기준이고, 워커 Opus 5.5($4/$20·캐시 읽기 $0.20) 기준 재산정은 미실시(선택 과제 — `guides/model-guide.md` §5 가격 비교).
 
 ### 모델 승격 매트릭스
 
@@ -272,7 +272,7 @@ Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워�
 
 ### cross-model 상호검증 원칙
 
-- 모든 TEAM 구성에 Codex CLI가 포함된다.
+- 모든 TEAM 구성에 GPT CLI가 포함된다.
 - **Lead가 직접** `/fz-gpt`를 실행한다 (에이전트가 GPT를 직접 호출하지 않음).
 - Claude (opus/sonnet) + GPT (다른 모델)의 교차 검증으로 blind spot을 보완한다.
 
@@ -303,6 +303,7 @@ GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 �
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
 | 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: **동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217)·**depth 3**(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, v2.1.219) — fz governance(**opus 동시 ≤3** — 정본 `guides/model-guide.md` §5)는 이보다 보수적. ⛔ 세션 생애 200 캡(`…MAX_SUBAGENTS_PER_SESSION`)은 **v2.1.224에서 제거**됐다 — 누적 스폰 제약은 더 이상 없고 **동시·depth만 남는다** |
+| ↳ Opus 5.5 (현행 워커) | 5.5 프롬프팅 페이지에는 subagent 캡 절이 없지만 Opus 5 패턴을 상속한다 — *"the patterns in Prompting Claude Opus 5 remain a reasonable starting point"* → **캡 절 부재는 캡 폐기 근거가 아니다**. 장기 자율 런에는 시간 예산 신호를 권한다 — *"give the model a time budget: have your harness add a short line at the end of each message … giving the elapsed time"* [verified: prompting-claude-opus-5-5] | 위 명시 캡 유지 + elapsed 시간 신호 |
 | coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) + 동일 토큰예산서 우위 소멸 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
 | standalone Task | 통신 불가, 고립된 작업 | Workflow `agent()` 사용 (`skill-authoring.md` §12) — ⛔ `TeamCreate`는 v2.1.178부터 존재하지 않는다 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
