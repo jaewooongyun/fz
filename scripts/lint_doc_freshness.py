@@ -95,6 +95,9 @@ LEGACY_MODELS = [
     # ⛔ `Claude N` 표기 (2026-08-20 신설): 어휘가 `Opus`/`Sonnet` 접두만 담고 있어
     #    `Claude 4.8` 형태가 통째로 빠져 있었다 — 실측 7곳(guides/ 3파일).
     "Claude 4.8", "Claude 4.7", "Claude 4.6",
+    # ⛔ `Opus 5` (2026-09-25 신설): 워커가 Opus 5.5 로 바뀌어 구세대가 됐다. `Opus 5` ⊂ `Opus 5.5`,
+    #    `opus-5` ⊂ `claude-opus-5-5` 라 부분문자열 검사로는 현행 표기까지 잡는다 → `legacy_hits()` 로 판정한다.
+    "Opus 5", "opus-5",
 ]
 
 # heading 판별 — `stale-model-heading` 전용 (아래 lint() 참조)
@@ -160,6 +163,23 @@ def model_tokens(names: list[str] | str) -> list[str]:
     return list(dict.fromkeys(out))
 
 
+def legacy_hits(text: str, cur_toks: list[str]) -> list[str]:
+    """`text` 에 나오는 구세대 모델 토큰 — 같은 위치에서 현행 토큰이 시작하는 매치는 버린다.
+
+    `Opus 5.5` 안의 `Opus 5`, `claude-opus-5-5` 안의 `opus-5` 는 현행 표기의 일부라 구세대가 아니다.
+    `claude-opus-4-8-20260101` 의 `opus-4-8` 은 같은 위치에 현행 토큰이 없으므로 그대로 잡는다.
+    """
+    hits = set()
+    for t in LEGACY_MODELS:
+        start = text.find(t)
+        while start != -1:
+            if not any(text.startswith(c, start) for c in cur_toks):
+                hits.add(t)
+                break
+            start = text.find(t, start + 1)
+    return sorted(hits)
+
+
 def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
     today = date.today()
     cur, cur_src = current_model(root)
@@ -201,12 +221,12 @@ def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
 
         # 구세대 모델명만 있고 현행이 없는 파일
         if cur_toks:
-            legacy_hits = [t for t in LEGACY_MODELS if t in text]
+            legacy = legacy_hits(text, cur_toks)
             has_current = any(t in text for t in cur_toks)
-            if legacy_hits and not has_current:
+            if legacy and not has_current:
                 findings.append({
                     "file": rel, "rule": "stale-model-ref", "severity": "warn",
-                    "detail": f"구세대 모델명 {sorted(set(legacy_hits))} 언급, 현행 '{cur_label}' 미언급",
+                    "detail": f"구세대 모델명 {legacy} 언급, 현행 '{cur_label}' 미언급",
                 })
 
         # 구세대 모델명이 **섹션 제목**에 박힌 경우 (2026-08-20 신설)
@@ -236,7 +256,7 @@ def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
                     continue
                 if not HEADING.match(line):
                     continue
-                hits = [t for t in LEGACY_MODELS if t in line]
+                hits = legacy_hits(line, cur_toks)
                 if hits and not any(t in line for t in cur_toks):
                     findings.append({
                         "file": f"{rel}:{ln}", "rule": "stale-model-heading", "severity": "warn",
@@ -316,6 +336,33 @@ def self_test():
             passed.append("caller-uses-new-predicate")
         else:
             failed.append(f"caller-uses-new-predicate: 대상 {n_target}개 (기대 1 — 템플릿은 제외돼야 한다)")
+
+    # ── 구세대 판정 — 부분문자열 충돌(`Opus 5` ⊂ `Opus 5.5`) 과 날짜 ID
+    toks = model_tokens(["Fable 5.1", "Opus 5.5"])
+    for name, text, want in (
+        ("legacy-opus5-bare", "Opus 5 운용 절", ["Opus 5"]),
+        ("legacy-opus5-id", "모델 ID `claude-opus-5`", ["opus-5"]),
+        ("legacy-opus5-not-inside-opus55", "Opus 5.5 · `claude-opus-5-5`", []),
+        ("legacy-opus48-dated-id", "`claude-opus-4-8-20260101`", ["opus-4-8"]),
+    ):
+        cases += 1
+        got = legacy_hits(text, toks)
+        (passed.append(name) if got == want else failed.append(f"{name}: {got} (기대 {want})"))
+    # ── 파일 규칙은 **호출부**로 본다 — 헬퍼만 부르면 lint() 가 구판 부분문자열 검사로 돌아가도 통과한다
+    for name, body, want in (
+        ("file-rule-opus5-only-fires", "> 근거 (arxiv 2503.13657) — Opus 5 운용\n", True),
+        ("file-rule-opus55-exempt", "> 근거 (arxiv 2503.13657) — Opus 5.5 · `claude-opus-5-5` 운용\n", False),
+    ):
+        cases += 1
+        with _tf.TemporaryDirectory() as _d:
+            root = Path(_d)
+            (root / "guides").mkdir()
+            (root / "modules").mkdir()
+            (root / "guides" / "llm-references.md").write_text(
+                "> **모델 정책: Fable 5.1 (Lead) · Opus 5.5 (worker) only**\n", encoding="utf-8")
+            (root / "modules" / "a.md").write_text(body, encoding="utf-8")
+            fired = any(f["rule"] == "stale-model-ref" and f["file"] == "modules/a.md" for f in lint(root, 90)[0])
+            (passed.append(name) if fired == want else failed.append(f"{name}: 발화 {fired} (기대 {want})"))
 
     print(f"self-test {len(passed)}/{cases} 통과")
     for x in passed:
