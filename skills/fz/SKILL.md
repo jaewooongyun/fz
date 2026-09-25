@@ -75,7 +75,7 @@ metadata:
 
 ## Prerequisites
 
-- TEAM 모드는 네이티브 **Workflow 도구** 가용 환경 필요 (미가용 시 SOLO 폴백). ⛔ `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`은 **TeamCreate 경로 전용**이며 Wave 4 전환 후 Workflow 경로에는 불필요
+- TEAM 모드는 네이티브 **Workflow 도구** 가용 환경 필요 (미가용 시 SOLO 폴백). ⛔ `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`은 **TeamCreate 경로 전용**이며 Wave 4 전환 후 Workflow 경로에는 불필요 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -467,8 +467,8 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 | intent-triggers 매칭 0개 (total-miss) | AskUserQuestion | 사용자에게 스킬 직접 선택 요청 (⛔ 3.2 임의 실행 금지) |
 | 스킬 SKILL.md 누락 | 해당 단계 스킵 제안 | 남은 파이프라인 계속 |
 | Gate 실패 (SOLO) | 재시도/스킵/중단 선택 | 사용자 에스컬레이션 |
-| Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | SOLO 폴백 |
-| 팀 에이전트 스폰 실패 | SOLO 폴백 | 사용자 에스컬레이션 |
+| Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | ⛔ SOLO 직행 아님 — `guides/skill-authoring.md` §12 판별 표 |
+| 팀 에이전트 스폰 실패 | §12 판별 표 **상태 5** → L3(일시 장애 의심) 우선 | 미해소 시 L4 사용자 에스컬레이션 (⛔ SOLO 는 승인 후) |
 | provides/needs 체인 끊김 | 중간 스킬 자동 제안 | AskUserQuestion |
 | 파이프라인 12스텝+ | Artifact + 체크포인트 | compact 대비 기록 확인(작업은 계속 — 아티팩트로 복원 가능) <!-- 기존: 6스텝+ --> |
 

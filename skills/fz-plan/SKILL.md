@@ -47,7 +47,7 @@ metadata:
 
 ## Prerequisites
 
-- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
@@ -135,7 +135,8 @@ metadata:
      `{ verdict, alternatives }` 형태이며 `directionVerdict` 가 `RECONSIDER`·`REDIRECT` 일 때만 실린다.
      ⛔ **필드다, 반환 모드가 아니다** — 현행 배선(`plan-lean2.js`)은 방향 판정을 full 콜 안에서 하므로 정상 경로와 반환 형태를 가르지 않는다.
      (롤백해 `plan-collaborative.js` 를 쓰면 그쪽은 `mode:'direction_escalation'` 으로 온다 — 두 형태를 모두 받는다.)
-   - `mode:'fallback'` → SOLO 계획 수립 수행 + 사유 experiment-log 기록 (두 배선 모두 반환한다)
+   - `mode:'fallback'` (두 배선 공통) → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`·`agent null` 에만 이 값을 돌려준다 —
+     도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 experiment-log 기록
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(GPT 회복 시) + GPT verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
 6. **지표 기록**: `return.metrics` + **자동 계측** → `experiment-log.md` §5.7 fz-plan 테이블
    ```bash

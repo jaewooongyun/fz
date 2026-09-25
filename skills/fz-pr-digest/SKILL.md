@@ -56,7 +56,7 @@ metadata:
 
 ## Prerequisites
 
-- Deep Tier 심층 탐색은 네이티브 Workflow 도구 필요 — 미가용 시 SOLO 탐색 폴백
+- Deep Tier 심층 탐색은 네이티브 Workflow 도구 필요 — 미가용 시 SOLO 탐색 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/skill-authoring.md` §12 (Workflow 규약)
 
 ## 3-Tier 깊이

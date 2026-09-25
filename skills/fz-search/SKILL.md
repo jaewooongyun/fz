@@ -373,7 +373,8 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 | normal | 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴, "누가 쓰는"·"전수" 키워드, Serena 연결됨 | `/fz-search "TVG-1234 AuthRepository 누가 쓰는지 전수"` | Gate 0 (Work Dir Ready) 3/3 통과 (`{CWD}/TVG-1234/` + index.md 생성) + impact depth 2 추적 + Coverage Gate 통과(전수 주장) + `{WORK_DIR}/search/search-result.md` 기록 |
 | edge-case | `--deep` 플래그 + 네이티브 Workflow 도구 가용 | `/fz-search --deep "Player 모듈 구조"` | `mode:'workflow'` 반환 → 출력에 신뢰도 등급 열(★★★/★★/★) 표시 + `return.metrics`(agentCalls/nullCount/stages/fallback) → experiment-log §5.7 기록 |
 | edge-case | 모드 트리거 키워드가 복수/모호한 질의 | `/fz-search "Player 관련된 거"` | AskUserQuestion으로 모드 확인 (임의 모드 선택 금지) → 사용자가 선택한 모드로 실행 |
-| failure | `--deep` 플래그 + Workflow 도구 미가용 | `/fz-search --deep "Auth 데이터 흐름"` | `mode:'fallback'` → 기본 순차 모드 자동 전환 + 폴백 사유 experiment-log 기록 (중단/크래시 없이 결과 반환) |
+| failure | `--deep` 플래그 + Workflow **도구 미가용**(호출 자체 거부) | `/fz-search --deep "Auth 데이터 흐름"` | 기본 순차 모드 자동 전환 + 사유 experiment-log 기록 (중단/크래시 없이 결과 반환) |
+| failure | `--deep` 실행 중 실패 → `mode:'fallback'` 반환 | 동일 | ⛔ 자동 전환 아님 — `guides/skill-authoring.md` §12 판별 표로 분기 (L3 `resume` 우선). 순차 모드 강등은 L4 승인 후 |
 | failure | Serena MCP 연결 실패 | `/fz-search "AuthRepository 영향 범위"` | Grep + Glob 전용 폴백(패턴 검색만 수행) + 크래시 없이 Gate: Search Complete 통과 |
 
 ## Boundaries
