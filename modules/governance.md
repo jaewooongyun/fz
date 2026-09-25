@@ -49,7 +49,7 @@
 | 모델 비용 상한 초과 | fable 에이전트 동시 2개 이상 (Lead 세션 제외) 또는 opus 에이전트 동시 4개 이상 | 추가 스폰 차단 |
 | 의도 이탈 | 실행 결과가 원래 요청과 무관 | 파이프라인 중단 + 사용자 확인 |
 
-> 모델 비용 상한 근거: **정본 = `guides/model-guide.md` §5** — 동시 상한 수치(opus ≤3 · fable 1 · 총 ≤4)와 그 근거를 모두 그곳에서 읽는다. ⚠️ 2026-09-06 정정 — 이전에 여기 적혀 있던 "fable 1 ≈ opus 2 비용 등가 → opus 5 equivalent" 산식은 정본이 폐기했다(Fable 5.1 캐시 읽기 $0.25 < Opus 5 $0.50, 남는 차이는 출력·캐시쓰기 단가 2배 + 지연 +49%). 값을 여기 복사하지 않는다.
+> 모델 비용 상한 근거: **정본 = `guides/model-guide.md` §5** — 동시 상한 수치(opus ≤3 · fable 1 · 총 ≤4)와 그 근거를 모두 그곳에서 읽는다. ⚠️ 2026-09-06 정정 — 이전에 여기 적혀 있던 "fable 1 ≈ opus 2 비용 등가 → opus 5 equivalent" 산식은 정본이 폐기했다(Fable 5.1 캐시 읽기 $0.25 < Opus 5 $0.50, 남는 차이는 출력·캐시쓰기 단가 2배 + 지연 +49%). 값을 여기 복사하지 않는다. 워커가 Opus 5.5($4/$20·캐시 읽기 $0.20)로 바뀐 뒤의 재산정은 미실시(선택 과제 — `guides/model-guide.md` §5 가격 비교).
 > **rate-limit 폴백 계약**: 병렬 opus 스폰이 상한 미달로 실패/429 시 순차화 재시도 1회 → 재실패 시 `mode:'fallback'` 반환. 구현은 workflows 코드(plan-collaborative stage2 · peer-review stage1의 병렬 블록).
 
 ### ⛔ 사각지대 — advisor 도구는 위 상한이 **전혀 보지 못한다**
@@ -74,6 +74,7 @@
 2. ad-hoc Workflow 프로브 등 일회성 실행은 advisor 호출을 유도하는 지시를 넣지 않는다 — 계측되지 않는 지출이 된다.
 3. ⚠️ 격리 워커의 advisor는 **워커 자신의 컨텍스트만** 읽는다(메인 세션 트랜스크립트 아님) → 회당 비용은 메인 세션보다 작다. 리스크는 회당 비용이 아니라 **호출 수 × 무계측**이다.
 4. 끄려면 `advisorModel` **unset** 또는 `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`. ⛔ 실험 게이트류 env var를 `"0"`으로 두는 것은 끄는 게 아니다 — 공식: *"any non-empty value **including `0`** turns the behavior on"*.
+5. 워크플로 실행 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --wf <runId>` 의 advisor 카운트를 확인하고, **advisor > 0 이면 결과 보고에 적는다**. 워커 쪽을 끄는 네이티브 수단은 없다 — 공식: *"Subagents inherit the configured advisor and apply the same pairing check against their own model"*(code.claude.com/docs/en/advisor, 2026-09-22 대조). `advisorModel: "fable"` 이면 opus·sonnet 워커가 페어링을 통과해 상속하므로, 억제는 각 워크플로 `OVERRIDE` 상수의 "advisor 도 호출하지 않는다" 문구뿐이다(`scripts/check_wf_advisor_ban.py` 는 문구 **누락**만 막는다). 효과 관측(2026-09-25, `fz_wf_metrics.py` 로 워크플로 125회 전수): 문구가 실린 실행 20회·워커 87개 → advisor **0회** / 문구 없는 실행 102회(워커 기록 없는 3회는 측정 불가로 제외)·워커 519개 → advisor 403회(64회 실행, 63%). 비교한 것은 호출 수뿐이다 — 완료 시간·결과 품질은 비교하지 않았다. ⚠️ 무작위 대조가 아니다 — 워크플로 종류·advisor 설정 시점이 섞여 있다. 문구 실린 실행에서 advisor 가 다시 보이면 이 규칙의 보고 대상이다.
 
 ### Kill-Switch 실행 절차
 
@@ -139,7 +140,7 @@
 |------|------|------|------|
 | L1 (경미) | 단일 스킬 본문 | 오타 수정, 문구 개선 | 자체 검증 |
 | L2 (중간) | YAML frontmatter, 에이전트 | description 변경, 도구 추가 | `/fz-skill eval` |
-| L3 (중대) | 공유 모듈, 가이드, 템플릿 | team-core.md 규칙 변경 | `/fz-manage check` + 영향 스킬 확인 |
+| L3 (중대) | 공유 모듈, 가이드, 템플릿 | gates.md 규칙 변경 | `/fz-manage check` + 영향 스킬 확인 |
 
 ### L3 변경 시 필수 절차
 

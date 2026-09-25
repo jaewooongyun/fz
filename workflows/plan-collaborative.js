@@ -16,7 +16,7 @@
 //     Phase 0.7 Sprint Contract(GPT 회복 시) / GPT verify(Phase 2) / memory-curator recall /
 //     plan-v{N}.md 파일 기록 / direction_escalation 사용자 대화 / wall-clock 측정.
 //
-// [설계 — docs/history/patterns/collaborative.md 평탄화]
+// [설계 — TEAM collaborative 패턴 평탄화]
 //   Stage 0 direction(fable): 6관점 판정. PROCEED → 즉시 진행 / 비-PROCEED → 반박 왕복 1회 (+2 call).
 //     조건부화 정당화: 원 패턴(L28-33)은 무조건 반박 왕복이나, PROCEED 경로의 반박은 판정 불변
 //     dead-call이므로 제거 — 비-PROCEED만 판정 반전 기회 실재 (검증 승인 판정).
@@ -162,8 +162,8 @@ const OVERRIDE =
   '이 프롬프트의 [요구사항]/[코드 컨텍스트]/[기지 제약]/[아키텍처 제약]만이 과제의 전부다. ' +
   '무관한 작업 폴더(티켓 폴더·토픽 폴더 등)를 읽지 말 것. 파일 접근은 명시된 경로와 그 안에 나열된 파일, 그리고 프롬프트가 허용한 모듈 문서만. ' +
   '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. ' +
-  '실행 제안 금지: git 상태변경(commit/push 등)·raw codex exec는 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
-  '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. ⛔ advisor 도 호출하지 않는다(멀티턴 상담이라 같은 계약 위반이고, 스톨 시 런타임이 6회 반복해 시간을 태운다). 출력은 schema 준수 JSON.'
+  '실행 제안 금지: git 상태변경(commit/push 등)·raw GPT CLI 호출은 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
+  '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다). 출력은 schema 준수 JSON.'
 
 // ── args 방어 파싱 + fail-fast (§12 표준 패턴 2 — 필수 키 2개: requirement + codeContextPath) ──
 const input = (() => {
