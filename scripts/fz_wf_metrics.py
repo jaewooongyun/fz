@@ -84,6 +84,7 @@ def read_agent(path: str) -> dict:
     turns = tools = out_tok = think = 0
     cache_r = cache_w = 0
     advisor_ids = set()
+    tool_names = {}
     so_calls = 0
     so_errors = 0
     pending = {}
@@ -146,6 +147,9 @@ def read_agent(path: str) -> dict:
                         elif b.get("type") == "tool_use":
                             tools += 1
                             pending[b.get("id")] = b.get("name")
+                            # ⛔ 이름별로 센다 — 총 건수만으로는 *어느* 도구가 안 불렸는지 모른다
+                            nm = b.get("name") or "(unnamed)"
+                            tool_names[nm] = tool_names.get(nm, 0) + 1
                             if b.get("name") == "StructuredOutput":
                                 so_calls += 1
     dur = (last - first).total_seconds() if first and last else None
@@ -159,6 +163,7 @@ def read_agent(path: str) -> dict:
         "dur": dur,
         "turns": turns,
         "tools": tools,
+        "tool_names": tool_names,
         "out_tok": out_tok,
         "thinking": think,
         "cache_read": cache_r,
@@ -394,6 +399,47 @@ def _write_probe(root: str, kind: str) -> None:
         with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
             fh.write(json.dumps({"type": "result", "agentId": "a1", "result": {"links": [{"sourceId": "E:E1", "finding": "x" * 500}], "additions": []}}, ensure_ascii=False) + "\n")
         return
+    if kind == "sweep-effort":
+        rows = [
+            {"type": "user", "timestamp": "2026-09-11T00:00:00Z",
+             "message": {"content": "[역할] 구조 설계자"}},
+            {"type": "assistant", "timestamp": "2026-09-11T00:02:00Z",
+             "message": {"stop_reason": "tool_use", "effort": "xhigh",
+                         "content": [{"type": "tool_use", "id": "t1", "name": "StructuredOutput", "input": {}}],
+                         "usage": {"output_tokens": 70, "output_tokens_details": {"thinking_tokens": 20}}}},
+        ]
+        with open(p, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        with open(os.path.join(folder, "agent-a1.meta.json"), "w", encoding="utf-8") as fh:
+            json.dump({"agentType": "fz:plan-structure", "model": "opus"}, fh)
+        with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
+            fh.write('{"type": "result", "agentId": "a1", "result": "x"}\n')
+        return
+    if kind in ("mcp-ok", "mcp-dead", "mcp-unrun", "mcp-nocontrol"):
+        # ⛔ 세 픽스처는 **도구 호출 조합만** 다르다 — 판정이 그 조합에서만 갈리는지 보기 위해서다.
+        calls = {"mcp-ok": [("mcp__plugin_fz_serena__find_symbol", "s1"), ("Read", "r1")],
+                 "mcp-dead": [("Read", "r1"), ("Grep", "g1")],
+                 "mcp-unrun": [],
+                 # ⛔ 작업은 했지만 **대조 심볼이 없다** — 부재를 주장할 근거가 없는 경로
+                 "mcp-nocontrol": [("Grep", "g1")]}[kind]
+        blocks = [{"type": "tool_use", "id": i, "name": nm, "input": {}} for nm, i in calls]
+        blocks.append({"type": "tool_use", "id": "so1", "name": "StructuredOutput", "input": {}})
+        rows = [
+            {"type": "user", "timestamp": "2026-09-11T00:00:00Z",
+             "message": {"content": "[역할] 심볼 탐색자"}},
+            {"type": "assistant", "timestamp": "2026-09-11T00:01:00Z",
+             "message": {"stop_reason": "tool_use", "content": blocks,
+                         "usage": {"output_tokens": 50}}},
+        ]
+        with open(p, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        with open(os.path.join(folder, "agent-a1.meta.json"), "w", encoding="utf-8") as fh:
+            json.dump({"agentType": "fz:search-symbolic", "model": "opus"}, fh)
+        with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
+            fh.write('{"type": "result", "agentId": "a1", "result": "x"}\n')
+        return
     rows = [
         {"type": "user", "timestamp": "2026-09-11T00:00:00Z",
          "message": {"content": "[역할] 방향성 도전자(review-direction 렌즈)"}},
@@ -413,6 +459,123 @@ def _write_probe(root: str, kind: str) -> None:
         json.dump({"agentType": "fz:review-direction", "model": "fable"}, fh)
     with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
         fh.write('{"type": "started", "agentId": "a1"}\n{"type": "result", "agentId": "a1", "result": "x"}\n')
+
+
+
+# ── --sweep-row (S15) ───────────────────────────────────────────────────────
+#  `experiment-log.md` §5.8 ⑥ 의 행을 **측정값으로** 만든다.
+#  ⛔ 이 표가 두 달간 비어 있던 원인이 *재는 주체 부재* 였다 — 손으로 옮기면 안 옮긴다.
+#  ⛔ 사람이 판정하는 칸(arm·G2 5축·채점자 판정·판정)은 **채우지 않는다.** 플레이스홀더로 남겨
+#     측정값과 판단을 섞지 않는다. 섞으면 어느 칸이 실측인지 구별되지 않는다.
+EFFORT_RE = re.compile(r'"effort"\s*:\s*"([A-Za-z]+)"')
+
+
+def scan_effort(folder: str) -> dict:
+    """트랜스크립트 raw 라인에서 `effort` 값을 센다.
+
+    ⛔ JSON 경로를 **추측하지 않는다** — 키 위치가 바뀌어도 잡히도록 raw 정규식으로 센다.
+       0건이면 값을 지어내지 않고 `unavailable` 로 보고한다(부재 주장에 근거를 남긴다).
+    """
+    counts, files = {}, 0
+    for f in sorted(glob.glob(os.path.join(folder, "agent-*.jsonl"))):
+        files += 1
+        try:
+            with open(f, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    for v in EFFORT_RE.findall(line):
+                        counts[v] = counts.get(v, 0) + 1
+        except OSError:
+            continue
+    return {"counts": counts, "files": files}
+
+
+def cmd_sweep_row(args) -> int:
+    folder = args.wf if (args.wf and os.path.isdir(args.wf)) else (
+        resolve(args.root, args.session, args.wf) if args.wf else None)
+    if folder is None:
+        print(f"UNRUN: wf 폴더를 찾지 못했다 (wf={args.wf} root={args.root}) — 미판정")
+        return 2
+    wf = read_wf(folder)
+    if not wf["agents"]:
+        print("UNRUN: agent 트랜스크립트 0건 — 측정 실패 (⛔ 통과 아님)")
+        return 2
+    eff = scan_effort(folder)
+    if eff["counts"]:
+        top = sorted(eff["counts"].items(), key=lambda kv: -kv[1])
+        effort = " · ".join(f"`{k}`×{v}" for k, v in top)
+    else:
+        effort = f"unavailable (raw `\"effort\"` 0건 · 파일 {eff['files']}개 — ⛔ 0 으로 쓰지 않는다)"
+    lb = "≥" if wf["tokens_partial"] else ""
+    ot = f"{lb}{wf['out_tok']:,}" if wf["out_tok"] is not None else "unavailable"
+    th = f"{wf['thinking']:,}" if wf["thinking"] is not None else "unavailable"
+    print("| N | DATE | ARM(사람) | " + effort + " | "
+          + fmt(round(wf["wall"]) if wf["wall"] is not None else None, "s") + " | "
+          + fmt(round(wf["critical_path"]) if wf["critical_path"] is not None else None, "s") + " | "
+          + ot + " | " + th + " | " + str(wf["advisor"]) + " | "
+          "G2 5축(사람) | 채점자 판정(사람) | 판정(사람) |")
+    print(f"# wf={os.path.basename(folder)} · agents={len(wf['agents'])} · journal_results={wf['journal_results']}")
+    if wf["errors"]:
+        print("# ⛔ errors: " + " · ".join(wf["errors"]))
+    return 0
+
+
+# ── --mcp-audit (S5) ────────────────────────────────────────────────────────
+#  워커가 **선언된 MCP 도구를 실제로 불렀는가**. 배선이 죽으면 호출이 0이 되는데,
+#  산출물에는 표시가 없다(실측: serena 배선 2곳이 죽은 채로 리포트가 정상으로 읽혔다).
+#
+#  ⛔ **0건을 그대로 경보로 쓰지 않는다.** 0건은 「배선 죽음」과 「그 워커가 원래 안 쓸 일」을
+#     구별하지 못한다. 그래서 **대조 심볼**(positive control)을 요구한다 — 같은 런에서
+#     `Read` 가 불렸다면 워커는 파일 작업을 했고, 그런데도 serena 가 0이면 배선을 의심한다.
+#     대조가 없으면 경보가 아니라 **미판정**이다.
+MCP_PREFIXES = ("mcp__plugin_fz_serena__", "mcp__serena__")
+CONTROL_TOOL = "Read"
+NOT_WORK = ("StructuredOutput",)   # 산출 제출은 "도구 작업"이 아니다
+
+
+def audit_counts(agents) -> dict:
+    serena = 0
+    control = 0
+    work = 0
+    names = {}
+    for a in agents:
+        for nm, c in (a.get("tool_names") or {}).items():
+            names[nm] = names.get(nm, 0) + c
+            if nm.startswith(MCP_PREFIXES):
+                serena += c
+            if nm == CONTROL_TOOL:
+                control += c
+            if nm not in NOT_WORK:
+                work += c
+    return {"serena": serena, "control": control, "work": work, "names": names}
+
+
+def cmd_mcp_audit(args) -> int:
+    folder = args.wf if (args.wf and os.path.isdir(args.wf)) else (
+        resolve(args.root, args.session, args.wf) if args.wf else None)
+    if folder is None:
+        # ⛔ 대상이 없는 것은 통과가 아니다
+        print(f"UNRUN: wf 폴더를 찾지 못했다 (wf={args.wf} root={args.root}) — 미판정")
+        return 2
+    wf = read_wf(folder)
+    c = audit_counts(wf["agents"])
+    top = ", ".join(f"{k}={v}" for k, v in sorted(c["names"].items(), key=lambda kv: -kv[1])[:6]) or "(없음)"
+    print(f"wf={os.path.basename(folder)} · agents={len(wf['agents'])}")
+    print(f"  serena 호출 {c['serena']} · 대조({CONTROL_TOOL}) {c['control']} · 도구작업 {c['work']}")
+    print(f"  도구 분포: {top}")
+
+    if c["work"] == 0:
+        print("UNRUN: 도구 작업이 0건이다 — 배선 죽음과 '할 일이 없었음'을 구별할 수 없다 (⛔ 통과 아님)")
+        return 2
+    if c["serena"] == 0 and c["control"] == 0:
+        print(f"UNRUN: serena 0건이지만 대조 심볼({CONTROL_TOOL})도 0건이다 — "
+              "부재를 주장할 근거가 없다 (⛔ 통과 아님)")
+        return 2
+    if c["serena"] == 0:
+        print(f"MCP_WIRING_SUSPECT: serena 0건인데 {CONTROL_TOOL} {c['control']}건 — "
+              "워커는 파일 작업을 했다. 배선을 확인하라")
+        return 1
+    print(f"MCP_AUDIT_OK (serena {c['serena']}건 · 대조 {c['control']}건)")
+    return 0
 
 
 def cmd_self_test(args) -> int:
@@ -474,13 +637,66 @@ def cmd_self_test(args) -> int:
             fails.append(f"no-turns: out_tok={a['out_tok']} (기대 None) · result_chars={a.get('result_chars')} · partial={wf['tokens_partial']}")
     finally:
         shutil.rmtree(root, ignore_errors=True)
+    # ⑧~⑩ --mcp-audit 3분 판정 — 도구 조합만 바꿔 세 판정을 각각 확인한다
+    def audit(kind, want_exit, want_text):
+        nonlocal passed
+        r2 = tempfile.mkdtemp(prefix="fzwf-mcp-")
+        try:
+            _write_probe(r2, kind)
+            proc = subprocess.run([sys.executable, me, "--mcp-audit", "--root", r2,
+                                   "--wf", "wf_probe", "--session", "*"],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+            out = (proc.stdout or b"").decode("utf-8", "replace")
+            why = []
+            if proc.returncode != want_exit:
+                why.append(f"exit {proc.returncode} (기대 {want_exit})")
+            if want_text not in out:
+                why.append(f"출력에 {want_text!r} 없음: {out.strip()[:140]}")
+            if why:
+                fails.append(f"mcp-audit/{kind}: " + " · ".join(why))
+            else:
+                passed += 1
+        finally:
+            shutil.rmtree(r2, ignore_errors=True)
+
+    audit("mcp-ok", 0, "MCP_AUDIT_OK")
+    audit("mcp-dead", 1, "MCP_WIRING_SUSPECT")
+    audit("mcp-unrun", 2, "도구 작업이 0건")
+    audit("mcp-nocontrol", 2, "대조 심볼")
+
+    # ⑪~⑬ --sweep-row — 측정값과 사람 판정 칸이 섞이지 않는지, 부재를 0 으로 쓰지 않는지
+    def sweep(kind, want_exit, want_text):
+        nonlocal passed
+        r3 = tempfile.mkdtemp(prefix="fzwf-sw-")
+        try:
+            _write_probe(r3, kind)
+            proc = subprocess.run([sys.executable, me, "--sweep-row", "--root", r3,
+                                   "--wf", "wf_probe", "--session", "*"],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+            out = (proc.stdout or b"").decode("utf-8", "replace")
+            why = []
+            if proc.returncode != want_exit:
+                why.append(f"exit {proc.returncode} (기대 {want_exit})")
+            if want_text not in out:
+                why.append(f"출력에 {want_text!r} 없음: {out.strip()[:140]}")
+            if why:
+                fails.append(f"sweep-row/{kind}: " + " · ".join(why))
+            else:
+                passed += 1
+        finally:
+            shutil.rmtree(r3, ignore_errors=True)
+
+    sweep("sweep-effort", 0, "`xhigh`×1")     # 실측된 effort 가 행에 들어간다
+    sweep("mcp-ok", 0, "unavailable (raw")    # ⛔ 부재를 0 으로 쓰지 않는다
+    sweep("empty", 2, "UNRUN")                # agent 0건은 통과가 아니다
+
     for f in fails:
         print(f"  FAIL {f}")
     total = passed + len(fails)
     if fails:
         print(f"fz_wf_metrics self-test {passed}/{total} passed")
         return 1
-    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5)")
+    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 4 · sweep-row 3)")
     return 0
 
 
@@ -491,6 +707,10 @@ def main() -> int:
     ap.add_argument("--session", default="*", help="--wf 와 함께 쓰는 세션 glob")
     ap.add_argument("--expect", help="fixture JSON 과 대조 (성공 시 METRICS_OK)")
     ap.add_argument("--self-test", action="store_true", help="양성·음성 self-test")
+    ap.add_argument("--sweep-row", action="store_true",
+                    help="experiment-log §5.8 ⑥ 행을 측정값으로 출력 (사람 판정 칸은 플레이스홀더)")
+    ap.add_argument("--mcp-audit", action="store_true",
+                    help="선언된 MCP 도구를 워커가 실제로 불렀는가 (0=OK · 1=배선 의심 · 2=미판정)")
     ap.add_argument("--row", action="store_true", help="experiment-log §5.7 행 형식 출력")
     ap.add_argument("--summary", action="store_true", help="stage 상세 출력")
     ap.add_argument("--verbose", action="store_true")
@@ -503,6 +723,10 @@ def main() -> int:
         return cmd_self_test(args)
     if args.expect:
         return cmd_expect(args)
+    if args.mcp_audit:
+        return cmd_mcp_audit(args)
+    if args.sweep_row:
+        return cmd_sweep_row(args)
     if args.wf:
         folder = args.wf if os.path.isdir(args.wf) else resolve(args.root, args.session, args.wf)
         if folder is None:

@@ -144,7 +144,7 @@ metadata:
    python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --wf {runId 폴더명}            # stage 상세(advisor·so_retries·cache)
    python3 "${FZ_PLUGIN_ROOT}/scripts/fz_telemetry_report.py" --plan-segments {세션 id 앞 8자}   # Lead·GPT 층 분리
    ```
-   ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 않는다
+   ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 않는다. ⛔ 같은 runId 에 `--mcp-audit` 도 돌린다 — 배선이 죽으면 MCP 호출이 0이 되는데 산출물에는 표시가 없다(exit 1=배선 의심 · 2=미판정, **둘 다 통과 아님**)
 
 **6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거. Workflow stage에 동일 적용):
 
