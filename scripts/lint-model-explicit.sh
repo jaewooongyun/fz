@@ -7,7 +7,7 @@
 #   ① 전 workflow(workflows/*.js)의 agent 호출 opts 에 model: 명시 강제
 #      → AC-6 (model 생략 전환 금지 — 생략 시 agent 정의 기본 model 로 강등)
 #   ①-b 전 workflow 의 agent 호출 opts 에 effort: 명시 강제 (표준 effort=xhigh)
-#      → agent() 는 model+effort 모두 명시 의무 (skill-authoring §12) — effort 생략 시 세션 max 를 상속
+#      → agent() 는 model+effort 모두 명시 의무 (skill-authoring §12) — effort 생략 시 세션 값이 아니라 워커 모델 기본으로 돈다 (Opus 5.5 = medium, 2026-09-25 실측)
 #   ② repo 전체 model: 'fable' 총계 == EXPECTED_FABLE 고정
 #      기대 분포: search-cross-verify.js ×1 + plan-collaborative.js ×2 = 3
 #      → AC-1 ("fable 지정은 정확히 3곳") 양방향 강제: 무단 확산(>3) · 무단 제거(<3) 모두 차단
