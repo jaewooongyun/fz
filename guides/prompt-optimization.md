@@ -2,7 +2,7 @@
 
 > 실전 최적화 체크리스트. 이론이 아닌 즉시 적용 가능한 가이드.
 >
-> **Sources (last audited: 2026-09-06):**
+> **Sources (last audited: 2026-09-25 — 모델 사실 축: Opus 5.5·GPT-6 출처 행, 원칙 8 GPT 근거, §3b 무인 런 2줄, Tier 2 CAPO 만 대조):**
 >
 > **Tier 1 — Anthropic Official:**
 > - Claude 4 Best Practices (live docs) — prompt-engineering, agentic systems, adaptive thinking
@@ -19,21 +19,22 @@
 > - **Tool Use Context Engineering Cookbook (Anthropic 2026)** — memory, compaction, tool clearing 실전
 > - **Introducing Claude Opus 4.8 (Anthropic 2026-05-28)** — release announcement (effort 기본 high, 자기 코드 결함 ~4x↓, tool-calling 효율↑, 단일 세션 수백 parallel subagents)
 > - **Introducing Claude Opus 5 (Anthropic 2026-07-24)** — release announcement. "comes close to the frontier intelligence of Claude Fable 5 at half the price", $5/$25(4.8 동일), effort dial 강조
-> - **What's new in Claude Opus 5 / Prompting Claude Opus 5 (Anthropic, live)** — **현행 기본 모델 정본**. thinking 기본 ON · thinking disabled는 effort ≤ high(400) · **검증 지시 삭제** · **subagent 위임 캡**(4.8 대비 역방향) · 길이는 프롬프트로(effort 아님) → 상세: `llm-references.md` §1.2
+> - **What's new in Claude Opus 5.5 / Prompting Claude Opus 5.5 (Anthropic 2026-09-22)** — **현행 워커 정본**. thinking 끄기 불가(400) · forced `tool_choice` 400 · effort 기본 `medium` · 상속("the patterns in Prompting Claude Opus 5 remain a reasonable starting point") · elapsed 시간 신호 · text-only 턴 종료는 보고 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5] → 상세: `llm-references.md` §1.2
+> - **What's new in Claude Opus 5 / Prompting Claude Opus 5 (Anthropic, live)** — **Opus 5 지침 정본 (Opus 5.5 가 상속)**. thinking 기본 ON · thinking disabled는 effort ≤ high(400) · **검증 지시 삭제** · **subagent 위임 캡**(4.8 대비 역방향) · 길이는 프롬프트로(effort 아님) → 상세: `llm-references.md` §1.2
 > - **Introducing Claude Fable 5 and Claude Mythos 5 (Anthropic 2026-06-09 GA)** — Opus 상위 tier ($10/$50), thinking 상시 활성, refusal/fallback/billing → 상세: `model-guide.md`
 > - **Prompting Claude Fable 5 (Anthropic, live)** — Fable 전용 프롬프팅 (de-prescription, async subagents, grounded progress, reasoning_extraction 주의)
 > - **What's new in Claude Fable 5.1 (Anthropic 2026-09-01)** — 캐시 읽기 $0.25(Opus 5의 절반·Fable 5의 1/4), breaking 3(forced tool use 400 에러·thinking block 단방향·earlier-turn 편집 무효화), 폴백 대상 Opus 4.8·Opus 5 [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1] → 상세: `model-guide.md`
 > - **Prompting Claude Fable 5.1 (Anthropic, live)** — effort **재sweep 필수**("Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]), 코딩 루프 한정 배칭 변동·fewer progress update·append-only 히스토리(compaction 늦게 실험 권고)
 > - **Claude Code: Model configuration (Anthropic, live)** — /model fable, effort 체계(frontmatter effort 포함), 안전 분류기 자동 폴백
 > - **Best Practices for Claude Code (Anthropic, live reference)** — Claude Code 전용 prompt 가이드
-> - **Anthropic Prompting Best Practices (live, `claude-prompting-best-practices`)** — 전 모델 공통 기법 + **모델별 페이지 분기**(`prompting-claude-{opus-5|fable-5|sonnet-5|opus-4-8}`). ⚠️ 모델별 프롬프팅이 1급 문서로 승격돼 세대 간 프롬프트 재사용이 기본 가정이 아니게 됨
+> - **Anthropic Prompting Best Practices (live, `claude-prompting-best-practices`)** — 전 모델 공통 기법 + **모델별 페이지 분기**(`prompting-claude-{opus-5-5|opus-5|fable-5-1|fable-5|sonnet-5|opus-4-8}`). ⚠️ 모델별 프롬프팅이 1급 문서로 승격돼 세대 간 프롬프트 재사용이 기본 가정이 아니게 됨
 > - **Anthropic Interactive Prompt Engineering Tutorial (GitHub, 2026)** — 공식 튜토리얼
 > - **OpenAI Prompt Guidance (live)** — 공식 API prompt 가이드
 > - **GPT-5 Prompting Guide (OpenAI Cookbook, 2026)** — 공식 Cookbook
-> - **Using GPT-5.5 (OpenAI 2026-04-23)** — GPT-5.5 prompting (literal and thorough manner)
-> - **Introducing GPT-5.5 (OpenAI 2026-04-23)** — release announcement
-> - **GPT-5.5 System Card (OpenAI 2026-04-23)** — 안전 평가
-> - **Codex CLI Changelog (OpenAI)** — Browser + Auto Review Agent + GPT-5.5(0.124.0) · GPT-6 Astra(0.153.1) 통합. https://learn.chatgpt.com/docs/changelog
+> - **Rethinking skills and prompts for GPT-6 Astra (OpenAI Developers blog)** — "what used to require a lot of handholding and scaffolding no longer does" · 스킬 설명은 짧게, 다중 워크플로 스킬은 최소 라우터 [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra]
+> - **GPT-6 Sol model page (OpenAI API, 2026-09-22)** — fz GPT 교차검증 현행 모델 `gpt-6-sol` · effort `none`~`max` · 1,050,000 ctx [verified: developers.openai.com/api/docs/models/gpt-6-sol]
+> - **Model guidance — latest model (OpenAI API, live)** — GPT-6 계열 instruction following·검증 성향 [verified: developers.openai.com/api/docs/guides/latest-model]
+> - **GPT CLI Changelog (OpenAI)** — Browser + Auto Review Agent + GPT-5.5(0.124.0) · GPT-6 Astra(0.153.1) · **GPT-6 Sol·Luna**(0.156.1 에서 모델 선택기 추가 2026-09-23 · 0.157.0 정식 추가 2026-09-25 · CLI 기본 `gpt-6-sol` medium) 통합. https://learn.chatgpt.com/docs/changelog
 >
 > **Tier 2 — Academic (peer-reviewed + arxiv preprint):**
 > - ACE: Agentic Context Engineering v3 (Stanford, ICLR 2026, arXiv 2510.04618) — context collapse, brevity bias
@@ -54,6 +55,7 @@
 > - **Towards Thinking-Optimal Scaling of Test-Time Compute** (arxiv 2502.18080) [NeurIPS 2025 / peer-reviewed] — 도메인별 optimal CoT length 다름
 > - **When More Thinking Hurts** (arxiv 2604.10739) [arxiv preprint, 2026-04] — Overthinking 위험 (긴 CoT가 성능 저하)
 > - **MemCoT (Memory-Driven CoT)** (arxiv 2604.08216) [arxiv preprint, 2026-04] — training-free, LoCoMo SOTA
+> - **CAPO: Constraint-Aware Prompt Optimization for LLM Agents** (arxiv 2608.16068) [arxiv preprint, 2026-08] — 운영 제약(길이·비용) 하 primal-dual 시스템 프롬프트 최적화, "more reliably reaches empirically feasible operating points while improving task performance"
 >
 > **Tier 3 — Community/Practitioner:**
 > - Agents at Work: 2026 Playbook — ReAct, verification-aware planning, circuit breakers
@@ -320,7 +322,7 @@ Fallback:   대안 도구 (Primary 실패 시 사용)
 
 ### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
-**근거:** Anthropic Claude 4 Best Practices + **Fable 5는 짧은 지시로 대부분 행동을 조향할 수 있다** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]. 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-5.5도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model] — GPT 측 동일 가드.) ⚠️ 2026-09-06 정정: 이전 근거였던 "Opus 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
+**근거:** Anthropic Claude 4 Best Practices + **Fable 5는 짧은 지시로 대부분 행동을 조향할 수 있다** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]. 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-6 계열도 같은 방향 — "GPT-6 Astra is stronger at general instruction following than our previous models … It can be more sensitive to instructions contained in skills and other files, such as AGENTS.md." [verified: developers.openai.com/api/docs/guides/latest-model, 2026-09-25 재조회] — fz 교차검증 모델 `gpt-6-sol` 한정 진술은 이 페이지에 없다 [미검증: Sol 한정 문면 부재] — GPT 측 동일 가드.) ⚠️ 2026-09-06 정정: 이전 근거였던 "Opus 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
 
 > **항목별 범위 명시 원칙**: broad 규칙은 적용 범위를 항목별로 명시하라. [이유] 범위가 명시된 지시가 더 정확히 적용된다. [GOOD] "verify each step, not just the first"  [BAD] "verify the step" (범위 모호). 메모리 8/13/18차(silent disappearance) 증상과 정합하는 일반 원칙 — 모델 버전 무관.
 
@@ -706,6 +708,7 @@ fz 적용:
 ```
 
 ---
+> ⚠️ **후보 — 무인 런 한정, 미채택**(fz 실행 경로에 배선 없음 · 관측된 실패 없음 — 필요가 확인되면 실행 계층에 배선한다): Opus 5.5 공식은 무인 런에서 text-only 턴 종료를 **보고**로 보고 자동 이어가기를 2~3회로 제한하며("Treat a text-only end of turn as a report rather than as proof the task is done" · "stop after two or three automatic continuations on the same task"), 병렬 위임 하네스에 **elapsed 시간** 한 줄을 권한다 [verified: prompting-claude-opus-5-5]
 
 ## 4. Anti-Patterns
 

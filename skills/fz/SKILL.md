@@ -40,8 +40,8 @@ metadata:
 - **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(Fable 5.1) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
 - **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 현행 `xhigh`) — fable 판단 지점 3곳과 별개
 - **3-Tier 모델**: **Fable 5.1**(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
-  > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `xhigh` 단일값. 공식 출발점은 Opus 5·Fable 5.1 모두 **`high`(기본)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
-- **GPT 필수 참여**: 모든 TEAM 스킬에 Codex CLI 포함 → cross-model 상호검증
+  > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `xhigh` 단일값. 공식 출발점: **Fable 5.1 `high` · Opus 5.5 `medium`(Opus 5 는 `high`)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
+- **GPT 필수 참여**: 모든 TEAM 스킬에 GPT CLI 포함 → cross-model 상호검증
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
 - **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + GPT 교차검증
 
@@ -86,7 +86,6 @@ metadata:
 |------|------|
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/complexity.md | 5차원 복잡도 → 모드 결정 |
-| docs/history/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리 L1~L4) |
 | modules/team-registry.md | 에이전트 + 모델 자동 결정 |
 | modules/cross-validation.md | 검증 게이트 자동 삽입 |
 | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
@@ -342,7 +341,7 @@ commit/pr 전 → ✓ gpt check (TEAM)
 ### 5.2 Workflow Execution
 
 > 멀티에이전트 실행은 네이티브 Workflow 결정적 스크립트가 소유한다 (TEAM 일몰, Wave 4). 스크립트가 fan-out/수렴/라운드를 구현 — P2P SendMessage 없음.
-> 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본). ⛔ `docs/history/patterns/`는 라운드 의미론의 **설계 출처**일 뿐 폴백 실행 절차가 아니다.
+> 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본).
 
 각 스킬은 자신의 `workflows/{skill}-{pattern}.js`를 소유한다. Lead는 스킬의 Workflow를 호출하고 반환(구조화 출력)을 통합한다. Lead는 퍼실리테이터 (호출 + 게이트 실행 + 통합).
 

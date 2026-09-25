@@ -1,16 +1,20 @@
-# Model Guide — Fable 5.1 (Lead) · Opus 5 (worker)
+# Model Guide — Fable 5.1 (Lead) · Opus 5.5 (worker)
 
-> ✅ **운용 상태 (2026-09-06)**: Lead = **Fable 5.1**(2026-09 출시, 사용자 `/model fable` 세션 · effort **xhigh**), 실질 생산 워커 = **Opus 5**, 단순(retrieval·breadth) 워커 = **Sonnet 5**. 판단 지점 3곳 explicit `'fable'` 배선 유지 — `search-cross-verify.js:166` merge + `plan-collaborative.js:220`/`:167` direction (§재배선 확정 배선), `scripts/lint-model-explicit.sh` 기계 감시. ⚠️ 2026-09-06 정정 — 이전 판의 "세션 레벨 max(기본)/ultracode 운용"은 현행이 아니다(세션 = xhigh, `ultracode`는 effort arm으로 무효).
+> ✅ **운용 상태 (2026-09-06 · 워커 모델 2026-09-25 갱신)**: Lead = **Fable 5.1**(2026-09 출시, 사용자 `/model fable` 세션 · effort **xhigh**), 실질 생산 워커 = **Opus 5.5**(`opus` alias — Claude Code 2.1.280+ 가 Opus 5.5 로 해석), 단순(retrieval·breadth) 워커 = **Sonnet 5**. 판단 지점 3곳 explicit `'fable'` 배선 유지 — `search-cross-verify.js:166` merge + `plan-collaborative.js:220`/`:167` direction (§재배선 확정 배선), `scripts/lint-model-explicit.sh` 기계 감시. ⚠️ 2026-09-06 정정 — 이전 판의 "세션 레벨 max(기본)/ultracode 운용"은 현행이 아니다(세션 = xhigh, `ultracode`는 effort arm으로 무효).
 >
 > Claude Fable 5.1 / Claude Mythos 5.1의 사양 · API 동작 차이 · Claude Code 통합 · fz 생태계 적용 전략의 단일 참조.
 > 모델 무관 프롬프팅 원칙은 `prompt-optimization.md`, 하네스 설계는 `harness-engineering.md` 참조.
 >
-> **Sources (last audited: 2026-09-06) — Tier 1 only:**
+> **Sources (last audited: 2026-09-25 — 모델 사실 축: Opus 5.5 워커 절·가격표·effort 기본값·advisor 페어링·공식 포지셔닝 인용만 대조. Fable 5.1 절은 2026-09-06 대조 그대로) — Tier 1 only:**
 >
 > - **What's new in Claude Fable 5.1** (Anthropic, live) — platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1
 > - **Prompting Claude Fable 5.1** (Anthropic, live) — platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1
 > - **Pricing** (Anthropic, live) — platform.claude.com/docs/en/about-claude/pricing
 > - **Prompting Claude Opus 5** (Anthropic, live) — platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5
+> - **What's new in Claude Opus 5.5** (Anthropic, live) — platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5
+> - **Prompting Claude Opus 5.5** (Anthropic, live) — platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5 *(Opus 5 패턴을 상속한다고 명시 — 위 Opus 5 인용의 존치 근거)*
+> - **Models overview** (Anthropic, live) — platform.claude.com/docs/en/models/overview
+> - **Claude Code: advisor** (Anthropic, live) — code.claude.com/docs/en/advisor
 > - **Prompting Claude Fable 5** (Anthropic, live) — platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 *(5.1이 철회하지 않은 진술의 출처로만 유지)*
 > - **Claude Code: Model configuration** (Anthropic, live) — code.claude.com/docs/en/model-config
 > - **Claude Code: Best practices** (Anthropic, live) — code.claude.com/docs/en/best-practices
@@ -20,20 +24,24 @@
 
 ---
 
-## Opus 5 운용 (워커 기본 모델, 2026-07-24~)
+## Opus 5.5 운용 (워커 기본 모델, 2026-09-22~)
 
 fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated는 `guides/llm-references.md` §1.2·§4·§5 + `prompt-optimization.md` 참조 (중복 회피).
 
-ℹ️ 아래 표의 `whats-new-opus-5`·`release-notes/overview` [verified:] 태그는 **2026-07-25 판에서 승계**한 것으로, 본 세션(2026-09-06) 출처 팩과는 대조하지 않았다. 재검증은 별건.
+ℹ️ 2026-09-25 — Opus 5.5 행은 whats-new-opus-5-5·prompting-claude-opus-5-5 원문과 대조했다. **"Opus 5 기준"** 라벨이 붙은 행은 이력이며, 5.5 가 상속하므로 존치한다: "Existing Claude Opus 5 prompts should perform well without changes, and the patterns in Prompting Claude Opus 5 remain a reasonable starting point." [verified: prompting-claude-opus-5-5]. `claude-opus-5` 는 **Active**(퇴역 예정일 not sooner than 2027-07-24)이며 현행 워커 자리에서 교체됐을 뿐이다 [verified: models/overview].
 
 | 항목 | 값 |
 |------|-----|
-| Model ID / Context | `claude-opus-5` · 1M tokens (**기본값이자 최대값**). 가격 **$5/$25** — Opus 4.8과 동일 |
-| Thinking | **기본 ON** — 파라미터 생략 시 adaptive 실행 (Opus 4.8은 생략 시 OFF였음). `{type:"adaptive"}`는 기본값과 동등. ⚠️ `max_tokens`는 **thinking+응답 합산** 하드캡 → 4.8 기준 타이트한 값은 **응답 절단** 위험 [verified: platform.claude.com/docs/en/about-claude/models/whats-new-opus-5] |
-| effort | 출발점 **`high`(기본)**; **`low`/`medium`을 비용·지연의 1차 레버**로; demanding coding/agentic만 `xhigh`; `max`는 무제한 지출 정당화 시. ⛔ **이전 모델 effort 값 재사용 금지 → fresh sweep**: "If you carried effort defaults over from a prior model, re-run an effort sweep on your own evals." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] |
-| thinking 비활성화 | `{"type":"disabled"}`는 **effort ≤ `high`에서만**. `xhigh`/`max`와 조합 시 **400**(요청 단위 검증) [verified: platform.claude.com/docs/en/release-notes/overview 2026-07-24] |
+| Model ID / Context | `claude-opus-5-5` · 1M tokens (**기본값이자 최대값**) · 128K 출력. 가격 **$4/$20**(Opus 5 는 $5/$25) — "Claude Opus 5.5 costs $4 USD per million input tokens and $20 USD per million output tokens, below Claude Opus 5's $5 and $25" [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] |
+| Thinking | **상시 ON — 끄기 불가**: "On Claude Opus 5.5, thinking is always on: a request that sets `thinking: {"type": "disabled"}`, or a manual budget with `thinking: {"type": "enabled", "budget_tokens": N}`, returns a 400 `invalid_request_error`." ⚠️ `max_tokens`는 **thinking+응답 합산** 하드캡 — "leave room in `max_tokens` for the thinking" [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] |
+| effort | **5.5 기본 `medium`** — "A request that omits `effort` runs at `medium`; on Claude Opus 5 it ran at `high`." 같은 effort 에서 사고량 증가 — "At the same effort setting the model tends to think more per turn than Claude Opus 5, most of all at `xhigh` and `max`." [verified: whats-new-opus-5-5]. *Opus 5 기준 (이력):* 출발점 **`high`(기본)**; **`low`/`medium`을 비용·지연의 1차 레버**로; demanding coding/agentic만 `xhigh`; `max`는 무제한 지출 정당화 시. ⛔ **이전 모델 effort 값 재사용 금지 → fresh sweep**: "If you carried effort defaults over from a prior model, re-run an effort sweep on your own evals." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] |
+| thinking 비활성화 | *Opus 5 기준 (이력 — 5.5 는 불가, 위 Thinking 행):* `{"type":"disabled"}`는 **effort ≤ `high`에서만**. `xhigh`/`max`와 조합 시 **400**(요청 단위 검증) [verified: platform.claude.com/docs/en/release-notes/overview 2026-07-24] |
 | 자기검증 | "Claude Opus 5 verifies its own work without being told to. If your prompt contains explicit verification instructions … remove them" + "do not use subagents to verify or double-check your own work" [verified: …/prompting-claude-opus-5]. ⛔ 단, **fresh-context 이종 검증자**는 이 권고의 대상이 아니다 (§5 T2 참조) |
-| 구버전 제거 (Fable 5.1·Opus 5) | manual `budget_tokens`(400)·prefill(미지원)·sampling 파라미터(400)·`interleaved-thinking-2025-05-14`(ignored) + **[신설] 검증 지시**(over-verification)·**"생각하지 마라" 규칙**(태그 누출 증가)·**carried-over effort**. 상세 `llm-references.md` §5 |
+| forced tool use | `tool_choice` `{"type":"any"}`·`{"type":"tool",…}` → **400** — "Claude Opus 5.5 doesn't support forced tool use." 대체는 `auto` + strict tool use 또는 structured outputs [verified: whats-new-opus-5-5] |
+| 도구 호출 사이 텍스트 | thinking 블록으로 온다 — "The short notes the model writes between tool calls arrive as progress-update `thinking` blocks rather than `text` blocks, so at the default `display: \"omitted\"` an application that streams them to its users goes quiet between tool calls, with no error." [verified: whats-new-opus-5-5] |
+| 5.5 프롬프팅 추가 패턴 | elapsed 시간 신호 — "give the model a time budget: have your harness add a short line at the end of each message … giving the elapsed time" · text-only 턴 종료는 보고로 — "Treat a text-only end of turn as a report rather than as proof the task is done" · continuation 상한 — "stop after two or three automatic continuations on the same task" [verified: prompting-claude-opus-5-5] |
+| advisor 페어링 | "The advisor must be at least as capable as the main model." — Opus 5.5·Opus 5 main → Fable 과 Opus 5 이상 허용 / Fable 5.1 main → **Fable 5.1 만**("An Opus or Sonnet advisor is rejected") [verified: code.claude.com/docs/en/advisor, 2026-09-22 판]. 워커는 advisor 를 상속한다(`modules/governance.md` 운용 규칙 5) |
+| 구버전 제거 (Fable 5.1·Opus 5.5) | manual `budget_tokens`(400)·prefill(미지원)·sampling 파라미터(400)·`interleaved-thinking-2025-05-14`(ignored) + **[신설] 검증 지시**(over-verification)·**"생각하지 마라" 규칙**(태그 누출 증가)·**carried-over effort**. 상세 `llm-references.md` §5 |
 
 ---
 
@@ -46,7 +54,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 | 항목 | 값 |
 |------|-----|
 | Model ID | `claude-fable-5-1` (alias 없음, 이 문자열 그대로). Claude Code alias는 `fable` — "Uses the latest Fable model for your hardest and longest-running tasks" [verified: code.claude.com/docs/en/model-config] |
-| 포지션 | **기본 업그레이드 경로가 아니다.** "For most workloads, start with Claude Opus 5 (see Choosing a model). Use Claude Fable 5.1 for demanding reasoning and long-horizon agentic work, or when your evals on Claude Opus 5 at higher effort still fall short." |
+| 포지션 | **기본 업그레이드 경로가 아니다.** "If you're unsure which model to use, start with Claude Opus 5.5 for most workloads. Use Claude Fable 5.1 for demanding reasoning and long-horizon agentic work, or when your evals on Claude Opus 5.5 at higher effort still fall short." [verified: platform.claude.com/docs/en/models/overview, 2026-09-25] |
 | Context window | **1M tokens** — "a 1M token context window (default and maximum) at standard per-token pricing across the whole window" |
 | Max output | **128k max output tokens** |
 | Thinking | "adaptive thinking is always on" — 끄기 불가 |
@@ -58,12 +66,13 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 
 [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1 + platform.claude.com/docs/en/about-claude/pricing]
 
-### 가격 비교 (per MTok, 2026-09-06)
+### 가격 비교 (per MTok, 2026-09-06 · Opus 5.5 행 2026-09-25)
 
 | Model | Base input | 5m cache writes | 1h cache writes | Cache hits and refreshes | Output |
 |---|---|---|---|---|---|
 | Claude Fable 5.1 | $10 | $12.50 | $20 | **$0.25** | $50 |
 | Claude Fable 5 | $10 | $12.50 | $20 | $1 | $50 |
+| Claude Opus 5.5 | $4 | $5 | $8 | **$0.20** | $20 |
 | Claude Opus 5 | $5 | $6.25 | $10 | $0.50 | $25 |
 | Claude Sonnet 5 | $2 | $2.50 | $4 | **$0.20** | $10 |
 
@@ -71,9 +80,9 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 
 ### tier 격차 — 실측 결과
 
-⚠️ 2026-09-06 정정 — 이전 판의 "tier 격차 재검토 필요" 경고는 실측으로 해소됐다. 같은 opus-5 main 트래픽을 Fable 5.1 단가로 환산하면 **+9%**($17,137 → $18,751)이고, 남는 차이는 **호출당 지연 중앙값 +49%**(10.5s → 15.6s)와 **출력·캐시쓰기 단가 2배**다 [fz 실측 2026-09-06].
+⚠️ 2026-09-06 정정 — 이전 판의 "tier 격차 재검토 필요" 경고는 실측으로 해소됐다. 같은 opus-5 main 트래픽을 Fable 5.1 단가로 환산하면 **+9%**($17,137 → $18,751 — **Opus 5 단가 기준**. Opus 5.5 단가($4/$20·캐시 읽기 $0.20) 재산정은 미실시 — 선택 과제)이고, 남는 차이는 **호출당 지연 중앙값 +49%**(10.5s → 15.6s)와 **출력·캐시쓰기 단가 2배**다 [fz 실측 2026-09-06].
 
-## 2. Opus 5 대비 API 동작 차이
+## 2. Opus 5·Opus 5.5 대비 API 동작 차이 (Fable 5.1 기준)
 
 ⚠️ 2026-09-06 정정 — 이 표는 Fable 5 기준 행을 **Fable 5.1 기준으로 교체**한 것이다. 5.1은 Fable 5 대비 **breaking 3 · additive 5**를 가진다: "If you already call Claude Fable 5, three changes are breaking: forced tool use returns an error, earlier models can't read its thinking blocks, and editing earlier turns invalidates thinking blocks. Five are additive: per-message effort (beta), turn-scoped system messages (beta), readable progress updates between tool calls (`display: \"updates\"`, beta), a lower cache read price, and content provenance."
 
@@ -82,8 +91,8 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 | **Forced tool use** (breaking) | `tool_choice`의 `{"type":"any"}` / `{"type":"tool","name":"..."}` 미지원 | **400 `invalid_request_error`** |
 | **Thinking block 단방향** (breaking) | "Claude Fable 5.1 reads earlier models' thinking blocks, and no earlier model reads Claude Fable 5.1's." — 하위 모델로 전환하면 5.1 thinking block 은 **API 가 제거**해 추론 상태가 보존되지 않는다(요청 실패가 아니다 — 실패는 §earlier-turn 편집 조건). beta 헤더 없으면 제거는 조용히 일어난다 | 블록 드롭 (`input_transformations` 로 보고, beta) |
 | **earlier-turn 편집 무효화** (breaking) | "Modifying anything before a Claude Fable 5.1 thinking block (the `system` prompt, the `tools`, or an earlier message) results in an error on the next request, or in the block being dropped if you opt into that." 강제 대상 = "new accounts created on or after August 31, 2026". ✅ "Claude Code, claude.ai, Claude Managed Agents, and the Claude Agent SDK keep that prefix intact for you." | 다음 요청 에러 또는 블록 드롭 |
-| Thinking | adaptive **상시 활성 — 끄기 불가**. *Opus 5는 기본 ON이되 effort ≤ `high`에서 `disabled` 허용* — 여기서 갈린다 | — |
-| **per-message effort** (additive, beta) | "On Claude Fable 5.1 you can change the effort level mid-conversation without invalidating the prompt cache. Raise it for a hard step and lower it for routine ones." 헤더 `mid-conversation-output-config-2026-07-01`. 지원 = Fable 5.1 · Mythos 5.1 · Opus 5 (Claude API) | — |
+| Thinking | adaptive **상시 활성 — 끄기 불가**. *Opus 5는 기본 ON이되 effort ≤ `high`에서 `disabled` 허용* — 여기서 갈린다. **Opus 5.5 도 끄기 불가**(400, §Opus 5.5 운용) | — |
+| **per-message effort** (additive, beta) | "On Claude Fable 5.1 you can change the effort level mid-conversation without invalidating the prompt cache. Raise it for a hard step and lower it for routine ones." 헤더 `mid-conversation-output-config-2026-07-01`. 지원 = Fable 5.1 · Mythos 5.1 · Opus 5 · **Opus 5.5** (Claude API) — "Claude Opus 5.5 also supports changing effort mid-conversation with a per-message `output_config`, which preserves the prompt cache." [verified: platform.claude.com/docs/en/build-with-claude/effort] | — |
 | **turn-scoped system messages** (additive, beta) | 헤더 `mid-conversation-system-clear-at-2026-08-21`, `clear_at: "next_user_message"` | — |
 | **progress updates** (additive, beta) | 도구 호출 사이 읽을 수 있는 진행 표시 — `display: "updates"` | — |
 | Refusal | 안전 분류기가 HTTP 200 + `stop_reason: "refusal"` 반환 가능. 5.1은 오탐이 줄었다 — "Claude Fable 5.1's safety classifiers produce fewer false positives than Claude Fable 5's did at launch, and finding vulnerabilities in source code is permitted." | — |
@@ -101,7 +110,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 - **어떤 계정 유형에서도 default 모델이 아님** — `/model fable`로 명시 선택 (선택 시 user settings에 기본값으로 저장됨). `best` alias = "조직이 Fable 접근 가능하면 Fable, 아니면 최신 Opus"
 - Claude Code **v2.1.170+** 필요. ZDR 환경에서는 피커에서 숨김/비활성 [verified: 환경 실측 2026-06-12]
 - alias 3종: "`fable`: Uses the latest Fable model for your hardest and longest-running tasks" / "`opus`: … complex reasoning tasks" / "`sonnet`: … daily coding tasks" [verified: code.claude.com/docs/en/model-config]
-- ⚠️ 2026-09-06 정정 — Fast mode(`/fast`) 대상: 공식 가격표에 등재된 것은 **Opus 5 / Opus 4.8** 뿐이고, "Fast mode is not available on Claude Opus 4.7 (requests with `speed: \"fast\"` return an error)" [verified: platform.claude.com/docs/en/about-claude/pricing]. 이전 판의 "Opus 4.8/4.7/4.6 전용"은 **4.7 포함이 틀렸다**. Fable은 fast mode 대상이 아니다 — 공식: "Fast mode, in research preview, provides significantly faster output for Claude Opus 5 and Claude Opus 4.8 at premium pricing." + 환경 실측 2026-06-12 미지원
+- ⚠️ 2026-09-06 정정 — Fast mode(`/fast`) 대상: 공식 가격표에 등재된 것은 **Opus 5 / Opus 4.8** 뿐이고, "Fast mode is not available on Claude Opus 4.7 (requests with `speed: \"fast\"` return an error)" [verified: platform.claude.com/docs/en/about-claude/pricing]. 이전 판의 "Opus 4.8/4.7/4.6 전용"은 **4.7 포함이 틀렸다**. Fable은 fast mode 대상이 아니다 — 공식: "Fast mode, in research preview, provides significantly faster output for Claude Opus 5 and Claude Opus 4.8 at premium pricing." + 환경 실측 2026-06-12 미지원. **Opus 5.5 fast mode**: "Fast mode (research preview) is available for Claude Opus 5.5 on the Claude API only; it is not available on Amazon Bedrock, Claude Platform on AWS, Google Cloud, or Microsoft Foundry." [verified: whats-new-opus-5-5] — 가격 $8/$40, Claude Code 에서도 사용 가능 [verified: anthropic.com/claude-opus-5-5]
 
 ### Effort
 
@@ -119,7 +128,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 1. 명시 선택 — `CLAUDE_CODE_EFFORT_LEVEL` 환경변수 · `--effort` 실행 플래그 · 세션 내 `/effort`
 2. 모델 고유 default hold — Fable 5 · Opus 4.8 · Opus 4.7에만 존재. "Opus 5 and Fable 5.1 have no such hold"
 3. 저장 설정 — 모델별 저장값 또는 `effortLevel` 키
-4. 모델 default — "`high` on every model that supports effort, except that Opus 4.7 defaults to `xhigh`"
+4. 모델 default — "high on every model that supports effort, except that Opus 5.5 defaults to medium, Opus 4.7 defaults to xhigh" [verified: code.claude.com/docs/en/model-config, 2026-09-25 재조회]
 
 - 설정 경로: `/effort` 슬라이더 · `--effort` 플래그 · `CLAUDE_CODE_EFFORT_LEVEL` · settings `effortLevel` · **스킬/서브에이전트 frontmatter `effort` 필드** (해당 스킬/에이전트 실행 동안만 override)
 - ✅ **5.1 신규**: 세션 중간 effort 변경이 프롬프트 캐시를 무효화하지 않는다 (§2 per-message effort). "Re-tune effort from the default (`high`), and consider changing it mid-conversation instead of holding one level for the whole session."
@@ -129,10 +138,10 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 ⚠️ 2026-09-06 정정 — 이전 판의 "사용 시점 가이드 (2026-06-12 배선)" 표는 **배선 상태 열이 전부 철회/미배선**이라 삭제했다. 현행은 3줄이다.
 
 - **세션 effort = `xhigh`** (사용자 `/model` 실측). frontmatter `effort` 배선은 없다 (§effort frontmatter 배선 철회 유지).
-- **워크플로 36콜 = `effort: 'xhigh'` 명시** — 세션 상속을 차단하는 콜 단위 값. 공식 default는 `high`이며, 변경 여부는 **fresh sweep 후 결정**한다 (판정 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0이 통과 기준).
+- **워크플로 36콜 = `effort: 'xhigh'` 명시** — 세션 상속을 차단하는 콜 단위 값. 공식 default는 Fable 5.1 `high` · Opus 5.5 `medium`이며, 변경 여부는 **fresh sweep 후 결정**한다 (사용자 결정 2026-09-25: `xhigh` 유지·하향 sweep 종결 · 재개 시 판정 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0이 통과 기준).
 - **`ultracode`는 effort arm으로 무효** (T0 실측) — 사용 가이드·배선 모두 대상 아님. `ultrathink` 키워드는 해당 turn만 심층 추론(effort 설정 불변)이며 "think hard" 류는 더 이상 키워드가 아니다.
 
-> **T1 긴장 (공식 default vs fz 세션 운용)**: 공식 문서는 `high`를 출발점으로 두고 `xhigh`/`max`는 "measured a quality gain" 이후로 미룬다. fz 세션·워크플로의 `xhigh` 상시 운용은 이 기본에서의 **의식적 이탈**로, 다중 파이프라인 오케스트레이션 난이도에 대한 사용자 결정이다 (공식 default를 몰라서가 아님 — `modules/peer-review-tiers.md`: "`xhigh`는 관성이 아니라 결정된 값이다"). 재판정은 위 짝 비교로만 한다.
+> **T1 긴장 (공식 default vs fz 세션 운용)**: 공식 문서는 `high`를 출발점으로 두고(Opus 5.5 는 `medium`) `xhigh`/`max`는 "measured a quality gain" 이후로 미룬다. fz 세션·워크플로의 `xhigh` 상시 운용은 이 기본에서의 **의식적 이탈**로, 다중 파이프라인 오케스트레이션 난이도에 대한 사용자 결정이다 (공식 default를 몰라서가 아님 — `modules/peer-review-tiers.md`: "`xhigh`는 관성이 아니라 결정된 값이다"). 재판정은 위 짝 비교로만 한다.
 
 ### 안전 분류기 자동 폴백 (Claude Code 고유)
 
@@ -146,7 +155,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 ### 서브에이전트 · 워크플로
 
 - Agent tool `model` 파라미터 enum: `sonnet` / `opus` / `haiku` / **`fable`** [verified: 환경 실측 2026-06-12 — Claude Code v2.1.170+ Agent tool 스키마]
-- Workflow `agent()` `opts.model`: 생략 시 **메인 루프 모델 상속** — 세션이 Fable이면 model 미지정 워크플로 에이전트도 Fable로 실행됨. ⚠️ 2026-09-06 정정 — 이 함정의 비용 영향은 "2배"가 아니다: 캐시 읽기가 지배하는 세션에서는 **+9%**, 출력·캐시쓰기 단가는 2배, 호출당 지연은 +49% [fz 실측 2026-09-06]. **함정 자체는 그대로 유효**하다(model 명시 의무 불변)
+- Workflow `agent()` `opts.model`: 생략 시 **메인 루프 모델 상속** — 세션이 Fable이면 model 미지정 워크플로 에이전트도 Fable로 실행됨. ⚠️ 2026-09-06 정정 — 이 함정의 비용 영향은 "2배"가 아니다: 캐시 읽기가 지배하는 세션에서는 **+9%**, 출력·캐시쓰기 단가는 2배, 호출당 지연은 +49% [fz 실측 2026-09-06 — Opus 5 기준]. **함정 자체는 그대로 유효**하다(model 명시 의무 불변)
 - `CLAUDE_CODE_SUBAGENT_MODEL`: 모든 서브에이전트/에이전트 팀 모델을 일괄 override (per-invocation `model` 파라미터·frontmatter보다 우선)
 - `ANTHROPIC_DEFAULT_FABLE_MODEL`: `fable` alias 해석 대상 지정 (서드파티 프로바이더 폴백 식별에도 사용)
 - `DISABLE_PROMPT_CACHING_FABLE=1`: Fable 모델만 프롬프트 캐싱 비활성 — ⚠️ 5.1에서는 캐시 읽기가 $0.25이므로 이 플래그의 비용 효과가 역전된다(끄면 비싸진다)
@@ -204,7 +213,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 - **De-prescribe**: "Skills developed for prior models are often too prescriptive for Claude Fable 5 and can degrade output quality. Review and consider removing older instructions if default performance is better." — 5.1이 철회하지 않았다(§Fable 5.1 상세 서문)
 - **검증 리마인더 축소**: "Skip the verification reminders: it verifies its own work with less prompting, so reminders to test or check are usually unnecessary" [verified: code.claude.com/docs/en/model-config]
 - **자기검증은 fresh-context 검증자로**: "Separate, fresh-context verifier subagents tend to outperform self-critique" — 제거 대상은 *자기재확인 지시*, 존치 대상은 *이종·fresh-context 검증자*
-- ⛔ **reasoning 재현 지시 금지**: 내부 추론을 응답 텍스트로 echo/transcribe하라는 지시는 `reasoning_extraction` refusal 트리거 → Opus 폴백 증가. 기존 스킬의 "사고 과정을 보여라" 류 지시 감사 필요 (fz 전수 grep 실측 0건 — §점검 항목)
+- ⛔ **reasoning 재현 지시 금지**: 내부 추론을 응답 텍스트로 echo/transcribe하라는 지시는 `reasoning_extraction` refusal 트리거 → Opus 폴백 증가. 기존 스킬의 "사고 과정을 보여라" 류 지시 감사 필요 (fz 전수 grep 실측 0건 — §점검 항목). **Opus 5.5 에도 적용** — "Requests that push the model to reproduce its internal reasoning in the response text can be declined with the `reasoning_extraction` category, which is new if you're coming from Claude Opus 5." [verified: prompting-claude-opus-5-5]
 - **send_to_user 도구**: "When running long, asynchronous agents, give the agent a way to surface a message the user must see exactly as written, without ending its turn" — 도구 정의만으로 부족: "Defining the tool is not sufficient on its own; without an instruction in the system prompt, Claude Fable 5 rarely calls it." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 "Create a send-to-user tool" — 5.1이 철회하지 않은 진술]
 
 ## 5. fz 생태계 적용 전략
@@ -217,13 +226,13 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 | 옵션 | 품질 | 비용·시간 | 변경 범위 | 판정 |
 |------|------|----------|----------|------|
 | A. 재배선 이전 baseline (Lead=세션 모델, 워커 전반 sonnet) | 기준 | 기준 | 0 | 현행 아님 (재배선 확정으로 대체) |
-| **B. Lead만 Fable** (사용자가 `/model fable` — 설정 변경 불요) | Lead 추론·오케스트레이션 ↑ | Lead 호출만 Fable 단가 — 캐시 지배 세션 **+9%**, 출력·캐시쓰기 단가 2배, 호출당 지연 **+49%** [fz 실측 2026-09-06] | 0 (이미 가능) | **가동 중** |
+| **B. Lead만 Fable** (사용자가 `/model fable` — 설정 변경 불요) | Lead 추론·오케스트레이션 ↑ | Lead 호출만 Fable 단가 — 캐시 지배 세션 **+9%**(Opus 5 기준), 출력·캐시쓰기 단가 2배, 호출당 지연 **+49%** [fz 실측 2026-09-06] | 0 (이미 가능) | **가동 중** |
 | C. Primary 선택 승격 (capability-sensitive 단일 호출만 `model: 'fable'`) | 병목 단계 ↑ | 해당 호출만 Fable 단가 | 워크플로/스킬 일부 | **적용 확정** (판단 3지점 fable 고정: merge + direction ×2, lint `EXPECTED_FABLE=3`) — 추가 fable 승격(②③)은 측정 후 deferred |
-| D. 전면 Fable | 최대 | 시간 **+49%** · 출력·캐시쓰기 단가 2배 (비용 총액은 캐시 지배 시 +9%) | 전체 | ⛔ 비권장 — 공식이 "For most workloads, start with Claude Opus 5"이고, 이득 근거가 시간 손실을 넘지 못한다 |
+| D. 전면 Fable | 최대 | 시간 **+49%** · 출력·캐시쓰기 단가 2배 (비용 총액은 캐시 지배 시 +9% — Opus 5 기준) | 전체 | ⛔ 비권장 — 공식이 "start with Claude Opus 5.5 for most workloads"이고, 이득 근거가 시간 손실을 넘지 못한다 |
 
-- **B가 공식 포지셔닝과 정합**: Fable의 강점(long-horizon 자율성, 모호성 처리, 위임 관리)은 Lead 역할 그 자체 — "Use Claude Fable 5.1 for demanding reasoning and long-horizon agentic work". 워커 중 단순(retrieval·breadth) lens 작업은 Sonnet 5로 충분하고, 실질 분석·생산은 Opus 5가 담당
+- **B가 공식 포지셔닝과 정합**: Fable의 강점(long-horizon 자율성, 모호성 처리, 위임 관리)은 Lead 역할 그 자체 — "Use Claude Fable 5.1 for demanding reasoning and long-horizon agentic work". 워커 중 단순(retrieval·breadth) lens 작업은 Sonnet 5로 충분하고, 실질 분석·생산은 Opus 5.5가 담당
 - **C (판단 3지점 확정 · ②③ deferred)**: ① 워크플로 merge/synthesis 단계 — **적용됨** (search-cross-verify stage3-merge; plan-collaborative 통합/integrate 단계는 생산 스테이지라 opus 유지 — AC-1) ② fz-review Primary — **Deferred** (AC-5) ③ fz-discover landscape 합성 — **Deferred** (AC-5). 도입 방법(②③): Workflow `agent()` `opts.model: 'fable'` 또는 Agent tool `model: "fable"` [verified: 환경 실측]
-- ⛔ **동시 실행 상한 (불변)**: opus 동시 ≤3 · fable 에이전트 **동시 1개**(Lead 세션 제외) · 총 ≤4. ⚠️ 2026-09-06 정정 — 이전 판의 근거였던 "fable 1 ≈ opus 2 비용 등가 → 최대 동시 ≈ opus 5 equivalent"는 **캐시 읽기가 지배하는 세션에서 성립하지 않는다**(Fable 5.1 캐시 읽기 $0.25 < Opus 5 $0.50). 상한 **수치는 유지**하되 근거는 **출력·캐시쓰기 단가 2배 + 호출당 지연 +49%**로 교체한다. 비용 등가 산식 재산정은 P1 sweep 이후 [fz 실측 2026-09-06]
+- ⛔ **동시 실행 상한 (불변)**: opus 동시 ≤3 · fable 에이전트 **동시 1개**(Lead 세션 제외) · 총 ≤4. ⚠️ 2026-09-06 정정 — 이전 판의 근거였던 "fable 1 ≈ opus 2 비용 등가 → 최대 동시 ≈ opus 5 equivalent"는 **캐시 읽기가 지배하는 세션에서 성립하지 않는다**(Fable 5.1 캐시 읽기 $0.25 < Opus 5 $0.50). 상한 **수치는 유지**하되 근거는 **출력·캐시쓰기 단가 2배 + 호출당 지연 +49%**로 교체한다(Opus 5 기준 수치). 비용 등가 산식 재산정은 P1 sweep 이후 [fz 실측 2026-09-06]
 - ⚠️ **Workflow model 생략 함정**: `opts.model` 생략 시 메인 루프 모델 상속 — Fable 세션에서는 모든 미지정 에이전트가 Fable로 실행됨. fz workflows는 현재 전 호출에 model + `effort: 'xhigh'` 명시(opus/sonnet + 판단 3지점 fable)되어 있어 안전 (workflows/*.js 6파일 전수 명시). `scripts/lint-model-explicit.sh`가 기계 검증 (전 호출 model + effort 명시 + fable=3 고정)
 
 ### 재배선 확정 배선 (정적 45콜) — 현행
@@ -231,10 +240,10 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 판단 3지점 fable 배선에 이어 비-Lead 워커의 opus/sonnet 분할이 확정됐다. 정적 콜사이트 36개 기준이 현행이다:
 
 - **판단 = fable 3** (불변, Fable 5.1) — search-cross-verify merge + plan-collaborative direction ×2. lint `EXPECTED_FABLE=3` 고정
-- **실질 분석·생산 워커 = opus 36** (Opus 5) — plan/peer-review/review-live/code-pair의 impact·edge·arch·quality·correctness·cross-critique(CC)·counter·recheck·review 등 capability-sensitive 스테이지 (4-axes A의 "워커 전반 sonnet" baseline을 대체)
+- **실질 분석·생산 워커 = opus 36** (`opus` alias = Opus 5.5 — Claude Code 2.1.280+) — plan/peer-review/review-live/code-pair의 impact·edge·arch·quality·correctness·cross-critique(CC)·counter·recheck·review 등 capability-sensitive 스테이지 (4-axes A의 "워커 전반 sonnet" baseline을 대체)
 - ⛔ **2026-09-12 fz-plan 배선 전환**: 기본 워크플로가 `plan-collaborative.js`(6단계 9콜) → **`plan-lean2.js`(2단계 4콜)**. wall 3,492s→1,344s(-61.5%). ⭐ 근거의 핵심은 **노이즈 바닥 교정** — 같은 9콜 구조를 동일 입력·트리로 2회 실행하니 상호 고유 major 5건·`Q-superior`(동등 아님)였다. run-to-run 분산이 구조 간 차이보다 크므로 "손실 0" 임계는 도달 불가능했고, 새 배선의 발산(3)은 그 바닥(5) 이하다. ⛔ N=1 — 실사용 3회 후 재평가(`experiment-log.md` §5.9). 롤백은 `skills/fz-plan/SKILL.md` 절차 2.5·3 의 스크립트명 원복
 - **단순(retrieval·breadth) = sonnet 6** (Sonnet 5) — search stage1·2 + discover lens fan-out·cost-lens
-- 전 45콜 `effort: 'xhigh'` 명시 — 세션 effort 상속을 차단하는 콜 단위 값. ⛔ 값 변동은 `scripts/lint-model-explicit.sh --baseline tests/fixtures/model-effort-baseline.json` 이 **label 별로** 대조한다(줄 수 세기는 콜별 변경을 못 잡는다). sweep 결과는 `experiment-log.md` §5.8 ⑥ · 구조 ablation 은 §5.9. **공식 default는 `high`**이며, 변경 여부는 fresh sweep 후 결정한다 (짝 비교 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0). ⛔ 이 문서는 하향을 권고하지 않는다 — `xhigh`는 사용자가 유지를 택한 결정된 값이다
+- 전 45콜 `effort: 'xhigh'` 명시 — 세션 effort 상속을 차단하는 콜 단위 값. ⛔ 값 변동은 `scripts/lint-model-explicit.sh --baseline tests/fixtures/model-effort-baseline.json` 이 **label 별로** 대조한다(줄 수 세기는 콜별 변경을 못 잡는다). sweep 결과는 `experiment-log.md` §5.8 ⑥ · 구조 ablation 은 §5.9. **공식 default는 Fable 5.1 `high` · Opus 5.5 `medium`**이며, 변경 여부는 fresh sweep 후 결정한다(사용자 결정 2026-09-25: `xhigh` 유지·sweep 종결) (짝 비교 절차: `modules/peer-review-tiers.md:225-227` — 같은 입력에 `xhigh`/`high` 각 1회, 검증된 critical·major 손실 0). ⛔ 이 문서는 하향을 권고하지 않는다 — `xhigh`는 사용자가 유지를 택한 결정된 값이다
 - opus 동시 실행 ≤3 (Lead=fable 제외, 총 ≤4)
 - **runtime fan-out**: discover lens 등 정적 1콜이 런타임 N인스턴스로 전개 — 동시성·비용은 런타임 기준 별도 계산
 
@@ -244,7 +253,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 
 > B안 가동 상태에서 fable 강점을 실제로 끌어내는 3패턴. 새 주장 없이 §4 공식 권고를 fz 운용에 대응시킨 것.
 
-- **ⓐ 에스컬레이션 종점**: Gate 반복 실패·디버깅 막다른 길(워커 2사이클 루프)에서만 fable 단발 root-cause 에이전트를 스폰 — 동시 1 상한(위 4-axes C) 내 단발로만, 상시 승격 아님. 공식 "when your evals on Claude Opus 5 at higher effort still fall short"에 정합.
+- **ⓐ 에스컬레이션 종점**: Gate 반복 실패·디버깅 막다른 길(워커 2사이클 루프)에서만 fable 단발 root-cause 에이전트를 스폰 — 동시 1 상한(위 4-axes C) 내 단발로만, 상시 승격 아님. 공식 "when your evals on Claude Opus 5.5 at higher effort still fall short"에 정합.
 - **ⓑ long-horizon 세션**: 평소 쪼개던 다중 파이프라인을 한 세션에서 처리 — 공식 §4 "Size up larger tasks: give it work you would normally break into pieces" + 1M 컨텍스트 + 티켓 폴더 아티팩트 누적의 시너지. 단, 단일 요청이 수 분 소요(§2 Turn 길이)이므로 진행 표시·타임아웃 설계 병행. ℹ️ 5.1은 진행 보고를 **덜** 쓴다(§4 신규 행동) — 진행 표시 설계는 도구·훅 층으로 옮기는 편이 안전하다.
 - **ⓒ outcome-delegation**: 승인 후 실행 경로는 Lead 재량에 위임 — 공식 §4 "Describe the outcome, not the steps". 승인 게이트 이후 step 단위 지시 대신 성공 기준만 전달.
 
@@ -285,15 +294,15 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 | Intent context | **채택** | skill-authoring §12 규약 성문화(agent 스폰 시 intentContext 3요소) + plan CTX 목적 축 |
 | **Batching nudge** (5.1) | ⛔ **비채택 — fz 추가 금지** | Claude Code가 이 문장을 **turn-scoped 시스템 메시지로 이미 주입**한다 [fz 실측 2026-09-06 — report.md §3]. fz가 다시 넣으면 중복 주입 |
 | **Finish the whole task** (5.1) | 비채택(기존재) | `modules/execution-modes.md` § autonomous-reminder(LOOP 한정)가 동등 — "마지막 문단이 계획·의도·다음 단계 선언이면 해당 tool call을 실제로 실행하고, 종료는 작업 완료 또는 사용자만 줄 수 있는 입력 대기 시에만" [verified: 코드 실측 2026-09-06] |
-| **Compaction preserve** (5.1) | **미판정 (보강 후보)** | 접점은 Context reassurance 채택 행과 `skills/fz/SKILL.md:338` "4스텝+ 시 /compact 안내". 그 트리거는 **스텝 수 기반**이지 비용 기반이 아니므로 5.1의 "later compaction points"와 직접 충돌하지는 않는다. 4스텝+ 임계가 캐시 읽기 $0.25 하에서 여전히 적정인지는 **미측정** → P1 sweep 항목 |
-| **Keep changes to the task** (5.1) | 비채택(기존재) | No-tidying 행과 동일 근거 — `skills/fz-code/SKILL.md:269` 관찰 보고 의무("실행 금지, 범위 외 정리 금지") + `modules/code-transform-validation.md` Scope Minimality [verified: 코드 실측 2026-09-06] |
+| **Compaction preserve** (5.1) | **미판정 (보강 후보)** | 접점은 Context reassurance 채택 행과 `skills/fz/SKILL.md:339` "4스텝+ 시 /compact 안내". 그 트리거는 **스텝 수 기반**이지 비용 기반이 아니므로 5.1의 "later compaction points"와 직접 충돌하지는 않는다. 4스텝+ 임계가 캐시 읽기 $0.25 하에서 여전히 적정인지는 **미측정** → P1 sweep 항목 |
+| **Keep changes to the task** (5.1) | 비채택(기존재) | No-tidying 행과 동일 근거 — `skills/fz-code/SKILL.md:268` 관찰 보고 의무("실행 금지, 범위 외 정리 금지") + `modules/code-transform-validation.md` Scope Minimality [verified: 코드 실측 2026-09-06] |
 
 ### 점검 항목 (후속 작업 후보)
 
 - [x] fz 스킬/모듈 중 "사고 과정·추론을 출력하라" 류 지시 전수 grep → `reasoning_extraction` refusal 위험 평가 — **실측 0건** (2026-06-12, skills/·modules/·agents/·workflows/ 전수. `reasoning`/`사고` 매치는 전부 추론 품질·모듈명 등 정상 용법)
 - [ ] Fable 세션에서 fz-review self-review 품질 재측정 → GPT cross-model 의존도 재조정 (단, 이종 blind-spot 안전망 자체는 유지 — 15차/23차). **→ 본 감사의 P1 sweep에 연결**: 짝 비교 절차는 `modules/peer-review-tiers.md:225-227`
 - [ ] **P1 effort sweep (신설)** — 36콜 `xhigh` ↔ `high` 짝 비교. 공식 근거 "Re-run the sweep even if you already ran one on Claude Fable 5". ⛔ 결과 전까지 하향 금지
-- [ ] **Compaction 임계 재측정 (신설)** — `skills/fz/SKILL.md:338` 4스텝+ `/compact` 안내가 캐시 읽기 $0.25 하에서 적정한지
+- [ ] **Compaction 임계 재측정 (신설)** — `skills/fz/SKILL.md:339` 4스텝+ `/compact` 안내가 캐시 읽기 $0.25 하에서 적정한지
 - [x] `/model` effort 세션 지속성 실측 — **해소** (2026-07-05 `/model` 피커 stdout 실측). ⚠️ 현행 값은 `xhigh` (2026-09-06)
 - [x] async subagent 권고 반영 — one-shot Workflow `agent()` 전환으로 대체 결정 (T2 긴장 참조). TEAM(SendMessage) async 패턴 배선은 미채택
 

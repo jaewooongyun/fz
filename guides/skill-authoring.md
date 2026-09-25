@@ -163,9 +163,9 @@ skills/fz-code/
 └── (단순 스킬은 하위 디렉토리 없음)
 
 modules/      ← Level 3 (공유 모듈)
-├── team-core.md
+├── gates.md
+├── cross-validation.md
 ├── team-registry.md
-├── patterns/
 └── ...
 
 guides/       ← Level 3 (공유 가이드)
@@ -242,7 +242,7 @@ Step 1: ContentDetailBuilder 생성 (DI: ContentRepository, ImageCacheUseCase)
 
 ### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
-**Fable 5 (2026-06-09 GA)** 는 짧은 지시로 대부분 행동을 조향할 수 있다 — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5] → 과격·모호한 지시가 그대로 적용될 위험. **GPT-5.5 (2026-04-23 GA)** 도 "literal and thorough manner" 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]. 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: 동 Fable 5 문서]). **Opus 5 (2026-07-24 GA)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. ⚠️ 2026-09-06 정정: 이전 근거였던 "Claude 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
+**Fable 5 (2026-06-09 GA)** 는 짧은 지시로 대부분 행동을 조향할 수 있다 — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5] → 과격·모호한 지시가 그대로 적용될 위험. **GPT-6 계열**도 같은 방향 — "what used to require a lot of handholding and scaffolding no longer does" · 스킬 설명은 짧게 [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra] (Astra 대상 글 — 현행 Sol 적용은 [미검증]). 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: 동 Fable 5 문서]). **Opus 5.5 (2026-09-22 GA — Opus 5 패턴 상속)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. ⚠️ 2026-09-06 정정: 이전 근거였던 "Claude 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
 
 ```
 BAD:  "CRITICAL: You MUST ALWAYS use this tool"
@@ -348,13 +348,13 @@ await agent(prompt, { label: 'stage1-impl', agentType: 'fz:impl-correctness',
 
 ### 통신 패턴 선택
 
-| 패턴 | 적용 스킬 | 핵심 동작 | 패턴 파일 |
+| 패턴 | 적용 스킬 | 핵심 동작 | 구현 스크립트 |
 |------|-----------|-----------|----------|
-| Collaborative Design | fz-plan | 만들면서 토론 | `docs/history/patterns/collaborative.md` |
-| Pair Programming | fz-code | 구현 중 실시간 피드백 | `docs/history/patterns/pair-programming.md` |
-| Live Review | fz-review | 분석하면서 발견 공유 | `docs/history/patterns/live-review.md` |
-| Adversarial Discovery | fz-discover | 만들고 부수며 제약 발견 | `docs/history/patterns/adversarial.md` |
-| Cross-Verify | fz-search | 발견 즉시 교차 확인 | `docs/history/patterns/cross-verify.md` |
+| Collaborative Design | fz-plan | 만들면서 토론 | `workflows/plan-collaborative.js` (fz-plan 기본은 `plan-lean2.js`) |
+| Pair Programming | fz-code | 구현 중 실시간 피드백 | `workflows/code-pair.js` |
+| Live Review | fz-review | 분석하면서 발견 공유 | `workflows/review-live.js` |
+| Adversarial Discovery | fz-discover | 만들고 부수며 제약 발견 | `workflows/discover-adversarial.js` |
+| Cross-Verify | fz-search | 발견 즉시 교차 확인 | `workflows/search-cross-verify.js` |
 
 자세한 내용: `guides/agent-team-guide.md`
 
@@ -470,9 +470,9 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 
 | 패턴 | 적용 시점 | fz 적용 예시 |
 |------|----------|-------------|
-| Cross-Model Verification | 독립 모델 교차검증 | fz-gpt (Codex CLI로 독립 검증) |
+| Cross-Model Verification | 독립 모델 교차검증 | fz-gpt (GPT CLI로 독립 검증) |
 
-fz-gpt는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --output-schema`)과
+fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 — 호출은 `scripts/gpt-exec.sh {review|exec --schema}`)과
 3-Tier 디스커버리 스킬 체인(fz-reviewer, fz-architect, fz-guardian, fz-challenger, fz-searcher, fz-fixer)을
 결합하여 Main Agent와 독립된 교차검증을 수행한다.
 
@@ -526,7 +526,7 @@ fz-gpt는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --output-
 
 ### 표준 패턴 3종 (전 스크립트 의무 — pilot 실측 검증)
 
-1. **OVERRIDE 블록**: agentType 재사용 시 모든 agent() 프롬프트 선두에 — "P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시 미적용. 에이전트 정의의 Phase 절차·티켓 폴더·이전 세션·메모리 컨텍스트 로딩도 미적용 — 이 프롬프트의 입력만이 과제 전부. 무관 작업 폴더 읽기 금지. 최종 텍스트가 반환값(1-shot raw data)." [근거: pilot invoke #1 — 에이전트 정의의 컨텍스트 로딩이 args를 압도해 무관 폴더 anchoring]
+1. **OVERRIDE 블록**: agentType 재사용 시 모든 agent() 프롬프트 선두에 — "P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시 미적용. 에이전트 정의의 Phase 절차·티켓 폴더·이전 세션·메모리 컨텍스트 로딩도 미적용 — 이 프롬프트의 입력만이 과제 전부. 무관 작업 폴더 읽기 금지. 최종 텍스트가 반환값(1-shot raw data). ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다)." [근거: pilot invoke #1 — 에이전트 정의의 컨텍스트 로딩이 args를 압도해 무관 폴더 anchoring] [advisor 문구 근거: 워커는 세션 `advisorModel` 을 상속하고 네이티브 차단 수단이 없다(`modules/governance.md` 운용 규칙 5) — 표준에 문구가 없던 시기 워크플로 4개가 누락해 `scripts/check_wf_advisor_ban.py` 가 표준을 강제한다]
 2. **args 방어 파싱 + fail-fast**: scriptPath 호출 시 args가 JSON **문자열**로 도착한다 [실측: probe wf_89418b73, typeof=string] → `typeof args === 'string' ? JSON.parse(args) : args` + 필수 키 누락 시 에이전트 스폰 전 `{mode:'fallback'}` 즉시 반환 (fabrication 방지)
 3. **agentType 네임스페이스**: 플러그인 에이전트는 `fz:` prefix 필수 [실측: S0 — 'plan-structure' not found / 'fz:plan-structure' 동작]
 
@@ -538,7 +538,7 @@ fz-gpt는 Codex CLI의 네이티브 기능(`codex review`, `codex exec --output-
   - ⛔ **비ASCII 본문은 손으로 이스케이프하지 않는다** — MCP 도구 파라미터는 UTF-8 문자열을 그대로 받는다. `\uXXXX` 수동 변환은 안전장치가 아니라 **오류원**이다: 5천 자 한국어를 이스케이프해 보낸 호출이 **200 성공 + 본문 11곳 손상**으로 끝난 실측이 있다. 짧은 본문에서는 재현되지 않아 길이가 늘수록 위험하다.
   - ⛔ 외부 시스템(JIRA·GitHub·Slack)에 비ASCII 본문을 기록한 직후 **반환 본문을 1회 스캔**한다. 이 층에는 빌드도 린트도 없어 *성공 응답이 정확한 산출물을 뜻하지 않는다* — 유일한 오라클이 반환값 확인이다. 파일로 먼저 쓴 뒤 그 내용을 보내는 경로가 있으면 그쪽이 안전하다.
 - agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정), effort 생략 시 세션 effort 상속. 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 — ⛔ **차단이 아니라 "요청 시 검출"이다.** `/fz-manage check`가 호출할 때만 돌고, 실제 차단은 훅 설치 시에만 성립한다(훅은 `settings.json` = 사용자 소관, `modules/governance.md` § Hook 최소 강제 권고)
-- **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `'xhigh'` 단일값. Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**.
+- **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `'xhigh'` 단일값. Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**. **Opus 5.5 는 기본 `medium`·같은 effort 에서 사고량 증가** [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] — fz 는 `xhigh` 유지(사용자 결정 2026-09-25, 하향 sweep 종결).
   - ⛔ **상수 일괄 교체 금지**: 공식이 *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* 을 요구. **sweep 등록·기록 위치는 `experiment-log.md` §5.8 ⑥**(세션 effort sweep — plan, 2026-09-11 신설)이며 ①(frontmatter)은 철회된 사료라 대상이 아니다. 측정 주체는 `scripts/fz_wf_metrics.py`(stage별 wall·out_tok·thinking·advisor·so_retries) + `scripts/fz_telemetry_report.py --plan-segments`(Lead·GPT 층 분리) 다 — 사전등록만 하고 재는 주체가 없으면 표가 빈 채로 남는다(실측: 두 달). 측정 없이 `xhigh`→`high`로 치환하는 건 근거 없는 값을 근거 없는 값으로 바꾸는 것. **워크로드별 sweep 후** 스테이지 성격(생산/판정/탐색)에 맞춰 차등 배정. 미측정 상태의 기본값 = **현행 유지**.
   - **[2026-09-06 추가] Fable 5.1 갱신**: 이월 금지가 세대를 건너서도 반복 적용된다 — "Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. Lead(Fable 5.1)에도 동일 적용 — Fable 5·Opus 5에서 측정한 sweep 결과를 그대로 이월하지 않는다.
   - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [미검증: per-call `opts.effort` vs settings.json `effortLevel` 우선순위. 문서화된 체인은 `env var > frontmatter > 세션`이며 per-call opts는 미명시]
@@ -599,7 +599,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 ### ⛔ 실패 복구 사다리 (`mode:'fallback'` · 스톨 — **본 절이 정본**)
 
-> 신설 근거(2026-08-09): 이전에는 5개 스킬이 폴백 절차로 `docs/history/team-core.md` + `docs/history/patterns/`(679줄)를 지목했으나 그 내용은 `TeamCreate`/`SendMessage` **P2P 절차**였다 — SOLO에는 에이전트가 없어 **실행 자체가 불가능**했다. 그런데 실측상 실패는 2회 발생하고 **두 번 다 아래 사다리로 복구**됐다(`experiment-log.md` §5.7 fz-code #1 · fz-review #8). `team-core` 사용 이력은 **0건**이다.
+> 신설 근거(2026-08-09): 이전에는 5개 스킬이 폴백 절차로 TEAM 사료(team-core + patterns, 679줄 — 2026-09-25 삭제)를 지목했으나 그 내용은 `TeamCreate`/`SendMessage` **P2P 절차**였다 — SOLO에는 에이전트가 없어 **실행 자체가 불가능**했다. 그런데 실측상 실패는 2회 발생하고 **두 번 다 아래 사다리로 복구**됐다(`experiment-log.md` §5.7 fz-code #1 · fz-review #8). `team-core` 사용 이력은 **0건**이다.
 > 즉 본 절은 새 프로토콜을 발명하는 것이 아니라 **이미 작동한 복구 경로를 성문화**한다.
 
 #### ⛔ 먼저 상태를 판별한다 — 6종 (2026-09-18)
@@ -632,7 +632,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 - ⛔ **`resume`은 동일 Claude Code 세션 내에서만** 동작한다 — 세션이 끝났으면 L3를 건너뛰고 티켓 폴더 아티팩트로 복원한다
 - ⛔ **재시도는 `buildFeedback` 등을 args에 넣어 캐시 키를 바꾼다** (resume 비의존 경로)
 - ⛔ **진단은 추측 금지** — `<transcriptDir>/journal.jsonl`이 agent별 실제 반환값을 기록한다. 빈 결과·이상 결과는 journal을 먼저 Read
-- `docs/history/team-core.md` + `docs/history/patterns/*.md`는 **라운드 의미론의 역사적 출처**다 — 폴백 실행 절차로 참조하지 않는다
+- TEAM 사료(team-core + patterns 5종)는 **2026-09-25 삭제**됐다 — 결정: `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰. 폴백 실행 절차는 위 사다리뿐이다
 
 ### intentContext 규약 (과제 목적 전달)
 

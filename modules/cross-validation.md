@@ -1,9 +1,9 @@
 # 교차 검증 주입 전략
 
-> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료 (Opus 5 "검증 지시 삭제" 지침 대비 게이트 존치 경계 성문화 포함).
+> **Sources (last audited: 2026-09-25 — 모델 사실 축: Opus 5.5 상속·think-carefully 권고 1문단 · 원칙 A3 에 2607.08065 · 교차 검증 대상 GPT 표기만 대조. 나머지는 2026-07-25 대조 그대로):** `guides/llm-references.md` §1 정본 대조 완료 (Opus 5 "검증 지시 삭제" 지침 대비 게이트 존치 경계 성문화 포함).
 >
 > fz Phase 3에서 파이프라인에 검증 게이트를 자동 삽입. 모든 모드에서 최소한의 검증 보장.
-> 핵심 원칙: TEAM = Claude 에이전트(N) + GPT(1). 코드/계획 생산 TEAM에 Codex CLI 필수 참여. 탐색 파이프라인은 --deep만.
+> 핵심 원칙: TEAM = Claude 에이전트(N) + GPT(1). 코드/계획 생산 TEAM에 GPT CLI 필수 참여. 탐색 파이프라인은 --deep만.
 
 ## 목차
 
@@ -53,7 +53,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 
 - **fz-gpt 모든 서브커맨드** = Generator≠Evaluator 분리 구현체
 - **T1-G ensemble** = MoA-Lite 2-layer 구현 (cross-agent diversity 강화)
-- **η-1** = Position bias 회피의 prompt-level 강화 (team-core.md Gate 1.0 Independence Verified로 구현)
+- **η-1** = Position bias 회피의 prompt-level 강화 (TEAM 사료의 Gate 1.0 Independence Verified로 구현 — 사료 2026-09-25 삭제)
 - **Reflection Rate 측정** = 이종 blind spot 보완 효과 정량화 (T1-B §5.5 schema)
 
 ### 학술 참조
@@ -111,7 +111,9 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 
 > ⚠️ **Opus 5 경계선 (2026-07-25) — 이 게이트들은 존치한다.** Opus 5 공식 프롬프팅 가이드는 *검증 지시를 삭제하라*고 명시한다("include a final verification step" / "use a subagent to verify" / "double-check your answer" → 제거 시 *"no loss in quality"*) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. 그러나 **삭제 대상은 *모델에게 자기 작업을 재확인시키는 프롬프트 문구*** 다.
 >
-> 아래 게이트는 성격이 다르다 — **① 하네스가 실행하는 결정론적 oracle**(build·enforcement·implication-scan: 모델 판단이 아니라 도구 실행) **② 이종 모델 교차검증**(gpt check/verify: 동종 self-eval이 못 잡는 blind-spot) **③ 다른 관점의 독립 분석**(direction challenge, review-arch/quality). 셋 다 자기재확인이 아니므로 **일괄 제거 금지**.
+> ⚠️ **Opus 5.5 (2026-09-25) — 이 방침을 뒤집지 않는다(상속).** *"Existing Claude Opus 5 prompts should perform well without changes, and the patterns in Prompting Claude Opus 5 remain a reasonable starting point."* 5.5 가 새로 권하는 것은 chat 시스템 프롬프트의 think-carefully 문구 제거다 — *"In chat applications, if your system prompt contains instructions that tell Claude to think carefully before answering, consider removing them for Claude Opus 5.5."* 이것도 **모델에게 주는 문구**가 대상이고, 아래 결정론적 게이트·이종 검증자와는 무관하다 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5]
+>
+> 아래 게이트는 성격이 다르다 — **① 하네스가 실행하는 결정론적 oracle**(build·enforcement·implication-scan: 모델 판단이 아니라 도구 실행) **② 이종 모델 교차검증**(gpt check/verify: 동종 self-eval이 못 잡는 blind-spot) **③ 다른 관점의 독립 분석**(direction challenge, review-arch/quality). 셋 다 자기재확인이 아니므로 **일괄 제거 금지**. 단 존치 근거의 종류가 다르다 — ①은 결과가 결정적이라 비용만 보면 되고, ②③은 모델을 한 번 더 부르는 단계라 **개별 존치를 효과로 판정**한다: 단계별 검증된 발견(critical·major)·오탐·비용을 `/fz-review` Harness Metrics → `experiment-log.md` §5.4 에 누적하고, 발견 0 이 이어지는 단계는 축소 후보로 올린다.
 >
 > ⛔ 반대로, 워커 프롬프트 안에 "마지막에 스스로 검증하라" 류 문구가 있다면 그건 제거 대상이다. **게이트(구조) ≠ 지시(문구)** — 이 구분을 흐리면 load-bearing 게이트가 사라진다.
 
@@ -150,7 +152,7 @@ TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 �
 ## 외부 모델 포함 원칙 (TEAM 필수)
 
 > 핵심: TEAM = Claude 에이전트(N) + GPT(1). 코드/계획 생산 TEAM에 GPT 필수.
-> **A3 (동종 합의 ≠ 독립검증)**: 동종 모델 에이전트 N명의 합의는 독립 검증이 아니다 — 같은 맹점을 공유하고 wrong-majority에 conform한다(debate ceiling). cross-model(GPT) 체크 후에만 합의를 신뢰하고, lone correct dissent를 majority보다 우선 검토한다 [verified: arxiv 2503.13657 MAST — inter-agent misalignment]. (memory 23차 — self-review blind spot, cross-model이 마지막 안전판)
+> **A3 (동종 합의 ≠ 독립검증)**: 동종 모델 에이전트 N명의 합의는 독립 검증이 아니다 — 같은 맹점을 공유하고 wrong-majority에 conform한다(debate ceiling). cross-model(GPT) 체크 후에만 합의를 신뢰하고, lone correct dissent를 majority보다 우선 검토한다 [verified: arxiv 2503.13657 MAST — inter-agent misalignment]. 교차 모델 합의도 정확성의 증거는 아니다 — *"Agreement is not accuracy: a model can agree with itself, and different models can agree with each other, out of shared bias"*, 합의는 약한 양의 예측자(rho 0.20~0.59) [arxiv 2607.08065, arxiv preprint 2026-07] → GPT 동의는 판정이 아니라 **대조할 근거**로 읽는다. (memory 23차 — self-review blind spot, cross-model이 마지막 안전판)
 > 근거:
 > - X-MAS(arxiv 2505.16997) — **이종 모델 조합이 동종보다 우수** (MATH +8.4%, AIME +47% 성능 향상). `[verified: 2차 research, 논문 abstract 확인 2026-04-21]`
 > - VeriGuard(arxiv 2510.05156) — **dual-stage verification** (Pre-action Gate + Runtime Gate 이중 구조)이 단일 검증보다 우수. fz의 ✓ stress-test + ✓ gpt check 2단계와 구조적 정합
@@ -171,7 +173,7 @@ TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 �
 
 ## Cross-Model Verification (2-Model)
 
-Claude + GPT(GPT-5.5) 교차 검증:
+Claude + GPT(현행 모델) 교차 검증:
 
 | 트리거 | 프로바이더 | Effort |
 |--------|-----------|--------|
@@ -335,7 +337,7 @@ Tier 1: CLAUDE.md `## GPT Skills` 테이블 → Tier 2a: `~/.codex/skills/` 심�
 
 > **신설 근거 (2026-08-09 외부 감사 ISSUE-009)**: 위 함수와 8개 호출부가 `FZ_PLUGIN_ROOT`를 **소비**하는데 레포 어디에도 **할당이 없었다**(실측: 소비 10곳 / 할당 0곳). 전부 빈 문자열이 전달되어 `[ -n "$PLUGIN_ROOT" ]`가 false → **Tier 2b가 항상 건너뛰어졌다.** Tier 2b 파손을 고치려던 변경이 목표를 달성하지 못한 상태였다.
 
-⛔ **`codex exec` 호출 전에 반드시 1회 실행한다.** 절차는 **2단계**다 — ①Lead가 스크립트의 절대경로를 만들고 ②스크립트가 자기 위치에서 루트를 해석한다.
+⛔ **GPT 호출(`scripts/gpt-exec.sh`) 전에 반드시 1회 실행한다.** 절차는 **2단계**다 — ①Lead가 스크립트의 절대경로를 만들고 ②스크립트가 자기 위치에서 루트를 해석한다.
 
 ⛔ **부트스트랩 순환 주의**: 셸 스니펫만으로는 해결되지 않는다. `{스킬 base directory}` 같은 토큰은 **치환되지 않는 리터럴**이라 `cd`가 실패한다 (2026-08-09 감사 ISSUE-PLAN-001). 첫 절대경로는 **Lead가 대화 컨텍스트에서** 만든다.
 

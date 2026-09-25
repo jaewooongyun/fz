@@ -52,8 +52,8 @@ metadata:
 
 ## Prerequisites
 
-- **외부 자료 접근**: WebSearch + WebFetch + Codex CLI (cross-model verify)
-- **Codex CLI**: cross-model 검증(모델=config SSOT — 버전 플로어는 `modules/gpt-strategy.md`). trust_level="trusted" 설정 필요 (30차 교훈)
+- **외부 자료 접근**: WebSearch + WebFetch + GPT CLI (cross-model verify)
+- **GPT CLI**: cross-model 검증(모델=config SSOT — 버전 플로어는 `modules/gpt-strategy.md`). trust_level="trusted" 설정 필요 (30차 교훈)
 - **6+ 스텝 자동 티켓 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 티켓 ID
 
 ## 모듈 참조
@@ -272,7 +272,7 @@ echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.m
 
 ## Phase 4: Verify (GPT Cross-Model 검증)
 
-**핵심 원칙**: Plan을 GPT-5.5 (또는 사용 가능한 cross-model)로 독립 검증. **누적 한도 3회**.
+**핵심 원칙**: Plan을 GPT(현행 모델 — `modules/gpt-strategy.md` 정본, 또는 사용 가능한 cross-model)로 독립 검증. **누적 한도 3회**.
 
 ### 절차
 
@@ -291,17 +291,12 @@ echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.m
 ### 권장 — GPT 호출 환경
 
 ```bash
-# fz-gpt SKILL.md hygiene 적용
-# 1. Stdin close (29차)
-# 2. trust_level="trusted" 등록 (30차)
-# 3. -o flag 작동 안 할 시 stdout > file redirect 사용
-codex exec \
-  -c model_reasoning_effort=high \
-  -c 'sandbox_permissions=["disk-full-read-access"]' \
-  --skip-git-repo-check \
-  -C "{WORK_DIR}" \
-  "$(cat /tmp/verify-prompt.txt)" < /dev/null \
-  > {WORK_DIR}/verify/gpt-verify-v{N}-result.md 2>&1
+# hygiene(stdin close 29차 · trust_level 30차 · `--` 구분자 · exit 계약)는 래퍼가 처리한다 — modules/fz-gpt-bash-hygiene.md §8
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec \
+  --cd "{WORK_DIR}" \
+  --out "{WORK_DIR}/verify/gpt-verify-v{N}-result.md" \
+  --prompt-file /tmp/verify-prompt.txt \
+  --effort high
 ```
 
 ### Gate 4: Cross-Verify Complete
@@ -458,7 +453,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | Probe WebSearch 실패 | 재시도 1회 → 사용자에게 직접 자료 요청 | manual probe |
-| Codex CLI 통신 실패 | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
+| GPT CLI 통신 실패 | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
 | GPT 누적 한도 도달 | 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (GPT 권고 점 수정 N건만) |
 | AC8 broken link 발견 | archive.org 폴백 또는 인용 제거 | 사용자 결정 |
 | Impact Scan line 번호 깨짐 | 모듈에서 path/section 참조로 변경 권고 | 영향 모듈 목록 보고 |
