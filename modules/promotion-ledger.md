@@ -63,7 +63,7 @@
 
 ### ~~P1-B: Generator≠Evaluator Lead 독립 절차~~ — ✅ **구현 완료 종결 (2026-08-24)**
 - 관측 #0: OBS-03 (원본, 3차 설계 반영)
-- ⛔ **승격 절차를 거치지 않고 구현이 먼저 됐다** — `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:66` 참조. 관측 2건 대기는 무의미해졌다
+- ⛔ **승격 절차를 거치지 않고 구현이 먼저 됐다** — `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md` Phase 3 1b(Scope Challenge — "GPT 결과를 읽기 전 독립 판정") 참조. 관측 2건 대기는 무의미해졌다
 - 처분: **종결** (REMOVED 아님 — 폐기가 아니라 반영 확인). 사용자 결정 2026-08-24
 
 ### ~~P1-C: Drift telemetry (AskUserQuestion)~~ — ⛔ **REMOVED (2026-08-24)**
@@ -92,7 +92,7 @@
 - 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. GPT `gpt-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/GPT 비대칭).
 - generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
 - ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
-- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md:215` retain cycle 점검 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(GPT 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
+- ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md` "⛔ retain cycle 점검" 블록 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(GPT 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
 - 승격 목표 (트랙 C → 트랙 A): 별개 세션 추가 관측 후 safety-audit §확장 active 전환.
 
 ## OBS-08 회고 후보 (P2, 관측 #1)
@@ -117,15 +117,15 @@
   - 근거: [verified: 내부 figma 대조 기록]
   - Lead/GPT 일치 여부: user_decided
   - **트랙 A 3/5**. 카운트 근거: `memory-guide.md` §Evidence 출처 *"동일 failure mode가 **별개 세션**에서 관찰돼야 1 count"* + 본 파일 §"카운트 기준 (본 세션 채택)" (Eligible `(a)+(b)`는 **P-track 승격 전용** — 트랙 A friction 신호에 비적용). ⚠️ heading 앵커로 인용 — 줄번호는 본 엔트리 추가로 이동함
-- ⚠️ **관측 후보 (카운트 제외)**: OBS-22 | Date: 2026-07-30 | finding-source: **external**(QA 팀원 + CodeRabbit 2건) — 이력/구매 화면 디자인 검수 버그 티켓(Highest), M1~M7·P1~P3 중 P3 철회·M3 3차 전환. ⛔ **트랙 C 진입 조건 3개 중 어느 것도 미증명**: ① `/fz-review --deep` **이후** 발견인가 — QA 티켓은 작업을 *시작시킨 선행 입력*이라 아님 ② actionable Major+ 근거 미기재 ③ **4-classify 분류 미실행**(`project-rule|valid-suggestion`만 카운트, `:16`). → **카운트 제외**. CodeRabbit 건만 분리해 review 실행 시점·Major+ 근거·4-classify를 명시하면 별도 트랙 C 관측으로 재등록 가능. [외부: Codex review — `fz-h11-design-coverage/review/codex-review-out.md:10038-10048`]
+- ⚠️ **관측 후보 (카운트 제외)**: OBS-22 | Date: 2026-07-30 | finding-source: **external**(QA 팀원 + CodeRabbit 2건) — 이력/구매 화면 디자인 검수 버그 티켓(Highest), M1~M7·P1~P3 중 P3 철회·M3 3차 전환. ⛔ **트랙 C 진입 조건 3개 중 어느 것도 미증명**: ① `/fz-review --deep` **이후** 발견인가 — QA 티켓은 작업을 *시작시킨 선행 입력*이라 아님 ② actionable Major+ 근거 미기재 ③ **4-classify 분류 미실행**(`project-rule|valid-suggestion`만 카운트, `:16`). → **카운트 제외**. CodeRabbit 건만 분리해 review 실행 시점·Major+ 근거·4-classify를 명시하면 별도 트랙 C 관측으로 재등록 가능. [외부: GPT review — `fz-h11-design-coverage/review/codex-review-out.md:10038-10048`]
 - 내용: figma 토큰 테이블 작성 시 변경 코드의 *모든 수치* enumerate 또는 non-exhaustive 마킹 + code 시점 per-value MCP 측정. **⊕ 확장 축 2개 (2026-08-03)**: (i) **합성 실효값** — 요소 간 렌더 간격은 단일 노드의 padding/gap이 아니라 **두 요소 경계 사이를 실제로 통과하는 gap·padding의 합**이다(⚠️ flexible spacer·절대배치·음수 간격·modifier 순서 개재 시 단순 합 불성립 → 렌더 판정. 상세 `swift-pattern-detection.md` 원칙 H) [verified: 내부 figma 대조 기록 — `root gap 12 + section padding 24 = 36`인데 코드 24] (ii) **표 값의 정확성** — 표 작성은 *완전성*만 보증하고 채워진 *값의 정확성*은 보증하지 않는다 (빈 칸 카운터가 원리적으로 미탐지하는 영역)
 - generalize: **narrow** (figma/UI 전용) | 과적합 위험: 中
 - 근거: [verified: index.md — 23차로 figma-tokens.md 작성됐으나 §5 갭 테이블이 간격/마진 누락 → exhaustiveness 보증 부재]
 - ⚡ 조치 (2026-06-01): *code 시점* 부분(개별 수치 figma 대조)을 fz-code friction-detect에 **candidate 마찰 신호 추가** (active). *plan 시점* 부분(토큰 테이블 exhaustiveness, fz-plan §F) + broad CLAUDE.md 1줄은 **보류** (narrow + 42차 frame 한계 + 23차 중복 → GPT/사용자 판단)
 - ⚡ 조치 (2026-06-02, OBS-09 관측 #2): fz-code:277 신호에 **색/style-run/정렬 enumeration + data>render(childOrder) clause 확장** + **`figma 텍스트 미대조` candidate 신호 신설**(text-content 2세션, candidate 유지). plan 시점 Node Inventory(회고 §5-A)는 **DEFERRED 유지** — code 시점 enumeration gap은 277의 '사전 토큰 테이블 exhaustive 신뢰 → 누락 항목 답습' clause로 cover. 42차 caveat는 *구조 데이터 부재(flattened IMAGE)* 한정으로 재범위화 (구조 데이터 존재 노드값 읽기는 결정론적). 적용: TVOD/OBS-09/fz-enhancement/plan.md (TEAM plan+review)
-- ⚡ 조치 (2026-08-03, 관측 #3): ① fz-code:276의 blanket 문장("raw 노드값 그대로 적용")을 **축별 분기로 대체** — direct property는 raw 직접 / 요소 간 실효 거리는 경계 사이 gap·padding 합산(⚠️ spacer·절대배치·음수간격·modifier 순서 개재 시 단순 합 불성립 → 렌더 판정) / raw 미표현 축은 렌더 스냅샷. ② **측정 아티팩트 provenance 3필드 표준** — figma 측정 산출물 헤더에 `file key` + `node ID` + `실측일` 고정. 선례 `OBS-23-work/figma-code-diff-01:3`은 기재, `OBS-18-work/figma-measure-exhaustive.md:3`은 미기재 → **후속 세션이 동일 스냅샷 여부를 판정 불가**(본 세션 실측 실패로 확인). ③ **Adapter(합성값 자동 diff)는 미착수** — figma node ↔ SwiftUI expression 매핑 계약 부재 [외부: Codex verify rejected — `내부 Codex 검증 기록`]. 재설계(figma calculator + mapping manifest 2단 분리) 후 재제안.
+- ⚡ 조치 (2026-08-03, 관측 #3): ① fz-code:276의 blanket 문장("raw 노드값 그대로 적용")을 **축별 분기로 대체** — direct property는 raw 직접 / 요소 간 실효 거리는 경계 사이 gap·padding 합산(⚠️ spacer·절대배치·음수간격·modifier 순서 개재 시 단순 합 불성립 → 렌더 판정) / raw 미표현 축은 렌더 스냅샷. ② **측정 아티팩트 provenance 3필드 표준** — figma 측정 산출물 헤더에 `file key` + `node ID` + `실측일` 고정. 선례 `OBS-23-work/figma-code-diff-01:3`은 기재, `OBS-18-work/figma-measure-exhaustive.md:3`은 미기재 → **후속 세션이 동일 스냅샷 여부를 판정 불가**(본 세션 실측 실패로 확인). ③ **Adapter(합성값 자동 diff)는 미착수** — figma node ↔ SwiftUI expression 매핑 계약 부재 [외부: GPT verify rejected — `내부 GPT 검증 기록`]. 재설계(figma calculator + mapping manifest 2단 분리) 후 재제안.
 - ⚠️ **경합 가설 미해소 (2026-08-03)**: `figma-measure-exhaustive.md`(07-24 16:08)가 정정(07-29 04:10)보다 앞서 존재했으나, 두 산출물의 node 집합이 다르다(`114292…` vs file `6T8hjmMGw8xKd95NC32yKg` node `6725-121653`). **(가) 표가 stale 스펙 / (나) 합성 누락** 중 판정 불가 — provenance 부재가 원인. Figma `/design/` URL 확보 시 결판 가능. ⛔ 어느 쪽도 확정 서술 금지.
-- 승격 목표 (트랙 A): figma 작업 세션 5회 관측 후 신호 활성 (memory-guide line 43). GPT verify = 활성 전 권장 게이트. **현재 3/5 — 2건 남음.** ⛔ **활성 전 필수**: 회귀 fixture 1개(`parent gap 12 + child padding 24 → effective 36` 검출 / direct property는 직접 비교 / raw 미표현 축은 render-required / external 관측에 4-classify 없으면 lint 실패) — `harness-engineering.md:799` 규율1(회귀·반증 게이트 통과분만 수용). 현재 **oracle 0개** [외부: Codex review `codex-review-out.md:10091-10100`].
+- 승격 목표 (트랙 A): figma 작업 세션 5회 관측 후 신호 활성 (memory-guide line 43). GPT verify = 활성 전 권장 게이트. **현재 3/5 — 2건 남음.** ⛔ **활성 전 필수**: 회귀 fixture 1개(`parent gap 12 + child padding 24 → effective 36` 검출 / direct property는 직접 비교 / raw 미표현 축은 render-required / external 관측에 4-classify 없으면 lint 실패) — `harness-engineering.md:799` 규율1(회귀·반증 게이트 통과분만 수용). 현재 **oracle 0개** [외부: GPT review `codex-review-out.md:10091-10100`].
 
 ### L-2: fz-code 구현시점 reuse 게이트 (41차 enforcement plan→code 이동)
 - 관측 #1: OBS-08 (catch #3,6,7 — helper 중복 작성)
@@ -274,7 +274,7 @@
 - 관측 #1·#2: 구 `F5`(Decision-Type)·`F6`(Boundary-Sizing) | finding-source: **internal(사용자 catch)** — 구조/경계 포크에서 (가) 코드로 좁혀지는 엔지니어링 판단을 (나) 제품·팀 소유처럼 과잉 위임 · plan 분할 제안을 경계 권위로 답습
 - 내용: 구조/경계 결단 시 유형 분류가 없어 두 방향으로 어긋난다 — (가) `read`/`grep` 으로 정답이 1개로 좁혀지는 엔지니어링 판단인데 옵션 메뉴로 위임(확신 권고+근거+"이의 없으면 진행"이 맞음) (나) 제품·디자인·팀 컨벤션 소유인데 임의 결정. 경계(PR/커밋)에서는 **plan 분할 제안 = 판단 입력이지 경계 권위가 아니다**(1커밋 = 1관심사 + 컴파일 + 1결정 trace)
 - generalize: broad (언어·도메인 무관 — 모든 구조/경계 포크) | 과적합 위험: 中 (판정이 사람 해석에 의존)
-- 근거: [verified: `skills/fz-plan/SKILL.md:231` Gate 0.5 체크 항목 · `modules/lead-action-default.md:16` Trigger Matrix 행 — 두 소비자가 같은 신호를 참조]
+- 근거: [verified: `skills/fz-plan/SKILL.md:229` Gate 0.5 체크 항목 · `modules/lead-action-default.md:16` Trigger Matrix 행 — 두 소비자가 같은 신호를 참조]
 - ⛔ **활성 차단: evidence 2 sessions → candidate.** active 전환 = 트랙 A **5 sessions**
 - ⛔ **본 항목 신설 사유는 새 규칙이 아니라 카운터 귀속 복구다.** 이전에는 두 소비자가 임계 권위를 본 원장으로 지목하면서 실제 관측 카운터는 **플러그인 밖 작성자 로컬 메모리**를 참조했다 — 배포본만 가진 사용자는 그 카운터를 읽을 수 없다. `guides/skill-authoring.md:395-412`(작성자 환경의 개인 메모리 내용은 배포물에 넣지 않는다) 위반이며, 권위와 카운터가 다른 경계에 있으면 관측이 발생해도 카운트가 오르지 않는다
 - ⚠️ 관측 요약만 옮겼다 — 개인 경로·파일명은 옮기지 않는다(같은 규약)
@@ -423,11 +423,11 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 - 관측 #2: **F-045** — 표본을 `cost-log.json` 존재로 잡아 3/10 만 봄. 본문이 *"F-022 와 같은 형태, 3회째"* 라 기록
 - 관측 #3: **F-098** — 35절 중 5절(14%) 검사하고 산출물에 "전수 검사·총 위반 0건" 으로 적음. 사용자 지적이 오라클
 - 내용(수정 전 상태): `modules/cross-validation.md` § Coverage Gate 절차 1이 *"대상 **파일** 전수 목록"* 이라 단위를 파일로 고정했다. 주장이 파일 안의 항목을 수량화하면 파일 1/1 = 100% 로 통과했다
-- generalize: broad (문서·코드 무관) | 과적합 위험: 中 — ⛔ **'항목 단위' 일괄 강제는 과구조화**다(§5 원칙 3). 단위는 **전수 주장이 겨누는 대상**이어야 한다 — ⛔ 결과 건수("위반 0건")를 단위로 읽으면 violation 이 단위가 되어 같은 붕괴가 재발한다 [외부: codex — "결과 명사를 단위로 오인 가능"]
+- generalize: broad (문서·코드 무관) | 과적합 위험: 中 — ⛔ **'항목 단위' 일괄 강제는 과구조화**다(§5 원칙 3). 단위는 **전수 주장이 겨누는 대상**이어야 한다 — ⛔ 결과 건수("위반 0건")를 단위로 읽으면 violation 이 단위가 되어 같은 붕괴가 재발한다 [외부: GPT — "결과 명사를 단위로 오인 가능"]
 - 근거: [verified: 회귀 fixture `tests/fixtures/cross-validation/coverage-units/run.sh` 케이스 S — 파일 100% 대 항목 14%]
 - ⚠️ negative 케이스 병기 — 러너의 `F file-claim 2/2` 는 발화하지 **않아야** 하는 케이스다(파일 단위 주장에는 파일 분모가 정답). 과잉 교정 방어이며 F-050(works) 과 같은 축
 - ✅ **승격 완료 (2026-09-01)**: 세션 3건 + 회귀 fixture 1개 + **외부 채점 1회** 전부 충족. 반영처 = `modules/cross-validation.md` § Coverage Gate 절차 0~4 · Gate 조건 4행 · SOLO 요약 행
-- **외부 채점 결과** `verdict: revise` [외부: codex]: 문제 실재 True · 제안이 해결 False · 과잉교정 위험 medium · fixture 충분 False. 원문 요지 — *"제안된 두 문장만 바꾸면 주변 계약과 모순된다"*, *"`:501,522-529,541-545` 의 요약·전략 변수·출력 형식·체크리스트를 함께 바꾸지 않으면 새 절차 1과 충돌한다"*
+- **외부 채점 결과** `verdict: revise` [외부: GPT]: 문제 실재 True · 제안이 해결 False · 과잉교정 위험 medium · fixture 충분 False. 원문 요지 — *"제안된 두 문장만 바꾸면 주변 계약과 모순된다"*, *"`:501,522-529,541-545` 의 요약·전략 변수·출력 형식·체크리스트를 함께 바꾸지 않으면 새 절차 1과 충돌한다"*
 - ⛔ **채점자가 요구한 연동 범위를 그대로 반영**했다 — 단위 `U`(전수 주장 대상)와 실행 비용 `F`(읽을 파일 수)를 **분리**하고, 절차 2 임계값을 F 기준으로, 절차 3 출력 형식·Gate 조건·SOLO 요약을 `U` 기준으로 동기화. ⛔ 채점자 지시대로 **임계값 없는 '컨텍스트 부피' 기준은 넣지 않았다**(판정이 비결정적으로 바뀐다)
 - ⛔ **채점자가 fixture 를 직접 실행하지 못했다** — 원문: *"읽기 전용 환경에서 `mktemp -d` 가 거부되어 exit 2 로 끝났으므로 제시된 PASS 를 실행 성공으로 인정하지 않았다"*. 산술만 쓰기 없이 재현해 확인했다고 명시. 러너의 로컬 PASS 는 별도 증거로 남는다
 
@@ -439,7 +439,7 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 - 근거: [verified: 회귀 fixture 케이스 D — 재실행 100% 대 독립조달 50%]
 - ⛔ 활성 차단: **세션 1건**(F-026) → 트랙 D 2세션 미달. 회귀 fixture 는 충족
 - ⚠️ **D-2 와 분리한다** — 단위 불일치와 조달원 동일은 다른 기전이고, 합치면 어느 수정이 효과를 냈는지 사라진다
-- ⛔ **2026-09-01 D-2 외부 채점이 본 항의 보류를 독립 확인**했다 [외부: codex]: *"promotion-ledger.md(당시 :370-372) 는 별개 세션 2건에 도달해야 한다고 규정하지만 현재 1건이라고 기록한다. 외부 채점만으로 이 내부 승격 조건을 충족할 수 없으므로 교체 2는 아직 보류 대상이다."* → D-2 를 적용하면서 본 항 문구는 **건드리지 않았다**
+- ⛔ **2026-09-01 D-2 외부 채점이 본 항의 보류를 독립 확인**했다 [외부: GPT]: *"promotion-ledger.md(당시 :370-372) 는 별개 세션 2건에 도달해야 한다고 규정하지만 현재 1건이라고 기록한다. 외부 채점만으로 이 내부 승격 조건을 충족할 수 없으므로 교체 2는 아직 보류 대상이다."* → D-2 를 적용하면서 본 항 문구는 **건드리지 않았다**
   - ⛔ **인용 속 줄번호는 채점 당시 좌표다** — 원문이므로 고치지 않는다(외부 판정 재포장 금지).
     가리키는 규정은 본 파일 **「승격 조건 | 별개 세션 2건 + 회귀 fixture 1개 + 외부 채점 1회」 행**이다.
     ⭐ 줄번호 인용은 같은 파일에 블록을 더하는 것만으로 깨진다 — 정본은 **heading-based anchor**다
@@ -476,13 +476,13 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 
 | 항목 | 자산의 기존 방어 | 조치 |
 |---|---|---|
-| **P2-C** | ✅ `fz-review/SKILL.md:213` retain cycle 점검 | 앵커 부착 완료 |
+| **P2-C** | ✅ `fz-review/SKILL.md` "⛔ retain cycle 점검" 블록 | 앵커 부착 완료 |
 | D-1 | ⛔ **0건** — `catch` 본문 인용 강제 방어 없음(`modules/evidence-collection.md:117` 은 base 대조 축) | **보류** |
 | L-5 | ⛔ **0건** — 상보 연산 쌍(expand↔collapse) 방어 없음 | **보류** |
 | L-10 | ⛔ **0건** — path prefix 실측 대조 방어 없음 | **보류** |
 | L-12 | ⛔ **0건** — 규칙 이식 근거 태깅 방어 없음(`pre-existing` origin 은 다른 축) | **보류** |
 
-⛔ **보류 4건은 앵커를 달 자리가 없다.** 자산에 방어가 아예 없어서 역방향 고아가 된 것이고, 앵커를 만들려면 **신규 행을 신설**해야 한다 — 그것은 관측이 아니라 규칙 추가이며 `guides/prompt-optimization.md:719`(체크리스트 행 추가 반사 금지) 대상이다.
+⛔ **보류 4건은 앵커를 달 자리가 없다.** 자산에 방어가 아예 없어서 역방향 고아가 된 것이고, 앵커를 만들려면 **신규 행을 신설**해야 한다 — 그것은 관측이 아니라 규칙 추가이며 `guides/prompt-optimization.md` §4 Anti-Patterns "실패에서 체크리스트 행 추가 반사" 행(체크리스트 행 추가 반사 금지) 대상이다.
 
 ⭐ 판별 기준: **기존 방어가 있으면 앵커(배선 복구), 없으면 보류(규칙 신설은 별개 판정)**. P2-C 는 전자이고 4건은 후자다. 4건의 승격 조건은 그대로 유지되며, 관측이 발생하면 그때 "신규 행이 정당한가" 를 별도로 묻는다.
 
@@ -525,7 +525,9 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 **소비자** — `scripts/migrate_findings_frontmatter.py`(백필: `p_id` 는 유도 불가라 대상 아님) ·
 이 문서(승격 계산) · `scripts/check_findings_hygiene.py`(**신설**: 형식·미지 P-ID 검사).
 
-## 미결 안건 — TEAM 메커니즘 일몰 (2026-09-18 통합)
+## 결정 완료 — TEAM 메커니즘 일몰 (2026-09-25)
+
+> 2026-09-18 스킬 3곳의 미결 문장을 이 항목으로 통합했고(아래 표), 2026-09-25 사용자가 남은 안건(사료 보존 여부)을 **"사료 삭제"** 로 결정했다.
 
 > ⛔ **이 항목이 정본이다.** 이전에는 *"TEAM 메커니즘 일몰은 확산 판정 시 결정"* 이 스킬 3곳
 > (`fz-discover`·`fz-plan`·`fz-code`)에 **같은 문장으로 복제**돼 있었다 — 결정 주체도 시점도 없는
@@ -537,10 +539,20 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 | `TeamCreate`/`TeamDelete`/`shutdown_request` | **도구 자체가 v2.1.178부터 부재** · fz 호출부 **0건** [`modules/governance.md` § Kill-Switch] |
 | P2P `SendMessage` | 실행 경로 **0건**. 남은 언급은 금지문·역사 표기·전환 설명이다 |
 | 잔존 실행 지시 | **0건** — 2026-09-18 마지막 2곳 정정(`guides/skill-troubleshooting.md` §3.4 · `skills/fz-manage/prompts/generate_suggestion.md`). ⛔ 분모는 *실행 지시*다: `guides/harness-engineering.md` §8 의 P2P 프로토콜 블록은 아키텍처 **비교 분석**이라 이 분모 밖이며, 현재형 제목이 오독을 부르던 것을 같은 날 사료로 표기했다 |
-| 사료 보존 | `docs/history/team-core.md` · `docs/history/patterns/*.md` — ⛔ **라운드 의미론의 역사적 출처**이며 실행 절차가 아니다 |
+| 사료 | **2026-09-25 삭제** — 아래 결정 참조 |
 
-**판정**: 일몰은 **사실상 완료**됐고 남은 것은 사료 보존 여부뿐이다. ⛔ 사료를 지우는 결정은
-**사용자 소관**이며, 이 원장이 그 판단의 단일 근거다. 스킬 문서는 이 항목을 가리키기만 한다.
+**결정 (2026-09-25, 사용자)**: 일몰 **완료**. 남아 있던 사료 보존 여부를 사용자가 "사료 삭제" 로 결정했고, 참조를 먼저 정리한 뒤(행별 원장 61행 — remove-ref·repoint·keep) 아래 6파일(701줄)을 지웠다. 라운드 의미론은 각 `workflows/*.js` 의 평탄화 구현이 대신한다.
+
+| 삭제한 사료 | 평탄화 구현 |
+|---|---|
+| `docs/history/team-core.md` | (공통 프로토콜 — `guides/skill-authoring.md` §12 Workflow 규약) |
+| `docs/history/patterns/collaborative.md` | `workflows/plan-collaborative.js` |
+| `docs/history/patterns/pair-programming.md` | `workflows/code-pair.js` |
+| `docs/history/patterns/cross-verify.md` | `workflows/search-cross-verify.js` |
+| `docs/history/patterns/adversarial.md` | `workflows/discover-adversarial.js` |
+| `docs/history/patterns/live-review.md` | `workflows/review-live.js` |
+
+스킬 문서는 이 항목을 가리키기만 한다.
 
 ⛔ **재복제 금지** — 스킬·모듈에 같은 미결 문장을 다시 쓰지 않는다. 상태가 바뀌면 여기만 고친다.
 
@@ -554,7 +566,7 @@ A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIE
 
 | 항목 | 구현 상태 | 근거 |
 |---|:--:|---|
-| **P1-B** Generator≠Evaluator Lead 독립 절차 | ✅ **구현됨** | `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md:66` 참조 |
+| **P1-B** Generator≠Evaluator Lead 독립 절차 | ✅ **구현됨** | `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md` Phase 3 1b(Scope Challenge — "GPT 결과를 읽기 전 독립 판정") 참조 |
 | **P2-A** Q-S5 Decision Re-open Gate | ✅ **구현됨** | `modules/scope-challenge.md:104` Appendix + `:56` `parent-reopen` 배선 + `skills/fz-plan/SKILL.md` § Phase 3 절차 5 `Refactoring Mode 감지` 발동 조건 |
 | **P2-B** fz-fix 자동 전환 + complexity 보정 | ✅ **구현됨** | `skills/fz-fix/SKILL.md:43 · 217 · 300`(테스트 케이스 포함) |
 | **P1-C** Drift telemetry (AskUserQuestion) | ⛔ **미구현** | 본 파일 밖 참조 **0건** |

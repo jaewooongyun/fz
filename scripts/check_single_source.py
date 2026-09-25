@@ -28,10 +28,10 @@ DEFAULT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 # ⛔ 사실 하나가 표의 한 행이다. 새 사실을 넣을 때 코드가 아니라 이 표만 늘린다.
 FACTS = [
     {
-        "name": "TEAM 메커니즘 일몰 미결",
+        "name": "TEAM 메커니즘 일몰 (결정 완료 2026-09-25)",
         "canonical_file": "modules/promotion-ledger.md",
         # 정본은 **heading** 으로 센다 — 산문 언급이 정본으로 오인되지 않게
-        "canonical_re": r"^##\s*미결 안건 — TEAM 메커니즘 일몰",
+        "canonical_re": r"^##\s*결정 완료 — TEAM 메커니즘 일몰",
         "consumer_globs": ["skills/*/SKILL.md", "skills/*/*/*.md", "guides/*.md"],
         # 소비자에 있으면 **재복제**인 선언 문구
         "declaration_re": r"확산 판정 시 결정",
@@ -140,7 +140,7 @@ def self_test() -> int:
         (d / "skills" / "fz-x" / "SKILL.md").write_text(skill_text, encoding="utf-8")
         return d
 
-    CANON = "# L\n\n## 미결 안건 — TEAM 메커니즘 일몰 (통합)\n\n본문\n"
+    CANON = "# L\n\n## 결정 완료 — TEAM 메커니즘 일몰 (2026-09-25)\n\n본문\n"
 
     def case(name, canon, skill, want, needle=None):
         nonlocal passed
@@ -159,11 +159,11 @@ def self_test() -> int:
             shutil.rmtree(d, ignore_errors=True)
 
     # ① 정본 1 · 소비자 0 → PASS
-    case("single-source", CANON, "> TEAM 일몰 상태는 `modules/promotion-ledger.md` § 미결 안건 참조\n", "PASS")
+    case("single-source", CANON, "> TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 참조\n", "PASS")
     # ② ⛔ 소비자 재복제 → 위반 (개수로 잡는다)
     case("consumer-duplicate", CANON, "> TEAM 일몰은 확산 판정 시 결정한다\n", "VIOLATION", "소비자 선언 수 1")
     # ③ ⛔ 정본이 둘 → 정본이 갈렸다 (존재 여부로는 못 잡는다)
-    case("canonical-split", CANON + "\n## 미결 안건 — TEAM 메커니즘 일몰 (사본)\n\n본문\n",
+    case("canonical-split", CANON + "\n## 결정 완료 — TEAM 메커니즘 일몰 (사본)\n\n본문\n",
          "> TEAM 일몰 상태는 `modules/promotion-ledger.md` 참조\n", "VIOLATION", "정본 선언 수 2")
     # ④ ⛔ 정본 소실 → 0 도 1 이 아니다
     case("canonical-missing", "# L\n\n본문만\n",

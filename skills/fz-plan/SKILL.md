@@ -54,8 +54,6 @@ metadata:
 
 | 모듈 | 용도 |
 |------|------|
-| docs/history/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
-| docs/history/patterns/collaborative.md | Phase 0.5 Collaborative Design (review-direction → plan-structure) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 비-티켓 세션 Serena checkpoint |
@@ -87,10 +85,10 @@ metadata:
 
 ## 팀 에이전트 모드
 
-> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `docs/history/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
+> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
-> Collaborative Design 패턴 canonical: `docs/history/patterns/collaborative.md` (보존 — 라운드 의미론의 역사적 출처).
+> Collaborative Design 패턴은 `workflows/plan-collaborative.js` 가 평탄화 구현한다.
 > **스크립트: `workflows/plan-lean2.js`** (플러그인 루트 상대) — **4콜 2단계**: 전체 플랜 ∥ edge 적대 ∥ impact+arch(동시 3) → 델타 병합.
 > agents/의 plan-structure·plan-edge-case·plan-impact 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > 동시 opus ≤3(Lead 세션 fable은 별도)는 Stage 1 의 3-병렬이 상한을 **정확히** 채워 구조적으로 보장한다. rate-limit 시 순차화 폴백(governance.md).
@@ -155,7 +153,7 @@ metadata:
 | plan-impact (영향+아키) | Stage 1 통합 렌즈 | "어디까지 퍼지는가 · 기존 패턴과 맞는가?" — `secondaryHosts`·`existingTestSuites` 를 schema 로 명시 요구 |
 | GPT verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |
 
-> 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 미결 안건 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
+> 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
 
 ---
 

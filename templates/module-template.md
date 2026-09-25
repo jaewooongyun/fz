@@ -39,12 +39,11 @@ Modules are reusable knowledge resources loaded by Claude via Read tool only whe
 
 | Pattern | Example | Use |
 |---------|---------|-----|
-| `{domain}-core.md` | team-core.md | Core protocols, absolute rules |
+| `{domain}-core.md` | fz-gpt-subcommands-core.md | Core protocols, absolute rules |
 | `{domain}-registry.md` | team-registry.md | Agent/capability registries |
 | `{domain}-policy.md` | memory-policy.md | Policies, rules, constraints |
 | `{function}.md` | complexity.md, pipelines.md | Functional modules, domain knowledge |
 | `{reference}-refs.md` | plugin-refs.md | Reference collections, lookup tables |
-| `patterns/{name}.md` | patterns/collaborative.md | Communication pattern definitions |
 
 ---
 
