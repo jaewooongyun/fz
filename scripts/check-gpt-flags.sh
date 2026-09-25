@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# check-gpt-flags.sh — `codex exec` 와 `codex exec review` 의 플래그 집합 차이를 실측하고
-# gpt-exec.sh 가 review 경로로 넘기는 플래그가 그 차집합에 들어 있지 않은지 검사한다.
+# check-gpt-flags.sh — `codex exec` 와 `codex exec review`·`codex exec resume` 의 플래그 집합 차이를 실측하고
+# gpt-exec.sh 가 review·resume 경로로 넘기는 플래그가 그 차집합에 들어 있지 않은지 검사한다.
 #
 # 왜 필요한가 (F-015): 두 서브커맨드는 플래그 집합이 다르다. 공용 배열로 넘기면
 # review 가 `-C`/`--add-dir` 를 거부해 exit 2 를 내는데, 호출부는 이를 "이슈 0건"으로 오독하기 쉽다.
@@ -66,4 +66,21 @@ if [ -n "$VIOLATIONS" ]; then
 fi
 
 echo "✅ review 경로에 미지원 플래그 없음"
+
+# ── resume 경로 (2026-09-25 — 공용 ARGS 의 세 번째 소비자) ──
+#    resume 분기는 ARGS 에 추가하지 않는다 → 대상은 공용 ARGS 블록뿐이다.
+RESUME_F="$(flags_of 'exec resume')"
+RESUME_N=$(printf '%s\n' "$RESUME_F" | grep -c . || true)
+[ "$RESUME_N" -ge 3 ] || { echo "GATE-FAIL(2): resume help 파싱 실패 (resume=$RESUME_N) — 측정 실패다" >&2; exit 2; }
+ONLY_EXEC_R="$(comm -23 <(printf '%s\n' "$EXEC_F") <(printf '%s\n' "$RESUME_F"))"
+RESUME_PATH_FLAGS="$(awk '/^ARGS=\(/,/^ARGS\+=\(-o/' "$TARGET" | sed 's/#.*$//')"
+R_VIOL=""
+for f in $ONLY_EXEC_R; do
+  printf '%s' "$RESUME_PATH_FLAGS" | grep -qE -- "(^|[[:space:](])${f}([[:space:]\"]|$)" && R_VIOL="$R_VIOL $f"
+done
+if [ -n "$R_VIOL" ]; then
+  echo "GATE-FAIL(1): resume 경로가 미지원 플래그를 전달한다 →$R_VIOL" >&2
+  exit 1
+fi
+echo "✅ resume 경로에 미지원 플래그 없음 (resume 플래그 ${RESUME_N}개)"
 exit 0
