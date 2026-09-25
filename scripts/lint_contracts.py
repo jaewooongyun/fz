@@ -786,7 +786,7 @@ def gh_anchors(txt: str) -> dict:
 
     ⛔ 1차 구현은 `slug-N` 을 만들고 그것이 이미 점유됐는지 확인하지 않아 덮어썼다:
        `Foo`/`Foo`/`Foo-1` → foo, foo-1 (2개) — GitHub는 foo, foo-1, **foo-1-1** (3개).
-       [외부: codex — github-slugger 2.0.0 occupied-slug 루프 검증 통과]
+       [외부: GPT — github-slugger 2.0.0 occupied-slug 루프 검증 통과]
     """
     out: dict[str, str] = {}
     counts: dict[str, int] = {}
@@ -965,7 +965,7 @@ def chk_N5(root: Path | None = None):
 # ─────────────────────────────────────────────────────────────────────────────
 # #N6 루트 앵커 — **줄 단위 화이트리스트**(.py/.sh 공통). fail-closed.
 #
-# ⛔ 설계 전환 (2026-08-10, 4라운드 감사 ISSUE-005·006 + Codex C3):
+# ⛔ 설계 전환 (2026-08-10, 4라운드 감사 ISSUE-005·006 + GPT C3):
 #   3차 구현은 `.py` 를 `ast` 로 **일반 분석**했다. 그 방향은 실패했다 —
 #     · `from evil import Path as P` → `P(__file__)` 통과 (ImportFrom.module 미검증)
 #     · `X().resolve(__file__)` 통과 (임의 attr 이름이 화이트리스트와 충돌)

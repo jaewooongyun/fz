@@ -40,7 +40,7 @@
 | 18차 | Scope Inflation 방어 — 분석 범위가 요청을 넘어 부푼다 | 세션 기록 (v4 ISSUE-016) |
 | 19차 | self-review blind spot family(16·17·19) — 분석은 맞는데 **적용 범위** 판단이 틀린다 | 세션 기록 |
 | 23차 | GPT 단독 발견 재현 — cross-model 이 마지막 안전망 | 세션 기록 |
-| 29차 | GPT CLI(`codex exec`) stdin hang — `< /dev/null` + `--skip-git-repo-check` 필요 | `modules/fz-gpt-bash-hygiene.md` §2 |
+| 29차 | GPT CLI(`exec` 서브커맨드) stdin hang — `< /dev/null` + `--skip-git-repo-check` 필요 | `modules/fz-gpt-bash-hygiene.md` §2 |
 | 30차 | `[projects.<path>] trust_level = "trusted"` 없으면 profile sandbox 무효 | `modules/fz-gpt-bash-hygiene.md` §5 |
 | 34차 | 리팩토링 옵션을 **첫 라운드에** 시각화한다 | 세션 기록 |
 | 35차 | Calibrate-from-Real — 상상한 계획이 아니라 실물에서 보정한다 | 세션 기록 |

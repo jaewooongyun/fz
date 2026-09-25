@@ -196,7 +196,7 @@ metadata:
 ## 팀 에이전트 모드 (복잡한 버그 — Workflow 오케스트레이션, Wave 3)
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체. 복잡한 버그(여러 파일, 아키텍처 영향)에서 활성화.
-> Pair Programming(경량) canonical: `docs/history/patterns/pair-programming.md` (보존 — 평탄화 출처).
+> Pair Programming(경량)은 `workflows/code-pair.js` 가 평탄화 구현한다.
 > 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.md` §12.
 > ⛔ 책임 재배분 (사용자 승인): 에이전트는 changeset JSON만 반환 — **Lead가 적용 + 빌드 검증**.
 
@@ -267,7 +267,7 @@ Phase 1 분석 후 영향 범위 3개 모듈+ → "복잡도 초과. /fz-search�
 
 ```
 BAD (GPT 직접 호출):
-수정: codex exec review --uncommitted ... 직접 호출
+수정: GPT CLI review 모드(`--uncommitted`) 직접 호출
 → fz-fix allowed-tools에 Bash(codex *) 없음. 권한 에러.
 
 GOOD (--gpt 위임 패턴):
@@ -291,7 +291,7 @@ GOOD (--gpt 위임 패턴):
 | "플레이어 모듈 아키텍처 설계해줘" | NOT trigger | → /fz-plan (계획·설계) |
 | "이 함수 누가 호출하는지 찾아줘" | NOT trigger | → /fz-search (코드 탐색·구조 분석) |
 | "내가 짠 코드 리뷰해줘" | NOT trigger | → /fz-review (풀 코드 리뷰) |
-| "codex exec로 직접 검증 돌려줘" | NOT trigger | → /fz-gpt (Codex CLI 직접 호출 금지·위임) |
+| "codex exec로 직접 검증 돌려줘" | NOT trigger | → /fz-gpt (GPT CLI 직접 호출 금지·위임) |
 
 ### Functional Test — Given / When / Then
 
@@ -321,7 +321,7 @@ GOOD (--gpt 위임 패턴):
 - 새 기능 구현 (→ /fz-plan + /fz-code)
 - 대규모 리팩토링 (→ /fz-plan)
 - 풀 코드 리뷰 (→ /fz-review)
-- Codex CLI 직접 호출 (→ /fz-gpt 위임)
+- GPT CLI 직접 호출 (→ /fz-gpt 위임)
 - **팀 공유 영역 자동 변경 (36차)**: fast fix 시에도 `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` 등 팀 영역 보호. 사용자 명시 합의 없이 자동 변경 금지
 
 ## 에러 대응

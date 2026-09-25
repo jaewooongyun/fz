@@ -9,57 +9,55 @@
 
 ## 목차
 
-- **final** — PR 전 최종 리뷰 (resume --last 심화)
+- **final** — PR 전 최종 리뷰 (resume --session-file 심화)
 - **adversarial** — Devil's Advocate 리뷰
 - **drift** — 아키텍처 드리프트 전체 스캔
 - **plan** — 독립 플랜 생성 (C4 원칙)
 - **micro-eval** — 단일 주장 독립 재평가 (claim-type 라우팅)
 
-> ⛔ **아래 codex exec 예시는 축약형** (서브커맨드별 *차이점*만 표시 — 가독성 우선). **raw 복붙 금지**.
-> 실제 실행 시 반드시 `modules/fz-gpt-bash-hygiene.md` §6 Standard Wrapper Template 적용:
-> `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `-o` readback + (git diff 분석 시) §5.5 Base Verification Gate.
-> 예시의 `codex exec ...`는 *wrapper의 §3 표준 호출 부분*에 해당하는 차이점만 보여준다 (29/30차 hang/sandbox 재발 차단 — GPT 검증 §Blind Spot 1).
+> ⛔ **아래 예시는 전부 래퍼(`scripts/gpt-exec.sh`) 호출이다** — 서브커맨드별 *차이점*(모드·effort·schema·프롬프트)만 보인다. ⛔ GPT CLI 를 직접 부르지 않는다.
+> 래퍼가 `modules/fz-gpt-bash-hygiene.md` 의 교훈을 대신 처리한다: `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `--out` readback + `--` 구분자 + (review 모드) §5.5 Base Verification Gate.
+> 프롬프트는 `--prompt-file` 로만 받는다 — 아래 `P_*` 는 앞 줄에서 heredoc 으로 쓴 임시 파일이다.
 
 ## final -- PR 전 최종 리뷰
 
 모든 커밋의 누적 변경을 최고 정밀도로 종합 리뷰합니다.
 
 ```bash
-# 1차: 전체 리뷰
-cd "$GIT_ROOT" && codex exec review \
-  --base "$BASE_BRANCH" \
-  -c model_reasoning_effort=xhigh \
-  --add-dir "$SHARED_MODULES" \
-  --title "[TICKET] PR 전 최종 리뷰" \
-  -o "$REVIEW_FILE"   # 계측: gpt-exec.sh 인자에 --gpt-skill reviewer --gpt-skill-path unknown (자동 트리거 — 로드 확인 불가)
+# 1차: 전체 리뷰 — review 모드(diff 범위 결정론 · base 검증 게이트 · reviewer 스킬 자동 트리거). 공유 모듈도 읽는다
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH" --effort xhigh \
+  --title "[TICKET] PR 전 최종 리뷰" --gpt-skill reviewer --gpt-skill-path unknown   # 자동 트리거 — 로드 확인 불가
 
-# 2차 (major+ 이슈 존재 시): resume로 심화 검증
+# 2차 (major+ 이슈 존재 시): 1차 세션을 이어 심화 검증
 if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
-  codex exec resume --last \
-    "위 리뷰에서 발견된 major 이슈 $MAJOR_ISSUES_COUNT건을 심화 검증하라.
-     각 이슈에 대해: 1) 재현 가능성 2) 영향 범위 3) false positive 여부를 판단하라."
+  cat > "$P_DEEP" <<EOF
+위 리뷰에서 발견된 major 이슈 ${MAJOR_ISSUES_COUNT}건을 심화 검증하라.
+각 이슈에 대해: 1) 재현 가능성 2) 영향 범위 3) false positive 여부를 판단하라.
+EOF
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$REVIEW_DEEP_FILE" --prompt-file "$P_DEEP" \
+    --session-file "${REVIEW_FILE}.session" --effort xhigh
 fi
 ```
 
-> `codex exec resume --last`: 1차 리뷰 컨텍스트를 유지한 채 심화 검증. false positive 감소.
+> ⚠️ DA·adversarial 의 옛 `--sandbox read-only` 는 래퍼가 대신한다 — `gpt-exec.sh` 가 **모든** 호출에 `-c sandbox_mode="read-only"` 를 강제한다(사용자 config 보다 우선). 프롬프트의 "파일을 수정하지 마라" 는 보조 문구다.
+> `resume --session-file`: 1차 리뷰 컨텍스트를 유지한 채 심화 검증. false positive 감소 (세션 지정 이유: `modules/fz-gpt-bash-hygiene.md` §8).
 
 **/fz-challenger DA 모드**: `final` 완료 후 major 이상 이슈가 발견되면 DA(Devil's Advocate) 패스를 추가 실행하여 false positive를 제거한다.
 
 ```bash
-CHALLENGER_SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill challenger --gpt-skill-path "$CHALLENGER_SKILL_PATH"
+CHALLENGER_SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
 if [ -n "$CHALLENGER_SKILL_PATH" ] && [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
-  codex exec \
-    --output-schema schemas/gpt_peer_review_schema.json \
-    -c model_reasoning_effort=xhigh \
-    --sandbox read-only \
-    -o "$DA_REVIEW_FILE" \
-    -C "$GIT_ROOT" \
-    "$(cat "${CHALLENGER_SKILL_PATH}")
+  { cat "${CHALLENGER_SKILL_PATH}"; cat <<EOF
 
-     아래 리뷰 이슈 목록에 대해 Devil's Advocate 분석을 수행하라.
-     각 이슈에 agree|challenge|supplement|reverse 판정과 근거를 제시하라.
-     ## 이슈 목록
-     $MAJOR_ISSUES"
+아래 리뷰 이슈 목록에 대해 Devil's Advocate 분석을 수행하라.
+각 이슈에 agree|challenge|supplement|reverse 판정과 근거를 제시하라. 파일을 수정하지 마라(읽기 전용 분석).
+## 이슈 목록
+$MAJOR_ISSUES
+EOF
+  } > "$P_DA"
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$DA_REVIEW_FILE" --prompt-file "$P_DA" \
+    --effort xhigh --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_peer_review_schema.json" \
+    --gpt-skill challenger --gpt-skill-path "$CHALLENGER_SKILL_PATH"
 fi
 ```
 
@@ -71,12 +69,11 @@ fi
 # Plugin 모드 (우선)
 /codex:adversarial-review --base "$BASE_BRANCH" --json
 
-# CLI 폴백
+# 래퍼 폴백
 SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
-codex exec -c model_reasoning_effort=xhigh \
-  --sandbox read-only -o "$DA_REVIEW_FILE" -C "$GIT_ROOT" \
-  "$(cat "${SKILL_PATH}")
-   현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라."
+{ cat "${SKILL_PATH}"; echo; echo "현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라. 파일을 수정하지 마라(읽기 전용 분석)."; } > "$P_DA"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$DA_REVIEW_FILE" --prompt-file "$P_DA" \
+  --effort xhigh --gpt-skill challenger --gpt-skill-path "$SKILL_PATH"
 ```
 
 ## drift -- 아키텍처 드리프트 전체 스캔
@@ -84,22 +81,21 @@ codex exec -c model_reasoning_effort=xhigh \
 전체 코드베이스를 1M context로 스캔하여 아키텍처 드리프트를 감지합니다.
 
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "drift" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill drift --gpt-skill-path "$SKILL_PATH"
+SKILL_PATH=$(get_gpt_skill_path "drift" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
   SKILL_PROMPT="CLAUDE.md를 읽고 아키텍처 규칙을 파악한 후, 전체 코드베이스의 레이어 위반과 RIBs 역할 위반을 감지하라."
 fi
 
-codex exec \
-  -c model_reasoning_effort=high \
-  -c 'sandbox_permissions=["disk-full-read-access"]' \
-  -o "$DRIFT_REPORT_FILE" \
-  -C "$GIT_ROOT" \
-  "${SKILL_PROMPT}
+cat > "$P_DRIFT" <<EOF
+${SKILL_PROMPT}
 
-   전체 코드베이스를 스캔하여 아키텍처 드리프트를 감지하라.
-   Critical → Major → Minor 순으로 보고하라."
+전체 코드베이스를 스캔하여 아키텍처 드리프트를 감지하라.
+Critical → Major → Minor 순으로 보고하라.
+EOF
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$DRIFT_REPORT_FILE" --prompt-file "$P_DRIFT" \
+  --effort high --gpt-skill drift --gpt-skill-path "$SKILL_PATH"
 ```
 
 > **권장 실행 시점**: PR 전, 대규모 리팩토링 후.
@@ -111,25 +107,24 @@ codex exec \
 
 ```bash
 REQUIREMENTS="$1"
-SKILL_PATH=$(get_gpt_skill_path "planner" "$FZ_PLUGIN_ROOT")   # 계측: gpt-exec.sh 인자에 --gpt-skill planner --gpt-skill-path "$SKILL_PATH"
+SKILL_PATH=$(get_gpt_skill_path "planner" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then
   SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else
   SKILL_PROMPT="CLAUDE.md를 읽고 프로젝트 패턴을 파악한 후, 요구사항에 대한 독립 구현 계획을 수립하라."
 fi
 
-codex exec \
-  -c model_reasoning_effort=xhigh \
-  -c 'sandbox_permissions=["disk-full-read-access"]' \
-  -o "$PLAN_FILE" \
-  -C "$GIT_ROOT" \
-  "${SKILL_PROMPT}
+cat > "$P_PLAN" <<EOF
+${SKILL_PROMPT}
 
-   ## 요구사항
-   ${REQUIREMENTS}
+## 요구사항
+${REQUIREMENTS}
 
-   위 요구사항에 대해 독립적으로 구현 계획을 수립하라.
-   Claude 계획을 전달받지 않았으므로 코드베이스를 직접 탐색하여 계획하라."
+위 요구사항에 대해 독립적으로 구현 계획을 수립하라.
+Claude 계획을 전달받지 않았으므로 코드베이스를 직접 탐색하여 계획하라.
+EOF
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$PLAN_FILE" --prompt-file "$P_PLAN" \
+  --effort xhigh --gpt-skill planner --gpt-skill-path "$SKILL_PATH"
 ```
 
 > **C4 원칙**: Claude의 중간 작업물(계획 텍스트)을 전달하지 않는다. 요구사항만 공유.
@@ -147,9 +142,9 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 - "이 주장이 맞는가?" 형태의 단일 이슈 검증
 - cross-validation.md Claim-Type 라우팅에서 분류/심각도 판단 → micro-eval로 흐름
 
-**호출**: `codex exec` 공통 패턴 + 다음 차이:
+**호출**: 래퍼 `exec` 모드 공통 패턴 + 다음 차이:
 - skill: `challenger` (3-Tier 디스커버리), 폴백: "단일 주장을 독립 판정하라"
-- effort: `medium` + `--ephemeral` (경량)
+- effort: `--effort medium` + `--ephemeral` (경량)
 - 입력: `${CLAIM}` + `${CONTEXT_HINT}`
 - 출력: `verdict (agree | disagree | partial | needs_verification) + reasoning (1-3문장) + missing_evidence`
 

@@ -12,7 +12,7 @@ PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 GPT_SOURCE_DIR="$PLUGIN_DIR/gpt-skills"
 PLUGIN_SOURCE_DIR="$PLUGIN_DIR/skills"
 # ⛔ 테스트 주입점 — 회귀 검증이 실제 사용자 디렉토리를 변경하지 않도록 override 를 받는다.
-#    기본값은 Codex CLI 네임스페이스(개명 금지 — CLI 소유 경로다).
+#    기본값은 GPT CLI 네임스페이스(`~/.codex/` — 개명 금지, CLI 소유 경로다).
 TARGET_DIR="${FZ_SKILL_TARGET:-$HOME/.codex/skills}"
 
 for source_dir in "$GPT_SOURCE_DIR" "$PLUGIN_SOURCE_DIR"; do

@@ -17,7 +17,7 @@
 
 1. **Lead 컨텍스트 전달**: Phase 0.5 verdict (PROCEED/RECONSIDER) + discover 산출물 + 요구사항 → GPT (`/fz-gpt` plan 또는 verify pre-mode)
 
-2. **GPT Sprint Contract 작성** (`codex exec` skill: `architect`):
+2. **GPT Sprint Contract 작성** (`scripts/gpt-exec.sh exec` · skill: `architect`):
    - 출력: `{WORK_DIR}/plan/sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`
    - 형식: 아래 schema 참조
 

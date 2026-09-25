@@ -82,8 +82,7 @@ metadata:
 
 | 참조 | 용도 |
 |------|------|
-| `guides/skill-authoring.md` §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본). ⛔ `team-core.md`·`patterns/`는 역사적 출처 — 실행 절차 아님 |
-| `docs/history/patterns/live-review.md` | Live Review (peer-review 공유 패턴, fz-review 동일) (UC-11, v4.7.1) |
+| `guides/skill-authoring.md` §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본) |
 | `modules/cross-validation.md` | get_gpt_skill_path() 3-Tier 디스커버리, GIT_ROOT 추출 |
 | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
 | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
@@ -472,7 +471,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 **Will Not**:
 - 코드를 직접 수정하지 않음 (리뷰만 수행)
 - 자기 코드 리뷰 (→ `/fz-review`)
-- GPT 위임 (→ `/fz-gpt`) — codex exec 직접 호출
+- GPT 위임 (→ `/fz-gpt`) — GPT CLI 직접 호출
 - Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Code Conventions` 위임)
 - ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응

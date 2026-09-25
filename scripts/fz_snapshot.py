@@ -178,7 +178,7 @@ def collect(root, date_str, memory_md):
 class SnapshotUnreadable(Exception):
     """존재하는 스냅샷을 읽지 못했다 — 부재(정상)와 다른 상태. ⛔ 이것을 (None, []) 로 돌리면
     `--diff` 가 "행 2개 미만" 으로 통과하고 `write_snapshot` 이 `w` 로 열어 **이력을 지운다**
-    (Codex 리뷰 2026-09-06). 전파해서 호출부가 exit 2 를 내게 한다."""
+    (GPT 리뷰 2026-09-06). 전파해서 호출부가 exit 2 를 내게 한다."""
 
 
 def read_tsv(path):
@@ -359,7 +359,7 @@ def self_test():
     check("3회차 행 2개", len(rows3), 2)
     dlines = []
     check("--diff exit 0", diff_snapshot(argparse.Namespace(telemetry_dir=telemetry), dlines.append), 0)
-    # ⛔ 읽을 수 없는 기존 스냅샷 — 부재로 오인해 `w` 로 덮으면 이력이 사라진다 (Codex 리뷰 2026-09-06)
+    # ⛔ 읽을 수 없는 기존 스냅샷 — 부재로 오인해 `w` 로 덮으면 이력이 사라진다 (GPT 리뷰 2026-09-06)
     locked = os.path.join(telemetry, "snapshots.tsv")
     before_bytes = open(locked, "rb").read()
     os.chmod(locked, 0)

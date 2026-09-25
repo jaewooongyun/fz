@@ -1,15 +1,15 @@
 ---
 name: fz-gpt
 description: >-
-  Codex CLI(GPT) 교차 검증. 코드/계획을 독립 모델로 상호 검증.
-  예: codex, 교차검증, GPT로 확인, 상호검증 (비사용: 직접 수정 →fz-fix, 자기 리뷰 →fz-review; codex는 검증 전용)
+  GPT CLI 교차 검증. 코드/계획을 독립 모델로 상호 검증.
+  예: codex, 교차검증, GPT로 확인, 상호검증 (비사용: 직접 수정 →fz-fix, 자기 리뷰 →fz-review; GPT는 검증 전용)
 user-invocable: true
 argument-hint: "[review|verify|verify-gates|validate|check|final|adversarial|drift|plan|micro-eval] [대상]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__write_memory,
   mcp__plugin_fz_serena__read_memory,
-  Bash(codex *), Read, Grep
+  Bash(codex *), Bash(*/scripts/gpt-exec.sh*), Read, Grep
 metadata:
   provides: [verification]
   needs: [none]
@@ -20,12 +20,12 @@ metadata:
 
 # /fz-gpt - GPT 상호검증 스킬 (Hybrid)
 
-> **행동 원칙**: Codex CLI(모델=config SSOT)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
-> CLI(`codex exec`) + Plugin(`/codex:*`, 설치 시) 자동 라우팅. Plugin 미설치 시 CLI 폴백.
+> **행동 원칙**: GPT CLI(모델=config SSOT)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
+> 래퍼(`scripts/gpt-exec.sh`) + Plugin(`/codex:*`, 설치 시) 자동 라우팅. Plugin 미설치 시 CLI 폴백.
 
 > **Authority**:
-> - Hybrid Routing: OpenAI Codex CLI 공식 docs [verified: official] — 0.118.0+ Plugin 도입 · 0.124.0+ gpt-5.5 · **0.153.1+ gpt-6-astra**(0.153.4가 bundled default로 승격)
-> - Effort Routing: OpenAI **Model guidance** [verified: official, raw] — API는 `low/medium/high/xhigh/max`(`none`은 HTTP 400) · Codex CLI/SDK 0.149.0+ 는 `ultra` 추가 — 모델 페이지엔 없지만 **`models_cache.json` 실측으로 확인**(gpt-6-astra·gpt-5.6 계열 지원, gpt-5.5 는 xhigh 까지).
+> - Hybrid Routing: OpenAI GPT CLI 공식 docs [verified: official] — 0.118.0+ Plugin 도입 · 0.124.0+ gpt-5.5 · 0.153.1+ gpt-6-astra(0.153.4가 bundled default로 승격) · **0.157.0+ gpt-6-sol — 현 CLI 기본**(0.156.1 에서 선택기 추가, 기본 effort medium). 실제 모델은 CLI 버전과 `config.toml` 에 따른다
+> - Effort Routing: API `reasoning.effort` 는 **모델별**이다 — gpt-6-sol 은 `none`·`low`·`medium`(기본)·`high`·`xhigh`·`max` [verified: developers.openai.com/api/docs/models/gpt-6-sol] · **gpt-6-astra 는 `none` → HTTP 400** [verified: developers.openai.com/api/docs/guides/reasoning] · gpt-6-luna 의 `none` 은 [미검증]. GPT CLI 0.149.0+ 는 `ultra` 추가 — **`models_cache.json` 실측(2026-09-25)**: sol·astra = low~max + ultra, luna = low~max, 세 모델 모두 CLI 목록에 `none` 없음 (gpt-5.5 는 xhigh 까지).
 >   ⛔ 구 출처 GPT-5 Prompting Guide 는 `gpt-5.3-gpt` 대상이라 Astra 를 다루지 않는다.
 >   ⛔ 공식은 xhigh 를 무조건 권하지 않는다 — *"Only use when your evals show a clear benefit that justifies the extra latency and cost."*
 > - adversarial 서브커맨드: ICLR 2025 Blogposts [verified: peer-reviewed] — Adversarial debate는 majority voting으로 환원, "Generator≠Evaluator 분리"가 fz의 frame
@@ -35,10 +35,10 @@ metadata:
 
 > 서브커맨드: review | verify | verify-gates | validate | check | final | adversarial | drift | plan | micro-eval (10개)
 
-- **CLI** (`codex exec review`): git diff + `-o`/`--json` + `--add-dir` + 3-Tier 스킬 — review/check/final
-- **CLI** (`codex exec`): 프롬프트 + `--output-schema` — verify/validate/drift/plan
+- **래퍼 review** (`gpt-exec.sh review`): git diff + `--out` + 3-Tier 스킬 — review/check/final
+- **래퍼 exec** (`gpt-exec.sh exec`): `--prompt-file` + `--schema` — verify/validate/drift/plan
 - **Plugin** (`/codex:*`): 설치 시 review/check/adversarial에 우선 사용. 백그라운드 Job 관리 (`status`/`result`)
-- **`--add-dir`**: 모노레포 공유 모듈 컨텍스트 확장 (대상은 프로젝트 `CLAUDE.md` `## Shared Modules` 기준)
+- **공유 모듈**: read-only 가 전 디스크 읽기를 허용해 별도 플래그가 필요 없다. `--add-dir` 는 **쓰기** 디렉토리 플래그라 fz 에서 쓰지 않는다 (2026-09-25 CLI help 실측)
 - **GPT 네이티브 스킬**: 3-Tier 디스커버리 (`~/.codex/skills/`) 역할 기반 매칭
 
 ## 사용 시점
@@ -68,13 +68,13 @@ metadata:
 
 ### GPT System Skills 활용 (Cnew-4, 2026-05-16)
 
-> Codex self-reflexive verify Q5 단독 발견 — `~/.codex/skills/.system/` 활용.
+> GPT self-reflexive verify Q5 단독 발견 — `~/.codex/skills/.system/` 활용.
 
 `~/.codex/skills/.system/` 아래 5개 system skill을 fz-gpt 호출 시 보조적으로 활용 가능:
 
 | System Skill | 활용 시점 | fz-gpt 통합 |
 |------------|---------|------------|
-| **openai-docs** | preamble 표준 / GPT-5.5 best practices 참조 | verify/plan 서브커맨드 prompt 작성 시 |
+| **openai-docs** | preamble 표준 / GPT-6 best practices 참조 | verify/plan 서브커맨드 prompt 작성 시 |
 | **skill-creator** | 새 GPT 스킬 생성 (메타 도구) | fz-gpt 자체 진화 (별도 사이클) |
 | **skill-installer** | GPT 스킬 install 자동화 | 새 fz-gpt 스킬 추가 시 |
 | **plugin-creator** | GPT plugin 생성 | 별도 영역 |
@@ -82,45 +82,46 @@ metadata:
 
 **활용 예** (openai-docs):
 ```bash
-# verify prompt 작성 전 openai-docs 호출하여 최신 GPT-5.5 prompting 가이드 확인
-codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵심"
-# 결과를 verify prompt template에 반영
+# verify prompt 작성 전 openai-docs 로 최신 GPT-6 prompting 가이드 확인 — 래퍼 exec, 스킬은 프롬프트에서 이름으로 지정
+echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 요약하라' > "$P_DOCS"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$WORK_DIR" --out "$DOCS_FILE" --prompt-file "$P_DOCS" --gpt-skill openai-docs   # 경로 없음 = 텔레메트리 fallback=1 (스킬 본문을 싣지 않으므로 정직하게)
+# 결과를 verify prompt template에 반영 — ⚠️ 이름 지정으로 system skill 이 로드되는지는 [미검증] (래퍼는 CLI 스킬 플래그를 넘기지 않는다)
 ```
 
 ## GPT 네이티브 스킬 (3-Tier 디스커버리)
 
 | 서브커맨드 | 역할 | 스킬 | 연결 방식 |
 |-----------|------|------|----------|
-| review, check, final | reviewer | fz-reviewer | `codex exec review` — 스킬 자동 트리거 + `--json`/`-o` 구조화 출력 |
-| verify | architect | fz-architect | `codex exec` + `get_gpt_skill_path("architect")` |
-| validate | guardian | fz-guardian | `codex exec` + `get_gpt_skill_path("guardian")` |
-| final (DA 패스) | challenger | fz-challenger | `codex exec` + `get_gpt_skill_path("challenger")` — major 이상 이슈 발견 시 |
-| verify/validate (탐색 보조) | searcher | fz-searcher | `codex exec` + `get_gpt_skill_path("searcher")` — 심볼 탐색 필요 시 |
-| check (수정 제안) | fixer | fz-fixer | `codex exec` + `get_gpt_skill_path("fixer")` — fixable 이슈 존재 시 |
-| drift | drift | fz-drift | `codex exec` + `get_gpt_skill_path("drift")` — 전체 스캔 |
-| plan | planner | fz-planner | `codex exec` + `get_gpt_skill_path("planner")` — 독립 플랜, xhigh effort |
+| review, check, final | reviewer | fz-reviewer | `gpt-exec.sh review` — 스킬 자동 트리거 + `--out` 구조화 출력 |
+| verify | architect | fz-architect | `gpt-exec.sh exec` + `get_gpt_skill_path("architect")` |
+| validate | guardian | fz-guardian | `gpt-exec.sh exec` + `get_gpt_skill_path("guardian")` |
+| final (DA 패스) | challenger | fz-challenger | `gpt-exec.sh exec` + `get_gpt_skill_path("challenger")` — major 이상 이슈 발견 시 |
+| verify/validate (탐색 보조) | searcher | fz-searcher | `gpt-exec.sh exec` + `get_gpt_skill_path("searcher")` — 심볼 탐색 필요 시 |
+| check (수정 제안) | fixer | fz-fixer | `gpt-exec.sh exec` + `get_gpt_skill_path("fixer")` — fixable 이슈 존재 시 |
+| drift | drift | fz-drift | `gpt-exec.sh exec` + `get_gpt_skill_path("drift")` — 전체 스캔 |
+| plan | planner | fz-planner | `gpt-exec.sh exec` + `get_gpt_skill_path("planner")` — 독립 플랜, xhigh effort |
 
 스킬 위치: `~/.codex/skills/` (3-Tier 디스커버리로 결정)
 
 ## 팀 에이전트 모드
 
-참조: `docs/history/team-core.md` -- Sub Agent 프로토콜. ⛔ `composable` frontmatter는 2026-08-09 제거(소비처 0) — 파이프라인 연결은 `provides`/`needs`가 결정한다
+⛔ `composable` frontmatter는 2026-08-09 제거(소비처 0) — 파이프라인 연결은 `provides`/`needs`가 결정한다
 
 ---
 
 > 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드): `modules/gpt-strategy.md`
 
-## Hybrid Routing (0.118.0+; gpt-5.5 = 0.124.0+ · gpt-6-astra = 0.153.1+)
+## Hybrid Routing (0.118.0+; gpt-5.5 = 0.124.0+ · gpt-6-astra = 0.153.1+ · gpt-6-sol = 0.157.0+)
 
 서브커맨드별 최적 실행 경로. Plugin 미설치 시 경고 없이 CLI 폴백.
 > 버전 플로어: Hybrid 라우팅 자체는 0.118.0부터 동작한다. 예시는 `-m`을 생략해 config `model` 기본값(최신 frontier)을 사용한다 — 모델 버전을 pin하지 말 것(SSOT=config.toml). 구버전 CLI에서 config 모델이 미지원이면 에러 대응표 `모델 미지원` 행대로 대응.
 
 | 서브커맨드 | Plugin 우선 | CLI (폴백/전용) | Plugin 불가 이유 |
 |-----------|------------|----------------|----------------|
-| review | `/codex:review --base` | `codex exec review -o` | — |
-| check | `/codex:review --scope working-tree` | `codex exec review --uncommitted` | — |
+| review | `/codex:review --base` | `gpt-exec.sh review --base --out` | — |
+| check | `/codex:review --scope working-tree` | `gpt-exec.sh review --uncommitted` | — |
 | adversarial | `/codex:adversarial-review` | challenger 프롬프트 | — |
-| final | — | CLI only | `--add-dir`, `resume` |
+| final | — | CLI only | `resume` |
 | verify/validate | — | CLI only | `--output-schema` |
 | drift/plan | — | CLI only | 커스텀 스킬 + 구조화 출력 |
 | micro-eval | — | CLI only | 경량 단일 주장 재평가, `--ephemeral` |
@@ -181,7 +182,7 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 | **verify** | 계획 검증 (Q1-Q8 stress-test) | /fz-plan Phase 2 | high |
 | **validate** | 피드백 역검증 | /fz-review Phase 5.5 | high |
 | **check** | 커밋 전 빠른 검증 (verdict contract) | /fz-fix | high |
-| **final** | PR 전 최종 리뷰 (resume --last 심화) | /fz-pr 전 | xhigh |
+| **final** | PR 전 최종 리뷰 (resume --session-file 심화) | /fz-pr 전 | xhigh |
 | **adversarial** | Devil's Advocate 리뷰 | /fz-review DA 패스 | xhigh |
 | **drift** | 아키텍처 드리프트 전체 스캔 | /fz-manage drift | high |
 | **plan** | 독립 플랜 (Claude와 교차 비교, C4 원칙) | /fz-plan cross-check | xhigh |
@@ -214,7 +215,7 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 예시 3 — validate: BAD Rate 85% 수치만 보고 pass (regressed 놓침) / GOOD resolved/partial/unresolved/regressed 4축 → regressed 0 + Rate 80+ 동시
 ```
 
-서브커맨드: 리뷰→`codex exec review -o`, 검증→`--output-schema`, 심화→`resume --last`. Schema version: `"1.1"`이면 `scope_disposition` read, 미존재/`"1.0"`이면 Lead가 `modules/scope-challenge.md` 수동 실행 (`jq '.schemaVersion // "1.0"'`).
+서브커맨드: 리뷰→`gpt-exec.sh review --out`, 검증→`gpt-exec.sh exec --schema`, 심화→`gpt-exec.sh resume --session-file`. Schema version: `"1.1"`이면 `scope_disposition` read, 미존재/`"1.0"`이면 Lead가 `modules/scope-challenge.md` 수동 실행 (`jq '.schemaVersion // "1.0"'`).
 
 ---
 
@@ -237,28 +238,27 @@ should-NOT-trigger (Boundaries Will Not / '비사용:' 대안 스킬)
 | 쿼리 | 예상 | redirect | 근거 |
 |------|------|----------|------|
 | "이 버그 직접 고쳐줘" | NOT trigger | fz-fix | '비사용: 직접 수정 →fz-fix' + Will Not "코드를 직접 수정하지 않음 (검증만 수행)" |
-| "이 컴파일 에러 수정해줘" | NOT trigger | fz-fix | Will Not "코드 직접 수정 안 함" — codex는 검증 전용 |
+| "이 컴파일 에러 수정해줘" | NOT trigger | fz-fix | Will Not "코드 직접 수정 안 함" — GPT는 검증 전용 |
 | "내 코드 자체적으로 검증해줘" | NOT trigger | fz-review | '비사용: 자기 리뷰 →fz-review' (gpt/교차검증 미언급 = 자기 3중 검증) |
 
 ### Functional Test (Given/When/Then)
 
 | Given | When | Then (pass/fail oracle) | type |
 |-------|------|--------------------------|------|
-| Git diff 존재, Codex CLI 설치 + Plugin 사용 가능 | `/fz-gpt review` | Plugin 우선(`/codex:review --base`) 또는 CLI(`codex exec review -o`) 실행 → 구조화 이슈 캡처 + verdict(approved/rejected/conditional) 판정 → Gate "GPT Verification Complete" 3항목 전부 통과 | normal |
+| Git diff 존재, GPT CLI 설치 + Plugin 사용 가능 | `/fz-gpt review` | Plugin 우선(`/codex:review --base`) 또는 래퍼(`gpt-exec.sh review --out`) 실행 → 구조화 이슈 캡처 + verdict(approved/rejected/conditional) 판정 → Gate "GPT Verification Complete" 3항목 전부 통과 | normal |
 | Claude 계획 초안 존재 | `/fz-gpt verify` | gpt가 plan을 `--output-schema`로 독립 재작성 → Claude 계획과 diff → divergence 기록 + verdict 판정 후 /fz-plan으로 반환 (Gate 3/3 통과) | normal |
 | base branch 후보 불확실(자동 결정 불가) | `/fz-gpt review` | Will Not "Base branch를 추측하지 않음" — 추측 base 실행 0건, 사용자에게 질문 → 확정 후 실행 | edge-case |
 | CLAUDE.md `## GPT Skills` 테이블(Tier 1) 부재 | `/fz-gpt verify` | Tier 2(글로벌 fz-*) → Tier 3(인라인 프롬프트) 순차 폴백으로 서브커맨드 실행 완료 (Gate "서브커맨드 실행 완료" 통과) | edge-case |
-| Codex CLI 통신 실패 | `/fz-gpt review` | 컨텍스트 축소 후 재시도 → 실패 시 Issue Tracker에 기록 + /sc:sc-analyze 단독 폴백 실행 (3회 연속 실패 시 사용자 에스컬레이션) | failure |
+| GPT CLI 통신 실패 | `/fz-gpt review` | 컨텍스트 축소 후 재시도 → 실패 시 Issue Tracker에 기록 + /sc:sc-analyze 단독 폴백 실행 (3회 연속 실패 시 사용자 에스컬레이션) | failure |
 
 ## Boundaries
 
-Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행한다.
+GPT CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행한다.
 
 **Will**:
-- `codex exec review` + `-o`/`--json`으로 구조화된 리뷰 캡처
-- `codex exec` + `--output-schema`로 구조화된 검증
-- `--add-dir`로 모노레포 공유 모듈 컨텍스트 확장
-- `codex exec resume`로 multi-pass 심화 검증 (final)
+- `gpt-exec.sh review` + `--out`으로 구조화된 리뷰 캡처
+- `gpt-exec.sh exec` + `--schema`로 구조화된 검증
+- `gpt-exec.sh resume --session-file`로 multi-pass 심화 검증 (final)
 - GPT 네이티브 스킬(3-Tier 디스커버리로 결정) 자동 활용
 - Base branch 자동 결정 (불확실 시 사용자 질문)
 - Critical 이슈 감지 시 xhigh 자동 에스컬레이션
@@ -274,15 +274,15 @@ Codex CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행
 |------|------|------|
 | CLAUDE.md 미발견 | `../CLAUDE.md` → `CLAUDE.md` → `find .. -maxdepth 2` | 경고 후 계속 |
 | Guidelines 미발견 | CLAUDE.md `## Code Conventions` 참조 | 일반 규칙 적용 |
-| Plugin 명령 실패 | CLI 자동 폴백 (`codex exec`) | 경고 없이 진행 |
-| Codex CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:sc-analyze 단독 |
-| `codex exec review` 실패 | `codex exec` + diff 인라인 | 수동 분석 |
+| Plugin 명령 실패 | 래퍼 자동 폴백 (`gpt-exec.sh`) | 경고 없이 진행 |
+| GPT CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:sc-analyze 단독 |
+| `gpt-exec.sh review` 실패 | `gpt-exec.sh exec` + diff 인라인 프롬프트 | 수동 분석 |
 | JSON 파싱 실패 | `-o` 파일 캡처 폴백 | Claude 분석 |
 | 모델 미지원 (구버전 CLI가 config 모델 미인식) | CLI 업데이트 권장, 불가 시 config `model`을 호환 모델로 조정 (사용자 소관 — 임시 `-m` pin 금지) | -- |
 | 3회 연속 실패 | 사용자 에스컬레이션 | -- |
 | **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (`modules/fz-gpt-bash-hygiene.md` § 1) | 프로세스 kill + 재시도 |
 | **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (`modules/fz-gpt-bash-hygiene.md` § 2) | working dir을 GIT_ROOT로 변경 |
-| **`--profile` 사용 시 sandbox가 read-only로 force** (30차, Critical) | `[projects.<path>] trust_level = "trusted"` 추가 (`modules/fz-gpt-bash-hygiene.md` § 5) | `-c 'sandbox_permissions=...'` inline override |
+| **`--profile` 사용 시 sandbox가 read-only로 force** (30차, Critical) | `[projects.<path>] trust_level = "trusted"` 추가 (`modules/fz-gpt-bash-hygiene.md` § 5) | 래퍼 경유(`gpt-exec.sh` 가 read-only 강제 — `--profile` 불사용) |
 
 ## Completion → Next
 
