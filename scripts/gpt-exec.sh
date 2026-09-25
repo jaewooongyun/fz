@@ -18,6 +18,11 @@
 #                        [--expected-branch B] [--gpt-skill N] [--gpt-skill-path P]
 #   gpt-exec.sh exec   --cd DIR --out FILE --prompt-file F
 #                        [--effort E] [--schema F] [--add-dir D] [--gpt-skill N] [--gpt-skill-path P]
+#   gpt-exec.sh resume --cd DIR --out FILE --prompt-file F --session-file PREV_OUT.session
+#                        [--effort E] [--schema F]
+#                        ⛔ 이전 exec/review 가 남긴 `${OUT}.session`(UUID) 으로 **그 세션**을 잇는다.
+#                           `--last` 를 쓰지 않는다 — 사이에 다른 GPT 실행이 끼면 엉뚱한 세션을 잇는다.
+#   (모든 모드) 성공 시 스트림 로그의 `session id:` 를 `${OUT}.session` 에 기록한다.
 #
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건 / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
@@ -31,11 +36,11 @@ need() { [ "$1" -ge 2 ] || die 10 "$2 는 값이 필요하다"; }
 
 MODE="${1:-}"; shift || true
 case "$MODE" in
-  review|exec) ;;
-  *) die 10 "mode는 review|exec — 받은 값: '${MODE}'" ;;
+  review|exec|resume) ;;
+  *) die 10 "mode는 review|exec|resume — 받은 값: '${MODE}'" ;;
 esac
 
-CD="" OUT="" PROMPT_FILE="" SCHEMA="" EFFORT="high" TITLE="" EPHEMERAL="" EXPECTED_BRANCH="" GPT_SKILL="" GPT_SKILL_PATH=""
+CD="" OUT="" PROMPT_FILE="" SCHEMA="" EFFORT="high" TITLE="" EPHEMERAL="" EXPECTED_BRANCH="" GPT_SKILL="" GPT_SKILL_PATH="" SESSION_FILE=""
 ADD_DIRS=()
 SCOPE_ARGS=()          # ⛔ 문자열이 아니라 **배열** — 비인용 확장의 단어분할·glob를 차단한다
 SCOPE_KIND=""          # base|uncommitted|commit — 중복 지정을 거부하기 위해 기록
@@ -66,6 +71,7 @@ while [ $# -gt 0 ]; do
     --uncommitted)     set_scope uncommitted
                        SCOPE_ARGS=(--uncommitted); shift ;;
     --ephemeral)       EPHEMERAL="--ephemeral";     shift ;;
+    --session-file)    need $# "--session-file";    SESSION_FILE="$2"; shift 2 ;;
     *) die 10 "알 수 없는 인자: $1" ;;
   esac
 done
@@ -93,6 +99,19 @@ fi
 [ "$MODE" = "review" ] && [ -z "$SCOPE_KIND" ] && die 10 "review 모드는 --base|--uncommitted|--commit 중 하나 필수"
 [ "$MODE" = "exec" ] && [ -z "$PROMPT_FILE" ] && die 10 "exec 모드는 --prompt-file 필수"
 [ "$MODE" = "exec" ] && [ -n "$SCOPE_KIND" ] && die 10 "exec 모드에 review 스코프 플래그를 줄 수 없다 (diff는 프롬프트에 인라인)"
+# ── resume: 이을 세션을 **명시**로만 받는다 (--last 금지 — 동시 실행 시 다른 세션을 잇는다)
+if [ "$MODE" = "resume" ]; then
+  [ -n "$PROMPT_FILE" ] || die 10 "resume 모드는 --prompt-file 필수"
+  [ -n "$SCOPE_KIND" ] && die 10 "resume 모드에 review 스코프 플래그를 줄 수 없다"
+  [ "${#ADD_DIRS[@]}" -gt 0 ] && die 10 "resume 모드는 --add-dir 미지원 (GPT CLI resume 가 받지 않는다)"
+  [ -n "$SESSION_FILE" ] || die 10 "resume 모드는 --session-file 필수 (이전 exec/review 의 \${OUT}.session)"
+  [ -s "$SESSION_FILE" ] || die 10 "세션 파일 없음/빈 파일: $SESSION_FILE"
+  SESSION_ID="$(tr -d '[:space:]' < "$SESSION_FILE")"
+  printf '%s' "$SESSION_ID" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' \
+    || die 10 "세션 파일 내용이 UUID 가 아니다: '$SESSION_ID'"
+elif [ -n "$SESSION_FILE" ]; then
+  die 10 "--session-file 은 resume 모드 전용"
+fi
 
 # ── 사전 게이트 2: 경로·파일 존재
 [ -n "$CD" ] || die 10 "--cd 필수"
@@ -105,9 +124,7 @@ fi
 [ -n "$SCHEMA" ] && { [ -s "$SCHEMA" ] || die 11 "스키마 파일 없음: $SCHEMA"; }
 command -v codex >/dev/null 2>&1 || die 11 "codex CLI 미설치"
 
-# ── 사전 게이트 3: trust_level (hygiene §5) — 경고만, 차단 아님
-grep -qE '^\[projects\.' "${CODEX_HOME:-$HOME/.codex}/config.toml" 2>/dev/null \
-  || echo "WARN: trust_level 미설정 — sandbox가 read-only로 강제될 수 있다 (hygiene §5)" >&2
+# ── 사전 게이트 3: (폐지 2026-09-25) trust_level 경고 — 래퍼가 read-only 를 스스로 강제하므로(아래 ARGS) "read-only 로 강제될 수 있다" 는 경고는 거짓 경보였다
 
 # ── 사전 게이트 4: git repo 판정 → skip flag (hygiene §2)
 IS_REPO=1
@@ -150,14 +167,17 @@ fi
 # ⛔ 공용 ARGS에는 **review·exec 양쪽이 수용하는 플래그만** 넣는다 (F-015).
 #    `-C/--cd` 와 `--add-dir` 는 `codex exec review` 가 거부한다 → exec 전용 배열로 분리.
 #    검증: scripts/check-gpt-flags.sh (양 서브커맨드 --help 전수 대조)
-ARGS=(-c "sandbox_permissions=[\"disk-full-read-access\"]" -c "model_reasoning_effort=$EFFORT")
+# ⛔ read-only 강제 — fz GPT 호출은 검증 전용이다. 프롬프트 문구는 경계가 아니고, 사용자 config.toml 의 sandbox_mode 가
+#    쓰기 가능이면 검증 호출이 레포를 고칠 수 있다. `-c` 는 session 층이라 사용자 config 보다 우선한다(2026-09-25 실측).
+#    `sandbox_permissions` 는 CLI 0.157 이 무시한다고 출력하지만 구버전 호환을 위해 남긴다.
+ARGS=(-c 'sandbox_mode="read-only"' -c "sandbox_permissions=[\"disk-full-read-access\"]" -c "model_reasoning_effort=$EFFORT")
 [ -n "$SKIP_FLAG" ] && ARGS+=("$SKIP_FLAG")
 [ -n "$SCHEMA" ] && ARGS+=(--output-schema "$SCHEMA")
 [ -n "$EPHEMERAL" ] && ARGS+=("$EPHEMERAL")
 ARGS+=(-o "$OUT")
 
 LOG="${OUT}.stream.log"
-rm -f "$OUT"
+rm -f "$OUT" "${OUT}.session"   # 실패 시 이전 성공 run 의 session 이 남아 resume 이 엉뚱한 세션을 잇지 않게 (resume 의 SESSION_ID 는 위에서 이미 읽었다)
 
 # ── 호출 (hygiene §1 stdin close · §3 -o · §7 `--` 구분자)
 if [ "$MODE" = "review" ]; then
@@ -165,6 +185,11 @@ if [ "$MODE" = "review" ]; then
   # ⛔ review 는 `-C` 를 받지 않는다 → 서브셸 cwd 전환으로 작업 디렉토리를 확보한다.
   #    ( ) 안에서만 cd 하므로 호출자 cwd 는 불변이다.
   ( cd "$CD" && codex exec review "${ARGS[@]}" "${SCOPE_ARGS[@]}" < /dev/null ) > "$LOG" 2>&1
+elif [ "$MODE" = "resume" ]; then
+  # ⛔ resume 는 `-C`·`--add-dir` 를 받지 않는다 → review 와 같이 서브셸 cwd 전환.
+  # ⛔ 프롬프트는 cd **전에** 읽는다 — 상대 경로가 서브셸 cwd 기준으로 풀리면 사전 게이트가 본 파일과 다른 파일을 읽는다
+  RESUME_PROMPT="$(cat "$PROMPT_FILE")"
+  ( cd "$CD" && codex exec resume "${ARGS[@]}" -- "$SESSION_ID" "$RESUME_PROMPT" < /dev/null ) > "$LOG" 2>&1
 else
   EXEC_ARGS=(-C "$CD")
   for d in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do EXEC_ARGS+=(--add-dir "$d"); done
@@ -200,4 +225,7 @@ if [ -n "$SCHEMA" ]; then
 else
   echo "GATE-PASS text_ok bytes=$(wc -c < "$OUT" | tr -d ' ')"
 fi
+# ── 세션 ID 기록 (resume 입력) — ⛔ 사후 게이트(exit·파일·스키마) **전부 통과 뒤**에만 쓴다. 실패 run 의 세션을 resume 에 넘기지 않는다 — 배너의 ANSI 색 코드를 벗긴 뒤 첫 `session id:` 만 쓴다
+SID="$(sed $'s/\x1b\\[[0-9;]*m//g' "$LOG" | grep -m1 -oE 'session id: *[0-9a-f-]{36}' | grep -oE '[0-9a-f-]{36}' || true)"
+if [ -n "$SID" ]; then printf '%s\n' "$SID" > "${OUT}.session"; else rm -f "${OUT}.session"; echo "WARN: 스트림 로그에서 session id 를 찾지 못했다 — resume 불가" >&2; fi
 exit 0
