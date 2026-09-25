@@ -1,0 +1,4 @@
+scripts/fz_telemetry_report.py	GPT_CALL_RE = re.compile(r"codex exec|gpt-exec\.sh")
+scripts/check_external_commands.py	"""⛔ `codex` 는 부재 시 폴백이 정의돼 있다 — 차단하면 안 된다."""
+scripts/check_external_commands.py	r = mk(tmp / "r", "# x\n\n```bash\ncodex exec review\n```\n")
+scripts/check_external_commands.py	return None if c == "codex" else real(c, *a, **k)
