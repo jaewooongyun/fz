@@ -1,0 +1,690 @@
+===== arch-critic =====
+참조 판정: skills/arch-critic/SKILL.md
+  floor(무조건 로드) 2850 / ceiling(로드 전체) 2850 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] modules/review-checks.md               ~  2850 tok
+     ! L52: 이유: 숫자 임계를 1표본으로 정하면 ① 리뷰어 간 severity가 갈리고 ② `fz-review` Gate 4에서 그 등급이 차단으로 변한다 — 미정 규칙이 verdict를 바꾼다. 임계 SSO
+
+===== code-auditor =====
+참조 판정: skills/code-auditor/SKILL.md
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 2850 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[출처표기  ] modules/review-checks.md               ~  2850 tok
+     ~ L51: ⛔ **N 강도 임계는 미정이다 — severity를 부여하지 않는다.** 표본 1건(PR I3, N=5)으로는 등급 근거가 없다. 형제 N곳을 세어 **근거로 제시하고 관찰 보고로 남긴다.** 임
+
+===== fz =====
+참조 판정: skills/fz/SKILL.md
+  floor(무조건 로드) 38433 / ceiling(로드 전체) 38433 ~tokens  · 로드 아님(카탈로그·출처표기) 4194 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/skill-authoring.md              ~  7533 tok
+     ! L43: > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `xhigh` 단일값. 공식 출발점은 Opus 5·Fable 
+     ? L80: - TEAM 모드는 네이티브 **Workflow 도구** 가용 환경 필요 (미가용 시 SOLO 폴백). ⛔ `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`은 **TeamCr
+     · L89: | modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리 L1~L4
+     ? L197: (⛔ `guides/skill-authoring.md` § 파이프라인 매칭 흐름이 규정한 3단 폴백이다.
+     ? L345: > 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본). ⛔ `modules/patterns/`는 라운드 의미론의
+     ? L350: 1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{플러그인 루트}/workflows/{skill}-{pattern}.js', args })   → ⛔ 거부 시 정본 =
+     ? L353: 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
+     ! L472: | Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | ⛔ SOLO 직행 아님 — `guides/skill-authoring.md` §12 판별 표 |
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L81: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+[로드/무조건] modules/memory-policy.md               ~  1932 tok
+     · L87: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+     ? L148: - `Read(modules/memory-policy.md)` — 메모리 키 네이밍
+     ! L486: - 참조: `modules/memory-policy.md`
+[로드/무조건] modules/complexity.md                  ~   546 tok
+     · L88: | modules/complexity.md | 5차원 복잡도 → 모드 결정 |
+     ! L209: > 참조: `modules/complexity.md`
+[로드/무조건] modules/team-registry.md               ~  1128 tok
+     · L90: | modules/team-registry.md | 에이전트 + 모델 자동 결정 |
+     ! L273: > 참조: `modules/team-registry.md`
+[로드/무조건] modules/cross-validation.md            ~  6974 tok
+     · L91: | modules/cross-validation.md | 검증 게이트 자동 삽입 |
+     ! L143: - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄). 단, 산출물이 전수/카운트/부정 주장 예정이면 abbreviated여도 `Read(modules/cros
+     ! L289: > 참조: `modules/cross-validation.md`
+[로드/무조건] modules/context-artifacts.md           ~  4129 tok
+     · L92: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
+     ? L123: - Ticket ID 해석 (참조: `modules/context-artifacts.md`)
+     ? L147: - `Read(modules/context-artifacts.md)` — Artifact Budget Table + 산출물 프로토콜
+     ! L394: > 참조: `modules/context-artifacts.md`
+     ? L400: | 6+ 스텝 또는 context-heavy | 티켓 폴더 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
+[로드/무조건] modules/execution-modes.md             ~  1160 tok
+     · L93: | modules/execution-modes.md | BATCH/LOOP/SIMPLIFY 실행 모드 |
+     ! L218: 4. **실행 모드 결정**: STANDARD / BATCH / LOOP (참조: modules/execution-modes.md)
+     ! L388: > 참조: `modules/execution-modes.md` — BATCH 모드 상세
+[로드/무조건] modules/pipelines.md                   ~  1582 tok
+     · L95: | modules/pipelines.md | 19개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
+     ! L238: > 참조: `modules/pipelines.md` — 19개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
+[로드/무조건] modules/memory-guide.md                ~  1230 tok
+     · L96: | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
+     ! L485: - L1 저장 시 `modules/memory-guide.md` 정책 준수: `[skill: X]` `[status: Y]` `[priority: Z]` 태깅
+[로드/무조건] modules/intent-registry.md             ~  1288 tok
+     · L98: | modules/intent-registry.md | Phase 1 이 읽는 트리거 소스 — 스킬·파이프라인 트리거 + 구어체 보강 + Confidence 판정 |
+     ! L178: > ⛔ **Phase 1 이 읽는 트리거 소스는 `modules/intent-registry.md` 다.** 스킬 YAML 의
+[로드/무조건] modules/lead-action-default.md         ~   893 tok
+     · L99: | modules/lead-action-default.md | 교훈 사전 로드 Trigger Matrix (Phase 0 Step 4) |
+     ! L139: - SOLO: `modules/lead-action-default.md` Trigger Matrix 매칭 → 매칭된 메모리 ID + 적용 패턴 명시 출력
+[로드/무조건] modules/fz-pipeline-proposal.md        ~   857 tok
+     · L100: | modules/fz-pipeline-proposal.md | 파이프라인 시각화 + AskUserQuestion 형식 (Phase 4) |
+     ! L317: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조
+[로드/무조건] modules/uncertainty-verification.md    ~  1304 tok
+     · L101: | modules/uncertainty-verification.md | Default-Deny — 미검증 주장 차단 (Phase 5 Brief) |
+     ! L367: 참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead
+[로드/무조건] modules/lead-reasoning.md              ~  2087 tok
+     · L102: | modules/lead-reasoning.md | Speculation-to-Fact Fallacy 방어 (Phase 5 Brief) |
+     ! L367: 참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead
+[로드/무조건] modules/system-reminders.md            ~   936 tok
+     · L103: | modules/system-reminders.md | T6/T7 트리거 리마인더 (Phase 5 Brief) |
+     ! L367: 참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead
+[카탈로그  ] modules/governance.md                  ~  2057 tok
+     · L94: | modules/governance.md | kill-switch |
+[카탈로그  ] modules/plugin-refs.md                 ~  2137 tok
+     · L97: | modules/plugin-refs.md | SwiftUI + Concurrency 플러그인 참조 가이드 |
+
+===== fz-code =====
+참조 판정: skills/fz-code/SKILL.md
+  floor(무조건 로드) 42516 / ceiling(로드 전체) 47797 ~tokens  · 로드 아님(카탈로그·출처표기) 20788 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/skill-authoring.md              ~  7533 tok
+     ! L36: > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guid
+     ? L58: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 구현 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중
+     · L65: | modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
+     ? L101: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출
+     ~ L105: > 스크립트: `workflows/code-pair.js` (mode='full') — agents/의 impl-correctness·review-arch 정의를 agentType(`fz:`)으로 
+     ? L119: 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: 
+     ? L126: - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). 
+     ? L491: | Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 
+[로드/무조건] modules/memory-guide.md                ~  1230 tok
+     ! L36: > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guid
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L59: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+[로드/무조건] modules/session.md                     ~   799 tok
+     · L67: | modules/session.md | 세션 감지, Issue Tracker 연동 |
+     ! L222: 1. **세션 감지**: 참조 `modules/session.md`
+[로드/무조건] modules/build.md                       ~   585 tok
+     · L68: | modules/build.md | 빌드 검증 |
+     ? L122: 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소
+     ! L239: - □ 빌드 성공 (modules/build.md)
+     ! L322: 6. **매 Step 완료 후 빌드 검증**: 참조 `modules/build.md`
+     ! L369: 참조: `modules/build.md` — 에러 유형별 대응표, 빌드-수정 반복 패턴
+     ! L422: Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
+[로드/무조건] modules/execution-modes.md             ~  1160 tok
+     · L69: | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
+     ! L242: - /simplify 자동 트리거: 새 함수 3개+ 또는 100줄+ 추가 시 (modules/execution-modes.md)
+     ? L320: 5. **(선택) /simplify 게이트**: 코드 변경이 있을 때 `/simplify focus on {step-context}` (참조: modules/execution-modes.md)
+     ! L371: /ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
+     ! L490: | 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
+[로드/무조건] modules/context-artifacts.md           ~  4129 tok
+     · L71: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
+     ! L137: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+     ! L349: 형식 참조: `modules/context-artifacts.md`
+[로드/무조건] modules/plugin-refs.md                 ~  2137 tok
+     · L72: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ! L82: > 참조: `modules/plugin-refs.md` — SwiftUI Expert(구현 시) + Swift Concurrency(구현 시) 섹션
+     ! L85: > 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
+     ! L86: > **역방향 트리거**: `modules/plugin-refs.md` "역방향 감지 트리거" 참조. `@MainActor`/`actor` 등이 없어도 싱글톤+가변상태 감지 시 안전성 분석 활성화
+[로드/무조건] modules/rtm.md                         ~   496 tok
+     · L73: | modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
+     ! L243: - ⛔ RTM 갱신: 해당 Step의 Req-ID를 `implemented`로 갱신 (참조: modules/rtm.md)
+[로드/무조건] modules/code-transform-validation.md   ~  1477 tok
+     · L75: | modules/code-transform-validation.md | 코드 변환 동등성 — BEC 절차 + 마찰 신호 (패턴 변환 시) |
+     ! L266: | 스레드 컨텍스트 불일치 | Plan Transformation Spec에 "@MainActor 필수" → 구현이 일반 Task. 원본이 main queue(PromiseKit .done 등)인데
+     ! L267: | 래퍼 범위 과잉 | @MainActor/do-catch/Task 블록 내에 해당 컨텍스트 불필요 문장 포함. 원본 `.done { UI업데이트; 데이터변환 }` → After `MainActor
+     ! L329: - 불일치 → 마찰 보고 → 사용자 확인. 참조: `modules/code-transform-validation.md`
+[로드/무조건] modules/lead-reasoning.md              ~  2087 tok
+     · L77: | modules/lead-reasoning.md | Implication Scan — 제거/리팩토링 시 의미론적 완결성 |
+     ! L265: | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가
+     ! L270: | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견. 단 동일 패턴이 코드베이스 3곳+ 존재하면 conventi
+     ! L275: | SDK 래퍼 부분 분석 | 외부 SDK 객체의 `?.` 메서드 중 일부만 nil 동작 분석하고 나머지 건너뜀. "안전" 결론으로 추가 분석 중단 | 같은 객체의 모든 `?.` 메서드 nil 동작
+     ! L276: | Task 내부 프로퍼티 쓰기 | `Task { }` 블록 내에서 `self.property = value`를 `MainActor.run` 밖에서 실행. 특히 리뷰어 조언으로 MainActor 범
+     ? L384: - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
+[로드/무조건] modules/gates.md                       ~  4316 tok
+     ? L118: 2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 
+     ! L334: 6.4. **⛔ 게이트 판정** (원장이 있을 때 — `modules/gates.md` 배선 2):
+[로드/무조건] modules/promotion-ledger.md            ~  9816 tok
+     ! L131: > 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 미결 안
+     ! L280: | 기존 인프라 미확인 helper/공용모델 *[candidate: 1 session evidence]* | (helper) 새 helper(포맷/변환/날짜·시간·숫자→문자열 류) 작성 *전* **
+     ! L283: | 표면 churn *[candidate: 1 session evidence]* | 동일 UI 속성/레이아웃 값(좌표·offset·margin·spacing 등) 또는 **설계 원칙(레이어 소속·필
+     ? L284: | figma 수치 미측정 *[candidate: 3 session evidence]* | UI 레이아웃 수치(spacing/margin/offset/size/radius/opacity)·색(nod
+     ! L286: | 값-매핑 전량 복사 *[candidate: 1 session evidence]* | canonical/형제 파일의 값 매핑(코드접두→타입 등)을 통째 복사 — 각 항목이 현 도메인에서 실제 발생
+     ! L287: | DTO 미러링 서버 실필드 미검증 *[candidate: 1 session evidence]* | 형제 DTO/Entity 미러링하며 필드 추가/제거 시 "서버가 이 필드를 실제 payload로
+     ! L288: | DTO/Entity dead 판정 레이어 혼동 *[candidate: 1 session evidence]* | "미사용/dead" 판정을 레이어 구분 없이 적용 — DTO(Decodable pa
+[로드/무조건] modules/swift-pattern-detection.md     ~  1897 tok
+     ? L185: > 본문: `modules/swift-pattern-detection.md` 참조 (Level 3) — 5 원칙(D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환 /
+     ! L190: - [ ] `modules/swift-pattern-detection.md` Read 완료? (D/E/F/G/H 원칙 5개 token 스캔)
+     ? L284: | figma 수치 미측정 *[candidate: 3 session evidence]* | UI 레이아웃 수치(spacing/margin/offset/size/radius/opacity)·색(nod
+[로드/조건부] modules/team-core.md                   ~  2431 tok
+     ? L101: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출
+[로드/조건부] modules/review-checks.md               ~  2850 tok
+     ? L279: | Swift Naming 위반 *[candidate: 1 session evidence]* | Swift/iOS 프로젝트에서 새 helper/method/type 이름 또는 주석이 (a) 반환값 
+[출처표기  ] guides/harness-engineering.md          ~ 15650 tok
+     ~ L107: > ✅ **2026-08-09부터 스키마 수준 보장**: `agents/impl-correctness.md` `tools:`에서 **쓰기 도구를 전부 제거**했다 — 이전에는 프롬프트 금지(OVER
+     ~ L274: | 외부 피드백 무검증 수긍/기각 | 외부 도구/리뷰어의 "파라미터 누락" 등 지적에 함수 시그니처 확인 없이 동의 **또는 기각(dismiss)**. ⊕ **근거 종류(provenance) 미분류
+     ~ L281: | **peer slot 비대칭 (post-state)** *[candidate: 1 session evidence]* | 편집한 라인이 **동종 슬롯 집합**(같은 `switch`의 case 절 
+[카탈로그  ] modules/memory-policy.md               ~  1932 tok
+     · L70: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+[카탈로그  ] modules/native-agents.md               ~   966 tok
+     · L74: | modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
+[카탈로그  ] modules/uncertainty-verification.md    ~  1304 tok
+     · L76: | modules/uncertainty-verification.md | BEC fail-closed — [verified] 없는 주장 구현 전 검증 강제 |
+[카탈로그  ] modules/system-reminders.md            ~   936 tok
+     · L78: | modules/system-reminders.md | Instruction fade-out 대응 — 트리거 기반 리마인더 |
+
+===== fz-commit =====
+참조 판정: skills/fz-commit/SKILL.md
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+
+===== fz-discover =====
+참조 판정: skills/fz-discover/SKILL.md
+  floor(무조건 로드) 36693 / ceiling(로드 전체) 44226 ~tokens  · 로드 아님(카탈로그·출처표기) 5323 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L63: - 참조: `guides/agent-team-guide.md` §8 (TEAM 공식 사양 — 패턴 canonical 문서용, pilot 기간 실행 경로 아님)
+[로드/무조건] modules/native-agents.md               ~   966 tok
+     · L72: | modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
+     ! L85: | Phase 2 | L3 `deep-research-agent` | 외부 기술/라이브러리 조사 (modules/native-agents.md) |
+[로드/무조건] modules/cross-validation.md            ~  6974 tok
+     · L73: | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
+     ~ L234: - [ ] "전체/모든/생태계/전수" 분석 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (단위 U 확정 후
+     ! L235: - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation
+[로드/무조건] modules/plugin-refs.md                 ~  2137 tok
+     ! L91: > 참조: `modules/plugin-refs.md` — SwiftUI Expert(상태 관리 결정 시) + Swift Concurrency(동시성 관련 제약 시)
+[로드/무조건] guides/prompt-optimization.md          ~  7817 tok
+     ! L118: ### TEAM 추론 품질 3원칙 보존 (guides/prompt-optimization.md §다양성 매핑)
+[로드/무조건] modules/promotion-ledger.md            ~  9816 tok
+     ! L127: > 통신 기록: `discover-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 
+[로드/무조건] modules/context-artifacts.md           ~  4129 tok
+     ! L169: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+     ! L315: 형식 참조: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)"
+     ! L319: > 형식 상세 + 예시: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)" 참조.
+[로드/조건부] guides/skill-authoring.md              ~  7533 tok
+     ? L62: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 폴백 (에러 대응 표) (⛔ **도구 부재** — 실행 중 실패와 다른 축이
+     · L69: | guides/skill-authoring.md §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본). ⛔ `team-core.md`는 역사적 출처 — 실행 절
+     ? L107: 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/discover-adversarial.js', args })` — ⛔ 거부 시 S
+     ? L113: 이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
+     ? L490: | `mode: 'fallback'` 반환(실행 중 실패) | ⛔ SOLO 아님 — `guides/skill-authoring.md` §12 판별 표로 분기 | L1~L3 후 미해소면 L4 |
+[카탈로그  ] modules/memory-policy.md               ~  1932 tok
+     · L71: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+[카탈로그  ] modules/lead-reasoning.md              ~  2087 tok
+     · L74: | modules/lead-reasoning.md | Speculation-to-Fact Fallacy (§1.5) — 탐색 결과 주장 시 [verified] 태그 |
+[카탈로그  ] modules/uncertainty-verification.md    ~  1304 tok
+     · L75: | modules/uncertainty-verification.md | Default-Deny — 증거 없는 옵션/제약 주장 차단 |
+
+===== fz-explain =====
+참조 판정: skills/fz-explain/SKILL.md
+  floor(무조건 로드) 2723 / ceiling(로드 전체) 2723 ~tokens  · 로드 아님(카탈로그·출처표기) 540 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] modules/explanation-protocol.md        ~  2723 tok
+     ! L38: - 규칙 정본은 `modules/explanation-protocol.md` — 이 스킬은 **seed 산출**과 **호출**만 맡는다
+     · L57: | `modules/explanation-protocol.md` | 폐포 5축 · 어휘 등급 · 게이트 G1~G8 · 층위의 **정본** |
+     ! L92: `{플러그인 루트}/modules/explanation-protocol.md` 를 Read 한 뒤 §9 실행 절차 T2~T6 을 수행한다.
+[카탈로그  ] modules/explanation-output.md          ~   540 tok
+     · L58: | `modules/explanation-output.md` | 출력 섹션 A~E 형식 (정본 §7 에서 분리) |
+
+===== fz-fix =====
+참조 판정: skills/fz-fix/SKILL.md
+  floor(무조건 로드) 16429 / ceiling(로드 전체) 23962 ~tokens  · 로드 아님(카탈로그·출처표기) 3236 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L56: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+[로드/무조건] modules/build.md                       ~   585 tok
+     · L62: | modules/build.md | 빌드 검증 |
+     ! L179: 참조: `modules/build.md` — 빌드 검증 패턴
+[로드/무조건] modules/execution-modes.md             ~  1160 tok
+     · L63: | modules/execution-modes.md | LOOP 실행 모드 |
+     ! L181: /ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
+     ! L332: | 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
+[로드/무조건] modules/context-artifacts.md           ~  4129 tok
+     · L65: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
+     ! L107: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+[로드/무조건] modules/plugin-refs.md                 ~  2137 tok
+     · L66: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ! L73: > 참조: `modules/plugin-refs.md` — SwiftUI Expert(수정 시) + Swift Concurrency(수정 시) 섹션
+     ! L76: > 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
+     ! L80: > 참조: `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 부재해도 다음 패턴이 감지되면 안전성 
+[로드/무조건] modules/code-transform-validation.md   ~  1477 tok
+     · L67: | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
+     ! L167: - `modules/code-transform-validation.md` 참조. 원본 런타임 특성(스레드, 에러) 확인 후 수정
+[로드/무조건] modules/lead-reasoning.md              ~  2087 tok
+     ! L132: → 키워드 기반이 아닌 **상태 기반**으로 범위 정의 (참조: `modules/lead-reasoning.md`)
+[로드/조건부] guides/skill-authoring.md              ~  7533 tok
+     ? L55: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중
+     ~ L200: > 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.m
+     ? L207: 2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — Stage 1 impl(opus) 
+     ? L209: 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
+[카탈로그  ] modules/memory-policy.md               ~  1932 tok
+     · L64: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+[카탈로그  ] modules/uncertainty-verification.md    ~  1304 tok
+     · L68: | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
+
+===== fz-gpt =====
+참조 판정: skills/fz-gpt/SKILL.md
+  floor(무조건 로드) 19483 / ceiling(로드 전체) 19483 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] modules/session.md                     ~   799 tok
+     · L56: | modules/session.md | 세션 감지, Issue Tracker 연동 |
+     ! L198: 검증 결과를 자동으로 Issue Tracker에 기록 (참조: modules/session.md). `-o` 파일을 jq로 파싱하여 phase/status 태그 후 통합.
+[로드/무조건] modules/cross-validation.md            ~  6974 tok
+     · L57: | modules/cross-validation.md | 검증 게이트, get_gpt_skill_path() 3-Tier 디스커버리, GIT_ROOT 추출 |
+     ! L61: > CLAUDE.md `## Directory Structure`에서 동적 추출. 상세: modules/cross-validation.md 참조.
+     ! L65: > 3-Tier 디스커버리 정의: `modules/cross-validation.md § get_gpt_skill_path()` 참조.
+[로드/무조건] modules/team-core.md                   ~  2431 tok
+     ! L107: 참조: `modules/team-core.md` -- Sub Agent 프로토콜. ⛔ `composable` frontmatter는 2026-08-09 제거(소비처 0) — 파이프라인 연결은 `pr
+[로드/무조건] modules/gpt-strategy.md                ~  1791 tok
+     ! L111: > 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드): `modules/gpt-strategy.md`
+[로드/무조건] modules/fz-gpt-bash-hygiene.md         ~  2650 tok
+     ! L141: > 상세: `modules/fz-gpt-bash-hygiene.md` — Stdin 닫기 (§1) / Trusted Dir (§2) / `-o` 버퍼링 (§3) / Background Task (§
+     ! L190: ⛔ **Bash 호출 시 의무**: 모든 서브커맨드 호출은 `modules/fz-gpt-bash-hygiene.md` 준수 (stdin close / trusted dir / Base Verific
+     ! L283: | **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (`modules/fz-gpt
+     ! L284: | **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (`modules/fz-
+     ! L285: | **`--profile` 사용 시 sandbox가 read-only로 force** (30차, Critical) | `[projects.<path>] trust_level = "trusted"`
+[로드/무조건] modules/fz-gpt-subcommands-core.md     ~  2292 tok
+     ! L175: > - **Core (review/verify/validate/check)**: `modules/fz-gpt-subcommands-core.md`
+[로드/무조건] modules/fz-gpt-subcommands-aux.md      ~  1508 tok
+     ! L176: > - **Aux (final/adversarial/drift/plan/micro-eval)**: `modules/fz-gpt-subcommands-aux.md`
+[로드/무조건] modules/scope-challenge.md             ~  1038 tok
+     ! L217: 서브커맨드: 리뷰→`codex exec review -o`, 검증→`--output-schema`, 심화→`resume --last`. Schema version: `"1.1"`이면 `scope_d
+
+===== fz-manage =====
+참조 판정: skills/fz-manage/SKILL.md
+  floor(무조건 로드) 9590 / ceiling(로드 전체) 9590 ~tokens  · 로드 아님(카탈로그·출처표기) 6974 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] modules/governance.md                  ~  2057 tok
+     ! L33: - 거버넌스 (`modules/governance.md`)
+     ! L58: | `governance` | `modules/governance.md` | 거버넌스 프레임워크 |
+     ! L98: 2b. **실효 모델은 YAML이 아니라 스크립트에서 읽는다** — `Grep("agentType: 'fz:", "workflows/{skill}-*.js")` → `model`/`effort` 인
+     ! L438: - 거버넌스 프레임워크 (`modules/governance.md`)
+[로드/무조건] guides/skill-authoring.md              ~  7533 tok
+     ! L57: | `team <pattern>` | `workflows/*.js` + `guides/skill-authoring.md` §12 | 각 스킬이 자기 Workflow를 소유. ⛔ `team-core.
+     ! L444: - 팀 에이전트 생성 (→ 각 스킬의 `workflows/*.js`, 규약은 `guides/skill-authoring.md` §12)
+[출처표기  ] modules/cross-validation.md            ~  6974 tok
+     ~ L180: ⛔ **exit code를 판정에 포함한다** — `>/dev/null 2>&1`로 감싸지 않는다. `2`는 **PASS도 SKIP도 아니다**(configuration/parse error). 근
+
+===== fz-memory =====
+참조 판정: skills/fz-memory/SKILL.md
+  floor(무조건 로드) 1932 / ceiling(로드 전체) 1932 ~tokens  · 로드 아님(카탈로그·출처표기) 5359 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] modules/memory-policy.md               ~  1932 tok
+     · L52: | modules/memory-policy.md | L2 Serena Memory 키 네이밍 + GC 정책 |
+     ! L80: 2. 키별 수명 정책과 대조 (`modules/memory-policy.md`)
+[카탈로그  ] modules/memory-guide.md                ~  1230 tok
+     · L51: | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
+[카탈로그  ] modules/context-artifacts.md           ~  4129 tok
+     · L53: | modules/context-artifacts.md | L3 티켓 폴더 관리 |
+
+===== fz-modernize =====
+참조 판정: skills/fz-modernize/SKILL.md
+  floor(무조건 로드) 42813 / ceiling(로드 전체) 42813 ~tokens  · 로드 아님(카탈로그·출처표기) 8763 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/harness-engineering.md          ~ 15650 tok
+     ! L45: /fz-modernize probe "guides/harness-engineering.md"           # → Phase 1만
+[로드/무조건] guides/prompt-optimization.md          ~  7817 tok
+     ! L46: /fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
+     · L63: | guides/prompt-optimization.md | Tier 1+2 인용 정책 + 헤더 갱신 패턴 |
+[로드/무조건] modules/gpt-strategy.md                ~  1791 tok
+     ! L56: - **Codex CLI**: cross-model 검증(모델=config SSOT — 버전 플로어는 `modules/gpt-strategy.md`). trust_level="trusted" 설정 
+[로드/무조건] modules/cross-validation.md            ~  6974 tok
+     · L65: | modules/cross-validation.md | GPT 3회 한도 + Reflection Rate |
+     ! L446: - ⛔ 단 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**(`modules/cross-validation.md §Coverage Gate`)는 light에서도 **생략 불
+[로드/무조건] modules/context-artifacts.md           ~  4129 tok
+     · L66: | modules/context-artifacts.md | 티켓 폴더 + 산출물 보존 |
+     ! L98: > 참조: `modules/context-artifacts.md` Work Dir Resolution
+[로드/무조건] guides/llm-references.md               ~  6452 tok
+     ! L166: - **현행 모델명은 `guides/llm-references.md`의 `모델 정책: <X> only`에서 자동 파싱**(SSOT) — 새 모델 출시 시 그 한 줄만 갱신하면 lint가 따라온다
+[카탈로그  ] guides/skill-authoring.md              ~  7533 tok
+     · L64: | guides/skill-authoring.md | 본 스킬 작성 시 표준 |
+[카탈로그  ] modules/memory-guide.md                ~  1230 tok
+     · L67: | modules/memory-guide.md | feedback_* 교훈 태깅 규칙 |
+
+===== fz-new-file =====
+참조 판정: skills/fz-new-file/SKILL.md
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+
+===== fz-peer-review =====
+참조 판정: skills/fz-peer-review/SKILL.md
+  floor(무조건 로드) 39223 / ceiling(로드 전체) 46756 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] modules/peer-review-gates.md           ~  5822 tok
+     ! L37: > **행동 원칙**: 팀원의 PR/브랜치를 3-렌즈 독립 분석 + GPT 교차검증으로 리뷰하고, Confidence Matrix 투표(적용 Tier 는 `modules/peer-review-gat
+     ! L45: - **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정 (적용 Tier·산식은 `modules/peer-review-gates.md` § Merge
+     ! L90: | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Orig
+     ! L297: sequential-thinking으로 Confidence Matrix를 계산한다 (Tier 별 생성 여부·산식은 `modules/peer-review-gates.md` § MergeContract
+     ? L302: 3 → 3-vote / 2 → 2-vote 모드(§3) / **1 → 투표 불가. 단독 렌즈 결과이므로 Confidence Matrix를 만들지 않고 `[단일 렌즈 — 교차검증 없음]` 태그와 함께
+     ! L334: > ⛔ **Tier 3 전용** — 그 외 Tier 의 병합·판정 산식은 `modules/peer-review-gates.md` § MergeContract § 9 가 정본이다.
+     ! L354: > ⛔ **적용 Tier** — 이 절 산출물의 Tier 별 생성 여부는 `modules/peer-review-gates.md` § MergeContract § 9, 절 안 Coverage·Nega
+     ! L367: > 참조: `modules/peer-review-gates.md` — Factual Claim (4.4) + Line (4.5) + Compiler (4.6) + Behavior (4.7) + **
+     ! L378: ${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 라인 — 투표 적용 Tier 는 modules/peer-review-gates.md § Me
+     ! L379: ${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (마크다운 — Tier 별 생성 여부는 modules/peer-review-gates.md
+     ! L411: Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9) → Major 이슈(file:line + What/Impac
+     ! L468: - 3-Model Cross-Review + Confidence Matrix 투표 (적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)
+     ? L480: `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-r
+[로드/무조건] modules/peer-review-tiers.md           ~  6963 tok
+     ~ L44: - **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 s
+     ? L142: ⛔ **`review-surface.md` 를 먼저 읽는다.** base 가 분기점보다 앞서 있으면 이미 base 에 있는 커밋이 diff 에 다시 나타나 Tier 와 리뷰 표면이 함께 부풀려진다(
+     ! L146: ⛔ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-m
+     ! L242: > **자동 선택 실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED + risk escalation): `modules/peer-review-tiers.md
+     ! L244: 상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조.
+     ! L262: - **Tier 0** → `modules/peer-review-tiers.md` §Tier 0 절차로 위임. 본 SKILL.md Analyze 후속 섹션(Gate 0 / Tier 2 / Tier 
+     ! L263: - **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 
+     ! L291: Anti-Sycophancy 규칙(코드 증거 없는 self-reverse 금지), reverse 판정 절차, DA 호출 패턴: `modules/peer-review-tiers.md` §Cross-C
+     ? L446: > 참조: `modules/peer-review-tiers.md` — Tier 구성, 자동 선택, 타임아웃 + 폴백
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L79: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+     ! L363: > ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를
+[로드/무조건] modules/cross-validation.md            ~  6974 tok
+     ! L87: | `modules/cross-validation.md` | get_gpt_skill_path() 3-Tier 디스커버리, GIT_ROOT 추출 |
+     ! L119: # GIT_ROOT 추출: modules/cross-validation.md의 GIT_ROOT 공유 유틸 참조
+     ! L218: 4. ⛔ Fact 중 **"0건·부재·전부·~뿐"이 결론인 것**은 `modules/cross-validation.md` §Negative-Result Gate를 **Read 후 적용** — pos
+     ! L363: > ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를
+     ! L415: > **⛔ 대화 출력 전에 반드시 Write 도구로 아래 파일들을 저장하세요. 저장 완료 후 사용자에게 경로를 안내합니다.** ⛔ 쓰기 경로는 **항상 절대경로**다 — cwd 는 도구 호출 사이에
+[로드/무조건] modules/lead-reasoning.md              ~  2087 tok
+     ! L88: | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
+[로드/무조건] modules/uncertainty-verification.md    ~  1304 tok
+     ! L89: | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
+[로드/무조건] modules/peer-review-inline-anchoring.md ~  1796 tok
+     ! L91: | `modules/peer-review-inline-anchoring.md` | Deliver `--post` 인라인 앵커 게시 7단계 + 확인 게이트 + 다지점 분할(SSOT). `Bash(gh
+     ! L430: 발견을 PR 대화창이 아니라 **코드 라인 옆**(Files changed)에 붙인다. 7단계 절차·실패 대응·다지점 분할 전문: `modules/peer-review-inline-anchoring
+[로드/무조건] modules/peer-review-finding-anatomy.md ~   962 tok
+     ! L92: | `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
+     ! L423: 서술 형태(인과가 한 문장으로 안 끝나는 결함): `modules/peer-review-finding-anatomy.md` — 필드 나열이 아니라 원칙. 결함마다 인과의 모양이 다르다
+[로드/무조건] modules/evidence-collection.md         ~  2437 tok
+     ! L93: | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer
+     ! L179: > 참조: `modules/evidence-collection.md` — 수집 절차 상세 (a~d)
+     ! L199: > 참조: `modules/evidence-collection.md` — 섹션 e (Caller Analysis), 섹션 f (Convention Sampling)
+     ! L280: > ⛔ **경로별 구현**(Tier 2/3 브리프 검사 · Tier 0/1 탐지·표시 + 강등 결정식) + `intentContext` 허용/금지 표: `modules/evidence-collect
+[로드/무조건] modules/plugin-refs.md                 ~  2137 tok
+     ! L94: | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
+[로드/무조건] modules/review-structural-axes.md      ~  1000 tok
+     ! L95: | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4를 `args.structura
+[로드/무조건] modules/peer-review-workflow.md        ~  1410 tok
+     ! L144: ⛔ **읽고 끝내지 않는다 — `review-surface.patch` 를 `reviewSurfacePatchPath` 로 넘긴다.** 진단 파일(`review-surface.md`)만 넘기면 무력
+     ! L285: > `modules/peer-review-workflow.md`. Tier 0/1 은 sub-agent·GPT 가 없어 **읽지 않는다**.
+[로드/무조건] modules/code-transform-validation.md   ~  1477 tok
+     ! L227: - `modules/code-transform-validation.md` 참조
+[로드/조건부] guides/skill-authoring.md              ~  7533 tok
+     ? L78: - Tier 2/3 Analyze는 네이티브 Workflow 도구 필요 (`workflows/peer-review.js`) — 미가용 시 SOLO 리뷰 폴백(`mode:'fallback'`) (⛔ 
+     ? L85: | `guides/skill-authoring.md` §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본). ⛔ `team-core.md`·`patterns/`는
+
+===== fz-plan =====
+참조 판정: skills/fz-plan/SKILL.md
+  floor(무조건 로드) 37942 / ceiling(로드 전체) 45532 ~tokens  · 로드 아님(카탈로그·출처표기) 19504 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/skill-authoring.md              ~  7533 tok
+     ? L50: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실
+     · L57: | modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
+     ? L90: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출
+     ~ L95: > agents/의 plan-structure·plan-edge-case·plan-impact 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.m
+     ! L115: `{플러그인 루트}`가 세션 working directory(또는 additional directory) **하위가 아니면** `guides/skill-authoring.md` §12 우회 계약의 
+     ? L121: 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-autho
+     ? L139: 도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 experiment-log 기록
+     ? L492: | Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L51: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+[로드/무조건] modules/session.md                     ~   799 tok
+     · L59: | modules/session.md | 세션 감지, Issue Tracker 연동 |
+     ! L179: 1. **세션 감지**: 참조 `modules/session.md`
+[로드/무조건] modules/context-artifacts.md           ~  4129 tok
+     · L61: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 비-티켓 세션 Serena checkpoint |
+     ! L163: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 0b 전에 반드시 실행.**
+[로드/무조건] modules/rtm.md                         ~   496 tok
+     · L62: | modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
+     ! L403: 이유: `/fz-code` Phase 0.4 는 `plan-final.md` **하나만** 복원하고 RTM 도 그 문서 안에서 갱신된다(`modules/rtm.md`). 이전 본문과 수정 delta
+[로드/무조건] modules/scope-challenge.md             ~  1038 tok
+     · L65: | modules/scope-challenge.md | Phase 3 GPT 이슈 scope_disposition 분류 + Lead 독립 판정 (additive 자동 번역 차단) |
+     ! L388: 1b. **⛔ Scope Challenge (이슈당 필수)**: 각 GPT 이슈를 플랜에 반영 전 `modules/scope-challenge.md` Q-S1~S4 실행 → `scope_dispos
+[로드/무조건] modules/promotion-ledger.md            ~  9816 tok
+     · L66: | modules/promotion-ledger.md | P1/P2 조치 eligible session 관측 기록 (학습 승격 금지) |
+     ! L158: > 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 미결 안건 
+     ? L235: - [ ] 구조/경계 포크 결단 시 유형 분류 — (가) 코드 read/grep으로 정답이 1개로 좁혀지는 엔지니어링 판단 → 확신 권고+근거+"이의 없으면 진행"(옵션 메뉴화 금지) / (나) 제
+[로드/무조건] modules/fz-gpt-subcommands-core.md     ~  2292 tok
+     ! L79: | Phase 2 | `/fz-gpt verify` | 계획 검증 (독립 스킬 — GPT 교차 검증, `modules/fz-gpt-subcommands-core.md § verify`) |
+     ! L362: ⛔ **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하
+[로드/무조건] modules/sprint-contract.md             ~   771 tok
+     ! L245: - 절차: `modules/sprint-contract.md` §절차 (4-step)
+     ! L246: - Schema: `modules/sprint-contract.md` §Schema (yaml: success_criteria + anti_criteria + scope_boundary)
+[로드/무조건] modules/plan-deep-planning.md          ~  1898 tok
+     ? L264: > **본문**: `modules/plan-deep-planning.md` 참조 (Level 3) — 9 절차 (요구사항 분해, Exhaustive Impact Scan a-f, API 확인, Cl
+     ! L279: > 각 절차 상세는 `modules/plan-deep-planning.md` 참조. 트리밍 비저하 원칙(single source: `guides/prompt-optimization.md` §1 보충
+[로드/무조건] modules/gates.md                       ~  4316 tok
+     ! L352: 3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 + full 모드 — `modules/gates.md` 배선 1):
+     ! L360: 3.2. **⛔ 게이트 판정** (draft 원장이 있을 때 — `modules/gates.md` 배선 1):
+     ? L406: — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?}` 또는 `{kind:'manual', crite
+     ? L411: ⛔ 상대 경로 금지 — 설치된 플러그인에서 대상 레포에 파일이 없어 exit 2로 떨어지고, exit 3만 차단하는 규칙 하에서 **invalid ledger 검증이 fail-open** 된다. 절
+[로드/조건부] modules/plan-direction-preflight.md    ~   807 tok
+     · L67: | modules/plan-direction-preflight.md | Phase 0c·0.5 절차 본문 (Phase 0c·0.5 진입 시 Read — 조건부) |
+     ? L210: > **절차 본문**: `modules/plan-direction-preflight.md` Phase 0c 절 참조 (Level 3) — 3 절차(가정 추출 3 axes · 검증 분류 · probe
+     ? L227: > **절차 본문**: `modules/plan-direction-preflight.md` Phase 0.5 절 참조 (Level 3) — 발동 조건표 4행 + 4 절차(아키텍처 대조 · 6관점 검
+[로드/조건부] modules/plugin-refs.md                 ~  2137 tok
+     ? L84: > 참조: `modules/plugin-refs.md` — Swift Concurrency(계획 시) 섹션
+     ? L326: > 발동 시 행동: `modules/swift-anti-pattern-preblock.md` Read + `modules/plugin-refs.md` 역방향 트리거 섹션 강제 참조 + 3 원칙 점검
+[로드/조건부] modules/team-core.md                   ~  2431 tok
+     ? L90: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출
+[로드/조건부] modules/lead-action-default.md         ~   893 tok
+     ? L223: > **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). verification esc
+[로드/조건부] modules/swift-anti-pattern-preblock.md ~  1322 tok
+     ? L317: > 본문: `modules/swift-anti-pattern-preblock.md` 참조 (Level 3) — 3 원칙(P1 SwiftUI 결정 / P2 Concurrency isolation / 
+     ? L320: - [ ] Swift/iOS 프로젝트 + SwiftUI/Concurrency/패턴 변환 plan? (해당 시 `modules/swift-anti-pattern-preblock.md` Read 후 진
+     ? L326: > 발동 시 행동: `modules/swift-anti-pattern-preblock.md` Read + `modules/plugin-refs.md` 역방향 트리거 섹션 강제 참조 + 3 원칙 점검
+[출처표기  ] modules/cross-validation.md            ~  6974 tok
+     ~ L257: > Phase 0.7 출처: Anthropic Harness Engineering 패턴 B (2026-03) + Plan v3.1.3 §T2-B. 학술 근거: `modules/cross-valida
+[출처표기  ] guides/prompt-optimization.md          ~  7817 tok
+     ~ L279: > 각 절차 상세는 `modules/plan-deep-planning.md` 참조. 트리밍 비저하 원칙(single source: `guides/prompt-optimization.md` §1 보충
+[카탈로그  ] modules/memory-policy.md               ~  1932 tok
+     · L60: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+[카탈로그  ] modules/code-transform-validation.md   ~  1477 tok
+     · L63: | modules/code-transform-validation.md | 코드 변환 동등성 — Transformation Spec + 검증 체크리스트 (패턴 변환 시) |
+[카탈로그  ] modules/uncertainty-verification.md    ~  1304 tok
+     · L64: | modules/uncertainty-verification.md | 기술적 주장 → Default-Deny 검증 (하네스 원칙, Transformation Spec Pilot) |
+
+===== fz-pr =====
+참조 판정: skills/fz-pr/SKILL.md
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+
+===== fz-pr-digest =====
+참조 판정: skills/fz-pr-digest/SKILL.md
+  floor(무조건 로드) 10256 / ceiling(로드 전체) 10256 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/skill-authoring.md              ~  7533 tok
+     ? L59: - Deep Tier 심층 탐색은 네이티브 Workflow 도구 필요 — 미가용 시 SOLO 탐색 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/ski
+     ! L60: - 참조: `guides/skill-authoring.md` §12 (Workflow 규약)
+     ~ L426: Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체, Wave 4 — 결정적 스크립트, P2P SendMessage 없음). 규약: `guides/skill-auth
+     ? L429: - `Workflow({ scriptPath: '{플러그인 루트}/workflows/search-cross-verify.js', args })` — search-symbolic(심볼/Before-A
+[로드/무조건] modules/explanation-protocol.md        ~  2723 tok
+     ! L86: ⛔ **규칙 정본은 `modules/explanation-protocol.md`** 다 — 폐포 5축 · 어휘 등급 · 게이트 G1~G8 ·
+     ! L93: 실행 전 `{플러그인 루트}/modules/explanation-protocol.md` 를 Read 하고 §3(폐포)·§5(게이트)·§10(체크리스트)을
+     ! L239: > ⛔ 매핑 블록 전문 · 구조 근거 본문 · 탐색 경계는 대화에 내지 않는다 (`modules/explanation-protocol.md` §9).
+     ! L261: Tutor: (사양 = modules/explanation-protocol.md §7 · PR 고유분 = references/tutor-mode.md)
+     ! L403: **Tutor**: 위 규칙을 적용하지 않는다. 규칙이 없는 것이 아니라 다른 규칙을 쓴다 — `modules/explanation-protocol.md` §3 폐포가 범위를 정한다.
+
+===== fz-rebase =====
+참조 판정: skills/fz-rebase/SKILL.md
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+
+===== fz-recording =====
+참조 판정: skills/fz-recording/SKILL.md
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+
+===== fz-review =====
+참조 판정: skills/fz-review/SKILL.md
+  floor(무조건 로드) 67608 / ceiling(로드 전체) 74190 ~tokens  · 로드 아님(카탈로그·출처표기) 7840 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/llm-references.md               ~  6452 tok
+     ! L31: > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2
+[로드/무조건] guides/harness-engineering.md          ~ 15650 tok
+     ! L31: > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2
+     ! L253: > 4-N Swift Naming Compliance · 4-O Session-added Assets Application · **4-P Post-State Consistency**(편집 라인이 놓
+[로드/무조건] guides/skill-authoring.md              ~  7533 tok
+     ! L35: > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guid
+     ? L54: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실
+     · L61: | modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
+     ? L90: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출
+     ~ L94: > 스크립트: `workflows/review-live.js` (플러그인 루트 상대) — agents/의 review-arch·review-quality·review-counter 정의를 agent
+     ? L100: 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님
+     ? L102: 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false
+     ? L482: | Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 
+[로드/무조건] modules/memory-guide.md                ~  1230 tok
+     ! L35: > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guid
+[로드/무조건] modules/cross-validation.md            ~  6974 tok
+     ! L43: ⛔ **threshold gating은 `N≥10`에서만** — `N<10`은 `preliminary`(measurement only, verdict 보류)다. **정본 = `modules/cros
+     · L72: | modules/cross-validation.md | 검증 게이트 + 외부 피드백 검증 + 런타임 주장 검증 + Coverage Gate + Reflection Rate 정본 |
+     ! L330: > 요약: `/fz-gpt validate "피드백 반영 검증"` 실행 → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-va
+     ! L359: > 정본: `modules/cross-validation.md §Reflection Rate threshold`. ⛔ N<10에서 Rate 미달을 이유로 반복 루프를 돌리지 않는다 (통계적 소음).
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L55: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+[로드/무조건] modules/session.md                     ~   799 tok
+     · L63: | modules/session.md | 세션 감지, Issue Tracker 연동 |
+     ! L386: 2. **Final Issue Report 생성**: `modules/session.md` 참조
+[로드/무조건] modules/build.md                       ~   585 tok
+     · L64: | modules/build.md | 빌드 검증 |
+     ! L365: 3. **빌드 재검증**: 참조 `modules/build.md` — 빌드 검증 절차
+     ! L374: - [ ] 최종 빌드 성공? (modules/build.md 절차)
+[로드/무조건] modules/execution-modes.md             ~  1160 tok
+     · L65: | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
+     ! L357: └─ NO  → /ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
+[로드/무조건] modules/plugin-refs.md                 ~  2137 tok
+     · L67: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ! L76: > 참조: `modules/plugin-refs.md` — SwiftUI Expert + Swift Concurrency (리뷰 시) 섹션
+[로드/무조건] modules/rtm.md                         ~   496 tok
+     · L68: | modules/rtm.md | RTM 검증 — Phase 4.5에서 Req-ID 상태 확인 |
+     ! L141: 1. ⛔ RTM 기반 기계적 확인 (참조: modules/rtm.md):
+[로드/무조건] modules/safety-audit.md                ~   871 tok
+     · L70: | modules/safety-audit.md | 검증 4-J Concurrency Safety Audit — 역방향 안전성 감사 |
+     ! L248: ### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 
+     ! L314: - [ ] Concurrency Safety Audit 통과? (싱글톤 가변 상태 동기화, 콜백 스레드, @Published 스레드 — modules/safety-audit.md)
+[로드/무조건] modules/review-structural-axes.md      ~  1000 tok
+     · L73: | modules/review-structural-axes.md | 구조 판정 5축 (fz-peer-review 공유). ⛔ Phase 5 전 **Read 후** §3+§4를 `args.struct
+     ! L99: 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / 
+     ! L465: - review-arch 단독 (review-quality 생략) — 아키텍처 적합성만 평가. ⛔ **구조 축은 Lead가 직접 적용** — light는 Workflow 미호출이라 `args.str
+[로드/무조건] modules/context-artifacts.md           ~  4129 tok
+     ! L126: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 1 전에 반드시 실행.**
+[로드/무조건] modules/fz-gpt-bash-hygiene.md         ~  2650 tok
+     ! L218: > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 
+[로드/무조건] modules/review-checks.md               ~  2850 tok
+     ? L241: ### 검증 4-D~4-H: 조건부 정밀 검증 → `modules/review-checks.md`
+     ! L243: > 모듈화/리팩토링/마이그레이션 시 실행. 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
+     ! L250: ### 검증 4-N/4-O/4-P: candidate self-check → `modules/review-checks.md`
+     ! L252: > ⚠️ candidate (evidence 1 session, 활성 강제 X — 5 sessions 후 결정). 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
+     ! L420: 예시 2 — Anti-Pattern 잔존 검증 (검증 4-F → 절차: modules/review-checks.md):
+     ! L424: 예시 3 — Source Fidelity (검증 4-H → 절차: modules/review-checks.md, 리팩토링/마이그레이션):
+[로드/무조건] modules/lead-reasoning.md              ~  2087 tok
+     ! L246: ### 검증 4-I: Implication Coverage (함의 커버리지) — `modules/lead-reasoning.md` 참조. 제거/리팩토링 시 실행. 검증 4는 diff 안(judge)
+[로드/무조건] modules/code-transform-validation.md   ~  1477 tok
+     ! L257: Plan에 Transformation Spec이 포함된 경우, diff가 Spec 요구사항을 준수하는지 검증. 참조: `modules/code-transform-validation.md`
+[로드/무조건] modules/feedback-verification.md       ~   358 tok
+     ! L328: > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
+[로드/무조건] modules/gates.md                       ~  4316 tok
+     ! L332: ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
+[로드/조건부] modules/native-agents.md               ~   966 tok
+     · L69: | modules/native-agents.md | L3 에이전트 스폰 — Phase 5 병렬 검증 |
+     ? L187: ├─ [병렬 4] L3 silent-failure-hunter: 에러 처리 스캔 (조건부 — modules/native-agents.md)
+     ? L188: └─ [병렬 5] L3 type-design-analyzer: 타입 설계 평가 (조건부 — modules/native-agents.md)
+[로드/조건부] modules/team-core.md                   ~  2431 tok
+     ? L90: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출
+[로드/조건부] modules/lead-action-default.md         ~   893 tok
+     ? L326: > **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). 추가 verify round는
+[로드/조건부] modules/fz-gpt-subcommands-core.md     ~  2292 tok
+     ? L344: - 원장이 있으면 **`verify-gates`를 추가 호출**해 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산
+[출처표기  ] guides/skill-testing.md                ~  4604 tok
+     ~ L431: > 근거: `guides/skill-testing.md` §1(테스트 3단계) + §4(테스트 스펙 템플릿). Then은 객관 pass/fail oracle로 기술.
+[카탈로그  ] modules/memory-policy.md               ~  1932 tok
+     · L66: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+[카탈로그  ] modules/uncertainty-verification.md    ~  1304 tok
+     · L71: | modules/uncertainty-verification.md | 4-K enforcement — [verified] 없는 주장 violation 판정 |
+
+===== fz-search =====
+참조 판정: skills/fz-search/SKILL.md
+  floor(무조건 로드) 18094 / ceiling(로드 전체) 25627 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L58: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+[로드/무조건] modules/plugin-refs.md                 ~  2137 tok
+     · L66: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ! L71: > 참조: `modules/plugin-refs.md` — SwiftUI Expert 섹션 (탐색 시 View 구조/패턴 판단 기준)
+[로드/무조건] modules/cross-validation.md            ~  6974 tok
+     · L67: | modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
+     ~ L341: - [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (단위 U 확정 후
+     ! L342: - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation
+[로드/무조건] modules/context-artifacts.md           ~  4129 tok
+     ! L87: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+[로드/조건부] guides/skill-authoring.md              ~  7533 tok
+     · L64: | modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
+     ~ L256: > 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern·**plan-struc
+     ? L262: 2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/search-cross-verify.js', args })` — ⛔ 거부 시 SO
+     ? L377: | failure | `--deep` 실행 중 실패 → `mode:'fallback'` 반환 | 동일 | ⛔ 자동 전환 아님 — `guides/skill-authoring.md` §12 판별 표로
+
+===== fz-skill =====
+참조 판정: skills/fz-skill/SKILL.md
+  floor(무조건 로드) 29575 / ceiling(로드 전체) 29575 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
+   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
+------------------------------------------------------------------------------
+[로드/무조건] guides/prompt-optimization.md          ~  7817 tok
+     ! L56: | 프롬프트 최적화 | `guides/prompt-optimization.md` | 모든 생성/수정 시 |
+     ! L91: 2. `Read(guides/prompt-optimization.md)` → 10대 원칙
+     ! L103: 1. **10대 원칙 체크**: `guides/prompt-optimization.md` 직접 적용 (write 섹션 체크리스트 참조)
+     ! L135: 3. `Read(guides/prompt-optimization.md)` → 수정 시에도 원칙 적용
+     ! L352: - `guides/prompt-optimization.md` — 10대 원칙 (모든 문서)
+[로드/무조건] guides/skill-authoring.md              ~  7533 tok
+     ! L57: | 스킬 작성법 | `guides/skill-authoring.md` | create, update 시 |
+     ! L90: 1. `Read(guides/skill-authoring.md)` → 작성 가이드라인
+     ! L353: - `guides/skill-authoring.md` — 스킬 문서
+[로드/무조건] guides/agent-team-guide.md             ~  4854 tok
+     ! L58: | 에이전트/팀 가이드 | `guides/agent-team-guide.md` | new-agent 시 |
+     ! L183: 2. `Read(guides/agent-team-guide.md)` → 에이전트 작성법
+     ! L354: - `guides/agent-team-guide.md` — 에이전트 문서
+[로드/무조건] modules/governance.md                  ~  2057 tok
+     ! L84: > ⛔ **필수 필드 정본** = `modules/governance.md` § 스킬 최소 기준 (L1 공식 4 + L2 fz 정책 2). ⛔ `team-agents`·`composable`·`mo
+[로드/무조건] modules/pipelines.md                   ~  1582 tok
+     ! L144: | provides/needs 변경 | `modules/pipelines.md` 영향 확인 |
+[로드/무조건] modules/team-registry.md               ~  1128 tok
+     ! L185: - `name`: `{domain}-{specialty}` 형식 (`modules/team-registry.md` 네이밍 규칙 준수)
+     ! L196: 6. **team-registry.md 업데이트**: `modules/team-registry.md`에 에이전트 1줄 추가
+[로드/무조건] guides/skill-testing.md                ~  4604 tok
+     ! L204: 테스트 프레임워크: `guides/skill-testing.md` 참조.
+     ! L239: 단일 트리거 정확도로는 리뷰 품질을 못 잡는다. `guides/skill-testing.md` §6.4 적용.
