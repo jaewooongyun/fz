@@ -88,7 +88,7 @@ metadata:
 > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
-> Collaborative Design 패턴은 `workflows/plan-collaborative.js` 가 평탄화 구현한다.
+> Collaborative Design 패턴의 평탄화 구현은 `workflows/plan-collaborative.js` 로 남아 있다 — **롤백 경로**다(아래 ⛔ 배선 전환). 기본 실행은 아래 스크립트다.
 > **스크립트: `workflows/plan-lean2.js`** (플러그인 루트 상대) — **4콜 2단계**: 전체 플랜 ∥ edge 적대 ∥ impact+arch(동시 3) → 델타 병합.
 > agents/의 plan-structure·plan-edge-case·plan-impact 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > 동시 opus ≤3(Lead 세션 fable은 별도)는 Stage 1 의 3-병렬이 상한을 **정확히** 채워 구조적으로 보장한다. rate-limit 시 순차화 폴백(governance.md).
