@@ -47,7 +47,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -206,6 +206,87 @@ else
     *) UNRUN=$((UNRUN + 1))
        record "G8 문체 fixture" UNRUN "미실행 — fixture 부재 (⛔ PASS 아님)" ;;
   esac
+fi
+
+# ── 4.9 발견 레지스트리 도구 self-test ────────────────────────────
+# ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
+#    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
+# ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
+for FS in eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry; do
+  FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
+  if [ "$FS_CODE" -eq 0 ]; then
+    record "레지스트리 도구 self-test ($FS)" 0 "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)"
+  else
+    record "레지스트리 도구 self-test ($FS)" 1 "⛔ $(printf '%s\n' "$FS_OUT" | grep -E 'FAIL|self-test' | tail -1)"
+  fi
+done
+
+# ── Workflow 계측기 self-test (B6/S5) ─────────────────────────
+# ⛔ 12케이스가 통합 검사에서 **한 번도 돌지 않았다**(§4.9 가 경고한 비대칭 그대로).
+#    `--mcp-audit` 3분 판정도 여기서만 회귀가 잡힌다.
+WM="$(cd "$ROOT" && python3 scripts/fz_wf_metrics.py --self-test 2>&1)"; WM_CODE=$?
+if [ "$WM_CODE" -eq 0 ]; then
+  record "Workflow 계측기 self-test" 0 "$(printf '%s\n' "$WM" | grep -E 'SELFTEST_OK' | tail -1)"
+else
+  record "Workflow 계측기 self-test" 1 "⛔ $(printf '%s\n' "$WM" | grep -E 'FAIL|self-test' | tail -1)"
+fi
+
+# ── Workflow 실패 처방 표 계약 (C2) ───────────────────────────
+# ⛔ self-test 와 별도로 **실제 표**를 검사한다 — self-test 는 검사기가 살아 있는지만 본다.
+FT="$(cd "$ROOT" && python3 scripts/check_failure_table.py 2>&1)"; FT_CODE=$?
+if [ "$FT_CODE" -eq 0 ]; then
+  record "실패 처방 표 계약" 0 "$(printf '%s\n' "$FT" | grep -E 'expected=' | tail -1)"
+else
+  record "실패 처방 표 계약" 1 "⛔ $(printf '%s\n' "$FT" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
+fi
+
+# ── plan 계약 왕복 (B14 / SC1~SC2) ────────────────────────────
+# ⛔ **파일 존재는 계약 복구의 증거가 아니다.** v7 의 done 판정 오라클이
+#    `plan_integrity_check.py` **존재**였고, 그것은 왕복이 도는지를 말해주지 않는다.
+#    이 검사기는 self-test 가 있는데 통합 검사에서 **한 번도 돌지 않았다**(실측 0건 참조).
+PI="$(cd "$ROOT" && python3 scripts/plan_integrity_check.py --self-test tests/fixtures/plan-integrity 2>&1)"; PI_CODE=$?
+if [ "$PI_CODE" -eq 0 ]; then
+  record "plan 계약 왕복" 0 "$(printf '%s\n' "$PI" | grep -E 'INTEGRITY_SELFTEST_OK' | tail -1)"
+else
+  record "plan 계약 왕복" 1 "⛔ $(printf '%s\n' "$PI" | grep -E 'FAIL|SELFTEST' | tail -1)"
+fi
+
+# ── 단일 출처 계약 (C4) ───────────────────────────────────────
+# ⛔ 정수 단언이다 — "있다/없다" 는 두 벌로 늘어난 것을 놓친다.
+SS="$(cd "$ROOT" && python3 scripts/check_single_source.py 2>&1)"; SS_CODE=$?
+if [ "$SS_CODE" -eq 0 ]; then
+  record "단일 출처 계약" 0 "$(printf '%s\n' "$SS" | grep -E 'canonical=' | tail -1)"
+else
+  record "단일 출처 계약" 1 "⛔ $(printf '%s\n' "$SS" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
+fi
+
+# ── 릴리즈 동기 검사기 self-test (B1/S7) ──────────────────────
+# ⛔ **`--self-test` 만 부른다.** 기본·`--release` 모드는 health-check 를 **자기가 호출하므로**
+#    여기서 부르면 무한 재귀가 된다. self-test 경로는 그보다 앞에서 exit 하므로 안전하다.
+RS="$(cd "$ROOT" && bash scripts/check_release_sync.sh --self-test 2>&1)"; RS_CODE=$?
+if [ "$RS_CODE" -eq 0 ]; then
+  record "릴리즈 동기 self-test" 0 "$(printf '%s\n' "$RS" | grep -E '^self-test' | tail -1)"
+else
+  record "릴리즈 동기 self-test" 1 "⛔ $(printf '%s\n' "$RS" | grep -E 'FAIL|self-test|픽스처' | tail -1)"
+fi
+
+# ── 4.10 baseline 기준점 (B15) ────────────────────────────────
+# ⛔ self-test 만 돌린다. `--verify` 를 여기 넣으면 **트리를 고칠 때마다 빨개진다** —
+#    baseline 은 "바뀌면 안 되는 것" 이 아니라 "무엇과 비교하는지" 의 기준점이다
+#    (§3 freshness·§4.8 부하추세와 같은 클래스). 실제 대조는 감량·측정 작업이 명시적으로 부른다.
+FB="$(cd "$ROOT" && python3 scripts/freeze_baseline.py --self-test 2>&1)"; FB_CODE=$?
+if [ "$FB_CODE" -eq 0 ]; then
+  record "baseline 동결기 self-test" 0 "$(printf '%s\n' "$FB" | grep -E '^self-test' | tail -1)"
+else
+  record "baseline 동결기 self-test" 1 "⛔ $(printf '%s\n' "$FB" | grep -E 'FAIL|self-test' | tail -1)"
+fi
+if [ -f "$ROOT/tests/fixtures/baseline-manifest.json" ]; then
+  record "baseline manifest 실재" 0 "$(python3 -c "
+import json;d=json.load(open('$ROOT/tests/fixtures/baseline-manifest.json'))
+print(f\"{d['date']} · 파일 {d['file_count']}건 · HEAD {str(d.get('git_head'))[:8]}\")" 2>/dev/null)"
+else
+  UNRUN=$((UNRUN + 1))
+  record "baseline manifest 실재" UNRUN "미동결 — \`freeze_baseline.py --freeze\` (⛔ PASS 아님)"
 fi
 
 # ── 4.8 하네스 정적 부하 추세 (경고 전용) ─────────────────────────
