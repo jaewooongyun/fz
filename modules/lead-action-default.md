@@ -19,6 +19,39 @@
 
 > 출처: MAST (NeurIPS 2025, arXiv 2503.13657 v3) — FM-2.2 "Fail to ask for clarification" = **6.80% 오류율** [verified: v3 §4 원문 "(FM-2.2, 6.80%)"]. 모호한 요청을 그대로 진행하면 trigger (MAST-Data 7개 프레임워크 / 1642 traces).
 
+## 교훈 번호 정의 색인 (B0-K12)
+
+> ⛔ **왜 있는가**: 플러그인 문서가 `N차` 를 인용하는데 정의가 **Trigger Matrix 5행(31·32·33·40)뿐**이었다.
+> 실측(2026-09-22): 사용 **22종/128회** 중 정의 없음 **18종/91회** — 작성자 외에는 조회할 수 없었다.
+> ⛔ **Trigger Matrix 를 용어집으로 만들지 않는다.** 저 표는 *패턴 → 행동* 이고, 이 절은 *번호 → 내용* 이다.
+> ⛔ 내용은 **개인 메모리 기록에서 추출**했다 — 추측으로 채우지 않았다.
+>
+> 술어(재현용): 두 자리 + 뒤에 `원` 아님 + `차원`·`레버`·`resume`·`재시도` 줄 제외.
+> `1차 레버`·`5차원 복잡도`·`재시도 2차` 는 교훈 참조가 **아니다** — 첫 측정이 이것들을 긁어 184회로 부풀었다.
+
+| 번호 | 내용 (한 줄) | 근거 |
+|---|---|---|
+| 10차 | Fable 5 사용 재개 + B안 가동, 재배선은 보류 | 세션 기록 2026-07-05 |
+| 11차 | 재배선 완료 — 생산은 `code-pair` 워커 전담, Lead 는 적용·검증 | 세션 기록 2026-07-06 (v4.18.0) |
+| 13차 | thought-terminator 방어 — 결론을 닫는 문구로 탐색을 멈추지 않는다 | `[[feedback_thought_terminator_defense]]` |
+| 15차 | 싱글톤 future safety — 현재 호출 1곳이라는 이유로 안전 판정 금지 | 세션 기록 |
+| 16차 | Origin 함정 + 실측 누락 — 출처를 확인하지 않고 수치를 주장 | 세션 기록 |
+| 17차 | fz 생태계 메타 갭 — 스킬이 자기 생태계를 점검하는 자리가 없다 | 세션 기록 |
+| 18차 | Scope Inflation 방어 — 분석 범위가 요청을 넘어 부푼다 | 세션 기록 (v4 ISSUE-016) |
+| 19차 | self-review blind spot family(16·17·19) — 분석은 맞는데 **적용 범위** 판단이 틀린다 | 세션 기록 |
+| 23차 | GPT 단독 발견 재현 — cross-model 이 마지막 안전망 | 세션 기록 |
+| 29차 | GPT CLI(`codex exec`) stdin hang — `< /dev/null` + `--skip-git-repo-check` 필요 | `modules/fz-gpt-bash-hygiene.md` §2 |
+| 30차 | `[projects.<path>] trust_level = "trusted"` 없으면 profile sandbox 무효 | `modules/fz-gpt-bash-hygiene.md` §5 |
+| 34차 | 리팩토링 옵션을 **첫 라운드에** 시각화한다 | 세션 기록 |
+| 35차 | Calibrate-from-Real — 상상한 계획이 아니라 실물에서 보정한다 | 세션 기록 |
+| 36차 | 팀 공유 영역·훅 우회는 **명시 승인** 후에만 | 세션 기록 |
+| 38차 | SwiftUI `_ConditionalContent` re-mount — 정적 검증의 한계, 실기기가 안전망 | `[[feedback_swiftui_conditional_remount]]` |
+| 41차 | Reuse-First — 새로 만들기 전에 기존 인프라를 찾는다 | `[[feedback_reuse_first_default]]` |
+| 42차 | 디자인 frame **실측** — figma 수치를 눈대중으로 옮기지 않는다 | `[[feedback_design_spec_empirical_comparison]]` |
+| 45차 | 템플릿 권위 편향 — 형제·템플릿이 근거를 대신하지 않는다 | `[[feedback_template_authority_bias]]` |
+
+⛔ **새 번호를 인용하면 이 표에 한 줄을 함께 넣는다.** 넣지 않으면 그 인용은 작성자 외에는 조회 불가다.
+
 ## Genuine-Need Pause (Fable 5 checkpoint)
 
 > 대상 = **intra-pipeline runtime pause**만 (스텝 진행 중 재확인 · promise-종료 시점). 아래 allowlist의 명시 승인 게이트는 별개 규율.
