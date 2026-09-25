@@ -84,7 +84,7 @@ metadata:
 |------|------|
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/complexity.md | 5차원 복잡도 → 모드 결정 |
-| modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리 L1~L4) |
+| docs/history/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리 L1~L4) |
 | modules/team-registry.md | 에이전트 + 모델 자동 결정 |
 | modules/cross-validation.md | 검증 게이트 자동 삽입 |
 | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
@@ -340,7 +340,7 @@ commit/pr 전 → ✓ gpt check (TEAM)
 ### 5.2 Workflow Execution
 
 > 멀티에이전트 실행은 네이티브 Workflow 결정적 스크립트가 소유한다 (TEAM 일몰, Wave 4). 스크립트가 fan-out/수렴/라운드를 구현 — P2P SendMessage 없음.
-> 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본). ⛔ `modules/patterns/`는 라운드 의미론의 **설계 출처**일 뿐 폴백 실행 절차가 아니다.
+> 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본). ⛔ `docs/history/patterns/`는 라운드 의미론의 **설계 출처**일 뿐 폴백 실행 절차가 아니다.
 
 각 스킬은 자신의 `workflows/{skill}-{pattern}.js`를 소유한다. Lead는 스킬의 Workflow를 호출하고 반환(구조화 출력)을 통합한다. Lead는 퍼실리테이터 (호출 + 게이트 실행 + 통합).
 

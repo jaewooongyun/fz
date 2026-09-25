@@ -350,11 +350,11 @@ await agent(prompt, { label: 'stage1-impl', agentType: 'fz:impl-correctness',
 
 | 패턴 | 적용 스킬 | 핵심 동작 | 패턴 파일 |
 |------|-----------|-----------|----------|
-| Collaborative Design | fz-plan | 만들면서 토론 | `modules/patterns/collaborative.md` |
-| Pair Programming | fz-code | 구현 중 실시간 피드백 | `modules/patterns/pair-programming.md` |
-| Live Review | fz-review | 분석하면서 발견 공유 | `modules/patterns/live-review.md` |
-| Adversarial Discovery | fz-discover | 만들고 부수며 제약 발견 | `modules/patterns/adversarial.md` |
-| Cross-Verify | fz-search | 발견 즉시 교차 확인 | `modules/patterns/cross-verify.md` |
+| Collaborative Design | fz-plan | 만들면서 토론 | `docs/history/patterns/collaborative.md` |
+| Pair Programming | fz-code | 구현 중 실시간 피드백 | `docs/history/patterns/pair-programming.md` |
+| Live Review | fz-review | 분석하면서 발견 공유 | `docs/history/patterns/live-review.md` |
+| Adversarial Discovery | fz-discover | 만들고 부수며 제약 발견 | `docs/history/patterns/adversarial.md` |
+| Cross-Verify | fz-search | 발견 즉시 교차 확인 | `docs/history/patterns/cross-verify.md` |
 
 자세한 내용: `guides/agent-team-guide.md`
 
@@ -599,7 +599,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 ### ⛔ 실패 복구 사다리 (`mode:'fallback'` · 스톨 — **본 절이 정본**)
 
-> 신설 근거(2026-08-09): 이전에는 5개 스킬이 폴백 절차로 `modules/team-core.md` + `modules/patterns/`(679줄)를 지목했으나 그 내용은 `TeamCreate`/`SendMessage` **P2P 절차**였다 — SOLO에는 에이전트가 없어 **실행 자체가 불가능**했다. 그런데 실측상 실패는 2회 발생하고 **두 번 다 아래 사다리로 복구**됐다(`experiment-log.md` §5.7 fz-code #1 · fz-review #8). `team-core` 사용 이력은 **0건**이다.
+> 신설 근거(2026-08-09): 이전에는 5개 스킬이 폴백 절차로 `docs/history/team-core.md` + `docs/history/patterns/`(679줄)를 지목했으나 그 내용은 `TeamCreate`/`SendMessage` **P2P 절차**였다 — SOLO에는 에이전트가 없어 **실행 자체가 불가능**했다. 그런데 실측상 실패는 2회 발생하고 **두 번 다 아래 사다리로 복구**됐다(`experiment-log.md` §5.7 fz-code #1 · fz-review #8). `team-core` 사용 이력은 **0건**이다.
 > 즉 본 절은 새 프로토콜을 발명하는 것이 아니라 **이미 작동한 복구 경로를 성문화**한다.
 
 | 단계 | 조건 | 행동 | 실측 선례 |
@@ -613,7 +613,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 - ⛔ **`resume`은 동일 Claude Code 세션 내에서만** 동작한다 — 세션이 끝났으면 L3를 건너뛰고 티켓 폴더 아티팩트로 복원한다
 - ⛔ **재시도는 `buildFeedback` 등을 args에 넣어 캐시 키를 바꾼다** (resume 비의존 경로)
 - ⛔ **진단은 추측 금지** — `<transcriptDir>/journal.jsonl`이 agent별 실제 반환값을 기록한다. 빈 결과·이상 결과는 journal을 먼저 Read
-- `modules/team-core.md` + `modules/patterns/*.md`는 **라운드 의미론의 역사적 출처**다 — 폴백 실행 절차로 참조하지 않는다
+- `docs/history/team-core.md` + `docs/history/patterns/*.md`는 **라운드 의미론의 역사적 출처**다 — 폴백 실행 절차로 참조하지 않는다
 
 ### intentContext 규약 (과제 목적 전달)
 

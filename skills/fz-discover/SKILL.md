@@ -67,7 +67,7 @@ metadata:
 | 모듈 | 용도 |
 |------|------|
 | guides/skill-authoring.md §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본). ⛔ `team-core.md`는 역사적 출처 — 실행 절차 아님 |
-| modules/patterns/adversarial.md | Tree Search Adversarial Discovery — **설계 출처**(Workflow 평탄화 원본). ⛔ 폴백 실행 절차 아님 |
+| docs/history/patterns/adversarial.md | Tree Search Adversarial Discovery — **설계 출처**(Workflow 평탄화 원본). ⛔ 폴백 실행 절차 아님 |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
 | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
@@ -93,7 +93,7 @@ metadata:
 ## 팀 에이전트 모드 (Workflow 오케스트레이션 — pilot)
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 pilot.
-> Adversarial Constraint Discovery 패턴의 canonical은 `modules/patterns/adversarial.md` — 라운드 의미론(만들고-부수기)은 스크립트가 구현하며, 패턴 문서는 보존(재배치이지 삭제 아님).
+> Adversarial Constraint Discovery 패턴의 canonical은 `docs/history/patterns/adversarial.md` — 라운드 의미론(만들고-부수기)은 스크립트가 구현하며, 패턴 문서는 보존(재배치이지 삭제 아님).
 > 스크립트: `workflows/discover-adversarial.js` (플러그인 루트 상대 경로) — agents/의 plan-structure·review-arch 정의를 agentType(`fz:` 네임스페이스)으로 재사용.
 
 ### 발동 조건
@@ -122,7 +122,7 @@ metadata:
 | 합의/불합의 명시 | `conditions[].mutability`(locked/unlocked) + evidence·confidence로 표현 |
 
 > Workflow 추가 보장: 실패 에이전트 = null 명시(silent fail 불가) · 출력 스키마 강제 · resume 캐시 · 종료 핸드셰이크 부재(자동 정리). Reflection Rate는 cross-check 포함 시만 해당(--deep GPT 후행 검증).
-> 통신 기록: `discover-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 메커니즘 일몰 여부는 확산 판정 시 결정.
+> 통신 기록: `discover-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 미결 안건 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
 
 ---
 

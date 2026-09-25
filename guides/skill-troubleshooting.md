@@ -200,24 +200,29 @@ User prompt에 추가:
 
 ### 3.4 에이전트 통신 실패
 
-**증상:** 팀 에이전트 간 통신 타임아웃, 결과 누락.
+**증상:** Workflow 워커의 반환 누락·스톨, 렌즈 결과 부재.
 
-**솔루션:**
-- Context 소진 시 새 에이전트를 스폰한다 (기존 에이전트 컨텍스트 리셋)
-- 메시지 크기를 줄인다 (핵심 결과만 전달)
-- SendMessage의 summary 필드를 활용한다
+⛔ **2026-09-18 정정**: 이전 판은 `SendMessage` 의 summary 필드를 처방했다 — 그 도구는 v2.1.178부터
+**존재하지 않는다**(`modules/governance.md` § Kill-Switch). 부재 도구를 지시하는 트러블슈팅은
+독자를 막다른 길로 보낸다.
 
-### 3.4b TEAM 프로토콜 위반
+**솔루션 (Workflow 경로):**
+- ⛔ **추측 금지 — `<transcriptDir>/journal.jsonl` 을 먼저 Read** 한다. agent 별 실제 반환값이 1줄씩 기록된다
+- 렌즈 회계를 본다: `lensesCompleted` < `lensesExpected` 면 `reviewVerdict` 가 `'partial'` 이고 그 관점은 **적용되지 않았다**
+- 대형 입력은 args 가 아니라 **파일 경로**로 전달한다 (`guides/skill-authoring.md` §12 배치·호출 규약)
+- 스톨·일시 장애는 **`resume` 우선** — 실패 분기는 §12 판별 표 6종을 따른다
+
+### 3.4b 다관점 검토 프로토콜 위반 (Workflow 경로)
 
 **증상:** 에이전트가 동조 수렴하거나, 독립 분석 없이 합의, Gate 스킵.
 
 | 위반 | 원인 | 대응 |
 |------|------|------|
-| 동조 수렴 (모든 에이전트 동일 의견) | Round 1 독립성 미준수 | Task Brief에 "Round 1: 다른 에이전트 초안 참조 금지" 명시 |
+| 동조 수렴 (모든 렌즈 동일 의견) | 초기 생성 호출에 피어 데이터가 주입됨 | ⛔ Workflow 는 **구조적으로 보장**한다 — 초기 생성 호출에 피어 산출을 넣지 않는다(`skill-authoring.md` §12 § TEAM 추론 품질 3원칙). 주입됐다면 스크립트 결함이다 |
 | **동종 모델 맹점** (3/3 동일 모델이 동일 이슈 미탐지) | 같은 모델은 같은 지식 갭 공유 | GPT(이종 모델) cross-validation 필수. "diff에 부재가 나타나지 않는" 패턴(상속 체인, optional DI, willSet 연쇄)에서 발생. PR#3478 교훈 참조 |
 | Gate 스킵 | Lead가 Gate를 "선택"으로 인식 | cross-validation.md Gate 절차적 강제 참조 |
-| 합의/불합의 미보고 | Round 0.5 규칙 누락 | Task Brief에 "[합의]/[불합의] 마커 필수" 포함 |
-| Task Brief 미구조화 | 역할/목표/제약 모호 | 5요소 형식 적용: [Role] [Context] [Goal] [Constraints] [Deliverable] |
+| 합의/불합의 미보고 | 반환 schema 에 표현 필드 부재 | **schema 필드로 표현**한다(mutability/severity + evidence) — 프롬프트 요청이 아니라 스키마가 강제한다 |
+| 프롬프트 미구조화 | 역할/목표/제약 모호 | OVERRIDE 블록 + schema(=Deliverable) 로 5요소를 채운다 (`skill-authoring.md` §12 § 표준 패턴 3종) |
 
 ### 3.5 Codex CLI 관련 에러
 

@@ -196,7 +196,7 @@ metadata:
 ## 팀 에이전트 모드 (복잡한 버그 — Workflow 오케스트레이션, Wave 3)
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체. 복잡한 버그(여러 파일, 아키텍처 영향)에서 활성화.
-> Pair Programming(경량) canonical: `modules/patterns/pair-programming.md` (보존 — 평탄화 출처).
+> Pair Programming(경량) canonical: `docs/history/patterns/pair-programming.md` (보존 — 평탄화 출처).
 > 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.md` §12.
 > ⛔ 책임 재배분 (사용자 승인): 에이전트는 changeset JSON만 반환 — **Lead가 적용 + 빌드 검증**.
 

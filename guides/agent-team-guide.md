@@ -217,7 +217,7 @@ GOOD (Mesh / Peer-to-Peer):
 
 ## 3. 통신 패턴 5가지
 
-> 상세 구현(pseudocode 흐름)은 `modules/patterns/`가 canonical. 아래는 빠른 매핑만 — 중복 pseudocode는 patterns/로 위임 (hot-path 슬림화).
+> 상세 구현(pseudocode 흐름)은 `docs/history/patterns/`가 canonical. 아래는 빠른 매핑만 — 중복 pseudocode는 patterns/로 위임 (hot-path 슬림화).
 
 | 패턴 | 스킬 | 핵심 (에이전트 간 직접 대화) | 상세 |
 |------|------|------------------------------|------|
@@ -231,7 +231,7 @@ GOOD (Mesh / Peer-to-Peer):
 > - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:78` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — 6개 워크플로가 전 패턴을 덮는다.
 > - `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 **존재하지 않으며**, fz 실행 경로에도 호출부가 **0건**이다 [verified: `grep -rn "TeamCreate(" workflows/ scripts/` → 0]. 본 가이드의 TeamCreate 예시(§2/§3/§7)는 **역사적 의미론 기록**이며 SOLO 폴백 프로토콜 참조용으로만 유효하다.
 
-공통: 3명+ Star 토폴로지는 Supporting 발견을 Primary 경유 전달, 합의 후 Lead 보고. 라운드·토폴로지 상세는 `modules/team-core.md`.
+공통: 3명+ Star 토폴로지는 Supporting 발견을 Primary 경유 전달, 합의 후 Lead 보고. 라운드·토폴로지 상세는 `docs/history/team-core.md`.
 
 ---
 

@@ -12,7 +12,7 @@
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
 //   Workflow 외부(Lead 책임 유지): L3 통합 / review-correctness(RTM 시 Phase 4.5) / GPT validate(Phase 5.5) / wall-clock.
 //
-// [설계 — modules/patterns/live-review.md 평탄화]
+// [설계 — docs/history/patterns/live-review.md 평탄화]
 //   Stage1 독립 병렬: review-arch(opus) + review-quality(opus) — Round 1 독립성 (opus 동시 2 + Lead=fable).
 //   Stage2 교차: 상대 findings에 id-기반 severity 조정/FP 판정 (live-review Round 2 동형, opus 2).
 //   Stage3 counter: DA 패스 — findings 반론 + okAreas 도전 (live-review.md L16 기존 Supporting — ablation Verifier 재판정 레이어 아님).

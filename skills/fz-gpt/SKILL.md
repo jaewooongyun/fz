@@ -104,7 +104,7 @@ codex exec --skill openai-docs "GPT-5.5 prompting guide의 preamble 패턴 핵�
 
 ## 팀 에이전트 모드
 
-참조: `modules/team-core.md` -- Sub Agent 프로토콜. ⛔ `composable` frontmatter는 2026-08-09 제거(소비처 0) — 파이프라인 연결은 `provides`/`needs`가 결정한다
+참조: `docs/history/team-core.md` -- Sub Agent 프로토콜. ⛔ `composable` frontmatter는 2026-08-09 제거(소비처 0) — 파이프라인 연결은 `provides`/`needs`가 결정한다
 
 ---
 

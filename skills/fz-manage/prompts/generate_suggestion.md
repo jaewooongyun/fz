@@ -7,7 +7,7 @@
 ## 사용법
 
 이 프롬프트는 fz-manage `reflect-to-module` 서브커맨드 내부에서 Claude에게 전달됩니다.
-Lead가 다음 변수들을 채워서 Claude에게 SendMessage로 전달:
+Lead가 다음 변수들을 채워 프롬프트에 주입한다 (⛔ `SendMessage` 아님 — 그 도구는 v2.1.178부터 부재다):
 
 - `{{PARSED_LESSON}}`: parse_memory.py JSON 출력
 - `{{SCORED_MODULES}}`: score_relevance.py JSON 출력 (results filtered ≥ threshold)

@@ -56,8 +56,8 @@ metadata:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
-| modules/patterns/live-review.md | Live Review (review-arch ↔ review-quality 발견 즉시 공유) (UC-11, v4.7.1) |
+| docs/history/patterns/ | 라운드 의미론의 **역사적 출처** (⛔ 폴백 실행 절차 아님 — 실패 복구는 `guides/skill-authoring.md` §12 실패 복구 사다리) |
+| docs/history/patterns/live-review.md | Live Review (review-arch ↔ review-quality 발견 즉시 공유) (UC-11, v4.7.1) |
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
@@ -85,10 +85,10 @@ metadata:
 | 7 | `/sc:sc-test` | 최종 테스트 검증 |
 ## 팀 에이전트 모드 (Review Squad)
 
-> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `modules/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
+> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4). ⛔ `docs/history/team-core.md`는 역사적 출처 — 실행 절차로 참조하지 않는다
 
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
-> Live Review 패턴 canonical: `modules/patterns/live-review.md` (보존 — 라운드 의미론은 스크립트가 구현).
+> Live Review 패턴 canonical: `docs/history/patterns/live-review.md` (보존 — 라운드 의미론은 스크립트가 구현).
 > 스크립트: `workflows/review-live.js` (플러그인 루트 상대) — agents/의 review-arch·review-quality·review-counter 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 
 ### 실행 절차 (Lead)

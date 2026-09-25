@@ -980,10 +980,15 @@ Q6: 에이전트가 실패했을 때 복구 경로가 있는가? (회복력)
   - 파일 형식 규약이 암묵적 (스키마 없음)
 ```
 
-### P2P SendMessage의 구체적 구현 (fz 생태계)
+### P2P SendMessage의 구체적 구현 (fz 생태계 — ⛔ 2026-07 이전 사료)
+
+⛔ **지금 이렇게 하지 않는다.** Wave 1~4 에서 이 메커니즘은 결정적 Workflow 스크립트
+(`workflows/*.js`)로 전부 대체됐고 P2P `SendMessage` 배선은 남아 있지 않다. 아래는 위의
+파일 기반 구현과 **나란히 비교하기 위한 설계 기록**이지 실행 절차가 아니다 — 현행 절차는
+`guides/skill-authoring.md` §12 다.
 
 ```
-통신 프로토콜:
+통신 프로토콜(당시):
   1. TeamCreate("code-feature") → 에이전트 N명 스폰
   2. 각 에이전트에게 피어 목록 + 통신 규칙 전달
   3. impl-correctness: "UseCase에서 두 Repo 조합, Workflow로 빼야 할까요?"

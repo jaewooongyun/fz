@@ -16,7 +16,7 @@
 //     Phase 0.7 Sprint Contract(GPT 회복 시) / GPT verify(Phase 2) / memory-curator recall /
 //     plan-v{N}.md 파일 기록 / direction_escalation 사용자 대화 / wall-clock 측정.
 //
-// [설계 — modules/patterns/collaborative.md 평탄화]
+// [설계 — docs/history/patterns/collaborative.md 평탄화]
 //   Stage 0 direction(fable): 6관점 판정. PROCEED → 즉시 진행 / 비-PROCEED → 반박 왕복 1회 (+2 call).
 //     조건부화 정당화: 원 패턴(L28-33)은 무조건 반박 왕복이나, PROCEED 경로의 반박은 판정 불변
 //     dead-call이므로 제거 — 비-PROCEED만 판정 반전 기회 실재 (검증 승인 판정).
