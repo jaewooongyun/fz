@@ -1,5 +1,17 @@
 # Changelog
 
+### v4.39.1 (2026-09-25) — 마지막 검증이 마지막 편집보다 앞섰다 [PATCH]
+
+v4.39.0 발행 뒤 재리뷰가 찾은 문서 사실 오류를 고친다. 동작 변경은 없다.
+
+**v4.39.0 노트** — 게이트 재실행 뒤 5절로 줄이며 `docs/releases/_TEMPLATE.md` 를 벗어나 템플릿 게이트 B8 이 깨진 채 발행됐다.
+템플릿 6절로 되돌리고 검증 절을 사실대로 고쳤다: 게이트는 자동 33 재실행 + C0 수동 확인 · Reflection 70% 는 임계 80% 미달(`needs_work`) ·
+기능 단위 10커밋 중 5개는 단독 health-check 실패(F-310, 이력은 다시 쓰지 않는다) · advisor 관측 분모(실행 20/102 · 워커 87/519) · 미검증 항목 복원.
+
+**effort 생략 서술** — "세션 상속" 4곳(skill-authoring §12 · model-guide 2곳 · `lint-model-explicit.sh` 주석)을 실측대로
+"워커 모델 기본(Opus 5.5 = `medium`)" 으로. **plan 스크립트** — agent-team-guide·fz-plan 에서 `plan-collaborative.js` 는 롤백 경로, 기본은 `plan-lean2.js`.
+**README** — v4.38.0 한 줄 요약의 "다섯 곳을 전부 health-check 에 배선" 을 원 노트 서술로. **CHANGELOG v4.39.0** — advisor 문장을 관측 범위로 한정.
+
 ### v4.39.0 (2026-09-25) — 별칭은 새 모델을 따라갔고 단가표는 따라가지 않았다 [MINOR]
 
 2026-09-22 Claude Opus 5.5(`claude-opus-5-5`)·GPT-6 Sol 출시 대응. `opus` 별칭은 Claude Code 2.1.280 에서
@@ -27,7 +39,7 @@ GPT effort 는 모델별로 적는다 — CLI `models_cache` 실측과 API 문�
 exec·resume·review 라이브 확인). 실패 run 뒤 이전 `${OUT}.session` 이 남던 결함도 고쳤다. ⚠️ CLI 0.157 은 `sandbox_permissions` 를 무시한다.
 
 **advisor 억제** — 워커는 세션 advisor 를 상속하고 끄는 네이티브 수단이 없다. 워크플로 OVERRIDE 에 금지 문구 +
-`scripts/check_wf_advisor_ban.py`(블록 단위 판정). Lead 만 advisor 를 쓴다.
+`scripts/check_wf_advisor_ban.py`(블록 단위 판정). 워커 호출은 프롬프트로 억제한다 — 문구가 실린 관측 집단(실행 20회)에서 0회였다(비무작위, `modules/governance.md` 운용 규칙 5).
 
 **TEAM 사료 삭제** — 사용자 결정(2026-09-25): `docs/history/` 6파일(701줄) 삭제. 참조 61행을 행별 원장으로
 정리한 뒤 지웠다. `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰.
