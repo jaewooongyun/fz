@@ -145,16 +145,19 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.38.0
+## What's New — v4.39.0
 
-**검사기는 있었고 부르는 곳이 없었다.** 호출처가 0건인 검사기·게이트·플래그가 다섯 곳 있었다.
-완료 근거와 측정 대상이 달랐고(`F-292`), 0건만 의심하고 큰 수는 의심하지 않았다(`F-293`).
+**별칭은 새 모델을 따라갔고 단가표는 따라가지 않았다.** Opus 5.5·GPT-6 Sol 출시에 `opus` 별칭은 자동으로 따라갔지만,
+모델 이름에 기대는 텔레메트리 단가·최신성 lint·문서는 Opus 5 에 머물렀다.
 
-- 검사기 신설 15 · 수정 6, 전부 `health-check` 에 배선
-- Workflow `fallback` 을 SOLO 직행 대신 판별 표 6종으로 분기
-- 리뷰 게이트: 증상 관측(4.7-S) · 형제 관례 양방향 · 단일 도구 0건 삭제 권고 금지
-- 게이트 `TOOLS`: 도구 부재는 UNRUN · 도구 인벤토리 단일 출처
+- 텔레메트리 Opus 5.5 단가 · 미등록 모델은 옛 단가 대신 경고
+- GPT 교차검증: GPT-6 Sol · 래퍼 `resume --session-file` · 모든 호출 read-only 강제
+- 워크플로 워커의 advisor 호출 금지 + 누락 검사기
+- fz 표면의 옛 CLI 호칭을 GPT 로 통일 · TEAM 사료 삭제
 
+→ [릴리즈 노트](docs/releases/v4.39.0.md)
+
+**v4.38.0 — 검사기는 있었고 부르는 곳이 없었다.** 호출처가 0건인 검사기·게이트·플래그 다섯 곳을 전부 `health-check` 에 배선했다.
 → [릴리즈 노트](docs/releases/v4.38.0.md)
 
 **v4.37.0 — 참조 탐색이 63%를 놓치고 있었다.** Swift conformance 구현을 못 찾는 `find_referencing_symbols`(recall 36.9%) 대신 codegraph(88.8%)를 참조 탐색 Primary 로 옮겼다.

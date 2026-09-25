@@ -18,7 +18,7 @@ harness-engineering · skill-authoring · skill-troubleshooting · skill-testing
 gpt-strategy · fz-gpt. thinking 끄기 불가(400) · forced `tool_choice` 400 · 기본 effort `medium` · Opus 5 지침 상속.
 GPT effort 는 모델별로 적는다 — CLI `models_cache` 실측과 API 문서가 다르다(`none`).
 
-**Track C — GPT 표면에서 codex 명칭 제거** — raw CLI 예시를 `scripts/gpt-exec.sh` 호출로 전환(`resume --session-file`
+**Track C — GPT 표면에서 옛 CLI 호칭 제거** — raw CLI 예시를 `scripts/gpt-exec.sh` 호출로 전환(`resume --session-file`
 신설 · `--last` 레포 0), 산문·주석은 GPT/GPT CLI. 보존은 도구가 깨지는 것(경로·트리거·`/codex:` 네임스페이스·
 `Bash(codex *)`)과 사실이 거짓이 되는 것뿐. `scripts/check_gpt_surface.py` 신설 — 범주 토큰 + `tests/fixtures/gpt-surface-keep.tsv` 로 재유입 차단, health-check 배선 (이행용 원장 모드는 레포 밖 입력이 필요해 작업 폴더 도구로 분리 — fz-review S1). `--add-dir` 은 **쓰기** 디렉토리 플래그라(CLI help 실측) final·review 는 review 모드 그대로 둔다 — read-only 도 전 디스크를 읽는다.
 
