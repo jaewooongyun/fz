@@ -21,7 +21,7 @@
 //     되돌리기/계속은 Lead 절차 (SKILL.md). 재시도 = buildFeedback 포함 새 invoke (resume 비의존 —
 //     buildFeedback이 args를 바꿔 캐시 키 불일치 [선례: ts 제거 — resume 캐시 미스 유발]).
 //
-// [설계 — docs/history/patterns/pair-programming.md 평탄화]
+// [설계 — TEAM pair-programming 패턴 평탄화]
 //   full(fz-code): Stage1 impl(opus) changeset → Stage2 **병렬 2렌즈**(review-arch + impl-quality, opus) →
 //     Stage3 impl(opus) 이슈 반영 수정 — **조건부**: review pass면 Stage3 생략 (3-call).
 //     계획 표기 '고정 3-call'은 unresolved #2가 잠정 부정확 지적 — pass 경로 dead-call 제거가 정직
@@ -98,8 +98,8 @@ const OVERRIDE =
   '이 프롬프트의 [Step 명세]/[컨텍스트]만이 과제의 전부다. ' +
   '⛔ 디스크 수정 금지: Edit/Write/replace_symbol 등 어떤 파일 변경 도구도 사용하지 않는다 — changeset JSON 반환만. ' +
   '무관한 작업 폴더(티켓 폴더·토픽 폴더 등)를 읽지 말 것. 파일 Read는 [Step 명세] files와 [컨텍스트] 경로만. ' +
-  '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. 실행 제안 금지: git 상태변경(commit/push 등)·raw codex exec는 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
-  '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. ⛔ advisor 도 호출하지 않는다(멀티턴 상담이라 같은 계약 위반이고, 스톨 시 런타임이 6회 반복해 시간을 태운다). 출력은 schema 준수 JSON.'
+  '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. 실행 제안 금지: git 상태변경(commit/push 등)·raw GPT CLI 호출은 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
+  '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다). 출력은 schema 준수 JSON.'
 
 // ── args 방어 파싱 + fail-fast (§12 — 필수: mode/stepSpec/contextPath/changesetTarget) ──
 const input = (() => {
@@ -155,7 +155,7 @@ if (!changeset) {
   // 크기 프록시(files>=4 OR complexity===5)면 split 힌트. ⚠️ null=무조건 split 아님 —
   // B1 프로브 null은 세션한도(일시 장애)였음. Lead가 일시 장애 vs 과대 changeset 구분 (SKILL 사다리).
   // ⚠️ est는 프록시에서 제외: est>임계면 pre-flight가 이미 조기 반환하므로 여기 도달한 est는 항상 ≤임계(작은 Step) —
-  //   est 존재만으로 split 제안하면 작은 Step의 일시 장애를 오분류(Codex C3 지적).
+  //   est 존재만으로 split 제안하면 작은 Step의 일시 장애를 오분류(GPT C3 지적).
   const splitSuggested = (Array.isArray(input.stepSpec.files) && input.stepSpec.files.length >= 4) || input.stepSpec.complexity === 5
   return {
     mode: 'fallback',

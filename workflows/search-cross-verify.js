@@ -8,7 +8,7 @@
 //   반환: { mode:'workflow', results:[{file,line,symbol,kind,note,sources,confidence}], metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후. wall-clock은 Lead 측정.
 //
-// [설계 — docs/history/patterns/cross-verify.md 평탄화]
+// [설계 — TEAM cross-verify 패턴 평탄화]
 //   Stage1 독립 병렬: search-symbolic(심볼) + search-pattern(텍스트) — Round 1 독립성 구조 보장.
 //   Stage2 교차: 각자 상대 결과를 받아 FP 판정/보완 (cross-verify Round 2 동형).
 //   Stage3 병합: plan-structure 렌즈 + fable (동일성 판정 = 해석 작업 — §11/§12 분류). 3-Tier 수렴 merge 판단 지점.
@@ -85,8 +85,8 @@ const OVERRIDE =
   '에이전트 정의의 Phase 절차·티켓 폴더(WORK_DIR)·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
   '이 프롬프트의 [질의]/[탐색 범위]만이 과제의 전부다. ' +
   '무관한 작업 폴더(티켓 폴더·토픽 폴더 등)를 읽지 말 것. 탐색은 [탐색 범위]가 지시한 경로만. ' +
-  '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. 실행 제안 금지: git 상태변경(commit/push 등)·raw codex exec는 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
-  '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. 출력은 schema 준수 JSON.'
+  '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. 실행 제안 금지: git 상태변경(commit/push 등)·raw GPT CLI 호출은 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
+  '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다). 출력은 schema 준수 JSON.'
 
 // ── args 방어 파싱 (§12 표준 패턴 2 — scriptPath 호출 시 args는 JSON 문자열 도착) ──
 const input = (() => {
