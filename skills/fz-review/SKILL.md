@@ -236,6 +236,12 @@ fz-gpt가 수행하는 작업:
 - [ ] 이전 심볼 사용처 0 → 삭제 대상?
 - [ ] deprecated 코드 중 사용처 0?
 - [ ] 삭제 대상의 의존 코드도 정리?
+
+⛔ 「사용처 0」은 부재 주장이고 이 절차의 결론은 **삭제 권고**다. 한 도구의 0건으로 내지 않는다 —
+   `find_referencing_symbols` 는 실측 recall 36.9% · **0건 반환 19%** 다(프로토콜 선언과 conformance
+   구현은 서로 다른 선언이라 참조 관계가 아니다). codegraph `implements` 또는 `Grep` 전수와 교차하고,
+   교차 결과를 근거에 함께 적는다. 미교차 0건은 「삭제 권고」가 아니라 「확인 필요」로 낸다.
+   정본: `modules/cross-validation.md` § Negative-Result Gate
 ```
 
 ### 검증 4-D~4-H: 조건부 정밀 검증 → `modules/review-checks.md`
@@ -319,6 +325,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] ⛔ Default-Deny 통과? (Spec 기술적 주장에 [verified] 태그 존재)
 - [ ] ⚠️ Swift Naming Compliance 권장 통과? (검증 4-N **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
 - [ ] ⚠️ Session-added Assets Application 권장 통과? (검증 4-O **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
+- [ ] ⛔ 형제 관례 판정이 **양방향**인가? (관례 존중 + 선례 이전 가능성 — `modules/review-structural-axes.md` §E. light 는 Workflow 미호출이라 Lead 가 직접 적용)
 - [ ] ⚠️ Post-State Consistency 권장 통과? (검증 4-P **candidate** — 활성 강제 X. **형제 균일성 게이트 통과 시에만** 발화, 접근수준·소유권 축 제외)
 
 ## Phase 5.5: Feedback Verification (역방향 검증)
