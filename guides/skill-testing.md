@@ -77,8 +77,8 @@
 
 | Given | When | Then |
 |-------|------|------|
-| Git diff 존재 | `/fz-gpt review` | `codex review --base` 실행 + 이슈 보고 |
-| Codex CLI 미설치 | `/fz-gpt review` | 에러 감지 + sc:analyze 폴백 |
+| Git diff 존재 | `/fz-gpt review` | `scripts/gpt-exec.sh review --base` 실행 + 이슈 보고 |
+| GPT CLI 미설치 | `/fz-gpt review` | 에러 감지 + sc:analyze 폴백 |
 | Critical 이슈 발견 | `/fz-gpt final` | xhigh 에스컬레이션 + DA 패스 자동 실행 |
 | 3-Tier 스킬 부재 | `/fz-gpt verify` | Tier 3 인라인 프롬프트로 폴백 |
 
@@ -152,7 +152,7 @@
 
 ```
 Q: "fz-gpt 스킬은 언제 쓰는 거야?"
-A (기대): "Codex CLI를 통한 독립적 코드/계획 검증... codex review, codex exec..."
+A (기대): "GPT CLI를 통한 독립적 코드/계획 검증... gpt-exec.sh review, gpt-exec.sh exec..."
 A (문제): "코드를 수정할 때 쓰는 스킬입니다" ← 잘못된 인식!
 → description에 "검증만 수행, 코드 수정 안 함" 강화 필요
 ```
@@ -240,12 +240,12 @@ test-spec:
         reason: "검증만 수행"
 
   functional:
-    - given: "Git diff 존재, Codex CLI 설치됨"
+    - given: "Git diff 존재, GPT CLI 설치됨"
       when: "/fz-gpt review"
-      then: "codex review 실행 + 이슈 리포트 생성"
+      then: "gpt-exec.sh review 실행 + 이슈 리포트 생성"
       type: normal
 
-    - given: "Codex CLI 미설치"
+    - given: "GPT CLI 미설치"
       when: "/fz-gpt review"
       then: "에러 메시지 + sc:analyze 폴백"
       type: failure
@@ -413,7 +413,7 @@ A/B 비교 시 `/skill-creator`의 제안을 B 버전으로 테스트하면 효�
 
 ### 8.1 effort sweep (§8의 특화 — arm 설정만 다름)
 
-**발동 조건**: 새 모델 전환 시. Opus 5 공식이 요구한다 — *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* [verified: platform.claude.com/docs/en/build-with-claude/effort]. 채점·집계·오염 탐지는 §8 계약을 그대로 상속하고, **arm 설정 방법만** 아래로 대체한다.
+**발동 조건**: 새 모델 전환 시. Opus 5 공식이 요구한다 — *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* [verified: platform.claude.com/docs/en/build-with-claude/effort]. 채점·집계·오염 탐지는 §8 계약을 그대로 상속하고, **arm 설정 방법만** 아래로 대체한다. (Opus 5.5 도 같은 요구 — "Re-run your effort sweep rather than carrying a setting over" [verified: whats-new-opus-5-5])
 
 **⛔ arm은 세션 레벨로 설정한다 — `workflows/*.js`의 per-call `opts.effort`를 수정하지 말 것**
 
@@ -465,6 +465,8 @@ PY
 
 **arm 선정**: Opus 5 공식 출발점이 `high`(기본)이고 `low`/`medium`이 비용·지연의 1차 레버이므로 최소 `{low, medium, high}` 3-arm. `xhigh`는 demanding coding/agentic 대조군으로 추가.
 
+**Opus 5.5 보정**: 공식 기본이 `medium`(Opus 5 는 `high`)이고 같은 effort 에서 사고량이 늘어난다(`xhigh`·`max` 에서 두드러짐) — "A request that omits `effort` runs at `medium`; on Claude Opus 5 it ran at `high`." · "At the same effort setting the model tends to think more per turn than Claude Opus 5, most of all at `xhigh` and `max`." [verified: whats-new-opus-5-5]. fz 는 `xhigh` 유지를 택해(사용자 결정 2026-09-25) 5.5 sweep 은 하지 않았다 — 재개하면 `experiment-log.md` 에 새 절을 만든다.
+
 **대상 스킬 우선순위**: `measure_constraint_load.py` 의 **floor 큰 순** — `fz`(31,259) · `fz-review`(29,264) · `fz-code`(26,837). floor가 큰 스킬일수록 effort 변화의 절대 효과가 크다.
 
 ⛔ **sweep 결과로 곧바로 `.js`를 고치지 말 것**: arm이 세션 레벨이었으므로 결론도 세션/frontmatter 레벨에 적용한다. per-call 배선 변경은 위 `[미검증]` 해소가 **선행**이다.
@@ -494,12 +496,23 @@ python3 scripts/fz_snapshot.py --diff                                           
 | 질문 | 지표 | 판정 |
 |---|---|---|
 | 워커 effort `xhigh`→`high` 해도 되나 | 같은 입력 짝 비교(§8.1): critical·major 손실 0 AND (시간 or 토큰) ≥10%↓ | `modules/peer-review-tiers.md` 짝 비교 절차 그대로 |
-| 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) **과 `adjust`**(어댑터 `verdict adjust` [verified: `scripts/fz_telemetry_report.py:328,398`]) 수, 워크플로 **N≥20** 실행 | overturn 0~1 **AND** adjust 0~1 이면 제거 A/B 후보(0~1 임계는 **잠정 휴리스틱**) — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
+| 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) **과 `adjust`**(어댑터 `verdict adjust` [verified: `scripts/fz_telemetry_report.py:339,409`]) 수, 워크플로 **N≥20** 실행 | overturn 0~1 **AND** adjust 0~1 이면 제거 A/B 후보(0~1 임계는 **잠정 휴리스틱**) — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
 | 규칙 감량이 품질을 떨어뜨렸나 | 감량 전후 fz-findings `detector: user` 월별 건수 + events `user_correction_signal` 비율 | 증가하면 되돌림 |
 | floor 성장이 지연을 늘리나 | `snapshots.tsv` floor × 스킬별 지연 중앙값 상관 | 상관 없으면 감량 우선순위 ↓ |
 | events 의 0 은 저부하인가 | `measurement` 필드 — `complete` 만 카운트로 읽는다 | `incomplete`·`unattributable`·`no_transcript` 는 분모에서 뺀다 |
 
 ---
+
+### 8.3 공식 플러그인 eval (`claude plugin eval`)
+
+Claude Code 2.1.269+ 가 플러그인 기여도를 재는 공식 수단을 제공한다 [verified: code.claude.com/docs/en/plugin-evals].
+
+- **WITH / W/OUT Δ** — "Each case's runs are repeated with no plugin loaded by default, and you get two scores, WITH and W/OUT. Their difference, Δ, is what the plugin contributed. If a case scores 1.0 both with and without the plugin, the plugin isn't what made it pass."
+- **채점기** — regex · tool_used · tool_order · file_exists(추가 모델 호출 없음) · llm/baseline(judge 모델 호출). `claude plugin eval init` 이 케이스와 채점기를 제안한다
+- **CI** — `--model`·`--judge-model` 고정, `--threshold` 설정, exit code 로 게이트
+
+**§8 과의 관계**: 이 도구의 baseline arm 은 "플러그인 미로드" 다. §8 same-agent A/B 격리 프로토콜의 **대조군 설계를 공식 도구로 대체할 후보**이지만, 훅·전역 설정 오염을 이 도구가 어떻게 차단하는지는 문서에 없다 [미검증: 격리 범위]. 채택 전 §8 의 arm 적용 검증(트랜스크립트 effort 필드 대조)과 같은 방식으로 **W/OUT arm 이 실제로 플러그인 없이 돌았는지** 1회 실측한다.
+
 
 ## 참조
 

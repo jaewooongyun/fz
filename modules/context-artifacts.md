@@ -1,6 +1,6 @@
 # Context Artifact 관리
 
-> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료 (Opus 5 1M context·tokenizer·프롬프트 캐시 최소 512 반영).
+> **Sources (last audited: 2026-09-25 — 모델 사실 축: Opus 5.5 1M 기본값·캐시 최소 prefix 두 줄만 대조, tokenizer 줄은 5.5 진술 부재로 2026-07-25 판 그대로):** `guides/llm-references.md` §1 정본 대조 완료 (Opus 5 1M context·tokenizer·프롬프트 캐시 최소 512 반영).
 >
 > 아티팩트를 파일로 기록한다. 대화 컨텍스트는 compact 시 손실되지만 파일은 남는다.
 
@@ -163,7 +163,7 @@ Disposable: "Grep 결과 42개 파일 매칭. find_referencing_symbols 호출 3�
 
 ## Upstream Hydration Sets
 
-> Codex M5: 스킬별 Phase 0에서 Read해야 하는 파일 목록 표준화. Artifact drift 방지.
+> GPT M5: 스킬별 Phase 0에서 Read해야 하는 파일 목록 표준화. Artifact drift 방지.
 
 | 스킬 | Upstream (Read 대상) |
 |------|---------------------|
@@ -263,9 +263,9 @@ Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이
 
 ## Artifact Token Budget
 
-> 현재 환경: **Fable 5 (Lead 운용, 2026-07-06~)** — 워커(수행 에이전트)는 opus/sonnet. Fable 5·**Opus 5**·Opus 4.8 모두 1M context (Opus 5는 1M이 **기본값이자 최대값**) [verified: platform.claude.com/docs/en/about-claude/models/whats-new-opus-5 + .../introducing-claude-fable-5]. 티켓 폴더 파일 전략은 모델 무관 유지 (1M에서도 compact 발생).
+> 현재 환경: **Fable 5.1 (Lead 운용)** · 워커(수행 에이전트)는 opus(=Opus 5.5, 2026-09-22~)/sonnet. Fable 5.1·**Opus 5.5** 모두 1M context — "The 1M token context window is the default, and a header sent for older models has no effect." [verified: platform.claude.com/docs/en/models/opus-5-5/migration-guide]. 티켓 폴더 파일 전략은 모델 무관 유지
 > ⚠️ **tokenizer**: 1.00-1.35x 토큰 증가 (pre-4.7 baseline, fz 자체 실측 미완료) `[미검증: fz 자체 count_tokens 측정 대기]`. **Opus 4.7/4.8/5 · Fable 5는 동일 tokenizer** → 이들 간 이전 시 토큰 수 거의 불변 [verified: claude-api 번들 스킬 — "same tokenizer as Opus 4.8"]. 측정 후 하단 테이블 크기 조정 가능.
-> ℹ️ **프롬프트 캐시 최소 prefix**: Opus 5·Fable 5 = **512 tokens**, Opus 4.8 = 1024 [verified: whats-new-opus-5 — "512 tokens, down from 1,024 on Claude Opus 4.8"]. 짧은 artifact도 캐시 대상이 되므로 분할 전략 재검토 여지 있음.
+> ℹ️ **프롬프트 캐시 최소 prefix**: Opus 5.5 = **512 tokens**, Opus 4.8 = 1024 — "The minimum cacheable prompt length on Claude Opus 5.5 is 512 tokens, down from 1,024 tokens on Claude Opus 4.8." [verified: platform.claude.com/docs/en/models/opus-5-5/migration-guide]. 짧은 artifact도 캐시 대상이 되므로 분할 전략 재검토 여지 있음.
 > 원칙: 전체 artifact 로드 합계 ≤ 100K tokens. 나머지는 실행 working memory.
 > Context Rot 원칙(집중 > 분산)은 context 크기와 무관하게 동일 적용.
 

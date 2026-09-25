@@ -1,6 +1,6 @@
 # 스킬 트러블슈팅 가이드
 
-> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-09-25 — 모델 사실 축: §2.4 인용 모델을 현행(Fable 5.1·Opus 5.5·GPT-6 Sol)으로 갱신 · 중복 절을 prompt-optimization 보충 8a 참조로 축약만 대조. 나머지는 2026-07-25 대조 그대로):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
 >
 > fz-* 스킬에서 발생하는 일반적인 문제의 진단과 해결 방법.
 > Anthropic 32p Skills Guide의 Under/Over-triggering, Instructions Not Followed 패턴 기반.
@@ -144,19 +144,8 @@ GOOD: "에러 시 테이블의 폴백 전략을 순서대로 실행하라."
 **증상:** Claude가 Gate 체크를 건너뛰거나 검증 없이 완료 보고.
 
 **솔루션:**
-- SKILL.md에 과격한 표현을 다시 넣지 않는다 (overtriggering 위험. Claude 4.8 instruction-following consistency로 과격 지시가 그대로 적용될 위험 [verified: anthropic.com/news/claude-opus-4-8]; GPT-5.5도 동일 방향 [verified: developers.openai.com/api/docs/guides/latest-model]; Fable 5는 짧은 지시 조향이 공식 권장 — 과격 표현 불필요 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]; **Opus 5**는 여기에 더해 *지시를 겹치는 것 자체*가 비용이다 — 검증 지시는 자체검증과 중복 실행되므로 **삭제**가 권장 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5])
-- **user prompt** 쪽에 격려 문구를 배치한다
-
-```
-User prompt에 추가:
-- "Take your time to do this thoroughly"
-- "Quality is more important than speed"
-- "Do not skip validation steps"
-```
-
-> **공식 가이드**: "Adding this to user prompts is more effective than in SKILL.md"
-> SKILL.md에 anti-laziness를 넣으면 모든 호출에 오버헤드가 발생하지만,
-> user prompt에 넣으면 필요한 세션에서만 적용된다.
+- SKILL.md에 과격한 표현을 다시 넣지 않는다 (overtriggering 위험. Claude 4.8 instruction-following consistency로 과격 지시가 그대로 적용될 위험 [verified: anthropic.com/news/claude-opus-4-8]; GPT-6 계열도 같은 방향 — "what used to require a lot of handholding and scaffolding no longer does" [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra] (Astra 대상 글 — 현행 Sol 적용은 [미검증]); Fable 5는 짧은 지시 조향이 공식 권장 — 과격 표현 불필요 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]; **Opus 5**(현행 **Opus 5.5** 가 상속)는 여기에 더해 *지시를 겹치는 것 자체*가 비용이다 — 검증 지시는 자체검증과 중복 실행되므로 **삭제**가 권장 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5])
+- **user prompt** 쪽에 격려 문구를 배치한다 — 배치 전략·문구 예시·공식 근거는 `guides/prompt-optimization.md` 보충 8a(Anti-laziness 배치 전략)가 정본이다
 
 ---
 
@@ -224,14 +213,14 @@ User prompt에 추가:
 | 합의/불합의 미보고 | 반환 schema 에 표현 필드 부재 | **schema 필드로 표현**한다(mutability/severity + evidence) — 프롬프트 요청이 아니라 스키마가 강제한다 |
 | 프롬프트 미구조화 | 역할/목표/제약 모호 | OVERRIDE 블록 + schema(=Deliverable) 로 5요소를 채운다 (`skill-authoring.md` §12 § 표준 패턴 3종) |
 
-### 3.5 Codex CLI 관련 에러
+### 3.5 GPT CLI 관련 에러
 
-**증상:** `codex review`, `codex exec` 실행 실패.
+**증상:** `scripts/gpt-exec.sh review`·`exec` 실행 실패.
 
 | 에러 | 대응 | 폴백 |
 |------|------|------|
-| Codex CLI 미설치 | 설치 안내 | sc:analyze 단독 실행 |
-| `codex review` 네트워크 에러 | `codex exec` + diff 인라인 | 수동 리뷰 |
+| GPT CLI 미설치 | 설치 안내 | sc:analyze 단독 실행 |
+| `gpt-exec.sh review` 네트워크 에러 | `gpt-exec.sh exec` + diff 인라인 프롬프트 | 수동 리뷰 |
 | `--output-schema` 파싱 실패 | 스키마 검증 | Claude 직접 파싱 |
 | 3-Tier 스킬 디스커버리 실패 | Tier 순차 폴백 | 인라인 프롬프트 (Tier 3) |
 | GPT 응답 토큰 제한 초과 | diff 분할 전략 (Medium/Large) | 핵심 파일만 리뷰 |
