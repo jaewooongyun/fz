@@ -99,11 +99,13 @@ codex exec \
 LEDGER="{호출자가 정한 원장}"          # plan: gates/plan.draft.md · review: gates/plan.md
 [ -f "$LEDGER" ] || exit 0   # 원장 없으면 이 호출 자체를 생략
 
-scripts/gpt-exec.sh exec \
+# ⛔ 정본 경로로 부른다 — 상대 경로는 cwd 가 플러그인 루트가 아닐 때 조용히 깨진다
+#    (`FZ_PLUGIN_ROOT` 는 `scripts/resolve-plugin-root.sh` 로 해석한다)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec \
   --cd "$GIT_ROOT" \
   --out "$GATE_VERDICT_FILE" \
   --prompt-file "$PROMPT" \
-  --schema schemas/gpt_gate_verdict_schema.json \
+  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_gate_verdict_schema.json" \
   --effort high
 ```
 

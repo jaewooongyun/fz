@@ -147,7 +147,7 @@ Plan v{N}에서 v{N+1}로 진화할 때 복잡도 5차원(Scope/Depth/Risk/Novel
 | 통합 (서브커맨드) | S | fz-manage 스킬 확장 |
 
 **총 추정**: M+ (약 1-2일 구현 + 1일 튜닝)
-사용자가 `/sc:estimate`로 재검증 권장.
+사용자가 `/sc:sc-estimate`로 재검증 권장.
 
 ---
 

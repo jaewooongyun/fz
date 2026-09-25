@@ -44,7 +44,7 @@ ITEMS = [
     ("9",  "SEMANTIC",      "fz-*",      "테스트 케이스 충분성 — 존재는 세지만 충분성은 의미 판단"),
     ("10", "SEMANTIC",      "fz-*",      "Triggering 테스트 3개+ — 품질은 의미 판단"),
     ("11", "SEMANTIC",      "infra",     "skill-creator 설치 — 외부 환경"),
-    ("12", "THRESHOLD",     "agents",    "frontmatter tools ↔ 본문 Primary 정합 — ⛔ 도구명 free-form grammar 미정"),
+    ("12", "DETERMINISTIC", "agents",    "MCP 도구명 — **4축**: 2형식 문법 + retired 접두 재등장 + 인벤토리 선언 정합 + 본문 Primary ↔ frontmatter 서버 정합 (⛔ 실제 **가용성**(서버가 떠 있는가)만 #2 SEMANTIC 소관 — 정적으로 닫히지 않는다. 선언 여부는 여기서 닫는다)"),
     # ⛔ 2026-08-09 DETERMINISTIC→SEMANTIC 강등: `agents/*.md`의 `CLAUDE.md ## Architecture` 는
     #    **소비 프로젝트의** CLAUDE.md를 뜻한다(에이전트는 대상 프로젝트 지침을 읽는다).
     #    플러그인 자신의 CLAUDE.md로 해석하면 89건 전부 오탐 — 정적으로 구별 불가.
@@ -53,7 +53,7 @@ ITEMS = [
     ("16", "DETERMINISTIC", "agents",    "team-registry ↔ agents/ 양방향 일치"),
     ("17", "THRESHOLD",     "fz-*",      "Gate Evidence 패턴 — ⛔ 정규식 미정"),
     ("N1", "DETERMINISTIC", "schemas",   "gpt_base_issue $defs 값이 소비 스키마와 일치 — severity enum + confidence 경계 (⛔ 값은 **인라인**한다: fz 스키마는 `$ref` 를 쓰지 않는다(실측 0건) — 본 검사가 인라인 정합을 본다)"),
-    ("N2", "DETERMINISTIC", "infra",     "CLAUDE.md 인벤토리 선언 ↔ 실측 카운트"),
+    ("N2", "DETERMINISTIC", "infra",     "인벤토리 선언 ↔ 실측 카운트 — `CLAUDE.md` + `docs/architecture.md` 트리 표기 **양쪽** (한 곳만 보면 나머지가 조용히 낡는다)"),
     ("N3", "DETERMINISTIC", "all",       "줄번호 인용 — 대상 파일 실재 + 행 범위 내 + **빈 줄 아님** (⛔ 인용 *내용*의 정합은 여전히 검사하지 않는다 — 빈 줄만이 내용 판단 없이 닫히는 결정론 조각이다)"),
     ("N4", "DETERMINISTIC", "all",       "ERE alternation 오용 — `grep -E` 같은 줄의 `\\|`"),
     ("N5", "DETERMINISTIC", "scripts",   "측정 명령의 신호 폐기 (`>/dev/null 2>&1` + exit 미사용)"),
@@ -68,6 +68,7 @@ ITEMS = [
     #    (b) 파일명 없는 `§N` self-file: 프로브 329건 → 위반 119(36%) → ⛔ **미도입**.
     #        대부분 다른 문서·논문의 절을 문맥상 축약한 표기(`§2.4`=OpenDev 논문, `§5.7`=experiment-log)라
     #        정적으로 대상 문서를 특정할 수 없다. 도입하면 오탐률이 #13 강등 선례(89건)를 재현한다.
+    ("N12", "DETERMINISTIC", "all",     "`/sc:` 네임스페이스 형식 — `/sc:sc-*` 만 유효 (v4.35.0 에서 86곳을 고쳤는데 **지키는 검사가 없었다**. B14: done 판정의 오라클이 `mcp__serena__` 0건이었고 그것은 다른 대상을 잰다)"),
     ("N11", "DETERMINISTIC", "skills", "경량 경로 검증 계약 — light/tier 경로를 가진 스킬은 **그 경로 절차가 있는 문서**에 어떤 검증이 살아남는지 선언한다. ⛔ 절차를 모듈로 위임하면 그 모듈에도 있어야 한다 — SKILL.md 에만 적으면 위임 절차를 따르는 Lead 가 못 본다 (실측: Coverage Gate 가 `### 4. Confidence Matrix 출력` 안에 있는데 Tier 0 은 그 섹션을 건너뛴다)"),
     ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 gpt 응답이 아니다)"),
     ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
@@ -94,6 +95,12 @@ MIN_HITS = {
     "7": 10,     # 에이전트 13개
     "14": 20,    # 목차 보유 모듈 30개
     "16": 10,    # 에이전트 13개
+    # ⛔ #12 는 agents + skills 의 `tools:`/`allowed-tools:` 를 함께 본다 — 실측 34파일.
+    #    보수적으로 10. 0 으로 두면 walk 실패가 "위반 0건" 으로 조용히 통과한다(fail-open).
+    "12": 10,
+    # ⛔ #N12 는 `/sc:` 토큰을 센다 — 실측 20종(고유). 보수적으로 10.
+    #    0 으로 두면 walk 실패가 "위반 0건" 으로 통과한다 — B14 가 고치려는 바로 그 형태다.
+    "N12": 10,
     # ⛔ #N1·#N2는 **여유 0**이 의도된 설계다. 하한은 *최소*이므로 항목 추가는 발화하지 않고
     #    **삭제만** 발화한다 — 소비 스키마나 INV 카테고리가 줄면 그때는 검토가 옳다.
     #    ⚠️ 미래 편집자: 여유가 0이라고 낮추지 말 것. 낮추면 "조용히 검사에서 빠짐"이 다시 가능해진다.
@@ -376,6 +383,128 @@ SECREF = re.compile(r"CLAUDE\.md\s*`##\s*([^`]+)`")
 #    판정 근거는 항목 설명에 있다 — 참조 대상이 소비 프로젝트인지 플러그인 자신인지 정적 구별 불가.
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# #12 MCP 도구명 — 3축 (문법 · retired 재등장 · Primary 정합)
+#
+# 왜 필요한가: 같은 클래스가 **세 서버째** 손으로 고쳐졌다 — `/sc:` 네임스페이스(v4.35.0 86곳) ·
+#   Serena 런타임 접두(v4.35.0 148곳) · LSP·JIRA(v4.36.0 18곳). 매번 배선이 죽어 있었고
+#   오류는 나지 않았다: `tools:` 는 목록이 **전부** 미해결일 때만 launch 가 실패하므로
+#   `Read, Grep, Glob` 이 살아 있으면 MCP 항목만 조용히 빠진다(워커 251회 Serena 호출 0).
+#
+# ⛔ 전체 문법을 정하지 않는다 — 아래 3축만 결정론으로 닫고 나머지는 SKIP 으로 **인쇄**한다.
+#   축3(실제 가용성)은 #2 SEMANTIC 소관이다: 문법이 맞아도 등록되지 않은 서버는 여기서 못 잡는다.
+#
+# 형식 2종 [verified: code.claude.com/docs/en/mcp · 실측 27 고유 토큰]:
+#   플러그인 제공 — mcp__plugin_<plugin>_<server>__<tool>
+#   일반         — mcp__<server>__<tool>
+#   ⛔ 도구명에 하이픈이 들어간다(`mcp__context7__query-docs`) — 문자 클래스에 포함해야 한다.
+MCP_TOKEN = re.compile(r"mcp__[A-Za-z0-9_-]+(?:__[A-Za-z0-9_-]+)?")
+# ⛔ 플러그인 이름은 **kebab-case** 를 허용한다 [verified: code.claude.com/docs/en/plugins-reference].
+#    이전 판은 `plugin_[A-Za-z0-9]+_` 라 `mcp__plugin_my-plugin_server__tool` 을 위반으로 잡았다
+#    (현재 트리는 플러그인명이 `fz` 라 오탐 0 — 다른 플러그인 도입 시 발화했을 잠재 오탐).
+MCP_OK = re.compile(r"^mcp__(?:plugin_[A-Za-z0-9-]+_[A-Za-z0-9-]+|[A-Za-z0-9-]+)__[A-Za-z0-9_-]+$")
+
+# ⛔ retired 접두 — 과거 드리프트로 **이미 고친** 이름이다. 문법만으로는 정상 형식과
+#   구분되지 않으므로(둘 다 `mcp__<a>__<b>`) 명시 목록이 유일한 판별 수단이다.
+#   재등장 = 회귀. 새 드리프트를 고칠 때마다 여기에 한 줄 추가한다.
+# ⛔ **하드코딩하지 않는다.** 목록이 소비자마다 흩어지면 한 곳만 고쳐진다 —
+#    N4 가 기록한 *"세 서버째 손으로 고쳤고 검사는 없다"* 가 그 증상이다.
+#    단일 출처: `schemas/tool-inventory.json` (S3·S6·S20 이 같은 파일을 읽는다).
+def _inventory() -> dict:
+    """도구 인벤토리. ⛔ 부재·파싱 실패는 **빈 목록이 아니라 예외**다 —
+    빈 목록으로 폴백하면 retired 축과 선언 축이 조용히 죽고 '위반 0건' 이 된다."""
+    q = ROOT / "schemas" / "tool-inventory.json"
+    try:
+        with open(q, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError) as e:
+        # ⛔ exit 2 = 설정/파싱 오류. PASS 도 SKIP 도 아니다 (이 파일의 3분 규약).
+        print(f"⛔ 도구 인벤토리를 읽지 못했다 — {q}: {type(e).__name__}: {e}\n"
+              f"   #12 의 retired·선언 축이 이 파일에 의존한다. 빈 목록으로 넘기면 축이 조용히 죽는다.",
+              file=sys.stderr)
+        raise SystemExit(2)
+
+
+_INV = _inventory()
+RETIRED_MCP = dict(_INV["retired_mcp_prefixes"])
+DECLARED_SERVERS = set(_INV["mcp_servers"])
+
+# 본문 Primary 는 **축약 이름**이다(`**Primary**: codegraph`) — frontmatter 의 전체 이름과
+# 직접 대조할 수 없어 **서버 단위**로 맞춘다.
+# ⛔ 실제 문서 형식은 `- **Primary**: codegraph` 다 — 리스트 접두 `- `/`*`/`+` 와 괄호 설명을
+#    허용해야 한다. 이전 판(`^\s*\**Primary`)은 13개 에이전트에서 **매칭 0건**이었고, 그 0을
+#    "위반 없음" 으로 읽으면 축 자체가 죽은 것을 통과로 오인한다 [외부: fz-gpt review #2].
+PRIMARY_LINE = re.compile(r"^\s*(?:[-*+]\s*)?\**\s*Primary\**[^:：\n]{0,24}[:：]\s*(.+)$", re.M)
+PRIMARY_ALIAS = {"serena": "plugin_fz_serena", "codegraph": "codegraph",
+                 "context7": "context7", "sequential-thinking": "sequential-thinking"}
+
+
+def _mcp_servers(tools_field) -> set[str]:
+    """frontmatter tools: 에서 서버 부분만 뽑는다."""
+    raw = tools_field if isinstance(tools_field, str) else " ".join(map(str, tools_field or []))
+    out = set()
+    for t in MCP_TOKEN.findall(raw):
+        m = re.match(r"^mcp__([A-Za-z0-9_-]+)__", t)
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+def chk_12(root: Path | None = None):
+    v, seen, primary_seen = [], 0, 0
+    base = root or ROOT
+    if root is None:
+        targets = list(AGENTS) + list(SKILLS)
+    else:
+        targets = sorted((root / "agents").glob("*.md")) + sorted((root / "skills").glob("*/SKILL.md"))
+    for p in targets:
+        # ⛔ frontmatter() 의 두 번째 반환은 본문 **줄수(int)** 다 — 텍스트가 아니다.
+        fm, _ = frontmatter(p)
+        if fm is None:
+            continue
+        body = read(p)
+        seen += 1
+        rel = p.relative_to(base).as_posix()
+        decl = fm.get("tools") or fm.get("allowed-tools") or ""
+        decl_raw = decl if isinstance(decl, str) else " ".join(map(str, decl))
+        # 축1 — 문법: frontmatter 와 본문의 모든 mcp 토큰
+        for tok in set(MCP_TOKEN.findall(decl_raw)) | set(MCP_TOKEN.findall(body)):
+            if not MCP_OK.match(tok):
+                v.append(f"{rel}: MCP 도구명 형식 위반 `{tok}` — mcp__<server>__<tool> 또는 mcp__plugin_<plugin>_<server>__<tool>")
+            # 축2 — retired 재등장
+            for bad, fix in RETIRED_MCP.items():
+                if tok.startswith(bad):
+                    v.append(f"{rel}: retired MCP 접두 `{bad}` 재등장 ({tok}) → {fix}")
+            # 축4 — **선언 정합**: 서버가 인벤토리에 있는가.
+            # ⛔ 문법 축과 다르다 — `mcp__nosuchserver__x` 는 문법이 맞고 선언이 없다.
+            # ⛔ 가용성 축과도 다르다 — 여기는 *우리가 선언했는가* 를 정적으로 닫고,
+            #    *실제로 떠 있는가* 는 #2(SEMANTIC) 가 본다. 선언에 없는 이름은
+            #    오타이거나 배선 누락이므로 정적으로 잡힌다(계획 C1: "문법만으로는
+            #    '문법은 맞지만 등록되지 않은 서버' 를 못 잡는다").
+            # ⛔ retired 토큰은 제외한다 — 같은 사실이 두 줄로 인쇄되고, 사람이 할 일은
+            #    "인벤토리에 추가" 가 아니라 "새 이름으로 교체" 다(retired 축이 그것을 준다).
+            if MCP_OK.match(tok) and not any(tok.startswith(b) for b in RETIRED_MCP):
+                srv = _mcp_servers(tok)
+                for sv in srv:
+                    if sv not in DECLARED_SERVERS:
+                        v.append(f"{rel}: 미선언 MCP 서버 `{sv}` ({tok}) — "
+                                 f"`schemas/tool-inventory.json` 의 mcp_servers 에 없다. "
+                                 f"오타이거나 인벤토리 갱신 누락이다")
+        # 축3 — 본문 Primary ↔ frontmatter 서버 정합
+        if decl_raw:
+            have = _mcp_servers(decl_raw)
+            for m in PRIMARY_LINE.finditer(body):
+                primary_seen += 1
+                line = m.group(1).lower()
+                for alias, server in PRIMARY_ALIAS.items():
+                    if alias in line and server not in have:
+                        v.append(f"{rel}: 본문 Primary 가 `{alias}` 를 지목하나 frontmatter 에 `mcp__{server}__*` 가 없다")
+    # ⛔ 축 3 이 한 건도 안 돌면 **측정 실패**다 — 파일 수(seen)는 그것을 증명하지 않는다.
+    if primary_seen == 0 and seen > 0:
+        v.append(f"#12 축3(Primary 정합) 미작동 — Primary 선언 {primary_seen}건 / 대상 {seen}파일. 정규식이 실제 형식을 놓쳤을 수 있다")
+    return v, seen
+
+
 TOC = re.compile(r"^#+\s*(목차|Index|Contents|TOC)\b", re.M)
 
 
@@ -488,6 +617,9 @@ def chk_N1():
 # ⛔ 선언 카운트를 갖는 디렉토리는 전부 등재한다 — scripts/는 2026-08-09에 한 세션 안에서
 #    6→7로 늘며 CLAUDE.md가 stale해졌다(미등재 탓에 #N2가 침묵). 새 디렉토리 카운트 추가 시 여기도 추가.
 INV = {
+    # ⛔ `skills` 는 두 문서가 모두 카운트를 적는데 INV 에 없어 **검사 밖이었다**
+    #    (실측 2026-09-21: architecture.md 를 99개로 바꿔도 통과했다)
+    "skills": lambda: len([q for q in (ROOT / "skills").iterdir() if q.is_dir()]),
     "modules": lambda: len(MODULES),
     "guides": lambda: len(list((ROOT / "guides").glob("*.md"))),
     "scripts": lambda: len(SCRIPTS),
@@ -496,7 +628,40 @@ INV = {
 }
 
 
+# ⛔ 인벤토리 선언은 **CLAUDE.md 한 곳이 아니다** — `docs/architecture.md` 의 트리 표기도
+#    같은 수를 적는다. 실측(2026-09-21): 그쪽 6개 중 **5개가 어긋나 있었다**(skills 21→22 ·
+#    modules 42→45 · workflows 6→8 · scripts 13→33 · patterns 이동 미반영). 한 곳만 검사하면
+#    나머지가 조용히 낡는다 — 같은 클래스가 `INDEX.md` 「다음 ID」에서도 났다(fz-findings F-032).
+INV_DOCS = {
+    "CLAUDE.md":           r"`{key}/`[^\n]*?\((\d+)\s*개",          # - `skills/` — 설명 (22개)
+    "docs/architecture.md": r"├──\s*{key}/\s+(\d+)개",                # ├── skills/    22개
+}
+
+
 def chk_N2():
+    v, seen = [], 0
+    for doc, pat_tpl in INV_DOCS.items():
+        dp = ROOT / doc
+        if not dp.exists():
+            raise ParseError(f"{doc} 부재")
+        txt = read(dp)
+        for key, counter in INV.items():
+            m = re.search(pat_tpl.replace("{key}", re.escape(key)), txt)
+            seen += 1
+            if not m:
+                if doc != "CLAUDE.md":
+                    # architecture.md 는 전 디렉토리를 적지 않는다 — 적힌 것만 대조한다
+                    continue
+                v.append(f"{doc}: `{key}/` 카운트 선언 부재 또는 형식 불일치 "
+                         f"— 형식은 `` - `{key}/` — 설명 (N개) `` (⛔ skip 아님)")
+                continue
+            declared, actual = int(m.group(1)), counter()
+            if declared != actual:
+                v.append(f"{doc}: `{key}/` 선언 {declared}개 ≠ 실측 {actual}개")
+    return v, seen
+
+
+def _chk_N2_legacy():
     cm = ROOT / "CLAUDE.md"
     if not cm.exists():
         raise ParseError("CLAUDE.md 부재")
@@ -753,6 +918,31 @@ def chk_N4(root: Path | None = None):
     return v, seen
 
 
+SC_NS = re.compile(r"/sc:([a-z][a-z0-9-]*)")
+
+
+def chk_N12(root: Path | None = None):
+    """`/sc:` 네임스페이스는 `/sc:sc-*` 형태만 유효하다.
+
+    ⛔ **왜 필요한가**: v4.35.0 이 86곳을 고쳤으나 그 형태를 **지키는 검사가 없었다**.
+       B14 가 지적한 done 판정의 한계가 이것이다 — 오라클이 `mcp__serena__` 0건이었고
+       그것은 `/sc:` 치환과 **다른 대상을 잰다**. 0건은 고쳐진 증거가 아니라 다른 것의 증거였다.
+    """
+    self_rel = Path(__file__).resolve().relative_to(ROOT).as_posix()
+    v, seen = [], 0
+    for rel, p in walk_files(".md", ".sh", ".py", ".js", root=root):
+        if rel == "CHANGELOG.md" or rel.startswith("docs/releases/"):
+            continue          # 사료 — 옛 형태가 남는 것이 정상이다
+        if rel == self_rel:
+            continue          # ⛔ 자기 참조 제외 — 이 설명 문구가 대상 패턴을 담는다
+        for i, line in enumerate(read(p).split("\n"), 1):
+            for m in SC_NS.finditer(line):
+                seen += 1
+                if not m.group(1).startswith("sc-"):
+                    v.append(f"{rel}:{i}: `/sc:{m.group(1)}` — `/sc:sc-{m.group(1)}` 형태여야 한다")
+    return v, seen
+
+
 def chk_N5(root: Path | None = None):
     v, seen = [], 0
     scripts = (sorted(p for p in (root / "scripts").glob("*") if p.is_file())
@@ -942,7 +1132,31 @@ SELF_TEST_COUNT = len(SELF_TESTS)
 #    `([], 그럴듯한 hits)` 반환. 위반의 **정확한 위치와 건수**를 단정한다.
 # ─────────────────────────────────────────────────────────────────────────────
 INTEG_TREE = {
+    # ── #12 MCP 도구명 3축 (2026-09-18 신설) ─────────────────────────────────
+    # ⛔ 이 다섯은 **축마다 하나씩** 이다. 축이 죽으면 그 줄만 조용히 사라지므로
+    #    양성 3 + 음성 2 를 함께 둔다 — 음성이 없으면 "전부 위반" 으로 뒤집혀도 통과한다.
+    # (양성) retired 접두 재등장 — 문법은 정상이라 문법 축으로는 못 잡는다
+    "agents/bad_12_retired.md": "---\nname: b\ntools: mcp__serena__find_symbol\n---\n\n본문\n",
+    # (양성) 형식 위반 — 구분자 `__` 가 하나뿐
+    "agents/bad_12_syntax.md": "---\nname: b\ntools: mcp__badformat\n---\n\n본문\n",
+    # (양성) 본문 Primary 가 지목한 서버가 frontmatter 에 없다
+    "agents/bad_12_primary.md": "---\nname: b\ntools: mcp__context7__query-docs\n---\n\n**Primary**: codegraph — 참조 추적\n",
+    # (음성) 정상 2형식 — 플러그인 제공 + 일반
+    "agents/ok_12_both.md": "---\nname: o\ntools: mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore\n---\n\n**Primary**: codegraph\n",
+    # (양성) ⭐ 실제 문서 형식 `- **Primary**: …` — 이전 정규식은 이것을 0건으로 놓쳤다
+    "agents/bad_12_primary_list.md": "---\nname: b\ntools: mcp__context7__query-docs\n---\n\n- **Primary**: codegraph (`codegraph_explore`) — 참조 추적\n",
+    # (양성, 축4 전용) ⭐ 플러그인 이름 kebab-case — **문법은 통과**하고(형식 위반 줄이 안 나온다)
+    #   선언 축만 발화한다. ⚠️ 축4 도입 전에는 음성이었다 — 대조할 인벤토리가 없었기 때문이다.
+    #   ⛔ 이 가짜 서버를 인벤토리에 넣지 않는다(시험용 이름으로 실 인벤토리를 오염시킨다).
+    "agents/bad_12_kebab_undeclared.md": "---\nname: o\ntools: mcp__plugin_my-plugin_server__tool\n---\n\n본문\n",
+    # (양성) ⛔ 문법은 맞고 **인벤토리에 선언되지 않은** 서버 — 축4 가 잡는다.
+    #        ⚠️ **경계가 이동했다**: 인벤토리(`schemas/tool-inventory.json`)가 생기기 전에는
+    #        대조할 것이 없어 통과가 정답이었고 이 fixture 가 음성이었다. 이제 선언 여부는
+    #        정적으로 닫히므로 양성이다. #2 에 남는 것은 *선언됐으나 실제로 안 떠 있는* 경우뿐이다.
+    "agents/bad_12_undeclared.md": "---\nname: b\ntools: mcp__nosuchserver__sometool\n---\n\n본문\n",
     # #15: 잘림 + 3줄 뒤 카운트 → 위반 1
+    # #N12: `/sc:` 네임스페이스 → 위반 1 (양성) + 정상형 1 (음성 — "전부 위반" 뒤집힘 방어)
+    "modules/bad_n12.md": '실행: `/sc:analyze` 로 본다\n정상형: `/sc:sc-analyze` 도 함께 쓴다\n',
     # #N4: grep -E 같은 줄의 `\|` → 위반 1
     "modules/bad_n4.md": 'run: grep -E "^(a\\|b)" f\n',
     # #N7: 할당 없는 $VAR 검사 → 위반 1
@@ -978,6 +1192,9 @@ INTEG_TREE = {
 # ⛔ 위반 **건수 + 정확한 위치**를 단정한다 (3라운드 감사 ISSUE-006: 건수만 보면
 #    잘못된 파일을 잡아도 통과한다). 위치는 `rel:line` 접두로 대조한다.
 INTEG_EXPECT = {
+    "N12": ["modules/bad_n12.md"],
+           "12": ["agents/bad_12_retired.md", "agents/bad_12_syntax.md", "agents/bad_12_primary.md",
+           "agents/bad_12_primary_list.md", "agents/bad_12_undeclared.md", "agents/bad_12_kebab_undeclared.md"],
     "N4": ["modules/bad_n4.md:1", "scripts/bad_n4.sh:3", "scripts/bad_n4.py:3"],
     "N5": ["scripts/bad_n5.sh:3", "scripts/bad_n5.py:4"],
     "N6": ["scripts/bad_n6.py", "scripts/bad_n6.sh"],
@@ -1291,7 +1508,7 @@ def chk_N9(root: Path | None = None):
 
 CHECKS = {
     "1": chk_1, "3": chk_3, "5": chk_5, "6": chk_6, "7": chk_7,
-    "14": chk_14, "16": chk_16,
+    "12": chk_12, "14": chk_14, "16": chk_16, "N12": chk_N12,
     "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
     "N7": chk_N7, "N8": chk_N8, "N9": chk_N9, "N10": chk_N10,
     "N11": chk_N11,
