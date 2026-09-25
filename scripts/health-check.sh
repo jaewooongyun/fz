@@ -47,7 +47,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -146,15 +146,15 @@ fi
 # ── 4.5 gpt 플래그 호환성
 # ⛔ 신설 근거: `check-gpt-flags.sh` 는 review 경로가 거부하는 플래그를 잡는 회귀 게이트인데
 #    어느 자동 실행 경로에도 없었다(health-check 참조 0건 · gpt-exec.sh 는 주석만).
-#    막으려던 실패 = 공용 인자 배열이 `codex exec review` 에 거부돼 exit 2 를 내고
+#    막으려던 실패 = 공용 인자 배열이 GPT CLI review 모드에 거부돼 exit 2 를 내고
 #    호출부가 그것을 "이슈 0건" 으로 읽는 것. CLI 가 플래그 집합을 바꾸면 침묵한다.
-# ⛔ exit 2(codex CLI 부재·help 파싱 실패)는 **PASS 가 아니라 미실행**이다 — §4 와 같은 클래스.
+# ⛔ exit 2(GPT CLI 부재·help 파싱 실패)는 **PASS 가 아니라 미실행**이다 — §4 와 같은 클래스.
 CF_OUT="$(bash "$ROOT/scripts/check-gpt-flags.sh" 2>&1)"; CF_CODE=$?
 case "$CF_CODE" in
   0) record "gpt 플래그 호환성" 0 "review 미지원 플래그 0건" ;;
   1) record "gpt 플래그 호환성" 1 "⛔ review 경로에 미지원 플래그 — $(printf '%s\n' "$CF_OUT" | tail -1)" ;;
   *) UNRUN=$((UNRUN + 1))
-     record "gpt 플래그 호환성" UNRUN "미실행 — codex CLI 부재·help 파싱 실패 (⛔ PASS 아님)" ;;
+     record "gpt 플래그 호환성" UNRUN "미실행 — GPT CLI 부재·help 파싱 실패 (⛔ PASS 아님)" ;;
 esac
 
 # ── 4.6 회귀 오라클 실행 (tests/) ─────────────────────────────────
@@ -212,7 +212,7 @@ fi
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry; do
+for FS in eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry check_wf_advisor_ban check_gpt_surface; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   if [ "$FS_CODE" -eq 0 ]; then
     record "레지스트리 도구 self-test ($FS)" 0 "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)"
@@ -260,6 +260,25 @@ else
   record "단일 출처 계약" 1 "⛔ $(printf '%s\n' "$SS" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
 fi
 
+# ── 워크플로 advisor 억제 계약 (A-ADV) ─────────────────────────
+# ⛔ 워커는 세션 advisorModel 을 상속하고 끌 수단이 없다 — OVERRIDE 상수의 금지 문구가 유일한 억제다.
+#    파일 단위가 아니라 OVERRIDE **블록 단위**로 본다(주석·다른 문자열은 워커에게 안 실린다).
+AB="$(cd "$ROOT" && python3 scripts/check_wf_advisor_ban.py 2>&1)"; AB_CODE=$?
+if [ "$AB_CODE" -eq 0 ]; then
+  record "워크플로 advisor 억제" 0 "$(printf '%s\n' "$AB" | grep -E '^advisor-ban' | tail -1)"
+else
+  record "워크플로 advisor 억제" 1 "⛔ $(printf '%s\n' "$AB" | grep -E 'VIOLATION|UNRUN' | head -1)"
+fi
+
+# ── GPT 표면 계약 (Track C) ──────────────────────────────────
+# ⛔ 보존 규칙 밖 옛 CLI 호칭(Track C)의 **재유입**을 막는다. 허용은 범주 토큰 + `tests/fixtures/gpt-surface-keep.tsv` 뿐이다.
+GS="$(cd "$ROOT" && python3 scripts/check_gpt_surface.py 2>&1)"; GS_CODE=$?
+if [ "$GS_CODE" -eq 0 ]; then
+  record "GPT 표면 계약" 0 "$(printf '%s\n' "$GS" | grep -E '^gpt-surface' | tail -1)"
+else
+  record "GPT 표면 계약" 1 "⛔ $(printf '%s\n' "$GS" | grep -E 'VIOLATION|UNRUN' | head -1)"
+fi
+
 # ── 릴리즈 동기 검사기 self-test (B1/S7) ──────────────────────
 # ⛔ **`--self-test` 만 부른다.** 기본·`--release` 모드는 health-check 를 **자기가 호출하므로**
 #    여기서 부르면 무한 재귀가 된다. self-test 경로는 그보다 앞에서 exit 하므로 안전하다.
@@ -297,7 +316,7 @@ fi
 if [ -f "$ROOT/scripts/fz_snapshot.py" ]; then
   SNAP_OUT="$(python3 "$ROOT/scripts/fz_snapshot.py" --diff 2>&1)"; SNAP_CODE=$?
   SNAP_WARN="$(printf '%s\n' "$SNAP_OUT" | grep -c '⚠️' || true)"
-  # ⛔ "비교 대상 없음"(정상, exit 0 + 안내문)과 "검사기 고장"(exit≠0)은 다른 것이다 — Codex 리뷰(2026-09-06)가
+  # ⛔ "비교 대상 없음"(정상, exit 0 + 안내문)과 "검사기 고장"(exit≠0)은 다른 것이다 — GPT 리뷰(2026-09-06)가
   #    exit 7 이 record 0 으로 덮이는 것을 재현했다. 고장은 §diff 파서와 같은 규약(record 2 + UNRUN)으로 기록한다.
   if [ "$SNAP_CODE" -ne 0 ]; then
     record "정적 부하 추세" 2 "⛔ 검사기 비정상 종료 exit $SNAP_CODE — 판정 불가 ($(printf '%s\n' "$SNAP_OUT" | tail -1))"
