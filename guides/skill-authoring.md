@@ -595,7 +595,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 - 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — ⛔ `mode='fallback'` 이면 **아래 § 실패 복구 사다리의 판별 표로 분기**한다(SOLO 직행 아님 — `fallback` 하나에 분할 요구·입력 오류·실행 실패가 함께 담긴다). wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
 - 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / **opus 동시 ≤3** (워커 기준 — Lead는 fable, fan-out은 sonnet. **정본 = `guides/model-guide.md` §5** — ⛔ 여기서 값을 재정의하지 않는다) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
 - 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
-- 검증 oracle: 래핑 syntax 검사(`async function wrap(...){...본문...}` 후 node --check — 직접 node --check는 CJS 관대 파싱으로 무효) + **실 invoke ≥1** + experiment-log §5.7 지표 기록
+- 검증 oracle: `node scripts/check_wf_syntax.js --root {플러그인 루트}`(AsyncFunction 컴파일 + `export const meta` 첫 문장 — health-check 가 같은 검사를 돈다. ⛔ 직접 `node --check` 는 판별력 0 이고, 함수로 감싼 파싱은 본문이 `})` 로 탈출하면 통과할 수 있어 판정에 쓰지 않는다) + **실 invoke ≥1** + experiment-log §5.7 지표 기록
 
 ### ⛔ 실패 복구 사다리 (`mode:'fallback'` · 스톨 — **본 절이 정본**)
 

@@ -9,6 +9,9 @@
 그 문장을 **파싱해서 읽는다**. 수치를 복사해 두면 정본이 바뀔 때 조용히 어긋난다
 (`modules/governance.md` § Truth-of-Source 가 지정한 단일 출처 규약).
 
+⛔ **변수로 넘긴 병렬은 세지 않는다** — `parallel(lensThunks)`·`parallel(costThunks.slice(…))` 처럼 배열이 리터럴이 아니면
+블록을 못 잘라 분모에서 빠진다(discover-adversarial 이 이 형태다). 데이터 흐름 추적은 이 검사의 범위 밖이다 — 통과는 "리터럴 병렬이 상한 이내" 까지만 뜻한다.
+
 ⛔ **advisor 사각지대는 이 검사의 범위 밖이다** — `governance.md` 가 명시하듯 advisor 는
 스폰된 에이전트가 아니라 서버사이드 tool call 이라 어떤 동시 상한도 bound 하지 못한다.
 여기서 통과해도 그 지출은 재지지 않는다.
@@ -38,7 +41,10 @@ LIMIT_OPUS = re.compile(r"opus\s*동시\s*[≤<=]+\s*(\d+)")
 LIMIT_FABLE = re.compile(r"fable[^·\n]*?동시\s*\*{0,2}(\d+)\s*개")
 LIMIT_TOTAL = re.compile(r"총\s*[≤<=]+\s*(\d+)")
 # parallel([...]) 블록 — 괄호 균형으로 끝을 찾는다
-PARALLEL = re.compile(r"parallel\s*\(\s*\[")
+# ⛔ `parallel\w*` — 재시도 래퍼(`parallelWithRetry([…])`)도 동시 스폰이다. 이전 판은 `parallel(` 만 잡아
+#    peer-review Stage 1 · plan-collaborative Stage 2 의 opus 병렬을 분모에서 뺐다(A5-03 실측: 블록 9 → 11).
+# ⛔ `(` 와 `[` 사이의 블록 주석도 허용한다 — `parallelWithRetry(/* x */ [` 가 블록 탐색을 빠져나갔다(2라운드 003)
+PARALLEL = re.compile(r"\bparallel\w*\s*\(\s*(?:/\*.*?\*/\s*)*\[", re.S)
 MODEL = re.compile(r"model:\s*'([a-z0-9.-]+)'")
 
 
@@ -93,6 +99,9 @@ def check(root: pathlib.Path):
     for q in wf:
         src = q.read_text(encoding="utf-8")
         for pos, body in parallel_blocks(src):
+            # ⛔ 주석 줄은 호출이 아니다 — 세면 `// model:'opus'` 한 줄이 거짓 초과를 만든다(GPT R-A 검토 004)
+            body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)   # 블록 주석도 호출이 아니다(2라운드 004)
+            body = "\n".join(l for l in body.split("\n") if not l.lstrip().startswith("//"))
             models = MODEL.findall(body)
             if not models:
                 continue                   # 에이전트 스폰이 아닌 parallel (thunk 변수 등)
@@ -181,6 +190,21 @@ def self_test():
         rc = check(r)
         assert rc == UNRUN, f"⛔ 정본 파싱 실패인데 rc={rc} — 기본값으로 때우면 안 된다"
 
+    def c_parallel_with_retry_counted(tmp):
+        """재시도 래퍼 안의 병렬도 동시다 — 래퍼 이름이 `parallel` 로 시작하면 센다."""
+        r = mk(tmp / "r", "await parallelWithRetry([\n" + " a({model:'opus'}),\n"*4 + "])\n")
+        assert check(r) == VIOLATION, "⛔ parallelWithRetry 안의 opus 4 동시를 놓쳤다"
+
+    def c_comment_line_not_counted(tmp):
+        r = mk(tmp / "r", "await parallel([\n a({model:'opus'}),\n // a({model:'opus'}),\n a({model:'opus'}), a({model:'opus'})\n])\n")
+        assert check(r) == OK, "주석 줄의 model 을 세어 opus 4 로 오판했다"
+
+    def c_block_comment_forms(tmp):
+        r = mk(tmp / "r", "await parallelWithRetry(/* audit */ [\n" + " a({model:'opus'}),\n"*4 + "])\n")
+        assert check(r) == VIOLATION, "⛔ ( 와 [ 사이 주석 뒤의 opus 4 동시를 놓쳤다"
+        r2 = mk(tmp / "r2", "await parallel([ a({model:'opus'}), /* a({model:'opus'}) */ a({model:'opus'}), a({model:'opus'}) ])\n")
+        assert check(r2) == OK, "블록 주석 안의 model 을 세어 거짓 초과를 냈다"
+
     def c_sequential_not_counted(tmp):
         """순차 스폰은 동시가 아니다 — parallel 밖은 세지 않는다."""
         r = mk(tmp / "r", "await a({model:'opus'})\nawait a({model:'opus'})\n"
@@ -203,6 +227,9 @@ def self_test():
                  ("fable-over-detected", c_fable_over),
                  ("total-over-detected", c_total_over),
                  ("limits-read-from-canon", c_limits_read_from_canon),
+                 ("parallel-with-retry-counted", c_parallel_with_retry_counted),
+                 ("comment-line-not-counted", c_comment_line_not_counted),
+                 ("block-comment-forms", c_block_comment_forms),
                  ("canon-unparseable-unrun", c_canon_unparseable_unrun),
                  ("sequential-not-counted", c_sequential_not_counted),
                  ("no-workflows-unrun", c_no_workflows_unrun),

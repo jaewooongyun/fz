@@ -276,4 +276,4 @@ Workflow(멀티에이전트 오케스트레이션)를 호출하는 스킬이면 
 
 - [ ] frontmatter `allowed-tools`에 `Workflow` 추가 (누락 시 호출 불가 dead code)
 - [ ] 표준 3종 (OVERRIDE 블록 / args 방어 파싱+fail-fast / agentType `fz:`)
-- [ ] 반환 `{mode, metrics{...}}` 계약 + 검증 oracle (래핑 syntax + 실 invoke ≥1 + §5.7 기록)
+- [ ] 반환 `{mode, metrics{...}}` 계약 + 검증 oracle (`node scripts/check_wf_syntax.js --root` + 실 invoke ≥1 + §5.7 기록)

@@ -20,6 +20,11 @@ const SECTION_TOKENS = {
   'Phase 3: Feedback Integration': 'FINAL_RULE_OK',   // S9a — plan-final 완전 재생성 규칙
   'Phase 2: Plan Validation': 'PARALLEL_OK',          // S9b — verify∥verify-gates 병렬 계약
 }
+// ⛔ `--order-in-section` 도 등록된 섹션만 본다 — 미등록 제목이 토큰을 인쇄하면 다른 섹션의 순서 게이트를
+//    대신 통과시킨다(`--section-has` 와 같은 이유).
+const ORDER_TOKENS = {
+  '실행 절차 (Lead)': 'PRECOPY_OK',   // fz-plan 2.5 사전 복사(cp) → 3 Workflow 호출. S22 가 fz-review·fz-peer-review 에 같은 절차를 더한다
+}
 
 function die(msg) { console.error(`FAIL: ${msg}`); process.exit(1) }
 function read(p) { try { return fs.readFileSync(p, 'utf8') } catch (e) { die(`읽을 수 없다: ${p} (${e.code})`) } }
@@ -117,13 +122,17 @@ function extractObjectLiteral(src, name) {
 if (mode === '--order-in-section') {
   // usage: --order-in-section '<섹션 제목>' '<먼저>' '<나중>' <file>
   const [, title, first, second, file] = argv
+  const token = ORDER_TOKENS[title]
+  if (!token) die(`순서 검사 미등록 섹션: '${title}' — ORDER_TOKENS 에 추가하라 (조용한 통과 금지)`)
   const sec = mdSection(read(file), title)
   if (!sec) die(`섹션을 찾지 못했다: ${title}`)
-  const a = sec.indexOf(first), b = sec.indexOf(second)
+  // ⛔ 첫 needle 의 **마지막** 등장이 둘째 needle 의 첫 등장보다 앞이어야 한다 — 첫 등장끼리 비교하면
+  //    절차 앞 설명의 인용이 실제 순서 역전을 가린다(GPT R-A 2라운드 005)
+  const a = sec.lastIndexOf(first), b = sec.indexOf(second)
   if (a < 0) die(`'${first}' 가 섹션 '${title}' 에 없다`)
   if (b < 0) die(`'${second}' 가 섹션 '${title}' 에 없다`)
-  if (!(a < b)) die(`순서 위반: '${first}'(${a}) 가 '${second}'(${b}) 보다 뒤에 있다`)
-  console.log(`PRECOPY_OK ('${first}' → '${second}' 순서 확인)`)
+  if (!(a < b)) die(`순서 위반: '${first}'(마지막 ${a}) 가 '${second}'(첫 ${b}) 보다 뒤에 있다`)
+  console.log(`${token} ('${first}' → '${second}' 순서 확인)`)
   process.exit(0)
 }
 
@@ -219,13 +228,17 @@ if (mode === '--self-test') {
   run(['--section-has', 'Phase 2: Plan Validation', '불변 입력', '별도 출력', '양쪽 완료', 'schema', md], 0)
   run(['--section-has', 'Phase 2: Plan Validation', '없는문구', md], 1)
   run(['--section-has', 'Unregistered Section', 'x', md], 1)
-  // --order-in-section: 양성 / 역순
+  // --order-in-section: 양성 / 역순 / 미등록 섹션
   const md2 = path.join(d, 'b.md')
-  fs.writeFileSync(md2, '### 실행 절차 (Lead)\n3. cp foo bar\n4. Workflow(x)\n')
+  fs.writeFileSync(md2, '### 실행 절차 (Lead)\n3. cp foo bar\n4. Workflow(x)\n\n### Other Steps\n1. cp a b\n2. Workflow(y)\n')
   run(['--order-in-section', '실행 절차 (Lead)', 'cp ', 'Workflow(', md2], 0)
   const md3 = path.join(d, 'c.md')
   fs.writeFileSync(md3, '### 실행 절차 (Lead)\n3. Workflow(x)\n4. cp foo bar\n')
   run(['--order-in-section', '실행 절차 (Lead)', 'cp ', 'Workflow(', md3], 1)
+  run(['--order-in-section', 'Other Steps', 'cp ', 'Workflow(', md2], 1)
+  const md4 = path.join(d, 'g.md')
+  fs.writeFileSync(md4, '### 실행 절차 (Lead)\n설명: cp foo bar 가 먼저다\n3. Workflow(x)\n4. cp foo bar\n')
+  run(['--order-in-section', '실행 절차 (Lead)', 'cp ', 'Workflow(', md4], 1)
   // --schema-len: 상한 있음 / 없음
   const js1 = path.join(d, 'd.js')
   fs.writeFileSync(js1, "const S = { properties: { evidence: { type: 'string', description: '근거 — 200자 이내' } } }\n")
