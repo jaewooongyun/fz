@@ -1,0 +1,54 @@
+{
+ "fixture": "rules-conflict",
+ "kind": "review",
+ "platform": "ios",
+ "base_branch": "main",
+ "head_branch": "feature",
+ "guidelines": [
+  "CLAUDE.md",
+  "AGENTS.md"
+ ],
+ "axes_required": [],
+ "not_applicable_axes": [],
+ "issues": [
+  {
+   "id": "C1",
+   "axis": "correctness",
+   "severity": "critical",
+   "file": "Sources/Profile/ProfileService.swift",
+   "side": "RIGHT",
+   "line_start": 15,
+   "line_end": 15,
+   "anchor": "DispatchQueue.main.sync",
+   "rule_ref": null,
+   "summary": "메인 스레드에서 호출되면 DispatchQueue.main.sync 가 교착(deadlock) — 호출 스레드 가정 없음"
+  }
+ ],
+ "conflicts": [
+  {
+   "id": "K1",
+   "axis": "naming",
+   "sources": [
+    "CLAUDE.md#Naming",
+    "AGENTS.md#Naming"
+   ],
+   "claim_a": "서버 응답 파싱 타입은 …DTO",
+   "claim_b": "서버 응답 타입은 …Response",
+   "target": "Sources/Profile/ProfileResponse.swift",
+   "expected": "flag_conflict_no_pick"
+  },
+  {
+   "id": "K2",
+   "axis": "ui_structure",
+   "sources": [
+    "CLAUDE.md#UI",
+    "AGENTS.md#UI"
+   ],
+   "claim_a": "새 UI 는 SwiftUI",
+   "claim_b": "UIKit 만, SwiftUI 금지",
+   "target": "Sources/Profile/ProfileCardView.swift",
+   "expected": "flag_conflict_no_pick"
+  }
+ ],
+ "forbidden_rule_citations": []
+}

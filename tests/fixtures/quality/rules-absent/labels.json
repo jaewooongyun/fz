@@ -1,0 +1,55 @@
+{
+ "fixture": "rules-absent",
+ "kind": "review",
+ "platform": "ios",
+ "base_branch": "main",
+ "head_branch": "feature",
+ "guidelines": [],
+ "axes_required": [],
+ "not_applicable_axes": [],
+ "issues": [
+  {
+   "id": "A1",
+   "axis": "correctness",
+   "severity": "major",
+   "file": "Sources/Profile/ProfileLoader.swift",
+   "side": "RIGHT",
+   "line_start": 17,
+   "line_end": 17,
+   "anchor": "URL(string: \"https://img.example.invalid/avatars/\" + rawValue)!",
+   "rule_ref": null,
+   "summary": "외부 입력으로 만든 URL 을 강제 언래핑 — 공백·특수문자 입력에서 크래시"
+  },
+  {
+   "id": "A2",
+   "axis": "ui_structure",
+   "severity": "major",
+   "file": "Sources/Profile/ProfileHeaderView.swift",
+   "side": "RIGHT",
+   "line_start": 9,
+   "line_end": 9,
+   "anchor": "@ObservedObject var model = ProfileHeaderModel()",
+   "rule_ref": null,
+   "summary": "View 가 소유하는 모델을 @ObservedObject 로 생성 — 재렌더 때 팔로우 상태 초기화(SwiftUI 소유권 의미론, 프로젝트 규칙 아님)"
+  }
+ ],
+ "conflicts": [],
+ "forbidden_rule_citations": [
+  {
+   "topic": "weak var 를 guard let 으로 푸는 것",
+   "why": "지침 파일이 없다 — 프로젝트 규칙으로 인용하면 AC-3 위반(코드 근거 제안은 허용)"
+  },
+  {
+   "topic": "하드코딩 색상 / 디자인 토큰",
+   "why": "토큰 규칙의 출처가 없다"
+  },
+  {
+   "topic": "RIBs·Clean Architecture 레이어·DTO 접미사",
+   "why": "아키텍처 규칙의 출처가 없다"
+  },
+  {
+   "topic": "Passive View·ViewModel 규약",
+   "why": "플러그인 기본 지식을 이 프로젝트 규칙으로 올리지 않는다"
+  }
+ ]
+}

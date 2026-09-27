@@ -1,0 +1,21 @@
+# SampleTV iOS — 프로젝트 지침
+
+## Architecture
+
+- RIBs: 화면 단위는 `{Feature}Builder` · `{Feature}Router` · `{Feature}Interactor` · `{Feature}ViewController` 4종으로 만든다
+- Clean Architecture 의존 방향은 Interactor → UseCase → Repository → Network 한 방향이다. Interactor 는 Network 계층(`APIClient`)을 직접 부르지 않는다
+- 폴더: Entity·Repository 프로토콜·UseCase 는 `Domain/{Feature}/`, DTO·Repository 구현(`Default…Repository`)은 `Data/{Feature}/` 에 둔다
+- 서버 응답을 파싱하는 타입은 `…DTO` 접미사를 쓴다(`…Response` 금지). Entity 에는 `Decodable` 을 붙이지 않는다
+
+## Code Conventions
+
+- `weak var` 는 `if let`·`guard let` 으로 풀지 않고 `?.` 로 호출한다
+- UI 상태 변경은 `@MainActor`(메인 스레드)에서만 한다
+- 최소 타깃은 iOS 16 이다. `@Observable`·`@Bindable` 은 `#available(iOS 17, *)` 가드 없이 쓰지 않는다
+- 새 UI 는 SwiftUI 로 만들고 UIKit 화면에는 `UIHostingController` 로 넣는다. View 가 소유하는 모델은 `@StateObject`, 주입받는 모델은 `@ObservedObject`
+- `Shared/Utils/` 에 있는 공용 유틸을 다시 만들지 않는다(예: `Debouncer`)
+- 색·폰트는 디자인 토큰(`DSColor`·`DSFont`)만 쓴다
+
+## Build
+
+- 이 저장소는 합성 리뷰 fixture 라 빌드·테스트 대상이 없다. 빌드 검증 단계는 `true` 로 대신한다(실행할 빌드 명령 없음)

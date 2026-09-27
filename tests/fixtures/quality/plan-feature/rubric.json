@@ -1,0 +1,189 @@
+{
+ "fixture": "plan-feature",
+ "kind": "plan",
+ "requirement": "requirement.md",
+ "guidelines": [
+  "CLAUDE.md"
+ ],
+ "sections": {
+  "Contracts": [
+   {
+    "id": "PC1",
+    "criterion": "등록·해제 API 의 요청/응답 DTO 와 오류 계약, 중복 등록(멱등성) 처리를 정의한다 — 구체 상태 코드·방식은 계획이 정한다(409·멱등 키 등은 예시)",
+    "keywords": [
+     "DTO",
+     "멱등",
+     "중복",
+     "오류"
+    ]
+   }
+  ],
+  "Roles": [
+   {
+    "id": "PR1",
+    "criterion": "알림 예약·해제의 책임 계층(UseCase)과 Interactor·Router 의 역할을 나눈다",
+    "keywords": [
+     "UseCase",
+     "Interactor",
+     "Router"
+    ]
+   }
+  ],
+  "Stage": [
+   {
+    "id": "PS1",
+    "criterion": "Step 순서와 각 Step 의 검증(빌드·테스트)을 둔다",
+    "keywords": [
+     "Step",
+     "검증"
+    ]
+   }
+  ],
+  "Adapters": [
+   {
+    "id": "PA1",
+    "criterion": "Network(APIClient)·UNUserNotificationCenter·로컬 저장을 어댑터로 분리한다",
+    "keywords": [
+     "UNUserNotificationCenter",
+     "Repository",
+     "APIClient"
+    ]
+   }
+  ],
+  "State": [
+   {
+    "id": "PT1",
+    "criterion": "알림 상태의 정본(서버 vs 로컬)과 동기화 규칙을 정한다",
+    "keywords": [
+     "정본",
+     "동기화",
+     "서버"
+    ]
+   }
+  ],
+  "Failure": [
+   {
+    "id": "PF1",
+    "criterion": "오프라인 재전송·알림 권한 거부·중복 알림을 다룬다",
+    "keywords": [
+     "오프라인",
+     "권한",
+     "중복"
+    ]
+   }
+  ]
+ },
+ "questions": {
+  "Q1": [
+   {
+    "id": "Q1a",
+    "criterion": "항목 N개에 알림을 켰을 때도 같은 설계가 성립하는가",
+    "keywords": [
+     "N개",
+     "일괄"
+    ]
+   }
+  ],
+  "Q2": [
+   {
+    "id": "Q2a",
+    "criterion": "시청 목록 화면·설정 화면(소비자)에 새 분기가 필요한가",
+    "keywords": [
+     "설정",
+     "시청 목록"
+    ]
+   }
+  ],
+  "Q3": [
+   {
+    "id": "Q3a",
+    "criterion": "Interactor 단순화가 UseCase 복잡도로 옮겨 가는지 본다",
+    "keywords": [
+     "복잡도"
+    ]
+   }
+  ],
+  "Q4": [
+   {
+    "id": "Q4a",
+    "criterion": "이미 공개된 콘텐츠·시간대(timezone)·공개일 변경",
+    "keywords": [
+     "시간대",
+     "공개일 변경"
+    ]
+   }
+  ],
+  "Q5": [
+   {
+    "id": "Q5a",
+    "criterion": "알림을 눌러 상세로 들어올 때 로그아웃·권한 없음 상태를 어떻게 처리하는지 정한다(로그인 유도·목록 이동·무시 등 어느 것이든)",
+    "keywords": [
+     "딥링크",
+     "로그인",
+     "권한"
+    ]
+   }
+  ],
+  "Q6": [
+   {
+    "id": "Q6a",
+    "criterion": "등록·해제·알림 탭 이벤트 계측 위치",
+    "keywords": [
+     "이벤트",
+     "계측"
+    ]
+   }
+  ],
+  "Q7": [
+   {
+    "id": "Q7a",
+    "criterion": "기존 Watchlist 소비 코드가 새 API 를 올바르게 쓰는가",
+    "keywords": [
+     "소비"
+    ]
+   }
+  ],
+  "Q8": [
+   {
+    "id": "Q8a",
+    "criterion": "항목 삭제 시 알림도 해제(요구 5) — 원인·결과 코드까지 범위에 포함",
+    "keywords": [
+     "삭제",
+     "해제"
+    ]
+   }
+  ]
+ },
+ "load_10x": [
+  {
+   "id": "L1",
+   "criterion": "예약 알림 수가 10배로 늘 때 — iOS 대기 로컬 알림 수 상한(64개)을 인지하고 넘칠 때의 정책을 정한다(가까운 N개만 예약·재예약·서버 푸시 전환 등 어느 것이든)",
+   "keywords": [
+    "64",
+    "상한",
+    "정책"
+   ]
+  }
+ ],
+ "dependency_failure": [
+  {
+   "id": "D1",
+   "criterion": "서버 장애·알림 권한 거부 시 토글 상태와 사용자 안내",
+   "keywords": [
+    "장애",
+    "권한 거부"
+   ]
+  }
+ ],
+ "rollback": [
+  {
+   "id": "B1",
+   "criterion": "원격 플래그로 기능을 끄고, 예약된 로컬 알림을 정리하는 롤백 경로",
+   "keywords": [
+    "플래그",
+    "롤백",
+    "정리"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+# SampleTV Profile — 지침
+
+## Naming
+
+- 서버 응답을 파싱하는 타입은 `…DTO` 접미사를 쓴다
+
+## UI
+
+- 새 UI 는 SwiftUI 로 만든다

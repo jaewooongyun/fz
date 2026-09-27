@@ -1,0 +1,9 @@
+# SampleTV Profile — 에이전트 지침
+
+## Naming
+
+- 서버 응답 타입은 `…Response` 접미사로 통일한다
+
+## UI
+
+- 화면은 UIKit 으로만 만든다. SwiftUI 는 쓰지 않는다

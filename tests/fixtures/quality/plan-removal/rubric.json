@@ -1,0 +1,233 @@
+{
+ "fixture": "plan-removal",
+ "kind": "plan",
+ "requirement": "requirement.md",
+ "guidelines": [
+  "CLAUDE.md"
+ ],
+ "sections": {
+  "Contracts": [
+   {
+    "id": "RC1",
+    "criterion": "제거 뒤 남는 공개 인터페이스(HomeInteractor·AppContainer 생성자) 변경을 정의한다",
+    "keywords": [
+     "생성자",
+     "인터페이스"
+    ]
+   }
+  ],
+  "Roles": [
+   {
+    "id": "RR1",
+    "criterion": "DI 컨테이너가 배너 의존을 더 이상 만들지 않는다",
+    "keywords": [
+     "AppContainer",
+     "DI"
+    ]
+   }
+  ],
+  "Stage": [
+   {
+    "id": "RS1",
+    "criterion": "소비자 제거 → DI 제거 → 타입 제거 순서와 단계별 빌드 검증",
+    "keywords": [
+     "순서",
+     "빌드"
+    ]
+   }
+  ],
+  "Adapters": [
+   {
+    "id": "RA1",
+    "criterion": "UserDefaults 키 정리(마이그레이션) 경로",
+    "keywords": [
+     "UserDefaults",
+     "마이그레이션"
+    ]
+   }
+  ],
+  "State": [
+   {
+    "id": "RT1",
+    "criterion": "원격 플래그 legacy_promo_banner 의 서버 쪽 정리 또는 무시 처리",
+    "keywords": [
+     "플래그"
+    ]
+   }
+  ],
+  "Failure": [
+   {
+    "id": "RF1",
+    "criterion": "구버전 앱과 신버전이 공존할 때 플래그·계측이 깨지지 않는다",
+    "keywords": [
+     "구버전",
+     "공존"
+    ]
+   }
+  ]
+ },
+ "questions": {
+  "Q1": [
+   {
+    "id": "Q1a",
+    "criterion": "배너 슬롯이 여러 화면(홈·시청 목록)에 있다는 다중성",
+    "keywords": [
+     "홈",
+     "시청 목록"
+    ]
+   }
+  ],
+  "Q2": [
+   {
+    "id": "Q2a",
+    "criterion": "생성자에서 manager 인자를 지우면 소비자 전부가 바뀐다",
+    "keywords": [
+     "소비자"
+    ]
+   }
+  ],
+  "Q3": [
+   {
+    "id": "Q3a",
+    "criterion": "홈 레이아웃에서 bannerView 제거가 다른 제약에 미치는 영향",
+    "keywords": [
+     "레이아웃"
+    ]
+   }
+  ],
+  "Q4": [
+   {
+    "id": "Q4a",
+    "criterion": "플래그가 꺼진 사용자·이미 닫은 사용자의 경계",
+    "keywords": [
+     "경계"
+    ]
+   }
+  ],
+  "Q5": [
+   {
+    "id": "Q5a",
+    "criterion": "제거 뒤 배너를 다시 띄우는 우회 경로가 없다",
+    "keywords": [
+     "우회"
+    ]
+   }
+  ],
+  "Q6": [
+   {
+    "id": "Q6a",
+    "criterion": "promo_banner_impression·promo_banner_dismiss 계측 제거와 대시보드 영향",
+    "keywords": [
+     "계측",
+     "impression"
+    ]
+   }
+  ],
+  "Q7": [
+   {
+    "id": "Q7a",
+    "criterion": "남은 호출부가 없는지 소비자 코드 전수",
+    "keywords": [
+     "전수"
+    ]
+   }
+  ],
+  "Q8": [
+   {
+    "id": "Q8a",
+    "criterion": "배너가 존재하기 위해 추가된 구조(프로토콜·저장 프로퍼티·생성자 인자·DI·테스트)까지 제거",
+    "keywords": [
+     "잔재",
+     "구조"
+    ]
+   }
+  ]
+ },
+ "load_10x": [
+  {
+   "id": "L1",
+   "criterion": "해당 없음을 근거와 함께 명시(제거 작업)",
+   "keywords": [
+    "해당 없음"
+   ]
+  }
+ ],
+ "dependency_failure": [
+  {
+   "id": "D1",
+   "criterion": "원격 설정 서버가 옛 플래그를 계속 내려줘도 무해하다",
+   "keywords": [
+    "원격 설정"
+   ]
+  }
+ ],
+ "rollback": [
+  {
+   "id": "B1",
+   "criterion": "제거 커밋 되돌리기로 복구 가능하고 UserDefaults 정리는 되돌릴 필요가 없다",
+   "keywords": [
+    "되돌리기",
+    "복구"
+   ]
+  }
+ ],
+ "residues": [
+  {
+   "id": "RZ1",
+   "symbol": "LegacyPromoBannerManaging",
+   "file": "App/Promo/LegacyPromoBannerManager.swift"
+  },
+  {
+   "id": "RZ2",
+   "symbol": "legacyPromoBannerDismissedAt",
+   "file": "App/Promo/LegacyPromoBannerManager.swift"
+  },
+  {
+   "id": "RZ3",
+   "symbol": "legacyPromoBanner = \"legacy_promo_banner\"",
+   "file": "App/Shared/FeatureFlags.swift"
+  },
+  {
+   "id": "RZ4",
+   "symbol": "private let promoBannerManager",
+   "file": "App/Home/HomeInteractor.swift"
+  },
+  {
+   "id": "RZ5",
+   "symbol": "lazy var promoBannerManager",
+   "file": "App/AppContainer.swift"
+  },
+  {
+   "id": "RZ6",
+   "symbol": "private let bannerView",
+   "file": "App/Home/HomeViewController.swift"
+  },
+  {
+   "id": "RZ7",
+   "symbol": "promo_banner_impression",
+   "file": "App/Home/HomeViewController.swift"
+  },
+  {
+   "id": "RZ8",
+   "symbol": "LegacyPromoBannerManagerTests",
+   "file": "Tests/LegacyPromoBannerManagerTests.swift"
+  }
+ ],
+ "consumers": [
+  {
+   "id": "CU1",
+   "symbol": "promoBannerManager.shouldShowBanner()",
+   "file": "App/Home/HomeInteractor.swift"
+  },
+  {
+   "id": "CU2",
+   "symbol": "manager.shouldShowBanner()",
+   "file": "App/Watchlist/WatchlistPromoSlot.swift"
+  },
+  {
+   "id": "CU3",
+   "symbol": "WatchlistPromoSlot(manager: promoBannerManager)",
+   "file": "App/AppContainer.swift"
+  }
+ ]
+}
