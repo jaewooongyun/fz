@@ -1,5 +1,28 @@
 # Changelog
 
+### v4.42.0 (2026-09-28) — 리뷰는 확신 없는 후보를 발견 단계에서 지웠고, 같은 이슈를 세 번 옮겨 적었다 [MINOR]
+
+R-B 품질 축 — 리뷰·계획의 품질을 올리는 길을 옵션으로 넣는다. 워크플로 옵션 셋과 `--render` 는 기본 off 라서 주지 않으면 콜 입력이
+기준(v4.39.1)과 바이트 단위로 같다. 측정 없이 출하하고, 켠 효과와 기본값 전환은 R-C(v4.43.0)에서 판정한다.
+
+**후보 보존 (`args.preserveLowConfidence`)** — 발견 단계의 "confidence 80 미만 미보고" 를 켤 때만 `[후보 보존]` 문장으로 바꾼다.
+렌즈 스킬과 Lead 모듈은 원문을 두고 조건부 줄을 달았다. 문구 변형까지 잡는 검사기가 표기가 다른 Synthesize 줄(`confidence<80 미보고`)도 찾는다.
+
+**단일 출처 렌더 (`--render` · `render_review.py`)** — review.json 하나에서 review-report.md · pr-comments.md · 게시 payload 를 만든다.
+줄 앵커는 `diff_anchors.py` 로 계산하고, 겹치는 hunk 는 `pick` 없이는 거부하며, 확인 게이트 사유를 미리보기에 적는다.
+
+**결정론 병합 (`review_merge.py`)** — §3 키로 묶되 후보를 지우지 않는다. 근거 재실측 실패와 확신도 80 미만 결함은 hold 이고, craft 는
+ruleRef 가 있고 확신도 80 이상일 때만 post 다. 계약은 MergeContract §10.
+
+**craft 6축 (`args.craftAxes`) · 필수 필드 재고지 (`args.crossRequiredFields`)** — arch 렌즈에 6축 줄과 axisCoverage 를, Stage 2 교차
+프롬프트에 additions 의 required 키(스키마에서 읽는다)를 넣는다.
+
+**규칙 추출 · 검증** — 지침 원문 색인 → 모델별 규칙 레코드 → 검증 통과본만 쓴다. ⚠️ 옵션이 아니라 fz-plan 절차 1.5 의 Lead 절차
+변경이다 — 워커에 넘기는 `archConstraints` 는 옛 형식의 호환 투영이고, 넘기지 않으면 워커 프롬프트는 그대로다.
+
+**fz-plan 기계 작업 (`plan_apply_delta.py` · `plan_divergence.py`)** — lean2 델타를 Step id 에 붙이고, Claude ↔ GPT 독립 플랜 차이표를
+만든다. fz-plan 이 이 둘을 부르는 배선은 R-C 다.
+
 ### v4.41.0 (2026-09-27) — 원장은 미룸을 포기로만 적을 수 있었고, 확정 원장을 고치는 길은 자기 거부 문구에 막혀 있었다 [MINOR]
 
 R-B 실행 선행 — 세 릴리스에 걸친 계획을 원장 하나로 끌고 가며 R-A 내내 우회로 버틴 게이트 원장 도구의 구멍을 채운다. R-B 본 작업은 v4.42.0 이다.
