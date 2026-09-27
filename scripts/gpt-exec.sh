@@ -19,10 +19,11 @@
 #   gpt-exec.sh exec   --cd DIR --out FILE --prompt-file F
 #                        [--effort E] [--schema F] [--add-dir D] [--gpt-skill N] [--gpt-skill-path P]
 #   gpt-exec.sh resume --cd DIR --out FILE --prompt-file F --session-file PREV_OUT.session
-#                        [--effort E] [--schema F]
+#                        [--effort E] [--schema F] [--gpt-skill N] [--gpt-skill-path P]
 #                        ⛔ 이전 exec/review 가 남긴 `${OUT}.session`(UUID) 으로 **그 세션**을 잇는다.
 #                           `--last` 를 쓰지 않는다 — 사이에 다른 GPT 실행이 끼면 엉뚱한 세션을 잇는다.
 #   (모든 모드) 성공 시 스트림 로그의 `session id:` 를 `${OUT}.session` 에 기록한다.
+#   --gpt-skill-path: exec·resume 는 그 SKILL.md 본문을 프롬프트 앞에 주입한다(멱등). review 는 프롬프트가 없어 WARN 만.
 #
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건 / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
@@ -61,7 +62,8 @@ while [ $# -gt 0 ]; do
     --title)           need $# "--title";           TITLE="$2"; shift 2 ;;
     --add-dir)         need $# "--add-dir";         ADD_DIRS+=("$2"); shift 2 ;;
     --expected-branch) need $# "--expected-branch"; EXPECTED_BRANCH="$2"; shift 2 ;;
-    # ⛔ 계측 전용 — gpt 에 전달하지 않는다(기록만). resolved 해석은 호출부 get_gpt_skill_path 소관.
+    # --gpt-skill = 역할 이름(계측 전용 — gpt 에 전달하지 않는다) · --gpt-skill-path = SKILL.md 경로(exec·resume 는 본문 주입).
+    #   resolved 해석은 호출부 get_gpt_skill_path 소관.
     --gpt-skill)       need $# "--gpt-skill";       GPT_SKILL="$2"; shift 2 ;;
     --gpt-skill-path)  need $# "--gpt-skill-path";  GPT_SKILL_PATH="$2"; shift 2 ;;
     --base)            need $# "--base";            set_scope base "$2"
@@ -122,6 +124,13 @@ fi
 [ -n "$OUT" ] || die 10 "--out 필수"
 [ -n "$PROMPT_FILE" ] && { [ -s "$PROMPT_FILE" ] || die 11 "프롬프트 파일 없음/빈 파일: $PROMPT_FILE"; }
 [ -n "$SCHEMA" ] && { [ -s "$SCHEMA" ] || die 11 "스키마 파일 없음: $SCHEMA"; }
+# ⛔ exec·resume 는 --gpt-skill-path 본문을 주입한다 — 경로가 있는데 파일이 없으면 역할 없이 도는 run 을 호출 전에 막는다.
+#    빈 문자열은 "해석 실패 → 일반 프롬프트 폴백" 이라 여기서 막지 않는다(fallback=1 로 기록된다).
+if [ -n "$GPT_SKILL_PATH" ] && [ "$MODE" != "review" ]; then
+  # ⛔ `-s` 는 디렉터리·공백뿐 파일도 통과시킨다 — 빈 본문은 `*""*` 가 늘 참이라 주입 없이 injected=1 이 됐다(v4.40.0 리뷰)
+  { [ -f "$GPT_SKILL_PATH" ] && [ -r "$GPT_SKILL_PATH" ] && grep -q '[^[:space:]]' "$GPT_SKILL_PATH"; } \
+    || die 11 "--gpt-skill-path 가 읽을 수 있는 본문 파일이 아니다(없음·디렉터리·공백뿐): $GPT_SKILL_PATH"
+fi
 command -v codex >/dev/null 2>&1 || die 11 "codex CLI 미설치"
 
 # ── 사전 게이트 3: (폐지 2026-09-25) trust_level 경고 — 래퍼가 read-only 를 스스로 강제하므로(아래 ARGS) "read-only 로 강제될 수 있다" 는 경고는 거짓 경보였다
@@ -179,6 +188,36 @@ ARGS+=(-o "$OUT")
 LOG="${OUT}.stream.log"
 rm -f "$OUT" "${OUT}.session"   # 실패 시 이전 성공 run 의 session 이 남아 resume 이 엉뚱한 세션을 잇지 않게 (resume 의 SESSION_ID 는 위에서 이미 읽었다)
 
+# ── 스킬 본문 주입 (A2-03) — exec·resume 전용 · 멱등
+# ⛔ 호출부 8곳(modules/cross-validation.md 호출 계약)은 본문을 마커 없이 `cat` 으로 넣는다 → 멱등 판정은 마커가 아니라
+#    **본문 전체**가 이미 있으면 넣지 않는다. 제목 기반 판정은 쓰지 않는다 — 번들 스킬 8개 모두 첫 제목 다음 줄이
+#    `## Role` 이라 구별되지 않고, 과제 문구에 제목이 우연히 들어가면 본문 없이 injected=1 로 집계된다(GPT R-A 검토 011·2라운드 009).
+#    형식이 다른 사본이 이미 있으면 두 번 들어간다 — 역할 지시가 빠지는 것보다 낫다.
+# ⛔ INJECTED = 최종 프롬프트에 본문이 들어 있는가(래퍼가 넣었든 호출부가 넣었든 1). review 는 프롬프트가 없어 항상 0.
+# ⛔ 프롬프트는 여기서(cd **전에**) 읽는다 — 상대 경로가 서브셸 cwd 기준으로 풀리면 사전 게이트가 본 파일과 다른 파일을 읽는다.
+INJECTED=0
+PROMPT_TEXT=""
+if [ "$MODE" != "review" ]; then
+  PROMPT_TEXT="$(cat "$PROMPT_FILE")"
+  if [ -n "$GPT_SKILL_PATH" ]; then
+    SKILL_BODY="$(cat "$GPT_SKILL_PATH")" || die 11 "--gpt-skill-path 를 읽지 못했다: $GPT_SKILL_PATH"
+    if [[ "$PROMPT_TEXT" == *"$SKILL_BODY"* ]]; then
+      INJECTED=1
+    else
+      SKILL_NAME="$(basename "$(dirname "$GPT_SKILL_PATH")")"
+      PROMPT_TEXT="[fz-gpt-skill-injected] ${SKILL_NAME} — 아래는 역할 스킬 본문이다(래퍼 주입)
+${SKILL_BODY}
+
+---
+
+${PROMPT_TEXT}"
+      INJECTED=1
+    fi
+  fi
+elif [ -n "$GPT_SKILL_PATH" ]; then
+  echo "WARN: review 모드는 프롬프트를 받지 않아 --gpt-skill-path 본문을 주입하지 못한다 — 역할 스킬이 필요하면 exec 모드를 쓴다" >&2
+fi
+
 # ── 호출 (hygiene §1 stdin close · §3 -o · §7 `--` 구분자)
 if [ "$MODE" = "review" ]; then
   [ -n "$TITLE" ] && ARGS+=(--title "$TITLE")
@@ -186,25 +225,28 @@ if [ "$MODE" = "review" ]; then
   #    ( ) 안에서만 cd 하므로 호출자 cwd 는 불변이다.
   ( cd "$CD" && codex exec review "${ARGS[@]}" "${SCOPE_ARGS[@]}" < /dev/null ) > "$LOG" 2>&1
 elif [ "$MODE" = "resume" ]; then
-  # ⛔ resume 는 `-C`·`--add-dir` 를 받지 않는다 → review 와 같이 서브셸 cwd 전환.
-  # ⛔ 프롬프트는 cd **전에** 읽는다 — 상대 경로가 서브셸 cwd 기준으로 풀리면 사전 게이트가 본 파일과 다른 파일을 읽는다
-  RESUME_PROMPT="$(cat "$PROMPT_FILE")"
-  ( cd "$CD" && codex exec resume "${ARGS[@]}" -- "$SESSION_ID" "$RESUME_PROMPT" < /dev/null ) > "$LOG" 2>&1
+  # ⛔ resume 는 `-C`·`--add-dir` 를 받지 않는다 → review 와 같이 서브셸 cwd 전환. 프롬프트는 위 주입 단계에서 cd 전에 읽었다.
+  ( cd "$CD" && codex exec resume "${ARGS[@]}" -- "$SESSION_ID" "$PROMPT_TEXT" < /dev/null ) > "$LOG" 2>&1
 else
   EXEC_ARGS=(-C "$CD")
   for d in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do EXEC_ARGS+=(--add-dir "$d"); done
-  codex exec "${EXEC_ARGS[@]}" "${ARGS[@]}" -- "$(cat "$PROMPT_FILE")" < /dev/null > "$LOG" 2>&1
+  codex exec "${EXEC_ARGS[@]}" "${ARGS[@]}" -- "$PROMPT_TEXT" < /dev/null > "$LOG" 2>&1
 fi
 GPT_EXIT=$?
 
-# ── gpt-skill 실사용 계측 (기록 전용) — 열: ts / mode / requested / resolved / fallback / exit (헤더 없음)
-#    resolved = 호출부가 해석한 SKILL.md 경로. 빈 값이면 일반 프롬프트 폴백이므로 fallback=1.
+# ── gpt-skill 실사용 계측 (기록 전용) — 열: ts / mode / requested / resolved / fallback / exit / injected / cli_version (헤더 없음)
+#    requested = --gpt-skill(없으면 -). resolved = 호출부가 해석한 SKILL.md 경로. 빈 값이면 일반 프롬프트 폴백이므로 fallback=1.
+#    injected = 최종 프롬프트에 스킬 본문이 들어 있는가 — SC-1 은 이 열이 1 인 호출만 "스킬 사용" 으로 센다. review 는 항상 0.
+#    ⛔ 열은 **뒤에만** 붙인다(헤더 없는 TSV — 앞 열 위치를 바꾸면 옛 행과 섞인다). cli_version 조회 실패는 `-`.
 #    ⛔ exit 열은 **gpt 종료코드**다 — 사후 게이트 12~14(측정 실패)는 반영되지 않는다.
 #    ⛔ 로그 실패는 exit 계약(10~14)을 바꾸지 않는다. 디렉토리 부재 시 조용히 건너뛴다.
 TELEMETRY_DIR="${FZ_TELEMETRY_DIR:-${HOME:-}/.fz/telemetry}"   # 기본값 출처: scripts/fz_stop_telemetry.py:32
-if [ -n "$GPT_SKILL" ] && [ -d "$TELEMETRY_DIR" ]; then
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODE" "$GPT_SKILL" \
-    "${GPT_SKILL_PATH:--}" "$([ -n "$GPT_SKILL_PATH" ] && echo 0 || echo 1)" "$GPT_EXIT" \
+if { [ -n "$GPT_SKILL" ] || [ -n "$GPT_SKILL_PATH" ]; } && [ -d "$TELEMETRY_DIR" ]; then
+  # ⛔ 필드 안의 탭·개행은 공백으로 — 한 호출이 8열이 아니게 되거나 여러 행으로 갈라지지 않게(검토 012)
+  tsv() { printf '%s' "$1" | tr '\t\n\r' '   '; }
+  CLI_VERSION="$(codex --version 2>/dev/null | head -1)"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODE" "$(tsv "${GPT_SKILL:--}")" \
+    "$(tsv "${GPT_SKILL_PATH:--}")" "$([ -n "$GPT_SKILL_PATH" ] && echo 0 || echo 1)" "$GPT_EXIT" "$INJECTED" "$(tsv "${CLI_VERSION:--}")" \
     2>/dev/null >> "$TELEMETRY_DIR/gpt-skill-usage.tsv" || true
 fi
 

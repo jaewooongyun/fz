@@ -1,0 +1,23 @@
+#!/bin/bash
+# 가짜 GPT CLI — tests/fixtures/gpt/* 러너 전용. 실제 CLI 를 부르지 않고 gpt-exec.sh 의 계약만 본다.
+# 파일 이름은 래퍼가 `command -v` 로 찾는 CLI 바이너리 이름을 따른다(러너가 PATH 앞에 이 폴더를 붙인다).
+#
+#   FZ_SHIM_CAPTURE : argv 를 JSON 배열로 이 파일에 쓴다 — 프롬프트가 여러 줄이라 줄 단위 덤프는 깨진다
+#   FZ_SHIM_OUTPUT  : `-o FILE` 에 쓸 내용 (미설정이면 "ok" · 빈 문자열이면 빈 파일)
+#   FZ_SHIM_EXIT    : 종료코드 (기본 0)
+if [ "${1:-}" = "--version" ]; then echo "codex-cli 0.0.0-shim"; exit 0; fi
+if [ -n "${FZ_SHIM_CAPTURE:-}" ]; then
+  python3 - "$@" <<'PY'
+import json, os, sys
+json.dump(sys.argv[1:], open(os.environ["FZ_SHIM_CAPTURE"], "w", encoding="utf-8"), ensure_ascii=False)
+PY
+fi
+out="" prev=""
+for a in "$@"; do
+  [ "$a" = "--" ] && break
+  [ "$prev" = "-o" ] && out="$a"
+  prev="$a"
+done
+[ -n "$out" ] && printf '%s' "${FZ_SHIM_OUTPUT-ok}" > "$out"
+echo "session id: 11111111-2222-3333-4444-555555555555"
+exit "${FZ_SHIM_EXIT:-0}"
