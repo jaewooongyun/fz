@@ -206,6 +206,10 @@ grep -q '§5.8 ⑥' guides/model-guide.md || note "model-guide.md 가 sweep 기�
 grep -q '### ⑥ 세션 effort sweep' experiment-log.md || note "experiment-log.md 에 §5.8 ⑥ 표가 없다 (가이드가 없는 곳을 가리킨다)"
 grep -q '## §5.9 구조 ablation' experiment-log.md || note "experiment-log.md 에 §5.9 표가 없다"
 
+# ③-b 최상단 절의 finding 표 — 표가 있으면 모든 행의 판정·근거·검증 절차가 차 있어야 한다(없는 릴리즈는 통과)
+python3 scripts/check_release_notes.py --table-complete --version "$CV" >/tmp/fz-release-notes.log 2>&1 \
+  || note "CHANGELOG v$CV finding 표에 빈 칸이 있다 (로그: /tmp/fz-release-notes.log)"
+
 # ④ health-check — 이번 변경이 기존 계약을 깨지 않았는가
 if bash scripts/health-check.sh >/tmp/fz-release-hc.log 2>&1; then
   echo "  ✅ health-check exit 0"
