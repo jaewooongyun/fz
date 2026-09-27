@@ -122,6 +122,8 @@ metadata:
    - ⛔ 반환의 `delta` 는 plan 에 **자동 병합되지 않는다** — Lead 가 적용 판정을 한다(병합 콜이 본문을 못 쓰게 한 것과 같은 이유)
 4. **반환 처리**:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
+   - ⛔ **`degraded: true` 면 완주가 아니다** (A3-01) — `missingLenses` 에 적힌 렌즈(edge·impactArch·merge)가 빠진 결과이고 `metrics.stagesCompleted` 도 그만큼 낮다. 이 반환으로 plan-v{N} 을 확정하거나 Gate 1 로 넘기지 않는다(**완주 보류**).
+     → `guides/skill-authoring.md` §12 사다리 **L3** — 같은 세션이면 `Workflow({ scriptPath, resumeFromRunId })` 로 재개한다. 재개 뒤에도 `degraded` 면(죽은 렌즈의 null 이 캐시로 재생되면 같은 결과가 온다) **L4** — 빠진 렌즈 이름과 선택지(새 호출 재실행·범위 축소·중단)를 사용자에게 보고한다. ⛔ 빠진 렌즈를 Lead 가 SOLO 로 채우지 않는다(L4 승인 후에만)
    - ⛔ `delta`(있으면) 처리: `stepAmendments` 를 해당 Step 에 반영하고 `addedEdgeCases`·`addedImpact` 를 plan 에 편입한다. `unresolved` 는 사용자 보고 대상 — 조용히 버리지 않는다
    - ⛔ **반환 전체를 `{WORK_DIR}/plan/workflow-result.json` 으로 먼저 기록한다** — 아래 resolve 스크립트와 `plan_integrity_check.py` 가 그 파일을 읽는다. 기록하지 않으면 두 스크립트가 읽을 입력이 없어 계약이 no-op 이 된다(읽는 곳 3 · 쓰는 지시 0 이었다).
    - ⛔ `impactRequests` 가 비어 있지 않으면 **Lead 가 resolve 한다** — impact 렌즈는 Bash 가 없어 base 원본·이전 호출자 수를 직접 못 얻는다(`agents/plan-impact.md`). 요청을 무시하면 영향 분석이 그만큼 비어 있는 채로 plan 에 들어간다

@@ -446,7 +446,9 @@ if (!deep) {
     mode: 'workflow', tier: 2, reviews, issues: tier2Issues,
     crossAdjustments: { archOnPeers, qualityOnPeers },
     stage2Ran: stage2Actually, stage2Trigger: trigger,
-    metrics: metrics(archOnPeers && qualityOnPeers ? 2 : 1),
+    // ⛔ 완주 = 완전 완주 stage 수(Tier 3 의 s1full 과 같은 식) — Stage 1 은 세 렌즈가 모두 있을 때만 완주다.
+    //    이전 판은 Stage 1 을 항상 1 로 셌다 — correctness 가 죽어도 교차가 돌면 "완주 2/2" 를 냈다(S24a 실패 주입 재현).
+    metrics: metrics((reviews.length === 3 ? 1 : 0) + (archOnPeers && qualityOnPeers ? 1 : 0)),
   }
 }
 

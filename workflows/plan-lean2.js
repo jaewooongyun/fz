@@ -228,8 +228,19 @@ if (edge || impactArch) {
     { label: 'lean2-merge', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: MergeSchema })
 }
 
-const stagesCompleted = (full ? 1 : 0) + (merge ? 1 : 0)
-log(`lean2 완주 ${stagesCompleted}/2 — steps ${(full.steps || []).length} · edge ${(edge && edge.edgeCases || []).length} · impact ${(impactArch && impactArch.impactFiles || []).length} · 2차호스트 ${(impactArch && impactArch.secondaryHosts || []).length} · arch ${(impactArch && impactArch.patternVerdicts || []).length} · 델타 ${(merge && merge.stepAmendments || []).length} amendments`)
+// ⛔ 완주 계산 (A3-01): Stage 1 은 세 팔(full·edge·impactArch)이 **모두** 있을 때만 완주다.
+//    이전 판은 full 과 merge 만 셌다 — edge 가 죽어도 impact 로 병합이 돌면 "완주 2/2" 를 냈다(가짜 런타임 재현).
+//    빠진 렌즈는 degraded·missingLenses 로 반환한다 — 소비처(fz-plan 절차 4)가 완주를 보류하고 L3 로 간다.
+const lensStatus = {
+  full: 'ok',
+  edge: edge ? 'ok' : 'null',
+  impactArch: impactArch ? 'ok' : 'null',
+  merge: merge ? 'ok' : ((edge || impactArch) ? 'null' : 'skipped'),
+}
+const missingLenses = Object.keys(lensStatus).filter(k => lensStatus[k] === 'null')
+const degraded = missingLenses.length > 0
+const stagesCompleted = (edge && impactArch ? 1 : 0) + (merge ? 1 : 0)
+log(`lean2 완주 ${stagesCompleted}/2${degraded ? ` — ⛔ degraded(빠진 렌즈: ${missingLenses.join(', ')})` : ''} — steps ${(full.steps || []).length} · edge ${(edge && edge.edgeCases || []).length} · impact ${(impactArch && impactArch.impactFiles || []).length} · 2차호스트 ${(impactArch && impactArch.secondaryHosts || []).length} · arch ${(impactArch && impactArch.patternVerdicts || []).length} · 델타 ${(merge && merge.stepAmendments || []).length} amendments`)
 
 return {
   mode: 'workflow',
@@ -248,5 +259,8 @@ return {
     ? { verdict: full.directionVerdict, alternatives: full.directionAlternatives || [] }
     : null,
   lensOutputs: { edge, impactArch },
+  lensStatus,
+  missingLenses,
+  degraded,
   metrics: { agentCalls, nullCount: nullCalls, fallbackCount: 0, stagesCompleted },
 }
