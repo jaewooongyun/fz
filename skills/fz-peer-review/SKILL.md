@@ -50,6 +50,7 @@ metadata:
 /fz-peer-review feature/TKT-1234      # 브랜치 리뷰
 /fz-peer-review 123 --deep            # Cross-Critique 활성화 (추가 ~$0.5-1.5)
 /fz-peer-review 123 --post            # 인라인 라인 앵커로 리뷰 게시
+/fz-peer-review 123 --render          # 리포트·코멘트·payload 를 review.json 하나에서 렌더 (기본 off)
 /fz-peer-review 123 --tier 2          # Tier 강제 지정
 /fz-peer-review 123 --explain         # 리뷰 후 해설 — 기능 흐름 + 동작↔코드 1:1 (Tutor, ~20-30K)
 /fz-peer-review 123 --explain --light # 리뷰 후 해설 — Before/After 중심 (Standard, ~5-8K)
@@ -423,12 +424,14 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 
 - `${WORK_DIR}/pr-comments.md` — 이슈별 부드러운 톤 PR 코멘트 모음 (복사/붙여넣기용)
 - `${WORK_DIR}/*-result.json` — 에이전트/GPT 원본 결과
+- ⊕ `--render`(기본 off)면 리포트·코멘트를 따로 쓰지 않는다 — 판정·문장만 `${WORK_DIR}/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review "${WORK_DIR}/review.json" --diff "${WORK_DIR}/diff.patch" --out-dir "${WORK_DIR}"` 가 위 두 문서와 `payload.json` · `render-preview.json` 을 만든다(줄 앵커는 `skills/fz-peer-review/scripts/diff_anchors.py` · 입력 형식은 렌더러 머리말). 미지정이면 위 절차 그대로다
 
 #### --post 시 — 인라인 앵커 게시
 
 발견을 PR 대화창이 아니라 **코드 라인 옆**(Files changed)에 붙인다. 7단계 절차·실패 대응·다지점 분할 전문: `modules/peer-review-inline-anchoring.md`
 
 `앵커 계산(scripts/diff_anchors.py) → 구간 선택(Lead) → non_anchorable은 본문 인용 → payload(top-level body = **review-report.md 전문**) → ⛔확인 게이트 → gh api …/pulls/{N}/reviews → 착지 검증`
+> ⊕ `--render` 와 함께면 앵커 계산부터 payload 조립까지 렌더러가 끝낸다 — 겹치는 hunk 는 review.json 의 site `pick` 으로 Lead 가 고르고(없으면 렌더러가 거부한다), `render-preview.json` 의 `reasons` 가 아래 확인 게이트 (a)(b)(c) 다. 게시·착지 검증은 그대로다
 
 > ⛔ **확인 게이트** — 미리보기는 항상 출력하되, 차단은 셋 중 하나일 때만: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 (c) 겹치는 hunk 복수로 Lead가 구간 선택.
 > ⛔ `mcp__github__create_pull_request_review`로 대체 불가 — `comments[]`에 `start_line`·`side`가 없어 범위 하이라이트·LEFT 앵커가 안 된다. 이 스킬만 `Bash(gh *)`를 선언하는 이유.
