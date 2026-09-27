@@ -602,7 +602,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 > 신설 근거(2026-08-09): 이전에는 5개 스킬이 폴백 절차로 TEAM 사료(team-core + patterns, 679줄 — 2026-09-25 삭제)를 지목했으나 그 내용은 `TeamCreate`/`SendMessage` **P2P 절차**였다 — SOLO에는 에이전트가 없어 **실행 자체가 불가능**했다. 그런데 실측상 실패는 2회 발생하고 **두 번 다 아래 사다리로 복구**됐다(`experiment-log.md` §5.7 fz-code #1 · fz-review #8). `team-core` 사용 이력은 **0건**이다.
 > 즉 본 절은 새 프로토콜을 발명하는 것이 아니라 **이미 작동한 복구 경로를 성문화**한다.
 
-#### ⛔ 먼저 상태를 판별한다 — 6종 (2026-09-18)
+#### ⛔ 먼저 상태를 판별한다 — 7종 (2026-09-18 · degraded 행 2026-09-27)
 
 > 신설 근거: 같은 §12 안에서 산출물 계약이 *"`fallback` 이면 SOLO 폴백"* 을 무조건으로 지시하고
 > 사다리는 L1·L2 를 먼저 요구했다 — **문면이 상충했다**. 그리고 소비자(`skills/fz/SKILL.md` 에러표)는
@@ -616,9 +616,10 @@ scriptPath must be a script path this tool returned, or a file you can already r
 | 3 | **입력 오류** | `mode:'fallback'` + args 파싱 실패·필수 키 누락 (설계된 fail-fast) | **L2** |
 | 4 | **일시 장애** | 스테이지 스톨 · 세션/rate limit · 타임아웃 | **L3** |
 | 5 | **스폰 실패** | agent 스폰 예외 · `metrics.agentCalls` 가 0 인데 `mode` 는 정상 | **L3** 우선(일시 장애 의심) → 미해소 시 **L4** |
-| 6 | **알 수 없는 반환** | 위 다섯 중 어느 판별에도 걸리지 않음 (`mode` 값이 예상 밖이거나 metrics 부재) | **L4 직행** — ⛔ 판정 불가를 추측으로 메우지 않는다 |
+| 6 | **렌즈 결손 (degraded)** | `mode:'workflow'` 인데 렌즈가 빠졌다 — 반환 형태가 정상이라 놓치기 쉽다. 워크플로마다 알리는 필드가 다르다: `plan-lean2.js` 는 `degraded:true` · `missingLenses`(비어 있지 않음), `code-pair.js` 는 `reviewVerdict:'partial'`(`lensesCompleted < lensesExpected`) · `residualNote` | ⛔ **완주로 세지 않는다.** **L3** 1회(죽은 렌즈의 null 이 캐시로 재생되면 즉시 같은 결과 — 비용이 거의 없다) → 여전히 degraded 면 **L4**(선택지: 새 invoke 재실행 — 워크플로 1회 전체 비용 · 범위 축소 · 중단). `code-pair.js` 의 `partial` 은 `skills/fz-code/SKILL.md` 반환 처리 6 이 정한다(다음 Step 전 재invoke 여부를 Lead 가 판정) |
+| 7 | **알 수 없는 반환** | 위 여섯 중 어느 판별에도 걸리지 않음 (`mode` 값이 예상 밖이거나 metrics 부재) | **L4 직행** — ⛔ 판정 불가를 추측으로 메우지 않는다 |
 
-⛔ **여섯 중 어느 것도 SOLO 직행이 아니다.** Lead 단독 SOLO 수행은 **L4 에서 사용자 승인 후에만**
+⛔ **일곱 중 어느 것도 SOLO 직행이 아니다.** Lead 단독 SOLO 수행은 **L4 에서 사용자 승인 후에만**
 성립한다(Lead=fable 자동 SOLO 금지). 소비자 문서가 이 표와 다르게 적으면 **이 표가 이긴다**.
 
 | 단계 | 조건 | 행동 | 실측 선례 |

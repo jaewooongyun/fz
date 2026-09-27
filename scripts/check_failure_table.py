@@ -10,7 +10,7 @@
    산문만으로는 빠진 것을 세지 못한다.
 
 축 4개:
-  ① 상태 6종이 각각 **고유 행**을 갖는가 (중복·누락 없음)
+  ① 상태 7종이 각각 **고유 행**을 갖는가 (중복·누락 없음)
   ② 각 행에 판별 근거와 처방이 **둘 다** 있는가 (빈 칸은 판정 불가다)
   ③ 표의 처방에 **SOLO 전환이 0건** 인가 · L4 행동에 **승인 요구**가 명시됐는가
   ④ 소비자(`skills/fz/SKILL.md`)의 `SOLO 폴백`/`SOLO 직행` 언급이 전부
@@ -40,6 +40,7 @@ STATES = {
     "입력 오류":       ("입력 오류", "입력오류"),
     "일시 장애":       ("일시 장애", "일시장애"),
     "스폰 실패":       ("스폰",),
+    "렌즈 결손":       ("렌즈 결손", "degraded"),
     "알 수 없는 반환": ("알 수 없는", "미지 반환"),
 }
 SOLO_IN_ROW = re.compile(r"SOLO")
@@ -215,15 +216,17 @@ def self_test() -> int:
     # ① 실제 문서 = 통과 (양성 대조)
     case("real-passes", real, cons, False)
     # ② 상태 1행 삭제 → ① 발화
-    case("state-removed", re.sub(r"^\| 5 \| \*\*스폰 실패\*\*.*\n", "", real, flags=re.M), cons, True, "① 상태")
+    # ⛔ 행 번호가 아니라 **상태 이름**으로 찾는다 — 번호로 고정하면 행을 끼워 넣는 순간 변형이 헛돌아
+    #    원문이 그대로 통과한다(실측 2026-09-27: degraded 행 추가로 `| 6 |` 이 `| 7 |` 이 되자 prescription-empty 가 깨졌다)
+    case("state-removed", re.sub(r"^\| \d+ \| \*\*스폰 실패\*\*.*\n", "", real, flags=re.M), cons, True, "① 상태")
     # ③ 처방 칸 비움 → ② 발화
     case("prescription-empty",
-         re.sub(r"(^\| 6 \| \*\*알 수 없는 반환\*\* \| [^|]*\|)[^|]*\|", r"\1  |", real, flags=re.M),
+         re.sub(r"(^\| \d+ \| \*\*알 수 없는 반환\*\* \| [^|]*\|)[^|]*\|", r"\1  |", real, flags=re.M),
          cons, True, "② 상태")
     # ④ 표 행이 SOLO 를 금지 문구 없이 처방 → ③ 발화
     case("solo-in-row",
-         re.sub(r"^\| 4 \| \*\*일시 장애\*\* \| ([^|]*)\|[^|]*\|",
-                r"| 4 | **일시 장애** | \1| SOLO 로 전환한다 |", real, flags=re.M),
+         re.sub(r"^\| (\d+) \| \*\*일시 장애\*\* \| ([^|]*)\|[^|]*\|",
+                r"| \1 | **일시 장애** | \2| SOLO 로 전환한다 |", real, flags=re.M),
          cons, True, "③ 표 행"),
     # ⑤ 소비자가 판별 표를 참조하지 않는 SOLO 언급 → ④ 발화
     case("consumer-unqualified", real, cons + "\n- 실패하면 SOLO 폴백으로 간다\n", True, "④")

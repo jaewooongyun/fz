@@ -199,7 +199,7 @@ GOOD: "에러 시 테이블의 폴백 전략을 순서대로 실행하라."
 - ⛔ **추측 금지 — `<transcriptDir>/journal.jsonl` 을 먼저 Read** 한다. agent 별 실제 반환값이 1줄씩 기록된다
 - 렌즈 회계를 본다: `lensesCompleted` < `lensesExpected` 면 `reviewVerdict` 가 `'partial'` 이고 그 관점은 **적용되지 않았다**
 - 대형 입력은 args 가 아니라 **파일 경로**로 전달한다 (`guides/skill-authoring.md` §12 배치·호출 규약)
-- 스톨·일시 장애는 **`resume` 우선** — 실패 분기는 §12 판별 표 6종을 따른다
+- 스톨·일시 장애는 **`resume` 우선** — 실패 분기는 §12 판별 표 7종을 따른다
 
 ### 3.4b 다관점 검토 프로토콜 위반 (Workflow 경로)
 
