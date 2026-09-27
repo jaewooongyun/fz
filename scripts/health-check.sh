@@ -304,6 +304,24 @@ else
   esac
 fi
 
+# ── 4.8c 텔레메트리 스테이지 서명 (S16) ──────────────────────────
+# ⛔ craft 옵션이 arch 결과에 키(axisCoverage)를 더해도 스테이지 분류가 그대로여야 한다. 서명 표를 고치다
+#    기존 서명이 빠지면 과거 run 이 조용히 other 로 집계된다. self-test 가 먼저 통과해야 실제 판정을 믿는다.
+TS_BASE="$ROOT/tests/fixtures/telemetry/stage-signatures-base.json"
+TS_SELF="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/tests/telemetry/stage_signatures_keys.py" --baseline "$TS_BASE" --self-test 2>&1)"; TS_SELF_CODE=$?
+if [ "$TS_SELF_CODE" -ne 0 ]; then
+  UNRUN=$((UNRUN + 1))
+  record "텔레메트리 스테이지 서명" UNRUN "⛔ self-test 실패 — 판정 불가 ($(printf '%s\n' "$TS_SELF" | tail -1))"
+else
+  TS_OUT="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/tests/telemetry/stage_signatures_keys.py" --baseline "$TS_BASE" 2>&1)"; TS_CODE=$?
+  case "$TS_CODE" in
+    0) record "텔레메트리 스테이지 서명" 0 "$(printf '%s\n' "$TS_OUT" | tail -1) · $(printf '%s\n' "$TS_SELF" | tail -1)" ;;
+    1) record "텔레메트리 스테이지 서명" 1 "$(printf '%s\n' "$TS_OUT" | grep -E '⛔' | head -1 | sed 's/^[[:space:]]*//')" ;;
+    *) UNRUN=$((UNRUN + 1))
+       record "텔레메트리 스테이지 서명" UNRUN "미실행 — $(printf '%s\n' "$TS_OUT" | tail -1) (⛔ PASS 아님)" ;;
+  esac
+fi
+
 # ── 4.8b A/B 원장 판정기 + 프로토콜 절 ──────────────────────────
 # ⛔ 판정기 self-test(SC-3·SC-6·교차 순서·AC-1·AC-5·AC-7·SC-4·SC-7·입력 해시)가 판정을 믿을 전제다.
 #    collect→score→judge 통합(원천 파서·증거 사본·원천 재대조·측정값 고정)은
