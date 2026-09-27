@@ -384,7 +384,8 @@ def self_test():
     check("result_line", first["result_line"], "result")
     check("정정 신호", first["user_correction_signal"], True)
     check("cwd 는 해시 8자만", len(first["cwd_hash"]), 8)
-    check("cwd 원문 미저장", "대상 앱" in json.dumps(first, ensure_ascii=False), False)
+    # ⛔ 입력 cwd 원문 자체를 찾는다 — 입력에 없는 문자열을 찾으면 저장해도 늘 통과한다(원래 판정이 그랬다)
+    check("cwd 원문 미저장", "/Users/x/proj" in json.dumps(first, ensure_ascii=False), False)
     check("메시지 본문 미저장", "빌드 성공" in json.dumps(first, ensure_ascii=False), False)
 
     second = rows[1]

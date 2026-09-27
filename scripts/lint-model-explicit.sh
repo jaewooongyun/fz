@@ -32,12 +32,15 @@ set -euo pipefail
 #    (git rev-parse 대신 스크립트 상대 경로 — 임시 사본 디렉토리(비-git repo 포함)에서도 동작)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ⛔ `--baseline FILE` 은 위치 인자가 아니다 — workflows 디렉토리로 해석되지 않게 **먼저** 벗긴다.
+# ⛔ `--baseline [FILE]` 은 위치 인자가 아니다 — workflows 디렉토리로 해석되지 않게 **먼저** 벗긴다.
+#    FILE 을 생략하면 정본 `tests/fixtures/model-effort-baseline.json` 을 쓴다(health-check 가 이 형태로 부른다).
 BASELINE=""
 if [ "${1:-}" = "--baseline" ]; then
-  BASELINE="${2:-}"
-  [ -n "$BASELINE" ] || { echo "❌ --baseline 은 값이 필요하다" >&2; exit 2; }
-  shift 2
+  if [ -n "${2:-}" ]; then
+    BASELINE="$2"; shift 2
+  else
+    BASELINE="$(dirname "$SCRIPT_DIR")/tests/fixtures/model-effort-baseline.json"; shift 1
+  fi
 fi
 
 WORKFLOWS_DIR="${1:-$(dirname "$SCRIPT_DIR")/workflows}"
@@ -61,19 +64,26 @@ import json, re, sys, glob, os
 baseline_path, wf_dir = sys.argv[1], sys.argv[2]
 with open(baseline_path, encoding="utf-8") as fh:
     want = json.load(fh).get("calls") or {}
-got = {}
+got, dups = {}, []
 for f in sorted(glob.glob(os.path.join(wf_dir, "*.js"))):
     for i, line in enumerate(open(f, encoding="utf-8"), 1):
         if "label:" not in line or "agentType:" not in line:
             continue
+        # ⛔ 주석은 호출이 아니다 — 세면 같은 label 주석 한 줄이 강등된 실제 호출 값을 덮는다(GPT R-A 검토 003)
+        if line.lstrip().startswith(("//", "*", "/*")):
+            continue
+        # ⛔ 같은 줄 안의 블록 주석도 걷는다 — `/* model:'opus' */ model:'sonnet'` 이 주석 값을 읽혀 강등을 숨긴다(2라운드 002)
+        line = re.sub(r"/\*.*?\*/", "", line)
         lab = re.search(r"label:\s*'([^']+)'", line) or re.search(r"label:\s*`([^`]+)`", line)
         mod = re.search(r"model:\s*'([^']+)'", line)
         eff = re.search(r"effort:\s*'([^']+)'", line)
         key = f"{os.path.basename(f)}::{lab.group(1) if lab else f'line{i}'}"
+        if key in got:
+            dups.append(f"{key} (줄 {i})")   # ⛔ 같은 키 두 번 — 뒤가 앞을 덮으면 한쪽 값 변경이 숨는다
         got[key] = {"model": mod.group(1) if mod else None, "effort": eff.group(1) if eff else None}
 if not got:
     print("❌ lint --baseline: agent 호출을 찾지 못했다 (측정 실패)", file=sys.stderr); sys.exit(2)
-diffs = []
+diffs = [f"중복 호출 키: {d} — label 을 호출마다 다르게 두어야 값 변경을 가려낼 수 있다" for d in dups]
 for k in sorted(set(want) | set(got)):
     w, g = want.get(k), got.get(k)
     if w is None:

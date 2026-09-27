@@ -13,8 +13,9 @@
 #   · 각 검사의 exit 을 **개별 캡처**해 표로 보고하고, 하나라도 실패면 **비0**으로 종료한다
 #   · lint 의 SKIP(THRESHOLD·SEMANTIC) 건수를 **따로 표기**한다 — ⛔ SKIP 은 PASS 가 아니다
 #
-# usage: health-check.sh [--strict-freshness]
+# usage: health-check.sh [--strict-freshness] [--realmode-only]
 #   --strict-freshness : 최신성 findings 가 있으면 실패로 취급 (기본: 경고)
+#   --realmode-only    : 0.5 실모드 블록만 돌리고 멈춘다 — 배선 fixture 전용, 초록으로 끝나지 않는다(실패 1 · 그 외 2)
 # exit: 0=전 검사 통과 / 1=검사 실패 있음 / 2=사전조건 실패
 set -u
 
@@ -27,10 +28,12 @@ fi
 
 # ⛔ 인자 루프 — `$1`만 보면 `--bogus --strict-freshness` 가 조용히 non-strict 로 돈다 (ISSUE-010)
 STRICT_FRESHNESS=0
+REALMODE_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --strict-freshness) STRICT_FRESHNESS=1; shift ;;
-    *) echo "⛔ 알 수 없는 인자: $1 (사용법: health-check.sh [--strict-freshness])" >&2; exit 2 ;;
+    --realmode-only) REALMODE_ONLY=1; shift ;;
+    *) echo "⛔ 알 수 없는 인자: $1 (사용법: health-check.sh [--strict-freshness] [--realmode-only])" >&2; exit 2 ;;
   esac
 done
 
@@ -47,9 +50,78 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
+
+# ── 0.5 실모드 불변식 (A5-01·A5-03) ───────────────────────────────
+# ⛔ self-test 는 **검사기**가 멀쩡한지만 본다 — 트리를 보지 않으면 값 강등이 그대로 통과한다.
+#    실측: effort 를 xhigh→high 로 낮추거나 재시도 래퍼 안에 opus 를 늘려도 이전 판 health-check 는 exit 0 이었다.
+#    그래서 여섯 검사를 이 트리에 **실모드**로 돌린다(합산 1~2s).
+# ⛔ 워크플로 문법은 check_wf_syntax.js(AsyncFunction 파싱)로 본다 — 워크플로 파일은 async 함수 본문이라
+#    일반 JS 파서 검사로는 판별력이 0 이다(Node v26 에서 심은 문법 오류도 rc=0).
+# ⛔ `node` 부재는 **문법 실패가 아니라 미실행**이다 (ISSUE-001과 동일 클래스) — 실패로 적으면 "문법이 깨졌다"고
+#    오귀속하고, 통과로 적으면 SKIP을 PASS로 만든다.
+# ⛔ `--realmode-only` 는 이 블록만 돌리고 멈춘다 — 배선 fixture(tests/fixtures/health/wiring-failure) 전용이며
+#    나머지를 안 돌렸으므로 **초록으로 끝나지 않는다**(실패 1 · 그 외 2).
+if command -v node >/dev/null 2>&1; then
+  WS_SELF="$(node "$ROOT/scripts/check_wf_syntax.js" --self-test 2>&1)"; WS_SELF_CODE=$?
+  WS_OUT="$(node "$ROOT/scripts/check_wf_syntax.js" --root "$ROOT" 2>&1)"; WS_CODE=$?
+  if [ "$WS_SELF_CODE" -ne 0 ]; then
+    record "workflow 문법" 1 "⛔ 검사기 self-test 실패 — $(printf '%s\n' "$WS_SELF" | grep -E 'FAIL|self-test' | head -2 | tr '\n' ' ')"
+  elif [ "$WS_CODE" -eq 0 ]; then
+    record "workflow 문법" 0 "$(printf '%s\n' "$WS_OUT" | tail -1) · $(printf '%s\n' "$WS_SELF" | tail -1)"
+  else
+    record "workflow 문법" "$WS_CODE" "⛔ $(printf '%s\n' "$WS_OUT" | grep -E 'FAIL|UNRUN' | head -2 | tr '\n' ' ')"
+  fi
+  WT_SELF="$(node "$ROOT/scripts/check_wf_text.js" --self-test 2>&1)"; WT_SELF_CODE=$?
+  WT_PAR="$(node "$ROOT/scripts/check_wf_text.js" --section-has 'Phase 2: Plan Validation' '불변 입력' '별도 출력' '양쪽 완료' 'schema' "$ROOT/skills/fz-plan/SKILL.md" 2>&1)"; WT_PAR_CODE=$?
+  WT_ORD="$(node "$ROOT/scripts/check_wf_text.js" --order-in-section '실행 절차 (Lead)' 'cp {플러그인 루트}/workflows/plan-lean2.js' 'Workflow({ scriptPath' "$ROOT/skills/fz-plan/SKILL.md" 2>&1)"; WT_ORD_CODE=$?
+  if [ "$WT_SELF_CODE" -eq 0 ] && [ "$WT_PAR_CODE" -eq 0 ] && [ "$WT_ORD_CODE" -eq 0 ]; then
+    record "문구 배선" 0 "fz-plan ${WT_PAR%% *} · ${WT_ORD%% *} · $(printf '%s\n' "$WT_SELF" | tail -1)"
+  else
+    record "문구 배선" 1 "⛔ $(printf '%s\n' "$WT_SELF" "$WT_PAR" "$WT_ORD" | grep -E 'FAIL' | head -2 | tr '\n' ' ')"
+  fi
+else
+  UNRUN=$((UNRUN + 2))
+  record "workflow 문법" UNRUN "미실행 — node 부재 (⛔ PASS 아님)"
+  record "문구 배선" UNRUN "미실행 — node 부재 (⛔ PASS 아님)"
+fi
+MB_OUT="$(bash "$ROOT/scripts/lint-model-explicit.sh" --baseline 2>&1)"; MB_CODE=$?
+if [ "$MB_CODE" -eq 0 ]; then
+  record "모델·effort 기준선" 0 "$(printf '%s\n' "$MB_OUT" | tail -1)"
+else
+  record "모델·effort 기준선" "$MB_CODE" "⛔ $(printf '%s\n' "$MB_OUT" | grep -E '❌' | head -2 | tr '\n' ' ')"
+fi
+GB_OUT="$(python3 "$ROOT/scripts/check_global_budget.py" --root "$ROOT" 2>&1)"; GB_CODE=$?
+if [ "$GB_CODE" -eq 0 ]; then
+  record "동시 스폰 예산" 0 "$(printf '%s\n' "$GB_OUT" | grep -E '^분모' | tail -1)"
+else
+  record "동시 스폰 예산" "$GB_CODE" "⛔ $(printf '%s\n' "$GB_OUT" | grep -E '^      |UNRUN' | head -2 | tr '\n' ' ')"
+fi
+AC_OUT="$(python3 "$ROOT/scripts/check_asset_census.py" --root "$ROOT" 2>&1)"; AC_CODE=$?
+if [ "$AC_CODE" -eq 0 ]; then
+  record "자산 census" 0 "$(printf '%s\n' "$AC_OUT" | grep -E '^분모' | tail -1)"
+else
+  record "자산 census" "$AC_CODE" "⛔ $(printf '%s\n' "$AC_OUT" | grep -E '^      |UNRUN' | head -2 | tr '\n' ' ')"
+fi
+EC_OUT="$(python3 "$ROOT/scripts/check_external_commands.py" --root "$ROOT" 2>&1)"; EC_CODE=$?
+if [ "$EC_CODE" -eq 0 ]; then
+  record "외부 명령 실존" 0 "$(printf '%s\n' "$EC_OUT" | grep -E '^분모' | tail -1)"
+else
+  record "외부 명령 실존" "$EC_CODE" "⛔ $(printf '%s\n' "$EC_OUT" | grep -E '^      |UNRUN|⛔' | head -2 | tr '\n' ' ')"
+fi
+if [ "$REALMODE_ONLY" -eq 1 ]; then
+  RM_FAILED=0
+  for i in "${!NAMES[@]}"; do
+    code="${CODES[$i]}"
+    if [ "$code" = "UNRUN" ]; then mark="⏸"; elif [ "$code" -ne 0 ]; then mark="⛔"; RM_FAILED=1; else mark="✅"; fi
+    printf '%s %s | %s | %s\n' "$mark" "${NAMES[$i]}" "$code" "${NOTES[$i]}"
+  done
+  echo "⛔ 부분 실행(--realmode-only) — 나머지 검사를 돌리지 않았다 (PASS 아님)"
+  [ "$RM_FAILED" -eq 1 ] && exit 1
+  exit 2
+fi
 
 # ── 1. 계약 lint (양성 대조 + 통합 fixture 선행 → exit 2 = 검사기 고장)
 LINT_OUT="$(python3 "$ROOT/scripts/lint_contracts.py" 2>&1)"; LINT_CODE=$?
@@ -129,20 +201,6 @@ else
   record "출처 최신성" "$FRESH_CODE" "findings ${FRESH_N}건 (경고 — exit 에 미반영)"
 fi
 
-# ── 4. workflow 문법
-# ⛔ `node` 부재는 **문법 실패가 아니라 미실행**이다 (ISSUE-001과 동일 클래스 — Lead 자체 발견).
-#    도구 부재를 실패로 기록하면 "문법이 깨졌다"고 오귀속하고, 통과로 기록하면 SKIP을 PASS로 만든다.
-if command -v node >/dev/null 2>&1; then
-  JS_FAIL=0 JS_BAD=""
-  for f in "$ROOT"/workflows/*.js; do
-    node --check "$f" >/dev/null 2>&1 || { JS_FAIL=1; JS_BAD="$JS_BAD $(basename "$f")"; }
-  done
-  record "workflow 문법" "$JS_FAIL" "$([ "$JS_FAIL" -eq 0 ] && echo "$(ls "$ROOT"/workflows/*.js | wc -l | tr -d ' ')개 통과" || echo "실패:$JS_BAD")"
-else
-  UNRUN=$((UNRUN + 1))
-  record "workflow 문법" UNRUN "미실행 — node 부재 (⛔ PASS 아님)"
-fi
-
 # ── 4.5 gpt 플래그 호환성
 # ⛔ 신설 근거: `check-gpt-flags.sh` 는 review 경로가 거부하는 플래그를 잡는 회귀 게이트인데
 #    어느 자동 실행 경로에도 없었다(health-check 참조 0건 · gpt-exec.sh 는 주석만).
@@ -166,7 +224,8 @@ esac
 #    "전건 통과" 로 인쇄되는 것이 정확히 막으려는 실패다(0건은 측정 실패를 먼저 의심).
 if command -v node >/dev/null 2>&1; then
   T_TOTAL=0 T_FAIL=0 T_BAD=""
-  for f in "$ROOT"/tests/workflows/*.js; do
+  # tests/lib/*.test.js — 라이브러리(가짜 런타임 로더)의 테스트. 라이브러리 파일 자체는 이 글롭 밖이다
+  for f in "$ROOT"/tests/workflows/*.js "$ROOT"/tests/lib/*.test.js; do
     [ -f "$f" ] || continue
     T_TOTAL=$((T_TOTAL + 1))
     (cd "$ROOT" && node "$f" >/dev/null 2>&1) || { T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $(basename "$f")"; }
@@ -208,11 +267,53 @@ else
   esac
 fi
 
+# ── 4.8 합성 품질 fixture 계약 ────────────────────────────────
+# ⛔ A/B 의 정답 라벨이 diff 밖 줄·축 오타·평문 지침을 품으면 채점이 틀린다.
+#    self-test(축 오타·hunk 밖·축 누락 검출)가 먼저 통과해야 실제 세트 판정을 믿는다.
+QF_SELF="$(cd "$ROOT" && python3 scripts/check_quality_fixtures.py --self-test 2>&1)"; QF_SELF_CODE=$?
+if [ "$QF_SELF_CODE" -ne 0 ]; then
+  UNRUN=$((UNRUN + 1))
+  record "품질 fixture 계약" UNRUN "⛔ 검사기 self-test 실패 — 판정 불가 ($(printf '%s\n' "$QF_SELF" | tail -1))"
+else
+  QF_OUT="$(cd "$ROOT" && python3 scripts/check_quality_fixtures.py --root "$ROOT" 2>&1)"; QF_CODE=$?
+  case "$QF_CODE" in
+    0) record "품질 fixture 계약" 0 "$(printf '%s\n' "$QF_OUT" | tail -1) · $(printf '%s\n' "$QF_SELF" | tail -1)" ;;
+    1) record "품질 fixture 계약" 1 "⛔ $(printf '%s\n' "$QF_OUT" | grep -E 'VIOLATION' | head -1)" ;;
+    *) UNRUN=$((UNRUN + 1))
+       record "품질 fixture 계약" UNRUN "미실행 — $(printf '%s\n' "$QF_OUT" | tail -1) (⛔ PASS 아님)" ;;
+  esac
+fi
+
+# ── 4.8b A/B 원장 판정기 + 프로토콜 절 ──────────────────────────
+# ⛔ 판정기 self-test(SC-3·SC-6·교차 순서·AC-1·AC-5·AC-7·SC-4·SC-7·입력 해시)가 판정을 믿을 전제다.
+#    collect→score→judge 통합(원천 파서·증거 사본·원천 재대조·측정값 고정)은
+#    tests/fixtures/ab/mini-ledger/run.sh 가 회귀 오라클로 돈다.
+ABL_SELF="$(cd "$ROOT" && python3 scripts/ab_ledger.py --self-test 2>&1)"; ABL_CODE=$?
+if [ "$ABL_CODE" -eq 0 ]; then
+  record "A/B 원장 판정기" 0 "$(printf '%s\n' "$ABL_SELF" | tail -1)"
+else
+  UNRUN=$((UNRUN + 1))
+  record "A/B 원장 판정기" UNRUN "⛔ self-test 실패 — 판정 불가 ($(printf '%s\n' "$ABL_SELF" | tail -1))"
+fi
+ABP_SELF="$(cd "$ROOT" && python3 scripts/check_ab_protocol.py --self-test 2>&1)"; ABP_SELF_CODE=$?
+if [ "$ABP_SELF_CODE" -ne 0 ]; then
+  UNRUN=$((UNRUN + 1))
+  record "A/B 프로토콜 절" UNRUN "⛔ 검사기 self-test 실패 — 판정 불가 ($(printf '%s\n' "$ABP_SELF" | tail -1))"
+else
+  ABP_OUT="$(cd "$ROOT" && python3 scripts/check_ab_protocol.py experiment-log.md 2>&1)"; ABP_CODE=$?
+  case "$ABP_CODE" in
+    0) record "A/B 프로토콜 절" 0 "$(printf '%s\n' "$ABP_OUT" | tail -1) · $(printf '%s\n' "$ABP_SELF" | tail -1)" ;;
+    1) record "A/B 프로토콜 절" 1 "⛔ $(printf '%s\n' "$ABP_OUT" | grep -E 'MISSING' | head -1)" ;;
+    *) UNRUN=$((UNRUN + 1))
+       record "A/B 프로토콜 절" UNRUN "미실행 — $(printf '%s\n' "$ABP_OUT" | tail -1) (⛔ PASS 아님)" ;;
+  esac
+fi
+
 # ── 4.9 발견 레지스트리 도구 self-test ────────────────────────────
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry check_wf_advisor_ban check_gpt_surface; do
+for FS in check_release_notes eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry check_wf_advisor_ban check_gpt_surface; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   if [ "$FS_CODE" -eq 0 ]; then
     record "레지스트리 도구 self-test ($FS)" 0 "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)"
@@ -350,9 +451,18 @@ esac
 #    표에 ✅가 찍히고 총평이 "전 검사 통과"로 나왔다 — 플러그인 로딩이 **검증되지 않았는데도**.
 #    주석으로 "PASS 아님"이라 적어도 **기계 판정이 PASS라면 그게 판정**이다.
 #    이 스크립트가 다른 곳에서 강제하는 "SKIP ≠ PASS"를 스스로 위반하고 있었다.
+# ⛔ A5-02: 루트 디렉터리를 대상으로 주면 CLI 가 marketplace 매니페스트만 검증해 스킬·에이전트 frontmatter 가
+#    깨져도 통과했다. 대상 선택·경고 판정은 단일 지점 scripts/plugin_validate.sh 가 정한다 — 여기서 CLI 를 직접 부르지 않는다.
 if command -v claude >/dev/null 2>&1; then
-  (cd "$ROOT" && claude plugin validate . >/dev/null 2>&1); VAL_CODE=$?
-  record "plugin validate" "$VAL_CODE" "$([ "$VAL_CODE" -eq 0 ] && echo "OK" || echo "실패")"
+  VAL_SELF="$(bash "$ROOT/scripts/plugin_validate.sh" --self-test 2>&1)"; VAL_SELF_CODE=$?
+  VAL_OUT="$(bash "$ROOT/scripts/plugin_validate.sh" "$ROOT" 2>&1)"; VAL_CODE=$?
+  if [ "$VAL_SELF_CODE" -ne 0 ]; then
+    record "plugin validate" 1 "⛔ 판정기 self-test 실패 — $(printf '%s\n' "$VAL_SELF" | grep -E 'FAIL|self-test' | head -2 | tr '\n' ' ')"
+  elif [ "$VAL_CODE" -eq 0 ]; then
+    record "plugin validate" 0 "$(printf '%s\n' "$VAL_OUT" | tail -1) · $(printf '%s\n' "$VAL_SELF" | tail -1)"
+  else
+    record "plugin validate" "$VAL_CODE" "⛔ $(printf '%s\n' "$VAL_OUT" | grep -E 'FAIL|UNRUN' | head -2 | tr '\n' ' ')"
+  fi
 else
   UNRUN=$((UNRUN + 1))
   record "plugin validate" UNRUN "미실행 — claude CLI 부재 (⛔ PASS 아님)"

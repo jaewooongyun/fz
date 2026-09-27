@@ -15,6 +15,8 @@ fz-plugin/
 ├── schemas/         6개 — GPT JSON 응답 스키마 (review, verification, gate_verdict, peer_review ...)
 ├── scripts/         48개 — gate_check(완료 판정기) · gate_stop_hook(종료 차단) · lint 3 · gpt-exec · health-check ...
 ├── tests/           fixtures/gates/ — 판정기 회귀 66케이스 (16범주, 기대 exit·산출물·시간·stdout·stderr)
+│                    fixtures/*/*/run.sh 회귀 오라클(health-check 가 자동 실행) · lib/ 가짜 워크플로 런타임 ·
+│                    workflows/ 완주·실패 주입 · ab/ A/B 원장 통합 · docs/ 문서 계약
 └── templates/       스킬/에이전트/CLAUDE.md 생성 템플릿
 ```
 
