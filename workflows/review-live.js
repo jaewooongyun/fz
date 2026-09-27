@@ -4,12 +4,13 @@
 //   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/review-live.js',
-//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath? } })
+//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields? } })
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어가고,
 //     Stage 1 finding 에 line_range · discoveryAxis 선택 필드가 생긴다. 미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다.
 //   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
+//   crossRequiredFields: ⛔ 기본 off(R-B). true 면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
@@ -193,6 +194,12 @@ function craftSummary(findingList, archResult) {
     axisCoverage: archResult && Array.isArray(archResult.axisCoverage) ? archResult.axisCoverage : null,
   }
 }
+// 교차 스테이지 필수 필드 재고지 (S17) — ⛔ 기본 off. 켜면 Stage 2 프롬프트에 additions 항목의 required 키를 **스키마에서 읽어** 적는다.
+//    키 목록을 여기 박지 않는다 — 스키마가 바뀌면 재고지 문구가 저절로 따라간다. 교차 워커가 additions 에 required 필드를
+//    빠뜨려 스키마 재출력이 났다(4/18 run). 효과(so_retries 0)는 R-C 의 S25 가 fz_wf_metrics 로 잰다.
+const crossRequiredOn = input.crossRequiredFields === true || input.crossRequiredFields === 'true'
+const crossRequiredLine = !crossRequiredOn ? '' :
+  `\n[필수 필드 — additions] 새 항목마다 ${CrossReviewSchema.properties.additions.items.required.join(' · ')} 를 모두 채운다(스키마 required — 하나라도 빠지면 출력이 거부돼 다시 쓰게 된다)`
 
 // ════════ Stage 1: 독립 병렬 리뷰 (Round 1 독립성) ════════
 phase('Stage 1: arch/quality 독립 리뷰')
@@ -221,11 +228,11 @@ if (arch && quality) {
   const cross = await parallel([
     () => callAgent(
       `${OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대(품질) findings] ${JSON.stringify(quality.findings)}\n` +
-      `[목표] 각 finding의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 finding은 additions(id A-X)로.`,
+      `[목표] 각 finding의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 finding은 additions(id A-X)로.${crossRequiredLine}`,
       { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
     () => callAgent(
       `${OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대(아키) findings] ${JSON.stringify(arch.findings)}\n` +
-      `[목표] 각 finding의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 finding은 additions(id Q-X)로.`,
+      `[목표] 각 finding의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 finding은 additions(id Q-X)로.${crossRequiredLine}`,
       { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
   ])
   archOnQuality = cross[0]

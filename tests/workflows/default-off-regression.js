@@ -6,6 +6,7 @@
 // ⛔ 기준 소스: env FZ_BASE_TREE 의 workflows/ → 없으면 이 저장소 이력의 `git show ${FZ_BASE_SHA:-13755a6}:workflows/<wf>.js`.
 //    health-check 러너는 env 없이 돈다 — 이력이 있는 클론(작업 트리 · 격리 검증 클론)이면 된다. 둘 다 없으면 UNRUN(exit 2)이다.
 // ⛔ 옵션마다 세 가지를 본다: 미지정 == 기준 · false == 기준 · true != 기준(옵션이 실제로 배선돼 있다 — 헛돌이 방어).
+//    옵션이 닿지 않는 경로(예: Stage 2 가 없는 Tier 2 미발화)에서는 셋째를 true == 기준 으로 본다 — 옵션이 엉뚱한 경로로 새지 않는다.
 // 인자: --option NAME(여러 번) · --all-rb-options · 인자 없음 = 등록된 옵션 전부(health-check 러너가 인자 없이 돈다).
 'use strict'
 const fs = require('fs')
@@ -20,17 +21,19 @@ const BASE_SHA = process.env.FZ_BASE_SHA || '13755a6'
 // R-B 기본 off 옵션 레지스트리 — 새 옵션(S16b · S17 …)은 여기에 한 줄 더한다. 없는 이름을 부르면 FAIL 이다.
 const OPTIONS = {
   craftAxes: { workflows: ['peer-review', 'review-live'], on: { craftAxes: true }, off: { craftAxes: false } },
+  crossRequiredFields: { workflows: ['peer-review', 'review-live'], on: { crossRequiredFields: true }, off: { crossRequiredFields: false },
+    applies: sc => sc.stage2 },   // Stage 2 교차 프롬프트에만 닿는다
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }
 // 경로가 다른 시나리오 — peer-review 는 Tier 2(트리거 미발화 · 발화)와 Tier 3 을 다 탄다
 const SCENARIOS = {
   'peer-review': [
-    { name: 'Tier 2 · 트리거 미발화', args: {}, fire: false },
-    { name: 'Tier 2 · 트리거 발화', args: {}, fire: true },
-    { name: 'Tier 3 · deep', args: { deep: true }, fire: true },
+    { name: 'Tier 2 · 트리거 미발화', args: {}, fire: false, stage2: false },
+    { name: 'Tier 2 · 트리거 발화', args: {}, fire: true, stage2: true },
+    { name: 'Tier 3 · deep', args: { deep: true }, fire: true, stage2: true },
   ],
-  'review-live': [{ name: '기본', args: {}, fire: false }],
+  'review-live': [{ name: '기본', args: {}, fire: false, stage2: true }],
 }
 
 function responses(wf, fire) {
@@ -124,7 +127,8 @@ function check(name, cond, got) {
           const tag = `${name} · ${wf} · ${sc.name}`
           check(`${tag}: 미지정 == 기준(${bases[wf].from}) — 콜 ${base.length}개`, base.length > 0 && firstDiff(unset, base) === null, firstDiff(unset, base) || '콜 0개')
           check(`${tag}: ${JSON.stringify(opt.off)} == 기준`, firstDiff(off, base) === null, firstDiff(off, base))
-          check(`${tag}: ${JSON.stringify(opt.on)} != 기준(옵션이 배선돼 있다)`, firstDiff(on, base) !== null, '켜도 콜 입력이 같다 — 헛돌이')
+          if (!opt.applies || opt.applies(sc)) check(`${tag}: ${JSON.stringify(opt.on)} != 기준(옵션이 배선돼 있다)`, firstDiff(on, base) !== null, '켜도 콜 입력이 같다 — 헛돌이')
+          else check(`${tag}: ${JSON.stringify(opt.on)} == 기준(이 경로에는 옵션이 닿지 않는다)`, firstDiff(on, base) === null, firstDiff(on, base))
         }
       }
     }

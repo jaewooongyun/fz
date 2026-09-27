@@ -4,7 +4,7 @@
 //   표준 패턴 3종 적용. 대형 입력(diff/evidence)은 args가 아닌 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md Analyze Step): Lead가 Gather 산출물(diff/evidence/base-behavior)을 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/peer-review.js',
-//       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext?, craftAxes?, projectRulesPath? } })
+//       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields? } })
 //   reviewSurfacePatchPath: gather 가 만든 `review-surface.patch`(중복 커밋 제외분). 있으면 **이것이 1차 리뷰 대상**이 되고
 //     `diffPath` 는 부풀림 확인용 보조로 내려간다. ⛔ 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없다 —
 //     진단 파일만 넘기면 무력하다(GPT 리뷰 지적, 2026-09-01).
@@ -14,6 +14,7 @@
 //   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어간다.
 //     미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다(tests/workflows/default-off-regression.js).
 //   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
+//   crossRequiredFields: ⛔ 기본 off(R-B). true 면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   deep=false → Tier 2 (Lite): Stage1 3-병렬만 (3-call). Confidence Matrix 미투표 — Lead 단순 병합.
 //   deep=true  → Tier 3 (Full): +Stage2 교차(arch↔quality) +Stage3 counter DA (6-call). Lead full Matrix.
@@ -393,6 +394,12 @@ function craftSummary(issueList, archResult) {
     axisCoverage: archResult && Array.isArray(archResult.axisCoverage) ? archResult.axisCoverage : null,
   }
 }
+// 교차 스테이지 필수 필드 재고지 (S17) — ⛔ 기본 off. 켜면 Stage 2 프롬프트에 additions 항목의 required 키를 **스키마에서 읽어** 적는다.
+//    키 목록을 여기 박지 않는다 — 스키마가 바뀌면 재고지 문구가 저절로 따라간다. 교차 워커가 additions 에 required 필드를
+//    빠뜨려 스키마 재출력이 났다(4/18 run). 효과(so_retries 0)는 R-C 의 S25 가 fz_wf_metrics 로 잰다.
+const crossRequiredOn = input.crossRequiredFields === true || input.crossRequiredFields === 'true'
+const crossRequiredLine = !crossRequiredOn ? '' :
+  `\n[필수 필드 — additions] 새 항목마다 ${CrossReviewSchema.properties.additions.items.required.join(' · ')} 를 모두 채운다(스키마 required — 하나라도 빠지면 출력이 거부돼 다시 쓰게 된다)`
 
 // ════════ Stage 1: 독립 병렬 리뷰 (3-Model — Round 1 독립성) ════════
 phase('Stage 1: arch/quality/correctness 독립 리뷰')
@@ -462,11 +469,11 @@ if (shouldRunStage2 && arch && quality) {
   const cross = await parallel([
     () => callAgent(
       `${OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대 issues] ${peerFor('arch')}${cnote}\n` +
-      `[목표] 각 issue의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 issue는 additions(id A-X)로.`,
+      `[목표] 각 issue의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 issue는 additions(id A-X)로.${crossRequiredLine}`,
       { label: 'stage2-arch-on-peers', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
     () => callAgent(
       `${OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대 issues] ${peerFor('quality')}${cnote}\n` +
-      `[목표] 각 issue의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 issue는 additions(id Q-X)로.`,
+      `[목표] 각 issue의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 issue는 additions(id Q-X)로.${crossRequiredLine}`,
       { label: 'stage2-quality-on-peers', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
   ])
   archOnPeers = cross[0]
