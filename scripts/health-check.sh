@@ -157,7 +157,9 @@ record "model·effort 명시" "$MODEL_CODE" "$(printf '%s\n' "$MODEL_OUT" | tail
 
 # ── 2.5 게이트 판정기 self-test (⛔ 0/1/2 구분 — 2는 매니페스트·fixture 부재)
 #    이 검사가 없으면 gate_check.py 가 회귀해도 통합 건강 체크가 통과한다.
-GATE_OUT="$(cd "$ROOT" && python3 scripts/gate_check.py --self-test 2>&1)"; GATE_CODE=$?
+#    ⛔ 루트 **밖**에서 돌린다 — self-test 결과는 호출 위치와 무관해야 한다. `cd "$ROOT"` 로 돌리던
+#       시절에는 루트 기준 상대 경로가 cwd 로 풀리는 결함(F-338 — 루트 밖이면 verdict-* 11개 FAIL)이 보이지 않았다.
+GATE_OUT="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/scripts/gate_check.py" --self-test 2>&1)"; GATE_CODE=$?
 GATE_LAST="$(printf '%s\n' "$GATE_OUT" | tail -1)"
 case "$GATE_CODE" in
   0) record "게이트 self-test"      0 "$GATE_LAST" ;;

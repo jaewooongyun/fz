@@ -1025,6 +1025,286 @@
         "mutates": false
       },
       "why": "빈 선언은 아무 도구도 요구하지 않는 것과 구별되지 않는다 — CHECK/EXPECT/MANUAL 이 이미 같은 이유로 빈 값을 거부한다"
+    },
+    {
+      "id": "defer-later-release-not-run",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-a.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "DEFER G2: R-B",
+          "deferred: 1",
+          "reran: 1"
+        ],
+        "expect_contains": {
+          "EVIDENCE: pending": 1
+        }
+      },
+      "why": "F-328 — 뒤 릴리즈 게이트는 포기가 아니라 예정이다. 지금 릴리즈가 아니면 돌리지 않고(돌면 실패하는 CHECK) 미충족으로도 세지 않는다"
+    },
+    {
+      "id": "defer-current-release-runs",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-b.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": true,
+        "expect_stdout": [
+          "FAIL  G2"
+        ]
+      },
+      "why": "미룬 릴리즈가 CURRENT_RELEASE 가 되면 DEFER 는 효력이 없다 — 그 게이트를 평소처럼 판정한다"
+    },
+    {
+      "id": "defer-status-blocks-current-unmet",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-a.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1",
+          "DEFER G2: R-B",
+          "UNMET: 1 (met: 0, abandoned: 0, deferred: 1)"
+        ]
+      },
+      "why": "F-328 오라클 전반부 — 이번 릴리즈 미충족만으로 막는다. 미룬 게이트는 막는 사유에서 빠진다(미충족 1 = G1 뿐)"
+    },
+    {
+      "id": "defer-status-hook-path",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-a.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET (1 met, abandoned: 0, deferred: 1)"
+        ]
+      },
+      "why": "Stop hook 은 --status 의 exit 만 본다 — 미룬 게이트가 있어도 지금 릴리즈를 다 채웠으면 막지 않아야 한다(F-328 오라클)"
+    },
+    {
+      "id": "defer-without-current-release",
+      "category": "defer",
+      "ledger": "defer/no-current-release.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "CURRENT_RELEASE 헤더가 없다"
+        ]
+      },
+      "why": "지금이 어느 릴리즈인지 모르면 미룸을 판정할 수 없다 — 조용히 전부 미룬 것으로 읽지 않는다(fail-closed)"
+    },
+    {
+      "id": "defer-abandon-conflict",
+      "category": "defer",
+      "ledger": "defer/abandon-and-defer.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "함께 쓸 수 없다"
+        ]
+      },
+      "why": "예정(DEFER)과 포기(ABANDON)는 서로 다른 기록이다 — 한 게이트에 둘 다 있으면 어느 쪽인지 원장이 말하지 못한다"
+    },
+    {
+      "id": "defer-malformed",
+      "category": "defer",
+      "ledger": "defer/malformed.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "DEFER 형식"
+        ]
+      },
+      "why": "릴리즈·이유가 빠진 DEFER 가 산문으로 흘러가면 미룸이 없던 일이 된다 — 거부한다"
+    },
+    {
+      "id": "defer-blocks-close",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-a.md",
+      "pre": [
+        [
+          "--reverify"
+        ],
+        [
+          "--set-state",
+          "ready_for_review"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "closed"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: deferred-gates"
+        ]
+      },
+      "why": "원장을 닫으면 뒤 릴리즈의 수용 기준이 기록 없이 사라진다 — 미룬 게이트가 남으면 closed 전이를 거부한다(ready_for_review 는 허용)"
+    },
+    {
+      "id": "run-mode-stamp-only-visible",
+      "category": "run",
+      "ledger": "amend/two-gates-draft.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "MET   G1",
+          "MET   G2",
+          "reran: 0, stamp-only: 2"
+        ]
+      },
+      "why": "F-330 — 기본 실행은 충족 게이트를 다시 돌리지 않는다. 그 사실이 출력에 없으면 \"ALL MET\" 을 재실행으로 읽는다"
+    },
+    {
+      "id": "finalize-only-new-gate",
+      "category": "finalize",
+      "ledger": "amend/two-gates-draft.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "append": "- [ ] G3: 확정 뒤 더한 게이트\n  CRITERION: G3 이 통과한다\n  CHECK: echo g3 ok\n  EXPECT: g3 ok\n  EVIDENCE: pending"
+        }
+      ],
+      "args": [
+        "--only",
+        "G3"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "확정 보강: 게이트 1개(G3)",
+          "나머지 실행 게이트 2개"
+        ],
+        "expect_contains": {
+          "APPROVED_ORACLE_HASH: ": 3,
+          "APPROVED: yes": 1
+        }
+      },
+      "why": "F-334 — 확정 원장에 게이트를 더하면 그 게이트만 도장이 필요하다. 헤더를 지우고 전부 다시 찍는 우회는 다른 게이트의 변경까지 재승인한다"
+    },
+    {
+      "id": "finalize-only-refuses-changed-other",
+      "category": "finalize",
+      "ledger": "amend/two-gates-draft.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "append": "- [ ] G3: 확정 뒤 더한 게이트\n  CRITERION: G3 이 통과한다\n  CHECK: echo g3 ok\n  EXPECT: g3 ok\n  EVIDENCE: pending"
+        },
+        {
+          "replace": [
+            "  CHECK: echo g1 ok",
+            "  CHECK: echo g1 changed"
+          ]
+        }
+      ],
+      "args": [
+        "--only",
+        "G3"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "계약이 바뀐 게이트 ['G1']"
+        ]
+      },
+      "why": "F-334 오라클 — 새 게이트 보강에 끼워 다른 게이트의 바뀐 계약을 재승인하지 않는다"
+    },
+    {
+      "id": "finalize-approved-naked-message",
+      "category": "finalize",
+      "ledger": "amend/two-gates-draft.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "append": "- [ ] G3: 확정 뒤 더한 게이트\n  CRITERION: G3 이 통과한다\n  CHECK: echo g3 ok\n  EXPECT: g3 ok\n  EVIDENCE: pending"
+        }
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "--finalize --only G3"
+        ]
+      },
+      "why": "거부 문구가 권하는 명령은 실제로 되는 절차여야 한다 — 이전 문구는 같은 읽기에서 막히는 `--finalize` 를 권했다"
+    },
+    {
+      "id": "finalize-only-draft-refused",
+      "category": "finalize",
+      "ledger": "amend/two-gates-draft.md",
+      "mode": "finalize",
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "확정 원장을 보강할 때만"
+        ]
+      },
+      "why": "draft 는 일부만 도장하면 부분 도장 원장이 된다 — --only 는 확정 원장 보강 전용이다"
     }
   ],
   "_max_seconds": "선택 필드 — 벽시계 상한(초). ⛔ exit code 만으로는 hang 을 못 잡는다: 손자 프로세스가 파이프를 붙잡아 30초 걸렸는데 exit 는 1로 정상이었다(2026-08-24 실측).",

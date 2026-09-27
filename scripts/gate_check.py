@@ -102,6 +102,11 @@ GATE_RE = re.compile(r"^- \[( |x)\] ([A-Za-z0-9_.-]+): (.+)$")
 ATTR_RE = re.compile(r"^  ([A-Z_]+): ?(.*)$")
 HEADER_RE = re.compile(r"^([A-Z][A-Za-z_]*): ?(.*)$")
 ABANDON_RE = re.compile(r"^ABANDON: ([A-Za-z0-9_.-]+)[ \t]*(.*)$")
+# ⛔ `DEFER: <게이트> <릴리즈> <이유>` — 포기가 아니라 **예정**이다(F-328). 여러 릴리즈로 나눈 원장에서
+#    뒤 릴리즈 게이트를 ABANDON 으로 적으면 수용 기준이 사라졌다는 거짓 기록이 된다.
+#    `CURRENT_RELEASE:` 헤더와 다른 릴리즈의 DEFER 게이트는 판정·차단 대상이 아니다.
+DEFER_RE = re.compile(r"^DEFER: ([A-Za-z0-9_.-]+) ([A-Za-z0-9_.-]+)[ \t]*(.*)$")
+RELEASE_RE = re.compile(r"[A-Za-z0-9_.-]+\Z")
 
 RUNNABLE_ATTRS = {"CHECK", "EXPECT"}
 KNOWN_ATTRS = {
@@ -123,6 +128,7 @@ class Gate:
         self.line = line
         self.attrs = {}
         self.abandoned_reason = None
+        self.deferred = None          # (릴리즈, 이유) — `DEFER:` 줄
         # ⛔ 이 게이트가 차지하는 원장 라인 번호(1-기반). **파서가 SSOT다.**
         #    별도 스캐너를 쓰면 파서와 문법이 갈린다 — 펜스 안의 예시가
         #    `- [ ] G1:` 모양이면 파서는 무시하는데 스캐너는 게이트로 읽어
@@ -202,9 +208,12 @@ class Gate:
 
 
 class Ledger:
-    def __init__(self, path: Path, text: str):
+    def __init__(self, path: Path, text: str, allow_unstamped: bool = False):
         self.path = path
         self.text = text
+        # ⛔ `--finalize --only` 만 켠다 — 확정 원장에 새 게이트를 더한 직후의 도장 없는 상태를 읽어야
+        #    그 게이트에 도장을 찍을 수 있다(F-334: 검증이 확정보다 먼저 돌아 정정 경로가 자기 거부에 걸렸다)
+        self.allow_unstamped = allow_unstamped
         self.newline = "\r\n" if "\r\n" in text else "\n"
         self.headers = {}
         self.root = None          # _validate 가 정규화해 채운다
@@ -259,7 +268,27 @@ class Ledger:
                 target = next((g for g in self.gates if g.id == gid), None)
                 if target is None:
                     raise LedgerError(f"ABANDON 대상 {gid} 이 원장에 없다 (line {i})")
+                if target.deferred is not None:
+                    raise LedgerError(f"{gid}: DEFER 와 ABANDON 을 함께 쓸 수 없다 (line {i}) — 예정과 포기는 다르다")
                 target.abandoned_reason = reason
+                target.span.append(i)
+                current = None
+                continue
+
+            if raw.startswith("DEFER:"):
+                # ⛔ 형식이 틀린 DEFER 를 조용히 흘리지 않는다 — 산문으로 떨어지면 미룸이 없던 일이 된다
+                m = DEFER_RE.match(raw)
+                if m is None or not m.group(3).strip():
+                    raise LedgerError(f"DEFER 형식은 `DEFER: <게이트> <릴리즈> <이유>` 다 (line {i})")
+                gid, rel, reason = m.group(1), m.group(2), m.group(3).strip()
+                target = next((g for g in self.gates if g.id == gid), None)
+                if target is None:
+                    raise LedgerError(f"DEFER 대상 {gid} 이 원장에 없다 (line {i})")
+                if target.deferred is not None:
+                    raise LedgerError(f"{gid}: DEFER 중복 (line {i})")
+                if target.abandoned_reason:
+                    raise LedgerError(f"{gid}: ABANDON 과 DEFER 를 함께 쓸 수 없다 (line {i}) — 포기와 예정은 다르다")
+                target.deferred = (rel, reason)
                 target.span.append(i)
                 current = None
                 continue
@@ -312,15 +341,21 @@ class Ledger:
         # ⛔ 확정본이면 실행 게이트 **전부** 도장이 있어야 한다. 일부만 찍히면
         #    안 찍힌 게이트는 CHECK 를 바꿔도 통과하므로, 부분 도장은 무도장보다 위험하다
         #    (도장이 있으니 보호받는다고 읽힌다).
-        if self.headers.get("APPROVED", "").strip().lower() == "yes":
+        if self.headers.get("APPROVED", "").strip().lower() == "yes" and not self.allow_unstamped:
             naked = [g.id for g in self.gates
                      if g.is_runnable and "APPROVED_ORACLE_HASH" not in g.attrs]
             if naked:
                 raise LedgerError(
-                    f"확정 원장인데 승인 도장 없는 실행 게이트: {naked} — `--finalize` 를 다시 돌린다")
+                    f"확정 원장인데 승인 도장 없는 실행 게이트: {naked} — 그 게이트만 도장: "
+                    f"`--finalize --only {','.join(naked)}` (다른 게이트의 계약이 바뀌었으면 거부된다)")
         state = self.headers.get("STATE")
         if state not in STATES:
             raise LedgerError(f"STATE 는 {'/'.join(STATES)} 중 하나 — 받은 값 {state!r}")
+        cur = self.headers.get("CURRENT_RELEASE", "").strip()
+        if cur and not RELEASE_RE.match(cur):
+            raise LedgerError(f"CURRENT_RELEASE 형식 오류 — {cur!r}")
+        if not cur and any(g.deferred for g in self.gates):
+            raise LedgerError("DEFER 가 있는데 CURRENT_RELEASE 헤더가 없다 — 지금이 어느 릴리즈인지 모르면 미룸을 판정할 수 없다")
         for g in self.gates:
             g.validate()
 
@@ -329,14 +364,14 @@ class Ledger:
         return self.headers["STATE"]
 
 
-def load(path: Path) -> Ledger:
+def load(path: Path, allow_unstamped: bool = False) -> Ledger:
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         raise InfraError(f"원장 파일 없음: {path}")
     except OSError as e:
         raise InfraError(f"원장 읽기 실패: {e}")
-    return Ledger(path, text)
+    return Ledger(path, text, allow_unstamped)
 
 
 # ── 원장 발견 (Stop hook · health-check 공용) ─────────────────────────────
@@ -816,7 +851,7 @@ def parse_evidence(evidence: str) -> dict:
 
 
 def gate_state(gate: Gate, ledger=None) -> str:
-    """met / unmet / abandoned — 체크박스가 아니라 **인증된** 증거가 판정한다.
+    """met / unmet / abandoned / deferred — 체크박스가 아니라 **인증된** 증거가 판정한다.
 
     ⛔ `ledger` 없이 호출하면 서명 검증을 건너뛴다. 호출부는 반드시 넘긴다 —
        인자를 optional 로 둔 것은 기존 호출부 호환이 아니라 **순환 참조 회피**용이고,
@@ -824,6 +859,9 @@ def gate_state(gate: Gate, ledger=None) -> str:
     """
     if gate.abandoned_reason:
         return "abandoned"
+    # ⛔ 지금 릴리즈가 아닌 DEFER 는 판정하지 않는다 — 원장을 모르면 지금을 몰라 미룸을 인정하지 않는다
+    if gate.deferred and ledger is not None and gate.deferred[0] != ledger.headers.get("CURRENT_RELEASE", "").strip():
+        return "deferred"
     if not gate.checked:
         return "unmet"
     evidence = gate.attrs.get("EVIDENCE", "").strip()
@@ -896,7 +934,7 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
         print(f"{ledger.path.name}: STATE closed — no-op")
         return EXIT_OK
 
-    unmet, met, abandoned, ran = [], [], [], 0
+    unmet, met, abandoned, deferred, ran, stamp_only = [], [], [], [], 0, 0
     started = time.monotonic()
 
     # ⛔ fz-code 는 "해당 Step 게이트"만 돌려야 한다. 선택자가 없으면 미래 Step 게이트가
@@ -915,6 +953,10 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
             abandoned.append(gate)
             print(f"  ABANDON {gate.id}: {gate.abandoned_reason}")
             continue
+        if state == "deferred":
+            deferred.append(gate)
+            print(f"  DEFER {gate.id}: {gate.deferred[0]} — {gate.deferred[1]}")
+            continue
 
         if mode == "status" or not gate.is_runnable:
             (met if state == "met" else unmet).append(gate)
@@ -924,6 +966,9 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
 
         if mode == "run" and state == "met":
             met.append(gate)
+            # ⛔ 조용히 건너뛰지 않는다 — "ALL MET" 을 재실행으로 읽는 오독(F-330)을 막는다
+            stamp_only += 1
+            print(f"  MET   {gate.id}: 기록된 증거 — 다시 돌리지 않았다(재실행은 --reverify)")
             continue
 
         cwd = resolve_cwd(gate, ledger)
@@ -989,15 +1034,17 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
             unmet.append(gate)
 
     total = len(targets)
-    suffix = f", reran: {ran}" if ran else ""
+    counts = f"abandoned: {len(abandoned)}, deferred: {len(deferred)}"
+    # ⛔ 재실행 수는 0 이어도 적는다 — 빠지면 "재실행 0" 과 "표시 안 함" 이 같아 보인다(F-330)
+    suffix = "" if mode == "status" else f", reran: {ran}, stamp-only: {stamp_only}"
     if unmet:
         print(f"{ledger.path.name}: {total} gates")
-        print(f"UNMET: {len(unmet)} (met: {len(met)}, abandoned: {len(abandoned)}{suffix})")
+        print(f"UNMET: {len(unmet)} (met: {len(met)}, {counts}{suffix})")
         for g in unmet:
             print(f"  {g.id}")
         return EXIT_UNMET
     print(f"{ledger.path.name}: {total} gates")
-    print(f"ALL MET ({len(met)} met, abandoned: {len(abandoned)}{suffix})")
+    print(f"ALL MET ({len(met)} met, {counts}{suffix})")
     return EXIT_OK
 
 
@@ -1058,6 +1105,18 @@ def confirm(ledger: Ledger, gate_id: str) -> int:
 
 # ── self-test (매니페스트 기반) ─────────────────────────────────────────
 FIXTURES = ROOT / "tests" / "fixtures" / "gates"
+# manifest 의 경로 인자는 플러그인 루트 기준으로 적는다 — 사람이 루트에서 그대로 복사해 돌릴 수 있게.
+FIXTURES_REL = "tests/fixtures/gates/"
+
+
+def sandbox_args(args, sandbox: Path) -> list:
+    """manifest 의 루트 기준 fixture 경로 인자를 sandbox 사본 경로로 옮긴다.
+
+    ⛔ 그대로 두면 호출자 cwd 기준으로 풀린다 — 루트 밖에서 돌리면 verdict-* 11개가
+       파일을 못 찾아 exit 2 로 FAIL 했다(F-338). 원장이 sandbox 사본을 쓰는 것과도 맞춘다.
+    """
+    return [str(sandbox / a[len(FIXTURES_REL):]) if isinstance(a, str) and a.startswith(FIXTURES_REL) else a
+            for a in args]
 
 
 def want_exit(case: dict) -> int:
@@ -1102,6 +1161,31 @@ def self_test() -> int:
                 md.write_text(body, encoding="utf-8")
 
             ledger_path = sandbox / case["ledger"]
+            # ⛔ `pre`(사전 명령)·`edits`(원장 편집) — 도장·증거는 cwd 에 묶여 fixture 에 미리 박을 수 없다.
+            #    확정 뒤 게이트 추가(F-334)·기록된 증거로 판정(--status) 같은 여러 단계 사례를 여기서 만든다.
+            pre_reason = None
+            for step in case.get("pre") or []:
+                o_buf, e_buf = io.StringIO(), io.StringIO()
+                so, se = sys.stdout, sys.stderr
+                sys.stdout, sys.stderr = o_buf, e_buf
+                try:
+                    pc = _dispatch(sandbox_args(step, sandbox) + [str(ledger_path)], quiet=False)
+                finally:
+                    sys.stdout, sys.stderr = so, se
+                if pc != EXIT_OK:
+                    pre_reason = f"사전 단계 {step} exit {pc} — {e_buf.getvalue().strip()[-160:]}"
+                    break
+            for ed in (case.get("edits") or []) if pre_reason is None else []:
+                body = ledger_path.read_text(encoding="utf-8")
+                if "replace" in ed:
+                    old, new = ed["replace"]
+                    if body.count(old) != 1:
+                        pre_reason = f"편집 대상 {old!r} 이 {body.count(old)}회"
+                        break
+                    body = body.replace(old, new)
+                if "append" in ed:
+                    body = body.rstrip("\n") + "\n\n" + ed["append"].rstrip("\n") + "\n"
+                ledger_path.write_text(body, encoding="utf-8")
             before = ledger_path.read_text(encoding="utf-8") if ledger_path.exists() else None
 
             if case.get("mode") == "from-plan":
@@ -1110,7 +1194,7 @@ def self_test() -> int:
                 argv = ["--from-plan", str(ledger_path), "--root", str(sandbox), "--out", str(out)]
             elif case.get("mode") == "finalize":
                 # 확정 경로 — 입력 원장이 그대로 산출물이다(제자리 도장).
-                argv = ["--finalize"]
+                argv = ["--finalize"] + sandbox_args(case.get("args", []), sandbox)
             elif case.get("mode") == "oracle-fields":
                 argv = ["--oracle-fields"]
             elif case.get("mode") == "cross-session":
@@ -1118,7 +1202,7 @@ def self_test() -> int:
             elif case.get("mode") == "discover":
                 argv = None          # 디렉토리를 받는다 — 아래 실행부가 분기
             else:
-                argv = list(case.get("args", ["--reverify"]))
+                argv = sandbox_args(case.get("args", ["--reverify"]), sandbox)
             started = time.monotonic()
             captured, captured_err = io.StringIO(), io.StringIO()
             saved_out, saved_err = sys.stdout, sys.stderr
@@ -1156,6 +1240,8 @@ def self_test() -> int:
 
             want = case["expect"]
             reasons = []
+            if pre_reason:
+                reasons.append(pre_reason)
             if parse_reason:
                 reasons.append(parse_reason)
             if code != want["exit"]:
@@ -1352,7 +1438,7 @@ def from_plan(plan_path: Path, root: str, out: Path) -> int:
     return EXIT_OK
 
 
-def finalize(ledger: Ledger) -> int:
+def finalize(ledger: Ledger, only=None) -> int:
     """draft 를 확정 원장으로 만든다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 를 찍는다.
 
     ⛔ **이것이 없으면 승인 계약이 존재하지 않았다.** `gate_state` 와 `evaluate` 는
@@ -1374,10 +1460,34 @@ def finalize(ledger: Ledger) -> int:
     헤더 `APPROVED:` 는 "이 원장은 확정본"이라는 표식이다. 없으면 draft 로 보고
     경고만 낸다 — draft 단계에서 도장을 요구하면 순서가 뒤집힌다(Phase 2 평가자가
     볼 CHECK 가 도장보다 먼저 있어야 한다).
+
+    ⛔ `only`(= `--finalize --only <id,…>`)는 **확정 원장 보강**이다(F-334). 사용자 결정으로 확정 뒤 게이트를
+       더하거나 고치면 도장 없는 게이트가 생기는데, 헤더를 지우고 전체를 다시 찍는 우회는 **다른 게이트의 변경까지
+       재승인**한다. 그래서 지정한 게이트에만 찍고, 나머지 실행 게이트는 도장이 현재 계약과 같을 때만 통과시킨다.
     """
+    wanted = None
+    if only is not None:
+        wanted = {x.strip() for x in only.split(",") if x.strip()}
+        if ledger.headers.get("APPROVED", "").strip().lower() != "yes":
+            raise LedgerError("`--finalize --only` 는 확정 원장을 보강할 때만 쓴다 — draft 는 `--finalize` 로 전부 도장한다")
+        missing = wanted - {g.id for g in ledger.gates}
+        if missing:
+            raise InfraError(f"--only 에 없는 게이트 id: {', '.join(sorted(missing))}")
+        manual = sorted(g.id for g in ledger.gates if g.id in wanted and not g.is_runnable)
+        if manual:
+            raise LedgerError(f"도장은 실행 게이트에만 찍는다 — manual: {manual}")
+        naked = sorted(g.id for g in ledger.gates
+                       if g.is_runnable and g.id not in wanted and "APPROVED_ORACLE_HASH" not in g.attrs)
+        changed = sorted(g.id for g in ledger.gates
+                         if g.is_runnable and g.id not in wanted and "APPROVED_ORACLE_HASH" in g.attrs
+                         and g.attrs["APPROVED_ORACLE_HASH"] != oracle_hash(g, resolve_cwd(g, ledger)))
+        if naked or changed:
+            raise LedgerError(
+                f"확정 보강 거부 — --only 밖에 도장 없는 게이트 {naked} · 계약이 바뀐 게이트 {changed}. "
+                "바꾼 게이트를 재승인하려면 --only 에 명시한다(다른 게이트를 몰래 재승인하지 않는다)")
     lines = ledger_lines(ledger)
     gate_ids = [g.id for g in ledger.gates]
-    stamped, skipped = 0, 0
+    stamped, skipped, kept = 0, 0, 0
     for gid in gate_ids:
         # ⛔ 재로드본에서 id 로 다시 찾는다 — 옛 `Gate` 객체의 `attr_lines` 는 앞선
         #    삽입만큼 낡아 있어 도장이 남의 줄에 박힌다.
@@ -1386,6 +1496,9 @@ def finalize(ledger: Ledger) -> int:
             raise LedgerError(f"{gid}: 확정 중 게이트가 사라졌다 — 도장 위치를 정할 수 없다")
         if not gate.is_runnable:
             skipped += 1
+            continue
+        if wanted is not None and gid not in wanted:
+            kept += 1                 # 도장 대조는 위에서 끝났다 — 건드리지 않는다
             continue
         cwd = resolve_cwd(gate, ledger)
         h = oracle_hash(gate, cwd)
@@ -1399,12 +1512,12 @@ def finalize(ledger: Ledger) -> int:
             anchor = max(gate.attr_lines.values())
             lines.insert(anchor, f"  APPROVED_ORACLE_HASH: {h}")
             # 삽입으로 뒤쪽 게이트의 스팬이 밀리므로 매 게이트마다 재파싱한다.
-            fresh = load(ledger.path)
+            fresh = load(ledger.path, allow_unstamped=True)   # 보강 중엔 아직 안 찍은 지정 게이트가 남는다
             if gate_block_hash(fresh, gate.id) != baseline:
                 raise LedgerError(
                     f"{gate.id}: 확정 중 이 게이트가 변경됨 — stale 도장을 거부한다 (CAS 충돌)")
             write_atomic(ledger.path, "\n".join(lines))
-            ledger = load(ledger.path)
+            ledger = load(ledger.path, allow_unstamped=True)
             lines = ledger_lines(ledger)
         stamped += 1
 
@@ -1421,7 +1534,11 @@ def finalize(ledger: Ledger) -> int:
         text = "\n".join(out)
     write_atomic(ledger.path, text)
     load(ledger.path)          # 확정본이 자기 계약을 만족하는지 파서가 판정한다
-    print(f"확정: 실행 게이트 {stamped}개에 승인 도장, manual {skipped}개 제외")
+    if wanted is not None:
+        print(f"확정 보강: 게이트 {stamped}개({', '.join(sorted(wanted))})에 승인 도장 · "
+              f"나머지 실행 게이트 {kept}개는 도장 대조 일치")
+    else:
+        print(f"확정: 실행 게이트 {stamped}개에 승인 도장, manual {skipped}개 제외")
     return EXIT_OK
 
 
@@ -1464,6 +1581,13 @@ def set_state(ledger: Ledger, target: str) -> int:
                   file=sys.stderr)
             print("REJECT: unmet-gates")               # self-test 관측용 — 축 구분
             print("   (증거가 낡았으면 --reverify 후 재시도)", file=sys.stderr)
+            return EXIT_UNMET
+        waiting = [g.id for g in fresh.gates if gate_state(g, fresh) == "deferred"]
+        if target == "closed" and waiting:
+            # ⛔ 미룸은 예정이다 — 닫으면 뒤 릴리즈의 수용 기준이 기록 없이 사라진다
+            print(f"⛔ {current} → {target} 거부: 미룬 게이트 {len(waiting)}개 — {', '.join(waiting)} "
+                  "(그 릴리즈를 마치거나 ABANDON 한다)", file=sys.stderr)
+            print("REJECT: deferred-gates")             # self-test 관측용 — 축 구분
             return EXIT_UNMET
 
     text = fresh.path.read_text(encoding="utf-8")
@@ -1562,13 +1686,13 @@ def _dispatch(argv, quiet: bool = False) -> int:
     if quiet:
         sys.stdout = open(os.devnull, "w")
     try:
-        ledger = load(Path(opt.ledger).resolve())
+        ledger = load(Path(opt.ledger).resolve(), allow_unstamped=bool(opt.finalize and opt.only))
         if opt.cross_session:
             return cross_session(ledger)
         if opt.oracle_fields:
             return oracle_fields(ledger)
         if opt.finalize:
-            return finalize(ledger)
+            return finalize(ledger, opt.only)
         if opt.verdict_check:
             return verdict_check(ledger, opt.verdict_check)
         if opt.confirm:
