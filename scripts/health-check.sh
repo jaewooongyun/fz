@@ -50,7 +50,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -319,6 +319,22 @@ else
     1) record "텔레메트리 스테이지 서명" 1 "$(printf '%s\n' "$TS_OUT" | grep -E '⛔' | head -1 | sed 's/^[[:space:]]*//')" ;;
     *) UNRUN=$((UNRUN + 1))
        record "텔레메트리 스테이지 서명" UNRUN "미실행 — $(printf '%s\n' "$TS_OUT" | tail -1) (⛔ PASS 아님)" ;;
+  esac
+fi
+
+# ── 4.8d 결정론 병합 review_merge (S20) ──────────────────────────
+# ⛔ self-test(축 분리 · 후보 보존 · 근거 재실측 · reverse→question · GPT 입력 계약)가 먼저 통과해야 fixture 대조를 믿는다.
+RM_SELF="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/scripts/review_merge.py" --self-test 2>&1)"; RM_SELF_CODE=$?
+if [ "$RM_SELF_CODE" -ne 0 ]; then
+  UNRUN=$((UNRUN + 1))
+  record "결정론 병합 review_merge" UNRUN "⛔ self-test 실패 — 판정 불가 ($(printf '%s\n' "$RM_SELF" | tail -1))"
+else
+  RM_OUT="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/scripts/review_merge.py" --check-fixture "$ROOT/tests/fixtures/peer-review/tier2-merge" 2>&1)"; RM_CODE=$?
+  case "$RM_CODE" in
+    0) record "결정론 병합 review_merge" 0 "$(printf '%s\n' "$RM_OUT" | tail -1) · $(printf '%s\n' "$RM_SELF" | tail -1)" ;;
+    1) record "결정론 병합 review_merge" 1 "$(printf '%s\n' "$RM_OUT" | grep -E 'FIXTURE FAIL' | head -1)" ;;
+    *) UNRUN=$((UNRUN + 1))
+       record "결정론 병합 review_merge" UNRUN "미실행 — $(printf '%s\n' "$RM_OUT" | tail -1) (⛔ PASS 아님)" ;;
   esac
 fi
 

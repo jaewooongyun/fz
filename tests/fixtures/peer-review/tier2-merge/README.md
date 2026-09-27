@@ -44,3 +44,9 @@ Stage 1 3-렌즈가 낸 원본 findings 24건이 최종 14건으로 병합된 �
 대조 대상: 최종 건수 · 각 항목의 `id`·`severity`·`origin` · `votes.count` · `gpt_verdict`.
 
 ⚠️ `confidence` 값은 Lead 판정이 반영된 결과라 계약 구현이 달라지면 바뀔 수 있다. 값 자체보다 **어떤 항목이 살아남았는가**를 먼저 본다.
+
+## 결정론 병합(S20)과의 관계
+
+`expected-output.json` 은 `votes` 를 가진 **투표 병합** 결과다. MergeContract §9 가 Tier 2 는 투표하지 않는다고 정했으므로, 이 기대값은 Tier 3 식 병합의 참고 자료로 읽는다.
+
+`scripts/review_merge.py --check-fixture` 는 `stage1-input.json` 만 쓴다. 24건이 모두 보존되는지, 입력 순서를 바꿔도 같은 그룹(14개)이 나오는지를 본다. 입력에 증거와 `discoveryAxis` 가 없으므로 근거 재실측은 하지 않고 축은 `unknown` 하나로 본다.

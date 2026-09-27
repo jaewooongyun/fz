@@ -599,9 +599,33 @@ Lead 가 `crossVerdicts[]` 를 읽고 § 4(Lead 실측의 자격)로 판정한�
 
 회귀: `tests/workflows/s2-cross-merge.js` (원본 `>>> PURE:cross-merge` 블록 추출 실행)
 
+### 10. 결정론 병합 — `scripts/review_merge.py`
+
+§3·§6·§7 가운데 **기계로 결판나는 부분**을 스크립트가 한다. 판정은 Lead 에 남는다.
+
+스크립트가 하는 일:
+- §3 키로 그룹을 묶는다 — ⛔ 후보를 지우지 않는다(입력 후보 수 = 출력 후보 수, AC-4)
+- 그룹마다 누가 찾았는지 귀속한다 — `both` · `claude_only` · `gpt_only`
+- 근거를 재실측한다 — 증거의 인용(백틱 구간, 없으면 전문)이 그 파일 hunk 에 공백 정규화 후 전부 있어야 `evidenceVerified`. 없으면 `hold` 로 두고 지우지 않는다
+- §6 `reverse` 를 `question` + oracle 로 바꾸고, `challenge` 와 `contested` 는 Lead 확인으로 표시한다
+- §7 pre-existing 을 suggestion 으로 cap 한다(원본 severity 는 남긴다)
+- 게시 등급을 매긴다 — craft 항목은 ruleRef 가 있고 confidence 80 이상일 때만 `post`(확신도가 낮으면 suggestion 채널), confidence 80 미만 결함은 `hold`
+
+Lead 에 남는 일: disposition `include` · `observation` · `exclude` 결정(⛔ 스크립트는 `exclude` 를 매기지 않는다) · 그룹의 대표 선택과 문장 · `hold` 를 §4 자격으로 되살릴지 · `challenge`·`contested` 의 실측 판정
+
+입력원 계약:
+- Claude 렌즈 반환(`peer-review.js` · `review-live.js`)과 diff 는 필수다
+- **GPT 독립 첫 패스**(S13 — R-C 에서 배선)는 격리 dir 의 `head/` 스냅샷을 보므로, 경로의 `head/` 접두를 벗겨 레포 경로로 맞춘 뒤 §3 키를 비교한다
+- ⛔ GPT 독립 입력이 없으면 사유(`--gpt-unavailable`)를 요구한다 — 없으면 exit 2. 조용히 Claude 단독으로 병합하지 않는다
+- ⛔ 오염 표시(`contaminated` · `contamination`)가 붙은 GPT 입력은 거부한다 — 독립 첫 패스가 아니다(AC-2)
+- craft 항목(`craftAxis`)은 결함과 같은 그룹에 넣지 않는다 — 별 채널이다
+
+회귀: `--self-test` · `--check-fixture tests/fixtures/peer-review/tier2-merge`
+
 ### 회귀 검증
 
 `tests/fixtures/peer-review/tier2-merge/` — 24건 입력 → 14건 기대. 계약을 바꿀 때 이 입력으로 같은 disposition 이 나오는지 본다.
+결정론 병합(§10)은 같은 입력 24건을 모두 보존하고 14개 그룹으로 묶는다 — `expected-output.json` 의 14건은 투표를 거친 병합(Tier 3 식)이라 스크립트 출력과 1:1 로 비교하지 않는다.
 
 ⛔ 그 fixture 는 **오염된 브리프**로 실행된 자료다. seed 파생 항목의 기대값은 `include` 가 아니라 `question`/`observation` 이다 (`modules/evidence-collection.md` § InputHygiene 참조).
 
