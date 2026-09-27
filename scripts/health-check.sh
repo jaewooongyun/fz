@@ -50,7 +50,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -337,6 +337,17 @@ else
        record "결정론 병합 review_merge" UNRUN "미실행 — $(printf '%s\n' "$RM_OUT" | tail -1) (⛔ PASS 아님)" ;;
   esac
 fi
+
+# ── 4.8e fz-plan 기계 작업 — 델타 반영 plan_apply_delta · 독립 플랜 차이표 plan_divergence (S21) ──
+# ⛔ self-test 만 돈다 — 실데이터(lean2 반환 · GPT 독립 플랜)는 저장소에 없고 fz-plan 배선은 뒤 스텝이다.
+for PS in plan_apply_delta plan_divergence; do
+  PS_OUT="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/scripts/$PS.py" --self-test 2>&1)"; PS_CODE=$?
+  if [ "$PS_CODE" -eq 0 ]; then
+    record "fz-plan 기계 작업 $PS" 0 "$(printf '%s\n' "$PS_OUT" | tail -1)"
+  else
+    record "fz-plan 기계 작업 $PS" 1 "⛔ $(printf '%s\n' "$PS_OUT" | grep -E '^FAIL' | head -1) · $(printf '%s\n' "$PS_OUT" | tail -1)"
+  fi
+done
 
 # ── 4.8b A/B 원장 판정기 + 프로토콜 절 ──────────────────────────
 # ⛔ 판정기 self-test(SC-3·SC-6·교차 순서·AC-1·AC-5·AC-7·SC-4·SC-7·입력 해시)가 판정을 믿을 전제다.
