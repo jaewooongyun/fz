@@ -468,7 +468,7 @@ Gate 5 통과 후:
 ### light 모드 (40차 simplified mode)
 
 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-review light "..."` 호출 시:
-- review-arch 단독 (review-quality 생략) — 아키텍처 적합성만 평가. ⛔ **구조 축은 Lead가 직접 적용** — light는 Workflow 미호출이라 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read)
+- review-arch 단독 (review-quality 생략) — 아키텍처 적합성만 평가. ⛔ **구조 축은 Lead가 직접 적용** — light는 Workflow 미호출이라 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
 - GPT 교차 검증 생략 (3중 → 1중)
 - 역방향 검증 (Phase 5.5) 생략
 - Reflection Rate 추적 생략

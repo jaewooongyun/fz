@@ -38,6 +38,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - CLAUDE.md `## Plugins` 참조: UI 프레임워크별 플러그인 기준으로 state 관리 패턴 검증
 - 최소 타겟 제약 준수 (CLAUDE.md `## Plugins` 참조)
 - SwiftUI 프로젝트: `swiftui-expert` 플러그인, View-ViewModel 분리, RIBs 정합성
+- ⊕ 워크플로가 `[프로젝트 규칙 — 이 렌즈 전용]` 줄(craftAxes 옵션 — `modules/project-rules.md`)을 주면 UI 프레임워크·상태 관리 기준은 그 규칙 레코드가 정하고, 위 `## Plugins` 기준보다 우선한다. 그 줄이 없으면 위 기준 그대로다
 
 ### 3. Extensibility
 

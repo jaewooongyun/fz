@@ -276,7 +276,7 @@ Lead 단독으로 아래 perspectives 를 검토한다 (9 perspectives 중 선�
 
 ⛔ **Level 1 과 Level 2 를 나눈다** — Level 1 은 트리거 스캔이다(공유 가변 상태·비동기 진입점·콜백 스레드를 diff 에서 훑는다). **양성일 때만** Level 2 로 올라가 `modules/safety-audit.md` 의 참조 추적·API 확인까지 수행한다. Level 2 를 상시로 두면 Lead 순차 작업이 늘어 시간 목표와 충돌한다.
 
-⛔ **구조 축은 Lead가 직접 적용한다** — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 위 perspectives 와 **함께** 검토한다. Tier 0/1은 Workflow를 호출하지 않으므로 `args.structuralContext` 경로가 **존재하지 않는다**. 여기서 직접 적용하지 않으면 `<100줄` PR — 실무에서 가장 흔한 규모 — 은 구조 판정이 영구히 0건이다. (Tier 1도 Tier 0와 동일 perspectives 를 쓰므로 본 항목을 승계한다.)
+⛔ **구조 축은 Lead가 직접 적용한다** — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 위 perspectives 와 **함께** 검토한다. Tier 0/1은 Workflow를 호출하지 않으므로 `args.structuralContext` 경로가 **존재하지 않는다**. 여기서 직접 적용하지 않으면 `<100줄` PR — 실무에서 가장 흔한 규모 — 은 구조 판정이 영구히 0건이다. (Tier 1도 Tier 0와 동일 perspectives 를 쓰므로 본 항목을 승계한다.) craft 를 쓰기로 했을 때만(`craftAxes` — R-B 기본 off) 같은 모듈 §6(F~J)도 함께 적용하고, 규칙 레코드(`check_project_rules.py --check` 통과본)와 axisCoverage 표(6축 × finding · none · not_applicable)를 산출물에 남긴다.
 
 sub-agent spawn 없음. GPT 호출 없음 (`--gpt` 옵션 시 Tier 1 절차로 자동 전환).
 
