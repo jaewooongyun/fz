@@ -23,4 +23,5 @@
 - 지침 파일(`CLAUDE.md`·`AGENTS.md` 등)은 **`*.fixture` 접미사로만** 둔다 — 이 플러그인 폴더에서 작업하는 세션이 fixture 지침을 자기 지침으로 자동 로드하지 않게 한다. `build-repo.sh DEST` 가 임시 저장소에 원래 이름으로 복원한다
 - `labels.json`(review) — 정답 결함. 줄 번호는 `anchor` 코드 조각으로 생성기가 계산했고, 검사기는 그 줄이 **실제 diff hunk 안**에 있고 `anchor` 가 그 줄에 있는지 본다
 - `rubric.json`(plan) — 채점 항목. 제거 fixture 는 잔재(`residues`)·소비자(`consumers`)가 base 에 실재하는지 검사한다
+- `expected-index.json`(review 4종) — 지침 원문 색인 golden(S15). `check_project_rules.py --fixtures` 가 저장소를 복원해 `extract_project_rules.py` 출력과 구조로 비교한다. ⛔ 추출기 출력을 그대로 믿지 않고 heading 수(`grep`)와 quote 원문 포함을 따로 대조해 만들었다 — 고칠 때도 같은 대조를 다시 한다
 - ⛔ 홈 절대경로·이메일 금지. 커밋 신원·날짜는 `_lib/build_repo.sh` 가 고정한다(같은 입력 → 같은 커밋 해시)

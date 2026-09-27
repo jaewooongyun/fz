@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "absent": false,
+  "files": [
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "sections": [
+    {
+      "file": "AGENTS.md",
+      "line": 1,
+      "endLine": 2,
+      "level": 1,
+      "heading": "SampleTV Profile — 에이전트 지침",
+      "bodyLine": null,
+      "quote": ""
+    },
+    {
+      "file": "AGENTS.md",
+      "line": 3,
+      "endLine": 6,
+      "level": 2,
+      "heading": "Naming",
+      "bodyLine": 5,
+      "quote": "- 서버 응답 타입은 `…Response` 접미사로 통일한다"
+    },
+    {
+      "file": "AGENTS.md",
+      "line": 7,
+      "endLine": 9,
+      "level": 2,
+      "heading": "UI",
+      "bodyLine": 9,
+      "quote": "- 화면은 UIKit 으로만 만든다. SwiftUI 는 쓰지 않는다"
+    },
+    {
+      "file": "CLAUDE.md",
+      "line": 1,
+      "endLine": 2,
+      "level": 1,
+      "heading": "SampleTV Profile — 지침",
+      "bodyLine": null,
+      "quote": ""
+    },
+    {
+      "file": "CLAUDE.md",
+      "line": 3,
+      "endLine": 6,
+      "level": 2,
+      "heading": "Naming",
+      "bodyLine": 5,
+      "quote": "- 서버 응답을 파싱하는 타입은 `…DTO` 접미사를 쓴다"
+    },
+    {
+      "file": "CLAUDE.md",
+      "line": 7,
+      "endLine": 9,
+      "level": 2,
+      "heading": "UI",
+      "bodyLine": 9,
+      "quote": "- 새 UI 는 SwiftUI 로 만든다"
+    }
+  ]
+}
