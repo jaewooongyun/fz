@@ -312,16 +312,17 @@ get_gpt_skill_path() {
   local ROLE=$1
   local PLUGIN_ROOT="${2:-${FZ_PLUGIN_ROOT:-}}"
   local PROJECT_ROOT="$(pwd)"
+  local SK_ROOT="${CODEX_HOME:-$HOME/.codex}/skills"   # ⛔ setup-gpt-skills.sh 와 같은 기준 경로 — 다르면 정리 안 된 옛 폴더를 읽는다
 
   # Tier 1: 프로젝트 CLAUDE.md `## GPT Skills` 테이블
   local SKILL=$(grep -A 20 "^## GPT Skills" "${PROJECT_ROOT}/CLAUDE.md" 2>/dev/null | \
     grep "| $ROLE " | awk -F'|' '{print $3}' | xargs)
-  if [ -n "$SKILL" ] && [ -f "$HOME/.codex/skills/$SKILL/SKILL.md" ]; then
-    echo "$HOME/.codex/skills/$SKILL/SKILL.md"; return
+  if [ -n "$SKILL" ] && [ -f "$SK_ROOT/$SKILL/SKILL.md" ]; then
+    echo "$SK_ROOT/$SKILL/SKILL.md"; return
   fi
-  # Tier 2a: ~/.codex/skills/ (setup-gpt-skills.sh 심볼릭 또는 기존 설치)
-  if [ -f "$HOME/.codex/skills/fz-${ROLE}/SKILL.md" ]; then
-    echo "$HOME/.codex/skills/fz-${ROLE}/SKILL.md"; return
+  # Tier 2a: $SK_ROOT (setup-gpt-skills.sh 심볼릭 또는 기존 설치)
+  if [ -f "$SK_ROOT/fz-${ROLE}/SKILL.md" ]; then
+    echo "$SK_ROOT/fz-${ROLE}/SKILL.md"; return
   fi
   # Tier 2b: 플러그인 번들본 — ⛔ 경로를 반환한다 (이름만 반환하면 호출자가 못 찾는다)
   if [ -n "$PLUGIN_ROOT" ] && [ -f "$PLUGIN_ROOT/gpt-skills/fz-${ROLE}/SKILL.md" ]; then
@@ -331,7 +332,7 @@ get_gpt_skill_path() {
 }
 ```
 
-Tier 1: CLAUDE.md `## GPT Skills` 테이블 → Tier 2a: `~/.codex/skills/` 심볼릭 → Tier 2b: 플러그인 번들 → Tier 3: 인라인 프롬프트(빈 문자열 반환).
+Tier 1: CLAUDE.md `## GPT Skills` 테이블 → Tier 2a: `${CODEX_HOME:-~/.codex}/skills/` 심볼릭 → Tier 2b: 플러그인 번들 → Tier 3: 인라인 프롬프트(빈 문자열 반환).
 
 ### ⛔ `FZ_PLUGIN_ROOT` 초기화 (Tier 2b 전제 — 미설정 시 Tier 2b가 성립하지 않는다)
 
@@ -366,7 +367,8 @@ if [ -n "$SKILL_PATH" ]; then SKILL_PROMPT="$(cat "$SKILL_PATH")"
 else SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."; fi
 ```
 
-⛔ **`setup-gpt-skills.sh`는 dead가 아니라 load-bearing이다** — Tier 2a를 성립시키는 심볼릭을 만드는 유일한 수단이다. 미실행 시 Tier 2b(번들 경로)로 내려가고, `PLUGIN_ROOT` 미전달이면 Tier 3로 폴백한다.
+⛔ **`setup-gpt-skills.sh` 는 Tier 2a 심볼릭(`gpt-skills/`)을 만든다 — 디스커버리의 필수 조건은 아니다.** 미실행이어도 `FZ_PLUGIN_ROOT` 가 있으면 Tier 2b 가 같은 번들 `SKILL.md` 를 돌려주고, 없으면 Tier 3 로 폴백한다. setup 이 더하는 것은 GPT CLI 가 자기 스킬 폴더에서 역할 스킬을 스스로 싣게 하는 것이다.
+⛔ Claude 스킬(`skills/`)을 그 폴더에 링크하면 GPT 가 역할 스킬 대신 Claude 스킬을 고른다(A2-02 실측: 링크 확장 뒤 fz-reviewer 로드 28세션 중 26회 → 31세션 중 1회). 그래서 setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 `skills/` 를 가리키는 링크는 이름과 무관하게 지운다.
 
 ## 참조 스킬
 
