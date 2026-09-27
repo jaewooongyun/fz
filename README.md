@@ -47,8 +47,10 @@ fz 가 번들하는 MCP 는 **Serena 하나**다. 나머지는 직접 등록한�
 GPT CLI 를 쓰면 네이티브 스킬을 심볼릭으로 연결한다.
 
 ```bash
-bash ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/setup-gpt-skills.sh
+bash "$(printf '%s\n' ~/.claude/plugins/cache/fz-orchestrator/fz/*/ | sort -V | tail -1)scripts/setup-gpt-skills.sh"
 ```
+
+⛔ 캐시에 버전이 여럿이면 glob 을 그대로 실행하지 않는다 — 사전순 **첫** 경로(가장 오래된 판일 수 있다)가 돌아 구버전에 링크된다. 위처럼 `sort -V` 로 최신 1개를 고르거나, 로컬 체크아웃이면 그 플러그인 루트에서 `bash scripts/setup-gpt-skills.sh` 를 실행한다. setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 Claude 스킬(`skills/`)을 가리키는 옛 링크는 지운다.
 
 ⛔ GPT 모델·버전 하한은 README 가 고정하지 않는다 — `/fz-gpt` 가 `~/.codex/config.toml` 의 `model` 을 SSOT 로 위임한다(구버전이면 에러 대응표가 업데이트를 권고).
 
@@ -145,9 +147,15 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.39.1
+## What's New — v4.40.0
 
-**마지막 검증이 마지막 편집보다 앞섰다.** v4.39.0 노트를 게이트 재실행 뒤에 줄여 템플릿 게이트가 깨진 채 발행됐고, 검증 수치 일부가 사실과 달랐다.
+**게이트는 초록이었고, 그 아래에서 아무것도 재지 않았다.** 워크플로 문법 검사(`node --check`)는 심은 오류도 통과시켰고, plugin validate 는
+marketplace 만 봤으며, effort 강등이나 opus→sonnet 교체는 어떤 자동 경로에도 걸리지 않았다(fable 개수만 셌다). 검사기를 교체·배선하고 배선이 실제로 실패를 내는지
+회귀를 심은 사본으로 확인한다. GPT setup 은 GPT 스킬만 링크하고, 래퍼가 역할 스킬 본문이 프롬프트에 있는지 보장하고 잰다. 렌즈가 죽은 run 은 더 이상 완주로 세지 않는다.
+⚠️ 이 판과 함께 공개 이력을 다시 썼다(커밋 SHA 전부 변경). 기존 clone 은 새로 받고, 마켓플레이스 갱신이 실패하면 마켓플레이스를 지웠다가 다시 더한다.
+→ [릴리즈 노트](docs/releases/v4.40.0.md)
+
+**v4.39.1 — 마지막 검증이 마지막 편집보다 앞섰다.** v4.39.0 노트를 게이트 재실행 뒤에 줄여 템플릿 게이트가 깨진 채 발행됐고, 검증 수치 일부가 사실과 달랐다.
 노트·effort 생략 서술·README 요약을 바로잡았다(동작 변경 없음).
 → [릴리즈 노트](docs/releases/v4.39.1.md)
 

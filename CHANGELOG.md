@@ -1,5 +1,74 @@
 # Changelog
 
+### v4.40.0 (2026-09-27) — 게이트는 초록이었고, 그 아래에서 아무것도 재지 않았다 [MINOR]
+
+2026-09-25 전수 실측(major 7)의 R-A 묶음 — 결함 수리. 검사기가 **선언한 일을 하지 못한 채 통과**하던 자리를 동작으로 확인할 수 있게 했다.
+속도·GPT 독립 변경(R-B·R-C)은 이 판에 없다. 그 비교의 기준선(S08)을 재는 계측기가 이 판에 들어간다.
+
+| ID | 판정 | 근거 | 검증 절차 |
+|---|---|---|---|
+| A1-04 | 해결 — 실 PR 에서 줄인 fixture 를 합성 fixture 로 교체 | 3파일·26 hunk·hunk 좌표 동일. 원본과의 줄 교집합 0 · 원본 파일명 0 은 S03 게이트가 기준 커밋의 원본과 대조했다 | `bash tests/fixtures/peer-review/anchors-synthetic/run.sh` — test-spec A1~A10 10/10 |
+| A2-02 | 해결 — setup 이 GPT 스킬만 링크. 사용자 폴더는 setup 재실행으로 정리된다 | 이전 setup 은 Claude 스킬 22개도 GPT 스킬 폴더에 링크했다(fz-reviewer 로드: 07-09 링크 확장 전 28세션 중 26회 → 확장 뒤 31세션 중 1회). prune 은 링크 대상 루트(`skills`·`gpt-skills` 바로 위)가 이 플러그인이거나 매니페스트 name 이 같을 때만 지운다 — 경로는 정규화(`..`·중복·끝 슬래시)하고, 매니페스트는 JSON 으로 읽고, 소유를 판정할 수 없거나 살아 있는 남의 같은 이름 링크면 보존한다. README 설치 명령은 `sort -V` 최신 1개(glob 은 사전순 첫 판을 돌린다 — 가장 오래된 판일 수 있다) | `bash tests/fixtures/gpt/setup-links/run.sh` — 11/11 · 기준 트리 스크립트 FAIL 4줄 |
+| A5-01 | 해결 | 워크플로 파일은 async 함수 본문이라 `node --check` 는 Node v26 에서 심은 문법 오류도 rc=0 이었다. `scripts/check_wf_syntax.js`(AsyncFunction 파싱 · 주석·공백 뒤 첫 문장이 meta)로 교체 — 이 판 작업 중 실제 구문 오류(객체 키 누락)를 451행에서 잡았고, 같은 사본에 `node --check` 는 rc=0 | `node scripts/check_wf_syntax.js --self-test`(7/7) · health-check `workflow 문법` |
+| A5-02 | 해결 | 루트 디렉터리 대상은 marketplace 만 검증했다. plugin.json 대상은 YAML 파싱 실패를 오류로 잡지만 frontmatter 결손(description 누락 등)은 **경고**만 내고 exit 0 이다. `scripts/plugin_validate.sh` 가 JSON 보고서의 오류·허용 밖 경고를 실패로 본다(허용 = 루트 `CLAUDE.md` 파일의 root 경고 1종 — 이 경고가 없으면 CLI 가 내용을 검사하지 않은 것으로 보고 판정 불가 · 대상이 plugin.json 이 아니면 판정 불가 · 엄격 모드 미사용) | `bash scripts/plugin_validate.sh --self-test`(9/9) · 깨진 frontmatter 사본 exit 1 |
+| A5-03 | 해결 — 실모드 6검사 배선 | effort xhigh→high 강등이 이전 health-check 에서 exit 0 이었다 — model·effort 는 키 존재와 fable 개수만 보았고 `--baseline` 대조는 호출되지 않았다. health-check 0.5 블록이 문법·문구 배선·model/effort 기준선(줄·블록 주석 제외 · 같은 키 중복은 위반)·동시 스폰 예산(`parallelWithRetry` 포함 — 블록 9→11)·자산 census·외부 명령을 트리에 실모드로 돌린다 | `bash tests/fixtures/health/wiring-failure/run.sh` — 회귀를 심은 사본에서 6 record 가 각자의 plant 로 exit 1 · 다른 plant 없음 (14/14) |
+
+**스킬 본문 주입 (A2-03)** — 호출부 8곳은 이미 SKILL.md 본문을 `cat` 으로 프롬프트에 넣고 있었고, 래퍼는 경로를 계측만 했다.
+이제 `gpt-exec.sh --gpt-skill-path` 가 exec·resume 프롬프트에 본문이 있는지 **보장**한다 — 없으면 앞에 넣고, 본문 전체가 이미 있으면
+넣지 않는다(제목으로 판정하지 않는다 — 번들 스킬 8개 모두 첫 제목 다음 줄이 `## Role` 이라 구별되지 않는다). review 는 WARN, 파일 부재는 exit 11. 텔레메트리 8열 — `injected`(최종 프롬프트에 본문이 있으면 1)·`cli_version` 추가,
+필드의 탭·개행은 공백으로. `tests/fixtures/gpt/skill-inject` 32/32 · 기준 트리 래퍼 FAIL 16줄.
+
+**완주 판정 (A3-01 · F-327)** — plan-lean2 는 세 팔(full·edge·impactArch)이 모두 있을 때만 Stage 1 완주로 세고 `degraded`·`missingLenses`·`lensStatus`
+를 반환한다(이전: edge 가 죽어도 완주 2/2). fz-plan 절차 4 에 degraded 분기(완주 보류 → L3 resume → L4). 실패 주입 A(워크플로 58검사 · 래퍼 4셀)가 같은 부류를
+peer-review Tier 2 교차 경로에서 찾았다 — correctness 결손을 완주 2/2 로 셌다. Tier 3 과 같은 식으로 고쳤다.
+
+**memory 필드 제거 (A2-01)** — review-arch·review-quality·plan-structure·impl-correctness 의 `memory: project` 제거. Workflow 무쓰기 계약과
+충돌하고 쓰기 도구가 자동 부여된다. lint N13 이 재유입을 막는다(따옴표 키 포함 · memory-curator 예외).
+
+**계측기 (A/B 원장)** — `scripts/ab_ledger.py`(원천 증거 재구성 판정 · 가린 검증자 · fail-closed) · `scripts/check_ab_protocol.py`(experiment-log
+§5.10 필수 22항목) · `scripts/check_quality_fixtures.py`(합성 품질 fixture 6세트 계약) · `fz_wf_metrics.py` usage 중복·역할 추출 수정
+(F-316: 워커 출력 토큰을 1.35~1.6배 과대 집계했다). 원장 collect 는 실제 transcript 스모크에서 파서 오류 4곳을 고쳤다(F-321). §5.10 에서
+"FZ_AUTONOMY 가 사람 확인 질문을 막는다" 는 서술을 뺐다 — 세 스킬은 그 값을 읽지 않는다(F-319). 판정기는 GPT 적대 검토 3라운드를
+거쳤다(F-317 — 실데이터 판정 전이라 열어 둔다). 실데이터 판정에서 두 결함을 더 고쳤다 — 산출물 끝점이 셸 변수·`for` 값·argv 로 넘긴
+경로의 쓰기를 놓쳐 B run 4/6 의 wall 이 150~195s 짧게 잡혔고(F-331), GPT effort 비교 키가 Lead 의 `--effort` 명시를 환경 차이로 보았다(F-333).
+
+**가짜 런타임** — `tests/lib/wf_harness.js` 가 워크플로를 통째로 가짜 hook(agent·parallel·pipeline·phase·log·budget)으로 돌린다.
+`Date.now()`·`Math.random()` 은 런타임처럼 던진다. meta 판정은 문법 검사기와 같은 함수를 쓴다. `budget.spent()` 는 0 고정이다(한계).
+
+**출하 전 교차 검증 (F-329)** — GPT 적대 검토 2라운드(1라운드 major 13 · 2라운드 major 8)와 새 맥락 주장 감사를 반영했다. 고친 검사기가
+다시 거짓 통과하던 경로를 막았다 — 주석 속 meta · 같은 label 주석·인라인 블록 주석으로 기준선 우회 · 허용 경고의 파일 무관 · 대상 매니페스트
+미확인 · 알려진 경고 없는 빈 보고서 · 남의 끊어진·살아 있는 `fz-*` 링크 삭제·교체 · 중첩 name 매니페스트 오인 · 주입 멱등의 제목 판정 ·
+순서 검사의 설명문 인용 · 표 검사의 구분선·중복 ID · 배선 fixture 가 exit 2 도 통과로 읽음. 기각 2건(가짜 런타임의 budget 흉내 — 소비자 0 ·
+pre-release 판 정렬 — tag·캐시에 해당 판 0). 릴리즈 동기 검사가
+CHANGELOG 최상단 finding 표의 빈 칸을 막는다(`check_release_notes.py --table-complete`).
+
+**출하 전 fz-review (2026-09-27)** — 리뷰 Workflow(42건: minor 26 · suggestion 16) · GPT 리뷰(P2 2) · 실패 경로 점검(major 2 · minor 10)을
+병합해 22건을 고쳤다. 원장: 원천 재대조가 판정 필드(`gpt.failed`·`gpt.unlinked`·`plugin.dirty` 등)를 빼 행 위조가 통과하던 것 ·
+`` `path` L52–65 `` 형식 인용을 채점 후보에서 버리던 것 · 종료 스냅샷 경로 미검증 · 판정 인자 하한·범위 · recollect 부분 기록 ·
+들여쓴·접두 GPT 호출 누락. 검사기: 릴리즈 노트 표 머리행의 열 누락이 '표 없음' 으로 통과 · N13 이 템플릿을 0줄 검사 · 래퍼가 빈
+역할 본문을 injected=1 로 기록 · 러너 2개가 크래시를 통과로 읽음. 문서: §12 oracle 이 옛 `node --check` · CLAUDE.md 와 모듈이 setup
+필수성을 반대로 적음 · 앵커 모듈 예시에 남은 원 PR 파일명(A1-04 잔여). 수정마다 옛 코드에서 실패하는 self-test 를 붙였다.
+역검증(GPT validate 2회)이 그 수정에서 다시 찾은 회귀·빈틈 12건도 고쳤다 — 러너 인자 필수화가 호출자 스크립트를 깨뜨린 것 ·
+따옴표 안의 `;` 를 명령 경계로 읽은 것 · 원장 일괄 기록의 동시 쓰기 유실(잠금 추가) · 수면 확인 불가·기존 라운드 폴더를 성공으로 끝낸 것 등.
+
+**사내 식별자 중립화 (2026-09-27)** — 공개 저장소에서 대상 프로젝트를 유추할 수 있는 식별자를 트리 전체에서 뺐다(57파일 · 259건):
+회사명 · 사내 패키지·도메인 · 개인 경로(`{작업 폴더}` · `~`) · 사내 티켓 키(번호는 두고 키만 `TKT`·`PRJ`) · 사내 PR 번호 · 사내 디자인 시스템 이름.
+옛 릴리즈 노트·CHANGELOG 절도 같은 규칙으로 바꿨다. 공개 이력도 같은 규칙으로 다시 썼다 — 커밋 SHA 가 모두 바뀌었으니 기존 clone 은 새로 받는다. 흔한 예시 코드 이름은 그대로 둔다. 정리 중 `fz_stop_telemetry` self-test 의
+'cwd 원문 미저장' 판정이 입력에 없는 문자열을 찾아 늘 통과하던 것을 입력 cwd 로 고쳤다(변이 사본에서 실패 확인).
+설계 개선(원장 분할 · 러너 쪽 끝점 · 복구 사다리의 degraded 행 등)은 R-B 로 미뤘다.
+
+**기준선 이동** — S02(memory) · S18(plan-lean2 완주) · S24a(peer-review Tier 2 완주)를 experiment-log §5.10 표에 적었다. 이 시점 앞뒤의 완주 지표를
+그대로 비교하지 않는다.
+
+**하지 않은 것** — 사용자 `~/.codex/skills` 정리(릴리즈 뒤 setup 재실행) · fz-review·fz-peer-review 사전 복사 순서 검사(두 스킬에는 아직
+사전 복사(cp) 단계가 없다 — S22 가 더한다) · 변수로 넘긴 병렬(`parallel(lensThunks)`)의 예산 계산(리터럴 배열만 센다) · 판정기의 수면 감지
+(F-326 — 지금은 플러그인 밖 러너 `ab_run.py` 가 수면이 낀 run 을 원장에서 뺀다) · A/B run 의 MCP 격리(F-325).
+
+**검증** — health-check exit 0 · 회귀 오라클 25 · 계약 lint 위반 0 · SKIP 8(PASS 아님) · 게이트 S01~S07·S09·S10·S18·S24a·S28a2 PASS(CHECK 직접 실행).
+⛔ **A/B 는 이 판에서 미확립이다** — S08 기준선 9 run(B 6 · C 3)을 쟀지만 판정 유효는 B 1/6 이었다. A/B 러너가 `claude -p` 턴 경계에서
+백그라운드 GPT 셸을 죽였다(F-332 — plan 3/3 run 의 GPT 검증 · peer-review 3/3 run 의 DA). 그래서 SC-3 스모크를 출하 조건에서 뺐다
+(S28a → S28a2). 러너는 stream-json 한 세션으로 고쳤고(experiment-log §5.10 §1), 기준선은 R-B 에서 다시 잰다.
+
 ### v4.39.1 (2026-09-25) — 마지막 검증이 마지막 편집보다 앞섰다 [PATCH]
 
 v4.39.0 발행 뒤 재리뷰가 찾은 문서 사실 오류를 고친다. 동작 변경은 없다.
