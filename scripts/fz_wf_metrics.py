@@ -47,7 +47,22 @@ import tempfile
 DEFAULT_ROOT = os.path.expanduser("~/.claude/projects")
 
 # 역할 문구 → stage 라벨. Workflow meta 에는 label 이 없어 프롬프트 [역할] 로 판별한다.
+# ⛔ 첫 일치가 이긴다(부분 문자열). 현행 배선 규칙을 **일반 규칙보다 앞에** 둔다:
+#    · lean2 "영향 범위 + 아키텍처 검증자" 는 아래 "아키텍처 검증자"(S2-arch) 에도 걸린다
+#    · 리뷰 Stage 2 "… 리뷰어 — 교차" 는 Stage 1 "… 리뷰어(" 와 앞부분이 같다 — 교차를 먼저 본다
+#    · "설계자" 단독은 sweep probe 의 "구조 설계자" 에 걸린다 — "설계자 — 이 과제" 로 좁힌다
+#    라벨 공간(L*·R*)을 plan-collaborative 의 S* 와 나눈다 — 섞으면 임계 경로가 이중 합산된다.
 STAGE_RULES = (
+    ("설계자 — 이 과제", "L1-full"),
+    ("경계 케이스 적대자", "L1-edge"),
+    ("영향 범위 + 아키텍처 검증자", "L1-impact"),
+    ("통합자 —", "L2-merge"),
+    ("아키텍처 리뷰어 — 교차", "R2-arch"),
+    ("품질 리뷰어 — 교차", "R2-quality"),
+    ("아키텍처 리뷰어(review-arch", "R1-arch"),
+    ("품질 리뷰어(review-quality", "R1-quality"),
+    ("정확성 리뷰어(review-correctness", "R1-correct"),
+    ("반론자(review-counter", "R3-counter"),
     ("방향 반박", "S0-reb"),
     ("최종 판정", "S0-fin"),
     ("방향성 도전자", "S0"),
@@ -60,8 +75,10 @@ STAGE_RULES = (
     ("재검증", "S5"),
     ("아키텍처 검증자", "S2-arch"),
 )
-SERIAL_STAGES = ("S0", "S0-reb", "S0-fin", "S1", "S4", "S5")
-PARALLEL_GROUPS = (("S2-impact", "S2-edge", "S2-arch"), ("S3-imp", "S3-edge"))
+SERIAL_STAGES = ("S0", "S0-reb", "S0-fin", "S1", "S4", "S5", "L2-merge", "R3-counter")
+PARALLEL_GROUPS = (("S2-impact", "S2-edge", "S2-arch"), ("S3-imp", "S3-edge"),
+                   ("L1-full", "L1-edge", "L1-impact"),
+                   ("R1-arch", "R1-quality", "R1-correct"), ("R2-arch", "R2-quality"))
 
 
 def _ts(raw):
@@ -81,14 +98,15 @@ def _stage_of(role: str) -> str:
 def read_agent(path: str) -> dict:
     """agent-*.jsonl 1개 → 지표. 파싱 불가 줄은 세고 버린다(조용히 넘기지 않는다)."""
     first = last = None
-    turns = tools = out_tok = think = 0
-    cache_r = cache_w = 0
+    tools = 0
+    usage_by_id = {}
     advisor_ids = set()
     tool_names = {}
     so_calls = 0
     so_errors = 0
     pending = {}
     role = ""
+    role_found = False
     bad_lines = 0
     total_lines = 0
     with open(path, "r", encoding="utf-8", errors="replace") as fh:
@@ -114,12 +132,18 @@ def read_agent(path: str) -> dict:
                 continue
             content = msg.get("content")
             if ev.get("type") == "user":
-                if not role:
+                # ⛔ 첫 user 메시지만 보면 안 된다 — 현행 하네스는 `[Workflow harness — user request]` 래퍼를
+                #    먼저 쓰고 [역할] 은 다음 메시지(`… computed task`)에 온다(실측 2026-09-26: 전 stage 가 '?').
+                #    [역할] 을 찾을 때까지 본다. 끝내 없으면 첫 메시지 앞부분을 남긴다.
+                if not role_found:
                     text = content if isinstance(content, str) else ""
                     if isinstance(content, list):
                         text = " ".join(b.get("text", "") for b in content if isinstance(b, dict))
                     m = re.search(r"\[역할\]\s*([^\n]{0,60})", text)
-                    role = m.group(1) if m else text[:60]
+                    if m:
+                        role, role_found = m.group(1), True
+                    elif not role:
+                        role = text[:60]
                 if isinstance(content, list):
                     for b in content:
                         if not isinstance(b, dict) or b.get("type") != "tool_result":
@@ -132,11 +156,10 @@ def read_agent(path: str) -> dict:
             elif ev.get("type") == "assistant":
                 usage = msg.get("usage") or {}
                 if msg.get("stop_reason"):
-                    turns += 1
-                    out_tok += usage.get("output_tokens") or 0
-                    think += (usage.get("output_tokens_details") or {}).get("thinking_tokens") or 0
-                    cache_r += usage.get("cache_read_input_tokens") or 0
-                    cache_w += usage.get("cache_creation_input_tokens") or 0
+                    # ⛔ 응답 1건이 content block 마다 한 줄로 기록되고 **같은 id 에 같은 usage 가 반복**된다.
+                    #    줄마다 더하면 과대 집계다(실측 2026-09-26 wf_5717b0f9-6a1 한 워커: 119,597 → 74,518 tok,
+                    #    턴 62 → 39). id 별로 한 번만 센다. id 가 없는 줄은 각각 별개 응답으로 본다.
+                    usage_by_id[msg.get("id") or f"anon-{total_lines}"] = usage
                 if isinstance(content, list):
                     for b in content:
                         if not isinstance(b, dict):
@@ -153,6 +176,11 @@ def read_agent(path: str) -> dict:
                             if b.get("name") == "StructuredOutput":
                                 so_calls += 1
     dur = (last - first).total_seconds() if first and last else None
+    turns = len(usage_by_id)
+    out_tok = sum(u.get("output_tokens") or 0 for u in usage_by_id.values())
+    think = sum((u.get("output_tokens_details") or {}).get("thinking_tokens") or 0 for u in usage_by_id.values())
+    cache_r = sum(u.get("cache_read_input_tokens") or 0 for u in usage_by_id.values())
+    cache_w = sum(u.get("cache_creation_input_tokens") or 0 for u in usage_by_id.values())
     return {
         "complete_turns": turns,
         "file": os.path.basename(path),
@@ -305,7 +333,10 @@ def print_detail(wf: dict) -> None:
           f"  cache_r={wf['cache_read']:,}  cache_w={wf['cache_write']:,}  so_retries={wf['so_retries']}  so_errors={wf['so_errors']}"
           f"  journal_results={wf['journal_results']}")
     order = {s: i for i, s in enumerate(["S0", "S0-reb", "S0-fin", "S1", "S2-impact", "S2-edge", "S2-arch",
-                                         "S3-imp", "S3-edge", "S4", "S5", "?"])}
+                                         "S3-imp", "S3-edge", "S4", "S5",
+                                         "L1-full", "L1-edge", "L1-impact", "L2-merge",
+                                         "R1-arch", "R1-quality", "R1-correct", "R2-arch", "R2-quality",
+                                         "R3-counter", "?"])}
     for a in sorted(wf["agents"], key=lambda x: (order.get(x["stage"], 99), x["file"])):
         ot = "unavail" if a["out_tok"] is None else f"{a['out_tok']:,}"
         th = "unavail" if a["thinking"] is None else f"{a['thinking']:,}"
@@ -690,13 +721,64 @@ def cmd_self_test(args) -> int:
     sweep("mcp-ok", 0, "unavailable (raw")    # ⛔ 부재를 0 으로 쓰지 않는다
     sweep("empty", 2, "UNRUN")                # agent 0건은 통과가 아니다
 
+    # ⑭ stage 규칙 — 현행 워크플로의 실제 [역할] 문구(앞 60자 이내)가 기대 라벨로 가는가.
+    #    ⛔ 첫 일치 규칙이라 순서가 틀리면 조용히 다른 라벨이 붙는다(교차 콜이 Stage 1 로 읽힌다).
+    stage_cases = (
+        ("설계자 — 이 과제의 계획을 **혼자** 끝낸다. 방향 판정·영향 범위·", "L1-full"),
+        ("경계 케이스 적대자 — 이 접근이 **어디서 깨지는가**만 판다.", "L1-edge"),
+        ("영향 범위 + 아키텍처 검증자 — **이 변경이 어디까지 퍼지는가**와", "L1-impact"),
+        ("통합자 — 적대 렌즈와 영향·아키 렌즈의 발견을 기존 계획에", "L2-merge"),
+        ("아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성", "R1-arch"),
+        ("품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능", "R1-quality"),
+        ("정확성 리뷰어(review-correctness 렌즈) — 요구사항 충족·로직", "R1-correct"),
+        ("아키텍처 리뷰어 — 교차 조정", "R2-arch"),
+        ("품질 리뷰어 — 교차 보충", "R2-quality"),
+        ("반론자(review-counter 렌즈) — Devil's Advocate", "R3-counter"),
+        ("아키텍처 검증자(review-arch 렌즈)", "S2-arch"),          # 옛 배선 — 라벨 불변
+        ("설계자(plan-structure 렌즈) — 방향 반박", "S0-reb"),
+        ("구조 설계자", "?"),                                        # sweep probe — 새 규칙에 걸리면 안 된다
+    )
+    bad_stage = [f"{r[:18]}…→{_stage_of(r)}(기대 {want})" for r, want in stage_cases if _stage_of(r) != want]
+    if bad_stage:
+        fails.append("stage 규칙: " + " · ".join(bad_stage))
+    else:
+        passed += 1
+
+    # ⑮ ⛔ usage 중복 — 같은 id 의 content block 줄 3개가 usage 를 반복해도 응답 1건으로 센다.
+    #    같은 fixture 로 하네스 래퍼 뒤의 [역할] 도 본다(첫 메시지만 보면 stage 가 '?').
+    root = tempfile.mkdtemp(prefix="fzwf-dup-")
+    try:
+        p = os.path.join(root, "agent-d1.jsonl")
+        u = {"output_tokens": 100, "output_tokens_details": {"thinking_tokens": 40}}
+        rows = [{"type": "user", "timestamp": "2026-09-26T00:00:00Z",
+                 "message": {"content": "[Workflow harness — user request] relayed"}},
+                {"type": "user", "timestamp": "2026-09-26T00:00:00Z",
+                 "message": {"content": "[Workflow harness — computed task]\n[역할] 통합자 — x"}}]
+        rows += [{"type": "assistant", "timestamp": f"2026-09-26T00:00:0{i}Z",
+                  "message": {"id": "msg_1", "stop_reason": "tool_use", "usage": u,
+                              "content": [{"type": kind}]}} for i, kind in enumerate(("thinking", "text", "tool_use"), 1)]
+        rows.append({"type": "assistant", "timestamp": "2026-09-26T00:00:09Z",
+                     "message": {"id": "msg_2", "stop_reason": "end_turn", "usage": {"output_tokens": 7}, "content": []}})
+        with open(p, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        a = read_agent(p)
+        if (a["turns"], a["out_tok"], a["thinking"], a["stage"]) == (2, 107, 40, "L2-merge"):
+            passed += 1
+        else:
+            fails.append(f"usage 중복: turns={a['turns']} out_tok={a['out_tok']} thinking={a['thinking']} "
+                         f"stage={a['stage']} (기대 2·107·40·L2-merge)")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
     for f in fails:
         print(f"  FAIL {f}")
     total = passed + len(fails)
     if fails:
         print(f"fz_wf_metrics self-test {passed}/{total} passed")
         return 1
-    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 4 · sweep-row 3)")
+    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 4 · sweep-row 3"
+          f" · stage 규칙 1 · usage 중복 1)")
     return 0
 
 
