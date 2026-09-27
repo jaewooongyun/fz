@@ -5,7 +5,6 @@ description: >-
 model: sonnet
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
-memory: project
 skills:
   - arch-critic
 ---

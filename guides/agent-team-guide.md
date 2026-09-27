@@ -385,14 +385,17 @@ GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 �
 
 ```yaml
 ---
-name: review-arch
+name: example-agent
 memory: project
 ---
 ```
 
 - 에이전트가 MEMORY.md를 자동 관리 (200줄 제한, 자동 큐레이션)
-- 코드베이스 패턴, 아키텍처 결정, 반복 이슈를 세션 간 축적
-- **적용 우선순위**: review-arch (아키텍처 패턴) > impl-correctness (버그 패턴) > review-quality (품질 패턴)
+- ⛔ **fz 워크플로 에이전트에는 쓰지 않는다** (2026-09-26, A2-01). 두 가지가 충돌한다:
+  1. `memory` 필드는 **Read/Write/Edit 도구를 자동 부여**한다(Claude Code sub-agents 문서 · 2026-09-25 감사에서 로더 코드로 확인 · 런타임 에이전트 목록에서도 `memory` 필드가 있는 5개만 Write·Edit 를 가졌다). Workflow 에이전트는 디스크를 쓰지 않는 계약이다(`agents/impl-correctness.md` 등 — changeset 을 반환하고 Lead 가 적용). 필드 하나가 스키마로 막은 쓰기 권한을 되살린다
+  2. 한 run 이 쓴 에이전트 메모리를 다음 run 이 읽는다(실측: 실험 run 의 메모리를 이후 run 이 25회 읽었다) — 같은 입력의 반복 측정(A/B)이 서로 다른 입력이 된다
+- 예외: `memory-curator`(`memory: user`) — 워크플로가 부르지 않는 recall 전용 에이전트다. A/B 측정 중에는 부르지 않는다
+- 재유입 방지: `scripts/lint_contracts.py` #N13 이 `agents/`(memory-curator 제외)·`templates/` 의 `memory:` 를 막는다. 위 예시 블록은 기능 설명이라 검사 범위 밖이다
 
 ### 8.2 Skills Preloading (`skills` 필드)
 
@@ -487,7 +490,7 @@ isolation: worktree
   Lead --> /fz-gpt                  (검증 게이트)
 
 고급 (§8):
-  memory: project → 세션 간 학습
+  memory: project → 세션 간 학습 (⛔ 워크플로 에이전트 금지 — §8.1)
   skills: [fz-code] → 스킬 사전 주입
   hooks: PostToolUse → 자동 품질 게이트
   isolation: worktree → 코드 수정 격리

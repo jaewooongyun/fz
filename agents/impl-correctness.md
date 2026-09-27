@@ -8,7 +8,6 @@ model: sonnet
 #    Lead가 적용한다. 쓰기 capability는 아무도 요구하지 않는 vestigial이었다.
 #    근거: harness-engineering.md "에이전트가 시도할 수 없는 것은 실패할 수 없다 — 스키마 수준 필터링" + "capability ≠ authorization"
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
-memory: project
 isolation: worktree
 ---
 

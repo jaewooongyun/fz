@@ -71,6 +71,7 @@ ITEMS = [
     ("N12", "DETERMINISTIC", "all",     "`/sc:` 네임스페이스 형식 — `/sc:sc-*` 만 유효 (v4.35.0 에서 86곳을 고쳤는데 **지키는 검사가 없었다**. B14: done 판정의 오라클이 `mcp__serena__` 0건이었고 그것은 다른 대상을 잰다)"),
     ("N11", "DETERMINISTIC", "skills", "경량 경로 검증 계약 — light/tier 경로를 가진 스킬은 **그 경로 절차가 있는 문서**에 어떤 검증이 살아남는지 선언한다. ⛔ 절차를 모듈로 위임하면 그 모듈에도 있어야 한다 — SKILL.md 에만 적으면 위임 절차를 따르는 Lead 가 못 본다 (실측: Coverage Gate 가 `### 4. Confidence Matrix 출력` 안에 있는데 Tier 0 은 그 섹션을 건너뛴다)"),
     ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 gpt 응답이 아니다)"),
+    ("N13", "DETERMINISTIC", "agents",   "memory 필드 재도입 금지 — `agents/`(memory-curator 제외)·`templates/` 에 `^memory:` 0 (A2-01·AC-7: 필드가 Read/Write/Edit 를 자동 부여해 Workflow 에이전트의 쓰기 없음 계약과 충돌하고, 세션 간 기록이 A/B 입력을 오염시킨다. guides 의 기능 설명 예시는 범위 밖)"),
     ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
 ]
 DET = {i for i, k, _, _ in ITEMS if k == "DETERMINISTIC"}
@@ -104,6 +105,7 @@ MIN_HITS = {
     # ⛔ #N1·#N2는 **여유 0**이 의도된 설계다. 하한은 *최소*이므로 항목 추가는 발화하지 않고
     #    **삭제만** 발화한다 — 소비 스키마나 INV 카테고리가 줄면 그때는 검토가 옳다.
     #    ⚠️ 미래 편집자: 여유가 0이라고 낮추지 말 것. 낮추면 "조용히 검사에서 빠짐"이 다시 가능해진다.
+    "N13": 10,   # agents 13 + templates — 순회가 죽으면 '위반 0건' 으로 통과한다(fail-open)
     "N1": 4,     # 소비 스키마 4개 — 삭제 시 발화(의도)
     "N2": 5,     # INV 카테고리 5개 전부 검사돼야 한다 (S6에서 3→5, 선언 형식 통일과 원자적)
     "N3": 10,    # 줄번호 인용 32건
@@ -523,6 +525,44 @@ def chk_14():
 
 
 
+
+
+# ⛔ 따옴표 키(`"memory": project`)도 YAML 에서 같은 키다 — 맨 앞 `memory:` 만 보면 재도입을 놓친다(GPT R-A 검토 001)
+MEMORY_FIELD = re.compile(r"^[\"']?memory[\"']?\s*:\s*\S", re.M)
+MEMORY_EXEMPT = {"memory-curator"}   # 워크플로가 부르지 않는 recall 전용 — A/B 중에는 부르지 않는다
+
+
+def chk_N13():
+    """#N13 — `agents/`(memory-curator 제외)·`templates/` 의 `memory:` 필드. 가이드 §8.1 이 이유를 설명한다."""
+    v, seen = [], 0
+    files = [p for p in AGENTS] + sorted((ROOT / "templates").glob("*.md"))
+    for p in files:
+        tpl = p.parent.name == "templates"
+        lines = read(p).split("\n")
+        span = _frontmatter_span(lines, template=tpl)
+        if not span:
+            continue   # ⛔ frontmatter 를 못 찾은 파일은 검사한 것이 아니다 — 분모에 넣지 않는다(v4.40.0 리뷰: 템플릿 0줄 검사)
+        seen += 1
+        if not tpl and p.stem in MEMORY_EXEMPT:
+            continue
+        for i in span:
+            if MEMORY_FIELD.match(lines[i]):
+                v.append(f"{p.parent.name}/{p.name}:{i + 1}: memory 필드 — Workflow 계약(쓰기 없음)과 A/B 입력 고정을 깬다(guides/agent-team-guide.md §8.1)")
+    return v, seen
+
+
+def _frontmatter_span(lines, template=False):
+    """frontmatter 줄 범위(0 기준) — 맨 앞 `---`~`---` 만 본다(본문의 예시 코드는 필드가 아니다 — GPT R-A 2라운드 001).
+    템플릿은 1행이 제목이고 frontmatter 예시가 ```yaml 펜스 안에 있다 — 펜스 안 `---`~`---` 를 본다."""
+    if lines and lines[0].strip() == "---":
+        end = next((j for j in range(1, len(lines)) if lines[j].strip() == "---"), None)
+        return range(1, end) if end else range(0)
+    if template:
+        f0 = next((j for j, l in enumerate(lines) if l.strip().startswith("```yaml")), None)
+        a0 = next((j for j in range(f0 + 1, len(lines)) if lines[j].strip() == "---"), None) if f0 is not None else None
+        a1 = next((j for j in range(a0 + 1, len(lines)) if lines[j].strip() in ("---", "```")), None) if a0 is not None else None
+        return range(a0 + 1, a1) if a1 else range(0)
+    return range(0)
 
 
 def chk_16():
@@ -1070,6 +1110,11 @@ class ParseError(Exception):
 # ─────────────────────────────────────────────────────────────────────────────
 SELF_TESTS: list[tuple[str, str, bool, str]] = [
     # (항목, 입력, 매칭 기대, 설명)
+    ("N13", "memory: project",                True,  "frontmatter 의 memory 필드"),
+    ("N13", '"memory": project',              True,  "따옴표 키도 같은 필드"),
+    ("N13", "# memory: 필드를 넣지 않는다",       False, "주석은 필드가 아니다(템플릿의 금지 안내)"),
+    ("N13", "TEMPLATE_FENCE",                 True,  "템플릿 ```yaml 펜스 안 frontmatter 의 memory 필드도 잡는다"),
+    ("N13", "TEMPLATE_NO_FM",                 False, "frontmatter 없는 파일은 검사 구간이 0줄 — 분모에 넣지 않는다"),
     ("N4", 'grep -E "^(a\\|b)" f',           True,  "ERE에서 `\\|`는 alternation 아님"),
     ("N4", 'grep -E "^(a|b)" f',             False, "정상 ERE"),
     ("N4", 'grep "a\\|b" f',                 False, "BRE의 `\\|`는 정당"),
@@ -1270,6 +1315,14 @@ def run_self_tests() -> list[str]:
                 enum, err = resolve_ref("other.json#/$defs/severity",
                                         base_doc, "gpt_base_issue_schema.json")
                 got = enum is None and err is not None
+        elif item == "N13":
+            if src == "TEMPLATE_FENCE":
+                ls = "# T\n\n```yaml\n---\nname: x\nmemory: user\n---\n```\n".split("\n")
+                got = any(MEMORY_FIELD.match(ls[i]) for i in _frontmatter_span(ls, template=True))
+            elif src == "TEMPLATE_NO_FM":
+                got = bool(_frontmatter_span("# T\n\n본문 memory: user\n".split("\n"), template=True))
+            else:
+                got = bool(MEMORY_FIELD.search(src))
         elif item == "N4":
             got = bool(ERE_BAD.search(src)) and "\\|" in src
         elif item == "N5":
@@ -1511,7 +1564,7 @@ CHECKS = {
     "12": chk_12, "14": chk_14, "16": chk_16, "N12": chk_N12,
     "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
     "N7": chk_N7, "N8": chk_N8, "N9": chk_N9, "N10": chk_N10,
-    "N11": chk_N11,
+    "N11": chk_N11, "N13": chk_N13,
 }
 
 
@@ -1576,7 +1629,11 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="검사 항목 + 판정자 출력 (SSOT)")
     ap.add_argument("--only", help="쉼표 구분 항목 id만 실행 (예: 14,N4)")
     ap.add_argument("--self-test", action="store_true", help="양성 대조만 실행하고 종료")
+    ap.add_argument("--agents-root", help="agents/ 대신 검사할 폴더(음성 대조용 사본)")
     a = ap.parse_args()
+    if a.agents_root:
+        global AGENTS
+        AGENTS = sorted(Path(a.agents_root).glob("*.md"))
 
     if a.list:
         return cmd_list()

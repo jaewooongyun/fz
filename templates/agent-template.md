@@ -15,7 +15,8 @@ model: sonnet                          # sonnet|opus|inherit
 tools: Read, Grep, Glob, Bash         # 도구 제한 (생략 시 부모 상속)
 permissionMode: default                # default|acceptEdits|plan|bypassPermissions
 maxTurns: 15                           # 합리적인 턴 제한
-memory: user                           # user|project|local
+# memory: 필드를 넣지 않는다 — Read/Write/Edit 가 자동 부여돼 Workflow 에이전트의 '쓰기 없음' 계약과 충돌하고
+#   세션 간 기록이 A/B 입력을 오염시킨다(guides/agent-team-guide.md §8.1). 예외는 워크플로 밖 memory-curator 뿐이다
 skills:                                # 사전 로드 스킬
   - skill-name
 hooks:                                 # 라이프사이클 훅 (선택)
@@ -37,7 +38,7 @@ hooks:                                 # 라이프사이클 훅 (선택)
 | `tools` | No | 허용 도구 목록. 생략하면 부모 컨텍스트 상속 |
 | `permissionMode` | No | 권한 모드. 대부분 default 사용 |
 | `maxTurns` | No | 최대 턴 수. 10-20 권장 |
-| `memory` | No | 세션 간 학습 저장 위치 |
+| `memory` | ⛔ 넣지 않음 | Read/Write/Edit 가 자동 부여돼 Workflow '쓰기 없음' 계약과 충돌하고 A/B 입력을 오염시킨다(guides/agent-team-guide.md §8.1 · lint #N13). 예외는 워크플로 밖 memory-curator 뿐 |
 | `skills` | No | 자동 로드할 스킬 목록 |
 | `hooks` | No | 도구 사용 전후 검증 훅 |
 

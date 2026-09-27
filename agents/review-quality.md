@@ -4,7 +4,6 @@ description: >-
   코드 품질 + Dead Code + 성능 리뷰 에이전트. 기능 분리, API 사용, 성능 평가.
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs
-memory: project
 skills:
   - code-auditor
 ---
