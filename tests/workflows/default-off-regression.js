@@ -1,0 +1,136 @@
+// 기본 off 회귀 (R-B) — 옵션을 주지 않으면 워크플로의 모든 콜 입력이 기준 트리와 바이트 단위로 같다.
+//
+// ⛔ 비교 대상은 **콜 입력**(label · prompt · schema · model · effort · agentType)이다. 반환값은 비교하지 않는다 —
+//    R-A 가 peer-review Tier 2 반환의 완주 수 계산을 고쳤다(프롬프트·스키마는 그대로). 반환까지 비교하면 그 수정이 회귀로 보인다.
+//    하네스의 calls 는 스키마를 불리언으로만 남기므로 responder 가 opts.schema 를 직렬화해 잡는다.
+// ⛔ 기준 소스: env FZ_BASE_TREE 의 workflows/ → 없으면 이 저장소 이력의 `git show ${FZ_BASE_SHA:-13755a6}:workflows/<wf>.js`.
+//    health-check 러너는 env 없이 돈다 — 이력이 있는 클론(작업 트리 · 격리 검증 클론)이면 된다. 둘 다 없으면 UNRUN(exit 2)이다.
+// ⛔ 옵션마다 세 가지를 본다: 미지정 == 기준 · false == 기준 · true != 기준(옵션이 실제로 배선돼 있다 — 헛돌이 방어).
+// 인자: --option NAME(여러 번) · --all-rb-options · 인자 없음 = 등록된 옵션 전부(health-check 러너가 인자 없이 돈다).
+'use strict'
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { execFileSync } = require('child_process')
+const { run } = require('../lib/wf_harness')
+
+const ROOT = path.join(__dirname, '..', '..')
+const BASE_SHA = process.env.FZ_BASE_SHA || '13755a6'
+
+// R-B 기본 off 옵션 레지스트리 — 새 옵션(S16b · S17 …)은 여기에 한 줄 더한다. 없는 이름을 부르면 FAIL 이다.
+const OPTIONS = {
+  craftAxes: { workflows: ['peer-review', 'review-live'], on: { craftAxes: true }, off: { craftAxes: false } },
+}
+
+const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }
+// 경로가 다른 시나리오 — peer-review 는 Tier 2(트리거 미발화 · 발화)와 Tier 3 을 다 탄다
+const SCENARIOS = {
+  'peer-review': [
+    { name: 'Tier 2 · 트리거 미발화', args: {}, fire: false },
+    { name: 'Tier 2 · 트리거 발화', args: {}, fire: true },
+    { name: 'Tier 3 · deep', args: { deep: true }, fire: true },
+  ],
+  'review-live': [{ name: '기본', args: {}, fire: false }],
+}
+
+function responses(wf, fire) {
+  const major = { id: 'Q1', file: 'a.swift', line_range: '10-12', severity: 'major', perspective: 'p', discoveryAxis: 'code_quality',
+    origin: 'regression', description: 'd', evidence: 'e', confidence: 90 }
+  if (wf === 'peer-review') {
+    return {
+      'stage1-arch': { issues: [], strengths: ['s'], overall_assessment: 'o' },
+      'stage1-quality': { issues: fire ? [major] : [], strengths: [], overall_assessment: 'o' },
+      'stage1-correctness': { issues: [], strengths: [], overall_assessment: 'o' },
+      'stage2-arch-on-peers': { adjustments: [], additions: [] },
+      'stage2-quality-on-peers': { adjustments: [], additions: [] },
+      'stage3-counter': { challenges: [], missedIssues: [] },
+    }
+  }
+  return {
+    'stage1-arch': { findings: [{ id: 'A1', severity: 'minor', category: 'c', title: 't', detail: 'd', evidence: 'e' }], okAreas: ['ok'] },
+    'stage1-quality': { findings: [], okAreas: [] },
+    'stage2-arch-on-quality': { adjustments: [], additions: [] },
+    'stage2-quality-on-arch': { adjustments: [], additions: [] },
+    'stage3-counter': { challenges: [], missedFindings: [] },
+  }
+}
+
+async function callsOf(file, wf, scenario, extraArgs) {
+  const calls = []
+  const table = responses(wf, scenario.fire)
+  await run(file, {
+    args: Object.assign({}, BASE_ARGS, scenario.args, extraArgs),
+    responder: (prompt, opts) => {
+      calls.push({ label: opts.label, agentType: opts.agentType, model: opts.model, effort: opts.effort,
+                   schema: JSON.stringify(opts.schema || null), prompt })
+      return table[opts.label] ? JSON.parse(JSON.stringify(table[opts.label])) : null
+    },
+  })
+  return calls
+}
+
+function baseFile(wf, tmp) {
+  const env = process.env.FZ_BASE_TREE
+  if (env) {
+    const f = path.join(env, 'workflows', `${wf}.js`)
+    if (!fs.existsSync(f)) throw new Error(`FZ_BASE_TREE 에 ${wf}.js 가 없다 — ${f}`)
+    return { file: f, from: `FZ_BASE_TREE` }
+  }
+  const src = execFileSync('git', ['-C', ROOT, 'show', `${BASE_SHA}:workflows/${wf}.js`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  const f = path.join(tmp, `${wf}.base.js`)
+  fs.writeFileSync(f, src)
+  return { file: f, from: `git ${BASE_SHA}` }
+}
+
+function firstDiff(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const x = a[i], y = b[i]
+    if (!x || !y) return `콜 수 ${a.length} ≠ ${b.length}`
+    for (const k of ['label', 'agentType', 'model', 'effort', 'schema', 'prompt']) if (x[k] !== y[k]) return `${i}번 콜(${x.label}) ${k} 다름`
+  }
+  return null
+}
+
+let fail = 0
+function check(name, cond, got) {
+  console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${cond ? '' : ` — ${got}`}`)
+  if (!cond) fail += 1
+}
+
+;(async () => {
+  const argv = process.argv.slice(2)
+  const asked = argv.flatMap((a, i) => (a === '--option' ? [argv[i + 1]] : []))
+  const names = argv.includes('--all-rb-options') || asked.length === 0 ? Object.keys(OPTIONS) : asked
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-default-off-'))
+  let bases
+  try {
+    const wfs = [...new Set(names.flatMap(n => (OPTIONS[n] ? OPTIONS[n].workflows : [])))]
+    try {
+      bases = Object.fromEntries(wfs.map(wf => [wf, baseFile(wf, tmp)]))
+    } catch (e) {
+      console.log(`UNRUN  기준 소스를 얻지 못했다 — ${e.message.split('\n')[0]} (⛔ 통과 아님)`)
+      process.exit(2)
+    }
+    for (const name of names) {
+      const opt = OPTIONS[name]
+      if (!opt) { check(`옵션 ${name} 이 레지스트리에 있다`, false, `등록된 옵션: ${Object.keys(OPTIONS).join(', ')}`); continue }
+      for (const wf of opt.workflows) {
+        const work = path.join(ROOT, 'workflows', `${wf}.js`)
+        for (const sc of SCENARIOS[wf]) {
+          const base = await callsOf(bases[wf].file, wf, sc, {})
+          const unset = await callsOf(work, wf, sc, {})
+          const off = await callsOf(work, wf, sc, opt.off)
+          const on = await callsOf(work, wf, sc, opt.on)
+          const tag = `${name} · ${wf} · ${sc.name}`
+          check(`${tag}: 미지정 == 기준(${bases[wf].from}) — 콜 ${base.length}개`, base.length > 0 && firstDiff(unset, base) === null, firstDiff(unset, base) || '콜 0개')
+          check(`${tag}: ${JSON.stringify(opt.off)} == 기준`, firstDiff(off, base) === null, firstDiff(off, base))
+          check(`${tag}: ${JSON.stringify(opt.on)} != 기준(옵션이 배선돼 있다)`, firstDiff(on, base) !== null, '켜도 콜 입력이 같다 — 헛돌이')
+        }
+      }
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
+  console.log(`\n기본 off 회귀 ${fail ? '실패 ' + fail + '건' : '전건 통과'} (옵션 ${names.join(', ')})`)
+  process.exit(fail ? 1 : 0)
+})().catch(e => { console.log(`FAIL  실행 오류 — ${e.message}`); process.exit(1) })

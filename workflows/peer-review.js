@@ -4,13 +4,16 @@
 //   표준 패턴 3종 적용. 대형 입력(diff/evidence)은 args가 아닌 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md Analyze Step): Lead가 Gather 산출물(diff/evidence/base-behavior)을 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/peer-review.js',
-//       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext? } })
+//       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext?, craftAxes?, projectRulesPath? } })
 //   reviewSurfacePatchPath: gather 가 만든 `review-surface.patch`(중복 커밋 제외분). 있으면 **이것이 1차 리뷰 대상**이 되고
 //     `diffPath` 는 부풀림 확인용 보조로 내려간다. ⛔ 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없다 —
 //     진단 파일만 넘기면 무력하다(GPT 리뷰 지적, 2026-09-01).
 //   reviewSurfacePath: `review-surface.md`(진단 산문). patch 와 함께 넘기면 렌즈가 부풀림 규모를 안다.
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality/correctness는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
+//   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어간다.
+//     미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다(tests/workflows/default-off-regression.js).
+//   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   deep=false → Tier 2 (Lite): Stage1 3-병렬만 (3-call). Confidence Matrix 미투표 — Lead 단순 병합.
 //   deep=true  → Tier 3 (Full): +Stage2 교차(arch↔quality) +Stage3 counter DA (6-call). Lead full Matrix.
@@ -78,6 +81,43 @@ const CrossReviewSchema = {
       },
     },
     additions: PeerReviewSchema.properties.issues,
+  },
+}
+
+// craft 6축 — ⛔ tests/fixtures/quality 의 AXES6(SC-4 채점 축)과 같은 목록·순서다. review-live.js · modules/review-structural-axes.md §6
+//    과 함께 tests/workflows/craft-axes.js 가 일치를 단언한다. 한 줄 리터럴로 둔다(그 테스트가 이 줄을 추출한다).
+const CRAFT_AXES = ['idiom', 'naming', 'architecture', 'ui_structure', 'placement', 'design_alternative']
+
+// arch 전용 craft 스키마 — ⛔ PeerReviewSchema 를 고치지 않고 **새 객체**로 만든다. CrossReviewSchema.additions ·
+//    CounterSchema.missedIssues 가 issues 하위 객체를 참조로 공유해서, 원본을 고치면 craft 필드가 전 렌즈로 샌다.
+const ArchCraftSchema = {
+  ...PeerReviewSchema,
+  required: [...PeerReviewSchema.required, 'axisCoverage'],
+  properties: {
+    ...PeerReviewSchema.properties,
+    issues: {
+      ...PeerReviewSchema.properties.issues,
+      items: {
+        ...PeerReviewSchema.properties.issues.items,
+        properties: {
+          ...PeerReviewSchema.properties.issues.items.properties,
+          craftAxis: { type: 'string', enum: CRAFT_AXES, description: 'craft 축 발견이면 그 축 — 결함 발견이면 비운다' },
+          ruleRef: { type: 'string', description: '인용한 프로젝트 규칙 레코드 id — 규칙 없이 낸 craft 지적이면 비운다' },
+        },
+      },
+    },
+    axisCoverage: {
+      type: 'array', minItems: CRAFT_AXES.length,
+      description: '6축 각각의 판정 — 발견이 없어도 축마다 1행(none·not_applicable 는 note 에 이유)',
+      items: {
+        type: 'object', required: ['axis', 'status', 'note'],
+        properties: {
+          axis: { type: 'string', enum: CRAFT_AXES },
+          status: { type: 'string', enum: ['finding', 'none', 'not_applicable'] },
+          note: { type: 'string' },
+        },
+      },
+    },
   },
 }
 
@@ -338,14 +378,29 @@ const TARGET = `[리뷰 대상] diff 파일: ${primaryDiff} (Read로 로드)\n[�
 // 구조 축 브리프 — arch 렌즈에만 주입 (modules/review-structural-axes.md §2).
 // quality/correctness는 결함 축을 유지해야 하고, A/B 검증도 review-arch 1개로만 이뤄졌다.
 const structuralLine = input.structuralContext ? `\n[구조 축 — 이 렌즈 전용] ${input.structuralContext}` : ''
+// craft 축 — arch 렌즈에만(structuralLine 과 같은 이유 — modules/review-structural-axes.md §2·§6). ⛔ 기본 off — 꺼지면 빈 문자열이다.
+// ⛔ projectRulesPath 는 craftAxes 의 하위 옵션이다 — craftAxes 없이 넘겨도 기본 경로를 바꾸지 않는다.
+const craftOn = input.craftAxes === true || input.craftAxes === 'true'
+const craftLine = !craftOn ? '' :
+  `\n[craft 축 — 이 렌즈 전용] ${CRAFT_AXES.join(' · ')} — 축마다 axisCoverage 에 1행(finding · none · not_applicable, note 에 근거)을 쓴다. ` +
+  `craft 발견에는 craftAxis 를 단다. severity: ruleRef 가 프로젝트 규칙을 인용할 때만 minor 이상, 그 밖 craft 지적은 suggestion 까지.` +
+  (input.projectRulesPath
+    ? `\n[프로젝트 규칙 — 이 렌즈 전용] ${input.projectRulesPath} (Read — 검증을 통과한 규칙 레코드. ruleRef 는 그 레코드 id)`
+    : `\n[프로젝트 규칙] 없음 — 규칙 인용 지적 금지 — 코드 근거만`)
+function craftSummary(issueList, archResult) {
+  return {
+    counts: Object.fromEntries(CRAFT_AXES.map(ax => [ax, issueList.filter(f => f.craftAxis === ax).length])),
+    axisCoverage: archResult && Array.isArray(archResult.axisCoverage) ? archResult.axisCoverage : null,
+  }
+}
 
 // ════════ Stage 1: 독립 병렬 리뷰 (3-Model — Round 1 독립성) ════════
 phase('Stage 1: arch/quality/correctness 독립 리뷰')
 const [arch, quality, correctness] = await parallelWithRetry([
   () => callAgent(
-    `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}\n` +
+    `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}${craftLine}\n` +
     `[목표] 아키텍처 관점 issues (id는 A1, A2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.`,
-    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: PeerReviewSchema }),
+    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: craftOn ? ArchCraftSchema : PeerReviewSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
     `[목표] 품질 관점 issues (id는 Q1, Q2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.`,
@@ -382,6 +437,7 @@ if (!deep && !trigger.fire) {
   return {
     mode: 'workflow', tier: 2, reviews, issues: allIssues,
     stage2Ran: false, stage2Trigger: trigger,
+    ...(craftOn ? { craftAxes: craftSummary(allIssues, arch) } : {}),
     metrics: metrics(reviews.length === 3 ? 1 : 0),
   }
 }
@@ -446,6 +502,7 @@ if (!deep) {
     mode: 'workflow', tier: 2, reviews, issues: tier2Issues,
     crossAdjustments: { archOnPeers, qualityOnPeers },
     stage2Ran: stage2Actually, stage2Trigger: trigger,
+    ...(craftOn ? { craftAxes: craftSummary(tier2Issues, arch) } : {}),
     // ⛔ 완주 = 완전 완주 stage 수(Tier 3 의 s1full 과 같은 식) — Stage 1 은 세 렌즈가 모두 있을 때만 완주다.
     //    이전 판은 Stage 1 을 항상 1 로 셌다 — correctness 가 죽어도 교차가 돌면 "완주 2/2" 를 냈다(S24a 실패 주입 재현).
     metrics: metrics((reviews.length === 3 ? 1 : 0) + (archOnPeers && qualityOnPeers ? 1 : 0)),
@@ -503,6 +560,10 @@ const dist = {
   contested: mergedIssues.filter(f => f.crossVerdict === 'contested').length,
   // 구조 축 주입 여부 — structuralContext는 optional이라 누락 시 에러 없이 꺼진다. 반환값으로 판별 가능하게 남긴다.
   structuralAxes: !!input.structuralContext,
+}
+if (craftOn) {
+  dist.craftAxes = craftSummary(mergedIssues, arch)
+  log(`craft 축 — ${CRAFT_AXES.map(ax => `${ax} ${dist.craftAxes.counts[ax]}`).join(' / ')} · axisCoverage ${dist.craftAxes.axisCoverage ? dist.craftAxes.axisCoverage.length + '행' : '⛔없음'}`)
 }
 log(`Tier3 issues ${mergedIssues.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / suggestion ${dist.suggestion} / FP·refute 플래그 ${dist.fpFlagged} / 판정갈림 ${dist.contested} / 구조축 ${dist.structuralAxes ? 'ON' : '⛔OFF'} (최종 투표·Matrix는 Lead)`)
 

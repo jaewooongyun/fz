@@ -17,6 +17,7 @@
 - [3. 축 5개](#3-축-5개)
 - [4. 경계 문구 (필수)](#4-경계-문구-필수)
 - [5. ablation 기록](#5-ablation-기록)
+- [6. craft 축 F~J — craftAxes 옵션 전용](#6-craft-축-fj--craftaxes-옵션-전용)
 
 ---
 
@@ -48,6 +49,8 @@ Lead: Read(modules/review-structural-axes.md) → §3 축 + §4 경계 문구를
 2. **검증 범위 일치** — A/B는 `review-arch` 1개로만 측정됐다. 전 렌즈 주입은 측정 범위를 넘는다.
 
 비용(실측 기준): 축 블록 약 1,140자 → 1콜 주입 시 Tier 2 총량의 **약 0.2%**. 3콜 주입이면 0.6%.
+
+⛔ **§6 craft 축(F~J)은 기본 브리프가 아니다.** `craftAxes:true` 로 부를 때만 §6 을 브리프에 더하고, 규칙 레코드가 있으면 `projectRulesPath` 도 넘긴다(R-B 기본 off). Lead 가 직접 적용하는 경로(Tier 0/1 · fz-review light)도 craft 를 쓰기로 했을 때만 §6 을 적용한다.
 
 ## 3. 축 5개
 
@@ -128,3 +131,57 @@ Lead: Read(modules/review-structural-axes.md) → §3 축 + §4 경계 문구를
 ```
 
 **축별로 분리해 세고, 카운트를 혼합하지 않는다.** — 이 형식이 필요한 전부다 (`modules/review-checks.md` 4-N과 동형이지만 그 파일을 Read할 필요는 없다).
+
+## 6. craft 축 F~J — craftAxes 옵션 전용
+
+> ⛔ 기본 off(R-B). §2 의 기본 브리프(§3 + §4)에 넣지 않는다 — `craftAxes:true` 로 부를 때만 브리프에 더한다. Lead 가 직접 적용하는 경로(Tier 0/1 · fz-review light)도 같다.
+
+craft 축은 **결함이 아닌 솜씨**를 본다. 동작은 맞는데 이 프로젝트의 규칙·관례나 언어 관용과 어긋나는 자리다. 축 목록은 품질 fixture 의 채점 축(`tests/fixtures/quality` · SC-4)과 같고, 여섯 중 `design_alternative` 는 위 B 가 이미 묻는다.
+
+| craft 축 | 모듈 축 |
+|---|---|
+| `idiom` | F. 관용 |
+| `naming` | G. 네이밍 |
+| `architecture` | H. 아키텍처 규칙 |
+| `ui_structure` | I. UI 구조 |
+| `placement` | J. 배치 |
+| `design_alternative` | B. 구조 대안 ≥2 |
+
+⛔ 이 표의 첫 열은 `workflows/peer-review.js` · `workflows/review-live.js` 의 `CRAFT_AXES` 와 같은 목록·순서다. `tests/workflows/craft-axes.js` 가 두 워크플로와 이 표, 품질 fixture 검사기의 축 목록을 대조한다.
+
+### F. 관용
+
+이 언어·프레임워크에서 **흔히 쓰는 표현**을 쓰는가. 같은 일을 하는 관용 형태가 있으면 그 형태와 줄 수 차이를 제시한다.
+
+이유: 관용에서 벗어난 코드는 동작해도 읽는 사람을 한 번 더 멈추게 한다. E(코드 형태)가 형제와 대조한다면 F 는 언어의 관용과 대조한다.
+
+### G. 네이밍
+
+이름이 **역할 · 도메인 어휘 · 프로젝트 명명 규칙**과 맞는가. 맞지 않으면 바꿀 이름과 근거(규칙 레코드 · 형제 이름)를 제시한다.
+
+이유: 이름은 컴파일러가 검증하지 않는다. 규칙(`…DTO` 접미사 같은)이 있으면 지적이 검증 가능해진다.
+
+### H. 아키텍처 규칙
+
+**의존 방향 · 레이어 규칙**을 지키는가. 프로젝트가 선언한 방향을 거스르는 호출을 찾는다.
+
+이유: A·D 는 구조가 좋은지를 묻고, H 는 이 프로젝트가 **정한 규칙**과 맞는지를 묻는다. 규칙 레코드가 없으면 H 로 지적하지 않는다.
+
+### I. UI 구조
+
+화면 구성이 규칙·형제와 맞는가 — **상태 소유(누가 만들고 누가 받는가) · 뷰 책임 · UI 프레임워크 선택**을 본다.
+
+이유: UI 상태 소유가 틀리면 화면이 다시 그려질 때 상태를 잃는다. 빌드와 테스트는 이것을 잘 잡지 못한다.
+
+### J. 배치
+
+코드가 **놓인 모듈 · 폴더 · 레이어**가 맞는가. 이미 있는 공용 코드를 다시 만들지 않았는가.
+
+이유: 잘못 놓인 코드는 다음 사람이 찾지 못해 다시 만든다. 공용 유틸의 재구현도 J 로 잡는다.
+
+### severity 와 규칙 인용
+
+- 규칙 레코드(`projectRulesPath` — `modules/project-rules.md`)를 `ruleRef` 로 인용할 때만 **minor 이상**이다
+- 규칙 없이 낸 craft 지적은 **suggestion 까지**다 — 취향을 결함처럼 올리지 않는다
+- 규칙 레코드가 없으면 워크플로가 "규칙 인용 지적 금지 — 코드 근거만" 줄을 넣는다
+- 축마다 `axisCoverage` 에 1행을 쓴다(`finding` · `none` · `not_applicable`). `none` 과 `not_applicable` 도 note 에 이유를 쓴다 — §3 머리의 "해당 없음도 이유를 쓴다" 와 같은 장치다
