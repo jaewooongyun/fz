@@ -17,6 +17,7 @@
 3. `git commit` + `git push origin main`
 4. `git tag vX.Y.Z` + `git push origin --tags`
 5. (선택) `gh release create vX.Y.Z`
+6. ⛔ 릴리즈 노트·CHANGELOG 는 **마지막 게이트(health-check · `check_release_sync.sh`) 뒤에 고치지 않는다** — 고쳤으면 게이트를 다시 돌린 뒤 발행한다. 노트의 검증 수치는 마지막 재실행 출력에서 옮긴다 (F-311: 게이트 뒤에 노트를 줄여 템플릿 게이트가 깨진 채 발행됐다)
 
 > **version bump 누락 시 `plugin update`가 "already at latest"로 스킵됨. 반드시 올릴 것.**
 
