@@ -103,9 +103,9 @@ metadata:
 ### 실행 절차 (Lead)
 
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/plan/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
-1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**):
-   프로젝트 지침 전체(CLAUDE.md·AGENTS.md 등 peer 파일 **모두**)에서 4축을 추출한다 — `architecturePattern` / `uiStack` / `dependencyDirection` / `naming`.
-   - 미확정 축 → `null`. 코드 실측(grep) 1회로 보완 시도하고, 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
+1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**) — ⛔ 정본은 `modules/project-rules.md` 다(절차 · 레코드 형식 · 검증기):
+   원문 색인(`extract_project_rules.py`) → 규칙 레코드(모델이 각자) → `check_project_rules.py --check` 통과본만 쓴다. `archConstraints` 는 그 **호환 투영**이다(`--project-arch` — 4축 `architecturePattern` / `uiStack` / `dependencyDirection` / `naming` + 그 축의 `conflicts`).
+   - 미확정 축 → `null` + `gaps`(Probe Coverage Gap). 코드 실측(grep) 1회로 보완을 시도하고(`authority: 관례` — 코드를 인용), 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
    - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / GPT)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
 2.5. **호출 경로 선결정** (⛔ 사전 복사 — 거부 왕복을 없앤다):
