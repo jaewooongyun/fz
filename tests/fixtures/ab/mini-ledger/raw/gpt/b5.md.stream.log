@@ -1,0 +1,11 @@
+Reading additional input from stdin...
+OpenAI GPT-CLI v0.157.0
+--------
+[1mworkdir:[0m @INPUT@
+[1mmodel:[0m gpt-6-sol
+[1mprovider:[0m openai
+[1mreasoning effort:[0m xhigh
+[1msession id:[0m 01a0d8c9-7239-7ae1-9e9c-832f78b30c8b
+--------
+[36muser[0m
+(프롬프트)

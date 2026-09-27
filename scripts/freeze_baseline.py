@@ -66,7 +66,9 @@ def tree_files(root: pathlib.Path, exclude=()):
     out = git(root, "ls-files", "--cached", "--others", "--exclude-standard")
     if out is None:
         return None
-    ex = set(exclude)
+    # ⛔ 작업 트리에서 지운(아직 커밋하지 않은) 추적 파일은 트리에 없다 — 목록에 넣으면 해시가 '읽기 실패' 로 통째로 None 이 된다
+    #    (실측 2026-09-26: 지운 fixture 1개 때문에 A/B C arm 원본 해시가 None — 모든 C run 이 미완주로 판정됐다)
+    ex = set(exclude) | set((git(root, "ls-files", "--deleted") or "").splitlines())
     return sorted(set(l for l in out.splitlines() if l.strip() and l not in ex))
 
 

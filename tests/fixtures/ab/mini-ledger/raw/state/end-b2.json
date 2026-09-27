@@ -1,0 +1,24 @@
+{
+ "schema": "ab-state/1",
+ "watch": {
+  "user_agent_memory": {
+   "path": "~/.claude/agent-memory",
+   "exists": true,
+   "files": {
+    "fz-memory-curator/MEMORY.md": "6555a4f2db9ed4c3a7ba6254736071d0498247be8064a7406dfd5430d8c77f44"
+   }
+  },
+  "repo_agent_memory": {
+   "path": "@INPUT_B2@/.claude/agent-memory",
+   "exists": false,
+   "files": {}
+  },
+  "user_sessions": {
+   "path": "~/.claude/sessions",
+   "pattern": "SESSION-*_issues.json",
+   "exists": true,
+   "files": {}
+  }
+ },
+ "hash": "(재계산)"
+}

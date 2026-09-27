@@ -102,6 +102,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 2 | 2026-04-25 | T1-G Sprint 2 Contract | 17 (distinct 17, shared 0 agg; manual 1 "6 vs Q8") | fz-codex SKILL.md verify, FP 0%, Coverage 100%, Actionability 100% → pass + fz-plugin bug 1건 교정 |
 | 3 | 2026-04-25 | T1-G Sprint 3 Contract | 18 (distinct 12 after F fix, shared 2: micro-eval + reflection-rate) | cross-validation.md Cross-Model, FP 0%, Coverage 83.3%, Actionability 100% → pass + fz-plugin bug 2건 교정 |
 | 4 | 2026-04-25 | T1-G Sprint 4 Contract | 19 (distinct 17, shared 1: approval) | harness-engineering.md §기둥2, FP 0%, Coverage 94.1%, Actionability 68.4% warn (H fix 후) → pass |
+| 5 | 2026-09-27 | fz-review v4.40.0(R-A) 출하 전 | 63 (review-live 42 · GPT review 2 · 실패 경로 점검 16 · Lead 3) → 수정 22 · R-B 연기 20여 · 기각 0 | GPT validate 1차 22건 반영률 86.4%(회귀 1·새 이슈 4) → 재수정 → 2차 9건 94.4%(새 이슈 3) → 재수정(3차 GPT 미실행). 고친 검사기가 다시 fail-open — F-329 부류 3회째 |
 
 ### 누적 지표 요약 (Sprint 1-4)
 
@@ -634,3 +635,99 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 
 | # | date | case | verdict | retro_baseline_same? | evidence_citations | alternatives_count | escalation_correct? | 품질 관찰 | wall_clock | session_model | env_subagent_model |
 |---|------|------|---------|---------------------|--------------------|--------------------|--------------------|----------|-----------|---------------|--------------------|
+
+## §5.10 A/B 원장 프로토콜 (S05 — 신설 2026-09-26)
+
+> 판정기 `scripts/ab_ledger.py`(수집·채점·판정) · 통합 테스트 `tests/ab/integration.py` · 이 절의 필수 항목은 `scripts/check_ab_protocol.py` 가 검사한다(health-check).
+> ⛔ 이 절은 **측정 절차**다. 수치는 원장(`{FZ_WORK}/ab/ledger.jsonl`)에 쌓고 여기에 옮겨 적지 않는다 — 손으로 옮긴 수치는 조건 검사를 건너뛴다.
+> ⛔ 2026-09-26 이전 `fz_wf_metrics` 의 out_tok·turns 는 **과대**다. 응답 1건이 content block 마다 한 줄로 기록되며 같은 usage 를 반복하는데, 줄마다 더했다(실측 1.35~1.6배). 같은 날 워커 역할 추출도 고쳤다(하네스 래퍼 뒤의 [역할] 을 못 읽어 stage 가 전부 '?' 였다). 위 §5.7·§5.8 의 토큰·턴 수치와 새 원장 수치를 직접 비교하지 않는다.
+> 판정기는 2026-09-26 GPT 적대 검토(critical 3·major 17)를 반영했다 — 위치 매칭 채점 폐기(가린 검증자 필수)·재구성 대조·arm 별 트리 검사 등.
+
+### 1. arm 과 트리
+- **B(기준선)** = `FZ_BASE_TREE`(FZ_BASE_SHA 의 불변 worktree). **C(변경안)** = `FZ_TREE`(작업 worktree). ⛔ 두 트리를 `--plugin-dir` 로 **직접 쓰지 않는다** — fz-review·fz-plan 이 플러그인 루트의 experiment-log 에 지표를 쓰므로 불변 트리가 오염된다. run 마다 **플러그인 사본**을 만든다: B 는 base 저장소를 clone 해 FZ_BASE_SHA 를 checkout, C 는 작업 트리를 rsync 한 사본.
+- `claude -p --input-format stream-json --output-format stream-json --verbose --plugin-dir <사본> --add-dir <사본>` **한 프로세스 세션**으로 띄운다(플러그인 루트가 추가 폴더면 Workflow scriptPath 거부와 사전 복사가 생기지 않는다). run 이 어느 트리를 썼는지는 transcript 의 `Base directory for this skill:` 로 판정한다(collect 가 `plugin.roots` 로 기록 — 1개가 아니면 미완주).
+- ⛔ 턴이 끝나도 stdin 을 열어 두고, **유휴**일 때만 후속 턴을 보내거나 stdin 을 닫는다. 유휴 = 이번 발화 뒤 `result` 가 왔고 · `background_tasks_changed` 의 실행 중 작업이 0 이고 · 그 뒤 온 `task_notification` 이 다음 `result` 로 소화됐고 · 5s 동안 이벤트가 없다(빈 작업 목록이 완료 알림보다 먼저 온다). `claude -p` 는 입력이 닫히면 local_bash 백그라운드 작업을 **기다리지 않는다** — 턴마다 새 프로세스(`--resume`)를 쓰면 Lead 가 알림을 기다리며 턴을 끝낼 때 GPT 셸이 죽는다(2026-09-27 실측: plan 3/3 run 의 GPT 검증 · peer-review 3/3 run 의 DA, F-332).
+- 플러그인 신원은 **run 전에** 잰다: `input --plugin-root <사본> --plugin-source <원본>`(B 원본 = FZ_BASE_TREE · C 원본 = FZ_TREE). 사본의 트리 해시가 원본과 같아야 하고(충실한 사본), 트리 해시가 없으면 무효다. run 뒤에는 사본이 experiment-log 로 dirty 가 되므로 **코드 해시**(허용 출력 `experiment-log.md` 제외)를 전후로 비교한다 — 실행 중 코드가 바뀌면 무효다. B 는 `judge --plugin-sha` 로 SHA 를, 묶음 검사로 arm 별 트리 일치와 **C 트리 ≠ B 트리**를 본다. C 사본은 git 저장소여야 한다(rsync 뒤 `git init` + 커밋 — 트리 목록을 git 이 정한다).
+- 모델·effort 는 `--model claude-opus-5-5 --effort xhigh` 로 고정한다. 판정은 transcript 의 `message.model` 과 최상위 `effort` 로 한다(AC-1 — 불일치 run 은 무효). 워커도 같은 두 필드로 본다.
+- `FZ_AUTONOMY` 는 세 스킬(fz-plan·fz-review·fz-peer-review)이 **읽지 않는다** — `/fz` Phase 4 에만 배선돼 있다(`modules/governance.md` · 2026-09-26 base 트리 전수 grep). 설정해도 사람 대기 지점은 그대로이므로 대기 회피는 아래 §3 의 입력 설계로 한다. 두 arm 에 같은 값(`FZ_AUTONOMY=autonomous`)을 두는 것은 기록용이다.
+- `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` — `claude -p` 의 백그라운드 대기 600s 천장을 끈다. 켜 두면 긴 Workflow 가 600s 에서 잘린 채 오류 없이 끝난다(2026-09-13 실측, F-203). ⛔ 이 천장은 에이전트·Workflow 작업에만 걸린다 — 셸(local_bash)은 값과 무관하게 기다리지 않으므로 위의 세션 유지가 따로 필요하다.
+- `FZ_GATES_OFF=1` — 사용자 전역 Stop hook 이 **main 트리**의 gate_stop_hook 을 부른다. finalize 된 원장이 미충족이면 종료를 막아 run 을 바꾼다 — 검사 대상이 아닌 트리의 hook 이 두 arm 에 끼어들지 않게 끈다.
+
+### 2. 격리와 시작 상태 (AC-7)
+- run 마다 fixture 저장소를 **새 경로**에 복원한다(`tests/fixtures/quality/<fixture>/build-repo.sh <run 폴더>/repo`). 같은 경로를 두 run 이 쓰면 judge 가 '재사용' 으로 무효 처리한다. 경로가 새로우면 프로젝트 auto-memory 와 프로젝트 범위 에이전트 메모리(`<repo>/.claude/agent-memory/`)가 run 마다 비어서 시작한다. base 트리의 plan-structure·review-arch·review-quality 는 `memory: project` 다.
+- 저장소 `.git/info/exclude` 에 `/ABT-*/`·`/NOTASK-*/`·`/peer-review-*/`·`/.claude/`·`/.serena/` 를 넣는다(입력 기록 전). 작업 폴더가 untracked 로 리뷰 diff 에 섞이지 않게 한다.
+- 사용자 범위 에이전트 메모리(`~/.claude/agent-memory/`)와 이슈 트래커(`~/.claude/sessions/` — 60분 안이면 재사용된다)는 run 사이에 공유된다. A/B 동안 memory-curator recall 을 쓰지 않는다(`memory: user`). 시작·종료 스냅샷으로 감시한다 — 감시 이름 `user_agent_memory`·`repo_agent_memory`·`user_sessions` 는 **필수**이고 경로는 정본이어야 한다(`~/.claude/agent-memory` · `<repo>/.claude/agent-memory` · `~/.claude/sessions` 의 `SESSION-*_issues.json` — 이름만 맞고 다른 곳을 보면 무효). ⛔ `~/.claude/sessions` 폴더 전체를 보면 안 된다 — Claude Code 세션 등록 파일(`<pid>.json`·`.key`)이 세션마다 바뀌어 모든 run 이 거짓 무효가 된다(2026-09-26 실측):
+  ```
+  python3 scripts/ab_ledger.py snapshot --out <ab>/state/pristine.json --watch user_agent_memory=~/.claude/agent-memory --watch repo_agent_memory=/nonexistent --watch 'user_sessions=~/.claude/sessions::SESSION-*_issues.json'
+  python3 scripts/ab_ledger.py snapshot --out <run>/start.json --watch user_agent_memory=~/.claude/agent-memory --watch repo_agent_memory=<repo>/.claude/agent-memory --watch 'user_sessions=~/.claude/sessions::SESSION-*_issues.json'
+  (run)
+  python3 scripts/ab_ledger.py snapshot --out <run>/end.json --watch …(시작과 같은 watch)
+  ```
+  pristine 은 A/B 전에 1회 찍는다. 시작 스냅샷이 pristine 과 다르면 그 run 은 무효다(다른 run 의 상태 유입). 이전 A/B run 이 만든 트래커 파일은 run 전에 그 run 증거 폴더로 옮긴다. 종료와 시작의 차이는 `state.writes` 로 남는다 — memory 필드가 무엇을 썼는지의 원인 기록이며 무효 사유는 아니다.
+- 입력: run 전에 `python3 scripts/ab_ledger.py input --root <repo> --fixture <이름> --plugin-root <플러그인 사본> --plugin-source <원본 트리> --out <run>/input.json` 을 남긴다. 저장소가 깨끗해야 한다(미커밋·미추적 0). 입력 해시 = sha256(fixture 이름 · main/feature 커밋 · 작업 트리 해시 · 첫 사람 발화). build-repo.sh 가 커밋 신원·시각을 고정하므로 같은 fixture 는 같은 SHA 다. collect 는 Lead 의 작업 폴더가 이 저장소 안인지 대조한다. 프롬프트에는 경로를 넣지 않는다(run 마다 경로가 달라 해시가 갈린다).
+
+- ⛔ **증거 부재 = 위반**: `input` 의 `--plugin-root`·`--plugin-source`, `collect` 의 `--input-json`·`--state-end` 는 필수 인자다. "있으면 대조" 는 fail-open 이다 — 증거를 안 주면 그 검사가 조용히 빠진다(GPT 검토 3라운드, F-317).
+
+### 3. 사람 대기 회피 (입력 설계)
+- 작업 폴더: 티켓 패턴이 있으면 질문 없이 `{PROJECT_ROOT}/{TICKET}/` 를 만든다 → 저장소에 `hotfix/ABT-1001-<이름>` 브랜치(= feature 커밋)를 만들어 checkout 한다. `hotfix/*` 는 base=main 으로 gather·Tier·GPT review 세 곳이 모두 질문 없이 풀린다.
+- fz-review: fixture 지침에 `## Build` 절(빌드 대상 없음)을 둔다 — 없으면 빌드 명령을 묻는다. 최종 산출물 = `{WORK_DIR}/review/self-review.md`.
+- fz-peer-review: `--tier 3` 고정(작은 diff 는 Tier 0 으로 떨어져 Workflow·GPT 를 부르지 않는다). 슬래시 명령을 그대로 프롬프트로 준다. `--post` 는 쓰지 않는다.
+- fz-plan: plan-final.md 는 Gate 2 승인 뒤에만 쓴다 → **표준 승인 턴** 1회를 같은 세션에 보낸다(같은 프로세스의 stdin — 첫 턴이 유휴가 된 뒤, §1): "Gate 2 승인·확정 — 추가 질문 없이 plan-final.md 를 기록해줘". wall 은 plan-final.md 기록에서 끝난다. 두 arm 이 같은 문구를 쓴다. 요구사항에서 리팩토링 어휘를 뺀다(추가 질문 트리거).
+
+### 4. 순서 (교차)
+- 워크플로마다 B1 → C1 → B2 → C2(또는 C1 → B1 → C2 → B2) 순서로 `--order` 를 준다. 기준선을 먼저 재면 C 자리를 비워 두고 번호를 예약한다(S08: B1=1 · B2=3). `judge --require crossover-order` 가 교차를 판정한다.
+- 정식 비교는 arm 별 유효 run 이 **정확히 2개**여야 한다. 모자라면 무효 run 을 다시 재고, 넘치면 FAIL 이다(골라 쓰지 않는다). smoke 는 C 가 `--runs` 와 정확히 같아야 한다.
+
+### 5. wall 자
+- **wall_total** = Lead transcript 의 첫 사람 발화 → 최종 산출물 기록 이벤트의 결과 시각이다. 기록 이벤트는 **완료된** Write·Edit, 또는 쓰기 근거(리다이렉트·쓰기 동사)가 있는 Bash 뿐이다(읽기는 후보가 아니다). 셸 변수·`for` 값·`python3 - ARG` 의 argv 로 넘긴 경로는 펴서 대상과 맞춘다(argv 는 위치까지 — F-331). 모르는 쓰기 형태는 mtime 교차 실패로 run 이 무효가 된다. SC-6 은 이것으로만 판정한다. 파일 mtime 은 끝점 이벤트를 고르고 **교차 검사**(허용 5s)에만 쓴다 — ⛔ mtime 자로 wall 을 재지 않는다(`fz_telemetry_report` 의 mtime wall 은 -36% 편향).
+- **wall_workflow** = 에이전트 timestamp(`fz_wf_metrics`) 와 Lead 의 Workflow 기동 → 완료 알림. 이 두 자끼리만 교차하고 5% 를 넘으면 run 무효다(judge 가 두 값과 차이를 함께 인쇄한다). 실측 교차 차이는 0.12~0.27% 였다(2026-09-25 run 5건).
+- **wall_gpt** = GPT 래퍼 기동 → 완료. 성공은 **GATE-PASS 증거**로만 인정한다 — 백그라운드면 알림의 상태·종료 코드 + 작업 출력 파일의 GATE-PASS, 포그라운드면 도구 결과의 GATE-PASS(래퍼는 비지 않은 출력을 확인한 뒤에만 찍는다), 출력 경로를 풀 수 있으면 그 파일도 비어 있지 않아야 한다. 실행 위치에서 래퍼를 부른 명령만 호출로 센다(검색·읽기는 제외). 성공한 호출마다 **자기** 배너(model·reasoning effort)를 1:1 로 붙인다 — 출력 경로의 `.stream.log`, 변수 경로면 그 호출의 시간창 안 로그 하나. 연결되지 않은 성공 호출이 있으면 AC-1 판정 불가로 무효, 실패한 호출이 하나라도 있으면 무효다. 묶음 비교에서 GPT effort 는 Lead 가 `--effort` 를 **명시하지 않은** 호출끼리만 맞춘다 — 명시 플래그는 측정 대상의 행동이고, 기본값 effort 가 다르면 환경 차이로 무효다(F-333). 변수 경로로 호출한 run 은 `collect --gpt-log-dir <run 폴더>` 를 준다.
+
+### 6. 완주 오라클 (AC-5)
+- 주 오라클: Workflow 반환의 `metrics.agentCalls` = 하네스 `agentCount`(알림 결과가 온전해도 output-file 이 있으면 함께 대조) = Workflow 폴더 agent 수 = journal started 수 = journal result 수 · `mode:'workflow'` · nullCount·fallbackCount 0(필드가 없으면 0 으로 읽지 않고 미완주) · 빈·실패 결과(`ok:false`·`error`) 0 · 실행 모드별 필수 stage 전부(peer-review 는 Stage 2 발화 시 R2, Tier 3 이면 R3 까지) · `stagesCompleted` 기대값(fz-plan 2 · fz-review 3(조건부 Stage 2 미발화면 2) · peer-review Tier 3 이면 3 · Tier 2 는 Stage 2 여부로 2/1). 수동 교차는 `python3 scripts/fz_wf_metrics.py --wf <runId> --expect-agents <agentCalls>` 가 COMPLETE 를 내는지로 한다.
+- 완료 알림의 `<result>` 는 8,000자에서 잘린다(실측) — collect 는 `<output-file>`(하네스 래퍼 JSON)을 읽고 원장 옆 `evidence/` 에 같은 파일명으로 사본을 남긴다(`/tmp` 는 지워질 수 있다). 러너가 run 직후 tasks 폴더를 복사했으면 `collect --tasks-dir` 로 준다.
+- 대체 오라클(반환을 못 읽은 경우): journal started = result = agent 수 + 필수 stage 전부. 어느 오라클을 썼는지 `wf.runs[].oracle` 에 남는다. ⛔ peer-review 는 실행 모드(tier·Stage 2)를 반환으로만 알 수 있어 대체 오라클을 쓰지 않는다(미완주). 알림의 반환과 하네스 래퍼의 반환이 둘 다 있는데 다르면 미완주다. JSON 문자열로 기록된 journal 결과의 오류(`ok:false`·`error`)도 실패로 센다.
+- 미완주 run 은 **0건이 아니라 무효**다 — 비교에서 빼고, 남은 유효 run 이 모자라면 FAIL 이다. 공백뿐인 산출물도 미완주다.
+
+### 7. 채점과 가린 검증자
+- ⛔ 진성 여부는 **가린 검증자**만 정한다. 인용 위치가 라벨과 겹친다는 것만으로 세지 않는다('정상' 언급도 위치는 겹친다 — GPT 검토 ISSUE-001).
+  ```
+  python3 scripts/ab_ledger.py blind-pack --ledger <ab>/ledger.jsonl --out <ab>/blind-<n>      # pack.json(검증자용) · key.json(열쇠)
+  (fresh-context 검증자에게 pack.json 만 준다 — key.json·원장·arm 정보 금지 → verdicts-anon.json)
+  python3 scripts/ab_ledger.py blind-unpack --pack <ab>/blind-<n> --verdicts verdicts-anon.json --out <ab>/verdicts-<n>.json
+  python3 scripts/ab_ledger.py score --ledger <ab>/ledger.jsonl --verdicts <ab>/verdicts-<n>.json
+  ```
+  꾸러미에는 run_id·arm·순서·절대 경로가 없다(anon id 는 소금 해시). 리뷰는 인용 후보마다 **지적 문단 전체**와 위치 힌트(near_labels)를, fixture 마다 **diff 와 인용된 파일 본문**을 준다 — 검증자는 **코드로 확인한** 결함만 real 로 판정한다(주장만으로는 false). 계획은 본문·요구사항·채점표 항목을 준다. 검증자는 어느 arm 의 산출물인지 알 수 없어야 한다. 판정 값은 JSON boolean 이다(`"false"` 같은 문자열은 미검증).
+- 판정은 꾸러미를 만들 때의 **산출물 해시**에 묶인다. 산출물이 바뀌었거나 recollect 로 행이 바뀌었으면 옛 판정은 쓰이지 않고(score 가 미검증으로 채점), judge 는 점수의 산출물 해시가 현재 행과 다르면 낡은 점수로 보고 UNRUN 한다.
+- 리뷰: 검증자가 후보마다 {real, label_ids, severity, axis} 를 낸다. 라벨로 매핑된 발견은 **라벨의** severity·axis 로, 라벨 밖 진성 발견은 판정 값으로 센다. 한 라벨은 한 번만 센다. real=true 인데 유효한 라벨 매핑도, 허용된 severity·axis 도 없거나, 없는 라벨·다른 파일의 라벨로 매핑하면 그 후보는 **미검증**이다(세지 않고 넘어가면 발견이 사라진다). 점수에는 채점기(계측기) 버전이 남고, 현재 버전과 다르면 judge 가 낡은 점수로 본다. 계획: 채점표 항목마다 {covered} — 절·질문·10배 부하·의존성 장애·롤백은 major, 잔재·소비자 심볼은 critical 이다(키워드는 힌트뿐).
+- 판정이 빠진 후보·항목이 하나라도 있으면 그 점수는 미검증이며 SC-3·SC-3-smoke·SC-4 는 UNRUN 이다.
+
+### 8. peer-review B arm 의 표준 후속 필터 턴
+- 실측: peer-review 호출 다음 발화의 63% 가 "코멘트 달 가치·근거 재실측" 요청이고, 그 턴에 호출 시간의 +35% 가 든다(감사 REPORT §3 — 호출 구간 측정 밖이었다). SC-6 의 peer-review 끝점은 **게시 가치·근거 확인까지**다.
+- 그래서 B arm 은 첫 응답 뒤 **고정 문구 1턴**을 같은 세션에 보낸다(같은 프로세스의 stdin — 첫 턴이 유휴가 된 뒤, §1): "코멘트로 달 가치가 있는 항목만 근거를 다시 실측해 추리고, 게시할 코멘트를 pr-comments.md 로 저장해줘". wall 은 그 턴의 산출물에서 끝난다. C arm 이 같은 산출물을 첫 턴에 내면 후속 턴을 보내지 않고, 못 내면 같은 문구를 보낸다. 어느 쪽이든 `lead.followup_prompts` 에 남는다.
+
+### 9. 원장 명령과 판정식
+```
+python3 scripts/ab_ledger.py collect --ledger <ab>/ledger.jsonl --workflow fz-review --arm B --run 1 --order 1 --phase baseline \
+  --fixture review-ios-ribs --transcript <session>.jsonl --artifact <repo>/ABT-1001/review/self-review.md \
+  --input-json <run>/input.json --state-pristine <ab>/state/pristine.json --state-start <run>/start.json --state-end <run>/end.json
+python3 scripts/ab_ledger.py judge --ledger <ab>/ledger.jsonl --phase baseline --workflows fz-plan,fz-review,fz-peer-review \
+  --min-runs 2 --plugin-sha <FZ_BASE_SHA> --verify-sources transcript,wf-metrics,start-state,input-hash,instrument-sha
+python3 scripts/ab_ledger.py show --ledger <ab>/ledger.jsonl
+```
+- 계측기(ab_ledger·fz_wf_metrics·freeze_baseline)의 내용 해시가 `instrument_sha` 로 남는다. B 와 C 는 같은 계측기로 수집해야 한다 — 다르면 judge 가 무효로 두고, `recollect` 로 원천에서 다시 모은다.
+- judge 는 `--verify-sources` 로 기록된 collect 인자를 써서 행을 원천(transcript · Workflow 폴더 · 반환 사본 · 스냅샷 · 입력 기록 · 산출물 해시)에서 **다시 만들고** 판정 필드 전체를 대조한다. 행을 손으로 고치거나 원천이 사라지면 무효가 된다(통합 테스트 `tampered-*`).
+- 판정식:
+  - SC-3 = critical·major 각각 max(0, mean(B) − mean(C)) ≤ |B1 − B2|
+  - SC-3-smoke = 같은 식에 C 1회(R-A 출하 전용 — 재실행 이력이 있으면 골라 쓰지 않고 FAIL)
+  - SC-4 = C run 마다 6축 각 1건 이상 + 검증 비율 ≥ mean(B) − |B1 − B2|
+  - SC-6 = median(B) − median(C) > max(|B1 − B2|, |C1 − C2|)
+  - SC-7 = Lead out_tok·messages·retries·followup_prompts 와 워커 out_tok·turns·so_retries 존재 + B 공통 stage·성공한 GPT 호출 수 보존
+- ⛔ 구현한 기준의 정본은 `scripts/ab_ledger.py` 의 `IMPLEMENTED` 다 — 여기에 목록을 옮겨 적지 않는다(옮긴 사본이 코드와 어긋났다, v4.40.0 리뷰). 그 밖의 기준과, 받지만 구현하지 않은 옵션(`--envs` 등 — `judge_rows` 입구가 막는다)은 **exit 2** 다. baseline phase 에 다른 기준을 주어도 exit 2 다. 받고 무시하면 그것이 AC-5 의 '빠른 성공'이다.
+
+### 10. 기준선 이동 기록
+| 시점 | 변경 | 영향 받는 측정 | 비교 규칙 |
+|---|---|---|---|
+| v4.40.0 (R-A · S02) | review-arch·review-quality·plan-structure·impl-correctness 의 `memory:` 제거(A2-01) | 이 에이전트를 쓰는 모든 워크플로 — plan-lean2·review-live·peer-review 외에 code-pair·plan-collaborative·discover-adversarial | 이 시점 앞뒤의 §5.7·§5.8 행을 같은 조건으로 비교하지 않는다(에이전트 메모리 읽기·쓰기가 사라졌다). S08 기준선 B 는 이전 트리(필드 있음)로 재고 기록만 한다(AC-7) |
+| v4.40.0 (R-A · S18) | plan-lean2 `metrics.stagesCompleted` — Stage 1 은 세 팔(full·edge·impactArch)이 모두 있을 때만 완주로 센다 + `degraded`·`missingLenses` 반환(A3-01) | fz-plan 의 완주 지표. 렌즈가 빠진 run 은 이전 판에서 2, 이후 판에서 1 또는 0 | 완주 비교는 두 arm 모두 원천 증거(journal 의 null 결과)로 다시 센 값만 쓴다 — 반환의 `stagesCompleted` 를 arm 사이에 그대로 비교하지 않는다 |
+| v4.40.0 (R-A · S24a) | peer-review Tier 2(교차 발화) `metrics.stagesCompleted` — Stage 1 은 세 렌즈가 모두 있을 때만 완주(F-327) | fz-peer-review 의 완주 지표. Stage 1 렌즈가 빠진 Tier 2 run 은 이전 판 2, 이후 판 1 | S18 행과 같다 — 원천 증거로 다시 센 값만 arm 사이에 비교한다 |

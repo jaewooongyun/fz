@@ -1,0 +1,11 @@
+{"type": "launched", "runId": "wf_b2"}
+{"type": "started", "agentId": "b2R1a"}
+{"type": "result", "agentId": "b2R1a", "result": {"ok": true}}
+{"type": "started", "agentId": "b2R1q"}
+{"type": "result", "agentId": "b2R1q", "result": {"ok": true}}
+{"type": "started", "agentId": "b2R2a"}
+{"type": "result", "agentId": "b2R2a", "result": {"ok": true}}
+{"type": "started", "agentId": "b2R2q"}
+{"type": "result", "agentId": "b2R2q", "result": {"ok": true}}
+{"type": "started", "agentId": "b2R3c"}
+{"type": "result", "agentId": "b2R3c", "result": {"ok": true}}

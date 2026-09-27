@@ -1,0 +1,182 @@
+{
+ "runs": [
+  {
+   "run_id": "B1",
+   "workflow": "fz-review",
+   "arm": "B",
+   "run": 1,
+   "order": 1,
+   "phase": "baseline",
+   "release": null,
+   "fixture": "review-mini",
+   "transcript": "@FIX@/raw/transcripts/b1.jsonl",
+   "artifact": [
+    "@FIX@/raw/artifacts/b1-review-report.md"
+   ],
+   "input": "@INPUT_B1@",
+   "plugin": "@PLUGIN@",
+   "state_pristine": "@FIX@/raw/state/pristine.json",
+   "state_start": "@FIX@/raw/state/start-b1.json",
+   "state_end": "@FIX@/raw/state/end-b1.json",
+   "evidence_dir": "@WORK@/evidence"
+  },
+  {
+   "run_id": "B2",
+   "workflow": "fz-review",
+   "arm": "B",
+   "run": 2,
+   "order": 3,
+   "phase": "baseline",
+   "release": null,
+   "fixture": "review-mini",
+   "transcript": "@FIX@/raw/transcripts/b2.jsonl",
+   "artifact": [
+    "@FIX@/raw/artifacts/b2-review-report.md"
+   ],
+   "input": "@INPUT_B2@",
+   "plugin": "@PLUGIN@",
+   "state_pristine": "@FIX@/raw/state/pristine.json",
+   "state_start": "@FIX@/raw/state/start-b2.json",
+   "state_end": "@FIX@/raw/state/end-b2.json",
+   "evidence_dir": "@WORK@/evidence"
+  },
+  {
+   "run_id": "B3",
+   "workflow": "fz-review",
+   "arm": "B",
+   "run": 3,
+   "order": 5,
+   "phase": "baseline",
+   "release": null,
+   "fixture": "review-mini",
+   "transcript": "@FIX@/raw/transcripts/b3.jsonl",
+   "artifact": [
+    "@FIX@/raw/artifacts/b3-review-report.md"
+   ],
+   "input": "@INPUT_B3@",
+   "plugin": "@PLUGIN@",
+   "state_pristine": "@FIX@/raw/state/pristine.json",
+   "state_start": "@FIX@/raw/state/start-b3.json",
+   "state_end": "@FIX@/raw/state/end-b3.json",
+   "evidence_dir": "@WORK@/evidence"
+  },
+  {
+   "run_id": "B4",
+   "workflow": "fz-review",
+   "arm": "B",
+   "run": 4,
+   "order": 6,
+   "phase": "baseline",
+   "release": null,
+   "fixture": "review-mini",
+   "transcript": "@FIX@/raw/transcripts/b4.jsonl",
+   "artifact": [
+    "@FIX@/raw/artifacts/b4-review-report.md"
+   ],
+   "input": "@INPUT_B4@",
+   "plugin": "@PLUGIN@",
+   "state_pristine": "@FIX@/raw/state/pristine.json",
+   "state_start": "@FIX@/raw/state/start-b4.json",
+   "state_end": "@FIX@/raw/state/end-b4.json",
+   "evidence_dir": "@WORK@/evidence"
+  },
+  {
+   "run_id": "B5",
+   "workflow": "fz-review",
+   "arm": "B",
+   "run": 5,
+   "order": 7,
+   "phase": "baseline",
+   "release": null,
+   "fixture": "review-mini",
+   "transcript": "@FIX@/raw/transcripts/b5.jsonl",
+   "artifact": [
+    "@FIX@/raw/artifacts/b5-review-report.md"
+   ],
+   "input": "@INPUT_B5@",
+   "plugin": "@PLUGIN@",
+   "state_pristine": "@FIX@/raw/state/pristine.json",
+   "state_start": "@FIX@/raw/state/start-b5.json",
+   "state_end": "@FIX@/raw/state/end-b5.json",
+   "evidence_dir": "@WORK@/evidence"
+  },
+  {
+   "run_id": "B6",
+   "workflow": "fz-review",
+   "arm": "B",
+   "run": 6,
+   "order": 8,
+   "phase": "baseline",
+   "release": null,
+   "fixture": "review-mini",
+   "transcript": "@FIX@/raw/transcripts/b6.jsonl",
+   "artifact": [
+    "@FIX@/raw/artifacts/b6-review-report.md"
+   ],
+   "input": "@INPUT_B6@",
+   "plugin": "@PLUGIN@",
+   "state_pristine": "@FIX@/raw/state/pristine.json",
+   "state_start": "@FIX@/raw/state/start-b6.json",
+   "state_end": "@FIX@/raw/state/end-b6.json",
+   "evidence_dir": "@WORK@/evidence"
+  },
+  {
+   "run_id": "S1",
+   "workflow": "fz-review",
+   "arm": "C",
+   "run": 1,
+   "order": 9,
+   "phase": "release-smoke",
+   "release": "R-A",
+   "fixture": "review-mini",
+   "transcript": "@FIX@/raw/transcripts/s1.jsonl",
+   "artifact": [
+    "@FIX@/raw/artifacts/s1-review-report.md"
+   ],
+   "input": "@INPUT_S1@",
+   "plugin": "@PLUGIN_C@",
+   "state_pristine": "@FIX@/raw/state/pristine.json",
+   "state_start": "@FIX@/raw/state/start-s1.json",
+   "state_end": "@FIX@/raw/state/end-s1.json",
+   "evidence_dir": "@WORK@/evidence"
+  },
+  {
+   "run_id": "S2",
+   "workflow": "fz-review",
+   "arm": "C",
+   "run": 1,
+   "order": 10,
+   "phase": "release-smoke",
+   "release": "R-Z",
+   "fixture": "review-mini",
+   "transcript": "@FIX@/raw/transcripts/s2.jsonl",
+   "artifact": [
+    "@FIX@/raw/artifacts/s2-review-report.md"
+   ],
+   "input": "@INPUT_S2@",
+   "plugin": "@PLUGIN_C@",
+   "state_pristine": "@FIX@/raw/state/pristine.json",
+   "state_start": "@FIX@/raw/state/start-s2.json",
+   "state_end": "@FIX@/raw/state/end-s2.json",
+   "evidence_dir": "@WORK@/evidence"
+  }
+ ],
+ "mtimes": {
+  "@FIX@/raw/artifacts/b1-review-report.md": "2026-01-01T00:25:02.000Z",
+  "@FIX@/raw/gpt/b1.md.stream.log": "2026-01-01T00:06:39.000Z",
+  "@FIX@/raw/artifacts/b2-review-report.md": "2026-01-03T00:25:04.000Z",
+  "@FIX@/raw/gpt/b2.md.stream.log": "2026-01-03T00:06:39.000Z",
+  "@FIX@/raw/artifacts/b3-review-report.md": "2026-01-05T00:25:06.000Z",
+  "@FIX@/raw/gpt/b3.md.stream.log": "2026-01-05T00:06:39.000Z",
+  "@FIX@/raw/artifacts/b4-review-report.md": "2026-01-06T00:25:07.000Z",
+  "@FIX@/raw/gpt/b4.md.stream.log": "2026-01-06T00:06:39.000Z",
+  "@FIX@/raw/artifacts/b5-review-report.md": "2026-01-07T00:25:08.000Z",
+  "@FIX@/raw/gpt/b5.md.stream.log": "2026-01-07T00:06:39.000Z",
+  "@FIX@/raw/artifacts/b6-review-report.md": "2026-01-08T00:25:09.000Z",
+  "@FIX@/raw/gpt/b6.md.stream.log": "2026-01-08T00:06:39.000Z",
+  "@FIX@/raw/artifacts/s1-review-report.md": "2026-01-09T00:25:10.000Z",
+  "@FIX@/raw/gpt/s1.md.stream.log": "2026-01-09T00:06:39.000Z",
+  "@FIX@/raw/artifacts/s2-review-report.md": "2026-01-10T00:25:11.000Z",
+  "@FIX@/raw/gpt/s2.md.stream.log": "2026-01-10T00:06:39.000Z"
+ }
+}
