@@ -23,6 +23,8 @@ const OPTIONS = {
   craftAxes: { workflows: ['peer-review', 'review-live'], on: { craftAxes: true }, off: { craftAxes: false } },
   crossRequiredFields: { workflows: ['peer-review', 'review-live'], on: { crossRequiredFields: true }, off: { crossRequiredFields: false },
     applies: sc => sc.stage2 },   // Stage 2 교차 프롬프트에만 닿는다
+  // review-live 는 confidence 필드가 없어 조기 필터도 없다 — peer-review 만. OVERRIDE 가 모든 콜에 있어 applies 가 없다
+  preserveLowConfidence: { workflows: ['peer-review'], on: { preserveLowConfidence: true }, off: { preserveLowConfidence: false } },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }

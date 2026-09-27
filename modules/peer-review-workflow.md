@@ -34,6 +34,7 @@
 3. **GPT Analyze** (out-of-band, `--gpt`/Tier3): Lead가 `/fz-gpt` 경유 challenger 호출 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과는 Synthesize Confidence Matrix의 GPT 열로 주입 — Matrix 생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9.
 
 > 산출물 계약(Confidence Matrix, origin severity 보정, confidence<80 미보고, dedup+투표)은 Synthesize Step에 보존 — Matrix·투표의 적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9. metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록.
+> ⊕ `args.preserveLowConfidence`(기본 off)를 켠 호출은 위 계약의 확신도 미달 항목을 버리지 않고 hold 로 둔다(`[후보 보존]` — `modules/peer-review-gates.md` §10).
 > ⚠️ **§5.7에 fz-peer-review 테이블이 아직 없다** (Wave 4가 `[Unreleased]` + 실 invoke 캘리브레이션 pending). 확산 임계 사전등록과 테이블 생성은 **별건** — 실 invoke 전에 처리해야 `확증 편향 방어`가 유지된다.
 
 ### 에이전트 출력 스키마
@@ -44,6 +45,7 @@
 **Per-Agent 품질 원칙**: 시니어 엔지니어가 PR 코멘트로 달 만한 이슈만 보고한다. 이슈 0개도 유효한 결과다.
 자체 confidence 80% 미만이면 보고하지 않는다. description ≤400chars (WHY 필수), suggestion ≤300chars, strengths ≤3. `challenges` 키는 GPT DA 전용 (기본값 `[]`).
 WHY: 이슈 수가 많으면 리뷰어 피로가 증가하고, 진짜 문제가 marginal finding에 묻힌다.
+> ⊕ `args.preserveLowConfidence`(기본 off)를 켜면 워크플로가 렌즈 프롬프트의 이 임계를 `[후보 보존]` 문장으로 바꾼다 — 렌즈는 confidence 를 값으로 달아 보고하고, 게시 여부는 병합이 정한다(`modules/peer-review-gates.md` §10).
 
 ### 방법 A — 기본 (Orchestrator 합성)
 

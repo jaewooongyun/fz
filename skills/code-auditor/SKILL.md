@@ -424,6 +424,7 @@ func routeToDetail() {
 
 시니어 엔지니어가 PR 코멘트로 달 만한 이슈만 보고한다. **이슈 0개도 유효한 결과다.**
 자체 confidence 80% 미만이면 보고하지 않는다. 이슈 수가 많으면 진짜 문제가 marginal finding에 묻힌다.
+> ⊕ 워크플로 프롬프트에 `[후보 보존]` 문장(preserveLowConfidence 옵션 — `modules/peer-review-gates.md` §10)이 있으면 위 문장과 아래 `자체 신뢰도 임계치` 행을 적용하지 않는다. confidence 는 값으로 달아 그대로 보고하고, 게시 여부는 병합이 정한다. 그 문장이 없으면 원칙 그대로다.
 
 | 항목 | 제한값 |
 |------|--------|

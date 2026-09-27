@@ -400,23 +400,33 @@ function craftSummary(issueList, archResult) {
 const crossRequiredOn = input.crossRequiredFields === true || input.crossRequiredFields === 'true'
 const crossRequiredLine = !crossRequiredOn ? '' :
   `\n[필수 필드 — additions] 새 항목마다 ${CrossReviewSchema.properties.additions.items.required.join(' · ')} 를 모두 채운다(스키마 required — 하나라도 빠지면 출력이 거부돼 다시 쓰게 된다)`
+// 발견 단계 후보 보존 (S16b) — ⛔ 기본 off. 켜면 OVERRIDE 의 조기 필터 문장과 이슈 스키마의 confidence 설명을 **사본에서만** 바꾼다.
+//    원본 상수는 그대로라 꺼지면 여섯 콜 모두 기준과 바이트 단위로 같다. 스키마 쪽 문구는 스키마에서 읽는다(두 번 박지 않는다).
+//    그 설명은 참조로 네 스키마(Stage 1 · ArchCraft · 교차 additions · counter missedIssues)에 퍼져 있어 콜마다 사본을 만든다.
+//    낮은 확신도 후보의 게시 여부는 병합이 정한다 — scripts/review_merge.py (MergeContract §10 게시 등급).
+const lowConfOn = input.preserveLowConfidence === true || input.preserveLowConfidence === 'true'
+const EARLY_FILTER_DESC = PeerReviewSchema.properties.issues.items.properties.confidence.description
+const LENS_OVERRIDE = !lowConfOn ? OVERRIDE : OVERRIDE.replace('confidence 80 미만은 보고하지 않는다. ',
+  '[후보 보존] confidence 는 0-100 값으로 달되 낮다고 빼지 않는다 — 게시 여부는 병합이 정한다. ')
+const lensSchema = schema => !lowConfOn ? schema :
+  JSON.parse(JSON.stringify(schema).split(EARLY_FILTER_DESC).join('0-100 — 낮아도 보고한다(게시 등급은 병합이 정한다)'))
 
 // ════════ Stage 1: 독립 병렬 리뷰 (3-Model — Round 1 독립성) ════════
 phase('Stage 1: arch/quality/correctness 독립 리뷰')
 const [arch, quality, correctness] = await parallelWithRetry([
   () => callAgent(
-    `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}${craftLine}\n` +
+    `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}${craftLine}\n` +
     `[목표] 아키텍처 관점 issues (id는 A1, A2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.`,
-    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: craftOn ? ArchCraftSchema : PeerReviewSchema }),
+    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(craftOn ? ArchCraftSchema : PeerReviewSchema) }),
   () => callAgent(
-    `${OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
+    `${LENS_OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
     `[목표] 품질 관점 issues (id는 Q1, Q2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.`,
-    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: PeerReviewSchema }),
+    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(PeerReviewSchema) }),
   () => callAgent(
-    `${OVERRIDE}\n[역할] 정확성 리뷰어(review-correctness 렌즈) — 요구사항 충족·로직 정확성·엣지 케이스\n${TARGET}\n` +
+    `${LENS_OVERRIDE}\n[역할] 정확성 리뷰어(review-correctness 렌즈) — 요구사항 충족·로직 정확성·엣지 케이스\n${TARGET}\n` +
     `[목표] 정확성 관점 issues (id는 C1, C2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin. ` +
     `함수 제거/책임 이전 감지 시 base 원본(prefetch)과 대조 — 원본 책임이 어디로 이전됐는지 추적.`,
-    { label: 'stage1-correctness', agentType: 'fz:review-correctness', model: 'opus', effort: 'xhigh', schema: PeerReviewSchema }),
+    { label: 'stage1-correctness', agentType: 'fz:review-correctness', model: 'opus', effort: 'xhigh', schema: lensSchema(PeerReviewSchema) }),
 ])
 if (!arch && !quality && !correctness) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 all null', metrics: metrics(0) } }
 if (!arch || !quality || !correctness) log('WARN stage1 일부 null — 단독 진행 (해당 렌즈 결측)')
@@ -468,13 +478,13 @@ if (shouldRunStage2 && arch && quality) {
     : ''
   const cross = await parallel([
     () => callAgent(
-      `${OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대 issues] ${peerFor('arch')}${cnote}\n` +
+      `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대 issues] ${peerFor('arch')}${cnote}\n` +
       `[목표] 각 issue의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 issue는 additions(id A-X)로.${crossRequiredLine}`,
-      { label: 'stage2-arch-on-peers', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
+      { label: 'stage2-arch-on-peers', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(CrossReviewSchema) }),
     () => callAgent(
-      `${OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대 issues] ${peerFor('quality')}${cnote}\n` +
+      `${LENS_OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대 issues] ${peerFor('quality')}${cnote}\n` +
       `[목표] 각 issue의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 issue는 additions(id Q-X)로.${crossRequiredLine}`,
-      { label: 'stage2-quality-on-peers', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: CrossReviewSchema }),
+      { label: 'stage2-quality-on-peers', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(CrossReviewSchema) }),
   ])
   archOnPeers = cross[0]
   qualityOnPeers = cross[1]
@@ -523,10 +533,10 @@ const allIssues = []
   .concat(archOnPeers ? archOnPeers.additions : [], qualityOnPeers ? qualityOnPeers.additions : [])
 const allStrengths = [].concat(arch ? arch.strengths : [], quality ? quality.strengths : [], correctness ? correctness.strengths : [])
 const counter = await callAgent(
-  `${OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
+  `${LENS_OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
   `[issues] ${JSON.stringify(allIssues)}\n[strengths(정상/우수 판정)] ${JSON.stringify(allStrengths)}\n` +
   `[목표] (1) 각 issue를 실측 재검증 — 과장/오독이면 refute + 인용. (2) strengths에 "정말 문제 없나?" 반례 탐색 — 반례 발견 시 missedIssues(id CT-X)로. 라인 인용 오류를 특히 의심.`,
-  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: 'xhigh', schema: CounterSchema })
+  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: 'xhigh', schema: lensSchema(CounterSchema) })
 if (!counter) log('WARN counter null — DA 패스 미수행 (issues 원판정 유지)')
 
 // ════════ 병합 — 스크립트 binary 규칙 (id-기반 verdict 반영. Confidence Matrix/투표는 Lead) ════════
