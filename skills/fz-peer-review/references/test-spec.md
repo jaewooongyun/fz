@@ -33,7 +33,7 @@
 ## 인라인 앵커 계산 (`skills/fz-peer-review/scripts/diff_anchors.py`)
 
 > 근거: `guides/skill-authoring.md` §11 — "결과가 binary(pass/fail)인가? → 스크립트". 앵커 가능 여부는 binary이므로 언어 지시가 아닌 스크립트가 판정한다.
-> fixture: `skills/fz-peer-review/references/fixtures/internal-pr-sample.patch` (PR 축약본 — 3파일 26 hunk). ⛔ 플러그인 **안**에 둔다 — 외부 폴더는 정리되면 테스트가 깨진다.
+> fixture: `skills/fz-peer-review/references/fixtures/synthetic-sample.patch` (합성 — 3파일 26 hunk. 원 PR 의 **hunk 좌표만** 보존하고 본문·경로는 새로 만들었다). ⛔ 플러그인 **안**에 둔다 — 외부 폴더는 정리되면 테스트가 깨진다. 실행 러너: `tests/fixtures/peer-review/anchors-synthetic/run.sh`(health-check 회귀 오라클).
 
 ### I/O 계약
 

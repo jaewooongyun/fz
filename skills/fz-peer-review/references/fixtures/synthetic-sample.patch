@@ -1,0 +1,500 @@
+diff --git a/Packages/MediaKit/Sources/MediaKit/Engine/MediaEngine.swift b/Packages/MediaKit/Sources/MediaKit/Engine/MediaEngine.swift
+index 0000001..0000101 100644
+--- a/Packages/MediaKit/Sources/MediaKit/Engine/MediaEngine.swift
++++ b/Packages/MediaKit/Sources/MediaKit/Engine/MediaEngine.swift
+@@ -66,10 +66,9 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L66→L66 — 합성 fixture 본문
+     // MediaEngine: 문맥 L67→L67 — 합성 fixture 본문
+     // MediaEngine: 문맥 L68→L68 — 합성 fixture 본문
+-    let legacyMediaEngineValue69 = legacyCompute(step: 69)
++    let nextMediaEngineValue69 = compute(step: 69, mode: .synthetic)
+     // MediaEngine: 문맥 L70→L70 — 합성 fixture 본문
+     // MediaEngine: 문맥 L71→L71 — 합성 fixture 본문
+-    let legacyMediaEngineValue72 = legacyCompute(step: 72)
+     // MediaEngine: 문맥 L73→L72 — 합성 fixture 본문
+     // MediaEngine: 문맥 L74→L73 — 합성 fixture 본문
+     // MediaEngine: 문맥 L75→L74 — 합성 fixture 본문
+@@ -81,6 +80,9 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L81→L80 — 합성 fixture 본문
+     // MediaEngine: 문맥 L82→L81 — 합성 fixture 본문
+     // MediaEngine: 문맥 L83→L82 — 합성 fixture 본문
++    let nextMediaEngineValue83 = compute(step: 83, mode: .synthetic)
++    let nextMediaEngineValue84 = compute(step: 84, mode: .synthetic)
++    let nextMediaEngineValue85 = compute(step: 85, mode: .synthetic)
+     // MediaEngine: 문맥 L84→L86 — 합성 fixture 본문
+     // MediaEngine: 문맥 L85→L87 — 합성 fixture 본문
+     // MediaEngine: 문맥 L86→L88 — 합성 fixture 본문
+@@ -108,7 +110,7 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L108→L110 — 합성 fixture 본문
+     // MediaEngine: 문맥 L109→L111 — 합성 fixture 본문
+     // MediaEngine: 문맥 L110→L112 — 합성 fixture 본문
+-    let legacyMediaEngineValue111 = legacyCompute(step: 111)
++    let nextMediaEngineValue113 = compute(step: 113, mode: .synthetic)
+     // MediaEngine: 문맥 L112→L114 — 합성 fixture 본문
+     // MediaEngine: 문맥 L113→L115 — 합성 fixture 본문
+     // MediaEngine: 문맥 L114→L116 — 합성 fixture 본문
+@@ -723,7 +725,6 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L723→L725 — 합성 fixture 본문
+     // MediaEngine: 문맥 L724→L726 — 합성 fixture 본문
+     // MediaEngine: 문맥 L725→L727 — 합성 fixture 본문
+-    let legacyMediaEngineValue726 = legacyCompute(step: 726)
+     // MediaEngine: 문맥 L727→L728 — 합성 fixture 본문
+     // MediaEngine: 문맥 L728→L729 — 합성 fixture 본문
+     // MediaEngine: 문맥 L729→L730 — 합성 fixture 본문
+@@ -1252,19 +1253,17 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L1252→L1253 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1253→L1254 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1254→L1255 — 합성 fixture 본문
+-    let legacyMediaEngineValue1255 = legacyCompute(step: 1255)
++    let nextMediaEngineValue1256 = compute(step: 1256, mode: .synthetic)
++    let nextMediaEngineValue1257 = compute(step: 1257, mode: .synthetic)
++    let nextMediaEngineValue1258 = compute(step: 1258, mode: .synthetic)
++    let nextMediaEngineValue1259 = compute(step: 1259, mode: .synthetic)
++    let nextMediaEngineValue1260 = compute(step: 1260, mode: .synthetic)
++    let nextMediaEngineValue1261 = compute(step: 1261, mode: .synthetic)
++    let nextMediaEngineValue1262 = compute(step: 1262, mode: .synthetic)
++    let nextMediaEngineValue1263 = compute(step: 1263, mode: .synthetic)
+     // MediaEngine: 문맥 L1256→L1264 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1257→L1265 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1258→L1266 — 합성 fixture 본문
+-    let legacyMediaEngineValue1259 = legacyCompute(step: 1259)
+-    let legacyMediaEngineValue1260 = legacyCompute(step: 1260)
+-    let legacyMediaEngineValue1261 = legacyCompute(step: 1261)
+-    let legacyMediaEngineValue1262 = legacyCompute(step: 1262)
+-    let legacyMediaEngineValue1263 = legacyCompute(step: 1263)
+-    let legacyMediaEngineValue1264 = legacyCompute(step: 1264)
+-    let legacyMediaEngineValue1265 = legacyCompute(step: 1265)
+-    let legacyMediaEngineValue1266 = legacyCompute(step: 1266)
+-    let legacyMediaEngineValue1267 = legacyCompute(step: 1267)
+     // MediaEngine: 문맥 L1268→L1267 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1269→L1268 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1270→L1269 — 합성 fixture 본문
+@@ -1369,10 +1368,10 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L1369→L1368 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1370→L1369 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1371→L1370 — 합성 fixture 본문
+-    let legacyMediaEngineValue1372 = legacyCompute(step: 1372)
++    let nextMediaEngineValue1371 = compute(step: 1371, mode: .synthetic)
+     // MediaEngine: 문맥 L1373→L1372 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1374→L1373 — 합성 fixture 본문
+-    let legacyMediaEngineValue1375 = legacyCompute(step: 1375)
++    let nextMediaEngineValue1374 = compute(step: 1374, mode: .synthetic)
+     // MediaEngine: 문맥 L1376→L1375 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1377→L1376 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1378→L1377 — 합성 fixture 본문
+@@ -1410,8 +1409,8 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L1410→L1409 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1411→L1410 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1412→L1411 — 합성 fixture 본문
+-    let legacyMediaEngineValue1413 = legacyCompute(step: 1413)
+-    let legacyMediaEngineValue1414 = legacyCompute(step: 1414)
++    let nextMediaEngineValue1412 = compute(step: 1412, mode: .synthetic)
++    let nextMediaEngineValue1413 = compute(step: 1413, mode: .synthetic)
+     // MediaEngine: 문맥 L1415→L1414 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1416→L1415 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1417→L1416 — 합성 fixture 본문
+@@ -1451,30 +1450,30 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L1451→L1450 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1452→L1451 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1453→L1452 — 합성 fixture 본문
+-    let legacyMediaEngineValue1454 = legacyCompute(step: 1454)
++    let nextMediaEngineValue1453 = compute(step: 1453, mode: .synthetic)
++    let nextMediaEngineValue1454 = compute(step: 1454, mode: .synthetic)
++    let nextMediaEngineValue1455 = compute(step: 1455, mode: .synthetic)
++    let nextMediaEngineValue1456 = compute(step: 1456, mode: .synthetic)
++    let nextMediaEngineValue1457 = compute(step: 1457, mode: .synthetic)
+     // MediaEngine: 문맥 L1455→L1458 — 합성 fixture 본문
++    let nextMediaEngineValue1459 = compute(step: 1459, mode: .synthetic)
+     // MediaEngine: 문맥 L1456→L1460 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1457→L1461 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1458→L1462 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1459→L1463 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1460→L1464 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1461→L1465 — 합성 fixture 본문
+-    let legacyMediaEngineValue1462 = legacyCompute(step: 1462)
+-    let legacyMediaEngineValue1463 = legacyCompute(step: 1463)
++    let nextMediaEngineValue1466 = compute(step: 1466, mode: .synthetic)
++    let nextMediaEngineValue1467 = compute(step: 1467, mode: .synthetic)
+     // MediaEngine: 문맥 L1464→L1468 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1465→L1469 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1466→L1470 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1467→L1471 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1468→L1472 — 합성 fixture 본문
+-    let legacyMediaEngineValue1469 = legacyCompute(step: 1469)
+-    let legacyMediaEngineValue1470 = legacyCompute(step: 1470)
+-    let legacyMediaEngineValue1471 = legacyCompute(step: 1471)
+-    let legacyMediaEngineValue1472 = legacyCompute(step: 1472)
+-    let legacyMediaEngineValue1473 = legacyCompute(step: 1473)
+     // MediaEngine: 문맥 L1474→L1473 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1475→L1474 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1476→L1475 — 합성 fixture 본문
+-    let legacyMediaEngineValue1477 = legacyCompute(step: 1477)
++    let nextMediaEngineValue1476 = compute(step: 1476, mode: .synthetic)
+     // MediaEngine: 문맥 L1478→L1477 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1479→L1478 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1480→L1479 — 합성 fixture 본문
+@@ -1483,8 +1482,40 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L1483→L1482 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1484→L1483 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1485→L1484 — 합성 fixture 본문
+-    let legacyMediaEngineValue1486 = legacyCompute(step: 1486)
+-    let legacyMediaEngineValue1487 = legacyCompute(step: 1487)
++    let nextMediaEngineValue1485 = compute(step: 1485, mode: .synthetic)
++    let nextMediaEngineValue1486 = compute(step: 1486, mode: .synthetic)
++    let nextMediaEngineValue1487 = compute(step: 1487, mode: .synthetic)
++    let nextMediaEngineValue1488 = compute(step: 1488, mode: .synthetic)
++    let nextMediaEngineValue1489 = compute(step: 1489, mode: .synthetic)
++    let nextMediaEngineValue1490 = compute(step: 1490, mode: .synthetic)
++    let nextMediaEngineValue1491 = compute(step: 1491, mode: .synthetic)
++    let nextMediaEngineValue1492 = compute(step: 1492, mode: .synthetic)
++    let nextMediaEngineValue1493 = compute(step: 1493, mode: .synthetic)
++    let nextMediaEngineValue1494 = compute(step: 1494, mode: .synthetic)
++    let nextMediaEngineValue1495 = compute(step: 1495, mode: .synthetic)
++    let nextMediaEngineValue1496 = compute(step: 1496, mode: .synthetic)
++    let nextMediaEngineValue1497 = compute(step: 1497, mode: .synthetic)
++    let nextMediaEngineValue1498 = compute(step: 1498, mode: .synthetic)
++    let nextMediaEngineValue1499 = compute(step: 1499, mode: .synthetic)
++    let nextMediaEngineValue1500 = compute(step: 1500, mode: .synthetic)
++    let nextMediaEngineValue1501 = compute(step: 1501, mode: .synthetic)
++    let nextMediaEngineValue1502 = compute(step: 1502, mode: .synthetic)
++    let nextMediaEngineValue1503 = compute(step: 1503, mode: .synthetic)
++    let nextMediaEngineValue1504 = compute(step: 1504, mode: .synthetic)
++    let nextMediaEngineValue1505 = compute(step: 1505, mode: .synthetic)
++    let nextMediaEngineValue1506 = compute(step: 1506, mode: .synthetic)
++    let nextMediaEngineValue1507 = compute(step: 1507, mode: .synthetic)
++    let nextMediaEngineValue1508 = compute(step: 1508, mode: .synthetic)
++    let nextMediaEngineValue1509 = compute(step: 1509, mode: .synthetic)
++    let nextMediaEngineValue1510 = compute(step: 1510, mode: .synthetic)
++    let nextMediaEngineValue1511 = compute(step: 1511, mode: .synthetic)
++    let nextMediaEngineValue1512 = compute(step: 1512, mode: .synthetic)
++    let nextMediaEngineValue1513 = compute(step: 1513, mode: .synthetic)
++    let nextMediaEngineValue1514 = compute(step: 1514, mode: .synthetic)
++    let nextMediaEngineValue1515 = compute(step: 1515, mode: .synthetic)
++    let nextMediaEngineValue1516 = compute(step: 1516, mode: .synthetic)
++    let nextMediaEngineValue1517 = compute(step: 1517, mode: .synthetic)
++    let nextMediaEngineValue1518 = compute(step: 1518, mode: .synthetic)
+     // MediaEngine: 문맥 L1488→L1519 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1489→L1520 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1490→L1521 — 합성 fixture 본문
+@@ -1493,7 +1524,7 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L1493→L1524 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1494→L1525 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1495→L1526 — 합성 fixture 본문
+-    let legacyMediaEngineValue1496 = legacyCompute(step: 1496)
++    let nextMediaEngineValue1527 = compute(step: 1527, mode: .synthetic)
+     // MediaEngine: 문맥 L1497→L1528 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1498→L1529 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1499→L1530 — 합성 fixture 본문
+@@ -1518,14 +1549,14 @@ // MediaEngine 합성 hunk
+     // MediaEngine: 문맥 L1518→L1549 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1519→L1550 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1520→L1551 — 합성 fixture 본문
+-    let legacyMediaEngineValue1521 = legacyCompute(step: 1521)
++    let nextMediaEngineValue1552 = compute(step: 1552, mode: .synthetic)
+     // MediaEngine: 문맥 L1522→L1553 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1523→L1554 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1524→L1555 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1525→L1556 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1526→L1557 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1527→L1558 — 합성 fixture 본문
+-    let legacyMediaEngineValue1528 = legacyCompute(step: 1528)
++    let nextMediaEngineValue1559 = compute(step: 1559, mode: .synthetic)
+     // MediaEngine: 문맥 L1529→L1560 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1530→L1561 — 합성 fixture 본문
+     // MediaEngine: 문맥 L1531→L1562 — 합성 fixture 본문
+diff --git a/Packages/MediaKit/Sources/MediaKit/Engine/EngineContext.swift b/Packages/MediaKit/Sources/MediaKit/Engine/EngineContext.swift
+index 0000002..0000102 100644
+--- a/Packages/MediaKit/Sources/MediaKit/Engine/EngineContext.swift
++++ b/Packages/MediaKit/Sources/MediaKit/Engine/EngineContext.swift
+@@ -14,7 +14,7 @@ // EngineContext 합성 hunk
+     // EngineContext: 문맥 L14→L14 — 합성 fixture 본문
+     // EngineContext: 문맥 L15→L15 — 합성 fixture 본문
+     // EngineContext: 문맥 L16→L16 — 합성 fixture 본문
+-    let legacyEngineContextValue17 = legacyCompute(step: 17)
++    let nextEngineContextValue17 = compute(step: 17, mode: .synthetic)
+     // EngineContext: 문맥 L18→L18 — 합성 fixture 본문
+     // EngineContext: 문맥 L19→L19 — 합성 fixture 본문
+     // EngineContext: 문맥 L20→L20 — 합성 fixture 본문
+@@ -30,7 +30,7 @@ // EngineContext 합성 hunk
+     // EngineContext: 문맥 L30→L30 — 합성 fixture 본문
+     // EngineContext: 문맥 L31→L31 — 합성 fixture 본문
+     // EngineContext: 문맥 L32→L32 — 합성 fixture 본문
+-    let legacyEngineContextValue33 = legacyCompute(step: 33)
++    let nextEngineContextValue33 = compute(step: 33, mode: .synthetic)
+     // EngineContext: 문맥 L34→L34 — 합성 fixture 본문
+     // EngineContext: 문맥 L35→L35 — 합성 fixture 본문
+     // EngineContext: 문맥 L36→L36 — 합성 fixture 본문
+diff --git a/Packages/MediaKit/Sources/MediaKit/Engine/Views/TimelineView.swift b/Packages/MediaKit/Sources/MediaKit/Engine/Views/TimelineView.swift
+index 0000003..0000103 100644
+--- a/Packages/MediaKit/Sources/MediaKit/Engine/Views/TimelineView.swift
++++ b/Packages/MediaKit/Sources/MediaKit/Engine/Views/TimelineView.swift
+@@ -77,6 +77,14 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L77→L77 — 합성 fixture 본문
+     // TimelineView: 문맥 L78→L78 — 합성 fixture 본문
+     // TimelineView: 문맥 L79→L79 — 합성 fixture 본문
++    let nextTimelineViewValue80 = compute(step: 80, mode: .synthetic)
++    let nextTimelineViewValue81 = compute(step: 81, mode: .synthetic)
++    let nextTimelineViewValue82 = compute(step: 82, mode: .synthetic)
++    let nextTimelineViewValue83 = compute(step: 83, mode: .synthetic)
++    let nextTimelineViewValue84 = compute(step: 84, mode: .synthetic)
++    let nextTimelineViewValue85 = compute(step: 85, mode: .synthetic)
++    let nextTimelineViewValue86 = compute(step: 86, mode: .synthetic)
++    let nextTimelineViewValue87 = compute(step: 87, mode: .synthetic)
+     // TimelineView: 문맥 L80→L88 — 합성 fixture 본문
+     // TimelineView: 문맥 L81→L89 — 합성 fixture 본문
+     // TimelineView: 문맥 L82→L90 — 합성 fixture 본문
+@@ -131,7 +139,6 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L131→L139 — 합성 fixture 본문
+     // TimelineView: 문맥 L132→L140 — 합성 fixture 본문
+     // TimelineView: 문맥 L133→L141 — 합성 fixture 본문
+-    let legacyTimelineViewValue134 = legacyCompute(step: 134)
+     // TimelineView: 문맥 L135→L142 — 합성 fixture 본문
+     // TimelineView: 문맥 L136→L143 — 합성 fixture 본문
+     // TimelineView: 문맥 L137→L144 — 합성 fixture 본문
+@@ -139,20 +146,12 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L139→L146 — 합성 fixture 본문
+     // TimelineView: 문맥 L140→L147 — 합성 fixture 본문
+     // TimelineView: 문맥 L141→L148 — 합성 fixture 본문
+-    let legacyTimelineViewValue142 = legacyCompute(step: 142)
+-    let legacyTimelineViewValue143 = legacyCompute(step: 143)
+-    let legacyTimelineViewValue144 = legacyCompute(step: 144)
+-    let legacyTimelineViewValue145 = legacyCompute(step: 145)
+-    let legacyTimelineViewValue146 = legacyCompute(step: 146)
+     // TimelineView: 문맥 L147→L149 — 합성 fixture 본문
+     // TimelineView: 문맥 L148→L150 — 합성 fixture 본문
+     // TimelineView: 문맥 L149→L151 — 합성 fixture 본문
+     // TimelineView: 문맥 L150→L152 — 합성 fixture 본문
+     // TimelineView: 문맥 L151→L153 — 합성 fixture 본문
+     // TimelineView: 문맥 L152→L154 — 합성 fixture 본문
+-    let legacyTimelineViewValue153 = legacyCompute(step: 153)
+-    let legacyTimelineViewValue154 = legacyCompute(step: 154)
+-    let legacyTimelineViewValue155 = legacyCompute(step: 155)
+     // TimelineView: 문맥 L156→L155 — 합성 fixture 본문
+     // TimelineView: 문맥 L157→L156 — 합성 fixture 본문
+     // TimelineView: 문맥 L158→L157 — 합성 fixture 본문
+@@ -166,9 +165,11 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L166→L165 — 합성 fixture 본문
+     // TimelineView: 문맥 L167→L166 — 합성 fixture 본문
+     // TimelineView: 문맥 L168→L167 — 합성 fixture 본문
+-    let legacyTimelineViewValue169 = legacyCompute(step: 169)
+     // TimelineView: 문맥 L170→L168 — 합성 fixture 본문
+     // TimelineView: 문맥 L171→L169 — 합성 fixture 본문
++    let nextTimelineViewValue170 = compute(step: 170, mode: .synthetic)
++    let nextTimelineViewValue171 = compute(step: 171, mode: .synthetic)
++    let nextTimelineViewValue172 = compute(step: 172, mode: .synthetic)
+     // TimelineView: 문맥 L172→L173 — 합성 fixture 본문
+     // TimelineView: 문맥 L173→L174 — 합성 fixture 본문
+     // TimelineView: 문맥 L174→L175 — 합성 fixture 본문
+@@ -192,19 +193,20 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L192→L193 — 합성 fixture 본문
+     // TimelineView: 문맥 L193→L194 — 합성 fixture 본문
+     // TimelineView: 문맥 L194→L195 — 합성 fixture 본문
+-    let legacyTimelineViewValue195 = legacyCompute(step: 195)
+-    let legacyTimelineViewValue196 = legacyCompute(step: 196)
+-    let legacyTimelineViewValue197 = legacyCompute(step: 197)
+-    let legacyTimelineViewValue198 = legacyCompute(step: 198)
+-    let legacyTimelineViewValue199 = legacyCompute(step: 199)
+-    let legacyTimelineViewValue200 = legacyCompute(step: 200)
+-    let legacyTimelineViewValue201 = legacyCompute(step: 201)
+-    let legacyTimelineViewValue202 = legacyCompute(step: 202)
+-    let legacyTimelineViewValue203 = legacyCompute(step: 203)
+-    let legacyTimelineViewValue204 = legacyCompute(step: 204)
+-    let legacyTimelineViewValue205 = legacyCompute(step: 205)
+-    let legacyTimelineViewValue206 = legacyCompute(step: 206)
+-    let legacyTimelineViewValue207 = legacyCompute(step: 207)
++    let nextTimelineViewValue196 = compute(step: 196, mode: .synthetic)
++    let nextTimelineViewValue197 = compute(step: 197, mode: .synthetic)
++    let nextTimelineViewValue198 = compute(step: 198, mode: .synthetic)
++    let nextTimelineViewValue199 = compute(step: 199, mode: .synthetic)
++    let nextTimelineViewValue200 = compute(step: 200, mode: .synthetic)
++    let nextTimelineViewValue201 = compute(step: 201, mode: .synthetic)
++    let nextTimelineViewValue202 = compute(step: 202, mode: .synthetic)
++    let nextTimelineViewValue203 = compute(step: 203, mode: .synthetic)
++    let nextTimelineViewValue204 = compute(step: 204, mode: .synthetic)
++    let nextTimelineViewValue205 = compute(step: 205, mode: .synthetic)
++    let nextTimelineViewValue206 = compute(step: 206, mode: .synthetic)
++    let nextTimelineViewValue207 = compute(step: 207, mode: .synthetic)
++    let nextTimelineViewValue208 = compute(step: 208, mode: .synthetic)
++    let nextTimelineViewValue209 = compute(step: 209, mode: .synthetic)
+     // TimelineView: 문맥 L208→L210 — 합성 fixture 본문
+     // TimelineView: 문맥 L209→L211 — 합성 fixture 본문
+     // TimelineView: 문맥 L210→L212 — 합성 fixture 본문
+@@ -214,87 +216,6 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L214→L216 — 합성 fixture 본문
+     // TimelineView: 문맥 L215→L217 — 합성 fixture 본문
+     // TimelineView: 문맥 L216→L218 — 합성 fixture 본문
+-    let legacyTimelineViewValue217 = legacyCompute(step: 217)
+-    let legacyTimelineViewValue218 = legacyCompute(step: 218)
+-    let legacyTimelineViewValue219 = legacyCompute(step: 219)
+-    let legacyTimelineViewValue220 = legacyCompute(step: 220)
+-    let legacyTimelineViewValue221 = legacyCompute(step: 221)
+-    let legacyTimelineViewValue222 = legacyCompute(step: 222)
+-    let legacyTimelineViewValue223 = legacyCompute(step: 223)
+-    let legacyTimelineViewValue224 = legacyCompute(step: 224)
+-    let legacyTimelineViewValue225 = legacyCompute(step: 225)
+-    let legacyTimelineViewValue226 = legacyCompute(step: 226)
+-    let legacyTimelineViewValue227 = legacyCompute(step: 227)
+-    let legacyTimelineViewValue228 = legacyCompute(step: 228)
+-    let legacyTimelineViewValue229 = legacyCompute(step: 229)
+-    let legacyTimelineViewValue230 = legacyCompute(step: 230)
+-    let legacyTimelineViewValue231 = legacyCompute(step: 231)
+-    let legacyTimelineViewValue232 = legacyCompute(step: 232)
+-    let legacyTimelineViewValue233 = legacyCompute(step: 233)
+-    let legacyTimelineViewValue234 = legacyCompute(step: 234)
+-    let legacyTimelineViewValue235 = legacyCompute(step: 235)
+-    let legacyTimelineViewValue236 = legacyCompute(step: 236)
+-    let legacyTimelineViewValue237 = legacyCompute(step: 237)
+-    let legacyTimelineViewValue238 = legacyCompute(step: 238)
+-    let legacyTimelineViewValue239 = legacyCompute(step: 239)
+-    let legacyTimelineViewValue240 = legacyCompute(step: 240)
+-    let legacyTimelineViewValue241 = legacyCompute(step: 241)
+-    let legacyTimelineViewValue242 = legacyCompute(step: 242)
+-    let legacyTimelineViewValue243 = legacyCompute(step: 243)
+-    let legacyTimelineViewValue244 = legacyCompute(step: 244)
+-    let legacyTimelineViewValue245 = legacyCompute(step: 245)
+-    let legacyTimelineViewValue246 = legacyCompute(step: 246)
+-    let legacyTimelineViewValue247 = legacyCompute(step: 247)
+-    let legacyTimelineViewValue248 = legacyCompute(step: 248)
+-    let legacyTimelineViewValue249 = legacyCompute(step: 249)
+-    let legacyTimelineViewValue250 = legacyCompute(step: 250)
+-    let legacyTimelineViewValue251 = legacyCompute(step: 251)
+-    let legacyTimelineViewValue252 = legacyCompute(step: 252)
+-    let legacyTimelineViewValue253 = legacyCompute(step: 253)
+-    let legacyTimelineViewValue254 = legacyCompute(step: 254)
+-    let legacyTimelineViewValue255 = legacyCompute(step: 255)
+-    let legacyTimelineViewValue256 = legacyCompute(step: 256)
+-    let legacyTimelineViewValue257 = legacyCompute(step: 257)
+-    let legacyTimelineViewValue258 = legacyCompute(step: 258)
+-    let legacyTimelineViewValue259 = legacyCompute(step: 259)
+-    let legacyTimelineViewValue260 = legacyCompute(step: 260)
+-    let legacyTimelineViewValue261 = legacyCompute(step: 261)
+-    let legacyTimelineViewValue262 = legacyCompute(step: 262)
+-    let legacyTimelineViewValue263 = legacyCompute(step: 263)
+-    let legacyTimelineViewValue264 = legacyCompute(step: 264)
+-    let legacyTimelineViewValue265 = legacyCompute(step: 265)
+-    let legacyTimelineViewValue266 = legacyCompute(step: 266)
+-    let legacyTimelineViewValue267 = legacyCompute(step: 267)
+-    let legacyTimelineViewValue268 = legacyCompute(step: 268)
+-    let legacyTimelineViewValue269 = legacyCompute(step: 269)
+-    let legacyTimelineViewValue270 = legacyCompute(step: 270)
+-    let legacyTimelineViewValue271 = legacyCompute(step: 271)
+-    let legacyTimelineViewValue272 = legacyCompute(step: 272)
+-    let legacyTimelineViewValue273 = legacyCompute(step: 273)
+-    let legacyTimelineViewValue274 = legacyCompute(step: 274)
+-    let legacyTimelineViewValue275 = legacyCompute(step: 275)
+-    let legacyTimelineViewValue276 = legacyCompute(step: 276)
+-    let legacyTimelineViewValue277 = legacyCompute(step: 277)
+-    let legacyTimelineViewValue278 = legacyCompute(step: 278)
+-    let legacyTimelineViewValue279 = legacyCompute(step: 279)
+-    let legacyTimelineViewValue280 = legacyCompute(step: 280)
+-    let legacyTimelineViewValue281 = legacyCompute(step: 281)
+-    let legacyTimelineViewValue282 = legacyCompute(step: 282)
+-    let legacyTimelineViewValue283 = legacyCompute(step: 283)
+-    let legacyTimelineViewValue284 = legacyCompute(step: 284)
+-    let legacyTimelineViewValue285 = legacyCompute(step: 285)
+-    let legacyTimelineViewValue286 = legacyCompute(step: 286)
+-    let legacyTimelineViewValue287 = legacyCompute(step: 287)
+-    let legacyTimelineViewValue288 = legacyCompute(step: 288)
+-    let legacyTimelineViewValue289 = legacyCompute(step: 289)
+-    let legacyTimelineViewValue290 = legacyCompute(step: 290)
+-    let legacyTimelineViewValue291 = legacyCompute(step: 291)
+-    let legacyTimelineViewValue292 = legacyCompute(step: 292)
+-    let legacyTimelineViewValue293 = legacyCompute(step: 293)
+-    let legacyTimelineViewValue294 = legacyCompute(step: 294)
+-    let legacyTimelineViewValue295 = legacyCompute(step: 295)
+-    let legacyTimelineViewValue296 = legacyCompute(step: 296)
+-    let legacyTimelineViewValue297 = legacyCompute(step: 297)
+     // TimelineView: 문맥 L298→L219 — 합성 fixture 본문
+     // TimelineView: 문맥 L299→L220 — 합성 fixture 본문
+     // TimelineView: 문맥 L300→L221 — 합성 fixture 본문
+@@ -314,14 +235,10 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L314→L235 — 합성 fixture 본문
+     // TimelineView: 문맥 L315→L236 — 합성 fixture 본문
+     // TimelineView: 문맥 L316→L237 — 합성 fixture 본문
+-    let legacyTimelineViewValue317 = legacyCompute(step: 317)
+     // TimelineView: 문맥 L318→L238 — 합성 fixture 본문
+     // TimelineView: 문맥 L319→L239 — 합성 fixture 본문
+     // TimelineView: 문맥 L320→L240 — 합성 fixture 본문
+     // TimelineView: 문맥 L321→L241 — 합성 fixture 본문
+-    let legacyTimelineViewValue322 = legacyCompute(step: 322)
+-    let legacyTimelineViewValue323 = legacyCompute(step: 323)
+-    let legacyTimelineViewValue324 = legacyCompute(step: 324)
+     // TimelineView: 문맥 L325→L242 — 합성 fixture 본문
+     // TimelineView: 문맥 L326→L243 — 합성 fixture 본문
+     // TimelineView: 문맥 L327→L244 — 합성 fixture 본문
+@@ -368,7 +285,6 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L368→L285 — 합성 fixture 본문
+     // TimelineView: 문맥 L369→L286 — 합성 fixture 본문
+     // TimelineView: 문맥 L370→L287 — 합성 fixture 본문
+-    let legacyTimelineViewValue371 = legacyCompute(step: 371)
+     // TimelineView: 문맥 L372→L288 — 합성 fixture 본문
+     // TimelineView: 문맥 L373→L289 — 합성 fixture 본문
+     // TimelineView: 문맥 L374→L290 — 합성 fixture 본문
+@@ -504,8 +420,9 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L504→L420 — 합성 fixture 본문
+     // TimelineView: 문맥 L505→L421 — 합성 fixture 본문
+     // TimelineView: 문맥 L506→L422 — 합성 fixture 본문
+-    let legacyTimelineViewValue507 = legacyCompute(step: 507)
+-    let legacyTimelineViewValue508 = legacyCompute(step: 508)
++    let nextTimelineViewValue423 = compute(step: 423, mode: .synthetic)
++    let nextTimelineViewValue424 = compute(step: 424, mode: .synthetic)
++    let nextTimelineViewValue425 = compute(step: 425, mode: .synthetic)
+     // TimelineView: 문맥 L509→L426 — 합성 fixture 본문
+     // TimelineView: 문맥 L510→L427 — 합성 fixture 본문
+     // TimelineView: 문맥 L511→L428 — 합성 fixture 본문
+@@ -514,7 +431,10 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L514→L431 — 합성 fixture 본문
+     // TimelineView: 문맥 L515→L432 — 합성 fixture 본문
+     // TimelineView: 문맥 L516→L433 — 합성 fixture 본문
+-    let legacyTimelineViewValue517 = legacyCompute(step: 517)
++    let nextTimelineViewValue434 = compute(step: 434, mode: .synthetic)
++    let nextTimelineViewValue435 = compute(step: 435, mode: .synthetic)
++    let nextTimelineViewValue436 = compute(step: 436, mode: .synthetic)
++    let nextTimelineViewValue437 = compute(step: 437, mode: .synthetic)
+     // TimelineView: 문맥 L518→L438 — 합성 fixture 본문
+     // TimelineView: 문맥 L519→L439 — 합성 fixture 본문
+     // TimelineView: 문맥 L520→L440 — 합성 fixture 본문
+@@ -549,13 +469,10 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L549→L469 — 합성 fixture 본문
+     // TimelineView: 문맥 L550→L470 — 합성 fixture 본문
+     // TimelineView: 문맥 L551→L471 — 합성 fixture 본문
+-    let legacyTimelineViewValue552 = legacyCompute(step: 552)
+-    let legacyTimelineViewValue553 = legacyCompute(step: 553)
+-    let legacyTimelineViewValue554 = legacyCompute(step: 554)
++    let nextTimelineViewValue472 = compute(step: 472, mode: .synthetic)
+     // TimelineView: 문맥 L555→L473 — 합성 fixture 본문
+     // TimelineView: 문맥 L556→L474 — 합성 fixture 본문
+     // TimelineView: 문맥 L557→L475 — 합성 fixture 본문
+-    let legacyTimelineViewValue558 = legacyCompute(step: 558)
+     // TimelineView: 문맥 L559→L476 — 합성 fixture 본문
+     // TimelineView: 문맥 L560→L477 — 합성 fixture 본문
+     // TimelineView: 문맥 L561→L478 — 합성 fixture 본문
+@@ -587,12 +504,13 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L587→L504 — 합성 fixture 본문
+     // TimelineView: 문맥 L588→L505 — 합성 fixture 본문
+     // TimelineView: 문맥 L589→L506 — 합성 fixture 본문
+-    let legacyTimelineViewValue590 = legacyCompute(step: 590)
++    let nextTimelineViewValue507 = compute(step: 507, mode: .synthetic)
++    let nextTimelineViewValue508 = compute(step: 508, mode: .synthetic)
+     // TimelineView: 문맥 L591→L509 — 합성 fixture 본문
+     // TimelineView: 문맥 L592→L510 — 합성 fixture 본문
+     // TimelineView: 문맥 L593→L511 — 합성 fixture 본문
+     // TimelineView: 문맥 L594→L512 — 합성 fixture 본문
+-    let legacyTimelineViewValue595 = legacyCompute(step: 595)
++    let nextTimelineViewValue513 = compute(step: 513, mode: .synthetic)
+     // TimelineView: 문맥 L596→L514 — 합성 fixture 본문
+     // TimelineView: 문맥 L597→L515 — 합성 fixture 본문
+     // TimelineView: 문맥 L598→L516 — 합성 fixture 본문
+@@ -656,6 +574,12 @@ // TimelineView 합성 hunk
+     // TimelineView: 문맥 L656→L574 — 합성 fixture 본문
+     // TimelineView: 문맥 L657→L575 — 합성 fixture 본문
+     // TimelineView: 문맥 L658→L576 — 합성 fixture 본문
++    let nextTimelineViewValue577 = compute(step: 577, mode: .synthetic)
++    let nextTimelineViewValue578 = compute(step: 578, mode: .synthetic)
++    let nextTimelineViewValue579 = compute(step: 579, mode: .synthetic)
++    let nextTimelineViewValue580 = compute(step: 580, mode: .synthetic)
++    let nextTimelineViewValue581 = compute(step: 581, mode: .synthetic)
++    let nextTimelineViewValue582 = compute(step: 582, mode: .synthetic)
+     // TimelineView: 문맥 L659→L583 — 합성 fixture 본문
+     // TimelineView: 문맥 L660→L584 — 합성 fixture 본문
+     // TimelineView: 문맥 L661→L585 — 합성 fixture 본문
