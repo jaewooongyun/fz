@@ -4,7 +4,7 @@
 //   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/review-live.js',
-//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2?, crossOutput?, preserveLowConfidence? } })
+//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2?, crossOutput?, preserveLowConfidence?, snapshotDir? } })
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄 · axisCoverage(6축 필수) · craftAxis · ruleRef 가 들어간다.
@@ -23,6 +23,8 @@
 //   preserveLowConfidence: ⛔ 기본 off(R-C S22 · peer-review S16b 와 같은 옵션). 켜면 다섯 콜 프롬프트에 `[후보 보존]` 문장을 더하고
 //     finding 스키마 사본에 confidence(0-100) 선택 필드를 얹는다. 렌즈 스킬(arch-critic · code-auditor)의 '자체 confidence 80% 미만
 //     미보고' 는 그 문장이 있을 때만 풀린다 — 게시 여부는 review_merge 가 정한다(tests/workflows/low-confidence-preserved.js).
+//   snapshotDir: ⛔ 기본 off(R-C S22b). scripts/review_snapshot.sh 산출 폴더를 주면 Stage 1 두 렌즈에 '스냅샷 우선' 1줄 — 미지정 · 빈 문자열이면
+//     바이트 단위로 같다(tests/workflows/review-live-snapshot-arm.js). 효과(워커 턴 · 출력 · SC-3)는 S25 가 잰다.
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
@@ -244,6 +246,11 @@ const lensSchema = schema => {
   withConfidence(copy)
   return copy
 }
+// 사전 수집 스냅샷 (S22b) — ⛔ 기본 off. snapshotDir 를 주면 Stage 1 두 렌즈 프롬프트에 경로와 '스냅샷 우선' 1줄을 더한다.
+//    스냅샷은 scripts/review_snapshot.sh 가 결정론으로 만든다(Lead 가 고르지 않는다). 교차 · counter 는 Stage 1 산출을 보므로 그대로다.
+const snapshotOn = typeof input.snapshotDir === 'string' && input.snapshotDir.trim() !== ''
+const snapshotLine = !snapshotOn ? '' :
+  `\n[사전 수집 스냅샷] ${input.snapshotDir} — diff.patch · manifest.tsv · base/ · head/ (· project-rules.json). 스냅샷으로 판정할 수 있는 것은 추가로 Read 하지 않는다(스냅샷 우선)`
 const stage1Schema = locatedOn ? LocatedFindingsSchema : ReviewFindingsSchema
 const craftLine = !craftOn ? '' :
   `\n[craft 축 — 이 렌즈 전용] ${CRAFT_AXES.join(' · ')} — 축마다 axisCoverage 에 1행(finding · none · not_applicable, note 에 근거)을 쓴다. ` +
@@ -278,11 +285,11 @@ const crossDeltaLine = !crossDeltaOn ? '' :
 phase('Stage 1: arch/quality 독립 리뷰')
 const [arch, quality] = await parallel([
   () => callAgent(
-    `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}${craftLine}\n` +
+    `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${snapshotLine}${structuralLine}${craftLine}\n` +
     `[목표] 아키텍처 관점 findings (id는 A1, A2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
     { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(craftOn ? archCraftSchema(stage1Schema) : stage1Schema) }),
   () => callAgent(
-    `${LENS_OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
+    `${LENS_OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}${snapshotLine}\n` +
     `[목표] 품질 관점 findings (id는 Q1, Q2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
     { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(stage1Schema) }),
 ])

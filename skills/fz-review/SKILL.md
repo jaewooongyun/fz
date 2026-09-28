@@ -95,6 +95,7 @@ metadata:
 ### 실행 절차 (Lead)
 
 1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12)
+   - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용)
 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff {diff.patch} [--rules-index {projectRulesPath}] …` — 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. `{플러그인 루트}` 가 세션 working directory 밖이면 스크립트를 `{WORK_DIR}` 로 **사전 복사**해 그 경로로 부른다(fz-plan 절차 2.5 와 같은 규칙)

@@ -40,6 +40,8 @@ const OPTIONS = {
   // R-C 교차 delta — 콜 수는 그대로, Stage 2 교차의 스키마 · 프롬프트만 바뀐다(동치는 tests/workflows/cross-delta-arm.js)
   crossOutput: { workflows: ['peer-review', 'review-live'], on: { crossOutput: 'delta' }, off: { crossOutput: 'full' },
     applies: sc => sc.stage2 },
+  // R-C 사전 수집 스냅샷 — Stage 1 두 프롬프트에만 닿는다(콜 수 그대로). 빈 문자열은 미지정과 같다
+  snapshotDir: { workflows: ['review-live'], on: { snapshotDir: '/tmp/fz-snapshot' }, off: { snapshotDir: '' } },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }
