@@ -4,12 +4,12 @@ description: >-
   GPT CLI 교차 검증. 코드/계획을 독립 모델로 상호 검증.
   예: codex, 교차검증, GPT로 확인, 상호검증 (비사용: 직접 수정 →fz-fix, 자기 리뷰 →fz-review; GPT는 검증 전용)
 user-invocable: true
-argument-hint: "[review|verify|verify-gates|validate|check|final|adversarial|drift|plan|micro-eval] [대상]"
+argument-hint: "[review|verify|verify-gates|validate|check|final|adversarial|drift|plan|micro-eval|independent-plan|independent-review] [대상]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__write_memory,
   mcp__plugin_fz_serena__read_memory,
-  Bash(codex *), Bash(*/scripts/gpt-exec.sh*), Read, Grep
+  Bash(codex *), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt_independent.sh*), Read, Grep
 metadata:
   provides: [verification]
   needs: [none]
@@ -33,7 +33,7 @@ metadata:
 
 ## 개요
 
-> 서브커맨드: review | verify | verify-gates | validate | check | final | adversarial | drift | plan | micro-eval (10개)
+> 서브커맨드: review | verify | verify-gates | validate | check | final | adversarial | drift | plan | micro-eval | independent-plan | independent-review (12개 — 뒤 둘은 opt-in `--gpt-independent`)
 
 - **래퍼 review** (`gpt-exec.sh review`): git diff + `--out` + 3-Tier 스킬 — review/check/final
 - **래퍼 exec** (`gpt-exec.sh exec`): `--prompt-file` + `--schema` — verify/validate/drift/plan
@@ -174,7 +174,7 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 
 > **상세 정의**:
 > - **Core (review/verify/validate/check)**: `modules/fz-gpt-subcommands-core.md`
-> - **Aux (final/adversarial/drift/plan/micro-eval)**: `modules/fz-gpt-subcommands-aux.md`
+> - **Aux (final/adversarial/drift/plan/micro-eval/independent-plan/independent-review)**: `modules/fz-gpt-subcommands-aux.md`
 
 | 명령 | 용도 | 호출 스킬 | effort |
 |------|------|----------|:------:|
@@ -187,6 +187,8 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 | **drift** | 아키텍처 드리프트 전체 스캔 | /fz-manage drift | high |
 | **plan** | 독립 플랜 (Claude와 교차 비교, C4 원칙) | /fz-plan cross-check | xhigh |
 | **micro-eval** | 단일 주장 독립 재평가 (claim-type 라우팅) | cross-validation Gate | medium |
+| **independent-plan** | 격리 첫 패스 플랜 — `scripts/gpt_independent.sh plan` (opt-in `--gpt-independent`) | /fz-plan cross-check | xhigh |
+| **independent-review** | 격리 첫 패스 리뷰 — `scripts/gpt_independent.sh review` (opt-in `--gpt-independent`) | /fz-review · /fz-peer-review | high |
 
 ⛔ **Bash 호출 시 의무**: 모든 서브커맨드 호출은 `modules/fz-gpt-bash-hygiene.md` 준수 (stdin close / trusted dir / Base Verification Gate / Wrapper Template).
 

@@ -131,6 +131,23 @@ EOF
 > **effort**: `xhigh` — 독립 설계이므로 최고 추론력 활용.
 > **비교**: 결과는 JSON 한 객체다(`gpt-skills/fz-planner` 출력 형식 — `status` · `steps` · `riskMatrix` · `divergencePoints` · `projectRules`). `status` 가 `rejected` 면 계획이 아니다 — `reason` 을 보고 입력을 고친다. 차이표는 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {workflow-result.json} --gpt "$PLAN_FILE"` 로 만든다
 
+## independent-plan · independent-review -- 격리 첫 패스 (opt-in `--gpt-independent`)
+
+Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. 규약은 `modules/cross-validation.md` § 독립 첫 패스.
+
+```bash
+"${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" plan --requirement "$REQ_FILE" [--sprint-contract F] [--rules-index F] \
+  [--repo "$GIT_ROOT"] [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
+"${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" review --diff "$WORK_DIR/diff.patch" --base "$WORK_DIR/base" --head "$WORK_DIR/head" \
+  [--pr-meta F] [--rules-index F] [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
+```
+
+- 역할 본문은 격리 사본 `gpt-skills/fz-planner` · `fz-reviewer` 를 래퍼 `--inject-skill` 로 넣는다. effort 는 plan xhigh · review high 가 기본이다
+- `--repo` 는 복사하지 않고 권한 프로필 read 로 연다 — 그 안의 `.claude` · `.fz-work` 와 `--deny` 는 막는다. review 의 `head/` 는 `skills/fz-peer-review/scripts/gather.sh` 가 만든다
+- 산출: `.json` · `.md` · `.audit.json`(rollout 수 · spawn 수 · 격리 적용 · 적중) · `.rollouts/`
+- exit: 0 성공 · 10 사용법 · 같은 --out 동시 실행 · 11 사전조건 · 12~14 래퍼 측정 실패(14 는 6축 후검사도) · 15 오염 · 16 시간 초과 · 17 planner 거부 — ⛔ 10~17 은 결과 0건이 아니다
+- ⛔ 옵션을 켜지 않으면 위 `plan` 서브커맨드 경로가 그대로다
+
 ## micro-eval -- 단일 주장 독립 재평가 (Claim-Type 라우팅)
 
 단일 주장(severity 판단, 분류, 사실 주장 등)을 GPT로 빠르게 독립 재평가합니다.
@@ -164,7 +181,7 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 |------|----------------|
 | /fz-review | Phase 5 → final (PR 전) |
 | /fz-pr | PR 생성 전 → final |
-| /fz-plan | TEAM 모드 → plan (독립 비교), micro-eval (claim 재평가) |
+| /fz-plan | cross-check → plan (독립 비교 · `--gpt-independent` 면 independent-plan), micro-eval (claim 재평가) |
 | /fz-manage | drift (전체 스캔) |
 
 ## 설계 원칙
