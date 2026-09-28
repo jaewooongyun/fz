@@ -1,13 +1,13 @@
 ---
 name: fz-planner
-description: Independent Plan Generation Skill
+description: Independent implementation plan from requirements and the repository only — JSON output with status ok|rejected, steps and risk matrix
 ---
 
 # fz-planner — Independent Plan Generation Skill
 
 ## Role
 Generate an implementation plan INDEPENDENTLY from scratch.
-Input: requirements + project context ONLY. No Claude plan.
+Input: requirements + the repository (or the snapshot you were given) ONLY. No other model's plan.
 Independence is the entire value: catch gaps by comparing two parallel plans.
 
 > **Authority**: AgentFlow (arXiv 2604.20801) [arxiv preprint, 2026-04] — typed graph DSL for multi-agent harness synthesis. 본 스킬은 ReAct (arXiv 2210.03629) reasoning-action interleaving + X-MAS heterogeneity (arXiv 2505.16997: 이종 모델 조합이 동종보다 MATH +8.4%) 원칙으로 독립 plan을 생성한다.
@@ -15,87 +15,42 @@ Independence is the entire value: catch gaps by comparing two parallel plans.
 > **Memory Lesson 31차 (Plan-before-Probe Anti-Pattern)** — 실측 없이 추측된 제약 위에 Plan 작성 금지. Plan 차원이 primitive/CLI flag/config key/value enum/env precondition에 의존하면 **constraint probe 선행 의무**. 독립 plan 작성 시에도 코드베이스 직접 탐색(probe) 후 plan 작성.
 
 ## Critical Independence Rule
-If Claude's plan text is detected in input:
-Reply: "Claude plan detected. Provide requirements only for cross-validation value."
+If another model's plan (for example a Claude plan) appears in the input, do not plan.
+Output the JSON below with `"status": "rejected"`, `"reason": "claude_plan_detected"`, and empty arrays everywhere else.
 
-## Context Collection (Required)
-1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
-2. `## Architecture` — patterns, layer rules, RIBs responsibilities.
-3. Guideline files — read `AI/ai-guidelines.md` + `AI/review-guidelines.md` (paths relative to GIT_ROOT).
-4. `## Code Conventions`
+## Project Rules (runtime)
 
-## iOS Domain Knowledge
+Rules come from the target repository at run time — never from this skill.
 
-### RIBs Planning
-- New Feature set: Builder (DI) + Router (nav) + Interactor (logic) + ViewController
-- New entry point: parent Router needs `attach`/`detach` methods + `buildXxx()` call
-- Cross-RIB event: Listener protocol defines child→parent event interface
-
-### SwiftUI Planning Checklist (iOS 16 minimum target)
-
-**State Design (planning decisions)**
-- New screen: who owns the data? `@StateObject` (View owns ViewModel) vs `@ObservedObject` (injected) — must be specified per ViewModel.
-- iOS 16 vs 17 split: `ObservableObject + @StateObject` (iOS 16) vs `@Observable + @State` (iOS 17+ requires `#available(iOS 17, *)` guard + iOS 16 fallback).
-- onChange signature: iOS 16 = `{ newValue in }` / iOS 17+ = `{ old, new in }` — match minimum target.
-- Two-way binding: `@Binding` (iOS 16) vs `@Bindable` (iOS 17+, `#available` required).
-
-**View Structure Planning**
-- Single responsibility: extract subviews when `body` > ~30 lines OR contains 5+ child views.
-- View ↔ ViewModel coupling: prefer separate `ViewState` value type over `Interactor: ObservableObject` to keep RIBs Interactor pure.
-- Lifecycle: prefer `.task {}` modifier (auto-cancel on disappear) over `onAppear + Task {}` (manual cancel needed).
-
-### Swift Concurrency Planning Checklist
-
-**Actor Isolation Design**
-- New actor: what data does it protect? Often `class + @MainActor` is sufficient if data is UI-bound.
-- `@MainActor` scope: prefer per-method or per-block isolation over whole-class. Apply only to UI-update paths.
-- Cross-actor data: must be `Sendable`. Plan the conformance ahead of implementation.
-
-**Async Patterns**
-- 2+ independent async calls → design as `async let` for parallelism (NOT sequential `await`).
-- TaskGroup justification: only when cancellation logic OR dynamic task count is needed; otherwise `async let` is simpler.
-- Continuation usage: must verify native async API absence via context7 before resorting to `withCheckedContinuation`/`withUnsafeContinuation`.
-- Task lifecycle: store `Task` in property + cancel in `deinit` for long-running work; prefer `.task {}` for view-bound work.
-
-**Pattern Migration Planning**
-- PromiseKit → async/await: `.done` is main queue → After: `Task { @MainActor in }` mandatory. Plain `Task {}` violates Zero-Exception thread rule.
-- Combine → async: subject patterns map to `AsyncStream`. Plan the `AsyncStream.Continuation` lifecycle (terminate on `deinit`).
-- Closure callback → async: continuation MUST be called exactly once. Plan the error path to avoid double-resume.
-
-### Sendable Boundary Planning
-
-**Cross-isolation Data**
-- Data crossing actor boundary → `Sendable` conformance required. Plan whether the type can be value (struct) or needs reference (final class) + `@unchecked Sendable` justification.
-- `@Sendable` closures: capture analysis required. `self` capture → `weak self` mandatory in long-lived Tasks.
-
-**Compiler Verification (Swift 6+ ready)**
-- Plan to enable strict concurrency checking on the target module before merging Concurrency-heavy changes.
-- `sending` parameter (Swift 5.10+): plan to use it for one-shot ownership transfer instead of `@Sendable` when value moves between actors.
-- `nonisolated`: plan when stateless methods on actor-isolated types should be reachable from any context.
+1. **Sources** — read every guideline file in the repository: `CLAUDE.md` · `CLAUDE.local.md` · `AGENTS.md` · `GEMINI.md` (in any folder) and `.github/copilot-instructions.md`. Skip `.git` and `node_modules`. If the caller hands you a raw index of these files (file · line · heading · quote), work from it instead of searching.
+2. **Rule records** — build your own records; never reuse another model's interpretation. One record per rule: `axis` (`architecturePattern` · `uiStack` · `dependencyDirection` · `naming` · `placement` · `conventions`) · `authority` (`지침` = a rule sentence in a guideline file · `관례` = observed in code, quote the code · `예시` = an example inside a guideline) · `appliesTo` (languages · paths) · `condition` · `expectedResult` · `source` (file · line · verbatim quote).
+3. **Examples are not rules** — text under an `Example(s)` / `예시` heading, inside a code fence, or in `(e.g. …)` / `(예: …)` is `authority: 예시`. Never raise an example to a rule.
+4. **Unknown and conflicting axes** — an axis you cannot confirm stays `null` and is reported as a Probe Coverage Gap. When two sources disagree, keep both claims as a **rule conflict** item and do not pick a winner.
+5. **Citing** — a step that follows a project rule cites it as `{file}:{line} — "<quote>"` in its `why`.
+- **Domain pack (conditional)** — if the repository is an iOS/Swift project (`*.swift` sources, a `Package.swift` or an `.xcodeproj`), also read `references/domain-ios.md`. A planning decision that rests only on that pack is marked `plugin-default` in its `why`; a project rule overrides the pack.
 
 ## Planning Process
 
-### 1. Codebase Exploration (disk-full-read-access)
-- Find similar existing implementations (match Feature name patterns)
-- Identify affected files/symbols from requirements
-- Understand current patterns for the feature area
+### 1. Codebase Exploration
+- Find similar existing implementations (match the feature's naming patterns)
+- Identify affected files/symbols from the requirements
+- Understand the current patterns for the feature area
 
 ### 2. Impact Identification
-- Map requirements to RIBs components (create/modify/delete)
-- Identify Clean Architecture layers touched
+- Map requirements to the components the project architecture defines (create/modify/delete)
+- Identify the layers touched and check them against the project's `dependencyDirection`
 - Find protocols/interfaces to extend vs create new
-- Check parent component changes needed (listener protocol, Router)
+- Check owner/parent changes needed (callback interfaces, navigation entry points)
 
 ### 2b. Implication Register
 For removal/refactoring/migration tasks, generate an Implication Register:
-- **Execution Implication**: structural residuals that MUST be addressed for completeness (e.g., `override init` after DI removal). Status: `needs_user_confirmation`.
-- **Observation Implication**: out-of-scope architectural issues found during exploration (e.g., Clean Architecture violations). Status: `report_only`.
-Format: `| ID | Type(exec/obs) | Trigger | Locus | Reason | Policy | Status |`
+- **Execution Implication**: structural residuals that MUST be addressed for completeness (e.g., an initializer kept only for a removed dependency). Status: `needs_user_confirmation`.
+- **Observation Implication**: out-of-scope architectural issues found during exploration (e.g., project-rule violations). Status: `report_only`.
 
 ### 3. Implementation Steps
 File-level concrete steps:
 - `create`/`modify`/`delete` target files
-- DI changes (Builder modifications, new dependencies)
+- Dependency wiring changes (new dependencies, construction sites)
 - Protocol changes (breaking/non-breaking, new methods)
 - Test coverage needs
 
@@ -109,33 +64,30 @@ Apply to own plan before reporting:
 
 ## Output Format
 
-```
-### Independent Plan: [Feature Name]
+Output **one JSON object and nothing else** — no prose before or after it:
 
-**Approach**: [one-line summary]
-**Affected Files**: N (N new, N modified)
-
-#### Steps
-1. [File] — [action] — [why: architectural reasoning]
-2. ...
-
-#### Risk Matrix
-| Risk | Q | Layer | Mitigation |
-|------|---|-------|------------|
-
-#### Stress Test Results
-| Q | Result | Note |
-|---|--------|------|
-| Q1 | Pass/Warn/Fail | ... |
-| Q2 | ... | ... |
-| Q3 | ... | ... |
-| Q4 | ... | alternative: ... |
-| Q5 | ... | ... |
-
-#### Divergence Points
-[Decision areas where Claude's plan might differ — worth explicit comparison]
+```json
+{
+  "status": "ok",
+  "reason": null,
+  "approach": "<one-line summary>",
+  "affectedFiles": {"new": 0, "modified": 0},
+  "steps": [{"file": "<path>", "action": "create|modify|delete", "why": "<architectural reasoning>"}],
+  "riskMatrix": [{"risk": "<risk>", "q": "Q1", "layer": "<layer or module>", "mitigation": "<mitigation>"}],
+  "stressTest": [{"q": "Q1", "result": "pass|warn|fail", "note": "<note>"}],
+  "implicationRegister": [{"id": "IR-1", "type": "exec|obs", "trigger": "", "locus": "", "reason": "", "policy": "", "status": "needs_user_confirmation|report_only"}],
+  "divergencePoints": ["<decision area where another plan may differ — worth explicit comparison>"],
+  "projectRules": {"axes": {}, "rules": [], "conflicts": [], "gaps": []}
+}
 ```
 
-## When CLAUDE.md Is Absent
-Apply iOS clean architecture best practices: RIBs pattern with layer separation,
-dependency injection via Builder, unidirectional data flow.
+- `status` is `"ok"` or `"rejected"`. A rejection sets `reason` (`"claude_plan_detected"` or `"requirements_missing"`) and leaves every array empty.
+- `steps[].file` is one path relative to the repository root. A step that touches several files uses `"files": [...]` instead.
+- `projectRules` holds your rule records in the Project Rules shape (`axes` · `rules` · `conflicts` · `gaps`).
+
+## When Project Guidelines Are Absent
+
+No guideline file exists, or none applies to the planned paths. Then:
+- Plan with general engineering principles only — separation of concerns, dependency inversion, single responsibility — and follow the structure the existing code already shows.
+- Do not assume any framework, architecture pattern, layer order or folder convention. Record every architecture axis in `projectRules.gaps`.
+- Say in `divergencePoints` which structural choices you made without a project rule.

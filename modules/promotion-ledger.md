@@ -89,7 +89,7 @@
 ### P2-C: general closure-capture retain cycle lens (Claude 경로) — 트랙 C
 - 관측 #0: OBS-10 (CodeRabbit Major1 — sheetRef 강한 캡처 cycle, fz-review 6-Layer 통과)
 - finding-source: external(CodeRabbit) — 4-classify: valid-suggestion
-- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. GPT `gpt-skills/fz-reviewer/SKILL.md:35-36`엔 일반 retain cycle lens 존재 (Claude/GPT 비대칭).
+- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. GPT `gpt-skills/fz-reviewer/SKILL.md:36-37`엔 일반 retain cycle lens 존재 (Claude/GPT 비대칭).
 - generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
 - ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
 - ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md` "⛔ retain cycle 점검" 블록 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(GPT 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다

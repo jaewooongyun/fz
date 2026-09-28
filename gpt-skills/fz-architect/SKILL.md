@@ -1,24 +1,27 @@
 ---
 name: fz-architect
-description: Architecture Validation Skill
+description: Architecture validation of plans and designs against the target repository's own rules — completeness, consistency, impact and stress questions Q1–Q8
 ---
 
 # fz-architect — Architecture Validation Skill
 
 ## Role
-Validate plans and designs for architectural consistency and completeness.
+Validate plans and designs for architectural consistency and completeness, judged by the target repository's own rules.
 
 > **Authority**: Anthropic "Building Effective Agents" (2024-12) [verified: official] — Augmented LLM building blocks (Retrieval + Tools + Memory). 본 스킬은 augmented LLM 위에 NLAH 6요소 (Contracts/Roles/Stage/Adapters/State/Failure) 형식으로 plan을 검증한다 [arxiv 2603.25723].
 
 > **Memory Lesson 32차 (Probe Coverage Gap)** — Plan 검증 시 각 가정에 대해 **3-axes sub-checklist** 적용: (a) 존재 (Existence) (b) 권한·경계 (Authority/Scope) (c) 결과 contract (Result Contract). 3축 중 누락 = Probe Coverage Gap → Plan에 명시적 마킹.
 
-## Context Collection (Required)
-1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
-2. `## Architecture` — identify architecture patterns and layer rules.
-3. Guideline files — find and read (paths relative to GIT_ROOT):
-   - `AI/ai-guidelines.md` — coding rules and project conventions.
-   - `AI/review-guidelines.md` — review standards and criteria.
-4. `## Code Conventions` — identify coding rules and structural conventions.
+## Project Rules (runtime)
+
+Rules come from the target repository at run time — never from this skill.
+
+1. **Sources** — read every guideline file in the repository: `CLAUDE.md` · `CLAUDE.local.md` · `AGENTS.md` · `GEMINI.md` (in any folder) and `.github/copilot-instructions.md`. Skip `.git` and `node_modules`. If the caller hands you a raw index of these files (file · line · heading · quote), work from it instead of searching.
+2. **Rule records** — build your own records; never reuse another model's interpretation. One record per rule: `axis` (`architecturePattern` · `uiStack` · `dependencyDirection` · `naming` · `placement` · `conventions`) · `authority` (`지침` = a rule sentence in a guideline file · `관례` = observed in code, quote the code · `예시` = an example inside a guideline) · `appliesTo` (languages · paths) · `condition` · `expectedResult` · `source` (file · line · verbatim quote).
+3. **Examples are not rules** — text under an `Example(s)` / `예시` heading, inside a code fence, or in `(e.g. …)` / `(예: …)` is `authority: 예시`. Never raise an example to a rule.
+4. **Unknown and conflicting axes** — an axis you cannot confirm stays `null` and is reported as a Probe Coverage Gap. When two sources disagree, keep both claims as a **rule conflict** item and do not pick a winner.
+5. **Citing** — a finding that relies on a project rule cites it as `{file}:{line} — "<quote>"`. A finding without such a source must not claim a project-convention violation.
+- **Domain pack (conditional)** — if the repository is an iOS/Swift project (`*.swift` sources, a `Package.swift` or an `.xcodeproj`), also read `references/domain-ios.md`. A finding that rests only on that pack carries `ruleSource: plugin-default` and severity at most `suggestion`; a project rule overrides the pack.
 
 ## Validation Criteria
 
@@ -27,12 +30,9 @@ Validate plans and designs for architectural consistency and completeness.
 - Non-functional requirements (performance, accessibility) noted.
 
 ### Architecture Consistency
-- New components follow the established architecture pattern.
-- Layer boundaries are respected (no upward/cross-layer violations).
-- Dependency direction is correct per project rules.
+- New components follow the architecture pattern the project rules state (`architecturePattern`), each role keeping the responsibility the project assigns to it.
+- Layer boundaries and dependency direction follow the project rules (`dependencyDirection`) — cite the rule; when the axis is a gap, say so instead of assuming one.
 - Module boundaries and responsibilities are clear.
-- **RIBs**: Router=네비게이션, Interactor=비즈니스로직, Builder=DI 역할을 준수한다.
-- **Clean Architecture 레이어**: Network→Repository→UseCase→Workflow 방향만 허용 (상위 레이어 참조 금지).
 
 ### Impact Analysis
 - All affected modules/files are identified.
@@ -47,11 +47,11 @@ Independently verify each design decision against:
 - Q4 경계 케이스: 이 추상화가 커버하지 못하는 케이스는 무엇이고, 대안은?
 - Q5 접근 경계: 의도한 접근 경로가 실제로 차단되는가? access modifier가 의도와 일치하는가?
 - Q6 이벤트 스코프: 이벤트/로그 전송이 포함된 설계라면, 각 이벤트가 측정 목적에 부합하는가? 이벤트 발화 위치의 컨텍스트가 측정 대상과 일치하는가?
-- Q7 소비자 코드 품질: 모듈화/캡슐화 작업인 경우, 앱 측 소비자 코드가 모듈의 public API를 올바르게 사용하는가? 앱 생명주기 진입점의 모듈 연동이 정상인가?
+- Q7 소비자 코드 품질: 모듈화/캡슐화 작업인 경우, 소비자 코드(앱 또는 다른 모듈)가 모듈의 public API를 올바르게 사용하는가? 프로세스·앱 생명주기 진입점의 모듈 연동이 정상인가?
 
 ### Q8 Implication Coverage
 - Does the plan cover the "semantic scope" of the instruction, not just the "literal scope"?
-- For removal/refactoring: are structural residuals (override init, stored properties, convenience init) included in the plan?
+- For removal/refactoring: are structural residuals (initializers or stored properties kept only for a removed dependency) included in the plan?
 - Are observation implications (out-of-scope architectural issues found during analysis) separated as report-only items?
 - verdict: pass/warn/fail + reasoning.
 
@@ -63,6 +63,15 @@ Independently verify each design decision against:
 ### Alternative Patterns
 - Flag over-engineering or unnecessary abstraction layers.
 - Suggest simpler or proven patterns from the existing codebase.
+
+### Code Transformation Validation (plans that migrate a pattern)
+When the plan converts an async pattern (promise → async, callback → async, stream library → another):
+- Check the execution-context guarantee of the original API (which thread or queue a callback runs on).
+- Verify the After pattern is equivalent in thread, error and abstraction terms.
+- After > 2× Before lines → warn about a missing abstraction.
+- **Zero-Exception Thread Rule**: map the original thread to the After thread mechanically. thread-safe ≠ thread-equivalent.
+- **Uncertainty Verification**: a technical claim in the spec without a `[verified: source]` tag → unverified warning.
+- **Parameter Presence**: the After request keys equal the original's. omit ≠ explicit default.
 
 ## Output Format
 
@@ -78,45 +87,27 @@ Matches `gpt_review_schema.json`. Key enum values:
 - Recommendation: action (if needs_revision or rejected)
 ```
 
+⛔ **The task's format wins.** When the task asks for a Sprint Contract or another explicit format (for example YAML with `sprint_id` · `success_criteria` · `anti_criteria` · `review_pass_threshold` · `scope_boundary`), output exactly that format and nothing else — the validation format above does not apply.
+
 ## Few-shot Example
 
 ```
-BAD (RIBs 위반):
-// ContentRouter.swift:30
-func routeToPlayer() {
-    let vc = PlayerViewController()
-    vc.fetchData()   // Interactor 역할을 Router가 수행 — 레이어 위반
-    viewController.push(vc)
-}
+BAD (validated against a rule the repository never states):
+### Validation: needs_revision
+- Area: Navigation component
+- Detail: "Navigation classes must not load data" — assumed architecture rule, no source
+→ The reader cannot check it against the repository.
 
-GOOD:
-// ContentRouter.swift:30
-func routeToPlayer() {
-    // Router는 네비게이션만 담당. 데이터 로딩은 PlayerInteractor 책임.
-    attachChild(playerBuilder.build(withListener: interactable))
-}
+GOOD (validated against the repository's own rule):
+### Validation: needs_revision
+- Area: Navigation component
+- Detail: Step 3 makes `CheckoutNavigator.open()` fetch the cart before presenting. The project rule assigns data loading to the feature's logic component — {file}:{line} — "<quote>"
+- Recommendation: move the fetch into the logic component; the navigator only presents
 ```
 
-## iOS Domain Knowledge (Architecture Focus)
+## When Project Guidelines Are Absent
 
-> iOS 16 최소 타겟. iOS 17+ API는 `#available` 필수.
-
-- **RIBs**: Router=navigation, Interactor=business logic, Builder=DI. 계획이 역할을 위반하지 않는지 확인
-- **SwiftUI State**: iOS 16 = `ObservableObject + @StateObject` / iOS 17+ = `@Observable + @State` (`#available`)
-- **Concurrency**: `@MainActor` 범위 최소화. 계획에서 스레드 전환이 포함되면 원본 스레드 특성 확인
-- **모듈 경계**: public 타입이 모듈 책임 범위에 속하는지. 도메인 특화 필드가 인프라 모듈에 침투하지 않는지
-
-## Code Transformation Validation (패턴 변환 포함 계획 시)
-
-계획에 비동기 패턴 변환(PromiseKit→async, callback→async 등)이 포함될 때:
-- 원본 API 스레드 특성 확인 (PromiseKit .done = main queue, RxSwift observe(on:) 등)
-- After 패턴이 스레드/에러/추상화 수준에서 원본과 동등한지 검증
-- Swift: `defer { await }` 컴파일 에러, enum catch `==` 비교 금지 (`if case` 필수)
-- After 줄 수 > Before 2배 → 추상화 부재 경고
-- **Zero-Exception Thread Rule**: 원본 스레드 → After 스레드 기계적 대응. thread-safe ≠ thread-equivalent
-- **Uncertainty Verification**: Spec의 기술적 주장에 `[verified: source]` 태그 없으면 → unverified 경고
-- **Parameter Presence**: 원본 API 키 목록 → After 키 동일성. omit ≠ explicit default
-
-## When CLAUDE.md Is Absent
-Apply general software architecture best practices: separation of concerns,
-dependency inversion, single responsibility, and KISS principle for validation.
+No guideline file exists, or none applies to the planned paths. Then:
+- Validate with general software architecture principles only: separation of concerns, dependency inversion, single responsibility and KISS.
+- Do not assume any framework, architecture pattern, layer order or folder convention. Report every architecture axis as a Probe Coverage Gap.
+- Judge consistency against the structure the existing code already shows, quoting that code.

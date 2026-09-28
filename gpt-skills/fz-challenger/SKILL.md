@@ -1,6 +1,6 @@
 ---
 name: fz-challenger
-description: Devil's Advocate and Peer Review Skill
+description: Devil's advocate and peer review — challenges assumptions, detects over-engineering and classifies issues by origin, judged by the target repository's own rules
 ---
 
 # fz-challenger — Devil's Advocate & Peer Review Skill
@@ -10,50 +10,26 @@ Challenge assumptions, detect over-engineering, and classify issues independentl
 
 > **Authority**: MAST (NeurIPS 2025, arXiv 2503.13657 v3) [verified: 원문 §4 — FC2 36.94%] — inter-agent misalignment(FC2) = 36.94% (FC1 41.77/FC3 21.30, "단일 지배 카테고리 없음 — balanced"). 본 스킬은 *adversarial debate*가 아닌 **Generator≠Evaluator 분리 + position bias 회피** 프레임으로 작동한다 (ICLR 2025 Debate 회의론).
 
-## iOS Domain Knowledge
+## Project Rules (runtime)
 
-Challenge these iOS-specific over-engineering patterns:
+Rules come from the target repository at run time — never from this skill.
 
-### RIBs Over-Engineering
-- Builder with unnecessary abstract factory layers (1 feature = 1 concrete Builder is enough)
-- Router with direct View manipulation (Router routes, ViewController renders)
-- Interactor owning UI state (@Published in Interactor = RIBs violation)
-- Excessive Listener protocol methods (each method = one cross-RIB concern)
-
-### SwiftUI Over-Engineering
-- @Observable on classes that don't need reactivity (plain struct/enum may suffice)
-- Nested ObservableObject chains (flatten state ownership)
-- ViewModifier for one-off styling that's clearer inline
-
-### Concurrency Over-Engineering
-- actor for classes that never cross isolation boundaries (class + @MainActor suffices)
-- TaskGroup for sequential work that's simpler as sequential async calls
-- Custom AsyncSequence when AsyncStream covers the use case
-
-### Swift 5.10+ sending Parameter Semantics (compiler-verifiable)
-- `group.addTask` signature: `sending @escaping @Sendable () async -> ChildTaskResult`
-- `@MainActor`-isolated closure → `sending` parameter = "passing closure as a 'sending' parameter" warning
-- **Correct pattern**: non-isolated closure + `await MainActor.run { /* UI work */ }`
-- **Wrong suggestion**: adding `@MainActor` to addTask closure (causes warning, not removes it)
-- This type of claim MUST be marked `compiler_verifiable: true` — do NOT assert warning presence without compilation
+1. **Sources** — read every guideline file in the repository: `CLAUDE.md` · `CLAUDE.local.md` · `AGENTS.md` · `GEMINI.md` (in any folder) and `.github/copilot-instructions.md`. Skip `.git` and `node_modules`. If the caller hands you a raw index of these files (file · line · heading · quote), work from it instead of searching.
+2. **Rule records** — build your own records; never reuse another model's interpretation. One record per rule: `axis` (`architecturePattern` · `uiStack` · `dependencyDirection` · `naming` · `placement` · `conventions`) · `authority` (`지침` = a rule sentence in a guideline file · `관례` = observed in code, quote the code · `예시` = an example inside a guideline) · `appliesTo` (languages · paths) · `condition` · `expectedResult` · `source` (file · line · verbatim quote).
+3. **Examples are not rules** — text under an `Example(s)` / `예시` heading, inside a code fence, or in `(e.g. …)` / `(예: …)` is `authority: 예시`. Never raise an example to a rule.
+4. **Unknown and conflicting axes** — an axis you cannot confirm stays `null` and is reported as a Probe Coverage Gap. When two sources disagree, keep both claims as a **rule conflict** item and do not pick a winner.
+5. **Citing** — a challenge that relies on a project rule cites it as `{file}:{line} — "<quote>"`. A challenge without such a source must not claim a project-convention violation.
+- **Domain pack (conditional)** — if the repository is an iOS/Swift project (`*.swift` sources, a `Package.swift` or an `.xcodeproj`), also read `references/domain-ios.md`. A challenge that rests only on that pack carries `ruleSource: plugin-default` and severity at most `suggestion`; a project rule overrides the pack.
 
 ## Epistemic Boundary (지식 경계)
 
-When asserting compiler warning/error existence:
-- Without actual compilation result, set confidence ceiling to **60**
-- Any claim about `sending`, `nonisolated`, actor isolation MUST include `compiler_verifiable: true` flag
-- If current PR code already exists and no build failure reported, default assumption is "no warning" — challenger must prove otherwise
-- Pattern: "this code will produce warning X" is an empirical claim, not a design claim. Mark it differently.
+When asserting that a compiler warning or error exists:
+- Without an actual compilation result, the confidence ceiling is **60**
+- Such a claim MUST include `compiler_verifiable: true`
+- If the current code already exists and no build failure is reported, the default assumption is "no warning" — the challenger must prove otherwise
+- "This code will produce warning X" is an empirical claim, not a design claim. Mark it differently.
 
-Reversal trigger: If evidence suggests current code has NO warnings (e.g., PR was submitted without warnings, build CI passes), then "add @MainActor to fix warning" = **reverse** verdict with `compiler_verifiable: true`.
-
-## Context Collection (Required)
-1. Find and read CLAUDE.md (`../CLAUDE.md` from GIT_ROOT, or `CLAUDE.md` in current dir).
-2. `## Architecture` — identify architecture patterns and layer rules.
-3. Guideline files — find and read (paths relative to GIT_ROOT):
-   - `AI/ai-guidelines.md` — coding rules and project conventions.
-   - `AI/review-guidelines.md` — review standards and criteria.
-4. `## Code Conventions` — identify coding rules.
+Reversal trigger: if evidence suggests the current code has NO warnings (the change was submitted clean, CI passes), a suggestion whose only purpose is to "fix" that warning = **reverse** verdict with `compiler_verifiable: true`.
 
 ## Challenge Criteria
 
@@ -72,7 +48,7 @@ For each identified issue, assign one verdict:
 - Unnecessary abstraction layers, indirection, or wrapper types.
 - Generic solutions for single-use cases.
 - Premature optimization without profiling evidence.
-- **RIBs Builder 과잉 추상화**: 단일 화면용 Builder가 프로토콜+기본구현+팩토리 3단 구조를 갖는 경우 — 단순 `Builder` 클래스로 충분하다.
+- A single-use component split into protocol + default implementation + factory — one concrete type is enough unless a second implementation exists.
 
 ### Code Evidence Required
 - Every challenge MUST cite specific file:line references.
@@ -110,17 +86,20 @@ Matches `schemas/gpt_peer_review_schema.json`. Key enum values:
 
 ```
 BAD (과잉 추상화 미탐지):
-// agree: PlayerBuilder — 인터페이스 분리 잘 됨
-PlayerBuildable (protocol) + PlayerBuilder (concrete) + PlayerBuilderFactory (factory)
-→ 단일 화면용인데 3단 구조 검토 안 함
+// agree: ExportService — 인터페이스 분리 잘 됨
+ExportServiceProtocol (protocol) + ExportService (concrete) + ExportServiceFactory (factory)
+→ 구현이 하나뿐인데 3단 구조 검토 안 함
 
 GOOD:
-// reverse: PlayerBuilder — 단일 화면용 과잉 설계
-- Evidence: PlayerBuilder.swift:1-80 — Protocol+Implementation+Factory 3단
-- Alternative: PlayerBuilder class 단일 파일로 충분 (팩토리 분리 근거 없음)
+// reverse: ExportService — 단일 구현용 과잉 설계
+- Evidence: src/export/export_service.ts:1-80 — Protocol+Implementation+Factory 3단, 구현체 1개
+- Alternative: ExportService 구체 타입 하나로 충분 (팩토리 분리 근거 없음)
 - Origin: pre-existing
 ```
 
-## When CLAUDE.md Is Absent
-Apply general critical thinking: challenge assumptions, prefer simplicity,
-demand evidence, and classify issues by origin and severity.
+## When Project Guidelines Are Absent
+
+No guideline file exists, or none applies to the changed paths. Then:
+- Apply general critical thinking: challenge assumptions, prefer simplicity, demand evidence, classify issues by origin and severity.
+- Do not assume any framework, architecture pattern, layer order or folder convention. Report every architecture axis as a Probe Coverage Gap.
+- A convention challenge may cite only what the code itself shows (`authority: 관례`, quoting the code).

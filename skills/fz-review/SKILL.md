@@ -215,7 +215,7 @@ fz-gpt가 수행하는 작업:
 >
 > **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. GPT CLI 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(Agent·/sc:sc-analyze)로 **상속되지 않는다**.
 > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 규모는 그 근거 밖이다.
-> **⛔ retain cycle 점검 (rank3b, 2026-06-18 · 원장 `promotion-ledger.md` **P2-C** candidate `active=false`)**: fresh-context 검증자는 retain cycle 검사 시 `gpt-skills/fz-reviewer/SKILL.md` Memory Management(closures capturing `self` without `[weak self]`)를 명시 적용한다 — GPT 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
+> **⛔ retain cycle 점검 (rank3b, 2026-06-18 · 원장 `promotion-ledger.md` **P2-C** candidate `active=false`)**: fresh-context 검증자는 retain cycle 검사 시 `gpt-skills/fz-reviewer/SKILL.md` Memory and Resource Management(소유자를 강하게 잡는 closure·콜백·구독)와, Swift 저장소면 `references/domain-ios.md` 의 `[weak self]` 항목을 명시 적용한다 — GPT 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
 > **보조 이종 소스 (rank6)**: PR이 열려 있으면 `/fz` pr-comment-review로 CodeRabbit 코멘트를 보조 이종 소스로 활용 가능 (강제 아닌 Lead 판단).
 
 ### 검증 3: SuperClaude 정적 분석
