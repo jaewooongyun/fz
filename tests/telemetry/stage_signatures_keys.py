@@ -9,6 +9,8 @@
 검사
   ① 기준 파일의 서명(키 튜플 → 스테이지)이 현재 표에 전부 있고 상대 순서도 같다 — 첫 일치가 분류를 정한다
   ② craft 가 켜진 결과(axisCoverage 포함)의 분류가 꺼진 결과와 같다 — peer-review(review1) · review-live
+     분류는 실제 분류기(`classify_result`)로 한다. 꺼짐 결과가 어느 서명에도 안 맞는 쌍은 둘 다 other 일 뿐이라
+     '동일'로 세지 않고 판별 불가로 따로 적는다(판별한 쌍이 0 이면 exit 2)
 
 exit: 0=충족 · 1=위반 · 2=측정 실패(⛔ 통과 아님)
 """
@@ -41,16 +43,21 @@ def load_report():
     return mod
 
 
-def classify(table, result):
-    keys = set(result)
-    for required, stage in table:
-        if set(required).issubset(keys):
-            return stage
-    return "other"
+def classifier(mod, table):
+    """실제 분류기(fz_telemetry_report.classify_result)를 이 표로 돌린다 — 분류 논리를 여기 다시 짜지 않는다."""
+    def run(result):
+        saved = mod.STAGE_SIGNATURES
+        mod.STAGE_SIGNATURES = tuple(table)
+        try:
+            return mod.classify_result(result)[0]
+        finally:
+            mod.STAGE_SIGNATURES = saved
+    return run
 
 
-def check(table, baseline) -> list:
-    v = []
+def check(table, baseline, classify) -> tuple:
+    """(위반, 판별 불가 쌍)."""
+    v, blind = [], []
     cur = [(tuple(r), s) for r, s in table]
     base = [(tuple(r), s) for r, s in baseline]
     missing = [b for b in base if b not in cur]
@@ -60,10 +67,12 @@ def check(table, baseline) -> list:
     if not missing and kept != base:
         v.append(f"기존 서명의 상대 순서가 바뀌었다 — 첫 일치가 분류를 정한다: {kept} ≠ {base}")
     for name, off, on in PAIRS:
-        a, b = classify(cur, off), classify(cur, on)
+        a, b = classify(off), classify(on)
         if a != b:
             v.append(f"{name}: craft 켜짐 결과의 분류가 다르다 — 꺼짐 {a} · 켜짐 {b}")
-    return v
+        elif a == "other":
+            blind.append(name)                       # ⛔ 서명이 없어 둘 다 other — 같다는 판정이 아니다
+    return v, blind
 
 
 # ⛔ self-test 는 **합성 표**로 검사기 논리만 본다 — 실제 표·기준을 쓰면 진짜 위반이 "self-test 실패(판정 불가)" 로
@@ -80,11 +89,20 @@ def self_test() -> int:
         results.append(ok)
         print(f"{'PASS' if ok else 'FAIL'}  {name}")
 
-    case("⛔ 합성 표 · 합성 기준 → 위반 0(양성 대조)", check(SYN_TABLE, SYN_BASE) == [])
-    case("거부: 기존 서명이 빠졌다", any("빠졌다" in x for x in check(SYN_TABLE[1:], SYN_BASE)))
-    case("거부: 기존 서명 순서가 바뀌었다", any("순서" in x for x in check(list(reversed(SYN_TABLE)), SYN_BASE)))
+    try:
+        mod = load_report()
+    except (OSError, AttributeError, ImportError) as e:
+        print(f"FAIL  실제 분류기를 불러오지 못했다 — {e}")
+        return VIOLATION
+    run = lambda t: check(t, SYN_BASE, classifier(mod, t))  # noqa: E731
+    case("⛔ 합성 표 · 합성 기준 → 위반 0(양성 대조)", run(SYN_TABLE)[0] == [])
+    case("거부: 기존 서명이 빠졌다", any("빠졌다" in x for x in run(SYN_TABLE[1:])[0]))
+    case("거부: 기존 서명 순서가 바뀌었다", any("순서" in x for x in run(list(reversed(SYN_TABLE)))[0]))
     stealer = [(("axisCoverage",), "craft")] + SYN_TABLE
-    case("거부: axisCoverage 를 가로채는 서명이 앞에 섰다", any("분류가 다르다" in x for x in check(stealer, SYN_BASE)))
+    case("거부: axisCoverage 를 가로채는 서명이 앞에 섰다", any("분류가 다르다" in x for x in run(stealer)[0]))
+    case("판별 불가: 꺼짐 결과가 어느 서명에도 안 맞는 쌍은 '동일'로 세지 않는다", run(SYN_TABLE)[1] == ["review-live stage1-arch"])
+    case("거부: 서명 없는 결과가 craft 로 서명에 걸리면(other → craft) 판별 불가가 아니라 분류 변경",
+         any(x.startswith("review-live stage1-arch: craft 켜짐") for x in run(stealer)[0]))
     print(f"self-test {sum(results)}/{len(results)} passed")
     return OK if all(results) else VIOLATION
 
@@ -97,7 +115,8 @@ def main() -> int:
     if a.self_test:
         return self_test()
     try:
-        table = list(load_report().STAGE_SIGNATURES)
+        mod = load_report()
+        table = list(mod.STAGE_SIGNATURES)
         baseline = json.loads(pathlib.Path(a.baseline).read_text(encoding="utf-8"))
     except (OSError, ValueError, AttributeError) as e:
         print(f"UNRUN: 표나 기준을 읽지 못했다 — {e}")
@@ -105,11 +124,18 @@ def main() -> int:
     if not baseline:
         print("UNRUN: 기준 서명이 0개다(비교 대상 0 은 통과가 아니다)")
         return UNRUN
-    v = check(table, baseline)
+    v, blind = check(table, baseline, classifier(mod, table))
     for x in v:
         print(f"  ⛔ {x}")
-    print(f"VIOLATION {len(v)}건" if v else f"stage-signatures: 기준 {len(baseline)}개 보존 · craft 켜짐 분류 {len(PAIRS)}쌍 동일")
-    return VIOLATION if v else OK
+    if v:
+        print(f"VIOLATION {len(v)}건")
+        return VIOLATION
+    tail = f" · 판별 불가 {len(blind)}쌍(서명 없음 — {', '.join(blind)})" if blind else ""
+    if len(blind) == len(PAIRS):
+        print(f"UNRUN: 판별한 쌍이 0 이다{tail}")
+        return UNRUN
+    print(f"stage-signatures: 기준 {len(baseline)}개 보존 · craft 켜짐 분류 {len(PAIRS) - len(blind)}쌍 동일{tail}")
+    return OK
 
 
 if __name__ == "__main__":
