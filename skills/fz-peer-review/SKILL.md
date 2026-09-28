@@ -5,7 +5,7 @@ description: >-
   예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토 (비사용: 자기 코드 →fz-review, PR 해설 →fz-pr-digest)
 user-invocable: true
 disable-model-invocation: true
-argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--deep] [--post] [--render] [--explain [--light|--deep]]"
+argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--gpt-independent] [--deep] [--post] [--render] [--explain [--light|--deep]]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
@@ -23,7 +23,7 @@ allowed-tools: >-
   mcp__github__add_issue_comment,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Bash(codex *), Bash(gh *), Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow, Write
+  Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
 metadata:
   provides: [peer-review]
   needs: [none]
@@ -50,6 +50,7 @@ metadata:
 /fz-peer-review feature/TKT-1234      # 브랜치 리뷰
 /fz-peer-review 123 --deep            # Cross-Critique 활성화 (추가 ~$0.5-1.5)
 /fz-peer-review 123 --post            # 인라인 라인 앵커로 리뷰 게시
+/fz-peer-review 123 --gpt-independent # GPT 독립 첫 패스를 Workflow 와 동시에 — 병합은 review_merge.py (기본 off)
 /fz-peer-review 123 --render          # 리포트·코멘트·payload 를 review.json 하나에서 렌더 (기본 off)
 /fz-peer-review 123 --tier 2          # Tier 강제 지정
 /fz-peer-review 123 --explain         # 리뷰 후 해설 — 기능 흐름 + 동작↔코드 1:1 (Tutor, ~20-30K)
@@ -260,7 +261,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 
 ### Tier 0/1 분기
 - **Tier 0** → `modules/peer-review-tiers.md` §Tier 0 절차로 위임. 본 SKILL.md Analyze 후속 섹션(Gate 0 / Tier 2 / Tier 3) 모두 skip.
-- **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip.
+- **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip. ⊕ `--gpt-independent` 면 challenger 자리에 독립 첫 패스(아래 절)
 - **Tier 2/3** → 아래 기존 시퀀스 실행.
 
 ### Orchestrator Bias 방지 규칙 (InputHygiene 계약)
@@ -283,6 +284,10 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 
 > ⛔ **Tier 2/3 실행 상세**(Workflow 시퀀스 · 에이전트 출력 스키마 · Evidence-Only Brief · 병합 방법 A/B):
 > `modules/peer-review-workflow.md`. Tier 0/1 은 sub-agent·GPT 가 없어 **읽지 않는다**.
+
+### GPT 독립 첫 패스 (`--gpt-independent` · 기본 off)
+- **Workflow 직전에** `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff … --base … --head … [--rules-index {projectRulesPath}]` 를 background 로 띄우고, 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py"` 로 합친다. 경로는 **플러그인 루트 기준**이고, Workflow 스크립트는 세션 working directory 밖이면 **사전 복사**한 경로로 부른다
+- 순서 · 거부(오염 · 실패 · stale) 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서. Tier 3 GPT DA 는 병합 뒤다
 
 ## Step: Challenge (상호 비판)
 

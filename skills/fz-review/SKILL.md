@@ -4,7 +4,7 @@ description: >-
   자기 코드 3중 검증(Claude+GPT+sc:analyze) + 역방향 검증.
   예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR →fz-peer-review, 직접 수정 →fz-fix)
 user-invocable: true
-argument-hint: "[리뷰 대상 설명] [light] [--render]"
+argument-hint: "[리뷰 대상 설명] [light] [--render] [--gpt-independent]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__codegraph__codegraph_explore,
@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
-  Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [review-results]
   needs: [code-changes]
@@ -96,9 +96,11 @@ metadata:
 
 1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12)
 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용)
-3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff {diff.patch} [--rules-index {projectRulesPath}] …` — 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
+3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. `{플러그인 루트}` 가 세션 working directory 밖이면 스크립트를 `{WORK_DIR}` 로 **사전 복사**해 그 경로로 부른다(fz-plan 절차 2.5 와 같은 규칙)
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기. SOLO 3중 검증은 **L4 사용자 승인 후**. 사유는 experiment-log 기록
+4.5. **(`--gpt-independent`) 병합**: 두 패스가 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환} --gpt {독립 첫 패스 .json} --diff {같은 diff.patch}` — 런처 옆 파일로 오염 · 실패 · stale 을 거부한다. 결과가 Phase 5 [병렬 2] GPT 리뷰를 대신한다(두 번 부르지 않는다)
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + GPT validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
 6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-review 테이블. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
 ### 티켓 폴더 컨텍스트 로딩 (티켓 폴더(WORK_DIR) 활성 시):
@@ -205,6 +207,7 @@ mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분�
 # 독립 스킬로 위임
 /fz-gpt review "코드 리뷰"
 ```
+> ⊕ `--gpt-independent` 면 이 검증을 실행 절차 2.5 · 4.5 가 대신한다 — GPT 가 Claude 산출을 보기 전에 따로 리뷰한 결과를 `review_merge.py` 가 합친다
 
 fz-gpt가 수행하는 작업:
 - GPT CLI에 변경 심볼 + diff 전송 (effort: high)

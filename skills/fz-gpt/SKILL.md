@@ -190,6 +190,8 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 | **independent-plan** | 격리 첫 패스 플랜 — `scripts/gpt_independent.sh plan` (opt-in `--gpt-independent`) | /fz-plan cross-check | xhigh |
 | **independent-review** | 격리 첫 패스 리뷰 — `scripts/gpt_independent.sh review` (opt-in `--gpt-independent`) | /fz-review · /fz-peer-review | high |
 
+> independent-review 는 호출 스킬이 Workflow 와 **동시에** 띄우고 `scripts/review_merge.py` 로 합친다 — 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
+
 ⛔ **Bash 호출 시 의무**: 모든 서브커맨드 호출은 `modules/fz-gpt-bash-hygiene.md` 준수 (stdin close / trusted dir / Base Verification Gate / Wrapper Template).
 
 ⛔ **3-Tier 디스커버리**: 각 서브커맨드는 `get_gpt_skill_path()` (cross-validation.md)로 GPT System Skill 우선 사용 → 폴백 인라인 프롬프트.

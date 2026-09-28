@@ -13,6 +13,7 @@
 
 > TEAM(TeamCreate+SendMessage) → 네이티브 Workflow 전환 (Wave 4). Analyze 코어는 `workflows/peer-review.js`가 소유한다 (결정적 스크립트 — P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
 
+0. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff … --base … --head … [--rules-index {projectRulesPath}]` 를 **Workflow 호출 전에** background 로 띄운다. `projectRulesPath` 는 craftAxes 를 켤 때 Workflow args 에도 같은 파일이다. 순서 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js', args: { diffPath, intentContext, reviewSurfacePatchPath, reviewSurfacePath, evidencePaths, basePath, deep, structuralContext } })` — `structuralContext`는 `modules/review-structural-axes.md`를 Read해 §3 축 + §4 경계 문구를 담는다 (미전달 시 구조 축 미적용) ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - `deep=false` → **Tier 2 (Lite)**: Stage1 3-병렬(arch+quality+correctness) → **트리거 발화 시에만 Stage2 교차**. **3 또는 5-call**(null 재시도 시 최대 6/10). 발화 여부는 반환 `stage2Ran`·`stage2Trigger`. Confidence Matrix 미투표(Lead 단순 병합)
    - `deep=true` → **Tier 3 (Full)**: +Stage2 교차(arch↔quality) +Stage3 counter DA, **기본 6-call**(부분 실패로 Stage2 생략 시 5, 재시도 시 최대 9). 권위 수치는 `metrics.agentCalls`
@@ -32,6 +33,7 @@
    - base 원본은 Gather에서 prefetch하여 `basePath`로 전달 — 에이전트가 SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `agent-team-guide.md` §2)
 2. **반환 처리**: `mode:'workflow'` → reviews/issues를 Synthesize Step 입력으로. `mode:'fallback'` → Lead SOLO 리뷰 폴백.
 3. **GPT Analyze** (out-of-band, `--gpt`/Tier3): Lead가 `/fz-gpt` 경유 challenger 호출 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과는 Synthesize Confidence Matrix의 GPT 열로 주입 — Matrix 생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9.
+   - ⊕ `--gpt-independent` 면 이 단계는 **병합**이다 — `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude … --gpt … --diff …`(오염 · 실패 · stale 거부). challenger 를 따로 부르지 않고, Tier 3 GPT DA 는 병합 뒤 한 번이다
 
 > 산출물 계약(Confidence Matrix, origin severity 보정, confidence<80 미보고, dedup+투표)은 Synthesize Step에 보존 — Matrix·투표의 적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9. metrics는 Lead가 `experiment-log.md` §5.7 fz-peer-review 테이블에 기록.
 > ⊕ `args.preserveLowConfidence`(기본 off)를 켠 호출은 위 계약의 확신도 미달 항목을 버리지 않고 hold 로 둔다(`[후보 보존]` — `modules/peer-review-gates.md` §10).

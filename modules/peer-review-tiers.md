@@ -31,6 +31,8 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 | **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-gpt ×1 | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
 | **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-gpt ×2 | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
 
+> ⊕ **`--gpt-independent`(기본 off)**: GPT 슬롯 1 = **독립 리뷰어** — `gpt_independent.sh review` 를 Workflow 와 **병렬**로 띄우고 `review_merge.py` 로 합친다(Tier 1 은 challenger 자리). Tier 3 의 GPT DA(슬롯 2)는 **두 패스가 끝난 뒤**다. 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
+>
 > ⛔ **모델은 스크립트가 single source** — `peer-review.js`의 `label: 'stage1-arch'`·`'stage1-quality'`·`'stage1-correctness'`(Stage1) · `'stage2-arch-on-quality'`·`'stage2-quality-on-arch'`(Stage2) · `'stage3-counter'`(Stage3) 전 호출이 `model:'opus'`다. 에이전트 frontmatter(`review-quality`·`review-correctness`·`review-counter` = `sonnet`)와 `skills/code-auditor/SKILL.md` `main: sonnet`은 **스크립트에 의해 override된다** — 실행 경로는 스크립트다.
 > ⛔ **재시도 포함 실제 호출 수는 더 클 수 있다** — `parallelWithRetry`가 Stage1 null 항목마다 1회 재호출하므로 **Tier 2는 3~6, Tier 3는 6~9**다(`peer-review.js`의 `parallelWithRetry`). 부분 실패로 Stage2가 생략되면 Tier 3가 6보다 적을 수도 있다. **권위 있는 수치는 반환값 `metrics.agentCalls`뿐이다.**
 > ⛔ **비용 상한 수치 열을 제거했다.** 기존 `~$2.00`/`~$3.50`은 "opus 1 + sonnet 1" 전제로 산정된 값이라 실제(opus 3 / opus 6)와 맞지 않았다. 추정치를 다른 추정치로 바꾸는 대신 **검증 가능한 call 수**로 대체한다 — 실제 비용은 `cost-log.json`이 invoke마다 실측으로 남긴다. [참고 실측: PR Tier 2 = 448K tokens]
@@ -339,6 +341,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
   "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "${WORK_DIR}" --out "${WORK_DIR}/gpt-challenger-raw.txt" \
     --prompt-file /tmp/gpt-challenger-prompt.txt --effort xhigh
   ```
+- ⊕ `--gpt-independent`(기본 off) 면 위 challenger 대신 `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review` 를 쓴다 — 허용 입력만 격리 폴더로 들어가 Lead 요약 · 가설이 GPT 에 닿지 않는다. Synthesize 에서 `review_merge.py` 로 합친다(순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서)
 - GPT prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
 
 ### Synthesize

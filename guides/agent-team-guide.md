@@ -228,7 +228,7 @@ GOOD (Mesh / Peer-to-Peer):
 | Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ∥ search-pattern(텍스트) → 서로의 결과를 교차 확인 | `workflows/search-cross-verify.js` |
 
 > **실행 전환 (Wave 1-4, 완료)**: 위 5 패턴의 구현은 `workflows/{discover-adversarial,plan-collaborative,review-live,code-pair,search-cross-verify}.js` 결정적 Workflow다 — fz-plan 기본 실행은 `plan-lean2.js` 이고 `plan-collaborative.js` 는 롤백 경로다(P2P SendMessage 아님 — 라운드 의미론은 스크립트가 구현). 규약: `guides/skill-authoring.md` §12.
-> - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:79` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — 6개 워크플로가 전 패턴을 덮는다.
+> - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:80` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — 6개 워크플로가 전 패턴을 덮는다.
 > - `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 **존재하지 않으며**, fz 실행 경로에도 호출부가 **0건**이다 [verified: `grep -rn "TeamCreate(" workflows/ scripts/` → 0]. 본 가이드의 TeamCreate 예시(§2/§3/§7)는 **역사적 의미론 기록**이다 — ⛔ SOLO 폴백 절차로 참조하지 않는다(머리 경고).
 
 공통: 에이전트끼리 직접 대화하지 않는다 — 스크립트가 단계 결과를 다음 단계 입력으로 넘긴다. 병합은 워크플로마다 다르다 — 스크립트 안의 통합 단계(예: plan-collaborative·search-cross-verify)가 하거나, 반환 뒤 Lead 가 한다. 최종 판정은 Lead 가 한다. 옛 P2P 라운드·토폴로지 상세를 담던 TEAM 사료는 삭제됐다(위 "상세 구현은 각 `workflows/*.js`" 인용문).
@@ -275,6 +275,7 @@ Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워�
 - 모든 TEAM 구성에 GPT CLI가 포함된다.
 - **Lead가 직접** `/fz-gpt`를 실행한다 (에이전트가 GPT를 직접 호출하지 않음).
 - Claude (opus/sonnet) + GPT (다른 모델)의 교차 검증으로 blind spot을 보완한다.
+- ⊕ **독립 첫 패스**(opt-in `--gpt-independent`): GPT 가 Claude 산출을 보기 **전에** 같은 입력으로 따로 리뷰 · 플랜한다(`scripts/gpt_independent.sh` — 강제 격리). 합치는 것은 스크립트다(`review_merge.py` · `plan_divergence.py`) — 교차 검증은 그 뒤의 일이다. 규약 `modules/cross-validation.md` § 독립 첫 패스
 
 ### 검증 게이트 삽입 위치
 
