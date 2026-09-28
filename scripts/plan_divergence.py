@@ -6,8 +6,9 @@
 판정은 하지 않는다 — 어느 쪽이 옳은지는 Lead 가 정한다. 스크립트가 하는 일은 기계 대조뿐이다.
 
   파일       변경 대상 가운데 한쪽에만 있는 것. Claude = steps[].files ∪ writeScope[].file · GPT = steps[].file ∪ steps[].files.
-             경로의 접두(./ · 격리 dir 의 head/)와 뒤의 설명(공백 뒤 · 괄호 · :줄)을 벗기고 `{a,b}` 를 펼친다. 한쪽이 다른 쪽의
-             경로 꼬리면 같은 파일이고, 디렉터리 항목(`dir/`)은 그 아래 파일을 덮는다. 경로 모양이 아닌 값(`--flag` · 버전)은 버린다
+             경로의 접두(./ · GPT 쪽은 격리 dir 의 head/ 도)와 뒤의 설명(공백 뒤 · 괄호 · :줄)을 벗기고 `{a,b}` 를 펼친다. 한쪽이
+             다른 쪽의 경로 꼬리면 같은 파일이다 — ⛔ 짧은 쪽이 성분 두 개 이상일 때만(basename 하나로는 짝짓지 않는다).
+             디렉터리 항목(`dir/`)은 그 아래 파일을 덮는다. 경로 모양이 아닌 값(`--flag` · 버전)은 버린다
   요구(RTM)  Claude RTM 의 요구마다 그 Step 의 파일을 GPT 플랜이 하나라도 건드리는가 — 하나도 없으면 미커버다.
              Step 이 없거나 Step 에 파일이 없으면 판정 불가로 적는다(⛔ 미커버 0 으로 세지 않는다).
              Claude 플랜 안의 RTM ↔ Step 참조 무결성은 plan_integrity_check.py 가 본다
@@ -37,7 +38,9 @@ import tempfile
 
 OK, REJECT, UNRUN = 0, 1, 2
 # ponytail: 글자 bigram Jaccard 한 값 — 표현이 많이 다른 같은 위험은 양쪽에 한쪽 위험으로 뜬다(숨기지 않는 쪽으로 틀린다).
-#   짝지은 쌍과 유사도를 표에 함께 적어 Lead 가 근거를 본다. 오짝이 보이면 임계를 올린다
+#   ⛔ 실측 실패 방향은 오짝이 아니라 '짝 없음'이다 — 실제 두 독립 플랜(S21)에서 가장 비슷한 쌍도 0.13 이었다. 그래서 짝 절은
+#   거의 같은 문장(한쪽이 다른 쪽을 옮겨 적은 위험)만 잡는 표시이고, 위험 표는 나란히 보는 표다. 임계를 낮추면 오짝이 생긴다.
+#   의미 짝짓기가 필요해지면 임계가 아니라 판정자(Lead · 모델)를 바꾼다
 RISK_MATCH = 0.45
 STEP_SPLIT = re.compile(r"[,·/]| and ")    # plan_integrity_check.py 와 같은 stepId 표기
 
@@ -50,13 +53,13 @@ class Reject(Exception):
     """독립이 아닌 GPT 입력 — exit 1."""
 
 
-def norm(path) -> str:
+def norm(path, gpt: bool = False) -> str:
     p = str(path or "").strip().strip("`")
     p = re.split(r"[\s(（]", p, maxsplit=1)[0] if p else ""
     p = re.sub(r":\d+(?:[-,]\d+)*$", "", p)
-    if "/head/" in p:                         # review_merge.gpt_path 와 같은 규칙
+    if gpt and "/head/" in p:                 # review_merge.gpt_path 와 같은 규칙 · 같은 적용 범위(GPT 격리 dir 의 스냅샷만)
         p = p.split("/head/", 1)[1]
-    elif p.startswith("head/"):
+    elif gpt and p.startswith("head/"):
         p = p[len("head/"):]
     p = re.sub(r"^(?:\./)+", "", p)            # ⛔ a/ · b/ 는 벗기지 않는다 — diff 헤더 접두가 아니라 실제 디렉터리일 수 있다
     return p.strip("/")
@@ -68,20 +71,22 @@ def expand(raw) -> list:
     return [raw] if not m else [x for alt in m.group(1).split(",") for x in expand(raw[:m.start()] + alt.strip() + raw[m.end():])]
 
 
-def entries(raw) -> list:
+def entries(raw, gpt: bool = False) -> list:
     """파일 칸 하나 → [(경로, 디렉터리인가)]. 경로 모양이 아닌 값(`--flag` · 버전 번호)은 버린다."""
     out = []
     for x in expand(str(raw or "").strip().strip("`")):
         is_dir = bool(re.search(r"/\**$", x.split()[0] if x.split() else ""))
-        p = norm(x).rstrip("*").rstrip("/")
+        p = norm(x, gpt).rstrip("*").rstrip("/")
         if p and not p.startswith("-") and not re.fullmatch(r"[\d.]+", p) and ("/" in p or re.search(r"\.[A-Za-z][\w-]{0,9}$", p)):
             out.append((p, is_dir))
     return out
 
 
 def same(a: str, b: str, a_dir: bool = False, b_dir: bool = False) -> bool:
-    """경로 꼬리가 같으면 같은 파일 · 디렉터리 항목은 그 아래 파일을 덮는다."""
-    if a == b or a.endswith("/" + b) or b.endswith("/" + a):
+    """같은 경로이거나, 짧은 쪽이 성분 두 개 이상인 경로 꼬리면 같은 파일 · 디렉터리 항목은 그 아래 파일을 덮는다.
+    ⛔ basename 하나로는 짝짓지 않는다 — `Package.swift` 가 아무 패키지의 Package.swift 와 짝이 돼 차이가 표에서 사라진다."""
+    short, longer = sorted((a, b), key=len)
+    if a == b or ("/" in short and longer.endswith("/" + short)):
         return True
     return (a_dir and f"/{a}/" in f"/{b}/") or (b_dir and f"/{b}/" in f"/{a}/")
 
@@ -105,11 +110,11 @@ def gpt_plan(doc) -> dict:
     return doc
 
 
-def collect(pairs) -> dict:
+def collect(pairs, gpt: bool = False) -> dict:
     """[(파일 칸, 출처)] → {경로: {where, dir}}."""
     out = {}
     for raw, where in pairs:
-        for p, is_dir in entries(raw):
+        for p, is_dir in entries(raw, gpt):
             e = out.setdefault(p, {"where": [], "dir": False})
             e["dir"] = e["dir"] or is_dir
             if where not in e["where"]:
@@ -124,7 +129,7 @@ def claude_files(plan: dict) -> dict:
 
 def gpt_files(plan: dict) -> dict:
     return collect([(f, f"{k}번 단계") for k, s in enumerate(plan["steps"], 1) if isinstance(s, dict)
-                    for f in ([s["file"]] if isinstance(s.get("file"), str) else []) + [x for x in s.get("files") or [] if isinstance(x, str)]])
+                    for f in ([s["file"]] if isinstance(s.get("file"), str) else []) + [x for x in s.get("files") or [] if isinstance(x, str)]], gpt=True)
 
 
 def hit(path: str, is_dir: bool, other: dict) -> bool:
@@ -285,7 +290,7 @@ def samples():
     # ⛔ 짝 없는 GPT 파일(Extra)에 격리 dir 전체 경로를 준다 — 경로 꼬리 대조는 head/ 를 안 벗겨도 짝을 찾으므로
     #    접두 규칙은 짝 없는 파일의 표시에서만 드러난다(변이 검증에서 발견)
     gpt = {"steps": [{"file": "head/Sources/App/Model.swift", "action": "create", "why": "w"},
-                     {"file": "View.swift", "action": "modify", "why": "w"},
+                     {"file": "App/View.swift", "action": "modify", "why": "w"},
                      {"files": ["/tmp/fz-gpt-iso/head/Sources/App/Extra.swift"], "action": "create", "why": "w"}],
            "riskMatrix": [{"risk": "캐시 무효화가 늦으면 목록이 옛 값을 보여준다", "mitigation": "m"},
                           {"risk": "동시 편집 충돌", "mitigation": "m"}]}
@@ -322,9 +327,17 @@ def self_test() -> int:
         d = diverge(c, g)
         case("paths — 중괄호를 펼치고 · 경로 아닌 값(--flag · 버전 번호)은 버리고 · 디렉터리 항목은 그 아래 파일을 덮는다",
              entries("--gpt-skill") == [] and entries("0.157.0") == [] and entries("tests/x/") == [("tests/x", True)]
-             and entries("head/tests/x/") == [("tests/x", True)] and entries("/tmp/iso/head/a/b.swift") == [("a/b.swift", False)]
+             and entries("head/tests/x/", gpt=True) == [("tests/x", True)] and entries("/tmp/iso/head/a/b.swift", gpt=True) == [("a/b.swift", False)]
              and entries("a/{b,c}.json") == [("a/b.json", False), ("a/c.json", False)]
              and d["files"] == {"claudeOnly": [], "gptOnly": []} and d["requirements"] == [], d["files"])
+
+    def t_tail():
+        c = {"plan": {"steps": [{"id": "S1", "files": ["Packages/A/Package.swift", "web/head/meta.ts"]}]}}
+        g = {"steps": [{"files": ["Package.swift", "/tmp/fz-gpt-iso/head/web/head/meta.ts"]}]}
+        d = diverge(c, g)
+        case("tail — basename 하나로는 짝짓지 않는다(양쪽에 드러난다) · head/ 는 GPT 경로에서만 벗긴다(Claude 의 web/head/ 는 실제 폴더)",
+             [x["file"] for x in d["files"]["claudeOnly"]] == ["Packages/A/Package.swift"] and [x["file"] for x in d["files"]["gptOnly"]] == ["Package.swift"]
+             and entries("web/head/meta.ts") == [("web/head/meta.ts", False)], d["files"])
 
     def t_rtm():
         rows = {r["req"].split()[0]: r["verdict"] for r in diverge(*samples())["requirements"]}
@@ -399,7 +412,7 @@ def self_test() -> int:
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    for t in (t_files, t_paths, t_rtm, t_multi, t_risks, t_contam, t_inputs, t_no_rtm, t_bare, t_render, t_det, t_cli):
+    for t in (t_files, t_paths, t_tail, t_rtm, t_multi, t_risks, t_contam, t_inputs, t_no_rtm, t_bare, t_render, t_det, t_cli):
         try:
             t()
         except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다

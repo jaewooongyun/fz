@@ -342,11 +342,12 @@ fi
 # ⛔ self-test 만 돈다 — 실데이터(lean2 반환 · GPT 독립 플랜)는 저장소에 없고 fz-plan 배선은 뒤 스텝이다.
 for PS in plan_apply_delta plan_divergence; do
   PS_OUT="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/scripts/$PS.py" --self-test 2>&1)"; PS_CODE=$?
-  if [ "$PS_CODE" -eq 0 ]; then
-    record "fz-plan 기계 작업 $PS" 0 "$(printf '%s\n' "$PS_OUT" | tail -1)"
-  else
-    record "fz-plan 기계 작업 $PS" 1 "⛔ $(printf '%s\n' "$PS_OUT" | grep -E '^FAIL' | head -1) · $(printf '%s\n' "$PS_OUT" | tail -1)"
-  fi
+  case "$PS_CODE" in
+    0) record "fz-plan 기계 작업 $PS" 0 "$(printf '%s\n' "$PS_OUT" | tail -1)" ;;
+    1) record "fz-plan 기계 작업 $PS" 1 "⛔ $(printf '%s\n' "$PS_OUT" | grep -E '^FAIL' | head -1) · $(printf '%s\n' "$PS_OUT" | tail -1)" ;;
+    *) UNRUN=$((UNRUN + 1))   # ⛔ exit 2 는 측정 불가다 — 실패로도 통과로도 세지 않는다(4.8c 와 같은 규약)
+       record "fz-plan 기계 작업 $PS" UNRUN "미실행 exit $PS_CODE — $(printf '%s\n' "$PS_OUT" | tail -1) (⛔ PASS 아님)" ;;
+  esac
 done
 
 # ── 4.8b A/B 원장 판정기 + 프로토콜 절 ──────────────────────────

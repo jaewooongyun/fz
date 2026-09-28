@@ -17,7 +17,8 @@ Step 본문을 결정론으로 고칠 수 없다. 본문을 어떻게 고칠지�
   --result FILE [--out FILE] [--table FILE]   lean2 반환(plan + delta) → 반영한 반환 JSON(--out) · Step 별 귀속 표(--table, 없으면 stdout)
   --self-test
 
-exit: 0=반영(delta 가 null 이면 그대로) · 1=거부(모르는 Step id · field enum 밖) · 2=입력 불가(⛔ 통과 아님 — plan.steps 없음 · JSON 아님)
+exit: 0=반영(delta 가 null 이면 그대로) · 1=거부(모르는 Step id · field enum 밖) · 2=입력 불가(⛔ 통과 아님 — plan.steps 없음 · JSON 아님 ·
+      delta 키 없음 · degraded 반환 — 병합 렌즈가 죽어 delta 가 null 인 것은 "델타 없음"이 아니다)
 실패하면 어떤 파일도 쓰지 않는다.
 """
 from __future__ import annotations
@@ -90,6 +91,11 @@ def add_once(items: list, item, key) -> None:
 def apply(result) -> dict:
     """반영한 반환 사본. 입력은 바꾸지 않는다."""
     ids = step_ids(result)
+    if "delta" not in result:
+        raise InputError("delta 키가 없다 — lean2 반환이 아니거나 잘렸다('델타 없음'은 delta: null 로 온다)")
+    if result.get("degraded") is True:
+        raise InputError(f"degraded 반환이다(빠진 렌즈 {result.get('missingLenses')}) — delta 가 비어 보여도 '없음'이 아니다. "
+                         "§12 L3(resume)로 먼저 복구한다")
     delta = result.get("delta")
     out = copy.deepcopy(result)
     if delta is None:
@@ -254,6 +260,11 @@ def self_test() -> int:
         out = apply(a)
         case("no-delta — delta 가 null 이면 계획은 그대로이고 표가 그 사실을 적는다",
              out["plan"] == sample()["plan"] and "델타 없음" in table(out))
+        gone = sample()
+        del gone["delta"]
+        dead = dict(sample(), delta=None, degraded=True, missingLenses=["merge"])
+        case("no-delta-contract — delta 키가 없거나 degraded 반환이면 '델타 없음'이 아니라 입력 불가",
+             raises(lambda: apply(gone), InputError) and raises(lambda: apply(dead), InputError))
 
     def t_input():
         bad = [{}, {"plan": {}}, {"plan": {"steps": []}}, {"plan": {"steps": [{"id": "S1"}, {"id": "S1"}]}}, [1]]
