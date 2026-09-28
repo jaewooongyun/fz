@@ -18,7 +18,7 @@
 #   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 와 --deny 는 막는다
 #   --snapshot 소비자 · 공유 모듈 본문 폴더 — 격리 폴더의 snapshot/<이름>/ 으로 복사한다(리뷰 범위를 줄이지 않는다)
 #
-# 산출(out-dir): <arm>-<run-id>.json (스키마 출력) · .md (사람용) · .audit.json · .rollouts/ (세션 로그 사본) · .contaminated (오염 시)
+# 산출(out-dir): <arm>-<run-id>.json (스키마 출력) · .md (사람용) · .audit.json · .rollouts/ (세션 로그 사본) · .contaminated (오염 시) · .json.session(세션 ID — 감사 sessionFile · --keep-iso 면 감사 iso · resume 입력)
 # exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건 · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
 #   ⛔ 10~17 은 전부 첫 패스 결과가 아니다 — 0건으로 읽지 않는다.
@@ -219,9 +219,10 @@ TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
 # ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(spawn 을 못 끈다 — S11 ⑤)
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
-python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" <<'PY'
+python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" <<'PY'
 import glob, hashlib, json, os, re, sys
 mode, out, stem, home, repo, iso, rc, timed_out, schema_p = sys.argv[1:10]
+keep = sys.argv[10:11] == ["1"]   # --keep-iso — 격리 홈이 남아야 resume 이 세션을 잇는다
 # ⛔ 입력 해시는 격리 사본에서 잰다 — GPT 가 실제로 본 내용이다(읽기 전용 프로필이라 실행 중에 바뀌지 않는다). 병합이 stale 을 가린다
 inputs = {n: hashlib.sha256(open(os.path.join(iso, "input", n), "rb").read()).hexdigest()
           for n in ("diff.patch", "requirement.md", "sprint-contract.md", "rules-index.json", "pr-meta.json")
@@ -277,7 +278,9 @@ for f in rolls:
 if tcs == 0:
     iso_ok = False
 audit = {"mode": mode, "rollouts": len(rolls), "turnContexts": tcs, "isolationApplied": iso_ok, "spawnAgent": spawn, "spawnedRoles": roles,
-         "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs}
+         "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs,
+         # resume 입력(fz-plan Phase 2 resume 교차) — 세션 ID 파일은 래퍼가 사후 게이트 통과 뒤에만 쓴다. 격리 홈은 --keep-iso 일 때만 남는다
+         "iso": iso if keep else None, "sessionFile": out + ".session" if os.path.isfile(out + ".session") else None}
 code, note = 0, "ok"
 if hits or (not iso_ok and not timed_out and rc == 0):
     code, note = 15, ("rollout 감사 적중" if hits else "격리 미적용 — rollout 에 HOME deny 가 없다(또는 rollout 이 없다)")

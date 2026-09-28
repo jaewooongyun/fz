@@ -93,6 +93,10 @@ check "plan: rollout 사본 1" "$(ls "$T/c-plan/out/A-plan.rollouts" 2>/dev/null
 check "plan: 감사 격리 적용" "$(audit plan isolationApplied)" True
 check "plan: 감사 적중 0" "$(audit plan hits)" "[]"
 [ ! -e "$T/c-plan/out/A-plan.json.lock" ] && ok "plan: 잠금 해제" || no "plan: 잠금이 남았다"
+# resume 입력(S23) — --keep-iso 면 감사가 격리 폴더와 세션 ID 파일을 가리킨다(fz-plan Phase 2 resume 교차가 둘을 쓴다)
+check "plan: 감사 iso = --keep-iso 로 남긴 격리 폴더" "$(audit plan iso)" "$ISO"
+check "plan: 감사 sessionFile = 세션 ID 파일" "$(audit plan sessionFile)" "$T/c-plan/out/A-plan.json.session"
+check "plan: 세션 파일 = 세션 ID" "$(tr -d '[:space:]' < "$T/c-plan/out/A-plan.json.session" 2>/dev/null)" "11111111-2222-3333-4444-555555555555"
 rm -rf "$ISO"
 
 # ② review 정상 — fz-reviewer 본문 1회 · base · head 복사 · 격리 폴더는 기본으로 지운다
@@ -104,6 +108,7 @@ RISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-review/env.txt")"
 
 # ②-b 감사 입력 해시 · 런처 → 병합(S22) — 병합은 감사의 diff 해시로 stale 을 가린다. 손으로 만든 감사가 아니라 런처 실제 산출로 본다
 inp() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("inputs", {}).get(sys.argv[2], "-"))' "$T/c-$1/out/A-$1.audit.json" "$2" 2>/dev/null || echo "-"; }
+check "review: --keep-iso 가 없으면 감사 iso 는 없다" "$(audit review iso)" None
 check "review: 감사에 GPT 가 본 diff 의 sha256" "$(inp review diff.patch)" "$(shasum -a 256 "$IN/diff.patch" | cut -d' ' -f1)"
 check "plan: 감사에 요구의 sha256" "$(inp plan requirement.md)" "$(shasum -a 256 "$IN/requirement.md" | cut -d' ' -f1)"
 printf '{"issues": []}\n' > "$T/claude-empty.json"
