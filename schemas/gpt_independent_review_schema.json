@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gpt_independent_review_schema.json",
+  "title": "GPT Independent Review (first pass)",
+  "description": "GPT 독립 첫 패스 리뷰(S13 · scripts/gpt_independent.sh review). 결함 issues 와 craft 항목을 별 배열로 둔다. $ref · oneOf 없이 자기완결 — 모든 필드를 required 로 두고 선택은 type 배열의 null 로 표현한다(CLI strict 구조화 출력은 required 에 없는 필드를 거부한다 · S11 ④). 필드 이름은 scripts/review_merge.py 후보 필드(line_range · discoveryAxis · craftAxis · ruleRef)와 같다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "issues", "craft", "axis_coverage", "projectRules"],
+  "properties": {
+    "verdict": {"type": "string", "enum": ["approved", "needs_revision", "rejected"]},
+    "summary": {"type": "string"},
+    "issues": {
+      "type": "array",
+      "description": "결함 — 회귀 · 버그 · 영향 범위. craft(솜씨) 항목은 craft 배열로.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "confidence", "file", "line_range", "discoveryAxis", "origin", "title", "detail", "evidence", "suggestion", "ruleSource"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["critical", "major", "minor", "suggestion"], "$comment": "→ gpt_base_issue_schema.json#/$defs/severity"},
+          "confidence": {"type": "integer", "minimum": 0, "maximum": 100, "$comment": "→ gpt_base_issue_schema.json#/$defs/confidence"},
+          "file": {"type": ["string", "null"]},
+          "line_range": {"type": ["string", "null"], "description": "\"12\" · \"12-15\" · \"3,7\""},
+          "discoveryAxis": {"type": "string", "enum": ["code_quality", "structure", "correctness", "runtime_safety", "direction", "other"]},
+          "origin": {"type": ["string", "null"], "enum": ["regression", "pre-existing", "improvement", null]},
+          "title": {"type": "string"},
+          "detail": {"type": "string"},
+          "evidence": {"type": "string"},
+          "suggestion": {"type": "string"},
+          "ruleSource": {"type": ["string", "null"], "enum": ["project", "plugin-default", null], "$comment": "→ gpt_base_issue_schema.json#/$defs/rule_source · 결함은 규칙이 없어도 된다(null)"}
+        }
+      }
+    },
+    "craft": {
+      "type": "array",
+      "description": "솜씨 항목 — 동작은 맞지만 프로젝트 규칙 · 관례 · 언어 관용과 어긋나는 자리(6축).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "craftAxis", "ruleSource", "ruleRef", "severity", "confidence", "file", "line_range", "title", "detail", "suggestion"],
+        "properties": {
+          "id": {"type": "string"},
+          "craftAxis": {"type": "string", "enum": ["idiom", "naming", "architecture", "ui_structure", "placement", "design_alternative"], "$comment": "= workflows/*.js CRAFT_AXES — tests/workflows/craft-axes.js 가 대조한다"},
+          "ruleSource": {"type": "string", "enum": ["project", "plugin-default"], "$comment": "→ gpt_base_issue_schema.json#/$defs/rule_source · plugin-default 는 상한 suggestion"},
+          "ruleRef": {"type": ["string", "null"], "description": "projectRules.rules[].id — ruleSource=project 이면 필수"},
+          "severity": {"type": "string", "enum": ["critical", "major", "minor", "suggestion"], "$comment": "→ gpt_base_issue_schema.json#/$defs/severity"},
+          "confidence": {"type": "integer", "minimum": 0, "maximum": 100, "$comment": "→ gpt_base_issue_schema.json#/$defs/confidence"},
+          "file": {"type": ["string", "null"]},
+          "line_range": {"type": ["string", "null"]},
+          "title": {"type": "string"},
+          "detail": {"type": "string"},
+          "suggestion": {"type": "string"}
+        }
+      }
+    },
+    "axis_coverage": {
+      "type": "array",
+      "description": "6축마다 한 행 — 발견이 없어도 사유를 적는다. 축 중복은 스키마가 못 잡아 런처가 후검사한다(6축 집합 == CRAFT_AXES).",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["axis", "status", "note"],
+        "properties": {
+          "axis": {"type": "string", "enum": ["idiom", "naming", "architecture", "ui_structure", "placement", "design_alternative"]},
+          "status": {"type": "string", "enum": ["found", "none", "gap"]},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "projectRules": {
+      "type": "object",
+      "description": "모델이 원문에서 각자 만든 규칙 레코드 — modules/project-rules.md §3 모양(schemaVersion 제외).",
+      "additionalProperties": false,
+      "required": ["axes", "rules", "conflicts", "gaps"],
+      "properties": {
+        "axes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["architecturePattern", "uiStack", "dependencyDirection", "naming", "placement", "conventions"],
+          "properties": {
+            "architecturePattern": {"type": ["string", "null"]},
+            "uiStack": {"type": ["string", "null"]},
+            "dependencyDirection": {"type": ["string", "null"]},
+            "naming": {"type": ["string", "null"]},
+            "placement": {"type": ["string", "null"]},
+            "conventions": {"type": ["string", "null"]}
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "axis", "authority", "appliesTo", "condition", "expectedResult", "source", "appliedTo"],
+            "properties": {
+              "id": {"type": "string"},
+              "axis": {"type": "string", "enum": ["architecturePattern", "uiStack", "dependencyDirection", "naming", "placement", "conventions"]},
+              "authority": {"type": "string", "enum": ["지침", "관례", "예시"]},
+              "appliesTo": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["languages", "modules", "paths"],
+                "properties": {
+                  "languages": {"type": "array", "items": {"type": "string"}},
+                  "modules": {"type": "array", "items": {"type": "string"}},
+                  "paths": {"type": "array", "items": {"type": "string"}}
+                }
+              },
+              "condition": {"type": "string"},
+              "expectedResult": {"type": "string"},
+              "source": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["file", "line", "quote"],
+                "properties": {"file": {"type": "string"}, "line": {"type": "integer", "minimum": 1}, "quote": {"type": "string"}}
+              },
+              "appliedTo": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["axis", "claim_a", "claim_b", "sources"],
+            "properties": {
+              "axis": {"type": "string", "enum": ["architecturePattern", "uiStack", "dependencyDirection", "naming", "placement", "conventions"]},
+              "claim_a": {"type": "string"},
+              "claim_b": {"type": "string"},
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["file", "line", "quote"],
+                  "properties": {"file": {"type": "string"}, "line": {"type": "integer", "minimum": 1}, "quote": {"type": "string"}}
+                }
+              }
+            }
+          }
+        },
+        "gaps": {"type": "array", "items": {"type": "string", "enum": ["architecturePattern", "uiStack", "dependencyDirection", "naming", "placement", "conventions"]}}
+      }
+    }
+  }
+}

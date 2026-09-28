@@ -15,6 +15,11 @@
       "maximum": 100,
       "description": "이슈 신뢰도 0-100 (높을수록 확실). Confidence Matrix 투표 시 사용."
     },
+    "rule_source": {
+      "type": "string",
+      "enum": ["project", "plugin-default"],
+      "description": "규칙 출처 — project = 대상 저장소 지침·관례를 인용한 발견(ruleRef 필수) · plugin-default = GPT 스킬 도메인 팩(references/domain-*.md)에서만 나온 발견(상한 suggestion). 값은 소비 스키마에 인라인한다(gpt_independent_review_schema.json)"
+    },
     "location": {
       "type": "object",
       "description": "문제 위치 정보",
