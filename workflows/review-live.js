@@ -4,12 +4,13 @@
 //   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/review-live.js',
-//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields? } })
+//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings? } })
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
-//   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어가고,
-//     Stage 1 finding 에 line_range · discoveryAxis 선택 필드가 생긴다. 미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다.
-//     ⛔ 위치 필드는 craft 가 아니라 §3 병합 키다 — 그래서 켠 arm 은 quality 렌즈 스키마도 다르다. craft 효과를 A/B 로 재기(R-C) 전에 떼야 한다.
+//   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄 · axisCoverage(6축 필수) · craftAxis · ruleRef 가 들어간다.
+//     미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다.
+//   locatedFindings: §3 병합 키 — ⛔ 기본 off(R-C S16c). true 면 Stage 1 두 렌즈 finding 에 line_range · discoveryAxis 선택 필드가 생긴다.
+//     craft 와 다른 관심사라 따로 켠다 — craft 효과를 A/B 로 잴 때는 두 arm 모두 켜서 병합 키 효과를 지운다. 미지정·false 면 바이트 단위로 같다.
 //   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
 //   crossRequiredFields: ⛔ 기본 off(R-B). true 면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
@@ -92,9 +93,9 @@ const CounterSchema = {
 //    과 함께 tests/workflows/craft-axes.js 가 일치를 단언한다. 한 줄 리터럴로 둔다(그 테스트가 이 줄을 추출한다).
 const CRAFT_AXES = ['idiom', 'naming', 'architecture', 'ui_structure', 'placement', 'design_alternative']
 
-// craft 스키마 — ⛔ ReviewFindingsSchema 를 고치지 않고 **새 객체**로 만든다. CrossReviewSchema.additions ·
-//    CounterSchema.missedFindings 가 findings 하위 객체를 참조로 공유해서, 원본을 고치면 craft 필드가 전 렌즈로 샌다.
-//    Stage 1 finding 에는 위치·발견 축을 선택 필드로 둔다 — peer-review.js 와 같은 discoveryAxis 목록(MergeContract §3 dedup 키).
+// 위치 · craft 스키마 — ⛔ ReviewFindingsSchema 를 고치지 않고 **새 객체**로 만든다. CrossReviewSchema.additions ·
+//    CounterSchema.missedFindings 가 findings 하위 객체를 참조로 공유해서, 원본을 고치면 새 필드가 전 렌즈로 샌다.
+//    위치 스키마는 Stage 1 finding 에 위치·발견 축 선택 필드를 둔다 — peer-review.js 와 같은 discoveryAxis 목록(MergeContract §3 dedup 키).
 const LocatedFindingItems = {
   ...ReviewFindingsSchema.properties.findings.items,
   properties: {
@@ -107,21 +108,22 @@ const LocatedFindingItems = {
     },
   },
 }
-const CraftFindingsSchema = {
+const LocatedFindingsSchema = {
   ...ReviewFindingsSchema,
   properties: { ...ReviewFindingsSchema.properties, findings: { ...ReviewFindingsSchema.properties.findings, items: LocatedFindingItems } },
 }
-const ArchCraftSchema = {
-  ...CraftFindingsSchema,
-  required: [...CraftFindingsSchema.required, 'axisCoverage'],
+// craft 는 arch 렌즈 전용 — 기반 스키마(위치 필드가 있든 없든)에 craftAxis · ruleRef · axisCoverage 만 얹는다
+const archCraftSchema = base => ({
+  ...base,
+  required: [...base.required, 'axisCoverage'],
   properties: {
-    ...CraftFindingsSchema.properties,
+    ...base.properties,
     findings: {
-      ...CraftFindingsSchema.properties.findings,
+      ...base.properties.findings,
       items: {
-        ...LocatedFindingItems,
+        ...base.properties.findings.items,
         properties: {
-          ...LocatedFindingItems.properties,
+          ...base.properties.findings.items.properties,
           craftAxis: { type: 'string', enum: CRAFT_AXES, description: 'craft 축 발견이면 그 축 — 결함 발견이면 비운다' },
           ruleRef: { type: 'string', description: '인용한 프로젝트 규칙 레코드 id — 규칙 없이 낸 craft 지적이면 비운다' },
         },
@@ -140,7 +142,7 @@ const ArchCraftSchema = {
       },
     },
   },
-}
+})
 
 const OVERRIDE =
   '[Workflow 모드 오버라이드] P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시는 적용하지 않는다. ' +
@@ -183,6 +185,8 @@ const structuralLine = input.structuralContext ? `\n[구조 축 — 이 렌즈 �
 // craft 축 — arch 렌즈에만(structuralLine 과 같은 이유 — modules/review-structural-axes.md §2·§6). ⛔ 기본 off — 꺼지면 빈 문자열이다.
 // ⛔ projectRulesPath 는 craftAxes 의 하위 옵션이다 — craftAxes 없이 넘겨도 기본 경로를 바꾸지 않는다.
 const craftOn = input.craftAxes === true || input.craftAxes === 'true'
+const locatedOn = input.locatedFindings === true || input.locatedFindings === 'true'
+const stage1Schema = locatedOn ? LocatedFindingsSchema : ReviewFindingsSchema
 const craftLine = !craftOn ? '' :
   `\n[craft 축 — 이 렌즈 전용] ${CRAFT_AXES.join(' · ')} — 축마다 axisCoverage 에 1행(finding · none · not_applicable, note 에 근거)을 쓴다. ` +
   `craft 발견에는 craftAxis 를 단다. severity: ruleRef 가 프로젝트 규칙을 인용할 때만 minor 이상, 그 밖 craft 지적은 suggestion 까지.` +
@@ -212,11 +216,11 @@ const [arch, quality] = await parallel([
   () => callAgent(
     `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}${craftLine}\n` +
     `[목표] 아키텍처 관점 findings (id는 A1, A2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
-    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: craftOn ? ArchCraftSchema : ReviewFindingsSchema }),
+    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: craftOn ? archCraftSchema(stage1Schema) : stage1Schema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
     `[목표] 품질 관점 findings (id는 Q1, Q2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
-    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: craftOn ? CraftFindingsSchema : ReviewFindingsSchema }),
+    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: stage1Schema }),
 ])
 if (!arch && !quality) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 both null', metrics: metrics(0) } }
 if (!arch || !quality) log('WARN stage1 한쪽 null — 단독 진행 (교차 조정 생략)')

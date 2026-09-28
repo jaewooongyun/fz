@@ -16,8 +16,8 @@ ruleRef 가 있고 확신도 80 이상일 때만 post 다. GPT reverse 는 hold 
 계약은 MergeContract §10.
 
 **craft 6축 (`args.craftAxes`) · 필수 필드 재고지 (`args.crossRequiredFields`)** — arch 렌즈에 6축 줄과 axisCoverage 를, Stage 2 교차
-프롬프트에 additions 의 required 키(스키마에서 읽는다)를 넣는다. review-live 는 craftAxes 를 켜면 §3 병합 키(`line_range` · `discoveryAxis`)도
-Stage 1 두 렌즈 finding 에 선택 필드로 더한다(peer-review 는 기본 스키마에 있다) — 그래서 켠 arm 은 quality 렌즈 스키마도 다르다(분리는 R-C).
+프롬프트에 additions 의 required 키(스키마에서 읽는다)를 넣는다. review-live 의 §3 병합 키(`line_range` · `discoveryAxis`) 선택 필드는
+`args.locatedFindings`(기본 off)가 따로 켠다(peer-review 는 기본 스키마에 있다).
 
 **규칙 추출 · 검증** — 지침 원문 색인 → 모델별 규칙 레코드 → 검증 통과본만 쓴다. ⚠️ 옵션이 아니라 fz-plan 절차 1.5 의 Lead 절차
 변경이다 — 워커에 넘기는 `archConstraints` 는 옛 형식의 호환 투영이고, 넘기지 않으면 워커 프롬프트는 그대로다.

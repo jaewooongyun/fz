@@ -127,8 +127,8 @@ const labels = calls => calls.map(c => c.label).sort().join(',')
     if (wf === 'review-live') {
       const q = byLabel(on.calls, 'stage1-quality')
       const qItems = q.schema && q.schema.properties.findings.items
-      check('review-live: Stage 1 finding 에 line_range · discoveryAxis 선택 필드', !!archItems && !!qItems &&
-        [archItems, qItems].every(it => it.properties.line_range && it.properties.discoveryAxis && !it.required.includes('line_range') && !it.required.includes('discoveryAxis')),
+      check('review-live: craftAxes 만 켜면 Stage 1 에 위치 필드가 없다 — §3 병합 키는 locatedFindings 가 따로 켠다(S16c · located-findings.js)',
+        !!archItems && !!qItems && [archItems, qItems].every(it => !it.properties.line_range && !it.properties.discoveryAxis),
         JSON.stringify(qItems && Object.keys(qItems.properties)))
     }
     // ── 3. 켜짐 · 규칙 레코드 있음 ──

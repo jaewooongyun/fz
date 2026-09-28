@@ -27,6 +27,8 @@ const OPTIONS = {
   //   '자체 confidence 80% 미만이면 보고하지 않는다'. 그 해제 줄은 [후보 보존] 문장에만 발화하는데 review-live 는 그 문장을
   //   내지 않고 confidence 필드도 없어 끌 길이 없다(배선은 R-C). OVERRIDE 가 모든 콜에 있어 applies 가 없다
   preserveLowConfidence: { workflows: ['peer-review'], on: { preserveLowConfidence: true }, off: { preserveLowConfidence: false } },
+  // review-live 만 — peer-review 는 기본 스키마에 위치 필드가 있다. Stage 1 두 콜의 스키마만 바뀐다
+  locatedFindings: { workflows: ['review-live'], on: { locatedFindings: true }, off: { locatedFindings: false } },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }
