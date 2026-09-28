@@ -27,7 +27,7 @@
 | Tier 2 실행, 리포트에 전수·부정 주장 포함("사용처 0건") | `/fz-peer-review 123` | Synthesize §4에서 `cross-validation.md` §Coverage Gate Read 후 **전체 N / 분석 M 비율 보고** = pass (미보고면 fail) | normal |
 | Tier 3 실행, suggestion 등급 이슈 존재 | `/fz-peer-review 123 --deep` | 반환 `distribution.suggestion` 이 실제 suggestion 이슈 수와 일치 + log에 표기 = pass (H24 회귀 방어) | normal |
 | Tier 2/3 실행 | `/fz-peer-review 123` | `args.structuralContext` 가 전달되고 **arch 프롬프트에만** `[구조 축 — 이 렌즈 전용]` 이 포함 = pass. ⛔ `structuralLine` 이 조건부라 args 누락 시 **에러 없이 구조 축이 꺼진다** — quality/correctness 프롬프트에 포함되면 fail(결함 축 오염) | normal |
-| Tier 2/3 실행, `args.craftAxes: true`(R-B 기본 off 옵션) | Workflow 직접 호출 | **arch 콜에만** `[craft 축 — 이 렌즈 전용]` 줄과 axisCoverage(6축 필수) 스키마가 들어가고, 규칙 레코드가 없으면 `규칙 인용 지적 금지 — 코드 근거만` 줄이 붙는다. Tier 3 반환 `distribution.craftAxes` 에 축별 수와 axisCoverage = pass(`tests/workflows/craft-axes.js`) | normal |
+| Tier 2/3 실행, `args.craftAxes: true`(R-B 기본 off 옵션) | Workflow 직접 호출 | **arch 콜에만** `[craft 축 — 이 렌즈 전용]` 줄과 axisCoverage(6축 필수) 스키마가 들어가고(review-live 는 §3 병합 키 `line_range` · `discoveryAxis` 선택 필드가 Stage 1 두 렌즈 finding 에 붙는다 — craft 가 아니다), 규칙 레코드가 없으면 `규칙 인용 지적 금지 — 코드 근거만` 줄이 붙는다. Tier 3 반환 `distribution.craftAxes` 에 축별 수와 axisCoverage = pass(`tests/workflows/craft-axes.js`) | normal |
 | `args.craftAxes` 미지정 또는 false | Workflow 직접 호출 | 모든 콜의 프롬프트·스키마가 기준 트리와 바이트 단위로 같다 = pass(`tests/workflows/default-off-regression.js`). `projectRulesPath` 만 넘겨도 기본 경로다 | edge-case |
 
 ---
@@ -74,6 +74,7 @@ exit 0 = 계산 성공 (앵커 0건이어도 0) / exit 1 = 입력 오류
 | **A8** | hunk 본문에 `+++ b/fake.txt` 추가 라인이 있는 diff → `real.txt` 조회 | `real.txt`의 hunk가 유지되고 `fake.txt`는 **미등록**(`path_not_in_diff`). ⛔ 오귀속되면 엉뚱한 파일에 코멘트가 달린다 | failure |
 | **A9** | `"b/dir/file name.txt"` quoted path diff → `dir/file name.txt` 조회 | `anchorable` 1건 — quote 해제 | edge-case |
 | **A10** | 신규 파일(`--- /dev/null`)에 `side=LEFT` · `side` 값이 `UP` | 전자 `reason=no_hunks_on_side` / 후자 **exit 1** | failure |
+| **A11** | `.claude-plugin/plugin.json` diff → 같은 경로 · `./.claude-plugin/plugin.json` 조회 | `anchorable` 2건 — 선두 `./` 만 벗기고 폴더 이름의 점은 남긴다 | edge-case |
 
 ### 구현 제약 (검증 가능)
 

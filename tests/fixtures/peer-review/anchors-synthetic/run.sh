@@ -1,9 +1,9 @@
 #!/bin/bash
 # diff-parse: not-a-diff — 이 러너는 diff_anchors.py 의 JSON 출력과 exit code 만 본다. diff 파싱은 diff_anchors.py 소관.
-# 인라인 앵커 오라클 A1~A10 (skills/fz-peer-review/references/test-spec.md) — 합성 fixture 기준.
+# 인라인 앵커 오라클 A1~A11 (skills/fz-peer-review/references/test-spec.md) — 합성 fixture 기준.
 #
 # ⛔ 옛 fixture(사내 코드)를 합성 patch 로 바꿨다(S03 · A1-04). hunk 좌표를 그대로 보존했으므로 A1~A7 의
-#    기대값이 바뀌지 않는다 — 이 러너가 그 사실을 고정한다. A8~A10 은 명세대로 작은 diff 를 여기서 만든다.
+#    기대값이 바뀌지 않는다 — 이 러너가 그 사실을 고정한다. A8~A11 은 명세대로 작은 diff 를 여기서 만든다.
 # exit: 0 전건 통과 / 1 불일치 / 2 실행 오류
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -69,6 +69,10 @@ na = (o or {}).get("non_anchorable", [])
 rc2, _, _ = run(d10, [{"path": "new.txt", "start": 1, "end": 2, "side": "UP"}])
 check("A10 신규 LEFT=no_hunks_on_side · side UP=exit 1", bool(na) and na[0]["reason"] == "no_hunks_on_side" and rc2 == 1
       and "side는" in last_err and "Traceback" not in last_err, f"UP exit={rc2}")
-print(f"anchors-synthetic: {10 - fails}/10 통과")
+d11 = mk("a11.patch", "diff --git a/.claude-plugin/plugin.json b/.claude-plugin/plugin.json\n--- a/.claude-plugin/plugin.json\n"
+       "+++ b/.claude-plugin/plugin.json\n@@ -1 +1 @@\n-a\n+b\n")
+rc, _, o = run(d11, [{"path": ".claude-plugin/plugin.json", "start": 1, "end": 1}, {"path": "./.claude-plugin/plugin.json", "start": 1, "end": 1}])
+check("A11 점으로 시작하는 폴더 · 선두 ./ 만 벗긴다", len((o or {}).get("anchorable", [])) == 2, str((o or {}).get("non_anchorable")))
+print(f"anchors-synthetic: {11 - fails}/11 통과")
 sys.exit(1 if fails else 0)
 PY

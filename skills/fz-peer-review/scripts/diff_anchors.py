@@ -124,7 +124,9 @@ def resolve_path(requested, known_paths):
     정확 일치 우선, 없으면 유일한 suffix 일치를 채택한다.
     복수 일치는 임의로 고르지 않고 호출자에게 되돌린다.
     """
-    needle = strip_prefix(unquote_path(requested)).lstrip("./")
+    needle = strip_prefix(unquote_path(requested))
+    while needle.startswith("./"):              # ⛔ lstrip("./") 는 문자 집합이라 `.claude-plugin/` 의 점까지 벗긴다
+        needle = needle[2:]
     if needle in known_paths:
         return needle, None
     matches = [p for p in known_paths if p == needle or p.endswith("/" + needle)]
