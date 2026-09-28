@@ -173,8 +173,8 @@ def inline(us: list) -> tuple:
         carried = [u for u in group if not u["anchor"] and u["part"]]
         for k, u in enumerate(placed):
             body = u["body"]
-            if k == 0:
-                body += "".join(f"\n\n[{c['part']}] {quote(c['at'])}" for c in carried)
+            if k == 0:   # ⛔ 조각 본문째 옮긴다 — 첫 지점이 앵커 불가면 이슈의 논지(what · suggestion)가 그 조각 본문에만 있다
+                body += "".join(f"\n\n{c['body']}\n\n{quote(c['at'])}" for c in carried)
             comments.append(comment(u["anchor"], MARK.format(iid) + "\n" + body))
             a = u["anchor"]
             rows.append({"id": iid, "part": u["part"], "site": u["site"], "path": a["path"],
@@ -227,6 +227,8 @@ def pr_comments(r: dict, us: list) -> str:
 
 def render(review, diff_text: str) -> dict:
     validate(review)
+    if not re.search(r"^diff --git ", diff_text, re.M):
+        raise InputError("diff 에 `diff --git` 헤더가 없다 — 파일 경계를 가를 수 없어 모든 지점이 앵커 불가로 조용히 떨어진다(git diff 출력만 받는다)")
     da = anchors_module()
     files = da.parse_hunks(diff_text)
     plans = []
@@ -273,21 +275,25 @@ def render(review, diff_text: str) -> dict:
 
 
 def run_render(a) -> int:
+    d = Path(a.out_dir)
+
+    def fail(code: int, msg: str) -> int:
+        for f in OUTPUTS:
+            (d / f).unlink(missing_ok=True)   # ⛔ 실패한 렌더 뒤에 이전 실행의 산출물이 남으면 지금 리뷰로 오인해 게시한다
+        print(msg, file=sys.stderr)
+        return code
+
     try:
         review = json.loads(Path(a.review).read_text(encoding="utf-8"))
         diff_text = Path(a.diff).read_text(encoding="utf-8", errors="replace")
     except (OSError, ValueError) as e:
-        print(f"UNRUN: 입력을 읽지 못했다 — {e}", file=sys.stderr)
-        return UNRUN
+        return fail(UNRUN, f"UNRUN: 입력을 읽지 못했다 — {e}")
     try:
         out = render(review, diff_text)
     except InputError as e:
-        print(f"UNRUN: {e}", file=sys.stderr)
-        return UNRUN
+        return fail(UNRUN, f"UNRUN: {e}")
     except Reject as e:
-        print(f"REJECT: {e}", file=sys.stderr)
-        return REJECT
-    d = Path(a.out_dir)
+        return fail(REJECT, f"REJECT: {e}")
     d.mkdir(parents=True, exist_ok=True)
     (d / "review-report.md").write_text(out["review-report.md"], encoding="utf-8")
     (d / "pr-comments.md").write_text(out["pr-comments.md"], encoding="utf-8")
@@ -449,7 +455,21 @@ def self_test() -> int:
         out = render(review([three]), SELF_DIFF)
         m = by_id(out, "M2")
         case("carry — 앵커 불가 조각은 같은 이슈 첫 인라인 조각에 인용한다",
-             len(m) == 2 and "[2/3] 관련 코드가 이 PR 의 diff 밖이라" in m[0]["body"] and "src/a.swift:20-25" in m[0]["body"], m)
+             len(m) == 2 and "[2/3] 전체 논지는" in m[0]["body"] and "관련 코드가 이 PR 의 diff 밖이라" in m[0]["body"]
+             and "src/a.swift:20-25" in m[0]["body"], m)
+        first_out = {"id": "M3", "severity": "major", "what": "w", "comment": "논지 본문",
+                     "sites": [site("src/a.swift", 20, 25), site("src/a.swift", 11, 12), site("src/b.swift", 2, 2)]}
+        m = by_id(render(review([first_out]), SELF_DIFF), "M3")
+        case("carry-first — 첫 지점이 앵커 불가여도 논지 본문이 인라인 코멘트에 남는다(인용만 옮기면 본문이 사라진다)",
+             len(m) == 2 and "논지 본문" in m[0]["body"], m)
+
+    def t_nodiff():
+        try:
+            render(review(base), "변경 요약만 있고 diff 헤더가 없다\n@@ -1 +1 @@\n-a\n+b\n")
+            refused = False
+        except InputError:
+            refused = True
+        case("no-diff-header — `diff --git` 헤더가 없으면 입력 불가(전부 앵커 불가로 떨어뜨려 exit 0 하지 않는다)", refused)
 
     def t_empty():
         try:
@@ -495,8 +515,12 @@ def self_test() -> int:
         f.write_text(json.dumps(r), encoding="utf-8")
         subprocess.run([sys.executable, __file__, "--review", str(f), "--diff", str(diff), "--out-dir", str(tmp / "ok")], capture_output=True)
         case("stale-payload — headSha 없는 재실행은 이전 payload.json 을 지운다", not (tmp / "ok" / "payload.json").exists())
+        rc1, files1 = main_exit(review(base), "same")
+        rc2, files2 = main_exit(review(over), "same")
+        case("stale-on-failure — 같은 out-dir 에서 실패하면 이전 실행의 산출물 넷을 지운다",
+             (rc1, rc2) == (0, 1) and files1 == sorted(OUTPUTS) and files2 == [], (rc1, rc2, files1, files2))
 
-    tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_empty, t_nopr, t_det, t_limit, t_cli]
+    tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_nodiff, t_empty, t_nopr, t_det, t_limit, t_cli]
     try:
         for t in tests:
             try:
