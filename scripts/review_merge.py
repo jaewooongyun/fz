@@ -33,6 +33,7 @@ import argparse
 import collections
 import contextlib
 import functools
+import hashlib
 import importlib.util
 import io
 import json
@@ -235,7 +236,37 @@ def gpt_candidates(doc) -> tuple:
     verdicts = doc.get("verdicts") or []
     if not isinstance(verdicts, list):
         raise Unrun("GPT verdicts 가 배열이 아니다")
-    return unique([candidate(i, "gpt", "gpt") for i in items]), verdicts
+    # GPT 독립 첫 패스는 craft 를 결함과 다른 배열에 둔다(schemas/gpt_independent_review_schema.json) — 빠뜨리면 craft 지적이 조용히 사라진다.
+    #    렌즈 "craft" 로 읽어 id 가 결함과 겹칠 때만 gpt:gpt:X · gpt:craft:X 로 가른다. craftAxis 가 없으면 결함 채널로 섞이므로 거부한다
+    craft = doc.get("craft")
+    if craft is not None and not isinstance(craft, list):
+        raise Unrun("GPT craft 가 배열이 아니다")
+    for c in craft or []:
+        if not isinstance(c, dict) or not c.get("craftAxis"):
+            raise Reject(f"GPT craft 항목에 craftAxis 가 없다 — 결함 채널로 섞지 않는다: {str(c)[:80]}")
+    return unique([candidate(i, "gpt", "gpt") for i in items] + [candidate(c, "gpt", "craft") for c in craft or []], qualify=True), verdicts
+
+
+def gpt_sidecars(gpt_path: str, diff_path: str) -> None:
+    """런처(gpt_independent.sh) 산출이면 옆 파일로 판정한다 — 런처는 오염을 본문이 아니라 `.contaminated` 옆 파일로만 남긴다.
+    감사가 없으면 런처 밖 입력(/fz-gpt review 등 — 독립성을 주장하지 않는 기존 경로)이라 그대로 받는다."""
+    stem = gpt_path[:-5] if gpt_path.endswith(".json") else gpt_path
+    if os.path.exists(stem + ".contaminated"):
+        raise Reject(f"GPT 독립 첫 패스가 오염으로 끝났다({stem}.contaminated) — 병합하지 않는다")
+    if not os.path.exists(stem + ".audit.json"):
+        return
+    audit = load(stem + ".audit.json")
+    if audit.get("exit") != 0 or audit.get("isolationApplied") is not True:
+        raise Reject(f"GPT 독립 첫 패스가 통과하지 못했다 — exit {audit.get('exit')} · 격리 {audit.get('isolationApplied')} · {audit.get('note')}")
+    want = (audit.get("inputs") or {}).get("diff.patch")
+    if not want:
+        raise Unrun("런처 감사에 diff 해시가 없다 — 어느 diff 를 봤는지 모르는 GPT 입력으로 판정하지 않는다")
+    try:
+        got = hashlib.sha256(pathlib.Path(diff_path).read_bytes()).hexdigest()
+    except OSError as e:
+        raise Unrun(f"diff 를 읽을 수 없다 — {e}")
+    if want != got:
+        raise Reject(f"stale — GPT 독립 첫 패스가 본 diff({want[:12]})와 병합 diff({got[:12]})가 다르다. 다시 돌리거나 --gpt-unavailable 로 사유를 적는다")
 
 
 # ── 병합 ───────────────────────────────────────────────────────────
@@ -359,6 +390,8 @@ def run_merge(a) -> int:
         raise Unrun("--claude 와 --diff 가 필요하다(근거 재실측 없이는 게시 등급을 매기지 않는다)")
     if not a.gpt and not (a.gpt_unavailable or "").strip():
         raise Unrun("GPT 독립 입력(--gpt)이 없는데 사유(--gpt-unavailable)도 없다 — 조용히 Claude 단독으로 병합하지 않는다")
+    if a.gpt:
+        gpt_sidecars(a.gpt, a.diff)
     gpt, verdicts = gpt_candidates(load(a.gpt)) if a.gpt else ([], [])
     try:
         texts = hunk_text(pathlib.Path(a.diff).read_text(encoding="utf-8", errors="replace"))
@@ -525,6 +558,13 @@ def self_test() -> int:
         case("reviews-contract — issues · findings 가 없는 리뷰는 exit 2 · 같은 렌즈 안 id 중복은 거부",
              raises(lambda: claude_candidates({"reviews": [{"agent": "arch", "verdict": "pass"}]}), Unrun)
              and raises(lambda: claude_candidates({"reviews": [{"agent": "arch", "issues": [issue("Q1"), issue("Q1")]}]}), Reject))
+        g, _ = gpt_candidates({"issues": [issue("X1")], "craft": [issue("X1", axis="naming", craftAxis="naming"), issue("K9", craftAxis="placement")]})
+        case("gpt-craft — craft 배열도 읽는다 · 결함과 id 가 겹칠 때만 렌즈로 가른다 · craft 는 craft 채널",
+             sorted(c["id"] for c in g) == ["gpt:K9", "gpt:craft:X1", "gpt:gpt:X1"] and [axis_key(c)[0] for c in g if c["id"] == "gpt:K9"] == ["craft"],
+             sorted(c["id"] for c in g))
+        case("gpt-craft-axis — craftAxis 가 없는 craft 항목은 거부 · craft 가 배열이 아니면 exit 2",
+             raises(lambda: gpt_candidates({"issues": [], "craft": [issue("K1")]}), Reject)
+             and raises(lambda: gpt_candidates({"issues": [], "craft": {"x": 1}}), Unrun))
         case("gpt-shape — findings · issues 배열이 없는 GPT 입력은 exit 2(GPT 0건으로 병합하지 않는다)",
              raises(lambda: gpt_candidates({"result": {"findings": [issue("G1")]}}), Unrun) and raises(lambda: gpt_candidates([issue("G1")]), Unrun))
 
@@ -564,6 +604,25 @@ def self_test() -> int:
             case("gpt-contaminated — 오염 표시가 붙은 GPT 입력은 거부(exit 1)", rc == REJECT, f"exit {rc}")
             rc = subprocess.run(base_args + ["--gpt", str(t / "gpt-shape.json")], capture_output=True, text=True).returncode
             case("gpt-shape-cli — 알아보지 못하는 GPT 입력은 exit 2", rc == UNRUN, f"exit {rc}")
+            # 런처 옆 파일 — 본문은 멀쩡해도 옆 파일이 실패를 말하면 병합하지 않는다
+            good = hashlib.sha256((t / "diff.patch").read_bytes()).hexdigest()
+            def arm(name, audit=None, contaminated=False):
+                (t / f"{name}.json").write_text(json.dumps({"issues": [issue("G1")], "craft": []}), encoding="utf-8")
+                if audit is not None:
+                    (t / f"{name}.audit.json").write_text(json.dumps(audit), encoding="utf-8")
+                if contaminated:
+                    (t / f"{name}.contaminated").write_text("{}", encoding="utf-8")
+                return subprocess.run(base_args + ["--gpt", str(t / f"{name}.json")], capture_output=True, text=True).returncode
+            ok_audit = {"exit": 0, "isolationApplied": True, "inputs": {"diff.patch": good}}
+            case("sidecar-ok — 감사 통과 · diff 해시 일치면 병합한다", arm("arm-ok", ok_audit) == OK)
+            case("sidecar-plain — 감사가 없는 GPT 입력(런처 밖)은 기존대로 받는다", arm("arm-plain") == OK)
+            case("sidecar-contaminated — .contaminated 옆 파일이 있으면 거부(exit 1)", arm("arm-bad", ok_audit, contaminated=True) == REJECT)
+            case("sidecar-failed — 감사 exit≠0(시간 초과 · 6축 후검사 등)이면 거부",
+                 arm("arm-timeout", dict(ok_audit, exit=16, note="시간 초과")) == REJECT)
+            case("sidecar-isolation — 격리 미적용이면 거부", arm("arm-iso", dict(ok_audit, isolationApplied=False)) == REJECT)
+            case("sidecar-stale — GPT 가 본 diff 해시가 병합 diff 와 다르면 거부",
+                 arm("arm-stale", dict(ok_audit, inputs={"diff.patch": "0" * 64})) == REJECT)
+            case("sidecar-nohash — 감사에 diff 해시가 없으면 exit 2", arm("arm-nohash", {"exit": 0, "isolationApplied": True}) == UNRUN)
 
     for t in (t_group, t_evidence, t_paths, t_verdicts, t_attribution, t_grades, t_inputs, t_fixture, t_cli):
         try:

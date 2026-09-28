@@ -102,6 +102,17 @@ check "review: fz-reviewer 본문 1회" "$(count review '# fz-reviewer — Code 
 RISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-review/env.txt")"
 [ -n "$RISO" ] && [ ! -e "$RISO" ] && ok "review: 격리 폴더를 지웠다(--keep-iso 없음)" || no "review: 격리 폴더가 남았다: $RISO"
 
+# ②-b 감사 입력 해시 · 런처 → 병합(S22) — 병합은 감사의 diff 해시로 stale 을 가린다. 손으로 만든 감사가 아니라 런처 실제 산출로 본다
+inp() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("inputs", {}).get(sys.argv[2], "-"))' "$T/c-$1/out/A-$1.audit.json" "$2" 2>/dev/null || echo "-"; }
+check "review: 감사에 GPT 가 본 diff 의 sha256" "$(inp review diff.patch)" "$(shasum -a 256 "$IN/diff.patch" | cut -d' ' -f1)"
+check "plan: 감사에 요구의 sha256" "$(inp plan requirement.md)" "$(shasum -a 256 "$IN/requirement.md" | cut -d' ' -f1)"
+printf '{"issues": []}\n' > "$T/claude-empty.json"
+python3 "$R/scripts/review_merge.py" --claude "$T/claude-empty.json" --gpt "$T/c-review/out/A-review.json" --diff "$IN/diff.patch" > /dev/null 2>&1
+check "런처→병합: 같은 diff 면 병합한다" "$?" 0
+cp "$IN/diff.patch" "$T/diff-changed.patch"; printf '+c\n' >> "$T/diff-changed.patch"
+python3 "$R/scripts/review_merge.py" --claude "$T/claude-empty.json" --gpt "$T/c-review/out/A-review.json" --diff "$T/diff-changed.patch" > /dev/null 2>&1
+check "런처→병합: diff 가 바뀌면 stale 로 거부(exit 1)" "$?" 1
+
 # ③ 금지 입력 → exit 15 · CLI 미호출
 run bad1 "" "" plan --requirement "$IN/code-context.md"
 run bad2 "" "" plan --requirement "$IN/plan-v2.md"

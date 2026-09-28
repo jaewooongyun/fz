@@ -220,8 +220,12 @@ TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
 python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" <<'PY'
-import glob, json, os, re, sys
+import glob, hashlib, json, os, re, sys
 mode, out, stem, home, repo, iso, rc, timed_out, schema_p = sys.argv[1:10]
+# ⛔ 입력 해시는 격리 사본에서 잰다 — GPT 가 실제로 본 내용이다(읽기 전용 프로필이라 실행 중에 바뀌지 않는다). 병합이 stale 을 가린다
+inputs = {n: hashlib.sha256(open(os.path.join(iso, "input", n), "rb").read()).hexdigest()
+          for n in ("diff.patch", "requirement.md", "sprint-contract.md", "rules-index.json", "pr-meta.json")
+          if os.path.isfile(os.path.join(iso, "input", n))}
 rc, timed_out = int(rc), timed_out == "1"
 rolls = sorted(glob.glob(os.path.join(stem + ".rollouts", "*.jsonl")))
 FORBID = re.compile(r"\.claude/|plan-v\d|workflow-result|-result\.json|code-context|review-report\.md|pr-comments\.md")
@@ -273,7 +277,7 @@ for f in rolls:
 if tcs == 0:
     iso_ok = False
 audit = {"mode": mode, "rollouts": len(rolls), "turnContexts": tcs, "isolationApplied": iso_ok, "spawnAgent": spawn, "spawnedRoles": roles,
-         "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out}
+         "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs}
 code, note = 0, "ok"
 if hits or (not iso_ok and not timed_out and rc == 0):
     code, note = 15, ("rollout 감사 적중" if hits else "격리 미적용 — rollout 에 HOME deny 가 없다(또는 rollout 이 없다)")
