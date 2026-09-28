@@ -9,19 +9,21 @@ R-B 품질 축 — 리뷰·계획의 품질을 올리는 길을 옵션으로 넣
 렌즈 스킬과 Lead 모듈은 원문을 두고 조건부 줄을 달았다. 문구 변형까지 잡는 검사기가 표기가 다른 Synthesize 줄(`confidence<80 미보고`)도 찾는다.
 
 **단일 출처 렌더 (`--render` · `render_review.py`)** — review.json 하나에서 review-report.md · pr-comments.md · 게시 payload 를 만든다.
-줄 앵커는 `diff_anchors.py` 로 계산하고, 겹치는 hunk 는 `pick` 없이는 거부하며, 확인 게이트 사유를 미리보기에 적는다.
+줄 앵커는 `diff_anchors.py` 로 계산하고, 겹치는 hunk 는 `pick` 없이는 거부하며, 확인 게이트 사유를 미리보기에 적는다. 실패하면 이전 산출물을 지운다.
 
 **결정론 병합 (`review_merge.py`)** — §3 키로 묶되 후보를 지우지 않는다. 근거 재실측 실패와 확신도 80 미만 결함은 hold 이고, craft 는
-ruleRef 가 있고 확신도 80 이상일 때만 post 다. 계약은 MergeContract §10.
+ruleRef 가 있고 확신도 80 이상일 때만 post 다. GPT reverse 는 hold 이고 question 에만 싣는다. 입력 계약 위반은 거부, 알아보지 못하는 형태는 exit 2.
+계약은 MergeContract §10.
 
 **craft 6축 (`args.craftAxes`) · 필수 필드 재고지 (`args.crossRequiredFields`)** — arch 렌즈에 6축 줄과 axisCoverage 를, Stage 2 교차
-프롬프트에 additions 의 required 키(스키마에서 읽는다)를 넣는다.
+프롬프트에 additions 의 required 키(스키마에서 읽는다)를 넣는다. review-live 는 craftAxes 를 켜면 §3 병합 키(`line_range` · `discoveryAxis`)도
+Stage 1 두 렌즈 finding 에 선택 필드로 더한다(peer-review 는 기본 스키마에 있다) — 그래서 켠 arm 은 quality 렌즈 스키마도 다르다(분리는 R-C).
 
 **규칙 추출 · 검증** — 지침 원문 색인 → 모델별 규칙 레코드 → 검증 통과본만 쓴다. ⚠️ 옵션이 아니라 fz-plan 절차 1.5 의 Lead 절차
 변경이다 — 워커에 넘기는 `archConstraints` 는 옛 형식의 호환 투영이고, 넘기지 않으면 워커 프롬프트는 그대로다.
 
-**fz-plan 기계 작업 (`plan_apply_delta.py` · `plan_divergence.py`)** — lean2 델타를 Step id 에 붙이고, Claude ↔ GPT 독립 플랜 차이표를
-만든다. fz-plan 이 이 둘을 부르는 배선은 R-C 다.
+**fz-plan 기계 작업 (`plan_apply_delta.py` · `plan_divergence.py`)** — lean2 델타를 Step id 에 붙이고(degraded 반환은 입력 불가), Claude ↔ GPT
+독립 플랜 차이표를 만든다. fz-plan 이 이 둘을 부르는 배선은 R-C 다.
 
 ### v4.41.0 (2026-09-27) — 원장은 미룸을 포기로만 적을 수 있었고, 확정 원장을 고치는 길은 자기 거부 문구에 막혀 있었다 [MINOR]
 
