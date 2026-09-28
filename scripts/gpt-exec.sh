@@ -27,6 +27,8 @@
 #                     들어 있는지만 판정해 injected 열에 적고, 넣지는 않는다.
 #   --inject-skill:   exec 전용 주입 — 그 SKILL.md 본문을 프롬프트 앞에 넣는다(멱등). resume 은 세션 이력에 본문이
 #                     이미 있고 review 는 프롬프트가 없어 둘 다 exit 10 이다.
+#   --config-permissions: sandbox_mode 를 넘기지 않고 $CODEX_HOME/config.toml 의 권한 프로필(default_permissions)을 쓴다.
+#                     넘기면 프로필의 경로 deny 를 덮는다(F-348). 프로필이 `extends = ":read-only"` 가 아니면 exit 11.
 #
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건 / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
@@ -44,7 +46,7 @@ case "$MODE" in
   *) die 10 "mode는 review|exec|resume — 받은 값: '${MODE}'" ;;
 esac
 
-CD="" OUT="" PROMPT_FILE="" SCHEMA="" EFFORT="high" TITLE="" EPHEMERAL="" EXPECTED_BRANCH="" GPT_SKILL="" GPT_SKILL_PATH="" INJECT_SKILL="" SESSION_FILE=""
+CD="" OUT="" PROMPT_FILE="" SCHEMA="" EFFORT="high" TITLE="" EPHEMERAL="" EXPECTED_BRANCH="" GPT_SKILL="" GPT_SKILL_PATH="" INJECT_SKILL="" SESSION_FILE="" CONFIG_PERMS=""
 ADD_DIRS=()
 SCOPE_ARGS=()          # ⛔ 문자열이 아니라 **배열** — 비인용 확장의 단어분할·glob를 차단한다
 SCOPE_KIND=""          # base|uncommitted|commit — 중복 지정을 거부하기 위해 기록
@@ -77,6 +79,7 @@ while [ $# -gt 0 ]; do
     --uncommitted)     set_scope uncommitted
                        SCOPE_ARGS=(--uncommitted); shift ;;
     --ephemeral)       EPHEMERAL="--ephemeral";     shift ;;
+    --config-permissions) CONFIG_PERMS=1;            shift ;;
     --session-file)    need $# "--session-file";    SESSION_FILE="$2"; shift 2 ;;
     *) die 10 "알 수 없는 인자: $1" ;;
   esac
@@ -142,6 +145,25 @@ if [ -n "$SKILL_SRC" ] && [ "$MODE" != "review" ]; then
   { [ -f "$SKILL_SRC" ] && [ -r "$SKILL_SRC" ] && grep -q '[^[:space:]]' "$SKILL_SRC"; } \
     || die 11 "스킬 본문 경로가 읽을 수 있는 본문 파일이 아니다(없음·디렉터리·공백뿐): $SKILL_SRC"
 fi
+# ⛔ --config-permissions 는 쓰기 금지 강제를 config 프로필에 맡긴다 — 그 프로필이 read-only 를 확장하는지 호출 전에 본다.
+#    `default_permissions` 는 첫 table 앞에 있어야 한다(뒤에 두면 앞 table 의 키가 된다 — S11 ⑦ R11).
+if [ -n "$CONFIG_PERMS" ]; then
+  CFG="${CODEX_HOME:-}/config.toml"
+  [ -n "${CODEX_HOME:-}" ] && [ -f "$CFG" ] || die 11 "--config-permissions 는 CODEX_HOME 의 config.toml 이 필요하다: '${CODEX_HOME:-}'"
+  PERMS_ERR="$(python3 - "$CFG" <<'PY'
+import re, sys
+t = open(sys.argv[1], encoding="utf-8").read()
+head = re.split(r"(?m)^\s*\[", t, maxsplit=1)[0]
+m = re.search(r'(?m)^default_permissions\s*=\s*"([^"]+)"\s*$', head)
+if not m:
+    sys.exit("default_permissions 가 첫 table 앞에 없다")
+name = m.group(1)
+sec = re.search(rf'(?ms)^\[permissions\.{re.escape(name)}\]\s*$(.*?)(?=^\s*\[|\Z)', t)
+if not sec or not re.search(r'(?m)^extends\s*=\s*":read-only"\s*$', sec.group(1)):
+    sys.exit(f"권한 프로필 '{name}' 이 extends = \":read-only\" 가 아니다 — 쓰기 금지가 사라진다")
+PY
+)" || die 11 "--config-permissions: ${PERMS_ERR:-권한 프로필 판정 실패}"
+fi
 command -v codex >/dev/null 2>&1 || die 11 "codex CLI 미설치"
 
 # ── 사전 게이트 3: (폐지 2026-09-25) trust_level 경고 — 래퍼가 read-only 를 스스로 강제하므로(아래 ARGS) "read-only 로 강제될 수 있다" 는 경고는 거짓 경보였다
@@ -191,6 +213,8 @@ fi
 #    쓰기 가능이면 검증 호출이 레포를 고칠 수 있다. `-c` 는 session 층이라 사용자 config 보다 우선한다(2026-09-25 실측).
 #    `sandbox_permissions` 는 CLI 0.157 이 무시한다고 출력하지만 구버전 호환을 위해 남긴다.
 ARGS=(-c 'sandbox_mode="read-only"' -c "sandbox_permissions=[\"disk-full-read-access\"]" -c "model_reasoning_effort=$EFFORT")
+# ⛔ --config-permissions — sandbox_mode 를 넘기면 config 권한 프로필의 경로 deny 가 지워진다(F-348 · 실측 09-28). 쓰기 금지는 위 사전 게이트가 본 프로필이 맡는다
+[ -n "$CONFIG_PERMS" ] && ARGS=(-c "model_reasoning_effort=$EFFORT")
 [ -n "$SKIP_FLAG" ] && ARGS+=("$SKIP_FLAG")
 [ -n "$SCHEMA" ] && ARGS+=(--output-schema "$SCHEMA")
 [ -n "$EPHEMERAL" ] && ARGS+=("$EPHEMERAL")
