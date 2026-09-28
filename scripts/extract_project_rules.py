@@ -41,15 +41,24 @@ FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
 
 def guide_files(root: pathlib.Path) -> list:
-    found = []
-    for cur, dirs, files in os.walk(root):
+    """⛔ 읽지 못한 폴더를 건너뛰지 않는다 — os.walk 는 기본값에서 오류를 삼켜, 못 읽은 지침을 '지침 없음'으로 만든다."""
+    found, errors = [], []
+    for cur, dirs, files in os.walk(root, onerror=errors.append):
         rel_dir = pathlib.Path(cur).relative_to(root)
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS) if len(rel_dir.parts) < MAX_DEPTH else []
         for f in files:
             rel = (rel_dir / f).as_posix()
             if f in GUIDE_NAMES or rel in GUIDE_PATHS:
                 found.append(rel)
+    if errors:
+        raise OSError(f"폴더를 읽을 수 없다 — {errors[0].filename}: {errors[0].strerror}")
     return sorted(found)
+
+
+def closes(opening: str, mark: str, rest: str) -> bool:
+    """닫는 펜스 — 여는 펜스와 같은 문자 · 같거나 긴 길이 · 뒤에 정보 문자열 없음(CommonMark).
+    ⛔ 길이를 보지 않으면 네 백틱 펜스 안의 세 백틱 줄이 펜스를 닫아, 그 뒤 `#` 줄이 heading 이 된다."""
+    return mark[0] == opening[0] and len(mark) >= len(opening) and not rest.strip()
 
 
 def sections_of(rel: str, text: str) -> list:
@@ -62,8 +71,8 @@ def sections_of(rel: str, text: str) -> list:
         if f:
             mark = f.group(1)
             if fence is None:
-                fence = mark[0] * 3
-            elif mark.startswith(fence):
+                fence = mark
+            elif closes(fence, mark, ln[f.end():]):
                 fence = None
             continue
         if fence is None:
@@ -122,36 +131,73 @@ def self_test() -> int:
         (p / ".git" / "CLAUDE.md").write_text("# 무시\n", encoding="utf-8")
         (p / "node_modules" / "x" / "CLAUDE.md").write_text("# 무시\n", encoding="utf-8")
         (p / "README.md").write_text("# 지침 아님\n", encoding="utf-8")
-        idx = extract(p)
-        case("지침 파일 집합 — .git·node_modules·README 제외, 하위 폴더 포함", idx["files"] == ["CLAUDE.md", "sub/AGENTS.md"], idx["files"])
-        heads = [(s["file"], s["line"], s["level"], s["heading"]) for s in idx["sections"]]
-        want = [("CLAUDE.md", 1, 0, None), ("CLAUDE.md", 3, 1, "제목"), ("CLAUDE.md", 5, 2, "Architecture"),
-                ("CLAUDE.md", 10, 2, "Build"), ("sub/AGENTS.md", 1, 2, "Sub")]
-        case("heading 분할 · 머리말 절 · 닫는 # 제거", heads == want, heads)
-        build = next(s for s in idx["sections"] if s["heading"] == "Build")
-        case("⛔ 펜스 안 `#` 줄은 heading 이 아니다(``` · ~~~)", "# 이 줄은 heading 이 아니다" in build["quote"] and "## 이것도 아니다" in build["quote"],
-             build["quote"])
-        arch = next(s for s in idx["sections"] if s["heading"] == "Architecture")
-        case("본문 원문 · bodyLine · endLine", arch["quote"] == "- 규칙 A\n- 규칙 B(예: `Foo`)" and arch["bodyLine"] == 7 and arch["endLine"] == 9,
-             json.dumps(arch, ensure_ascii=False))
-        title = next(s for s in idx["sections"] if s["heading"] == "제목")
-        case("빈 본문 절 — quote '' · bodyLine null", title["quote"] == "" and title["bodyLine"] is None, json.dumps(title, ensure_ascii=False))
+        def t_index():
+            idx = extract(p)
+            case("지침 파일 집합 — .git·node_modules·README 제외, 하위 폴더 포함", idx["files"] == ["CLAUDE.md", "sub/AGENTS.md"], idx["files"])
+            heads = [(s["file"], s["line"], s["level"], s["heading"]) for s in idx["sections"]]
+            want = [("CLAUDE.md", 1, 0, None), ("CLAUDE.md", 3, 1, "제목"), ("CLAUDE.md", 5, 2, "Architecture"),
+                    ("CLAUDE.md", 10, 2, "Build"), ("sub/AGENTS.md", 1, 2, "Sub")]
+            case("heading 분할 · 머리말 절 · 닫는 # 제거", heads == want, heads)
+            build = next(s for s in idx["sections"] if s["heading"] == "Build")
+            case("⛔ 펜스 안 `#` 줄은 heading 이 아니다(``` · ~~~)", "# 이 줄은 heading 이 아니다" in build["quote"] and "## 이것도 아니다" in build["quote"],
+                 build["quote"])
+            arch = next(s for s in idx["sections"] if s["heading"] == "Architecture")
+            case("본문 원문 · bodyLine · endLine", arch["quote"] == "- 규칙 A\n- 규칙 B(예: `Foo`)" and arch["bodyLine"] == 7 and arch["endLine"] == 9,
+                 json.dumps(arch, ensure_ascii=False))
+            title = next(s for s in idx["sections"] if s["heading"] == "제목")
+            case("빈 본문 절 — quote '' · bodyLine null", title["quote"] == "" and title["bodyLine"] is None, json.dumps(title, ensure_ascii=False))
 
         me = pathlib.Path(__file__).resolve()
-        r1 = subprocess.run([sys.executable, str(me), "--project", str(p)], capture_output=True, text=True)
-        r2 = subprocess.run([sys.executable, str(me), "--project", str(p)], cwd=tmp, capture_output=True, text=True)
-        case("stdout 은 JSON 하나 · 두 번 돌려도 같다(cwd 무관)", r1.returncode == 0 and json.loads(r1.stdout) == idx and r1.stdout == r2.stdout,
-             f"exit {r1.returncode} {r1.stderr[-120:]}")
-        case("출력에 임시 경로가 없다", tmp not in r1.stdout, "임시 경로 노출")
 
-        e = pathlib.Path(tmp) / "empty"
-        e.mkdir()
-        (e / "main.swift").write_text("let x = 1\n", encoding="utf-8")
-        r = subprocess.run([sys.executable, str(me), "--project", str(e)], capture_output=True, text=True)
-        case("지침 부재 → exit 0 · absent true · sections []", r.returncode == 0 and json.loads(r.stdout) ==
-             {"schemaVersion": 1, "absent": True, "files": [], "sections": []}, f"exit {r.returncode} {r.stdout[:80]}")
-        r = subprocess.run([sys.executable, str(me), "--project", str(pathlib.Path(tmp) / "없다")], capture_output=True, text=True)
-        case("⛔ 폴더를 읽을 수 없으면 exit 2 · stdout 비움", r.returncode == UNRUN and r.stdout == "", f"exit {r.returncode}")
+        def t_cli():
+            idx = extract(p)
+            r1 = subprocess.run([sys.executable, str(me), "--project", str(p)], capture_output=True, text=True)
+            r2 = subprocess.run([sys.executable, str(me), "--project", str(p)], cwd=tmp, capture_output=True, text=True)
+            case("stdout 은 JSON 하나 · 두 번 돌려도 같다(cwd 무관)", r1.returncode == 0 and json.loads(r1.stdout) == idx and r1.stdout == r2.stdout,
+                 f"exit {r1.returncode} {r1.stderr[-120:]}")
+            case("출력에 임시 경로가 없다", tmp not in r1.stdout, "임시 경로 노출")
+
+            e = pathlib.Path(tmp) / "empty"
+            e.mkdir()
+            (e / "main.swift").write_text("let x = 1\n", encoding="utf-8")
+            r = subprocess.run([sys.executable, str(me), "--project", str(e)], capture_output=True, text=True)
+            case("지침 부재 → exit 0 · absent true · sections []", r.returncode == 0 and json.loads(r.stdout) ==
+                 {"schemaVersion": 1, "absent": True, "files": [], "sections": []}, f"exit {r.returncode} {r.stdout[:80]}")
+            r = subprocess.run([sys.executable, str(me), "--project", str(pathlib.Path(tmp) / "없다")], capture_output=True, text=True)
+            case("⛔ 폴더를 읽을 수 없으면 exit 2 · stdout 비움", r.returncode == UNRUN and r.stdout == "", f"exit {r.returncode}")
+
+        def t_fence4():
+            fz = pathlib.Path(tmp) / "fence4"
+            fz.mkdir()
+            (fz / "CLAUDE.md").write_text("## 앞\n\n````md\n```\n## 안 — heading 아님\n```\n````\n\n## 뒤\n\n- 규칙\n", encoding="utf-8")
+            got = [s["heading"] for s in extract(fz)["sections"]]
+            case("⛔ 네 백틱 펜스 안의 세 백틱 줄은 펜스를 닫지 않는다(같은 문자 · 같거나 긴 길이)", got == ["앞", "뒤"], got)
+
+        def t_locked():
+            if os.geteuid() != 0:                      # root 는 권한을 무시해 이 경우를 만들 수 없다
+                lk = pathlib.Path(tmp) / "locked"
+                (lk / "sub").mkdir(parents=True)
+                (lk / "CLAUDE.md").write_text("## 위\n", encoding="utf-8")
+                (lk / "sub" / "AGENTS.md").write_text("## 아래\n", encoding="utf-8")
+                try:
+                    (lk / "sub").chmod(0)
+                    r = subprocess.run([sys.executable, str(me), "--project", str(lk)], capture_output=True, text=True)
+                    case("⛔ 하위 폴더를 읽지 못하면 exit 2 — 건너뛰고 지침 일부만 내지 않는다", r.returncode == UNRUN and r.stdout == "",
+                         f"exit {r.returncode} {r.stdout[:80]}")
+                    (lk / "sub").chmod(0o755)
+                    lk.chmod(0)
+                    r = subprocess.run([sys.executable, str(me), "--project", str(lk)], capture_output=True, text=True)
+                    case("⛔ 루트를 읽지 못하면 exit 2 — absent(지침 없음)로 세지 않는다", r.returncode == UNRUN and r.stdout == "",
+                         f"exit {r.returncode} {r.stdout[:80]}")
+                finally:
+                    lk.chmod(0o755)
+                    (lk / "sub").chmod(0o755)
+
+        for t in (t_index, t_cli, t_fence4, t_locked):
+            try:
+                t()
+            except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다
+                case(f"{t.__name__} — 예외", False, repr(e))
 
     print(f"self-test {sum(results)}/{len(results)} passed")
     return OK if all(results) else 1
@@ -171,7 +217,12 @@ def main() -> int:
     if not root.is_dir():
         print(f"UNRUN: 프로젝트 폴더를 읽을 수 없다 — {root}", file=sys.stderr)
         return UNRUN
-    sys.stdout.write(dump(extract(root.resolve())))
+    try:
+        index = extract(root.resolve())
+    except OSError as e:                           # 폴더 순회 · 지침 파일 읽기 실패 — 지침 없음(exit 0)이 아니다
+        print(f"UNRUN: {e}", file=sys.stderr)
+        return UNRUN
+    sys.stdout.write(dump(index))
     return OK
 
 

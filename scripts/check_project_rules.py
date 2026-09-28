@@ -40,11 +40,22 @@ ARCH_AXES = AXES[:4]                       # plan 워크플로가 읽는 archCon
 AUTHORITIES = {"지침", "관례", "예시"}
 LANG_EXT = {".swift": "swift", ".m": "objc", ".mm": "objc", ".kt": "kotlin", ".java": "java", ".ts": "typescript",
             ".tsx": "typescript", ".js": "javascript", ".jsx": "javascript", ".py": "python", ".go": "go",
-            ".rs": "rust", ".rb": "ruby", ".cs": "csharp", ".dart": "dart", ".c": "c", ".h": "c", ".cpp": "cpp"}
+            ".rs": "rust", ".rb": "ruby", ".cs": "csharp", ".dart": "dart", ".c": "c", ".cpp": "cpp"}
+AMBIGUOUS_EXT = {".h": {"c", "objc", "cpp"}}  # 헤더는 C · ObjC · C++ 가 함께 쓴다 — 하나로 정하면 iOS 저장소의 정상 레코드를 거부한다
+
+
+def langs_of(path: str) -> set:
+    ext = pathlib.PurePosixPath(path).suffix
+    return AMBIGUOUS_EXT.get(ext) or ({LANG_EXT[ext]} if ext in LANG_EXT else set())
+
+
+def path_in(path: str, glob: str) -> bool:
+    """glob 대조 — `**/x` 는 루트의 x 도 덮는다(fnmatch 의 `**/` 는 '/' 를 하나 이상 요구한다)."""
+    return fnmatch.fnmatchcase(path, glob) or (glob.startswith("**/") and fnmatch.fnmatchcase(path, glob[3:]))
 
 # 예시 구간 표지 — ⛔ modules/project-rules.md §5 와 같은 정의다(Claude·GPT 가 같은 표지로 판별한다)
 EX_HEADING = re.compile(r"예시|\b[Ee]xamples?\b")
-EX_PAREN = re.compile(r"\((?:예|예시|e\.g\.|eg\.|Example|For example)\s*[:,)]?[^()]*\)")
+EX_PAREN = re.compile(r"\((?:예시?(?![가-힣])|e\.g\.|eg\.|Example|For example)\s*[:,)]?[^()]*\)")   # ⛔ '예'·'예시' 뒤에 한글 음절이 오면 표지가 아니다 — `(예외: …)` · `(예약 …)`
 EX_LINE = re.compile(r"^[ \t]*(?:[-*+][ \t]+|\d+[.)][ \t]+)?((?:예|예시)[:)]|e\.g\.|Example:|For example).*$", re.M)
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
@@ -76,20 +87,38 @@ def example_spans(section: dict) -> list:
     body = section["quote"]
     if section.get("heading") and EX_HEADING.search(section["heading"]):
         return [(0, len(body))]
-    spans, fence_at, pos = [], None, 0
+    spans, fence_at, opening, pos = [], None, None, 0
     for ln in body.split("\n"):
-        if FENCE.match(ln):
-            if fence_at is None:
-                fence_at = pos
-            else:
-                spans.append((fence_at, pos + len(ln)))
-                fence_at = None
+        f = FENCE.match(ln)
+        if f:
+            mark = f.group(1)
+            if opening is None:
+                fence_at, opening = pos, mark
+            elif mark[0] == opening[0] and len(mark) >= len(opening) and not ln[f.end():].strip():
+                spans.append((fence_at, pos + len(ln)))   # 추출기 closes() 와 같은 닫기 규칙 — 네 백틱 안의 세 백틱은 닫지 않는다
+                fence_at = opening = None
         pos += len(ln) + 1
     if fence_at is not None:
         spans.append((fence_at, len(body)))
     spans += [m.span() for m in EX_PAREN.finditer(body)]
     spans += [m.span(1)[:1] + (m.end(),) for m in EX_LINE.finditer(body)]
     return spans
+
+
+def under_example_heading(index: dict, sec: dict) -> bool:
+    """절 자신이나 조상 heading 이 예시 절인가 — `## Examples` 아래 `### Good` 도 예시다.
+    ⛔ 추출기는 heading 마다 절을 나누므로 절 자신의 heading 만 보면 하위 절이 예시 표시를 잃는다."""
+    stack = []                                    # (level, heading) — 같은 파일 안의 조상 사슬
+    for s in index["sections"]:
+        if s["file"] != sec["file"]:
+            continue
+        if s["level"] > 0:
+            while stack and stack[-1][0] >= s["level"]:
+                stack.pop()
+            stack.append((s["level"], s.get("heading") or ""))
+        if s is sec:
+            return any(EX_HEADING.search(h) for _, h in stack)
+    return False
 
 
 def inside(spans: list, a: int, b: int) -> bool:
@@ -152,7 +181,8 @@ def check(rules: dict, index: dict, project) -> list:
             continue
         if r.get("axis") not in AXES:
             v.append(f"S  {rid}: axis {r.get('axis')!r} 는 {AXES} 밖이다")
-        rule_axes.add(r.get("axis"))
+        if auth in ("지침", "관례"):               # ⛔ 예시 레코드로는 축 값을 세우지 못한다(§5 — 예시를 규칙으로 올리지 않는다)
+            rule_axes.add(r.get("axis"))
         if source_missing(src):
             v.append(f"V4 {rid}: 출처 없는 규칙 — source 의 file·line·quote 가 모두 있어야 한다")
             continue
@@ -173,14 +203,14 @@ def check(rules: dict, index: dict, project) -> list:
             if sec is None:
                 v.append(f"V1 {rid}: 지어낸 인용 — {occ}")
                 continue
-            if auth == "지침" and occ is not None and inside(example_spans(sec), occ[2], occ[3]):
+            if auth == "지침" and occ is not None and (under_example_heading(index, sec) or inside(example_spans(sec), occ[2], occ[3])):
                 v.append(f"V5 {rid}: 예시를 지침으로 오인 — 인용이 전부 예시 구간 안이다(authority 는 예시여야 한다)")
         langs = set((r.get("appliesTo") or {}).get("languages") or [])
         globs = (r.get("appliesTo") or {}).get("paths") or []
         for path in r.get("appliedTo") or []:
-            if globs and not any(fnmatch.fnmatchcase(path, g) for g in globs):
+            if globs and not any(path_in(path, g) for g in globs):
                 v.append(f"V6 {rid}: appliesTo.paths {globs} 밖 경로에 적용 — {path}")
-            if langs and LANG_EXT.get(pathlib.PurePosixPath(path).suffix) not in langs:
+            if langs and not (langs_of(path) & langs):
                 v.append(f"V6 {rid}: appliesTo.languages {sorted(langs)} 밖 언어에 적용 — {path}")
 
     for c in conflicts:
@@ -311,55 +341,101 @@ def self_test() -> int:
             except Unrun as e:
                 return UNRUN, [str(e)]
 
-        code, v = run(positive_rules())
-        case("⛔ 양성 대조 — 여섯 거부를 모두 통과하는 레코드는 exit 0", code == OK, v)
-
         def mutated(fn):
             r = positive_rules()
             fn(r)
             return r
 
-        negatives = [
-            ("V1 지어낸 인용", "V1", lambda r: r["rules"][0]["source"].update(quote="서버 응답은 무조건 DTO 로 한다")),
-            ("V1 맞는 문장 · 틀린 줄", "V1", lambda r: r["rules"][0]["source"].update(line=6)),
-            ("V1 관례 인용이 코드에 없다", "V1", lambda r: r["rules"][4]["source"].update(quote="class BarService")),
-            ("V2 상충 축에 값", "V2", lambda r: r["axes"].update(naming="…DTO")),
-            ("V4 출처 없는 규칙", "V4", lambda r: r["rules"][0].pop("source")),
-            ("V5 예시(괄호)를 지침으로", "V5", lambda r: r["rules"][3].update(authority="지침")),
-            ("V5 예시 절을 지침으로", "V5", lambda r: r["rules"].append(dict(r["rules"][0], id="R6", source={
-                "file": "CLAUDE.md", "line": 10, "quote": "`WatchlistItemDTO` 처럼 쓴다"}))),
-            ("V6 appliesTo.paths 밖", "V6", lambda r: r["rules"][0].update(appliedTo=["Tests/FooServiceTests.swift"])),
-            ("V6 appliesTo.languages 밖", "V6", lambda r: r["rules"][0].update(appliedTo=["Sources/web/app.ts"])),
-            ("S 근거 없는 축 값", "S ", lambda r: r["axes"].update(placement="Domain/{Feature}/")),
-            ("S 미확인 축이 gaps 에 없다", "S ", lambda r: r["gaps"].remove("placement")),
-        ]
-        for name, key, fn in negatives:
-            code, v = run(mutated(fn))
-            case(f"거부: {name}", code == VIOLATION and any(x.startswith(key) for x in v), f"exit {code} {v}")
+        def t_records():
+            code, v = run(positive_rules())
+            case("⛔ 양성 대조 — 여섯 거부를 모두 통과하는 레코드는 exit 0", code == OK, v)
 
-        code, v = run({"schemaVersion": 1, "axes": {}, "gaps": AXES, "conflicts": [],
-                       "rules": [positive_rules()["rules"][0]]}, idx=absent)
-        case("거부: V3 지침 부재인데 지침 레코드", code == VIOLATION and any(x.startswith("V3") for x in v), f"exit {code} {v}")
-        code, v = run(mutated(lambda r: r["rules"][0]["source"].update(file="Sources/Feature/FooService.swift")))
-        case("거부: V3 지침이 지침 파일 밖을 인용", code == VIOLATION and any(x.startswith("V3") for x in v), f"exit {code} {v}")
-        code, v = run(positive_rules(), project=None)
-        case("⛔ 관례 레코드인데 --project 없음 → UNRUN(통과 아님)", code == UNRUN, f"exit {code} {v}")
+            negatives = [
+                ("V1 지어낸 인용", "V1", lambda r: r["rules"][0]["source"].update(quote="서버 응답은 무조건 DTO 로 한다")),
+                ("V1 맞는 문장 · 틀린 줄", "V1", lambda r: r["rules"][0]["source"].update(line=6)),
+                ("V1 관례 인용이 코드에 없다", "V1", lambda r: r["rules"][4]["source"].update(quote="class BarService")),
+                ("V2 상충 축에 값", "V2", lambda r: r["axes"].update(naming="…DTO")),
+                ("V4 출처 없는 규칙", "V4", lambda r: r["rules"][0].pop("source")),
+                ("V5 예시(괄호)를 지침으로", "V5", lambda r: r["rules"][3].update(authority="지침")),
+                ("V5 예시 절을 지침으로", "V5", lambda r: r["rules"].append(dict(r["rules"][0], id="R6", source={
+                    "file": "CLAUDE.md", "line": 10, "quote": "`WatchlistItemDTO` 처럼 쓴다"}))),
+                ("V6 appliesTo.paths 밖", "V6", lambda r: r["rules"][0].update(appliedTo=["Tests/FooServiceTests.swift"])),
+                ("V6 appliesTo.languages 밖", "V6", lambda r: r["rules"][0].update(appliedTo=["Sources/web/app.ts"])),
+                ("S 근거 없는 축 값", "S ", lambda r: r["axes"].update(placement="Domain/{Feature}/")),
+                ("S 미확인 축이 gaps 에 없다", "S ", lambda r: r["gaps"].remove("placement")),
+            ]
+            for name, key, fn in negatives:
+                code, v = run(mutated(fn))
+                case(f"거부: {name}", code == VIOLATION and any(x.startswith(key) for x in v), f"exit {code} {v}")
 
-        arch = project_arch(mutated(lambda r: r["conflicts"].append(
-            {"axis": "placement", "claim_a": "a", "claim_b": "b", "sources": []})))
-        case("투영 — 키는 4축 + conflicts, conflicts 는 4축 것만",
-             list(arch) == ARCH_AXES + ["conflicts"] and [c["axis"] for c in arch["conflicts"]] == ["naming"], json.dumps(arch, ensure_ascii=False))
+            code, v = run({"schemaVersion": 1, "axes": {}, "gaps": AXES, "conflicts": [],
+                           "rules": [positive_rules()["rules"][0]]}, idx=absent)
+            case("거부: V3 지침 부재인데 지침 레코드", code == VIOLATION and any(x.startswith("V3") for x in v), f"exit {code} {v}")
+            code, v = run(mutated(lambda r: r["rules"][0]["source"].update(file="Sources/Feature/FooService.swift")))
+            case("거부: V3 지침이 지침 파일 밖을 인용", code == VIOLATION and any(x.startswith("V3") for x in v), f"exit {code} {v}")
+            code, v = run(positive_rules(), project=None)
+            case("⛔ 관례 레코드인데 --project 없음 → UNRUN(통과 아님)", code == UNRUN, f"exit {code} {v}")
 
-        me = pathlib.Path(__file__).resolve()
-        (t / "a.json").write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
-        (t / "b.json").write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")   # 공백만 다르다
-        changed = json.loads(json.dumps(index))
-        changed["sections"][1]["line"] += 1
-        (t / "c.json").write_text(json.dumps(changed, ensure_ascii=False), encoding="utf-8")
-        r_same = subprocess.run([sys.executable, str(me), "--compare", str(t / "a.json"), str(t / "b.json")], capture_output=True, text=True)
-        r_diff = subprocess.run([sys.executable, str(me), "--compare", str(t / "a.json"), str(t / "c.json")], capture_output=True, text=True)
-        case("--compare 는 구조 비교 — 공백만 다르면 OK · 줄이 다르면 exit 1",
-             r_same.returncode == OK and r_diff.returncode == VIOLATION and "line" in r_diff.stdout, f"{r_same.returncode} {r_diff.returncode} {r_diff.stdout[-120:]}")
+        def t_examples():
+            ex = t / "examples"
+            ex.mkdir()
+            ex_text = ("## Naming\n\n- DTO 는 `…DTO` 접미사를 쓴다\n- 캐시는 쓰지 않는다(예외: 오프라인 모드)\n\n## Examples\n\n### Good\n\n- `WatchlistItemDTO` 를 쓴다\n\n"
+                       "## Fence\n\n````md\n```\n- `FooDTO` 를 쓴다\n```\n````\n")
+            (ex / "CLAUDE.md").write_text(ex_text, encoding="utf-8")
+            ex_index = extract_to(ex)
+            ex_lines = ex_text.split("\n")
+
+            def one(auth, quote, axes=None):
+                vals = dict({a: None for a in AXES}, **(axes or {}))
+                return {"schemaVersion": 1, "axes": vals, "gaps": [a for a in AXES if vals[a] is None], "conflicts": [],
+                        "rules": [{"id": "R1", "axis": "naming", "authority": auth, "condition": "c", "expectedResult": "e",
+                                   "source": {"file": "CLAUDE.md", "line": next(i + 1 for i, l in enumerate(ex_lines) if quote in l),
+                                              "quote": quote}}]}
+            code, v = run(one("지침", "- `WatchlistItemDTO` 를 쓴다"), idx=ex_index, project=ex)
+            case("거부: V5 예시 heading 아래 하위 절(### Good)을 지침으로 — 조상 heading 의 예시 표시를 잇는다",
+                 code == VIOLATION and any(x.startswith("V5") for x in v), f"exit {code} {v}")
+            code, v = run(one("지침", "- `FooDTO` 를 쓴다"), idx=ex_index, project=ex)
+            case("거부: V5 네 백틱 펜스 안(세 백틱 줄 뒤) 인용을 지침으로 — 펜스는 같거나 긴 길이로만 닫힌다",
+                 code == VIOLATION and any(x.startswith("V5") for x in v), f"exit {code} {v}")
+            code, v = run(one("예시", "- `WatchlistItemDTO` 를 쓴다", axes={"naming": "…DTO"}), idx=ex_index, project=ex)
+            case("거부: S 예시 레코드 하나로 축 값을 세움 — 축의 근거는 지침 · 관례 레코드만",
+                 code == VIOLATION and any(x.startswith("S ") and "근거 레코드가 없다" in x for x in v), f"exit {code} {v}")
+            code, v = run(one("지침", "- DTO 는 `…DTO` 접미사를 쓴다", axes={"naming": "…DTO"}), idx=ex_index, project=ex)
+            case("⛔ 양성 대조 — 예시 밖 지침 인용이 축 값을 세우면 통과", code == OK, f"exit {code} {v}")
+            body = "a(예)b(예시)c(예외: x)d(예약 y)e(eg. z)f(Example w)"
+            got = [body[a:b] for a, b in example_spans({"quote": body, "heading": None})]
+            case("괄호 표지 — 단독 (예) · (예시) · eg. · 콜론 없는 Example 은 표지 · (예외: …) · (예약 …) 은 아니다(§5)",
+                 got == ["(예)", "(예시)", "(eg. z)", "(Example w)"], got)
+            code, v = run(one("지침", "예외: 오프라인 모드"), idx=ex_index, project=ex)
+            case("통과: `(예외: …)` 는 예시 표지가 아니다 — '예' 뒤 경계(§5 목록)", code == OK, f"exit {code} {v}")
+            applied = one("지침", "- DTO 는 `…DTO` 접미사를 쓴다")
+            applied["rules"][0].update(appliesTo={"languages": ["objc"], "paths": ["**/*.h"]}, appliedTo=["Bridge.h", "Sources/Foo.h"])
+            code, v = run(applied, idx=ex_index, project=ex)
+            case("통과: V6 — `.h` 는 objc 로도 본다 · `**/` 패턴이 루트 파일을 덮는다", code == OK, f"exit {code} {v}")
+
+        def t_projection():
+            arch = project_arch(mutated(lambda r: r["conflicts"].append(
+                {"axis": "placement", "claim_a": "a", "claim_b": "b", "sources": []})))
+            case("투영 — 키는 4축 + conflicts, conflicts 는 4축 것만",
+                 list(arch) == ARCH_AXES + ["conflicts"] and [c["axis"] for c in arch["conflicts"]] == ["naming"], json.dumps(arch, ensure_ascii=False))
+
+        def t_compare():
+            me = pathlib.Path(__file__).resolve()
+            (t / "a.json").write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+            (t / "b.json").write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")   # 공백만 다르다
+            changed = json.loads(json.dumps(index))
+            changed["sections"][1]["line"] += 1
+            (t / "c.json").write_text(json.dumps(changed, ensure_ascii=False), encoding="utf-8")
+            r_same = subprocess.run([sys.executable, str(me), "--compare", str(t / "a.json"), str(t / "b.json")], capture_output=True, text=True)
+            r_diff = subprocess.run([sys.executable, str(me), "--compare", str(t / "a.json"), str(t / "c.json")], capture_output=True, text=True)
+            case("--compare 는 구조 비교 — 공백만 다르면 OK · 줄이 다르면 exit 1",
+                 r_same.returncode == OK and r_diff.returncode == VIOLATION and "line" in r_diff.stdout, f"{r_same.returncode} {r_diff.returncode} {r_diff.stdout[-120:]}")
+
+        for fn in (t_records, t_examples, t_projection, t_compare):   # ⛔ `t` 는 임시 폴더 Path 다 — 루프 변수로 쓰면 클로저가 덮인다
+            try:
+                fn()
+            except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다
+                case(f"{fn.__name__} — 예외", False, repr(e))
 
     print(f"self-test {sum(results)}/{len(results)} passed")
     return OK if all(results) else 1
