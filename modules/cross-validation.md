@@ -84,7 +84,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | planning 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
 | code-changes 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
 | review 시작 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
-| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬) | TEAM |
+| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ `--gpt-independent` 로 resume 교차를 마쳤으면 생략) | TEAM |
 | review 포함 | 다관점 리뷰 | review-arch + review-quality + GPT (팀 내 병렬) | TEAM |
 | search 포함 | 교차 검증 | search-symbolic + search-pattern + GPT (팀 내 병렬) | TEAM(--deep) |
 | commit/pr 포함 | Pre-ship gate | `fz-gpt check` | TEAM |

@@ -89,5 +89,5 @@ scope_boundary:
 ## fz 통합
 
 - `fz-plan` Phase 0.7로 진입 (TEAM mode + 5+ Step or Cross-skill)
-- `fz-gpt plan` (또는 `verify pre-mode`)에서 GPT Sprint Contract 작성 호출
+- GPT Sprint Contract 는 §절차 2 대로 `scripts/gpt-exec.sh exec`(skill `architect`)로 작성한다 — 형식은 `tests/fixtures/gpt/sprint-contract-format/run.sh` 가 본다
 - `experiment-log.md §5.5`에 sprint_contract 메타 기록 (Reflection Rate 측정의 baseline)

@@ -4,7 +4,7 @@ description: >-
   계획 수립 + 영향 범위 분석 + 설계. 요구사항 분해와 Serena 기반 코드베이스 탐색.
   예: 계획 세워줘, 설계해줘, 아키텍처 잡아줘, 요구사항 분석 (비사용: 접근 불명확 시 →fz-discover, 구현 →fz-code)
 user-invocable: true
-argument-hint: "[기능/요구사항 설명] [light]"
+argument-hint: "[기능/요구사항 설명] [light] [--gpt-independent]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
@@ -19,7 +19,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
   mcp__atlassian-jira__jira_get,
-  Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [planning, architecture-analysis]
   needs: [none]
@@ -93,11 +93,7 @@ metadata:
 > agents/의 plan-structure·plan-edge-case·plan-impact 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > 동시 opus ≤3(Lead 세션 fable은 별도)는 Stage 1 의 3-병렬이 상한을 **정확히** 채워 구조적으로 보장한다. rate-limit 시 순차화 폴백(governance.md).
 >
-> ⛔ **2026-09-12 배선 전환 (6단계 9콜 → 2단계 4콜)** — 근거는 `experiment-log.md` §5.9 (구조 ablation · 노이즈 교정 · 채택 판정):
-> · wall **3,492s → 1,344s (-61.5%)** · 요구 3축 양쪽 closed · 실행 가능 command verify **4 → 5**
-> · ⭐ **노이즈 바닥 교정**: 같은 9콜 구조를 동일 입력·트리로 2회 실행하니 상호 고유 major **5건** · overall `Q-superior`(동등 아님) ·
->   채택 기전까지 갈렸다. 즉 **run-to-run 분산이 구조 간 차이보다 크다**. D1b 가 9콜과 갈리는 정도(**3**)는 그 바닥(**5**) **이하**다.
-> · ⛔ 근거는 전부 **N=1** 이다. 실사용 3회 관찰 후 재평가한다(`experiment-log.md` §5.9).
+> ⛔ **2026-09-12 배선 전환 (6단계 9콜 → 2단계 4콜)** — wall · 노이즈 바닥 · 채택 판정은 `experiment-log.md` §5.9 가 정본이다. ⛔ 근거는 전부 **N=1** 이고 run-to-run 분산이 구조 간 차이보다 컸다 — 실사용 3회 관찰 후 재평가한다.
 > · **롤백**: 아래 절차 2.5·3 의 스크립트명을 `plan-collaborative.js` 로 되돌리면 끝이다 — 파일은 그대로 남겨 둔다.
 
 ### 실행 절차 (Lead)
@@ -116,6 +112,7 @@ metadata:
    cp {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js
    ```
    ⛔ 판별이 불확정이면 **원본 경로로 호출한다**(기존 동작) — 미확정을 '하위 아님' 으로 읽어 불필요한 복사를 만들지 않는다. ⛔ 복사본은 산출물이 아니다(원본 변경 시 stale — §12).
+2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Sprint Contract 합의 직후 · Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh plan --requirement {요구 원문} [--sprint-contract {합의본}] [--rules-index {규칙 색인}] --repo {대상 레포} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - **Stage 1 (동시 3, opus)**: 전체 플랜(방향 판정·readScope/writeScope·steps·rtm·antiPattern 포함) ∥ edge 적대 렌즈 ∥ impact+arch 렌즈
      → **Stage 2 (opus)**: 델타 병합 — ⛔ 병합 콜의 schema 는 **델타 전용**(`stepAmendments`·`addedEdgeCases`·`addedImpact`)이라 본문을 다시 쓸 수 없다. **4 call**
@@ -137,6 +134,7 @@ metadata:
      (롤백해 `plan-collaborative.js` 를 쓰면 그쪽은 `mode:'direction_escalation'` 으로 온다 — 두 형태를 모두 받는다.)
    - `mode:'fallback'` (두 배선 공통) → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`·`agent null` 에만 이 값을 돌려준다 —
      도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 experiment-log 기록
+4.5. **(`--gpt-independent`) 합치기**: 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_apply_delta.py" --result {WORK_DIR}/plan/workflow-result.json` 로 `delta` 를 반영하고 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {WORK_DIR}/plan/workflow-result.json --gpt {out-dir}/gpt-{run}.json` 차이표를 붙인다 — 런처 옆 파일이 오염 · 실패(planner 거부 포함)를 말하면 exit 1 로 거부한다. 차이표의 결정 항목은 사용자 보고 대상이다(판정은 Lead)
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(GPT 회복 시) + GPT verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
 6. **지표 기록**: `return.metrics` + **자동 계측** → `experiment-log.md` §5.7 fz-plan 테이블
    ```bash
@@ -335,6 +333,7 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 > 3. **양쪽 완료 대기** — 두 로그에 종료 표시가 모두 나온 뒤 판정한다. 한쪽만 보고 진행하면 나머지가 조용히 버려진다.
 > 4. **schema 검증 후 사용** — 각 응답을 `--output-schema` 계약으로 받고, `verify-gates` 는 `gate_check.py --verdict-check` 사후 대조까지 통과해야 판정으로 인정한다(⛔ 게이트 수 ≠ 판정 수이면 미판정).
 > ⛔ 버전 불일치(호출 사이에 plan 이 수정됨) 시 **재검증**한다 — 옛 plan 에 대한 판정을 새 plan 의 승인 근거로 쓰지 않는다.
+> ⊕ `--gpt-independent` 면 `verify` 자리를 **resume 교차**가 맡는다 — 독립 플래너 세션을 `gpt-exec.sh resume --session-file {감사 sessionFile}` 로 이어 같은 Q1–Q8 · `gpt_review_schema` · effort high 로 검증한다(`modules/fz-gpt-subcommands-core.md` § resume 교차). 위 네 계약은 그대로이고 `verify-gates` 와 동시에 돈다. 세션 파일이 없으면 기본 `verify` 다.
 
 ### 절차
 
