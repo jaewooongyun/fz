@@ -27,7 +27,7 @@ Rules come from the target repository at run time — never from this skill.
 3. **Examples are not rules** — text under an `Example(s)` / `예시` heading, inside a code fence, or in `(e.g. …)` / `(예: …)` is `authority: 예시`. Never raise an example to a rule.
 4. **Unknown and conflicting axes** — an axis you cannot confirm stays `null` and is reported as a Probe Coverage Gap. When two sources disagree, keep both claims as a **rule conflict** item and do not pick a winner.
 5. **Citing** — a step that follows a project rule cites it as `{file}:{line} — "<quote>"` in its `why`.
-- **Domain pack (conditional)** — if the repository is an iOS/Swift project (`*.swift` sources, a `Package.swift` or an `.xcodeproj`), also read `references/domain-ios.md`. A planning decision that rests only on that pack is marked `plugin-default` in its `why`; a project rule overrides the pack.
+- **Domain pack (conditional)** — if the repository is an iOS/Swift project (`*.swift` sources, a `Package.swift` or an `.xcodeproj`), also read `references/domain-ios.md` in this skill's folder — the folder named on the `[fz-gpt-skill-injected]` marker line when this body was injected, otherwise the installed copy `$CODEX_HOME/skills/fz-planner/references/domain-ios.md` (default `~/.codex/skills/fz-planner/…`). A planning decision that rests only on that pack is marked `plugin-default` in its `why`; a project rule overrides the pack.
 
 ## Planning Process
 

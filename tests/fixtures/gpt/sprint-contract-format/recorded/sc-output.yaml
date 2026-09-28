@@ -1,102 +1,93 @@
 sprint_id: T1-release-reminders
 date: 2026-09-28
 contract_owner: gpt_architect
+
 context:
-  intent: "Phase 0.5 판정이 제공되지 않아 요구사항을 잠정 채택한다. 미확정 연동 계약은 구현 전에 확정한다."
-  scope: "Domain/Watchlist, Data/Watchlist, App/Watchlist, Shared/Network 및 새 알림·설정·상세 이동 연동 코드"
-  constraints: "CLAUDE.md:5-8의 RIBs 구성·의존 방향·DTO 규칙, CLAUDE.md:13-17의 메인 액터·iOS 16·SwiftUI·디자인 토큰 규칙을 보존한다. CLAUDE.md:21에 따라 빌드 단계는 true로 판정한다."
+  intent: "PROCEED 가정: 시청 목록의 미공개 콘텐츠에 공개일 알림을 추가한다. Phase 0.5 verdict는 제공되지 않았다."
+  scope: "Domain/Watchlist, Data/Watchlist, App/Watchlist, Shared/Network/APIClient, 알림 처리 진입점, 설정 화면, 콘텐츠 상세 라우팅 연동"
+  constraints: "CLAUDE.md의 RIBs 구성, Interactor → UseCase → Repository → Network 의존 방향, iOS 16 지원, 새 UI의 SwiftUI 사용, @MainActor UI 변경을 보존한다. 이 fixture에는 빌드·테스트 타깃이 없으므로 빌드 검증 명령은 true다."
 
 success_criteria:
   - id: SC-1
     measurable: true
-    description: "서버 공개 시각이 WatchlistItem까지 전달된다."
-    verification: "testReleaseAtMapsFromWatchlistDTO"
+    description: "공개 시각이 미래인 시청 목록 항목에만 개별 알림 토글이 표시된다."
+    verification: "test: WatchlistReminderToggleVisibilityTests"
   - id: SC-2
     measurable: true
-    description: "미공개 항목마다 공개일 알림 토글이 표시된다."
-    verification: "testUnreleasedItemShowsReminderToggle"
+    description: "개별 토글을 켜면 해당 contentId로 POST /reminders 요청이 전송된다."
+    verification: "test: EnableReminderRequestTests"
   - id: SC-3
     measurable: true
-    description: "공개된 항목에는 공개일 알림 토글이 표시되지 않는다."
-    verification: "testReleasedItemHidesReminderToggle"
+    description: "개별 토글을 끄면 DELETE /reminders/{contentId} 요청이 전송된다."
+    verification: "test: DisableReminderRequestTests"
   - id: SC-4
     measurable: true
-    description: "항목의 토글을 켜면 서버 계약에 맞는 POST /reminders 요청이 전송된다."
-    verification: "testEnableReminderPostsAgreedPayload"
+    description: "알림을 켠 항목의 공개 시각에 해당 contentId의 로컬 알림이 예약된다."
+    verification: "test: ReleaseNotificationSchedulingTests"
   - id: SC-5
     measurable: true
-    description: "항목의 토글을 끄면 DELETE /reminders/{contentId} 요청이 전송된다."
-    verification: "testDisableReminderDeletesByContentId"
+    description: "로컬 알림을 누르면 알림에 담긴 contentId의 상세 화면이 열린다."
+    verification: "test: ReleaseNotificationRoutingTests"
   - id: SC-6
     measurable: true
-    description: "토글을 켜면 해당 항목의 공개 시각에 로컬 알림이 예약된다."
-    verification: "testEnableSchedulesNotificationAtReleaseTime"
+    description: "오프라인에서 켠 알림의 등록 의도가 앱 재시작 후에도 유지된다."
+    verification: "test: OfflineReminderPersistenceTests"
   - id: SC-7
     measurable: true
-    description: "토글을 끄면 해당 항목의 예약된 로컬 알림이 취소된다."
-    verification: "testDisableCancelsLocalNotification"
+    description: "온라인 복귀 시 보류된 등록 의도가 POST /reminders로 재전송된다."
+    verification: "test: PendingReminderReplayTests"
   - id: SC-8
     measurable: true
-    description: "로컬 알림을 누르면 해당 contentId의 상세 화면으로 이동한다."
-    verification: "testNotificationTapRoutesToMatchingContent"
+    description: "같은 항목을 오프라인에서 켰다가 끈 경우 온라인 복귀 시 등록 요청이 전송되지 않는다."
+    verification: "test: OfflineReminderLatestIntentTests"
   - id: SC-9
     measurable: true
-    description: "오프라인에서 켠 항목의 등록 의도가 앱 재시작 뒤에도 유지된다."
-    verification: "testOfflineEnablePersistsAcrossRelaunch"
+    description: "설정 화면에 '공개일 알림 전체 끄기' 스위치가 표시된다."
+    verification: "test: SettingsReleaseReminderSwitchTests"
   - id: SC-10
     measurable: true
-    description: "온라인 복귀 시 미전송 등록 의도가 서버에 전송된다."
-    verification: "testReconnectReplaysPendingEnable"
+    description: "전체 끄기를 실행하면 모든 시청 목록 항목의 예약된 로컬 공개일 알림이 취소된다."
+    verification: "test: DisableAllLocalRemindersTests"
   - id: SC-11
     measurable: true
-    description: "재전송이 완료된 등록 의도는 다음 온라인 복귀 때 다시 전송되지 않는다."
-    verification: "testCompletedReplayIsNotRepeated"
+    description: "전체 끄기를 실행하면 서버에 등록된 각 공개일 알림의 해제 요청이 전송된다."
+    verification: "test: DisableAllServerRemindersTests"
   - id: SC-12
     measurable: true
-    description: "설정 화면에 '공개일 알림 전체 끄기' 스위치가 표시된다."
-    verification: "testSettingsShowsDisableAllSwitch"
+    description: "전체 끄기 후 온라인 복귀 시 이전 등록 의도가 재전송되지 않는다."
+    verification: "test: DisableAllClearsPendingRemindersTests"
   - id: SC-13
     measurable: true
-    description: "전체 끄기 스위치를 켜면 모든 항목의 예약된 로컬 알림이 취소된다."
-    verification: "testDisableAllCancelsEveryPendingNotification"
+    description: "시청 목록 항목 삭제 시 해당 contentId의 로컬 알림이 취소된다."
+    verification: "test: RemoveWatchlistItemCancelsLocalReminderTests"
   - id: SC-14
     measurable: true
-    description: "시청 목록에서 항목을 삭제하면 해당 항목의 서버 알림이 해제된다."
-    verification: "testRemoveWatchlistItemDeletesReminder"
+    description: "시청 목록 항목 삭제 시 해당 contentId의 서버 알림이 해제된다."
+    verification: "test: RemoveWatchlistItemDeletesServerReminderTests"
   - id: SC-15
     measurable: true
-    description: "시청 목록에서 항목을 삭제하면 해당 항목의 로컬 알림이 취소된다."
-    verification: "testRemoveWatchlistItemCancelsLocalNotification"
-  - id: SC-16
-    measurable: true
-    description: "알림 권한이 거부된 경우 토글에 예약 성공 상태가 표시되지 않는다."
-    verification: "testDeniedPermissionDoesNotShowScheduledState"
+    description: "알림 권한이 거부되면 로컬 알림 예약 실패가 사용자에게 표시된다."
+    verification: "test: NotificationPermissionDeniedTests"
 
 anti_criteria:
   - id: AC-1
     description: "Interactor가 APIClient를 직접 호출한다."
-    detection: "rg -n 'APIClient|\\.shared' App/Watchlist/*Interactor.swift"
+    detection: "grep: App/**/\\*Interactor.swift에서 APIClient 또는 /reminders 직접 참조 검사"
   - id: AC-2
-    description: "Entity에 Decodable이 선언되거나 서버 응답 타입에 Response 접미사가 붙는다."
-    detection: "rg -n 'Decodable|struct .*Response' Domain/Watchlist Data/Watchlist"
+    description: "공개 시각이 지난 항목에 로컬 공개일 알림이 예약된다."
+    detection: "test: PastReleaseDoesNotScheduleNotificationTests"
   - id: AC-3
-    description: "UI 상태를 메인 액터 밖에서 변경한다."
-    detection: "UI 갱신 호출부의 @MainActor 범위를 정적 검토한다."
+    description: "삭제하거나 전체 끄기 한 항목의 보류된 등록 의도가 온라인 복귀 후 다시 전송된다."
+    detection: "test: RemovedReminderIsNotReplayedTests"
   - id: AC-4
-    description: "삭제하거나 끈 항목의 오프라인 등록 의도가 나중에 재전송된다."
-    detection: "testDisableSupersedesPendingEnable 및 testRemovalSupersedesPendingEnable"
-  - id: AC-5
-    description: "동일 항목에 로컬 알림이 중복 예약된다."
-    detection: "testRepeatedEnableKeepsOnePendingNotification"
-  - id: AC-6
-    description: "iOS 16에서 사용할 수 없는 관찰 API를 가드 없이 사용한다."
-    detection: "rg -n '@Observable|@Bindable' App Domain Data Shared 후 각 결과의 가용성 가드를 검토한다."
+    description: "새 UI가 UIKit 전용 화면으로 추가되거나 UI 상태가 메인 액터 밖에서 변경된다."
+    detection: "grep: 새 View의 SwiftUI·UIHostingController 사용 및 UI 변경 경로의 @MainActor 검사"
 
 review_pass_threshold:
   reflection_rate_min: 80
-  required_resolutions: [SC-1, SC-4, SC-5, SC-6, SC-7, SC-8, SC-9, SC-10, SC-12, SC-13, SC-14, SC-15]
+  required_resolutions: [SC-1, SC-2, SC-3, SC-4, SC-5, SC-6, SC-7, SC-8, SC-9, SC-10, SC-11, SC-12, SC-13, SC-14, SC-15]
 
 scope_boundary:
-  in_scope: "항목별 토글, 서버 등록·해제, 로컬 알림, 상세 이동, 오프라인 재전송, 설정의 전체 끄기, 시청 목록 삭제와 알림 정리"
-  out_of_scope: "공개일 데이터의 서버 생성·수정, 푸시 알림, 알림 문구의 마케팅 실험"
-  deferred: "구현 전 서버의 공개 시각 필드·POST 본문·기존 알림 조회 계약, 설정 화면 진입점, 상세 이동 경로, 전체 끄기의 서버 상태 처리 및 권한 거부 시 표시 정책을 확정한다."
+  in_scope: "개별 토글, 서버 등록·해제, 로컬 알림 예약·취소와 상세 이동, 오프라인 의도 저장·재전송, 전체 끄기, 목록 삭제 연동, 해당 동작의 검증 코드"
+  out_of_scope: "서버의 실제 푸시 발송 기능과 시청 목록 외 콘텐츠의 알림"
+  deferred: "Probe Coverage Gap: 공개 시각의 데이터 출처, POST 요청·응답 형식, 기존 상세 라우트, 연결 상태 감지 수단은 현재 저장소에서 존재·권한 범위·결과 계약을 확인할 수 없다. 구현 설계 시 해당 계약을 확인해야 하며 필수 동작을 범위 밖으로 미루지 않는다. Reflection Rate는 표본 N<10이면 preliminary로 기록하고 게이트 판정은 보류한다."

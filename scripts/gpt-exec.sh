@@ -217,7 +217,9 @@ if [ "$MODE" != "review" ]; then
       INJECTED=1
     elif [ -n "$INJECT_SKILL" ]; then
       SKILL_NAME="$(basename "$(dirname "$INJECT_SKILL")")"
-      PROMPT_TEXT="[fz-gpt-skill-injected] ${SKILL_NAME} — 아래는 역할 스킬 본문이다(래퍼 주입)
+      # ⛔ 폴더 절대경로를 싣는다 — 주입된 본문은 자기 위치를 모르므로 로더 줄의 references/… 를 풀 수 없다(S12 후속)
+      SKILL_DIR="$(cd "$(dirname "$INJECT_SKILL")" && pwd -P)"
+      PROMPT_TEXT="[fz-gpt-skill-injected] ${SKILL_NAME} (${SKILL_DIR}) — 아래는 역할 스킬 본문이다(래퍼 주입) · 본문의 상대 경로(references/…)는 이 폴더 기준
 ${SKILL_BODY}
 
 ---

@@ -67,6 +67,7 @@ check "exec 주입: exit" "$(rc exec1)" 0
 check "exec 주입: 마커 1회" "$(count exec1 "$MARK")" 1
 check "exec 주입: 본문 첫 제목 1회" "$(count exec1 "$HEAD")" 1
 check "exec 주입: 과제 본문 보존" "$(count exec1 "$TASK")" 1
+check "exec 주입: 마커 줄에 스킬 폴더 절대경로" "$(count exec1 "$MARK fz-demo ($(cd "$T/fz-demo" && pwd -P))")" 1
 check "exec 주입: 텔레메트리 injected=1" "$(tel exec1 7)" 1
 check "exec 주입: 텔레메트리 fallback=0" "$(tel exec1 5)" 0
 check "exec 주입: 텔레메트리 resolved=주입 경로" "$(tel exec1 4)" "$SK"
