@@ -7,6 +7,8 @@
 //    health-check 러너는 env 없이 돈다 — 이력이 있는 클론(작업 트리 · 격리 검증 클론)이면 된다. 둘 다 없으면 UNRUN(exit 2)이다.
 // ⛔ 옵션마다 세 가지를 본다: 미지정 == 기준 · false == 기준 · true != 기준(옵션이 실제로 배선돼 있다 — 헛돌이 방어).
 //    옵션이 닿지 않는 경로(예: Stage 2 가 없는 Tier 2 미발화)에서는 셋째를 true == 기준 으로 본다 — 옵션이 엉뚱한 경로로 새지 않는다.
+// ⛔ `structural` 옵션(R-C 속도 arm)은 켜면 콜을 빼는 것이 목적이다 — 켠 쪽 두 검사(!= 기준 · 콜 구성 동일)를 여기서 하지 않고
+//    그 값이 가리키는 전용 테스트가 본다. 미지정 == 기준 · off == 기준 은 똑같이 본다.
 // 인자: --option NAME(여러 번) · --all-rb-options · 인자 없음 = 등록된 옵션 전부(health-check 러너가 인자 없이 돈다).
 'use strict'
 const fs = require('fs')
@@ -29,6 +31,9 @@ const OPTIONS = {
   preserveLowConfidence: { workflows: ['peer-review'], on: { preserveLowConfidence: true }, off: { preserveLowConfidence: false } },
   // review-live 만 — peer-review 는 기본 스키마에 위치 필드가 있다. Stage 1 두 콜의 스키마만 바뀐다
   locatedFindings: { workflows: ['review-live'], on: { locatedFindings: true }, off: { locatedFindings: false } },
+  // R-C 속도 arm — 켜면 병합 콜을 뺄 수 있다(structural)
+  mergeMode: { workflows: ['plan-lean2'], on: { mergeMode: 'conditional' }, off: { mergeMode: 'always' },
+    structural: 'tests/workflows/plan-lean2-merge-arm.js' },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }
@@ -40,6 +45,7 @@ const SCENARIOS = {
     { name: 'Tier 3 · deep', args: { deep: true }, fire: true, stage2: true },
   ],
   'review-live': [{ name: '기본', args: {}, fire: false, stage2: true }],
+  'plan-lean2': [{ name: '기본', args: { requirement: '합성 요구', codeContextPath: '/tmp/code-context.md' }, fire: false, stage2: false }],
 }
 
 function responses(wf, fire) {
@@ -53,6 +59,14 @@ function responses(wf, fire) {
       'stage2-arch-on-peers': { adjustments: [], additions: [] },
       'stage2-quality-on-peers': { adjustments: [], additions: [] },
       'stage3-counter': { challenges: [], missedIssues: [] },
+    }
+  }
+  if (wf === 'plan-lean2') {
+    return {
+      'lean2-full': { directionVerdict: 'PROCEED', directionAlternatives: [], steps: [{ id: 'S1', title: 't', files: ['a'] }], readScope: [], writeScope: [] },
+      'lean2-edge': { edgeCases: [{ id: 'E1', case: 'c', failureScenario: 'f', whereItBreaks: 'w' }], impactNotes: [], latentDefects: [] },
+      'lean2-impact-arch': { impactFiles: [], patternVerdicts: [] },
+      'lean2-merge': { addedEdgeCases: [], addedImpact: [], stepAmendments: [], implicationRegister: [], unresolved: [] },
     }
   }
   return {
@@ -134,6 +148,10 @@ function check(name, cond, got) {
           const tag = `${name} · ${wf} · ${sc.name}`
           check(`${tag}: 미지정 == 기준(${bases[wf].from}) — 콜 ${base.length}개`, base.length > 0 && firstDiff(unset, base) === null, firstDiff(unset, base) || '콜 0개')
           check(`${tag}: ${JSON.stringify(opt.off)} == 기준`, firstDiff(off, base) === null, firstDiff(off, base))
+          if (opt.structural) {
+            check(`${tag}: ${JSON.stringify(opt.on)} 은 콜 구성을 바꿀 수 있다 — 켠 동작은 ${opt.structural} 가 본다(여기서는 실행만)`, on.length > 0, '켜니 콜 0개')
+            continue
+          }
           if (!opt.applies || opt.applies(sc)) check(`${tag}: ${JSON.stringify(opt.on)} != 기준(옵션이 배선돼 있다)`, firstDiff(on, base) !== null, '켜도 콜 입력이 같다 — 헛돌이')
           else check(`${tag}: ${JSON.stringify(opt.on)} == 기준(이 경로에는 옵션이 닿지 않는다)`, firstDiff(on, base) === null, firstDiff(on, base))
           check(`${tag}: ${JSON.stringify(opt.on)} 의 콜 구성(label 다중집합) == 기준`, on.length > 0 && labels(on) === labels(base), `켬 ${labels(on)} · 기준 ${labels(base)}`)

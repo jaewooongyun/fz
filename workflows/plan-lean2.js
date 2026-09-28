@@ -21,6 +21,11 @@
 //   ③ **병합 콜 확장** — edge 뿐 아니라 impact/arch 발견도 델타로 접는다.
 //
 // ⛔ 여전히 **델타 전용 schema** 다 — 병합 콜은 본문을 다시 쓸 수 없다(D1 의 R3 방어 유지).
+//
+// [옵션]
+//   mergeMode: ⛔ 기본 'always'(기준선 불변 — 미지정도 always). 'conditional' 이면 Stage 1 두 렌즈의 **의미 필드**(MERGE_SIGNAL_FIELDS)가
+//     전부 비고 미해결 요청이 0 일 때만 병합 콜을 생략하고 mergeSkipped{reason} 을 반환한다(S18b · tests/workflows/plan-lean2-merge-arm.js).
+//     렌즈가 하나라도 null 이거나 필드 하나라도 차 있으면 병합한다(fail-open). 기본값 전환은 A/B(S26) 뒤다.
 
 export const meta = {
   name: 'plan-lean2',
@@ -207,9 +212,25 @@ if (!full) {
 if (!edge) log('WARN edge null')
 if (!impactArch) log('WARN impact-arch null')
 
+// ── 병합 조건부 생략 (S18b) — ⛔ 기본 always. 생략은 두 렌즈가 모두 반환됐고 의미 필드가 전부 빌 때뿐이다.
+//    Stage 2 출력(addedEdgeCases 등)을 조건으로 쓰지 않는다 — 입력(Stage 1 반환)만 본다.
+const MERGE_SIGNAL_FIELDS = {
+  edge: ['edgeCases', 'impactNotes', 'latentDefects'],
+  impactArch: ['impactFiles', 'hiddenDependencies', 'secondaryHosts', 'existingTestSuites', 'patternVerdicts', 'violations',
+    'deadCode', 'originBodyRequests', 'impactRequests'],
+}
+const mergeConditional = input.mergeMode === 'conditional'
+const lensSignals = (lens, fields) => fields.filter(k => (Array.isArray(lens[k]) ? lens[k].length > 0 : lens[k] != null && lens[k] !== ''))
+let mergeSkipped = null
+if (mergeConditional && edge && impactArch &&
+    lensSignals(edge, MERGE_SIGNAL_FIELDS.edge).length + lensSignals(impactArch, MERGE_SIGNAL_FIELDS.impactArch).length === 0) {
+  mergeSkipped = { reason: 'conditional — Stage 1 두 렌즈의 의미 필드가 전부 비었다(미해결 요청 0)' }
+  log(`병합 생략 — ${mergeSkipped.reason}`)
+}
+
 // ════════ Stage 2: 델타 병합 ════════
 let merge = null
-if (edge || impactArch) {
+if ((edge || impactArch) && !mergeSkipped) {
   phase('델타 병합')
   const stepIds = (full.steps || []).map(s => s.id)
   merge = await callAgent(
@@ -235,11 +256,11 @@ const lensStatus = {
   full: 'ok',
   edge: edge ? 'ok' : 'null',
   impactArch: impactArch ? 'ok' : 'null',
-  merge: merge ? 'ok' : ((edge || impactArch) ? 'null' : 'skipped'),
+  merge: merge ? 'ok' : (mergeSkipped || !(edge || impactArch) ? 'skipped' : 'null'),
 }
 const missingLenses = Object.keys(lensStatus).filter(k => lensStatus[k] === 'null')
 const degraded = missingLenses.length > 0
-const stagesCompleted = (edge && impactArch ? 1 : 0) + (merge ? 1 : 0)
+const stagesCompleted = (edge && impactArch ? 1 : 0) + (merge || mergeSkipped ? 1 : 0)   // 조건에 따라 생략한 병합은 할 일이 없어 끝난 것이다
 log(`lean2 완주 ${stagesCompleted}/2${degraded ? ` — ⛔ degraded(빠진 렌즈: ${missingLenses.join(', ')})` : ''} — steps ${(full.steps || []).length} · edge ${(edge && edge.edgeCases || []).length} · impact ${(impactArch && impactArch.impactFiles || []).length} · 2차호스트 ${(impactArch && impactArch.secondaryHosts || []).length} · arch ${(impactArch && impactArch.patternVerdicts || []).length} · 델타 ${(merge && merge.stepAmendments || []).length} amendments`)
 
 return {
@@ -262,5 +283,6 @@ return {
   lensStatus,
   missingLenses,
   degraded,
+  ...(mergeConditional ? { mergeSkipped } : {}),   // ⛔ 기본 경로의 반환 모양은 그대로 둔다
   metrics: { agentCalls, nullCount: nullCalls, fallbackCount: 0, stagesCompleted },
 }
