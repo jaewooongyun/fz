@@ -13,7 +13,7 @@
 - [SwiftUI Expert](#swiftui-expert)
 - [Swift Concurrency](#swift-concurrency)
 - [참조 스킬](#참조-스킬)
-- [GPT 스킬용 iOS 지식 임베딩 원칙](#gpt-스킬용-ios-지식-임베딩-원칙)
+- [GPT 스킬의 프레임워크 지식 — 조건부 도메인 팩](#gpt-스킬의-프레임워크-지식--조건부-도메인-팩)
 - [설계 원칙](#설계-원칙)
 
 ---
@@ -187,34 +187,22 @@ diff에 `@MainActor`, `actor`, `async`, `await`, `Task`, `Sendable`, `AsyncStrea
 | /fz-peer-review | SwiftUI/Concurrency 피어 리뷰 |
 | /fz-search | Swift 심볼 탐색 |
 
-## GPT 스킬용 iOS 지식 임베딩 원칙
+## GPT 스킬의 프레임워크 지식 — 조건부 도메인 팩
 
-> GPT GPT는 Claude 플러그인(swiftui-expert, swift-concurrency)에 직접 접근 불가.
-> 대신, 핵심 iOS 지식을 각 GPT 스킬 SKILL.md에 직접 임베딩한다.
+> GPT 는 Claude 플러그인(swiftui-expert · swift-concurrency)에 접근하지 못한다. 그렇다고 스택 지식을 스킬 본문에 박으면 비-iOS 저장소나 지침이 없는 저장소에서도 그 규칙이 적용된다(AC-3). 그래서 본문과 스택 지식을 나눈다.
 
-### 임베딩 원칙
-1. **핵심 체크포인트만** — 상세 설명이 아닌 체크 항목 형식으로 작성
-2. **iOS 16 최소 타겟 명시** — 모든 GPT 스킬에 `#available` 규칙 포함
-3. **중복 최소화** — GPT 스킬에는 GPT가 즉시 판단 가능한 패턴만 기술
-4. **업데이트 연동** — SwiftUI Expert/Concurrency 플러그인 버전업 시 GPT 스킬도 검토
+### 원칙
+1. **본문은 프레임워크를 전제하지 않는다** — `gpt-skills/*/SKILL.md` 의 규칙은 대상 저장소 지침에서 런타임에 뽑는다(`## Project Rules (runtime)` 절 · 정본 `modules/project-rules.md`). 지침이 없으면 `## When Project Guidelines Are Absent` 절대로 일반 원칙만 쓰고 아키텍처 축을 Probe Coverage Gap 으로 보고한다
+2. **스택 지식은 조건부 팩에 둔다** — `gpt-skills/<스킬>/references/domain-<스택>.md`. 본문의 로더 줄 한 줄이 조건(예: `*.swift` 소스 · `Package.swift` · `.xcodeproj`)이 맞을 때만 팩을 읽게 한다. 팩 안의 프레임워크 절(RIBs 등)은 그 프레임워크를 실제로 쓸 때만 적용된다
+3. **팩에서만 나온 발견은 `ruleSource: plugin-default` · 상한 `suggestion` 이다** — 같은 내용을 프로젝트 지침이 말하면 그 규칙(`ruleSource: project`)과 규칙 기반 severity 로 낸다. 코드로 보일 수 있는 결함(누수 · 경합 · 크래시)은 상한 대상이 아니다 — 팩은 찾는 것을 돕기만 한다
+4. **작성자 프로젝트의 관례는 팩에도 싣지 않는다** — 고정 레이어 순서 · 명명 템플릿 · 호출 관례는 그 저장소 지침이 말할 때 런타임 추출이 가져온다. 최소 배포 타겟도 고정값을 쓰지 않고 프로젝트 설정에서 읽는다
+5. **검사** — `scripts/check_gpt_skill_portability.py`(health-check 배선): 본문 프레임워크 토큰(로더 줄 제외) · `AI/*guidelines` 경로 · 고정 레이어 순서 사슬 · 작성자 관례 표지 · 두 절 · 지침 파일 집합 · fz-reviewer 6축 · fz-architect Q1~Q8 · fz-planner JSON · `agents/openai.yaml` 정책
 
-### 현재 임베딩 현황
+### 팩 현황
+팩이 있는 스킬은 architect · challenger · drift · fixer · guardian · planner · reviewer 일곱이다(`references/domain-ios.md`). fz-searcher 는 탐색 전용이라 팩이 없다.
 
-| GPT 스킬 | SwiftUI | Concurrency | RIBs Lifecycle |
-|-----------|:-------:|:-----------:|:--------------:|
-| fz-reviewer | ✅ | ✅ | ✅ |
-| fz-architect | 부분 (1줄) | 부분 (2줄) | ✅ (Q1-Q5) |
-| fz-drift | ✅ | ✅ | ✅ |
-| fz-planner | ✅ (v4.5.0+ Planning Checklist 3 anchor) | ✅ (v4.5.0+ Planning Checklist) | ✅ |
-| fz-guardian | — | ✅ | — |
-| fz-challenger | 부분 (over-engineering 관점) | 부분 (sending parameter semantics) | 부분 (Builder 과잉 관점) |
-| fz-fixer | ✅ (v4.5.0+ Repair Checklist 3 anchor) | ✅ (v4.5.0+ Repair Checklist) | — |
-| fz-searcher | — (search-only) | — (search-only) | 검색 예시만 (임베딩 불필요) |
-
-> 부분: 주요 패턴만 포함. 추후 확장 필요 시 해당 스킬 SKILL.md에 섹션 추가.
-> fz-challenger over-engineering 관점: SwiftUI(@Observable 과잉) + RIBs(Builder 과잉) + Concurrency(sending semantics) 모두 명시 (v4.6.0 정정).
-> fz-searcher: 검색 전용 스킬이라 임베딩 불필요 (v4.6.0 추가).
-> v4.5.0+ 강화 명시: fz-planner는 SwiftUI/Concurrency/Sendable Boundary 3 anchor, fz-fixer는 SwiftUI Repair/Concurrency Repair/Anti-Repair 3 anchor (v4.6.0 정정).
+### 암묵 호출 정책
+`gpt-skills/*/agents/openai.yaml` 의 `policy.allow_implicit_invocation` 은 fz-reviewer 만 `true` 이고 나머지 7개는 `false` 다. 프롬프트가 없는 review 모드 호출(`gpt-exec.sh review`)에서 CLI 가 암묵으로 고를 수 있는 fz 스킬이 fz-reviewer 하나가 된다. 나머지 스킬은 호출부가 본문을 프롬프트에 넣어서만 쓴다(`modules/cross-validation.md` 호출 계약).
 
 ## 설계 원칙
 

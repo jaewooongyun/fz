@@ -33,7 +33,7 @@ BOUNDARY = {"scripts/gpt-exec.sh", "scripts/check-gpt-flags.sh",   # 래퍼 — 
             "schemas/tool-inventory.json"}                           # 외부 실행 파일 목록 — 키가 실행 파일명이다
 # 이력 파일 — 과거 실행·결정의 기록이다. 호칭을 바꾸면 당시 기록이 달라진다(CHANGELOG·릴리즈 노트·실험 로그)
 EXCLUDE_PREFIX = ("docs/releases/", "tests/fixtures/", ".git/", "CHANGELOG.md", "experiment-log.md")
-SUFFIXES = (".md", ".js", ".py", ".sh", ".json")
+SUFFIXES = (".md", ".js", ".py", ".sh", ".json", ".yaml", ".toml")   # yaml·toml — GPT 스킬 메타(agents/openai.yaml) · 역할 파일
 TOKEN = re.compile(r"codex", re.I)
 
 # (a) 범주 토큰 — 원장의 keep 범주에서 나온 **형태**다(행 목록이 아니다). 새 범주는 원장 검수 후에만 추가한다.
@@ -139,6 +139,9 @@ def self_test() -> int:
         expect("keep 파일 행은 통과", run(d), OK)
         (d / "guides" / "a.md").write_text("경로 `~/.codex/config.toml`\nCodex CLI 로 검증 — 뒤에 덧붙임\n", encoding="utf-8")
         expect("keep 행과 달라진 줄 → 위반 (완전 일치만 보존)", run(d), VIOLATION)
+        (d / "guides" / "meta.yaml").write_text("description: Codex 로 검증\n", encoding="utf-8")
+        _, hits = scan(d)
+        expect("yaml 도 스캔한다(GPT 스킬 메타 agents/openai.yaml)", any(r == "guides/meta.yaml" for r, _, _ in hits), True)
         empty = pathlib.Path(tempfile.mkdtemp(prefix="fz-gs-empty-"))
         expect("스캔 대상 0개 → 측정 실패", run(empty), UNRUN)
         shutil.rmtree(empty)

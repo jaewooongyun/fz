@@ -50,7 +50,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py check_gpt_skill_portability.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -379,7 +379,7 @@ fi
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in check_release_notes eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry check_wf_advisor_ban check_gpt_surface; do
+for FS in check_release_notes eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   if [ "$FS_CODE" -eq 0 ]; then
     record "레지스트리 도구 self-test ($FS)" 0 "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)"
@@ -444,6 +444,15 @@ if [ "$GS_CODE" -eq 0 ]; then
   record "GPT 표면 계약" 0 "$(printf '%s\n' "$GS" | grep -E '^gpt-surface' | tail -1)"
 else
   record "GPT 표면 계약" 1 "⛔ $(printf '%s\n' "$GS" | grep -E 'VIOLATION|UNRUN' | head -1)"
+fi
+
+# ── GPT 스킬 이식성 (S12 · AC-3) ─────────────────────────────
+# ⛔ 번들 GPT 스킬이 특정 프레임워크·작성자 관례를 보편 규칙으로 박지 않는다 — 규칙은 런타임 추출, 스택 지식은 조건부 팩.
+GP="$(cd "$ROOT" && python3 scripts/check_gpt_skill_portability.py 2>&1)"; GP_CODE=$?
+if [ "$GP_CODE" -eq 0 ]; then
+  record "GPT 스킬 이식성" 0 "$(printf '%s\n' "$GP" | grep -E '^gpt-skill-portability' | tail -1)"
+else
+  record "GPT 스킬 이식성" 1 "⛔ $(printf '%s\n' "$GP" | grep -E 'VIOLATION|UNRUN' | head -1)"
 fi
 
 # ── 릴리즈 동기 검사기 self-test (B1/S7) ──────────────────────
