@@ -1,0 +1,102 @@
+sprint_id: T1-release-reminders
+date: 2026-09-28
+contract_owner: gpt_architect
+context:
+  intent: "Phase 0.5 판정이 제공되지 않아 요구사항을 잠정 채택한다. 미확정 연동 계약은 구현 전에 확정한다."
+  scope: "Domain/Watchlist, Data/Watchlist, App/Watchlist, Shared/Network 및 새 알림·설정·상세 이동 연동 코드"
+  constraints: "CLAUDE.md:5-8의 RIBs 구성·의존 방향·DTO 규칙, CLAUDE.md:13-17의 메인 액터·iOS 16·SwiftUI·디자인 토큰 규칙을 보존한다. CLAUDE.md:21에 따라 빌드 단계는 true로 판정한다."
+
+success_criteria:
+  - id: SC-1
+    measurable: true
+    description: "서버 공개 시각이 WatchlistItem까지 전달된다."
+    verification: "testReleaseAtMapsFromWatchlistDTO"
+  - id: SC-2
+    measurable: true
+    description: "미공개 항목마다 공개일 알림 토글이 표시된다."
+    verification: "testUnreleasedItemShowsReminderToggle"
+  - id: SC-3
+    measurable: true
+    description: "공개된 항목에는 공개일 알림 토글이 표시되지 않는다."
+    verification: "testReleasedItemHidesReminderToggle"
+  - id: SC-4
+    measurable: true
+    description: "항목의 토글을 켜면 서버 계약에 맞는 POST /reminders 요청이 전송된다."
+    verification: "testEnableReminderPostsAgreedPayload"
+  - id: SC-5
+    measurable: true
+    description: "항목의 토글을 끄면 DELETE /reminders/{contentId} 요청이 전송된다."
+    verification: "testDisableReminderDeletesByContentId"
+  - id: SC-6
+    measurable: true
+    description: "토글을 켜면 해당 항목의 공개 시각에 로컬 알림이 예약된다."
+    verification: "testEnableSchedulesNotificationAtReleaseTime"
+  - id: SC-7
+    measurable: true
+    description: "토글을 끄면 해당 항목의 예약된 로컬 알림이 취소된다."
+    verification: "testDisableCancelsLocalNotification"
+  - id: SC-8
+    measurable: true
+    description: "로컬 알림을 누르면 해당 contentId의 상세 화면으로 이동한다."
+    verification: "testNotificationTapRoutesToMatchingContent"
+  - id: SC-9
+    measurable: true
+    description: "오프라인에서 켠 항목의 등록 의도가 앱 재시작 뒤에도 유지된다."
+    verification: "testOfflineEnablePersistsAcrossRelaunch"
+  - id: SC-10
+    measurable: true
+    description: "온라인 복귀 시 미전송 등록 의도가 서버에 전송된다."
+    verification: "testReconnectReplaysPendingEnable"
+  - id: SC-11
+    measurable: true
+    description: "재전송이 완료된 등록 의도는 다음 온라인 복귀 때 다시 전송되지 않는다."
+    verification: "testCompletedReplayIsNotRepeated"
+  - id: SC-12
+    measurable: true
+    description: "설정 화면에 '공개일 알림 전체 끄기' 스위치가 표시된다."
+    verification: "testSettingsShowsDisableAllSwitch"
+  - id: SC-13
+    measurable: true
+    description: "전체 끄기 스위치를 켜면 모든 항목의 예약된 로컬 알림이 취소된다."
+    verification: "testDisableAllCancelsEveryPendingNotification"
+  - id: SC-14
+    measurable: true
+    description: "시청 목록에서 항목을 삭제하면 해당 항목의 서버 알림이 해제된다."
+    verification: "testRemoveWatchlistItemDeletesReminder"
+  - id: SC-15
+    measurable: true
+    description: "시청 목록에서 항목을 삭제하면 해당 항목의 로컬 알림이 취소된다."
+    verification: "testRemoveWatchlistItemCancelsLocalNotification"
+  - id: SC-16
+    measurable: true
+    description: "알림 권한이 거부된 경우 토글에 예약 성공 상태가 표시되지 않는다."
+    verification: "testDeniedPermissionDoesNotShowScheduledState"
+
+anti_criteria:
+  - id: AC-1
+    description: "Interactor가 APIClient를 직접 호출한다."
+    detection: "rg -n 'APIClient|\\.shared' App/Watchlist/*Interactor.swift"
+  - id: AC-2
+    description: "Entity에 Decodable이 선언되거나 서버 응답 타입에 Response 접미사가 붙는다."
+    detection: "rg -n 'Decodable|struct .*Response' Domain/Watchlist Data/Watchlist"
+  - id: AC-3
+    description: "UI 상태를 메인 액터 밖에서 변경한다."
+    detection: "UI 갱신 호출부의 @MainActor 범위를 정적 검토한다."
+  - id: AC-4
+    description: "삭제하거나 끈 항목의 오프라인 등록 의도가 나중에 재전송된다."
+    detection: "testDisableSupersedesPendingEnable 및 testRemovalSupersedesPendingEnable"
+  - id: AC-5
+    description: "동일 항목에 로컬 알림이 중복 예약된다."
+    detection: "testRepeatedEnableKeepsOnePendingNotification"
+  - id: AC-6
+    description: "iOS 16에서 사용할 수 없는 관찰 API를 가드 없이 사용한다."
+    detection: "rg -n '@Observable|@Bindable' App Domain Data Shared 후 각 결과의 가용성 가드를 검토한다."
+
+review_pass_threshold:
+  reflection_rate_min: 80
+  required_resolutions: [SC-1, SC-4, SC-5, SC-6, SC-7, SC-8, SC-9, SC-10, SC-12, SC-13, SC-14, SC-15]
+
+scope_boundary:
+  in_scope: "항목별 토글, 서버 등록·해제, 로컬 알림, 상세 이동, 오프라인 재전송, 설정의 전체 끄기, 시청 목록 삭제와 알림 정리"
+  out_of_scope: "공개일 데이터의 서버 생성·수정, 푸시 알림, 알림 문구의 마케팅 실험"
+  deferred: "구현 전 서버의 공개 시각 필드·POST 본문·기존 알림 조회 계약, 설정 화면 진입점, 상세 이동 경로, 전체 끄기의 서버 상태 처리 및 권한 거부 시 표시 정책을 확정한다."

@@ -1,0 +1,9 @@
+{
+ "architect_sha256_16": "0db934f5ea853bcd",
+ "task_sha256_16": "b3f0a867df8bda05",
+ "cli_version": "codex-cli 0.157.0",
+ "effort": "high",
+ "codex_home": "isolated",
+ "recorded": "2026-09-28",
+ "note": "run.sh --live 가 쓴다 — 손으로 고치지 않는다"
+}
