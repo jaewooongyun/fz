@@ -4,7 +4,7 @@ description: >-
   자기 코드 3중 검증(Claude+GPT+sc:analyze) + 역방향 검증.
   예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR →fz-peer-review, 직접 수정 →fz-fix)
 user-invocable: true
-argument-hint: "[리뷰 대상 설명] [light]"
+argument-hint: "[리뷰 대상 설명] [light] [--render]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__codegraph__codegraph_explore,
@@ -392,7 +392,7 @@ Gate 5 통과 후:
 2. **Final Issue Report 생성**: `modules/session.md` 참조
 3. **세션 저장**: `write_memory` (작업 요약 + 결정사항 + 변경 심볼)
 4. **아티팩트 기록** (티켓 폴더(WORK_DIR) 활성 시): `{WORK_DIR}/review/self-review.md` + `index.md` 업데이트
-   - ⊕ `--render`(기본 off)면 이슈 목록을 손으로 다시 쓰지 않는다 — 판정·문장만 `{WORK_DIR}/review/review.json` 에 쓰고 `scripts/render_review.py --review … --diff {WORK_DIR}/review/diff.patch --out-dir {WORK_DIR}/review` 가 `review-report.md` 를 만든다(PR 이 없으면 payload 는 만들지 않는다). 미지정이면 위 절차 그대로다
+   - ⊕ `--render`(기본 off)면 이슈 목록을 손으로 다시 쓰지 않는다 — 판정·문장만 `{WORK_DIR}/review/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review {WORK_DIR}/review/review.json --diff {WORK_DIR}/review/diff.patch --out-dir {WORK_DIR}/review` 가 `review-report.md` 를 만든다(PR 이 없으면 payload 는 만들지 않는다). 미지정이면 위 절차 그대로다
 5. **Git 연계** (사용자 확인 후): `/fz-commit` → `/fz-pr`
 
 완료 보고: 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계

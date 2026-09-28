@@ -5,7 +5,7 @@ description: >-
   예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토 (비사용: 자기 코드 →fz-review, PR 해설 →fz-pr-digest)
 user-invocable: true
 disable-model-invocation: true
-argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--deep] [--post] [--explain [--light|--deep]]"
+argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--deep] [--post] [--render] [--explain [--light|--deep]]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
