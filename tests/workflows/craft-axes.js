@@ -80,6 +80,7 @@ async function capture(wf, args, axes) {
 }
 const byLabel = (calls, label) => calls.find(c => c.label === label) || { prompt: '', schema: null }
 const has = (schema, key) => JSON.stringify(schema || {}).includes(`"${key}"`)
+const labels = calls => calls.map(c => c.label).sort().join(',')
 
 ;(async () => {
   // ── 1. craft 축 목록 — 네 곳(+ GPT 스키마가 있으면 다섯 곳)이 같다 ──
@@ -108,15 +109,19 @@ const has = (schema, key) => JSON.stringify(schema || {}).includes(`"${key}"`)
     check(`${wf}: arch issue 에 craftAxis · ruleRef 선택 필드(required 아님)`,
       !!archItems && !!archItems.properties.craftAxis && !!archItems.properties.ruleRef && !archItems.required.includes('craftAxis') && !archItems.required.includes('ruleRef'),
       JSON.stringify(archItems && Object.keys(archItems.properties)))
-    check(`${wf}: arch 밖 스키마에는 axisCoverage · craftAxis 가 없다(결함 축 회귀 방어)`, others.every(c => !has(c.schema, 'axisCoverage') && !has(c.schema, 'craftAxis')),
+    check(`${wf}: arch 밖 스키마에는 axisCoverage · craftAxis 가 없다(결함 축 회귀 방어)`, others.length > 0 && others.every(c => !has(c.schema, 'axisCoverage') && !has(c.schema, 'craftAxis')),
       others.filter(c => has(c.schema, 'axisCoverage') || has(c.schema, 'craftAxis')).map(c => c.label).join(','))
-    check(`${wf}: craft 줄은 arch 프롬프트에만`, arch.prompt.includes('[craft 축 — 이 렌즈 전용]') && others.every(c => !c.prompt.includes('[craft 축')), 'craft 줄 위치')
+    check(`${wf}: craft 줄은 arch 프롬프트에만`, arch.prompt.includes('[craft 축 — 이 렌즈 전용]') && others.length > 0 && others.every(c => !c.prompt.includes('[craft 축')), 'craft 줄 위치')
     check(`${wf}: 규칙 레코드가 없으면 arch 에 '규칙 인용 지적 금지 — 코드 근거만'`, arch.prompt.includes('규칙 인용 지적 금지 — 코드 근거만') &&
-      others.every(c => !c.prompt.includes('규칙 인용 지적 금지')), '규칙 부재 줄')
+      others.length > 0 && others.every(c => !c.prompt.includes('규칙 인용 지적 금지')), '규칙 부재 줄')
     const dist = on.result && on.result.distribution && on.result.distribution.craftAxes
     const hit = wf === 'peer-review' ? 'naming' : 'placement'
-    check(`${wf}: distribution.craftAxes 집계 — ${hit} 1 · axisCoverage 6행`, !!dist && dist.counts[hit] === 1 && Array.isArray(dist.axisCoverage) && dist.axisCoverage.length === 6,
-      JSON.stringify(dist))
+    check(`${wf}: distribution.craftAxes 집계 — ${hit} 1 · axisCoverage 6행 · 빠진 축 없음`, !!dist && dist.counts[hit] === 1 && Array.isArray(dist.axisCoverage) &&
+      dist.axisCoverage.length === 6 && Array.isArray(dist.missingAxes) && dist.missingAxes.length === 0, JSON.stringify(dist))
+    const dup = await capture(wf, Object.assign({ craftAxes: true }, extra), Array(6).fill(axes[0]))
+    const dd = dup.result && dup.result.distribution && dup.result.distribution.craftAxes
+    check(`${wf}: 같은 축 6행은 6축이 아니다 — missingAxes 가 나머지 5축`, !!dd && JSON.stringify(dd.missingAxes) === JSON.stringify(axes.slice(1)),
+      JSON.stringify(dd && dd.missingAxes))
     check(`${wf}: 전 콜 opus · xhigh · advisor 금지 문구 유지`, on.calls.length > 0 && on.calls.every(c => c.model === 'opus' && c.effort === 'xhigh' && c.prompt.includes(ADVISOR_BAN)),
       on.calls.filter(c => !(c.model === 'opus' && c.effort === 'xhigh' && c.prompt.includes(ADVISOR_BAN))).map(c => c.label).join(','))
     if (wf === 'review-live') {
@@ -130,11 +135,14 @@ const has = (schema, key) => JSON.stringify(schema || {}).includes(`"${key}"`)
     const rules = await capture(wf, Object.assign({ craftAxes: true, projectRulesPath: RULES }, extra), axes)
     const archR = byLabel(rules.calls, 'stage1-arch')
     check(`${wf}: projectRulesPath → arch 에만 규칙 줄 · 부재 줄은 사라진다`, archR.prompt.includes(`[프로젝트 규칙 — 이 렌즈 전용] ${RULES}`) &&
-      !archR.prompt.includes('규칙 인용 지적 금지') && rules.calls.filter(c => c.label !== 'stage1-arch').every(c => !c.prompt.includes(RULES)), '규칙 줄 위치')
+      !archR.prompt.includes('규칙 인용 지적 금지') && rules.calls.length > 1 && rules.calls.filter(c => c.label !== 'stage1-arch').every(c => !c.prompt.includes(RULES)), '규칙 줄 위치')
     // ── 4. 꺼짐 — 하위 옵션만 넘겨도 기본 경로 ──
     const sub = await capture(wf, Object.assign({ projectRulesPath: RULES }, extra), axes)
     check(`${wf}: craftAxes 없이 projectRulesPath 만 → craft·규칙 줄 없음 · axisCoverage 없음`,
-      sub.calls.every(c => !c.prompt.includes('[craft 축') && !c.prompt.includes('[프로젝트 규칙') && !has(c.schema, 'axisCoverage')), '하위 옵션이 새었다')
+      sub.calls.length > 0 && sub.calls.every(c => !c.prompt.includes('[craft 축') && !c.prompt.includes('[프로젝트 규칙') && !has(c.schema, 'axisCoverage')), '하위 옵션이 새었다')
+    // ⛔ 옵션은 콜을 더하거나 빼지 않는다 — 콜별 검사는 빠진 콜을 보지 못한다(빈 배열의 every 는 참이다)
+    check(`${wf}: 켠 실행 · 규칙 실행 · 끈 실행의 콜 구성(label 다중집합)이 같다`, labels(on.calls) === labels(sub.calls) && labels(rules.calls) === labels(sub.calls),
+      `켬 ${labels(on.calls)} · 규칙 ${labels(rules.calls)} · 끔 ${labels(sub.calls)}`)
   }
 
   console.log(`\ncraft 축 배선 ${fail ? '실패 ' + fail + '건' : '전건 통과'} (대상 ${path.relative(process.cwd(), ROOT) || '.'})`)

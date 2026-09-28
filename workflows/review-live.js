@@ -9,6 +9,7 @@
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어가고,
 //     Stage 1 finding 에 line_range · discoveryAxis 선택 필드가 생긴다. 미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다.
+//     ⛔ 위치 필드는 craft 가 아니라 §3 병합 키다 — 그래서 켠 arm 은 quality 렌즈 스키마도 다르다. craft 효과를 A/B 로 재기(R-C) 전에 떼야 한다.
 //   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
 //   crossRequiredFields: ⛔ 기본 off(R-B). true 면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
@@ -189,9 +190,13 @@ const craftLine = !craftOn ? '' :
     ? `\n[프로젝트 규칙 — 이 렌즈 전용] ${input.projectRulesPath} (Read — 검증을 통과한 규칙 레코드. ruleRef 는 그 레코드 id)`
     : `\n[프로젝트 규칙] 없음 — 규칙 인용 지적 금지 — 코드 근거만`)
 function craftSummary(findingList, archResult) {
+  const rows = archResult && Array.isArray(archResult.axisCoverage) ? archResult.axisCoverage : null
+  const seen = new Set((rows || []).map(r => r && r.axis))
   return {
     counts: Object.fromEntries(CRAFT_AXES.map(ax => [ax, findingList.filter(f => f.craftAxis === ax).length])),
-    axisCoverage: archResult && Array.isArray(archResult.axisCoverage) ? archResult.axisCoverage : null,
+    axisCoverage: rows,
+    // ⛔ 행 수가 아니라 축으로 센다 — 같은 축을 여섯 번 적어도 스키마 minItems 6 은 통과한다
+    missingAxes: CRAFT_AXES.filter(ax => !seen.has(ax)),
   }
 }
 // 교차 스테이지 필수 필드 재고지 (S17) — ⛔ 기본 off. 켜면 Stage 2 프롬프트에 additions 항목의 required 키를 **스키마에서 읽어** 적는다.
@@ -292,7 +297,7 @@ const dist = {
 }
 if (craftOn) {
   dist.craftAxes = craftSummary(findings, arch)
-  log(`craft 축 — ${CRAFT_AXES.map(ax => `${ax} ${dist.craftAxes.counts[ax]}`).join(' / ')} · axisCoverage ${dist.craftAxes.axisCoverage ? dist.craftAxes.axisCoverage.length + '행' : '⛔없음'}`)
+  log(`craft 축 — ${CRAFT_AXES.map(ax => `${ax} ${dist.craftAxes.counts[ax]}`).join(' / ')} · axisCoverage ${dist.craftAxes.axisCoverage ? dist.craftAxes.axisCoverage.length + '행' : '⛔없음'}${dist.craftAxes.missingAxes.length ? ` · ⛔빠진 축 ${dist.craftAxes.missingAxes.join('·')}` : ''}`)
 }
 log(`findings ${findings.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / suggestion ${dist.suggestion} / FP·refute 플래그 ${dist.fpFlagged} / 구조축 ${dist.structuralAxes ? 'ON' : '⛔OFF'} (최종 기각은 Lead)`)
 
