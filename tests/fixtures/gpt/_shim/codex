@@ -5,7 +5,17 @@
 #   FZ_SHIM_CAPTURE : argv 를 JSON 배열로 이 파일에 쓴다 — 프롬프트가 여러 줄이라 줄 단위 덤프는 깨진다
 #   FZ_SHIM_OUTPUT  : `-o FILE` 에 쓸 내용 (미설정이면 "ok" · 빈 문자열이면 빈 파일)
 #   FZ_SHIM_EXIT    : 종료코드 (기본 0)
+#   FZ_SHIM_ENV_CAPTURE : HOME · CODEX_HOME 을 이 파일에 쓴다(격리 런처 셀)
+#   FZ_SHIM_ROLLOUT : 쉼표로 가른 jsonl 파일들을 $CODEX_HOME/sessions/2026/09/28/ 에 복사한다(rollout 감사 셀)
+#   FZ_SHIM_SLEEP   : 초 — 자식 sleep 을 띄우고 기다린다(멈춘 CLI · 프로세스 그룹째 죽는지 보는 셀)
 if [ "${1:-}" = "--version" ]; then echo "codex-cli 0.0.0-shim"; exit 0; fi
+[ -n "${FZ_SHIM_ENV_CAPTURE:-}" ] && printf 'HOME=%s\nCODEX_HOME=%s\n' "${HOME:-}" "${CODEX_HOME:-}" > "$FZ_SHIM_ENV_CAPTURE"
+if [ -n "${FZ_SHIM_ROLLOUT:-}" ] && [ -n "${CODEX_HOME:-}" ]; then
+  mkdir -p "$CODEX_HOME/sessions/2026/09/28"
+  n=0; IFS=',' read -r -a _rolls <<< "$FZ_SHIM_ROLLOUT"
+  for f in "${_rolls[@]}"; do n=$((n + 1)); cp "$f" "$CODEX_HOME/sessions/2026/09/28/rollout-shim-$n.jsonl"; done
+fi
+if [ -n "${FZ_SHIM_SLEEP:-}" ]; then sleep "$FZ_SHIM_SLEEP" & wait $!; fi
 if [ -n "${FZ_SHIM_CAPTURE:-}" ]; then
   python3 - "$@" <<'PY'
 import json, os, sys

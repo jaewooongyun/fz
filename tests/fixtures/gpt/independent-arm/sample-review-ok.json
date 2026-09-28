@@ -1,0 +1,111 @@
+{
+ "verdict": "needs_revision",
+ "summary": "결함 1 · 솜씨 1",
+ "issues": [
+  {
+   "id": "I1",
+   "severity": "major",
+   "confidence": 85,
+   "file": "src/orders/order_service.ts",
+   "line_range": "40-44",
+   "discoveryAxis": "correctness",
+   "origin": "regression",
+   "title": "취소된 주문에도 알림을 보낸다",
+   "detail": "status 검사가 알림 호출 뒤에 있다",
+   "evidence": "order_service.ts:40-44",
+   "suggestion": "검사를 호출 앞으로",
+   "ruleSource": null
+  }
+ ],
+ "craft": [
+  {
+   "id": "C1",
+   "craftAxis": "naming",
+   "ruleSource": "project",
+   "ruleRef": "R1",
+   "severity": "minor",
+   "confidence": 90,
+   "file": "src/orders/order_response.ts",
+   "line_range": "3",
+   "title": "파싱 타입 이름이 …DTO 규칙과 다르다",
+   "detail": "OrderResponse",
+   "suggestion": "OrderDTO 로 바꾼다"
+  }
+ ],
+ "axis_coverage": [
+  {
+   "axis": "idiom",
+   "status": "none",
+   "note": "해당 없음"
+  },
+  {
+   "axis": "naming",
+   "status": "found",
+   "note": "C1"
+  },
+  {
+   "axis": "architecture",
+   "status": "none",
+   "note": "해당 없음"
+  },
+  {
+   "axis": "ui_structure",
+   "status": "none",
+   "note": "해당 없음"
+  },
+  {
+   "axis": "placement",
+   "status": "none",
+   "note": "해당 없음"
+  },
+  {
+   "axis": "design_alternative",
+   "status": "none",
+   "note": "해당 없음"
+  }
+ ],
+ "projectRules": {
+  "axes": {
+   "architecturePattern": null,
+   "uiStack": null,
+   "dependencyDirection": null,
+   "naming": "서버 응답 파싱 타입은 …DTO 접미사",
+   "placement": null,
+   "conventions": null
+  },
+  "rules": [
+   {
+    "id": "R1",
+    "axis": "naming",
+    "authority": "지침",
+    "appliesTo": {
+     "languages": [
+      "ts"
+     ],
+     "modules": [],
+     "paths": [
+      "src/**"
+     ]
+    },
+    "condition": "서버 응답을 파싱하는 타입",
+    "expectedResult": "`…DTO` 접미사",
+    "source": {
+     "file": "AGENTS.md",
+     "line": 4,
+     "quote": "서버 응답을 파싱하는 타입은 `…DTO` 접미사를 쓴다"
+    },
+    "appliedTo": [
+     "src/orders/order_response.ts"
+    ]
+   }
+  ],
+  "conflicts": [],
+  "gaps": [
+   "architecturePattern",
+   "uiStack",
+   "dependencyDirection",
+   "placement",
+   "conventions"
+  ]
+ }
+}

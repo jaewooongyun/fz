@@ -195,6 +195,14 @@ GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-
 - 경로가 있는데 파일이 없거나 비었으면 exit 11(`exec`·`resume` — 두 플래그 모두). 빈 문자열은 "해석 실패 → 일반 프롬프트 폴백" 이라 `fallback=1` 로 남긴다
 - 텔레메트리(`gpt-skill-usage.tsv`, 헤더 없음) 8열: ts · mode · requested · resolved · fallback · exit · **injected** · **cli_version**. `resolved` 는 `--gpt-skill-path`(없으면 `--inject-skill`) 경로다. `fallback` 은 review 행에서 `-` 다 — 폴백 개념이 없다. `injected` 는 최종 프롬프트에 본문이 들어 있는가다(래퍼가 넣었든 호출부가 넣었든 1 · review 는 항상 0). 스킬 사용 지표는 이 열이 1 인 호출만 센다
 
+### 격리 호출 (`--config-permissions` — F-348)
+
+래퍼는 모든 호출에 `-c sandbox_mode="read-only"` 를 붙인다(사용자 config 가 쓰기 가능이어도 검증 호출이 쓰지 못하게). 그런데 이 값은 config 의 권한 프로필(`default_permissions`)을 **덮는다** — 프로필의 경로 deny 가 지워져 막아 둔 파일이 읽힌다(실측 2026-09-28).
+
+- `--config-permissions` 를 주면 `sandbox_mode` · `sandbox_permissions` 를 넘기지 않고 `$CODEX_HOME/config.toml` 의 프로필을 쓴다. 독립 첫 패스 런처(`scripts/gpt_independent.sh`)가 쓰는 경로다
+- 호출 전에 확인한다 — `default_permissions` 가 첫 table 앞에 있고, 그 프로필이 `extends = ":read-only"` 다. 아니면 exit 11 이다. 쓰기 금지는 그 프로필이 맡는다
+- 옵션을 주지 않은 호출의 인자는 분리 전과 바이트 단위로 같다(`tests/fixtures/gpt/config-permissions/run.sh`)
+
 ### 사전 게이트 (호출 전 거부)
 
 1. **플래그 상호 배타** — `review` + `--prompt-file` → exit 10. `exec` + `--base/--uncommitted/--commit` → exit 10

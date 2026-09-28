@@ -1,0 +1,106 @@
+{
+ "status": "ok",
+ "reason": null,
+ "approach": "주문 취소 시 알림을 끊는다",
+ "affectedFiles": {
+  "new": 1,
+  "modified": 1
+ },
+ "steps": [
+  {
+   "file": "src/orders/order_service.ts",
+   "files": null,
+   "action": "modify",
+   "why": "취소 상태 검사를 알림 앞으로"
+  },
+  {
+   "file": "tests/orders/order_service.test.ts",
+   "files": null,
+   "action": "create",
+   "why": "취소 주문 알림 0회 회귀 테스트"
+  }
+ ],
+ "riskMatrix": [
+  {
+   "risk": "기존 호출자가 순서에 의존",
+   "q": "Q2",
+   "layer": "orders",
+   "mitigation": "호출자 전수 확인"
+  }
+ ],
+ "stressTest": [
+  {
+   "q": "Q1",
+   "result": "pass",
+   "note": "-"
+  },
+  {
+   "q": "Q2",
+   "result": "pass",
+   "note": "-"
+  },
+  {
+   "q": "Q3",
+   "result": "pass",
+   "note": "-"
+  },
+  {
+   "q": "Q4",
+   "result": "pass",
+   "note": "-"
+  },
+  {
+   "q": "Q5",
+   "result": "pass",
+   "note": "-"
+  }
+ ],
+ "implicationRegister": [],
+ "divergencePoints": [
+  "검사를 서비스에 둘지 호출자에 둘지"
+ ],
+ "projectRules": {
+  "axes": {
+   "architecturePattern": null,
+   "uiStack": null,
+   "dependencyDirection": null,
+   "naming": "서버 응답 파싱 타입은 …DTO 접미사",
+   "placement": null,
+   "conventions": null
+  },
+  "rules": [
+   {
+    "id": "R1",
+    "axis": "naming",
+    "authority": "지침",
+    "appliesTo": {
+     "languages": [
+      "ts"
+     ],
+     "modules": [],
+     "paths": [
+      "src/**"
+     ]
+    },
+    "condition": "서버 응답을 파싱하는 타입",
+    "expectedResult": "`…DTO` 접미사",
+    "source": {
+     "file": "AGENTS.md",
+     "line": 4,
+     "quote": "서버 응답을 파싱하는 타입은 `…DTO` 접미사를 쓴다"
+    },
+    "appliedTo": [
+     "src/orders/order_response.ts"
+    ]
+   }
+  ],
+  "conflicts": [],
+  "gaps": [
+   "architecturePattern",
+   "uiStack",
+   "dependencyDirection",
+   "placement",
+   "conventions"
+  ]
+ }
+}
