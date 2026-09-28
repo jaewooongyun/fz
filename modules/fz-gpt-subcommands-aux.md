@@ -143,6 +143,7 @@ Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. �
 ```
 
 - 역할 본문은 격리 사본 `gpt-skills/fz-planner` · `fz-reviewer` 를 래퍼 `--inject-skill` 로 넣는다. effort 는 plan xhigh · review high 가 기본이다
+- `--gpt-agents`(review 전용 · opt-in) — 역할 파일 `gpt-agents/*.toml` 을 격리 홈에 넣고 두 렌즈 역할(`fz-review-arch` · `fz-review-quality`)만 spawn 하게 한다. 감사의 `spawnedRoles` 에 역할 이름이 남는다. 없으면 하위 에이전트 금지다
 - `--repo` 는 복사하지 않고 권한 프로필 read 로 연다 — 그 안의 `.claude` · `.fz-work` 와 `--deny` 는 막는다. review 의 `head/` 는 `skills/fz-peer-review/scripts/gather.sh` 가 만든다
 - 산출: `.json` · `.md` · `.audit.json`(rollout 수 · spawn 수 · 격리 적용 · 적중) · `.rollouts/`
 - exit: 0 성공 · 10 사용법 · 같은 --out 동시 실행 · 11 사전조건 · 12~14 래퍼 측정 실패(14 는 6축 후검사도) · 15 오염 · 16 시간 초과 · 17 planner 거부 — ⛔ 10~17 은 결과 0건이 아니다

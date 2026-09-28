@@ -12,7 +12,9 @@
 #   gpt_independent.sh plan   --requirement F [--sprint-contract F] [--rules-index F] [--snapshot D]... [--repo D [--deny D]...]
 #                             --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
 #   gpt_independent.sh review --diff F [--pr-meta F] [--requirement F] [--rules-index F] [--base D] [--head D] [--snapshot D]...
-#                             [--repo D [--deny D]...] --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
+#                             [--repo D [--deny D]...] [--gpt-agents] --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
+#   --gpt-agents review 전용 — 역할 파일(gpt-agents/*.toml)을 격리 홈 agents/ 에 넣고 두 렌즈 역할(fz-review-arch · fz-review-quality)만
+#             spawn 하게 한다(S14 · opt-in). 없으면 하위 에이전트 금지. 하위 에이전트는 부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
 #   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 와 --deny 는 막는다
 #   --snapshot 소비자 · 공유 모듈 본문 폴더 — 격리 폴더의 snapshot/<이름>/ 으로 복사한다(리뷰 범위를 줄이지 않는다)
 #
@@ -34,7 +36,7 @@ case "$MODE" in
   *) die 10 "mode 는 plan|review — 받은 값: '${MODE}'" ;;
 esac
 
-ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 EFFORT="" REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO=""
+ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 EFFORT="" REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO="" GPT_AGENTS=""
 SNAPS=() DENIES=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -54,6 +56,7 @@ while [ $# -gt 0 ]; do
     --repo)            need $# "--repo";            REPO="$2"; shift 2 ;;
     --deny)            need $# "--deny";            DENIES+=("$2"); shift 2 ;;
     --keep-iso)        KEEP_ISO=1; shift ;;
+    --gpt-agents)      GPT_AGENTS=1; shift ;;
     *) die 10 "알 수 없는 인자: $1" ;;
   esac
 done
@@ -73,6 +76,7 @@ else
   EFFORT="${EFFORT:-high}"
 fi
 [ "${#DENIES[@]}" -eq 0 ] || [ -n "$REPO" ] || die 10 "--deny 는 --repo 안에서 더 막을 경로다 — --repo 없이 줄 수 없다"
+[ -z "$GPT_AGENTS" ] || [ "$MODE" = "review" ] || die 10 "--gpt-agents 는 review 전용이다(역할 파일은 리뷰 렌즈다)"
 
 # ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — Claude 산출물이 첫 패스에 들어가면 독립이 아니다)
 REAL_HOME="$(cd "${HOME:?HOME 미설정}" && pwd -P)"
@@ -124,7 +128,10 @@ trap cleanup EXIT
 ISO="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/fz-gpt-iso.XXXXXX")" && pwd -P)" || die 11 "격리 폴더 생성 실패"
 mkdir -p "$ISO/gpt-home/skills" "$ISO/home" "$ISO/input" || die 11 "격리 폴더 구성 실패"
 ln -s "$REAL_GPT_HOME/auth.json" "$ISO/gpt-home/auth.json" || die 11 "인증 링크 실패"   # ⛔ 인증은 링크만 — 내용을 복사하지 않는다
-for s in "$PLUGIN_ROOT"/gpt-skills/fz-*; do cp -R "$s" "$ISO/gpt-home/skills/" || die 11 "스킬 사본 실패: $s"; done   # ⛔ 사본 — HOME 아래 링크 대상은 샌드박스에서 안 읽힌다
+for s in "$PLUGIN_ROOT"/gpt-skills/fz-*; do cp -R "$s" "$ISO/gpt-home/skills/" || die 11 "스킬 사본 실패: $s"; done
+if [ -n "$GPT_AGENTS" ]; then
+  mkdir -p "$ISO/gpt-home/agents" && cp "$PLUGIN_ROOT"/gpt-agents/*.toml "$ISO/gpt-home/agents/" || die 11 "역할 파일 사본 실패: $PLUGIN_ROOT/gpt-agents"
+fi   # ⛔ 사본 — HOME 아래 링크 대상은 샌드박스에서 안 읽힌다
 put() { [ -z "$1" ] || cp "$1" "$ISO/input/$2" || die 11 "입력 복사 실패: $1"; }
 put_dir() { [ -z "$1" ] || { mkdir -p "$ISO/input/$2" && cp -R "$1"/. "$ISO/input/$2/"; } || die 11 "입력 폴더 복사 실패: $1"; }
 put "$REQ" requirement.md; put "$SC" sprint-contract.md; put "$RULES" rules-index.json; put "$DIFF" diff.patch; put "$META" pr-meta.json
@@ -167,7 +174,12 @@ PY
 
 # ── 과제 프롬프트 — 역할 본문은 래퍼 --inject-skill 이 넣는다(격리 사본 경로 → 팩 경로가 풀린다)
 {
-  echo "[독립 첫 패스 — $MODE] 다른 모델과 독립으로 수행한다. 다른 모델의 계획 · 리뷰 · 중간 산출물을 찾거나 읽지 않는다. 하위 에이전트를 만들지 않는다."
+  echo "[독립 첫 패스 — $MODE] 다른 모델과 독립으로 수행한다. 다른 모델의 계획 · 리뷰 · 중간 산출물을 찾거나 읽지 않는다."
+  if [ -n "$GPT_AGENTS" ]; then
+    echo "하위 에이전트는 역할 두 개만 만든다 — agent_type \`fz-review-arch\`(아키텍처 렌즈) · \`fz-review-quality\`(품질 렌즈). 각 렌즈에 diff 와 네가 만든 규칙 레코드를 넘기고, 두 결과를 합쳐 스키마 JSON 하나로 낸다. 다른 하위 에이전트는 만들지 않는다."
+  else
+    echo "하위 에이전트를 만들지 않는다."
+  fi
   echo "읽기는 권한 프로필로 제한돼 있다 — 막힌 경로를 우회하려 하지 않는다."
   echo
   echo "## 입력 (격리 입력 폴더 $ISO/input)"
@@ -222,7 +234,7 @@ def home_ref(cmd):
         if not ((repo and (p == repo or p.startswith(repo + "/"))) or p == iso or p.startswith(iso + "/")):
             return p
     return None
-tcs, spawn, calls, hits = 0, 0, 0, []
+tcs, spawn, calls, hits, roles = 0, 0, 0, [], []
 iso_ok = bool(rolls)
 for f in rolls:
     for line in open(f, encoding="utf-8", errors="replace"):
@@ -239,6 +251,10 @@ for f in rolls:
         t = p.get("type")
         if t == "function_call" and p.get("name") == "spawn_agent":
             spawn += 1
+            try:
+                roles.append(json.loads(p.get("arguments") or "{}").get("agent_type"))
+            except (ValueError, AttributeError):
+                roles.append(None)
         cmd = None
         if t == "custom_tool_call":
             cmd = p.get("input")
@@ -256,7 +272,7 @@ for f in rolls:
             hits.append({"rollout": os.path.basename(f), "rule": why, "cmd": cmd[:300]})
 if tcs == 0:
     iso_ok = False
-audit = {"mode": mode, "rollouts": len(rolls), "turnContexts": tcs, "isolationApplied": iso_ok, "spawnAgent": spawn,
+audit = {"mode": mode, "rollouts": len(rolls), "turnContexts": tcs, "isolationApplied": iso_ok, "spawnAgent": spawn, "spawnedRoles": roles,
          "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out}
 code, note = 0, "ok"
 if hits or (not iso_ok and not timed_out and rc == 0):

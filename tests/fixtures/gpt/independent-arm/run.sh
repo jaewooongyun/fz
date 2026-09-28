@@ -38,8 +38,9 @@ ents = ([{"path": {"type": "path", "path": home}, "access": "deny"}] if deny els
 rows = [{"type": "session_meta", "payload": {"id": "x"}},
         {"type": "turn_context", "payload": {"permission_profile": {"type": "managed", "file_system": {"type": "restricted", "entries": ents}}}}]
 for c in cmds:
-    if c == "SPAWN":
-        rows.append({"type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent", "arguments": "{}"}})
+    if c == "SPAWN" or c.startswith("SPAWN:"):
+        args = json.dumps({"agent_type": c.split(":", 1)[1]}) if ":" in c else "{}"
+        rows.append({"type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent", "arguments": args}})
     else:
         rows.append({"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": f"tools.exec_command({{cmd:{json.dumps(c)}}})"}})
 open(f, "w", encoding="utf-8").write("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n")
@@ -52,6 +53,7 @@ roll "$T/r-claude.jsonl" 1 "cat /x/.claude/projects/p/a.jsonl"
 roll "$T/r-find.jsonl" 1 "find ~ -name '*.md'"
 roll "$T/r-home.jsonl" 1 "head -1 $HREAL/dev/notes.md"
 roll "$T/r-nodeny.jsonl" 0 "cat requirement.md"
+roll "$T/r-roles.jsonl" 1 "SPAWN:fz-review-arch" "SPAWN:fz-review-quality" "cat diff.patch"
 
 run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자
   local name="$1" outf="$2" rolls="$3"; shift 3
@@ -157,6 +159,24 @@ check "6축 중복: exit 14" "$(rc dup)" 14
 # ⑩ 스키마 위반(axis_coverage 누락) → 래퍼 exit 14 그대로
 run nocov "$HERE/sample-review-no-coverage.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch"
 check "스키마 위반: exit 14" "$(rc nocov)" 14
+
+# ⑪-a 역할 파일(--gpt-agents · S14) — 켜면 격리 홈에 역할 사본 · 두 역할 spawn 지시 · 감사에 역할 이름 / 끄면 agents 없음 · 하위 에이전트 금지
+run roleson "$HERE/sample-review-ok.json" "$T/r-roles.jsonl" review --diff "$IN/diff.patch" --gpt-agents --keep-iso
+check "역할 켬: exit 0" "$(rc roleson)" 0
+AISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-roleson/env.txt")"
+[ -f "$AISO/gpt-home/agents/fz-review-arch.toml" ] && [ -f "$AISO/gpt-home/agents/fz-review-quality.toml" ] && [ ! -L "$AISO/gpt-home/agents/fz-review-arch.toml" ] \
+  && ok "역할 켬: 격리 홈 agents/ 에 역할 사본 2" || no "역할 켬: 역할 사본이 없다"
+check "역할 켬: 두 역할 spawn 지시" "$(count roleson 'agent_type `fz-review-arch`')" 1
+check "역할 켬: 감사에 spawn 역할" "$(audit roleson spawnedRoles)" "['fz-review-arch', 'fz-review-quality']"
+rm -rf "$AISO"
+run rolesoff "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --keep-iso
+OISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-rolesoff/env.txt")"
+[ ! -e "$OISO/gpt-home/agents" ] && ok "역할 끔: agents 폴더 없음" || no "역할 끔: agents 폴더가 있다"
+check "역할 끔: 하위 에이전트 금지" "$(count rolesoff '하위 에이전트를 만들지 않는다.')" 1
+check "역할 끔: 감사 spawn 0" "$(audit rolesoff spawnAgent)" 0
+rm -rf "$OISO"
+run rolesplan "" "" plan --requirement "$IN/requirement.md" --gpt-agents
+check "역할 plan: exit 10(review 전용)" "$(rc rolesplan)" 10
 
 # ⑪ 사용법 → exit 10
 run u1 "" "" plan
