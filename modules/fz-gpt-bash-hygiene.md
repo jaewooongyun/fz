@@ -173,25 +173,33 @@ GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --base develop
 
 # exec: 커스텀 지시가 필요할 때 (diff는 프롬프트에 인라인 — 스코프 플래그 금지)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S] [--gpt-skill N --gpt-skill-path "$SKILL_PATH"]   # --add-dir = 쓰기 디렉토리 플래그 — fz(read-only)에선 쓰지 않는다
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S] [--gpt-skill N --gpt-skill-path "$SKILL_PATH"] [--inject-skill "$SKILL_PATH"]   # --add-dir = 쓰기 디렉토리 플래그 — fz(read-only)에선 쓰지 않는다
 
 # resume: 이전 exec·review 가 남긴 `${OUT}.session` 으로 **그 세션**을 잇는다 (⛔ --last 금지 — 사이에 다른 실행이 끼면 엉뚱한 세션)
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$F2" --prompt-file P --session-file "$F.session" [--effort xhigh] [--gpt-skill-path "$SKILL_PATH"]
 ```
 
-### 스킬 본문 주입 (`--gpt-skill-path` — A2-03)
+### 스킬 본문 판정과 주입 (`--gpt-skill-path` · `--inject-skill` — A2-03 · F-335)
 
-- `exec`·`resume` — 래퍼가 SKILL.md 본문을 프롬프트 **앞**에 넣는다(마커 줄 `[fz-gpt-skill-injected] <스킬>` + 본문 + `---`). GPT 의 스킬 자동 선택에 기대지 않는 결정론 경로다.
-- ⛔ **멱등** — **본문 전체**가 프롬프트에 이미 있으면 넣지 않는다. 호출 계약(`modules/cross-validation.md` — 호출부 8곳이 본문을 `cat` 으로 넣는다)과 함께 써도 본문은 1회다. 제목으로 판정하지 않는다 — 번들 스킬 8개 모두 첫 제목 다음 줄이 `## Role` 이라 구별되지 않는다.
-- `review` — 프롬프트를 받지 않으므로 주입할 수 없다 → WARN 만 낸다. 역할 스킬이 필요하면 `exec` 를 쓴다.
-- 경로가 있는데 파일이 없거나 비었으면 exit 11(`exec`·`resume`). 빈 문자열은 "해석 실패 → 일반 프롬프트 폴백" 이라 주입하지 않고 `fallback=1` 로 남긴다.
-- 텔레메트리(`gpt-skill-usage.tsv`, 헤더 없음) 8열: ts · mode · requested · resolved · fallback · exit · **injected** · **cli_version**. `injected` 는 최종 프롬프트에 본문이 들어 있는가다(래퍼가 넣었든 호출부가 넣었든 1 · review 는 항상 0). 스킬 사용 지표는 이 열이 1 인 호출만 센다.
+플래그 하나가 모드마다 뜻이 달랐다(주입 · 계측 · WARN). 지금은 둘로 나뉜다.
+
+| 플래그 | 뜻 | 모드 |
+|---|---|---|
+| `--gpt-skill-path P` | 계측 — 호출부가 해석한 SKILL.md 경로 | 전 모드 |
+| `--inject-skill F` | 주입 — 본문을 프롬프트 **앞**에 넣는다 | exec 전용 |
+
+- `--gpt-skill-path` 는 넣지 않는다. `exec`·`resume` 에서는 그 본문이 최종 프롬프트에 들어 있는지만 판정해 `injected` 열에 적는다. 호출 계약(`modules/cross-validation.md` — 호출부 8곳이 본문을 `cat` 으로 넣는다)의 호출은 이것만 넘긴다
+- `--inject-skill` 은 마커 줄 `[fz-gpt-skill-injected] <스킬>` + 본문 + `---` 을 앞에 붙인다. GPT 의 스킬 자동 선택에 기대지 않는 결정론 경로다. ⛔ **멱등** — **본문 전체**가 이미 있으면 넣지 않는다. 제목으로 판정하지 않는다 — 번들 스킬 8개 모두 첫 제목 다음 줄이 `## Role` 이라 구별되지 않는다
+- ⛔ `resume` · `review` 에 `--inject-skill` 을 주면 exit 10 이다. resume 은 세션 이력에 본문이 이미 있어 다시 넣으면 두 번이 되고, review 는 프롬프트가 없다. 두 플래그가 서로 다른 파일을 가리켜도 exit 10 이다
+- `review` 호출은 `--gpt-skill reviewer` 만 넘긴다. reviewer 는 fz 스킬 가운데 유일하게 CLI 가 암묵 호출하는 스킬이다(나머지 7개는 `agents/openai.yaml` 의 `policy.allow_implicit_invocation: false`). 옛 표지 `--gpt-skill-path unknown` 도 받지만 WARN 은 없다
+- 경로가 있는데 파일이 없거나 비었으면 exit 11(`exec`·`resume` — 두 플래그 모두). 빈 문자열은 "해석 실패 → 일반 프롬프트 폴백" 이라 `fallback=1` 로 남긴다
+- 텔레메트리(`gpt-skill-usage.tsv`, 헤더 없음) 8열: ts · mode · requested · resolved · fallback · exit · **injected** · **cli_version**. `resolved` 는 `--gpt-skill-path`(없으면 `--inject-skill`) 경로다. `fallback` 은 review 행에서 `-` 다 — 폴백 개념이 없다. `injected` 는 최종 프롬프트에 본문이 들어 있는가다(래퍼가 넣었든 호출부가 넣었든 1 · review 는 항상 0). 스킬 사용 지표는 이 열이 1 인 호출만 센다
 
 ### 사전 게이트 (호출 전 거부)
 
 1. **플래그 상호 배타** — `review` + `--prompt-file` → exit 10. `exec` + `--base/--uncommitted/--commit` → exit 10
 2. **필수 인자** — `review`는 스코프 1개 필수 · `exec`는 `--prompt-file` 필수 · 양쪽 `--cd`/`--out` 필수
-3. **경로 실재** — `--cd` 디렉토리 · 프롬프트·스키마 파일 비어있지 않음 · `exec`·`resume` 의 `--gpt-skill-path` 파일 · `gpt` 설치 (exit 11)
+3. **경로 실재** — `--cd` 디렉토리 · 프롬프트·스키마 파일 비어있지 않음 · `exec`·`resume` 의 `--gpt-skill-path`·`--inject-skill` 파일 · `gpt` 설치 (exit 11)
 4. **trust_level** — 미설정 시 경고(§5). ⛔ 차단은 아니다 — inline override 경로가 있다
 5. **git repo 판정** → `--skip-git-repo-check` 자동 부착(§2)
 6. **값 옵션 arity** — 값 없는 `--cd`/`--out`/… → exit 10 (⛔ 없으면 `set -u`가 exit **1**로 죽어 문서와 어긋난다)

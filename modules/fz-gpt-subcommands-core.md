@@ -22,7 +22,7 @@ fz-review의 Phase 5 GPT 부분. **Plugin 우선 → CLI 폴백.**
 
 # 래퍼 모드 (폴백 — Plugin 미설치). 공유 모듈도 읽는다(read-only 는 전 디스크 읽기 허용)
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH" --effort high \
-  --gpt-skill reviewer --gpt-skill-path unknown   # 자동 트리거 — 로드 확인 불가
+  --gpt-skill reviewer   # reviewer 는 CLI 암묵 호출 — 경로를 넘기지 않는다(로드 확인 불가)
 ```
 
 **래퍼 주요 옵션**: `--out`(파일 캡처) · `--effort` · `--schema` · `--ephemeral`(일회성). ⛔ 모델은 넘기지 않는다(`config.toml` SSOT)
@@ -191,7 +191,7 @@ fi
 
 ```bash
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --uncommitted --effort high --ephemeral \
-  --gpt-skill reviewer --gpt-skill-path unknown   # 자동 트리거 — 로드 확인 불가
+  --gpt-skill reviewer   # reviewer 는 CLI 암묵 호출 — 경로를 넘기지 않는다(로드 확인 불가)
 ```
 
 > `--ephemeral`: 일회성 검증이므로 세션 미저장. 3-Tier 스킬 자동 트리거.

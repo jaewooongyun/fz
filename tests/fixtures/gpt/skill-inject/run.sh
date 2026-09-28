@@ -1,5 +1,5 @@
 #!/bin/bash
-# gpt-exec.sh 스킬 본문 주입 계약 러너 (A2-03) — 가짜 CLI(../_shim/codex)로 래퍼 계약만 본다.
+# gpt-exec.sh 스킬 본문 판정·주입 계약 러너 (A2-03 · F-335 분리) — 가짜 CLI(../_shim/codex)로 래퍼 계약만 본다.
 #
 # ⛔ 실제 GPT CLI·사용자 텔레메트리를 건드리지 않는다 — PATH 앞에 shim 폴더, FZ_TELEMETRY_DIR 은 셀마다 임시.
 # ⛔ FZ_GPT_EXEC_UNDER_TEST 로 다른 판(기준 트리)의 래퍼를 같은 러너로 돌린다 — 판별력 대조용.
@@ -51,54 +51,90 @@ tel() {     # 텔레메트리 마지막 행의 n번째 열 (없으면 빈 값)
   tail -1 "$f" | awk -F'\t' -v c="$2" '{print $c}'
 }
 
-# ⓪ 경로가 디렉터리·공백뿐 파일이면 본문 없이 injected=1 이 되던 경로(v4.40.0 리뷰) — 호출 전에 exit 11
+# ⛔ F-335 분리 뒤 계약: --gpt-skill-path 는 계측 전용(판정만 · 넣지 않는다) · 주입은 --inject-skill(exec 전용) 하나만 한다.
+
+# ⓪ 경로가 디렉터리·공백뿐 파일이면 본문 없이 injected=1 이 되던 경로(v4.40.0 리뷰) — 호출 전에 exit 11 (두 플래그 모두)
 mkdir -p "$T/skill-dir"; printf '  \n\t\n' > "$T/blank-skill.md"
-cell pdir exec --prompt-file "$T/task.txt" --gpt-skill fz-demo --gpt-skill-path "$T/skill-dir"
-check "경로가 디렉터리: exit 11" "$(rc pdir)" 11
+cell pdir exec --prompt-file "$T/task.txt" --gpt-skill fz-demo --inject-skill "$T/skill-dir"
+check "주입 경로가 디렉터리: exit 11" "$(rc pdir)" 11
 cell pblank exec --prompt-file "$T/task.txt" --gpt-skill fz-demo --gpt-skill-path "$T/blank-skill.md"
-check "경로가 공백뿐 파일: exit 11" "$(rc pblank)" 11
+check "계측 경로가 공백뿐 파일: exit 11" "$(rc pblank)" 11
 check "공백뿐 파일: GPT 미호출" "$(count pblank "$TASK")" 0
 
-# ① exec + 경로 → 마커·제목 정확히 1회, 과제 보존, injected=1 · fallback=0
-cell exec1 exec --prompt-file "$T/task.txt" --gpt-skill fz-demo --gpt-skill-path "$SK"
+# ① exec + --inject-skill → 마커·제목 정확히 1회, 과제 보존, injected=1 · fallback=0
+cell exec1 exec --prompt-file "$T/task.txt" --gpt-skill fz-demo --inject-skill "$SK"
 check "exec 주입: exit" "$(rc exec1)" 0
 check "exec 주입: 마커 1회" "$(count exec1 "$MARK")" 1
 check "exec 주입: 본문 첫 제목 1회" "$(count exec1 "$HEAD")" 1
 check "exec 주입: 과제 본문 보존" "$(count exec1 "$TASK")" 1
 check "exec 주입: 텔레메트리 injected=1" "$(tel exec1 7)" 1
 check "exec 주입: 텔레메트리 fallback=0" "$(tel exec1 5)" 0
+check "exec 주입: 텔레메트리 resolved=주입 경로" "$(tel exec1 4)" "$SK"
 [ -n "$(tel exec1 8)" ] && [ "$(tel exec1 8)" != "-" ] && ok "exec 주입: 텔레메트리 cli_version 기록" || no "exec 주입: cli_version 열이 비었다"
 
-# ② 호출 계약 8곳(cat) + --gpt-skill-path 동시 → 본문은 여전히 1회(멱등), injected=1
+# ①-b exec + --gpt-skill-path 만 → 계측 전용이라 넣지 않는다 · injected=0 (본문이 프롬프트에 없으므로)
+cell exec1p exec --prompt-file "$T/task.txt" --gpt-skill fz-demo --gpt-skill-path "$SK"
+check "계측 전용: exit" "$(rc exec1p)" 0
+check "계측 전용: 마커 0회(주입하지 않는다)" "$(count exec1p "$MARK")" 0
+check "계측 전용: 본문 첫 제목 0회" "$(count exec1p "$HEAD")" 0
+check "계측 전용: 텔레메트리 injected=0" "$(tel exec1p 7)" 0
+check "계측 전용: 텔레메트리 fallback=0(경로는 해석됨)" "$(tel exec1p 5)" 0
+
+# ② 호출 계약 8곳(cat) + --gpt-skill-path → 본문 1회, injected=1 (판정이 살아 있어야 SC-1 집계가 선다)
 cell exec2 exec --prompt-file "$T/task-with-skill.txt" --gpt-skill fz-demo --gpt-skill-path "$SK"
-check "멱등: 본문 첫 제목 1회" "$(count exec2 "$HEAD")" 1
-check "멱등: 마커 0회(이미 들어 있어 주입 생략)" "$(count exec2 "$MARK")" 0
-check "멱등: 텔레메트리 injected=1" "$(tel exec2 7)" 1
+check "cat 호출부: 본문 첫 제목 1회" "$(count exec2 "$HEAD")" 1
+check "cat 호출부: 마커 0회" "$(count exec2 "$MARK")" 0
+check "cat 호출부: 텔레메트리 injected=1" "$(tel exec2 7)" 1
+
+# ②-a cat + --inject-skill → 여전히 1회(멱등)
+cell exec2i exec --prompt-file "$T/task-with-skill.txt" --gpt-skill fz-demo --inject-skill "$SK"
+check "멱등: 본문 첫 제목 1회" "$(count exec2i "$HEAD")" 1
+check "멱등: 마커 0회(이미 들어 있어 주입 생략)" "$(count exec2i "$MARK")" 0
+check "멱등: 텔레메트리 injected=1" "$(tel exec2i 7)" 1
 
 # ②-b 제목만 우연히 포함 → 본문이 없으므로 주입한다(생략하면 역할 없이 injected=1 로 집계된다)
-cell headonly exec --prompt-file "$T/task-head-only.txt" --gpt-skill fz-demo --gpt-skill-path "$SK"
+cell headonly exec --prompt-file "$T/task-head-only.txt" --gpt-skill fz-demo --inject-skill "$SK"
 check "제목만 우연히 포함: 마커 1회(주입함)" "$(count headonly "$MARK")" 1
 check "제목만 우연히 포함: 본문 줄 1회" "$(count headonly "역할 지시 본문 — 합성.")" 1
 
 # ②-c 제목 + 다음 줄만 포함 → 본문 전체가 아니므로 주입한다
-cell headnext exec --prompt-file "$T/task-head-next.txt" --gpt-skill fz-demo --gpt-skill-path "$SK"
+cell headnext exec --prompt-file "$T/task-head-next.txt" --gpt-skill fz-demo --inject-skill "$SK"
 check "제목+다음 줄만 포함: 마커 1회(주입함)" "$(count headnext "$MARK")" 1
 
-# ③ resume + 경로 → 주입 (--gpt-skill 없이도 행을 쓴다 · requested='-')
-cell resume1 resume --prompt-file "$T/task.txt" --session-file "$T/prev.session" --gpt-skill-path "$SK"
-check "resume 주입: exit" "$(rc resume1)" 0
-check "resume 주입: 마커 1회" "$(count resume1 "$MARK")" 1
-check "resume 주입: 본문 첫 제목 1회" "$(count resume1 "$HEAD")" 1
-check "resume 주입: 텔레메트리 requested='-'" "$(tel resume1 3)" "-"
-check "resume 주입: 텔레메트리 injected=1" "$(tel resume1 7)" 1
+# ②-d 두 플래그가 다른 파일 → 어느 본문을 판정할지 정할 수 없다 → exit 10
+printf -- '---\nname: fz-other\n---\n\n# Other\n' > "$T/other.md"
+cell conflict exec --prompt-file "$T/task.txt" --inject-skill "$SK" --gpt-skill-path "$T/other.md"
+check "두 경로 불일치: exit 10" "$(rc conflict)" 10
 
-# ④ review + 경로 → 프롬프트 없음 + WARN, injected=0
-cell review1 review --uncommitted --gpt-skill fz-demo --gpt-skill-path "$SK"
+# ③ resume + --inject-skill → 거부(세션 이력에 이미 본문이 있어 다시 넣으면 두 번 — 리뷰 A:A9) · GPT 미호출
+cell resume1 resume --prompt-file "$T/task.txt" --session-file "$T/prev.session" --inject-skill "$SK"
+check "resume 주입 거부: exit 10" "$(rc resume1)" 10
+check "resume 주입 거부: GPT 미호출" "$(count resume1 "$TASK")" 0
+
+# ③-b resume + --gpt-skill-path → 계측만 · 넣지 않는다 (--gpt-skill 없이도 행을 쓴다 · requested='-')
+cell resume2 resume --prompt-file "$T/task.txt" --session-file "$T/prev.session" --gpt-skill-path "$SK"
+check "resume 계측: exit" "$(rc resume2)" 0
+check "resume 계측: 마커 0회" "$(count resume2 "$MARK")" 0
+check "resume 계측: 텔레메트리 requested='-'" "$(tel resume2 3)" "-"
+check "resume 계측: 텔레메트리 injected=0" "$(tel resume2 7)" 0
+
+# ④ review + --gpt-skill 만 → 프롬프트 없음 · WARN 없음 · injected=0 · fallback='-' (XA:A-5 — 표지 없이 역할 이름만)
+cell review1 review --uncommitted --gpt-skill fz-demo
 check "review: exit" "$(rc review1)" 0
 check "review: 본문 주입 0회" "$(count review1 "$HEAD")" 0
-grep -q "WARN" "$T/c-review1/stderr" 2>/dev/null && grep -q -- "--gpt-skill-path" "$T/c-review1/stderr" 2>/dev/null \
-  && ok "review: WARN(주입 불가) 출력" || no "review: --gpt-skill-path WARN 이 없다"
+grep -q -- "WARN.*--gpt-skill-path" "$T/c-review1/stderr" 2>/dev/null && no "review: 주입 불가 WARN 이 났다(소음)" || ok "review: 주입 불가 WARN 없음"
 check "review: 텔레메트리 injected=0" "$(tel review1 7)" 0
+check "review: 텔레메트리 fallback='-'" "$(tel review1 5)" "-"
+
+# ④-b review + --inject-skill → exit 10 (넣을 프롬프트가 없다)
+cell review2 review --uncommitted --inject-skill "$SK"
+check "review 주입 거부: exit 10" "$(rc review2)" 10
+
+# ④-c review + 옛 표지 `--gpt-skill-path unknown` → WARN 없음 · fallback='-' (호환 — 문서 호출부에서는 표지를 뺐다)
+cell review3 review --uncommitted --gpt-skill fz-demo --gpt-skill-path unknown
+check "옛 표지: exit" "$(rc review3)" 0
+grep -q -- "WARN.*--gpt-skill-path" "$T/c-review3/stderr" 2>/dev/null && no "옛 표지: WARN 이 났다" || ok "옛 표지: WARN 없음"
+check "옛 표지: 텔레메트리 fallback='-'" "$(tel review3 5)" "-"
 
 # ⑤ 빈 경로 → 주입 없음, fallback=1 · injected=0
 cell empty1 exec --prompt-file "$T/task.txt" --gpt-skill fz-demo --gpt-skill-path ""
@@ -107,9 +143,11 @@ check "빈 경로: 마커 0회" "$(count empty1 "$MARK")" 0
 check "빈 경로: 텔레메트리 fallback=1" "$(tel empty1 5)" 1
 check "빈 경로: 텔레메트리 injected=0" "$(tel empty1 7)" 0
 
-# ⑥ 경로가 있는데 파일이 없다 → exit 11 (호출 전 사전조건)
-cell missing1 exec --prompt-file "$T/task.txt" --gpt-skill-path "$T/nope/SKILL.md"
-check "없는 스킬 파일: exit 11" "$(rc missing1)" 11
+# ⑥ 경로가 있는데 파일이 없다 → exit 11 (호출 전 사전조건 — 두 플래그 모두)
+cell missing1 exec --prompt-file "$T/task.txt" --inject-skill "$T/nope/SKILL.md"
+check "없는 주입 파일: exit 11" "$(rc missing1)" 11
+cell missing2 exec --prompt-file "$T/task.txt" --gpt-skill-path "$T/nope/SKILL.md"
+check "없는 계측 파일: exit 11" "$(rc missing2)" 11
 
 # 회귀 셀 — 기존 계약 유지
 cell rvp review --uncommitted --prompt-file "$T/task.txt"

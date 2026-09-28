@@ -26,7 +26,7 @@
 ```bash
 # 1차: 전체 리뷰 — review 모드(diff 범위 결정론 · base 검증 게이트 · reviewer 스킬 자동 트리거). 공유 모듈도 읽는다
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH" --effort xhigh \
-  --title "[TICKET] PR 전 최종 리뷰" --gpt-skill reviewer --gpt-skill-path unknown   # 자동 트리거 — 로드 확인 불가
+  --title "[TICKET] PR 전 최종 리뷰" --gpt-skill reviewer   # reviewer 는 CLI 암묵 호출 — 경로를 넘기지 않는다(로드 확인 불가)
 
 # 2차 (major+ 이슈 존재 시): 1차 세션을 이어 심화 검증
 if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
@@ -129,7 +129,7 @@ EOF
 
 > **C4 원칙**: Claude의 중간 작업물(계획 텍스트)을 전달하지 않는다. 요구사항만 공유.
 > **effort**: `xhigh` — 독립 설계이므로 최고 추론력 활용.
-> **비교**: 결과를 Claude 계획과 나란히 놓고 `Divergence Points` 섹션 검토.
+> **비교**: 결과는 JSON 한 객체다(`gpt-skills/fz-planner` 출력 형식 — `status` · `steps` · `riskMatrix` · `divergencePoints` · `projectRules`). `status` 가 `rejected` 면 계획이 아니다 — `reason` 을 보고 입력을 고친다. 차이표는 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {workflow-result.json} --gpt "$PLAN_FILE"` 로 만든다
 
 ## micro-eval -- 단일 주장 독립 재평가 (Claim-Type 라우팅)
 
