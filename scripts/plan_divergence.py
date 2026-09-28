@@ -20,6 +20,8 @@
                  (gpt-skills/fz-planner 출력 형식의 Steps · Risk Matrix 두 절을 옮긴 모양이다)
                  ⛔ contaminated: true 이거나 contamination 사유가 있으면 거부한다 — 독립 첫 패스가 아니다(AC-2)
                  ⛔ planner 마크다운은 받지 않는다 — 오염 표시를 실을 곳이 없다
+                 ⛔ 런처(gpt_independent.sh plan) 산출이면 옆 파일로 판정한다 — `.contaminated` 가 있거나 감사 exit≠0(planner 거부 17 ·
+                    시간 초과 16 포함) · 격리 미적용이면 거부한다. 감사가 없으면 런처 밖 입력이라 그대로 받는다
   --out FILE     차이표 마크다운(없으면 stdout) · --json FILE 행 단위 JSON
   --self-test
 
@@ -245,9 +247,33 @@ def render(d: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def gpt_sidecars(gpt_path: str) -> None:
+    """런처 산출이면 옆 파일로 판정한다 — 런처는 오염을 본문이 아니라 `.contaminated` 옆 파일로만 남긴다(S23)."""
+    stem = gpt_path[:-5] if gpt_path.endswith(".json") else gpt_path
+    if pathlib.Path(stem + ".contaminated").exists():
+        raise Reject(f"GPT 독립 플랜이 오염으로 끝났다({stem}.contaminated) — 차이표를 만들지 않는다")
+    audit_p = pathlib.Path(stem + ".audit.json")
+    if not audit_p.exists():
+        return
+    try:
+        audit = json.loads(audit_p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise InputError(f"런처 감사를 읽을 수 없다 — {audit_p}: {e}")
+    if audit.get("exit") != 0 or audit.get("isolationApplied") is not True:
+        raise Reject(f"GPT 독립 플랜이 통과하지 못했다 — exit {audit.get('exit')} · 격리 {audit.get('isolationApplied')} · {audit.get('note')}")
+
+
 def run(a) -> int:
     if not (a.claude and a.gpt):
         print("UNRUN: --claude 와 --gpt 가 모두 필요하다 — 한쪽만으로는 차이를 만들 수 없다", file=sys.stderr)
+        return UNRUN
+    try:
+        gpt_sidecars(a.gpt)
+    except Reject as e:
+        print(f"REJECT: {e}", file=sys.stderr)
+        return REJECT
+    except InputError as e:
+        print(f"UNRUN: {e}", file=sys.stderr)
         return UNRUN
     try:
         docs = [json.loads(pathlib.Path(p).read_text(encoding="utf-8")) for p in (a.claude, a.gpt)]
@@ -409,6 +435,18 @@ def self_test() -> int:
                    cli("--claude", str(tmp / "c.json"), "--gpt", str(tmp / "g.md")))
             case("cli-exit — 차이표 0 · 한쪽 입력 없음 2 · 오염 1 · 마크다운 2 · 실패하면 파일 0개",
                  got == ((0, ["out.md", "rows.json"]), (2, []), (1, []), (2, [])), got)
+            # 런처 옆 파일(S23) — 본문은 멀쩡해도 옆 파일이 실패를 말하면 차이표를 만들지 않는다
+            def arm(name, audit=None, contaminated=False):
+                (tmp / f"{name}.json").write_text(json.dumps(g, ensure_ascii=False), encoding="utf-8")
+                if audit is not None:
+                    (tmp / f"{name}.audit.json").write_text(json.dumps(audit), encoding="utf-8")
+                if contaminated:
+                    (tmp / f"{name}.contaminated").write_text("{}", encoding="utf-8")
+                return cli("--claude", str(tmp / "c.json"), "--gpt", str(tmp / f"{name}.json"))[0]
+            ok_a = {"exit": 0, "isolationApplied": True}
+            side = (arm("s-ok", ok_a), arm("s-plain"), arm("s-bad", ok_a, contaminated=True),
+                    arm("s-rej", dict(ok_a, exit=17, note="planner 거부")), arm("s-iso", dict(ok_a, isolationApplied=False)))
+            case("sidecar — 감사 통과 0 · 감사 없음 0 · .contaminated 1 · planner 거부(17) 1 · 격리 미적용 1", side == (0, 0, 1, 1, 1), side)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
