@@ -490,7 +490,7 @@ python3 scripts/fz_snapshot.py --diff                                           
 - **조인 키는 `prompt_id`** 다. events.jsonl 의 한 줄이 트랜스크립트의 어느 턴인지는 `prompt_id`로만 확정된다(`session_id`는 여러 턴을 묶는다). arm 짝을 맞출 때 이 키로 붙인다.
 - ⛔ **arm 적용 검증(§8.1)을 대체하지 않는다.** 계측은 사후 기록이고, arm 이 실제로 갈렸는지는 여전히 트랜스크립트 `effort` 필드 대조로 확인한다.
 - ⛔ **분모 0건은 "부하 없음"이 아니라 측정 실패다.** 리포트 부록이 분모(세션·메시지·journal·findings 수)를 함께 인쇄하므로 그 줄을 먼저 본다.
-- ⛔ **adjust 가 많아도 A/B 필요성은 사라지지 않는다.** 실측 peer-review `cross`(N=20 · overturn 1 · adjust 41 — 감사 아티팩트 audit-report §5)는 후보 *제외* 근거가 아니라 후속 검증 대상이다. adjust 는 `newSeverity` 를 필수로 요구하지 않아 건수가 유효 조정과 1:1 이 아니다 [verified: `workflows/peer-review.js:71,75`].
+- ⛔ **adjust 가 많아도 A/B 필요성은 사라지지 않는다.** 실측 peer-review `cross`(N=20 · overturn 1 · adjust 41 — 감사 아티팩트 audit-report §5)는 후보 *제외* 근거가 아니라 후속 검증 대상이다. adjust 는 `newSeverity` 를 필수로 요구하지 않아 건수가 유효 조정과 1:1 이 아니다 [verified: `workflows/peer-review.js:74,78`].
 - **판정 기준표 (정본 — 이 표가 배포물이다)**. 데이터는 이 기준을 만족할 때만 결론을 낸다:
 
 | 질문 | 지표 | 판정 |

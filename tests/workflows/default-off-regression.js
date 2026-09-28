@@ -37,6 +37,9 @@ const OPTIONS = {
   // R-C 속도 arm — 켜면 교차 2콜을 뺄 수 있다(structural)
   stage2: { workflows: ['review-live'], on: { stage2: 'conditional' }, off: { stage2: 'always' },
     structural: 'tests/workflows/review-live-stage2-arm.js' },
+  // R-C 교차 delta — 콜 수는 그대로, Stage 2 교차의 스키마 · 프롬프트만 바뀐다(동치는 tests/workflows/cross-delta-arm.js)
+  crossOutput: { workflows: ['peer-review', 'review-live'], on: { crossOutput: 'delta' }, off: { crossOutput: 'full' },
+    applies: sc => sc.stage2 },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }

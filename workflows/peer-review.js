@@ -4,7 +4,7 @@
 //   표준 패턴 3종 적용. 대형 입력(diff/evidence)은 args가 아닌 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md Analyze Step): Lead가 Gather 산출물(diff/evidence/base-behavior)을 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/peer-review.js',
-//       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields? } })
+//       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, crossOutput? } })
 //   reviewSurfacePatchPath: gather 가 만든 `review-surface.patch`(중복 커밋 제외분). 있으면 **이것이 1차 리뷰 대상**이 되고
 //     `diffPath` 는 부풀림 확인용 보조로 내려간다. ⛔ 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없다 —
 //     진단 파일만 넘기면 무력하다(GPT 리뷰 지적, 2026-09-01).
@@ -15,6 +15,9 @@
 //     미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다(tests/workflows/default-off-regression.js).
 //   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
 //   crossRequiredFields: ⛔ 기본 off(R-B). true 면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
+//   crossOutput: ⛔ 기본 'full'(미지정도 full). 'delta' 면 Stage 2 교차가 동의를 id 로만(reviewedIds) 내고 조정 · 기각 · 신규만 쓴다(S19b).
+//     PURE:cross-delta 가 full 모양으로 펴서 병합은 그대로다. 확인 목록에서 빠진 id 는 unreviewed 로 남고 crossCoverage 로 보고한다
+//     (tests/workflows/cross-delta-arm.js). 기본값 전환은 S25 가 SC-3 · SC-4 · AC-4 를 통과할 때만이다.
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   deep=false → Tier 2 (Lite): Stage1 3-병렬만 (3-call). Confidence Matrix 미투표 — Lead 단순 병합.
 //   deep=true  → Tier 3 (Full): +Stage2 교차(arch↔quality) +Stage3 counter DA (6-call). Lead full Matrix.
@@ -82,6 +85,34 @@ const CrossReviewSchema = {
       },
     },
     additions: PeerReviewSchema.properties.issues,
+  },
+}
+
+// 교차 delta 응답 (S19b) — ⛔ 기본 off(crossOutput 미지정 = full). 동의는 id 만(reviewedIds) 쓰고 조정 · 기각 · 신규만 적는다.
+//    additions 는 full 과 같은 스키마를 참조한다. expandCrossDelta(PURE:cross-delta)가 full 모양으로 펴서 병합에 넘긴다.
+const CrossDeltaSchema = {
+  type: 'object', required: ['reviewedIds', 'adjustments', 'rejections', 'additions'],
+  properties: {
+    reviewedIds: { type: 'array', items: { type: 'string' }, description: '확인한 상대 id 전부 — 동의는 여기에만 둔다' },
+    adjustments: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['id', 'newSeverity', 'note'],
+        properties: {
+          id: { type: 'string' },
+          newSeverity: CrossReviewSchema.properties.adjustments.items.properties.newSeverity,
+          note: { type: 'string', description: '조정 근거 — 실측 인용 필수' },
+        },
+      },
+    },
+    rejections: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['id', 'note'],
+        properties: { id: { type: 'string' }, note: { type: 'string', description: 'false_positive 근거 — 실측 인용 필수' } },
+      },
+    },
+    additions: CrossReviewSchema.properties.additions,
   },
 }
 
@@ -346,6 +377,30 @@ function crossFields(entries) {
 }
 // <<< PURE:cross-merge
 
+// >>> PURE:cross-delta — ⛔ 이 마커 사이는 **순수 함수**다. peer-review.js 와 review-live.js 에 **같은 글자로** 있다 —
+//     tests/workflows/cross-delta-arm.js 가 추출해 실행하고 두 사본이 같은지 단언한다. 한쪽만 고치지 말 것.
+//     delta 응답(동의는 reviewedIds 에만 둔다)을 기존 병합이 읽는 full 모양 { adjustments, additions } 로 편다 — 병합 코드는 그대로다.
+//     ⛔ 확인 목록(expectedIds)에 있는데 reviewedIds · adjustments · rejections 어디에도 없는 id 를 agree 로 채우지 않는다 —
+//        full 모드에서 판정이 빠진 id 와 같이 unreviewed 로 남고 missing 으로 보고된다(전수 확인 보존).
+//     ⛔ agree 에는 note 가 없다 — 출력을 줄이는 몫이 이것이다. 판정 필드와 adjust · false_positive 의 note 는 full 과 같다.
+function expandCrossDelta(delta, expectedIds) {
+  if (!delta) return { result: null, missing: null }
+  const list = k => (Array.isArray(delta[k]) ? delta[k] : [])
+  const judged = new Set(list('adjustments').concat(list('rejections')).map(e => e.id))
+  const agreed = [...new Set(list('reviewedIds'))].filter(id => !judged.has(id))
+  const reviewed = new Set(agreed.concat([...judged]))
+  return {
+    result: {
+      adjustments: agreed.map(id => ({ id, verdict: 'agree' }))
+        .concat(list('adjustments').map(a => ({ id: a.id, verdict: 'adjust', newSeverity: a.newSeverity, note: a.note })))
+        .concat(list('rejections').map(r => ({ id: r.id, verdict: 'false_positive', note: r.note }))),
+      additions: list('additions'),
+    },
+    missing: (expectedIds || []).filter(id => !reviewed.has(id)),
+  }
+}
+// <<< PURE:cross-delta
+
   // ⛔ 내용 게이트는 **의도적으로 없다** (2026-08-25 사용자 결정). C3 InputHygiene 는
   //    문서 규율(`SKILL.md § Orchestrator Bias 방지 규칙`)로만 지킨다 — 대상이 자연어라
   //    패턴 검사는 오탐이 나면 경고가 노이즈가 되고, 구조화 필드는 소비처 전부를 바꾼다.
@@ -404,6 +459,12 @@ function craftSummary(issueList, archResult) {
 const crossRequiredOn = input.crossRequiredFields === true || input.crossRequiredFields === 'true'
 const crossRequiredLine = !crossRequiredOn ? '' :
   `\n[필수 필드 — additions] 새 항목마다 ${CrossReviewSchema.properties.additions.items.required.join(' · ')} 를 모두 채운다(스키마 required — 하나라도 빠지면 출력이 거부돼 다시 쓰게 된다)`
+// 교차 delta 응답 (S19b) — ⛔ 기본 off. 켜면 교차 스키마를 CrossDeltaSchema 로 바꾸고 응답 모양을 한 줄로 알린다.
+const crossDeltaOn = input.crossOutput === 'delta'
+const crossSchema = crossDeltaOn ? CrossDeltaSchema : CrossReviewSchema
+const crossDeltaLine = !crossDeltaOn ? '' :
+  `\n[응답 모양 — delta] 위 목록에서 확인한 id 를 전부 reviewedIds 에 적는다. 동의는 reviewedIds 에만 두고 따로 쓰지 않는다. ` +
+  `조정은 adjustments(id · newSeverity · note), 기각(false_positive)은 rejections(id · note — 실측 인용 필수)에 쓴다. 동의한 항목을 다시 서술하지 않는다.`
 // 발견 단계 후보 보존 (S16b) — ⛔ 기본 off. 켜면 OVERRIDE 의 조기 필터 문장과 이슈 스키마의 confidence 설명을 **사본에서만** 바꾼다.
 //    원본 상수는 그대로라 꺼지면 여섯 콜 모두 기준과 바이트 단위로 같다. 스키마 쪽 문구는 스키마에서 읽는다(두 번 박지 않는다).
 //    그 설명은 참조로 네 스키마(Stage 1 · ArchCraft · 교차 additions · counter missedIssues)에 퍼져 있어 콜마다 사본을 만든다.
@@ -473,25 +534,35 @@ if (!deep) log(`Tier2 — 트리거 발화(불일치 ${trigger.severityConflicts
 phase('Stage 2: 교차 severity 조정 (arch·quality 가 서로 + correctness 를 본다)')
 let archOnPeers = null
 let qualityOnPeers = null
+let crossCoverage = null   // crossOutput='delta' 일 때만 — 렌즈별 reviewedIds 누락 id(null = 렌즈 결손)
 if (shouldRunStage2 && arch && quality) {
   const correctnessIssues = correctness ? correctness.issues : []
-  const peerFor = (own) => JSON.stringify(
-    [].concat(own === 'arch' ? quality.issues : arch.issues, correctnessIssues))
+  const peersOf = (own) => [].concat(own === 'arch' ? quality.issues : arch.issues, correctnessIssues)
+  const peerFor = (own) => JSON.stringify(peersOf(own))
   const cnote = correctnessIssues.length
     ? `\n⛔ 위 목록에는 정확성 렌즈(id \`C:\`) issue 가 포함돼 있다 — 그것도 같은 기준으로 판정한다.`
     : ''
   const cross = await parallel([
     () => callAgent(
       `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대 issues] ${peerFor('arch')}${cnote}\n` +
-      `[목표] 각 issue의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 issue는 additions(id A-X)로.${crossRequiredLine}`,
-      { label: 'stage2-arch-on-peers', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(CrossReviewSchema) }),
+      `[목표] 각 issue의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 issue는 additions(id A-X)로.${crossRequiredLine}${crossDeltaLine}`,
+      { label: 'stage2-arch-on-peers', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(crossSchema) }),
     () => callAgent(
       `${LENS_OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대 issues] ${peerFor('quality')}${cnote}\n` +
-      `[목표] 각 issue의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 issue는 additions(id Q-X)로.${crossRequiredLine}`,
-      { label: 'stage2-quality-on-peers', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(CrossReviewSchema) }),
+      `[목표] 각 issue의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 issue는 additions(id Q-X)로.${crossRequiredLine}${crossDeltaLine}`,
+      { label: 'stage2-quality-on-peers', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(crossSchema) }),
   ])
   archOnPeers = cross[0]
   qualityOnPeers = cross[1]
+  if (crossDeltaOn) {
+    const a = expandCrossDelta(archOnPeers, peersOf('arch').map(f => f.id))
+    const q = expandCrossDelta(qualityOnPeers, peersOf('quality').map(f => f.id))
+    archOnPeers = a.result
+    qualityOnPeers = q.result
+    crossCoverage = { arch: a.missing, quality: q.missing }
+    const lost = [a.missing, q.missing].filter(Boolean).reduce((n, m) => n + m.length, 0)
+    if (lost) log(`WARN 교차 delta — reviewedIds 에 없는 상대 id ${lost}건 (unreviewed 로 남긴다)`)
+  }
   if (archOnPeers) archOnPeers.additions = archOnPeers.additions.map(f => ({ ...f, id: `XA:${f.id}` }))
   if (qualityOnPeers) qualityOnPeers.additions = qualityOnPeers.additions.map(f => ({ ...f, id: `XQ:${f.id}` }))
   if (!archOnPeers || !qualityOnPeers) log('WARN stage2 부분 null — 해당 측 조정 미반영')
@@ -523,6 +594,7 @@ if (!deep) {
     mode: 'workflow', tier: 2, reviews, issues: tier2Issues,
     crossAdjustments: { archOnPeers, qualityOnPeers },
     stage2Ran: stage2Actually, stage2Trigger: trigger,
+    ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본 반환 모양 불변
     ...(craftOn ? { craftAxes: craftSummary(tier2Issues, arch) } : {}),
     // ⛔ 완주 = 완전 완주 stage 수(Tier 3 의 s1full 과 같은 식) — Stage 1 은 세 렌즈가 모두 있을 때만 완주다.
     //    이전 판은 Stage 1 을 항상 1 로 셌다 — correctness 가 죽어도 교차가 돌면 "완주 2/2" 를 냈다(S24a 실패 주입 재현).
@@ -601,6 +673,7 @@ return {
   reviews,          // 원본 per-agent (strengths/overall_assessment 포함)
   issues: mergedIssues,
   crossAdjustments: { archOnPeers, qualityOnPeers },
+  ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본 반환 모양 불변
   strengthChallenges,  // counter의 strength 반례 (Lead 판정 입력)
   distribution: dist,
   metrics: metrics(stagesCompleted),  // Lead가 experiment-log §5.7 fz-peer-review 테이블 기록
