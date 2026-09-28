@@ -604,23 +604,24 @@ Lead 가 `crossVerdicts[]` 를 읽고 § 4(Lead 실측의 자격)로 판정한�
 §3·§6·§7 가운데 **기계로 결판나는 부분**을 스크립트가 한다. 판정은 Lead 에 남는다.
 
 스크립트가 하는 일:
-- §3 키로 그룹을 묶는다 — ⛔ 후보를 지우지 않는다(입력 후보 수 = 출력 후보 수, AC-4)
+- §3 키로 그룹을 묶는다 — ⛔ 후보를 지우지 않는다(입력 후보 수 = 출력 후보 수, AC-4). 후보 경로는 먼저 diff 경로로 푼다(basename · `./` · git 따옴표 · 탭 꼬리 — `diff_anchors.resolve_path` 와 같은 의미)
 - 그룹마다 누가 찾았는지 귀속한다 — `both` · `claude_only` · `gpt_only`
-- 근거를 재실측한다 — 증거의 인용(백틱 구간, 없으면 전문)이 그 파일 hunk 에 공백 정규화 후 전부 있어야 `evidenceVerified`. 없으면 `hold` 로 두고 지우지 않는다
-- §6 `reverse` 를 `question` + oracle 로 바꾸고, `challenge` 와 `contested` 는 Lead 확인으로 표시한다
+- 근거를 재실측한다 — 증거의 인용(백틱 구간, 없으면 전문)이 그 파일 hunk 에 공백 정규화 후 전부 있어야 `evidenceVerified`. 없으면 `hold` 로 두고 지우지 않는다. ⛔ file 이 없거나 diff 에서 경로를 못 푼 후보는 전 파일을 뒤지지 않고 `hold` + 사유(`evidenceNote`)다
+- §6 `reverse` 를 `question` + oracle 로 바꾸고, `challenge` 와 `contested` 는 Lead 확인으로 표시한다. `question` 의 게시 등급은 `hold` 이고 보고서에는 `question` 목록에만 싣는다
 - §7 pre-existing 을 suggestion 으로 cap 한다(원본 severity 는 남긴다)
 - 게시 등급을 매긴다 — craft 항목은 ruleRef 가 있고 confidence 80 이상일 때만 `post`(확신도가 낮으면 suggestion 채널), confidence 80 미만 결함은 `hold`
 
 Lead 에 남는 일: disposition `include` · `observation` · `exclude` 결정(⛔ 스크립트는 `exclude` 를 매기지 않는다) · 그룹의 대표 선택과 문장 · `hold` 를 §4 자격으로 되살릴지 · `challenge`·`contested` 의 실측 판정
 
 입력원 계약:
-- Claude 렌즈 반환(`peer-review.js` · `review-live.js`)과 diff 는 필수다
+- Claude 렌즈 반환(`peer-review.js` · `review-live.js`)과 diff 는 필수다. ⚠️ `review-live.js` 반환은 렌즈 단계에서 이미 걸러진 입력이다 — 렌즈가 미리 올리는 스킬(arch-critic · code-auditor)의 '자체 confidence 80% 미만 미보고'를 끌 옵션이 없다(`preserveLowConfidence` 는 peer-review 에만 배선 · review-live 는 R-C). 병합은 그 필터 뒤에 남은 후보만 보존한다
 - **GPT 독립 첫 패스**(S13 — R-C 에서 배선)는 격리 dir 의 `head/` 스냅샷을 보므로, 경로의 `head/` 접두를 벗겨 레포 경로로 맞춘 뒤 §3 키를 비교한다
 - ⛔ GPT 독립 입력이 없으면 사유(`--gpt-unavailable`)를 요구한다 — 없으면 exit 2. 조용히 Claude 단독으로 병합하지 않는다
 - ⛔ 오염 표시(`contaminated` · `contamination`)가 붙은 GPT 입력은 거부한다 — 독립 첫 패스가 아니다(AC-2)
 - craft 항목(`craftAxis`)은 결함과 같은 그룹에 넣지 않는다 — 별 채널이다
+- ⛔ 입력 계약을 어기면 거부한다(exit 1) — severity 는 네 값 · confidence 는 0-100 숫자(생략 가능) · 후보 id 는 겹치지 않는다(`reviews` 입력은 겹친 id 에 렌즈를 붙여 가른다) · verdict 는 §6 네 종류이고 대상이 Claude 후보에 있다. 알아보지 못하는 형태(`findings`·`issues` 배열이 없는 GPT 입력 · 그 배열이 없는 리뷰)는 exit 2 — 0건으로 세지 않는다
 
-회귀: `--self-test` · `--check-fixture tests/fixtures/peer-review/tier2-merge`
+회귀: `--self-test` · `--check-fixture tests/fixtures/peer-review/tier2-merge`(기대 후보 수 · 그룹 수는 그 폴더의 `merge-expect.json`)
 
 ### 회귀 검증
 

@@ -10,6 +10,7 @@ Stage 1 3-렌즈가 낸 원본 findings 24건이 최종 14건으로 병합된 �
 |---|---|
 | `stage1-input.json` | 3-렌즈 원본 24건 — `id` · `severity` · `perspective` · `origin` · `confidence` |
 | `expected-output.json` | 병합 후 14건 — `votes` · `basis` · `found_by` · `gpt_verdict` 포함 |
+| `merge-expect.json` | 결정론 병합(S20)의 기대 수 — 후보 24 · 그룹 14. `--check-fixture` 가 대조한다 |
 
 ## 왜 판정 필드만 있는가
 
@@ -49,4 +50,4 @@ Stage 1 3-렌즈가 낸 원본 findings 24건이 최종 14건으로 병합된 �
 
 `expected-output.json` 은 `votes` 를 가진 **투표 병합** 결과다. MergeContract §9 가 Tier 2 는 투표하지 않는다고 정했으므로, 이 기대값은 Tier 3 식 병합의 참고 자료로 읽는다.
 
-`scripts/review_merge.py --check-fixture` 는 `stage1-input.json` 만 쓴다. 24건이 모두 보존되는지, 입력 순서를 바꿔도 같은 그룹(14개)이 나오는지를 본다. 입력에 증거와 `discoveryAxis` 가 없으므로 근거 재실측은 하지 않고 축은 `unknown` 하나로 본다.
+`scripts/review_merge.py --check-fixture` 는 `stage1-input.json` 과 `merge-expect.json` 을 쓴다. 24건이 모두 보존되는지, 입력 순서를 바꿔도 같은 그룹(14개)이 나오는지를 보고, 두 수를 `merge-expect.json` 과 대조한다. 입력에 증거와 `discoveryAxis` 가 없으므로 근거 재실측은 하지 않고 축은 `unknown` 하나로 본다.
