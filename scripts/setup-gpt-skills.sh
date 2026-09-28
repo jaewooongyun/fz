@@ -11,9 +11,19 @@
 # 소유 = 링크 대상 `<루트>/(skills|gpt-skills)/<이름>` 의 루트가 이 플러그인 루트이거나, 루트 매니페스트 name 이 같다
 #   (같은 name 의 포크·구버전 캐시는 같은 플러그인 계열로 본다). 루트가 사라져 판정할 수 없으면 보존한다.
 #
-# Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh
+# Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh [--gpt-agents]
+#   --gpt-agents  GPT 역할 파일(gpt-agents/*.toml — 독립 리뷰의 렌즈 역할)도 ${CODEX_HOME:-~/.codex}/agents 에 링크한다.
+#                 opt-in 이다 — 없으면 agents 폴더를 건드리지 않는다. 역할 파일 형식 실측: probe/p2 ①②(S11)
 
 set -euo pipefail
+
+WITH_AGENTS=0
+for a in "$@"; do
+  case "$a" in
+    --gpt-agents) WITH_AGENTS=1 ;;
+    *) echo "Error: unknown option: $a (usage: setup-gpt-skills.sh [--gpt-agents])"; exit 1 ;;
+  esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -39,10 +49,10 @@ except Exception:
   fi
 }
 
-# 링크 대상을 비교 가능한 형태로 — 상대 경로를 대상 폴더 기준으로 풀고, 중복·끝 슬래시를 걷고, 부모가 있으면 `..` 를 푼다
+# 링크 대상을 비교 가능한 형태로 — 상대 경로를 대상 폴더($2 · 기본 스킬 폴더) 기준으로 풀고, 중복·끝 슬래시를 걷고, 부모가 있으면 `..` 를 푼다
 norm() {
-  local d="$1" parent
-  case "$d" in /*) ;; *) d="$TARGET_DIR/$d" ;; esac
+  local d="$1" base="${2:-$TARGET_DIR}" parent
+  case "$d" in /*) ;; *) d="$base/$d" ;; esac
   d="$(printf '%s' "$d" | tr -s '/')"
   while [ "${d%/}" != "$d" ]; do d="${d%/}"; done
   parent="$(dirname "$d")"
@@ -140,6 +150,39 @@ for link in "$TARGET_DIR"/fz-*; do
   fi
 done
 
+# ── GPT 역할 파일 (opt-in --gpt-agents) — 스킬 링크와 같은 소유 규칙: 남의 살아 있는 링크 · 실제 파일은 건드리지 않는다
+agents_linked=0
+if [ "$WITH_AGENTS" -eq 1 ]; then
+  AGENT_SOURCE_DIR="$PLUGIN_DIR/gpt-agents"
+  AGENT_TARGET_DIR="${FZ_AGENT_TARGET:-${CODEX_HOME:-$HOME/.codex}/agents}"   # ⛔ 테스트 주입점 — FZ_SKILL_TARGET 과 같은 이유
+  [ -d "$AGENT_SOURCE_DIR" ] || { echo "Error: role directory not found at $AGENT_SOURCE_DIR"; exit 1; }
+  mkdir -p "$AGENT_TARGET_DIR"
+  for role in "$AGENT_SOURCE_DIR"/*.toml; do
+    [ -f "$role" ] || continue
+    role_name="$(basename "$role")"
+    target="$AGENT_TARGET_DIR/$role_name"
+    if [ -L "$target" ]; then
+      current="$(readlink "$target")"
+      if [ "$current" = "$role" ]; then
+        echo "  skip: agent $role_name (already linked)"
+        continue
+      fi
+      cur_norm="$(norm "$current" "$AGENT_TARGET_DIR")"
+      if [ -e "$target" ] && ! owned_under "$cur_norm" gpt-agents; then
+        echo "  skip: agent $role_name (다른 플러그인 링크 -> $current — manual resolution needed)"
+        continue
+      fi
+      rm "$target"
+    elif [ -e "$target" ]; then
+      echo "  skip: agent $role_name (real file exists — manual resolution needed)"
+      continue
+    fi
+    ln -s "$role" "$target"
+    echo "  link: agent $role_name -> $role"
+    agents_linked=$((agents_linked + 1))
+  done
+fi
+
 echo ""
-echo "Done: $linked linked, $skipped skipped, $pruned pruned."
+echo "Done: $linked linked, $skipped skipped, $pruned pruned.$([ "$WITH_AGENTS" -eq 1 ] && echo " agents: $agents_linked linked.")"
 echo "Verify: ls -la $TARGET_DIR/fz-*"

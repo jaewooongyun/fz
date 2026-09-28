@@ -4,6 +4,8 @@
 # 판정: ① GPT 스킬(SKILL.md 가진 gpt-skills/ 전부)이 현 판으로 링크된다 ② 이 플러그인 skills/ 를 가리키는
 #       링크가 0 이다(구버전 캐시·이름 무관 포함) ③ 다른 플러그인 링크·실제 디렉토리는 보존된다
 #       ④ 재실행은 멱등이다 ⑤ Tier 2a 디스커버리(get_gpt_skill_path)가 역할 전부를 이 폴더에서 해석한다
+#       ⑥ 인자 없으면 agents 폴더를 건드리지 않는다 ⑦ --gpt-agents 면 역할 파일(gpt-agents/*.toml)을 현 판으로 링크하고
+#          남의 같은 이름 링크 · 실제 파일은 보존한다 · 재실행 멱등 (S14 · opt-in)
 # ⛔ 실제 사용자 폴더를 건드리지 않는다 — HOME·FZ_SKILL_TARGET 은 임시 폴더, CODEX_HOME 은 비운다.
 # ⛔ FZ_SETUP_UNDER_TEST 로 다른 판(기준 트리)의 스크립트를 같은 러너로 돌린다 — 판별력 대조용.
 #    이때 기대값은 **그 스크립트의** 플러그인 루트 기준이다.
@@ -107,6 +109,28 @@ else
   done
   [ "$roles" -gt 0 ] && [ "$hit" -eq "$roles" ] && ok "Tier 2a 디스커버리 $hit/$roles 역할" || no "Tier 2a 디스커버리 $hit/$roles — 미해석:$miss"
 fi
+
+# ⑥ 인자 없는 두 번의 실행 뒤에도 agents 폴더가 없다(opt-in)
+[ -e "$H/.codex/agents" ] && no "인자 없이 agents 폴더가 생겼다(opt-in 아님)" || ok "인자 없으면 agents 폴더를 건드리지 않는다"
+
+# ⑦ --gpt-agents — 역할 파일 링크 · 남의 링크 · 실제 파일 보존 · 멱등
+AG="$T/agents"; mkdir -p "$AG" "$OTH/gpt-agents"
+echo 'name = "x"' > "$OTH/gpt-agents/fz-review-quality.toml"
+ln -s "$OTH/gpt-agents/fz-review-quality.toml" "$AG/fz-review-quality.toml"   # 남의 살아 있는 같은 이름 링크 → 보존
+echo 'name = "mine"' > "$AG/my-role.toml"                                      # 실제 파일 → 보존
+runa() { env -u CODEX_HOME HOME="$H" FZ_SKILL_TARGET="$TG" FZ_AGENT_TARGET="$AG" bash "$SETUP" --gpt-agents > "$T/out.a$1" 2>&1; }
+runa 1 && ok "--gpt-agents exit 0" || no "--gpt-agents exit $? — $(tail -2 "$T/out.a1" | tr '\n' ' ')"
+want=0 good=0
+for f in "$P"/gpt-agents/*.toml; do
+  [ -f "$f" ] || continue
+  n="$(basename "$f")"; [ "$n" = "fz-review-quality.toml" ] && continue
+  want=$((want + 1)); [ "$(readlink "$AG/$n" 2>/dev/null)" = "$f" ] && good=$((good + 1))
+done
+[ "$want" -gt 0 ] && [ "$good" -eq "$want" ] && ok "역할 파일 링크 $good/$want (현 판)" || no "역할 파일 링크 $good/$want"
+[ "$(readlink "$AG/fz-review-quality.toml")" = "$OTH/gpt-agents/fz-review-quality.toml" ] && ok "남의 같은 이름 역할 링크 보존" || no "남의 역할 링크를 바꿨다"
+[ -f "$AG/my-role.toml" ] && [ ! -L "$AG/my-role.toml" ] && ok "실제 역할 파일 보존" || no "실제 역할 파일이 바뀌었다"
+abefore="$(ls -l "$AG" | tail -n +2)"; runa 2; aafter="$(ls -l "$AG" | tail -n +2)"
+[ "$abefore" = "$aafter" ] && ok "--gpt-agents 재실행 멱등" || no "--gpt-agents 재실행이 상태를 바꿨다"
 
 echo
 [ "$fail" -eq 0 ] && echo "setup-links: 전건 통과" || echo "setup-links: 실패 있음"

@@ -12,6 +12,7 @@ fz-plugin/
 │   (TEAM 사료 — team-core·patterns 5종 — 는 2026-09-21 이동 후 2026-09-25 삭제. 결정: `modules/promotion-ledger.md` § TEAM 일몰)
 ├── guides/          9개 — prompt-optimization, skill-authoring, harness-engineering, agent-team-guide, skill-testing, model-guide, llm-references ...
 ├── gpt-skills/    8개 — GPT 네이티브 스킬 + Authority 인용 + Memory Lesson inline (fz-reviewer, fz-architect ...)
+├── gpt-agents/  GPT 역할 파일 — 독립 리뷰 렌즈(fz-review-arch · fz-review-quality) · opt-in
 ├── schemas/         6개 — GPT JSON 응답 스키마 (review, verification, gate_verdict, peer_review ...)
 ├── scripts/         56개 — gate_check(완료 판정기) · gate_stop_hook(종료 차단) · lint 3 · gpt-exec · health-check ...
 ├── tests/           fixtures/gates/ — 판정기 회귀 66케이스 (16범주, 기대 exit·산출물·시간·stdout·stderr)
