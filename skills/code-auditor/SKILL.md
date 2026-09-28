@@ -83,8 +83,6 @@ class ContentDetailInteractor: ContentDetailInteractable {
 
 ### SwiftUI Passive View 원칙
 
-> ⊕ 워크플로가 `[프로젝트 규칙 — 이 렌즈 전용]` 줄(craftAxes 옵션 — `modules/project-rules.md`)을 주면, 아래 원칙은 그 규칙이 선언한 경우에만 결함으로 판정하고 선언이 없으면 suggestion 까지로 낸다. 그 줄이 없으면 아래 원칙 그대로다.
-
 - `@State`가 비즈니스 상태를 직접 관리 → 위반 (비즈니스 로직 컴포넌트로 이동 필요)
 - `@StateObject`로 UseCase 직접 보유 → 위반 (DI를 통한 주입 필요)
 - View 내 네트워크 호출, DB 접근 → 즉시 위반
