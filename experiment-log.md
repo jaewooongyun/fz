@@ -103,6 +103,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 3 | 2026-04-25 | T1-G Sprint 3 Contract | 18 (distinct 12 after F fix, shared 2: micro-eval + reflection-rate) | cross-validation.md Cross-Model, FP 0%, Coverage 83.3%, Actionability 100% → pass + fz-plugin bug 2건 교정 |
 | 4 | 2026-04-25 | T1-G Sprint 4 Contract | 19 (distinct 17, shared 1: approval) | harness-engineering.md §기둥2, FP 0%, Coverage 94.1%, Actionability 68.4% warn (H fix 후) → pass |
 | 5 | 2026-09-27 | fz-review v4.40.0(R-A) 출하 전 | 63 (review-live 42 · GPT review 2 · 실패 경로 점검 16 · Lead 3) → 수정 22 · R-B 연기 20여 · 기각 0 | GPT validate 1차 22건 반영률 86.4%(회귀 1·새 이슈 4) → 재수정 → 2차 9건 94.4%(새 이슈 3) → 재수정(3차 GPT 미실행). 고친 검사기가 다시 fail-open — F-329 부류 3회째 |
+| 6 | 2026-09-28 | fz-review v4.42.0(R-B) 출하 전 | 73 (review-live 41 · GPT review 4 · 실패 경로 점검 26 · Lead 관찰 2) → 수정 33 · 연기 24 · 기각 0 | GPT validate 1차 33건 반영률 93.9%(회귀 2 — W2 가 §3 병합 키를 없앰 · W5 정규식이 대안을 다시 써 기존 표지까지 놓침) → 재수정 → 2차 2/2 pass · 회귀 0. 옵션 테스트 5개가 '옵션이 콜을 빼도 통과'하던 구멍(label 다중집합 · `every()` 콜 수 가드)을 막았다 |
 
 ### 누적 지표 요약 (Sprint 1-4)
 
@@ -458,6 +459,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 | 6 | 2026-06-13 | 5 | 0 | 3 | 0 | 743s | ✅ clean — **Fable 5 대응(v4.14.0 Part A) diff 리뷰** (28 path, 실사용·Fable 세션): findings 7 (critical 0/major 2/minor 5, FP 0) — 두 major가 동일 실패 클래스(사후 사용자 피드백 반영 시 승계 문서 미동기화: effort 4스킬 3곳 stale + ④ 활성/비활성 3곳 이진 상충). counter 전건 uphold + finding 정확도 보완 노트 2건([verified: Read/Grep] 인용 충실 — grounded progress OVERRIDE 첫 적용 invoke). okAreas 13 + okArea 도전 4건 전부 uphold. Lead 처분: 7건 전원 수용 즉시 반영 → Reflection 7/7 grep 검증 100%. Codex validate 불능 — 결정론적 grep 대체 |
 | 7 | 2026-07-18 | 5 | 2 | 2/3 | 0 | 4653s (invoke 2: 초회 1720s 스톨 2 + resume 2933s 캐시재생) | ⚠️ **부분 완주 — 정직 기록**: stage2 교차 2회 연속 API 스톨(Response stalled) = 임계 'null 0%' 위반 행. 대상: fz 자기수정 7커밋 diff(비-Swift). findings 11(major 3·minor 8, FP 0) — counter가 okArea 2건 refute + 신규 C-1 적발(신 fz-code 표 '입력 오류 제외'가 frozen 임계 무근거 완화로 보임 → Lead 판정: H5 재기준선 innocent reading 채택 + 승계 노트 명시로 해소). DA 가치 재실증. Codex 불능 — 이종 안전망 상실 명시 |
 | 8 | 2026-07-20 | 5(+스톨 재시도) | 0 | 3/3 | 0 | 초회 7287s **스톨 실패**(1 agent 6회 무진행 — 세션 3번째 스톨 패턴) → **resume 부분 재시도 성공**(사용자 교정: resume-first, 캐시 4 재생+1 재실행, 1193s) | ✅ 대상: plan-tkt2906-holes 플랜 문서 리뷰(비-diff, #3/#5 선례). findings 19(major 2·minor 17·FP 0): direction↔plan 카운트 disposition 상충(A1, Lead判 counter 채택 minor 정정)·H-P2→L-7 과병합 의심(조건부 격하)·순증 재산술(candidate 2→1)·브리프 전제 F-A5 반증(L-11 4회차 실효)·**감사↔플랜 직교 CONFIRMED**(file/line-disjoint). 6건 즉시 반영. Codex 불능 — 이종 상실 명시 |
+| 9 | 2026-09-28 | 5 | 0 | 3 | 0 | 1875s | ✅ clean — R-B(v4.42.0) diff 리뷰(`wf_c184ce99-1f8` · 구조 축 arch 전용): findings 41(minor 19 · suggestion 22 · critical/major 0) · counter uphold 41 · 수정 13(W1~W13, 나머지는 다른 출처와 같은 기전이거나 연기). `fz_wf_metrics` — advisor 0 · so_retries 0 · 출력 244,894 tok(thinking 162,677) · critical path 1871s · `--mcp-audit` exit 1(serena 0 · Read 67 — 09-12 감사의 serena 배선 죽음과 같은 상태) |
 
 ### fz-plan (collaborative) — Wave 2 전환 (시작: 2026-06-05)
 
