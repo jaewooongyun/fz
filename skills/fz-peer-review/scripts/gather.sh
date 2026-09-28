@@ -178,7 +178,7 @@ for e in entries:
     old = e["old"]
     if old is None and e["status"] != "added":
         old = from_header(e["header"])
-    print("%s\t%s\t%s" % (e["status"], safe(old) or "", e["new"] or ""))
+    print("%s\t%s\t%s" % (e["status"], safe(old) or "", safe(e["new"]) or ""))   # 새 경로도 같은 가드 — head/ 스냅샷이 쓴다
 PY
 
 # ⛔ PR 경로의 `baseRefName` 은 **원격 브랜치 이름**이다 — 로컬에 그 ref 가 없을 수 있다.
@@ -369,6 +369,26 @@ while IFS= read -r row; do
   fi
 done < "$STAGE_DIR/base-manifest.tsv"
 
+# ── head 원본 (GPT 독립 첫 패스 입력 — S13) ─────────────────────
+# ⛔ 새 경로(`+++ b/…` · rename to)를 head ref 에서 읽는다 — 독립 리뷰는 저장소를 보지 않고 이 스냅샷을 본다.
+#    삭제 파일은 head 에 없으므로 대상이 아니다. 경로 가드는 base/ 와 같다(manifest 의 새 경로 열도 safe() 를 거쳤다).
+# ⚠️ PR 인데 `pr-{N}` 이 없으면 head ref 를 모른다 — 수집하지 않고 GATHER-NOTE 로 남긴다(실패가 아니다)
+mkdir -p "$STAGE_DIR/head"
+hsaved=0 hexpected=0
+if [ -n "$HEAD_REF" ]; then
+  while IFS= read -r row; do
+    status="${row%%$'\t'*}"
+    new="${row##*$'\t'}"
+    [ "$status" != "deleted" ] && [ -n "$new" ] && [ "$new" != "$row" ] || continue
+    hexpected=$((hexpected+1))
+    out="$STAGE_DIR/head/$new"
+    mkdir -p "$(dirname "$out")" 2>/dev/null || continue
+    if git show "${HEAD_REF}:${new}" > "$out" 2>/dev/null; then hsaved=$((hsaved+1)); else rm -f "$out"; fi
+  done < "$STAGE_DIR/base-manifest.tsv"
+else
+  echo "GATHER-NOTE: head ref 를 해석하지 못해 head/ 스냅샷을 만들지 않았다(PR 이면 pr-${TARGET} 을 fetch)" >&2
+fi
+
 {
   printf '# base 원본\n\n'
   printf '대상 base: `%s`' "$BASE"
@@ -433,8 +453,8 @@ rm -rf "$STAGE_DIR"
 
 added=$(awk '{a+=$1} END{print a+0}' "$WORK_DIR/numstat.txt")
 deleted=$(awk '{d+=$2} END{print d+0}' "$WORK_DIR/numstat.txt")
-echo "수집 완료 — base=$BASE / +$added −$deleted / base 원본 ${saved}/${expected}개"
-echo "  diff.patch · requirements.md · base-behavior.md · base/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json"
+echo "수집 완료 — base=$BASE / +$added −$deleted / base 원본 ${saved}/${expected}개 · head 원본 ${hsaved}/${hexpected}개"
+echo "  diff.patch · requirements.md · base-behavior.md · base/ · head/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json"
 [ -f "$WORK_DIR/evidence-move-drift.md" ] && echo "  ⭐ evidence-move-drift.md — 이동 리팩토링 감지. 동등성과 **별개 축**이다"
 grep -q '⛔ \*\*head 커밋' "$WORK_DIR/review-surface.md" 2>/dev/null && \
   echo "⚠️  중복 커밋 감지 — review-surface.md 를 먼저 읽어라. Tier 판정이 부풀려져 있다"

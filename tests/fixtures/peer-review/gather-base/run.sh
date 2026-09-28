@@ -10,6 +10,7 @@
 #   C  경로 충돌       `/`→`_` 평탄화는 `a_b/c` 와 `a/b_c` 를 한 파일로 만든다
 #   M  merge-base      `A...B` 는 merge-base 기준인데 BASE 팁 내용을 읽으면 원본이 아니다
 #   H  hunk 안의 `--- a/x` 를 파일 헤더로 오인하면 남의 경로를 수집한다
+#   Hd head/ 스냅샷(S13 — GPT 독립 첫 패스 입력) — 새 경로로 head 내용을 읽고, 삭제 파일은 빼고, 신규 파일은 넣는다
 #
 # exit: 0 전건 통과 / 1 불일치 / 2 실행 오류
 set -uo pipefail
@@ -91,6 +92,15 @@ else ok "H hunk 내 --- 를 헤더로 오인 안 함"; fi
 
 # 신규 파일은 base 에 없다
 if has fresh.txt; then no "added 파일 제외" "base/fresh.txt 가 생겼다"; else ok "added 파일 제외"; fi
+
+# Hd head/ 스냅샷 — head ref(feature/t)의 내용 · 새 경로 · 신규 포함 · 삭제 제외
+hbody() { cat "$WORK/head/$1" 2>/dev/null; }
+[ "$(hbody mod.txt)" = "CHANGED" ] && ok "Hd head 내용(base 팁 아님)" || no "Hd head 내용" "기대 CHANGED, 실제 [$(hbody mod.txt)]"
+[ "$(hbody new/name.txt)" = "renamed body" ] && ok "Hd rename 은 새 경로로" || no "Hd rename 은 새 경로로" "head/new/name.txt [$(hbody new/name.txt)]"
+[ "$(hbody fresh.txt)" = "brand new" ] && ok "Hd 신규 파일 포함" || no "Hd 신규 파일 포함" "head/fresh.txt 없음"
+[ -f "$WORK/head/gone.txt" ] && no "Hd 삭제 파일 제외" "head/gone.txt 가 생겼다" || ok "Hd 삭제 파일 제외"
+[ -f "$WORK/head/evil/injected.txt" ] && no "Hd hunk 내 +++ 오인 없음" "head/evil/injected.txt" || ok "Hd hunk 내 경로 오인 없음"
+[ "$(hbody a_b/c.txt)" = "A_B slash C v2" ] && [ "$(hbody a/b_c.txt)" = "A slash B_C v2" ] && ok "Hd 경로 충돌 없음" || no "Hd 경로 충돌 없음" "[$(hbody a_b/c.txt)] / [$(hbody a/b_c.txt)]"
 
 # 매니페스트 상태 표기
 m="$WORK/base-manifest.tsv"

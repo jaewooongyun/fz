@@ -133,7 +133,7 @@ bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/gather.sh" \
   --work-dir "${WORK_DIR}" --target {PR번호|브랜치} [--base BRANCH]
 ```
 
-산출: `diff.patch` · `requirements.md` · `base-behavior.md` + `base/` · `base-manifest.tsv` · **`review-surface.md`** · `numstat.txt` · `risk.json`
+산출: `diff.patch` · `requirements.md` · `base-behavior.md` + `base/` · `head/`(GPT 독립 첫 패스 입력) · `base-manifest.tsv` · **`review-surface.md`** · `numstat.txt` · `risk.json`
 
 ⭐ 이동 리팩토링(신규 파일 + 그만큼의 삭제)이면 **`evidence-move-drift.md`** 가 함께 나온다 — ⛔ **동등성과 별개 축**이다. 다중집합 차가 "값 표현식 변화 0" 을 보여도 이동이 만든 문서·구조 드리프트는 거기 없다(실측 #4774: 동등성 통과 후 단독 리뷰 0건 · 3렌즈가 regression 3건).
 
