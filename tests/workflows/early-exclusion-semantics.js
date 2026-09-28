@@ -49,6 +49,7 @@ if (require.main === module) {
   const ROOT = process.env.FZ_WF_ROOT || path.join(__dirname, '..', '..')
   const WF = path.join(ROOT, 'workflows', 'peer-review.js')
   let fail = 0
+  const labels = calls => calls.map(c => c.label).sort().join(',')   // ⛔ 옵션은 콜을 더하거나 빼지 않는다 — 콜별 검사는 빠진 콜을 못 본다
   const check = (name, cond, got) => {
     console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${cond ? '' : ` — ${got}`}`)
     if (!cond) fail += 1
@@ -128,6 +129,7 @@ if (require.main === module) {
       const leaked = on.filter(c => c.found.length)
       check(`${sc.name} · preserveLowConfidence: 콜 ${on.length}개 어디에도 조기 배제가 없다`,
         on.length > 0 && leaked.length === 0, leaked.map(c => `${c.label}: ${c.found[0]}`).join(' | ') || '콜 0개')
+      check(`${sc.name}: 켠 실행과 미지정 실행의 콜 구성(label 다중집합)이 같다`, labels(on) === labels(unset), `켬 ${labels(on)} · 미지정 ${labels(unset)}`)
     }
     console.log(`\n조기 배제 의미 검사 ${fail ? '실패 ' + fail + '건' : '전건 통과'} (대상 ${path.relative(process.cwd(), ROOT) || '.'})`)
     process.exit(fail ? 1 : 0)

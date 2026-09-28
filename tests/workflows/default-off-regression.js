@@ -23,7 +23,9 @@ const OPTIONS = {
   craftAxes: { workflows: ['peer-review', 'review-live'], on: { craftAxes: true }, off: { craftAxes: false } },
   crossRequiredFields: { workflows: ['peer-review', 'review-live'], on: { crossRequiredFields: true }, off: { crossRequiredFields: false },
     applies: sc => sc.stage2 },   // Stage 2 교차 프롬프트에만 닿는다
-  // review-live 는 confidence 필드가 없어 조기 필터도 없다 — peer-review 만. OVERRIDE 가 모든 콜에 있어 applies 가 없다
+  // peer-review 만 — ⛔ review-live 도 조기 필터가 있다: 렌즈 에이전트가 미리 올리는 스킬(arch-critic · code-auditor)의
+  //   '자체 confidence 80% 미만이면 보고하지 않는다'. 그 해제 줄은 [후보 보존] 문장에만 발화하는데 review-live 는 그 문장을
+  //   내지 않고 confidence 필드도 없어 끌 길이 없다(배선은 R-C). OVERRIDE 가 모든 콜에 있어 applies 가 없다
   preserveLowConfidence: { workflows: ['peer-review'], on: { preserveLowConfidence: true }, off: { preserveLowConfidence: false } },
 }
 
@@ -96,6 +98,7 @@ function firstDiff(a, b) {
   return null
 }
 
+const labels = calls => calls.map(c => c.label).sort().join(',')   // ⛔ 옵션은 콜을 더하거나 빼지 않는다 — 콜별 검사는 빠진 콜을 못 본다
 let fail = 0
 function check(name, cond, got) {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${cond ? '' : ` — ${got}`}`)
@@ -131,6 +134,7 @@ function check(name, cond, got) {
           check(`${tag}: ${JSON.stringify(opt.off)} == 기준`, firstDiff(off, base) === null, firstDiff(off, base))
           if (!opt.applies || opt.applies(sc)) check(`${tag}: ${JSON.stringify(opt.on)} != 기준(옵션이 배선돼 있다)`, firstDiff(on, base) !== null, '켜도 콜 입력이 같다 — 헛돌이')
           else check(`${tag}: ${JSON.stringify(opt.on)} == 기준(이 경로에는 옵션이 닿지 않는다)`, firstDiff(on, base) === null, firstDiff(on, base))
+          check(`${tag}: ${JSON.stringify(opt.on)} 의 콜 구성(label 다중집합) == 기준`, on.length > 0 && labels(on) === labels(base), `켬 ${labels(on)} · 기준 ${labels(base)}`)
         }
       }
     }

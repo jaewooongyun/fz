@@ -64,6 +64,7 @@ function scope(text) {
   return { hits, bare }
 }
 
+const labels = calls => calls.map(c => c.label).sort().join(',')   // ⛔ 옵션은 콜을 더하거나 빼지 않는다 — 콜별 검사는 빠진 콜을 못 본다
 let fail = 0
 function check(name, cond, got) {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${cond ? '' : ` — ${got}`}`)
@@ -87,6 +88,7 @@ function check(name, cond, got) {
     const lost = off.calls.filter(c => !FILTER.test(c.prompt))
     check(`${sc.name} · 옵션 미지정: 모든 콜 프롬프트에 기존 조기 필터가 남아 있다(기본 경로 유지)`, off.calls.length > 0 && lost.length === 0,
       lost.map(c => c.label).join(',') || '콜 0개')
+    check(`${sc.name}: 켠 실행과 끈 실행의 콜 구성(label 다중집합)이 같다`, labels(on.calls) === labels(off.calls), `켬 ${labels(on.calls)} · 끔 ${labels(off.calls)}`)
   }
 
   for (const d of DOCS) {
