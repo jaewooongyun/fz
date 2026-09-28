@@ -25,10 +25,10 @@ const OPTIONS = {
   craftAxes: { workflows: ['peer-review', 'review-live'], on: { craftAxes: true }, off: { craftAxes: false } },
   crossRequiredFields: { workflows: ['peer-review', 'review-live'], on: { crossRequiredFields: true }, off: { crossRequiredFields: false },
     applies: sc => sc.stage2 },   // Stage 2 교차 프롬프트에만 닿는다
-  // peer-review 만 — ⛔ review-live 도 조기 필터가 있다: 렌즈 에이전트가 미리 올리는 스킬(arch-critic · code-auditor)의
-  //   '자체 confidence 80% 미만이면 보고하지 않는다'. 그 해제 줄은 [후보 보존] 문장에만 발화하는데 review-live 는 그 문장을
-  //   내지 않고 confidence 필드도 없어 끌 길이 없다(배선은 R-C). OVERRIDE 가 모든 콜에 있어 applies 가 없다
-  preserveLowConfidence: { workflows: ['peer-review'], on: { preserveLowConfidence: true }, off: { preserveLowConfidence: false } },
+  // 두 워크플로 — 렌즈 에이전트가 미리 올리는 스킬(arch-critic · code-auditor)의 '자체 confidence 80% 미만이면 보고하지 않는다' 는
+  //   [후보 보존] 문장에만 풀린다. peer-review 는 OVERRIDE 문장을 바꾸고, review-live(R-C S22)는 문장을 덧붙이고 스키마 사본에
+  //   confidence 를 얹는다. OVERRIDE 가 모든 콜에 있어 applies 가 없다
+  preserveLowConfidence: { workflows: ['peer-review', 'review-live'], on: { preserveLowConfidence: true }, off: { preserveLowConfidence: false } },
   // review-live 만 — peer-review 는 기본 스키마에 위치 필드가 있다. Stage 1 두 콜의 스키마만 바뀐다
   locatedFindings: { workflows: ['review-live'], on: { locatedFindings: true }, off: { locatedFindings: false } },
   // R-C 속도 arm — 켜면 병합 콜을 뺄 수 있다(structural)

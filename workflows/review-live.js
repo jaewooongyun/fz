@@ -4,7 +4,7 @@
 //   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/review-live.js',
-//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2?, crossOutput? } })
+//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2?, crossOutput?, preserveLowConfidence? } })
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄 · axisCoverage(6축 필수) · craftAxis · ruleRef 가 들어간다.
@@ -20,6 +20,9 @@
 //   crossOutput: ⛔ 기본 'full'(미지정도 full). 'delta' 면 Stage 2 교차가 동의를 id 로만(reviewedIds) 내고 조정 · 기각 · 신규만 쓴다(S19b).
 //     PURE:cross-delta 가 full 모양으로 펴서 병합은 그대로다. 확인 목록에서 빠진 id 는 unreviewed 로 남고 crossCoverage 로 보고한다
 //     (tests/workflows/cross-delta-arm.js). 기본값 전환은 S25 가 SC-3 · SC-4 · AC-4 를 통과할 때만이다.
+//   preserveLowConfidence: ⛔ 기본 off(R-C S22 · peer-review S16b 와 같은 옵션). 켜면 다섯 콜 프롬프트에 `[후보 보존]` 문장을 더하고
+//     finding 스키마 사본에 confidence(0-100) 선택 필드를 얹는다. 렌즈 스킬(arch-critic · code-auditor)의 '자체 confidence 80% 미만
+//     미보고' 는 그 문장이 있을 때만 풀린다 — 게시 여부는 review_merge 가 정한다(tests/workflows/low-confidence-preserved.js).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
@@ -221,6 +224,26 @@ const structuralLine = input.structuralContext ? `\n[구조 축 — 이 렌즈 �
 // ⛔ projectRulesPath 는 craftAxes 의 하위 옵션이다 — craftAxes 없이 넘겨도 기본 경로를 바꾸지 않는다.
 const craftOn = input.craftAxes === true || input.craftAxes === 'true'
 const locatedOn = input.locatedFindings === true || input.locatedFindings === 'true'
+// 발견 단계 후보 보존 (S22) — ⛔ 기본 off. peer-review 와 달리 OVERRIDE 에 바꿀 조기 필터 문장이 없다(필터는 렌즈 스킬에만 있다) —
+//    표지 문장을 **덧붙이고**, finding 스키마는 **사본**에만 confidence 를 얹는다. ReviewFindingsSchema 는 교차 additions ·
+//    counter missedFindings 가 참조로 공유해서 원본을 고치면 끈 경로까지 샌다. 끄면 원본 객체를 그대로 넘겨 바이트 단위로 같다.
+const lowConfOn = input.preserveLowConfidence === true || input.preserveLowConfidence === 'true'
+const LENS_OVERRIDE = !lowConfOn ? OVERRIDE : `${OVERRIDE} [후보 보존] confidence 는 0-100 값으로 달되 낮다고 빼지 않는다 — 게시 여부는 병합이 정한다.`
+function withConfidence(node) {
+  if (Array.isArray(node)) { node.forEach(withConfidence); return }
+  if (!node || typeof node !== 'object') return
+  const p = node.properties
+  if (p && p.severity && p.evidence && p.category && !p.confidence) {
+    p.confidence = { type: 'number', description: '0-100 — 낮아도 보고한다(게시 등급은 병합이 정한다)' }
+  }
+  Object.values(node).forEach(withConfidence)
+}
+const lensSchema = schema => {
+  if (!lowConfOn) return schema
+  const copy = JSON.parse(JSON.stringify(schema))
+  withConfidence(copy)
+  return copy
+}
 const stage1Schema = locatedOn ? LocatedFindingsSchema : ReviewFindingsSchema
 const craftLine = !craftOn ? '' :
   `\n[craft 축 — 이 렌즈 전용] ${CRAFT_AXES.join(' · ')} — 축마다 axisCoverage 에 1행(finding · none · not_applicable, note 에 근거)을 쓴다. ` +
@@ -255,13 +278,13 @@ const crossDeltaLine = !crossDeltaOn ? '' :
 phase('Stage 1: arch/quality 독립 리뷰')
 const [arch, quality] = await parallel([
   () => callAgent(
-    `${OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}${craftLine}\n` +
+    `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}${craftLine}\n` +
     `[목표] 아키텍처 관점 findings (id는 A1, A2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
-    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: craftOn ? archCraftSchema(stage1Schema) : stage1Schema }),
+    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(craftOn ? archCraftSchema(stage1Schema) : stage1Schema) }),
   () => callAgent(
-    `${OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
+    `${LENS_OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
     `[목표] 품질 관점 findings (id는 Q1, Q2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
-    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: stage1Schema }),
+    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(stage1Schema) }),
 ])
 if (!arch && !quality) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 both null', metrics: metrics(0) } }
 if (!arch || !quality) log('WARN stage1 한쪽 null — 단독 진행 (교차 조정 생략)')
@@ -399,13 +422,13 @@ let crossCoverage = null   // crossOutput='delta' 일 때만 — 렌즈별 revie
 if (arch && quality && !stage2Skipped) {
   const cross = await parallel([
     () => callAgent(
-      `${OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대(품질) findings] ${JSON.stringify(quality.findings)}\n` +
+      `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대(품질) findings] ${JSON.stringify(quality.findings)}\n` +
       `[목표] 각 finding의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 finding은 additions(id A-X)로.${crossRequiredLine}${crossDeltaLine}`,
-      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: crossSchema }),
+      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(crossSchema) }),
     () => callAgent(
-      `${OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대(아키) findings] ${JSON.stringify(arch.findings)}\n` +
+      `${LENS_OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대(아키) findings] ${JSON.stringify(arch.findings)}\n` +
       `[목표] 각 finding의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 finding은 additions(id Q-X)로.${crossRequiredLine}${crossDeltaLine}`,
-      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: crossSchema }),
+      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(crossSchema) }),
   ])
   archOnQuality = cross[0]
   qualityOnArch = cross[1]
@@ -430,10 +453,10 @@ const allFindings = []
   .concat(archOnQuality ? archOnQuality.additions : [], qualityOnArch ? qualityOnArch.additions : [])
 const allOkAreas = [].concat(arch ? arch.okAreas : [], quality ? quality.okAreas : [])
 const counter = await callAgent(
-  `${OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
+  `${LENS_OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
   `[findings] ${JSON.stringify(allFindings)}\n[okAreas(정상 판정)] ${JSON.stringify(allOkAreas)}\n` +
   `[목표] (1) 각 finding을 실측 재검증 — 과장/오독이면 refute + 인용. (2) okAreas에 "정말 OK인가?" 반례 탐색 — 반례 발견 시 missedFindings(id C-X)로. 라인 인용 오류를 특히 의심.`,
-  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: 'xhigh', schema: CounterSchema })
+  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: 'xhigh', schema: lensSchema(CounterSchema) })
 if (!counter) log('WARN counter null — DA 패스 미수행 (findings 원판정 유지)')
 
 // ════════ 병합 — 스크립트 binary 규칙 (id-기반 verdict 반영) ════════

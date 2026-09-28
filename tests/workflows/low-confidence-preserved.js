@@ -6,6 +6,8 @@
 // ⛔ 하네스는 에이전트 frontmatter 가 미리 올리는 스킬 본문(review-arch → arch-critic · review-quality → code-auditor)을 볼 수 없다.
 //    그래서 스킬 쪽은 문서 검사다 — 검사기가 잡은 조기 배제 문장마다 같은 절(제목과 제목 사이)에 `[후보 보존]` 조건부 절이 있어야 한다.
 // ⛔ 옵션 미지정일 때 기준과 바이트 단위로 같은지는 default-off-regression.js 가 본다. 기준 트리(FZ_WF_ROOT)는 옵션을 몰라 FAIL 이다.
+// ⛔ review-live(R-C S22)는 워크플로 안에 조기 필터 문장이 없다 — 필터는 렌즈 스킬에만 있다. 그래서 거기는 **표지 문장의 존재**와
+//    finding 스키마 사본의 confidence 필드, 확신도 낮은 finding 이 반환에 남는지를 본다.
 'use strict'
 const fs = require('fs')
 const path = require('path')
@@ -14,6 +16,7 @@ const { earlyExclusions } = require('./early-exclusion-semantics')
 
 const ROOT = process.env.FZ_WF_ROOT || path.join(__dirname, '..', '..')
 const WF = path.join(ROOT, 'workflows', 'peer-review.js')
+const WF_LIVE = path.join(ROOT, 'workflows', 'review-live.js')
 const FILTER = /80 미만 미보고|confidence 80 미만은 보고하지|confidence < 80 → 보고하지|confidence 80% 미만이면 보고하지/
 const MARK = '[후보 보존]'
 const SCENARIOS = [
@@ -46,6 +49,23 @@ async function capture(args, fire) {
   const calls = []
   const table = responses(fire)
   const { result } = await run(WF, { args: Object.assign({ diffPath: '/tmp/diff.patch', intentContext: '합성 의도' }, args), responder: (prompt, opts) => {
+    calls.push({ label: opts.label, prompt, schema: JSON.stringify(opts.schema || null) })
+    return table[opts.label] ? JSON.parse(JSON.stringify(table[opts.label])) : null
+  } })
+  return { calls, result }
+}
+
+const LIVE_LOW = { id: 'Q7', severity: 'minor', category: 'c', title: 't', detail: 'd', evidence: 'e', confidence: 40 }
+async function captureLive(args) {
+  const calls = []
+  const table = {
+    'stage1-arch': { findings: [], okAreas: ['ok'] },
+    'stage1-quality': { findings: [LIVE_LOW], okAreas: [] },
+    'stage2-arch-on-quality': { adjustments: [], additions: [] },
+    'stage2-quality-on-arch': { adjustments: [], additions: [] },
+    'stage3-counter': { challenges: [], missedFindings: [] },
+  }
+  const { result } = await run(WF_LIVE, { args: Object.assign({ diffPath: '/tmp/diff.patch', intentContext: '합성 의도' }, args), responder: (prompt, opts) => {
     calls.push({ label: opts.label, prompt, schema: JSON.stringify(opts.schema || null) })
     return table[opts.label] ? JSON.parse(JSON.stringify(table[opts.label])) : null
   } })
@@ -90,6 +110,24 @@ function check(name, cond, got) {
       lost.map(c => c.label).join(',') || '콜 0개')
     check(`${sc.name}: 켠 실행과 끈 실행의 콜 구성(label 다중집합)이 같다`, labels(on.calls) === labels(off.calls), `켬 ${labels(on.calls)} · 끔 ${labels(off.calls)}`)
   }
+
+  // review-live — 다섯 콜 모두에 표지 문장 · finding 을 내는 모든 스키마(Stage 1 · 교차 additions · counter missedFindings)에 confidence
+  const liveOn = await captureLive({ preserveLowConfidence: true })
+  const liveUnmarked = liveOn.calls.filter(c => !c.prompt.includes(MARK))
+  check(`review-live · preserveLowConfidence: 콜 ${liveOn.calls.length}개 프롬프트 모두에 ${MARK} 문장이 있다`,
+    liveOn.calls.length === 5 && liveUnmarked.length === 0, liveUnmarked.map(c => c.label).join(',') || `콜 ${liveOn.calls.length}개`)
+  const noConf = liveOn.calls.filter(c => !c.schema.includes('"confidence"'))
+  check('review-live · preserveLowConfidence: finding 을 내는 모든 스키마에 confidence 필드가 있다', liveOn.calls.length === 5 && noConf.length === 0,
+    noConf.map(c => c.label).join(','))
+  const liveKept = liveOn.result && Array.isArray(liveOn.result.findings) ? liveOn.result.findings.find(f => f.id === 'Q:Q7') : null
+  check('review-live · preserveLowConfidence: confidence 40 finding 이 반환 findings 에 값 그대로 남는다', !!liveKept && liveKept.confidence === 40,
+    liveKept ? `confidence ${liveKept.confidence}` : '반환에 없다')
+  const liveOff = await captureLive({})
+  const liveLeak = liveOff.calls.filter(c => c.prompt.includes(MARK) || c.schema.includes('"confidence"'))
+  check('review-live · 옵션 미지정: 표지 문장과 confidence 필드가 없다(기본 경로 유지)', liveOff.calls.length === 5 && liveLeak.length === 0,
+    liveLeak.map(c => c.label).join(',') || `콜 ${liveOff.calls.length}개`)
+  check('review-live: 켠 실행과 끈 실행의 콜 구성(label 다중집합)이 같다', labels(liveOn.calls) === labels(liveOff.calls),
+    `켬 ${labels(liveOn.calls)} · 끔 ${labels(liveOff.calls)}`)
 
   for (const d of DOCS) {
     const f = path.join(ROOT, d.file)
