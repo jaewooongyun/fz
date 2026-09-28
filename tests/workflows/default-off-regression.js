@@ -34,6 +34,9 @@ const OPTIONS = {
   // R-C 속도 arm — 켜면 병합 콜을 뺄 수 있다(structural)
   mergeMode: { workflows: ['plan-lean2'], on: { mergeMode: 'conditional' }, off: { mergeMode: 'always' },
     structural: 'tests/workflows/plan-lean2-merge-arm.js' },
+  // R-C 속도 arm — 켜면 교차 2콜을 뺄 수 있다(structural)
+  stage2: { workflows: ['review-live'], on: { stage2: 'conditional' }, off: { stage2: 'always' },
+    structural: 'tests/workflows/review-live-stage2-arm.js' },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }

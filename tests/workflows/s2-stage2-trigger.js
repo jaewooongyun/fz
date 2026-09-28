@@ -117,6 +117,19 @@ push('축 누락 → 겹침만 판정 (현행 유지)',
     { agent: 'q', issues: [{ file: 'F.ext', line_range: '5-9', severity: 'minor' }] },
   ]).severityConflicts === 1, 'ok')
 
+// ⛔ review-live.js 사본 동일성 (S19) — review-live 는 이 블록을 복제해 쓴다. 마커 줄까지 글자가 같아야 하고, 한쪽만 고치면 여기서 FAIL 이다.
+//    같으면 위의 판정 케이스가 사본에도 그대로 성립한다. review-live 의 제어 흐름은 tests/workflows/review-live-stage2-arm.js 가 실제로 돌려 본다.
+function blockOf(file) {
+  const src = fs.readFileSync(file, 'utf8')
+  const i = src.indexOf(BEGIN), j = src.indexOf(END)
+  if (i < 0 || j < 0 || j < i) return null
+  return src.slice(src.lastIndexOf('\n', i) + 1, src.indexOf('\n', j))
+}
+const orig = blockOf(SOURCE)
+const copy = blockOf(path.join(__dirname, '..', '..', 'workflows', 'review-live.js'))
+push('review-live 사본 == peer-review 원본 (마커 줄 포함 전문)', orig !== null && copy !== null && orig === copy,
+  copy === null ? 'review-live 에 마커 없음' : `원본 ${orig.length}자 · 사본 ${copy.length}자`)
+
 const c1 = flow(false, false), c2 = flow(false, true), c3 = flow(true, false), c4 = flow(true, true)
 push('케이스1 deep=F trig=F → tier2·ran F·S3 X', c1.tier === 2 && !c1.stage2Ran && !c1.stage3, c1)
 push('케이스2 deep=F trig=T → tier2·ran T·S3 X', c2.tier === 2 && c2.stage2Ran && !c2.stage3, c2)

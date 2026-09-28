@@ -4,7 +4,7 @@
 //   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
 //     Workflow({ scriptPath: '{plugin_root}/workflows/review-live.js',
-//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings? } })
+//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2? } })
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄 · axisCoverage(6축 필수) · craftAxis · ruleRef 가 들어간다.
@@ -12,6 +12,10 @@
 //   locatedFindings: §3 병합 키 — ⛔ 기본 off(R-C S16c). true 면 Stage 1 두 렌즈 finding 에 line_range · discoveryAxis 선택 필드가 생긴다.
 //     craft 와 다른 관심사라 따로 켠다 — craft 효과를 A/B 로 잴 때는 두 arm 모두 켜서 병합 키 효과를 지운다. 미지정·false 면 바이트 단위로 같다.
 //   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
+//   stage2: ⛔ 기본 'always'(기준선 불변 — 미지정도 always). 'conditional' 이면 peer-review 의 D1 트리거(PURE:stage2-trigger 복제)로 Stage 2 를 판정한다.
+//     위치 미상 major 가 하나라도 있으면 발화한다(fail-open). 생략하면 stage2Skipped{reason}. Stage 3 counter 는 항상 돈다
+//     (S19 · tests/workflows/review-live-stage2-arm.js). 기본값 전환은 A/B(S25 C' arm) 뒤다.
+//     ⛔ 생략하면 교차 additions(상대 렌즈가 놓친 finding 보충)도 없다 — 그 손실은 S25 가 SC-3 으로 잰다.
 //   crossRequiredFields: ⛔ 기본 off(R-B). true 면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
@@ -229,11 +233,108 @@ if (!arch || !quality) log('WARN stage1 한쪽 null — 단독 진행 (교차 �
 if (arch) arch.findings = arch.findings.map(f => ({ ...f, id: `A:${f.id}` }))
 if (quality) quality.findings = quality.findings.map(f => ({ ...f, id: `Q:${f.id}` }))
 
+// ── Stage 2 조건부 실행 (S19) — ⛔ 기본 always. 아래 PURE 블록은 peer-review.js 의 같은 이름 블록과 **글자까지 같아야** 한다 —
+//    tests/workflows/s2-stage2-trigger.js 가 단언한다(복제 드리프트 방어). 블록 안 주석도 원본 그대로 둔다.
+//    ⛔ review-live 는 위치 미상 major 도 발화시킨다(fail-open) — 기본 스키마 finding 에는 line_range 가 없어(locatedFindings 가 꺼져 있으면)
+//       major 는 전부 위치 미상이다. peer-review 의 "판단 불가는 발화시키지 않는다" 를 그대로 쓰면 major 가 교차 없이 지나간다.
+// >>> PURE:stage2-trigger — ⛔ 이 마커 사이는 **순수 함수**다(런타임 의존 없음).
+//     tests/workflows/s2-stage2-trigger.js 가 이 블록을 **추출해 실행**한다 —
+//     복사본을 두면 원본이 바뀔 때 테스트가 과거를 검증한다. 마커를 지우지 말 것.
+const SEVERITY_RANK = { critical: 3, major: 2, minor: 1, suggestion: 0 }
+
+// ⛔ 범위를 min-max 로 뭉치지 않는다. `41, 293-295` 를 41–295 로 만들면
+//    사이의 무관한 finding 이 전부 "같은 자리"가 되어 교차 조정이 오발화한다.
+//    (진단에서 같은 방식이 과대 병합을 낳는 것을 이미 관측했다.)
+//    구간 **목록**으로 파싱하고 하나라도 겹치면 같은 자리로 본다.
+function lineSpans(range) {
+  const text = String(range || '')
+  if (!text.trim()) return []
+  const spans = []
+  for (const part of text.split(/[,;]/)) {
+    const nums = part.match(/\d+/g)
+    if (!nums) continue
+    const ints = nums.map(Number)
+    spans.push([Math.min(...ints), Math.max(...ints)])
+  }
+  return spans
+}
+
+function spansOverlap(a, b) {
+  for (const x of a) for (const y of b) if (x[0] <= y[1] && y[0] <= x[1]) return true
+  return false
+}
+
+// ⛔ `line_range` 는 스키마상 **optional** 이다(required 에 없음). 위치를 모르는 finding 을
+//    "짝 없음"으로 처리하면 major 하나가 무조건 Stage 2 를 발화시켜 opus 2콜을 부른다.
+//    위치 미상은 **판단 불가**이지 단독이 아니다 — 아래 sameSite 는 false 를 주되
+//    unpairedMajor 집계에서는 별도로 제외한다.
+function hasLocation(x) {
+  return !!x.file && lineSpans(x.line_range).length > 0
+}
+
+// ⛔ `sameAxis` 는 **severityConflicts 에만** 쓴다. `MergeContract § 3` 이 dedup 키를
+//    `파일 + line_range 겹침 + discoveryAxis` 로 규정하고 **"축이 다르면 같은 자리라도 별건"** 이라
+//    못박는데, 트리거가 축을 안 보면 같은 세션의 두 규칙이 모순이 된다.
+//    실측(PR): severityConflicts 7건 중 **5건(71%)이 축이 다른 별건**이었다 —
+//    세 렌즈가 신규 파일 **헤더 라인(23-27)** 에 서로 다른 주제를 앵커해 위치만 겹쳤다.
+// ⚠️ 축이 **없으면** 비교를 건너뛴다(= 현행 동작). fail-close 하면 "덜 발화" 쪽이고,
+//    아래 임계 주석대로 놓치는 쪽이 더 비싸다. 스키마상 required 지만 방어적으로 둔다.
+// ⛔ `unpairedMajor` 에는 쓰지 않는다 — 단독 major 는 축과 무관하게 교차가 필요하다.
+function sameAxis(x, y) {
+  if (!x.discoveryAxis || !y.discoveryAxis) return true
+  return x.discoveryAxis === y.discoveryAxis
+}
+
+function sameSite(x, y) {
+  if (!hasLocation(x) || !hasLocation(y) || x.file !== y.file) return false
+  return spansOverlap(lineSpans(x.line_range), lineSpans(y.line_range))
+}
+
+function stage2Trigger(reviewList) {
+  const flat = []
+  for (const r of reviewList) for (const i of r.issues) flat.push({ agent: r.agent, i })
+
+  let severityConflicts = 0
+  for (let a = 0; a < flat.length; a += 1) {
+    for (let b = a + 1; b < flat.length; b += 1) {
+      if (flat[a].agent === flat[b].agent) continue
+      if (!sameSite(flat[a].i, flat[b].i)) continue
+      if (!sameAxis(flat[a].i, flat[b].i)) continue   // 축이 다르면 별건 — MergeContract § 3
+      if (flat[a].i.severity !== flat[b].i.severity) severityConflicts += 1
+    }
+  }
+
+  let unpairedMajor = 0
+  let unlocatedMajor = 0
+  for (let a = 0; a < flat.length; a += 1) {
+    if ((SEVERITY_RANK[flat[a].i.severity] || 0) < 2) continue
+    if (!hasLocation(flat[a].i)) { unlocatedMajor += 1; continue }   // 판단 불가 — 발화시키지 않는다
+    const paired = flat.some((o, b) => b !== a && o.agent !== flat[a].agent && sameSite(flat[a].i, o.i))
+    if (!paired) unpairedMajor += 1
+  }
+
+  return {
+    fire: severityConflicts >= 1 || unpairedMajor >= 1,
+    severityConflicts,   // ⛔ 같은 자리 **+ 같은 축** 만 센다 (교차축 공존은 별건)
+    unpairedMajor,       //    축 무관 — 단독 major 는 축과 상관없이 교차 대상
+    unlocatedMajor,   // 위치 미상이라 판정에서 뺀 수 — 0 이 아니면 리포트에 남긴다
+  }
+}
+// <<< PURE:stage2-trigger
+const stage2Conditional = input.stage2 === 'conditional'
+const liveTrigger = stage2Conditional && arch && quality
+  ? stage2Trigger([{ agent: 'arch', issues: arch.findings }, { agent: 'quality', issues: quality.findings }])
+  : null
+const stage2Skipped = liveTrigger && !liveTrigger.fire && liveTrigger.unlocatedMajor === 0
+  ? { reason: 'conditional — 같은 자리 · 같은 축 severity 이견 0 · 단독 major 0 · 위치 미상 major 0' }
+  : null
+if (stage2Skipped) log(`Stage 2 생략 — ${stage2Skipped.reason}`)
+
 // ════════ Stage 2: 교차 조정 (id-기반 — live-review Round 2) ════════
 phase('Stage 2: 교차 severity 조정')
 let archOnQuality = null
 let qualityOnArch = null
-if (arch && quality) {
+if (arch && quality && !stage2Skipped) {
   const cross = await parallel([
     () => callAgent(
       `${OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대(품질) findings] ${JSON.stringify(quality.findings)}\n` +
@@ -307,7 +408,7 @@ log(`findings ${findings.length}건 — critical ${dist.critical} / major ${dist
 
 // stagesCompleted = 완전 완주한 stage 수 (리뷰 Q2 교정 — stage2 미완주+stage3 완주 시 오보고 방지)
 const s1full = !!(arch && quality)
-const s2full = !!(archOnQuality && qualityOnArch)
+const s2full = !!(archOnQuality && qualityOnArch) || !!stage2Skipped   // 조건에 따라 생략한 교차는 할 일이 없어 끝난 것이다
 const s3full = !!counter
 const stagesCompleted = [s1full, s2full, s3full].filter(Boolean).length
 return {
@@ -316,5 +417,6 @@ return {
   okAreas: allOkAreas,
   okAreaChallenges, // counter의 okArea 반례 (Lead 판정 입력)
   distribution: dist,
+  ...(stage2Conditional ? { stage2Ran: !!(archOnQuality || qualityOnArch), stage2Trigger: liveTrigger, stage2Skipped } : {}),   // ⛔ 기본 반환 모양 불변
   metrics: metrics(stagesCompleted), // Lead가 experiment-log §5.7 fz-review 테이블 기록
 }

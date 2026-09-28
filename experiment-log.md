@@ -448,6 +448,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
 ### fz-review (live-review) — Wave 1 전환 (시작: 2026-06-05)
 
 > 임계 (사전 등록): 3건 전수 null률 0% + stage 완주 + fallback 0건. G2-review 품질 관찰 = finding 유효성 / counter 조정 실증 / severity 근거 충실.
+> `stage2: 'conditional'` 로 돈 행은 stages 칸에 `3(S2 생략)` 처럼 적는다 — 반환에 `stage2Skipped` 가 있으면 트리거 생략(완주로 센다), 없는데 2 면 교차 콜 결손이다.
 
 | # | date | agentCalls | nullCount | stages | fallback | wall-clock | G2-review (finding/counter/severity) |
 |---|------|-----------|-----------|--------|----------|-----------|--------------------------------------|
