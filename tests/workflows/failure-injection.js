@@ -6,15 +6,18 @@
 //   ② 해당 신호가 나온다 — 워크플로가 결손을 알리는 필드(degraded·missingLenses · partial·lensesCompleted · nullCount·reviews)
 // 대조 셀(아무도 죽이지 않음)은 완주 기준에 도달해야 한다 — 그래야 ① 의 "미달" 이 주입 때문임을 안다.
 // ⛔ 스크립트를 통째로 돌린다(tests/lib/wf_harness.js). 워커 응답은 label 로 고른 최소 객체다.
-// ⛔ 런처·병합·divergence(R-B·R-C) 셀은 이 판에 없다 — 다른 scope 는 미실행(exit 2)이다.
+// 대상(--scope independent · S24b): R-C 속도 arm 에서 '생략' 과 '결손' 이 같은 완주로 보고되지 않는다 —
+//   review-live stage2 conditional(생략 = 완주 3 · 교차 null = 완주 아님) · plan-lean2 mergeMode(생략 = degraded 아님 · 병합 null = degraded)
+//   · 교차 delta(id 누락 = unreviewed · crossCoverage 보고 — agree 로 채우지 않는다).
+//   런처 · 병합 · divergence 가 실패한 GPT 산출로 판정을 만들지 않는지는 tests/fixtures/gpt/failure-injection/run.sh --scope launcher 가 본다.
 'use strict'
 const path = require('path')
 const { run } = require('../lib/wf_harness')
 
 const argv = process.argv.slice(2)
 const scope = argv[0] === '--scope' ? argv[1] : 'existing'
-if (scope !== 'existing') {
-  console.log(`UNRUN  scope '${scope}' 의 셀은 아직 없다 — 이 판은 existing 만 구현한다`)
+if (!['existing', 'independent'].includes(scope)) {
+  console.log(`UNRUN  scope '${scope}' 의 셀은 없다 — existing · independent 만 구현한다`)
   process.exit(2)
 }
 
@@ -81,7 +84,44 @@ function check(name, cond, got) {
 const brief = r => JSON.stringify({ mode: r.mode, stages: r.metrics && r.metrics.stagesCompleted, nullCount: r.metrics && r.metrics.nullCount,
   degraded: r.degraded, missingLenses: r.missingLenses, reviews: r.reviews && r.reviews.length, verdict: r.reviewVerdict, lenses: r.lensesCompleted })
 
+// ── 실패 주입 B(independent) — 생략(할 일이 없어 끝남)과 결손(워커가 죽음)을 가른다 ──
+async function independent() {
+  const RL = wf('review-live.js'), PL = wf('plan-lean2.js')
+  const f = (id, severity, line_range) => ({ id, severity, category: 'c', title: 't', detail: 'd', evidence: 'e', file: 'F.swift', line_range, discoveryAxis: 'structure' })
+  const quiet = { 'stage1-arch': { findings: [f('A1', 'minor', '10-20')] }, 'stage1-quality': { findings: [f('Q1', 'minor', '15-25')] } }
+  const conflict = { 'stage1-arch': { findings: [f('A1', 'major', '10-20')] }, 'stage1-quality': { findings: [f('Q1', 'minor', '15-25')] } }
+  const S2 = ['stage2-arch-on-quality', 'stage2-quality-on-arch']
+  const live = { diffPath: '/tmp/d.diff', intentContext: 'i', stage2: 'conditional' }
+
+  const skip = (await run(RL, { args: live, responder: responder([], quiet) })).result
+  check('review-live · conditional 트리거 생략 → stage2Skipped · 완주 3 · null 0', !!skip.stage2Skipped && skip.metrics.stagesCompleted === 3 && skip.metrics.nullCount === 0, brief(skip))
+  const lost = (await run(RL, { args: live, responder: responder(S2, conflict) })).result
+  check('review-live · conditional 교차 두 콜 null → stage2Skipped 없음 · 완주 아님(<3) · null 2', lost.stage2Skipped === null && lost.metrics.stagesCompleted < 3 && lost.metrics.nullCount === 2, brief(lost))
+  const half = (await run(RL, { args: live, responder: responder([S2[0]], conflict) })).result
+  check('review-live · conditional 교차 한 콜 null → 완주 아님(<3) · null 1', half.stage2Skipped === null && half.metrics.stagesCompleted < 3 && half.metrics.nullCount === 1, brief(half))
+
+  const plan = { requirement: 'r', codeContextPath: '/tmp/c.md', mergeMode: 'conditional' }
+  const pskip = (await run(PL, { args: plan, responder: responder([]) })).result
+  check('plan-lean2 · conditional 의미 필드 전부 빔 → mergeSkipped · 완주 2 · degraded 아님', !!pskip.mergeSkipped && pskip.metrics.stagesCompleted === 2 && pskip.degraded === false, brief(pskip))
+  const edge = { 'lean2-edge': { edgeCases: [{ id: 'E1', case: 'c', failureScenario: 'f', whereItBreaks: 'w' }] } }
+  const pnull = (await run(PL, { args: plan, responder: responder(['lean2-merge'], edge) })).result
+  check('plan-lean2 · conditional 신호 있음 + 병합 null → degraded · 완주 아님 · mergeSkipped 없음', pnull.degraded === true && pnull.metrics.stagesCompleted < 2 && !pnull.mergeSkipped, brief(pnull))
+
+  const blank = { reviewedIds: [], adjustments: [], rejections: [], additions: [] }
+  const d = (await run(RL, { args: { diffPath: '/tmp/d.diff', intentContext: 'i', crossOutput: 'delta' },
+    responder: responder([], Object.assign({}, conflict, { [S2[0]]: blank, [S2[1]]: blank })) })).result
+  const two = (d.findings || []).filter(x => x.id === 'A:A1' || x.id === 'Q:Q1')
+  check('review-live · delta 교차가 id 를 전부 빠뜨림 → agree 아님(unreviewed) · crossCoverage 누락 보고',
+    two.length === 2 && two.every(x => x.crossVerdict === 'unreviewed') && !!d.crossCoverage && d.crossCoverage.arch.length === 1 && d.crossCoverage.quality.length === 1,
+    JSON.stringify({ verdicts: two.map(x => x.crossVerdict), coverage: d.crossCoverage }))
+}
+
 ;(async () => {
+  if (scope === 'independent') {
+    await independent()
+    console.log(`\n실패 주입 B(independent) ${fail ? '실패 ' + fail + '건' : '전건 통과'}`)
+    process.exit(fail ? 1 : 0)
+  }
   for (const s of SUITES) {
     const ctl = (await run(wf(s.file), { args: s.args, responder: responder([], s.extra) })).result
     check(`${s.name} · 대조(주입 없음) → 완주 ${s.full}`, ctl.mode === 'workflow' && ctl.metrics.stagesCompleted === s.full, brief(ctl))
