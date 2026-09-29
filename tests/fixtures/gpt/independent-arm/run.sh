@@ -137,6 +137,8 @@ run aud4 "$HERE/sample-plan-ok.json" "$T/r-nodeny.jsonl" plan --requirement "$IN
 for c in aud1 aud2 aud3 aud4; do
   check "감사($c): exit 15" "$(rc $c)" 15
   [ -s "$T/c-$c/out/A-$c.contaminated" ] && ok "감사($c): 오염 표시 파일" || no "감사($c): 오염 표시가 없다"
+  check "감사($c): 세션을 넘기지 않는다(sessionFile null · 세션 파일 삭제)" \
+    "$(audit $c sessionFile)|$([ -e "$T/c-$c/out/A-$c.json.session" ] && echo 남음 || echo 없음)" "None|없음"
 done
 check "감사(aud4): 격리 미적용으로 판정" "$(audit aud4 isolationApplied)" False
 
@@ -162,6 +164,8 @@ sleep 1; pgrep -f 'sleep 29.7' >/dev/null && no "시간 초과: CLI 의 자식�
 printf '%s' '{"status":"rejected","reason":"claude_plan_detected","approach":"-","affectedFiles":{"new":0,"modified":0},"steps":[],"riskMatrix":[],"stressTest":[],"implicationRegister":[],"divergencePoints":[],"projectRules":{"axes":{"architecturePattern":null,"uiStack":null,"dependencyDirection":null,"naming":null,"placement":null,"conventions":null},"rules":[],"conflicts":[],"gaps":[]}}' > "$T/rejected.json"
 run rej "$T/rejected.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md"
 check "planner 거부: exit 17" "$(rc rej)" 17
+check "planner 거부: 세션을 넘기지 않는다(sessionFile null · 세션 파일 삭제)" \
+  "$(audit rej sessionFile)|$([ -e "$T/c-rej/out/A-rej.json.session" ] && echo 남음 || echo 없음)" "None|없음"
 
 # ⑨ 6축 중복(스키마는 행 수만 본다) → 후검사 exit 14
 python3 - "$HERE/sample-review-ok.json" "$T/dup.json" <<'PY'

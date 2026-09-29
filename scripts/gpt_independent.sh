@@ -279,8 +279,8 @@ if tcs == 0:
     iso_ok = False
 audit = {"mode": mode, "rollouts": len(rolls), "turnContexts": tcs, "isolationApplied": iso_ok, "spawnAgent": spawn, "spawnedRoles": roles,
          "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs,
-         # resume 입력(fz-plan Phase 2 resume 교차) — 세션 ID 파일은 래퍼가 사후 게이트 통과 뒤에만 쓴다. 격리 홈은 --keep-iso 일 때만 남는다
-         "iso": iso if keep else None, "sessionFile": out + ".session" if os.path.isfile(out + ".session") else None}
+         # resume 입력(fz-plan Phase 2 resume 교차) — 격리 홈은 --keep-iso 일 때만 남는다. sessionFile 은 판정(exit) 뒤에 적는다(아래)
+         "iso": iso if keep else None}
 code, note = 0, "ok"
 if hits or (not iso_ok and not timed_out and rc == 0):
     code, note = 15, ("rollout 감사 적중" if hits else "격리 미적용 — rollout 에 HOME deny 가 없다(또는 rollout 이 없다)")
@@ -316,7 +316,12 @@ else:
             md += [f"- `{c.get('craftAxis')}` [{c.get('ruleSource')}] `{c.get('file')}:{c.get('line_range')}` — {c.get('title')}" for c in doc.get("craft", [])] or ["- 없음"]
             md += ["", "| 축 | 상태 | 비고 |", "|---|---|---|"] + [f"| {a.get('axis')} | {a.get('status')} | {a.get('note')} |" for a in doc.get("axis_coverage", [])]
         open(stem + ".md", "w", encoding="utf-8").write("\n".join(md) + "\n")
-audit.update({"exit": code, "note": note})
+# ⛔ 래퍼는 자기 게이트(exit · 파일 · 스키마) 통과 직후 세션 파일을 쓴다 — 그 뒤 여기서 걸린 run(오염 15 · 6축 14 · planner 거부 17)의
+#    세션은 resume 교차가 잇지 못하게 지운다. 감사 sessionFile 은 exit 0 일 때만 남는다
+sess = out + ".session"
+if code != 0 and os.path.isfile(sess):
+    os.remove(sess)
+audit.update({"exit": code, "note": note, "sessionFile": sess if os.path.isfile(sess) else None})
 json.dump(audit, open(stem + ".audit.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 print(f"INDEPENDENT {'OK' if code == 0 else 'FAIL(' + str(code) + ')'} mode={mode} rollouts={len(rolls)} spawn={spawn} calls={calls} hits={len(hits)} isolation={iso_ok} — {note}")
 sys.exit(code)

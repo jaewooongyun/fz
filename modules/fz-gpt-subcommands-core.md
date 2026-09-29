@@ -82,7 +82,8 @@ EOF
 독립 플래너(`gpt_independent.sh plan --keep-iso`)의 세션을 이어 위 틀(Q1–Q8 · `gpt_review_schema` · effort high)로 Claude 플랜을 검증한다 — 플래너가 이미 읽은 맥락을 다시 읽지 않는다. ⛔ 세션 파일이 없으면 위 기본 `verify` 다 — 그 프롬프트 · 인자는 바뀌지 않는다(`tests/fixtures/plan-wiring/parallel-arms/run.sh` 가 가짜 CLI 로 대조한다).
 
 ```bash
-# 감사(gpt-{run}.audit.json)의 iso · sessionFile — sessionFile 은 래퍼가 사후 게이트를 통과한 run 에만 남긴다
+# 감사(gpt-{run}.audit.json)의 iso · sessionFile — sessionFile 은 런처 판정까지 통과한(exit 0) run 에만 있다.
+#   오염 15 · 6축 14 · planner 거부 17 로 끝난 run 은 런처가 세션 파일을 지운다(래퍼는 그 판정 전에 세션을 쓴다)
 ISO="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("iso") or "")' "$AUDIT")"
 SESSION_FILE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("sessionFile") or "")' "$AUDIT")"
 CODEX_HOME="$ISO/gpt-home" "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$REVIEW_FILE" \
@@ -90,7 +91,7 @@ CODEX_HOME="$ISO/gpt-home" "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "
   --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
 rm -rf "$ISO"   # 교차가 끝나면 격리 홈을 지운다(인증은 링크뿐이다)
 ```
-- ⛔ `ISO` 나 `SESSION_FILE` 이 비었으면(런처가 `--keep-iso` 없이 돌았거나 실패했다) resume 하지 않고 기본 `verify` 로 간다 — 빈 값으로 부르면 래퍼가 exit 10 이다
+- ⛔ `ISO` 나 `SESSION_FILE` 이 비었으면(런처가 `--keep-iso` 없이 돌았거나 실패했다) resume 하지 않고 기본 `verify` 로 간다 — 빈 값으로 부르면 래퍼가 exit 10 이다. `ISO` 만 있으면 지운다(실패한 run 도 `--keep-iso` 면 격리 홈이 남는다)
 - resume 은 래퍼가 `sandbox_mode="read-only"` 를 넘겨 격리 프로필의 deny 를 덮는다(F-348) — 이 단계는 교차 검증이라 독립이 아니어도 된다. 독립은 첫 패스의 몫이다
 
 ## verify-gates -- 게이트 원장 판정 (fz-plan Phase 2 추가 호출)
