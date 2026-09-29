@@ -226,6 +226,10 @@ Claude + GPT(현행 모델) 교차 검증:
 
 **계산식**: Reflection Rate = (GPT가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100% (정밀 계산식 — `partially_resolved`에 0.5 가중 — 은 `schemas/gpt_verification_schema.json` canonical). **N=0 (GPT가 이슈 0개 제기) 시 `N/A`로 기록** — division-by-zero 방지 + 기준 미달 판정 아님 (vacuously passes).
 
+**분모 한정 (2026-09-29 적용 · 사용자 결정 · IR-07)**: N 은 GPT 가 제기한 **결함 이슈**다. craft 항목(`craftAxis` 가 있는 항목 — GPT 독립 첫 패스의 `craft` 배열 포함)은 분모에 넣지 않고 **별 채널**로 제기 수 · 반영 수를 따로 적는다. craft 는 대부분 suggestion 이라 반영하지 않는 것이 정상이고, 분모에 넣으면 Rate 가 낮아져 Phase 6 반복이 는다.
+- ⛔ 적용일 전 기록(experiment-log 의 과거 Rate 행)은 전체 분모다 — 두 시기를 비교할 때는 분모가 바뀐 것을 함께 적는다
+- R-C 한 Wave 동안은 **두 분모를 함께** 적는다(`결함 N · Rate` / `전체 N · Rate`) — 한정이 판정을 바꾼 사례가 보이게 한다
+
 ### Reflection Rate threshold (Sample Size Confidence Gate)
 
 | Sample N | Status | Verdict 가능 |
