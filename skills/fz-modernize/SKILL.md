@@ -53,7 +53,7 @@ metadata:
 ## Prerequisites
 
 - **외부 자료 접근**: WebSearch + WebFetch + GPT CLI (cross-model verify)
-- **GPT CLI**: cross-model 검증(모델=config SSOT — 버전 플로어는 `modules/gpt-strategy.md`). trust_level="trusted" 설정 필요 (30차 교훈)
+- **GPT CLI**: cross-model 검증 — ⛔ **첫 GPT 호출 전**(light micro-eval 포함): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`(버전 플로어도 같은 파일). trust_level="trusted" 설정 필요 (30차 교훈)
 - **6+ 스텝 자동 티켓 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 티켓 ID
 
 ## 모듈 참조
@@ -272,31 +272,43 @@ echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.m
 
 ## Phase 4: Verify (GPT Cross-Model 검증)
 
-**핵심 원칙**: Plan을 GPT(현행 모델 — `modules/gpt-strategy.md` 정본, 또는 사용 가능한 cross-model)로 독립 검증. **누적 한도 3회**.
+**핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **누적 한도 3회**. 모델·effort 는 호출에 적지 않는다 — `modules/gpt-strategy.md` § 모델·effort 선택.
 
 ### 절차
 
-1. **Skill 호출**: `/fz-gpt verify {PLAN_PATH}`
+1. **GPT 호출**: 아래 § GPT 호출 한 형태(래퍼 exec · architect 본문 · 5 Q 과제 · `gpt_review_schema`). 래퍼 exit 10~14 는 측정 실패다 — 판정으로 읽지 않는다. 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그 · 모델·effort 거부 12)는 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 먼저 따르고, 그 밖은 에러 대응 표 'GPT CLI 통신 실패' 행으로 간다
 2. **5 Q 검증 관점** (Plan-specific):
    - Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류)
    - Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜)
    - Q3: 출처 매핑 일관성 (Plan ↔ 가이드 line)
    - Q4: Anti-Pattern Constraints 누락 위험
    - Q5: 실행 순서 안전성 (impact-scan 사전 확인)
-3. **결과 분기**:
+3. **결과 분기** (`gpt_review_schema` 의 `verdict`):
    - approved → Phase 5 진행
    - needs_revision → v{N+1} 작성 (GPT 카운터 +1)
+   - rejected → 사용자 에스컬레이션 (⛔ v{N+1} 자동 작성 금지)
 4. **누적 한도 도달 (3/3)**: 사용자 에스컬레이션 의무 (18차 교훈)
 
-### 권장 — GPT 호출 환경
+### GPT 호출
 
 ```bash
 # hygiene(stdin close 29차 · trust_level 30차 · `--` 구분자 · exit 계약)는 래퍼가 처리한다 — modules/fz-gpt-bash-hygiene.md §8
+SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
+if [ -n "$SKILL_PATH" ]; then SKILL_PROMPT="$(cat "$SKILL_PATH")"
+else SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."; fi
+[ -s "{PLAN_PATH}" ] || { echo "PLAN_PATH 없음·빈 파일 — GPT verify UNRUN" >&2; exit 2; }
+cat > /tmp/verify-prompt.txt <<EOF
+${SKILL_PROMPT}
+
+아래 Plan 을 5 관점으로 검증하고 관점마다 판정과 근거를 제시하라 — Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류) · Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜) · Q3: 출처 매핑 일관성 (Plan ↔ 가이드 line) · Q4: Anti-Pattern Constraints 누락 위험 · Q5: 실행 순서 안전성 (impact-scan 사전 확인). Plan 원문:
+$(cat "{PLAN_PATH}")
+EOF
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec \
   --cd "{WORK_DIR}" \
-  --out "{WORK_DIR}/verify/gpt-verify-v{N}-result.md" \
+  --out "{WORK_DIR}/verify/gpt-verify-v{N}-result.json" \
   --prompt-file /tmp/verify-prompt.txt \
-  --effort high
+  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" \
+  --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
 ```
 
 ### Gate 4: Cross-Verify Complete
@@ -453,7 +465,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | Probe WebSearch 실패 | 재시도 1회 → 사용자에게 직접 자료 요청 | manual probe |
-| GPT CLI 통신 실패 | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
+| GPT CLI 통신 실패 · 래퍼 exit 10~14(측정 실패 — 11·12 선택 복구는 Phase 4 절차 1단) | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
 | GPT 누적 한도 도달 | 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (GPT 권고 점 수정 N건만) |
 | AC8 broken link 발견 | archive.org 폴백 또는 인용 제거 | 사용자 결정 |
 | Impact Scan line 번호 깨짐 | 모듈에서 path/section 참조로 변경 권고 | 영향 모듈 목록 보고 |

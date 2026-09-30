@@ -226,7 +226,7 @@
     },
     "challenges": {
       "type": "array",
-      "description": "Devil's Advocate 결과 (DA 모드에서만 사용)",
+      "description": "Lead 발견 목록에 대한 판정 — Tier 1·2·3 challenger 와 DA 공통 (발견 목록이 주어지면 각 id 마다)",
       "items": {
         "type": "object",
         "required": [
@@ -248,7 +248,7 @@
               "supplement",
               "reverse"
             ],
-            "description": "판정: agree(동의), challenge(반박-confidence 20% 감소), supplement(보완), reverse(역전-원래 이슈 제외 후 새 이슈 생성)"
+            "description": "판정: agree(동의), challenge(반박-confidence 20% 감소), supplement(보완), reverse(역전 — 원래 이슈를 지우지 않는다: 병합 계약에 따라 question 으로 전환되니 판별 근거를 reason 에 적는다)"
           },
           "reason": {
             "type": "string",

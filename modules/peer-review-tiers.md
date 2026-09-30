@@ -2,7 +2,7 @@
 
 diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 
-> ⛔ **TEAM 일몰 재매핑 (Wave 4)**: Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행된다 (TeamCreate 아님). Tier 0/1은 이미 Lead-solo. 폴백 체인 Tier3→2→1→0은 `mode:'workflow'` → `mode:'fallback'` → Lead SOLO로 매핑. GPT는 out-of-band (Lead `/fz-gpt`, 스크립트 내 스폰 금지).
+> ⛔ **TEAM 일몰 재매핑 (Wave 4)**: Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행된다 (TeamCreate 아님). Tier 0/1은 이미 Lead-solo. 폴백 체인 Tier3→2→1→0은 `mode:'workflow'` → `mode:'fallback'` → Lead SOLO로 매핑. GPT는 out-of-band (Lead 가 래퍼로 부른다 — § GPT Analyze 호출, 스크립트 내 스폰 금지).
 
 ---
 
@@ -27,9 +27,9 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 | Tier | review-arch | review-quality/correctness | GPT | Cross-Critique | 기본 agent call |
 |------|------------|----------------|-------|---------------|-----------|
 | **0 (Solo)** | Orchestrator 직접 | — | — | None | 0 |
-| **1 (Solo+GPT)** | Orchestrator 직접 | — | Lead /fz-gpt ×1 | None | 0 (+GPT 1) |
-| **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-gpt ×1 | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
-| **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead /fz-gpt ×2 | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
+| **1 (Solo+GPT)** | Orchestrator 직접 | — | Lead ×1 (§ GPT Analyze 호출) | None | 0 (+GPT 1) |
+| **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead ×1 (§ GPT Analyze 호출) | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
+| **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead ×2 (§ GPT Analyze 호출 + DA) | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
 
 > ⊕ **GPT 독립 첫 패스(기본 — `--gpt-independent` 생략 가능 · `--no-gpt-independent` 면 challenger)**: GPT 슬롯 1 = **독립 리뷰어** — `gpt_independent.sh review` 를 Workflow 와 **병렬**로 띄우고 `review_merge.py` 로 합친다(Tier 1 은 challenger 자리 — Lead 발견을 JSON 으로 써서 병합한다). Tier 3 의 GPT DA(슬롯 2)는 **두 패스가 끝난 뒤**다. 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 >
@@ -319,7 +319,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 | other | {n} | 어디에도 안 맞은 것 |
 ```
 
-> Tier 2/3은 `PeerReviewSchema.discoveryAxis` 가 이 집계를 담지만 Tier 0/1은 스키마가 없다. **이 표가 그 자리를 대신한다** — 축 이름을 그대로 써야 경로 간 비교가 성립한다.
+> 리뷰 집계 스키마(`PeerReviewSchema`)는 Tier 2/3 전용이다 — 그 `discoveryAxis` 가 이 집계를 담는다. Tier 1 GPT challenger 호출은 `gpt_peer_review_schema` 를 쓴다(축 집계 필드 없음). Tier 0/1 은 **이 표가 그 자리를 대신한다** — 축 이름을 그대로 써야 경로 간 비교가 성립한다.
 > ⛔ 0건인 축도 행을 지우지 않는다. **0이 관측인지 미탐색인지** 구별하려면 자리가 남아 있어야 한다.
 
 ---
@@ -334,13 +334,8 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 ### Analyze
 - Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2)
-- + GPT challenger 1회 호출 (래퍼가 stdin 을 닫고 git repo 밖 실행 플래그를 붙인다 — 직접 호출 금지):
-  ```bash
-  # ⛔ 원래 호출은 effort 미지정(= config.toml 기본 xhigh)이었다 → 래퍼 기본(high)으로 바뀌지 않게 xhigh 명시.
-  #    원래의 `--sandbox read-only` 는 래퍼가 모든 호출에 강제하는 `sandbox_mode="read-only"` 로 대체된다.
-  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "${WORK_DIR}" --out "${WORK_DIR}/gpt-challenger-raw.txt" \
-    --prompt-file /tmp/gpt-challenger-prompt.txt --effort xhigh
-  ```
+- + GPT challenger 1회 — 호출은 § GPT Analyze 호출 한 형태다(래퍼 exec · `gpt_peer_review_schema` · 산출 `${WORK_DIR}/gpt-challenger-result.json`)
+- ⛔ 래퍼 exit 10~14 는 전부 측정 실패다(스키마 계약 위반 14 포함 — "이슈 0건" 아님). 선택 관련 실패(래퍼 stderr 의 `CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그, 모델·effort 거부 12)는 먼저 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 따른다. 그 밖이거나 처방 뒤에도 실패면 `skills/fz-peer-review/SKILL.md` § 에러 대응의 Tier 1 GPT 실패 규칙(`solo (gpt 실패)` — 실질 Tier 0 강등)으로 간다
 - ⊕ 기본으로(`--no-gpt-independent` 면 위 challenger) 위 challenger 대신 `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review` 를 쓴다 — 허용 입력만 격리 폴더로 들어가 Lead 요약 · 가설이 GPT 에 닿지 않는다. Synthesize 에서 Lead 발견을 `{"issues": […]}` 로 써서 `review_merge.py --claude` 로 합친다(모양 · 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4)
 - GPT prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
 
@@ -353,6 +348,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - Lead + GPT 결과 dedup — 키는 § 3 (`파일` + `line_range` 겹침 + `discoveryAxis`)
 - 2-vote Confidence Matrix (3-vote 대비 단순화) — § 9 Tier 1 행
 - GPT verdict 처리는 § 6 — ⛔ `reverse` 는 제거가 아니라 `question` 전환
+- GPT 결과 소비: Tier 1 결과(`gpt-challenger-result.json`)는 Lead 가 Synthesize 에서 `modules/peer-review-gates.md` § MergeContract § 6 을 적용한다 — `challenges[].action`(agree · challenge · supplement · reverse)이 § 6 verdict 어휘다(`issues[]` 는 위 § 3 dedup · § 9 투표). `scripts/review_merge.py` 의 verdicts 는 `--gpt-independent` 경로 전용이다
 - Independence: GPT sandbox 독립 = HIGH
 
 ### Deliver
@@ -371,7 +367,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 | other | {n} | 어디에도 안 맞은 것 |
 ```
 
-> Tier 2/3은 `PeerReviewSchema.discoveryAxis` 가 이 집계를 담지만 Tier 0/1은 스키마가 없다. **이 표가 그 자리를 대신한다** — 축 이름을 그대로 써야 경로 간 비교가 성립한다.
+> 리뷰 집계 스키마(`PeerReviewSchema`)는 Tier 2/3 전용이다 — 그 `discoveryAxis` 가 이 집계를 담는다. Tier 1 GPT challenger 호출은 `gpt_peer_review_schema` 를 쓴다(축 집계 필드 없음). Tier 0/1 은 **이 표가 그 자리를 대신한다** — 축 이름을 그대로 써야 경로 간 비교가 성립한다.
 > ⛔ 0건인 축도 행을 지우지 않는다. **0이 관측인지 미탐색인지** 구별하려면 자리가 남아 있어야 한다.
 
 ---
@@ -564,7 +560,7 @@ jq -e '
                             structuralContext } })   // ⛔ 누락 시 에러 없이 구조 축이 꺼진다
 2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
              → parallelWithRetry (null 항목 1회 순차 재시도 = rate-limit 폴백 계약)
-3. Lead: /fz-gpt 경유 GPT challenger ×1  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
+3. Lead: GPT challenger ×1 — § GPT Analyze 호출  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
 4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
 ```
 
@@ -599,7 +595,7 @@ Stage 2: arch ↔ quality id-기반 교차 severity 조정 (correctness 불참)
          false_positive 판정은 실측 인용 필수
 Stage 3: review-counter DA — issues 반론 + strengths 도전
 → 반환 { …, crossAdjustments, strengthChallenges, distribution } → Lead가 Matrix에 반영
-→ Lead: GPT DA ×1 추가 (/fz-gpt)
+→ Lead: GPT DA ×1 추가 — `modules/fz-gpt-subcommands-aux.md` § final 의 DA 모드 블록 형태(이슈 목록 · agree|challenge|supplement|reverse · `gpt_peer_review_schema`), `--out` 은 `${WORK_DIR}/gpt-da-result.json`(challenger 결과를 덮지 않는다)
 ```
 
 > SendMessage 실시간 멀티턴 수렴은 **고정 1-pass 교차로 대체**됐다 (충실도 trade-off — 은폐하지 않고 명시). 라운드 의미론은 `workflows/review-live.js` 가 구현한다.
@@ -608,14 +604,46 @@ Stage 3: review-counter DA — issues 반론 + strengths 도전
 
 ## GPT Analyze 호출
 
-> `get_gpt_skill_path()` 3-Tier 디스커버리 + `scripts/gpt-exec.sh` 호출 패턴: `modules/cross-validation.md` 참조.
+> `get_gpt_skill_path()` 3-Tier 디스커버리 + `scripts/gpt-exec.sh` 호출 패턴: `modules/cross-validation.md` 참조. 모델·effort 는 호출에 적지 않는다 — 정본 `modules/gpt-strategy.md` § 모델·effort 선택.
 
 GPT challenger 프롬프트에 필수 포함:
 - Origin Classification(regression/pre-existing/improvement)
 - Inheritance Chain(base class init/willSet 변경 시 subclass 검색)
 - `schemas/gpt_peer_review_schema.json` 스키마 사용
+- 판정받을 발견 목록(id 포함 — Tier 1 은 Lead 분석 결과) — `challenges[]` 의 `target_issue_id` 대상이다. 발견이 0건이면 목록 파일에 `(없음 — Lead 발견 0건)` 한 줄을 쓴다(빈 파일은 채움 누락으로 보고 멈춘다 — 빈 `challenges` 가 조용히 통과하지 않게)
 
-결과: `${WORK_DIR}/gpt-challenger-result.json`
+호출 — Tier 1 · 2 · 3 challenger 공통 한 형태다(래퍼가 stdin 을 닫고 git repo 밖 실행 플래그를 붙인다 — 직접 호출 금지):
+
+```bash
+# 옛 `--sandbox read-only` 는 래퍼가 모든 호출에 강제하는 `sandbox_mode="read-only"` 로 대체된다.
+# --cd WORK_DIR(Tier 1·2·3 공통): GPT 작업 디렉터리를 diff · evidence 가 있는 WORK_DIR 로 둔다 — 현재 브랜치 ≠ PR head 인 레포 작업 트리를 기준으로 읽지 않게.
+#   cwd 에 레포 규칙 파일이 없으므로 규칙 원문 색인을 evidence 파일에 넣는다. 크기: Tier 1 ~5K(Tier 1 Analyze) · Tier 2/3 는 modules/gpt-strategy.md § Diff 크기 적응 전략
+# Lead 가 **파일로** 쓴다: challenger-findings.md(발견 목록 — id 포함) · challenger-evidence.md(evidence · 규칙 원문 색인)
+# ⛔ 셸 변수로 옮기지 않는다 — 3자 코드(Swift 의 $0 · 백틱)가 따옴표 대입이나 인용 없는 heredoc 안에서 확장된다. 아래처럼 $(cat) 로만 넣는다(치환 결과는 다시 확장되지 않는다)
+for f in "${WORK_DIR}/challenger-findings.md" "${WORK_DIR}/challenger-evidence.md"; do
+  [ -s "$f" ] || { echo "채움 누락: $f — 0건이면 '(없음 — Lead 발견 0건)' 한 줄" >&2; exit 2; }
+done
+SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
+if [ -n "$SKILL_PATH" ]; then SKILL_PROMPT="$(cat "$SKILL_PATH")"
+else SKILL_PROMPT="아래 인라인 규칙 색인과 evidence 로 아키텍처/가이드라인을 파악한 후 검증하라."; fi
+cat > "${WORK_DIR}/gpt-challenger-prompt.txt" <<EOF
+${SKILL_PROMPT}
+
+아래 PR 변경을 검증하라. 파일을 수정하지 마라(읽기 전용 분석).
+- issues[]: evidence 로 독립 발견 — 각 이슈에 Origin Classification(regression/pre-existing/improvement). base class init/willSet 변경이면 subclass 를 찾는다(Inheritance Chain)
+- challenges[]: 아래 발견 목록의 각 id 에 agree|challenge|supplement|reverse 판정과 근거
+발견 목록(id 포함):
+$(cat "${WORK_DIR}/challenger-findings.md")
+Evidence(인라인 — 규칙 원문 색인 포함):
+$(cat "${WORK_DIR}/challenger-evidence.md")
+EOF
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "${WORK_DIR}" --out "${WORK_DIR}/gpt-challenger-result.json" \
+  --prompt-file "${WORK_DIR}/gpt-challenger-prompt.txt" \
+  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_peer_review_schema.json" \
+  --gpt-skill challenger --gpt-skill-path "$SKILL_PATH"
+```
+
+결과: `${WORK_DIR}/gpt-challenger-result.json` — ⛔ exit 10~14 는 측정 실패다("이슈 0건" 아님). 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` · 모델·effort 거부 12)는 정본 `modules/gpt-strategy.md` § 모델·effort 선택, Tier 별 강등은 `skills/fz-peer-review/SKILL.md` § 에러 대응 의 GPT 실패 규칙이다.
 
 ⛔ GPT CLI 를 background 로 직접 부르면 stdin lock — 래퍼 `scripts/gpt-exec.sh` 가 `< /dev/null` 로 닫는다(직접 호출 금지).
 

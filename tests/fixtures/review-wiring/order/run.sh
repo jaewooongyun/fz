@@ -25,7 +25,7 @@ order modules/peer-review-workflow.md 'gpt_independent.sh review' "Workflow({ sc
 
 # 끄는 경로 — fz-review 는 기본 off, fz-peer-review 는 --no-gpt-independent · --no-render 로 고른다(리뷰 A:A3 · Q:Q8)
 has skills/fz-review/SKILL.md '/fz-gpt review "코드 리뷰"' 'fz-review 기본 경로의 GPT 리뷰 호출이 남아 있다'
-has modules/peer-review-tiers.md 'gpt-challenger-raw.txt' '--no-gpt-independent 경로의 Tier 1 challenger 호출이 남아 있다'
+has modules/peer-review-tiers.md '--out "${WORK_DIR}/gpt-challenger-result.json"' '--no-gpt-independent 경로의 Tier 1 challenger 호출이 남아 있다'
 has skills/fz-peer-review/SKILL.md '--no-gpt-independent' 'GPT 독립 첫 패스를 끄는 플래그가 있다'
 has skills/fz-peer-review/SKILL.md '--no-render' '렌더를 끄는 플래그가 있다'
 

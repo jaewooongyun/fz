@@ -95,7 +95,7 @@
 ### Gate 5c-2: GPT Verify
 
 ```
-Plan v{N}을 GPT(현행 모델 — `modules/gpt-strategy.md` 정본)로 검증
+Plan v{N}을 GPT로 검증 (모델·effort: `modules/gpt-strategy.md` § 모델·effort 선택)
 누적 카운터: {현재}/3 (한도 도달 시 사용자 에스컬레이션)
 ```
 
@@ -135,6 +135,7 @@ Phase 5d-final: AC8 link + Impact Scan + 최종 검토
 
 ## 8. 다음 단계
 
-→ Phase 4 (GPT Verify): `/fz-gpt verify {plan}`
+→ Phase 4 (GPT Verify): `skills/fz-modernize/SKILL.md` Phase 4 § GPT 호출 (래퍼 exec · `gpt_review_schema`)
 → approved → Phase 5 (Execute)
 → needs_revision → v{N+1} 작성 (카운터 +1)
+→ rejected → 사용자 에스컬레이션 (v{N+1} 자동 작성 금지)
