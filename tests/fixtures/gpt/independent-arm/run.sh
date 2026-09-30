@@ -28,6 +28,7 @@ echo x > "$IN/snap-ok/consumer.ts"; echo '{}' > "$IN/snap-bad1/workflow-result.j
 printf 'diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-a\n+b\n' > "$IN/diff.patch"
 echo a > "$IN/base/src/a.ts"; echo b > "$IN/head/src/a.ts"
 HREAL="$(cd "$H" && pwd -P)"
+mkdir -p "$H/dev/repo/src"; echo b > "$H/dev/repo/src/a.ts"   # --repo 로 여는 대상 저장소(실제 홈 아래 — macOS 저장소 모양)
 
 roll() {   # $1=파일 · $2=deny 여부(1/0) · 나머지=도구 호출 명령들 → rollout jsonl
   local f="$1" deny="$2"; shift 2
@@ -54,6 +55,8 @@ roll "$T/r-find.jsonl" 1 "find ~ -name '*.md'"
 roll "$T/r-home.jsonl" 1 "head -1 $HREAL/dev/notes.md"
 roll "$T/r-nodeny.jsonl" 0 "cat requirement.md"
 roll "$T/r-roles.jsonl" 1 "SPAWN:fz-review-arch" "SPAWN:fz-review-quality" "cat diff.patch"
+roll "$T/r-repo.jsonl" 1 "rg --files $HREAL/dev/repo -g '!.git'" "find $HREAL/dev/repo -name '*.ts'" "grep -rn b $HREAL/dev/repo"
+roll "$T/r-repomix.jsonl" 1 "rg b $HREAL/dev/repo ~"
 
 run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자
   local name="$1" outf="$2" rolls="$3"; shift 3
@@ -141,6 +144,28 @@ for c in aud1 aud2 aud3 aud4; do
     "$(audit $c sessionFile)|$([ -e "$T/c-$c/out/A-$c.json.session" ] && echo 남음 || echo 없음)" "None|없음"
 done
 check "감사(aud4): 격리 미적용으로 판정" "$(audit aud4 isolationApplied)" False
+# ④b 허용된 저장소(--repo) 안 재귀 검색은 오염이 아니다 — 같은 조각의 다른 뿌리(~)는 여전히 적중
+#    ⛔ S27 실측: macOS 저장소(/Users 아래)를 GPT 가 절대 경로로 검색하자 옛 규칙이 exit 15 로 첫 패스를 버렸다
+run audrepo "$HERE/sample-plan-ok.json" "$T/r-repo.jsonl" plan --requirement "$IN/requirement.md" --repo "$H/dev/repo"
+check "감사(repo 안 재귀 검색): exit 0" "$(rc audrepo)" 0
+check "감사(repo 안 재귀 검색): 적중 0" "$(audit audrepo hits)" "[]"
+run audmix "$HERE/sample-plan-ok.json" "$T/r-repomix.jsonl" plan --requirement "$IN/requirement.md" --repo "$H/dev/repo"
+check "감사(repo 뒤 ~ 재귀): exit 15" "$(rc audmix)" 15
+# ④c 재귀 검색 규칙 문자열 단위 — /Users 경로(macOS 저장소 모양). ⛔ 파일을 만들지 않는다 — 실제 홈을 건드리지 않는다
+#    ④b 의 가짜 홈은 /Users 밖이라 옛 결함(/Users 아래 전부 적중)을 재현하지 못한다 — 규칙 블록을 직접 꺼내 잰다
+UNIT="$(python3 - "$L" <<'UPY'
+import re, sys
+t = open(sys.argv[1], encoding="utf-8").read()
+env = {"re": re, "repo": "/Users/u/dev/repo", "iso": "/private/tmp/iso"}
+exec(t[t.index("ROOTS = r"):t.index("def home_ref(cmd):")], env)
+hit = env.get("recurse_hit") or (lambda c: any(x.search(c) for x in env["RECURSE"]))
+cases = [("rg --files /Users/u/dev/repo -g '!.git'", False), ("find /Users/u/dev/repo -name x", False),
+         ("rg foo /Users/u/dev/repo ~", True), ("rg --files /Users/u", True), ("find / -name x", True),
+         ("grep -rn x /Users/u/dev/other", True)]
+print(" ".join("ok" if hit(c) == w else "bad:" + c.split()[0] for c, w in cases))
+UPY
+)"
+check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖은 적중)" "$UNIT" "ok ok ok ok ok ok"
 
 # ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(끌 수 없다 — S11 ⑤)
 run sub "$HERE/sample-review-ok.json" "$T/r-parent.jsonl,$T/r-sub.jsonl" review --diff "$IN/diff.patch"

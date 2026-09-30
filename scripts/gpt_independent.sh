@@ -230,9 +230,27 @@ inputs = {n: hashlib.sha256(open(os.path.join(iso, "input", n), "rb").read()).he
 rc, timed_out = int(rc), timed_out == "1"
 rolls = sorted(glob.glob(os.path.join(stem + ".rollouts", "*.jsonl")))
 FORBID = re.compile(r"\.claude/|plan-v\d|workflow-result|-result\.json|code-context|review-report\.md|pr-comments\.md")
-ROOTS = r"(~|\$HOME|/Users(/[^\s'\"]*)?|/)(?=[\s'\";|&)]|$)"
-RECURSE = [re.compile(rf"\bfind\s+{ROOTS}"), re.compile(rf"\b(rg|fd|ag)\b[^|;&\n]*\s{ROOTS}"),
-           re.compile(rf"\bgrep\s+-[a-zA-Z]*[rR][a-zA-Z]*\b[^|;&\n]*\s{ROOTS}"), re.compile(rf"\bls\s+-[a-zA-Z]*R[a-zA-Z]*\b[^|;&\n]*\s{ROOTS}")]
+ROOTS = r"(~|\$HOME|/Users(?:/[^\s'\"]*)?|/)(?=[\s'\";|&)]|$)"
+FIND_ROOT = re.compile(rf"\bfind\s+{ROOTS}")                      # find 는 첫 인자가 검색 뿌리다
+MULTI_HEADS = [re.compile(r"\b(?:rg|fd|ag)\b"), re.compile(r"\bgrep\s+-[a-zA-Z]*[rR][a-zA-Z]*\b"),
+               re.compile(r"\bls\s+-[a-zA-Z]*R[a-zA-Z]*\b")]
+ROOT_ARG = re.compile(rf"\s{ROOTS}")
+def under_allowed(p):
+    """허용된 저장소(--repo) · 격리 폴더 하위 — home_ref 와 같은 기준."""
+    p = p.rstrip("/") or "/"
+    return bool((repo and (p == repo or p.startswith(repo + "/"))) or p == iso or p.startswith(iso + "/"))
+def recurse_hit(cmd):
+    """홈 · 루트 재귀 검색 — 뿌리가 허용된 저장소 · 격리 폴더 하위면 적중이 아니다.
+    ⛔ macOS 저장소는 거의 전부 /Users 아래라 예외가 없으면 GPT 가 저장소를 절대 경로로 검색하기만 해도 첫 패스가 버려진다(S27 실측).
+    ⛔ 조각(| ; & 줄바꿈 사이) 안의 뿌리 인자를 **전부** 본다 — 탐욕 접두는 마지막 뿌리만 잡아 `rg x <repo> ~` 를 놓친다."""
+    if any(not under_allowed(m.group(1)) for m in FIND_ROOT.finditer(cmd)):
+        return True
+    for h in MULTI_HEADS:
+        for m in h.finditer(cmd):
+            seg = re.split(r"[|;&\n]", cmd[m.end():], maxsplit=1)[0]
+            if any(not under_allowed(t.group(1)) for t in ROOT_ARG.finditer(seg)):
+                return True
+    return False
 def home_ref(cmd):
     for m in re.finditer(re.escape(home) + r"[^\s'\"]*", cmd):
         p = m.group(0)
@@ -271,7 +289,7 @@ for f in rolls:
             continue
         calls += 1
         why = ("금지 산출물 참조" if FORBID.search(cmd) else
-               "홈 · 루트 재귀 검색" if any(x.search(cmd) for x in RECURSE) else
+               "홈 · 루트 재귀 검색" if recurse_hit(cmd) else
                ("격리 밖 홈 경로 " + home_ref(cmd)) if home_ref(cmd) else None)
         if why:
             hits.append({"rollout": os.path.basename(f), "rule": why, "cmd": cmd[:300]})
