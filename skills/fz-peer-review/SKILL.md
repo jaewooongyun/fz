@@ -23,7 +23,7 @@ allowed-tools: >-
   mcp__github__add_issue_comment,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
+  Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
 metadata:
   provides: [peer-review]
   needs: [none]
@@ -79,6 +79,7 @@ metadata:
 
 - Tier 2/3 Analyze는 네이티브 Workflow 도구 필요 (`workflows/peer-review.js`) — 미가용 시 SOLO 리뷰 폴백(`mode:'fallback'`) (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+- ⛔ **첫 GPT 호출 전**(Tier 1·2·3 challenger · `--gpt-independent` 독립 첫 패스 중 가장 이른 것): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`. 호출에 모델·effort 를 적지 않는다
 
 ## 참조
 
@@ -480,7 +481,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 **Will Not**:
 - 코드를 직접 수정하지 않음 (리뷰만 수행)
 - 자기 코드 리뷰 (→ `/fz-review`)
-- GPT 위임 (→ `/fz-gpt`) — GPT CLI 직접 호출
+- GPT CLI 직접 호출 (→ 래퍼 `scripts/gpt-exec.sh` 경유 — `modules/peer-review-tiers.md` § GPT Analyze 호출)
 - Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Code Conventions` 위임)
 - ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응

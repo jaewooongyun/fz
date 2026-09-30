@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__delete_memory,
   mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
-  Bash(grep *), Bash(cp *), Read, Grep, Glob
+  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt-choice.sh*), Read, Grep, Glob
 metadata:
   provides: []
   needs: []
@@ -313,12 +313,13 @@ commit/pr 전 → ✓ gpt check (TEAM)
 
 결정된 파이프라인, 팀 구성, 모델 배정을 시각화하고 사용자 승인을 받습니다.
 
-> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — `FZ_AUTONOMY` 가 `autonomous` 면 *범위 내 가역* 파이프라인은 자동 진행하고, 그 밖은 여기서 묻는다. 금지 행동(commit·push·외부 발신·삭제)은 **모드와 무관하게 차단**이다 (`scripts/autonomy_decide.py` · 정책 `modules/governance.md` § 자율 모드)
+> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — `FZ_AUTONOMY` 가 `autonomous` 면 *범위 내 가역* 파이프라인은 자동 진행하고, 그 밖은 여기서 묻는다. 금지 행동(commit·push·외부 발신·삭제)은 **모드와 무관하게 차단**이다 (`scripts/autonomy_decide.py` · 정책 `modules/governance.md` § 자율 모드). ⛔ **GPT 모델·effort**: 확정 파이프라인에 GPT 를 부를 수 있는 스킬이 있으면(모르면 묻는다) `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" get` 을 부르고 정본의 `get` 결과 표대로 한다 — 묻기로 나오면 모델·effort 질문 2개를 이 AskUserQuestion 에 합치고 답을 `set` 한다(자율 판정도 `get` 이 한다). 선택이 있으면 제안 시각화에 표시만 한다 — 정본 `modules/gpt-strategy.md` § 모델·effort 선택
 
 ### Gate 4: Pipeline Approved
 - [ ] 파이프라인 + 팀 구성 시각화 출력 완료?
 - [ ] 사용자가 승인했는가?
 - [ ] 적극적 확인 원칙 적용 완료? (짧은 요청/범위 확인)
+- [ ] GPT 모델·effort 질문을 정본 `get` 결과 표대로 처리했는가? (GPT 를 부를 수 있는 파이프라인이면 `gpt-choice.sh get` 을 불렀는가)
 
 ---
 

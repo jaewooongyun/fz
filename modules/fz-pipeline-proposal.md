@@ -38,7 +38,7 @@
 **에이전트**: Lead(fable) + impl-correctness(★opus) + review-arch(opus) + review-quality(opus) — 동시 opus ≤3
 ```
 
-> ✓ 접두사: 자동 삽입된 검증 게이트. ★: Primary Worker (opus).
+> ✓ 접두사: 자동 삽입된 검증 게이트. ★: Primary Worker (opus). 모델 열 `gpt` 는 세션 선택이 있으면(`gpt-choice.sh get` exit 0) `gpt (<slug>/<level>)` 로 선택값을 붙인다.
 
 ---
 
@@ -76,6 +76,8 @@
 - ⛔ 사용자 명시 선택 후 Lead 재권장 금지 (edge-cases Failure 4-2 완화)
 - ⛔ "Default = SOLO + minimal은 시작점이지 *상한 아님*" — complexity 또는 catch 누적 신호 시 TEAM 자동 전환 (Failure 4-3 완화)
 - ⛔ Phase 3 TEAM 결정 시 Phase 4가 SOLO로 *역전 금지* (review-arch MUST-1)
+- GPT 모델·effort 질문은 이 AskUserQuestion 에 합친다(GPT 를 부를 수 있는 파이프라인에서 `gpt-choice.sh get` 이 묻기로 나올 때) — 판정·질문 형식 정본 `modules/gpt-strategy.md` § 모델·effort 선택
+- ⛔ AskUserQuestion 한 번은 **최대 4문항**이다 — 파이프라인 · 범위 확인 질문에 GPT 두 질문을 더해 넘치면 정본 규칙대로 나눈다
 
 ---
 

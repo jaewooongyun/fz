@@ -19,7 +19,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
   mcp__atlassian-jira__jira_get,
-  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [planning, architecture-analysis]
   needs: [none]
@@ -48,7 +48,7 @@ metadata:
 ## Prerequisites
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **첫 GPT 호출 전**(0.7 Sprint Contract · 2.7 독립 플랜 · Phase 2 verify 중 가장 이른 것): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`. 호출에 모델·effort 를 적지 않는다
 
 ## 모듈 참조
 
@@ -333,7 +333,7 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 > 3. **양쪽 완료 대기** — 두 로그에 종료 표시가 모두 나온 뒤 판정한다. 한쪽만 보고 진행하면 나머지가 조용히 버려진다.
 > 4. **schema 검증 후 사용** — 각 응답을 `--output-schema` 계약으로 받고, `verify-gates` 는 `gate_check.py --verdict-check` 사후 대조까지 통과해야 판정으로 인정한다(⛔ 게이트 수 ≠ 판정 수이면 미판정).
 > ⛔ 버전 불일치(호출 사이에 plan 이 수정됨) 시 **재검증**한다 — 옛 plan 에 대한 판정을 새 plan 의 승인 근거로 쓰지 않는다.
-> ⊕ `--gpt-independent` 면 `verify` 자리를 **resume 교차**가 맡는다 — 독립 플래너 세션을 `gpt-exec.sh resume --session-file {감사 sessionFile}` 로 이어 같은 Q1–Q8 · `gpt_review_schema` · effort high 로 검증한다(`modules/fz-gpt-subcommands-core.md` § resume 교차). 위 네 계약은 그대로이고 `verify-gates` 와 동시에 돈다. 세션 파일이 없으면 기본 `verify` 다.
+> ⊕ `--gpt-independent` 면 `verify` 자리를 **resume 교차**가 맡는다 — 독립 플래너 세션을 `gpt-exec.sh resume --session-file {감사 sessionFile}` 로 이어 같은 Q1–Q8 · `gpt_review_schema` 로 검증한다(`modules/fz-gpt-subcommands-core.md` § resume 교차). 위 네 계약은 그대로이고 `verify-gates` 와 동시에 돈다. 세션 파일이 없으면 기본 `verify` 다.
 
 ### 절차
 
@@ -343,7 +343,7 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 ```
 
 검증이 수행하는 작업:
-- 계획 전송 (cross-model 검증, effort: high)
+- 계획 전송 (cross-model 검증)
 - 응답 파싱
 - Issue Tracker에 이슈 자동 기록
 - 이슈 요약 반환

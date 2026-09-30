@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
-  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [review-results]
   needs: [code-changes]
@@ -54,6 +54,7 @@ metadata:
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+- ⛔ **첫 GPT 호출 전**(2.5 독립 첫 패스 · Phase 5 검증 2 와 그 직전 probe 중 가장 이른 것): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`. 호출에 모델·effort 를 적지 않는다
 
 ## 모듈 참조
 
@@ -211,7 +212,7 @@ mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분�
 > ⊕ `--gpt-independent` 면 이 검증을 실행 절차 2.5 · 4.5 가 대신한다 — GPT 가 Claude 산출을 보기 전에 따로 리뷰한 결과를 `review_merge.py` 가 합친다
 
 fz-gpt가 수행하는 작업:
-- GPT CLI에 변경 심볼 + diff 전송 (effort: high)
+- GPT CLI에 변경 심볼 + diff 전송
 - JSON 응답 파싱 → Issue Tracker 자동 기록
 - 이슈 요약 반환
 
