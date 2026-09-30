@@ -702,7 +702,7 @@ jsonl 상세: `experiment-log-traces.jsonl` group_id `fz_tier1g_cp2_2026_04_25` 
   ```
   꾸러미에는 run_id·arm·순서·절대 경로가 없다(anon id 는 소금 해시). 리뷰는 인용 후보마다 **지적 문단 전체**와 위치 힌트(near_labels)를, fixture 마다 **diff 와 인용된 파일 본문**을 준다 — 검증자는 **코드로 확인한** 결함만 real 로 판정한다(주장만으로는 false). 계획은 본문·요구사항·채점표 항목을 준다. 검증자는 어느 arm 의 산출물인지 알 수 없어야 한다. 판정 값은 JSON boolean 이다(`"false"` 같은 문자열은 미검증).
 - 판정은 꾸러미를 만들 때의 **산출물 해시**에 묶인다. 산출물이 바뀌었거나 recollect 로 행이 바뀌었으면 옛 판정은 쓰이지 않고(score 가 미검증으로 채점), judge 는 점수의 산출물 해시가 현재 행과 다르면 낡은 점수로 보고 UNRUN 한다.
-- 리뷰: 검증자가 후보마다 {real, label_ids, severity, axis} 를 낸다. 라벨로 매핑된 발견은 **라벨의** severity·axis 로, 라벨 밖 진성 발견은 판정 값으로 센다. 한 라벨은 한 번만 센다. real=true 인데 유효한 라벨 매핑도, 허용된 severity·axis 도 없거나, 없는 라벨·다른 파일의 라벨로 매핑하면 그 후보는 **미검증**이다(세지 않고 넘어가면 발견이 사라진다). 점수에는 채점기(계측기) 버전이 남고, 현재 버전과 다르면 judge 가 낡은 점수로 본다. 계획: 채점표 항목마다 {covered} — 절·질문·10배 부하·의존성 장애·롤백은 major, 잔재·소비자 심볼은 critical 이다(키워드는 힌트뿐).
+- 리뷰: 검증자가 후보마다 {real, label_ids, severity, axis} 를 낸다. 라벨로 매핑된 발견은 **라벨의** severity·axis 로, 라벨 밖 진성 발견은 판정 값으로 센다. 한 라벨은 한 번만 센다. real=true 인데 유효한 라벨 매핑도, 허용된 severity·axis 도 없거나, 없는 라벨·다른 파일의 라벨로 매핑하면 그 후보는 **미검증**이다(세지 않고 넘어가면 발견이 사라진다). 인용 파일은 fixture 파일로 풀어 대조한다 — 경로 성분 끝이 맞는 파일, 없으면 basename 이 fixture 파일 basename 의 접미인 파일이 정확히 하나일 때 그 파일(약칭 — 실측: B 의 Lead 보고서는 `EditRow.swift` · `VC.swift` 를 쓴다). 못 푼 인용(0 · 2개 이상)의 라벨 매핑은 받고 `mapping_unchecked` 로 센다(SC-3 · SC-4 판정 줄에 인쇄). 점수에는 채점기(계측기) 버전이 남고, 현재 버전과 다르면 judge 가 낡은 점수로 본다. 계획: 채점표 항목마다 {covered} — 절·질문·10배 부하·의존성 장애·롤백은 major, 잔재·소비자 심볼은 critical 이다(키워드는 힌트뿐).
 - 판정이 빠진 후보·항목이 하나라도 있으면 그 점수는 미검증이며 SC-3·SC-3-smoke·SC-4 는 UNRUN 이다.
 
 ### 8. peer-review B arm 의 표준 후속 필터 턴

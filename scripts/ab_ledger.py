@@ -1540,22 +1540,51 @@ def _same_file(cited, label_file):
     return cited == label_file or label_file.endswith("/" + cited) or cited.endswith("/" + label_file)
 
 
-def near_labels(sp, labels):
-    return [lab["id"] for lab in labels["issues"] if _same_file(sp[0], lab["file"])
-            and sp[1] - LINE_TOL <= lab["line_end"] and lab["line_start"] <= sp[2] + LINE_TOL]
+def fixture_files(fxdir):
+    """fixture 의 base/ · head/ 아래 파일 상대 경로(합집합 · `.fixture` 접미 제거) — 인용 해석용."""
+    out = set()
+    for side in ("base", "head"):
+        root = os.path.join(fxdir, side)
+        for dp, _, fns in os.walk(root):
+            for f in fns:
+                rel = os.path.relpath(os.path.join(dp, f), root)
+                out.add(rel[:-len(".fixture")] if rel.endswith(".fixture") else rel)
+    return sorted(out)
 
 
-def score_review(labels, texts, verdicts=None):
+def resolve_cited(cited, files):
+    """인용 파일 → 같은-파일 대조에 쓸 경로 · None(미해석).
+    ① fixture 파일 목록이 없거나 경로 성분 끝이 맞는 파일이 있으면 인용 그대로 — 기존 규칙이 판정한다
+    ② 아니면 인용 basename 이 fixture 파일 basename 의 **문자열 접미**인 파일이 정확히 하나일 때 그 파일
+       (약칭 — `Interactor.swift` → `App/Watchlist/WatchlistInteractor.swift`). 둘 이상 · 0개면 None.
+    ⛔ 실측: B 의 Lead 보고서는 약칭(`EditRow.swift` · `VC.swift`)을, C 의 렌더러 산출은 전체 경로를 쓴다 —
+       경로 성분 끝만 받으면 인용 형식이 arm 차이가 된다."""
+    if not files or any(_same_file(cited, f) for f in files):
+        return cited
+    base = cited.rsplit("/", 1)[-1]
+    hit = [f for f in files if f.rsplit("/", 1)[-1].endswith(base)]
+    return hit[0] if len(hit) == 1 else None
+
+
+def near_labels(sp, labels, files=None):
+    r = resolve_cited(sp[0], files)
+    return [] if r is None else [lab["id"] for lab in labels["issues"] if _same_file(r, lab["file"])
+                                 and sp[1] - LINE_TOL <= lab["line_end"] and lab["line_start"] <= sp[2] + LINE_TOL]
+
+
+def score_review(labels, texts, verdicts=None, files=None):
     """후보(인용) 마다 가린 검증자 판정 {real, label_ids, severity, axis} 로 센다. 라벨로 매핑된 발견은 **라벨의**
-    severity·axis 로, 라벨 밖 진성 발견은 판정의 값으로 센다. 한 라벨은 한 번만 센다. 판정이 빠진 후보가 있으면 verified=False."""
+    severity·axis 로, 라벨 밖 진성 발견은 판정의 값으로 센다. 한 라벨은 한 번만 센다. 판정이 빠진 후보가 있으면 verified=False.
+    files(fixture 파일 목록)가 있으면 인용 파일을 풀어(`resolve_cited`) 같은-파일 대조를 하고, 못 푼 인용의 라벨 매핑은
+    받되 `mapping_unchecked` 로 센다(후보 수)."""
     spans = cite_spans(texts)
     base = {"kind": "review", "candidates": len(spans), "labels_total": len(labels["issues"]),
             "empty": not any(t.strip() for t in texts)}
     if verdicts is None:
         return dict(base, verified=False, unverified=len(spans), by_severity=None, by_axis=None, labels_found=[],
-                    verified_true=None, verified_ratio=None, mapping_errors=[])
+                    verified_true=None, verified_ratio=None, mapping_errors=[], mapping_unchecked=0)
     lab = {x["id"]: x for x in labels["issues"]}
-    found, extras, unverified, real_n, bad = set(), [], 0, 0, []
+    found, extras, unverified, real_n, bad, unchecked = set(), [], 0, 0, [], 0
     for sp in spans:
         v = verdicts.get(cand_id(sp))
         if not isinstance(v, dict) or not isinstance(v.get("real"), bool):
@@ -1564,7 +1593,8 @@ def score_review(labels, texts, verdicts=None):
         if not v["real"]:
             continue
         raw_ids = v.get("label_ids") or []
-        ids = [i for i in raw_ids if i in lab and _same_file(sp[0], lab[i]["file"])]
+        r = resolve_cited(sp[0], files)
+        ids = [i for i in raw_ids if i in lab and (r is None or _same_file(r, lab[i]["file"]))]
         if len(ids) != len(raw_ids):
             # ⛔ 없는 라벨·다른 파일의 라벨로 매핑 — 판정 형식 오류다. 무시하고 넘어가면 발견이 사라진다(미검증)
             bad.append(f"{cand_id(sp)}→{[i for i in raw_ids if i not in ids]}")
@@ -1578,6 +1608,8 @@ def score_review(labels, texts, verdicts=None):
         real_n += 1
         if ids:
             found.update(ids)
+            if r is None:
+                unchecked += 1   # 못 푼 인용(약칭 · fixture 밖 파일)의 라벨 매핑 — 채점기가 파일을 대조하지 못했다(검증자 매핑을 받았다)
         else:
             extras.append(v)
     by_sev = {s: 0 for s in SEVERITIES}
@@ -1591,7 +1623,8 @@ def score_review(labels, texts, verdicts=None):
     ok = unverified == 0
     return dict(base, verified=ok, unverified=unverified, by_severity=by_sev, by_axis=by_axis,
                 labels_found=sorted(found), verified_true=real_n,
-                verified_ratio=round(real_n / len(spans), 4) if spans and ok else None, mapping_errors=bad)
+                verified_ratio=round(real_n / len(spans), 4) if spans and ok else None, mapping_errors=bad,
+                mapping_unchecked=unchecked)
 
 
 def _items(v):
@@ -1666,7 +1699,7 @@ def _fixture_source(fxdir, cited):
     changed = sorted(k for k in head if base.get(k) != head.get(k))
     diff = "".join("".join(difflib.unified_diff(base.get(k, "").splitlines(True), head[k].splitlines(True),
                                                 fromfile=f"a/{k}", tofile=f"b/{k}")) for k in changed)
-    want = set(changed) | {k for k in head for c in cited if _same_file(c, k)}
+    want = set(changed) | {k for k in head for c in cited if _same_file(resolve_cited(c, sorted(head)) or c, k)}
     return {"diff": diff, "files": {k: head[k] for k in sorted(want)}}
 
 
@@ -1690,11 +1723,12 @@ def blind_pack(rows, fixtures_root, salt):
                 {k: x.get(k) for k in ("id", "axis", "severity", "file", "line_start", "line_end", "summary")}
                 for x in labels["issues"]]}
             spans = cite_spans(texts)
+            ff = fixture_files(fxdir)
             cited.setdefault(r["fixture"], (fxdir, set()))[1].update(sp[0] for sp in spans)
             items.append({"anon": anon, "kind": "review", "fixture": r["fixture"],
                           "artifacts_sha": [x.get("sha256") for x in r.get("artifacts") or []], "candidates": [
                 {"cid": cand_id(sp), "file": sp[0], "lines": [sp[1], sp[2]], "context": PATH_SCRUB_RE.sub("<path>", sp[3]),
-                 "near_labels": near_labels(sp, labels)} for sp in spans]})
+                 "near_labels": near_labels(sp, labels, ff)} for sp in spans]})
         elif os.path.isfile(os.path.join(fxdir, "rubric.json")):
             rubric = read_json(os.path.join(fxdir, "rubric.json"))
             req = os.path.join(fxdir, rubric.get("requirement") or "requirement.md")
@@ -1871,6 +1905,14 @@ def _exact(B, C, nb=2, nc=2):
     return None
 
 
+def _unchecked_note(B, C, scores):
+    """파일 대조 못 한 라벨 매핑 수(약칭 · fixture 밖 인용에 검증자가 붙인 라벨 — 받았다). 전부 0 이면 줄을 내지 않는다."""
+    un = [(r["run_id"], (scores.get(r["run_id"]) or {}).get("mapping_unchecked") or 0) for r in B + C]
+    if not any(n for _, n in un):
+        return []
+    return ["파일 대조 못 한 라벨 매핑(검증자 매핑을 받았다) " + " · ".join(f"{k} {n}" for k, n in un if n)]
+
+
 def crit_sc3(B, C, scores, c_runs=2):
     """critical·major 각각 max(0, mean(B) − mean(C)) ≤ N, N = |B1 − B2|."""
     bad = _exact(B, C, 2, c_runs)
@@ -1885,7 +1927,7 @@ def crit_sc3(B, C, scores, c_runs=2):
         good = loss <= n
         ok &= good
         lines.append(f"{sev} B={b} C={c} N={n} loss={loss:g} {'≤' if good else '>'} N")
-    return ok, lines
+    return ok, lines + _unchecked_note(B, C, scores)
 
 
 def crit_sc4(B, C, scores):
@@ -1908,7 +1950,7 @@ def crit_sc4(B, C, scores):
     good = _mean(cr) >= floor
     ok &= good
     lines.append(f"검증 비율 B={br} C={cr} 하한={floor:.4f} {'통과' if good else '미달'}")
-    return ok, lines
+    return ok, lines + _unchecked_note(B, C, scores)
 
 
 def crit_sc6(B, C):
@@ -2317,7 +2359,7 @@ def cmd_score(a):
             v = None
         if os.path.isfile(os.path.join(fx, "labels.json")):
             lp = os.path.join(fx, "labels.json")
-            s = score_review(read_json(lp), texts, v)
+            s = score_review(read_json(lp), texts, v, fixture_files(fx))
         elif os.path.isfile(os.path.join(fx, "rubric.json")):
             lp = os.path.join(fx, "rubric.json")
             s = score_plan(read_json(lp), "\n".join(texts), v)
@@ -3024,6 +3066,42 @@ def self_test(case=None):
         a = score_review(labels2, ["- `A.swift:13` 이름"], {"A.swift:13": {"real": True, "label_ids": []}})
         b = score_review(labels2, ["- `A.swift:13` 이름"], {"A.swift:13": {"real": True, "label_ids": ["I2"]}})
         return (a["verified"] is False and b["verified"] is False and a["unverified"] == 1 and b["unverified"] == 1), [str(a), str(b)]
+
+    @reg
+    def cited_abbrev_resolves():
+        # ⛔ 실측 peer C2 · review B1 — Lead 보고서의 약칭 인용(`Interactor.swift`)을 fixture 파일로 풀어 같은-파일 대조를 한다
+        labs = {"issues": [{"id": "I1", "axis": "idiom", "severity": "major", "file": "App/W/WatchlistInteractor.swift",
+                            "line_start": 10, "line_end": 12},
+                           {"id": "I2", "axis": "naming", "severity": "minor", "file": "App/W/WatchlistRouter.swift",
+                            "line_start": 5, "line_end": 5}]}
+        files = ["App/W/WatchlistInteractor.swift", "App/W/WatchlistRouter.swift"]
+        t = ["- `Interactor.swift:11` 결함"]
+        a = score_review(labs, t, {"Interactor.swift:11": {"real": True, "label_ids": ["I1"]}}, files)
+        b = score_review(labs, t, {"Interactor.swift:11": {"real": True, "label_ids": ["I2"]}}, files)   # 풀린 파일과 다른 파일의 라벨
+        return (a["verified"] and a["labels_found"] == ["I1"] and a["mapping_unchecked"] == 0
+                and b["verified"] is False and b["unverified"] == 1), [str(a), str(b)]
+
+    @reg
+    def cited_unresolved_mapping_counted():
+        # ⛔ 못 푸는 인용(`VC.swift` — 접미 일치 0 · `Interactor.swift` — 접미 일치 2)은 검증자 매핑을 받고 수를 남긴다 · 없는 라벨은 미검증
+        labs = {"issues": [{"id": "I7", "axis": "ui_structure", "severity": "major", "file": "App/W/WatchlistViewController.swift",
+                            "line_start": 34, "line_end": 40}]}
+        files = ["App/W/WatchlistViewController.swift", "App/W/WatchlistInteractor.swift", "App/H/HomeInteractor.swift"]
+        a = score_review(labs, ["- `VC.swift:34-40` 구조"], {"VC.swift:34-40": {"real": True, "label_ids": ["I7"]}}, files)
+        b = score_review(labs, ["- `Interactor.swift:3` 결함"], {"Interactor.swift:3": {"real": True, "label_ids": ["I7"]}}, files)
+        c = score_review(labs, ["- `VC.swift:34-40` 구조"], {"VC.swift:34-40": {"real": True, "label_ids": ["NOPE"]}}, files)
+        return (a["verified"] and a["labels_found"] == ["I7"] and a["mapping_unchecked"] == 1
+                and b["verified"] and b["mapping_unchecked"] == 1
+                and c["verified"] is False and c["unverified"] == 1), [str(a), str(b), str(c)]
+
+    @reg
+    def near_labels_resolve_abbrev():
+        # 다음 꾸러미부터 — 약칭 인용에도 위치 힌트가 붙는다(파일 목록이 없으면 옛 규칙 그대로 빈 힌트)
+        labs = {"issues": [{"id": "I1", "axis": "idiom", "severity": "major", "file": "App/W/WatchlistInteractor.swift",
+                            "line_start": 10, "line_end": 12}]}
+        sp = ("Interactor.swift", 11, 11, "")
+        got = (near_labels(sp, labs, ["App/W/WatchlistInteractor.swift"]), near_labels(sp, labs))
+        return got == (["I1"], []), [str(got)]
 
     @reg
     def stale_scorer_unrun():
