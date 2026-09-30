@@ -272,7 +272,7 @@ BAD (GPT 직접 호출):
 
 GOOD (--gpt 위임 패턴):
 수정: --gpt 옵션 + /fz-gpt check 위임
-→ fz-gpt가 Hybrid Routing/Bash Hygiene/severity 파싱 처리. fz-fix는 verdict 분기만.
+→ fz-gpt가 Bash Hygiene/severity 파싱 처리. fz-fix는 verdict 분기만.
 ```
 
 ---

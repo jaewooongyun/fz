@@ -174,14 +174,14 @@ TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 �
 
 ## Cross-Model Verification (2-Model)
 
-Claude + GPT(현행 모델) 교차 검증:
+Claude + GPT 교차 검증:
 
-| 트리거 | 프로바이더 | Effort |
-|--------|-----------|--------|
-| code-changes (TEAM) | GPT check | high |
-| planning (TEAM) | GPT verify | high |
-| final / --deep | GPT | xhigh |
-| 불일치 시 | AskUserQuestion | 사용자 판단 |
+| 트리거 | 프로바이더 |
+|--------|-----------|
+| code-changes (TEAM) | GPT check |
+| planning (TEAM) | GPT verify |
+| `final` · `--deep` | GPT |
+| 불일치 시 | AskUserQuestion (사용자 판단) |
 
 ### Disagreement 기록
 - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/verify/consensus-{YYYYMMDD_HHMMSS}.md` (timestamp suffix로 같은 날 다중 session overwrite 방지)
@@ -194,10 +194,10 @@ Claude + GPT(현행 모델) 교차 검증:
 | 모드 | 코드 생산 후 검증 | 계획 생산 후 검증 |
 |------|-----------------|-----------------|
 | SOLO | 빌드만 | 없음 (Lead 직접 판단) |
-| TEAM | 빌드 + GPT check (config 모델+high) + 에이전트 확인 | GPT verify (config 모델+high) |
-| TEAM --deep | 빌드 + GPT (config 모델+xhigh) | GPT verify (xhigh) |
+| TEAM | 빌드 + GPT check + 에이전트 확인 | GPT verify |
+| TEAM --deep | 빌드 + GPT | GPT verify |
 
-> Effort 정의: `modules/gpt-strategy.md` 참조. 기본 high, final/--deep은 xhigh. Review Gate OFF.
+> GPT 모델·effort: 정본 `modules/gpt-strategy.md` § 모델·effort 선택 — 트리거·모드(`final` · `--deep` 포함)로 바꾸지 않는다. Review Gate OFF 도 그 절이다.
 
 ---
 
@@ -365,7 +365,7 @@ export FZ_PLUGIN_ROOT
 - ✅ 이미 스크립트 안에서 호출하는 경우(자기 `dirname`을 아는 경우)는 ①이 불필요하다:
   `FZ_PLUGIN_ROOT="$("$(dirname "${BASH_SOURCE[0]}")/resolve-plugin-root.sh")"`
 
-**호출 계약** (⛔ 8곳 전부 이 형태로 통일 — 할당 변수와 조건 검사 변수가 **같은 이름**이어야 한다):
+**호출 계약** (⛔ 호출부 전부 이 형태로 통일 — 할당 변수와 조건 검사 변수가 **같은 이름**이어야 한다):
 ```bash
 SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
 if [ -n "$SKILL_PATH" ]; then SKILL_PROMPT="$(cat "$SKILL_PATH")"

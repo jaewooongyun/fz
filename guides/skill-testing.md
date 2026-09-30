@@ -79,7 +79,7 @@
 |-------|------|------|
 | Git diff 존재 | `/fz-gpt review` | `scripts/gpt-exec.sh review --base` 실행 + 이슈 보고 |
 | GPT CLI 미설치 | `/fz-gpt review` | 에러 감지 + sc:analyze 폴백 |
-| Critical 이슈 발견 | `/fz-gpt final` | xhigh 에스컬레이션 + DA 패스 자동 실행 |
+| Critical 이슈 발견 | `/fz-gpt final` | DA 패스 자동 실행 |
 | 3-Tier 스킬 부재 | `/fz-gpt verify` | Tier 3 인라인 프롬프트로 폴백 |
 
 ### 1.3 Performance Comparison — Before/After 비교

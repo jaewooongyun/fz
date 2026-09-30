@@ -784,7 +784,7 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 - → SOLO 게이팅으로는 overthinking(추론 깊이)을 못 막는다. 게이팅이 줄이는 것은 fan-out 비용·MAST 실패다.
 
 **max + ultracode 운영점의 함의**:
-- (a) token 비용은 *세션* binding 제약이 아니다 → 세션은 품질 최적화. 단 GPT/subagent leg의 per-call effort·비용은 fz가 여전히 소유한다 (`modules/gpt-strategy.md` Standard/Deep/Light 티어 — 회귀시키지 않는다).
+- (a) token 비용은 *세션* binding 제약이 아니다 → 세션은 품질 최적화. 단 subagent leg 의 per-call effort·비용은 fz가 여전히 소유한다. GPT leg 의 모델·effort 는 세션 1회 선택(없으면 `config.toml`)이 모든 호출에 적용된다 — 호출마다 바꾸지 않는다(`modules/gpt-strategy.md` § 모델·effort 선택).
 - (b) max는 단순 작업도 깊게 추론한다(overthinking 가능). 세션 추론 깊이를 못 낮추므로, fz는 *task surface 축소*(light/simplified 모드 = 로드 instruction 감소)로 "무엇을 생각하는가"를 좁힌다 — 추론 깊이가 아니라 추론 *대상*을 줄이는 접근.
 - (c) ultracode는 workflow를 기본화하나 coupled 작업의 결합도는 바뀌지 않는다(§8 multi-agent 통신 + `guides/agent-team-guide.md` 참조). 비용 반론만 제거할 뿐 fan-out 정당화가 아니다.
 
@@ -1339,7 +1339,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 9b | GPT-5.5 System Card | OpenAI | 2026-04-23 | https://openai.com/index/gpt-5-5-system-card/ |
 | 9c | GPT CLI Changelog | OpenAI | 상시 갱신 | https://learn.chatgpt.com/docs/changelog |
 | 9d | GPT-5 Prompting Guide (Cookbook) | OpenAI | 2026 | https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide |
-| 9e | GPT CLI (fz cross-model verification 도구 — 모델 pin 없음, SSOT=`config.toml`. CLI 버전 플로어는 호환 사실로 별도 유지) | OpenAI | live | https://developers.openai.com/codex/cli |
+| 9e | GPT CLI (fz cross-model verification 도구 — 모델·effort 는 세션 선택 > `config.toml`(정본 `modules/gpt-strategy.md` § 모델·effort 선택). CLI 버전 플로어는 호환 사실로 별도 유지) | OpenAI | live | https://developers.openai.com/codex/cli |
 
 
 ### 오픈소스 구현체

@@ -52,7 +52,7 @@ bash "$(printf '%s\n' ~/.claude/plugins/cache/fz-orchestrator/fz/*/ | sort -V | 
 
 ⛔ 캐시에 버전이 여럿이면 glob 을 그대로 실행하지 않는다 — 사전순 **첫** 경로(가장 오래된 판일 수 있다)가 돌아 구버전에 링크된다. 위처럼 `sort -V` 로 최신 1개를 고르거나, 로컬 체크아웃이면 그 플러그인 루트에서 `bash scripts/setup-gpt-skills.sh` 를 실행한다. setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 Claude 스킬(`skills/`)을 가리키는 옛 링크는 지운다.
 
-⛔ GPT 모델·버전 하한은 README 가 고정하지 않는다 — `/fz-gpt` 가 `~/.codex/config.toml` 의 `model` 을 SSOT 로 위임한다(구버전이면 에러 대응표가 업데이트를 권고).
+⛔ GPT 모델·버전 하한은 README 가 고정하지 않는다 — GPT 모델·effort 는 세션 선택(없으면 `~/.codex/config.toml`)이다. 정본 `modules/gpt-strategy.md` § 모델·effort 선택(구버전이면 에러 대응표가 업데이트를 권고).
 
 > **표의 수치** — **사용처** = 스킬 22개 중 그 도구의 *호출*이 있는 파일 수(MCP 는 `mcp__…`, GPT 는 `fz-gpt`, SuperClaude 는 `sc:` 로 센다). 언급만 된 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. **폴백** = 각 스킬 `## 에러 대응` 표에 대체 경로가 적힌 스킬 수.
 
@@ -82,7 +82,7 @@ claude plugin update fz@fz-orchestrator
 | | `/fz-rebase` | 리베이스 조용한 유실 게이트 (경로 단위 배타 분할 + prepush 원격 실측) |
 | **탐색** | `/fz-discover` | 풍경 탐색 + 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic + pattern) |
-| **검증** | `/fz-gpt` | GPT CLI 교차 검증 (모델은 `config.toml` SSOT 위임 = 항상 최신 frontier) + `micro-eval` 단일 주장 재평가 |
+| **검증** | `/fz-gpt` | GPT CLI 교차 검증 (모델·effort 는 세션 선택(없으면 `config.toml`) — `modules/gpt-strategy.md` § 모델·effort 선택) + `micro-eval` 단일 주장 재평가 |
 | | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점 + caller/convention 검증) |
 | **문서/시스템** | `/fz-memory`, `/fz-skill`, `/fz-manage`, `/fz-modernize` | 메모리, 스킬 관리 (`write` 서브커맨드 = 문서 작성 + 글쓰기 + 프롬프트 최적화), 가이드 modernization |
 | **보조** | `/fz-recording`, `/fz-pr-digest` | 회의록, PR 요약 |

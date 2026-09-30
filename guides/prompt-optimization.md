@@ -32,9 +32,9 @@
 > - **OpenAI Prompt Guidance (live)** — 공식 API prompt 가이드
 > - **GPT-5 Prompting Guide (OpenAI Cookbook, 2026)** — 공식 Cookbook
 > - **Rethinking skills and prompts for GPT-6 Astra (OpenAI Developers blog)** — "what used to require a lot of handholding and scaffolding no longer does" · 스킬 설명은 짧게, 다중 워크플로 스킬은 최소 라우터 [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra]
-> - **GPT-6 Sol model page (OpenAI API, 2026-09-22)** — fz GPT 교차검증 현행 모델 `gpt-6-sol` · effort `none`~`max` · 1,050,000 ctx [verified: developers.openai.com/api/docs/models/gpt-6-sol]
+> - **GPT-6 Sol model page (OpenAI API, 2026-09-22)** — `gpt-6-sol` · effort `none`~`max` · 1,050,000 ctx [verified: developers.openai.com/api/docs/models/gpt-6-sol]. fz 의 모델은 세션 선택(없으면 `config.toml`) — `modules/gpt-strategy.md` § 모델·effort 선택
 > - **Model guidance — latest model (OpenAI API, live)** — GPT-6 계열 instruction following·검증 성향 [verified: developers.openai.com/api/docs/guides/latest-model]
-> - **GPT CLI Changelog (OpenAI)** — Browser + Auto Review Agent + GPT-5.5(0.124.0) · GPT-6 Astra(0.153.1) · **GPT-6 Sol·Luna**(0.156.1 에서 모델 선택기 추가 2026-09-23 · 0.157.0 정식 추가 2026-09-25 · CLI 기본 `gpt-6-sol` medium) 통합. https://learn.chatgpt.com/docs/changelog
+> - **GPT CLI Changelog (OpenAI)** — Browser + Auto Review Agent + GPT-5.5(0.124.0) · GPT-6 Astra(0.153.1) · **GPT-6 Sol·Luna**(0.156.1 에서 모델 선택기 추가 2026-09-23 · 0.157.0 정식 추가 2026-09-25 · CLI 기본 `gpt-6-sol` medium) · GPT-6.1 Sol(0.159.0 추가 · 0.159.1 bundled default, 2026-09-29) 통합. https://learn.chatgpt.com/docs/changelog
 >
 > **Tier 2 — Academic (peer-reviewed + arxiv preprint):**
 > - ACE: Agentic Context Engineering v3 (Stanford, ICLR 2026, arXiv 2510.04618) — context collapse, brevity bias
