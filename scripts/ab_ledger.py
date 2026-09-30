@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # lint:no-root-anchor — 플러그인 루트를 참조하지 않는다. 형제 모듈 import(fz_wf_metrics·freeze_baseline)와
 #   계측기 해시에 이 파일의 디렉토리만 쓴다. 원장·transcript·fixture 경로는 전부 호출자가 넘긴다.
+# diff-parse: not-a-diff — `startswith("-")` 는 셸 명령 토큰의 플래그 판별이다(sed -i · --out-dir · --out= · 스크립트 argv).
+#   `startswith("--------")` 는 GPT 스트림 로그 배너의 구분선이다. diff 줄 접두를 판정하는 곳은 없다.
 """ab_ledger.py — A/B 원장: 수집(collect)·채점(score)·판정(judge) (S05).
 
 왜: 속도 개선을 주장하려면 **같은 입력·같은 모델/effort·완주한 run** 끼리만 비교해야 한다. 손으로 옮긴
@@ -71,9 +73,10 @@ WALL_XCHECK_PCT = 5.0   # wall_workflow 두 자의 허용 차이
 MTIME_TOL_S = 5.0       # 최종 산출물 기록 이벤트 ↔ 파일 mtime 허용 차이
 PHASES = ("baseline", "release-smoke", "change")
 INSTRUMENTS = ("ab_ledger.py", "fz_wf_metrics.py", "freeze_baseline.py")
-# ⛔ R-A 에서 구현한 기준만 판정한다. 나머지(SC-1·SC-2·SC-5·SC-8·AC-2·AC-3·AC-4·AC-6·blind-labels·gpt-wf-wall·
-#    critical-path)는 **exit 2** — 받고 무시하면 그것이 AC-5 의 '빠른 성공'이다. 구현 스텝: S25~S27.
-IMPLEMENTED = ("SC-3", "SC-3-smoke", "SC-4", "SC-6", "SC-7", "AC-1", "AC-5", "AC-7", "crossover-order", "input-hash")
+# ⛔ 구현한 기준만 판정한다. 나머지(SC-1·SC-2·SC-8·AC-2·AC-3·AC-6)는 **exit 2** — 받고 무시하면 그것이 AC-5 의
+#    '빠른 성공'이다. S25 · S26 에서 SC-5 · AC-4 · blind-labels · gpt-wf-wall · critical-path 를 더했다. 남은 구현 스텝: S27.
+IMPLEMENTED = ("SC-3", "SC-3-smoke", "SC-4", "SC-5", "SC-6", "SC-7", "AC-1", "AC-4", "AC-5", "AC-7", "crossover-order", "input-hash",
+               "blind-labels", "gpt-wf-wall", "critical-path")
 SOURCE_KINDS = ("transcript", "wf-metrics", "start-state", "input-hash", "instrument-sha")
 
 
@@ -145,7 +148,9 @@ GPT_CALL_RE = re.compile(r"(?:^[ \t]*|[;&|(]\s*|\b(?:then|do|else)\s+|\b(?:bash|
                          r"[\"']?(?:[^\s\"';&|]*/)?gpt-exec\.sh[\"']?\s+(?:review|exec|resume)\b", re.M)
 # Bash 가 산출물을 **썼다**는 근거 — 경로 문자열만 있는 읽기(cat·grep)는 끝점 후보가 아니다
 WRITE_HINT_RE = re.compile(r"write_text|write_bytes|open\([^)]*['\"][wax]\+?['\"]|json\.dump\(|shutil\.copy")
-CPMV_RE = re.compile(r"(?:^|[;&|]\s*)(?:cp|mv|install)\s+(?:-\S+\s+)*(?:\S+\s+)+(['\"]?)([^\s'\";|&]+)\1\s*(?:$|[;&|])", re.M)
+# ⛔ 원본 인자에 셸 연산자를 넣지 않는다 — `\S+` 는 `&&` 도 단어로 읽어 다음 명령까지 삼켰다(실측: plan B1
+#    `… gen_plan.py 3 && cp A plan-final.md && R=…; … head -1` 에서 대상이 `-1` 로 잡혀 완주 run 이 미완주가 됐다)
+CPMV_RE = re.compile(r"(?:^|[;&|]\s*)(?:cp|mv|install)\s+(?:-\S+\s+)*(?:[^\s;&|]+\s+)+(['\"]?)([^\s'\";|&]+)\1\s*(?:$|[;&|])", re.M)
 GPT_OUT_RE = re.compile(r"--out\s+(['\"]?)([^\s'\"]+)\1")
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 # 반환·하네스 계수가 없을 때의 대체 완주 오라클 — 건강한 run 에서 **항상** 도는 stage (base 트리 실측)
@@ -336,6 +341,56 @@ def _expand_vars(cmd):
     return [cmd] + [sub(cmd, e) for e in envs if e]
 
 
+ARGV_DIRECT_RE = re.compile(r"open\(\s*sys\.argv\[(\d+)\]\s*,\s*['\"][wax]|Path\(\s*sys\.argv\[(\d+)\]\s*\)\s*\.\s*write_(?:text|bytes)\(")
+PY_SCRIPT_RE = re.compile(r"(?:^|[;&|(]\s*|\s)python3?(?:\.\d+)?\s+(?:-[uBO]+\s+)*([^\s;&|<>'\"-][^\s;&|<>]*\.py)\s+([^\n;&|<>]*)", re.M)
+
+
+def _argv_written(body):
+    """본문이 **쓰는** argv 인덱스 — `x = sys.argv[N]` 뒤 open(x,'w') 류(튜플 풀기 포함) · 직접 `open(sys.argv[N],'w')`."""
+    idx = set()
+    for names, vals in ARGV_BIND_RE.findall(body):
+        for v, n in zip(re.split(r"\s*,\s*", names), re.findall(r"\[(\d+)\]", vals)):
+            if _var_written(body, v):
+                idx.add(int(n))
+    for m in ARGV_DIRECT_RE.finditer(body):
+        idx.add(int(m.group(1) or m.group(2)))
+    return idx
+
+
+def _script_argv_writes(cmd, a, bases, scripts):
+    """`python3 스크립트.py ARG…` — 스크립트 본문(transcript 의 Write 입력 → 없으면 디스크)이 쓰는 argv 가 산출물 `a` 인가.
+    실측(plan B1-feature 재측정): Lead 가 Write 로 make_plan_final.py 를 만들어 `python3 $W/make_plan_final.py v3.md plan-final.md`
+    로 쓰고 곧 지웠다 — heredoc 만 보던 판정이 끝점을 놓쳐 완주 run 이 미완주가 됐다."""
+    for m in PY_SCRIPT_RE.finditer(_shell_part(cmd)):
+        try:
+            args = shlex.split(m.group(2))
+        except ValueError:
+            continue
+        sp = m.group(1)
+        cands = [sp] if os.path.isabs(sp) else [os.path.join(b, sp) for b in bases]
+        body = None
+        for c_ in cands:
+            body = (scripts or {}).get(os.path.normpath(c_))
+            if body is None and os.path.isfile(c_):
+                try:
+                    body = open(c_, encoding="utf-8", errors="replace").read()
+                except OSError:
+                    body = None
+            if body is not None:
+                break
+        if body is None:
+            continue
+        # ⛔ 경로를 스크립트 **안에서** 만들어 쓰는 경우(실측 plan-feature C1 — render_plan.py 가 `OUT = f"{W}/plan/plan-final.md"`
+        #    로 썼다): 본문이 산출물 이름과 쓰기 호출을 함께 담으면 후보다. 여러 후보 가운데 선택은 파일 mtime 최근접이 한다
+        if os.path.basename(a) in body and re.search(r"open\([^)\n]*['\"][wax]|write_(?:text|bytes)\(", body):
+            return True
+        for n in _argv_written(body):
+            p_ = args[n - 1] if 1 <= n <= len(args) else None
+            if p_ and any(_same_path(x, a) for x in ([p_] if os.path.isabs(p_) else [os.path.join(b, p_) for b in bases])):
+                return True
+    return False
+
+
 def _argv_writes(cmd, a, bases):
     """`python3 - ARG… <<DELIM` 본문이 `x = sys.argv[N]`(튜플 풀기 포함)로 받은 경로를 쓰고, N 번째 ARG 가 산출물 `a` 인가.
     ⛔ 위치를 맞춘다 — `python3 - "$A" "$F"` 에서 argv[1] 만 쓰고 argv[2] 는 읽기만 하면 `F` 쓰기가 아니다."""
@@ -347,24 +402,299 @@ def _argv_writes(cmd, a, bases):
         rest = cmd[m.end():]
         end = re.search(rf"^{re.escape(m.group(3))}\s*$", rest, re.M)
         body = rest[:end.start()] if end else rest
-        for names, vals in ARGV_BIND_RE.findall(body):
-            for v, n in zip(re.split(r"\s*,\s*", names), re.findall(r"\[(\d+)\]", vals)):
-                p = args[int(n) - 1] if 1 <= int(n) <= len(args) else None
-                cands = ([p] if os.path.isabs(p) else [os.path.join(b, p) for b in bases]) if p else []
-                if cands and _var_written(body, v) and any(_same_path(x, a) for x in cands):
-                    return True
+        for n in _argv_written(body):
+            p = args[n - 1] if 1 <= n <= len(args) else None
+            cands = ([p] if os.path.isabs(p) else [os.path.join(b, p) for b in bases]) if p else []
+            if cands and any(_same_path(x, a) for x in cands):
+                return True
     return False
 
 
-def _bash_writes(cmd, a, cwd):
+RENDER_OUTPUTS = ("review-report.md", "pr-comments.md", "render-preview.json", "payload.json")   # scripts/render_review.py OUTPUTS
+
+
+def _segments(sh):
+    """heredoc 을 뺀 셸 줄 → 명령마다 토큰 목록. 따옴표를 지키며 `;` `&&` `||` `|` `&` 로 끊는다
+    (sed 의 `s|a|b|` 처럼 따옴표 안 구분자는 끊지 않는다). 못 읽는 줄은 건너뛴다."""
+    def toks_of(text):
+        lx = shlex.shlex(text, posix=True, punctuation_chars="();<>|&\n")
+        lx.whitespace = " \t\r"
+        lx.whitespace_split = True
+        return list(lx)
+
+    # ⛔ 줄마다 끊으면 여러 줄 따옴표(`python3 -c "…⏎…"`)가 있는 줄의 앞 명령까지 버린다(실측 peer C1 — 병합 명령 누락).
+    #    전체를 한 번에 읽고, 따옴표가 끝내 안 맞을 때만 줄마다로 물러선다
+    try:
+        chunks = [toks_of(sh)]
+    except ValueError:
+        chunks = []
+        for line in sh.split("\n"):
+            try:
+                chunks.append(toks_of(line))
+            except ValueError:
+                continue
+    out = []
+    for toks in chunks:
+        cur = []
+        for t in toks:
+            if t and set(t) <= set(";&|\n"):
+                if cur:
+                    out.append(cur)
+                cur = []
+            else:
+                cur.append(t)
+        if cur:
+            out.append(cur)
+    return out
+
+
+def _sed_inplace_files(seg):
+    """`sed -i` 가 제자리에서 고치는 파일들(BSD `-i ''` · `-i .bak` · GNU `-i` · `-i.bak`). -i 가 없으면 빈 목록."""
+    if not seg or os.path.basename(seg[0]) not in ("sed", "gsed"):
+        return []
+    files, script, inplace, i = [], False, False, 1
+    while i < len(seg):
+        t = seg[i]
+        if t and set(t) <= set("<>&0123456789") and ("<" in t or ">" in t):
+            break                                   # 리다이렉트부터는 파일 인자가 아니다
+        if t == "-i":
+            inplace = True
+            if i + 1 < len(seg) and (seg[i + 1] == "" or seg[i + 1].startswith(".")):
+                i += 1                              # BSD 백업 접미 인자
+        elif t.startswith("-i") or t.startswith("--in-place"):
+            inplace = True
+        elif t in ("-e", "-f", "--expression", "--file"):
+            script, i = True, i + 1
+        elif t.startswith("-") and not script:
+            pass
+        elif not script:
+            script = True
+        else:
+            files.append(t)
+        i += 1
+    return files if inplace else []
+
+
+def _render_outputs(seg):
+    """`render_review.py … --out-dir D` 가 쓰는 산출물들 — 렌더러가 스크립트 안에서 쓰므로 명령 모양으로만 안다."""
+    if not any(os.path.basename(t) == "render_review.py" for t in seg):
+        return []
+    for i, t in enumerate(seg):
+        d = seg[i + 1] if t == "--out-dir" and i + 1 < len(seg) else (t.split("=", 1)[1] if t.startswith("--out-dir=") else None)
+        if d:
+            return [os.path.join(d, x) for x in RENDER_OUTPUTS]
+    return []
+
+
+def _resolve_vars(s, cmd, cwd):
+    """같은 명령의 대입(`W=$PWD/…` · `export R=…`)과 이벤트 cwd(`$PWD`)로 문자열의 셸 변수를 푼다 — 못 풀면 그대로 둔다."""
+    env = {"PWD": cwd} if cwd else {}
+    sub_ = lambda x: VAR_RE.sub(lambda m: env.get(m.group(1) or m.group(2), m.group(0)), x)
+    sh = _shell_part(cmd)
+    # ⛔ 대입과 `cd` 를 **나온 순서대로** 편다 — `cd /repo && R="$PWD"` 의 R 은 이벤트 cwd 가 아니라 /repo 다(실측 review B2)
+    evs = sorted([(m.start(1), "a", m) for m in ASSIGN_RE.finditer(sh)] + [(m.start(), "c", m) for m in CD_RE.finditer(sh)],
+                 key=lambda x: x[0])
+    for _, k, m in evs:
+        if k == "a":
+            v = m.group(2)
+            env[m.group(1)] = v[1:-1] if v[:1] == "'" else sub_(v.strip('"'))
+        else:
+            t = sub_(m.group(2))
+            if "$" not in t:
+                env["PWD"] = t if os.path.isabs(t) else os.path.join(env.get("PWD") or "", t)
+    return sub_(s)
+
+
+PY_EXE_RE = re.compile(r"^python(?:3(?:\.\d+)?)?$")
+
+
+def _exec_of(seg, name):
+    """명령 토큰이 스크립트 `name` 을 **실행**하는가 — `python3 [-u] …/name …` · `…/name …`. 읽기(`wc -l …/name`)는 아니다."""
+    if not seg:
+        return False
+    if os.path.basename(seg[0]) == name:
+        return True
+    if PY_EXE_RE.match(os.path.basename(seg[0])):
+        rest = [t for t in seg[1:] if not t.startswith("-")]
+        return bool(rest) and os.path.basename(rest[0]) == name
+    return False
+
+
+def _merge_summaries(tool_uses, results):
+    """결정론 병합(review_merge.py) 실행마다 후보 수 — AC-4(입력 = 출력). `--out F` 면 그 파일의 summary, 아니면 표준출력의 JSON.
+    병합이 거부했으면(후보 보존 위반) violations 에 센다. ⛔ 파일은 수집 시점 내용이다 — 같은 경로에 여러 번 쓰면 마지막 결과다."""
+    out = {"summaries": [], "violations": 0}
+    for u in tool_uses:
+        if u["name"] != "Bash":
+            continue
+        cmd = str(u["input"].get("command") or "")
+        segs = [x for body in [cmd] + _shell_heredoc_bodies(cmd) for x in _segments(_shell_part(body))
+                if _exec_of(x, "review_merge.py") and not any(t in ("--self-test", "--check-fixture") for t in x)]
+        if not segs:
+            continue
+        text = (results.get(u["id"]) or {}).get("text") or ""
+        if "후보 보존 위반" in text:
+            out["violations"] += 1
+        for x in segs:
+            o = next((t.split("=", 1)[1] for t in x if t.startswith("--out=")), None)
+            if o is None and "--out" in x and x.index("--out") + 1 < len(x):
+                o = x[x.index("--out") + 1]
+            summ, src = None, None
+            if o:
+                f = _resolve_vars(o, cmd, u["cwd"])
+                if "$" not in f:
+                    # ⛔ 상대 경로는 명령 안 `cd` 목적지 기준일 수 있다(실측 review C2 — `cd …/review && … --out merged-r1.json`)
+                    for base in ([""] if os.path.isabs(f) else list(reversed(_cd_bases(_expand_vars(cmd)[-1], u["cwd"]))) or [u["cwd"] or ""]):
+                        ff = f if os.path.isabs(f) else os.path.join(base, f)
+                        try:
+                            summ, src = (read_json(ff) or {}).get("summary"), ff
+                        except (OSError, ValueError):
+                            summ = None
+                        if isinstance(summ, dict):
+                            break
+            if summ is None:
+                mi, mo = re.search(r'"candidatesIn":\s*(\d+)', text), re.search(r'"candidatesOut":\s*(\d+)', text)
+                mt = re.search(r"MERGE OK\s*—\s*후보\s+(\d+)\s*→\s*(\d+)", text)   # 표준출력 한 줄 요약(review_merge.py)
+                if mi and mo:
+                    summ, src = {"candidatesIn": int(mi.group(1)), "candidatesOut": int(mo.group(1))}, "stdout"
+                elif mt:
+                    summ, src = {"candidatesIn": int(mt.group(1)), "candidatesOut": int(mt.group(2))}, "stdout-line"
+            if isinstance(summ, dict) and isinstance(summ.get("candidatesIn"), int):
+                out["summaries"].append({"in": summ["candidatesIn"], "out": summ.get("candidatesOut"), "src": src})
+    return out
+
+
+# 실제 GPT 홈의 스킬을 직접 가리키는 경로 — `$CODEX_HOME` 격리를 우회한다(실측 peer B2 8회 · C1 1회)
+REAL_HOME_SKILL_RE = re.compile(r"(?:\$HOME|\$\{HOME\}|~|/Users/[^/\s'\"]+)/\.codex/skills/")
+
+
+SH_HEREDOC_RE = re.compile(r"(?:^|[;&|(]\s*|\s)(?:bash|sh|zsh)(?:\s+-[A-Za-z]+)*\s*<<-?\s*(['\"]?)([A-Za-z_]\w*)\1[^\n]*\n", re.M)
+
+
+def _shell_heredoc_bodies(cmd):
+    """셸에 먹이는 heredoc(`bash <<'BASH' … BASH`)의 본문 — 데이터가 아니라 **셸 명령**이다.
+    실측(plan-removal B1): 명령 전체를 bash heredoc 으로 감싸 `python3 $W/plan/make_final.py … plan-final.md` 를 실행했는데,
+    heredoc 본문을 지우는 _shell_part 가 그 명령을 통째로 버려 끝점을 놓쳤다."""
+    out = []
+    for m in SH_HEREDOC_RE.finditer(cmd):
+        rest = cmd[m.end():]
+        end = re.search(rf"^{re.escape(m.group(2))}\s*$", rest, re.M)
+        out.append(rest[:end.start()] if end else rest)
+    return out
+
+
+def _cmd_views(cmd):
+    """판정용 명령 모양들 — 원 명령 · `\\⏎` 줄 이어쓰기를 합친 명령 · 같은 명령의 대입으로 셸 변수를 편 명령.
+    실측(plan B2-removal): `X=".../gpt-exec.sh"; ( "$X" exec … )` 로 부른 GPT 가 호출로 안 잡혀 GPT 0건 · Phase 2 없음이 됐다.
+    실측(plan C2-removal): `gpt-exec.sh exec … \\⏎ --schema …gpt_review_schema` 가 한 줄 판정에서 빠졌다."""
+    out = []
+    for base in [cmd] + _shell_heredoc_bodies(cmd):
+        joined = re.sub(r"\\\n[ \t]*", " ", base)
+        for c in (base, joined) + tuple(_expand_vars(joined)):
+            if c not in out:
+                out.append(c)
+    return out
+
+
+PHASE2_RE = re.compile(r"gpt-exec\.sh[\"']?\s+(?:exec\b[^\n]*gpt_review_schema|resume\b)")
+
+
+def queued_followups(evs, first_prompt):
+    """후속 턴이 모델 작업 중에 도착해 대기열에서 **턴 한가운데** 끼어든 횟수 — `attachment.type == queued_command` 이면서
+    첫 프롬프트가 아닌 사람 프롬프트. 실측(2026-09-29): 후속 턴이 있는 7 run 전부가 도구 결과 바로 뒤에 끼어들었고,
+    plan 2건은 그 '승인' 을 받고 Phase 2 를 건너뛰었다. ⛔ 러너의 유휴 판정과 독립된 원천(transcript)으로 센다."""
+    n = 0
+    for ev in evs:
+        a = ev.get("attachment") if ev.get("type") == "attachment" else None
+        if isinstance(a, dict) and a.get("type") == "queued_command":
+            pr = str(a.get("prompt") or "").strip()
+            # ⛔ 하네스 내부 메시지(작업 알림 · 하위 에이전트 보고 — isMeta · origin · `<…>` 태그로 시작)는 사람 프롬프트가 아니다
+            if a.get("isMeta") or a.get("origin") or pr.startswith("<"):
+                continue
+            if pr and pr != (first_prompt or "").strip():
+                n += 1
+    return n
+
+
+LAUNCHER_RE = re.compile(r"gpt_independent\.sh[\"']?\s+(plan|review)\b")
+
+
+def _launcher_calls(bash, notifs, results):
+    """GPT 독립 첫 패스 런처 호출마다 {mode, launch, done, wall_s} — 시작 = 도구 호출 시각, 끝 = 완료 알림(백그라운드) 또는
+    도구 결과(포그라운드). ⛔ 읽기(`sed -n … gpt_independent.sh`)는 모드 인자가 없어 걸리지 않는다."""
+    out = []
+    for u in bash:
+        m = None
+        for v in _cmd_views(str(u["input"].get("command") or "")):
+            m = LAUNCHER_RE.search(_shell_part(v))
+            if m:
+                break
+        if not m:
+            continue
+        nt, res = notifs.get(u["id"]) or {}, results.get(u["id"]) or {}
+        done = nt.get("ts") or res.get("ts")
+        out.append({"mode": m.group(1), "launch": iso(u["ts"]), "done": iso(done), "wall_s": secs(u["ts"], done)})
+    return out
+
+
+def _plan_phase2(tool_uses, results):
+    """fz-plan Phase 2 GPT 검증을 실행했는가 — B 는 verify(gpt_review_schema), C 는 resume 교차. 실패한 호출은 세지 않는다."""
+    for u in tool_uses:
+        if u["name"] == "Bash" and not (results.get(u["id"]) or {}).get("is_error") \
+                and any(PHASE2_RE.search(_shell_part(v)) for v in _cmd_views(str(u["input"].get("command") or ""))):
+            return True
+    return False
+
+
+def _launcher_ok(audit):
+    """런처 감사 파일 → 성공 여부. `exit == 0` 은 gpt_independent.sh 가 격리 적용 · 오염 적중 없음 · 시한 안 ·
+    래퍼 exit 0 · 출력 읽힘 · 후검사 통과를 모두 확인한 뒤에만 쓴다. ⛔ 읽기 실패 · 다른 값은 성공이 아니다(fail-closed)."""
+    try:
+        with open(audit, encoding="utf-8") as fh:
+            return json.load(fh).get("exit") == 0
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def gpt_home_sessions(home):
+    """arm 별 GPT 홈의 세션(rollout) → [{model, effort, version, session}] · 홈이 없으면 None(옛 run — 배너 연결로만 판정).
+    ⛔ turn_context 가 없는 세션(첫 턴 전에 끝난 것)은 GPT 호출로 세지 않는다."""
+    if not home or not os.path.isdir(home):
+        return None
+    d = os.path.join(home, "sessions")
+    if not os.path.isdir(d):
+        return []
+    out = []
+    for f in sorted(pathlib.Path(d).rglob("*.jsonl")):
+        m = e = v = sid = None
+        with open(f, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                try:
+                    r = json.loads(ln)
+                except ValueError:
+                    continue
+                pl = r.get("payload") or {}
+                if r.get("type") == "session_meta":
+                    # ⛔ review 모드는 부모(배너의 session id) · 자식(모델 턴) 두 세션이다 — 자식의 session_id 가 부모를 가리킨다
+                    v, sid = pl.get("cli_version"), pl.get("session_id") or pl.get("id")
+                elif r.get("type") == "turn_context" and m is None:
+                    m, e = pl.get("model"), pl.get("effort")
+        if m and e:
+            out.append({"model": m, "effort": e, "version": v, "session": sid})
+    return out
+
+
+def _bash_writes(cmd, a, cwd, scripts=None):
     """완료된 Bash 한 번이 산출물 `a` 를 썼는가 — 원 명령과, 셸 변수·`for` 값을 편 명령마다
     리다이렉트·cp/mv 대상 · 파이썬 쓰기 표현 · argv 로 넘긴 경로의 쓰기를 본다."""
     base = os.path.basename(a)
-    for c in _expand_vars(cmd):
+    for c in [v for x in [cmd] + _shell_heredoc_bodies(cmd) for v in _expand_vars(x)]:
         bases = _cd_bases(c, cwd) or [""]
         dests = _redirect_targets(c) + [m.group(2) for m in CPMV_RE.finditer(_shell_part(c))]
+        for seg in _segments(_shell_part(c)):
+            dests += _sed_inplace_files(seg) + _render_outputs(seg)   # 실측(C1): sed -i '' … self-review.md · 렌더러 --out-dir
         if any(_same_path(x if os.path.isabs(x) else os.path.join(b, x), a) for x in dests for b in bases) \
-                or _writes_path(c, base) or _argv_writes(c, a, bases):
+                or _writes_path(c, base) or _argv_writes(c, a, bases) or _script_argv_writes(c, a, bases, scripts):
             return True
     return False
 
@@ -379,9 +709,11 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
     prompts = []
     notifs = {}
     cwds = collections.Counter()
+    start_cwd = None
     for n, ev in enumerate(evs):
         if ev.get("type") in ("user", "assistant") and ev.get("cwd"):
             cwds[ev["cwd"]] += 1
+            start_cwd = start_cwd or ev["cwd"]
         t = wfm._ts(ev.get("timestamp"))
         if ev.get("version"):
             versions.add(ev["version"])
@@ -486,13 +818,25 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
 
     gpt = []
     for u in bash:
-        cmd = _shell_part(str(u["input"].get("command") or ""))
-        call = GPT_CALL_RE.search(cmd)
+        call = None
+        for view in _cmd_views(str(u["input"].get("command") or "")):   # ⛔ 변수로 부른 래퍼(`"$X" exec`)도 호출이다
+            cmd = _shell_part(view)
+            call = GPT_CALL_RE.search(cmd)
+            if call:
+                break
         if not call:
             continue
         seg = _call_segment(cmd, call)
         m = GPT_OUT_RE.search(seg)
         out = m.group(2) if m else None
+        if out and "$" in out:
+            # ⛔ 변수 경로는 같은 명령의 대입 · cd · $PWD 로 푼다 — 병렬 호출이 시간창 후보 2개로 미연결되던 것(plan B1 배너 1/5).
+            #    풀린 경로(또는 그 스트림 로그)가 **실재할 때만** 쓴다 — 틀리게 풀면 성공 호출이 '빈 출력' 실패가 된다(review B2 실측)
+            r_ = _resolve_vars(out, str(u["input"].get("command") or ""), u["cwd"])
+            if "$" not in r_:
+                r_ = r_ if os.path.isabs(r_) else os.path.join(u["cwd"] or "", r_)
+                if os.path.exists(r_) or os.path.exists(r_ + ".stream.log"):
+                    out = r_
         if out and not os.path.isabs(out) and "$" not in out:
             out = os.path.join(u["cwd"], out)
         nt, res = notifs.get(u["id"]) or {}, results.get(u["id"]) or {}
@@ -512,18 +856,41 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
                   and "GATE-PASS" in task_out)
         else:    # 포그라운드 — 도구 결과가 오류가 아니고 래퍼의 사후 게이트 통과 표시가 있다
             ok = bool(res) and not res.get("is_error") and "GATE-PASS" in (res.get("text") or "")
+        if not ok and (nt.get("status") == "completed" and not re.search(r"exit code [1-9]", nt.get("summary") or "")
+                       if nt else (bool(res) and not res.get("is_error"))):
+            # ⛔ 래퍼 출력을 로그 파일로 돌린 호출(`… gpt-exec.sh … > $W/gpt-da.log 2>&1`)은 GATE-PASS 가 그 파일에 있다(실측 peer C1)
+            full = str(u["input"].get("command") or "")
+            for tgt in _redirect_targets(seg):
+                f = _resolve_vars(tgt, full, u["cwd"])
+                if "$" in f:
+                    continue
+                f = f if os.path.isabs(f) else os.path.join(u["cwd"] or "", f)
+                try:
+                    with open(f, encoding="utf-8", errors="replace") as fh:
+                        if "GATE-PASS" in fh.read():
+                            ok = True
+                            break
+                except OSError:
+                    continue
         if ok and out and "$" not in out:
             try:   # ⛔ 출력 파일이 비었으면 성공이 아니다(래퍼 게이트 13 과 같은 조건)
                 ok = os.path.getsize(out) > 0
             except OSError:
                 ok = False
+        real_home = bool(REAL_HOME_SKILL_RE.search(str(u["input"].get("command") or "")))
         gpt.append({"out": out, "launch": iso(u["ts"]), "done": iso(done), "wall_s": secs(u["ts"], done), "ok": ok,
+                    "real_home_skill": real_home,
                     "t0": u["ts"].timestamp() if u["ts"] else None, "t1": done.timestamp() if done else None,
                     "explicit_effort": bool(re.search(r"--effort\b", seg))})
 
     # 최종 산출물 기록 이벤트 — 산출물을 가리키는 도구 호출 중 **파일 mtime 에 가장 가까운** 결과 시각.
     #   ⛔ '마지막으로 가리킨 호출' 을 쓰면 쓰기 뒤의 읽기(cat·Read)가 끝점이 된다. 경로를 변수로 쓴
     #      파이썬 heredoc 도 잡으려고 basename 까지 후보로 보고, mtime 으로 쓰기를 고른다(wall 은 transcript 시계).
+    py_scripts = {}   # Lead 가 Write 로 만든 .py 본문 — 곧 지워도 transcript 에 남는다
+    for u in tool_uses:
+        fp = str(u["input"].get("file_path") or "") if u["name"] == "Write" else ""
+        if fp.endswith(".py"):
+            py_scripts[os.path.normpath(fp if os.path.isabs(fp) else os.path.join(u["cwd"] or "", fp))] = str(u["input"].get("content") or "")
     art = []
     for a in artifacts:
         mtime = None
@@ -541,7 +908,7 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
                 fp = u["input"].get("file_path") or u["input"].get("notebook_path")
                 hit = bool(fp) and _same_path(fp if os.path.isabs(fp) else os.path.join(u["cwd"], fp), a)
             elif u["name"] == "Bash":
-                hit = _bash_writes(str(u["input"].get("command") or ""), a, u["cwd"])
+                hit = _bash_writes(str(u["input"].get("command") or ""), a, u["cwd"], py_scripts)
             if hit:
                 cands.append(res["ts"])
         if not cands:
@@ -580,7 +947,13 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
         "start": start, "end": end,
         "mtime_delta_s": round(max(deltas, key=abs), 3) if deltas and len(deltas) == len(art) else None,
         "artifacts": [dict(x, write=iso(x["write"])) for x in art],
-        "workflows": workflows, "gpt": gpt, "cwd": cwds.most_common(1)[0][0] if cwds else None,
+        "workflows": workflows, "gpt": gpt, "cwd": start_cwd, "launcher": _launcher_calls(bash, notifs, results),
+        "merge": _merge_summaries(tool_uses, results), "plan_phase2": _plan_phase2(tool_uses, results),
+        "queued_followups": queued_followups(evs, prompts[0][1] if prompts else None),
+        # ⛔ Lead 작업 폴더 = **세션 시작** cwd(러너가 claude -p 를 띄운 곳). 최빈 cwd 는 잡음이다 — Lead 는 --add-dir 로 받은
+        #    플러그인 폴더에 들어가 모듈 · 스크립트를 읽고 부른다(실측 review B1 repo 70:plugin 53 통과 · B2 125:128 무효 ·
+        #    C1 11:129 무효). 스크립트를 더 부르는 C 가 구조적으로 무효가 되는 편향이었다. 폴더별 이벤트 수는 cwds 로 남긴다
+        "cwds": dict(cwds),
     }
 
 
@@ -977,6 +1350,24 @@ def build_row(a, dry=False) -> dict:
             continue
         used.add(cand[0][0])
         banners.append(dict(cand[0][2], explicit=g.get("explicit_effort", False)))
+    # ② 런처(gpt_independent.sh) — 격리 폴더에서 돌아 arm 홈에 rollout 이 없다. 감사 옆 스트림 로그 배너로 model · effort 를 본다.
+    #    effort 는 런처가 정한다(명시) — F-333 의 환경 기본값 비교에 넣지 않는다
+    launched = launched_ok = 0
+    for d in a.gpt_log_dir or []:
+        for au in sorted(pathlib.Path(d).rglob("*.audit.json")):
+            mt = au.stat().st_mtime
+            if (lo is None or mt >= lo) and (hi is None or mt <= hi):
+                b = parse_gpt_log(str(au)[:-len(".audit.json")] + ".json.stream.log")
+                if b and b["model"] and b["effort"]:
+                    banners.append(dict(b, explicit=True, launcher=True))
+                    launched += 1
+                    if _launcher_ok(au):
+                        launched_ok += 1
+    # ③ arm 별 GPT 홈 rollout 과 대조 — 명령과 연결되지 않은 세션(nohup 으로 떼어 띄운 호출)은 model · 버전만 비교에 넣고 수를 남긴다
+    run_dir = os.path.dirname(os.path.realpath(a.input_json)) if a.input_json else None
+    sessions = gpt_home_sessions(os.path.join(run_dir, "gpt-home")) if run_dir else None
+    linked = {b.get("session") for b in banners if b.get("session")}
+    invisible = [x for x in (sessions or []) if x["session"] not in linked]
     gw = [g["wall_s"] for g in tp["gpt"] if g["wall_s"] is not None]
     wsum = [s for s in (r["summary"] for r in wf_runs) if s]
     stages_completed = [(r["metrics"] or {}).get("stagesCompleted") for r in wf_runs]
@@ -1006,9 +1397,13 @@ def build_row(a, dry=False) -> dict:
                "rejections": sum(1 for w in tp["workflows"] if w["rejected"])},
         "gpt": {"calls": len(tp["gpt"]), "ok": sum(1 for g in tp["gpt"] if g["ok"]),
                 "failed": sum(1 for g in tp["gpt"] if not g["ok"]), "banners": len(banners), "unlinked": unlinked,
-                "models": sorted({b["model"] for b in banners}), "efforts": sorted({b["effort"] for b in banners}),
+                "models": sorted({b["model"] for b in banners} | {x["model"] for x in invisible}),
+                "efforts": sorted({b["effort"] for b in banners}),
                 "efforts_default": sorted({b["effort"] for b in banners if not b.get("explicit")}),
-                "versions": sorted({b["version"] for b in banners if b["version"]}), "logs": sorted(set(gpt_logs))},
+                "versions": sorted({b["version"] for b in banners if b["version"]} | {x["version"] for x in invisible if x["version"]}),
+                "logs": sorted(set(gpt_logs)), "launcher": launched, "launcher_ok": launched_ok,
+                "real_home_skill_refs": sum(1 for g in tp["gpt"] if g.get("real_home_skill")),
+                "sessions": None if sessions is None else len(sessions), "invisible": len(invisible)},
         "state": state_info(a.state_pristine, a.state_start, a.state_end, root),
         "sources": {"transcript": os.path.abspath(a.transcript), "artifacts": [os.path.abspath(x) for x in a.artifact or []],
                     "wf_dirs": [w["dir"] for w in tp["workflows"] if not w["rejected"]],
@@ -1016,6 +1411,18 @@ def build_row(a, dry=False) -> dict:
                     "input_root": a.input_root, "input_json": a.input_json, "tasks_dirs": list(a.tasks_dir or [])},
         "collect_args": {k: v for k, v in vars(a).items() if k not in ("func", "cmd")},
     }
+    row["merge"] = tp.get("merge")
+    # S26 — GPT 독립 플랜 wall 이 Workflow wall 을 넘으면 임계 경로가 GPT 로 바뀐 것이다(계획 S26: 기록형 판정)
+    lp = [x["wall_s"] for x in tp.get("launcher") or [] if x["mode"] == "plan" and x["wall_s"] is not None]
+    ws = [w["lead_s"] for w in tp.get("workflows") or [] if w.get("lead_s") is not None and not w.get("rejected")]
+    row["critical"] = {"gpt_plan_s": round(max(lp), 1) if lp else None, "wf_s": round(max(ws), 1) if ws else None,
+                       "launchers": tp.get("launcher") or [],
+                       "path": None if not (lp and ws) else ("gpt" if max(lp) > max(ws) else "workflow")}
+    row["lead"]["queued_followups"] = tp.get("queued_followups", 0)
+    if tp.get("queued_followups"):
+        why.append(f"후속 턴이 모델 작업 중에 끼어들었다 {tp['queued_followups']}회(queued_command) — 표준 후속 턴 계약 위반")
+    if a.workflow == "fz-plan" and not tp.get("plan_phase2"):
+        why.append("plan Phase 2 GPT 검증 흔적 없음(verify · resume 교차 미실행) — 절차 미완주")
     row["complete"] = {"ok": not why, "why": why}
     return row
 
@@ -1207,7 +1614,8 @@ def plan_items(rubric):
 def score_plan(rubric, text, verdicts=None):
     """항목마다 가린 검증자 판정 {covered} 로 센다. ⛔ 키워드 적중만으로는 세지 않는다(부정문·다른 절의 용어도 맞는다)."""
     items = plan_items(rubric)
-    base = {"kind": "plan", "items_total": len(items), "empty": not text.strip()}
+    base = {"kind": "plan", "items_total": len(items), "empty": not text.strip(), "items": [i[0] for i in items],
+            "items_by_severity": {s: sum(1 for i in items if i[1] == s) for s in SEVERITIES}}
     if verdicts is None:
         return dict(base, verified=False, unverified=len(items), by_severity=None, covered=[])
     by_sev = {s: 0 for s in SEVERITIES}
@@ -1325,6 +1733,19 @@ def row_invalid(row, score, opts):
     """run 1개의 무효 사유. ⛔ 무효 run 은 0건으로 세지 않고 비교에서 뺀다(AC-5)."""
     why = []
     lead, wf, g = row.get("lead") or {}, row.get("wf") or {}, row.get("gpt") or {}
+    if "AC-4" in (opts.get("require") or []) and row.get("phase") not in ("baseline", None) \
+            and row.get("workflow") in ("fz-review", "fz-peer-review"):
+        # ⛔ AC-4 — 병합을 기본으로 둔 변경안(R-C S25)의 리뷰는 결정론 병합을 거친다. 후보 수가 줄었거나 병합 흔적이 없으면
+        #    후보 보존을 확인하지 못한다. 판정이 AC-4 를 요구할 때만 본다 — 병합이 없는 변경안 · 기준선 판정은 이 계약 밖이다
+        mg = row.get("merge") or {}
+        sm = mg.get("summaries") or []
+        if mg.get("violations"):
+            why.append(f"AC-4 후보 보존 위반(병합 거부) {mg['violations']}회")
+        bad = [(x.get("in"), x.get("out")) for x in sm if x.get("in") != x.get("out")]
+        if bad:
+            why.append(f"AC-4 입력 후보 수 ≠ 출력 {bad}")
+        if not sm and not mg.get("violations"):
+            why.append("AC-4 병합 흔적 없음 — 후보 보존을 확인하지 못한다")
     if norm_model(lead.get("model")) != opts["model"]:
         why.append(f"AC-1 Lead model {lead.get('model')}≠{opts['model']}")
     if lead.get("effort") != opts["effort"]:
@@ -1508,7 +1929,9 @@ SC7_FIELDS = (("lead", "out_tok"), ("lead", "messages"), ("lead", "retries"), ("
 
 
 def crit_sc7(B, C):
-    """Lead·워커 출력·메시지·재시도·후속 요청 필드 필수 + 필수 검증(B 공통 stage · 성공한 GPT 호출 수) 보존."""
+    """Lead·워커 출력·메시지·재시도·후속 요청 필드 필수 + 필수 검증(B 공통 stage · 성공한 GPT 호출 수) 보존.
+    성공한 GPT 호출 = 직접 호출(`gpt.ok`) + 런처 호출(`gpt.launcher_ok` — 감사 exit 0). ⛔ 런처를 빼면 GPT 리뷰를
+    런처로 옮긴 후보가 검증을 잃은 것처럼 보인다(실측 review C 4 run: 직접 0 · 런처 1)."""
     ok, lines = True, []
     for r in B + C:
         miss = [f"{a}.{b}" for a, b in SC7_FIELDS if (r.get(a) or {}).get(b) is None]
@@ -1519,17 +1942,21 @@ def crit_sc7(B, C):
     if bad:
         return False, lines + [bad]
     need = set.intersection(*[set(r["wf"].get("stages") or ()) for r in B])
-    gmin = min(r["gpt"].get("ok") or 0 for r in B)
+    direct = lambda r: r["gpt"].get("ok") or 0
+    launch = lambda r: r["gpt"].get("launcher_ok") or 0
+    said = lambda r: f"{direct(r) + launch(r)}(직접 {direct(r)} + 런처 {launch(r)})"
+    gmin = min(direct(r) + launch(r) for r in B)
     for r in C:
         lost = sorted(need - set(r["wf"].get("stages") or ()))
         if lost:
             ok = False
             lines.append(f"{r['run_id']} 필수 stage 누락 {lost}")
-        if (r["gpt"].get("ok") or 0) < gmin:
+        if direct(r) + launch(r) < gmin:
             ok = False
-            lines.append(f"{r['run_id']} 성공한 GPT 호출 {r['gpt'].get('ok')} < 기준 {gmin}")
+            lines.append(f"{r['run_id']} 성공한 GPT 호출 {said(r)} < 기준 {gmin}")
     if ok:
-        lines.append(f"필드 존재 · 필수 stage {sorted(need)} 보존 · 성공한 GPT 호출 ≥ {gmin}")
+        lines.append(f"필드 존재 · 필수 stage {sorted(need)} 보존 · 성공한 GPT 호출 ≥ {gmin} — "
+                     + " | ".join(f"{r['run_id']} {said(r)}" for r in C))
     return ok, lines
 
 
@@ -1541,6 +1968,68 @@ def crit_crossover(B, C):
     orders, arms = [r["order"] for r in seq], [r["arm"] for r in seq]
     good = len(set(orders)) == len(orders) and all(x != y for x, y in zip(arms, arms[1:]))
     return good, [f"순서 {list(zip(orders, arms))} {'교차' if good else '⛔ 교차 아님'}"]
+
+
+def crit_sc5(B, C, scores):
+    """계획 완결성(SC-5) — 유효한 C run 마다 채점표 항목을 **전부** 덮는다: 절 6 · Q1~Q8 · 10배 부하 · 의존성 장애 · 롤백,
+    제거 fixture 는 잔재 · 소비자까지(누락 0). 두 채점표 모두 절 · 질문마다 항목이 1개라 '각각' = '전부'다.
+    기준선 대비가 아니라 절대 조건이다 — B 는 비교 묶음 확인(_exact)에만 쓴다."""
+    bad = _exact(B, C)
+    if bad:
+        return False, [bad]
+    good, lines = True, []
+    for r in C:
+        s = scores.get(r["run_id"]) or {}
+        if s.get("kind") != "plan" or not isinstance(s.get("items"), list):
+            return False, [f"⛔ {r['run_id']}: 항목 목록이 있는 계획 점수가 아니다 — score 를 다시"]
+        miss = sorted(set(s["items"]) - set(s.get("covered") or []))
+        good &= not miss
+        lines.append(f"{r['run_id']} {len(s['items']) - len(miss)}/{len(s['items'])}" + (f" ⛔누락 {miss}" if miss else ""))
+    return good, lines
+
+
+def crit_gpt_wf_wall(B, C):
+    """S26 — 유효한 C run 마다 GPT 독립 플랜 wall 과 Workflow wall 이 둘 다 재졌는가(값을 줄에 남긴다).
+    ⛔ 기준선(B)은 독립 플랜이 없는 트리라 비교 묶음 확인(_exact)에만 쓴다."""
+    bad = _exact(B, C)
+    if bad:
+        return False, [bad]
+    good, lines = True, []
+    for r in C:
+        cp = r.get("critical") or {}
+        ok = cp.get("gpt_plan_s") is not None and cp.get("wf_s") is not None
+        good &= ok
+        lines.append(f"{r['run_id']} GPT {cp.get('gpt_plan_s')}s · Workflow {cp.get('wf_s')}s" + ("" if ok else " ⛔ 측정 없음"))
+    return good, lines
+
+
+def crit_critical_path(B, C):
+    """S26 — C run 마다 임계 경로(workflow · gpt)를 기록했는가. GPT 가 더 길면 '임계 경로 전환' 으로 적는다(통과 · 실패와 무관한 기록)."""
+    bad = _exact(B, C)
+    if bad:
+        return False, [bad]
+    good, lines = True, []
+    for r in C:
+        pth = (r.get("critical") or {}).get("path")
+        good &= pth in ("gpt", "workflow")
+        lines.append(f"{r['run_id']} 임계 경로 {pth or '⛔ 미상'}" + (" ← 전환(GPT 독립 플랜이 Workflow 보다 길다)" if pth == "gpt" else ""))
+    return good, lines
+
+
+def crit_blind_labels(B, C, scores):
+    """가린 검증 — 비교에 쓴 run 의 점수가 전부 blind-unpack 판정에서 왔고(blind_pack_sha), B · C 가 **한 꾸러미**에서
+    판정됐다. arm 별로 따로 싼 꾸러미는 묶음 자체가 arm 을 드러낸다(experiment-log §5.10 §7 — 검증자는 어느 arm 의
+    산출물인지 알 수 없어야 한다). 판정 전 · 미완 · 낡은 점수는 judge_rows 가 먼저 UNRUN 으로 거른다."""
+    bad = _exact(B, C)
+    if bad:
+        return False, [bad]
+    packs = {r["run_id"]: (scores.get(r["run_id"]) or {}).get("blind_pack_sha") for r in B + C}
+    none = sorted(rid for rid, p in packs.items() if not p)
+    if none:
+        return False, [f"⛔ 가린 판정이 아닌 점수 {none}"]
+    uniq = sorted(set(packs.values()))
+    good = len(uniq) == 1
+    return good, [f"꾸러미 {len(uniq)}개" + ("" if good else f" — ⛔ B · C 가 다른 꾸러미에서 판정됐다 {uniq}")]
 
 
 def select(runs, workflow, fixture, arm, phase, release=None):
@@ -1568,6 +2057,7 @@ def judge_rows(runs, scores, opts, source_check=None):
     if not wfs:
         return UNRUN, ["UNRUN: 판정할 워크플로가 없다(baseline 행 0)"]
     worst = PASS
+    removal_seen = False      # SC-5 — 제거 · 리팩터링 fixture(critical 항목이 있는 채점표)를 판정했는가
     roots_first = {}
     for r in sorted(runs.values(), key=lambda r: (r.get("order") or 0, r["run_id"])):
         root = (r.get("input") or {}).get("root")
@@ -1606,7 +2096,7 @@ def judge_rows(runs, scores, opts, source_check=None):
                        + (" — " + ", ".join(r["run_id"] for r in vB) if vB else ""))
             worst = max(worst, PASS if good else FAIL)
             continue
-        if {"SC-3", "SC-3-smoke", "SC-4"} & set(req):
+        if {"SC-3", "SC-3-smoke", "SC-4", "SC-5", "blind-labels"} & set(req):
             cur_i = opts.get("instrument") or instrument_sha()
             unv = [r["run_id"] for r in vB + vC if not (scores.get(r["run_id"]) or {}).get("verified")
                    or (scores.get(r["run_id"]) or {}).get("artifacts_sha") != _artifact_shas(r)
@@ -1628,7 +2118,17 @@ def judge_rows(runs, scores, opts, source_check=None):
                 good, lines = crit_sc7(vB, vC)
             elif c == "crossover-order":
                 good, lines = crit_crossover(vB, vC)
-            elif c in ("AC-1", "AC-5", "AC-7", "input-hash"):
+            elif c == "gpt-wf-wall":
+                good, lines = crit_gpt_wf_wall(vB, vC)
+            elif c == "critical-path":
+                good, lines = crit_critical_path(vB, vC)
+            elif c == "blind-labels":
+                good, lines = crit_blind_labels(vB, vC, scores)
+            elif c == "SC-5":
+                good, lines = crit_sc5(vB, vC, scores)
+                removal_seen |= any(((scores.get(r["run_id"]) or {}).get("items_by_severity") or {}).get("critical", 0) > 0
+                                    for r in vC)
+            elif c in ("AC-1", "AC-4", "AC-5", "AC-7", "input-hash"):
                 hit = [rid for rid, why in inv.items() if any(w.startswith(c) for w in why)]
                 bad = _exact(vB, vC, 2, opts["runs"] if opts["phase"] == "release-smoke" else 2)
                 good = bad is None
@@ -1637,6 +2137,10 @@ def judge_rows(runs, scores, opts, source_check=None):
                 good, lines = False, [f"판정기 없음 {c}"]
             out.append(f"{'PASS' if good else 'FAIL'} {c} {label}: " + " | ".join(lines))
             worst = max(worst, PASS if good else FAIL)
+    if "SC-5" in req and not removal_seen and opts["phase"] != "baseline":
+        # ⛔ feature fixture 만으로 SC-5 를 통과시키지 않는다 — 기준의 '제거 · 리팩터링 fixture 잔재 · 소비자 누락 0' 이 조용히 빠진다
+        out.append("UNRUN SC-5: 제거 · 리팩터링 fixture(잔재 · 소비자 항목이 있는 채점표)를 판정한 C run 이 없다")
+        worst = max(worst, UNRUN)
     return worst, out
 
 
@@ -1944,6 +2448,7 @@ def _mk(run_id, arm, order, crit=1, major=2, wall=1000.0, **kw):
                   "advisor": 0, "stages": kw.get("stages", ["R1-arch", "R1-quality", "R3-counter"]),
                   "out_tok": 9000, "turns": 30, "so_retries": 0},
            "gpt": {"calls": kw.get("gpt_calls", 1), "ok": kw.get("gpt_ok", 1), "failed": kw.get("gpt_failed", 0),
+                   "launcher_ok": kw.get("gpt_launcher_ok", 0),
                    "banners": kw.get("banners", 1), "unlinked": kw.get("unlinked", 0),
                    "models": ["gpt-6-sol"], "efforts": ["xhigh"], "versions": ["0.157.0"]},
            "plugin": {"sha": "10197a0aaaa", "dirty": False, "tree_hash": kw.get("tree", "tB" if arm == "B" else "tC"),
@@ -1962,7 +2467,7 @@ def _mk(run_id, arm, order, crit=1, major=2, wall=1000.0, **kw):
              "by_severity": {"critical": crit, "major": major, "minor": 0, "suggestion": 0},
              "by_axis": axes, "verified_ratio": kw.get("ratio", 0.8), "empty": False,
              "verified": kw.get("verified", True), "artifacts_sha": kw.get("score_arts", [f"a-{run_id}"]),
-             "instrument_sha": kw.get("score_instr", INSTR_NOW)}
+             "instrument_sha": kw.get("score_instr", INSTR_NOW), "blind_pack_sha": kw.get("pack", "P1")}
     return row, score
 
 
@@ -2029,6 +2534,266 @@ def self_test(case=None):
         return (bad_rc, good_rc) == (FAIL, PASS), a + b
 
     @reg
+    def sc5_negative():
+        # 계획 채점표 항목을 전부 덮으면 PASS · 잔재 1건 누락이면 FAIL · feature fixture 만 있으면 UNRUN(제거 조항 미판정)
+        FEAT, REM = ["RC1", "Q1a", "L1"], ["RC1", "Q1a", "L1", "RZ1", "CU1"]
+
+        def plan(run_id, arm, order, fx, items, covered):
+            row, score = _mk(run_id, arm, order, workflow="fz-plan", fixture=fx)
+            crit = sum(1 for i in items if i.startswith(("RZ", "CU")))
+            score = dict(score, kind="plan", items=items, covered=covered, items_total=len(items),
+                         items_by_severity={"critical": crit, "major": len(items) - crit, "minor": 0, "suggestion": 0})
+            return row, score
+
+        def grp(fx, items, c2_cov):
+            return [plan(f"{fx}-B1", "B", 1, fx, items, items), plan(f"{fx}-B2", "B", 3, fx, items, items),
+                    plan(f"{fx}-C1", "C", 2, fx, items, items), plan(f"{fx}-C2", "C", 4, fx, items, c2_cov)]
+
+        def j(rs):
+            return judge_rows({r["run_id"]: r for r, _ in rs}, {s["run_id"]: s for _, s in rs},
+                              dict(model=DEFAULT_MODEL, effort=DEFAULT_EFFORT, phase=None, arm="C", release=None,
+                                   workflows=["fz-plan"], min_runs=2, runs=1, plugin_sha=None, require=["SC-5"],
+                                   envs=None, options_on=False, require_passed=None))
+        ok_rc, a = j(grp("feat", FEAT, FEAT) + grp("rem", REM, REM))
+        miss_rc, b = j(grp("feat", FEAT, FEAT) + grp("rem", REM, ["RC1", "Q1a", "L1", "CU1"]))
+        only_rc, c = j(grp("feat", FEAT, FEAT))
+        return ((ok_rc, miss_rc, only_rc) == (PASS, FAIL, UNRUN) and any("⛔누락 ['RZ1']" in x for x in b)), a + b + c
+
+    @reg
+    def cp_dest_stops_at_operator():
+        # 실측 명령 모양 — heredoc 뒤 `&& cp A B && … head -1`. 대상은 B 여야 하고 `-1` 이 아니다
+        cmd = ("python3 - <<'EOF'\nx = 1\nEOF\npython3 gen.py 3 && cp P/plan-v3.md P/plan-final.md && R=/r; W=$PWD/P; "
+               "python3 $R/g.py --out $W/g.md && cp $W/g.md $W/plan.md; echo \"E=$?\"; grep -c H $W/x | head -1")
+        dests = [m.group(2) for m in CPMV_RE.finditer(_shell_part(cmd))]
+        hit = _bash_writes(cmd, "/repo/P/plan-final.md", "/repo")
+        miss = _bash_writes("cp P/a.md P/b.md && echo done", "/repo/P/plan-final.md", "/repo")
+        return (dests[:1] == ["P/plan-final.md"] and "-1" not in dests and hit and not miss), [str(dests), hit, miss]
+
+    @reg
+    def writes_sed_inplace_and_renderer():
+        # 실측(C1 마지막 명령) — 렌더러 --out-dir 가 review-report.md 를, sed -i '' 가 self-review.md 를 고쳤다
+        cmd = ("WD=/r/ABT-1001; PR=/r/plugin\npython3 - \"$WD/review/review.json\" <<'PY'\nx=1\nPY\n"
+               "rm -f $WD/review/review-report.md $WD/review/pr-comments.md\n"
+               "python3 $PR/scripts/render_review.py --review $WD/review/review.json --diff $WD/review/diff.patch --out-dir $WD/review | head -2; echo x\n"
+               "sed -i '' 's/suggestion 3/suggestion 4/' $WD/review/self-review.md $WD/index.md\n"
+               "grep -n 's|a|b|' $WD/review/self-review.md | head")
+        rep = _bash_writes(cmd, "/r/ABT-1001/review/review-report.md", "/r/plugin")
+        sr = _bash_writes(cmd, "/r/ABT-1001/review/self-review.md", "/r/plugin")
+        idx = _bash_writes(cmd, "/r/ABT-1001/index.md", "/r/plugin")
+        # 음성 대조 — 읽기만(grep · cat · sed 출력) · rm · 렌더러 self-test · sed -n 은 쓰기가 아니다
+        neg = [_bash_writes(x, "/r/ABT-1001/review/self-review.md", "/r")
+               for x in ("grep -n x /r/ABT-1001/review/self-review.md", "sed -n 1,5p /r/ABT-1001/review/self-review.md",
+                         "sed 's/a/b/' /r/ABT-1001/review/self-review.md > /tmp/o", "rm -f /r/ABT-1001/review/self-review.md",
+                         "python3 /r/plugin/scripts/render_review.py --self-test")]
+        gnu = _bash_writes("sed -i -e 's/a/b/' /r/f.md", "/r/f.md", "/r")
+        return (rep and sr and idx and gnu and not any(neg)), [rep, sr, idx, gnu, neg]
+
+    @reg
+    def lead_cwd_is_session_start():
+        # Lead 가 플러그인 폴더에 오래 머물러도(최빈 cwd = plugin) 작업 폴더는 세션 시작 cwd(repo)다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            evs = [{"type": "user", "timestamp": "2026-01-01T00:00:00Z", "cwd": "/runs/x/repo", "message": {"content": "/fz:fz-review"}}]
+            evs += [{"type": "assistant", "timestamp": f"2026-01-01T00:00:0{i}Z", "cwd": "/runs/x/plugin", "version": "2.1.282",
+                     "message": {"id": f"m{i}", "model": "claude-opus-5-5", "stop_reason": "end_turn", "usage": {"output_tokens": 1},
+                                 "content": [{"type": "text", "text": "t"}]}} for i in range(1, 6)]
+            p = os.path.join(td, "t.jsonl")
+            _write_lines(p, evs)
+            tp = parse_transcript(p)
+            return (tp["cwd"] == "/runs/x/repo" and tp["cwds"].get("/runs/x/plugin") == 5), [tp["cwd"], tp["cwds"]]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def gpt_out_var_resolved():
+        # 실측(plan B1) — `W=$PWD/ABT-2001; …; "$R/scripts/gpt-exec.sh" exec --cd "$PWD" --out "$W/plan/gpt-verify.json"`
+        cmd = 'W=$PWD/ABT-2001; R=/r/plugin; export FZ_PLUGIN_ROOT=$R; "$R/scripts/gpt-exec.sh" exec --cd "$PWD" --out "$W/plan/g.json"'
+        a_ = _resolve_vars("$W/plan/g.json", cmd, "/runs/x/repo")
+        b_ = _resolve_vars("$Q/plan/g.json", cmd, "/runs/x/repo")
+        # 실측(review B2) — cwd=plugin 에서 `cd /runs/x/repo && R="$PWD" && …gpt-exec.sh review --out "$R/…"`
+        c_ = _resolve_vars("$R/ABT-1001/review/gpt-review.md", 'cd /runs/x/repo && R="$PWD" && /p/gpt-exec.sh review --out "$R/o"', "/runs/x/plugin")
+        d_ = _resolve_vars("$PWD/$W/o", "cd sub && W=a/b; x", "/runs/x")
+        return (a_ == "/runs/x/repo/ABT-2001/plan/g.json" and b_ == "$Q/plan/g.json"
+                and c_ == "/runs/x/repo/ABT-1001/review/gpt-review.md" and d_ == "/runs/x/sub/a/b/o"), [a_, b_, c_, d_]
+
+    @reg
+    def merge_summary_and_ac4():
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            f = os.path.join(td, "merged.json")
+            with open(f, "w", encoding="utf-8") as fh:
+                json.dump({"summary": {"candidatesIn": 5, "candidatesOut": 5}}, fh)
+            uses = [{"name": "Bash", "id": "1", "cwd": td, "input": {"command": f"WD={td}; python3 /p/scripts/review_merge.py --claude a --gpt b --diff d --out $WD/merged.json"}},
+                    {"name": "Bash", "id": "2", "cwd": td, "input": {"command": "python3 scripts/review_merge.py --claude a --gpt-unavailable x --diff d"}},
+                    {"name": "Bash", "id": "3", "cwd": td, "input": {"command": "wc -l scripts/review_merge.py; sed -n 1,5p scripts/review_merge.py"}},
+                    {"name": "Bash", "id": "4", "cwd": td, "input": {"command": "python3 scripts/review_merge.py --self-test"}}]
+            res = {"2": {"text": '{"summary": {"candidatesIn": 7, "candidatesOut": 7}}'}}
+            m_ = _merge_summaries(uses, res)
+            ok_sum = [(x["in"], x["out"]) for x in m_["summaries"]] == [(5, 5), (7, 7)] and m_["violations"] == 0
+            rej = _merge_summaries([{"name": "Bash", "id": "5", "cwd": td, "input": {"command": "python3 scripts/review_merge.py --claude a --gpt b --diff d"}}],
+                                   {"5": {"is_error": True, "text": "REJECT 후보 보존 위반 — 입력 3 ≠ 출력 2(AC-4)"}})
+            rows = base() + [_mk("C1", "C", 2), _mk("C2", "C", 4)]
+            for r_, _ in rows[2:]:
+                r_["merge"] = {"summaries": [{"in": 5, "out": 5}], "violations": 0}
+            good_rc, a_ = _judge(rows, require=["AC-4"])
+            rows[3][0]["merge"] = {"summaries": [{"in": 5, "out": 4}], "violations": 0}
+            bad_rc, b_ = _judge(rows, require=["AC-4"])
+            rows[3][0]["merge"] = None
+            none_rc, c_ = _judge(rows, require=["AC-4"])
+            return (ok_sum and rej["violations"] == 1 and (good_rc, bad_rc, none_rc) == (PASS, FAIL, FAIL)), [m_, rej, a_, b_, c_]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def plan_phase2_evidence():
+        mk = lambda c, err=False: ([{"name": "Bash", "id": "1", "cwd": "/r", "input": {"command": c}}], {"1": {"is_error": err}})
+        v = _plan_phase2(*mk('"$R/scripts/gpt-exec.sh" exec --out "$W/plan/gpt-verify.json" --schema "$R/schemas/gpt_review_schema.json"'))
+        r_ = _plan_phase2(*mk('"$R/scripts/gpt-exec.sh" resume --session-file "$S" --out o.json'))
+        sprint = _plan_phase2(*mk('nohup "$R/scripts/gpt-exec.sh" exec --out "$W/plan/sprint-contract-gpt.md" --prompt-file p &'))
+        doc = _plan_phase2(*mk("python3 - <<'EOF'\nx = 'gpt-exec.sh exec --schema gpt_review_schema'\nEOF"))
+        fail = _plan_phase2(*mk('"$R/scripts/gpt-exec.sh" resume --session-file s', err=True))
+        return (v and r_ and not sprint and not doc and not fail), [v, r_, sprint, doc, fail]
+
+    @reg
+    def gpt_home_sessions_count():
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            d = os.path.join(td, "sessions", "2026", "09", "29")
+            os.makedirs(d)
+            _write_lines(os.path.join(d, "a.jsonl"), [{"type": "session_meta", "payload": {"id": "s1", "cli_version": "0.157.0"}},
+                                                      {"type": "turn_context", "payload": {"model": "gpt-6-sol", "effort": "high"}}])
+            _write_lines(os.path.join(d, "b.jsonl"), [{"type": "session_meta", "payload": {"id": "s2"}}])
+            # review 모드 자식 — id 는 다르고 session_id 가 부모를 가리킨다
+            _write_lines(os.path.join(d, "c.jsonl"), [{"type": "session_meta", "payload": {"id": "c1", "session_id": "s2", "cli_version": "0.157.0"}},
+                                                      {"type": "turn_context", "payload": {"model": "gpt-6-sol", "effort": "high"}}])
+            got = gpt_home_sessions(td)
+            empty = tempfile.mkdtemp(prefix="abl-")
+            try:
+                none_sessions = gpt_home_sessions(empty)
+            finally:
+                shutil.rmtree(empty, ignore_errors=True)
+            return (sorted(x["session"] for x in got) == ["s1", "s2"] and len(got) == 2
+                    and gpt_home_sessions(os.path.join(td, "none")) is None and none_sessions == []), [got, none_sessions]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def segments_multiline_quote():
+        # 실측(peer C1) — 병합 뒤 같은 줄에서 여는 여러 줄 `python3 -c "…"` 가 병합 명령까지 버리게 했다
+        cmd = 'W=/w; P=/p; python3 $P/scripts/review_merge.py --claude a --gpt b --diff d --out $W/m.json; echo "e=$?"; python3 -c "\nimport json\nprint(1)\n"'
+        segs = _segments(_shell_part(cmd))
+        merged = [x for x in segs if _exec_of(x, "review_merge.py")]
+        bad = _segments("echo 'unclosed\necho ok")    # 따옴표가 끝내 안 맞으면 줄마다로 물러선다
+        return (len(merged) == 1 and merged[0][-2:] == ["--out", "$W/m.json"] and ["echo", "ok"] in bad), [segs, bad]
+
+    @reg
+    def gate_pass_in_redirect_target():
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            with open(os.path.join(td, "da.log"), "w") as fh:
+                fh.write("…\nGATE-PASS contract_ok issues=0\n")
+            seg = f'bash /p/scripts/gpt-exec.sh exec --cd /r --out "$W/r.json" --prompt-file p > $W/da.log 2>&1'
+            tg = _redirect_targets(seg)
+            f = _resolve_vars(tg[0], f"W={td}; " + seg, td) if tg else None
+            real = bool(REAL_HOME_SKILL_RE.search('SK=$HOME/.codex/skills/fz-challenger/SKILL.md; gpt-exec.sh exec --gpt-skill-path "$SK"'))
+            iso_ = bool(REAL_HOME_SKILL_RE.search('SK=${CODEX_HOME:-$HOME/.codex}/skills/fz-challenger/SKILL.md'))
+            return (f == os.path.join(td, "da.log") and real and not iso_), [tg, f, real, iso_]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def queued_followup_detected():
+        first = "/fz:fz-plan ABT-2001 …"
+        mk = lambda pr: {"type": "attachment", "attachment": {"type": "queued_command", "prompt": pr}}
+        evs = [mk(first), {"type": "user", "message": {"content": "x"}}, mk("Gate 2 승인·확정 — 추가 질문 없이 plan-final.md 를 기록해줘"),
+               mk("<task-notification>\n<task-id>b1</task-id>…"), {"type": "attachment", "attachment": {"type": "hook_success"}},
+               {"type": "attachment", "attachment": {"type": "queued_command", "prompt": "<agent-message from=\"a1\">…", "isMeta": True, "origin": "x"}}]
+        return (queued_followups(evs, first) == 1 and queued_followups(evs[:2], first) == 0), [queued_followups(evs, first)]
+
+    @reg
+    def script_file_argv_write():
+        scripts = {"/r/W/plan/mk.py": "import sys\nsrc = open(sys.argv[1]).read()\nopen(sys.argv[2], 'w', encoding='utf-8').write(src)\n"}
+        cmd = "W=/r/W/plan; python3 $W/mk.py $W/plan-v3.md $W/plan-final.md && echo ok"
+        final = _bash_writes(cmd, "/r/W/plan/plan-final.md", "/r", scripts)
+        src = _bash_writes(cmd, "/r/W/plan/plan-v3.md", "/r", scripts)          # argv[1] 은 읽기
+        unknown = _bash_writes(cmd, "/r/W/plan/plan-final.md", "/r", {})        # 본문을 모르면 쓰기로 치지 않는다
+        here = _bash_writes("python3 - /r/a.md /r/f.md <<'EOF'\nimport sys\nopen(sys.argv[2], 'w').write('x')\nEOF", "/r/f.md", "/r")
+        here_read = _bash_writes("python3 - /r/a.md /r/f.md <<'EOF'\nimport sys\nopen(sys.argv[2], 'w').write('x')\nEOF", "/r/a.md", "/r")
+        return (final and not src and not unknown and here and not here_read), [final, src, unknown, here, here_read]
+
+    @reg
+    def gpt_call_via_variable_and_continuation():
+        c1 = 'R=/r; X="/p/scripts/gpt-exec.sh"; ( "$X" exec --cd "$R" --out $R/v.json --prompt-file p --schema /p/schemas/gpt_review_schema.json ) > l 2>&1'
+        c2 = '( "/p/scripts/gpt-exec.sh" exec --cd "$R" --out "$W/v.json" --prompt-file p \\\n    --effort high --schema /p/schemas/gpt_review_schema.json )'
+        found1 = any(GPT_CALL_RE.search(_shell_part(v)) for v in _cmd_views(c1))
+        ph1 = any(PHASE2_RE.search(_shell_part(v)) for v in _cmd_views(c1))
+        ph2 = any(PHASE2_RE.search(_shell_part(v)) for v in _cmd_views(c2))
+        neg = any(GPT_CALL_RE.search(_shell_part(v)) for v in _cmd_views('X="/p/scripts/gpt-exec.sh"; sed -n 1,5p "$X"'))
+        return (found1 and ph1 and ph2 and not neg), [found1, ph1, ph2, neg]
+
+    @reg
+    def script_internal_output_path():
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            sp = os.path.join(td, "render_plan.py")
+            with open(sp, "w") as fh:
+                fh.write('import sys\nW="/r/W"\nOUT = f"{W}/plan/plan-final.md" if sys.argv[1] == "final" else "x"\nopen(OUT, "w").write("x")\n')
+            hit = _bash_writes(f"python3 {sp} final a.md b.json", "/r/W/plan/plan-final.md", "/r")
+            other = _bash_writes(f"python3 {sp} final a.md b.json", "/r/W/plan/other.md", "/r")
+            return (hit and not other), [hit, other]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def merge_summary_cd_relative_and_text():
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            os.makedirs(os.path.join(td, "review"))
+            with open(os.path.join(td, "review", "m.json"), "w") as fh:
+                json.dump({"summary": {"candidatesIn": 56, "candidatesOut": 56}}, fh)
+            u1 = {"name": "Bash", "id": "1", "cwd": td, "input": {"command": f"cd {td}/review && P=/p && python3 \"$P/scripts/review_merge.py\" --claude c.json --gpt g.json --diff d --out m.json"}}
+            u2 = {"name": "Bash", "id": "2", "cwd": td, "input": {"command": "python3 /p/scripts/review_merge.py --claude c --gpt g --diff d"}}
+            got = _merge_summaries([u1, u2], {"2": {"text": "MERGE OK — 후보 12→12 · 그룹 9"}})
+            return ([(x["in"], x["out"]) for x in got["summaries"]] == [(56, 56), (12, 12)]), [got]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def shell_heredoc_body_is_command():
+        scripts = {"/r/W/plan/mk.py": "import sys\nsrc, dst = sys.argv[1], sys.argv[2]\nopen(dst, 'w').write(open(src).read())\n"}
+        cmd = "bash <<'BASH'\nset -u\nW=/r/W\npython3 $W/plan/mk.py $W/plan/v3.md $W/plan/plan-final.md || exit 1\nBASH"
+        w = _bash_writes(cmd, "/r/W/plan/plan-final.md", "/r", scripts)
+        r = _bash_writes(cmd, "/r/W/plan/v3.md", "/r", scripts)
+        data = _bash_writes("cat > /r/n.txt <<'EOF'\npython3 /r/W/plan/mk.py a /r/W/plan/plan-final.md\nEOF", "/r/W/plan/plan-final.md", "/r", scripts)
+        g = any(GPT_CALL_RE.search(_shell_part(v)) for v in _cmd_views("bash <<'X'\n/p/scripts/gpt-exec.sh exec --out o --prompt-file p\nX"))
+        return (w and not r and not data and g), [w, r, data, g]
+
+    @reg
+    def critical_path_recorded():
+        rows = base() + [_mk("C1", "C", 2), _mk("C2", "C", 4)]
+        rows[2][0]["critical"] = {"gpt_plan_s": 900.0, "wf_s": 1200.0, "path": "workflow"}
+        rows[3][0]["critical"] = {"gpt_plan_s": 1500.0, "wf_s": 1200.0, "path": "gpt"}
+        ok_w, a = _judge(rows, require=["gpt-wf-wall"])
+        ok_p, b = _judge(rows, require=["critical-path"])
+        switched = any("전환" in x for x in b)
+        rows[3][0]["critical"] = {"gpt_plan_s": None, "wf_s": 1200.0, "path": None}
+        miss_w, c = _judge(rows, require=["gpt-wf-wall"])
+        miss_p, d = _judge(rows, require=["critical-path"])
+        calls = _launcher_calls([{"id": "1", "ts": None, "input": {"command": 'bash "$P/scripts/gpt_independent.sh" plan --requirement r'}},
+                                 {"id": "2", "ts": None, "input": {"command": "sed -n 1,80p $P/scripts/gpt_independent.sh"}}], {}, {})
+        return ((ok_w, ok_p, miss_w, miss_p) == (PASS, PASS, FAIL, FAIL) and switched
+                and [x["mode"] for x in calls] == ["plan"]), a + b + c + d + [str(calls)]
+
+    @reg
+    def blind_labels_one_pack():
+        # 한 꾸러미 → PASS · arm 별 꾸러미 → FAIL · 판정 전(미검증) → UNRUN · 검증됐다는데 꾸러미가 없음 → FAIL
+        one_rc, a = _judge(base() + [_mk("C1", "C", 2), _mk("C2", "C", 4)], require=["blind-labels"])
+        split_rc, b = _judge(base() + [_mk("C1", "C", 2, pack="P2"), _mk("C2", "C", 4, pack="P2")], require=["blind-labels"])
+        unv_rc, c = _judge(base() + [_mk("C1", "C", 2, verified=False), _mk("C2", "C", 4)], require=["blind-labels"])
+        nopack_rc, d = _judge(base() + [_mk("C1", "C", 2, pack=None), _mk("C2", "C", 4)], require=["blind-labels"])
+        return (one_rc, split_rc, unv_rc, nopack_rc) == (PASS, FAIL, UNRUN, FAIL), a + b + c + d
+
+    @reg
     def ac1_mismatch_invalid():
         rc, out = _judge(base() + [_mk("C1", "C", 2, effort="high"), _mk("C2", "C", 4, wmodel="claude-sonnet-5"),
                                    _mk("C3", "C", 6), _mk("C4", "C", 8)], require=["SC-3"])
@@ -2067,6 +2832,32 @@ def self_test(case=None):
         return (bad_rc, ok_rc) == (FAIL, PASS) and any("out_tok" in x for x in a), a + b
 
     @reg
+    def sc7_launcher_counts():
+        # 실측 review C: 직접 호출 0 · 런처 1(감사 exit 0) — 런처를 세지 않으면 GPT 리뷰를 옮긴 후보가 '검증 누락' 으로 떨어졌다
+        lrow = lambda n, o, lo: _mk(n, "C", o, gpt_calls=0, gpt_ok=0, gpt_launcher_ok=lo)
+        ok_rc, a = _judge(base() + [lrow("C1", 2, 1), lrow("C2", 4, 1)], require=["SC-7"])
+        bad_rc, b = _judge(base() + [lrow("C1", 2, 0), lrow("C2", 4, 1)], require=["SC-7"])
+        return ((ok_rc, bad_rc) == (PASS, FAIL) and any("직접 0 + 런처 1" in x for x in a)
+                and any("C1" in x and "직접 0 + 런처 0" in x for x in b)), a + b
+
+    @reg
+    def launcher_audit_ok():
+        # ⛔ 성공은 감사 exit 0 뿐 — 실패 코드 · 깨진 JSON · 객체가 아닌 JSON · 없는 파일은 성공이 아니다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            got = []
+            for name, body in [("a", '{"exit": 0, "note": "ok"}'), ("b", '{"exit": 15, "note": "격리 미적용"}'),
+                               ("c", '{"exit": 0'), ("d", "[0]")]:
+                pth = os.path.join(td, name + ".audit.json")
+                with open(pth, "w", encoding="utf-8") as fh:
+                    fh.write(body)
+                got.append(_launcher_ok(pth))
+            got.append(_launcher_ok(os.path.join(td, "none.audit.json")))
+            return got == [True, False, False, False, False], got
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
     def input_hash_mismatch_invalid():
         rc, out = _judge(base() + [_mk("B3", "B", 5, input="h2")], phase="baseline", min_runs=2)
         return rc == PASS and any("B3" in x and "input-hash" in x for x in out), out
@@ -2082,9 +2873,10 @@ def self_test(case=None):
 
     @reg
     def unimplemented_is_unrun():
-        a_rc, a = _judge(base(), require=["SC-5"])
+        # ⛔ 아직 구현하지 않은 기준으로 잰다 — 구현된 기준은 입력 부족으로도 UNRUN 이 나와 이 사례를 헛되이 통과시킨다
+        a_rc, a = _judge(base(), require=["SC-1"])
         b_rc, b = _judge(base(), require=["SC-3"], envs="isolated,installed")
-        return (a_rc, b_rc) == (UNRUN, UNRUN), a + b
+        return (a_rc, b_rc) == (UNRUN, UNRUN) and any("미구현 기준 ['SC-1']" in x for x in a), a + b
 
     @reg
     def plugin_sha_baseline():

@@ -234,11 +234,11 @@
     "--ledger",
     "@LEDGER@",
     "--require",
-    "SC-5"
+    "SC-1"
    ],
    "exit": 2,
    "stdout_has": [
-    "UNRUN: 미구현 기준 ['SC-5']"
+    "UNRUN: 미구현 기준 ['SC-1']"
    ]
   },
   {
