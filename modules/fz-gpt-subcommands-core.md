@@ -8,24 +8,21 @@
 
 **review** (주력, fz-review P5) · **verify** (Q1-Q8, fz-plan P2) · **verify-gates** (게이트 원장 판정, fz-plan P2 **추가** 호출) · **validate** (역검증, fz-review P5.5) · **check** (verdict contract: pass/warn/fail)
 
-> ⛔ **아래 예시는 전부 래퍼(`scripts/gpt-exec.sh`) 호출이다** — 서브커맨드별 *차이점*(모드·effort·schema·프롬프트)만 보인다. ⛔ GPT CLI 를 직접 부르지 않는다.
+> ⛔ **아래 예시는 전부 래퍼(`scripts/gpt-exec.sh`) 호출이다** — 서브커맨드별 *차이점*(모드·schema·프롬프트)만 보인다. 모델·effort 는 적지 않는다(`modules/gpt-strategy.md` § 모델·effort 선택). ⛔ GPT CLI 를 직접 부르지 않는다.
 > 래퍼가 `modules/fz-gpt-bash-hygiene.md` 의 교훈을 대신 처리한다: `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `--out` readback + `--` 구분자 + (review 모드) §5.5 Base Verification Gate.
 > 프롬프트는 `--prompt-file` 로만 받는다 — 아래 `P_*` 는 앞 줄에서 heredoc 으로 쓴 임시 파일이다. 읽기 전용은 래퍼가 모든 호출에 `-c sandbox_mode="read-only"` 로 **강제**한다(사용자 config 보다 우선) — 옛 `--sandbox read-only` 플래그는 쓰지 않는다.
 
 ## review -- 코드 리뷰 (주력)
 
-fz-review의 Phase 5 GPT 부분. **Plugin 우선 → CLI 폴백.**
+fz-review의 Phase 5 GPT 부분. **래퍼 review 모드 한 경로.**
 
 ```bash
-# Plugin 모드 (우선)
-/codex:review --base "$BASE_BRANCH" --json
-
-# 래퍼 모드 (폴백 — Plugin 미설치). 공유 모듈도 읽는다(read-only 는 전 디스크 읽기 허용)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH" --effort high \
+# 공유 모듈도 읽는다(read-only 는 전 디스크 읽기 허용)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH" \
   --gpt-skill reviewer   # reviewer 는 CLI 암묵 호출 — 경로를 넘기지 않는다(로드 확인 불가)
 ```
 
-**래퍼 주요 옵션**: `--out`(파일 캡처) · `--effort` · `--schema` · `--ephemeral`(일회성). ⛔ 모델은 넘기지 않는다(`config.toml` SSOT)
+**래퍼 주요 옵션**: `--out`(파일 캡처) · `--schema` · `--ephemeral`(일회성). `--model` · `--effort` 는 보통 넘기지 않는다 — 세션 선택 > config 다(정본 `modules/gpt-strategy.md` § 모델·effort 선택)
 
 **공유 모듈**: `--add-dir` 는 **쓰기 가능 디렉토리**를 늘리는 플래그다(CLI help: *"Additional directories that should be writable"*). fz GPT 호출은 read-only 강제라 쓰지 않는다 — read-only 도 전 디스크를 **읽을 수** 있어 공유 모듈을 읽는 데 필요 없다 (2026-09-25 실측). 모듈화 리뷰에서 공유 모듈·소비자 코드를 꼭 보게 하려면 프로젝트 `CLAUDE.md` `## Shared Modules` 경로를 exec 프롬프트에 적는다 — review 모드는 diff 를 기준으로 필요한 파일을 스스로 연다.
 
@@ -73,13 +70,13 @@ Q8 함의 커버리지: 계획이 지시의 "문자적 범위"뿐 아니라 "의
 Anti-Pattern Constraints가 있으면 각 금지 패턴의 실효성을 검증하라.
 EOF
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$REVIEW_FILE" --prompt-file "$P_VERIFY" \
-  --effort high --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" \
+  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" \
   --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
 ```
 
 ### resume 교차 (fz-plan Phase 2 · opt-in `--gpt-independent`)
 
-독립 플래너(`gpt_independent.sh plan --keep-iso`)의 세션을 이어 위 틀(Q1–Q8 · `gpt_review_schema` · effort high)로 Claude 플랜을 검증한다 — 플래너가 이미 읽은 맥락을 다시 읽지 않는다. ⛔ 세션 파일이 없으면 위 기본 `verify` 다 — 그 프롬프트 · 인자는 바뀌지 않는다(`tests/fixtures/plan-wiring/parallel-arms/run.sh` 가 가짜 CLI 로 대조한다).
+독립 플래너(`gpt_independent.sh plan --keep-iso`)의 세션을 이어 위 틀(Q1–Q8 · `gpt_review_schema`)로 Claude 플랜을 검증한다 — 플래너가 이미 읽은 맥락을 다시 읽지 않는다. ⛔ 세션 파일이 없으면 위 기본 `verify` 다 — 그 프롬프트 · 인자는 바뀌지 않는다(`tests/fixtures/plan-wiring/parallel-arms/run.sh` 가 가짜 CLI 로 대조한다).
 
 ```bash
 # 감사(gpt-{run}.audit.json)의 iso · sessionFile — sessionFile 은 런처 판정까지 통과한(exit 0) run 에만 있다.
@@ -87,7 +84,7 @@ EOF
 ISO="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("iso") or "")' "$AUDIT")"
 SESSION_FILE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("sessionFile") or "")' "$AUDIT")"
 CODEX_HOME="$ISO/gpt-home" "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$REVIEW_FILE" \
-  --prompt-file "$P_VERIFY" --session-file "$SESSION_FILE" --effort high \
+  --prompt-file "$P_VERIFY" --session-file "$SESSION_FILE" \
   --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
 bash "${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" cleanup --iso "$ISO"   # 교차가 끝나면 격리 홈을 지운다(인증은 링크뿐이다)
 #   ⛔ `rm -rf "$ISO"` 를 직접 쓰지 않는다 — 자동 모드가 거부한다. 런처가 이름(fz-gpt-iso.*)과 gpt-home/ 을 확인하고 지운다
@@ -118,8 +115,7 @@ LEDGER="{호출자가 정한 원장}"          # plan: gates/plan.draft.md · re
   --cd "$GIT_ROOT" \
   --out "$GATE_VERDICT_FILE" \
   --prompt-file "$PROMPT" \
-  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_gate_verdict_schema.json" \
-  --effort high
+  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_gate_verdict_schema.json"
 ```
 
 프롬프트에 **원장 경로와 내용을 함께** 넣는다. 현재 `verify` 템플릿에는 WORK_DIR·ledger 변수가 없어 그대로는 게이트를 볼 수 없다.
@@ -179,11 +175,9 @@ $ORIGINAL_ISSUES
 $FIXES_APPLIED
 EOF
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE" \
-  --effort high --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_verification_schema.json" \
+  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_verification_schema.json" \
   --gpt-skill guardian --gpt-skill-path "$SKILL_PATH"
 ```
-
-**Critical 자동 에스컬레이션**: 이전 검증에서 critical 이슈가 있었으면 자동으로 `xhigh`로 전환.
 
 **/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.
 
@@ -198,7 +192,7 @@ $PLAN_CONTENT
 파일을 수정하지 마라(읽기 전용 분석).
 EOF
   } > "$P_SEARCH"
-  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$SEARCH_FILE" --prompt-file "$P_SEARCH" --effort high \
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$SEARCH_FILE" --prompt-file "$P_SEARCH" \
     --gpt-skill searcher --gpt-skill-path "$SEARCHER_SKILL_PATH"
 fi
 ```
@@ -208,7 +202,7 @@ fi
 스테이징/언스테이징 변경을 커밋 전에 빠르게 검증합니다.
 
 ```bash
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --uncommitted --effort high --ephemeral \
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --uncommitted --ephemeral \
   --gpt-skill reviewer   # reviewer 는 CLI 암묵 호출 — 경로를 넘기지 않는다(로드 확인 불가)
 ```
 
@@ -245,7 +239,7 @@ $FIXABLE_ISSUES
 파일을 수정하지 마라(읽기 전용 분석).
 EOF
   } > "$P_FIX"
-  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$FIXER_FILE" --prompt-file "$P_FIX" --effort high \
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$FIXER_FILE" --prompt-file "$P_FIX" \
     --gpt-skill fixer --gpt-skill-path "$FIXER_SKILL_PATH"
 fi
 ```

@@ -9,7 +9,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__write_memory,
   mcp__plugin_fz_serena__read_memory,
-  Bash(codex *), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt_independent.sh*), Read, Grep
+  Bash(codex *), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-choice.sh*), Read, Grep
 metadata:
   provides: [verification]
   needs: [none]
@@ -18,15 +18,14 @@ metadata:
     - "gpt|cross-validate|verify with gpt"
 ---
 
-# /fz-gpt - GPT 상호검증 스킬 (Hybrid)
+# /fz-gpt - GPT 상호검증 스킬
 
-> **행동 원칙**: GPT CLI(모델=config SSOT)를 **Hybrid 모드**로 활용하여 독립적 교차 검증을 수행한다.
-> 래퍼(`scripts/gpt-exec.sh`) + Plugin(`/codex:*`, 설치 시) 자동 라우팅. Plugin 미설치 시 CLI 폴백.
+> **행동 원칙**: GPT CLI 를 래퍼(`scripts/gpt-exec.sh`) 한 경로로 불러 독립적 교차 검증을 수행한다.
+> ⛔ **첫 GPT 호출 전**: `modules/gpt-strategy.md § 모델·effort 선택` — 세션에 한 번 모델·effort 를 묻고(`gpt-choice.sh get` → `options` → `set`) 그 값을 모든 서브커맨드에 적용한다. 서브커맨드별 effort 는 없다.
 
 > **Authority**:
-> - Hybrid Routing: OpenAI GPT CLI 공식 docs [verified: official] — 0.118.0+ Plugin 도입 · 0.124.0+ gpt-5.5 · 0.153.1+ gpt-6-astra(0.153.4가 bundled default로 승격) · **0.157.0+ gpt-6-sol — 현 CLI 기본**(0.156.1 에서 선택기 추가, 기본 effort medium). 실제 모델은 CLI 버전과 `config.toml` 에 따른다
-> - Effort Routing: API `reasoning.effort` 는 **모델별**이다 — gpt-6-sol 은 `none`·`low`·`medium`(기본)·`high`·`xhigh`·`max` [verified: developers.openai.com/api/docs/models/gpt-6-sol] · **gpt-6-astra 는 `none` → HTTP 400** [verified: developers.openai.com/api/docs/guides/reasoning] · gpt-6-luna 의 `none` 은 [미검증]. GPT CLI 0.149.0+ 는 `ultra` 추가 — **`models_cache.json` 실측(2026-09-25)**: sol·astra = low~max + ultra, luna = low~max, 세 모델 모두 CLI 목록에 `none` 없음 (gpt-5.5 는 xhigh 까지).
->   ⛔ 구 출처 GPT-5 Prompting Guide 는 `gpt-5.3-gpt` 대상이라 Astra 를 다루지 않는다.
+> - CLI 버전: OpenAI GPT CLI 공식 docs [verified: official] — 0.124.0+ gpt-5.5 · 0.153.1+ gpt-6-astra(0.153.4가 bundled default로 승격) · 0.157.0+ gpt-6-sol(0.156.1 에서 선택기 추가) · **0.159.0+ gpt-6.1-sol(0.159.1 이 bundled default 로 승격)** — 둘 다 effort 기본값은 medium. 실제 모델은 세션 선택(없으면 `config.toml`)과 CLI 버전에 따른다
+> - effort 수준: API `reasoning.effort` 는 **모델별**이다 [verified: developers.openai.com/api/docs/guides/reasoning] — 지원 목록은 문서에 적지 않는다. `gpt-choice.sh options` 가 `models_cache.json`(visibility=list · supported_reasoning_levels)에서 선택지를 만들고 `gpt-choice.sh set` 이 검증한다 (`modules/gpt-strategy.md § 모델·effort 선택`)
 >   ⛔ 공식은 xhigh 를 무조건 권하지 않는다 — *"Only use when your evals show a clear benefit that justifies the extra latency and cost."*
 > - adversarial 서브커맨드: ICLR 2025 Blogposts [verified: peer-reviewed] — Adversarial debate는 majority voting으로 환원, "Generator≠Evaluator 분리"가 fz의 frame
 > - micro-eval 서브커맨드: Chain-of-Verification (CoVe, arXiv 2309.11495) [verified: peer-reviewed] — 단일 주장 재평가 패턴
@@ -37,7 +36,6 @@ metadata:
 
 - **래퍼 review** (`gpt-exec.sh review`): git diff + `--out` + 3-Tier 스킬 — review/check/final
 - **래퍼 exec** (`gpt-exec.sh exec`): `--prompt-file` + `--schema` — verify/validate/drift/plan
-- **Plugin** (`/codex:*`): 설치 시 review/check/adversarial에 우선 사용. 백그라운드 Job 관리 (`status`/`result`)
 - **공유 모듈**: read-only 가 전 디스크 읽기를 허용해 별도 플래그가 필요 없다. `--add-dir` 는 **쓰기** 디렉토리 플래그라 fz 에서 쓰지 않는다 (2026-09-25 CLI help 실측)
 - **GPT 네이티브 스킬**: 3-Tier 디스커버리 (`${CODEX_HOME:-~/.codex}/skills/` → 플러그인 `gpt-skills/`) 역할 기반 매칭
 
@@ -99,7 +97,7 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 | verify/validate (탐색 보조) | searcher | fz-searcher | `gpt-exec.sh exec` + `get_gpt_skill_path("searcher")` — 심볼 탐색 필요 시 |
 | check (수정 제안) | fixer | fz-fixer | `gpt-exec.sh exec` + `get_gpt_skill_path("fixer")` — fixable 이슈 존재 시 |
 | drift | drift | fz-drift | `gpt-exec.sh exec` + `get_gpt_skill_path("drift")` — 전체 스캔 |
-| plan | planner | fz-planner | `gpt-exec.sh exec` + `get_gpt_skill_path("planner")` — 독립 플랜, xhigh effort |
+| plan | planner | fz-planner | `gpt-exec.sh exec` + `get_gpt_skill_path("planner")` — 독립 플랜 |
 
 스킬 위치: `get_gpt_skill_path()` 가 정한다 — `${CODEX_HOME:-~/.codex}/skills/` → 플러그인 `gpt-skills/` (3-Tier 디스커버리). ⛔ `~/.codex/skills/` 를 경로에 직접 쓰지 않는다 — 격리 `CODEX_HOME` 을 우회해 설치된 다른 판의 스킬을 읽는다
 
@@ -109,31 +107,7 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 
 ---
 
-> 공통 설정 (Base Branch / Effort / Diff 크기 / CLI 모드): `modules/gpt-strategy.md`
-
-## Hybrid Routing (0.118.0+; gpt-5.5 = 0.124.0+ · gpt-6-astra = 0.153.1+ · gpt-6-sol = 0.157.0+)
-
-서브커맨드별 최적 실행 경로. Plugin 미설치 시 경고 없이 CLI 폴백.
-> 버전 플로어: Hybrid 라우팅 자체는 0.118.0부터 동작한다. 예시는 `-m`을 생략해 config `model` 기본값(최신 frontier)을 사용한다 — 모델 버전을 pin하지 말 것(SSOT=config.toml). 구버전 CLI에서 config 모델이 미지원이면 에러 대응표 `모델 미지원` 행대로 대응.
-
-| 서브커맨드 | Plugin 우선 | CLI (폴백/전용) | Plugin 불가 이유 |
-|-----------|------------|----------------|----------------|
-| review | `/codex:review --base` | `gpt-exec.sh review --base --out` | — |
-| check | `/codex:review --scope working-tree` | `gpt-exec.sh review --uncommitted` | — |
-| adversarial | `/codex:adversarial-review` | challenger 프롬프트 | — |
-| final | — | CLI only | `resume` |
-| verify/validate | — | CLI only | `--output-schema` |
-| drift/plan | — | CLI only | 커스텀 스킬 + 구조화 출력 |
-| micro-eval | — | CLI only | 경량 단일 주장 재평가, `--ephemeral` |
-
-> **Plugin 감지** (Cbug-1 수정, 2026-05-16): `codex mcp list`는 MCP server 목록이라 plugin과 다른 계층 — config.toml 기반 감지가 정확하다. 오류 시에도 CLI 자동 폴백.
-> ```bash
-> # Plugin enabled detection (config.toml + cache 동시 확인)
-> grep -q '^\[plugins\.' ~/.codex/config.toml 2>/dev/null && \
->   ls ~/.codex/plugins/cache/*/  2>/dev/null | head -1 >/dev/null && \
->   PLUGIN_AVAILABLE=true || PLUGIN_AVAILABLE=false
-> ```
-> 이전 `codex mcp list | grep -q plugin`은 plugin enabled 상태에서도 항상 false 반환 (MCP server ≠ plugin) → Plugin 모드 영원히 미사용 위험 있었음.
+> 공통 설정 (Base Branch / 모델·effort 선택 / Diff 크기 / CLI 모드): `modules/gpt-strategy.md`
 
 ---
 
@@ -144,29 +118,11 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 ⛔ **`${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh`를 경유한다** (§8 — 경로 기준은 플러그인 루트) — 손 조립 금지. 스크립트가 사전 게이트(플래그 상호 배타·필수 인자·경로 실재)와 **사후 게이트(exit≠0 / 빈 출력 / **스키마 계약 위반** → 측정 실패)**를 강제한다.
 
 ```bash
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --uncommitted --effort high   # 대상=플래그만
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --uncommitted   # 대상=플래그만
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P --schema S     # 커스텀 지시
 ```
 
 ⛔ **exit 10~14 = 측정 실패**이며 "이슈 0건"이 아니다. ⛔ 게이트 3은 **스키마 계약**(required·type·enum·재귀)을 본다 — `{}`는 통과하지 못한다. ⛔ 스크립트 exit을 뒤 명령이 덮지 않게 하라. 미준수 시 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch / **인자 충돌 exit 2를 정상 결과로 오독**.
-
----
-
-## Effort Routing (δ-2)
-
-`-c model_reasoning_effort=<medium|high|xhigh>` 매핑. 단순 호출에 xhigh 낭비 + 심화 호출에 medium 부족 방지.
-
-| 서브커맨드 | effort | 근거 |
-|----------|:------:|------|
-| `micro-eval` | **medium** | 단일 주장 재평가, 수백 토큰 단위 |
-| `review`, `check`, `verify`, **`verify-gates`**, `validate`, `drift` | **high** | 리뷰/검증 표준 |
-| `final` (1차+resume 2차), `adversarial`, `plan` | **xhigh** | 종합 리뷰 + 독립 설계 + DA 패스 |
-
-**Critical 자동 에스컬레이션**: 이전 검증에서 critical 이슈 발견 시 → high → xhigh 자동 전환 (validate/verify에 명시).
-
-**원칙**: effort는 호출 종류 기준 (단순/표준/심화), 모델 가용성 기준 아님. 최신 frontier(config 모델)의 high가 이전 세대 xhigh보다 빠르고 정확할 수 있으므로 default = config 모델 + high.
-
-> δ-2 출처: plan v3.1.3 §Tier 1 row 5. 32차 axis (a) probe: `plan_mode_reasoning_effort` direct flag 미존재 → `-c model_reasoning_effort=...` config override 형식이 정식 primitive.
 
 ---
 
@@ -176,19 +132,19 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 > - **Core (review/verify/validate/check)**: `modules/fz-gpt-subcommands-core.md`
 > - **Aux (final/adversarial/drift/plan/micro-eval/independent-plan/independent-review)**: `modules/fz-gpt-subcommands-aux.md`
 
-| 명령 | 용도 | 호출 스킬 | effort |
-|------|------|----------|:------:|
-| **review** | 코드 리뷰 (주력) | /fz-review Phase 5 | high |
-| **verify** | 계획 검증 (Q1-Q8 stress-test) | /fz-plan Phase 2 | high |
-| **validate** | 피드백 역검증 | /fz-review Phase 5.5 | high |
-| **check** | 커밋 전 빠른 검증 (verdict contract) | /fz-fix | high |
-| **final** | PR 전 최종 리뷰 (resume --session-file 심화) | /fz-pr 전 | xhigh |
-| **adversarial** | Devil's Advocate 리뷰 | /fz-review DA 패스 | xhigh |
-| **drift** | 아키텍처 드리프트 전체 스캔 | /fz-manage drift | high |
-| **plan** | 독립 플랜 (Claude와 교차 비교, C4 원칙) | /fz-plan cross-check | xhigh |
-| **micro-eval** | 단일 주장 독립 재평가 (claim-type 라우팅) | cross-validation Gate | medium |
-| **independent-plan** | 격리 첫 패스 플랜 — `scripts/gpt_independent.sh plan` (opt-in `--gpt-independent`) | /fz-plan cross-check | xhigh |
-| **independent-review** | 격리 첫 패스 리뷰 — `scripts/gpt_independent.sh review` (/fz-peer-review 기본 · /fz-review 는 opt-in `--gpt-independent`) | /fz-review · /fz-peer-review | high |
+| 명령 | 용도 | 호출 스킬 |
+|------|------|----------|
+| **review** | 코드 리뷰 (주력) | /fz-review Phase 5 |
+| **verify** | 계획 검증 (Q1-Q8 stress-test) | /fz-plan Phase 2 |
+| **validate** | 피드백 역검증 | /fz-review Phase 5.5 |
+| **check** | 커밋 전 빠른 검증 (verdict contract) | /fz-fix |
+| **final** | PR 전 최종 리뷰 (resume --session-file 심화) | /fz-pr 전 |
+| **adversarial** | Devil's Advocate 리뷰 | /fz-review DA 패스 |
+| **drift** | 아키텍처 드리프트 전체 스캔 | /fz-manage drift |
+| **plan** | 독립 플랜 (Claude와 교차 비교, C4 원칙) | /fz-plan cross-check |
+| **micro-eval** | 단일 주장 독립 재평가 (claim-type 라우팅) | cross-validation Gate |
+| **independent-plan** | 격리 첫 패스 플랜 — `scripts/gpt_independent.sh plan` (opt-in `--gpt-independent`) | /fz-plan cross-check |
+| **independent-review** | 격리 첫 패스 리뷰 — `scripts/gpt_independent.sh review` (/fz-peer-review 기본 · /fz-review 는 opt-in `--gpt-independent`) | /fz-review · /fz-peer-review |
 
 > independent-review 는 호출 스킬이 Workflow 와 **동시에** 띄우고 `scripts/review_merge.py` 로 합친다 — 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 
@@ -231,7 +187,7 @@ should-trigger (description '예:' 어휘 기반)
 
 | 쿼리 | 예상 | 근거 |
 |------|------|------|
-| "이 변경분 codex로 리뷰해줘" | trigger | '예: codex' + review 서브커맨드 (Plugin 우선 `/codex:review --base`) |
+| "이 변경분 codex로 리뷰해줘" | trigger | '예: codex' + review 서브커맨드 (래퍼 `gpt-exec.sh review --base`) |
 | "코드 교차검증 돌려줘" | trigger | '예: 교차검증' — 핵심 유스케이스 (독립 모델 상호 검증) |
 | "GPT로 한 번 더 확인해줘" | trigger | '예: GPT로 확인' |
 | "이 계획 상호검증해줘" | trigger | '예: 상호검증' + verify 서브커맨드 (계획 검증) |
@@ -249,7 +205,7 @@ should-NOT-trigger (Boundaries Will Not / '비사용:' 대안 스킬)
 
 | Given | When | Then (pass/fail oracle) | type |
 |-------|------|--------------------------|------|
-| Git diff 존재, GPT CLI 설치 + Plugin 사용 가능 | `/fz-gpt review` | Plugin 우선(`/codex:review --base`) 또는 래퍼(`gpt-exec.sh review --out`) 실행 → 구조화 이슈 캡처 + verdict(approved/rejected/conditional) 판정 → Gate "GPT Verification Complete" 3항목 전부 통과 | normal |
+| Git diff 존재, GPT CLI 설치 | `/fz-gpt review` | 래퍼(`gpt-exec.sh review --out`) 실행 → 구조화 이슈 캡처 + verdict(approved/rejected/conditional) 판정 → Gate "GPT Verification Complete" 3항목 전부 통과 | normal |
 | Claude 계획 초안 존재 | `/fz-gpt verify` | gpt가 plan을 `--output-schema`로 독립 재작성 → Claude 계획과 diff → divergence 기록 + verdict 판정 후 /fz-plan으로 반환 (Gate 3/3 통과) | normal |
 | base branch 후보 불확실(자동 결정 불가) | `/fz-gpt review` | Will Not "Base branch를 추측하지 않음" — 추측 base 실행 0건, 사용자에게 질문 → 확정 후 실행 | edge-case |
 | CLAUDE.md `## GPT Skills` 테이블(Tier 1) 부재 | `/fz-gpt verify` | Tier 2(글로벌 fz-*) → Tier 3(인라인 프롬프트) 순차 폴백으로 서브커맨드 실행 완료 (Gate "서브커맨드 실행 완료" 통과) | edge-case |
@@ -265,7 +221,6 @@ GPT CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행�
 - `gpt-exec.sh resume --session-file`로 multi-pass 심화 검증 (final)
 - GPT 네이티브 스킬(3-Tier 디스커버리로 결정) 자동 활용
 - Base branch 자동 결정 (불확실 시 사용자 질문)
-- Critical 이슈 감지 시 xhigh 자동 에스컬레이션
 
 **Will Not**:
 - 코드를 직접 수정하지 않음 (검증만 수행)
@@ -278,11 +233,10 @@ GPT CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행�
 |------|------|------|
 | CLAUDE.md 미발견 | `../CLAUDE.md` → `CLAUDE.md` → `find .. -maxdepth 2` | 경고 후 계속 |
 | Guidelines 미발견 | CLAUDE.md `## Code Conventions` 참조 | 일반 규칙 적용 |
-| Plugin 명령 실패 | 래퍼 자동 폴백 (`gpt-exec.sh`) | 경고 없이 진행 |
 | GPT CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:sc-analyze 단독 |
 | `gpt-exec.sh review` 실패 | `gpt-exec.sh exec` + diff 인라인 프롬프트 | 수동 분석 |
 | JSON 파싱 실패 | `-o` 파일 캡처 폴백 | Claude 분석 |
-| 모델 미지원 (구버전 CLI가 config 모델 미인식) | CLI 업데이트 권장, 불가 시 config `model`을 호환 모델로 조정 (사용자 소관 — 임시 `-m` pin 금지) | -- |
+| 모델 미지원 (구버전 CLI가 config 모델·세션 선택 모델 미인식) | CLI 업데이트 권장, 불가 시 세션 선택을 다시 묻거나(`modules/gpt-strategy.md § 모델·effort 선택`) config `model`을 호환 모델로 조정 (사용자 소관 — 호출부에 모델을 적지 않는다) | -- |
 | 3회 연속 실패 | 사용자 에스컬레이션 | -- |
 | **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (`modules/fz-gpt-bash-hygiene.md` § 1) | 프로세스 kill + 재시도 |
 | **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (`modules/fz-gpt-bash-hygiene.md` § 2) | working dir을 GIT_ROOT로 변경 |

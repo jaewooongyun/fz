@@ -48,7 +48,7 @@ fi
 
 ## 4. Background Task 의무 영역
 
-**조건**: high effort + Plan 300줄+ 입력 시 5-8분 소요(frontier 모델 실측). Bash foreground는 timeout 위험.
+**조건**: effort 가 아니라 입력 크기 · 호출 종류로 정한다(`modules/gpt-strategy.md` § 모델·effort 선택) — Plan 300줄+ 입력은 5-8분 소요(frontier 모델 · high effort 실측)이고, 독립 런처 · 심화 resume 도 오래 돈다. Bash foreground는 timeout 위험.
 
 **패턴**: `run_in_background: true` + `ScheduleWakeup`으로 비동기 처리.
 
@@ -137,7 +137,7 @@ cat > /tmp/gpt-prompt.txt << 'EOF'
 EOF
 # 2. 래퍼 호출 — stdin close·`-o`·`--` 구분자·skip flag·read-only sandbox 를 래퍼가 조립한다 (§1~§7 의 교훈)
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$WORK_DIR" --out "$RESULT_FILE" --prompt-file /tmp/gpt-prompt.txt
-# 3. 결과는 Read 로 $RESULT_FILE · high effort + 300줄 이상이면 run_in_background (§4)
+# 3. 결과는 Read 로 $RESULT_FILE · 입력 300줄 이상 · 오래 도는 호출이면 run_in_background (§4 — 기준은 effort 가 아니다)
 ```
 
 ## 7. 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자)
@@ -168,15 +168,16 @@ GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-
 ### 인터페이스
 
 ```bash
+# --model M · --effort E: 보통 넘기지 않는다 — 정본 modules/gpt-strategy.md § 모델·effort 선택 (필드마다 플래그 > 세션 선택 > config.toml)
 # review: 대상 선택은 플래그로만 (PROMPT 불가 — 스크립트가 거부한다)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --uncommitted [--effort high] [--schema S] [--title T] [--ephemeral]
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --uncommitted [--model M] [--effort E] [--schema S] [--title T] [--ephemeral]
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$F" --base develop
 
 # exec: 커스텀 지시가 필요할 때 (diff는 프롬프트에 인라인 — 스코프 플래그 금지)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--effort xhigh] [--schema S] [--gpt-skill N --gpt-skill-path "$SKILL_PATH"] [--inject-skill "$SKILL_PATH"]   # --add-dir = 쓰기 디렉토리 플래그 — fz(read-only)에선 쓰지 않는다
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec   --cd "$GIT_ROOT" --out "$F" --prompt-file P [--model M] [--effort E] [--schema S] [--gpt-skill N --gpt-skill-path "$SKILL_PATH"] [--inject-skill "$SKILL_PATH"]   # --add-dir = 쓰기 디렉토리 플래그 — fz(read-only)에선 쓰지 않는다
 
 # resume: 이전 exec·review 가 남긴 `${OUT}.session` 으로 **그 세션**을 잇는다 (⛔ --last 금지 — 사이에 다른 실행이 끼면 엉뚱한 세션)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$F2" --prompt-file P --session-file "$F.session" [--effort xhigh] [--gpt-skill-path "$SKILL_PATH"]
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$F2" --prompt-file P --session-file "$F.session" [--model M] [--effort E] [--gpt-skill-path "$SKILL_PATH"]
 ```
 
 ### 스킬 본문 판정과 주입 (`--gpt-skill-path` · `--inject-skill` — A2-03 · F-335)
@@ -201,7 +202,7 @@ GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-
 
 - `--config-permissions` 를 주면 `sandbox_mode` · `sandbox_permissions` 를 넘기지 않고 `$CODEX_HOME/config.toml` 의 프로필을 쓴다. 독립 첫 패스 런처(`scripts/gpt_independent.sh`)가 쓰는 경로다
 - 호출 전에 확인한다 — `default_permissions` 가 첫 table 앞에 있고, 그 프로필이 `extends = ":read-only"` 다. 아니면 exit 11 이다. 쓰기 금지는 그 프로필이 맡는다
-- 옵션을 주지 않은 호출의 인자는 분리 전과 바이트 단위로 같다(`tests/fixtures/gpt/config-permissions/run.sh`)
+- 옵션을 주지 않은 호출의 인자 모양은 황금값으로 고정돼 있다 — 세션 선택이 없으면 모델·effort 를 넘기지 않는다(`tests/fixtures/gpt/config-permissions/run.sh`). 선택이 있으면 두 경로(기본 · `--config-permissions`)가 같이 받는다 — 래퍼가 ARGS 재대입 뒤에 붙인다(`tests/fixtures/gpt/choice/run.sh` --scope wrapper)
 
 ### 사전 게이트 (호출 전 거부)
 

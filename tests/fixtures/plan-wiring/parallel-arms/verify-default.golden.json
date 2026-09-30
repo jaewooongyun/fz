@@ -6,8 +6,6 @@
  "sandbox_mode=\"read-only\"",
  "-c",
  "sandbox_permissions=[\"disk-full-read-access\"]",
- "-c",
- "model_reasoning_effort=high",
  "--output-schema",
  "<R>/schemas/gpt_review_schema.json",
  "-o",
