@@ -1536,19 +1536,27 @@ def cite_spans(texts, rules=None):
     """→ [(파일, 시작, 끝, 인용이 든 문단)] — 후보 추출. 문단 전체를 남겨 검증자가 **주장과 근거**를 함께 보게 한다.
     인용 행이 1행짜리 위치 표면 다음 `#` 제목 · `<!--` 마커 전까지 뒤 블록을 문맥에 붙인다 — 붙이지 않으면 렌더러
     보고서의 코드 위치 후보가 주장 없는 표 행만 문맥으로 받는다(실측 review C 23~25/후보).
+    붙인 블록(What · Suggestion) 안의 인용도 같은 절 문맥을 쓴다 — 판정 단위는 렌더러 지적 절이다(What 안 근거 인용이
+    같은 절 위치 표의 라벨 파일을 보게).
     문맥 상한은 CTX_CAP 이다(800 에서는 C 의 Suggestion 꼬리만 잘렸다).
     rules(fixture 가 선언한 규칙 출처 파일)로 풀리는 인용은 뺀다 — 참조는 발견이 아니다(검증 비율 분모에 들지 않는다)."""
     seen, out = set(), []
     for t in texts:
         blks = _blocks(t)
+        sec_ctx, sec_end = None, -1
         for i, blk in enumerate(blks):
             ctx = blk.strip()
-            if _one_row_table(blks, i):
-                for nb in blks[i + 1:]:
-                    nxt = nb.strip()
+            if i < sec_end:
+                ctx = sec_ctx      # 렌더러 지적 절의 What · Suggestion 안 인용 — 절 문맥
+            elif _one_row_table(blks, i):
+                j = i + 1
+                while j < len(blks):
+                    nxt = blks[j].strip()
                     if nxt.startswith("#") or nxt.startswith("<!--"):
                         break
                     ctx += "\n\n" + nxt
+                    j += 1
+                sec_ctx, sec_end = ctx, j
             for m in CITE_RE.finditer(blk):
                 f = m.group(1)[2:] if m.group(1).startswith("./") else m.group(1)
                 if rules and any(_same_file(f, r) for r in rules):
@@ -1619,9 +1627,10 @@ def score_review(labels, texts, verdicts=None, files=None, rules=None):
             "empty": not any(t.strip() for t in texts)}
     if verdicts is None:
         return dict(base, verified=False, unverified=len(spans), by_severity=None, by_axis=None, labels_found=[],
-                    verified_true=None, verified_ratio=None, mapping_errors=[], mapping_unchecked=0)
+                    verified_true=None, verified_ratio=None, mapping_errors=[], mapping_unchecked=0,
+                    mapping_context=0)
     lab = {x["id"]: x for x in labels["issues"]}
-    found, extras, unverified, real_n, bad, unchecked = set(), [], 0, 0, [], 0
+    found, extras, unverified, real_n, bad, unchecked, via_ctx_n = set(), [], 0, 0, [], 0, 0
     for sp in spans:
         v = verdicts.get(cand_id(sp))
         if not isinstance(v, dict) or not isinstance(v.get("real"), bool):
@@ -1631,7 +1640,13 @@ def score_review(labels, texts, verdicts=None, files=None, rules=None):
             continue
         raw_ids = v.get("label_ids") or []
         r = resolve_cited(sp[0], files)
-        ids = [i for i in raw_ids if i in lab and (r is None or _same_file(r, lab[i]["file"]))]
+        own = [i for i in raw_ids if i in lab and (r is None or _same_file(r, lab[i]["file"]))]
+        # 같은 지적 문단이 인용한 다른 파일의 라벨 — 렌더러의 1행 위치 표는 결함 위치와 근거 위치를 나란히 적는다(§14)
+        ctx_files = [] if r is None else [x for x in (resolve_cited(mm.group(1)[2:] if mm.group(1).startswith("./")
+                                                                    else mm.group(1), files)
+                                                      for mm in CITE_RE.finditer(sp[3])) if x]
+        via_ctx = [i for i in raw_ids if i in lab and i not in own and any(_same_file(x, lab[i]["file"]) for x in ctx_files)]
+        ids = own + via_ctx
         if len(ids) != len(raw_ids):
             # ⛔ 없는 라벨·다른 파일의 라벨로 매핑 — 판정 형식 오류다. 무시하고 넘어가면 발견이 사라진다(미검증)
             bad.append(f"{cand_id(sp)}→{[i for i in raw_ids if i not in ids]}")
@@ -1647,6 +1662,8 @@ def score_review(labels, texts, verdicts=None, files=None, rules=None):
             found.update(ids)
             if r is None:
                 unchecked += 1   # 못 푼 인용(약칭 · fixture 밖 파일)의 라벨 매핑 — 채점기가 파일을 대조하지 못했다(검증자 매핑을 받았다)
+            if via_ctx:
+                via_ctx_n += 1   # 같은 지적 문단의 다른 인용 파일로 받은 매핑(후보 수)
         else:
             extras.append(v)
     by_sev = {s: 0 for s in SEVERITIES}
@@ -1661,7 +1678,7 @@ def score_review(labels, texts, verdicts=None, files=None, rules=None):
     return dict(base, verified=ok, unverified=unverified, by_severity=by_sev, by_axis=by_axis,
                 labels_found=sorted(found), verified_true=real_n,
                 verified_ratio=round(real_n / len(spans), 4) if spans and ok else None, mapping_errors=bad,
-                mapping_unchecked=unchecked)
+                mapping_unchecked=unchecked, mapping_context=via_ctx_n)
 
 
 def _items(v):
@@ -1944,11 +1961,15 @@ def _exact(B, C, nb=2, nc=2):
 
 
 def _unchecked_note(B, C, scores):
-    """파일 대조 못 한 라벨 매핑 수(약칭 · fixture 밖 인용에 검증자가 붙인 라벨 — 받았다). 전부 0 이면 줄을 내지 않는다."""
-    un = [(r["run_id"], (scores.get(r["run_id"]) or {}).get("mapping_unchecked") or 0) for r in B + C]
-    if not any(n for _, n in un):
-        return []
-    return ["파일 대조 못 한 라벨 매핑(검증자 매핑을 받았다) " + " · ".join(f"{k} {n}" for k, n in un if n)]
+    """채점기가 받은 특수 매핑 수 — 파일 대조 못 한 매핑(약칭 · fixture 밖 인용) · 같은 지적 문단의 다른 인용 파일로 받은
+    매핑(§14). 전부 0 인 항목은 줄을 내지 않는다."""
+    out = []
+    for key, what in (("mapping_unchecked", "파일 대조 못 한 라벨 매핑(검증자 매핑을 받았다)"),
+                      ("mapping_context", "같은 지적 문단의 다른 인용 파일로 받은 라벨 매핑")):
+        un = [(r["run_id"], (scores.get(r["run_id"]) or {}).get(key) or 0) for r in B + C]
+        if any(n for _, n in un):
+            out.append(what + " " + " · ".join(f"{k} {n}" for k, n in un if n))
+    return out
 
 
 def crit_sc3(B, C, scores, c_runs=2):
@@ -3168,6 +3189,63 @@ def self_test(case=None):
         with_rules = [x[0] for x in cite_spans(t, ["CLAUDE.md"])]
         without = [x[0] for x in cite_spans(t)]
         return with_rules == ["App/X.swift"] and sorted(without) == ["App/X.swift", "CLAUDE.md"], [str(with_rules), str(without)]
+
+    @reg
+    def cited_same_finding_other_file():
+        # ⛔ 실측 review C — 렌더러의 1행 위치 표가 결함 위치(Interactor:54)와 근거 위치(Repo:15-19)를 한 지적에 적는다.
+        #    근거 위치 후보에 붙은 같은 지적의 라벨을 받는다 · 라벨은 한 번만 센다
+        labs = {"issues": [{"id": "I1", "axis": "architecture", "severity": "major", "file": "App/W/WatchlistInteractor.swift",
+                            "line_start": 54, "line_end": 54}]}
+        files = ["App/W/WatchlistInteractor.swift", "Data/W/Repo.swift"]
+        t = ["### [major] M1\n\n| File:line | Origin |\n|---|---|\n"
+             "| `App/W/WatchlistInteractor.swift:54` · `Data/W/Repo.swift:15-19` | regression |\n\n"
+             "**What** — Interactor 가 APIClient 를 직접 부른다.\n\n<!-- fz-review:M2 -->"]
+        v = {"App/W/WatchlistInteractor.swift:54": {"real": True, "label_ids": ["I1"]},
+             "Data/W/Repo.swift:15-19": {"real": True, "label_ids": ["I1"]}}
+        s_ = score_review(labs, t, v, files)
+        return (s_["verified"] and s_["labels_found"] == ["I1"] and s_["by_severity"]["major"] == 1
+                and s_["mapping_context"] == 1), [str(s_)]
+
+    @reg
+    def cross_file_mapping_without_citation_unverified():
+        # 보존: 문단이 인용하지 않은 파일의 라벨로 매핑하면 여전히 미검증(ISSUE-027)
+        labs = {"issues": [{"id": "I1", "axis": "architecture", "severity": "major", "file": "App/W/WatchlistInteractor.swift",
+                            "line_start": 54, "line_end": 54}]}
+        files = ["App/W/WatchlistInteractor.swift", "Data/W/Repo.swift"]
+        s_ = score_review(labs, ["- `Data/W/Repo.swift:15-19` 저장소가 이미 있다"],
+                          {"Data/W/Repo.swift:15-19": {"real": True, "label_ids": ["I1"]}}, files)
+        return s_["verified"] is False and s_["unverified"] == 1, [str(s_)]
+
+    @reg
+    def section_what_citation_maps_row_file():
+        # ⛔ 실측 C′1 — What 문단 안 근거 인용(Repo:15)이 같은 절 위치 표의 라벨 파일(Interactor)을 본다
+        labs = {"issues": [{"id": "I1", "axis": "architecture", "severity": "major", "file": "App/W/WatchlistInteractor.swift",
+                            "line_start": 54, "line_end": 54}]}
+        files = ["App/W/WatchlistInteractor.swift", "Data/W/Repo.swift"]
+        t = ["### [major] M1\n\n| File:line | Origin |\n|---|---|\n| `App/W/WatchlistInteractor.swift:54` | regression |\n\n"
+             "**What** — Interactor 가 APIClient 를 직접 부른다. 같은 요청을 감싼 `Data/W/Repo.swift:15` 가 이미 있다.\n\n"
+             "<!-- fz-review:M2 -->\n### [minor] M2\n\n| File:line | Origin |\n|---|---|\n| `Data/W/Repo.swift:30` | new |\n\n**What** — 다른 지적"]
+        v = {"App/W/WatchlistInteractor.swift:54": {"real": True, "label_ids": ["I1"]},
+             "Data/W/Repo.swift:15": {"real": True, "label_ids": ["I1"]},
+             "Data/W/Repo.swift:30": {"real": False, "label_ids": []}}
+        s_ = score_review(labs, t, v, files)
+        ctx = {x[0] + ":" + str(x[1]): x[3] for x in cite_spans(t)}
+        return (s_["verified"] and s_["labels_found"] == ["I1"] and s_["mapping_context"] == 1
+                and "WatchlistInteractor.swift:54" in ctx.get("Data/W/Repo.swift:15", "")
+                and "WatchlistInteractor" not in ctx.get("Data/W/Repo.swift:30", "x WatchlistInteractor")), [str(s_), str(ctx)]
+
+    @reg
+    def section_cross_file_without_label_file_unverified():
+        # 보존(절 형태): 절 어디에도 라벨 파일 인용이 없으면 What 안 교차 파일 매핑은 여전히 미검증
+        labs = {"issues": [{"id": "I1", "axis": "architecture", "severity": "major", "file": "App/W/WatchlistInteractor.swift",
+                            "line_start": 54, "line_end": 54}]}
+        files = ["App/W/WatchlistInteractor.swift", "Data/W/Repo.swift", "App/W/Other.swift"]
+        t = ["### [major] M1\n\n| File:line | Origin |\n|---|---|\n| `App/W/Other.swift:3` | regression |\n\n"
+             "**What** — 같은 요청을 감싼 `Data/W/Repo.swift:15` 가 이미 있다.\n\n<!-- fz-review:M2 -->"]
+        v = {"App/W/Other.swift:3": {"real": False, "label_ids": []},
+             "Data/W/Repo.swift:15": {"real": True, "label_ids": ["I1"]}}
+        s_ = score_review(labs, t, v, files)
+        return s_["verified"] is False and s_["unverified"] == 1, [str(s_)]
 
     @reg
     def stale_scorer_unrun():
