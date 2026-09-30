@@ -73,11 +73,13 @@ WALL_XCHECK_PCT = 5.0   # wall_workflow 두 자의 허용 차이
 MTIME_TOL_S = 5.0       # 최종 산출물 기록 이벤트 ↔ 파일 mtime 허용 차이
 PHASES = ("baseline", "release-smoke", "change")
 INSTRUMENTS = ("ab_ledger.py", "fz_wf_metrics.py", "freeze_baseline.py")
-# ⛔ 구현한 기준만 판정한다. 나머지(SC-1·SC-2·SC-8·AC-2·AC-3·AC-6)는 **exit 2** — 받고 무시하면 그것이 AC-5 의
-#    '빠른 성공'이다. S25 · S26 에서 SC-5 · AC-4 · blind-labels · gpt-wf-wall · critical-path 를 더했다. 남은 구현 스텝: S27.
+# ⛔ 구현한 기준만 판정한다. 나머지(SC-8·AC-6)는 **exit 2** — 받고 무시하면 그것이 AC-5 의 '빠른 성공'이다.
+#    S25 · S26 에서 SC-5 · AC-4 · blind-labels · gpt-wf-wall · critical-path 를 더했다. S27 의 SC-1 · SC-2 · AC-2 · AC-3 은
+#    run 행이 아니라 gpt-pass 행(런처 첫 패스)을 판정한다 — `GPT_PASS_CRIT` · judge_gpt(run 기준과 섞지 않는다).
 IMPLEMENTED = ("SC-3", "SC-3-smoke", "SC-4", "SC-5", "SC-6", "SC-7", "AC-1", "AC-4", "AC-5", "AC-7", "crossover-order", "input-hash",
                "blind-labels", "gpt-wf-wall", "critical-path")
 SOURCE_KINDS = ("transcript", "wf-metrics", "start-state", "input-hash", "instrument-sha")
+GPT_PASS_CRIT = ("SC-1", "SC-2", "AC-2", "AC-3")
 
 
 # ── 공통 ────────────────────────────────────────────────────────────────
@@ -2143,6 +2145,9 @@ def judge_rows(runs, scores, opts, source_check=None):
     """→ (exit, 출력 줄). source_check(row) → 원천 대조 무효 사유(없으면 생략)."""
     out = []
     req = opts["require"]
+    gp = [x for x in req if x in GPT_PASS_CRIT]
+    if gp:
+        return UNRUN, [f"UNRUN: {gp} 는 gpt-pass 행 기준이다 — `judge --require {','.join(gp)} --envs …` 로 따로 부른다(run 판정과 섞지 않는다)"]
     unknown = [x for x in req if x not in IMPLEMENTED and x != "baseline-runs"]
     if unknown:
         return UNRUN, [f"UNRUN: 미구현 기준 {unknown} — 구현 스텝(S25~S27)에서 추가한다. ⛔ 받고 무시하지 않는다"]
@@ -2502,6 +2507,22 @@ def cmd_judge(a):
     elif not req:
         print("UNRUN: --require 없음 — 무엇을 판정할지 정하지 않았다")
         return UNRUN
+    s27 = [x for x in req if x in GPT_PASS_CRIT]
+    if s27:
+        if len(s27) != len(req):
+            print(f"UNRUN: S27 기준 {s27} 은 run 기준과 섞지 않는다 — 따로 부른다")
+            return UNRUN
+        try:
+            gpts = load_gpt(a.ledger)
+        except (OSError, ValueError) as e:
+            print(f"UNRUN: 원장을 읽지 못했다 — {e}")
+            return UNRUN
+        envs = [e for e in (a.envs or "").split(",") if e]
+        rc, lines = judge_gpt(gpts, req, envs, a.fixtures_root)
+        for x in lines:
+            print(x)
+        print(f"judge: {('PASS', 'FAIL', 'UNRUN')[rc]} (gpt-pass · require={','.join(req)} · envs={','.join(envs) or '-'})")
+        return rc
     opts = {"model": a.model, "effort": a.effort, "phase": a.phase, "arm": a.arm, "release": a.release,
             "workflows": wfs, "min_runs": a.min_runs, "runs": a.runs, "plugin_sha": a.plugin_sha,
             "require": req, "envs": a.envs, "options_on": a.options_on, "require_passed": a.require_passed}
@@ -2528,9 +2549,492 @@ def cmd_show(a):
     return PASS
 
 
+# ── S27 — GPT 첫 패스 독립성 · 이식성 (gpt-pass 행) ─────────────────────────────────────────
+# ⛔ run 행(Claude Lead 측정)과 판정 경로를 섞지 않는다. 원천 = 런처 한 호출분 `<stem>.json` · `.audit.json` · `.rollouts/`.
+#    판정 규칙 정본은 측정 노트 §17(실행 전 등록) — 여기 식이 그 문장을 코드로 옮긴 것이다.
+GPT_BAD_INPUT_RE = re.compile(r"^(code-context.*|plan-v\d.*|plan-final.*|.*workflow-result.*|.*-result\.json|review-report\.md"
+                              r"|pr-comments\.md|payload\.json|render-preview\.json|self-review\.md|triage\.md)$")   # 런처 사전 검사와 같은 식
+GPT_MARKER_RE = re.compile(r"\[fz-gpt-skill-injected\] (fz-[a-z0-9-]+) \(([^)\n]+)\)")
+GPT_CMD_STR_RE = re.compile(r"""\bcmd\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)""")
+GPT_SKILL_REF_RE = re.compile(r"[~$\w{}./-]*skills/fz-[a-z0-9-]+/[\w./-]*")
+IOS_VOCAB_RE = re.compile(r"\bRIBs?\b|SwiftUI|UIKit|@StateObject|@ObservedObject|ViewController|\bInteractor\b|\bRouter\b|\bBuilder\b")
+RULE_FIXTURES = {"nonios": "review-nonios", "absent": "rules-absent", "conflict": "rules-conflict"}
+LABEL_TO_RULE_AXIS = {"ui_structure": "uiStack", "architecture": "architecturePattern"}   # labels.conflicts 축 → projectRules 축
+SEV_RANK = {"suggestion": 0, "minor": 1, "major": 2, "critical": 3}
+EVIDENCE_KINDS = ("session-log", "input-hash", "gpt-skills-only", "marker", "no-claude-artifacts", "rules-compare")
+
+
+def _sha_file(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def tree_hash(d):
+    """폴더 안 파일 전부의 (상대 경로, 내용 해시) → 한 해시. 없는 폴더는 None."""
+    if not d or not os.path.isdir(d):
+        return None
+    h = hashlib.sha256()
+    for p in sorted(pathlib.Path(d).rglob("*")):
+        if p.is_file() and p.name != ".DS_Store":
+            h.update(f"{p.relative_to(d)}\0{_sha_file(p)}\n".encode())
+    return h.hexdigest()
+
+
+def _js_unquote(tok):
+    if tok[0] == '"':
+        try:
+            return json.loads(tok)
+        except ValueError:
+            return tok[1:-1]
+    return tok[1:-1].replace("\\" + tok[0], tok[0]).replace("\\\\", "\\")
+
+
+def scan_gpt_rollouts(rdir):
+    """런처 `<stem>.rollouts/` 의 세션 jsonl 전부 → 주입 마커 · 주입 본문 · 실행 명령 · host 스킬 목록 · 스킬 루트.
+    ⛔ session_meta 의 계정 식별자(creator_*)는 읽지도 싣지도 않는다 — 판정에 쓰지 않고 원장에 남기면 안 되는 값이다."""
+    files = sorted(pathlib.Path(rdir).rglob("*.jsonl")) if rdir and os.path.isdir(rdir) else []
+    out = {"files": [str(f) for f in files], "markers": [], "bodies": {}, "cmds": [], "host_skills": [], "skill_roots": [],
+           "spawn": 0, "turn_contexts": 0}
+    for f in files:
+        with open(f, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                try:
+                    r = json.loads(ln)
+                except ValueError:
+                    continue
+                typ, p = r.get("type"), r.get("payload") or {}
+                if typ == "turn_context":
+                    out["turn_contexts"] += 1
+                elif typ == "world_state":
+                    body = ((((p.get("state") or {}) if isinstance(p.get("state"), dict) else {}).get("host_skills") or {})
+                            .get("body") or "")
+                    out["host_skills"] += re.findall(r"^- ([A-Za-z0-9_.:-]+):", body, re.M)
+                    out["skill_roots"] += re.findall(r"^- `r\d+` = `([^`]+)`", body, re.M)
+                elif typ == "response_item" and p.get("type") == "message":
+                    for c in p.get("content") or []:
+                        t = c.get("text") if isinstance(c, dict) else None
+                        if t and "[fz-gpt-skill-injected]" in t:
+                            m = GPT_MARKER_RE.search(t)
+                            if m:
+                                out["markers"].append({"skill": m.group(1), "path": m.group(2), "role": p.get("role")})
+                                rest = t[t.index("[fz-gpt-skill-injected]"):].split("\n", 1)
+                                out["bodies"].setdefault(m.group(1), rest[1] if len(rest) > 1 else "")
+                elif typ == "response_item" and p.get("type") in ("custom_tool_call", "function_call", "local_shell_call"):
+                    if p.get("name") == "spawn_agent":
+                        out["spawn"] += 1
+                    raw = p.get("input") if p.get("input") is not None else (p.get("arguments") or p.get("action") or "")
+                    raw = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
+                    got = [_js_unquote(x) for x in GPT_CMD_STR_RE.findall(raw)]
+                    if not got:
+                        try:
+                            j = json.loads(raw)
+                        except ValueError:
+                            j = None
+                        c = (j.get("cmd") or j.get("command")) if isinstance(j, dict) else None
+                        got = [" ".join(map(str, c)) if isinstance(c, list) else str(c)] if c else []
+                    out["cmds"] += got
+    out["host_skills"] = sorted(set(out["host_skills"]))
+    out["skill_roots"] = sorted(set(out["skill_roots"]))
+    return out
+
+
+def classify_skill_refs(scan, tree_root):
+    """명령이 가리킨 스킬 파일 경로 · host 스킬 목록 → 격리 홈 밖 참조 · Claude 스킬 노출."""
+    iso_roots = sorted({m["path"].split("/gpt-home/skills/")[0] + "/gpt-home/skills"
+                        for m in scan["markers"] if "/gpt-home/skills/" in m["path"]})
+    names = lambda sub: sorted(n for n in os.listdir(os.path.join(tree_root, sub))
+                               if os.path.isdir(os.path.join(tree_root, sub, n))) if os.path.isdir(os.path.join(tree_root, sub)) else []
+    claude_names, gpt_names = set(names("skills")), set(names("gpt-skills"))
+    refs = sorted({m.group(0) for c in scan["cmds"] for m in GPT_SKILL_REF_RE.finditer(c)})
+    bad = []
+    for r in refs:
+        if any(r.startswith(x + "/") for x in iso_roots) or re.match(r"\$\{?CODEX_HOME\}?/skills/", r):
+            continue       # 격리 홈 사본 — 런처 안에서 CODEX_HOME 은 격리 홈이다
+        if re.search(r"(^|/)\.codex/skills/", r) or r.startswith(("~/", "$HOME/", "${HOME}/")):
+            bad.append(f"실제 GPT 홈 경로 {r}")
+        elif "/gpt-home/skills/" in r:
+            bad.append(f"다른 격리 홈 {r}")
+        elif re.search(r"(^|/)skills/fz-[a-z0-9-]+/", r) and not re.search(r"(^|/)gpt-skills/", r):
+            bad.append(f"Claude 스킬 폴더 {r}")
+    claude_listed = sorted(n for n in scan["host_skills"] if n in claude_names and n not in gpt_names)
+    return {"iso_roots": iso_roots, "refs": refs, "bad": bad, "claude_listed": claude_listed}
+
+
+def _body_matches(tree_root, skill, body):
+    try:
+        with open(os.path.join(tree_root, "gpt-skills", skill, "SKILL.md"), encoding="utf-8") as fh:
+            return fh.read().strip() in body
+    except OSError:
+        return False
+
+
+def summarize_gpt_output(doc, mode):
+    """첫 패스 출력(스키마 JSON) → 판정에 쓰는 필드만."""
+    doc = doc if isinstance(doc, dict) else {}
+    pr = doc.get("projectRules") or {}
+    rules = [{"id": x.get("id"), "axis": x.get("axis"), "file": (x.get("source") or {}).get("file")}
+             for x in pr.get("rules") or [] if isinstance(x, dict)]
+    conflicts = [{"axis": x.get("axis"), "sources": x.get("sources")} for x in pr.get("conflicts") or [] if isinstance(x, dict)]
+    items = []
+    for kind in ("issues", "craft"):
+        for x in doc.get(kind) or []:
+            if isinstance(x, dict):
+                items.append({"kind": kind, "id": x.get("id"), "ruleSource": x.get("ruleSource"), "ruleRef": x.get("ruleRef"),
+                              "severity": x.get("severity"), "craftAxis": x.get("craftAxis"), "file": x.get("file"),
+                              "text": f"{x.get('title') or ''} {x.get('detail') or ''}"[:600]})
+    cov = {x.get("axis"): x.get("status") for x in doc.get("axis_coverage") or [] if isinstance(x, dict)}
+    return {"mode": mode, "status": doc.get("status") or doc.get("verdict"), "rules": rules, "conflicts": conflicts,
+            "gaps": list(pr.get("gaps") or []), "items": items, "axis_coverage": cov}
+
+
+def rules_compare(summ, lead):
+    """GPT 추출(projectRules) vs Lead 추출(규칙 레코드 · check_project_rules 통과본) — 기록용(합격 조건 아님)."""
+    key = lambda axis, f: [str(axis), str(f)]
+    g = {tuple(key(r.get("axis"), r.get("file"))) for r in summ.get("rules") or []}
+    lr = [r for r in (lead or {}).get("rules") or [] if isinstance(r, dict)]
+    l_ = {tuple(key(r.get("axis"), (r.get("source") or {}).get("file"))) for r in lr}
+    return {"both": len(g & l_), "gpt_only": sorted(list(x) for x in g - l_), "lead_only": sorted(list(x) for x in l_ - g),
+            "conflict_axes": {"gpt": sorted({str(c.get("axis")) for c in summ.get("conflicts") or []}),
+                              "lead": sorted({str(c.get("axis")) for c in (lead or {}).get("conflicts") or [] if isinstance(c, dict)})}}
+
+
+def build_gpt_row(args, tree_root=None):
+    """collect-gpt 인자(dict) → gpt-pass 행. verify-evidence 가 같은 인자로 다시 부른다(두 번째 자)."""
+    tree = tree_root or os.path.dirname(SCRIPT_DIR)
+    out = args["out"]
+    stem = out[:-len(".json")] if out.endswith(".json") else out
+    audit = read_json(stem + ".audit.json")
+    doc = read_json(out) if os.path.isfile(out) else None
+    scan = scan_gpt_rollouts(stem + ".rollouts")
+    cls = classify_skill_refs(scan, tree)
+    inputs = audit.get("inputs") or {}
+    given = dict(args.get("inputs") or {})
+    hash_ok = {n: (os.path.isfile(p) and _sha_file(p) == inputs.get(n)) for n, p in given.items()}
+    plugin_root = os.path.realpath(args["plugin_root"])
+    summ = summarize_gpt_output(doc, args["mode"]) if doc is not None else None
+    lead = read_json(args["lead_rules"]) if args.get("lead_rules") else None
+    return {"type": "gpt-pass", "schema": 1, "run_id": args["run_id"], "env": args["env"], "mode": args["mode"],
+            "fixture": args["fixture"], "plugin_root": plugin_root, "instrument_sha": instrument_sha(),
+            "skills": {"tree_hash": tree_hash(os.path.join(tree, "gpt-skills")),
+                       "plugin_hash": tree_hash(os.path.join(plugin_root, "gpt-skills")),
+                       "body_matches_tree": {sk: _body_matches(tree, sk, b) for sk, b in scan["bodies"].items()}},
+            "audit": dict({k: audit.get(k) for k in ("mode", "exit", "note", "timedOut", "isolationApplied", "spawnAgent",
+                                                       "toolCalls", "rollouts", "turnContexts", "wrapperExit")},
+                          hits=len(audit.get("hits") or [])),
+            "inputs": {"names": sorted(inputs), "claude_named": sorted(n for n in inputs if GPT_BAD_INPUT_RE.match(n)),
+                       "given": sorted(given), "hash_ok": hash_ok},
+            "scan": {"rollout_files": len(scan["files"]), "markers": scan["markers"], "host_skills": scan["host_skills"],
+                     "skill_roots": scan["skill_roots"], "refs": cls["refs"], "bad_refs": cls["bad"],
+                     "claude_listed": cls["claude_listed"], "spawn": scan["spawn"], "cmd_count": len(scan["cmds"]),
+                     "turn_contexts": scan["turn_contexts"]},
+            "output": summ,
+            "rules_compare": rules_compare(summ, lead) if (summ is not None and lead is not None) else None,
+            "collect_args": dict(args)}
+
+
+def gpt_sc1_problems(g):
+    """SC-1 · AC-2 셀 조건(노트 §17 ①~⑤) — 행 하나의 위반 목록. (종류, 문장) — 종류 AC-2 는 Claude 쪽 유입."""
+    au, sc, sk, ip = g.get("audit") or {}, g.get("scan") or {}, g.get("skills") or {}, g.get("inputs") or {}
+    p = []
+    if au.get("exit") != 0:
+        p.append(("SC-1", f"감사 exit {au.get('exit')} ({au.get('note')})"))
+    if au.get("timedOut"):
+        p.append(("SC-1", "시간 초과"))
+    if not au.get("isolationApplied"):
+        p.append(("SC-1", "격리 미적용"))
+    if au.get("hits"):
+        p.append(("AC-2", f"rollout 금지 참조 {au['hits']}건(Claude 산출물)"))
+    if (sc.get("spawn") or au.get("spawnAgent") or 0) and not (g.get("collect_args") or {}).get("gpt_agents"):
+        p.append(("SC-1", f"하위 에이전트 spawn {sc.get('spawn') or au.get('spawnAgent')}"))
+    if not sc.get("rollout_files"):
+        p.append(("SC-1", "rollout 없음"))
+    mk = sc.get("markers") or []
+    if not mk:
+        p.append(("SC-1", "주입 마커 없음"))
+    elif not all("/gpt-home/skills/" in m["path"] for m in mk):
+        p.append(("SC-1", "마커 경로가 격리 홈 밖"))
+    for b in sc.get("bad_refs") or []:
+        p.append(("AC-2" if b.startswith("Claude") else "SC-1", f"격리 홈 밖 스킬 참조 — {b}"))
+    if sc.get("claude_listed"):
+        p.append(("AC-2", f"Claude 스킬이 GPT 스킬 목록에 {sc['claude_listed']}"))
+    bm = sk.get("body_matches_tree") or {}
+    if not bm or not all(bm.values()):
+        p.append(("SC-1", f"주입 본문 ≠ 검증 트리 gpt-skills {bm}"))
+    if not sk.get("tree_hash") or sk.get("plugin_hash") != sk.get("tree_hash"):
+        p.append(("SC-1", "런처 PLUGIN_ROOT 의 gpt-skills ≠ 검증 트리"))
+    if ip.get("claude_named"):
+        p.append(("AC-2", f"Claude 산출물 이름 입력 {ip['claude_named']}"))
+    bad_hash = sorted(n for n, ok in (ip.get("hash_ok") or {}).items() if not ok)
+    if bad_hash:
+        p.append(("SC-1", f"입력 해시 불일치 {bad_hash}"))
+    return p
+
+
+def _index_sections(index):
+    return [s for s in (index or {}).get("sections") or [] if isinstance(s, dict)]
+
+
+def _ref_in_section(ref, src, sections):
+    """ruleRef 가 상충 절(`CLAUDE.md#Naming`)을 가리키는가 — 절 이름 또는 그 절의 줄 범위 안 줄 번호."""
+    if not ref or "#" not in src:
+        return False
+    f, head = src.split("#", 1)
+    if f not in ref:
+        return False
+    if head.lower() in ref.lower():
+        return True
+    m = re.search(re.escape(f) + r"[:#L ]+L?(\d+)", ref)
+    if not m:
+        return False
+    n = int(m.group(1))
+    return any(s.get("file") == f and (s.get("heading") or "").lower().startswith(head.lower())
+               and (s.get("line") or 0) <= n <= (s.get("endLine") or s.get("line") or 0) for s in sections)
+
+
+def gpt_sc2_problems(g, labels, index):
+    """SC-2 · AC-3(노트 §17 규칙 fixture 절) → (위반 [(종류, 문장)], Probe Coverage Gap 문장)."""
+    o = g.get("output") or {}
+    items = o.get("items") or []
+    fx = g.get("fixture")
+    probs, gaps = [], []
+    ids = lambda xs: [x.get("id") for x in xs]
+    proj = [x for x in items if x.get("ruleSource") == "project"]
+    pdef = [x for x in items if x.get("ruleSource") == "plugin-default"
+            and SEV_RANK.get(x.get("severity"), 9) > SEV_RANK["suggestion"]]
+    if pdef:
+        probs.append(("AC-3", f"plugin-default 인데 severity > suggestion {ids(pdef)}"))
+    if fx == "rules-absent":
+        if o.get("rules"):
+            probs.append(("SC-2", f"지침 파일이 없는데 projectRules.rules {len(o['rules'])}건"))
+        if o.get("conflicts"):
+            probs.append(("SC-2", f"지침 파일이 없는데 conflicts {len(o['conflicts'])}건"))
+        if proj:
+            probs.append(("SC-2", f"없는 규칙의 추정 적용(ruleSource=project) {ids(proj)}"))
+    elif fx == "rules-conflict":
+        want = {LABEL_TO_RULE_AXIS.get(c.get("axis"), c.get("axis")) for c in labels.get("conflicts") or []}
+        got = {c.get("axis") for c in o.get("conflicts") or []}
+        if want - got:
+            probs.append(("SC-2", f"상충 축 미표시 {sorted(want - got)}(표시 {sorted(got)})"))
+        secs = [s for c in labels.get("conflicts") or [] for s in c.get("sources") or []]
+        picks = [x for x in proj if any(_ref_in_section(x.get("ruleRef"), s, _index_sections(index)) for s in secs)]
+        if picks:
+            probs.append(("SC-2", f"상충 규칙 임의 선택(ruleRef 가 상충 절) {ids(picks)}"))
+        targets = {c.get("target") for c in labels.get("conflicts") or []}
+        vague = [x for x in proj if x.get("file") in targets and not x.get("ruleRef")]
+        if vague:
+            gaps.append(f"상충 대상 파일에 ruleRef 없는 project 인용 {ids(vague)}(어느 절인지 판정 불가)")
+    elif fx == "review-nonios":
+        files = list(labels.get("guidelines") or [])
+        outside = [x for x in proj if x.get("kind") == "craft" and not (x.get("ruleRef") and any(f in x["ruleRef"] for f in files))]
+        if outside:
+            probs.append(("SC-2", f"지침({files}) 밖 규칙 인용 {ids(outside)}"))
+        na = set(labels.get("not_applicable_axes") or [])
+        na_items = [x for x in items if x.get("craftAxis") in na]
+        if na_items:
+            probs.append(("AC-3", f"해당 없음 축 craft {sorted(na)} {ids(na_items)}"))
+        found = sorted(a for a in na if (o.get("axis_coverage") or {}).get(a) == "found")
+        if found:
+            probs.append(("AC-3", f"axis_coverage 해당 없음 축이 found {found}"))
+        ios = [x for x in items if IOS_VOCAB_RE.search(x.get("text") or "")]
+        if ios:
+            probs.append(("AC-3", f"비-iOS 저장소에 iOS 도메인 어휘 {ids(ios)}"))
+    issue_proj = [x for x in proj if x.get("kind") == "issues"]
+    if issue_proj and fx != "rules-absent":
+        gaps.append(f"issues 의 ruleSource=project {ids(issue_proj)} — 스키마에 ruleRef 가 없어 출처 판정 불가")
+    return probs, gaps
+
+
+def load_gpt(ledger):
+    """→ gpt-pass 행 {run_id: 마지막 행}."""
+    evs, bad = iter_jsonl(ledger)
+    if bad:
+        raise ValueError(f"원장 파싱 불가 줄 {bad}")
+    return {r["run_id"]: r for r in evs if r.get("type") == "gpt-pass"}
+
+
+def _fixture_docs(fixtures_root, fx):
+    d = os.path.join(fixtures_root, fx)
+    lab = read_json(os.path.join(d, "labels.json")) if os.path.isfile(os.path.join(d, "labels.json")) else {}
+    idx = read_json(os.path.join(d, "expected-index.json")) if os.path.isfile(os.path.join(d, "expected-index.json")) else {}
+    return lab, idx
+
+
+def judge_gpt(gpts, req, envs, fixtures_root):
+    """SC-1 · AC-2(매트릭스 셀) · SC-2 · AC-3(규칙 fixture) → (exit, 줄)."""
+    out, worst = [], PASS
+
+    def bump(rc):
+        nonlocal worst
+        worst = max(worst, rc)
+    rows = sorted(gpts.values(), key=lambda g: g["run_id"])
+    rule_fx = set(RULE_FIXTURES.values())
+    if {"SC-1", "AC-2"} & set(req):
+        if not envs:
+            return UNRUN, ["UNRUN: SC-1 · AC-2 는 --envs(예: isolated,installed)가 필요하다 — 매트릭스를 정하지 않으면 한 환경만 보고 통과한다"]
+        ac2 = []
+        for env in envs:
+            for mode in ("plan", "review"):
+                cell = [g for g in rows if g.get("env") == env and g.get("mode") == mode and g.get("fixture") not in rule_fx]
+                label = f"{env}×{mode}"
+                if not cell:
+                    out.append(f"UNRUN SC-1 [{label}]: gpt-pass 행 없음 — collect-gpt 로 첫 패스 산출을 싣는다")
+                    bump(UNRUN)
+                    continue
+                probs = {g["run_id"]: gpt_sc1_problems(g) for g in cell}
+                ac2 += [f"{k}: {t}" for k, ps in probs.items() for c, t in ps if c == "AC-2"]
+                bad = {k: [t for c, t in ps if c == "SC-1"] for k, ps in probs.items()}
+                bad = {k: v for k, v in bad.items() if v}
+                if "SC-1" in req:
+                    good = not bad and not any(c == "AC-2" for ps in probs.values() for c, _ in ps)
+                    bump(PASS if good else FAIL)
+                    out.append(f"{'PASS' if good else 'FAIL'} SC-1 [{label}]: " + (" | ".join(
+                        f"{k} — {'; '.join(v)}" for k, v in bad.items()) if bad else
+                        f"{len(cell)} 행 · 감사 exit 0 · 격리 · hits 0 · 마커 · 격리 홈 사본 · 주입 본문 = 트리 gpt-skills — "
+                        + ", ".join(sorted(probs))))
+        if "AC-2" in req:
+            bump(FAIL if ac2 else PASS)
+            out.append(f"{'FAIL' if ac2 else 'PASS'} AC-2: " + (" | ".join(ac2) if ac2 else
+                       "Claude 스킬 노출 · 참조 0 · Claude 산출물 입력 · 참조 0"))
+    if {"SC-2", "AC-3"} & set(req):
+        for short, fx in RULE_FIXTURES.items():
+            cell = [g for g in rows if g.get("fixture") == fx and g.get("mode") == "review"]
+            if not cell:
+                out.append(f"UNRUN SC-2 [{fx}]: gpt-pass 행 없음 — 규칙 fixture 의 review 첫 패스를 싣는다")
+                bump(UNRUN)
+                continue
+            lab, idx = _fixture_docs(fixtures_root, fx)
+            for g in cell:
+                if g.get("output") is None:
+                    out.append(f"UNRUN SC-2 [{fx}] {g['run_id']}: 출력 없음(스키마 JSON 을 읽지 못했다)")
+                    bump(UNRUN)
+                    continue
+                probs, gaps = gpt_sc2_problems(g, lab, idx)
+                for crit in ("SC-2", "AC-3"):
+                    if crit not in req:
+                        continue
+                    mine = [t for c, t in probs if c == crit]
+                    bump(FAIL if mine else PASS)
+                    out.append(f"{'FAIL' if mine else 'PASS'} {crit} [{fx}] {g['run_id']}: "
+                               + ("; ".join(mine) if mine else "위반 0"))
+                for x in gaps:
+                    out.append(f"  Probe Coverage Gap [{fx}] {g['run_id']}: {x}")
+                rc_ = g.get("rules_compare")
+                if rc_ is not None:
+                    out.append(f"  rules-compare [{fx}] {g['run_id']}: 일치 {rc_['both']} · GPT 만 {len(rc_['gpt_only'])} · "
+                               f"Lead 만 {len(rc_['lead_only'])} · 상충 축 GPT {rc_['conflict_axes']['gpt']} / Lead {rc_['conflict_axes']['lead']}")
+    return worst, out
+
+
+def verify_gpt_row(g, kinds, tree_root=None):
+    """두 번째 자 — 행의 원천(감사 · rollout · 입력 · 출력)을 다시 읽어 행과 대조한다. → 어긋남 목록."""
+    try:
+        fresh = build_gpt_row(g.get("collect_args") or {}, tree_root)
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        return [f"원천을 다시 읽지 못했다 — {e}"]
+    bad = []
+    same = lambda k: json.dumps(fresh.get(k), sort_keys=True, ensure_ascii=False) == json.dumps(g.get(k), sort_keys=True, ensure_ascii=False)
+    if "session-log" in kinds:
+        if not (fresh["scan"]["rollout_files"] and same("scan")):
+            bad.append("session-log: rollout 이 없거나 재스캔 결과가 행과 다르다")
+    if "input-hash" in kinds:
+        if not fresh["inputs"]["hash_ok"] or not all(fresh["inputs"]["hash_ok"].values()) or not same("inputs"):
+            bad.append(f"input-hash: 입력 재해시 불일치 {fresh['inputs']['hash_ok']}")
+    if "gpt-skills-only" in kinds:
+        sk = fresh["skills"]
+        if (fresh["scan"]["bad_refs"] or fresh["scan"]["claude_listed"] or not sk["body_matches_tree"]
+                or not all(sk["body_matches_tree"].values()) or sk["plugin_hash"] != sk["tree_hash"] or not same("skills")):
+            bad.append("gpt-skills-only: 격리 홈 밖 참조 · Claude 스킬 노출 · 주입 본문 · 스킬 해시 중 어긋남")
+    if "marker" in kinds:
+        mk = fresh["scan"]["markers"]
+        if not mk or not all("/gpt-home/skills/" in m["path"] for m in mk):
+            bad.append("marker: 주입 마커가 없거나 격리 홈 밖")
+    if "no-claude-artifacts" in kinds:
+        if fresh["audit"]["hits"] or fresh["inputs"]["claude_named"] or not same("audit"):
+            bad.append(f"no-claude-artifacts: 감사 hits {fresh['audit']['hits']} · 이름 {fresh['inputs']['claude_named']}")
+    if "rules-compare" in kinds and g.get("fixture") in RULE_FIXTURES.values():
+        if fresh.get("rules_compare") is None or not same("rules_compare"):
+            bad.append("rules-compare: 비교 기록이 없거나 원천과 다르다")
+    return bad
+
+
+def cmd_collect_gpt(a):
+    inputs = {}
+    for x in a.input or []:
+        if "=" not in x:
+            print(f"UNRUN: --input 은 이름=경로 — 받은 값 {x}")
+            return UNRUN
+        n, pth = x.split("=", 1)
+        inputs[n] = os.path.abspath(pth)
+    args = {"out": os.path.abspath(a.out), "run_id": a.run_id, "env": a.env, "mode": a.mode, "fixture": a.fixture,
+            "plugin_root": os.path.abspath(a.plugin_root), "inputs": inputs,
+            "lead_rules": os.path.abspath(a.lead_rules) if a.lead_rules else None, "gpt_agents": bool(a.gpt_agents)}
+    try:
+        row = build_gpt_row(args)
+    except (OSError, ValueError) as e:
+        print(f"UNRUN: 원천을 읽지 못했다 — {e}")
+        return UNRUN
+    append(a.ledger, row)
+    pr = gpt_sc1_problems(row)
+    print(f"collect-gpt {row['run_id']}: env={row['env']} mode={row['mode']} fixture={row['fixture']} · 감사 exit {row['audit']['exit']} · "
+          f"마커 {len(row['scan']['markers'])} · 스킬 참조 {len(row['scan']['refs'])}(밖 {len(row['scan']['bad_refs'])}) · "
+          f"host 스킬 {row['scan']['host_skills']} · SC-1 문제 {len(pr)}")
+    return PASS
+
+
 def cmd_verify_evidence(a):
-    print("UNRUN: verify-evidence 미구현 — S27(독립성·이식성 판정)에서 구현한다. ⛔ 통과로 읽지 않는다")
-    return UNRUN
+    """S27 CHECK 두 번째 자 — 매트릭스 · 규칙 fixture 범위 확인 + 행마다 원천 재판독."""
+    try:
+        gpts = load_gpt(a.ledger)
+    except (OSError, ValueError) as e:
+        print(f"UNRUN: 원장을 읽지 못했다 — {e}")
+        return UNRUN
+    kinds = [k for k in (a.require or "").split(",") if k]
+    unknown = [k for k in kinds if k not in EVIDENCE_KINDS]
+    if not kinds or unknown:
+        print(f"UNRUN: --require 는 {EVIDENCE_KINDS} 중에서 — 받은 값 {kinds}")
+        return UNRUN
+    envs = [e for e in (a.envs or "").split(",") if e]
+    cells = []
+    if a.matrix:
+        m = re.fullmatch(r"([a-z,]+):x:([a-z,]+)", a.matrix)
+        if not m:
+            print(f"UNRUN: --matrix 형식은 env1,env2:x:mode1,mode2 — 받은 값 {a.matrix}")
+            return UNRUN
+        cells = [(e, md) for e in m.group(1).split(",") for md in m.group(2).split(",")]
+    if envs and cells and sorted({e for e, _ in cells}) != sorted(envs):
+        print(f"UNRUN: --envs {envs} 와 --matrix 환경이 다르다")
+        return UNRUN
+    rfx = [x for x in (a.rule_fixtures or "").split(",") if x]
+    miss = [x for x in rfx if x not in RULE_FIXTURES]
+    if miss:
+        print(f"UNRUN: 모르는 --rule-fixtures {miss} (허용 {sorted(RULE_FIXTURES)})")
+        return UNRUN
+    rc, rows = PASS, sorted(gpts.values(), key=lambda g: g["run_id"])
+    scope = []
+    for e, md in cells:
+        cell = [g for g in rows if g.get("env") == e and g.get("mode") == md and g.get("fixture") not in RULE_FIXTURES.values()]
+        if not cell:
+            print(f"UNRUN 매트릭스 [{e}×{md}]: gpt-pass 행 없음")
+            rc = max(rc, UNRUN)
+        scope += cell
+    for x in rfx:
+        cell = [g for g in rows if g.get("fixture") == RULE_FIXTURES[x] and g.get("mode") == "review"]
+        if not cell:
+            print(f"UNRUN 규칙 fixture [{x}]: gpt-pass 행 없음")
+            rc = max(rc, UNRUN)
+        scope += cell
+    if not scope:
+        print("UNRUN: 대상 행 0 — 측정 실패를 먼저 의심한다")
+        return UNRUN
+    for g in scope:
+        bad = verify_gpt_row(g, kinds)
+        rc = max(rc, FAIL if bad else PASS)
+        print(f"{'FAIL' if bad else 'PASS'} verify-evidence {g['run_id']}: " + ("; ".join(bad) if bad else f"{','.join(kinds)} 재판독 일치"))
+    print(f"verify-evidence: {('PASS', 'FAIL', 'UNRUN')[rc]} (행 {len(scope)} · require={','.join(kinds)})")
+    return rc
 
 
 # ── self-test ──────────────────────────────────────────────────────────
@@ -2975,9 +3479,11 @@ def self_test(case=None):
     @reg
     def unimplemented_is_unrun():
         # ⛔ 아직 구현하지 않은 기준으로 잰다 — 구현된 기준은 입력 부족으로도 UNRUN 이 나와 이 사례를 헛되이 통과시킨다
-        a_rc, a = _judge(base(), require=["SC-1"])
+        a_rc, a = _judge(base(), require=["SC-8"])
         b_rc, b = _judge(base(), require=["SC-3"], envs="isolated,installed")
-        return (a_rc, b_rc) == (UNRUN, UNRUN) and any("미구현 기준 ['SC-1']" in x for x in a), a + b
+        c_rc, c = _judge(base(), require=["SC-1"])
+        return ((a_rc, b_rc, c_rc) == (UNRUN, UNRUN, UNRUN) and any("미구현 기준 ['SC-8']" in x for x in a)
+                and any("gpt-pass" in x for x in c)), a + b + c
 
     @reg
     def plugin_sha_baseline():
@@ -3246,6 +3752,121 @@ def self_test(case=None):
              "Data/W/Repo.swift:15": {"real": True, "label_ids": ["I1"]}}
         s_ = score_review(labs, t, v, files)
         return s_["verified"] is False and s_["unverified"] == 1, [str(s_)]
+
+    def _gpt_fixture(td, bad=False):
+        """가짜 검증 트리 + 런처 한 호출분(출력 · 감사 · rollout) → (collect 인자, 트리 루트)."""
+        tree = os.path.join(td, "tree")
+        os.makedirs(os.path.join(tree, "gpt-skills", "fz-reviewer"))
+        os.makedirs(os.path.join(tree, "skills", "fz-review"))
+        with open(os.path.join(tree, "gpt-skills", "fz-reviewer", "SKILL.md"), "w", encoding="utf-8") as fh:
+            fh.write("---\nname: fz-reviewer\n---\nBODY-OF-REVIEWER\n")
+        run = os.path.join(td, "run")
+        os.makedirs(os.path.join(run, "g.rollouts"))
+        with open(os.path.join(run, "diff.patch"), "w", encoding="utf-8") as fh:
+            fh.write("diff\n")
+        iso = "/private/tmp/fz-gpt-iso.T/gpt-home/skills"
+        with open(os.path.join(run, "g.audit.json"), "w", encoding="utf-8") as fh:
+            json.dump({"mode": "review", "exit": 0, "note": "ok", "timedOut": False, "isolationApplied": True, "spawnAgent": 0,
+                       "hits": [], "inputs": {"diff.patch": _sha_file(os.path.join(run, "diff.patch"))}}, fh)
+        with open(os.path.join(run, "g.json"), "w", encoding="utf-8") as fh:
+            json.dump({"verdict": "approved", "issues": [], "craft": [], "axis_coverage": [],
+                       "projectRules": {"rules": [], "conflicts": [], "gaps": []}}, fh)
+        skills = "fz-reviewer" + (", fz-review" if bad else "")
+        host = "\n## Skills\n### Skill roots\n- `r0` = `" + iso + "`\n### Available\n" + "".join(
+            f"- {n}: d (r0/{n}/SKILL.md)\n" for n in skills.split(", "))
+        cmds = [f'tools.exec_command({{cmd:"cat {iso}/fz-reviewer/references/domain-ios.md"}})']
+        if bad:
+            cmds.append('tools.exec_command({cmd:"cat ~/.codex/skills/fz-reviewer/SKILL.md"})')
+        _write_lines(os.path.join(run, "g.rollouts", "r.jsonl"), [
+            {"type": "session_meta", "payload": {"id": "s1", "creator_account_id": "ACCT-SECRET", "creator_user_id": "USER-SECRET"}},
+            {"type": "world_state", "payload": {"state": {"host_skills": {"body": host}}}},
+            {"type": "turn_context", "payload": {"model": "gpt-6-sol"}},
+            {"type": "response_item", "payload": {"type": "message", "role": "user", "content": [
+                {"type": "input_text", "text": f"[fz-gpt-skill-injected] fz-reviewer ({iso}/fz-reviewer) — 본문\n"
+                                               "---\nname: fz-reviewer\n---\nBODY-OF-REVIEWER\n"}]}},
+            *[{"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": c}} for c in cmds]])
+        args = {"out": os.path.join(run, "g.json"), "run_id": "t:isolated:review", "env": "isolated", "mode": "review",
+                "fixture": "review-ios-ribs", "plugin_root": tree, "inputs": {"diff.patch": os.path.join(run, "diff.patch")},
+                "lead_rules": None, "gpt_agents": False}
+        return args, tree
+
+    @reg
+    def gpt_pass_scan_and_sc1():
+        # ⛔ S27 — 격리 홈 사본만 읽고 주입 본문 = 검증 트리면 SC-1 문제 0 · 실제 GPT 홈 경로 · Claude 스킬 노출은 잡는다 · 계정 식별자는 싣지 않는다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            args, tree = _gpt_fixture(os.path.join(td, "ok"))
+            row = build_gpt_row(args, tree)
+            ok_p = gpt_sc1_problems(row)
+            args2, tree2 = _gpt_fixture(os.path.join(td, "bad"), bad=True)
+            row2 = build_gpt_row(args2, tree2)
+            bad_p = gpt_sc1_problems(row2)
+            blob = json.dumps([row, row2], ensure_ascii=False)
+            return (ok_p == [] and any(c == "SC-1" and "실제 GPT 홈 경로" in t for c, t in bad_p)
+                    and any(c == "AC-2" and "fz-review" in t for c, t in bad_p)
+                    and "ACCT-SECRET" not in blob and "USER-SECRET" not in blob), [str(ok_p), str(bad_p)]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def gpt_matrix_cell_missing_unrun():
+        # 매트릭스 한 칸이라도 비면 UNRUN — 한 환경만 보고 통과하지 않는다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            args, tree = _gpt_fixture(td)
+            rows = {}
+            for mode in ("plan", "review"):
+                r = build_gpt_row(dict(args, mode=mode, run_id=f"t:isolated:{mode}"), tree)
+                rows[r["run_id"]] = r
+            rc, out = judge_gpt(rows, ["SC-1", "AC-2"], ["isolated", "installed"], td)
+            rc_one, out_one = judge_gpt(rows, ["SC-1", "AC-2"], ["isolated"], td)
+            return (rc == UNRUN and any("installed×plan" in x for x in out) and rc_one == PASS), out + out_one
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def gpt_rule_fixtures_sc2_ac3():
+        # 규칙 fixture 3개 — 없는 규칙 추정 적용 · 상충 임의 선택 · 비-iOS 에 iOS 어휘는 잡고 깨끗한 출력은 통과
+        labs = {"rules-conflict": {"conflicts": [{"id": "K1", "axis": "naming", "sources": ["CLAUDE.md#Naming", "AGENTS.md#Naming"],
+                                                   "target": "Sources/P/ProfileResponse.swift"},
+                                                  {"id": "K2", "axis": "ui_structure", "sources": ["CLAUDE.md#UI", "AGENTS.md#UI"],
+                                                   "target": "Sources/P/ProfileCardView.swift"}]},
+                "review-nonios": {"guidelines": ["AGENTS.md"], "not_applicable_axes": ["ui_structure"]}, "rules-absent": {}}
+        it = lambda **kw: dict({"kind": "craft", "id": "X1", "ruleSource": "plugin-default", "ruleRef": None, "severity": "suggestion",
+                                "craftAxis": "naming", "file": "a.ts", "text": "t"}, **kw)
+        row = lambda fx, items, conflicts=(), rules=(): {"run_id": fx, "fixture": fx, "mode": "review", "output": {
+            "items": list(items), "conflicts": list(conflicts), "rules": list(rules), "axis_coverage": {}}}
+        cases = [
+            (row("rules-absent", [it()]), []),
+            (row("rules-absent", [it(ruleSource="project", ruleRef="CLAUDE.md:3")]), ["SC-2"]),
+            (row("rules-conflict", [it()], [{"axis": "naming"}, {"axis": "uiStack"}]), []),
+            (row("rules-conflict", [it(ruleSource="project", ruleRef="CLAUDE.md#Naming")], [{"axis": "naming"}, {"axis": "uiStack"}]), ["SC-2"]),
+            (row("rules-conflict", [it()], [{"axis": "naming"}]), ["SC-2"]),
+            (row("review-nonios", [it(text="SwiftUI 로 바꾸라")]), ["AC-3"]),
+            (row("review-nonios", [it(ruleSource="project", ruleRef="AGENTS.md:4")]), []),
+            (row("review-nonios", [it(severity="major")]), ["AC-3"]),
+        ]
+        got = [sorted({c for c, _ in gpt_sc2_problems(g, labs[g["fixture"]], {})[0]}) for g, _ in cases]
+        want = [w for _, w in cases]
+        return got == want, [str(got)]
+
+    @reg
+    def gpt_verify_evidence_rereads():
+        # 두 번째 자 — 원천이 그대로면 일치 · rollout 을 바꾸면 session-log · gpt-skills-only 가 잡는다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            args, tree = _gpt_fixture(td)
+            row = build_gpt_row(args, tree)
+            kinds = ["session-log", "input-hash", "gpt-skills-only", "marker", "no-claude-artifacts"]
+            same = verify_gpt_row(row, kinds, tree)
+            with open(os.path.join(td, "run", "g.rollouts", "r.jsonl"), "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec",
+                                     "input": 'tools.exec_command({cmd:"cat ~/.codex/skills/fz-x/SKILL.md"})'}}) + "\n")
+            moved = verify_gpt_row(row, kinds, tree)
+            return (same == [] and any(x.startswith("session-log") for x in moved)
+                    and any(x.startswith("gpt-skills-only") for x in moved)), [str(same), str(moved)]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
 
     @reg
     def stale_scorer_unrun():
@@ -3556,7 +4177,8 @@ def main() -> int:
     p.add_argument("--plugin-sha")
     p.add_argument("--verify-sources", help=",".join(SOURCE_KINDS))
     p.add_argument("--require", help=",".join(IMPLEMENTED))
-    p.add_argument("--envs", help="(미구현 — S27)")
+    p.add_argument("--envs", help="S27 gpt-pass 매트릭스 환경(isolated,installed) — SC-1 · AC-2")
+    p.add_argument("--fixtures-root", default=os.path.join(os.path.dirname(SCRIPT_DIR), "tests", "fixtures", "quality"))
     p.add_argument("--options-on", action="store_true", help="(미구현 — S28b)")
     p.add_argument("--require-passed", help="(미구현 — S28c)")
     p.set_defaults(func=cmd_judge)
@@ -3565,11 +4187,29 @@ def main() -> int:
     p.add_argument("--ledger", required=True)
     p.set_defaults(func=cmd_show)
 
-    p = sub.add_parser("verify-evidence", help="(미구현 — S27)")
+    p = sub.add_parser("collect-gpt", help="GPT 첫 패스(런처 한 호출분) → gpt-pass 행 (S27)")
+    p.add_argument("--ledger", required=True)
+    p.add_argument("--out", required=True, help="런처 출력 <stem>.json (옆에 .audit.json · .rollouts/)")
+    p.add_argument("--run-id", required=True)
+    p.add_argument("--env", required=True, choices=("isolated", "installed"))
+    p.add_argument("--mode", required=True, choices=("plan", "review"))
+    p.add_argument("--fixture", required=True)
+    p.add_argument("--plugin-root", required=True, help="런처를 부른 플러그인 루트")
+    p.add_argument("--input", action="append", help="이름=경로 — 감사 inputs 해시와 대조할 원본(반복)")
+    p.add_argument("--lead-rules", help="Lead 규칙 레코드(rules.json — check_project_rules 통과본) — rules-compare")
+    p.add_argument("--gpt-agents", action="store_true", help="런처를 --gpt-agents 로 불렀다(하위 에이전트 허용)")
+    p.set_defaults(func=cmd_collect_gpt)
+
+    p = sub.add_parser("verify-evidence", help="S27 두 번째 자 — gpt-pass 행의 원천 재판독 · 매트릭스 · 규칙 fixture 범위")
+    p.add_argument("--ledger", required=True)
+    p.add_argument("--envs")
+    p.add_argument("--require", help=",".join(EVIDENCE_KINDS))
+    p.add_argument("--matrix", help="env1,env2:x:mode1,mode2")
+    p.add_argument("--rule-fixtures", help=",".join(sorted(RULE_FIXTURES)))
     p.set_defaults(func=cmd_verify_evidence)
 
     a, extra = ap.parse_known_args()
-    if extra and getattr(a, "func", None) is not cmd_verify_evidence:
+    if extra:
         ap.error(f"모르는 인자 {extra}")
     if a.self_test:
         return self_test(a.case)

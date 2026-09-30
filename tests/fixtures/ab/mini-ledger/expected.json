@@ -234,11 +234,11 @@
     "--ledger",
     "@LEDGER@",
     "--require",
-    "SC-1"
+    "SC-8"
    ],
    "exit": 2,
    "stdout_has": [
-    "UNRUN: 미구현 기준 ['SC-1']"
+    "UNRUN: 미구현 기준 ['SC-8']"
    ]
   },
   {
@@ -250,7 +250,7 @@
    ],
    "exit": 2,
    "stdout_has": [
-    "UNRUN: verify-evidence 미구현"
+    "UNRUN: --require 는"
    ]
   },
   {
