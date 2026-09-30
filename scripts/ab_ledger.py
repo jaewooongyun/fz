@@ -2557,6 +2557,7 @@ GPT_BAD_INPUT_RE = re.compile(r"^(code-context.*|plan-v\d.*|plan-final.*|.*workf
 GPT_MARKER_RE = re.compile(r"\[fz-gpt-skill-injected\] (fz-[a-z0-9-]+) \(([^)\n]+)\)")
 GPT_CMD_STR_RE = re.compile(r"""\bcmd\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)""")
 GPT_SKILL_REF_RE = re.compile(r"[~$\w{}./-]*skills/fz-[a-z0-9-]+/[\w./-]*")
+GPT_WORKDIR_RE = re.compile(r"""\bworkdir\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)""")
 IOS_VOCAB_RE = re.compile(r"\bRIBs?\b|SwiftUI|UIKit|@StateObject|@ObservedObject|ViewController|\bInteractor\b|\bRouter\b|\bBuilder\b")
 RULE_FIXTURES = {"nonios": "review-nonios", "absent": "rules-absent", "conflict": "rules-conflict"}
 LABEL_TO_RULE_AXIS = {"ui_structure": "uiStack", "architecture": "architecturePattern"}   # labels.conflicts 축 → projectRules 축
@@ -2596,8 +2597,8 @@ def scan_gpt_rollouts(rdir):
     """런처 `<stem>.rollouts/` 의 세션 jsonl 전부 → 주입 마커 · 주입 본문 · 실행 명령 · host 스킬 목록 · 스킬 루트.
     ⛔ session_meta 의 계정 식별자(creator_*)는 읽지도 싣지도 않는다 — 판정에 쓰지 않고 원장에 남기면 안 되는 값이다."""
     files = sorted(pathlib.Path(rdir).rglob("*.jsonl")) if rdir and os.path.isdir(rdir) else []
-    out = {"files": [str(f) for f in files], "markers": [], "bodies": {}, "cmds": [], "host_skills": [], "skill_roots": [],
-           "spawn": 0, "turn_contexts": 0}
+    out = {"files": [str(f) for f in files], "markers": [], "bodies": {}, "cmds": [], "workdirs": [], "host_skills": [],
+           "skill_roots": [], "spawn": 0, "turn_contexts": 0}
     for f in files:
         with open(f, encoding="utf-8", errors="replace") as fh:
             for ln in fh:
@@ -2627,7 +2628,15 @@ def scan_gpt_rollouts(rdir):
                         out["spawn"] += 1
                     raw = p.get("input") if p.get("input") is not None else (p.get("arguments") or p.get("action") or "")
                     raw = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
-                    got = [_js_unquote(x) for x in GPT_CMD_STR_RE.findall(raw)]
+                    got, wds = [], []
+                    ms = list(GPT_CMD_STR_RE.finditer(raw))
+                    for i, mm in enumerate(ms):
+                        got.append(_js_unquote(mm.group(1)))
+                        # 같은 exec_command 객체의 workdir — 명령 뒤(다음 cmd 전)를 먼저, 없으면 앞(이전 cmd 뒤)을 본다
+                        hi = ms[i + 1].start() if i + 1 < len(ms) else len(raw)
+                        lo = ms[i - 1].end() if i else 0
+                        w = GPT_WORKDIR_RE.search(raw, mm.end(), hi) or GPT_WORKDIR_RE.search(raw, lo, mm.start())
+                        wds.append(_js_unquote(w.group(1)) if w else None)
                     if not got:
                         try:
                             j = json.loads(raw)
@@ -2635,7 +2644,9 @@ def scan_gpt_rollouts(rdir):
                             j = None
                         c = (j.get("cmd") or j.get("command")) if isinstance(j, dict) else None
                         got = [" ".join(map(str, c)) if isinstance(c, list) else str(c)] if c else []
+                        wds = [j.get("workdir") if isinstance(j, dict) else None] * len(got)
                     out["cmds"] += got
+                    out["workdirs"] += wds
     out["host_skills"] = sorted(set(out["host_skills"]))
     out["skill_roots"] = sorted(set(out["skill_roots"]))
     return out
@@ -2648,7 +2659,14 @@ def classify_skill_refs(scan, tree_root):
     names = lambda sub: sorted(n for n in os.listdir(os.path.join(tree_root, sub))
                                if os.path.isdir(os.path.join(tree_root, sub, n))) if os.path.isdir(os.path.join(tree_root, sub)) else []
     claude_names, gpt_names = set(names("skills")), set(names("gpt-skills"))
-    refs = sorted({m.group(0) for c in scan["cmds"] for m in GPT_SKILL_REF_RE.finditer(c)})
+    refs = set()
+    for c, wd in zip(scan["cmds"], scan.get("workdirs") or [None] * len(scan["cmds"])):
+        for m in GPT_SKILL_REF_RE.finditer(c):
+            r = m.group(0)
+            if wd and not r.startswith(("/", "~", "$")):
+                r = os.path.normpath(os.path.join(wd, r))   # ⛔ 상대 참조는 그 명령의 workdir 기준 — 격리 폴더면 사본 읽기다
+            refs.add(r)
+    refs = sorted(refs)
     bad = []
     for r in refs:
         if any(r.startswith(x + "/") for x in iso_roots) or re.match(r"\$\{?CODEX_HOME\}?/skills/", r):
@@ -2675,7 +2693,8 @@ def summarize_gpt_output(doc, mode):
     """첫 패스 출력(스키마 JSON) → 판정에 쓰는 필드만."""
     doc = doc if isinstance(doc, dict) else {}
     pr = doc.get("projectRules") or {}
-    rules = [{"id": x.get("id"), "axis": x.get("axis"), "file": (x.get("source") or {}).get("file")}
+    rules = [{"id": x.get("id"), "axis": x.get("axis"), "file": (x.get("source") or {}).get("file"),
+              "line": (x.get("source") or {}).get("line")}
              for x in pr.get("rules") or [] if isinstance(x, dict)]
     conflicts = [{"axis": x.get("axis"), "sources": x.get("sources")} for x in pr.get("conflicts") or [] if isinstance(x, dict)]
     items = []
@@ -2773,25 +2792,36 @@ def gpt_sc1_problems(g):
     return p
 
 
+def _rule_src(ref, rules):
+    """ruleRef → (파일, 줄 | None, 절 이름 | None) · 풀 수 없으면 None.
+    ⛔ GPT 는 ruleRef 에 자기 projectRules id(R1 …)를 적는다(S27 실측) — id 면 그 규칙의 출처로 푼다. 아니면 `파일:줄` · `파일#절`."""
+    if not ref or not isinstance(ref, str):
+        return None
+    for r in rules or []:
+        if r.get("id") and ref.strip() == str(r["id"]):
+            return (r.get("file"), r.get("line"), None)
+    m = re.match(r"\s*([^\s:#]+\.[A-Za-z]+)\s*(?:[:#]\s*L?(\d+)\b|#\s*(.+))?", ref)
+    if not m:
+        return None
+    return (m.group(1), int(m.group(2)) if m.group(2) else None, (m.group(3) or "").strip() or None)
+
+
+def _src_in_section(src, sec, sections):
+    """풀린 출처가 상충 절(`CLAUDE.md#Naming`) 안인가 — 절 이름 또는 색인 절의 줄 범위."""
+    if not src or "#" not in sec:
+        return False
+    f, head = sec.split("#", 1)
+    if src[0] != f and not (src[0] or "").endswith("/" + f):
+        return False
+    if src[2] and src[2].lower().startswith(head.lower()):
+        return True
+    n = src[1]
+    return bool(n) and any(s.get("file") == f and (s.get("heading") or "").lower().startswith(head.lower())
+                           and (s.get("line") or 0) <= n <= (s.get("endLine") or s.get("line") or 0) for s in sections)
+
+
 def _index_sections(index):
     return [s for s in (index or {}).get("sections") or [] if isinstance(s, dict)]
-
-
-def _ref_in_section(ref, src, sections):
-    """ruleRef 가 상충 절(`CLAUDE.md#Naming`)을 가리키는가 — 절 이름 또는 그 절의 줄 범위 안 줄 번호."""
-    if not ref or "#" not in src:
-        return False
-    f, head = src.split("#", 1)
-    if f not in ref:
-        return False
-    if head.lower() in ref.lower():
-        return True
-    m = re.search(re.escape(f) + r"[:#L ]+L?(\d+)", ref)
-    if not m:
-        return False
-    n = int(m.group(1))
-    return any(s.get("file") == f and (s.get("heading") or "").lower().startswith(head.lower())
-               and (s.get("line") or 0) <= n <= (s.get("endLine") or s.get("line") or 0) for s in sections)
 
 
 def gpt_sc2_problems(g, labels, index):
@@ -2819,7 +2849,8 @@ def gpt_sc2_problems(g, labels, index):
         if want - got:
             probs.append(("SC-2", f"상충 축 미표시 {sorted(want - got)}(표시 {sorted(got)})"))
         secs = [s for c in labels.get("conflicts") or [] for s in c.get("sources") or []]
-        picks = [x for x in proj if any(_ref_in_section(x.get("ruleRef"), s, _index_sections(index)) for s in secs)]
+        picks = [x for x in proj if any(_src_in_section(_rule_src(x.get("ruleRef"), o.get("rules")), s, _index_sections(index))
+                                        for s in secs)]
         if picks:
             probs.append(("SC-2", f"상충 규칙 임의 선택(ruleRef 가 상충 절) {ids(picks)}"))
         targets = {c.get("target") for c in labels.get("conflicts") or []}
@@ -2828,9 +2859,17 @@ def gpt_sc2_problems(g, labels, index):
             gaps.append(f"상충 대상 파일에 ruleRef 없는 project 인용 {ids(vague)}(어느 절인지 판정 불가)")
     elif fx == "review-nonios":
         files = list(labels.get("guidelines") or [])
-        outside = [x for x in proj if x.get("kind") == "craft" and not (x.get("ruleRef") and any(f in x["ruleRef"] for f in files))]
+        craft_proj = [x for x in proj if x.get("kind") == "craft"]
+        srcs = {x.get("id"): _rule_src(x.get("ruleRef"), o.get("rules")) for x in craft_proj}
+        unknown = [x for x in craft_proj if x.get("ruleRef") and srcs[x.get("id")] is None]
+        outside = [x for x in craft_proj if srcs[x.get("id")] is not None and srcs[x.get("id")][0] not in files]
+        if unknown:
+            probs.append(("SC-2", f"풀 수 없는 규칙 인용(projectRules 에 없는 id · 형식 밖) {ids(unknown)}"))
         if outside:
             probs.append(("SC-2", f"지침({files}) 밖 규칙 인용 {ids(outside)}"))
+        noref = [x for x in craft_proj if not x.get("ruleRef")]
+        if noref:
+            gaps.append(f"craft ruleSource=project 인데 ruleRef 없음 {ids(noref)}(출처 판정 불가)")
         na = set(labels.get("not_applicable_axes") or [])
         na_items = [x for x in items if x.get("craftAxis") in na]
         if na_items:
@@ -3809,6 +3848,32 @@ def self_test(case=None):
             shutil.rmtree(td, ignore_errors=True)
 
     @reg
+    def gpt_relative_skill_ref_uses_workdir():
+        # ⛔ 실측 S27 plan — `cat gpt-home/skills/fz-planner/references/domain-ios.md` · workdir = 격리 폴더 → 사본 읽기(문제 0).
+        #    같은 상대 경로라도 workdir 가 다른 곳이면 여전히 격리 홈 밖이다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            iso = "/private/tmp/fz-gpt-iso.T"
+            os.makedirs(os.path.join(td, "skills", "fz-review"))
+            os.makedirs(os.path.join(td, "gpt-skills", "fz-planner"))
+            os.makedirs(os.path.join(td, "r"))
+            rel = "cat gpt-home/skills/fz-planner/references/domain-ios.md"
+            _write_lines(os.path.join(td, "r", "x.jsonl"), [
+                {"type": "response_item", "payload": {"type": "message", "role": "user", "content": [
+                    {"type": "input_text", "text": f"[fz-gpt-skill-injected] fz-planner ({iso}/gpt-home/skills/fz-planner) — b\nB"}]}},
+                {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input":
+                    f'tools.exec_command({{cmd:"{rel}",workdir:"{iso}",max_output_tokens:10}})'}},
+                {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input":
+                    f'tools.exec_command({{cmd:"{rel}",workdir:"/private/tmp/other"}})'}}])
+            sc = scan_gpt_rollouts(os.path.join(td, "r"))
+            ok = classify_skill_refs(dict(sc, cmds=sc["cmds"][:1], workdirs=sc["workdirs"][:1]), td)
+            bad = classify_skill_refs(dict(sc, cmds=sc["cmds"][1:], workdirs=sc["workdirs"][1:]), td)
+            return (sc["workdirs"] == [iso, "/private/tmp/other"] and ok["bad"] == [] and len(bad["bad"]) == 1), \
+                [str(sc["workdirs"]), str(ok["bad"]), str(bad["bad"])]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
     def gpt_matrix_cell_missing_unrun():
         # 매트릭스 한 칸이라도 비면 UNRUN — 한 환경만 보고 통과하지 않는다
         td = tempfile.mkdtemp(prefix="abl-")
@@ -3849,6 +3914,24 @@ def self_test(case=None):
         got = [sorted({c for c, _ in gpt_sc2_problems(g, labs[g["fixture"]], {})[0]}) for g, _ in cases]
         want = [w for _, w in cases]
         return got == want, [str(got)]
+
+    @reg
+    def gpt_rule_ref_resolves_ids():
+        # ⛔ 실측 S27 nonios — GPT 는 ruleRef 에 자기 projectRules id 를 적는다. id → 출처로 풀어 판정한다(거짓 FAIL · 거짓 PASS 방지)
+        it = lambda **kw: dict({"kind": "craft", "id": "X1", "ruleSource": "project", "ruleRef": "R1", "severity": "minor",
+                                "craftAxis": "naming", "file": "a.ts", "text": "t"}, **kw)
+        non = {"guidelines": ["AGENTS.md"], "not_applicable_axes": []}
+        con = {"conflicts": [{"axis": "naming", "sources": ["CLAUDE.md#Naming", "AGENTS.md#Naming"], "target": "P.swift"}]}
+        idx = {"sections": [{"file": "CLAUDE.md", "heading": "Naming", "line": 3, "endLine": 6},
+                            {"file": "AGENTS.md", "heading": "Naming", "line": 3, "endLine": 6}]}
+        row = lambda fx, items, rules, conflicts=(): {"run_id": fx, "fixture": fx, "mode": "review", "output": {
+            "items": list(items), "rules": list(rules), "conflicts": list(conflicts), "axis_coverage": {}}}
+        a = gpt_sc2_problems(row("review-nonios", [it()], [{"id": "R1", "file": "AGENTS.md", "line": 5}]), non, {})[0]
+        b = gpt_sc2_problems(row("review-nonios", [it(ruleRef="R9")], [{"id": "R1", "file": "AGENTS.md", "line": 5}]), non, {})[0]
+        c = gpt_sc2_problems(row("rules-conflict", [it(ruleRef="R2", file="P.swift")], [{"id": "R2", "file": "CLAUDE.md", "line": 5}],
+                                 [{"axis": "naming"}]), con, idx)[0]
+        return (a == [] and any(k == "SC-2" and "풀 수 없는" in t for k, t in b)
+                and any(k == "SC-2" and "임의 선택" in t for k, t in c)), [str(a), str(b), str(c)]
 
     @reg
     def gpt_verify_evidence_rereads():
