@@ -1499,6 +1499,7 @@ CITE_RE = re.compile(r"`?([A-Za-z0-9_./-]+\.[A-Za-z]{1,6})`?(?::L?|\s+L|#L)(\d+)
 PATH_SCRUB_RE = re.compile(r"(?:/Users|/home|/private|/tmp|/var)/[^\s`'\")\]]+")
 
 
+CTX_CAP = 1600   # 후보 문맥 상한 — 렌더러 절(표 행 + What + Suggestion) 실측 최대 1,153자 · 조각 pack.json 한 줄 ≤ 2000 을 지킨다
 BLOCK_START_RE = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|#{1,6}\s|\|)")
 
 
@@ -1517,18 +1518,46 @@ def _blocks(text):
     return out
 
 
-def cite_spans(texts):
-    """→ [(파일, 시작, 끝, 인용이 든 문단)] — 후보 추출. 문단 전체를 남겨 검증자가 **주장과 근거**를 함께 보게 한다."""
+def _sep_row(blk):
+    b = blk.strip()
+    return b.startswith("|") and "-" in b and set(b.replace("|", "").strip()) <= set("-: ")
+
+
+def _one_row_table(blks, i):
+    """blks[i] 가 머리 · 구분선 · 데이터 1행짜리 표의 데이터 행인가 — 렌더러가 지적마다 앞에 두는 위치 표다.
+    주장은 표 뒤 문단(**What**)에 있다. 여러 행 표(Lead 보고서)는 행마다 주장을 적으므로 해당 없음.
+    ⛔ `_blocks` 는 표 행마다 블록을 끊는다 — 표 전체가 아니라 앞뒤 블록으로 판별한다."""
+    row = lambda j: 0 <= j < len(blks) and blks[j].lstrip().startswith("|")
+    return (i >= 2 and row(i) and not _sep_row(blks[i]) and _sep_row(blks[i - 1]) and row(i - 2)
+            and not _sep_row(blks[i - 2]) and not row(i - 3) and not row(i + 1))
+
+
+def cite_spans(texts, rules=None):
+    """→ [(파일, 시작, 끝, 인용이 든 문단)] — 후보 추출. 문단 전체를 남겨 검증자가 **주장과 근거**를 함께 보게 한다.
+    인용 행이 1행짜리 위치 표면 다음 `#` 제목 · `<!--` 마커 전까지 뒤 블록을 문맥에 붙인다 — 붙이지 않으면 렌더러
+    보고서의 코드 위치 후보가 주장 없는 표 행만 문맥으로 받는다(실측 review C 23~25/후보).
+    문맥 상한은 CTX_CAP 이다(800 에서는 C 의 Suggestion 꼬리만 잘렸다).
+    rules(fixture 가 선언한 규칙 출처 파일)로 풀리는 인용은 뺀다 — 참조는 발견이 아니다(검증 비율 분모에 들지 않는다)."""
     seen, out = set(), []
     for t in texts:
-        for blk in _blocks(t):
+        blks = _blocks(t)
+        for i, blk in enumerate(blks):
+            ctx = blk.strip()
+            if _one_row_table(blks, i):
+                for nb in blks[i + 1:]:
+                    nxt = nb.strip()
+                    if nxt.startswith("#") or nxt.startswith("<!--"):
+                        break
+                    ctx += "\n\n" + nxt
             for m in CITE_RE.finditer(blk):
                 f = m.group(1)[2:] if m.group(1).startswith("./") else m.group(1)
+                if rules and any(_same_file(f, r) for r in rules):
+                    continue
                 s, e = int(m.group(2)), int(m.group(3) or m.group(2))
                 k = (f, min(s, e), max(s, e))
                 if k not in seen:
                     seen.add(k)
-                    out.append(k + (blk.strip()[:800],))
+                    out.append(k + (ctx[:CTX_CAP],))
     return sorted(out)
 
 
@@ -1538,6 +1567,14 @@ def cand_id(sp):
 
 def _same_file(cited, label_file):
     return cited == label_file or label_file.endswith("/" + cited) or cited.endswith("/" + label_file)
+
+
+def rule_files(fxdir):
+    """fixture 가 선언한 규칙 출처 파일(`expected-index.json` files) — 선언이 없으면 [](규칙 인용 제외 없음 · 옛 동작)."""
+    try:
+        return list(read_json(os.path.join(fxdir, "expected-index.json")).get("files") or [])
+    except (OSError, ValueError, AttributeError):
+        return []
 
 
 def fixture_files(fxdir):
@@ -1572,12 +1609,12 @@ def near_labels(sp, labels, files=None):
                                  and sp[1] - LINE_TOL <= lab["line_end"] and lab["line_start"] <= sp[2] + LINE_TOL]
 
 
-def score_review(labels, texts, verdicts=None, files=None):
+def score_review(labels, texts, verdicts=None, files=None, rules=None):
     """후보(인용) 마다 가린 검증자 판정 {real, label_ids, severity, axis} 로 센다. 라벨로 매핑된 발견은 **라벨의**
     severity·axis 로, 라벨 밖 진성 발견은 판정의 값으로 센다. 한 라벨은 한 번만 센다. 판정이 빠진 후보가 있으면 verified=False.
     files(fixture 파일 목록)가 있으면 인용 파일을 풀어(`resolve_cited`) 같은-파일 대조를 하고, 못 푼 인용의 라벨 매핑은
-    받되 `mapping_unchecked` 로 센다(후보 수)."""
-    spans = cite_spans(texts)
+    받되 `mapping_unchecked` 로 센다(후보 수). rules 는 `cite_spans` 로 넘긴다(규칙 문서 인용 제외)."""
+    spans = cite_spans(texts, rules)
     base = {"kind": "review", "candidates": len(spans), "labels_total": len(labels["issues"]),
             "empty": not any(t.strip() for t in texts)}
     if verdicts is None:
@@ -1699,7 +1736,8 @@ def _fixture_source(fxdir, cited):
     changed = sorted(k for k in head if base.get(k) != head.get(k))
     diff = "".join("".join(difflib.unified_diff(base.get(k, "").splitlines(True), head[k].splitlines(True),
                                                 fromfile=f"a/{k}", tofile=f"b/{k}")) for k in changed)
-    want = set(changed) | {k for k in head for c in cited if _same_file(resolve_cited(c, sorted(head)) or c, k)}
+    want = set(changed) | {k for k in head for c in list(cited) + rule_files(fxdir)
+                           if _same_file(resolve_cited(c, sorted(head)) or c, k)}
     return {"diff": diff, "files": {k: head[k] for k in sorted(want)}}
 
 
@@ -1722,7 +1760,7 @@ def blind_pack(rows, fixtures_root, salt):
             fixtures[r["fixture"]] = {"kind": "review", "labels": [
                 {k: x.get(k) for k in ("id", "axis", "severity", "file", "line_start", "line_end", "summary")}
                 for x in labels["issues"]]}
-            spans = cite_spans(texts)
+            spans = cite_spans(texts, rule_files(fxdir))
             ff = fixture_files(fxdir)
             cited.setdefault(r["fixture"], (fxdir, set()))[1].update(sp[0] for sp in spans)
             items.append({"anon": anon, "kind": "review", "fixture": r["fixture"],
@@ -2359,7 +2397,7 @@ def cmd_score(a):
             v = None
         if os.path.isfile(os.path.join(fx, "labels.json")):
             lp = os.path.join(fx, "labels.json")
-            s = score_review(read_json(lp), texts, v, fixture_files(fx))
+            s = score_review(read_json(lp), texts, v, fixture_files(fx), rule_files(fx))
         elif os.path.isfile(os.path.join(fx, "rubric.json")):
             lp = os.path.join(fx, "rubric.json")
             s = score_plan(read_json(lp), "\n".join(texts), v)
@@ -3102,6 +3140,34 @@ def self_test(case=None):
         sp = ("Interactor.swift", 11, 11, "")
         got = (near_labels(sp, labs, ["App/W/WatchlistInteractor.swift"]), near_labels(sp, labs))
         return got == (["I1"], []), [str(got)]
+
+    @reg
+    def context_one_row_table_section():
+        # ⛔ 실측 review C1 — 렌더러 보고서의 지적 절(1행 위치 표 → What → Suggestion → 마커)을 그대로 옮겼다
+        t = ("### [minor] m1\n\n| File:line | Origin | Confidence | Found-by |\n|---|---|---|---|\n"
+             "| `App/Watchlist/WatchlistInteractor.swift:53` | regression | 90 | claude · gpt |\n\n"
+             "**What** — `weak var listener`를 `guard let`으로 풀었다(CLAUDE.md:12, R5 위반)." + "가" * 900 + "\n\n"
+             "**Suggestion** — guard를 지운다.\n\n<!-- fz-review:m2 -->\n### [minor] m2\n\n다음 지적")
+        sp = [x for x in cite_spans([t]) if x[0].endswith("WatchlistInteractor.swift")]
+        ctx = sp[0][3] if sp else ""
+        return ("**What**" in ctx and "**Suggestion**" in ctx and "다음 지적" not in ctx and "fz-review:m2" not in ctx), [ctx]
+
+    @reg
+    def context_multirow_table_unchanged():
+        # Lead 보고서의 여러 행 표는 행마다 주장을 적는다 — 뒤 문단을 붙이지 않는다
+        t = ("| 위치 | 등급 | 내용 |\n|---|---|---|\n| `A.swift:3` | major | 이름이 틀렸다 |\n"
+             "| `B.swift:9` | minor | 색 하드코딩 |\n\n표 뒤 요약 문단")
+        got = {x[0]: x[3] for x in cite_spans([t])}
+        return (got.get("A.swift", "").endswith("이름이 틀렸다 |") and "요약 문단" not in got.get("B.swift", "x요약 문단")
+                and "요약 문단" not in got.get("A.swift", "x요약 문단")), [str(got)]
+
+    @reg
+    def rule_citation_excluded():
+        # ⛔ 규칙 문서 인용(`CLAUDE.md:12`)은 참조다 — 선언된 규칙 출처면 후보에서 뺀다 · 선언이 없으면 옛 동작
+        t = ["- `App/X.swift:3` guard let 으로 풀었다(`CLAUDE.md:12` 위반)"]
+        with_rules = [x[0] for x in cite_spans(t, ["CLAUDE.md"])]
+        without = [x[0] for x in cite_spans(t)]
+        return with_rules == ["App/X.swift"] and sorted(without) == ["App/X.swift", "CLAUDE.md"], [str(with_rules), str(without)]
 
     @reg
     def stale_scorer_unrun():
