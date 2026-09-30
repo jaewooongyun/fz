@@ -10,10 +10,13 @@
 #
 # usage:
 #   gpt_independent.sh plan   --requirement F [--sprint-contract F] [--rules-index F] [--snapshot D]... [--repo D] [--deny D]...
-#                             --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
+#                             --arm A --run-id ID --out-dir D [--timeout S] [--model M] [--effort E] [--keep-iso]
 #   gpt_independent.sh review --diff F [--pr-meta F] [--requirement F] [--rules-index F] [--base D] [--head D] [--snapshot D]...
-#                             [--repo D] [--deny D]... [--gpt-agents] --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
+#                             [--repo D] [--deny D]... [--gpt-agents] --arm A --run-id ID --out-dir D [--timeout S] [--model M] [--effort E] [--keep-iso]
 #   gpt_independent.sh cleanup --iso D   --keep-iso 로 남긴 격리 폴더를 지운다(resume 교차 뒤). 이름 fz-gpt-iso.XXXXXX · gpt-home/ 가 맞을 때만
+#   --model · --effort 보통 넘기지 않는다. 기본값 없음 — 정본 modules/gpt-strategy.md § 모델·effort 선택
+#             주면 그대로 래퍼로 넘긴다(형식 검증은 래퍼 — 빈 값 · 불량 값이면 래퍼 exit 10). 안 주면 래퍼가 필드마다 정한다 —
+#             Lead 세션 선택(선택 폴더를 실제 홈 기준으로 넘긴다) > 격리 config(실제 config 최상위 model · model_reasoning_effort 두 줄 사본)
 #   --gpt-agents review 전용 — 역할 파일(gpt-agents/*.toml)을 격리 홈 agents/ 에 넣고 두 렌즈 역할(fz-review-arch · fz-review-quality)만
 #             spawn 하게 한다(S14 · opt-in). 없으면 하위 에이전트 금지. 하위 에이전트는 부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
 #   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 는 막는다
@@ -25,8 +28,10 @@
 #
 # 산출(out-dir): <arm>-<run-id>.json (스키마 출력) · .md (사람용) · .audit.json · .rollouts/ (세션 로그 사본) · .contaminated (오염 시) · .json.session(세션 ID — 감사 sessionFile · --keep-iso 면 감사 iso · resume 입력)
 #   ⛔ 시작할 때 같은 stem 의 옛 산출을 지우고 감사를 'running'(exit null)으로 먼저 쓴다 — 중간에 멈춘 run 의 산출은 병합 · 차이표가 거부한다
+# stderr: 래퍼의 적용값 줄 'GPT-CHOICE model=<값> (출처) effort=<값> (출처)' 을 그대로 한 줄 옮긴다(래퍼가 그 줄 전에 멈추면 없다)
 # exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건 · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
+#       래퍼의 10 · 11 도 그대로 낸다 — --model · --effort 불량(10) · 세션 선택 판독 실패(11) 포함, 사유는 .wrapper.log
 #   ⛔ 10~17 은 전부 첫 패스 결과가 아니다 — 0건으로 읽지 않는다.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -58,15 +63,17 @@ case "$MODE" in
   *) die 10 "mode 는 plan|review|cleanup — 받은 값: '${MODE}'" ;;
 esac
 
-ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 EFFORT="" REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO="" GPT_AGENTS=""
+ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO="" GPT_AGENTS=""
 SNAPS=() DENIES=()
+CHOICE_ARGS=()   # --model · --effort — 주어진 것만 받은 그대로 래퍼에 넘긴다(기본값 없음 · 형식 검증은 래퍼)
 while [ $# -gt 0 ]; do
   case "$1" in
     --arm)             need $# "--arm";             ARM="$2"; shift 2 ;;
     --run-id)          need $# "--run-id";          RUN_ID="$2"; shift 2 ;;
     --out-dir)         need $# "--out-dir";         OUT_DIR="$2"; shift 2 ;;
     --timeout)         need $# "--timeout";         TIMEOUT="$2"; shift 2 ;;
-    --effort)          need $# "--effort";          EFFORT="$2"; shift 2 ;;
+    --model)           need $# "--model";           CHOICE_ARGS+=(--model "$2"); shift 2 ;;
+    --effort)          need $# "--effort";          CHOICE_ARGS+=(--effort "$2"); shift 2 ;;
     --requirement)     need $# "--requirement";     REQ="$2"; shift 2 ;;
     --sprint-contract) need $# "--sprint-contract"; SC="$2"; shift 2 ;;
     --rules-index)     need $# "--rules-index";     RULES="$2"; shift 2 ;;
@@ -91,11 +98,9 @@ printf '%s' "$TIMEOUT" | grep -qE '^[1-9][0-9]*$' || die 10 "--timeout 은 양�
 if [ "$MODE" = "plan" ]; then
   [ -n "$REQ" ] || die 10 "plan 은 --requirement 필수"
   [ -z "$DIFF$META$BASE_DIR$HEAD_DIR" ] || die 10 "plan 은 --diff · --pr-meta · --base · --head 를 받지 않는다"
-  EFFORT="${EFFORT:-xhigh}"
 else
   [ -n "$DIFF" ] || die 10 "review 는 --diff 필수"
   [ -z "$SC" ] || die 10 "review 는 --sprint-contract 를 받지 않는다"
-  EFFORT="${EFFORT:-high}"
 fi
 [ -z "$GPT_AGENTS" ] || [ "$MODE" = "review" ] || die 10 "--gpt-agents 는 review 전용이다(역할 파일은 리뷰 렌즈다)"
 
@@ -180,11 +185,16 @@ python3 - "$ISO" "$REAL_HOME" "$REAL_GPT_HOME/config.toml" "$REPO_REAL" "$CD" "$
 import json, os, re, sys
 iso, home, real_cfg, repo, cd, denies = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6:]
 q = lambda p: json.dumps(p)          # TOML basic string — JSON 이스케이프와 호환
-model = ""
+# ⛔ 최상위(첫 표 앞) model · model_reasoning_effort 두 줄만 옮긴다 — MCP env 등 다른 줄은 옮기지 않는다. 줄 머리 key · 큰따옴표 값 하나로 끝나는 줄만(엄격 판독)
+#    런처는 effort 기본값이 없다 — effort 줄을 빼면 '묻지 않으면 config 그대로' 가 격리 팔에서만 CLI 의 모델 기본 effort 로 바뀐다.
+#    래퍼의 GPT-CHOICE 줄(출처 config)도 이 격리 config 를 읽는다 — 표시와 실제로 쓰일 값이 같다
+keep = []
 try:
     head = re.split(r"(?m)^\s*\[", open(real_cfg, encoding="utf-8").read(), maxsplit=1)[0]
-    m = re.search(r'(?m)^model\s*=\s*"[^"\n]*"\s*$', head)   # ⛔ model 한 줄만 — MCP env 등 다른 줄은 옮기지 않는다
-    model = m.group(0) if m else ""
+    for key in ("model", "model_reasoning_effort"):
+        m = re.search(r'(?m)^' + key + r'\s*=\s*"[^"\n]*"\s*$', head)
+        if m:
+            keep.append(m.group(0))
 except OSError:
     pass
 fs = [(home, "deny")]
@@ -199,9 +209,7 @@ if repo:
             fs.append((os.path.join(repo, sub), "deny"))
 for d in denies:   # ⛔ --repo 와 무관 — 프로필은 디스크 전체 읽기에서 출발해 HOME 밖 작업 폴더는 이것이 없으면 읽힌다
     fs.append((os.path.realpath(d), "deny"))
-lines = ['default_permissions = "fz-iso"']
-if model:
-    lines.append(model)
+lines = ['default_permissions = "fz-iso"'] + keep
 lines += ["", "[features]", "memories = false", "", "[permissions.fz-iso]", 'extends = ":read-only"', "", "[permissions.fz-iso.filesystem]"]
 lines += [f"{q(p)} = {q(a)}" for p, a in fs]
 lines += ["", f"[projects.{q(cd)}]", 'trust_level = "trusted"', ""]
@@ -241,10 +249,13 @@ PY
 
 # ── 실행 — ⛔ 래퍼를 새 프로세스 그룹에서 띄운다. 시간 초과면 그룹째 죽인다(래퍼만 죽이면 그 아래 CLI 가 고아로 남아 세션을 계속 쓴다)
 TEL="${FZ_TELEMETRY_DIR:-$REAL_HOME/.fz/telemetry}"   # ⛔ 가짜 HOME 이면 래퍼 기본값이 달라져 행이 조용히 사라진다 — 명시로 넘긴다
+CHOICE_DIR="${FZ_GPT_CHOICE_DIR:-$REAL_HOME/.fz/gpt-choice}"   # ⛔ 같은 이유 — 가짜 HOME 이면 래퍼(gpt-choice.sh get)의 선택 폴더가 격리 홈 아래로 바뀌어 Lead 세션 선택이 조용히 빠진다
+#    ⛔ 상대 경로여도 절대 경로로 바꾸지 않고 그대로 넘긴다 — get 이 exit 5('선택 없음' · config)로 처리하는 것이 계약이다(set 도 거부한다).
+#       런처가 자기 cwd 로 풀면 격리 팔만 규칙을 조용히 다시 해석해 다른 폴더를 읽는다. 세션 id(CLAUDE_CODE_SESSION_ID — 선택 파일 이름)는 env 가 그대로 물려준다
 SCHEMA="$PLUGIN_ROOT/schemas/gpt_independent_${MODE}_schema.json"
-perl -e 'setpgrp(0, 0); exec @ARGV' env HOME="$ISO/home" CODEX_HOME="$ISO/gpt-home" FZ_TELEMETRY_DIR="$TEL" \
+perl -e 'setpgrp(0, 0); exec @ARGV' env HOME="$ISO/home" CODEX_HOME="$ISO/gpt-home" FZ_TELEMETRY_DIR="$TEL" FZ_GPT_CHOICE_DIR="$CHOICE_DIR" \
   bash "$SCRIPT_DIR/gpt-exec.sh" exec --cd "$CD" --out "$OUT" --prompt-file "$ISO/prompt.txt" --schema "$SCHEMA" \
-  --effort "$EFFORT" --gpt-skill "$ROLE" --inject-skill "$ISO/gpt-home/skills/fz-$ROLE/SKILL.md" --config-permissions \
+  ${CHOICE_ARGS[@]+"${CHOICE_ARGS[@]}"} --gpt-skill "$ROLE" --inject-skill "$ISO/gpt-home/skills/fz-$ROLE/SKILL.md" --config-permissions \
   > "$OUT_DIR/$BASE_NAME.wrapper.log" 2>&1 &
 WPID=$!
 # 감시자 — ⛔ 자기 sleep 을 trap 으로 정리한다(서브셸만 죽이면 `sleep $TIMEOUT` 이 고아로 남는다 — 정상 run 마다 30분짜리 프로세스).
@@ -256,6 +267,10 @@ wait "$WPID"; RC=$?
 if [ -f "$ISO/.timed-out" ]; then wait "$TPID" 2>/dev/null
 else kill "$TPID" 2>/dev/null; wait "$TPID" 2>/dev/null; fi
 TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
+# ── 적용값 표시 — 래퍼는 CLI 호출 직전 stderr 에 'GPT-CHOICE …' 한 줄을 찍지만 위에서 .wrapper.log 로 받았다. 그 줄 하나를 런처 stderr 로 옮긴다 —
+#    안 옮기면 Lead 가 격리 팔의 적용 모델·effort 와 출처를 못 보고, 배선이 빠져도 드러나지 않는다. 래퍼가 그 줄 전에 멈췄으면 없다(조용히 넘어간다).
+#    ⛔ 리다이렉션 순서 — 찾은 줄은 stderr(>&2)로 보내고, 그 뒤의 2>/dev/null 은 grep 자신의 오류만 버린다
+grep -m1 '^GPT-CHOICE ' "$OUT_DIR/$BASE_NAME.wrapper.log" >&2 2>/dev/null
 
 # ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(spawn 을 못 끈다 — S11 ⑤)
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"

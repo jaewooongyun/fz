@@ -4,6 +4,12 @@
 # ⛔ 실제 GPT CLI · 사용자 홈을 건드리지 않는다 — PATH 앞에 shim, HOME 은 셀마다 임시 "실제 홈"(그 아래 인증 파일 · config).
 #    rollout 은 shim 이 FZ_SHIM_ROLLOUT 으로 격리 홈에 넣는다 — deny 경로는 그 임시 홈의 realpath 로 만든다.
 # ⛔ 실제 샌드박스 강제는 여기서 보지 않는다(가짜 CLI 라 강제가 없다) — probe/p2-agent-roles.md ⑦ · ⑩ 실측이 그 근거다.
+# ⛔ Lead 세션의 GPT 모델·effort 선택이 argv 로 새지 않게 run() 은 env -u FZ_GPT_CHOICE_DIR · 고정 세션 id 로 돈다(CSID=… 로 셀마다 바꾼다) —
+#    런처가 선택 폴더를 임시 "실제 홈" 아래(.fz/gpt-choice)로 정하고, 선택 파일은 ⑫ 선택 셀의 세션 id 에만 둔다.
+# ⛔ FZ_GPT_INDEPENDENT_UNDER_TEST 로 기준 트리의 런처를 같은 러너로 돌린다 — 기준 런처(effort 기본값 · 선택 폴더 미전달 · effort 줄 미복사 ·
+#    GPT-CHOICE 줄 미전달 · --model 미지원)에서 FAIL 이어야 하는 셀(판별력): ① 의 모델·effort 0 · GPT-CHOICE · 격리 config 두 줄 · model 계열 줄 수,
+#    ② 의 모델·effort 0, ⑫ 의 sel argv · sel GPT-CHOICE · mdl 두 셀 · eff GPT-CHOICE · mbad · ebad 의 '거부한 쪽은 래퍼' · ebad exit.
+#    기준 런처로도 통과하는 셀(판별 셀 아님): sel exit · eff 전달 · mbad exit · mbad · ebad 의 GPT-CHOICE 없음 — 기준도 --effort 를 넘기고, --model 을 모르면 스스로 exit 10 이다
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,10 +23,10 @@ ok() { echo "PASS  $1"; }
 no() { echo "FAIL  $1"; fail=1; }
 check() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — 기대 '$3' · 실제 '$2'"; fi; }
 
-# 임시 "실제 홈" — 인증 파일 · MCP 비밀이 든 config(격리 config 로 새면 안 된다)
+# 임시 "실제 홈" — 인증 파일 · MCP 비밀이 든 config(격리 config 로 새면 안 된다) · 최상위 model · model_reasoning_effort(격리 config 로 옮긴다) · 표 안의 model 계열 줄(옮기지 않는다)
 H="$T/realhome"; mkdir -p "$H/.codex" "$H/.claude/projects/p" "$H/dev"
 echo '{"fake":"auth"}' > "$H/.codex/auth.json"
-printf 'model = "m-test"\n\n[mcp_servers.x]\nenv = { TOKEN = "SECRET-TOKEN-XYZ" }\n' > "$H/.codex/config.toml"
+printf 'model = "m-test"\nmodel_reasoning_effort = "medium"\n\n[mcp_servers.x]\nenv = { TOKEN = "SECRET-TOKEN-XYZ" }\n\n[profiles.p]\nmodel = "m-table"\nmodel_reasoning_effort = "low"\n' > "$H/.codex/config.toml"
 echo "claude log" > "$H/.claude/projects/p/notes.md"
 IN="$T/in"; mkdir -p "$IN/snap-ok" "$IN/snap-bad1" "$IN/snap-bad2" "$IN/base/src" "$IN/head/src"
 printf '# 요구\n주문 취소 시 알림을 끊는다 REQ-MARK-7\n' > "$IN/requirement.md"
@@ -64,12 +70,13 @@ roll "$T/r-quoted.jsonl" 1 'cat "work dir/review-report.md"'
 roll "$T/r-pattern.jsonl" 1 "rg -n 'review-report\\.md' scripts"
 roll "$T/r-sq.jsonl" 1 "RAWINPUT:const r = await tools.exec_command({cmd:'cat review-report.md',max_output_tokens:2000});"
 
-run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자
+run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자 · CSID=세션 id(기본 = 선택 파일 없는 id)
   local name="$1" outf="$2" rolls="$3"; shift 3
   local d="$T/c-$name"; mkdir -p "$d/out"
   local body="ok"; [ -n "$outf" ] && body="$(cat "$outf")"
   local start; start=$(date +%s)
-  env -u CODEX_HOME HOME="$H" FZ_TELEMETRY_DIR="$d/tel" FZ_SHIM_CAPTURE="$d/argv.json" FZ_SHIM_ENV_CAPTURE="$d/env.txt" \
+  env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="$H" CLAUDE_CODE_SESSION_ID="${CSID:-arm-no-choice}" \
+    FZ_TELEMETRY_DIR="$d/tel" FZ_SHIM_CAPTURE="$d/argv.json" FZ_SHIM_ENV_CAPTURE="$d/env.txt" \
     FZ_SHIM_OUTPUT="$body" FZ_SHIM_ROLLOUT="$rolls" ${SLEEP:+FZ_SHIM_SLEEP="$SLEEP"} ${IGNORE_TERM:+FZ_SHIM_IGNORE_TERM=1} ${TMPX:+TMPDIR="$TMPX"} \
     bash "$L" "$@" --arm A --run-id "$name" --out-dir "$d/out" > "$d/stdout" 2> "$d/stderr"
   echo $? > "$d/rc"; echo $(( $(date +%s) - start )) > "$d/secs"
@@ -79,6 +86,20 @@ called() { [ -s "$T/c-$1/argv.json" ] && echo 1 || echo 0; }
 count() { [ -s "$T/c-$1/argv.json" ] || { echo 0; return; }
   python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1], encoding="utf-8"))).count(sys.argv[2]))' "$T/c-$1/argv.json" "$2"; }
 audit() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$T/c-$1/out/A-$1.audit.json" "$2" 2>/dev/null || echo "-"; }
+# 모델·effort 전달 판정 — argv 원소 단위로 센다(프롬프트 본문 안의 같은 글자는 세지 않는다)
+leak() {   # $1=셀 — 모델·effort 를 넘기는 argv 원소 수('model=…' · 'model_reasoning_effort…' · '--model' · '-m'). CLI 를 부르지 않았으면 '-'
+  [ -s "$T/c-$1/argv.json" ] || { echo "-"; return; }
+  python3 -c 'import json,sys; print(sum(1 for x in json.load(open(sys.argv[1], encoding="utf-8")) if x.startswith(("model=", "model_reasoning_effort")) or x in ("--model", "-m")))' "$T/c-$1/argv.json"
+}
+argc() {   # $1=셀 · $2=값 — argv 에서 '-c' 바로 뒤에 그 값이 오는 횟수(CLI 를 부르지 않았으면 '-')
+  [ -s "$T/c-$1/argv.json" ] || { echo "-"; return; }
+  python3 -c 'import json,sys; a=json.load(open(sys.argv[1], encoding="utf-8")); print(sum(1 for i in range(len(a) - 1) if a[i] == "-c" and a[i + 1] == sys.argv[2]))' "$T/c-$1/argv.json" "$2"
+}
+gline()  { grep '^GPT-CHOICE ' "$T/c-$1/stderr" 2>/dev/null | head -1; }   # 런처 stderr 의 적용값 줄(래퍼 줄의 사본)
+gcount() { grep -c '^GPT-CHOICE ' "$T/c-$1/stderr" 2>/dev/null; }
+# 거부한 쪽 판정 — 런처 자신의 die 는 런처 stderr 에 INDEPENDENT-FAIL 을, 래퍼의 die 는 래퍼 로그(.wrapper.log)에 GATE-FAIL 을 찍는다
+wfail() { grep -c "^GATE-FAIL(10): $2 " "$T/c-$1/out/A-$1.wrapper.log" 2>/dev/null; }   # $2=플래그 — 래퍼 로그의 그 플래그 거부 줄 수(로그가 없으면 빈 값)
+lfail() { grep -c '^INDEPENDENT-FAIL' "$T/c-$1/stderr" 2>/dev/null; }                 # 런처가 스스로 멈춘 줄 수
 
 # ① plan 정상 — 역할 본문 1회 · 격리 환경 · sandbox_mode 없음 · 산출 넷 · 잠금 · 격리 폴더 정리
 run plan "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md" --snapshot "$IN/snap-ok" --keep-iso
@@ -87,12 +108,16 @@ check "plan: fz-planner 본문 1회" "$(count plan '# fz-planner — Independent
 check "plan: 주입 마커가 격리 사본 폴더를 가리킨다" "$(count plan '[fz-gpt-skill-injected] fz-planner (/')" 1
 check "plan: 요구 원문이 과제에 있다" "$(count plan 'REQ-MARK-7')" 1
 check "plan: sandbox_mode 안 넘김(--config-permissions)" "$(count plan 'sandbox_mode')" 0
+check "plan: --effort 없음 · 선택 없음 → argv 에 모델·effort 0(런처 기본값 없음 — config 그대로)" "$(leak plan)" 0
+check "plan: 런처 stderr 에 래퍼의 GPT-CHOICE 한 줄(출처 config = 격리 config 값)" "$(gcount plan)|$(gline plan)" "1|GPT-CHOICE model=m-test (config) effort=medium (config)"
 ISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-plan/env.txt")"
 [ -n "$ISO" ] && [ "$(sed -n 's/^HOME=//p' "$T/c-plan/env.txt")" = "$ISO/home" ] && ok "plan: CLI 는 격리 HOME · 격리 CODEX_HOME 으로 돈다" || no "plan: 격리 환경이 아니다 — $(tr '\n' ' ' < "$T/c-plan/env.txt")"
 CFG="$ISO/gpt-home/config.toml"
 [ "$(head -1 "$CFG" 2>/dev/null)" = 'default_permissions = "fz-iso"' ] && ok "plan: config 첫 줄 = default_permissions" || no "plan: config 첫 줄이 default_permissions 가 아니다"
 grep -q "^\"$HREAL\" = \"deny\"$" "$CFG" 2>/dev/null && grep -q "^\"$ISO\" = \"read\"$" "$CFG" && ok "plan: 실제 홈 deny · 격리 폴더 read" || no "plan: 권한 프로필에 홈 deny · 격리 read 가 없다"
-grep -q '^memories = false$' "$CFG" 2>/dev/null && grep -q '^model = "m-test"$' "$CFG" && ok "plan: memories 끔 · model 한 줄만 옮김" || no "plan: memories · model 줄"
+grep -q '^memories = false$' "$CFG" 2>/dev/null && grep -q '^model = "m-test"$' "$CFG" && grep -q '^model_reasoning_effort = "medium"$' "$CFG" \
+  && ok "plan: memories 끔 · 최상위 model · model_reasoning_effort 두 줄 옮김" || no "plan: memories · model · model_reasoning_effort 줄"
+check "plan: 격리 config 의 model 계열 줄은 그 두 줄뿐(표 안의 줄은 옮기지 않는다)" "$(grep -c '^model' "$CFG" 2>/dev/null)" 2
 grep -q 'SECRET-TOKEN-XYZ' "$CFG" 2>/dev/null && no "plan: 실제 config 의 비밀 줄이 격리 config 로 샜다" || ok "plan: 실제 config 의 다른 줄은 옮기지 않는다"
 [ -L "$ISO/gpt-home/auth.json" ] && [ ! -L "$ISO/gpt-home/skills/fz-planner" ] && [ -f "$ISO/gpt-home/skills/fz-planner/SKILL.md" ] \
   && ok "plan: 인증은 링크 · 스킬은 사본" || no "plan: 인증 링크 · 스킬 사본"
@@ -121,6 +146,7 @@ headsum() { python3 -c 'import json,sys; h=json.load(open(sys.argv[1]))["head"];
 check "review: 감사 head — 변경 후 경로 1 · 있음 1 · 빠짐 없음" "$(headsum review)" "1 1 "
 check "review: exit 0" "$(rc review)" 0
 check "review: fz-reviewer 본문 1회" "$(count review '# fz-reviewer — Code Review Skill')" 1
+check "review: --effort 없음 · 선택 없음 → argv 에 모델·effort 0" "$(leak review)" 0
 RISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-review/env.txt")"
 [ -n "$RISO" ] && [ ! -e "$RISO" ] && ok "review: 격리 폴더를 지웠다(--keep-iso 없음)" || no "review: 격리 폴더가 남았다: $RISO"
 
@@ -354,6 +380,29 @@ mkdir -p "$T/c-auditcrash/out/A-auditcrash.md"
 run auditcrash "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md"
 check "감사 블록 예외: exit 11" "$(rc auditcrash)" 11
 check "감사 블록 예외: 감사 exit null(running)" "$(audit auditcrash exit)" None
+# ⑭ 모델·effort — 런처는 기본값이 없고 주어진 --model · --effort 만 그대로 넘긴다. 안 주면 래퍼가 Lead 세션 선택(실제 홈 선택 폴더) > 격리 config 로 정한다
+mkdir -p "$H/.fz/gpt-choice"; printf 'model=m-sel\neffort=low\n' > "$H/.fz/gpt-choice/arm-sel"
+CSID=arm-sel run sel "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md"
+check "세션 선택(임시 실제 홈 .fz/gpt-choice): exit 0" "$(rc sel)" 0
+check "세션 선택: argv 에 선택 모델 · effort(-c 뒤) · 그 둘뿐" "$(argc sel 'model="m-sel"')|$(argc sel 'model_reasoning_effort=low')|$(leak sel)" "1|1|2"
+check "세션 선택: 런처 stderr GPT-CHOICE (session)" "$(gline sel)" "GPT-CHOICE model=m-sel (session) effort=low (session)"
+run eff "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --effort max
+check "--effort 명시 · review: exit 0 · 그대로 전달 · 모델 0" "$(rc eff)|$(argc eff 'model_reasoning_effort=max')|$(leak eff)" "0|1|1"
+check "--effort 명시: GPT-CHOICE (config · flag)" "$(gline eff)" "GPT-CHOICE model=m-test (config) effort=max (flag)"
+run mdl "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md" --model m-flag
+check "--model 명시 · plan: exit 0 · 그대로 전달 · effort 0" "$(rc mdl)|$(argc mdl 'model="m-flag"')|$(leak mdl)" "0|1|1"
+check "--model 명시: GPT-CHOICE (flag · config)" "$(gline mdl)" "GPT-CHOICE model=m-flag (flag) effort=medium (config)"
+# 형식 검증은 래퍼 몫 — 런처는 불량 값 · 빈 값도 그대로 넘기고 래퍼 exit 10 을 그대로 낸다(빈 --effort 를 조용히 빼 config 로 돌리지 않는다)
+run mbad "" "" plan --requirement "$IN/requirement.md" --model -x
+run ebad "" "" review --diff "$IN/diff.patch" --effort ''
+for c in mbad ebad; do
+  flg=--model; [ "$c" = ebad ] && flg=--effort
+  check "플래그 불량($c): exit 10 · CLI 미호출" "$(rc $c)|$(called $c)" "10|0"
+  check "플래그 불량($c): 런처 stderr 에 GPT-CHOICE 줄 없음(래퍼가 그 줄 전에 멈춘다)" "$(gcount $c)" 0
+  # ⛔ 위 두 셀은 런처가 스스로 die 10 해도 같다(⑪ 사용법 셀과 구별되지 않는다) — 거부한 쪽이 래퍼인지 따로 본다
+  check "플래그 불량($c): 거부한 쪽은 래퍼(감사 wrapperExit 10 · 래퍼 로그에 $flg 거부 줄 1 · 런처 INDEPENDENT-FAIL 0)" \
+    "$(audit $c wrapperExit)|$(wfail $c "$flg")|$(lfail $c)" "10|1|0"
+done
 
 echo
 [ "$fail" -eq 0 ] && echo "independent-arm: 전건 통과" || echo "independent-arm: 실패 있음"
