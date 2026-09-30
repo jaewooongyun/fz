@@ -7,6 +7,7 @@
 #    verify-default.golden.json 과 바이트 단위로 대조한다. golden 은 S23 직전 모듈에서 `--capture` 로 잡았다
 #    (`bash run.sh --capture <(git show <S23 직전>:modules/fz-gpt-subcommands-core.md)`). fz-discover --deep 도 같은 verify 를 쓴다.
 # ⛔ 실제 GPT CLI · 사용자 홈을 건드리지 않는다 — PATH 앞에 tests/fixtures/gpt/_shim · HOME 은 임시 폴더.
+#    FZ_GPT_CHOICE_DIR 는 unset — 선택 폴더가 임시 HOME 아래로 정해져 Lead 세션의 GPT 모델·effort 선택이 argv(golden)로 새지 않는다.
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +29,7 @@ print(s[j:s.index("\n```", j)])
 PY
   } > "$w/verify.sh" || return 1
   local ok_json='{"schemaVersion":"1.1","review_id":"fixture","timestamp":"2026-09-29T00:00:00Z","review_type":"plan_validation","issues":[],"summary":{"total_issues":0,"by_severity":{"critical":0,"major":0,"minor":0,"suggestion":0},"by_category":""},"verdict":"approved","overall_feedback":"ok","strengths":[]}'
-  env -u CODEX_HOME HOME="$w/home" PATH="$R/tests/fixtures/gpt/_shim:$PATH" W="$w" STUB_SKILL="$w/skill.md" FZ_PLUGIN_ROOT="$R" GIT_ROOT="$w/repo" \
+  env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="$w/home" PATH="$R/tests/fixtures/gpt/_shim:$PATH" W="$w" STUB_SKILL="$w/skill.md" FZ_PLUGIN_ROOT="$R" GIT_ROOT="$w/repo" \
     FZ_SHIM_CAPTURE="$w/argv.json" FZ_SHIM_OUTPUT="$ok_json" FZ_TELEMETRY_DIR="$w/tel" bash "$w/verify.sh" > "$w/log" 2>&1 || { cat "$w/log" >&2; return 1; }
   python3 - "$w/argv.json" "$w" "$R" <<'PY'
 import json, sys

@@ -13,16 +13,21 @@
 #
 # usage:
 #   gpt-exec.sh review --cd DIR --out FILE (--base BR | --uncommitted | --commit SHA)
-#                        [--effort E] [--schema F] [--title T] [--ephemeral]
+#                        [--model M] [--effort E] [--schema F] [--title T] [--ephemeral]
 #                        ⛔ review 는 --add-dir 미지원 (codex exec review 가 거부) — exec 모드를 쓸 것
 #                        [--expected-branch B] [--gpt-skill N] [--gpt-skill-path P]
 #   gpt-exec.sh exec   --cd DIR --out FILE --prompt-file F
-#                        [--effort E] [--schema F] [--add-dir D] [--gpt-skill N] [--gpt-skill-path P] [--inject-skill F]
+#                        [--model M] [--effort E] [--schema F] [--add-dir D] [--gpt-skill N] [--gpt-skill-path P] [--inject-skill F]
 #   gpt-exec.sh resume --cd DIR --out FILE --prompt-file F --session-file PREV_OUT.session
-#                        [--effort E] [--schema F] [--gpt-skill N] [--gpt-skill-path P]
+#                        [--model M] [--effort E] [--schema F] [--gpt-skill N] [--gpt-skill-path P]
 #                        ⛔ 이전 exec/review 가 남긴 `${OUT}.session`(UUID) 으로 **그 세션**을 잇는다.
 #                           `--last` 를 쓰지 않는다 — 사이에 다른 GPT 실행이 끼면 엉뚱한 세션을 잇는다.
 #   (모든 모드) 성공 시 스트림 로그의 `session id:` 를 `${OUT}.session` 에 기록한다.
+#   --model · --effort: 보통 넘기지 않는다. effort 기본값 없음 — 정본 modules/gpt-strategy.md § 모델·effort 선택
+#                     필드마다 플래그 > 세션 선택(같은 폴더 gpt-choice.sh get) > config.toml(넘기지 않음) 순으로 정한다. resume 도 같다 —
+#                     선택을 바꾼 뒤의 resume 은 새 값으로 돈다(원래 모델로 이으려면 플래그로 고정한다). 값 config = 그 필드를 넘기지 않는다.
+#                     적용값·출처는 호출 직전 stderr 한 줄 'GPT-CHOICE model=<값> (flag|session|config) effort=<값> (flag|session|config)'
+#                     — 출처 config 인 필드는 config.toml 최상위 값이다(모르면 '?'). 세션 선택을 읽지 못하면 exit 11.
 #   --gpt-skill-path: 계측 전용(모든 모드) — 호출부가 해석한 SKILL.md 경로다. exec·resume 는 그 본문이 최종 프롬프트에
 #                     들어 있는지만 판정해 injected 열에 적고, 넣지는 않는다.
 #   --inject-skill:   exec 전용 주입 — 그 SKILL.md 본문을 프롬프트 앞에 넣는다(멱등). resume 은 세션 이력에 본문이
@@ -30,7 +35,7 @@
 #   --config-permissions: sandbox_mode 를 넘기지 않고 $CODEX_HOME/config.toml 의 권한 프로필(default_permissions)을 쓴다.
 #                     넘기면 프로필의 경로 deny 를 덮는다(F-348). 프로필이 `extends = ":read-only"` 가 아니면 exit 11.
 #
-# exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건 / 12=gpt 비정상종료
+# exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건(세션 선택 판독 실패 포함) / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
 #   ⛔ 10~14는 전부 **측정 실패**다 — "이슈 0건"으로 해석하면 안 된다.
 set -u
@@ -39,6 +44,10 @@ die() { echo "GATE-FAIL($1): $2" >&2; exit "$1"; }
 # ⛔ 값 옵션의 arity 가드 — 없으면 `set -u` 하에서 `$2` 참조가 **exit 1(unbound variable)** 로 죽어
 #    문서상 게이트 10과 어긋난다 (2026-08-09 감사 ISSUE-011: `review --cd` 가 exit 1이었다).
 need() { [ "$1" -ge 2 ] || die 10 "$2 는 값이 필요하다"; }
+# ⛔ gpt-choice.sh 의 MODEL_RE 와 **같은 문자열**이다 — 모델은 TOML 문자열(-c 'model="<slug>"')로 넘기므로 따옴표·역슬래시·공백·개행은
+#    문자열을 깨고, '-' 로 시작하면 플래그로 읽힌다. 두 파일의 일치는 tests/fixtures/gpt/choice(--scope wrapper)가 대조한다.
+MODEL_RE='^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
+CHOICE_RE='^model=([^ ]+) effort=([^ ]+)$'   # gpt-choice.sh get · config 의 stdout 한 줄
 
 MODE="${1:-}"; shift || true
 case "$MODE" in
@@ -46,7 +55,7 @@ case "$MODE" in
   *) die 10 "mode는 review|exec|resume — 받은 값: '${MODE}'" ;;
 esac
 
-CD="" OUT="" PROMPT_FILE="" SCHEMA="" EFFORT="high" TITLE="" EPHEMERAL="" EXPECTED_BRANCH="" GPT_SKILL="" GPT_SKILL_PATH="" INJECT_SKILL="" SESSION_FILE="" CONFIG_PERMS=""
+CD="" OUT="" PROMPT_FILE="" SCHEMA="" MODEL="" MODEL_SET="" EFFORT="" EFFORT_SET="" TITLE="" EPHEMERAL="" EXPECTED_BRANCH="" GPT_SKILL="" GPT_SKILL_PATH="" INJECT_SKILL="" SESSION_FILE="" CONFIG_PERMS=""
 ADD_DIRS=()
 SCOPE_ARGS=()          # ⛔ 문자열이 아니라 **배열** — 비인용 확장의 단어분할·glob를 차단한다
 SCOPE_KIND=""          # base|uncommitted|commit — 중복 지정을 거부하기 위해 기록
@@ -63,7 +72,8 @@ while [ $# -gt 0 ]; do
     --out)             need $# "--out";             OUT="$2"; shift 2 ;;
     --prompt-file)     need $# "--prompt-file";     PROMPT_FILE="$2"; shift 2 ;;
     --schema)          need $# "--schema";          SCHEMA="$2"; shift 2 ;;
-    --effort)          need $# "--effort";          EFFORT="$2"; shift 2 ;;
+    --effort)          need $# "--effort";          EFFORT="$2"; EFFORT_SET=1; shift 2 ;;
+    --model)           need $# "--model";           MODEL="$2"; MODEL_SET=1; shift 2 ;;
     --title)           need $# "--title";           TITLE="$2"; shift 2 ;;
     --add-dir)         need $# "--add-dir";         ADD_DIRS+=("$2"); shift 2 ;;
     --expected-branch) need $# "--expected-branch"; EXPECTED_BRANCH="$2"; shift 2 ;;
@@ -85,7 +95,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# ── 사전 게이트 0: effort 화이트리스트 (2026-09-06 신설)
+# ── 사전 게이트 0: effort 화이트리스트 (2026-09-06 신설) · 모델 형식 — **플래그 값만** 본다(순수 검사). 세션 선택 값은 게이트 2 뒤 결정에서 같은 effort_ok 로 본다
 # ⛔ 왜: Codex CLI 는 무효 effort 를 **로컬에서 거부하지 않는다**. 실측 —
 #    `codex exec -c model_reasoning_effort=bogus` 가 배너에 `reasoning effort: bogus` 를 찍고
 #    서버까지 왕복한 뒤에야 실패한다. 오타가 조용히 통과하면 "올렸다고 믿는데 무효"가 된다.
@@ -95,10 +105,22 @@ done
 #             ("Maximum reasoning with automatic task delegation"). gpt-5.6 계열도 동일, gpt-5.5 는 xhigh 까지.
 # ⛔ 최초판은 문서에 `ultra` 가 없다는 이유로 제외했으나 **캐시 실측이 그것을 뒤집었다** — 문서보다 캐시가 최신이다.
 # ⚠️ 구버전 CLI 나 ultra 미지원 모델에서는 서버가 거부한다(로컬 게이트가 아니라 호출 시점에 드러남).
-case "$EFFORT" in
-  low|medium|high|xhigh|max|ultra) ;;
-  *) die 10 "--effort 는 low|medium|high|xhigh|max|ultra 중 하나 — 받은 값: '$EFFORT'" ;;
-esac
+# ⛔ gpt-choice.sh EFFORT_WHITELIST 와 같은 집합이다 — 한쪽만 넓히면 set 이 받은 값을 래퍼가 막는다(또는 그 반대).
+#    두 파일의 일치는 tests/fixtures/gpt/choice 가 아래 case 줄로 대조한다. 플래그 값(여기)과 세션 선택 값(게이트 2 뒤 결정)이 이 함수 하나를 쓴다.
+effort_ok() {
+  case "$1" in
+    low|medium|high|xhigh|max|ultra) return 0 ;;
+  esac
+  return 1
+}
+# 값 config = 그 필드를 넘기지 않는다. ⛔ 명시적 빈 값(--effort '' · --model '')도 10 이다 — 호출부의 빈 변수를 조용히 config 로 돌리면
+#    의도한 값이 빠진 것을 아무도 모른다.
+if [ -n "$EFFORT_SET" ] && [ "$EFFORT" != "config" ] && ! effort_ok "$EFFORT"; then
+  die 10 "--effort 는 low|medium|high|xhigh|max|ultra 중 하나 또는 config — 받은 값: '$EFFORT'"
+fi
+if [ -n "$MODEL_SET" ] && [ "$MODEL" != "config" ] && ! [[ "$MODEL" =~ $MODEL_RE ]]; then
+  die 10 "--model 형식 불량 '$MODEL' — 첫 글자 영숫자 + [A-Za-z0-9._:/-] 128자 이하, 또는 config"
+fi
 
 # ── 사전 게이트 1: 플래그 상호 배타 (실측 근거: codex 0.144.1)
 #    `codex exec review`는 flag-only — PROMPT positional과 --uncommitted/--base가 충돌한다.
@@ -145,6 +167,50 @@ if [ -n "$SKILL_SRC" ] && [ "$MODE" != "review" ]; then
   { [ -f "$SKILL_SRC" ] && [ -r "$SKILL_SRC" ] && grep -q '[^[:space:]]' "$SKILL_SRC"; } \
     || die 11 "스킬 본문 경로가 읽을 수 있는 본문 파일이 아니다(없음·디렉터리·공백뿐): $SKILL_SRC"
 fi
+# ── 사전 게이트 2.5: 모델·effort 결정 — 필드마다 플래그 > 세션 선택 > config.toml(넘기지 않음). effort 기본값 없음 — 정본 modules/gpt-strategy.md § 모델·effort 선택
+# ⛔ 왜 래퍼 한 곳인가: 호출부마다 붙이면 한 곳만 빠져도 조용히 config 로 돈다. 적용값·출처는 호출 직전 stderr GPT-CHOICE 한 줄로 늘 보인다.
+# ⛔ 사용법·경로 게이트(0~2) **뒤**에 둔다 — 선택 판독은 자식 프로세스(gpt-choice.sh get → autonomy_decide.py)다. 앞에 두면 선택 파일이
+#    손상된 세션에서 사용법 오류(10)가 11 로 가려져, Lead 가 사용자에게 먼저 다시 묻고 진짜 호출 버그는 그 뒤에야 드러난다.
+MODEL_SRC="" EFFORT_SRC=""
+[ -n "$MODEL_SET" ] && MODEL_SRC="flag"
+[ -n "$EFFORT_SET" ] && EFFORT_SRC="flag"
+# ⛔ 세션 선택은 같은 폴더 gpt-choice.sh get 으로만 읽는다(판독·검증 규칙이 그 한 곳이다) — `bash` 로 부른다(실행 비트 비의존).
+#    get exit: 0=적용 · 3/4/5=선택 없음(config) · 그 밖(11 손상 · 126/127 스크립트 부재 포함)=exit 11.
+#    ⛔ 읽지 못한 선택을 config 로 넘기면 사용자가 고른 것이 아닌 모델·effort 로 조용히 돈다 — fail-closed.
+#    ⛔ stdout 만 파싱한다(get 계약 = stdout 한 줄). stderr 를 섞으면 자식 셸 경고 한 줄에 정상 선택이 매 호출 11 이 되고 set 으로
+#       덮어써도 풀리지 않는다. stderr 는 임시 파일로 받아 비정상 exit 일 때만 메시지에 붙인다(3/4/5 의 안내는 버린다 — 출처는
+#       GPT-CHOICE 줄이 적는다). 두 필드가 모두 플래그면 읽지 않는다 — 쓰지 않을 값이다.
+#    get 이 검증한 값도 여기서 다시 본다(모델 = MODEL_RE · effort = effort_ok) — 두 규칙이 어긋나면 스크립트 오류(11)로 멈춘다.
+# ⛔ 11 의 처방은 원인마다 다르다 — 메시지 머리의 ASCII 태그로 가른다(문서는 한국어 문구가 아니라 태그를 인용한다):
+#    CHOICE-UNREADABLE  = get exit 11(선택 파일 손상) → Lead 는 다시 묻고 set 으로 덮어쓴다
+#    CHOICE-SCRIPT-ERROR = 그 밖(스크립트 부재·오류 · get 출력과 이 규칙의 불일치) → 다시 물어도 풀리지 않는다 — 묻지 않는다
+CHOICE_FIX="이 세션의 GPT 호출은 --model config --effort config 로 부르거나(두 필드가 플래그면 선택을 읽지 않는다) gpt-choice.sh 를 고친다"
+# ⛔ 모델 목록 캐시는 읽지 않는다 — 독립 런처는 격리 CODEX_HOME(캐시 없음)에서 래퍼를 띄운다. 모델별 검증은 gpt-choice.sh set 한 곳이 한다.
+if [ -z "$MODEL_SRC" ] || [ -z "$EFFORT_SRC" ]; then
+  CHOICE_ERR="$(mktemp "${TMPDIR:-/tmp}/fz-gpt-choice.XXXXXX" 2>/dev/null)" || die 11 "선택 판독용 임시 파일을 만들지 못했다(TMPDIR='${TMPDIR:-}')"
+  CHOICE_OUT="$(bash "$(dirname "$0")/gpt-choice.sh" get 2> "$CHOICE_ERR")"; CHOICE_RC=$?
+  CHOICE_MSG="$(head -3 "$CHOICE_ERR" 2>/dev/null | tr '\n' ' ')"; rm -f "$CHOICE_ERR"
+  case "$CHOICE_RC" in
+    0)
+      [[ "$CHOICE_OUT" =~ $CHOICE_RE ]] \
+        || die 11 "CHOICE-SCRIPT-ERROR: 선택 스크립트 오류 — 다시 묻지 않는다. $CHOICE_FIX (get 출력 형식 불량: '$CHOICE_OUT')"
+      S_MODEL="${BASH_REMATCH[1]}" S_EFFORT="${BASH_REMATCH[2]}"
+      [ "$S_MODEL" = "config" ] || [[ "$S_MODEL" =~ $MODEL_RE ]] \
+        || die 11 "CHOICE-SCRIPT-ERROR: 선택 스크립트 오류 — 다시 묻지 않는다. $CHOICE_FIX (get 이 낸 모델이 래퍼 형식 밖: '$S_MODEL')"
+      [ "$S_EFFORT" = "config" ] || effort_ok "$S_EFFORT" \
+        || die 11 "CHOICE-SCRIPT-ERROR: 선택 스크립트 오류 — 다시 묻지 않는다. $CHOICE_FIX (get 이 낸 effort 가 래퍼 화이트리스트 밖: '$S_EFFORT')"
+      [ -n "$MODEL_SRC" ] || { MODEL="$S_MODEL"; MODEL_SRC="session"; }
+      [ -n "$EFFORT_SRC" ] || { EFFORT="$S_EFFORT"; EFFORT_SRC="session"; } ;;
+    3|4|5) ;;
+    11) die 11 "CHOICE-UNREADABLE: 선택 파일을 읽지 못했다 — Lead 는 다시 묻고 gpt-choice.sh set 으로 덮어쓴다 (get: ${CHOICE_MSG:-출력 없음})" ;;
+    *) die 11 "CHOICE-SCRIPT-ERROR: 선택 스크립트 오류 — 다시 묻지 않는다. $CHOICE_FIX (get exit $CHOICE_RC: ${CHOICE_MSG:-출력 없음})" ;;
+  esac
+fi
+# 값 config = 그 필드를 넘기지 않는다(플래그 · 세션 선택 공통) — 출처는 config 로 적는다
+[ "$MODEL" = "config" ] && MODEL=""
+[ "$EFFORT" = "config" ] && EFFORT=""
+[ -n "$MODEL" ] || MODEL_SRC="config"
+[ -n "$EFFORT" ] || EFFORT_SRC="config"
 # ⛔ --config-permissions 는 쓰기 금지 강제를 config 프로필에 맡긴다 — 그 프로필이 read-only 를 확장하는지 호출 전에 본다.
 #    `default_permissions` 는 첫 table 앞에 있어야 한다(뒤에 두면 앞 table 의 키가 된다 — S11 ⑦ R11).
 if [ -n "$CONFIG_PERMS" ]; then
@@ -212,9 +278,17 @@ fi
 # ⛔ read-only 강제 — fz GPT 호출은 검증 전용이다. 프롬프트 문구는 경계가 아니고, 사용자 config.toml 의 sandbox_mode 가
 #    쓰기 가능이면 검증 호출이 레포를 고칠 수 있다. `-c` 는 session 층이라 사용자 config 보다 우선한다(2026-09-25 실측).
 #    `sandbox_permissions` 는 CLI 0.157 이 무시한다고 출력하지만 구버전 호환을 위해 남긴다.
-ARGS=(-c 'sandbox_mode="read-only"' -c "sandbox_permissions=[\"disk-full-read-access\"]" -c "model_reasoning_effort=$EFFORT")
+ARGS=(-c 'sandbox_mode="read-only"' -c "sandbox_permissions=[\"disk-full-read-access\"]")
 # ⛔ --config-permissions — sandbox_mode 를 넘기면 config 권한 프로필의 경로 deny 가 지워진다(F-348 · 실측 09-28). 쓰기 금지는 위 사전 게이트가 본 프로필이 맡는다
-[ -n "$CONFIG_PERMS" ] && ARGS=(-c "model_reasoning_effort=$EFFORT")
+[ -n "$CONFIG_PERMS" ] && ARGS=()
+# ⛔ 모델·effort 는 값이 있을 때만 넘긴다 — 비면 config.toml 그대로다. 재대입 **뒤**에 붙여 두 경로(기본 · --config-permissions)가 같이 받는다.
+#    `-c` 값은 TOML 로 읽힌다 → 모델은 큰따옴표로 감싼 TOML 문자열이다(숫자처럼 보이는 slug 오파싱 방지). 값은 MODEL_RE 를 통과한 것뿐이라
+#    따옴표·역슬래시가 없다. 모델도 `-c` 층으로 넘긴다 — exec · review · resume 가 모두 받으므로 서브커맨드별 모델 플래그 지원에 기대지 않는다.
+[ -n "$MODEL" ] && ARGS+=(-c "model=\"$MODEL\"")
+# ⛔ review 모드는 config 의 `review_model` 이 있으면 그것을 `model` 보다 먼저 쓴다(GPT CLI 설정 키 — 2026-09-30 GPT 리뷰 지적 · 바이너리
+#    설정 필드 목록 실측). 모델을 넘길 때 함께 덮지 않으면 선택이 review·check·final 에서 조용히 빠지고 GPT-CHOICE 표시와 실제가 갈린다.
+[ -n "$MODEL" ] && [ "$MODE" = "review" ] && ARGS+=(-c "review_model=\"$MODEL\"")
+[ -n "$EFFORT" ] && ARGS+=(-c "model_reasoning_effort=$EFFORT")
 [ -n "$SKIP_FLAG" ] && ARGS+=("$SKIP_FLAG")
 [ -n "$SCHEMA" ] && ARGS+=(--output-schema "$SCHEMA")
 [ -n "$EPHEMERAL" ] && ARGS+=("$EPHEMERAL")
@@ -253,6 +327,21 @@ ${PROMPT_TEXT}"
     fi
   fi
 fi
+
+# ── 적용값 표시 — 호출 직전 stderr 한 줄(스트림 로그 $LOG 가 아니다). 출처 config 인 필드는 config.toml 최상위 값을 같은 폴더
+#    gpt-choice.sh config 로 읽는다(판독 규칙 한 곳 · 모르면 '?'). CLI 와 같은 CODEX_HOME 을 읽으므로 격리 런처에서도 실제로 쓰일 config 다.
+#    get 판독과 같이 stdout 만 읽는다 — 표시용이라 실패해도 멈추지 않고 '?' 로 적는다.
+# ⛔ 이 줄에 WARN · GATE-PASS · GATE-FAIL · --gpt-skill-path 를 쓰지 않고 행머리를 'model:' 로 두지 않는다 — 소비자가 그 토큰으로 판정한다
+#    (예: skill-inject 의 WARN.*--gpt-skill-path · failure-injection 의 GATE-PASS/GATE-FAIL).
+SHOW_MODEL="$MODEL" SHOW_EFFORT="$EFFORT"
+if [ -z "$MODEL" ] || [ -z "$EFFORT" ]; then
+  CFG_OUT="$(bash "$(dirname "$0")/gpt-choice.sh" config 2>/dev/null)" || CFG_OUT=""
+  CFG_MODEL="?" CFG_EFFORT="?"
+  if [[ "$CFG_OUT" =~ $CHOICE_RE ]]; then CFG_MODEL="${BASH_REMATCH[1]}"; CFG_EFFORT="${BASH_REMATCH[2]}"; fi
+  [ -n "$SHOW_MODEL" ] || SHOW_MODEL="$CFG_MODEL"
+  [ -n "$SHOW_EFFORT" ] || SHOW_EFFORT="$CFG_EFFORT"
+fi
+echo "GPT-CHOICE model=$SHOW_MODEL ($MODEL_SRC) effort=$SHOW_EFFORT ($EFFORT_SRC)" >&2
 
 # ── 호출 (hygiene §1 stdin close · §3 -o · §7 `--` 구분자)
 if [ "$MODE" = "review" ]; then

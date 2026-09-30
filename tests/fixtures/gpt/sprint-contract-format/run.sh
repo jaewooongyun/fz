@@ -124,7 +124,7 @@ PY
 fi
 
 # ① 조립 — 래퍼 + 가짜 CLI
-env PATH="$R/tests/fixtures/gpt/_shim:$PATH" FZ_SHIM_CAPTURE="$T/argv.json" FZ_SHIM_OUTPUT="sprint_id: x" FZ_TELEMETRY_DIR="$T/tel-shim" \
+env PATH="$R/tests/fixtures/gpt/_shim:$PATH" FZ_GPT_CHOICE_DIR="$T/no-choice" FZ_SHIM_CAPTURE="$T/argv.json" FZ_SHIM_OUTPUT="sprint_id: x" FZ_TELEMETRY_DIR="$T/tel-shim" \
   bash "$R/scripts/gpt-exec.sh" exec --cd "$T" --out "$T/shim.out" --prompt-file "$T/task.txt" --effort high --gpt-skill architect --inject-skill "$ARCH" \
   > "$T/shim.stdout" 2>&1
 [ -s "$T/argv.json" ] && ok "조립: 래퍼가 CLI 를 불렀다" || no "조립: 래퍼가 CLI 를 부르지 않았다 — $(tail -1 "$T/shim.stdout")"

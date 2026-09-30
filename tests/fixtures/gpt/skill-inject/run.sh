@@ -2,6 +2,7 @@
 # gpt-exec.sh 스킬 본문 판정·주입 계약 러너 (A2-03 · F-335 분리) — 가짜 CLI(../_shim/codex)로 래퍼 계약만 본다.
 #
 # ⛔ 실제 GPT CLI·사용자 텔레메트리를 건드리지 않는다 — PATH 앞에 shim 폴더, FZ_TELEMETRY_DIR 은 셀마다 임시.
+# ⛔ Lead 세션의 GPT 모델·effort 선택(실제 세션 id · 실제 홈)이 argv 로 새지 않게 FZ_GPT_CHOICE_DIR 도 임시 폴더로 둔다(판정은 그대로).
 # ⛔ FZ_GPT_EXEC_UNDER_TEST 로 다른 판(기준 트리)의 래퍼를 같은 러너로 돌린다 — 판별력 대조용.
 #    그 경우에도 죽지 않고 셀마다 FAIL 줄을 낸다(셀 결과를 읽는 함수는 빈 값을 0/빈 문자열로 돌려준다).
 # 스킬 파일은 **합성**이다 — 실제 gpt-skills 내용이 바뀌어도 판정이 흔들리지 않게.
@@ -36,7 +37,7 @@ SHIM_OUT="ok" SHIM_EXIT=0
 cell() {   # $1=셀 이름 · 나머지=래퍼 인자(모드 먼저). 결과 파일은 $T/c-이름/ 아래
   local name="$1"; shift
   local d="$T/c-$name"; mkdir -p "$d/tel"
-  env FZ_SHIM_CAPTURE="$d/argv.json" FZ_SHIM_OUTPUT="$SHIM_OUT" FZ_SHIM_EXIT="$SHIM_EXIT" FZ_TELEMETRY_DIR="$d/tel" \
+  env FZ_SHIM_CAPTURE="$d/argv.json" FZ_SHIM_OUTPUT="$SHIM_OUT" FZ_SHIM_EXIT="$SHIM_EXIT" FZ_TELEMETRY_DIR="$d/tel" FZ_GPT_CHOICE_DIR="$T/no-choice" \
     bash "$WRAP" "$@" --cd "$T/repo" --out "$d/out.txt" > "$d/stdout" 2> "$d/stderr"
   echo $? > "$d/rc"
 }

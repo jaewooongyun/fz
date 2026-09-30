@@ -7,6 +7,8 @@
 #     판정: 런처 exit 가 기대값이고 성공 줄(INDEPENDENT OK)이 없으며, 소비자가 거부(1) 또는 입력 불가(2)로 끝나고 산출 파일을 쓰지 않는다.
 # 대조: 주입 없는 호출은 성공해야 한다 — 그래야 실패가 주입 때문임을 안다.
 # ⛔ 실제 GPT CLI 를 부르지 않는다 — PATH 앞에 가짜 CLI(../_shim/codex) · HOME 은 임시 "실제 홈".
+# ⛔ Lead 세션의 GPT 모델·effort 선택이 argv 로 새지 않게 선택 폴더를 격리한다(판정은 그대로) — wrapper 는 임시 FZ_GPT_CHOICE_DIR,
+#    launcher 는 env -u FZ_GPT_CHOICE_DIR · 고정 세션 id(선택 폴더가 임시 홈 아래로 정해지고 그 id 의 선택 파일은 없다).
 set -u
 SCOPE="wrapper"
 [ "${1:-}" = "--scope" ] && SCOPE="${2:-}"
@@ -53,7 +55,8 @@ PY
     local name="$1" outf="$2" rolls="$3"; shift 3
     local d="$T/l-$name"; mkdir -p "$d/out"
     local body="ok"; [ -n "$outf" ] && body="$(cat "$outf")"
-    env -u CODEX_HOME HOME="$H" FZ_TELEMETRY_DIR="$d/tel" FZ_SHIM_OUTPUT="$body" FZ_SHIM_ROLLOUT="$rolls" ${SLEEP:+FZ_SHIM_SLEEP="$SLEEP"} \
+    env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="$H" CLAUDE_CODE_SESSION_ID=fi-launcher-no-choice FZ_TELEMETRY_DIR="$d/tel" \
+      FZ_SHIM_OUTPUT="$body" FZ_SHIM_ROLLOUT="$rolls" ${SLEEP:+FZ_SHIM_SLEEP="$SLEEP"} \
       bash "$L" "$@" --arm A --run-id "$name" --out-dir "$d/out" > "$d/stdout" 2> "$d/stderr"
     echo $? > "$d/rc"
   }
@@ -113,7 +116,7 @@ printf '{"type":"object","required":["verdict"],"properties":{"verdict":{"type":
 cell() {   # $1=이름 · $2=기대 exit · $3=FZ_SHIM_OUTPUT · $4=FZ_SHIM_EXIT · 나머지=추가 래퍼 인자
   local name="$1" want="$2" out="$3" ex="$4"; shift 4
   local d="$T/$name"; mkdir -p "$d"
-  env FZ_SHIM_OUTPUT="$out" FZ_SHIM_EXIT="$ex" FZ_TELEMETRY_DIR="$d" \
+  env FZ_SHIM_OUTPUT="$out" FZ_SHIM_EXIT="$ex" FZ_TELEMETRY_DIR="$d" FZ_GPT_CHOICE_DIR="$T/no-choice" \
     bash "$WRAP" exec --cd "$T/repo" --out "$d/out.txt" --prompt-file "$T/task.txt" "$@" > "$d/stdout" 2> "$d/stderr"
   local rc=$?
   local pass_shown=0 fail_shown=0

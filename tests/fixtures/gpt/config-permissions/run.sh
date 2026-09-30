@@ -3,7 +3,8 @@
 #
 # ⛔ 왜: 래퍼가 늘 붙이는 `-c sandbox_mode="read-only"` 가 config 권한 프로필(default_permissions)의 경로 deny 를 덮는다(실측 09-28).
 #    격리 경로는 sandbox_mode 를 빼고 프로필에 쓰기 금지를 맡긴다 — 그래서 프로필이 read-only 를 확장하는지 호출 전에 본다.
-# ⛔ 옵션을 안 주면 argv 가 분리 전과 같아야 한다 — 기본 경로의 인자 모양을 황금값으로 고정한다.
+# ⛔ 옵션을 안 주고 세션 선택도 없으면 argv 에 모델·effort 가 없다(config.toml 그대로) — 기본 경로의 인자 모양을 황금값으로 고정한다.
+# ⛔ Lead 세션의 GPT 모델·effort 선택(실제 세션 id · 실제 홈)이 argv 로 새면 황금값이 선택 있는 세션에서만 깨진다 — FZ_GPT_CHOICE_DIR 는 셀마다 임시 폴더다.
 # ⛔ FZ_GPT_EXEC_UNDER_TEST 로 다른 판(기준 트리)의 래퍼를 같은 러너로 돌린다 — 판별력 대조용.
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
@@ -55,9 +56,9 @@ cell() {   # $1=셀 · $2=CODEX_HOME(빈 값이면 unset) · 나머지=래퍼 �
   local name="$1" ch="$2"; shift 2
   local d="$T/c-$name"; mkdir -p "$d"
   if [ -n "$ch" ]; then
-    env CODEX_HOME="$ch" FZ_SHIM_CAPTURE="$d/argv.json" FZ_TELEMETRY_DIR="$d/tel" bash "$WRAP" "$@" --cd "$T/repo" --out "$d/out.txt" > "$d/stdout" 2> "$d/stderr"
+    env CODEX_HOME="$ch" FZ_GPT_CHOICE_DIR="$T/no-choice" FZ_SHIM_CAPTURE="$d/argv.json" FZ_TELEMETRY_DIR="$d/tel" bash "$WRAP" "$@" --cd "$T/repo" --out "$d/out.txt" > "$d/stdout" 2> "$d/stderr"
   else
-    env -u CODEX_HOME FZ_SHIM_CAPTURE="$d/argv.json" FZ_TELEMETRY_DIR="$d/tel" bash "$WRAP" "$@" --cd "$T/repo" --out "$d/out.txt" > "$d/stdout" 2> "$d/stderr"
+    env -u CODEX_HOME FZ_GPT_CHOICE_DIR="$T/no-choice" FZ_SHIM_CAPTURE="$d/argv.json" FZ_TELEMETRY_DIR="$d/tel" bash "$WRAP" "$@" --cd "$T/repo" --out "$d/out.txt" > "$d/stdout" 2> "$d/stderr"
   fi
   echo $? > "$d/rc"
 }
@@ -75,12 +76,18 @@ print(" ".join("<prompt>" if "CP-TASK-7" in x else x.replace(T, "$T") for x in a
 PY
 }
 
-# ① 좋은 프로필 + --config-permissions → sandbox_mode · sandbox_permissions 를 넘기지 않는다 · effort 는 넘긴다
-cell good "$T/h-good" exec --prompt-file "$T/task.txt" --config-permissions
+# ① 좋은 프로필 + --config-permissions → sandbox_mode · sandbox_permissions 를 넘기지 않는다 · 준 effort 는 넘긴다
+cell good "$T/h-good" exec --prompt-file "$T/task.txt" --config-permissions --effort high
 check "좋은 프로필: exit 0" "$(rc good)" 0
 check "좋은 프로필: sandbox_mode 안 넘김" "$(has good 'sandbox_mode')" 0
 check "좋은 프로필: sandbox_permissions 안 넘김" "$(has good 'sandbox_permissions')" 0
-check "좋은 프로필: effort 는 넘김" "$(has good 'model_reasoning_effort=high')" 1
+check "좋은 프로필: 준 effort 는 넘김" "$(has good 'model_reasoning_effort=high')" 1
+
+# ①-b 같은 경로 · effort 도 세션 선택도 없음 → 모델·effort 를 넘기지 않는다(config.toml 그대로 — 래퍼에 effort 기본값이 없다)
+cell goodb "$T/h-good" exec --prompt-file "$T/task.txt" --config-permissions
+check "좋은 프로필 · effort 없음: exit 0" "$(rc goodb)" 0
+check "좋은 프로필 · effort 없음: effort 미전달" "$(has goodb 'model_reasoning_effort')" 0
+check "좋은 프로필 · effort 없음: 모델 미전달" "$(has goodb 'model=')" 0
 
 # ② default_permissions 가 table 뒤 → 앞 table 의 키가 된다(S11 ⑦ R11) → 호출 전 exit 11
 cell late "$T/h-late" exec --prompt-file "$T/task.txt" --config-permissions
@@ -99,11 +106,12 @@ check "프로필 표 없음: exit 11" "$(rc noprof)" 11
 cell nohome "" exec --prompt-file "$T/task.txt" --config-permissions
 check "CODEX_HOME 없음: exit 11" "$(rc nohome)" 11
 
-# ⑥ 옵션 없음 → 분리 전과 같은 인자 모양(황금값 — 2026-09-28 bc7779a 래퍼와 바이트 대조 뒤 고정)
+# ⑥ 옵션 없음 · 세션 선택 없음 → 기본 경로 인자 모양(황금값). 2026-09-28 bc7779a 래퍼와 바이트 대조 뒤 고정했고,
+#    effort 기본값을 없애면서(모델·effort 는 플래그·세션 선택이 있을 때만 넘긴다) model_reasoning_effort 두 원소만 뺐다
 cell plain "$T/h-good" exec --prompt-file "$T/task.txt"
 check "옵션 없음: exit 0" "$(rc plain)" 0
-check "옵션 없음: 인자 모양 불변" "$(shape plain)" \
-  'exec -C $T/repo -c sandbox_mode="read-only" -c sandbox_permissions=["disk-full-read-access"] -c model_reasoning_effort=high --skip-git-repo-check -o $T/c-plain/out.txt -- <prompt>'
+check "옵션 없음: 인자 모양(모델·effort 미전달)" "$(shape plain)" \
+  'exec -C $T/repo -c sandbox_mode="read-only" -c sandbox_permissions=["disk-full-read-access"] --skip-git-repo-check -o $T/c-plain/out.txt -- <prompt>'
 
 echo
 [ "$fail" -eq 0 ] && echo "config-permissions: 전건 통과" || echo "config-permissions: 실패 있음"
