@@ -39,7 +39,7 @@ metadata:
 - **래퍼 exec** (`gpt-exec.sh exec`): `--prompt-file` + `--schema` — verify/validate/drift/plan
 - **Plugin** (`/codex:*`): 설치 시 review/check/adversarial에 우선 사용. 백그라운드 Job 관리 (`status`/`result`)
 - **공유 모듈**: read-only 가 전 디스크 읽기를 허용해 별도 플래그가 필요 없다. `--add-dir` 는 **쓰기** 디렉토리 플래그라 fz 에서 쓰지 않는다 (2026-09-25 CLI help 실측)
-- **GPT 네이티브 스킬**: 3-Tier 디스커버리 (`~/.codex/skills/`) 역할 기반 매칭
+- **GPT 네이티브 스킬**: 3-Tier 디스커버리 (`${CODEX_HOME:-~/.codex}/skills/` → 플러그인 `gpt-skills/`) 역할 기반 매칭
 
 ## 사용 시점
 
@@ -68,9 +68,9 @@ metadata:
 
 ### GPT System Skills 활용 (Cnew-4, 2026-05-16)
 
-> GPT self-reflexive verify Q5 단독 발견 — `~/.codex/skills/.system/` 활용.
+> GPT self-reflexive verify Q5 단독 발견 — `${CODEX_HOME:-~/.codex}/skills/.system/` 활용.
 
-`~/.codex/skills/.system/` 아래 5개 system skill을 fz-gpt 호출 시 보조적으로 활용 가능:
+`${CODEX_HOME:-~/.codex}/skills/.system/` 아래 5개 system skill을 fz-gpt 호출 시 보조적으로 활용 가능:
 
 | System Skill | 활용 시점 | fz-gpt 통합 |
 |------------|---------|------------|
@@ -101,7 +101,7 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 | drift | drift | fz-drift | `gpt-exec.sh exec` + `get_gpt_skill_path("drift")` — 전체 스캔 |
 | plan | planner | fz-planner | `gpt-exec.sh exec` + `get_gpt_skill_path("planner")` — 독립 플랜, xhigh effort |
 
-스킬 위치: `~/.codex/skills/` (3-Tier 디스커버리로 결정)
+스킬 위치: `get_gpt_skill_path()` 가 정한다 — `${CODEX_HOME:-~/.codex}/skills/` → 플러그인 `gpt-skills/` (3-Tier 디스커버리). ⛔ `~/.codex/skills/` 를 경로에 직접 쓰지 않는다 — 격리 `CODEX_HOME` 을 우회해 설치된 다른 판의 스킬을 읽는다
 
 ## 팀 에이전트 모드
 

@@ -151,7 +151,7 @@ GPT 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 reaso
 
 **적용 위치**:
 - `fz-gpt` SKILL.md verify/validate/plan 서브커맨드 prompt template
-- GPT CLI 네이티브 스킬 (`~/.codex/skills/.system/openai-docs` 활용 가능)
+- GPT CLI 네이티브 스킬 (`${CODEX_HOME:-~/.codex}/skills/.system/openai-docs` 활용 가능)
 
 **Few-shot 예시**:
 ```
