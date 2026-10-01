@@ -58,6 +58,7 @@ roll "$T/r-nodeny.jsonl" 0 "cat requirement.md"
 roll "$T/r-roles.jsonl" 1 "SPAWN:fz-review-arch" "SPAWN:fz-review-quality" "cat diff.patch"
 roll "$T/r-repo.jsonl" 1 "rg --files $HREAL/dev/repo -g '!.git'" "find $HREAL/dev/repo -name '*.ts'" "grep -rn b $HREAL/dev/repo"
 roll "$T/r-repomix.jsonl" 1 "rg b $HREAL/dev/repo ~"
+roll "$T/r-quoted.jsonl" 1 'cat "work dir/review-report.md"'
 
 run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자
   local name="$1" outf="$2" rolls="$3"; shift 3
@@ -161,10 +162,12 @@ check "감사(repo 안 재귀 검색): exit 0" "$(rc audrepo)" 0
 check "감사(repo 안 재귀 검색): 적중 0" "$(audit audrepo hits)" "[]"
 run audmix "$HERE/sample-plan-ok.json" "$T/r-repomix.jsonl" plan --requirement "$IN/requirement.md" --repo "$H/dev/repo"
 check "감사(repo 뒤 ~ 재귀): exit 15" "$(rc audmix)" 15
+run audq "$HERE/sample-plan-ok.json" "$T/r-quoted.jsonl" plan --requirement "$IN/requirement.md"
+check "감사(직렬화된 큰따옴표 경로의 산출물 참조): exit 15" "$(rc audq)" 15
 # ④c 재귀 검색 규칙 문자열 단위 — /Users 경로(macOS 저장소 모양). ⛔ 파일을 만들지 않는다 — 실제 홈을 건드리지 않는다
 #    ④b 의 가짜 홈은 /Users 밖이라 옛 결함(/Users 아래 전부 적중)을 재현하지 못한다 — 규칙 블록을 직접 꺼내 잰다
 UNIT="$(python3 - "$L" <<'UPY'
-import os, re, sys
+import json, os, re, sys
 t = open(sys.argv[1], encoding="utf-8").read()
 m = re.search(r"^FZ_ART_NAMES='([^']*)'", t, re.M)
 if m:
@@ -183,10 +186,17 @@ forbid = env.get("forbid_hit")
 fcases = [("cat T-1/plan/plan-final.md", True), ("cat work/workflow-result.json", True), ("cat ~/.claude/projects/p/a.jsonl", True),
           ("cat Sources/Foo/code-context-builder.swift", False), ("cat ci/test-result.json", False), ("rg 'workflow-result' scripts", False)]
 out += ["ok" if forbid and forbid(c) == w else "fbad:" + c.split()[-1] for c, w in fcases]
+# 역검증 ISSUE-001 — rollout 은 명령을 JSON 문자열에 담는다: custom_tool_call input · function_call arguments
+roll = lambda c: "tools.exec_command({cmd:" + json.dumps(c) + "})"
+fc = lambda c: json.dumps({"cmd": c})
+scases = [(roll('cat "work dir/review-report.md"'), True), (roll('cat "plan/plan-final.md"'), True), (roll('cat work/code-context".md"'), True),
+          (fc('cat "T-1/plan/workflow-result.json"'), True), ('{"cmd":"cat ~\\/.claude\\/projects\\/p\\/a.jsonl"}', True),
+          (roll('rg -n "workflow-result" scripts'), False), (roll('cat "Sources/Foo/code-context-builder.swift"'), False)]
+out += ["ok" if forbid and forbid(c) == w else f"sbad{i}" for i, (c, w) in enumerate(scases)]
 print(" ".join(out))
 UPY
 )"
-check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위)" "$UNIT" "ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok"
+check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok"
 
 # ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(끌 수 없다 — S11 ⑤)
 run sub "$HERE/sample-review-ok.json" "$T/r-parent.jsonl,$T/r-sub.jsonl" review --diff "$IN/diff.patch"
@@ -296,6 +306,15 @@ grep -qF "\"$(cd "$IN/snap-ok" && pwd -P)\" = \"deny\"" "$DISO/gpt-home/config.t
 mkdir -p "$IN/head-empty"
 run headmiss "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --base "$IN/base" --head "$IN/head-empty"
 check "head 결손: 감사 head — 1 · 0 · src/a.ts" "$(headsum headmiss)" "1 0 src/a.ts"
+# ⑬i head 수집 — hunk 안의 `+++ b/phantom.ts` 는 추가 행이다 · 따옴표 8진 경로 · 순수 rename · 바이너리는 센다 · 삭제는 빼다(역검증 ISSUE-002)
+printf '%s\n' 'diff --git a/src/a.ts b/src/a.ts' '--- a/src/a.ts' '+++ b/src/a.ts' '@@ -1 +1,2 @@' '-a' '+b' '+++ b/phantom.ts' \
+  'diff --git "a/src/\355\225\234.ts" "b/src/\355\225\234.ts"' '--- "a/src/\355\225\234.ts"' '+++ "b/src/\355\225\234.ts"' '@@ -1 +1 @@' '-x' '+y' \
+  'diff --git a/old.ts b/new.ts' 'similarity index 100%' 'rename from old.ts' 'rename to new.ts' \
+  'diff --git a/img.png b/img.png' 'index 1111111..2222222 100644' 'Binary files a/img.png and b/img.png differ' \
+  'diff --git a/gone.ts b/gone.ts' 'deleted file mode 100644' '--- a/gone.ts' '+++ /dev/null' '@@ -1 +0,0 @@' '-z' > "$IN/diff-mixed.patch"
+mkdir -p "$IN/head-mixed/src"; echo b > "$IN/head-mixed/src/a.ts"; echo y > "$IN/head-mixed/src/한.ts"; echo n > "$IN/head-mixed/new.ts"
+run headmix "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff-mixed.patch" --head "$IN/head-mixed"
+check "head 수집(혼합 diff): 감사 head — 기대 4 · 있음 3 · 빠짐 img.png" "$(headsum headmix)" "4 3 img.png"
 # ⑬g 미러 안 범용 이름은 저장소 파일이다 — base/head 의 payload.json 은 거부하지 않는다 · fz 고유 이름은 거부한다(F6)
 mkdir -p "$IN/base-gen" "$IN/head-gen" "$IN/head-fz/T-1/plan"; echo '{}' > "$IN/base-gen/payload.json"; echo '{}' > "$IN/head-gen/payload.json"
 echo x > "$IN/head-fz/T-1/plan/plan-final.md"

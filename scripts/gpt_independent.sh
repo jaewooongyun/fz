@@ -31,6 +31,7 @@
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# diff-parse: hunk-state — review 감사의 head 결손 표시는 diff_anchors.py 로 경로를 풀고 `diff --git` 블록마다 `@@` 전 헤더 구간만 본다
 # fz 고유 산출물 이름(경로 성분 전체 일치) — 입력 가드 · base/head 미러 · 스냅샷 · rollout 감사가 이 표 하나를 쓴다(두 목록이 어긋나던 결함).
 #   ⛔ 범용 이름(payload.json · *-result.json)은 여기 넣지 않는다 — 저장소 파일에 흔하다. 직접 입력에만 따로 댄다(GUARD)
 FZ_ART_NAMES='code-context\.md|plan-v[0-9][^/]*\.md|plan-final[^/]*\.md|workflow-result[^/]*\.json|review-report\.md|pr-comments\.md|self-review\.md|triage\.md|render-preview\.json'
@@ -259,30 +260,75 @@ TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
 # ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(spawn 을 못 끈다 — S11 ⑤)
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
-FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" <<'PY'
-import glob, hashlib, json, os, re, sys
+FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" <<'PY'
+import glob, hashlib, importlib.util, json, os, re, sys
 mode, out, stem, home, repo, iso, rc, timed_out, schema_p = sys.argv[1:10]
 keep = sys.argv[10:11] == ["1"]   # --keep-iso — 격리 홈이 남아야 resume 이 세션을 잇는다
+plugin_root = sys.argv[11]
 # ⛔ 입력 해시는 격리 사본에서 잰다 — GPT 가 실제로 본 내용이다(읽기 전용 프로필이라 실행 중에 바뀌지 않는다). 병합이 stale 을 가린다
 inputs = {n: hashlib.sha256(open(os.path.join(iso, "input", n), "rb").read()).hexdigest()
           for n in ("diff.patch", "requirement.md", "sprint-contract.md", "rules-index.json", "pr-meta.json")
           if os.path.isfile(os.path.join(iso, "input", n))}
 rc, timed_out = int(rc), timed_out == "1"
-# head/ 결손 표시(fail-visible) — diff 의 변경 후 경로(+++ b/…)가 head/ 미러에 있는가. 삭제만 있는 PR 은 head/ 가 정당하게 빈다
+# head/ 결손 표시(fail-visible) — diff 의 변경 후 경로가 head/ 미러에 있는가. 삭제만 있는 PR 은 head/ 가 정당하게 빈다.
+#   ⛔ 경로는 diff_anchors.py 로 푼다(git 따옴표 8진 · 탭 꼬리 · a/ b/ — 여기서 다시 짜지 않는다). `diff --git` 블록마다 `@@` 전 헤더만 본다 —
+#      hunk 안의 `+++ x` 는 `++ x` 를 더한 소스 행이다. 순수 rename(`rename to`) · 바이너리(`Binary files … differ`)는 ---/+++ 가 없어 따로 잡는다.
+#      풀지 못하면 감사를 죽이지 않고 head 에 error 를 적는다(결과 판정이 아니라 표시다)
 head = None
 hdir, dpath = os.path.join(iso, "input", "head"), os.path.join(iso, "input", "diff.patch")
 if mode == "review" and os.path.isdir(hdir) and os.path.isfile(dpath):
-    post = sorted({m.group(1) for m in re.finditer(r"(?m)^\+\+\+ b/([^\t\n]+)", open(dpath, encoding="utf-8", errors="replace").read())})
-    miss = [p for p in post if not os.path.isfile(os.path.join(hdir, p))]
-    head = {"expected": len(post), "present": len(post) - len(miss), "missing": miss[:20]}
+    try:
+        spec = importlib.util.spec_from_file_location("diff_anchors", os.path.join(plugin_root, "skills", "fz-peer-review", "scripts", "diff_anchors.py"))
+        da = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(da)
+        side = lambda raw: da.strip_prefix(da.unquote_path(raw))
+        post, blk = set(), None
+        def close(b):
+            if b and not b["gone"]:
+                p = b["post"] or b["same"]
+                if p:
+                    post.add(p)
+        for line in open(dpath, encoding="utf-8", errors="replace").read().splitlines():
+            if line.startswith("diff --git "):
+                close(blk)
+                rest = line[len("diff --git "):]
+                n = (len(rest) - 5) // 2      # 따옴표 없는 같은 경로 쌍 `a/X b/X` — 모드만 바뀐 파일의 경로
+                blk = {"post": None, "gone": False, "hdr": True,
+                       "same": rest[2:2 + n] if n > 0 and rest == f"a/{rest[2:2 + n]} b/{rest[2:2 + n]}" else None}
+                continue
+            if not blk or not blk["hdr"]:
+                continue
+            if line.startswith("@@"):
+                blk["hdr"] = False
+            elif line.startswith("deleted file mode"):
+                blk["gone"] = True
+            elif line.startswith(("rename to ", "copy to ")):
+                blk["post"] = da.unquote_path(line.split(" to ", 1)[1])
+            elif line.startswith("+++ "):
+                p = side(line[4:])
+                blk["gone"], blk["post"] = (True, None) if p == "/dev/null" else (blk["gone"], p)
+            elif line.startswith("Binary files ") and line.endswith(" differ"):
+                m = re.match(r"Binary files (.+) and (.+) differ$", line)
+                p = side(m.group(2)) if m else None
+                blk["gone"], blk["post"] = (True, None) if p == "/dev/null" else (blk["gone"], p or blk["post"])
+                blk["hdr"] = False
+        close(blk)
+        post = sorted(post)
+        miss = [p for p in post if not os.path.isfile(os.path.join(hdir, p))]
+        head = {"expected": len(post), "present": len(post) - len(miss), "missing": miss[:20]}
+    except Exception as e:   # ⛔ 표시용 — 감사 판정을 막지 않는다
+        head = {"expected": None, "error": f"{type(e).__name__}: {e}"}
 rolls = sorted(glob.glob(os.path.join(stem + ".rollouts", "*.jsonl")))
 ROOTS = r"(~|\$HOME|/Users(?:/[^\s'\"]*)?|/)(?=[\s'\";|&)]|$)"
 FZ_ART = re.compile(os.environ["FZ_ART_NAMES"])
 def forbid_hit(cmd):
     """Claude 산출물 참조 — `.claude/` 경로 또는 fz 고유 산출물 이름(경로 성분 전체 일치 · 입력 가드와 같은 표).
     ⛔ 부분 문자열로 보지 않는다 — `code-context-builder.swift` · `ci/test-result.json` · 검색 패턴 'workflow-result' 는 산출물이 아니다.
-       범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다"""
-    return ".claude/" in cmd or any(FZ_ART.fullmatch(t) for t in re.findall(r"[^\s'\"/;|&()<>=]+", cmd))
+       범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다
+    ⛔ 따옴표 · 이스케이프를 먼저 걷는다 — rollout 의 명령은 JSON 문자열 안에 있어 `"…"` 가 `\\"…\\"` 로 남고(이름 끝에 `\\` 가 붙는다),
+       셸은 이어 붙은 따옴표 조각을 한 단어로 읽는다(`code-context".md"`). 걷은 뒤 경로 · JSON 구분자로 자른다(역검증 ISSUE-001)"""
+    flat = re.sub(r"[\\'\"`]", "", cmd)
+    return ".claude/" in flat or any(FZ_ART.fullmatch(t) for t in re.findall(r"[^\s/;|&()<>=,{}\[\]:]+", flat))
 FIND_ROOT = re.compile(rf"\bfind\s+{ROOTS}")                      # find 는 첫 인자가 검색 뿌리다
 MULTI_HEADS = [re.compile(r"\b(?:rg|fd|ag)\b"), re.compile(r"\bgrep\s+-[a-zA-Z]*[rR][a-zA-Z]*\b"),
                re.compile(r"\bls\s+-[a-zA-Z]*R[a-zA-Z]*\b")]
