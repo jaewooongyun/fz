@@ -2,6 +2,8 @@
 //   기본 off 워크플로: 미지정 == 기준 트리. 기본 on 워크플로(레지스트리 `defaultOn` — v4.42.0 peer-review): 미지정 == 켠 값.
 //   기본 off 워크플로는 옵션마다 끄는 값(off) == 기준. 기본 on 워크플로는 **기본 on 옵션을 모두 끄면** == 기준이다 — 롤백 경로
 //   (하나만 끄면 나머지가 켜져 있어 기준이 아니다 — 옵션마다는 '끔 != 켬' 으로 배선을 본다).
+//   ⛔ 이 검사는 Workflow 층만 본다 — 모든 arm 에 같은 합성 structuralContext 를 넣는다. 실제 롤백은 Lead 가 브리프에서 §6 도 빼야 한다
+//     (modules/review-structural-axes.md — 브리프는 Lead 가 조립해 스크립트가 거르지 못한다).
 //   레지스트리는 tests/workflows/default-arms.js 가 재사용한다(require — 실행부는 직접 실행할 때만 돈다).
 //
 // ⛔ 비교 대상은 **콜 입력**(label · prompt · schema · model · effort · agentType)이다. 반환값은 비교하지 않는다 —
@@ -148,6 +150,7 @@ if (require.main === module) (async () => {
   const names = argv.includes('--all-rb-options') || asked.length === 0 ? Object.keys(OPTIONS) : asked
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-default-off-'))
   const rolledBack = new Set()   // 롤백 검사는 (워크플로 · 경로)마다 한 번
+  const typoChecked = new Set()  // 값 검증은 (옵션 · 워크플로)마다 한 번
   let bases
   try {
     const wfs = [...new Set(names.flatMap(n => (OPTIONS[n] ? OPTIONS[n].workflows : [])))]
@@ -181,6 +184,21 @@ if (require.main === module) (async () => {
               const allOff = Object.assign({}, ...Object.values(OPTIONS).filter(o => (o.defaultOn || []).includes(wf)).map(o => o.off))
               const back = await callsOf(work, wf, sc, allOff)
               check(`${wf} · ${sc.name}: 기본 on 옵션을 모두 끔 ${JSON.stringify(allOff)} == 기준(롤백 경로)`, firstDiff(back, base) === null, firstDiff(back, base))
+            }
+            if (!typoChecked.has(`${name}|${wf}`)) {
+              typoChecked.add(`${name}|${wf}`)
+              // 끄는 값을 잘못 쓰면 조용히 기본(on)으로 읽히지 않는다 — fallback(args invalid) · 콜 0 (리뷰 F8 — 옛 판은 오타를 on 으로 읽었다)
+              const v = Object.values(opt.on)[0]
+              const typo = { [name]: typeof v === 'boolean' ? 'off' : String(v).toUpperCase() }
+              const table = responses(wf, sc.fire, sc.quiet), seen = []
+              const r = (await run(work, { args: Object.assign({}, BASE_ARGS, sc.args, typo),
+                responder: (p, o) => { seen.push(o.label); return table[o.label] ? JSON.parse(JSON.stringify(table[o.label])) : null } })).result
+              check(`${name} · ${wf}: 모르는 값 ${JSON.stringify(typo)} → fallback(args invalid) · 콜 0`,
+                r.mode === 'fallback' && /args invalid/.test(r.reason || '') && seen.length === 0, JSON.stringify({ mode: r.mode, reason: r.reason, calls: seen.length }))
+              if (typeof v === 'boolean') {
+                const strOff = await callsOf(work, wf, sc, { [name]: 'false' })
+                check(`${name} · ${wf}: 문자열 'false' == false(값 검증이 문자열 형식을 막지 않는다)`, strOff.length > 0 && firstDiff(strOff, off) === null, firstDiff(strOff, off) || '콜 0개')
+              }
             }
           } else {
             check(`${tag}: 미지정 == 기준(${bases[wf].from}) — 콜 ${base.length}개`, base.length > 0 && firstDiff(unset, base) === null, firstDiff(unset, base) || '콜 0개')

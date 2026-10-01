@@ -12,8 +12,11 @@
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality/correctness는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   ⛔ 아래 네 옵션(craftAxes · crossRequiredFields · crossOutput · preserveLowConfidence)은 **기본 on**이다(v4.42.0 — S25p peer-review
-//     판정 PASS). 끄는 값(false · crossOutput 'full')을 주면 모든 콜의 프롬프트·스키마가 기준(v4.39.1)과 바이트 단위로 같다 — 롤백 경로.
+//     판정 PASS). 끄는 값(false · crossOutput 'full')을 주고 structuralContext 에서 §6 을 빼면 모든 콜의 프롬프트·스키마가 기준(v4.39.1)과
+//     바이트 단위로 같다 — 롤백 경로(브리프는 Lead 가 조립한다 — 이 스크립트는 §6 을 거르지 못한다).
 //     review-live 의 같은 이름 옵션은 기본 off 다(S25 미달). 워크플로별 기본값: tests/workflows/default-off-regression.js 의 defaultOn.
+//     ⛔ 값은 정해진 것만 받는다 — 불리언 셋은 true · false('true' · 'false'), crossOutput 은 'delta' · 'full'. 그 밖(오타 'off' · 'Full')은
+//     fallback(args invalid)이다 — 끄는 값을 잘못 써서 조용히 기본(on)으로 읽히면 롤백이 실패한 줄 모른다.
 //   craftAxes: craft 6축 판정. 켜지면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어간다.
 //   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes 가 켜져 있을 때만 효력 · arch 렌즈에만.
 //   crossRequiredFields: 켜지면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
@@ -413,6 +416,15 @@ if (!input || !input.diffPath || !input.intentContext) {
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: metrics(0) }
 }
+const badOpts = ['craftAxes', 'crossRequiredFields', 'preserveLowConfidence']
+  .filter(k => input[k] != null && ![true, false, 'true', 'false'].includes(input[k]))
+  .concat(input.crossOutput != null && !['delta', 'full'].includes(input.crossOutput) ? ['crossOutput'] : [])
+  .map(k => `${k}=${JSON.stringify(input[k])}`)
+if (badOpts.length) {
+  log(`FATAL args invalid — ${badOpts.join(' · ')}: 불리언 옵션은 true · false('true' · 'false'), crossOutput 은 'delta' · 'full'. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: ${badOpts.join(' · ')}`, metrics: metrics(0) }
+}
 
 const deep = input.deep === true || input.deep === 'true'  // Tier 3 = full (교차+counter)
 const evidenceLine = input.evidencePaths ? `\n[증거] ${input.evidencePaths}` : ''
@@ -596,7 +608,7 @@ if (!deep) {
     mode: 'workflow', tier: 2, reviews, issues: tier2Issues,
     crossAdjustments: { archOnPeers, qualityOnPeers },
     stage2Ran: stage2Actually, stage2Trigger: trigger,
-    ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본 반환 모양 불변
+    ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본(delta)은 crossCoverage 를 더한다 — 'full'(롤백)이면 반환 모양이 기준과 같다
     ...(craftOn ? { craftAxes: craftSummary(tier2Issues, arch) } : {}),
     // ⛔ 완주 = 완전 완주 stage 수(Tier 3 의 s1full 과 같은 식) — Stage 1 은 세 렌즈가 모두 있을 때만 완주다.
     //    이전 판은 Stage 1 을 항상 1 로 셌다 — correctness 가 죽어도 교차가 돌면 "완주 2/2" 를 냈다(S24a 실패 주입 재현).
@@ -675,7 +687,7 @@ return {
   reviews,          // 원본 per-agent (strengths/overall_assessment 포함)
   issues: mergedIssues,
   crossAdjustments: { archOnPeers, qualityOnPeers },
-  ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본 반환 모양 불변
+  ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본(delta)은 crossCoverage 를 더한다 — 'full'(롤백)이면 반환 모양이 기준과 같다
   strengthChallenges,  // counter의 strength 반례 (Lead 판정 입력)
   distribution: dist,
   metrics: metrics(stagesCompleted),  // Lead가 experiment-log §5.7 fz-peer-review 테이블 기록
