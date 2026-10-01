@@ -286,7 +286,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 > `modules/peer-review-workflow.md`. Tier 0/1 은 Workflow 가 없어 **읽지 않는다**(Tier 1 의 GPT 는 아래 절).
 
 ### GPT 독립 첫 패스 (기본 실행 — `--gpt-independent` 생략 가능 · `--no-gpt-independent` 로 끈다)
-- **Workflow 직전에** `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff {review-surface.patch — 없으면 diff.patch} --base … --head … --deny "${WORK_DIR}" [--pr-meta {pr-meta.json}] [--rules-index {원문 색인}]` 를 background 로 띄우고, 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py"` 로 합친다. 경로는 **플러그인 루트 기준**이고, Workflow 스크립트는 세션 working directory 밖이면 **사전 복사**한 경로로 부른다
+- **Workflow 직전에** `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff {review-surface.patch — 없으면 diff.patch} --base … --head … --deny "${WORK_DIR}" [--pr-meta {pr-meta.json}] [--rules-index {원문 색인}]` 를 background 로 띄우고(규칙 레코드 `projectRulesPath` 는 Workflow args 에만 — 런처에 넘기면 exit 11), 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py"` 로 합친다. 경로는 **플러그인 루트 기준**이고, Workflow 스크립트는 세션 working directory 밖이면 **사전 복사**한 경로로 부른다
 - `--no-gpt-independent` 면 띄우지 않고 GPT challenger(`modules/peer-review-tiers.md` · `gpt-challenger-raw.txt`)를 쓴다 — 병합 없는 옛 경로다
 - 순서 · 거부(오염 · 실패 · stale) 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서. Tier 3 GPT DA 는 병합 뒤다
 
