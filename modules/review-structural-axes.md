@@ -50,7 +50,7 @@ Lead: Read(modules/review-structural-axes.md) → §3 축 + §4 경계 문구를
 
 비용(실측 기준): 축 블록 약 1,140자 → 1콜 주입 시 Tier 2 총량의 **약 0.2%**. 3콜 주입이면 0.6%.
 
-⛔ **§6 craft 축(F~J)은 기본 브리프가 아니다.** `craftAxes:true` 로 부를 때만 §6 을 브리프에 더하고, 규칙 레코드가 있으면 `projectRulesPath` 도 넘긴다(R-B 기본 off). Lead 가 직접 적용하는 경로(Tier 0/1 · fz-review light)도 craft 를 쓰기로 했을 때만 §6 을 적용한다.
+⛔ **§6 craft 축(F~J)의 기본값은 스킬마다 다르다.** fz-peer-review 는 기본으로 §6 을 브리프에 더한다(`craftAxes:false` 로 끈다 — v4.42.0). fz-review 는 `craftAxes:true` 로 부를 때만 더한다(기본 off). 규칙 레코드가 있으면 어느 쪽이든 `projectRulesPath` 도 넘긴다. Lead 가 직접 적용하는 경로도 같다 — Tier 0/1(fz-peer-review)은 기본으로 §6 을 적용하고, fz-review light 는 craft 를 쓰기로 했을 때만 적용한다.
 
 ## 3. 축 5개
 
@@ -134,7 +134,7 @@ Lead: Read(modules/review-structural-axes.md) → §3 축 + §4 경계 문구를
 
 ## 6. craft 축 F~J — craftAxes 옵션 전용
 
-> ⛔ 기본 off(R-B). §2 의 기본 브리프(§3 + §4)에 넣지 않는다 — `craftAxes:true` 로 부를 때만 브리프에 더한다. Lead 가 직접 적용하는 경로(Tier 0/1 · fz-review light)도 같다.
+> ⛔ 기본값은 스킬마다 다르다 — fz-peer-review 는 §2 의 기본 브리프(§3 + §4)에 §6 을 더하고(`craftAxes:false` 로 끈다), fz-review 는 `craftAxes:true` 로 부를 때만 더한다. Lead 가 직접 적용하는 경로(Tier 0/1 · fz-review light)도 그 스킬의 기본을 따른다.
 
 craft 축은 **결함이 아닌 솜씨**를 본다. 동작은 맞는데 이 프로젝트의 규칙·관례나 언어 관용과 어긋나는 자리다. 축 목록은 품질 fixture 의 채점 축(`tests/fixtures/quality` · SC-4)과 같고, 여섯 중 `design_alternative` 는 위 B 가 이미 묻는다.
 

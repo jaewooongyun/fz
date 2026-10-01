@@ -78,8 +78,8 @@ async function capture(wf, args) {
       const offP = await capture(wf, p.args)
       check(`${wf} · ${p.name}: 켠 실행과 미지정 실행의 콜 구성(label 다중집합)이 같다`, labels(on) === labels(offP), `켬 ${labels(on)} · 미지정 ${labels(offP)}`)
     }
-    const off = await capture(wf, PATHS[wf][0].args)
-    check(`${wf}: 옵션 미지정 → 어느 프롬프트에도 재고지 줄이 없다`, off.length > 0 && off.every(c => !LINE.test(c.prompt)), off.length ? '미지정인데 줄이 있다' : '콜 0개')
+    const off = await capture(wf, Object.assign({ crossRequiredFields: false }, PATHS[wf][0].args))   // ⛔ peer-review 는 기본 on(v4.42.0)
+    check(`${wf}: 옵션 false → 어느 프롬프트에도 재고지 줄이 없다`, off.length > 0 && off.every(c => !LINE.test(c.prompt)), off.length ? '끈 실행인데 줄이 있다' : '콜 0개')
   }
 
   console.log(`\n교차 필수 필드 재고지 ${fail ? '실패 ' + fail + '건' : '전건 통과'} (대상 ${path.relative(process.cwd(), ROOT) || '.'})`)

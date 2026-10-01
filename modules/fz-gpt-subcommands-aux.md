@@ -131,7 +131,7 @@ EOF
 > **effort**: `xhigh` — 독립 설계이므로 최고 추론력 활용.
 > **비교**: 결과는 JSON 한 객체다(`gpt-skills/fz-planner` 출력 형식 — `status` · `steps` · `riskMatrix` · `divergencePoints` · `projectRules`). `status` 가 `rejected` 면 계획이 아니다 — `reason` 을 보고 입력을 고친다. 차이표는 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {workflow-result.json} --gpt "$PLAN_FILE"` 로 만든다
 
-## independent-plan · independent-review -- 격리 첫 패스 (opt-in `--gpt-independent`)
+## independent-plan · independent-review -- 격리 첫 패스 (fz-peer-review 기본 · fz-review · fz-plan 은 opt-in `--gpt-independent`)
 
 Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. 규약은 `modules/cross-validation.md` § 독립 첫 패스.
 
@@ -151,7 +151,7 @@ Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. �
 
 ### review — Lead 순서
 
-fz-review · fz-peer-review 가 `--gpt-independent`(기본 off)일 때 함께 쓰는 정본이다. 두 스킬과 Tier 표는 이 절을 가리킨다.
+fz-peer-review(기본 실행)와 fz-review(`--gpt-independent` · 기본 off)가 함께 쓰는 정본이다. 두 스킬과 Tier 표는 이 절을 가리킨다.
 
 1. **Workflow 직전에** 런처를 `run_in_background` 로 띄운다 — 두 패스가 동시에 돈다. GPT 는 허용 입력만 받아 Claude 산출을 보지 않는다
 2. `projectRulesPath`(규칙 레코드)가 있으면 Workflow args 와 런처 `--rules-index` 에 **같은 파일**을 준다

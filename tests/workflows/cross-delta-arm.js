@@ -108,7 +108,7 @@ async function go(wf, fx, mode, extraArgs, patch) {
   const table = Object.assign({}, fx.stage1, mode === 'delta' ? fx.delta : fx.full, patch || {})
   const cross = []
   const r = await run(path.join(ROOT, 'workflows', `${wf}.js`), {
-    args: Object.assign({}, ARGS, extraArgs, mode === 'delta' ? { crossOutput: 'delta' } : {}),
+    args: Object.assign({}, ARGS, extraArgs, { crossOutput: mode === 'delta' ? 'delta' : 'full' }),   // ⛔ peer-review 기본이 delta(v4.42.0) — full 은 명시
     responder: (prompt, opts) => {
       if (/^stage2-/.test(opts.label)) cross.push({ prompt, schema: opts.schema })
       return table[opts.label] ? JSON.parse(JSON.stringify(table[opts.label])) : null
@@ -139,7 +139,7 @@ const CASES = [
     const seen = [...new Set(full.items.map(f => f.crossVerdict))].sort()
     check(`${c.name}: full 결과에 판정 종류가 다 있다(동치가 공허하지 않다) — ${c.expect.join('·')}`,
       JSON.stringify(seen) === JSON.stringify(c.expect), JSON.stringify(seen))
-    check(`${c.name}: 미지정은 full — delta 스키마 · 응답 모양 줄이 없고 crossCoverage 키도 없다`,
+    check(`${c.name}: full 은 delta 스키마 · 응답 모양 줄이 없고 crossCoverage 키도 없다`,
       full.cross.length === 2 && !full.cross.some(x => x.schema && x.schema.properties && x.schema.properties.reviewedIds)
       && !('crossCoverage' in full.result), JSON.stringify({ cross: full.cross.length, keys: Object.keys(full.result) }))
     check(`${c.name}: delta 는 교차 두 콜에 delta 스키마 · 응답 모양 줄을 쓴다`, usesDelta(delta), `교차 ${delta.cross.length}콜`)

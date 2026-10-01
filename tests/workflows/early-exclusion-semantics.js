@@ -5,8 +5,9 @@
 //    확신도 말은 바로 앞 문장에 있어도 된다(`confidence 는 0-100 으로 단다. 70 미만은 뺀다.`). "N 이상만 보고" 꼴도 배제다.
 // ⛔ 확신도를 말하지만 배제가 아닌 문장은 잡지 않는다 — Lead 에스컬레이션(`판단 confidence < 60% 시`) · 병합 등급
 //    (`80 미만 결함은 hold`) · 보존 지시(`낮다고 빼지 않는다`). 아래 음성 예시가 이것들이다.
-// 이 파일이 보는 것: ① 합성 양성·음성 예시로 검사기 자체 ② peer-review 콜 입력(프롬프트·스키마) — 옵션 미지정은 모든 콜이 걸리고
-//    (실데이터 양성 대조), `preserveLowConfidence:true` 는 하나도 걸리지 않는다. 기준 트리(FZ_WF_ROOT)는 옵션을 몰라 ② 둘째가 FAIL 이다.
+// 이 파일이 보는 것: ① 합성 양성·음성 예시로 검사기 자체 ② peer-review 콜 입력(프롬프트·스키마) — `preserveLowConfidence:false` 는 모든 콜이 걸리고
+//    (실데이터 양성 대조), `true` 는 하나도 걸리지 않는다. 기준 트리(FZ_WF_ROOT)는 옵션을 몰라 ② 둘째가 FAIL 이다.
+//    ⛔ peer-review 는 v4.42.0 부터 이 옵션이 기본 on 이다 — 끈 경로는 명시 false 로 부른다(미지정 == 켬은 default-off-regression.js).
 // 검사기는 tests/workflows/low-confidence-preserved.js 가 문서 검사에 가져다 쓴다(module.exports).
 'use strict'
 const path = require('path')
@@ -121,9 +122,9 @@ if (require.main === module) {
 
   ;(async () => {
     for (const sc of SCENARIOS) {
-      const unset = await capture(sc.args, sc.fire)
+      const unset = await capture(Object.assign({ preserveLowConfidence: false }, sc.args), sc.fire)
       const missed = unset.filter(c => !c.prompt || !c.schema)
-      check(`${sc.name} · 옵션 미지정: 콜 ${unset.length}개 모두 프롬프트·스키마가 걸린다(실데이터 양성 대조)`,
+      check(`${sc.name} · 옵션 false: 콜 ${unset.length}개 모두 프롬프트·스키마가 걸린다(실데이터 양성 대조)`,
         unset.length > 0 && missed.length === 0, missed.map(c => `${c.label}(프롬프트 ${c.prompt} · 스키마 ${c.schema})`).join(', ') || '콜 0개')
       const on = await capture(Object.assign({ preserveLowConfidence: true }, sc.args), sc.fire)
       const leaked = on.filter(c => c.found.length)

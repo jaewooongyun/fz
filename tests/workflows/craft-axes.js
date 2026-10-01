@@ -136,9 +136,9 @@ const labels = calls => calls.map(c => c.label).sort().join(',')
     const archR = byLabel(rules.calls, 'stage1-arch')
     check(`${wf}: projectRulesPath → arch 에만 규칙 줄 · 부재 줄은 사라진다`, archR.prompt.includes(`[프로젝트 규칙 — 이 렌즈 전용] ${RULES}`) &&
       !archR.prompt.includes('규칙 인용 지적 금지') && rules.calls.length > 1 && rules.calls.filter(c => c.label !== 'stage1-arch').every(c => !c.prompt.includes(RULES)), '규칙 줄 위치')
-    // ── 4. 꺼짐 — 하위 옵션만 넘겨도 기본 경로 ──
-    const sub = await capture(wf, Object.assign({ projectRulesPath: RULES }, extra), axes)
-    check(`${wf}: craftAxes 없이 projectRulesPath 만 → craft·규칙 줄 없음 · axisCoverage 없음`,
+    // ── 4. 꺼짐 — 하위 옵션을 넘겨도 craft 가 켜지지 않는다(⛔ peer-review 는 기본 on 이라 끈 경로를 명시 false 로 부른다) ──
+    const sub = await capture(wf, Object.assign({ craftAxes: false, projectRulesPath: RULES }, extra), axes)
+    check(`${wf}: craftAxes:false 와 projectRulesPath → craft·규칙 줄 없음 · axisCoverage 없음`,
       sub.calls.length > 0 && sub.calls.every(c => !c.prompt.includes('[craft 축') && !c.prompt.includes('[프로젝트 규칙') && !has(c.schema, 'axisCoverage')), '하위 옵션이 새었다')
     // ⛔ 옵션은 콜을 더하거나 빼지 않는다 — 콜별 검사는 빠진 콜을 보지 못한다(빈 배열의 every 는 참이다)
     check(`${wf}: 켠 실행 · 규칙 실행 · 끈 실행의 콜 구성(label 다중집합)이 같다`, labels(on.calls) === labels(sub.calls) && labels(rules.calls) === labels(sub.calls),

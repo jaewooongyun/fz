@@ -33,7 +33,7 @@ metadata:
 
 ## 개요
 
-> 서브커맨드: review | verify | verify-gates | validate | check | final | adversarial | drift | plan | micro-eval | independent-plan | independent-review (12개 — 뒤 둘은 opt-in `--gpt-independent`)
+> 서브커맨드: review | verify | verify-gates | validate | check | final | adversarial | drift | plan | micro-eval | independent-plan | independent-review (12개 — 뒤 둘은 fz-peer-review 기본 · fz-review · fz-plan 은 opt-in `--gpt-independent`)
 
 - **래퍼 review** (`gpt-exec.sh review`): git diff + `--out` + 3-Tier 스킬 — review/check/final
 - **래퍼 exec** (`gpt-exec.sh exec`): `--prompt-file` + `--schema` — verify/validate/drift/plan
@@ -188,7 +188,7 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 | **plan** | 독립 플랜 (Claude와 교차 비교, C4 원칙) | /fz-plan cross-check | xhigh |
 | **micro-eval** | 단일 주장 독립 재평가 (claim-type 라우팅) | cross-validation Gate | medium |
 | **independent-plan** | 격리 첫 패스 플랜 — `scripts/gpt_independent.sh plan` (opt-in `--gpt-independent`) | /fz-plan cross-check | xhigh |
-| **independent-review** | 격리 첫 패스 리뷰 — `scripts/gpt_independent.sh review` (opt-in `--gpt-independent`) | /fz-review · /fz-peer-review | high |
+| **independent-review** | 격리 첫 패스 리뷰 — `scripts/gpt_independent.sh review` (/fz-peer-review 기본 · /fz-review 는 opt-in `--gpt-independent`) | /fz-review · /fz-peer-review | high |
 
 > independent-review 는 호출 스킬이 Workflow 와 **동시에** 띄우고 `scripts/review_merge.py` 로 합친다 — 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 

@@ -375,7 +375,7 @@ else SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인
 ⛔ **`setup-gpt-skills.sh` 는 Tier 2a 심볼릭(`gpt-skills/`)을 만든다 — 디스커버리의 필수 조건은 아니다.** 미실행이어도 `FZ_PLUGIN_ROOT` 가 있으면 Tier 2b 가 같은 번들 `SKILL.md` 를 돌려주고, 없으면 Tier 3 로 폴백한다. setup 이 더하는 것은 GPT CLI 가 자기 스킬 폴더에서 역할 스킬을 스스로 싣게 하는 것이다.
 ⛔ Claude 스킬(`skills/`)을 그 폴더에 링크하면 GPT 가 역할 스킬 대신 Claude 스킬을 고른다(A2-02 실측: 링크 확장 뒤 fz-reviewer 로드 28세션 중 26회 → 31세션 중 1회). 그래서 setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 `skills/` 를 가리키는 링크는 이름과 무관하게 지운다.
 
-### 독립 첫 패스 — `scripts/gpt_independent.sh` (opt-in `--gpt-independent`)
+### 독립 첫 패스 — `scripts/gpt_independent.sh` (fz-peer-review 기본 · fz-review · fz-plan 은 opt-in `--gpt-independent`)
 
 위 호출 계약의 GPT 는 대상 저장소와 **같은 디스크**를 본다 — 작업 폴더의 Claude 산출물과 `~/.claude/projects` 로그도 읽을 수 있다. 첫 패스를 Claude 결과와 독립으로 돌려야 할 때(SC-1)는 런처를 쓴다.
 

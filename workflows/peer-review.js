@@ -11,13 +11,15 @@
 //   reviewSurfacePath: `review-surface.md`(진단 산문). patch 와 함께 넘기면 렌즈가 부풀림 규모를 안다.
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality/correctness는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
-//   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어간다.
-//     미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다(tests/workflows/default-off-regression.js).
-//   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
-//   crossRequiredFields: ⛔ 기본 off(R-B). true 면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
-//   crossOutput: ⛔ 기본 'full'(미지정도 full). 'delta' 면 Stage 2 교차가 동의를 id 로만(reviewedIds) 내고 조정 · 기각 · 신규만 쓴다(S19b).
+//   ⛔ 아래 네 옵션(craftAxes · crossRequiredFields · crossOutput · preserveLowConfidence)은 **기본 on**이다(v4.42.0 — S25p peer-review
+//     판정 PASS). 끄는 값(false · crossOutput 'full')을 주면 모든 콜의 프롬프트·스키마가 기준(v4.39.1)과 바이트 단위로 같다 — 롤백 경로.
+//     review-live 의 같은 이름 옵션은 기본 off 다(S25 미달). 워크플로별 기본값: tests/workflows/default-off-regression.js 의 defaultOn.
+//   craftAxes: craft 6축 판정. 켜지면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어간다.
+//   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes 가 켜져 있을 때만 효력 · arch 렌즈에만.
+//   crossRequiredFields: 켜지면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
+//   crossOutput: 'delta'(기본) 면 Stage 2 교차가 동의를 id 로만(reviewedIds) 내고 조정 · 기각 · 신규만 쓴다(S19b). 'full' 이면 옛 전체 응답이다.
 //     PURE:cross-delta 가 full 모양으로 펴서 병합은 그대로다. 확인 목록에서 빠진 id 는 unreviewed 로 남고 crossCoverage 로 보고한다
-//     (tests/workflows/cross-delta-arm.js). 기본값 전환은 S25 가 SC-3 · SC-4 · AC-4 를 통과할 때만이다.
+//     (tests/workflows/cross-delta-arm.js).
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   deep=false → Tier 2 (Lite): Stage1 3-병렬만 (3-call). Confidence Matrix 미투표 — Lead 단순 병합.
 //   deep=true  → Tier 3 (Full): +Stage2 교차(arch↔quality) +Stage3 counter DA (6-call). Lead full Matrix.
@@ -88,7 +90,7 @@ const CrossReviewSchema = {
   },
 }
 
-// 교차 delta 응답 (S19b) — ⛔ 기본 off(crossOutput 미지정 = full). 동의는 id 만(reviewedIds) 쓰고 조정 · 기각 · 신규만 적는다.
+// 교차 delta 응답 (S19b) — ⛔ 기본 on(crossOutput 미지정 = delta · 'full' 이면 끈다). 동의는 id 만(reviewedIds) 쓰고 조정 · 기각 · 신규만 적는다.
 //    additions 는 full 과 같은 스키마를 참조한다. expandCrossDelta(PURE:cross-delta)가 full 모양으로 펴서 병합에 넘긴다.
 const CrossDeltaSchema = {
   type: 'object', required: ['reviewedIds', 'adjustments', 'rejections', 'additions'],
@@ -434,9 +436,9 @@ const TARGET = `[리뷰 대상] diff 파일: ${primaryDiff} (Read로 로드)\n[�
 // 구조 축 브리프 — arch 렌즈에만 주입 (modules/review-structural-axes.md §2).
 // quality/correctness는 결함 축을 유지해야 하고, A/B 검증도 review-arch 1개로만 이뤄졌다.
 const structuralLine = input.structuralContext ? `\n[구조 축 — 이 렌즈 전용] ${input.structuralContext}` : ''
-// craft 축 — arch 렌즈에만(structuralLine 과 같은 이유 — modules/review-structural-axes.md §2·§6). ⛔ 기본 off — 꺼지면 빈 문자열이다.
-// ⛔ projectRulesPath 는 craftAxes 의 하위 옵션이다 — craftAxes 없이 넘겨도 기본 경로를 바꾸지 않는다.
-const craftOn = input.craftAxes === true || input.craftAxes === 'true'
+// craft 축 — arch 렌즈에만(structuralLine 과 같은 이유 — modules/review-structural-axes.md §2·§6). ⛔ 기본 on — false 로 끄면 빈 문자열이다.
+// ⛔ projectRulesPath 는 craftAxes 의 하위 옵션이다 — craftAxes:false 와 함께 넘겨도 경로를 바꾸지 않는다.
+const craftOn = !(input.craftAxes === false || input.craftAxes === 'false')
 const craftLine = !craftOn ? '' :
   `\n[craft 축 — 이 렌즈 전용] ${CRAFT_AXES.join(' · ')} — 축마다 axisCoverage 에 1행(finding · none · not_applicable, note 에 근거)을 쓴다. ` +
   `craft 발견에는 craftAxis 를 단다. severity: ruleRef 가 프로젝트 규칙을 인용할 때만 minor 이상, 그 밖 craft 지적은 suggestion 까지.` +
@@ -453,23 +455,23 @@ function craftSummary(issueList, archResult) {
     missingAxes: CRAFT_AXES.filter(ax => !seen.has(ax)),
   }
 }
-// 교차 스테이지 필수 필드 재고지 (S17) — ⛔ 기본 off. 켜면 Stage 2 프롬프트에 additions 항목의 required 키를 **스키마에서 읽어** 적는다.
+// 교차 스테이지 필수 필드 재고지 (S17) — ⛔ 기본 on(false 로 끈다). 켜면 Stage 2 프롬프트에 additions 항목의 required 키를 **스키마에서 읽어** 적는다.
 //    키 목록을 여기 박지 않는다 — 스키마가 바뀌면 재고지 문구가 저절로 따라간다. 교차 워커가 additions 에 required 필드를
-//    빠뜨려 스키마 재출력이 났다(4/18 run). 효과(so_retries 0)는 R-C 의 S25 가 fz_wf_metrics 로 잰다.
-const crossRequiredOn = input.crossRequiredFields === true || input.crossRequiredFields === 'true'
+//    빠뜨려 스키마 재출력이 났다(4/18 run).
+const crossRequiredOn = !(input.crossRequiredFields === false || input.crossRequiredFields === 'false')
 const crossRequiredLine = !crossRequiredOn ? '' :
   `\n[필수 필드 — additions] 새 항목마다 ${CrossReviewSchema.properties.additions.items.required.join(' · ')} 를 모두 채운다(스키마 required — 하나라도 빠지면 출력이 거부돼 다시 쓰게 된다)`
-// 교차 delta 응답 (S19b) — ⛔ 기본 off. 켜면 교차 스키마를 CrossDeltaSchema 로 바꾸고 응답 모양을 한 줄로 알린다.
-const crossDeltaOn = input.crossOutput === 'delta'
+// 교차 delta 응답 (S19b) — ⛔ 기본 on('full' 이면 끈다). 켜면 교차 스키마를 CrossDeltaSchema 로 바꾸고 응답 모양을 한 줄로 알린다.
+const crossDeltaOn = input.crossOutput !== 'full'
 const crossSchema = crossDeltaOn ? CrossDeltaSchema : CrossReviewSchema
 const crossDeltaLine = !crossDeltaOn ? '' :
   `\n[응답 모양 — delta] 위 목록에서 확인한 id 를 전부 reviewedIds 에 적는다. 동의는 reviewedIds 에만 두고 따로 쓰지 않는다. ` +
   `조정은 adjustments(id · newSeverity · note), 기각(false_positive)은 rejections(id · note — 실측 인용 필수)에 쓴다. 동의한 항목을 다시 서술하지 않는다.`
-// 발견 단계 후보 보존 (S16b) — ⛔ 기본 off. 켜면 OVERRIDE 의 조기 필터 문장과 이슈 스키마의 confidence 설명을 **사본에서만** 바꾼다.
+// 발견 단계 후보 보존 (S16b) — ⛔ 기본 on(false 로 끈다). 켜면 OVERRIDE 의 조기 필터 문장과 이슈 스키마의 confidence 설명을 **사본에서만** 바꾼다.
 //    원본 상수는 그대로라 꺼지면 여섯 콜 모두 기준과 바이트 단위로 같다. 스키마 쪽 문구는 스키마에서 읽는다(두 번 박지 않는다).
 //    그 설명은 참조로 네 스키마(Stage 1 · ArchCraft · 교차 additions · counter missedIssues)에 퍼져 있어 콜마다 사본을 만든다.
 //    낮은 확신도 후보의 게시 여부는 병합이 정한다 — scripts/review_merge.py (MergeContract §10 게시 등급).
-const lowConfOn = input.preserveLowConfidence === true || input.preserveLowConfidence === 'true'
+const lowConfOn = !(input.preserveLowConfidence === false || input.preserveLowConfidence === 'false')
 const EARLY_FILTER_DESC = PeerReviewSchema.properties.issues.items.properties.confidence.description
 const LENS_OVERRIDE = !lowConfOn ? OVERRIDE : OVERRIDE.replace('confidence 80 미만은 보고하지 않는다. ',
   '[후보 보존] confidence 는 0-100 값으로 달되 낮다고 빼지 않는다 — 게시 여부는 병합이 정한다. ')

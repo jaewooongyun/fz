@@ -50,8 +50,8 @@ metadata:
 /fz-peer-review feature/TKT-1234      # 브랜치 리뷰
 /fz-peer-review 123 --deep            # Cross-Critique 활성화 (추가 ~$0.5-1.5)
 /fz-peer-review 123 --post            # 인라인 라인 앵커로 리뷰 게시
-/fz-peer-review 123 --gpt-independent # GPT 독립 첫 패스를 Workflow 와 동시에 — 병합은 review_merge.py (기본 off)
-/fz-peer-review 123 --render          # 리포트·코멘트·payload 를 review.json 하나에서 렌더 (기본 off)
+/fz-peer-review 123 --gpt-independent # GPT 독립 첫 패스를 Workflow 와 동시에 — 병합은 review_merge.py (기본 — 생략 가능)
+/fz-peer-review 123 --render          # 리포트·코멘트·payload 를 review.json 하나에서 렌더 (기본 — 생략 가능)
 /fz-peer-review 123 --tier 2          # Tier 강제 지정
 /fz-peer-review 123 --explain         # 리뷰 후 해설 — 기능 흐름 + 동작↔코드 1:1 (Tutor, ~20-30K)
 /fz-peer-review 123 --explain --light # 리뷰 후 해설 — Before/After 중심 (Standard, ~5-8K)
@@ -93,7 +93,7 @@ metadata:
 | `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
 | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
-| `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
+| `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4(+§6 craft — 이 스킬은 기본)를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
 | GPT challenger 스킬 | 관점 3(Over-Engineering) + 관점 7 보조 + Devil's Advocate |
@@ -261,7 +261,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 
 ### Tier 0/1 분기
 - **Tier 0** → `modules/peer-review-tiers.md` §Tier 0 절차로 위임. 본 SKILL.md Analyze 후속 섹션(Gate 0 / Tier 2 / Tier 3) 모두 skip.
-- **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip. ⊕ `--gpt-independent` 면 challenger 자리에 독립 첫 패스(아래 절)
+- **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip. ⊕ 기본으로 challenger 자리에 독립 첫 패스(아래 절)
 - **Tier 2/3** → 아래 기존 시퀀스 실행.
 
 ### Orchestrator Bias 방지 규칙 (InputHygiene 계약)
@@ -285,7 +285,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 > ⛔ **Tier 2/3 실행 상세**(Workflow 시퀀스 · 에이전트 출력 스키마 · Evidence-Only Brief · 병합 방법 A/B):
 > `modules/peer-review-workflow.md`. Tier 0/1 은 sub-agent·GPT 가 없어 **읽지 않는다**.
 
-### GPT 독립 첫 패스 (`--gpt-independent` · 기본 off)
+### GPT 독립 첫 패스 (기본 실행 — `--gpt-independent` 생략 가능)
 - **Workflow 직전에** `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff … --base … --head … [--rules-index {projectRulesPath}]` 를 background 로 띄우고, 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py"` 로 합친다. 경로는 **플러그인 루트 기준**이고, Workflow 스크립트는 세션 working directory 밖이면 **사전 복사**한 경로로 부른다
 - 순서 · 거부(오염 · 실패 · stale) 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서. Tier 3 GPT DA 는 병합 뒤다
 
@@ -429,14 +429,14 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 
 - `${WORK_DIR}/pr-comments.md` — 이슈별 부드러운 톤 PR 코멘트 모음 (복사/붙여넣기용)
 - `${WORK_DIR}/*-result.json` — 에이전트/GPT 원본 결과
-- ⊕ `--render`(기본 off)면 리포트·코멘트를 따로 쓰지 않는다 — 판정·문장만 `${WORK_DIR}/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review "${WORK_DIR}/review.json" --diff "${WORK_DIR}/diff.patch" --out-dir "${WORK_DIR}"` 가 위 두 문서와 `payload.json` · `render-preview.json` 을 만든다(줄 앵커는 `skills/fz-peer-review/scripts/diff_anchors.py` · 입력 형식은 렌더러 머리말). 미지정이면 위 절차 그대로다
+- ⊕ 기본으로(`--render` 생략 가능) 리포트·코멘트를 따로 쓰지 않는다 — 판정·문장만 `${WORK_DIR}/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review "${WORK_DIR}/review.json" --diff "${WORK_DIR}/diff.patch" --out-dir "${WORK_DIR}"` 가 위 두 문서와 `payload.json` · `render-preview.json` 을 만든다(줄 앵커는 `skills/fz-peer-review/scripts/diff_anchors.py` · 입력 형식은 렌더러 머리말). ⛔ 위 두 문서를 손으로 다시 쓰지 않는다 — 렌더러 출력이 단일 출처다
 
 #### --post 시 — 인라인 앵커 게시
 
 발견을 PR 대화창이 아니라 **코드 라인 옆**(Files changed)에 붙인다. 7단계 절차·실패 대응·다지점 분할 전문: `modules/peer-review-inline-anchoring.md`
 
 `앵커 계산(scripts/diff_anchors.py) → 구간 선택(Lead) → non_anchorable은 본문 인용 → payload(top-level body = **review-report.md 전문**) → ⛔확인 게이트 → gh api …/pulls/{N}/reviews → 착지 검증`
-> ⊕ `--render` 와 함께면 앵커 계산부터 payload 조립까지 렌더러가 끝낸다 — 겹치는 hunk 는 review.json 의 site `pick` 으로 Lead 가 고르고(없으면 렌더러가 거부한다), `render-preview.json` 의 `reasons` 가 아래 확인 게이트 (a)(b)(c) 다. 게시·착지 검증은 그대로다
+> ⊕ 렌더(기본)와 함께면 앵커 계산부터 payload 조립까지 렌더러가 끝낸다 — 겹치는 hunk 는 review.json 의 site `pick` 으로 Lead 가 고르고(없으면 렌더러가 거부한다), `render-preview.json` 의 `reasons` 가 아래 확인 게이트 (a)(b)(c) 다. 게시·착지 검증은 그대로다
 
 > ⛔ **확인 게이트** — 미리보기는 항상 출력하되, 차단은 셋 중 하나일 때만: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 (c) 겹치는 hunk 복수로 Lead가 구간 선택.
 > ⛔ `mcp__github__create_pull_request_review`로 대체 불가 — `comments[]`에 `start_line`·`side`가 없어 범위 하이라이트·LEFT 앵커가 안 된다. 이 스킬만 `Bash(gh *)`를 선언하는 이유.

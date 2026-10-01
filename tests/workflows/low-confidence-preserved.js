@@ -104,9 +104,9 @@ function check(name, cond, got) {
     check(`${tag}: confidence 40 후보가 반환 issues 에 값 그대로 남는다`, !!kept && kept.confidence === 40,
       kept ? `confidence ${kept.confidence}` : '반환에 없다')
 
-    const off = await capture(sc.args, sc.fire)
+    const off = await capture(Object.assign({ preserveLowConfidence: false }, sc.args), sc.fire)   // ⛔ peer-review 는 기본 on(v4.42.0) — 끈 경로는 명시
     const lost = off.calls.filter(c => !FILTER.test(c.prompt))
-    check(`${sc.name} · 옵션 미지정: 모든 콜 프롬프트에 기존 조기 필터가 남아 있다(기본 경로 유지)`, off.calls.length > 0 && lost.length === 0,
+    check(`${sc.name} · 옵션 false: 모든 콜 프롬프트에 기존 조기 필터가 남아 있다(끈 경로 = 옛 기본)`, off.calls.length > 0 && lost.length === 0,
       lost.map(c => c.label).join(',') || '콜 0개')
     check(`${sc.name}: 켠 실행과 끈 실행의 콜 구성(label 다중집합)이 같다`, labels(on.calls) === labels(off.calls), `켬 ${labels(on.calls)} · 끔 ${labels(off.calls)}`)
   }
