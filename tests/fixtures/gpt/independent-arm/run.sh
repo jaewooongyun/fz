@@ -100,7 +100,14 @@ check "plan: 감사 적중 0" "$(audit plan hits)" "[]"
 check "plan: 감사 iso = --keep-iso 로 남긴 격리 폴더" "$(audit plan iso)" "$ISO"
 check "plan: 감사 sessionFile = 세션 ID 파일" "$(audit plan sessionFile)" "$T/c-plan/out/A-plan.json.session"
 check "plan: 세션 파일 = 세션 ID" "$(tr -d '[:space:]' < "$T/c-plan/out/A-plan.json.session" 2>/dev/null)" "11111111-2222-3333-4444-555555555555"
-rm -rf "$ISO"
+# ⑫ 격리 폴더 정리(cleanup — resume 교차 뒤 Lead 가 부른다). 이름 · gpt-home 이 맞을 때만 지우고, 아니면 아무것도 지우지 않는다
+bash "$L" cleanup --iso "$T" >/dev/null 2>&1; check "cleanup: 런처가 만든 이름이 아니면 exit 10" "$?" 10
+[ -d "$T/c-plan" ] && ok "cleanup: 거부한 폴더는 그대로다" || no "cleanup: 거부한 폴더가 지워졌다"
+mkdir -p "$T/fz-gpt-iso.Zz9Zz9"; bash "$L" cleanup --iso "$T/fz-gpt-iso.Zz9Zz9" >/dev/null 2>&1
+check "cleanup: 이름만 같고 gpt-home 이 없으면 exit 10" "$?" 10
+bash "$L" cleanup >/dev/null 2>&1; check "cleanup: --iso 가 없으면 exit 10" "$?" 10
+bash "$L" cleanup --iso "$ISO" >/dev/null 2>&1; check "cleanup: --keep-iso 로 남긴 격리 폴더 exit 0" "$?" 0
+[ -n "$ISO" ] && [ ! -e "$ISO" ] && ok "cleanup: 격리 폴더가 사라졌다" || no "cleanup: 격리 폴더가 남았다: $ISO"
 
 # ② review 정상 — fz-reviewer 본문 1회 · base · head 복사 · 격리 폴더는 기본으로 지운다
 run review "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --base "$IN/base" --head "$IN/head"

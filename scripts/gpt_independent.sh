@@ -13,6 +13,7 @@
 #                             --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
 #   gpt_independent.sh review --diff F [--pr-meta F] [--requirement F] [--rules-index F] [--base D] [--head D] [--snapshot D]...
 #                             [--repo D [--deny D]...] [--gpt-agents] --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
+#   gpt_independent.sh cleanup --iso D   --keep-iso 로 남긴 격리 폴더를 지운다(resume 교차 뒤). 이름 fz-gpt-iso.XXXXXX · gpt-home/ 가 맞을 때만
 #   --gpt-agents review 전용 — 역할 파일(gpt-agents/*.toml)을 격리 홈 agents/ 에 넣고 두 렌즈 역할(fz-review-arch · fz-review-quality)만
 #             spawn 하게 한다(S14 · opt-in). 없으면 하위 에이전트 금지. 하위 에이전트는 부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
 #   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 와 --deny 는 막는다
@@ -30,10 +31,22 @@ die() { echo "INDEPENDENT-FAIL($1): $2" >&2; exit "$1"; }
 need() { [ "$1" -ge 2 ] || die 10 "$2 는 값이 필요하다"; }
 
 MODE="${1:-}"; shift || true
+# 격리 폴더 정리 — --keep-iso 로 남긴 폴더를 resume 교차가 끝난 뒤 지운다(modules/fz-gpt-subcommands-core.md § resume 교차).
+#   ⛔ Lead 명령줄의 `rm -rf "$ISO"` 는 자동 모드 안전 검사가 거부한다(R-C 측정 실측) — 지우기는 런처가 맡고 대상을 확인한다:
+#      이름이 이 런처의 mktemp 형식(fz-gpt-iso.XXXXXX)이고 격리 홈(gpt-home/)이 있어야 한다. 아니면 아무것도 지우지 않는다.
+if [ "$MODE" = "cleanup" ]; then
+  [ "${1:-}" = "--iso" ] && [ -n "${2:-}" ] || die 10 "cleanup 은 --iso D 가 필요하다"
+  D="$(cd "$2" 2>/dev/null && pwd -P)" || die 11 "격리 폴더가 없다: $2"
+  case "${D##*/}" in fz-gpt-iso.??????) ;; *) die 10 "이 런처가 만든 격리 폴더가 아니다: $D" ;; esac
+  [ -d "$D/gpt-home" ] || die 10 "격리 홈(gpt-home/)이 없다 — 격리 폴더가 아니다: $D"
+  rm -rf "$D" || die 11 "격리 폴더 삭제 실패: $D"
+  echo "INDEPENDENT-CLEANUP: $D"
+  exit 0
+fi
 case "$MODE" in
   plan) ROLE=planner ;;
   review) ROLE=reviewer ;;
-  *) die 10 "mode 는 plan|review — 받은 값: '${MODE}'" ;;
+  *) die 10 "mode 는 plan|review|cleanup — 받은 값: '${MODE}'" ;;
 esac
 
 ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 EFFORT="" REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO="" GPT_AGENTS=""

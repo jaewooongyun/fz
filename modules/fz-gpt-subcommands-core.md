@@ -89,9 +89,10 @@ SESSION_FILE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).
 CODEX_HOME="$ISO/gpt-home" "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$REVIEW_FILE" \
   --prompt-file "$P_VERIFY" --session-file "$SESSION_FILE" --effort high \
   --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
-rm -rf "$ISO"   # 교차가 끝나면 격리 홈을 지운다(인증은 링크뿐이다)
+bash "${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" cleanup --iso "$ISO"   # 교차가 끝나면 격리 홈을 지운다(인증은 링크뿐이다)
+#   ⛔ `rm -rf "$ISO"` 를 직접 쓰지 않는다 — 자동 모드가 거부한다. 런처가 이름(fz-gpt-iso.*)과 gpt-home/ 을 확인하고 지운다
 ```
-- ⛔ `ISO` 나 `SESSION_FILE` 이 비었으면(런처가 `--keep-iso` 없이 돌았거나 실패했다) resume 하지 않고 기본 `verify` 로 간다 — 빈 값으로 부르면 래퍼가 exit 10 이다. `ISO` 만 있으면 지운다(실패한 run 도 `--keep-iso` 면 격리 홈이 남는다)
+- ⛔ `ISO` 나 `SESSION_FILE` 이 비었으면(런처가 `--keep-iso` 없이 돌았거나 실패했다) resume 하지 않고 기본 `verify` 로 간다 — 빈 값으로 부르면 래퍼가 exit 10 이다. `ISO` 만 있으면 같은 `cleanup` 으로 지운다(실패한 run 도 `--keep-iso` 면 격리 홈이 남는다)
 - resume 은 래퍼가 `sandbox_mode="read-only"` 를 넘겨 격리 프로필의 deny 를 덮는다(F-348) — 이 단계는 교차 검증이라 독립이 아니어도 된다. 독립은 첫 패스의 몫이다
 
 ## verify-gates -- 게이트 원장 판정 (fz-plan Phase 2 추가 호출)
