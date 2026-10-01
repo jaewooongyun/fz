@@ -9,7 +9,8 @@ R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 L="${FZ_GPT_INDEPENDENT_UNDER_TEST:-$R/scripts/gpt_independent.sh}"
 export PATH="$R/tests/fixtures/gpt/_shim:$PATH"
-T="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$T"' EXIT
+# ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp -d)"` 는 mktemp 가 실패해도 `cd ""` 가 성공해(bash 3.2) 현재 폴더를 지운다
+T0="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }; T="$(cd "$T0" && pwd -P)"; trap 'rm -rf "$T"' EXIT
 
 fail=0
 ok() { echo "PASS  $1"; }
@@ -64,7 +65,7 @@ run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout �
   local body="ok"; [ -n "$outf" ] && body="$(cat "$outf")"
   local start; start=$(date +%s)
   env -u CODEX_HOME HOME="$H" FZ_TELEMETRY_DIR="$d/tel" FZ_SHIM_CAPTURE="$d/argv.json" FZ_SHIM_ENV_CAPTURE="$d/env.txt" \
-    FZ_SHIM_OUTPUT="$body" FZ_SHIM_ROLLOUT="$rolls" ${SLEEP:+FZ_SHIM_SLEEP="$SLEEP"} \
+    FZ_SHIM_OUTPUT="$body" FZ_SHIM_ROLLOUT="$rolls" ${SLEEP:+FZ_SHIM_SLEEP="$SLEEP"} ${IGNORE_TERM:+FZ_SHIM_IGNORE_TERM=1} ${TMPX:+TMPDIR="$TMPX"} \
     bash "$L" "$@" --arm A --run-id "$name" --out-dir "$d/out" > "$d/stdout" 2> "$d/stderr"
   echo $? > "$d/rc"; echo $(( $(date +%s) - start )) > "$d/secs"
 }
@@ -111,6 +112,8 @@ bash "$L" cleanup --iso "$ISO" >/dev/null 2>&1; check "cleanup: --keep-iso 로 �
 
 # ② review 정상 — fz-reviewer 본문 1회 · base · head 복사 · 격리 폴더는 기본으로 지운다
 run review "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --base "$IN/base" --head "$IN/head"
+headsum() { python3 -c 'import json,sys; h=json.load(open(sys.argv[1]))["head"]; print(h["expected"], h["present"], ",".join(h["missing"]))' "$T/c-$1/out/A-$1.audit.json" 2>/dev/null || echo "-"; }
+check "review: 감사 head — 변경 후 경로 1 · 있음 1 · 빠짐 없음" "$(headsum review)" "1 1 "
 check "review: exit 0" "$(rc review)" 0
 check "review: fz-reviewer 본문 1회" "$(count review '# fz-reviewer — Code Review Skill')" 1
 RISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-review/env.txt")"
@@ -161,18 +164,29 @@ check "감사(repo 뒤 ~ 재귀): exit 15" "$(rc audmix)" 15
 # ④c 재귀 검색 규칙 문자열 단위 — /Users 경로(macOS 저장소 모양). ⛔ 파일을 만들지 않는다 — 실제 홈을 건드리지 않는다
 #    ④b 의 가짜 홈은 /Users 밖이라 옛 결함(/Users 아래 전부 적중)을 재현하지 못한다 — 규칙 블록을 직접 꺼내 잰다
 UNIT="$(python3 - "$L" <<'UPY'
-import re, sys
+import os, re, sys
 t = open(sys.argv[1], encoding="utf-8").read()
-env = {"re": re, "repo": "/Users/u/dev/repo", "iso": "/private/tmp/iso"}
+m = re.search(r"^FZ_ART_NAMES='([^']*)'", t, re.M)
+if m:
+    os.environ["FZ_ART_NAMES"] = m.group(1)
+env = {"re": re, "os": os, "repo": "/Users/u/dev/repo", "iso": "/private/tmp/iso"}
 exec(t[t.index("ROOTS = r"):t.index("def home_ref(cmd):")], env)
 hit = env.get("recurse_hit") or (lambda c: any(x.search(c) for x in env["RECURSE"]))
 cases = [("rg --files /Users/u/dev/repo -g '!.git'", False), ("find /Users/u/dev/repo -name x", False),
          ("rg foo /Users/u/dev/repo ~", True), ("rg --files /Users/u", True), ("find / -name x", True),
-         ("grep -rn x /Users/u/dev/other", True)]
-print(" ".join("ok" if hit(c) == w else "bad:" + c.split()[0] for c, w in cases))
+         ("grep -rn x /Users/u/dev/other", True),
+         # 리뷰 F6 — 공백 든 따옴표 패턴은 뿌리가 아니다 · 패턴을 지운 뒤에도 그 뒤 뿌리는 적중 · `..` 탈출은 적중
+         ("rg -n 'bounds.width / 2' Sources/", False), ("grep -rn 'x ~ y' .", False),
+         ("rg 'a b' /Users/someone", True), ("rg x /Users/u/dev/repo/../..", True)]
+out = ["ok" if hit(c) == w else "bad:" + c.split()[0] for c, w in cases]
+forbid = env.get("forbid_hit")
+fcases = [("cat T-1/plan/plan-final.md", True), ("cat work/workflow-result.json", True), ("cat ~/.claude/projects/p/a.jsonl", True),
+          ("cat Sources/Foo/code-context-builder.swift", False), ("cat ci/test-result.json", False), ("rg 'workflow-result' scripts", False)]
+out += ["ok" if forbid and forbid(c) == w else "fbad:" + c.split()[-1] for c, w in fcases]
+print(" ".join(out))
 UPY
 )"
-check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖은 적중)" "$UNIT" "ok ok ok ok ok ok"
+check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위)" "$UNIT" "ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok"
 
 # ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(끌 수 없다 — S11 ⑤)
 run sub "$HERE/sample-review-ok.json" "$T/r-parent.jsonl,$T/r-sub.jsonl" review --diff "$IN/diff.patch"
@@ -191,6 +205,16 @@ SLEEP=29.7 run hang "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requireme
 check "시간 초과: exit 16" "$(rc hang)" 16
 [ "$(cat "$T/c-hang/secs")" -lt 15 ] && ok "시간 초과: 타이머 뒤 곧 끝난다($(cat "$T/c-hang/secs")s)" || no "시간 초과: $(cat "$T/c-hang/secs")s 걸렸다"
 sleep 1; pgrep -f 'sleep 29.7' >/dev/null && no "시간 초과: CLI 의 자식이 고아로 남았다" || ok "시간 초과: CLI 의 자식까지 종료"
+# ⑦b 정상 run 뒤 감시자의 sleep 이 남지 않는다 — 옛 판은 run 마다 `sleep $TIMEOUT` 을 고아로 남겼다(리뷰 F5)
+run watchok "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md" --timeout 1797
+check "감시자 정리: exit 0" "$(rc watchok)" 0
+sleep 1; pgrep -f 'sleep 1797' >/dev/null && no "감시자 정리: sleep 1797 이 고아로 남았다" || ok "감시자 정리: 고아 sleep 없음"
+pkill -f 'sleep 1797' 2>/dev/null   # 옛 판을 잴 때 남는 고아를 치운다
+# ⑦c TERM 을 무시하는 자손 — 시간 초과면 KILL 까지 간다. 옛 판은 TERM 에 래퍼가 죽자 감시자를 먼저 죽여 자손이 남았다(리뷰 F5 · G2)
+IGNORE_TERM=1 SLEEP=29.6 run hangterm "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md" --timeout 2
+check "TERM 무시 자손: exit 16" "$(rc hangterm)" 16
+sleep 1; pgrep -f 'sleep 29.6' >/dev/null && no "TERM 무시 자손: KILL 되지 않고 남았다" || ok "TERM 무시 자손: KILL 로 정리"
+pkill -KILL -f 'sleep 29.6' 2>/dev/null
 
 # ⑧ planner 거부 → exit 17
 printf '%s' '{"status":"rejected","reason":"claude_plan_detected","approach":"-","affectedFiles":{"new":0,"modified":0},"steps":[],"riskMatrix":[],"stressTest":[],"implicationRegister":[],"divergencePoints":[],"projectRules":{"axes":{"architecturePattern":null,"uiStack":null,"dependencyDirection":null,"naming":null,"placement":null,"conventions":null},"rules":[],"conflicts":[],"gaps":[]}}' > "$T/rejected.json"
@@ -233,8 +257,58 @@ check "역할 plan: exit 10(review 전용)" "$(rc rolesplan)" 10
 # ⑪ 사용법 → exit 10
 run u1 "" "" plan
 run u2 "" "" review --diff "$IN/diff.patch" --sprint-contract "$IN/requirement.md"
-run u3 "" "" plan --requirement "$IN/requirement.md" --deny "$IN"
+run u3 "" "" plan --requirement "$IN/requirement.md" --timeout 0
 for c in u1 u2 u3; do check "사용법($c): exit 10" "$(rc $c)" 10; done
+
+# ⑬ 리뷰 반영 회귀 — 각 항목은 옛 런처에서 FAIL 한다
+# ⑬a mktemp 실패 — 격리 폴더가 현재 폴더로 풀리지 않는다(bash 3.2 의 `cd ""` 는 성공한다 · 옛 판은 현재 폴더를 지웠다 — F1)
+mkdir -p "$T/sandbox"; echo keep > "$T/sandbox/marker"
+(cd "$T/sandbox" && TMPX=/nonexistent/fz-tmp run tmpfail "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md")
+check "mktemp 실패: exit 11" "$(rc tmpfail)" 11
+[ -f "$T/sandbox/marker" ] && ok "mktemp 실패: 현재 폴더가 지워지지 않는다" || no "mktemp 실패: 현재 폴더가 지워졌다"
+# ⑬b 같은 stem 재실행 — 옛 .contaminated 가 남아 깨끗한 재실행을 거부하지 않는다(F2)
+run rerun "$HERE/sample-plan-ok.json" "$T/r-claude.jsonl" plan --requirement "$IN/requirement.md"
+check "재실행 1차(오염): exit 15" "$(rc rerun)" 15
+run rerun "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md"
+check "재실행 2차(정상): exit 0" "$(rc rerun)" 0
+[ ! -e "$T/c-rerun/out/A-rerun.contaminated" ] && ok "재실행: 옛 .contaminated 가 지워졌다" || no "재실행: 옛 .contaminated 가 남았다"
+# ⑬c 감사 선기록 — 래퍼가 도는 동안 감사는 'running'(exit null)이다 · 끝나면 덮인다(F2 — 중간에 멈춘 run 은 병합이 거부한다)
+(SLEEP=4 run running "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md") &
+RUNP=$!; sleep 2
+check "감사 선기록: 실행 중 exit null" "$(audit running exit)" None
+wait "$RUNP"
+check "감사 선기록: 끝나면 exit 0" "$(audit running exit)" 0
+# ⑬d 규칙 레코드를 원문 색인 자리에 넘기면 거부한다(F3 — Claude 해석이 GPT 첫 패스로 새는 것)
+printf '%s\n' '{"schemaVersion": 1, "axes": [], "rules": [{"id": "R1", "axis": "naming", "authority": "project"}], "conflicts": [], "gaps": []}' > "$IN/records.json"
+printf '%s\n' '{"schemaVersion": 1, "absent": false, "files": [], "sections": []}' > "$IN/index.json"
+run rulesrec "" "" review --diff "$IN/diff.patch" --rules-index "$IN/records.json"
+check "규칙 레코드 → exit 11" "$(rc rulesrec)" 11
+check "규칙 레코드: CLI 미호출" "$(called rulesrec)" 0
+run rulesidx "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --rules-index "$IN/index.json"
+check "원문 색인 → exit 0" "$(rc rulesidx)" 0
+# ⑬e --deny 는 --repo 없이도 받고 권한 프로필 deny 에 들어간다(F7 — HOME 밖 작업 폴더)
+run denyonly "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --deny "$IN/snap-ok" --keep-iso
+check "--deny(저장소 없이): exit 0" "$(rc denyonly)" 0
+DISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-denyonly/env.txt")"
+grep -qF "\"$(cd "$IN/snap-ok" && pwd -P)\" = \"deny\"" "$DISO/gpt-home/config.toml" 2>/dev/null && ok "--deny: 권한 프로필에 deny 가 있다" || no "--deny: 권한 프로필에 없다"
+[ -n "$DISO" ] && bash "$L" cleanup --iso "$DISO" >/dev/null 2>&1
+# ⑬f head/ 결손 표시 — 변경 후 파일이 head/ 에 없으면 감사가 빠진 경로를 적는다(F14 · fail-visible)
+mkdir -p "$IN/head-empty"
+run headmiss "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --base "$IN/base" --head "$IN/head-empty"
+check "head 결손: 감사 head — 1 · 0 · src/a.ts" "$(headsum headmiss)" "1 0 src/a.ts"
+# ⑬g 미러 안 범용 이름은 저장소 파일이다 — base/head 의 payload.json 은 거부하지 않는다 · fz 고유 이름은 거부한다(F6)
+mkdir -p "$IN/base-gen" "$IN/head-gen" "$IN/head-fz/T-1/plan"; echo '{}' > "$IN/base-gen/payload.json"; echo '{}' > "$IN/head-gen/payload.json"
+echo x > "$IN/head-fz/T-1/plan/plan-final.md"
+run mirrorgen "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --base "$IN/base-gen" --head "$IN/head-gen"
+check "미러 범용 이름(payload.json): exit 0" "$(rc mirrorgen)" 0
+run mirrorfz "" "" review --diff "$IN/diff.patch" --base "$IN/base" --head "$IN/head-fz"
+check "미러 fz 고유 이름(plan-final.md): exit 15" "$(rc mirrorfz)" 15
+# ⑬h 감사 블록이 예외로 죽으면 exit 11 · 감사는 running 그대로(F2 — 옛 판은 exit 1 · 감사 없음이라 병합이 '런처 밖 입력'으로 받았다)
+#     .md 자리에 폴더를 두면 감사 블록의 렌더 쓰기가 IsADirectoryError 로 죽는다(결정적 주입)
+mkdir -p "$T/c-auditcrash/out/A-auditcrash.md"
+run auditcrash "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md"
+check "감사 블록 예외: exit 11" "$(rc auditcrash)" 11
+check "감사 블록 예외: 감사 exit null(running)" "$(audit auditcrash exit)" None
 
 echo
 [ "$fail" -eq 0 ] && echo "independent-arm: 전건 통과" || echo "independent-arm: 실패 있음"

@@ -9,23 +9,31 @@
 #    rollout 감사는 격리가 실제로 걸렸는지와 시도를 보는 보조 확인이다.
 #
 # usage:
-#   gpt_independent.sh plan   --requirement F [--sprint-contract F] [--rules-index F] [--snapshot D]... [--repo D [--deny D]...]
+#   gpt_independent.sh plan   --requirement F [--sprint-contract F] [--rules-index F] [--snapshot D]... [--repo D] [--deny D]...
 #                             --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
 #   gpt_independent.sh review --diff F [--pr-meta F] [--requirement F] [--rules-index F] [--base D] [--head D] [--snapshot D]...
-#                             [--repo D [--deny D]...] [--gpt-agents] --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
+#                             [--repo D] [--deny D]... [--gpt-agents] --arm A --run-id ID --out-dir D [--timeout S] [--effort E] [--keep-iso]
 #   gpt_independent.sh cleanup --iso D   --keep-iso 로 남긴 격리 폴더를 지운다(resume 교차 뒤). 이름 fz-gpt-iso.XXXXXX · gpt-home/ 가 맞을 때만
 #   --gpt-agents review 전용 — 역할 파일(gpt-agents/*.toml)을 격리 홈 agents/ 에 넣고 두 렌즈 역할(fz-review-arch · fz-review-quality)만
 #             spawn 하게 한다(S14 · opt-in). 없으면 하위 에이전트 금지. 하위 에이전트는 부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
-#   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 와 --deny 는 막는다
+#   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 는 막는다
+#   --deny    더 막을 폴더(작업 폴더 WORK_DIR 등) — --repo 와 무관하게 권한 프로필 deny 로 넣는다. 권한 프로필은 디스크 전체 읽기에서
+#             HOME · 임시 폴더만 막으므로, HOME 밖 작업 폴더의 Claude 산출은 --deny 가 없으면 읽힌다
+#   --rules-index 지침 원문 색인(extract_project_rules.py 출력 — files · sections). ⛔ 규칙 레코드(rules · axes — Claude 가 해석한
+#             check_project_rules 통과본)를 넘기면 독립이 깨진다 — 모양으로 판별해 exit 11
 #   --snapshot 소비자 · 공유 모듈 본문 폴더 — 격리 폴더의 snapshot/<이름>/ 으로 복사한다(리뷰 범위를 줄이지 않는다)
 #
 # 산출(out-dir): <arm>-<run-id>.json (스키마 출력) · .md (사람용) · .audit.json · .rollouts/ (세션 로그 사본) · .contaminated (오염 시) · .json.session(세션 ID — 감사 sessionFile · --keep-iso 면 감사 iso · resume 입력)
+#   ⛔ 시작할 때 같은 stem 의 옛 산출을 지우고 감사를 'running'(exit null)으로 먼저 쓴다 — 중간에 멈춘 run 의 산출은 병합 · 차이표가 거부한다
 # exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건 · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
 #   ⛔ 10~17 은 전부 첫 패스 결과가 아니다 — 0건으로 읽지 않는다.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# fz 고유 산출물 이름(경로 성분 전체 일치) — 입력 가드 · base/head 미러 · 스냅샷 · rollout 감사가 이 표 하나를 쓴다(두 목록이 어긋나던 결함).
+#   ⛔ 범용 이름(payload.json · *-result.json)은 여기 넣지 않는다 — 저장소 파일에 흔하다. 직접 입력에만 따로 댄다(GUARD)
+FZ_ART_NAMES='code-context\.md|plan-v[0-9][^/]*\.md|plan-final[^/]*\.md|workflow-result[^/]*\.json|review-report\.md|pr-comments\.md|self-review\.md|triage\.md|render-preview\.json'
 
 die() { echo "INDEPENDENT-FAIL($1): $2" >&2; exit "$1"; }
 need() { [ "$1" -ge 2 ] || die 10 "$2 는 값이 필요하다"; }
@@ -88,7 +96,6 @@ else
   [ -z "$SC" ] || die 10 "review 는 --sprint-contract 를 받지 않는다"
   EFFORT="${EFFORT:-high}"
 fi
-[ "${#DENIES[@]}" -eq 0 ] || [ -n "$REPO" ] || die 10 "--deny 는 --repo 안에서 더 막을 경로다 — --repo 없이 줄 수 없다"
 [ -z "$GPT_AGENTS" ] || [ "$MODE" = "review" ] || die 10 "--gpt-agents 는 review 전용이다(역할 파일은 리뷰 렌즈다)"
 
 # ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — Claude 산출물이 첫 패스에 들어가면 독립이 아니다)
@@ -97,35 +104,41 @@ REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)" |
 [ -f "$REAL_GPT_HOME/auth.json" ] || die 11 "인증 파일이 없다: $REAL_GPT_HOME/auth.json (로그인 필요)"
 for f in "$REQ" "$SC" "$RULES" "$DIFF" "$META"; do [ -z "$f" ] || [ -s "$f" ] || die 11 "입력 파일 없음/빈 파일: $f"; done
 for d in "$BASE_DIR" "$HEAD_DIR" "$REPO" "${SNAPS[@]+"${SNAPS[@]}"}" "${DENIES[@]+"${DENIES[@]}"}"; do [ -z "$d" ] || [ -d "$d" ] || die 11 "입력 폴더 없음: $d"; done
-GUARD="$(python3 - "$REAL_HOME" "$REQ" "$SC" "$RULES" "$DIFF" "$META" -- "$BASE_DIR" "$HEAD_DIR" "${SNAPS[@]+"${SNAPS[@]}"}" -- "$REPO" <<'PY'
+GUARD="$(FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$REAL_HOME" "$REQ" "$SC" "$RULES" "$DIFF" "$META" -- "$BASE_DIR" "$HEAD_DIR" "${SNAPS[@]+"${SNAPS[@]}"}" -- "$REPO" <<'PY'
 import os, re, sys
 home, argv = sys.argv[1], sys.argv[2:]
 a = argv.index("--"); b = argv.index("--", a + 1)
 files, dirs, repo = [x for x in argv[:a] if x], [x for x in argv[a + 1:b] if x], [x for x in argv[b + 1:] if x]
-BAD = re.compile(r"^(code-context.*|plan-v\d.*|plan-final.*|.*workflow-result.*|.*-result\.json|review-report\.md|pr-comments\.md"
-                 r"|payload\.json|render-preview\.json|self-review\.md|triage\.md)$")
+FZ = re.compile(os.environ["FZ_ART_NAMES"])                 # fz 고유 이름 — 어디서든 금지
+GENERIC = re.compile(r"payload\.json|.+-result\.json")      # 범용 이름 — 직접 입력에만(base/head 미러 · 스냅샷은 저장소 파일이다)
 claude = os.path.join(home, ".claude")
 hits = []
-def check(p, name_check=True):
+def check(p, names):
     rp = os.path.realpath(p)
     if rp == claude or rp.startswith(claude + os.sep):
         hits.append(f"{p} — ~/.claude 아래(에이전트 로그 · journal)")
-    elif name_check and BAD.match(os.path.basename(rp)):
+    elif any(r.fullmatch(os.path.basename(rp)) for r in names):
         hits.append(f"{p} — Claude 산출물 이름")
 for f in files:
-    check(f)
+    check(f, (FZ, GENERIC))
 for d in dirs:
-    check(d, name_check=False)
+    check(d, ())
     for root, _, names in os.walk(d):
         for n in names:
-            check(os.path.join(root, n))
+            check(os.path.join(root, n), (FZ,))
 for r in repo:
-    check(r, name_check=False)
+    check(r, ())
 print("\n".join(hits))
 PY
 )" || die 11 "입력 판정 실패"
 [ -z "$GUARD" ] || die 15 "허용 목록 밖 입력 — 독립 첫 패스가 아니다:
 $GUARD"
+# ⛔ --rules-index 는 원문 색인이다 — 규칙 레코드(Claude 의 해석)를 넘기면 GPT 가 그 해석을 원문으로 알고 받아쓴다(독립 붕괴 · 리뷰 C:C-1)
+if [ -n "$RULES" ] && python3 -c 'import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+sys.exit(0 if isinstance(d, dict) and "rules" in d and "sections" not in d else 1)' "$RULES" 2>/dev/null; then
+  die 11 "--rules-index 에 규칙 레코드(rules · axes — Claude 가 해석한 통과본)를 넘겼다. 지침 원문 색인(extract_project_rules.py 의 files · sections)을 넘긴다"
+fi
 
 # ── 같은 --out 동시 실행 거부 (mkdir 는 원자적이다)
 mkdir -p "$OUT_DIR" || die 11 "--out-dir 생성 실패: $OUT_DIR"
@@ -134,11 +147,20 @@ BASE_NAME="${ARM}-${RUN_ID}"
 OUT="$OUT_DIR/$BASE_NAME.json"
 mkdir "$OUT.lock" 2>/dev/null || die 10 "같은 --out 이 이미 실행 중이다(또는 전 실행의 잠금이 남았다): $OUT.lock"
 ISO=""
-cleanup() { rm -rf "$OUT.lock"; [ -n "$ISO" ] && [ -z "$KEEP_ISO" ] && rm -rf "$ISO"; }
+# ⛔ 지우기 전에 이름을 확인한다 — 격리 폴더 경로가 잘못 풀리면(빈 mktemp 결과 · bash 3.2 의 `cd ""` 는 성공한다) 현재 폴더를 지운다
+cleanup() { rm -rf "$OUT.lock"; [ -n "$ISO" ] && [ -z "$KEEP_ISO" ] && case "${ISO##*/}" in fz-gpt-iso.??????) rm -rf "$ISO" ;; esac; }
 trap cleanup EXIT
 
+# ── 같은 stem 의 옛 산출 정리 + 감사 선기록 — 다시 돌린 run 이 옛 `.contaminated` 로 거부되거나, 옛 성공 감사가 새 미감사 출력을 보증하지 않게.
+#    ⛔ 지울 파일은 명시 목록이다(글롭 금지). 감사는 'running'(exit null)으로 먼저 쓰고 끝에 덮는다 — 중간에 멈춘 run 은 병합 · 차이표가 거부한다
+rm -f "$OUT" "$OUT.session" "$OUT.stream.log" "$OUT_DIR/$BASE_NAME.md" "$OUT_DIR/$BASE_NAME.audit.json" \
+  "$OUT_DIR/$BASE_NAME.contaminated" "$OUT_DIR/$BASE_NAME.wrapper.log"
+printf '{"exit": null, "note": "running — 감사가 끝나기 전에 런처가 멈췄다(중단 · 시그널 · 감사 실패). 결과가 아니다"}\n' > "$OUT_DIR/$BASE_NAME.audit.json"
+
 # ── 격리 폴더 — ⛔ 경로는 전부 realpath(`/tmp`→`/private/tmp` · `/var/folders`→`/private/var/folders`). deny·read 표기가 어긋나면 중첩 규칙이 안 맞는다
-ISO="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/fz-gpt-iso.XXXXXX")" && pwd -P)" || die 11 "격리 폴더 생성 실패"
+#    ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp …)"` 꼴은 mktemp 가 실패해도 `cd ""` 가 성공해 현재 폴더가 격리 폴더가 된다(bash 3.2 실측)
+ISO_TMP="$(mktemp -d "${TMPDIR:-/tmp}/fz-gpt-iso.XXXXXX")" || die 11 "격리 폴더 생성 실패(mktemp)"
+ISO="$(cd "$ISO_TMP" && pwd -P)" || die 11 "격리 폴더 경로 해석 실패: $ISO_TMP"
 mkdir -p "$ISO/gpt-home/skills" "$ISO/home" "$ISO/input" || die 11 "격리 폴더 구성 실패"
 ln -s "$REAL_GPT_HOME/auth.json" "$ISO/gpt-home/auth.json" || die 11 "인증 링크 실패"   # ⛔ 인증은 링크만 — 내용을 복사하지 않는다
 for s in "$PLUGIN_ROOT"/gpt-skills/fz-*; do cp -R "$s" "$ISO/gpt-home/skills/" || die 11 "스킬 사본 실패: $s"; done
@@ -174,8 +196,8 @@ if repo:
     for sub in (".claude", ".fz-work"):
         if os.path.isdir(os.path.join(repo, sub)):
             fs.append((os.path.join(repo, sub), "deny"))
-    for d in denies:
-        fs.append((os.path.realpath(d), "deny"))
+for d in denies:   # ⛔ --repo 와 무관 — 프로필은 디스크 전체 읽기에서 출발해 HOME 밖 작업 폴더는 이것이 없으면 읽힌다
+    fs.append((os.path.realpath(d), "deny"))
 lines = ['default_permissions = "fz-iso"']
 if model:
     lines.append(model)
@@ -212,6 +234,7 @@ PY
   else
     echo "## 출력"
     echo "스키마의 JSON 한 객체 — 결함은 issues, 솜씨 항목은 craft, 6축마다 axis_coverage 한 행. 파일 경로는 저장소 상대 경로로 쓴다(head/ 접두 없이)."
+    echo "issues 와 craft 의 evidence 에는 diff 에 있는 코드 원문을 백틱으로 인용한다 — 병합이 그 인용을 diff 에서 다시 찾지 못하면 게시하지 않는다."
   fi
 } > "$ISO/prompt.txt"
 
@@ -223,16 +246,20 @@ perl -e 'setpgrp(0, 0); exec @ARGV' env HOME="$ISO/home" CODEX_HOME="$ISO/gpt-ho
   --effort "$EFFORT" --gpt-skill "$ROLE" --inject-skill "$ISO/gpt-home/skills/fz-$ROLE/SKILL.md" --config-permissions \
   > "$OUT_DIR/$BASE_NAME.wrapper.log" 2>&1 &
 WPID=$!
-( sleep "$TIMEOUT"; touch "$ISO/.timed-out"; kill -TERM -- "-$WPID" 2>/dev/null; sleep 3; kill -KILL -- "-$WPID" 2>/dev/null ) >/dev/null 2>&1 &
+# 감시자 — ⛔ 자기 sleep 을 trap 으로 정리한다(서브셸만 죽이면 `sleep $TIMEOUT` 이 고아로 남는다 — 정상 run 마다 30분짜리 프로세스).
+#    ⛔ 시간 초과면 본문이 감시자를 죽이지 않고 KILL 까지 기다린다 — TERM 을 무시한 자손이 격리 폴더를 지운 뒤에도 남지 않게
+( trap 'kill "$SP" 2>/dev/null; exit 0' TERM; sleep "$TIMEOUT" & SP=$!; wait "$SP"
+  touch "$ISO/.timed-out"; kill -TERM -- "-$WPID" 2>/dev/null; sleep 3; kill -KILL -- "-$WPID" 2>/dev/null ) >/dev/null 2>&1 &
 TPID=$!
 wait "$WPID"; RC=$?
-kill "$TPID" 2>/dev/null; wait "$TPID" 2>/dev/null
+if [ -f "$ISO/.timed-out" ]; then wait "$TPID" 2>/dev/null
+else kill "$TPID" 2>/dev/null; wait "$TPID" 2>/dev/null; fi
 TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
 
 # ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(spawn 을 못 끈다 — S11 ⑤)
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
-python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" <<'PY'
+FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" <<'PY'
 import glob, hashlib, json, os, re, sys
 mode, out, stem, home, repo, iso, rc, timed_out, schema_p = sys.argv[1:10]
 keep = sys.argv[10:11] == ["1"]   # --keep-iso — 격리 홈이 남아야 resume 이 세션을 잇는다
@@ -241,16 +268,28 @@ inputs = {n: hashlib.sha256(open(os.path.join(iso, "input", n), "rb").read()).he
           for n in ("diff.patch", "requirement.md", "sprint-contract.md", "rules-index.json", "pr-meta.json")
           if os.path.isfile(os.path.join(iso, "input", n))}
 rc, timed_out = int(rc), timed_out == "1"
+# head/ 결손 표시(fail-visible) — diff 의 변경 후 경로(+++ b/…)가 head/ 미러에 있는가. 삭제만 있는 PR 은 head/ 가 정당하게 빈다
+head = None
+hdir, dpath = os.path.join(iso, "input", "head"), os.path.join(iso, "input", "diff.patch")
+if mode == "review" and os.path.isdir(hdir) and os.path.isfile(dpath):
+    post = sorted({m.group(1) for m in re.finditer(r"(?m)^\+\+\+ b/([^\t\n]+)", open(dpath, encoding="utf-8", errors="replace").read())})
+    miss = [p for p in post if not os.path.isfile(os.path.join(hdir, p))]
+    head = {"expected": len(post), "present": len(post) - len(miss), "missing": miss[:20]}
 rolls = sorted(glob.glob(os.path.join(stem + ".rollouts", "*.jsonl")))
-FORBID = re.compile(r"\.claude/|plan-v\d|workflow-result|-result\.json|code-context|review-report\.md|pr-comments\.md")
 ROOTS = r"(~|\$HOME|/Users(?:/[^\s'\"]*)?|/)(?=[\s'\";|&)]|$)"
+FZ_ART = re.compile(os.environ["FZ_ART_NAMES"])
+def forbid_hit(cmd):
+    """Claude 산출물 참조 — `.claude/` 경로 또는 fz 고유 산출물 이름(경로 성분 전체 일치 · 입력 가드와 같은 표).
+    ⛔ 부분 문자열로 보지 않는다 — `code-context-builder.swift` · `ci/test-result.json` · 검색 패턴 'workflow-result' 는 산출물이 아니다.
+       범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다"""
+    return ".claude/" in cmd or any(FZ_ART.fullmatch(t) for t in re.findall(r"[^\s'\"/;|&()<>=]+", cmd))
 FIND_ROOT = re.compile(rf"\bfind\s+{ROOTS}")                      # find 는 첫 인자가 검색 뿌리다
 MULTI_HEADS = [re.compile(r"\b(?:rg|fd|ag)\b"), re.compile(r"\bgrep\s+-[a-zA-Z]*[rR][a-zA-Z]*\b"),
                re.compile(r"\bls\s+-[a-zA-Z]*R[a-zA-Z]*\b")]
 ROOT_ARG = re.compile(rf"\s{ROOTS}")
 def under_allowed(p):
     """허용된 저장소(--repo) · 격리 폴더 하위 — home_ref 와 같은 기준."""
-    p = p.rstrip("/") or "/"
+    p = os.path.normpath(p) if p.startswith("/") else p   # `<repo>/../..` 로 허용 범위를 벗어나지 못하게
     return bool((repo and (p == repo or p.startswith(repo + "/"))) or p == iso or p.startswith(iso + "/"))
 def recurse_hit(cmd):
     """홈 · 루트 재귀 검색 — 뿌리가 허용된 저장소 · 격리 폴더 하위면 적중이 아니다.
@@ -261,6 +300,7 @@ def recurse_hit(cmd):
     for h in MULTI_HEADS:
         for m in h.finditer(cmd):
             seg = re.split(r"[|;&\n]", cmd[m.end():], maxsplit=1)[0]
+            seg = re.sub(r"'[^']*\s[^']*'|\"[^\"]*\s[^\"]*\"", " ", seg)   # 공백 든 따옴표 구간은 검색 패턴이다('width / 2') — 뿌리로 읽지 않는다
             if any(not under_allowed(t.group(1)) for t in ROOT_ARG.finditer(seg)):
                 return True
     return False
@@ -278,7 +318,11 @@ for f in rolls:
             r = json.loads(line)
         except ValueError:
             continue
+        if not isinstance(r, dict):
+            continue
         p = r.get("payload") or {}
+        if not isinstance(p, dict):
+            continue   # 모르는 모양은 건너뛴다 — 감사 블록이 예외로 죽지 않게(죽어도 감사는 running 으로 남아 거부된다)
         if r.get("type") == "turn_context":
             tcs += 1
             ents = ((p.get("permission_profile") or {}).get("file_system") or {}).get("entries") or []
@@ -301,7 +345,7 @@ for f in rolls:
         if not isinstance(cmd, str):
             continue
         calls += 1
-        why = ("금지 산출물 참조" if FORBID.search(cmd) else
+        why = ("금지 산출물 참조" if forbid_hit(cmd) else
                "홈 · 루트 재귀 검색" if recurse_hit(cmd) else
                ("격리 밖 홈 경로 " + home_ref(cmd)) if home_ref(cmd) else None)
         if why:
@@ -309,7 +353,7 @@ for f in rolls:
 if tcs == 0:
     iso_ok = False
 audit = {"mode": mode, "rollouts": len(rolls), "turnContexts": tcs, "isolationApplied": iso_ok, "spawnAgent": spawn, "spawnedRoles": roles,
-         "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs,
+         "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs, "head": head,
          # resume 입력(fz-plan Phase 2 resume 교차) — 격리 홈은 --keep-iso 일 때만 남는다. sessionFile 은 판정(exit) 뒤에 적는다(아래)
          "iso": iso if keep else None}
 code, note = 0, "ok"
@@ -357,3 +401,9 @@ json.dump(audit, open(stem + ".audit.json", "w", encoding="utf-8"), ensure_ascii
 print(f"INDEPENDENT {'OK' if code == 0 else 'FAIL(' + str(code) + ')'} mode={mode} rollouts={len(rolls)} spawn={spawn} calls={calls} hits={len(hits)} isolation={iso_ok} — {note}")
 sys.exit(code)
 PY
+ARC=$?
+# ⛔ 감사 블록이 예외로 죽으면(파이썬 exit 1) 감사는 'running' 그대로다 — 결과가 아니므로 사전조건 실패로 끝낸다(10~17 밖의 코드는 Lead 규칙이 못 본다)
+if [ "$ARC" -ne 0 ] && grep -q '"exit": null' "$OUT_DIR/$BASE_NAME.audit.json" 2>/dev/null; then
+  die 11 "감사 블록 실패(exit $ARC) — 감사는 running 으로 남는다(병합 · 차이표가 거부한다)"
+fi
+exit "$ARC"
