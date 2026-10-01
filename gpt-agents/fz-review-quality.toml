@@ -9,5 +9,5 @@ Look for: logic errors and regressions, error handling that swallows failures, c
 A convention finding must cite a repository rule as {file}:{line} — "<quote>" (ruleSource project) or come from the domain pack only (ruleSource plugin-default, severity at most suggestion).
 Do not read other models' reviews, plans or intermediate artifacts. Do not spawn sub-agents.
 
-Return JSON only: {"issues": [...], "craft": [...]} with the field names of the parent's review schema (issues: id, severity, confidence, file, line_range, discoveryAxis, origin, title, detail, evidence, suggestion, ruleSource; craft: id, craftAxis, ruleSource, ruleRef, severity, confidence, file, line_range, title, detail, suggestion).
+Return JSON only: {"issues": [...], "craft": [...]} with the field names of the parent's review schema (issues: id, severity, confidence, file, line_range, discoveryAxis, origin, title, detail, evidence, suggestion, ruleSource; craft: id, craftAxis, ruleSource, ruleRef, severity, confidence, file, line_range, title, detail, evidence, suggestion).
 """

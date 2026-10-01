@@ -567,6 +567,10 @@ def self_test() -> int:
              and raises(lambda: gpt_candidates({"issues": [], "craft": {"x": 1}}), Unrun))
         case("gpt-shape — findings · issues 배열이 없는 GPT 입력은 exit 2(GPT 0건으로 병합하지 않는다)",
              raises(lambda: gpt_candidates({"result": {"findings": [issue("G1")]}}), Unrun) and raises(lambda: gpt_candidates([issue("G1")]), Unrun))
+        # 근거 재실측은 evidence 를 읽는다 — GPT 스키마가 그 필드를 받지 않으면 GPT 항목은 늘 hold 다(리뷰 G1: craft 에 evidence 가 없었다)
+        sch = json.loads((pathlib.Path(__file__).resolve().parent.parent / "schemas" / "gpt_independent_review_schema.json").read_text(encoding="utf-8"))
+        need = {k: "evidence" in sch["properties"][k]["items"]["required"] for k in ("issues", "craft")}
+        case("schema-contract — GPT 독립 리뷰 스키마의 issues · craft 둘 다 evidence 를 필수로 받는다", all(need.values()), need)
 
     def t_fixture():
         with tempfile.TemporaryDirectory(prefix="fz-review-merge-fx-") as tmp:
@@ -604,6 +608,14 @@ def self_test() -> int:
             case("gpt-contaminated — 오염 표시가 붙은 GPT 입력은 거부(exit 1)", rc == REJECT, f"exit {rc}")
             rc = subprocess.run(base_args + ["--gpt", str(t / "gpt-shape.json")], capture_output=True, text=True).returncode
             case("gpt-shape-cli — 알아보지 못하는 GPT 입력은 exit 2", rc == UNRUN, f"exit {rc}")
+            # Tier 1(Workflow 없음) — Lead 가 쓰는 발견 모양(modules/fz-gpt-subcommands-aux.md § review — Lead 순서 4)을 그대로 받는다
+            (t / "lead-findings.json").write_text(json.dumps({"issues": [{"id": "L1", "severity": "minor", "file": "src/a.swift", "line_range": "10-12",
+                                                                        "discoveryAxis": "correctness", "title": "t", "evidence": "`let x = 2`"}]}), encoding="utf-8")
+            p = subprocess.run([sys.executable, str(me), "--claude", str(t / "lead-findings.json"), "--diff", str(t / "diff.patch"),
+                                "--gpt-unavailable", "tier1 시험", "--out", str(t / "tier1.json")], capture_output=True, text=True)
+            got = json.loads((t / "tier1.json").read_text(encoding="utf-8"))["candidates"] if p.returncode == OK else p.stderr[-200:]
+            case("tier1-shape — 문서가 정한 Lead 발견 모양을 병합한다(근거 재실측 verified)",
+                 p.returncode == OK and len(got) == 1 and got[0]["evidenceVerified"] is True, got)
             # 런처 옆 파일 — 본문은 멀쩡해도 옆 파일이 실패를 말하면 병합하지 않는다
             good = hashlib.sha256((t / "diff.patch").read_bytes()).hexdigest()
             def arm(name, audit=None, contaminated=False):
@@ -620,6 +632,8 @@ def self_test() -> int:
             case("sidecar-failed — 감사 exit≠0(시간 초과 · 6축 후검사 등)이면 거부",
                  arm("arm-timeout", dict(ok_audit, exit=16, note="시간 초과")) == REJECT)
             case("sidecar-isolation — 격리 미적용이면 거부", arm("arm-iso", dict(ok_audit, isolationApplied=False)) == REJECT)
+            case("sidecar-running — 런처가 감사를 끝내지 못한 run(exit null · 'running' 선기록)은 거부",
+                 arm("arm-running", {"exit": None, "note": "running"}) == REJECT)
             case("sidecar-stale — GPT 가 본 diff 해시가 병합 diff 와 다르면 거부",
                  arm("arm-stale", dict(ok_audit, inputs={"diff.patch": "0" * 64})) == REJECT)
             case("sidecar-nohash — 감사에 diff 해시가 없으면 exit 2", arm("arm-nohash", {"exit": 0, "isolationApplied": True}) == UNRUN)

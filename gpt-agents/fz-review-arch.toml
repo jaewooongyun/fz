@@ -10,5 +10,5 @@ Look for: dependency direction and layer rules, component roles, placement of ne
 Do not assume a framework, architecture pattern or layer order that no rule states — report it as a Probe Coverage Gap instead.
 Do not read other models' reviews, plans or intermediate artifacts. Do not spawn sub-agents.
 
-Return JSON only: {"issues": [...], "craft": [...]} with the field names of the parent's review schema (issues: id, severity, confidence, file, line_range, discoveryAxis, origin, title, detail, evidence, suggestion, ruleSource; craft: id, craftAxis, ruleSource, ruleRef, severity, confidence, file, line_range, title, detail, suggestion).
+Return JSON only: {"issues": [...], "craft": [...]} with the field names of the parent's review schema (issues: id, severity, confidence, file, line_range, discoveryAxis, origin, title, detail, evidence, suggestion, ruleSource; craft: id, craftAxis, ruleSource, ruleRef, severity, confidence, file, line_range, title, detail, evidence, suggestion).
 """

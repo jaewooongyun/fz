@@ -38,7 +38,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "craftAxis", "ruleSource", "ruleRef", "severity", "confidence", "file", "line_range", "title", "detail", "suggestion"],
+        "required": ["id", "craftAxis", "ruleSource", "ruleRef", "severity", "confidence", "file", "line_range", "title", "detail", "evidence", "suggestion"],
         "properties": {
           "id": {"type": "string"},
           "craftAxis": {"type": "string", "enum": ["idiom", "naming", "architecture", "ui_structure", "placement", "design_alternative"], "$comment": "= workflows/*.js CRAFT_AXES — tests/workflows/craft-axes.js 가 대조한다"},
@@ -50,6 +50,7 @@
           "line_range": {"type": ["string", "null"]},
           "title": {"type": "string"},
           "detail": {"type": "string"},
+          "evidence": {"type": "string"},
           "suggestion": {"type": "string"}
         }
       }

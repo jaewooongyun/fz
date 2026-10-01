@@ -29,6 +29,7 @@
    "line_range": "3",
    "title": "파싱 타입 이름이 …DTO 규칙과 다르다",
    "detail": "OrderResponse",
+   "evidence": "`export interface OrderResponse`",
    "suggestion": "OrderDTO 로 바꾼다"
   }
  ],
