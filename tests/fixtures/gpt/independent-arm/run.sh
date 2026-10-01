@@ -59,6 +59,7 @@ roll "$T/r-roles.jsonl" 1 "SPAWN:fz-review-arch" "SPAWN:fz-review-quality" "cat 
 roll "$T/r-repo.jsonl" 1 "rg --files $HREAL/dev/repo -g '!.git'" "find $HREAL/dev/repo -name '*.ts'" "grep -rn b $HREAL/dev/repo"
 roll "$T/r-repomix.jsonl" 1 "rg b $HREAL/dev/repo ~"
 roll "$T/r-quoted.jsonl" 1 'cat "work dir/review-report.md"'
+roll "$T/r-pattern.jsonl" 1 "rg -n 'review-report\\.md' scripts"
 
 run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자
   local name="$1" outf="$2" rolls="$3"; shift 3
@@ -164,15 +165,17 @@ run audmix "$HERE/sample-plan-ok.json" "$T/r-repomix.jsonl" plan --requirement "
 check "감사(repo 뒤 ~ 재귀): exit 15" "$(rc audmix)" 15
 run audq "$HERE/sample-plan-ok.json" "$T/r-quoted.jsonl" plan --requirement "$IN/requirement.md"
 check "감사(직렬화된 큰따옴표 경로의 산출물 참조): exit 15" "$(rc audq)" 15
+run audpat "$HERE/sample-plan-ok.json" "$T/r-pattern.jsonl" plan --requirement "$IN/requirement.md"
+check "감사(정규식 패턴 'review-report\\.md' 검색은 참조가 아니다): exit 0" "$(rc audpat)" 0
 # ④c 재귀 검색 규칙 문자열 단위 — /Users 경로(macOS 저장소 모양). ⛔ 파일을 만들지 않는다 — 실제 홈을 건드리지 않는다
 #    ④b 의 가짜 홈은 /Users 밖이라 옛 결함(/Users 아래 전부 적중)을 재현하지 못한다 — 규칙 블록을 직접 꺼내 잰다
 UNIT="$(python3 - "$L" <<'UPY'
-import json, os, re, sys
+import json, os, re, shlex, sys
 t = open(sys.argv[1], encoding="utf-8").read()
 m = re.search(r"^FZ_ART_NAMES='([^']*)'", t, re.M)
 if m:
     os.environ["FZ_ART_NAMES"] = m.group(1)
-env = {"re": re, "os": os, "repo": "/Users/u/dev/repo", "iso": "/private/tmp/iso"}
+env = {"re": re, "os": os, "json": json, "shlex": shlex, "repo": "/Users/u/dev/repo", "iso": "/private/tmp/iso"}
 exec(t[t.index("ROOTS = r"):t.index("def home_ref(cmd):")], env)
 hit = env.get("recurse_hit") or (lambda c: any(x.search(c) for x in env["RECURSE"]))
 cases = [("rg --files /Users/u/dev/repo -g '!.git'", False), ("find /Users/u/dev/repo -name x", False),
@@ -189,14 +192,22 @@ out += ["ok" if forbid and forbid(c) == w else "fbad:" + c.split()[-1] for c, w 
 # 역검증 ISSUE-001 — rollout 은 명령을 JSON 문자열에 담는다: custom_tool_call input · function_call arguments
 roll = lambda c: "tools.exec_command({cmd:" + json.dumps(c) + "})"
 fc = lambda c: json.dumps({"cmd": c})
-scases = [(roll('cat "work dir/review-report.md"'), True), (roll('cat "plan/plan-final.md"'), True), (roll('cat work/code-context".md"'), True),
-          (fc('cat "T-1/plan/workflow-result.json"'), True), ('{"cmd":"cat ~\\/.claude\\/projects\\/p\\/a.jsonl"}', True),
-          (roll('rg -n "workflow-result" scripts'), False), (roll('cat "Sources/Foo/code-context-builder.swift"'), False)]
+# 실제 0.159.2 rollout 의 exec 입력은 JS 프로그램이다(S27 저장 rollout 실측) — 여러 호출 묶음 · 경로 배열
+js = lambda *cs: "const results = await Promise.allSettled([\n" + ",\n".join("  tools.exec_command({cmd:" + json.dumps(c) + ",max_output_tokens:4000})" for c in cs) + "\n]);"
+arr = lambda *ps: "const paths = [\n" + ",\n".join(json.dumps(p) for p in ps) + "\n];\nfor (const p of paths) await tools.exec_command({cmd: 'cat ' + p});"
+POS = ['cat "work dir/review-report.md"', 'cat "plan/plan-final.md"', 'cat work/code-context".md"', 'cat "T-1/plan/workflow-result.json"',
+       "cat work/review-report.md\nwc -l requirement.md"]
+NEG = ["rg -n 'review-report\\.md' scripts", "cat src/review-report.md,backup", "cat src/code-context.md:backup",
+       'rg -n "workflow-result" scripts', 'cat "Sources/Foo/code-context-builder.swift"']
+scases = [(f(c), True) for c in POS for f in (roll, fc, js)] + [(f(c), False) for c in NEG for f in (roll, fc, js)]
+scases += [(js("pwd", 'cat "T-1/review/triage.md"'), True), (arr("Domain/A.swift", "T-1/plan/plan-v2.md"), True),
+           ("const paths = ['T-1/review/self-review.md'];", True), ('{"cmd":"cat ~\\/.claude\\/projects\\/p\\/a.jsonl"}', True),
+           (arr("Domain/A.swift", "Sources/code-context-builder.swift"), False)]
 out += ["ok" if forbid and forbid(c) == w else f"sbad{i}" for i, (c, w) in enumerate(scases)]
-print(" ".join(out))
+print(f"ALL-OK n={len(out)}" if all(x == "ok" for x in out) else " ".join(out))
 UPY
 )"
-check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok ok"
+check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ALL-OK n=51"
 
 # ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(끌 수 없다 — S11 ⑤)
 run sub "$HERE/sample-review-ok.json" "$T/r-parent.jsonl,$T/r-sub.jsonl" review --diff "$IN/diff.patch"
@@ -312,9 +323,14 @@ printf '%s\n' 'diff --git a/src/a.ts b/src/a.ts' '--- a/src/a.ts' '+++ b/src/a.t
   'diff --git a/old.ts b/new.ts' 'similarity index 100%' 'rename from old.ts' 'rename to new.ts' \
   'diff --git a/img.png b/img.png' 'index 1111111..2222222 100644' 'Binary files a/img.png and b/img.png differ' \
   'diff --git a/gone.ts b/gone.ts' 'deleted file mode 100644' '--- a/gone.ts' '+++ /dev/null' '@@ -1 +0,0 @@' '-z' > "$IN/diff-mixed.patch"
-mkdir -p "$IN/head-mixed/src"; echo b > "$IN/head-mixed/src/a.ts"; echo y > "$IN/head-mixed/src/한.ts"; echo n > "$IN/head-mixed/new.ts"
+printf 'diff --git a/end sp.ts  b/end sp.ts \n--- a/end sp.ts \t\n+++ b/end sp.ts \t\n@@ -1 +1 @@\n-p\n+q\n' >> "$IN/diff-mixed.patch"   # 끝 공백 경로(git 은 탭 꼬리를 붙인다)
+mkdir -p "$IN/head-mixed/src"; echo b > "$IN/head-mixed/src/a.ts"; echo y > "$IN/head-mixed/src/한.ts"; echo n > "$IN/head-mixed/new.ts"; echo q > "$IN/head-mixed/end sp.ts "
 run headmix "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff-mixed.patch" --head "$IN/head-mixed"
-check "head 수집(혼합 diff): 감사 head — 기대 4 · 있음 3 · 빠짐 img.png" "$(headsum headmix)" "4 3 img.png"
+check "head 수집(혼합 diff · 끝 공백 경로): 감사 head — 기대 5 · 있음 4 · 빠짐 img.png" "$(headsum headmix)" "5 4 img.png"
+printf '%s\n' '--- a/src/a.ts' '+++ b/src/a.ts' '@@ -1 +1 @@' '-a' '+b' > "$IN/diff-plain.patch"
+run headplain "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff-plain.patch" --head "$IN/head"
+check "head 수집(git 헤더 없는 diff): 0 으로 세지 않고 error 로 드러낸다" \
+  "$(python3 -c 'import json,sys; h=json.load(open(sys.argv[1]))["head"]; print("error" if h.get("expected") is None and h.get("error") else h)' "$T/c-headplain/out/A-headplain.audit.json" 2>/dev/null || echo -)" "error"
 # ⑬g 미러 안 범용 이름은 저장소 파일이다 — base/head 의 payload.json 은 거부하지 않는다 · fz 고유 이름은 거부한다(F6)
 mkdir -p "$IN/base-gen" "$IN/head-gen" "$IN/head-fz/T-1/plan"; echo '{}' > "$IN/base-gen/payload.json"; echo '{}' > "$IN/head-gen/payload.json"
 echo x > "$IN/head-fz/T-1/plan/plan-final.md"

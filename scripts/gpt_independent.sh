@@ -261,7 +261,7 @@ TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
 FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" <<'PY'
-import glob, hashlib, importlib.util, json, os, re, sys
+import glob, hashlib, importlib.util, json, os, re, shlex, sys
 mode, out, stem, home, repo, iso, rc, timed_out, schema_p = sys.argv[1:10]
 keep = sys.argv[10:11] == ["1"]   # --keep-iso — 격리 홈이 남아야 resume 이 세션을 잇는다
 plugin_root = sys.argv[11]
@@ -281,15 +281,20 @@ if mode == "review" and os.path.isdir(hdir) and os.path.isfile(dpath):
         spec = importlib.util.spec_from_file_location("diff_anchors", os.path.join(plugin_root, "skills", "fz-peer-review", "scripts", "diff_anchors.py"))
         da = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(da)
-        side = lambda raw: da.strip_prefix(da.unquote_path(raw))
-        post, blk = set(), None
+        def unq(raw):
+            raw = raw.split("\t", 1)[0]                 # git 은 공백 경로 끝에 탭을 붙인다 — 탭 앞까지가 경로다(끝 공백 보존 · strip 하지 않는다)
+            return da.unquote_path(raw) if raw.startswith('"') else raw
+        side = lambda raw: da.strip_prefix(unq(raw))
+        post, blk, saw_git, saw_new = set(), None, False, False
         def close(b):
             if b and not b["gone"]:
                 p = b["post"] or b["same"]
                 if p:
                     post.add(p)
         for line in open(dpath, encoding="utf-8", errors="replace").read().splitlines():
+            saw_new = saw_new or line.startswith("+++ ")
             if line.startswith("diff --git "):
+                saw_git = True
                 close(blk)
                 rest = line[len("diff --git "):]
                 n = (len(rest) - 5) // 2      # 따옴표 없는 같은 경로 쌍 `a/X b/X` — 모드만 바뀐 파일의 경로
@@ -303,32 +308,66 @@ if mode == "review" and os.path.isdir(hdir) and os.path.isfile(dpath):
             elif line.startswith("deleted file mode"):
                 blk["gone"] = True
             elif line.startswith(("rename to ", "copy to ")):
-                blk["post"] = da.unquote_path(line.split(" to ", 1)[1])
+                blk["post"] = unq(line.split(" to ", 1)[1])
             elif line.startswith("+++ "):
                 p = side(line[4:])
                 blk["gone"], blk["post"] = (True, None) if p == "/dev/null" else (blk["gone"], p)
             elif line.startswith("Binary files ") and line.endswith(" differ"):
-                m = re.match(r"Binary files (.+) and (.+) differ$", line)
-                p = side(m.group(2)) if m else None
-                blk["gone"], blk["post"] = (True, None) if p == "/dev/null" else (blk["gone"], p or blk["post"])
+                if line.endswith(" and /dev/null differ"):
+                    blk["gone"] = True
+                elif not blk["post"]:          # 헤더의 같은 경로 쌍을 먼저 — 이름에 ' and ' 가 있으면 이 줄은 모호하다
+                    m = re.match(r"Binary files (.+) and (.+) differ$", line)
+                    blk["post"] = blk["same"] or (side(m.group(2)) if m else None)
                 blk["hdr"] = False
         close(blk)
-        post = sorted(post)
-        miss = [p for p in post if not os.path.isfile(os.path.join(hdir, p))]
-        head = {"expected": len(post), "present": len(post) - len(miss), "missing": miss[:20]}
+        if not saw_git and saw_new:            # git 헤더 없는 unified diff — 세지 않고 드러낸다(0 은 '변경 없음' 으로 읽힌다)
+            head = {"expected": None, "error": "git 헤더(diff --git) 없는 diff — head 결손을 세지 않았다"}
+        else:
+            post = sorted(post)
+            miss = [p for p in post if not os.path.isfile(os.path.join(hdir, p))]
+            head = {"expected": len(post), "present": len(post) - len(miss), "missing": miss[:20]}
     except Exception as e:   # ⛔ 표시용 — 감사 판정을 막지 않는다
         head = {"expected": None, "error": f"{type(e).__name__}: {e}"}
 rolls = sorted(glob.glob(os.path.join(stem + ".rollouts", "*.jsonl")))
 ROOTS = r"(~|\$HOME|/Users(?:/[^\s'\"]*)?|/)(?=[\s'\";|&)]|$)"
 FZ_ART = re.compile(os.environ["FZ_ART_NAMES"])
+STR_LIT = re.compile(r'"(?:[^"\\\n]|\\.)*"')
+def str_literals(cmd):
+    """명령 안 큰따옴표 문자열 리터럴의 값 — rollout 의 exec 입력은 JS 프로그램이다(`tools.exec_command({cmd:"…"})` · `const paths = ["…"]`).
+    JSON 으로 해독한다(`\\"` · `\\/` · `\\n`). ⛔ 작은따옴표는 해독하지 않는다 — JSON 문자열 안의 `'review-report\\.md'` 를 꺼내면
+    따옴표 밖 셸 문맥이 되어 `\\.` 가 `.` 로 풀린다(거짓 양성). 작은따옴표 문자열은 원문의 셸 단어 나누기가 따옴표째 처리한다"""
+    out = []
+    for lit in STR_LIT.findall(cmd):
+        try:
+            v = json.loads(lit)
+        except ValueError:
+            continue
+        if isinstance(v, str):
+            out.append(v)
+    return out
+def shell_words(s):
+    """셸 단어 — 따옴표 · 이어 붙인 조각 · 이스케이프를 셸처럼 푼다(`code-context".md"` → 한 단어). 안 닫힌 따옴표면 공백으로만 자른다."""
+    try:
+        lx = shlex.shlex(s, posix=True, punctuation_chars=True)
+        lx.whitespace_split, lx.commenters = True, ""
+        return list(lx)
+    except ValueError:
+        return s.split()
 def forbid_hit(cmd):
     """Claude 산출물 참조 — `.claude/` 경로 또는 fz 고유 산출물 이름(경로 성분 전체 일치 · 입력 가드와 같은 표).
     ⛔ 부분 문자열로 보지 않는다 — `code-context-builder.swift` · `ci/test-result.json` · 검색 패턴 'workflow-result' 는 산출물이 아니다.
        범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다
-    ⛔ 따옴표 · 이스케이프를 먼저 걷는다 — rollout 의 명령은 JSON 문자열 안에 있어 `"…"` 가 `\\"…\\"` 로 남고(이름 끝에 `\\` 가 붙는다),
-       셸은 이어 붙은 따옴표 조각을 한 단어로 읽는다(`code-context".md"`). 걷은 뒤 경로 · JSON 구분자로 자른다(역검증 ISSUE-001)"""
-    flat = re.sub(r"[\\'\"`]", "", cmd)
-    return ".claude/" in flat or any(FZ_ART.fullmatch(t) for t in re.findall(r"[^\s/;|&()<>=,{}\[\]:]+", flat))
+    ⛔ 글자를 지워 정규화하지 않는다 — 직렬화 층을 해독하고(원문 + 문자열 리터럴) 셸 단어로 나눈 뒤 `/` 성분을 본다.
+       글자 제거는 정규식의 `\\.` · 이름의 `,` · `:` 까지 지워 정상 명령을 오염으로 만들었다(역검증 2차 ISSUE-001)
+    ⛔ 알려진 한계: 산출물 이름과 같은 검색 패턴(`rg "review-report.md" docs`)은 적중한다 — 패턴과 경로의 구분은 명령별 파싱이라 범위 밖이고
+       OS deny(--deny 작업 폴더)가 1차 방어다. 따옴표 없는 `review-report\\.md` 는 셸이 역슬래시를 걷어 실제 인자가 `review-report.md` 다
+       · 변수 전개 · 이름 조립(`$'…'` · `${p}`)은 보지 않는다"""
+    for s in [cmd] + str_literals(cmd):
+        if ".claude/" in s:
+            return True
+        if any(FZ_ART.fullmatch(c.strip("[](){},;:'\"`")) for w in shell_words(s) for c in w.split("/")):   # 양 끝만 — JS 배열 · 호출 구두점
+            return True
+    return False
 FIND_ROOT = re.compile(rf"\bfind\s+{ROOTS}")                      # find 는 첫 인자가 검색 뿌리다
 MULTI_HEADS = [re.compile(r"\b(?:rg|fd|ag)\b"), re.compile(r"\bgrep\s+-[a-zA-Z]*[rR][a-zA-Z]*\b"),
                re.compile(r"\bls\s+-[a-zA-Z]*R[a-zA-Z]*\b")]
