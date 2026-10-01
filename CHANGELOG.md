@@ -8,10 +8,11 @@ fz-plan(plan-lean2)은 품질 손실은 없었지만 속도 기준을 넘지 못
 
 **fz-peer-review 기본값 전환 (S25p)** — craft 6축 · 교차 필수 필드 재고지 · 후보 보존 · 교차 delta · GPT 독립 첫 패스 · 렌더가 기본이다.
 A/B 에서 품질 기준을 모두 통과했고 새 경로가 238s 빨랐다(잡음 167s). `--gpt-independent` · `--render` 는 생략해도 된다. 되돌리려면
-Workflow args 의 네 옵션을 `false`(crossOutput 은 `'full'`)로 준다 — 콜 입력이 기준(v4.39.1)과 바이트 단위로 같다.
+Workflow args 의 네 옵션을 `false`(crossOutput 은 `'full'`)로 주고 structuralContext 에서 §6 을 뺀다 — 콜 입력이 기준(v4.39.1)과 바이트 단위로
+같다. GPT 독립 첫 패스와 렌더는 `--no-gpt-independent` · `--no-render` 로 끈다.
 
 **GPT 독립 첫 패스 (`gpt_independent.sh`)** — 허용 입력만 격리 폴더로 복사하고 읽기는 OS 수준에서 막는다(격리 CODEX_HOME · 가짜 HOME ·
-권한 프로필). rollout 을 감사해 오염이면 산출을 버리고, 병합(`review_merge.py`)과 차이표(`plan_divergence.py`)는 오염 · 실패 · stale 산출을
+권한 프로필). rollout 을 감사해 오염이면 산출을 버리고, 병합(`review_merge.py`)은 오염 · 실패 · stale 산출을, 차이표(`plan_divergence.py`)는 오염 · 실패 산출을
 거부한다. 격리 홈과 실제 설치 경로 두 환경에서 첫 패스의 스킬 로드가 전부 gpt-skills 이고 Claude 산출 노출이 0 임을 쟀다(S27).
 fz-review · fz-plan 은 `--gpt-independent` 로 켠다. 런처 `cleanup` 모드가 resume 교차 뒤 격리 폴더를 확인하고 지운다.
 

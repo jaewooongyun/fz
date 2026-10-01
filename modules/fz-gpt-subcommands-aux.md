@@ -136,15 +136,19 @@ EOF
 Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. 규약은 `modules/cross-validation.md` § 독립 첫 패스.
 
 ```bash
-"${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" plan --requirement "$REQ_FILE" [--sprint-contract F] [--rules-index F] \
-  [--repo "$GIT_ROOT"] [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
-"${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" review --diff "$WORK_DIR/diff.patch" --base "$WORK_DIR/base" --head "$WORK_DIR/head" \
-  [--pr-meta F] [--rules-index F] [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
+"${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" plan --requirement "$REQ_FILE" [--sprint-contract F] [--rules-index "$WORK_DIR/rules/index.json"] \
+  [--repo "$GIT_ROOT"] --deny "$WORK_DIR" [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
+"${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" review --diff "$REVIEW_DIFF" --base "$WORK_DIR/base" --head "$WORK_DIR/head" --deny "$WORK_DIR" \
+  [--pr-meta "$WORK_DIR/pr-meta.json"] [--rules-index "$WORK_DIR/rules/index.json"] [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
 ```
 
 - 역할 본문은 격리 사본 `gpt-skills/fz-planner` · `fz-reviewer` 를 래퍼 `--inject-skill` 로 넣는다. effort 는 plan xhigh · review high 가 기본이다
 - `--gpt-agents`(review 전용 · opt-in) — 역할 파일 `gpt-agents/*.toml` 을 격리 홈에 넣고 두 렌즈 역할(`fz-review-arch` · `fz-review-quality`)만 spawn 하게 한다. 감사의 `spawnedRoles` 에 역할 이름이 남는다. 없으면 하위 에이전트 금지다
 - `--repo` 는 복사하지 않고 권한 프로필 read 로 연다 — 그 안의 `.claude` · `.fz-work` 와 `--deny` 는 막는다. review 의 `head/` 는 `skills/fz-peer-review/scripts/gather.sh` 가 만든다
+- `--deny "$WORK_DIR"` 는 늘 준다 — 권한 프로필은 디스크 전체 읽기에서 HOME · 임시 폴더만 막는다. 작업 폴더가 HOME 밖이거나 저장소 안이면 Claude 산출이 읽힌다
+- `--rules-index` 는 지침 **원문 색인**이다(`extract_project_rules.py` 출력 — `modules/project-rules.md`). ⛔ 규칙 레코드(`projectRulesPath`)를 넘기면 런처가 모양으로 판별해 exit 11 로 거부한다 — Claude 의 해석이 GPT 첫 패스의 원문이 되기 때문이다
+- `$REVIEW_DIFF` 는 `review-surface.patch`(gather 가 중복 커밋을 뺀 patch)가 있으면 그것, 없으면 `diff.patch` 다 — Claude 렌즈의 1차 리뷰 대상과 같아야 두 패스가 같은 범위를 본다. 병합 `--diff` 도 이 파일이다. `head/` 는 그대로 쓴다(표면의 상위 집합이다)
+- `--pr-meta` 는 PR 입력일 때 gather 가 만든 `pr-meta.json`(작성자가 쓴 제목 · 본문)이다. ⛔ Lead 가 채운 `requirements.md` 는 넘기지 않는다 — Lead 의 해석이 GPT 에 닿는다(InputHygiene)
 - 산출: `.json` · `.md` · `.audit.json`(rollout 수 · spawn 수 · 격리 적용 · 적중) · `.rollouts/`
 - exit: 0 성공 · 10 사용법 · 같은 --out 동시 실행 · 11 사전조건 · 12~14 래퍼 측정 실패(14 는 6축 후검사도) · 15 오염 · 16 시간 초과 · 17 planner 거부 — ⛔ 10~17 은 결과 0건이 아니다
 - ⛔ 옵션을 켜지 않으면 위 `plan` 서브커맨드 경로가 그대로다
@@ -154,9 +158,9 @@ Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. �
 fz-peer-review(기본 실행)와 fz-review(`--gpt-independent` · 기본 off)가 함께 쓰는 정본이다. 두 스킬과 Tier 표는 이 절을 가리킨다.
 
 1. **Workflow 직전에** 런처를 `run_in_background` 로 띄운다 — 두 패스가 동시에 돈다. GPT 는 허용 입력만 받아 Claude 산출을 보지 않는다
-2. `projectRulesPath`(규칙 레코드)가 있으면 Workflow args 와 런처 `--rules-index` 에 **같은 파일**을 준다
+2. 입력을 나눠 준다 — 규칙 레코드(`projectRulesPath`)는 Workflow args 에만, 지침 원문 색인은 런처 `--rules-index` 에만 준다(⛔ 같은 파일이 아니다 — 위 bullet). fz-review 는 Workflow args 에 `locatedFindings: true` 를 함께 준다 — 위치 필드(`line_range`)가 없는 Claude 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다
 3. ⛔ GPT 팔이 끝나기 전에는 대상 트리를 고치지 않는다 — 감사(`.audit.json` 의 `inputs`)가 GPT 가 본 diff 의 sha256 을 남기고, 병합이 `--diff` 와 대조해 다르면 stale 로 거부한다
-4. 두 패스가 끝나면 병합한다: `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환 JSON} --gpt {out-dir}/gpt-{run}.json --diff {같은 diff.patch}`. 옆 파일(`.contaminated` · `.audit.json`)이 오염 · 실패 · stale 을 말하면 exit 1(거부)이다. 런처가 10~17 로 끝났으면 `--gpt` 대신 `--gpt-unavailable "exit {n} — {note}"` 로 부른다
+4. 두 패스가 끝나면 병합한다: `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환 JSON} --gpt {out-dir}/gpt-{run}.json --diff {런처 --diff 와 같은 파일}`. 옆 파일(`.contaminated` · `.audit.json`)이 오염 · 실패 · stale 을 말하면 exit 1(거부)이다. 런처가 10~17 로 끝났으면 `--gpt` 대신 `--gpt-unavailable "exit {n} — {note}"` 로 부른다. Tier 1(Workflow 없음)은 Lead 발견을 `{"issues": [{id, severity, file, line_range, discoveryAxis, title, evidence}]}` 로 `{WORK_DIR}/review/lead-findings.json` 에 써서 `--claude` 로 준다 — evidence 는 diff 원문을 백틱으로 인용한다(병합이 그 hunk 에서 다시 찾는다 · 계약은 `review_merge.py` 머리말 입력 계약)
 5. 병합 결과가 기존 GPT 리뷰 호출(fz-review Phase 5 [병렬 2] · fz-peer-review GPT challenger)을 대신한다 — 두 번 부르지 않는다. Tier 3 GPT DA 는 병합 뒤 한 번이다
 - 경로는 **플러그인 루트 기준**이다 — `FZ_PLUGIN_ROOT` 는 `scripts/resolve-plugin-root.sh` 로 푼다(상대 경로는 대상 레포에서 조용히 빗나간다)
 

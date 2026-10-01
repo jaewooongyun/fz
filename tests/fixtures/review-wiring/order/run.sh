@@ -2,7 +2,7 @@
 # 리뷰 배선 순서 러너 (S22) — `--gpt-independent` 경로에서 GPT 독립 첫 패스 기동이 Workflow 호출보다 **앞**, 병합이 **뒤**다.
 #
 # ⛔ 문서 순서 오라클이다 — 실행을 대신하지 않는다(두 패스가 실제로 동시에 도는지는 S25 가 잰다).
-# ⛔ 기본 off 도 본다 — 옵션을 켜지 않은 경로(fz-review `/fz-gpt review` · peer-review Tier 1 challenger)가 그대로 남아 있어야 한다.
+# ⛔ 끄는 경로도 본다 — fz-review 기본(`/fz-gpt review`)과 fz-peer-review `--no-gpt-independent`(Tier 1 challenger)가 남아 있어야 한다.
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 fail=0
@@ -18,13 +18,27 @@ order() {   # 파일 · 기동 토큰 · Workflow 토큰 · 병합 토큰
   fi
 }
 has() { /usr/bin/grep -qF -- "$2" "$R/$1" 2>/dev/null && ok "$1: $3" || no "$1: $3 — '$2' 없음"; }
+nohas() { /usr/bin/grep -qF -- "$2" "$R/$1" 2>/dev/null && no "$1: $3 — '$2' 가 있다" || ok "$1: $3"; }
 
 order skills/fz-review/SKILL.md 'gpt_independent.sh review' "Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js'" 'review_merge.py'
 order modules/peer-review-workflow.md 'gpt_independent.sh review' "Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js'" 'review_merge.py'
 
-# 기본 off — 옵션을 켜지 않은 경로가 그대로다
-has skills/fz-review/SKILL.md '/fz-gpt review "코드 리뷰"' '기본 경로의 GPT 리뷰 호출이 남아 있다'
-has modules/peer-review-tiers.md 'gpt-challenger-raw.txt' 'Tier 1 기본 challenger 호출이 남아 있다'
+# 끄는 경로 — fz-review 는 기본 off, fz-peer-review 는 --no-gpt-independent · --no-render 로 고른다(리뷰 A:A3 · Q:Q8)
+has skills/fz-review/SKILL.md '/fz-gpt review "코드 리뷰"' 'fz-review 기본 경로의 GPT 리뷰 호출이 남아 있다'
+has modules/peer-review-tiers.md 'gpt-challenger-raw.txt' '--no-gpt-independent 경로의 Tier 1 challenger 호출이 남아 있다'
+has skills/fz-peer-review/SKILL.md '--no-gpt-independent' 'GPT 독립 첫 패스를 끄는 플래그가 있다'
+has skills/fz-peer-review/SKILL.md '--no-render' '렌더를 끄는 플래그가 있다'
+
+# 런처 입력 — 규칙 레코드가 아니라 원문 색인 · 작업 폴더 deny · fz-review 위치 필드(리뷰 C:C-1 · F7 · C:C-4)
+for f in skills/fz-review/SKILL.md skills/fz-peer-review/SKILL.md modules/peer-review-workflow.md; do
+  nohas "$f" '--rules-index {projectRulesPath}' '규칙 레코드를 런처 --rules-index 로 넘기지 않는다'
+done
+nohas modules/fz-gpt-subcommands-aux.md '런처 `--rules-index` 에 **같은 파일**' '규칙 레코드와 원문 색인을 같은 파일로 주지 않는다'
+has modules/fz-gpt-subcommands-aux.md '--deny "$WORK_DIR"' '정본 호출이 작업 폴더를 deny 로 넘긴다'
+has skills/fz-peer-review/SKILL.md '--deny "${WORK_DIR}"' '기본 호출이 작업 폴더를 deny 로 넘긴다'
+has skills/fz-review/SKILL.md '--deny {WORK_DIR}' 'opt-in 호출이 작업 폴더를 deny 로 넘긴다'
+has skills/fz-plan/SKILL.md '--deny {WORK_DIR}' 'plan 호출이 작업 폴더를 deny 로 넘긴다'
+has skills/fz-review/SKILL.md 'locatedFindings: true' '--gpt-independent 면 위치 필드를 켠다'
 
 # 권한 — 런처 · 래퍼 · 병합을 부를 수 있고, Will Not(GPT CLI 직접 호출 금지)과 모순되는 권한이 없다
 for f in skills/fz-review/SKILL.md skills/fz-peer-review/SKILL.md; do

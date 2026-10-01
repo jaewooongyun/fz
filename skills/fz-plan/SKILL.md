@@ -112,7 +112,7 @@ metadata:
    cp {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js
    ```
    ⛔ 판별이 불확정이면 **원본 경로로 호출한다**(기존 동작) — 미확정을 '하위 아님' 으로 읽어 불필요한 복사를 만들지 않는다. ⛔ 복사본은 산출물이 아니다(원본 변경 시 stale — §12).
-2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Sprint Contract 합의 직후 · Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh plan --requirement {요구 원문} [--sprint-contract {합의본}] [--rules-index {규칙 색인}] --repo {대상 레포} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
+2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Sprint Contract 합의 직후 · Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh plan --requirement {요구 원문} [--sprint-contract {합의본}] [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - **Stage 1 (동시 3, opus)**: 전체 플랜(방향 판정·readScope/writeScope·steps·rtm·antiPattern 포함) ∥ edge 적대 렌즈 ∥ impact+arch 렌즈
      → **Stage 2 (opus)**: 델타 병합 — ⛔ 병합 콜의 schema 는 **델타 전용**(`stepAmendments`·`addedEdgeCases`·`addedImpact`)이라 본문을 다시 쓸 수 없다. **4 call**

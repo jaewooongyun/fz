@@ -384,7 +384,7 @@ else SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인
 - rollout 을 전부 감사한다 — HOME deny 가 없거나 금지 경로 · 홈 재귀 검색이 있으면 exit 15 와 `.contaminated` 다. 읽는 대상이 명령에 없는 읽기가 있어 읽기 로그만으로는 "안 읽었다"를 증명할 수 없다 — 감사는 보조다
 - review 의 `--gpt-agents`(opt-in)는 역할 파일(`gpt-agents/`)로 두 렌즈 역할을 spawn 한다. 하위 에이전트는 부모 이력을 물려받지만 부모가 격리돼 있어 독립이 유지되고, 같은 권한 프로필을 강제받는다(S11 ⑤)
 - 산출은 `<arm>-<run>.json`(`schemas/gpt_independent_{plan,review}_schema.json`) · `.md` · `.audit.json` · `.rollouts/` 다. 호출법은 `modules/fz-gpt-subcommands-aux.md` § independent-plan · independent-review
-- ⛔ 기본 경로가 아니다 — 옵션을 켜지 않으면 위 호출 계약이 그대로다. 기본값 전환은 A/B(S25~S27) 뒤다
+- 기본값은 스킬마다 다르다 — fz-peer-review 는 기본으로 쓰고(`--no-gpt-independent` 로 끈다 · S25p · S27 판정 뒤 v4.42.0), fz-review · fz-plan 은 `--gpt-independent` 로 켠다. 쓰지 않는 경로에서는 위 호출 계약이 그대로다
 
 ## 참조 스킬
 
