@@ -16,7 +16,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 VR="$HERE/verify-rebase.sh"
 # PWD 비교로 가드하므로 경로를 정규화한다 (macOS TMPDIR의 trailing slash → `//` 방지, symlink 해소)
-ROOT="$(cd "$(mktemp -d)" && pwd -P)"
+# ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp -d)"` 는 mktemp 가 실패해도 `cd ""` 가 성공해(bash 3.2) 현재 폴더가 ROOT 가 되고 trap 이 지운다
+ROOT0="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }; ROOT="$(cd "$ROOT0" && pwd -P)"
 trap 'rm -rf "$ROOT"' EXIT
 PASS=0; FAIL=0
 D=""

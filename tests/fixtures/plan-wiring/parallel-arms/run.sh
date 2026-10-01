@@ -10,7 +10,8 @@
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-T="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$T"' EXIT
+# ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp -d)"` 는 mktemp 가 실패해도 `cd ""` 가 성공해(bash 3.2) 현재 폴더를 지운다
+T0="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }; T="$(cd "$T0" && pwd -P)"; trap 'rm -rf "$T"' EXIT
 
 capture() {   # $1 = core 모듈 파일 → stdout 에 정규화한 CLI 인자 JSON(실패면 빈 출력 · exit 1)
   local src="$1" w="$T/cap"; rm -rf "$w"; mkdir -p "$w/repo" "$w/home" "$w/tel"
