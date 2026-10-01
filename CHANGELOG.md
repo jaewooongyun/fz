@@ -1,29 +1,44 @@
 # Changelog
 
-### v4.42.0 (2026-09-28) — 리뷰는 확신 없는 후보를 발견 단계에서 지웠고, 같은 이슈를 세 번 옮겨 적었다 [MINOR]
+### v4.42.0 (2026-10-01) — GPT 는 Lead 가 요약한 가설을 받아 검증했고, 리뷰는 확신 없는 후보를 발견 단계에서 지웠다 [MINOR]
 
-R-B 품질 축 — 리뷰·계획의 품질을 올리는 길을 옵션으로 넣는다. 워크플로 옵션 셋과 `--render` 는 기본 off 라서 주지 않으면 콜 입력이
-기준(v4.39.1)과 바이트 단위로 같다. 측정 없이 출하하고, 켠 효과와 기본값 전환은 R-C(v4.43.0)에서 판정한다.
+R-B(품질 축)와 R-C(속도 · GPT 독립 · 기본값 전환)를 한 판으로 출하한다 — R-B 만 담은 중간 v4.42.0 은 공개하지 않았다. 새 길은 전부
+옵션으로 넣고 A/B(같은 입력 · 가린 판정)로 잰 뒤 **측정을 통과한 fz-peer-review 만 기본으로 켰다**. fz-review(review-live)와
+fz-plan(plan-lean2)은 품질 손실은 없었지만 속도 기준을 넘지 못해 기본 off 그대로다 — 다음 릴리스(R-D)에서 표본을 늘려 다시 잰다.
 
-**후보 보존 (`args.preserveLowConfidence`)** — 발견 단계의 "confidence 80 미만 미보고" 를 켤 때만 `[후보 보존]` 문장으로 바꾼다.
-렌즈 스킬과 Lead 모듈은 원문을 두고 조건부 줄을 달았다. 문구 변형까지 잡는 검사기가 표기가 다른 Synthesize 줄(`confidence<80 미보고`)도 찾는다.
+**fz-peer-review 기본값 전환 (S25p)** — craft 6축 · 교차 필수 필드 재고지 · 후보 보존 · 교차 delta · GPT 독립 첫 패스 · 렌더가 기본이다.
+A/B 에서 품질 기준을 모두 통과했고 새 경로가 238s 빨랐다(잡음 167s). `--gpt-independent` · `--render` 는 생략해도 된다. 되돌리려면
+Workflow args 의 네 옵션을 `false`(crossOutput 은 `'full'`)로 준다 — 콜 입력이 기준(v4.39.1)과 바이트 단위로 같다.
 
-**단일 출처 렌더 (`--render` · `render_review.py`)** — review.json 하나에서 review-report.md · pr-comments.md · 게시 payload 를 만든다.
-줄 앵커는 `diff_anchors.py` 로 계산하고, 겹치는 hunk 는 `pick` 없이는 거부하며, 확인 게이트 사유를 미리보기에 적는다. 실패하면 이전 산출물을 지운다.
+**GPT 독립 첫 패스 (`gpt_independent.sh`)** — 허용 입력만 격리 폴더로 복사하고 읽기는 OS 수준에서 막는다(격리 CODEX_HOME · 가짜 HOME ·
+권한 프로필). rollout 을 감사해 오염이면 산출을 버리고, 병합(`review_merge.py`)과 차이표(`plan_divergence.py`)는 오염 · 실패 · stale 산출을
+거부한다. 격리 홈과 실제 설치 경로 두 환경에서 첫 패스의 스킬 로드가 전부 gpt-skills 이고 Claude 산출 노출이 0 임을 쟀다(S27).
+fz-review · fz-plan 은 `--gpt-independent` 로 켠다. 런처 `cleanup` 모드가 resume 교차 뒤 격리 폴더를 확인하고 지운다.
 
-**결정론 병합 (`review_merge.py`)** — §3 키로 묶되 후보를 지우지 않는다. 근거 재실측 실패와 확신도 80 미만 결함은 hold 이고, craft 는
-ruleRef 가 있고 확신도 80 이상일 때만 post 다. GPT reverse 는 hold 이고 question 에만 싣는다. 입력 계약 위반은 거부, 알아보지 못하는 형태는 exit 2.
-계약은 MergeContract §10.
+**GPT 역할 스킬 이식성 (A8-03)** — 역할 스킬 8개가 프로젝트 규칙을 런타임에 뽑고 iOS · RIBs · SwiftUI 지식은 조건부 도메인 팩으로 옮겼다.
+래퍼 `--gpt-skill-path` 는 계측 전용이고 주입은 `--inject-skill` 이다(F-335). `--config-permissions` 로 `sandbox_mode` 가 권한 프로필의
+경로 deny 를 덮지 않는다(F-348).
 
-**craft 6축 (`args.craftAxes`) · 필수 필드 재고지 (`args.crossRequiredFields`)** — arch 렌즈에 6축 줄과 axisCoverage 를, Stage 2 교차
-프롬프트에 additions 의 required 키(스키마에서 읽는다)를 넣는다. review-live 의 §3 병합 키(`line_range` · `discoveryAxis`) 선택 필드는
-`args.locatedFindings`(기본 off)가 따로 켠다(peer-review 는 기본 스키마에 있다).
+**속도 arm (기본 off)** — plan-lean2 병합 조건부 생략(`mergeMode`), review-live Stage 2 조건부(`stage2`) · 사전 수집 스냅샷(`snapshotDir`) ·
+교차 delta(`crossOutput` — peer-review 는 기본). 측정에서 잡음을 넘는 단축을 보이지 못해 켜지 않았다.
 
-**규칙 추출 · 검증** — 지침 원문 색인 → 모델별 규칙 레코드 → 검증 통과본만 쓴다. ⚠️ 옵션이 아니라 fz-plan 절차 1.5 의 Lead 절차
-변경이다 — 워커에 넘기는 `archConstraints` 는 옛 형식의 호환 투영이고, 넘기지 않으면 워커 프롬프트는 그대로다.
+**R-B 품질 축** — 후보 보존(`preserveLowConfidence`) · 단일 출처 렌더(`--render` · `render_review.py`) · 결정론 병합(`review_merge.py`) ·
+craft 6축(`craftAxes`) · 교차 필수 필드 재고지(`crossRequiredFields`) · review-live 위치 필드(`locatedFindings`) · 규칙 추출 · 검증(fz-plan
+절차 1.5) · fz-plan 델타 반영(`plan_apply_delta.py`) · 독립 플랜 차이표. fz-peer-review 밖에서는 옵션이다.
 
-**fz-plan 기계 작업 (`plan_apply_delta.py` · `plan_divergence.py`)** — lean2 델타를 Step id 에 붙이고(degraded 반환은 입력 불가), Claude ↔ GPT
-독립 플랜 차이표를 만든다. fz-plan 이 이 둘을 부르는 배선은 R-C 다.
+**기본값 검사** — `tests/workflows/default-arms.js` 가 워크플로별 실제 기본값을 실행으로 재고 A/B 원장 판정과 대조한다(합격한 arm 만 on).
+기본값 회귀는 기본 on 워크플로에서 '미지정 == 켬' 과 '모두 끔 == 기준'(롤백 경로)을 본다.
+
+| ID | 판정 | 근거 | 검증 절차 |
+|---|---|---|---|
+| A1-03 | 절차 확정 — 이 판은 /fz 동작을 바꾸지 않는다. 결함 여부는 아래 절차로 판정한다 | 감사(2026-09-25): 30일 /fz 179구간 중 Phase 1 실행 3 · Phase 5 실행 15 · 60구간은 설명을 보고 바로 실행하고 사용자가 하위 스킬을 따로 불렀다. 하위 스킬 Gate 가 실제로 빠졌는지는 미검증이었다. 이 판을 만든 세션도 `/fz:fz` 3회에 하위 스킬 Skill 호출 3회(fz-code · fz-gpt · fz-review)였다 | 세션 트랜스크립트(`~/.claude/projects/<프로젝트>/<세션>.jsonl`)에서 `<command-name>/fz:fz</command-name>` 사용자 줄을 세고, 뒤따르는 assistant `tool_use` 가운데 `name` 이 `Skill` 이고 `input.skill` 이 `fz:fz-` 로 시작하는 것을 센다. 하위 스킬 호출이 0 인 /fz 구간은 하위 스킬 Gate 를 거치지 않은 실행이다 |
+| A8-01 | 해결 — README 가 실측 설치 경로를 적는다 | 옛 안내 `superclaude` 는 GitHub 404 였다(2026-09-25). 설치본 실측(2026-10-01): 마켓플레이스 `superclaude` 의 출처 = GitHub `SuperClaude-Org/SuperClaude_Plugin` · 플러그인 `sc@superclaude` 4.3.0. 스킬이 부르는 형식은 `/sc:sc-*` 89곳이고 짧은 형식 `/sc:X` 는 0 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` 를 실행하고 `~/.claude/plugins/installed_plugins.json` 에 `sc@superclaude` 가 있는지 본다. 짧은 형식은 `git grep -nE '/sc:[a-z]'` 결과가 전부 `/sc:sc-` 인지로 본다 |
+| A8-03 | 해결 — GPT 역할 스킬 8개가 규칙을 런타임에 뽑고 스택 지식을 조건부 도메인 팩으로 옮겼다(S12) | GPT 독립 첫 패스 실측(S27 · 2026-09-30): 비-iOS fixture 에서 iOS 어휘 항목 0 · 규칙 인용 전부 유일한 지침(AGENTS.md) · ui_structure 축 미발견. 지침 없는 fixture 에서 추정 규칙 0. 상충 fixture 에서 상충 축 둘을 모두 표시하고 한쪽 선택 0 | `python3 scripts/check_gpt_skill_portability.py`(health-check 배선) · A/B 원장에서 `ab_ledger.py judge --require SC-2,AC-3` 와 `ab_ledger.py verify-evidence --rule-fixtures nonios,absent,conflict` |
+| A1-04 | 해결(v4.40.0) — 실 PR 에서 줄인 fixture 를 합성 fixture 로 교체 | 원본과의 줄 교집합 0 · 원본 파일명 0(S03 게이트 — v4.40.0 판정표) | `bash tests/fixtures/peer-review/anchors-synthetic/run.sh` |
+| A2-02 | 해결(v4.40.0) — setup 이 GPT 스킬만 링크하고 이 플러그인의 Claude 스킬 링크를 지운다 | 실제 설치 경로에 옛 setup 이 남긴 Claude 스킬 링크 22개가 있었고 이 판 setup 이 22개를 정리했다(S27 실설치 셀 · 2026-10-01). 그 뒤 첫 패스의 스킬 로드는 전부 gpt-skills 였다 | `bash scripts/setup-gpt-skills.sh` 출력의 `pruned` 수와, `${CODEX_HOME:-~/.codex}/skills` 에 이 플러그인 `skills/` 를 가리키는 링크가 0 인지 본다 |
+| A5-01 | 해결(v4.40.0) — 워크플로 문법 검사를 AsyncFunction 파싱으로 교체 | 워크플로 파일은 async 함수 본문이라 `node --check` 가 심은 문법 오류에도 rc=0 이었다 | `node scripts/check_wf_syntax.js --self-test` · health-check `workflow 문법` |
+| A5-02 | 해결(v4.40.0) — plugin validate 의 오류 · 허용 밖 경고를 실패로 본다 | plugin.json 대상 validate 가 frontmatter 결손을 경고만 내고 exit 0 이었다 | `bash scripts/plugin_validate.sh --self-test` |
+| A5-03 | 해결(v4.40.0) — health-check 에 실모드 6검사를 배선 | effort xhigh→high 강등이 health-check 에서 exit 0 이었다 | `bash tests/fixtures/health/wiring-failure/run.sh` |
 
 ### v4.41.0 (2026-09-27) — 원장은 미룸을 포기로만 적을 수 있었고, 확정 원장을 고치는 길은 자기 거부 문구에 막혀 있었다 [MINOR]
 

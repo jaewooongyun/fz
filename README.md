@@ -34,7 +34,7 @@ fz 가 번들하는 MCP 는 **Serena 하나**다. 나머지는 직접 등록한�
 | 도구 | 없으면 | 사용처 | 설치 |
 |------|--------|:------:|------|
 | **Claude Node CLI** | 동작 불가 | 전부 | `npm install -g @anthropic-ai/claude-code` |
-| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 15/22 | `superclaude` (GitHub 저장소 404 — 2026-09-25 확인) |
+| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 15/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` → `/plugin install sc@superclaude` (설치본 실측 — sc 4.3.0 · 2026-10-01) |
 | **Serena MCP** | 심볼 탐색이 Grep 으로 (14 중 7 폴백) | 14/22 | 자동 등록 · `uv` 필수 (`brew install uv`) |
 | **GPT CLI** (`@openai/codex`) | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` |
 | **sequential-thinking** | 구조화 추론 실패 (폴백 0) | 10/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
@@ -149,10 +149,10 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ## What's New — v4.42.0
 
-**리뷰는 확신 없는 후보를 발견 단계에서 지웠고, 같은 이슈를 세 번 옮겨 적었다.** 발견 단계의 조기 필터를 걷는 후보 보존(`preserveLowConfidence`),
-review.json 하나에서 리포트·코멘트·게시 payload 를 만드는 렌더러(`--render`), 결정론 병합(`review_merge.py`), 리뷰 craft 6축(`craftAxes`),
-교차 필수 필드 재고지(`crossRequiredFields`), 검증된 프로젝트 규칙 레코드, fz-plan 델타 반영·독립 플랜 차이표를 넣었다. 워크플로 옵션과
-`--render` 는 기본 off 라 주지 않으면 콜 입력이 바뀌지 않는다. 켠 효과는 v4.43.0 에서 잰다.
+**GPT 는 Lead 가 요약한 가설을 받아 검증했고, 리뷰는 확신 없는 후보를 발견 단계에서 지웠다.** GPT 독립 첫 패스(`gpt_independent.sh` —
+허용 입력만 격리 폴더로 · 읽기는 OS 수준 차단 · rollout 감사), 후보 보존 · 단일 출처 렌더 · 결정론 병합 · craft 6축 · 교차 delta,
+GPT 역할 스킬의 규칙 런타임 추출을 넣었다. 새 길은 모두 A/B(같은 입력 · 가린 판정)로 재서 **통과한 fz-peer-review 만 기본으로 켰다**
+(품질 손실 0 · 238s 단축). fz-review · fz-plan 은 속도 기준 미달이라 옵션(`--gpt-independent` · Workflow args)으로 남는다.
 → [릴리즈 노트](docs/releases/v4.42.0.md)
 
 **v4.41.0 — 원장은 미룸을 포기로만 적을 수 있었고, 확정 원장을 고치는 길은 자기 거부 문구에 막혀 있었다.** 게이트 원장이 뒤 릴리스 게이트를 `DEFER` 로 미루고(Stop hook 이
