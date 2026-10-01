@@ -61,10 +61,13 @@ const SCENARIOS = {
     { name: 'Tier 3 · deep', args: { deep: true }, fire: true, stage2: true },
   ],
   'review-live': [{ name: '기본', args: {}, fire: false, stage2: true }],
-  'plan-lean2': [{ name: '기본', args: { requirement: '합성 요구', codeContextPath: '/tmp/code-context.md' }, fire: false, stage2: false }],
+  // 둘째 경로 = Stage 1 의미 필드가 전부 빈 응답 — mergeMode 'conditional' 이 병합을 실제로 빼는 경로다(없으면 켬 == 끔 이라
+  //   default-arms.js 가 plan-lean2 의 기본값을 판정하지 못한다)
+  'plan-lean2': [{ name: '기본', args: { requirement: '합성 요구', codeContextPath: '/tmp/code-context.md' }, fire: false, stage2: false },
+    { name: 'Stage 1 의미 필드 빔', args: { requirement: '합성 요구', codeContextPath: '/tmp/code-context.md' }, fire: false, stage2: false, quiet: true }],
 }
 
-function responses(wf, fire) {
+function responses(wf, fire, quiet) {
   const major = { id: 'Q1', file: 'a.swift', line_range: '10-12', severity: 'major', perspective: 'p', discoveryAxis: 'code_quality',
     origin: 'regression', description: 'd', evidence: 'e', confidence: 90 }
   if (wf === 'peer-review') {
@@ -80,7 +83,7 @@ function responses(wf, fire) {
   if (wf === 'plan-lean2') {
     return {
       'lean2-full': { directionVerdict: 'PROCEED', directionAlternatives: [], steps: [{ id: 'S1', title: 't', files: ['a'] }], readScope: [], writeScope: [] },
-      'lean2-edge': { edgeCases: [{ id: 'E1', case: 'c', failureScenario: 'f', whereItBreaks: 'w' }], impactNotes: [], latentDefects: [] },
+      'lean2-edge': { edgeCases: quiet ? [] : [{ id: 'E1', case: 'c', failureScenario: 'f', whereItBreaks: 'w' }], impactNotes: [], latentDefects: [] },
       'lean2-impact-arch': { impactFiles: [], patternVerdicts: [] },
       'lean2-merge': { addedEdgeCases: [], addedImpact: [], stepAmendments: [], implicationRegister: [], unresolved: [] },
     }
@@ -96,7 +99,7 @@ function responses(wf, fire) {
 
 async function callsOf(file, wf, scenario, extraArgs) {
   const calls = []
-  const table = responses(wf, scenario.fire)
+  const table = responses(wf, scenario.fire, scenario.quiet)
   await run(file, {
     args: Object.assign({}, BASE_ARGS, scenario.args, extraArgs),
     responder: (prompt, opts) => {
