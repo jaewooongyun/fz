@@ -43,6 +43,8 @@ for c in cmds:
     if c == "SPAWN" or c.startswith("SPAWN:"):
         args = json.dumps({"agent_type": c.split(":", 1)[1]}) if ":" in c else "{}"
         rows.append({"type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent", "arguments": args}})
+    elif c.startswith("RAWINPUT:"):   # input 그대로 — 실제 rollout 은 JS 프로그램이라 작은따옴표 문자열도 온다
+        rows.append({"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": c[len("RAWINPUT:"):]}})
     else:
         rows.append({"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": f"tools.exec_command({{cmd:{json.dumps(c)}}})"}})
 open(f, "w", encoding="utf-8").write("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n")
@@ -60,6 +62,7 @@ roll "$T/r-repo.jsonl" 1 "rg --files $HREAL/dev/repo -g '!.git'" "find $HREAL/de
 roll "$T/r-repomix.jsonl" 1 "rg b $HREAL/dev/repo ~"
 roll "$T/r-quoted.jsonl" 1 'cat "work dir/review-report.md"'
 roll "$T/r-pattern.jsonl" 1 "rg -n 'review-report\\.md' scripts"
+roll "$T/r-sq.jsonl" 1 "RAWINPUT:const r = await tools.exec_command({cmd:'cat review-report.md',max_output_tokens:2000});"
 
 run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자
   local name="$1" outf="$2" rolls="$3"; shift 3
@@ -167,6 +170,8 @@ run audq "$HERE/sample-plan-ok.json" "$T/r-quoted.jsonl" plan --requirement "$IN
 check "감사(직렬화된 큰따옴표 경로의 산출물 참조): exit 15" "$(rc audq)" 15
 run audpat "$HERE/sample-plan-ok.json" "$T/r-pattern.jsonl" plan --requirement "$IN/requirement.md"
 check "감사(정규식 패턴 'review-report\\.md' 검색은 참조가 아니다): exit 0" "$(rc audpat)" 0
+run audsq "$HERE/sample-plan-ok.json" "$T/r-sq.jsonl" plan --requirement "$IN/requirement.md"
+check "감사(JS 작은따옴표 명령의 산출물 참조): exit 15" "$(rc audsq)" 15
 # ④c 재귀 검색 규칙 문자열 단위 — /Users 경로(macOS 저장소 모양). ⛔ 파일을 만들지 않는다 — 실제 홈을 건드리지 않는다
 #    ④b 의 가짜 홈은 /Users 밖이라 옛 결함(/Users 아래 전부 적중)을 재현하지 못한다 — 규칙 블록을 직접 꺼내 잰다
 UNIT="$(python3 - "$L" <<'UPY'
@@ -195,11 +200,12 @@ fc = lambda c: json.dumps({"cmd": c})
 # 실제 0.159.2 rollout 의 exec 입력은 JS 프로그램이다(S27 저장 rollout 실측) — 여러 호출 묶음 · 경로 배열
 js = lambda *cs: "const results = await Promise.allSettled([\n" + ",\n".join("  tools.exec_command({cmd:" + json.dumps(c) + ",max_output_tokens:4000})" for c in cs) + "\n]);"
 arr = lambda *ps: "const paths = [\n" + ",\n".join(json.dumps(p) for p in ps) + "\n];\nfor (const p of paths) await tools.exec_command({cmd: 'cat ' + p});"
+sq = lambda c: "tools.exec_command({cmd:'" + c.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n") + "'})"   # JS 작은따옴표 문자열
 POS = ['cat "work dir/review-report.md"', 'cat "plan/plan-final.md"', 'cat work/code-context".md"', 'cat "T-1/plan/workflow-result.json"',
-       "cat work/review-report.md\nwc -l requirement.md"]
+       "cat work/review-report.md\nwc -l requirement.md", "cat review-report.md", "cat work/review-report.md | head", "wc -l a.txt work/plan-final.md"]
 NEG = ["rg -n 'review-report\\.md' scripts", "cat src/review-report.md,backup", "cat src/code-context.md:backup",
        'rg -n "workflow-result" scripts', 'cat "Sources/Foo/code-context-builder.swift"']
-scases = [(f(c), True) for c in POS for f in (roll, fc, js)] + [(f(c), False) for c in NEG for f in (roll, fc, js)]
+scases = [(f(c), True) for c in POS for f in (roll, fc, js, sq)] + [(f(c), False) for c in NEG for f in (roll, fc, js, sq)]
 scases += [(js("pwd", 'cat "T-1/review/triage.md"'), True), (arr("Domain/A.swift", "T-1/plan/plan-v2.md"), True),
            ("const paths = ['T-1/review/self-review.md'];", True), ('{"cmd":"cat ~\\/.claude\\/projects\\/p\\/a.jsonl"}', True),
            (arr("Domain/A.swift", "Sources/code-context-builder.swift"), False)]
@@ -207,7 +213,7 @@ out += ["ok" if forbid and forbid(c) == w else f"sbad{i}" for i, (c, w) in enume
 print(f"ALL-OK n={len(out)}" if all(x == "ok" for x in out) else " ".join(out))
 UPY
 )"
-check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ALL-OK n=51"
+check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ALL-OK n=73"
 
 # ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(끌 수 없다 — S11 ⑤)
 run sub "$HERE/sample-review-ok.json" "$T/r-parent.jsonl,$T/r-sub.jsonl" review --diff "$IN/diff.patch"

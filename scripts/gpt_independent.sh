@@ -331,19 +331,54 @@ if mode == "review" and os.path.isdir(hdir) and os.path.isfile(dpath):
 rolls = sorted(glob.glob(os.path.join(stem + ".rollouts", "*.jsonl")))
 ROOTS = r"(~|\$HOME|/Users(?:/[^\s'\"]*)?|/)(?=[\s'\";|&)]|$)"
 FZ_ART = re.compile(os.environ["FZ_ART_NAMES"])
-STR_LIT = re.compile(r'"(?:[^"\\\n]|\\.)*"')
-def str_literals(cmd):
-    """명령 안 큰따옴표 문자열 리터럴의 값 — rollout 의 exec 입력은 JS 프로그램이다(`tools.exec_command({cmd:"…"})` · `const paths = ["…"]`).
-    JSON 으로 해독한다(`\\"` · `\\/` · `\\n`). ⛔ 작은따옴표는 해독하지 않는다 — JSON 문자열 안의 `'review-report\\.md'` 를 꺼내면
-    따옴표 밖 셸 문맥이 되어 `\\.` 가 `.` 로 풀린다(거짓 양성). 작은따옴표 문자열은 원문의 셸 단어 나누기가 따옴표째 처리한다"""
-    out = []
-    for lit in STR_LIT.findall(cmd):
-        try:
-            v = json.loads(lit)
-        except ValueError:
+JS_ESC = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f", "v": "\v", "0": "\0"}
+def js_strings(src):
+    """JS 문자열 리터럴의 값 — rollout 의 exec 입력은 JS 프로그램이다(`tools.exec_command({cmd:"…"})` · `{cmd:'…'}` · `const paths = ["…"]`).
+    왼쪽부터 읽는다 — 큰따옴표 · 작은따옴표 · 백틱 리터럴을 각각 하나로 읽어, 한 리터럴 안의 다른 따옴표는 그 내용이다
+    (`"rg -n 'review-report\\\\.md' x"` 는 큰따옴표 하나 — 안쪽 작은따옴표는 셸 인용으로 남는다). `//` · `/* */` 주석은 건너뛴다.
+    JS 이스케이프를 푼다(`\\n` · `\\'` · `\\"` · `\\/` · `\\xHH` · `\\uXXXX` · `\\u{…}` · 그 밖 `\\c` → `c`). 닫히지 않은 리터럴은 버린다.
+    ⛔ 4143e7c 는 큰따옴표만 해독해 `{cmd:'cat review-report.md'}` 를 놓쳤다(역검증 3차 ISSUE-001)"""
+    out, i, n = [], 0, len(src)
+    while i < n:
+        if src.startswith("//", i):
+            j = src.find("\n", i)
+            i = n if j < 0 else j
             continue
-        if isinstance(v, str):
-            out.append(v)
+        if src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        q = src[i]
+        if q not in "\"'`":
+            i += 1
+            continue
+        i, buf, closed = i + 1, [], False
+        while i < n:
+            ch = src[i]
+            if ch == q:
+                closed = True
+                break
+            if ch == "\n" and q != "`":
+                break                                   # 줄을 넘는 따옴표 — 리터럴이 아니다
+            if ch == "\\" and i + 1 < n:
+                e = src[i + 1]
+                m = (re.match(r"u\{([0-9a-fA-F]{1,6})\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})", src[i + 1:]) if e in "ux" else None)
+                if m:
+                    try:
+                        buf.append(chr(int(next(g for g in m.groups() if g), 16)))
+                    except (ValueError, OverflowError):
+                        pass
+                    i += 1 + m.end()
+                    continue
+                if e != "\n":                           # 줄 이음 `\\` + 줄바꿈은 아무것도 아니다
+                    buf.append(JS_ESC.get(e, e))
+                i += 2
+                continue
+            buf.append(ch)
+            i += 1
+        if closed:
+            out.append("".join(buf))
+        i += 1
     return out
 def shell_words(s):
     """셸 단어 — 따옴표 · 이어 붙인 조각 · 이스케이프를 셸처럼 푼다(`code-context".md"` → 한 단어). 안 닫힌 따옴표면 공백으로만 자른다."""
@@ -357,12 +392,12 @@ def forbid_hit(cmd):
     """Claude 산출물 참조 — `.claude/` 경로 또는 fz 고유 산출물 이름(경로 성분 전체 일치 · 입력 가드와 같은 표).
     ⛔ 부분 문자열로 보지 않는다 — `code-context-builder.swift` · `ci/test-result.json` · 검색 패턴 'workflow-result' 는 산출물이 아니다.
        범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다
-    ⛔ 글자를 지워 정규화하지 않는다 — 직렬화 층을 해독하고(원문 + 문자열 리터럴) 셸 단어로 나눈 뒤 `/` 성분을 본다.
+    ⛔ 글자를 지워 정규화하지 않는다 — 직렬화 층을 해독하고(원문 + JS 문자열 리터럴) 셸 단어로 나눈 뒤 `/` 성분을 본다.
        글자 제거는 정규식의 `\\.` · 이름의 `,` · `:` 까지 지워 정상 명령을 오염으로 만들었다(역검증 2차 ISSUE-001)
     ⛔ 알려진 한계: 산출물 이름과 같은 검색 패턴(`rg "review-report.md" docs`)은 적중한다 — 패턴과 경로의 구분은 명령별 파싱이라 범위 밖이고
        OS deny(--deny 작업 폴더)가 1차 방어다. 따옴표 없는 `review-report\\.md` 는 셸이 역슬래시를 걷어 실제 인자가 `review-report.md` 다
        · 변수 전개 · 이름 조립(`$'…'` · `${p}`)은 보지 않는다"""
-    for s in [cmd] + str_literals(cmd):
+    for s in [cmd] + js_strings(cmd):
         if ".claude/" in s:
             return True
         if any(FZ_ART.fullmatch(c.strip("[](){},;:'\"`")) for w in shell_words(s) for c in w.split("/")):   # 양 끝만 — JS 배열 · 호출 구두점
