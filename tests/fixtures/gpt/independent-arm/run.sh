@@ -208,12 +208,16 @@ NEG = ["rg -n 'review-report\\.md' scripts", "cat src/review-report.md,backup", 
 scases = [(f(c), True) for c in POS for f in (roll, fc, js, sq)] + [(f(c), False) for c in NEG for f in (roll, fc, js, sq)]
 scases += [(js("pwd", 'cat "T-1/review/triage.md"'), True), (arr("Domain/A.swift", "T-1/plan/plan-v2.md"), True),
            ("const paths = ['T-1/review/self-review.md'];", True), ('{"cmd":"cat ~\\/.claude\\/projects\\/p\\/a.jsonl"}', True),
-           (arr("Domain/A.swift", "Sources/code-context-builder.swift"), False)]
+           (arr("Domain/A.swift", "Sources/code-context-builder.swift"), False),
+           ('const rx = /\\/\\//; await tools.exec_command({cmd:"cat review-report.md"});', True),
+           ('const rx = /\\/*/; await tools.exec_command({cmd:"cat review-report.md"});', True),
+           ("// don" + chr(39) + "t read it twice\nawait tools.exec_command({cmd:\"cat work/review-report.md\"});", True),
+           ("/* don" + chr(39) + "t */ await tools.exec_command({cmd:\"cat work/review-report.md\"});", True)]
 out += ["ok" if forbid and forbid(c) == w else f"sbad{i}" for i, (c, w) in enumerate(scases)]
 print(f"ALL-OK n={len(out)}" if all(x == "ok" for x in out) else " ".join(out))
 UPY
 )"
-check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ALL-OK n=73"
+check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ALL-OK n=77"
 
 # ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(끌 수 없다 — S11 ⑤)
 run sub "$HERE/sample-review-ok.json" "$T/r-parent.jsonl,$T/r-sub.jsonl" review --diff "$IN/diff.patch"

@@ -335,19 +335,12 @@ JS_ESC = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f", "v": "\v", "0":
 def js_strings(src):
     """JS 문자열 리터럴의 값 — rollout 의 exec 입력은 JS 프로그램이다(`tools.exec_command({cmd:"…"})` · `{cmd:'…'}` · `const paths = ["…"]`).
     왼쪽부터 읽는다 — 큰따옴표 · 작은따옴표 · 백틱 리터럴을 각각 하나로 읽어, 한 리터럴 안의 다른 따옴표는 그 내용이다
-    (`"rg -n 'review-report\\\\.md' x"` 는 큰따옴표 하나 — 안쪽 작은따옴표는 셸 인용으로 남는다). `//` · `/* */` 주석은 건너뛴다.
+    (`"rg -n 'review-report\\\\.md' x"` 는 큰따옴표 하나 — 안쪽 작은따옴표는 셸 인용으로 남는다). 주석을 따로 보지 않는다 — 주석 속 따옴표는 줄 끝에서 죽는 리터럴이 되고, 주석 속 산출물 경로 언급은 원문 후보가 적중시킨다(알려진 한계).
     JS 이스케이프를 푼다(`\\n` · `\\'` · `\\"` · `\\/` · `\\xHH` · `\\uXXXX` · `\\u{…}` · 그 밖 `\\c` → `c`). 닫히지 않은 리터럴은 버린다.
-    ⛔ 4143e7c 는 큰따옴표만 해독해 `{cmd:'cat review-report.md'}` 를 놓쳤다(역검증 3차 ISSUE-001)"""
+    ⛔ 4143e7c 는 큰따옴표만 해독해 `{cmd:'cat review-report.md'}` 를 놓쳤다(역검증 3차 ISSUE-001)
+    ⛔ 782b980 은 `//` · `/*` 를 주석으로 건너뛰어 정규식 리터럴(`/\\/\\//`) 뒤 같은 줄의 명령을 놓쳤다(역검증 4차) — 주석 판정은 JS 문맥 없이는 못 한다"""
     out, i, n = [], 0, len(src)
     while i < n:
-        if src.startswith("//", i):
-            j = src.find("\n", i)
-            i = n if j < 0 else j
-            continue
-        if src.startswith("/*", i):
-            j = src.find("*/", i + 2)
-            i = n if j < 0 else j + 2
-            continue
         q = src[i]
         if q not in "\"'`":
             i += 1
