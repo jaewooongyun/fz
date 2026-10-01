@@ -3,7 +3,8 @@
 # 리뷰 산출물 단일 출처 (S20b) — review.json 하나에서 세 산출물을 만들고, 서로와 diff_anchors CLI 에 대조한다.
 #   인자 없음                 render_review.py --self-test → fixture 렌더 대조. health-check 가 이 모드로 돈다(git 이력 불필요)
 #   --default-path-unchanged  옵션 미지정 절차가 기준과 같은가 — 두 SKILL 의 보호 구간에서 기준 줄이 순서대로 전부 남고,
-#                             더한 줄은 모두 --render 조건부 줄이며, 렌더러 경로가 실제로 들어갔다(양성 대조).
+#                             더한 줄은 모두 렌더 줄이며, 렌더러 경로가 실제로 들어갔다(양성 대조).
+#                             렌더 줄 = fz-review(렌더 opt-in)는 --render 조건부 줄 · fz-peer-review(v4.42.0 렌더 기본)는 렌더를 말하는 줄
 #                             기준 = FZ_BASE_TREE 또는 git ${FZ_BASE_SHA:-13755a6} — 둘 다 없으면 exit 2
 # exit: 0 전건 통과 / 1 불일치 / 2 실행 불가
 set -uo pipefail
@@ -29,8 +30,9 @@ def check(name, ok, detail=""):
     fails += 0 if ok else 1
 
 def default_path():
-    guard = [("skills/fz-peer-review/SKILL.md", "## Step: Synthesize", "## 4-Tier Graceful Degradation"),
-             ("skills/fz-review/SKILL.md", "## Phase 7: Completion", "## ")]
+    # 넷째 = 렌더가 그 스킬의 기본인가(v4.42.0 — fz-peer-review 만). 기본이면 더한 줄이 `--render` 를 안 써도 렌더를 말하면 된다
+    guard = [("skills/fz-peer-review/SKILL.md", "## Step: Synthesize", "## 4-Tier Graceful Degradation", True),
+             ("skills/fz-review/SKILL.md", "## Phase 7: Completion", "## ", False)]
     tree, sha = os.environ.get("FZ_BASE_TREE"), os.environ.get("FZ_BASE_SHA", "13755a6")
 
     def base_text(rel):
@@ -48,7 +50,7 @@ def default_path():
         j = next((k for k in range(i + 1, len(ls)) if ls[k].startswith(stop)), len(ls))
         return [l.rstrip() for l in ls[i:j] if l.strip()]
 
-    for rel, start, stop in guard:
+    for rel, start, stop, render_default in guard:
         bt = base_text(rel)
         if bt is None:
             print(f"UNRUN  기준 {rel} 를 얻지 못했다 — FZ_BASE_TREE 또는 git 이력({sha})이 필요하다 (⛔ 통과 아님)")
@@ -65,8 +67,10 @@ def default_path():
             else:
                 extra.append(line)
         check(f"{rel} '{start}': 기준 {len(b)}줄이 순서대로 전부 남았다", k == len(b), f"기준 {k + 1}번째 줄부터 어긋남 — {b[k][:80] if k < len(b) else ''}")
-        bare = [line for line in extra if "--render" not in line]
-        check(f"{rel} '{start}': 더한 {len(extra)}줄은 모두 --render 조건부 줄이다", not bare, " | ".join(line[:80] for line in bare))
+        is_render = (lambda l: any(t in l for t in ("--render", "렌더", "render_review.py"))) if render_default else (lambda l: "--render" in l)
+        bare = [line for line in extra if not is_render(line)]
+        kind = "렌더 줄(렌더 기본)" if render_default else "--render 조건부 줄"
+        check(f"{rel} '{start}': 더한 {len(extra)}줄은 모두 {kind}이다", not bare, " | ".join(line[:80] for line in bare))
         check(f"{rel} '{start}': 렌더러 경로가 이 구간에 있다(--render 와 render_review.py 가 한 줄에)",
               any("--render" in line and "render_review.py" in line for line in extra), "없다 — 옵션이 절차에 배선되지 않았다")
 
