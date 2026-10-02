@@ -90,7 +90,7 @@ metadata:
 > TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
 > Collaborative Design 패턴의 평탄화 구현은 `workflows/plan-collaborative.js` 로 남아 있다 — **롤백 경로**다(아래 ⛔ 배선 전환). 기본 실행은 아래 스크립트다.
 > **스크립트: `workflows/plan-lean2.js`** (플러그인 루트 상대) — **4콜 2단계**: 전체 플랜 ∥ edge 적대 ∥ impact+arch(동시 3) → 델타 병합.
-> agents/의 plan-structure·plan-edge-case·plan-impact 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+> agents/의 plan-structure·plan-edge-case·plan-impact·plan-merge 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > 동시 opus ≤3(Lead 세션 fable은 별도)는 Stage 1 의 3-병렬이 상한을 **정확히** 채워 구조적으로 보장한다. rate-limit 시 순차화 폴백(governance.md).
 >
 > ⛔ **2026-09-12 배선 전환 (6단계 9콜 → 2단계 4콜)** — wall · 노이즈 바닥 · 채택 판정은 `experiment-log.md` §5.9 가 정본이다. ⛔ 근거는 전부 **N=1** 이고 run-to-run 분산이 구조 간 차이보다 컸다 — 실사용 3회 관찰 후 재평가한다.
@@ -116,7 +116,7 @@ metadata:
 2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Sprint Contract 합의 직후 · Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh plan --requirement {요구 원문} [--sprint-contract {합의본}] [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - **Stage 1 (동시 3, opus)**: 전체 플랜(방향 판정·readScope/writeScope·steps·rtm·antiPattern 포함) ∥ edge 적대 렌즈 ∥ impact+arch 렌즈
-     → **Stage 2 (opus)**: 델타 병합 — ⛔ 병합 콜의 schema 는 **델타 전용**(`stepAmendments`·`addedEdgeCases`·`addedImpact`)이라 본문을 다시 쓸 수 없다. **4 call**
+     → **Stage 2 (opus)**: 델타 병합(탐색 도구 없는 `fz:plan-merge` — 입력 JSON 만 접는다) — ⛔ 병합 콜의 schema 는 **델타 전용**(`stepAmendments`·`addedEdgeCases`·`addedImpact`)이라 본문을 다시 쓸 수 없다. **4 call**
    - ⛔ 반환의 `delta` 는 plan 에 **자동 병합되지 않는다** — Lead 가 적용 판정을 한다(병합 콜이 본문을 못 쓰게 한 것과 같은 이유)
 4. **반환 처리**:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
@@ -149,7 +149,7 @@ metadata:
 
 | 렌즈 | 스크립트 위치 | 핵심 질문 |
 |------|--------------|----------|
-| plan-structure (설계+분해) | Stage 1 전체 플랜 + Stage 2 병합 | "어떻게 나누고 만들 것인가?" · 방향 판정도 이 콜이 함께 낸다 |
+| plan-structure (설계+분해) | Stage 1 전체 플랜 (Stage 2 병합은 도구 없는 plan-merge) | "어떻게 나누고 만들 것인가?" · 방향 판정도 이 콜이 함께 낸다 |
 | plan-edge-case (경계) | Stage 1 적대 렌즈 | "어디서 깨지는가?" — ⭐ 측정상 고유 기여가 가장 큰 렌즈 |
 | plan-impact (영향+아키) | Stage 1 통합 렌즈 | "어디까지 퍼지는가 · 기존 패턴과 맞는가?" — `secondaryHosts`·`existingTestSuites` 를 schema 로 명시 요구 |
 | GPT verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |

@@ -21,6 +21,8 @@
 //   ③ **병합 콜 확장** — edge 뿐 아니라 impact/arch 발견도 델타로 접는다.
 //
 // ⛔ 여전히 **델타 전용 schema** 다 — 병합 콜은 본문을 다시 쓸 수 없다(D1 의 R3 방어 유지).
+// ⛔ 병합 콜은 탐색 도구 없는 fz:plan-merge 다(R-D S32) — 도구가 있던 판은 Read 28 · Grep 20 으로 재조사해 임계 경로 711s 를 썼다(F-345).
+//    조사는 Stage 1 렌즈의 몫이고, 근거가 모자라면 병합은 unresolved 로 돌려준다.
 //
 // [옵션]
 //   mergeMode: ⛔ 기본 'always'(기준선 불변 — 미지정도 always). 'conditional' 이면 Stage 1 두 렌즈의 **의미 필드**(MERGE_SIGNAL_FIELDS)가
@@ -245,8 +247,9 @@ if ((edge || impactArch) && !mergeSkipped) {
     `4. implicationRegister — 제거/리팩토링 함의 {type: exec|obs}. 없으면 빈 배열.\n` +
     `5. unresolved — 접을 수 없어 사용자 판단이 필요한 것.\n` +
     `⛔ 이미 계획에 있는 내용을 다시 적지 말 것 — 델타가 아니면 값이 0이다.\n` +
+    `⛔ 이 콜에는 탐색 도구가 없다 — 위 코드 컨텍스트 파일도 읽지 않는다. 입력 JSON 만으로 접고, 근거가 입력에 없어 접을 수 없으면 unresolved 에 적는다.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.`,
-    { label: 'lean2-merge', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: MergeSchema })
+    { label: 'lean2-merge', agentType: 'fz:plan-merge', model: 'opus', effort: 'xhigh', schema: MergeSchema })
 }
 
 // ⛔ 완주 계산 (A3-01): Stage 1 은 세 팔(full·edge·impactArch)이 **모두** 있을 때만 완주다.

@@ -113,6 +113,23 @@ async function callsOf(file, wf, scenario, extraArgs) {
   return calls
 }
 
+// ⛔ R-D 의도된 기본 경로 변경 — 기준 트리의 콜 입력을 이 변환으로 옮긴 뒤 비교한다. 그 밖의 차이는 여전히 회귀다.
+//    변환은 정확한 치환이다 — 기준 콜이 전제(옛 agentType · 앵커 문장 있음 · 새 줄 없음)와 다르면 던져서 실패한다(변환이 헛돌면 회귀를 가린다).
+//    S32(plan-lean2 병합 콜 무탐색 · F-345): agentType plan-structure → plan-merge · 계약 한 줄. 새 모양은 plan-lean2-merge-no-explore.js 가 본다.
+const MERGE_CONTRACT = '⛔ 이 콜에는 탐색 도구가 없다 — 위 코드 컨텍스트 파일도 읽지 않는다. 입력 JSON 만으로 접고, 근거가 입력에 없어 접을 수 없으면 unresolved 에 적는다.\n'
+const MERGE_AT = '⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.'
+const INTENDED = {
+  'plan-lean2': {
+    'lean2-merge': c => {
+      if (c.agentType !== 'fz:plan-structure' || c.prompt.split(MERGE_AT).length !== 2 || c.prompt.includes(MERGE_CONTRACT)) {
+        throw new Error(`기준 lean2-merge 콜이 S32 변환 전제와 다르다(agentType ${c.agentType}) — 기준 트리가 S32 이전인지 본다`)
+      }
+      return Object.assign({}, c, { agentType: 'fz:plan-merge', prompt: c.prompt.replace(MERGE_AT, MERGE_CONTRACT + MERGE_AT) })
+    },
+  },
+}
+const intended = (wf, calls) => calls.map(c => ((INTENDED[wf] || {})[c.label] ? INTENDED[wf][c.label](c) : c))
+
 function baseFile(wf, tmp) {
   const env = process.env.FZ_BASE_TREE
   if (env) {
@@ -166,7 +183,7 @@ if (require.main === module) (async () => {
       for (const wf of opt.workflows) {
         const work = path.join(ROOT, 'workflows', `${wf}.js`)
         for (const sc of SCENARIOS[wf]) {
-          const base = await callsOf(bases[wf].file, wf, sc, {})
+          const base = intended(wf, await callsOf(bases[wf].file, wf, sc, {}))
           const unset = await callsOf(work, wf, sc, {})
           const off = await callsOf(work, wf, sc, opt.off)
           const on = await callsOf(work, wf, sc, opt.on)

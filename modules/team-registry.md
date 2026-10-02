@@ -19,6 +19,7 @@
 | plan-structure | plan | 구현 구조 + Step 순서 설계 | sonnet | opus | project | — | — | Primary |
 | plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | opus | — | — | — | 실질 워커 |
 | plan-impact | plan | 영향 범위 전담 (Exhaustive Impact Scan a~f) | sonnet | opus | project | — | — | Impact Scanner · 실질 워커 |
+| plan-merge | plan | 델타 병합 전용 — 탐색 도구 없이 입력 JSON 만 접는다 (plan-lean2 Stage 2) | sonnet | opus | — | — | — | 실질 워커 · 도구 0 (F-345) |
 | impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | worktree | Primary |
 | impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | opus | — | — | — | 실질 워커 |
 | review-arch | review | 아키텍처 결정 + 레이어 위반 | sonnet | opus | project | arch-critic | — | Primary |
@@ -47,7 +48,7 @@
 | 스킬 | Primary | Supporting | 패턴 |
 |------|---------|-----------|------|
 | /fz-discover | plan-structure (O) | review-arch (S) | adversarial |
-| /fz-plan | plan-structure (O) | plan-impact (S), plan-edge-case (S), review-arch (S), review-direction (S), memory-curator (S) | collaborative |
+| /fz-plan | plan-structure (O) | plan-impact (S), plan-edge-case (S), plan-merge (S), review-arch (S), review-direction (S), memory-curator (S) | collaborative |
 | /fz-code | impl-correctness (O) | review-arch (S), impl-quality (S), review-correctness (S), memory-curator (S) | pair-programming — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
 | /fz-fix | impl-correctness (O) | review-arch (S, 복잡도3+) | pair-programming — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
 | /fz-review | review-arch (O) | review-quality (S), review-counter (S), review-correctness (S, Phase4.5), memory-curator (S) | live-review |
