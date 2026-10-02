@@ -79,7 +79,7 @@ metadata:
 
 - Tier 2/3 Analyze는 네이티브 Workflow 도구 필요 (`workflows/peer-review.js`) — 미가용 시 SOLO 리뷰 폴백(`mode:'fallback'`) (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-- ⛔ **첫 GPT 호출 전**(Tier 1·2·3 challenger · `--gpt-independent` 독립 첫 패스 중 가장 이른 것): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`. 호출에 모델·effort 를 적지 않는다
+- ⛔ **첫 GPT 호출 전**(독립 첫 패스(기본) · `--no-gpt-independent` 면 Tier 1·2·3 challenger 중 가장 이른 것): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`. 호출에 모델·effort 를 적지 않는다
 
 ## 참조
 

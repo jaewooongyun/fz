@@ -348,7 +348,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - Lead + GPT 결과 dedup — 키는 § 3 (`파일` + `line_range` 겹침 + `discoveryAxis`)
 - 2-vote Confidence Matrix (3-vote 대비 단순화) — § 9 Tier 1 행
 - GPT verdict 처리는 § 6 — ⛔ `reverse` 는 제거가 아니라 `question` 전환
-- GPT 결과 소비: Tier 1 결과(`gpt-challenger-result.json`)는 Lead 가 Synthesize 에서 `modules/peer-review-gates.md` § MergeContract § 6 을 적용한다 — `challenges[].action`(agree · challenge · supplement · reverse)이 § 6 verdict 어휘다(`issues[]` 는 위 § 3 dedup · § 9 투표). `scripts/review_merge.py` 의 verdicts 는 `--gpt-independent` 경로 전용이다
+- GPT 결과 소비: Tier 1 결과(`gpt-challenger-result.json`)는 Lead 가 Synthesize 에서 `modules/peer-review-gates.md` § MergeContract § 6 을 적용한다 — `challenges[].action`(agree · challenge · supplement · reverse)이 § 6 verdict 어휘다(`issues[]` 는 위 § 3 dedup · § 9 투표). 이 결과는 `--no-gpt-independent` 로 challenger 를 고른 경로의 것이다 — 기본 경로(독립 첫 패스)는 `scripts/review_merge.py` 가 합친다
 - Independence: GPT sandbox 독립 = HIGH
 
 ### Deliver
