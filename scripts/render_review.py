@@ -26,6 +26,8 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
 
 모드
   --review FILE --diff FILE --out-dir DIR   review-report.md · pr-comments.md · render-preview.json · payload.json(pr.headSha 가 있을 때만)
+  --example   위 형식의 최소 review JSON 을 stdout 으로 — Lead 가 형식을 이 코드에서 다시 읽지 않게 한다(self-test example-roundtrip 이
+              같은 객체를 검증 · 렌더한다)
   --self-test
 
 exit: 0=렌더 · 1=거부(구간 선택 필요 · 후보 밖 pick · body 상한 초과) · 2=입력 불가(⛔ 통과 아님 — 빈 JSON · 필수 키 없음)
@@ -333,6 +335,21 @@ diff --git a/src/b.swift b/src/b.swift
  k3
 """
 
+# --example 이 내는 최소 review JSON — 지점은 SELF_DIFF 의 앵커 가능한 줄이라 self-test 가 이 객체를 그대로 렌더한다
+EXAMPLE = {
+    "verdict": "코멘트 수준 — 머지를 막을 결함은 없다",
+    "event": "COMMENT",
+    "pr": {"number": 7, "headSha": "abc123"},
+    "strengths": ["변경 범위가 요구사항과 맞는다"],
+    "issues": [
+        {"id": "A1", "severity": "major", "origin": "regression", "confidence": 90, "foundBy": ["arch", "gpt"],
+         "what": "무엇이 왜 문제인지(WHY 포함)", "suggestion": "어떻게 고칠지",
+         "comment": "PR 코멘트 톤 본문 — 없으면 what + suggestion 을 쓴다",
+         "sites": [{"path": "src/a.swift", "start": 11, "end": 12}]},
+        {"id": "Q1", "severity": "minor", "what": "한 줄 지적", "sites": [{"path": "src/b.swift", "start": 2, "end": 2, "note": "조각 설명"}]},
+    ],
+}
+
 
 def self_test() -> int:
     passed = total = 0
@@ -520,7 +537,16 @@ def self_test() -> int:
         case("stale-on-failure — 같은 out-dir 에서 실패하면 이전 실행의 산출물 넷을 지운다",
              (rc1, rc2) == (0, 1) and files1 == sorted(OUTPUTS) and files2 == [], (rc1, rc2, files1, files2))
 
-    tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_nodiff, t_empty, t_nopr, t_det, t_limit, t_cli]
+    def t_example():
+        r = subprocess.run([sys.executable, __file__, "--example"], capture_output=True, text=True)
+        cli = json.loads(r.stdout) if r.returncode == 0 else None
+        rep, com, pay = ids_of(render(EXAMPLE, SELF_DIFF))   # render 가 validate 를 먼저 부른다
+        want = {i["id"] for i in EXAMPLE["issues"]}
+        case("example-roundtrip — --example 출력이 예시 객체와 같고 검증 · 렌더를 통과한다(세 산출물의 이슈 id 일치)",
+             cli == EXAMPLE and rep == com == pay == want, (r.returncode, rep, com, pay))
+
+    tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_nodiff, t_empty, t_nopr, t_det, t_limit, t_cli,
+             t_example]
     try:
         for t in tests:
             try:
@@ -539,9 +565,13 @@ def main() -> int:
     ap.add_argument("--diff")
     ap.add_argument("--out-dir")
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--example", action="store_true")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
+    if a.example:
+        print(json.dumps(EXAMPLE, ensure_ascii=False, indent=2))
+        return OK
     if not (a.review and a.diff and a.out_dir):
         print("UNRUN: --review · --diff · --out-dir 가 모두 필요하다 (또는 --self-test)", file=sys.stderr)
         return UNRUN
