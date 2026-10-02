@@ -95,6 +95,7 @@ metadata:
 
 ### 실행 절차 (Lead)
 
+> ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 · 2)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 참조 무결성 확인 · L3 에이전트)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 첫 패스(2.5)는 백그라운드 한 줄이라 그대로 직전에 둔다(S22). 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
 1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12)
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용)
