@@ -95,7 +95,7 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 | 도메인 | Primary (Opus) | Supporting (Sonnet) |
 |--------|:---:|---|
-| **계획** | plan-structure | plan-impact, plan-edge-case, review-arch, review-direction |
+| **계획** | plan-structure | plan-impact, plan-edge-case, plan-merge(병합 전용 · 도구 없음), review-arch, review-direction |
 | **구현** | impl-correctness | review-arch, impl-quality, review-correctness |
 | **리뷰** | review-arch | review-quality, review-correctness, review-counter |
 | **탐색** | — | search-symbolic, search-pattern |
@@ -147,9 +147,15 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.42.0
+## What's New — v4.43.0
 
-**GPT 는 Lead 가 요약한 가설을 받아 검증했고, 리뷰는 확신 없는 후보를 발견 단계에서 지웠다.** GPT 독립 첫 패스(`gpt_independent.sh` —
+**fz-plan 병합 콜은 도구를 빼야 입력만 접었고, GPT effort 는 config 에 닿지 않았다 — 놓친 계획 항목은 렌즈 질문을 더해도 잡히지 않았다.** GPT 를 쓰는 세션은
+초반에 모델 · effort 를 한 번 묻는다(래퍼가 플래그 > 세션 선택 > config 순으로 정한다 · `scripts/gpt-choice.sh`). plan-lean2 병합 콜은 탐색 도구 없는
+`fz:plan-merge` 로 입력 JSON 만 접는다(확인 run 에서 탐색 0). fz-review · fz-plan 은 입력이 확정되면 Workflow 를 곧바로 띄우고, 렌더러는 `--example` 로 입력 예시를 낸다.
+fz-plan 렌즈에 운영 축을 더했지만 사전 등록 확인 run 에서 놓친 항목이 잡히지 않아 F-352 는 열어 둔다(회귀 0).
+→ [릴리즈 노트](docs/releases/v4.43.0.md)
+
+**v4.42.0 — GPT 는 Lead 가 요약한 가설을 받아 검증했고, 리뷰는 확신 없는 후보를 발견 단계에서 지웠다.** GPT 독립 첫 패스(`gpt_independent.sh` —
 허용 입력만 격리 폴더로 · 읽기는 OS 수준 차단 · rollout 감사), 후보 보존 · 단일 출처 렌더 · 결정론 병합 · craft 6축 · 교차 delta,
 GPT 역할 스킬의 규칙 런타임 추출을 넣었다. 새 길은 모두 A/B(같은 입력 · 가린 판정)로 재서 **통과한 fz-peer-review 만 기본으로 켰다**
 (품질 손실 0 · 238s 단축). fz-review · fz-plan 은 속도 기준 미달이라 옵션(`--gpt-independent` · Workflow args)으로 남는다.
