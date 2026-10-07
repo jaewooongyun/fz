@@ -6,7 +6,8 @@
 //    대신 옵션마다 판정한 경로가 **하나 이상** 있어야 한다(증거 없는 통과 방지).
 // ⛔ 한 워크플로의 옵션은 묶음이다 — 측정 arm(S25 C)이 옵션을 한꺼번에 켰다. 묶음 안에서 on · off 가 섞이면 FAIL.
 // 기대값: --expect-from <A/B 원장 jsonl> 이면 원장 판정 — ab_ledger.py judge 를 게이트와 **같은 기준**으로 불러 exit 0 이면 on,
-//    1(미달) · 2(판정 불가)는 off(fail-closed — 합격 증거가 없으면 켜지 않는다). 이때 v3.5 결정 표도 원장과 같아야 한다.
+//    1(미달)이면 off 다. 2(판정 불가)는 '판정 불가' 로 돌려줘 그 워크플로가 FAIL 한다 — off 로 읽으면 빈 원장 · 깨진 원장에서도
+//    기본값 대조가 통과한다(판정 불가가 통과로 샌다). 이때 v3.5 결정 표도 원장과 같아야 한다.
 //    인자가 없으면 결정 표와 대조한다(health-check 러너가 인자 없이 돈다).
 //    ⛔ 기준을 바꾸면 게이트 CHECK 도 같이 바꾼다: peer-review = S25p · review-live = S25(fz-review) · plan-lean2 = S26 첫 judge.
 // exit: 0 일치 · 1 불일치 · 2 실행 불가(판정기를 부를 수 없음)
@@ -35,7 +36,8 @@ function fromLedger(ledger, arm) {
     execFileSync('python3', [path.join(ROOT, 'scripts', 'ab_ledger.py'), 'judge', '--ledger', ledger, ...arm.judge], { stdio: 'ignore' })
     return { value: 'on', exit: 0 }
   } catch (e) {
-    if (e.status === 1 || e.status === 2) return { value: 'off', exit: e.status }
+    if (e.status === 1) return { value: 'off', exit: 1 }
+    if (e.status === 2) return { value: '판정 불가', exit: 2 }
     throw new Error(`판정기를 부르지 못했다 — ${e.message.split('\n')[0]}`)
   }
 }
