@@ -1,5 +1,37 @@
 # Changelog
 
+### v4.43.0 (2026-10-07) — fz-plan 병합 콜은 도구를 빼야 입력만 접었고, GPT effort 는 config 에 닿지 않았다 — 놓친 계획 항목은 렌즈 질문을 더해도 잡히지 않았다 [MINOR]
+
+R-D — R-C 가 남긴 원인(Lead 앞 구간 · plan-lean2 병합 콜 재조사 · fz-plan 이 두 arm 모두 놓친 항목)을 고친 판(W6 5스텝)과 GPT 통로 통합을 한 판으로 낸다
+(GPT 통로는 2026-10-02 에 로컬 main 에 먼저 들어갔고 버전이 붙지 않았다). 기본값은 R-C 판정
+그대로다 — fz-peer-review 만 새 길이 기본이고, fz-review(review-live) · fz-plan(plan-lean2)의 C 옵션은 opt-in 이다. 고친 기본 경로를 사전 등록한
+확인 run(S36 · 합본 전 트리)으로 쟀고 판정은 FAIL 이었다 — F-345 는 닫고 F-352 는 열어 둔다.
+
+**병합 전용 에이전트 (F-345)** — plan-lean2 Stage 2 병합 콜이 `fz:plan-merge` 로 돈다. `tools:` 가 비어 있어 클라이언트 도구가 없고(StructuredOutput 만
+런타임이 넣는다) 입력 JSON 만으로 델타를 접는다. 접을 근거가 입력에 없으면 unresolved 에 적는다. 확인 run 2건에서 병합 콜은 1턴 · 탐색 도구 0 이었다
+(같은 계측으로 R-C 8 run 은 도구 11~18 · 3~7턴).
+
+**Workflow 먼저 기동 · 렌더러 입력 예시** — fz-review · fz-plan 은 Workflow 입력이 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 참조 무결성 확인 · L3)은
+도는 동안 한다(`tests/docs/check_workflow_first.py`). `render_review.py --example` 이 렌더러 입력 예시를 내어 렌더 단계가 렌더러 코드를 읽지 않는다.
+
+**fz-plan 렌즈 축 (F-352 — 미해결)** — edge 렌즈에 운영 · 복구 경계(인증 상태별 진입 · 원격 차단 경로 · 되돌리기 범위), impact 렌즈에 운영 영향(계측 위치 ·
+구버전 공존 · 레이아웃 제약 파급) 축을 더했다. 확인 run 에서 feature fixture 의 놓친 세 항목은 여전히 0/3 이었다(회귀 0). `scripts/check_rubric_leakage.py` 가
+품질 fixture 채점표 문장이 fz-plan 프롬프트 자산에 들어가지 않았음을 본다.
+
+**기본값 검사** — `tests/workflows/default-arms.js` 가 원장 판정의 판정 불가(judge exit 2)를 off 로 읽지 않는다. 빈 원장 · 깨진 원장에서 기본값 대조가
+통과하던 구멍이다.
+
+**GPT 모델 · effort 세션 선택** — GPT 를 쓰는 세션은 초반에 모델 · effort 를 한 번 묻는다(/fz 는 Phase 4 질문에 합치고, 개별 스킬은 첫 GPT 호출 직전에 선택을 확인한다).
+래퍼(`gpt-exec.sh`)가 필드마다 플래그 > 세션 선택 > config 순으로 한 곳에서 정하고 호출 직전 `GPT-CHOICE` 한 줄로 적용값과 출처를 찍는다(새 `scripts/gpt-choice.sh` —
+options · get · set · config). 이전에는 effort 가 래퍼 기본 high · 문서 리터럴 · 표 여러 벌로 흩어져 config 의 effort 가 fz 의 GPT 호출에 닿지 않았다. 서브커맨드별 effort 표와
+모델이 부를 수 없는 Plugin 우선 경로를 걷어냈고(정본 `modules/gpt-strategy.md` § 모델·effort 선택), peer-review Tier 1·2·3 challenger 와 fz-modernize Phase 4 가 래퍼 한 형태로
+부른다. 독립 첫 패스 런처도 같은 규칙이다(effort 기본값 제거). 선택하지 않은 자율 · 헤드리스 세션은 config 그대로다.
+
+| ID | 판정 | 근거 | 검증 절차 |
+|---|---|---|---|
+| F-345 | 해결 — 병합 콜이 탐색 도구 없는 전용 에이전트(`fz:plan-merge`)로 입력 JSON 만 접는다. 렌즈 재독 · 생성 지배(레버 L2 · L3)는 F-362 로 이어 간다 | 프로브(2026-10-02): 병합 에이전트에 부여된 도구 = StructuredOutput 하나 · 읽기를 시켜도 도구 호출 0. 확인 run 2건(S36): 병합 콜 1턴 · 도구 1(StructuredOutput) · 탐색 0 — 같은 계측으로 R-C 8 run 은 도구 11~18 · 3~7턴 | `node tests/workflows/plan-lean2-merge-no-explore.js`(health-check 배선). 실제 run 은 `python3 scripts/fz_wf_metrics.py --wf <runId>` 의 `L2-merge` 행이 turns=1 · tools=1 인지 본다 |
+| F-352 | 미해결 | edge · impact 렌즈에 렌즈가 묻지 않던 운영 축 둘을 더했지만 사전 등록 확인 run(S36 · fz-plan 2 fixture × 1 · 가린 판정)이 FAIL 이다 — feature 의 B1 · Q5a · Q6a 0/3(R-C 4 run 도 0) · removal 의 B1 · Q3a · RF1 3/3(R-C 에서도 4 run 중 1~2회 충족이라 N=1 로 변동과 구별 불가) · 회귀 0(두 fixture). 열어 둔다 | 품질 fixture `plan-feature` · `plan-removal` 로 fz-plan 을 돌리고 `ab_ledger.py blind-pack` → 가린 검증자 → `blind-unpack` → `score` 로 위 항목의 covered 를 본다. 다음 시도는 새 fixture 로 잰다(같은 fixture 과적합) |
+
 ### v4.42.0 (2026-10-01) — GPT 는 Lead 가 요약한 가설을 받아 검증했고, 리뷰는 확신 없는 후보를 발견 단계에서 지웠다 [MINOR]
 
 R-B(품질 축)와 R-C(속도 · GPT 독립 · 기본값 전환)를 한 판으로 출하한다 — R-B 만 담은 중간 v4.42.0 은 공개하지 않았다. 새 길은 전부
