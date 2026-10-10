@@ -1,5 +1,81 @@
 # Changelog
 
+### v4.44.0 (2026-10-10) — 닫은 finding 은 오라클을 재지 않고 배출됐고, 도구 부재 · diff 실패 · null 응답은 0건 · 최저 Tier · 불일치로 읽혔다 [MINOR]
+
+R-E1 — fz 개선 계획(2026-10-07)의 세 판 가운데 첫 판이다. 레지스트리(배출 · 위생 · 복원)와, 측정 실패를 결과로 읽던 검사 · 러너 · 문서 절차를
+고쳤다. 게이트 원장 하나(29 게이트 — 계획 밖 삽입 E1-12p · E1-14h · E1-19f 포함)로 Step 마다 후보 트리와 기준 트리(be8c871)를 대조했다. 28건을 닫는다 —
+v4.33.0 · v4.34.0 이 고치고 배출하지 않은 F-155 · F-281, v4.42.0 에 오라클 미충족으로 배출된 F-348 의 정정을 함께 싣는다. 이 판에서 생긴
+F-400 ~ F-420(F-416 은 비어 있다)은 열어 둔다. 기본 동작이 바뀐 곳은 릴리즈 노트 §2 표에 모았다.
+
+**레지스트리 (F-372 · F-373 · F-374 · F-375)** — 위생 검사 기본 모드가 옛 `--strict` 판정 전부와 대기열 밖 행 · APPLIED/live 번호 충돌 ·
+title/H1/본문 중복 · 펜스 밖 덤프를 본다(`--strict` 는 별칭). `eject_findings.py --audit` 이 대조 뒤 같은 루트에 이 기본 모드를 돌리는 실레지스트리
+소비자다. 배출이 이번 실행분 INDEX 행을 지우고(`--prune-index` · `--keep`), 협조 writer 는 `.fz-registry.lock` 에 flock 을 건다. 09-17 복원이
+덮어쓴 엔트리는 원천이 있는 범위에서 복원했고(원천 없는 것은 stub — DG-13), 정리 뒤 실레지스트리의 위생 검사가 위반 0 이다. 배출 뒤 오라클
+미충족이 드러나면 분리한다 — F-348 의 미충족 오라클 (b) 는 F-400 으로 분리하고 APPLIED 에 `CORRECTION F-348->F-400` 을 더했다. 이 판 노트는
+Closes 항목마다 엔트리 오라클의 충족 근거를 적는다(F-375).
+
+**측정 실패를 0 으로 읽던 자리 (F-160 · F-224 · F-135 · F-350 · F-385 · F-381)** — AC8 링크 검사는 `rg` 대신 POSIX grep 을 쓰고 URL 0 이면
+UNRUN exit 2 다. gather 의 numstat 은 최종 BASE 뒤 `numstat_fallback.awk diff.patch` 한 줄로 내고 PR 메타와 다르면 `GATHER-WARN` 이다 —
+PR 번호가 SHA 접두로 풀려 exit 0 · 0바이트(F-135)나 부풀린 수치(F-350)를 내던 경로다. Tier 자동 선택은 diff 실패를 0줄로 읽지 않고 TIER=2 를
+지키며, 판정 불가면 auto 단락이 덮지 않는다(기존 BASE 부재 경로도 — F-413). risk_scan 은 삭제 파일을 `diff --git` 헤더 경로로 귀속해
+tier_delta 가 오를 수 있고 `files` 가 삭제 파일을 각각 센다(IR-10). health-check 는 `UNRUN` 표지 있는 exit 2 만 미실행으로 센다.
+
+**null 과 legacy 값 (F-150 · F-256 · F-282 · F-216)** — 인라인 착지 검증(§7)은 하위 컬렉션에서 id 만 받고 id 마다 개별 조회해
+OK · MISMATCH · UNVERIFIED · MISSING 으로 가른다(`skills/fz-peer-review/scripts/verify_landing.py` — 삭제 · 재게시 없음). UNVERIFIED 는
+지우지 않고, 확정 MISMATCH 도 사용자 확인 뒤에 지운다. head 이동 뒤 이월된 코멘트는 `original_commit_id` 가 payload `commit_id` 와 같을 때만
+`original_*` 로 대조한다. review · peer 스키마는 schemaVersion 1.1 만 받고 `scope_disposition` null 을 거부한다(DG-15).
+
+**기준과 base (F-363 · F-240 · F-253)** — 회귀 러너의 기준 env 는 `FZ_REGRESSION_BASE_SHA` · `FZ_REGRESSION_BASE_TREE` 다(옛 이름만 있으면
+WARN 뒤 기본값 · 기준 출처는 롤백 검사 이름에). gather PR 모드는 PR url 과 맞는 원격의 추적 ref 를 base 로 쓰고 baseRefOid 와 다르면
+`GATHER-WARN: stale base` 를 낸다(fetch 안 함). Gather Step 0.5 는 `fetch_pr_refs.sh` 로 PR head 와 base 원격 추적 ref 를 받는다 — gh 가 없으면
+head 만 받고 exit 5 다.
+
+**GPT 래퍼 · Stop 훅 (F-364 · F-147 · F-360)** — `gpt-exec.sh` 가 그 호출의 `stream.log` 크기를 감시해 `FZ_GPT_IDLE_SEC`(기본 900 · 0=끔)초
+동안 늘지 않으면 TERM → KILL 하고 exit 12 + `GPT-IDLE` 로 끝난다(래퍼 호출마다 최대 약 1초 · health-check 약 +236s). Stop 훅 차단 사유는
+`UNMET:` 줄과 미충족 id 8개 + '…외 N건' 을 싣는다.
+
+**lint · setup (F-357 · F-379 · F-380 · F-355 · F-353)** — diff 파서 lint 가 인라인 플래그 정규식과 `.githooks/` · 확장자 없는 셔뱅 파일을
+보고, pre-commit 훅은 추가 줄을 hunk 상태로 판정한다. 외부 명령 lint 가 2글자 명령을 본다(rg 는 선언하지 않는다 — 계획 이탈 · 사용자 결정).
+계약 lint #N14 가 실행 코드의 `cd "$(mktemp …)"` 꼴을 막는다. `setup-gpt-skills.sh --check` 가 GPT 홈의 옛 링크를 읽기 전용으로 나열한다.
+
+| ID | 판정 | 근거 | 검증 절차 |
+|---|---|---|---|
+| F-135 | 해결 — gather numstat 을 최종 BASE 뒤 patch 에서 계산한다. 엔트리의 'pathspec 흡수' 기제는 git 2.54 실측과 다르다 — exit 0 · 0바이트는 PR 번호가 조상 SHA 접두로 풀릴 때다 | E1-18: gather.sh numstat 을 `numstat_fallback.awk diff.patch` 한 줄로 · awk 헤더 키잉 · 공용 gh shim · gather-pr-mode numstat 5셀 24 단언(기준 7 FAIL) | 게이트 E1-18 — PR 번호가 SHA 로 풀리는 셀에서 numstat = patch 계산값 · PR 메타 불일치면 GATHER-WARN · 기준 gather 는 exit 0 · 빈 numstat 로 FAIL · 기존 gather fixture 5종 통과 |
+| F-147 | 해결 — F-364 와 같은 idle 감시가 결론 뒤 무출력 정지도 끊는다. [미검증: 실 CLI 의 SIGTERM 정리] | E1-16: gpt-exec.sh 세 호출을 백그라운드로 · stream.log 크기 감시 · exit 12 + GPT-IDLE · idle-watchdog 16셀 | 게이트 E1-16 — 정체 사례 exit 12 · idle 토큰 · 자손 잔존 0 · 지속 출력 · 감시 끔은 정상 완료 · 기준 래퍼는 외부 상한까지 안 끝나 FAIL |
+| F-150 | 해결 — §7 이 하위 컬렉션은 id 만 받고 id 별 개별 조회로 4값 판정 · UNVERIFIED 삭제 금지 · MISMATCH 도 확인 뒤 | E1-20(+ 리뷰 반영): inline-anchoring §7 · `verify_landing.py` · SKILL Deliver 한 줄 정확 변환 · landing-verify ran=25 · 단언 72 | 게이트 E1-20 — 4값 구분 · null 은 UNVERIFIED · 확정 MISMATCH 도 확인 전 삭제 0 · wiring 재생과 호출 제거 음성 · 기준 §7 의 무조건 삭제 문장 · render-single-source 정확 변환 |
+| F-155 | 해결(v4.33.0 반영) — 사후 배출 | E1-3: 반영판별 노트로 `--version 4.33.0` 배출 · 9ec3018 첫 태그 v4.33.0 | 게이트 E1-3 — 스냅샷 live 유일 slug 가 archive 에 있고 live · INDEX 링크 0 · APPLIED 에 노트 버전 · 키 줄 넷이 글자 그대로 · 첫 태그 재확인 · --audit 통과 |
+| F-160 | 해결(흡수 · DG-7=absorb) — 개별 원장 CHECK 변환(TKT-5743)으로 닫힌다. TOOLS 미선언 rg CHECK 의 판정기 거짓 PASS 기제는 F-409 로 남는다 | E1-13: AC8 rg → POSIX · SKILL AC8 단일 출처 / E1-5: 손상 엔트리 본문 완전 복원 | 게이트 E1-13 — URL 49 집합 · rg 명령 위치 검출(양성 24 · 음성 17) · 기준 rg 127 FAIL / E1-5 manual — 원천 바이트 대조 |
+| F-216 | 해결 — 남은 축 N4(1.1 에서 scope_disposition null 통과). N1 ~ N3 · N5 ~ N7 은 앞선 판이 고쳤다. [미검증: EC-27 CLI --output-schema 수용] | E1-12 · E1-12p(DG-15.review=retire-1.0 · peer=same): review · peer 스키마 1.1 만 · null 제거 · fz-gpt 1.0 분기 정리 | 게이트 E1-12 · E1-12p — null · 잘못된 값 · 누락 · 1.0 거부 · 유효값 통과 · 저장된 review 출력 13건 통과 · peer 26건 새 오류 0 · 기준 fixture exit 1 |
+| F-224 | 해결 | E1-13: ac8-link-check.sh POSIX grep · URL 0 은 UNRUN exit 2 · 원자 쓰기 · ac8-links 27 단언 | 게이트 E1-13 — 일반 셸과 `env -i sh` 에서 URL 49 집합 일치 · 실패 시 기존 출력 보존 · 기준은 rg 127 · 0바이트로 FAIL |
+| F-240 | 부분 해결 — 제안 ①②(원격 추적 ref 우선 · baseRefOid 대조 경고). 제안 ③(all-clear 에 base 해시)은 승인 범위 밖이라 F-414 로 넘긴다 | E1-19(+ 리뷰 반영): gather PR 모드 원격 선택 · stale WARN(fetch 안 함) · `--base <원격>/<브랜치>` · base 셀 5 · shim-fields 4 | 게이트 E1-19 — stale 로컬 base 에서도 base · diff 가 base 저장소 원격 추적 ref · upstream 이 base 저장소가 아닌 리포 · shim 미지원 필드 거부 · 기준 FAIL · stale-base 회귀 |
+| F-253 | 해결(DG-11=approve) — Step 0.5 가 base 원격 추적 ref 를 받는다. 행동 변경: gh 부재 · baseRefName 조회 실패면 head 만 받고 exit 5 | E1-19f(+ 리뷰 반영): `fetch_pr_refs.sh` · SKILL §0.5 호출 한 줄 · step05-base-fetch 5셀 28 단언 | 게이트 E1-19f — 원격보다 뒤인 저장소에서 §0.5 재생 뒤 원격 추적 ref = 원격 최신 · pr-7 = head · 로컬 · HEAD · 작업 트리 불변 · stale PR 셀은 ref 불변 · 경고 유지 |
+| F-256 | 해결 — F-150 과 같은 §7 | E1-20: 하위 컬렉션 null 앵커는 UNVERIFIED | 게이트 E1-20 — null-required · zero-ids 셀이 UNVERIFIED · 삭제 0 |
+| F-281 | 해결(v4.34.0 반영) — 사후 배출 · effort 하향 sweep 종결(사용자 결정 2026-09-25) | E1-3: `--version 4.34.0` 배출 · F-157 · F-191 은 같은 run 의 관측이라 live 유지 | 게이트 E1-3 — 키 줄 `resolved=plan-lean2 closure=§5.8 ⑥ effort 사용자 종결` · CLAUDE.md '하향 sweep 종결' 줄 · experiment-log §5.8 ⑥ 'high 기각' 대조 · --audit 통과 |
+| F-282 | 해결 — 필드 대조를 개별 조회로 | E1-20: 하위 컬렉션은 `--jq '.[].id'` 로 id 만 | 게이트 E1-20 — ok-two-call(호출이 둘로 갈림) · wiring 재생 · 호출 제거 음성 |
+| F-348 | 정정 — v4.42.0 에 이미 배출됐다. 미충족이던 오라클 (b) 를 실 CLI 4셀로 채우고 그 기록은 F-400 으로 분리했다(DG-4=split). [미검증: 래퍼 exec 경로] | E1-9: `tests/fixtures/gpt/os-deny/external.sh`(실 GPT CLI sandbox · 모델 호출 없음) 4/4 · 래퍼 기본 인자를 끼우면 3/4 · APPLIED `CORRECTION F-348->F-400` | 게이트 E1-9 — split 정합(새 엔트리의 F-348 링크 + CORRECTION 행) · hygiene 통과 · external.sh 4셀 live · independent-arm 이 external.sh 를 인용 |
+| F-350 | 해결 — PR 메타 additions/deletions 와 다르면 GATHER-WARN | E1-18: numstat-sha-inflated · numstat-meta-mismatch 셀(기준 +50 · 경고 없음) | 게이트 E1-18 — 메타 불일치 GATHER-WARN · sha 로 풀리는 셀의 numstat = patch 계산값 |
+| F-353 | 해결(DG-21 SC-11=contract) — `--check` 읽기 전용 · stale 이면 목록 + exit 1 · health-check 경고 행 | E1-15: setup-gpt-skills.sh `--check` · setup-links 새 셀 3 · README 한 줄 | 게이트 E1-15 — 임시 설치 트리에서 stale 목록 정확 · 결정된 코드 · 정리 후 0 · 전후 해시 같음 · 폴더 생성 0 · 기준은 목록 단언 FAIL |
+| F-355 | 해결(DG-5=A) — v4.42.0 의 4곳 수정 + 정적 검사 #N14 | E1-8: lint_contracts #N14 · empty-cd-mktemp fixture · v4.42.0 근거는 사후 노트에 보존 | E1-8 manual — 기준 4곳 복원 사본에서 정확히 4위치 위반 · 현 트리 0 · 변형 양성 · 문서 예시 음성 · fixture 후보 0 · 기준 1 |
+| F-357 | 해결 — diff 파서 lint 신호 변형 B | E1-14: lint_diff_parsers SIGNALS · SELF_TESTS 19 · diff-and-cmd-cells 26 단언 | 게이트 E1-14 — 인라인 플래그 · 이스케이프 · JS RegExp 셀 위반 · 정상 대조와 라이브 트리 통과 · 기준 lint 는 같은 셀을 놓쳐 FAIL |
+| F-360 | 해결 | E1-10: gate_stop_hook `UNMET:` 요약 · id 8 + '…외 N건' · 접기 · 사유 상한 · self-test 27 · stop-reason-multi 9셀 | 게이트 E1-10 — 미충족 2개면 두 id · 상한을 넘으면 표시 id + 생략 수 = 전체 · 지문 같음 · 기준은 마지막 1개라 FAIL · hook self-test 통과 |
+| F-363 | 해결 — 기준 env 를 FZ_REGRESSION_BASE_* 로. 엔트리 오라클의 '첫 줄' 은 사실과 다르다 — 출처는 롤백 검사 이름 라벨 `기준(git 13755a6(기본값) · 롤백 경로)` 이다 | E1-11: default-off-regression.js · render-single-source/run.sh · 옛 이름만이면 WARN · FZ_BASE_SHA=52ecc42 상속 셀 통과 | 게이트 E1-11 — 오염 FZ_BASE_* 에서 기준 러너는 UNRUN 2 · 후보 exit 0 · 옛 이름만이면 exit 0 + WARN · A/B self-test 통과 |
+| F-364 | 해결 — 새 exit 코드 대신 12 를 재사용하고 GPT-IDLE 토큰으로 가른다. [미검증: 900s 기본값의 꼬리 정체] | E1-16: idle-watchdog 16셀 `WATCHDOG-CELLS=16 CAP3X=ok REPEAT=2 LEAK=0`(기준 7/16) | 게이트 E1-16 — 정체 쪽만 끊김 · 동시 호출 비정체 쪽 정상 · 런처 그룹 kill 이 CLI 에 닿음 · skill-inject · independent-arm · choice · failure-injection 회귀 |
+| F-372 | 해결 | E1-2: index_sync · `--prune-index` · `--keep` · flock 잠금 · eject-index 후보 PASS 75(기준 FAIL 43) | 게이트 E1-2 — 대상 행만 지움 · 비대상 해시 불변 · 재실행 무변경 · 중단 뒤 복구 · 읽기~교체 사이 변경은 비0 · lock 셀 · 기준 fixture exit 1 |
+| F-373 | 해결 — 기본 모드 승격 + 실레지스트리 소비자(`--audit`) | E1-4(탐지 규칙) · E1-7(기본 승격 · audit 소비자 · consumer 셀 · hygiene-cells 후보 PASS 48 · 기준 FAIL 38) | 게이트 E1-4 · E1-7 — 손상 셀 6종 위반 · 정상 대조 통과 · 기준 놓침 / consumer 셀에서 기본 hygiene · --audit 이 같은 태그로 exit 1 · 손상 스냅샷 불합격 · 정리된 실레지스트리 통과 |
+| F-374 | 부분 해결 — 중복 축(title · H1 · 본문) 0 · 덤프 0. 크기 검산은 F-022 미달(원본 6321 B 중 원천 2255 B — 09-17 절단). 소실분 재구성은 후속 | E1-5(DG-13=stub · 복원 26파일 · restore-log) · E1-6(정리 (a)~(g) · F-050 → F-397) | 게이트 E1-6 — 단계 백업 8 · 단계별 허용 파일 · applied_records 유실 0 · 실레지스트리 hygiene --strict 위반 0 · 정리 전 스냅샷 exit 1 / E1-5 manual — 왕복 해시 · 원천 바이트 · F-022 · F-163 크기 |
+| F-375 | 해결 — 분리 규칙 · APPLIED 정정 · 노트의 Closes 항목별 근거 | E1-9: 레지스트리 README §1 분리 규칙 · CORRECTION 행 / docs/releases/v4.44.0.md '`Closes:` 줄 규약' 절 28항목 | 게이트 E1-9 는 split 정합만 잰다 — 항목별 근거는 강제하는 게이트가 없는 절차 판정이라 노트 끝 절에서 항목마다 오라클 · 명령 · 결과를 대조한다 |
+| F-379 | 해결 — 2글자 첫 토큰 · rg 미선언(계획 이탈 — 사용자 결정 2026-10-09) | E1-14: FIRST_TOKEN · POSIX_UTILS 8 · self-test 10(two-letter-rg-reported) · undeclared-rg 셀 | 게이트 E1-14 — 미선언 fd · ag 위반 · 선언 gh 는 위반 아님 · 라이브 트리 통과 · 기준 lint 놓침 · check_gpt_surface 회귀 |
+| F-380 | 해결(DG-12=approve) | E1-14h: pre-commit hunk 상태 awk · 추출 실패면 차단 · `.githooks` · 확장자 없는 셔뱅 · `--json` ext · 훅 8 · lint 6셀 | 게이트 E1-14h — 임시 저장소에서 + · ++ 로 시작하는 추가 줄의 사용자 경로 차단 · 통과 대조 · lint 가 훅을 .sh · hunk-state ok 로 · 셔뱅 5종 ext · 기준 FAIL |
+| F-381 | 해결 — 삭제 경로는 diff --git 헤더. tier_delta · files 의미가 바뀐다(IR-10) | E1-17: risk_scan `_header_path` · risk-scan 21셀(새 5 · 기준 18/21) · tiers.md 정정 | 게이트 E1-17 — 삭제 파일 셀이 실제 경로로 귀속 · 기존 셀 통과 · 기준은 /dev/null 귀속으로 FAIL · numstat-fallback 러너 통과 |
+| F-385 | 해결 — diff 실패 표지 + TIER=2 · 판정 불가면 auto 가 덮지 않는다(F-413 Lead 보정 · 기존 BASE 부재 경로 포함) | E1-18b: tiers.md 브랜치 경로 · `TIER_AUTO_BLOCKED` · branch 셀 + 'Tier 단락 뒤에도 TIER=2' | 게이트 E1-18b — 없는 INPUT 에서 diff 실패 표지 · TIER=2 · 정상 브랜치는 실제 변경량 · 기준은 CHANGED_LINES=0 으로 FAIL · 기존 셀 S · V · F 통과 |
+| F-400 | 열어 둠 — 오라클 4/4 를 같은 판(E1-9)이 채웠지만 Closes 기대 표가 원장 확정 때 고정돼 판 중 생긴 ID 를 담지 못한다(F-401) | E1-9 split 산출 · os-deny/external.sh 4/4 | 다음 판 `Closes:` — external.sh 4셀(`OS-DENY-CELLS=4/4`)을 다시 돌려 근거로 적는다 |
+| F-414 | 열어 둠 — stale base 경고가 stderr 에만 나가 산출물은 all-clear(F-240 제안 ③) · §0.5 와 gather 의 원격 선택 규칙 불일치 · force-push 뒤 낡은 pr-{N} 미대조 | E1-19 · E1-19f 리뷰 probe | 후속 판 — review-surface.md 에 base 해시 · 경고를 싣고 fork 폴백 배치 셀로 잰다 |
+| F-415 | 열어 둠 — 삽입 게이트 승인이 시제품의 CRITERION 충족만 봐 대체한 경로의 회귀를 놓쳤다(이 판은 리뷰가 잡아 exit 5 로 고쳤다) | E1-19f 리뷰 probe4 · step05 gh-fail 셀 | 후속 판 — 대체 구현의 기존 실패 경로를 승인 입력에 싣고 그 경로 셀을 CHECK 로 잰다 |
+| F-417 | 열어 둠 — manual 게이트 4건을 판 끝에 몰아 사유 없이 confirm 요청 · 순수 점검표까지 manual | 사용자 질문(2026-10-10) | 후속 판 — manual 사유 한 줄 · 기계화 가능한 점검표는 command 게이트 · 독립 판정으로 |
+| F-418 | 열어 둠 — 사용자 결정 계획 이탈(E1-14 rg)을 원장 문언에 반영하지 않음 · closing verify-gates 가 잡아 재승인으로 해소 | closing verify-gates revise 1 | 후속 판 — 이탈 기록과 원장 문언 갱신 · 재승인을 같은 턴에 |
+| F-419 | 열어 둠 — 리뷰 처분 '반영' · '다른 Step 범위' 주장 미대조 2건(E1-2 `.tmp` · E1-4 F-001) | closing guardian validate | 후속 판 — 처분 '반영' 에 수정 위치(파일:줄) 필수 · Step 마무리 때 diff 대조 |
+| F-420 | 열어 둠 — 릴리스 경로에 공개 중립화 검사가 없어 노트 초안의 사내 티켓 키가 게이트를 통과 | 커밋 전 Lead 의 중립화 규칙 대조(적중 3 → 0) | 후속 판 — 동기 검사에 '추가 줄 × 중립화 규칙 적중 0' 단계 |
+
 ### v4.43.0 (2026-10-07) — fz-plan 병합 콜은 도구를 빼야 입력만 접었고, GPT effort 는 config 에 닿지 않았다 — 놓친 계획 항목은 렌즈 질문을 더해도 잡히지 않았다 [MINOR]
 
 R-D — R-C 가 남긴 원인(Lead 앞 구간 · plan-lean2 병합 콜 재조사 · fz-plan 이 두 arm 모두 놓친 항목)을 고친 판(W6 5스텝)과 GPT 통로 통합을 한 판으로 낸다
