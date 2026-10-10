@@ -23,7 +23,7 @@ allowed-tools: >-
   mcp__github__add_issue_comment,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
+  Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
 metadata:
   provides: [peer-review]
   needs: [none]

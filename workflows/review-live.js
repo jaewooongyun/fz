@@ -3,7 +3,7 @@
 // [API 계약 — verified: guides/skill-authoring.md §12 + pilot 실측]
 //   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
-//     Workflow({ scriptPath: '{plugin_root}/workflows/review-live.js',
+//     Workflow({ scriptPath: '{WORK_DIR}/review-live.js',   // 원본 {plugin_root}/workflows/ 를 §12 0단계 준비(cp → cmp -s)로 복사
 //       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2?, crossOutput?, preserveLowConfidence?, snapshotDir? } })
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.

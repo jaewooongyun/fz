@@ -1,7 +1,7 @@
 # Phase 0c·0.5 Direction Pre-flight 본문
 
 > 본 모듈은 fz-plan SKILL.md Phase 0c(Constraint Probe Pre-flight) + Phase 0.5(Direction Challenge)의 절차 본문을 담는다. SKILL은 Phase 헤딩 + 발동 요약 + Gate 체크리스트만 유지 (Progressive Disclosure Level 3).
-> 발동: fz-plan Phase 0c / Phase 0.5 진입 시 조건부 Read. Phase 0c 는 외부 primitive 의존 시, Phase 0.5 는 4분기 — Workflow 모드는 `workflows/plan-collaborative.js` Stage 0이 수행(escalation 시 본 모듈 Phase 0.5 절차 3 준용) / SOLO + 새 아키텍처 결정 시 필수 / discover 방향 명확 시 스킵 가능 / 단순 수정 스킵(⛔ 미러링 신규 생성은 스킵 불가 — 45차).
+> 발동: fz-plan Phase 0c / Phase 0.5 진입 시 조건부 Read. Phase 0c 는 외부 primitive 의존 시, Phase 0.5 는 4분기 — Workflow 모드는 `workflows/plan-lean2.js` 의 전체 플랜 콜이 방향 판정까지 수행(`directionEscalation` 이 null 이 아니면 본 모듈 Phase 0.5 절차 3 준용 · 롤백 `plan-collaborative.js` 는 Stage 0) / SOLO + 새 아키텍처 결정 시 필수 / discover 방향 명확 시 스킵 가능 / 단순 수정 스킵(⛔ 미러링 신규 생성은 스킵 불가 — 45차).
 
 ---
 
@@ -36,7 +36,7 @@
 
 | 조건 | Direction Challenge | 근거 |
 |------|:------------------:|------|
-| Workflow 모드 (plan-to-code, plan-only) | **Stage 0이 수행** | workflows/plan-collaborative.js Stage 0 direction (escalation 시 본 절차 3 준용) |
+| Workflow 모드 (plan-to-code, plan-only) | **Workflow 가 수행** | workflows/plan-lean2.js 전체 플랜 콜의 방향 판정(`directionEscalation` 이 null 이 아니면 본 절차 3 준용 · 롤백 plan-collaborative.js 는 Stage 0) |
 | SOLO 모드 + 새로운 아키텍처 결정 | **필수** | Lead가 직접 6관점 검토 |
 | discover 결과에 명확한 방향 존재 | **스킵 가능** | 이미 제약 기반 방향이 결정됨 |
 | 단순 수정 (기존 패턴 따르기) | **스킵** | 방향성 검토가 과잉. ⛔ 템플릿/형제 **미러링으로 신규 화면·컴포넌트를 생성**하는 작업은 단순 수정 아님 — 3축 결정 포함, 스킵 불가 (45차) |

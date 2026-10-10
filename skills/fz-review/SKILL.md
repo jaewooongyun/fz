@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
-  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [review-results]
   needs: [code-changes]
@@ -100,7 +100,8 @@ metadata:
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용)
 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff {diff.patch} --deny {WORK_DIR} [--rules-index {원문 색인}] …` — 켜면 Workflow args 에 `locatedFindings: true` 를 함께 준다(위치 필드가 없는 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다). ⛔ 규칙 레코드(`projectRulesPath`)는 런처에 넘기지 않는다(exit 11). 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
-3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. `{플러그인 루트}` 가 세션 working directory 밖이면 스크립트를 `{WORK_DIR}` 로 **사전 복사**해 그 경로로 부른다(fz-plan 절차 2.5 와 같은 규칙)
+2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js && cmp -s {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. 복사본은 2.8 준비가 매 호출 만든다(fz-plan 절차 2.5 와 같은 규칙)
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기. SOLO 3중 검증은 **L4 사용자 승인 후**. 사유는 experiment-log 기록
 4.5. **(`--gpt-independent`) 병합**: 두 패스가 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환} --gpt {독립 첫 패스 .json} --diff {같은 diff.patch}` — 런처 옆 파일로 오염 · 실패 · stale 을 거부한다. 결과가 Phase 5 [병렬 2] GPT 리뷰를 대신한다(두 번 부르지 않는다)
@@ -350,7 +351,7 @@ python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --reverify {WORK_DIR}/gates/pl
 ```
 ⛔ `FZ_PLUGIN_ROOT`는 `scripts/resolve-plugin-root.sh`로 해석한다 — 상대 경로는 대상 레포에서 exit 2로 조용히 통과한다.
 
-- `--reverify`는 이미 `- [x]`인 게이트도 실행하고, 통과 못 하면 `- [ ]` + `EVIDENCE: pending`으로 **강등**한다
+- `--reverify`는 이미 `- [x]`인 게이트도 실행하고, 통과 못 하면 `- [ ]` + `EVIDENCE: pending`(재실행 전 진행 기록이 있던 게이트는 `pending; demoted`)으로 **강등**한다
 - ⛔ `--status`는 재검증이 아니다 — 파싱만 하고 과거 증거를 그대로 읽는다
 - `/fz-gpt validate`(fz-guardian)의 `resolved/partially_resolved/unresolved/**regressed**` 4축에서 `regressed`가 0이 아니면 통합 차단 — 기존 `gpt_verification_schema` 유지
 - 원장이 있으면 **`verify-gates`를 추가 호출**해 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산출물이다). 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates
@@ -492,7 +493,7 @@ Gate 5 통과 후:
 | fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다. probe 성립 = `gpt-exec.sh exec` 가 **non-empty 산출 + exit 0**(⛔ `--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
-| Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
+| Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
 
 ## Completion → Next
 Gate 5 통과 후: `/fz-commit` → `/fz-pr`

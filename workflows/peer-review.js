@@ -3,7 +3,7 @@
 // [API 계약 — verified: guides/skill-authoring.md §12 + review-live.js 동형 선례]
 //   표준 패턴 3종 적용. 대형 입력(diff/evidence)은 args가 아닌 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md Analyze Step): Lead가 Gather 산출물(diff/evidence/base-behavior)을 파일로 기록 후
-//     Workflow({ scriptPath: '{plugin_root}/workflows/peer-review.js',
+//     Workflow({ scriptPath: '{WORK_DIR}/peer-review.js',   // 원본 {plugin_root}/workflows/ 를 §12 0단계 준비(cp → cmp -s)로 복사
 //       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, crossOutput? } })
 //   reviewSurfacePatchPath: gather 가 만든 `review-surface.patch`(중복 커밋 제외분). 있으면 **이것이 1차 리뷰 대상**이 되고
 //     `diffPath` 는 부풀림 확인용 보조로 내려간다. ⛔ 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없다 —

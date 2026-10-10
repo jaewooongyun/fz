@@ -3,7 +3,7 @@
 // [API 계약 — verified: guides/skill-authoring.md §12 + Wave 0-2 실측]
 //   표준 패턴 3종 적용. Step당 1회 invoke — 빌드 oracle은 Lead 전용이므로 분할 invoke 구조.
 //   호출(Lead, SKILL.md 절차 — Step 루프는 Lead 소유):
-//     Workflow({ scriptPath: '{plugin_root}/workflows/code-pair.js',
+//     Workflow({ scriptPath: '{WORK_DIR}/code-pair.js',   // 원본 {plugin_root}/workflows/ 를 §12 0단계 준비(cp → cmp -s)로 복사
 //   ⛔ verify 는 VerifySpec 객체다 ({kind:'command'|'manual', …} — plan-collaborative.js 정의).
 //      본 스크립트는 stepSpec 을 **해석하지 않고** 프롬프트에 통째 전달하므로 형태 변경에 무관하다.
 //       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify:VerifySpec, complexity, estimatedNewBodyLines?}, contextPath, buildFeedback?, changesetTarget } })

@@ -1,7 +1,7 @@
 // workflows/plan-lean2.js — fz-plan **D1b**: 4콜 · 2단계. D1 의 실측 손실을 출처별로 복원한다.
 //
-// ⛔ `plan-lean.js`(D1)를 **수정하지 않고** 별도 파일로 둔다 — D1 측정(2026-09-11, 2트리)의 재현성을 지킨다.
-//    기본 배선은 여전히 `plan-collaborative.js` 다. 확산 판정 전까지 셋 다 공존한다.
+// ⛔ `workflows/plan-lean.js`(D1)를 **수정하지 않고** 별도 파일로 둔다 — D1 측정(2026-09-11, 2트리)의 재현성을 지킨다.
+//    기본 배선은 이 파일이다(2026-09-12 전환 — `skills/fz-plan/SKILL.md` 팀 에이전트 모드). `plan-collaborative.js` 는 롤백 경로로 남는다.
 //
 // [D1 이 떨어진 이유 — 실측]
 //   사전등록 임계 "검증된 critical·major 손실 0" 대비 **신규구현 major 5 · 감사형 major 3**.

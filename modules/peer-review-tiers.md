@@ -568,7 +568,8 @@ jq -e '
 > ⛔ **standalone Agent() 금지** — Gather 의 evidence 수집과 Analyze는 `workflows/peer-review.js` Workflow가 소유한다 (결정적 스크립트, P2P SendMessage 없음). `SKILL.md` Boundaries와 동일 지시.
 
 ```
-1. Lead: Workflow({ scriptPath: '{플러그인 루트}/workflows/peer-review.js',   // ⛔ 거부 시 정본 = guides/skill-authoring.md §12 우회 계약 (SOLO 폴백 아님)
+0. Lead: 준비 — cp {플러그인 루트}/workflows/peer-review.js {WORK_DIR}/peer-review.js && cmp -s {플러그인 루트}/workflows/peer-review.js {WORK_DIR}/peer-review.js   // §12 0단계(매 호출 · 경로 판정과 self-contained 확인 포함) — exit 0 일 때만 1 · 비0 이면 L4
+1. Lead: Workflow({ scriptPath: '{WORK_DIR}/peer-review.js',   // ⛔ 거부 시 정본 = guides/skill-authoring.md §12 우회 계약 (SOLO 폴백 아님)
                     args: { diffPath, intentContext, evidencePaths, basePath, deep: false,
                             structuralContext } })   // ⛔ 누락 시 에러 없이 구조 축이 꺼진다
 2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
@@ -637,12 +638,10 @@ for f in "${WORK_DIR}/challenger-findings.md" "${WORK_DIR}/challenger-evidence.m
   [ -s "$f" ] || { echo "채움 누락: $f — 0건이면 '(없음 — Lead 발견 0건)' 한 줄" >&2; exit 2; }
 done
 SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
-if [ -n "$SKILL_PATH" ]; then SKILL_PROMPT="$(cat "$SKILL_PATH")"
-else SKILL_PROMPT="아래 인라인 규칙 색인과 evidence 로 아키텍처/가이드라인을 파악한 후 검증하라."; fi
+SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다(호출 계약 — modules/cross-validation.md)
+[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'아래 인라인 규칙 색인과 evidence 로 아키텍처/가이드라인을 파악한 후 검증하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
 cat > "${WORK_DIR}/gpt-challenger-prompt.txt" <<EOF
-${SKILL_PROMPT}
-
-아래 PR 변경을 검증하라. 파일을 수정하지 마라(읽기 전용 분석).
+${SKILL_PROMPT}아래 PR 변경을 검증하라. 파일을 수정하지 마라(읽기 전용 분석).
 - issues[]: evidence 로 독립 발견 — 각 이슈에 Origin Classification(regression/pre-existing/improvement). base class init/willSet 변경이면 subclass 를 찾는다(Inheritance Chain)
 - challenges[]: 아래 발견 목록의 각 id 에 agree|challenge|supplement|reverse 판정과 근거
 발견 목록(id 포함):
@@ -653,7 +652,7 @@ EOF
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "${WORK_DIR}" --out "${WORK_DIR}/gpt-challenger-result.json" \
   --prompt-file "${WORK_DIR}/gpt-challenger-prompt.txt" \
   --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_peer_review_schema.json" \
-  --gpt-skill challenger --gpt-skill-path "$SKILL_PATH"
+  --gpt-skill challenger --inject-skill "$SKILL_PATH"
 ```
 
 결과: `${WORK_DIR}/gpt-challenger-result.json` — ⛔ exit 10~14 는 측정 실패다("이슈 0건" 아님). 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` · 모델·effort 거부 12)는 정본 `modules/gpt-strategy.md` § 모델·effort 선택, Tier 별 강등은 `skills/fz-peer-review/SKILL.md` § 에러 대응 의 GPT 실패 규칙이다.

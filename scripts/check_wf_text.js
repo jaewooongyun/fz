@@ -23,7 +23,7 @@ const SECTION_TOKENS = {
 // ⛔ `--order-in-section` 도 등록된 섹션만 본다 — 미등록 제목이 토큰을 인쇄하면 다른 섹션의 순서 게이트를
 //    대신 통과시킨다(`--section-has` 와 같은 이유).
 const ORDER_TOKENS = {
-  '실행 절차 (Lead)': 'PRECOPY_OK',   // fz-plan 2.5 사전 복사(cp) → 3 Workflow 호출. S22 가 fz-review·fz-peer-review 에 같은 절차를 더한다
+  '실행 절차 (Lead)': 'PRECOPY_OK',   // fz-plan 2.5 준비(cp → cmp -s) → 3 Workflow 호출. 소비자 9곳의 준비 순서는 tests/fixtures/workflow-prep/copy-cmp --cells sites 가 본다
 }
 
 function die(msg) { console.error(`FAIL: ${msg}`); process.exit(1) }

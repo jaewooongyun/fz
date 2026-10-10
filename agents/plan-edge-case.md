@@ -64,7 +64,7 @@ tools: Read, Grep, Glob, mcp__codegraph__codegraph_explore, mcp__plugin_fz_seren
 
 ## Peer-to-Peer 규칙
 
-- Workflow 전환됨 (Wave 4): `plan-collaborative.js` 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 엣지 케이스는 구조화 출력으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
+- Workflow 전환됨 (Wave 4): `plan-lean2.js`(기본 — 롤백 `plan-collaborative.js`) 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 엣지 케이스는 구조화 출력으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
 
 ---
 

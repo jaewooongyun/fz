@@ -3,7 +3,7 @@
 // [API 계약 — verified: guides/skill-authoring.md §12 + Wave 0/1 실측]
 //   표준 패턴 3종 적용. 대형 입력(코드 컨텍스트)은 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md 절차): Lead가 codeContext 요약을 파일로 기록 후
-//     Workflow({ scriptPath: '{plugin_root}/workflows/plan-collaborative.js',
+//     Workflow({ scriptPath: '{WORK_DIR}/plan-collaborative.js',   // 원본 {plugin_root}/workflows/ 를 §12 0단계 준비(cp → cmp -s)로 복사
 //       args: { requirement, codeContextPath, constraintsKnown, archConstraints?, intentContext?, discoverJournalPath? } })
 //   archConstraints = { architecturePattern, uiStack, dependencyDirection, naming, conflicts } — typed 아키텍처 객체.
 //     축은 미확정 시 null. 소스 간 모순 축도 null + conflicts[]에 보존(자동 승자 선정 안 함 — 런타임 식별 불가).

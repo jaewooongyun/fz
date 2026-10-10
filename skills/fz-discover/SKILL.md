@@ -18,7 +18,7 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
-  Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Workflow
 metadata:
   provides: [landscape-map, trade-off-table, open-questions]
   needs: [none]
@@ -103,7 +103,8 @@ metadata:
 
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/discover/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
 2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중)
-3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js && cmp -s {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - default: lean 5-call — 경로생성(opus) → 비용평가(sonnet) → R2 추가경로 → R2 비용 → 합성(opus). TEAM 2-agent 비용 동급대
    - --deep: 렌즈 3 fan-out(sonnet, 독립 생성) → 병합(opus, 탈락 금지) → 경로별 평가(동시 ≤4 chunk) → 합성. budget 가드 내장
 4. **반환 처리**:

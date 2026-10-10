@@ -2,7 +2,7 @@
 //
 // [API 계약 — verified: guides/skill-authoring.md §12 + pilot 실측 (discover-adversarial.js)]
 //   표준 패턴 3종 적용: OVERRIDE / args 방어 파싱 + fail-fast / agentType fz: prefix.
-//   호출(Lead, SKILL.md 절차): Workflow({ scriptPath: '{plugin_root}/workflows/search-cross-verify.js',
+//   호출(Lead, SKILL.md 절차 — §12 0단계 준비 cp → cmp -s 뒤 복사본): Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js',
 //     args: { query, codeContext } })
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', results:[{file,line,symbol,kind,note,sources,confidence}], metrics }

@@ -533,7 +533,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 ### 배치·호출 규약
 
 - 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
-- 호출(Lead): `Workflow({ scriptPath: '{플러그인 루트}/workflows/....js', args })`. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
+- 호출(Lead): 아래 § scriptPath 거부 우회 계약의 **0단계 준비**(매 호출) 뒤 복사본을 부른다 — `Workflow({ scriptPath: '{WORK_DIR}/....js', args })`. 원본은 `{플러그인 루트}/workflows/....js` 다. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
   - ⛔ **비ASCII 본문은 손으로 이스케이프하지 않는다** — MCP 도구 파라미터는 UTF-8 문자열을 그대로 받는다. `\uXXXX` 수동 변환은 안전장치가 아니라 **오류원**이다: 5천 자 한국어를 이스케이프해 보낸 호출이 **200 성공 + 본문 11곳 손상**으로 끝난 실측이 있다. 짧은 본문에서는 재현되지 않아 길이가 늘수록 위험하다.
   - ⛔ 외부 시스템(JIRA·GitHub·Slack)에 비ASCII 본문을 기록한 직후 **반환 본문을 1회 스캔**한다. 이 층에는 빌드도 린트도 없어 *성공 응답이 정확한 산출물을 뜻하지 않는다* — 유일한 오라클이 반환값 확인이다. 파일로 먼저 쓴 뒤 그 내용을 보내는 경로가 있으면 그쪽이 안전하다.
@@ -549,7 +549,24 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 > 신설 정당화 (DELETE/MERGE-default): 위 배치·호출 규약 bullet 들은 *스크립트가 어디에 사는가*(플러그인 루트 절대경로)를 정한다 — 표기가 옳은데도 **도구가 그 경로 읽기를 거부하는** 경우는 다루지 않아 기존 bullet 흡수 불가.
 > ⛔ **근본 해결이 아니다.** fz 가 고칠 수 있는 결함이 아니라 **도구별 경로 게이트**다 — 같은 경로를 `Bash`·`Read` 는 읽는다. 플러그인 루트가 세션 working directory 이거나 additional directory 면 애초에 발생하지 않는다. 아래는 그 조건이 아닐 때의 **세션 한정 우회**이며, 조건이 사라지면 이 블록도 함께 삭제한다.
 
-`Workflow` 호출이 스크립트를 실행하지 못하고 이렇게 거부될 수 있다:
+**0단계 — 준비** (⛔ 매 호출 · 거부를 기다리지 않는다). 플러그인 루트 직접 호출은 실사용 세션(대상 레포가 working directory)에서 매번 거부됐다 — 우회가 통한 3회는 1차 경로가 3회 틀렸다는 뜻이다. 그래서 소비자 9곳(`skills/` 7 · `modules/` 2)과 fz-plan 은 원본이 아니라 **준비한 복사본**을 부른다. 아래 블록이 **exit 0** 일 때만 `Workflow({ scriptPath: '{WORK_DIR}/{파일}.js', args })` 를 부른다:
+
+```bash
+S=$(cd "{세션 디렉터리}" && pwd -P) && D=$(cd "{WORK_DIR}" && pwd -P) &&
+  case "$D/" in "${S%/}"/*) ;; *) false ;; esac &&
+  test "$(grep -c '^import\|require(' "{플러그인 루트}/workflows/{파일}.js")" = 0 &&
+  cp "{플러그인 루트}/workflows/{파일}.js" "$D/{파일}.js" &&
+  cmp -s "{플러그인 루트}/workflows/{파일}.js" "$D/{파일}.js"
+```
+
+- **경로 판정** — `{세션 디렉터리}` 는 세션 working directory 또는 additional directory 중 `{WORK_DIR}` 를 품는 쪽이다. 두 경로를 `pwd -P` 로 편 **실제 경로**(realpath)로, **경로 세그먼트 경계**에서 비교한다(`"$D/"` 가 `"$S/"` 로 시작). ⛔ 문자열 접두사 비교 금지 — `/a/work-x` 는 `/a/work` 를 문자열 접두사로 갖지만 하위가 아니고(형제 접두사), `{WORK_DIR}` 가 범위 밖을 가리키는 symlink 면 실제 경로가 밖으로 나온다. 같은 판정의 코드 선례는 `scripts/gate_check.py` 의 `os.path.commonpath` 다.
+- **self-contained 확인** — 아래 2단계의 식 그대로다. 무출력(경로 오류)은 `0` 이 아니라서 `test` 가 거짓이 된다.
+- **cp 덮어쓰기 · 종료 코드** — 매 호출 원본을 **같은 basename** 으로 `{WORK_DIR}` 루트에 덮어쓴다. stale 복사본이 남지 않고, 텔레메트리(`scripts/fz_telemetry_report.py` 의 `norm_wf_name`)가 basename 으로 워크플로를 센다. `&&` 사슬이라 `cp` 가 비0 이면 뒤가 돌지 않는다.
+- **`cmp -s`** — 호출 직전 원본과 복사본이 바이트 단위로 같아야 한다. 같지 않으면 부르지 않는다.
+- ⛔ **비0 이면 어느 단계든 복사본을 부르지 않는다 — L4**(사용자 에스컬레이션). 원본 경로 직접 호출로 되돌리거나 SOLO 로 직행하지 않는다 — 스크립트가 시작조차 안 한 실패라 사다리 L1~L3 도 아니다.
+- 이 블록은 `tests/fixtures/workflow-prep/copy-cmp/run.sh` 가 셀(없음 · stale · 정상 · 형제 접두사 · symlink · import · 실워크플로 · cp 실패)로 실행하고, `--cells sites` 가 소비자 9곳의 준비 줄을 실제로 돌린다. ⛔ 블록이나 소비자 준비 줄을 고치면 그 fixture 를 함께 돈다.
+
+준비(0단계) 없이 원본 경로를 부르면 `Workflow` 호출이 스크립트를 실행하지 못하고 이렇게 거부될 수 있다:
 
 ```
 scriptPath must be a script path this tool returned, or a file you can already read
@@ -560,17 +577,17 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 ⛔ **이 거부는 `mode:'fallback'` 이 아니다.** 스크립트가 시작조차 못 한 상태라 **반환에 `mode` 필드 자체가 없다**(에이전트 0 · 산출 0). `fallback` 으로 읽어 SOLO 로 강등하면 멀티에이전트 경로가 조용히 사라진다 — 아래 실패 복구 사다리 L1~L4 어디에도 해당하지 않는다.
 
-**우회 4단계** (⛔ 순서 고정 — 2를 건너뛰면 의존이 끊긴 복사본을 실행한다):
+**우회 4단계** (⛔ 순서 고정 — 2를 건너뛰면 의존이 끊긴 복사본을 실행한다 · ⛔ 거부된 경로가 이미 0단계의 `{WORK_DIR}` 복사본이면 1~4 를 반복하지 않고 L4(사용자 에스컬레이션) — 같은 복사를 다시 해도 같은 게이트에 걸린다):
 
 1. **판별** — 에러가 `scriptPath must be a script path this tool returned, or a file you can already read` 로 시작하면 이 케이스다. 표기 문제가 아니므로 경로 표기를 고쳐 쓰는 것으로는 통과하지 않는다.
 2. **self-contained 확인** — `grep -c '^import\|require(' {플러그인 루트}/workflows/{파일}.js` 가 `0` 이어야 복사가 안전하다. ⛔ 이 식이 보는 것은 **모듈 import 부재 하나**다 — `__dirname` 기준 경로·상대 파일 읽기는 걸리지 않으니 눈으로 함께 본다. ⛔ 무출력은 `0` 이 아니라 경로 오류(측정 실패)다. 0 이 아니거나 상대 접근이 보이면 **복사하지 말고** L4(사용자 에스컬레이션)로 간다.
-3. **검증 후 복사** — 먼저 목적지를 본다: `{WORK_DIR}` 의 절대경로가 세션 working directory(또는 additional directory)의 절대경로를 **접두사로 가져야** 한다 — 위 거부 메시지가 읽을 수 있다고 말하는 범위가 그 둘뿐이다. 두 값 모두 `~`·상대 표기를 편 뒤 비교한다. ⛔ 둘 중 하나라도 확정하지 못하면 **'하위 아님' 으로 처리한다** — 미확정을 '하위' 로 읽으면 어차피 거부될 복사를 그대로 진행한다(측정 실패는 통과가 아니다). `/tmp/fz-peer-review/` 같은 폴백 WORK_DIR [실측: `skills/fz-peer-review/SKILL.md` L101 "쓰기 불가 시 `/tmp/fz-peer-review/` 폴백"]은 그 밖이라 **복사본도 같은 게이트에 걸린다** — 복사하지 말고 L4(사용자 에스컬레이션)로 간다. 접두사를 확인했을 때만 `cp {플러그인 루트}/workflows/{파일}.js {WORK_DIR}/{파일}.js` — 그 목적지라야 도구가 읽는다. ⛔ **목적지는 `{WORK_DIR}` 루트다 — 하위 디렉터리를 만들지 않는다.** `cp` 는 부모 디렉터리를 만들지 못하는데 아래 권한 bullet 이 요구하는 것은 `Bash(grep *)`·`Bash(cp *)` 뿐이라 `mkdir` 을 가정할 수 없다 — 없는 하위 경로로 복사하면 4단계 재시도 **전에** `No such file or directory` 로 죽는다. 평탄화의 이름 충돌 위험은 워크플로 스크립트명이 고유해(`code-pair.js` 등) 낮다.
+3. **검증 후 복사** — 먼저 목적지를 본다: 0단계의 **경로 판정**이다 — `{WORK_DIR}` 의 실제 경로가 세션 working directory(또는 additional directory)의 실제 경로 **안**(경로 세그먼트 경계)에 있어야 한다. 위 거부 메시지가 읽을 수 있다고 말하는 범위가 그 둘뿐이다. ⛔ 문자열 접두사로 비교하지 않는다(형제 접두사 · 범위 밖 symlink). ⛔ 둘 중 하나라도 확정하지 못하면 **'하위 아님' 으로 처리한다** — 미확정을 '하위' 로 읽으면 어차피 거부될 복사를 그대로 진행한다(측정 실패는 통과가 아니다). `/tmp/fz-peer-review/` 같은 폴백 WORK_DIR [실측: `skills/fz-peer-review/SKILL.md` L105 "쓰기 불가 시 `/tmp/fz-peer-review/` 폴백"]은 그 밖이라 **복사본도 같은 게이트에 걸린다** — 복사하지 말고 L4(사용자 에스컬레이션)로 간다. 판정을 통과했을 때만 0단계 블록의 `cp` → `cmp -s` 로 `{WORK_DIR}/{파일}.js` 를 만든다 — 그 목적지라야 도구가 읽는다. ⛔ **목적지는 `{WORK_DIR}` 루트다 — 하위 디렉터리를 만들지 않는다.** `cp` 는 부모 디렉터리를 만들지 못하는데 아래 권한 bullet 이 요구하는 것은 `Bash(grep *)`·`Bash(cp *)`·`Bash(cmp *)` 뿐이라 `mkdir` 을 가정할 수 없다 — 없는 하위 경로로 복사하면 4단계 재시도 **전에** `No such file or directory` 로 죽는다. 평탄화의 이름 충돌 위험은 워크플로 스크립트명이 고유해(`code-pair.js` 등) 낮다.
 4. **재시도** — `Workflow({ scriptPath: '{WORK_DIR}/{파일}.js', args })`. 복사본이 원본과 같으면 resume·캐시도 그대로 동작한다.
 
 [실측: 2026-09-03 세션 — 플러그인 루트 경로는 거부되고 `{WORK_DIR}/code/code-pair.js` 복사본 경로는 **6 invoke 전부 성공**(agent 17 · error 0 · resume 정상)] ⛔ 그 경로의 `code/` 는 복사 **이전에 이미 존재했다** — `cp` 가 부모를 만든 증거가 아니다. 계약이 `{WORK_DIR}` 루트를 쓰는 이유다.
 
-- ⛔ **복사본은 산출물이 아니다** — 원본이 바뀌면 stale 이 된다. WORK_DIR 밖으로 옮기거나 커밋하지 않고, 원본을 고쳤으면 3단계부터 수행한다.
-- ⛔ **소비자 SKILL.md 에 권한이 없으면 2·3 단계가 실행되지 않는다** — `allowed-tools` 에 `Bash(grep *)`·`Bash(cp *)` 를 둔다. 위 배치·호출 규약의 `Workflow` 추가 의무와 같은 계약이며, 없으면 우회는 정확히 그것이 필요한 상황에서 죽는다. [실측: 2026-09-03 — `Workflow` 를 가진 소비자 9곳 전부에 두 권한이 0이었다]
+- ⛔ **복사본은 산출물이 아니다** — 원본이 바뀌면 stale 이 된다. WORK_DIR 밖으로 옮기거나 커밋하지 않는다. 0단계가 매 호출 덮어쓰고 `cmp -s` 로 확인하므로 원본을 고쳐도 다음 호출은 새 본을 부른다.
+- ⛔ **소비자 SKILL.md 에 권한이 없으면 0단계와 2·3 단계가 실행되지 않는다** — `allowed-tools` 에 `Bash(grep *)`·`Bash(cp *)`·`Bash(cmp *)` 를 둔다(`cmp` 는 `schemas/tool-inventory.json` 에도 선언한다). 위 배치·호출 규약의 `Workflow` 추가 의무와 같은 계약이며, 없으면 준비는 정확히 그것이 필요한 상황에서 죽는다. 경로 판정의 `cd`·`pwd -P` 는 셸 내장이다 [미검증: 권한 규칙이 명령 치환 안의 내장을 따로 묻는지 — 실세션 관측 전]. [실측: 2026-09-03 — `Workflow` 를 가진 소비자 9곳 전부에 두 권한이 0이었다]
 
 ### resume 계약 + advisor 상속 (2026-08-08 신설)
 

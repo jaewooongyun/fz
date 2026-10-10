@@ -16,7 +16,7 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   LSP,
-  Bash(grep *), Bash(cp *), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Workflow
 
 metadata:
   provides: [search-results, architecture-analysis]
@@ -257,7 +257,8 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 ### 실행 절차 (Lead)
 
 1. **args 조립**: `query`=탐색 질의 원문 / `codeContext`=탐색 허용 범위(경로·디렉토리 — 명시적으로 한정)
-2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/search-cross-verify.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/search-cross-verify.js {WORK_DIR}/search-cross-verify.js && cmp -s {플러그인 루트}/workflows/search-cross-verify.js {WORK_DIR}/search-cross-verify.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - Stage 1 독립 병렬(symbolic+pattern, 피어 미주입) → Stage 2 교차(FP 판정+보완) → **Stage 3 병합(`fable` — 수렴 merge 판단 지점)** → 등급은 스크립트 binary 규칙. 총 5-call
 3. **반환 처리**: `mode:'workflow'` → results(신뢰도 포함)를 출력 형식으로 정리 / `mode:'fallback'` → 기본 모드(순차) 수행 + 사유 experiment-log 기록
 4. **지표 기록**: `return.metrics`(agentCalls/nullCount/stages/fallback) + wall-clock(Lead 측정) → `experiment-log.md` §5.7 fz-search 테이블

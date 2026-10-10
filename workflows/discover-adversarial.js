@@ -7,7 +7,7 @@
 //   phase(title)/log(msg) → 진행 표시. budget.{total,spent(),remaining()} — total null이면 remaining()=Infinity.
 //   제약: P2P 통신 불가(데이터는 스크립트 경유) / 시각·난수 API 불가(시간 측정은 Lead 책임) /
 //     에이전트 최종 텍스트 = 반환값(1-shot raw data) / 동시 캡 min(16, cores-2).
-//   호출(Lead, SKILL.md 절차): Workflow({ scriptPath: '{plugin_root}/workflows/discover-adversarial.js',
+//   호출(Lead, SKILL.md 절차 — §12 0단계 준비 cp → cmp -s 뒤 복사본): Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js',
 //     args: { problem, codeContextPath, constraintsKnown, deep }  // codeContextPath = 요약 파일 절대경로 (대형 입력 §12) · ts 제거: 미사용 + resume 캐시 미스 유발 (리뷰 교정) })
 //   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   명명 등록: 플러그인 workflows/*.js의 meta.name이 명명 워크플로우로 자동 등록됨(스킬 목록 등장 실측) — scriptPath 없이 이름 'discover-adversarial' 호출 가능.

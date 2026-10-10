@@ -37,6 +37,7 @@
     "sleep":   { "required": true }, "test": { "required": true },
     "command": { "required": true }, "find": { "required": true },
     "sed":     { "required": true }, "sort": { "required": true },
-    "wc":      { "required": true }
+    "wc":      { "required": true },
+    "cmp":     { "required": true,  "note": "Workflow 준비 — 원본 ↔ WORK_DIR 복사본 바이트 일치(guides/skill-authoring.md §12 0단계)" }
   }
 }

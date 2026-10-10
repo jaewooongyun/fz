@@ -20,7 +20,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
-  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Workflow
+  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Bash(cmp *), Workflow
 metadata:
   provides: [code-changes]
   needs: [planning]
@@ -114,7 +114,8 @@ metadata:
    `plan/direction-challenge.md` 의 방향 판정 · `plan/verify-result.md` 의 미해소 이슈(있으면).
    ⚠️ 만들기만 하고 넘기지 않으면 무력하다 — 렌즈는 `contextPath` 밖 파일을 열 수 없다.
 2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 참조),complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
-3. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - Stage 1 impl(opus) changeset → Stage 2 **검토**(full: review-arch + impl-quality **병렬 2렌즈**, opus / light: arch 단독) → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, full 3-4 call · light 1-2 call)
 4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유)
 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
@@ -173,6 +174,7 @@ metadata:
 
    누락 시 → 마찰 신호 **"plan 계약 미충족"** 보고 후 계속 (판단은 사용자).
    ⛔ 이 검사는 D/E/F/G token 발견 여부와 **무관하게** 실행한다 — 결정이 빠진 plan은 token도 없으므로, token 게이팅 하에 두면 검사가 스스로 비활성화된다.
+3. **원장 착수** (`{WORK_DIR}/gates/plan.md` 가 `STATE: planned` 일 때 — fz-plan 4.5 가 승인·미착수로 남긴 원장): `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --set-state active {WORK_DIR}/gates/plan.md` — 착수는 증명 불요. ⛔ planned 인 채로는 6.4 `--only` 가 exit 3 으로 거부된다(착수 전 원장에는 증거를 쓰지 않는다).
 
 ---
 
@@ -337,7 +339,7 @@ metadata:
    python3 "$G" --set-state ready_for_review {WORK_DIR}/gates/plan.md   # 전 Step 완료 시
    ```
    ⛔ **상대 경로 금지** — 설치된 플러그인에서는 대상 레포에 `scripts/gate_check.py`가 없다. exit 2(인프라 통과)로 떨어져 강제력이 조용히 사라진다.
-   - 원장 부재 · `ROOT:` 불일치 · `STATE: closed` → no-op (기존 경로 무회귀)
+   - 원장 부재 · `ROOT:` 불일치 · `STATE: closed` → no-op (기존 경로 무회귀) · `STATE: planned` → exit 3 (Phase 0.4 착수 전환 누락)
    - `--set-state`는 **전 게이트 충족 시만** 전진한다 — 실행 게이트만 통과하고 MANUAL이 미확인이면 거부된다
 
 6.5. **⛔ 아티팩트 기록** (항상 — compact recovery 필수):
@@ -486,8 +488,8 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 | XcodeBuildMCP 실패 | Bash로 xcodebuild 직접 | 수동 빌드 |
 | Serena 연결 실패 | Edit + Write 직접 수정 | 수동 편집 |
 | 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
-| Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
-| **advisor 스톨** (워커가 advisor 호출 → 3분 무진행 × 런타임 6회 재시도) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분). ⛔ **문구의 효과는 미측정** — 문구 삽입 전 실행에서 advisor 8/8/10회가 관측됐으나 그것은 기준선이지 대조군이 아니다(F-161·F-191). 든 상태의 실행과 비교해 줄지 않으면 **문구를 삭제한다** | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
+| Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
+| **advisor 스톨** (워커가 advisor 호출 → 응답 없이 런타임이 6회 시도 · 관측: 첫 시도 37.5분, 재시도마다 15~17분) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분). 판정 데이터(F-161·F-191): 문구 없음 13 run/78 agent 에서 advisor 66회, 문구 있음 65 run/318 agent 에서 0회 — 관측 연관이다. 두 구간은 advisor 모델과 워커 세대도 함께 다르다(교란). 같은 조건 대조군이 없어 인과는 미확정이다. 삭제 조건은 '문구 든 실행에서 호출이 줄지 않음' 이고, 결론은 **삭제 조건 미충족 = 유지**다. 측정 수단은 `fz_wf_metrics.py --wf` 의 `advisor_stalled`(결과 없는 호출 수)다 — `advisor` 열은 결과 블록만 세어 스톨 run 을 0 으로 읽는다 | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
 
 ## Completion → Next
 

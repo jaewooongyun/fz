@@ -19,7 +19,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
   mcp__atlassian-jira__jira_get,
-  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [planning, architecture-analysis]
   needs: [none]
@@ -105,14 +105,14 @@ metadata:
    - 미확정 축 → `null` + `gaps`(Probe Coverage Gap). 코드 실측(grep) 1회로 보완을 시도하고(`authority: 관례` — 코드를 인용), 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
    - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / GPT)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
-2.5. **호출 경로 선결정** (⛔ 사전 복사 — 거부 왕복을 없앤다):
+2.5. **준비** (⛔ 매 호출 사전 복사 — 거부 왕복을 없앤다):
    실측(2026-09-11, 3건 전부): 플러그인 루트 경로로 첫 호출이 거부되고 WORK_DIR 복사본으로 재호출해 성공했다 — 거부 1회가 매번 낭비된다(텔레메트리 `n_workflow=2` 의 정체).
-   `{플러그인 루트}`가 세션 working directory(또는 additional directory) **하위가 아니면** `guides/skill-authoring.md` §12 우회 계약의 2·3단계를 **선행**한다:
-   `grep -c '^import\|require(' {플러그인 루트}/workflows/plan-lean2.js` 가 `0` 임을 확인(⛔ 무출력은 0이 아니라 경로 오류) → 복사 → 그 경로로 **1회** 호출:
+   매 호출 `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비**를 **선행**한다 — 경로 판정(실제 경로 · 세그먼트 경계) · self-contained 확인 · cp 덮어쓰기 · `cmp -s`:
+   `grep -c '^import\|require(' {플러그인 루트}/workflows/plan-lean2.js` 가 `0` 임을 확인(⛔ 무출력은 0이 아니라 경로 오류) → 복사 → 바이트 일치 → 그 경로로 **1회** 호출:
    ```bash
-   cp {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js
+   cp {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js && cmp -s {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js
    ```
-   ⛔ 판별이 불확정이면 **원본 경로로 호출한다**(기존 동작) — 미확정을 '하위 아님' 으로 읽어 불필요한 복사를 만들지 않는다. ⛔ 복사본은 산출물이 아니다(원본 변경 시 stale — §12).
+   ⛔ 0단계가 비0 이면(경로 판정 불확정 포함) 복사본을 부르지 않는다 — **L4**(원본 경로 직접 호출·SOLO 로 낮추지 않는다). ⛔ 복사본은 산출물이 아니다 — 매 호출 덮어써서 stale 이 남지 않는다(§12).
 2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Sprint Contract 합의 직후 · Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh plan --requirement {요구 원문} [--sprint-contract {합의본}] [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - **Stage 1 (동시 3, opus)**: 전체 플랜(방향 판정·readScope/writeScope·steps·rtm·antiPattern 포함) ∥ edge 적대 렌즈 ∥ impact+arch 렌즈
@@ -128,7 +128,7 @@ metadata:
      ```bash
      python3 "${FZ_PLUGIN_ROOT}/scripts/plan_resolve_impact_requests.py" {WORK_DIR}/plan/workflow-result.json --repo {대상 레포}
      ```
-     심볼 census 는 자동으로 붙고(요청당 상위 3개 · positive control 동반), `UNRESOLVED` 로 남은 항목만 Lead 가 판단한다. ⛔ 미해소 항목은 plan 에 **그 사실을 적는다** — 조용히 비워두지 않는다
+     심볼 census 는 자동으로 붙는다(요청당 상위 3개 · positive control 동반). `RESOLVED` 는 질문형으로 판별되지 않은 요청이다 — 판별은 어휘 규칙이라 내포 질문(…인지 확인 필요 · …여부)도 `RESOLVED` 로 남을 수 있으니 Lead 는 `RESOLVED` 도 요청 문장과 census 가 맞는지 훑는다. 질문형(…가 해석되는가 · 분포·비율·수를 묻는 꼴)은 census 를 붙인 채 `UNRESOLVED`(단어 census, 질문 미답)로 남는다. `UNRESOLVED` 항목은 Lead 가 직접 재거나 판단한다. ⛔ 미해소 항목은 plan 에 **그 사실을 적는다** — 조용히 비워두지 않는다
    - ⛔ `directionEscalation` 이 **null 이 아니면** → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용).
      `{ verdict, alternatives }` 형태이며 `directionVerdict` 가 `RECONSIDER`·`REDIRECT` 일 때만 실린다.
      ⛔ **필드다, 반환 모드가 아니다** — 현행 배선(`plan-lean2.js`)은 방향 판정을 full 콜 안에서 하므로 정상 경로와 반환 형태를 가르지 않는다.
@@ -221,7 +221,7 @@ metadata:
 
 > **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). verification escalation은 명시적 risk signal 발생 시에만.
 
-발동: Workflow 모드는 Stage 0이 수행 / SOLO + 새 아키텍처 결정 시 필수 / discover 방향 명확 시 스킵 가능 / 단순 수정 스킵 (⛔ 미러링으로 신규 화면·컴포넌트 생성은 스킵 불가 — 45차).
+발동: Workflow 모드는 plan-lean2.js 전체 플랜 콜이 방향 판정(롤백 collaborative 는 Stage 0) / SOLO + 새 아키텍처 결정 시 필수 / discover 방향 명확 시 스킵 가능 / 단순 수정 스킵 (⛔ 미러링으로 신규 화면·컴포넌트 생성은 스킵 불가 — 45차).
 
 > **절차 본문**: `modules/plan-direction-preflight.md` Phase 0.5 절 참조 (Level 3) — 발동 조건표 4행 + 4 절차(아키텍처 대조 · 6관점 검토 · 방향 판정 · 판정 기록). Phase 0.5 발동 시 Read.
 
@@ -406,7 +406,7 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
      — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?, tools?}` 또는 `{kind:'manual', criterion}` (정의: `workflows/plan-lean2.js` VerifySpec · 배선: `modules/gates.md`)
      (요약만 저장하면 `/fz-code` Phase 0.4의 구조 검사가 판정 불가)
 
-4.5. **⛔ 원장 확정** (draft 원장이 있을 때): Phase 2 판정(3.2)을 반영해 `gates/plan.draft.md` → `gates/plan.md` 로 복사한 뒤 **`--finalize`** 를 돌린다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 도장을 찍고 `APPROVED: yes` 를 남긴다. ⛔ 도장이 없으면 승인 계약이 존재하지 않는다(검사는 있으나 발급이 없어 한 번도 발화하지 않았다). `revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 `MANUAL:`로 전환. 확정 후 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status {WORK_DIR}/gates/plan.md`.
+4.5. **⛔ 원장 확정** (draft 원장이 있을 때): Phase 2 판정(3.2)을 반영해 `gates/plan.draft.md` → `gates/plan.md` 로 복사한 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --finalize {WORK_DIR}/gates/plan.md` 를 돌린다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 도장을 찍고 `APPROVED: yes` 를 남긴다. ⛔ 도장이 없으면 승인 계약이 존재하지 않는다(검사는 있으나 발급이 없어 한 번도 발화하지 않았다). `revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 `MANUAL:`로 전환. 이어 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --set-state planned {WORK_DIR}/gates/plan.md` — 승인·미착수라 Stop hook 이 ABANDON 없이 통과시킨다(진행 기록이 있으면 거부 · `/fz-code` Phase 0.4 가 `active` 로 연다). 확정 후 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status {WORK_DIR}/gates/plan.md`.
    exit별 행동 — `0` 진행 · `1` 미충족 보고 후 진행(작업 중 정상 상태) · `2` **인프라 경고 후 진행**(경로·인터프리터 문제이지 원장 결함이 아니다) · `3` **미통과 차단**(확정 원장이 계약을 위반하면 안 된다).
    ⛔ 상대 경로 금지 — 설치된 플러그인에서 대상 레포에 파일이 없어 exit 2로 떨어지고, exit 3만 차단하는 규칙 하에서 **invalid ledger 검증이 fail-open** 된다. 절차 정본: `modules/gates.md`
 
@@ -489,8 +489,8 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 | Serena 연결 실패 | Grep + Glob 폴백 | 수동 탐색 |
 | Context7 실패 | WebSearch 폴백 | 문서 직접 검색 |
 | 검증 실패 | /sc:sc-analyze 단독 검증 | Claude 자체 판단 |
-| Workflow scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약(self-contained 확인 → WORK_DIR 복사 → 재시도) | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
-| **advisor 스톨** (워커가 advisor 호출 → 3분 무진행 × 런타임 6회 재시도) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분). ⛔ **문구의 효과는 미측정** — 문구 삽입 전 실행에서 advisor 8/8/10회가 관측됐으나 그것은 기준선이지 대조군이 아니다(F-161·F-191). 든 상태의 실행과 비교해 줄지 않으면 **문구를 삭제한다** | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
+| Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
+| **advisor 스톨** (워커가 advisor 호출 → 응답 없이 런타임이 6회 시도 · 관측: 첫 시도 37.5분, 재시도마다 15~17분) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분). 판정 데이터(F-161·F-191): 문구 없음 13 run/78 agent 에서 advisor 66회, 문구 있음 65 run/318 agent 에서 0회 — 관측 연관이다. 두 구간은 advisor 모델과 워커 세대도 함께 다르다(교란). 같은 조건 대조군이 없어 인과는 미확정이다. 삭제 조건은 '문구 든 실행에서 호출이 줄지 않음' 이고, 결론은 **삭제 조건 미충족 = 유지**다. 측정 수단은 `fz_wf_metrics.py --wf` 의 `advisor_stalled`(결과 없는 호출 수)다 — `advisor` 열은 결과 블록만 세어 스톨 run 을 0 으로 읽는다 | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
 
 ## Completion → Next
 

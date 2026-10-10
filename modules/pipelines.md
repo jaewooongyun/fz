@@ -41,7 +41,7 @@
 | 트리거 | `찾아.*계획, 분석.*설계, 탐색.*후.*계획` |
 | 체인 | fz-search → fz-plan |
 | 기본 모드 | SOLO |
-| TEAM 모드 | `workflows/search-cross-verify.js` → `workflows/plan-collaborative.js` (순차) |
+| TEAM 모드 | `workflows/search-cross-verify.js` → `workflows/plan-lean2.js` (순차) |
 
 ### 3. discover
 
@@ -78,7 +78,7 @@
 | 트리거 | `계획, 설계, 아키텍처` |
 | 체인 | fz-plan |
 | 기본 모드 | SOLO |
-| TEAM 모드 | `workflows/plan-collaborative.js` |
+| TEAM 모드 | `workflows/plan-lean2.js` (롤백 경로 `workflows/plan-collaborative.js`) |
 | 게이트 | ✓ direction-challenge (Phase 0.5) + ✓ stress-test(Q1-Q6) |
 
 ### 7. plan-to-code
@@ -88,7 +88,7 @@
 | 트리거 | `계획.*구현, 설계.*개발, 만들어줘` |
 | 체인 | fz-plan → fz-code |
 | 기본 모드 | TEAM |
-| TEAM 모드 | `workflows/plan-collaborative.js` → `workflows/code-pair.js` (순차) |
+| TEAM 모드 | `workflows/plan-lean2.js` → `workflows/code-pair.js` (순차) |
 | 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ implication-scan (조건부) + ✓ gpt check |
 
 ### 8. code-only
@@ -146,7 +146,7 @@
 | 트리거 | `처음부터.*끝까지, 계획부터.*PR` |
 | 체인 | fz-plan → fz-code → fz-review → fz-commit → fz-pr |
 | 기본 모드 | TEAM |
-| TEAM 모드 | 단계별 스크립트 순차 — `workflows/plan-collaborative.js` → `workflows/code-pair.js` → `workflows/review-live.js` |
+| TEAM 모드 | 단계별 스크립트 순차 — `workflows/plan-lean2.js` → `workflows/code-pair.js` → `workflows/review-live.js` |
 | 게이트 | 전체 게이트 자동 삽입 |
 | 특수 | opus Primary 2개 원칙 예외 (단계별 순차이므로 동시 아님) |
 

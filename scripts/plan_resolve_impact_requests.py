@@ -15,6 +15,13 @@ git·grep 질문을 직접 못 얻고 `originBodyRequests` 로 되돌려 보낸�
    같은 명령으로 **positive control**(레포에 반드시 있는 토큰)을 함께 돌려 도구가 살아 있음을
    보인다. control 이 0 이면 그 census 는 `unavailable` 이다 — 부재로 쓰지 않는다.
 
+⛔ **질문형 요청은 census 로 해소되지 않는다** (F-386): 요청이 예/아니오(…가 해석되는가)나
+   분포·비율·수(…이 어떻게 분포하는가 · 몇 건인가)를 물으면 단어 등장 수는 그 답이 아니다.
+   census 는 그대로 붙이되 `UNRESOLVED` 로 두고 사유를 '단어 census, 질문 미답' 으로 적는다 —
+   RESOLVED 로 세면 Lead 가 그 항목을 다시 재지 않는다. census 로 해소되는 것은 위치·호출자 수
+   요청(…확인 필요)뿐이다. 판별은 문장 끝 의문형(절 단위 — ' — ' 뒤 문맥은 끊는다)과 분포·비율·수를
+   묻는 낱말이며, 애매하면 질문형으로 읽는다(미해소로 남는 쪽이 안전하다).
+
 exit: 0=전건 판정(해소 또는 미해소로 분류 완료) / 1=측정 실패·입력 결함 / 2=사용법
 Python 3.9 stdlib 전용.
 """
@@ -35,6 +42,31 @@ SYMBOL_RES = (
     re.compile(r"\b([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+)\b"),
 )
 CONTROL_TOKEN = "func "          # Swift 레포 기준 positive control. --control 로 교체 가능
+# 질문형 판별 — 절 끝 의문형 어미 · 물음표 · 분포/비율/수를 묻는 낱말. ⛔ 낱말 '수' 하나는 넣지 않는다:
+#   '호출자 수 확인 필요' 는 census 가 답하는 요청이다(대조 셀이 지킨다)
+CLAUSE_SPLIT = re.compile(r"\s+[—–]+\s+|\s+--?\s+|[.;。\n]+\s*")
+CLAUSE_TAIL = " \t\r)]}>\"'`*」』"
+QUESTION_END = re.compile(r"(?:[는은인한된던]가|[는은인던]지|[일할될을]까|[나까가]요|[습입됩합]니까)$")
+QUESTION_MARK = re.compile(r"[?？](?=\s|$)")
+QUESTION_ASK = re.compile(
+    r"분포|비율|비중|백분율|퍼센트|몇\s*(?:개|건|곳|군데|번|줄|퍼센트|%)?|얼마나?"
+    r"|\bhow (?:many|much|often)\b|\b(?:ratio|distribution|percentage|proportion|whether)\b", re.I)
+
+
+def question_kind(text: str):
+    """질문형이면 판별 근거 문자열, 아니면 None. 절마다 끝을 본다 — 요청 뒤에 ' — 문맥' 이 붙는 꼴(F-386 실측)."""
+    t = text or ""
+    if QUESTION_MARK.search(t):
+        return "물음표"
+    for clause in CLAUSE_SPLIT.split(t):
+        c = clause.rstrip(CLAUSE_TAIL)
+        m = QUESTION_END.search(c)
+        if m:
+            return f"문장 끝 의문형 '{m.group(0)}'"
+    m = QUESTION_ASK.search(t)
+    if m:
+        return f"분포·비율·수를 묻는 꼴 '{m.group(0).strip()}'"
+    return None
 
 
 def extract_symbols(text: str) -> list:
@@ -88,9 +120,20 @@ def resolve(doc: dict, repo: str, control: str) -> tuple:
             counts.append((sym, n, note))
         if all(n is None for _, n, _ in counts):
             unresolved.append((text, "census 전건 실패"))
+            continue
+        kind = question_kind(text)
+        if kind:
+            # ⛔ census 는 붙이되 해소로 세지 않는다 — 단어 등장 수는 예/아니오·분포의 답이 아니다(F-386)
+            unresolved.append((text, f"단어 census, 질문 미답 — {kind} · 답은 Lead 가 직접 잰다", counts))
         else:
             resolved.append((text, counts))
     return resolved, unresolved, errors
+
+
+def print_counts(counts) -> None:
+    for sym, n, note in counts:
+        shown = "unavailable" if n is None else f"{n}건"
+        print(f"      census `{sym}` = {shown}{f' ({note})' if note else ''}")
 
 
 def report(resolved, unresolved, errors, control, ctrl_n=None) -> int:
@@ -98,16 +141,17 @@ def report(resolved, unresolved, errors, control, ctrl_n=None) -> int:
         print(f"  ⚠️ {e}")
     for text, counts in resolved:
         print(f"  RESOLVED {text[:90]}")
-        for sym, n, note in counts:
-            shown = "unavailable" if n is None else f"{n}건"
-            print(f"      census `{sym}` = {shown}{f' ({note})' if note else ''}")
-    for text, why in unresolved:
+        print_counts(counts)
+    for text, why, *counts in unresolved:
         print(f"  UNRESOLVED {text[:90]}\n      사유: {why}")
+        if counts:
+            print_counts(counts[0])
     total = len(resolved) + len(unresolved)
     if errors:
         print(f"측정 실패 — 요청 {total}건 중 해소 0 (positive control: {control!r})")
         return 1
-    print(f"RESOLVE_OK (요청 {total}건 — 해소 {len(resolved)} · 미해소 {len(unresolved)}"
+    nq = sum(1 for u in unresolved if len(u) > 2)
+    print(f"RESOLVE_OK (요청 {total}건 — 해소 {len(resolved)} · 미해소 {len(unresolved)}(질문형 {nq})"
           f" · 심볼 상한 요청당 3 · 판단 경계: 책임 비교는 Lead)")
     return 0
 
@@ -154,6 +198,28 @@ def self_test() -> int:
             passed += 1
         else:
             fails.append("빈 요청 배열 처리 이상")
+        # 질문형(F-386) — 심볼이 있어도 질문형이면 census 를 붙인 채 UNRESOLVED, 위치·호출자 수 요청은 RESOLVED(대조)
+        qdoc = {"impactRequests": [
+            "`extractBody` 는 origin 의 base 에서 해석되는가",                              # 예/아니오
+            "`extractBody` 호출이 모듈별로 어떻게 분포하는가?",                             # 분포 + 물음표
+            "격리 clone(origin)을 만들 때 `extractBody` 가 해석되는가 — 뒤 문맥 extractBody",  # ' — ' 뒤 문맥이 붙은 실측 꼴
+            "base 원본의 `extractBody` 호출자 수 확인 필요",                                # 비질문 대조
+            "`extractBody` 정의 위치 확인 필요",                                           # 비질문 대조
+        ]}
+        r5, u5, e5 = resolve(qdoc, repo, CONTROL_TOKEN)
+        q_ok = [u for u in u5 if len(u) > 2 and "질문 미답" in u[1] and any(n for _, n, _ in u[2])]
+        if not e5 and len(r5) == 2 and len(u5) == 3 and len(q_ok) == 3:
+            passed += 1
+        else:
+            fails.append(f"질문형: resolved {len(r5)} (기대 2) · 질문 미답+census {len(q_ok)}/{len(u5)} (기대 3/3) · errors {e5}")
+        # 판별 단위 — 질문형 양성·음성(낱말 '수' 는 질문형이 아니다)
+        pos = ["abc1234 가 해석되는가", "분포는?", "호출 비율", "몇 건이 남았나요", "사용 중인지", "whether it resolves"]
+        neg = ["호출자 수 확인 필요", "정의 위치 확인 필요", "`x` 의 이전 호출자 수", "설계 판단이 필요하다", "끝까지 확인"]
+        miss = [s for s in pos if not question_kind(s)] + [f"(음성) {s}" for s in neg if question_kind(s)]
+        if not miss:
+            passed += 1
+        else:
+            fails.append(f"질문형 판별 오분류: {miss}")
     finally:
         shutil.rmtree(root, ignore_errors=True)
     for f in fails:
@@ -162,7 +228,7 @@ def self_test() -> int:
     if fails:
         print(f"plan_resolve_impact_requests self-test {passed}/{total} passed")
         return 1
-    print(f"RESOLVE_OK (self-test {passed}/{total} — 양성 1 · 경계 1 · 음성 2)")
+    print(f"RESOLVE_OK (self-test {passed}/{total} — 양성 1 · 경계 1 · 음성 2 · 질문형 2)")
     return 0
 
 

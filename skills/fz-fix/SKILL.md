@@ -19,7 +19,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
-  Edit, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Workflow
+  Edit, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Bash(cmp *), Workflow
 metadata:
   provides: [code-changes]
   needs: [none]
@@ -204,7 +204,8 @@ metadata:
 
 1. **args 조립**: `mode:'light'` / `stepSpec`={id,title,goal,files,verify,**complexity**, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 시 `split_required`. 임계값 single source=상수)} / `contextPath`(버그 분석 요약 파일) / `changesetTarget` / `buildFeedback`(재시도 시)
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
-2. **Workflow 호출**: `Workflow({ scriptPath: '{플러그인 루트}/workflows/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus). 1-2 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus). 1-2 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
 3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke
 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
    Mode A Bug Fix Step 1-4 직접 진입은 **L4 사용자 승인 후**다. 어느 경로로 가든 **--gpt 처리 책임은 유효**하고,

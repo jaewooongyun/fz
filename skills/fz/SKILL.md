@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__delete_memory,
   mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
-  Bash(grep *), Bash(cp *), Bash(*/scripts/gpt-choice.sh*), Read, Grep, Glob
+  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-choice.sh*), Read, Grep, Glob
 metadata:
   provides: []
   needs: []
@@ -347,12 +347,12 @@ commit/pr 전 → ✓ gpt check (TEAM)
 각 스킬은 자신의 `workflows/{skill}-{pattern}.js`를 소유한다. Lead는 스킬의 Workflow를 호출하고 반환(구조화 출력)을 통합한다. Lead는 퍼실리테이터 (호출 + 게이트 실행 + 통합).
 
 ```
-1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{플러그인 루트}/workflows/{skill}-{pattern}.js', args })   → ⛔ 거부 시 정본 = `guides/skill-authoring.md` §12 우회 계약 (SOLO 폴백 아님)
+0. 준비(§12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): cp {플러그인 루트}/workflows/{skill}-{pattern}.js {WORK_DIR}/{skill}-{pattern}.js && cmp -s {플러그인 루트}/workflows/{skill}-{pattern}.js {WORK_DIR}/{skill}-{pattern}.js   → exit 0 일 때만 1 · 비0 이면 L4
+1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{WORK_DIR}/{skill}-{pattern}.js', args })   → ⛔ 거부 시 정본 = `guides/skill-authoring.md` §12 우회 계약 (SOLO 폴백 아님)
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
 3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/GPT) + 통합
 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
-   **L1** split_required/splitSuggested → Step 분할 후 재invoke · **L2** 입력 오류 → 수정 후 재invoke(설계된 fail-fast) · **L3** 스톨·일시 장애 → **`resume` 우선**(동일 세션 한정) · **L4** 미해소 → 사용자 에스컬레이션
-   ⛔ Lead 단독 SOLO 수행은 **사용자 승인 후에만** (Lead=fable 자동 SOLO 금지)
+   **L1** split_required/splitSuggested → Step 분할 후 재invoke · **L2** 입력 오류 → 수정 후 재invoke(설계된 fail-fast) · **L3** 스톨·일시 장애 → **`resume` 우선**(동일 세션 한정) · **L4** 미해소 → 사용자 에스컬레이션 — ⛔ Lead 단독 SOLO 수행은 **사용자 승인 후에만** (Lead=fable 자동 SOLO 금지)
 ```
 
 ### Verification Discipline Brief (모든 agent() spawn에 자동 포함)
@@ -371,7 +371,7 @@ Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④�
 | 스킬 | 통신 패턴 | 핵심: 에이전트 간 직접 대화 |
 |------|----------|--------------------------|
 | fz-discover | Adversarial Constraint Discovery — (pilot: `workflows/discover-adversarial.js` Workflow 대체, P2P 아님) | plan-structure ↔ review-arch 만들고 부수며 제약 발견 |
-| fz-plan | Collaborative Design — (Wave 2: `workflows/plan-collaborative.js` Workflow 대체, P2P 아님) | review-direction → plan-structure 방향 도전 (Phase 0.5) + plan-structure ↔ peers 만들면서 토론 |
+| fz-plan | Collaborative Design — (기본 `workflows/plan-lean2.js` · 롤백 `workflows/plan-collaborative.js` Workflow 대체, P2P 아님) | review-direction → plan-structure 방향 도전 (Phase 0.5) + plan-structure ↔ peers 만들면서 토론 |
 | fz-code | Pair Programming — (Wave 3: `workflows/code-pair.js` Workflow 대체, P2P 아님) | impl-correctness ↔ review-arch 구현 중 실시간 질문/검토 |
 | fz-review | Live Review — (Wave 1: `workflows/review-live.js` Workflow 대체, P2P 아님) | review-arch ↔ review-quality 분석하면서 발견 공유 |
 | fz-search --deep | Cross-Verify — (Wave 1: `workflows/search-cross-verify.js` Workflow 대체, P2P 아님) | search-symbolic ↔ search-pattern 발견 즉시 교차 확인 |
