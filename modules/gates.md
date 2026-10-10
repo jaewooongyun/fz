@@ -12,6 +12,7 @@
 - [판정 계약](#판정-계약)
 - [스킬 배선 5지점](#스킬-배선-5지점)
 - [이탈 경로](#이탈-경로)
+- [릴리스 경계](#릴리스-경계)
 - [승인 계약 (APPROVED_ORACLE_HASH)](#승인-계약-approved_oracle_hash)
 - [관측 (FZ_GATES_TRACE)](#관측-fz_gates_trace)
 - [참조 스킬](#참조-스킬)
@@ -46,14 +47,25 @@
 
 WORK_DIR 결정은 `modules/context-artifacts.md` Work Dir Resolution을 따른다. **Serena fallback(disk WORK_DIR 없음)은 명시적 비지원** — 원장을 만들지 않는다.
 
-### STATE 3상태
+### STATE 와 전이표
+
+`STATE:` 값은 넷이다 — 수명주기 셋(`active` → `ready_for_review` → `closed`)과 승인·미착수 `planned`(F-190). ⛔ `planned` 는 수명주기 순서에 넣지 않는다 — 순서 산술로 두면 `active → planned` 가 '역행(자유)' 이 되어 진행 기록이 있는 원장도 착수 전으로 돌아간다. 간선과 전제는 `gate_check.py` 의 `TRANSITIONS` 가 정본이고 표 밖 간선(`active → closed` · `planned → ready_for_review|closed` · `ready_for_review|closed → planned`)은 거부한다.
 
 | 전이 | 주체 | 조건 |
 |------|------|------|
-| (생성) → `active` | `/fz-plan` | 원장 생성 |
+| (생성) → `active` | `/fz-plan` | 원장 생성. `--finalize` 는 STATE 를 쓰지 않는다 — 확정은 승인이지 착수 판정이 아니라, 진행 기록이 있는 원장을 다시 확정해도 `planned` 가 되지 않는다 |
+| `active` → `planned` | `/fz-plan` 4.5 | `APPROVED: yes` + 진행 기록 0 — 아니면 `REJECT: not-approved` · `REJECT: work-recorded` |
+| `planned` → `active` | `/fz-code` Phase 0.4 | 없음 — 착수는 완료 주장이 아니다 |
 | `active` → `ready_for_review` | `/fz-code` | 전 Step 게이트 충족 |
-| `ready_for_review` → `closed` | `/fz-review` | reverify 통과 + guardian `regressed` 0 |
-| 임의 → `closed` | 사용자 | 전량 `ABANDON:` |
+| `ready_for_review` → `closed` | `/fz-review` | reverify 통과 + guardian `regressed` 0 · 미룬 게이트 0 |
+| `ready_for_review`·`closed` → `active`, `closed` → `ready_for_review` | 누구나 | 없음 — 역행은 재작업이다 |
+| `ready_for_review` → `closed` (전량 `ABANDON:`) | 사용자 | 포기한 게이트는 미충족으로 세지 않아 위 전진 조건을 지난다 — `--set-state` 는 인접 전진만 받으므로 `active` 에서 닫는 길은 `ready_for_review` 를 거치거나 손으로 `STATE:` 를 고치는 것뿐이다 |
+
+`planned` 원장은 `--status`(Stop hook · `--discover` 경로)에서만 no-op 이다 — exit 0, `--discover` 는 '착수 전' 수로 따로 센다. 실행(기본 · `--reverify`) · `--only` · `--confirm` 은 exit 3 이고 착수는 `--set-state active` 다. 전제가 깨진 `planned`(미승인이거나 진행 기록이 있는데 손으로 STATE 만 바꾼 원장)는 no-op 이 아니라 `active` 로 판정한다.
+
+**진행 기록** = `- [x]` · 빈 값/`pending` 이 아닌 `EVIDENCE:`(위조·낡은 증거 포함 — 진위가 아니라 흔적을 본다) · `CONFIRMED:`. 진행 기록이 있던 게이트(직전 met · `- [x]` · 증거 흔적 — 재승인으로 unmet 이 된 PASS 포함)가 재실행에서 떨어지면 `EVIDENCE: pending; demoted` 로 남아(reverify 이력) 미착수와 갈린다. ⛔ **잡지 못하는 것(잔존 위험) 두 갈래**: ① 코드를 고치고도 게이트를 한 번도 안 돌렸거나 실패만 한 세션은 흔적이 0 이라 `planned` 로 갈 수 있고 Stop hook 도 통과한다 — 거부 범위를 '진행 기록이 있는 원장' 으로 정한 결과다. ② 진행 중인 원장에서 `/fz-plan` 4.5 를 다시 돌리면 산문 단계 `cp plan.draft.md plan.md` 가 기록을 판정기 밖에서 먼저 덮고, 이어지는 `--finalize` · `--set-state planned` 는 전제(승인 · 기록 0)를 갖춘 원장을 보게 된다. 훅 차단 사유가 `--set-state planned` 를 안내하므로 두 갈래 모두 닿기 쉽다(`tests/fixtures/gates/planned-state` 의 `residual-no-record` · `residual-replan` 셀이 지금 동작을 고정한다).
+
+⛔ **하향 설치 전**: 4.44.0 이하 판정기는 `STATE: planned` 를 모른다 — exit 3 으로 읽어 Stop hook 이 '원장 계약 위반' 으로 막는다. 이전 판으로 되돌리기 전에 `planned` 원장마다 `--set-state active` 를 돌린다.
 
 ⛔ **`ready_for_review`도 미완료다.** fz-code가 끝났다고 원장을 닫으면 fz-review의 재검증이 강등을 수행할 수 없다 — 중간 상태가 그 구멍을 막는다.
 
@@ -84,7 +96,7 @@ ABANDON: G3 서버 API 미배포 — TKT-9999로 핸드오프
 DEFER: G4 R-B 소비자 전환은 다음 릴리즈에서 한다
 ```
 
-- `ROOT:`는 이 원장이 속한 WORK_DIR의 **realpath 절대경로**다. 발견 키가 아니라 **검증 키**다(발견은 세션 바인딩 — [스킬 배선 4지점](#스킬-배선-4지점) 참조).
+- `ROOT:`는 이 원장이 속한 WORK_DIR의 **realpath 절대경로**다. 발견 키가 아니라 **검증 키**다(발견은 `cwd` 하위 glob · `FZ_GATES_LEDGER` 이고, 세션과는 transcript 소유 판정으로 묶는다 — [스킬 배선 5지점](#스킬-배선-5지점) 참조).
 - 실행 게이트는 `CHECK:`와 `EXPECT:` **둘 다** 갖는다. 수동 게이트는 `MANUAL:`만 갖는다. 하나만 있으면 오류다.
 - `EXPECT:`는 **부분 문자열 매칭**이다. 정규식을 지원하지 않는다 — 이유는 [설계 원칙](#설계-원칙) 참조.
 - `CWD:`는 절대경로만 허용한다. `..` 포함 시 오류다.
@@ -126,6 +138,12 @@ DEFER: G4 R-B 소비자 전환은 다음 릴리즈에서 한다
 ⛔ **timeout·출력 초과는 exit 1(미충족)이다.** 인프라가 아니라 판정이다 — 시간이 없었다는 것은 통과가 아니다.
 
 ⛔ **기본 실행은 충족 게이트를 다시 돌리지 않는다**(F-330). 그 게이트마다 `MET … 다시 돌리지 않았다` 줄을 내고, 요약에 `reran`(재실행 수)과 `stamp-only`(기록된 증거만 읽은 수)를 0 이어도 적는다. 코드를 고친 뒤 게이트를 다시 확인하려면 `--reverify`(충족 게이트도 재실행)를 쓴다 — `ALL MET` 만 보고 재실행했다고 읽지 않는다.
+
+### `--only` — 이름을 댄 게이트는 충족이어도 다시 돈다
+
+`--only <id,…>` 로 이름을 댄 게이트는 이미 충족이어도 CHECK 를 다시 실행하고 그 결과로 증거를 새로 찍는다(F-330). 고친 뒤 그 게이트를 지목한 호출이 옛 도장만 읽고 `ALL MET` 을 내면 '재실행 PASS' 로 읽히기 때문이다. 떨어졌을 때의 처리(exit 1 · 강등 기록)는 `--reverify` 와 같다. 선택자 없는 기본 실행은 위 문단 그대로 도장만 읽고, `--status --only` 는 실행하지 않으며, `closed` 원장은 no-op 이다(`tests/fixtures/gates/only-rerun`).
+
+⛔ `--only` 에는 **지금 확인할 게이트만** 넣는다 — 충족 게이트를 함께 적으면 그 CHECK 가 다시 돌고(시간), 지금 트리에서 떨어지면 강등된다. 전부 다시 확인하려면 `--reverify` 를 쓴다.
 
 ### 미판정 — 도구 부재는 실패가 아니다
 
@@ -213,7 +231,7 @@ lock을 지금 넣지 않는 이유는 설계가 필요하기 때문이다. `wri
 
 Phase 1 산출 시 `steps[].verify`를 읽어 `{WORK_DIR}/gates/plan.draft.md`를 만든다. `verify.kind`가 `command`면 `CHECK:`/`EXPECT:`, `manual`이면 `MANUAL:`+`CRITERION_HASH:`. `verify.tools`가 있으면 `TOOLS:`로 옮긴다 — ⛔ VerifySpec이 `additionalProperties: false`라 스키마에 필드가 없으면 plan 저자가 채울 수 없다(`workflows/plan-collaborative.js`가 정의, `plan-lean2.js`도 같은 필드).
 
-Phase 2의 `verify-gates`가 **게이트마다 판정 1개**를 낸다 — "이 `CHECK:`가 제목이 말하는 것을 측정하는가" + noninteractive·rerunnable·side-effect·determinism. Phase 3에서 판정을 반영해 `plan.md`로 확정한다.
+Phase 2의 `verify-gates`가 **게이트마다 판정 1개**를 낸다 — "이 `CHECK:`가 제목이 말하는 것을 측정하는가" + noninteractive·rerunnable·side-effect·determinism. Phase 3에서 판정을 반영해 `plan.md`로 확정하고 `--set-state planned` 로 승인·미착수를 남긴다(계획만 하고 끝나는 세션이 Stop hook 에 막히지 않는다).
 
 ⛔ **`verify`를 대체하지 않고 추가한다.** `gpt_gate_verdict_schema`에는 `issues`·`verdict`가 없어서, 스키마를 바꿔치기하면 fz-plan의 Issue Tracker 기록·scope challenge·Gate 2 승인 입력이 사라진다. 두 호출은 관심사가 다르다 — 계획이 옳은가(`verify`)와 게이트가 그 계획을 측정하는가(`verify-gates`).
 
@@ -236,19 +254,19 @@ Step 완료 선언 전 `--only {StepID}`로 **해당 Step 게이트만** 실행�
 
 ⛔ **전진은 인접 단계만** — `active → closed` 직행은 fz-review 재검증을 통째로 건너뛰므로 거부된다.
 
-원장 부재·`STATE: closed`면 no-op이다. `ROOT:`는 **realpath 정규화 후 원장이 그 하위인지**로 판정한다 — 상대 경로·`..`·존재하지 않는 디렉토리·타 디렉토리 ROOT는 exit 3이다.
+원장 부재·`STATE: closed`면 no-op이다. `STATE: planned` 면 exit 3 이다 — Phase 0.4 에서 `--set-state active` 로 연다. `ROOT:`는 **realpath 정규화 후 원장이 그 하위인지**로 판정한다 — 상대 경로·`..`·존재하지 않는 디렉토리·타 디렉토리 ROOT는 exit 3이다.
 
 ⛔ realpath **일치**를 요구하지는 않는다. macOS의 `/var → /private/var`처럼 정상 경로도 심볼릭을 거치므로, 정규형을 강요하면 정당한 원장이 거부된다(fixture 21건이 이것으로 깨졌다). 필요한 것은 정규형이 아니라 소유 판정이다.
 
 ### 3. fz-review — 재검증
 
-Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를 재실행한다(`--reverify`). 통과 못 하면 `- [x]` → `- [ ]` + `EVIDENCE: pending`으로 **강등**한다.
+Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를 재실행한다(`--reverify`). 통과 못 하면 `- [x]` → `- [ ]` + `EVIDENCE: pending`으로 **강등**한다 — 재실행 전에 진행 기록이 있던 게이트(met · `- [x]` · 증거 흔적)는 `EVIDENCE: pending; demoted` 로 남긴다(통과 기록이 사라진 게이트를 미착수와 가른다 — `planned` 전제의 진행 기록).
 
 `/fz-gpt validate`(fz-guardian)가 각 게이트를 `resolved / partially_resolved / unresolved / regressed` 4축으로 분류한다. `regressed`가 0이 아니면 통합을 차단한다.
 
 ### 4. Stop hook — 차단 (2차 계층, 사용자 설치)
 
-`scripts/gate_stop_hook.py`. 세션 종료 시 `cwd` 하위 확정 원장을 찾아, 그중 **이 세션의 transcript 가 쓴 원장**이 미충족이면 종료를 막는다(남의 원장은 경고만 — 병렬 세션이 같은 루트에 있어도 막지 않는다). **1차 배선 1~3은 SKILL.md 산문이라 Lead가 건너뛰어도 신호가 없다 — 그 재귀를 끊는 것은 이 hook 하나뿐이다.**
+`scripts/gate_stop_hook.py`. 세션 종료 시 `cwd` 하위 확정 원장을 찾아, 그중 **이 세션의 transcript 가 쓴 원장**이 미충족이면 종료를 막는다(남의 원장은 경고만 — 병렬 세션이 같은 루트에 있어도 막지 않는다). '쓴' 은 `Write`/`Edit` · `cp`/`mv`/`tee` · `>` 와 원장을 쓰는 판정기 호출(`--finalize` · `--confirm` · `--set-state` · `--only` · `--reverify` · 플래그 없는 기본 실행)이다 — `--status`(`--only` 와 함께여도) · `--discover` 는 읽기라 소유가 아니다. 원장 인자가 변수면 같은 명령의 대입과 그 명령이 `source` 한 파일(훅이 도는 지금의 내용)로 풀고, 풀지 못한 쓰기는 '대상 미상 쓰기' 로 전 원장을 판정한다(fail-closed). 판정기 옵션은 argparse 처럼 푼다 — 축약(`--set` → `--set-state`)은 유일한 접두 일치로 펴고, 어휘 밖 옵션이 하나라도 있으면 argparse 가 거부할 호출이라 쓰기가 아니다. `source` 경로의 `~` · `$HOME` 은 훅 환경으로 펴고, 그래도 못 읽은 source 뒤에서는 파일명 자리가 변수인 명령만, 쓰기 플래그나 `plan.md` 인자가 있을 때 판정기 후보로 본다(무관한 명령이 '대상 미상' 으로 남의 원장에 막히지 않게). `python3 -` · `-c` · `-m` 뒤의 판정기 경로는 그 프로그램의 인자라 호출이 아니다. ⛔ 잔존 위험(보지 않는 꼴): 서브셸 `( cd X && … )` 의 cd 는 닫는 괄호 뒤에도 같은 명령의 다음 세그먼트에 남는다 · 괄호에 붙은 인자(`plan.md)`) · `bash -c '…'` · `xargs` 로 넘긴 판정기 호출 · `~` 로 시작하는 원장 인자(펴지 않아 남의 원장으로 본다 — `$HOME/…` 는 대상 미상으로 막힌다) · `if` · `while` · `until` 조건이나 `{ …; }` · `timeout` 같은 래퍼 뒤의 판정기 호출 · Bash 호출 사이에 이어지는 cwd · 못 읽은 source 뒤의 플래그 없는 기본 실행(`python3 "$G" "$L"`). 그래서 `/fz-code` · `/fz-review` 처럼 판정기 호출만 한 세션도 자기 원장 미충족으로 막힌다. **1차 배선 1~3은 SKILL.md 산문이라 Lead가 건너뛰어도 신호가 없다 — 그 재귀를 끊는 것은 이 hook 하나뿐이다.** `STATE: planned`(승인·미착수)는 판정기 `--status` 가 no-op 으로 보므로 막지 않는다. 차단 사유는 '충족 · `ABANDON:`' 에 셋째 선택지 '착수 전이면 ABANDON 이 아니다 — `--set-state planned`' 를 함께 준다 — 2지선다는 계획만 승인한 원장에 거짓 포기 기록을 유도한다.
 
 ⛔ **자동 배선하지 않는다.** `examples/hooks.json.example`에 템플릿만 두고 사용자가 `.claude/settings.json`의 `hooks.Stop` **배열에 추가**한다 (통째 복사하면 기존 항목이 사라진다) — `modules/governance.md` "Claude는 훅 설치·설정 변경을 명시 합의 없이 지시·실행하지 않는다"와 같은 파일 `_note`의 "자동 배선 금지". 따라서 **기계적 차단은 설치한 머신에만 존재한다.** 원장·판정기·1~3번 배선은 어디서나 동작한다.
 
@@ -277,6 +295,8 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 
 깊이는 0~3이다. `*/gates/plan.md` 하나만 보면 `{CWD}/gates/plan.md`(깊이 1)·`{CWD}/a/b/gates/plan.md`(깊이 3)를 놓치고 **조용히 통과한다** — 실측에서 4종 중 1종만 발견됐다.
 
+⛔ **발견 수에는 상한이 없다.** 8개에서 자르던 구판은 사전순 뒤(대개 최신 티켓)의 소유 원장을 말없이 빼고 통과했다. hook 은 발견한 원장 전부에 소유 판정을 먼저 하고 소유 원장을 예산(45초) 안에서 **먼저** 판정한다. 상한(8)은 남의 원장 판정에만 두고, 넘거나 예산이 모자라 못 본 남의 원장은 수를 진단으로 남긴다. 예산이 다해 판정하지 못한 소유 원장이 남으면 통과하지 않고 '소유 원장 N개 미판정(예산 소진)' 으로 막는다(루프 방어 2회는 같다 · 시험용 `FZ_GATES_HOOK_BUDGET_S` 는 예산을 줄이기만 한다). `--discover` 도 자르지 않고 읽지 못한 원장을 `미판정 N` 으로 센다 — 종료 코드는 그대로다.
+
 깊이 4 이상, 그리고 `cwd` **밖**은 어떤 glob으로도 찾지 못한다. 워크트리에서 작업하고 원장이 리포 루트에 있는 경우가 그렇다 — hook은 `cwd`만 받으므로 설계 한계다. `FZ_GATES_LEDGER`(경로 목록, `os.pathsep` 구분)로 명시 지정한다.
 
 ⛔ **"찾지 못함"은 조용하지 않다.** `gates/` 디렉토리가 아예 없으면 게이트 미사용 세션이므로 조용히 통과하지만, `gates/`는 있는데 확정 원장이 없으면(draft 단계이거나 `--finalize`가 빠졌으면) stderr로 남긴다. 미사용과 미발견이 같은 침묵이면 놓친 원장이 통과로 보인다.
@@ -285,7 +305,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 
 ⛔ **설치 주의 6항은 `docs/completion-gates.md`가 정본이다** — 배열 추가 · hook 병렬 실행 · 캐시 경로의 버전(하드코딩하면 업데이트 후 조용히 꺼진다) · `python3` 3.9+ 부재 시 fail-open · `~/.fz/stop-hook-state.json` 생성 · 탐색 깊이 3 한계.
 
-검증: `python3 scripts/gate_stop_hook.py --self-test` (**27케이스** — no-gates-dir · 깊이 1~4 · draft-only · skip-git · closed-passes · approved · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard ×2 · **소유 판정 11종**: foreign-ledger·foreign-heredoc-cite·foreign-py-c-read 통과 / owned-ledger·owned-redirect·owned-bash·owned-bash-cd·owned-bash-var·owned-py-heredoc·owned-py-c 차단 / transcript-missing fail-closed 차단 · multi-unmet 사유의 미충족 id 목록). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
+검증: `python3 scripts/gate_stop_hook.py --self-test` (**37케이스** — 판정기 옵션 어휘 대조(gate-vocab — 훅의 옵션 집합 = 판정기 add_argument) · no-gates-dir · 깊이 1~4 · draft-only · skip-git · closed-passes · approved · planned-passes · planned-reason(셋째 선택지) · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard ×2 · **소유 판정 17종**: foreign-ledger·foreign-heredoc-cite·foreign-py-c-read·foreign-status-only 통과 / owned-ledger·owned-redirect·owned-bash·owned-bash-cd·owned-bash-var·owned-py-heredoc·owned-py-c·owned-only·owned-default·owned-var-L·owned-sourced 차단 / transcript-missing·unknown-target fail-closed 차단 · multi-unmet 사유의 미충족 id 목록 · budget-undecided 예산 소진 차단). 동작 fixture: `tests/fixtures/gates/write-ownership`(쓰기·읽기 짝) · `tests/fixtures/gates/discover-limit`(원장 1·9·10·80 · 예산 소진). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
 
 ### 5. health-check — 노출 (hook 미설치 머신)
 
@@ -313,9 +333,23 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 
 `DEFER:` 는 이탈이 아니다 — 수용 기준을 그대로 두고 **판정 시점만 뒤 릴리즈로 옮긴다.** 그래서 미룬 게이트가 남은 원장은 `closed` 로 전이할 수 없다(`ready_for_review` 는 된다). 닫으려면 그 릴리즈를 마치거나 `ABANDON:` 으로 포기를 기록한다.
 
-⛔ **진행 없는 블록 N회 후 자동 해제는 두지 않는다.** 그것은 판정 fail-open이며 위 두 경로 밖의 세 번째 우회로다. 우회는 사용자의 명시적 행위여야 한다.
+⛔ **Stop hook 의 루프 방어는 이탈 경로가 아니다.** 같은 상태로 2회 막은 뒤 통과시키는 것(배선 4 '무한 루프 방어')은 세션 감금을 피하는 fail-open 이다 — 원장을 바꾸지 않고, 미충족은 `--discover` 와 다음 세션에 그대로 남는다. 진행 없는 블록을 **원장 상태 변경**으로 풀지는 않는다 — 우회는 사용자의 명시적 행위여야 한다. `planned` 도 이탈이 아니다 — 수용 기준을 그대로 두고 '착수 전' 을 기록할 뿐이며, 진행 기록이 있으면 판정기가 거부한다.
 
 ⛔ **MANUAL 게이트를 차단 대상에서 제외하지 않는다.** 제외하면 모델이 어려운 게이트를 MANUAL로 미는 우회로가 생긴다. MANUAL은 `--confirm`이 발급한 토큰이 있어야 충족이고, 그 명령은 사용자 stdin 응답을 요구한다.
+
+## 릴리스 경계
+
+판정기는 릴리스 사이의 **순서**를 모른다(F-359). `DEFER:` 는 `CURRENT_RELEASE:` 와 *다르면* 미룸으로 읽힐 뿐이라, 한 원장을 여러 판에 걸쳐 쓰면 두 곳이 깨진다. 헤더를 다음 판(R-B)으로 넘기는 순간 지난 판(R-A)으로 미뤄 두고 판정하던 게이트가 다시 `deferred` 가 되어 미충족 목록에서 빠진다(사용자 확인 대기도 가려진다). 출하 버전을 박아 둔 CHECK 는 다음 판이 버전을 올리면 `--reverify` 에서 강등된다. 그래서 규칙은 셋이다.
+
+1. **릴리스마다 새 원장을 연다.** 한 원장은 한 릴리스만 담고 `CURRENT_RELEASE:` 를 다음 판으로 넘기지 않는다. 다음 판의 게이트는 다음 판 원장에 쓴다. [원장 문법 (요약)](#원장-문법-요약) 의 `DEFER:` 설명('헤더를 그 릴리즈로 바꾸면 평소처럼 판정한다')은 헤더를 바꿨을 때의 동작을 적은 것이고, 판을 넘길 때는 그 변경을 하지 않는다.
+2. **판이 끝나면 `closed` 로 닫는다.** `closed` 원장은 `--status` · 기본 실행 · `--only` · `--reverify` 가 모두 no-op 이라, 다음 판의 변경(버전 올림 · 공유 파일 수정)이 지난 판의 증거를 강등하지 못한다. 미룬 게이트가 남으면 `closed` 가 거부되므로([이탈 경로](#이탈-경로)), 다음 판으로 넘길 게이트는 이 원장에 `ABANDON: <id> <다음 판으로 이월 — 사유>` 로 남기고 다음 판 원장에 새 게이트로 다시 쓴다.
+3. **여러 판에 걸쳐 열려 있을 원장의 버전 CHECK 는 `>=` 로 쓴다.** 다음 버전이 올라간 뒤에도 닫히지 않을 원장에서 `version == "4.42.0"` · '최상단 CHANGELOG 절' 처럼 한 버전에 고정하면, 다음 버전이 올라오는 순간 `--reverify` 에서 떨어진다. '이 버전 이상' · '이 버전 절이 있다' 로 쓴다 — 버전을 올리지 않은 실수(4.44.0 그대로)는 `>=` 로도 잡힌다. ⛔ 예외: 판 하나만 담고 끝나면 `closed` 로 닫는 원장(규칙 1 · 2)의 릴리스 게이트는 그 판 버전을 환경변수로 받아 **등식**(`= "$V"`)으로 잰다 — 너무 높게 올린 버전도 잡고, 닫힌 뒤에는 규칙 2 가 다음 판의 강등을 막는다.
+
+```markdown
+- [ ] G9: 출하 버전이 4.45.0 이상이고 그 판의 CHANGELOG 절이 있다
+  CHECK: python3 -c 'import json,sys;v=json.load(open(".claude-plugin/plugin.json"))["version"];sys.exit(0 if tuple(map(int,v.split(".")))>=(4,45,0) else 1)' && grep -q '^### v4\.45\.0 ' CHANGELOG.md && echo VERSION-OK
+  EXPECT: VERSION-OK
+```
 
 ## 승인 계약 (APPROVED_ORACLE_HASH)
 

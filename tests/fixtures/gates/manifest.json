@@ -17,7 +17,7 @@
     "hook": "⛔ 비어 있음 — 2차 계층(S14)에서 추가",
     "merge": "⛔ 비어 있음 — 2차 계층(S16)에서 추가",
     "fromplan": "plan steps[] → 원장 변환 (--from-plan)",
-    "state": "STATE 전이 — 전진은 전 게이트 충족 조건부, 역행은 자유",
+    "state": "STATE 전이표 — 전진은 전 게이트 충족 조건부, 역행은 자유, active→planned 는 승인 + 진행 기록 0, planned→active 는 증명 불요",
     "forgery": "증거·토큰 위조와 수명주기 우회 — 2026-08-24 코드 리뷰가 실증한 false-green 경로",
     "root": "ROOT 소유 검증 + 실행 환경 격리",
     "expect": "EXPECT 문법 판별 — 경로 리터럴 vs 정규식",
@@ -115,7 +115,7 @@
         "exit": 3,
         "mutates": false
       },
-      "why": "STATE 는 active/ready_for_review/closed 셋뿐 — 미지 값은 수명주기 판정 불가"
+      "why": "STATE 는 planned/active/ready_for_review/closed 넷뿐 — 미지 값은 수명주기 판정 불가 (planned 는 수명주기 순서 밖이라 전이표가 간선마다 전제를 정한다)"
     },
     {
       "id": "exec-pass",
@@ -335,6 +335,310 @@
         "mutates": true
       },
       "why": "역행은 증명 없이 허용한다 — 전진은 '끝났다'는 주장이라 증명이 필요하지만 역행은 '다시 열겠다'이고, 막으면 재작업이 막힌다"
+    },
+    {
+      "id": "state-planned-enter",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "planned"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "STATE: active ← planned"
+        ],
+        "expect_contains": {
+          "STATE: planned": 1
+        }
+      },
+      "why": "F-190 — 확정만 하고 구현을 시작하지 않은 원장은 착수 전(planned)으로 남긴다. 상태값이 없으면 계획만 하고 끝내는 세션이 Stop hook 에 막히고, 출구가 ABANDON(거짓 기록)뿐이다"
+    },
+    {
+      "id": "state-planned-needs-approval",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "args": [
+        "--set-state",
+        "planned"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: not-approved"
+        ]
+      },
+      "why": "planned 는 '승인·미착수' 다 — 확정 전 draft 를 planned 로 두면 승인받지 않은 원장이 hook 판정에서 빠진다"
+    },
+    {
+      "id": "state-planned-work-recorded",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--only",
+          "G1"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "planned"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: work-recorded"
+        ]
+      },
+      "why": "F-190 — 진행 기록(PASS 증거)이 있는 원장을 미착수로 되돌리면 Stop hook 을 피하는 자기 선언 우회로가 된다. ⛔ 상태값을 수명주기 순서에 넣고 역행을 자유로 두면 이 전이가 증명 없이 통과한다"
+    },
+    {
+      "id": "state-planned-demoted-recorded",
+      "category": "state",
+      "ledger": "state/planned-demoted.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "planned"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: work-recorded"
+        ]
+      },
+      "why": "강등 기록(`EVIDENCE: pending; demoted` — reverify 이력)도 진행 기록이다. `pending` 과 같게 읽으면 재실행이 통과 기록을 지운 원장이 착수 전으로 돌아간다"
+    },
+    {
+      "id": "state-planned-status-noop",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "STATE planned — 착수 전"
+        ]
+      },
+      "why": "Stop hook 은 `--status` 로 판정한다 — 착수 전 원장의 미충족은 앞으로 할 일의 정의이지 이 세션이 남긴 빚이 아니다"
+    },
+    {
+      "id": "state-planned-run-refused",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "--set-state active"
+        ]
+      },
+      "why": "planned 원장의 실행은 착수다 — 착수 전 원장에 증거를 쓰면 '착수 전' 이 거짓이 된다. 실행 전에 `--set-state active` 를 요구한다"
+    },
+    {
+      "id": "state-planned-only-refused",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "--set-state active"
+        ]
+      },
+      "why": "fz-code 6.4 의 Step 실행(`--only`)도 같다 — Phase 0.4 착수 전환을 건너뛴 세션은 여기서 멈춘다(fail-closed)"
+    },
+    {
+      "id": "state-planned-confirm-refused",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--confirm",
+        "G3"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "확인을 기록하지 않는다"
+        ]
+      },
+      "why": "MANUAL 확인도 진행 기록이다 — planned 원장에 쓰면 전제(진행 기록 0)가 깨진 채 no-op 으로 남는다"
+    },
+    {
+      "id": "state-planned-to-active",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "active"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "STATE: planned → active"
+        ],
+        "expect_contains": {
+          "STATE: active": 1
+        }
+      },
+      "why": "착수(planned → active)는 완료 주장이 아니다 — 미충족 게이트가 있어도 증명 없이 허용한다(fz-code Phase 0.4)"
+    },
+    {
+      "id": "state-planned-no-skip",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "ready_for_review"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: no-edge"
+        ]
+      },
+      "why": "전이표에 없는 간선은 거부한다 — planned 에서 갈 수 있는 곳은 active 뿐이다. 순서 산술이면 '비인접 전진' 이라는 엉뚱한 사유가 나온다"
+    },
+    {
+      "id": "state-planned-hand-edit-judged",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "- [ ] G1: 첫 구현",
+            "- [x] G1: 첫 구현"
+          ]
+        }
+      ],
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1"
+        ],
+        "expect_stderr": [
+          "active 로 판정"
+        ]
+      },
+      "why": "손편집으로 전제가 깨진 planned(진행 흔적이 있다)는 no-op 이 아니라 active 로 판정한다 — `--set-state` 를 거치지 않은 STATE 줄이 hook 을 무력화하지 못하게 전이와 판정이 같은 전제를 쓴다"
+    },
+    {
+      "id": "reverify-demote-marks",
+      "category": "reverify",
+      "ledger": "reverify/flip.md",
+      "pre": [
+        [
+          "--only",
+          "G1"
+        ]
+      ],
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": true,
+        "expect_contains": {
+          "EVIDENCE: pending; demoted": 1,
+          "- [x] G1": 0
+        }
+      },
+      "why": "진행 기록이 있던 게이트(직전 met · `- [x]` · 증거 흔적)가 재실행에서 떨어지면 강등 기록을 남긴다 — `pending` 으로 되돌리면 미착수와 구별되지 않아 진행 기록이 사라진다(planned 전제). 첫 실행 FAIL 은 `pending` 그대로다(writeback-evidence-missing 등)"
     },
     {
       "id": "writeback-evidence-missing",

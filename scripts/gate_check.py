@@ -20,6 +20,9 @@ exit code 4분 (⛔ 판정의 fail-open 금지 / 인프라 부재의 fail-open �
 ⛔ 2 와 3 의 구분: 원장 *내용*의 위반은 3, 원장에 도달하지 못한 환경 문제는 2.
    `lint_contracts.py` 의 "2 = configuration/parse error" 3분 구조를 확장한 것.
 
+STATE planned(승인·미착수 — F-190): `--status` 만 no-op(exit 0)이고 실행·`--only`·`--confirm` 은 3 이다.
+   착수는 `--set-state active`. 전이 간선과 전제는 `TRANSITIONS` 가 정본이다.
+
 정규식 미지원 — Python `re` 에 타임아웃이 없어 파멸적 백트래킹을 막을 수 없다. 원장을 fz 가
 생성하므로 정규식이 필요 없고, 지원하지 않으면 그 실패 유형이 통째로 사라진다.
 
@@ -53,6 +56,27 @@ DRAIN_GRACE_S = 1.0            # killpg 후 파이프 강제 종료까지의 유
 HASH_LEN = 12                  # sha256 앞 N자
 
 STATES = ("active", "ready_for_review", "closed")
+# ⛔ `planned`(승인·미착수 — F-190)는 위 튜플에 넣지 않는다. STATES 는 **완료 주장의 순서**다 — 넣으면 순서
+#    산술이 `active → planned` 를 '역행(자유)' 으로 읽어 진행 기록이 있는 원장도 착수 전으로 되돌릴 수 있고,
+#    전제가 간선이 아니라 튜플 위치에서 우연히 나온다. 그래서 STATE 전이는 아래 표가 **간선마다 전제를** 적는다.
+PLANNED = "planned"
+STATE_VALUES = (PLANNED,) + STATES      # 파서가 받는 값 — 순서 산술에는 쓰지 않는다
+# 진입 경로는 한 곳에서 정한다: 원장 생성(`render_ledger` · 손으로 쓴 draft)은 INITIAL_STATE, `--finalize` 는 STATE 를
+# **쓰지 않는다**(확정은 승인이지 착수 판정이 아니다 — 진행 기록이 있는 원장을 다시 확정해도 planned 가 되지 않는다),
+# planned 는 `--set-state planned` 한 경로(아래 간선과 그 전제)로만 들어간다.
+INITIAL_STATE = "active"
+# (현재, 목표) → (전제, 화살표). 표에 없는 간선은 거부한다. 전제: None = 증명 불요(역행 · 착수)
+TRANSITIONS = {
+    ("active", "ready_for_review"): ("all-met", "→"),                 # /fz-code — 전 Step 충족
+    ("ready_for_review", "closed"): ("all-met-none-deferred", "→"),   # /fz-review — 재검증 통과 · 미룸 0
+    ("ready_for_review", "active"): (None, "←"),                      # 역행 — 재작업을 막지 않는다
+    ("closed", "ready_for_review"): (None, "←"),
+    ("closed", "active"): (None, "←"),
+    ("active", PLANNED): ("approved-no-work", "←"),                   # /fz-plan 4.5 — 승인 · 진행 기록 0
+    (PLANNED, "active"): (None, "→"),                                 # /fz-code Phase 0.4 — 착수는 완료 주장이 아니다
+}
+# 진행 기록이 있던 게이트가 재실행에서 떨어졌다는 기록(reverify 이력). `pending` 으로 되돌리면 미착수와 구별되지 않는다
+DEMOTED_EVIDENCE = "pending; demoted"
 
 EXIT_OK, EXIT_UNMET, EXIT_INFRA, EXIT_INVALID = 0, 1, 2, 3
 
@@ -349,8 +373,8 @@ class Ledger:
                     f"확정 원장인데 승인 도장 없는 실행 게이트: {naked} — 그 게이트만 도장: "
                     f"`--finalize --only {','.join(naked)}` (다른 게이트의 계약이 바뀌었으면 거부된다)")
         state = self.headers.get("STATE")
-        if state not in STATES:
-            raise LedgerError(f"STATE 는 {'/'.join(STATES)} 중 하나 — 받은 값 {state!r}")
+        if state not in STATE_VALUES:
+            raise LedgerError(f"STATE 는 {'/'.join(STATE_VALUES)} 중 하나 — 받은 값 {state!r}")
         cur = self.headers.get("CURRENT_RELEASE", "").strip()
         if cur and not RELEASE_RE.match(cur):
             raise LedgerError(f"CURRENT_RELEASE 형식 오류 — {cur!r}")
@@ -389,7 +413,9 @@ SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".build", "
 # ⛔ cwd **밖** 원장용 탈출로. hook 은 `cwd` 만 받으므로 워크트리에서 작업하고
 #    원장이 리포 루트에 있으면 어떤 glob 으로도 못 찾는다 — 설계 한계다.
 LEDGER_ENV = "FZ_GATES_LEDGER"
-MAX_DISCOVERED = 8              # 상한 — 큰 트리에서 탐색이 늘어지지 않게
+# ⛔ 발견 수에 상한을 두지 않는다(F-378). 8개에서 자르던 구판은 사전순 뒤(대개 최신 티켓)의 원장을 **말없이** 빼서, 그 원장이
+#    이 세션의 미충족 원장이어도 Stop hook 이 통과했고 `--discover` 는 '원장 8건' 만 냈다. glob 은 상한과 무관하게 전부 돈다 —
+#    비용은 판정 쪽이므로 상한은 소비자가 정한다(hook 은 남의 원장 판정에만 상한 · `--discover` 는 파싱만이라 전부 본다).
 
 
 def _skipped(path: Path, base: Path) -> bool:
@@ -424,7 +450,7 @@ def find_ledgers(cwd, env_raw: str = "") -> tuple:
             else:
                 missing.append(chunk)
         note = f"{LEDGER_ENV} 의 경로 {missing} 를 찾을 수 없다" if missing else ""
-        return picked[:MAX_DISCOVERED], note
+        return picked, note
 
     found = []
     for pattern in LEDGER_GLOBS:
@@ -435,7 +461,7 @@ def find_ledgers(cwd, env_raw: str = "") -> tuple:
             continue
     uniq = sorted({p.resolve() for p in found})
     if uniq:
-        return uniq[:MAX_DISCOVERED], ""
+        return uniq, ""
 
     # 원장은 없다 — `gates/` 자체가 없으면 게이트 미사용 세션이다(조용히 통과).
     for pattern in GATES_DIR_GLOBS:
@@ -910,12 +936,44 @@ def gate_state(gate: Gate, ledger=None) -> str:
     return "met"
 
 
+def work_records(ledger: Ledger) -> list:
+    """진행 기록이 있는 게이트 id — PASS 증거 · 강등 기록(reverify 이력) · `--confirm` 기록.
+
+    ⛔ **진위가 아니라 흔적을 본다.** `- [x]` · 빈 값/`pending` 이 아닌 `EVIDENCE:` · `CONFIRMED:` 가 하나라도
+       있으면 기록이다 — 서명이 깨진 증거·손으로 쓴 증거도 센다. 기록 판정이 증거 진위에 기대면 증거를 위조한
+       원장이 '기록 없음' 으로 읽혀 착수 전(planned)으로 되돌아간다. 애매하면 거부 쪽으로 기운다.
+    ⛔ **잡지 못하는 것**: 한 번도 통과하지 못한 실행(첫 실행 FAIL 은 `pending` 으로 남는다)과 게이트를 아예
+       돌리지 않은 작업 — 흔적이 0 이라 `active → planned` 가 허용된다(잔존 위험 — `modules/gates.md` STATE 절).
+    """
+    return [g.id for g in ledger.gates if has_work_record(g)]
+
+
+def has_work_record(gate: Gate) -> bool:
+    """게이트 하나의 진행 기록 흔적 — `work_records` 와 강등 표지(`evaluate`)가 같은 술어를 쓴다."""
+    ev = gate.attrs.get("EVIDENCE", "").strip()
+    return gate.checked or ev not in ("", "pending") or "CONFIRMED" in gate.attrs
+
+
+def planned_refusal(ledger: Ledger):
+    """`planned`(승인·미착수)의 전제를 못 갖추면 `(거부 토큰, 이유)`, 갖추면 None.
+
+    `active → planned` 전이와 `planned` 원장의 `--status` no-op 이 **같은 정의**를 쓴다 — 손으로 `STATE: planned`
+    를 쓴 원장이 전이 전제를 건너뛰어도 no-op 이 되지 않는다.
+    """
+    if ledger.headers.get("APPROVED", "").strip().lower() != "yes":
+        return "not-approved", "확정(`--finalize`) 전 원장이다 — 승인·미착수가 아니라 draft"
+    recorded = work_records(ledger)
+    if recorded:
+        return "work-recorded", f"진행 기록이 있는 게이트 {len(recorded)}개 — {', '.join(recorded)}"
+    return None
+
+
 def resolve_cwd(gate: Gate, ledger: Ledger) -> str:
     return gate.attrs.get("CWD") or ledger.root      # 검증된 정규 경로 (헤더 원문 아님)
 
 
 def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
-    """mode: status(미실행) | run(미충족만) | reverify(전부 재실행).
+    """mode: status(미실행) | run(미충족만 — `only` 로 이름을 댄 게이트는 충족이어도 재실행) | reverify(전부 재실행).
 
     ⛔ 수명주기 가드가 **여기** 있어야 한다. 문서(modules/gates.md)가 선언한
        `STATE: closed` no-op · `FZ_GATES_OFF` kill-switch · `ROOT` 불일치 no-op 를
@@ -933,6 +991,21 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
     if ledger.state == "closed":
         print(f"{ledger.path.name}: STATE closed — no-op")
         return EXIT_OK
+    if ledger.state == PLANNED:
+        # ⛔ planned 는 **판정(`--status`, Stop hook 경로)에서만** no-op 이다. 실행은 착수다 — 착수 전 원장에
+        #    증거를 쓰면 '착수 전' 이 거짓이 된다. 그래서 실행·`--only` 는 막고 `--set-state active` 를 요구한다.
+        if mode != "status":
+            raise LedgerError(f"{ledger.path.name}: STATE planned(승인·미착수) 원장은 실행하지 않는다 — "
+                              "착수는 `--set-state active` 뒤에 (fz-code Phase 0.4)")
+        refusal = planned_refusal(ledger)
+        if refusal is None:
+            waiting = sum(1 for g in ledger.gates if gate_state(g, ledger) == "unmet")
+            print(f"{ledger.path.name}: STATE planned — 착수 전. 미충족 {waiting}건은 구현 게이트라 "
+                  "막지 않는다 (착수: --set-state active)")
+            return EXIT_OK
+        # ⛔ 전제가 깨진 planned(손편집 · 기록 뒤 STATE 만 바꿈)는 no-op 이 아니다 — active 로 판정한다
+        print(f"⚠️  {ledger.path.name}: STATE planned 인데 {refusal[1]} — 착수 전으로 볼 수 없어 active 로 판정한다",
+              file=sys.stderr)
 
     unmet, met, abandoned, deferred, ran, stamp_only = [], [], [], [], 0, 0
     started = time.monotonic()
@@ -964,11 +1037,13 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
                 print(f"  UNMET {gate.id}: {gate.title}")
             continue
 
-        if mode == "run" and state == "met":
+        # ⛔ `--only` 로 이름을 댄 게이트는 충족이어도 다시 돈다(F-330) — 고친 뒤 그 게이트를 지목한 호출이 옛 도장만
+        #    읽고 통과하면 '재실행 PASS' 로 오독한다. 떨어지면 아래 FAIL 경로가 강등 기록을 남긴다
+        if mode == "run" and state == "met" and not only:
             met.append(gate)
             # ⛔ 조용히 건너뛰지 않는다 — "ALL MET" 을 재실행으로 읽는 오독(F-330)을 막는다
             stamp_only += 1
-            print(f"  MET   {gate.id}: 기록된 증거 — 다시 돌리지 않았다(재실행은 --reverify)")
+            print(f"  MET   {gate.id}: 기록된 증거 — 다시 돌리지 않았다(재실행은 --reverify · --only <id>)")
             continue
 
         cwd = resolve_cwd(gate, ledger)
@@ -1030,7 +1105,12 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
         else:
             print(f"  FAIL  {gate.id}: {gate.title}")
             print(f"        {result.error}; output={tail(result.output)}")
-            apply_result(ledger.path, baseline, gate.id, False, "pending")
+            # ⛔ 진행 기록이 있던 게이트(이번 판정 전 met · `- [x]` · 증거 흔적 — 재승인으로 unmet 이 된 PASS 와 위조
+            #    증거 포함)가 떨어지면 `pending` 이 아니라 강등 기록을 남긴다 — `pending` 이면 미착수와 구별되지 않아 진행
+            #    기록이 사라진 원장이 `--set-state planned` 로 착수 전이 된다. 술어는 `work_records` 와 같다(흔적이지 진위가
+            #    아니다). 이미 강등된 게이트가 다시 떨어져도 기록을 지우지 않는다. 첫 실행 FAIL 은 `pending` 그대로.
+            demoted = state == "met" or has_work_record(gate)
+            apply_result(ledger.path, baseline, gate.id, False, DEMOTED_EVIDENCE if demoted else "pending")
             unmet.append(gate)
 
     total = len(targets)
@@ -1049,6 +1129,10 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
 
 
 def confirm(ledger: Ledger, gate_id: str) -> int:
+    if ledger.state == PLANNED:
+        # 확인 기록은 진행 기록이다 — 착수 전 원장에 쓰면 planned 의 전제가 깨진다
+        raise LedgerError(f"{ledger.path.name}: STATE planned(승인·미착수) 원장에는 확인을 기록하지 않는다 — "
+                          "착수는 `--set-state active` 뒤에")
     gate = next((g for g in ledger.gates if g.id == gate_id), None)
     if gate is None:
         raise InfraError(f"게이트 {gate_id} 이 원장에 없다")
@@ -1343,7 +1427,7 @@ def render_ledger(steps, root: str, scope: str, title: str) -> str:
     ⛔ 문자열 verify(구 계약)는 **manual 로 강등**한다. 자연어에서 명령을 지어내면
        제목과 무관한 oracle 이 생긴다 — 이 도구가 막으려는 실패 그 자체다.
     """
-    lines = [f"# Gates: {title}", f"ROOT: {root}", "STATE: active"]
+    lines = [f"# Gates: {title}", f"ROOT: {root}", f"STATE: {INITIAL_STATE}"]
     if scope:
         lines.append(f"Scope: {scope}")
     lines.append("")
@@ -1464,6 +1548,9 @@ def finalize(ledger: Ledger, only=None) -> int:
     ⛔ `only`(= `--finalize --only <id,…>`)는 **확정 원장 보강**이다(F-334). 사용자 결정으로 확정 뒤 게이트를
        더하거나 고치면 도장 없는 게이트가 생기는데, 헤더를 지우고 전체를 다시 찍는 우회는 **다른 게이트의 변경까지
        재승인**한다. 그래서 지정한 게이트에만 찍고, 나머지 실행 게이트는 도장이 현재 계약과 같을 때만 통과시킨다.
+
+    ⛔ **STATE 는 쓰지 않는다**(`TRANSITIONS` 위 진입 경로). 확정이 planned 를 쓰면 진행 기록이 있는 active 원장을
+       다시 확정하는 것만으로 착수 전이 된다 — `active → planned` 의 전제를 우회하는 길이다.
     """
     wanted = None
     if only is not None:
@@ -1544,18 +1631,23 @@ def finalize(ledger: Ledger, only=None) -> int:
 
 # ── --set-state (STATE 전이) ────────────────────────────────────────────
 def set_state(ledger: Ledger, target: str) -> int:
-    """STATE 를 전이한다.
+    """STATE 를 전이한다 — `TRANSITIONS` 의 간선과 그 전제로만.
 
     ⛔ **전진은 조건부, 역행은 자유.** 전진(active → ready_for_review → closed)은
        "이만큼 끝났다"는 주장이므로 증명이 필요하고, 역행은 "다시 열겠다"라 증명이 없어도 된다.
        역행을 막으면 재작업이 막힌다.
 
+    ⛔ **planned(승인·미착수)는 역행의 예외다.** `active → planned` 는 '다시 열겠다' 가 아니라 '아직 시작하지
+       않았다' 는 주장이고, 그 상태는 Stop hook 판정(`--status`)에서 no-op 이다 — 증명 없이 허용하면 진행 기록이
+       있는 원장을 미착수로 되돌려 차단을 피한다. 그래서 전제(승인 · 진행 기록 0)를 둔다. `planned → active`
+       (착수)는 완료 주장이 아니라 증명이 필요 없다.
+
     ⛔ 전진 판정은 **기록된 증거**로 한다(CHECK 미실행). 전이마다 전체 재실행은 비싸고,
        fz-code 가 Step 마다 게이트를 돌렸으므로 증거가 최신이다. 증거가 낡았다고 의심되면
        `--reverify` 를 먼저 돌리는 것이 호출자 책임이다.
     """
-    if target not in STATES:
-        raise InfraError(f"STATE 는 {'/'.join(STATES)} 중 하나 — 받은 값 {target!r}")
+    if target not in STATE_VALUES:
+        raise InfraError(f"STATE 는 {'/'.join(STATE_VALUES)} 중 하나 — 받은 값 {target!r}")
 
     # ⛔ 판정은 **디스크 최신본**으로 한다. 인자로 받은 ledger 는 호출 전 파스라
     #    그 사이 편집된 내용을 반영하지 못한다 (2026-08-24 실측: 파스 후 게이트를 unmet 으로
@@ -1566,15 +1658,22 @@ def set_state(ledger: Ledger, target: str) -> int:
         print(f"STATE 이미 {target}")
         return EXIT_OK
 
-    forward = STATES.index(target) > STATES.index(current)
-    if forward:
-        # ⛔ 인접 단계만 전진한다. active → closed 직행은 fz-review 재검증을 통째로 건너뛴다.
-        if STATES.index(target) - STATES.index(current) != 1:
-            reason = (f"⛔ {current} → {target} 거부: 인접 단계만 전진 가능 "
-                      f"(다음 단계는 {STATES[STATES.index(current) + 1]})")
-            print(reason, file=sys.stderr)
+    edge = TRANSITIONS.get((current, target))
+    if edge is None:
+        if current in STATES and target in STATES and STATES.index(target) > STATES.index(current):
+            # ⛔ 인접 단계만 전진한다. active → closed 직행은 fz-review 재검증을 통째로 건너뛴다.
+            print(f"⛔ {current} → {target} 거부: 인접 단계만 전진 가능 "
+                  f"(다음 단계는 {STATES[STATES.index(current) + 1]})", file=sys.stderr)
             print("REJECT: non-adjacent-transition")   # self-test 관측용 — 축 구분
-            return EXIT_UNMET
+        else:
+            reachable = sorted(t for (c, t) in TRANSITIONS if c == current)
+            print(f"⛔ {current} → {target} 거부: 전이표에 없는 간선 ({current} 에서 갈 수 있는 곳: "
+                  f"{', '.join(reachable)})", file=sys.stderr)
+            print("REJECT: no-edge")                   # self-test 관측용 — 축 구분
+        return EXIT_UNMET
+    premise, arrow = edge
+
+    if premise in ("all-met", "all-met-none-deferred"):
         unmet = [g.id for g in fresh.gates if gate_state(g, fresh) == "unmet"]
         if unmet:
             print(f"⛔ {current} → {target} 거부: 미충족 게이트 {len(unmet)}개 — {', '.join(unmet)}",
@@ -1582,12 +1681,19 @@ def set_state(ledger: Ledger, target: str) -> int:
             print("REJECT: unmet-gates")               # self-test 관측용 — 축 구분
             print("   (증거가 낡았으면 --reverify 후 재시도)", file=sys.stderr)
             return EXIT_UNMET
+    if premise == "all-met-none-deferred":
         waiting = [g.id for g in fresh.gates if gate_state(g, fresh) == "deferred"]
-        if target == "closed" and waiting:
+        if waiting:
             # ⛔ 미룸은 예정이다 — 닫으면 뒤 릴리즈의 수용 기준이 기록 없이 사라진다
             print(f"⛔ {current} → {target} 거부: 미룬 게이트 {len(waiting)}개 — {', '.join(waiting)} "
                   "(그 릴리즈를 마치거나 ABANDON 한다)", file=sys.stderr)
             print("REJECT: deferred-gates")             # self-test 관측용 — 축 구분
+            return EXIT_UNMET
+    if premise == "approved-no-work":
+        refusal = planned_refusal(fresh)
+        if refusal is not None:
+            print(f"⛔ {current} → {target} 거부: {refusal[1]} — 착수 전으로 되돌릴 수 없다", file=sys.stderr)
+            print(f"REJECT: {refusal[0]}")              # self-test 관측용 — 축 구분
             return EXIT_UNMET
 
     text = fresh.path.read_text(encoding="utf-8")
@@ -1604,7 +1710,6 @@ def set_state(ledger: Ledger, target: str) -> int:
     if sha(ledger.path.read_text(encoding="utf-8")) != baseline:
         raise LedgerError("전이 중 원장이 변경됨 (CAS 충돌)")
     write_atomic(ledger.path, "\n".join(out))
-    arrow = "→" if forward else "←"
     print(f"STATE: {current} {arrow} {target}")
     return EXIT_OK
 
@@ -1620,7 +1725,8 @@ def _dispatch(argv, quiet: bool = False) -> int:
                         help="이미 충족된 게이트까지 재실행 (강등 가능)")
     parser.add_argument("--confirm", metavar="GATE_ID", help="MANUAL 게이트 사용자 확인")
     parser.add_argument("--set-state", metavar="STATE",
-                        help="STATE 전이 (active|ready_for_review|closed). 전진은 전 게이트 충족 시만")
+                        help="STATE 전이 (planned|active|ready_for_review|closed). 전진은 전 게이트 충족 시만 · "
+                             "active→planned 는 승인 + 진행 기록 0 일 때만 · planned→active 는 증명 불요")
     parser.add_argument("--self-test", action="store_true", help="매니페스트 fixture 실행")
     parser.add_argument("--from-plan", metavar="PLAN_JSON",
                         help="plan steps[] 를 원장으로 변환 (--root, --out 필수)")
@@ -1815,13 +1921,17 @@ def discover(root_dir: str) -> int:
 
     이것이 hook 미설치 머신의 유일한 노출 경로다 — 배선 1~3 은 SKILL.md 산문이라
     건너뛰어도 신호가 없고, `FZ_GATES_TRACE` 는 환경변수 opt-in 이다.
+
+    ⛔ 발견한 원장을 **자르지 않고** 전부 파싱한다(F-378 — CHECK 를 돌리지 않아 수가 많아도 싸다). 읽지 못한 원장은
+       요약의 `미판정 N` 으로 센다 — 종료 코드는 그대로다(미판정도 미충족처럼 실패가 아니다. hook 의 exit 2 는 차단이고
+       health-check 는 exit 2 를 '탐색 실행 불가' 로 센다).
     """
     ledgers, note = find_ledgers(root_dir, os.environ.get(LEDGER_ENV, ""))
     if not ledgers:
         print(note or "원장 0건 (게이트 미사용)")
         return EXIT_OK
 
-    met_n, unmet_n, invalid = 0, 0, []
+    met_n, planned_n, unmet_n, invalid, undecided = 0, 0, 0, [], 0
     for path in ledgers:
         try:
             led = load(path)
@@ -1829,10 +1939,18 @@ def discover(root_dir: str) -> int:
             invalid.append(f"{path}: {e}")
             continue
         except InfraError as e:
+            # ⛔ 읽지 못한 원장도 요약 수에 든다 — 빠지면 '원장 N건' 과 내역 합이 어긋난 채 말이 없다(F-378 과 같은 축)
+            undecided += 1
             print(f"⚠️  {path}: {e}", file=sys.stderr)
             continue
         if led.state == "closed":
             met_n += 1
+            continue
+        # ⛔ 착수 전 원장은 미충족으로 세지 않되 **숨기지도 않는다** — 자기 선언 상태라 수를 늘 보인다.
+        #    전제가 깨진 planned(planned_refusal)는 아래에서 active 처럼 센다(evaluate 와 같은 규칙)
+        if led.state == PLANNED and planned_refusal(led) is None:
+            planned_n += 1
+            print(f"  착수 전 {path}")
             continue
         bad = [g.id for g in led.gates if gate_state(g, led) == "unmet"]
         if bad:
@@ -1843,7 +1961,8 @@ def discover(root_dir: str) -> int:
 
     for line in invalid:
         print(f"⛔ 계약 위반 {line}", file=sys.stderr)
-    summary = f"원장 {len(ledgers)}건 (충족·closed {met_n} · 미충족 {unmet_n} · 계약위반 {len(invalid)})"
+    summary = (f"원장 {len(ledgers)}건 (충족·closed {met_n} · 착수 전 {planned_n} · 미충족 {unmet_n} · "
+               f"계약위반 {len(invalid)} · 미판정 {undecided})")
     if note:
         summary += f" · {note}"
     print(summary)

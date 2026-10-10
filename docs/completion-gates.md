@@ -38,8 +38,8 @@ APPROVED: yes
 
 | 시점 | 하는 일 |
 |------|--------|
-| `/fz-plan` | 계획의 Step 에서 원장을 만들고, GPT 판정을 받아 확정 |
-| `/fz-code` | Step 완료 선언 전에 그 Step 게이트만 실행. 실패하면 다음 Step 으로 안 간다 |
+| `/fz-plan` | 계획의 Step 에서 원장을 만들고, GPT 판정을 받아 확정한 뒤 착수 전(`STATE: planned`)으로 남긴다 |
+| `/fz-code` | 시작할 때 착수 전 원장을 `active` 로 연다. Step 완료 선언 전에 그 Step 게이트만 실행. 실패하면 다음 Step 으로 안 간다 |
 | `/fz-review` | 기록된 증거를 믿지 않고 다시 돌린다. 통과 못 하면 체크를 푼다 |
 | 세션 종료 | 미충족 원장이 있으면 종료를 막는다 (hook 설치한 머신만) |
 | `/fz-manage check` | 원장 상태를 보여준다. hook 없는 머신의 노출 경로 |
@@ -55,6 +55,10 @@ ABANDON: S3 시각 확인은 비대화형 세션에서 불가
 ```
 
 그러면 통과로 처리되고 포기 사실이 원장에 남는다. 최종 보고에도 표면화된다. 조용히 사라지지 않는다.
+
+계획만 승인하고 구현은 시작하지 않았다면 포기가 아니다. `ABANDON` 대신 `--set-state planned` 로 착수 전을 남긴다(`/fz-plan` 이 확정 직후 이렇게 하고, `/fz-code` 가 시작할 때 `--set-state active` 로 연다). 착수 전 원장은 세션 종료를 막지 않는다.
+
+진행 기록(통과 증거 · 재실행에서 떨어진 기록 · MANUAL 확인)이 있는 원장은 착수 전으로 되돌릴 수 없다. 착수 전 원장은 판정(`--status`)에서만 통과로 보고, 실행은 `active` 로 연 뒤에 한다.
 
 세션 전체를 끄려면 환경변수를 쓴다.
 
@@ -73,6 +77,8 @@ python3 "$G" --status  {WORK_DIR}/gates/plan.md   # 파싱만, 명령 미실행
 python3 "$G" --only S1 {WORK_DIR}/gates/plan.md   # S1 게이트만 실행
 python3 "$G" --reverify {WORK_DIR}/gates/plan.md  # 통과한 것도 다시 실행
 python3 "$G" --confirm S2 {WORK_DIR}/gates/plan.md # MANUAL 확인 (터미널에서만)
+python3 "$G" --set-state planned {WORK_DIR}/gates/plan.md # 승인·미착수로 남김 (진행 기록이 있으면 거부)
+python3 "$G" --set-state active  {WORK_DIR}/gates/plan.md # 착수
 python3 "$G" --discover .                          # 하위 원장 상태 요약
 ```
 
@@ -145,7 +151,7 @@ exec python3 "$H"
 
 ```bash
 python3 --version
-python3 <플러그인>/scripts/gate_stop_hook.py --self-test   # 27/27 passed
+python3 <플러그인>/scripts/gate_stop_hook.py --self-test   # 37/37 passed
 ```
 
 ### 5. 상태 파일을 홈에 만든다
