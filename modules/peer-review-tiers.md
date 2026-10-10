@@ -60,7 +60,7 @@ CHANGED_LINES > 2000  → AskUserQuestion ($3+ 예상)
 ```bash
 # 1. Changed lines 측정 (PR 또는 branch). gh CLI는 .previous_filename (snake_case) 반환
 # ⛔ **snapshot 우선** — `gather.sh` 가 이미 `pr-meta.json` 에 `additions,deletions,files` 를
-#    한 번에 받아 저장한다(`gh pr view "$TARGET" --json baseRefName,headRefName,title,body,additions,deletions,files`).
+#    한 번에 받아 저장한다(`gh pr view "$TARGET" --json baseRefName,headRefName,title,body,additions,deletions,files,url,baseRefOid`).
 #    같은 값을 다시 받으면 네트워크 4회 + **드리프트 표면**이 늘어난다 — gather 시점과 Tier 시점
 #    사이에 force-push 가 나면 두 값이 갈린다.
 #    회귀 고정: `tests/fixtures/peer-review/tier-input-single-source/run.sh`
@@ -95,11 +95,21 @@ else
     hotfix/*)  BASE="${BASE:-main}";;
     *) BASE=$(AskUserQuestion "Base branch?");;
   esac
-  git rev-parse --verify "$BASE" >/dev/null 2>&1 || git fetch origin "$BASE" 2>/dev/null || { echo "⛔ BASE '$BASE' not found. Abort tier auto."; TIER=2; }
-  ADDED=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '$1!="-"{a+=$1} END{print a+0}')
-  DELETED=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '$2!="-"{d+=$2} END{print d+0}')
-  GENERATED_LINES=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null | awk '/(package-lock|Package\.resolved|\.pbxproj|\.lock)/ {g+=$1+$2} END{print g+0}')
-  RENAMED_LINES=$(git diff --name-status "${BASE}...${INPUT}" 2>/dev/null | awk '/^R[0-9]/ {r++} END {print r*5+0}')  # rename 1건당 ~5줄 추정
+  git rev-parse --verify "$BASE" >/dev/null 2>&1 || git fetch origin "$BASE" 2>/dev/null || { echo "⛔ BASE '$BASE' not found. Abort tier auto."; TIER=2; TIER_AUTO_BLOCKED=1; }
+  # ⛔ numstat 을 한 번 떠 git 종료 코드를 먼저 받는다(F-385). `git diff … 2>/dev/null | awk … END{print a+0}` 는
+  #    diff 실패(없는 INPUT 브랜치 등)를 변경량 0 으로 읽어 가장 낮은 Tier 로 기운다 — F-135 와 같은 클래스.
+  #    실패면 위 BASE 부재와 같이 TIER=2. 회귀: tests/fixtures/peer-review/tier-input-single-source/run.sh --cells branch
+  NUMSTAT=$(git diff --numstat "${BASE}...${INPUT}" 2>/dev/null); NUMSTAT_RC=$?
+  NAMESTAT=$(git diff --name-status "${BASE}...${INPUT}" 2>/dev/null); NAMESTAT_RC=$?
+  if [ "$NUMSTAT_RC" -ne 0 ] || [ "$NAMESTAT_RC" -ne 0 ]; then
+    echo "⛔ diff 실패 — Tier 자동 판정 불가 (git diff ${BASE}...${INPUT} exit ${NUMSTAT_RC}/${NAMESTAT_RC})"; TIER=2; TIER_AUTO_BLOCKED=1
+    ADDED=0; DELETED=0; GENERATED_LINES=0; RENAMED_LINES=0
+  else
+    ADDED=$(printf '%s\n' "$NUMSTAT" | awk '$1!="-"{a+=$1} END{print a+0}')
+    DELETED=$(printf '%s\n' "$NUMSTAT" | awk '$2!="-"{d+=$2} END{print d+0}')
+    GENERATED_LINES=$(printf '%s\n' "$NUMSTAT" | awk '/(package-lock|Package\.resolved|\.pbxproj|\.lock)/ {g+=$1+$2} END{print g+0}')
+    RENAMED_LINES=$(printf '%s\n' "$NAMESTAT" | awk '/^R[0-9]/ {r++} END {print r*5+0}')  # rename 1건당 ~5줄 추정
+  fi
 fi
 CHANGED_LINES=$((ADDED + DELETED))
 SIGNIFICANT_LINES=$((CHANGED_LINES - GENERATED_LINES))  # rename은 실 편집 가능성 있어 *차감 안 함* (보수적)
@@ -111,6 +121,9 @@ SIGNIFICANT_LINES=$((CHANGED_LINES - GENERATED_LINES))  # rename은 실 편집 �
 # 2. --tier 옵션 최우선 (precedence: --tier > Risk escalation > auto)
 if [ -n "$TIER_OPT" ]; then
   TIER=$TIER_OPT  # 사용자 명시 → 그대로. Risk escalation 적용 안 함 (precedence 모순 방지)
+elif [ -n "${TIER_AUTO_BLOCKED:-}" ]; then
+  # ⛔ 앞에서 판정 불가(BASE 부재 · diff 실패)로 TIER=2 를 세웠다 — auto 가 변경량 0 으로 TIER=0 을 덮으면 F-385 가 그대로다
+  echo "⛔ Tier 자동 판정 불가 — TIER=2 유지(auto · 위험 승격 건너뜀)"
 else
   # auto tier
   if [ $SIGNIFICANT_LINES -lt 100 ]; then TIER=0
@@ -122,7 +135,7 @@ else
     TIER=2
   fi
 
-  # Risk-based escalation (auto일 때만 적용. 6 카테고리 → cap=Tier 2)
+  # Risk-based escalation (auto일 때만 적용. 7 카테고리 → cap=Tier 2)
   # ⛔ 인라인 grep 금지 — 오탐 실측 후 스크립트로 이관 (§ 위험 판정 참조).
   #    경로는 절대경로로 해석한다. 상대 경로는 대상 레포에 파일이 없어 조용히 통과한다.
   RISK_JSON=$(python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/risk_scan.py" \
@@ -274,7 +287,7 @@ Lead 단독으로 아래 perspectives 를 검토한다 (9 perspectives 중 선�
 6. Refactoring Completeness — 리팩토링·치환·제거가 diff 에 있을 때
 7. Dependency Impact — import·DI·초기화 경로가 바뀔 때
 
-⛔ **Concurrency Safety 가 상시인 이유**: `<100줄` 이라도 `Task {}` 하나로 data race 가 생기고 크래시로 이어진다. 그런데 auto-tier 의 `RISK_PATTERN` 은 **키워드가 보일 때만** 승격시킨다 — `static let shared` + `var` 같은 **역방향 신호는 그 패턴에 없다**. 즉 키워드 없는 동시성 위험은 Tier 0 에 남고, 여기서 보지 않으면 아무도 보지 않는다.
+⛔ **Concurrency Safety 가 상시인 이유**: `<100줄` 이라도 `Task {}` 하나로 data race 가 생기고 크래시로 이어진다. 그런데 auto-tier 승격(`risk_scan.py`)은 동시성 토큰이 **순증할 때**와 역방향 신호 하나(`static let`/`static var shared` + 저장 `var` 가 같은 파일의 추가 행에 함께 — 들여쓰기 근사 · 삭제 행에도 같은 조합이 있으면 개명으로 보고 제외)만 본다. 그 밖의 키워드 없는 동시성 위험(예: `static let shared` 가 아닌 경로로 공유되는 가변 상태)은 승격 신호가 없고, `--tier` 를 명시하면 승격 자체가 돌지 않는다. 즉 그런 위험은 Tier 0 에 남고, 여기서 보지 않으면 아무도 보지 않는다.
 
 ⛔ **Level 1 과 Level 2 를 나눈다** — Level 1 은 트리거 스캔이다(공유 가변 상태·비동기 진입점·콜백 스레드를 diff 에서 훑는다). **양성일 때만** Level 2 로 올라가 `modules/safety-audit.md` 의 참조 추적·API 확인까지 수행한다. Level 2 를 상시로 두면 Lead 순차 작업이 늘어 시간 목표와 충돌한다.
 

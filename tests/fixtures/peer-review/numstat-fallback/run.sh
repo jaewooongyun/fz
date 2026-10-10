@@ -3,7 +3,7 @@
 #   ⛔ oracle 이 같은 함정을 밟으면 두 구현이 같이 틀려도 통과한다.
 # numstat_fallback.awk 회귀 판정 — patch 별 추가·삭제 행 수를 독립 구현과 대조한다.
 #
-# ⛔ 이 폴백은 PR 경로에서 **항상** 돈다(`git diff --numstat` 이 로컬 ref 부재로 실패).
+# ⛔ 이 awk 는 gather.sh 의 **유일한 numstat 출처**다(PR · 브랜치 모두 diff.patch 에서 센다 — F-135 · F-350).
 #    그런데 테스트가 0건이었고, 실제로 두 가지를 잃고 있었다:
 #      · 빈 추가 행 (`+` 단독)        — 6줄 변경을 5줄로 셌다
 #      · `++ actor` 를 추가한 행      — diff 를 담은 diff
@@ -49,16 +49,36 @@ for f in "$PATCHES"/*.patch "$HERE"/*.patch; do
   got="$(awk -f "$AWKF" "$f" | sort)"
   want="$(python3 - "$f" <<'PY'
 import sys
+
+
+def header_b(rest):
+    # awk 와 다른 방식으로 푼다 — 가운데 산술 대신 모든 공백 자리를 시도해 양쪽이 같은 경로인 자리를 찾는다.
+    for i, ch in enumerate(rest):
+        if ch != " ":
+            continue
+        a, b = rest[:i], rest[i + 1:]
+        if a == b:
+            return b
+        for pa, pb in (("a/", "b/"), ('"a/', '"b/')):
+            if a.startswith(pa) and b.startswith(pb) and a[len(pa):] == b[len(pb):]:
+                return b
+    return None
+
+
 h = False
 add, dele, order = {}, {}, []
-cur = None
+cur = hb = None
 for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
     line = line.rstrip("\n")
     if line.startswith("diff --git "):
         h = False
+        hb = header_b(line[len("diff --git "):])
         continue
     if not h and line.startswith("+++ "):
-        cur = line.split()[1]
+        # ⛔ 삭제 파일은 `+++ /dev/null` — 경로는 `diff --git` 헤더에만 남는다(F-381). 공백 경로는 `split()` 이 자르므로 줄 끝 탭만 뗀다
+        cur = line[4:-1] if line.endswith("\t") else line[4:]
+        if cur == "/dev/null" and hb:
+            cur = hb
         if cur not in order:
             order.append(cur)
         continue
@@ -95,6 +115,29 @@ pin() {
 pin "$PATCHES/positive-hunk-plus-no-loss.patch" 2   # `++ actor` 를 잃으면 1
 pin "$PATCHES/positive-concurrency.patch" 6         # 빈 추가 행을 잃으면 5
 pin "$TMPD/blank-and-delete-only.patch" 3           # 빈 행 2개 포함
+
+# ⛔ 경로 못박기 — 삭제 파일 행이 **실제 경로**로 귀속되는가(F-381 · E1-17 이 risk-scan 에 넣은 삭제 patch).
+#    awk 와 oracle 이 같이 '/dev/null' 로 키잉하면 위 대조는 합계만 맞은 채 통과한다 — 정답 출력을 통째로 고정한다.
+pin_rows() {
+  local patch="$1" expect="$2"
+  local got; got="$(awk -f "$AWKF" "$patch" | LC_ALL=C sort | tr '\n' ';')"
+  if [ "$got" = "$expect" ]; then echo "PASS  경로: $(basename "$patch" .patch) [$got]"
+  else echo "FAIL  경로: $(basename "$patch" .patch) 기대 [$expect], 실제 [$got]"; fail=$((fail+1)); fi
+}
+T=$'\t'
+pin_rows "$PATCHES/negative-deleted-file-path.patch" "0${T}5${T}b/Sources/Legacy Cache.swift;"
+pin_rows "$PATCHES/negative-deleted-files-and-doc.patch" "0${T}1${T}b/Sources/OldA.swift;0${T}1${T}b/Sources/OldB.swift;0${T}2${T}b/CHANGELOG-old.md;1${T}1${T}b/Sources/Keep.swift;"
+pin_rows "$PATCHES/positive-deleted-doc-unmasks-netnew.patch" "0${T}2${T}b/docs/auth-notes.md;3${T}0${T}b/Sources/Login.swift;"
+pin_rows "$PATCHES/negative-rename-file-pair.patch" "1${T}1${T}b/Sources/NewName.swift;"
+pin_rows "$PATCHES/negative-binary-delete-add.patch" ""      # 바이너리는 hunk 행이 없다 — 0줄(git --numstat 은 `-` 행, 합계는 같다)
+# '/dev/null' 키는 어느 patch 에서도 나오지 않아야 한다(헤더를 못 푸는 patch 가 생기면 여기서 드러난다)
+dn=""
+for f in "$PATCHES"/*.patch "$HERE"/*.patch "$TMPD"/*.patch; do
+  [ -f "$f" ] || continue
+  awk -f "$AWKF" "$f" | awk -F'\t' '$3=="/dev/null"{found=1} END{exit !found}' && dn="$dn $(basename "$f" .patch)"
+done
+if [ -z "$dn" ]; then echo "PASS  경로: '/dev/null' 키 0건 (전 patch)"
+else echo "FAIL  경로: '/dev/null' 키가 남았다 —$dn"; fail=$((fail+1)); fi
 
 echo
 echo "$fail 건 실패"
