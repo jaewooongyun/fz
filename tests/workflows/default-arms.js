@@ -38,7 +38,7 @@ function fromLedger(ledger, arm) {
   } catch (e) {
     if (e.status === 1) return { value: 'off', exit: 1 }
     if (e.status === 2) return { value: '판정 불가', exit: 2 }
-    throw new Error(`판정기를 부르지 못했다 — ${e.message.split('\n')[0]}`)
+    throw Object.assign(new Error(`판정기를 부르지 못했다 — ${e.message.split('\n')[0]}`), { unrun: true })
   }
 }
 
@@ -83,4 +83,9 @@ async function actual(wf) {
   }
   console.log(`\n기본 arm ${fail ? '불일치 ' + fail + '건' : '전건 일치'}${ledger ? ' (원장 대조)' : ' (결정 표 대조)'}`)
   process.exit(fail ? 1 : 0)
-})().catch(e => { console.log(`UNRUN  ${e.message}`); process.exit(2) })
+// ⛔ exit 2 는 머리말 계약(판정기를 부를 수 없음)일 때만이다 — 워크플로 실행 중 예외까지 UNRUN 으로 내보내면
+//    health-check 3분 판정(UNRUN 표지 exit 2 = 미실행)이 crash 를 미실행으로 센다
+})().catch(e => {
+  if (e.unrun) { console.log(`UNRUN  ${e.message}`); process.exit(2) }
+  console.log(`FAIL  실행 오류 — ${e.message}`); process.exit(1)
+})

@@ -40,6 +40,31 @@ done
 NAMES=() CODES=() NOTES=()
 UNRUN=0     # 실행되지 못한 검사 수 — ⛔ 0이 아니면 "전 검사 통과"라 말하지 않는다
 record() { NAMES+=("$1"); CODES+=("$2"); NOTES+=("$3"); }
+# ⛔ 3분 판정 (F-335 ⑬): exit 2 이면서 줄 맨 앞 `UNRUN` 표지가 있을 때만 미실행이다. 표지 없는 exit 2 와
+#    traceback 은 실패다 — 검사기가 죽은 것을 미실행으로 세탁하지 않는다. 이전 판은 이분(0 · 그 외 1)이라
+#    검사기가 정의한 측정 불가(exit 2 · `UNRUN:`)까지 실패로 적었다.
+# return: 0 통과 · 1 실패 · 2 미실행
+classify() {
+  [ "$1" -eq 0 ] && return 0
+  [ "$1" -eq 2 ] || return 1
+  printf '%s\n' "$2" | grep -qF 'Traceback (most recent call last)' && return 1
+  printf '%s\n' "$2" | grep -qE '^UNRUN[: ]' && return 2
+  return 1
+}
+# record3 <이름> <exit> <출력> <통과 비고> <실패 비고> — classify 결과대로 기록한다(미실행은 UNRUN 을 센다)
+record3() {
+  classify "$2" "$3"
+  case $? in
+    0) record "$1" 0 "$4" ;;
+    2) UNRUN=$((UNRUN + 1))
+       record "$1" UNRUN "미실행 — $(printf '%s\n' "$3" | grep -E '^UNRUN[: ]' | head -1) (⛔ PASS 아님)" ;;
+    *) local why=""
+       if [ "$2" -eq 2 ]; then
+         printf '%s\n' "$3" | grep -qF 'Traceback (most recent call last)' && why=' · exit 2 + traceback — 실패로 센다' || why=' · UNRUN 표지 없는 exit 2 — 실패로 센다'
+       fi
+       record "$1" 1 "$5$why" ;;
+  esac
+}
 
 echo "══════════════════════════════════════════════════════════════"
 echo "fz 건강 체크 — root $ROOT"
@@ -217,6 +242,27 @@ case "$CF_CODE" in
      record "gpt 플래그 호환성" UNRUN "미실행 — GPT CLI 부재·help 파싱 실패 (⛔ PASS 아님)" ;;
 esac
 
+# ── 4.5b GPT 스킬 링크 stale (경고 전용 — F-353)
+# ⛔ 신설 근거: 플러그인 업데이트는 setup 을 다시 돌리지 않는다 — 옛 setup 이 남긴 이 플러그인 Claude 스킬 링크·끊어진 소유 링크가
+#    사용자 스킬 폴더에 그대로 남아도 알릴 경로가 없었다(실측 22개). 점검은 읽기 전용 `setup-gpt-skills.sh --check` 가 맡는다.
+# ⛔ 실패가 아니다 — 대상은 이 트리가 아니라 사용자 홈 상태다(§4.8 과 같은 클래스). 그래서 record 는 늘 0 이고 비고만 다르다:
+#    stale 이면 건수·이름과 정리 명령, 점검이 정해진 요약 줄 없이 끝나면 판정 불가(⛔ 깨끗하다는 뜻이 아니다).
+#    스크립트 자체의 판정은 §4.6 회귀 오라클의 setup-links 셀이 임시 홈에서 본다.
+# ⛔ 판정 불가도 record 0(경고) 이다 — 계획 문언 '경고 행(FAIL 아님)'. 대상이 사용자 홈이라 UNRUN 으로 올리면 이 트리와 무관하게
+#    health-check 가 exit 2 가 된다. 스크립트가 깨진 경우는 setup-links 셀이 실패로 잡는다. 소유 판정 불가 링크(unknown)는 건수만 비고에.
+SL_OUT="$(bash "$ROOT/scripts/setup-gpt-skills.sh" --check 2>&1)"; SL_CODE=$?
+SL_N="$(printf '%s\n' "$SL_OUT" | grep -E '^Check: [0-9]+ stale' | tail -1 | grep -oE '[0-9]+' | head -1)"
+SL_U="$(printf '%s\n' "$SL_OUT" | grep -c '^  unknown: ')"; SL_UN=""; [ "$SL_U" -gt 0 ] && SL_UN=" · ⚠️ 소유 판정 불가 ${SL_U}건(끊긴 링크 — setup 이 보존)"
+if [ "$SL_CODE" -eq 0 ] && [ "${SL_N:-x}" = 0 ]; then
+  record "GPT 스킬 링크" 0 "stale 0건${SL_UN}"
+elif [ "$SL_CODE" -eq 1 ] && [ "${SL_N:-0}" -gt 0 ]; then
+  SL_NAMES="$(printf '%s\n' "$SL_OUT" | sed -n 's/^  stale: \([^ ]*\) .*/\1/p' | head -3 | tr '\n' ' ')"
+  [ "$SL_N" -gt 3 ] && SL_NAMES="${SL_NAMES}…"
+  record "GPT 스킬 링크" 0 "⚠️ stale ${SL_N}건 (${SL_NAMES% })${SL_UN} — 정리: bash scripts/setup-gpt-skills.sh (경고 — exit 에 미반영)"
+else
+  record "GPT 스킬 링크" 0 "⚠️ 점검 판정 불가 exit $SL_CODE — $(printf '%s\n' "$SL_OUT" | tail -1) (⛔ 깨끗하다는 뜻 아님 · exit 에 미반영)"
+fi
+
 # ── 4.6 회귀 오라클 실행 (tests/) ─────────────────────────────────
 # ⛔ 신설 근거: 오라클이 **아무 자동 경로에도 없었다**. `tests/workflows/*.js` 3종 중
 #    참조 1곳(s2-cross-merge)뿐이고 d6·s2-stage2-trigger 는 0곳, `tests/fixtures/*/run.sh`
@@ -225,25 +271,37 @@ esac
 # ⛔ 러너를 **0개 발견**한 경우는 PASS 가 아니라 미실행이다: 경로 오타·디렉터리 이동이
 #    "전건 통과" 로 인쇄되는 것이 정확히 막으려는 실패다(0건은 측정 실패를 먼저 의심).
 if command -v node >/dev/null 2>&1; then
-  T_TOTAL=0 T_FAIL=0 T_BAD=""
+  T_TOTAL=0 T_FAIL=0 T_BAD="" T_UN=0 T_UNLIST=""
+  # 러너 하나를 3분 판정한다 — 출력을 버리면 UNRUN 표지를 볼 수 없다(F-335 ⑬)
+  t_one() {
+    T_TOTAL=$((T_TOTAL + 1))
+    classify "$1" "$2"
+    case $? in
+      0) ;;
+      2) T_UN=$((T_UN + 1)); T_UNLIST="$T_UNLIST $3" ;;
+      *) T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $3" ;;
+    esac
+  }
   # tests/lib/*.test.js — 라이브러리(가짜 런타임 로더)의 테스트. 라이브러리 파일 자체는 이 글롭 밖이다
   for f in "$ROOT"/tests/workflows/*.js "$ROOT"/tests/lib/*.test.js; do
     [ -f "$f" ] || continue
-    T_TOTAL=$((T_TOTAL + 1))
-    (cd "$ROOT" && node "$f" >/dev/null 2>&1) || { T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $(basename "$f")"; }
+    t_out="$(cd "$ROOT" && node "$f" 2>&1)"; t_one $? "$t_out" "$(basename "$f")"
   done
   for r in "$ROOT"/tests/fixtures/*/*/run.sh; do
     [ -f "$r" ] || continue
-    T_TOTAL=$((T_TOTAL + 1))
-    (cd "$ROOT" && bash "$r" >/dev/null 2>&1) || { T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $(basename "$(dirname "$r")")"; }
+    t_out="$(cd "$ROOT" && bash "$r" 2>&1)"; t_one $? "$t_out" "$(basename "$(dirname "$r")")"
   done
+  # ⛔ 실패와 미실행이 함께 있으면 둘 다 보고한다 — 한 행은 ⛔ 와 ⏸ 를 함께 표시할 수 없어 미실행 행을 따로 둔다
   if [ "$T_TOTAL" -eq 0 ]; then
     UNRUN=$((UNRUN + 1))
     record "회귀 오라클" UNRUN "미실행 — 러너 0개 발견 (경로 오타 의심, ⛔ PASS 아님)"
-  elif [ "$T_FAIL" -eq 0 ]; then
-    record "회귀 오라클" 0 "${T_TOTAL}개 전건 통과"
   else
-    record "회귀 오라클" 1 "⛔ ${T_FAIL}/${T_TOTAL} 실패 —$T_BAD"
+    [ "$T_FAIL" -gt 0 ] && record "회귀 오라클" 1 "⛔ ${T_FAIL}/${T_TOTAL} 실패 —$T_BAD"
+    if [ "$T_UN" -gt 0 ]; then
+      UNRUN=$((UNRUN + 1))
+      record "회귀 오라클 미실행" UNRUN "UNRUN 표지 exit 2 ${T_UN}/${T_TOTAL} —$T_UNLIST · 통과 $((T_TOTAL - T_FAIL - T_UN)) (⛔ PASS 아님)"
+    fi
+    [ "$T_FAIL" -eq 0 ] && [ "$T_UN" -eq 0 ] && record "회귀 오라클" 0 "${T_TOTAL}개 전건 통과"
   fi
 else
   UNRUN=$((UNRUN + 1))
@@ -389,100 +447,80 @@ fi
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
 for FS in check_release_notes eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
-  if [ "$FS_CODE" -eq 0 ]; then
-    record "레지스트리 도구 self-test ($FS)" 0 "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)"
-  else
-    record "레지스트리 도구 self-test ($FS)" 1 "⛔ $(printf '%s\n' "$FS_OUT" | grep -E 'FAIL|self-test' | tail -1)"
-  fi
+  record3 "레지스트리 도구 self-test ($FS)" "$FS_CODE" "$FS_OUT" \
+    "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)" \
+    "⛔ $(printf '%s\n' "$FS_OUT" | grep -E 'FAIL|self-test' | tail -1)"
 done
 
 # ── Workflow 계측기 self-test (B6/S5) ─────────────────────────
 # ⛔ 12케이스가 통합 검사에서 **한 번도 돌지 않았다**(§4.9 가 경고한 비대칭 그대로).
 #    `--mcp-audit` 3분 판정도 여기서만 회귀가 잡힌다.
 WM="$(cd "$ROOT" && python3 scripts/fz_wf_metrics.py --self-test 2>&1)"; WM_CODE=$?
-if [ "$WM_CODE" -eq 0 ]; then
-  record "Workflow 계측기 self-test" 0 "$(printf '%s\n' "$WM" | grep -E 'SELFTEST_OK' | tail -1)"
-else
-  record "Workflow 계측기 self-test" 1 "⛔ $(printf '%s\n' "$WM" | grep -E 'FAIL|self-test' | tail -1)"
-fi
+record3 "Workflow 계측기 self-test" "$WM_CODE" "$WM" \
+  "$(printf '%s\n' "$WM" | grep -E 'SELFTEST_OK' | tail -1)" \
+  "⛔ $(printf '%s\n' "$WM" | grep -E 'FAIL|self-test' | tail -1)"
 
 # ── Workflow 실패 처방 표 계약 (C2) ───────────────────────────
 # ⛔ self-test 와 별도로 **실제 표**를 검사한다 — self-test 는 검사기가 살아 있는지만 본다.
 FT="$(cd "$ROOT" && python3 scripts/check_failure_table.py 2>&1)"; FT_CODE=$?
-if [ "$FT_CODE" -eq 0 ]; then
-  record "실패 처방 표 계약" 0 "$(printf '%s\n' "$FT" | grep -E 'expected=' | tail -1)"
-else
-  record "실패 처방 표 계약" 1 "⛔ $(printf '%s\n' "$FT" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
-fi
+record3 "실패 처방 표 계약" "$FT_CODE" "$FT" \
+  "$(printf '%s\n' "$FT" | grep -E 'expected=' | tail -1)" \
+  "⛔ $(printf '%s\n' "$FT" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
 
 # ── plan 계약 왕복 (B14 / SC1~SC2) ────────────────────────────
 # ⛔ **파일 존재는 계약 복구의 증거가 아니다.** v7 의 done 판정 오라클이
 #    `plan_integrity_check.py` **존재**였고, 그것은 왕복이 도는지를 말해주지 않는다.
 #    이 검사기는 self-test 가 있는데 통합 검사에서 **한 번도 돌지 않았다**(실측 0건 참조).
 PI="$(cd "$ROOT" && python3 scripts/plan_integrity_check.py --self-test tests/fixtures/plan-integrity 2>&1)"; PI_CODE=$?
-if [ "$PI_CODE" -eq 0 ]; then
-  record "plan 계약 왕복" 0 "$(printf '%s\n' "$PI" | grep -E 'INTEGRITY_SELFTEST_OK' | tail -1)"
-else
-  record "plan 계약 왕복" 1 "⛔ $(printf '%s\n' "$PI" | grep -E 'FAIL|SELFTEST' | tail -1)"
-fi
+record3 "plan 계약 왕복" "$PI_CODE" "$PI" \
+  "$(printf '%s\n' "$PI" | grep -E 'INTEGRITY_SELFTEST_OK' | tail -1)" \
+  "⛔ $(printf '%s\n' "$PI" | grep -E 'FAIL|SELFTEST' | tail -1)"
 
 # ── 단일 출처 계약 (C4) ───────────────────────────────────────
 # ⛔ 정수 단언이다 — "있다/없다" 는 두 벌로 늘어난 것을 놓친다.
 SS="$(cd "$ROOT" && python3 scripts/check_single_source.py 2>&1)"; SS_CODE=$?
-if [ "$SS_CODE" -eq 0 ]; then
-  record "단일 출처 계약" 0 "$(printf '%s\n' "$SS" | grep -E 'canonical=' | tail -1)"
-else
-  record "단일 출처 계약" 1 "⛔ $(printf '%s\n' "$SS" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
-fi
+record3 "단일 출처 계약" "$SS_CODE" "$SS" \
+  "$(printf '%s\n' "$SS" | grep -E 'canonical=' | tail -1)" \
+  "⛔ $(printf '%s\n' "$SS" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
 
 # ── 워크플로 advisor 억제 계약 (A-ADV) ─────────────────────────
 # ⛔ 워커는 세션 advisorModel 을 상속하고 끌 수단이 없다 — OVERRIDE 상수의 금지 문구가 유일한 억제다.
 #    파일 단위가 아니라 OVERRIDE **블록 단위**로 본다(주석·다른 문자열은 워커에게 안 실린다).
 AB="$(cd "$ROOT" && python3 scripts/check_wf_advisor_ban.py 2>&1)"; AB_CODE=$?
-if [ "$AB_CODE" -eq 0 ]; then
-  record "워크플로 advisor 억제" 0 "$(printf '%s\n' "$AB" | grep -E '^advisor-ban' | tail -1)"
-else
-  record "워크플로 advisor 억제" 1 "⛔ $(printf '%s\n' "$AB" | grep -E 'VIOLATION|UNRUN' | head -1)"
-fi
+record3 "워크플로 advisor 억제" "$AB_CODE" "$AB" \
+  "$(printf '%s\n' "$AB" | grep -E '^advisor-ban' | tail -1)" \
+  "⛔ $(printf '%s\n' "$AB" | grep -E 'VIOLATION|UNRUN' | head -1)"
 
 # ── GPT 표면 계약 (Track C) ──────────────────────────────────
 # ⛔ 보존 규칙 밖 옛 CLI 호칭(Track C)의 **재유입**을 막는다. 허용은 범주 토큰 + `tests/fixtures/gpt-surface-keep.tsv` 뿐이다.
 GS="$(cd "$ROOT" && python3 scripts/check_gpt_surface.py 2>&1)"; GS_CODE=$?
-if [ "$GS_CODE" -eq 0 ]; then
-  record "GPT 표면 계약" 0 "$(printf '%s\n' "$GS" | grep -E '^gpt-surface' | tail -1)"
-else
-  record "GPT 표면 계약" 1 "⛔ $(printf '%s\n' "$GS" | grep -E 'VIOLATION|UNRUN' | head -1)"
-fi
+record3 "GPT 표면 계약" "$GS_CODE" "$GS" \
+  "$(printf '%s\n' "$GS" | grep -E '^gpt-surface' | tail -1)" \
+  "⛔ $(printf '%s\n' "$GS" | grep -E 'VIOLATION|UNRUN' | head -1)"
 
 # ── GPT 스킬 이식성 (S12 · AC-3) ─────────────────────────────
 # ⛔ 번들 GPT 스킬이 특정 프레임워크·작성자 관례를 보편 규칙으로 박지 않는다 — 규칙은 런타임 추출, 스택 지식은 조건부 팩.
 GP="$(cd "$ROOT" && python3 scripts/check_gpt_skill_portability.py 2>&1)"; GP_CODE=$?
-if [ "$GP_CODE" -eq 0 ]; then
-  record "GPT 스킬 이식성" 0 "$(printf '%s\n' "$GP" | grep -E '^gpt-skill-portability' | tail -1)"
-else
-  record "GPT 스킬 이식성" 1 "⛔ $(printf '%s\n' "$GP" | grep -E 'VIOLATION|UNRUN' | head -1)"
-fi
+record3 "GPT 스킬 이식성" "$GP_CODE" "$GP" \
+  "$(printf '%s\n' "$GP" | grep -E '^gpt-skill-portability' | tail -1)" \
+  "⛔ $(printf '%s\n' "$GP" | grep -E 'VIOLATION|UNRUN' | head -1)"
 
 # ── 릴리즈 동기 검사기 self-test (B1/S7) ──────────────────────
 # ⛔ **`--self-test` 만 부른다.** 기본·`--release` 모드는 health-check 를 **자기가 호출하므로**
 #    여기서 부르면 무한 재귀가 된다. self-test 경로는 그보다 앞에서 exit 하므로 안전하다.
 RS="$(cd "$ROOT" && bash scripts/check_release_sync.sh --self-test 2>&1)"; RS_CODE=$?
-if [ "$RS_CODE" -eq 0 ]; then
-  record "릴리즈 동기 self-test" 0 "$(printf '%s\n' "$RS" | grep -E '^self-test' | tail -1)"
-else
-  record "릴리즈 동기 self-test" 1 "⛔ $(printf '%s\n' "$RS" | grep -E 'FAIL|self-test|픽스처' | tail -1)"
-fi
+record3 "릴리즈 동기 self-test" "$RS_CODE" "$RS" \
+  "$(printf '%s\n' "$RS" | grep -E '^self-test' | tail -1)" \
+  "⛔ $(printf '%s\n' "$RS" | grep -E 'FAIL|self-test|픽스처' | tail -1)"
 
 # ── 4.10 baseline 기준점 (B15) ────────────────────────────────
 # ⛔ self-test 만 돌린다. `--verify` 를 여기 넣으면 **트리를 고칠 때마다 빨개진다** —
 #    baseline 은 "바뀌면 안 되는 것" 이 아니라 "무엇과 비교하는지" 의 기준점이다
 #    (§3 freshness·§4.8 부하추세와 같은 클래스). 실제 대조는 감량·측정 작업이 명시적으로 부른다.
 FB="$(cd "$ROOT" && python3 scripts/freeze_baseline.py --self-test 2>&1)"; FB_CODE=$?
-if [ "$FB_CODE" -eq 0 ]; then
-  record "baseline 동결기 self-test" 0 "$(printf '%s\n' "$FB" | grep -E '^self-test' | tail -1)"
-else
-  record "baseline 동결기 self-test" 1 "⛔ $(printf '%s\n' "$FB" | grep -E 'FAIL|self-test' | tail -1)"
-fi
+record3 "baseline 동결기 self-test" "$FB_CODE" "$FB" \
+  "$(printf '%s\n' "$FB" | grep -E '^self-test' | tail -1)" \
+  "⛔ $(printf '%s\n' "$FB" | grep -E 'FAIL|self-test' | tail -1)"
 if [ -f "$ROOT/tests/fixtures/baseline-manifest.json" ]; then
   record "baseline manifest 실재" 0 "$(python3 -c "
 import json;d=json.load(open('$ROOT/tests/fixtures/baseline-manifest.json'))

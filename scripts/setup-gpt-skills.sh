@@ -11,17 +11,23 @@
 # 소유 = 링크 대상 `<루트>/(skills|gpt-skills)/<이름>` 의 루트가 이 플러그인 루트이거나, 루트 매니페스트 name 이 같다
 #   (같은 name 의 포크·구버전 캐시는 같은 플러그인 계열로 본다). 루트가 사라져 판정할 수 없으면 보존한다.
 #
-# Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh [--gpt-agents]
+# Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh [--gpt-agents] [--check]
 #   --gpt-agents  GPT 역할 파일(gpt-agents/*.toml — 독립 리뷰의 렌즈 역할)도 ${CODEX_HOME:-~/.codex}/agents 에 링크한다.
 #                 opt-in 이다 — 없으면 agents 폴더를 건드리지 않는다. 역할 파일 형식 실측: probe/p2 ①②(S11)
+#   --check       읽기 전용 점검 — 아래 두 prune 판정에 걸리는 stale 링크를 `  stale: <이름> …` 줄로 나열만 한다.
+#                 판정은 `Check: N stale` 요약 줄로 한다 — 그 줄 없이 끝난 exit 1 은 stale 이 아니라 준비 오류(매니페스트 · gpt-skills 없음)다.
+#                 소유를 판정할 수 없는 끊긴 `fz-*` 링크(setup 의 'keep: … 소유 판정 불가')는 `  unknown: <이름> …` 줄로 따로 낸다(stale 아님).
+#                 스킬 폴더만 보고(--gpt-agents 는 무시) 아무것도 만들거나 지우지 않는다. exit: 0 = stale 0 · 1 = stale 있음
 
 set -euo pipefail
 
 WITH_AGENTS=0
+CHECK=0
 for a in "$@"; do
   case "$a" in
     --gpt-agents) WITH_AGENTS=1 ;;
-    *) echo "Error: unknown option: $a (usage: setup-gpt-skills.sh [--gpt-agents])"; exit 1 ;;
+    --check) CHECK=1; export PYTHONDONTWRITEBYTECODE=1 ;;   # 읽기 전용 — 시스템 python3 가 $HOME/Library/Caches 에 바이트코드를 쓰지 않게
+    *) echo "Error: unknown option: $a (usage: setup-gpt-skills.sh [--gpt-agents] [--check])"; exit 1 ;;
   esac
 done
 
@@ -77,6 +83,39 @@ if [ -z "$SELF_NAME" ]; then
 fi
 if [ ! -d "$GPT_SOURCE_DIR" ]; then
   echo "Error: skill directory not found at $GPT_SOURCE_DIR"
+  exit 1
+fi
+
+# ── --check: 읽기 전용 점검 — ⛔ mkdir -p 앞에서 끝낸다(스킬 폴더가 없으면 만들지 않고 stale 0 이다)
+#    stale = 아래 prune ① · ② 의 판정(같은 norm · owned_under)에 걸리는 링크다. 그래서 정리(인자 없는 실행) 뒤 다시 보면 0 이다.
+# ⛔ 비교 기준은 링크 대상의 설치 루트다 — 루트 매니페스트 name 으로 소유를 본다. 이 실행 트리 경로와 같은지는 보지 않는다:
+#    그렇게 보면 dev 트리·격리 clone 에서 돌릴 때 설치본을 가리키는 정상 GPT 스킬 링크가 전부 stale 로 보인다(트리마다 결과가 달라진다).
+#    같은 이유로 살아 있는 다른 판의 GPT 스킬 링크(인자 없는 실행이 이 판으로 다시 거는 것)와 아직 링크되지 않은 스킬은 내지 않는다.
+if [ "$CHECK" -eq 1 ]; then
+  stale=0; unknown=0
+  for link in "$TARGET_DIR"/*; do
+    [ -L "$link" ] || continue
+    name="$(basename "$link")"
+    dest="$(norm "$(readlink "$link")")"
+    if owned_under "$dest" skills; then
+      echo "  stale: $name (Claude skill link -> $dest)"                 # prune ① 대상
+    else
+      case "$name" in fz-*) ;; *) continue ;; esac
+      [ -e "$link" ] && continue
+      if ! owned_under "$dest" gpt-skills; then                               # prune ② 의 keep — 판정 불가는 stale 이 아니다
+        echo "  unknown: $name (dangling — 소유 판정 불가 -> $dest)"
+        unknown=$((unknown + 1)); continue
+      fi
+      echo "  stale: $name (dangling -> $dest)"                          # prune ② 대상
+    fi
+    stale=$((stale + 1))
+  done
+  note=""; [ "$unknown" -gt 0 ] && note=" · 판정 불가 $unknown"
+  if [ "$stale" -eq 0 ]; then
+    echo "Check: 0 stale in $TARGET_DIR$note"
+    exit 0
+  fi
+  echo "Check: $stale stale in $TARGET_DIR$note — 정리: bash $PLUGIN_DIR/scripts/setup-gpt-skills.sh"
   exit 1
 fi
 
