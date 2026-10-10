@@ -3,7 +3,7 @@
 #
 # ⛔ 실제 GPT CLI · 사용자 홈을 건드리지 않는다 — PATH 앞에 shim, HOME 은 셀마다 임시 "실제 홈"(그 아래 인증 파일 · config).
 #    rollout 은 shim 이 FZ_SHIM_ROLLOUT 으로 격리 홈에 넣는다 — deny 경로는 그 임시 홈의 realpath 로 만든다.
-# ⛔ 실제 샌드박스 강제는 여기서 보지 않는다(가짜 CLI 라 강제가 없다) — probe/p2-agent-roles.md ⑦ · ⑩ 실측이 그 근거다.
+# ⛔ 실제 샌드박스 강제는 여기서 보지 않는다(가짜 CLI 라 강제가 없다) — 실 GPT CLI 로 재는 것은 tests/fixtures/gpt/os-deny/external.sh(게이트 전용 · 모델 호출 없음)다.
 # ⛔ Lead 세션의 GPT 모델·effort 선택이 argv 로 새지 않게 run() 은 env -u FZ_GPT_CHOICE_DIR · 고정 세션 id 로 돈다(CSID=… 로 셀마다 바꾼다) —
 #    런처가 선택 폴더를 임시 "실제 홈" 아래(.fz/gpt-choice)로 정하고, 선택 파일은 ⑫ 선택 셀의 세션 id 에만 둔다.
 # ⛔ FZ_GPT_INDEPENDENT_UNDER_TEST 로 기준 트리의 런처를 같은 러너로 돌린다 — 기준 런처(effort 기본값 · 선택 폴더 미전달 · effort 줄 미복사 ·
