@@ -1,11 +1,38 @@
 # Changelog
 
+### v4.45.0 (2026-10-10) — 원장 · Stop 훅 · 계측기가 한데 뭉쳐 읽던 상태를 나눴다 [MINOR]
+
+R-E2 — fz 개선 계획(2026-10-07)의 둘째 판이다. 게이트 원장 · Stop 훅 · A/B 계측기가 서로 다른 상태를 하나로 읽던 자리를 나눴다 —
+승인만 된 원장(`planned`) · 판정기로 원장을 고친 세션의 소유 · 결과 없는 advisor 호출 · 실패와 재개 시도 · 질문형 요청. 게이트 원장 하나(20 게이트 —
+계획 밖 삽입 E2-9d 포함)로 Step 마다 후보 트리와 기준 트리(f500bc9)를 대조했다. 17건을 닫는다. 이 판에서 생긴 F-421 ~ F-429(F-424 · F-425 는 비어 있다)와
+F-199 · F-400 · F-404 · F-422 는 열어 둔다. 기본 동작이 바뀐 곳은 릴리즈 노트 '쓰는 쪽에서 달라지는 점' 에 모았다.
+
+| ID | 판정 | 근거 | 검증 절차 |
+|---|---|---|---|
+| F-158 | 흡수 — F-182 처방에 흡수(사용자 결정 DG-14=delete) | E2-6: 호출 직전 WORK_DIR 복사 + cmp 가 우회 계약을 기본 경로로 | 게이트 E2-6 — copy-cmp 9/9 SITE-OK |
+| F-159 | 해결 — F-190 과 같은 처방 | E2-1: planned 상태 · fz-plan --set-state planned | 게이트 E2-1 — approved-unstarted 셀 훅 통과 |
+| F-161 | 해결 — advisor 에러표 행을 측정과 맞게 다시 썼다 | E2-11 · E2-11b: '3분 무진행' 0 · 수치 원천 일치 · 결론 유지 | 게이트 E2-11b · manual E2-11 |
+| F-164 | 해결 — 정본 호출 경로 둘 | gpt-exec.sh 는 7a87bac(v4.33.0) · Workflow scriptPath 는 E2-6 | 게이트 E2-6 · 사후 노트 키 줄 |
+| F-182 | 해결 — 스킬이 플러그인 루트 scriptPath 를 직접 부르지 않는다 | E2-6: 9사이트 복사 + cmp · §12 0단계 준비 | 게이트 E2-6 — 오라클 grep 후보 0 · 기준 1 |
+| F-190 | 해결 — STATE planned 와 명시 전이표 | E2-1: 전이표 · fz-code Phase 0.4 --set-state active · 훅 사유 셋째 선택지 | 게이트 E2-1 — planned-state 후보 0 · 기준 1 |
+| F-330 | 해결 — --only 가 충족 게이트를 다시 돌린다(DG-3=b) | E2-5: evaluate 한 줄 · gates.md '--only' 절 | manual E2-5 — only-rerun 후보 7/7 · 기준 1 |
+| F-335 | 해결(범위 명시) — v4.40.0 리뷰 미룸 항목 | E2-7 · E2-9 · E2-9d: ab_ledger 분할 · CRITERIA · CollectSpec 등. ⑫ 는 형식 · 소비자, ⑧ 은 --formal 까지(나머지 F-428) | 게이트 E2-7 · E2-9 · E2-9d — structure-d 24/24 · 기준 8/24 |
+| F-358 | 해결 — 외부 형식 파서 실표본 재생 러너 | E2-10: rollout · transcript · journal 재생 · fz-commit 검증 목록 | 게이트 E2-10 — 후보 5/5 · 기준 1 |
+| F-359 | 해결(범위 명시) — 릴리스 경계 규칙을 문서로(DG-2=doc) | E2-4: gates.md '릴리스 경계' 규칙 셋 · 단일 판 원장 예외 | manual E2-4 |
+| F-361 | 해결 — f-string argv 끝점 · 옮긴 GPT 로그 · 여러 GPT 호출 | E2-7: 수집기 차분 · recollect 악화 exit 1 · E2-13 재채점 | 게이트 E2-7 · manual E2-13 — 의도 밖 차이 0 |
+| F-376 | 해결(범위 명시) — 대리 판정 철회 · F-199 재개방 | E2-6: F-199 open · 행동 오라클을 F-199 로 이관 | 게이트 E2-6 — 효력 주장 줄 0 |
+| F-377 | 해결 — 판정기 쓰기 호출을 소유로 본다 | E2-2: 호출 구조 해석 · 대상 미상 fail-closed · 읽기 전용 제외 | 게이트 E2-2 — write-ownership 23셀 · 기준 1 |
+| F-378 | 해결 — 원장 발견 침묵 절단 제거 | E2-3: 소유 원장 우선 · 남의 원장만 상한 · 미판정 차단 | 게이트 E2-3 — discover-limit 11셀 · 기준 1 |
+| F-382 | 해결 — advisor 스톨을 센다 | E2-8: advisor_calls · advisor_stalled · 운용 규칙 5 | 게이트 E2-8 — advisor-stall 후보 통과 · 기준 1 |
+| F-386 | 해결 — 질문형 요청은 UNRESOLVED | E2-15: question_kind · self-test 6/6 · fz-plan 절차 4 | 게이트 E2-15 — question-form 후보 통과 · 기준 1 |
+| F-387 | 해결 — 실패 · 재개 시도를 가른다 | E2-8: journal 시도 분리 · 모호 경계 UNRUN | 게이트 E2-8 · manual E2-13 — 실표본 wall 2214.4 |
+
 ### v4.44.0 (2026-10-10) — 측정 실패를 0건 · 통과 · 불일치로 읽던 자리를 고쳤다 [MINOR]
 
 R-E1 — fz 개선 계획(2026-10-07)의 세 판 가운데 첫 판이다. 레지스트리(배출 · 위생 · 복원)와, 측정 실패를 결과로 읽던 검사 · 러너 · 문서 절차를
 고쳤다. 게이트 원장 하나(29 게이트 — 계획 밖 삽입 E1-12p · E1-14h · E1-19f 포함)로 Step 마다 후보 트리와 기준 트리(be8c871)를 대조했다. 28건을 닫는다 —
 v4.33.0 · v4.34.0 이 고치고 배출하지 않은 F-155 · F-281, v4.42.0 에 오라클 미충족으로 배출된 F-348 의 정정을 함께 싣는다. 이 판에서 생긴
-F-400 ~ F-420(F-416 은 비어 있다)은 열어 둔다. 기본 동작이 바뀐 곳은 릴리즈 노트 §2 표에 모았다.
+F-400 ~ F-420(F-416 은 비어 있다)은 열어 둔다. 기본 동작이 바뀐 곳은 릴리즈 노트 '쓰는 쪽에서 달라지는 점' 에 모았다.
 
 **레지스트리 (F-372 · F-373 · F-374 · F-375)** — 위생 검사 기본 모드가 옛 `--strict` 판정 전부와 대기열 밖 행 · APPLIED/live 번호 충돌 ·
 title/H1/본문 중복 · 펜스 밖 덤프를 본다(`--strict` 는 별칭). `eject_findings.py --audit` 이 대조 뒤 같은 루트에 이 기본 모드를 돌리는 실레지스트리
@@ -63,7 +90,7 @@ head 만 받고 exit 5 다.
 | F-372 | 해결 | E1-2: index_sync · `--prune-index` · `--keep` · flock 잠금 · eject-index 후보 PASS 75(기준 FAIL 43) | 게이트 E1-2 — 대상 행만 지움 · 비대상 해시 불변 · 재실행 무변경 · 중단 뒤 복구 · 읽기~교체 사이 변경은 비0 · lock 셀 · 기준 fixture exit 1 |
 | F-373 | 해결 — 기본 모드 승격 + 실레지스트리 소비자(`--audit`) | E1-4(탐지 규칙) · E1-7(기본 승격 · audit 소비자 · consumer 셀 · hygiene-cells 후보 PASS 48 · 기준 FAIL 38) | 게이트 E1-4 · E1-7 — 손상 셀 6종 위반 · 정상 대조 통과 · 기준 놓침 / consumer 셀에서 기본 hygiene · --audit 이 같은 태그로 exit 1 · 손상 스냅샷 불합격 · 정리된 실레지스트리 통과 |
 | F-374 | 부분 해결 — 중복 축(title · H1 · 본문) 0 · 덤프 0. 크기 검산은 F-022 미달(원본 6321 B 중 원천 2255 B — 09-17 절단). 소실분 재구성은 후속 | E1-5(DG-13=stub · 복원 26파일 · restore-log) · E1-6(정리 (a)~(g) · F-050 → F-397) | 게이트 E1-6 — 단계 백업 8 · 단계별 허용 파일 · applied_records 유실 0 · 실레지스트리 hygiene --strict 위반 0 · 정리 전 스냅샷 exit 1 / E1-5 manual — 왕복 해시 · 원천 바이트 · F-022 · F-163 크기 |
-| F-375 | 해결 — 분리 규칙 · APPLIED 정정 · 노트의 Closes 항목별 근거 | E1-9: 레지스트리 README §1 분리 규칙 · CORRECTION 행 / docs/releases/v4.44.0.md '`Closes:` 줄 규약' 절 28항목 | 게이트 E1-9 는 split 정합만 잰다 — 항목별 근거는 강제하는 게이트가 없는 절차 판정이라 노트 끝 절에서 항목마다 오라클 · 명령 · 결과를 대조한다 |
+| F-375 | 해결 — 분리 규칙 · APPLIED 정정 · 노트의 Closes 항목별 근거 | E1-9: 레지스트리 README §1 분리 규칙 · CORRECTION 행 / docs/releases/v4.44.0.md 'Closes 항목별 근거' 절 28항목 | 게이트 E1-9 는 split 정합만 잰다 — 항목별 근거는 강제하는 게이트가 없는 절차 판정이라 노트 끝 절에서 항목마다 오라클 · 명령 · 결과를 대조한다 |
 | F-379 | 해결 — 2글자 첫 토큰 · rg 미선언(계획 이탈 — 사용자 결정 2026-10-09) | E1-14: FIRST_TOKEN · POSIX_UTILS 8 · self-test 10(two-letter-rg-reported) · undeclared-rg 셀 | 게이트 E1-14 — 미선언 fd · ag 위반 · 선언 gh 는 위반 아님 · 라이브 트리 통과 · 기준 lint 놓침 · check_gpt_surface 회귀 |
 | F-380 | 해결(DG-12=approve) | E1-14h: pre-commit hunk 상태 awk · 추출 실패면 차단 · `.githooks` · 확장자 없는 셔뱅 · `--json` ext · 훅 8 · lint 6셀 | 게이트 E1-14h — 임시 저장소에서 + · ++ 로 시작하는 추가 줄의 사용자 경로 차단 · 통과 대조 · lint 가 훅을 .sh · hunk-state ok 로 · 셔뱅 5종 ext · 기준 FAIL |
 | F-381 | 해결 — 삭제 경로는 diff --git 헤더. tier_delta · files 의미가 바뀐다(IR-10) | E1-17: risk_scan `_header_path` · risk-scan 21셀(새 5 · 기준 18/21) · tiers.md 정정 | 게이트 E1-17 — 삭제 파일 셀이 실제 경로로 귀속 · 기존 셀 통과 · 기준은 /dev/null 귀속으로 FAIL · numstat-fallback 러너 통과 |
