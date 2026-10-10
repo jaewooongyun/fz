@@ -25,13 +25,15 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import md_section  # noqa: E402 — 형제 모듈(절 추출 공용 · F-335 ⑰)
+
 OK, VIOLATION, UNRUN = 0, 1, 2
 DEFAULT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 GUIDE = "guides/skill-authoring.md"
 CONSUMER = "skills/fz/SKILL.md"
 SECTION = re.compile(r"^###\s*⛔?\s*실패 복구 사다리", re.M)
-NEXT_H = re.compile(r"^#{1,3}\s", re.M)
 
 # 상태는 **표기가 아니라 의미**로 찾는다 — 제목 문구가 조금 바뀌어도 걸리게 별칭을 둔다.
 STATES = {
@@ -56,12 +58,10 @@ def read(root: pathlib.Path, rel: str) -> str:
 
 
 def section_of(text: str) -> str:
-    m = SECTION.search(text)
-    if not m:
+    sec = md_section.section(text, SECTION)
+    if sec is None:
         raise ValueError("§ 실패 복구 사다리 절을 찾지 못했다")
-    rest = text[m.end():]
-    nxt = NEXT_H.search(rest)
-    return rest[: nxt.start()] if nxt else rest
+    return sec
 
 
 def split_tables(sec: str) -> list:

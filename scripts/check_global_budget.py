@@ -11,6 +11,8 @@
 
 ⛔ **변수로 넘긴 병렬은 세지 않는다** — `parallel(lensThunks)`·`parallel(costThunks.slice(…))` 처럼 배열이 리터럴이 아니면
 블록을 못 잘라 분모에서 빠진다(discover-adversarial 이 이 형태다). 데이터 흐름 추적은 이 검사의 범위 밖이다 — 통과는 "리터럴 병렬이 상한 이내" 까지만 뜻한다.
+그 수는 `unmeasured_parallel=N` 한 줄과 위치로 찍는다(F-335 ⑮) — 안 찍으면 "블록 11개 이내" 가 전수처럼 읽힌다.
+재시도 래퍼 본문의 `parallel(thunks)` 도 여기 든다(호출부의 리터럴 배열은 따로 잰다). 함수 정의 줄 · 주석은 호출이 아니다.
 
 ⛔ **advisor 사각지대는 이 검사의 범위 밖이다** — `governance.md` 가 명시하듯 advisor 는
 스폰된 에이전트가 아니라 서버사이드 tool call 이라 어떤 동시 상한도 bound 하지 못한다.
@@ -26,6 +28,8 @@ Python 3.9 stdlib 전용.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import os
 import pathlib
 import re
@@ -46,6 +50,9 @@ LIMIT_TOTAL = re.compile(r"총\s*[≤<=]+\s*(\d+)")
 # ⛔ `(` 와 `[` 사이의 블록 주석도 허용한다 — `parallelWithRetry(/* x */ [` 가 블록 탐색을 빠져나갔다(2라운드 003)
 PARALLEL = re.compile(r"\bparallel\w*\s*\(\s*(?:/\*.*?\*/\s*)*\[", re.S)
 MODEL = re.compile(r"model:\s*'([a-z0-9.-]+)'")
+# 병렬 호출 전부(리터럴 여부 무관) — `(` 뒤 첫 비공백(블록 주석 건너뜀)이 `[` 가 아니면 미측정이다
+PARALLEL_CALL = re.compile(r"\bparallel\w*\s*\(\s*(?:/\*.*?\*/\s*)*(.)", re.S)
+FUNC_DEF = re.compile(r"\bfunction\s*\*?\s*$")
 
 
 def log(*a):
@@ -83,6 +90,22 @@ def parallel_blocks(src: str):
     return out
 
 
+def unmeasured_calls(src: str):
+    """리터럴 배열이 아닌 병렬 호출의 줄 번호들 — 이 검사가 모델 수를 세지 못하는 동시 스폰 후보.
+
+    ⛔ 주석 안의 호출은 뺀다(블록 주석은 줄 수를 지켜 지운다 · `//` 줄 주석은 공백 뒤 또는 줄머리만 — URL 의 `://` 는 남긴다).
+    ⛔ `function parallelWithRetry(thunks)` 같은 정의는 호출이 아니다.
+    """
+    src = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), src, flags=re.S)
+    src = "\n".join(re.sub(r"(^|\s)//.*$", r"\1", l) for l in src.split("\n"))
+    out = []
+    for m in PARALLEL_CALL.finditer(src):
+        if m.group(1) == "[" or FUNC_DEF.search(src[:m.start()]):
+            continue
+        out.append(src[:m.start()].count("\n") + 1)
+    return out
+
+
 def check(root: pathlib.Path):
     lim, err = read_limits(root)
     if lim is None:
@@ -95,9 +118,10 @@ def check(root: pathlib.Path):
         return UNRUN
 
     print(f"정본 상한 ({GUIDE}): opus ≤{lim['opus']} · fable ≤{lim['fable']} · 총 ≤{lim['total']}")
-    bad, nblocks = [], 0
+    bad, nblocks, unmeasured = [], 0, []
     for q in wf:
         src = q.read_text(encoding="utf-8")
+        unmeasured += [f"{q.name}:{n}" for n in unmeasured_calls(src)]
         for pos, body in parallel_blocks(src):
             # ⛔ 주석 줄은 호출이 아니다 — 세면 `// model:'opus'` 한 줄이 거짓 초과를 만든다(GPT R-A 검토 004)
             body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)   # 블록 주석도 호출이 아니다(2라운드 004)
@@ -123,6 +147,10 @@ def check(root: pathlib.Path):
     print(f"  상한 초과                          : {len(bad)}")
     for b in bad:
         print(f"      {b}")
+    # ⛔ 미측정 수는 판정을 바꾸지 않는다(데이터 흐름 추적은 범위 밖) — 대신 숫자로 드러낸다
+    print(f"  unmeasured_parallel={len(unmeasured)} (리터럴 배열이 아닌 병렬 — 모델 수를 세지 못했다)")
+    for u in unmeasured:
+        print(f"      {u}")
     print("  ⛔ advisor 는 이 검사의 범위 밖이다 (서버사이드 tool call — governance.md § 사각지대)")
 
     if nblocks == 0:
@@ -218,6 +246,36 @@ def self_test():
         (r / "guides" / "model-guide.md").write_text(GUIDE_OK, encoding="utf-8")
         assert check(r) == UNRUN, "워크플로 0건이 통과했다"
 
+    def c_unmeasured_nonliteral_counted(tmp):
+        """⛔ 변수로 넘긴 병렬은 모델 수를 못 센다 — 세지 못한 수를 숫자로 낸다(F-335 ⑮)."""
+        js = ("const a = (await parallel(lensThunks)).filter(Boolean)\n"
+              "  const chunk = await parallel(costThunks.slice(c, c + 4))\n"
+              "async function parallelWithRetry(thunks) {\n  const out = await parallel(thunks)\n}\n"
+              "await parallel([ a({model:'opus'}) ])\n")
+        assert unmeasured_calls(js) == [1, 2, 4], f"비리터럴 병렬 줄 {unmeasured_calls(js)} (기대 [1, 2, 4])"
+        r = mk(tmp / "r", js)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = check(r)
+        assert rc == OK, f"미측정은 판정을 바꾸지 않는다 — rc={rc}"
+        assert "unmeasured_parallel=3 " in buf.getvalue(), "⛔ 출력에 unmeasured_parallel=3 이 없다"
+        assert "w.js:4" in buf.getvalue(), "미측정 위치(w.js:4)를 찍지 않았다"
+
+    def c_unmeasured_literal_and_defs_not_counted(tmp):
+        """리터럴 배열 · 정의 줄 · 주석은 미측정이 아니다 — 세면 수가 부풀어 표면화가 소음이 된다."""
+        js = ("async function parallelWithRetry(thunks) {\n}\n"
+              "await parallelWithRetry(/* audit */ [ a({model:'opus'}) ])\n"
+              "await parallel(\n  [ a({model:'opus'}) ])\n"
+              "// parallel(thunks) 는 주석이다\n"
+              "/* parallel(lensThunks)\n   parallel(more) */\n"
+              "const u = 'https://x/parallel' // parallel(tail)\n")
+        assert unmeasured_calls(js) == [], f"⛔ 리터럴 · 정의 · 주석을 미측정으로 셌다: {unmeasured_calls(js)}"
+        r = mk(tmp / "r", js)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = check(r)
+        assert rc == OK and "unmeasured_parallel=0 " in buf.getvalue(), f"rc={rc} · unmeasured_parallel=0 이 아니다"
+
     def c_no_model_blocks_unrun(tmp):
         r = mk(tmp / "r", "await parallel(thunks)\n")
         assert check(r) == UNRUN, "⛔ 모델 명시 블록 0건이 통과했다 — 스캔 실패를 먼저 의심"
@@ -233,7 +291,9 @@ def self_test():
                  ("canon-unparseable-unrun", c_canon_unparseable_unrun),
                  ("sequential-not-counted", c_sequential_not_counted),
                  ("no-workflows-unrun", c_no_workflows_unrun),
-                 ("no-model-blocks-unrun", c_no_model_blocks_unrun)]:
+                 ("no-model-blocks-unrun", c_no_model_blocks_unrun),
+                 ("unmeasured-nonliteral-counted", c_unmeasured_nonliteral_counted),
+                 ("unmeasured-literal-and-defs-not-counted", c_unmeasured_literal_and_defs_not_counted)]:
         case(n, f)
 
     print(f"self-test {len(passed)}/{cases} 통과")

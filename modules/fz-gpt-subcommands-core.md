@@ -34,16 +34,11 @@ fz-plan의 Phase 2. **`gpt-exec.sh exec` + `--schema` 사용.**
 
 ```bash
 SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
-if [ -n "$SKILL_PATH" ]; then
-  SKILL_PROMPT="$(cat "$SKILL_PATH")"
-else
-  SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."
-fi
+SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다(호출 계약 — modules/cross-validation.md)
+[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
 
 cat > "$P_VERIFY" <<EOF
-${SKILL_PROMPT}
-
-이 구현 계획을 검증하라.
+${SKILL_PROMPT}이 구현 계획을 검증하라.
 CLAUDE.md ## Code Conventions 섹션의 가이드라인을 참조하라.
 
 ## 계획
@@ -71,7 +66,7 @@ Anti-Pattern Constraints가 있으면 각 금지 패턴의 실효성을 검증�
 EOF
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$REVIEW_FILE" --prompt-file "$P_VERIFY" \
   --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" \
-  --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
+  --gpt-skill architect --inject-skill "$SKILL_PATH"
 ```
 
 ### resume 교차 (fz-plan Phase 2 · opt-in `--gpt-independent`)
@@ -83,8 +78,11 @@ EOF
 #   오염 15 · 6축 14 · planner 거부 17 로 끝난 run 은 런처가 세션 파일을 지운다(래퍼는 그 판정 전에 세션을 쓴다)
 ISO="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("iso") or "")' "$AUDIT")"
 SESSION_FILE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("sessionFile") or "")' "$AUDIT")"
+# ⛔ resume 은 --inject-skill 을 받지 않는다(exit 10) — 이어 받는 플래너 세션에 architect 본문이 없고 위 P_VERIFY 에도 없다(verify 는 래퍼가 넣는다).
+#    그래서 이 호출만 호출부가 본문을 앞에 붙이고 --gpt-skill-path 로 판정만 받는다(경로가 비면 cat 이 조용히 빠져 폴백 지시만 남는다)
+{ cat "$SKILL_PATH" 2>/dev/null && echo; cat "$P_VERIFY"; } > "$P_CROSS"
 CODEX_HOME="$ISO/gpt-home" "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$REVIEW_FILE" \
-  --prompt-file "$P_VERIFY" --session-file "$SESSION_FILE" \
+  --prompt-file "$P_CROSS" --session-file "$SESSION_FILE" \
   --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
 bash "${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" cleanup --iso "$ISO"   # 교차가 끝나면 격리 홈을 지운다(인증은 링크뿐이다)
 #   ⛔ `rm -rf "$ISO"` 를 직접 쓰지 않는다 — 자동 모드가 거부한다. 런처가 이름(fz-gpt-iso.*)과 gpt-home/ 을 확인하고 지운다
@@ -156,16 +154,11 @@ fz-review의 Phase 5.5. **`gpt-exec.sh exec` + `--schema` 사용.**
 
 ```bash
 SKILL_PATH=$(get_gpt_skill_path "guardian" "$FZ_PLUGIN_ROOT")
-if [ -n "$SKILL_PATH" ]; then
-  SKILL_PROMPT="$(cat "$SKILL_PATH")"
-else
-  SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."
-fi
+SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다(호출 계약 — modules/cross-validation.md)
+[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
 
 cat > "$P_VALIDATE" <<EOF
-${SKILL_PROMPT}
-
-피드백 반영 여부를 검증하라.
+${SKILL_PROMPT}피드백 반영 여부를 검증하라.
 CLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.
 
 ## 원본 이슈
@@ -176,7 +169,7 @@ $FIXES_APPLIED
 EOF
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE" \
   --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_verification_schema.json" \
-  --gpt-skill guardian --gpt-skill-path "$SKILL_PATH"
+  --gpt-skill guardian --inject-skill "$SKILL_PATH"
 ```
 
 **/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.
@@ -184,16 +177,14 @@ EOF
 ```bash
 SEARCHER_SKILL_PATH=$(get_gpt_skill_path "searcher" "$FZ_PLUGIN_ROOT")
 if [ -n "$SEARCHER_SKILL_PATH" ] && [ -z "$AFFECTED_SYMBOLS" ]; then
-  { cat "${SEARCHER_SKILL_PATH}"; cat <<EOF
-
+  cat > "$P_SEARCH" <<EOF
 아래 변경 대상의 영향 심볼과 의존성 체인을 탐색하라.
 ## 변경 대상
 $PLAN_CONTENT
 파일을 수정하지 마라(읽기 전용 분석).
 EOF
-  } > "$P_SEARCH"
   "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$SEARCH_FILE" --prompt-file "$P_SEARCH" \
-    --gpt-skill searcher --gpt-skill-path "$SEARCHER_SKILL_PATH"
+    --gpt-skill searcher --inject-skill "$SEARCHER_SKILL_PATH"   # 역할 본문은 래퍼가 넣는다(호출 계약 — modules/cross-validation.md)
 fi
 ```
 
@@ -231,16 +222,14 @@ fi
 ```bash
 FIXER_SKILL_PATH=$(get_gpt_skill_path "fixer" "$FZ_PLUGIN_ROOT")
 if [ -n "$FIXER_SKILL_PATH" ] && [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
-  { cat "${FIXER_SKILL_PATH}"; cat <<EOF
-
+  cat > "$P_FIX" <<EOF
 위 리뷰 결과에서 수정이 필요한 이슈에 대해 Root Cause와 Fix Strategy를 제시하라.
 ## 이슈 목록
 $FIXABLE_ISSUES
 파일을 수정하지 마라(읽기 전용 분석).
 EOF
-  } > "$P_FIX"
   "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$FIXER_FILE" --prompt-file "$P_FIX" \
-    --gpt-skill fixer --gpt-skill-path "$FIXER_SKILL_PATH"
+    --gpt-skill fixer --inject-skill "$FIXER_SKILL_PATH"   # 역할 본문은 래퍼가 넣는다(호출 계약 — modules/cross-validation.md)
 fi
 ```
 

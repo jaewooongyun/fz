@@ -22,6 +22,9 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import md_section  # noqa: E402 — 형제 모듈(절 추출 공용 · F-335 ⑰)
+
 PASS, VIOLATION, BADARG = 0, 1, 2
 # ⛔ `closed` 는 B0-P2 가 만든 상태다 — **복원 불가로 판정해 닫은** 항목이다.
 #    `unknown` 과 다르다: unknown 은 "아직 안 봤다", closed 는 "보았고 복원이 불가하다".
@@ -31,16 +34,12 @@ MIN_TOTAL = 31
 # 표 행: | `ID` | 클러스터 | 건수 | 상태 | … |
 ROW = re.compile(r"^\|\s*`(B0-[^`]+)`\s*\|([^|]*)\|\s*(\d+)\s*\|\s*\**([A-Za-z`]+)\**\s*\|")
 SECTION = re.compile(r"^###\s*B0 판정표", re.M)
-NEXT_H = re.compile(r"^#{1,3}\s", re.M)
 
 
 def parse(text: str) -> list:
-    m = SECTION.search(text)
-    if not m:
+    sec = md_section.section(text, SECTION)
+    if sec is None:
         raise ValueError("### B0 판정표 절을 찾지 못했다")
-    rest = text[m.end():]
-    nxt = NEXT_H.search(rest)
-    sec = rest[: nxt.start()] if nxt else rest
     rows = []
     for ln in sec.splitlines():
         mm = ROW.match(ln.strip())

@@ -202,7 +202,7 @@ diff에 `@MainActor`, `actor`, `async`, `await`, `Task`, `Sendable`, `AsyncStrea
 팩이 있는 스킬은 architect · challenger · drift · fixer · guardian · planner · reviewer 일곱이다(`references/domain-ios.md`). fz-searcher 는 탐색 전용이라 팩이 없다.
 
 ### 암묵 호출 정책
-`gpt-skills/*/agents/openai.yaml` 의 `policy.allow_implicit_invocation` 은 fz-reviewer 만 `true` 이고 나머지 7개는 `false` 다. 프롬프트가 없는 review 모드 호출(`gpt-exec.sh review`)에서 CLI 가 암묵으로 고를 수 있는 fz 스킬이 fz-reviewer 하나가 된다. 나머지 스킬은 호출부가 본문을 프롬프트에 넣어서만 쓴다(`modules/cross-validation.md` 호출 계약).
+`gpt-skills/*/agents/openai.yaml` 의 `policy.allow_implicit_invocation` 은 fz-reviewer 만 `true` 이고 나머지 7개는 `false` 다. 프롬프트가 없는 review 모드 호출(`gpt-exec.sh review`)에서 CLI 가 암묵으로 고를 수 있는 fz 스킬이 fz-reviewer 하나가 된다. 나머지 스킬은 래퍼(`--inject-skill`)가 본문을 프롬프트에 넣어서만 쓴다(`modules/cross-validation.md` 호출 계약).
 
 ## 설계 원칙
 

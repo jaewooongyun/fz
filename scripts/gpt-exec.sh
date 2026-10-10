@@ -306,12 +306,12 @@ LOG="${OUT}.stream.log"
 rm -f "$OUT" "${OUT}.session"   # 실패 시 이전 성공 run 의 session 이 남아 resume 이 엉뚱한 세션을 잇지 않게 (resume 의 SESSION_ID 는 위에서 이미 읽었다)
 
 # ── 스킬 본문 판정 · 주입 (A2-03 · F-335) — exec·resume 는 판정, 주입은 --inject-skill(exec) 하나만
-# ⛔ 호출부 8곳(modules/cross-validation.md 호출 계약)은 본문을 마커 없이 `cat` 으로 넣고 --gpt-skill-path 만 넘긴다 → 그 호출은
+# ⛔ 본문을 호출부가 마커 없이 `cat` 으로 넣고 --gpt-skill-path 만 넘기는 호출(resume 교차 · 외부 호출부 — 호출 계약의 exec 는 --inject-skill)은
 #    판정만 받는다. 멱등 판정은 마커가 아니라 **본문 전체**가 이미 있는가다. 제목 기반 판정은 쓰지 않는다 — 번들 스킬 8개 모두 첫 제목
 #    다음 줄이 `## Role` 이라 구별되지 않고, 과제 문구에 제목이 우연히 들어가면 본문 없이 injected=1 로 집계된다(GPT R-A 검토 011·2라운드 009).
 #    형식이 다른 사본이 이미 있으면 두 번 들어간다 — 역할 지시가 빠지는 것보다 낫다.
 # ⛔ INJECTED = 최종 프롬프트에 본문이 들어 있는가(래퍼가 넣었든 호출부가 넣었든 1). review 는 프롬프트가 없어 항상 0.
-#    ⛔ 판정을 빼면 cat 호출부 8곳이 injected=0 이 되어 SC-1 집계(injected=1 인 호출만 스킬 사용)가 무너진다.
+#    ⛔ 판정을 빼면 cat 으로 넣는 호출이 injected=0 이 되어 SC-1 집계(injected=1 인 호출만 스킬 사용)가 무너진다.
 # ⛔ 프롬프트는 여기서(cd **전에**) 읽는다 — 상대 경로가 서브셸 cwd 기준으로 풀리면 사전 게이트가 본 파일과 다른 파일을 읽는다.
 INJECTED=0
 PROMPT_TEXT=""

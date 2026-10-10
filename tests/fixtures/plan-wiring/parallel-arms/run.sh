@@ -4,8 +4,9 @@
 # ① 순서 — 독립 플랜 기동(gpt_independent.sh plan) < Workflow 호출 < 합치기(plan_divergence.py)
 # ② Phase 2 절에 resume 교차(resume --session-file)와 병렬 계약 네 토큰이 있다(check_wf_text --section-has)
 # ③ 기본 verify 불변 — core 모듈 § verify 의 bash 블록을 고정 입력 · 가짜 CLI 로 **실제로 돌려** CLI 인자(프롬프트 포함)를
-#    verify-default.golden.json 과 바이트 단위로 대조한다. golden 은 S23 직전 모듈에서 `--capture` 로 잡았다
-#    (`bash run.sh --capture <(git show <S23 직전>:modules/fz-gpt-subcommands-core.md)`). fz-discover --deep 도 같은 verify 를 쓴다.
+#    verify-default.golden.json 과 바이트 단위로 대조한다. golden 은 S23 직전 모듈에서 `--capture` 로 잡았고, verify 가 본문을
+#    `--inject-skill` 로 넘기게 된 판(F-335 ㉒ — 프롬프트 앞 마커 줄 · `---` 만 달라졌다)에서 `bash run.sh --capture modules/fz-gpt-subcommands-core.md` 로 다시 잡았다
+#    (`bash run.sh --capture <(git show <기준>:modules/fz-gpt-subcommands-core.md)`). fz-discover --deep 도 같은 verify 를 쓴다.
 # ⛔ 실제 GPT CLI · 사용자 홈을 건드리지 않는다 — PATH 앞에 tests/fixtures/gpt/_shim · HOME 은 임시 폴더.
 #    FZ_GPT_CHOICE_DIR 는 unset — 선택 폴더가 임시 HOME 아래로 정해져 Lead 세션의 GPT 모델·effort 선택이 argv(golden)로 새지 않는다.
 set -u

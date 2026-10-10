@@ -183,12 +183,18 @@ def check_review(fx: pathlib.Path, work: pathlib.Path) -> tuple[list[str], dict]
             v.append(f"{w}: severity {i.get('severity')!r}")
         f = i.get("file")
         s, e = i.get("line_start", 0), i.get("line_end", 0)
+        # ⛔ 줄 범위는 정수(bool 제외)이고 line_start ≤ line_end 여야 한다 — 역순 범위(6-4)는 아래 hunk 포함 검사(a ≤ s · e ≤ b)를
+        #    그대로 통과했고, 문자열 줄 번호("5")는 비교에서 TypeError 로 감사 전체를 죽였다(traceback). 파일 끝을 넘는 줄은
+        #    RIGHT hunk 가 파일 길이를 넘지 못하므로 hunk 검사가 잡는다
+        rng = type(s) is int and type(e) is int and s <= e
+        if not rng:
+            v.append(f"{w}: 줄 범위 {s!r}-{e!r} 가 잘못됐다 — 정수이고 line_start ≤ line_end 여야 한다")
         if f not in hunks:
             v.append(f"{w}: {f} 는 diff 에 없다")
-        elif not any(a <= s and e <= b for a, b in hunks[f]):
+        elif rng and not any(a <= s and e <= b for a, b in hunks[f]):
             v.append(f"{w}: {f}:{s}-{e} 가 diff hunk 밖 — 리뷰어가 볼 수 없는 줄")
         fp = repo / f if f else None
-        if fp and fp.is_file():
+        if fp and fp.is_file() and type(s) is int:
             lines = read(fp).split("\n")
             if not (1 <= s <= len(lines)) or i.get("anchor", "\0") not in lines[s - 1]:
                 v.append(f"{w}: {f}:{s} 에 anchor {i.get('anchor')!r} 없음(줄 드리프트)")

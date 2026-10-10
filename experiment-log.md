@@ -718,15 +718,15 @@ python3 scripts/ab_ledger.py judge --ledger <ab>/ledger.jsonl --phase baseline -
   --min-runs 2 --plugin-sha <FZ_BASE_SHA> --verify-sources transcript,wf-metrics,start-state,input-hash,instrument-sha
 python3 scripts/ab_ledger.py show --ledger <ab>/ledger.jsonl
 ```
-- 계측기(ab_ledger·fz_wf_metrics·freeze_baseline)의 내용 해시가 `instrument_sha` 로 남는다. B 와 C 는 같은 계측기로 수집해야 한다 — 다르면 judge 가 무효로 두고, `recollect` 로 원천에서 다시 모은다.
-- judge 는 `--verify-sources` 로 기록된 collect 인자를 써서 행을 원천(transcript · Workflow 폴더 · 반환 사본 · 스냅샷 · 입력 기록 · 산출물 해시)에서 **다시 만들고** 판정 필드 전체를 대조한다. 행을 손으로 고치거나 원천이 사라지면 무효가 된다(통합 테스트 `tampered-*`).
+- 계측기(ab_ledger.py 와 실행 모듈 ab_ledger_*.py · fz_wf_metrics · freeze_baseline — 목록 정본은 `INSTRUMENTS`, self-test 모듈은 밖)의 내용 해시가 `instrument_sha` 로 남는다. B 와 C 는 같은 계측기로 수집해야 한다 — 다르면 judge 가 무효로 두고, `recollect` 로 원천에서 다시 모은다.
+- judge 는 `--verify-sources` 로 기록된 collect 인자를 써서 행을 원천(transcript · Workflow 폴더 · 반환 사본 · 스냅샷 · 입력 기록 · 산출물 해시 · run 별 플러그인 사본 — 행 `sources.plugin_roots`)에서 **다시 만들고** 판정 필드 전체를 대조한다. 행을 손으로 고치거나 원천이 사라지면 무효가 된다(통합 테스트 `tampered-*`).
 - 판정식:
   - SC-3 = critical·major 각각 max(0, mean(B) − mean(C)) ≤ |B1 − B2|
   - SC-3-smoke = 같은 식에 C 1회(R-A 출하 전용 — 재실행 이력이 있으면 골라 쓰지 않고 FAIL)
   - SC-4 = C run 마다 6축 각 1건 이상 + 검증 비율 ≥ mean(B) − |B1 − B2|
   - SC-6 = median(B) − median(C) > max(|B1 − B2|, |C1 − C2|)
-  - SC-7 = Lead out_tok·messages·retries·followup_prompts 와 워커 out_tok·turns·so_retries 존재 + B 공통 stage·성공한 GPT 호출 수 보존
-- ⛔ 구현한 기준의 정본은 `scripts/ab_ledger.py` 의 `IMPLEMENTED` 다 — 여기에 목록을 옮겨 적지 않는다(옮긴 사본이 코드와 어긋났다, v4.40.0 리뷰). 그 밖의 기준과, 받지만 구현하지 않은 옵션(`--envs` 등 — `judge_rows` 입구가 막는다)은 **exit 2** 다. baseline phase 에 다른 기준을 주어도 exit 2 다. 받고 무시하면 그것이 AC-5 의 '빠른 성공'이다.
+  - SC-7 = Lead out_tok·messages·tool_errors·followup_prompts 와 워커 out_tok·turns·so_retries 존재 + B 공통 stage·성공한 GPT 호출 수 보존
+- ⛔ 구현한 기준의 정본은 판정 표 `CRITERIA`(`scripts/ab_ledger_judge.py` — `IMPLEMENTED` 는 그 키)다 — 여기에 목록을 옮겨 적지 않는다(옮긴 사본이 코드와 어긋났다, v4.40.0 리뷰). 그 밖의 기준과, 받지만 구현하지 않은 옵션(`--envs` 등 — `judge_rows` 입구가 막는다)은 **exit 2** 다. baseline phase 에 다른 기준을 주어도 exit 2 다. 받고 무시하면 그것이 AC-5 의 '빠른 성공'이다.
 
 ### 10. 기준선 이동 기록
 | 시점 | 변경 | 영향 받는 측정 | 비교 규칙 |

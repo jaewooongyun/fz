@@ -1,7 +1,8 @@
 // workflows/plan-lean.js — fz-plan D1 구조: **3콜 · 2단계 직렬**.
 //
-// ⛔ 이 파일은 `plan-collaborative.js` 를 **대체하지 않는다** — 나란히 둔 대조군이다(롤백 경로 보존).
-//    확산 판정 전까지 `skills/fz-plan/SKILL.md` 의 기본 배선은 collaborative 그대로다.
+// ⛔ 보존 사유 — **측정 재현**: 어떤 스킬도 이 파일을 부르지 않는다(fz-plan 기본은 `workflows/plan-lean2.js` · 롤백 경로는
+//    `plan-collaborative.js`). 아래 D1 측정(2026-09-11)을 같은 구조로 다시 돌릴 수 있게 남긴 기준 팔이다 — 고치면 그 수치와
+//    비교할 수 없게 되므로 고치지 않는다. 바꿀 일이 생기면 plan-lean2.js 처럼 새 파일로 둔다.
 //
 // [왜 이 구조인가 — 측정 근거]
 //   S8-0 blind 채점(`wf_ac6e5638-9ff`, 2026-09-11): 9-agent(3,621s) vs 단일 1콜(805s).

@@ -9,10 +9,15 @@
 usage: check_ab_protocol.py EXPERIMENT_LOG | --self-test
 exit: 0=충족 · 1=누락 · 2=파일을 읽지 못함(⛔ 통과 아님)
 """
+import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_section  # noqa: E402 — 형제 모듈(절 추출 공용 · F-335 ⑰)
+
 HEADING = re.compile(r"^##\s+.*A/B 원장 프로토콜.*$", re.M)
+NEXT_H2 = re.compile(r"^##\s", re.M)   # 이 절은 `##` 단위다 — `###` 소제목은 절 안에 둔다
 # (id, 뜻, 모두 있어야 하는 정규식들)
 REQUIRED = (
     ("arms", "B·C worktree 와 --plugin-dir", (r"FZ_BASE_TREE", r"FZ_TREE", r"--plugin-dir")),
@@ -46,11 +51,7 @@ REQUIRED = (
 
 
 def section(text):
-    m = HEADING.search(text)
-    if not m:
-        return None
-    nxt = re.search(r"^##\s", text[m.end():], re.M)
-    return text[m.start(): m.end() + (nxt.start() if nxt else len(text) - m.end())]
+    return md_section.section(text, HEADING, NEXT_H2, keep_heading=True)
 
 
 def check(text):

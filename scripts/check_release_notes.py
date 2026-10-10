@@ -34,16 +34,16 @@ import tempfile
 OK, MISSING, UNRUN = 0, 1, 2
 # ⛔ N6 루트 앵커 — lint_contracts ANCHOR_LINES 허용 형태와 정확히 일치
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
+import md_section  # noqa: E402 — 형제 모듈(절 추출 공용 · F-335 ⑰)
+
+NEXT_VERSION = re.compile(r"^### v\d", re.M)
 COLUMN = {"verdict": "판정", "evidence": "근거", "procedure": "검증 절차"}
 EMPTY = {"", "-", "—", "tbd", "todo"}
 
 
 def section(text, version):
-    m = re.search(rf"^### v{re.escape(version)}\b.*$", text, re.M)
-    if not m:
-        return None
-    nxt = re.search(r"^### v\d", text[m.end():], re.M)
-    return text[m.end(): m.end() + nxt.start()] if nxt else text[m.end():]
+    return md_section.section(text, re.compile(rf"^### v{re.escape(version)}\b.*$", re.M), NEXT_VERSION)
 
 
 def cells(line):

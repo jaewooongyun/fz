@@ -9,7 +9,7 @@
 #    CLI 의 엄격 모드는 이 경고까지 실패로 만들어 쓰지 않는다.
 # ⛔ 새 경고가 생기면 실패한다(fail-closed) — 고치거나, 의도된 것이면 ALLOWED 에 근거와 함께 더한다.
 #
-# usage: plugin_validate.sh [PLUGIN_ROOT] | --self-test
+# usage: plugin_validate.sh [PLUGIN_ROOT] | --self-test | --self-test-cli(실 CLI 음성 대조 — 게이트 전용, 아래)
 # exit: 0=통과 · 1=오류 또는 허용 밖 경고 · 2=미실행(claude CLI 부재·매니페스트 없음·보고서 해석 불가)
 set -u
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -81,6 +81,55 @@ if [ "${1:-}" = "--self-test" ]; then
   t "contents 없음 → 미실행" 0 "{$M}" 2
   t "contents 비었고 오류 없음(카나리아 없음) → 미실행" 0 "{$M,\"contents\":[]}" 2
   echo "plugin_validate self-test $ok/$n passed"
+  [ "$ok" -eq "$n" ] && exit 0 || exit 1
+fi
+
+# --self-test-cli — 실 claude CLI 음성 대조(F-335 ⑭). --self-test 는 judge 에 보고서 문자열만 넣는다 — CLI 가 보고서 형식 · exit 를
+#   바꾸면 그쪽은 그대로 통과한다. 여기서는 합성 플러그인 4종을 아래 본 경로와 **같은** 실 CLI 호출 → judge 로 돌려 기대 exit 와 대조한다.
+#   cli-clean 0 · cli-broken-frontmatter 1(그 파일이 FAIL 줄에) · cli-broken-manifest 1(name 이 숫자 — 스키마 오류) · cli-no-canary 2
+#   (CLI 2.1.292 관찰). ⛔ 외부 실증이라 health-check 는 부르지 않는다 — tests/fixtures/plugin/validate-cli/external.sh(게이트 전용)가 부른다.
+#   ⛔ 설정은 임시 CLAUDE_CONFIG_DIR 에서 쓴다(호출자가 주지 않으면 임시 폴더 안에 만든다) — 사용자 설정을 건드리지 않는다.
+#   출력: 첫 줄 `SELF-TEST-CLI claude=<버전>` · 셀마다 `CELL <이름> exit=<판정 exit> want=<기대> PASS|FAIL` · 끝 줄 요약.
+#   exit: 0 전건 일치 · 1 불일치 · 2 claude CLI 부재(UNRUN)
+if [ "${1:-}" = "--self-test-cli" ]; then
+  command -v claude >/dev/null 2>&1 || { echo "UNRUN: claude CLI 부재"; exit 2; }
+  # ⛔ mktemp 결과를 따로 받는다 — 치환을 바로 cd 에 넘기면 실패해도 `cd ""` 가 성공한다(F-355)
+  W="$(mktemp -d "${TMPDIR:-/tmp}/fz-plugin-validate-cli.XXXXXX")" || { echo "UNRUN: 임시 폴더를 만들지 못했다"; exit 2; }
+  trap 'rm -rf "${W:?}"' EXIT
+  if [ -z "${CLAUDE_CONFIG_DIR:-}" ]; then mkdir -p "$W/config" && export CLAUDE_CONFIG_DIR="$W/config"; fi
+  VER="$(claude --version 2>/dev/null | sed -n '1s/^\([0-9][0-9.]*\).*/\1/p')"
+  echo "SELF-TEST-CLI claude=${VER:-unknown}"
+  GOOD='{"name":"probe","version":"0.0.1","description":"probe plugin","author":{"name":"probe"}}'
+  SKILL='---
+name: a
+description: probe skill
+---
+
+# a
+'
+  mk() {   # $1 이름 · $2 plugin.json · $3 루트 CLAUDE.md(1|0) · $4 SKILL.md 본문
+    mkdir -p "$W/$1/.claude-plugin" "$W/$1/skills/a" || return 1
+    printf '%s\n' "$2" > "$W/$1/.claude-plugin/plugin.json"
+    [ "$3" = 1 ] && printf '# probe\n' > "$W/$1/CLAUDE.md"
+    printf '%s' "$4" > "$W/$1/skills/a/SKILL.md"
+  }
+  mk cli-clean "$GOOD" 1 "$SKILL" && mk cli-broken-frontmatter "$GOOD" 1 '---
+name: [broken
+---
+' && mk cli-broken-manifest '{"name":123,"version":"0.0.1","description":"probe plugin","author":{"name":"probe"}}' 1 "$SKILL" \
+    && mk cli-no-canary "$GOOD" 0 "$SKILL" || { echo "UNRUN: 합성 플러그인을 만들지 못했다"; exit 2; }
+  ok=0 n=0
+  for c in cli-clean:0 cli-broken-frontmatter:1 cli-broken-manifest:1 cli-no-canary:2; do
+    name="${c%%:*}" want="${c##*:}" n=$((n + 1))
+    OUT="$(cd "$W/$name" && claude plugin validate --json .claude-plugin/plugin.json 2>/dev/null)"; CODE=$?
+    J="$(judge "$CODE" "$OUT" "$W/$name" 2>&1)"; got=$?
+    pass=1
+    [ "$got" = "$want" ] || pass=0
+    if [ "$name" = cli-broken-frontmatter ]; then printf '%s\n' "$J" | grep -q 'FAIL .*skills/a/SKILL.md' || pass=0; fi
+    if [ "$pass" = 1 ]; then ok=$((ok + 1)); echo "CELL $name exit=$got want=$want PASS"; else
+      echo "CELL $name exit=$got want=$want FAIL (cli exit $CODE · $(printf '%s' "$J" | tail -1 | cut -c1-160))"; fi
+  done
+  echo "plugin_validate self-test-cli $ok/$n passed (claude ${VER:-unknown})"
   [ "$ok" -eq "$n" ] && exit 0 || exit 1
 fi
 

@@ -23,11 +23,13 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import md_section  # noqa: E402 — 형제 모듈(절 추출 공용 · F-335 ⑰)
+
 PASS, VIOLATION, UNRUN = 0, 1, 2
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CLASSES = ("중복확인", "확인불가", "고유")
 SECTION = re.compile(r"^###\s*D3 census", re.M)
-NEXT_H = re.compile(r"^#{1,3}\s", re.M)
 ROW = re.compile(r"^\|\s*`(D3-\d+)`\s*\|\s*`([^`]+)`\s*\|[^|]*\|[^|]*\|[^|]*\|\s*`?([^`|]+?)`?\s*\|")
 DELETE_LINE = re.compile(r"\*\*삭제 목록\*\*\s*:\s*\*\*(\d+)\s*건", re.M)
 POC = re.compile(r"^\s*-\s*([^:]+):\s*justification")
@@ -53,12 +55,9 @@ def population() -> set:
 
 
 def census(text: str):
-    m = SECTION.search(text)
-    if not m:
+    sec = md_section.section(text, SECTION)
+    if sec is None:
         raise ValueError("### D3 census 절을 찾지 못했다")
-    rest = text[m.end():]
-    nxt = NEXT_H.search(rest)
-    sec = rest[: nxt.start()] if nxt else rest
     rows = []
     for ln in sec.splitlines():
         mm = ROW.match(ln.strip())

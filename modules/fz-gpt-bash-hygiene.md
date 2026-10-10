@@ -189,7 +189,7 @@ GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-
 | `--gpt-skill-path P` | 계측 — 호출부가 해석한 SKILL.md 경로 | 전 모드 |
 | `--inject-skill F` | 주입 — 본문을 프롬프트 **앞**에 넣는다 | exec 전용 |
 
-- `--gpt-skill-path` 는 넣지 않는다. `exec`·`resume` 에서는 그 본문이 최종 프롬프트에 들어 있는지만 판정해 `injected` 열에 적는다. 호출 계약(`modules/cross-validation.md` — 호출부 8곳이 본문을 `cat` 으로 넣는다)의 호출은 이것만 넘긴다
+- `--gpt-skill-path` 는 넣지 않는다. `exec`·`resume` 에서는 그 본문이 최종 프롬프트에 들어 있는지만 판정해 `injected` 열에 적는다. 호출부가 본문을 직접 넣는 호출(이어 받는 세션에 본문이 없는 `resume` — `modules/fz-gpt-subcommands-core.md` § resume 교차)은 이것만 넘긴다. 호출 계약(`modules/cross-validation.md`)의 exec 는 `--inject-skill` 을 넘긴다
 - `--inject-skill` 은 마커 줄 `[fz-gpt-skill-injected] <스킬> (<스킬 폴더 절대경로>)` + 본문 + `---` 을 앞에 붙인다. 폴더 경로는 본문의 상대 경로(`references/domain-*.md`)를 풀기 위한 것이다. GPT 의 스킬 자동 선택에 기대지 않는 결정론 경로다. ⛔ **멱등** — **본문 전체**가 이미 있으면 넣지 않는다. 제목으로 판정하지 않는다 — 번들 스킬 8개 모두 첫 제목 다음 줄이 `## Role` 이라 구별되지 않는다
 - ⛔ `resume` · `review` 에 `--inject-skill` 을 주면 exit 10 이다. resume 은 세션 이력에 본문이 이미 있어 다시 넣으면 두 번이 되고, review 는 프롬프트가 없다. 두 플래그가 서로 다른 파일을 가리켜도 exit 10 이다
 - `review` 호출은 `--gpt-skill reviewer` 만 넘긴다. reviewer 는 fz 스킬 가운데 유일하게 CLI 가 암묵 호출하는 스킬이다(나머지 7개는 `agents/openai.yaml` 의 `policy.allow_implicit_invocation: false`). 옛 표지 `--gpt-skill-path unknown` 도 받지만 WARN 은 없다

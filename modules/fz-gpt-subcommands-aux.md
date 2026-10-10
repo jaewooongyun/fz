@@ -47,17 +47,15 @@ fi
 ```bash
 CHALLENGER_SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
 if [ -n "$CHALLENGER_SKILL_PATH" ] && [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
-  { cat "${CHALLENGER_SKILL_PATH}"; cat <<EOF
-
+  cat > "$P_DA" <<EOF
 아래 리뷰 이슈 목록에 대해 Devil's Advocate 분석을 수행하라.
 각 이슈에 agree|challenge|supplement|reverse 판정과 근거를 제시하라. 파일을 수정하지 마라(읽기 전용 분석).
 ## 이슈 목록
 $MAJOR_ISSUES
 EOF
-  } > "$P_DA"
   "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$DA_REVIEW_FILE" --prompt-file "$P_DA" \
     --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_peer_review_schema.json" \
-    --gpt-skill challenger --gpt-skill-path "$CHALLENGER_SKILL_PATH"
+    --gpt-skill challenger --inject-skill "$CHALLENGER_SKILL_PATH"   # 역할 본문은 래퍼가 넣는다(호출 계약 — modules/cross-validation.md)
 fi
 ```
 
@@ -67,9 +65,9 @@ fi
 
 ```bash
 SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
-{ cat "${SKILL_PATH}"; echo; echo "현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라. 파일을 수정하지 마라(읽기 전용 분석)."; } > "$P_DA"
+echo "현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라. 파일을 수정하지 마라(읽기 전용 분석)." > "$P_DA"
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$DA_REVIEW_FILE" --prompt-file "$P_DA" \
-  --gpt-skill challenger --gpt-skill-path "$SKILL_PATH"
+  --gpt-skill challenger --inject-skill "$SKILL_PATH"   # 역할 본문은 래퍼가 넣는다(호출 계약 — modules/cross-validation.md)
 ```
 
 ## drift -- 아키텍처 드리프트 전체 스캔
@@ -78,20 +76,15 @@ SKILL_PATH=$(get_gpt_skill_path "challenger" "$FZ_PLUGIN_ROOT")
 
 ```bash
 SKILL_PATH=$(get_gpt_skill_path "drift" "$FZ_PLUGIN_ROOT")
-if [ -n "$SKILL_PATH" ]; then
-  SKILL_PROMPT="$(cat "$SKILL_PATH")"
-else
-  SKILL_PROMPT="CLAUDE.md를 읽고 아키텍처 규칙을 파악한 후, 전체 코드베이스의 레이어 위반과 RIBs 역할 위반을 감지하라."
-fi
+SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다(호출 계약 — modules/cross-validation.md)
+[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'CLAUDE.md를 읽고 아키텍처 규칙을 파악한 후, 전체 코드베이스의 레이어 위반과 RIBs 역할 위반을 감지하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
 
 cat > "$P_DRIFT" <<EOF
-${SKILL_PROMPT}
-
-전체 코드베이스를 스캔하여 아키텍처 드리프트를 감지하라.
+${SKILL_PROMPT}전체 코드베이스를 스캔하여 아키텍처 드리프트를 감지하라.
 Critical → Major → Minor 순으로 보고하라.
 EOF
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$DRIFT_REPORT_FILE" --prompt-file "$P_DRIFT" \
-  --gpt-skill drift --gpt-skill-path "$SKILL_PATH"
+  --gpt-skill drift --inject-skill "$SKILL_PATH"
 ```
 
 > **권장 실행 시점**: PR 전, 대규모 리팩토링 후.
@@ -103,23 +96,18 @@ EOF
 ```bash
 REQUIREMENTS="$1"
 SKILL_PATH=$(get_gpt_skill_path "planner" "$FZ_PLUGIN_ROOT")
-if [ -n "$SKILL_PATH" ]; then
-  SKILL_PROMPT="$(cat "$SKILL_PATH")"
-else
-  SKILL_PROMPT="CLAUDE.md를 읽고 프로젝트 패턴을 파악한 후, 요구사항에 대한 독립 구현 계획을 수립하라."
-fi
+SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다(호출 계약 — modules/cross-validation.md)
+[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'CLAUDE.md를 읽고 프로젝트 패턴을 파악한 후, 요구사항에 대한 독립 구현 계획을 수립하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
 
 cat > "$P_PLAN" <<EOF
-${SKILL_PROMPT}
-
-## 요구사항
+${SKILL_PROMPT}## 요구사항
 ${REQUIREMENTS}
 
 위 요구사항에 대해 독립적으로 구현 계획을 수립하라.
 Claude 계획을 전달받지 않았으므로 코드베이스를 직접 탐색하여 계획하라.
 EOF
 "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$PLAN_FILE" --prompt-file "$P_PLAN" \
-  --gpt-skill planner --gpt-skill-path "$SKILL_PATH"
+  --gpt-skill planner --inject-skill "$SKILL_PATH"
 ```
 
 > **C4 원칙**: Claude의 중간 작업물(계획 텍스트)을 전달하지 않는다. 요구사항만 공유.

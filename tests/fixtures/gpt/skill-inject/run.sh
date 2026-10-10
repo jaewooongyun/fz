@@ -28,7 +28,7 @@ printf '%s\n' "$TASK" > "$T/task.txt"
 printf '%s\n\n%s\n' "$HEAD 를 참고한 요청" "$TASK" > "$T/task-head-only.txt"
 # 제목과 그 다음 본문 줄만 든 프롬프트 — 본문 전체는 없다(번들 스킬은 다음 줄이 모두 `## Role` 이라 이 조합은 구별되지 않는다)
 printf '%s\n역할 지시 본문 — 합성.\n\n%s\n' "$HEAD" "$TASK" > "$T/task-head-next.txt"
-# 호출 계약 8곳의 형태 — 본문을 `$(cat SKILL.md)` 로 먼저 넣은 프롬프트
+# 본문을 cat 으로 넣는 호출(resume 교차 — `modules/fz-gpt-subcommands-core.md`)의 형태 — 본문을 `$(cat SKILL.md)` 로 먼저 넣은 프롬프트
 printf '%s\n\n%s\n' "$(cat "$SK")" "$TASK" > "$T/task-with-skill.txt"
 echo '11111111-2222-3333-4444-555555555555' > "$T/prev.session"
 printf '{"type":"object","required":["verdict"],"properties":{"verdict":{"type":"string"}}}\n' > "$T/schema.json"
@@ -82,7 +82,7 @@ check "계측 전용: 본문 첫 제목 0회" "$(count exec1p "$HEAD")" 0
 check "계측 전용: 텔레메트리 injected=0" "$(tel exec1p 7)" 0
 check "계측 전용: 텔레메트리 fallback=0(경로는 해석됨)" "$(tel exec1p 5)" 0
 
-# ② 호출 계약 8곳(cat) + --gpt-skill-path → 본문 1회, injected=1 (판정이 살아 있어야 SC-1 집계가 선다)
+# ② 본문을 cat 으로 넣는 호출(resume 교차) + --gpt-skill-path → 본문 1회, injected=1 (판정이 살아 있어야 SC-1 집계가 선다)
 cell exec2 exec --prompt-file "$T/task-with-skill.txt" --gpt-skill fz-demo --gpt-skill-path "$SK"
 check "cat 호출부: 본문 첫 제목 1회" "$(count exec2 "$HEAD")" 1
 check "cat 호출부: 마커 0회" "$(count exec2 "$MARK")" 0

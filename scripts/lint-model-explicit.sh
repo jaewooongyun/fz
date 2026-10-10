@@ -67,7 +67,8 @@ with open(baseline_path, encoding="utf-8") as fh:
 got, dups = {}, []
 for f in sorted(glob.glob(os.path.join(wf_dir, "*.js"))):
     for i, line in enumerate(open(f, encoding="utf-8"), 1):
-        if "label:" not in line or "agentType:" not in line:
+        # ⛔ label 없는 호출도 센다(F-335 ⑲) — 빼면 baseline 에 없는 호출이 비교 밖에서 돈다. 키는 아래 `line{i}` 다
+        if "agentType:" not in line:
             continue
         # ⛔ 주석은 호출이 아니다 — 세면 같은 label 주석 한 줄이 강등된 실제 호출 값을 덮는다(GPT R-A 검토 003)
         if line.lstrip().startswith(("//", "*", "/*")):

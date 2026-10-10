@@ -368,9 +368,14 @@ export FZ_PLUGIN_ROOT
 **호출 계약** (⛔ 호출부 전부 이 형태로 통일 — 할당 변수와 조건 검사 변수가 **같은 이름**이어야 한다):
 ```bash
 SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
-if [ -n "$SKILL_PATH" ]; then SKILL_PROMPT="$(cat "$SKILL_PATH")"
-else SKILL_PROMPT="프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라."; fi
+SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다
+[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
+printf '%s%s\n' "$SKILL_PROMPT" "{과제 지시}" > "$P"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$OUT" --prompt-file "$P" \
+  --gpt-skill architect --inject-skill "$SKILL_PATH"
 ```
+- 역할 본문은 래퍼 `--inject-skill` 이 넣는다 — exec 전용 · 본문 전체가 이미 있으면 넣지 않는다 · 스킬 폴더 경로 마커로 본문의 상대 경로(`references/…`)가 풀린다(`modules/fz-gpt-bash-hygiene.md` § 스킬 본문 판정과 주입). ⛔ 호출부가 본문을 `cat` 으로 또 넣지 않는다 — 넣는 곳이 둘이면 어느 쪽이 빠져도 드러나지 않는다(F-335). 빈 경로는 폴백이고 래퍼가 `fallback=1` 로 적는다
+- ⛔ `resume` 은 `--inject-skill` 을 받지 않는다(exit 10) — 이어 받는 세션에 그 본문이 없을 때만 호출부가 본문을 프롬프트에 붙이고 `--gpt-skill-path` 로 판정만 받는다(`modules/fz-gpt-subcommands-core.md` § resume 교차)
 
 ⛔ **`setup-gpt-skills.sh` 는 Tier 2a 심볼릭(`gpt-skills/`)을 만든다 — 디스커버리의 필수 조건은 아니다.** 미실행이어도 `FZ_PLUGIN_ROOT` 가 있으면 Tier 2b 가 같은 번들 `SKILL.md` 를 돌려주고, 없으면 Tier 3 로 폴백한다. setup 이 더하는 것은 GPT CLI 가 자기 스킬 폴더에서 역할 스킬을 스스로 싣게 하는 것이다.
 ⛔ Claude 스킬(`skills/`)을 그 폴더에 링크하면 GPT 가 역할 스킬 대신 Claude 스킬을 고른다(A2-02 실측: 링크 확장 뒤 fz-reviewer 로드 28세션 중 26회 → 31세션 중 1회). 그래서 setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 `skills/` 를 가리키는 링크는 이름과 무관하게 지운다.
