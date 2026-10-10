@@ -175,7 +175,7 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 예시 3 — validate: BAD Rate 85% 수치만 보고 pass (regressed 놓침) / GOOD resolved/partial/unresolved/regressed 4축 → regressed 0 + Rate 80+ 동시
 ```
 
-서브커맨드: 리뷰→`gpt-exec.sh review --out`, 검증→`gpt-exec.sh exec --schema`, 심화→`gpt-exec.sh resume --session-file`. Schema version: `"1.1"`이면 `scope_disposition` read, 미존재/`"1.0"`이면 Lead가 `modules/scope-challenge.md` 수동 실행 (`jq '.schemaVersion // "1.0"'`).
+서브커맨드: 리뷰→`gpt-exec.sh review --out`, 검증→`gpt-exec.sh exec --schema`, 심화→`gpt-exec.sh resume --session-file`. Schema version: `--schema …gpt_review_schema.json` 출력은 `"1.1"` 만 통과한다(다른 값·`scope_disposition` null 은 validate-gpt-output 이 거부 → exit 14) → `scope_disposition` read. `schemaVersion` 미존재면 Lead가 `modules/scope-challenge.md` 수동 실행 (`jq '.schemaVersion // empty'`).
 
 ---
 

@@ -19,10 +19,9 @@
     "schemaVersion": {
       "type": "string",
       "enum": [
-        "1.0",
         "1.1"
       ],
-      "description": "스키마 버전. v1.1에서 issues[].scope_disposition 추가 (OBS-03 v2.2)"
+      "description": "스키마 버전. 1.1 만 받는다 — issues[].scope_disposition 필수 분류(OBS-03 v2.2). 1.0(null 호환)은 퇴역 (F-216 N4 · DG-15.peer=same)"
     },
     "agent": {
       "type": "string",
@@ -72,19 +71,15 @@
             "description": "이슈 고유 식별자 (예: ARCH-001, CODE-003)"
           },
           "scope_disposition": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "enum": [
               "scope-in",
               "scope-out",
               "invariant-risk",
               "parent-reopen",
-              "improvement",
-              null
+              "improvement"
             ],
-            "description": "이슈 scope 분류 (v1.1+). origin과 매핑: regression→scope-in, pre-existing→scope-out, improvement→improvement. parent-reopen은 Q-S5 발동 시 (P2-A). null은 legacy 호환"
+            "description": "이슈 scope 분류 (필수 — null 금지). origin과 매핑: regression→scope-in, pre-existing→scope-out, improvement→improvement. parent-reopen은 Q-S5 발동 시 (P2-A)"
           },
           "perspective": {
             "$comment": "→ gpt_base_issue_schema.json#/$defs/unified_category 의 서브셋 (peer-review 관점용)",

@@ -93,7 +93,7 @@
         "array",
         "null"
       ],
-      "description": "검증 중 새로 발견된 이슈 (gpt_review_schema의 issues 형식과 동일)",
+      "description": "검증 중 새로 발견된 이슈 (gpt_review_schema의 issues 축약형 — 필드는 id·severity·category·description·location·suggestion 6개뿐이고 scope_disposition·confidence 등은 없다. id 형식·category·location 제약도 다르다)",
       "items": {
         "type": "object",
         "required": [

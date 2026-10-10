@@ -20,7 +20,6 @@
     "schemaVersion": {
       "type": "string",
       "enum": [
-        "1.0",
         "1.1"
       ],
       "description": "스키마 버전. v1.1에서 scope_disposition 필드 추가 (OBS-03 v2.2)"
@@ -63,19 +62,15 @@
         "additionalProperties": false,
         "properties": {
           "scope_disposition": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "enum": [
               "scope-in",
               "scope-out",
               "invariant-risk",
               "parent-reopen",
-              "improvement",
-              null
+              "improvement"
             ],
-            "description": "이슈 scope 분류 (v1.1+). Lead/GPT 독립 판정 후 채택. modules/scope-challenge.md 참조. null은 legacy 호환 (v1.0 응답)"
+            "description": "이슈 scope 분류 (v1.1+). Lead/GPT 독립 판정 후 채택. modules/scope-challenge.md 참조"
           },
           "id": {
             "type": "string",
