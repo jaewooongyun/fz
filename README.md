@@ -63,6 +63,8 @@ claude plugin marketplace update fz-orchestrator
 claude plugin update fz@fz-orchestrator
 ```
 
+업데이트는 GPT 스킬 setup 을 다시 돌리지 않는다 — 위 setup 경로에 `--check` 를 붙이면 남은 옛 링크(이 플러그인 Claude 스킬 링크·끊어진 소유 링크)를 읽기 전용으로 나열하고 stale 이면 exit 1 이다(정리는 인자 없이 다시 실행 · `/fz-manage check` 도 같은 점검을 경고로 보인다 · 다른 판을 가리키는 살아 있는 GPT 스킬 링크는 내지 않는다 — 판을 맞추려면 인자 없이 다시 실행).
+
 ⛔ 접미사 없는 `claude plugin update fz` 는 `Plugin "fz" not found` 로 실패한다 — 설치할 땐 `fz` 로 통하지만 **설치된 이름은 `fz@fz-orchestrator`** 다. 버전 문자열이 같으면 캐시를 갱신하지 않으니, 소스만 고치고 버전을 안 올리면 반영되지 않는다.
 
 ---
@@ -147,9 +149,16 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.43.0
+## What's New — v4.44.0
 
-**fz-plan 병합 콜은 도구를 빼야 입력만 접었고, GPT effort 는 config 에 닿지 않았다 — 놓친 계획 항목은 렌즈 질문을 더해도 잡히지 않았다.** GPT 를 쓰는 세션은
+**닫은 finding 은 오라클을 재지 않고 배출됐고, 도구 부재 · diff 실패 · null 응답은 0건 · 최저 Tier · 불일치로 읽혔다.** 레지스트리 위생 검사 기본 모드가
+고아 행 · 번호 충돌 · 중복 · 덤프까지 보고(`--strict` 는 별칭) 배출 감사(`--audit`)가 그것을 실레지스트리에 돌린다. 배출 뒤 오라클 미충족이 드러나면 분리하고,
+노트는 Closes 항목마다 오라클의 충족 근거를 적는다. GPT 래퍼는 출력 없이 멈춘 호출을 끊고(`FZ_GPT_IDLE_SEC` · exit 12), 착지 검증은 null 응답을 불일치가 아니라
+미검증으로 읽는다(`verify_landing.py`). peer-review 는 PR base 를 원격 추적 ref 로 받고(`fetch_pr_refs.sh`), Tier 판정 불가는 TIER=2 로 남는다.
+⚠️ 기본 동작이 바뀐 곳(위생 검사 기본 · review/peer 스키마 1.1 만 · risk_scan tier_delta · 회귀 러너 env 이름)은 릴리즈 노트 §2 표에 있다. 이 판에서 생긴 F-400 ~ F-420(F-416 은 비어 있다)은 열어 둔다.
+→ [릴리즈 노트](docs/releases/v4.44.0.md)
+
+**v4.43.0 — fz-plan 병합 콜은 도구를 빼야 입력만 접었고, GPT effort 는 config 에 닿지 않았다 — 놓친 계획 항목은 렌즈 질문을 더해도 잡히지 않았다.** GPT 를 쓰는 세션은
 초반에 모델 · effort 를 한 번 묻는다(래퍼가 플래그 > 세션 선택 > config 순으로 정한다 · `scripts/gpt-choice.sh`). plan-lean2 병합 콜은 탐색 도구 없는
 `fz:plan-merge` 로 입력 JSON 만 접는다(확인 run 에서 탐색 0). fz-review · fz-plan 은 입력이 확정되면 Workflow 를 곧바로 띄우고, 렌더러는 `--example` 로 입력 예시를 낸다.
 fz-plan 렌즈에 운영 축을 더했지만 사전 등록 확인 run 에서 놓친 항목이 잡히지 않아 F-352 는 열어 둔다(회귀 0).
