@@ -1,0 +1,12 @@
+{
+ "cli_version": "Claude Code 2.1.259 (agent transcript version)",
+ "captured_at": "실행 2026-09-07T11:01:41Z~11:39:11Z · 스크럽 2026-10-10",
+ "source": "code-pair Workflow 워커 트랜스크립트 — advisor 호출(server_tool_use)이 결과 없이 34분 42초 뒤 사용자 중단까지 멈췄다(F-382 무결과 advisor)",
+ "scrub": "82줄 전부 순서대로 type · timestamp · version 만 남겼다. message 는 role · id(대체값) · stop_reason · usage.output_tokens · content 블록 type/name/id(대체값, `srvtoolu_` 접두 유지). text · thinking 은 비우고 도구 입력은 `{}`, 도구 결과는 `(scrubbed)`. 첫 사용자 메시지는 `[역할]` 줄(플러그인 프롬프트 문구)만, 마지막 줄은 하네스 표지 `[Request interrupted by user]` 만 남겼다. attachment 는 type · timestamp 만",
+ "samples": [
+  {
+   "file": "samples/agent-stall.jsonl",
+   "sha256": "e01ebd854e54473e57edafc28871a94fa4dca5d90bc5ff4a80071ba25c7164c8"
+  }
+ ]
+}

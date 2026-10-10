@@ -1,0 +1,32 @@
+{
+ "cli_version": "GPT CLI 0.159.2 (스트림 로그 배너) · Claude Code 2.1.285 (Lead transcript version)",
+ "captured_at": "실행 2026-10-02T06:33:32Z~07:40:59Z · 스크럽 2026-10-10",
+ "source": "2-run 묶음 run 1 — GPT 검증 2라운드 fz-plan. 2라운드 전에 1라운드 스트림 로그를 `mv … .r1.json.stream.log` 로 옮겼다(F-361 이동 로그)",
+ "scrub": "Lead transcript 는 GPT 로그 연결기가 읽는 이벤트만 남겼다 — 첫 요청(인자 → `(scrubbed)`) · gpt-exec.sh Bash 호출 4 · 보관 mv 루프(프롬프트를 만드는 heredoc → `: scrubbed-prompt-builder`) · 그 도구 결과 · 큐/사용자 작업 알림. 나머지 이벤트와 필드(session · uuid · branch · usage · thinking)는 버렸다. run 루트 → `@RUN@`, 하네스 임시 작업 폴더 → `@TMP@/tasks`, fixture 폴더 → `X-1`, tool_use · message id → 순번 대체값. 스트림 로그는 둘째 구분선까지 배너만 (ANSI 유지 · workdir → `@RUN@/repo` · session id → 대체 UUID · CLI 이름 줄은 `OpenAI GPT-CLI v0.159.2` 로 호칭만 바꿈 — 버전 그대로), 프롬프트 · 응답 본문은 버렸다. GPT 출력 JSON → `{\"scrubbed\": true}`, 래퍼 로그 · 작업 출력은 원문 그대로(게이트 · 종료 줄뿐). 파일 mtime 은 layout.json 에 적었다(연결기의 시간창이 mtime 을 본다)",
+ "samples": [
+  {
+   "file": "samples/lead.jsonl",
+   "sha256": "26ed0c8f5635dfab5872803db61b0417becc7627395da32ca7ab46f4492079e4"
+  },
+  {
+   "file": "samples/layout.json",
+   "sha256": "91ed9c3aaf956e1bcd5b9d973cab3c95e6744d4a3df6ed93bb401c772733ebbe"
+  },
+  {
+   "file": "samples/logs/gpt-verify.r1.json.stream.log",
+   "sha256": "527050d2ed063515c151b6cdcc15b87927ce8f4f8e6017a2b970d8a01e0571e9"
+  },
+  {
+   "file": "samples/logs/gpt-verify-gates.r1.json.stream.log",
+   "sha256": "9ba5f3a023a4eda4b1d5a966591cc6f82335464c46b7fd09fc12b74698c0cc9a"
+  },
+  {
+   "file": "samples/logs/gpt-verify.json.stream.log",
+   "sha256": "9341b656654e6dce3540d8fad46668fa1af09ba9c3e2383dc9551cd1edf4e54a"
+  },
+  {
+   "file": "samples/logs/gpt-verify-gates.json.stream.log",
+   "sha256": "cfcbddab77c3e20b9d832d974876bcb10f34aa69c9a785882d2cb63146cfd19d"
+  }
+ ]
+}

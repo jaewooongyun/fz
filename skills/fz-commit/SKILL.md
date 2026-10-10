@@ -55,6 +55,7 @@ CLAUDE.md `## Git Workflow` 섹션에 커밋 규칙이 정의되어 있으면 �
 2. **검사기는 검사 대상 뒤에** — 전체 검사가 부르는 새 검사기의 배선은 검사기와 그 대상이 모두 들어간 뒤의 커밋에 둔다
 3. **커밋마다 격리 clone 에서 돌린다** — clone 에도 커밋 훅(`core.hooksPath`)과 커밋 신원(`user.name` · `user.email`)을 건다. clone 은 원본 저장소의 로컬 설정을 물려받지 않아서, 빠뜨리면 전역 신원으로 커밋된다. 커밋마다 저장소 전체 검사(fz: `scripts/health-check.sh`)를 실행한다. ⛔ 파일 배정 dry-run 은 단독 실패를 보지 못한다
 4. **검증한 객체를 그대로 쓴다** — 1번처럼 작업 트리에 없던 중간 상태가 있으면 실제 저장소에서 같은 묶음으로 다시 커밋하지 않는다. 격리 clone 의 검증된 커밋을 `git fetch` 로 가져와 `git reset --mixed <검증한 끝 커밋>` 으로 브랜치만 앞으로 옮긴다(작업 파일 불변 · fast-forward 와 같은 방향). 옮긴 뒤 `git status` 가 비어야 하고, 가져온 커밋의 작성자·커밋터 메일이 의도한 신원이어야 한다
+5. **외부 형식 파서를 바꾸는 커밋에는 실표본 재생 셀을 같이 넣는다** — 남이 정한 기록 형식(GPT 스트림 로그 · Claude Code transcript · Workflow journal)을 읽는 코드를 바꾸면, 스크럽한 실표본(`provenance.json` 에 CLI 버전 · 채취 시점 · 스크럽 방식 · 해시)을 바뀐 파서로 다시 읽는 셀이 같은 커밋에 있어야 한다(fz: `tests/fixtures/gpt/rollout-replay` · `tests/fixtures/wf-metrics/transcript-replay` · `journal-replay`). 합성 셀만으로는 실제 기록과 어긋난 것을 보지 못한다(F-358). 표본이 없으면 그 셀은 UNRUN 이고 통과가 아니다
 
 ---
 
