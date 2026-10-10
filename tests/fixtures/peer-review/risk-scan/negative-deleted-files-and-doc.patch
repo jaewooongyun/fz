@@ -1,0 +1,29 @@
+diff --git a/CHANGELOG-old.md b/CHANGELOG-old.md
+deleted file mode 100644
+index bccc614..0000000
+--- a/CHANGELOG-old.md
++++ /dev/null
+@@ -1,2 +0,0 @@
+-# Old changelog
+-- removed feature
+diff --git a/Sources/Keep.swift b/Sources/Keep.swift
+index 3c37c33..6392506 100644
+--- a/Sources/Keep.swift
++++ b/Sources/Keep.swift
+@@ -1 +1 @@
+-let value = 1
++let value = 2
+diff --git a/Sources/OldA.swift b/Sources/OldA.swift
+deleted file mode 100644
+index 660572d..0000000
+--- a/Sources/OldA.swift
++++ /dev/null
+@@ -1 +0,0 @@
+-func a() {}
+diff --git a/Sources/OldB.swift b/Sources/OldB.swift
+deleted file mode 100644
+index 983b64b..0000000
+--- a/Sources/OldB.swift
++++ /dev/null
+@@ -1 +0,0 @@
+-func b() {}

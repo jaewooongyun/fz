@@ -1,0 +1,14 @@
+diff --git a/Sources/OldName.swift b/Sources/NewName.swift
+similarity index 72%
+rename from Sources/OldName.swift
+rename to Sources/NewName.swift
+index e081228..80c2037 100644
+--- a/Sources/OldName.swift
++++ b/Sources/NewName.swift
+@@ -1,5 +1,5 @@
+ final class Panel {
+-    @MainActor var isOld = false
++    @MainActor var isNew = false
+     let title = "panel"
+     let width = 320
+     let height = 240

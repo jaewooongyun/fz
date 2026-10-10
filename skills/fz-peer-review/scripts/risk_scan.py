@@ -117,20 +117,39 @@ def _tally(matches):
     return out
 
 
+def _header_path(line):
+    """`diff --git a/X b/X` 의 b 쪽 토큰(`+++ ` 줄과 같은 꼴)을 돌려준다. 양쪽 이름이 다르면 None.
+
+    삭제 파일은 개명이 없어 양쪽 이름이 같다 — 가운데 공백으로 가르므로 공백이 든 경로도 풀린다.
+    """
+    rest = line[len("diff --git "):]
+    mid = len(rest) // 2
+    if len(rest) % 2 == 0 or rest[mid] != " ":
+        return None
+    a, b = rest[:mid], rest[mid + 1:]
+    return b if a == b or a.replace("a/", "b/", 1) == b else None
+
+
 def added_lines_by_file(diff_text):
     """추가된 **코드** 행만 파일별로 모은다.
 
     ⛔ hunk 상태를 추적한다. `+++ ` 는 hunk **밖**에서만 파일 헤더다 —
        hunk 안의 `+++ actor` 는 `++ actor` 를 추가한 소스 행이지 헤더가 아니다.
        상태 없이 접두사만 보면 그 행을 잃고 뒤따르는 추가 행도 엉뚱한 파일에 붙는다.
+    ⛔ 삭제 파일은 `+++ /dev/null` 이라 경로가 `diff --git` 헤더에만 남는다(F-381). `+++` 를 그대로 쓰면
+       삭제 행이 전부 '/dev/null' 한 키로 모이고, 지운 문서가 문서 제외를 피해 추가 코드의 순증을 상쇄한다.
+       헤더를 못 풀면(대칭 아님) 예전처럼 '/dev/null' 로 모은다 — 행을 잃지는 않는다.
     """
     files, removed, current, in_hunk = {}, {}, None, False
-    hunks, cur_hunk = [], None
+    hunks, cur_hunk, header = [], None, None
     for line in diff_text.splitlines():
         if line.startswith("diff --git "):
             current, in_hunk, cur_hunk = None, False, None
+            header = _header_path(line)
         elif not in_hunk and line.startswith("+++ "):
             path = line[4:].strip()
+            if path == "/dev/null" and header:
+                path = header
             current = path[2:] if path.startswith("b/") else path
             if current.lower().endswith(DOC_SUFFIXES):
                 current = None          # 문서는 수집하지 않는다

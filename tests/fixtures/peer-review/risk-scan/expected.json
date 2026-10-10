@@ -1,5 +1,5 @@
 {
-  "note": "risk_scan.py 회귀 기대값. ⛔ 눈으로 확인하지 말고 run.sh 로 판정한다. added_lines 는 numstat_fallback 의 독립 python 오라클로 교차 검산 가능하다(같은 diff 를 다른 파서가 센다).",
+  "note": "risk_scan.py 회귀 기대값. ⛔ 눈으로 확인하지 말고 run.sh 로 판정한다. added_lines 는 numstat_fallback 의 독립 python 오라클로 교차 검산 가능하다(같은 diff 를 다른 파서가 센다). 비교 키는 risk · added_lines · tier_delta · files · removed_paths 중 셀에 적힌 것만이다. before_f381 은 F-381 수정 전 트리(be8c871)의 실측 기록이고 비교하지 않는다.",
   "cases": {
     "negative-interactor": {
       "risk": 0,
@@ -80,6 +80,45 @@
       "risk": 0,
       "added_lines": 2,
       "why": "auth 개명(net 0)이 **다른 hunk** 에 있고 session 만 순증 → 미성립. 위 케이스와 짝이며 hunk 로직이 죽은 코드가 아님을 증명한다"
+    },
+    "negative-deleted-file-path": {
+      "risk": 0,
+      "added_lines": 0,
+      "files": 1,
+      "removed_paths": ["Sources/Legacy Cache.swift"],
+      "before_f381": {"files": 1, "removed_paths": ["/dev/null"]},
+      "why": "F-381 오라클: 코드 파일 1개 삭제(경로에 공백). `+++ /dev/null` 이라 경로는 `diff --git` 헤더에만 있다 — 삭제 행이 실제 경로로 귀속돼야 한다. 기준 트리는 '/dev/null' 로 모았다"
+    },
+    "positive-deleted-doc-unmasks-netnew": {
+      "risk": 1,
+      "tier_delta": 1,
+      "added_lines": 3,
+      "files": 1,
+      "removed_paths": [],
+      "before_f381": {"risk": 0, "tier_delta": 0, "files": 2, "removed_paths": ["/dev/null"]},
+      "why": "⛔ 의도된 Tier 변경(EC-28 · IR-10): 문서 `docs/auth-notes.md` 를 지우고 `authManager` 코드를 더한 PR. 기준 트리는 지운 .md 의 auth·token 이 '/dev/null' 키로 문서 제외를 피해 추가 auth 를 상쇄했다(risk 0 · tier_delta +0). 실제 경로면 .md 가 빠져 auth 가 순증한다(risk 1 · tier_delta +1)"
+    },
+    "negative-deleted-files-and-doc": {
+      "risk": 0,
+      "added_lines": 1,
+      "files": 3,
+      "removed_paths": ["Sources/Keep.swift", "Sources/OldA.swift", "Sources/OldB.swift"],
+      "before_f381": {"files": 2, "removed_paths": ["/dev/null", "Sources/Keep.swift"]},
+      "why": "코드 2개 · 문서 1개 삭제 + 코드 1개 수정. 삭제 파일마다 제 경로로 귀속되고(기준은 '/dev/null' 하나로 합쳐 files 2) 지운 문서는 문서 접미사 필터로 빠진다"
+    },
+    "negative-rename-file-pair": {
+      "risk": 0,
+      "added_lines": 1,
+      "files": 1,
+      "removed_paths": ["Sources/NewName.swift"],
+      "why": "회귀: git rename(similarity 72%) 안의 `-@MainActor var isOld` / `+@MainActor var isNew` 개명 짝. 삭제 행은 전처럼 `+++ b/` 새 경로에 붙는다 — 헤더 경로는 `+++ /dev/null` 일 때만 쓴다"
+    },
+    "negative-binary-delete-add": {
+      "risk": 0,
+      "added_lines": 0,
+      "files": 0,
+      "removed_paths": [],
+      "why": "회귀: binary 삭제 1 · 추가 1(`Binary files … differ`, `+++` 없음). 헤더만 있는 블록은 파일로 세지 않는다 — 전과 같다"
     }
   }
 }

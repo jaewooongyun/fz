@@ -1,0 +1,17 @@
+diff --git a/Sources/Login.swift b/Sources/Login.swift
+new file mode 100644
+index 0000000..37baed1
+--- /dev/null
++++ b/Sources/Login.swift
+@@ -0,0 +1,3 @@
++final class Login {
++    let authManager = AuthManager()
++}
+diff --git a/docs/auth-notes.md b/docs/auth-notes.md
+deleted file mode 100644
+index 1edf51a..0000000
+--- a/docs/auth-notes.md
++++ /dev/null
+@@ -1,2 +0,0 @@
+-# Auth notes
+-Rotate the auth token before release.
