@@ -9,8 +9,10 @@
 // ⛔ 비교 대상은 **콜 입력**(label · prompt · schema · model · effort · agentType)이다. 반환값은 비교하지 않는다 —
 //    R-A 가 peer-review Tier 2 반환의 완주 수 계산을 고쳤다(프롬프트·스키마는 그대로). 반환까지 비교하면 그 수정이 회귀로 보인다.
 //    하네스의 calls 는 스키마를 불리언으로만 남기므로 responder 가 opts.schema 를 직렬화해 잡는다.
-// ⛔ 기준 소스: env FZ_BASE_TREE 의 workflows/ → 없으면 이 저장소 이력의 `git show ${FZ_BASE_SHA:-13755a6}:workflows/<wf>.js`.
-//    health-check 러너는 env 없이 돈다 — 이력이 있는 클론(작업 트리 · 격리 검증 클론)이면 된다. 둘 다 없으면 UNRUN(exit 2)이다.
+// ⛔ 기준 소스: env FZ_REGRESSION_BASE_TREE 의 workflows/ → 없으면 이 저장소 이력의 `git show ${FZ_REGRESSION_BASE_SHA:-13755a6}:workflows/<wf>.js`.
+//    health-check 러너는 env 를 비우지 않고 부른다 — 호출자 env 를 그대로 물려받는다. 그래서 전용 이름만 읽는다: 범용 FZ_BASE_TREE · FZ_BASE_SHA 는
+//    A/B 기준 arm · 게이트 환경이 다른 뜻으로 내보낸다(F-363). 새 이름 없이 옛 이름만 있으면 WARN 줄을 내고 기본값으로 돈다.
+//    기준 env 가 없으면 이력이 있는 클론(작업 트리 · 격리 검증 클론)이면 된다. 둘 다 없으면 UNRUN(exit 2)이다. 검사 이름의 `기준(…)` 이 출처다.
 // ⛔ 옵션마다 세 가지를 본다: 미지정 == 기준(defaultOn 이면 미지정 == 켬) · false == 기준 · true != 기준(옵션이 실제로 배선돼 있다 — 헛돌이 방어).
 //    옵션이 닿지 않는 경로(예: Stage 2 가 없는 Tier 2 미발화)에서는 셋째를 true == 기준 으로 본다 — 옵션이 엉뚱한 경로로 새지 않는다.
 // ⛔ `structural` 옵션(R-C 속도 arm)은 켜면 콜을 빼는 것이 목적이다 — 켠 쪽 두 검사(!= 기준 · 콜 구성 동일)를 여기서 하지 않고
@@ -24,7 +26,8 @@ const { execFileSync } = require('child_process')
 const { run } = require('../lib/wf_harness')
 
 const ROOT = path.join(__dirname, '..', '..')
-const BASE_SHA = process.env.FZ_BASE_SHA || '13755a6'
+const BASE_SHA = process.env.FZ_REGRESSION_BASE_SHA || '13755a6'
+const BASE_SHA_FROM = process.env.FZ_REGRESSION_BASE_SHA ? 'FZ_REGRESSION_BASE_SHA' : '기본값'
 
 // 옵션 레지스트리 — 새 옵션(S16b · S17 …)은 여기에 한 줄 더한다. 없는 이름을 부르면 FAIL 이다.
 // defaultOn: 그 옵션이 **기본으로 켜진** 워크플로(v4.42.0 — S25p 판정 PASS 인 peer-review 만). 나머지 워크플로는 기본 off 다.
@@ -131,16 +134,16 @@ const INTENDED = {
 const intended = (wf, calls) => calls.map(c => ((INTENDED[wf] || {})[c.label] ? INTENDED[wf][c.label](c) : c))
 
 function baseFile(wf, tmp) {
-  const env = process.env.FZ_BASE_TREE
+  const env = process.env.FZ_REGRESSION_BASE_TREE
   if (env) {
     const f = path.join(env, 'workflows', `${wf}.js`)
-    if (!fs.existsSync(f)) throw new Error(`FZ_BASE_TREE 에 ${wf}.js 가 없다 — ${f}`)
-    return { file: f, from: `FZ_BASE_TREE` }
+    if (!fs.existsSync(f)) throw new Error(`FZ_REGRESSION_BASE_TREE 에 ${wf}.js 가 없다 — ${f}`)
+    return { file: f, from: `FZ_REGRESSION_BASE_TREE` }
   }
   const src = execFileSync('git', ['-C', ROOT, 'show', `${BASE_SHA}:workflows/${wf}.js`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   const f = path.join(tmp, `${wf}.base.js`)
   fs.writeFileSync(f, src)
-  return { file: f, from: `git ${BASE_SHA}` }
+  return { file: f, from: `git ${BASE_SHA}(${BASE_SHA_FROM})` }
 }
 
 function firstDiff(a, b) {
@@ -169,6 +172,8 @@ if (require.main === module) (async () => {
   const rolledBack = new Set()   // 롤백 검사는 (워크플로 · 경로)마다 한 번
   const typoChecked = new Set()  // 값 검증은 (옵션 · 워크플로)마다 한 번
   let bases
+  const env = process.env   // 옛 이름은 있는지만 본다 — 그 값은 기준에 쓰지 않는다(조용한 기본값 복귀만 알린다)
+  if (!env.FZ_REGRESSION_BASE_SHA && !env.FZ_REGRESSION_BASE_TREE && (env.FZ_BASE_SHA || env.FZ_BASE_TREE)) console.log('WARN: FZ_BASE_* 는 무시된다 — FZ_REGRESSION_BASE_*')
   try {
     const wfs = [...new Set(names.flatMap(n => (OPTIONS[n] ? OPTIONS[n].workflows : [])))]
     try {
@@ -200,7 +205,7 @@ if (require.main === module) (async () => {
               rolledBack.add(key)
               const allOff = Object.assign({}, ...Object.values(OPTIONS).filter(o => (o.defaultOn || []).includes(wf)).map(o => o.off))
               const back = await callsOf(work, wf, sc, allOff)
-              check(`${wf} · ${sc.name}: 기본 on 옵션을 모두 끔 ${JSON.stringify(allOff)} == 기준(롤백 경로)`, firstDiff(back, base) === null, firstDiff(back, base))
+              check(`${wf} · ${sc.name}: 기본 on 옵션을 모두 끔 ${JSON.stringify(allOff)} == 기준(${bases[wf].from} · 롤백 경로)`, firstDiff(back, base) === null, firstDiff(back, base))
             }
             if (!typoChecked.has(`${name}|${wf}`)) {
               typoChecked.add(`${name}|${wf}`)
