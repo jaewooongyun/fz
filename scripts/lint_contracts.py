@@ -73,6 +73,7 @@ ITEMS = [
     ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 gpt 응답이 아니다)"),
     ("N13", "DETERMINISTIC", "agents",   "memory 필드 재도입 금지 — `agents/`(memory-curator 제외)·`templates/` 에 `^memory:` 0 (A2-01·AC-7: 필드가 Read/Write/Edit 를 자동 부여해 Workflow 에이전트의 쓰기 없음 계약과 충돌하고, 세션 간 기록이 A/B 입력을 오염시킨다. guides 의 기능 설명 예시는 범위 밖)"),
     ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
+    ("N14", "DETERMINISTIC", "all",      "빈 mktemp 치환 cd — 실행 코드(.sh·.py·.js)의 `cd`/`pushd` 인자가 `$(mktemp …)` 치환 0 (F-355: mktemp 가 실패하면 `cd \"\"` 가 성공해 현재 폴더가 임시 폴더가 되고 정리가 그 폴더를 지운다. ⛔ 범위 외: 주석·`.sh` 따옴표 구분자 heredoc 본문·`.md` 의 BAD 예시 — 설명이다 · 결과를 확인 없이 변수로 받은 뒤 `cd \"$d\"` 하는 두 줄 꼴)"),
 ]
 DET = {i for i, k, _, _ in ITEMS if k == "DETERMINISTIC"}
 
@@ -121,6 +122,8 @@ MIN_HITS = {
     "N11": 3,    # 경량 경로 보유 스킬 **실측 5**(fz-code·fz-plan·fz-review·fz-modernize·fz-peer-review)
                  #   ⛔ 0 으로 두면 walk 실패 시 대상 0개로 조용히 통과한다(fail-open)
                  #   ⛔ 121은 도입 판정 프로브(5개 디렉토리 한정) 값이니 하한 근거로 쓰지 말 것
+    "N14": 70,   # 실행 코드의 `cd`/`pushd` 줄 **실측 147**(2026-10-08 · .sh 139 · .py 8 · .js 0 — 자기 파일 제외 · 지금 값은 `--only N14` 의 검사 대상) — 절반 이하로 보수적. 하한은 순회·확장자 집합
+                 #   붕괴를 잡는다 — 주석·heredoc 과잉 제거(fail-open)는 하한 위에서도 남으므로 self-test·통합 fixture 가 잡는다
 }
 
 
@@ -1165,6 +1168,38 @@ SELF_TESTS: list[tuple[str, str, bool, str]] = [
     ("N8", "SETEXT_QUOTE",                   True,  "⛔ 인용 + --- → 유령 금지"),
     ("N8", "ATX_TRAILING_HASH",              True,  "`## Foo ##` → foo"),
     ("N8", "FENCE_UNCLOSED",                 True,  "미종료 fence 내부 heading 제외"),
+    # #N14 — 접두 `py:`·`js:`·`md:` 는 확장자(없으면 .sh). 양성 = 위반 줄이 있다
+    ("N14", 'ISO="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/fz-gpt-iso.XXXXXX")" && pwd -P)" || die 11 "격리 폴더 생성 실패"',
+                                              True,  "v4.42.0 이전 런처 원형(db7c411^ gpt_independent.sh)"),
+    ("N14", 'T="$(cd "$(mktemp -d)" && pwd -P)"; trap \'rm -rf "$T"\' EXIT', True, "러너 원형 — trap 이 현재 폴더를 지운다"),
+    ("N14", 'cd "$(mktemp -d)" || exit 2   # 재현 줄',  True,  "뒤 주석은 앞 코드를 가리지 않는다(E1-0 재현 줄)"),
+    ("N14", 'pushd "$(mktemp -d)" >/dev/null', True,  "pushd 변형"),
+    ("N14", 'cd "$(mktemp -d -t fz-x)"',        True,  "mktemp -d -t 변형"),
+    ("N14", 'cd $(mktemp -d)',                  True,  "따옴표 없음 — 빈 치환이면 인자 없는 cd 가 HOME 으로 간다"),
+    ("N14", 'cd "`mktemp -d`"',                 True,  "백틱 치환"),
+    ("N14", 'cd -P -- "$(mktemp -d)"',          True,  "옵션 · `--` 뒤"),
+    ("N14", 'cd "$(TMPDIR=/x mktemp -d)"',      True,  "치환 안 환경 접두"),
+    ("N14", 'py:subprocess.run("cd \\"$(mktemp -d)\\" && make", shell=True)', True, ".py 의 셸 문자열"),
+    ("N14", "js:execSync('cd \"$(mktemp -d)\" && make')", True, ".js 의 셸 문자열"),
+    ("N14", "cat <<'EOF' > ok.txt\nx\nEOF\ncd \"$(mktemp -d)\"", True, "닫힌 heredoc 뒤의 코드는 본다"),
+    ("N14", "cat <<EOF\nx\ncd \"$(mktemp -d)\"", True, "⛔ 종결자 없는 `<<` 는 heredoc 으로 접지 않는다(미탐 방향)"),
+    ("N14", 'while read -r l; do :; done <<< EOF\ncd "$(mktemp -d)"\nEOF', True,
+                                              "`<<<` here-string 은 heredoc 이 아니다 — 뒤 줄이 낱말과 같아도 접지 않는다"),
+    ("N14", '# ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp -d)"` 는 mktemp 가 실패해도 `cd ""` 가 성공해',
+                                              False, "주석 — 고친 자리의 설명문(현 트리 4곳)"),
+    ("N14", "cat > bad.sh <<'EOF'\ncd \"$(mktemp -d)\"\nEOF", False, "heredoc 본문 BAD 예시는 데이터"),
+    ("N14", "\tcat <<-'EOF'\n\tcd \"$(mktemp -d)\"\n\tEOF", False, "`<<-'EOF'` 따옴표 탭 종결자 — 본문은 데이터"),
+    ("N14", "\tcat <<-EOF\n\tcd \"$(mktemp -d)\"\n\tEOF", True, "⛔ 따옴표 없는 `<<-EOF` 본문은 생성 셸이 `$(…)` 를 실행한다 — 코드로 본다"),
+    ("N14", "cat > g.sh <<EOF\nX=\"$(cd \"$(mktemp -d)\" && pwd -P)\"\nEOF", True, "⛔ 따옴표 없는 `<<EOF` 본문 — 현재 폴더 경로가 생성물에 박힌다"),
+    ("N14", "cat > g.sh <<\\EOF\ncd \"$(mktemp -d)\"\nEOF", False, "`<<\\EOF` 는 따옴표 구분자와 같다(확장 없음)"),
+    ("N14", 'T0="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }; T="$(cd "$T0" && pwd -P)"',
+                                              False, "안전 꼴 — 결과를 따로 받고 실패면 멈춘다(현 러너)"),
+    ("N14", 'd=$(mktemp -d) || exit 1\ncd "${d:?}"', False, "안전 꼴 — `:?` 로 빈 값을 막는다"),
+    ("N14", 'cd "$(dirname "$0")"',             False, "mktemp 가 아닌 치환"),
+    ("N14", 'abcd "$(mktemp -d)"',              False, "낱말 안의 cd 는 cd 가 아니다"),
+    ("N14", 'py:# cd "$(mktemp -d)" 는 쓰지 않는다', False, ".py 주석"),
+    ("N14", 'js:// cd "$(mktemp -d)" 는 쓰지 않는다', False, ".js 주석"),
+    ("N14", 'md:```bash\ncd "$(mktemp -d)"\n```', False, ".md BAD 예시 — 대상 확장자가 아니다"),
 ]
 SELF_TEST_COUNT = len(SELF_TESTS)
 
@@ -1230,6 +1265,20 @@ INTEG_TREE = {
     #      (구현 중 실측: 두 결함이 각각 142/142·11/12 오탐을 냈고 fixture 없이는 조용히 통과했다)
     "modules/target_n9.md": '# T\n\n## 1. 정상절\n\n본문\n\n## §5.7 § 접두절\n\n본문\n\n### 3) 괄호형 절\n\n본문\n',
     "modules/bad_n9.md": '`target_n9.md` §1 정상\n`target_n9.md` §5.7 § 접두 정상\n`target_n9.md` §3 괄호형 정상\n`target_n9.md` §9 부재\n',
+    # #N14: 빈 mktemp 치환 cd → **계열별 각 1개 이상**(.sh 2 · .py 1 · .js 1). 같은 파일에 음성(주석 · heredoc 본문 ·
+    #       안전 꼴)을 함께 둬 '전부 위반' 뒤집힘과 주석·heredoc 처리 소실을 같이 잡는다.
+    #       ⛔ scripts/ 밖에 둔다 — scripts/ 의 .sh/.py 는 #N5·#N6 대상이라 그 건수가 바뀐다
+    "tests/bad_n14.sh": '#!/bin/bash\n# 설명 주석 cd "$(mktemp -d)" 는 데이터다\ncat > ex.sh <<\'EOF\'\n'
+                        'cd "$(mktemp -d)"\nEOF\nT0="$(mktemp -d)" || exit 2; T="$(cd "$T0" && pwd -P)"\n'
+                        'X="$(cd "$(mktemp -d)" && pwd -P)"\npushd "$(mktemp -d -t fz)"\n',
+    "tests/bad_n14.py": 'import subprocess\nsubprocess.run(\'cd "$(mktemp -d)" && true\', shell=True)\n'
+                        '# cd "$(mktemp -d)" 는 쓰지 않는다\n',
+    "tests/bad_n14.js": '// cd "$(mktemp -d)" 는 쓰지 않는다\n'
+                        'require("child_process").execSync(\'cd "$(mktemp -d)" && true\');\n',
+    # (음성) .md BAD 예시 — 대상 확장자가 아니다 · SKIP 미끼 2종(제외 디렉터리 · docs/releases/)
+    "modules/ok_n14.md": '```bash\ncd "$(mktemp -d)"\n```\n',
+    "node_modules/decoy_n14.sh": 'cd "$(mktemp -d)"\n',
+    "docs/releases/decoy_n14.sh": 'cd "$(mktemp -d)"\n',
     # 정상 대조군 — 위반 0이어야 한다
     "modules/ok.md": '# T\n\n## 목차\n\n- [실제절](#실제절)\n\n## 실제절\n\n본문\n',
     "scripts/ok.py": 'from pathlib import Path\nroot = Path(__file__).resolve().parent\n',
@@ -1246,6 +1295,7 @@ INTEG_EXPECT = {
     "N7": ["modules/bad_n7.md:2"],
     "N8": ["modules/bad_n8.md"],
     "N9": ["modules/bad_n9.md:4"],
+    "N14": ["tests/bad_n14.sh:7", "tests/bad_n14.sh:8", "tests/bad_n14.py:2", "tests/bad_n14.js:2"],
 }
 
 
@@ -1369,6 +1419,10 @@ def run_self_tests() -> list[str]:
         elif item == "N6":
             # ⛔ chk_N6와 **동일 함수**를 호출한다 — fixture가 별도 로직을 검사하면 드리프트한다
             got = n6_ok(src, ".sh" if ("$" in src or src.startswith("echo ")) else ".py")
+        elif item == "N14":
+            # ⛔ chk_N14 와 **같은 술어**(n14_hits)와 같은 확장자 집합(N14_EXTS)을 쓴다
+            sfx, body = ("." + src[:2], src[3:]) if src[:3] in ("py:", "js:", "md:") else (".sh", src)
+            got = sfx in N14_EXTS and bool(n14_hits(body, sfx)[0])
         else:                                                     # pragma: no cover
             fails.append(f"#{item}: self-test 라우팅 미구현")
             continue
@@ -1559,12 +1613,87 @@ def chk_N9(root: Path | None = None):
     return v, seen
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# #N14 빈 mktemp 치환 cd (F-355)
+#
+# ⛔ 신설 근거: `X="$(cd "$(mktemp -d)" && pwd -P)"` 꼴은 mktemp 가 실패하면 안쪽 치환이 빈 문자열이 되고
+#    bash 3.2 의 `cd ""` 가 성공해 X 가 **현재 폴더**가 된다 — 정리 단계(`rm -rf "$X"` · trap)가 그 폴더를
+#    지웠다(따옴표가 없으면 인자 없는 `cd` 라 HOME 으로 간다). v4.42.0(db7c411 · 4fba0db)이 복사로 퍼진
+#    4곳을 고쳤으나 같은 꼴을 막는 검사가 없었다(F-355 '남은 구멍').
+# 범위: 실행 코드 `.sh`·`.py`·`.js`. 주석과 `.sh` 의 **따옴표 구분자** heredoc 본문(`<<'EOF'` · `<<"EOF"` · `<<\EOF`)은
+#    뺀다 — 고친 자리의 설명 주석과 fixture 의 BAD 예시가 그곳에 산다. ⛔ 따옴표 없는 `<<EOF` · `<<-EOF` 본문은 코드로
+#    본다 — 생성하는 셸이 그 자리에서 `$(…)` 를 실행하므로 mktemp 실패 시 현재 폴더 경로가 생성물에 박힌다.
+#    `.md`(모듈·레지스트리 INDEX 의 BAD 예시)는 보지 않는다.
+# ⛔ heredoc 은 **종결자 줄을 찾았을 때만** 건너뛴다. N6 의 '첫 `<<` 뒤 전부 버림' 은 앵커를 찾는 N6 에는
+#    안전 방향이지만 위험 꼴을 찾는 이 검사에서는 미탐 방향이다. `<<<` here-string 은 heredoc 이 아니다.
+# 안전 꼴(음성): 결과를 따로 받아 실패를 멈춘다 — `d="$(mktemp -d)" || exit 1` 뒤 `cd "${d:?}"`.
+# ⛔ 범위 외(미탐): 확인 없이 받은 변수로 cd 하는 두 줄 꼴 · 줄 이음(`\`)으로 나뉜 cd · 인터프리터에 먹이는
+#    **따옴표** heredoc(`python3 - <<'PY'` · `bash <<'EOF'`) 본문 · 큰따옴표 안에서 이스케이프된 `\$(`(`eval "cd \"\$(…)\""`)
+#    · `${T:-$(mktemp -d)}` 같은 기본값 확장 · 중첩 치환(`$(dirname "$(mktemp)")`) · `\cd` · 따옴표 안 ` #` 뒤의 코드 ·
+#    확장자 없는 스크립트. 오탐 가능(눈에 보이는 실패): .sh 문자열 속 설명 · 한 줄 here-string · 한 줄에 여러 heredoc.
+# ─────────────────────────────────────────────────────────────────────────────
+N14_EXTS = (".sh", ".py", ".js")
+# cd/pushd 바로 앞 경계 — 줄 시작 · 공백 · 셸 구분자 · 치환 여는 괄호 · 따옴표(.py/.js 셸 문자열)
+_N14_LEAD = r"(?:^|[\s;&|(`'\"{!])"
+N14_CD = re.compile(_N14_LEAD + r"(?:cd|pushd)\s")
+N14_BAD = re.compile(_N14_LEAD + r"(?:cd|pushd)\s+(?:-[A-Za-z]+\s+)*(?:--\s+)?\\?[\"']?(?:\$\(|`)[^()`]*?\bmktemp\b")
+N14_COMMENT = {".sh": re.compile(r"(^|\s)#.*$"), ".py": re.compile(r"(^|\s)#.*$"),
+               ".js": re.compile(r"(^|\s)//.*$")}
+N14_HEREDOC = re.compile(r"(?<!<)<<(?!<)(-?)\s*(?:'([^']+)'|\"([^\"]+)\"|(\\)?([A-Za-z_][A-Za-z0-9_]*))")
+
+
+def n14_code_lines(txt: str, suffix: str) -> list[tuple[int, str]]:
+    """(줄 번호, 주석을 뗀 코드). `.sh` 는 종결자가 있는 **따옴표 구분자** heredoc 본문만 건너뛴다(따옴표 없는 본문은 코드)."""
+    lines, strip = txt.split("\n"), N14_COMMENT.get(suffix)
+    out, i = [], 0
+    while i < len(lines):
+        code = strip.sub(r"\1", lines[i]) if strip else lines[i]
+        out.append((i + 1, code))
+        m = N14_HEREDOC.search(code) if suffix == ".sh" else None
+        if m:
+            word, dash = m.group(2) or m.group(3) or m.group(5), m.group(1) == "-"
+            quoted = bool(m.group(2) or m.group(3) or m.group(4))
+            end = next((j for j in range(i + 1, len(lines))
+                        if (lines[j].lstrip("\t") if dash else lines[j]) == word), None)
+            if quoted and end is not None:
+                i = end + 1          # 본문과 종결자 줄은 데이터다
+                continue
+        i += 1
+    return out
+
+
+def n14_hits(txt: str, suffix: str) -> tuple[list[int], int]:
+    """(위반 줄 번호, `cd`/`pushd` 코드 줄 수). ⛔ chk_N14 와 self-test 가 **같은 함수**를 쓴다."""
+    bad, seen = [], 0
+    for n, code in n14_code_lines(txt, suffix):
+        if N14_CD.search(code):
+            seen += 1
+            if N14_BAD.search(code):
+                bad.append(n)
+    return bad, seen
+
+
+def chk_N14(root: Path | None = None):
+    self_rel = Path(__file__).resolve().relative_to(ROOT).as_posix()
+    v, seen = [], 0
+    for rel, p in walk_files(*N14_EXTS, root=root):
+        if rel == self_rel:
+            continue          # ⛔ 자기 참조 제외 — 정규식·self-test·통합 fixture 문자열이 대상 꼴을 담는다
+        bad, n = n14_hits(read(p), p.suffix)
+        seen += n
+        v += [f"{rel}:{i}: `cd`/`pushd` 인자가 `$(mktemp …)` 치환 — mktemp 가 실패하면 빈 인자로 cd 가 "
+              f"성공해(bash 3.2 `cd \"\"`) 현재 폴더가 임시 폴더가 되고 정리가 그 폴더를 지운다 → 결과를 "
+              f"따로 받아 실패를 멈춘다: `d=\"$(mktemp -d)\" || exit 1` 뒤 `cd \"${{d:?}}\"` (F-355)"
+              for i in bad]
+    return v, seen
+
+
 CHECKS = {
     "1": chk_1, "3": chk_3, "5": chk_5, "6": chk_6, "7": chk_7,
     "12": chk_12, "14": chk_14, "16": chk_16, "N12": chk_N12,
     "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
     "N7": chk_N7, "N8": chk_N8, "N9": chk_N9, "N10": chk_N10,
-    "N11": chk_N11, "N13": chk_N13,
+    "N11": chk_N11, "N13": chk_N13, "N14": chk_N14,
 }
 
 

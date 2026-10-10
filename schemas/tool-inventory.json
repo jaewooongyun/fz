@@ -31,6 +31,7 @@
     "bash":    { "required": true },
     "codex":   { "required": false, "note": "/fz-gpt — 부재 시 fresh-context Agent 폴백이 정의돼 있다" },
     "jq":      { "required": false, "note": "일부 게이트 예시" },
+    "gh":      { "required": false, "note": "PR 조회·게시(fz-peer-review) — 부재 시 그 단계만 못 한다" },
     "mkdir":   { "required": true }, "cat":  { "required": true },
     "printf":  { "required": true }, "xargs": { "required": true },
     "sleep":   { "required": true }, "test": { "required": true },

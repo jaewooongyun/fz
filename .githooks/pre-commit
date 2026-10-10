@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # fz-plugin pre-commit: user-specific 절대 경로 차단
 # H1 원칙 (모델이 혼자 못하는 것) 구현 — deterministic check.
+# diff-parse: hunk-state — staged diff 의 추가 줄을 hunk 상태(`@@`)로 고른다. 파일 헤더 `+++ b/…` 는 첫 `@@` 앞이라 빠진다
 #
 # Codex Round 2 unique finding 반영: staged diff 추가 라인만 검사하여
 # 기존 잔존 정당 reference (예: ~/dev/fz-plugin/...)는 self-block하지 않음.
@@ -24,11 +25,17 @@ CHANGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E "$SCOPED_RE"
 
 EXIT=0
 for FILE in $CHANGED; do
-  # Staged diff에서 추가된 라인만 (`+`로 시작, `+++` filename header 제외)
-  ADDED_VIOLATIONS=$(git diff --cached -U0 -- "$FILE" \
-    | grep -E "^\+[^+]" \
-    | grep -nE "$USER_PATH_RE" \
-    || true)
+  # Staged diff에서 추가된 라인만 — hunk 상태로 고른다. ⛔ 접두사 정규식(`+` 다음이 `+` 아님)은
+  #   내용이 `+` 로 시작하는 추가 줄(diff 에서 `++…` · `+++…`)을 헤더로 오인해 놓쳤다(F-380).
+  #   헤더 `+++ b/…` 는 첫 `@@` 앞이고, 추가 줄은 hunk 안에서 언제나 `+` 로 시작한다
+  #   ⛔ 추출(git diff · awk)이 실패하면 막는다(fail-closed) — `|| true` 는 아래 grep 의 무매치에만
+  if ! ADDED=$(git diff --cached -U0 -- "$FILE" \
+    | awk '/^diff --git /{h=0;next} /^@@/{h=1;next} h&&/^\+/'); then
+    echo "⛔ fz pre-commit: ${FILE} 추가 줄 추출 실패(git diff · awk) — 판정할 수 없어 커밋을 막는다"
+    EXIT=1
+    continue
+  fi
+  ADDED_VIOLATIONS=$(printf '%s\n' "$ADDED" | grep -nE "$USER_PATH_RE" || true)
   if [ -n "$ADDED_VIOLATIONS" ]; then
     echo "⛔ fz pre-commit: ${FILE}에 user-specific 절대 경로 신규 추가:"
     echo "$ADDED_VIOLATIONS"

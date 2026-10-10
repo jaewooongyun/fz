@@ -57,9 +57,15 @@ NOT_A_COMMAND = {
     "except", "raise", "assert", "lambda", "yield", "await", "async", "pass", "break",
     "continue", "global", "nonlocal", "for", "while", "if", "then", "fi", "done", "case",
     "esac", "export", "set", "read", "local", "exit", "source", "echo", "function", "eval",
+    "do",
 }
+# ⛔ POSIX 기본 유틸 — 명령이지만 선언·실존 확인 대상이 아니다. 인벤토리에 넣으면 `shutil.which` 를 거치는데
+#    `cd` 는 셸 내장이라 실행 파일이 없는 환경(Linux)에서 필수 부재로 FAIL 한다(EC-33). 그래서 스캔에서 걷는다.
+POSIX_UTILS = {"cd", "ls", "cp", "mv", "rm", "wc", "tr", "sh"}
 CODE_BLOCK = re.compile(r"```(?:bash|sh|shell)\n(.*?)```", re.S)
-FIRST_TOKEN = re.compile(r"^\s*(?:\$ )?([a-z][a-z0-9_.-]{2,})\s", re.M)
+# ⛔ 2글자 명령도 본다(F-379). `{2,}`(3글자 이상)는 `rg`·`fd`·`ag`·`gh` 를 구조적으로 못 봤다 —
+#    AC8 의 `rg` 의존(F-224)이 이 사각으로 통과했다. 2글자 셸 키워드(`if`·`fi`·`do`)는 NOT_A_COMMAND 가 걷는다
+FIRST_TOKEN = re.compile(r"^\s*(?:\$ )?([a-z][a-z0-9_.-]{1,})\s", re.M)
 SCAN_GLOBS = ("skills/*/SKILL.md", "modules/*.md", "guides/*.md")
 
 
@@ -76,7 +82,7 @@ def scan_commands(root: pathlib.Path):
             for blk in CODE_BLOCK.findall(q.read_text(encoding="utf-8")):
                 for m in FIRST_TOKEN.finditer(blk):
                     tok = m.group(1)
-                    if tok in NOT_A_COMMAND:
+                    if tok in NOT_A_COMMAND or tok in POSIX_UTILS:
                         continue
                     if "_" in tok:          # 문서 내 함수 관례 (init_or_use_session)
                         continue
@@ -186,13 +192,32 @@ def self_test():
         r = mk(tmp / "r", "# x\n\n```python\nkubectl_like_name = 1\n```\n\n```bash\ngit log\n```\n")
         assert check(r) == OK, "python 블록을 명령으로 읽었다"
 
+    def c_two_letter_undeclared_detected(tmp):
+        """⛔ F-379 — 2글자 미선언 명령(`fd`)을 놓치면 AC8 의 `rg` 의존 같은 사각이 다시 열린다."""
+        r = mk(tmp / "r", "# x\n\n```bash\nfd -e md .\n```\n")
+        assert check(r) == VIOLATION, "⛔ 2글자 미선언 명령을 놓쳤다"
+
+    def c_two_letter_rg_reported(tmp):
+        """⛔ F-379 오라클 — `rg foo` 한 줄짜리 bash 블록은 미설치(미선언) 명령으로 보고한다. rg 는 인벤토리에 넣지 않는다(넣으면 재유입이 통과한다)."""
+        r = mk(tmp / "r", "# x\n\n```bash\nrg foo\n```\n")
+        assert check(r) == VIOLATION, "⛔ rg 재유입을 놓쳤다"
+
+    def c_posix_util_and_keyword_not_flagged(tmp):
+        """⛔ 오탐 방어 — 2글자를 열면 POSIX 유틸·셸 키워드 `do` 가 미선언으로 잡힌다(EC-33)."""
+        r = mk(tmp / "r", "# x\n\n```bash\ncd /tmp\nls -l\ncp a b\nfor f in a; do\n  rm -f \"$f\"\ndone\n```\n")
+        rc = check(r)
+        assert rc == OK, f"⛔ POSIX 유틸·셸 키워드를 미선언 명령으로 오탐했다 (rc={rc})"
+
     for n, f in [("clean-passes", c_clean_passes),
                  ("undeclared-detected", c_undeclared_detected),
                  ("keyword-not-flagged", c_keyword_not_flagged),
                  ("missing-required-detected", c_missing_required_detected),
                  ("optional-missing-ok", c_optional_missing_is_not_violation),
                  ("no-docs-unrun", c_no_docs_unrun),
-                 ("non-bash-block-ignored", c_non_bash_block_ignored)]:
+                 ("non-bash-block-ignored", c_non_bash_block_ignored),
+                 ("two-letter-undeclared-detected", c_two_letter_undeclared_detected),
+                 ("two-letter-rg-reported", c_two_letter_rg_reported),
+                 ("posix-util-keyword-not-flagged", c_posix_util_and_keyword_not_flagged)]:
         case(n, f)
 
     print(f"self-test {len(passed)}/{cases} 통과")

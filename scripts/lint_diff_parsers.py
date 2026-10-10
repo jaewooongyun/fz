@@ -23,7 +23,9 @@ diff 라인 접두사를 판정에 쓰는 파일은 첫 40행 안에 선언 1줄
     # diff-parse: not-a-diff   — 접두사가 diff 가 아니다 (CLI 인자·git cherry 등). 사유 필수
     # diff-parse: waived       — 알면서 안 한다. 사유 + 영향 필수
 
-⚠️ 한계 1 — **범위**: `.py`·`.sh`·`.awk`·`.js` 파일만 본다. **`.md` 안의 인라인 bash 는 대상이 아니다.**
+⚠️ 한계 1 — **범위**: `.py`·`.sh`·`.awk`·`.js` 파일과 **확장자 없는 셔뱅 파일**(첫 줄 `#!` — 인터프리터로
+   `.py`·`.js`·`.awk`·`.sh` 중 하나로 읽는다)만 본다. 스캔 뿌리에 `.githooks/` 가 있다 — 확장자 없는 훅이
+   범위 밖이라 위반인 `pre-commit` 이 "위반 0건" 에 묻혔다(F-380). **`.md` 안의 인라인 bash 는 대상이 아니다.**
    이 레포는 절차를 문서 안 bash 로 적는 관용구가 있고(`risk_scan.py` 가 대체한 것이 바로 그것),
    실측 결과 지금은 접두사 판정이 0건이지만(`tiers.md § 자동 선택` 은 `--numstat` **컬럼**을 본다)
    **"위반 0건"을 전수로 읽지 말 것.**
@@ -73,7 +75,9 @@ SIGNALS = (
     (re.compile(r"/\^-(?!\w)"), "awk:/^-"),
     (re.compile(r"""grep\s[^|;]*['"]\^\\?\+"""), "bash:grep '^+"),
     (re.compile(r"""grep\s[^|;]*['"]\^-"""), "bash:grep '^-"),
-    (re.compile(r'r?["\']\^\\\+'), 're:"^\\\\+"'),
+    # ⛔ 따옴표 바로 뒤를 요구하지 않는다(F-357). 인라인 플래그 `r"(?m)^\+\+\+ b/"` 가 이 앵커에 걸리지 않아
+    #    hunk 상태 없는 수집기가 통과했다. 역슬래시 1~2개 — 비-raw 문자열 `"^\\+"` · JS `new RegExp("^\\+")`
+    (re.compile(r'\^\\{1,2}\+'), 're:"^\\\\+"'),
     # ⛔ 정규식 형태의 `-` 쪽 헤더. `diff_anchors.py:35` 의 `^--- ` 가 이 형태인데
     #    첫 판이 못 봤다(다른 신호로 **우연히** 잡혔다).
     # ⛔ 3-dash 뒤 **공백을 요구**한다. diff 헤더는 언제나 `--- <경로>` 지만
@@ -90,6 +94,8 @@ SIGNALS = (
 
 AT_MARK = re.compile(r"@@")
 EXTS = (".py", ".sh", ".awk", ".js")
+# 확장자 없는 셔뱅 파일의 판정 확장자 — 첫 줄에 이 낱말이 있으면 그 확장자, 없으면 `.sh`
+SHEBANG_EXT = (("python", ".py"), ("node", ".js"), ("awk", ".awk"))
 SKIP_DIRS = {"node_modules", ".git", ".claude"}
 
 # ⛔ 주석 안의 예시를 코드로 세지 않는다. `test-gates.sh` 의 `# grep '^+' 0매치가…` 가
@@ -135,7 +141,24 @@ def classify(path, text, ext):
     return "ok", signals, mode
 
 
-def scan(root, roots=("scripts", "skills", "workflows", "agents", "tests")):
+def effective_ext(path, fn):
+    """판정 확장자. 확장자가 EXTS 면 그대로, 다른 확장자면 None(대상 아님), 없으면 셔뱅으로 정한다.
+
+    ⛔ 셔뱅은 **바이트로** 먼저 본다 — 확장자 없는 데이터·바이너리 파일을 utf-8 로 읽으면
+       디코드 실패가 UNKNOWN(exit 2)이 된다. 셔뱅 없는 확장자 없는 파일은 대상이 아니다.
+    """
+    ext = os.path.splitext(fn)[1]
+    if ext:
+        return ext if ext in EXTS else None
+    with open(path, "rb") as fh:
+        head = fh.readline(256)
+    if not head.startswith(b"#!"):
+        return None
+    line = head.decode("utf-8", "replace")
+    return next((e for key, e in SHEBANG_EXT if key in line), ".sh")
+
+
+def scan(root, roots=("scripts", "skills", "workflows", "agents", "tests", ".githooks")):
     results, unknown = [], []
     for r in roots:
         base = os.path.join(root, r)
@@ -144,10 +167,14 @@ def scan(root, roots=("scripts", "skills", "workflows", "agents", "tests")):
         for dirpath, dirnames, filenames in os.walk(base):
             dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
             for fn in sorted(filenames):
-                ext = os.path.splitext(fn)[1]
-                if ext not in EXTS:
-                    continue
                 p = os.path.join(dirpath, fn)
+                try:
+                    ext = effective_ext(p, fn)
+                except OSError as exc:
+                    unknown.append((os.path.relpath(p, root), str(exc)))
+                    continue
+                if ext is None:
+                    continue
                 if os.path.relpath(p, root) == SELF:
                     continue
                 try:
@@ -159,9 +186,10 @@ def scan(root, roots=("scripts", "skills", "workflows", "agents", "tests")):
                 verdict, signals, mode = classify(p, text, ext)
                 if verdict == "not-parser":
                     continue
+                # ext = 판정 확장자 — 확장자 없는 셔뱅 파일은 effective_ext 가 정한 값(--json 으로 관측된다)
                 results.append({
                     "file": os.path.relpath(p, root),
-                    "verdict": verdict, "signals": signals, "mode": mode,
+                    "verdict": verdict, "signals": signals, "mode": mode, "ext": ext,
                 })
     return results, unknown
 
@@ -202,6 +230,19 @@ SELF_TESTS = (
     ("문장 안의 diff-parse: 는 선언 아님", ".py",
      'x = "diff-parse: hunk-state"\nif line.startswith("@@"):\n    h=1\nif line.startswith("+"):\n    pass\n',
      "violation"),
+    # ⛔ F-357 — 따옴표 바로 뒤가 `^\+` 가 아닌 정규식 형태. 첫 판 신호는 넷 다 놓쳤다
+    ("인라인 플래그 (?m) 수집기 (선언 없음) → 위반", ".py",
+     'paths = re.finditer(r"(?m)^\\+\\+\\+ b/([^\\t\\n]+)", d)\n', "violation"),
+    ("인라인 플래그 (?ms) 작은따옴표 → 위반", ".py",
+     "HDR = re.compile(r'(?ms)^\\+\\+\\+ b/(\\S+)')\n", "violation"),
+    ("비-raw 이스케이프 \"^\\\\+\" → 위반", ".py",
+     'HDR = re.compile("^\\\\+\\\\+\\\\+ b/(.*)$", re.M)\n', "violation"),
+    ("JS new RegExp(\"^\\\\+\") → 위반", ".js",
+     'const HDR = new RegExp("^\\\\+\\\\+\\\\+ b/(.*)$", "gm");\n', "violation"),
+    ("줄 전체 주석 안의 (?m)^\\+ 예시는 파서 아님", ".py",
+     '# re.finditer(r"(?m)^\\+\\+\\+ b/", d) 는 hunk 안 줄을 헤더로 센다\nprint("ok")\n', "not-parser"),
+    ("+ 가 아닌 이스케이프 \"^\\\\s\" 는 파서 아님", ".py",
+     'IND = re.compile("^\\\\s*#")\n', "not-parser"),
 )
 
 
