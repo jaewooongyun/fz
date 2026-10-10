@@ -78,6 +78,16 @@ LEDGER_ENV = "FZ_GATES_LEDGER"
 CHECK_TIMEOUT_S = 20                   # 판정기 1회 호출 상한
 TOTAL_BUDGET_S = 45                    # 전체 예산 — 넘으면 통과(진단만)
 MAX_BLOCKS = 2                         # 같은 상태로 이 횟수까지만 막는다
+# 사유 크기 — 차단 사유는 막을 때마다 Claude 컨텍스트에 실린다(F-360 · EC-07).
+# 한 줄 ≈ 접두 + 원장 경로(~100) + 요약(≤400) ≈ 500자. 전체 상한 4000 ≈ 8줄 = 판정기 원장
+# 발견 상한(`gate_check.MAX_DISCOVERED` 8)이라 지금 상한에서는 거의 자르지 않는다. 남의 원장
+# 경고는 3줄(≈1500자)을 넘으면 한 줄로 접고, 자를 때는 본문 끝(진단 · 남의 원장 경고)부터 빼므로
+# 소유 원장 줄이 가장 늦게 빠진다. 발견 상한이 오르면 접기와 전체 상한이 사유를 묶는다 — 없으면
+# 원장 수만큼 수십 KB 가 실린다.
+SUMMARY_MAX_CHARS = 400                # 원장 하나의 판정 요약 상한
+UNMET_IDS_SHOWN = 8                    # 요약에 싣는 미충족 id 상한 — 넘으면 `…외 N건`
+FOREIGN_NOTES_FOLD = 3                 # 남의 원장 경고가 이보다 많으면 한 줄로 접는다
+REASON_MAX_CHARS = 4000                # 차단 사유 전체 상한 — 넘는 본문 줄은 `…외 N줄 생략`
 STATE_FILE = Path.home() / ".fz" / "stop-hook-state.json"
 # 소유 판정 — transcript 의 tool_use 중 원장을 **쓴** 것만 센다. 읽기·grep·hook 피드백
 # 인용은 제외(진단 세션이 남의 원장 경로를 출력만 해도 소유가 되면 안 된다).
@@ -123,6 +133,11 @@ WRITE_TARGET_RES = tuple(re.compile(pat.replace("TOKEN", _TOKEN)) for pat in (
 ))
 
 EXIT_PASS, EXIT_BLOCK = 0, 2
+# 판정기 `--status` 의 요약 줄 — 미충족 id 는 이 줄 **아래**에 한 줄씩 온다(`gate_check.py` evaluate 끝).
+# 게이트별 줄은 `  UNMET <id>: …` 라 콜론이 id 뒤에 와서 이 꼴과 겹치지 않는다.
+UNMET_LINE_RE = re.compile(r"^UNMET: (\d+) \(")
+# 그 아래 id 줄 — 판정기 게이트 id 문자 집합(`gate_check.GATE_RE`) 그대로. 이 꼴이 끊기면 목록 끝이다
+UNMET_ID_RE = re.compile(r"^\s+([A-Za-z0-9_.-]+)$")
 
 
 def _pass(diagnostic: str = "") -> int:
@@ -350,11 +365,45 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
     return owned, ""
 
 
+def _ids_line(head: str, shown: list, rest: int) -> str:
+    text = f"{head} — {', '.join(shown)}" if shown else head
+    if rest > 0:
+        text += (" " if shown else " — ") + f"…외 {rest}건"
+    return text
+
+
+def _unmet_summary(out: list) -> str:
+    """`--status` 의 마지막 `UNMET: n (…)` 줄과 그 아래 미충족 id 목록을 한 줄로 만든다.
+
+    ⛔ 마지막 줄만 싣던 구판은 미충족이 둘 이상이면 앞의 id 를 사유에서 뺐다(F-360).
+    id 는 `UNMET_IDS_SHOWN` 개까지, 그리고 요약이 `SUMMARY_MAX_CHARS` 안에 드는 만큼만 싣고
+    나머지는 `…외 N건` 으로 센다 — 자르기 뒤에도 표시 id 수 + N = n 이 맞는다.
+    `UNMET:` 줄이 없으면(충족 · 인프라 · 계약 위반 · 판정기 고장) 빈 문자열 — 호출부가 끝 줄로 간다.
+    """
+    idx = next((i for i in range(len(out) - 1, -1, -1) if UNMET_LINE_RE.match(out[i])), None)
+    if idx is None:
+        return ""
+    head = out[idx].strip()
+    total = int(UNMET_LINE_RE.match(out[idx]).group(1))
+    ids = []
+    for l in out[idx + 1:]:   # 연속된 id 줄만 — 판정기가 목록 뒤에 다른 줄을 더해도 id 로 섞지 않는다
+        m = UNMET_ID_RE.match(l)
+        if not m or len(ids) >= total:
+            break
+        ids.append(m.group(1))
+    shown = []
+    for gid in ids[:UNMET_IDS_SHOWN]:
+        if len(_ids_line(head, shown + [gid], total - len(shown) - 1)) > SUMMARY_MAX_CHARS:
+            break
+        shown.append(gid)
+    return _ids_line(head, shown, total - len(shown))
+
+
 def judge(checker: Path, ledger: Path, budget_left: float):
     """판정기를 `--status` 로 부른다 — CHECK 재실행 없음.
 
-    반환: (exit_code, 요약 한 줄). exit 는 판정기 계약을 그대로 쓴다
-    (0 충족 · 1 미충족 · 2 인프라 · 3 원장 계약 위반).
+    반환: (exit_code, 요약 한 줄). 미충족이면 `UNMET:` 줄 + id 목록, 아니면 출력의 끝 줄.
+    exit 는 판정기 계약을 그대로 쓴다 (0 충족 · 1 미충족 · 2 인프라 · 3 원장 계약 위반).
     """
     timeout = min(CHECK_TIMEOUT_S, max(1.0, budget_left))
     try:
@@ -367,8 +416,24 @@ def judge(checker: Path, ledger: Path, budget_left: float):
         return None, "판정기 호출 실패"
     out = (proc.stdout or b"").decode("utf-8", "replace").strip().splitlines()
     err = (proc.stderr or b"").decode("utf-8", "replace").strip().splitlines()
-    tail = (out[-1] if out else "") or (err[-1] if err else "")
-    return proc.returncode, tail[:200]
+    tail = _unmet_summary(out) or (out[-1] if out else "") or (err[-1] if err else "")
+    return proc.returncode, tail[:SUMMARY_MAX_CHARS]
+
+
+def _cap_reason(body: list, footer: list, more: str) -> str:
+    """차단 사유를 `REASON_MAX_CHARS` 안으로 — 넘치면 본문 끝 줄부터 빼고 `…외 N줄 생략` 한 줄을 남긴다.
+
+    ⛔ 안내(footer — ABANDON 출구 · 판정 명령)는 빼지 않는다. 길어도 다음 행동은 보여야 한다.
+    본문은 계약 위반 → 미충족 → 진단 순이라 끝에서 빼면 진단이 먼저 빠진다.
+    """
+    text = "\n".join(body + footer)
+    if len(text) <= REASON_MAX_CHARS:
+        return text
+    for keep in range(len(body) - 1, -1, -1):
+        text = "\n".join(body[:keep] + [f"…외 {len(body) - keep}줄 생략 {more}"] + footer)
+        if len(text) <= REASON_MAX_CHARS:
+            return text
+    return text[:REASON_MAX_CHARS]
 
 
 def main() -> int:
@@ -425,14 +490,25 @@ def main() -> int:
     if owner_note:
         notes.append(owner_note)
     # 남의 원장 — 판정은 하되 **막지 않는다**. 충족도 ABANDON 도 이 세션이 할 일이 아니다.
+    # ⛔ 경고가 `FOREIGN_NOTES_FOLD` 개를 넘으면 건수 한 줄로 접는다(EC-07) — 원장마다 요약
+    #    한 줄씩이면 원장 수만큼 사유가 자란다. 원장별 목록은 `--discover` 가 준다.
+    foreign_notes, foreign_invalid, budget_note = [], 0, ""
     for led in foreign:
         left = TOTAL_BUDGET_S - (time.monotonic() - started)
         if left <= 1.0:
-            notes.append(f"예산 소진 — {led.name} 미판정")
+            budget_note = f"예산 소진 — {led.name} 미판정"
             break
         code, tail = judge(checker, led, left)
         if code in (1, 3):
-            notes.append(f"다른 세션의 원장(막지 않음): {led} — {tail}")
+            foreign_notes.append(f"다른 세션의 원장(막지 않음): {led} — {tail}")
+            foreign_invalid += code == 3
+    if len(foreign_notes) > FOREIGN_NOTES_FOLD:
+        n = len(foreign_notes)
+        foreign_notes = [f"다른 세션의 원장(막지 않음) {n}개 — 미충족 {n - foreign_invalid} · "
+                         f"계약 위반 {foreign_invalid} (목록: python3 {checker} --discover {cwd})"]
+    notes += foreign_notes
+    if budget_note:
+        notes.append(budget_note)
     for led in ledgers:
         left = TOTAL_BUDGET_S - (time.monotonic() - started)
         if left <= 1.0:
@@ -483,13 +559,13 @@ def main() -> int:
             f"같은 상태로 {MAX_BLOCKS}회 막았다 — 통과시킨다. "
             f"미충족 {len(unmet)}건 · 계약 위반 {len(invalid)}건 (수동 확인 필요)")
 
-    lines = []
+    body = []
     for led, tail in invalid:
-        lines.append(f"⛔ 원장 계약 위반: {led} — {tail}")
+        body.append(f"⛔ 원장 계약 위반: {led} — {tail}")
     for led, tail in unmet:
-        lines.append(f"미충족 게이트: {led} — {tail}")
-    lines += notes
-    lines.append("")
+        body.append(f"미충족 게이트: {led} — {tail}")
+    body += notes
+    lines = [""]
     lines.append("게이트를 충족시키거나, 할 수 없으면 원장에 "
                  "`ABANDON: <게이트ID> <이유>` 를 남긴다 (포기 사실이 원장에 보존된다).")
     # 위 목록은 **이 세션의 transcript 가 쓴 원장**만이다(소유 판정). transcript 를 못 읽어
@@ -499,7 +575,7 @@ def main() -> int:
                      f"{LEDGER_ENV} 에 판정할 원장 경로만 나열해 범위를 좁힌다 (여러 개는 "
                      f"'{os.pathsep}' 로 구분). 남의 원장에 ABANDON 을 쓰면 그 작업의 수용 기준이 사라진다.")
     lines.append(f"판정: python3 {checker} --status <원장>")
-    return _block("\n".join(lines))
+    return _block(_cap_reason(body, lines, f"(전체: python3 {checker} --discover {cwd})"))
 
 
 # ── self-test ───────────────────────────────────────────────────────────
@@ -560,6 +636,9 @@ SELF_TEST_CASES = (
     #    게이트가 통째로 통과한다(2026-09-11 실측 fail-open). 읽기 전용 짝으로 오탐도 함께 막는다.
     ("owned-py-c",       "unmet",          {"transcript": "py-c"}, {}, 2, '"decision": "block"'),
     ("foreign-py-c-read", "unmet",         {"transcript": "py-c-read"}, {}, 0, "다른 세션의 원장"),
+    # ⛔ **사유의 미충족 목록** (F-360) — 판정기 끝 줄만 실으면 `G11` 하나만 보인다. 이 케이스가
+    #    없으면 판정기 `UNMET:` 출력 형식이 바뀔 때 사유가 조용히 한 줄로 퇴화한다. 상한 8 + 생략 수.
+    ("multi-unmet",      "multi",          {}, {}, 2, "— G1, G2, G3, G4, G5, G6, G7, G8 …외 3건"),
 )
 # 반복 발사가 필요한 케이스 — 이름 → 발사 횟수
 REPEAT_CASES = {"loop-guard": MAX_BLOCKS + 1, "loop-guard-churn": MAX_BLOCKS + 1}
@@ -573,7 +652,7 @@ PROBE_LAYOUT = {
 
 
 def _write_probe_ledger(root, spec):
-    """`spec` = `[배치:]종류`. 배치 미지정이면 깊이 2(`TICKET-0000/gates`)."""
+    """`spec` = `[배치:]종류`. 배치 미지정이면 깊이 2(`TICKET-0000/gates`). `multi` 는 미충족 11개."""
     layout, _, kind = spec.rpartition(":")
     rel = PROBE_LAYOUT.get(layout, "TICKET-0000/gates")
     gates = root / rel
@@ -592,6 +671,13 @@ def _write_probe_ledger(root, spec):
             "  EXPECT: ok\n"
             "  CWD: /usr\n"
             "  EVIDENCE: pending\n")
+    if kind == "multi":
+        body += "".join(f"\n- [ ] G{i}: 판정 대상\n"
+                        "  CRITERION: 사람이 읽는 합격 조건\n"
+                        "  CHECK: echo ok\n"
+                        "  EXPECT: ok\n"
+                        "  CWD: /usr\n"
+                        "  EVIDENCE: pending\n" for i in range(2, 12))
     target = gates / name
     target.write_text(body, encoding="utf-8")
     if kind == "approved":

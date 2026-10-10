@@ -271,7 +271,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 | 판정 = `--status` (CHECK 재실행 없음) | 재실행은 게이트당 기본 120초여서 hook에 부적합하다. 기록된 증거는 서명으로 oracle에 묶여 있어 "안 돌리고 통과 텍스트만 쓴" 경로를 이미 막는다 |
 | 전면 fail-open | exit 계약의 "세션 감금이 게이트 누락보다 나쁘다"가 가장 날카롭게 적용되는 자리다 — 여기서 실수하면 사용자가 세션을 끝낼 수 없다 |
 
-⛔ **무한 루프 방어.** Stop을 막으면 Claude가 계속하고 다시 Stop에 도달한다. 원장 상태가 그대로면 같은 이유로 또 막혀 세션이 끝나지 않는다. 같은 상태(원장 해시)로 **2회**까지만 막고 이후 통과 + 진단한다. 상태를 쓸 수 없으면(디스크 오류) 즉시 통과 — 방어 없이 막으면 무한 block이 된다.
+⛔ **무한 루프 방어.** Stop을 막으면 Claude가 계속하고 다시 Stop에 도달한다. 원장 상태가 그대로면 같은 이유로 또 막혀 세션이 끝나지 않는다. 같은 상태(지문 = 막힌 원장 경로와 판정 종류 `path:unmet|invalid` — 원장 내용·사유 요약은 넣지 않는다. 옆 세션이 원장을 고쳐도 카운터가 리셋되지 않게)로 **2회**까지만 막고 이후 통과 + 진단한다. 상태를 쓸 수 없으면(디스크 오류) 즉시 통과 — 방어 없이 막으면 무한 block이 된다.
 
 #### ⛔ 발견 한계와 탈출로
 
@@ -285,7 +285,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 
 ⛔ **설치 주의 6항은 `docs/completion-gates.md`가 정본이다** — 배열 추가 · hook 병렬 실행 · 캐시 경로의 버전(하드코딩하면 업데이트 후 조용히 꺼진다) · `python3` 3.9+ 부재 시 fail-open · `~/.fz/stop-hook-state.json` 생성 · 탐색 깊이 3 한계.
 
-검증: `python3 scripts/gate_stop_hook.py --self-test` (**23케이스** — 깊이 1~4 · draft-only · skip-git · approved · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard ×2 · **소유 판정 8종**: foreign-ledger·foreign-heredoc-cite 통과 / owned-ledger·owned-redirect·owned-bash·owned-bash-cd·owned-bash-var 차단 / transcript-missing fail-closed 차단). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
+검증: `python3 scripts/gate_stop_hook.py --self-test` (**27케이스** — no-gates-dir · 깊이 1~4 · draft-only · skip-git · closed-passes · approved · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard ×2 · **소유 판정 11종**: foreign-ledger·foreign-heredoc-cite·foreign-py-c-read 통과 / owned-ledger·owned-redirect·owned-bash·owned-bash-cd·owned-bash-var·owned-py-heredoc·owned-py-c 차단 / transcript-missing fail-closed 차단 · multi-unmet 사유의 미충족 id 목록). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
 
 ### 5. health-check — 노출 (hook 미설치 머신)
 
