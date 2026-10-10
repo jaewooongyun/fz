@@ -4,23 +4,34 @@
 릴리즈가 finding 을 닫아도 레지스트리로 돌아오는 길이 없었다 — `docs/releases/` 네 문서에
 `F-\\d{3}` 인용이 0건이었고, 그것이 배출률 5.8%(15/258)의 직접 원인이다.
 
-배출 = `entries/{slug}.md` → `.archive/{slug}.md` 이동 + `APPLIED.md` 1행 추가.
+배출 = `entries/{slug}.md` → `.archive/{slug}.md` 이동 + `APPLIED.md` 1행 추가 + `INDEX.md` 대기열 행 제거.
 ⛔ 삭제하지 않는다. 이동과 기록만 하며, 무엇을 닫았는지는 릴리즈 저자가 `Closes:` 로 적는다.
+⛔ 셋은 한 번에 원자적으로 바뀌지 않는다 — 이동·대장은 manifest 선기록으로, INDEX 행은 실행 끝의
+   재계산(`index_sync`)으로 같은 노트 재실행(또는 `--prune-index`)이 맞춘다. 남은 어긋남은 `--audit` 이 보여 준다.
 
-exit 0  배출 성공 (또는 --audit 대조 일치)
-exit 1  거부 — 모호한 ID · 없는 엔트리 · 대장 불일치
-exit 2  UNRUN — 레지스트리·릴리즈 노트 부재 등 판정 불가. ⛔ 통과로 읽지 않는다
+exit 0  배출 성공 (또는 --audit 대조 일치 · 위생 검사 기본 모드 통과)
+exit 1  거부 — 모호한 ID · 없는 엔트리 · 대장 불일치 · INDEX 정리 실패(읽은 뒤 바뀜 · 쓰기 실패 · 교체 뒤 대조 불일치) · --audit 의 위생 위반
+exit 2  UNRUN — 레지스트리·릴리즈 노트 부재 · 레지스트리 잠금 대기 상한 초과 등 판정 불가. ⛔ 통과로 읽지 않는다
 """
 # lint:no-root-anchor — 대상 레지스트리를 --root 인자로 받는 외부 검사기다
 from __future__ import annotations
 
 import argparse
+import collections
+import contextlib
+import fcntl
+import functools
+import hashlib
 import json
+import math
 import os
 import pathlib
 import re
+import shlex
 import shutil
+import subprocess
 import sys
+import time
 
 OK, REJECT, UNRUN = 0, 1, 2
 # ⛔ `\s*` 는 개행을 먹는다 — `Closes:` 다음 줄의 제목이 토큰으로 읽혔다(exit 1).
@@ -118,11 +129,6 @@ def applied_records(applied: pathlib.Path):
     return slugs, nums_only
 
 
-def applied_ids(applied: pathlib.Path):
-    """하위호환 — 번호 집합만 돌려준다."""
-    return applied_records(applied)[1]
-
-
 def archive_slugs(archive: pathlib.Path):
     """archive 에 실재하는 엔트리 slug 집합.
 
@@ -192,7 +198,238 @@ def write_manifest(mani: pathlib.Path, hist):
         raise
 
 
-def reconcile(root: pathlib.Path, hist, applied: pathlib.Path, mani: pathlib.Path):
+LOCK_NAME = ".fz-registry.lock"
+LOCK_WAIT_ENV = "FZ_REGISTRY_LOCK_WAIT"
+LOCK_WAIT_DEFAULT = 30.0
+
+
+@contextlib.contextmanager
+def registry_lock(root: pathlib.Path):
+    """협조 writer 끼리의 배타 구간 — `{root}/.fz-registry.lock` 에 `fcntl.flock(LOCK_EX)` 를 상한 안에서 재시도한다.
+
+    ⛔ 잠금은 **프로세스가 쥔다** — 프로세스가 끝나면(SIGKILL 포함) 커널이 푼다. 그래서 이 파일은 지우지
+       않고, 파일이 있다는 것을 잠김으로 읽지 않는다. 존재로 판정하는 잠금 파일은 보유자가 강제 종료되면
+       그대로 남아 다음 writer 를 영영 막는다.
+    ⛔ 같은 규칙을 따르는 writer(이 스크립트 · 이 파일에 flock 을 잡는 도구)끼리만 막는다. 에디터 Edit ·
+       `cat >` 처럼 잠금을 모르는 쓰기는 막지 못한다 — INDEX 는 교체 직전 재확인만 한다(`index_sync`).
+
+    yield: 잡았으면 True. 상한(`FZ_REGISTRY_LOCK_WAIT` 초, 기본 30)을 넘기거나 파일을 못 열면 False.
+    """
+    raw = os.environ.get(LOCK_WAIT_ENV, "")
+    try:
+        wait = float(raw) if raw else LOCK_WAIT_DEFAULT
+    except ValueError:
+        wait = None
+    # ⛔ float() 는 'nan' · 'inf' 를 받아들인다 — 그러면 마감이 영영 오지 않아 '상한 안 재시도' 가 무한 대기가 된다
+    if wait is None or not math.isfinite(wait) or wait < 0:
+        log(f"UNRUN: {LOCK_WAIT_ENV}={raw!r} 는 0 이상의 유한한 초가 아니다 — 아무것도 바꾸지 않았다")
+        yield False
+        return
+    path = root / LOCK_NAME
+    try:
+        fd = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o644)
+    except OSError as e:
+        log(f"UNRUN: 레지스트리 잠금 파일을 열 수 없다 — {path}: {e} (아무것도 바꾸지 않았다)")
+        yield False
+        return
+    try:
+        deadline = time.monotonic() + wait
+        got = False
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                got = True
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    break
+            time.sleep(0.1)
+        if not got:
+            log(f"UNRUN: 레지스트리 잠금을 {wait:g}초 안에 얻지 못했다 — 다른 협조 writer 가 쓰는 중이다 ({path}). "
+                "아무것도 바꾸지 않았다. ⛔ 잠금 파일을 지우지 마라 — 파일이 있는 것은 잠김이 아니고, "
+                "보유자가 끝나면 커널이 푼다")
+        yield got
+    finally:
+        os.close(fd)                      # 닫으면 flock 이 풀린다 — 파일은 남긴다
+
+
+INDEX_NAME = "INDEX.md"
+# INDEX 행이 가리키는 엔트리 — `](entries/<slug>.md)` 와 `](./entries/<slug>.md)` 는 같은 파일이다.
+INDEX_LINK = re.compile(r"\]\((\./)?entries/([^)\s/]+)\.md\)")
+TEST_HOOK_ENV = "FZ_REGISTRY_TEST_HOOK"
+
+
+@functools.lru_cache(maxsize=None)
+def _hygiene_module():
+    """`check_findings_hygiene.py` 를 importlib 로 읽는다 — 행 규칙(`IDX_ROW`)과 `--audit` 의 위생 검사(`check`)가 쓴다.
+
+    ⛔ 모듈 최상위에서 import 하지 않는다 — 위생 검사도 이 파일을 importlib 로 읽어서(`applied_records`) 양쪽이
+       최상위에서 서로를 부르면 순환이 된다. 쓰는 순간에만 올린다.
+    """
+    import importlib.util
+    path = pathlib.Path(__file__).resolve().parent / "check_findings_hygiene.py"
+    spec = importlib.util.spec_from_file_location("fz_findings_hygiene", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@functools.lru_cache(maxsize=None)
+def _queue_row():
+    """INDEX 대기열 행 판정 정규식 — `check_findings_hygiene.py` 의 `IDX_ROW` 를 그대로 빌린다.
+
+    ⛔ 행 규칙을 여기서 다시 짜지 않는다. 위생 검사가 '등재' 로 세는 행과 배출이 지우는 행이 갈리면
+       한쪽이 지운 행을 다른 쪽이 고아로 세거나, 지우지 않은 행을 등재로 센다.
+    ⛔ 절을 가리지 않고 문서 전체에 쓴다 — 위생 검사의 등재(`queue_rows`, `## 대기열` 절만)보다 넓은 것이
+       의도다. 절 밖에 잘못 붙은 행(위생 검사의 `대기열 밖` 위반)도 배출되면 고아이고, 좁히면 `--prune-index` 가 못 지운다.
+    """
+    return _hygiene_module().IDX_ROW
+
+
+def _test_hook(point: str, idx: pathlib.Path):
+    """⛔ 시험 전용 틈 — `FZ_REGISTRY_TEST_HOOK` 이 비어 있으면 아무것도 하지 않는다(운영 경로 무동작).
+
+    값은 명령(shlex 분할)이고 `<지점> <INDEX 경로>` 를 덧붙여 실행한다. 지점:
+      read     — 처음 읽은 뒤 · 교체 직전 재확인 전 (읽기~교체 사이 변경 재현)
+      replace  — 재확인 뒤 · os.replace 직전, 잠금을 쥔 채 (협조 writer 가 기다리는지 재현)
+      replaced — 교체 뒤 · 비대상 행 대조 전 (대조 실패와 백업 경로 재현)
+    소비자: tests/fixtures/registry/eject-index/run.sh
+    """
+    cmd = os.environ.get(TEST_HOOK_ENV, "")
+    if cmd:
+        # ⛔ env 가 셸에 남아 있으면 운영 경로에서도 돈다 — 돌 때마다 알린다(조용히 임의 명령을 실행하지 않는다)
+        log(f"WARN: {TEST_HOOK_ENV} 활성 — 시험 전용 훅을 '{point}' 지점에서 실행한다")
+        subprocess.run(shlex.split(cmd) + [point, str(idx)], check=False)
+
+
+def _row_counter(text: str):
+    """표 행(`|` 로 시작하는 줄)의 다중집합."""
+    return collections.Counter(line.rstrip("\r") for line in text.split("\n") if line.startswith("|"))
+
+
+def _index_plan(text: str, targets: set, live_ids: set):
+    """INDEX 본문을 (남길 본문, 지울 행 [(slug, 줄)], WARN 목록) 으로 가른다.
+
+    지울 행 = 대기열 행(위생 검사 `IDX_ROW`)이면서 **full slug 링크**가 targets 의 slug 를 가리키고
+    그 slug 의 번호가 행 ID 와 같은 것.
+    ⛔ ID 만으로 지우지 않는다 — 같은 번호를 다른 slug 가 쓰고 있을 수 있다(현재 수는 위생 검사의 `중복 ID` 줄).
+    ⛔ 못 지운 의심 행을 말없이 넘기지 않는다 — archive slug 를 가리키는데 행 ID 가 다르거나, 행 ID 가
+       live 에는 없고 archive 에만 있는데 링크가 다른 slug(옛 이름 · 오타)면 WARN 으로 남긴다.
+    """
+    row_re = _queue_row()
+    tids = {SLUG.match(s).group(1) for s in targets}
+    keep, removed, warns = [], [], []
+    for line in text.splitlines(keepends=True):
+        m = row_re.match(line)
+        if not m:
+            keep.append(line)
+            continue
+        rid = m.group(1)
+        links = INDEX_LINK.findall(line)
+        hit = [s for _, s in links if s in targets and SLUG.match(s).group(1) == rid]
+        if hit:
+            removed.append((hit[0], line.rstrip("\r\n")))
+            if any(dot for dot, s in links if s == hit[0]):
+                warns.append(f"{rid}: `./entries/` 형태 링크 — 같은 파일로 보고 지웠다 ({hit[0]})")
+            continue
+        keep.append(line)
+        stale = sorted({s for _, s in links if s in targets})
+        if stale or (rid not in live_ids and rid in tids):
+            arc_same = sorted(s for s in targets if s.startswith(rid + "-")) or stale
+            got = ", ".join(s for _, s in links) or "링크 없음"
+            warns.append(f"{rid}: slug 변형 의심 — 지우지 않았다 (행 링크 {got} · archive {', '.join(arc_same)})")
+    return "".join(keep), removed, warns
+
+
+def _live(root: pathlib.Path):
+    """entries 의 (slug 집합, 번호 집합)."""
+    ent = root / "entries"
+    slugs = {q.stem for q in ent.iterdir() if q.suffix == ".md" and SLUG.match(q.stem)} if ent.is_dir() else set()
+    return slugs, {SLUG.match(s).group(1) for s in slugs}
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def index_sync(root: pathlib.Path, slugs) -> int:
+    """INDEX.md 에서 **archive 에 있는 slug** 의 대기열 행을 0 으로 다시 계산한다 — 배출·복구·정리의 공통 끝 단계.
+
+    호출자(잠금을 쥔 채): eject(이번 실행이 옮긴 것 · 이미 배출돼 skip 한 것 · reconcile 이 복구한 것) ·
+    `--resolve-pending`(확정한 레코드의 archive 분) · `--prune-index`(archive 전부 − keep).
+    ⛔ 대상은 넘겨받은 slug 중 **실제로 archive 에 있고 entries 에 없는 것**뿐이다 — 넘겨받았다는 것만으로
+       지우지 않는다. 이동이 실패한 slug 의 행을 지우면 live 엔트리가 색인에서 사라진다.
+    ⛔ 원자적 비교-교체가 아니다. 순서: 읽기·해시 → 새 본문을 `.tmp` 에 → **교체 직전 재읽기** 해시가 다르면
+       교체하지 않고 거부 → `os.replace` → 다시 읽어 비대상 행 다중집합 대조. 재확인과 교체 사이에 잠금
+       없는 쓰기(에디터 Edit 등)가 끼면 그 쓰기는 잃는다 — 보장 밖이다. 교체 뒤 대조는 경합 탐지가 아니라
+       이 변환이 비대상 행을 건드리지 않았는지의 검산이다(다르면 원본을 백업하고 경로를 알린다).
+    ⛔ 지울 행이 0 이면 파일을 다시 쓰지 않는다 — 재실행은 바이트·mtime 을 바꾸지 않는다.
+    ⛔ INDEX 가 없으면 배출을 막지 않고 NOTE 만 남긴다 — 잘못된 루트를 조용히 넘기지 않도록 경로를 찍는다.
+    """
+    idx = root / INDEX_NAME
+    if not idx.is_file():
+        print(f"NOTE: {INDEX_NAME} 없음 — 대기열 행 정리를 건너뛴다 ({idx}) · ⛔ 레지스트리 루트가 맞는지 확인하라")
+        return OK
+    try:
+        raw0 = idx.read_bytes()
+        text0 = raw0.decode("utf-8")
+        arc = archive_slugs(root / ".archive")
+        live, live_ids = _live(root)
+        targets = {s for s in set(slugs) & arc if SLUG.match(s)} - live
+        new_text, removed, warns = _index_plan(text0, targets, live_ids)
+    except (OSError, UnicodeDecodeError, AttributeError) as e:
+        log(f"UNRUN: {INDEX_NAME} 대기열 행을 판정하지 못했다 — {type(e).__name__}: {e} (INDEX 는 그대로다)")
+        return UNRUN
+    for w in warns:
+        print(f"  WARN   {w}")
+    _test_hook("read", idx)
+    if not removed:
+        print(f"{INDEX_NAME} -0행 (archive slug 의 대기열 행 재계산 — 지울 행 없음)")
+        return OK
+    tmp = idx.with_name(idx.name + ".tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8", newline="") as f:
+            f.write(new_text)
+        shutil.copymode(idx, tmp)
+    except OSError as e:
+        if tmp.is_file():
+            tmp.unlink()
+        log(f"REJECT: {INDEX_NAME} 정리 실패 — {type(e).__name__}: {e} (원본 그대로 · 이동·대장 기록은 남았다 — "
+            f"다시 실행하거나 `--prune-index {root}` 로 맞춘다)")
+        return REJECT
+    if _sha(idx.read_bytes()) != _sha(raw0):
+        tmp.unlink()
+        log(f"REJECT: {INDEX_NAME} 가 읽은 뒤 바뀌었다 — 교체하지 않았다 (잠금 밖 writer). "
+            "다시 실행하면 바뀐 내용 기준으로 다시 계산한다")
+        return REJECT
+    _test_hook("replace", idx)
+    try:
+        os.replace(tmp, idx)
+    except OSError as e:
+        tmp.unlink(missing_ok=True)
+        log(f"REJECT: {INDEX_NAME} 교체 실패 — {type(e).__name__}: {e} (원본 그대로)")
+        return REJECT
+    _test_hook("replaced", idx)
+    after = idx.read_bytes().decode("utf-8", errors="replace")
+    want = _row_counter(text0) - collections.Counter(line for _, line in removed)
+    if _row_counter(after) != want:
+        bak = root / f"{INDEX_NAME}.bak-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"
+        try:
+            bak.write_bytes(raw0)
+            where = f"원본 백업: {bak}"
+        except OSError as e:
+            where = f"⛔ 원본 백업도 실패했다 — {e}"
+        log(f"REJECT: 교체 뒤 {INDEX_NAME} 의 비대상 행이 지운 행만큼만 달라지지 않았다 — {where}")
+        return REJECT
+    print(f"{INDEX_NAME} -{len(removed)}행 (archive slug 의 대기열 행 재계산)")
+    for slug, _ in removed:
+        print(f"  INDEX  -  {slug}")
+    print("NOTE: 잠금은 협조 writer 끼리만 막는다 — 잠금 없이 INDEX 를 고친 쓰기(에디터 Edit 등)는 교체 직전 "
+          "재확인 뒤로는 보장되지 않는다. 레지스트리 정리 중에는 다른 세션이 쓰지 않는다(README §1)")
+    return OK
+
+
+def reconcile(root: pathlib.Path, hist, applied: pathlib.Path, mani: pathlib.Path, landed_out: set | None = None):
     """중단된 배출(`state: pending`)을 재실행에서 **복구**한다.
 
     ⛔ 이동은 됐는데 대장·manifest 기록 전에 끊기면, 이전 판은 그 상태를 영영 복구하지 못했다 —
@@ -201,6 +438,8 @@ def reconcile(root: pathlib.Path, hist, applied: pathlib.Path, mani: pathlib.Pat
 
     복구 규칙: pending 레코드의 계획 slug 중 archive 에 실재하고 대장에 없는 것을 대장에 적고,
     레코드를 done 으로 확정한다. 이미 적힌 것은 건드리지 않는다(멱등).
+    landed_out: archive 에 도착한 slug 를 모은다 — 호출자(eject)가 마지막 `index_sync` 에 넘겨
+    INDEX 대기열 행을 지운다(대장만 복구하고 INDEX 행을 남기면 고아가 된다).
     """
     pend = [r for r in hist if r.get("state") == "pending"]
     if not pend:
@@ -213,6 +452,8 @@ def reconcile(root: pathlib.Path, hist, applied: pathlib.Path, mani: pathlib.Pat
     for rec in pend:
         planned = rec.get("planned", [])
         landed = [x for x in planned if x in arc]
+        if landed_out is not None:
+            landed_out.update(landed)
         add = [x for x in landed if x not in ap_slugs]
         if add:
             rows = [f"| {rec.get('version', '?')} | {x} | `{rec.get('note', '?')}` | 중단 복구 |" for x in add]
@@ -241,6 +482,22 @@ def reconcile(root: pathlib.Path, hist, applied: pathlib.Path, mani: pathlib.Pat
 
 
 def resolve_pending(root: pathlib.Path):
+    """⛔ 설명되지 않은 중단을 **사람의 판정으로** 닫는다 — 잠금을 쥐고 본체(`_resolve_pending`)를 돌린 뒤
+    확정한 레코드의 archive 분 INDEX 대기열 행을 지운다(`index_sync`)."""
+    # ⛔ 잠금 파일은 manifest 가 있는 레지스트리 루트에만 만든다 — 잘못된 루트에 흔적을 남기지 않는다
+    if not (root / MANI_NAME).is_file():
+        return _resolve_pending(root, set())
+    landed: set = set()
+    with registry_lock(root) as held:
+        if not held:
+            return UNRUN
+        rc = _resolve_pending(root, landed)
+        if rc != OK:
+            return rc
+        return index_sync(root, landed)
+
+
+def _resolve_pending(root: pathlib.Path, landed_out: set):
     """⛔ 설명되지 않은 중단을 **사람의 판정으로** 닫는다.
 
     보수적 reconcile 은 planned 를 설명하지 못하면 pending 을 유지하고 모든 배출을 막는다 —
@@ -279,6 +536,7 @@ def resolve_pending(root: pathlib.Path):
             ap_slugs = ap_slugs | set(add)
             recovered += len(add)
             print(f"  복구   대장 기록 {len(add)}건: {', '.join(add)}")
+        landed_out.update(landed)
         rec["ejected"] = landed
         rec["lost"] = [x for x in planned if x not in arc and x not in ent]
         rec["state"] = "done"
@@ -293,6 +551,27 @@ def resolve_pending(root: pathlib.Path):
 
 
 def eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool):
+    """잠금을 쥐고 배출(`_eject`)한 뒤, 이번 실행이 건드린 slug 의 INDEX 대기열 행을 지운다(`index_sync`).
+
+    ⛔ INDEX 정리는 **이번 실행분**(옮긴 것 · 이미 배출돼 skip 한 것 · reconcile 이 복구한 것)만이다.
+       예전 배출분이 남긴 행은 `--prune-index` 가 맡는다 — 배출 하나가 무관한 행을 한꺼번에 지우지 않는다.
+    ⛔ dry-run 은 읽기만 하므로 잠금도 INDEX 정리도 하지 않는다.
+    """
+    # ⛔ 잠금 파일은 레지스트리로 확인된 루트에만 만든다 — 잘못된 --root 에 흔적을 남기지 않는다
+    if dry or not (root / "entries").is_dir():
+        return _eject(root, note, version, dry, set())
+    touched: set = set()
+    with registry_lock(root) as held:
+        if not held:
+            return UNRUN
+        rc = _eject(root, note, version, dry, touched)
+        if rc == UNRUN or (rc == REJECT and not touched):
+            return rc                     # 노트 부재 · 이동 전 거부 — 아무것도 바꾸지 않았다(INDEX 포함)
+        rc_idx = index_sync(root, touched)
+    return rc if rc != OK else rc_idx
+
+
+def _eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool, touched: set):
     entries, archive, applied = root / "entries", root / ".archive", root / "APPLIED.md"
     if not entries.is_dir():
         log(f"UNRUN: entries 디렉토리 없음 — {entries}")
@@ -316,8 +595,9 @@ def eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool):
         log(f"REJECT: manifest 최상위가 배열이 아니다 — {mani} (하나도 이동하지 않았다)")
         return REJECT
     if not dry:
-        hist, _, unresolved = reconcile(root, hist, applied, mani)
+        hist, _, unresolved = reconcile(root, hist, applied, mani, landed_out=touched)
         if unresolved:
+            touched.clear()      # ⛔ 거부는 전무 — INDEX 도 건드리지 않는다(README 규칙 2)
             return REJECT        # ⛔ 설명 안 된 중단 위에 새 배출을 얹지 않는다
 
     by_slug, by_id = index_entries(entries)
@@ -342,6 +622,8 @@ def eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool):
                         # ⛔ manifest 가 배출했다고 기록한 것이 archive 에 없다 — 사람이 지웠거나 옮겼다
                         note_ = " ⚠️ manifest 는 배출됐다는데 archive 에 파일이 없다 — `--audit` 으로 확인하라"
                     skipped.append(f"{t}: 이미 배출됨 (대장 {done}){note_}")
+                    if SLUG.match(done):
+                        touched.add(done)      # 행이 남았으면 이번 실행 끝에 지운다(중단 뒤 재실행 복구)
                     continue
             rejects.append(e)
             continue
@@ -355,6 +637,7 @@ def eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool):
         print(f"  거부   {r}")
     if rejects:
         log("REJECT: 모호하거나 없는 토큰이 있다 — 하나도 이동하지 않았다")
+        touched.clear()
         return REJECT
     if dry:
         for s in plan:
@@ -369,6 +652,7 @@ def eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool):
     conflicts = [s for s in plan if (archive / f"{s}.md").exists()]
     if conflicts:
         log(f"REJECT: archive 에 같은 이름이 이미 있다 — {', '.join(conflicts)} (하나도 이동하지 않았다)")
+        touched.clear()
         return REJECT
     # ⛔ **선기록**: 옮기기 전에 계획을 manifest 에 pending 으로 적는다. 이동 뒤 기록 전에
     #    끊겨도 다음 실행의 reconcile() 이 이 레코드를 보고 복구한다 [외부: fz-gpt validate r2 #1].
@@ -389,6 +673,7 @@ def eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool):
             break
         moved.append(slug)
         print(f"  이동   {slug}")
+    touched.update(moved)
 
     # ⛔ full slug 로 적는다 — 번호만 적으면 같은 번호의 다른 slug 와 구분되지 않는다(#3)
     rows = [f"| {version} | {s} | `{note.name}` | 릴리즈 `Closes:` 로 배출 |" for s in moved]
@@ -408,8 +693,59 @@ def eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool):
     return OK
 
 
+def prune_index(root: pathlib.Path, keep=frozenset()):
+    """`--prune-index ROOT` — archive 에 있는 slug **전부**의 INDEX 대기열 행을 0 으로 다시 계산한다(일괄 정리).
+
+    맡는 것: INDEX 를 지우기 전의 배출분 · 중단된 정리. 수동 기각·흡수는 `entries/` 에서 지우므로(archive 없음)
+    대상이 아니다 — 그 행은 손으로 지운다(레지스트리 README §1).
+    keep: 지우지 않을 ID 또는 full slug(결정 대기 엔트리처럼 행을 남겨야 하는 것).
+    ⛔ INDEX.md 만 바꾼다 — manifest·APPLIED·엔트리는 건드리지 않는다.
+    ⛔ 이 명령의 일이 INDEX 뿐이라 INDEX 가 없으면 UNRUN 이다(배출의 NOTE 와 다르다 — 잘못된 루트 의심).
+    """
+    if not (root / "entries").is_dir():
+        log(f"UNRUN: entries 디렉토리 없음 — {root / 'entries'} (레지스트리 루트가 아니다)")
+        return UNRUN
+    if not (root / INDEX_NAME).is_file():
+        log(f"UNRUN: {INDEX_NAME} 없음 — {root / INDEX_NAME} (정리할 대상이 없다 · 루트 확인)")
+        return UNRUN
+    with registry_lock(root) as held:
+        if not held:
+            return UNRUN
+        arc = archive_slugs(root / ".archive")
+        kept = sorted(s for s in arc if s in keep or (SLUG.match(s) and SLUG.match(s).group(1) in keep))
+        # ⛔ archive 와 하나도 맞지 않는 keep 토큰(오타 · 형식 틀림)은 남기려던 행을 지운다 — 바꾸기 전에 멈춘다
+        hit = set(kept) | {SLUG.match(s).group(1) for s in kept if SLUG.match(s)}
+        miss = sorted(k for k in keep if k not in hit)
+        if miss:
+            log(f"UNRUN: --keep 토큰이 archive 의 어느 엔트리와도 맞지 않는다 — {', '.join(miss)} "
+                "(ID F-NNN 또는 full slug · 아무것도 바꾸지 않았다)")
+            return UNRUN
+        for s in kept:
+            print(f"  keep   {s} (지우지 않는다)")
+        return index_sync(root, arc - set(kept))
+
+
+def index_residual(root: pathlib.Path, slugs):
+    """읽기 전용 — slugs 중 entries 에 없는 것의 INDEX 대기열 행이 남았는가. 반환 (잔존 [(slug, 줄)], WARN, 대조 불가 사유)."""
+    idx = root / INDEX_NAME
+    if not idx.is_file():
+        return [], [], f"{INDEX_NAME} 없음 ({idx})"
+    try:
+        live, live_ids = _live(root)
+        targets = {s for s in slugs if SLUG.match(s)} - live
+        _, residual, warns = _index_plan(idx.read_text(encoding="utf-8"), targets, live_ids)
+    except (OSError, UnicodeDecodeError, AttributeError) as e:
+        return [], [], f"{INDEX_NAME} 대기열 행을 판정하지 못했다 — {type(e).__name__}: {e}"
+    return residual, warns, None
+
+
 def audit(root: pathlib.Path, mani_path: pathlib.Path):
-    """A3 verify — manifest 의 배출 ID 집합이 APPLIED 에 전건 있는지 대조."""
+    """A3 verify — manifest 의 배출 ID 집합이 APPLIED 에 전건 있는지 대조 + 배출분·archive 의 INDEX 대기열 잔존 대조.
+
+    ⛔ INDEX 잔존은 **보고만** 하고 exit 를 바꾸지 않는다 — INDEX 를 지우기 전의 배출분(레거시)이 남아
+       있어서 여기서 거부하면 일괄 정리(`--prune-index`) 전의 레지스트리가 감사를 통과하지 못한다.
+       고아 행을 위반으로 세는 것은 위생 검사 쪽이다.
+    """
     if not mani_path.is_file():
         log(f"UNRUN: manifest 없음 — {mani_path}")
         return UNRUN
@@ -440,12 +776,51 @@ def audit(root: pathlib.Path, mani_path: pathlib.Path):
         print(f"  archive 누락  {s}")
     for r in pending:
         print(f"  미완료 레코드  {r.get('version', '?')} planned={r.get('planned', [])}")
+    residual, warns, why = index_residual(root, want | arc)
+    if why:
+        print(f"NOTE: INDEX 잔존 대조 생략 — {why}")
+    else:
+        print(f"INDEX 잔존 {len(residual)} (배출분·archive slug 의 대기열 행)")
+        for slug, _ in residual:
+            print(f"  INDEX 잔존  {slug}")
+        for w in warns:
+            print(f"  WARN   {w}")
+        if residual:
+            print(f"    → `--prune-index {root}` 가 지운다 (⛔ 잔존은 대장 대조의 exit 를 바꾸지 않는다 — 고아 판정은 `--audit` 의 위생 검사)")
     return REJECT if (missing or arch_missing or pending) else OK
+
+
+def audit_cli(root: pathlib.Path, mani_path: pathlib.Path):
+    """`--audit ROOT` — 대장 대조(`audit`) 뒤 같은 ROOT 에 위생 검사 기본 모드(`check_findings_hygiene.check`)를 돌린다.
+
+    실 레지스트리 소비자(SC-3 · G27): 릴리스마다 배출 뒤 이 진입점을 부른다. `audit()` 의 대조 규칙·self-test 는 그대로다.
+    판정(위반 우선): 대조 거부 또는 위생 위반이 하나라도 있으면 1 · 아니고 어느 쪽이 UNRUN 이면 2 · 둘 다 통과면 0.
+    ⛔ 위생 검사기를 읽지 못하거나 검사 중 예외가 나면 UNRUN 이다 — 통과로 읽지 않고, traceback 으로 죽지도 않는다.
+       모듈은 대장 대조보다 **먼저** 읽는다 — 대조의 INDEX 잔존 판정도 같은 모듈(`_queue_row`)을 쓰므로, 뒤에서 읽으면
+       적재 실패가 대조 단계의 traceback 으로 새어 나간다.
+    """
+    try:
+        hmod = _hygiene_module()
+    except Exception as e:      # 적재 실패 = 판정 불가 — 대장 대조도 이 모듈에 기대므로 돌리지 않는다
+        print(f"UNRUN: 위생 검사기를 읽지 못했다 — {type(e).__name__}: {e} (대장 대조도 돌리지 않았다)")
+        print(f"AUDIT: 대장 대조 미실행 · 위생 검사 미실행 → exit {UNRUN}")
+        return UNRUN
+    rc = audit(root, mani_path)
+    print("── 위생 검사 (check_findings_hygiene.py 기본 모드 · 같은 ROOT) ──")
+    try:
+        hy = hmod.check(root, False)
+    except Exception as e:      # 모듈 고장·예상 밖 예외 = 판정 불가
+        print(f"UNRUN: 위생 검사를 돌리지 못했다 — {type(e).__name__}: {e}")
+        hy = UNRUN
+    final = REJECT if REJECT in (rc, hy) else (UNRUN if UNRUN in (rc, hy) else OK)
+    print(f"AUDIT: 대장 대조 exit {rc} · 위생 검사 exit {hy} → exit {final}")
+    return final
 
 
 def self_test():
     """fixture — 정상·없는ID·이미배출·ID충돌거부·중단후재실행·산문언급·모호비skip
-    + 중복토큰·충돌시전무이동·같은번호다른slug·빈Closes (뒤 4종 = fz-gpt review #1/#3/#8 회귀)."""
+    + 중복토큰·충돌시전무이동·같은번호다른slug·빈Closes (뒤 4종 = fz-gpt review #1/#3/#8 회귀)
+    + INDEX 대기열 행 정리·잠금·감사 잔존(index-* · prune-index-keep · lock-busy-unrun · audit-reports-index-residual)."""
     import tempfile
 
     passed, failed, cases = [], [], 0
@@ -945,6 +1320,243 @@ def self_test():
         assert rc == OK, f"⛔ 확정 후에도 새 배출이 막힌다 (rc={rc})"
         assert (root / ".archive" / "F-990-new.md").is_file(), "새 배출이 진행되지 않았다"
 
+    def row(slug):
+        return f"| {slug[:5]} | x | [{slug[:5]}](entries/{slug}.md) |\n"
+
+    def ix(root, slugs, extra=""):
+        """INDEX.md — `## 대기열` 아래 표에 slug 마다 한 행 + 다른 절의 산문 링크(행이 아니다)."""
+        text = ("# INDEX\n\n> 반영되면 행을 지운다\n\n## 대기열\n\n| ID | 한 줄 | 문서 |\n|---|---|---|\n"
+                + "".join(row(s) for s in slugs) + extra
+                + "\n## 다음 ID\n\n산문 속 링크 [F-001](entries/F-001-alpha.md) 는 대기열 행이 아니다\n")
+        (root / "INDEX.md").write_text(text, encoding="utf-8")
+        return text
+
+    def c_index_row_pruned_on_eject(tmp):
+        """⛔ 회귀: 배출은 그 slug 의 INDEX 대기열 행을 지운다 — 이동·대장만 하고 행을 남기면 고아가 된다."""
+        root, note = mk(tmp, ["F-001-alpha", "F-002-beta"])
+        before = ix(root, ["F-001-alpha", "F-002-beta"])
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        assert eject(root, note, "9.9.9", False) == OK, "배출이 OK 가 아니다"
+        after = (root / "INDEX.md").read_text(encoding="utf-8")
+        assert row("F-001-alpha") not in after, "⛔ 배출한 slug 의 대기열 행이 남았다"
+        assert after == before.replace(row("F-001-alpha"), ""), "⛔ 대상 행 밖의 줄이 바뀌었다"
+        assert eject(root, note, "9.9.9", False) == OK, "재실행이 실패했다"
+        assert (root / "INDEX.md").read_text(encoding="utf-8") == after, "⛔ 재실행이 INDEX 를 바꿨다"
+        assert (root / LOCK_NAME).is_file(), "잠금 파일이 없다 — 잠금을 잡지 않았다"
+
+    def c_index_same_number_other_slug(tmp):
+        """⛔ 회귀: 같은 번호의 다른 slug 행은 지우지 않는다 — 행 식별은 ID 가 아니라 full slug 링크다.
+
+        배출은 이번 실행분만 지우고, 예전 배출분은 `--prune-index` 가 지운다.
+        """
+        root, note = mk(tmp, ["F-070-two", "F-071-x"])
+        (root / ".archive").mkdir()
+        (root / ".archive" / "F-070-one.md").write_text("x\n", encoding="utf-8")
+        ix(root, ["F-070-one", "F-070-two", "F-071-x"])
+        note.write_text("Closes: F-071-x\n", encoding="utf-8")
+        assert eject(root, note, "9.9.9", False) == OK, "배출이 OK 가 아니다"
+        t = (root / "INDEX.md").read_text(encoding="utf-8")
+        assert row("F-071-x") not in t, "배출 행이 남았다"
+        assert row("F-070-two") in t, "⛔ 같은 번호의 live 행을 지웠다"
+        assert row("F-070-one") in t, "⛔ 이번 배출과 무관한 예전 배출 행까지 지웠다"
+        assert prune_index(root) == OK, "--prune-index 실패"
+        t = (root / "INDEX.md").read_text(encoding="utf-8")
+        assert row("F-070-one") not in t and row("F-070-two") in t, "⛔ --prune-index 가 slug 로 가르지 못했다"
+
+    def c_index_absent_note(tmp):
+        """⛔ 회귀: INDEX 가 없어도 배출은 성공하되 **말없이 넘기지 않는다**(NOTE). `--prune-index` 는 UNRUN."""
+        import io
+        root, note = mk(tmp, ["F-001-alpha"])
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = eject(root, note, "9.9.9", False)
+        assert rc == OK, f"INDEX 부재가 배출을 막았다 (rc={rc})"
+        assert "NOTE: INDEX.md 없음" in buf.getvalue(), "⛔ INDEX 부재를 조용히 넘겼다"
+        assert not (root / "INDEX.md").exists(), "없던 INDEX 를 만들었다"
+        assert prune_index(root) == UNRUN, "⛔ --prune-index 가 INDEX 없이 통과했다"
+
+    def c_index_reconcile_prunes(tmp):
+        """⛔ 회귀: 중단 복구(reconcile)도 INDEX 대기열 행을 지운다 — 대장만 복구하면 고아가 남는다."""
+        root, note = mk(tmp, ["F-960-y"])
+        (root / ".archive").mkdir()
+        (root / ".archive" / "F-001-a.md").write_text("x\n", encoding="utf-8")
+        (root / MANI_NAME).write_text(json.dumps([{"version": "1", "note": "n", "planned": ["F-001-a"],
+                                                  "state": "pending", "ejected": []}]), encoding="utf-8")
+        ix(root, ["F-001-a", "F-960-y"])
+        note.write_text("Closes: F-960-y\n", encoding="utf-8")
+        assert eject(root, note, "9.9.9", False) == OK, "복구 뒤 배출이 OK 가 아니다"
+        t = (root / "INDEX.md").read_text(encoding="utf-8")
+        assert row("F-001-a") not in t, "⛔ reconcile 이 복구한 slug 의 행이 남았다"
+        assert row("F-960-y") not in t, "배출 행이 남았다"
+
+    def c_index_resolve_pending_prunes(tmp):
+        """⛔ 회귀: `--resolve-pending` 도 확정한 레코드의 archive 분 행을 지운다."""
+        root, _ = mk(tmp, [])
+        (root / ".archive").mkdir()
+        (root / ".archive" / "F-001-a.md").write_text("x\n", encoding="utf-8")
+        (root / MANI_NAME).write_text(json.dumps([{"version": "1", "note": "n", "planned": ["F-001-a", "F-002-lost"],
+                                                  "state": "pending", "ejected": []}]), encoding="utf-8")
+        ix(root, ["F-001-a"])
+        assert resolve_pending(root) == OK, "확정이 OK 가 아니다"
+        assert row("F-001-a") not in (root / "INDEX.md").read_text(encoding="utf-8"), "⛔ 확정 뒤에도 행이 남았다"
+
+    def c_index_changed_after_read_rejects(tmp):
+        """⛔ 회귀: 처음 읽은 뒤 INDEX 가 바뀌면 교체하지 않고 거부한다 — 덮으면 남의 행을 잃는다."""
+        root, note = mk(tmp, ["F-001-alpha"])
+        ix(root, ["F-001-alpha"])
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        foreign = "| F-990 | 다른 세션 | [F-990](entries/F-990-foreign.md) |\n"
+
+        def fake(point, idx):
+            if point == "read":
+                with open(idx, "a", encoding="utf-8") as f:
+                    f.write(foreign)
+
+        g = globals()
+        real = g["_test_hook"]
+        g["_test_hook"] = fake
+        try:
+            rc = eject(root, note, "9.9.9", False)
+        finally:
+            g["_test_hook"] = real
+        t = (root / "INDEX.md").read_text(encoding="utf-8")
+        assert rc == REJECT, f"⛔ 읽은 뒤 바뀐 INDEX 를 그대로 덮었다 (rc={rc})"
+        assert foreign in t, "⛔ 다른 writer 의 행을 잃었다"
+        assert row("F-001-alpha") in t, "거부인데 교체했다"
+        assert not (root / "INDEX.md.tmp").exists(), ".tmp 를 남겼다"
+        assert eject(root, note, "9.9.9", False) == OK, "재실행이 맞추지 못했다"
+        t = (root / "INDEX.md").read_text(encoding="utf-8")
+        assert foreign in t and row("F-001-alpha") not in t, "재실행 결과가 틀렸다"
+
+    def c_index_write_failure_rejects(tmp):
+        """⛔ 회귀: INDEX 쓰기가 실패하면 성공을 반환하지 않고 원본을 그대로 둔다(배출 기록은 남는다)."""
+        root, note = mk(tmp, ["F-001-alpha"])
+        before = ix(root, ["F-001-alpha"])
+        (root / "INDEX.md.tmp").mkdir()        # .tmp 자리를 디렉토리로 막아 쓰기를 실패시킨다
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        rc = eject(root, note, "9.9.9", False)
+        assert rc == REJECT, f"⛔ INDEX 쓰기 실패인데 rc={rc}"
+        assert (root / "INDEX.md").read_text(encoding="utf-8") == before, "⛔ 실패했는데 원본이 바뀌었다"
+        assert (root / ".archive" / "F-001-alpha.md").is_file(), "배출 자체가 안 됐다 — 전제 불성립"
+        assert "F-001-alpha" in (root / "APPLIED.md").read_text(encoding="utf-8"), "대장 기록이 없다"
+        (root / "INDEX.md.tmp").rmdir()
+        assert eject(root, note, "9.9.9", False) == OK, "막힘이 풀린 뒤 재실행이 맞추지 못했다"
+        assert row("F-001-alpha") not in (root / "INDEX.md").read_text(encoding="utf-8"), "재실행 뒤에도 행이 남았다"
+
+    def c_index_link_variants(tmp):
+        """⛔ 회귀: `./entries/` 링크도 같은 파일로 지우고, 다른 slug 링크(옛 이름)는 지우지 않되 WARN 한다."""
+        import io
+        root, _ = mk(tmp, [])
+        (root / ".archive").mkdir()
+        for s in ("F-001-a", "F-002-b"):
+            (root / ".archive" / f"{s}.md").write_text("x\n", encoding="utf-8")
+        dot = "| F-001 | x | [F-001](./entries/F-001-a.md) |\n"
+        old = "| F-002 | x | [F-002](entries/F-002-old-name.md) |\n"
+        ix(root, [], dot + old)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = prune_index(root)
+        t = (root / "INDEX.md").read_text(encoding="utf-8")
+        out = buf.getvalue()
+        assert rc == OK, f"rc={rc}"
+        assert dot not in t, "⛔ `./entries/` 링크 행을 놓쳤다 (0건을 지우고 OK)"
+        assert old in t, "⛔ slug 가 다른 행을 번호만 보고 지웠다"
+        assert "slug 변형" in out and "./entries/" in out, f"⛔ 변형을 말없이 넘겼다 — {out!r}"
+
+    def c_prune_index_keep(tmp):
+        """`--prune-index` 의 keep 은 결정 대기 엔트리의 행을 남긴다(ID 또는 full slug)."""
+        root, _ = mk(tmp, [])
+        (root / ".archive").mkdir()
+        for s in ("F-001-a", "F-002-b", "F-003-c"):
+            (root / ".archive" / f"{s}.md").write_text("x\n", encoding="utf-8")
+        ix(root, ["F-001-a", "F-002-b", "F-003-c"])
+        assert prune_index(root, frozenset({"F-002", "F-003-c"})) == OK, "--prune-index 실패"
+        t = (root / "INDEX.md").read_text(encoding="utf-8")
+        assert row("F-001-a") not in t, "keep 밖 행이 남았다"
+        assert row("F-002-b") in t and row("F-003-c") in t, "⛔ keep 한 행을 지웠다"
+
+    def c_lock_busy_unrun(tmp):
+        """⛔ 회귀: 다른 협조 writer 가 잠금을 쥐고 있으면 상한까지 기다린 뒤 아무것도 바꾸지 않고 UNRUN.
+
+        ⛔ 판정은 잠금 파일의 존재가 아니라 flock 보유다 — 보유자가 놓으면 파일이 남아 있어도 바로 잡힌다.
+        """
+        root, note = mk(tmp, ["F-001-alpha"])
+        before = ix(root, ["F-001-alpha"])
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        old = os.environ.get(LOCK_WAIT_ENV)
+        os.environ[LOCK_WAIT_ENV] = "0.3"
+        fd = os.open(str(root / LOCK_NAME), os.O_RDWR | os.O_CREAT, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            t0 = time.monotonic()
+            rc = eject(root, note, "9.9.9", False)
+            waited = time.monotonic() - t0
+        finally:
+            os.close(fd)
+            if old is None:
+                os.environ.pop(LOCK_WAIT_ENV, None)
+            else:
+                os.environ[LOCK_WAIT_ENV] = old
+        assert rc == UNRUN, f"⛔ 잠금이 잡혀 있는데 rc={rc}"
+        assert waited >= 0.25, f"⛔ 상한까지 기다리지 않았다 ({waited:.2f}s)"
+        assert (root / "entries" / "F-001-alpha.md").is_file(), "⛔ 잠금 없이 이동했다"
+        assert (root / "INDEX.md").read_text(encoding="utf-8") == before, "⛔ 잠금 없이 INDEX 를 바꿨다"
+        assert (root / LOCK_NAME).is_file(), "⛔ 잠금 파일을 지웠다"
+
+    def c_reject_leaves_index(tmp):
+        """⛔ 회귀: 거부(모호·없는 토큰)는 전무다 — 이미 배출된 slug 가 섞여 있어도 INDEX 를 바꾸지 않는다."""
+        root, note = mk(tmp, [], "| 9.9.8 | F-001-a | `old.md` | 릴리즈 `Closes:` 로 배출 |\n")
+        (root / ".archive").mkdir()
+        (root / ".archive" / "F-001-a.md").write_text("x\n", encoding="utf-8")
+        before = ix(root, ["F-001-a"])
+        note.write_text("Closes: F-001-a, F-009-typo\n", encoding="utf-8")
+        assert eject(root, note, "9.9.9", False) == REJECT, "없는 토큰인데 거부하지 않았다"
+        assert (root / "INDEX.md").read_text(encoding="utf-8") == before, "⛔ 거부한 실행이 INDEX 를 바꿨다"
+
+    def c_prune_index_keep_miss(tmp):
+        """⛔ 회귀: archive 와 맞지 않는 keep 토큰(오타)은 바꾸기 전에 UNRUN — 남기려던 행을 지우지 않는다."""
+        root, _ = mk(tmp, [])
+        (root / ".archive").mkdir()
+        (root / ".archive" / "F-348-a.md").write_text("x\n", encoding="utf-8")
+        before = ix(root, ["F-348-a"])
+        assert prune_index(root, frozenset({"F348"})) == UNRUN, "오타 keep 을 받아들였다"
+        assert (root / "INDEX.md").read_text(encoding="utf-8") == before, "⛔ 오타 keep 으로 행을 지웠다"
+
+    def c_lock_wait_nonfinite_unrun(tmp):
+        """⛔ 회귀: 잠금 대기 상한이 nan · inf · 음수면 기다리지 않고 UNRUN — float() 가 받아들여 무한 대기가 되던 경로."""
+        root, note = mk(tmp, ["F-001-alpha"])
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        old = os.environ.get(LOCK_WAIT_ENV)
+        try:
+            for v in ("nan", "inf", "-1"):
+                os.environ[LOCK_WAIT_ENV] = v
+                t0 = time.monotonic()
+                rc = eject(root, note, "9.9.9", False)
+                assert rc == UNRUN and time.monotonic() - t0 < 1.0, f"⛔ {v}: rc={rc}"
+        finally:
+            if old is None:
+                os.environ.pop(LOCK_WAIT_ENV, None)
+            else:
+                os.environ[LOCK_WAIT_ENV] = old
+        assert (root / "entries" / "F-001-alpha.md").is_file(), "⛔ 상한이 틀렸는데 이동했다"
+        assert eject(root, note, "9.9.9", False) == OK, "⛔ 보유자가 놓았는데 파일이 남았다는 이유로 막혔다"
+
+    def c_audit_reports_index_residual(tmp):
+        """⛔ 회귀: --audit 은 배출분의 INDEX 잔존 행을 보여 준다 — INDEX 를 안 보면 고아가 감사를 그대로 통과한다."""
+        import io
+        root, _ = mk(tmp, [], "| 9.9.9 | F-001-a | `n` | 릴리즈 `Closes:` 로 배출 |\n")
+        (root / ".archive").mkdir()
+        (root / ".archive" / "F-001-a.md").write_text("x\n", encoding="utf-8")
+        mani = root / MANI_NAME
+        mani.write_text(json.dumps([{"version": "9.9.9", "note": "n", "planned": ["F-001-a"],
+                                     "state": "done", "ejected": ["F-001-a"]}]), encoding="utf-8")
+        ix(root, ["F-001-a"])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            audit(root, mani)
+        assert "INDEX 잔존  F-001-a" in buf.getvalue(), f"⛔ 잔존 행을 보고하지 않았다 — {buf.getvalue()!r}"
+
     for n, f in [("normal", c_normal), ("absent-id", c_absent), ("already-ejected", c_already),
                  ("ambiguous-id-reject", c_ambiguous), ("rerun-idempotent", c_rerun),
                  ("prose-mention-not-row", c_prose_not_row),
@@ -971,7 +1583,21 @@ def self_test():
                  ("audit-pending-missing-ledger", c_audit_pending_missing_ledger),
                  ("audit-pending-unfinalized", c_audit_pending_complete_but_unfinalized),
                  ("resolve-pending-recovers-ledger", c_resolve_pending_recovers_ledger),
-                 ("resolve-pending-breaks-deadlock", c_resolve_pending_breaks_deadlock)]:
+                 ("resolve-pending-breaks-deadlock", c_resolve_pending_breaks_deadlock),
+                 ("index-row-pruned-on-eject", c_index_row_pruned_on_eject),
+                 ("index-same-number-other-slug", c_index_same_number_other_slug),
+                 ("index-absent-note", c_index_absent_note),
+                 ("index-reconcile-prunes", c_index_reconcile_prunes),
+                 ("index-resolve-pending-prunes", c_index_resolve_pending_prunes),
+                 ("index-changed-after-read-rejects", c_index_changed_after_read_rejects),
+                 ("index-write-failure-rejects", c_index_write_failure_rejects),
+                 ("index-link-variants", c_index_link_variants),
+                 ("prune-index-keep", c_prune_index_keep),
+                 ("lock-busy-unrun", c_lock_busy_unrun),
+                 ("reject-leaves-index", c_reject_leaves_index),
+                 ("prune-index-keep-miss", c_prune_index_keep_miss),
+                 ("lock-wait-nonfinite-unrun", c_lock_wait_nonfinite_unrun),
+                 ("audit-reports-index-residual", c_audit_reports_index_residual)]:
         cases += 1
         case(n, f)
 
@@ -990,20 +1616,28 @@ def main():
     ap.add_argument("--note", type=pathlib.Path, help="릴리즈 노트 경로")
     ap.add_argument("--version", default="", help="APPLIED 행에 적을 버전/날짜")
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--audit", type=pathlib.Path, metavar="ROOT", help="manifest ↔ APPLIED 대조")
+    ap.add_argument("--audit", type=pathlib.Path, metavar="ROOT", help="manifest ↔ APPLIED 대조 + 위생 검사 기본 모드")
     ap.add_argument("--resolve-pending", type=pathlib.Path, metavar="ROOT",
                     help="⛔ 설명되지 않은 중단(pending)을 사람 판정으로 확정한다 — 유실분은 `lost` 로 남긴다")
+    ap.add_argument("--prune-index", type=pathlib.Path, metavar="ROOT",
+                    help="archive 에 있는 slug 의 INDEX 대기열 행을 전부 지운다 (일괄 정리 — INDEX.md 만 바꾼다)")
+    ap.add_argument("--keep", default="", metavar="ID,...",
+                    help="--prune-index 에서 지우지 않을 ID 또는 full slug (쉼표 구분)")
     ap.add_argument("--manifest", type=pathlib.Path)
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
 
+    if a.keep and not a.prune_index:
+        ap.error("--keep 은 --prune-index 와 함께만 쓴다")
     if a.self_test:
         return self_test()
     if a.audit:
         mani = a.manifest or (a.audit / ".eject-manifest.json")
-        return audit(a.audit, mani)
+        return audit_cli(a.audit, mani)
     if a.resolve_pending:
         return resolve_pending(a.resolve_pending)
+    if a.prune_index:
+        return prune_index(a.prune_index, frozenset(t for t in re.split(r"[,\s]+", a.keep) if t))
     if not a.root or not a.note:
         ap.error("--root 와 --note 가 필요하다 (또는 --self-test / --audit)")
     return eject(a.root, a.note, a.version or "unversioned", a.dry_run)

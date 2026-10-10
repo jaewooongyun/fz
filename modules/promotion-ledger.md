@@ -415,7 +415,7 @@ findings 22건 전수 분류 결과 **대다수가 E**다. 현행 4트랙 어디
 
 ### 배출 기록
 
-A·B 로 처리한 엔트리는 findings 에서 삭제하고 `fz-findings/APPLIED.md` 에 1행을 남긴다(반영처 = 파일:섹션 + 버전 + oracle 결과). 본 원장에는 등재하지 않는다 — 승격이 아니라 수리이기 때문이다.
+A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 노트 `Closes:` 로 `scripts/eject_findings.py` 를 돌리면 `entries/` → `.archive/` 이동(삭제가 아니다) · `fz-findings/APPLIED.md` 1행 · `INDEX.md` 대기열 행 제거를 함께 처리한다(기각·흡수의 수동 경로와 동시 쓰기 잠금은 레지스트리 README §1). APPLIED 행에는 노트 이름만 남으므로 반영처(파일:섹션 + 버전 + oracle 결과)는 노트 본문에 적는다. 본 원장에는 등재하지 않는다 — 승격이 아니라 수리이기 때문이다.
 
 ### D-2: coverage-unit-mismatch (트랙 D 관측 #1~#3)
 

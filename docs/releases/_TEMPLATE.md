@@ -47,8 +47,11 @@ python3 scripts/eject_findings.py --root {작업 폴더}/fz-findings \
 # 실제 배출
 python3 scripts/eject_findings.py --root {작업 폴더}/fz-findings \
   --note docs/releases/vX.Y.Z.md --version X.Y.Z
-# 사후 대조 (manifest ↔ APPLIED ↔ .archive)
+# 사후 대조 (manifest ↔ APPLIED ↔ .archive) + 같은 루트의 위생 검사 기본 모드
 python3 scripts/eject_findings.py --audit {작업 폴더}/fz-findings
 ```
+
+⛔ `--audit` 은 대장 대조 뒤 `check_findings_hygiene.py` 기본 모드를 같은 루트에 돌린다 — 등재율 미달(새 엔트리의 대기열 행 누락) · status 줄 부재 ·
+고아 행 · 대기열 밖 행 · APPLIED/live 번호 충돌 · 중복 · 펜스 밖 덤프도 비0 이다(F-373). 검사 기본 동작을 바꾼 판은 그 변경을 §2 표에 적는다.
 
 ⛔ 배출은 **이동과 기록만** 한다. 삭제하지 않고, 무엇을 닫았는지는 릴리즈 저자가 적는다.
