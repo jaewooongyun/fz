@@ -9,12 +9,35 @@
 #   FZ_SHIM_ROLLOUT : 쉼표로 가른 jsonl 파일들을 $CODEX_HOME/sessions/2026/09/28/ 에 복사한다(rollout 감사 셀)
 #   FZ_SHIM_SLEEP   : 초 — 자식 sleep 을 띄우고 기다린다(멈춘 CLI · 프로세스 그룹째 죽는지 보는 셀)
 #   FZ_SHIM_IGNORE_TERM : 1 이면 그 자식이 TERM 을 무시한다(KILL 로만 죽는 자손 — 시간 초과 감시자가 KILL 까지 가는지 보는 셀)
+#   FZ_SHIM_PRELINES : N — 시작하자마자 stdout 에 `shim-line 1`…`shim-line N` 을 쓴다(출력 뒤 정체 · 진행 감시 셀)
+#   FZ_SHIM_TICK    : 초:횟수 — 그 간격으로 `tick 1`…`tick 횟수` 를 쓴다(지속 출력 — 감시가 끊지 않아야 하는 셀)
+#   FZ_SHIM_TAG     : 이 shim 과 그 자식(sleep)의 argv0 를 `fz-shim[<태그>]` 로 바꾼다 — 러너가 잔존을 이름(`sleep N`)이 아니라
+#                     셀 태그로 센다(전역 이름 검색은 동시 실행과 충돌한다 · F-407). 환경 변수는 ps 에 보이지 않아 argv 에 싣는다
 if [ "${1:-}" = "--version" ]; then echo "codex-cli 0.0.0-shim"; exit 0; fi
+if [ -n "${FZ_SHIM_TAG:-}" ] && [ -z "${FZ_SHIM_TAGGED:-}" ]; then
+  export FZ_SHIM_TAGGED=1; exec -a "fz-shim[$FZ_SHIM_TAG]" /bin/bash "$0" "$@"
+fi
 [ -n "${FZ_SHIM_ENV_CAPTURE:-}" ] && printf 'HOME=%s\nCODEX_HOME=%s\n' "${HOME:-}" "${CODEX_HOME:-}" > "$FZ_SHIM_ENV_CAPTURE"
 if [ -n "${FZ_SHIM_ROLLOUT:-}" ] && [ -n "${CODEX_HOME:-}" ]; then
   mkdir -p "$CODEX_HOME/sessions/2026/09/28"
   n=0; IFS=',' read -r -a _rolls <<< "$FZ_SHIM_ROLLOUT"
   for f in "${_rolls[@]}"; do n=$((n + 1)); cp "$f" "$CODEX_HOME/sessions/2026/09/28/rollout-shim-$n.jsonl"; done
+fi
+if [ -n "${FZ_SHIM_PRELINES:-}" ]; then
+  n=0; while [ "$n" -lt "$FZ_SHIM_PRELINES" ]; do n=$((n + 1)); echo "shim-line $n"; done
+fi
+if [ -n "${FZ_SHIM_TICK:-}" ]; then
+  _s="${FZ_SHIM_TICK%%:*}" _c="${FZ_SHIM_TICK##*:}"; n=0
+  while [ "$n" -lt "$_c" ]; do
+    n=$((n + 1)); echo "tick $n"
+    if [ -n "${FZ_SHIM_TAG:-}" ]; then (exec -a "fz-shim[$FZ_SHIM_TAG]" sleep "$_s"); else sleep "$_s"; fi
+  done
+fi
+# 태그 셀의 sleep — 아래 원래 경로와 같은 모양(TERM 무시 포함)에 argv0 만 태그다. 원래 경로는 건너뛴다
+if [ -n "${FZ_SHIM_SLEEP:-}" ] && [ -n "${FZ_SHIM_TAG:-}" ]; then
+  if [ -n "${FZ_SHIM_IGNORE_TERM:-}" ]; then (trap '' TERM; exec -a "fz-shim[$FZ_SHIM_TAG]" sleep "$FZ_SHIM_SLEEP") &
+  else (exec -a "fz-shim[$FZ_SHIM_TAG]" sleep "$FZ_SHIM_SLEEP") & fi
+  wait $!; FZ_SHIM_SLEEP=""
 fi
 if [ -n "${FZ_SHIM_SLEEP:-}" ]; then
   if [ -n "${FZ_SHIM_IGNORE_TERM:-}" ]; then (trap '' TERM; exec sleep "$FZ_SHIM_SLEEP") & else sleep "$FZ_SHIM_SLEEP" & fi

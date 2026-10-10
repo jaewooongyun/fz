@@ -38,6 +38,9 @@
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건(세션 선택 판독 실패 포함) / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
 #   ⛔ 10~14는 전부 **측정 실패**다 — "이슈 0건"으로 해석하면 안 된다.
+#   ⛔ 12 에는 진행 감시 종료도 든다(F-364) — 그 호출의 스트림 로그(${OUT}.stream.log) 크기가 FZ_GPT_IDLE_SEC(기본 900 · 0 = 끔)초
+#      동안 그대로면 CLI 자손 트리를 TERM → KILL 하고 12 로 끝낸다. 가르는 표지는 메시지 머리 토큰 `GPT-IDLE` · 텔레메트리 9열 `idle` 이다
+#      (gpt 종료코드 열은 143 같은 신호값이라 CLI 스스로의 실패와 구분되지 않는다). FZ_GPT_IDLE_SEC 형식 불량(0 이상 정수 아님)은 10
 set -u
 
 die() { echo "GATE-FAIL($1): $2" >&2; exit "$1"; }
@@ -121,6 +124,11 @@ fi
 if [ -n "$MODEL_SET" ] && [ "$MODEL" != "config" ] && ! [[ "$MODEL" =~ $MODEL_RE ]]; then
   die 10 "--model 형식 불량 '$MODEL' — 첫 글자 영숫자 + [A-Za-z0-9._:/-] 128자 이하, 또는 config"
 fi
+# 진행 감시 임계(초) — 0 = 끔. ⛔ 형식을 여기서 막는다 — 불량 값이 감시 루프의 산술 비교까지 가면 bash 오류로 exit 1 이 되어 10~14 계약 밖이다
+IDLE_SEC="${FZ_GPT_IDLE_SEC:-900}"
+case "$IDLE_SEC" in
+  ''|*[!0-9]*|??????????*) die 10 "FZ_GPT_IDLE_SEC 는 0 이상 정수(초 · 9자리 이하 · 0 = 감시 끔) — 받은 값: '$IDLE_SEC'" ;;
+esac
 
 # ── 사전 게이트 1: 플래그 상호 배타 (실측 근거: codex 0.144.1)
 #    `codex exec review`는 flag-only — PROMPT positional과 --uncommitted/--base가 충돌한다.
@@ -343,19 +351,61 @@ if [ -z "$MODEL" ] || [ -z "$EFFORT" ]; then
 fi
 echo "GPT-CHOICE model=$SHOW_MODEL ($MODEL_SRC) effort=$SHOW_EFFORT ($EFFORT_SRC)" >&2
 
-# ── 호출 (hygiene §1 stdin close · §3 -o · §7 `--` 구분자)
+# ── 진행 감시 (F-364 · F-147) — CLI 를 백그라운드로 띄우고 그 호출의 스트림 로그($LOG) 크기를 1초마다 잰다(guard_wait).
+#    크기가 IDLE_SEC 번 연속 그대로면 CLI 자손 트리를 TERM → 2초 → KILL 하고 사후 게이트가 exit 12(사유 토큰 GPT-IDLE)로 끝낸다.
+#    ⛔ 생존 신호는 이 호출의 $LOG 크기(wc -c) 하나다 — GPT 세션 기록 파일의 성장은 어느 호출의 것인지 가를 수 없어 쓰지 않는다
+#       (동시 호출이 같은 세션 폴더에 쓴다). ${OUT}.session 은 위에서 지웠고 성공 뒤에만 쓴다.
+#    ⛔ CLI 는 래퍼 프로세스 그룹 안에 둔다 — setpgrp · `kill -- -$$` 금지. 독립 런처의 시간 초과는 래퍼 그룹째 죽인다
+#       (gpt_independent.sh 감시자 — CLI 를 새 그룹에 두면 닿지 않는다). `kill -- -$$` 는 Lead 가 Bash 도구로 직접 부를 때 도구의 그룹까지 죽인다.
+#       그래서 그룹이 아니라 pid 트리를 걷는다.
+#    ⛔ 목록은 TERM **전에** 모은다 — TERM 으로 부모가 죽으면 TERM 을 무시한 자손이 pid 1 아래로 옮겨가 다시 걸어도 보이지 않는다.
+#       KILL 은 그 목록 ∪ 남은 pid 의 새 자손이다.
+#    ⛔ 경과는 벽시계가 아니라 `sleep 1` 반복 횟수다 — 부하로 루프가 늦으면 늦게 끊는 쪽이다(일찍 끊지 않는다).
+#       [미검증: 실 CLI 가 SIGTERM 에 세션을 정리하는지 · 시스템 수면 중 sleep 이 흐르는지 — shim 으로만 쟀다]
+#    기본 900초 근거: 정상 종료 run 의 같은 턴 무출력 최장 456초(스트림에 보이는 사건 기준) · 600초 초과 0 [미검증: 꼬리 정체 · stream.log 성장 간격]
+#      반례(같은 측정 M3): 09-25 한 쌍이 1029 · 973 · 912 · 910초 무출력 간격 뒤 task_complete 없이 끝났다 — 900 이면 첫 간격에서 끊긴다.
+#      그것이 정체였는지 정상이었는지는 [미검증](수면 · API 지연 · 모델 정체 구분 불가). 'reasoning summaries: none' 이라 추론 중에는
+#      로그가 늘지 않는다 — 긴 추론이 예상되는 호출은 그 호출만 FZ_GPT_IDLE_SEC 를 올린다(modules/gpt-strategy.md GPT-IDLE 행)
+IDLE_KILLED=""
+tree_pids() {   # $1=pid — 자손부터 자기까지
+  local c
+  for c in $(pgrep -P "$1" 2>/dev/null); do tree_pids "$c"; done
+  echo "$1"
+}
+guard_wait() {  # $1=백그라운드 CLI pid — 끝날 때까지 기다리고 그 종료코드를 돌려준다
+  local pid="$1" last="" cur idle=0 pids more p rc
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 1
+    cur="$(wc -c < "$LOG" 2>/dev/null | tr -d ' ')"
+    if [ "$cur" != "$last" ]; then last="$cur"; idle=0; else idle=$((idle + 1)); fi
+    if [ "$IDLE_SEC" -gt 0 ] && [ "$idle" -ge "$IDLE_SEC" ] && kill -0 "$pid" 2>/dev/null; then
+      IDLE_KILLED="$idle"; pids="$(tree_pids "$pid")"
+      kill -TERM $pids 2>/dev/null; sleep 2
+      more=""; for p in $pids; do more="$more $(tree_pids "$p")"; done
+      kill -KILL $pids $more 2>/dev/null
+      break
+    fi
+  done
+  wait "$pid"; rc=$?
+  return "$rc"
+}
+
+# ── 호출 (hygiene §1 stdin close · §3 -o · §7 `--` 구분자) — 세 경로 모두 백그라운드 + guard_wait
 if [ "$MODE" = "review" ]; then
   [ -n "$TITLE" ] && ARGS+=(--title "$TITLE")
   # ⛔ review 는 `-C` 를 받지 않는다 → 서브셸 cwd 전환으로 작업 디렉토리를 확보한다.
   #    ( ) 안에서만 cd 하므로 호출자 cwd 는 불변이다.
-  ( cd "$CD" && codex exec review "${ARGS[@]}" "${SCOPE_ARGS[@]}" < /dev/null ) > "$LOG" 2>&1
+  ( cd "$CD" && codex exec review "${ARGS[@]}" "${SCOPE_ARGS[@]}" < /dev/null ) > "$LOG" 2>&1 &
+  guard_wait $!
 elif [ "$MODE" = "resume" ]; then
   # ⛔ resume 는 `-C`·`--add-dir` 를 받지 않는다 → review 와 같이 서브셸 cwd 전환. 프롬프트는 위 주입 단계에서 cd 전에 읽었다.
-  ( cd "$CD" && codex exec resume "${ARGS[@]}" -- "$SESSION_ID" "$PROMPT_TEXT" < /dev/null ) > "$LOG" 2>&1
+  ( cd "$CD" && codex exec resume "${ARGS[@]}" -- "$SESSION_ID" "$PROMPT_TEXT" < /dev/null ) > "$LOG" 2>&1 &
+  guard_wait $!
 else
   EXEC_ARGS=(-C "$CD")
   for d in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do EXEC_ARGS+=(--add-dir "$d"); done
-  codex exec "${EXEC_ARGS[@]}" "${ARGS[@]}" -- "$PROMPT_TEXT" < /dev/null > "$LOG" 2>&1
+  codex exec "${EXEC_ARGS[@]}" "${ARGS[@]}" -- "$PROMPT_TEXT" < /dev/null > "$LOG" 2>&1 &
+  guard_wait $!
 fi
 GPT_EXIT=$?
 
@@ -365,19 +415,23 @@ GPT_EXIT=$?
 #    injected = 최종 프롬프트에 스킬 본문이 들어 있는가 — SC-1 은 이 열이 1 인 호출만 "스킬 사용" 으로 센다. review 는 항상 0.
 #    ⛔ 열은 **뒤에만** 붙인다(헤더 없는 TSV — 앞 열 위치를 바꾸면 옛 행과 섞인다). cli_version 조회 실패는 `-`.
 #    ⛔ exit 열은 **gpt 종료코드**다 — 사후 게이트 12~14(측정 실패)는 반영되지 않는다.
+#    9열 end = 진행 감시가 CLI 를 끝냈으면 `idle`, 아니면 `-` — exit 열(143 · 137 같은 신호값)만으로는 CLI 스스로의 실패와 가를 수 없다.
 #    ⛔ 로그 실패는 exit 계약(10~14)을 바꾸지 않는다. 디렉토리 부재 시 조용히 건너뛴다.
 TELEMETRY_DIR="${FZ_TELEMETRY_DIR:-${HOME:-}/.fz/telemetry}"   # 기본값 출처: scripts/fz_stop_telemetry.py:32
 if { [ -n "$GPT_SKILL" ] || [ -n "$SKILL_SRC" ]; } && [ -d "$TELEMETRY_DIR" ]; then
-  # ⛔ 필드 안의 탭·개행은 공백으로 — 한 호출이 8열이 아니게 되거나 여러 행으로 갈라지지 않게(검토 012)
+  # ⛔ 필드 안의 탭·개행은 공백으로 — 한 호출이 9열이 아니게 되거나 여러 행으로 갈라지지 않게(검토 012)
   tsv() { printf '%s' "$1" | tr '\t\n\r' '   '; }
   CLI_VERSION="$(codex --version 2>/dev/null | head -1)"
   if [ "$MODE" = "review" ]; then FALLBACK="-"; elif [ -n "$SKILL_SRC" ]; then FALLBACK=0; else FALLBACK=1; fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODE" "$(tsv "${GPT_SKILL:--}")" \
-    "$(tsv "${SKILL_SRC:--}")" "$FALLBACK" "$GPT_EXIT" "$INJECTED" "$(tsv "${CLI_VERSION:--}")" \
+  END_REASON="-"; [ -n "$IDLE_KILLED" ] && END_REASON="idle"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODE" "$(tsv "${GPT_SKILL:--}")" \
+    "$(tsv "${SKILL_SRC:--}")" "$FALLBACK" "$GPT_EXIT" "$INJECTED" "$(tsv "${CLI_VERSION:--}")" "$END_REASON" \
     2>/dev/null >> "$TELEMETRY_DIR/gpt-skill-usage.tsv" || true
 fi
 
 # ── 사후 게이트: exit → 파일 → **계약**. 어느 하나라도 실패면 측정 실패.
+# ⛔ 진행 감시 종료를 일반 12 보다 먼저 본다 — 메시지 머리 토큰 GPT-IDLE 이 CLI 스스로의 실패(같은 12 · 같은 신호값 exit)와 가른다
+[ -z "$IDLE_KILLED" ] || { tail -20 "$LOG" >&2; die 12 "GPT-IDLE: 스트림 로그가 ${IDLE_KILLED}초 동안 자라지 않아 진행 감시가 CLI 를 종료했다(FZ_GPT_IDLE_SEC=${IDLE_SEC} · CLI exit=${GPT_EXIT} · 측정 실패 — 리뷰 결과 아님). log: $LOG"; }
 [ "$GPT_EXIT" -eq 0 ] || { tail -20 "$LOG" >&2; die 12 "codex exit=$GPT_EXIT (측정 실패 — 리뷰 결과 아님). log: $LOG"; }
 [ -s "$OUT" ] || { tail -20 "$LOG" >&2; die 13 "출력 파일 없음/빈 파일 (측정 실패). log: $LOG"; }
 if [ -n "$SCHEMA" ]; then

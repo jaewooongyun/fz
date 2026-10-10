@@ -104,6 +104,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" set --model "$MODEL_ID" --effort 
 | `set` · `options` 그 밖의 exit(1 · 126 · 127 등 — 스크립트 오류·경로 오류) | 같은 **우회**로 진행하고 알린다 |
 | `options` exit 11 — 모델 목록 캐시 없음·판독 불가 | 묻지 않고 `set --model config --effort config` 후 "모델 목록을 읽지 못해 config 로 진행" 을 알린다 |
 | 저장 선택으로 부른 GPT 호출(`GPT-CHOICE` 출처 session)이 exit 12 이고 스트림 로그(`<out>.stream.log`)에 모델·effort 거부 흔적이 있다 | 선택을 다시 묻는다. 그 밖의 exit 12(quota · 네트워크 · 인증)는 선택 탓이 아니다 — 호출부의 GPT 실패 규칙을 따른다(§ 장기 불능 인지) |
+| GPT 호출이 exit 12 이고 메시지 머리에 `GPT-IDLE` 이 있다 — 래퍼 진행 감시가 끊었다(스트림 로그 크기가 `FZ_GPT_IDLE_SEC`(기본 900 · 0 = 끔)초 동안 그대로 · 텔레메트리 9열 `idle`) | 선택 탓이 아니다 — 다시 묻지 않는다. 측정 실패(결과 아님)로 호출부의 GPT 실패 규칙을 따른다. CLI 종료코드(143 등 신호값)만으로는 CLI 스스로의 실패와 가를 수 없어 토큰으로 가른다. 긴 무출력 추론이 의심되면 그 호출만 `FZ_GPT_IDLE_SEC` 를 올려 다시 돈다 |
 
 `set --model config --effort config` 는 모델 목록 캐시와 config 를 읽지 않아 캐시가 없어도 기록된다 — "물었고 config" 를 남겨 스킬마다 다시 묻지 않게 한다.
 
@@ -134,6 +135,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" set --model "$MODEL_ID" --effort 
 - `FZ_GPT_CHOICE_DIR` 를 실제 홈 기준(미설정이면 `<실제 홈>/.fz/gpt-choice`)으로 넘긴다 — Lead 세션 선택이 격리 팔에도 닿는다. 세션 id 는 env 가 물려준다. 상대 경로 값은 바꾸지 않고 넘긴다(`get` exit 5 → config)
 - 격리 config 에 실제 config 최상위 `model` · `model_reasoning_effort` 두 줄을 옮긴다 — 선택이 없으면 격리 팔도 사용자 config 로 돈다
 - 런처 exit 10 · 11 · 12 는 래퍼 exit 를 그대로 낸 것일 수 있다 — 사유는 `<out-dir>/<arm>-<run-id>.wrapper.log` 에 있다. 세션 선택 판독 실패(11)면 런처 stderr 에 `GPT-CHOICE` 줄이 없고 `.wrapper.log` 에 `CHOICE-UNREADABLE` 또는 `CHOICE-SCRIPT-ERROR` 가 있다 — 위 결정 순서의 exit 11 규칙을 따른다. 12 는 기록 표의 exit 12 행을 따른다
+- 런처 exit 12 이고 `.wrapper.log` 에 `GPT-IDLE` 이 있으면 래퍼 진행 감시가 끊은 것이다(기록 표의 `GPT-IDLE` 행). 런처 `--timeout`(16)은 총 시간 상한이고 진행 감시는 무출력 정체다 — 둘은 따로 걸린다. 런처는 래퍼 프로세스 그룹째 죽이고 래퍼는 CLI pid 트리만 죽인다(CLI 는 래퍼 그룹 안이다)
 - max · ultra 를 고르면 런처 `--timeout` 기본 1800초(exit 16)에 걸릴 수 있다 — 필요하면 `--timeout` 을 준다
 
 ### light 모드

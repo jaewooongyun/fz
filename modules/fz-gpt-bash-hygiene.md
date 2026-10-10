@@ -194,7 +194,7 @@ GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-
 - ⛔ `resume` · `review` 에 `--inject-skill` 을 주면 exit 10 이다. resume 은 세션 이력에 본문이 이미 있어 다시 넣으면 두 번이 되고, review 는 프롬프트가 없다. 두 플래그가 서로 다른 파일을 가리켜도 exit 10 이다
 - `review` 호출은 `--gpt-skill reviewer` 만 넘긴다. reviewer 는 fz 스킬 가운데 유일하게 CLI 가 암묵 호출하는 스킬이다(나머지 7개는 `agents/openai.yaml` 의 `policy.allow_implicit_invocation: false`). 옛 표지 `--gpt-skill-path unknown` 도 받지만 WARN 은 없다
 - 경로가 있는데 파일이 없거나 비었으면 exit 11(`exec`·`resume` — 두 플래그 모두). 빈 문자열은 "해석 실패 → 일반 프롬프트 폴백" 이라 `fallback=1` 로 남긴다
-- 텔레메트리(`gpt-skill-usage.tsv`, 헤더 없음) 8열: ts · mode · requested · resolved · fallback · exit · **injected** · **cli_version**. `resolved` 는 `--gpt-skill-path`(없으면 `--inject-skill`) 경로다. `fallback` 은 review 행에서 `-` 다 — 폴백 개념이 없다. `injected` 는 최종 프롬프트에 본문이 들어 있는가다(래퍼가 넣었든 호출부가 넣었든 1 · review 는 항상 0). 스킬 사용 지표는 이 열이 1 인 호출만 센다
+- 텔레메트리(`gpt-skill-usage.tsv`, 헤더 없음) 9열: ts · mode · requested · resolved · fallback · exit · **injected** · **cli_version** · **end**(진행 감시가 끊었으면 `idle`, 아니면 `-` — 옛 행은 6 또는 8열이다). ⛔ 이 파일은 스킬을 계측하는 호출(`--gpt-skill` · 스킬 경로)만 쓴다 — 모든 호출에서 정체 종료와 CLI 실패를 가르는 표지는 stderr 의 `GATE-FAIL(12): GPT-IDLE` 토큰이다. `resolved` 는 `--gpt-skill-path`(없으면 `--inject-skill`) 경로다. `fallback` 은 review 행에서 `-` 다 — 폴백 개념이 없다. `injected` 는 최종 프롬프트에 본문이 들어 있는가다(래퍼가 넣었든 호출부가 넣었든 1 · review 는 항상 0). 스킬 사용 지표는 이 열이 1 인 호출만 센다
 
 ### 격리 호출 (`--config-permissions` — F-348)
 
@@ -220,6 +220,7 @@ GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-
 
 | 순서 | 검사 | 실패 시 exit | 의미 |
 |:--:|---|:--:|---|
+| 0 | 진행 정체 없음 — 실행 중 스트림 로그(`${OUT}.stream.log`) 크기가 `FZ_GPT_IDLE_SEC`(기본 900 · 0 = 끔)초 동안 그대로면 래퍼가 CLI 자손 트리를 TERM → KILL | **12** | 측정 실패 — 메시지 머리 토큰 `GPT-IDLE` · 텔레메트리 9열 `idle` 로 CLI 실패와 가른다 |
 | 1 | `gpt` 종료코드 == 0 | **12** | 측정 실패 |
 | 2 | `-o` 파일 존재 + 비어있지 않음 | **13** | 측정 실패 |
 | 3 | `--schema` 지정 시 **스키마 계약** 충족 (`scripts/validate-gpt-output.py`) | **14** | 측정 실패 |
