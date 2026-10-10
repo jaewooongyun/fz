@@ -20,7 +20,7 @@ diff 본문에 들어 있는 `+++ b/...` 추가 라인(패치 파일을 리뷰�
 파일 경계를 오염시켜 hunk가 엉뚱한 경로에 귀속된다.
 
 의존성: Python 표준 라이브러리만. 외부 패키지/CLI 호출 금지
-(같은 레포 ac8-link-check.sh가 rg 하드 의존으로 미설치 환경에서 exit 127).
+(같은 레포 ac8-link-check.sh가 rg 하드 의존이던 동안 미설치 환경에서 exit 127 — F-224, POSIX grep 으로 교체됨).
 """
 
 import argparse

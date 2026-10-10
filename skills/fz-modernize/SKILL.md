@@ -220,22 +220,15 @@ metadata:
 | AC5 | 미검증 사실 임의 verified 처리 | "Korean 실측 부재" 등 정확한 미검증 사유 보호 |
 | AC6 | 도서 기반 stable 가이드 본문 변경 | clean-architecture.md 같은 곳은 References 1줄 추가만 |
 | AC7 | 새 원칙/섹션 추가 | 합의 깊이 제한 — 모든 변경 = 기존 표/리스트 추가/교체 |
-| AC8 | broken link 미감지 | 다음 스크립트 (Rust regex 호환) |
+| AC8 | broken link 미감지 | 다음 스크립트 (POSIX grep 추출 · URL 0건 = UNRUN) |
 | AC9 | Tier 3 단독 verified | A5 단독 발견 시 → `[partially-verified]` 격하 |
 
 ### AC8 스크립트 (xargs 병렬, Bash background+redirect 교훈)
 
-```bash
-# 1. URL 추출 (Rust regex 호환, POSIX class 회피)
-rg -o 'https?://[^\]\[)<>"\s]+' guides/*.md \
-  | cut -d: -f2- \
-  | sed 's/[.,;|]*$//' \
-  | sort -u > /tmp/urls.txt
+정본은 `skills/fz-modernize/scripts/ac8-link-check.sh` 하나다 — 여기에 사본을 두지 않는다(F-224: 스크립트 · 인라인 사본 모두 `rg` 였고 rg 없는 셸에서 exit 127). exit 0 broken 0건 · 1 broken 있음 · 2 UNRUN(URL 0건, ⛔ 통과 아님) · 3 입력 오류. 실패한 단계는 기존 산출물(`/tmp/urls-to-check.txt` · `/tmp/link-check-results.txt`)을 덮지 않는다. `FZ_PLUGIN_ROOT` 는 `modules/cross-validation.md` § FZ_PLUGIN_ROOT 초기화로 **같은 Bash 호출 안에서** 먼저 잡는다 — 미설정이면 아래 줄이 'parameter not set' 으로 끝나는데(zsh exit 1 · bash 127) 그것은 broken 이 아니다.
 
-# 2. xargs -P 5 병렬 검증 (sequential while loop 금지!)
-cat /tmp/urls.txt | xargs -I {} -P 5 sh -c \
-  'echo "$(curl -I -s -L --max-time 15 -o /dev/null -w %{http_code} "$1") $1"' _ {} \
-  2>&1 | tee /tmp/link-results.txt
+```bash
+bash "${FZ_PLUGIN_ROOT:?FZ_PLUGIN_ROOT 미설정 - 같은 Bash 호출에서 초기화를 먼저}"/skills/fz-modernize/scripts/ac8-link-check.sh guides /tmp
 ```
 
 ### AC9 스크립트 (Tier 3 단독 verified 검증)

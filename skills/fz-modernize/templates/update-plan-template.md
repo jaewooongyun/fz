@@ -33,7 +33,7 @@
 | AC6 | stable 가이드 본문 변경 | (예: 도서 기반) | 본문 변경 0 |
 | AC7 | 새 원칙/섹션 추가 | 합의 깊이 제한 | 모든 변경 = 기존 항목 추가/교체 |
 | AC8 | broken link 미감지 | 신뢰성 | xargs 병렬 스크립트 (§AC8) |
-| AC9 | Tier 3 단독 verified | A5 과승격 | rg -n -e 스크립트 (§AC9) |
+| AC9 | Tier 3 단독 verified | A5 과승격 | `/usr/bin/grep -nE` 스크립트 (§AC9) |
 
 ## 2. 출처 표기 규약
 
