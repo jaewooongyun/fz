@@ -56,7 +56,7 @@ is_pr=false
 # ── diff + 메타 ──────────────────────────────────────────────
 if $is_pr; then
   command -v gh >/dev/null 2>&1 || die 3 "PR 번호를 받았으나 gh 가 없다 — 브랜치명으로 호출하라"
-  gh pr view "$TARGET" --json baseRefName,headRefName,title,body,additions,deletions,files \
+  gh pr view "$TARGET" --json baseRefName,headRefName,title,body,additions,deletions,files,url,baseRefOid \
      > "$STAGE_DIR/pr-meta.json" 2>/dev/null || die 3 "PR $TARGET 조회 실패"
   BASE="${BASE:-$(python3 -c "import json,sys;print(json.load(open('$STAGE_DIR/pr-meta.json'))['baseRefName'])" 2>/dev/null)}"
   gh pr diff "$TARGET" > "$STAGE_DIR/diff.patch" 2>/dev/null || die 3 "PR $TARGET diff 실패"
@@ -80,13 +80,6 @@ else
 fi
 
 [ -s "$STAGE_DIR/diff.patch" ] || die 4 "diff 가 비어 있다 — 대상이 맞는지 확인하라"
-
-# ── 변경 규모 (tier 판정 입력) ────────────────────────────────
-git diff --numstat "${BASE}...${TARGET}" > "$STAGE_DIR/numstat.txt" 2>/dev/null || \
-  awk -f "$HERE/numstat_fallback.awk" \
-      "$STAGE_DIR/diff.patch" > "$STAGE_DIR/numstat.txt"
-  # ⛔ PR 경로는 로컬 ref 부재로 `--numstat` 이 **항상 실패**한다 → 이 폴백이 매번 돈다.
-  #    셈 규칙과 그 근거는 `numstat_fallback.awk` 안에. 회귀: tests/fixtures/peer-review/numstat-fallback/
 
 # ── base 원본 (origin 판정 근거) ──────────────────────────────
 # ⛔ base 쪽 경로(`--- a/…`)를 읽는다. `+++ b/…` 는 두 경우에 **틀린다**:
@@ -181,18 +174,92 @@ for e in entries:
     print("%s\t%s\t%s" % (e["status"], safe(old) or "", safe(e["new"]) or ""))   # 새 경로도 같은 가드 — head/ 스냅샷이 쓴다
 PY
 
-# ⛔ PR 경로의 `baseRefName` 은 **원격 브랜치 이름**이다 — 로컬에 그 ref 가 없을 수 있다.
-#    실측(#4766): `feature/mini-player` 로컬 부재 → `git show` 25건 전부 실패 → base 원본 **0/25**.
-#    브랜치 경로엔 `rev-parse --verify` 가드가 있는데 PR 경로엔 없어 실패가 조용히 아래로 흘렀다.
-#    remote 접두를 붙여 재해석한다. 원격이 여럿이면 upstream → origin 순.
-if $is_pr && ! git rev-parse --verify "$BASE" >/dev/null 2>&1; then
-  for rem in upstream origin $(git remote 2>/dev/null); do
-    if git rev-parse --verify "${rem}/${BASE}" >/dev/null 2>&1; then
-      echo "GATHER-NOTE: base '$BASE' 로컬 부재 → '${rem}/${BASE}' 로 해석" >&2
-      BASE="${rem}/${BASE}"
-      break
+# ⛔ PR 경로의 `baseRefName` 은 **원격 브랜치 이름**이다. 로컬 같은 이름 브랜치는 체크아웃용이라 뒤처져 있거나
+#    (F-240 실측: 로컬 `develop` 이 8커밋 뒤 → base/ 13파일이 diff(GitHub 이 계산한 merge-base)와 다른 리비전에서 떠졌다)
+#    아예 없다(#4766: `feature/mini-player` 로컬 부재 → `git show` 25건 전부 실패 → base 원본 0/25).
+#    그래서 로컬 존재와 무관하게 **base 저장소 원격의 원격 추적 ref** 를 먼저 쓴다.
+#    base 저장소 = PR `url` 의 owner/repo(`gh pr view --json` 실제 필드). 원격 URL(`git remote get-url`)을 같은 꼴로
+#    정규화해 맞는 원격을 고른다 — https · ssh · scp 꼴(`git@host:o/r`) · 로컬 경로 모두 마지막 두 경로 조각(소문자).
+#    맞는 원격이 없으면 GATHER-NOTE 를 남기고 upstream → origin → 나머지 원격 순으로 찾는다. 어디에도 없으면 이름 그대로.
+# ⛔ fetch 하지 않는다(아래 신선도 절과 같은 계약). 고른 ref 가 PR `baseRefOid` 와 다르면 GATHER-WARN 만 낸다 —
+#    base/ · review-surface 는 그 ref 기준으로 모인다. 최신으로 모으려면 base 를 fetch 한 뒤 재수집한다.
+#    회귀: tests/fixtures/peer-review/gather-pr-mode/ (--cells base,shim-fields)
+repo_key() {   # URL → `owner/repo`(소문자). 경로 조각이 둘 미만이면 실패
+  local u="${1%/}" o r
+  u="${u%.git}"
+  u="${u//:/\/}"
+  case "$u" in */*) ;; *) return 1 ;; esac
+  r="${u##*/}" o="${u%/*}"
+  o="${o##*/}"
+  [ -n "$o" ] && [ -n "$r" ] || return 1
+  printf '%s/%s\n' "$o" "$r" | tr '[:upper:]' '[:lower:]'
+}
+if $is_pr; then
+  BASE_IN="$BASE" PR_BASE_NAME="" PR_URL="" PR_BASE_OID="" PR_REPO="" base_rem="" base_found="" pre_branch=""
+  read -r PR_BASE_NAME PR_URL PR_BASE_OID < <(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(*[d.get(k) or '-' for k in ('baseRefName','url','baseRefOid')])" "$STAGE_DIR/pr-meta.json" 2>/dev/null) || true
+  case "$PR_URL" in */pull/[0-9]*) PR_REPO=$(repo_key "${PR_URL%/pull/*}") || PR_REPO="" ;; esac
+  # --base 가 이미 `<원격>/<브랜치>` 꼴이고 그 원격 추적 ref 가 있으면 원격을 다시 고르지 않는다 — 신선도는 브랜치 이름으로 대조
+  case "$BASE_IN" in
+    */*) git remote get-url "${BASE_IN%%/*}" >/dev/null 2>&1 \
+           && git rev-parse --verify -q "refs/remotes/${BASE_IN}" >/dev/null && pre_branch="${BASE_IN#*/}" ;;
+  esac
+  if [ -z "$pre_branch" ] && [ -n "$PR_REPO" ]; then
+    for rem in upstream origin $(git remote 2>/dev/null); do
+      rem_url=$(git remote get-url "$rem" 2>/dev/null) || continue
+      [ "$(repo_key "$rem_url")" = "$PR_REPO" ] && { base_rem="$rem"; break; }
+    done
+  fi
+  if [ -n "$pre_branch" ]; then
+    echo "GATHER-NOTE: base '$BASE' 는 원격 추적 ref 다 — 원격 선택을 건너뛴다" >&2
+  elif [ -n "$base_rem" ] && git rev-parse --verify "${base_rem}/${BASE}" >/dev/null 2>&1; then
+    echo "GATHER-NOTE: base '$BASE' → '${base_rem}/${BASE}' 로 해석 — 원격 '${base_rem}' 이 PR 기준 저장소(${PR_REPO})다" >&2
+    BASE="${base_rem}/${BASE}"
+  else
+    if [ -n "$base_rem" ]; then
+      echo "GATHER-NOTE: 기준 저장소 원격 '${base_rem}' 에 '${base_rem}/${BASE}' 가 없다(미fetch) — upstream → origin 순으로 찾는다" >&2
+    else
+      echo "GATHER-NOTE: 기준 저장소 대조 실패 — PR url(${PR_REPO:-해석 불가})과 맞는 원격이 없다. upstream → origin 순으로 찾는다" >&2
     fi
-  done
+    for rem in upstream origin $(git remote 2>/dev/null); do
+      if git rev-parse --verify "${rem}/${BASE}" >/dev/null 2>&1; then
+        echo "GATHER-NOTE: base '$BASE' → '${rem}/${BASE}' 로 해석" >&2
+        BASE="${rem}/${BASE}" base_found=1
+        break
+      fi
+    done
+    [ -n "$base_found" ] || echo "GATHER-NOTE: 어느 원격에도 '<원격>/${BASE}' 가 없다 — '${BASE}' 를 그대로 쓴다(로컬이면 뒤처졌을 수 있다)" >&2
+  fi
+  # 신선도 — 고른 ref 의 팁을 PR 이 가리키는 base 팁(baseRefOid)과 대조한다. --base 로 다른 브랜치를 주면 대조하지 않는다
+  #   (`<원격>/<브랜치>` 꼴은 브랜치 이름으로 본다)
+  if [ "${pre_branch:-$BASE_IN}" = "$PR_BASE_NAME" ]; then
+    if [[ "$PR_BASE_OID" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]; then
+      base_tip=$(git rev-parse --verify "${BASE}^{commit}" 2>/dev/null) || base_tip=""
+      if [ -n "$base_tip" ] && [ "$base_tip" != "$PR_BASE_OID" ]; then
+        echo "GATHER-WARN: stale base — '${BASE}'=${base_tip:0:7} ≠ PR baseRefOid ${PR_BASE_OID:0:7}. 마지막 fetch 뒤 base 가 움직였을 수 있다 — fetch 하지 않는다(base/ · review-surface 는 '${BASE}' 기준). 최신으로 모으려면 base 를 fetch 한 뒤 재수집하라" >&2
+      fi
+    else
+      echo "GATHER-NOTE: pr-meta.json 에 baseRefOid 가 없다 — base 팁 대조 생략" >&2
+    fi
+  fi
+fi
+
+# ── 변경 규모 (tier 판정 입력) ────────────────────────────────
+# ⛔ numstat 의 **유일한 출처**는 diff.patch 다(PR · 브랜치 모두). `git diff --numstat "${BASE}...${TARGET}"` 를 쓰지 않는다 —
+#    PR 경로의 TARGET 은 PR 번호이고 git 은 그것을 SHA 접두로 푼다: 조상 커밋이면 exit 0 · 0바이트(F-135 — 완료 줄 `+0 −0`),
+#    다른 커밋이면 엉뚱한 범위(F-350 — 9파일 PR 이 1361파일). exit 0 이라 `||` 폴백도 돌지 않았다.
+#    최종 BASE 해석(위 원격 접두) 뒤에 둔다(AE-34). 셈 규칙과 근거는 `numstat_fallback.awk` 안에.
+#    회귀: tests/fixtures/peer-review/numstat-fallback/ · gather-pr-mode/ (--cells numstat)
+awk -f "$HERE/numstat_fallback.awk" "$STAGE_DIR/diff.patch" > "$STAGE_DIR/numstat.txt" || die 4 "numstat 계산 실패"
+# ⛔ PR 메타와 교차 대조한다(F-350) — 두 도구가 같은 PR 을 다르게 보면 Tier(pr-meta)와 완료 줄(numstat)이 갈린다.
+#    경고만 하고 진행한다(gh 응답 시점 · force-push 차이일 수 있다 — 판단은 읽는 사람에게).
+if $is_pr; then
+  ns_sum=$(awk -F'\t' '{a+=$1; d+=$2} END{print a+0, d+0}' "$STAGE_DIR/numstat.txt")
+  meta_sum=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));a,b=d.get('additions'),d.get('deletions');print('%d %d'%(a,b) if isinstance(a,int) and isinstance(b,int) else '')" "$STAGE_DIR/pr-meta.json" 2>/dev/null)
+  if [ -z "$meta_sum" ]; then
+    echo "GATHER-NOTE: pr-meta.json 에 additions·deletions 가 없다 — numstat 대조 생략" >&2
+  elif [ "$meta_sum" != "$ns_sum" ]; then
+    echo "GATHER-WARN: numstat(+${ns_sum% *} −${ns_sum#* }) ≠ PR 메타(+${meta_sum% *} −${meta_sum#* }) — diff.patch 와 gh 메타가 갈렸다. Tier 는 메타를, 완료 줄은 numstat 을 본다" >&2
+  fi
 fi
 
 # ── base 신선도 (원격 대조) ──────────────────────────────────

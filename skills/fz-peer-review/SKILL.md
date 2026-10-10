@@ -123,9 +123,9 @@ gh auth status  # 성공→gh 사용, 실패→git 폴백 (git fetch upstream + 
 
 ### 0.5. PR 브랜치 fetch
 
-`git show pr-{PR}:{FILE}` 직접 참조 및 GPT DA sandbox 제약 우회를 위해 필수.
+`git show pr-{PR}:{FILE}` 직접 참조 및 GPT DA sandbox 제약 우회를 위해 필수. base(`baseRefName`) 원격 추적 ref 도 함께 받는다 — 로컬 base 가 뒤처져도 gather 가 원격 기준으로 모은다(F-253). ⛔ 네트워크 — 사용자가 요청한 리뷰 턴에서만. 원격 선택·계약: 스크립트 머리말
 ```bash
-git fetch upstream pull/{PR_NUMBER}/head:pr-{PR_NUMBER}
+bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/fetch_pr_refs.sh" --target {PR_NUMBER}
 ```
 
 ### 1. 입력 파싱 + diff 수집 — ⛔ 스크립트 1회
@@ -437,7 +437,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 
 발견을 PR 대화창이 아니라 **코드 라인 옆**(Files changed)에 붙인다. 7단계 절차·실패 대응·다지점 분할 전문: `modules/peer-review-inline-anchoring.md`
 
-`앵커 계산(scripts/diff_anchors.py) → 구간 선택(Lead) → non_anchorable은 본문 인용 → payload(top-level body = **review-report.md 전문**) → ⛔확인 게이트 → gh api …/pulls/{N}/reviews → 착지 검증`
+`앵커 계산(scripts/diff_anchors.py) → 구간 선택(Lead) → non_anchorable은 본문 인용 → payload(top-level body = **review-report.md 전문**) → ⛔확인 게이트 → gh api …/pulls/{N}/reviews → 착지 검증(scripts/verify_landing.py — 판정만. ⛔UNVERIFIED 는 삭제·재게시 금지 · MISMATCH 삭제·재게시는 사용자 확인 뒤)`
 > ⊕ 렌더(기본)와 함께면 앵커 계산부터 payload 조립까지 렌더러가 끝낸다 — 겹치는 hunk 는 review.json 의 site `pick` 으로 Lead 가 고르고(없으면 렌더러가 거부한다), `render-preview.json` 의 `reasons` 가 아래 확인 게이트 (a)(b)(c) 다. 게시·착지 검증은 그대로다
 
 > ⛔ **확인 게이트** — 미리보기는 항상 출력하되, 차단은 셋 중 하나일 때만: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 (c) 겹치는 hunk 복수로 Lead가 구간 선택.

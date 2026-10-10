@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+# 가짜 gh CLI — tests/fixtures/peer-review/* 러너 공용. 실제 gh 를 부르지 않고 네트워크도 쓰지 않는다.
+# 러너가 이 폴더를 PATH 맨 앞에 붙이고 GH_* env 를 지운 뒤 부른다 — 실 gh · GitHub 로 새지 않게(EC-31).
+#
+# 고정 응답만 낸다. 응답 폴더 FZ_GH_SHIM_DIR 에:
+#   pr.json  `gh pr view --json` 이 낼 필드 값(요청한 필드가 여기 없으면 지어내지 않고 실패한다)
+#   pr.diff  `gh pr diff` 가 낼 본문(그대로 흘린다 — 이 shim 은 diff 를 해석하지 않는다)
+#   gh-calls.log  모든 호출을 `CALL …` 로, 거부한 호출을 `UNSUPPORTED …` 로 덧붙인다(러너가 거부 0 을 단언한다)
+# FZ_GH_SHIM_PR 이 이 shim 이 아는 PR 번호다(다른 번호는 실 gh 처럼 찾지 못한다).
+#
+# ⛔ 필드는 gh 2.87.3 `gh pr view --json` 이 실제로 받는 이름만(I6). 없는 이름(예: `baseRepository`)은
+#    실 gh 처럼 `Unknown JSON field` 로 거부한다 — shim 이 관대하면 실 gh 에서 깨질 호출이 fixture 에서 통과한다.
+# 지원: `gh --version` · `gh pr view <N> --json <f1,f2,…> [-q|--jq .<필드>]` · `gh pr diff <N>`. 나머지는 전부 거부(exit 1).
+import json
+import os
+import sys
+
+KNOWN = sorted(
+    "additions assignees author autoMergeRequest baseRefName baseRefOid body changedFiles closed closedAt "
+    "closingIssuesReferences comments commits createdAt deletions files fullDatabaseId headRefName headRefOid "
+    "headRepository headRepositoryOwner id isCrossRepository isDraft labels latestReviews maintainerCanModify "
+    "mergeCommit mergeStateStatus mergeable mergedAt mergedBy milestone number potentialMergeCommit projectCards "
+    "projectItems reactionGroups reviewDecision reviewRequests reviews state statusCheckRollup title updatedAt url".split()
+)
+
+args = sys.argv[1:]
+if args == ["--version"]:
+    print("gh version 2.87.3 (fixture shim)")
+    sys.exit(0)
+
+cell = os.environ.get("FZ_GH_SHIM_DIR", "")
+pr = os.environ.get("FZ_GH_SHIM_PR", "")
+if not cell or not os.path.isdir(cell) or not pr:
+    print("gh-shim: FZ_GH_SHIM_DIR · FZ_GH_SHIM_PR 미설정 — 러너 밖 호출을 거부한다", file=sys.stderr)
+    sys.exit(1)
+log = open(os.path.join(cell, "gh-calls.log"), "a", encoding="utf-8")
+log.write("CALL " + " ".join(args) + "\n")
+log.flush()
+
+
+def refuse(msg, extra=""):
+    log.write("UNSUPPORTED " + msg + "\n")
+    log.flush()
+    print(msg + extra, file=sys.stderr)
+    sys.exit(1)
+
+
+if args[:2] == ["pr", "diff"]:
+    if len(args) != 3:
+        refuse("gh-shim: 미지원 pr diff 인자 " + " ".join(args[2:]))
+    if args[2] != pr:
+        refuse('no pull requests found for branch "%s"' % args[2])
+    with open(os.path.join(cell, "pr.diff"), encoding="utf-8") as fh:
+        sys.stdout.write(fh.read())
+    sys.exit(0)
+
+if args[:2] == ["pr", "view"]:
+    if len(args) < 3 or args[2] != pr:
+        refuse('no pull requests found for branch "%s"' % (args[2] if len(args) > 2 else ""))
+    fields, jq, rest, i = None, None, args[3:], 0
+    while i < len(rest):
+        if rest[i] == "--json" and i + 1 < len(rest):
+            fields, i = rest[i + 1].split(","), i + 2
+        elif rest[i] in ("-q", "--jq") and i + 1 < len(rest):
+            jq, i = rest[i + 1], i + 2
+        else:
+            refuse("gh-shim: 미지원 pr view 인자 " + rest[i])
+    if not fields:
+        refuse("gh-shim: --json 없는 pr view 는 미지원(사람용 출력)")
+    unknown = [f for f in fields if f not in KNOWN]
+    if unknown:
+        refuse('Unknown JSON field: "%s"' % unknown[0], "\nAvailable fields:\n" + "".join("  %s\n" % k for k in KNOWN))
+    with open(os.path.join(cell, "pr.json"), encoding="utf-8") as fh:
+        vals = json.load(fh)
+    absent = [f for f in fields if f not in vals]
+    if absent:
+        refuse("gh-shim: 고정 응답 pr.json 에 없는 필드 %s — 지어내지 않는다" % ",".join(absent))
+    out = {f: vals[f] for f in fields}
+    if jq is None:
+        print(json.dumps(out, ensure_ascii=False))
+        sys.exit(0)
+    key = jq[1:] if jq[:1] == "." else ""
+    if key in out:
+        v = out[key]
+        print(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False))
+        sys.exit(0)
+    refuse("gh-shim: 미지원 --jq " + jq)
+
+refuse("gh-shim: 미지원 호출 " + " ".join(args))

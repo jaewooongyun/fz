@@ -611,6 +611,9 @@ GOOD: rg X | wc -l → 11 → 잘림 없이 11줄 직접 확인 후 "사용처 1
 | codegraph `explore` 의 blast radius 절단 | `41 callers … +14 more` — **개수는 알려주고 목록은 자른다**. `--max-files` 로 못 푼다(출력 바이트 동일). ⛔ CLI `impact --depth 2` 로 전량을 받는 우회는 **권하지 않는다** — 간접 순회라 무관 항목이 압도한다(실측 precision 4.2% · 거짓 양성 114/119). 부재 판정이 필요하면 `Grep` 전수와 교차한다 | — (Grep 교차) |
 | 흔한 메서드명으로 만든 ground truth | `popViewController`·`evaluateJavaScript`·`detachChild`·`build`·`update`·`present` 처럼 **프레임워크 표준 API 와 동명**이면 텍스트 매칭이 무관한 호출을 전부 긁어 분모가 부푼다 — 정확한 도구가 **낮은 점수로 보인다**. 호출 **수신자 타입**으로 거르거나 동명 정의 개수를 먼저 센다 | — (수신자 분류) |
 | 프로토콜 선언을 구현으로 집계 | `protocol` 블록 안의 `func x()` 는 **선언**이지 구현이 아니다. 파일:줄만 보면 갈리지 않는다 — 직전 최상위 선언(컨테이너)을 함께 확인한다 | — (컨테이너 확인) |
+| 리뷰 하위 컬렉션 `/pulls/{N}/reviews/{id}/comments` 로 앵커 대조 | 이 응답은 `line`·`side`·`start_*` 를 **null** 로 주고 `position`·`diff_hunk` 만 채운다 — 정상 게시가 전건 불일치로 읽혀 삭제 직전까지 갔다(F-150 · F-256 · F-282). 하위 컬렉션은 id 수집에만 쓰고 필드는 `/pulls/comments/{id}` 개별 조회로 본다 | `skills/fz-peer-review/scripts/verify_landing.py` |
+| 필드 null 을 값 불일치로 확정 | null 은 "다르다" 가 아니라 "이 응답이 그 값을 안 줬다" 일 수 있다. POST 와 조회 사이 PR head 가 움직이면 두 경우다 — 코멘트가 outdated 면 개별 조회도 `line` 이 null 이고 `original_line` 만 남는다(→ `UNVERIFIED`), 새 head 로 이월되면 `line` 이 다시 매겨지고 `commit_id` 가 전진한다(→ 응답 `original_commit_id` 가 payload `commit_id` 와 같을 때만 `original_line`·`original_start_line` 으로 대조, 아니면 `UNVERIFIED` — 다시 매긴 `line` 을 불일치로 확정하지 않는다 [미검증: 실 GitHub 의 이월 재매핑 — 실 API UNRUN]). 이 게이트의 발동 어휘(`0건`·`부재`)에 null 은 없다 — 판정은 `UNVERIFIED` 이고 삭제·재게시하지 않는다 | `verify_landing.py` `UNVERIFIED` |
+| 보내지 않은 필드를 필수로 대조 | 단일 줄 코멘트는 `start_line`·`start_side` 를 보내지 않아 응답의 두 값이 null 이다 — 그 둘까지 대조하면 정상 게시가 불일치·미확인으로 읽힌다. 필수 필드는 payload 에 넣은 것만이다 | `verify_landing.py` (payload 모양 기준) |
 
 ### Gate 조건
 

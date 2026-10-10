@@ -124,12 +124,23 @@ gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST --input payload.json
 REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST \
               --input payload.json --jq '.id')
 
-# 그 리뷰에 속한 코멘트만 조회 (pagination 명시)
-gh api --paginate "repos/{owner}/{repo}/pulls/{N}/reviews/${REVIEW_ID}/comments" \
-  --jq '.[] | {id, path, start_line, start_side, line, side, body}'
+# 판정만 한다(삭제·재게시 없음) — 그 리뷰의 코멘트 id 를 모으고, id 마다 개별 조회해 payload 와 대조한다
+python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/verify_landing.py" --payload payload.json --pr {N} --review-id "$REVIEW_ID"
 ```
 
-대조 항목: payload의 각 항목과 **`path`·`start_line`·`start_side`·`line`·`side`가 정확히 일치**하는지, 개수가 같은지. 불일치한 코멘트는 조회로 얻은 `id`로 삭제한다(`gh api -X DELETE repos/{o}/{r}/pulls/comments/{id}`).
+`verify_landing.py` 는 두 호출을 나눈다. ① 리뷰 하위 컬렉션(`/pulls/{N}/reviews/{id}/comments`)에서는 **id 만** 모은다 — 이 응답은 `line`·`side`·`start_*` 를 null 로 주고 `position`·`diff_hunk` 만 채울 수 있다(F-150 · F-256 · F-282, 실측 3회). ② 필드 대조는 id 마다 개별 조회(`/pulls/comments/{id}`)한 값으로만 한다. 짝은 코멘트 본문으로 맞추고(렌더 경로는 본문에 `<!-- fz-review:ID -->` 표지가 있다), payload 항목마다 넷 중 하나로 판정한다. 개수도 함께 본다 — 짝 없는 코멘트는 `unpaired` 로 따로 나온다.
+
+| 판정 | 조건 | 대응 |
+|------|------|------|
+| `OK` | payload 에 넣은 앵커 필드(`path`·`line`·`side`, 다중 라인이면 `start_line`·`start_side` 도)가 조회 값과 모두 같다 | 끝 |
+| `MISMATCH` | 그 필드가 모두 non-null 인데 하나라도 다르다 — 다른 파일·다른 줄로 **확정** | 사용자에게 보이고 **확인받은 뒤에만** 삭제(`gh api -X DELETE repos/{o}/{r}/pulls/comments/{id}`)·재게시 |
+| `UNVERIFIED` | 그 필드 중 null 이 있다 · 개별 조회 실패 · 짝을 확정 못 했다 · 하위 컬렉션이 id 0건이다(측정 실패를 먼저 의심) · head 가 움직였는데 응답 `original_commit_id` 가 payload `commit_id` 와 다르다(게시 시점 위치를 확인할 수 없다) | ⛔ **삭제·재게시 금지** — 판정 그대로 사용자에게 보고한다 |
+| `MISSING` | 이 리뷰의 id 를 전부 조회했는데 본문이 같은 코멘트가 없다 | 사용자 확인 뒤 그 항목만 재게시 |
+
+- 단일 줄 코멘트는 `start_line`·`start_side` 를 보내지 않으므로 응답의 두 값이 null 이어도 `OK` 다
+- ⛔ null 은 "값이 다르다" 가 아니라 "이 응답이 그 값을 주지 않았다" 일 수 있다 — null 을 불일치로 읽고 지우면 정상 게시가 사라지고 알림이 두 번 간다. 삭제는 되돌릴 수 없다
+- POST 와 조회 사이 PR head 가 움직이면 두 경우다(payload 최상위 `commit_id` = 게시 시점 head 로 가른다). ① 코멘트가 outdated 가 되면 `line` 은 null 이고 `original_line` 만 남는다 → `UNVERIFIED`. ② 코멘트가 새 head 로 이월되면 `line` 이 다시 매겨지고 `commit_id` 가 전진한다 → 응답 `original_commit_id` 가 payload `commit_id` 와 같을 때만 `line`·`start_line` 을 `original_line`·`original_start_line` 과, `path`·`side`·`start_side` 는 현재 값과 대조해 `OK`/`MISMATCH`, 같지 않으면 `UNVERIFIED`. 다시 매긴 `line` 을 게시값과 바로 비교해 `MISMATCH` 로 확정하지 않는다. payload 에 `commit_id` 가 없으면 이월을 가르지 못해 현재 값으로 대조한다 [미검증: 실 GitHub 가 이월 코멘트의 `line` 을 다시 매기는지 — 실 API UNRUN]
+- exit: 0 전건 `OK` · 1 `OK` 아닌 항목이 있다 · 짝 없는 코멘트(`unpaired`)가 있다 · 2 판정 불가(gh 부재 · 하위 컬렉션 조회 실패 · payload 읽기 실패 · review id 비정상 — ⛔ 통과 아님)
 
 ## 4. 게시 전 확인 게이트
 
@@ -207,9 +218,11 @@ GOOD: diff_anchors.py → [423-428, 431-439] 두 후보 확인
 BAD: 게시 후 "달렸습니다" 보고
      → 엉뚱한 줄에 달렸어도 모른다
 
-GOOD: POST 응답의 review id 캡처 → /pulls/{N}/reviews/{id}/comments 조회 → payload와 필드 대조
+GOOD: POST 응답의 review id 캡처 → verify_landing.py
+     → /pulls/{N}/reviews/{id}/comments 에서는 id 만 모은다 (이 응답의 line·side 는 null 일 수 있다)
+     → id 마다 /pulls/comments/{id} 조회 → payload와 필드 대조 → OK · MISMATCH · UNVERIFIED · MISSING
      (⛔ /pulls/{N}/comments 전체 조회 금지 — 기존 코멘트와 구분 불가)
-     → 불일치 발견 시 해당 코멘트 삭제 후 재게시
+     → UNVERIFIED 는 지우지도 다시 올리지도 않고 보고 · MISMATCH 삭제·재게시는 사용자 확인 뒤
 ```
 
 ```
