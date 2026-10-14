@@ -150,13 +150,12 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.45.0
+## What's New — v4.46.0
 
-**원장 · Stop 훅 · 계측기가 한데 뭉쳐 읽던 상태를 나눴다.** fz-plan 이 확정한 원장은 `STATE: planned`(승인 · 미착수)로 두고, fz-code 가 `--set-state active` 로 착수한다 — Stop 훅이 plan 세션을 막지 않는다.
-Stop 훅은 판정기 쓰기 호출(`--only` · `--reverify` · `--set-state`)을 한 세션을 그 원장의 소유자로 보고, 원장이 8개를 넘어도 말없이 자르지 않는다. `--only` 는 충족 게이트도 다시 돌린다.
-스킬의 Workflow 호출은 매번 WORK_DIR 로 복사하고 `cmp` 로 대조한다. A/B 수집기와 워크플로 계측기는 f-string 끝점 · 옮긴 GPT 로그 · advisor 스톨 · 실패와 재개 시도를 따로 센다.
-⚠️ 기본 동작이 바뀐 곳(판정기 쓰기 호출 세션의 Stop 훅 차단 · `--only` 재실행 · `retries` 별칭 삭제 · 계측기 출력 키)은 릴리즈 노트 '쓰는 쪽에서 달라지는 점' 에 있다. 이 판에서 생긴 F-421 ~ F-429 는 열어 둔다.
-→ [릴리즈 노트](docs/releases/v4.45.0.md)
+**GPT 호출을 정문 하나로 모으고, 여러 각도로 부르는 실험을 잴 계기를 넣었다.** 문서마다 손으로 조립하던 GPT 호출을 정문 `scripts/gpt-call.sh <kind>` 와 레지스트리 `scripts/gpt-kinds.json` 으로 모았다 — 모든 kind 의 argv 는 이전과 바이트가 같다.
+래퍼는 호출마다 `gpt-calls.tsv` 에 하위 에이전트 spawn 수와 토큰을 한 행씩 남긴다(관측 전용). 질문 틀이 다른 실험 kind(falsify · repro), N-way 병합 `gpt_merge.py`, 판정기 `gpt_ab_decide.py` 를 넣었지만 기본 흐름에는 없다 — 측정은 사용자가 사전등록을 동결한 뒤에 한다.
+⚠️ 쓰는 쪽에서 달라지는 곳(정문 경유 의무 · 정책 플래그를 넘기면 10 · 독립 kind 의 `--timeout` 은 `--experimental` 에서만 · fz-gpt 의 GPT CLI 직접 실행 권한 제거)은 릴리즈 노트 '쓰는 쪽에서 달라지는 점' 에 있다. 이 계획에서 생긴 F-430 · F-432 ~ F-437 · F-439 는 열어 둔다.
+→ [릴리즈 노트](docs/releases/v4.46.0.md)
 
 **v4.43.0 — fz-plan 병합 콜은 도구를 빼야 입력만 접었고, GPT effort 는 config 에 닿지 않았다 — 놓친 계획 항목은 렌즈 질문을 더해도 잡히지 않았다.** GPT 를 쓰는 세션은
 초반에 모델 · effort 를 한 번 묻는다(래퍼가 플래그 > 세션 선택 > config 순으로 정한다 · `scripts/gpt-choice.sh`). plan-lean2 병합 콜은 탐색 도구 없는
