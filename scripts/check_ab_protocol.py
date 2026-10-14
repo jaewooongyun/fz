@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # lint:no-root-anchor — 검사 대상 파일 경로를 인자로 받는다. self-test 는 임시 문서만 쓴다.
-"""experiment-log 의 'A/B 원장 프로토콜' 절 필수 항목 검사 (S05).
+"""experiment-log 의 'A/B 원장 프로토콜' 절 · 'GPT 다각도 원장 프로토콜' 절 필수 항목 검사 (S05 · R-G2 S9).
 
 ⛔ 왜: A/B 판정은 절차가 한 줄만 빠져도 조용히 틀린다 — 600s 천장을 끄지 않으면 잘린 run 이 오류 없이 빠른
    wall 을 내고(F-203), 가린 검증자 없이 채점하면 arm 을 아는 채점자가 판정한다. 절차 문서가 이 항목을
    **그 절 안에** 담고 있는지 본다(다른 절에 흩어진 문구로는 통과하지 않는다).
+
+GPT 절(GPT 다각도 측정 — plan R-G2 S9)은 사전등록 템플릿 · 근거 레코드 D1–D14 · 공식 문서 재조회 기준일 · 동결 행 · 판정 도구를
+그 절 안에 담아야 한다. 빠진 항목은 `AB-PROTOCOL-MISSING: gpt.<id>` 한 줄씩 낸다(원장 게이트가 표지로 센다).
 
 usage: check_ab_protocol.py EXPERIMENT_LOG | --self-test
 exit: 0=충족 · 1=누락 · 2=파일을 읽지 못함(⛔ 통과 아님)
@@ -50,8 +53,27 @@ REQUIRED = (
 )
 
 
+GPT_HEADING = re.compile(r"^##\s+.*GPT 다각도 원장 프로토콜.*$", re.M)
+GPT_REQUIRED = (
+    ("gpt.prereg_template", "사전등록 템플릿 — 임계는 사용자 승인 전 requires_user_approval · 다중 frame 집계 규칙 칸",
+     (r"requires_user_approval", r"n_min", r"n_max", r"arm_budget", r"daily_cap", r"arm_timeout", r"grader", r"frame_aggregation")),
+    ("gpt.evidence_records", "근거 레코드 D1–D14", tuple(rf"\bD{i}\b" for i in range(1, 15))),
+    ("gpt.recheck_date", "공식 문서(A1–A5 · B1) 재조회 기준일", (r"재조회 기준일: \d{4}-\d{2}-\d{2}",)),
+    ("gpt.freeze_row", "동결 행 — prereg_sha256 · approved_by · time · instrument", (r"prereg_sha256", r"approved_by", r"instrument")),
+    ("gpt.decide", "판정 · 동결 확인 도구", (r"gpt_ab_decide\.py decide", r"gpt_ab_decide\.py verify-freeze")),
+)
+
+
 def section(text):
     return md_section.section(text, HEADING, NEXT_H2, keep_heading=True)
+
+
+def check_gpt(text):
+    """-> [(id, 뜻)] — GPT 절에 빠진 필수 항목. 절이 없으면 gpt.section 하나."""
+    sec = md_section.section(text, GPT_HEADING, NEXT_H2, keep_heading=True)
+    if sec is None:
+        return [("gpt.section", "'## … GPT 다각도 원장 프로토콜' 제목이 없다")]
+    return [(rid, desc) for rid, desc, pats in GPT_REQUIRED if not all(re.search(p, sec) for p in pats)]
 
 
 def check(text):
@@ -79,8 +101,23 @@ def self_test():
             passed += 1
         else:
             print(f"  FAIL {name}: {check(text)[:2]}")
-    print(f"self-test {passed}/{len(cases)} passed")
-    return 0 if passed == len(cases) else 1
+    gfull = ("- requires_user_approval n_min n_max arm_budget daily_cap arm_timeout grader frame_aggregation · "
+             + " · ".join(f"D{i}" for i in range(1, 15)) + " · prereg_sha256 approved_by instrument · "
+             "gpt_ab_decide.py decide · gpt_ab_decide.py verify-freeze\n- 재조회 기준일: 2026-10-12\n")
+    gdoc = f"# log\n\n## GPT 다각도 원장 프로토콜\n\n{gfull}\n## 다음 절\n"
+    gcases = [("GPT 완비", gdoc, []), ("GPT 재조회일 누락", gdoc.replace("- 재조회 기준일: 2026-10-12\n", ""), ["gpt.recheck_date"]),
+              ("GPT D7 누락", gdoc.replace(" · D7 ·", " ·"), ["gpt.evidence_records"]),
+              ("GPT 절 없음", gdoc.replace("GPT 다각도 원장 프로토콜", "다른 제목"), ["gpt.section"]),
+              ("GPT 절 밖 문구", f"# log\n\n## GPT 다각도 원장 프로토콜\n\n(비어 있음)\n\n## 다음 절\n{gfull}", [r[0] for r in GPT_REQUIRED])]
+    for name, text, want in gcases:
+        got = [rid for rid, _ in check_gpt(text)]
+        if got == want:
+            passed += 1
+        else:
+            print(f"  FAIL {name}: {got} (want {want})")
+    total = len(cases) + len(gcases)
+    print(f"self-test {passed}/{total} passed")
+    return 0 if passed == total else 1
 
 
 def main():
@@ -98,8 +135,11 @@ def main():
     miss = check(text)
     for m in miss:
         print(f"  MISSING {m}")
-    print(f"ab-protocol: 필수 {len(REQUIRED)}항목 · 누락 {len(miss)}")
-    return 1 if miss else 0
+    gmiss = check_gpt(text)
+    for rid, desc in gmiss:
+        print(f"AB-PROTOCOL-MISSING: {rid} — {desc}")
+    print(f"ab-protocol: 필수 {len(REQUIRED)}항목 · 누락 {len(miss)} · GPT 절 필수 {len(GPT_REQUIRED)}항목 · 누락 {len(gmiss)}")
+    return 1 if miss or gmiss else 0
 
 
 if __name__ == "__main__":

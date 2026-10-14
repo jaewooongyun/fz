@@ -734,3 +734,70 @@ python3 scripts/ab_ledger.py show --ledger <ab>/ledger.jsonl
 | v4.40.0 (R-A · S02) | review-arch·review-quality·plan-structure·impl-correctness 의 `memory:` 제거(A2-01) | 이 에이전트를 쓰는 모든 워크플로 — plan-lean2·review-live·peer-review 외에 code-pair·plan-collaborative·discover-adversarial | 이 시점 앞뒤의 §5.7·§5.8 행을 같은 조건으로 비교하지 않는다(에이전트 메모리 읽기·쓰기가 사라졌다). S08 기준선 B 는 이전 트리(필드 있음)로 재고 기록만 한다(AC-7) |
 | v4.40.0 (R-A · S18) | plan-lean2 `metrics.stagesCompleted` — Stage 1 은 세 팔(full·edge·impactArch)이 모두 있을 때만 완주로 센다 + `degraded`·`missingLenses` 반환(A3-01) | fz-plan 의 완주 지표. 렌즈가 빠진 run 은 이전 판에서 2, 이후 판에서 1 또는 0 | 완주 비교는 두 arm 모두 원천 증거(journal 의 null 결과)로 다시 센 값만 쓴다 — 반환의 `stagesCompleted` 를 arm 사이에 그대로 비교하지 않는다 |
 | v4.40.0 (R-A · S24a) | peer-review Tier 2(교차 발화) `metrics.stagesCompleted` — Stage 1 은 세 렌즈가 모두 있을 때만 완주(F-327) | fz-peer-review 의 완주 지표. Stage 1 렌즈가 빠진 Tier 2 run 은 이전 판 2, 이후 판 1 | S18 행과 같다 — 원천 증거로 다시 센 값만 arm 사이에 비교한다 |
+
+## §5.11 GPT 다각도 원장 프로토콜 (R-G2 S9 — 신설 2026-10-13)
+
+> GPT 를 질문 틀이 다른 별도 호출(frame)로 더 부르는 것이 결함을 더 찾는지 재는 절차다. 정본 계획: fz GPT 다각도·통합 플랜 rev2(R-G3 S11~S13).
+> ⛔ 이 절은 측정 **전** 동결된다 — 임계 · 표본 · 예산은 사용자가 승인하고(S11) 그 prereg sha256 을 아래 동결 행에 적은 뒤에만 첫 run 을 돈다.
+> ⛔ 기본값은 바꾸지 않는다 — 판정 KEEP 은 승격을 제안할 자격일 뿐이다(별도 계획 · 버전 · 사용자 승인).
+
+### 사전등록 템플릿 (prereg.json — S11 에서 사용자가 값을 정하고 status 를 approved 로 바꾼다)
+
+```json
+{
+  "instrument_sha": "<사용자가 요청한 커밋 — 계측기 gpt_merge · gpt_ab_decide · gpt-call · gpt_kinds · gpt_independent · frame>",
+  "n_min": 6, "n_max": 12,
+  "corpus": ["K 층 — 정답 라벨 fixture 2종 + 결함 도입 커밋(major 이상 1 · 도입/수정 SHA · diff 2000줄 이하)"],
+  "arms": {"A0": 2, "A2": 2, "A3": "P4 runnable 일 때 1 · 아니면 deferred", "A4": "예산이 남을 때 1"},
+  "arm_budget": "과제당 핵심 4호출(A0×2 · A2×2) + 선택 2", "daily_cap": 12,
+  "arm_timeout": {"value": "<제안 — 런처 기본 1800 보다 길게>", "status": "requires_user_approval"},
+  "grader": "fresh-context Claude Opus 5.5 xhigh 또는 사용자 — gpt_merge --blind-pack 으로 가린 채 채점",
+  "window": "사용자 실세션 GPT 사용과 분리 · 창 안 quota 실패율 따로 기록", "concurrency": 1,
+  "record": "arm 마다 배너 model · effort · CLI 와 정규화 유효 설정 해시(원시 해시는 provenance) · 감사 promptSha256",
+  "frame_aggregation": {"value": "<제안 — frame 마다 따로 판정(decide --frame-arm A2 · A3 · A4), 여러 frame 을 합친 판정은 내지 않는다>", "status": "requires_user_approval"},
+  "thresholds": {
+    "delta_keep": {"value": 1.0, "status": "requires_user_approval"},
+    "positive_share": {"value": "2/3", "status": "requires_user_approval"},
+    "fp_keep": {"value": 0.15, "status": "requires_user_approval"},
+    "fp_rollback": {"value": 0.30, "status": "requires_user_approval"},
+    "tokens_ratio": {"value": 1.5, "status": "requires_user_approval"},
+    "fail_max": {"value": 0.10, "status": "requires_user_approval"}
+  }
+}
+```
+
+- 노이즈는 과제마다 A0r1 대 A0r2 로 잰다 — 상수(예: 과거 노이즈 바닥 5)를 쓰는 prereg 는 판정기가 거부한다
+- 임계는 숫자 또는 정확한 분수 `"a/b"` 다 — 0.667 은 2/3 이 아니다(n=6 에서 ceil(0.667×6)=5 · ceil(2/3×6)=4). `instrument_sha` 가 비어 있으면 판정기가 거부한다
+- 판정 순서(Z-14): INVALID(prereg · 계측기 SHA 불일치) → n_valid < n_min DEFER → ROLLBACK → KEEP → 그 밖 DEFER. 과제 안 arm 의 model · effort · CLI · 정규화 설정이 다르면 그 과제는 비교에서 빠진다
+
+### 근거 레코드 (조회 · 논문 탐색은 계획 research.md · 상세는 계획 Z-15)
+
+| ID | 결정 | 근거 | 한계 |
+|---|---|---|---|
+| D1 | 정문 하나로 호출을 모은다 | A5 · census · CLAUDE.md:61 | A5 는 Astra 대상 · Sol 미검증 |
+| D2 | 모델 · effort 는 래퍼가 소유, 레지스트리 금지 | A2 · A5 · gpt-strategy | — |
+| D3 | spawn 은 감사 먼저 | A1 · A4 · S1 실측(끄는 키 `[agents] enabled`) | 일반 경로 끄기는 측정 뒤 |
+| D4 | 질문 틀이 다른 별도 fresh 호출 | C4 · C3 · C6 · C5 · C1 · B1 · A5 | 초록 수준 · fz 효과로 환산 금지 |
+| D5 | 같은 질문 반복 대조군(A0r2) | C2 · C8 · 기존 측정 행(N=1) | 과제별 노이즈 |
+| D6 | 정확성 기준 + 출처 보존 | B1 | — |
+| D7 | 재현은 read-only 안에서만 | C6 · A5 · F-258 | 쓰기 차단(P4) — repro 팔은 조건부 |
+| D8 | 측정 뒤 채택 · 비용 지표 | A3 · B2 | 단일 벤치마크 |
+| D9 | 측정 경로 = 격리 런처 | 런처 격리 · F-348 | — |
+| D10 | 소수 · 위치 없음 보존 | C3 · C8 · review_merge 다중집합 | — |
+| D11 | 하위 에이전트 렌즈는 arm 으로만 | A3 · --gpt-agents | 자식은 부모 이력 상속 |
+| D12 | 생성 표 + --check | CLAUDE.md 카운트 규칙 | — |
+| D13 | frame 은 스킬로 설치하지 않는다 | plugin-refs · cross-validation | — |
+| D14 | 가린 채점 | C7 자기선호 | 모든 arm 이 GPT 라 대칭이지만 라벨은 가린다 |
+
+- 재조회 기준일: 2026-10-12
+
+### 판정 · 동결 도구
+
+- `python3 scripts/gpt_ab_decide.py verify-freeze --prereg <prereg.json> --log experiment-log.md --runs <runs.jsonl>` — 동결 행 해시 일치 · 동결 시각 이전 run 없음 · 계측기 커밋 일치
+- `python3 scripts/gpt_ab_decide.py decide --prereg <prereg.json> --log experiment-log.md --runs <runs.jsonl> --verdicts <judged.json> [--verdicts …] [--frame-arm A2|A3|A4] --out <decision.json>` — 동결 확인을 먼저 하고 판정한다
+- 채점 입력은 `scripts/gpt_merge.py --blind-pack` → 채점 → `--blind-unpack` 으로 만든다(라벨 · 출처를 가린다). unpack 출력(`gpt-merge-judged/1`)을 그대로 `--verdicts` 로 넘긴다 — 모르는 형식 · 판정이 빠진 후보는 거부된다
+
+### 동결 행 (S11 — 사용자가 승인한 prereg 만)
+
+| prereg_sha256 | approved_by | time | instrument |
+|---|---|---|---|
