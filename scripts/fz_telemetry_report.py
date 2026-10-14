@@ -1183,6 +1183,7 @@ def self_test():
 # ⛔ 구간을 못 가르면 `unavailable` + exit 1 이다 — 0 으로 쓰지 않는다.
 PLAN_DOC_RE = re.compile(r"plan-(?:v\d+|final|light)\.md")
 GPT_CALL_RE = re.compile(r"codex exec|gpt-exec\.sh")
+GATE_CALL_RE = re.compile(r"gpt-call\.sh")   # 정문 호출도 GPT 호출이다(R-G1 S5 · XE-19) — 위 줄은 보존 행이라 따로 둔다
 
 
 def _seg_events(path):
@@ -1235,7 +1236,7 @@ def _seg_events(path):
                     blob = json.dumps(b.get("input", {}), ensure_ascii=False)
                     if PLAN_DOC_RE.search(blob) and when:
                         doc_writes.append(when)
-                    if GPT_CALL_RE.search(blob) and when:
+                    if (GPT_CALL_RE.search(blob) or GATE_CALL_RE.search(blob)) and when:
                         pending[b.get("id")] = when
     return start, end, doc_writes, gpt_spans
 

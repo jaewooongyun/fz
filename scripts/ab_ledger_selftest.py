@@ -245,7 +245,13 @@ def self_test(case=None):
         sprint = _plan_phase2(*mk('nohup "$R/scripts/gpt-exec.sh" exec --out "$W/plan/sprint-contract-gpt.md" --prompt-file p &'))
         doc = _plan_phase2(*mk("python3 - <<'EOF'\nx = 'gpt-exec.sh exec --schema gpt_review_schema'\nEOF"))
         fail = _plan_phase2(*mk('"$R/scripts/gpt-exec.sh" resume --session-file s', err=True))
-        return (v and r_ and not sprint and not doc and not fail), [v, r_, sprint, doc, fail]
+        # 정문 형태 — verify · verify-cross 는 Phase 2, 실험 kind(verify-falsify) · verify-gates · sprint-contract 는 아니다(XE-17)
+        g_v = _plan_phase2(*mk('"$R/scripts/gpt-call.sh" verify --cd "$G" --out "$W/plan/gpt-verify.json" --prompt-file p'))
+        g_c = _plan_phase2(*mk('"$R/scripts/gpt-call.sh" verify-cross --audit a --cd "$G" --out o --prompt-file p --prompt-out q'))
+        g_x = _plan_phase2(*mk('"$R/scripts/gpt-call.sh" verify-falsify --experimental --cd "$G" --out o --prompt-file p'))
+        g_g = _plan_phase2(*mk('"$R/scripts/gpt-call.sh" verify-gates --cd "$G" --out o --prompt-file p'))
+        g_s = _plan_phase2(*mk('"$R/scripts/gpt-call.sh" sprint-contract --cd "$G" --out o --prompt-file p'))
+        return (v and r_ and not sprint and not doc and not fail and g_v and g_c and not g_x and not g_g and not g_s), [v, r_, sprint, doc, fail, g_v, g_c, g_x, g_g, g_s]
 
     @reg
     def gpt_home_sessions_count():
@@ -322,7 +328,12 @@ def self_test(case=None):
         ph1 = any(PHASE2_RE.search(_shell_part(v)) for v in _cmd_views(c1))
         ph2 = any(PHASE2_RE.search(_shell_part(v)) for v in _cmd_views(c2))
         neg = any(GPT_CALL_RE.search(_shell_part(v)) for v in _cmd_views('X="/p/scripts/gpt-exec.sh"; sed -n 1,5p "$X"'))
-        return (found1 and ph1 and ph2 and not neg), [found1, ph1, ph2, neg]
+        # 정문 형태 — kind 호출은 GPT 호출 · 독립 kind 는 런처라 여기서 세지 않는다 · 읽기는 호출이 아니다
+        g1 = [m.group(0).split()[-1] for v in _cmd_views('"/p/scripts/gpt-call.sh" verify --cd "$R" --out o --prompt-file p; bash /p/scripts/gpt-call.sh check --cd "$R" --out c')
+              for m in GPT_CALL_RE.finditer(_shell_part(v))]
+        g_ind = any(GPT_CALL_RE.search(_shell_part(v)) for v in _cmd_views('"/p/scripts/gpt-call.sh" independent-review --diff d --arm a --run-id r --out-dir o'))
+        g_read = any(GPT_CALL_RE.search(_shell_part(v)) for v in _cmd_views('sed -n 1,5p /p/scripts/gpt-call.sh'))
+        return (found1 and ph1 and ph2 and not neg and g1[:2] == ["verify", "check"] and not g_ind and not g_read), [found1, ph1, ph2, neg, g1, g_ind, g_read]
 
     @reg
     def script_internal_output_path():
@@ -486,9 +497,23 @@ def self_test(case=None):
         miss_w, c = _judge(rows, require=["gpt-wf-wall"])
         miss_p, d = _judge(rows, require=["critical-path"])
         calls = _launcher_calls([{"id": "1", "ts": None, "input": {"command": 'bash "$P/scripts/gpt_independent.sh" plan --requirement r'}},
-                                 {"id": "2", "ts": None, "input": {"command": "sed -n 1,80p $P/scripts/gpt_independent.sh"}}], {}, {})
+                                 {"id": "2", "ts": None, "input": {"command": "sed -n 1,80p $P/scripts/gpt_independent.sh"}},
+                                 {"id": "3", "ts": None, "input": {"command": '"$P/scripts/gpt-call.sh" independent-review --diff d --arm a --run-id r --out-dir o'}},
+                                 {"id": "4", "ts": None, "input": {"command": '"$P/scripts/gpt-call.sh" independent-plan --requirement r --arm a --run-id r --out-dir o'}}], {}, {})
         return ((ok_w, ok_p, miss_w, miss_p) == (PASS, PASS, FAIL, FAIL) and switched
-                and [x["mode"] for x in calls] == ["plan"]), a + b + c + d + [str(calls)]
+                and [x["mode"] for x in calls] == ["plan", "review", "plan"]), a + b + c + d + [str(calls)]
+
+    @reg
+    def gate_launcher_mode_and_wall():
+        # P-11 — 정문 형태 런처 호출도 mode(plan · review)와 wall(시작 = 도구 호출 · 끝 = 완료 알림/도구 결과)로 집계된다
+        import datetime as _dt
+        t0 = _dt.datetime(2026, 10, 13, 0, 0, 0)
+        bash = [{"id": "p", "ts": t0, "input": {"command": '"$P/scripts/gpt-call.sh" independent-plan --requirement r --arm a --run-id r --out-dir o'}},
+                {"id": "r", "ts": t0, "input": {"command": 'bash "$P/scripts/gpt-call.sh" independent-review --diff d --arm a --run-id r --out-dir o'}},
+                {"id": "v", "ts": t0, "input": {"command": '"$P/scripts/gpt-call.sh" verify --cd g --out o --prompt-file p'}}]
+        calls = _launcher_calls(bash, {"p": {"ts": t0 + _dt.timedelta(seconds=90)}}, {"r": {"ts": t0 + _dt.timedelta(seconds=30)}})
+        got = [(x["mode"], x["wall_s"]) for x in calls]
+        return got == [("plan", 90.0), ("review", 30.0)], [str(got)]
 
     @reg
     def blind_labels_one_pack():

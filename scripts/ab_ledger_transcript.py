@@ -31,7 +31,9 @@ HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 #    `bash`/`sh` 를 건너뛴다 — 템플릿이 `if …; then` 안 들여쓴 호출과 `FZ_PLUGIN_ROOT=… bash …` 로 부른다(v4.40.0 리뷰).
 GPT_CALL_RE = re.compile(r"(?:^[ \t]*|[;&|(]\s*|\b(?:then|do|else)\s+|\b(?:bash|sh|exec)\s+)"
                          r"(?:(?:[A-Za-z_]\w*=\S*|timeout\s+\S+)\s+)*(?:(?:bash|sh)\s+)?"
-                         r"[\"']?(?:[^\s\"';&|]*/)?gpt-exec\.sh[\"']?\s+(?:review|exec|resume)\b", re.M)
+                         r"[\"']?(?:[^\s\"';&|]*/)?(?:gpt-exec\.sh[\"']?\s+(?:review|exec|resume)"
+                         r"|gpt-call\.sh[\"']?\s+(?!independent-)[a-z][a-z0-9-]*)(?![\w-])", re.M)
+# ⛔ 정문(gpt-call.sh <kind>)도 같은 호출이다 — 독립 kind(independent-*)는 런처라 LAUNCHER_RE 가 센다(R-G1 S5 · XE-19)
 # Bash 가 산출물을 **썼다**는 근거 — 경로 문자열만 있는 읽기(cat·grep)는 끝점 후보가 아니다
 WRITE_HINT_RE = re.compile(r"write_text|write_bytes|open\([^)]*['\"][wax]\+?['\"]|json\.dump\(|shutil\.copy")
 # ⛔ 원본 인자에 셸 연산자를 넣지 않는다 — `\S+` 는 `&&` 도 단어로 읽어 다음 명령까지 삼켰다(실측: plan B1
@@ -546,7 +548,8 @@ def _cmd_views(cmd):
     return out
 
 
-PHASE2_RE = re.compile(r"gpt-exec\.sh[\"']?\s+(?:exec\b[^\n]*gpt_review_schema|resume\b)")
+# 정문 형태는 kind 로 센다 — verify(B) · verify-cross(C). ⛔ 실험 kind(verify-falsify)와 verify-gates 는 Phase 2 실행이 아니다(XE-17)
+PHASE2_RE = re.compile(r"gpt-exec\.sh[\"']?\s+(?:exec\b[^\n]*gpt_review_schema|resume\b)|gpt-call\.sh[\"']?\s+verify(?:-cross)?(?![\w-])")
 
 
 def queued_followups(evs, first_prompt):
@@ -566,7 +569,8 @@ def queued_followups(evs, first_prompt):
     return n
 
 
-LAUNCHER_RE = re.compile(r"gpt_independent\.sh[\"']?\s+(plan|review)\b")
+# 정문 형태(gpt-call.sh independent-plan|review)도 같은 런처 호출이다 — mode 는 plan · review 로 정규화한다(P-11)
+LAUNCHER_RE = re.compile(r"gpt_independent\.sh[\"']?\s+(plan|review)\b|gpt-call\.sh[\"']?\s+independent-(plan|review)\b")
 
 
 def _launcher_calls(bash, notifs, results):
@@ -583,7 +587,7 @@ def _launcher_calls(bash, notifs, results):
             continue
         nt, res = notifs.get(u["id"]) or {}, results.get(u["id"]) or {}
         done = nt.get("ts") or res.get("ts")
-        out.append({"mode": m.group(1), "launch": iso(u["ts"]), "done": iso(done), "wall_s": secs(u["ts"], done)})
+        out.append({"mode": m.group(1) or m.group(2), "launch": iso(u["ts"]), "done": iso(done), "wall_s": secs(u["ts"], done)})
     return out
 
 
