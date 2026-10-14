@@ -39,6 +39,26 @@ FACTS = [
         "reference_re": r"promotion-ledger\.md",
         "mention_re": r"TEAM 일몰",
     },
+    {
+        # 진행 감시 기본값의 소유자는 래퍼 하나다 — 레지스트리 · resolver · 정문은 값을 갖지 않는다(Z-02 idle_timeout)
+        "name": "GPT 진행 감시 기본 900초 (FZ_GPT_IDLE_SEC)",
+        "canonical_file": "scripts/gpt-exec.sh",
+        "canonical_re": r'^IDLE_SEC="\$\{FZ_GPT_IDLE_SEC:-900\}"\s*$',
+        "consumer_globs": ["scripts/gpt-kinds.json", "scripts/gpt_kinds.py", "scripts/gpt-call.sh"],
+        "declaration_re": r'FZ_GPT_IDLE_SEC:-[0-9]|"idle[_a-z]*"\s*:|\bIDLE_SEC=',
+        "reference_re": r"gpt-exec\.sh",
+        "mention_re": r"FZ_GPT_IDLE_SEC",
+    },
+    {
+        # 독립 첫 패스 총 시간 상한의 소유자는 런처 하나다(Z-02 total_timeout · 측정 manifest override 는 E8)
+        "name": "GPT 독립 첫 패스 총 시간 기본 1800초 (--timeout)",
+        "canonical_file": "scripts/gpt_independent.sh",
+        "canonical_re": r"\bTIMEOUT=1800\b",
+        "consumer_globs": ["scripts/gpt-kinds.json", "scripts/gpt_kinds.py", "scripts/gpt-call.sh"],
+        "declaration_re": r'"timeout"\s*:|\bTIMEOUT=[0-9]|--timeout\s+[0-9]',
+        "reference_re": r"gpt_independent\.sh",
+        "mention_re": r"--timeout",
+    },
 ]
 
 
@@ -46,9 +66,9 @@ def read(q: pathlib.Path) -> str:
     return q.read_text(encoding="utf-8", errors="replace")
 
 
-def audit(root: pathlib.Path) -> dict:
+def audit(root: pathlib.Path, facts: list | None = None) -> dict:
     v, unread, rows = [], [], []
-    for f in FACTS:
+    for f in (FACTS if facts is None else facts):
         cf = root / f["canonical_file"]
         if not cf.is_file():
             # ⛔ 정본 파일 부재는 "위반 0건" 이 아니라 측정 실패다
@@ -142,11 +162,16 @@ def self_test() -> int:
 
     CANON = "# L\n\n## 결정 완료 — TEAM 메커니즘 일몰 (2026-09-25)\n\n본문\n"
 
-    def case(name, canon, skill, want, needle=None):
+    TEAM = [f for f in FACTS if f["name"].startswith("TEAM")]
+
+    def case(name, canon, skill, want, needle=None, facts=TEAM, files=None):
         nonlocal passed
         d = mk(canon, skill)
+        for rel, text in (files or {}).items():
+            (d / rel).parent.mkdir(parents=True, exist_ok=True)
+            (d / rel).write_text(text, encoding="utf-8")
         try:
-            r = audit(d)
+            r = audit(d, facts)
             got = "UNRUN" if r["unread"] else ("VIOLATION" if r["violations"] else "PASS")
             pool = r["violations"] + r["unread"]
             if got != want:
@@ -172,6 +197,18 @@ def self_test() -> int:
     case("canonical-file-absent", None, "> 본문\n", "UNRUN", "부재")
     # ⑥ 정본 미참조 맨 언급은 기본 **보고만** (위반 아님) — 경계를 고정한다
     case("bare-mention-reports-only", CANON, "> TEAM 일몰 경로로 대체됐다\n", "PASS")
+    # ⑦~⑩ GPT 타임아웃 기본값 — 래퍼 · 런처만 갖는다. 정문 · resolver · 레지스트리가 값을 가지면 재복제다
+    IDLE = [f for f in FACTS if "FZ_GPT_IDLE_SEC" in f["name"]]
+    TOTAL = [f for f in FACTS if "--timeout" in f["name"]]
+    wrap = {"scripts/gpt-exec.sh": 'IDLE_SEC="${FZ_GPT_IDLE_SEC:-900}"\n', "scripts/gpt-call.sh": "# 정문\n"}
+    case("idle-single-source", None, "x\n", "PASS", facts=IDLE, files=wrap)
+    case("idle-gate-redeclares", None, "x\n", "VIOLATION", "소비자 선언 수 1", facts=IDLE,
+         files=dict(wrap, **{"scripts/gpt-call.sh": 'IDLE="${FZ_GPT_IDLE_SEC:-600}"\n'}))
+    launcher = {"scripts/gpt_independent.sh": 'ARM="" TIMEOUT=1800 REQ=""\n', "scripts/gpt-kinds.json": '{"kinds": {}}\n'}
+    case("total-registry-timeout-key", None, "x\n", "VIOLATION", "소비자 선언 수 1", facts=TOTAL,
+         files=dict(launcher, **{"scripts/gpt-kinds.json": '{"kinds": {"k": {"timeout": 900}}}\n'}))
+    case("total-canonical-changed", None, "x\n", "VIOLATION", "정본 선언 수 0", facts=TOTAL,
+         files=dict(launcher, **{"scripts/gpt_independent.sh": 'ARM="" TIMEOUT=900 REQ=""\n'}))
 
     for f in fails:
         print(f"  FAIL {f}")

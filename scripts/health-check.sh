@@ -75,7 +75,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -447,12 +447,32 @@ fi
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in check_release_notes eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability; do
+for FS in check_release_notes eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source check_k_cluster check_host_census candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   record3 "레지스트리 도구 self-test ($FS)" "$FS_CODE" "$FS_OUT" \
     "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)" \
     "⛔ $(printf '%s\n' "$FS_OUT" | grep -E 'FAIL|self-test' | tail -1)"
 done
+
+# ── 4.9b GPT kind 레지스트리 lint (R-G1 S3) ───────────────────
+# ⛔ self-test 는 검사기만 본다 — 실제 레지스트리(scripts/gpt-kinds.json)와 역할 파일(gpt-agents · gpt-skills/*/agents)의
+#    model · effort 핀은 lint 로 따로 본다. 레지스트리 손상은 exit 11 이다(PASS 아님).
+GKL="$(cd "$ROOT" && python3 scripts/gpt_kinds.py lint --root "$ROOT" 2>&1)"; GKL_CODE=$?
+record3 "GPT kind 레지스트리 lint" "$GKL_CODE" "$GKL" \
+  "$(printf '%s\n' "$GKL" | grep -E '^GPT-KINDS-LINT' | tail -1)" \
+  "⛔ $(printf '%s\n' "$GKL" | grep -E '^LINT|^GPT-KINDS-LINT' | head -1)"
+
+# ── 4.9c GPT 소비자 lint · 생성 표 drift (R-G1) ───────────────
+# ⛔ 정문 하나(AC-1)를 막는 것은 소비자 lint 다 — 스텝 verify 에서 한 번 돌고 끝나면 그 뒤 회귀를 못 잡는다(아무도 안 돌리는 oracle).
+#    생성 표(skills/fz-gpt/SKILL.md)도 레지스트리와 어긋나면 손으로 고친 표가 정본처럼 남는다
+GKC="$(cd "$ROOT" && python3 scripts/gpt_kinds.py lint --consumers --allowed-tools --root "$ROOT" 2>&1)"; GKC_CODE=$?
+record3 "GPT 소비자 lint (정문 경유 · allowed-tools)" "$GKC_CODE" "$GKC" \
+  "$(printf '%s\n' "$GKC" | grep -E '^GPT-KINDS-CONSUMERS' | tail -1)" \
+  "⛔ $(printf '%s\n' "$GKC" | grep -E '^LINT|^GPT-KINDS-CONSUMERS' | head -1)"
+GKT="$(cd "$ROOT" && python3 scripts/gpt_kinds.py table --check --root "$ROOT" 2>&1)"; GKT_CODE=$?
+record3 "GPT kind 생성 표 drift" "$GKT_CODE" "$GKT" \
+  "$(printf '%s\n' "$GKT" | grep -E '^GPT-KINDS-TABLE' | tail -1)" \
+  "⛔ $(printf '%s\n' "$GKT" | grep -E '^TABLE|^GPT-KINDS-TABLE' | head -1)"
 
 # ── Workflow 계측기 self-test (B6/S5) ─────────────────────────
 # ⛔ 12케이스가 통합 검사에서 **한 번도 돌지 않았다**(§4.9 가 경고한 비대칭 그대로).
