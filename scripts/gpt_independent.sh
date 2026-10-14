@@ -1,5 +1,6 @@
 #!/bin/bash
 # GPT 독립 첫 패스 런처 (S13) — plan | review. 허용 입력만 격리 폴더에 복사하고, 강제 격리 아래에서 GPT 역할 스킬로 첫 패스를 돌린다.
+# diff-parse: hunk-state — review 감사의 head 결손 표시는 diff_anchors.py 로 경로를 풀고 `diff --git` 블록마다 `@@` 전 헤더 구간만 본다
 #
 # ⛔ 왜: Claude 워크플로가 병렬로 도는 동안 런타임이 ~/.claude/projects 에 로그를 쓰고, 작업 폴더에는 Claude 산출물이 쌓인다.
 #    시간 격리는 성립하지 않는다. 읽기 로그로 "안 읽었다"를 증명할 수도 없다(S11 ⑥ 반례 — `sh show.sh` 는 읽는 대상이 명령에 없다).
@@ -13,6 +14,11 @@
 #                             --arm A --run-id ID --out-dir D [--timeout S] [--model M] [--effort E] [--keep-iso]
 #   gpt_independent.sh review --diff F [--pr-meta F] [--requirement F] [--rules-index F] [--base D] [--head D] [--snapshot D]...
 #                             [--repo D] [--deny D]... [--gpt-agents] --arm A --run-id ID --out-dir D [--timeout S] [--model M] [--effort E] [--keep-iso]
+#                             [--frame NAME]
+#   --frame   review 전용 · 측정 전용(정문 경유는 --experimental — E8). 레지스트리 실험 kind 가 이름 붙인 frame 본문
+#             (templates/gpt-frames/NAME-review.md)을 기본 본문 **뒤에** 덧붙인다 — 기본 본문은 바이트 그대로다
+#   역할 · 스키마 · spawn 문장 · frame 은 이 런처가 정하지 않는다 — resolver(`gpt_kinds.py launcher-policy`)가 레지스트리에서 답한다(R-06).
+#             정문 경유면 정문이 넘긴 kind 라벨(FZ_GPT_CALL_LABEL)로, 직접 호출이면 모드의 기본 kind 로 묻는다 — argv 는 그대로다
 #   gpt_independent.sh cleanup --iso D   --keep-iso 로 남긴 격리 폴더를 지운다(resume 교차 뒤). 이름 fz-gpt-iso.XXXXXX · gpt-home/ 가 맞을 때만
 #   --model · --effort 보통 넘기지 않는다. 기본값 없음 — 정본 modules/gpt-strategy.md § 모델·effort 선택
 #             주면 그대로 래퍼로 넘긴다(형식 검증은 래퍼 — 빈 값 · 불량 값이면 래퍼 exit 10). 안 주면 래퍼가 필드마다 정한다 —
@@ -36,7 +42,6 @@
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-# diff-parse: hunk-state — review 감사의 head 결손 표시는 diff_anchors.py 로 경로를 풀고 `diff --git` 블록마다 `@@` 전 헤더 구간만 본다
 # fz 고유 산출물 이름(경로 성분 전체 일치) — 입력 가드 · base/head 미러 · 스냅샷 · rollout 감사가 이 표 하나를 쓴다(두 목록이 어긋나던 결함).
 #   ⛔ 범용 이름(payload.json · *-result.json)은 여기 넣지 않는다 — 저장소 파일에 흔하다. 직접 입력에만 따로 댄다(GUARD)
 FZ_ART_NAMES='code-context\.md|plan-v[0-9][^/]*\.md|plan-final[^/]*\.md|workflow-result[^/]*\.json|review-report\.md|pr-comments\.md|self-review\.md|triage\.md|render-preview\.json'
@@ -58,12 +63,11 @@ if [ "$MODE" = "cleanup" ]; then
   exit 0
 fi
 case "$MODE" in
-  plan) ROLE=planner ;;
-  review) ROLE=reviewer ;;
+  plan|review) ;;
   *) die 10 "mode 는 plan|review|cleanup — 받은 값: '${MODE}'" ;;
 esac
 
-ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO="" GPT_AGENTS=""
+ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO="" GPT_AGENTS="" FRAME=""
 SNAPS=() DENIES=()
 CHOICE_ARGS=()   # --model · --effort — 주어진 것만 받은 그대로 래퍼에 넘긴다(기본값 없음 · 형식 검증은 래퍼)
 while [ $# -gt 0 ]; do
@@ -86,6 +90,7 @@ while [ $# -gt 0 ]; do
     --deny)            need $# "--deny";            DENIES+=("$2"); shift 2 ;;
     --keep-iso)        KEEP_ISO=1; shift ;;
     --gpt-agents)      GPT_AGENTS=1; shift ;;
+    --frame)           need $# "--frame";           FRAME="$2"; shift 2 ;;
     *) die 10 "알 수 없는 인자: $1" ;;
   esac
 done
@@ -103,6 +108,32 @@ else
   [ -z "$SC" ] || die 10 "review 는 --sprint-contract 를 받지 않는다"
 fi
 [ -z "$GPT_AGENTS" ] || [ "$MODE" = "review" ] || die 10 "--gpt-agents 는 review 전용이다(역할 파일은 리뷰 렌즈다)"
+[ -z "$FRAME" ] || [ "$MODE" = "review" ] || die 10 "--frame 은 review 전용이다 — 계획 검증은 격리 첫 패스가 아니다(XE-11)"
+# ── 정책 — 역할 · 스키마 · spawn 문장 · frame 을 resolver 에게 묻는다(R-06 · SC-2). ⛔ 런처는 정책 값을 직접 갖지 않는다
+POL_KIND="independent-$MODE"
+case "${FZ_GPT_CALL_LABEL:-}" in independent-*) POL_KIND="$FZ_GPT_CALL_LABEL" ;; esac
+POL_ARGS=("$POL_KIND")
+[ -n "$GPT_AGENTS" ] && POL_ARGS+=(--gpt-agents)
+[ -n "$FRAME" ] && POL_ARGS+=(--frame "$FRAME")
+# 정문 경유면 정문이 해석에 쓴 플러그인 루트(env 채널) · 직접 호출이면 이 런처의 루트 — 같은 resolver 가 답한다
+POL_ROOT="${FZ_GPT_POLICY_ROOT:-$PLUGIN_ROOT}"
+[ -f "$POL_ROOT/scripts/gpt_kinds.py" ] && [ -f "$POL_ROOT/scripts/gpt-kinds.json" ] || die 11 "정책 resolver 가 없다: $POL_ROOT/scripts"
+POL="$(python3 "$POL_ROOT/scripts/gpt_kinds.py" launcher-policy "${POL_ARGS[@]}")"; POL_RC=$?
+case "$POL_RC" in
+  0) ;;
+  10) die 10 "정책 해석 거부 — 위 GPT-KINDS-USAGE 줄" ;;
+  *) die 11 "정책 해석 실패(resolver exit $POL_RC)" ;;
+esac
+ROLE="" SCHEMA="" SPAWN_LINE="" FRAME_FILE=""
+while IFS= read -r line; do
+  case "$line" in
+    ROLE=*) ROLE="${line#ROLE=}" ;;
+    SCHEMA=*) SCHEMA="${line#SCHEMA=}" ;;
+    SPAWN_LINE=*) SPAWN_LINE="${line#SPAWN_LINE=}" ;;
+    FRAME=*) FRAME_FILE="${line#FRAME=}" ;;
+  esac
+done <<< "$POL"
+[ -n "$ROLE" ] && [ -n "$SCHEMA" ] && [ -n "$SPAWN_LINE" ] || die 11 "정책 해석 결과가 비었다: $POL"
 
 # ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — Claude 산출물이 첫 패스에 들어가면 독립이 아니다)
 REAL_HOME="$(cd "${HOME:?HOME 미설정}" && pwd -P)"
@@ -219,11 +250,7 @@ PY
 # ── 과제 프롬프트 — 역할 본문은 래퍼 --inject-skill 이 넣는다(격리 사본 경로 → 팩 경로가 풀린다)
 {
   echo "[독립 첫 패스 — $MODE] 다른 모델과 독립으로 수행한다. 다른 모델의 계획 · 리뷰 · 중간 산출물을 찾거나 읽지 않는다."
-  if [ -n "$GPT_AGENTS" ]; then
-    echo "하위 에이전트는 역할 두 개만 만든다 — agent_type \`fz-review-arch\`(아키텍처 렌즈) · \`fz-review-quality\`(품질 렌즈). 각 렌즈에 diff 와 네가 만든 규칙 레코드를 넘기고, 두 결과를 합쳐 스키마 JSON 하나로 낸다. 다른 하위 에이전트는 만들지 않는다."
-  else
-    echo "하위 에이전트를 만들지 않는다."
-  fi
+  echo "$SPAWN_LINE"   # 레지스트리 spawn 값(--gpt-agents 면 spawn_opt_in)이 고른 문장 — resolver 소관(SC-2)
   echo "읽기는 권한 프로필로 제한돼 있다 — 막힌 경로를 우회하려 하지 않는다."
   echo
   echo "## 입력 (격리 입력 폴더 $ISO/input)"
@@ -246,13 +273,17 @@ PY
     echo "issues 와 craft 의 evidence 에는 diff 에 있는 코드 원문을 백틱으로 인용한다 — 병합이 그 인용을 diff 에서 다시 찾지 못하면 게시하지 않는다."
   fi
 } > "$ISO/prompt.txt"
+# frame(측정 전용) — 기본 본문 뒤에 덧붙인다. 기본 본문은 바이트 그대로다(S0 해시 · P-16) · spawn 문장도 그대로 앞에 남는다(XE-23)
+if [ -n "$FRAME_FILE" ]; then
+  { echo; echo "## Frame — $FRAME"; cat "$FRAME_FILE"; } >> "$ISO/prompt.txt" || die 11 "frame 덧붙이기 실패: $FRAME_FILE"
+fi
 
 # ── 실행 — ⛔ 래퍼를 새 프로세스 그룹에서 띄운다. 시간 초과면 그룹째 죽인다(래퍼만 죽이면 그 아래 CLI 가 고아로 남아 세션을 계속 쓴다)
 TEL="${FZ_TELEMETRY_DIR:-$REAL_HOME/.fz/telemetry}"   # ⛔ 가짜 HOME 이면 래퍼 기본값이 달라져 행이 조용히 사라진다 — 명시로 넘긴다
 CHOICE_DIR="${FZ_GPT_CHOICE_DIR:-$REAL_HOME/.fz/gpt-choice}"   # ⛔ 같은 이유 — 가짜 HOME 이면 래퍼(gpt-choice.sh get)의 선택 폴더가 격리 홈 아래로 바뀌어 Lead 세션 선택이 조용히 빠진다
 #    ⛔ 상대 경로여도 절대 경로로 바꾸지 않고 그대로 넘긴다 — get 이 exit 5('선택 없음' · config)로 처리하는 것이 계약이다(set 도 거부한다).
 #       런처가 자기 cwd 로 풀면 격리 팔만 규칙을 조용히 다시 해석해 다른 폴더를 읽는다. 세션 id(CLAUDE_CODE_SESSION_ID — 선택 파일 이름)는 env 가 그대로 물려준다
-SCHEMA="$PLUGIN_ROOT/schemas/gpt_independent_${MODE}_schema.json"
+# SCHEMA 는 위 정책(resolver)이 정했다
 perl -e 'setpgrp(0, 0); exec @ARGV' env HOME="$ISO/home" CODEX_HOME="$ISO/gpt-home" FZ_TELEMETRY_DIR="$TEL" FZ_GPT_CHOICE_DIR="$CHOICE_DIR" \
   bash "$SCRIPT_DIR/gpt-exec.sh" exec --cd "$CD" --out "$OUT" --prompt-file "$ISO/prompt.txt" --schema "$SCHEMA" \
   ${CHOICE_ARGS[@]+"${CHOICE_ARGS[@]}"} --gpt-skill "$ROLE" --inject-skill "$ISO/gpt-home/skills/fz-$ROLE/SKILL.md" --config-permissions \
@@ -272,18 +303,41 @@ TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
 #    ⛔ 리다이렉션 순서 — 찾은 줄은 stderr(>&2)로 보내고, 그 뒤의 2>/dev/null 은 grep 자신의 오류만 버린다
 grep -m1 '^GPT-CHOICE ' "$OUT_DIR/$BASE_NAME.wrapper.log" >&2 2>/dev/null
 
-# ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(spawn 을 못 끈다 — S11 ⑤)
+# ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(기본 경로는 spawn 을 프롬프트로만 금지한다 — CLI 는 `[agents] enabled = false`
+#    로 끌 수 있으나(R-G1 S1 실측) 런처 배선은 측정 뒤 별도 결정이다 · F-436)
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
-FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" <<'PY'
+FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" "$FRAME" "$FRAME_FILE" <<'PY'
 import glob, hashlib, importlib.util, json, os, re, shlex, sys
 mode, out, stem, home, repo, iso, rc, timed_out, schema_p = sys.argv[1:10]
 keep = sys.argv[10:11] == ["1"]   # --keep-iso — 격리 홈이 남아야 resume 이 세션을 잇는다
 plugin_root = sys.argv[11]
+frame, frame_file = sys.argv[12] or None, sys.argv[13]
+frame_sha = hashlib.sha256(open(frame_file, "rb").read()).hexdigest() if frame_file else None
+# Z-12 — GPT 가 받은 프롬프트의 해시. prompt.txt 는 격리 폴더와 함께 지워지므로 지금 남긴다. 비교용은 격리 경로를 토큰으로 바꾼 값(P-16)
+_prompt = open(os.path.join(iso, "prompt.txt"), "rb").read() if os.path.isfile(os.path.join(iso, "prompt.txt")) else None
+prompt_sha = {"raw": hashlib.sha256(_prompt).hexdigest(), "normalized": hashlib.sha256(_prompt.replace(iso.encode(), b"<ISO>")).hexdigest()} if _prompt else None
 # ⛔ 입력 해시는 격리 사본에서 잰다 — GPT 가 실제로 본 내용이다(읽기 전용 프로필이라 실행 중에 바뀌지 않는다). 병합이 stale 을 가린다
 inputs = {n: hashlib.sha256(open(os.path.join(iso, "input", n), "rb").read()).hexdigest()
           for n in ("diff.patch", "requirement.md", "sprint-contract.md", "rules-index.json", "pr-meta.json")
           if os.path.isfile(os.path.join(iso, "input", n))}
+# P-07 — 폴더 입력(base · head · snapshot/<이름>)도 GPT 가 본 사본의 tree hash 로 남긴다: 같은 diff 에 다른 head 를 붙인 run 을 병합이 가른다
+#    ⛔ 링크는 따라가지 않는다 — cp -R 은 링크를 링크로 옮긴다. 대상 내용을 읽으면 격리 밖 파일이 해시에 섞이고 끊긴 링크에서 감사가 죽는다
+def tree_hash(d):
+    h = hashlib.sha256()
+    for root, dirs, files in sorted(os.walk(d)):
+        dirs.sort()
+        for f in sorted(files) + sorted(x for x in dirs if os.path.islink(os.path.join(root, x))):
+            p = os.path.join(root, f)
+            body = b"L" + os.readlink(p).encode() if os.path.islink(p) else hashlib.sha256(open(p, "rb").read()).digest()
+            h.update(os.path.relpath(p, d).encode() + b"\0" + body)
+    return h.hexdigest()
+for n in ("base", "head"):
+    if os.path.isdir(os.path.join(iso, "input", n)):
+        inputs[n + "/"] = tree_hash(os.path.join(iso, "input", n))
+snap = os.path.join(iso, "input", "snapshot")
+for n in (sorted(os.listdir(snap)) if os.path.isdir(snap) else []):
+    inputs[f"snapshot/{n}/"] = tree_hash(os.path.join(snap, n))
 rc, timed_out = int(rc), timed_out == "1"
 # head/ 결손 표시(fail-visible) — diff 의 변경 후 경로가 head/ 미러에 있는가. 삭제만 있는 PR 은 head/ 가 정당하게 빈다.
 #   ⛔ 경로는 diff_anchors.py 로 푼다(git 따옴표 8진 · 탭 꼬리 · a/ b/ — 여기서 다시 짜지 않는다). `diff --git` 블록마다 `@@` 전 헤더만 본다 —
@@ -438,8 +492,16 @@ def home_ref(cmd):
         if not ((repo and (p == repo or p.startswith(repo + "/"))) or p == iso or p.startswith(iso + "/")):
             return p
     return None
-tcs, spawn, calls, hits, roles = 0, 0, 0, [], []
+tcs, spawn, calls, hits, roles, child_results = 0, 0, 0, [], [], 0
 iso_ok = bool(rolls)
+child_rolls = set()
+for f in rolls:
+    try:
+        first = json.loads(open(f, encoding="utf-8", errors="replace").readline())
+        if ((first.get("payload") or {}) if isinstance(first, dict) else {}).get("parent_thread_id"):
+            child_rolls.add(f)
+    except (ValueError, OSError, AttributeError):
+        pass
 for f in rolls:
     for line in open(f, encoding="utf-8", errors="replace"):
         try:
@@ -457,6 +519,9 @@ for f in rolls:
             if not any((e.get("path") or {}).get("path") == home and e.get("access") == "deny" for e in ents):
                 iso_ok = False
         t = p.get("type")
+        if r.get("type") == "response_item" and t == "agent_message" and p.get("recipient") == "/root" and p.get("author") != "/root" \
+                and f not in child_rolls:
+            child_results += 1   # 자식이 부모에게 낸 결과 — 부모 rollout 에서만 센다(자식 rollout 의 사본을 두 번 세지 않는다)
         if t == "function_call" and p.get("name") == "spawn_agent":
             spawn += 1
             try:
@@ -482,6 +547,7 @@ if tcs == 0:
     iso_ok = False
 audit = {"mode": mode, "rollouts": len(rolls), "turnContexts": tcs, "isolationApplied": iso_ok, "spawnAgent": spawn, "spawnedRoles": roles,
          "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs, "head": head,
+         "frame": frame, "frameSha256": frame_sha, "promptSha256": prompt_sha, "childResults": child_results,
          # resume 입력(fz-plan Phase 2 resume 교차) — 격리 홈은 --keep-iso 일 때만 남는다. sessionFile 은 판정(exit) 뒤에 적는다(아래)
          "iso": iso if keep else None}
 code, note = 0, "ok"

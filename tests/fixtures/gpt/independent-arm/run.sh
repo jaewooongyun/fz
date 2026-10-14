@@ -22,6 +22,12 @@ fail=0
 ok() { echo "PASS  $1"; }
 no() { echo "FAIL  $1"; fail=1; }
 check() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — 기대 '$3' · 실제 '$2'"; fi; }
+# 프로세스 조회 · 정리는 이 run 의 shim 태그로만 한다 — 전역 이름 검색(`sleep N`)은 동시에 도는 다른 run 의 프로세스를 보거나 죽인다(F-407)
+RUNTAG="arm-$$-$RANDOM"
+tagged_alive() { pgrep -f "fz-shim\[$1\]" >/dev/null; }
+tagged_kill() { pkill ${2:+-$2} -f "fz-shim\[$1\]" 2>/dev/null; }
+# 런처 감시자의 sleep 은 shim 이 아니라 태그가 없다 — PG=1 셀은 런처를 자기 프로세스 그룹에서 띄우고 그 그룹만 본다
+pg_alive() { /bin/ps -axo pgid= | awk -v g="$1" '$1 == g { f = 1 } END { exit !f }'; }
 
 # 임시 "실제 홈" — 인증 파일 · MCP 비밀이 든 config(격리 config 로 새면 안 된다) · 최상위 model · model_reasoning_effort(격리 config 로 옮긴다) · 표 안의 model 계열 줄(옮기지 않는다)
 H="$T/realhome"; mkdir -p "$H/.codex" "$H/.claude/projects/p" "$H/dev"
@@ -75,9 +81,10 @@ run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout �
   local d="$T/c-$name"; mkdir -p "$d/out"
   local body="ok"; [ -n "$outf" ] && body="$(cat "$outf")"
   local start; start=$(date +%s)
-  env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="$H" CLAUDE_CODE_SESSION_ID="${CSID:-arm-no-choice}" \
+  local pg=(); [ -n "${PG:-}" ] && pg=(perl -e 'setpgrp(0, 0); open(my $f, ">", shift) or die; print $f $$; close $f; exec @ARGV' "$d/pgid")
+  ${pg[@]+"${pg[@]}"} env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="$H" CLAUDE_CODE_SESSION_ID="${CSID:-arm-no-choice}" \
     FZ_TELEMETRY_DIR="$d/tel" FZ_SHIM_CAPTURE="$d/argv.json" FZ_SHIM_ENV_CAPTURE="$d/env.txt" \
-    FZ_SHIM_OUTPUT="$body" FZ_SHIM_ROLLOUT="$rolls" ${SLEEP:+FZ_SHIM_SLEEP="$SLEEP"} ${IGNORE_TERM:+FZ_SHIM_IGNORE_TERM=1} ${TMPX:+TMPDIR="$TMPX"} \
+    FZ_SHIM_OUTPUT="$body" FZ_SHIM_ROLLOUT="$rolls" ${SLEEP:+FZ_SHIM_SLEEP="$SLEEP"} ${SLEEP:+FZ_SHIM_TAG="$RUNTAG-$name"} ${IGNORE_TERM:+FZ_SHIM_IGNORE_TERM=1} ${TMPX:+TMPDIR="$TMPX"} \
     bash "$L" "$@" --arm A --run-id "$name" --out-dir "$d/out" > "$d/stdout" 2> "$d/stderr"
   echo $? > "$d/rc"; echo $(( $(date +%s) - start )) > "$d/secs"
 }
@@ -245,7 +252,7 @@ UPY
 )"
 check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ALL-OK n=77"
 
-# ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(끌 수 없다 — S11 ⑤)
+# ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(CLI 는 `[agents] enabled = false` 로 끌 수 있다 — R-G1 S1 실측. 런처 배선은 F-436)
 run sub "$HERE/sample-review-ok.json" "$T/r-parent.jsonl,$T/r-sub.jsonl" review --diff "$IN/diff.patch"
 check "하위 에이전트: exit 0" "$(rc sub)" 0
 check "하위 에이전트: rollout 2 감사" "$(audit sub rollouts)" 2
@@ -261,17 +268,21 @@ check "잠금: CLI 미호출" "$(called lock)" 0
 SLEEP=29.7 run hang "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md" --timeout 2
 check "시간 초과: exit 16" "$(rc hang)" 16
 [ "$(cat "$T/c-hang/secs")" -lt 15 ] && ok "시간 초과: 타이머 뒤 곧 끝난다($(cat "$T/c-hang/secs")s)" || no "시간 초과: $(cat "$T/c-hang/secs")s 걸렸다"
-sleep 1; pgrep -f 'sleep 29.7' >/dev/null && no "시간 초과: CLI 의 자식이 고아로 남았다" || ok "시간 초과: CLI 의 자식까지 종료"
+sleep 1; tagged_alive "$RUNTAG-hang" && no "시간 초과: CLI 의 자식이 고아로 남았다" || ok "시간 초과: CLI 의 자식까지 종료"
 # ⑦b 정상 run 뒤 감시자의 sleep 이 남지 않는다 — 옛 판은 run 마다 `sleep $TIMEOUT` 을 고아로 남겼다(리뷰 F5)
-run watchok "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md" --timeout 1797
+PG=1 run watchok "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md" --timeout 1797
 check "감시자 정리: exit 0" "$(rc watchok)" 0
-sleep 1; pgrep -f 'sleep 1797' >/dev/null && no "감시자 정리: sleep 1797 이 고아로 남았다" || ok "감시자 정리: 고아 sleep 없음"
-pkill -f 'sleep 1797' 2>/dev/null   # 옛 판을 잴 때 남는 고아를 치운다
+WPG="$(cat "$T/c-watchok/pgid" 2>/dev/null)"
+if [ -z "$WPG" ]; then no "감시자 정리: 런처 프로세스 그룹 id 를 얻지 못했다(판정 불가)"
+else
+  sleep 1; pg_alive "$WPG" && no "감시자 정리: 런처 프로세스 그룹에 고아(감시자 sleep)가 남았다" || ok "감시자 정리: 고아 sleep 없음"
+  kill -- -"$WPG" 2>/dev/null   # 옛 판을 잴 때 남는 고아를 치운다 — 이 셀의 프로세스 그룹만
+fi
 # ⑦c TERM 을 무시하는 자손 — 시간 초과면 KILL 까지 간다. 옛 판은 TERM 에 래퍼가 죽자 감시자를 먼저 죽여 자손이 남았다(리뷰 F5 · G2)
 IGNORE_TERM=1 SLEEP=29.6 run hangterm "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md" --timeout 2
 check "TERM 무시 자손: exit 16" "$(rc hangterm)" 16
-sleep 1; pgrep -f 'sleep 29.6' >/dev/null && no "TERM 무시 자손: KILL 되지 않고 남았다" || ok "TERM 무시 자손: KILL 로 정리"
-pkill -KILL -f 'sleep 29.6' 2>/dev/null
+sleep 1; tagged_alive "$RUNTAG-hangterm" && no "TERM 무시 자손: KILL 되지 않고 남았다" || ok "TERM 무시 자손: KILL 로 정리"
+tagged_kill "$RUNTAG-hangterm" KILL
 
 # ⑧ planner 거부 → exit 17
 printf '%s' '{"status":"rejected","reason":"claude_plan_detected","approach":"-","affectedFiles":{"new":0,"modified":0},"steps":[],"riskMatrix":[],"stressTest":[],"implicationRegister":[],"divergencePoints":[],"projectRules":{"axes":{"architecturePattern":null,"uiStack":null,"dependencyDirection":null,"naming":null,"placement":null,"conventions":null},"rules":[],"conflicts":[],"gaps":[]}}' > "$T/rejected.json"

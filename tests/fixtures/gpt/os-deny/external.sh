@@ -22,12 +22,22 @@
 # UNRUN(exit 2 · 줄 맨 앞 `UNRUN:`): 비 macOS · CLI 부재 · 중첩 샌드박스(CODEX_SANDBOX 설정 · `sandbox_apply` 거부) ·
 #    `--version` 실패 · `sandbox` 하위 명령 없음(남는 실증 경로는 모델 호출뿐). 그 밖의 어긋남은 FAIL 이다 — UNRUN 으로 세탁하지 않는다.
 # 출력: `EVIDENCE-CLASS=live` 는 4셀을 실 CLI 로 돌렸을 때만(FAIL 포함) · `OS-DENY-CELLS=<PASS 수>/4`.
-# exit: 0 4/4 PASS · 1 셀 FAIL · 2 UNRUN · 3 준비 실패(인자 · 상한 값 · 임시 폴더)
-# usage: external.sh [--tree <플러그인 루트>]   (기본: 이 파일이 든 트리. 셀은 트리 코드를 부르지 않는다 — 기록용)
+# --launcher-profile (P-12): 위 4셀에 더해, 이 트리의 런처(scripts/gpt_independent.sh)가 실제로 쓴 격리 config 로 5셀을 돈다.
+#   런처는 가짜 CLI(../_shim)로 돌려 --keep-iso 로 격리 홈만 남긴다(모델 호출 없음). 그 홈을 CODEX_HOME 으로 `sandbox` 를 부른다.
+#   lp-home-deny        실제 HOME 아래 표지 → 거부(HOME 은 임시 루트 밖이라 이 셀은 HOME 규칙만 잰다)
+#   lp-tmp-deny         /private/tmp 아래 표지 → 거부
+#   lp-varfolders-deny  사용자 임시 폴더(/private/var/folders 아래) 표지 → 거부
+#   lp-explicit-deny    HOME · 임시 루트 밖 폴더(/Users/Shared)를 --deny 로 준 표지 → 거부 · 같은 위치의 --deny 아닌 폴더 표지 → 읽힘(대조)
+#   lp-iso-read         격리 폴더 입력(diff.patch) → 읽힘(임시 루트 거부 안의 읽기 예외)
+#   줄 형식 `PASS|FAIL  [<셀>] …` · `PROFILE-SOURCE=launcher` — 원장 게이트가 셀 id 를 센다(N/N 개수식은 0/0 을 받는다)
+# exit: 0 전 셀 PASS · 1 셀 FAIL · 2 UNRUN · 3 준비 실패(인자 · 상한 값 · 임시 폴더)
+# usage: external.sh [--tree <플러그인 루트>] [--launcher-profile]   (기본: 이 파일이 든 트리)
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+LP=""
 while [ $# -gt 0 ]; do
   case "$1" in
+    --launcher-profile) LP=1; shift ;;
     --tree) [ $# -ge 2 ] || { echo "SETUP --tree 에 경로가 없다"; exit 3; }
             R="$(cd "$2" 2>/dev/null && pwd)" || { echo "SETUP --tree 경로 없음: $2"; exit 3; }; shift 2 ;;
     *) echo "SETUP 알 수 없는 인자: $1"; exit 3 ;;
@@ -78,8 +88,8 @@ tree_pids() {   # $1=pid — 자손부터 자기까지
 run() {
   local name="$1" home="$2"; shift 2
   local flag="$T/$name.capped" pid w
-  OUTF="$T/$name.out"
-  ( cd "$WORK" && exec env CODEX_HOME="$home" "$@" ) </dev/null >"$OUTF" 2>&1 &
+  OUTF="${RUN_OUT:-$T}/$name.out"   # 런처 프로필 셀은 거부 루트 밖 — 샌드박스 안 명령이 상속받은 stdout 파일에도 거부가 걸린다
+  ( cd "${RUN_CWD:-$WORK}" && exec env CODEX_HOME="$home" "$@" ) </dev/null >"$OUTF" 2>&1 &
   pid=$!
   ( i=0
     while kill -0 "$pid" 2>/dev/null; do
@@ -163,8 +173,73 @@ if [ "$CAPPED" = 1 ]; then cell no-profile-control FAIL "상한 ${CAP}s 초과"
 elif [ "$RC" = 0 ] && grep -qx 'OS-DENY-SECRET-MARK-7' "$OUTF"; then cell no-profile-control PASS "exit 0 · 비밀 마커 읽힘 — 차단은 프로필에서 온다"
 else cell no-profile-control FAIL "exit $RC · 비밀 마커 $(grep -c 'OS-DENY-SECRET-MARK-7' "$OUTF")건 — 대조가 안 선다(프로필 밖 차단)"; fi
 
+NCELL=4
+if [ -n "$LP" ]; then
+  NCELL=9
+  SHIMD="$R/tests/fixtures/gpt/_shim"
+  [ -f "$SHIMD/codex" ] && [ -f "$R/scripts/gpt_independent.sh" ] || { echo "SETUP shim · 런처 없음: $R"; exit 3; }
+  [ -f "${HOME:?}/.codex/auth.json" ] || unrun "실제 홈에 인증 파일이 없다 — 런처가 격리 홈을 만들지 않는다"
+  [ -d /Users/Shared ] && [ -w /Users/Shared ] || unrun "/Users/Shared 가 없다 · 쓸 수 없다 — HOME · 임시 루트 밖 --deny 셀을 만들 수 없다"
+  VFT="$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null)"
+  [ -n "$VFT" ] || unrun "사용자 임시 폴더(DARWIN_USER_TEMP_DIR)를 알 수 없다"
+  LPD=""
+  for spec in "HM:$HOME/.fz-os-deny.XXXXXX" "TM:/private/tmp/fz-os-deny.XXXXXX" "VF:${VFT%/}/fz-os-deny.XXXXXX" \
+              "EX:/Users/Shared/fz-os-deny.XXXXXX" "EA:/Users/Shared/fz-os-allow.XXXXXX" "OU:/Users/Shared/fz-os-out.XXXXXX"; do
+    d_="$(mktemp -d "${spec#*:}")" || { echo "SETUP 표지 폴더 생성 실패: ${spec#*:}"; exit 3; }
+    d_="$(cd "$d_" && pwd -P)"; LPD="$LPD $d_"
+    printf 'OS-DENY-LP-%s-7\n' "${spec%%:*}" > "$d_/m.txt"
+    eval "D_${spec%%:*}=\$d_"
+  done
+  trap 'rm -rf "${T0:?}" $LPD; [ -n "${ISO:-}" ] && bash "$R/scripts/gpt_independent.sh" cleanup --iso "$ISO" >/dev/null 2>&1' EXIT
+  printf 'diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+OS-DENY-LP-ISO-7\n' > "$T/lp.diff"
+  env -u CODEX_HOME PATH="$SHIMD:$PATH" FZ_TELEMETRY_DIR="$T/lp-tel" FZ_GPT_CHOICE_DIR="$T/lp-nc" \
+    FZ_SHIM_OUTPUT="$(cat "$R/tests/fixtures/gpt/independent-arm/sample-review-ok.json")" \
+    bash "$R/scripts/gpt_independent.sh" review --diff "$T/lp.diff" --arm gpt --run-id osd --out-dir "$T/lp-out" \
+    --deny "$D_EX" --keep-iso > "$T/lp-launcher.out" 2>&1
+  ISO="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("iso") or "")' "$T/lp-out/gpt-osd.audit.json" 2>/dev/null)"
+  [ -n "$ISO" ] && [ -f "$ISO/gpt-home/config.toml" ] || { echo "SETUP 런처가 격리 config 를 남기지 않았다(로그 $T/lp-launcher.out)"; tail -5 "$T/lp-launcher.out"; exit 3; }
+  echo "PROFILE-SOURCE=launcher"
+  echo "  [launcher] config $ISO/gpt-home/config.toml · deny 줄 $(grep -c '= "deny"' "$ISO/gpt-home/config.toml")"
+  # ⛔ 셀 출력 파일은 거부 루트 밖(OU)에 둔다 — 임시 폴더에 두면 프로필이 그 루트를 막아 `cat: stdout: Operation not permitted` 로
+  #    읽기 성공 셀이 실패로 보인다(실측). 출력 파일 자체는 표지가 아니다
+  LPH="$ISO/gpt-home"; RUN_CWD="$ISO/input"; RUN_OUT="$D_OU"
+  lp_deny() {   # $1 = 셀 · $2 = 표지 파일 → 거부여야 한다
+    run "$1" "$LPH" "$CLI" sandbox -- /bin/cat "$2"
+    show "$1" "CODEX_HOME=<launcher iso> sandbox -- /bin/cat $2"
+    ln_="$(denied "$OUTF" "$2")"
+    if [ "$CAPPED" = 0 ] && [ "$RC" != 0 ] && [ -n "$ln_" ] && ! grep -q 'OS-DENY-LP-' "$OUTF"; then
+      echo "PASS  [$1] exit $RC · '$ln_'"; PASS=$((PASS + 1)); return 0
+    fi
+    echo "FAIL  [$1] exit $RC · 거부 줄 '${ln_:-없음}' · 표지 $(grep -c 'OS-DENY-LP-' "$OUTF")건$([ "$CAPPED" = 1 ] && echo " · 상한 ${CAP}s 초과")"
+    BAD="$BAD $1"; return 1
+  }
+  lp_read() {   # $1 = 이름 · $2 = 파일 · $3 = 표지 → 읽혀야 한다
+    run "$1" "$LPH" "$CLI" sandbox -- /bin/cat "$2"
+    show "$1" "CODEX_HOME=<launcher iso> sandbox -- /bin/cat $2"
+    [ "$CAPPED" = 0 ] && [ "$RC" = 0 ] && grep -q "$3" "$OUTF"
+  }
+  lp_deny lp-home-deny "$D_HM/m.txt"
+  lp_deny lp-tmp-deny "$D_TM/m.txt"
+  lp_deny lp-varfolders-deny "$D_VF/m.txt"
+  if lp_deny lp-explicit-deny "$D_EX/m.txt" >/dev/null; then
+    if lp_read lp-explicit-control "$D_EA/m.txt" 'OS-DENY-LP-EA-7'; then
+      echo "PASS  [lp-explicit-deny] --deny 폴더 거부 · 같은 위치의 다른 폴더는 읽힘(차단은 --deny 에서 온다)"
+    else
+      PASS=$((PASS - 1)); BAD="$BAD lp-explicit-deny"
+      echo "FAIL  [lp-explicit-deny] 대조 폴더도 막혔다(exit $RC) — 차단이 --deny 에서 온다고 볼 수 없다"
+    fi
+  else
+    echo "FAIL  [lp-explicit-deny] --deny 폴더가 막히지 않았다"
+  fi
+  if lp_read lp-iso-read "$ISO/input/diff.patch" 'OS-DENY-LP-ISO-7'; then
+    echo "PASS  [lp-iso-read] 격리 입력 읽힘(임시 루트 거부 안의 읽기 예외)"; PASS=$((PASS + 1))
+  else
+    echo "FAIL  [lp-iso-read] exit $RC — 격리 입력이 막혔다"; BAD="$BAD lp-iso-read"
+  fi
+fi
+
 echo "EVIDENCE-CLASS=live"
-echo "OS-DENY-CELLS=$PASS/4"
-[ "$PASS" -eq 4 ] && exit 0
+echo "OS-DENY-CELLS=$PASS/$NCELL"
+[ "$PASS" -eq "$NCELL" ] && exit 0
 echo "FAIL:$BAD"
 exit 1
