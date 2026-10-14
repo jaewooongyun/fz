@@ -23,7 +23,7 @@ allowed-tools: >-
   mcp__github__add_issue_comment,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
+  Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
 metadata:
   provides: [peer-review]
   needs: [none]
@@ -86,7 +86,7 @@ metadata:
 | 참조 | 용도 |
 |------|------|
 | `guides/skill-authoring.md` §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본) |
-| `modules/cross-validation.md` | get_gpt_skill_path() 3-Tier 디스커버리, GIT_ROOT 추출 |
+| `modules/cross-validation.md` | 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`), GIT_ROOT 추출 |
 | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
 | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
 | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |
@@ -287,7 +287,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 > `modules/peer-review-workflow.md`. Tier 0/1 은 Workflow 가 없어 **읽지 않는다**(Tier 1 의 GPT 는 아래 절).
 
 ### GPT 독립 첫 패스 (기본 실행 — `--gpt-independent` 생략 가능 · `--no-gpt-independent` 로 끈다)
-- **Workflow 직전에** `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh review --diff {review-surface.patch — 없으면 diff.patch} --base … --head … --deny "${WORK_DIR}" [--pr-meta {pr-meta.json}] [--rules-index {원문 색인}]` 를 background 로 띄우고(규칙 레코드 `projectRulesPath` 는 Workflow args 에만 — 런처에 넘기면 exit 11), 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py"` 로 합친다. 경로는 **플러그인 루트 기준**이고, Workflow 스크립트는 세션 working directory 밖이면 **사전 복사**한 경로로 부른다
+- **Workflow 직전에** `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {review-surface.patch — 없으면 diff.patch} --base … --head … --deny "${WORK_DIR}" [--pr-meta {pr-meta.json}] [--rules-index {원문 색인}]` 를 background 로 띄우고(규칙 레코드 `projectRulesPath` 는 Workflow args 에만 — 런처에 넘기면 exit 11), 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py"` 로 합친다. 경로는 **플러그인 루트 기준**이고, Workflow 스크립트는 세션 working directory 밖이면 **사전 복사**한 경로로 부른다
 - `--no-gpt-independent` 면 띄우지 않고 GPT challenger(`modules/peer-review-tiers.md` · `gpt-challenger-raw.txt`)를 쓴다 — 병합 없는 옛 경로다
 - 순서 · 거부(오염 · 실패 · stale) 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서. Tier 3 GPT DA 는 병합 뒤다
 
@@ -481,7 +481,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 **Will Not**:
 - 코드를 직접 수정하지 않음 (리뷰만 수행)
 - 자기 코드 리뷰 (→ `/fz-review`)
-- GPT CLI 직접 호출 (→ 래퍼 `scripts/gpt-exec.sh` 경유 — `modules/peer-review-tiers.md` § GPT Analyze 호출)
+- GPT CLI 직접 호출 (→ 정문 `scripts/gpt-call.sh <kind>` 경유 — `modules/peer-review-tiers.md` § GPT Analyze 호출)
 - Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Code Conventions` 위임)
 - ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응

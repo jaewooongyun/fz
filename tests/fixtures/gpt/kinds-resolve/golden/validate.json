@@ -1,0 +1,38 @@
+{
+ "entry_argv": [
+  [
+   "gpt-exec.sh",
+   "exec",
+   "--cd",
+   "<W>/repo",
+   "--out",
+   "<W>/k/validate/val.json",
+   "--prompt-file",
+   "<W>/k/validate/p.txt",
+   "--schema",
+   "<R>/schemas/gpt_verification_schema.json",
+   "--gpt-skill",
+   "guardian",
+   "--inject-skill",
+   "<R>/gpt-skills/fz-guardian/SKILL.md"
+  ]
+ ],
+ "cli_argv": [
+  [
+   "exec",
+   "-C",
+   "<W>/repo",
+   "-c",
+   "sandbox_mode=\"read-only\"",
+   "-c",
+   "sandbox_permissions=[\"disk-full-read-access\"]",
+   "--output-schema",
+   "<R>/schemas/gpt_verification_schema.json",
+   "-o",
+   "<W>/k/validate/val.json",
+   "--",
+   "[fz-gpt-skill-injected] fz-guardian (<R>/gpt-skills/fz-guardian) — 아래는 역할 스킬 본문이다(래퍼 주입) · 본문의 상대 경로(references/…)는 이 폴더 기준\n---\nname: fz-guardian\ndescription: Post-change verification — every feedback item resolved, the original issue fixed and no regression introduced, judged by the target repository's own rules\n---\n\n# fz-guardian — Post-Change Verification Skill\n\n## Role\nVerify that feedback has been fully applied and no regressions are introduced.\n\n> **Authority**: VeriGuard (arXiv 2510.05156) [arxiv preprint, 2025-10] — **dual-stage verification** (Pre-action Gate + Runtime Gate) outperforms single-stage. 본 스킬은 feedback completeness (Pre-action) + regression scan (Runtime) 이중 구조로 검증한다 (Chain-of-Verification arXiv 2309.11495 패턴 결합).\n\n## Project Rules (runtime)\n\nRules come from the target repository at run time — never from this skill.\n\n1. **Sources** — read every guideline file in the repository: `CLAUDE.md` · `CLAUDE.local.md` · `AGENTS.md` · `GEMINI.md` (in any folder) and `.github/copilot-instructions.md`. Skip `.git` and `node_modules`. If the caller hands you a raw index of these files (file · line · heading · quote), work from it instead of searching.\n2. **Rule records** — build your own records; never reuse another model's interpretation. One record per rule: `axis` (`architecturePattern` · `uiStack` · `dependencyDirection` · `naming` · `placement` · `conventions`) · `authority` (`지침` = a rule sentence in a guideline file · `관례` = observed in code, quote the code · `예시` = an example inside a guideline) · `appliesTo` (languages · paths) · `condition` · `expectedResult` · `source` (file · line · verbatim quote).\n3. **Examples are not rules** — text under an `Example(s)` / `예시` heading, inside a code fence, or in `(e.g. …)` / `(예: …)` is `authority: 예시`. Never raise an example to a rule.\n4. **Unknown and conflicting axes** — an axis you cannot confirm stays `null` and is reported as a Probe Coverage Gap. When two sources disagree, keep both claims as a **rule conflict** item and do not pick a winner.\n5. **Citing** — a verdict that relies on a project rule cites it as `{file}:{line} — \"<quote>\"`.\n- **Domain pack (conditional)** — if the repository is an iOS/Swift project (`*.swift` sources, a `Package.swift` or an `.xcodeproj`), also read `references/domain-ios.md` in this skill's folder — the folder named on the `[fz-gpt-skill-injected]` marker line when this body was injected, otherwise the installed copy `$CODEX_HOME/skills/fz-guardian/references/domain-ios.md` (default `~/.codex/skills/fz-guardian/…`). A finding that rests only on that pack carries `ruleSource: plugin-default` and severity at most `suggestion`; a project rule overrides the pack.\n\n## Verification Criteria\n\n### Feedback Completeness\n- Every review comment or requested change is addressed.\n- No feedback item is partially applied or skipped.\n- Mark each feedback item: resolved | partially_resolved | unresolved | regressed.\n\n### Original Issue Resolution\n- The root cause identified in the original issue is fixed.\n- The fix directly addresses the problem (not a workaround).\n- Acceptance criteria from the original request are met.\n\n### No New Issues Introduced\n- No new compiler errors or warnings.\n- No new lint or static analysis violations.\n- No unrelated code changes bundled in.\n- No TODO/FIXME added without tracking.\n\n### Memory and Concurrency Safety\n- Changes do not introduce reference cycles.\n- Shared state access remains thread-safe.\n- UI-update paths keep the execution context they require (the UI thread) — no path lost it in the change.\n- State owned by one execution context is not touched from another without synchronization.\n- Resource cleanup paths are intact.\n\n### Implication Gate Compliance\n- Verify no inferred changes were executed without user confirmation.\n- For removal/refactoring: check that execution implications (structural residuals) were either approved and addressed, or dismissed with reason.\n- For observation implications: verify they were reported but NOT auto-fixed.\n\n### Regression Risk\n- Identify code paths affected by the change.\n- Check that existing behavior is preserved where intended.\n- Flag any behavioral changes that were not explicitly requested.\n\n### Transformation Equivalence (피드백에 패턴 변환이 포함될 때)\n- 비동기 패턴 변환(promise → async, callback → async 등)이면 원본 API 의 실행 컨텍스트(어느 스레드·큐에서 도는가)를 확인한다\n- After 패턴이 스레드/에러 수준에서 원본과 동등한지 검증\n- Zero-Exception Thread: 원본이 UI 스레드에서 돌았으면 After 도 UI 스레드를 보장해야 한다\n- After 줄 수 > Before 2배 → 추상화 부재 경고\n\n## Output Format\n\nMatches `schemas/gpt_verification_schema.json`. Key enum values:\n- `resolution_status`: `resolved` | `partially_resolved` | `unresolved` | `regressed`\n- `verdict`: `pass` | `needs_work` | `fail`\n- Feedback reflection rate: `(resolved*1.0 + partially_resolved*0.5) / total_issues`\n\n```\n### Feedback Item: \"description\"\n- Status: resolved|partially_resolved|unresolved|regressed\n- Evidence: file:line or explanation\n- Risk: none|low|medium|high\n```\n\n## Few-shot Example\n\n```\nBAD (검증 누락):\n### Feedback Item: \"해제 시 구독 정리 요청\"\n- Status: resolved\n- Evidence: \"코드 수정함\"     ← 파일:라인 없음, 실제 확인 불가\n- Risk: none\n\nGOOD:\n### Feedback Item: \"해제 시 구독 정리 요청\"\n- Status: resolved\n- Evidence: src/sync/sync_job.py:87 — stop() 에서 구독을 해제한다 · tests/test_sync_job.py:40 가 해제 뒤 콜백 0회를 단언한다\n- Risk: none\n```\n\n## When Project Guidelines Are Absent\n\nNo guideline file exists, or none applies to the changed paths. Then:\n- Apply general verification practice: confirm each change request is met, check for side effects, and validate no regressions in affected code paths.\n- Do not assume any framework, architecture pattern, layer order or folder convention. Report every architecture axis as a Probe Coverage Gap.\n- A convention verdict may cite only what the code itself shows (`authority: 관례`, quoting the code).\n\n---\n\n피드백 반영 여부를 검증하라.\nCLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.\n\n## 원본 이슈\nISSUES-FIXED\n\n## 적용된 수정\nFIXES-FIXED"
+  ]
+ ],
+ "exit": 14
+}

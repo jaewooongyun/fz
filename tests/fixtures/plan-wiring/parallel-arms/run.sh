@@ -16,9 +16,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 T0="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }; T="$(cd "$T0" && pwd -P)"; trap 'rm -rf "$T"' EXIT
 
 capture() {   # $1 = core 모듈 파일 → stdout 에 정규화한 CLI 인자 JSON(실패면 빈 출력 · exit 1)
-  local src="$1" w="$T/cap"; rm -rf "$w"; mkdir -p "$w/repo" "$w/home" "$w/tel"
+  local src="$1" w="$T/cap"; rm -rf "$w"; mkdir -p "$w/repo" "$w/home" "$w/tel" "$w/codex/skills/fz-architect"
   git -C "$w/repo" init -q 2>/dev/null
-  printf '# fz-architect — 고정 본문(러너 전용)\n' > "$w/skill.md"
+  # 고정 본문은 Tier 2a 자리($CODEX_HOME/skills/fz-architect)에 둔다 — 정문(gpt-call.sh)의 resolver 가 그 경로를 고른다.
+  #   옛 모듈(호출부가 get_gpt_skill_path 를 부르던 판)을 --capture 할 때도 같은 파일을 가리켜 두 판의 마커 줄이 같은 경로를 적는다
+  printf '# fz-architect — 고정 본문(러너 전용)\n' > "$w/codex/skills/fz-architect/SKILL.md"
   { echo 'get_gpt_skill_path() { echo "$STUB_SKILL"; }'
     echo 'P_VERIFY="$W/p_verify.txt"; PLAN_CONTENT="PLAN-FIXED"; AFFECTED_SYMBOLS="SYM-FIXED"; REVIEW_FILE="$W/review.json"'
     python3 - "$src" <<'PY'
@@ -30,7 +32,7 @@ print(s[j:s.index("\n```", j)])
 PY
   } > "$w/verify.sh" || return 1
   local ok_json='{"schemaVersion":"1.1","review_id":"fixture","timestamp":"2026-09-29T00:00:00Z","review_type":"plan_validation","issues":[],"summary":{"total_issues":0,"by_severity":{"critical":0,"major":0,"minor":0,"suggestion":0},"by_category":""},"verdict":"approved","overall_feedback":"ok","strengths":[]}'
-  env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="$w/home" PATH="$R/tests/fixtures/gpt/_shim:$PATH" W="$w" STUB_SKILL="$w/skill.md" FZ_PLUGIN_ROOT="$R" GIT_ROOT="$w/repo" \
+  env -u FZ_GPT_CHOICE_DIR CODEX_HOME="$w/codex" HOME="$w/home" PATH="$R/tests/fixtures/gpt/_shim:$PATH" W="$w" STUB_SKILL="$w/codex/skills/fz-architect/SKILL.md" FZ_PLUGIN_ROOT="$R" GIT_ROOT="$w/repo" \
     FZ_SHIM_CAPTURE="$w/argv.json" FZ_SHIM_OUTPUT="$ok_json" FZ_TELEMETRY_DIR="$w/tel" bash "$w/verify.sh" > "$w/log" 2>&1 || { cat "$w/log" >&2; return 1; }
   python3 - "$w/argv.json" "$w" "$R" <<'PY'
 import json, sys
@@ -48,7 +50,7 @@ first() { /usr/bin/grep -nF -- "$2" "$R/$1" 2>/dev/null | head -1 | cut -d: -f1;
 P=skills/fz-plan/SKILL.md
 
 # ① 순서
-a="$(first "$P" 'gpt_independent.sh plan')"; b="$(first "$P" "Workflow({ scriptPath: '{2.5에서 정한 경로}'")"; c="$(first "$P" 'plan_divergence.py')"
+a="$(first "$P" 'gpt-call.sh independent-plan')"; b="$(first "$P" "Workflow({ scriptPath: '{2.5에서 정한 경로}'")"; c="$(first "$P" 'plan_divergence.py')"
 if [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ "$a" -lt "$b" ] && [ "$b" -lt "$c" ]; then
   ok "$P: 독립 플랜 기동($a) < Workflow($b) < 합치기($c)"
 else

@@ -1,0 +1,34 @@
+{
+ "entry_argv": [
+  [
+   "gpt-exec.sh",
+   "exec",
+   "--cd",
+   "<W>/repo",
+   "--out",
+   "<W>/k/fix-suggest/fix.md",
+   "--prompt-file",
+   "<W>/k/fix-suggest/p.txt",
+   "--gpt-skill",
+   "fixer",
+   "--inject-skill",
+   "<R>/gpt-skills/fz-fixer/SKILL.md"
+  ]
+ ],
+ "cli_argv": [
+  [
+   "exec",
+   "-C",
+   "<W>/repo",
+   "-c",
+   "sandbox_mode=\"read-only\"",
+   "-c",
+   "sandbox_permissions=[\"disk-full-read-access\"]",
+   "-o",
+   "<W>/k/fix-suggest/fix.md",
+   "--",
+   "[fz-gpt-skill-injected] fz-fixer (<R>/gpt-skills/fz-fixer) — 아래는 역할 스킬 본문이다(래퍼 주입) · 본문의 상대 경로(references/…)는 이 폴더 기준\n---\nname: fz-fixer\ndescription: Bug fix — root cause, minimal fix and regression prevention, following the target repository's own rules and existing patterns\n---\n\n# fz-fixer — Bug Fix Skill\n\n## Role\nDiagnose root causes, apply minimal fixes, and prevent regressions.\n\n> **Authority**: Chain-of-Verification (CoVe, arXiv 2309.11495) [verified: peer-reviewed] — Generate verification questions before applying fix, then verify each independently. 본 스킬은 수정 전 root cause 가설을 verification chain으로 검증한다 (Reflexion arXiv 2303.11366의 self-refinement 패턴과 결합).\n\n> **Memory Lesson 36차 (Team-Shared Boundary)** — Bug fix 시에도 팀 공유 영역(lint 설정 · `.github/` · 패키지 매니페스트 · 빌드 설정 · pre-commit hook 등) 자동 변경 금지. 사용자 명시 합의 의무. 대상 저장소 지침이 \"팀 공유 영역\"을 정의하면 그 정의가 우선.\n\n## Project Rules (runtime)\n\nRules come from the target repository at run time — never from this skill.\n\n1. **Sources** — read every guideline file in the repository: `CLAUDE.md` · `CLAUDE.local.md` · `AGENTS.md` · `GEMINI.md` (in any folder) and `.github/copilot-instructions.md`. Skip `.git` and `node_modules`. If the caller hands you a raw index of these files (file · line · heading · quote), work from it instead of searching.\n2. **Rule records** — build your own records; never reuse another model's interpretation. One record per rule: `axis` (`architecturePattern` · `uiStack` · `dependencyDirection` · `naming` · `placement` · `conventions`) · `authority` (`지침` = a rule sentence in a guideline file · `관례` = observed in code, quote the code · `예시` = an example inside a guideline) · `appliesTo` (languages · paths) · `condition` · `expectedResult` · `source` (file · line · verbatim quote).\n3. **Examples are not rules** — text under an `Example(s)` / `예시` heading, inside a code fence, or in `(e.g. …)` / `(예: …)` is `authority: 예시`. Never raise an example to a rule.\n4. **Unknown and conflicting axes** — an axis you cannot confirm stays `null` and is reported as a Probe Coverage Gap. When two sources disagree, keep both claims as a **rule conflict** item and do not pick a winner.\n5. **Citing** — a fix shaped by a project rule cites it as `{file}:{line} — \"<quote>\"`.\n- **Domain pack (conditional)** — if the repository is an iOS/Swift project (`*.swift` sources, a `Package.swift` or an `.xcodeproj`), also read `references/domain-ios.md` in this skill's folder — the folder named on the `[fz-gpt-skill-injected]` marker line when this body was injected, otherwise the installed copy `$CODEX_HOME/skills/fz-fixer/references/domain-ios.md` (default `~/.codex/skills/fz-fixer/…`). A repair choice that rests only on that pack is marked `plugin-default`; a project rule overrides the pack.\n\n## Fix Process\n\n### Root Cause Analysis\n- Trace execution flow from symptom to root cause.\n- Distinguish root cause from symptoms (fix cause, not symptom).\n- Document the causal chain clearly.\n\n### Fix Strategy\n- Apply the minimal change that resolves the root cause.\n- Prefer fixes at the correct abstraction layer; choose the least invasive.\n- Do not refactor unrelated code in the same change.\n\n### Side Effect Minimization\n- Check all callers of modified functions.\n- Verify behavioral contracts and public API are preserved.\n- Validate that default values and edge cases still hold.\n\n### Existing Pattern Compliance\n- Match the coding style and error handling pattern of surrounding code.\n- Follow the project's dependency injection approach.\n- Respect layer boundaries and module ownership as the project rules state them.\n\n### Regression Prevention\n- Identify related code paths that could break.\n- Suggest test cases that cover the fix.\n- Verify the fix does not mask other latent bugs.\n\n## Anti-Repair Patterns (DO NOT do these as fixes)\n\nThese look like fixes but introduce new violations or suppress symptoms without resolving the root cause.\n\n- ❌ Weakening isolation or thread annotations only to silence a warning — fix the pattern that caused it.\n- ❌ Loosening access control only to silence an access error — restructure the data flow instead.\n- ❌ Moving work off the thread or queue the original code guaranteed (for example UI updates off the UI thread).\n- ❌ Swallowing errors that the original code propagated — preserve the original error semantics (catch + handle, not silence).\n- ❌ Wrapping a layer violation in an async block instead of moving the call to the layer that owns it.\n\n## Linkage\n- When invoked via `fz-gpt`, results feed into the `check` subcommand for iterative fix-verify cycles.\n\n## Output Format\n```\n### Bug: \"description\"\n- Root Cause: explanation with file:line\n- Fix: description of change\n- Files Modified: list\n- Side Effects: none|description\n- Suggested Tests: test case descriptions\n```\n\n## Few-shot Example\n\n```\nBAD (증상 수정):\n### Bug: \"API 응답 후 화면 갱신 안 됨\"\n- Root Cause: \"응답 처리 코드 문제\"   ← 막연한 설명, 파일:라인 없음\n- Fix: 갱신 호출에 지연(delay) 추가\n\nGOOD:\n### Bug: \"API 응답 후 화면 갱신 안 됨\"\n- Root Cause: src/feed/feed_loader.js:94 — fetchFeed() 완료 콜백이 워커 스레드에서 render() 를 호출한다(원본 콜백은 UI 스레드였다)\n- Fix: src/feed/feed_loader.js:94 — render() 를 UI 스레드로 디스패치\n- Side Effects: tests/feed_loader.test.js:51 — 기존 테스트 통과 확인\n```\n\n## When Project Guidelines Are Absent\n\nNo guideline file exists, or none applies to the changed paths. Then:\n- Apply general debugging practice: isolate the root cause, apply the minimal fix, verify no regressions, and follow the patterns of the surrounding code.\n- Do not assume any framework, architecture pattern, layer order or folder convention. Report every architecture axis as a Probe Coverage Gap.\n- A convention-driven fix choice may cite only what the code itself shows (`authority: 관례`, quoting the code).\n\n---\n\n위 리뷰 결과에서 수정이 필요한 이슈에 대해 Root Cause와 Fix Strategy를 제시하라.\n## 이슈 목록\nISSUES-FIXED\n파일을 수정하지 마라(읽기 전용 분석)."
+  ]
+ ],
+ "exit": 0
+}

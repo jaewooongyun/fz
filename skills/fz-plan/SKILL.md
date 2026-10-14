@@ -19,7 +19,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
   mcp__atlassian-jira__jira_get,
-  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [planning, architecture-analysis]
   needs: [none]
@@ -113,7 +113,7 @@ metadata:
    cp {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js && cmp -s {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js
    ```
    ⛔ 0단계가 비0 이면(경로 판정 불확정 포함) 복사본을 부르지 않는다 — **L4**(원본 경로 직접 호출·SOLO 로 낮추지 않는다). ⛔ 복사본은 산출물이 아니다 — 매 호출 덮어써서 stale 이 남지 않는다(§12).
-2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Sprint Contract 합의 직후 · Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt_independent.sh plan --requirement {요구 원문} [--sprint-contract {합의본}] [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
+2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Sprint Contract 합의 직후 · Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-plan --requirement {요구 원문} [--sprint-contract {합의본}] [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - **Stage 1 (동시 3, opus)**: 전체 플랜(방향 판정·readScope/writeScope·steps·rtm·antiPattern 포함) ∥ edge 적대 렌즈 ∥ impact+arch 렌즈
      → **Stage 2 (opus)**: 델타 병합(탐색 도구 없는 `fz:plan-merge` — 입력 JSON 만 접는다) — ⛔ 병합 콜의 schema 는 **델타 전용**(`stepAmendments`·`addedEdgeCases`·`addedImpact`)이라 본문을 다시 쓸 수 없다. **4 call**
@@ -334,7 +334,7 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 > 3. **양쪽 완료 대기** — 두 로그에 종료 표시가 모두 나온 뒤 판정한다. 한쪽만 보고 진행하면 나머지가 조용히 버려진다.
 > 4. **schema 검증 후 사용** — 각 응답을 `--output-schema` 계약으로 받고, `verify-gates` 는 `gate_check.py --verdict-check` 사후 대조까지 통과해야 판정으로 인정한다(⛔ 게이트 수 ≠ 판정 수이면 미판정).
 > ⛔ 버전 불일치(호출 사이에 plan 이 수정됨) 시 **재검증**한다 — 옛 plan 에 대한 판정을 새 plan 의 승인 근거로 쓰지 않는다.
-> ⊕ `--gpt-independent` 면 `verify` 자리를 **resume 교차**가 맡는다 — 독립 플래너 세션을 `gpt-exec.sh resume --session-file {감사 sessionFile}` 로 이어 같은 Q1–Q8 · `gpt_review_schema` 로 검증한다(`modules/fz-gpt-subcommands-core.md` § resume 교차). 위 네 계약은 그대로이고 `verify-gates` 와 동시에 돈다. 세션 파일이 없으면 기본 `verify` 다.
+> ⊕ `--gpt-independent` 면 `verify` 자리를 **resume 교차**가 맡는다 — kind `verify-cross`(`gpt-call.sh verify-cross --audit {감사}`)가 독립 플래너 세션을 `resume --session-file {감사 sessionFile}` 로 이어 같은 Q1–Q8 · `gpt_review_schema` 로 검증한다(`modules/fz-gpt-subcommands-core.md` § resume 교차). 위 네 계약은 그대로이고 `verify-gates` 와 동시에 돈다. 세션 파일이 없으면 기본 `verify` 다.
 
 ### 절차
 

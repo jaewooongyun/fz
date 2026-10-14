@@ -1,0 +1,5 @@
+단일 주장을 독립 판정하라. verdict(agree | disagree | partial | needs_verification) · reasoning(1-3문장) · missing_evidence 를 낸다. 파일을 수정하지 마라(읽기 전용 분석).
+## 주장
+CLAIM-FIXED
+## 컨텍스트
+CONTEXT-FIXED

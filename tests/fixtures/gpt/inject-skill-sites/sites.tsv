@@ -1,6 +1,6 @@
 # 문서	제목	역할	변수	기준 줄 — run.sh --base <기준> --emit-sites 로 만든다
 skills/fz-modernize/SKILL.md	### GPT 호출	architect	SKILL_PATH	290
-modules/cross-validation.md	### ⛔ `FZ_PLUGIN_ROOT` 초기화 (Tier 2b 전제 — 미설정 시 Tier 2b가 성립하지 않는다)	architect	SKILL_PATH	371
+modules/cross-validation.md	### ⛔ `FZ_PLUGIN_ROOT` 초기화 (정문 경로 전제 — 미설정 시 호출부가 정문을 찾지 못한다)	architect	SKILL_PATH	371
 modules/fz-gpt-subcommands-aux.md	## final -- PR 전 최종 리뷰	challenger	CHALLENGER_SKILL_PATH	50
 modules/fz-gpt-subcommands-aux.md	## adversarial -- Devil's Advocate 리뷰	challenger	SKILL_PATH	70
 modules/fz-gpt-subcommands-aux.md	## drift -- 아키텍처 드리프트 전체 스캔	drift	SKILL_PATH	82

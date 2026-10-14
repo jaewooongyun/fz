@@ -1,0 +1,31 @@
+{
+ "entry_argv": [
+  [
+   "gpt-exec.sh",
+   "review",
+   "--cd",
+   "<W>/repo",
+   "--out",
+   "<W>/k/review/review.md",
+   "--base",
+   "main",
+   "--gpt-skill",
+   "reviewer"
+  ]
+ ],
+ "cli_argv": [
+  [
+   "exec",
+   "review",
+   "-c",
+   "sandbox_mode=\"read-only\"",
+   "-c",
+   "sandbox_permissions=[\"disk-full-read-access\"]",
+   "-o",
+   "<W>/k/review/review.md",
+   "--base",
+   "main"
+  ]
+ ],
+ "exit": 0
+}

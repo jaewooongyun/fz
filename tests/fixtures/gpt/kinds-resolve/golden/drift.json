@@ -1,0 +1,34 @@
+{
+ "entry_argv": [
+  [
+   "gpt-exec.sh",
+   "exec",
+   "--cd",
+   "<W>/repo",
+   "--out",
+   "<W>/k/drift/drift.md",
+   "--prompt-file",
+   "<W>/k/drift/p.txt",
+   "--gpt-skill",
+   "drift",
+   "--inject-skill",
+   "<R>/gpt-skills/fz-drift/SKILL.md"
+  ]
+ ],
+ "cli_argv": [
+  [
+   "exec",
+   "-C",
+   "<W>/repo",
+   "-c",
+   "sandbox_mode=\"read-only\"",
+   "-c",
+   "sandbox_permissions=[\"disk-full-read-access\"]",
+   "-o",
+   "<W>/k/drift/drift.md",
+   "--",
+   "[fz-gpt-skill-injected] fz-drift (<R>/gpt-skills/fz-drift) — 아래는 역할 스킬 본문이다(래퍼 주입) · 본문의 상대 경로(references/…)는 이 폴더 기준\n---\nname: fz-drift\ndescription: Architecture drift detection across the whole codebase — systemic violations of the target repository's own rules that diff-level review cannot catch\n---\n\n# fz-drift — Architecture Drift Detection Skill\n\n## Role\nDetect architecture drift across the entire codebase using 1M context window.\nFind violations that diff-level review cannot catch — systemic patterns, not just changed lines.\n\n> **Authority**: DSPy \"Programming, not prompting\" (Stanford NLP, dspy.ai) [verified: official framework] — Architecture as code rather than ad-hoc prompts. 본 스킬은 대상 저장소 지침에서 런타임에 뽑은 규칙을 ground truth로, MAST 14 failure modes의 \"System Design Issues\" 카테고리 (arXiv 2503.13657) 기반으로 drift를 분류한다.\n\n## Project Rules (runtime)\n\nRules come from the target repository at run time — never from this skill.\n\n1. **Sources** — read every guideline file in the repository: `CLAUDE.md` · `CLAUDE.local.md` · `AGENTS.md` · `GEMINI.md` (in any folder) and `.github/copilot-instructions.md`. Skip `.git` and `node_modules`. If the caller hands you a raw index of these files (file · line · heading · quote), work from it instead of searching.\n2. **Rule records** — build your own records; never reuse another model's interpretation. One record per rule: `axis` (`architecturePattern` · `uiStack` · `dependencyDirection` · `naming` · `placement` · `conventions`) · `authority` (`지침` = a rule sentence in a guideline file · `관례` = observed in code, quote the code · `예시` = an example inside a guideline) · `appliesTo` (languages · paths) · `condition` · `expectedResult` · `source` (file · line · verbatim quote).\n3. **Examples are not rules** — text under an `Example(s)` / `예시` heading, inside a code fence, or in `(e.g. …)` / `(예: …)` is `authority: 예시`. Never raise an example to a rule.\n4. **Unknown and conflicting axes** — an axis you cannot confirm stays `null` and is reported as a Probe Coverage Gap. When two sources disagree, keep both claims as a **rule conflict** item and do not pick a winner.\n5. **Citing** — every drift finding cites the rule it violates as `{file}:{line} — \"<quote>\"`. A pattern no rule states is not drift — report it as an observation at most.\n- **Domain pack (conditional)** — if the repository is an iOS/Swift project (`*.swift` sources, a `Package.swift` or an `.xcodeproj`), also read `references/domain-ios.md` in this skill's folder — the folder named on the `[fz-gpt-skill-injected]` marker line when this body was injected, otherwise the installed copy `$CODEX_HOME/skills/fz-drift/references/domain-ios.md` (default `~/.codex/skills/fz-drift/…`). A finding that rests only on that pack carries `ruleSource: plugin-default` and severity at most `suggestion`; a project rule overrides the pack.\n\n## Drift Patterns (driven by the rule records)\n\n### Layer dependency violations — `dependencyDirection`\n- An import that runs against the stated direction → **critical**\n- A feature reaching into another feature's internals, when the rules separate features → **major**\n- Axis is a gap → do not invent a direction. Report only import cycles between modules (**major**), as observations\n\n### Role violations — `architecturePattern`\n- A component doing work the pattern assigns to another role (navigation code loading data, view code holding business logic) → **major**\n- Assembly/wiring code containing branching logic beyond construction → **minor**\n\n### Lifecycle drift\n- Resources acquired without release on teardown (subscriptions, timers, background tasks) → **major**\n- Long-lived tasks stored without cancellation → **major**\n\n### Naming drift — `naming`\n- Components that break the stated naming rule → **minor**\n- File names that do not match the type they define, when the rules tie them → **minor**\n\n### Placement drift — `placement`\n- Types living outside the module or folder the rules assign to them → **minor**\n\n## Scan Strategy\n\nTraverse the source files of the languages the repository actually uses (its manifests and file-extension census decide), from GIT_ROOT.\n\n**Priority order**:\n1. **Critical** — Layer dependency violations (import analysis across files)\n2. **Major** — Role violations, lifecycle leaks, concurrency misuse\n3. **Minor** — Naming and placement drift, style violations\n\n**For each violation**: report file path + line number + the violated rule's citation + a concrete fix suggestion.\n\n## Output Format\n\n```\n### Architecture Drift Report\n\n**Scan Coverage**: N files\n**Critical**: N | **Major**: N | **Minor**: N\n**Rule gaps**: <axes that could not be confirmed>\n\n#### [layer-dependency] severity: critical\n- File: src/billing/domain/charge.ts:3\n- Rule: {file}:{line} — \"<quote>\"\n- Issue: The domain module imports the HTTP client module, against the stated dependency direction\n- Suggestion: Depend on an interface in the domain module and inject the client from the outer layer\n\n#### [role] severity: major\n- File: src/checkout/checkout_navigator.ts:45\n- Rule: {file}:{line} — \"<quote>\"\n- Issue: Navigation code calls the cart service — data loading belongs to the logic component\n- Suggestion: Move the call into the logic component and pass the result in\n\n#### [lifecycle] severity: major\n- File: src/sync/sync_job.ts:88\n- Issue: Subscription created in start() is never released in stop()\n- Suggestion: Dispose the subscription in stop()\n```\n\n## When Project Guidelines Are Absent\n\nNo guideline file exists, or none applies to the scanned paths. Then:\n- Report only drift that needs no project rule: import cycles, lifecycle leaks, and files that contradict the structure the rest of the codebase shows (quote that structure).\n- Do not assume any framework, architecture pattern, layer order or folder convention. Report every architecture axis as a Probe Coverage Gap.\n- Put `Rule gaps: all` at the top of the report so the reader knows no rule-based drift was checked.\n\n---\n\n전체 코드베이스를 스캔하여 아키텍처 드리프트를 감지하라.\nCritical → Major → Minor 순으로 보고하라."
+  ]
+ ],
+ "exit": 0
+}

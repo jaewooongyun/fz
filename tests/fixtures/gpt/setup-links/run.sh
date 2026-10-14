@@ -3,7 +3,7 @@
 #
 # 판정: ① GPT 스킬(SKILL.md 가진 gpt-skills/ 전부)이 현 판으로 링크된다 ② 이 플러그인 skills/ 를 가리키는
 #       링크가 0 이다(구버전 캐시·이름 무관 포함) ③ 다른 플러그인 링크·실제 디렉토리는 보존된다
-#       ④ 재실행은 멱등이다 ⑤ Tier 2a 디스커버리(get_gpt_skill_path)가 역할 전부를 이 폴더에서 해석한다
+#       ④ 재실행은 멱등이다 ⑤ Tier 2a 디스커버리(resolver `scripts/gpt_kinds.py skill-path`)가 역할 전부를 이 폴더에서 해석한다
 #       ⑥ 인자 없으면 agents 폴더를 건드리지 않는다 ⑦ --gpt-agents 면 역할 파일(gpt-agents/*.toml)을 현 판으로 링크하고
 #          남의 같은 이름 링크 · 실제 파일은 보존한다 · 재실행 멱등 (S14 · opt-in)
 #       ⑧ --check 읽기 전용 점검(F-353) — 셀 check-stale-owned · check-preserve-unowned · check-clean-after-setup.
@@ -152,16 +152,16 @@ sig2="$(tsig)"; runc c2; rc2=$?; sig3="$(tsig)"
 before="$(snap)"; run 2; after="$(snap)"
 [ "$before" = "$after" ] && ok "재실행 멱등" || no "재실행이 상태를 바꿨다"
 
-# ⑤ Tier 2a — 정본 함수를 modules/cross-validation.md 에서 떼어 실행한다(복사본 아님)
-FN="$(awk '/^get_gpt_skill_path\(\) \{/{f=1} f{print} f&&/^\}$/{exit}' "$R/modules/cross-validation.md")"
-if [ -z "$FN" ]; then
-  no "get_gpt_skill_path 정의를 찾지 못했다 — 문서에서 지워졌거나 형식이 바뀌었다"
+# ⑤ Tier 2a — 정본 구현(resolver scripts/gpt_kinds.py skill_path — R-G1 에서 문서 인라인 함수를 옮겼다)을 실행한다.
+#    resolver 는 Tier 2a 가 없으면 플러그인 번들(Tier 2b)을 돌려준다 — 기대값이 Tier 2a 경로라 링크가 깨지면 그대로 miss 다
+if [ ! -f "$R/scripts/gpt_kinds.py" ]; then
+  no "resolver scripts/gpt_kinds.py 가 없다"
 else
   roles=0 hit=0 miss=""
   for d in "$P"/gpt-skills/fz-*/; do
     [ -f "$d/SKILL.md" ] || continue
     role="$(basename "$d")"; role="${role#fz-}"; roles=$((roles + 1))
-    got="$(cd "$T" && env -u FZ_PLUGIN_ROOT HOME="$H" bash -c "$FN"$'\n''get_gpt_skill_path "$1"' _ "$role")"
+    got="$(cd "$T" && env -u FZ_PLUGIN_ROOT HOME="$H" python3 "$R/scripts/gpt_kinds.py" skill-path "$role")"
     [ "$got" = "$H/.codex/skills/fz-$role/SKILL.md" ] && [ -f "$got" ] && hit=$((hit + 1)) || miss="$miss $role"
   done
   [ "$roles" -gt 0 ] && [ "$hit" -eq "$roles" ] && ok "Tier 2a 디스커버리 $hit/$roles 역할" || no "Tier 2a 디스커버리 $hit/$roles — 미해석:$miss"

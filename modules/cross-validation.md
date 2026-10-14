@@ -53,7 +53,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 ### 적용 가이드
 
 - **fz-gpt 모든 서브커맨드** = Generator≠Evaluator 분리 구현체
-- **T1-G ensemble** = MoA-Lite 2-layer 구현 (cross-agent diversity 강화)
+- **T1-G ensemble** = MoA-Lite 2-layer 를 **설계 목표**로 둔다 — 기본 흐름은 GPT 를 한 번 부르므로 구현돼 있지 않다. 질문 틀이 다른 GPT 호출(다각도)은 실험 kind(`scripts/gpt-kinds.json` · `--experimental`)로만 돌며 측정(E1) 뒤에 기본값을 정한다
 - **η-1** = Position bias 회피의 prompt-level 강화 (TEAM 사료의 Gate 1.0 Independence Verified로 구현 — 사료 2026-09-25 삭제)
 - **Reflection Rate 측정** = 이종 blind spot 보완 효과 정량화 (T1-B §5.5 schema)
 
@@ -304,46 +304,21 @@ GIT_ROOT_REL=$(grep -A 5 "^## Directory Structure" CLAUDE.md 2>/dev/null | \
 GIT_ROOT="${GIT_ROOT_REL:-.}"
 ```
 
-### get_gpt_skill_path() — 3-Tier 디스커버리
+### 역할 스킬 경로 — 3-Tier 디스커버리 (`scripts/gpt_kinds.py skill-path`)
 
-> ⛔ **2026-08-09 계약 변경 — 이름이 아니라 `SKILL.md` 절대경로를 반환한다.**
-> 이전 판(`get_codex_skill()`)은 Tier 2b에서 **플러그인 `gpt-skills/`를 확인한 뒤 이름만** 반환했는데, 호출자 8곳은 항상 `cat ~/.codex/skills/${NAME}/SKILL.md` 를 읽었다. 심볼릭이 없으면 `[ -n "$NAME" ]`가 true라 **Tier 3 generic 폴백으로 가지 않고 존재하지 않는 경로를 `cat`** 했다 — 즉 Tier 2b가 파손 상태였다.
-> 부수 정정: `BASH_SOURCE[0]` 의존 제거 — 이 함수는 **마크다운에서 인라인 복사**되어 실행되므로 `dirname "${BASH_SOURCE[0]}"`가 스크립트 위치를 가리키지 않는다. 플러그인 루트를 **인자/환경변수로 명시 전달**한다.
+역할 스킬(`gpt-skills/fz-<역할>/SKILL.md`)의 경로는 resolver 한 곳이 정한다 — `scripts/gpt_kinds.py` 의 `skill_path()` 가 유일한 구현이고, 정문(`scripts/gpt-call.sh`)이 kind 마다 부른다. 호출부는 경로를 다루지 않는다.
 
-```bash
-# usage: get_gpt_skill_path <role> [plugin_root]
-#   반환: SKILL.md 절대경로 (없으면 빈 문자열 → 호출자가 Tier 3 인라인 프롬프트로 폴백)
-get_gpt_skill_path() {
-  local ROLE=$1
-  local PLUGIN_ROOT="${2:-${FZ_PLUGIN_ROOT:-}}"
-  local PROJECT_ROOT="$(pwd)"
-  local SK_ROOT="${CODEX_HOME:-$HOME/.codex}/skills"   # ⛔ setup-gpt-skills.sh 와 같은 기준 경로 — 다르면 정리 안 된 옛 폴더를 읽는다
+Tier 1: 호출자 cwd 의 `CLAUDE.md` `## GPT Skills` 테이블 → Tier 2a: `${CODEX_HOME:-~/.codex}/skills/fz-<역할>` (setup 심볼릭 또는 기존 설치) → Tier 2b: 플러그인 번들 `gpt-skills/fz-<역할>` → Tier 3: kind 의 `fallback_prompt`(레지스트리)를 프롬프트 앞에 붙인다.
 
-  # Tier 1: 프로젝트 CLAUDE.md `## GPT Skills` 테이블
-  local SKILL=$(grep -A 20 "^## GPT Skills" "${PROJECT_ROOT}/CLAUDE.md" 2>/dev/null | \
-    grep "| $ROLE " | awk -F'|' '{print $3}' | xargs)
-  if [ -n "$SKILL" ] && [ -f "$SK_ROOT/$SKILL/SKILL.md" ]; then
-    echo "$SK_ROOT/$SKILL/SKILL.md"; return
-  fi
-  # Tier 2a: $SK_ROOT (setup-gpt-skills.sh 심볼릭 또는 기존 설치)
-  if [ -f "$SK_ROOT/fz-${ROLE}/SKILL.md" ]; then
-    echo "$SK_ROOT/fz-${ROLE}/SKILL.md"; return
-  fi
-  # Tier 2b: 플러그인 번들본 — ⛔ 경로를 반환한다 (이름만 반환하면 호출자가 못 찾는다)
-  if [ -n "$PLUGIN_ROOT" ] && [ -f "$PLUGIN_ROOT/gpt-skills/fz-${ROLE}/SKILL.md" ]; then
-    echo "$PLUGIN_ROOT/gpt-skills/fz-${ROLE}/SKILL.md"; return
-  fi
-  echo ""
-}
-```
+- 해석은 **호출자의 cwd · env 기준**이다 — 정문이 cwd 를 바꾸기 전에 resolver 를 부른다(Tier 1 이 대상 프로젝트를 본다). verify-cross 의 격리 `CODEX_HOME` 은 경로를 정한 **뒤** 래퍼에만 준다(격리 홈이 Tier 2a 에 새지 않는다)
+- 직접 확인: `python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_kinds.py" skill-path architect` — 빈 줄이면 Tier 3 다
+- 이력: 2026-08-09 이전 판은 Tier 2b 에서 이름만 돌려줘 호출자가 없는 경로를 `cat` 했다 · 같은 날 경로 반환으로 고쳤다 · R-G1(2026-10) 에서 마크다운 인라인 함수를 resolver 로 옮겼다
 
-Tier 1: CLAUDE.md `## GPT Skills` 테이블 → Tier 2a: `${CODEX_HOME:-~/.codex}/skills/` 심볼릭 → Tier 2b: 플러그인 번들 → Tier 3: 인라인 프롬프트(빈 문자열 반환).
-
-### ⛔ `FZ_PLUGIN_ROOT` 초기화 (Tier 2b 전제 — 미설정 시 Tier 2b가 성립하지 않는다)
+### ⛔ `FZ_PLUGIN_ROOT` 초기화 (정문 경로 전제 — 미설정 시 호출부가 정문을 찾지 못한다)
 
 > **신설 근거 (2026-08-09 외부 감사 ISSUE-009)**: 위 함수와 8개 호출부가 `FZ_PLUGIN_ROOT`를 **소비**하는데 레포 어디에도 **할당이 없었다**(실측: 소비 10곳 / 할당 0곳). 전부 빈 문자열이 전달되어 `[ -n "$PLUGIN_ROOT" ]`가 false → **Tier 2b가 항상 건너뛰어졌다.** Tier 2b 파손을 고치려던 변경이 목표를 달성하지 못한 상태였다.
 
-⛔ **GPT 호출(`scripts/gpt-exec.sh`) 전에 반드시 1회 실행한다.** 절차는 **2단계**다 — ①Lead가 스크립트의 절대경로를 만들고 ②스크립트가 자기 위치에서 루트를 해석한다.
+⛔ **GPT 호출(`scripts/gpt-call.sh`) 전에 반드시 1회 실행한다** — 호출부가 정문을 찾는 경로다(resolver 는 자기 위치에서 Tier 2b 를 해석하므로 역할 경로에는 이 값이 필요 없다). 절차는 **2단계**다 — ①Lead가 스크립트의 절대경로를 만들고 ②스크립트가 자기 위치에서 루트를 해석한다.
 
 ⛔ **부트스트랩 순환 주의**: 셸 스니펫만으로는 해결되지 않는다. `{스킬 base directory}` 같은 토큰은 **치환되지 않는 리터럴**이라 `cd`가 실패한다 (2026-08-09 감사 ISSUE-PLAN-001). 첫 절대경로는 **Lead가 대화 컨텍스트에서** 만든다.
 
@@ -353,31 +328,28 @@ Tier 1: CLAUDE.md `## GPT Skills` 테이블 → Tier 2a: `${CODEX_HOME:-~/.codex
 ```bash
 # 자기 위치에서 루트를 해석하고 마커로 fail-closed 검증한다 (exit 2 = 루트 아님)
 FZ_PLUGIN_ROOT="$(<PLUGIN_ROOT_ABS>/scripts/resolve-plugin-root.sh)" || {
-  echo "WARN: FZ_PLUGIN_ROOT 해석 실패 — Tier 2b 불가, Tier 2a/3로만 동작" >&2
+  echo "WARN: FZ_PLUGIN_ROOT 해석 실패 — 정문 경로가 없다. GPT 호출은 불능 분기로 간다(측정 실패 · 0건 아님)" >&2
   FZ_PLUGIN_ROOT=""
 }
 export FZ_PLUGIN_ROOT
 ```
 
-- ⛔ **빈 값으로 조용히 진행하지 말 것**: 위처럼 경고를 내야 "Tier 2b를 썼다"는 오해가 생기지 않는다
+- ⛔ **빈 값으로 정문을 부르지 말 것**: `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh"` 가 `/scripts/gpt-call.sh` 가 되어 exit 127 로 끝난다 — 10~17 계약 밖이라 측정 실패로도 읽히지 않는다. 비면 호출하지 않고 불능 분기(`skills/fz-review/SKILL.md` 검증 2)로 간다
 - ⛔ 스크립트는 `BASH_SOURCE[0]`을 쓴다 — `$0`은 `source` 시 **호출자**를 가리켜 오해석된다
-- ✅ Tier 2a(심볼릭)가 있으면 Tier 2b에 닿지 않으므로 미설정이 **무증상**이다 — 그래서 실측 없이는 드러나지 않았다
+- ✅ (이력) 정문 이전에는 Tier 2a(심볼릭)가 있으면 미설정이 **무증상**이었다 — 지금은 미설정이면 정문 경로가 없어 첫 호출에서 드러난다
 - ✅ 이미 스크립트 안에서 호출하는 경우(자기 `dirname`을 아는 경우)는 ①이 불필요하다:
   `FZ_PLUGIN_ROOT="$("$(dirname "${BASH_SOURCE[0]}")/resolve-plugin-root.sh")"`
 
-**호출 계약** (⛔ 호출부 전부 이 형태로 통일 — 할당 변수와 조건 검사 변수가 **같은 이름**이어야 한다):
+**호출 계약** (⛔ 호출부 전부 이 형태 — kind 와 입력만 쓴다):
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
-SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다
-[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
-printf '%s%s\n' "$SKILL_PROMPT" "{과제 지시}" > "$P"
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$OUT" --prompt-file "$P" \
-  --gpt-skill architect --inject-skill "$SKILL_PATH"
+printf '%s\n' "{과제 지시}" > "$P"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$OUT" --prompt-file "$P"
 ```
-- 역할 본문은 래퍼 `--inject-skill` 이 넣는다 — exec 전용 · 본문 전체가 이미 있으면 넣지 않는다 · 스킬 폴더 경로 마커로 본문의 상대 경로(`references/…`)가 풀린다(`modules/fz-gpt-bash-hygiene.md` § 스킬 본문 판정과 주입). ⛔ 호출부가 본문을 `cat` 으로 또 넣지 않는다 — 넣는 곳이 둘이면 어느 쪽이 빠져도 드러나지 않는다(F-335). 빈 경로는 폴백이고 래퍼가 `fallback=1` 로 적는다
-- ⛔ `resume` 은 `--inject-skill` 을 받지 않는다(exit 10) — 이어 받는 세션에 그 본문이 없을 때만 호출부가 본문을 프롬프트에 붙이고 `--gpt-skill-path` 로 판정만 받는다(`modules/fz-gpt-subcommands-core.md` § resume 교차)
+- 모드 · 역할 · 스키마 · 고정 플래그는 kind 가 정한다(`scripts/gpt-kinds.json` · 생성 표 `skills/fz-gpt/SKILL.md`). 정문이 역할 경로를 해석해 래퍼 `--inject-skill` 로 넘긴다 — exec 전용 · 본문 전체가 이미 있으면 넣지 않는다 · 스킬 폴더 경로 마커로 본문의 상대 경로(`references/…`)가 풀린다(`modules/fz-gpt-bash-hygiene.md` § 스킬 본문 판정과 주입). ⛔ 호출부가 본문을 `cat` 으로 또 넣지 않는다 — 넣는 곳이 둘이면 어느 쪽이 빠져도 드러나지 않는다(F-335). 경로를 못 찾으면 정문이 kind 의 `fallback_prompt` 를 프롬프트 앞에 붙인다
+- ⛔ `resume` 은 `--inject-skill` 을 받지 않는다 — 이어 받는 세션에 본문이 없는 resume 교차는 kind `verify-cross` 가 맡는다(정문이 본문을 앞에 붙이고 `--gpt-skill-path` 로 판정만 받는다 — `modules/fz-gpt-subcommands-core.md` § resume 교차)
+- ⛔ 정책 플래그(`--schema` · `--inject-skill` · `--gpt-skill(-path)` · `--ephemeral` · `-c` · `-p` · `--profile` · `--ignore-user-config` · `--config-permissions`)를 넘기면 정문이 10 으로 거부한다. `--model` · `--effort` 는 그대로 넘긴다(E1 — 판정은 래퍼)
 
-⛔ **`setup-gpt-skills.sh` 는 Tier 2a 심볼릭(`gpt-skills/`)을 만든다 — 디스커버리의 필수 조건은 아니다.** 미실행이어도 `FZ_PLUGIN_ROOT` 가 있으면 Tier 2b 가 같은 번들 `SKILL.md` 를 돌려주고, 없으면 Tier 3 로 폴백한다. setup 이 더하는 것은 GPT CLI 가 자기 스킬 폴더에서 역할 스킬을 스스로 싣게 하는 것이다.
+⛔ **`setup-gpt-skills.sh` 는 Tier 2a 심볼릭(`gpt-skills/`)을 만든다 — 디스커버리의 필수 조건은 아니다.** 미실행이어도 resolver(`scripts/gpt_kinds.py`)가 자기 위치의 번들 `SKILL.md`(Tier 2b)를 돌려주고, 번들이 없으면 Tier 3 로 폴백한다. setup 이 더하는 것은 GPT CLI 가 자기 스킬 폴더에서 역할 스킬을 스스로 싣게 하는 것이다.
 ⛔ Claude 스킬(`skills/`)을 그 폴더에 링크하면 GPT 가 역할 스킬 대신 Claude 스킬을 고른다(A2-02 실측: 링크 확장 뒤 fz-reviewer 로드 28세션 중 26회 → 31세션 중 1회). 그래서 setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 `skills/` 를 가리키는 링크는 이름과 무관하게 지운다.
 
 ### 독립 첫 패스 — `scripts/gpt_independent.sh` (fz-peer-review 기본 · fz-review · fz-plan 은 opt-in `--gpt-independent`)
@@ -387,7 +359,7 @@ printf '%s%s\n' "$SKILL_PROMPT" "{과제 지시}" > "$P"
 - 허용 입력만 격리 폴더에 복사한다 — 요구사항 원문 · 합의 Sprint Contract · PR 메타 · diff · `base/` · `head/` 스냅샷 · 지침 원문 색인 · 소비자 스냅샷. Claude 산출물 이름(`code-context*` · `plan-v*` · `*workflow-result*` · 리뷰 산출물)이나 `~/.claude` 아래 경로가 들어오면 exit 15 다
 - 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` 는 deny, 격리 폴더(와 `--repo`)만 read 다
 - rollout 을 전부 감사한다 — HOME deny 가 없거나 금지 경로 · 홈 재귀 검색이 있으면 exit 15 와 `.contaminated` 다. 읽는 대상이 명령에 없는 읽기가 있어 읽기 로그만으로는 "안 읽었다"를 증명할 수 없다 — 감사는 보조다
-- review 의 `--gpt-agents`(opt-in)는 역할 파일(`gpt-agents/`)로 두 렌즈 역할을 spawn 한다. 하위 에이전트는 부모 이력을 물려받지만 부모가 격리돼 있어 독립이 유지되고, 같은 권한 프로필을 강제받는다(S11 ⑤)
+- review 의 `--gpt-agents`(opt-in)는 역할 파일(`gpt-agents/`)로 두 렌즈 역할을 spawn 한다. 하위 에이전트는 부모와 같은 권한 프로필을 강제받는다(S11 ⑤ · R-G1 S1 실측 — 자식 turn_context 에 HOME deny). 부모 이력을 물려받는지는 `spawn_agent` 의 `fork_turns` 를 모델이 매번 고른다(S1 관측 2건 모두 `none`) — 부모가 격리돼 있어 어느 쪽이든 독립은 유지된다. `--gpt-agents` 가 없으면 프롬프트로 하위 에이전트를 금지하고 감사가 spawn 수를 기록한다 — 지시 + 기록이고 강제가 아니다(spawn 도구는 노출된다 — F-436)
 - 산출은 `<arm>-<run>.json`(`schemas/gpt_independent_{plan,review}_schema.json`) · `.md` · `.audit.json` · `.rollouts/` 다. 호출법은 `modules/fz-gpt-subcommands-aux.md` § independent-plan · independent-review
 - 기본값은 스킬마다 다르다 — fz-peer-review 는 기본으로 쓰고(`--no-gpt-independent` 로 끈다 · S25p · S27 판정 뒤 v4.42.0), fz-review · fz-plan 은 `--gpt-independent` 로 켠다. 쓰지 않는 경로에서는 위 호출 계약이 그대로다
 
@@ -395,7 +367,7 @@ printf '%s%s\n' "$SKILL_PROMPT" "{과제 지시}" > "$P"
 
 | 스킬 | 참조 이유 |
 |------|----------|
-| /fz-gpt | 검증 게이트 + `get_gpt_skill_path()` 3-Tier 디스커버리 |
+| /fz-gpt | 검증 게이트 + 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`) |
 | /fz | 파이프라인 검증 게이트 자동 삽입 |
 | modules/lead-reasoning.md | Implication Scan + origin-equivalence 추론 원칙 |
 | modules/system-reminders.md | Instruction fade-out 대응 트리거 정책 |

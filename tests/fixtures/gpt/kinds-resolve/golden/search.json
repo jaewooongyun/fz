@@ -1,0 +1,34 @@
+{
+ "entry_argv": [
+  [
+   "gpt-exec.sh",
+   "exec",
+   "--cd",
+   "<W>/repo",
+   "--out",
+   "<W>/k/search/search.md",
+   "--prompt-file",
+   "<W>/k/search/p.txt",
+   "--gpt-skill",
+   "searcher",
+   "--inject-skill",
+   "<R>/gpt-skills/fz-searcher/SKILL.md"
+  ]
+ ],
+ "cli_argv": [
+  [
+   "exec",
+   "-C",
+   "<W>/repo",
+   "-c",
+   "sandbox_mode=\"read-only\"",
+   "-c",
+   "sandbox_permissions=[\"disk-full-read-access\"]",
+   "-o",
+   "<W>/k/search/search.md",
+   "--",
+   "[fz-gpt-skill-injected] fz-searcher (<R>/gpt-skills/fz-searcher) — 아래는 역할 스킬 본문이다(래퍼 주입) · 본문의 상대 경로(references/…)는 이 폴더 기준\n---\nname: fz-searcher\ndescription: Codebase exploration — structure, symbol relationships, similar patterns and impact scope, read through the target repository's own module rules\n---\n\n# fz-searcher — Codebase Exploration Skill\n\n## Role\nExplore codebase structure, trace dependencies, and analyze impact scope.\n\n> **Authority**: Anthropic \"How we built our multi-agent research system\" (2025-06) [verified: official A1] — \"Token usage explains 80% of performance variance\". 본 스킬은 ReAct (arXiv 2210.03629) reasoning-action-observation 루프로 효율적 검색 + Context Rot (Chroma Research 18 frontier models) 회피 (focused 300 tokens > unfocused 113K tokens) 원칙을 적용한다.\n\n## Project Rules (runtime)\n\nRules come from the target repository at run time — never from this skill.\n\n1. **Sources** — read every guideline file in the repository: `CLAUDE.md` · `CLAUDE.local.md` · `AGENTS.md` · `GEMINI.md` (in any folder) and `.github/copilot-instructions.md`. Skip `.git` and `node_modules`. If the caller hands you a raw index of these files (file · line · heading · quote), work from it instead of searching.\n2. **Rule records** — build your own records; never reuse another model's interpretation. One record per rule: `axis` (`architecturePattern` · `uiStack` · `dependencyDirection` · `naming` · `placement` · `conventions`) · `authority` (`지침` = a rule sentence in a guideline file · `관례` = observed in code, quote the code · `예시` = an example inside a guideline) · `appliesTo` (languages · paths) · `condition` · `expectedResult` · `source` (file · line · verbatim quote).\n3. **Examples are not rules** — text under an `Example(s)` / `예시` heading, inside a code fence, or in `(e.g. …)` / `(예: …)` is `authority: 예시`. Never raise an example to a rule.\n4. **Unknown and conflicting axes** — an axis you cannot confirm stays `null` and is reported as a Probe Coverage Gap. When two sources disagree, keep both claims as a **rule conflict** item and do not pick a winner.\n5. **Citing** — module boundaries and naming patterns you rely on come from the rules; cite them as `{file}:{line} — \"<quote>\"`.\n\n## Search Capabilities\n\n### Codebase Structure Exploration\n- Map directory structure and module boundaries.\n- Identify entry points, main components, and their responsibilities.\n- Trace the flow from feature entry to data layer.\n\n### Symbol Relationship Tracing\n- Find all usages of a type, function, or property.\n- Trace protocol conformances and inheritance chains.\n- Map dependency injection paths and object creation sites.\n- Identify circular dependencies.\n\n### Similar Pattern Search\n- Find existing implementations of similar functionality.\n- Locate patterns that match a described behavior.\n- Identify reusable components for a given requirement.\n- Find test examples for similar features.\n\n### Impact Scope Analysis\n- Given a change target, list all directly affected files.\n- Identify indirect effects through dependency chains.\n- Map which tests cover the affected code paths.\n- Flag public API surface changes that affect consumers.\n\n## Linkage\n- When invoked via `fz-gpt`, results feed into the `search` subcommand for structured codebase exploration.\n\n## Output Format\n```\n### Search: \"query description\"\n- Found: N results\n- Key Findings:\n  1. file:line — description\n  2. file:line — description\n- Dependency Chain: A → B → C (if tracing)\n- Impact Scope: list of affected modules/files\n```\n\n## Few-shot Example\n\n```\nBAD:\n### Search: \"OrderService 찾기\"\n- Found: 3 results\n- Key Findings: 파일들이 있음\n\nGOOD:\n### Search: \"OrderService 의존성 추적\"\n- Found: 4 results\n- Key Findings:\n  1. src/orders/order_service.ts:1 — 심볼 정의, OrderStore 의존\n  2. src/orders/order_module.ts:28 — 생성 및 OrderStore 주입\n  3. src/orders/order_controller.ts:15 — 콜백 수신자로 참조\n  4. tests/orders/order_service.test.ts:10 — 테스트 대상\n- Dependency Chain: order_module → OrderService → OrderStore → HttpClient\n- Impact Scope: OrderService 수정 시 order_module, order_controller, order_service.test 영향\n```\n\n## When Project Guidelines Are Absent\n\nNo guideline file exists, or none applies to the searched paths. Then:\n- Use general exploration techniques: directory traversal, symbol search, reference tracing and dependency analysis with the available tools.\n- Do not assume any framework, architecture pattern, layer order or folder convention; describe the structure the code shows. Report every architecture axis as a Probe Coverage Gap.\n\n---\n\n아래 변경 대상의 영향 심볼과 의존성 체인을 탐색하라.\n## 변경 대상\nPLAN-FIXED\n파일을 수정하지 마라(읽기 전용 분석)."
+  ]
+ ],
+ "exit": 0
+}

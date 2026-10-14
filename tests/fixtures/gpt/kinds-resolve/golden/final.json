@@ -1,0 +1,35 @@
+{
+ "entry_argv": [
+  [
+   "gpt-exec.sh",
+   "review",
+   "--cd",
+   "<W>/repo",
+   "--out",
+   "<W>/k/final/final.md",
+   "--base",
+   "main",
+   "--title",
+   "[TICKET] PR 전 최종 리뷰",
+   "--gpt-skill",
+   "reviewer"
+  ]
+ ],
+ "cli_argv": [
+  [
+   "exec",
+   "review",
+   "-c",
+   "sandbox_mode=\"read-only\"",
+   "-c",
+   "sandbox_permissions=[\"disk-full-read-access\"]",
+   "-o",
+   "<W>/k/final/final.md",
+   "--title",
+   "[TICKET] PR 전 최종 리뷰",
+   "--base",
+   "main"
+  ]
+ ],
+ "exit": 0
+}

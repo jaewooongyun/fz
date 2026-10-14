@@ -8,8 +8,8 @@
 
 **review** (주력, fz-review P5) · **verify** (Q1-Q8, fz-plan P2) · **verify-gates** (게이트 원장 판정, fz-plan P2 **추가** 호출) · **validate** (역검증, fz-review P5.5) · **check** (verdict contract: pass/warn/fail)
 
-> ⛔ **아래 예시는 전부 래퍼(`scripts/gpt-exec.sh`) 호출이다** — 서브커맨드별 *차이점*(모드·schema·프롬프트)만 보인다. 모델·effort 는 적지 않는다(`modules/gpt-strategy.md` § 모델·effort 선택). ⛔ GPT CLI 를 직접 부르지 않는다.
-> 래퍼가 `modules/fz-gpt-bash-hygiene.md` 의 교훈을 대신 처리한다: `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `--out` readback + `--` 구분자 + (review 모드) §5.5 Base Verification Gate.
+> ⛔ **아래 예시는 전부 정문(`scripts/gpt-call.sh <kind>`) 호출이다** — 호출자는 kind 와 입력(`--cd` · `--out` · `--prompt-file` …)만 쓴다. 모드 · 역할 스킬 · schema · 고정 플래그는 레지스트리 `scripts/gpt-kinds.json` 이 정한다(생성 표: `skills/fz-gpt/SKILL.md`). 모델·effort 는 적지 않는다(`modules/gpt-strategy.md` § 모델·effort 선택). ⛔ 래퍼 · GPT CLI 를 직접 부르지 않는다.
+> 정문이 부르는 래퍼(`scripts/gpt-exec.sh`)가 `modules/fz-gpt-bash-hygiene.md` 의 교훈을 대신 처리한다: `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `--out` readback + `--` 구분자 + (review 모드) §5.5 Base Verification Gate.
 > 프롬프트는 `--prompt-file` 로만 받는다 — 아래 `P_*` 는 앞 줄에서 heredoc 으로 쓴 임시 파일이다. 읽기 전용은 래퍼가 모든 호출에 `-c sandbox_mode="read-only"` 로 **강제**한다(사용자 config 보다 우선) — 옛 `--sandbox read-only` 플래그는 쓰지 않는다.
 
 ## review -- 코드 리뷰 (주력)
@@ -18,27 +18,23 @@ fz-review의 Phase 5 GPT 부분. **래퍼 review 모드 한 경로.**
 
 ```bash
 # 공유 모듈도 읽는다(read-only 는 전 디스크 읽기 허용)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH" \
-  --gpt-skill reviewer   # reviewer 는 CLI 암묵 호출 — 경로를 넘기지 않는다(로드 확인 불가)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH"
+# reviewer 는 CLI 암묵 선택이다 — 정문은 텔레메트리 라벨(--gpt-skill reviewer)만 붙이고 경로를 넘기지 않는다
 ```
 
-**래퍼 주요 옵션**: `--out`(파일 캡처) · `--schema` · `--ephemeral`(일회성). `--model` · `--effort` 는 보통 넘기지 않는다 — 세션 선택 > config 다(정본 `modules/gpt-strategy.md` § 모델·effort 선택)
+**정문 입력**: kind 마다 `scripts/gpt-kinds.json` 의 `inputs` 다(review: `--cd` · `--out` · `--base|--uncommitted|--commit` · 선택 `--title` · `--expected-branch`). `--schema` · `--ephemeral` 은 레지스트리 몫이라 넘기면 정문이 10 으로 거부한다. `--model` · `--effort` 는 보통 넘기지 않는다 — 세션 선택 > config 다(정본 `modules/gpt-strategy.md` § 모델·effort 선택)
 
 **공유 모듈**: `--add-dir` 는 **쓰기 가능 디렉토리**를 늘리는 플래그다(CLI help: *"Additional directories that should be writable"*). fz GPT 호출은 read-only 강제라 쓰지 않는다 — read-only 도 전 디스크를 **읽을 수** 있어 공유 모듈을 읽는 데 필요 없다 (2026-09-25 실측). 모듈화 리뷰에서 공유 모듈·소비자 코드를 꼭 보게 하려면 프로젝트 `CLAUDE.md` `## Shared Modules` 경로를 exec 프롬프트에 적는다 — review 모드는 diff 를 기준으로 필요한 파일을 스스로 연다.
 
-**⚠️ `review`는 flag-only** (G7/#7 회고 #8): GPT CLI review 모드는 PROMPT positional을 받지 않는다 — 리뷰 대상 선택은 플래그(`--base`/`--uncommitted`/`--commit`)로만. 프롬프트 주입이 필요하면 review 모드가 아니라 `gpt-exec.sh exec --prompt-file`(verify 형식, §verify) 사용. 래퍼는 review 에 프롬프트를 넘기지 않아 이 충돌을 구조적으로 막는다.
+**⚠️ `review`는 flag-only** (G7/#7 회고 #8): GPT CLI review 모드는 PROMPT positional을 받지 않는다 — 리뷰 대상 선택은 플래그(`--base`/`--uncommitted`/`--commit`)로만. 프롬프트 주입이 필요하면 review 모드 kind 가 아니라 exec 모드 kind(`gpt-call.sh verify` 형식, §verify)를 쓴다. 정문은 review 모드 kind 에 `--prompt-file` 을 받지 않고 래퍼는 review 에 프롬프트를 넘기지 않아 이 충돌을 구조적으로 막는다.
 
 ## verify -- 계획 검증
 
-fz-plan의 Phase 2. **`gpt-exec.sh exec` + `--schema` 사용.**
+fz-plan의 Phase 2. **kind `verify` — 래퍼 exec · architect 본문 주입 · `gpt_review_schema`(레지스트리).** 역할 본문을 찾지 못하면 정문이 레지스트리의 폴백 지시를 프롬프트 앞에 붙인다.
 
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
-SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다(호출 계약 — modules/cross-validation.md)
-[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
-
 cat > "$P_VERIFY" <<EOF
-${SKILL_PROMPT}이 구현 계획을 검증하라.
+이 구현 계획을 검증하라.
 CLAUDE.md ## Code Conventions 섹션의 가이드라인을 참조하라.
 
 ## 계획
@@ -64,30 +60,22 @@ Q8 함의 커버리지: 계획이 지시의 "문자적 범위"뿐 아니라 "의
 계획의 리스크 매트릭스가 빈약하거나 누락된 경우 반드시 지적하라.
 Anti-Pattern Constraints가 있으면 각 금지 패턴의 실효성을 검증하라.
 EOF
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$REVIEW_FILE" --prompt-file "$P_VERIFY" \
-  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" \
-  --gpt-skill architect --inject-skill "$SKILL_PATH"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$REVIEW_FILE" --prompt-file "$P_VERIFY"
 ```
 
 ### resume 교차 (fz-plan Phase 2 · opt-in `--gpt-independent`)
 
-독립 플래너(`gpt_independent.sh plan --keep-iso`)의 세션을 이어 위 틀(Q1–Q8 · `gpt_review_schema`)로 Claude 플랜을 검증한다 — 플래너가 이미 읽은 맥락을 다시 읽지 않는다. ⛔ 세션 파일이 없으면 위 기본 `verify` 다 — 그 프롬프트 · 인자는 바뀌지 않는다(`tests/fixtures/plan-wiring/parallel-arms/run.sh` 가 가짜 CLI 로 대조한다).
+독립 플래너(kind `independent-plan` · `--keep-iso`)의 세션을 이어 위 틀(Q1–Q8 · `gpt_review_schema`)로 Claude 플랜을 검증한다 — 플래너가 이미 읽은 맥락을 다시 읽지 않는다. ⛔ 세션 파일이 없으면 위 기본 `verify` 다 — 그 프롬프트 · 인자는 바뀌지 않는다(`tests/fixtures/plan-wiring/parallel-arms/run.sh` 가 가짜 CLI 로 대조한다).
 
 ```bash
-# 감사(gpt-{run}.audit.json)의 iso · sessionFile — sessionFile 은 런처 판정까지 통과한(exit 0) run 에만 있다.
-#   오염 15 · 6축 14 · planner 거부 17 로 끝난 run 은 런처가 세션 파일을 지운다(래퍼는 그 판정 전에 세션을 쓴다)
-ISO="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("iso") or "")' "$AUDIT")"
-SESSION_FILE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("sessionFile") or "")' "$AUDIT")"
-# ⛔ resume 은 --inject-skill 을 받지 않는다(exit 10) — 이어 받는 플래너 세션에 architect 본문이 없고 위 P_VERIFY 에도 없다(verify 는 래퍼가 넣는다).
-#    그래서 이 호출만 호출부가 본문을 앞에 붙이고 --gpt-skill-path 로 판정만 받는다(경로가 비면 cat 이 조용히 빠져 폴백 지시만 남는다)
-{ cat "$SKILL_PATH" 2>/dev/null && echo; cat "$P_VERIFY"; } > "$P_CROSS"
-CODEX_HOME="$ISO/gpt-home" "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" resume --cd "$GIT_ROOT" --out "$REVIEW_FILE" \
-  --prompt-file "$P_CROSS" --session-file "$SESSION_FILE" \
-  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" --gpt-skill architect --gpt-skill-path "$SKILL_PATH"
-bash "${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" cleanup --iso "$ISO"   # 교차가 끝나면 격리 홈을 지운다(인증은 링크뿐이다)
-#   ⛔ `rm -rf "$ISO"` 를 직접 쓰지 않는다 — 자동 모드가 거부한다. 런처가 이름(fz-gpt-iso.*)과 gpt-home/ 을 확인하고 지운다
+# 정문이 감사(gpt-{run}.audit.json)의 iso · sessionFile 을 읽는다 — sessionFile 은 런처 판정까지 통과한(exit 0) run 에만 있다
+#   (오염 15 · 6축 14 · planner 거부 17 로 끝난 run 은 런처가 세션 파일을 지운다).
+# ⛔ resume 은 --inject-skill 을 받지 않는다 — 정문이 architect 본문을 P_VERIFY 앞에 붙여 $P_CROSS 에 쓰고 --gpt-skill-path 로 판정만 받는다.
+#    격리 홈(CODEX_HOME=<iso>/gpt-home)은 이 호출의 래퍼에만 주고, 끝나면 런처 cleanup 으로 지운다(E3 — 인증은 링크뿐이다)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify-cross --audit "$AUDIT" --cd "$GIT_ROOT" --out "$REVIEW_FILE" \
+  --prompt-file "$P_VERIFY" --prompt-out "$P_CROSS"
 ```
-- ⛔ `ISO` 나 `SESSION_FILE` 이 비었으면(런처가 `--keep-iso` 없이 돌았거나 실패했다) resume 하지 않고 기본 `verify` 로 간다 — 빈 값으로 부르면 래퍼가 exit 10 이다. `ISO` 만 있으면 같은 `cleanup` 으로 지운다(실패한 run 도 `--keep-iso` 면 격리 홈이 남는다)
+- ⛔ 감사에 `sessionFile` 이 없으면(런처가 `--keep-iso` 없이 돌았거나 실패했다) 정문이 resume 하지 않고 10 으로 끝낸다 — 그때 `iso` 가 있으면 같은 cleanup 으로 지운다. 호출자는 기본 `verify` 로 간다
 - resume 은 래퍼가 `sandbox_mode="read-only"` 를 넘겨 격리 프로필의 deny 를 덮는다(F-348) — 이 단계는 교차 검증이라 독립이 아니어도 된다. 독립은 첫 패스의 몫이다
 
 ## verify-gates -- 게이트 원장 판정 (fz-plan Phase 2 추가 호출)
@@ -104,16 +92,12 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" cleanup --iso "$ISO"   # 교
 | fz-review Phase 5.5 | `{WORK_DIR}/gates/plan.md` | 확정 **후** — 변경된 코드 기준 재판정 |
 
 ```bash
-LEDGER="{호출자가 정한 원장}"          # plan: gates/plan.draft.md · review: gates/plan.md
+: "${LEDGER:?호출자가 원장 경로를 정한다 — plan: gates/plan.draft.md · review: gates/plan.md}"
 [ -f "$LEDGER" ] || exit 0   # 원장 없으면 이 호출 자체를 생략
 
 # ⛔ 정본 경로로 부른다 — 상대 경로는 cwd 가 플러그인 루트가 아닐 때 조용히 깨진다
-#    (`FZ_PLUGIN_ROOT` 는 `scripts/resolve-plugin-root.sh` 로 해석한다)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec \
-  --cd "$GIT_ROOT" \
-  --out "$GATE_VERDICT_FILE" \
-  --prompt-file "$PROMPT" \
-  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_gate_verdict_schema.json"
+#    (`FZ_PLUGIN_ROOT` 는 `scripts/resolve-plugin-root.sh` 로 해석한다). 역할 없음 · gpt_gate_verdict_schema 는 레지스트리 몫이다
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify-gates --cd "$GIT_ROOT" --out "$GATE_VERDICT_FILE" --prompt-file "$PROMPT"
 ```
 
 프롬프트에 **원장 경로와 내용을 함께** 넣는다. 현재 `verify` 템플릿에는 WORK_DIR·ledger 변수가 없어 그대로는 게이트를 볼 수 없다.
@@ -150,15 +134,11 @@ exit 1 이면 재호출 1회 후 **미판정으로 기록**하고 Lead가 판단
 
 ## validate -- 피드백 역검증
 
-fz-review의 Phase 5.5. **`gpt-exec.sh exec` + `--schema` 사용.**
+fz-review의 Phase 5.5. **kind `validate` — 래퍼 exec · guardian 본문 주입 · `gpt_verification_schema`(레지스트리).** 역할 본문을 찾지 못하면 정문이 폴백 지시를 붙인다.
 
 ```bash
-SKILL_PATH=$(get_gpt_skill_path "guardian" "$FZ_PLUGIN_ROOT")
-SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다(호출 계약 — modules/cross-validation.md)
-[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
-
 cat > "$P_VALIDATE" <<EOF
-${SKILL_PROMPT}피드백 반영 여부를 검증하라.
+피드백 반영 여부를 검증하라.
 CLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.
 
 ## 원본 이슈
@@ -167,24 +147,20 @@ $ORIGINAL_ISSUES
 ## 적용된 수정
 $FIXES_APPLIED
 EOF
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE" \
-  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_verification_schema.json" \
-  --gpt-skill guardian --inject-skill "$SKILL_PATH"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" validate --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE"
 ```
 
 **/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.
 
 ```bash
-SEARCHER_SKILL_PATH=$(get_gpt_skill_path "searcher" "$FZ_PLUGIN_ROOT")
-if [ -n "$SEARCHER_SKILL_PATH" ] && [ -z "$AFFECTED_SYMBOLS" ]; then
+if [ -z "$AFFECTED_SYMBOLS" ]; then
   cat > "$P_SEARCH" <<EOF
 아래 변경 대상의 영향 심볼과 의존성 체인을 탐색하라.
 ## 변경 대상
 $PLAN_CONTENT
 파일을 수정하지 마라(읽기 전용 분석).
 EOF
-  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$SEARCH_FILE" --prompt-file "$P_SEARCH" \
-    --gpt-skill searcher --inject-skill "$SEARCHER_SKILL_PATH"   # 역할 본문은 래퍼가 넣는다(호출 계약 — modules/cross-validation.md)
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" search --cd "$GIT_ROOT" --out "$SEARCH_FILE" --prompt-file "$P_SEARCH"   # searcher 본문은 정문이 래퍼로 주입한다
 fi
 ```
 
@@ -193,11 +169,10 @@ fi
 스테이징/언스테이징 변경을 커밋 전에 빠르게 검증합니다.
 
 ```bash
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" review --cd "$GIT_ROOT" --out "$REVIEW_FILE" --uncommitted --ephemeral \
-  --gpt-skill reviewer   # reviewer 는 CLI 암묵 호출 — 경로를 넘기지 않는다(로드 확인 불가)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" check --cd "$GIT_ROOT" --out "$REVIEW_FILE"
 ```
 
-> `--ephemeral`: 일회성 검증이므로 세션 미저장. 3-Tier 스킬 자동 트리거.
+> kind `check` 는 레지스트리가 `--uncommitted --ephemeral` 을 고정한다 — 일회성 검증이라 세션을 남기지 않는다. 스키마가 없다(아래 판정 grep 이 스키마의 `"critical": 0` 을 결함으로 읽기 때문 — XE-08).
 
 ### check verdict contract (호출자 분기 규칙)
 
@@ -220,16 +195,14 @@ fi
 **/fz-fixer 연결**: 리뷰 결과에 수정 제안이 포함된 경우(issues with suggestion 필드 비어있지 않음), /fz-fixer 스킬을 참조하여 수정 전략을 제시한다.
 
 ```bash
-FIXER_SKILL_PATH=$(get_gpt_skill_path "fixer" "$FZ_PLUGIN_ROOT")
-if [ -n "$FIXER_SKILL_PATH" ] && [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
+if [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
   cat > "$P_FIX" <<EOF
 위 리뷰 결과에서 수정이 필요한 이슈에 대해 Root Cause와 Fix Strategy를 제시하라.
 ## 이슈 목록
 $FIXABLE_ISSUES
 파일을 수정하지 마라(읽기 전용 분석).
 EOF
-  "${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec --cd "$GIT_ROOT" --out "$FIXER_FILE" --prompt-file "$P_FIX" \
-    --gpt-skill fixer --inject-skill "$FIXER_SKILL_PATH"   # 역할 본문은 래퍼가 넣는다(호출 계약 — modules/cross-validation.md)
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" fix-suggest --cd "$GIT_ROOT" --out "$FIXER_FILE" --prompt-file "$P_FIX"   # fixer 는 exec + 본문 주입(check 와 다른 kind — XE-06)
 fi
 ```
 

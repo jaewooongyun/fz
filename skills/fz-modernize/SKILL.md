@@ -6,7 +6,7 @@ description: >-
 user-invocable: true
 argument-hint: "[probe|audit|plan|verify|execute|validate|full|light] [target]"
 allowed-tools: >-
-  Read, Edit, Write, Bash, Grep, Glob,
+  Read, Edit, Write, Bash, Bash(*/scripts/gpt-call.sh*), Grep, Glob,
   WebSearch, WebFetch,
   mcp__plugin_fz_serena__write_memory, mcp__plugin_fz_serena__read_memory,
   mcp__sequential-thinking__sequentialthinking,
@@ -285,21 +285,19 @@ echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.m
 ### GPT 호출
 
 ```bash
-# hygiene(stdin close 29차 · trust_level 30차 · `--` 구분자 · exit 계약)는 래퍼가 처리한다 — modules/fz-gpt-bash-hygiene.md §8
-SKILL_PATH=$(get_gpt_skill_path "architect" "$FZ_PLUGIN_ROOT")
-SKILL_PROMPT=""   # 역할 본문은 호출부가 cat 하지 않는다 — 래퍼가 --inject-skill 로 앞에 넣는다(호출 계약 — modules/cross-validation.md)
-[ -n "$SKILL_PATH" ] || SKILL_PROMPT=$'프로젝트 CLAUDE.md를 읽고 아키텍처/가이드라인을 파악한 후 검증하라.\n\n'   # 경로 해석 실패 → 일반 지시 폴백
+# hygiene(stdin close 29차 · trust_level 30차 · `--` 구분자 · exit 계약)는 정문이 부르는 래퍼가 처리한다 — modules/fz-gpt-bash-hygiene.md §8
+# kind modernize-verify — architect 본문 주입 · gpt_review_schema · 폴백 지시는 레지스트리. 5Q 본문은 verify 의 Q1~Q8 과 섞지 않는다(XE-15)
 [ -s "{PLAN_PATH}" ] || { echo "PLAN_PATH 없음·빈 파일 — GPT verify UNRUN" >&2; exit 2; }
-cat > /tmp/verify-prompt.txt <<EOF
-${SKILL_PROMPT}아래 Plan 을 5 관점으로 검증하고 관점마다 판정과 근거를 제시하라 — Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류) · Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜) · Q3: 출처 매핑 일관성 (Plan ↔ 가이드 line) · Q4: Anti-Pattern Constraints 누락 위험 · Q5: 실행 순서 안전성 (impact-scan 사전 확인). Plan 원문:
+mkdir -p "{WORK_DIR}/verify"   # --out 의 상위 폴더 — 없으면 정문이 10 으로 거부한다
+P_MOD="$(mktemp "${TMPDIR:-/tmp}/fz-modernize-verify.XXXXXX")" || exit 2   # 호출별 파일 — 공유 /tmp 경로는 동시 세션끼리 덮어쓴다(XE-15)
+cat > "$P_MOD" <<EOF
+아래 Plan 을 5 관점으로 검증하고 관점마다 판정과 근거를 제시하라 — Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류) · Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜) · Q3: 출처 매핑 일관성 (Plan ↔ 가이드 line) · Q4: Anti-Pattern Constraints 누락 위험 · Q5: 실행 순서 안전성 (impact-scan 사전 확인). Plan 원문:
 $(cat "{PLAN_PATH}")
 EOF
-"${FZ_PLUGIN_ROOT}/scripts/gpt-exec.sh" exec \
-  --cd "{WORK_DIR}" \
-  --out "{WORK_DIR}/verify/gpt-verify-v{N}-result.json" \
-  --prompt-file /tmp/verify-prompt.txt \
-  --schema "${FZ_PLUGIN_ROOT}/schemas/gpt_review_schema.json" \
-  --gpt-skill architect --inject-skill "$SKILL_PATH"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" modernize-verify --cd "{WORK_DIR}" \
+  --out "{WORK_DIR}/verify/gpt-verify-v{N}-result.json" --prompt-file "$P_MOD"; RC=$?
+rm -f "$P_MOD"   # Plan 원문 사본을 TMPDIR 에 남기지 않는다
+exit "$RC"       # 정문 exit 를 덮지 않는다(hygiene §8)
 ```
 
 ### Gate 4: Cross-Verify Complete

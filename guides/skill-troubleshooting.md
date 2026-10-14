@@ -215,12 +215,12 @@ GOOD: "에러 시 테이블의 폴백 전략을 순서대로 실행하라."
 
 ### 3.5 GPT CLI 관련 에러
 
-**증상:** `scripts/gpt-exec.sh review`·`exec` 실행 실패.
+**증상:** `scripts/gpt-call.sh review`·`verify` 등 GPT 호출 실패(정문 아래 래퍼 `scripts/gpt-exec.sh` 의 exit 10~14 · 런처 15~17).
 
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | GPT CLI 미설치 | 설치 안내 | sc:analyze 단독 실행 |
-| `gpt-exec.sh review` 네트워크 에러 | `gpt-exec.sh exec` + diff 인라인 프롬프트 | 수동 리뷰 |
+| `gpt-call.sh review` 네트워크 에러 | exec 모드 kind(`gpt-call.sh verify` 등) + diff 인라인 프롬프트 | 수동 리뷰 |
 | `--output-schema` 파싱 실패 | 스키마 검증 | Claude 직접 파싱 |
 | 3-Tier 스킬 디스커버리 실패 | Tier 순차 폴백 | 인라인 프롬프트 (Tier 3) |
 | GPT 응답 토큰 제한 초과 | diff 분할 전략 (Medium/Large) | 핵심 파일만 리뷰 |

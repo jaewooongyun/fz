@@ -77,7 +77,7 @@
 
 | Given | When | Then |
 |-------|------|------|
-| Git diff 존재 | `/fz-gpt review` | `scripts/gpt-exec.sh review --base` 실행 + 이슈 보고 |
+| Git diff 존재 | `/fz-gpt review` | `scripts/gpt-call.sh review --base` 실행 + 이슈 보고 |
 | GPT CLI 미설치 | `/fz-gpt review` | 에러 감지 + sc:analyze 폴백 |
 | Critical 이슈 발견 | `/fz-gpt final` | DA 패스 자동 실행 |
 | 3-Tier 스킬 부재 | `/fz-gpt verify` | Tier 3 인라인 프롬프트로 폴백 |
@@ -152,7 +152,7 @@
 
 ```
 Q: "fz-gpt 스킬은 언제 쓰는 거야?"
-A (기대): "GPT CLI를 통한 독립적 코드/계획 검증... gpt-exec.sh review, gpt-exec.sh exec..."
+A (기대): "GPT CLI를 통한 독립적 코드/계획 검증... gpt-call.sh review, gpt-call.sh verify..."
 A (문제): "코드를 수정할 때 쓰는 스킬입니다" ← 잘못된 인식!
 → description에 "검증만 수행, 코드 수정 안 함" 강화 필요
 ```
@@ -242,7 +242,7 @@ test-spec:
   functional:
     - given: "Git diff 존재, GPT CLI 설치됨"
       when: "/fz-gpt review"
-      then: "gpt-exec.sh review 실행 + 이슈 리포트 생성"
+      then: "gpt-call.sh review 실행 + 이슈 리포트 생성"
       type: normal
 
     - given: "GPT CLI 미설치"

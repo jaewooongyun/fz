@@ -1,0 +1,34 @@
+{
+ "entry_argv": [
+  [
+   "gpt-exec.sh",
+   "exec",
+   "--cd",
+   "<W>/repo",
+   "--out",
+   "<W>/k/verify-gates/gv.json",
+   "--prompt-file",
+   "<W>/k/verify-gates/prompt.txt",
+   "--schema",
+   "<R>/schemas/gpt_gate_verdict_schema.json"
+  ]
+ ],
+ "cli_argv": [
+  [
+   "exec",
+   "-C",
+   "<W>/repo",
+   "-c",
+   "sandbox_mode=\"read-only\"",
+   "-c",
+   "sandbox_permissions=[\"disk-full-read-access\"]",
+   "--output-schema",
+   "<R>/schemas/gpt_gate_verdict_schema.json",
+   "-o",
+   "<W>/k/verify-gates/gv.json",
+   "--",
+   "GATES-PROMPT-FIXED"
+  ]
+ ],
+ "exit": 14
+}

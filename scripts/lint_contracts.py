@@ -1497,6 +1497,15 @@ def chk_N10(root: Path | None = None):
         except (OSError, UnicodeDecodeError):
             continue
         used.update(pat.findall(body))
+    # ⛔ 레지스트리의 kinds.*.schema 도 사용처다 — 정문(scripts/gpt-call.sh)이 그 값을 --schema 로 넘긴다. 레시피 문자열이
+    #    정문 호출로 바뀌면 위 grep 에서 사라지므로, 여기서 세지 않으면 그 스키마가 strict 검사에서 조용히 빠진다(XE-12)
+    reg = root / "scripts" / "gpt-kinds.json"
+    if reg.is_file():
+        try:
+            kinds = json.loads(read(reg)).get("kinds") or {}
+        except ValueError as e:
+            raise ParseError(f"scripts/gpt-kinds.json 판독 실패: {e}")
+        used.update(Path(k["schema"]).name for k in kinds.values() if isinstance(k, dict) and isinstance(k.get("schema"), str))
 
     def is_object(node) -> bool:
         ty = node.get("type")

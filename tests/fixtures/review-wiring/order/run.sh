@@ -22,8 +22,8 @@ nohas() { /usr/bin/grep -qF -- "$2" "$R/$1" 2>/dev/null && no "$1: $3 — '$2' �
 
 # ⛔ Workflow 토큰은 호출 줄에만 있는 꼴(`Workflow({ scriptPath:` + 복사본 파일명)이다 — 준비 줄(cp · cmp)도 파일명을 담으므로
 #    파일명만으로 찾으면 first() 가 준비 줄을 잡아 순서가 틀어진 것처럼 보인다
-order skills/fz-review/SKILL.md 'gpt_independent.sh review' "Workflow({ scriptPath: '{WORK_DIR}/review-live.js'" 'review_merge.py'
-order modules/peer-review-workflow.md 'gpt_independent.sh review' "Workflow({ scriptPath: '{WORK_DIR}/peer-review.js'" 'review_merge.py'
+order skills/fz-review/SKILL.md 'gpt-call.sh independent-review' "Workflow({ scriptPath: '{WORK_DIR}/review-live.js'" 'review_merge.py'
+order modules/peer-review-workflow.md 'gpt-call.sh independent-review' "Workflow({ scriptPath: '{WORK_DIR}/peer-review.js'" 'review_merge.py'
 
 # 끄는 경로 — fz-review 는 기본 off, fz-peer-review 는 --no-gpt-independent · --no-render 로 고른다(리뷰 A:A3 · Q:Q8)
 has skills/fz-review/SKILL.md '/fz-gpt review "코드 리뷰"' 'fz-review 기본 경로의 GPT 리뷰 호출이 남아 있다'
@@ -44,6 +44,7 @@ has skills/fz-review/SKILL.md 'locatedFindings: true' '--gpt-independent 면 위
 
 # 권한 — 런처 · 래퍼 · 병합을 부를 수 있고, Will Not(GPT CLI 직접 호출 금지)과 모순되는 권한이 없다
 for f in skills/fz-review/SKILL.md skills/fz-peer-review/SKILL.md; do
+  has "$f" 'Bash(*/scripts/gpt-call.sh*)' '정문 Bash 권한'
   has "$f" 'Bash(*/scripts/gpt_independent.sh*)' '런처 Bash 권한'
   has "$f" 'Bash(*/scripts/gpt-exec.sh*)' '래퍼 Bash 권한'
   has "$f" 'Bash(python3 */scripts/*)' '병합 스크립트 Bash 권한'

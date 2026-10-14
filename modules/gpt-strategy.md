@@ -165,16 +165,16 @@ DIFF_LINES=$(printf '%s\n' "$DIFF_RAW" \
 
 | diff 크기 | 전략 | 실행 방법 |
 |-----------|------|----------|
-| **Small** (<2000줄) | Full diff → `gpt-exec.sh review` | config 모델의 대형 컨텍스트 활용, 구조화 전체 리뷰 (기본) |
-| **Medium** (2000-8000줄) | File-split → `gpt-exec.sh exec` xN | 변경 파일을 기능 그룹으로 분할, 그룹별 독립 리뷰 |
+| **Small** (<2000줄) | Full diff → kind `review` (래퍼 review 모드) | config 모델의 대형 컨텍스트 활용, 구조화 전체 리뷰 (기본) |
+| **Medium** (2000-8000줄) | File-split → 그룹별 exec 리뷰 xN (등록 kind 없음 — 아래) | 변경 파일을 기능 그룹으로 분할, 그룹별 독립 리뷰 |
 | **Large** (>8000줄) | Key files + summary | 핵심 파일만 상세 리뷰 + 나머지 요약 |
 
-**Medium 전략**: 변경 파일을 기능 그룹(Architecture/Data/UI)으로 분할 → 그룹별 `gpt-exec.sh exec` 독립 리뷰 → `jq`로 결과 합산.
+**Medium 전략**: 변경 파일을 기능 그룹(Architecture/Data/UI)으로 분할 → 그룹별 exec 독립 리뷰 → `jq`로 결과 합산. ⛔ 고정 레시피가 없는 산문 전략이라 레지스트리에 kind 가 없다(R-G1 S0 aux-inventory `diff-medium-exec-n` excluded) — 실행할 때는 kind 를 먼저 등록한다(`scripts/gpt-kinds.json`). 출처를 남기는 N-way 병합은 R-G2 의 GPT 병합 도구 대상이다
 
 **Large 전략**: 변경량 상위 10 파일만 상세 리뷰 + 나머지 요약.
 
 **자동 전환 규칙**:
-- `review`, `check`, `commit`: Small 전략 기본, Medium/Large 시 자동 전환
+- `review`, `check`: Small 전략 기본, Medium/Large 시 자동 전환
 - `final`: 항상 최대 커버리지 (Medium→Full 시도, Large→Key files)
 - `verify`, `validate`: diff 크기 무관 (프롬프트 기반)
 
@@ -184,40 +184,23 @@ DIFF_LINES=$(printf '%s\n' "$DIFF_RAW" \
 
 ## CLI 모드 선택 전략
 
-래퍼 review 모드(`gpt-exec.sh review`)가 git diff + 구조화 출력을 통합. 모든 서브커맨드가 래퍼(`scripts/gpt-exec.sh`) 한 경로로 동작한다.
+래퍼 review 모드가 git diff + 구조화 출력을 통합한다. 모든 호출은 정문(`scripts/gpt-call.sh <kind>`) 한 경로로 들어가고, 정문이 kind 의 모드로 래퍼(`scripts/gpt-exec.sh`)를 부른다.
 
-| 기준 | `gpt-exec.sh review` | `gpt-exec.sh exec` |
+| 기준 | review 모드 kind | exec 모드 kind |
 |------|---------------------|-------------|
 | **diff 입력** | Git 자동 감지 (--base/--uncommitted/--commit) | 수동 주입 (프롬프트에 인라인) |
 | **출력 형식** | `--out`(최종 메시지 파일) | `--out` + `--schema` JSON 강제 |
 | **모델·effort** | 세션 선택이 있으면 넘기고, 없으면 넘기지 않는다(config 그대로) — § 모델·effort 선택 | 동일 |
-| **GPT 스킬** | 3-Tier 디스커버리 자동 트리거 | 스킬 내용 수동 주입 필요 |
+| **GPT 스킬** | CLI 암묵 선택(`--gpt-skill` 은 라벨) | 정문이 경로를 해석하고 래퍼가 본문 주입(`--inject-skill`) |
 | **모노레포 컨텍스트** | read-only 가 전 디스크 읽기 허용 — 별도 플래그 불필요 | 동일 (필요한 경로는 프롬프트에 적는다) |
 
-**서브커맨드별 매핑**:
+**kind 별 모드**: 레지스트리 `scripts/gpt-kinds.json` 이 정한다 — 생성 표는 `skills/fz-gpt/SKILL.md` § GPT 네이티브 스킬 · § 서브커맨드(`gpt_kinds.py table --check` 가 레지스트리와 대조한다). 여기에 사본을 두지 않는다.
 
-| 서브커맨드 | CLI 모드 | 이유 |
-|-----------|----------|------|
-| review | `gpt-exec.sh review` | Git diff + `--out` 구조화 캡처 + 스킬 자동 |
-| check | `gpt-exec.sh review` | --uncommitted + `--out` |
-| commit | `gpt-exec.sh review` | --commit + `--out` |
-| final | `gpt-exec.sh review` | --base + `--out` + `resume --session-file` 심화 |
-| verify | `gpt-exec.sh exec` | 계획 텍스트 + `--schema` JSON 필요 |
-| validate | `gpt-exec.sh exec` | 이슈 목록 + `--schema` JSON 필요 |
-
-**심화 패턴**: `gpt-exec.sh review`·`exec` 로 1차 리뷰 → `gpt-exec.sh resume --session-file {1차 --out}.session` 으로 특정 이슈 심화 검증. `final`에서 자동 적용. (세션 지정 이유: `modules/fz-gpt-bash-hygiene.md` §8)
+**심화 패턴**: review·exec 모드 kind 로 1차 리뷰 → resume 모드 kind(`final-deep` — `--session-file {1차 --out}.session`)로 특정 이슈 심화 검증. `final` 에서 적용. (세션 지정 이유: `modules/fz-gpt-bash-hygiene.md` §8)
 
 ## Sandbox Permissions
 
-GPT CLI의 `sandbox_permissions` 설정 (역할별 의도):
-
-| 권한 | 용도 | 사용 스킬 |
-|------|------|----------|
-| `disk-full-read-access` | 전체 코드베이스 읽기 (drift 스캔, 독립 플랜) | fz-drift, fz-planner |
-| `read-only` (기본) | 변경 없이 읽기만 | fz-challenger, fz-searcher |
-| (미지정) | GPT 기본 샌드박스 | fz-reviewer, fz-guardian, fz-fixer |
-
-설정 위치: 래퍼 `scripts/gpt-exec.sh` 가 **모든** 호출에 `-c sandbox_mode="read-only"` 를 강제한다(session 층 — 사용자 `config.toml` 보다 우선). 위 표는 역할별 옛 설계 의도이며, 현행은 역할과 무관하게 전부 read-only 다. `sandbox_permissions=["disk-full-read-access"]` 도 함께 넘기지만 CLI 0.157 은 이 키를 **무시**한다고 출력한다(2026-09-25 실측).
+⛔ 역할별 샌드박스는 없다 — 일반 kind 는 래퍼 `scripts/gpt-exec.sh` 가 **모든** 호출에 `-c sandbox_mode="read-only"` 를 강제하고(session 층 — 사용자 `config.toml` 보다 우선), 독립 kind 는 런처 `scripts/gpt_independent.sh` 의 격리 권한 프로필(`extends = ":read-only"` · HOME · 임시 폴더 deny)을 쓴다. 샌드박스의 소유자는 두 어댑터이고 레지스트리에는 키가 없다(`gpt_kinds.py lint` 가 금지 키로 막는다). `sandbox_permissions=["disk-full-read-access"]` 도 함께 넘기지만 CLI 0.157 이후 이 키를 **무시**한다고 출력한다(2026-09-25 실측 · R-G1 S1 0.159.2 재확인).
 
 > `disk-full-read-access`는 GPT가 프로젝트 디렉토리 전체를 읽을 수 있게 허용한다.
 > 쓰기 권한은 부여하지 않으므로 코드 수정 위험 없음.

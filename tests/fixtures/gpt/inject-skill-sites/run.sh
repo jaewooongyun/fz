@@ -4,8 +4,13 @@
 #   ① 사이트 목록: 기준 문서(--base) 의 ```bash 블록에서 `cat "$…SKILL_PATH"` 줄을 찾고, 같은 블록의 `get_gpt_skill_path "<역할>"` 로
 #      (문서 · 제목 · 역할) 고유 사이트를 만든다. --base 가 없으면 이 폴더의 sites.tsv(f500bc9 에서 뽑은 동결본)를 쓴다
 #   ② 사이트마다 대상 트리(--tree)의 같은 문서 · 같은 제목 · 같은 역할 Bash 블록을 가짜 래퍼(scripts/gpt-exec.sh 대역 — argv 기록)로
-#      돌려, exec argv 에 `--inject-skill <그 역할 본문 경로>` 가 있고 프롬프트 파일에 본문이 없음(호출부 cat 없음)을 단언한다
-#   ③ 대조 셀 — 셋 다 판정기가 **거부**해야 통과다: 설명/주석만 추가(argv 는 --gpt-skill-path) · 잘못된 경로 · 호출 삭제
+#      돌려, exec argv 에 `--inject-skill <그 역할 본문 경로>` 가 있고 프롬프트 파일에 본문이 없음(호출부 cat 없음)을 단언한다.
+#      블록은 두 형태다(R-G1 S4~S5 이행 중 공존): 옛 형태 = `get_gpt_skill_path "<역할>"` + 래퍼 직접 호출 · 정문 형태 =
+#      `scripts/gpt-call.sh <kind>` 이고 레지스트리(대상 트리 scripts/gpt-kinds.json)에서 그 kind 의 역할이 사이트 역할이다.
+#      정문 형태는 대역 루트에 정문 · resolver · 레지스트리 · schemas 를 링크하고 CODEX_HOME 을 재생 폴더로 둬, resolver 가 고정 본문
+#      (Tier 2a — 옛 형태의 대역 get_gpt_skill_path 와 같은 파일)을 고르게 한다
+#   ③ 대조 셀 — 셋 다 판정기가 **거부**해야 통과다: 설명/주석만 추가(argv 는 --gpt-skill-path · 정문 형태는 호출을 주석으로) ·
+#      잘못된 경로(정문 형태는 다른 역할의 kind) · 호출 삭제
 #   ④ harness — 합성 블록 양성(통과해야)·음성(거부해야). 둘 중 하나라도 어긋나면 판정기 고장이라 준비 실패(3)다
 #   ⑤ floor — 통과한 고유 사이트가 7 이상(원장 하한)
 # 기준 트리는 cat + --gpt-skill-path 그대로라 ② 가 전부 실패한다 → exit 1.
@@ -34,7 +39,7 @@ T0="$(mktemp -d)" || { echo "SETUP mktemp 실패"; exit 3; }; T="$(cd "$T0" && p
 trap 'rm -rf "${T:?}"' EXIT
 
 PYTHONDONTWRITEBYTECODE=1 python3 -B - "$R" "$BASE" "$HERE/sites.tsv" "$T" "$EMIT" <<'PY'
-import json, os, pathlib, re, subprocess, sys, traceback
+import json, os, pathlib, re, shlex, subprocess, sys, traceback
 
 
 def _crash(*exc):   # 판정기 고장은 3 — 미처리 예외의 기본 exit 1 은 '단언 실패' 와 구별되지 않는다
@@ -51,6 +56,11 @@ FLOOR = 7
 CAT = re.compile(r'cat "\$\{?([A-Z_]*SKILL_PATH)')
 ROLE = re.compile(r'\b([A-Z_]*SKILL_PATH)=\$\(get_gpt_skill_path "([a-z-]+)"')
 EXEC_LINE = re.compile(r'/scripts/gpt-exec\.sh"')
+GATE_LINE = re.compile(r'/scripts/gpt-call\.sh"\s+([a-z][a-z0-9-]*)')
+try:
+    KINDS = json.loads((TREE / "scripts" / "gpt-kinds.json").read_text(encoding="utf-8"))["kinds"]
+except (OSError, ValueError, KeyError):
+    KINDS = {}     # 정문 이전 트리 — 정문 형태 블록이 없다
 WRONG = '"$FZ_PLUGIN_ROOT/gpt-skills/fz-wrong/SKILL.md"'
 
 
@@ -114,8 +124,7 @@ def load_frozen():
 
 
 # ── 대역 래퍼 · 재생 ───────────────────────────────────────────────
-STUB = '''#!/usr/bin/env python3
-import json, os, sys
+STUB_PY = '''import json, os, sys
 a = sys.argv[1:]
 with open(os.environ["FZ_SITE_CAPTURE"], "a", encoding="utf-8") as fh:
     fh.write(json.dumps(a, ensure_ascii=False) + "\\n")
@@ -124,6 +133,8 @@ if "--out" in a and a.index("--out") + 1 < len(a):
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     open(out, "w").write("{}")
 '''
+# ⛔ bash 머리 — 옛 형태는 대역을 직접 실행하고 정문은 어댑터를 `bash <어댑터>` 로 띄운다. 둘 다 같은 Python 을 돌린다
+STUB = "#!/bin/bash\nexec python3 -c " + shlex.quote(STUB_PY) + ' "$@"\n'
 FIXED = {"AFFECTED_SYMBOLS": "", "MAJOR_ISSUES_COUNT": "1", "HAS_FIXABLE_ISSUES": "true"}   # 호출 분기에 들어가는 전제
 ENV_GIVEN = {"FZ_PLUGIN_ROOT", "HOME", "PATH"}
 RUN_N = [0]
@@ -138,6 +149,15 @@ def replay(body):
     stub = w / "plugin/scripts/gpt-exec.sh"
     stub.write_text(STUB, encoding="utf-8")
     stub.chmod(0o755)
+    # 정문 형태: 대역 루트에 정문 · resolver · 레지스트리 · schemas 링크. resolver 는 Tier 2a($CODEX_HOME/skills = w/skills)의 고정 본문을 고른다
+    for name in ("gpt-call.sh", "gpt_kinds.py", "gpt-kinds.json"):
+        if (TREE / "scripts" / name).is_file():
+            (w / "plugin/scripts" / name).symlink_to(TREE / "scripts" / name)
+    if (TREE / "schemas").is_dir():
+        (w / "plugin/schemas").symlink_to(TREE / "schemas")
+    for role in {k.get("role") for k in KINDS.values() if k.get("role")} | {"architect"}:
+        (w / "skills" / f"fz-{role}").mkdir(parents=True, exist_ok=True)
+        (w / "skills" / f"fz-{role}" / "SKILL.md").write_text(f"# fz-{role} — 고정 본문(fixture)\nSTUB-BODY-{role}\n", encoding="utf-8")
     # 자리표시 `{NAME}` — 경로 · 파일은 내용 있는 파일, 폴더는 폴더, 나머지는 고정 토큰
     def ph(m):
         n = m.group(1)
@@ -157,7 +177,7 @@ def replay(body):
     for n in sorted(used - assigned - ENV_GIVEN):
         if n in FIXED:
             v = FIXED[n]
-        elif n in ("WORK_DIR", "GIT_ROOT", "ISO"):
+        elif n in ("WORK_DIR", "GIT_ROOT", "ISO", "TMPDIR"):   # 폴더를 담는 변수 — TMPDIR 은 블록의 `mktemp "${TMPDIR:-/tmp}/…"` 용
             (w / "dirs" / n).mkdir(exist_ok=True)
             v = str(w / "dirs" / n)
         elif n.startswith("P_") or n in ("P", "OUT") or n.endswith("_FILE"):
@@ -176,7 +196,7 @@ def replay(body):
         ' printf \'# fz-%s — 고정 본문(fixture)\\nSTUB-BODY-%s\\n\' "$1" "$1" > "$d/SKILL.md"; printf \'%s\' "$d/SKILL.md"; }',
         *pre, body, ""])
     (w / "block.sh").write_text(script, encoding="utf-8")
-    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(w / "home"), "FZ_PLUGIN_ROOT": str(w / "plugin"),
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(w / "home"), "FZ_PLUGIN_ROOT": str(w / "plugin"), "CODEX_HOME": str(w),
            "FZ_STUB_SKILLS": str(w / "skills"), "FZ_SITE_CAPTURE": str(w / "cap.jsonl"), "LC_ALL": "C.UTF-8"}
     try:
         r = subprocess.run(["bash", "--noprofile", "--norc", str(w / "block.sh")], cwd=str(w / "cwd"), env=env,
@@ -220,8 +240,37 @@ def is_code(line):
     return not line.lstrip().startswith("#")
 
 
+def gate_form(body):
+    return any(is_code(l) and GATE_LINE.search(l) for l in body.split("\n"))
+
+
+def gate_calls(body, fn):
+    """정문 호출 줄과 그 이어진 줄(`\\` 끝)을 fn(줄) 로 바꾼다(None 이면 지운다)."""
+    out, cont = [], False
+    for l in body.split("\n"):
+        if cont or (is_code(l) and GATE_LINE.search(l)):
+            cont = l.rstrip().endswith("\\")
+            l = fn(l)
+            if l is None:
+                continue
+        out.append(l)
+    return "\n".join(out)
+
+
+def other_kind(role):
+    """같은 입력(cd · out · prompt-file)을 받는 다른 역할의 주입 kind — 잘못된 경로 변이용."""
+    for n, k in KINDS.items():
+        if k.get("status") == "stable" and k.get("skill_delivery") == "inject" and k.get("role") != role \
+                and (k.get("inputs") or {}).get("required") == ["cd", "out", "prompt-file"]:
+            return n
+    raise Setup("레지스트리에 다른 역할의 주입 kind 가 없다 — 잘못된 경로 변이를 만들 수 없다")
+
+
 def ctl_comment(body, var):
-    """설명/주석만 — 코드의 --inject-skill 을 --gpt-skill-path 로 되돌리고 --inject-skill 은 주석에만 둔다."""
+    """설명/주석만 — 코드의 --inject-skill 을 --gpt-skill-path 로 되돌리고 --inject-skill 은 주석에만 둔다.
+    정문 형태는 호출을 주석으로 돌리고 '정문이 주입한다' 설명만 남긴다."""
+    if gate_form(body):
+        return gate_calls(body, lambda l: "# " + l) + "\n# 역할 본문은 정문이 --inject-skill 로 넣는다(설명만)"
     lines = [l.replace("--inject-skill", "--gpt-skill-path") if is_code(l) else l for l in body.split("\n")]
     out = []
     for l in lines:
@@ -233,7 +282,15 @@ def ctl_comment(body, var):
 
 
 def ctl_wrong(body):
-    """잘못된 경로 — --inject-skill 의 인자를 다른 스킬로(없으면 --gpt-skill-path 자리를 잘못된 --inject-skill 로)."""
+    """잘못된 경로 — --inject-skill 의 인자를 다른 스킬로(없으면 --gpt-skill-path 자리를 잘못된 --inject-skill 로).
+    정문 형태는 kind 를 다른 역할의 주입 kind 로 바꾼다(정문은 --inject-skill 입력을 거부한다)."""
+    if gate_form(body):
+        def swap(l):
+            m = GATE_LINE.search(l)
+            if not m:
+                return l
+            return l[:m.start(1)] + other_kind(KINDS.get(m.group(1), {}).get("role")) + l[m.end(1):]
+        return gate_calls(body, swap)
     def fix(l):
         if not is_code(l):
             return l
@@ -244,7 +301,9 @@ def ctl_wrong(body):
 
 
 def ctl_deleted(body):
-    """호출 삭제 — gpt-exec.sh 호출 줄과 그 이어진 줄(`\\` 끝)을 지운다."""
+    """호출 삭제 — gpt-exec.sh(정문 형태는 gpt-call.sh) 호출 줄과 그 이어진 줄(`\\` 끝)을 지운다."""
+    if gate_form(body):
+        return gate_calls(body, lambda l: None)
     out, skip = [], False
     for l in body.split("\n"):
         if skip or (is_code(l) and EXEC_LINE.search(l)):
@@ -306,13 +365,24 @@ def main():
     ok_n, why_n = judge(neg, "architect")
     if not ok_p or ok_n:
         raise Setup(f"harness 고장 — 양성 {ok_p}({why_p}) · 음성 {ok_n}({why_n})")
-    check("harness", True, "합성 블록 양성 통과 · 음성(cat + --gpt-skill-path) 거부")
+    hn = "옛 형태 양성 통과 · 음성(cat + --gpt-skill-path) 거부"
+    if KINDS:
+        gpos = 'printf \'x\\n\' > "$P"\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$OUT" --prompt-file "$P"\n'
+        gneg = 'printf \'STUB-BODY-architect\\n\' > "$P"\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$OUT" --prompt-file "$P"\n'
+        gok_p, gwhy_p = judge(gpos, "architect")
+        gok_n, gwhy_n = judge(gneg, "architect")
+        if not gok_p or gok_n:
+            raise Setup(f"harness 고장(정문 형태) — 양성 {gok_p}({gwhy_p}) · 음성 {gok_n}({gwhy_n})")
+        hn += " · 정문 형태 양성 통과 · 음성(본문을 프롬프트에 직접) 거부"
+    check("harness", True, "합성 블록 " + hn)
 
     passed, ctl = 0, {"ctl-comment": [], "ctl-wrongpath": [], "ctl-deleted": []}
     skipped = {k: 0 for k in ctl}
     for doc, head, role, var, line in sites:
         cell = cell_of((doc, head, role, var, line))
-        cands = [b for b in blocks(tree_text[doc]) if b[0] == head and f'get_gpt_skill_path "{role}"' in b[2]]
+        cands = [b for b in blocks(tree_text[doc]) if b[0] == head and (
+            f'get_gpt_skill_path "{role}"' in b[2]
+            or any(KINDS.get(m.group(1), {}).get("role") == role for l in b[2].split("\n") if is_code(l) for m in [GATE_LINE.search(l)] if m))]
         if len(cands) != 1:
             check(cell, False, f"대응 Bash 블록 1개 ({doc} · {head} · {role})", f"{len(cands)}개 — 0 이면 블록 삭제 · 제목 변경")
             continue

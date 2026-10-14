@@ -472,7 +472,7 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 |------|----------|-------------|
 | Cross-Model Verification | 독립 모델 교차검증 | fz-gpt (GPT CLI로 독립 검증) |
 
-fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 — 호출은 `scripts/gpt-exec.sh {review|exec --schema}`)과
+fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 — 호출은 정문 `scripts/gpt-call.sh <kind>` — 모드 · 스키마는 kind 가 정한다)과
 3-Tier 디스커버리 스킬 체인(fz-reviewer, fz-architect, fz-guardian, fz-challenger, fz-searcher, fz-fixer)을
 결합하여 Main Agent와 독립된 교차검증을 수행한다.
 

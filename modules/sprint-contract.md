@@ -17,7 +17,7 @@
 
 1. **Lead 컨텍스트 전달**: Phase 0.5 verdict (PROCEED/RECONSIDER) + discover 산출물 + 요구사항 → GPT (`/fz-gpt` plan 또는 verify pre-mode)
 
-2. **GPT Sprint Contract 작성** (`scripts/gpt-exec.sh exec` · skill: `architect`):
+2. **GPT Sprint Contract 작성** (kind `sprint-contract` — `scripts/gpt-call.sh sprint-contract` · architect 본문 주입):
    - 출력: `{WORK_DIR}/plan/sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`
    - 형식: 아래 schema 참조
 
@@ -89,5 +89,5 @@ scope_boundary:
 ## fz 통합
 
 - `fz-plan` Phase 0.7로 진입 (TEAM mode + 5+ Step or Cross-skill)
-- GPT Sprint Contract 는 §절차 2 대로 `scripts/gpt-exec.sh exec`(skill `architect`)로 작성한다 — 형식은 `tests/fixtures/gpt/sprint-contract-format/run.sh` 가 본다
+- GPT Sprint Contract 는 §절차 2 대로 kind `sprint-contract`(`scripts/gpt-call.sh sprint-contract` — architect)로 작성한다 — 형식은 `tests/fixtures/gpt/sprint-contract-format/run.sh` 가 본다
 - `experiment-log.md §5.5`에 sprint_contract 메타 기록 (Reflection Rate 측정의 baseline)

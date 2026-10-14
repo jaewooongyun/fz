@@ -1,0 +1,33 @@
+{
+ "entry_argv": [
+  [
+   "gpt-exec.sh",
+   "exec",
+   "--cd",
+   "<W>/k/openai-docs",
+   "--out",
+   "<W>/k/openai-docs/docs.md",
+   "--prompt-file",
+   "<W>/k/openai-docs/p.txt",
+   "--gpt-skill",
+   "openai-docs"
+  ]
+ ],
+ "cli_argv": [
+  [
+   "exec",
+   "-C",
+   "<W>/k/openai-docs",
+   "-c",
+   "sandbox_mode=\"read-only\"",
+   "-c",
+   "sandbox_permissions=[\"disk-full-read-access\"]",
+   "--skip-git-repo-check",
+   "-o",
+   "<W>/k/openai-docs/docs.md",
+   "--",
+   "openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 요약하라"
+  ]
+ ],
+ "exit": 0
+}
