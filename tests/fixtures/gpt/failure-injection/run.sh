@@ -137,6 +137,17 @@ cell "CLI 비정상 종료(exit 1)"  12 "ok" 1
 cell "빈 출력"                  13 ""   0
 cell "스키마 위반"              14 "{}" 0 --schema "$T/schema.json"
 
+# --out 상위 폴더 없음 → 사전조건 11 · CLI 미호출 — 전에는 CLI 가 결과를 쓰다 실패해 exit 12 로 원인이 가려졌다
+d="$T/noparent"; mkdir -p "$d"
+env FZ_SHIM_OUTPUT="ok" FZ_SHIM_CAPTURE="$d/argv.json" FZ_TELEMETRY_DIR="$d" FZ_GPT_CHOICE_DIR="$T/no-choice" \
+  bash "$WRAP" exec --cd "$T/repo" --out "$d/missing/out.txt" --prompt-file "$T/task.txt" > "$d/stdout" 2> "$d/stderr"
+rc=$?
+if [ "$rc" -eq 11 ] && grep -q 'GATE-FAIL(11): --out 상위 폴더 없음' "$d/stderr" && [ ! -e "$d/argv.json" ]; then
+  echo "PASS  --out 상위 폴더 없음 → exit 11 · CLI 미호출"
+else
+  echo "FAIL  --out 상위 폴더 없음 — exit $rc(기대 11) · CLI 호출 $([ -e "$d/argv.json" ] && echo 있음 || echo 없음)"; fail=1
+fi
+
 echo
 [ "$fail" -eq 0 ] && echo "실패 주입 A(wrapper) 전건 통과" || echo "실패 주입 A(wrapper) 실패 있음"
 exit "$fail"

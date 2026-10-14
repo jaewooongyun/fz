@@ -11,6 +11,10 @@
 #   FZ_SHIM_IGNORE_TERM : 1 이면 그 자식이 TERM 을 무시한다(KILL 로만 죽는 자손 — 시간 초과 감시자가 KILL 까지 가는지 보는 셀)
 #   FZ_SHIM_PRELINES : N — 시작하자마자 stdout 에 `shim-line 1`…`shim-line N` 을 쓴다(출력 뒤 정체 · 진행 감시 셀)
 #   FZ_SHIM_TICK    : 초:횟수 — 그 간격으로 `tick 1`…`tick 횟수` 를 쓴다(지속 출력 — 감시가 끊지 않아야 하는 셀)
+#   FZ_SHIM_SESSION_ID : 끝에 찍는 `session id:` 값(기본 11111111-2222-3333-4444-555555555555)
+#   FZ_SHIM_SESSION_ROLLOUT : 이 jsonl 내용을 ${CODEX_HOME:-$HOME/.codex}/sessions/2026/09/28/rollout-2026-09-28T00-00-00-<세션 id>.jsonl 에
+#                     **이어 쓴다**(없으면 만든다 — resume 이 부모 파일에 이어 쓰는 CLI 동작 · spawn 감사 셀)
+#   FZ_SHIM_CHILD_ROLLOUTS : 쉼표로 가른 jsonl 들을 같은 날짜 폴더에 rollout-2026-09-28T00-00-0N-child-N.jsonl 로 복사한다(자식 rollout)
 #   FZ_SHIM_TAG     : 이 shim 과 그 자식(sleep)의 argv0 를 `fz-shim[<태그>]` 로 바꾼다 — 러너가 잔존을 이름(`sleep N`)이 아니라
 #                     셀 태그로 센다(전역 이름 검색은 동시 실행과 충돌한다 · F-407). 환경 변수는 ps 에 보이지 않아 argv 에 싣는다
 if [ "${1:-}" = "--version" ]; then echo "codex-cli 0.0.0-shim"; exit 0; fi
@@ -22,6 +26,15 @@ if [ -n "${FZ_SHIM_ROLLOUT:-}" ] && [ -n "${CODEX_HOME:-}" ]; then
   mkdir -p "$CODEX_HOME/sessions/2026/09/28"
   n=0; IFS=',' read -r -a _rolls <<< "$FZ_SHIM_ROLLOUT"
   for f in "${_rolls[@]}"; do n=$((n + 1)); cp "$f" "$CODEX_HOME/sessions/2026/09/28/rollout-shim-$n.jsonl"; done
+fi
+_SID="${FZ_SHIM_SESSION_ID:-11111111-2222-3333-4444-555555555555}"
+_SDIR="${CODEX_HOME:-${HOME:-}/.codex}/sessions/2026/09/28"
+if [ -n "${FZ_SHIM_SESSION_ROLLOUT:-}" ]; then
+  mkdir -p "$_SDIR" && cat "$FZ_SHIM_SESSION_ROLLOUT" >> "$_SDIR/rollout-2026-09-28T00-00-00-$_SID.jsonl"
+fi
+if [ -n "${FZ_SHIM_CHILD_ROLLOUTS:-}" ]; then
+  mkdir -p "$_SDIR"; n=0; IFS=',' read -r -a _kids <<< "$FZ_SHIM_CHILD_ROLLOUTS"
+  for f in "${_kids[@]}"; do n=$((n + 1)); cp "$f" "$_SDIR/rollout-2026-09-28T00-00-0$n-child-$n.jsonl"; done
 fi
 if [ -n "${FZ_SHIM_PRELINES:-}" ]; then
   n=0; while [ "$n" -lt "$FZ_SHIM_PRELINES" ]; do n=$((n + 1)); echo "shim-line $n"; done
@@ -56,5 +69,5 @@ for a in "$@"; do
   prev="$a"
 done
 [ -n "$out" ] && printf '%s' "${FZ_SHIM_OUTPUT-ok}" > "$out"
-echo "session id: 11111111-2222-3333-4444-555555555555"
+echo "session id: $_SID"
 exit "${FZ_SHIM_EXIT:-0}"

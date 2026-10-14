@@ -52,6 +52,119 @@ need() { [ "$1" -ge 2 ] || die 10 "$2 는 값이 필요하다"; }
 MODEL_RE='^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
 CHOICE_RE='^model=([^ ]+) effort=([^ ]+)$'   # gpt-choice.sh get · config 의 stdout 한 줄
 
+# ── 호출 행 (spawn 감사 · 관측 전용) — 종료 경로마다(사용법 거부 10 · 사전 게이트 11 · 사후 게이트 12~14 포함) gpt-calls.tsv 에 한 행.
+#    열(헤더 없음 · 뒤에만 붙인다): start · end · call_id · label · mode · session · spawn · child_results · tokens · idle_sec · idle_src · exit · origin
+#    spawn · child_results · tokens 는 이 호출의 rollout 에서 센다(CLI 0.159.2 형식 — spawn = function_call spawn_agent · 자식 결과 =
+#    수신자 /root 의 agent_message · 토큰 = token_count 누적값 · 자식 = session_meta.parent_thread_id 가 이 세션인 rollout).
+#    ⛔ rollout 이 없거나(--ephemeral · 세션 id 없음) 모양을 모르면 '?' 다 — 0 으로 쓰면 '하위 에이전트 없음' 으로 읽힌다(AC-4).
+#    ⛔ resume 은 호출 전 rollout 크기 이후 사건만 세고 토큰은 증분이다 — 부모 run 의 spawn 이 이번 호출에 섞이지 않게.
+#       자식도 같다 — 호출 시작 전 시각의 token_count 를 빼서 앞 호출이 만든 자식의 누적값이 이번 행에 들어오지 않게.
+#    ⛔ exit 를 바꾸지 않는다(행 실패는 조용히 건너뛴다). 9열 gpt-skill-usage.tsv 와 별개 파일이다. label · call_id 는 정문이 넘긴다.
+CALL_T0="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+CALL_T0_F="$(perl -MTime::HiRes=time -e 'printf "%.3f", time' 2>/dev/null || true)"   # 소수초 — 같은 초 안의 앞 기록을 가른다(없으면 초 단위)
+CALL_ID="${FZ_GPT_CALL_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}}"
+PRE_BYTES=""
+calls_row() {
+  local rc="$1" dir="${FZ_TELEMETRY_DIR:-${HOME:-}/.fz/telemetry}" sid="${SESSION_ID:-}" src="default"
+  [ -d "$dir" ] || return 0
+  if [ -z "$sid" ] && [ -n "${LOG:-}" ] && [ -f "${LOG:-}" ]; then
+    sid="$(sed $'s/\x1b\\[[0-9;]*m//g' "$LOG" | grep -m1 -oE 'session id: *[0-9a-f-]{36}' | grep -oE '[0-9a-f-]{36}')"
+  fi
+  [ -n "${FZ_GPT_IDLE_SEC+x}" ] && src="env"
+  python3 - "$dir/gpt-calls.tsv" "$CALL_T0" "$CALL_ID" "${FZ_GPT_CALL_LABEL:--}" "${MODE:--}" "${sid:--}" "${EPHEMERAL:-}" \
+    "${PRE_BYTES:-}" "${CODEX_HOME:-${HOME:-}/.codex}" "${IDLE_SEC:--}" "$src" "$rc" "${CALL_T0_F:-}" <<'PY' 2>/dev/null || true
+import calendar, json, os, re, sys, time
+out, t0, cid, label, mode, sid, eph, pre, home, idle, src, rc, t0f = sys.argv[1:14]
+Q = "?"
+pl = lambda r: r.get("payload") if isinstance(r.get("payload"), dict) else {}
+
+
+def rows_of(raw):
+    out = []
+    for line in raw.decode("utf-8", "replace").splitlines():
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(r, dict):
+            out.append(r)
+    return out
+
+
+def last_total(rows):
+    t = None
+    for r in rows:
+        p = pl(r)
+        if r.get("type") == "event_msg" and p.get("type") == "token_count":
+            v = ((p.get("info") or {}).get("total_token_usage") or {}).get("total_tokens")
+            if isinstance(v, int):
+                t = v
+    return t
+
+
+def epoch(ts):
+    """rollout row time (UTC, e.g. 2026-10-13T09:28:18.601Z) -> seconds with the fraction, or None."""
+    m = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?Z?$", str(ts))
+    return calendar.timegm(time.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S")) + float(m.group(2) or 0) if m else None
+
+
+def since(rows, start):
+    """Tokens a rollout added from start on — a child that existed before this call (resume) counts only its increment."""
+    end = last_total(rows)
+    if end is None:
+        return None
+    before = [r for r in rows if (epoch(r.get("timestamp")) or start) < start]
+    return end - (last_total(before) or 0)
+
+
+spawn = kids = tokens = Q
+if not eph and sid != "-" and mode in ("exec", "review", "resume") and not (mode == "resume" and not pre.isdigit()):
+    start = float(t0f) if re.fullmatch(r"\d+(\.\d+)?", t0f or "") else calendar.timegm(time.strptime(t0, "%Y-%m-%dT%H:%M:%SZ"))
+    own, children = None, []
+    for d, _, fs in os.walk(os.path.join(home, "sessions")):
+        for f in fs:
+            if not (f.startswith("rollout-") and f.endswith(".jsonl")):
+                continue
+            p = os.path.join(d, f)
+            if f.endswith(sid + ".jsonl"):
+                own = p
+                continue
+            try:
+                if os.path.getmtime(p) + 1 < start:
+                    continue
+                with open(p, "rb") as fh:
+                    first = rows_of(fh.readline())
+            except OSError:
+                continue
+            if first and pl(first[0]).get("parent_thread_id") == sid:
+                children.append(p)
+    if own:
+        raw = open(own, "rb").read()
+        base = int(pre) if pre.isdigit() else 0
+        if base <= len(raw):
+            prev, rows = rows_of(raw[:base]), rows_of(raw[base:])
+            kid_rows = [rows_of(open(k, "rb").read()) for k in children]
+            review_tc = any(r.get("type") == "turn_context" for kr in kid_rows for r in kr
+                            if (pl(kr[0]).get("source") or {}).get("subagent") == "review") if kid_rows else False
+            if any(r.get("type") == "turn_context" for r in rows) or review_tc:
+                spawn = sum(1 for r in rows if r.get("type") == "response_item" and pl(r).get("type") == "function_call"
+                            and pl(r).get("name") == "spawn_agent")
+                kids = sum(1 for r in rows if r.get("type") == "response_item" and pl(r).get("type") == "agent_message"
+                           and pl(r).get("recipient") == "/root" and pl(r).get("author") != "/root")
+                spawned = sum(1 for kr in kid_rows if kr and isinstance((pl(kr[0]).get("source") or {}).get("subagent"), dict))
+                own_t, prev_t = last_total(rows), last_total(prev)
+                kid_t = [since(kr, start) for kr in kid_rows]
+                if spawned >= spawn and None not in kid_t and (own_t is not None or kid_t):
+                    tokens = (own_t - (prev_t or 0) if own_t is not None else 0) + sum(kid_t)
+clean = lambda v: str(v).replace("\t", " ").replace("\n", " ").replace("\r", " ")
+row = [t0, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), cid, label, mode, sid, spawn, kids, tokens,
+       idle, src if idle != "-" else "-", rc, "wrapper"]
+with open(out, "a", encoding="utf-8") as fh:
+    fh.write("\t".join(clean(v) for v in row) + "\n")
+PY
+}
+trap 'calls_row $?' EXIT
+
 MODE="${1:-}"; shift || true
 case "$MODE" in
   review|exec|resume) ;;
@@ -81,7 +194,7 @@ while [ $# -gt 0 ]; do
     --add-dir)         need $# "--add-dir";         ADD_DIRS+=("$2"); shift 2 ;;
     --expected-branch) need $# "--expected-branch"; EXPECTED_BRANCH="$2"; shift 2 ;;
     # --gpt-skill = 역할 이름 · --gpt-skill-path = 호출부가 해석한 SKILL.md 경로 — 둘 다 계측 전용(gpt 에 전달하지 않는다).
-    #   resolved 해석은 호출부 get_gpt_skill_path 소관. 주입은 --inject-skill 하나만 한다(F-335 — 한 플래그가 모드마다 뜻이 달랐다).
+    #   resolved 해석은 resolver(scripts/gpt_kinds.py skill-path — 정문 gpt-call.sh 가 부른다) 소관. 주입은 --inject-skill 하나만 한다(F-335 — 한 플래그가 모드마다 뜻이 달랐다).
     --gpt-skill)       need $# "--gpt-skill";       GPT_SKILL="$2"; shift 2 ;;
     --gpt-skill-path)  need $# "--gpt-skill-path";  GPT_SKILL_PATH="$2"; shift 2 ;;
     --inject-skill)    need $# "--inject-skill";    INJECT_SKILL="$2"; shift 2 ;;
@@ -159,6 +272,8 @@ fi
   && die 10 "review 모드는 --add-dir 미지원 (codex exec review 가 거부). exec 모드를 쓰거나 --add-dir 를 빼라"
 [ -d "$CD" ] || die 11 "--cd 디렉토리 없음: $CD"
 [ -n "$OUT" ] || die 10 "--out 필수"
+# ⛔ 상위 폴더가 없으면 CLI 가 결과를 쓰다 실패해 exit 12(CLI 비정상 종료)로 원인이 가려진다 — 사전조건으로 먼저 알린다
+[ -d "$(dirname "$OUT")" ] || die 11 "--out 상위 폴더 없음: $(dirname "$OUT")"
 [ -n "$PROMPT_FILE" ] && { [ -s "$PROMPT_FILE" ] || die 11 "프롬프트 파일 없음/빈 파일: $PROMPT_FILE"; }
 [ -n "$SCHEMA" ] && { [ -s "$SCHEMA" ] || die 11 "스키마 파일 없음: $SCHEMA"; }
 # ⛔ 주입은 exec 전용이다 — resume 은 세션 이력에 본문이 이미 있어 다시 넣으면 두 번이 되고(리뷰 A:A9), review 는 프롬프트가 없다.
@@ -303,6 +418,10 @@ ARGS=(-c 'sandbox_mode="read-only"' -c "sandbox_permissions=[\"disk-full-read-ac
 ARGS+=(-o "$OUT")
 
 LOG="${OUT}.stream.log"
+if [ "$MODE" = "resume" ]; then   # 호출 행의 증분 기준 — 부모 run 이 남긴 사건을 이번 호출로 세지 않는다
+  PRE_ROLL="$(find "${CODEX_HOME:-${HOME:-}/.codex}/sessions" -name "rollout-*${SESSION_ID}.jsonl" 2>/dev/null | head -1)"
+  [ -n "$PRE_ROLL" ] && PRE_BYTES="$(wc -c < "$PRE_ROLL" | tr -d ' ')"
+fi
 rm -f "$OUT" "${OUT}.session"   # 실패 시 이전 성공 run 의 session 이 남아 resume 이 엉뚱한 세션을 잇지 않게 (resume 의 SESSION_ID 는 위에서 이미 읽었다)
 
 # ── 스킬 본문 판정 · 주입 (A2-03 · F-335) — exec·resume 는 판정, 주입은 --inject-skill(exec) 하나만
