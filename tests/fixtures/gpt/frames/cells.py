@@ -25,7 +25,7 @@ SEQ = itertools.count()
 GOLD = {k: json.load(open(os.path.join(HERE, "..", "kinds-resolve", "golden", f"independent-{k}.json"), encoding="utf-8"))
         for k in ("review", "plan")}
 FRAME = {n: open(os.path.join(R, "templates", "gpt-frames", f"{n}.md"), encoding="utf-8").read()
-         for n in ("falsify-review", "repro-review", "falsify-plan")}
+         for n in ("repro-review", "falsify-plan")}
 REC = capture.RECIPES
 NO_SPAWN = gpt_kinds.SPAWN_LINES["forbid-prompt"]
 REVIEW_OK = capture.shim_body("REVIEW_IND_OK")
@@ -109,16 +109,16 @@ def defaults_and_frames(env):
                           rollouts=[env.rollout(f"{d2}/r.jsonl", "cat requirement.md")])
     pp = env.norm(cli2[0][-1]) if cli2 else ""
     check("default-prompt-plan", pp == GOLD["plan"]["cli_argv"][0][-1] and "## Frame" not in pp, f"rc={p2.returncode}")
-    for name, fname, cid in (("falsify", "falsify-review", "frame-falsify-review"), ("repro", "repro-review", "frame-repro-review")):
+    for name, fname, cid in (("repro", "repro-review", "frame-repro-review"),):
         d, p, _, cli = run_review(env, f" --frame {name} --experimental")
         got = env.norm(cli[0][-1]) if cli else ""
         want = GOLD["review"]["cli_argv"][0][-1] + f"\n\n## Frame — {name}\n" + FRAME[fname].rstrip("\n")
         extra = ("Operation not permitted" in FRAME[fname]) if name == "repro" else True
         check(cid, got == want and extra, f"rc={p.returncode} · len {len(got)} vs {len(want)}")
-        if name == "falsify":
+        if name == "repro":
             a = json.load(open(f"{d}/gpt-independent/gpt-s0.audit.json", encoding="utf-8"))
             sha = hashlib.sha256(FRAME[fname].encode()).hexdigest()
-            check("frame-audit-fields", a.get("frame") == "falsify" and a.get("frameSha256") == sha and a.get("childResults") == 1,
+            check("frame-audit-fields", a.get("frame") == "repro" and a.get("frameSha256") == sha and a.get("childResults") == 1,
                   f"frame={a.get('frame')} sha_ok={a.get('frameSha256') == sha} childResults={a.get('childResults')}")
             i_ns, i_fr = got.find(NO_SPAWN), got.find("## Frame")
             check("frame-keeps-nospawn", got.count(NO_SPAWN) == 1 and -1 < i_ns < i_fr, f"no-spawn at {i_ns} · frame at {i_fr}")
@@ -132,7 +132,7 @@ def refusals(env):
         check(cid, ok, f"rc={p.returncode} entry={len(entry)} cli={len(cli)} {note}")
     refused("frame-bad-10", review(" --frame nope --experimental"), launcher_runs=True, note="(the launcher asks the resolver)")
     refused("explicit-inputs-unknown-10", review(" --bogus x"))
-    refused("frame-needs-experimental", review(" --frame falsify"))
+    refused("frame-needs-experimental", review(" --frame repro"))
     d = kd(env, "independent-review")
     p, entry, _ = env.run(d, review(" --timeout 60"))
     d2 = kd(env, "independent-review")
@@ -140,28 +140,28 @@ def refusals(env):
     ok = p.returncode == 10 and not entry and p2.returncode != 10 and bool(entry2) and entry2[0][-2:] == ["--timeout", "60"]
     check("timeout-needs-experimental", ok, f"without={p.returncode} with={p2.returncode} tail={entry2[0][-2:] if entry2 else None}")
     d3 = kd(env, "independent-plan")
-    p3, e3, _ = env.run(d3, REC["independent-plan"][1].split("\n")[0] + " --frame falsify --experimental\n")
+    p3, e3, _ = env.run(d3, REC["independent-plan"][1].split("\n")[0] + " --frame repro --experimental\n")
     d4 = kd(env, "independent-plan")
     direct = ('"${FZ_PLUGIN_ROOT}/scripts/gpt_independent.sh" plan --requirement "$K/requirement.md" --arm gpt --run-id d '
-              '--out-dir "$K/o" --frame falsify\n')
+              '--out-dir "$K/o" --frame repro\n')
     p4, _, c4 = env.run(d4, direct)
     check("frame-plan-mode-10", p3.returncode == 10 and not e3 and p4.returncode == 10 and not c4, f"gate={p3.returncode} direct={p4.returncode}")
 
 
 def wrapper_frames(env):
     d = kd(env, "verify")
-    os.makedirs(f"{d}/falsify-review")
-    call = capture.GC_CALL + 'review-falsify --cd "$GIT_ROOT" --out "$K/falsify-review/o.json" --prompt-file "$K/p.txt"'
+    os.makedirs(f"{d}/repro-review")
+    call = capture.GC_CALL + 'review-repro --cd "$GIT_ROOT" --out "$K/repro-review/o.json" --prompt-file "$K/p.txt"'
     p, entry, _ = env.run(d, call + "\n")
     check("experimental-gate-10", p.returncode == 10 and not entry, f"rc={p.returncode}")
     d = kd(env, "verify")
-    os.makedirs(f"{d}/falsify-review")
+    os.makedirs(f"{d}/repro-review")
     p, entry, _ = env.run(d, call + " --experimental\n")
     a = entry[-1] if entry else []
     bad = [x for x in ("--sandbox", "-c", "--model", "--effort", "--config-permissions") if x in a]
-    comp = read(f"{d}/falsify-review/o.json.frame-prompt.txt")
-    check("experimental-no-policy-flags", bool(a) and a[0] == "gpt-exec.sh" and not bad and comp.startswith(FRAME["falsify-review"]),
-          f"adapter={a[:2]} policy_flags={bad} frame_first={comp.startswith(FRAME['falsify-review'])}")
+    comp = read(f"{d}/repro-review/o.json.frame-prompt.txt")
+    check("experimental-no-policy-flags", bool(a) and a[0] == "gpt-exec.sh" and not bad and comp.startswith(FRAME["repro-review"]),
+          f"adapter={a[:2]} policy_flags={bad} frame_first={comp.startswith(FRAME['repro-review'])}")
     d = kd(env, "verify")
     p, entry, _ = env.run(d, capture.GC_CALL + 'verify-falsify --cd "$GIT_ROOT" --out "$K/o.json" --prompt-file "$K/p.txt" --experimental\n')
     outside = p.returncode == 10 and not entry

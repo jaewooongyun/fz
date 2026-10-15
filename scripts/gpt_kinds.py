@@ -698,22 +698,23 @@ def self_test():
         expect("independent unknown input", lambda: resolve("independent-review", ir + ["--bogus", "x"], env, cwd, reg=reg), ("usage",))
         expect("independent missing required", lambda: resolve("independent-review", ir[2:], env, cwd, reg=reg), ("usage",))
         expect("E8 --timeout without --experimental", lambda: resolve("independent-review", ir + ["--timeout", "60"], env, cwd, reg=reg), ("usage",))
-        expect("E8 --frame without --experimental", lambda: resolve("independent-review", ir + ["--frame", "falsify"], env, cwd, reg=reg), ("usage",))
+        expect("E8 --frame without --experimental", lambda: resolve("independent-review", ir + ["--frame", "repro"], env, cwd, reg=reg), ("usage",))
         expect("E8 with --experimental, order kept", lambda: resolve("independent-review", ["--deny", cwd] + ir + ["--timeout", "60", "--experimental"], env, cwd, reg=reg),
                ("ok", lambda p: p["argv"] == ["review", "--deny", cwd] + ir + ["--timeout", "60"]))
         expect("--experimental alone on stable independent", lambda: resolve("independent-review", ir + ["--experimental"], env, cwd, reg=reg), ("usage",))
         expect("repeatable --deny", lambda: resolve("independent-review", ir + ["--deny", cwd, "--deny", t], env, cwd, reg=reg), ("ok", lambda p: p["argv"].count("--deny") == 2))
-        expect("plan has no --frame", lambda: resolve("independent-plan", ["--requirement", pf, "--arm", "a", "--run-id", "r", "--out-dir", t, "--frame", "falsify", "--experimental"], env, cwd, reg=reg), ("usage",))
+        expect("plan has no --frame", lambda: resolve("independent-plan", ["--requirement", pf, "--arm", "a", "--run-id", "r", "--out-dir", t, "--frame", "repro", "--experimental"], env, cwd, reg=reg), ("usage",))
         # launcher policy (R-06 · SC-2)
         expect("policy review", lambda: launcher_policy("independent-review", reg=reg),
                ("ok", lambda d: d["ROLE"] == "reviewer" and d["SPAWN_LINE"] == SPAWN_LINES["forbid-prompt"] and d["SCHEMA"].endswith("gpt_independent_review_schema.json") and d["FRAME"] == ""))
         expect("policy lenses", lambda: launcher_policy("independent-review", gpt_agents=True, reg=reg), ("ok", lambda d: d["SPAWN_LINE"] == SPAWN_LINES["lenses-optin"]))
         expect("policy plan + lenses", lambda: launcher_policy("independent-plan", gpt_agents=True, reg=reg), ("usage",))
-        expect("policy frame", lambda: launcher_policy("independent-review", frame="falsify", reg=reg), ("ok", lambda d: d["FRAME"].endswith("templates/gpt-frames/falsify-review.md")))
+        expect("policy frame", lambda: launcher_policy("independent-review", frame="repro", reg=reg), ("ok", lambda d: d["FRAME"].endswith("templates/gpt-frames/repro-review.md")))
+        expect("policy falsify frame rolled back (E1)", lambda: launcher_policy("independent-review", frame="falsify", reg=reg), ("usage",))
         expect("policy bad frame", lambda: launcher_policy("independent-review", frame="nope", reg=reg), ("usage",))
         expect("policy wrapper kind", lambda: launcher_policy("verify", reg=reg), ("usage",))
         # frame kinds: own folder, frame first
-        expect("frame kind outside its folder", lambda: resolve("review-falsify", base + ["--prompt-file", pf, "--experimental"], env, cwd, reg=reg), ("usage",))
+        expect("frame kind outside its folder", lambda: resolve("review-repro", base + ["--prompt-file", pf, "--experimental"], env, cwd, reg=reg), ("usage",))
         # canonical order and registry-owned flags
         expect("check fixed args", lambda: resolve("check", base, env, cwd, reg=reg)["argv"],
                ("ok", lambda a: a[5:] == ["--uncommitted", "--ephemeral", "--gpt-skill", "reviewer"]))
@@ -770,13 +771,13 @@ def self_test():
                ("review mode with injected role", mut("review", skill_delivery="inject"), "implicit"),
                ("launcher frame on plan (XE-11)", mut("independent-plan", frame="scripts/gpt-kinds.json"), "XE-11"),
                ("verify kind on the launcher (XE-11)", mut("verify-falsify", launcher="independent", mode="review", skill_delivery="iso-copy"), "XE-11"),
-               ("experimental kind with a default-flow caller", mut("review-falsify", callers=["skills/fz-review/SKILL.md"]), "experimental"),
-               ("experimental kind without evidence", mut("review-falsify", evidence=[]), "experimental"),
+               ("experimental kind with a default-flow caller", mut("review-repro", callers=["skills/fz-review/SKILL.md"]), "experimental"),
+               ("experimental kind without evidence", mut("review-repro", evidence=[]), "experimental"),
                ("independent passthrough (D6)", mut("independent-review", inputs={"passthrough": True}), "passthrough"),
                ("spawn opt-in on plan", mut("independent-plan", spawn_opt_in="lenses-optin"), "spawn_opt_in"),
                ("spawn value without a sentence", mut("independent-review", spawn="inherit-audited"), "launcher sentence"),
                ("resume kind marked fresh", mut("final-deep", independence="plain"), "resumes-session"),
-               ("missing frame file", mut("review-falsify", frame="templates/gpt-frames/nope.md"), "frame"),
+               ("missing frame file", mut("review-repro", frame="templates/gpt-frames/nope.md"), "frame"),
                ("missing role skill", mut("verify", role="no-such-role"), "role skill"),
                ("core kind removed", {"kinds": {k: x for k, x in reg["kinds"].items() if k != "drift"}}, "core kind missing"),
                ("recipe without the kind's gate call", mut("drift", recipe="CLAUDE.md"), "recipe"),

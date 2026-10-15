@@ -80,7 +80,7 @@ def cells(env, tag0):
     kd = env.kdir("c")
     for name, args, want in (("no kind", "", 10), ("unknown kind", "nope --cd x", 10), ("missing input", 'verify --cd "$GIT_ROOT" --out "$K/o"', 10),
                              ("out parent missing", 'verify --cd "$GIT_ROOT" --out "$K/nodir/o" --prompt-file "$K/run.sh"', 10),
-                             ("experimental without flag", 'review-falsify --cd "$GIT_ROOT" --out "$K/o" --prompt-file "$K/run.sh"', 10),
+                             ("experimental without flag", 'review-repro --cd "$GIT_ROOT" --out "$K/o" --prompt-file "$K/run.sh"', 10),
                              ("--experimental on stable", 'check --cd "$GIT_ROOT" --out "$K/o" --experimental', 10)):
         p, entry, cli = gate(env, kd, args)
         check(f"(c) {name} -> {want}", p.returncode == want and not cli, f"rc={p.returncode} {p.stderr.strip()[-120:]}")
@@ -316,7 +316,7 @@ def discrimination():
     reg = json.load(open(os.path.join(R, "scripts", "gpt-kinds.json"), encoding="utf-8"))
     reg["kinds"]["check"]["fixed_args"] = ["--uncommitted"]          # drop --ephemeral
     reg["kinds"]["verify"]["schema"] = "schemas/gpt_peer_review_schema.json"
-    reg["kinds"]["review-falsify"]["status"] = "stable"
+    reg["kinds"]["review-repro"]["status"] = "stable"
     env = Env(json.dumps(reg))
     try:
         kd = env.kdir("check")
@@ -327,8 +327,8 @@ def discrimination():
         p, entry, _ = gate(env, kd, 'verify --cd "$GIT_ROOT" --out "$K/verify.json" --prompt-file "$K/p.txt"')
         check("discrimination: registry change (verify schema) changes argv", "<R>/schemas/gpt_peer_review_schema.json" in (entry[0] if entry else []), str(entry))
         kd = env.kdir("rf", "verify")
-        os.makedirs(f"{kd}/falsify-review", exist_ok=True)   # a frame kind writes into its own folder (XE-24)
-        p, entry, _ = gate(env, kd, 'review-falsify --cd "$GIT_ROOT" --out "$K/falsify-review/o.json" --prompt-file "$K/p.txt"')
+        os.makedirs(f"{kd}/repro-review", exist_ok=True)   # a frame kind writes into its own folder (XE-24)
+        p, entry, _ = gate(env, kd, 'review-repro --cd "$GIT_ROOT" --out "$K/repro-review/o.json" --prompt-file "$K/p.txt"')
         check("experimental gate is registry-driven (status stable in a proxy copy -> runs)", p.returncode != 10 and bool(entry), f"rc={p.returncode}")
     finally:
         env.close()
