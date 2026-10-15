@@ -91,6 +91,17 @@ total_findings: <int>             # gpt_unique + claude_unique + convergent
 
 > 목적: Cross-model verify 가치를 정량 evidence로 누적. 본 세션(2026-04-25 codex-utilization)에서 Codex unique 2건 (Step 1 readback, codex-strategy 충돌) 발견 — 활용 가치 정당화.
 
+```yaml
+# R-G3 E1 (2026-10-15 · prereg e6011be5) — GPT 두 arm(A0 · A2 falsify) 비교라 Claude 리뷰가 없다
+session: 0ff2128c
+date: 2026-10-15
+gpt_unique_findings: unmeasured      # review_merge both · gpt_only 귀속 없음(Claude arm 없음)
+claude_unique_findings: unmeasured
+convergent_findings: unmeasured
+total_findings: 16                 # 가린 채점의 검증된 critical·major 클래스 합(8 과제 · merged/*/judged.json)
+frame_unique_findings: 0            # A2 만 찾은 critical·major 클래스(비교 7 과제 · Lead 재계산 = decision meanΔ 0)
+```
+
 ### T1-G Ensemble Sprint Metrics (2026-04-25 CP-2 Early Qualification)
 
 Sprint Contract 4차원 (Correctness/Coverage/Severity/Actionability) 기반 Multi-angle Codex Ensemble 데이터.
@@ -801,3 +812,14 @@ python3 scripts/ab_ledger.py show --ledger <ab>/ledger.jsonl
 
 | prereg_sha256 | approved_by | time | instrument |
 |---|---|---|---|
+| a346020adc9454b2f75708efb38929146c7c4695c9958672344e5e6c82000bed | user | 2026-10-14T03:29:18Z | 1a40dd043235c392aad261fa5a4698696a2cc373 |
+| f8403f992354e392ba94a4a62507d9d4c624191b9c27c7471b850243a5078c64 | user | 2026-10-14T05:51:25Z | 1a40dd043235c392aad261fa5a4698696a2cc373 |
+| e6011be57269044e659adb1d003cfcf507c1e99fd9984635eb80129594dd4f8a | user | 2026-10-14T07:06:16Z | 1a40dd043235c392aad261fa5a4698696a2cc373 |
+
+### 결과 행 (S13 — 판정 · 사용자 선택)
+
+| 판정 | prereg_sha256 | n_valid | meanΔ | FP 차이 | tokens 비율 | A2 실패율 | 사용자 선택 | 시각 |
+|---|---|---|---|---|---|---|---|---|
+| ROLLBACK | e6011be57269044e659adb1d003cfcf507c1e99fd9984635eb80129594dd4f8a | 7 | 0.000 | +0.036946 | 0.9744 | 0.2632 | review-falsify만 제거 (권고) | 2026-10-15T02:09:25Z |
+
+> 값의 원천은 `measure/e1/decision.json`(S12 PASS). 판정은 meanΔ ≤ 0 이 가른다 — A2 실패율(감사 거짓 양성 F-442 · F-443)을 빼도 같다. 근거 · 공개 사항은 작업 폴더 `R-G3/DEVIATION.md` § E1 판정.
