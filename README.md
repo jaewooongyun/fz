@@ -150,9 +150,13 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.47.0
+## What's New — v4.48.0
 
-**질문 틀을 바꿔 GPT 를 한 번 더 부르는 것은 같은 질문을 반복한 것과 같았다 — 반증 틀 리뷰를 뺐다.** v4.46.0 이 넣은 계기로 반증 틀의 두 번째 GPT 리뷰를 같은 질문의 반복과 사전등록 실험으로 비교했다 — 비교한 7개 과제 모두 더 찾은 critical · major 결함이 0개라 실험 kind `review-falsify` 를 뺐다(token 비용도 같았다).
+**무거운 경로 앞에서 light · full 을 묻고, Workflow 워커는 Lead 의 effort 로 돈다.** 스킬을 직접 부르면 코드가 조금만 커도 Workflow(full)로 돌아 리뷰가 40~50분, 플랜이 20분 넘게 걸렸다. 이제 fz-review · fz-peer-review · fz-plan · fz-code · fz-fix · fz-discover 가 Workflow 직전에 작업 크기로 light · full 을 추천하고 사용자가 고른다(`light` · `full` 인자를 주면 묻지 않는다).
+GPT 교차 검증은 두 모드에 똑같이 붙고 모델 질문에서 `off` 로 끌 수 있다. Workflow 워커는 콜마다 고정된 `xhigh` 대신 Lead 세션의 effort 로 돈다.
+→ [릴리즈 노트](docs/releases/v4.48.0.md)
+
+**v4.47.0 — 질문 틀을 바꿔 GPT 를 한 번 더 부르는 것은 같은 질문을 반복한 것과 같았다 — 반증 틀 리뷰를 뺐다.** v4.46.0 이 넣은 계기로 반증 틀의 두 번째 GPT 리뷰를 같은 질문의 반복과 사전등록 실험으로 비교했다 — 비교한 7개 과제 모두 더 찾은 critical · major 결함이 0개라 실험 kind `review-falsify` 를 뺐다(token 비용도 같았다).
 기본 흐름의 GPT 호출은 그대로다. `review-falsify` · 독립 런처 `--frame falsify` 를 부르면 이제 10 이다. 측정이 드러낸 계측 구멍 F-440 ~ F-444 는 열어 둔다.
 → [릴리즈 노트](docs/releases/v4.47.0.md)
 
