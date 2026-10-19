@@ -14,6 +14,7 @@
 
 - [Base Branch 결정](#base-branch-결정)
 - [모델·effort 선택 (세션 1회)](#모델effort-선택-세션-1회)
+- [GPT 미사용 (off · CLI 없음)](#gpt-미사용-off--cli-없음)
 - [Diff 크기 적응 전략](#diff-크기-적응-전략)
 - [장기 불능 인지 (기간 조건부)](#장기-불능-인지-기간-조건부)
 - [CLI 모드 선택 전략](#cli-모드-선택-전략)
@@ -38,7 +39,7 @@ review, final 서브커맨드에서 `--base` 브랜치가 필요합니다.
 
 **원칙**: 세션에서 GPT 를 처음 부르기 전에 모델과 effort 를 **한 번** 묻고, 그 값이 그 세션의 모든 GPT 호출(래퍼 · 독립 런처 · resume)에 적용된다. ⛔ 서브커맨드별 effort 는 없다 — 호출 종류에 따라 effort 를 올리거나 내리지 않는다. 묻지 않았으면 `config.toml` 그대로다(래퍼가 모델·effort 를 넘기지 않는다).
 
-GPT 교차 검증 자체는 **명시 호출**이다 — 자동 경량 게이트는 없다(Review Gate OFF — 품질 ROI 가 낮다).
+GPT 교차 검증 자체는 **명시 호출**이다 — 자동 경량 게이트는 없다(Review Gate OFF — 품질 ROI 가 낮다). 스킬 절차가 Lead 에게 GPT 를 부르라고 적은 단계도 명시 호출이다 — "자동" 은 hook 이 호출마다 거는 게이트를 말한다. 그 단계를 돌릴지는 모드(light · full)가 아니라 **GPT 사용 여부**로 정한다(§ GPT 미사용).
 
 ### 결정 순서 (래퍼 한 곳)
 
@@ -55,7 +56,7 @@ GPT-CHOICE model=<값> (flag|session|config) effort=<값> (flag|session|config)
 - ⛔ 래퍼가 세션 선택을 읽지 못하면 config 로 가지 않고 exit 11 로 멈춘다. 처방은 메시지 머리의 태그로 가른다(문서는 태그를 인용한다)
   - `CHOICE-UNREADABLE` — 선택 파일 손상(`get` exit 11): Lead 는 다시 묻고 `gpt-choice.sh set` 으로 덮어쓴다
   - `CHOICE-SCRIPT-ERROR` — 스크립트 부재·오류 · `get` 출력과 래퍼 규칙의 불일치: 다시 물어도 풀리지 않는다 — 묻지 않는다
-  - **우회**: 덮어쓰기가 안 되거나(`set` 실패) 스크립트 오류면 이 세션의 GPT 호출에 `--model config --effort config` 를 붙이고 알린다 — 두 필드가 모두 플래그면 래퍼는 선택 파일을 읽지 않고 config 로 돈다
+  - **우회**: 덮어쓰기가 안 되거나(`set` 실패) 스크립트 오류면 이 세션의 GPT 호출에 `--model config --effort config` 를 붙이고 알린다 — 두 필드가 모두 플래그면 래퍼는 선택 파일을 읽지 않고 config 로 돈다. ⛔ 사용자가 `off` 를 고른 세션이면 이 우회가 아니라 `--model off` 다 — 이 우회는 GPT 를 켠다(§ GPT 미사용)
 
 ### 묻는 시점
 
@@ -69,9 +70,10 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" get   # exit 로 분기한다 —
 | `get` 결과 | 뜻 | Lead |
 |---|---|---|
 | exit 0 | 선택 있음 — stdout `model=… effort=…` | 묻지 않는다(이미 선택 — 래퍼가 적용한다) |
-| exit 3 | 선택 없음 | AskUserQuestion(아래 질문 형식) 후 `set` |
+| exit 0 · stdout `model=off effort=off` | GPT 미사용 — 사용자가 off 를 골랐거나, 선택이 없고 GPT CLI 가 없다(이때는 묻지 않고 off 를 기록하고 stderr 로 알린다 · 저장할 수 없는 세션이어도 off) | 묻지 않는다 — 이 세션의 GPT 단계는 § GPT 미사용 |
+| exit 3 | 선택 없음 | AskUserQuestion(아래 질문 형식) 후 `set`. ⛔ 질문 도구를 쓸 수 없는 실행(headless · 거부 · 오류)이면 exit 4 와 같다 — 스크립트는 그것을 알 수 없어 `FZ_AUTONOMY` 만 본다(`modules/mode-gate.md` § 언제 묻나 4) |
 | exit 4 | 선택 없음 + 자율 모드(`FZ_AUTONOMY`) | 묻지 않는다 — config |
-| exit 5 | 저장할 수 없는 세션 — 세션 id 없음·불량 · 저장 위치를 정할 수 없음 · `FZ_GPT_CHOICE_DIR` 가 절대 경로가 아님(stderr 안내) | 묻지 않는다 — config |
+| exit 5 | 저장할 수 없는 세션 — 세션 id 없음·불량 · 저장 위치를 정할 수 없음 · `FZ_GPT_CHOICE_DIR` 가 절대 경로가 아님(stderr 안내) | 묻지 않는다 — config. 사용자가 GPT 를 끄라고 하면 호출마다 `--model off`(§ GPT 미사용) |
 | exit 11 | 선택 파일 손상 | 다시 묻고 `set` 으로 덮어쓴다 |
 | 도구 호출 거부(권한 — exit 없음) · 그 밖의 exit(1 · 126 · 127 등 — `FZ_PLUGIN_ROOT` 경로 오류일 수 있다) | 판독 불가 | 묻지 않고 진행하며 알린다 — 래퍼는 자기 위치로 따로 판독한다(선택이 없으면 config). 래퍼가 `CHOICE-SCRIPT-ERROR` 로 멈추면 위 **우회**를 따른다 |
 
@@ -83,9 +85,10 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" options
 
 `gpt-choice.sh options` 의 stdout JSON 에서 `questions.model` · `questions.effort` 로 AskUserQuestion 을 만든다 — 각각 `choices[]`(`id` · `label`) · `skip` · `more[]` 다. `choices[].id` 가 `set` 에 넘길 값이다.
 
-- **모델 질문**: `config 기본 (<config 모델>)` (Recommended) + 목록 모델 최대 3 — `choices` 그대로다
-- **effort 질문**: `config 기본 (<config effort>)` + 최대 3 — `choices` 그대로다. 명시 수준은 지원 목록을 아는 제시 모델 모두가 지원하는 수준만 나온다. 모델 선택지 label 에 `effort 는 config 만` 이 붙은 모델(지원 effort 를 모름 — config 모델을 모르는 경우 포함)을 고르면 effort 는 `config` 로 `set` 한다(명시 effort 와 짝지으면 `set` 이 exit 10). max · ultra 는 독립 런처 1800초 상한(exit 16)에 걸릴 수 있다고 설명에 적는다
-- `skip` 이 참인 질문(선택지 2개 미만)은 뺀다. 뺀 질문의 필드는 `config` 로 `set` 한다 — `set` 은 `--model` · `--effort` 가 모두 필요하고, 하나만 넘기면 사용법 오류(exit 10)라 아래 '다시 묻기' 대상이 아니다. 두 질문이 모두 빠지면 묻지 않고 `set --model config --effort config`
+- **모델 질문**: `config 기본 (<config 모델>)` (Recommended) + 목록 모델 최대 2 + `사용 안 함 (GPT 교차검증 끔)`(id `off`) — 선택지 4 이하, `choices` 그대로다. 밀린 목록 모델은 `more` 다. off 가 늘 있어 모델 질문은 `skip` 되지 않는다
+- **effort 질문**: `config 기본 (<config effort>)` + 최대 3 — `choices` 그대로다. 명시 수준은 지원 목록을 아는 제시 모델 모두가 지원하는 수준만 나온다. 모델 선택지 label 에 `effort 는 config 만` 이 붙은 모델(지원 effort 를 모름 — config 모델을 모르는 경우 포함)을 고르면 effort 는 `config` 로 `set` 한다(명시 effort 와 짝지으면 `set` 이 exit 10). max · ultra 는 독립 런처 1800초 상한(exit 16)에 걸릴 수 있다고 설명에 적는다. 모델에서 off 를 고르면 effort 답은 쓰지 않는다(`set --model off`)
+- **degraded**: JSON 에 `degraded`(`cache-missing` · `cache-unreadable` · `python3-missing` · `options-error`)가 있으면 모델 목록을 못 읽은 것이다 — 모델 질문은 config / off 두 선택지, effort 질문은 `skip` 이다. ⛔ 그래도 묻는다 — 묻지 않고 config 로 가면 GPT 를 쓰지 않으려는 사용자가 끌 길이 없다
+- `skip` 이 참인 질문(선택지 2개 미만)은 뺀다. 뺀 질문의 필드는 `config` 로 `set` 한다 — `set` 은 `--model` · `--effort` 가 모두 필요하고(`--model off` 만 예외), 하나만 넘기면 사용법 오류(exit 10)라 아래 '다시 묻기' 대상이 아니다
 - `more` 는 질문 설명에 적는다 — 사용자는 Other 로 입력할 수 있고, Other 입력은 `set` 이 검증한다
 - ⛔ 호출 문서 · 질문 예시에 모델 이름을 적지 않는다 — 자리표시자 `<slug>` · `<level>` 만 쓴다(Authority 의 CLI 버전 이력은 예외)
 - `/fz` Phase 4 에 합칠 때 질문 합계가 4(AskUserQuestion 한 번의 상한)를 넘으면 GPT 두 질문을 바로 다음 AskUserQuestion 한 번으로 나눈다 — 왕복이 1 늘어난다
@@ -94,15 +97,18 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" options
 
 ```bash
 bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" set --model "$MODEL_ID" --effort "$EFFORT_ID"   # 각각 options 의 choices[].id(<slug> · <level>) 또는 config
+bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" set --model off                                 # 모델 질문에서 off — effort 는 없어도 되고 주면 무시
 ```
 
 | 결과 | Lead |
 |---|---|
 | `set` exit 0 — 기록됨(stdout `model=… effort=…`) | 이후 GPT 호출에서 다시 묻지 않는다 |
+| `set --model off` exit 0 — 기록됨(stdout `model=off effort=off`) | 이후 GPT 단계는 § GPT 미사용 — 다시 묻지 않는다 |
+| `set --model off` exit 11 — 세션 id · 저장 위치 · 쓰기 실패(모델 목록 캐시는 보지 않는다) | off 를 저장하지 못했다 — ⛔ config 우회로 가지 않는다(GPT 가 켜진다). 이 세션의 **모든 GPT 호출에 `--model off`** 를 붙이고 알린다(§ GPT 미사용 · off 저장 실패) |
 | `set` exit 10 — 목록 밖 모델 · 그 모델이 지원하지 않는 effort(effort 가 config 면 config effort) · 지원 목록을 모름(파일을 쓰지 않는다) | 그 질문만 1회 다시 묻는다. 또 실패하면 `set --model config --effort config` 후 "config 로 진행" 을 알린다 |
-| `set` exit 11 — 사전조건(세션 id · 저장 위치 · 모델 목록 캐시 없음 · 쓰기 실패) | 기록되지 않는다 — 이전 선택 파일이 있으면 그대로 남아 래퍼가 계속 읽는다(손상이면 계속 exit 11). 결정 순서의 **우회**(이 세션의 GPT 호출에 `--model config --effort config`)로 진행하고, 이 세션에서는 다시 묻지 않는다 · 알린다 |
-| `set` · `options` 그 밖의 exit(1 · 126 · 127 등 — 스크립트 오류·경로 오류) | 같은 **우회**로 진행하고 알린다 |
-| `options` exit 11 — 모델 목록 캐시 없음·판독 불가 | 묻지 않고 `set --model config --effort config` 후 "모델 목록을 읽지 못해 config 로 진행" 을 알린다 |
+| `set` exit 11 — 사전조건(세션 id · 저장 위치 · 모델 목록 캐시 없음 · 쓰기 실패) — 모델(config 포함)을 고른 경우 | 기록되지 않는다 — 이전 선택 파일이 있으면 그대로 남아 래퍼가 계속 읽는다(손상이면 계속 exit 11). 결정 순서의 **우회**(이 세션의 GPT 호출에 `--model config --effort config`)로 진행하고, 이 세션에서는 다시 묻지 않는다 · 알린다 |
+| `set` · `options` 그 밖의 exit(1 · 126 · 127 등 — 스크립트 오류·경로 오류) | 같은 **우회**로 진행하고 알린다 — 사용자가 off 를 골랐으면 `--model off` |
+| `options` exit 0 + `degraded` — 모델 목록 캐시 없음 · 판독 불가 · python3 없음 | config / off 두 선택지로 묻는다(위 질문 형식). config 면 `set --model config --effort config` 후 "모델 목록을 읽지 못해 config 로 진행" 을 알린다. ⛔ 캐시 · python3 문제로는 `options` 가 exit 11 을 내지 않는다 — 11 은 degraded JSON 을 만드는 python 자체가 실패했을 때뿐이다(그 밖의 exit 행 — 우회) |
 | 저장 선택으로 부른 GPT 호출(`GPT-CHOICE` 출처 session)이 exit 12 이고 스트림 로그(`<out>.stream.log`)에 모델·effort 거부 흔적이 있다 | 선택을 다시 묻는다. 그 밖의 exit 12(quota · 네트워크 · 인증)는 선택 탓이 아니다 — 호출부의 GPT 실패 규칙을 따른다(§ 장기 불능 인지) |
 | GPT 호출이 exit 12 이고 메시지 머리에 `GPT-IDLE` 이 있다 — 래퍼 진행 감시가 끊었다(스트림 로그 크기가 `FZ_GPT_IDLE_SEC`(기본 900 · 0 = 끔)초 동안 그대로 · 텔레메트리 9열 `idle`) | 선택 탓이 아니다 — 다시 묻지 않는다. 측정 실패(결과 아님)로 호출부의 GPT 실패 규칙을 따른다. CLI 종료코드(143 등 신호값)만으로는 CLI 스스로의 실패와 가를 수 없어 토큰으로 가른다. 긴 무출력 추론이 의심되면 그 호출만 `FZ_GPT_IDLE_SEC` 를 올려 다시 돈다 |
 
@@ -110,7 +116,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" set --model "$MODEL_ID" --effort 
 
 ### 저장
 
-`${FZ_GPT_CHOICE_DIR:-$HOME/.fz/gpt-choice}/${CLAUDE_CODE_SESSION_ID}` — 두 줄(`model=<slug|config>` · `effort=<level|config>`)이다. `set` 이 tmp+mv 로 원자 기록한다.
+`${FZ_GPT_CHOICE_DIR:-$HOME/.fz/gpt-choice}/${CLAUDE_CODE_SESSION_ID}` — 두 줄(`model=<slug|config>` · `effort=<level|config>`, off 면 두 줄 모두 `off`)이다. `set` 이 tmp+mv 로 원자 기록한다.
 
 - Claude Code `--resume` 은 같은 세션 id 를 유지한다(2026-09-30 실측: transcript `sessionId` 동일) → 선택이 유지된다
 - `/clear` 뒤 id 가 바뀌는지는 [미검증] — 바뀌면 다시 묻는 것이 정상이다
@@ -122,7 +128,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" set --model "$MODEL_ID" --effort 
 
 ### 자율 모드
 
-`FZ_AUTONOMY=autonomous` 면 `get` 이 선택 없음을 exit 4 로 알린다 — 묻지 않고 config 다. 판정은 `scripts/autonomy_decide.py` 가 한다(공백·대소문자를 정규화하고 모르는 값은 묻기로 본다). ⛔ 선택 파일이 있으면 자율이어도 적용된다(exit 0) — A/B 러너는 run 마다 새 세션 id 라 파일이 없다.
+`FZ_AUTONOMY=autonomous` 면 `get` 이 선택 없음을 exit 4 로 알린다 — 묻지 않고 config 다. 판정은 `scripts/autonomy_decide.py` 가 한다(공백·대소문자를 정규화하고 모르는 값은 묻기로 본다). ⛔ 선택 파일이 있으면 자율이어도 적용된다(exit 0 — off 포함) — A/B 러너는 run 마다 새 세션 id 라 파일이 없다. 질문 도구를 쓸 수 없는 실행(headless · 거부 · 오류)도 같다 — `get` 은 그것을 알 수 없어 exit 3 을 내므로 Lead 가 exit 4 처럼 묻지 않고 config 로 간다(`modules/mode-gate.md` § 언제 묻나 4).
 
 ### resume
 
@@ -137,14 +143,63 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" set --model "$MODEL_ID" --effort 
 - 런처 exit 10 · 11 · 12 는 래퍼 exit 를 그대로 낸 것일 수 있다 — 사유는 `<out-dir>/<arm>-<run-id>.wrapper.log` 에 있다. 세션 선택 판독 실패(11)면 런처 stderr 에 `GPT-CHOICE` 줄이 없고 `.wrapper.log` 에 `CHOICE-UNREADABLE` 또는 `CHOICE-SCRIPT-ERROR` 가 있다 — 위 결정 순서의 exit 11 규칙을 따른다. 12 는 기록 표의 exit 12 행을 따른다
 - 런처 exit 12 이고 `.wrapper.log` 에 `GPT-IDLE` 이 있으면 래퍼 진행 감시가 끊은 것이다(기록 표의 `GPT-IDLE` 행). 런처 `--timeout`(16)은 총 시간 상한이고 진행 감시는 무출력 정체다 — 둘은 따로 걸린다. 런처는 래퍼 프로세스 그룹째 죽이고 래퍼는 CLI pid 트리만 죽인다(CLI 는 래퍼 그룹 안이다)
 - max · ultra 를 고르면 런처 `--timeout` 기본 1800초(exit 16)에 걸릴 수 있다 — 필요하면 `--timeout` 을 준다
+- 런처 exit 18 = GPT 미사용 — 격리 폴더를 만들지 않고 감사에 `"gptOff"` 를 남긴다(§ GPT 미사용)
 
-### light 모드
+### 모드와 GPT
 
-fz-plan · fz-code · fz-review 의 light 모드는 GPT 를 부르지 않는다 — 질문도 없다.
+GPT 는 모드(light · full)와 독립이다 — 켠 세션이면 두 모드가 같은 GPT 단계를 갖고, 끈 세션 · CLI 없음이면 두 모드 모두 § GPT 미사용 대로 건너뛴다. 정본 `modules/mode-gate.md` § GPT 는 모드와 독립.
 
 ### 긴 호출의 background 기준
 
 effort 가 아니라 **입력 크기 · 호출 종류**로 정한다. 큰 입력(계획 300줄 이상 · 큰 diff)이나 독립 런처 · 심화 resume 처럼 오래 도는 호출은 `run_in_background` 로 띄운다(`modules/fz-gpt-bash-hygiene.md` §4). 세션 effort 가 높으면(max · ultra) 가벼운 호출도 길어질 수 있다.
+
+## GPT 미사용 (off · CLI 없음)
+
+> 이 절이 정본이다 — GPT 를 끈 세션과 GPT CLI 가 없는 환경에서 GPT 단계를 어떻게 건너뛰는지 정한다. 소비 문서(스킬 · 모듈)는 이 절을 가리킨다. 구현: `scripts/gpt-exec.sh`(사전 게이트 · `cli-check`) · `scripts/gpt_independent.sh`(사전 게이트 · 감사) · `scripts/gpt-call.sh`(어댑터 exit 전달) · `scripts/gpt-choice.sh`(off 기록 · CLI 없음 판정). 회귀: `tests/fixtures/gpt/off` · `tests/fixtures/gpt/choice`.
+
+GPT 는 모드와 독립이다(`modules/mode-gate.md` § GPT 는 모드와 독립) — 켰으면 light · full 이 같은 GPT 단계를 갖고, 껐으면 두 모드 모두 아래대로 건너뛴다. GPT 를 쓰지 않는 사용자도 흐름이 끊기지 않아야 하고(2026-10-19 사용자 결정 D5), 끈 GPT 가 조용히 다시 켜지면 안 된다.
+
+### 언제 미사용인가
+
+| 사유 | 조건 | 판정 |
+|---|---|---|
+| 사용자 선택 | 세션 선택이 off — `get` stdout `model=off effort=off`(모델 질문에서 off · `set --model off`) | 래퍼 · 런처가 선택을 읽을 때 |
+| 플래그 | 호출에 `--model off` — 선택 파일을 읽지 않는다 | 래퍼 · 런처 · 정문(어댑터로 그대로 넘긴다) |
+| CLI 없음 | GPT CLI 가 PATH 에 없다(`gpt-exec.sh cli-check` exit 18) | 래퍼 · 런처 — `get` 은 선택이 없으면 묻지 않고 off 를 기록한다 |
+
+- 래퍼는 사용법 · 경로 게이트(10 · 11) **뒤**, 선택 판독 **앞**에서 플래그 off · CLI 없음을 본다 — 손상 선택 파일(11)이 off 를 가리지 않는다. 세션 선택 off 는 플래그가 한 필드만이어도 이긴다
+- 런처는 실제 GPT 홈 · 인증 · 입력 게이트(11 · 15)보다 **먼저** 본다 — GPT 를 쓰지 않는 사용자는 GPT 홈이 없을 수 있다
+- 호출 하나만 켜는 길은 off 세션에서 `--model` 과 `--effort` 를 **둘 다** 플래그로 주는 것뿐이다(선택을 읽지 않는다 — `GPT-CHOICE` 출처 flag). 사용자가 그 호출을 명시로 요청했을 때만 쓴다
+
+### 신호 — exit 18 · `GPT-OFF`
+
+정문 `gpt-call.sh` · 래퍼 `gpt-exec.sh` · 런처 `gpt_independent.sh` 모두 CLI 를 부르지 않고 **exit 18** 로 끝나며 stderr 에 `GPT-OFF: <사유> — …` 한 줄을 남긴다(`GPT-CHOICE` 줄은 없다).
+
+- ⛔ exit 18 은 측정 실패(10~17)가 아니다 — "이슈 0건" 도 아니고, 재시도 · 불능 분기 · 장기 불능 표기 대상도 아니다. **GPT 미사용**이다
+- 런처는 격리 폴더를 만들지 않고 감사 `<out-dir>/<arm>-<run-id>.audit.json` 에 `"exit": 18` · `"gptOff": "<사유>"` 를 남긴다 — `.contaminated` 도 측정 실패도 아니다. 같은 stem 의 옛 산출은 지운다
+- 호출 행(`gpt-calls.tsv`)은 남는다 — 12열 exit 가 18 이다(행 = 호출 1:1)
+
+### 소비자 규칙 (light · full 같음)
+
+1. GPT 단계(정문 호출 · 독립 런처 · sprint contract · availability-probe)가 exit 18 이면 그 단계를 건너뛰고 흐름을 잇는다. 세션 선택이 off 인 것을 이미 알면(`get` → `model=off`) 부르지 않고 건너뛰어도 된다 — 18 은 불렀을 때의 안전망이다
+2. 산출물(보고서 · 리뷰 표 · `verify-result.md` · Gate 표시) 그 단계 자리에 `[GPT 미사용 — 사용자 선택]` 또는 `[GPT 미사용 — CLI 없음]` 을 남긴다 — 사유는 `GPT-OFF:` 줄이다. 사유 `플래그` 는 off 저장 실패의 우회이므로 `사용자 선택` 으로 적는다
+3. 대체 검증을 더하지 않는다 — **표기만**이다(2026-10-19 사용자 결정 · Gate 2). GPT 를 끈 것은 사용자이므로 fresh-context Claude 검증 같은 숨은 비용을 붙이지 않는다
+4. 병합(`scripts/review_merge.py`)은 `--gpt` 대신 `--gpt-unavailable "GPT 미사용 — <사유>"` 로 부른다. exit 18 감사를 `--gpt` 로 넘기면 병합이 exit 1 로 거부한다
+5. Reflection Rate 는 N/A 다 — GPT 이슈 0건이 아니라 GPT 부재다. 기준 미달로 읽지 않는다
+6. `--gpt-independent` · Sprint Contract(kind `sprint-contract`)는 건너뛴다 — 각각 `[GPT 미사용 — 사유]`
+
+### fz-plan 원장 (verify-gates 없음)
+
+- 대화형: Phase 2 의 `verify-gates` 를 부르지 않는다. 게이트 원장 판정을 **Gate 2 질문에 합쳐** "게이트 판정: GPT 미사용 — 사용자 확인" 으로 묻고, 답을 `{WORK_DIR}/plan/verify-result.md` 에 기록한 뒤 승인되면 `gate_check.py --finalize` 로 확정한다
+- 비대화형(질문 도구 없음 · 자율): draft 원장(`gates/plan.draft.md`)을 확정하지 않고 남긴 채 결과에 "원장 미확정 — GPT 미사용 · 사용자 확인 필요" 를 보고한다
+
+### off 저장 실패 — `--model off`
+
+`set --model off` 가 exit 11(세션 id 없음 · 저장 위치 · 쓰기 실패)이면 이 세션의 **모든 GPT 호출에 `--model off`** 를 붙이고 알린다. 래퍼 · 런처는 플래그 `--model off` 만으로 선택 파일을 읽지 않고 18 로 끝난다. ⛔ § 모델·effort 선택의 config 우회(`--model config --effort config`)로 가지 않는다 — 그 우회는 GPT 를 켠다. config 우회는 사용자가 GPT 를 고른 세션에서만 쓴다.
+
+### 켰는데 실패 — 기존 경로
+
+GPT 를 켠 세션의 실행 실패(10~17 · quota · 네트워크 · `GPT-IDLE`)는 바뀌지 않는다 — 호출부의 GPT 실패 규칙 · § 장기 불능 인지를 따른다. off 와 섞지 않는다 — 실패는 실패로, 미사용은 미사용으로 표기한다.
 
 ## Diff 크기 적응 전략
 

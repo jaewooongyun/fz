@@ -8,7 +8,7 @@
 //   archConstraints = { architecturePattern, uiStack, dependencyDirection, naming, conflicts } — typed 아키텍처 객체.
 //     축은 미확정 시 null. 소스 간 모순 축도 null + conflicts[]에 보존(자동 승자 선정 안 함 — 런타임 식별 불가).
 //     CTX에 포함되어 Stage 0/1/2/4에 상속되고, CTX를 쓰지 않는 Stage 3·5에는 ARCH_CTX로 직접 전달된다.
-//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
+//   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', plan: PlanSchema, directionVerdict, directionAlternatives, metrics }
 //     | { mode:'direction_escalation', verdict, alternatives, rebuttal, metrics } → Lead가 사용자 확인 (대화는 Workflow 밖)
 //     | { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
@@ -202,6 +202,13 @@ if (!input || !input.requirement || !input.codeContextPath) {
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: metrics(0) }
 }
+// effort = Lead 세션 effort(args.effort — modules/mode-gate.md § effort). 미지정이면 'xhigh'(기준선 불변), 허용값 밖이면 fallback
+const EFFORT = input.effort === undefined ? 'xhigh' : input.effort
+if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
+  log(`FATAL args invalid — effort=${JSON.stringify(input.effort)}: low · medium · high · xhigh · max. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: metrics(0) }
+}
 
 // archConstraints = typed 아키텍처 객체(4축 + conflicts). constraintsKnown(배열형 일반 제약)과 타입·책임 분리.
 // 미전달 시 ARCH_CTX === '' → 프롬프트 무변화 (빈 값 렌더 안 함).
@@ -221,7 +228,7 @@ phase('Stage 0: 방향성 도전')
 let direction = await callAgent(
   `${OVERRIDE}\n[역할] 방향성 도전자(review-direction 렌즈) — 6관점: Structural Fit / Alternative Paths(2개+) / Extensibility / Reuse-First / Maintenance / Over-Engineering\n${CTX}\n` +
   `[목표] 접근 방향을 비판적으로 판정 (PROCEED/RECONSIDER/REDIRECT) + 대안 2개 이상 + 우려 사항. 근거 인용.`,
-  { label: 'stage0-direction', agentType: 'fz:review-direction', model: 'fable', effort: 'xhigh', schema: DirectionSchema }) // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
+  { label: 'stage0-direction', agentType: 'fz:review-direction', model: 'fable', effort: EFFORT, schema: DirectionSchema }) // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
 if (!direction) { fallbackCount += 1; return { mode: 'fallback', reason: 'direction null', metrics: metrics(0) } }
 
 if (direction.verdict !== 'PROCEED') {
@@ -230,11 +237,11 @@ if (direction.verdict !== 'PROCEED') {
   const rebuttal = await callAgent(
     `${OVERRIDE}\n[역할] 설계자(plan-structure 렌즈) — 방향 반박\n${CTX}\n[방향 판정] ${JSON.stringify(direction)}\n` +
     `[목표] 현재 방향의 근거로 반박하거나, 대안 수용 사유를 명시. 추가 제약 발견 시 포함.`,
-    { label: 'stage0-rebuttal', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: RebuttalSchema })
+    { label: 'stage0-rebuttal', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: RebuttalSchema })
   const finalDirection = rebuttal ? await callAgent(
     `${OVERRIDE}\n[역할] 방향성 도전자 — 최종 판정\n${CTX}\n[1차 판정] ${JSON.stringify(direction)}\n[설계자 반박] ${JSON.stringify(rebuttal)}\n` +
     `[목표] 반박을 평가해 최종 판정. 반박이 타당하면 PROCEED 전환 가능.`,
-    { label: 'stage0-final', agentType: 'fz:review-direction', model: 'fable', effort: 'xhigh', schema: DirectionSchema }) : null // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
+    { label: 'stage0-final', agentType: 'fz:review-direction', model: 'fable', effort: EFFORT, schema: DirectionSchema }) : null // §5.8 ⑤ 측정: 판단 지점 → fable, model explicit(생략 시 sonnet 강등)
   if (finalDirection) direction = finalDirection
   if (direction.verdict !== 'PROCEED') {
     log(`direction 최종 ${direction.verdict} — 사용자 에스컬레이션 반환`)
@@ -248,7 +255,7 @@ const draft = await callAgent(
   `${OVERRIDE}\n[역할] 설계자(plan-structure 렌즈) — 구조 분해 + Step 순서\n${CTX}\n[방향 판정·우려] ${JSON.stringify({ concerns: direction.concerns, alternatives: direction.alternatives })}\n` +
   `[목표] 구현 계획 초안: Step 분해(id/title/files/approach) + readScope(탐색 범위) + 가정 목록.\n` +
   `⛔ 출력 형식: StructuredOutput 인자는 **유효한 JSON** 이어야 한다 — 문자열 값 안의 백슬래시·따옴표를 손으로 이스케이프하지 말 것(실측: 20k 출력이 파싱 거부돼 전량 재출력됐다). 코드·명령은 백틱 없는 평문으로 쓴다.`,
-  { label: 'stage1-draft', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: DraftSchema })
+  { label: 'stage1-draft', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: DraftSchema })
 if (!draft) { fallbackCount += 1; return { mode: 'fallback', reason: 'draft null', metrics: metrics(1) } }
 
 // ════════ Stage 2: 병렬 3렌즈 (opus — 동시 3 [verified: §5.7 #4 deep lens 3 동시]) ════════
@@ -259,15 +266,15 @@ const [impact, edge, arch] = await parallelWithRetry([
     `${OVERRIDE}\n[역할] 영향 범위 분석가(plan-impact 렌즈) — Exhaustive Impact Scan a-f\n` +
     `(참조 허용: {플러그인 루트}/modules/plan-deep-planning.md — Scan 절차 정의)\n${DRAFT_CTX}\n` +
     `[목표] 텍스트 전수 검색 + 소비자 + dead code + 숨은 의존성. 각 항목 evidence 인용.`,
-    { label: 'stage2-impact', agentType: 'fz:plan-impact', model: 'opus', effort: 'xhigh', schema: ImpactSchema }),
+    { label: 'stage2-impact', agentType: 'fz:plan-impact', model: 'opus', effort: EFFORT, schema: ImpactSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 경계 케이스 발굴자(plan-edge-case 렌즈)\n${DRAFT_CTX}\n` +
     `[목표] 경계 케이스 + 실패 시나리오 (id는 E1, E2...) + 영향 Step 매핑.`,
-    { label: 'stage2-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: 'xhigh', schema: EdgeSchema }),
+    { label: 'stage2-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: EFFORT, schema: EdgeSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 아키텍처 검증자(review-arch 렌즈)\n${DRAFT_CTX}\n` +
     `[목표] 패턴 선택지 검증(A vs B + 추천 + 근거) + 기존 규약 위반 식별.`,
-    { label: 'stage2-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ArchSchema }),
+    { label: 'stage2-arch', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: ArchSchema }),
 ])
 if (!impact && !edge && !arch) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage2 all null', metrics: metrics(1) } }
 if (!impact || !edge || !arch) log('WARN stage2 부분 null — 해당 렌즈 결손 상태로 진행')
@@ -284,11 +291,11 @@ if (impact && edge) {
     () => callAgent(
       `${OVERRIDE}\n[역할] 영향 범위 분석가 — CC 교차\n[경계 케이스] ${JSON.stringify(edge.edgeCases)}\n[기존 영향 범위] ${JSON.stringify(impact.impactFiles)}${ARCH_CTX}\n` +
       `[목표] 각 경계 케이스가 영향 범위 내 어느 파일에서 발생하는지 연쇄 발견 (links: sourceId=E:id) + 영향 범위 추가분.`,
-      { label: 'stage3-impact-on-edge', agentType: 'fz:plan-impact', model: 'opus', effort: 'xhigh', schema: CrossSchema }),
+      { label: 'stage3-impact-on-edge', agentType: 'fz:plan-impact', model: 'opus', effort: EFFORT, schema: CrossSchema }),
     () => callAgent(
       `${OVERRIDE}\n[역할] 경계 케이스 발굴자 — CC 교차 (입력 기반 — 제공된 영향 범위 데이터와 아키텍처 제약에서만 추론; 코드 컨텍스트 Read·독립 탐색 금지)\n[영향 범위] ${JSON.stringify(impact.impactFiles)}\n[숨은 의존성] ${JSON.stringify(impact.hiddenDependencies)}\n[기존 케이스] ${JSON.stringify(edge.edgeCases)}${ARCH_CTX}\n` +
       `[목표] 영향 범위에서 파생되는 추가 경계 케이스 (additions — 기존 미포함만).`,
-      { label: 'stage3-edge-on-impact', agentType: 'fz:plan-edge-case', model: 'opus', effort: 'xhigh', schema: CrossSchema }),
+      { label: 'stage3-edge-on-impact', agentType: 'fz:plan-edge-case', model: 'opus', effort: EFFORT, schema: CrossSchema }),
   ])
   impactOnEdge = cc[0]
   edgeOnImpact = cc[1]
@@ -353,7 +360,7 @@ const plan = await callAgent(
   `   ⛔ expect 는 **모든 단언이 통과한 뒤에만** 나오는 성공 토큰이어야 한다 (\`cmd; echo ok\` 는 cmd 실패해도 ok 가 찍힌다 — \`&&\` 를 쓸 것). 정규식 아닌 부분 문자열.\n` +
   `   ⛔ 판정 불가한 것을 억지로 command 로 만들지 말 것 — manual 이 정직하다.\n` +
   `5. 리스크 매트릭스 + openQuestions(사용자 결정 필요만).`,
-  { label: 'stage4-integrate', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: PlanSchema })
+  { label: 'stage4-integrate', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: PlanSchema })
 if (!plan) { fallbackCount += 1; return { mode: 'fallback', reason: 'integrate null', metrics: metrics(3) } }
 
 // ════════ Stage 5: 재검증 (collaborative Round 2 — 잔여는 반환, 수정 루프는 Lead 층) ════════
@@ -361,7 +368,7 @@ phase('Stage 5: 아키 재검증')
 const recheck = await callAgent(
   `${OVERRIDE}\n[역할] 아키텍처 검증자 — 재검증\n[1차 검증 결과] ${JSON.stringify(arch)}\n[최종 계획] ${JSON.stringify(plan)}${ARCH_CTX}\n` +
   `[목표] 1차 피드백 반영 여부 + 잔여 이슈. [아키텍처 제약]이 있으면 그것이 프로젝트 준수 재검증의 직접 근거다. 각 잔여에 archVerdict(must-fix/optional/disagree) 마커 — 합의/불합의 명시.`,
-  { label: 'stage5-recheck', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: RecheckSchema })
+  { label: 'stage5-recheck', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: RecheckSchema })
 if (!recheck) log('WARN stage5 null — 재검증 미수행 (unresolvedPeerIssues 빈 채 반환)')
 
 const s1 = !!draft

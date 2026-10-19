@@ -29,7 +29,7 @@
 2. **Background 스폰**: review에서 fz TEAM과 병렬로 background 실행
 3. **결과 통합**: Lead가 L3 결과 수신 → Issue Tracker에 merge (fz 이슈와 동일 형식)
 4. **조건부 스폰**: 아래 조건 충족 시에만 스폰
-5. **모델·effort 명시**: L3 및 직접 Agent 스폰도 model 명시 의무 — 실질 분석·생산 관점은 `opus`, retrieval·breadth 성격은 `sonnet`, **effort 명시 필수** (미지정 시 부모 세션 모델·effort 상속). 값 선택: Opus 5.5 공식 기본은 `medium`(Opus 5 는 `high`), 탐색·retrieval 성격은 `low`/`medium`, demanding coding/agentic만 `xhigh` — ⛔ 이전 모델 값 재사용 말고 sweep 후 결정 [verified: platform.claude.com/docs/en/build-with-claude/effort]. 미측정 상태의 기본값은 현행(`xhigh`) 유지. Lead(Fable 5.1) 공식 출발점은 `high` · 워커 Opus 5.5 공식 기본은 `medium`(Opus 5 는 `high`) [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] — effort 이름이 모델마다 같은 사고량을 뜻하지 않으므로 승격 시 별도 sweep [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1].
+5. **모델·effort 명시**: L3 및 직접 Agent 스폰도 model 명시 의무 — 실질 분석·생산 관점은 `opus`, retrieval·breadth 성격은 `sonnet`, **effort 명시 필수** (미지정 시 부모 세션 모델·effort 상속). Workflow 워커는 Lead 세션 effort 를 args 로 명시 전달한다(2026-10-19 — `modules/mode-gate.md` § effort). 값 선택: Opus 5.5 공식 기본은 `medium`(Opus 5 는 `high`), 탐색·retrieval 성격은 `low`/`medium`, demanding coding/agentic만 `xhigh` — ⛔ 이전 모델 값 재사용 말고 sweep 후 결정 [verified: platform.claude.com/docs/en/build-with-claude/effort]. 미측정 상태의 기본값은 현행(`xhigh`) 유지. Lead(Fable 5.1) 공식 출발점은 `high` · 워커 Opus 5.5 공식 기본은 `medium`(Opus 5 는 `high`) [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] — effort 이름이 모델마다 같은 사고량을 뜻하지 않으므로 승격 시 별도 sweep [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1].
 
 ### 스폰 조건
 

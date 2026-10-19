@@ -78,7 +78,7 @@
 | Given | When | Then |
 |-------|------|------|
 | Git diff 존재 | `/fz-gpt review` | `scripts/gpt-call.sh review --base` 실행 + 이슈 보고 |
-| GPT CLI 미설치 | `/fz-gpt review` | 에러 감지 + sc:analyze 폴백 |
+| GPT CLI 미설치 | `/fz-gpt review` | 정문 exit 18 `GPT-OFF` 감지 + `[GPT 미사용 — CLI 없음]` 표기 — 대체 검증 없음 |
 | Critical 이슈 발견 | `/fz-gpt final` | DA 패스 자동 실행 |
 | 3-Tier 스킬 부재 | `/fz-gpt verify` | Tier 3 인라인 프롬프트로 폴백 |
 
@@ -247,8 +247,8 @@ test-spec:
 
     - given: "GPT CLI 미설치"
       when: "/fz-gpt review"
-      then: "에러 메시지 + sc:analyze 폴백"
-      type: failure
+      then: "정문 exit 18 GPT-OFF 감지 + [GPT 미사용 — CLI 없음] 표기 (대체 검증 없음)"
+      type: edge-case
 
     - given: "3-Tier 디스커버리에서 Tier 1 부재"
       when: "/fz-gpt verify"
@@ -415,16 +415,16 @@ A/B 비교 시 `/skill-creator`의 제안을 B 버전으로 테스트하면 효�
 
 **발동 조건**: 새 모델 전환 시. Opus 5 공식이 요구한다 — *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* [verified: platform.claude.com/docs/en/build-with-claude/effort]. 채점·집계·오염 탐지는 §8 계약을 그대로 상속하고, **arm 설정 방법만** 아래로 대체한다. (Opus 5.5 도 같은 요구 — "Re-run your effort sweep rather than carrying a setting over" [verified: whats-new-opus-5-5])
 
-**⛔ arm은 세션 레벨로 설정한다 — `workflows/*.js`의 per-call `opts.effort`를 수정하지 말 것**
+**⛔ arm은 세션 레벨로 설정한다 — `workflows/*.js`의 per-call `opts.effort`를 수정하지 말 것** (sweep arm 설정용 규칙이다. 2026-10-19 부터 워크플로는 per-call `opts.effort` 에 Lead 세션 effort 를 싣는다 — 세션 arm 을 바꾸면 워커도 따라간다 · `modules/mode-gate.md` § effort)
 
 | 레이어 | 우선순위 | 근거 |
 |---|---|---|
 | `CLAUDE_CODE_EFFORT_LEVEL` env var | **최상위** | *"The environment variable takes precedence over all other methods"* [verified: code.claude.com/docs/en/model-config] |
 | skill/subagent frontmatter `effort` | 세션 위 | *"Frontmatter effort … overriding the session level but not the environment variable"* [verified: 동] |
-| Workflow `agent()` per-call `opts.effort` | **`[미검증]`** | 공식이 per-invocation **`model`** 파라미터는 실재 레이어로 명시하나(`CLAUDE_CODE_SUBAGENT_MODEL`이 "overrides the per-invocation `model` parameter"), **effort는 동일 서술이 없다** |
+| Workflow `agent()` per-call `opts.effort` | **세션 위** (실측 1회 · env · frontmatter 대비는 미측정) | 공식이 per-invocation **`model`** 파라미터는 실재 레이어로 명시하나(`CLAUDE_CODE_SUBAGENT_MODEL`이 "overrides the per-invocation `model` parameter"), **effort는 동일 서술이 없다**. 2026-10-19 실측: Lead 세션 `xhigh` 에서 `opts.effort: 'high'` 로 부른 code-pair 워커(Opus 5.5)의 transcript `effort` 6/6 = `high` — per-call 값이 세션 값을 이긴다 |
 | `settings.json` `effortLevel` (세션) | 기본 | *"a starting default, not enforcement"* [verified: 동] |
 
-> **이유**: per-call `opts.effort`의 지위가 미확정이므로, 그것으로 arm을 가르면 **arm이 실제로 갈렸는지 알 수 없다**. 미검증 메커니즘 위에 측정을 세우지 않는다. 현행 fz는 `.js` 36곳과 `settings.json:464/467`이 **모두 `xhigh`** 라 어느 쪽이 이기든 결과가 같아 이 모호성이 드러나지 않았다. ⚠️ 2026-09-06 정정: 줄번호 `:409`는 stale — 실측 `:464`(`effortLevel`)·`:467`(중첩 키).
+> **이유**: per-call `opts.effort`의 지위가 미확정이므로, 그것으로 arm을 가르면 **arm이 실제로 갈렸는지 알 수 없다**. 미검증 메커니즘 위에 측정을 세우지 않는다. 현행 fz는 `.js` 45곳(2026-10-19 부터 Lead 세션 effort 전달)과 `settings.json:464/467`이 **모두 `xhigh`** 라 어느 쪽이 이기든 결과가 같아 이 모호성이 드러나지 않았다. ⚠️ 2026-09-06 정정: 줄번호 `:409`는 stale — 실측 `:464`(`effortLevel`)·`:467`(중첩 키).
 
 **⛔ arm 적용 검증 (필수 — 매 run)**: Claude Code는 트랜스크립트 최상위에 `effort` 필드를 기록한다(v2.1.212+). run 직후 확인해 **의도한 arm이 실제 적용됐는지** 대조한다. 불일치 pair는 §8 오염 규칙에 따라 `invalid`로 **제외**.
 
@@ -469,7 +469,7 @@ PY
 
 **대상 스킬 우선순위**: `measure_constraint_load.py` 의 **floor 큰 순** — `fz`(31,259) · `fz-review`(29,264) · `fz-code`(26,837). floor가 큰 스킬일수록 effort 변화의 절대 효과가 크다.
 
-⛔ **sweep 결과로 곧바로 `.js`를 고치지 말 것**: arm이 세션 레벨이었으므로 결론도 세션/frontmatter 레벨에 적용한다. per-call 배선 변경은 위 `[미검증]` 해소가 **선행**이다.
+⛔ **sweep 결과로 곧바로 `.js`를 고치지 말 것**: arm이 세션 레벨이었으므로 결론도 세션/frontmatter 레벨에 적용한다. per-call 배선 변경은 위 `[미검증]` 해소가 **선행**이다. (2026-10-19 Lead effort 전달은 값을 바꾸지 않는 배선이다 — per-call 실효는 실행 스모크에서 워커 transcript effort 로 확인한다)
 
 ### 8.2 계측 데이터와 짝 맞추기
 

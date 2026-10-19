@@ -157,6 +157,12 @@ if (!input || !input.requirement || !input.codeContextPath) {
   log(`FATAL args invalid (typeof=${typeof args}) — requirement/codeContextPath 필수`)
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: { agentCalls: 0, nullCount: 0, fallbackCount: 1, stagesCompleted: 0 } }
 }
+// effort = Lead 세션 effort(args.effort — modules/mode-gate.md § effort). 미지정이면 'xhigh'(기준선 불변), 허용값 밖이면 fallback
+const EFFORT = input.effort === undefined ? 'xhigh' : input.effort
+if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
+  log(`FATAL args invalid — effort=${JSON.stringify(input.effort)}: low · medium · high · xhigh · max. fallback`)
+  return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: { agentCalls: 0, nullCount: 0, fallbackCount: 1, stagesCompleted: 0 } }
+}
 
 const AC = input.archConstraints || null
 const ARCH_CTX = AC ? `\n[아키텍처 제약] ${JSON.stringify({
@@ -185,14 +191,14 @@ const [full, edge, impactArch] = await parallel([
     `   ⛔ 경로를 하드코딩하지 말 것 — 구현 트리 루트를 파라미터로 받아 쓴다(다른 트리에서 실행 불가가 되면 게이트가 죽는다).\n` +
     `7. ⛔ **회귀 축(기존 동작 보존)은 변경이 공유하는 코드 경로를 전부 훑는다** — 같은 인식기·같은 정책·같은 진입점을 쓰는 **다른 기능**이 무엇인지 찾아 검증 셀에 넣는다. 요구에 적힌 것만 보지 말 것.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 **유효한 JSON** — 문자열 값 안의 백슬래시·따옴표를 손으로 이스케이프하지 말 것.`,
-    { label: 'lean2-full', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: FullSchema }),
+    { label: 'lean2-full', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: FullSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 경계 케이스 적대자 — 이 접근이 **어디서 깨지는가**만 판다. 계획을 쓰지 않는다.\n${CTX}\n` +
     `[목표] 경계 케이스와 실패 시나리오. ⛔ 일반론 금지 — 각 항목이 **어느 파일·심볼·줄에서** 깨지는지 코드로 특정한다.\n` +
     `필수 축: 좌표계·공간 정렬 · 상태 최신성(등록/해제 누락) · 회전·기기별 차이 · 대상이 트리에서 빠진 뒤 · 가시성과 조작 가능성의 불일치 · 타이밍(시작 임계) · 애니메이션 진행 중의 중간 상태 · 기존 소비자와의 상호작용.\n` +
     `⛔ **선존 결함**을 만나면 latentDefects 로 분리한다 — 이번 변경의 회귀로 오귀속되면 검증이 틀린 결론을 낸다.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.`,
-    { label: 'lean2-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: 'xhigh', schema: EdgeSchema }),
+    { label: 'lean2-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: EFFORT, schema: EdgeSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 영향 범위 + 아키텍처 검증자 — **이 변경이 어디까지 퍼지는가**와 **기존 패턴과 맞는가**를 함께 본다. 계획을 쓰지 않는다.\n${CTX}\n` +
     `[목표]\n` +
@@ -205,7 +211,7 @@ const [full, edge, impactArch] = await parallel([
     `7. ⛔ **originBodyRequests** — 네가 직접 못 얻은 것을 여기에 적는다. 너는 Bash 가 없어 base 원본 본문·이전 호출자 수를 못 본다. **추측으로 채우지 말고 요청으로 남긴다** — Lead 가 resolve 한다.\n` +
     `8. violations — 기존 규약 위반.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.`,
-    { label: 'lean2-impact-arch', agentType: 'fz:plan-impact', model: 'opus', effort: 'xhigh', schema: ImpactArchSchema }),
+    { label: 'lean2-impact-arch', agentType: 'fz:plan-impact', model: 'opus', effort: EFFORT, schema: ImpactArchSchema }),
 ])
 
 if (!full) {
@@ -249,7 +255,7 @@ if ((edge || impactArch) && !mergeSkipped) {
     `⛔ 이미 계획에 있는 내용을 다시 적지 말 것 — 델타가 아니면 값이 0이다.\n` +
     `⛔ 이 콜에는 탐색 도구가 없다 — 위 코드 컨텍스트 파일도 읽지 않는다. 입력 JSON 만으로 접고, 근거가 입력에 없어 접을 수 없으면 unresolved 에 적는다.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.`,
-    { label: 'lean2-merge', agentType: 'fz:plan-merge', model: 'opus', effort: 'xhigh', schema: MergeSchema })
+    { label: 'lean2-merge', agentType: 'fz:plan-merge', model: 'opus', effort: EFFORT, schema: MergeSchema })
 }
 
 // ⛔ 완주 계산 (A3-01): Stage 1 은 세 팔(full·edge·impactArch)이 **모두** 있을 때만 완주다.

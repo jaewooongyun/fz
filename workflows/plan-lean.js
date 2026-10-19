@@ -136,6 +136,12 @@ if (!input || !input.requirement || !input.codeContextPath) {
   log(`FATAL args invalid (typeof=${typeof args}) — requirement/codeContextPath 필수`)
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: { agentCalls: 0, nullCount: 0, fallbackCount: 1, stagesCompleted: 0 } }
 }
+// effort = Lead 세션 effort(args.effort — modules/mode-gate.md § effort). 미지정이면 'xhigh'(기준선 불변), 허용값 밖이면 fallback
+const EFFORT = input.effort === undefined ? 'xhigh' : input.effort
+if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
+  log(`FATAL args invalid — effort=${JSON.stringify(input.effort)}: low · medium · high · xhigh · max. fallback`)
+  return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: { agentCalls: 0, nullCount: 0, fallbackCount: 1, stagesCompleted: 0 } }
+}
 
 const AC = input.archConstraints || null
 const ARCH_CTX = AC ? `\n[아키텍처 제약] ${JSON.stringify({
@@ -161,7 +167,7 @@ const [full, edge] = await parallel([
     `   ⛔ command 는 제목이 말하는 것을 **실제로 측정**해야 한다. \`echo ok\` 류 금지. expect 는 모든 단언 통과 후에만 나오는 성공 토큰(\`&&\` 사용).\n` +
     `   ⛔ **현재 트리 상태에서 이미 통과하는 command 는 델타를 재지 못한다** — 변경 전에는 FAIL 하고 변경 후에만 PASS 해야 한다. 그럴 수 없으면 manual 이 정직하다.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 **유효한 JSON** — 문자열 값 안의 백슬래시·따옴표를 손으로 이스케이프하지 말 것.`,
-    { label: 'lean-full', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: FullSchema }),
+    { label: 'lean-full', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: FullSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 경계 케이스 적대자 — 이 접근이 **어디서 깨지는가**만 판다. 계획을 쓰지 않는다.\n${CTX}\n` +
     `[목표] 경계 케이스와 실패 시나리오. ⛔ 일반론 금지 — 각 항목이 **어느 파일·심볼·줄에서** 깨지는지 코드로 특정한다.\n` +
@@ -169,7 +175,7 @@ const [full, edge] = await parallel([
     `⛔ **영향 범위 축도 스스로 훑는다** — 경계를 판 자리의 소비자·형제 구현·숨은 의존성을 impactNotes 로 남긴다(별도 렌즈가 없다).\n` +
     `⛔ **선존 결함**을 만나면 latentDefects 로 분리한다 — 이번 변경의 회귀로 오귀속되면 기기 검증이 틀린 결론을 낸다.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON — 이스케이프를 손으로 하지 말 것.`,
-    { label: 'lean-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: 'xhigh', schema: EdgeSchema }),
+    { label: 'lean-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: EFFORT, schema: EdgeSchema }),
 ])
 
 if (!full) {
@@ -194,7 +200,7 @@ if (edge) {
     `4. unresolved — 계획에 접을 수 없어 사용자 판단이 필요한 것.\n` +
     `⛔ 이미 계획에 있는 내용을 다시 적지 말 것 — 델타가 아니면 값이 0이다.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.`,
-    { label: 'lean-merge', agentType: 'fz:plan-structure', model: 'opus', effort: 'xhigh', schema: MergeSchema })
+    { label: 'lean-merge', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: MergeSchema })
 }
 
 const stagesCompleted = (full ? 1 : 0) + (merge ? 1 : 0)

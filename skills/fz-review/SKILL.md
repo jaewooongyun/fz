@@ -4,7 +4,7 @@ description: >-
   자기 코드 3중 검증(Claude+GPT+sc:analyze) + 역방향 검증.
   예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR →fz-peer-review, 직접 수정 →fz-fix)
 user-invocable: true
-argument-hint: "[리뷰 대상 설명] [light] [--render] [--gpt-independent]"
+argument-hint: "[리뷰 대상 설명] [light|full] [--render] [--gpt-independent]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__codegraph__codegraph_explore,
@@ -97,8 +97,9 @@ metadata:
 
 > ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 · 2)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 참조 무결성 확인 · L3 에이전트)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 첫 패스(2.5)는 백그라운드 한 줄이라 그대로 직전에 둔다(S22). 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
 1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12)
+1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 결과로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 5 Lead 3중 검증으로 간다(아래 light 모드) · **full** 이면 이어간다
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
-2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용)
+2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {diff.patch} --deny {WORK_DIR} [--rules-index {원문 색인}] …` — 켜면 Workflow args 에 `locatedFindings: true` 를 함께 준다(위치 필드가 없는 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다). ⛔ 규칙 레코드(`projectRulesPath`)는 런처에 넘기지 않는다(exit 11). 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js && cmp -s {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. 복사본은 2.8 준비가 매 호출 만든다(fz-plan 절차 2.5 와 같은 규칙)
@@ -212,6 +213,7 @@ mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분�
 /fz-gpt review "코드 리뷰"
 ```
 > ⊕ `--gpt-independent` 면 이 검증을 실행 절차 2.5 · 4.5 가 대신한다 — GPT 가 Claude 산출을 보기 전에 따로 리뷰한 결과를 `review_merge.py` 가 합친다
+> ⊘ GPT 를 끈 세션(정문 exit 18 `GPT-OFF` — 사용자 선택 · CLI 없음)이면 light · full 모두 이 검증을 `[GPT 미사용 — 사유]` 표기로 대신한다 — 실행 실패(아래 불능 분기)와 다르다 · 정본 `modules/gpt-strategy.md` § GPT 미사용
 
 fz-gpt가 수행하는 작업:
 - GPT CLI에 변경 심볼 + diff 전송
@@ -464,7 +466,7 @@ Gate 5 통과 후:
 | Given | When | Then | type |
 |-------|------|------|------|
 | 구현된 코드 diff 존재 + GPT CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-gpt review` + `/sc:sc-analyze`) 모두 실행(GPT 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
-| "그냥/가볍게" 신호 + 소규모 변경(5파일 미만 & 100 LOC 미만, 리팩토링/시그니처 변경 아님) | `/fz-review light "그냥 가볍게 봐줘"` | review-arch 단독 실행 + GPT 교차검증/Phase 5.5 역방향/Reflection Rate 추적 생략 + `review-light.md` 산출; 단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 적용(light에서도 생략 불가) | edge-case |
+| 모드 게이트에서 light 선택(또는 `light` 인자 · 신호어) | `/fz-review light "가볍게 봐줘"` | review-live 미기동 + Phase 5 Lead 3중 검증(`/fz-gpt review` 포함 — 끈 세션이면 `[GPT 미사용]`) + Phase 5.5 · Reflection Rate 그대로; 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 적용(light에서도 생략 불가) | edge-case |
 | 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴 없음 + 브랜치명 없음 | `/fz-review "내 코드 봐줘"` | Phase 0에서 저장 여부 AskUserQuestion 발생 → '예' 시 `NOTASK-{YYYYMMDD}/` + index.md 생성 / '아니오' 시 Serena fallback → WORK_DIR 결정 → Gate 0(Work Dir Ready) 3개 항목 통과 | edge-case |
 | 코드 diff 존재 + 검증 2에서 fz-gpt 통신 실패 | `/fz-review "리뷰해줘"` | 재시도 1회 후 fresh-context Agent(review-correctness 관점)로 검증 2 대체 + 인용 태그 `[fresh-context: claude]` + 이종 안전망 상실 명시 (Agent 미가용 시 `/sc:sc-analyze` 폴백); 검증 2 미생략 상태로 Gate 4 진행 | failure |
 
@@ -473,17 +475,12 @@ Gate 5 통과 후:
 **Will**: 3중 검증(Claude+GPT+sc:analyze), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리
 **Will Not**: 대규모 구현 (→ /fz-code), GPT 직접 호출 (→ /fz-gpt), 계획 수립 (→ /fz-plan)
 
-### light 모드 (40차 simplified mode)
+### light 모드 (모드 게이트 — `modules/mode-gate.md`)
 
-사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-review light "..."` 호출 시:
-- review-arch 단독 (review-quality 생략) — 아키텍처 적합성만 평가. ⛔ **구조 축은 Lead가 직접 적용** — light는 Workflow 미호출이라 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
-- GPT 교차 검증 생략 (3중 → 1중)
-- 역방향 검증 (Phase 5.5) 생략
-- Reflection Rate 추적 생략
+진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+- review-live 를 띄우지 않고 Phase 5 Lead 3중 검증 · Phase 5.5 역방향 검증 · Reflection Rate 를 그대로 한다 — GPT 단계는 full 과 같다(끈 세션이면 `[GPT 미사용]`) · 산출물도 full 과 같다
+- ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
-- 산출물: `{WORK_DIR}/review/review-light.md` (간소화)
-
-조건: 메모리 40차 trigger 키워드 + 소규모 변경(5 파일 미만 + 100 LOC 미만)에만. 리팩토링/모듈화/시그니처 변경 시 full 모드 강제.
 
 ## 에러 대응
 

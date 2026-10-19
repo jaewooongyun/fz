@@ -42,9 +42,10 @@ def one(t, a, b):
 
 def downgrade(t):
     lines = t.split("\n")
-    idx = [i for i, l in enumerate(lines) if "label:" in l and "agentType:" in l and "effort: 'xhigh'" in l]
-    assert idx, "effort 를 낮출 호출 줄이 없다"
-    lines[idx[0]] = lines[idx[0]].replace("effort: 'xhigh'", "effort: 'high'", 1)
+    # effort 는 식별자 EFFORT(Lead 세션 effort 전달)다 — 한 콜만 리터럴로 고정하면 기준선의 "EFFORT" 와 어긋난다
+    idx = [i for i, l in enumerate(lines) if "label:" in l and "agentType:" in l and "effort: EFFORT" in l]
+    assert idx, "effort 를 고정할 호출 줄이 없다"
+    lines[idx[0]] = lines[idx[0]].replace("effort: EFFORT", "effort: 'high'", 1)
     return "\n".join(lines)
 
 edit("workflows/search-cross-verify.js", lambda t: t + "\nconst plantedSyntax = (\n")                       # 문법

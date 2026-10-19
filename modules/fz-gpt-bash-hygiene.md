@@ -156,7 +156,7 @@ EOF
 > 경로 기준은 **플러그인 루트**다 — `scripts/resolve-plugin-root.sh` 로 해석한 `${FZ_PLUGIN_ROOT}` 를 앞에 붙인다. 스킬 base directory 기준으로 읽으면 `skills/fz-gpt/scripts/` 를 찾다가 파일 없음에서 막힌다.
 
 > ⛔ **호출자는 정문만 부른다** — `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" <kind> [입력…]`. 모드 · 역할 스킬 · schema · 고정 플래그는 레지스트리(`scripts/gpt-kinds.json`)가 정하고 `scripts/gpt_kinds.py` 가 푼다. 래퍼(`gpt-exec.sh`) · 런처(`gpt_independent.sh`)를 마크다운 레시피에서 직접 부르지 않는다 — `gpt_kinds.py lint --consumers` 가 bash 블록을 검사한다(등록 예외 E1~E8 은 레지스트리 `consumer_allow`).
-> 정문은 정책 플래그(`--schema` · `--inject-skill` · `--gpt-skill(-path)` · `--ephemeral` · `-c` · `-p` · `--profile` · `--ignore-user-config` · `--config-permissions`)를 10 으로 거부하고, 어댑터의 exit(10~17)를 다시 매기지 않고 넘긴다. 같은 `--out` 동시 호출은 정문 잠금이 10 으로 막는다.
+> 정문은 정책 플래그(`--schema` · `--inject-skill` · `--gpt-skill(-path)` · `--ephemeral` · `-c` · `-p` · `--profile` · `--ignore-user-config` · `--config-permissions`)를 10 으로 거부하고, 어댑터의 exit(10~17 · 18)를 다시 매기지 않고 넘긴다. 같은 `--out` 동시 호출은 정문 잠금이 10 으로 막는다. 18(stderr `GPT-OFF:`)은 측정 실패가 아니라 GPT 미사용이다 — `modules/gpt-strategy.md` § GPT 미사용.
 
 > §1~§7을 손으로 조립하지 않는다. `guides/skill-authoring.md` §11 판정("결과가 binary(pass/fail)인가? → 스크립트")이 본 모듈 전체에 적용된다 — hygiene 규칙은 전부 binary다.
 
@@ -244,6 +244,7 @@ AFTER="$(git -C "$CD" status --porcelain 2>/dev/null)"
 
 - 통과 시 `GATE-PASS json_ok issues=N verdict=V` (또는 `text_ok bytes=N`)를 **stdout에 출력**한다 — 호출자가 결과 유효성을 눈으로 확인할 수 있다
 - ⛔ **exit 10~14는 전부 측정 실패다** — "이슈 0건"·"승인"으로 해석 금지. 실패 시 `${OUT}.stream.log`를 Read
+- ⛔ **exit 18 은 측정 실패가 아니다** — GPT 미사용(세션 선택 off · `--model off` · GPT CLI 없음)이라 래퍼가 CLI 를 부르지 않았다. 사후 게이트까지 가지 않고 stderr 머리가 `GPT-OFF:` 다. 그 단계를 건너뛰고 `[GPT 미사용 — 사유]` 를 남긴다(정본 `modules/gpt-strategy.md` § GPT 미사용)
 - ⛔ `GPT-CALL-FAIL(10): 같은 --out 이 이미 실행 중이다(또는 이전 실행의 잠금이 남았다)` 인데 같은 `--out` 의 다른 실행이 없으면 앞선 정문이 trap 없이 끝난 것이다(SIGKILL 등) — 그 실행의 GPT CLI 프로세스가 남지 않았는지 확인한 뒤 메시지의 `<OUT>.lock` 폴더를 `rmdir` 한다
 - ⛔ 호출자는 스크립트 exit을 **마지막 문장으로 두거나 변수에 담아라** — 뒤에 `wc`/`echo`를 붙이면 그 exit이 덮는다 (본 절 신설을 유발한 실패)
 

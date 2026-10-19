@@ -18,7 +18,7 @@ allowed-tools: >-
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
-  Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow
 metadata:
   provides: [landscape-map, trade-off-table, open-questions]
   needs: [none]
@@ -97,12 +97,13 @@ metadata:
 
 ### 발동 조건
 
-기존 TEAM 발동 지점과 동일: 복잡도 4+ 또는 `--team`/`--deep` (아래 SOLO vs TEAM 판단표 준용). 사용자 대화형 탐색(Phase 2 ↔ 사용자)은 본 모드와 무관하게 SOLO가 담당 — Workflow는 **비대화 다라운드 탐색만** 대체한다.
+모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modules/complexity.md` — 아래 SOLO vs TEAM 판단표)로 추천을 달고 묻는다 — light = SOLO 탐색. 사용자 대화형 탐색(Phase 2 ↔ 사용자)은 본 모드와 무관하게 SOLO가 담당 — Workflow는 **비대화 다라운드 탐색만** 대체한다.
 
 ### 실행 절차 (Lead)
 
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/discover/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
-2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중)
+1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" discover --complexity {점수} --estimate discover-adversarial` 로 추천을 달고 묻는다. **light** 면 2~4 를 건너뛰고 SOLO 탐색으로 간다 · **full** 이면 이어간다
+2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다)
 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js && cmp -s {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - default: lean 5-call — 경로생성(opus) → 비용평가(sonnet) → R2 추가경로 → R2 비용 → 합성(opus). TEAM 2-agent 비용 동급대

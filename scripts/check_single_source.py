@@ -59,6 +59,26 @@ FACTS = [
         "reference_re": r"gpt_independent\.sh",
         "mention_re": r"--timeout",
     },
+    {
+        # light/full 추천 임계의 소유자는 모드 게이트 하나다 — 스킬·모듈은 숫자를 다시 쓰지 않고 스크립트를 가리킨다
+        "name": "모드 추천 임계 (mode_gate.py 상수)",
+        "canonical_file": "scripts/mode_gate.py",
+        "canonical_re": r"^REVIEW_LINES_FULL = \d+",
+        "consumer_globs": ["skills/*/SKILL.md", "skills/*/references/*.md", "modules/*.md", "guides/*.md"],
+        "declaration_re": r"\b(REVIEW_LINES_FULL|REVIEW_FILES_FULL|PEER_RISK_FULL|PLAN_FILES_FULL|PLAN_MODULES_FULL|CODE_COMPLEXITY_FULL|CODE_STEPS_FULL|FIX_FILES_FULL|DISCOVER_COMPLEXITY_FULL)\s*=",
+        "reference_re": r"mode_gate\.py",
+        "mention_re": r"추천 임계",
+    },
+    {
+        # 신호어(light 로 읽는 말) 목록의 소유자는 모드 게이트 모듈 하나다 — 스킬 light 절 · /fz · lead-action-default 는 가리키기만
+        "name": "모드 게이트 신호어 목록",
+        "canonical_file": "modules/mode-gate.md",
+        "canonical_re": r"^\*\*정본 목록\*\*: 그냥",
+        "consumer_globs": ["skills/*/SKILL.md", "modules/*.md"],
+        "declaration_re": r"그냥[^\n]{0,6}가볍게[^\n]{0,6}(단순|빠르게)",
+        "reference_re": r"mode-gate\.md",
+        "mention_re": r"신호어",
+    },
 ]
 
 

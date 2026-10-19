@@ -2,15 +2,22 @@
 # gpt-choice.sh 계약 러너 — 세션 1회 GPT 모델·effort 선택(options · get · set · config)과 래퍼(gpt-exec.sh)의 결정 순서를 합성 입력으로 본다.
 #   --scope choice : get exit 0/3/4/5/11 · set 0/10/11 과 실패 시 파일 미기록 · 원자 기록(tmp+mv) · config config 센티넬 ·
 #                    options JSON 모양(id·label 분리 · effort 교집합 · skip · config effort 미지원 표시) · config 엄격 판독 ·
-#                    자율 판정 · 두 스크립트의 effort 화이트리스트 일치 · config(config.toml 최상위 값 · 캐시 비의존)
+#                    자율 판정 · 두 스크립트의 effort 화이트리스트 일치 · config(config.toml 최상위 값 · 캐시 비의존) ·
+#                    GPT 미사용(off — modules/gpt-strategy.md § GPT 미사용): options 모델 질문의 off(config + 모델 2 + off ≤ 4) ·
+#                    캐시 없음·손상·python3 없음이어도 config / off 로 묻는 degraded · set --model off 는 캐시 없이 기록 · off 짝 손상 판정 ·
+#                    get: 선택 없음 + GPT CLI 없음 → 묻지 않고 0 · model=off(기록 · 저장 불가 세션이면 기록 없이) · CLI 있음이면 3 · 파일 미기록
 #   --scope wrapper: 래퍼 결정 순서 — 필드마다 플래그 > 세션 선택 > config(미전달) · exec/review/resume · --config-permissions ·
 #                    stderr GPT-CHOICE 한 줄(출처 라벨 · config 실제 값 · '?') · 손상 선택 파일 · gpt-choice.sh 부재 → 11 ·
 #                    get 은 stdout 만 판독 · get 값 재검증 · 사용법·플래그 오류(10)가 선택 판독(11)보다 먼저 · 빈 값 · 불량 모델 → 10 ·
-#                    두 스크립트의 MODEL_RE 일치. 가짜 CLI(../_shim/codex)로 래퍼가 넘기는 argv 만 본다
+#                    두 스크립트의 MODEL_RE 일치 · GPT 미사용 결정 순서(세션 off 는 플래그 하나를 이긴다 · 두 플래그만 그 호출을 켠다 ·
+#                    플래그 --model off 는 선택 파일을 읽지 않는다 · 사용법 오류(10)가 off(18)보다 먼저 · cli-check 는 호출 행이 없다).
+#                    가짜 CLI(../_shim/codex)로 래퍼가 넘기는 argv 만 본다 — 정문 · 런처의 18 은 tests/fixtures/gpt/off
 #   ⛔ FZ_GPT_EXEC_UNDER_TEST 로 기준 트리의 래퍼를 같은 러너로 돌린다 — 기준 래퍼(effort 기본값 · 세션 선택 미판독)는 wrapper 가 FAIL 이어야 한다(판별력)
 #   (인자 없음)    : 구현한 scope 전부 — health-check 4.6 이 인자 없이 돌린다
 # ⛔ 실제 사용자 선택·모델 목록을 건드리지 않는다 — HOME · FZ_GPT_CHOICE_DIR · CODEX_HOME 은 셀마다 임시 폴더를 명시한다.
 # ⛔ 셀마다 FZ_AUTONOMY 와 CLAUDE_CODE_SESSION_ID 를 명시한다 — health-check 는 Lead 세션 env(실제 세션 id · 자율 모드)를 물려받는다.
+# ⛔ GPT CLI 유무도 셀마다 정한다 — 기본은 PATH 앞 가짜 CLI(../_shim — 있음), 'CLI 없음' 셀은 실행 파일이 든 폴더를 PATH 에서 뺀다.
+#    get 의 '선택 없음' 판정이 이 머신에 CLI 가 깔렸는지에 따라 3 과 0(off)으로 갈리지 않게.
 # ⛔ 대상 스크립트는 /bin/bash 로 돌린다 — macOS 기본 셸(3.2)에서 도는 것이 계약의 일부다.
 # 모델 목록 캐시·config 는 **합성**이다(가짜 slug) — 실제 목록이 바뀌어도 판정이 흔들리지 않게.
 set -u
@@ -39,13 +46,21 @@ ok() { echo "PASS  $1"; }
 no() { echo "FAIL  $1"; fail=1; }
 check() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — 기대 '$3' · 실제 '$2'"; fi; }
 
+# GPT CLI 있음 = 가짜 CLI 를 PATH 앞에 · 없음 = 실행 파일 codex 가 든 폴더를 PATH 에서 뺀다(python3 은 남아야 한다 — 아래 setup 확인)
+SHIM="$R/tests/fixtures/gpt/_shim"
+nocli_path() { local d out="" IFS=:; for d in $PATH; do [ -n "$d" ] && [ -x "$d/codex" ] && continue; out="${out:+$out:}$d"; done; printf '%s' "$out"; }
+NOCLI="$(nocli_path)"
+[ -z "$(PATH="$NOCLI"; command -v codex)" ] || { echo "UNRUN  setup — CLI 없는 PATH 를 만들지 못했다"; exit 2; }
+[ -n "$(PATH="$NOCLI"; command -v python3)" ] || { echo "UNRUN  setup — CLI 없는 PATH 에 python3 이 없다(같은 폴더)"; exit 2; }
+CLIP="$SHIM:$PATH"   # 셀의 PATH — 'CLI 없음' 셀만 잠시 $NOCLI 로 바꾼다(choice · wrapper 공통)
+
 # 셀 env 기본값 — 셀 앞에서 바꾸고 뒤에서 되돌린다. '-' 는 unset.
 HOMEV="$T/home" SEL="$T/sel" CH="$T/ch-a"
 cell() {   # $1=셀 · $2=FZ_AUTONOMY('-'=unset) · $3=CLAUDE_CODE_SESSION_ID('-'=unset) · 나머지=gpt-choice.sh 인자(하위 명령 먼저)
   local name="$1" auto="$2" sid="$3" d e
   shift 3
   d="$T/c-$name"; mkdir -p "$d"
-  e=(env -u FZ_AUTONOMY -u CLAUDE_CODE_SESSION_ID -u FZ_GPT_CHOICE_DIR -u CODEX_HOME "HOME=$HOMEV")
+  e=(env -u FZ_AUTONOMY -u CLAUDE_CODE_SESSION_ID -u FZ_GPT_CHOICE_DIR -u CODEX_HOME "HOME=$HOMEV" "PATH=$CLIP")
   [ "$auto" = "-" ] || e+=("FZ_AUTONOMY=$auto")
   [ "$sid" = "-" ] || e+=("CLAUDE_CODE_SESSION_ID=$sid")
   [ "$SEL" = "-" ] || e+=("FZ_GPT_CHOICE_DIR=$SEL")
@@ -98,13 +113,13 @@ PY
 }
 
 # ── wrapper scope 도구 — 가짜 CLI(../_shim/codex)가 FZ_SHIM_CAPTURE 에 argv 를 JSON 으로 남긴다(config-permissions 러너와 같은 사용법)
-SHIM="$R/tests/fixtures/gpt/_shim" WSEL="$T/wsel" WX="$WRAP"   # WX = 셀이 부를 래퍼 — 사본 트리 셀만 잠시 바꾼다
+WSEL="$T/wsel" WX="$WRAP"   # WX = 셀이 부를 래퍼 — 사본 트리 셀만 잠시 바꾼다
 wcell() {   # $1=셀 · $2=FZ_AUTONOMY('-'=unset) · $3=CLAUDE_CODE_SESSION_ID('-'=unset) · $4=CODEX_HOME(합성) · 나머지=래퍼 인자(모드 먼저)
   local name="$1" auto="$2" sid="$3" ch="$4" d e
   shift 4
   d="$T/w-$name"; mkdir -p "$d"
   # ⛔ 선택 폴더 · CODEX_HOME · HOME 은 늘 임시다 — Lead 세션의 실제 선택 · config 가 셀에 새지 않는다. 래퍼도 /bin/bash(3.2)로 돌린다
-  e=(env -u FZ_AUTONOMY -u CLAUDE_CODE_SESSION_ID "HOME=$T/home" "PATH=$SHIM:$PATH" "FZ_GPT_CHOICE_DIR=$WSEL" "CODEX_HOME=$ch"
+  e=(env -u FZ_AUTONOMY -u CLAUDE_CODE_SESSION_ID "HOME=$T/home" "PATH=$CLIP" "FZ_GPT_CHOICE_DIR=$WSEL" "CODEX_HOME=$ch"
      "FZ_SHIM_CAPTURE=$d/argv.json" "FZ_TELEMETRY_DIR=$d/tel")
   [ "$auto" = "-" ] || e+=("FZ_AUTONOMY=$auto")
   [ "$sid" = "-" ] || e+=("CLAUDE_CODE_SESSION_ID=$sid")
@@ -365,11 +380,13 @@ model_reasoning_effort = "high"'
   check "options: 모델 기본 effort" "$(js o-a 'd["models"][1]["default_effort"]')" high
   check "options: 지원 effort ∩ 화이트리스트(none 제외)" "$(js o-a 'd["models"][1]["efforts"]')" "medium,high,xhigh,ultra"
   check "options: 지원 목록 모름 = null" "$(js o-a 'd["models"][4]["efforts"]')" None
-  check "options: 모델 질문 = config + 목록 앞 3개(config 모델 중복 없음)" "$(js o-a '[c["id"] for c in d["questions"]["model"]["choices"]]')" "config,fake-beta,fake-gamma,fake-delta"
-  check "options: 모델 질문 나머지(more)" "$(js o-a 'd["questions"]["model"]["more"]')" fake-nolevels
+  check "options: 모델 질문 = config + 목록 앞 2개(config 모델 중복 없음) + off" "$(js o-a '[c["id"] for c in d["questions"]["model"]["choices"]]')" "config,fake-beta,fake-gamma,off"
+  check "options: 모델 질문 나머지(more — off 에 밀린 모델 포함)" "$(js o-a 'd["questions"]["model"]["more"]')" "fake-delta,fake-nolevels"
+  check "options: off 선택지 = 마지막 · 'GPT 교차검증 끔' label" "$(js o-a 'd["questions"]["model"]["choices"][-1]')" "{'id': 'off', 'label': '사용 안 함 (GPT 교차검증 끔)'}"
+  check "options: degraded 키 없음(정상)" "$(js o-a '"degraded" in d')" False
   check "options: config 선택지 label 에 config 값" "$(js o-a 'd["questions"]["model"]["choices"][0]["label"]')" "config 기본 (fake-alpha)"
   check "options: 선택지마다 id·label 두 키" "$(js o-a 'all(sorted(c) == ["id", "label"] for q in d["questions"].values() for c in q["choices"])')" True
-  check "options: effort 질문 = 제시 모델(알파·베타·감마·델타) 교집합 − config 값" "$(js o-a '[c["id"] for c in d["questions"]["effort"]["choices"]]')" "config,medium,xhigh"
+  check "options: effort 질문 = 제시 모델(알파·베타·감마) 교집합 − config 값" "$(js o-a '[c["id"] for c in d["questions"]["effort"]["choices"]]')" "config,medium,xhigh"
   check "options: 제시 모델이 모두 config effort 를 지원하면 config 선택지 표시 없음" "$(js o-a 'd["questions"]["effort"]["choices"][0]["label"]')" "config 기본 (high)"
   check "options: 선택지 2개 이상이면 skip 아님" "$(js o-a '[d["questions"][q]["skip"] for q in ("model", "effort")]')" "False,False"
   check "options: effort 화이트리스트" "$(js o-a 'd["effort_whitelist"]')" "low,medium,high,xhigh,max,ultra"
@@ -382,13 +399,14 @@ model_reasoning_effort = "high"'
   CH="$T/ch-none"; cell o-nocache - - options
   CH="$T/ch-bad"; cell o-bad - - options
   CH="-" HOMEV="$T/home2"; cell o-def - - options; CH="$T/ch-a" HOMEV="$T/home"
-  check "options 목록 모델 1개(config 모델): 모델 질문 skip" "$(js o-wide '[d["questions"]["model"]["skip"], len(d["questions"]["model"]["choices"])]')" "True,1"
+  check "options 목록 모델 1개(config 모델): 모델 질문 = config + off — off 가 늘 있어 skip 아님" "$(js o-wide '[d["questions"]["model"]["skip"]] + [c["id"] for c in d["questions"]["model"]["choices"]]')" "False,config,off"
   check "options effort 6개: config 값(medium)에 가까운 3개 · 화이트리스트 순" "$(js o-wide '[c["id"] for c in d["questions"]["effort"]["choices"]]')" "config,low,high,xhigh"
   check "options effort 6개: 나머지는 more" "$(js o-wide 'd["questions"]["effort"]["more"]')" "max,ultra"
   check "options effort 후보가 config 값뿐: effort 질문 skip" "$(js o-one '[d["questions"]["effort"]["skip"], len(d["questions"]["effort"]["choices"])]')" "True,1"
   check "options profile 사용: config 기본 '?'" "$(js o-prof '[d["config"]["model"], d["config"]["effort"]]')" "?,?"
-  check "options profile 사용: 모델 질문 = config + 목록 앞 3개" "$(js o-prof '[c["id"] for c in d["questions"]["model"]["choices"]]')" "config,fake-alpha,fake-beta,fake-gamma"
-  check "options profile 사용: effort 질문(알파·베타·감마 교집합)" "$(js o-prof '[c["id"] for c in d["questions"]["effort"]["choices"]]')" "config,medium,high,xhigh"
+  check "options profile 사용: 모델 질문 = config + 목록 앞 2개 + off" "$(js o-prof '[c["id"] for c in d["questions"]["model"]["choices"]]')" "config,fake-alpha,fake-beta,off"
+  check "options 모델 질문 선택지 4 이하(전 셀)" "$(for c in o-a o-wide o-one o-prof o-nomodel o-loose o-conly o-def; do js "$c" 'len(d["questions"]["model"]["choices"]) <= 4'; done | sort -u | tr '\n' ' ')" "True "
+  check "options profile 사용: effort 질문(알파·베타 교집합)" "$(js o-prof '[c["id"] for c in d["questions"]["effort"]["choices"]]')" "config,medium,high,xhigh"
   check "options 최상위 model 없음: config 모델 '?'(표 안의 model 은 무시)" "$(js o-nomodel '[d["config"]["model"], d["config"]["effort"]]')" "?,low"
   # ⛔ config 모델의 지원 effort 를 모르면 set 이 '--model config --effort <명시>' 를 exit 10 으로 거부한다 — 선택지 label 이 미리 알린다
   check "options config 모델 모름(profile): config 선택지 label 에 'effort 는 config 만'" "$(js o-prof 'd["questions"]["model"]["choices"][0]["label"]')" "config 기본 (? · effort 는 config 만)"
@@ -398,9 +416,19 @@ model_reasoning_effort = "high"'
   check "options config effort 미지원 제시 모델: config 선택지 label 에 표시" "$(js o-nomodel 'd["questions"]["effort"]["choices"][0]["label"]')" "config 기본 (low · fake-beta 미지원)"
   check "options config 줄 끝 주석·들여쓰기: 엄격 판독이라 config 기본 '?'" "$(js o-loose '[d["config"]["model"], d["config"]["effort"]]')" "?,?"
   check "options config.toml 없음: config 기본 '?'" "$(js o-conly '[d["config"]["model"], d["config"]["effort"]]')" "?,?"
-  check "options 모델 목록 캐시 없음 → 11" "$(rc o-nocache)" 11
-  check "options 캐시 없음: stdout 없음" "$(out o-nocache)" ""
-  check "options 모델 목록 캐시 손상 → 11" "$(rc o-bad)" 11
+  # ⛔ 캐시를 못 읽어도 묻는다 — config / off 두 선택지(degraded). 옛 계약(11 → 묻지 않고 config)은 off 를 고를 길을 막았다
+  check "options 모델 목록 캐시 없음 → 0 · degraded cache-missing" "$(rc o-nocache)|$(js o-nocache 'd["degraded"]')" "0|cache-missing"
+  check "options 캐시 없음: 모델 질문 = config · off · skip 아님" "$(js o-nocache '[d["questions"]["model"]["skip"]] + [c["id"] for c in d["questions"]["model"]["choices"]]')" "False,config,off"
+  check "options 캐시 없음: effort 질문 skip(config 하나)" "$(js o-nocache '[d["questions"]["effort"]["skip"]] + [c["id"] for c in d["questions"]["effort"]["choices"]]')" "True,config"
+  check "options 캐시 없음: stderr 안내" "$(said o-nocache)" 1
+  check "options 모델 목록 캐시 손상 → 0 · degraded cache-unreadable" "$(rc o-bad)|$(js o-bad 'd["degraded"]')" "0|cache-unreadable"
+  check "options 캐시 손상: config 선택지 label 에 config 값(config.toml 은 읽는다)" "$(js o-bad '[c["label"] for c in d["questions"]["model"]["choices"]]')" "config 기본 (fake-alpha),사용 안 함 (GPT 교차검증 끔)"
+  # python3 없음 — bash 가 같은 모양을 낸다. bash 만 든 PATH 로 돌린다
+  mkdir -p "$T/bash-only"; ln -sf /bin/bash "$T/bash-only/bash"
+  ( cd "$T/cwd" && env -i "HOME=$T/home" "PATH=$T/bash-only" CLAUDE_CODE_SESSION_ID=s1 "CODEX_HOME=$T/ch-a" /bin/bash "$CHOICE" options ) > "$T/c-o-nopy.out" 2>/dev/null
+  echo $? > "$T/c-o-nopy.rc"; mkdir -p "$T/c-o-nopy"; cp "$T/c-o-nopy.out" "$T/c-o-nopy/stdout"
+  check "options python3 없음 → 0 · degraded python3-missing · config/off" "$(cat "$T/c-o-nopy.rc")|$(js o-nopy '[d["degraded"]] + [c["id"] for c in d["questions"]["model"]["choices"]] + [d["questions"]["effort"]["skip"]]')" "0|python3-missing,config,off,True"
+  check "options python3 없음: effort 화이트리스트 그대로" "$(js o-nopy 'd["effort_whitelist"]')" "low,medium,high,xhigh,max,ultra"
   check "options 기본 CODEX_HOME(HOME/.codex) 판독" "$(js o-def 'd["config"]["model"]')" fake-alpha
 
   # ── config: config.toml 최상위 값 — 래퍼 GPT-CHOICE 표시용. options · set 과 같은 엄격 판독이고 캐시 · 선택 파일을 읽지 않는다
@@ -420,6 +448,53 @@ model_reasoning_effort = "high"'
   check "config config.toml 없음 → '?' 두 개 · exit 0" "$(rc k-nocfg)|$(out k-nocfg)" "0|model=? effort=?"
   cell k-arg - - config extra
   check "config 인자 → 10" "$(rc k-arg)" 10
+
+  # ── GPT 미사용(off) — set --model off 는 캐시 · config 를 보지 않고 두 줄 off 를 기록한다(effort 는 없어도 되고 주면 무시)
+  CH="$T/ch-none"; cell s-off - s-off set --model off; CH="$T/ch-a"
+  check "set --model off · 캐시 없음 → 0" "$(rc s-off)" 0
+  check "set --model off: 기록 두 줄 off" "$(body "$T/sel/s-off")" "model=off|effort=off|"
+  check "set --model off: stdout" "$(out s-off)" "model=off effort=off"
+  CH="$T/ch-bad"; cell s-off-e - s-off-e set --model off --effort high; CH="$T/ch-a"
+  check "set --model off --effort high · 캐시 손상 → 0 · effort 무시" "$(rc s-off-e)|$(body "$T/sel/s-off-e")" "0|model=off|effort=off|"
+  CH="-"; cell s-off-def - s-off-def set --model off; CH="$T/ch-a"
+  check "set --model off · 기본 CODEX_HOME(없음) → 0" "$(rc s-off-def)" 0
+  cell s-off-nosid - - set --model off
+  check "set --model off · 세션 id 없음 → 11(저장 불가 — 호출마다 --model off 로 우회)" "$(rc s-off-nosid)" 11
+  check "set --model off 저장 불가: stderr 에 --model off 우회 안내" "$(grep -c -- '--model off 를 붙인다' "$T/c-s-off-nosid/stderr")" 1
+  SEL="rel/sel"; cell s-off-rel - s-off-rel set --model off; SEL="$T/sel"
+  check "set --model off · FZ_GPT_CHOICE_DIR 상대 경로 → 11" "$(rc s-off-rel)" 11
+  s_fail s-effoff 10 "목록 모델 + effort off(off 는 모델 자리 값)" --model fake-beta --effort off
+  s_fail s-cfgoff 10 "config 모델 + effort off" --model config --effort off
+  cell s-over-off - s-ok set --model off
+  check "set --model off 로 기존 선택 덮어쓰기 → 0" "$(rc s-over-off)|$(body "$T/sel/s-ok")" "0|model=off|effort=off|"
+  cell g-off - s-off get
+  check "get 선택 off → 0 · stdout model=off effort=off" "$(rc g-off)|$(out g-off)" "0|model=off effort=off"
+  cell g-off-auto autonomous s-off get
+  check "get 선택 off · autonomous → 0 · off 그대로" "$(rc g-off-auto)|$(out g-off-auto)" "0|model=off effort=off"
+  printf 'model=off\neffort=high\n' > "$T/sel/bad-offhalf"
+  printf 'model=fake-beta\neffort=off\n' > "$T/sel/bad-effoff"
+  for c in bad-offhalf bad-effoff; do
+    cell "g-$c" - "$c" get
+    check "get 손상($c — off 는 두 줄이 함께) → 11" "$(rc "g-$c")" 11
+  done
+
+  # ── get: 선택 없음 + GPT CLI 없음 → 묻지 않고 0 · off(기록 · stderr 안내). CLI 있음이면 그대로 3 이고 아무것도 쓰지 않는다
+  CLIP="$NOCLI"
+  cell g-nocli - g-nocli get
+  cell g-nocli-auto autonomous g-nocli-auto get
+  cell g-nocli-nosid - - get
+  cell g-nocli-sel - s-cfgx get
+  cell g-nocli-bad - bad-order get
+  CLIP="$SHIM:$PATH"
+  check "get 선택 없음 + CLI 없음 → 0 · model=off effort=off" "$(rc g-nocli)|$(out g-nocli)" "0|model=off effort=off"
+  check "get 선택 없음 + CLI 없음: off 를 기록" "$(body "$T/sel/g-nocli")" "model=off|effort=off|"
+  check "get 선택 없음 + CLI 없음: stderr 안내" "$(said g-nocli)" 1
+  check "get 선택 없음 + CLI 없음 · autonomous → 0 · off(config 가 아니다)" "$(rc g-nocli-auto)|$(out g-nocli-auto)" "0|model=off effort=off"
+  check "get CLI 없음 · 세션 id 없음 → 0 · off(5 가 아니다) · 기록 없음" "$(rc g-nocli-nosid)|$(out g-nocli-nosid)|$(said g-nocli-nosid)" "0|model=off effort=off|1"
+  check "get CLI 없음 · 기존 선택 있음 → 그 선택 그대로(덮어쓰지 않는다 — 래퍼가 CLI 없음으로 18)" "$(rc g-nocli-sel)|$(out g-nocli-sel)|$(body "$T/sel/s-cfgx")" "0|model=config effort=xhigh|model=config|effort=xhigh|"
+  check "get CLI 없음 · 선택 파일 손상 → 11 그대로" "$(rc g-nocli-bad)" 11
+  cell g-cli-none - g-cli-none get
+  check "get 선택 없음 + CLI 있음 · FZ_AUTONOMY 미설정 → 3 · 파일 미기록(비대화 판정은 Lead — 스크립트는 FZ_AUTONOMY 만 본다)" "$(rc g-cli-none)|$(body "$T/sel/g-cli-none")" "3|<없음>"
 
   # ── 사용법 · 화이트리스트 대조
   cell u-sub - s1 bogus
@@ -577,6 +652,43 @@ run_wrapper() {
   else
     ok "GPT-CHOICE: 금지 토큰 · 행머리 'model:' 없음"
   fi
+
+  # ── GPT 미사용(18) 결정 순서 — 세션 off · 플래그 --model off · CLI 없음 → CLI 미호출 · stderr 'GPT-OFF: <사유>' · GPT-CHOICE 줄 없음
+  printf 'model=off\neffort=off\n' > "$WSEL/w-off"
+  for m in exec review resume; do
+    wrun "off-$m" "$m" - w-off "$T/wh-cfg"
+    check "세션 off $m: exit 18 · CLI 미호출" "$(wrc "off-$m")|$(wcalled "off-$m")" "18|0"
+    check "세션 off $m: stderr 'GPT-OFF: 사용자 선택' · GPT-CHOICE 없음" "$(wsaid "off-$m" 'GPT-OFF: 사용자 선택')|$(gcount "off-$m")" "1|0"
+  done
+  wrun off-auto exec autonomous w-off "$T/wh-cfg"
+  check "세션 off · autonomous: exit 18(선택이 있으면 자율이어도 적용)" "$(wrc off-auto)|$(wcalled off-auto)" "18|0"
+  wrun off-m1 exec - w-off "$T/wh-cfg" --model fake-flag
+  wrun off-e1 review - w-off "$T/wh-cfg" --effort high
+  check "세션 off + --model 하나: off 가 이긴다 → 18 · CLI 미호출" "$(wrc off-m1)|$(wcalled off-m1)" "18|0"
+  check "세션 off + --effort 하나: off 가 이긴다 → 18" "$(wrc off-e1)|$(wcalled off-e1)" "18|0"
+  wrun off-both exec - w-off "$T/wh-cfg" --model fake-flag --effort high
+  check "세션 off + 두 플래그: 선택을 읽지 않아 그 호출만 돈다(명시 덮어쓰기) · GPT-CHOICE (flag · flag)" "$(wrc off-both)|$(wcalled off-both)|$(gline off-both)" "0|1|GPT-CHOICE model=fake-flag (flag) effort=high (flag)"
+  wrun foff-bad exec - w-bad "$T/wh-cfg" --model off
+  check "플래그 --model off + 손상 선택 파일: 선택을 읽지 않고 18(11 이 아니다) · 'GPT-OFF: 플래그'" "$(wrc foff-bad)|$(wcalled foff-bad)|$(wsaid foff-bad 'GPT-OFF: 플래그')" "18|0|1"
+  wrun foff-none exec - - "$T/wh-none" --model off --config-permissions
+  check "플래그 --model off · 세션 id 없음 · 권한 프로필 없는 --config-permissions: 18(11 이 아니다)" "$(wrc foff-none)|$(wcalled foff-none)" "18|0"
+  wcell ord-off - w-off "$T/wh-cfg" exec
+  check "세션 off + exec 에 --prompt-file 없음: 사용법 10 이 먼저" "$(wrc ord-off)" 10
+  wrun ord-foff exec - w-none "$T/wh-cfg" --model off --effort bogus
+  check "플래그 --model off + 불량 --effort: 사용법 10 이 먼저" "$(wrc ord-foff)" 10
+  CLIP="$NOCLI"
+  wrun nocli exec - w-sel "$T/wh-cfg"
+  wrun nocli-bad review - w-bad "$T/wh-cfg"
+  CLIP="$SHIM:$PATH"
+  check "CLI 없음 · 세션 선택 있음: 18 · 'GPT-OFF: CLI 없음'(11 이 아니다)" "$(wrc nocli)|$(wsaid nocli 'GPT-OFF: CLI 없음')" "18|1"
+  check "CLI 없음 · 손상 선택 파일: 선택 판독 전에 18(다시 물어도 쓸 데가 없다)" "$(wrc nocli-bad)|$(wsaid nocli-bad 'CHOICE-UNREADABLE')" "18|0"
+  # cli-check — 호출이 아니다: 호출 행(gpt-calls.tsv)을 남기지 않는다
+  mkdir -p "$T/w-cc-tel"
+  env "PATH=$CLIP" "FZ_TELEMETRY_DIR=$T/w-cc-tel" /bin/bash "$WX" cli-check >/dev/null 2>&1; c1=$?
+  env "PATH=$NOCLI" "FZ_TELEMETRY_DIR=$T/w-cc-tel" /bin/bash "$WX" cli-check >/dev/null 2>&1; c2=$?
+  env "PATH=$CLIP" "FZ_TELEMETRY_DIR=$T/w-cc-tel" /bin/bash "$WX" cli-check extra >/dev/null 2>&1; c3=$?
+  check "cli-check: 있음 0 · 없음 18 · 인자 10" "$c1|$c2|$c3" "0|18|10"
+  check "cli-check: 호출 행 없음" "$(cat "$T/w-cc-tel/gpt-calls.tsv" 2>/dev/null | wc -l | tr -d ' ')" 0
 
   # ── 두 스크립트의 MODEL_RE 가 같은 문자열 — 한쪽만 넓히면 set 이 거부하는 값을 래퍼가 받는다(또는 그 반대)
   check "MODEL_RE: 래퍼 = gpt-choice.sh" "$(re_parity)" same

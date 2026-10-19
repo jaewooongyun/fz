@@ -9,7 +9,7 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 ## 목차
 
 - [Tier 구성](#tier-구성)
-- [자동 휴리스틱 (단일 진실 원천)](#자동-휴리스틱-단일-진실-원천)
+- [모드 선택 (측정 · 추천 · 질문)](#모드-선택-측정--추천--질문)
 - [Tier 0 (Solo) 절차](#tier-0-solo-절차)
 - [Tier 1 (Solo + GPT) 절차](#tier-1-solo--gpt-절차)
 - [Tier-Adaptive Evidence](#tier-adaptive-evidence)
@@ -31,29 +31,30 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 | **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead ×1 (§ GPT Analyze 호출) | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
 | **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead ×2 (§ GPT Analyze 호출 + DA) | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
 
+> ⛔ **모드 게이트**(2026-10-19): light = **Tier 1** · full = **Tier 2** · `--deep` = Tier 3. Tier 0(GPT 없음)은 `--tier 0` 을 명시할 때만이다 — 계약 `modules/mode-gate.md`
+>
 > ⊕ **GPT 독립 첫 패스(기본 — `--gpt-independent` 생략 가능 · `--no-gpt-independent` 면 challenger)**: GPT 슬롯 1 = **독립 리뷰어** — kind `independent-review`(`gpt-call.sh independent-review`) 를 Workflow 와 **병렬**로 띄우고 `review_merge.py` 로 합친다(Tier 1 은 challenger 자리 — Lead 발견을 JSON 으로 써서 병합한다). Tier 3 의 GPT DA(슬롯 2)는 **두 패스가 끝난 뒤**다. 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 >
 > ⛔ **모델은 스크립트가 single source** — `peer-review.js`의 `label: 'stage1-arch'`·`'stage1-quality'`·`'stage1-correctness'`(Stage1) · `'stage2-arch-on-quality'`·`'stage2-quality-on-arch'`(Stage2) · `'stage3-counter'`(Stage3) 전 호출이 `model:'opus'`다. 에이전트 frontmatter(`review-quality`·`review-correctness`·`review-counter` = `sonnet`)와 `skills/code-auditor/SKILL.md` `main: sonnet`은 **스크립트에 의해 override된다** — 실행 경로는 스크립트다.
 > ⛔ **재시도 포함 실제 호출 수는 더 클 수 있다** — `parallelWithRetry`가 Stage1 null 항목마다 1회 재호출하므로 **Tier 2는 3~6, Tier 3는 6~9**다(`peer-review.js`의 `parallelWithRetry`). 부분 실패로 Stage2가 생략되면 Tier 3가 6보다 적을 수도 있다. **권위 있는 수치는 반환값 `metrics.agentCalls`뿐이다.**
 > ⛔ **비용 상한 수치 열을 제거했다.** 기존 `~$2.00`/`~$3.50`은 "opus 1 + sonnet 1" 전제로 산정된 값이라 실제(opus 3 / opus 6)와 맞지 않았다. 추정치를 다른 추정치로 바꾸는 대신 **검증 가능한 call 수**로 대체한다 — 실제 비용은 `cost-log.json`이 invoke마다 실측으로 남긴다. [참고 실측: PR Tier 2 = 448K tokens]
 
-## 자동 휴리스틱 (단일 진실 원천)
+## 모드 선택 (측정 · 추천 · 질문)
 
-> ⛔ boundary 수치 변경 시 본 모듈 단일 지점 수정. SKILL.md는 *요약 인용*만.
+> ⛔ 출처가 셋이다 — **측정**은 아래 bash(PR 스냅샷 · gh · 브랜치 diff · 판정 불가 처리) · **추천 임계**는 `scripts/mode_gate.py` · **언제 묻나 · 질문 형식**은 `modules/mode-gate.md`. SKILL.md 는 요약만 인용한다.
 
 ```
-CHANGED_LINES = additions + deletions  (gh pr view --json additions,deletions 또는 git diff --numstat)
+SIGNIFICANT_LINES = 추가 + 삭제 − 생성 파일 줄   (rename 은 차감하지 않는다 — 보수적)
+CHANGED_FILES     = 변경 파일 수
+위험 카테고리     = skills/fz-peer-review/scripts/risk_scan.py 의 risk
 
-CHANGED_LINES <  100  → Tier 0 (base), Tier 1 (--gpt 옵션 시)
-CHANGED_LINES 100-200 → Tier 1 (base), Tier 2 (--deep 옵션 시)
-CHANGED_LINES 200-500 → Tier 2 (base), Tier 3 (--deep 옵션 시)
-CHANGED_LINES 500-2000 → Tier 2 + 비용 경고 ($2+ 예상)
-CHANGED_LINES > 2000  → AskUserQuestion ($3+ 예상)
-
---tier N 옵션으로 강제 지정 가능 (auto 무효화)
+--tier N              → 그 Tier (묻지 않는다)
+--deep                → Tier 3
+모드 인자 · /fz · 신호어 → light = Tier 1 · full = Tier 2 (묻지 않는다)
+그 밖                 → mode_gate.py peer 추천을 달고 묻는다 → light = Tier 1 · full = Tier 2
 ```
 
-> 위 표 = 사람용 개념 요약(경계값 100/200/500은 CHANGED_LINES 기준 설명). **실제 판정 SSOT는 아래 bash** — SIGNIFICANT_LINES(= CHANGED − GENERATED, 생성파일 제외) + risk escalation 적용. ⛔ 생성파일 많은 PR(Package.resolved 등)에선 표(CHANGED)와 bash(SIGNIFICANT) 판정이 달라질 수 있어 **Tier 결정은 bash를 신뢰**. ⛔ 경계값 변경 시 표 + bash 동시 수정(자동 검증 없음 — prose 규칙).
+> 이전에는 줄 수 경계(100/200/500)로 Tier 0/1/2 를 자동으로 정하고 위험 카테고리로 +1/+2 승격했다. 지금은 셋 다 **추천 근거**이고 Tier 를 직접 바꾸지 않는다(2026-10-19 사용자 결정 — `modules/mode-gate.md` § 사용자 결정). 추천 임계 숫자는 `scripts/mode_gate.py` 상수가 정본이다.
 
 ### 자동 선택 실행 bash (Gather Step 5.5)
 
@@ -80,6 +81,7 @@ d=json.load(open(sys.argv[1]))
 print(sum(f.get('additions',0)+f.get('deletions',0) for f in d.get('files',[])
           if f.get('previous_filename') or f.get('previousFilename')))
 " "$META" 2>/dev/null || echo 0)
+  CHANGED_FILES=$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1])).get('files',[])))" "$META" 2>/dev/null || echo 0)
   echo "▶ Tier 입력 = gather snapshot (pr-meta.json) — gh 재조회 0회"
 elif [[ "$INPUT" =~ ^[0-9]+$ ]]; then
   # ⚠️ snapshot 부재 폴백 — gather 를 거치지 않은 직접 호출 경로다
@@ -88,6 +90,7 @@ elif [[ "$INPUT" =~ ^[0-9]+$ ]]; then
   GENERATED_LINES=$(gh pr view "$INPUT" --json files -q '[.files[] | select(.path | test("(package-lock|pnpm-lock|yarn-lock|Package\\.resolved|Gemfile\\.lock|Cargo\\.lock|\\.pbxproj|\\.storyboard)$")) | .additions + .deletions] | add // 0' 2>/dev/null || echo 0)
   # rename: gh CLI는 previous_filename (snake_case) 노출. 단, gh CLI 버전에 따라 다름 → fallback grep
   RENAMED_LINES=$(gh pr view "$INPUT" --json files 2>/dev/null | jq '[.files[] | select(.previous_filename != null or .previousFilename != null) | .additions + .deletions] | add // 0' 2>/dev/null || echo 0)
+  CHANGED_FILES=$(gh pr view "$INPUT" --json files -q '.files | length' 2>/dev/null || echo 0)
 else
   # branch input — BASE 존재 검증
   case "$INPUT" in
@@ -103,53 +106,47 @@ else
   NAMESTAT=$(git diff --name-status "${BASE}...${INPUT}" 2>/dev/null); NAMESTAT_RC=$?
   if [ "$NUMSTAT_RC" -ne 0 ] || [ "$NAMESTAT_RC" -ne 0 ]; then
     echo "⛔ diff 실패 — Tier 자동 판정 불가 (git diff ${BASE}...${INPUT} exit ${NUMSTAT_RC}/${NAMESTAT_RC})"; TIER=2; TIER_AUTO_BLOCKED=1
-    ADDED=0; DELETED=0; GENERATED_LINES=0; RENAMED_LINES=0
+    ADDED=0; DELETED=0; GENERATED_LINES=0; RENAMED_LINES=0; CHANGED_FILES=0
   else
     ADDED=$(printf '%s\n' "$NUMSTAT" | awk '$1!="-"{a+=$1} END{print a+0}')
     DELETED=$(printf '%s\n' "$NUMSTAT" | awk '$2!="-"{d+=$2} END{print d+0}')
     GENERATED_LINES=$(printf '%s\n' "$NUMSTAT" | awk '/(package-lock|Package\.resolved|\.pbxproj|\.lock)/ {g+=$1+$2} END{print g+0}')
     RENAMED_LINES=$(printf '%s\n' "$NAMESTAT" | awk '/^R[0-9]/ {r++} END {print r*5+0}')  # rename 1건당 ~5줄 추정
+    CHANGED_FILES=$(printf '%s\n' "$NUMSTAT" | awk 'NF>=3 {n++} END {print n+0}')
   fi
 fi
 CHANGED_LINES=$((ADDED + DELETED))
 SIGNIFICANT_LINES=$((CHANGED_LINES - GENERATED_LINES))  # rename은 실 편집 가능성 있어 *차감 안 함* (보수적)
 [ "$SIGNIFICANT_LINES" -lt 0 ] && SIGNIFICANT_LINES=0
-[ "$RENAMED_LINES" -gt 0 ] && [ "$SIGNIFICANT_LINES" -lt 10 ] && {
-  AskUserQuestion "rename 위주 PR (SIGNIFICANT_LINES=$SIGNIFICANT_LINES). Tier 0 진행?"
-}
-
-# 2. --tier 옵션 최우선 (precedence: --tier > Risk escalation > auto)
+# 2. 모드 — --tier 명시가 최우선(묻지 않는다). 그 밖은 추천 → 질문 → light = Tier 1 · full = Tier 2
+#    MODE 는 Lead 가 미리 정할 수 있다: 모드 인자(light · full · --solo = light · --team = full) · /fz 경유 · 신호어 — 그러면 묻지 않는다
+#    정본: modules/mode-gate.md(언제 묻나 · 질문 형식) · scripts/mode_gate.py(추천 임계)
 if [ -n "$TIER_OPT" ]; then
-  TIER=$TIER_OPT  # 사용자 명시 → 그대로. Risk escalation 적용 안 함 (precedence 모순 방지)
-elif [ -n "${TIER_AUTO_BLOCKED:-}" ]; then
-  # ⛔ 앞에서 판정 불가(BASE 부재 · diff 실패)로 TIER=2 를 세웠다 — auto 가 변경량 0 으로 TIER=0 을 덮으면 F-385 가 그대로다
-  echo "⛔ Tier 자동 판정 불가 — TIER=2 유지(auto · 위험 승격 건너뜀)"
+  TIER=$TIER_OPT; MODE_SRC="--tier"   # 사용자 명시 → 그대로. 위험 근거도 쓰지 않는다
 else
-  # auto tier
-  if [ $SIGNIFICANT_LINES -lt 100 ]; then TIER=0
-  elif [ $SIGNIFICANT_LINES -lt 200 ]; then TIER=1
-  elif [ $SIGNIFICANT_LINES -lt 500 ]; then TIER=2
-  elif [ $SIGNIFICANT_LINES -lt 2000 ]; then TIER=2  # +cost warning
+  if [ -n "${TIER_AUTO_BLOCKED:-}" ]; then
+    # ⛔ 판정 불가(BASE 부재 · diff 실패) — 변경량 0 으로 읽어 가볍게 기울지 않는다(F-385). 추천 없이 묻는다
+    GATE_ARGS="peer --unmeasured"
   else
-    AskUserQuestion "diff $SIGNIFICANT_LINES줄. 진행?"
-    TIER=2
+    # 위험 카테고리는 추천 근거다(Tier 를 직접 올리지 않는다). ⛔ 인라인 grep 금지 — § 위험 판정. 경로는 절대경로로 해석한다
+    if ! python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/risk_scan.py" "${WORK_DIR}/diff.patch" --json > "${WORK_DIR}/risk.json"; then
+      echo "⚠️ risk_scan 실패 — 위험 근거 없이 추천한다. tier.txt 에 기록"; rm -f "${WORK_DIR}/risk.json"
+    fi
+    GATE_ARGS="peer --lines $SIGNIFICANT_LINES --files $CHANGED_FILES"
+    [ -f "${WORK_DIR}/risk.json" ] && GATE_ARGS="$GATE_ARGS --risk-json ${WORK_DIR}/risk.json"
   fi
-
-  # Risk-based escalation (auto일 때만 적용. 7 카테고리 → cap=Tier 2)
-  # ⛔ 인라인 grep 금지 — 오탐 실측 후 스크립트로 이관 (§ 위험 판정 참조).
-  #    경로는 절대경로로 해석한다. 상대 경로는 대상 레포에 파일이 없어 조용히 통과한다.
-  RISK_JSON=$(python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/risk_scan.py" \
-                "${WORK_DIR}/diff.patch" --json)
-  RISK_STATUS=$?
-  if [ $RISK_STATUS -ne 0 ]; then
-    echo "⚠️ risk_scan 실패 (exit $RISK_STATUS) — 승격 없이 진행. 근거 부재를 tier.txt 에 기록한다"
-    RISK_MATCHES=0; TIER_DELTA=0
+  python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" $GATE_ARGS --estimate peer-review > "${WORK_DIR}/mode-gate.json"
+  REC=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('recommend') or '')" "${WORK_DIR}/mode-gate.json" 2>/dev/null)
+  if [ -z "${MODE:-}" ]; then
+    # 질문에 보일 것: 추천 · 근거 · 위험 카테고리(risk.json categories) · full 의 Workflow 구간 추정 · rename 위주(SIGNIFICANT 10 미만 + rename)면 그 사실
+    MODE=$(AskUserQuestion "peer-review 모드 — 추천 ${REC:-없음(측정 불가)} · 근거 mode-gate.json · rename 줄 $RENAMED_LINES")
+    MODE_SRC="질문"
+    # 답이 없으면(비대화 · 자율 · 거부) 추천대로, 추천도 없으면 light — modules/mode-gate.md § 언제 묻나
+    [ -z "$MODE" ] && { MODE="${REC:-light}"; MODE_SRC="자동(추천 ${REC:-없음})"; }
   else
-    RISK_MATCHES=$(printf '%s' "$RISK_JSON" | jq -r '.risk')
-    TIER_DELTA=$(printf '%s' "$RISK_JSON" | jq -r '.tier_delta')
-    TIER=$((TIER + TIER_DELTA))
+    MODE_SRC="${MODE_SRC:-인자}"
   fi
-  [ "$TIER" -gt 2 ] && TIER=2  # cap (--deep 명시 시에만 Tier 3 진입)
+  [ "$MODE" = full ] && TIER=2 || TIER=1
 fi
 
 # 3. --deep 옵션 처리 (Tier 2/3에서만 Cross-Critique 활성화)
@@ -159,7 +156,7 @@ if [[ "$OPTS" == *"--deep"* ]]; then
 fi
 
 echo "$TIER" > ${WORK_DIR}/tier.txt
-echo "rationale: SIGNIFICANT=$SIGNIFICANT_LINES (added=$ADDED+del=$DELETED-gen=$GENERATED_LINES), risk=$RISK_MATCHES, override=${TIER_OPT:-auto}, deep=${OPTS}" >> ${WORK_DIR}/tier.txt
+echo "rationale: SIGNIFICANT=$SIGNIFICANT_LINES (added=$ADDED+del=$DELETED-gen=$GENERATED_LINES) files=$CHANGED_FILES, recommend=${REC:-none}, mode=${MODE:-} via ${MODE_SRC}, deep=${OPTS}" >> ${WORK_DIR}/tier.txt
 ```
 
 ### 리뷰 표면 진단 — stale merge-base
@@ -202,22 +199,24 @@ diff 에 다시 나타난다. 그러면 두 가지가 함께 틀린다 — Tier 
 | 단위 | 매칭 **행 수** | **카테고리 수** (같은 위험이 20줄에 걸쳐도 1) |
 | 역방향 | 없음 | `static let shared` + `var` 를 같은 파일에서 보면 동시성 위험 |
 
-⛔ **임계는 그대로다** — `≥2 → +2` · `==1 → +1`. 세는 단위만 바뀌었다.
+⛔ **카테고리 수는 추천 근거다** — 추천 임계는 `scripts/mode_gate.py`(`PEER_RISK_FULL`). Tier 를 직접 올리지 않는다(이전의 `≥2 → +2` · `==1 → +1` 승격은 2026-10-19 추천으로 옮겼다). 질문에 카테고리를 보인다.
 
 **왜 바꿨나**: 한 리뷰에서 4건이 매칭됐는데 전부 오탐이었다. `Interactor` substring 매칭 + 전부 `@@` 헤더였고, Lead 가 수동으로 0 으로 내렸다. 자동 판정 그대로면 114줄 PR 이 상위 Tier 로 올라가 3~6 agent call 을 유발한다 — **시간 목표를 직접 악화시킨다.**
 
-⛔ **실패 시 승격하지 않는다.** 스크립트가 비정상 종료하면 근거가 없는 것이므로 Tier 를 올리지 않고, 그 사실을 `tier.txt` 에 남긴다. 근거 없이 올리면 비용만 늘고, 조용히 넘어가면 판정이 있었던 것처럼 보인다.
+⛔ **실패 시 위험 근거 없이 추천한다.** 스크립트가 비정상 종료하면 근거가 없는 것이므로 추천에 쓰지 않고, 그 사실을 `tier.txt` 에 남긴다. 조용히 넘어가면 판정이 있었던 것처럼 보인다.
 
 회귀 자료: `tests/fixtures/peer-review/risk-scan/` — 음성 1(오탐 유발 형태) · 양성 2(직접 신호·역방향 신호).
 
 ### 옵션 precedence
-1. `--tier N` (최우선, auto 무효화). invalid 값 → auto fallback + error log
-2. `--deep` (auto Tier 2/3 시 Cross-Critique 활성화. auto Tier 0/1 시 warning + Tier 2 강제)
-3. `--gpt` (Tier 0 → Tier 1 효과: GPT challenger 1회 추가)
+1. `--tier N` (최우선 — 묻지 않는다). invalid 값 → 모드 질문 경로 + error log
+2. `--deep` (= full + Cross-Critique → Tier 3)
+3. 모드 인자 `light` · `full`(`--solo` = light · `--team` = full) · `/fz` 경유 · 신호어 → 그 모드(light = Tier 1 · full = Tier 2)
+4. 그 밖 → 모드 게이트 질문(`modules/mode-gate.md`)
+5. `--gpt` (`--tier 0` 명시 때 GPT challenger 1회 추가 — Tier 1 효과)
 
 ---
 
-### effort 배정 — 왜 전 스테이지 `xhigh` 인가
+### effort 배정 — 전 스테이지에 같은 effort (Lead 세션 effort)
 
 ⛔ **차등하지 않는다.** 계획 단계의 가정("Stage 2 는 판정 출력이라 가볍다")이 실측으로 반증됐다.
 
@@ -233,11 +232,11 @@ Stage 2 는 상대 렌즈 issue 에 `agree`/`adjust`/`false_positive` 를 매기
 
 ⭐ **어느 스테이지도 순수 판정이 아니다.** effort 차등의 전제(일부는 판정만 하니 낮춰도 된다)가 이 워크플로에서는 성립하지 않는다.
 
-⛔ `xhigh` 는 관성이 아니라 **결정된 값**이다 — `ultracode` 가 effort arm 으로 무효라는 실측 뒤 사용자가 유지를 택했다(CHANGELOG v4.14.0 T0). 근거 없이 되돌리지 않는다.
+⛔ **값은 Lead 세션 effort 다**(2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort): Workflow args `effort` 로 받아 전 스테이지에 같게 싣는다(미지정이면 `'xhigh'`). 위 표는 "스테이지마다 다르게 두지 않는다" 의 근거로 남는다 — 이전 기록: 2026-09 사용자가 `xhigh` 고정을 택했다(CHANGELOG v4.14.0 T0).
 
 **언제 다시 볼 것인가**: 위 표는 **N=1** 이다. Tier 3 실행이 3건 누적되면 아래를 본다.
 
-- Stage 2 의 `additions` 가 계속 최종에 생존하는가 → 생존하면 `xhigh` 정당
+- Stage 2 의 `additions` 가 계속 최종에 생존하는가 → 생존하면 전 스테이지 같은 effort 가 정당
 - 특정 스테이지의 출력량·기여가 일관되게 낮은가 → 그 스테이지만 `high` 로 ablation
 - ⛔ 짝 비교로 잰다: 같은 입력에 `xhigh`/`high` 각 1회, **검증된 critical·major 손실 0** 이 통과 기준
 
@@ -259,9 +258,11 @@ Stage 2 는 상대 렌즈 issue 에 `agree`/`adjust`/`false_positive` 를 매기
 
 ⚠️ 짝 비교는 비싸다(같은 입력 2회). 게이팅을 **랜딩하기 전에** 하고, 이후에는 `stage2Ran` 처럼 반환 필드로 관측한다.
 
+> 2026-10-19 사용자 결정: **모드 게이트(Tier 1 · Tier 2 선택)** 는 이 짝 비교 대신 실행 스모크로 랜딩한다 — 품질은 현재 effort 로 담보하고 사용자가 매번 고른다(`modules/mode-gate.md` § 사용자 결정 · `experiment-log.md` 재등록 행). 이 계약은 Tier **안의** 수집 게이팅에는 그대로 적용된다.
+
 ## Tier 0 (Solo) 절차
 
-> Orchestrator(Lead) 단독 분석. sub-agent + GPT 호출 없음. 작은 PR(<100 changed lines) 디폴트.
+> Orchestrator(Lead) 단독 분석. sub-agent + GPT 호출 없음. `--tier 0` 을 명시할 때만이다 — 모드 게이트의 light 는 Tier 1(GPT 포함)이다.
 
 ### Gather
 - WORK_DIR 초기화 + diff 수집 (SKILL.md Gather Step 0-5 그대로)
@@ -348,7 +349,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 ### Analyze
 - Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2)
 - + GPT challenger 1회 — 호출은 § GPT Analyze 호출 한 형태다(래퍼 exec · `gpt_peer_review_schema` · 산출 `${WORK_DIR}/gpt-challenger-result.json`)
-- ⛔ 래퍼 exit 10~14 는 전부 측정 실패다(스키마 계약 위반 14 포함 — "이슈 0건" 아님). 선택 관련 실패(래퍼 stderr 의 `CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그, 모델·effort 거부 12)는 먼저 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 따른다. 그 밖이거나 처방 뒤에도 실패면 `skills/fz-peer-review/SKILL.md` § 에러 대응의 Tier 1 GPT 실패 규칙(`solo (gpt 실패)` — 실질 Tier 0 강등)으로 간다
+- ⛔ 래퍼 exit 10~14 는 전부 측정 실패다(스키마 계약 위반 14 포함 — "이슈 0건" 아님). 선택 관련 실패(래퍼 stderr 의 `CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그, 모델·effort 거부 12)는 먼저 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 따른다. 그 밖이거나 처방 뒤에도 실패면 `skills/fz-peer-review/SKILL.md` § 에러 대응의 Tier 1 GPT 실패 규칙(`solo (gpt 실패)` — 실질 Tier 0 강등)으로 간다 · ⛔ exit 18(`GPT-OFF` — 사용자 선택 · CLI 없음)은 실패가 아니다 — GPT 칸 `[GPT 미사용 — 사유]` · 병합 `--gpt-unavailable` · 강등 · 감쇠 없음(`modules/gpt-strategy.md` § GPT 미사용)
 - ⊕ 기본으로(`--no-gpt-independent` 면 위 challenger) 위 challenger 대신 `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review` 를 쓴다 — 허용 입력만 격리 폴더로 들어가 Lead 요약 · 가설이 GPT 에 닿지 않는다. Synthesize 에서 Lead 발견을 `{"issues": […]}` 로 써서 `review_merge.py --claude` 로 합친다(모양 · 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4)
 - GPT prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
 
@@ -571,7 +572,7 @@ jq -e '
 0. Lead: 준비 — cp {플러그인 루트}/workflows/peer-review.js {WORK_DIR}/peer-review.js && cmp -s {플러그인 루트}/workflows/peer-review.js {WORK_DIR}/peer-review.js   // §12 0단계(매 호출 · 경로 판정과 self-contained 확인 포함) — exit 0 일 때만 1 · 비0 이면 L4
 1. Lead: Workflow({ scriptPath: '{WORK_DIR}/peer-review.js',   // ⛔ 거부 시 정본 = guides/skill-authoring.md §12 우회 계약 (SOLO 폴백 아님)
                     args: { diffPath, intentContext, evidencePaths, basePath, deep: false,
-                            structuralContext } })   // ⛔ 누락 시 에러 없이 구조 축이 꺼진다
+                            structuralContext, effort } })   // ⛔ 누락 시 에러 없이 구조 축이 꺼진다 · effort = mode-gate.json 의 effort.value(lead-effort — null 이면 뺀다)
 2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
              → parallelWithRetry (null 항목 1회 순차 재시도 = rate-limit 폴백 계약)
 3. Lead: GPT challenger ×1 — § GPT Analyze 호출  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
@@ -651,7 +652,7 @@ EOF
   --prompt-file "${WORK_DIR}/gpt-challenger-prompt.txt"
 ```
 
-결과: `${WORK_DIR}/gpt-challenger-result.json` — ⛔ exit 10~17 은 측정 실패다("이슈 0건" 아님). 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` · 모델·effort 거부 12)는 정본 `modules/gpt-strategy.md` § 모델·effort 선택, Tier 별 강등은 `skills/fz-peer-review/SKILL.md` § 에러 대응 의 GPT 실패 규칙이다.
+결과: `${WORK_DIR}/gpt-challenger-result.json` — ⛔ exit 10~17 은 측정 실패다("이슈 0건" 아님). 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` · 모델·effort 거부 12)는 정본 `modules/gpt-strategy.md` § 모델·effort 선택, Tier 별 강등은 `skills/fz-peer-review/SKILL.md` § 에러 대응 의 GPT 실패 규칙이다 · ⛔ exit 18(`GPT-OFF` — 사용자 선택 · CLI 없음)은 실패가 아니다 — GPT 칸 `[GPT 미사용 — 사유]` · 병합 `--gpt-unavailable` · 강등 · 감쇠 없음(`modules/gpt-strategy.md` § GPT 미사용).
 
 ⛔ GPT CLI 를 background 로 직접 부르면 stdin lock — 정문이 부르는 래퍼 `scripts/gpt-exec.sh` 가 `< /dev/null` 로 닫는다(CLI · 래퍼 직접 호출 금지).
 

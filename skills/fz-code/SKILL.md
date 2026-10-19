@@ -20,7 +20,7 @@ allowed-tools: >-
   mcp__context7__query-docs,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
-  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Bash(cmp *), Workflow
+  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow
 metadata:
   provides: [code-changes]
   needs: [planning]
@@ -108,15 +108,17 @@ metadata:
 
 각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
 
+0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" code --steps {WORK_DIR}/plan/steps.json --estimate code-pair`(없으면 `--plan-doc` · `--no-plan`) 로 추천을 달고 묻는다. **light** 면 이 루프 대신 Lead 가 구현 절차로 Step 마다 직접 구현한다(아래 light 모드) · **full** 이면 이 루프
+
 1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
    ⛔ 아래 넷도 **같은 파일에 요약해 넣는다** — 별도 arg 를 만들지 않고 기존 `contextPath` 하나로 전달한다:
    `code/phase-0.5-detection.md`(Swift token 검출 + 대응 step) · `discover/discover-journal.md` 의 🔒 불변 제약 ·
    `plan/direction-challenge.md` 의 방향 판정 · `plan/verify-result.md` 의 미해소 이슈(있으면).
    ⚠️ 만들기만 하고 넘기지 않으면 무력하다 — 렌즈는 `contextPath` 밖 파일을 열 수 없다.
-2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 참조),complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
+2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 참조),complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `effort`=0 결과 `effort.value`(lead-effort — null 이면 넣지 않는다) · `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
-   - Stage 1 impl(opus) changeset → Stage 2 **검토**(full: review-arch + impl-quality **병렬 2렌즈**, opus / light: arch 단독) → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, full 3-4 call · light 1-2 call)
+   - Stage 1 impl(opus) changeset → Stage 2 **검토**(full: review-arch + impl-quality **병렬 2렌즈**, opus / light: arch 단독) → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, full 3-4 call · light 1-3 call)
 4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유)
 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead
@@ -355,14 +357,14 @@ metadata:
 
 8. **Issue Tracker에 빌드 이슈 기록** (실패 시)
 
-8.5. **⛔ GPT 교차 검증** (TEAM 모드 — 생략 금지):
+8.5. **⛔ GPT 교차 검증** (GPT 를 켠 세션이면 light · full 모두 — 생략 금지):
    모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 실행한다.
    ```bash
    /fz-gpt check "구현 코드 교차 검증"
    ```
    - 에이전트 구현 결과를 cross-model로 검증
    - 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백
-   - SOLO 모드에서는 선택 (TEAM에서는 필수)
+   - GPT 를 끈 세션(정문 exit 18 `GPT-OFF`)이면 `[GPT 미사용 — 사유]` 를 남긴다 — `modules/gpt-strategy.md` § GPT 미사용
 
 ### 빌드 실패 대응
 
@@ -384,7 +386,7 @@ metadata:
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
 - [ ] SOLO + 3+ 파일 변경이면 `/sc:sc-reflect` 실행했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
-- [ ] ⛔ GPT 교차 검증 완료? (TEAM 모드 — Lead가 /fz-gpt check 실행)
+- [ ] ⛔ GPT 교차 검증 완료? (GPT 를 켠 세션 — light · full 모두 Lead가 /fz-gpt check 실행 · 끈 세션은 `[GPT 미사용]` 기록)
 
 ---
 
@@ -451,7 +453,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 |-------|------|------|------|
 | 승인된 `{WORK_DIR}/plan/plan-final.md`가 존재 | `/fz-code "검증된 계획대로 구현해줘"` | Plan의 모든 Step을 순차 구현 + 매 Step 빌드 성공 + Gate 3 체크리스트 전 항목 통과(모든 Step 완료·빌드 성공·아티팩트 기록 완료) | normal |
 | 구현 중 같은 대상에 switch/if/enum case 3개+ 발생 | Step N 구현 진행 | "분기 폭증" 마찰 신호를 보고 형식(신호/위치/현상/플랜 재검토)으로 출력 + 사용자 "계속" 응답 전까지 구현 진행 중단(무시 강행 없음) | edge-case |
-| Plan 존재 + 단일 파일/심볼 변경 + "가볍게" 신호 | `/fz-code light "이 변경만 빠르게 구현해줘"` | Plan 첫 Step(단일 변경)만 구현 + GPT 교차 검증 생략 + 매 Step 빌드 성공 유지 + `{WORK_DIR}/code/step-light.md` 산출 | edge-case |
+| Plan 존재 + 모드 게이트에서 light 선택(또는 `light` 인자 · 신호어) | `/fz-code light "가볍게 구현해줘"` | code-pair 미기동 · Plan 의 모든 Step 을 Lead 가 직접 구현 + 매 Step 빌드 성공 · 원장 게이트 + GPT 교차 검증(8.5) 그대로(끈 세션이면 `[GPT 미사용]`) | edge-case |
 | Step 구현 중 컴파일 에러로 빌드 2회 연속 실패 | Step N 빌드 검증 | `/sc:sc-troubleshoot --fix` 자동 트리거 후 재빌드, 반복 실패 시 `/ralph-loop` 래더로 에스컬레이션 — 빌드 성공 확인 전 다음 Step 진입 안 함(silent fail 없음) | failure |
 
 ## Boundaries
@@ -469,17 +471,12 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 - 코드 리뷰/검증 (→ /fz-review)
 - **팀 공유 영역 자동 변경 (36차)**: `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` / pre-commit hook 등 변경 시 사용자 명시 합의 의무. CLAUDE.md "팀 공유 영역" 정의 우선, 부재 시 fallback list 적용
 
-### light 모드 (40차 simplified mode)
+### light 모드 (모드 게이트 — `modules/mode-gate.md`)
 
-사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-code light "..."` 호출 시:
-- Step 1 (incremental, 단일 변경)만 실행 — Plan의 첫 Step 또는 가장 작은 단위
-- Stress Test / 마찰 감지 간소화 (분기 폭증 / 잔존 패턴만 유지)
-- GPT 교차 검증 생략 (TEAM 모드라도 light 우선)
-- 매 Step 후 빌드 검증은 유지 (build 안전성은 필수)
+진입: 팀 모드 실행 절차 0 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+- code-pair 를 띄우지 않고 Plan 의 **모든** Step 을 Lead 가 구현 절차(1~8.5)대로 직접 구현한다 — Step 마다 빌드 · 원장 게이트(6.4) · 마찰 감지 그대로
+- GPT 교차 검증(8.5)은 full 과 같다(끈 세션이면 `[GPT 미사용]`)
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
-- 산출물: `{WORK_DIR}/code/step-light.md` (간소화)
-
-조건: 메모리 40차 trigger 키워드 + 단일 파일/심볼 변경에만. 5+ 파일 영향 또는 리팩토링 시 full 모드 강제.
 
 ## 에러 대응
 

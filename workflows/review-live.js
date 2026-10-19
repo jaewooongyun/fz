@@ -25,7 +25,7 @@
 //     미보고' 는 그 문장이 있을 때만 풀린다 — 게시 여부는 review_merge 가 정한다(tests/workflows/low-confidence-preserved.js).
 //   snapshotDir: ⛔ 기본 off(R-C S22b). scripts/review_snapshot.sh 산출 폴더를 주면 Stage 1 두 렌즈에 '스냅샷 우선' 1줄 — 미지정 · 빈 문자열이면
 //     바이트 단위로 같다(tests/workflows/review-live-snapshot-arm.js). 효과(워커 턴 · 출력 · SC-3)는 S25 가 잰다.
-//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
+//   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
 //   Workflow 외부(Lead 책임 유지): L3 통합 / review-correctness(RTM 시 Phase 4.5) / GPT validate(Phase 5.5) / wall-clock.
@@ -217,6 +217,13 @@ if (!input || !input.diffPath || !input.intentContext) {
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: metrics(0) }
 }
+// effort = Lead 세션 effort(args.effort — modules/mode-gate.md § effort). 미지정이면 'xhigh'(기준선 불변), 허용값 밖이면 fallback
+const EFFORT = input.effort === undefined ? 'xhigh' : input.effort
+if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
+  log(`FATAL args invalid — effort=${JSON.stringify(input.effort)}: low · medium · high · xhigh · max. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: metrics(0) }
+}
 
 const TARGET = `[리뷰 대상] diff 파일: ${input.diffPath} (Read로 로드)\n[변경 의도] ${input.intentContext}`
 // 구조 축 브리프 — arch 렌즈에만 주입 (modules/review-structural-axes.md §2).
@@ -287,11 +294,11 @@ const [arch, quality] = await parallel([
   () => callAgent(
     `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${snapshotLine}${structuralLine}${craftLine}\n` +
     `[목표] 아키텍처 관점 findings (id는 A1, A2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
-    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(craftOn ? archCraftSchema(stage1Schema) : stage1Schema) }),
+    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: lensSchema(craftOn ? archCraftSchema(stage1Schema) : stage1Schema) }),
   () => callAgent(
     `${LENS_OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}${snapshotLine}\n` +
     `[목표] 품질 관점 findings (id는 Q1, Q2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.`,
-    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(stage1Schema) }),
+    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: EFFORT, schema: lensSchema(stage1Schema) }),
 ])
 if (!arch && !quality) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 both null', metrics: metrics(0) } }
 if (!arch || !quality) log('WARN stage1 한쪽 null — 단독 진행 (교차 조정 생략)')
@@ -431,11 +438,11 @@ if (arch && quality && !stage2Skipped) {
     () => callAgent(
       `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대(품질) findings] ${JSON.stringify(quality.findings)}\n` +
       `[목표] 각 finding의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 finding은 additions(id A-X)로.${crossRequiredLine}${crossDeltaLine}`,
-      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: lensSchema(crossSchema) }),
+      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: lensSchema(crossSchema) }),
     () => callAgent(
       `${LENS_OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대(아키) findings] ${JSON.stringify(arch.findings)}\n` +
       `[목표] 각 finding의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 finding은 additions(id Q-X)로.${crossRequiredLine}${crossDeltaLine}`,
-      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'opus', effort: 'xhigh', schema: lensSchema(crossSchema) }),
+      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'opus', effort: EFFORT, schema: lensSchema(crossSchema) }),
   ])
   archOnQuality = cross[0]
   qualityOnArch = cross[1]
@@ -463,7 +470,7 @@ const counter = await callAgent(
   `${LENS_OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
   `[findings] ${JSON.stringify(allFindings)}\n[okAreas(정상 판정)] ${JSON.stringify(allOkAreas)}\n` +
   `[목표] (1) 각 finding을 실측 재검증 — 과장/오독이면 refute + 인용. (2) okAreas에 "정말 OK인가?" 반례 탐색 — 반례 발견 시 missedFindings(id C-X)로. 라인 인용 오류를 특히 의심.`,
-  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: 'xhigh', schema: lensSchema(CounterSchema) })
+  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: EFFORT, schema: lensSchema(CounterSchema) })
 if (!counter) log('WARN counter null — DA 패스 미수행 (findings 원판정 유지)')
 
 // ════════ 병합 — 스크립트 binary 규칙 (id-기반 verdict 반영) ════════

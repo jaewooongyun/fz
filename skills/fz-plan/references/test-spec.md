@@ -30,6 +30,6 @@
 | 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴이 포함된 요구사항 + Serena 활성 가능 | `/fz-plan "[A-Z]{2,6}-\d{2,5} 새 화면 계획 세워줘"` | Phase 0에서 `{CWD}/{TICKET}/` 폴더 + index.md 생성 → Gate 0(Work Dir Ready) 3/3 통과 → Phase 1 영향 분석 후 Gate 1(Plan Ready) 통과 + plan-v1.md 기록 | normal |
 | SOLO 모드 + 새 아키텍처 결정 요구 | `/fz-plan "새 결제 모듈 설계해줘"` | Phase 0.5에서 6개 관점 검토 + 대안 ≥2 제시 → Gate 0.5(Direction Validated) 통과(판정 PROCEED) + direction-challenge.md 기록 | normal |
 | 계획 핵심 차원이 외부 primitive(CLI flag/config key)에 의존 + 미검증 상태 | `/fz-plan "외부 CLI 옵션 기반으로 계획 세워줘"` | Phase 0c에서 3 axes(존재/권한·경계/결과 contract) 분류 → 미검증 axis는 차원 제외 또는 explicit assumption tag, probe 필요 시 /fz-discover 선행 → Gate 0c 미통과 시 Plan 작성 차단 | edge-case |
-| "그냥/가볍게" 신호 + 단순 추가 작업 | `/fz-plan light "버튼 추가 계획 가볍게"` | Phase 1만 실행, Phase 0.5/2/3 미호출 → plan-light.md 산출 (단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 생략 불가) | edge-case |
+| 모드 게이트에서 light 선택(또는 `light` 인자 · 신호어) + 단순 추가 작업 | `/fz-plan light "버튼 추가 계획 가볍게"` | plan-lean2 미기동 · Phase 1 Lead 수행 → Phase 2(GPT verify ∥ verify-gates · 끈 세션이면 `[GPT 미사용]`) · Phase 3 · 원장 · plan-final.md 는 full 과 같다 (단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 생략 불가) | edge-case |
 | Serena MCP 연결 실패 | `/fz-plan "이 기능 영향 범위 분석해줘"` | 에러 대응에 따라 Grep + Glob 폴백으로 심볼 탐색 전환(Serena 미사용) → Phase 0b 계속 진행 | failure |
 | 네이티브 Workflow 도구 미가용 (팀 에이전트 모드 불가) | `/fz-plan "5+ Step 대규모 기능 계획해줘"` | SOLO 계획 수립으로 폴백 + 폴백 사유 experiment-log 기록 → Phase 1 산출물 정상 생성 | failure |

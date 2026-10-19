@@ -15,8 +15,11 @@
 #   F  폴백 보존        snapshot 이 없으면 gh 경로가 살아 있어야 한다(gather 미경유 직접 호출)
 #   branch  브랜치 입력 diff 실패(F-385) — 문서의 브랜치 분기 블록(`# branch input` ~ `fi` + `CHANGED_LINES=` 줄)을 뽑아
 #           임시 git 리포(BASE=develop 존재 · 원격 없음 · GIT_ALLOW_PROTOCOL=file · AskUserQuestion stub)에서 실행한다.
-#           없는 INPUT(feature/no-such-branch)은 0줄이 아니라 '⛔ diff 실패' 표지 + TIER=2, 정상 브랜치는 실제 변경량.
+#           없는 INPUT(feature/no-such-branch)은 0줄이 아니라 '⛔ diff 실패' 표지 + 판정 불가 표시, 정상 브랜치는 실제 변경량.
 #           ⛔ 기준 블록(`2>/dev/null | awk … END{print a+0}`)은 CHANGED_LINES=0 으로 진행한다 — 이 셀이 FAIL(exit 1)
+#           모드 단락(`# 2. 모드` — modules/mode-gate.md · 2026-10-19)까지 돌리면: 판정 불가는 **추천 없이** 묻고(mode_gate.py peer --unmeasured)
+#           답이 없으면(stub = 비대화) light = TIER=1 · 정상 브랜치는 추천 light → TIER=1 · MODE=full 이 정해져 있으면 묻지 않고 TIER=2 ·
+#           --tier 0 명시면 묻지 않고 TIER=0. 예전 단언 "판정 불가 → Tier 단락 뒤에도 TIER=2" 는 이 계약으로 옮겼다(측정 실패를 작음으로 읽지 않는 것은 그대로다)
 #
 # usage: run.sh [--tree <플러그인 트리>] [--cells S,V,F,branch]   (기본: 이 fixture 가 든 트리 · 전 셀 — health-check 는 인자 없이 부른다)
 #   --tree 는 읽을 문서(modules/peer-review-tiers.md)만 바꾼다
@@ -127,8 +130,8 @@ fi
 if want branch; then
   BLOCK=$(awk 'index($0, "# branch input") {s = 1} s && /^fi$/ {exit} s' "$DOC")
   CL_LINE=$(awk 's && /^CHANGED_LINES=/ {print; exit} index($0, "# branch input") {s = 1}' "$DOC")
-  # Tier 단락: CHANGED_LINES= 줄 다음부터 `# 2. --tier` 블록의 0열 `fi` 까지 — 판정 불가 TIER=2 를 auto 가 덮지 않는지(끝까지) 본다
-  TAIL=$(awk 'c && /^fi$/ && t {print; exit} c {print} c && index($0, "# 2. --tier") {t = 1} s && /^CHANGED_LINES=/ {c = 1} index($0, "# branch input") {s = 1}' "$DOC")
+  # 모드 단락: CHANGED_LINES= 줄 다음부터 `# 2. 모드` 블록의 0열 `fi` 까지 — 판정 불가가 추천 없이 묻는지 · 답 없으면 light 인지 본다
+  TAIL=$(awk 'c && /^fi$/ && t {print; exit} c {print} c && index($0, "# 2. 모드") {t = 1} s && /^CHANGED_LINES=/ {c = 1} index($0, "# branch input") {s = 1}' "$DOC")
   [ -n "$BLOCK" ] && [ -n "$CL_LINE" ] && [ -n "$TAIL" ] || { echo "브랜치 분기 블록 추출 실패: $DOC" >&2; exit 2; }
   R="$TMP/repo"
   mkdir -p "$TMP/home" && : > "$TMP/gitconfig" || exit 2
@@ -145,15 +148,17 @@ if want branch; then
     && git -C "$R" checkout -q develop; } >/dev/null 2>&1 || { echo "임시 git 리포 준비 실패" >&2; exit 2; }
   [ -z "$(git -C "$R" remote)" ] || { echo "전제 불성립 — 원격이 있다" >&2; exit 2; }
   ! git -C "$R" rev-parse -q --verify feature/no-such-branch >/dev/null || { echo "전제 불성립 — 없는 브랜치가 있다" >&2; exit 2; }
-  # $1=INPUT [$2=full — Tier 단락까지] — 블록을 실행하고 RESULT 줄을 낸다. AskUserQuestion 은 stub(호출을 기록하고 빈 답)
+  # $1=INPUT [$2=full — 모드 단락까지] [$3…=추가 env(MODE=full · TIER_OPT=0)] — 블록을 실행하고 RESULT 줄을 낸다.
+  #   AskUserQuestion 은 stub(호출을 기록하고 빈 답 = 비대화). 모드 단락은 이 트리의 mode_gate.py 를 부른다(WORK_DIR 은 임시)
+  mkdir -p "$TMP/wd" || exit 2
   run_block() {
     local tail_=""; [ "${2:-}" = full ] && tail_="$TAIL"
-    (cd "$R" && env -u BASE -u TIER -u TIER_OPT INPUT="$1" ASK_LOG="$TMP/ask.log" bash -c '
+    (cd "$R" && env -u BASE -u TIER -u TIER_OPT -u MODE -u MODE_SRC INPUT="$1" ASK_LOG="$TMP/ask.log" FZ_PLUGIN_ROOT="$TREE" WORK_DIR="$TMP/wd" FZ_MODE_GATE_ESTIMATE_SEC=1 "${@:3}" bash -c '
 AskUserQuestion() { printf "%s\n" "$*" >> "$ASK_LOG"; }
 '"$BLOCK"'
 '"$CL_LINE"'
 '"$tail_"'
-printf "RESULT TIER=%s CHANGED_LINES=%s ADDED=%s DELETED=%s RENAMED_LINES=%s\n" "${TIER:-unset}" "$CHANGED_LINES" "$ADDED" "$DELETED" "$RENAMED_LINES"
+printf "RESULT TIER=%s CHANGED_LINES=%s ADDED=%s DELETED=%s RENAMED_LINES=%s REC=%s MODE=%s\n" "${TIER:-unset}" "$CHANGED_LINES" "$ADDED" "$DELETED" "$RENAMED_LINES" "${REC-unset}" "${MODE:-unset}"
 ' 2>&1)
   }
   : > "$TMP/ask.log"
@@ -168,19 +173,39 @@ printf "RESULT TIER=%s CHANGED_LINES=%s ADDED=%s DELETED=%s RENAMED_LINES=%s\n" 
     *"TIER=2 "*) pass "branch 없는 INPUT: TIER=2" "$res_bad" ;;
     *) fail "branch 없는 INPUT: TIER=2" "${res_bad:-RESULT 없음}" ;;
   esac
+  : > "$TMP/ask.log"
   out_full=$(run_block feature/no-such-branch full)
   res_full=$(printf '%s\n' "$out_full" | command grep -m1 '^RESULT ')
   case "$res_full" in
-    *"TIER=2 "*) pass "branch 없는 INPUT: Tier 단락 뒤에도 TIER=2" "$res_full" ;;
-    *) fail "branch 없는 INPUT: Tier 단락 뒤에도 TIER=2" "auto 가 덮었다 — ${res_full:-RESULT 없음}" ;;
+    *"TIER=1 "*"REC= MODE=light"*) pass "branch 없는 INPUT: 추천 없음 → 답 없으면 light" "$res_full" ;;
+    *) fail "branch 없는 INPUT: 추천 없음 → 답 없으면 light" "${res_full:-RESULT 없음}" ;;
   esac
+  command grep -qF '추천 없음(측정 불가)' "$TMP/ask.log" \
+    && pass "branch 없는 INPUT: 질문에 '측정 불가'" "$(head -1 "$TMP/ask.log")" \
+    || fail "branch 없는 INPUT: 질문에 '측정 불가'" "$(head -1 "$TMP/ask.log" 2>/dev/null)"
+  out_okf=$(run_block feature/ok full)
+  res_okf=$(printf '%s\n' "$out_okf" | command grep -m1 '^RESULT ')
+  case "$res_okf" in
+    *"TIER=1 "*"REC=light MODE=light"*) pass "branch 정상 브랜치: 추천 light → TIER=1" "$res_okf" ;;
+    *) fail "branch 정상 브랜치: 추천 light → TIER=1" "${res_okf:-RESULT 없음}" ;;
+  esac
+  : > "$TMP/ask.log"
+  res_full2=$(run_block feature/ok full MODE=full | command grep -m1 '^RESULT ')
+  res_t0=$(run_block feature/ok full TIER_OPT=0 | command grep -m1 '^RESULT ')
+  case "$res_full2" in *"TIER=2 "*) ok1=1 ;; *) ok1=0 ;; esac
+  case "$res_t0" in *"TIER=0 "*) ok2=1 ;; *) ok2=0 ;; esac
+  if [ "$ok1" = 1 ] && [ "$ok2" = 1 ] && [ ! -s "$TMP/ask.log" ]; then
+    pass "branch 명시 MODE=full · --tier 0: 묻지 않음" "full → TIER=2 · --tier 0 → TIER=0 · 질문 0"
+  else
+    fail "branch 명시 MODE=full · --tier 0: 묻지 않음" "$res_full2 / $res_t0 / 질문 $(wc -l < "$TMP/ask.log")"
+  fi
   out_ok=$(run_block feature/ok)
   res_ok=$(printf '%s\n' "$out_ok" | command grep -m1 '^RESULT ')
-  if [ "$res_ok" = "RESULT TIER=unset CHANGED_LINES=7 ADDED=5 DELETED=2 RENAMED_LINES=5" ] \
+  if [ "$res_ok" = "RESULT TIER=unset CHANGED_LINES=7 ADDED=5 DELETED=2 RENAMED_LINES=5 REC=unset MODE=unset" ] \
      && ! printf '%s\n' "$out_ok" | command grep -qF '⛔ diff 실패'; then
     pass "branch 정상 브랜치: 실제 변경량" "$res_ok"
   else
-    fail "branch 정상 브랜치: 실제 변경량" "기대 TIER=unset CHANGED_LINES=7 ADDED=5 DELETED=2 RENAMED_LINES=5 · 실측 ${res_ok:-RESULT 없음}"
+    fail "branch 정상 브랜치: 실제 변경량" "기대 TIER=unset CHANGED_LINES=7 ADDED=5 DELETED=2 RENAMED_LINES=5 REC=unset MODE=unset · 실측 ${res_ok:-RESULT 없음}"
   fi
   [ ! -s "$TMP/ask.log" ] && pass "branch AskUserQuestion 호출 0" "feature/* → BASE=develop (stub 미호출)" \
     || fail "branch AskUserQuestion 호출 0" "$(head -1 "$TMP/ask.log")"

@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__github__get_pull_request_comments,
   mcp__context7__resolve-library-id,
   mcp__context7__query-docs,
-  Bash(git *), Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Workflow
+  Bash(git *), Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Workflow
 metadata:
   provides: [pr-digest, code-understanding]
   needs: [none]
@@ -427,7 +427,7 @@ Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체
 
 ### 심층 탐색
 - **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/search-cross-verify.js {WORK_DIR}/search-cross-verify.js && cmp -s {플러그인 루트}/workflows/search-cross-verify.js {WORK_DIR}/search-cross-verify.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
-- `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — search-symbolic(심볼/Before-After 구조) ↔ search-pattern(아키텍처 패턴/기술 배경) 교차 검증. 반환을 digest 입력으로 결합. ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+- `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — args 에 `effort`=`python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" lead-effort` 의 `effort.value`(null 이면 뺀다 · `modules/mode-gate.md` § effort) · search-symbolic(심볼/Before-After 구조) ↔ search-pattern(아키텍처 패턴/기술 배경) 교차 검증. 반환을 digest 입력으로 결합. ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
 
 ### peer-review 연계
 - fz-peer-review Tier 3 + `--explain --deep` 시: Lead가 `workflows/peer-review.js`(`deep:true`) 실행 → reviews/issues 수신 → pr-digest Deep 해설과 결합. 각 스킬이 자신의 Workflow를 소유하므로 별도 TeamCreate 불필요.

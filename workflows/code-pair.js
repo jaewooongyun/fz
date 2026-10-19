@@ -8,7 +8,7 @@
 //      본 스크립트는 stepSpec 을 **해석하지 않고** 프롬프트에 통째 전달하므로 형태 변경에 무관하다.
 //       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify:VerifySpec, complexity, estimatedNewBodyLines?}, contextPath, buildFeedback?, changesetTarget } })
 //       estimatedNewBodyLines?: Lead 추정 총 newBody 줄수 — SPLIT_THRESHOLD(600) 초과 시 pre-flight가 스폰 전 split_required 반환(H5). 미제공 시 가드 skip(하위호환).
-//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
+//   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, lensesExpected, lensesCompleted,
 //            residualIssues, residualNote, metrics }
 //   ⛔ reviewVerdict 는 'pass'|'issues'|'partial'|'skipped'. **'partial' 은 스크립트가 조립한다**
@@ -26,7 +26,7 @@
 //     Stage3 impl(opus) 이슈 반영 수정 — **조건부**: review pass면 Stage3 생략 (3-call).
 //     계획 표기 '고정 3-call'은 unresolved #2가 잠정 부정확 지적 — pass 경로 dead-call 제거가 정직
 //     (plan-collaborative direction 조건부화 동형). 분기 상한 고정(3-4 call) → 가변 fan-out 아님.
-//   light(fz-fix): Stage1 impl(opus) → Stage2 review-arch 단독은 stepSpec.complexity>=3만 (1-2 call).
+//   light(fz-fix): Stage1 impl(opus) → Stage2 review-arch 단독은 stepSpec.complexity>=3만 → 이슈가 있으면 Stage3 수정 (1-3 call).
 //     complexity 누락 시 review 포함 (안전 default) + log 명시. ⛔ light에 impl-quality 미추가 (비용 유지).
 //   opus 동시 ≤2 (+Lead=3): Stage2 full만 parallel — Stage1↔2↔3은 의존 사슬이라 순차.
 //   budget 가드: 해당 없음 — 분기 상한 고정 1-4 call (§12 단서).
@@ -127,6 +127,13 @@ if (!input || !input.mode || !input.stepSpec || !input.contextPath || !input.cha
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: metrics(0) }
 }
+// effort = Lead 세션 effort(args.effort — modules/mode-gate.md § effort). 미지정이면 'xhigh'(기준선 불변), 허용값 밖이면 fallback
+const EFFORT = input.effort === undefined ? 'xhigh' : input.effort
+if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
+  log(`FATAL args invalid — effort=${JSON.stringify(input.effort)}: low · medium · high · xhigh · max. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: metrics(0) }
+}
 // buildFeedback type guard: 빈 문자열('')은 "피드백 없음"이 아닌 유효 입력과 구분 (E:E15 계열)
 const buildFeedback = (typeof input.buildFeedback === 'string' && input.buildFeedback.length > 0) ? input.buildFeedback : null
 
@@ -149,7 +156,7 @@ const changeset = await callAgent(
   `[목표] Step 목표를 달성하는 changeset 생산. 각 symbolEdit의 newBody는 Lead가 그대로 적용 가능한 exact syntax ` +
   `(의사코드·생략 금지). 대상 파일을 Read해 현재 상태 기준으로 작성. buildExpectation은 검증 가능 형태로.` +
   (buildFeedback ? ' 이전 빌드 피드백의 오류를 우선 해소.' : ''),
-  { label: 'stage1-impl', agentType: 'fz:impl-correctness', model: 'opus', effort: 'xhigh', schema: ChangesetSchema })
+  { label: 'stage1-impl', agentType: 'fz:impl-correctness', model: 'opus', effort: EFFORT, schema: ChangesetSchema })
 if (!changeset) {
   fallbackCount += 1
   // 크기 프록시(files>=4 OR complexity===5)면 split 힌트. ⚠️ null=무조건 split 아님 —
@@ -196,7 +203,7 @@ if (needReview) {
     // 병렬 2렌즈 — 서로 다른 질문(아키 적합성 vs 코드베이스 패턴 일관성). 같은 질문 중복 금지.
     const [archReview, qualityReview] = await parallel([
       () => callAgent(archPrompt,
-        { label: 'stage2-review-arch', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewSchema }),
+        { label: 'stage2-review-arch', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: ReviewSchema }),
       () => callAgent(
         `${OVERRIDE}\n[역할] 구현 품질 검토자(impl-quality 렌즈)\n${STEP}\n[changeset] ${JSON.stringify(changeset)}\n` +
         `[목표] Codebase Pattern Consistency — 이 편집이 **놓인 자리**가 일관적인지 본다.\n` +
@@ -205,7 +212,7 @@ if (needReview) {
         `     ⛔ 접근수준·소유권은 소비처가 결정 → 이 렌즈에서 제외.\n` +
         ` (b) 기존 코드베이스의 유사 구현과 비교, 새 패턴 도입 시 기존 패턴과의 충돌.\n` +
         `이슈는 id(Q1...) + 실측 인용. 표현 차이가 **의미 차이**를 반영하면 이슈 아님.`,
-        { label: 'stage2-review-quality', agentType: 'fz:impl-quality', model: 'opus', effort: 'xhigh', schema: ReviewSchema }),
+        { label: 'stage2-review-quality', agentType: 'fz:impl-quality', model: 'opus', effort: EFFORT, schema: ReviewSchema }),
     ])
     // 하류 계약 보존: review는 단일 객체로 병합 (s2 완주 판정 / Stage3 조건 / residualIssues가 참조)
     // ⛔ F-216 N1: 이전 판은 렌즈 하나가 null 이어도 verdict:'pass' 를 만들고 완주 3/3 을 인쇄했다.
@@ -225,7 +232,7 @@ if (needReview) {
     }
   } else {
     review = await callAgent(archPrompt,
-      { label: 'stage2-review', agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: ReviewSchema })
+      { label: 'stage2-review', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: ReviewSchema })
     // ⛔ light 도 렌즈 회계에 넣는다 — 빠뜨리면 검토가 성공해도 lensesCompleted 가 0 이라 s2 가 항상 false 다.
     lensesCompleted = review ? 1 : 0
     if (!review) { deadLenses.push('review-arch'); log('WARN stage2 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)') }
@@ -242,7 +249,7 @@ if (review && review.issues.length > 0) {
   const revised = await callAgent(
     `${OVERRIDE}\n[역할] 구현자 — 검토 반영\n${STEP}\n[원 changeset] ${JSON.stringify(changeset)}\n[검토 이슈] ${JSON.stringify(review.issues)}\n` +
     `[목표] 이슈를 반영한 수정 changeset. 동의하지 않는 이슈는 그대로 두되 summary에 사유 명시.`,
-    { label: 'stage3-revise', agentType: 'fz:impl-correctness', model: 'opus', effort: 'xhigh', schema: ChangesetSchema })
+    { label: 'stage3-revise', agentType: 'fz:impl-correctness', model: 'opus', effort: EFFORT, schema: ChangesetSchema })
   if (revised) finalChangeset = revised
   else log('WARN stage3 null — 원 changeset 반환 (이슈 미반영, residualIssues 유지)')
 }

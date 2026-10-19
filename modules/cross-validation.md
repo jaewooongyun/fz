@@ -3,14 +3,14 @@
 > **Sources (last audited: 2026-09-25 — 모델 사실 축: Opus 5.5 상속·think-carefully 권고 1문단 · 원칙 A3 에 2607.08065 · 교차 검증 대상 GPT 표기만 대조. 나머지는 2026-07-25 대조 그대로):** `guides/llm-references.md` §1 정본 대조 완료 (Opus 5 "검증 지시 삭제" 지침 대비 게이트 존치 경계 성문화 포함).
 >
 > fz Phase 3에서 파이프라인에 검증 게이트를 자동 삽입. 모든 모드에서 최소한의 검증 보장.
-> 핵심 원칙: TEAM = Claude 에이전트(N) + GPT(1). 코드/계획 생산 TEAM에 GPT CLI 필수 참여. 탐색 파이프라인은 --deep만.
+> 핵심 원칙: GPT 사용 여부가 GPT 단계를 정한다 — 켠 세션이면 코드/계획 생산에 GPT CLI 가 light · full 모두 필수 참여(full = Claude 에이전트 N + GPT 1 · light = Lead + GPT 1), 끈 세션 · CLI 없음이면 두 모드 모두 `[GPT 미사용 — 사유]` 표기(`modules/gpt-strategy.md` § GPT 미사용 · `modules/mode-gate.md` § GPT 는 모드와 독립). 탐색 파이프라인은 --deep만.
 
 ## 목차
 
 - [이론 근거 — Heterogeneity + Blind-spot Complementarity (T1-E)](#이론-근거--heterogeneity--blind-spot-complementarity-t1-e)
 - [검증 유형별 전략](#검증-유형별-전략)
 - [검증 게이트 자동 삽입 규칙](#검증-게이트-자동-삽입-규칙)
-- [외부 모델 포함 원칙 (TEAM 필수)](#외부-모델-포함-원칙-team-필수)
+- [외부 모델 포함 원칙 (GPT 켬이면 필수)](#외부-모델-포함-원칙-gpt-켬이면-필수)
 - [Cross-Model Verification (2-Model)](#cross-model-verification-2-model)
 - [경량 검증 게이트](#경량-검증-게이트)
 - [Reflection Rate (Authoritative Source)](#reflection-rate-authoritative-source)
@@ -43,7 +43,7 @@
 |---------|------|--------|
 | **Self-preference bias 상쇄** | 2025 LLM-as-Judge 연구 다수 — 같은 모델이 자기 출력을 우호적으로 평가 (메모리 23차 Self-review blind spot 메커니즘) | Generator (Claude) ≠ Evaluator (GPT) 강제. fz-gpt `verify`/`check`가 이 분리의 구체화 |
 | **이종 blind spot 보완** | MoA "collaborativeness" (Wang 2024, ICLR 2025 Spotlight, +7.6pp AlpacaEval) | Claude family blind spot을 GPT family가 catch (15차/23차 패턴 — GPT 단독 발견 누적 사례) |
-| **Generator≠Evaluator 강제** | Anthropic Harness Engineering H2 (2026-03) — "Self-evaluation is unreliable"; fresh-context verifier > self-critique [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents] | TEAM 모드에 GPT 필수 참여. SOLO에서도 결정론적 도구 호출 (Q-OBSERVE 경량). GPT 불능 시 fresh-context Claude 검증자가 self-review blind spot(23차)을 부분 보강 — 동종 한계 명시 |
+| **Generator≠Evaluator 강제** | Anthropic Harness Engineering H2 (2026-03) — "Self-evaluation is unreliable"; fresh-context verifier > self-critique [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents] | GPT 를 켠 세션이면 light · full 모두 GPT 필수 참여. 모드와 무관하게 결정론적 도구 호출 (Q-OBSERVE 경량). GPT 불능(켰는데 실패) 시 fresh-context Claude 검증자가 self-review blind spot(23차)을 부분 보강 — 동종 한계 명시. GPT 미사용(off · CLI 없음)은 표기만(`modules/gpt-strategy.md` § GPT 미사용) |
 | **Position bias 회피** | Order effect on judgment (LLM-Judge 연구) | T1-G ensemble: 출력 randomize + Source label anonymize (CP-1 Step 3 규칙 5/6/7) |
 
 ### "Debate 프레임" 회의론 (X-3 기각 근거)
@@ -72,7 +72,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 |-------------------|----------|---------|----------|
 | code-changes 생산 | 빌드 검증 | modules/build.md 절차 | 모든 모드 |
 | code-changes 생산 | simplify check (선택) | /simplify | 모든 모드 |
-| code-changes 생산 | GPT check | `fz-gpt check` (팀 내 병렬) | TEAM |
+| code-changes 생산 | GPT check | `fz-gpt check` (팀 내 병렬) | GPT 켬(light · full) |
 | code-changes 생산 (리팩토링) | enforcement 검증 | Anti-Pattern Grep + Module Boundary | 모든 모드 (Plan에 Constraints 있을 때) |
 | code-changes 생산 (모듈화/캡슐화) | consumer quality 검증 | 소비자 파일 전수 수집 + 사용 패턴 + 진입점 검증 | 모든 모드 (모듈화 작업 시) |
 | code-changes 생산 (시그니처 변경) | protocol conformance 검증 | find_referencing_symbols → 프로토콜 요구사항 양방향 확인 | 모든 모드 |
@@ -84,11 +84,11 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | planning 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
 | code-changes 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
 | review 시작 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
-| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ `--gpt-independent` 로 resume 교차를 마쳤으면 생략) | TEAM |
-| review 포함 | 다관점 리뷰 | review-arch + review-quality + GPT (팀 내 병렬) | TEAM |
+| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ `--gpt-independent` 로 resume 교차를 마쳤으면 생략) | GPT 켬(light · full) |
+| review 포함 | 다관점 리뷰 | review-arch + review-quality + GPT (팀 내 병렬) | TEAM (GPT 는 켠 세션이면 light 도 — fz-review Phase 5) |
 | search 포함 | 교차 검증 | search-symbolic + search-pattern + GPT (팀 내 병렬) | TEAM(--deep) |
-| commit/pr 포함 | Pre-ship gate | `fz-gpt check` | TEAM |
-| fix 포함 | 수정 검증 | `fz-gpt check` (팀 내 병렬) | TEAM |
+| commit/pr 포함 | Pre-ship gate | `fz-gpt check` | GPT 켬(light · full) |
+| fix 포함 | 수정 검증 | `fz-gpt check` (팀 내 병렬) | GPT 켬(light · full) |
 | review 포함 | L3 에러 처리 스캔 | silent-failure-hunter (Agent background) | TEAM (diff에 에러처리 코드 포함 시) |
 | review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | TEAM (diff에 새 타입 정의 포함 시) |
 | code-changes 생산 | SC 빌드 진단 | `/sc:sc-troubleshoot --fix` 자동 | 빌드 2회 연속 실패 시 |
@@ -100,7 +100,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | planning 생산 (패턴 변환) | transformation spec | code-transform-validation.md Spec 작성 + Context7 확인 | 모든 모드 (패턴 변환 시) |
 | code-changes 생산 (패턴 변환) | behavioral equivalence | Spec 대비 구현 대조 (스레드/에러/추상화) | 모든 모드 (Spec 있을 때) |
 | review 포함 (패턴 변환) | transformation equivalence (4-K) | Spec 대비 diff 대조 | 모든 모드 (Spec 있을 때) |
-| planning 생산 (Spec v3.8) | spec-verify | GPT가 Spec의 기술적 정확성 검증 (스레드 모델, 파라미터 의미론, Default-Deny) | TEAM 필수, SOLO 권장 |
+| planning 생산 (Spec v3.8) | spec-verify | GPT가 Spec의 기술적 정확성 검증 (스레드 모델, 파라미터 의미론, Default-Deny) | GPT 켬이면 필수(light · full) |
 | cross-model 불일치 감지 | confident-error | Claude vs GPT 판정 불일치 → 교훈 기록 + 상세 분석 (uncertainty-verification.md) | 자동 |
 | code/review (Spec v3.8) | default-deny enforcement | Spec 기술적 주장에 [verified] 없으면 fail-closed | 모든 모드 (spec-version 3.8) |
 | 외부 피드백 수신 시 | external-feedback-verify | Read(시그니처) + 기존 패턴 대조 → valid/invalid 판정 | 모든 모드 |
@@ -121,7 +121,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 ### 코드 생산 파이프라인
 
 ```
-[코드 생산 스텝] → build → conformance (시그니처 변경 시) → enforcement (리팩토링 시) → consumer quality (모듈화 시) → implication-scan (제거/리팩토링 시) → gpt check (TEAM) → [다음 스텝]
+[코드 생산 스텝] → build → conformance (시그니처 변경 시) → enforcement (리팩토링 시) → consumer quality (모듈화 시) → implication-scan (제거/리팩토링 시) → gpt check (GPT 켬) → [다음 스텝]
 
 예시 (fix-ship, TEAM):
   /fz-fix → build → gpt check → /fz-commit → /fz-pr
@@ -130,7 +130,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
   /fz-plan → gpt verify → /fz-code → build → enforcement → gpt check
 
 예시 (quick-fix, SOLO):
-  /fz-fix → build → 완료 (gpt check 생략)
+  /fz-fix → build → gpt check (GPT 켬 · 끔이면 [GPT 미사용 — 사유]) → 완료
 ```
 
 > enforcement: Plan에 Anti-Pattern Constraints가 있을 때만 삽입.
@@ -138,7 +138,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 ### 계획 생산 파이프라인
 
 ```
-memory-recall (TEAM, informational) → direction challenge (TEAM, fz-plan Phase 0.5) → [계획 스텝] → gpt verify (TEAM) → [코드 스텝]
+memory-recall (TEAM, informational) → direction challenge (TEAM, fz-plan Phase 0.5) → [계획 스텝] → gpt verify (GPT 켬) → [코드 스텝]
 ```
 
 > direction challenge: review-direction 에이전트가 접근 방향 자체를 도전 (PROCEED/RECONSIDER/REDIRECT 판정).
@@ -150,9 +150,9 @@ TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 �
 
 ---
 
-## 외부 모델 포함 원칙 (TEAM 필수)
+## 외부 모델 포함 원칙 (GPT 켬이면 필수)
 
-> 핵심: TEAM = Claude 에이전트(N) + GPT(1). 코드/계획 생산 TEAM에 GPT 필수.
+> 핵심: GPT 를 켠 세션이면 코드/계획 생산에 GPT 필수 — light · full 같다(TEAM = Claude 에이전트(N) + GPT(1)). 끈 세션 · CLI 없음이면 `modules/gpt-strategy.md` § GPT 미사용(표기만).
 > **A3 (동종 합의 ≠ 독립검증)**: 동종 모델 에이전트 N명의 합의는 독립 검증이 아니다 — 같은 맹점을 공유하고 wrong-majority에 conform한다(debate ceiling). cross-model(GPT) 체크 후에만 합의를 신뢰하고, lone correct dissent를 majority보다 우선 검토한다 [verified: arxiv 2503.13657 MAST — inter-agent misalignment]. 교차 모델 합의도 정확성의 증거는 아니다 — *"Agreement is not accuracy: a model can agree with itself, and different models can agree with each other, out of shared bias"*, 합의는 약한 양의 예측자(rho 0.20~0.59) [arxiv 2607.08065, arxiv preprint 2026-07] → GPT 동의는 판정이 아니라 **대조할 근거**로 읽는다. (memory 23차 — self-review blind spot, cross-model이 마지막 안전판)
 > 근거:
 > - X-MAS(arxiv 2505.16997) — **이종 모델 조합이 동종보다 우수** (MATH +8.4%, AIME +47% 성능 향상). `[verified: 2차 research, 논문 abstract 확인 2026-04-21]`
@@ -178,8 +178,8 @@ Claude + GPT 교차 검증:
 
 | 트리거 | 프로바이더 |
 |--------|-----------|
-| code-changes (TEAM) | GPT check |
-| planning (TEAM) | GPT verify |
+| code-changes (GPT 켬 — light · full) | GPT check |
+| planning (GPT 켬 — light · full) | GPT verify |
 | `final` · `--deep` | GPT |
 | 불일치 시 | AskUserQuestion (사용자 판단) |
 
@@ -193,9 +193,11 @@ Claude + GPT 교차 검증:
 
 | 모드 | 코드 생산 후 검증 | 계획 생산 후 검증 |
 |------|-----------------|-----------------|
-| SOLO | 빌드만 | 없음 (Lead 직접 판단) |
+| SOLO (light) | 빌드 + GPT check | GPT verify |
 | TEAM | 빌드 + GPT check + 에이전트 확인 | GPT verify |
 | TEAM --deep | 빌드 + GPT | GPT verify |
+
+> GPT 칸은 GPT 사용 여부로 정한다 — 켠 세션이면 모드와 무관하게 돌고, 끈 세션 · CLI 없음이면 두 모드 모두 `[GPT 미사용 — 사유]` 로 남긴다(`modules/gpt-strategy.md` § GPT 미사용).
 
 > GPT 모델·effort: 정본 `modules/gpt-strategy.md` § 모델·effort 선택 — 트리거·모드(`final` · `--deep` 포함)로 바꾸지 않는다. Review Gate OFF 도 그 절이다.
 
@@ -240,10 +242,10 @@ Claude + GPT 교차 검증:
 
 **왜**: N=3-5 sample에서 73%-86% 변동 관측. 통계적 유의성 부재 → 작은 표본에서 threshold gating 시 false positive/negative 위험.
 
-| 모드 | Reflection Rate 추적 | 기준 |
+| GPT | Reflection Rate 추적 | 기준 |
 |------|---------------------|------|
-| SOLO | 추적 없음 | 사용자 직접 판단 |
-| TEAM | Reflection Rate 추적 (N<10이면 preliminary) | N≥10에서만 ≥80% gating. N=0이면 vacuous pass |
+| 미사용 (off · CLI 없음) | 추적 없음 — N/A(GPT 이슈 0건이 아니라 GPT 부재) | 사용자 직접 판단 |
+| 켬 (light · full) | Reflection Rate 추적 (N<10이면 preliminary) | N≥10에서만 ≥80% gating. N=0이면 vacuous pass |
 
 > 예시 1 (N≥10): GPT 5 이슈 / Claude 4 반영 → 80% (provisional or stable, threshold pass)
 > 예시 2 (N<10, current): N=5에서 81-86% → preliminary, no verdict gating
@@ -258,9 +260,9 @@ Claude + GPT 교차 검증:
 | 게이트 | 강제 수준 | 스킵 조건 |
 |--------|----------|----------|
 | build | **필수** (코드 변경 시) | 코드 변경 없는 문서 전용 파이프라인만 예외 |
-| gpt check | **필수** (TEAM 코드/계획) | SOLO 모드 또는 탐색(--deep 없음) |
+| gpt check | **필수** (GPT 켠 코드/계획 — light · full) | GPT 미사용(off · CLI 없음 — `[GPT 미사용 — 사유]` 표기) 또는 탐색(--deep 없음) |
 | stress-test | **필수** (fz-plan) | discover 결과에서 이미 검증된 제약은 재검증 생략 |
-| Reflection Rate | **필수** (TEAM review) | SOLO 모드 |
+| Reflection Rate | **필수** (GPT 켠 review — light · full) | GPT 미사용(N/A) |
 
 Gate 실패 시: 해당 단계를 "완료"로 표시할 수 없다. 반드시 재시도/수정/사용자 에스컬레이션 중 하나를 수행해야 한다.
 
@@ -487,7 +489,7 @@ code-changes 후 → build → [implication-scan] → gpt check
 
 > 하네스 원칙 4 + Gap G-R1: SOLO에서도 **결정론적 도구 호출**로 최소 Generator≠Evaluator 분리
 
-SOLO 모드에서는 에이전트 스폰/GPT 교차 검증 없이, 결정론적 도구만으로 검증한다.
+SOLO 모드에서는 에이전트 스폰 없이 결정론적 도구로 검증한다. GPT 교차 검증은 모드가 아니라 GPT 사용 여부를 따른다 — 켠 세션이면 SOLO(light)도 같은 GPT 단계를 돈다(`modules/mode-gate.md` § GPT 는 모드와 독립).
 
 | 상황 | 검증 방법 | 참조 |
 |------|----------|------|
@@ -499,7 +501,6 @@ SOLO 모드에서는 에이전트 스폰/GPT 교차 검증 없이, 결정론적 
 | 결론 보고 전 | Q-SCOPE + Q-COVERAGE 자문 의무. "분석하지 않은 영역" 명시 | lead-reasoning.md §3 |
 
 ⛔ SOLO에서 **하지 않는 것** (AP1 과도한 구조화 방지):
-- GPT 교차 검증 (TEAM 전용)
 - 에이전트 스폰 (TEAM 전용)
 - stress-test Q1-Q6 (fz-plan TEAM 전용)
 - 주관적 평가 분리가 필요하면 → TEAM 모드 전환 제안

@@ -4,7 +4,7 @@ description: >-
   계획 수립 + 영향 범위 분석 + 설계. 요구사항 분해와 Serena 기반 코드베이스 탐색.
   예: 계획 세워줘, 설계해줘, 아키텍처 잡아줘, 요구사항 분석 (비사용: 접근 불명확 시 →fz-discover, 구현 →fz-code)
 user-invocable: true
-argument-hint: "[기능/요구사항 설명] [light] [--gpt-independent]"
+argument-hint: "[기능/요구사항 설명] [light|full] [--gpt-independent]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
@@ -100,11 +100,12 @@ metadata:
 
 > ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 ~ 2.5)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 추가 탐색 · 문서 조회)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 플랜(2.7)은 백그라운드 한 줄이라 그대로 직전에 두고(S23), Phase 0.7 Sprint Contract 는 Workflow 입력이 될 수 있어 순서를 바꾸지 않는다. 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/plan/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
+1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): readScope 를 `{WORK_DIR}/plan/read-scope.txt`(한 줄 1경로)로 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" plan --read-scope {그 파일} --new-arch yes|no --estimate plan-lean2` 로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 1 을 Lead 가 수행한 뒤 Phase 2·3·원장으로 간다(아래 light 모드) · **full** 이면 이어간다
 1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**) — ⛔ 정본은 `modules/project-rules.md` 다(절차 · 레코드 형식 · 검증기):
    원문 색인(`extract_project_rules.py`) → 규칙 레코드(모델이 각자) → `check_project_rules.py --check` 통과본만 쓴다. `archConstraints` 는 그 **호환 투영**이다(`--project-arch` — 4축 `architecturePattern` / `uiStack` / `dependencyDirection` / `naming` + 그 축의 `conflicts`).
    - 미확정 축 → `null` + `gaps`(Probe Coverage Gap). 코드 실측(grep) 1회로 보완을 시도하고(`authority: 관례` — 코드를 인용), 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
    - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / GPT)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
-2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고)
+2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고) / `effort`=1.2 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
 2.5. **준비** (⛔ 매 호출 사전 복사 — 거부 왕복을 없앤다):
    실측(2026-09-11, 3건 전부): 플러그인 루트 경로로 첫 호출이 거부되고 WORK_DIR 복사본으로 재호출해 성공했다 — 거부 1회가 매번 낭비된다(텔레메트리 `n_workflow=2` 의 정체).
    매 호출 `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비**를 **선행**한다 — 경로 판정(실제 경로 · 세그먼트 경계) · self-contained 확인 · cp 덮어쓰기 · `cmp -s`:
@@ -349,7 +350,7 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 - Issue Tracker에 이슈 자동 기록
 - 이슈 요약 반환
 
-3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 + full 모드 — `modules/gates.md` 배선 1):
+3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 — light · full 모두 — `modules/gates.md` 배선 1):
    Phase 1 반환의 `steps[]`를 JSON으로 임시 기록한 뒤 변환한다. ⛔ **이 단계가 없으면 원장이 생기지 않아 배선 2·3이 전부 no-op이다.**
    ```bash
    python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" \
@@ -469,18 +470,12 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 **Will**: 요구사항 분해, 영향 분석, Serena 탐색, 구현 계획 출력, 계획 검증
 **Will Not**: 코드 수정 (→ /fz-code), 빌드 실행 (→ /fz-code)
 
-### light 모드 (40차 simplified mode)
+### light 모드 (모드 게이트 — `modules/mode-gate.md`)
 
-사용자 신호 "그냥/가볍게/단순/빠르게" 감지 또는 `/fz-plan light "..."` 호출 시:
-- Phase 1 (Deep Planning)만 실행 — 구조 분해 + 영향 분석 + Step 출력
-- Phase 0.5 (Direction Challenge) 생략 (단순 수정 patterns 대상)
-- Phase 2 (Validation) + Phase 3 (Feedback) 생략 (GPT verify 미호출)
-- Stress Test Q1-Q6 생략, 리스크 매트릭스 간소화
-- Anti-Pattern Constraints 작성 생략 (리팩토링 작업 외)
+진입: 실행 절차 1.2 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+- plan-lean2 를 띄우지 않고 Phase 1 (Deep Planning)을 Lead 가 수행한다 — Phase 0.5 · 스트레스 테스트 Q1-Q6 · RTM 은 그대로(발동 조건대로). 새 아키텍처 결정이면 1.2 가 full 을 추천한다
+- Phase 2 (GPT verify ∥ verify-gates) · Phase 3 · 원장(3.1 · 4.5) · `plan-final.md` 는 full 과 같다 — GPT 단계도 같다(끈 세션이면 `[GPT 미사용]` · 원장 판정은 Gate 2 확인으로)
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
-- 산출물: `{WORK_DIR}/plan/plan-light.md` (간소화 형식)
-
-조건: 메모리 40차 trigger 키워드 + 단순 수정/추가 작업에만. 새 아키텍처 결정 시 full 모드 강제.
 
 ## 에러 대응
 

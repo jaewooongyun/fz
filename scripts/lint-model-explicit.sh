@@ -6,7 +6,7 @@
 # 목적 (experiment-log §5.8 ⑤ 측정 지원 · Anti-Pattern Constraint 감시):
 #   ① 전 workflow(workflows/*.js)의 agent 호출 opts 에 model: 명시 강제
 #      → AC-6 (model 생략 전환 금지 — 생략 시 agent 정의 기본 model 로 강등)
-#   ①-b 전 workflow 의 agent 호출 opts 에 effort: 명시 강제 (표준 effort=xhigh)
+#   ①-b 전 workflow 의 agent 호출 opts 에 effort: 명시 강제 (값 = 식별자 EFFORT — args.effort, 미지정 'xhigh')
 #      → agent() 는 model+effort 모두 명시 의무 (skill-authoring §12) — effort 생략 시 세션 값이 아니라 워커 모델 기본으로 돈다 (Opus 5.5 = medium, 2026-09-25 실측)
 #   ② repo 전체 model: 'fable' 총계 == EXPECTED_FABLE 고정
 #      기대 분포: search-cross-verify.js ×1 + plan-collaborative.js ×2 = 3
@@ -77,7 +77,8 @@ for f in sorted(glob.glob(os.path.join(wf_dir, "*.js"))):
         line = re.sub(r"/\*.*?\*/", "", line)
         lab = re.search(r"label:\s*'([^']+)'", line) or re.search(r"label:\s*`([^`]+)`", line)
         mod = re.search(r"model:\s*'([^']+)'", line)
-        eff = re.search(r"effort:\s*'([^']+)'", line)
+        # effort 는 리터럴 또는 식별자 EFFORT(args.effort 주도 — modules/mode-gate.md § effort). 식별자는 값 "EFFORT" 로 대조한다
+        eff = re.search(r"effort:\s*'([^']+)'", line) or re.search(r"effort:\s*(EFFORT)\b", line)
         key = f"{os.path.basename(f)}::{lab.group(1) if lab else f'line{i}'}"
         if key in got:
             dups.append(f"{key} (줄 {i})")   # ⛔ 같은 키 두 번 — 뒤가 앞을 덮으면 한쪽 값 변경이 숨는다

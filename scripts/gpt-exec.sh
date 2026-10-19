@@ -34,16 +34,22 @@
 #                     이미 있고 review 는 프롬프트가 없어 둘 다 exit 10 이다.
 #   --config-permissions: sandbox_mode 를 넘기지 않고 $CODEX_HOME/config.toml 의 권한 프로필(default_permissions)을 쓴다.
 #                     넘기면 프로필의 경로 deny 를 덮는다(F-348). 프로필이 `extends = ":read-only"` 가 아니면 exit 11.
+#   gpt-exec.sh cli-check  GPT CLI 가 PATH 에 있는가만 본다(호출 아님 · 호출 행 없음) — 0=있음 · 18=없음. gpt-choice.sh get · 독립 런처가
+#                     'CLI 없음' 을 이 판정으로 본다 — 실행 파일 이름은 이 래퍼 한 곳에 둔다(scripts/check_gpt_surface.py 경계 파일)
 #
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건(세션 선택 판독 실패 포함) / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
+#       18=GPT 미사용 — 세션 선택 off · 플래그 --model off · GPT CLI 없음. CLI 를 부르지 않고 stderr 에 'GPT-OFF: <사유> — …' 한 줄
 #   ⛔ 10~14는 전부 **측정 실패**다 — "이슈 0건"으로 해석하면 안 된다.
+#   ⛔ 18 은 측정 실패가 아니다 — 소비자는 그 단계를 건너뛰고 [GPT 미사용 — 사유] 를 남긴다(정본 modules/gpt-strategy.md § GPT 미사용)
 #   ⛔ 12 에는 진행 감시 종료도 든다(F-364) — 그 호출의 스트림 로그(${OUT}.stream.log) 크기가 FZ_GPT_IDLE_SEC(기본 900 · 0 = 끔)초
 #      동안 그대로면 CLI 자손 트리를 TERM → KILL 하고 12 로 끝낸다. 가르는 표지는 메시지 머리 토큰 `GPT-IDLE` · 텔레메트리 9열 `idle` 이다
 #      (gpt 종료코드 열은 143 같은 신호값이라 CLI 스스로의 실패와 구분되지 않는다). FZ_GPT_IDLE_SEC 형식 불량(0 이상 정수 아님)은 10
 set -u
 
 die() { echo "GATE-FAIL($1): $2" >&2; exit "$1"; }
+# GPT 미사용 — CLI 를 부르지 않고 18. 머리 토큰 GPT-OFF 와 사유(사용자 선택 · 플래그 · CLI 없음)를 소비자가 읽는다(GATE-FAIL 이 아니다 — 측정 실패가 아니므로)
+gpt_off() { echo "GPT-OFF: $1 — GPT CLI 를 부르지 않았다(GPT 미사용 · 측정 실패 아님 — 그 단계를 건너뛰고 [GPT 미사용 — 사유] 를 남긴다 · modules/gpt-strategy.md § GPT 미사용)${2:+ · $2}" >&2; exit 18; }
 # ⛔ 값 옵션의 arity 가드 — 없으면 `set -u` 하에서 `$2` 참조가 **exit 1(unbound variable)** 로 죽어
 #    문서상 게이트 10과 어긋난다 (2026-08-09 감사 ISSUE-011: `review --cd` 가 exit 1이었다).
 need() { [ "$1" -ge 2 ] || die 10 "$2 는 값이 필요하다"; }
@@ -163,6 +169,12 @@ with open(out, "a", encoding="utf-8") as fh:
     fh.write("\t".join(clean(v) for v in row) + "\n")
 PY
 }
+# ── cli-check — GPT CLI 존재만 본다. ⛔ 호출 행 trap 보다 먼저 끝낸다(gpt-calls.tsv 행 = GPT 호출 1:1 — 확인은 호출이 아니다)
+if [ "${1:-}" = "cli-check" ]; then
+  [ $# -eq 1 ] || die 10 "cli-check 는 인자를 받지 않는다: $2"
+  command -v codex >/dev/null 2>&1 && exit 0
+  exit 18
+fi
 trap 'calls_row $?' EXIT
 
 MODE="${1:-}"; shift || true
@@ -307,7 +319,13 @@ MODEL_SRC="" EFFORT_SRC=""
 # ⛔ 11 의 처방은 원인마다 다르다 — 메시지 머리의 ASCII 태그로 가른다(문서는 한국어 문구가 아니라 태그를 인용한다):
 #    CHOICE-UNREADABLE  = get exit 11(선택 파일 손상) → Lead 는 다시 묻고 set 으로 덮어쓴다
 #    CHOICE-SCRIPT-ERROR = 그 밖(스크립트 부재·오류 · get 출력과 이 규칙의 불일치) → 다시 물어도 풀리지 않는다 — 묻지 않는다
-CHOICE_FIX="이 세션의 GPT 호출은 --model config --effort config 로 부르거나(두 필드가 플래그면 선택을 읽지 않는다) gpt-choice.sh 를 고친다"
+CHOICE_FIX="이 세션의 GPT 호출은 --model config --effort config 로 부르거나(두 필드가 플래그면 선택을 읽지 않는다 · 사용자가 off 를 골랐으면 --model off) gpt-choice.sh 를 고친다"
+# ── GPT 미사용(18) — 정본 modules/gpt-strategy.md § GPT 미사용. 사용법·경로 게이트(0~2) 뒤 · 선택 판독 앞이다.
+# ⛔ 플래그 --model off 는 선택 파일을 읽지 않고 끝낸다 — off 기록이 실패한 세션의 우회 경로다(손상 선택 파일의 11 이 off 를 가리지 않게).
+# ⛔ CLI 없음도 선택 판독 앞이다 — CLI 가 없으면 선택을 다시 물어도(11 의 처방) 쓸 데가 없다. get 이 'CLI 없음' 으로 남긴 off 를
+#    '사용자 선택' 으로 잘못 적지 않는 순서이기도 하다.
+[ -n "$MODEL_SET" ] && [ "$MODEL" = "off" ] && gpt_off "플래그" "--model off"
+command -v codex >/dev/null 2>&1 || gpt_off "CLI 없음" "GPT CLI 가 PATH 에 없다"
 # ⛔ 모델 목록 캐시는 읽지 않는다 — 독립 런처는 격리 CODEX_HOME(캐시 없음)에서 래퍼를 띄운다. 모델별 검증은 gpt-choice.sh set 한 곳이 한다.
 if [ -z "$MODEL_SRC" ] || [ -z "$EFFORT_SRC" ]; then
   CHOICE_ERR="$(mktemp "${TMPDIR:-/tmp}/fz-gpt-choice.XXXXXX" 2>/dev/null)" || die 11 "선택 판독용 임시 파일을 만들지 못했다(TMPDIR='${TMPDIR:-}')"
@@ -318,6 +336,9 @@ if [ -z "$MODEL_SRC" ] || [ -z "$EFFORT_SRC" ]; then
       [[ "$CHOICE_OUT" =~ $CHOICE_RE ]] \
         || die 11 "CHOICE-SCRIPT-ERROR: 선택 스크립트 오류 — 다시 묻지 않는다. $CHOICE_FIX (get 출력 형식 불량: '$CHOICE_OUT')"
       S_MODEL="${BASH_REMATCH[1]}" S_EFFORT="${BASH_REMATCH[2]}"
+      # ⛔ 세션 선택 off 는 effort 검증(effort=off 는 화이트리스트 밖) 앞에서 끝낸다. 플래그가 한 필드만이어도 off 가 이긴다 —
+      #    호출 하나만 켜는 길은 두 필드를 모두 플래그로 주는 것(선택을 읽지 않는다)뿐이다
+      [ "$S_MODEL" = "off" ] && [ "$S_EFFORT" = "off" ] && gpt_off "사용자 선택" "세션 선택 model=off"
       [ "$S_MODEL" = "config" ] || [[ "$S_MODEL" =~ $MODEL_RE ]] \
         || die 11 "CHOICE-SCRIPT-ERROR: 선택 스크립트 오류 — 다시 묻지 않는다. $CHOICE_FIX (get 이 낸 모델이 래퍼 형식 밖: '$S_MODEL')"
       [ "$S_EFFORT" = "config" ] || effort_ok "$S_EFFORT" \
@@ -353,7 +374,6 @@ if not sec or not re.search(r'(?m)^extends\s*=\s*":read-only"\s*$', sec.group(1)
 PY
 )" || die 11 "--config-permissions: ${PERMS_ERR:-권한 프로필 판정 실패}"
 fi
-command -v codex >/dev/null 2>&1 || die 11 "codex CLI 미설치"
 
 # ── 사전 게이트 3: (폐지 2026-09-25) trust_level 경고 — 래퍼가 read-only 를 스스로 강제하므로(아래 ARGS) "read-only 로 강제될 수 있다" 는 경고는 거짓 경보였다
 

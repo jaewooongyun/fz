@@ -1,185 +1,185 @@
 {
  "calls": {
   "code-pair.js::stage1-impl": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "code-pair.js::stage2-review": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "code-pair.js::stage2-review-arch": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "code-pair.js::stage2-review-quality": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "code-pair.js::stage3-revise": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "discover-adversarial.js::cost-${lensLabel}": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "sonnet"
   },
   "discover-adversarial.js::landscape": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "discover-adversarial.js::lens-${lens}": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "sonnet"
   },
   "discover-adversarial.js::merge": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "discover-adversarial.js::r1-paths": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "discover-adversarial.js::r2-paths": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "peer-review.js::stage1-arch": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "peer-review.js::stage1-correctness": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "peer-review.js::stage1-quality": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "peer-review.js::stage2-arch-on-peers": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "peer-review.js::stage2-quality-on-peers": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "peer-review.js::stage3-counter": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage0-direction": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "fable"
   },
   "plan-collaborative.js::stage0-final": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "fable"
   },
   "plan-collaborative.js::stage0-rebuttal": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage1-draft": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage2-arch": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage2-edge": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage2-impact": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage3-edge-on-impact": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage3-impact-on-edge": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage4-integrate": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-collaborative.js::stage5-recheck": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-lean.js::lean-edge": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-lean.js::lean-full": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-lean.js::lean-merge": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-lean2.js::lean2-edge": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-lean2.js::lean2-full": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-lean2.js::lean2-impact-arch": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "plan-lean2.js::lean2-merge": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "review-live.js::stage1-arch": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "review-live.js::stage1-quality": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "review-live.js::stage2-arch-on-quality": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "review-live.js::stage2-quality-on-arch": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "review-live.js::stage3-counter": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "opus"
   },
   "search-cross-verify.js::stage1-pattern": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "sonnet"
   },
   "search-cross-verify.js::stage1-symbolic": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "sonnet"
   },
   "search-cross-verify.js::stage2-pat-on-sym": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "sonnet"
   },
   "search-cross-verify.js::stage2-sym-on-pat": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "sonnet"
   },
   "search-cross-verify.js::stage3-merge": {
-   "effort": "xhigh",
+   "effort": "EFFORT",
    "model": "fable"
   }
  },
- "note": "label 별 model/effort 고정 baseline (2026-09-12). ⛔ 값 변경은 sweep/ablation 근거(experiment-log §5.8 ⑥·§5.9)와 함께. 2026-09-11 plan-lean.js 3콜(D1) · 2026-09-12 plan-lean2.js 4콜(D1b) 추가 — 기존 배선 불변."
+ "note": "label 별 model/effort 고정 baseline (2026-09-12). ⛔ 값 변경은 sweep/ablation 근거(experiment-log §5.8 ⑥·§5.9)와 함께. 2026-09-11 plan-lean.js 3콜(D1) · 2026-09-12 plan-lean2.js 4콜(D1b) 추가 — 기존 배선 불변. 2026-10-19 전 호출 effort 를 식별자 EFFORT(args.effort — Lead 세션 effort, 미지정 'xhigh')로 전환 — 값 고정이 아니라 전달 경로 고정이다. 근거 modules/mode-gate.md § effort · experiment-log §5.8 ⑥ 메모."
 }

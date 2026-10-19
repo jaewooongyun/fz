@@ -4,7 +4,7 @@
 //   표준 패턴 3종 적용: OVERRIDE / args 방어 파싱 + fail-fast / agentType fz: prefix.
 //   호출(Lead, SKILL.md 절차 — §12 0단계 준비 cp → cmp -s 뒤 복사본): Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js',
 //     args: { query, codeContext } })
-//   effort 계약: 전 agent() 호출 model+effort(=xhigh) 명시. 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
+//   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', results:[{file,line,symbol,kind,note,sources,confidence}], metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후. wall-clock은 Lead 측정.
 //
@@ -114,6 +114,13 @@ if (!input || !input.query || !input.codeContext) {
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: metrics(0) }
 }
+// effort = Lead 세션 effort(args.effort — modules/mode-gate.md § effort). 미지정이면 'xhigh'(기준선 불변), 허용값 밖이면 fallback
+const EFFORT = input.effort === undefined ? 'xhigh' : input.effort
+if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
+  log(`FATAL args invalid — effort=${JSON.stringify(input.effort)}: low · medium · high · xhigh · max. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: metrics(0) }
+}
 
 // ════════ Stage 1: 독립 병렬 탐색 (Round 1 독립성 — 피어 데이터 미주입) ════════
 phase('Stage 1: 심볼/패턴 독립 탐색')
@@ -122,12 +129,12 @@ const [sym, pat] = await parallel([
     `${OVERRIDE}\n[역할] 심볼 탐색자(search-symbolic 렌즈) — 정의/참조/타입 관계 중심\n` +
     `[질의] ${input.query}\n[탐색 범위] ${input.codeContext}\n` +
     `[목표] 질의 대상의 정의·참조·사용처를 심볼 관점으로 전수 수집. 각 발견에 근거 인용.`,
-    { label: 'stage1-symbolic', agentType: 'fz:search-symbolic', model: 'sonnet', effort: 'xhigh', schema: FindingsSchema }),
+    { label: 'stage1-symbolic', agentType: 'fz:search-symbolic', model: 'sonnet', effort: EFFORT, schema: FindingsSchema }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 패턴 탐색자(search-pattern 렌즈) — Grep/Glob 텍스트·파일 패턴 중심\n` +
     `[질의] ${input.query}\n[탐색 범위] ${input.codeContext}\n` +
     `[목표] 질의 대상을 텍스트 패턴으로 전수 수집 (주석/문서/설정 포함). 각 발견에 근거 인용.`,
-    { label: 'stage1-pattern', agentType: 'fz:search-pattern', model: 'sonnet', effort: 'xhigh', schema: FindingsSchema }),
+    { label: 'stage1-pattern', agentType: 'fz:search-pattern', model: 'sonnet', effort: EFFORT, schema: FindingsSchema }),
 ])
 if (!sym && !pat) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 both null', metrics: metrics(0) } }
 if (!sym || !pat) log('WARN stage1 한쪽 null — 단독 진행 (등급 상한 ★)')
@@ -145,11 +152,11 @@ if (sym && pat) {
     () => callAgent(
       `${OVERRIDE}\n[역할] 심볼 탐색자 — 교차 검증\n[상대(패턴) 발견] ${JSON.stringify(pat.findings)}\n` +
       `[목표] 각 발견을 심볼 레벨로 확인 — false_positive 판정은 교차 실측 인용 시만. 패턴이 놓친 심볼 발견은 additions로.`,
-      { label: 'stage2-sym-on-pat', agentType: 'fz:search-symbolic', model: 'sonnet', effort: 'xhigh', schema: CrossSchema }),
+      { label: 'stage2-sym-on-pat', agentType: 'fz:search-symbolic', model: 'sonnet', effort: EFFORT, schema: CrossSchema }),
     () => callAgent(
       `${OVERRIDE}\n[역할] 패턴 탐색자 — 교차 보완\n[상대(심볼) 발견] ${JSON.stringify(sym.findings)}\n` +
       `[목표] 각 발견을 텍스트 레벨로 확인 + 추가 사용처(주석/문서/설정) additions로. false_positive는 실측 인용 시만.`,
-      { label: 'stage2-pat-on-sym', agentType: 'fz:search-pattern', model: 'sonnet', effort: 'xhigh', schema: CrossSchema }),
+      { label: 'stage2-pat-on-sym', agentType: 'fz:search-pattern', model: 'sonnet', effort: EFFORT, schema: CrossSchema }),
   ])
   crossOnPattern = crossResults[0]
   crossOnSymbolic = crossResults[1]
@@ -164,7 +171,7 @@ const merged = await callAgent(
   `[교차 판정(패턴측에 대한)] ${JSON.stringify(crossOnPattern)}\n[교차 판정(심볼측에 대한)] ${JSON.stringify(crossOnSymbolic)}\n` +
   `[목표] 동일 발견을 병합하고 sources에 출처(symbolic/pattern) 전부 표기. ` +
   `crossVerified는 교차 단계 confirmed 판정 여부. false_positive 판정 항목만 제외(근거 인용 항목 한정) — 그 외 무근거 탈락 금지.`,
-  { label: 'stage3-merge', agentType: 'fz:plan-structure', model: 'fable', effort: 'xhigh', schema: MergeSchema }) // §5.8 ④ 동결→재개 (2026-07-06 제재 해제, 측정 재개): fable 명시 = 검색 에이전트(sonnet) 대비 synthesis 우위 유지 (model 생략 시 agent 정의 model:sonnet 강등 위험)
+  { label: 'stage3-merge', agentType: 'fz:plan-structure', model: 'fable', effort: EFFORT, schema: MergeSchema }) // §5.8 ④ 동결→재개 (2026-07-06 제재 해제, 측정 재개): fable 명시 = 검색 에이전트(sonnet) 대비 synthesis 우위 유지 (model 생략 시 agent 정의 model:sonnet 강등 위험)
 if (!merged) {
   fallbackCount += 1
   const doneStages = (sym && pat) ? ((crossOnPattern && crossOnSymbolic) ? 2 : 1) : 1 // 리뷰 C-2 교정: 하드코딩 제거

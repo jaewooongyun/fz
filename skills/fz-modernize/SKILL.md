@@ -269,7 +269,7 @@ echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.m
 
 ### 절차
 
-1. **GPT 호출**: 아래 § GPT 호출 한 형태(래퍼 exec · architect 본문 · 5 Q 과제 · `gpt_review_schema`). 래퍼 exit 10~14 는 측정 실패다 — 판정으로 읽지 않는다. 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그 · 모델·effort 거부 12)는 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 먼저 따르고, 그 밖은 에러 대응 표 'GPT CLI 통신 실패' 행으로 간다
+1. **GPT 호출**: 아래 § GPT 호출 한 형태(래퍼 exec · architect 본문 · 5 Q 과제 · `gpt_review_schema`). 래퍼 exit 10~14 는 측정 실패다 — 판정으로 읽지 않는다. exit 18(`GPT-OFF`)은 GPT 미사용이다 — 그 단계는 `[GPT 미사용 — 사유]` 표기만(self-review 폴백 아님 · `modules/gpt-strategy.md` § GPT 미사용). 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그 · 모델·effort 거부 12)는 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 먼저 따르고, 그 밖은 에러 대응 표 'GPT CLI 통신 실패' 행으로 간다
 2. **5 Q 검증 관점** (Plan-specific):
    - Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류)
    - Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜)
@@ -438,7 +438,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 - AC8 link 자동 검증 (xargs 병렬)
 - verify-evidence-matrix.md 갱신
 - 사용자 합의 기반 깊이 제한
-- **light 모드 (40차)**: 사용자 신호 "그냥/가볍게/단순/빠르게" 감지 시 Phase 1+2 + GPT micro-eval만 실행 (카운터 1 소비)
+- **light 모드 (40차)**: 사용자 신호(정본 목록 `modules/mode-gate.md` § 신호어) 감지 시 Phase 1+2 + GPT micro-eval만 실행 (카운터 1 소비)
   - ⛔ 단 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**(`modules/cross-validation.md §Coverage Gate`)는 light에서도 **생략 불가** — light는 절차 생략이지 검증 생략이 아니다. 본 스킬은 *최신성 전수 판정*을 산출하므로 특히 해당한다. ⛔ **부정 주장(0건·부재)은 §Negative-Result Gate 도 함께** — Coverage 는 범위, Negative-Result 는 도구 유효성이며 N 오측정 시 0/0 으로 통과한다
   - ⛔ **AC5·AC9 는 light 에서도 적용한다.** 나머지 AC 는 Phase 5 Execute 의 편집을 제약하므로 편집이 0인 light 에서 공허하지만, 이 둘은 **출처 표기**를 제약하고 그 표기를 만드는 것은 light 가 실제로 도는 Phase 1(Probe)·2(Audit) 다. AC 선언이 Phase 3, 집행이 Phase 5 에 있어 light 가 둘 다 건너뛰면 Tier 3 단독 발견이 `[verified]` 로 남는다 — `[partially-verified: A5; …]` 격하(AC9)와 미검증 사유 보존(AC5)은 Phase 2 산출 시점에 적용한다.
 
@@ -455,6 +455,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 |------|------|------|
 | Probe WebSearch 실패 | 재시도 1회 → 사용자에게 직접 자료 요청 | manual probe |
 | GPT CLI 통신 실패 · 래퍼 exit 10~14(측정 실패 — 11·12 선택 복구는 Phase 4 절차 1단) | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
+| 래퍼 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 · 폴백 없음(`modules/gpt-strategy.md` § GPT 미사용) |
 | GPT 누적 한도 도달 | 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (GPT 권고 점 수정 N건만) |
 | AC8 broken link 발견 | archive.org 폴백 또는 인용 제거 | 사용자 결정 |
 | Impact Scan line 번호 깨짐 | 모듈에서 path/section 참조로 변경 권고 | 영향 모듈 목록 보고 |

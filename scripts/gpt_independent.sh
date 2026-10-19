@@ -37,8 +37,10 @@
 # stderr: 래퍼의 적용값 줄 'GPT-CHOICE model=<값> (출처) effort=<값> (출처)' 을 그대로 한 줄 옮긴다(래퍼가 그 줄 전에 멈추면 없다)
 # exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건 · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
+#       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off. 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
+#          stderr 'GPT-OFF: <사유> — …' · 감사 <stem>.audit.json 에 "exit": 18 · "gptOff": "<사유>"(오염 · 측정 실패 아님 — 병합은 --gpt-unavailable)
 #       래퍼의 10 · 11 도 그대로 낸다 — --model · --effort 불량(10) · 세션 선택 판독 실패(11) 포함, 사유는 .wrapper.log
-#   ⛔ 10~17 은 전부 첫 패스 결과가 아니다 — 0건으로 읽지 않는다.
+#   ⛔ 10~17 은 전부 첫 패스 결과가 아니다 — 0건으로 읽지 않는다. 18 도 결과가 아니지만 실패가 아니다(정본 modules/gpt-strategy.md § GPT 미사용)
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -70,14 +72,15 @@ esac
 ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO="" GPT_AGENTS="" FRAME=""
 SNAPS=() DENIES=()
 CHOICE_ARGS=()   # --model · --effort — 주어진 것만 받은 그대로 래퍼에 넘긴다(기본값 없음 · 형식 검증은 래퍼)
+MODEL_FLAG="" EFFORT_FLAG="" MODEL_OFF=""   # GPT 미사용 판정용 — 플래그를 받았는가 · --model off 인가(아래 사전 게이트)
 while [ $# -gt 0 ]; do
   case "$1" in
     --arm)             need $# "--arm";             ARM="$2"; shift 2 ;;
     --run-id)          need $# "--run-id";          RUN_ID="$2"; shift 2 ;;
     --out-dir)         need $# "--out-dir";         OUT_DIR="$2"; shift 2 ;;
     --timeout)         need $# "--timeout";         TIMEOUT="$2"; shift 2 ;;
-    --model)           need $# "--model";           CHOICE_ARGS+=(--model "$2"); shift 2 ;;
-    --effort)          need $# "--effort";          CHOICE_ARGS+=(--effort "$2"); shift 2 ;;
+    --model)           need $# "--model";           CHOICE_ARGS+=(--model "$2"); MODEL_FLAG=1; [ "$2" = "off" ] && MODEL_OFF=1; shift 2 ;;
+    --effort)          need $# "--effort";          CHOICE_ARGS+=(--effort "$2"); EFFORT_FLAG=1; shift 2 ;;
     --requirement)     need $# "--requirement";     REQ="$2"; shift 2 ;;
     --sprint-contract) need $# "--sprint-contract"; SC="$2"; shift 2 ;;
     --rules-index)     need $# "--rules-index";     RULES="$2"; shift 2 ;;
@@ -135,6 +138,41 @@ while IFS= read -r line; do
 done <<< "$POL"
 [ -n "$ROLE" ] && [ -n "$SCHEMA" ] && [ -n "$SPAWN_LINE" ] || die 11 "정책 해석 결과가 비었다: $POL"
 
+# 같은 stem 의 옛 산출 — 지울 파일은 명시 목록이다(글롭 금지). 정상 경로(잠금 뒤)와 GPT 미사용 경로가 이 목록 하나를 쓴다
+clear_stem() {
+  rm -f "$OUT" "$OUT.session" "$OUT.stream.log" "$OUT_DIR/$BASE_NAME.md" "$OUT_DIR/$BASE_NAME.audit.json" \
+    "$OUT_DIR/$BASE_NAME.contaminated" "$OUT_DIR/$BASE_NAME.wrapper.log"
+}
+
+# ── 사전 게이트: GPT 미사용(⛔ exit 18 — 정본 modules/gpt-strategy.md § GPT 미사용) — 플래그 --model off · GPT CLI 없음(래퍼 cli-check 18) ·
+#    세션 선택 off(래퍼와 같은 규칙 — 두 필드가 모두 플래그가 아니면 선택을 본다)면 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
+#    ⛔ 실제 GPT 홈 · 인증 · 입력 게이트보다 먼저다 — GPT 를 쓰지 않는 사용자는 GPT 홈 · 인증이 없을 수 있다(11 이 18 을 가리지 않게).
+#    ⛔ 감사에 exit 18 · gptOff 를 남긴다 — 같은 stem 의 옛 산출을 지운 뒤다(옛 결과가 새 판정으로 읽히지 않게). 오염(.contaminated) · 측정 실패가 아니다
+OFF_WHY=""
+if [ -n "$MODEL_OFF" ]; then
+  OFF_WHY="플래그"
+else
+  bash "$SCRIPT_DIR/gpt-exec.sh" cli-check >/dev/null 2>&1
+  if [ $? -eq 18 ]; then
+    OFF_WHY="CLI 없음"
+  elif [ -z "$MODEL_FLAG" ] || [ -z "$EFFORT_FLAG" ]; then
+    # get 의 stdout 만 본다 — 'model=off effort=off' 는 exit 0 에서만 나온다(3 · 4 · 5 · 11 은 stdout 이 없다 — off 가 아니다)
+    [ "$(bash "$SCRIPT_DIR/gpt-choice.sh" get 2>/dev/null)" = "model=off effort=off" ] && OFF_WHY="사용자 선택"
+  fi
+fi
+if [ -n "$OFF_WHY" ]; then
+  mkdir -p "$OUT_DIR" || die 11 "--out-dir 생성 실패: $OUT_DIR"
+  OUT_DIR="$(cd "$OUT_DIR" && pwd -P)"; BASE_NAME="${ARM}-${RUN_ID}"; OUT="$OUT_DIR/$BASE_NAME.json"
+  mkdir "$OUT.lock" 2>/dev/null || die 10 "같은 --out 이 이미 실행 중이다(또는 전 실행의 잠금이 남았다): $OUT.lock"
+  clear_stem; rm -rf "$OUT_DIR/$BASE_NAME.rollouts"
+  printf '{"exit": 18, "gptOff": "%s", "note": "GPT 미사용 — %s · 첫 패스를 돌리지 않았다(결과 · 오염 · 측정 실패 아님 — 병합은 --gpt-unavailable)", "sessionFile": null}\n' \
+    "$OFF_WHY" "$OFF_WHY" > "$OUT_DIR/$BASE_NAME.audit.json"; OFF_RC=$?
+  rm -rf "$OUT.lock"
+  [ "$OFF_RC" -eq 0 ] || die 11 "감사 기록 실패: $OUT_DIR/$BASE_NAME.audit.json"
+  echo "GPT-OFF: $OFF_WHY — GPT 독립 첫 패스를 돌리지 않았다(GPT 미사용 · 측정 실패 아님 — 그 단계를 건너뛰고 [GPT 미사용 — 사유] 를 남긴다 · 병합은 --gpt-unavailable · modules/gpt-strategy.md § GPT 미사용). 감사: $OUT_DIR/$BASE_NAME.audit.json" >&2
+  exit 18
+fi
+
 # ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — Claude 산출물이 첫 패스에 들어가면 독립이 아니다)
 REAL_HOME="$(cd "${HOME:?HOME 미설정}" && pwd -P)"
 REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)" || die 11 "실제 GPT CLI 홈이 없다: ${CODEX_HOME:-$REAL_HOME/.codex}"
@@ -190,8 +228,7 @@ trap cleanup EXIT
 
 # ── 같은 stem 의 옛 산출 정리 + 감사 선기록 — 다시 돌린 run 이 옛 `.contaminated` 로 거부되거나, 옛 성공 감사가 새 미감사 출력을 보증하지 않게.
 #    ⛔ 지울 파일은 명시 목록이다(글롭 금지). 감사는 'running'(exit null)으로 먼저 쓰고 끝에 덮는다 — 중간에 멈춘 run 은 병합 · 차이표가 거부한다
-rm -f "$OUT" "$OUT.session" "$OUT.stream.log" "$OUT_DIR/$BASE_NAME.md" "$OUT_DIR/$BASE_NAME.audit.json" \
-  "$OUT_DIR/$BASE_NAME.contaminated" "$OUT_DIR/$BASE_NAME.wrapper.log"
+clear_stem
 printf '{"exit": null, "note": "running — 감사가 끝나기 전에 런처가 멈췄다(중단 · 시그널 · 감사 실패). 결과가 아니다"}\n' > "$OUT_DIR/$BASE_NAME.audit.json"
 
 # ── 격리 폴더 — ⛔ 경로는 전부 realpath(`/tmp`→`/private/tmp` · `/var/folders`→`/private/var/folders`). deny·read 표기가 어긋나면 중첩 규칙이 안 맞는다
@@ -302,6 +339,7 @@ TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
 #    안 옮기면 Lead 가 격리 팔의 적용 모델·effort 와 출처를 못 보고, 배선이 빠져도 드러나지 않는다. 래퍼가 그 줄 전에 멈췄으면 없다(조용히 넘어간다).
 #    ⛔ 리다이렉션 순서 — 찾은 줄은 stderr(>&2)로 보내고, 그 뒤의 2>/dev/null 은 grep 자신의 오류만 버린다
 grep -m1 '^GPT-CHOICE ' "$OUT_DIR/$BASE_NAME.wrapper.log" >&2 2>/dev/null
+grep -m1 '^GPT-OFF: ' "$OUT_DIR/$BASE_NAME.wrapper.log" >&2 2>/dev/null   # 래퍼가 GPT 미사용(18)으로 끝났으면 그 사유 줄도 옮긴다
 
 # ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(기본 경로는 spawn 을 프롬프트로만 금지한다 — CLI 는 `[agents] enabled = false`
 #    로 끌 수 있으나(R-G1 S1 실측) 런처 배선은 측정 뒤 별도 결정이다 · F-436)
@@ -556,6 +594,16 @@ if hits or (not iso_ok and not timed_out and rc == 0):
     open(stem + ".contaminated", "w", encoding="utf-8").write(json.dumps({"reason": note, "hits": hits}, ensure_ascii=False, indent=1))
 elif timed_out:
     code, note = 16, "시간 초과 — 프로세스 그룹째 종료"
+elif rc == 18:
+    # 래퍼가 GPT 를 부르지 않았다(GPT-OFF) — 사전 게이트 뒤에 선택이 off 로 바뀐 경우 등. 측정 실패로 적지 않는다(GPT 미사용)
+    why = None
+    try:
+        with open(stem + ".wrapper.log", encoding="utf-8", errors="replace") as fh:
+            why = next((ln[len("GPT-OFF: "):].split(" — ")[0].strip() for ln in fh if ln.startswith("GPT-OFF: ")), None)
+    except OSError:
+        pass
+    audit["gptOff"] = why or "래퍼"
+    code, note = 18, f"GPT 미사용 — {audit['gptOff']} · 래퍼가 GPT 를 부르지 않았다(결과 · 오염 · 측정 실패 아님 — 병합은 --gpt-unavailable)"
 elif rc != 0:
     code, note = rc, f"래퍼 exit {rc} — 측정 실패(결과 아님)"
 else:
@@ -592,7 +640,7 @@ if code != 0 and os.path.isfile(sess):
     os.remove(sess)
 audit.update({"exit": code, "note": note, "sessionFile": sess if os.path.isfile(sess) else None})
 json.dump(audit, open(stem + ".audit.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-print(f"INDEPENDENT {'OK' if code == 0 else 'FAIL(' + str(code) + ')'} mode={mode} rollouts={len(rolls)} spawn={spawn} calls={calls} hits={len(hits)} isolation={iso_ok} — {note}")
+print(f"INDEPENDENT {'OK' if code == 0 else 'OFF(18)' if code == 18 else 'FAIL(' + str(code) + ')'} mode={mode} rollouts={len(rolls)} spawn={spawn} calls={calls} hits={len(hits)} isolation={iso_ok} — {note}")
 sys.exit(code)
 PY
 ARC=$?

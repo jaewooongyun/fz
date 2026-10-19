@@ -215,7 +215,7 @@ fi
 | /fz-review | Phase 5 → review/check, Phase 5.5 → validate |
 | /fz-plan | Phase 2 → verify |
 | /fz-fix | check verdict contract 분기 처리 |
-| /fz | TEAM 모드 cross-validation 게이트 주입 시 verify/validate |
+| /fz | cross-validation 게이트 주입 시 verify/validate — GPT 켬이면 light · full 모두(끔 · CLI 없음은 `modules/gpt-strategy.md` § GPT 미사용) |
 
 ## 설계 원칙
 

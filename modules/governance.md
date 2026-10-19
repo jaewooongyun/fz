@@ -116,6 +116,7 @@
 | `/fz` 오케스트레이터 | **Phase 4** 사용자 확인 — 모드를 먼저 판정하고, 범위 내 가역만 자동 진행 | **배선됨** |
 | 개별 스킬 직접 진입 (`/fz-review` 등) | 각 스킬의 승인 지점 | ⛔ **미배선** — 아래 참조 (예외: 바로 아래 GPT 모델·effort 질문 행) |
 | GPT 모델·effort 질문 (`/fz` Phase 4 · 개별 스킬의 첫 GPT 호출 직전) | `scripts/gpt-choice.sh get`(`scripts/autonomy_decide.py` 판정 — 선택이 없고 자율이면 exit 4 로 묻지 않고 config · 선택이 있으면 모드와 무관하게 적용) | **배선됨** — 사용자 지목 지점(2026-09-30) |
+| 모드 게이트 (무거운 경로 light · full — `/fz-plan` · `/fz-review` · `/fz-peer-review` · `/fz-code` · `/fz-fix` · `/fz-discover`) | 각 스킬의 Workflow 기동 직전 — `modules/mode-gate.md` § 언제 묻나(`scripts/autonomy_decide.py --action mode_select --in-scope --reversible` · 자율이면 추천대로 진행하고 기록) | **배선됨** — 사용자 지목 지점(2026-10-19) |
 | 워커 실행 (Workflow agent) | `agent()` OVERRIDE 프롬프트 | ⛔ **미배선** — 환경변수는 모델 호출에 전달되지 않는다. 주입이 필요하다 |
 
 ⛔ **개별 스킬 경로의 배선은 열려 있다.** 승인 지점을 세려면 `AskUserQuestion` 호출부를 분류해야 하는데, 실측 **90건/31파일** 중 키워드 분류로 판정된 것이 37건뿐이다(unknown 42 · 복합 11). ⇒ 분류는 **기계로 닫히지 않는다**. 사람이 지점을 지목하기 전에는 이 경로를 자동 적용 대상으로 선언하지 않는다 — 잘못 적용하면 승인이 사라진다.
@@ -198,6 +199,8 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 | **YAML 필수 필드** | **본 문서 § 스킬 최소 기준** (L1 공식 4 + L2 fz 정책 2) | fz-manage check #1, skill-troubleshooting.md #1, templates/skill-template.md |
 | 에이전트 도구 | 에이전트 YAML `tools` | 본문 설명 |
 | 파이프라인 정의 | modules/pipelines.md | fz SKILL.md 인라인 |
+| **light · full 추천 임계** | **`scripts/mode_gate.py` 상수** | modules/mode-gate.md(계약만 — 숫자 없음) · 스킬 모드 게이트 줄. 감시 = `scripts/check_single_source.py` |
+| 모드 게이트 계약 · 신호어 목록 | `modules/mode-gate.md` | fz SKILL.md Phase 1 `simplified_keywords` · lead-action-default.md 40차 · 스킬 light 절 |
 | 평가 기준 | guides/skill-testing.md | fz-skill eval, fz-manage benchmark |
 
 동기화 불일치 발견 시: truth-of-source를 기준으로 나머지를 수정.

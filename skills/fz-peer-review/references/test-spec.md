@@ -25,6 +25,7 @@
 | `gh auth status` 실패 | `/fz-peer-review 123` | git 폴백 경로(`git fetch upstream` + `git diff`)로 `${WORK_DIR}/diff.patch` 생성(비어있지 않음) → 리뷰 파이프라인 계속 진행 = pass | failure |
 | Tier 2 결정, GPT challenger 호출 실패 | `/fz-peer-review 123` | **3-렌즈**(review-arch + review-quality + review-correctness — `peer-review.js`의 Stage 1 `parallelWithRetry` 호출) 결과를 GPT 열 없이 `modules/peer-review-gates.md` § MergeContract § 9 **Tier 2 행** 산식대로 Lead 가 병합 → 최종 verdict 산출(리뷰 비중단) = pass. Confidence Matrix 산출 여부도 그 행이 정본 | failure |
 | Tier 2 · `--gpt-independent`, 런처가 exit 15(오염) · 16(시간 초과)로 끝남 | `/fz-peer-review 123 --gpt-independent` | 병합을 `--gpt-unavailable "exit {n} — {note}"` 로 부른다. 실패한 산출을 `--gpt` 로 넘기면 `review_merge.py` 가 옆 파일(`.contaminated` · `.audit.json`)을 보고 exit 1 로 거부한다 — GPT 열 없이 Tier 2 행 산식 = pass | failure |
+| GPT 를 끈 세션(정문 · 런처 exit 18 `GPT-OFF`) | `/fz-peer-review 123` | 병합을 `--gpt-unavailable "GPT 미사용 — 사용자 선택"` 으로 부르고 GPT 칸에 `[GPT 미사용 — 사유]` — `solo (gpt 실패)` 강등 · ×0.7 감쇠 없음 | edge-case |
 | Tier 2 실행, 리포트에 전수·부정 주장 포함("사용처 0건") | `/fz-peer-review 123` | Synthesize §4에서 `cross-validation.md` §Coverage Gate Read 후 **전체 N / 분석 M 비율 보고** = pass (미보고면 fail) | normal |
 | Tier 3 실행, suggestion 등급 이슈 존재 | `/fz-peer-review 123 --deep` | 반환 `distribution.suggestion` 이 실제 suggestion 이슈 수와 일치 + log에 표기 = pass (H24 회귀 방어) | normal |
 | Tier 2/3 실행 | `/fz-peer-review 123` | `args.structuralContext` 가 전달되고 **arch 프롬프트에만** `[구조 축 — 이 렌즈 전용]` 이 포함 = pass. ⛔ `structuralLine` 이 조건부라 args 누락 시 **에러 없이 구조 축이 꺼진다** — quality/correctness 프롬프트에 포함되면 fail(결함 축 오염) | normal |

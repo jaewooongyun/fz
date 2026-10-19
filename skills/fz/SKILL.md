@@ -17,7 +17,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__delete_memory,
   mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
-  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-choice.sh*), Read, Grep, Glob
+  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob
 metadata:
   provides: []
   needs: []
@@ -38,10 +38,10 @@ metadata:
 - **사전 정의 파이프라인** (19개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
 - **동적 파이프라인**: `provides`/`needs` 그래프 기반 자동 구성 (폴백)
 - **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(Fable 5.1) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
-- **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 현행 `xhigh`) — fable 판단 지점 3곳과 별개
+- **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 값은 Lead 세션 effort · `modules/mode-gate.md` § effort) — fable 판단 지점 3곳과 별개
 - **3-Tier 모델**: **Fable 5.1**(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
-  > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `xhigh` 단일값. 공식 출발점: **Fable 5.1 `high` · Opus 5.5 `medium`(Opus 5 는 `high`)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
-- **GPT 필수 참여**: 모든 TEAM 스킬에 GPT CLI 포함 → cross-model 상호검증
+  > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `effort: EFFORT` — Lead 세션 effort 를 args 로 전달(미지정 `xhigh` · 2026-10-19 · `modules/mode-gate.md` § effort). 공식 출발점: **Fable 5.1 `high` · Opus 5.5 `medium`(Opus 5 는 `high`)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
+- **GPT 필수 참여**: GPT 를 켠 경우 light · full 모든 스킬에 GPT CLI 포함 → cross-model 상호검증(끔 · CLI 없음 → `[GPT 미사용 — 사유]` — `modules/gpt-strategy.md` § GPT 미사용)
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
 - **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + GPT 교차검증
 
@@ -189,7 +189,7 @@ metadata:
 | `target_count` | 언급된 대상 파일/모듈 수 | Complexity Scope 차원 |
 | `cross_concern` | 여러 관심사가 교차하는지 | Complexity Risk 차원 |
 | `override_flags` | --solo, --team, --deep | 모드 Override |
-| `simplified_keywords` | "그냥", "가볍게", "단순", "빠르게", "light", "확인해줘", "해도 돼?", "맞아?", "한 번 봐줘" (단, **`--deep`/`--team` override 시 무력화** — GPT MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. `lead-action-default.md` 40차 row와 동기화 (GPT 검증 §추가 발견 1). 단 산출물이 전수/카운트/부정 주장이면 light라도 Coverage Gate 유지, 외부 피드백 수용/기각 판정이면 External Feedback Gate 유지 (검증 경계 — cross-validation.md §Coverage Gate·§External Feedback Gate) |
+| `simplified_keywords` | 신호어 — 정본 목록 `modules/mode-gate.md` § 신호어 (단, **`--deep`/`--team` override 시 무력화** — GPT MUST 3) | **light variant 자동 라우팅 (40차)** — 매칭된 스킬이 light 모드 지원 시 우선 적용. 목록은 모듈 한 곳에만 둔다. 단 산출물이 전수/카운트/부정 주장이면 light라도 Coverage Gate 유지, 외부 피드백 수용/기각 판정이면 External Feedback Gate 유지 (검증 경계 — cross-validation.md §Coverage Gate·§External Feedback Gate) |
 
 ### Gate 1: Intent Resolved
 - [ ] 1개 이상의 스킬이 매칭되었는가? — **0개면 Phase 3.1 을 resolver-only 로 호출했는가?**
@@ -275,7 +275,7 @@ Phase 1 매칭 0  →  3.1 트리거 대조
 
 ```
 1. 파이프라인 스텝 → 필요 에이전트 식별
-2. 실질 생산 워커 판별 → opus 배정 (동시 ≤3, effort 명시 의무 — 현행 `xhigh`, sweep 후 차등 배정 예정)
+2. 실질 생산 워커 판별 → opus 배정 (동시 ≤3, effort 명시 의무 — Lead 세션 effort 를 args 로 · `modules/mode-gate.md` § effort)
 3. 단순 작업 에이전트만 sonnet으로 스폰
 4. 정적 팀 패턴 매칭 → 일치 시 정적 사용
 5. 미일치 시 동적 구성 적용
@@ -291,10 +291,10 @@ Phase 1 매칭 0  →  3.1 트리거 대조
 
 ```
 planning 생산 전 → ✓ direction-challenge (review-direction, TEAM fz-plan Phase 0.5)
-planning 생산 후 → ✓ stress-test(Q1-Q5) + ✓ gpt verify (TEAM)
+planning 생산 후 → ✓ stress-test(Q1-Q5) + ✓ gpt verify (GPT 켬 — light · full)
 code-changes 생산 중 → ✓ friction-detect (매 Step, fz-code 내장)
-code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ implication-scan (제거/리팩 시) + ✓ gpt check (TEAM)
-commit/pr 전 → ✓ gpt check (TEAM)
+code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ implication-scan (제거/리팩 시) + ✓ gpt check (GPT 켬 — light · full)
+commit/pr 전 → ✓ gpt check (GPT 켬 — light · full)
 ```
 
 > **direction-challenge**: review-direction 에이전트가 접근 방향 자체를 도전 (PROCEED/RECONSIDER/REDIRECT 판정). fz-plan TEAM Phase 0.5.
@@ -313,7 +313,7 @@ commit/pr 전 → ✓ gpt check (TEAM)
 
 결정된 파이프라인, 팀 구성, 모델 배정을 시각화하고 사용자 승인을 받습니다.
 
-> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — `FZ_AUTONOMY` 가 `autonomous` 면 *범위 내 가역* 파이프라인은 자동 진행하고, 그 밖은 여기서 묻는다. 금지 행동(commit·push·외부 발신·삭제)은 **모드와 무관하게 차단**이다 (`scripts/autonomy_decide.py` · 정책 `modules/governance.md` § 자율 모드). ⛔ **GPT 모델·effort**: 확정 파이프라인에 GPT 를 부를 수 있는 스킬이 있으면(모르면 묻는다) `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" get` 을 부르고 정본의 `get` 결과 표대로 한다 — 묻기로 나오면 모델·effort 질문 2개를 이 AskUserQuestion 에 합치고 답을 `set` 한다(자율 판정도 `get` 이 한다). 선택이 있으면 제안 시각화에 표시만 한다 — 정본 `modules/gpt-strategy.md` § 모델·effort 선택
+> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — `FZ_AUTONOMY` 가 `autonomous` 면 *범위 내 가역* 파이프라인은 자동 진행하고, 그 밖은 여기서 묻는다. 금지 행동(commit·push·외부 발신·삭제)은 **모드와 무관하게 차단**이다 (`scripts/autonomy_decide.py` · 정책 `modules/governance.md` § 자율 모드). ⛔ **GPT 모델·effort**: 확정 파이프라인에 GPT 를 부를 수 있는 스킬이 있으면(모르면 묻는다) `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" get` 을 부르고 정본의 `get` 결과 표대로 한다 — 묻기로 나오면 모델·effort 질문 2개를 이 AskUserQuestion 에 합치고 답을 `set` 한다(자율 판정도 `get` 이 한다). 선택이 있으면 제안 시각화에 표시만 한다 — 정본 `modules/gpt-strategy.md` § 모델·effort 선택 ⛔ **모드**: Phase 3 의 SOLO/TEAM 은 스킬별 light/full **추천**이다 — 이 질문에서 사용자가 고른 모드를 스킬에 인자(`light` · `full`)로 넘기고, 스킬은 다시 묻지 않는다(`modules/mode-gate.md`).
 
 ### Gate 4: Pipeline Approved
 - [ ] 파이프라인 + 팀 구성 시각화 출력 완료?
@@ -348,7 +348,7 @@ commit/pr 전 → ✓ gpt check (TEAM)
 
 ```
 0. 준비(§12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): cp {플러그인 루트}/workflows/{skill}-{pattern}.js {WORK_DIR}/{skill}-{pattern}.js && cmp -s {플러그인 루트}/workflows/{skill}-{pattern}.js {WORK_DIR}/{skill}-{pattern}.js   → exit 0 일 때만 1 · 비0 이면 L4
-1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{WORK_DIR}/{skill}-{pattern}.js', args })   → ⛔ 거부 시 정본 = `guides/skill-authoring.md` §12 우회 계약 (SOLO 폴백 아님)
+1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{WORK_DIR}/{skill}-{pattern}.js', args })   — args 에 `effort` = `mode_gate.py lead-effort` 의 `effort.value`(null 이면 뺀다) → ⛔ 거부 시 정본 = `guides/skill-authoring.md` §12 우회 계약 (SOLO 폴백 아님)
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
 3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/GPT) + 통합
 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
@@ -458,7 +458,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 - 스킬 자체 로직 수행 (스킬 SKILL.md 지침에 위임)
 - 사용자 승인 없이 실행 (Phase 4 필수)
 - 코드를 직접 수정 (각 스킬에 위임)
-- opus 과다 사용 (실질 워커 동시 ≤3 · fable ≤1[Lead 제외] · 총 ≤4 — Lead는 fable이라 opus 카운트 제외. 전 워커 effort 명시 의무(현행 `xhigh`). 비용 envelope ≈ Lead(fable) + opus 3 — governance.md 상한 행 정합)
+- opus 과다 사용 (실질 워커 동시 ≤3 · fable ≤1[Lead 제외] · 총 ≤4 — Lead는 fable이라 opus 카운트 제외. 전 워커 effort 명시 의무(값 = Lead 세션 effort). 비용 envelope ≈ Lead(fable) + opus 3 — governance.md 상한 행 정합)
 - haiku 모델 사용
 
 ## 에러 대응

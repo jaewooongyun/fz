@@ -127,7 +127,7 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$F" --prompt-file P  # 커스텀 지시 · 스키마는 kind 가 정한다
 ```
 
-⛔ **exit 10~17 = 측정 실패**이며 "이슈 0건"이 아니다. ⛔ 게이트 3은 **스키마 계약**(required·type·enum·재귀)을 본다 — `{}`는 통과하지 못한다. ⛔ 스크립트 exit을 뒤 명령이 덮지 않게 하라. 미준수 시 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch / **인자 충돌 exit 2를 정상 결과로 오독**.
+⛔ **exit 10~17 = 측정 실패**이며 "이슈 0건"이 아니다. exit 18(stderr `GPT-OFF:`)은 GPT 미사용 — 실패가 아니라 그 단계를 건너뛰고 `[GPT 미사용 — 사유]` 를 남긴다(`modules/gpt-strategy.md` § GPT 미사용). ⛔ 게이트 3은 **스키마 계약**(required·type·enum·재귀)을 본다 — `{}`는 통과하지 못한다. ⛔ 스크립트 exit을 뒤 명령이 덮지 않게 하라. 미준수 시 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch / **인자 충돌 exit 2를 정상 결과로 오독**.
 
 ---
 

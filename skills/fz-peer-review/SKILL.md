@@ -43,7 +43,7 @@ metadata:
 - **9개 관점**: Architecture Decision, Extensibility, Over-Engineering, Functional Decomposition, Modern API, Dependency Impact, **Refactoring Completeness**, **Concurrency Safety** (동시성 코드 포함 시), **Requirements Alignment**
 - **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 single source) + GPT challenger(**Tier 1·2·3 상시** — SSOT는 `modules/peer-review-tiers.md` § Tier 구성 표. Tier 0은 `--gpt` 시 Tier 1 전환)
 - **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정 (적용 Tier·산식은 `modules/peer-review-gates.md` § MergeContract § 9)
-- **4-Tier Graceful Degradation**: diff 크기 기반 자동 Tier 선택 (Tier 0/1/2/3) + 폴백 체인
+- **모드 게이트 + Tier**: 크기·위험으로 추천 → 질문 → light = Tier 1 · full = Tier 2 · `--deep` = Tier 3 · `--tier 0` 명시 = Tier 0 (`modules/mode-gate.md`) + 폴백 체인
 
 ```bash
 /fz-peer-review 123                   # PR #123 리뷰
@@ -64,14 +64,14 @@ metadata:
 
 | 입력 | 리뷰 깊이 | 해설 티어 |
 |------|----------|----------|
-| `--explain` | 기본 (Auto-Tier) | Tutor |
-| `--explain --light` | 기본 (Auto-Tier) | Standard |
+| `--explain` | 기본 (모드 게이트) | Tutor |
+| `--explain --light` | 기본 (모드 게이트) | Standard |
 | `--explain --deep` | Cross-Critique 활성 | Deep |
 | `--deep` (explain 없음) | Cross-Critique 활성 | 해설 없음 |
 
 ⛔ `--explain --light`의 `--light`는 **해설만** Standard로 내린다. peer-review 자체를 경량 모드로 바꾸지 않는다
-— 리뷰 깊이를 낮추려면 `--tier`를 쓴다. `/fz`의 simplified 키워드("가볍게", "light")가 이 자리의 `--light`와
-같은 뜻으로 읽히면 리뷰가 조용히 축소되므로, 이 표가 유일한 판별 근거다.
+— 리뷰 깊이는 모드 게이트(light = Tier 1 · full = Tier 2) 또는 `--tier` 로 정한다. 신호어(정본 `modules/mode-gate.md` § 신호어)는
+모드 게이트의 light 로 읽는다 — 이 자리의 `--light`(해설 Standard)와 섞이면 해설이 조용히 바뀌므로, 이 표가 유일한 판별 근거다.
 
 `--deep`은 두 축을 동시에 켠다(리뷰 Cross-Critique + 해설 Deep). 기존 배선이며 변경하지 않았다.
 
@@ -238,23 +238,23 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 <500줄 → FULL_INLINE | 500-2000줄 → SUMMARY | >2000줄 → FILE_LIST_ONLY
 ```
 
-### 5.5. Tier Determination (Auto-Tier)
+### 5.5. Tier Determination (모드 게이트)
 
-> ⛔ Gather Step 5 직후 필수 실행 (미실행 시 작은 PR도 Tier 2 디폴트 → 토큰 낭비).
-> **자동 선택 실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED + risk escalation): `modules/peer-review-tiers.md` "## 자동 휴리스틱 (단일 진실 원천)" → "### 자동 선택 실행 bash" 참조 (SSOT 단일 지점, L18 규칙).
+> ⛔ Gather Step 5 직후 필수 실행 — 측정 → 추천(`scripts/mode_gate.py peer`) → 질문(명시 인자 · 신호어 · `/fz` 경유 · `--tier` 면 묻지 않는다).
+> **실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED · 위험 카테고리는 추천 근거): `modules/peer-review-tiers.md` "## 모드 선택 (측정 · 추천 · 질문)" → "### 자동 선택 실행 bash" 참조 (SSOT 단일 지점, L18 규칙).
 
 상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조.
 
 #### Few-shot
 ```
 BAD: 13줄 PR → Tier 2 Lite Team 디폴트 → ~375K tokens
-GOOD: 13줄 PR → auto Tier 0 → Lead 단독 분석 → ~30-50K tokens
+GOOD: 13줄 PR → 추천 light → Tier 1(Lead + GPT 독립 첫 패스) → Workflow 0콜
 ```
 
 #### Gate 5.5: Tier Determined
 - [ ] CHANGED_LINES 계산 완료? (`gh pr view --json additions,deletions` 또는 `git diff --numstat`)
 - [ ] --tier 옵션 우선 적용?
-- [ ] auto 결정 결과 tier.txt 기록?
+- [ ] 모드(추천 · 선택 출처)와 Tier 를 tier.txt 에 기록?
 
 ## Step: Analyze (독립 리뷰, 병렬)
 
@@ -486,7 +486,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 - ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합.
 ## 에러 대응
 
-`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (gpt 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다**, GPT timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
+`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (gpt 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다** — 단 exit 18(`GPT-OFF`)은 GPT 미사용이라 `solo (gpt 실패)` 강등 · ×0.7 감쇠 대상이 아니고 `[GPT 미사용 — 사유]` 만 적는다(`modules/gpt-strategy.md` § GPT 미사용), GPT timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
 
 ## Completion → Next
 `--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계.

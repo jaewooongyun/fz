@@ -12,17 +12,26 @@
 #   gpt-choice.sh options                                            선택지 JSON (stdout)
 #   gpt-choice.sh get                                                현재 세션 선택 (stdout 'model=… effort=…')
 #   gpt-choice.sh set --model <slug|config> --effort <level|config>  검증 뒤 기록 (stdout 'model=… effort=…')
+#   gpt-choice.sh set --model off [--effort <무시>]                  GPT 미사용 기록 (stdout 'model=off effort=off')
 #   gpt-choice.sh config                                             config.toml 최상위 값 (stdout 'model=<값|?> effort=<값|?>')
 #
-# 저장: ${FZ_GPT_CHOICE_DIR:-$HOME/.fz/gpt-choice}/${CLAUDE_CODE_SESSION_ID} — 'model=<slug|config>' 'effort=<level|config>' 두 줄.
+# 저장: ${FZ_GPT_CHOICE_DIR:-$HOME/.fz/gpt-choice}/${CLAUDE_CODE_SESSION_ID} — 'model=<slug|config|off>' 'effort=<level|config|off>' 두 줄.
 #   값 config = 그 필드를 넘기지 않는다(config.toml 그대로). `set --model config --effort config` 는 "물었고 config" 센티넬이다.
+#   값 off = GPT 미사용(두 줄 모두 off — 한쪽만 off 면 손상). 래퍼 · 독립 런처는 CLI 를 부르지 않고 exit 18 이다
+#   (정본 modules/gpt-strategy.md § GPT 미사용).
 # 입력: ${CODEX_HOME:-$HOME/.codex}/models_cache.json (options·set) · 같은 폴더 config.toml 의 최상위(첫 표 앞) model·model_reasoning_effort (options·set·config)
+#   GPT CLI 존재: 같은 폴더 gpt-exec.sh cli-check(0=있음 · 18=없음) — 실행 파일 이름은 래퍼 한 곳에 둔다
 #
 # exit:
-#   get     0=선택 있음 · 3=없음(물어도 됨) · 4=없음 + 자율 모드(묻지 않음) · 11=선택 파일 손상(다시 묻고 set 으로 덮어쓴다)
+#   get     0=선택 있음(off 포함 — stdout 'model=off effort=off') · 3=없음(물어도 됨) · 4=없음 + 자율 모드(묻지 않음)
+#           11=선택 파일 손상(다시 묻고 set 으로 덮어쓴다)
 #           5=저장할 수 없는 세션(세션 id 없음·불량 · FZ_GPT_CHOICE_DIR 가 절대 경로 아님) — 묻지 않고 config, stderr 안내
+#           ⊕ 선택이 없고 GPT CLI 가 없으면 묻지 않고 0 · 'model=off effort=off' — off 를 기록하고(저장할 수 없는 세션이면 기록 없이) stderr 안내
 #   set     0=기록 · 10=검증 실패(fail-closed — 파일을 쓰지 않는다) · 11=사전조건(세션 id·저장 위치·모델 목록 캐시 없음 · 쓰기 실패)
-#   options 0=JSON · 11=모델 목록 캐시 없음·판독 불가(묻지 않고 set config config 로 진행한다)
+#           --model off 는 모델 목록 캐시 · config · python3 를 보지 않는다(11 은 세션 id · 저장 위치 · 쓰기 실패뿐)
+#   options 0=JSON — 모델 질문 = config + 목록 모델 최대 2 + off(4 이하). 모델 목록 캐시 없음·판독 불가 · python3 없음이면
+#           'degraded' 키(사유)와 config / off 두 선택지(effort 질문 skip) — 그래도 묻는다(off 를 고를 수 있어야 한다).
+#           11=degraded JSON 을 만드는 python 자체 실패뿐 · 10=사용법
 #   config  0=stdout 'model=<값|?> effort=<값|?>'(config.toml 이 없거나 값을 모르면 '?') · 11=python3 없음·판독 실패
 #           래퍼(gpt-exec.sh)의 GPT-CHOICE 줄이 출처 config 인 필드의 값을 이것으로 읽는다 — config 판독 규칙(config_top)의 출처를 한 곳에 둔다.
 #           모델 목록 캐시 · 선택 파일 · 세션 id 를 보지 않는다
@@ -46,10 +55,19 @@ MODEL_RE='^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
 #    '.' 로 시작하는 이름은 set 의 임시 파일 몫이라 선택 파일과 겹치지 않는다.
 SID_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 
+# 모델 질문의 GPT 미사용 선택지(id off) — options 정상 · degraded 가 같은 문구를 쓴다
+OFF_LABEL="사용 안 함 (GPT 교차검증 끔)"
+
 GPT_HOME="${CODEX_HOME:-${HOME:-}/.codex}"
 CACHE="$GPT_HOME/models_cache.json"
 CFG="$GPT_HOME/config.toml"
 WHY="" CHOICE_DIR="" CHOICE_FILE="" SEL_MODEL="" SEL_EFFORT=""
+
+# GPT CLI 가 없는가 — 래퍼 cli-check 의 18 만 '없음' 이다. 래퍼 부재(127) · 그 밖은 '모름' 이라 off 로 정하지 않는다(묻는 쪽으로 간다)
+cli_absent() {
+  bash "$(dirname "$0")/gpt-exec.sh" cli-check >/dev/null 2>&1
+  [ $? -eq 18 ]
+}
 
 is_effort() {   # 화이트리스트 원소인가
   local w
@@ -92,6 +110,11 @@ read_choice() {
     esac
   done < "$f"
   [ "$n" -eq 2 ] || return 1
+  # off 는 두 줄이 함께다 — 'model=off effort=high' 나 'model=x effort=off' 는 set 이 쓰지 않는 모양이라 손상이다
+  if [ "$SEL_MODEL" = "off" ] || [ "$SEL_EFFORT" = "off" ]; then
+    [ "$SEL_MODEL" = "off" ] && [ "$SEL_EFFORT" = "off" ]
+    return
+  fi
   valid_model "$SEL_MODEL" && valid_effort "$SEL_EFFORT"
 }
 
@@ -111,14 +134,16 @@ write_choice() {   # $1=모델 · $2=effort
 
 # 모델 목록 캐시 판독 — options(JSON 출력)와 set(검증)이 같은 판독을 쓴다. exit: 0 · 10(set 검증 실패) · 11(캐시 판독 불가)
 #   config 모드는 config.toml 최상위 값(config_top — options · set 과 같은 판독)만 내고 캐시를 열기 전에 끝난다(exit 0)
-choice_py() {   # $1=모드(options|set|config) · $2=모델 · $3=effort (options · config 는 빈 값)
-  python3 - "$1" "$CACHE" "$CFG" "$EFFORT_WHITELIST" "$MODEL_RE" "$2" "$3" <<'PY'
+#   degraded 모드는 캐시 없이 config / off 두 선택지 JSON 을 낸다($2 = 사유) — 캐시를 열기 전에 끝난다(exit 0)
+choice_py() {   # $1=모드(options|set|config|degraded) · $2=모델(degraded 는 사유) · $3=effort (options · config · degraded 는 빈 값)
+  python3 - "$1" "$CACHE" "$CFG" "$EFFORT_WHITELIST" "$MODEL_RE" "$2" "$3" "$OFF_LABEL" <<'PY'
 import json
 import re
 import sys
 
-mode, cache, cfg, wl, model_re, want_model, want_effort = sys.argv[1:8]
+mode, cache, cfg, wl, model_re, want_model, want_effort, off_label = sys.argv[1:9]
 WL = wl.split()
+OFF = {"id": "off", "label": off_label}
 
 
 def fail(code, msg):
@@ -156,6 +181,22 @@ if mode == "config":
     print(f"model={top_model} effort={top_effort}")
     sys.exit(0)
 
+if mode == "degraded":
+    # 모델 목록을 못 읽어도 off 는 고를 수 있어야 한다 — config / off 두 선택지만 내고 effort 는 묻지 않는다(config).
+    #   ⛔ 옛 계약(exit 11 → 묻지 않고 config)은 GPT 를 쓰지 않으려는 사용자에게 고를 길을 막았다
+    top_model, top_effort = config_top(cfg)
+    print(json.dumps({
+        "degraded": want_model,
+        "config": {"model": top_model, "effort": top_effort},
+        "models": [],
+        "questions": {
+            "model": {"skip": False, "choices": [{"id": "config", "label": f"config 기본 ({top_model})"}, OFF], "more": []},
+            "effort": {"skip": True, "choices": [{"id": "config", "label": f"config 기본 ({top_effort})"}], "more": []},
+        },
+        "effort_whitelist": WL,
+    }, ensure_ascii=False, indent=2))
+    sys.exit(0)
+
 
 try:
     with open(cache, encoding="utf-8") as fh:
@@ -190,8 +231,9 @@ for m in raw:
     if not isinstance(m, dict) or not isinstance(m.get("slug"), str) or m["slug"] in by_slug:
         continue
     by_slug[m["slug"]] = m
-    # ⛔ 저장할 수 없는 slug(문자셋 밖)는 선택지로 내지 않는다 — 고른 뒤 set 이 거부하면 한 번 더 묻게 된다
-    if m.get("visibility") == "list" and re.fullmatch(model_re, m["slug"]):
+    # ⛔ 저장할 수 없는 slug(문자셋 밖)는 선택지로 내지 않는다 — 고른 뒤 set 이 거부하면 한 번 더 묻게 된다.
+    #    'off' 는 GPT 미사용 예약어라 모델로 내지 않는다(set --model off 는 모델 기록이 아니다)
+    if m.get("visibility") == "list" and re.fullmatch(model_re, m["slug"]) and m["slug"] != "off":
         listed.append(m)
 
 cfg_model, cfg_effort = config_top(cfg)
@@ -218,16 +260,18 @@ if mode == "set":
             fail(10, f"effort 거부 — config effort '{cfg_effort}' 는 모델 '{want_model}' 에서 쓸 수 없다. effort 를 고르거나 모델을 config 로 둔다. 쓸 수 있는 값: {' '.join(sup) or '(없음)'}")
     sys.exit(0)
 
-# 모델 질문: config 기본 + 목록 앞 3개(config 모델은 config 선택지와 겹치므로 뺀다). 나머지는 more — Other 로 입력할 수 있다.
+# 모델 질문: config 기본 + 목록 앞 2개(config 모델은 config 선택지와 겹치므로 뺀다) + off(GPT 미사용) — 선택지 4 이하(AskUserQuestion
+#   한 질문의 상한). 나머지는 more — Other 로 입력할 수 있다. off 는 늘 있으므로 모델 질문은 skip 되지 않는다.
 others = [m for m in listed if m["slug"] != cfg_model]
-top, more = others[:3], others[3:]
+top, more = others[:2], others[2:]
 # ⛔ 지원 effort 를 모르는 모델(config 모델을 모름 · 캐시에 목록 없음)은 set 이 명시 effort 와의 짝을 exit 10 으로 거부한다 —
 #    label 에 적어 두지 않으면 사용자가 '기본 모델 + effort 올리기'를 고르고, 같은 선택지로 다시 물어도 또 실패한다
 ONLY_CFG = " · effort 는 config 만"
 model_choices = [{"id": "config", "label": f"config 기본 ({cfg_model}{'' if levels(cm) is not None else ONLY_CFG})"}]
 model_choices += [{"id": m["slug"], "label": label(m) + ("" if levels(m) is not None else ONLY_CFG)} for m in top]
+model_choices.append(OFF)
 
-# effort 질문: 모델과 한 번에 물으므로 명시 수준은 지원 목록을 아는 제시 모델(config 모델 + 위 3개) 모두가 지원하는 값만 낸다 —
+# effort 질문: 모델과 한 번에 물으므로 명시 수준은 지원 목록을 아는 제시 모델(config 모델 + 위 2개) 모두가 지원하는 값만 낸다 —
 #   교집합 ∩ 화이트리스트. 지원 목록을 모르는 모델은 교집합에서 빼고 모델 label 에 'effort 는 config 만' 을 붙인다.
 #   config 값과 같은 수준은 config 선택지와 겹치므로 빼고, 3개를 넘으면 config 값(모르면 config 모델 기본값)에 가까운 순 — 동률이면 높은 쪽.
 known = [k for k in (levels(m) for m in ([cm] if cm else []) + top) if k is not None]
@@ -239,7 +283,8 @@ if center not in WL:
 near = sorted(cands, key=lambda w: (abs(WL.index(w) - WL.index(center)), -WL.index(w)))
 pick, rest = near[:3], near[3:]
 # ⛔ config 선택지는 늘 낸다("물었고 config" 의 기본 경로 — 모델도 config 면 set 이 캐시를 읽지 않아 언제나 통한다). 다만 config
-#    effort 를 지원하지 않는 제시 모델(위 3개)이 캐시로 확인되면 label 에 적는다 — 그 모델과 짝지으면 set 이 exit 10 이다.
+#    effort 를 지원하지 않는 제시 모델(위 2개)이 캐시로 확인되면 label 에 적는다 — 그 모델과 짝지으면 set 이 exit 10 이다.
+#    off 를 고르면 effort 답은 쓰지 않는다(set --model off 가 무시한다).
 #    명시 수준처럼 교집합으로 거를 수 없는 선택지라 빼지 않고 알린다.
 cfg_bad = [label(m) for m in top if cfg_effort in WL and levels(m) is not None and cfg_effort not in levels(m)]
 note = f" · {', '.join(cfg_bad)} 미지원" if cfg_bad else ""
@@ -262,16 +307,30 @@ print(json.dumps(out, ensure_ascii=False, indent=2))
 PY
 }
 
+# ⛔ 모델 목록을 못 읽어도 묻는다 — config / off 두 선택지(degraded). 옛 계약(11 → 묻지 않고 config)은 off 를 고를 길을 막았다.
+#    python3 이 없으면 config 값도 모르므로 '?' 로 같은 모양을 bash 가 낸다(문자열에 이스케이프할 값이 없다).
 cmd_options() {
-  local rc
+  local rc why sep='", "'
   [ $# -eq 0 ] || die 10 "options 는 인자를 받지 않는다: $1"
-  command -v python3 >/dev/null 2>&1 || die 11 "python3 이 없어 모델 목록을 읽지 못한다"
-  [ -f "$CACHE" ] || die 11 "모델 목록 캐시가 없다: $CACHE"
-  choice_py options "" ""; rc=$?
-  case "$rc" in
-    0|11) exit "$rc" ;;
-    *) die 11 "선택지를 만들지 못했다(python3 exit $rc)" ;;
-  esac
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "gpt-choice: python3 이 없어 모델 목록을 읽지 못한다 — config / off 두 선택지만 낸다(degraded)" >&2
+    printf '{"degraded": "python3-missing", "config": {"model": "?", "effort": "?"}, "models": [], "questions": {"model": {"skip": false, "choices": [{"id": "config", "label": "config 기본 (?)"}, {"id": "off", "label": "%s"}], "more": []}, "effort": {"skip": true, "choices": [{"id": "config", "label": "config 기본 (?)"}], "more": []}}, "effort_whitelist": ["%s"]}\n' \
+      "$OFF_LABEL" "${EFFORT_WHITELIST// /$sep}"
+    exit 0
+  fi
+  if [ ! -f "$CACHE" ]; then
+    why="cache-missing"
+    echo "gpt-choice: 모델 목록 캐시가 없다: $CACHE — config / off 두 선택지만 낸다(degraded)" >&2
+  else
+    choice_py options "" ""; rc=$?
+    case "$rc" in
+      0) exit 0 ;;
+      11) why="cache-unreadable" ;;   # 사유는 python 이 stderr 에 적었다
+      *) why="options-error"; echo "gpt-choice: 선택지를 만들지 못했다(python3 exit $rc) — config / off 두 선택지만 낸다(degraded)" >&2 ;;
+    esac
+  fi
+  choice_py degraded "$why" ""; rc=$?
+  [ "$rc" -eq 0 ] || die 11 "degraded 선택지도 만들지 못했다(python3 exit $rc)"
 }
 
 # config.toml 최상위 model · model_reasoning_effort — 래퍼 GPT-CHOICE 표시용. 캐시 · 선택 파일 · 세션 id 를 보지 않는다
@@ -286,8 +345,27 @@ cmd_config() {
 cmd_get() {
   local rc
   [ $# -eq 0 ] || die 10 "get 은 인자를 받지 않는다: $1"
-  resolve_file || die 5 "선택을 저장할 수 없는 세션이다 — ${WHY}. 묻지 않고 config 로 진행한다"
+  if ! resolve_file; then
+    # GPT CLI 가 없으면 config 로 가도 쓸 데가 없다 — 기록 없이 off 를 낸다(래퍼 · 런처도 CLI 없음으로 18 이다)
+    if cli_absent; then
+      echo "gpt-choice: GPT CLI 가 없다 — 묻지 않고 GPT 미사용(off)으로 진행한다. 이 세션은 선택을 저장할 수 없다(${WHY})" >&2
+      printf 'model=off effort=off\n'
+      exit 0
+    fi
+    die 5 "선택을 저장할 수 없는 세션이다 — ${WHY}. 묻지 않고 config 로 진행한다"
+  fi
   if [ ! -e "$CHOICE_FILE" ] && [ ! -L "$CHOICE_FILE" ]; then
+    # ⛔ 선택이 없고 GPT CLI 가 없으면 묻지 않는다 — off 를 기록하고 알린다(질문은 고를 수 없는 것을 묻게 된다).
+    #    기록하지 못해도 off 를 낸다. 이미 선택이 있으면 그대로 둔다(래퍼가 CLI 없음으로 18 을 낸다)
+    if cli_absent; then
+      if write_choice off off; then
+        echo "gpt-choice: GPT CLI 가 없다 — 묻지 않고 GPT 미사용(off)을 기록했다: $CHOICE_FILE (CLI 를 설치한 뒤 쓰려면 다시 묻고 set 으로 덮어쓴다)" >&2
+      else
+        echo "gpt-choice: GPT CLI 가 없다 — 묻지 않고 GPT 미사용(off)으로 진행한다(기록 실패: $CHOICE_FILE)" >&2
+      fi
+      printf 'model=off effort=off\n'
+      exit 0
+    fi
     # ⛔ 자율 판정은 원문 비교가 아니라 판정기(autonomy_decide.py)에 맡긴다 — ' Autonomous ' 같은 값을 원문으로 비교하면
     #    헤드리스 run 이 질문을 시도한다. 판정기는 공백·대소문자를 정규화하고 모르는 값은 묻기(ASK)로 본다.
     #    PROCEED(0) 만 4 이고 ASK·BLOCK·측정 실패·python3 부재는 전부 3 이다.
@@ -296,7 +374,7 @@ cmd_get() {
     exit 3
   fi
   read_choice "$CHOICE_FILE" \
-    || die 11 "선택 파일 손상: $CHOICE_FILE — 'model=<slug|config>' 'effort=<level|config>' 두 줄이어야 한다. 다시 묻고 set 으로 덮어쓴다"
+    || die 11 "선택 파일 손상: $CHOICE_FILE — 'model=<slug|config>' 'effort=<level|config>' 또는 'model=off' 'effort=off' 두 줄이어야 한다. 다시 묻고 set 으로 덮어쓴다"
   printf 'model=%s effort=%s\n' "$SEL_MODEL" "$SEL_EFFORT"
 }
 
@@ -309,10 +387,19 @@ cmd_set() {
       *) die 10 "알 수 없는 인자: $1" ;;
     esac
   done
-  { [ -n "$has_m" ] && [ -n "$has_e" ]; } || die 10 "set 은 --model 과 --effort 가 모두 필요하다 (값 config = 그 필드를 넘기지 않음)"
+  # ⛔ off(GPT 미사용)는 캐시 · config · python3 검증 **앞**에서 기록한다 — 모델 목록이 없는 환경(신규 설치 · CLI 미설치)에서도 끌 수 있어야 한다.
+  #    effort 는 받아도 쓰지 않는다(off 에는 effort 가 없다 — 두 줄 모두 off). 기록 실패는 11 — Lead 는 config 우회가 아니라
+  #    호출마다 --model off 를 붙인다(config 우회는 GPT 를 켠다 — modules/gpt-strategy.md § GPT 미사용)
+  if [ -n "$has_m" ] && [ "$m" = "off" ]; then
+    resolve_file || die 11 "off 를 저장할 수 없다 — $WHY. 이 세션의 GPT 호출에 --model off 를 붙인다"
+    write_choice off off || die 11 "선택 파일을 쓰지 못했다: $CHOICE_FILE — 이 세션의 GPT 호출에 --model off 를 붙인다"
+    printf 'model=off effort=off\n'
+    return 0
+  fi
+  { [ -n "$has_m" ] && [ -n "$has_e" ]; } || die 10 "set 은 --model 과 --effort 가 모두 필요하다 (값 config = 그 필드를 넘기지 않음 · --model off 만 --effort 없이 받는다)"
   resolve_file || die 11 "선택을 저장할 수 없다 — $WHY"
   # ⛔ config config 는 캐시·config 를 읽지 않는다 — 신규 설치·격리 CODEX_HOME 처럼 캐시가 없어도 "물었고 config" 를 남겨야
-  #    스킬마다 다시 묻지 않는다. options 가 exit 11 일 때와 set 이 거듭 exit 10 일 때의 fallback 도 이것이다.
+  #    스킬마다 다시 묻지 않는다. options 가 degraded 일 때 config 를 고른 경우와 set 이 거듭 exit 10 일 때의 fallback 도 이것이다.
   if [ "$m" != "config" ] || [ "$e" != "config" ]; then
     valid_model "$m" || die 10 "모델 거부 — 형식 불량 '$m' (첫 글자 영숫자 + [A-Za-z0-9._:/-], 또는 config)"
     valid_effort "$e" || die 10 "effort 거부 — '$e' 는 ${EFFORT_WHITELIST// /|}|config 가 아니다"

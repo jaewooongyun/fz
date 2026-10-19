@@ -246,7 +246,7 @@ Phase 2의 `verify-gates`가 **게이트마다 판정 1개**를 낸다 — "이 
 ℹ️ **세션 바인딩은 만들지 않았다.** Stop hook 입력에 `session_id`가 오므로 `~/.fz/sessions/<id>.json` 바인딩이 가능하지만, 그러면 **쓰는 쪽 배선**이 필요하고 그 배선이 빠지면 hook이 원장을 못 찾아 조용히 무력화된다. `cwd` 하위 glob은 배선이 0이고 여러 원장을 전부 본다 — 배선 4 참조.
    ⛔ 단 **차단은 이 세션이 쓴 원장만** 한다(2026-09-11, F-188 2회 재관측). 발견은 glob 이지만 소유는 입력의 `transcript_path` 에서 그 원장을 `Write`/`Edit`/`--finalize`/`cp`/`>` 로 쓴 tool_use 가 있는지로 가른다 — 쓰는 쪽 배선 없이 세션 스코프가 된다. 남의 미충족 원장은 경고로만 인쇄하고, transcript 를 못 읽으면 전 원장을 판정한다(fail-closed).
 
-light 모드는 원장을 만들지 않는다.
+light 모드도 원장을 만든다(모드 게이트 — `modules/mode-gate.md` · light 는 Workflow 만 뺀다). GPT 를 끈 세션이면 verify-gates 판정은 Gate 2 사용자 확인으로 대신한다(`modules/gpt-strategy.md` § GPT 미사용).
 
 ### 2. fz-code — Step 판정
 
