@@ -1,5 +1,16 @@
 # Changelog
 
+### v4.48.0 (2026-10-19) — 무거운 경로 앞에서 light · full 을 묻고, Workflow 워커는 Lead 의 effort 로 돈다 [MINOR]
+
+스킬을 직접 부르면 Workflow 를 띄울지 Lead 가 정하고 비용은 통보만 했다 — 코드가 조금만 커도 full 로 돌아 리뷰 40~50분 · 플랜 20분 넘게 걸렸다는 사용자 보고가 계기다.
+이 판부터 fz-review · fz-peer-review · fz-plan · fz-code · fz-fix · fz-discover 가 Workflow 직전에 크기를 재서 추천을 달고 묻는다(`modules/mode-gate.md` · `scripts/mode_gate.py`).
+GPT 는 두 모드에 같게 붙고 사용자가 끌 수 있다(exit 18 `GPT-OFF`). 워크플로 8개 45콜의 effort 는 `xhigh` 고정 대신 Lead 세션 effort 를 받는다(미지정이면 `xhigh`).
+1건을 닫는다. 쓰는 쪽의 변화는 릴리즈 노트 '쓰는 쪽에서 달라지는 점' 에 모았다.
+
+| ID | 판정 | 근거 | 검증 절차 |
+|---|---|---|---|
+| F-187 | 해결 — 직접 호출도 Workflow 앞에서 모드를 묻는다(사용자 결정 D1 · 2026-10-19) | S4 · S5 · S8 ~ S13: `scripts/mode_gate.py` 추천 · `modules/mode-gate.md` 계약 · 여섯 스킬의 모드 게이트 줄. 게이트 S15a 배선 fixture 17셀 · 기준 26c42d3 음성 대조(선택 셀 전부 FAIL)는 그 줄이 있다는 증거다 | F-187 오라클은 사람 판정이다("직접 호출 시 어느 분기로 가는지가 결정되는가") — 여섯 스킬을 인자 없이 직접 불러 Workflow 앞에서 질문이 뜨고 고른 모드로 가는지 본다. ⛔ 이 판에서는 실행하지 않았다(사용자 결정 2026-10-19 — 닫는 근거는 배선 셀뿐이다) |
+
 ### v4.47.0 (2026-10-15) — 질문 틀을 바꿔 GPT 를 한 번 더 부르는 것은 같은 질문을 반복한 것과 같았다 — 반증 틀 리뷰를 뺐다 [MINOR]
 
 fz GPT 다각도 · 통합 계획의 세 번째 판(R-G3)이다. 질문 틀을 바꾼 두 번째 GPT 리뷰(반증 틀 `review-falsify`)가
