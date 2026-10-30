@@ -507,8 +507,25 @@ def collect_findings(findings_dir, since, until):
         "gap_type": collections.Counter(),
         "verdict": collections.Counter(),
         "verdict_estimated": 0,
+        "axis": collections.Counter(),
+        # 대기열 스냅샷 — 기간 창과 무관하게 entries 전체(미반영 재고). 나이는 until 기준.
+        "backlog": {"n": 0, "weighted": 0, "axis": collections.Counter(), "axis_age60": collections.Counter(),
+                    "age": collections.Counter(), "recurs_edges": 0, "recurs_roots": collections.Counter()},
+        "enumeration_error": None,
     }
-    for path in sorted(glob.glob(os.path.join(findings_dir, "F-*.md"))):
+    names = []
+    if not findings_dir:
+        # ⛔ 빈 경로를 그대로 열거하면 현재 폴더를 훑는다(옛 glob("F-*.md") 가 그랬다) — 미설정으로 밝힌다
+        out["enumeration_error"] = "미설정 (--findings-dir · FZ_FINDINGS_DIR 비어 있음)"
+    else:
+        try:
+            # ⛔ glob 금지 — 권한 오류를 예외 없이 빈 목록으로 돌려줘 '0건' 이 된다(F-271). scandir 은 던진다.
+            names = sorted(e.name for e in os.scandir(findings_dir)
+                           if e.name.startswith("F-") and e.name.endswith(".md"))
+        except OSError as e:
+            out["enumeration_error"] = "%s: %s" % (type(e).__name__, e)
+    for name in names:
+        path = os.path.join(findings_dir, name)
         out["total_files"] += 1
         meta = _read_frontmatter(path)
         if meta is None:
@@ -517,9 +534,27 @@ def collect_findings(findings_dir, since, until):
             continue
         day = meta.get("date")
         stamp = parse_day(day) if re.match(r"^\d{4}-\d{2}-\d{2}$", str(day or "")) else None
+        axis = str(meta.get("axis") or "-")
+        backlog = out["backlog"]
+        backlog["n"] += 1
+        bundle = str(meta.get("bundle_size") or "")
+        backlog["weighted"] += int(bundle) if bundle.isdigit() else 1
+        backlog["axis"][axis] += 1
+        if stamp is None:
+            backlog["age"]["(date 없음)"] += 1
+        else:
+            days = (until - stamp).days
+            backlog["age"]["<30" if days < 30 else "30-59" if days < 60 else "60+"] += 1
+            if days >= 60:
+                backlog["axis_age60"][axis] += 1
+        root = re.match(r"^\[?\s*(F-\d{3}[a-z]?)", str(meta.get("recurs_of") or ""))
+        if root:
+            backlog["recurs_edges"] += 1
+            backlog["recurs_roots"][root.group(1)] += 1
         if stamp is not None and (stamp < since or stamp >= until):
             continue
         out["n"] += 1
+        out["axis"][axis] += 1
         if stamp is not None:
             out["by_month"][str(day)[:7]] += 1
         else:
@@ -542,6 +577,58 @@ def collect_findings(findings_dir, since, until):
                 out["verdict"]["caught(추정)"] += 1
             else:
                 out["verdict"]["external(추정)"] += 1
+    # 열거가 실패했으면 배출도 재지 않는다 — 부모 폴더 추정이 엉뚱한 APPLIED.md 를 읽는다
+    root = None if out["enumeration_error"] else os.path.dirname(os.path.normpath(findings_dir))
+    out["outflow"] = _collect_outflow(root, since, until)
+    return out
+
+
+# APPLIED 4열 행(배출 · 수동)의 넷째 칸 머리 → 처리 값. 레거시 6열 대장은 다섯째 칸(`applied` 등)을 그대로 쓴다.
+OUTFLOW_KIND = (("works", "works"), ("subsumed", "subsumed"), ("rejected", "rejected"), ("applied", "applied"),
+                ("릴리즈", "closes"), ("CORRECTION", "correction"))
+
+
+def _collect_outflow(root, since, until):
+    """배출 흐름 — `.archive/` 의 axis 분포 + APPLIED 대장 행의 처리 값 분포(전체 · 창 안).
+
+    ⛔ 창 안 집계는 첫 칸이 날짜인 행만 센다 — 릴리즈 배출 행의 첫 칸은 버전이라 날짜를 모른다(`undated_rows` 로 따로 센다).
+    도구 대 그 밖의 배출 비율은 archive 에 axis 가 있는 엔트리로만 낸다 — axis 없는 옛 배출본은 `-` 로 남긴다.
+    """
+    out = {"archived": 0, "axis": collections.Counter(), "kind": collections.Counter(),
+           "kind_in_window": collections.Counter(), "undated_rows": 0, "error": None}
+    if root is None:
+        out["error"] = "미측정 (entries 열거 실패 · 미설정)"
+        return out
+    arc = os.path.join(root, ".archive")
+    if os.path.isdir(arc):
+        try:
+            names = sorted(e.name for e in os.scandir(arc) if e.name.startswith("F-") and e.name.endswith(".md"))
+        except OSError as e:
+            out["error"] = "archive %s: %s" % (type(e).__name__, e)
+            names = []
+        for name in names:
+            meta = _read_frontmatter(os.path.join(arc, name)) or {}
+            out["archived"] += 1
+            out["axis"][str(meta.get("axis") or "-")] += 1
+    applied = os.path.join(root, "APPLIED.md")
+    try:
+        text = open(applied, encoding="utf-8").read()
+    except OSError:
+        return out
+    for line in text.splitlines():
+        cells = [c.strip() for c in line.split("|")]
+        if len(cells) < 6 or not re.match(r"^\*{0,2}F-\d{3}", cells[2]):
+            continue
+        if len(cells) == 6:              # 4열: 날짜·버전 | slug | 근거 | 처리
+            kind = next((k for head, k in OUTFLOW_KIND if cells[4].startswith(head)), "other")
+        else:                            # 레거시 대장: 날짜 | ID | class | 한 줄 | 처리 | 반영처
+            kind = cells[5].strip("`") if len(cells) > 6 else "other"
+        out["kind"][kind] += 1
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", cells[1]):
+            if since <= parse_day(cells[1]) < until:
+                out["kind_in_window"][kind] += 1
+        else:
+            out["undated_rows"] += 1
     return out
 
 
@@ -565,11 +652,13 @@ def _read_frontmatter(path):
         if first.strip() != "---":
             return None
         for line in handle:
-            if line.strip() == "---":
+            if line.rstrip("\n") == "---":   # 열 0 의 `---` 만 끝이다 — 위생 검사기 FM 정규식과 같은 규칙(들여쓴 `  ---` 는 끝이 아니다)
                 break
             match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", line.rstrip("\n"))
             if match:
-                meta[match.group(1)] = match.group(2).strip().strip('"')
+                # ⛔ 템플릿 시절 `class: hole   # hole | miss …` 꼴 주석이 값에 섞여 있었다(2026-10-29 실측 51줄)
+                value = re.sub(r"\s{2,}#\s.*$", "", match.group(2))
+                meta[match.group(1)] = value.strip().strip('"')
     return meta
 
 
@@ -747,6 +836,10 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
             "gap_type": dict(findings["gap_type"]),
             "harness_verdict": dict(findings["verdict"]),
             "harness_verdict_estimated": findings["verdict_estimated"],
+            "axis": dict(findings["axis"]),
+            "backlog": {k: (dict(v) if isinstance(v, collections.Counter) else v) for k, v in findings["backlog"].items()},
+            "outflow": {k: (dict(v) if isinstance(v, collections.Counter) else v) for k, v in findings["outflow"].items()},
+            "enumeration_error": findings["enumeration_error"],
         },
         "static_load": static,
         "static_load_error": static_err,
@@ -878,7 +971,7 @@ def render_markdown(payload):
     lines.append("")
     lines.append("| 축 | 분포 |")
     lines.append("|---|---|")
-    for label, key in (("detector", "detector"), ("stage", "stage"), ("status", "status"), ("gap_type", "gap_type"), ("harness_verdict", "harness_verdict")):
+    for label, key in (("detector", "detector"), ("stage", "stage"), ("status", "status"), ("gap_type", "gap_type"), ("harness_verdict", "harness_verdict"), ("axis", "axis")):
         dist = findings[key]
         lines.append("| %s | %s |" % (label, " · ".join("%s %d" % kv for kv in sorted(dist.items(), key=lambda kv: -kv[1])) or "-"))
     lines.append("")
@@ -886,6 +979,35 @@ def render_markdown(payload):
         "> `harness_verdict` 는 frontmatter 에 있으면 그대로 쓰고, 없으면 detector 로 추정한다"
         "(user→missed · self→caught · 그 외→external). 추정 %d건." % findings["harness_verdict_estimated"]
     )
+    lines.append("")
+    if findings.get("enumeration_error"):
+        lines.append("> ⛔ entries 열거 실패 — 아래 수치는 0 이 아니라 **미측정**이다: %s" % findings["enumeration_error"])
+        lines.append("")
+    backlog, outflow = findings["backlog"], findings["outflow"]
+    age = backlog["age"]
+    lines.append("### 대기열 스냅샷 (미반영 전체 · 기간 무관)")
+    lines.append("")
+    lines.append("대기 %d건(묶음 가중 %d) · 나이 " % (backlog["n"], backlog["weighted"])
+                 + " · ".join("%s %d" % (k, age.get(k, 0)) for k in ("<30", "30-59", "60+", "(date 없음)")))
+    lines.append("")
+    lines.append("| axis | 대기 | 60일+ | 배출 |")
+    lines.append("|---|---|---|---|")
+    for axis in sorted(set(backlog["axis"]) | set(outflow["axis"]), key=lambda a: -backlog["axis"].get(a, 0)):
+        lines.append("| %s | %d | %d | %d |" % (axis, backlog["axis"].get(axis, 0), backlog["axis_age60"].get(axis, 0),
+                                              outflow["axis"].get(axis, 0)))
+    lines.append("")
+    roots = sorted(backlog["recurs_roots"].items(), key=lambda kv: -kv[1])
+    lines.append("재발 간선(`recurs_of`) %d · 뿌리: %s" % (backlog["recurs_edges"], " · ".join("%s %d" % kv for kv in roots) or "-"))
+    tool_out = outflow["axis"].get("tool", 0)
+    other_out = sum(v for k, v in outflow["axis"].items() if k not in ("tool", "works", "-"))
+    lines.append("배출 %d건(axis 없는 옛 배출 %d) · 도구 %d 대 그 밖 %d · works %d" % (
+        outflow["archived"], outflow["axis"].get("-", 0), tool_out, other_out, outflow["axis"].get("works", 0)))
+    lines.append("처리 값(APPLIED 행): " + (" · ".join("%s %d" % kv for kv in sorted(outflow["kind"].items(), key=lambda kv: -kv[1])) or "-")
+                 + " — 창 안 " + (" · ".join("%s %d" % kv for kv in sorted(outflow["kind_in_window"].items())) or "0")
+                 + " · 날짜 없는 릴리즈 행 %d" % outflow["undated_rows"])
+    lines.append("")
+    lines.append("> ⭐ 판단·절차 갈래(axis ≠ tool)가 대기에 쌓이고 배출이 tool 로만 일어나면, 릴리즈 `Closes:` 밖의 출구"
+                 "(README §1 수동 배출)가 돌지 않는 것이다.")
     lines.append("")
 
     lines.append("## 5. 정적 부하 (floor / ceiling)")
@@ -1068,7 +1190,23 @@ def _write_selftest_tree(base):
     with open(os.path.join(findings_dir, "F-001-x.md"), "w") as handle:
         handle.write("---\nid: F-001\ndate: 2026-08-12\nstatus: open\nstage: [discover, plan]\ngap_type: scope-gap\ndetector: user\n---\n\n# F-001\n")
     with open(os.path.join(findings_dir, "F-002-y.md"), "w") as handle:
-        handle.write("---\nid: F-002\ndate: 2026-08-13\nstatus: open\nstage: [review]\ngap_type: not-fired\ndetector: gpt 교차검증\nharness_verdict: caught\n---\n\n# F-002\n")
+        handle.write("---\nid: F-002\ndate: 2026-08-13\nstatus: open\nstage: [review]\ngap_type: not-fired\ndetector: gpt 교차검증\nharness_verdict: caught\n"
+                     "axis: tool\nrecurs_of: F-001\nbundle_size: 3\n---\n\n# F-002\n")
+    # 측정 필드(2026-10-29) — 창 밖 엔트리 1(스냅샷에만) · 주석 섞인 값 · archive 2 · APPLIED 세 형식
+    with open(os.path.join(findings_dir, "F-003-z.md"), "w") as handle:
+        handle.write("---\nid: F-003\ndate: 2026-06-01\nstatus: open\nclass: hole            # hole | miss\n  ---\naxis: review\n---\n\n# F-003\n")
+    archive = os.path.join(base, ".archive")
+    os.makedirs(archive, exist_ok=True)
+    with open(os.path.join(archive, "F-090-gone.md"), "w") as handle:
+        handle.write("---\nid: F-090\ndate: 2026-08-01\nstatus: open\naxis: works\n---\n\n# F-090\n")
+    with open(os.path.join(archive, "F-091-old.md"), "w") as handle:
+        handle.write("---\nid: F-091\ndate: 2026-07-01\nstatus: open\n---\n\n# F-091\n")
+    with open(os.path.join(base, "APPLIED.md"), "w") as handle:
+        handle.write("# APPLIED\n\n| 날짜 | ID | failure_class | 한 줄 | 처리 | 반영처 |\n|---|---|---|---|---|---|\n"
+                     "| 2026-08-24 | F-080 | x | y | `applied` | z |\n\n"
+                     "| 9.9.9 | F-091-old | `v9.9.9.md` | 릴리즈 `Closes:` 로 배출 |\n\n"
+                     "| 2026-08-20 | F-090-gone | triage-x | works — 근거 |\n"
+                     "| 2026-08-22 | F-092-local | main abc1234 | applied — scripts/x.py |\n")
     return os.path.join(base, "projects"), findings_dir
 
 
@@ -1143,6 +1281,20 @@ def self_test():
     check("stage 리스트 분해", findings["stage"]["discover"], 1)
     check("harness_verdict 읽기", findings["verdict"]["caught"], 1)
     check("harness_verdict 추정", findings["verdict"]["missed(추정)"], 1)
+    check("주석 섞인 값 정리", _read_frontmatter(os.path.join(findings_dir, "F-003-z.md"))["class"], "hole")
+    check("창 안 axis", (findings["axis"]["tool"], findings["axis"]["-"]), (1, 1))
+    backlog, outflow = findings["backlog"], findings["outflow"]
+    check("스냅샷은 창 밖도 센다", backlog["n"], 3)
+    check("묶음 가중(1+3+1)", backlog["weighted"], 5)
+    check("60일+ 와 그 axis", (backlog["age"]["60+"], backlog["axis_age60"]["review"]), (1, 1))
+    check("재발 간선 · 뿌리", (backlog["recurs_edges"], backlog["recurs_roots"]["F-001"]), (1, 1))
+    check("archive axis(없으면 -)", (outflow["archived"], outflow["axis"]["works"], outflow["axis"]["-"]), (2, 1, 1))
+    check("APPLIED 세 형식 처리 값(4열 applied 포함)", dict(outflow["kind"]), {"applied": 2, "closes": 1, "works": 1})
+    check("창 안 처리 값 · 날짜 없는 행", (dict(outflow["kind_in_window"]), outflow["undated_rows"]), ({"applied": 2, "works": 1}, 1))
+    unset = collect_findings("", since, until)
+    check("빈 경로 = 미설정(현재 폴더를 훑지 않는다)", (unset["total_files"], unset["enumeration_error"][:3], unset["outflow"]["archived"]), (0, "미설정", 0))
+    gone = collect_findings(os.path.join(base, "없는-폴더"), since, until)
+    check("열거 실패 = 미측정 표시", gone["enumeration_error"] is not None and gone["outflow"]["error"] is not None, True)
     static_rows, static_err = collect_static_load(args.plugin_root)
     check("정적 부하 n/a", static_rows == {} and static_err is not None, True)
 

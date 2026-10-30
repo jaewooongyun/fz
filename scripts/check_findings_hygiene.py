@@ -46,6 +46,13 @@ CANON_STATUS = {"open", "proposed"}
 #    형식은 실측 규약 `P{tier}-{letter}` 를 따른다(`P1-B`·`P2-A` — slug 가 아니다).
 P_ID_LINE = re.compile(r"^p_id:\s*(\S+)", re.M)
 P_ID_OK = re.compile(r"^P[0-9]-[A-Z]$")
+# 측정 필드(README §4 — 2026-10-29). 셋 다 선택 필드다 — 없는 것은 위반이 아니다.
+AXES = {"tool", "measure", "review", "reasoning", "false-green", "plan", "not-fired", "doc", "registry", "works"}
+AXIS_LINE = re.compile(r"^axis:\s*(\S+)", re.M)
+RECURS_LINE = re.compile(r"^recurs_of:\s*\[?\s*(F-\d{3}[a-z]?)", re.M)
+CANON_LINE = re.compile(r"^canonical:\s*(\S+)", re.M)
+# INDEX 한 줄이 자기 title 보다 남의 title 에 가까운가(F-449). 2026-10-29 실 레지스트리 교정 전 7행 · 뒤 0행에서 정한 값.
+ONELINER_OTHER_MIN, ONELINER_MARGIN, ONELINER_HEAD = 0.6, 0.15, 120
 
 
 
@@ -261,6 +268,62 @@ def _strict_axes(root: pathlib.Path, texts: dict, live_slugs: set, live_ids: set
     show(f"본문 근접 중복(4-gram 포함도 ≥{CONTAIN_MIN})", b_pairs, pair)
     counts.update({"title 중복": len(t_pairs), "H1 중복": len(h_pairs), "본문 중복": len(b_pairs)})
 
+    # 측정 필드 — live 엔트리만 본다(archive 는 배출 당시 규약)
+    known = {SLUG.match(d.split("/", 1)[1]).group(1) for d in docs if SLUG.match(d.split("/", 1)[1])}
+    bad_axis, bad_rec, bad_canon = [], [], []
+    for d in sorted(texts):
+        m = FM.match(texts[d])
+        fm = m.group(1) if m else ""
+        a = AXIS_LINE.search(fm)
+        if a and a.group(1) not in AXES:
+            bad_axis.append(f"{d}: axis={a.group(1)}")
+        r = RECURS_LINE.search(fm)
+        if r and r.group(1) not in known:
+            bad_rec.append(f"{d}: recurs_of={r.group(1)} — entries · .archive 어디에도 없다")
+        c = CANON_LINE.search(fm)
+        if c:
+            p = c.group(1).strip("`'\"")
+            if p.startswith(("/", "~")):
+                bad_canon.append(f"{d}: canonical={p} — 레지스트리 밖이다(작업 폴더 정리로 함께 사라진다 · F-450)")
+            elif not (root / p).exists():
+                bad_canon.append(f"{d}: canonical={p} — 없다")
+    show(f"axis 값 비정규({'|'.join(sorted(AXES))} 외)", bad_axis)
+    show("recurs_of 대상 부재", bad_rec)
+    show("canonical 정본 경로(레지스트리 밖 · 부재)", bad_canon)
+    counts.update({"axis": len(bad_axis), "recurs_of": len(bad_rec), "canonical": len(bad_canon)})
+
+    # INDEX 한 줄이 남의 엔트리를 설명한다(F-449) — 중복만 세면 혼자 틀린 행은 안 보인다
+    if idx_rows_all is not None:
+        import difflib
+        title_of = {}
+        for d in texts:
+            m = SLUG.match(d.split("/", 1)[1])
+            if m:
+                title_of[m.group(1)] = (keys[d][0] or keys[d][1])[:ONELINER_HEAD]
+        lines = idx_text.splitlines()
+        wrong = []
+        for n, i, _, inq in idx_rows_all:
+            cells = lines[n - 1].split("|")
+            if not inq or i not in title_of or len(cells) != 10:     # 한 줄 칸 안에 `|` 가 있으면 칸을 믿지 않는다
+                continue
+            one = cells[5].strip()[:ONELINER_HEAD]
+            sm = difflib.SequenceMatcher(None, one, title_of[i])
+            own = sm.ratio()
+            best, best_id = 0.0, None
+            for j, t in title_of.items():
+                if j == i:
+                    continue
+                sm = difflib.SequenceMatcher(None, one, t)
+                if sm.real_quick_ratio() <= ONELINER_OTHER_MIN or sm.quick_ratio() <= ONELINER_OTHER_MIN:
+                    continue
+                v = sm.ratio()
+                if v > best:
+                    best, best_id = v, j
+            if best > ONELINER_OTHER_MIN and best - own > ONELINER_MARGIN:
+                wrong.append(f"{i}: INDEX.md:{n} 한 줄이 {best_id} 의 title 에 가깝다({best:.2f} · 자기 {own:.2f})")
+        show("INDEX 한 줄 ↔ 남의 title(F-449)", wrong)
+        counts["INDEX 한 줄"] = len(wrong)
+
     # 펜스 밖 INDEX 덤프 잔재
     targets = dict(docs)
     if ap.is_file():
@@ -294,7 +357,11 @@ def _check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None)
     if not ent.is_dir():
         print(f"UNRUN: entries 디렉토리 없음 — {ent}")
         return UNRUN
-    files = sorted(p for p in ent.glob("*.md") if SLUG.match(p.stem))
+    try:
+        files = [p for p in list_md(ent) if SLUG.match(p.stem)]   # ⛔ glob 금지 — 권한 오류를 빈 목록으로 돌려준다(F-271)
+    except Unreadable as e:
+        print(f"UNRUN: {e}")
+        return UNRUN
     if not files:
         print(f"UNRUN: entries 에 F-NNN 엔트리가 0건 — 측정 실패를 먼저 의심한다 ({ent})")
         return UNRUN
@@ -799,6 +866,48 @@ def self_test():
         assert IDX_ROW.findall(t) == ["F-001", "F-002", "F-003", "F-004"], f"IDX_ROW 뜻이 바뀌었다 {IDX_ROW.findall(t)}"
         assert queue_rows(t) == ["F-001", "F-002"], f"queue_rows={queue_rows(t)}"
 
+    def c_measure_fields_bad(tmp):
+        """F-450 · README §4 측정 필드 — 비정규 axis · 없는 recurs_of · 레지스트리 밖 canonical 은 각각 위반."""
+        r = full(tmp)
+        edit(r / "entries" / "F-002-beta.md", "status: open\n",
+             "status: open\naxis: bogus\nrecurs_of: F-777\ncanonical: ~/dev/gone/REPORT.md\n")
+        rc, out = strict(r)
+        for line in ("axis 값 비정규(", "recurs_of 대상 부재: 1", "canonical 정본 경로(레지스트리 밖 · 부재): 1"):
+            assert rc == VIOLATION and line in out, f"⛔ 측정 필드 위반 {line!r} 를 놓쳤다 rc={rc}\n{out}"
+
+    def c_measure_fields_ok(tmp):
+        """정상 측정 필드는 통과 — archive 번호를 가리키는 recurs_of · 레지스트리 안 canonical."""
+        r = full(tmp)
+        (r / "_salvage-external").mkdir()
+        (r / "_salvage-external" / "r.md").write_text("x", encoding="utf-8")
+        edit(r / "entries" / "F-002-beta.md", "status: open\n",
+             "status: open\naxis: review\nrecurs_of: F-090\ncanonical: _salvage-external/r.md\n")
+        rc, out = strict(r)
+        assert rc == OK, f"⛔ 정상 측정 필드를 위반으로 셌다 rc={rc}\n{out}"
+
+    def _queue8(r, one_liners):
+        rows = "".join(f"| {s[:5]} | 2026-10-29 | `hole` | x-{s[6:]} | {one_liners[s]} | self | open | [{s[:5]}](entries/{s}.md) |\n"
+                       for s in LIVE)
+        t = (r / "INDEX.md").read_text(encoding="utf-8")
+        head, rest = t.split("## 대기열", 1)
+        tail = rest.split("\n## ", 1)[1]
+        hdr = "| ID | 날짜 | class | failure_class | 한 줄 | 탐지자 | status | 문서 |\n|---|---|---|---|---|---|---|---|\n"
+        (r / "INDEX.md").write_text(head + "## 대기열\n\n" + hdr + rows + "\n## " + tail, encoding="utf-8")
+
+    def c_oneliner_other_title(tmp):
+        """⛔ 회귀(F-449): 한 줄이 남의 title 을 달고 있으면 위반 — 중복이 아니어도(혼자 틀린 행) 잡는다."""
+        r = full(tmp)
+        _queue8(r, {s: f"제목 {s}" for s in LIVE} | {"F-001-alpha": "제목 F-003-gamma"})
+        rc, out = strict(r)
+        assert rc == VIOLATION and "INDEX 한 줄 ↔ 남의 title(F-449): 1" in out and "F-001: INDEX.md:" in out, \
+            f"⛔ 남의 title 을 단 INDEX 한 줄을 놓쳤다 rc={rc}\n{out}"
+
+    def c_oneliner_own_title_ok(tmp):
+        r = full(tmp)
+        _queue8(r, {s: f"제목 {s}" for s in LIVE})
+        rc, out = strict(r)
+        assert rc == OK and "INDEX 한 줄 ↔ 남의 title(F-449): 0" in out, f"⛔ 자기 title 한 줄을 위반으로 셌다 rc={rc}\n{out}"
+
     for n, f in [("ok", c_ok), ("resolved-remains", c_resolved), ("dup-id", c_dup),
                  ("archive-id-reuse", c_reuse), ("empty-denominator-unrun", c_unrun),
                  ("strict-no-index-unrun", c_strict_no_index),
@@ -826,7 +935,9 @@ def self_test():
                  ("strict-archive-bad-utf8-unrun", c_strict_archive_bad_utf8_unrun),
                  ("strict-violation-dominates-unjudged", c_strict_violation_dominates),
                  ("strict-violation-beats-unreadable", c_strict_violation_beats_unreadable),
-                 ("queue-rows-contract", c_queue_rows_contract)]:
+                 ("queue-rows-contract", c_queue_rows_contract),
+                 ("measure-fields-bad", c_measure_fields_bad), ("measure-fields-ok", c_measure_fields_ok),
+                 ("oneliner-other-title", c_oneliner_other_title), ("oneliner-own-title-ok", c_oneliner_own_title_ok)]:
         cases += 1
         case(n, f)
 
@@ -842,7 +953,7 @@ def self_test():
 def main():
     ap = argparse.ArgumentParser(description="fz-findings 불변식 검사")
     ap.add_argument("--root", type=pathlib.Path)
-    ap.add_argument("--strict", action="store_true", help="등재율 100% 미달도 위반으로 본다")
+    ap.add_argument("--strict", action="store_true", help="등재율 100%% 미달도 위반으로 본다")   # %% — 단독 % 는 Python 3.14 argparse 가 거부한다(F-343)
     ap.add_argument("--ledger", type=pathlib.Path,
                     help="promotion-ledger.md — p_id 소속 대조 (미지정 시 그 축은 **미판정**)")
     ap.add_argument("--self-test", action="store_true")
