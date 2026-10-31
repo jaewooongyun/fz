@@ -352,6 +352,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - ⛔ 래퍼 exit 10~14 는 전부 측정 실패다(스키마 계약 위반 14 포함 — "이슈 0건" 아님). 선택 관련 실패(래퍼 stderr 의 `CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그, 모델·effort 거부 12)는 먼저 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 따른다. 그 밖이거나 처방 뒤에도 실패면 `skills/fz-peer-review/SKILL.md` § 에러 대응의 Tier 1 GPT 실패 규칙(`solo (gpt 실패)` — 실질 Tier 0 강등)으로 간다 · ⛔ exit 18(`GPT-OFF` — 사용자 선택 · CLI 없음)은 실패가 아니다 — GPT 칸 `[GPT 미사용 — 사유]` · 병합 `--gpt-unavailable` · 강등 · 감쇠 없음(`modules/gpt-strategy.md` § GPT 미사용)
 - ⊕ 기본으로(`--no-gpt-independent` 면 위 challenger) 위 challenger 대신 `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review` 를 쓴다 — 허용 입력만 격리 폴더로 들어가 Lead 요약 · 가설이 GPT 에 닿지 않는다. Synthesize 에서 Lead 발견을 `{"issues": […]}` 로 써서 `review_merge.py --claude` 로 합친다(모양 · 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4)
 - GPT prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
+- ⛔ **실행 필요 표면 — launch smoke** (F-366: 루트 화면을 바꾼 PR 의 검은 화면을 정적 리뷰만으로 놓쳤다): `python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --risk "${WORK_DIR}/risk.json" --rule "${WORK_DIR}/rules/rules.json" --repo {리뷰 대상 head 를 체크아웃한 트리} --expect-head {PR headRefOid · 브랜치면 그 팁} --out "${WORK_DIR}/launch-smoke.md"` — `risk.json` 의 `launch_surface.flag` 가 false 면 '대상 아님' 만 쓴다. 실행 방법(`launchSmoke` 레코드 — `modules/project-rules.md` §3)이 없거나 HEAD 가 다르면 실행하지 않고 '⛔ 실행 미검증' 배너다. 첫 줄이 리포트에 들어갈 요약 줄이다 — 기본(렌더) 경로면 `review.json` 의 `launchSmoke` 에 그 줄을 넣는다(`scripts/render_review.py` 가 리포트 · payload body 에 같이 싣는다)
 
 ### Synthesize
 ⛔ **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계). GPT 호출이 있으므로 **Reflection Rate** 도 산출 — ⛔ `N<10` 은 preliminary, verdict 없음. 목록: `modules/peer-review-gates.md` § 경량 경로.
@@ -367,6 +368,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 ### Deliver
 - review-report.md + pr-comments.md + cost-log.json
+- ⛔ `python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --check-report "${WORK_DIR}/review-report.md" --smoke "${WORK_DIR}/launch-smoke.md"` — exit 1 이면 `launch-smoke.md` 첫 줄을 `review.json` 의 `launchSmoke` 에 넣고 렌더를 다시 돌린다(⛔ 렌더된 리포트를 손으로 고치지 않는다 — payload body 와 어긋난다 · `--render` 를 끈 경로만 리포트에 직접 쓴다). '대상 아님' 은 검사하지 않는다. 미실행을 적기만 하고 게이트로 쓰지 않은 것이 F-366 이다
 - ⛔ **축별 집계** — review-report.md 끝에 아래 표를 붙인다.
 
 ```markdown
@@ -576,7 +578,10 @@ jq -e '
 2. 스크립트: Stage1 3-병렬 (review-arch / review-quality / review-correctness — 전부 opus)
              → parallelWithRetry (null 항목 1회 순차 재시도 = rate-limit 폴백 계약)
 3. Lead: GPT challenger ×1 — § GPT Analyze 호출  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
+3.5 Lead: launch smoke (F-366 · Workflow 와 병렬 가능 · 인자는 Tier 1 Analyze 와 같다)
+     python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --risk "${WORK_DIR}/risk.json" --rule "${WORK_DIR}/rules/rules.json" --repo {head 트리} --expect-head {headRefOid} --out "${WORK_DIR}/launch-smoke.md"
 4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
+5. Lead: Deliver 전 — python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --check-report "${WORK_DIR}/review-report.md" --smoke "${WORK_DIR}/launch-smoke.md"   // exit 1 이면 요약 줄을 review.json launchSmoke 에 넣고 다시 렌더
 ```
 
 ⛔ **Tier 2 반환 계약 — 트리거 발화 여부로 필드가 달라진다** (D1):

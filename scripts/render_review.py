@@ -85,6 +85,8 @@ def validate(r) -> None:
         raise InputError("verdict(최종 판정 문장)가 없다")
     if not isinstance(r.get("issues"), list):
         raise InputError("issues 배열이 없다")
+    if "launchSmoke" in r and (not isinstance(r["launchSmoke"], str) or not r["launchSmoke"].strip()):
+        raise InputError("launchSmoke 는 launch-smoke.md 첫 줄(문자열)이다 — 비우려면 키를 빼라")
     if r.get("event", "COMMENT") not in EVENTS:
         raise InputError(f"event 는 {' · '.join(EVENTS)} 중 하나다 — {r.get('event')!r}")
     seen = set()
@@ -188,6 +190,8 @@ def report(r: dict, plans: list) -> str:
     pr = r.get("pr") or {}
     lines = [f"# PR #{pr['number']} 리뷰" if pr.get("number") is not None else "# 리뷰 보고서", "",
              f"**판정**: {r['verdict'].strip()}", ""]
+    if r.get("launchSmoke"):   # launch_smoke.py 요약 줄 — 리포트 · payload body 에 같이 실린다(손으로 리포트를 고치지 않는다 · F-366)
+        lines += [r["launchSmoke"].strip(), ""]
     if r.get("matrix"):
         lines += ["## Confidence Matrix", "", r["matrix"].strip(), ""]
     counts = " · ".join(f"{s} {c}" for s in SEVERITIES if (c := sum(p["issue"]["severity"] == s for p in plans)))
@@ -424,6 +428,17 @@ def self_test() -> int:
     def t_body():
         out = render(review(base), SELF_DIFF)
         case("body — top-level body 는 review-report.md 전문", out["payload"]["body"] == out["review-report.md"])
+        sm = "launch smoke — SMOKE PASS · exit 0 · expect 일치 · HEAD abc1234"
+        out = render({**review(base), "launchSmoke": sm}, SELF_DIFF)
+        rl = out["review-report.md"].splitlines()
+        case("launch-smoke — launchSmoke 줄이 판정 바로 뒤 · payload body 에도 같이",
+             sm in rl and rl.index(sm) == next(k for k, x in enumerate(rl) if x.startswith("**판정**")) + 2
+             and out["payload"]["body"] == out["review-report.md"])
+        try:
+            render({**review(base), "launchSmoke": 1}, SELF_DIFF)
+            case("launch-smoke-type — 문자열이 아니면 거부", False)
+        except InputError:
+            case("launch-smoke-type — 문자열이 아니면 거부", True)
 
     def t_na():
         out = render(review(base), SELF_DIFF)

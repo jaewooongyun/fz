@@ -61,6 +61,7 @@
 - `authority` — `지침` 은 지침 파일의 규칙 문장이다. `관례` 는 코드에서 관찰한 것이라 코드를 인용한다. `예시` 는 지침 속 예시다(§5)
 - `appliesTo.languages` 는 파일 확장자로 판정한다. `modules` 는 기록만 하고 검증기가 보지 않는다
 - `source.line` 은 인용문이 걸친 줄 중 하나여야 한다 — 맞는 문장이라도 다른 줄을 가리키면 거부된다
+- 선택 최상위 `launchSmoke: {"command", "expect", "timeout_s"}` — 대상 저장소에서 앱을 한 번 띄워 보는 명령 · 출력에 있어야 할 문자열 · 상한(1~3600초). 축이 아니라 `--check` 는 보지 않고, `skills/fz-peer-review/scripts/launch_smoke.py` 가 형식을 검사해 쓴다(없거나 틀리면 '실행 미검증' 배너 — 기본 명령을 지어내지 않는다)
 - `gaps` 는 Probe Coverage Gap 이다. 확인하지 못한 축을 조용히 비워 두지 않는다
 
 ## 4. 축 6개와 archConstraints 투영

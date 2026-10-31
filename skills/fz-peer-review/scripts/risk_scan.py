@@ -86,6 +86,21 @@ MUTABLE = re.compile(
 #   README 에 "auth token" 이라 쓴 것이 Tier 를 올리면 안 된다.
 DOC_SUFFIXES = (".md", ".markdown", ".txt", ".rst", ".adoc")
 
+# 실행 필요 표면(launch_surface) — 앱이 뜨는 경로를 바꾼 변경은 정적 리뷰만으로 놓친다(F-366: 루트 화면 교체 PR 의
+#   검은 화면은 신규 설치 1회 실행이면 보였다). ⛔ 위험(risk)과 다른 축이다 — Tier 를 올리지 않고 launch_smoke.py 가
+#   smoke 를 돌릴지 정하는 입력이다. 그래서 risk 합계에 넣지 않는다.
+# 범용 진입점만 둔다(플랫폼별 실행 방법은 project-rules 의 launchSmoke 레코드가 준다). 추가 · 삭제 양쪽을 본다 —
+#   루트 화면 설정을 지우는 것도 실행 경로 변경이다. ⛔ 바뀐 hunk 의 문맥 줄 · hunk 머리도 본다 — 진입점 안에서 루트만
+#   바꾸는 변경(`root.render(<New/>)` 옆의 바뀌지 않은 `createRoot(…)` · `WindowGroup { NewRoot() }`)은 바뀐 줄에 토큰이 없다.
+LAUNCH_TOKENS = re.compile(
+    r"rootViewController\s*=|setRootViewController|makeKeyAndVisible|UIApplicationMain|didFinishLaunching"
+    r"|willConnectTo|@main\b|WindowGroup\b|setContentView\s*\(|createRoot\s*\(|ReactDOM\.render"
+    r"|__name__\s*==\s*['\"]__main__['\"]|^\s*(?:func|fn)\s+main\s*\(",
+    re.M)
+LAUNCH_FILES = re.compile(
+    r"(?:^|/)(?:(?:App|Scene)Delegate\.(?:swift|mm?)|main\.(?:swift|mm?|c|cc|cpp|go|rs|py|tsx|jsx)|__main__\.py"
+    r"|Info\.plist|AndroidManifest\.xml|MainActivity\.(?:kt|java))$")
+
 
 LOW_CONFIDENCE = {
     # ⛔ 카테고리에 속하지만 **단독으로는 그 카테고리를 성립시키지 못하는** 토큰.
@@ -162,9 +177,12 @@ def added_lines_by_file(diff_text):
             in_hunk = True
             # ⛔ hunk 단위 묶음 — 저신뢰 토큰의 **동반 판정**에 쓴다. 파일 단위로 보면
             #    파일 어딘가에 auth 가 있다는 이유로 무관한 hunk 의 session 이 성립한다.
-            cur_hunk = {"path": current, "added": []}
+            cur_hunk = {"path": current, "added": [], "text": [line], "changed": False}   # text · changed — launch_surface 의 문맥 판정
             hunks.append(cur_hunk)
         elif in_hunk and current is not None:
+            if cur_hunk is not None:
+                cur_hunk["text"].append(line[1:])
+                cur_hunk["changed"] = cur_hunk["changed"] or line[:1] in "+-"
             if line.startswith("+"):
                 files[current].append(line[1:])
                 if cur_hunk is not None:
@@ -238,6 +256,7 @@ def scan(diff_text):
             break
 
     return {
+        "launch_surface": launch_surface(by_file, removed_by_file, hunks),
         "categories": sorted(hits),
         # ⛔ 저신뢰 단독 카테고리는 risk 에서 뺀다 — detail/categories 에는 남아 사람이 본다.
         "risk": sum(1 for h in hits.values() if not h.get("low_confidence_only")),
@@ -245,6 +264,22 @@ def scan(diff_text):
         "added_lines": len(all_added),
         "files": len(by_file),
     }
+
+
+def launch_surface(by_file, removed_by_file, hunks):
+    """진입점 파일 경로 · 바뀐 hunk(추가 · 삭제 · 문맥 줄 · 머리) 안의 진입점 토큰을 신호로 모은다. 신호가 하나라도 있으면 flag."""
+    signals = []
+    for path in sorted(set(by_file) | set(removed_by_file)):
+        if (by_file.get(path) or removed_by_file.get(path)) and LAUNCH_FILES.search(path or ""):
+            signals.append("path:" + path)
+    for h in hunks:
+        if h["path"] is None or not h.get("changed"):
+            continue
+        for tok in sorted(set(LAUNCH_TOKENS.findall("\n".join(h["text"])))):
+            sig = "token:%s (%s)" % (tok.strip(), h["path"])
+            if sig not in signals:
+                signals.append(sig)
+    return {"flag": bool(signals), "signals": signals[:10]}
 
 
 def escalation(risk):
@@ -274,6 +309,9 @@ def main(argv):
     else:
         print("risk=%d tier_delta=+%d (added %d lines / %d files)"
               % (result["risk"], result["tier_delta"], result["added_lines"], result["files"]))
+        ls = result["launch_surface"]
+        if ls["flag"]:
+            print("  launch_surface 실행 필요 표면 — %s" % ", ".join(ls["signals"][:3]))
         for name in result["categories"]:
             d = result["detail"][name]
             note = " [역방향: %s]" % d["reverse_signal"] if "reverse_signal" in d else ""
