@@ -185,6 +185,24 @@ def _pass(diagnostic: str = "") -> int:
     return EXIT_PASS
 
 
+def _manual_unmet(led) -> list:
+    """확인을 기다리는 MANUAL 게이트 id — 원장에서 `MANUAL:` 줄이 있고 `CONFIRMED:` 가 없으며 ABANDON · DEFER 되지 않은 게이트(F-202).
+    ⛔ 판정기 꼬리(`… — G1, G2 …외 N건`)를 파싱하지 않는다 — id 상한(UNMET_IDS_SHOWN)에 잘린 MANUAL 게이트를 놓친다.
+    안내 문구용이다 — 읽지 못하면 빈 목록(안내 줄을 더하지 않을 뿐 차단은 그대로)."""
+    try:
+        text = Path(str(led)).read_text(encoding="utf-8")
+    except OSError:
+        return []
+    gone = set(re.findall(r"^(?:ABANDON|DEFER): ([A-Za-z0-9_.-]+)", text, re.M))
+    out = []
+    for m in re.finditer(r"^- \[[ x]\] ([A-Za-z0-9_.-]+):.*\n((?:[ \t]+.*\n?)*)", text, re.M):
+        body = m.group(2)
+        if (re.search(r"^[ \t]+MANUAL:", body, re.M) and not re.search(r"^[ \t]+CONFIRMED:", body, re.M)
+                and m.group(1) not in gone):
+            out.append(m.group(1))
+    return out
+
+
 def _block(reason: str) -> int:
     """차단. ⛔ JSON 은 **stderr** 로, exit 는 **2** — 공식 command 타입 계약."""
     print(json.dumps({"decision": "block", "reason": reason},
@@ -793,6 +811,14 @@ def main() -> int:
                     f"{CHECK_TIMEOUT_S}초 안에 판정을 끝내지 못했다 · 판정하지 못한 원장은 통과가 아니다): {shown}")
     body += notes
     lines = [""]
+    # ⛔ MANUAL 게이트는 사용자 확인(`--confirm` · TTY)으로만 충족된다 — '충족 or ABANDON' 만 보이면 에이전트가 EVIDENCE 를
+    #    직접 쓰거나(F-202) 기다리는 확인을 포기로 바꾼다. 그래서 ABANDON 안내보다 먼저 둔다.
+    manual = [(led, ids) for led, _ in unmet for ids in [_manual_unmet(led)] if ids]
+    if manual:
+        shown = " · ".join(f"{', '.join(ids)} ({led})" for led, ids in manual[:3])
+        lines.append(f"⛔ MANUAL 게이트 {shown} 는 사용자 확인으로만 충족된다 — 사용자가 별도 터미널에서 "
+                     f"`python3 {checker} --confirm <게이트ID> <원장>` 을 실행한다(TTY 필요). 에이전트는 EVIDENCE 를 "
+                     "쓰지 않고 ABANDON 하지도 않는다 — 사용자에게 요청하고 기다린다.")
     lines.append("게이트를 충족시키거나, 할 수 없으면 원장에 "
                  "`ABANDON: <게이트ID> <이유>` 를 남긴다 (포기 사실이 원장에 보존된다).")
     # ⛔ 셋째 선택지(F-190) — '충족 or ABANDON' 2지선다는 계획만 승인한 원장에 거짓 ABANDON 을 유도한다. 착수 전

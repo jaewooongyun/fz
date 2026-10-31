@@ -1519,6 +1519,16 @@ def from_plan(plan_path: Path, root: str, out: Path) -> int:
     #    "만들었다"가 아니라 파서가 판정한다.
     load(out)
     print(f"원장 생성: {out} (게이트 {len(steps)}개)")
+    # ⛔ 제목이 약속한 백틱 토큰이 command 에 없으면 경고한다(F-245 · F-294) — 제목 · criterion 에만 있는 요구는
+    #    기계가 재지 않는다. 경고만 한다: 토큰이 command 밖에서 재지는 정당한 경우(fixture 안 단언)를 가를 수 없다.
+    for s in steps:
+        v = s.get("verify") if isinstance(s, dict) else None
+        if not isinstance(v, dict) or v.get("kind") != "command":
+            continue
+        missing = [t for t in re.findall(r"`([^`]+)`", str(s.get("title", ""))) if t not in str(v.get("command", ""))]
+        if missing:
+            print(f"⚠️  {s.get('id')}: 제목 토큰 {' · '.join('`' + t + '`' for t in missing)} 이 command 에 없다 — "
+                  "제목 · criterion 에만 있으면 기계가 재지 않는다(F-245 · F-294)")
     return EXIT_OK
 
 
@@ -2034,8 +2044,14 @@ def verdict_check(ledger: Ledger, response_path: str) -> int:
         if not isinstance(g, dict) or g.get("id") not in ledger_map:
             continue
         want_title, want_kind = ledger_map[g["id"]]
-        if str(g.get("title", "")).strip() != want_title:
-            reasons.append(f"{g['id']}: 제목이 원장과 다르다 — stale 응답 (응답 {g.get('title')!r})")
+        got_title = str(g.get("title", "")).strip()
+        if got_title != want_title:
+            # ⛔ 옮겨 적기 이스케이프(F-393) — 응답이 따옴표 · 백틱 앞에 역슬래시만 더했으면 stale 이 아니다. 거부는 같다(재판정)
+            if re.sub(r"\\([\"`'\\])", r"\1", got_title) == want_title:
+                reasons.append(f"{g['id']}: 제목 옮겨 적기 이스케이프 차이(stale 아님 — 응답이 따옴표 앞에 역슬래시를 더했다) "
+                               f"(응답 {g.get('title')!r})")
+            else:
+                reasons.append(f"{g['id']}: 제목이 원장과 다르다 — stale 응답 (응답 {g.get('title')!r})")
         if str(g.get("kind", "")).strip() != want_kind:
             reasons.append(f"{g['id']}: kind 가 원장과 다르다 (응답 {g.get('kind')!r} / 원장 {want_kind})")
 
