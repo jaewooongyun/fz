@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import pathlib
 import re
+import subprocess
 import sys
 
 OK, VIOLATION, UNRUN = 0, 1, 2
@@ -59,8 +60,30 @@ def residual(line: str) -> bool:
     return bool(TOKEN.search(ALLOW_RE.sub("", line)))
 
 
+class Unreadable(Exception):
+    """열거 실패 — 0건과 다른 축이다(F-271)."""
+
+
+def list_files(root: pathlib.Path):
+    """검사 대상 파일. git 저장소면 git 이 무시하지 않는 파일만 — 무시된 로컬 작업 폴더(`.fz-work/` 등)는
+    배포물이 아니다(F-339: 같은 커밋이 그 폴더가 있는 트리에서만 health-check 를 실패시켰다).
+    `.git` 은 디렉터리(일반 저장소)이거나 파일(worktree)이다. git 이 없는 설치본은 rglob 그대로.
+    """
+    if not (root / ".git").exists():
+        return sorted(p for p in root.rglob("*") if p.is_file())
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                              capture_output=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise Unreadable(f"git ls-files 실행 실패: {type(e).__name__}: {e}") from e
+    if proc.returncode != 0:
+        raise Unreadable(f"git ls-files exit {proc.returncode}: {proc.stderr.decode('utf-8', 'replace').strip()[:200]}")
+    names = [n for n in proc.stdout.decode("utf-8", "surrogateescape").split("\0") if n]
+    return sorted(p for p in (root / n for n in names) if p.is_file())   # 추적 중 삭제된 파일은 뺀다
+
+
 def scan(root: pathlib.Path):
-    files = [p for p in sorted(root.rglob("*")) if p.is_file() and p.suffix in SUFFIXES]
+    files = [p for p in list_files(root) if p.suffix in SUFFIXES]
     rel = [(p, p.relative_to(root).as_posix()) for p in files]
     rel = [(p, r) for p, r in rel if not r.startswith(EXCLUDE_PREFIX) and r not in BOUNDARY]
     hits = []
@@ -84,7 +107,11 @@ def main() -> int:
 
 
 def run(root: pathlib.Path) -> int:
-    files, hits = scan(root)
+    try:
+        files, hits = scan(root)
+    except Unreadable as e:
+        print(f"UNRUN: 검사 대상 열거 실패 — {e}")
+        return UNRUN
     if not files:
         print(f"UNRUN: 스캔 대상 0개 — {root} (경로 확인)")
         return UNRUN
@@ -147,6 +174,37 @@ def self_test() -> int:
         shutil.rmtree(empty)
     finally:
         shutil.rmtree(d)
+
+    # git 인식 (F-339) — 무시된 로컬 폴더는 배포물이 아니다
+    g = pathlib.Path(tempfile.mkdtemp(prefix="fz-gs-git-"))
+    git = lambda *a, cwd=g: subprocess.run(["git", "-C", str(cwd), *a], capture_output=True, check=True)
+    try:
+        git("init", "-q")
+        git("-c", "user.email=t@t", "-c", "user.name=t", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
+            "commit", "-q", "--allow-empty", "-m", "init")   # 사용자 전역 훅 · 서명 설정과 끊는다(review_snapshot.sh 와 같다)
+        (g / ".gitignore").write_text(".fz-work/\n", encoding="utf-8")
+        (g / "README.md").write_text("neutral\n", encoding="utf-8")
+        (g / ".fz-work").mkdir()
+        (g / ".fz-work" / "index.md").write_text("- Codex challenger: 1\n", encoding="utf-8")
+        expect("git 무시 폴더의 낱말 → 위반 아님", run(g), OK)
+        (g / "README.md").write_text("Codex CLI 로 검증\n", encoding="utf-8")
+        expect("미추적이지만 무시되지 않은 파일의 낱말 → 위반", run(g), VIOLATION)
+        (g / "README.md").write_text("neutral\n", encoding="utf-8")
+        wt = pathlib.Path(tempfile.mkdtemp(prefix="fz-gs-wt-")) / "wt"
+        git("worktree", "add", "-q", "--detach", str(wt))
+        (wt / ".gitignore").write_text(".fz-work/\n", encoding="utf-8")
+        (wt / "README.md").write_text("neutral\n", encoding="utf-8")
+        (wt / ".fz-work").mkdir()
+        (wt / ".fz-work" / "x.md").write_text("Codex CLI 로 검증\n", encoding="utf-8")
+        expect("worktree(.git 파일) 도 git 경로 — 무시 폴더 제외", ((wt / ".git").is_file(), run(wt)), (True, OK))
+        shutil.rmtree(wt.parent)
+        bad = pathlib.Path(tempfile.mkdtemp(prefix="fz-gs-bad-"))
+        (bad / ".git").write_text("gitdir: /nonexistent/path\n", encoding="utf-8")
+        (bad / "a.md").write_text("neutral\n", encoding="utf-8")
+        expect("깨진 .git → 측정 실패(0건으로 읽지 않는다)", run(bad), UNRUN)
+        shutil.rmtree(bad)
+    finally:
+        shutil.rmtree(g)
 
     for f in fails:
         print(f"  FAIL {f}")
