@@ -119,6 +119,14 @@
       "files": 0,
       "removed_paths": [],
       "why": "회귀: binary 삭제 1 · 추가 1(`Binary files … differ`, `+++` 없음). 헤더만 있는 블록은 파일로 세지 않는다 — 전과 같다"
+    },
+    "positive-quoted-nonascii-doc-unmasks-netnew": {
+      "risk": 1,
+      "tier_delta": 1,
+      "added_lines": 3,
+      "files": 1,
+      "removed_paths": [],
+      "why": "F-412: 비ASCII 이름 문서(docs/인증 메모.md)를 지우고 authManager 를 더한 PR 의 기본 설정(core.quotePath=true) diff. 인용 경로를 풀지 않으면 지운 .md 가 문서 제외를 피해 auth 를 상쇄한다(risk 0 · files 2) — 같은 커밋을 quotepath=false 로 뜨면 risk 1 · files 1"
     }
   }
 }

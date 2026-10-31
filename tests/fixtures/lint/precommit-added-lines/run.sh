@@ -13,6 +13,11 @@
 #     header-path    새 파일 modules/Users/fixture-user/n.md(내용 깨끗) → 통과 — 헤더 '+++ b/…' 는 추가 줄이 아니다
 #     deleted        기준선의 '+ old /Users/fixture-user/…' 줄 삭제 → 통과 — 지운 줄은 추가 줄이 아니다
 #     out-of-scope   범위 밖 notes/x.md 의 plus-lead 줄       → 통과 — 훅 범위(SCOPED_RE)는 그대로다
+#     rename-path    rename(R) 된 파일에 추가한 사용자 경로 → 차단 — 기준 훅은 --diff-filter=ACM 이라 R 을 뺀다(F-410)
+#     rename-existing-ok  기존 줄에 정당 참조가 있는 파일을 rename + 깨끗한 줄 추가 → 통과 — 옛 경로와 -M 비교
+#     space-path     'modules/a b.md' 의 사용자 경로 → 차단 — 기준 훅은 `for FILE in $CHANGED` 가 공백에서 가른다
+#     nonascii-path  'modules/한글 노트.md' → 차단 — 기준 훅은 core.quotePath 따옴표가 SCOPED_RE 를 비껴간다
+#     color-always   저장소 color.ui=always → 차단 — 기준 훅은 색 코드 때문에 추가 줄이 0이다
 #   lint 셀 (판정 확장자는 lint --json 결과의 ext 로 본다 — scan 경로를 거친 값이다. 기준 lint 는 확장자 없는 파일을 스캔하지 않아 'absent'):
 #     live           트리 자신의 lint --json 결과에 .githooks/pre-commit 이 판정 확장자 .sh · hunk-state 로 ok
 #     mini-bad       임시 트리(트리의 lint 사본) — 선언 없는 합성 훅 .githooks/pre-commit · 확장자 없는 셔뱅 도구 tests/…/_shim/ 5종
@@ -101,6 +106,27 @@ hook deleted 0 "$R"
 newrepo out-of-scope "base line"
 mkdir -p "$R/notes" && printf '%s\n' "+ see $U/dev/x" > "$R/notes/x.md" && git -C "$R" add -A || exit 3
 hook out-of-scope 0 "$R"
+
+# ── F-410 파일 열거 셀 — rename · 공백 경로 · 비ASCII 경로 · color.ui=always (기준 훅은 넷 다 통과시킨다) ──
+#    rename 셀의 기준선은 여러 줄이다 — 한 줄짜리에 한 줄을 더하면 유사도가 rename 문턱(50%)에 걸린다
+BODY="$(printf 'line %s\n' 1 2 3 4 5 6 7 8 9 10)"
+newrepo rename-path "$BODY"
+{ git -C "$R" mv modules/note.md modules/renamed.md && printf '%s\n' "+ see $U/dev/x" >> "$R/modules/renamed.md" && git -C "$R" add -A; } || exit 3
+hook rename-path 1 "$R"
+# 대조 — 기존 줄에 있던 정당 참조는 rename 만으로 '추가 줄' 이 되지 않는다(옛 경로와 -M 비교)
+newrepo rename-existing-ok "$BODY
++ old $U/dev/x"
+{ git -C "$R" mv modules/note.md modules/renamed.md && printf 'clean\n' >> "$R/modules/renamed.md" && git -C "$R" add -A; } || exit 3
+hook rename-existing-ok 0 "$R"
+newrepo space-path "base line"
+{ printf '%s\n' "+ see $U/dev/x" > "$R/modules/a b.md" && git -C "$R" add -A; } || exit 3
+hook space-path 1 "$R"
+newrepo nonascii-path "base line"
+{ printf '%s\n' "+ see $U/dev/x" > "$R/modules/한글 노트.md" && git -C "$R" add -A; } || exit 3
+hook nonascii-path 1 "$R"
+newrepo color-always "base line"
+{ git -C "$R" config color.ui always && printf '%s\n' "+ see $U/dev/x" >> "$R/modules/note.md" && git -C "$R" add modules/note.md; } || exit 3
+hook color-always 1 "$R"
 
 # ── lint 셀 ──────────────────────────────────────────────────
 # $1=lint 스크립트 $2=--json 출력 파일 — exit 를 돌려준다

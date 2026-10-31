@@ -20,8 +20,12 @@ exit: 0 = 판정 성공 / 2 = 사용법·입력 오류
   ⛔ exit 0 은 "위험 없음"이 아니다. 위험 수는 stdout 으로 읽는다.
 """
 import json
+import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from diff_anchors import unquote_path  # noqa: E402 — 같은 폴더 · git C 스타일 인용 경로 해독(F-412)
 
 # 카테고리별 패턴. 값은 (정규식, 설명).
 # ⛔ 토큰 경계가 필요한 것과 리터럴로 둬야 하는 것을 구분한다 —
@@ -162,9 +166,11 @@ def added_lines_by_file(diff_text):
             current, in_hunk, cur_hunk = None, False, None
             header = _header_path(line)
         elif not in_hunk and line.startswith("+++ "):
-            path = line[4:].strip()
+            # ⛔ 인용 경로(core.quotePath — 비ASCII · 탭 · 따옴표)를 먼저 푼다 — 끝 글자 `"` 때문에 b/ 제거와 문서 접미사
+            #    검사가 빗나가 지운 비ASCII 이름 문서의 auth 행이 추가 auth 순증을 상쇄했다(F-412)
+            path = unquote_path(line[4:])
             if path == "/dev/null" and header:
-                path = header
+                path = unquote_path(header)
             current = path[2:] if path.startswith("b/") else path
             if current.lower().endswith(DOC_SUFFIXES):
                 current = None          # 문서는 수집하지 않는다
