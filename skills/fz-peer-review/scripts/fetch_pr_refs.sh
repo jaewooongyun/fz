@@ -8,9 +8,11 @@
 # ⛔ **네트워크를 쓴다.** 사용자가 요청한 리뷰 턴의 Gather 에서만 부른다. gather.sh 는 fetch 하지 않는다
 #    (이미 뜬 diff 와 수집 대상이 어긋난다 — tests/fixtures/peer-review/stale-base 계약).
 # ⛔ 로컬 브랜치 · 작업 트리 · HEAD 를 바꾸지 않는다 — 원격 추적 ref 와 `pr-{N}` 만 쓴다(pull·merge 아님).
-# 원격 선택: --remote 가 없으면 upstream → origin 중 처음 있는 것(이름 순). gather.sh 는 PR url 의 owner/repo 와
-#   맞는 원격을 먼저 고르므로, upstream 이 fork 인 배치에서는 두 스크립트가 다른 원격을 본다 — 그때는 --remote 로
-#   base 저장소 원격을 준다.
+# 원격 선택: --remote 가 없으면 PR url 의 owner/repo 와 URL 이 맞는 원격(gather.sh 와 같은 규칙 — repo_key.sh).
+#   맞는 원격이 없거나 gh 가 없으면 upstream → origin 중 처음 있는 것(이름 순)으로 내려가고 FETCH-NOTE 를 남긴다.
+#   이전에는 이름 순만 써서 upstream 이 fork 인 배치에서 gather.sh 와 다른 원격을 봤다(F-414 ②).
+# ⛔ head refspec 은 `+` 다 — PR 은 force-push 되므로 non-fast-forward 갱신이 정상이다. `+` 가 없으면 낡은 pr-{N} 이
+#    거부된 채 남고, gather.sh 가 headRefOid 대조에서 멈춘다(F-414 ③).
 # gh 가 없거나 baseRefName 조회가 실패하면 PR head 만 받고 exit 5 — base 원격 추적 ref 는 받지 않는다(이름을 모른다).
 #   SKILL.md 의 'gh 실패 → git 폴백' 경로에서도 pr-{N} 은 생긴다.
 #
@@ -30,25 +32,34 @@ while [ $# -gt 0 ]; do
 done
 [[ "$PR" =~ ^[0-9]+$ ]] || die 2 "--target 은 PR 번호다 (받은 값: '${PR}')"
 
-BASE=""
+. "$(dirname "${BASH_SOURCE[0]}")/repo_key.sh" || die 4 "repo_key.sh 를 읽지 못했다"
+
+BASE="" PR_URL=""
 if command -v gh >/dev/null 2>&1; then
-  BASE=$(gh pr view "$PR" --json baseRefName 2>/dev/null \
-    | python3 -c 'import json,sys;print(json.load(sys.stdin)["baseRefName"])' 2>/dev/null) || BASE=""
+  # 빈 값은 `-` 로 받는다 — 빈 칸을 공백으로 넘기면 read 가 앞 공백을 버려 url 이 BASE 자리로 밀린다
+  read -r BASE PR_URL < <(gh pr view "$PR" --json baseRefName,url 2>/dev/null \
+    | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("baseRefName") or "-", d.get("url") or "-")' 2>/dev/null) || true
+  [ "$BASE" = "-" ] && BASE=""
+  [ "$PR_URL" = "-" ] && PR_URL=""
 fi
 
 if [ -z "$REM" ]; then
-  for r in upstream origin; do
-    if git remote get-url "$r" >/dev/null 2>&1; then REM="$r"; break; fi
-  done
+  REM=$(remote_for_pr_url "$PR_URL") || REM=""
+  if [ -z "$REM" ]; then
+    for r in upstream origin; do
+      if git remote get-url "$r" >/dev/null 2>&1; then REM="$r"; break; fi
+    done
+    [ -n "$REM" ] && echo "FETCH-NOTE: PR url(${PR_URL:-조회 실패})과 맞는 원격이 없다 — 이름 순으로 '${REM}' 을 쓴다" >&2
+  fi
 fi
 [ -n "$REM" ] && git remote get-url "$REM" >/dev/null 2>&1 || die 3 "원격 없음 — upstream · origin 중 아무것도 없다 (--remote 로 지정)"
 
 if [ -z "$BASE" ]; then
-  GIT_TERMINAL_PROMPT=0 git fetch "$REM" "pull/${PR}/head:pr-${PR}" \
+  GIT_TERMINAL_PROMPT=0 git fetch "$REM" "+pull/${PR}/head:pr-${PR}" \
     || die 4 "'$REM' 에서 pull/${PR}/head fetch 실패 (base 저장소 원격이 다르면 --remote)"
   echo "FETCH-PARTIAL(5): pr-${PR}=$(git rev-parse --short "pr-${PR}") — gh 로 baseRefName 을 얻지 못해 base 원격 추적 ref 는 받지 않았다(낡았을 수 있다)" >&2
   exit 5
 fi
-GIT_TERMINAL_PROMPT=0 git fetch "$REM" "pull/${PR}/head:pr-${PR}" "+refs/heads/${BASE}:refs/remotes/${REM}/${BASE}" \
+GIT_TERMINAL_PROMPT=0 git fetch "$REM" "+pull/${PR}/head:pr-${PR}" "+refs/heads/${BASE}:refs/remotes/${REM}/${BASE}" \
   || die 4 "'$REM' 에서 pull/${PR}/head · ${BASE} 중 하나 이상 fetch 실패 — 어느 쪽인지는 위 git 출력 (base 저장소 원격이 다르면 --remote)"
 echo "FETCH-OK: pr-${PR}=$(git rev-parse --short pr-${PR}) · ${REM}/${BASE}=$(git rev-parse --short "refs/remotes/${REM}/${BASE}")"

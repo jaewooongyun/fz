@@ -21,8 +21,9 @@
 #    무엇을 읽을지는 Lead 가 Tier 별 canonical set 으로 고른다 — 수집을 여기서
 #    줄이면 Tier 승격 시 다시 호출해야 한다.
 #
-# exit: 0 성공 / 2 사용법 / 3 대상 해석 실패 / 4 수집 실패 / 5 base 원본 전건 실패
+# exit: 0 성공 / 2 사용법 / 3 대상 해석 실패 / 4 수집 실패 / 5 base 원본 전건 실패 / 6 낡은 head(로컬 pr-N ≠ PR headRefOid)
 #   ⛔ 5 는 산출물을 **남긴다** — diff 는 유효하고 origin 근거만 없다. 진행 여부는 호출자 판단.
+#   ⛔ 6 은 남기지 않는다 — 다시 fetch 하면 풀리는 실패다.
 #   ⛔ 실패 시 부분 산출물을 남기지 않는다 — 반쯤 찬 WORK_DIR 은 "수집했는데 없었다"로 오독된다.
 set -uo pipefail
 
@@ -56,7 +57,7 @@ is_pr=false
 # ── diff + 메타 ──────────────────────────────────────────────
 if $is_pr; then
   command -v gh >/dev/null 2>&1 || die 3 "PR 번호를 받았으나 gh 가 없다 — 브랜치명으로 호출하라"
-  gh pr view "$TARGET" --json baseRefName,headRefName,title,body,additions,deletions,files,url,baseRefOid \
+  gh pr view "$TARGET" --json baseRefName,headRefName,title,body,additions,deletions,files,url,baseRefOid,headRefOid \
      > "$STAGE_DIR/pr-meta.json" 2>/dev/null || die 3 "PR $TARGET 조회 실패"
   BASE="${BASE:-$(python3 -c "import json,sys;print(json.load(open('$STAGE_DIR/pr-meta.json'))['baseRefName'])" 2>/dev/null)}"
   gh pr diff "$TARGET" > "$STAGE_DIR/diff.patch" 2>/dev/null || die 3 "PR $TARGET diff 실패"
@@ -184,19 +185,12 @@ PY
 # ⛔ fetch 하지 않는다(아래 신선도 절과 같은 계약). 고른 ref 가 PR `baseRefOid` 와 다르면 GATHER-WARN 만 낸다 —
 #    base/ · review-surface 는 그 ref 기준으로 모인다. 최신으로 모으려면 base 를 fetch 한 뒤 재수집한다.
 #    회귀: tests/fixtures/peer-review/gather-pr-mode/ (--cells base,shim-fields)
-repo_key() {   # URL → `owner/repo`(소문자). 경로 조각이 둘 미만이면 실패
-  local u="${1%/}" o r
-  u="${u%.git}"
-  u="${u//:/\/}"
-  case "$u" in */*) ;; *) return 1 ;; esac
-  r="${u##*/}" o="${u%/*}"
-  o="${o##*/}"
-  [ -n "$o" ] && [ -n "$r" ] || return 1
-  printf '%s/%s\n' "$o" "$r" | tr '[:upper:]' '[:lower:]'
-}
+#    원격 규칙(repo_key · remote_for_pr_url)은 `repo_key.sh` 한 곳에 둔다 — Step 0.5 의 fetch_pr_refs.sh 와 같은 원격을 고른다(F-414 ②).
+. "$HERE/repo_key.sh" || die 4 "repo_key.sh 를 읽지 못했다: $HERE/repo_key.sh"
+PR_STALE_LINE=""   # base 팁 불일치 — 표준 오류만으로는 산출물을 읽는 렌즈에 닿지 않는다(F-414 ①)
 if $is_pr; then
-  BASE_IN="$BASE" PR_BASE_NAME="" PR_URL="" PR_BASE_OID="" PR_REPO="" base_rem="" base_found="" pre_branch=""
-  read -r PR_BASE_NAME PR_URL PR_BASE_OID < <(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(*[d.get(k) or '-' for k in ('baseRefName','url','baseRefOid')])" "$STAGE_DIR/pr-meta.json" 2>/dev/null) || true
+  BASE_IN="$BASE" PR_BASE_NAME="" PR_URL="" PR_BASE_OID="" PR_HEAD_OID="" PR_REPO="" base_rem="" base_found="" pre_branch=""
+  read -r PR_BASE_NAME PR_URL PR_BASE_OID PR_HEAD_OID < <(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(*[d.get(k) or '-' for k in ('baseRefName','url','baseRefOid','headRefOid')])" "$STAGE_DIR/pr-meta.json" 2>/dev/null) || true
   case "$PR_URL" in */pull/[0-9]*) PR_REPO=$(repo_key "${PR_URL%/pull/*}") || PR_REPO="" ;; esac
   # --base 가 이미 `<원격>/<브랜치>` 꼴이고 그 원격 추적 ref 가 있으면 원격을 다시 고르지 않는다 — 신선도는 브랜치 이름으로 대조
   case "$BASE_IN" in
@@ -204,10 +198,7 @@ if $is_pr; then
            && git rev-parse --verify -q "refs/remotes/${BASE_IN}" >/dev/null && pre_branch="${BASE_IN#*/}" ;;
   esac
   if [ -z "$pre_branch" ] && [ -n "$PR_REPO" ]; then
-    for rem in upstream origin $(git remote 2>/dev/null); do
-      rem_url=$(git remote get-url "$rem" 2>/dev/null) || continue
-      [ "$(repo_key "$rem_url")" = "$PR_REPO" ] && { base_rem="$rem"; break; }
-    done
+    base_rem=$(remote_for_pr_url "$PR_URL") || base_rem=""
   fi
   if [ -n "$pre_branch" ]; then
     echo "GATHER-NOTE: base '$BASE' 는 원격 추적 ref 다 — 원격 선택을 건너뛴다" >&2
@@ -236,6 +227,7 @@ if $is_pr; then
       base_tip=$(git rev-parse --verify "${BASE}^{commit}" 2>/dev/null) || base_tip=""
       if [ -n "$base_tip" ] && [ "$base_tip" != "$PR_BASE_OID" ]; then
         echo "GATHER-WARN: stale base — '${BASE}'=${base_tip:0:7} ≠ PR baseRefOid ${PR_BASE_OID:0:7}. 마지막 fetch 뒤 base 가 움직였을 수 있다 — fetch 하지 않는다(base/ · review-surface 는 '${BASE}' 기준). 최신으로 모으려면 base 를 fetch 한 뒤 재수집하라" >&2
+        PR_STALE_LINE="⛔ PR base 팁 불일치 — '${BASE}'=${base_tip:0:7} ≠ PR baseRefOid ${PR_BASE_OID:0:7}. 이 산출물은 '${BASE}' 기준으로 모였다 — base 를 fetch 한 뒤 재수집을 권한다."
       fi
     else
       echo "GATHER-NOTE: pr-meta.json 에 baseRefOid 가 없다 — base 팁 대조 생략" >&2
@@ -301,6 +293,16 @@ if $is_pr; then
     if git rev-parse --verify "$cand" >/dev/null 2>&1; then HEAD_REF="$cand"; break; fi
   done
   [ "$HEAD_REF" = "$TARGET" ] && HEAD_REF=""
+  # ⛔ 로컬 head 가 PR 의 현재 head 와 다르면 멈춘다(F-414 ③) — diff.patch 는 gh 가 준 현재 PR 인데
+  #    merge-base · review-surface · head/ 는 낡은 로컬 ref 에서 떠진다. 경고로 넘기면 두 리비전이 한 산출물에 섞인다.
+  if [ -n "$HEAD_REF" ]; then
+    if [[ "$PR_HEAD_OID" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]; then
+      head_tip=$(git rev-parse --verify "${HEAD_REF}^{commit}" 2>/dev/null) || head_tip=""
+      [ "$head_tip" = "$PR_HEAD_OID" ] || die 6 "낡은 head — '${HEAD_REF}'=${head_tip:0:7} ≠ PR headRefOid ${PR_HEAD_OID:0:7}. fetch_pr_refs.sh 로 pr-${TARGET} 을 다시 받은 뒤 재수집하라"
+    else
+      echo "GATHER-NOTE: pr-meta.json 에 headRefOid 가 없다 — head 대조 생략" >&2
+    fi
+  fi
 fi
 # ⛔ `A...B` 는 **merge-base** 기준이다. base 팁이 분기 후 앞서 있으면 팁의 내용은
 #    diff 가 비교한 원본이 아니다 — PR 경로에서도 반드시 맞춘다.
@@ -322,6 +324,7 @@ fi
   printf '# 리뷰 표면
 
 '
+  [ -n "$PR_STALE_LINE" ] && printf '%s\n\n' "$PR_STALE_LINE"
   if [ "$BASE_STALE" -eq 1 ]; then
     printf '⛔ 로컬 base 가 원격보다 뒤다 — 원격 %s · 로컬 %s. fetch 후 재수집을 권한다.
 
@@ -458,6 +461,7 @@ fi
 
 {
   printf '# base 원본\n\n'
+  [ -n "$PR_STALE_LINE" ] && printf '%s\n\n' "$PR_STALE_LINE"
   printf '대상 base: `%s`' "$BASE"
   if [ "$BASE_REF" != "$BASE" ]; then
     printf ' (merge-base `%s`)' "$BASE_REF"

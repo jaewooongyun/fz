@@ -34,6 +34,15 @@
 #   base-no-match-fallback       PR url 이 어느 원격과도 안 맞는다 → GATHER-NOTE '기준 저장소 대조 실패' + upstream → origin 순회(upstream/main)
 #   base-prefixed-remote         `--base upstream/main`(원격 추적 ref 그대로) · 추적 ref 가 1커밋 뒤. 원격을 다시 고르지 않고 사실과 다른
 #                                NOTE('upstream/upstream/main 미fetch' · '어느 원격에도') 없이, 브랜치 이름으로 오프라인 신선도를 잰다(GATHER-WARN stale)
+# 셀 (--cells freshness) — F-414: 낡은 base · head · 원격 규칙. base 묶음의 bare 2개 · 클론 배치를 함께 쓴다
+#   stale-in-surface     base 추적 ref 가 baseRefOid 보다 뒤(clone-stale) → review-surface.md 머리에 '⛔ PR base 팁 불일치'(두 sha7).
+#                        대조군: 신선한 클론(clone-up)에선 그 줄이 없다
+#   stale-in-behavior    같은 실행의 base-behavior.md 머리에도 같은 줄 — 표준 오류 경고만으로는 산출물을 읽는 렌즈에 닿지 않는다
+#   head-mismatch-stops  headRefOid ≠ 로컬 pr-<N> → gather exit 6 · 'headRefOid' 사유 · WORK_DIR 산출물 0
+#   remote-rule-aligned  upstream = 멈춘 fork(refs/pull 없음) · origin = base 저장소. fetch_pr_refs.sh 가 PR url 과 맞는 origin 에서
+#                        pr-<N> · origin/main 을 받는다 — 이름 순(upstream 먼저)이면 fork 에서 pull/<N>/head 를 못 받아 FAIL
+#   head-refspec-forced  pr-<N> 을 P 의 조상이 아닌 X 로 돌려놓고 --remote origin 으로 다시 받는다 → pr-<N> = P(force-push 반영).
+#                        `+` 없는 refspec 은 non-fast-forward 거부로 FAIL
 # 끝 — 고른 묶음의 기대 셀 집합(expect_of)과 실제로 판정한 셀(RAN)이 정확히 같아야 한다. 셀 블록을 지운 사본은 1(F-408)
 # 셀 (--cells shim-fields) — I6: shim 은 gh 2.87.3 `pr view --json` 실제 필드만 받는다
 #   shim-fields-real     실제 필드 url · baseRefOid 를 고정 응답 그대로 낸다(--json · -q 둘 다)
@@ -42,7 +51,7 @@
 #   shim-fields-gather   gather 의 실제 `--json` 요청이 url · baseRefOid 를 포함하고 shim 이 하나도 거부하지 않는다
 # exit: 0 전건 통과 · 1 단언 실패(판정 줄 뒤에만) · 3 준비 실패(인자 · 도구 · 저장소 · 전제)
 #   ⛔ 판정 줄 없이 끝나면(셸 오류 · 중간 종료) 1 이 아니라 3 으로 낸다 — 1 은 단언 실패만 뜻한다.
-# usage: run.sh [--tree <플러그인 트리>] [--cells numstat,base,shim-fields]   (기본: 이 fixture 가 든 트리 · 전 셀 — health-check 는 인자 없이 부른다)
+# usage: run.sh [--tree <플러그인 트리>] [--cells numstat,base,shim-fields,freshness]   (기본: 이 fixture 가 든 트리 · 전 셀 — health-check 는 인자 없이 부른다)
 set -u
 
 DONE=0 fail=0 TMP=""
@@ -60,7 +69,7 @@ setup_fail() { echo "SETUP $*"; exit 3; }
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || setup_fail "fixture 경로 해석 실패"
 TREE="$(cd "$HERE/../../../.." && pwd)" || setup_fail "기본 트리 해석 실패"
-ALL_GROUPS="numstat base shim-fields"
+ALL_GROUPS="numstat base shim-fields freshness"
 CELLS="$(printf '%s' "$ALL_GROUPS" | tr ' ' ',')"   # ⛔ 쉼표로 잇는다 — want() 가 `,<묶음>,` 으로 찾는다(공백으로 이으면 인자 없는 실행이 0셀)
 # 묶음마다 판정해야 하는 셀 — 끝에서 RAN 과 대조한다(원장 CHECK 는 exit 만 보므로 셀 하나를 지워도 통과하던 구멍 · F-408)
 expect_of() {
@@ -68,6 +77,7 @@ expect_of() {
     numstat) echo "numstat-sha-ancestor numstat-sha-inflated numstat-meta-mismatch numstat-unresolved numstat-branch-binary-rename" ;;
     base) echo "base-stale-local base-upstream-not-base-repo base-tracking-stale base-no-match-fallback base-prefixed-remote" ;;
     shim-fields) echo "shim-fields-real shim-fields-unknown shim-fields-absent shim-fields-gather" ;;
+    freshness) echo "stale-in-surface stale-in-behavior head-mismatch-stops remote-rule-aligned head-refspec-forced" ;;
   esac
 }
 while [ $# -gt 0 ]; do
@@ -85,8 +95,10 @@ want() { case ",$CELLS," in *",$1,"*) return 0 ;; esac; return 1; }
 
 for c in git python3 awk sed; do command -v "$c" >/dev/null 2>&1 || setup_fail "$c 부재"; done
 GATHER="$TREE/skills/fz-peer-review/scripts/gather.sh"
+FETCH="$TREE/skills/fz-peer-review/scripts/fetch_pr_refs.sh"
 SHIM="$HERE/../_shim"
 [ -f "$GATHER" ] || setup_fail "gather.sh 없음: $GATHER"
+[ -f "$FETCH" ] || setup_fail "fetch_pr_refs.sh 없음: $FETCH"
 [ -x "$SHIM/gh" ] || setup_fail "gh shim 없음(실행 불가): $SHIM/gh"
 SHIM="$(cd "$SHIM" && pwd)"
 
@@ -285,7 +297,7 @@ fi
 
 refs_of() { g "$1" for-each-ref --format='%(refname) %(objectname)'; }
 
-if want base; then
+if want base || want freshness; then
   # ── base 묶음 setup — owner/repo 꼴 경로의 bare 2개 · 클론 3개 (전부 준비 실패는 3) ──
   RB="$TMP/b/base-owner/base-repo.git" RF="$TMP/b/fork-owner/base-repo.git"
   { mkdir -p "$TMP/b/base-owner" "$TMP/b/fork-owner" \
@@ -320,7 +332,7 @@ if want base; then
   run_base() {
     D="$TMP/cells/$1" BCL="$2"
     mkdir -p "$D" && cp "$TMP/pr.diff" "$D/pr.diff" || setup_fail "$1 응답 폴더 실패"
-    python3 - "$D/pr.json" "$N_U" "$3" "$4" "$P" <<'PY' || setup_fail "$1 pr.json 실패"
+    python3 - "$D/pr.json" "$N_U" "$3" "$4" "${HEAD_OID:-$P}" <<'PY' || setup_fail "$1 pr.json 실패"
 import json, sys
 out, n, url, base_oid, head_oid = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5]
 json.dump({
@@ -366,7 +378,9 @@ PY
   assert_note() {   # $1=셀 $2=설명 $3=고정 문자열
     grep -F -q -- "$3" "$D/err" && ok "$1: $2" || no "$1: $2" "기대 '$3' · $(grep -m1 'GATHER-NOTE' "$D/err" | cut -c1-120)"
   }
+fi
 
+if want base; then
   run_base base-stale-local "$CU" "$BASE_URL" "$C2"
   assert_base base-stale-local upstream/main "$C2"; assert_diff_same_base base-stale-local
   assert_note base-stale-local "GATHER-NOTE — 기준 저장소 원격 upstream 선택" "원격 'upstream' 이 PR 기준 저장소(base-owner/base-repo)다"
@@ -413,6 +427,75 @@ PY
     *) no "base-prefixed-remote: 브랜치 이름으로 오프라인 신선도 대조 — GATHER-WARN stale" "${w:-경고 없음}" ;;
   esac
   assert_refs_same base-prefixed-remote; assert_shim base-prefixed-remote
+fi
+
+if want freshness; then
+  head_line() { awk 'NR>1 && NF{print; exit}' "$1" 2>/dev/null; }   # 제목 다음 첫 줄 — "머리에" 의 판정
+  # 같은 실행(clone-stale: upstream/main = C1 · baseRefOid = C2)의 두 산출물
+  run_base stale-in-surface "$CT" "$BASE_URL" "$C2"
+  [ "$RC" -eq 0 ] && ok "stale-in-surface: gather exit 0 (headRefOid = pr-$N_U)" \
+    || no "stale-in-surface: gather exit 0" "exit $RC · $(grep -m1 'GATHER-FAIL' "$D/err" | cut -c1-120)"
+  for pair in "stale-in-surface review-surface.md" "stale-in-behavior base-behavior.md"; do
+    c=${pair%% *} f=${pair#* } line=$(head_line "$D/wd/${pair#* }")
+    case "$line" in
+      "⛔ PR base 팁 불일치"*"${C1:0:7}"*"${C2:0:7}"*) ok "$c: $f 머리에 PR base 팁 불일치 (${C1:0:7} ≠ ${C2:0:7})" ;;
+      *) no "$c: $f 머리에 PR base 팁 불일치" "${line:-줄 없음}" ;;
+    esac
+  done
+  # 대조군 — 신선한 클론(upstream/main = C2 = baseRefOid)에선 그 줄이 없다(늘 찍는 구현을 가른다)
+  run_base stale-control "$CU" "$BASE_URL" "$C2"
+  for pair in "stale-in-surface review-surface.md" "stale-in-behavior base-behavior.md"; do
+    c=${pair%% *} f=${pair#* }
+    if [ "$RC" -eq 0 ] && [ -s "$D/wd/$f" ] && ! grep -q '팁 불일치' "$D/wd/$f"; then ok "$c: 대조군 — 신선한 base 면 $f 에 불일치 줄 없음"
+    else no "$c: 대조군 — 신선한 base 면 $f 에 불일치 줄 없음" "exit $RC · $(grep -m1 '팁 불일치' "$D/wd/$f" 2>/dev/null | cut -c1-100)"; fi
+  done
+
+  HEAD_OID="$C2"   # PR 이 force-push 돼 headRefOid 가 바뀌었는데 로컬 pr-<N> 은 P 에 남은 배치
+  run_base head-mismatch-stops "$CU" "$BASE_URL" "$C2"
+  unset HEAD_OID
+  if [ "$RC" -eq 6 ] && grep -q 'headRefOid' "$D/err" && [ ! -e "$D/wd" ]; then
+    ok "head-mismatch-stops: 로컬 pr-$N_U(${P:0:7}) ≠ headRefOid(${C2:0:7}) → exit 6 · 산출물 0"
+  else
+    no "head-mismatch-stops: 낡은 head → exit 6 · 산출물 0" "exit $RC · wd $([ -e "$D/wd" ] && echo 있음 || echo 없음) · $(grep -m1 'GATHER-' "$D/err" | cut -c1-120)"
+  fi
+  assert_shim head-mismatch-stops
+
+  # clone-remote — upstream = 멈춘 fork(refs/pull 없음) · origin = base 저장소. pr-<N> 없음 · origin/main 을 C1 로 돌려 fetch 를 드러낸다
+  CR="$TMP/b/clone-remote"
+  { mk_clone "$CR" "$RF" "$RB" origin && g "$CR" update-ref -d "refs/heads/pr-$N_U" && g "$CR" update-ref refs/remotes/origin/main "$C1"; } \
+    || setup_fail "클론 clone-remote 실패"
+  [ -z "$(g "$CR" rev-parse --verify -q "refs/heads/pr-$N_U")" ] && [ "$(g "$CR" rev-parse origin/main)" = "$C1" ] \
+    && [ "$(g "$CR" rev-parse upstream/main)" = "$C1" ] && [ -z "$(g "$CR" ls-remote upstream "refs/pull/$N_U/head")" ] \
+    || setup_fail "전제 불성립: clone-remote"
+  run_fetch() {   # $1=셀 [$2…=fetch_pr_refs 추가 인자] — 고정 응답(baseRefName · url)으로 clone-remote 에서 부른다
+    D="$TMP/cells/$1"
+    mkdir -p "$D" && python3 - "$D/pr.json" "$N_U" "$BASE_URL" <<'PY2' || setup_fail "$1 pr.json 실패"
+import json, sys
+json.dump({"number": int(sys.argv[2]), "baseRefName": "main", "url": sys.argv[3]}, open(sys.argv[1], "w", encoding="utf-8"))
+PY2
+    (cd "$CR" && FZ_GH_SHIM_DIR="$D" FZ_GH_SHIM_PR="$N_U" bash "$FETCH" --target "$N_U" "${@:2}") > "$D/out" 2> "$D/err"
+    RC=$?
+  }
+  run_fetch remote-rule-aligned
+  if [ "$RC" -eq 0 ] && [ "$(g "$CR" rev-parse --verify -q "pr-$N_U")" = "$P" ] && [ "$(g "$CR" rev-parse origin/main)" = "$C2" ] \
+     && [ "$(g "$CR" rev-parse upstream/main)" = "$C1" ]; then
+    ok "remote-rule-aligned: PR url 과 맞는 origin 에서 받는다 (pr-$N_U = ${P:0:7} · origin/main ${C1:0:7} → ${C2:0:7} · upstream/main 불변)"
+  else
+    no "remote-rule-aligned: PR url 과 맞는 origin 에서 받는다" "exit $RC · pr-$N_U=$(g "$CR" rev-parse --short --verify -q "pr-$N_U" || echo 없음) · origin/main=$(g "$CR" rev-parse --short origin/main) · $(grep -m1 -E 'FETCH-|fatal' "$D/err" | cut -c1-120)"
+  fi
+  assert_shim remote-rule-aligned
+
+  # 낡은 pr-<N> — P 의 조상이 아닌 커밋(C1 위 곁가지). 원격 선택과 무관하게 --remote origin 으로 refspec 만 가른다
+  Y=$(printf 'stale head\n' | g "$CR" commit-tree "$C1^{tree}" -p "$C1") && g "$CR" update-ref "refs/heads/pr-$N_U" "$Y" \
+    || setup_fail "pr-$N_U 을 낡은 커밋으로 되돌리기 실패"
+  g "$CR" merge-base --is-ancestor "$Y" "$P" && setup_fail "전제 불성립: 낡은 pr-$N_U 이 P 의 조상이다(non-fast-forward 아님)"
+  run_fetch head-refspec-forced --remote origin
+  if [ "$RC" -eq 0 ] && [ "$(g "$CR" rev-parse "pr-$N_U")" = "$P" ]; then
+    ok "head-refspec-forced: non-fast-forward pr-$N_U(${Y:0:7}) → ${P:0:7} 강제 갱신"
+  else
+    no "head-refspec-forced: non-fast-forward pr-$N_U → P 강제 갱신" "exit $RC · pr-$N_U=$(g "$CR" rev-parse --short "pr-$N_U") · $(grep -m1 -E 'rejected|FETCH-' "$D/err" | cut -c1-120)"
+  fi
+  assert_shim head-refspec-forced
 fi
 
 if want shim-fields; then
