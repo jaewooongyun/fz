@@ -95,6 +95,7 @@ MAX_BLOCKS = 2                         # 같은 상태로 이 횟수까지만 �
 # 원장이 많으면 이 상한이 사유를 묶는다 — 자를 때는 본문 끝(진단 · 남의 원장 경고)부터 빼고 `…외 N줄 생략` 으로 수를 남기며,
 # 소유 원장 줄이 가장 늦게 빠진다. 남의 원장 경고는 3줄(≈1500자)을 넘으면 한 줄로 접는다 — 없으면 원장 수만큼 수십 KB 가 실린다.
 SUMMARY_MAX_CHARS = 400                # 원장 하나의 판정 요약 상한
+MANUAL_HINT_MAX_CHARS = 600            # MANUAL 안내 줄의 원장 · id 목록 상한 — 넘는 원장은 `…외 N개 원장` (안내 문장 자리를 남긴다)
 UNMET_IDS_SHOWN = 8                    # 요약에 싣는 미충족 id 상한 — 넘으면 `…외 N건`
 FOREIGN_NOTES_FOLD = 3                 # 남의 원장 경고가 이보다 많으면 한 줄로 접는다
 REASON_MAX_CHARS = 4000                # 차단 사유 전체 상한 — 넘는 본문 줄은 `…외 N줄 생략`
@@ -815,7 +816,17 @@ def main() -> int:
     #    직접 쓰거나(F-202) 기다리는 확인을 포기로 바꾼다. 그래서 ABANDON 안내보다 먼저 둔다.
     manual = [(led, ids) for led, _ in unmet for ids in [_manual_unmet(led)] if ids]
     if manual:
-        shown = " · ".join(f"{', '.join(ids)} ({led})" for led, ids in manual[:3])
+        # ⛔ 원장을 조용히 자르지 않는다 — 앞 3개만 보이면 이 세션의 원장이 뒤에 있을 때 그 확인 대기가 사라진다(2026-11-01 실측).
+        #    ⛔ 목록이 사유 예산을 다 먹어도 안 된다 — _cap_reason 이 꼬리(--confirm · 판정 명령)를 자른다. 그래서 글자 수로 묶는다:
+        #    원장마다 id 는 UNMET_IDS_SHOWN 까지 · 원장 이름은 폴더(전체 경로는 위 미충족 줄) · 넘는 원장은 수만 남긴다
+        parts = []
+        for led, ids in manual:
+            more = f" …외 {len(ids) - UNMET_IDS_SHOWN}건" if len(ids) > UNMET_IDS_SHOWN else ""
+            part = f"{', '.join(ids[:UNMET_IDS_SHOWN])}{more} ({Path(str(led)).parent.parent.name})"
+            if parts and len(" · ".join(parts + [part])) > MANUAL_HINT_MAX_CHARS:
+                break
+            parts.append(part)
+        shown = " · ".join(parts) + (f" …외 {len(manual) - len(parts)}개 원장" if len(parts) < len(manual) else "")
         lines.append(f"⛔ MANUAL 게이트 {shown} 는 사용자 확인으로만 충족된다 — 사용자가 별도 터미널에서 "
                      f"`python3 {checker} --confirm <게이트ID> <원장>` 을 실행한다(TTY 필요). 에이전트는 EVIDENCE 를 "
                      "쓰지 않고 ABANDON 하지도 않는다 — 사용자에게 요청하고 기다린다.")

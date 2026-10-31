@@ -11,6 +11,9 @@
 #   hook-manual-hint       미충족 MANUAL 게이트 원장 → 차단(exit 2) · 사유에 '--confirm' 안내가 ABANDON 안내보다 먼저
 #   hook-command-no-hint   미충족 command 게이트만 → 차단 · '--confirm' 안내 없음(대조 — 두 트리 모두)
 #   hook-manual-hint-truncated  미충족 9개(command 8 + 마지막 MANUAL) — 요약 id 는 8개에서 잘린다 → 그래도 M9 안내(GPT check)
+#   hook-manual-hint-many-ledgers  MANUAL 대기 원장 4개 → 안내 줄에 넷 다(앞 3개로 조용히 자르면 넷째 원장의 대기가 사라진다 — 실측)
+#   hook-manual-hint-budget  MANUAL 대기 원장 8개 × 60자 id 8개 → 목록은 생략 수를 남기고, 안내 문장(--confirm · ABANDON 금지)과
+#                            판정 명령 줄이 사유에 남는다(목록이 사유 예산을 먹어 꼬리가 잘리면 안 된다 — GPT check)
 # 끝 — 판정한 셀 집합 = 기대 셀 집합(F-408)
 # exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패
 # usage: run.sh [--tree <플러그인 트리>]
@@ -34,7 +37,7 @@ while [ $# -gt 0 ]; do
     *) setup_fail "알 수 없는 인자: $1" ;;
   esac
 done
-EXPECT_CELLS="verdict-escape-label verdict-stale-label hook-manual-hint hook-command-no-hint hook-manual-hint-truncated"
+EXPECT_CELLS="verdict-escape-label verdict-stale-label hook-manual-hint hook-command-no-hint hook-manual-hint-truncated hook-manual-hint-many-ledgers hook-manual-hint-budget"
 G="$TREE/scripts/gate_check.py" H="$TREE/scripts/gate_stop_hook.py"
 [ -f "$G" ] && [ -f "$H" ] || setup_fail "gate_check.py · gate_stop_hook.py 없음: $TREE"
 command -v python3 >/dev/null 2>&1 || setup_fail "python3 부재"
@@ -106,6 +109,34 @@ mkledger "$TMP/t9" "$steps9"
 hookreason "$TMP/t9/gates/plan.md"; r=$R_TXT
 if [ "$HRC" -eq 2 ] && printf '%s' "$r" | grep -q -- '--confirm' && printf '%s' "$r" | grep -q 'MANUAL 게이트 M9'; then ok "hook-manual-hint-truncated: 미충족 9개 중 마지막 MANUAL M9 → 요약이 잘려도 --confirm 안내"
 else no "hook-manual-hint-truncated: M9 안내" "exit $HRC · $(printf '%s' "$r" | grep -m1 'UNMET' | cut -c1-140)"; fi
+
+for k in 1 2 3 4; do mkledger "$TMP/q$k" "{\"title\":\"diag\",\"steps\":[{\"id\":\"Q$k\",\"title\":\"사람이 확인한다\",\"verify\":{\"kind\":\"manual\",\"criterion\":\"사람이 확인한다\"}}]}"; done
+out=$(printf '{"hook_event_name":"Stop","cwd":"%s","session_id":"diag-many","transcript_path":"%s"}' "$TMP" "$TMP/t.jsonl" \
+      | HOME="$TMP/home" FZ_GATES_LEDGER="$TMP/q1/gates/plan.md:$TMP/q2/gates/plan.md:$TMP/q3/gates/plan.md:$TMP/q4/gates/plan.md" python3 -B "$H" 2>&1); HRC=$?
+r=$(printf '%s\n' "$out" | python3 -c 'import json,sys
+for l in sys.stdin:
+    if l.startswith("{\"decision\""): print(json.loads(l)["reason"])')
+hint=$(printf '%s\n' "$r" | grep -- '--confirm' | head -1)
+miss=""; for k in 1 2 3 4; do printf '%s' "$hint" | grep -q "Q$k" || miss="$miss Q$k"; done
+if [ "$HRC" -eq 2 ] && [ -n "$hint" ] && [ -z "$miss" ]; then ok "hook-manual-hint-many-ledgers: MANUAL 대기 원장 4개 → 안내 줄에 Q1~Q4 모두"
+else no "hook-manual-hint-many-ledgers: 넷 다 안내" "exit $HRC · 빠짐:${miss:- 없음} · $(printf '%s' "$hint" | cut -c1-120)"; fi
+
+LEDS=""
+for k in 1 2 3 4 5 6 7 8; do
+  st=$(python3 -c 'import json,sys
+k=sys.argv[1]
+print(json.dumps({"title":"diag","steps":[{"id":("L%s_G%d_" % (k, j)).ljust(60, "x"),"title":"사람이 확인한다","verify":{"kind":"manual","criterion":"사람이 확인한다"}} for j in range(1,9)]}))' "$k")
+  mkledger "$TMP/b$k" "$st"; LEDS="${LEDS:+$LEDS:}$TMP/b$k/gates/plan.md"
+done
+out=$(printf '{"hook_event_name":"Stop","cwd":"%s","session_id":"diag-budget","transcript_path":"%s"}' "$TMP" "$TMP/t.jsonl" \
+      | HOME="$TMP/home" FZ_GATES_LEDGER="$LEDS" python3 -B "$H" 2>&1); HRC=$?
+r=$(printf '%s\n' "$out" | python3 -c 'import json,sys
+for l in sys.stdin:
+    if l.startswith("{\"decision\""): print(json.loads(l)["reason"])')
+if [ "$HRC" -eq 2 ] && printf '%s' "$r" | grep -q -- '--confirm <게이트ID> <원장>' && printf '%s' "$r" | grep -q 'ABANDON 하지도 않는다' \
+   && printf '%s' "$r" | grep -q '^판정: ' && printf '%s' "$r" | grep -q '…외 [0-9]*개 원장'; then
+  ok "hook-manual-hint-budget: 원장 8 × 긴 id 8 → 생략 수 · --confirm 안내 · 판정 줄이 남는다 (사유 $(printf '%s' "$r" | wc -c | tr -d ' ')B)"
+else no "hook-manual-hint-budget: 안내 · 판정 줄 보존" "exit $HRC · confirm $(printf '%s' "$r" | grep -c -- '--confirm') · 판정 $(printf '%s' "$r" | grep -c '^판정: ') · 생략 $(printf '%s' "$r" | grep -c '외 [0-9]*개 원장')"; fi
 
 want=$(printf '%s\n' $EXPECT_CELLS | LC_ALL=C sort -u); got=$(printf '%s\n' $RAN | LC_ALL=C sort -u)
 if [ "$want" = "$got" ]; then echo "PASS  셀 집합: 판정한 셀 = 기대 셀 ($(printf '%s\n' "$want" | grep -c .)개)"
