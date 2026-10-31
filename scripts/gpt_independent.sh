@@ -525,10 +525,17 @@ def recurse_hit(cmd):
                 return True
     return False
 def home_ref(cmd):
-    for m in re.finditer(re.escape(home) + r"[^\s'\"]*", cmd):
-        p = m.group(0)
-        if not ((repo and (p == repo or p.startswith(repo + "/"))) or p == iso or p.startswith(iso + "/")):
-            return p
+    """격리 밖 홈 경로 — 직렬화 층을 해독(JS 문자열 리터럴 · forbid_hit 와 같다)하고 셸 단어로 푼 뒤 단어 안의 홈 경로를 본다(F-442).
+    ⛔ 원문에 정규식을 걸지 않는다 — 직렬화된 `\\"` 의 역슬래시가 경로 끝에 붙어 허용 저장소(`<repo>\\`)를 밖으로 읽었다.
+       역슬래시에서 끊어도 안 된다 — 셸 이스케이프 공백(`<repo>\\ copy/…`)이 형제 폴더를 저장소 안으로 읽는다.
+    리터럴이 없으면(원문이 셸 명령) 원문을 셸 단어로 푼다. 허용 판정은 under_allowed 다(정규화 — `<repo>/../..` 탈출을 잡는다)."""
+    for s in js_strings(cmd) or [cmd]:
+        for w in shell_words(s):
+            i = w.find(home)
+            while i >= 0:
+                if not under_allowed(w[i:]):
+                    return os.path.normpath(w[i:])
+                i = w.find(home, i + 1)
     return None
 tcs, spawn, calls, hits, roles, child_results = 0, 0, 0, [], [], 0
 iso_ok = bool(rolls)
