@@ -117,6 +117,8 @@ const VerifySpec = {
         //    TOOLS: 를 읽는 코드가 있어도 생산 경로가 막혀 영원히 비어 온다.
         tools: { type: 'array', items: { type: 'string' },
                  description: 'command 가 필요로 하는 외부 명령 (예: ["xcodebuild"]). 부재 시 게이트를 돌리지 않고 미판정으로 남긴다 — 셸 exit 127 을 일반 실패로 오귀속하지 않기 위함' },
+        env: { type: 'array', items: { type: 'string' },
+               description: 'command 가 ${NAME:?} 등으로 요구하는 환경 변수 이름 (예: ["FZ_IMPL_ROOT"]). 없거나 비면 게이트를 돌리지 않고 미판정으로 남긴다 — 통과 증거를 강등하지 않기 위함(F-342)' },
       },
       additionalProperties: false,
     },

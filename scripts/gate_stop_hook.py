@@ -118,12 +118,29 @@ _TOKEN = r"[^\s\"'`;|&<>()]*plan\.md"              # 원장 경로 토큰 — �
 CD_RE = re.compile(r"^\s*[({]?\s*(?:cd|pushd)\s+[\"']?([^\s\"';&|()]+)")
 # `NAME=값` · `export NAME=값` — 값은 대입 시점의 env 로 풀어 둔다(`L=$W/gates/plan.md` · `G="${FZ_PLUGIN_ROOT}/…/gate_check.py"`)
 ASSIGN_RE = re.compile(r"^\s*(?:export\s+)?(\w+)=[\"']?([^\s\"';&|]+)")
+# 따옴표 값에 공백이 있으면 ASSIGN_RE 는 첫 단어만 잡는다 — 그 변수는 미상으로 둔다(`LIST="A B"` 를 A 로 믿지 않는다)
+MULTIWORD_ASSIGN_RE = re.compile(r"^\s*(?:export\s+)?\w+=([\"'])[^\"']*\s")
 SEGMENT_SPLIT_RE = re.compile(r"\n|;|&&|\|\||\|")
+# `for NAME in …` 루프(F-457) — 몸체 조각에서만 값을 대입한다. 지원 밖(몸체 재대입 · break · continue · 중첩 · done 없음)과
+# done 뒤는 미상이다 — 실제 값은 셸만 안다(break 뒤 값 · 몸체 재대입이 마지막 값 추정을 틀리게 한다).
+FOR_RE = re.compile(r"^\s*for\s+([A-Za-z_]\w*)\s+in\s+(.*?)\s*$")
+LOOP_DO_RE = re.compile(r"^\s*do\b\s*")
+LOOP_OPEN_RE = re.compile(r"^\s*(?:for|while|until)\b")
+LOOP_DONE_RE = re.compile(r"^\s*done\b")
+FUNC_DEF_RE = re.compile(r"(?:^|\s)(?:function\s+\w+|\w+\s*\(\s*\))\s*\{")
+LOOP_COMPOUND_RE = re.compile(r"^\s*(?:(?:if|then|elif|else|fi|case|esac|while|until|select|function|\[\[|!)(?:\s|$)|[(){}])")
+LOOP_BODY_BANNED = frozenset((".", "source", "eval", "exec", "break", "continue"))
+# 셸 상태(변수 · 작업 폴더 · 위치 인자 · 옵션)를 바꾸는 내장 명령 — 몸체에 있으면 반복마다 env 가 달라 같은 env 로 펼칠 수 없다.
+# bash 내장 목록에서 닫힌 집합이다. 대입 단어(`D=…` · `D+=…`)와 `printf -v` 도 같다
+LOOP_STATEFUL = frozenset(("cd", "pushd", "popd", "export", "unset", "read", "declare", "typeset", "local", "readonly",
+                           "let", "shift", "getopts", "mapfile", "readarray", "set", "shopt", "alias", "unalias", "trap",
+                           "umask", "hash", "enable", "builtin"))
 # `. FILE` · `source FILE` — 그 파일의 대입을 env 에 더한다(F-422). 파일은 훅이 도는 **지금** 의 내용이다
 SOURCE_RE = re.compile(r"^\s*(?:\.|source)\s+[\"']?([^\s\"';&|]+)")
 SOURCE_ANY_RE = re.compile(r"(?:^|[;&|(])\s*(?:\.|source)\s+\S", re.M)
 SOURCE_MAX_BYTES = 65536
-_VAR_RE = re.compile(r"\$\{(\w+)(?::?[-?=+][^}]*)?\}|\$(\w+)")
+# `${N:-…}` · `${N:=…}` · `${N:?…}` 는 N 이 있으면 N 의 값이다. `${N:+…}` · `${N+…}` 는 다른 값이라 풀지 않는다(미상)
+_VAR_RE = re.compile(r"\$\{(\w+)(?::?[-?=][^}]*)?\}|\$(\w+)")
 # 판정기 호출 — 원장을 쓰는 플래그(F-377). 이름은 판정기 파일명. 옵션 어휘(`GATE_OPTS` — argparse 의 `--help` 포함)와 값을 받는
 # 옵션은 `gate_check._dispatch` 의 add_argument 와 같다 — self-test 가 판정기 소스와 두 집합을 대조한다(갈리면 새 쓰기 옵션을 놓친다)
 GATE_CHECK_NAME = "gate_check.py"
@@ -140,6 +157,9 @@ _CMD_PREFIX_WORDS = frozenset(("env", "command", "exec", "time", "nohup", "-i", 
 _REDIR_ONLY_RE = re.compile(r"^(?:\d*>>?|<|&>>?)$")           # 대상이 다음 단어인 리다이렉션
 _REDIR_RE = re.compile(r"^(?:\d*>>?|<|&>>?|\d*>&)")           # 대상이 붙은 리다이렉션(`>/dev/null` · `2>&1`)
 _UNRESOLVED_RE = re.compile(r"[$`*]")                          # 풀리지 않은 변수 · 치환 · 글롭
+# 원장 인자 · 루프 값은 이 글자만으로 된 경로일 때만 '풀렸다' 로 본다 — 허용 목록이다(F-458). 차단 목록은 `~` · `[…]` ·
+# `{a,b}` · `?` 처럼 셸이 바꾸는 꼴을 하나 빠뜨릴 때마다 남의 원장으로 판정해 Stop 을 통과시켰다(fail-open)
+_RESOLVED_PATH_RE = re.compile(r"^(?!-)[\w./@%+=:,-]+$")          # `-` 로 시작하면 변수로 들어온 옵션이다(`"$OPT"`)
 # ⛔ heredoc 본문이 **데이터인지 코드인지**는 어디에 먹이는가로 갈린다. `cat`/`tee` 로
 #    가는 본문은 데이터라, 명령으로 읽으면 문서에 인용한 경로가 쓰기로 잡힌다(F-193 오탐).
 #    반대로 `python3 -`/`bash -` 로 가는 본문은 **실행되는 코드**이고 이 리포가 파일을
@@ -393,8 +413,56 @@ def _source_env(path_tok: str, env: dict, cur_dir, cwd) -> bool:
     for line in text.splitlines():
         m = ASSIGN_RE.match(line)
         if m:
-            env[m.group(1)] = _expand(m.group(2), env)
+            _assign(line, m, env)
     return True
+
+
+def _assign(line: str, m, env: dict) -> None:
+    env[m.group(1)] = "$" + m.group(1) if MULTIWORD_ASSIGN_RE.match(line) else _expand(m.group(2), env)
+
+
+def _loop_spans(segs: list) -> dict:
+    """`for NAME in …` 조각 index → (이름, 짝 done 조각 index | None, 지원 여부).
+
+    - Important: 근사기의 전제 — 단어 분리는 기본 IFS 이고, 변수 값은 같은 명령의 대입 · source 한 파일에서만 안다.
+      명령이 IFS 를 건드리거나 함수를 정의하면 루프는 지원 밖(미상)이다. 명령 밖에서 물려받은 IFS 는 보지 못한다.
+    """
+    spans = {}
+    # 함수는 몸체 밖에서 루프 변수를 바꿀 수 있고, IFS 대입은 `$LIST` 의 단어 경계를 바꾼다
+    funcs = any(FUNC_DEF_RE.search(s) or re.search(r"(?<![\w$])IFS\b", s) for s in segs)
+    for i, seg in enumerate(segs):
+        m = FOR_RE.match(seg)
+        if not m:
+            continue
+        name, depth, ok, end = m.group(1), 0, not funcs, None
+        for j in range(i + 1, len(segs)):
+            body = LOOP_DO_RE.sub("", segs[j])
+            if LOOP_DONE_RE.match(body):
+                if depth == 0:
+                    end = j
+                    break
+                depth -= 1
+                continue
+            if LOOP_OPEN_RE.match(body):
+                depth, ok = depth + 1, False
+            # 몸체는 평범한 명령만 지원한다(허용 목록 — F-458): 복합 구문 · 흐름 제어 · 같은 셸에서 코드를 읽는 명령이 있거나,
+            # 루프 변수 이름이 확장(`$NAME` · `${NAME…}`) 밖에서 나오면(`X=` · `read X` · `printf -v X`) 지원 밖이다
+            bare = re.sub(r"\$\{?%s(?![A-Za-z0-9_])" % re.escape(name), "", body)
+            ws = _words(body)
+            head = next((w for w in ws if w not in _CMD_PREFIX_WORDS), "")
+            if (LOOP_COMPOUND_RE.match(body) or LOOP_BODY_BANNED & set(ws)
+                    or re.search(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(name), bare)
+                    or re.match(r"^\w+\+?=", head) or head in LOOP_STATEFUL or (head == "printf" and "-v" in ws)):
+                ok = False                 # 상태를 바꾸는 몸체 — 다음 반복의 값 · 폴더가 달라진다(GPT check 후속 5)
+        spans[i] = (name, end, ok and end is not None)
+    return spans
+
+
+def _bind_expand(token: str, env: dict, bind) -> list:
+    """루프 몸체 안이면 `$NAME` 을 루프 값마다 펼친다 — 진입 전 같은 이름의 값보다 우선한다(F-457)."""
+    if bind and re.search(r"\$\{?%s(?![A-Za-z0-9_])" % re.escape(bind[0]), token):
+        return [_expand(token, dict(env, **{bind[0]: v})) for v in bind[1]]
+    return [_expand(token, env)]
 
 
 def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
@@ -402,6 +470,12 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
 
     `unknown` 에 list 를 주면 원장을 쓰는 판정기 호출인데 원장 인자를 풀지 못한 것(`"$L"` 의 L 미상)을 모은다 —
     호출부가 그 세션을 '대상 미상 쓰기' 로 보고 전 원장을 판정한다(fail-closed). `cwd` 는 상대 경로 `source` 의 기준이다.
+
+    - Important: 근사기의 전제(F-458) — 이 밖의 정보가 필요한 꼴은 받아들인 한계다:
+      단어 분리는 기본 IFS(명령 · source 한 파일이 IFS 를 바꾸면 루프는 미상) · 변수 값은 같은 명령의 대입과 source 한
+      파일(훅이 도는 지금의 내용)에서만 안다(물려받은 환경 · 셸 프로필 · alias 는 모른다) · 함수 · eval 은 따라가지 않는다 ·
+      판정기는 파일명으로 가린다(PATH 가림 · 링크 이름은 모른다). 원장 인자와 루프 값은 허용 목록(`_RESOLVED_PATH_RE`)에
+      맞는 최종 경로일 때만 '풀렸다' 이고, 그 밖은 '대상 미상' 이다.
 
     ⛔ "명령에 쓰기 마커가 있다 + 어딘가에 원장 경로가 있다" 로 판정하면 안 된다.
        실측(2026-09-11): 발견 레지스트리에 사건을 기록하는 `cat > "$F" <<EOF` 가
@@ -441,7 +515,21 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
     cur_dir = None
     env = {}
     source_missing = False                 # 이 명령이 source 한 파일 중 못 읽은 것이 있다 — 그 뒤 `"$G"` 는 판정기일 수 있다
-    for seg in SEGMENT_SPLIT_RE.split(body):
+    segs = SEGMENT_SPLIT_RE.split(body)
+    spans = _loop_spans(segs)
+    bind = None                            # (이름, 값들, 짝 done index) — 지원 루프의 몸체 안에서만
+    for i, seg in enumerate(segs):
+        if bind and i >= bind[2]:
+            bind = None
+        if i in spans:
+            name, end, ok = spans[i]
+            vals = [_expand(w, env) for w in _words(FOR_RE.match(seg).group(2))]
+            # 원장 모양(`.md`) 값만 · IFS 를 바꾼 명령(source 한 파일 포함 — env 에 남는다)은 단어 경계를 모른다
+            if ok and vals and "IFS" not in env and all(_RESOLVED_PATH_RE.match(v) and v.endswith(".md") for v in vals):
+                bind = (name, vals, end)
+            env[name] = "$" + name             # ⛔ 미상 표식 — 지원 밖 몸체 · done 뒤는 대상 미상(fail-closed)
+            continue
+        seg = LOOP_DO_RE.sub("", seg) if bind or any(s < i for s in spans) else seg
         mcd = CD_RE.match(seg)
         if mcd:
             cur_dir = _expand(mcd.group(1), env)
@@ -452,21 +540,26 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
             continue
         masg = ASSIGN_RE.match(seg)
         if masg:
-            env[masg.group(1)] = _expand(masg.group(2), env)
-        call = _gate_call(_words(seg), env, unresolved_prog=source_missing)
-        if call is not None and call[0] and call[1] is not None:
-            tok = _expand(call[1], env)
-            if _UNRESOLVED_RE.search(tok) or not call[2]:
-                if unknown is not None:
-                    unknown.append(call[1])
+            _assign(seg, masg, env)
+        # 단어를 전부 푼 뒤 판정기 인자를 가른다 — 변수로 들어온 옵션(`"$OPT"`)이 원장 자리로 잡히지 않는다. 루프 몸체면 값마다
+        words, missed = _words(seg), None
+        for env_v in ([dict(env, **{bind[0]: v}) for v in bind[1]] if bind else [env]):
+            call = _gate_call([_expand(w, env_v) for w in words], env_v, unresolved_prog=source_missing)
+            if call is None or not call[0] or call[1] is None:
+                continue
+            path = call[1] if call[1].startswith("/") or not cur_dir else f"{cur_dir}/{call[1]}"
+            if not _RESOLVED_PATH_RE.match(path) or not call[2]:          # 허용 목록은 `cd` 접두를 붙인 최종 경로에 건다
+                missed = call[1]
             else:
-                out.append(tok if tok.startswith("/") or not cur_dir else f"{cur_dir}/{tok}")
+                out.append(path)
+        if missed is not None and unknown is not None:
+            unknown.append(missed)
         for rx in WRITE_TARGET_RES:
-            for tok in rx.findall(seg):
-                tok = _expand(tok, env)
-                if not tok.startswith("/") and cur_dir:
-                    tok = f"{cur_dir}/{tok}"
-                out.append(tok)
+            for raw in rx.findall(seg):
+                for tok in _bind_expand(raw, env, bind):
+                    if not tok.startswith("/") and cur_dir:
+                        tok = f"{cur_dir}/{tok}"
+                    out.append(tok)
     # 인터프리터 heredoc 이 파일을 쓰면, **그 본문 안에** 등장한 원장을 이 세션이 쓴
     # 것으로 본다. 쓰기 대상 **자리** 규칙은 셸 문법용이라 코드에는 맞지 않으므로,
     # 코드에서는 신호와 경로의 동거를 근거로 삼는다(보수적 — 어느 변수가 그 경로를 들고
@@ -587,6 +680,9 @@ def _line_may_write(line: str) -> bool:
     return '"Bash"' in line and SOURCE_LINE_RE.search(line) is not None
 
 
+DRIFT_LINE_RE = re.compile(r"^\s*DRIFT (\S+): 도구 부재 — (.+?) \(")
+
+
 def _ids_line(head: str, shown: list, rest: int) -> str:
     text = f"{head} — {', '.join(shown)}" if shown else head
     if rest > 0:
@@ -613,12 +709,18 @@ def _unmet_summary(out: list) -> str:
         if not m or len(ids) >= total:
             break
         ids.append(m.group(1))
+    # 환경 드리프트(F-291) — 기록은 met 인데 선언 도구가 없는 게이트. 일반 미충족과 할 일이 다르다(도구를 되살린다)
+    drift = [m for m in (DRIFT_LINE_RE.match(l) for l in out) if m]
+    tail = ""
+    if drift:
+        tools = list(dict.fromkeys(t.strip() for m in drift for t in m.group(2).split(",")))
+        tail = f" · 환경 드리프트 {len(drift)}(도구 부재: {', '.join(tools[:3])}{' …' if len(tools) > 3 else ''})"
     shown = []
     for gid in ids[:UNMET_IDS_SHOWN]:
-        if len(_ids_line(head, shown + [gid], total - len(shown) - 1)) > SUMMARY_MAX_CHARS:
+        if len(_ids_line(head, shown + [gid], total - len(shown) - 1)) + len(tail) > SUMMARY_MAX_CHARS:
             break
         shown.append(gid)
-    return _ids_line(head, shown, total - len(shown))
+    return _ids_line(head, shown, total - len(shown)) + tail
 
 
 def judge(checker: Path, ledger: Path, budget_left: float):

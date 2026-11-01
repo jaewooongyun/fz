@@ -121,8 +121,32 @@ async function callsOf(file, wf, scenario, extraArgs) {
 //    S32(plan-lean2 병합 콜 무탐색 · F-345): agentType plan-structure → plan-merge · 계약 한 줄. 새 모양은 plan-lean2-merge-no-explore.js 가 본다.
 const MERGE_CONTRACT = '⛔ 이 콜에는 탐색 도구가 없다 — 위 코드 컨텍스트 파일도 읽지 않는다. 입력 JSON 만으로 접고, 근거가 입력에 없어 접을 수 없으면 unresolved 에 적는다.\n'
 const MERGE_AT = '⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.'
+// R-F4 F4-2(F-342): VerifySpec 에 env — 기준 lean2-full 스키마의 VerifySpec `tools` 바로 뒤에 `env` 를 넣는다. 새 모양의 정본은
+//   workflows/plan-lean2.js VerifySpec 이다(설명 문구가 어긋나면 이 비교가 실패한다 — 그것이 맞다). 기준에 tools 가 없거나 env 가 이미 있으면 던진다.
+const ENV_PROP = { type: 'array', items: { type: 'string' },
+  description: 'command 가 ${NAME:?} 등으로 요구하는 환경 변수 이름 (예: ["FZ_IMPL_ROOT"]). 없거나 비면 게이트를 돌리지 않고 미판정으로 남긴다 — 통과 증거를 강등하지 않기 위함(F-342)' }
+function addEnv(node, hit) {
+  if (Array.isArray(node)) return node.map(n => addEnv(n, hit))
+  if (!node || typeof node !== 'object') return node
+  const out = {}
+  for (const [k, v] of Object.entries(node)) {
+    out[k] = addEnv(v, hit)
+    if (k === 'tools' && v && v.type === 'array' && String(v.description || '').startsWith('command 가 필요로 하는 외부 명령')) {
+      if ('env' in node) throw new Error('기준 VerifySpec 에 이미 env 가 있다 — 기준 트리가 R-F4 이후인지 본다')
+      out.env = ENV_PROP
+      hit.n++
+    }
+  }
+  return out
+}
 const INTENDED = {
   'plan-lean2': {
+    'lean2-full': c => {
+      const hit = { n: 0 }
+      const schema = addEnv(JSON.parse(c.schema), hit)
+      if (hit.n < 1) throw new Error('기준 lean2-full 스키마에 VerifySpec tools 가 없다 — F4-2 변환 전제와 다르다')
+      return Object.assign({}, c, { schema: JSON.stringify(schema) })
+    },
     'lean2-merge': c => {
       if (c.agentType !== 'fz:plan-structure' || c.prompt.split(MERGE_AT).length !== 2 || c.prompt.includes(MERGE_CONTRACT)) {
         throw new Error(`기준 lean2-merge 콜이 S32 변환 전제와 다르다(agentType ${c.agentType}) — 기준 트리가 S32 이전인지 본다`)

@@ -1,6 +1,6 @@
 # Model Guide — Fable 5.1 (Lead) · Opus 5.5 (worker)
 
-> ✅ **운용 상태 (2026-09-06 · 워커 모델 2026-09-25 갱신)**: Lead = **Fable 5.1**(2026-09 출시, 사용자 `/model fable` 세션 · effort **xhigh**), 실질 생산 워커 = **Opus 5.5**(`opus` alias — Claude Code 2.1.280+ 가 Opus 5.5 로 해석), 단순(retrieval·breadth) 워커 = **Sonnet 5**. 판단 지점 3곳 explicit `'fable'` 배선 유지 — `search-cross-verify.js:173` merge + `plan-collaborative.js:227`/`:167` direction (§재배선 확정 배선), `scripts/lint-model-explicit.sh` 기계 감시. ⚠️ 2026-09-06 정정 — 이전 판의 "세션 레벨 max(기본)/ultracode 운용"은 현행이 아니다(세션 = xhigh, `ultracode`는 effort arm으로 무효).
+> ✅ **운용 상태 (2026-09-06 · 워커 모델 2026-09-25 갱신)**: Lead = **Fable 5.1**(2026-09 출시, 사용자 `/model fable` 세션 · effort **xhigh**), 실질 생산 워커 = **Opus 5.5**(`opus` alias — Claude Code 2.1.280+ 가 Opus 5.5 로 해석), 단순(retrieval·breadth) 워커 = **Sonnet 5**. 판단 지점 3곳 explicit `'fable'` 배선 유지 — `search-cross-verify.js:173` merge + `plan-collaborative.js:229`/`:167` direction (§재배선 확정 배선), `scripts/lint-model-explicit.sh` 기계 감시. ⚠️ 2026-09-06 정정 — 이전 판의 "세션 레벨 max(기본)/ultracode 운용"은 현행이 아니다(세션 = xhigh, `ultracode`는 effort arm으로 무효).
 >
 > Claude Fable 5.1 / Claude Mythos 5.1의 사양 · API 동작 차이 · Claude Code 통합 · fz 생태계 적용 전략의 단일 참조.
 > 모델 무관 프롬프팅 원칙은 `prompt-optimization.md`, 하네스 설계는 `harness-engineering.md` 참조.

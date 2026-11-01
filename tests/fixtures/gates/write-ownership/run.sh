@@ -69,6 +69,14 @@ EXPECTED_CELLS = {
     "status-literal": 1, "status-only": 1, "status-only-sourced": 1, "discover": 1, "cat-args": 1,
     "status-abbrev": 1, "source-missing-unrelated": 1, "stdin-script-args": 1, "tilde-source-owned": 1,
     "only-profile-var": 1, "only-sourced-gone": 1, "control-finalize": 1, "own-and-foreign": 1, "loop-guard": 1,
+    "for-loop-var": 1, "for-loop-prior-value": 1, "for-loop-body-reassign": 1, "for-loop-break-after-done": 1,
+    "for-loop-after-done-use": 1, "for-loop-continue-unknown": 1, "for-loop-nested-unknown": 1, "for-loop-glob-unknown": 1,
+    "for-loop-charclass-unknown": 1, "for-loop-brace-unknown": 1, "for-loop-source-reassign": 1, "for-loop-multiword-list-unknown": 1,
+    "only-charclass-unknown": 1, "for-loop-conditional-reassign": 1, "for-loop-function-reassign": 1,
+    "for-loop-plain-body-owned": 1, "for-loop-tilde-unknown": 1, "for-loop-then-source": 1,
+    "for-loop-cd-inherited-unknown": 1, "for-loop-ifs-unknown": 1,
+    "for-loop-option-var": 1, "for-loop-alt-expansion": 1, "for-loop-sourced-ifs-unknown": 1, "var-option-owned": 1,
+    "for-loop-stateful-var": 1, "for-loop-stateful-cd": 1,
 }
 
 
@@ -311,6 +319,94 @@ try:
         check(c.name, rc == 2 and f"미충족 게이트: {a} — " in r, "쓴 원장 A 로 막는다", f"rc={rc} {err[-300:]}")
         check(c.name, f"미충족 게이트: {b} — " not in r and f"다른 세션의 원장(막지 않음): {b} — " in r,
               "읽기만 한 원장 B 는 소유가 아니다(경고만)", r[-300:])
+
+    # ── for — 루프 변수로 넘긴 원장 인자(F-457) ─────────────────────────────────────────
+    #    A(· B) 는 세션이 루프로 쓰고, C 는 남의 미충족 원장이다. 푼 경우 C 는 '막지 않음' 이어야 하고(전 원장 판정이면 C 가 막는다),
+    #    못 푸는 꼴(break · done 뒤 · continue · 중첩 · glob)은 '대상 미상'(fail-closed) 이어야 한다
+    def for_cell(name, make_cmd, owned=None, unknown=False, never=None):
+        with Cell(name) as c:
+            a, b, cl = c.ledger("A-own"), c.ledger("B-own"), c.ledger("C-foreign")
+            c.run(make_cmd(a, b, cl, c))
+            rc, reason, err = c.hook()
+            r = reason or ""
+            if owned is not None:
+                want = [{"a": a, "b": b}[k] for k in owned]
+                check(name, rc == 2 and all(f"미충족 게이트: {x} — " in r for x in want) and "대상 미상 쓰기" not in err
+                      and f"미충족 게이트: {cl} — " not in r,
+                      f"루프 값 {owned} 를 소유로 · 대상 미상 0 · 남의 C 는 막지 않는다", f"rc={rc} {err[-300:]}")
+            if unknown:
+                check(name, rc == 2 and "대상 미상 쓰기" in err, "푸는 법을 모르는 꼴은 '대상 미상 쓰기'(fail-closed)", f"rc={rc} {err[-300:]}")
+            if never:
+                check(name, never(a, b, cl, r, err), "실제로 쓰지 않은 원장으로 오귀속하지 않는다", f"rc={rc} {err[-300:]}")
+
+    for_cell("for-loop-var", lambda a, b, cl, c: f'{G_LINE}\nfor X in {a} {b}; do python3 "$G" --only S1 "$X"; done', owned="ab")
+    for_cell("for-loop-prior-value", lambda a, b, cl, c: f'{G_LINE}\nX={cl}; for X in {a}; do python3 "$G" --only S1 "$X"; done', owned="a")
+    # 몸체 재대입 — 셸은 A 를 쓴다. A 소유이거나 대상 미상이면 맞다(C 로 오귀속만 아니면 — GPT r2 #2)
+    for_cell("for-loop-body-reassign", lambda a, b, cl, c: f'{G_LINE}\nfor X in {cl}; do X={a}; python3 "$G" --only S1 "$X"; done',
+             never=lambda a, b, cl, r, err: "대상 미상 쓰기" in err or (f"미충족 게이트: {a} — " in r and f"미충족 게이트: {cl} — " not in r))
+    for_cell("for-loop-break-after-done",
+             lambda a, b, cl, c: f'{G_LINE}\nX={cl}; for X in {a} {b}; do break; done; python3 "$G" --only S1 "$X"', unknown=True)
+    for_cell("for-loop-after-done-use", lambda a, b, cl, c: f'{G_LINE}\nfor X in {a}; do echo; done; python3 "$G" --only S1 "$X"', unknown=True)
+    for_cell("for-loop-continue-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in {a}; do continue; python3 "$G" --only S1 "$X"; done', unknown=True)
+    for_cell("for-loop-nested-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in {a}; do for Y in z; do python3 "$G" --only S1 "$X"; done; done', unknown=True)
+    for_cell("for-loop-glob-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in {c.cwd}/A-*/gates/plan.md; do python3 "$G" --only S1 "$X"; done', unknown=True)
+    # GPT check P2 — 글자 그대로 바인딩하면 어떤 원장과도 안 맞아 소유가 비고 '대상 미상' 도 안 뜬다(fail-open)
+    for_cell("for-loop-charclass-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in {c.cwd}/[A]-own/gates/plan.md; do python3 "$G" --only S1 "$X"; done', unknown=True)
+    for_cell("for-loop-brace-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in {c.cwd}/{{A,B}}-own/gates/plan.md; do python3 "$G" --only S1 "$X"; done', unknown=True)
+    for_cell("only-charclass-unknown", lambda a, b, cl, c: f'{G_LINE}\npython3 "$G" --only S1 {c.cwd}/[A]-own/gates/plan.md', unknown=True)
+    # 몸체가 source 한 파일이 루프 변수를 바꾸면 셸은 B 를 쓴다 — 루프 값 A 로 오귀속하지 않는다(B 소유이거나 대상 미상)
+    for_cell("for-loop-source-reassign",
+             lambda a, b, cl, c: f"{G_LINE}\nprintf 'X=%s\\n' {b} > {c.cwd}/x.env; for X in {a}; do . {c.cwd}/x.env; "
+                                 f'python3 "$G" --only S1 "$X"; done',
+             never=lambda a, b, cl, r, err: "대상 미상 쓰기" in err or (f"미충족 게이트: {b} — " in r and f"미충족 게이트: {a} — " not in r))
+    # 따옴표 목록 — ASSIGN_RE 는 첫 단어만 잡는다. 셸은 A · B 를 돈다 → 잘린 값을 목록으로 믿지 않고 대상 미상
+    for_cell("for-loop-multiword-list-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\nLIST="{a} {b}"; for X in $LIST; do python3 "$G" --only S1 "$X"; done', unknown=True)
+    # GPT check 후속 P1 — 조각이 `then X=` 로 시작하는 재대입 · 함수 안 재대입도 셸은 B 를 쓴다(A 로 오귀속 금지)
+    not_a = lambda a, b, cl, r, err: "대상 미상 쓰기" in err or (f"미충족 게이트: {b} — " in r and f"미충족 게이트: {a} — " not in r)  # noqa: E731
+    for_cell("for-loop-conditional-reassign",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in {a}; do if true; then X={b}; fi; python3 "$G" --only S1 "$X"; done', never=not_a)
+    for_cell("for-loop-function-reassign",
+             lambda a, b, cl, c: f'{G_LINE}\nf() {{ X={b}; }}; for X in {a}; do f; python3 "$G" --only S1 "$X"; done', never=not_a)
+    # 허용 목록(F-458) — 평범한 몸체는 여전히 소유로 푼다(양성 대조: 허용 목록을 더 조이다 지원 꼴을 미상으로 떨어뜨리면 FAIL)
+    for_cell("for-loop-plain-body-owned",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in {a}; do echo x; python3 "$G" --only S1 "$X"; done', owned="a")
+    # GPT check 후속 2 — `~` 는 셸이 전개한다 · `then .` 접두 source 도 루프 변수를 바꾼다
+    for_cell("for-loop-tilde-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in ~/A-own/gates/plan.md; do python3 "$G" --only S1 "$X"; done', unknown=True)
+    for_cell("for-loop-then-source",
+             lambda a, b, cl, c: f"{G_LINE}\nprintf 'X=%s\\n' {b} > {c.cwd}/x.env; for X in {a}; do if true; then . {c.cwd}/x.env; fi; "
+                                 f'python3 "$G" --only S1 "$X"; done', never=not_a)
+    # GPT check 후속 3 — 허용 목록은 `cd` 접두(명령 밖 변수)를 붙인 최종 경로에 걸고, IFS 를 바꾼 명령의 루프는 미상이다
+    for_cell("for-loop-cd-inherited-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\ncd "$WORK"; for X in A-own/gates/plan.md; do python3 "$G" --only S1 "$X"; done', unknown=True)
+    for_cell("for-loop-ifs-unknown",
+             lambda a, b, cl, c: f'{G_LINE}\nIFS=:; LIST={a}:{b}; for X in $LIST; do python3 "$G" --only S1 "$X"; done', unknown=True)
+    # GPT check 후속 4 — 루프 변수가 옵션 자리 · `${X:+…}` 대체 값 · source 한 파일의 IFS. 셸이 쓴 원장(A · B)을 남의 것으로 보지 않는다
+    for_cell("for-loop-option-var",
+             lambda a, b, cl, c: f'{G_LINE}\nfor OPT in --reverify; do python3 "$G" "$OPT" {a}; done',
+             never=lambda a, b, cl, r, err: "대상 미상 쓰기" in err or f"미충족 게이트: {a} — " in r)
+    for_cell("for-loop-alt-expansion",
+             lambda a, b, cl, c: f'{G_LINE}\nfor X in {a}; do python3 "$G" --only S1 "${{X:+{b}}}"; done', never=not_a)
+    # 확장 뒤 인자 가르기 — 변수로 들어온 옵션은 옵션 자리에서 읽히고 원장 A 를 소유로 푼다(양성)
+    for_cell("var-option-owned", lambda a, b, cl, c: f'{G_LINE}\nO=--only; python3 "$G" "$O" S1 {a}', owned="a")
+    # GPT check 후속 5 — 몸체가 다른 변수 · 작업 폴더를 바꾸면 반복마다 원장이 다르다(셸은 A · B 둘 다 쓴다)
+    both = lambda a, b, cl, r, err: "대상 미상 쓰기" in err or (f"미충족 게이트: {a} — " in r and f"미충족 게이트: {b} — " in r)  # noqa: E731
+    top = lambda p: str(p).rsplit("/gates/", 1)[0]  # noqa: E731
+    for_cell("for-loop-stateful-var",
+             lambda a, b, cl, c: f'{G_LINE}\nD={top(a)}; for X in gates/plan.md gates/plan.md; do python3 "$G" --only S1 "$D/$X"; D={top(b)}; done',
+             never=both)
+    for_cell("for-loop-stateful-cd",
+             lambda a, b, cl, c: f'{G_LINE}\ncd {top(a)}; for X in gates/plan.md gates/plan.md; do python3 "$G" --only S1 "$X"; cd {top(b)}; done',
+             never=both)
+    for_cell("for-loop-sourced-ifs-unknown",
+             lambda a, b, cl, c: f"{G_LINE}\nprintf '%s=:\\nLIST=%s:%s\\n' I''FS {a} {b} > {c.cwd}/i.env; . {c.cwd}/i.env; "
+                                 f'for X in $LIST; do python3 "$G" --only S1 "$X"; done', unknown=True)
 
     # ── loop — 루프 방어 불변 ───────────────────────────────────────────────────────────
     with Cell("loop-guard") as c:

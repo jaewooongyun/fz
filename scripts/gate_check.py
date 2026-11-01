@@ -141,7 +141,13 @@ KNOWN_ATTRS = {
     #    "게이트가 깨졌다" 고 오귀속**한다 — 실제로는 판정 자체가 불가능했던 것이다.
     #    같은 오귀속이 `fz-findings F-288`(도구 부재를 문법 오류로 인쇄)에 기록돼 있다.
     "TOOLS",
+    # ⛔ `ENV:` — 이 CHECK 가 요구하는 환경 변수 (쉼표 구분). 없거나 비면 **미판정**이다(F-342) — `TOOLS:` 와 같은 자리 · 같은 처리.
+    #    `${NAME:?}` 로 막아 둔 CHECK 를 변수 없이 다시 돌리면 셸이 exit 127(dash 2)을 내고 그것을 FAIL 로 기록해
+    #    통과 증거를 강등했다. CHECK 본문에서 추론하지 않는다(빈 값 · 대입 순서 · 리터럴이 추론을 틀리게 한다).
+    #    승인 해시 밖이다(TOOLS 와 같다 — 환경은 승인 대상이 아니다). 하향 설치 전에는 이 줄을 지운다(modules/gates.md)
+    "ENV",
 }
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
 
 class Gate:
@@ -178,7 +184,7 @@ class Gate:
             raise LedgerError(f"{self.id}: CHECK/EXPECT 도 MANUAL 도 없다")
         if has_check and self.is_manual:
             raise LedgerError(f"{self.id}: CHECK 와 MANUAL 을 함께 쓸 수 없다")
-        for key in ("CHECK", "EXPECT", "MANUAL", "TOOLS"):
+        for key in ("CHECK", "EXPECT", "MANUAL", "TOOLS", "ENV"):
             if key in self.attrs and not self.attrs[key].strip():
                 raise LedgerError(f"{self.id}: {key} 값이 비었다")
         # ⛔ **선언인데 발화하지 않는 형태를 막는다.** 수동 게이트는 셸 명령을 돌리지
@@ -187,6 +193,12 @@ class Gate:
         #    (검사 코드가 있어도 발급처가 없어 한 번도 발화하지 않은 `CRITERION`).
         if "TOOLS" in self.attrs and not has_check:
             raise LedgerError(f"{self.id}: TOOLS 는 CHECK 가 있어야 의미가 있다 — 수동 게이트는 명령을 돌리지 않는다")
+        if "ENV" in self.attrs:
+            if not has_check:
+                raise LedgerError(f"{self.id}: ENV 는 CHECK 가 있어야 의미가 있다 — 수동 게이트는 명령을 돌리지 않는다")
+            bad = [t for t in (x.strip() for x in self.attrs["ENV"].split(",")) if not ENV_NAME.match(t)]
+            if bad:
+                raise LedgerError(f"{self.id}: ENV 항목이 환경 변수 이름이 아니다 — {bad[0]!r}")
         expect = self.attrs.get("EXPECT", "")
         # EXPECT 는 부분 문자열 매칭이다 (Python re 에 타임아웃이 없어 백트래킹을 막을 수 없다).
         # 저자가 정규식으로 착각하면 게이트가 영영 매칭되지 않으므로 알려야 한다.
@@ -601,6 +613,27 @@ def _drain(stream, sink: bytearray, lock: threading.Lock, state: dict) -> None:
     except (OSError, ValueError):
         pass
 
+
+
+def missing_env(gate) -> list:
+    """`ENV:` 로 선언된 환경 변수 중 없거나 빈 것(F-342). 선언이 없으면 빈 목록 — 선언한 게이트에만 발화한다."""
+    decl = gate.attrs.get("ENV", "").strip()
+    if not decl:
+        return []
+    return [t for t in (x.strip() for x in decl.split(",")) if t and not os.environ.get(t)]
+
+
+def tool_drift(gate, ledger, state=None) -> list:
+    """기록 판정은 met 인데 선언 도구가 지금 없는 것 — '환경 드리프트'(F-291). `--status` · `--discover` 가 같은 함수를 쓴다.
+
+    ⛔ 원장은 쓰지 않는다 — 강등하면 로컬 셸의 판정 한 번이 다른 환경(CI)에서 얻은 증거를 지운다(F-291 '범위').
+    ⛔ `ENV:` 는 보지 않는다 — Stop 훅은 세션 안 `export` 를 물려받지 않아 상시 드리프트가 된다.
+    """
+    if not gate.is_runnable or not gate.attrs.get("TOOLS", "").strip():
+        return []
+    if (state if state is not None else gate_state(gate, ledger)) != "met":
+        return []
+    return missing_tools(gate)
 
 
 def missing_tools(gate) -> list:
@@ -1032,6 +1065,11 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
             continue
 
         if mode == "status" or not gate.is_runnable:
+            drift = tool_drift(gate, ledger, state) if mode == "status" else []
+            if drift:
+                unmet.append(gate)
+                print(f"  DRIFT {gate.id}: 도구 부재 — {', '.join(drift)} (환경 드리프트 · 기록 판정은 met · 원장 무변경)")
+                continue
             (met if state == "met" else unmet).append(gate)
             if state != "met":
                 print(f"  UNMET {gate.id}: {gate.title}")
@@ -1074,6 +1112,12 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
         if gone:
             unmet.append(gate)
             print(f"  UNRUN {gate.id}: 필요 도구 부재 — {', '.join(gone)} (⛔ 실패 아님, 미판정)")
+            continue
+        # 환경 변수 부재도 같은 자리 · 같은 처리다(F-342) — CHECK 를 돌리지 않고 원장을 건드리지 않는다
+        gone = missing_env(gate)
+        if gone:
+            unmet.append(gate)
+            print(f"  UNRUN {gate.id}: 필요 환경 변수 부재 — {', '.join(gone)} (⛔ 실패 아님, 미판정)")
             continue
 
         baseline = gate_block_hash(load(ledger.path), gate.id)
@@ -1396,6 +1440,23 @@ def self_test() -> int:
 TOOL_NAME = re.compile(r"[A-Za-z0-9._+-]+\Z")
 
 
+def env_of(verify: dict, gid: str) -> list:
+    """VerifySpec 의 `env` 를 정규화한다 — 리스트 또는 쉼표 구분 문자열 · 환경 변수 이름 화이트리스트(tools_of 와 같은 이유)."""
+    raw = verify.get("env")
+    if raw in (None, "", []):
+        return []
+    items = raw if isinstance(raw, list) else str(raw).split(",")
+    out = []
+    for it in items:
+        tok = str(it).strip()
+        if not tok:
+            continue
+        if not ENV_NAME.match(tok):
+            raise InfraError(f"{gid}: verify.env 항목이 환경 변수 이름이 아니다 — {tok!r}")
+        out.append(tok)
+    return out
+
+
 def tools_of(verify: dict, gid: str) -> list:
     """VerifySpec 의 `tools` 를 정규화한다 — 리스트 또는 쉼표 구분 문자열.
 
@@ -1484,6 +1545,9 @@ def render_ledger(steps, root: str, scope: str, title: str) -> str:
             decl = tools_of(verify, gid)
             if decl:
                 lines.append(f"  TOOLS: {', '.join(decl)}")
+            envs = env_of(verify, gid)
+            if envs:
+                lines.append(f"  ENV: {', '.join(envs)}")
         else:
             lines.append(f"  MANUAL: {criterion}")
             lines.append(f"  CRITERION_HASH: {sha(criterion)}")
@@ -1962,7 +2026,16 @@ def discover(root_dir: str) -> int:
             planned_n += 1
             print(f"  착수 전 {path}")
             continue
-        bad = [g.id for g in led.gates if gate_state(g, led) == "unmet"]
+        bad, drifted = [], []
+        for g in led.gates:
+            st = gate_state(g, led)
+            if st == "unmet":
+                bad.append(g.id)
+            elif tool_drift(g, led, st):
+                bad.append(g.id)
+                drifted.append(g.id)                # 기록은 met 인데 선언 도구가 없다(F-291) — --status 와 같은 판정
+        if drifted:
+            print(f"  드리프트 {path} — {drifted}")
         if bad:
             unmet_n += 1
             print(f"  미충족 {path} — {bad}")
