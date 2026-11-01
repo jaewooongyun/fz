@@ -109,7 +109,7 @@ Lead: Read(modules/review-structural-axes.md) → §3 축 + §4 경계 문구를
 
 > *"버그·회귀·크래시는 다른 리뷰어가 담당한다. 너는 '이 코드가 취할 수 있는 더 나은 구조'만 본다. 동작은 맞다 — 그런데 이 형태가 최선인가?"*
 
-근거: A/B B군이 이 문장과 함께 severity `minor 7 / suggestion 3 / major 0`을 냈다. **결함 판정을 하지 않았다.** 이 문장을 빼면 구조 렌즈가 결함도 판정하려 하고, 결함 렌즈와 중복·충돌한다.
+> 옮긴 설명: `docs/rationale/review-structural-axes.rationale.md` § 4. 경계 문구 (필수)
 
 ## 5. ablation 기록
 

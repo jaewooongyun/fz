@@ -97,7 +97,7 @@
 
 ## OBS-08 회고 후보 (P2, 관측 #1)
 
-> 출처: 내부 회고 기록 (20 catches) + 개선 분석 (분류)
+> 옮긴 설명: `docs/rationale/promotion-ledger.rationale.md` § OBS-08 회고 후보 (P2, 관측 #1)
 > Eligible session 확인: OBS-08 = fz-plan Phase 0.5~3 (plan v1~v5) + fz-gpt verify 2건 → 기준 (a)+(b) 충족 [verified: plan/codex-verify-output.md, codex-verify-v3-output.md 존재]
 > ⛔ **승격 차단**: 2026-06-01 세션 GPT 한도 초과 → P2→P1 조건의 "GPT verify → approved" 미충족. 관측 #1 등록까지만. cross-model 검증 PENDING.
 >
@@ -166,7 +166,7 @@
 
 ## OBS-11 회고 후보 (이력 v3 마이그레이션, 관측 #1)
 
-> 출처: 내부 마이그레이션 회고 (실수 10건 + G1~G8) + 계획 문서
+> 옮긴 설명: `docs/rationale/promotion-ledger.rationale.md` § OBS-11 회고 후보 (이력 v3 마이그레이션, 관측 #1)
 > ⛔ **회고 자체 오류 정정**: 회고 §6/§9 "evidence ≥ 3 sessions"는 오류 — Track A 활성 임계 = **5 sessions** [verified: promotion-ledger.md 트랙 A 정의 + memory-guide.md:45]. ≥3은 별도 모듈 분리 자격이지 active 임계 아님. (P-track P2→P1=1 / P1→P0=2는 별도 — ledger:33-45.)
 > **카운트 기준** (본 세션 채택): Track A friction 신호 = memory-guide:47 "별개 세션 관측" (L-1 #2 선례 ledger:91). Eligible (a)+(b)는 P-track 승격 전용으로 구분.
 > **dedup**: 회고 G6→기존 L-3(표면 churn), G8→기존 L-2(helper reuse). 신규 = G1·G2·G3·G4·G5 → L-6~L-10. G7(툴링 문서)은 friction 신호 아님 → ledger 미등록.
