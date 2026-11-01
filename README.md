@@ -150,9 +150,9 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 ---
 
-## What's New — v4.48.0
+## What's New — v4.49.0
 
-**무거운 경로 앞에서 light · full 을 묻고, Workflow 워커는 Lead 의 effort 로 돈다.** 스킬을 직접 부르면 코드가 조금만 커도 Workflow(full)로 돌아 리뷰가 40~50분, 플랜이 20분 넘게 걸렸다. 이제 fz-review · fz-peer-review · fz-plan · fz-code · fz-fix · fz-discover 가 Workflow 직전에 작업 크기로 light · full 을 추천하고 사용자가 고른다(`light` · `full` 인자를 주면 묻지 않는다).
-GPT 교차 검증은 두 모드에 똑같이 붙고 모델 질문에서 `off` 로 끌 수 있다. Workflow 워커는 콜마다 고정된 `xhigh` 대신 Lead 세션의 effort 로 돈다.
-→ [릴리즈 노트](docs/releases/v4.48.0.md)
+**차단 목록으로 지은 근사기는 리뷰마다 새 구멍이 났다 — Stop 훅 소유 판정을 허용 목록으로 바꿨다.** `for` 루프 · `~` · 공백 경로로 넘긴 원장을 풀고, 모르는 셸 꼴은 '대상 미상' 으로 막는다(fail-closed).
+원장 `ENV:` 선언(없으면 UNRUN · 승인 해시 안) · 통과 뒤 도구 부재를 `--status` 도 미충족으로 · 엔트리 본문의 작성 명령 잔재를 위생 검사가 센다.
+→ [릴리즈 노트](docs/releases/v4.49.0.md)
 
