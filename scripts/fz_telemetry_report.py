@@ -500,6 +500,7 @@ def collect_findings(findings_dir, since, until):
         "n": 0,
         "total_files": 0,
         "skipped_no_frontmatter": 0,
+        "unreadable": [],        # 읽기 실패 — frontmatter 없음과 섞지 않는다(미측정)
         "by_month": collections.Counter(),
         "detector": collections.Counter(),
         "stage": collections.Counter(),
@@ -527,7 +528,11 @@ def collect_findings(findings_dir, since, until):
     for name in names:
         path = os.path.join(findings_dir, name)
         out["total_files"] += 1
-        meta = _read_frontmatter(path)
+        try:
+            meta = _parse_frontmatter(open(path, encoding="utf-8", errors="replace").read().splitlines(keepends=True))
+        except OSError as e:
+            out["unreadable"].append("%s %s" % (name, type(e).__name__))
+            continue
         if meta is None:
             # ⛔ 읽지 못한 파일을 세지 않으면 분모가 조용히 줄어든다.
             out["skipped_no_frontmatter"] += 1
@@ -656,7 +661,7 @@ def _collect_outflow(root, since, until):
     도구 대 그 밖의 배출 비율은 archive 에 axis 가 있는 엔트리로만 낸다 — axis 없는 옛 배출본은 `-` 로 남긴다.
     """
     out = {"archived": 0, "axis": collections.Counter(), "kind": collections.Counter(),
-           "kind_in_window": collections.Counter(), "undated_rows": 0, "error": None}
+           "kind_in_window": collections.Counter(), "undated_rows": 0, "error": None, "unreadable": []}
     if root is None:
         out["error"] = "미측정 (entries 열거 실패 · 미설정)"
         return out
@@ -668,8 +673,13 @@ def _collect_outflow(root, since, until):
             out["error"] = "archive %s: %s" % (type(e).__name__, e)
             names = []
         for name in names:
-            meta = _read_frontmatter(os.path.join(arc, name)) or {}
             out["archived"] += 1
+            try:
+                meta = _parse_frontmatter(open(os.path.join(arc, name), encoding="utf-8", errors="replace")
+                                          .read().splitlines(keepends=True)) or {}
+            except OSError as e:
+                out["unreadable"].append("archive %s %s" % (name, type(e).__name__))   # axis 를 '-' 로 지어내지 않는다
+                continue
             out["axis"][str(meta.get("axis") or "-")] += 1
     applied = os.path.join(root, "APPLIED.md")
     try:
@@ -895,6 +905,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
             "n": findings["n"],
             "total_files": findings["total_files"],
             "skipped_no_frontmatter": findings["skipped_no_frontmatter"],
+            "unreadable": findings["unreadable"],
             "by_month": dict(findings["by_month"]),
             "detector": dict(findings["detector"]),
             "stage": dict(findings["stage"]),
@@ -924,7 +935,7 @@ def render_markdown(payload):
     lines.append("")
     lines.append(
         "집계 대상: 트랜스크립트 %d파일(메시지 있는 파일 %d) · assistant 메시지 %d건 · "
-        "워크플로 journal %d실행 · findings %d/%d건 (frontmatter 없음 %d)."
+        "워크플로 journal %d실행 · findings %d/%d건 (frontmatter 없음 %d · 읽기 실패 %d)."
         % (
             payload["denominators"]["transcript_files"],
             payload["denominators"]["transcript_files_with_messages"],
@@ -933,6 +944,7 @@ def render_markdown(payload):
             payload["denominators"]["findings"],
             payload["findings"]["total_files"],
             payload["findings"]["skipped_no_frontmatter"],
+            len(payload["findings"]["unreadable"]),
         )
     )
     lines.append(
@@ -1049,6 +1061,9 @@ def render_markdown(payload):
     lines.append("")
     if findings.get("enumeration_error"):
         lines.append("> ⛔ entries 열거 실패 — 아래 수치는 0 이 아니라 **미측정**이다: %s" % findings["enumeration_error"])
+    unread = findings["unreadable"] + findings["outflow"].get("unreadable", [])
+    if unread:
+        lines.append("> ⛔ 엔트리 읽기 실패 %d — 그 엔트리는 아래 분포에 없다(미측정): %s" % (len(unread), " · ".join(unread[:8])))
         lines.append("")
     backlog, outflow = findings["backlog"], findings["outflow"]
     age = backlog["age"]
@@ -1362,6 +1377,18 @@ def self_test():
     check("미매치 형태 1종", list(unknown), [("yyy", "zzz")])
     findings = collect_findings(findings_dir, since, until)
     check("findings 2건", findings["n"], 2)
+    if os.geteuid() != 0:                  # root 는 권한 0 파일도 읽는다
+        locked = os.path.join(findings_dir, "F-004-locked.md")
+        with open(locked, "w") as handle:
+            handle.write("---\nid: F-004\ndate: 2026-08-01\n---\n")
+        os.chmod(locked, 0)
+        try:
+            locked_run = collect_findings(findings_dir, since, until)
+        finally:
+            os.chmod(locked, 0o644)
+            os.remove(locked)
+        check("읽기 실패 = 미측정(frontmatter 없음과 섞지 않는다)",
+              (len(locked_run["unreadable"]), locked_run["skipped_no_frontmatter"]), (1, findings["skipped_no_frontmatter"]))
     check("detector user", findings["detector"]["user"], 1)
     check("detector 첫 토큰만", findings["detector"]["gpt"], 1)
     check("stage 리스트 분해", findings["stage"]["discover"], 1)
