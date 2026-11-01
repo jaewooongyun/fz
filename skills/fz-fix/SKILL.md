@@ -94,7 +94,7 @@ metadata:
 
 | Mode/상황 | sc: 명령어 | 용도 |
 |----------|-----------|------|
-| 버그 수정 | `/sc:sc-troubleshoot` | 에러 원인 자동 진단 |
+| 버그 수정 | `/sc:sc-troubleshoot` | 에러 원인 진단(선택) |
 | 복잡한 에러 | `/sc:sc-explain` | 프레임워크/라이브러리 깊은 에러 교육적 설명 |
 | 수정 후 | `/sc:sc-analyze` | 수정 코드 빠른 품질 체크 |
 | 복잡한 수정 후 | `/sc:sc-reflect --type task` | 근본 원인 해결 여부 자체 검증 |
@@ -158,7 +158,7 @@ metadata:
 
 1. **구조적 추론** (복잡한 버그):
    - `mcp__sequential-thinking__sequentialthinking` → 5 Whys 기법
-   - `/sc:sc-troubleshoot` → 자동 진단
+   - `/sc:sc-troubleshoot` → 진단(선택)
    - `/sc:sc-explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명
 2. **⛔ Step 1c 완료 전 코드 수정 금지**. root-cause가 불명확하면 AskUserQuestion.
 

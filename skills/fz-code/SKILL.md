@@ -85,12 +85,12 @@ metadata:
 
 ## sc: 활용 (SuperClaude 연계)
 
-| 조건 | sc: 명령어 | 자동/수동 |
+| 조건 | sc: 명령어 | 쓰는 방식 |
 |------|-----------|----------|
-| 빌드 **2회 연속** 실패 | `/sc:sc-troubleshoot --fix` | **자동** |
+| 빌드 **2회 연속** 실패 | `/sc:sc-troubleshoot --fix` | 선택 |
 | 5+ 파일 변경한 Step | `/sc:sc-analyze --focus quality` | **자동 제안** |
-| SOLO + 3+ 파일 변경 | `/sc:sc-reflect --type correctness` | **자동** |
-| 3+ Step 구현 중간점 | `/sc:sc-reflect --type task` | **필수** |
+| SOLO + 3+ 파일 변경 | `/sc:sc-reflect --type correctness` | 선택 |
+| 3+ Step 구현 중간점 | `/sc:sc-reflect --type task` | 선택 |
 | 복잡한 다중 파일 구현 | `/sc:sc-implement` | 수동 |
 | API 불확실 | Context7 + `/sc:sc-explain` | 수동 |
 

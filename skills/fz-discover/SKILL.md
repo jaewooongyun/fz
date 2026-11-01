@@ -65,7 +65,6 @@ metadata:
 |-------|-----------|------|
 | Phase 1 | `/sc:sc-analyze` | 기존 코드/아키텍처 분석으로 암묵적 제약 사전 식별 |
 | Phase 2 | `/sc:sc-brainstorm` | 후보 옵션 발산이 필요할 때 |
-| Phase 2 | `/sc:sc-business-panel` | UX/전략 관점 분석 (`--business` 시) |
 | Phase 2 | `/sc:sc-explain` | 기존 패턴/규칙의 교육적 설명 |
 | Phase 2 | L3 `deep-research-agent` | 외부 기술/라이브러리 조사 (modules/native-agents.md) |
 | Phase 3 | `/sc:sc-reflect` | 수렴된 결과 자체 검증 |
