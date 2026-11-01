@@ -4,29 +4,30 @@
 
 ## 발동 조건
 
-| 조건 | Sprint Contract |
-|------|:-------------:|
-| TEAM 모드 + 코드/계획 생산 작업 | **권장** |
-| 5+ Step Plan + Cross-skill 변경 | **필수** |
-| 단순 수정 (1-2 Step) | 스킵 |
-| 탐색만 / 문서만 변경 | 스킵 |
+**발동 = full 모드 AND (잠정 플랜이 5+ Step OR 둘 이상의 스킬 · 모듈 계열에 걸침 — Cross-skill 변경)**. 그 밖(light · 단순 수정 · 탐색만 · 문서만)은 미발동이다. 조건은 이것 하나이고 이 절이 정본이다 — fz-plan Phase 0.7 · `modules/gpt-strategy.md` § 단계 실행 판정(정책 표의 "이 표 밖" 행)이 여기를 가리킨다.
 
-## 절차 (fz-plan Phase 0.7)
+- 판정 시점 · 입력: 아래 § 절차 ④ 직전에, Phase 1 을 마친 **잠정 플랜**(fz-plan 실행 절차 4 · 4.5 · 5 · Gate 1 · 1.5 뒤)의 `steps` · `writeScope` 로 센다 — Step 수는 Workflow 가 돌아온 뒤에야 안다
+- 이 조건은 단계가 **있는지**를 정하고 GPT 를 부를지는 정하지 않는다(입력인 Workflow 잠정 플랜이 full 에만 있다 — `modules/gpt-strategy.md` § 단계 실행 판정의 '모드로 GPT 단계를 돌리거나 건너뛰지 않는다' 와 부딪치지 않는다). GPT 실행은 직전 `gpt-choice.sh decide` 줄만 정한다 — `run`·`config` 면 ④ · `skip` 이면 `[GPT 미사용 — 사유]` 를 남기고 Contract 없이 fz-plan Phase 2 로 · `ask` 면 질문 → `set` → 다시 decide
+- light 에는 이 단계가 없다 — 입력인 Workflow 잠정 플랜이 없다
 
-> 위치: Phase 0.5 (Direction Challenge) 이후, Phase 1 (Deep Planning) 이전.
+## 절차 (fz-plan Phase 0.7 — 실행 절차 5.5 · 5.7)
 
-1. **Lead 컨텍스트 전달**: Phase 0.5 verdict (PROCEED/RECONSIDER) + discover 산출물 + 요구사항 → GPT (`/fz-gpt` plan 또는 verify pre-mode)
+> 위치: ① GPT 독립 플랜(켰을 때) ∥ Workflow → ② 잠정 플랜 · 방향 정지(RECONSIDER/REDIRECT · `degraded` 면 fz-plan 실행 절차 4 대로 멈춘다) → ③ 합치기 → Lead 의 Phase 1 몫(Gate 1 · 1.5) **뒤**, ⑥ Phase 2 verify ∥ verify-gates **앞**. 계획 단계의 첫 GPT 호출은 ① 이고 Contract 는 그 뒤의 호출이다. "Phase 0.7" 은 이력상 이름으로 남은 번호다.
+
+④ **Sprint Contract** (발동 시 · 직전 decide — fz-plan 실행 절차 5.5):
+
+1. **입력**: 잠정 플랜(Phase 1 을 마친 plan-v{N} — `steps` · `acceptanceCriteria` · `writeScope`) + `directionVerdict`(② 를 통과한 방향 판정) + 요구사항 원문 (+ discover 산출물 있으면) → GPT
 
 2. **GPT Sprint Contract 작성** (kind `sprint-contract` — `scripts/gpt-call.sh sprint-contract` · architect 본문 주입):
    - 출력: `{WORK_DIR}/plan/sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`
    - 형식: 아래 schema 참조
 
 3. **Claude 동의/수정** (Lead):
-   - **agree** → Phase 1 진입
-   - **modify** → Sprint Contract 수정안 작성 + GPT re-verify 1회 (한도)
-   - **reject** → Phase 0.5 재진입 (RECONSIDER 다시) 또는 사용자 에스컬레이션
+   - **agree** → ⑤
+   - **modify** → Sprint Contract 수정안 작성 + GPT re-verify 1회 (한도) → ⑤
+   - **reject** → ② 로 돌아간다 — 거부 사유를 방향 정지 규칙(사용자 확인)에 실어 보고한다
 
-4. **Phase 1 진입**: 합의된 Sprint Contract가 Plan v1의 Success Criteria로 직접 import
+⑤ **반영 · 재생성** (fz-plan 실행 절차 5.7 — 이 규칙은 여기 한 곳에만 적는다): 합의본을 plan 의 Success Criteria 로 import 하고, 그 결과 기준 · 범위 · 금지 기준(`success_criteria` · `scope_boundary` · `anti_criteria`) 중 하나라도 잠정 플랜과 달라지면 plan-v{N+1} · RTM · draft 원장(고친 `{WORK_DIR}/plan/steps.json` → `gate_check.py --from-plan` → `{WORK_DIR}/gates/plan.draft.md`)을 같은 합의본에서 **다시 만든다**. ⑥ verify ∥ verify-gates 는 이 스냅샷을 읽는다(fz-plan Phase 2 3.1 은 다시 만든 원장을 덮어쓰지 않는다) — 옛 plan 에 대한 판정을 새 plan 의 승인 근거로 쓰지 않는다.
 
 ## Sprint Contract Schema
 
@@ -66,16 +67,16 @@ scope_boundary:
 
 | GPT Sprint Contract 평가 | Lead 결정 |
 |--------------------------|----------|
-| 모든 SC가 measurable + binary | **agree** → Phase 1 진입 |
+| 모든 SC가 measurable + binary | **agree** → ⑤ 반영 · 재생성 |
 | SC 1개+ ambiguous (e.g., "잘 작동") | **modify** → 측정 가능하게 재작성 |
 | anti_criteria 누락 (제거/리팩 작업인데) | **modify** → AC 추가 |
 | out_of_scope 너무 광범위 | **modify** → scope 명시 |
-| 의도 자체가 Phase 0.5 verdict와 불일치 | **reject** → Phase 0.5 재진입 |
+| 의도 자체가 `directionVerdict`(② 방향 판정)와 불일치 | **reject** → ② 재진입 (거부 사유로 사용자 확인) |
 
 ## 자기 적용 규칙 (T2-B 자체에도)
 
 본 modules/sprint-contract.md 작성 시점의 Sprint Contract:
-- SC-1: Phase 0.7 절차 4-step 명시 (measurable: 본 파일 §"절차" 섹션 존재)
+- SC-1: Phase 0.7 절차 ④ · ⑤ 명시 (measurable: 본 파일 §"절차" 섹션 존재)
 - SC-2: Schema yaml 형식 정의 (measurable: 본 파일 §"Schema" yaml block 존재)
 - SC-3: Lead Decision Matrix 4 row (measurable: 본 파일 §"Decision Matrix" 표 4 행)
 - AC-1: harness-engineering.md 패턴 B와 모순 (detection: 본 파일이 사후 검증 형식이면 fail)
@@ -88,6 +89,6 @@ scope_boundary:
 
 ## fz 통합
 
-- `fz-plan` Phase 0.7로 진입 (TEAM mode + 5+ Step or Cross-skill)
+- `fz-plan` Phase 0.7 = 실행 절차 5.5 · 5.7 (발동 조건은 위 § 발동 조건 한 곳)
 - GPT Sprint Contract 는 §절차 2 대로 kind `sprint-contract`(`scripts/gpt-call.sh sprint-contract` — architect)로 작성한다 — 형식은 `tests/fixtures/gpt/sprint-contract-format/run.sh` 가 본다
 - `experiment-log.md §5.5`에 sprint_contract 메타 기록 (Reflection Rate 측정의 baseline)

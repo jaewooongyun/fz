@@ -35,7 +35,7 @@ metadata:
 
 ## 개요
 
-> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 0b (Context) → Phase 0c (Constraint Probe Pre-flight) → Phase 0.5 (Direction Challenge) → Phase 0.7 (Sprint Contract, TEAM 5+ Step) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
+> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 0b (Context) → Phase 0c (Constraint Probe Pre-flight) → Phase 0.5 (Direction Challenge) → Phase 1 (Deep Planning) → Phase 0.7 (Sprint Contract — full · 발동 시 · 잠정 플랜 뒤) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
 
 요구사항 구조 분해 + 영향 범위 분석. Serena 심볼 도구 기반 정밀 탐색.
 
@@ -47,7 +47,7 @@ metadata:
 ## Prerequisites
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **GPT 단계마다 직전**(0.7 Sprint Contract · 2.7 독립 플랜 · Phase 2 verify ∥ verify-gates): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(켰을 때 · 계획 단계의 첫 GPT 호출) · 5.5 Sprint Contract(발동 시) · Phase 2 verify ∥ verify-gates): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다
 
 ## 모듈 참조
 
@@ -93,7 +93,7 @@ metadata:
 
 ### 실행 절차 (Lead)
 
-> ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 ~ 2.5)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 추가 탐색 · 문서 조회)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 플랜(2.7)은 백그라운드 한 줄이라 그대로 직전에 두고(S23), Phase 0.7 Sprint Contract 는 Workflow 입력이 될 수 있어 순서를 바꾸지 않는다. 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
+> ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 ~ 2.5)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 추가 탐색 · 문서 조회)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 플랜(2.7)은 백그라운드 한 줄이라 그대로 직전에 둔다(S23). Sprint Contract 는 Workflow 입력이 아니다(plan-lean2 args 에 자리가 없다) — Phase 1 을 마친 잠정 플랜 뒤에 돈다. 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다. **full 순서**: ① 2.7 ∥ 3 → ② 4 잠정 플랜 · 방향 정지 → ③ 4.5 합치기 → 5 · Gate 1 · 1.5(Lead 의 Phase 1 몫) → ④ 5.5 Sprint Contract → ⑤ 5.7 재생성 → ⑥ Phase 2 verify ∥ verify-gates
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/plan/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
 1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): readScope 를 `{WORK_DIR}/plan/read-scope.txt`(한 줄 1경로)로 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" plan --read-scope {그 파일} --new-arch yes|no --estimate plan-lean2` 로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 1 을 Lead 가 수행한 뒤 Phase 2·3·원장으로 간다(아래 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**) — ⛔ 정본은 `modules/project-rules.md` 다(절차 · 레코드 형식 · 검증기):
@@ -108,12 +108,12 @@ metadata:
    cp {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js && cmp -s {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js
    ```
    ⛔ 0단계가 비0 이면(경로 판정 불확정 포함) 복사본을 부르지 않는다 — **L4**(원본 경로 직접 호출·SOLO 로 낮추지 않는다). ⛔ 복사본은 산출물이 아니다 — 매 호출 덮어써서 stale 이 남지 않는다(§12).
-2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Sprint Contract 합의 직후 · Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-plan --requirement {요구 원문} [--sprint-contract {합의본}] [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
+2.7. **(`--gpt-independent` · 기본 off) GPT 독립 플랜 — Workflow 와 함께 띄운다(계획 단계의 첫 GPT 호출)**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-plan --requirement {요구 원문} [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 두 팔은 입력이 다르고(GPT = 요구 원문 · 지침 원문 색인 · 대상 레포 / Claude = 2 의 args) 서로의 플랜을 보지 않는다 — Sprint Contract(5.5)는 이 뒤라 넘기지 않는다. 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - **Stage 1 (동시 3, opus)**: 전체 플랜(방향 판정·readScope/writeScope·steps·rtm·antiPattern 포함) ∥ edge 적대 렌즈 ∥ impact+arch 렌즈
      → **Stage 2 (opus)**: 델타 병합(탐색 도구 없는 `fz:plan-merge` — 입력 JSON 만 접는다) — ⛔ 병합 콜의 schema 는 **델타 전용**(`stepAmendments`·`addedEdgeCases`·`addedImpact`)이라 본문을 다시 쓸 수 없다. **4 call**
    - ⛔ 반환의 `delta` 는 plan 에 **자동 병합되지 않는다** — Lead 가 적용 판정을 한다(병합 콜이 본문을 못 쓰게 한 것과 같은 이유)
-4. **반환 처리**:
+4. **반환 처리** — 잠정 플랜: Workflow 결과는 잠정 플랜과 방향 · 완주 판정이다. `degraded`(아래 완주 보류 — L3 재개 → L4) 이거나 `directionEscalation`(RECONSIDER · REDIRECT — 아래 사용자 확인)이면 그 항목 절차대로 처리하고, 풀리기 전에는 4.5 · 5 로 넘어가지 않는다:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
    - ⛔ **`degraded: true` 면 완주가 아니다** (A3-01) — `missingLenses` 에 적힌 렌즈(edge·impactArch·merge)가 빠진 결과이고 `metrics.stagesCompleted` 도 그만큼 낮다. 이 반환으로 plan-v{N} 을 확정하거나 Gate 1 로 넘기지 않는다(**완주 보류**).
      → `guides/skill-authoring.md` §12 사다리 **L3** — 같은 세션이면 `Workflow({ scriptPath, resumeFromRunId })` 로 재개한다. 재개 뒤에도 `degraded` 면(죽은 렌즈의 null 이 캐시로 재생되면 같은 결과가 온다) **L4** — 빠진 렌즈 이름과 선택지(새 호출 재실행·범위 축소·중단)를 사용자에게 보고한다. ⛔ 빠진 렌즈를 Lead 가 SOLO 로 채우지 않는다(L4 승인 후에만)
@@ -130,7 +130,9 @@ metadata:
    - `mode:'fallback'` (두 배선 공통) → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`·`agent null` 에만 이 값을 돌려준다 —
      도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 experiment-log 기록
 4.5. **(`--gpt-independent`) 합치기**: 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_apply_delta.py" --result {WORK_DIR}/plan/workflow-result.json` 로 `delta` 를 반영하고 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {WORK_DIR}/plan/workflow-result.json --gpt {out-dir}/gpt-{run}.json` 차이표를 붙인다 — 런처 옆 파일이 오염 · 실패(planner 거부 포함)를 말하면 exit 1 로 거부한다. 차이표의 결정 항목은 사용자 보고 대상이다(판정은 Lead)
-5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Phase 0.7 Sprint Contract(GPT 회복 시) + GPT verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
+5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Sprint Contract(5.5 · 5.7 — 발동 시) + GPT verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체
+5.5. **Sprint Contract (Phase 0.7 · 발동 시)**: 4.5 합치기(켰을 때)와 Lead 의 Phase 1 몫(5 의 스트레스 테스트 · RTM · Gate 1 · 1.5)을 마친 잠정 플랜이 발동 조건(`modules/sprint-contract.md` § 발동 조건)을 채우면 `gpt-choice.sh decide` 를 부른다 — `run`·`config` 면 GPT(kind `sprint-contract`)가 잠정 플랜 + `directionVerdict` + 요구 원문(+ discover 산출물)으로 초안을 쓰고 Lead 가 agree · modify(GPT 재확인 1회) · reject(거부 사유를 들고 4 의 사용자 확인으로) 중 하나로 답한다 · `skip` 이면 `[GPT 미사용 — 사유]` 를 남기고 Phase 2 로 · `ask` 면 질문 → `set` → 다시 decide. 미발동이면 그대로 Phase 2 — 절차 정본 `modules/sprint-contract.md` ④
+5.7. **반영 · 재생성 (5.5 합의 뒤)**: `modules/sprint-contract.md` ⑤(재생성 규칙 정본 — 언제 다시 만드는지 포함)대로 합의본을 반영한다. 다시 만들 때 draft 원장은 Phase 2 3.1 명령(`gate_check.py --from-plan`)을 고친 `steps.json` 으로 여기서 돌리고, 3.1 은 그 원장을 덮어쓰지 않는다. Phase 2 verify ∥ verify-gates 는 이 스냅샷을 읽는다 · 5.5 가 돌지 않았으면 5.7 도 없다
 6. **지표 기록**: `return.metrics` + **자동 계측** → `experiment-log.md` §5.7 fz-plan 테이블
    ```bash
    python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --wf {runId 폴더명} --row      # §5.7 행 형식
@@ -220,28 +222,6 @@ metadata:
 
 ---
 
-## Phase 0.7: Sprint Contract (T2-B, TEAM mode)
-
-> 발동: **TEAM mode + (5+ Step Plan 또는 Cross-skill 변경)**. 단순 수정/탐색 스킵.
-
-GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude 동의/수정 → Phase 1 진입. 사후 수정 비용 감소.
-
-- 절차: `modules/sprint-contract.md` §절차 (4-step)
-- Schema: `modules/sprint-contract.md` §Schema (yaml: success_criteria + anti_criteria + scope_boundary)
-- Lead Decision: **agree** → Phase 1 / **modify** → GPT re-verify 1회 (한도) / **reject** → Phase 0.5 재진입
-
-### Gate 0.7: Sprint Contract Agreed
-
-- [ ] GPT Sprint Contract 작성 완료? (`sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`)
-- [ ] 모든 SC가 measurable + binary 판정 가능?
-- [ ] anti_criteria 명시? (제거/리팩토링 작업 시)
-- [ ] Lead 동의 (agree) 또는 modify 후 합의?
-- 미통과 시 → ⛔ Phase 1 작성 차단
-
-> Phase 0.7 출처: Anthropic Harness Engineering 패턴 B (2026-03) + Plan v3.1.3 §T2-B. 학술 근거: `modules/cross-validation.md` §이론 근거 (Generator≠Evaluator + MoA collaborativeness).
-
----
-
 ## Phase 1: Deep Planning
 
 > **프로젝트 규칙**: CLAUDE.md `## Architecture` 섹션을 따른다.
@@ -309,6 +289,28 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 
 ---
 
+## Phase 0.7: Sprint Contract (T2-B · 실행 절차 5.5 · 5.7)
+
+> 발동: `modules/sprint-contract.md` § 발동 조건(정본 — full 에서 Phase 1 을 마친 잠정 플랜으로 판정한다). 미발동(light 포함)이면 이 Phase 와 Gate 0.7 은 해당 없음 · 발동해도 직전 decide 가 `skip` 이면 `[GPT 미사용 — 사유]` 로 대신하고 Phase 2 로 간다.
+
+Phase 번호(0.7)는 이력상 이름이다 — 실행은 Phase 1 · 1.5 뒤 · Phase 2 앞이다(실행 절차 5.5 · 5.7). Gate 1 · 1.5 는 잠정 플랜(plan-v{N})을, Phase 2 는 합의본을 반영한 plan(다시 만들었으면 plan-v{N+1})을 판정한다. GPT 가 잠정 플랜 + `directionVerdict` 로 "성공 기준" Sprint Contract 작성 → Claude 동의/수정 → 합의본 반영 · 재생성(5.7) → Phase 2. 구현 전 기준 합의라 사후 수정 비용이 준다.
+
+- 절차: `modules/sprint-contract.md` §절차 (④ · ⑤)
+- Schema: `modules/sprint-contract.md` §Schema (yaml: success_criteria + anti_criteria + scope_boundary)
+- Lead Decision: **agree** → 5.7 / **modify** → GPT re-verify 1회 (한도) → 5.7 / **reject** → 실행 절차 4 의 사용자 확인으로 (거부 사유를 싣는다)
+
+### Gate 0.7: Sprint Contract Agreed
+
+- [ ] GPT Sprint Contract 작성 완료? (`sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`)
+- [ ] 모든 SC가 measurable + binary 판정 가능?
+- [ ] anti_criteria 명시? (제거/리팩토링 작업 시)
+- [ ] Lead 동의 (agree) 또는 modify 후 합의?
+- 미통과 시 → ⛔ 5.7 재생성 · Phase 2 진입 차단
+
+> Phase 0.7 출처: Anthropic Harness Engineering 패턴 B (2026-03) + Plan v3.1.3 §T2-B. 학술 근거: `modules/cross-validation.md` §이론 근거 (Generator≠Evaluator + MoA collaborativeness).
+
+---
+
 ## Phase 2: Plan Validation
 
 > **병렬 실행 계약** (⛔ `verify` 와 `verify-gates` 는 서로를 기다리지 않는다 — 실측: 순차 호출 시 고 tier 8~10분/회가 직렬로 누적된다):
@@ -327,7 +329,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 ```
 
 3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 — light · full 모두 — `modules/gates.md` 배선 1):
-   Phase 1 반환의 `steps[]`를 JSON으로 임시 기록한 뒤 변환한다. ⛔ **이 단계가 없으면 원장이 생기지 않아 배선 2·3이 전부 no-op이다.**
+   Phase 1 반환의 `steps[]`를 JSON으로 임시 기록한 뒤 변환한다 — 실행 절차 5.7 이 원장을 이미 다시 만들었으면 그 원장을 그대로 쓴다(반환 `steps[]` 로 덮어쓰지 않는다 — Phase 2 는 합의본 스냅샷을 읽는다). ⛔ **이 단계가 없으면 원장이 생기지 않아 배선 2·3이 전부 no-op이다.**
    ```bash
    python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" \
      --from-plan {WORK_DIR}/plan/steps.json --root {WORK_DIR} --out {WORK_DIR}/gates/plan.draft.md
@@ -445,7 +447,7 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 ### light 모드 (모드 게이트 — `modules/mode-gate.md`)
 
 진입: 실행 절차 1.2 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
-- plan-lean2 를 띄우지 않고 Phase 1 (Deep Planning)을 Lead 가 수행한다 — Phase 0.5 · 스트레스 테스트 Q1-Q6 · RTM 은 그대로(발동 조건대로). 새 아키텍처 결정이면 1.2 가 full 을 추천한다
+- plan-lean2 를 띄우지 않고 Phase 1 (Deep Planning)을 Lead 가 수행한다 — Phase 0.5 · 스트레스 테스트 Q1-Q6 · RTM 은 그대로(발동 조건대로) · Phase 0.7 Sprint Contract 는 열리지 않는다(발동 조건이 full — `modules/sprint-contract.md`). 새 아키텍처 결정이면 1.2 가 full 을 추천한다
 - Phase 2 (GPT verify ∥ verify-gates) · Phase 3 · 원장(3.1 · 4.5) · `plan-final.md` 는 full 과 같다 — GPT 단계도 같다(끈 세션이면 `[GPT 미사용]` · 원장 판정은 Gate 2 확인으로)
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
 

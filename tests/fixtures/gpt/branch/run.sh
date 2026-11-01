@@ -11,12 +11,19 @@
 #                             기록 CLI 호출 0 · 격리 폴더 미생성. GPT 홈 · 인증은 갖춰 둔다(다른 11 사유로 통과하지 않게)
 #   all-consumers-use-common  GPT kind 를 실제로 부르는 스킬(`gpt_kinds.py callers` 의 JSON — kinds-callers 와 같은 판독기)마다
 #                             decide 또는 § 단계 실행 판정을 가리킨다 · fz-fix 에 `--gpt` opt-in 이 없다 · gpt-strategy 에 정본 절이 있다
+#   contract-order            fz-plan full 순서(B2b · F-468) — skills/fz-plan/SKILL.md 에서 각 토큰이 처음 나오는 줄이 이 순서다:
+#                             독립 플랜 기동(`gpt-call.sh independent-plan`) < `Workflow({ scriptPath:` < 방향 · 완주 정지(RECONSIDER · degraded 한 줄)
+#                             < `plan_divergence.py` < Sprint Contract 단계(`directionVerdict` 한 줄) < 재생성(`--from-plan`) < Phase 2 절의 `verify-gates`
+#                             · 그리고 tests/fixtures/plan-wiring/parallel-arms 러너가 그대로 통과한다
+#   contract-regen            modules/sprint-contract.md 에 재생성 규칙 줄(`--from-plan` · plan-v · RTM · 원장)이 정확히 1개 · TEAM 발동 줄 0 ·
+#                             입력 줄이 잠정 플랜 + `directionVerdict` · fz-plan 의 Sprint Contract 단계 줄이 그 모듈을 가리키고 TEAM 기준 줄이 없다 ·
+#                             modules/cross-validation.md 의 방향성 검증 · 교훈 회상 · Sprint Contract 행에 TEAM 으로 시작하는 칸이 없다(그 표의 다른 행은 범위 밖)
 # ⛔ 한계(all-consumers-use-common): 스킬 단위다 — SKILL.md + references 어디든 decide · § 단계 실행 판정이 한 번만 있어도 통과한다.
 #    그래서 자리별 회귀(예: fz-review 5.5 의 decide 줄만 지움)와 modules/ 쪽 GPT 자리(peer-review-tiers.md Tier 1 등)는 잡지 못한다 —
 #    호출 줄마다의 근접 검사는 B2b 몫이다
 # ⛔ 실제 GPT CLI · 사용자 홈 · 사용자 선택을 건드리지 않는다 — PATH 에서 실제 CLI 가 든 폴더를 빼고 기록 CLI(../_shim/codex 로 위임)를
 #    앞에 붙인다. HOME · CODEX_HOME · FZ_GPT_CHOICE_DIR · FZ_TELEMETRY_DIR · TMPDIR 은 임시이고 FZ_AUTONOMY · 세션 id 는 명시한다.
-# ⛔ 음성 대조: 기준 트리(0e1353e — decide · 격리 폴더 자리 가드 · 공통 판정 배선이 없다)에 이 러너를 얹어 돌리면
+# ⛔ 음성 대조: 기준 트리(0e1353e — decide · 격리 폴더 자리 가드 · 공통 판정 배선 · Contract 순서가 없다)에 이 러너를 얹어 돌리면
 #    `gpt-branch: FAIL` · exit 1 이어야 한다(충돌 · exit 2 아님).
 # exit: 0=전건 통과(`gpt-branch: PASS`) · 1=실패 있음(`gpt-branch: FAIL`) · 2=준비 실패(UNRUN — PASS 아님)
 set -u
@@ -177,8 +184,135 @@ PY
   esac
 }
 
+# ── contract-order ─────────────────────────────────────────────────
+# fz-plan full 순서(B2b · F-468) — 자리마다 그 토큰이 처음 나오는 줄이다. verify-gates 만 Phase 2 절 머리 뒤에서 찾는다
+#   (Prerequisites 줄이 GPT 단계 목록으로 verify-gates 를 먼저 적는다). 이어서 parallel-arms 러너가 그대로 통과하는지 본다
+case_contract_order() {
+  local res rc arms="$ROOT/tests/fixtures/plan-wiring/parallel-arms/run.sh"
+  WHY=""
+  PYTHONDONTWRITEBYTECODE=1 python3 -B - "$ROOT/skills/fz-plan/SKILL.md" > "$T/order.out" 2> "$T/order.err" <<'PY'
+import sys
+
+try:
+    lines = open(sys.argv[1], encoding="utf-8").read().split("\n")
+except OSError as e:
+    print(f"FAIL skills/fz-plan/SKILL.md 를 읽지 못했다({type(e).__name__})")
+    sys.exit(0)
+
+
+def first(*tokens, start=1):
+    """tokens 가 모두 든 첫 줄 번호(1부터 · start 줄부터 찾는다) — 없으면 None"""
+    for i in range(start - 1, len(lines)):
+        if all(t in lines[i] for t in tokens):
+            return i + 1
+    return None
+
+
+p2 = first("## Phase 2: Plan Validation")
+marks = [
+    ("독립 플랜 기동", first("gpt-call.sh independent-plan")),
+    ("Workflow 호출", first("Workflow({ scriptPath:")),
+    ("방향 · 완주 정지", first("RECONSIDER", "degraded")),
+    ("합치기", first("plan_divergence.py")),
+    ("Sprint Contract", first("Sprint Contract", "directionVerdict")),
+    ("재생성", first("--from-plan")),
+    ("Phase 2 verify-gates", first("verify-gates", start=p2) if p2 else None),
+]
+why = [f"{name} 자리 없음" for name, at in marks if at is None]
+if not why:
+    why = [f"{n1}({a}) 가 {n2}({b}) 앞이 아니다" for (n1, a), (n2, b) in zip(marks, marks[1:]) if not a < b]
+print(("FAIL " + " · ".join(why)) if why else ("PASS " + " < ".join(f"{name}({at})" for name, at in marks)))
+PY
+  res="$(head -1 "$T/order.out" 2>/dev/null)"
+  case "$res" in
+    "PASS "*) ;;
+    "FAIL "*) add "${res#FAIL }" ;;
+    *) add "순서 판정기가 결과를 내지 못했다 — $(head -c 240 "$T/order.err" 2>/dev/null | tr '\n' ' ')" ;;
+  esac
+  if [ -f "$arms" ]; then
+    bash "$arms" < /dev/null > "$T/arms.out" 2>&1
+    rc=$?
+    [ "$rc" = 0 ] || add "parallel-arms 회귀(exit $rc) — $(grep -m1 '^FAIL' "$T/arms.out" 2>/dev/null | head -c 200)"
+  else
+    add "parallel-arms 러너가 없다(tests/fixtures/plan-wiring/parallel-arms/run.sh)"
+  fi
+  verdict contract-order "$WHY" "${res#PASS } · parallel-arms 통과"
+}
+
+# ── contract-regen ─────────────────────────────────────────────────
+# 재생성 규칙(⑤)은 modules/sprint-contract.md 한 곳 — 그 줄이 plan-v · RTM · 원장 · --from-plan 을 함께 말한다. TEAM 발동 줄은 없고
+#   입력 줄은 잠정 플랜 + directionVerdict 다. fz-plan 의 Sprint Contract 단계 줄(directionVerdict)은 그 모듈을 가리킨다.
+#   cross-validation.md 는 이 Step 이 다시 쓴 행(방향성 검증 · 교훈 회상 · Sprint Contract)만 본다
+case_contract_regen() {
+  local res
+  WHY=""
+  PYTHONDONTWRITEBYTECODE=1 python3 -B - "$ROOT" > "$T/regen.out" 2> "$T/regen.err" <<'PY'
+import os, re, sys
+
+root = sys.argv[1]
+why = []
+
+
+def read(rel):
+    try:
+        return open(os.path.join(root, rel), encoding="utf-8").read().split("\n")
+    except OSError as e:
+        why.append(f"{rel} 를 읽지 못했다({type(e).__name__})")
+        return []
+
+
+sc = read("modules/sprint-contract.md")
+plan = read("skills/fz-plan/SKILL.md")
+cv = read("modules/cross-validation.md")
+if sc:
+    regen = [ln for ln in sc if "--from-plan" in ln]
+    if len(regen) != 1:
+        why.append(f"sprint-contract.md 의 재생성 규칙(--from-plan) 줄이 {len(regen)}개다 — 한 곳이어야 한다")
+    elif not all(t in regen[0] for t in ("plan-v", "RTM", "원장")):
+        why.append("sprint-contract.md 의 재생성 줄이 plan · RTM · 원장을 함께 말하지 않는다")
+    team = [ln.strip() for ln in sc if "TEAM" in ln and (ln.lstrip().startswith("|") or re.search(r"발동|모드|mode|Step", ln))]
+    if team:
+        why.append("sprint-contract.md 에 TEAM 발동 줄이 남았다: " + team[0][:60])
+    if not any("directionVerdict" in ln and "잠정 플랜" in ln for ln in sc):
+        why.append("sprint-contract.md 입력 줄이 잠정 플랜 + directionVerdict 를 말하지 않는다")
+if plan:
+    step = next((ln for ln in plan if "Sprint Contract" in ln and "directionVerdict" in ln), "")
+    if not step:
+        why.append("fz-plan 에 Sprint Contract 단계(directionVerdict) 줄이 없다")
+    elif "modules/sprint-contract.md" not in step:
+        why.append("fz-plan 의 Sprint Contract 단계 줄이 modules/sprint-contract.md 를 가리키지 않는다")
+    old = [ln.strip() for ln in plan if "Sprint Contract" in ln and "TEAM" in ln]
+    if old:
+        why.append("fz-plan 에 TEAM 기준 Sprint Contract 줄이 남았다: " + old[0][:60])
+if cv:
+    # 이 Step 이 다시 쓴 행만 본다 — 같은 표의 다른 TEAM 칸(review · search · code)은 범위 밖이다
+    kinds = ("방향성 검증", "교훈 회상", "Sprint Contract")
+    rows = [ln.strip() for ln in cv if ln.lstrip().startswith("|") and any(k in ln for k in kinds)]
+    miss = [k for k in kinds if not any(k in row for row in rows)]
+    if miss:
+        why.append("cross-validation.md 표에 행이 없다: " + ", ".join(miss))
+    lead = re.compile(r"(모든\s+)?TEAM")
+    bad = [row for row in rows if any(lead.match(c.strip()) for c in row.strip("|").split("|"))]
+    if bad:
+        why.append("cross-validation.md 행에 TEAM 으로 시작하는 칸이 남았다: " + bad[0][:60])
+if why:
+    print("FAIL " + " · ".join(why))
+else:
+    msg = ["sprint-contract.md 재생성 규칙 1곳(plan-v · RTM · 원장 · --from-plan)", "TEAM 발동 줄 0",
+           "입력 = 잠정 플랜 + directionVerdict", "fz-plan Sprint Contract 단계가 그 모듈을 가리킨다",
+           "cross-validation 방향 · 회상 · Contract 행에 TEAM 칸 0"]
+    print("PASS " + " · ".join(msg))
+PY
+  res="$(head -1 "$T/regen.out" 2>/dev/null)"
+  case "$res" in
+    "PASS "*) verdict contract-regen "" "${res#PASS }" ;;
+    "FAIL "*) verdict contract-regen "${res#FAIL }" "" ;;
+    *) verdict contract-regen "판정기가 결과를 내지 못했다 — $(head -c 240 "$T/regen.err" 2>/dev/null | tr '\n' ' ')" "" ;;
+  esac
+}
+
 # ── 실행 — 케이스는 CASES 의 순서대로 돈다(B2b 는 이 배열에 함수를 더한다)
-CASES=(case_same_input_twice case_tmpdir_claude_zero_calls case_all_consumers_use_common)
+CASES=(case_same_input_twice case_tmpdir_claude_zero_calls case_all_consumers_use_common case_contract_order case_contract_regen)
 for c in "${CASES[@]}"; do "$c"; done
 echo
 if [ "$FAILS" -eq 0 ]; then

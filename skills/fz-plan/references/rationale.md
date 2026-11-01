@@ -60,3 +60,14 @@
 ## 요약만 저장하면 안 되는 이유
 
      (요약만 저장하면 `/fz-code` Phase 0.4의 구조 검사가 판정 불가)
+
+## Sprint Contract 를 잠정 플랜 뒤로 옮긴 이유 (2026-11-01 · F-468)
+
+옛 자리(Phase 0.5 뒤 · Phase 1 앞 · 2.7 독립 플랜보다 먼저)에서는 full 모드 Contract 가 돌 수 없었다.
+
+- **입력이 없었다** — 요구한 Phase 0.5 방향 판정은 full 에서 plan-lean2 전체 플랜 콜이 내므로 Workflow 가 돌아와야 생긴다. plan-lean2 args 에도 Contract 자리가 없다(Workflow 입력이 아니다)
+- **발동 조건을 셀 수 없었다** — "5+ Step" 은 Workflow 가 `steps[]` 를 돌려준 뒤에야 알 수 있는데 Gate 0.7 이 Phase 1 을 막았다
+- **import 대상이 나중에 생겼다** — Success Criteria 를 넣을 plan 은 Workflow 반환 뒤에 쓰인다
+- **발동 조건이 세 곳에서 달랐다** — 일몰한 TEAM 모드를 조건으로 쓴 곳도 있었다. 지금은 `modules/sprint-contract.md` § 발동 조건 한 곳이다
+- **자리를 Phase 1 · 1.5 뒤 · Phase 2 바로 앞(실행 절차 5.5 · 5.7)으로 정한 이유** — 재생성이 만든 plan · 원장을 Phase 2 가 곧바로 읽게 하려는 것이다. 스트레스 테스트 · RTM 검증(실행 절차 5)이 재생성 뒤에 오면 그 수정이 원장에 실리지 않는다. 그래서 Gate 1 · 1.5 는 잠정 플랜을, Phase 2 는 합의본을 반영한 plan 을 판정하고, 3.1 은 5.7 이 다시 만든 원장을 덮어쓰지 않는다
+- 사용자 결정(H.5-①): Contract 를 없애지 않고 실제로 발동하게 고친 뒤 측정한다. 독립 플랜은 더 이상 합의본(`--sprint-contract`)을 받지 않는다 — 런처 옵션(`scripts/gpt_independent.sh plan --sprint-contract`)은 남아 있고 fz-plan 쪽 호출자는 없다

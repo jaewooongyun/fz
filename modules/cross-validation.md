@@ -80,21 +80,21 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | code-changes 생산 (제거/리팩토링) | implication-scan | lead-reasoning.md § Implication Scan | 모든 모드 (1차/2차 트리거) |
 | code-changes 생산 (모든) | Q-OBSERVE 경량 | lead-reasoning.md § 상시 경량 | 모든 모드 (상시) |
 | revert 작업 | origin-equivalence | lead-reasoning.md + cross-validation.md § origin-equivalence | 모든 모드 (revert 키워드) |
-| planning 생산 전 | 방향성 검증 | review-direction 에이전트 (Phase 0.5) | TEAM (fz-plan) |
-| planning 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
-| code-changes 생산 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
-| review 시작 전 | 교훈 회상 | memory-curator (memory-recall) | 모든 TEAM |
+| planning 생산 | 방향성 검증 (Phase 0.5) | full: plan-lean2 전체 플랜 콜이 잠정 플랜과 함께 `directionVerdict` 를 낸다(롤백 plan-collaborative 는 Stage 0 review-direction) · light: Lead(`modules/plan-direction-preflight.md`) | fz-plan Phase 0.5 발동 조건대로(light · full) |
+| planning 생산 (Workflow 반환 뒤) | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 반환 후 수행(fz-plan 실행 절차 5) | full |
+| code-changes 생산 전 | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 수행(fz-code 실행 절차 7) | full |
+| review 시작 전 | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 수행(fz-review 실행 절차 5) | full |
+| planning 생산 (Phase 1 뒤 · 계획 검증 전) | Sprint Contract | kind `sprint-contract`(GPT 초안 → Lead 합의) + 합의본 반영 재생성 — fz-plan 실행 절차 5.5 · 5.7 | `modules/sprint-contract.md` § 발동 조건 + 직전 decide(`gpt-strategy.md` § 단계 실행 판정) |
 | planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ `--gpt-independent` 로 resume 교차를 마쳤으면 생략) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
-| review 포함 | 다관점 리뷰 | review-arch + review-quality + GPT (팀 내 병렬) | TEAM (GPT 는 켠 세션이면 light 도 — fz-review Phase 5) |
-| search 포함 | 교차 검증 | search-symbolic + search-pattern (팀 내 병렬 — GPT 단계 없음) | TEAM(--deep) |
+| review 포함 | 다관점 리뷰 | review-arch + review-quality(review-live Workflow) + GPT | full — review-live Workflow (GPT 는 켠 세션이면 light 도 — fz-review Phase 5) |
+| search 포함 | 교차 검증 | search-symbolic + search-pattern (search-cross-verify Workflow — GPT 단계 없음) | --deep |
 | commit/pr 포함 | Pre-ship gate | `fz-gpt check` — 명시 호출 전용(fz-commit · fz-pr 에 자동 배선 없음) | 명시 호출 때 GPT 켬(`gpt-strategy.md` § 단계 실행 판정 — 그때도 decide) |
 | fix 포함 | 수정 검증 | `fz-gpt check` (fz-fix Step 4 — 플래그 없음) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
-| review 포함 | L3 에러 처리 스캔 | silent-failure-hunter (Agent background) | TEAM (diff에 에러처리 코드 포함 시) |
-| review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | TEAM (diff에 새 타입 정의 포함 시) |
+| review 포함 | L3 에러 처리 스캔 | silent-failure-hunter (Agent background) | fz-review Phase 5 병렬 4 — diff에 에러처리 코드 포함 시(`modules/native-agents.md` 조건표) |
+| review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | fz-review Phase 5 병렬 5 — diff에 새 타입 정의 포함 시(`modules/native-agents.md` 조건표) |
 | code-changes 생산 | SC 빌드 진단 | `/sc:sc-troubleshoot --fix` 자동 | 빌드 2회 연속 실패 시 |
 | planning 생산 | SC 공수 추정 | `/sc:sc-estimate --breakdown` | plan + 복잡도 4+ |
 | review 포함 | L3 결과 반영 | Lead가 **다음 Workflow invoke의 args/브리프에 주입** — ⛔ Workflow 워커는 `SendMessage` 를 쓰지 않는 1-shot(OVERRIDE — P2P 통신 없음)이라 중간 채널 없음 (2026-11-01 정정 — 이전 표기 "`SendMessage` 부재(v2.1.178~)"는 틀렸다. 2.1.178 이 없앤 것은 `TeamCreate`/`TeamDelete`) | Workflow (L3 이슈 1건+, 다음 스테이지 전) |
-| code 포함 | Supporting 진행도 체크 | review-correctness → impl-correctness RTM 체크 | TEAM (3+ Step 50% 시점) |
 | review 시작 전 | Scope Expansion 검증 | plan 영향 범위 ⊇ discover 범위 확인. plan이 더 좁으면 warning | discover 산출물 존재 시 |
 | code 시작 전 | 시야 축소 감지 | plan 영향 범위 vs discover 범위 비교 → 좁으면 마찰 신호 | discover 산출물 존재 시 |
 | planning 생산 (패턴 변환) | transformation spec | code-transform-validation.md Spec 작성 + Context7 확인 | 모든 모드 (패턴 변환 시) |
@@ -139,10 +139,10 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 ### 계획 생산 파이프라인
 
 ```
-memory-recall (TEAM, informational) → direction challenge (TEAM, fz-plan Phase 0.5) → [계획 스텝] → gpt verify (GPT 켬) → [코드 스텝]
+[계획 스텝 — full: ① Workflow(방향 판정 포함) ∥ GPT 독립 플랜(켰을 때) → ② 잠정 플랜 + 방향 판정(RECONSIDER/REDIRECT · degraded 면 정지) → ③ 합치기 → Lead 몫(memory-recall informational · 스트레스 테스트 · RTM · Gate 1 · 1.5) / light: direction challenge(Lead · fz-plan Phase 0.5) → Phase 1] → sprint contract (full · 발동 시 · 직전 decide — ④ 초안 · 합의 → ⑤ 재생성) → gpt verify ∥ verify-gates (⑥ · GPT 켬) → [코드 스텝]
 ```
 
-> direction challenge: review-direction 에이전트가 접근 방향 자체를 도전 (PROCEED/RECONSIDER/REDIRECT 판정).
+> direction challenge: 접근 방향 자체를 도전한다(PROCEED/RECONSIDER/REDIRECT) — full 은 plan-lean2 전체 플랜 콜이 `directionVerdict` 로 함께 내고(롤백 plan-collaborative 는 Stage 0 review-direction) light 는 Lead 가 fz-plan Phase 0.5 로 한다. 순서 정본: `skills/fz-plan/SKILL.md` 실행 절차(4 → 4.5 → 5 → 5.5 → 5.7 → Phase 2) · Contract 발동: `modules/sprint-contract.md` § 발동 조건.
 
 ### 리뷰 포함 파이프라인
 
@@ -271,9 +271,9 @@ Gate 실패 시: 해당 단계를 "완료"로 표시할 수 없다. 반드시 �
 | 상황 | 모드 | 대응 |
 |------|------|------|
 | 빌드 실패 | 모든 모드 | /ralph-loop 에스컬레이션 래더 (modules/execution-modes.md) |
-| gpt check 실패 | TEAM | 에이전트에게 이슈 전달 → 수정 → 재검증 |
+| gpt check 실패 | 모든 모드 | Lead 가 지적을 수정 → 빌드 → 같은 kind 재검증 (fz-code 8.5 · fz-fix Step 4) |
 | 검증 실패 (반복) | SOLO | 사용자에게 `/fz-review` 제안 |
-| Reflection Rate < 60% | TEAM | /ralph-loop 래더 → 한도 후 사용자 에스컬레이션 |
+| Reflection Rate < 80% (N≥10 — § Reflection Rate threshold) | 모든 모드 | /ralph-loop 래더 → 한도 후 사용자 에스컬레이션 (fz-review Phase 6) |
 
 ---
 
