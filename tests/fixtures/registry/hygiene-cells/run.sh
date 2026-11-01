@@ -383,6 +383,14 @@ def c_writer_leak_eof_script(b):
         check("writer-leak-eof-script", f"{s2}:" in out, "위반에 파일:줄", out)
 
 
+def c_writer_leak_midbody(b):
+    # 종결자 없이 본문 중간에 낀 쓰기 명령(정리 전 레지스트리 꼴) — 뒤에 산문 절이 이어져도 잔재다
+    for k, mid in enumerate(('cat > "$D/F-003-next.md" <<\'EOF\'\n', 'W=/Users/x/fz-findings\n', "python3 - <<'PY'\n")):
+        root, s2 = _leaky(b / f"m{k}", f"\n{mid}\n## 다음 절\n\n본문.\n")
+        rc, out = strict(root)
+        expect_violation("writer-leak-midbody", out, rc, LEAK_AXIS, f"본문 중간 `{mid.split()[0]}`")
+
+
 def c_writer_leak_nested_fence(b):
     # 리뷰 R3 — 네 백틱 펜스 안에 인용한 세 백틱 예시는 펜스 경계가 아니다(CommonMark). 인용한 명령은 잔재가 아니다
     root, _ = _leaky(b, '\n````markdown\n```bash\nEOF\necho "기록: $F"\n```\n````\n')
@@ -400,7 +408,8 @@ CELLS = {"control": c_control, "orphan": c_orphan, "out-of-queue": c_out_of_queu
          "dup-title": c_dup_title, "dup-h1-body": c_dup_h1_body, "index-dump": c_index_dump, "unrun": c_unrun,
          "consumer": c_consumer, "writer-leak": c_writer_leak, "writer-leak-eof-echo": c_writer_leak_eof_echo,
          "writer-leak-fenced": c_writer_leak_fenced, "writer-leak-default-mode": c_writer_leak_default_mode,
-         "writer-leak-eof-script": c_writer_leak_eof_script, "writer-leak-nested-fence": c_writer_leak_nested_fence}
+         "writer-leak-eof-script": c_writer_leak_eof_script, "writer-leak-nested-fence": c_writer_leak_nested_fence,
+         "writer-leak-midbody": c_writer_leak_midbody}
 picked = []
 for tok in [t for t in CELLS_ARG.replace(" ", ",").split(",") if t] or list(CELLS):
     if tok not in CELLS:
