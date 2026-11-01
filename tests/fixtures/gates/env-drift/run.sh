@@ -12,7 +12,8 @@
 #   env-present-pass   변수 있음 → --reverify PASS(대조)
 #   env-from-plan      steps verify.env → 원장 `ENV:` 줄 · 잘못된 이름(`1X`)은 from_plan 이 거부
 #   env-verifyspec     두 Workflow VerifySpec 스키마에 env(문자열 배열) — 생산자 배선
-#   env-rollback       `ENV:` 줄을 지운 원장이 --status 에서 종전 그대로 met(승인 해시 · 증거 밖)
+#   env-rollback       `ENV:` 줄을 지운 원장은 --status 미충족(ENV 선언은 승인 해시 안 — 재확정 필요 · 리뷰 R4)
+#   env-added-unmet    ENV 없이 승인 · 통과한 게이트에 `ENV:` 를 더하면 --status 미충족(재검증 회피 레버 차단)
 # 셀 (--cells status):
 #   status-tools-drift   통과 게이트 · PATH 에서 선언 도구 제거 → --status UNMET · DRIFT 줄 · exit 1 · 원장 바이트 무변경
 #   discover-tools-drift 같은 상태에서 --discover 요약 '미충족 1'
@@ -47,7 +48,7 @@ while [ $# -gt 0 ]; do
 done
 expect_of() {
   case "$1" in
-    env) echo "env-absent-unrun env-empty-unrun env-present-pass env-from-plan env-verifyspec env-rollback" ;;
+    env) echo "env-absent-unrun env-empty-unrun env-present-pass env-from-plan env-verifyspec env-rollback env-added-unmet" ;;
     status) echo "status-tools-drift discover-tools-drift hook-drift-reason status-tools-present status-no-tools planned-no-drift" ;;
     *) setup_fail "알 수 없는 셀 묶음: $1 (지원: env status)" ;;
   esac
@@ -123,8 +124,20 @@ p = sys.argv[1]; s = open(p, encoding="utf-8").read()
 open(p, "w", encoding="utf-8").write("".join(l for l in s.splitlines(True) if not l.startswith("  ENV: ")))
 PYX
   gc "$WITH" - --status "$L"
-  if [ "$r1" -eq 0 ] && [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q 'ALL MET' && ! grep -q '^  ENV:' "$L"; then ok "env-rollback: ENV 줄을 지워도 도장 · 증거 유효(--status ALL MET)"
-  else no "env-rollback: ENV 삭제 뒤 met" "통과 rc=$r1 · status rc=$RC · $(printf '%s' "$OUT" | tail -2 | tr '\n' '|' | cut -c1-120)"; fi
+  if [ "$r1" -eq 0 ] && [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q 'UNMET G1' && ! grep -q '^  ENV:' "$L"; then ok "env-rollback: ENV 줄을 지우면 승인 해시가 달라 미충족(재확정 필요)"
+  else no "env-rollback: ENV 삭제 뒤 미충족" "통과 rc=$r1 · status rc=$RC · $(printf '%s' "$OUT" | tail -2 | tr '\n' '|' | cut -c1-120)"; fi
+  # 승인 뒤 met 게이트에 ENV 를 더하면 재검증을 영구히 피하는 레버가 된다 — 도장이 ENV 를 묶어 미충족이어야 한다(리뷰 R4)
+  d="$TMP/added"; mkled "$d" "$(printf '{"title":"p","steps":[{"id":"G1","title":"평범한 CHECK","verify":{"kind":"command","criterion":"c","command":"echo P_OK","expect":"P_OK"}}]}')"; L="$d/gates/plan.md"
+  gc "$WITH" - --only G1 "$L"; r1=$RC
+  "$PY" - "$L" <<'PYX'
+import re, sys
+p = sys.argv[1]; s = open(p, encoding="utf-8").read()
+open(p, "w", encoding="utf-8").write(re.sub(r"(?m)^(  CHECK: .*\n)", r"\1  ENV: FZPROBE_NEVER_SET\n", s, count=1))
+PYX
+  gc "$WITH" - --status "$L"
+  if [ "$MKRC" -eq 0 ] && [ "$r1" -eq 0 ] && grep -q '^  ENV: FZPROBE_NEVER_SET$' "$L" && [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q 'UNMET G1'; then
+    ok "env-added-unmet: 승인 뒤 met 게이트에 ENV 를 더하면 --status 미충족"
+  else no "env-added-unmet: 승인 뒤 ENV 추가 → 미충족" "mk=$MKRC 통과 rc=$r1 · status rc=$RC · $(printf '%s' "$OUT" | tail -2 | tr '\n' '|' | cut -c1-120)"; fi
 fi
 
 if want status; then
