@@ -161,7 +161,7 @@ metadata:
 ### 절차
 
 1. **키워드 추출**: 자연어에서 핵심 키워드 + 추가 신호 분리
-2. **트리거 매칭**: `modules/intent-registry.md` 의 트리거 표와 대조한다(스킬 YAML `intent-triggers` 는 스킬 자체 문서 — 아래 ⛔)
+2. **트리거 매칭**: `modules/intent-registry.md` 의 트리거 표와 대조한다(스킬 YAML `intent-triggers` 는 스킬 자체 문서 — 아래 참조)
 
 3. **후보 스킬 목록 생성**: 매칭된 스킬 + confidence 점수
 4. **추가 신호 추출**: 복잡도 평가를 위한 부가 정보
@@ -295,7 +295,7 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 
 결정된 파이프라인, 팀 구성, 모델 배정을 시각화하고 사용자 승인을 받습니다.
 
-> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행하고 무엇을 묻고 무엇을 막는지는 `modules/governance.md` § 자율 모드가 정본이고 판정은 `scripts/autonomy_decide.py` 가 한다(commit · push 는 모드와 무관하게 막는다). ⛔ **GPT 모델·effort**: 확정 파이프라인에 GPT 를 부를 수 있는 스킬이 있으면(모르면 묻는다) `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" get` 을 부르고 정본의 `get` 결과 표대로 한다 — 묻기로 나오면 모델·effort 질문 2개를 이 AskUserQuestion 에 합치고 답을 `set` 한다(자율 판정도 `get` 이 한다). 선택이 있으면 제안 시각화에 표시만 한다 — 정본 `modules/gpt-strategy.md` § 모델·effort 선택 ⛔ **모드**: Phase 3 의 SOLO/TEAM 은 스킬별 light/full **추천**이다 — 이 질문에서 사용자가 고른 모드를 스킬에 인자(`light` · `full`)로 넘기고, 스킬은 다시 묻지 않는다(`modules/mode-gate.md`).
+> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행하고 무엇을 묻고 무엇을 막는지는 `modules/governance.md` § 자율 모드가 정본이고 판정은 `scripts/autonomy_decide.py` 가 한다(commit · push 는 모드와 무관하게 막는다). **GPT 모델·effort**: 확정 파이프라인에 GPT 를 부를 수 있는 스킬이 있으면(모르면 묻는다) `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" get` 을 부르고 정본의 `get` 결과 표대로 한다 — 묻기로 나오면 모델·effort 질문 2개를 이 AskUserQuestion 에 합치고 답을 `set` 한다(자율 판정도 `get` 이 한다). 선택이 있으면 제안 시각화에 표시만 한다 — 정본 `modules/gpt-strategy.md` § 모델·effort 선택 ⛔ **모드**: Phase 3 의 SOLO/TEAM 은 스킬별 light/full **추천**이다 — 이 질문에서 사용자가 고른 모드를 스킬에 인자(`light` · `full`)로 넘기고, 스킬은 다시 묻지 않는다(`modules/mode-gate.md`).
 
 ### Gate 4: Pipeline Approved
 - [ ] 파이프라인 + 팀 구성 시각화 출력 완료?

@@ -89,7 +89,7 @@ metadata:
 > **스크립트: `workflows/plan-lean2.js`** (플러그인 루트 상대) — **4콜 2단계**: 전체 플랜 ∥ edge 적대 ∥ impact+arch(동시 3) → 델타 병합.
 > agents/의 plan-structure·plan-edge-case·plan-impact·plan-merge 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > 동시 opus ≤3(Lead 세션 fable은 별도)는 Stage 1 의 3-병렬이 상한을 **정확히** 채워 구조적으로 보장한다. rate-limit 시 순차화 폴백(governance.md).
-> ⛔ **배선 전환 롤백**: 아래 절차 2.5·3 의 스크립트명을 `plan-collaborative.js` 로 되돌리면 끝이다(파일은 남겨 둔다) — 전환 근거(2026-09-12 · N=1 · 실사용 3회 관찰 후 재평가): `experiment-log.md` §5.9
+> **배선 전환 롤백**: 아래 절차 2.5·3 의 스크립트명을 `plan-collaborative.js` 로 되돌리면 끝이다(파일은 남겨 둔다) — 전환 근거(2026-09-12 · N=1 · 실사용 3회 관찰 후 재평가): `experiment-log.md` §5.9
 
 ### 실행 절차 (Lead)
 
@@ -338,7 +338,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 
 3.2. **⛔ 게이트 판정** (draft 원장이 있을 때 — `modules/gates.md` 배선 1):
    Phase 1에서 만든 `{WORK_DIR}/gates/plan.draft.md`를 검증 입력에 **포함**한다. 원장이 Phase 3에서 만들어지면 Phase 2 평가자가 볼 `CHECK:`가 없다 — draft가 먼저인 이유다.
-   ⛔ **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하면 Issue Tracker·scope challenge·Gate 2 입력이 사라진다. 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates(`ARTIFACT=plan` · `WORK_DIR={WORK_DIR}` · `LEDGER={WORK_DIR}/gates/plan.draft.md`)
+   **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하면 Issue Tracker·scope challenge·Gate 2 입력이 사라진다. 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates(`ARTIFACT=plan` · `WORK_DIR={WORK_DIR}` · `LEDGER={WORK_DIR}/gates/plan.draft.md`)
    - 요구: 게이트마다 판정 1행. ⛔ **통과한 게이트도 표현**해야 N/N 대조가 성립한다
    - ⛔ **사후 대조 의무** — 눈으로 하지 않는다: `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check {응답.json} {WORK_DIR}/gates/plan.draft.md`
      게이트 수·id 집합·중복·summary 합계를 판정한다. exit 1이면 재호출 1회(core § verify-gates 의 사후 검증 블록 — `FZ_GPT_RECALL=post-check` 는 그 라운드를 잇고 라운드를 쓰지 않는다) 후 **미판정으로 기록** — 조용히 통과시키지 않는다

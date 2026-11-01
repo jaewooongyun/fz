@@ -103,7 +103,7 @@ EOF
 
 Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. 규약은 `modules/cross-validation.md` § 독립 첫 패스.
 
-⛔ **independent-plan 은 계획 대조가 아니다** — Claude 계획을 보지 않고 요구 원문 · 원문 색인 · 대상 저장소만으로 자기 계획을 세운다. 합격은 독립 계획 스키마 통과와 오염 감사 0 이고, 두 계획의 차이 판정은 `plan_divergence.py` 와 Lead 가 한다. 계획을 받아 검증하는 것은 `verify` 다(F-471).
+**independent-plan 은 계획 대조가 아니다** — Claude 계획을 보지 않고 요구 원문 · 원문 색인 · 대상 저장소만으로 자기 계획을 세운다. 합격은 독립 계획 스키마 통과와 오염 감사 0 이고, 두 계획의 차이 판정은 `plan_divergence.py` 와 Lead 가 한다. 계획을 받아 검증하는 것은 `verify` 다(F-471).
 
 ```bash
 FZ_GPT_ARTIFACT="${ARTIFACT:?호출자의 산출물 계열 — fz-plan: plan · fz-modernize: guide-plan}" FZ_WORK_DIR="$WORK_DIR" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-plan --requirement "$REQ_FILE" [--sprint-contract F] [--rules-index "$WORK_DIR/rules/index.json"] \
@@ -129,7 +129,7 @@ FZ_GPT_ARTIFACT="${ARTIFACT:?호출자의 산출물 계열 — fz-plan: plan · 
 fz-peer-review(기본 실행)와 fz-review(`--gpt-independent` · 기본 off)가 함께 쓰는 정본이다. 두 스킬과 Tier 표는 이 절을 가리킨다.
 
 1. **Workflow 직전에** 런처를 `run_in_background` 로 띄운다 — 두 패스가 동시에 돈다. GPT 는 허용 입력만 받아 Claude 산출을 보지 않는다
-2. 입력을 나눠 준다 — 규칙 레코드(`projectRulesPath`)는 Workflow args 에만, 지침 원문 색인은 런처 `--rules-index` 에만 준다(⛔ 같은 파일이 아니다 — 위 bullet). fz-review 는 Workflow args 에 `locatedFindings: true` 를 함께 준다 — 위치 필드(`line_range`)가 없는 Claude 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다
+2. 입력을 나눠 준다 — 규칙 레코드(`projectRulesPath`)는 Workflow args 에만, 지침 원문 색인은 런처 `--rules-index` 에만 준다(같은 파일이 아니다 — 위 bullet). fz-review 는 Workflow args 에 `locatedFindings: true` 를 함께 준다 — 위치 필드(`line_range`)가 없는 Claude 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다
 3. ⛔ GPT 팔이 끝나기 전에는 대상 트리를 고치지 않는다 — 감사(`.audit.json` 의 `inputs`)가 GPT 가 본 diff 의 sha256 을 남기고, 병합이 `--diff` 와 대조해 다르면 stale 로 거부한다
 4. 두 패스가 끝나면 병합한다: `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환 JSON} --gpt {out-dir}/gpt-{run}.json --diff {런처 --diff 와 같은 파일}`. 옆 파일(`.contaminated` · `.audit.json`)이 오염 · 실패 · stale 을 말하면 exit 1(거부)이다. 런처가 10~17 로 끝났으면 `--gpt` 대신 `--gpt-unavailable "exit {n} — {note}"` 로, 18(GPT 미사용)이면 `--gpt-unavailable "GPT 미사용 — <사유>"` 로 부른다(사유 = `GPT-OFF:` 줄 · `modules/gpt-strategy.md` § GPT 미사용). Tier 1(Workflow 없음)은 Lead 발견을 `{"issues": [{id, severity, file, line_range, discoveryAxis, title, evidence}]}` 로 `{WORK_DIR}/review/lead-findings.json` 에 써서 `--claude` 로 준다 — evidence 는 diff 원문을 백틱으로 인용한다(병합이 그 hunk 에서 다시 찾는다 · 계약은 `review_merge.py` 머리말 입력 계약)
 5. 병합 결과가 기존 GPT 리뷰 호출(fz-review Phase 5 [병렬 2] · fz-peer-review GPT challenger)을 대신한다 — 두 번 부르지 않는다. Tier 3 GPT DA 는 병합 뒤 한 번이다

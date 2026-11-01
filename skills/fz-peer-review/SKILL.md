@@ -131,11 +131,11 @@ bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/gather.sh" \
   --work-dir "${WORK_DIR}" --target {PR번호|브랜치} [--base BRANCH]
 ```
 
-산출: `diff.patch` · `requirements.md` · `base-behavior.md` + `base/` · `head/`(GPT 독립 첫 패스 입력) · `base-manifest.tsv` · **`review-surface.md`** · `numstat.txt` · `risk.json` · ⭐ 이동 리팩토링(신규 파일 + 그만큼의 삭제)이면 **`evidence-move-drift.md`** 도 — ⛔ **동등성과 별개 축**이다(근거: `references/rationale.md` § 이동 드리프트)
+산출: `diff.patch` · `requirements.md` · `base-behavior.md` + `base/` · `head/`(GPT 독립 첫 패스 입력) · `base-manifest.tsv` · **`review-surface.md`** · `numstat.txt` · `risk.json` · ⭐ 이동 리팩토링(신규 파일 + 그만큼의 삭제)이면 **`evidence-move-drift.md`** 도 — **동등성과 별개 축**이다(근거: `references/rationale.md` § 이동 드리프트)
 
 ⛔ **손으로 나눠 호출하지 않는다.** 병목은 fan-out 이 아니라 Lead 의 순차 도구 호출이다 — 결정론 구간을 한 번에 끝낸다. exit `2` 사용법 · `3` 대상 해석 실패 · `4` 수집 실패 — 셋 다 **산출물을 남기지 않는다**(staging 경유). ⛔ exit **`5`** 는 다르다: **base 원본 전건 실패**이고 **산출물을 남긴다**(diff 는 유효하고 origin 근거만 없다). 진행 여부는 Lead 판단, 진행하면 전 issue `origin` 을 `미지정` 으로 둔다 — 2·3·4 처럼 지우지 않는다.
 
-⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md` § 리뷰 표면 진단). ⛔ **읽고 끝내지 않는다 — `review-surface.patch` 를 `reviewSurfacePatchPath` 로 넘긴다**(1차 리뷰 대상 · 전량 `diffPath` 는 부풀림 확인용 보조 — `modules/peer-review-workflow.md` 절차 1). 근거: `references/rationale.md` § 리뷰 표면
+⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md` § 리뷰 표면 진단). **읽고 끝내지 않는다 — `review-surface.patch` 를 `reviewSurfacePatchPath` 로 넘긴다**(1차 리뷰 대상 · 전량 `diffPath` 는 부풀림 확인용 보조 — `modules/peer-review-workflow.md` 절차 1). 근거: `references/rationale.md` § 리뷰 표면
 
 ⛔ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-mapping` 은 Lead 가 채운다 (`modules/peer-review-tiers.md` § canonical set). ⛔ **패턴·일관성 이슈를 낼 때 `convention-samples` 를 건너뛰지 않는다** — 관례를 위반으로 판정하는 것도, 관례 이탈을 지적하는 것도 같은 N:M 카운트를 요구한다(실측: "형제 2곳이 다르다"로 적었는데 전수는 4:1이었다).
 
@@ -162,7 +162,7 @@ PR title/body에서 JIRA 티켓 ID 추출 + acceptance criteria 수집. JIRA 연
 
 코드로 확정할 수 없는 주장에는 "무엇을 보면 판별되는지"를 함께 적는다 — 방법을 모르면 그 지적은 판정 불가로 남는다.
 
-⛔ 배선이 확정돼도 **증상**(사용자에게 무엇으로 보이는지)은 코드에 없을 수 있으므로(근거: `references/rationale.md` § 증상 미확정 · F-285) `severity` 가 `minor` 이상이면 **증상 관측 지점** 두 칸을 채운다. 비면 `suggestion` 강등 (Gate 4.7-S 가 기계 판정): `symptom_screen` = 증상이 보이는 구체 화면·뷰 이름 / `symptom_reach` = 그 화면이 그 상태로 떠 있게 되는 사용자 동작. ⛔ `화면` 칸은 "값이 흐른다" 가 아니라 **"그 값을 그리는 뷰가 그 시점에 계층에 있는가"** 를 묻는다.
+⛔ 배선이 확정돼도 **증상**(사용자에게 무엇으로 보이는지)은 코드에 없을 수 있으므로(근거: `references/rationale.md` § 증상 미확정 · F-285) `severity` 가 `minor` 이상이면 **증상 관측 지점** 두 칸을 채운다. 비면 `suggestion` 강등 (Gate 4.7-S 가 기계 판정): `symptom_screen` = 증상이 보이는 구체 화면·뷰 이름 / `symptom_reach` = 그 화면이 그 상태로 떠 있게 되는 사용자 동작. `화면` 칸은 "값이 흐른다" 가 아니라 **"그 값을 그리는 뷰가 그 시점에 계층에 있는가"** 를 묻는다.
 
 - View 변경 → 시뮬레이터/실기기(+review-quality 집중 지시) · 런타임 순서·타이밍 → DEBUG 로그 캡처 지점 · 서버 계약 → curl 재현
 
@@ -288,7 +288,7 @@ sequential-thinking으로 Confidence Matrix를 계산한다 (Tier 별 생성 여
 
 ### 1. 결측 에이전트 처리
 
-Lead 보정 **불필요** — 실패 에이전트는 `reviews` 에서 이미 빠져 있고 1-review 경로가 실재한다(근거: `references/rationale.md` § 결측 에이전트). `reviews.length` 별: 3 → 3-vote / 2 → 2-vote 모드(§3) / **1 → 투표 불가. 단독 렌즈 결과이므로 Confidence Matrix를 만들지 않고 `[단일 렌즈 — 교차검증 없음]` 태그와 함께 보고하며, 이슈 confidence는 ×0.7 감쇠** / 0 → `mode:'fallback'`(Tier 하위 전환) — ⛔ 이 투표 산식은 Tier 3 기준이다(`modules/peer-review-gates.md` § MergeContract § 9)
+Lead 보정 **불필요** — 실패 에이전트는 `reviews` 에서 이미 빠져 있고 1-review 경로가 실재한다(근거: `references/rationale.md` § 결측 에이전트). `reviews.length` 별: 3 → 3-vote / 2 → 2-vote 모드(§3) / **1 → 투표 불가. 단독 렌즈 결과이므로 Confidence Matrix를 만들지 않고 `[단일 렌즈 — 교차검증 없음]` 태그와 함께 보고하며, 이슈 confidence는 ×0.7 감쇠** / 0 → `mode:'fallback'`(Tier 하위 전환) — 이 투표 산식은 Tier 3 기준이다(`modules/peer-review-gates.md` § MergeContract § 9)
 
 ### 2. Origin 기반 Severity 보정
 

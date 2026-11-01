@@ -35,7 +35,7 @@ fz-plan의 Phase 2. **kind `verify` — 래퍼 exec · architect 본문 주입 �
 
 ⛔ **verify 는 Claude 가 쓴 계획을 받아 대조한다** — 입력에 계획 본문이 있고, 합격은 Q1~Q8 판정과 issues 다. 계획을 보지 않고 요구 원문만으로 GPT 가 자기 계획을 세우는 것은 `independent-plan` 이다(`modules/fz-gpt-subcommands-aux.md` § independent-plan). 둘을 같은 검증으로 세지 않는다(F-471 · F-508).
 
-⛔ **산출물 계열(`ARTIFACT`)과 작업 폴더(`WORK_DIR`)는 호출자가 정한다** — 이 레시피는 여러 호출자가 같이 쓴다. 계열을 밝힌 호출만 재검증 라운드 상한(`modules/cross-validation.md` § 재검증 라운드 상한)에 센다.
+**산출물 계열(`ARTIFACT`)과 작업 폴더(`WORK_DIR`)는 호출자가 정한다** — 이 레시피는 여러 호출자가 같이 쓴다. 계열을 밝힌 호출만 재검증 라운드 상한(`modules/cross-validation.md` § 재검증 라운드 상한)에 센다.
 
 | 호출자 | `ARTIFACT` | `WORK_DIR` |
 |---|---|---|
@@ -155,7 +155,7 @@ exit 1 이면 위 블록대로 재호출 1회(`FZ_GPT_RECALL=post-check` — 정
 
 fz-review의 Phase 5.5. **kind `validate` — 래퍼 exec · guardian 본문 주입 · `gpt_verification_schema`(레지스트리).** 역할 본문을 찾지 못하면 정문이 폴백 지시를 붙인다.
 
-⛔ 산출물 계열(`ARTIFACT`)과 작업 폴더(`WORK_DIR`)는 호출자가 정한다 — fz-review Phase 5.5 는 `code` · 티켓 작업 폴더(같은 라운드의 `verify-gates` 와 한 원장), 직접 `/fz-gpt validate` 는 빈 값(`ARTIFACT=` — 재검증 라운드 상한에 세지 않는다).
+산출물 계열(`ARTIFACT`)과 작업 폴더(`WORK_DIR`)는 호출자가 정한다 — fz-review Phase 5.5 는 `code` · 티켓 작업 폴더(같은 라운드의 `verify-gates` 와 한 원장), 직접 `/fz-gpt validate` 는 빈 값(`ARTIFACT=` — 재검증 라운드 상한에 세지 않는다).
 
 ```bash
 : "${ARTIFACT?호출자가 산출물 계열을 정한다 — fz-review Phase 5.5: code · 직접 호출: 빈 값}"

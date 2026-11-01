@@ -201,7 +201,7 @@
 - 내용: "미사용/dead" 판정을 레이어별로 구분: DTO(Decodable payload 미러)에서 서버 실필드 제거 = 갭(#6 lastPlayTime), Entity(화면 사용분)에서 미사용 필드 제거 = OK. 한 레이어 판정을 다른 레이어에 오투영.
 - generalize: narrow (DTO/Entity 레이어) | 과적합 위험: 中 | 트리거=축1(레이어 식별)/해소=축2(서버 계약) 하이브리드. G1(#6)과 관점 공유.
 - 근거: [verified: OBS-11 리뷰 README #6·§2 P2].
-- ⛔ 활성 차단: evidence 1 session → candidate.
+- 활성 차단: evidence 1 session → candidate.
 - 승격 목표 (Track A): 5 sessions + GPT verify.
 
 ### L-10: 신규 엔드포인트 prefix/컨벤션 사전 체크 (G5)

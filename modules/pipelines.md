@@ -25,7 +25,7 @@
 > 정본 `modules/governance.md` § Truth-of-Source · 에이전트 목록은 `modules/team-registry.md`.
 > 이전 판은 에이전트를 열거해 실제 스폰과 어긋났다(code-only 에 `impl-quality` 누락 · peer-review 가 다른 스크립트를 지목).
 >
-> ⛔ `gpt verify` · `gpt check` 게이트는 GPT 를 켠 세션이면 필수다 — 실행 여부는 그 단계 직전 `gpt-choice.sh decide` 한 줄이 정하고(`skip` 이면 `[GPT 미사용 — 사유]`), 켬이면 필수 · 명시 플래그 · 명시 호출의 구분은 `modules/gpt-strategy.md` § 단계 실행 판정이 정본이다.
+> `gpt verify` · `gpt check` 게이트는 GPT 를 켠 세션이면 필수다 — 실행 여부는 그 단계 직전 `gpt-choice.sh decide` 한 줄이 정하고(`skip` 이면 `[GPT 미사용 — 사유]`), 켬이면 필수 · 명시 플래그 · 명시 호출의 구분은 `modules/gpt-strategy.md` § 단계 실행 판정이 정본이다.
 > 표의 `게이트` 행은 대표 표기다 — 게이트 행이 없는 파이프라인(explore-plan · review-only 등)도 체인 스킬의 GPT 단계(예: fz-plan Phase 2 verify · fz-review Phase 5 review · 5.5 validate)를 그대로 갖는다. 전수는 같은 절의 정책 표다.
 
 ### 1. explore

@@ -369,7 +369,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 ### Deliver
 - review-report.md + pr-comments.md + cost-log.json
 - ⛔ `python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --check-report "${WORK_DIR}/review-report.md" --smoke "${WORK_DIR}/launch-smoke.md"` — exit 1 이면 `launch-smoke.md` 첫 줄을 `review.json` 의 `launchSmoke` 에 넣고 렌더를 다시 돌린다(⛔ 렌더된 리포트를 손으로 고치지 않는다 — payload body 와 어긋난다 · `--render` 를 끈 경로만 리포트에 직접 쓴다). '대상 아님' 은 검사하지 않는다. 미실행을 적기만 하고 게이트로 쓰지 않은 것이 F-366 이다
-- ⛔ **축별 집계** — review-report.md 끝에 아래 표를 붙인다.
+- **축별 집계** — review-report.md 끝에 아래 표를 붙인다.
 
 ```markdown
 ## 발견 축 집계
@@ -384,7 +384,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 ```
 
 > 리뷰 집계 스키마(`PeerReviewSchema`)는 Tier 2/3 전용이다 — 그 `discoveryAxis` 가 이 집계를 담는다. Tier 1 GPT challenger 호출은 `gpt_peer_review_schema` 를 쓴다(축 집계 필드 없음). Tier 0/1 은 **이 표가 그 자리를 대신한다** — 축 이름을 그대로 써야 경로 간 비교가 성립한다.
-> ⛔ 0건인 축도 행을 지우지 않는다. **0이 관측인지 미탐색인지** 구별하려면 자리가 남아 있어야 한다.
+> 0건인 축도 행을 지우지 않는다. **0이 관측인지 미탐색인지** 구별하려면 자리가 남아 있어야 한다.
 
 ---
 

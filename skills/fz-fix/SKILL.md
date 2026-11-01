@@ -237,7 +237,7 @@ metadata:
 ---
 
 ## Gate: Bug Fix Complete
-- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] 티켓 패턴 또는 저장 여부 질문 완료?
 - [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
 - [ ] 빌드 성공?
 - [ ] 원인-수정 대응 명확?

@@ -32,7 +32,7 @@ metadata:
 
 > **행동 원칙**: 3중 검증(Claude+GPT+sc:analyze)으로 코드 품질을 확보하고, GPT 역방향 검증으로 피드백 반영을 정량화한다. 검증 결과가 기준 미달이면 반복 개선한다.
 >
-> ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.md` 사전 참조. **Decision Tree (evidence ≥ 3 sessions) + 태깅 (`[skill:][status:][priority:]`) + MEMORY.md 200줄 한도** 모두 검증. 사후 catch 방지 (Layer 1+2+3 systematic weakness 차단).
+> **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.md` 사전 참조. **Decision Tree (evidence ≥ 3 sessions) + 태깅 (`[skill:][status:][priority:]`) + MEMORY.md 200줄 한도** 모두 검증. 사후 catch 방지 (Layer 1+2+3 systematic weakness 차단).
 
 ## 개요
 
@@ -460,7 +460,7 @@ Gate 5 통과 후:
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백 | Claude 자체 판단 |
-| fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다(직전 `gpt-choice.sh decide` 가 `skip` 이면 probe 도 부르지 않고 `[GPT 미사용 — 사유]`). probe 성립 = kind `availability-probe`(`gpt-call.sh availability-probe` — 역할 없음 · ephemeral) 가 **non-empty 산출 + exit 0**(⛔ `--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
+| fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다(직전 `gpt-choice.sh decide` 가 `skip` 이면 probe 도 부르지 않고 `[GPT 미사용 — 사유]`). probe 성립 = kind `availability-probe`(`gpt-call.sh availability-probe` — 역할 없음 · ephemeral) 가 **non-empty 산출 + exit 0**(`--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
 | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |

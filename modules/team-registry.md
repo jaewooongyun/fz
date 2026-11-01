@@ -62,7 +62,7 @@
 ⛔ **팀 구성의 단일 진실 원천은 `workflows/*.js`의 `agentType` 인자다.**
 스킬 YAML `team-agents` 필드는 **2026-08-09 제거**됐다 — Wave 4 전환 후 팀 구성을 결정하지 않는 선언(런타임 효과 0)이었다.
 본 레지스트리와 `patterns/*.md`는 **스크립트와** 동기화를 유지한다. 불일치 발견 시 **스크립트 기준**으로 나머지를 수정한다.
-⛔ 단서 — `workflows/swarm.js` 만 agentType 을 args 로 받는다. 허용은 스크립트 `READ_ONLY_AGENTS`(`tools:` 가 비어 있지 않고 쓰기 도구도 `memory:` 필드도 없으며 텔레메트리 단일 스테이지 agentType 이 아닌 에이전트 · 기본 review-correctness) 안만이고 밖이면 콜 0 fallback 이다 — 정본 행 단서는 `modules/governance.md` § Truth-of-Source.
+단서 — `workflows/swarm.js` 만 agentType 을 args 로 받는다. 허용은 스크립트 `READ_ONLY_AGENTS`(`tools:` 가 비어 있지 않고 쓰기 도구도 `memory:` 필드도 없으며 텔레메트리 단일 스테이지 agentType 이 아닌 에이전트 · 기본 review-correctness) 안만이고 밖이면 콜 0 fallback 이다 — 정본 행 단서는 `modules/governance.md` § Truth-of-Source.
 
 > 참조: `modules/governance.md` — Truth-of-Source 정책 (모델 배정·팀 구성·상한·필수 필드 4항목 정본)
 

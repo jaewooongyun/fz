@@ -342,7 +342,7 @@ verdict: agree / disagree / partial / needs_verification
 - 제안된 type 분류의 정확성
 ```
 
-⛔ `--skip-gpt`로 건너뛰면 메모리 23차 (self-review blind spot) 재현 위험 — DRY-RUN 한정. GPT 미사용 세션의 decide `skip` 은 `--skip-gpt` 가 아니다 — 표기만 하고 Step 5 로 간다.
+`--skip-gpt`로 건너뛰면 메모리 23차 (self-review blind spot) 재현 위험 — DRY-RUN 한정. GPT 미사용 세션의 decide `skip` 은 `--skip-gpt` 가 아니다 — 표기만 하고 Step 5 로 간다.
 
 #### Step 5: 사용자 승인 + 적용
 
