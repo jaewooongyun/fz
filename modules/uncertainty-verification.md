@@ -2,7 +2,7 @@
 
 > 기술적 주장의 확실성을 평가하고, 불확실하면 검증 도구로 확인하는 하네스 원칙.
 > 참조: guides/harness-engineering.md — Adapters, Guardrails, State Semantics
-> 적용: v3.8 — Transformation Spec 경로에서만 (Pilot). 효과 확인 후 확장.
+> 적용: 모든 워커 · Lead 의 기술적 주장(Default-Deny) — 에이전트 Verification 절 · 스킬 Brief 가 이 모듈을 근거로 인용한다. v3.8 에 Transformation Spec 경로에서 시작해 확장됐다(F-484).
 
 ## 목차
 

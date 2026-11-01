@@ -18,7 +18,7 @@
 - [Serena Memory와의 관계](#serena-memory와의-관계)
 - [비-티켓 세션 모드 (Serena Memory Fallback)](#비-티켓-세션-모드-serena-memory-fallback)
 - [Artifact Token Budget](#artifact-token-budget)
-- [TEAM 로깅](#team-로깅)
+- [실행 기록](#실행-기록)
 - [Few-shot 예시](#few-shot-예시)
 - [Edge Case 대응](#edge-case-대응)
 - [참조 스킬](#참조-스킬)
@@ -277,17 +277,17 @@ Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이
 | plan-v{N} / plan-final | 10K tokens | 설계 결정 + 영향 분석 + 리스크 <!-- 기존: 3K --> |
 | code/step-{N} | 3K tokens | 구현 결과 + 결정 근거 <!-- 기존: 1.5K --> |
 | code/progress | 5K tokens | 전체 Step 진행 상황 <!-- 기존: 1.5K --> |
-| *-team.md | 5K tokens | 요약 기본. 원본은 *-team-full.md (drill-down용, Hydration 대상 아님) |
+| workflow-result.json | 5K tokens | Workflow 반환 기록(Lead 작성). 에이전트 간 통신 원본은 Workflow transcript(runId) — Hydration 대상 아님 |
 | verify-result.md | 3K tokens | GPT 요약 (원본: verify-result-full.md) |
 
 **Eviction 우선순위** (budget 100K 초과 시):
 1. 가장 오래된 discover-{phase}.md (journal은 보존)
 2. 완료된 step-{N}.md (progress.md 요약으로 대체)
-3. *-team.md (요약만 보존)
+3. workflow-result.json (요약만 보존 — 원본은 transcript)
 
-## TEAM 로깅
+## 실행 기록
 
-티켓 폴더(WORK_DIR) 활성 시: `{phase}/*-team.md`에 에이전트 간 핵심 통신 요약 (5K). 원본 전문은 `*-team-full.md`에 별도 보존 (drill-down용).
+멀티에이전트 실행 기록은 Workflow transcript(runId)와 Lead 가 쓰는 `{WORK_DIR}/{phase}/workflow-result.json` 이다 — 에이전트 간 통신을 따로 요약하는 파일은 만들지 않는다(TEAM 일몰 · P2P 없음, F-482).
 
 ## Few-shot 예시
 

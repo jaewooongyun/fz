@@ -75,7 +75,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -600,6 +600,14 @@ HM_OUT="$( (python3 "$ROOT/scripts/harness_census.py" --self-test && python3 "$R
 record3 "하네스 계측기 self-test" "$HM_CODE" "$HM_OUT" \
   "$(printf '%s\n' "$HM_OUT" | grep -E 'self-test: PASS' | tr '\n' ' ')" \
   "⛔ $(printf '%s\n' "$HM_OUT" | grep -E 'FAIL' | head -2 | tr '\n' ' ')"
+
+# ── 4.8j 재발 방지 lint 7종 (B6) ──────────────────────────────────
+# ⛔ self-test 먼저 — 검사기 고장을 "위반 0"으로 읽지 않는다. 트리 실행의 UNRUN(대상 0개)은 PASS 가 아니다(exit 2).
+#    모듈 500줄 초과는 경고(WARN)라 exit 0 이다(F-485) — 실패는 SKILL 500줄 · 사본 불일치 · TEAM 지시 · 끊긴 참조 · 개수 불일치.
+LR_OUT="$( (python3 "$ROOT/scripts/lint_recurrence.py" --self-test && python3 "$ROOT/scripts/lint_recurrence.py" --root "$ROOT") 2>&1)"; LR_CODE=$?
+record3 "재발 방지 lint" "$LR_CODE" "$LR_OUT" \
+  "$(printf '%s\n' "$LR_OUT" | grep -E '^lint_recurrence: ' | tail -1) · $(printf '%s\n' "$LR_OUT" | grep -E 'self-test: PASS')" \
+  "⛔ $(printf '%s\n' "$LR_OUT" | grep -E ': FAIL|: UNRUN|self-test: FAIL' | head -3 | tr '\n' ' ')"
 
 # ── 4.9 codegraph stale 검사기 self-test ──────────────────────────
 #    ⛔ 여기서 재는 것은 **검사기의 건강성**이지 인덱스 신선도가 아니다.
