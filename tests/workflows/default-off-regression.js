@@ -55,6 +55,9 @@ const OPTIONS = {
     defaultOn: PEER_ON, applies: sc => sc.stage2 },
   // R-C 사전 수집 스냅샷 — Stage 1 두 프롬프트에만 닿는다(콜 수 그대로). 빈 문자열은 미지정과 같다
   snapshotDir: { workflows: ['review-live'], on: { snapshotDir: '/tmp/fz-snapshot' }, off: { snapshotDir: '' } },
+  // B11 측정 arm — '켬' 은 counter 를 끈 arm 이다(이름과 반대). 켜면 Stage 3 콜을 뺀다(structural)
+  counter: { workflows: ['review-live'], on: { counter: 'off' }, off: { counter: 'opus' },
+    structural: 'tests/workflows/review-live-counter-arm.js' },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }

@@ -4,7 +4,7 @@
 //   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
 //   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
 //     Workflow({ scriptPath: '{WORK_DIR}/review-live.js',   // 원본 {plugin_root}/workflows/ 를 §12 0단계 준비(cp → cmp -s)로 복사
-//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2?, crossOutput?, preserveLowConfidence?, snapshotDir? } })
+//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2?, crossOutput?, preserveLowConfidence?, snapshotDir?, counter? } })
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
 //   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄 · axisCoverage(6축 필수) · craftAxis · ruleRef 가 들어간다.
@@ -25,6 +25,10 @@
 //     미보고' 는 그 문장이 있을 때만 풀린다 — 게시 여부는 review_merge 가 정한다(tests/workflows/low-confidence-preserved.js).
 //   snapshotDir: ⛔ 기본 off(R-C S22b). scripts/review_snapshot.sh 산출 폴더를 주면 Stage 1 두 렌즈에 '스냅샷 우선' 1줄 — 미지정 · 빈 문자열이면
 //     바이트 단위로 같다(tests/workflows/review-live-snapshot-arm.js). 효과(워커 턴 · 출력 · SC-3)는 S25 가 잰다.
+//   counter: ⛔ 기본 'opus'(미지정도 opus — 기준선 불변). 'off' 는 counter 대 GPT DA 측정 arm(B11 · M2) 전용이다 — Stage 3 콜을 빼고
+//     반환에 counterSkipped:'arm' 과 metrics.stagesExpected 2 를 단다(완주 2/2 — counter null 실패의 '3 중 2' 와 다르다).
+//     그 run 의 DA 는 Lead 가 정문 peer-da 로 돌리고 scripts/counter_adapter.py(prepare → convert → merge)가 이 스크립트와 같은 병합 규칙으로
+//     합친다. GPT 실패는 arm 무효다. 그 밖의 값은 fallback — 조용히 opus 로 읽지 않는다(tests/workflows/review-live-counter-arm.js).
 //   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
 //     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
@@ -224,6 +228,14 @@ if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: metrics(0) }
 }
+// counter = Stage 3 DA 담당(B11). 미지정이면 'opus'(기준선 불변). 'off' 는 측정 arm 전용 — 허용값 밖이면 fallback
+const COUNTER = input.counter === undefined ? 'opus' : input.counter
+if (!['opus', 'off'].includes(COUNTER)) {
+  log(`FATAL args invalid — counter=${JSON.stringify(input.counter)}: opus · off. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: counter=${JSON.stringify(input.counter)}`, metrics: metrics(0) }
+}
+const counterOff = COUNTER === 'off'
 
 const TARGET = `[리뷰 대상] diff 파일: ${input.diffPath} (Read로 로드)\n[변경 의도] ${input.intentContext}`
 // 구조 축 브리프 — arch 렌즈에만 주입 (modules/review-structural-axes.md §2).
@@ -466,12 +478,13 @@ const allFindings = []
   .concat(arch ? arch.findings : [], quality ? quality.findings : [])
   .concat(archOnQuality ? archOnQuality.additions : [], qualityOnArch ? qualityOnArch.additions : [])
 const allOkAreas = [].concat(arch ? arch.okAreas : [], quality ? quality.okAreas : [])
-const counter = await callAgent(
+if (counterOff) log('Stage 3 생략 — counter off(측정 arm) · DA 는 Lead 가 GPT 로 돌린다(scripts/counter_adapter.py)')
+const counter = counterOff ? null : await callAgent(
   `${LENS_OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
   `[findings] ${JSON.stringify(allFindings)}\n[okAreas(정상 판정)] ${JSON.stringify(allOkAreas)}\n` +
   `[목표] (1) 각 finding을 실측 재검증 — 과장/오독이면 refute + 인용. (2) okAreas에 "정말 OK인가?" 반례 탐색 — 반례 발견 시 missedFindings(id C-X)로. 라인 인용 오류를 특히 의심.`,
   { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: EFFORT, schema: lensSchema(CounterSchema) })
-if (!counter) log('WARN counter null — DA 패스 미수행 (findings 원판정 유지)')
+if (!counter && !counterOff) log('WARN counter null — DA 패스 미수행 (findings 원판정 유지)')
 
 // ════════ 병합 — 스크립트 binary 규칙 (id-기반 verdict 반영) ════════
 const adjustMap = {}
@@ -527,5 +540,7 @@ return {
   distribution: dist,
   ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본 반환 모양 불변
   ...(stage2Conditional ? { stage2Ran: !!(archOnQuality || qualityOnArch), stage2Trigger: liveTrigger, stage2Skipped } : {}),   // ⛔ 기본 반환 모양 불변
-  metrics: metrics(stagesCompleted), // Lead가 experiment-log §5.7 fz-review 테이블 기록
+  ...(counterOff ? { counterSkipped: 'arm' } : {}),   // ⛔ 기본 반환 모양 불변 — arm 생략을 counter 실패와 가른다
+  // Lead가 experiment-log §5.7 fz-review 테이블 기록. arm 은 기대 단계가 2 다(Stage 3 을 일부러 뺐다)
+  metrics: counterOff ? { ...metrics(stagesCompleted), stagesExpected: 2 } : metrics(stagesCompleted),
 }
