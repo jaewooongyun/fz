@@ -104,6 +104,7 @@ metadata:
 2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js && cmp -s {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. 복사본은 2.8 준비가 매 호출 만든다(fz-plan 절차 2.5 와 같은 규칙)
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
+3.5. **기본 GPT review 동시 기동**(F-473): Workflow 를 띄운 직후 Phase 5 검증 2 의 GPT review 를 background 로 함께 띄운다 — 입력이 diff 범위라 Workflow 반환을 기다릴 이유가 없다. 직전 `gpt-choice.sh decide` 가 `run` · `config` 면 `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd {GIT_ROOT} --out {WORK_DIR}/review/gpt-review.md --base {BASE}`(`modules/fz-gpt-subcommands-core.md` § review) · `skip` 이면 `[GPT 미사용 — 사유]`. 2.5 독립 첫 패스를 띄운 run 에는 이 단계가 없다(4.5 가 대신)
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기. SOLO 3중 검증은 **L4 사용자 승인 후**. 사유는 experiment-log 기록
 4.5. **(`--gpt-independent`) 병합**: 두 패스가 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환} --gpt {독립 첫 패스 .json} --diff {같은 diff.patch}` — 런처 옆 파일로 오염 · 실패 · stale 을 거부한다. 결과가 Phase 5 [병렬 2] GPT 리뷰를 대신한다(두 번 부르지 않는다)
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + GPT validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
@@ -212,7 +213,7 @@ mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분�
 # 독립 스킬로 위임
 /fz-gpt review "코드 리뷰"
 ```
-> ⊕ `--gpt-independent` 면 이 검증을 실행 절차 2.5 · 4.5 가 대신한다 — GPT 가 Claude 산출을 보기 전에 따로 리뷰한 결과를 `review_merge.py` 가 합친다
+> ⊕ `--gpt-independent` 면 이 검증을 실행 절차 2.5 · 4.5 가 대신한다 — GPT 가 Claude 산출을 보기 전에 따로 리뷰한 결과를 `review_merge.py` 가 합친다 · full 이면 실행 절차 3.5 가 Workflow 와 함께 띄운 결과를 읽는다(다시 부르지 않는다)
 > ⊘ 직전 `gpt-choice.sh decide`(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수)가 `skip` 이거나 정문이 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음)면 light · full 모두 이 검증을 `[GPT 미사용 — 사유]` 표기로 대신한다 — 실행 실패(아래 불능 분기)와 다르다 · 정본 `modules/gpt-strategy.md` § GPT 미사용
 
 fz-gpt가 수행하는 작업:
