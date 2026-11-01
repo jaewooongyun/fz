@@ -62,7 +62,9 @@
           "evidence_trace",
           "scope_disposition",
           "symptom_screen",
-          "symptom_reach"
+          "symptom_reach",
+          "compiler_verifiable",
+          "ruleSource"
         ],
         "additionalProperties": false,
         "properties": {
@@ -215,6 +217,26 @@
               "null"
             ],
             "description": "그 화면이 그 상태로 떠 있게 되는 사용자 동작. severity minor 이상이면 필수 — 비면 suggestion 으로 강등 [F-285]"
+          },
+          "compiler_verifiable": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "주장을 컴파일러 · 정적 검사로 판정할 수 있으면 true (fz-challenger 지시 — Lead Gate 4.6 이 컴파일 검증 대상을 고를 때 참고). 해당 없으면 null [F-466]"
+          },
+          "ruleSource": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "project",
+              "plugin-default",
+              null
+            ],
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/rule_source",
+            "description": "근거 규칙의 출처 — project(대상 프로젝트 규칙) · plugin-default(도메인 팩 기본값 — severity 는 suggestion 이하) · 규칙 근거가 없으면 null [F-466]"
           }
         }
       }
@@ -227,7 +249,9 @@
         "required": [
           "target_issue_id",
           "action",
-          "reason"
+          "reason",
+          "compiler_verifiable",
+          "ruleSource"
         ],
         "additionalProperties": false,
         "properties": {
@@ -248,6 +272,26 @@
           "reason": {
             "type": "string",
             "description": "판정 근거"
+          },
+          "compiler_verifiable": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "주장을 컴파일러 · 정적 검사로 판정할 수 있으면 true (fz-challenger 지시 — Lead Gate 4.6 이 컴파일 검증 대상을 고를 때 참고). 해당 없으면 null [F-466]"
+          },
+          "ruleSource": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "project",
+              "plugin-default",
+              null
+            ],
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/rule_source",
+            "description": "근거 규칙의 출처 — project(대상 프로젝트 규칙) · plugin-default(도메인 팩 기본값 — severity 는 suggestion 이하) · 규칙 근거가 없으면 null [F-466]"
           }
         }
       }

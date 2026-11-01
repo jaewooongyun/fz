@@ -294,7 +294,7 @@ planning 생산 전 → ✓ direction-challenge (review-direction, TEAM fz-plan 
 planning 생산 후 → ✓ stress-test(Q1-Q5) + ✓ gpt verify (GPT 켬 — light · full)
 code-changes 생산 중 → ✓ friction-detect (매 Step, fz-code 내장)
 code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ implication-scan (제거/리팩 시) + ✓ gpt check (GPT 켬 — light · full)
-commit/pr 전 → ✓ gpt check (GPT 켬 — light · full)
+commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-commit · fz-pr 에 자동 배선 없음)
 ```
 
 > **direction-challenge**: review-direction 에이전트가 접근 방향 자체를 도전 (PROCEED/RECONSIDER/REDIRECT 판정). fz-plan TEAM Phase 0.5.

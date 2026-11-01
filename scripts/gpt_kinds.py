@@ -616,7 +616,7 @@ def render(reg, root=ROOT):
     for n in stable:
         k = kinds[n]
         how = f"런처 {k['mode']}" if k.get("launcher") == "independent" else f"래퍼 {k['mode']}"
-        rows.append(f"| **{n}** | {how} | {k.get('purpose', '')} | {' · '.join(k.get('callers') or []) or '—'} |")
+        rows.append(f"| **{n}** | {how} | {k.get('purpose', '')} | {' · '.join(k.get('callers') or []) or f'명시 호출 전용(`/fz-gpt {n}`)'} |")
     out["kinds"] = rows
     return out
 
@@ -641,6 +641,68 @@ def table(root=ROOT, write=False):
                 problems.append(f"{TABLE_DOC}: generated block '{name}' differs from the registry — run gpt_kinds.py table --write")
     if write and not problems:
         open(path, "w", encoding="utf-8").write(text)
+    return problems
+
+
+# ── declared callers vs real wiring (F-467) ──────────────────────────────────────────────────────────────────────────
+# A caller label in the registry is a claim ("/fz-pr 전" runs final). Two directions are checked:
+#   undeclared — a skill step really calls the kind (front door or /fz-gpt) but the registry does not name that skill;
+#   unwired    — a declared label names a skill or module whose text (one hop through the modules it cites) never names the kind.
+# fz-gpt itself documents every kind for explicit use, so its own pages are recipes, not callers. A line that says
+# "명시 호출" documents how a user calls a kind by hand (e.g. "commit/pr 전 → gpt check 는 명시 호출 전용") — not wiring.
+CALLER_TOKEN = re.compile(r"(/fz(?:-[a-z]+)*)(?![\w-])|(modules/[\w.-]+\.md)")
+EXPLICIT_ONLY = "명시 호출"
+
+
+def _strict(kind):
+    return re.compile(r'gpt-call\.sh"?\s+' + re.escape(kind) + r"(?![-\w])|/fz-gpt\s+" + re.escape(kind) + r"(?![-\w])")
+
+
+def _loose(kind):
+    return re.compile(r"(?:gpt-call\.sh\"?\s+|fz-gpt\s+|`)" + re.escape(kind) + r"(?![-\w])")
+
+
+def _skill_files(root, skill):
+    d = os.path.join(root, "skills", skill)
+    return [p for p in [os.path.join(d, "SKILL.md")] + sorted(glob.glob(os.path.join(d, "references", "*.md"))) if os.path.isfile(p)]
+
+
+def _read(p):
+    return open(p, encoding="utf-8", errors="replace").read()
+
+
+def callers_scan(root=ROOT, reg=None):
+    """-> {kind: [skill, ...]} — skills (not fz-gpt) whose own pages really call the kind."""
+    reg = load(os.path.join(root, "scripts", "gpt-kinds.json")) if reg is None else reg
+    skills = sorted(os.path.basename(os.path.dirname(p)) for p in glob.glob(os.path.join(root, "skills", "*", "SKILL.md")))
+    texts = {s: "\n".join(l for p in _skill_files(root, s) for l in _read(p).split("\n") if EXPLICIT_ONLY not in l)
+             for s in skills if s != "fz-gpt"}
+    return {n: sorted(s for s, t in texts.items() if _strict(n).search(t)) for n in reg["kinds"]}
+
+
+def check_callers(reg, root=ROOT):
+    problems, real = [], callers_scan(root, reg)
+    for n, k in reg["kinds"].items():
+        decl = k.get("callers") or []
+        declared_skills = set()
+        for label in decl:
+            files = []
+            for m in CALLER_TOKEN.finditer(label):
+                if m.group(1):
+                    skill = m.group(1)[1:]
+                    declared_skills.add(skill)
+                    own = _skill_files(root, skill)
+                    files += own
+                    for p in own:   # one hop: modules the skill's pages cite
+                        files += [os.path.join(root, x) for x in re.findall(r"modules/[\w.-]+\.md", _read(p))]
+                else:
+                    files.append(os.path.join(root, m.group(2)))
+            files = [p for p in dict.fromkeys(files) if os.path.isfile(p)]
+            if CALLER_TOKEN.search(label) and not any(_loose(n).search(_read(p)) for p in files):
+                problems.append(f"kind {n}: declared caller '{label}' never names the kind — unwired claim (F-467)")
+        for s in real[n]:
+            if s not in declared_skills:
+                problems.append(f"kind {n}: skills/{s} calls it but the registry callers do not name /{s}")
     return problems
 
 
@@ -900,9 +962,20 @@ def main(argv):
     if argv[:1] == ["table"] and len(argv) in (2, 4) and argv[1] in ("--write", "--check") and (len(argv) == 2 or argv[2] == "--root"):
         root = os.path.abspath(argv[3]) if len(argv) == 4 else ROOT
         problems = table(root, write=argv[1] == "--write")
+        if argv[1] == "--check":   # the rendered 호출자 column is only true if the declared callers match real wiring
+            problems += check_callers(load(os.path.join(root, "scripts", "gpt-kinds.json")), root)
         for x in problems:
             print("TABLE", x)
         print("GPT-KINDS-TABLE", "OK" if not problems else f"FAIL ({len(problems)})")
+        return 0 if not problems else 11
+    if argv[:1] == ["callers"] and len(argv) in (1, 3) and (len(argv) == 1 or argv[1] == "--root"):
+        root = os.path.abspath(argv[2]) if len(argv) == 3 else ROOT
+        reg = load(os.path.join(root, "scripts", "gpt-kinds.json"))
+        print(json.dumps(callers_scan(root, reg), ensure_ascii=False, indent=1))
+        problems = check_callers(reg, root)
+        for x in problems:
+            print("CALLERS", x)
+        print("GPT-KINDS-CALLERS", "OK" if not problems else f"FAIL ({len(problems)})")
         return 0 if not problems else 11
     if argv[:1] == ["lint"] and (len(argv) == 1 or (argv[1:2] == ["--root"] and len(argv) == 3)):
         root = os.path.abspath(argv[2]) if len(argv) == 3 else ROOT

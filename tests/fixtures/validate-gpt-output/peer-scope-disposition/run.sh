@@ -77,6 +77,7 @@ ISSUE = {
     "alternatives": [{"label": "A: 현재", "description": "그대로", "pros": ["변경 없음"], "cons": ["결함 유지"]}],
     "recommended": "A: 현재", "evidence_trace": "Feature.swift:10 → :20",
     "scope_disposition": "scope-in", "symptom_screen": "FeatureView", "symptom_reach": "탭 진입",
+    "compiler_verifiable": None, "ruleSource": None,
 }
 BASE = {"schemaVersion": "1.1", "agent": "gpt-challenger", "agent_status": "ok", "status_reason": "정상",
         "issues": [ISSUE], "challenges": [], "strengths": ["fixture"], "overall_assessment": "good"}

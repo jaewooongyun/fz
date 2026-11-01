@@ -87,7 +87,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ `--gpt-independent` 로 resume 교차를 마쳤으면 생략) | GPT 켬(light · full) |
 | review 포함 | 다관점 리뷰 | review-arch + review-quality + GPT (팀 내 병렬) | TEAM (GPT 는 켠 세션이면 light 도 — fz-review Phase 5) |
 | search 포함 | 교차 검증 | search-symbolic + search-pattern + GPT (팀 내 병렬) | TEAM(--deep) |
-| commit/pr 포함 | Pre-ship gate | `fz-gpt check` | GPT 켬(light · full) |
+| commit/pr 포함 | Pre-ship gate | `fz-gpt check` — 명시 호출 전용(fz-commit · fz-pr 에 자동 배선 없음) | GPT 켬(light · full) |
 | fix 포함 | 수정 검증 | `fz-gpt check` (팀 내 병렬) | GPT 켬(light · full) |
 | review 포함 | L3 에러 처리 스캔 | silent-failure-hunter (Agent background) | TEAM (diff에 에러처리 코드 포함 시) |
 | review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | TEAM (diff에 새 타입 정의 포함 시) |

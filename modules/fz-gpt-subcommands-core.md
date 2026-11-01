@@ -32,6 +32,8 @@ fz-review의 Phase 5 GPT 부분. **래퍼 review 모드 한 경로.**
 
 fz-plan의 Phase 2. **kind `verify` — 래퍼 exec · architect 본문 주입 · `gpt_review_schema`(레지스트리).** 역할 본문을 찾지 못하면 정문이 레지스트리의 폴백 지시를 프롬프트 앞에 붙인다.
 
+⛔ **verify 는 Claude 가 쓴 계획을 받아 대조한다** — 입력에 계획 본문이 있고, 합격은 Q1~Q8 판정과 issues 다. 계획을 보지 않고 요구 원문만으로 GPT 가 자기 계획을 세우는 것은 `independent-plan` 이다(`modules/fz-gpt-subcommands-aux.md` § independent-plan). 둘을 같은 검증으로 세지 않는다(F-471 · F-508).
+
 ```bash
 cat > "$P_VERIFY" <<EOF
 이 구현 계획을 검증하라.

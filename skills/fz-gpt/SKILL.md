@@ -141,11 +141,11 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 | kind | 실행 | 용도 | 호출자 |
 |------|------|------|--------|
 | **review** | 래퍼 review | 코드 리뷰 (주력) | /fz-review Phase 5 |
-| **check** | 래퍼 review | 커밋 전 빠른 검증 (verdict contract) | /fz-fix |
+| **check** | 래퍼 review | 커밋 전 빠른 검증 (verdict contract) | /fz-fix · /fz-code 8.5 |
 | **verify** | 래퍼 exec | 계획 검증 (Q1-Q8 stress-test) | /fz-plan Phase 2 · /fz-discover --deep |
 | **verify-gates** | 래퍼 exec | 게이트 원장 판정 (verify 와 별도 호출) | /fz-plan Phase 2 · /fz-review Phase 5.5 |
 | **validate** | 래퍼 exec | 피드백 역검증 | /fz-review Phase 5.5 |
-| **final** | 래퍼 review | PR 전 최종 리뷰 (major 가 있으면 final-deep · final-da) | /fz-pr 전 |
+| **final** | 래퍼 review | PR 전 최종 리뷰 (major 가 있으면 final-deep · final-da) | 명시 호출 전용(`/fz-gpt final`) |
 | **adversarial** | 래퍼 exec | Devil's Advocate 리뷰 — 설계 필요성 (반증 frame 아님) | modules/promotion-ledger.md 승격 판정(2건 누적 후) |
 | **drift** | 래퍼 exec | 아키텍처 드리프트 전체 스캔 | /fz drift-check (modules/pipelines.md §15) |
 | **plan** | 래퍼 exec | 독립 플랜 (Claude 와 교차 비교, C4 원칙) | /fz-plan cross-check · /fz plan-parallel (modules/pipelines.md §16) |
@@ -153,8 +153,8 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 | **sprint-contract** | 래퍼 exec | Sprint Contract 초안 (성공 기준) | /fz-plan Phase 0.7 |
 | **independent-plan** | 런처 plan | 격리 첫 패스 플랜 (opt-in --gpt-independent) | /fz-plan 2.7 |
 | **independent-review** | 런처 review | 격리 첫 패스 리뷰 | /fz-peer-review (기본) · /fz-review (opt-in --gpt-independent) |
-| **final-deep** | 래퍼 resume | final 심화 — final 세션을 잇는다 | /fz-pr 전 (major > 0) |
-| **final-da** | 래퍼 exec | final 의 DA 패스 | /fz-pr 전 (major > 0) |
+| **final-deep** | 래퍼 resume | final 심화 — final 세션을 잇는다 | 명시 호출 전용(`/fz-gpt final-deep`) |
+| **final-da** | 래퍼 exec | final 의 DA 패스 | 명시 호출 전용(`/fz-gpt final-da`) |
 | **verify-cross** | 래퍼 resume | 독립 플래너 세션을 이어 같은 틀로 교차 검증 | /fz-plan Phase 2 (--gpt-independent) |
 | **search** | 래퍼 exec | 심볼 탐색 보조 | validate 보조 |
 | **fix-suggest** | 래퍼 exec | 수정 제안 (fixable 이슈) | check 후속 |
