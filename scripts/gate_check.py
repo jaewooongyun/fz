@@ -144,7 +144,7 @@ KNOWN_ATTRS = {
     # ⛔ `ENV:` — 이 CHECK 가 요구하는 환경 변수 (쉼표 구분). 없거나 비면 **미판정**이다(F-342) — `TOOLS:` 와 같은 자리 · 같은 처리.
     #    `${NAME:?}` 로 막아 둔 CHECK 를 변수 없이 다시 돌리면 셸이 exit 127(dash 2)을 내고 그것을 FAIL 로 기록해
     #    통과 증거를 강등했다. CHECK 본문에서 추론하지 않는다(빈 값 · 대입 순서 · 리터럴이 추론을 틀리게 한다).
-    #    승인 해시 밖이다(TOOLS 와 같다 — 환경은 승인 대상이 아니다). 하향 설치 전에는 이 줄을 지운다(modules/gates.md)
+    #    선언(이름 목록)은 승인 해시 안이다(TOOLS 와 다르다 — `oracle_hash`). 하향 설치 전 이 줄을 지우면 재확정한다(modules/gates.md)
     "ENV",
 }
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
@@ -516,7 +516,7 @@ def env_fingerprint() -> str:
 
 
 def oracle_hash(gate: Gate, cwd: str) -> str:
-    payload = json.dumps({
+    fields = {
         "schema": 1,
         "check": gate.attrs.get("CHECK", ""),
         "expect": gate.attrs.get("EXPECT", ""),
@@ -537,8 +537,15 @@ def oracle_hash(gate: Gate, cwd: str) -> str:
         #    fz-plan → fz-code 가 별 세션인 것은 예외가 아니라 설계된 흐름이다
         #    (compact · 다음 날 · 다른 터미널 · direnv/nvm shim).
         #    환경은 **증거 서명**이 묶는다 — 그쪽이 provenance 축이다.
-    }, sort_keys=True, ensure_ascii=False)
-    return sha(payload)
+    }
+    # ⛔ `ENV:` 선언(이름 목록)은 넣는다 — 값이 아니라 '이 CHECK 는 이 변수 없이 돌리지 않는다' 가 승인 대상이다.
+    #    빼면 승인 뒤 met 게이트에 `ENV: 없는변수` 를 더해 `--reverify` 를 영구 UNRUN(강등 없음)으로 만들고 `--status` 는
+    #    met 으로 읽는다(드리프트는 ENV 를 보지 않는다 — Stop 훅은 세션 export 를 못 물려받는다). 선언이 없으면 키를
+    #    넣지 않는다 — ENV 없는 원장의 도장은 종전 그대로다
+    env_decl = ",".join(t.strip() for t in gate.attrs.get("ENV", "").split(",") if t.strip())
+    if env_decl:
+        fields["env"] = env_decl
+    return sha(json.dumps(fields, sort_keys=True, ensure_ascii=False))
 
 
 def ev_enc(s: str) -> str:

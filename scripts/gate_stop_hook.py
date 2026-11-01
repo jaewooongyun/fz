@@ -135,6 +135,9 @@ LOOP_BODY_BANNED = frozenset((".", "source", "eval", "exec", "break", "continue"
 LOOP_STATEFUL = frozenset(("cd", "pushd", "popd", "export", "unset", "read", "declare", "typeset", "local", "readonly",
                            "let", "shift", "getopts", "mapfile", "readarray", "set", "shopt", "alias", "unalias", "trap",
                            "umask", "hash", "enable", "builtin"))
+# 인자 자리에서도 셸 상태를 바꾸는 확장 — 산술(`$((D+=1))`) · 기본값 대입(`${X:=…}` · `${X=…}`). 명령 머리가 변수(`"$C" …`)인
+# 몸체는 무엇을 부르는지 모르므로 위 목록과 대조할 수 없다 — 둘 다 지원 밖(리뷰 R2)
+LOOP_SIDE_EFFECT_RE = re.compile(r"\$\(\(|\$\{\w+:?=")
 # `. FILE` · `source FILE` — 그 파일의 대입을 env 에 더한다(F-422). 파일은 훅이 도는 **지금** 의 내용이다
 SOURCE_RE = re.compile(r"^\s*(?:\.|source)\s+[\"']?([^\s\"';&|]+)")
 SOURCE_ANY_RE = re.compile(r"(?:^|[;&|(])\s*(?:\.|source)\s+\S", re.M)
@@ -159,7 +162,8 @@ _REDIR_RE = re.compile(r"^(?:\d*>>?|<|&>>?|\d*>&)")           # 대상이 붙은
 _UNRESOLVED_RE = re.compile(r"[$`*]")                          # 풀리지 않은 변수 · 치환 · 글롭
 # 원장 인자 · 루프 값은 이 글자만으로 된 경로일 때만 '풀렸다' 로 본다 — 허용 목록이다(F-458). 차단 목록은 `~` · `[…]` ·
 # `{a,b}` · `?` 처럼 셸이 바꾸는 꼴을 하나 빠뜨릴 때마다 남의 원장으로 판정해 Stop 을 통과시켰다(fail-open)
-_RESOLVED_PATH_RE = re.compile(r"^(?!-)[\w./@%+=:,-]+$")          # `-` 로 시작하면 변수로 들어온 옵션이다(`"$OPT"`)
+# 공백은 따옴표로 묶은 한 단어 안에서만 온다(따옴표 값에 공백이 있는 대입은 미상 표식 — `_assign`) — 공백 든 원장 경로를 받는다(리뷰 R6)
+_RESOLVED_PATH_RE = re.compile(r"^(?!-)[\w./@%+=:, -]+$")         # `-` 로 시작하면 변수로 들어온 옵션이다(`"$OPT"`)
 # ⛔ heredoc 본문이 **데이터인지 코드인지**는 어디에 먹이는가로 갈린다. `cat`/`tee` 로
 #    가는 본문은 데이터라, 명령으로 읽으면 문서에 인용한 경로가 쓰기로 잡힌다(F-193 오탐).
 #    반대로 `python3 -`/`bash -` 로 가는 본문은 **실행되는 코드**이고 이 리포가 파일을
@@ -418,7 +422,37 @@ def _source_env(path_tok: str, env: dict, cur_dir, cwd) -> bool:
 
 
 def _assign(line: str, m, env: dict) -> None:
-    env[m.group(1)] = "$" + m.group(1) if MULTIWORD_ASSIGN_RE.match(line) else _expand(m.group(2), env)
+    env[m.group(1)] = "$" + m.group(1) if MULTIWORD_ASSIGN_RE.match(line) else _tilde(_expand(m.group(2), env), env)
+
+
+def _tilde(path: str, env: dict) -> str:
+    """앞머리 `~` · `~/` 를 셸처럼 HOME 으로 푼다 — 같은 명령이 HOME 을 대입했으면 그 값, 아니면 훅의 HOME(Bash 도구와 같은
+    사용자 · HOME — `_source_env` 와 같은 전제). 대입한 HOME 이 미상이면 `~` 도 풀지 않는다(미상).
+
+    풀지 않으면 `cd ~/x` · `W=~/x` 뒤의 경로가 어떤 원장과도 안 맞아 소유를 놓치거나(fail-open) 대상 미상(과차단)이 된다.
+    `~user` 는 풀지 않는다(미상). ponytail: 따옴표 안 `"~/x"` 도 푼다 — 셸은 글자 그대로 두지만 그런 원장 경로는 실측 0건이다.
+    """
+    if not (path == "~" or path.startswith("~/")):
+        return path
+    home = env.get("HOME")
+    if home is None:
+        return os.path.expanduser(path)
+    return path if "$" in home else home + path[1:]
+
+
+def _in_quotes(seg: str, pos: int) -> bool:
+    """`seg[pos]` 가 작은 · 큰따옴표 안인가 — 큰따옴표 안의 `\\` 이스케이프만 본다(셸 단어 규칙의 근사)."""
+    q, k = None, 0
+    while k < pos:
+        ch = seg[k]
+        if q is None and ch in "'\"":
+            q = ch
+        elif q == ch:
+            q = None
+        elif q == '"' and ch == "\\":
+            k += 1
+        k += 1
+    return q is not None
 
 
 def _loop_spans(segs: list) -> dict:
@@ -449,11 +483,12 @@ def _loop_spans(segs: list) -> dict:
             # 루프 변수 이름이 확장(`$NAME` · `${NAME…}`) 밖에서 나오면(`X=` · `read X` · `printf -v X`) 지원 밖이다
             bare = re.sub(r"\$\{?%s(?![A-Za-z0-9_])" % re.escape(name), "", body)
             ws = _words(body)
-            head = next((w for w in ws if w not in _CMD_PREFIX_WORDS), "")
+            head = next((w for w in ws if w not in _CMD_PREFIX_WORDS and not w.startswith("-")), "")   # `command -- "$C"`
             if (LOOP_COMPOUND_RE.match(body) or LOOP_BODY_BANNED & set(ws)
                     or re.search(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(name), bare)
-                    or re.match(r"^\w+\+?=", head) or head in LOOP_STATEFUL or (head == "printf" and "-v" in ws)):
-                ok = False                 # 상태를 바꾸는 몸체 — 다음 반복의 값 · 폴더가 달라진다(GPT check 후속 5)
+                    or re.match(r"^\w+\+?=", head) or head in LOOP_STATEFUL or (head == "printf" and "-v" in ws)
+                    or "$" in head or "`" in head or LOOP_SIDE_EFFECT_RE.search(body)):
+                ok = False                 # 상태를 바꾸는 몸체 — 다음 반복의 값 · 폴더가 달라진다(GPT check 후속 5 · 리뷰 R2)
         spans[i] = (name, end, ok and end is not None)
     return spans
 
@@ -474,8 +509,9 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
     - Important: 근사기의 전제(F-458) — 이 밖의 정보가 필요한 꼴은 받아들인 한계다:
       단어 분리는 기본 IFS(명령 · source 한 파일이 IFS 를 바꾸면 루프는 미상) · 변수 값은 같은 명령의 대입과 source 한
       파일(훅이 도는 지금의 내용)에서만 안다(물려받은 환경 · 셸 프로필 · alias 는 모른다) · 함수 · eval 은 따라가지 않는다 ·
-      판정기는 파일명으로 가린다(PATH 가림 · 링크 이름은 모른다). 원장 인자와 루프 값은 허용 목록(`_RESOLVED_PATH_RE`)에
-      맞는 최종 경로일 때만 '풀렸다' 이고, 그 밖은 '대상 미상' 이다.
+      판정기는 파일명으로 가린다(PATH 가림 · 링크 이름은 모른다) · 앞머리 `~` 는 훅의 HOME 으로 푼다(`_tilde`). 원장 인자 ·
+      루프 값 · 리다이렉트와 cp · mv 대상은 허용 목록(`_RESOLVED_PATH_RE`)에 맞는 최종 경로일 때만 '풀렸다' 이고, 그 밖은
+      '대상 미상' 이다.
 
     ⛔ "명령에 쓰기 마커가 있다 + 어딘가에 원장 경로가 있다" 로 판정하면 안 된다.
        실측(2026-09-11): 발견 레지스트리에 사건을 기록하는 `cat > "$F" <<EOF` 가
@@ -517,13 +553,15 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
     source_missing = False                 # 이 명령이 source 한 파일 중 못 읽은 것이 있다 — 그 뒤 `"$G"` 는 판정기일 수 있다
     segs = SEGMENT_SPLIT_RE.split(body)
     spans = _loop_spans(segs)
+    # 지원 밖 루프의 몸체 — 반복마다 상태(폴더 · 변수)가 달라질 수 있어 루프 변수를 안 쓰는 원장 인자도 한 값으로 못 정한다(리뷰 R2)
+    unbound = {j for s, (_n, e, ok) in spans.items() if not ok for j in range(s + 1, len(segs) if e is None else e)}
     bind = None                            # (이름, 값들, 짝 done index) — 지원 루프의 몸체 안에서만
     for i, seg in enumerate(segs):
         if bind and i >= bind[2]:
             bind = None
         if i in spans:
             name, end, ok = spans[i]
-            vals = [_expand(w, env) for w in _words(FOR_RE.match(seg).group(2))]
+            vals = [_tilde(_expand(w, env), env) for w in _words(FOR_RE.match(seg).group(2))]
             # 원장 모양(`.md`) 값만 · IFS 를 바꾼 명령(source 한 파일 포함 — env 에 남는다)은 단어 경계를 모른다
             if ok and vals and "IFS" not in env and all(_RESOLVED_PATH_RE.match(v) and v.endswith(".md") for v in vals):
                 bind = (name, vals, end)
@@ -532,7 +570,7 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
         seg = LOOP_DO_RE.sub("", seg) if bind or any(s < i for s in spans) else seg
         mcd = CD_RE.match(seg)
         if mcd:
-            cur_dir = _expand(mcd.group(1), env)
+            cur_dir = _tilde(_expand(mcd.group(1), env), env)
             continue
         msrc = SOURCE_RE.match(seg)
         if msrc:
@@ -544,22 +582,30 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
         # 단어를 전부 푼 뒤 판정기 인자를 가른다 — 변수로 들어온 옵션(`"$OPT"`)이 원장 자리로 잡히지 않는다. 루프 몸체면 값마다
         words, missed = _words(seg), None
         for env_v in ([dict(env, **{bind[0]: v}) for v in bind[1]] if bind else [env]):
-            call = _gate_call([_expand(w, env_v) for w in words], env_v, unresolved_prog=source_missing)
+            call = _gate_call([_tilde(_expand(w, env_v), env_v) for w in words], env_v, unresolved_prog=source_missing)
             if call is None or not call[0] or call[1] is None:
                 continue
             path = call[1] if call[1].startswith("/") or not cur_dir else f"{cur_dir}/{call[1]}"
-            if not _RESOLVED_PATH_RE.match(path) or not call[2]:          # 허용 목록은 `cd` 접두를 붙인 최종 경로에 건다
+            if not _RESOLVED_PATH_RE.match(path) or not call[2] or i in unbound:   # 허용 목록은 `cd` 접두를 붙인 최종 경로에 건다
                 missed = call[1]
             else:
                 out.append(path)
         if missed is not None and unknown is not None:
             unknown.append(missed)
         for rx in WRITE_TARGET_RES:
-            for raw in rx.findall(seg):
-                for tok in _bind_expand(raw, env, bind):
+            for mt in rx.finditer(seg):
+                raw = mt.group(1)
+                for tok in (_tilde(t, env) for t in _bind_expand(raw, env, bind)):
                     if not tok.startswith("/") and cur_dir:
                         tok = f"{cur_dir}/{tok}"
-                    out.append(tok)
+                    # 리다이렉트 · cp · mv 대상도 판정기 인자와 같은 허용 목록 — 못 푼 경로를 글자 그대로 소유로 두면 어떤 원장과도
+                    # 안 맞아 소유가 비고 '대상 미상' 도 없다(fail-open). 단 쓰기 연산자가 따옴표 안이면 명령이 아니라 데이터다
+                    # (`rg 'cat > "$F/gates/plan.md"'`) — 미상으로 올리지 않는다(과차단 금지)
+                    if not _RESOLVED_PATH_RE.match(tok) or i in unbound:
+                        if unknown is not None and not _in_quotes(seg, mt.start()):
+                            unknown.append(raw)
+                    else:
+                        out.append(tok)
     # 인터프리터 heredoc 이 파일을 쓰면, **그 본문 안에** 등장한 원장을 이 세션이 쓴
     # 것으로 본다. 쓰기 대상 **자리** 규칙은 셸 문법용이라 코드에는 맞지 않으므로,
     # 코드에서는 신호와 경로의 동거를 근거로 삼는다(보수적 — 어느 변수가 그 경로를 들고

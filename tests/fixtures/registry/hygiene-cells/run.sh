@@ -13,6 +13,8 @@
 #   unrun           entries 부재 · 빈 분모 · archive 디코딩 실패 · APPLIED 부재 → exit 2 + 줄 맨 앞 `UNRUN:`
 #   consumer        실 레지스트리 소비자(SC-3 · G27) — manifest↔APPLIED↔archive 가 맞는 레지스트리에 고아 행만 넣으면
 #                   기본 모드(--strict 없이)와 `eject_findings.py --audit ROOT` 가 같은 `VIOLATION:` 줄로 exit 1(대장 대조는 누락 0)
+#   writer-leak*    엔트리 본문의 작성 명령 잔재(F-456) — `echo "기록` · `EOF` 뒤 echo · `EOF` 뒤 쓰기 스크립트(`python3 - <<` ·
+#                   `cat >` — 리뷰 R1)는 위반 · 펜스 안 인용과 네 백틱 펜스 안 세 백틱 인용(리뷰 R3)은 OK · 기본 모드도 같은 축
 # 손상 셀은 exit 1 + `VIOLATION:` 줄 + 그 축의 보고 줄을 함께 단언한다 — exit 만 보면 검사기가 죽은 것(traceback,
 # 기본 exit 1)을 탐지로 읽는다. 기준 트리는 --strict 에 이 축들이 없어 orphan·control 외 셀이 놓친다 → exit 1.
 # consumer 는 기준 기본 모드가 고아를 통과시키고 기준 --audit 이 위생 검사를 부르지 않아 놓친다 → exit 1.
@@ -368,10 +370,46 @@ def c_writer_leak_default_mode(b):
     expect_violation("writer-leak-default-mode", out, rc, LEAK_AXIS, "기본 모드(strict 없음)도 같은 축")
 
 
+def c_writer_leak_eof_script(b):
+    # 리뷰 R1 — 실제 레지스트리 꼴(F-213:26 · F-154:25): `EOF` 뒤에 INDEX 를 고치는 스크립트 · 다음 엔트리를 쓰는 cat
+    # 종결자가 `EOF` 가 아닌 꼴(F-227:46 `MD` → echo · F-091:95 `F91_EOF` → python3)도 같다
+    for k, tail in enumerate(("\nEOF\npython3 - <<'PY'\ns=open('INDEX.md').read()\nPY\n", '\nEOF\ncat > "$E/F-003-next.md" <<\'EOF\'\n',
+                              '\nMD\necho "F-002 기록 완료"\n', "\nF91_EOF\npython3 - <<'PY_EOF'\n",
+                              # 빈 줄을 사이에 둔 다음 엔트리 쓰기(F-076:68) · 본문 끝에 홀로 남은 종결자(F-115:503)
+                              '\nEOF\n\ncat > "$FD/F-003-next.md" <<\'EOF\'\n', '\n끝 문단.\nEOF\n')):
+        root, s2 = _leaky(b / f"v{k}", tail)
+        rc, out = strict(root)
+        expect_violation("writer-leak-eof-script", out, rc, LEAK_AXIS, f"`EOF` → {tail.split(chr(10))[2][:12]}")
+        check("writer-leak-eof-script", f"{s2}:" in out, "위반에 파일:줄", out)
+
+
+def c_writer_leak_midbody(b):
+    # 종결자 없이 본문 중간에 낀 쓰기 명령(정리 전 레지스트리 꼴) — 뒤에 산문 절이 이어져도 잔재다
+    for k, mid in enumerate(('cat > "$D/F-003-next.md" <<\'EOF\'\n', 'W=/Users/x/fz-findings\n', "python3 - <<'PY'\n")):
+        root, s2 = _leaky(b / f"m{k}", f"\n{mid}\n## 다음 절\n\n본문.\n")
+        rc, out = strict(root)
+        expect_violation("writer-leak-midbody", out, rc, LEAK_AXIS, f"본문 중간 `{mid.split()[0]}`")
+
+
+def c_writer_leak_nested_fence(b):
+    # 리뷰 R3 — 네 백틱 펜스 안에 인용한 세 백틱 예시는 펜스 경계가 아니다(CommonMark). 인용한 명령은 잔재가 아니다
+    root, _ = _leaky(b, '\n````markdown\n```bash\nEOF\necho "기록: $F"\n```\n````\n')
+    rc, out = strict(root)
+    check("writer-leak-nested-fence", rc == 0 and has_line(out, "OK: 불변식 충족"),
+          f"중첩 펜스 안 인용 — exit 0 · OK (실제 {rc})", out)
+    # GPT validate 새 지적 — 대문자 한 단어 줄 뒤에 펜스 블록만 있으면 본문 끝이 아니다(원문 기준)
+    root, _ = _leaky(b / "upper", '\nAPI\n```python\nprint(1)\n```\n')
+    rc, out = strict(root)
+    check("writer-leak-nested-fence", rc == 0 and has_line(out, "OK: 불변식 충족"),
+          f"대문자 줄 뒤 펜스 블록 — 종결자 아님 · exit 0 (실제 {rc})", out)
+
+
 CELLS = {"control": c_control, "orphan": c_orphan, "out-of-queue": c_out_of_queue, "applied-conflict": c_applied_conflict,
          "dup-title": c_dup_title, "dup-h1-body": c_dup_h1_body, "index-dump": c_index_dump, "unrun": c_unrun,
          "consumer": c_consumer, "writer-leak": c_writer_leak, "writer-leak-eof-echo": c_writer_leak_eof_echo,
-         "writer-leak-fenced": c_writer_leak_fenced, "writer-leak-default-mode": c_writer_leak_default_mode}
+         "writer-leak-fenced": c_writer_leak_fenced, "writer-leak-default-mode": c_writer_leak_default_mode,
+         "writer-leak-eof-script": c_writer_leak_eof_script, "writer-leak-nested-fence": c_writer_leak_nested_fence,
+         "writer-leak-midbody": c_writer_leak_midbody}
 picked = []
 for tok in [t for t in CELLS_ARG.replace(" ", ",").split(",") if t] or list(CELLS):
     if tok not in CELLS:
