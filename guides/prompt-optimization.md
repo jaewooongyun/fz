@@ -2,7 +2,7 @@
 
 > 실전 최적화 체크리스트. 이론이 아닌 즉시 적용 가능한 가이드.
 >
-> **Sources (last audited: 2026-09-25 — 모델 사실 축: Opus 5.5·GPT-6 출처 행, 원칙 8 GPT 근거, §3b 무인 런 2줄, Tier 2 CAPO 만 대조):**
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조. 이전: 2026-09-25 모델 사실 축(Opus 5.5·GPT-6 출처 행, 원칙 8 GPT 근거, §3b 무인 런 2줄, Tier 2 CAPO)):**
 >
 > **Tier 1 — Anthropic Official:**
 > - Claude 4 Best Practices (live docs) — prompt-engineering, agentic systems, adaptive thinking
@@ -17,40 +17,44 @@
 > - Anthropic Claude Code Best Practices (living reference) — Subagent isolation, Compaction, filesystem > compaction
 > - **Effective Context Engineering for AI Agents (Anthropic 2026)** — "context engineering = load-bearing skill of 2026"
 > - **Tool Use Context Engineering Cookbook (Anthropic 2026)** — memory, compaction, tool clearing 실전
-> - **Introducing Claude Opus 4.8 (Anthropic 2026-05-28)** — release announcement (effort 기본 high, 자기 코드 결함 ~4x↓, tool-calling 효율↑, 단일 세션 수백 parallel subagents)
-> - **Introducing Claude Opus 5 (Anthropic 2026-07-24)** — release announcement. "comes close to the frontier intelligence of Claude Fable 5 at half the price", $5/$25(4.8 동일), effort dial 강조
+> - ℹ️ 2026-11-01 — 현행 Claude 4종 = Fable 5.1 · Opus 5.5 · Sonnet 5.5 · Haiku 5.5. 아래 Opus 4.8 · Opus 5 · Fable 5 행은 퇴출이 아니라 **legacy(still available)** 다 — "Legacy models (still available): Claude Fable 5, Claude Opus 5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 5, Claude Sonnet 4.6, Claude Haiku 4.5." [verified: platform.claude.com/docs/en/models/overview]
+> - **Introducing Claude Opus 4.8 (Anthropic 2026-05-28)** — (이력 — legacy, still available) release announcement (effort 기본 high, 자기 코드 결함 ~4x↓, tool-calling 효율↑, 단일 세션 수백 parallel subagents)
+> - **Introducing Claude Opus 5 (Anthropic 2026-07-24)** — (이력 — legacy, Opus 5.5 가 상속하는 근거로만) release announcement. "comes close to the frontier intelligence of Claude Fable 5 at half the price", $5/$25(4.8 동일), effort dial 강조
 > - **What's new in Claude Opus 5.5 / Prompting Claude Opus 5.5 (Anthropic 2026-09-22)** — **현행 워커 정본**. thinking 끄기 불가(400) · forced `tool_choice` 400 · effort 기본 `medium` · 상속("the patterns in Prompting Claude Opus 5 remain a reasonable starting point") · elapsed 시간 신호 · text-only 턴 종료는 보고 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5] → 상세: `llm-references.md` §1.2
-> - **What's new in Claude Opus 5 / Prompting Claude Opus 5 (Anthropic, live)** — **Opus 5 지침 정본 (Opus 5.5 가 상속)**. thinking 기본 ON · thinking disabled는 effort ≤ high(400) · **검증 지시 삭제** · **subagent 위임 캡**(4.8 대비 역방향) · 길이는 프롬프트로(effort 아님) → 상세: `llm-references.md` §1.2
-> - **Introducing Claude Fable 5 and Claude Mythos 5 (Anthropic 2026-06-09 GA)** — Opus 상위 tier ($10/$50), thinking 상시 활성, refusal/fallback/billing → 상세: `model-guide.md`
-> - **Prompting Claude Fable 5 (Anthropic, live)** — Fable 전용 프롬프팅 (de-prescription, async subagents, grounded progress, reasoning_extraction 주의)
+> - **What's new in Claude Opus 5 / Prompting Claude Opus 5 (Anthropic, live)** — (legacy 모델 페이지) **Opus 5 지침 정본 (Opus 5.5 가 상속)**. thinking 기본 ON · thinking disabled는 effort ≤ high(400) · **검증 지시 삭제** · **subagent 위임 캡**(4.8 대비 역방향) · 길이는 프롬프트로(effort 아님) → 상세: `llm-references.md` §1.2
+> - **Introducing Claude Fable 5 and Claude Mythos 5 (Anthropic 2026-06-09 GA)** — (이력 — legacy, Fable 5.1 이 철회하지 않은 진술의 출처로만) Opus 상위 tier ($10/$50), thinking 상시 활성, refusal/fallback/billing → 상세: `model-guide.md`
+> - **Prompting Claude Fable 5 (Anthropic, live)** — (legacy 모델 페이지 — 5.1 이 철회하지 않은 진술의 출처로만) Fable 전용 프롬프팅 (de-prescription, async subagents, grounded progress, reasoning_extraction 주의)
 > - **What's new in Claude Fable 5.1 (Anthropic 2026-09-01)** — 캐시 읽기 $0.25(Opus 5의 절반·Fable 5의 1/4), breaking 3(forced tool use 400 에러·thinking block 단방향·earlier-turn 편집 무효화), 폴백 대상 Opus 4.8·Opus 5 [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1] → 상세: `model-guide.md`
 > - **Prompting Claude Fable 5.1 (Anthropic, live)** — effort **재sweep 필수**("Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]), 코딩 루프 한정 배칭 변동·fewer progress update·append-only 히스토리(compaction 늦게 실험 권고)
 > - **Claude Code: Model configuration (Anthropic, live)** — /model fable, effort 체계(frontmatter effort 포함), 안전 분류기 자동 폴백
 > - **Best Practices for Claude Code (Anthropic, live reference)** — Claude Code 전용 prompt 가이드
-> - **Anthropic Prompting Best Practices (live, `claude-prompting-best-practices`)** — 전 모델 공통 기법 + **모델별 페이지 분기**(`prompting-claude-{opus-5-5|opus-5|fable-5-1|fable-5|sonnet-5|opus-4-8}`). ⚠️ 모델별 프롬프팅이 1급 문서로 승격돼 세대 간 프롬프트 재사용이 기본 가정이 아니게 됨
+> - **Anthropic Prompting Best Practices (live, `claude-prompting-best-practices`)** — 전 모델 공통 기법 + **모델별 페이지 분기**(`prompting-claude-{opus-5-5|opus-5|fable-5-1|fable-5|sonnet-5|opus-4-8}`). ⚠️ 모델별 프롬프팅이 1급 문서로 승격돼 세대 간 프롬프트 재사용이 기본 가정이 아니게 됨. 2026-11-01 — 현행 4종 페이지 = `prompting-claude-{fable-5-1|opus-5-5|sonnet-5-5|haiku-5-5}`(Sonnet 5.5·Haiku 5.5 신설), 구판(`opus-5`·`fable-5`·`sonnet-5`·`opus-4-8`)은 legacy 모델 페이지로 상속 근거로만 쓴다. 새 페이지는 델타 형식이다 — "Existing Claude Opus 5 prompts should perform well without changes" (Opus 5.5 페이지) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices]
 > - **Anthropic Interactive Prompt Engineering Tutorial (GitHub, 2026)** — 공식 튜토리얼
-> - **OpenAI Prompt Guidance (live)** — 공식 API prompt 가이드
-> - **GPT-5 Prompting Guide (OpenAI Cookbook, 2026)** — 공식 Cookbook
-> - **Rethinking skills and prompts for GPT-6 Astra (OpenAI Developers blog)** — "what used to require a lot of handholding and scaffolding no longer does" · 스킬 설명은 짧게, 다중 워크플로 스킬은 최소 라우터 [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra]
-> - **GPT-6 Sol model page (OpenAI API, 2026-09-22)** — `gpt-6-sol` · effort `none`~`max` · 1,050,000 ctx [verified: developers.openai.com/api/docs/models/gpt-6-sol]. fz 의 모델은 세션 선택(없으면 `config.toml`) — `modules/gpt-strategy.md` § 모델·effort 선택
-> - **Model guidance — latest model (OpenAI API, live)** — GPT-6 계열 instruction following·검증 성향 [verified: developers.openai.com/api/docs/guides/latest-model]
-> - **GPT CLI Changelog (OpenAI)** — Browser + Auto Review Agent + GPT-5.5(0.124.0) · GPT-6 Astra(0.153.1) · **GPT-6 Sol·Luna**(0.156.1 에서 모델 선택기 추가 2026-09-23 · 0.157.0 정식 추가 2026-09-25 · CLI 기본 `gpt-6-sol` medium) · GPT-6.1 Sol(0.159.0 추가 · 0.159.1 bundled default, 2026-09-29) 통합. https://learn.chatgpt.com/docs/changelog
+> - **OpenAI Prompt Guidance (live)** — 공식 API prompt 가이드. 2026-11-01 — 옛 `api/docs/guides/prompt-guidance` URL 은 latest-model 가이드("Using GPT-6")로 301 이동했다. 아래 latest-model 행과 같은 문서다 [verified: developers.openai.com/api/docs/guides/latest-model]
+> - **GPT-5 Prompting Guide (OpenAI Cookbook, 2026)** — 공식 Cookbook. (이력 — 2026-11-01 기준 보관 처리: "This recipe is archived and may reference outdated models or APIs." [verified: developers.openai.com/cookbook/examples/gpt-5/gpt-5_prompting_guide]. GPT-6 쿡북 프롬프팅 가이드는 없다 — 현행 근거는 아래 latest-model 행)
+> - **Rethinking skills and prompts for GPT-6 Astra (OpenAI Developers blog)** — "what used to require a lot of handholding and scaffolding no longer does" · 스킬 설명은 짧게, 다중 워크플로 스킬은 최소 라우터 [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra]. 2026-09-11 글이고 **GPT-6 Astra 범위** 진술이다 — 같은 글: "Guidance that helps Sol or Luna may overconstrain GPT-6 Astra, so consider which models will use the instructions you leave behind." [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra]
+> - **GPT-6 Sol model page (OpenAI API, 2026-09-22)** — `gpt-6-sol` · effort `none`~`max` · 1,050,000 ctx [verified: developers.openai.com/api/docs/models/gpt-6-sol]. fz 의 모델은 세션 선택(없으면 `config.toml`) — `modules/gpt-strategy.md` § 모델·effort 선택. (이력 — `gpt-6-sol` 은 GPT-6.1 Sol 이전 세대 Sol 이다. 현행 계열은 아래)
+>   - **GPT-6 계열 현행 4종 (2026-11-01)** — GPT-6 Astra(최고 지능) · **GPT-6.1 Sol**(균형 — "Near-Astra performance for complex work at a lower cost.") · GPT-6.1 Terra(고속) · GPT-6 Luna(최저가) [verified: developers.openai.com/api/docs/guides/latest-model]
+>   - effort `none` 지원은 모델마다 다르다 — "GPT-6 Astra and GPT-6.1 Sol do not support the `none` reasoning effort; GPT-6.1 Terra, GPT-6 Sol, and GPT-6 Luna do." 위 `none`~`max` 는 `gpt-6-sol` 에만 맞다 [verified: developers.openai.com/api/docs/guides/latest-model]
+>   - 컨텍스트 — API 1,050,000 과 GPT CLI 기본값이 다르다 — GPT CLI 와 ChatGPT Work 에서 GPT-6.1 Sol 의 기본 컨텍스트는 500,000 토큰이다(원문 의역) [verified: learn.chatgpt.com/docs/models]
+> - **Model guidance — latest model (OpenAI API, live)** — GPT-6 계열 instruction following·검증 성향 [verified: developers.openai.com/api/docs/guides/latest-model]. 2026-11-01 원문 — 검증 성향: "For coding tasks, the model tends to be thorough in testing before considering a task complete. For smaller tasks, this can result in broader tests than the task requires." · 적용 범위: "They address behavior observed with GPT-6 Astra; evaluate them with your chosen model and workload." [verified: developers.openai.com/api/docs/guides/latest-model#prompting-best-practices]
+> - **GPT CLI Changelog (OpenAI)** — Browser + Auto Review Agent + GPT-5.5(0.124.0 — 2026-10-14 ChatGPT 로그인 GPT CLI 에서 은퇴 [verified: learn.chatgpt.com/docs/models]) · GPT-6 Astra(0.153.1) · **GPT-6 Sol·Luna**(0.156.1 에서 모델 선택기 추가 2026-09-23 · 0.157.0 정식 추가 2026-09-25 · `gpt-6-sol` 기본 effort medium — 모델 페이지) · GPT-6.1 Sol(0.159.0 추가 [미검증: 원문 재대조 필요 — 0.159.0 노트에서 추가 문구 미발견] · 0.159.1 bundled default, 2026-09-29) 통합. https://learn.chatgpt.com/docs/changelog. ⚠️ 2026-11-01 정정 — 이전 표기 "CLI 기본 `gpt-6-sol` medium"은 어느 릴리스 노트에도 없어 지웠다. 번들 기본은 Astra(0.153.4) → GPT-6.1 Sol(0.159.1 · 0.161.0 재확인)이다 — "Added GPT-6.1 Sol as the default model in the bundled catalog and Amazon Bedrock Mantle and Runtime catalogs." [verified: learn.chatgpt.com/docs/changelog]. 0.159.1 이후 fz 관련 변화: 0.164.0 `-c` 보존("CLI configuration overrides are preserved when `-c` or `--config` appears at multiple subcommand levels.") · 0.165.0 대화 중 effort 변경 기본 활성 · 0.165.0/0.166.0 GPT-6.1 Terra 카탈로그 추가 · 최신 안정판 0.166.0(2026-10-29) [verified: github.com/openai/codex/releases]. 설치본은 0.159.2(환경 실측 2026-11-01)
 >
 > **Tier 2 — Academic (peer-reviewed + arxiv preprint):**
 > - ACE: Agentic Context Engineering v3 (Stanford, ICLR 2026, arXiv 2510.04618) — context collapse, brevity bias
 > - Context Rot (Chroma Research, 18 frontier models) — 집중된 300토큰 > 비집중 113K토큰
 > - IFScale (arXiv 2507.11538) — 규칙 수 증가 → 정확도 저하 (500규칙→68%)
-> - MAST (NeurIPS 2025, arXiv 2503.13657) — multi-agent 실패 14모드 / 3 카테고리 (FC1 41.77% / FC2 inter-agent 36.94% / FC3 21.30%, 논문 명시 "단일 지배 카테고리 없음")
+> - MAST (NeurIPS 2025, arXiv 2503.13657) — multi-agent 실패 14모드 / 3 카테고리 (FC1 41.77% / FC2 inter-agent 36.94% / FC3 21.30%, 논문 명시 "단일 지배 카테고리 없음"). ⚠️ 2026-11-01 정정 — 세 백분율은 **v2** 원문에만 있다("relatively balanced (FC1: 41.77%, FC2: 36.94%, FC3: 21.30%, Figure 2)") [arxiv preprint, 2025-03, v2]. 현행 v3 는 백분율이 없고 범주 명칭을 "(i) system design issues, (ii) inter-agent misalignment, and (iii) task verification" 으로 쓴다 [verified: arxiv.org/abs/2503.13657v3]
 > - Inside the Scaffold (arXiv 2604.03515, 2026-04) — 13개 코딩 에이전트 분석, 5가지 루프 프리미티브
 > - Multi-Agent Collaboration Survey (arXiv 2501.06322) — 협업 유형/구조/전략/프로토콜 분류
 > - CONSENSAGENT (ACL 2025) — 동적 프롬프트 정제로 sycophancy 완화
-> - **Meta-Harness: End-to-End Optimization of Model Harnesses** (Stanford NLP, arxiv 2603.28052) [arxiv preprint, 2026-03] — "harness design matters as much as model weights, 6x performance gap"
+> - **Meta-Harness: End-to-End Optimization of Model Harnesses** (Stanford NLP, arxiv 2603.28052) [arxiv preprint, 2026-03, v1] — "harness design matters as much as model weights, 6x performance gap". ⚠️ 2026-11-01 정정 — 6× 는 Meta-Harness 의 발견이 아니라 서론이 선행 연구 [47] 을 인용한 것이다("can produce a 6× performance gap on the same benchmark [47]… often matters as much as the model itself"). 자체 결과는 컨텍스트 토큰을 4배 적게 쓰고 +7.7pt, IMO급 200문제 +4.7pt
 > - **The Last Harness You'll Ever Build** (Sylph.AI, arxiv 2604.21003) [arxiv preprint, 2026-04] — Two-level Harness Evolution + Meta-Evolution
 > - **HARBOR: Automated Harness Optimization** (arxiv 2604.20938) [arxiv preprint, 2026-04] — Constrained-Noisy-BO production case
 > - **Agentic Harness Engineering** (arxiv 2604.25850) [arxiv preprint, 2026-04] — observability-driven auto-evolution
 > - **Externalization in LLM Agents** (arxiv 2604.08224) [arxiv preprint, 2026-04] — Memory/Skills/Protocols/Harness 통합 review
 > - **DSPy** (Stanford NLP, dspy.ai) [official framework] — "programming, not prompting", BootstrapFewShot/MIPROv2/GEPA optimizers
-> - **GEPA: Reflective Prompt Evolution** (Agrawal et al. with Khattab as co-author, Stanford+UCB, arxiv 2507.19457) [ICLR 2026 Oral / peer-reviewed] — MIPROv2 +10% AIME-2025, GRPO 35x fewer rollouts
+> - **GEPA: Reflective Prompt Evolution** (Agrawal et al. with Khattab as co-author, Stanford+UCB, arxiv 2507.19457) [ICLR 2026 Oral / peer-reviewed] — MIPROv2 대비 전체 10% 넘게 앞섬 · AIME-2025 는 +12%(abstract v2: "by over 10% (e.g., +12% accuracy on AIME-2025)" — 2026-11-01 정정, 이전 표기 "MIPROv2 +10% AIME-2025"), GRPO 35x fewer rollouts
 > - **TextGrad** (arxiv 2406.07496) [arxiv preprint, 2024-06] — automatic differentiation via text, DSPy 보완
 > - **Towards Thinking-Optimal Scaling of Test-Time Compute** (arxiv 2502.18080) [NeurIPS 2025 / peer-reviewed] — 도메인별 optimal CoT length 다름
 > - **When More Thinking Hurts** (arxiv 2604.10739) [arxiv preprint, 2026-04] — Overthinking 위험 (긴 CoT가 성능 저하)
@@ -65,7 +69,7 @@
 >
 > **Deprecated (2026-04-16 퇴출):**
 > - ~~DyLAN (COLM 2024)~~ → Multi-Agent Collaboration Survey로 대체 (Claude 4.x 이전 벤치마크)
-> - ~~서브에이전트 토큰 연구 (dev.to)~~ → Anthropic Agent Teams 공식 문서로 대체
+> - ~~서브에이전트 토큰 연구 (dev.to)~~ → Anthropic Agent Teams 공식 문서로 대체 (이력 — Agent Teams 는 실험 기능이고 fz 는 쓰지 않는다. 현행 근거는 Claude Code Sub-agents 문서 — "Each subagent starts with a fresh, isolated context window. It doesn't see your conversation history, the skills you've already invoked, or the files Claude has already read." [verified: code.claude.com/docs/en/sub-agents] — 와 Workflows 문서(동시 16 · 실행당 1,000 [verified: code.claude.com/docs/en/workflows]). Workflow 에이전트는 Agent 도구 서브에이전트 상한과 별도다 — "Agents that other features run, such as workflow agents and agent team teammates, follow their own limits instead." [verified: code.claude.com/docs/en/sub-agents])
 > - ~~hyperdev 컨텍스트 보호~~ → Claude Code 네이티브 기능으로 흡수됨
 >
 > **구버전 프롬프팅/API 제거 (Fable 5.1·Opus 5):** ⚠️ 2026-09-06 정정(제목 — 이전엔 Opus 5 only로 한정, Fable 5.1 breaking 변경 미반영)
@@ -110,6 +114,7 @@ GOOD: "이 프로젝트에서 리스트 직렬화는 orjson.dumps()를 사용한
 ### 원칙 2: Description이 곧 성능
 
 **근거:** Skills Deep Dive — "no algorithmic skill selection." Claude는 description 텍스트 매칭으로 스킬을 선택한다. description이 부정확하면 스킬이 호출되지 않거나 잘못 호출된다.
+⚠️ 2026-11-01 정정 — 매칭 텍스트는 description 하나가 아니라 **description + `when_to_use`** 다("Appended to `description` in the skill listing and counts toward the 1,536-character cap."). 또 모델 판단 **이전에** 거르는 하드 게이트가 둘 있다 — `paths`(설정하면 "Claude loads the skill automatically only when working with files matching the patterns") · `disable-model-invocation: true`(description 이 컨텍스트에 올라가지 않고 Claude 가 스스로 부르지 못한다). 나머지 선택은 리스팅을 본 모델 판단이다 [verified: code.claude.com/docs/en/skills]
 
 **체크리스트:**
 - [ ] 무엇을 하는지 (what) 포함?
@@ -126,7 +131,7 @@ BAD:
 GOOD:
   "프로젝트 코드 탐색 + 구조 분석 스킬 (code exploration, structure analysis).
    Use when exploring code structure, understanding architecture, or finding patterns.
-   Do NOT use for code modification (use fz-fix instead) or test execution (use fz-test)."
+   Do NOT use for code modification (use fz-fix instead) or implementation with build verification (use fz-code)."
 ```
 
 **Tip:** 사용자가 실제로 입력할 자연어 표현을 상상하고, 그 키워드를 description에 포함시켜라.
@@ -151,7 +156,12 @@ GOOD:
 ```
 Level 1: YAML frontmatter    -> 항상 로드 (스킬 발견 + 매칭)
          - name, description, allowed-tools
+           (2026-11-01: 공식 필드는 20개 — when_to_use · paths ·
+            disable-model-invocation · model · effort · context 등.
+            전체 표 = code.claude.com/docs/en/skills § Frontmatter reference)
          - 이 단계에서 스킬 선택 여부가 결정됨
+           (단 disable-model-invocation: true 면 description 이
+            컨텍스트에 안 올라가고, paths 는 파일 일치 시에만 자동 로드)
 
 Level 2: SKILL.md 본문       -> 관련 시 로드 (실행 지침)
          - 핵심 워크플로우, 규칙, 예시
@@ -322,7 +332,7 @@ Fallback:   대안 도구 (Primary 실패 시 사용)
 
 ### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
-**근거:** Anthropic Claude 4 Best Practices + **Fable 5는 짧은 지시로 대부분 행동을 조향할 수 있다** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]. 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-6 계열도 같은 방향 — "GPT-6 Astra is stronger at general instruction following than our previous models … It can be more sensitive to instructions contained in skills and other files, such as AGENTS.md." [verified: developers.openai.com/api/docs/guides/latest-model, 2026-09-25 재조회] — fz 교차검증 모델 `gpt-6-sol` 한정 진술은 이 페이지에 없다 [미검증: Sol 한정 문면 부재] — GPT 측 동일 가드.) ⚠️ 2026-09-06 정정: 이전 근거였던 "Opus 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
+**근거:** Anthropic Claude 4 Best Practices + **Fable 5는 짧은 지시로 대부분 행동을 조향할 수 있다** — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]. 과격·모호한 지시는 그대로 적용될 위험 → 자연스럽고 범위가 명시된 지시가 정확도를 높인다. (GPT-6 계열도 같은 방향 — "GPT-6 Astra is stronger at general instruction following than our previous models … It can be more sensitive to instructions contained in skills and other files, such as AGENTS.md." [verified: developers.openai.com/api/docs/guides/latest-model, 2026-09-25 재조회] — fz 교차검증 모델 `gpt-6-sol` 한정 진술은 이 페이지에 없다 [미검증: Sol 한정 문면 부재] — GPT 측 동일 가드.) (이력 — "fz 교차검증 모델 `gpt-6-sol`"은 2026-09 당시 표기. 현행: fz 의 GPT 모델은 세션 선택(없으면 `config.toml` — `modules/gpt-strategy.md` § 모델·effort 선택)이고, GPT CLI 문서의 코딩 에이전트 출발점은 `gpt-6.1-sol` 이다 — 대부분의 작업은 `gpt-6.1-sol` 에서 시작하라고 권한다(로그인 계정·워크스페이스에 접근 권한이 있을 때 — 원문 의역) [verified: learn.chatgpt.com/docs/agent-configuration/subagents]. 같은 latest-model 페이지는 스킬 감사를 강하게 권한다 — "We **strongly recommend** auditing skills and other files accessible to your model for instructions that could influence its behavior." [verified: developers.openai.com/api/docs/guides/latest-model]) Anthropic 쪽 인용의 Fable 5 는 legacy 모델이다 — 5.1 페이지는 "Your existing Claude Fable 5 prompts should perform well on Claude Fable 5.1 without changes" 라고 해 상속 근거로 둔다 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⚠️ 2026-09-06 정정: 이전 근거였던 "Opus 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
 
 > **항목별 범위 명시 원칙**: broad 규칙은 적용 범위를 항목별로 명시하라. [이유] 범위가 명시된 지시가 더 정확히 적용된다. [GOOD] "verify each step, not just the first"  [BAD] "verify the step" (범위 모호). 메모리 8/13/18차(silent disappearance) 증상과 정합하는 일반 원칙 — 모델 버전 무관.
 
@@ -386,8 +396,8 @@ GOOD: "Check the relevant files before making changes"
 
 **Will Not:**
 - 코드 직접 수정 -> use `fz-fix` skill
-- 테스트 실행 -> use `fz-test` skill
-- 새 파일 생성 -> use `fz-scaffold` skill
+- 구현·빌드 검증 -> use `fz-code` skill
+- 새 파일 생성 -> use `fz-new-file` skill
 ```
 
 ---
@@ -445,10 +455,12 @@ GOOD: "Check the relevant files before making changes"
 
 TEAM 모드에서 고성능 추론을 보장하는 3축:
 
+> ℹ️ 2026-11-01 — TEAM(TeamCreate·SendMessage) 실행 모델은 일몰됐다(`modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰 (2026-09-25)). 아래 3원칙의 Workflow 대응은 `guides/skill-authoring.md` § TEAM 추론 품질 3원칙 보존 매핑 (prompt-optimization §다양성) 이 적는다. 이 절은 원칙의 출처로 남긴다.
+
 ### 측정 (Measurement)
 
-**Reflection Rate**: GPT가 제기한 이슈 N개 중 Claude가 수정 반영한 수 / N × 100%
-- Gate: ≥80% (TEAM review). SOLO는 추적 없음.
+**Reflection Rate**: 정의·threshold·gating 정본은 `modules/cross-validation.md` § Reflection Rate (Authoritative Source) 다 — 여기서 재정의하지 않는다(정본: GPT 를 켜면 light·full 모두 추적, N≥10 에서만 ≥80% gating).
+- (이력 — 2026-03 당시 서술. 계산식은 정본과 같고 Gate 범위 서술이 정본과 어긋남) GPT가 제기한 이슈 N개 중 Claude가 수정 반영한 수 / N × 100% · Gate: ≥80% (TEAM review). SOLO는 추적 없음.
 - 정량 계산식이 있어야 "얼마나 잘 반영했는가"를 측정할 수 있다.
 
 **체크리스트:**
@@ -471,7 +483,7 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 ### 다양성 (Diversity)
 
 **Sycophancy 방어 — Round 1 독립성**: 에이전트가 서로의 초안을 보기 전에 독립 분석을 완료해야 한다.
-- MAST (NeurIPS 2025): inter-agent misalignment(FC2) = 36.94% (FC1 41.77% / FC3 21.30%, 합 100%; 논문 명시 "단일 지배 카테고리 없음 — balanced"). "false consensus"가 주요 실패 모드 중 하나. 특히 **FM-2.2 "Fail to ask for clarification" = 6.80%** [verified: MAST v3 §4 원문 "(FM-2.2, 6.80%)"] — 모호한 요청을 그대로 진행하면 trigger (MAST-Data 7개 프레임워크 / 1642 traces).
+- MAST (NeurIPS 2025): inter-agent misalignment(FC2) = 36.94% (FC1 41.77% / FC3 21.30%, 합 100%; 논문 명시 "단일 지배 카테고리 없음 — balanced" — 세 범주 백분율은 **v2** 원문 [arxiv preprint, 2025-03, v2], v3 에는 없다). "false consensus"가 주요 실패 모드 중 하나. 특히 **FM-2.2 "Fail to ask for clarification" = 6.80%** [verified: MAST v3 §4 원문 "(FM-2.2, 6.80%)"] — 모호한 요청을 그대로 진행하면 trigger (MAST-Data 7개 프레임워크 / 1642 traces).
 - CONSENSAGENT (ACL 2025): 동적 프롬프트 정제(dynamic prompt refinement)로 sycophancy를 런타임에 완화. 정적 방어(Round 1 독립성)와 동적 방어(상호작용 중 교정)를 결합하면 효과 극대화.
 - Multi-Agent Collaboration Survey (arXiv 2501.06322): 협업 구조를 peer/centralized/distributed로 분류. fz의 Peer-to-Peer 패턴은 "peer" 구조 + "role-based" 전략의 조합.
 - Round 1에서 독립성을 보장하면 동조 편향을 차단한다.
@@ -479,7 +491,7 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 **Task Brief 5요소**: 에이전트에게 작업 전달 시 `[Role] [Context] [Goal] [Constraints] [Deliverable]` 형식.
 - 구조화된 전달이 역할 경계 모호 → 중복/누락 작업 방지
 
-**합의/불합의 명시**: Round 0.5에서 `[합의]` 또는 `[불합의]` 마커로 최종 보고.
+**합의/불합의 명시**: Round 0.5에서 `[합의]` 또는 `[불합의]` 마커로 최종 보고. (이력 — Round 0.5·`[합의]`/`[불합의]` 마커는 TEAM 사료이고 실행 코드에 0건이다 [fz 실측 2026-11-01]. Workflow 에서는 schema 필드로 표현한다 — 위 ℹ️ 매핑)
 - 의견 차이가 묻히는 것을 방지. Lead가 판단 근거를 확보.
 
 **체크리스트:**
@@ -496,7 +508,7 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 | 발견 | 수치 | 대응 |
 |------|------|------|
 | 집중된 300토큰이 비집중 113K토큰보다 우수 | 대화 기반 작업 기준 | 핵심만 포함하고 불필요한 내용 제거 |
-| 중간 위치 정보 검색률 하락 | 30%+ 성능 하락 (Lost-in-the-Middle) | 핵심 지시를 문서 앞부분 또는 끝부분에 배치 |
+| 중간 위치 정보 검색률 하락 | 중간 위치에서 유의한 성능 저하 — 방향만, 수치는 abstract 에 없음(이전 표기 "30%+" 는 출처 미확인으로 삭제 · 2026-11-01). "performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts" — Lost in the Middle, arXiv 2307.03172 [arxiv preprint, 2023-07, v3] (2023년 모델 기준) | 핵심 지시를 문서 앞부분 또는 끝부분에 배치 |
 | 입력 길이 증가 시 전 모델 성능 저하 (보편 임계값 없음 — Chroma 명시; "64K"는 2차 출처) | Context Rot 발생 구간 | Progressive Disclosure 필수 적용 |
 | 주제 관련 오답이 무관 콘텐츠보다 해로움 | Distractor Interference 효과 | 부정확하거나 오래된 정보는 삭제 |
 
@@ -558,9 +570,9 @@ GOOD: head_limit 설정 + 필요한 파일만 선별 Read
 - defer_loading 활용: 필요 시에만 ToolSearch로 로드
 - 통합 가능한 도구는 통합 (20개→8개 = 60% 감소 사례)
 
-**D. 서브에이전트 효율** — 스폰마다 ~50K 토큰 재주입 (단, max+ultracode 운영점에선 *비용*보다 coordination·MAST 오버헤드가 binding 회피 이유 — `guides/harness-engineering.md §5 원칙 7` 참조)
+**D. 서브에이전트 효율** — 스폰마다 ~50K 토큰 재주입 [미검증: 출처 없음 — 원문 재대조 필요] (단, max+ultracode 운영점에선 *비용*보다 coordination·MAST 오버헤드가 binding 회피 이유 — `guides/harness-engineering.md §5 원칙 7` 참조) (이력 — max+ultracode 운영점은 2026-09-06 이전 전제다. 현행은 Lead 세션 effort(미지정 `xhigh`)를 워커가 따르고 `ultracode` 는 effort arm 이 아니다 — `guides/model-guide.md` § 현행 운용 (2026-09-06))
 - 단순 작업은 서브에이전트 대신 직접 실행
-- TEAM 모드에서만 에이전트 스폰 (standalone Agent 남발 금지)
+- 에이전트 스폰은 Workflow `agent()` 경로에서만 (standalone Agent 남발 금지). (이력 — 이전 표기 "TEAM 모드에서만"은 TEAM 일몰로 대체)
 - governance.md 에이전트 상한 준수
 
 **E. Proactive Context Protocol** — compact 전 선제 기록
@@ -660,7 +672,7 @@ fz 적용: `modules/context-artifacts.md`의 티켓 폴더 전략이 이 원칙�
 
 > ⛔ **Brain/Hands(infrastructure)와 Lead/Teammate(application)는 서로 다른 레이어.** 혼용 금지.
 > — Brain/Hands: Anthropic "many brains, many hands" 인프라 추상화 (Sandbox, Session, Harness 3-component)
-> — Lead/Teammate: fz의 TeamCreate + Task(N) 애플리케이션 역할 협업 패턴
+> — Lead/Teammate: fz의 TeamCreate + Task(N) 애플리케이션 역할 협업 패턴 (이력 — TEAM 일몰 전 서술. 현행 fz 는 Lead + 결정적 Workflow 워커(`workflows/*.js` 의 `agent()`)이고 계층 구분은 그대로다 — `guides/skill-authoring.md` §12)
 > 참조: `guides/harness-engineering.md` §1.3 (Infrastructure vs Application Layer)
 
 | 컴포넌트 | 역할 | fz 대응 |
@@ -720,7 +732,7 @@ fz 적용:
 | 비일관적 용어 사용 | 같은 개념에 다른 이름 -> 혼동 | 용어를 하나로 통일, 용어집 관리 |
 | 깊은 참조 중첩 (A -> B -> C -> D) | Context Rot 가속, 정보 손실 | 최대 1단계 깊이만 허용 |
 | "CRITICAL / MUST ALWAYS" 남용 | instruction-following 일관성이 높은 모델에서 과격 지시가 그대로 적용될 위험 | 자연스럽고 구체적인 표현 사용 |
-| 단순 작업에 서브에이전트 과다 위임 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율) | 단순 작업은 직접 실행하도록 지시 |
+| 단순 작업에 서브에이전트 과다 위임 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율) (이력 — Opus 4.8 당시 진술. 현행 Opus 5 지침(Opus 5.5 가 상속)은 subagent 위임을 캡하는 쪽이다 — 위 Sources 의 Opus 5 행) | 단순 작업은 직접 실행하도록 지시 |
 | Claude가 아는 것을 다시 설명 | 토큰 낭비, Context Rot 가속 | 프로젝트 고유 정보만 포함 |
 | 실패에서 체크리스트 행 추가 반사 | 규칙 수 증가→준수율 저하, Claude 추론 억압 | 원칙+이유 한 줄로 대체 (보충 4a) |
 | 예시 없이 장문으로 설명 | 모호함, 해석 편차 | Few-shot 예시 3-5개로 대체 |

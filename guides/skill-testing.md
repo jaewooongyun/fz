@@ -2,7 +2,7 @@
 
 > fz-* 스킬의 품질을 측정 가능하게 보장하는 테스트 방법론.
 > **근거**: Anthropic Agent Skills 공식 + 검증 기반 테스트 원칙(verifier oracle · fresh-context 검증).
-> **Sources (last audited: 2026-09-06) — Tier 1:** code.claude.com/docs/en/{skills, sub-agents, best-practices, changelog} · platform.claude.com/.../prompting-claude-opus-5 · .../effort. 권위 자료 단일 참조점: `guides/llm-references.md`.
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조 · 이전 감사 2026-09-06) — Tier 1:** code.claude.com/docs/en/{skills, sub-agents, best-practices, changelog, plugin-evals} · platform.claude.com/.../prompting-claude-opus-5 · .../prompting-claude-opus-5-5 · .../effort. 권위 자료 단일 참조점: `guides/llm-references.md`.
 
 ---
 
@@ -12,6 +12,7 @@
 
 1. **oracle은 객관 pass/fail로** — "looks done" 자가판정은 환각을 통과시킨다. Functional Test의 합격 판정은 test/build exit code·lint·script diff 같은 **실행 가능한 pass/fail**로 닫는다 [verified: code.claude.com/docs/en/best-practices].
 2. **검증자 ≠ 구현자** — 스킬 출력을 그 스킬을 만든 컨텍스트가 채점하면 안 된다. **fresh-context 검증자**(별도 세션/에이전트가 diff+기준만 보고 판정)가 self-critique보다 우월 [verified: code.claude.com/docs/en/sub-agents].
+   - 근거 문장(2026-11-01 정정): 공식 문장은 Fable 5(Legacy) 페이지(platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5)의 "Separate, fresh-context verifier subagents tend to outperform self-critique." [미검증: 원문 재대조 필요]. 실증은 약하다 — 새 세션 2차 리뷰(F1 28.6%)가 **같은 세션 2차 리뷰**(21.7%)보다 낫지만, 단일 같은 세션 리뷰(27.1%)와는 유의차가 없다 — "a second review helps only when it happens in a fresh session: CCR (F1 28.6%) outperforms a second review in the same session (SR2, 21.7%)" [arxiv preprint, 2026-03, v2] (arXiv 2603.12123 Cross-Context Review · 단일 저자 · 27.1% 비교는 v2 abstract 에만 있다). '우월'은 같은 세션 재검토 대비로 좁혀 읽는다.
 
 > 이 두 원칙이 아래 §1~§8 전 절차의 바탕이다.
 
@@ -28,6 +29,7 @@
 2. 각 쿼리를 Claude에 입력하고 스킬 트리거 여부를 기록한다
 3. 트리거율을 계산한다: `정확 트리거 수 / 전체 테스트 수`
 4. 목표: 관련 쿼리의 90% 이상에서 정확 트리거
+   - ⚠️ fz 실측은 이 목표에 크게 못 미친다: `claude -p` Runtime Trigger Eval 13개 스킬 전체 35/81(43%) · should-trigger 0% · should-NOT-trigger 100% · description 을 바꿔도 43%→44% (`CHANGELOG.md` § v2.5 (2026-03-20) — skill-creator Integration + Description Overhaul + Clean Architecture 의 "실증 테스트 결과 및 교훈" · `skills/fz-skill/references/skill-creator-integration.md`). 목표 수치의 재정의(`claude plugin eval` 채택 여부 — §8.3)는 아직 정하지 않았다
 
 > ⚠️ 스킬이 많으면 description이 listing budget에 맞춰 자동 축약되어 트리거 정확도가 떨어질 수 있다 — `skillListingBudgetFraction`/`SLASH_COMMAND_TOOL_CHAR_BUDGET` 확인 [verified: code.claude.com/docs/en/skills].
 
@@ -79,7 +81,7 @@
 |-------|------|------|
 | Git diff 존재 | `/fz-gpt review` | `scripts/gpt-call.sh review --base` 실행 + 이슈 보고 |
 | GPT CLI 미설치 | `/fz-gpt review` | 정문 exit 18 `GPT-OFF` 감지 + `[GPT 미사용 — CLI 없음]` 표기 — 대체 검증 없음 |
-| Critical 이슈 발견 | `/fz-gpt final` | DA 패스 자동 실행 |
+| major 이상 이슈 발견 (이전 표기 "Critical" 은 이력) | `/fz-gpt final` | `final-deep`(같은 세션 심화) · `final-da`(DA 패스) 실행 — 조건 `major > 0`, 정본 `modules/fz-gpt-subcommands-aux.md` § final -- PR 전 최종 리뷰 |
 | 3-Tier 스킬 부재 | `/fz-gpt verify` | Tier 3 인라인 프롬프트로 폴백 |
 
 ### 1.3 Performance Comparison — Before/After 비교
@@ -110,7 +112,7 @@
 
 | 기준 | 목표 | 측정 방법 |
 |------|------|----------|
-| 트리거 정확도 | ≥90% | §1.1 Triggering Test |
+| 트리거 정확도 | ≥90% | §1.1 Triggering Test (fz 실측 현황 — §1.1 절차 4 의 ⚠️) |
 | 도구 호출 효율 | 불필요 호출 ≤2개 | 실행 로그 분석 |
 | 실패율 | ≤10% | 10회 반복 실행 |
 | Gate 통과율 | 100% (필수 Gate) | Phase별 체크리스트 확인 |
@@ -424,7 +426,7 @@ A/B 비교 시 `/skill-creator`의 제안을 B 버전으로 테스트하면 효�
 | Workflow `agent()` per-call `opts.effort` | **세션 위** (실측 1회 · env · frontmatter 대비는 미측정) | 공식이 per-invocation **`model`** 파라미터는 실재 레이어로 명시하나(`CLAUDE_CODE_SUBAGENT_MODEL`이 "overrides the per-invocation `model` parameter"), **effort는 동일 서술이 없다**. 2026-10-19 실측: Lead 세션 `xhigh` 에서 `opts.effort: 'high'` 로 부른 code-pair 워커(Opus 5.5)의 transcript `effort` 6/6 = `high` — per-call 값이 세션 값을 이긴다 |
 | `settings.json` `effortLevel` (세션) | 기본 | *"a starting default, not enforcement"* [verified: 동] |
 
-> **이유**: per-call `opts.effort`의 지위가 미확정이므로, 그것으로 arm을 가르면 **arm이 실제로 갈렸는지 알 수 없다**. 미검증 메커니즘 위에 측정을 세우지 않는다. 현행 fz는 `.js` 45곳(2026-10-19 부터 Lead 세션 effort 전달)과 `settings.json:464/467`이 **모두 `xhigh`** 라 어느 쪽이 이기든 결과가 같아 이 모호성이 드러나지 않았다. ⚠️ 2026-09-06 정정: 줄번호 `:409`는 stale — 실측 `:464`(`effortLevel`)·`:467`(중첩 키).
+> **이유**: per-call `opts.effort`의 지위가 미확정이므로, 그것으로 arm을 가르면 **arm이 실제로 갈렸는지 알 수 없다**. 미검증 메커니즘 위에 측정을 세우지 않는다. 현행 fz는 `.js` 45곳(8개 워크플로 — 2026-10-19 부터 per-call `opts.effort` 에 Lead 세션 effort 를 싣는다, 미지정 시 `'xhigh'`)과 작성자 환경의 사용자 `settings.json` `effortLevel` 이 **모두 `xhigh`** 였다(2026-09-06 실측 — 이력) — 두 값이 같으면 어느 쪽이 이기든 결과가 같아 이 모호성이 드러나지 않는다. (이전 판의 작성자 `settings.json` 줄번호는 이식성 규칙으로 뺐다 — `guides/skill-authoring.md` § 이식성 — 플러그인은 배포물이다.) ⚠️ 사용자 settings 의 top-level `effortLevel` 은 Opus 5.5 에 적용되지 않는다는 서술이 Claude Code model-config 문서(code.claude.com/docs/en/model-config)에 있다 [미검증: 원문 재대조 필요] — 사실이면 Opus 5.5 세션에서는 위 '같은 값' 전제부터 성립하지 않는다.
 
 **⛔ arm 적용 검증 (필수 — 매 run)**: Claude Code는 트랜스크립트 최상위에 `effort` 필드를 기록한다(v2.1.212+). run 직후 확인해 **의도한 arm이 실제 적용됐는지** 대조한다. 불일치 pair는 §8 오염 규칙에 따라 `invalid`로 **제외**.
 
@@ -463,11 +465,11 @@ for p in new:
 PY
 ```
 
-**arm 선정**: Opus 5 공식 출발점이 `high`(기본)이고 `low`/`medium`이 비용·지연의 1차 레버이므로 최소 `{low, medium, high}` 3-arm. `xhigh`는 demanding coding/agentic 대조군으로 추가.
+**arm 선정**: Opus 5 공식 출발점이 `high`(기본)이고 `low`/`medium`이 비용·지연의 1차 레버이므로 최소 `{low, medium, high}` 3-arm. `xhigh`는 demanding coding/agentic 대조군으로 추가. (이 근거는 이력 — Opus 5 기준.) 현행 Opus 5.5 근거: 기본 effort 가 `medium` 이고 [verified: https://platform.claude.com/docs/en/build-with-claude/effort] "Claude Opus 5.5 at `medium` matches or exceeds Claude Opus 5 at `high` on coding and knowledge-work evaluations" · "Reserve `xhigh` and `max` for work where you've measured a quality gain." [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5#calibrate-effort] — 같은 3-arm 을 `medium` 출발점 기준으로 읽고, `xhigh` 는 측정된 이득이 있는지 확인하는 대조군이다.
 
-**Opus 5.5 보정**: 공식 기본이 `medium`(Opus 5 는 `high`)이고 같은 effort 에서 사고량이 늘어난다(`xhigh`·`max` 에서 두드러짐) — "A request that omits `effort` runs at `medium`; on Claude Opus 5 it ran at `high`." · "At the same effort setting the model tends to think more per turn than Claude Opus 5, most of all at `xhigh` and `max`." [verified: whats-new-opus-5-5]. fz 는 `xhigh` 유지를 택해(사용자 결정 2026-09-25) 5.5 sweep 은 하지 않았다 — 재개하면 `experiment-log.md` 에 새 절을 만든다.
+**Opus 5.5 보정**: 공식 기본이 `medium`(Opus 5 는 `high`)이고 같은 effort 에서 사고량이 늘어난다(`xhigh`·`max` 에서 두드러짐) — "A request that omits `effort` runs at `medium`; on Claude Opus 5 it ran at `high`." · "At the same effort setting the model tends to think more per turn than Claude Opus 5, most of all at `xhigh` and `max`." [verified: whats-new-opus-5-5]. fz 는 `xhigh` 유지를 택해(사용자 결정 2026-09-25 — 이력) 5.5 sweep 은 하지 않았다 — 재개하면 `experiment-log.md` 에 새 절을 만든다. 현행은 2026-10-19 사용자 결정으로 **워커 effort = Lead 세션 effort** 다(`modules/mode-gate.md` § 사용자 결정 · § effort). 5.5 sweep 은 이 결정 뒤에도 하지 않았다.
 
-**대상 스킬 우선순위**: `measure_constraint_load.py` 의 **floor 큰 순** — `fz`(31,259) · `fz-review`(29,264) · `fz-code`(26,837). floor가 큰 스킬일수록 effort 변화의 절대 효과가 크다.
+**대상 스킬 우선순위**: `measure_constraint_load.py` 의 **floor 큰 순** — 순위는 고를 때마다 다시 뽑는다: `python3 scripts/measure_constraint_load.py`(기계 판독은 `--json`). 이전 판에 적었던 floor 수치는 측정 시점과 함께 낡아서 뺐다. floor가 큰 스킬일수록 effort 변화의 절대 효과가 크다.
 
 ⛔ **sweep 결과로 곧바로 `.js`를 고치지 말 것**: arm이 세션 레벨이었으므로 결론도 세션/frontmatter 레벨에 적용한다. per-call 배선 변경은 위 `[미검증]` 해소가 **선행**이다. (2026-10-19 Lead effort 전달은 값을 바꾸지 않는 배선이다 — per-call 실효는 실행 스모크에서 워커 transcript effort 로 확인한다)
 
@@ -490,7 +492,8 @@ python3 scripts/fz_snapshot.py --diff                                           
 - **조인 키는 `prompt_id`** 다. events.jsonl 의 한 줄이 트랜스크립트의 어느 턴인지는 `prompt_id`로만 확정된다(`session_id`는 여러 턴을 묶는다). arm 짝을 맞출 때 이 키로 붙인다.
 - ⛔ **arm 적용 검증(§8.1)을 대체하지 않는다.** 계측은 사후 기록이고, arm 이 실제로 갈렸는지는 여전히 트랜스크립트 `effort` 필드 대조로 확인한다.
 - ⛔ **분모 0건은 "부하 없음"이 아니라 측정 실패다.** 리포트 부록이 분모(세션·메시지·journal·findings 수)를 함께 인쇄하므로 그 줄을 먼저 본다.
-- ⛔ **adjust 가 많아도 A/B 필요성은 사라지지 않는다.** 실측 peer-review `cross`(N=20 · overturn 1 · adjust 41 — 감사 아티팩트 audit-report §5)는 후보 *제외* 근거가 아니라 후속 검증 대상이다. adjust 는 `newSeverity` 를 필수로 요구하지 않아 건수가 유효 조정과 1:1 이 아니다 [verified: `workflows/peer-review.js:74,78`].
+- ⛔ **adjust 가 많아도 A/B 필요성은 사라지지 않는다.** 실측 peer-review `cross`(N=20 · overturn 1 · adjust 41 — 감사 아티팩트 audit-report §5)는 후보 *제외* 근거가 아니라 후속 검증 대상이다. adjust 는 `newSeverity` 를 필수로 요구하지 않아 건수가 유효 조정과 1:1 이 아니다 [verified: `workflows/peer-review.js` `CrossReviewSchema.properties.adjustments` — newSeverity 정의 :87 · required 는 :105 의 별도 스키마].
+  - 2026-11-01 정정 — '필수가 아니다'는 `crossOutput: 'full'` 경로의 `CrossReviewSchema` 에만 맞다. 현행 기본 경로(`crossOutput !== 'full'` — 2026-10-01 기본 on)는 `CrossDeltaSchema` 를 쓰고 그 `adjustments` 는 `newSeverity` 가 required 다(`workflows/peer-review.js` 의 `crossDeltaOn` · `crossSchema` 선택). 위 N=20 기록은 2026-09-07 에 적혔고 `CrossDeltaSchema` 는 2026-09-28 에 생겼으므로 full 스키마 경로의 기록이다. 결론(adjust 건수가 A/B 필요성을 없애지 않는다)은 그대로다.
 - **판정 기준표 (정본 — 이 표가 배포물이다)**. 데이터는 이 기준을 만족할 때만 결론을 낸다:
 
 | 질문 | 지표 | 판정 |

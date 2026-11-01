@@ -1,6 +1,6 @@
 # Harness Engineering Guide
 
-> **Sources (last audited: 2026-09-25 — 모델 사실 축: §10 Opus 5.5 행 신설·Opus 5 행 라벨·Opus 5 적용 블록 하네스 상수(v2.1.271 표지)·§참고 문헌 Opus 5.5·Workflows·Advisor·arXiv 2행(8ah·8ai — 본문 인용 0건 4행은 fz-review 에서 제거) 추가와 #4 제거만 대조. 2026-09-06 감사 축(Fable 5.1 모델 사실 + §참고 문헌 정리)은 아래 서술 그대로):** `guides/llm-references.md` §1 정본 대조 완료 (§1.3 세대 전환 테이블 Opus 5 행 포함 — 2026-07-25 모델 사실 축은 그대로 유효). 2026-09-06 감사가 실제로 손댄 범위 = §5 원칙 2 · §5 원칙 3 각주 · §6 AP1/AP5 · §10 모델 세대표 + Opus 5 적용 블록 · §참고 문헌(Anthropic 번호 중복 정리 · Fable 5.1 행 · arXiv 2건 출처 등급 승격 · Tier 3 정리). 그 밖의 절은 이번에 재감사하지 않았다. 그 외 인용(arxiv 하네스 논문군)은 §참고문헌 표 + 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조. 대조 범위 = §1.2 출처 · §1.3 · §2.2 · §3 기둥 1~3 의 서베이 경유 인용 · §5 원칙 2·7 · §5.5 · §6 AP1·AP3·AP5 · §8 · §9 각주 · §10 · §11 · §12 · §참고 문헌의 모델·도구·운영점 서술과 arXiv 인용(M3·M5~M8·M10·M12~M14 · harness-paper 경유 행 C-35). §3 기둥 4 재시도 규칙처럼 5b 로 넘긴 서술과 그 밖의 절은 이번에 재감사하지 않았다. 이력 — 2026-09-25 모델 사실 축: §10 Opus 5.5 행 신설·Opus 5 행 라벨·Opus 5 적용 블록 하네스 상수(v2.1.271 표지)·§참고 문헌 Opus 5.5·Workflows·Advisor·arXiv 2행(8ah·8ai — 본문 인용 0건 4행은 fz-review 에서 제거) 추가와 #4 제거만 대조. 2026-09-06 감사 축(Fable 5.1 모델 사실 + §참고 문헌 정리)은 아래 서술 그대로):** `guides/llm-references.md` §1 정본 대조 완료 (§1.3 세대 전환 테이블 Opus 5 행 포함 — 2026-07-25 모델 사실 축은 그대로 유효). 2026-09-06 감사가 실제로 손댄 범위 = §5 원칙 2 · §5 원칙 3 각주 · §6 AP1/AP5 · §10 모델 세대표 + Opus 5 적용 블록 · §참고 문헌(Anthropic 번호 중복 정리 · Fable 5.1 행 · arXiv 2건 출처 등급 승격 · Tier 3 정리). 그 밖의 절은 이번에 재감사하지 않았다. 그 외 인용(arxiv 하네스 논문군)은 §참고문헌 표 + 개별 `[verified:]` 태그 참조.
 >
 > "하네스의 모든 컴포넌트는 모델이 혼자 할 수 없는 것에 대한 가정을 인코딩한다.
 > 그 가정은 스트레스 테스트할 가치가 있다."
@@ -59,11 +59,11 @@ Harness H = (C, R, S, A, Σ, F) where:
   F = Failure Taxonomy — 복구 분류 (예: 재시도, 에스컬레이션, 롤백, 중단)
 ```
 
-> 출처: NLAH 논문 (청화대/HIT, arxiv 2603.25723)
+> 출처: NLAH 논문 (청화대/HIT, arxiv 2603.25723) [미검증: '6요소' 형식과 소속(청화대/HIT)은 abstract 에 없음 — 본문 미확인, U-21]
 
 이 형식의 가치: 하네스를 **분석 가능한 과학적 객체**로 만든다. 각 구성 요소를 독립적으로 교체·제거(ablation)·비교할 수 있다.
 
-> ⚠️ **택소노미 지위** (2026-07 추가): NLAH 6요소는 여러 경쟁 분류 중 하나다. 2026 상반기 서베이의 앵커는 2606.20683의 6런타임책임(observation·context·control·action·state·verification)이며 11책임(2605.13357)도 병존 — "분해 어휘가 6책임/11책임/3계층/범주론으로 … 표준 분류 어휘는 아직 없다." [외부: harness-paper §4-A/§5 트렌드5 — 원 논문 미대조]. 본 가이드는 NLAH를 실무 축으로 유지하되(§12에 6책임 자기점검 격자 병기) 어느 것도 권위로 채택하지 않는다.
+> ⚠️ **택소노미 지위** (2026-07 추가): NLAH 6요소는 여러 경쟁 분류 중 하나다. 2026 상반기 서베이의 앵커는 2606.20683의 6런타임책임(observation·context·control·action·state·verification)이며 11책임(2605.13357)도 병존 — "분해 어휘가 6책임/11책임/3계층/범주론으로 … 표준 분류 어휘는 아직 없다." [외부: harness-paper §4-A/§5 트렌드5 — 원 논문 미대조]. 6책임·11책임 명칭은 원 abstract 와 일치한다 [arxiv preprint, 2026-06, v1 — 2606.20683 abstract 대조 2026-11-01(C-35)] [arxiv preprint, 2026-05, v1 — 2605.13357 abstract 대조 2026-11-01(C-35)]. "표준 분류 어휘는 아직 없다"는 서베이의 문장이다(2606.20683 abstract 에 없음). 본 가이드는 NLAH를 실무 축으로 유지하되(§12에 6책임 자기점검 격자 병기) 어느 것도 권위로 채택하지 않는다.
 
 ### 1.2.1 NLAH 6요소 ↔ H1-H6 매핑 (UC-4, v4.8.0)
 
@@ -87,15 +87,15 @@ Harness H = (C, R, S, A, Σ, F) where:
 
 Anthropic은 **managed agents**를 `Brain (model reasoning)` + `Hands (tool execution)`로 분리하는 **인프라 레이어** 패턴을 제시. 구성: `Session` + `Harness` + `Sandbox`. 이 3-component는 OS/infrastructure 수준의 관심사.
 
-fz의 `Lead + Teammate` (TeamCreate + SendMessage)는 **애플리케이션 레이어**의 다관점 협업 패턴. Brain/Hands의 subset이 아니라 다른 계층.
+fz의 `Lead + Teammate` (TeamCreate + SendMessage)는 **애플리케이션 레이어**의 다관점 협업 패턴. Brain/Hands의 subset이 아니라 다른 계층. (이력 — TEAM 일몰 전 서술. 현행 fz 는 `Lead + 결정적 Workflow 워커`(`workflows/*.js` 의 `agent()` 호출 · 반환 JSON 스키마)이고 계층 구분은 그대로다 — `guides/skill-authoring.md` §12)
 
-| 계층 | Anthropic Brain/Hands | fz Lead/Teammate |
+| 계층 | Anthropic Brain/Hands | fz Lead/Workflow 워커 (이력: Lead/Teammate) |
 |------|----------------------|------------------|
 | 목적 | 모델 실행 격리 + 보안 + 스케일링 | 다관점 검토 + 역할 분리 |
 | 범위 | 인프라 (Session/Harness/Sandbox) | 애플리케이션 (에이전트 협업) |
 | 중복 여부 | fz는 Brain/Hands **위에서** 작동 — 상호 대체 아님 |
 
-**독자 주의**: Anthropic "Scaling Managed Agents" 글의 핵심 표현은 **"many brains, many hands"** — 이는 인프라 수준의 모델 실행/도구 격리 패턴. fz Lead/Teammate는 애플리케이션 수준의 역할 협업 패턴이므로 혼용 금지.
+**독자 주의**: Anthropic "Scaling Managed Agents" 글의 핵심 표현은 **"many brains, many hands"** — 이는 인프라 수준의 모델 실행/도구 격리 패턴. fz Lead/Workflow 워커(이력: Lead/Teammate)는 애플리케이션 수준의 역할 협업 패턴이므로 혼용 금지.
 
 ---
 
@@ -107,7 +107,7 @@ fz의 `Lead + Teammate` (TeamCreate + SendMessage)는 **애플리케이션 레�
 |------|------|-----------|-----------|
 | **무상태** | 세션 간 기억 없음 | "교대 근무 엔지니어가 이전 기억 없이 출근" | 세션 영속화 + 핸드오프 아티팩트 |
 | **자신감 있는 오류** | 자기 평가 시 과대 평가 | "명백히 깨진 게임을 '모든 기능이 작동합니다'로 평가" | Generator≠Evaluator 분리 |
-| **컨텍스트 불안** | 긴 작업에서 일관성 상실 | Sonnet 4.5가 윈도우 한도 근처에서 조기 마무리 (Opus 4.6+ 개선, 4.8 1M Compaction 충분 [verified: anthropic.com/news/claude-opus-4-8]) | Context Reset + 구조화된 핸드오프 |
+| **컨텍스트 불안** | 긴 작업에서 일관성 상실 | Sonnet 4.5가 윈도우 한도 근처에서 조기 마무리 (Opus 4.6+ 개선, 4.8 1M Compaction 충분 [verified: anthropic.com/news/claude-opus-4-8] — 이력, 2026-05 당시 기준. 현행 4종(Fable 5.1·Opus 5.5·Sonnet 5.5·Haiku 5.5)은 모두 1M 컨텍스트 [verified: https://platform.claude.com/docs/en/models/overview]) | Context Reset + 구조화된 핸드오프 |
 | **무제한 접근** | 통제 없는 도구 접근 | `rm -rf /`, force push, 비밀 파일 읽기 | 권한 계층 + 스키마 필터링 |
 
 > 출처: Anthropic 공식 — "자기 작업을 평가하라고 하면, 에이전트는 품질이 명백히 떨어져도 자신있게 칭찬하는 경향"
@@ -119,11 +119,11 @@ fz의 `Lead + Teammate` (TeamCreate + SendMessage)는 **애플리케이션 레�
 | LangChain 벤치마크 | 하네스 설계만 수정 | 없음 | 52.8% → 66.5% (**+13.7%p**) |
 | NLAH 논문 | 코드 하네스 → 자연어 하네스 | 없음 | 30.4% → 47.2% (**+16.8%p**) |
 | Anthropic Solo vs Harness | Solo → 3-Agent | 동일 모델 | $9/깨진 게임 → $200/완전한 앱 |
-| Claw-SWE-Bench (2026-06) | minimal → full adapter | 없음 (동일 GLM 5.1) | Pass@1 19.1% → 73.4% — "모델 선택이 29.4pp, 하네스 선택이 27.4pp를 움직임" [외부: harness-paper §4-D, arXiv 2606.12344 — 원 논문 미대조] |
-| StaminaBench (2026-06) | 하네스 최선↔최악 | 없음 | 최대 6배 격차 [외부: harness-paper §요약, arXiv 2606.19613 — 원 논문 미대조] |
+| Claw-SWE-Bench (2026-06) | minimal → full adapter | 없음 (동일 GLM 5.1) | Pass@1 19.1% → 73.4% — "모델 선택이 29.4pp, 하네스 선택이 27.4pp를 움직임" [arxiv preprint, 2026-06, v1 — 2026-11-01 원문 대조(M6): v1 본문과 일치, 이전 "harness-paper §4-D 경유·원 논문 미대조" 단서 해제] · 현행 v2 에는 19.1%·73.4%·27.4pp 가 없고 29.4pp 만 남는다(7 하네스 × 3 모델 비교로 개정, 최고 Hermes Agent 81.7%) [arxiv preprint, 2026-06, v2] |
+| StaminaBench (2026-06) | 하네스 최선↔최악 | 없음 | 최대 6배 격차 — 강한 모델의 최선↔최악 하네스 간 격차이고, 약한 모델은 어느 하네스로도 실패한다(오픈소스 LLM 7종 × 하네스 6종) [arxiv preprint, 2026-06, v1 — 2606.19613 abstract 대조 2026-11-01(C-35), 이전 "harness-paper §요약 경유·원 논문 미대조" 단서 해제] |
 
 > 하네스 설계가 모델 능력보다 더 큰 병목이다. 모델을 바꾸기 전에 하네스를 먼저 개선하라.
-> ⚠️ 2026-06 행 출처 단서: harness-paper 서베이는 **에이전트 생성 메타분석**(arXiv 편중·census 아님 자기고지)이며 본 가이드는 원 논문을 재검증하지 않았다 — 방향성 근거로만 사용.
+> ⚠️ 2026-06 행 출처 단서: harness-paper 서베이는 **에이전트 생성 메타분석**(arXiv 편중·census 아님 자기고지)이며 본 가이드는 원 논문을 재검증하지 않았다 — 방향성 근거로만 사용. (이력 — 2026-07 당시. 2026-11-01 두 행을 원문과 대조했다(C-35): Claw-SWE-Bench 는 v1 에서만 일치(M6), StaminaBench 는 abstract 일치 — 각 행 태그 참조)
 
 ---
 
@@ -165,13 +165,13 @@ GOOD: 도구 자체가 스키마에 없음 → 에이전트가 존재를 모르�
 
 **Lazy Tool Discovery**: MCP 도구를 사전에 모두 로드하지 않고 필요할 때만 발견한다. 프롬프트 버짓 절약 + 불필요한 도구 노출 방지.
 
-> 업계·학술 수렴 (2026-07 추가): intent 기반 동적 툴 검색이 대규모에서 실증 — "7,471 툴에서 full-corpus schema 노출 99.8% 감소" [외부: harness-paper §4-G, SING arXiv 2606.16591 — 대규모 세팅 결과, fz 규모(수십)엔 방향 지지로만]. OpenAI GPT도 MCP 툴검색 기본화 [외부: harness-paper §4-K]. 스킬/MCP 30+ 임계 초과 시 intent 동적 검색 전환 검토 — 임계 도달 전 구현 금지(원칙 1).
+> 업계·학술 수렴 (2026-07 추가): intent 기반 동적 툴 검색이 대규모에서 실증 — "7,471 툴에서 full-corpus schema 노출 99.8% 감소" [외부: harness-paper §4-G, SING arXiv 2606.16591 — 대규모 세팅 결과, fz 규모(수십)엔 방향 지지로만] [arxiv preprint, 2026-06, v2 — 2606.16591 abstract 대조 2026-11-01(C-35): 7,471 툴 · 99.8% 원문 일치]. OpenAI GPT도 MCP 툴검색 기본화 [외부: harness-paper §4-K]. 스킬/MCP 30+ 임계 초과 시 intent 동적 검색 전환 검토 — 임계 도달 전 구현 금지(원칙 1).
 
 ### 기둥 2: Guardrails & Safety (안전 제약)
 
 결정론적 규칙이 여러 계층에서 동작한다.
 
-> **원칙: 안전은 확률이 아니라 결정론으로** (서베이 안전 테마, 2026-07 추가 — fz 트리거 ID T8과 무관) — 프롬프트/스키마 레벨 가드레일(Layer 1-2)은 확률적 준수라 우회될 수 있다. 신뢰성-필수 제약은 결정론적 실행 훅(Layer 5)/OS 레벨로 강제한다: "거버넌스 제약(누가 인가·무엇이 제한·누구 지시 우선)은 결정론적 런타임 변수이므로 LLM이 아니라 실행 훅이 강제해야 한다." [외부: harness-paper §4-H, Harness-MU arXiv 2606.21856 — 원 논문 미대조]. OS 커널 레벨(eBPF) 강제는 연구 인프라 수준 — 플러그인 계층은 훅 원칙까지.
+> **원칙: 안전은 확률이 아니라 결정론으로** (서베이 안전 테마, 2026-07 추가 — fz 트리거 ID T8과 무관) — 프롬프트/스키마 레벨 가드레일(Layer 1-2)은 확률적 준수라 우회될 수 있다. 신뢰성-필수 제약은 결정론적 실행 훅(Layer 5)/OS 레벨로 강제한다: "거버넌스 제약(누가 인가·무엇이 제한·누구 지시 우선)은 결정론적 런타임 변수이므로 LLM이 아니라 실행 훅이 강제해야 한다." [arxiv preprint, 2026-06, v1 — Harness-MU 2606.21856 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-H 경유·원 논문 미대조" 단서 해제]. OS 커널 레벨(eBPF) 강제는 연구 인프라 수준 — 플러그인 계층은 훅 원칙까지.
 
 **Defense-in-Depth (깊이 방어) — 5계층 모델**:
 
@@ -226,7 +226,7 @@ Layer 5: Lifecycle Hooks
 
 **핵심 교훈**: "제약이 많을수록 오히려 안정성이 높아진다." — 승인 피로를 줄이려면 패턴 기반 자동 승인(Semi-Auto)을 활용한다.
 
-> **capability ≠ authorization** (2026-07 추가): 도구 노출 허용이 곧 인가가 아니다 — force push·`--no-verify` 같은 위험 *인자값* 단위의 재인가가 별도 축: "셋 다 기본 capability gating은 있으나 결정론적 fail-closed per-call value 인가 게이트가 없음." [외부: harness-paper §4-H, ScopeGate arXiv 2606.28679 — 원 논문 미대조]. 강제 지점은 tool-layer에서 per-call 인자값 인가로 하강 중.
+> **capability ≠ authorization** (2026-07 추가): 도구 노출 허용이 곧 인가가 아니다 — force push·`--no-verify` 같은 위험 *인자값* 단위의 재인가가 별도 축: "셋 다 기본 capability gating은 있으나 결정론적 fail-closed per-call value 인가 게이트가 없음." [arxiv preprint, 2026-06, v1 — ScopeGate 2606.28679 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-H 경유·원 논문 미대조" 단서 해제]. 강제 지점은 tool-layer에서 per-call 인자값 인가로 하강 중.
 
 ### 기둥 3: Context Engineering (컨텍스트 관리)
 
@@ -339,7 +339,7 @@ Layer 4: Optimization — 토큰 예산에 맞춰 압축/선택
 
 컨텍스트 압축은 효율 문제만이 아니라 **안전-critical 계층**이다. 압축 요약기가 거버넌스 제약(⛔ 규칙)을 조용히 탈락시키면, 이후 턴은 규칙이 없었던 것처럼 행동한다.
 
-> "컨텍스트 압축이 안전 제약을 조용히 삭제하는 실패 모드를 명명. … 위반율이 full-context 0% → 압축 후 30%(일부 모델 59%). … Compaction-Eviction Attack(요약기가 정책을 누락하도록 유도)이 전 모델을 무력화. Constraint Pinning(거버넌스 제약을 손실 압축에서 격리)으로 위반 0% 회복." [외부: harness-paper §4-C, arXiv 2606.22528 — 원 논문 미대조]
+> "컨텍스트 압축이 안전 제약을 조용히 삭제하는 실패 모드를 명명. … 위반율이 full-context 0% → 압축 후 30%(일부 모델 59%). … Compaction-Eviction Attack(요약기가 정책을 누락하도록 유도)이 전 모델을 무력화. Constraint Pinning(거버넌스 제약을 손실 압축에서 격리)으로 위반 0% 회복." [arxiv preprint, 2026-06, v2 — 2606.22528 abstract 대조 2026-11-01(C-35): 0%→30%(일부 59%) · 최적화 주입이 전 모델 무력화 · Constraint Pinning 0% 회복은 원문 일치, 이전 "harness-paper §4-C 경유·원 논문 미대조" 단서 해제. "Compaction-Eviction Attack" 명칭은 대조 기록의 인용에 없다]
 
 ```
 설계 원칙:
@@ -347,6 +347,10 @@ Layer 4: Optimization — 토큰 예산에 맞춰 압축/선택
   2. 압축/핸드오프 경계마다 활성 ⛔ 규칙을 명시 재기재
   3. 설계 축 이동: "무엇을 버리나" → "가역적으로 무엇을 노출하나" [외부: harness-paper §4-C 개관 (VISTA·ACE) — 원 논문 미대조]
   4. 계획도 비영속 — "계획 신호가 1스텝 후 4.1배 감쇠 … 재주입으로도 회복 안 됨" [외부: harness-paper §4-C, 2606.22953 — 원 논문 미대조]
+     ⚠️ 2026-11-01 정정(M10): 4.1배는 Llama-3.1-70B·ALFWorld 한 설정에서 잰 은닉 상태 대비(contrast) 감쇠이고 보편이 아니다
+        (원문 "native Qwen3 shows that the Llama timing pattern is not universal"). 재주입 부분은 원문과 일치 —
+        "preserving or re-surfacing only the plan does not recover the gap"
+        [arxiv preprint, 2026-06, v2 — 2606.22953 abstract 대조 2026-11-01 · venue 자기보고: COLM 2026 워크숍]
      → 요약본이 아닌 원본 아티팩트 전체 전달 (fz journal 전체 전달 규율과 정합)
 ```
 
@@ -688,7 +692,7 @@ Sprint 구조, 멀티에이전트 평가 등은 모델이 혼자 못 할 때만 
 
 > "모든 하네스 컴포넌트는 모델이 혼자 못 하는 것에 대한 가정. 그 가정을 스트레스 테스트하라."
 
-**Anthropic의 재검토 사례** (Opus 4.6 → Opus 4.8 [verified: anthropic.com/news/claude-opus-4-8]):
+**Anthropic의 재검토 사례** (Opus 4.6 → Opus 4.8 [verified: anthropic.com/news/claude-opus-4-8] — 이력, 2026-05 당시 기준. 현행 4종 판정은 아래 Fable 5.1 블록과 §10 모델 세대별 하네스 조정의 Opus 5.5 행):
 
 | 컴포넌트 | Sonnet 4.5 시절 | Opus 4.6 이후 | Opus 4.8 (2026-05-28 GA) | 변경 이유 |
 |----------|---------------|-------------|--------------------------|----------|
@@ -776,14 +780,14 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 
 ### 원칙 7: 운영점(Operating Point)을 하네스 가정으로 인코딩하라
 
-> H1("모든 하네스 컴포넌트 = 모델이 혼자 못 하는 것에 대한 가정")의 확장 — 가정에는 *운영 설정*도 포함된다. 운영점이 고정되면(예: Claude 세션 effort=max + ultracode) 하네스는 그 설정을 못 바꾸는 전제 위에서 설계한다.
+> H1("모든 하네스 컴포넌트 = 모델이 혼자 못 하는 것에 대한 가정")의 확장 — 가정에는 *운영 설정*도 포함된다. 운영점이 고정되면(예: Claude 세션 effort=max + ultracode — 이력, 2026-07 당시 운영점) 하네스는 그 설정을 못 바꾸는 전제 위에서 설계한다. 현행 운영점(2026-10-19 사용자 결정): 정적 45콜 워크플로 워커의 effort = Lead 세션 effort(읽지 못하면 워크플로 기본 `'xhigh'`) — `modules/mode-gate.md` § effort.
 
 **레버 구분** (혼동 주의):
 - `effort`(추론 깊이) = 세션 설정. max 고정 시 하네스가 *못 낮춘다*.
 - `SOLO/TEAM`(에이전트 수) = `modules/complexity.md` 소유. fan-out을 제어하지 *추론 깊이가 아니다*.
 - → SOLO 게이팅으로는 overthinking(추론 깊이)을 못 막는다. 게이팅이 줄이는 것은 fan-out 비용·MAST 실패다.
 
-**max + ultracode 운영점의 함의**:
+**max + ultracode 운영점의 함의** (이력 — 2026-07 운영점 기준 서술. 현행 운영점은 위 인용 블록, GPT leg 선택 규칙의 정본은 `modules/gpt-strategy.md` § 모델·effort 선택):
 - (a) token 비용은 *세션* binding 제약이 아니다 → 세션은 품질 최적화. 단 subagent leg 의 per-call effort·비용은 fz가 여전히 소유한다. GPT leg 의 모델·effort 는 세션 1회 선택(없으면 `config.toml`)이 모든 호출에 적용된다 — 호출마다 바꾸지 않는다(`modules/gpt-strategy.md` § 모델·effort 선택).
 - (b) max는 단순 작업도 깊게 추론한다(overthinking 가능). 세션 추론 깊이를 못 낮추므로, fz는 *task surface 축소*(light/simplified 모드 = 로드 instruction 감소)로 "무엇을 생각하는가"를 좁힌다 — 추론 깊이가 아니라 추론 *대상*을 줄이는 접근.
 - (c) ultracode는 workflow를 기본화하나 coupled 작업의 결합도는 바뀌지 않는다(§8 multi-agent 통신 + `guides/agent-team-guide.md` 참조). 비용 반론만 제거할 뿐 fan-out 정당화가 아니다.
@@ -791,6 +795,7 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 > 이유: 운영 설정을 하네스 가정으로 명시하면, 못 바꾸는 레버(세션 effort)에 헛된 게이팅을 걸지 않고 바꿀 수 있는 레버(surface·GPT effort·fan-out)에 집중하게 된다.
 > [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — `max`는 "prone to overthinking" + "diminishing returns from increased token usage"; 학술 보강 arxiv 2502.08235(overthinking↑→성능↓)·2604.10739]
 > ⚠️ **Opus 5 보정 (2026-07-25)**: 위 `max` 부정 평가는 **Opus 4.7/4.8 페이지의 문구**다. Opus 5 공식 문구는 톤이 다르다 — `max`는 *"when a task justifies unconstrained token spending"*, 그리고 Opus 5는 *"converts additional effort into better results more reliably than any earlier Opus model"* [verified: platform.claude.com/docs/en/build-with-claude/effort · about-claude/models/whats-new-opus-5]. 즉 **overthinking 경계는 여전히 유효한 운영 원칙이나, 근거를 4.8 문구에만 매달면 안 된다** — Opus 5에서는 측정(sweep)으로 운영점을 정할 것.
+> ⚠️ **Opus 5.5 보정 (2026-11-01)**: 위 두 문단은 Opus 4.7/4.8 · Opus 5 페이지 문구다(이력). 현행 공식 출발점은 Opus 5.5 `medium` · Fable 5.1 `high` 다 — *"Most Claude models default to high effort ...; Claude Opus 5.5 and Claude Haiku 5.5 default to medium."* [verified: https://platform.claude.com/docs/en/build-with-claude/effort]. *"Claude Opus 5.5 at `medium` matches or exceeds Claude Opus 5 at `high` on coding and knowledge-work evaluations"* · *"Reserve `xhigh` and `max` for work where you've measured a quality gain."* [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5#calibrate-effort]. `xhigh` 의 전형 용도는 *"Long-running agentic and coding tasks (over 30 minutes) with token budgets in the millions"*, `max` 는 *"Absolute maximum capability with no constraints on token spending."* [verified: https://platform.claude.com/docs/en/build-with-claude/effort]. ⇒ fz 현행 운영점(워커 effort = Lead 세션 effort, 기본 `xhigh`)은 Opus 5.5 워커 기준 공식 출발점(`medium`)보다 두 단계 위다. 이 문서는 하향을 권고하지 않는다 — 값은 2026-10-19 사용자 결정이다(`modules/mode-gate.md` § effort).
 
 ---
 
@@ -802,9 +807,9 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 
 **핵심 규율 3개** (fz는 이미 fz-skill/fz-memory/Lesson Intake로 부분 자기수정 수행 — 수동 검토 기반이라 아래 가드레일과 이미 정합):
 
-1. **회귀 게이트 / falsification 통과분만 수용**: 자기수정 제안은 회귀 테스트·반증 게이트를 통과한 것만 채택 — "3단계 루프: Weakness Mining → Harness Proposal(다양하되 최소의 수정 생성) → Proposal Validation(회귀 테스트 통과분만 수용)." [외부: harness-paper §4-B, Self-Harness arXiv 2606.09498 — 원 논문 미대조] / "자기진화가 요행·거짓 설명을 정책으로 굳히지 않도록 held-out acceptance gate·variance-aware credit·insight falsification·structural dedup을 도입." [외부: harness-paper §4-B, QueenBee arXiv 2606.27492 — 원 논문 미대조]
+1. **회귀 게이트 / falsification 통과분만 수용**: 자기수정 제안은 회귀 테스트·반증 게이트를 통과한 것만 채택 — "3단계 루프: Weakness Mining → Harness Proposal(다양하되 최소의 수정 생성) → Proposal Validation(회귀 테스트 통과분만 수용)." [arxiv preprint, 2026-06, v3 — Self-Harness 2606.09498 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-B 경유·원 논문 미대조" 단서 해제] / "자기진화가 요행·거짓 설명을 정책으로 굳히지 않도록 held-out acceptance gate·variance-aware credit·insight falsification·structural dedup을 도입." [arxiv preprint, 2026-06, v1 — QueenBee 2606.27492 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-B 경유·원 논문 미대조" 단서 해제]
 2. **self-preference 단독 채택 금지**: 검증셋 없는 self-preference/self-consistency 신호만으로 스킬·메모리 변경을 확정하지 않는다 — 외부 채점(fz-gpt 교차검증)을 병행.
-3. **잦은 갱신 균형추 (SEAGym)**: "잦은 업데이트가 held-out 개선에 실패하거나 유용한 중간 스냅샷이 나중에 붕괴할 수 있음." [외부: harness-paper §4-B, SEAGym arXiv 2606.17546 — 원 논문 미대조] → fz의 candidate 유지 규율(즉시 active 승격 안 함)·Lesson Intake evidence 카운팅·메모리 GC가 이미 이 붕괴 방어와 정합 — **현행 유지가 정답**(재설계 유발 금지).
+3. **잦은 갱신 균형추 (SEAGym)**: "잦은 업데이트가 held-out 개선에 실패하거나 유용한 중간 스냅샷이 나중에 붕괴할 수 있음." [arxiv preprint, 2026-06, v1 — SEAGym 2606.17546 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-B 경유·원 논문 미대조" 단서 해제] → fz의 candidate 유지 규율(즉시 active 승격 안 함)·Lesson Intake evidence 카운팅·메모리 GC가 이미 이 붕괴 방어와 정합 — **현행 유지가 정답**(재설계 유발 금지).
 
 > **경계**: 본 절은 "프레임+가드레일" 서술이지 완전자동 self-evolution 이식 제안이 아니다(fz는 "임의 판단 금지·AskUserQuestion" 규율 유지). falsification의 일반 이론은 서베이가 미해결로 남긴 과제 — "'요행을 정책으로 굳히지 않는' falsification 게이트의 일반 이론이 필요." [외부: harness-paper §6 미해결과제3 — 원 논문 미대조]. fz의 부분 자기수정을 "이 문제 해결"로 격상 금지.
 
@@ -826,7 +831,7 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 
 > **비단조성 보강** (2026-07 추가 · ⚠️ 2026-09-06 정정 — 출처 등급): "어설픈 하네스는 오히려 해롭다"는 실증도 있다 — *"A non-monotonic phenomenon - minimal-shell TSR < model-only TSR - is observed in two models."*(어설픈 하네스가 model-only보다 낮다) [verified: arxiv.org/abs/2605.12129 — abstract 대조 2026-09-06, 이전 "harness-paper 서베이 경유·원 논문 미대조" 단서 해제]. 단 2-3B 소형모델(Gemma4 E2B·Qwen3.5:2B·LLaMA 3.2 3B, 24 tasks) 실증이라 Claude(sonnet/opus) 계열 일반화는 [미검증: 모델 스케일 차이] — 반증 가능 가설로만.
 
-> **반대 방향 병기** (2026-09-06 추가): 같은 축을 프론티어 백엔드에서 잰 결과는 "하네스가 해로워진다"가 아니라 "하네스에 덜 민감해진다"다 — Harness-Bench(8 백엔드 × 6 하네스 × 106 tasks × 5,194 trajectories): *"stronger model backends tend to achieve higher mean scores while exhibiting lower cross-harness variance. This pattern suggests that stronger models may be more tolerant of differences in prompting, tool interfaces, state management, and recovery behavior."* [verified: arxiv.org/abs/2605.27922 — abstract 대조 2026-09-06]. 같은 논문이 하네스 간 **23.8pt 격차**(NanoBot 76.2 ↔ OpenClaw 52.4, 동일 태스크·백엔드 풀)도 보고하므로 **하네스 무용론의 근거가 아니다**. ⇒ AP1의 진단 질문("이 컴포넌트를 제거하면 성능이 떨어지는가")은 그대로 유효하고, 강한 백엔드에서 답이 NO 쪽으로 기울 뿐이다 — 질문을 없애라는 뜻이 아니라 **더 자주 물으라는 뜻**이다.
+> **반대 방향 병기** (2026-09-06 추가): 같은 축을 프론티어 백엔드에서 잰 결과는 "하네스가 해로워진다"가 아니라 "하네스에 덜 민감해진다"다 — Harness-Bench(8 백엔드 × 6 하네스 × 106 tasks × 5,194 trajectories): *"stronger model backends tend to achieve higher mean scores while exhibiting lower cross-harness variance. This pattern suggests that stronger models may be more tolerant of differences in prompting, tool interfaces, state management, and recovery behavior."* [arxiv preprint, 2026-05, v1 본문 §4.2 — 2026-11-01 재대조]. 같은 논문이 하네스 간 **23.8pt 격차**(NanoBot 76.2 ↔ OpenClaw 52.4, 동일 태스크·백엔드 풀)도 보고하므로 **하네스 무용론의 근거가 아니다**. ⇒ AP1의 진단 질문("이 컴포넌트를 제거하면 성능이 떨어지는가")은 그대로 유효하고, 강한 백엔드에서 답이 NO 쪽으로 기울 뿐이다 — 질문을 없애라는 뜻이 아니라 **더 자주 물으라는 뜻**이다. ⚠️ 2026-11-01 정정(M5): 위 인용과 23.8pt 격차는 abstract 가 아니라 **v1 본문 §4.2** 에만 있다(이전 태그의 "abstract 대조 2026-09-06" 은 사실과 달랐다). 현행 v2 에는 "52.4"·"more tolerant" 가 없고 표가 바뀌었다 — v2 가 같은 결론을 다른 말로 내는지는 [미검증: 원문 재대조 필요 — U-20].
 
 ### Anti-Pattern 2: 자기 평가 의존
 
@@ -850,11 +855,13 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 대응: Context Reset + 핸드오프 아티팩트
 
 예외: Opus 4.6+ 1M context는 Compaction 충분 [verified: Anthropic 2026.03 재검토 포스트]. Opus 4.8 동등 [verified: anthropic.com/news/claude-opus-4-8].
+     (이력 — 2026-05 당시 기준. 현행 4종은 모두 1M 컨텍스트 [verified: https://platform.claude.com/docs/en/models/overview].
+     "Compaction 충분" 판정은 현행 모델로 다시 확인하지 않았다 — Fable 5.1 의 늦은 compaction 실험은 §5 원칙 2 블록)
      tokenizer 1.00-1.35x 증가 [미검증: Korean tokenizer 실측 부재] — L1/L2 크기 영향 자체 측정 필요.
 
 ⚠️ 예외의 범위 (2026-07 추가): 위 "충분"은 *작업 일관성* 축에 한정. 압축이 *거버넌스 제약*(⛔ 규칙)을
      조용히 삭제하는 별도 실패축(Governance Decay)은 윈도우 크기와 무관하다 — §3 기둥3 서브시스템 7 참조.
-     [외부: harness-paper §4-C, arXiv 2606.22528 — 원 논문 미대조]
+     [arxiv preprint, 2026-06, v2 — 2606.22528 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-C 경유·원 논문 미대조" 단서 해제]
 ```
 
 ### Anti-Pattern 4: 모든 액션에 승인 요청
@@ -879,6 +886,7 @@ Anthropic 실제 사례:
   Opus 4.8 (2026-05-28 GA): effort 기본 high + 자기 코드 결함 ~4x↓ + tool-calling 효율↑ [verified: anthropic.com/news/claude-opus-4-8]
   Fable 5 (2026-06-09 GA): 이전 모델용 절차 지시가 품질 저하 요인으로 공식화 ("often too prescriptive... can degrade output quality") + 검증 리마인더 축소 권고 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5]
   Fable 5.1 (2026-09 GA): Fable 5 프롬프트 무변경 호환("should perform well on Claude Fable 5.1 without changes")이나 effort는 재sweep 대상("effort level names don't correspond to the same amount of thinking across models") + 캐시 읽기 $0.25/MTok(1/4)로 "일찍 compact" 전제가 뒤집힘 + 진행보고 억제 문구("hold all findings for the final response")는 제거 대상 [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1 + platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]
+  Opus 5.5 (현행 worker default): effort 기본 `medium` — "Claude Opus 5.5 at `medium` matches or exceeds Claude Opus 5 at `high`" + xhigh·max 는 측정된 이득이 있을 때만("Reserve `xhigh` and `max` for work where you've measured a quality gain.") [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5#calibrate-effort]
   이렇게 제거/추가된 컴포넌트가 "모델이 성장한 증거"
 ```
 
@@ -952,7 +960,7 @@ Q6: 에이전트가 실패했을 때 복구 경로가 있는가? (회복력)
 
 ### 패턴 비교표
 
-| 측면 | 파일 기반 (Anthropic) | P2P SendMessage (fz) | Contract 기반 (NLAH) |
+| 측면 | 파일 기반 (Anthropic) | P2P SendMessage (fz 이력 — TEAM 일몰, 아래 사료 절) | Contract 기반 (NLAH) |
 |------|---------------------|---------------------|---------------------|
 | **지연** | 높음 (파일 I/O) | 낮음 (메모리) | 중간 |
 | **실시간 대화** | 불가 | 가능 | 불가 |
@@ -960,6 +968,8 @@ Q6: 에이전트가 실패했을 때 복구 경로가 있는가? (회복력)
 | **이식성** | 높음 (파일 시스템) | 낮음 (프레임워크 종속) | 높음 (자연어) |
 | **형식 검증** | 없음 | 없음 | 있음 (계약 충족) |
 | **적합한 경우** | 비동기 장기 작업 | 실시간 협업 | 학술/이식 |
+
+> fz 현행 = 결정적 Workflow 스크립트(`workflows/*.js`)가 `agent()` 반환 JSON(스키마)으로 단계 사이를 잇는다. 위 표의 P2P 열은 비교용 이력이다 — `guides/skill-authoring.md` §12.
 
 ### 파일 기반 통신의 구체적 구현 (Anthropic)
 
@@ -1010,8 +1020,8 @@ Q6: 에이전트가 실패했을 때 복구 경로가 있는가? (회복력)
 
 에이전트/통신을 늘리는 것이 항상 이득은 아니다 — 두 근본 병목:
 
-- **정보병목 (C_min)**: "정보이론적 상한: 제약 그래프 분할로 생기는 정보 병목(minimum cut cost C_min)에 따라 MAS 성공확률이 지수적으로 감쇠. C_min이 높으면 에이전트/통신을 늘리지 말고 태스크를 재구조화하라." [외부: harness-paper §4-F, arXiv 2606.13733 — 원 논문 미대조]
-- **권한 병목**: "관리 병목은 지각이 아니라 권한 부여(어떤 모델도 workspace-permission precision 50% 미달), 비용과 관리 품질 decoupled(API 비용 100배 차이인데 점수는 4배 미만)." [외부: harness-paper §4-F, ClawArena arXiv 2606.31174 — 원 논문 미대조]
+- **정보병목 (C_min)**: "정보이론적 상한: 제약 그래프 분할로 생기는 정보 병목(minimum cut cost C_min)에 따라 MAS 성공확률이 지수적으로 감쇠. C_min이 높으면 에이전트/통신을 늘리지 말고 태스크를 재구조화하라." [arxiv preprint, 2026-06, v1 — 2606.13733 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-F 경유·원 논문 미대조" 단서 해제]
+- **권한 병목**: "관리 병목은 지각이 아니라 권한 부여(어떤 모델도 workspace-permission precision 50% 미달), 비용과 관리 품질 decoupled(API 비용 100배 차이인데 점수는 4배 미만)." [arxiv preprint, 2026-06, v2 — ClawArena-Team 2606.31174 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-F 경유·원 논문 미대조" 단서 해제]
 
 → fz 함의: 워커 수를 늘리기 전에 "정보병목이 큰가"를 먼저 본다(§10 역방향 게이트). C_min 정량 계산은 실무 불가 → `modules/complexity.md`의 coupling modifier로 정성 근사.
 
@@ -1047,7 +1057,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | **적응형 깊이** | 단순 작업 → SOLO, 복잡 → TEAM | 작업별 |
 | **Early Exit** | 품질 충분 시 추가 반복 중단 | 10-30% |
 
-> **비용↑ ≠ 관리품질↑** (2026-07 추가): 강한 모델(opus) 승격이 관리 품질을 자동 보장하지 않는다 — "비용과 관리 품질 decoupled(API 비용 100배 차이인데 점수는 4배 미만)." [외부: harness-paper §4-F, ClawArena arXiv 2606.31174 — 원 논문 미대조]. 모델 라우팅으로 비용을 올려도 오케스트레이션(위임·권한부여) 설계가 병목이면 품질은 따라오지 않는다.
+> **비용↑ ≠ 관리품질↑** (2026-07 추가): 강한 모델(opus) 승격이 관리 품질을 자동 보장하지 않는다 — "비용과 관리 품질 decoupled(API 비용 100배 차이인데 점수는 4배 미만)." [arxiv preprint, 2026-06, v2 — ClawArena-Team 2606.31174 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-F 경유·원 논문 미대조" 단서 해제]. 모델 라우팅으로 비용을 올려도 오케스트레이션(위임·권한부여) 설계가 병목이면 품질은 따라오지 않는다.
 
 ### ROI 판단 기준
 
@@ -1078,7 +1088,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
   ↓
 품질 검증 필요?                → YES → Generator≠Evaluator (B)
   ↓
-실시간 에이전트 협업 필요?      → YES → P2P 통신 (fz 패턴)
+실시간 에이전트 협업 필요?      → YES → P2P 통신 (이력 — fz 는 TEAM 일몰 뒤 쓰지 않는다. fz 현행 다단계 협업 = 결정적 Workflow, `guides/skill-authoring.md` §12)
   ↓
 프로덕션 안전 필요?            → YES → TypeScript 가드레일 (C)
   ↓
@@ -1089,8 +1099,8 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 위 결정 트리는 복잡도가 오르면 멀티에이전트로 상승하는 단조 흐름이다. 역방향 게이트를 함께 본다:
 
-- **정보병목 크면 재구조화 우선**: "C_min이 높으면 에이전트/통신을 늘리지 말고 태스크를 재구조화하라." [외부: harness-paper §4-F, arXiv 2606.13733 — 원 논문 미대조] (§8 근본 한계 참조).
-- **오케스트레이션 프롬프팅 과신 금지**: "멀티에이전트 오케스트레이션 프롬프팅은 별개의 과소평가된 능력 … 평균 pass rate 14.9%." [외부: harness-paper §4-F, PerspectiveGap arXiv 2606.08878 — 원 논문 미대조]. 강한 코딩 모델이라도 "무엇을 워커에게 전달하는가"는 별도 취약점 — 워커 추가가 자동으로 품질을 올리지 않는다.
+- **정보병목 크면 재구조화 우선**: "C_min이 높으면 에이전트/통신을 늘리지 말고 태스크를 재구조화하라." [arxiv preprint, 2026-06, v1 — 2606.13733 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-F 경유·원 논문 미대조" 단서 해제] (§8 근본 한계 참조).
+- **오케스트레이션 프롬프팅 과신 금지**: "멀티에이전트 오케스트레이션 프롬프팅은 별개의 과소평가된 능력 … 평균 pass rate 14.9%." [외부: harness-paper §4-F, PerspectiveGap arXiv 2606.08878 — 원 논문 미대조]. 강한 코딩 모델이라도 "무엇을 워커에게 전달하는가"는 별도 취약점 — 워커 추가가 자동으로 품질을 올리지 않는다. ⚠️ 2026-11-01 정정(M7): 14.9% 는 v1 abstract 수치다(이력) [arxiv preprint, 2026-06, v1]. 현행 v2 abstract 는 *"average combined pass rate of only 17.2% (GPT-5.5 62.0%)"* 이고 *"Opus 4.8 shows a notable weakness in orchestration prompting despite its strong coding performance"* 를 덧붙인다 [arxiv preprint, 2026-06, v2]. 이전 "원 논문 미대조" 단서는 이 대조로 해소됐다.
 - **C_min 정량 계산은 실무 불가** → `modules/complexity.md` coupling modifier로 정성 근사(교체 아님, 기존 MAST 기반 fan-out 억제의 이론적 뒷받침).
 
 ### 모델 세대별 하네스 조정
@@ -1099,14 +1109,14 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 |-----------|-------------|-----------------|
 | Sonnet 4.5 | Context Reset 필수, Sprint 분해 필수, Evaluator 필수 | — |
 | Opus 4.6 | Context Reset 선택, Compaction 충분, Evaluator 조건부 | Sprint 분해, 스프린트별 평가 |
-| **Opus 4.8 (2026-05-28 GA)** | effort 기본 **high** (xhigh/max는 더 어려운 작업용), 1M Compaction 충분, tool-calling 효율↑(fewer steps·required-call skip↓), 단일 세션 수백 parallel subagents 지원 [verified: anthropic.com/news/claude-opus-4-8] | Evaluator 조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 *이종 blind-spot*은 여전히 cross-model 필요 [verified: 동] |
-| **Fable 5 (2026-06-09 GA, 옵트인 최상위)** | effort 기본 **high** (xhigh=capability-sensitive, low도 이전 모델 xhigh 상회 가능), thinking 상시 활성(끄기 불가), async parallel subagents 공식 권장, fresh-context verifier > self-critique, 단일 turn 수 분·자율 런 수 시간 전제의 타임아웃/진행표시 설계 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 + code.claude.com/docs/en/model-config] | step-by-step 절차 지시("often too prescriptive... can degrade output quality" — 단 Gate 가드레일 제거는 A/B 후 결정), 검증 리마인더("verifies its own work with less prompting"). 안전 분류기 refusal 시 Opus 자동 폴백 주의. 상세: `guides/model-guide.md` |
-| **Opus 5 (2026-07-24 GA — 2026-09-22 까지 worker default — 지침은 5.5 가 상속)** | **위임 캡**(모델이 subagent를 과다 스폰 — 하네스측 `MAX_CONCURRENT_SUBAGENTS`=20·`MAX_SUBAGENT_SPAWN_DEPTH`=3 + 프롬프트측 제약 병행. ⛔ 세션 생애 `MAX_SUBAGENTS_PER_SESSION`=200은 **v2.1.224에서 제거**), **길이 통제 프롬프트**(응답·산출물 장문화, effort로는 안 줄어듦), **스코프 제약**(요청 외 단계 추가 경향), `max_tokens` 재점검(thinking 기본 ON → thinking+응답 합산 하드캡) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 + code.claude.com/docs/en/changelog v2.1.219] | **검증 지시·검증 스캐폴딩** — 자체검증 내장, *"removing them reduces wasted tokens with no loss in quality"*. 하네스도 같은 방향으로 이동(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). ⚠️ *외부 oracle·이종 교차검증은 존치* — 제거 대상은 **자기재확인 지시**뿐 |
-| **Opus 5.5 (2026-09-22 GA — 현행 worker default(생산). 단순 작업은 Sonnet 5)** | **effort 기본 `medium`**(Opus 5 는 `high`) + 같은 effort 에서 사고량 증가 → 공식은 fresh sweep 권고 · fz 는 `xhigh` 유지(사용자 결정 2026-09-25) [verified: whats-new-opus-5-5] · **thinking 끄기 불가**(`disabled`·manual budget → 400) · **forced `tool_choice` 400**(`auto` + strict tool use 로 대체) · 도구 호출 사이 진행 텍스트가 **progress-update `thinking` 블록**(기본 `display: "omitted"` 에서 스트림이 조용해짐) [verified: whats-new-opus-5-5] · **premature stopping** — 자동 continuation 은 같은 작업에 2~3회 상한 · **elapsed 시간 신호**(매 메시지 끝 경과 시간 1줄) [verified: prompting-claude-opus-5-5]. Opus 5 행의 지침(위임 캡 등)은 *"the patterns in Prompting Claude Opus 5 remain a reasonable starting point"* 로 상속 |
-| **Fable 5.1 (2026-09 GA — 현행 Lead)** | **effort 재sweep**(공식 default `high`. *"Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models"*), **늦은 compaction 실험**(캐시 읽기 $0.25/MTok = Fable 5 $1의 1/4 → *"compacting early to save cost may no longer be the right cost-intelligence tradeoff on Claude Fable 5.1, so experiment with later compaction points"*), **비차단 Lead**(*"letting the lead continue while subagents run lowers average time to completion at similar quality, token usage, and cost"* — 단 *"The model still often chooses to wait"*), **폴백 대상 확인**(허용 대상 = Opus 4.8 · Opus 5), **breaking 3 대비**(forced tool use `tool_choice` 400 · 이전 모델은 5.1 thinking block 못 읽음 · thinking block 앞 턴 편집 시 무효화 — Claude Code는 prefix를 보존해 줌) [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1 + platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1 + platform.claude.com/docs/en/about-claude/pricing] | **진행보고 억제 문구** — *"system prompt lines such as 'hold all findings for the final response'. Remove lines like that before adding anything"*(5.1은 기본적으로 중간 업데이트를 덜 쓴다). **배칭 nudge 추가** — ⛔ Claude Code가 turn-scoped 시스템 메시지로 **이미 주입**하므로 fz가 또 넣으면 중복 주입, **추가 금지**. ⚠️ **2026-09-06 정정**: "fable 1 ≈ opus 2 비용"은 **캐시 읽기에서 성립하지 않는다** — 2배인 것은 **출력·캐시 쓰기 단가**이고($50/$20 vs $25/$10), 캐시 읽기가 지배하는 실사용 세션을 재가격하면 **+9%**에 그친다(fz 실측 2026-09-06). 동시 상한의 실제 근거는 비용이 아니라 **호출당 지연 +49%**(중앙값 10.5s → 15.6s, fz 실측 2026-09-06)와 출력 단가다 |
+| **Opus 4.8 (2026-05-28 GA — 이력, 현재 legacy)** | effort 기본 **high** (xhigh/max는 더 어려운 작업용), 1M Compaction 충분, tool-calling 효율↑(fewer steps·required-call skip↓), 단일 세션 수백 parallel subagents 지원 [verified: anthropic.com/news/claude-opus-4-8] | Evaluator 조건부 — 자기 코드 결함 통과 ~4x↓(self-eval 개선)이나 *이종 blind-spot*은 여전히 cross-model 필요 [verified: 동] |
+| **Fable 5 (2026-06-09 GA, 옵트인 최상위 — 이력, 현재 legacy)** | effort 기본 **high** (xhigh=capability-sensitive, low도 이전 모델 xhigh 상회 가능), thinking 상시 활성(끄기 불가), async parallel subagents 공식 권장, fresh-context verifier > self-critique, 단일 turn 수 분·자율 런 수 시간 전제의 타임아웃/진행표시 설계 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 + code.claude.com/docs/en/model-config] | step-by-step 절차 지시("often too prescriptive... can degrade output quality" — 단 Gate 가드레일 제거는 A/B 후 결정), 검증 리마인더("verifies its own work with less prompting"). 안전 분류기 refusal 시 Opus 자동 폴백 주의. 상세: `guides/model-guide.md` |
+| **Opus 5 (2026-07-24 GA — 2026-09-22 까지 worker default — 지침은 5.5 가 상속 · 현재 legacy)** | **위임 캡**(모델이 subagent를 과다 스폰 — 하네스측 `MAX_CONCURRENT_SUBAGENTS`=20·`MAX_SUBAGENT_SPAWN_DEPTH`=3 + 프롬프트측 제약 병행. ⛔ 세션 생애 `MAX_SUBAGENTS_PER_SESSION`=200은 **v2.1.224에서 제거**), **길이 통제 프롬프트**(응답·산출물 장문화, effort로는 안 줄어듦), **스코프 제약**(요청 외 단계 추가 경향), `max_tokens` 재점검(thinking 기본 ON → thinking+응답 합산 하드캡) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 + code.claude.com/docs/en/changelog v2.1.219] · ⚠️ 2026-11-01 보강: 20·3 은 **Agent 도구 서브에이전트 풀** 상한이고(세션 총량 무제한) *"Agents that other features run, such as workflow agents and agent team teammates, follow their own limits instead."* [verified: https://code.claude.com/docs/en/sub-agents] — Workflow 에이전트 풀은 따로 동시 16(env 로 1~256) · 실행당 1,000 · `parallel()` 4,096 항목 [verified: https://code.claude.com/docs/en/workflows] | **검증 지시·검증 스캐폴딩** — 자체검증 내장, *"removing them reduces wasted tokens with no loss in quality"*. 하네스도 같은 방향으로 이동(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). ⚠️ *외부 oracle·이종 교차검증은 존치* — 제거 대상은 **자기재확인 지시**뿐 |
+| **Opus 5.5 (2026-09-22 GA — 현행 worker default(생산). 단순 작업은 Sonnet 5.5 — `sonnet` alias. 2026-09-25 당시 표기 "Sonnet 5" 는 이력)** | **effort 기본 `medium`**(Opus 5 는 `high`) + 같은 effort 에서 사고량 증가 → 공식은 fresh sweep 권고 · fz 는 `xhigh` 유지(사용자 결정 2026-09-25 — 이력. 2026-10-19 부터 워커 effort = Lead 세션 effort, `modules/mode-gate.md` § effort) [verified: whats-new-opus-5-5] · **thinking 끄기 불가**(`disabled`·manual budget → 400) · **forced `tool_choice` 400**(`auto` + strict tool use 로 대체) · 도구 호출 사이 진행 텍스트가 **progress-update `thinking` 블록**(기본 `display: "omitted"` 에서 스트림이 조용해짐) [verified: whats-new-opus-5-5] · **premature stopping** — 자동 continuation 은 같은 작업에 2~3회 상한 · **elapsed 시간 신호**(매 메시지 끝 경과 시간 1줄) [verified: prompting-claude-opus-5-5]. Opus 5 행의 지침(위임 캡 등)은 *"the patterns in Prompting Claude Opus 5 remain a reasonable starting point"* 로 상속 · 현행 4종 = Fable 5.1 · Opus 5.5 · Sonnet 5.5 · Haiku 5.5 (Sonnet 5 · Opus 5 · Fable 5 · Opus 4.8 은 legacy, 여전히 사용 가능) [verified: https://platform.claude.com/docs/en/models/overview] · fz 단순 워커의 `sonnet` alias 는 Claude Code 2.1.284 부터 Sonnet 5.5 로 해석된다(Anthropic API 공급자 기준 — *"now the default Sonnet model on the Anthropic API"*) [verified: https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md] |
+| **Fable 5.1 (2026-09 GA — 현행 Lead)** | **effort 재sweep**(공식 default `high`. *"Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models"*), **늦은 compaction 실험**(캐시 읽기 $0.25/MTok = Fable 5 $1의 1/4 → *"compacting early to save cost may no longer be the right cost-intelligence tradeoff on Claude Fable 5.1, so experiment with later compaction points"*), **비차단 Lead**(*"letting the lead continue while subagents run lowers average time to completion at similar quality, token usage, and cost"* — 단 *"The model still often chooses to wait"*), **폴백 대상 확인**(허용 대상 = Opus 4.8 · Opus 5 — 2026-11-01 재확인: *"The permitted fallback targets for Claude Fable 5.1 are Claude Opus 4.8 and Claude Opus 5."*), **breaking 3 대비**(forced tool use `tool_choice` 400 · 이전 모델은 5.1 thinking block 못 읽음 · thinking block 앞 턴 편집 시 무효화 — Claude Code는 prefix를 보존해 줌) [verified: platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1 + platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1 + platform.claude.com/docs/en/about-claude/pricing] | **진행보고 억제 문구** — *"system prompt lines such as 'hold all findings for the final response'. Remove lines like that before adding anything"*(5.1은 기본적으로 중간 업데이트를 덜 쓴다). **배칭 nudge 추가** — ⛔ Claude Code가 turn-scoped 시스템 메시지로 **이미 주입**하므로 fz가 또 넣으면 중복 주입, **추가 금지**. ⚠️ **2026-09-06 정정**: "fable 1 ≈ opus 2 비용"은 **캐시 읽기에서 성립하지 않는다** — 2배인 것은 **출력·캐시 쓰기 단가**이고($50/$20 vs $25/$10), 캐시 읽기가 지배하는 실사용 세션을 재가격하면 **+9%**에 그친다(fz 실측 2026-09-06). 동시 상한의 실제 근거는 비용이 아니라 **호출당 지연 +49%**(중앙값 10.5s → 15.6s, fz 실측 2026-09-06)와 출력 단가다. (이력 — 위 단가 비교는 Opus 5 기준이다. 현행 Opus 5.5($4/$20, 캐시 읽기 $0.20) 기준이면 Fable 5.1 은 입력·출력 2.5배, 캐시 읽기 1.25배다 [verified: https://platform.claude.com/docs/en/about-claude/pricing]. +9%·+49% 는 Opus 5.5 로 재측정하지 않았다) |
 | 미래 모델 | ? | Evaluator? 컨텍스트 관리? |
 
-> **4.8 새 기능 → fz 적용** [verified: anthropic.com/news/claude-opus-4-8]:
+> **4.8 새 기능 → fz 적용** [verified: anthropic.com/news/claude-opus-4-8] (이력 — Opus 4.8 당시 적용 기록, 현재 Opus 4.8 은 legacy):
 > - **effort 기본 high** (xhigh/max는 더 어려운 작업). fz는 못 낮추는 *세션* effort에 게이팅 걸지 않음 (§5 원칙 7 운영점).
 > - **자기 코드 결함 통과 ~4x↓** → fz-review: self-eval 개선분 인정, cross-model(GPT)은 *이종 blind-spot* 보완으로 재포지션 (과대확신 방어가 주목적 아님).
 > - **tool-calling 효율↑ (fewer steps·required-call skip↓)** → 강제 tool 호출 게이트 완화 가능. 단 breadth fan-out엔 명시 기준 유지.
@@ -1115,11 +1125,11 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 > **Opus 5 (2026-07-24) → fz 적용** [verified: prompting-claude-opus-5 · whats-new-opus-5 · effort · code.claude.com/docs/en/changelog]:
 > - ⛔ **검증 스캐폴딩 제거 방향** — 모델이 시키지 않아도 자기 작업을 검증한다. "final verification step 넣어라"/"subagent로 검증해라" 류 **프롬프트 지시**는 over-verification을 유발하므로 제거 대상. 하네스도 같은 판단(v2.1.215 `/verify`·`/code-review` 자동 실행 중단). **⚠️ 단 fz의 교차검증 스테이지**(plan `stage5-recheck`, review `stage3-counter`, peer-review `stage2` 교차)는 *다른 관점의 검증*이지 *자기재확인*이 아니다 — **일괄 제거 금지, 개별 판단**.
 > - ⚠️ **위임 방향 역전** — 4.8은 subagent를 *덜* 쓰려 해서 유도가 필요했으나, Opus 5는 *과다* 위임한다. 4.8용으로 넣은 "더 위임하라" 문구가 있으면 **제거**하고 캡으로 대체. fz는 Workflow 스크립트가 fan-out을 결정적으로 제어하므로 영향이 제한적이나, `agent()` **내부**에서 Task/Agent 도구를 쓰는 경로가 있으면 캡 필요.
-> - **effort 운용 전환** — 출발점 `xhigh`→**`high`(기본)**, `low`/`medium`이 비용·지연의 **1차 레버**. ⛔ 이전 모델 effort 값 재사용 금지 → **fresh sweep** 후 결정 (§5 원칙 7 운영점과 정합: 운영점은 측정으로 정한다). **⚠️ 2026-09-06 보강 (Fable 5.1)** — *"Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models."* [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1] ⇒ 모델을 넘길 때 effort 상수를 그대로 옮기는 것은 근거가 아니다. 현재 fz 워크플로 워커 36콜은 전부 `xhigh`이고(fz 실측 2026-09-06), 이는 **사용자가 유지를 택한 결정된 값**이다 — 공식 default가 `high`라는 사실은 하향 권고가 아니라 **fresh sweep의 출발점**이고, 변경 여부는 `modules/peer-review-tiers.md:239-241`이 규정한 짝 비교(`xhigh`/`high` 각 1회, critical·major 손실 0)로 측정한 뒤 사용자가 결정한다.
+> - **effort 운용 전환** — 출발점 `xhigh`→**`high`(기본)**, `low`/`medium`이 비용·지연의 **1차 레버**. ⛔ 이전 모델 effort 값 재사용 금지 → **fresh sweep** 후 결정 (§5 원칙 7 운영점과 정합: 운영점은 측정으로 정한다). **⚠️ 2026-09-06 보강 (Fable 5.1)** — *"Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models."* [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1] ⇒ 모델을 넘길 때 effort 상수를 그대로 옮기는 것은 근거가 아니다. 현재 fz 워크플로 워커 36콜은 전부 `xhigh`이고(fz 실측 2026-09-06 — 이력), 이는 **사용자가 유지를 택한 결정된 값**이다 — 공식 default가 `high`라는 사실은 하향 권고가 아니라 **fresh sweep의 출발점**이고, 변경 여부는 `modules/peer-review-tiers.md` § effort 배정 — 전 스테이지에 같은 effort (Lead 세션 effort) 이 규정한 짝 비교(`xhigh`/`high` 각 1회, critical·major 손실 0)로 측정한 뒤 사용자가 결정한다. **현행(2026-10-19 사용자 결정)**: 정적 45콜(2026-11-01 grep — `workflows/*.js` 8개의 `effort: EFFORT` 45건) 전부 워커 effort = Lead 세션 effort(읽지 못하면 워크플로 기본 `'xhigh'`) — `modules/mode-gate.md` § effort. 이 값은 위 "이전 모델 effort 값 재사용 금지 → fresh sweep" 규칙의 **사용자 결정 예외**다.
 > - **`max_tokens` 재점검** — thinking 기본 ON이라 `max_tokens`가 thinking+응답 **합산** 하드캡. 4.8 기준으로 타이트하게 잡은 경로는 응답 절단 위험. `xhigh`/`max` 운용 시 64k 출발.
 > - **길이는 프롬프트로** — 응답·산출물이 길어졌고 **effort로는 줄지 않는다**. 산출물 길이 계약이 필요한 스킬은 프롬프트에 명시.
 > - **하네스 상수 변경** — nested subagent depth **1→3**, **동시** 스폰 캡 20, dynamic workflow 기본 medium(<15 agents — **v2.1.271 에서 <10 으로 하향**: *"lowered the medium size guideline from 15 to 10 agents"* [verified: code.claude.com/docs/en/changelog]). fz governance 상한(opus 동시 ≤3 — 정본 `guides/model-guide.md` §5)은 **동시 20보다 훨씬 보수적**이므로 상충 없음 — 단 문서상 두 층위를 구분해 기술할 것.
->   - ⛔ **v2.1.224(2026-08-07) 갱신**: **세션 생애 200 스폰 캡은 제거**됐다 — *"Removed the 200-subagent-per-session spawn cap; long-running sessions no longer refuse new agents (**concurrency and depth limits still apply**)"*. 즉 남은 하네스 상한은 **동시 20 + depth 3**뿐이다. fz는 동시 ≤3(opus)이라 여전히 훨씬 보수적이므로 **거버넌스 재설계는 불필요**하고, 장기 세션에서 누적 스폰이 거부되던 제약만 사라졌다.
+>   - ⛔ **v2.1.224(2026-08-07) 갱신**: **세션 생애 200 스폰 캡은 제거**됐다 — *"Removed the 200-subagent-per-session spawn cap; long-running sessions no longer refuse new agents (**concurrency and depth limits still apply**)"*. 즉 남은 하네스 상한은 **동시 20 + depth 3**뿐이다(Agent 도구 풀 기준 — Workflow 에이전트는 별도 풀, 위 표 Opus 5 행의 2026-11-01 보강). fz는 동시 ≤3(opus)이라 여전히 훨씬 보수적이므로 **거버넌스 재설계는 불필요**하고, 장기 세션에서 누적 스폰이 거부되던 제약만 사라졌다.
 
 > "하네스 설계자의 일은 '다음 신기한 조합을 계속 찾는 것'이다." — Anthropic
 
@@ -1131,13 +1141,15 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 | 지표 | 측정 방법 | 목표 |
 |------|----------|------|
-| **Task Completion Rate** | 요구된 기능 중 실제 작동하는 비율 | > 90% |
+| **Task Completion Rate** | 요구된 기능 중 실제 작동하는 비율 | > 90% [미검증: 출처 없음 · 계측 미배선] |
 | **Iteration Count** | 목표 달성까지 반복 횟수 | 모델별 기준선 대비 |
 | **Cost per Feature** | 기능당 토큰/API 비용 | 지속적 감소 |
-| **Evaluator Agreement** | Evaluator 판단과 인간 판단의 일치율 | > 80% |
-| **Gate Pass Rate** | 첫 시도에 Gate 통과하는 비율 | > 70% |
-| **Recovery Rate** | 실패 후 자동 복구 성공률 | > 60% |
+| **Evaluator Agreement** | Evaluator 판단과 인간 판단의 일치율 | > 80% [미검증: 출처 없음 · 계측 미배선] |
+| **Gate Pass Rate** | 첫 시도에 Gate 통과하는 비율 | > 70% [미검증: 출처 없음 · 계측 미배선] |
+| **Recovery Rate** | 실패 후 자동 복구 성공률 | > 60% [미검증: 출처 없음 · 계측 미배선] |
 | **Context Utilization** | 컨텍스트 윈도우 중 유용한 정보 비율 | 측정 어려움 |
+
+> ⚠️ 2026-11-01 (감사 unwired): 위 목표치 4개는 출처가 없고 fz 의 어떤 스크립트도 재지 않는다. fz 가 실제로 재는 지표는 세 스크립트에서 나온다 — `scripts/fz_wf_metrics.py`(Workflow 실행 1건의 stage별 소요 · wall · 크리티컬 패스 · 완결 턴 토큰 · advisor 호출/스톨), `scripts/fz_telemetry_report.py`(하네스 부하 — 공식 단가 × usage 비용 추정 · 응답 지연 · 워크플로 wall 근사), `scripts/fz_stop_telemetry.py`(Stop 훅 — 턴 1건당 이벤트 1줄, 사용자가 `examples/hooks.json.example` 을 등록할 때만 기록). 실험별 임계는 `experiment-log.md` 에 사전등록한다.
 
 ### NLAH의 Module Ablation 방법론
 
@@ -1161,7 +1173,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 |-----------|---------|------|
 | Initializer 패턴 | 티켓 폴더 + index.md + Serena Memory | 세션 간 상태 영속화 |
 | Three-Agent | /fz-plan → /fz-code → /fz-review | 파이프라인 체인 |
-| Generator≠Evaluator | impl-correctness(생산) ↔ review-arch(평가) | TEAM Pair Programming |
+| Generator≠Evaluator | impl-correctness(생산) ↔ review-arch(평가 · full 모드는 impl-quality 병렬) | `workflows/code-pair.js` Workflow — stage1 impl → stage2 review (이력: TEAM Pair Programming) |
 | 파일 기반 핸드오프 | context-artifacts.md + plan-final.md | 티켓 폴더 산출물 프로토콜 |
 | Context Reset | compact 후 티켓 폴더 Read로 복원 | Essential Context 패턴 |
 | Guardrail Rules | Gate 체크리스트 + cross-validation.md + 마찰 감지 | Gate 절차적 강제 |
@@ -1172,7 +1184,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Cross-model Verification | fz-gpt (Claude + GPT; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
 | Lazy Tool Discovery | modules/ Progressive Disclosure Level 3 | 필요 시에만 로드 |
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
-| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Team + GPT. **Hooks는 opt-in** — 플러그인은 hook을 자동 등록하지 않는다(`hooks/` 없음, `plugin.json`에 `hooks` 키 없음). 실행체는 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 6케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **등록은 사용자가 `.claude/settings.json`으로 복사**한다. `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
+| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Workflow 교차 스테이지(이력: Team — TEAM 일몰) + GPT. **Hooks는 opt-in** — 플러그인은 hook을 자동 등록하지 않는다(`hooks/` 없음, `plugin.json`에 `hooks` 키 없음). 실행체는 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 6케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **등록은 사용자가 `.claude/settings.json`으로 복사**한다. `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
 
 ### Gap 분석 (NLAH 기반, 2026-04-14)
 
@@ -1187,18 +1199,18 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 ### 6런타임책임 자기점검 격자 (2026-07 추가 — 참고 축, 권위 아님)
 
-> 서베이 앵커는 2606.20683의 6런타임책임(observation·context·control·action·state·verification)이나 "표준 분류 어휘는 아직 없다"([외부: harness-paper §4-A/§5 트렌드5 — 원 논문 미대조]) — NLAH(§1.2) 교체가 아닌 병기, 자기점검용 참고 축.
+> 서베이 앵커는 2606.20683의 6런타임책임(observation·context·control·action·state·verification)이나 "표준 분류 어휘는 아직 없다"([외부: harness-paper §4-A/§5 트렌드5 — 원 논문 미대조]) — NLAH(§1.2) 교체가 아닌 병기, 자기점검용 참고 축. 6책임 명칭은 원 abstract 와 일치한다 [arxiv preprint, 2026-06, v1 — 2606.20683 abstract 대조 2026-11-01(C-35)]. "표준 분류 어휘 없음"은 서베이 문장이다.
 
 | 6런타임책임 (2606.20683) | fz 컴포넌트 | 상대 강도 |
 |------|-----------|----------|
-| observation (관찰) | discover/search 스킬 · workflow metrics | 약 — 트레이스 관측성 명시적 책임 부재 |
+| observation (관찰) | discover/search 스킬 · workflow metrics · `scripts/fz_wf_metrics.py` · `scripts/fz_telemetry_report.py` · `scripts/fz_stop_telemetry.py` | 약 — 트레이스 관측성 명시적 책임 부재(이력 — 2026-07 판정) → 2026-11-01 재평가 **중**: 계측 스크립트 3개(Workflow stage 집계 · 하네스 부하 리포트 · Stop 훅 턴 이벤트)가 있다. Stop 훅은 사용자 등록(opt-in)일 때만 기록 |
 | context (컨텍스트) | fz-memory · context-artifacts | 중~강 |
 | control (제어) | orchestrator 위임 로직 | 강 |
 | action (행동) | code/fix 스킬 · Adapters(Grep/git/빌드) | 강 |
 | state (상태) | 세션/워크트리 관리 · 티켓 폴더 | 중~강 |
 | verification (검증) | review/fz-gpt 게이트 | 강 |
 
-> 용도: fz의 상대적 약한 책임(observation 관측성)이 격자로 드러남. 서베이 스스로 표준 없음을 인정하므로 권위 채택 금지 — 참고 축으로만. [외부: harness-paper §4-A, arXiv 2606.20683 — 원 논문 미대조]
+> 용도: fz의 상대적 약한 책임(observation 관측성)이 격자로 드러남(이력 — 2026-07 판정, 2026-11-01 재평가는 위 표 observation 행). 서베이 스스로 표준 없음을 인정하므로 권위 채택 금지 — 참고 축으로만. [외부: harness-paper §4-A, arXiv 2606.20683 — 원 논문 미대조]
 
 ### 하네스 홀 candidate ↔ 외부 수렴 근거 (2026-07 추가)
 
@@ -1211,7 +1223,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | H3 site 단위 분류 | 지지+보완(거의 1:1) | 2606.11686 | 강 |
 | H4 review-counter diff-scope | **보류를 지지** (비단조성·partial harness가 over-structuring 경계) | 2605.12129 · 2605.21516 | 약~중 (보류 유지) |
 | H5 changeset 크기 무가드 | 강한 지지 (scaffold collapse 강한 유사 구조[유비]) + 해법(retry budget·C_min 재구조화) | 2605.12129 · 2605.21516 · 2606.13733 | 강 |
-| F5 Decision-Type | 지지+보완 (L1-L4 risk-tier) | 2606.27243 · 2606.31174 | 중~강 |
+| F5 Decision-Type | 지지+보완 (L1-L4 risk-tier — ⚠️ 2026-11-01 정정(M8): L1–L4 는 위험 등급이 아니라 과제 **능력 수준**(L1 atomic structural tuning → L4 open-ended architecture innovation) [arxiv preprint, 2026-06, v3]. '지지' 판정은 [미검증: F5 매핑 재판정 전 — M8]) | 2606.27243 · 2606.31174 | 중~강 |
 | F6 Boundary-Sizing | 지지+보완 (over-decomposition 동일 어휘) | 2605.21516 · 2606.13733 | 중~강 |
 | **R8-A post-state 일관성** (2026-08-10) | **미대조** — 자체 세션 관측 1건 | — | — (외부 근거 없음) |
 
@@ -1261,7 +1273,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | 6f | What's new in Claude Opus 5 | Anthropic | 2026-07-24 | https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5 |
 | 6g | Prompting Claude Opus 5 | Anthropic | live | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5 |
 | 6h | Effort (per-model 권장) | Anthropic | live | https://platform.claude.com/docs/en/build-with-claude/effort |
-| 6i | Claude Code changelog (v2.1.219 하네스 변경) | Anthropic | 2026-07-24 | https://code.claude.com/docs/en/changelog |
+| 6i | Claude Code changelog (v2.1.219 하네스 변경 — 이력. 2026-11-01 대조 기준 = 설치본 v2.1.312, `/doctor prompt-audit`(2.1.283+ — CLAUDE.md·스킬·에이전트·명령의 구모델용 프롬프트 패턴 감사) 포함) | Anthropic | 2026-07-24 · 2026-11-01 재대조 | https://code.claude.com/docs/en/changelog |
 | 6j | Scaling Managed Agents | Anthropic | 2026-04-08 | https://www.anthropic.com/engineering/managed-agents |
 | 6k | Introducing Claude Fable 5 and Claude Mythos 5 | Anthropic | 2026-06-09 | https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5 |
 | 6l | Prompting Claude Fable 5 | Anthropic | 2026 (live) | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 |
@@ -1283,63 +1295,65 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 | # | 제목 | 저자 | 출처 / Status | URL |
 |---|------|------|------|-----|
-| 6 | Natural-Language Agent Harnesses | Pan et al. (Tsinghua/HIT) | arxiv 2603.25723 [arxiv preprint] | https://arxiv.org/html/2603.25723v1 |
-| 7 | Building AI Coding Agents for the Terminal | Bui (OpenDev) | arxiv 2603.05344 [arxiv preprint] | https://arxiv.org/html/2603.05344v1 |
-| 8a | Meta-Harness: End-to-End Optimization of Model Harnesses | Lee/Nair/Zhang/Khattab/Finn (Stanford NLP) | arxiv 2603.28052 [arxiv preprint, 2026-03] — "harness design matters as much as model weights, 6x performance gap" | https://arxiv.org/abs/2603.28052 |
-| 8b | The Last Harness You'll Ever Build | Seong/Yin/Zhang (Sylph.AI) | arxiv 2604.21003 [arxiv preprint, 2026-04] — Two-level Harness Evolution + Meta-Evolution | https://arxiv.org/abs/2604.21003 |
+| 6 | Natural-Language Agent Harnesses | Pan et al. (Tsinghua/HIT [미검증: 소속은 abstract 에 없음 — U-21]) | arxiv 2603.25723 [arxiv preprint] | https://arxiv.org/html/2603.25723v1 |
+| 7 | Building Effective AI Coding Agents for the Terminal: Scaffolding, Harness, Context Engineering, and Lessons Learned (M14 — 2026-11-01 v3 제목으로 정정. 이전 표기: Building AI Coding Agents for the Terminal) | Bui (OpenDev) | arxiv 2603.05344 [arxiv preprint, 2026-03, v3 — 최초 제출 2026-03-05 · v3 2026-03-13 · 단일 저자 "Work in progress"] | https://arxiv.org/abs/2603.05344v3 |
+| 8a | Meta-Harness: End-to-End Optimization of Model Harnesses | Lee/Nair/Zhang/Khattab/Finn (Stanford NLP [미검증: 소속 — U-21]) | arxiv 2603.28052 [arxiv preprint, 2026-03] — "harness design matters as much as model weights, 6x performance gap" (⚠️ 2026-11-01 정정(M3): 6× 는 이 논문 서론이 다른 논문 [47] 을 인용한 수치다 — *"can produce a 6× performance gap on the same benchmark [47]… often matters as much as the model itself"*. 자체 결과는 +7.7pt(컨텍스트 토큰 4배 적게) · IMO급 200문제 +4.7pt [arxiv preprint, 2026-03, v1]) | https://arxiv.org/abs/2603.28052 |
+| 8b | The Last Harness You'll Ever Build | Seong/Yin/Zhang (Sylph.AI [미검증: 소속은 abstract 에 없음 — U-21]) | arxiv 2604.21003 [arxiv preprint, 2026-04] — Two-level Harness Evolution + Meta-Evolution | https://arxiv.org/abs/2604.21003 |
 | 8c | HARBOR: Automated Harness Optimization | — | arxiv 2604.20938 [arxiv preprint, 2026-04] — Constrained-Noisy-BO production case | https://arxiv.org/abs/2604.20938 |
 | 8d | Agentic Harness Engineering | — | arxiv 2604.25850 [arxiv preprint, 2026-04] — observability-driven auto-evolution | https://arxiv.org/abs/2604.25850 |
 | 8e | Externalization in LLM Agents | — | arxiv 2604.08224 [arxiv preprint, 2026-04] — Memory/Skills/Protocols/Harness 통합 review | https://arxiv.org/abs/2604.08224 |
 | 8f | DSPy: Programming, not Prompting | Khattab et al. (Stanford NLP) | dspy.ai [official framework] — BootstrapFewShot/MIPROv2/GEPA optimizers | https://dspy.ai/ |
-| 8g | GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning | Agrawal/Tan/Soylu/...(Khattab 공저자) (Stanford+UCB) | arxiv 2507.19457 [ICLR 2026 Oral / peer-reviewed] — MIPROv2 +10% AIME-2025, GRPO 35x fewer rollouts | https://arxiv.org/abs/2507.19457 |
+| 8g | GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning | Agrawal/Tan/Soylu/...(Khattab 공저자) (Stanford+UCB) | arxiv 2507.19457 [ICLR 2026 Oral / peer-reviewed] (venue 자기보고 — 저자 코멘트 "Accepted to ICLR 2026 (Oral)", 교차확인 안 됨, v2) — MIPROv2 대비 10% 이상(예: AIME-2025 +12%) — *"outperforms… MIPROv2, by over 10% (e.g., +12% accuracy on AIME-2025)"* (M12 — 이전 표기 "MIPROv2 +10% AIME-2025"), GRPO 35x fewer rollouts | https://arxiv.org/abs/2507.19457 |
 | 8h | Synthesizing Multi-Agent Harnesses for Vulnerability Discovery | Liu et al. | arxiv 2604.20801 [arxiv preprint, 2026-04] — 멀티에이전트 하네스 합성 (취약점 발견) | https://arxiv.org/abs/2604.20801 |
 | 8i | AI Harness Engineering: A Runtime Substrate for Foundation-Model Software Agents | Zhong et al. | arxiv 2605.13357 [arxiv preprint, 2026-05] — 하네스 런타임 substrate | https://arxiv.org/abs/2605.13357 |
-| 8j | Affordance Agent Harness: Verification-Gated Skill Orchestration | Huang et al. | arxiv 2605.00663 [arxiv preprint, 2026-05] — verification-gated skill orchestration | https://arxiv.org/abs/2605.00663 |
-| 8ah | Verify, Repair, Repeat, or Stop? Robust Stopping for Noisy Verify-Repair Loops in LLM Agents | Wu et al. (5인) | arxiv 2607.17641 [arxiv preprint, 2026-07] — 노이즈 verifier·repairer 에서 고정 5라운드 대비 true validity +60.6pp(평균 0.72 라운드) — 검증-수정 루프 **정지 규칙** | https://arxiv.org/abs/2607.17641 |
-| 8ai | When Do Agent Loops Mistake Stagnation for Progress? | Park et al. (2인) | arxiv 2607.25152 [arxiv preprint, 2026-07] — 자기 판정 54 사이클 전부 개선 주장, 56% 실측 delta ≤0 — **외부 oracle** 근거 | https://arxiv.org/abs/2607.25152 |
+| 8j | Affordance Agent Harness: Verification-Gated Skill Orchestration | Huang et al. | arxiv 2605.00663 [arxiv preprint, 2026-05] — verification-gated skill orchestration (⚠️ 2026-11-01 주석(M13): 분야는 시각 affordance grounding — *"identifying where and how an agent should interact in open-world scenes"*. 코딩·LLM 오케스트레이션 논문이 아니라 관련성 약함) | https://arxiv.org/abs/2605.00663 |
+| 8ah | Verify, Repair, Repeat, or Stop? Robust Stopping for Noisy Verify-Repair Loops in LLM Agents | Wu et al. (5인) | arxiv 2607.17641 [arxiv preprint, 2026-07] — 노이즈 verifier·repairer 에서 고정 5라운드 대비 true validity +60.6pp(평균 0.72 라운드 · GSM8K 스트레스 설정 — 2026-11-01 abstract 재확인, v1, 저자 코멘트 "Under review") — 검증-수정 루프 **정지 규칙** | https://arxiv.org/abs/2607.17641 |
+| 8ai | When Do Agent Loops Mistake Stagnation for Progress? | Park et al. (2인) | arxiv 2607.25152 [arxiv preprint, 2026-07] — 자기 판정 54 사이클 전부 개선 주장, 56% 실측 delta ≤0 — **외부 oracle** 근거 (2026-11-01 abstract 재확인, v2 · 저자 코멘트 "Preregistered pilot") | https://arxiv.org/abs/2607.25152 |
 
 ### 학술 논문 — 2026-06 wave (harness-paper 서베이 경유)
 
-> 아래는 본 가이드 본문이 실제 인용한 2026-05~06 논문만. **8z·8aa·8af·8ag를 제외한** 전 항목은 **harness-paper 서베이 경유**이며 원 arXiv 논문을 재검증하지 않았다. ⚠️ 2026-09-06 정정: 8z(2605.21516)·8aa(2605.12129)는 원 abstract를 `curl` raw로 대조 완료해 승격했고, 8af(2605.27922)·8ag(2604.07236)는 서베이를 거치지 않은 직접 대조분이다.
+> 아래는 본 가이드 본문이 실제 인용한 2026-05~06 논문만. **8z·8aa·8af·8ag를 제외한** 전 항목은 **harness-paper 서베이 경유**이며 원 arXiv 논문을 재검증하지 않았다. ⚠️ 2026-09-06 정정: 8z(2605.21516)·8aa(2605.12129)는 원 abstract를 `curl` raw로 대조 완료해 승격했고, 8af(2605.27922)·8ag(2604.07236)는 서베이를 거치지 않은 직접 대조분이다. ⚠️ 2026-11-01 정정(C-35 — 원 abstract·본문 재대조): 서베이 경유 행 중 15행(8k·8l·8m·8n·8o·8p·8q·8r·8t·8v·8w·8x·8y·8ab·8ae)은 원 abstract 와 일치해 "미검증" 단서를 행별로 해제했다(8q 는 6책임 명칭만). 4행은 정정했다 — 8s(M7, v2 17.2%) · 8u(M6, v1 에서만 일치) · 8ac(M8, risk-tier 아님) · 8ad(M10, 제목·측정). 8af 는 "abstract 대조"가 아니라 v1 본문 대조다(M5). 8z·8aa·8ag 는 재확인. 각 행의 버전(vN)은 2026-11-01 arXiv 최신판 기준이다.
 
 | # | arXiv | 주제 | 본문 인용 위치 |
 |---|-------|------|--------------|
-| 8k | 2606.22528 | Governance Decay (압축→안전제약 삭제) | §3 기둥3 서브시스템7 |
-| 8l | 2606.21856 | Harness-MU (결정론적 안전 강제) | §3 기둥2 원칙 + modules/governance.md |
-| 8m | 2606.28679 | ScopeGate (capability≠authorization) | §3 기둥2 |
-| 8n | 2606.09498 | Self-Harness (자기 하네스 개선 baseline) | §5.5 |
-| 8o | 2606.27492 | QueenBee (insight falsification 게이트) | §5.5 |
-| 8p | 2606.17546 | SEAGym (잦은 갱신 붕괴 경고) | §5.5 |
-| 8q | 2606.20683 | QA→Task 6런타임책임 | §1.2 택소노미 + §12 격자 |
-| 8r | 2606.13733 | Task Structure C_min (정보병목 상한) | §8 근본한계 · §10 역방향게이트 · §12 홀표 |
-| 8s | 2606.08878 | PerspectiveGap (오케스트레이션 프롬프팅 14.9%) | §10 역방향게이트 |
-| 8t | 2606.31174 | ClawArena-Team (관리 병목=권한, 비용 decoupled) | §8 근본한계 · §9 각주 · §12 홀표 |
-| 8u | 2606.12344 | Claw-SWE-Bench (19.1%→73.4%) | §2.2 |
-| 8v | 2606.19613 | StaminaBench (최선/최악 6배) | §2.2 |
-| 8w | 2606.11686 | Layer-Isolated (집계가 가리는 slice 회귀) | §12 홀표 (H2/H3) |
-| 8x | 2606.17799 | Position: Coding Benchmarks Misaligned (모델/하네스/환경 분리) | §2.2 평가분리 명제 배경 (Position paper — 개별 각주 아님) |
-| 8y | 2606.16591 | SING (intent 동적 툴 검색) | §3 기둥1 Lazy Tool Discovery |
-| 8z | 2605.21516 | Inference-Time Alignment (partial harness·over-decomposition·over-pruning·hallucinated execution) | §5 원칙3 각주 · §12 홀표 — **abstract 대조 완료(2026-09-06)**. 실험 세부(Terminal-Bench v2 / Qwen3.5-plus·GLM-5·GPT-OSS-120B·Gemini-3-flash)는 요약 경로, **Claude 5세대 미포함** |
-| 8aa | 2605.12129 | It's Not the Size (비단조성·scaffold collapse) | §6 AP1 각주 · §12 홀표 — **abstract 대조 완료(2026-09-06)**. 실증 범위 = SLM 2-3B(Gemma4 E2B·Qwen3.5:2B·LLaMA 3.2 3B) 24 tasks |
-| 8ab | 2606.08960 | Hardening Agent Benchmarks (hacker-fixer) | §12 홀표 (H1) |
-| 8ac | 2606.27243 | NOVA (L1-L4 risk-tier) | §12 홀표 (F5) |
-| 8ad | 2606.22953 | Plans Don't Persist (계획 신호 감쇠) | §3 기둥3 서브시스템7 |
-| 8ae | 2606.29914 | MemDelta (통제 A/B 프로토콜) | §12 홀표 (H2) |
-| 8af | 2605.27922 | Harness-Bench (8 백엔드 × 6 하네스 × 106 tasks × 5,194 trajectories; 하네스 간 23.8pt 격차, 강한 백엔드일수록 cross-harness variance 낮음, no systematic harness penalty) | §6 AP1 각주 — **abstract 대조 완료(2026-09-06)**, 서베이 미경유 |
-| 8ag | 2604.07236 | How Much Heavy Lifting Can an Agent Harness Do? (결정론적 declarative planning이 belief-only 대비 +24.1pp, LLM 호출 0) | — (2026-09-06 신규 등재, 본문 인용 아직 없음) — **abstract 대조 완료(2026-09-06)**, 서베이 미경유 |
+| 8k | 2606.22528 | Governance Decay (압축→안전제약 삭제) | §3 기둥3 서브시스템7 — abstract 대조 2026-11-01(C-35, v2) |
+| 8l | 2606.21856 | Harness-MU (결정론적 안전 강제) | §3 기둥2 원칙 + modules/governance.md — abstract 대조 2026-11-01(C-35, v1) |
+| 8m | 2606.28679 | ScopeGate (capability≠authorization) | §3 기둥2 — abstract 대조 2026-11-01(C-35, v1) |
+| 8n | 2606.09498 | Self-Harness (자기 하네스 개선 baseline) | §5.5 — abstract 대조 2026-11-01(C-35, v3) |
+| 8o | 2606.27492 | QueenBee (insight falsification 게이트) | §5.5 — abstract 대조 2026-11-01(C-35, v1) |
+| 8p | 2606.17546 | SEAGym (잦은 갱신 붕괴 경고) | §5.5 — abstract 대조 2026-11-01(C-35, v1) |
+| 8q | 2606.20683 | QA→Task 6런타임책임 | §1.2 택소노미 + §12 격자 — abstract 대조 2026-11-01(C-35, v1) · 6책임 명칭만. "표준 분류 어휘 없음"은 서베이 문장 |
+| 8r | 2606.13733 | Task Structure C_min (정보병목 상한) | §8 근본한계 · §10 역방향게이트 · §12 홀표 — abstract 대조 2026-11-01(C-35, v1) |
+| 8s | 2606.08878 | PerspectiveGap (오케스트레이션 프롬프팅 14.9% — v1 수치, 이력. 현행 v2 17.2%, M7) | §10 역방향게이트 |
+| 8t | 2606.31174 | ClawArena-Team (관리 병목=권한, 비용 decoupled) | §8 근본한계 · §9 각주 · §12 홀표 — abstract 대조 2026-11-01(C-35, v2) |
+| 8u | 2606.12344 | Claw-SWE-Bench (19.1%→73.4% — v1 에서만 일치, 현행 v2 에 없음, M6) | §2.2 |
+| 8v | 2606.19613 | StaminaBench (최선/최악 6배 — 강한 모델 기준, 오픈소스 LLM 7종) | §2.2 — abstract 대조 2026-11-01(C-35, v1) |
+| 8w | 2606.11686 | Layer-Isolated (집계가 가리는 slice 회귀) | §12 홀표 (H2/H3) — abstract 대조 2026-11-01(C-35, v1) |
+| 8x | 2606.17799 | Position: Coding Benchmarks Misaligned (모델/하네스/환경 분리) | §2.2 평가분리 명제 배경 (Position paper — 개별 각주 아님) — abstract 대조 2026-11-01(C-35, v2) |
+| 8y | 2606.16591 | SING (intent 동적 툴 검색) | §3 기둥1 Lazy Tool Discovery — abstract 대조 2026-11-01(C-35, v2) |
+| 8z | 2605.21516 | Inference-Time Alignment (partial harness·over-decomposition·over-pruning·hallucinated execution) | §5 원칙3 각주 · §12 홀표 — **abstract 대조 완료(2026-09-06)**. 실험 세부(Terminal-Bench v2 / Qwen3.5-plus·GLM-5·GPT-OSS-120B·Gemini-3-flash)는 요약 경로, **Claude 5세대 미포함** — 2026-11-01 재확인(C-35, v1) |
+| 8aa | 2605.12129 | It's Not the Size (비단조성·scaffold collapse) | §6 AP1 각주 · §12 홀표 — **abstract 대조 완료(2026-09-06)**. 실증 범위 = SLM 2-3B(Gemma4 E2B·Qwen3.5:2B·LLaMA 3.2 3B) 24 tasks — 2026-11-01 재확인(C-35, v1) |
+| 8ab | 2606.08960 | Hardening Agent Benchmarks (hacker-fixer) | §12 홀표 (H1) — abstract 대조 2026-11-01(C-35, v1 · 주제 수준 일치) |
+| 8ac | 2606.27243 | NOVA (L1-L4 risk-tier — ⚠️ M8: 위험 등급이 아니라 과제 능력 수준, v3) | §12 홀표 (F5) |
+| 8ad | 2606.22953 | Plans Fade Fast: Why Context Management Is Load-Bearing for LLM Agents (계획 신호 감쇠 — M10: 이전 표기 "Plans Don't Persist" 는 제목 오기. 4.1× 는 Llama-3.1-70B·ALFWorld 은닉 상태 측정, 보편 아님. v2 · venue 자기보고: COLM 2026 워크숍) | §3 기둥3 서브시스템7 |
+| 8ae | 2606.29914 | MemDelta (통제 A/B 프로토콜) | §12 홀표 (H2) — abstract 대조 2026-11-01(C-35, v1) |
+| 8af | 2605.27922 | Harness-Bench (8 백엔드 × 6 하네스 × 106 tasks × 5,194 trajectories; 하네스 간 23.8pt 격차, 강한 백엔드일수록 cross-harness variance 낮음, no systematic harness penalty) | §6 AP1 각주 — **abstract 대조 완료(2026-09-06)**(이력 — 2026-11-01 정정(M5): 인용 문장·수치는 abstract 가 아니라 v1 본문 §4.2 에만 있다 [arxiv preprint, 2026-05, v1 본문 §4.2]. 현행 v2 는 표가 바뀌었다. "no systematic harness penalty" 는 [미검증: 원문 재대조 필요 — U-20]), 서베이 미경유 |
+| 8ag | 2604.07236 | How Much Heavy Lifting Can an Agent Harness Do? (결정론적 declarative planning이 belief-only 대비 +24.1pp, LLM 호출 0) | — (2026-09-06 신규 등재, 본문 인용 아직 없음) — **abstract 대조 완료(2026-09-06)**, 서베이 미경유 — 2026-11-01 재확인(C-35, v4) |
 | 8survey | harness-paper 서베이 본체 | Harness Engineering 2026 (revfactory) | https://revfactory.github.io/harness-paper |
 
-> 단서: harness-paper는 **에이전트 생성 메타분석**이며 서베이 스스로 "완전한 census 아님·arXiv 편중·WebSearch 비활성·Meta/FAIR 부재"를 고지한다. 위 수치·주장은 서베이가 인용 논문에 대해 주장한 내용이고 **원 논문은 미재검증**이다 — 방향성 근거로만 사용, 사실 승격 금지.
+> 단서: harness-paper는 **에이전트 생성 메타분석**이며 서베이 스스로 "완전한 census 아님·arXiv 편중·WebSearch 비활성·Meta/FAIR 부재"를 고지한다. 위 수치·주장은 서베이가 인용 논문에 대해 주장한 내용이고 **원 논문은 미재검증**이다 — 방향성 근거로만 사용, 사실 승격 금지. (이력 — 2026-07 당시. 2026-11-01 원 abstract 대조 결과는 위 표의 행별 표기와 본문 태그를 따른다(C-35). 서베이 자체 서술 — 트렌드 · 미해결과제 · "표준 분류 어휘 없음" · §4-K 등 — 은 여전히 방향성 근거다)
 
 ### OpenAI / GPT 공식
 
 | # | 제목 | 저자 | 날짜 | URL |
 |---|------|------|------|-----|
-| 9a | Introducing GPT-5.5 | OpenAI | 2026-04-23 | https://openai.com/index/introducing-gpt-5-5/ |
-| 9b | GPT-5.5 System Card | OpenAI | 2026-04-23 | https://openai.com/index/gpt-5-5-system-card/ |
+| 9a | Introducing GPT-5.5 (이력 — GPT-5.5 는 2026-10-14 ChatGPT 로그인 GPT CLI 에서 은퇴, API 키 세션은 영향 없음. 현행 근거는 9f·9g) | OpenAI | 2026-04-23 | https://openai.com/index/introducing-gpt-5-5/ |
+| 9b | GPT-5.5 System Card (이력 — 9a 와 같음) | OpenAI | 2026-04-23 | https://openai.com/index/gpt-5-5-system-card/ |
 | 9c | GPT CLI Changelog | OpenAI | 상시 갱신 | https://learn.chatgpt.com/docs/changelog |
-| 9d | GPT-5 Prompting Guide (Cookbook) | OpenAI | 2026 | https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide |
+| 9d | GPT-5 Prompting Guide (Cookbook) (이력 — 보관 처리: "This recipe is archived and may reference outdated models or APIs." 현행 지침은 9f) | OpenAI | 2026 | https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide |
 | 9e | GPT CLI (fz cross-model verification 도구 — 모델·effort 는 세션 선택 > `config.toml`(정본 `modules/gpt-strategy.md` § 모델·effort 선택). CLI 버전 플로어는 호환 사실로 별도 유지) | OpenAI | live | https://developers.openai.com/codex/cli |
+| 9f | Using GPT-6 (latest-model 가이드 — GPT-6 계열 4종 Astra · GPT-6.1 Sol · GPT-6.1 Terra · Luna, 프롬프팅 best practices. 프롬프트 예시는 Astra 관찰 기반이라 쓰는 모델로 평가하라고 명시) | OpenAI | live (2026-11-01 대조) | https://developers.openai.com/api/docs/guides/latest-model |
+| 9g | GPT CLI 모델 문서 (GPT-6.1 Sol 의 GPT CLI 기본 컨텍스트 500K · GPT-5.5 은퇴 공지) | OpenAI | live (2026-11-01 대조) | https://learn.chatgpt.com/docs/models |
 
 
 ### 오픈소스 구현체

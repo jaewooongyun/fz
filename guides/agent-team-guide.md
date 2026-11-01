@@ -1,6 +1,6 @@
 # Agent & Team Configuration Guide
 
-> **Sources (last audited: 2026-09-25 — 모델 사실 축: :253 Fable 5.1 비용 결론의 Opus 5.5 재산정 포인터 · 서브에이전트 과다 행의 Opus 5.5 caveat 행만 대조. 나머지는 2026-09-06 대조 그대로):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용(MAST 등 arxiv)은 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조: §1 MCP 도구 계층화 표·예시 · §3 실행 전환 인용문의 워크플로 개수 · §4 Fable 5.1 비용 행·모델 승격 매트릭스(`workflows/*.js` 콜사이트 재생성) · §5 TEAM 서술·검증 게이트 표(`scripts/gpt-kinds.json` 생성 표 대조) · §6 서브에이전트 과다·coupled fan-out 행 · §8 Agent Teams 사양 블록·8.2 프리로드·8.4 impl-correctness 주석·8.5 `mcpServers` 행만 대조. 나머지는 이전 감사 그대로 — 2026-09-25 모델 사실 축(Fable 5.1 비용 결론의 Opus 5.5 재산정 포인터 · 서브에이전트 과다 행의 Opus 5.5 caveat 행) · 그 밖 2026-09-06 대조):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용(MAST 등 arxiv)은 개별 `[verified:]` 태그 참조.
 >
 > fz-* 스킬 생태계에서 에이전트 작성 및 (역사적) 팀 구성을 위한 종합 가이드.
 > 에이전트는 `agents/*.md`에 위치하며, agentType(`fz:`)으로 `workflows/*.js` Workflow가 재사용한다.
@@ -33,9 +33,11 @@ GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS projec
 
 | Tier | 용도 | 예시 |
 |------|------|------|
-| Primary (항상 사용) | 핵심 분석 도구 | serena find_symbol, get_symbols_overview |
+| Primary (항상 사용) | 핵심 분석 도구 | codegraph codegraph_explore + serena find_symbol, get_symbols_overview (구판: serena 단독) |
 | Secondary (필요 시) | 보조 도구 | context7 query-docs |
-| Unavailable (Team 제약) | Lead 전용 | Atlassian, XcodeBuild, LSP (일부) |
+| Unavailable (Workflow `tools:` allowlist 에 없음 — 구판 표기 "Team 제약") | Lead 전용 | Atlassian, XcodeBuild, LSP (일부) |
+
+> ⛔ codegraph blast radius 는 `+N more` 로 절단된다 — 개수만 주고 목록은 자른다. 부재·전수 판정 근거로 쓰지 않는다(2026-11-01 `agents/review-arch.md` § MCP 도구 전략 · `agents/impl-correctness.md` § Tools Strategy 대조).
 
 > Fallback은 명시하지 않는다. `tools:` YAML이 사용 가능한 도구를 선언하므로 Claude가 자연스럽게 폴백한다.
 
@@ -43,7 +45,7 @@ GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS projec
 
 ```markdown
 ## Tools Strategy
-- **Primary**: serena find_symbol, serena get_symbols_overview
+- **Primary**: codegraph codegraph_explore + serena find_symbol, serena get_symbols_overview
 - **Secondary**: context7 query-docs (외부 문서 참조 시)
 - **Unavailable**: 빌드 MCP 도구, Atlassian (Lead에게 요청)
 ```
@@ -228,7 +230,7 @@ GOOD (Mesh / Peer-to-Peer):
 | Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ∥ search-pattern(텍스트) → 서로의 결과를 교차 확인 | `workflows/search-cross-verify.js` |
 
 > **실행 전환 (Wave 1-4, 완료)**: 위 5 패턴의 구현은 `workflows/{discover-adversarial,plan-collaborative,review-live,code-pair,search-cross-verify}.js` 결정적 Workflow다 — fz-plan 기본 실행은 `plan-lean2.js` 이고 `plan-collaborative.js` 는 롤백 경로다(P2P SendMessage 아님 — 라운드 의미론은 스크립트가 구현). 규약: `guides/skill-authoring.md` §12.
-> - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:80` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — 6개 워크플로가 전 패턴을 덮는다.
+> - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:80` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — `workflows/*.js` 가 전 패턴을 덮는다(2026-11-01 기준 8개 — 개수는 디렉터리가 정본, 구판 표기 "6개").
 > - `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 **존재하지 않으며**, fz 실행 경로에도 호출부가 **0건**이다 [verified: `grep -rn "TeamCreate(" workflows/ scripts/` → 0]. 본 가이드의 TeamCreate 예시(§2/§3/§7)는 **역사적 의미론 기록**이다 — ⛔ SOLO 폴백 절차로 참조하지 않는다(머리 경고).
 
 공통: 에이전트끼리 직접 대화하지 않는다 — 스크립트가 단계 결과를 다음 단계 입력으로 넘긴다. 병합은 워크플로마다 다르다 — 스크립트 안의 통합 단계(예: plan-collaborative·search-cross-verify)가 하거나, 반환 뒤 Lead 가 한다. 최종 판정은 Lead 가 한다. 옛 P2P 라운드·토폴로지 상세를 담던 TEAM 사료는 삭제됐다(위 "상세 구현은 각 `workflows/*.js`" 인용문).
@@ -250,7 +252,7 @@ GOOD (Mesh / Peer-to-Peer):
   - **순차 승격** 허용: 병렬 opus 스폰은 순차 승격으로도 상한(≤3)을 넘지 않도록 유지한다.
   - 예외: full-cycle / plan-to-code 파이프라인에서 plan과 code 각각 Primary가 다르므로 순차적으로 opus를 사용한다.
 - **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단.
-- **Fable 5.1 (2026-09-01 GA, Lead 모델)**: 판단 tier 모델, 출력·캐시쓰기 단가는 opus 5의 2배($10/$50 vs $5/$25)나 **캐시 읽기는 $0.25/MTok로 opus 5($0.50)의 절반** — 캐시 지배 세션에서는 "2배" 진술이 성립하지 않는다(fz 실측 2026-09-06: 동일 트래픽을 Fable 5.1 단가로 환산 시 opus 대비 **+9%**). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/model-guide.md` §5. ⚠️ 2026-09-06 정정: "opus의 2배" 단정은 출력·캐시쓰기 단가에만 참이다. 위 비교는 Opus 5 단가 기준이고, 워커 Opus 5.5($4/$20·캐시 읽기 $0.20) 기준 재산정은 미실시(선택 과제 — `guides/model-guide.md` §5 가격 비교).
+- **Fable 5.1 (2026-09-01 GA, Lead 모델)**: 판단 tier 모델, 출력·캐시쓰기 단가는 opus 5의 2배($10/$50 vs $5/$25)나 **캐시 읽기는 $0.25/MTok로 opus 5($0.50)의 절반** — 캐시 지배 세션에서는 "2배" 진술이 성립하지 않는다(fz 실측 2026-09-06: 동일 트래픽을 Fable 5.1 단가로 환산 시 opus 대비 **+9%**). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/model-guide.md` §5. ⚠️ 2026-09-06 정정: "opus의 2배" 단정은 출력·캐시쓰기 단가에만 참이다. 위 비교는 Opus 5 단가 기준이다(이력 — 2026-09-06 당시 기준). 워커 Opus 5.5($4/$20·캐시 읽기 $0.20) 대비 단가 배율은 입력·출력 2.5배·캐시 읽기 1.25배이고, +9% 실측의 Opus 5.5 기준 재산정은 미실시(선택 과제 — `guides/model-guide.md` §5 가격 비교). 가격 정본은 `guides/llm-references.md` § 1.2 모델 프롬프팅의 about-claude/pricing 행 [verified: https://platform.claude.com/docs/en/about-claude/pricing].
 
 ### 모델 승격 매트릭스
 
@@ -258,11 +260,14 @@ GOOD (Mesh / Peer-to-Peer):
 
 | 파이프라인 | Primary (opus) | 실질 워커 (opus) | 단순 워커 (sonnet) |
 |-----------|----------------|------------------|--------------------|
-| plan-* | plan-structure | plan-impact, plan-edge-case, review-arch | memory-curator (direction=fable) |
-| code-* | impl-correctness | review-arch, impl-quality, review-correctness | memory-curator |
-| review-* | review-arch | review-quality, review-correctness, review-counter | memory-curator |
-| search --deep | -- | -- | search-symbolic, search-pattern (merge=fable) |
-| bug-hunt | impl-correctness | -- | search-symbolic |
+| plan-* (`plan-lean2.js` 기본 · `plan-lean.js` · `plan-collaborative.js` 롤백) | plan-structure | plan-edge-case, plan-impact(lean2·collaborative), plan-merge(lean2), review-arch(collaborative) | -- (direction=fable ×2, collaborative) |
+| code-* (`code-pair.js`) | impl-correctness | review-arch, impl-quality(full) | -- |
+| review-* (`review-live.js` · `peer-review.js`) | review-arch | review-quality, review-counter, review-correctness(peer-review 만) | -- |
+| discover (`discover-adversarial.js`) | plan-structure | -- | plan-structure(lens fan-out), review-arch(cost) |
+| search --deep (`search-cross-verify.js`) | -- | -- | search-symbolic, search-pattern (merge=fable — plan-structure) |
+| bug-hunt (이력 — 해당 `workflows/*.js` 없음, 2026-11-01) | impl-correctness | -- | search-symbolic |
+
+> 2026-11-01 `workflows/*.js` 정적 45콜(label·`agentType`·`model` 명시값)에서 다시 만든 표다. 구판과 다른 점: memory-curator 는 어느 워크플로도 부르지 않는다(recall 전용 — §8.1) · review-correctness 는 `peer-review.js` 에서만 불린다(`code-pair.js` 머리 주석 "review-correctness/memory-curator는 여전히 Lead 경로") · plan-merge(opus, `plan-lean2.js` `lean2-merge`)가 빠져 있었다.
 
 Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워커는 sonnet으로 실행된다 (동시 opus ≤3).
 
@@ -272,18 +277,21 @@ Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워�
 
 ### cross-model 상호검증 원칙
 
-- 모든 TEAM 구성에 GPT CLI가 포함된다.
+- (이력 — TEAM 시절 기준) 모든 TEAM 구성에 GPT CLI가 포함됐다. 현행: GPT 호출은 스킬·단계별 kind 로 배선된다 — 정본 `scripts/gpt-kinds.json` · 생성 표 `skills/fz-gpt/SKILL.md` § 서브커맨드.
 - **Lead가 직접** `/fz-gpt`를 실행한다 (에이전트가 GPT를 직접 호출하지 않음).
 - Claude (opus/sonnet) + GPT (다른 모델)의 교차 검증으로 blind spot을 보완한다.
 - ⊕ **독립 첫 패스**(fz-peer-review 기본 · fz-review · fz-plan 은 opt-in `--gpt-independent`): GPT 가 Claude 산출을 보기 **전에** 같은 입력으로 따로 리뷰 · 플랜한다(`scripts/gpt_independent.sh` — 강제 격리). 합치는 것은 스크립트다(`review_merge.py` · `plan_divergence.py`) — 교차 검증은 그 뒤의 일이다. 규약 `modules/cross-validation.md` § 독립 첫 패스
 
 ### 검증 게이트 삽입 위치
 
+> 정본은 `scripts/gpt-kinds.json` 이고 kind·호출자 전체 표는 `skills/fz-gpt/SKILL.md` § 서브커맨드의 생성 표(gpt-kinds:kinds)다. 아래는 주요 게이트만 2026-11-01 그 표와 대조해 고쳤다 — 구판은 code 완료 후·commit 전을 모두 `check` 로 적었다.
+
 | 시점 | GPT 명령 | 대상 |
 |------|-----------|------|
-| plan 완료 후 | `/fz-gpt verify` | 설계 검증: 제약 위반, 누락 확인 |
-| code 완료 후 | `/fz-gpt check` | 코드 검증: 구현 품질, 패턴 준수 |
-| commit 전 | `/fz-gpt check` | 최종 검증: 빌드 가능성, 회귀 위험 |
+| plan 완료 후 (/fz-plan Phase 2) | `/fz-gpt verify` (+ `verify-gates`) | 설계 검증: 제약 위반, 누락 확인 |
+| 코드 리뷰 (/fz-review Phase 5) | `/fz-gpt review` | 코드 리뷰 (주력) |
+| 커밋 전 (/fz-fix) | `/fz-gpt check` | 커밋 전 빠른 검증 (verdict contract) |
+| PR 전 (/fz-pr 전) | `/fz-gpt final` (major 가 있으면 `final-deep` · `final-da`) | PR 전 최종 리뷰 |
 
 ### GPT 결과 처리 흐름
 
@@ -303,9 +311,9 @@ GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 �
 | Anti-Pattern | 이유 | 대안 |
 |-------------|------|------|
 | Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
-| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: **동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217)·**depth 3**(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, v2.1.219) — fz governance(**opus 동시 ≤3** — 정본 `guides/model-guide.md` §5)는 이보다 보수적. ⛔ 세션 생애 200 캡(`…MAX_SUBAGENTS_PER_SESSION`)은 **v2.1.224에서 제거**됐다 — 누적 스폰 제약은 더 이상 없고 **동시·depth만 남는다** |
+| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (이력 — Opus 4.8 당시 기준: 4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: **동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217)·**depth 3**(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, v2.1.219) — 이 20·3 은 **Agent 도구 풀** 상한이다. Workflow 에이전트는 여기 포함되지 않고 자체 상한(**동시 16·실행당 1,000**)을 따르며, fz 실행 경로는 이 Workflow 풀이다 [verified: https://code.claude.com/docs/en/sub-agents] [verified: https://code.claude.com/docs/en/workflows] — fz governance(**opus 동시 ≤3** — 정본 `guides/model-guide.md` §5)는 이보다 보수적. ⛔ 세션 생애 200 캡(`…MAX_SUBAGENTS_PER_SESSION`)은 **v2.1.224에서 제거**됐다 — 누적 스폰 제약은 더 이상 없고 **동시·depth만 남는다** |
 | ↳ Opus 5.5 (현행 워커) | 5.5 프롬프팅 페이지에는 subagent 캡 절이 없지만 Opus 5 패턴을 상속한다 — *"the patterns in Prompting Claude Opus 5 remain a reasonable starting point"* → **캡 절 부재는 캡 폐기 근거가 아니다**. 장기 자율 런에는 시간 예산 신호를 권한다 — *"give the model a time budget: have your harness add a short line at the end of each message … giving the elapsed time"* [verified: prompting-claude-opus-5-5] | 위 명시 캡 유지 + elapsed 시간 신호 |
-| coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) + 동일 토큰예산서 우위 소멸 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley] | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
+| coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) [verified: https://arxiv.org/abs/2503.13657v3 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley, v3, NeurIPS 2025]. 추론 토큰을 같게 두면 단일 에이전트가 멀티에이전트와 같거나 낫다는 결과는 다중 홉 추론 과제에서 나왔다 [arxiv preprint, 2026-04: 2604.02460 — 다중 홉 추론, 코딩 과제 아님 · vN 미기록]. (이력 — 구판은 "동일 토큰예산서 우위 소멸"을 MAST 태그 하나로 묶었으나 MAST v1~v3 에 동일 예산 주장은 없다) | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
 | standalone Task | 통신 불가, 고립된 작업 | Workflow `agent()` 사용 (`skill-authoring.md` §12) — ⛔ `TeamCreate`는 v2.1.178부터 존재하지 않는다 |
 | Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
 | 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 3-Tier (판단=fable · 실질 워커=opus 동시 ≤3 · retrieval·breadth=sonnet) |
@@ -373,12 +381,13 @@ GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 �
 ## 8. Agent Frontmatter 고급 기능 (v2.1+)
 
 > Source: Claude Code 공식 Sub-agents/Agent Teams 문서 (2026-03, v2.1.32+). 기존 fz 에이전트에 점진적으로 적용.
-> **공식 사양** [verified: 2차 research 2026-04-21, code.claude.com/docs/en/agent-teams]:
+> **(이력 — fz 미사용) 공식 사양** [verified: 2차 research 2026-04-21, code.claude.com/docs/en/agent-teams]:
 > ⛔ 아래는 **Claude Code 플랫폼 기능의 사실 서술**이지 fz 처방이 아니다 — fz 실행 경로는 Workflow이며 P2P 채널을 쓰지 않는다.
 > - 활성화 flag: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
 > - 팀 크기: **hard limit 명시 없음, 3-5 teammates 권장**
 > - 통신: SendMessage peer-to-peer, shared task list, file locking
 > - Hooks 연계: `TeammateIdle`, `TaskCreated`, `TaskCompleted` events (Gate 강제에 활용 가능)
+> - 2026-11-01 재대조: Agent teams 는 여전히 실험 기능·기본 비활성(위 flag), 3~5명 권장이다. 켜면 이름 붙인 서브에이전트가 팀원이 될 수 있다 — fz 는 켜지 않는다 [verified: https://code.claude.com/docs/en/agent-teams]
 
 ### 8.1 Persistent Memory (`memory` 필드)
 
@@ -410,8 +419,8 @@ skills:
 ---
 ```
 
-- 스킬 전체 내용이 시스템 프롬프트에 포함됨
-- 부모 대화의 스킬을 상속하지 않음 — 명시적 선언 필요
+- 스킬 전체 내용이 시스템 프롬프트에 포함됨 — 2026-11-01 재대조: 전체 내용 주입·`skills:` 의 처음 32개까지 [verified: https://code.claude.com/docs/en/sub-agents]
+- 부모 대화의 스킬을 상속하지 않음 — 명시적 선언 필요. 원문: *"It doesn't see your conversation history, the skills you've already invoked, or the files Claude has already read."* [verified: https://code.claude.com/docs/en/sub-agents]
 - **주의**: 스킬 내용이 context를 소비하므로 필요한 스킬만 선별
 
 ### 8.3 Per-Agent Hooks (`hooks` 필드)
@@ -454,6 +463,7 @@ isolation: worktree
 - 변경 없으면 worktree 자동 정리
 - **적용**: 디스크를 **직접 수정하는** 에이전트의 병렬 실행 시 충돌 방지
 - ⛔ **예시 주체 정정 (2026-08-09, 감사 ISSUE-009)**: 이전 판은 `impl-correctness`를 예시로 썼다. `impl-correctness`는 `tools:`에서 **쓰기 도구가 전부 제거**됐고 산출물이 **changeset JSON**이며 적용은 Lead다(`workflows/code-pair.js`) — 디스크를 수정하지 않으므로 worktree 격리가 **불필요**하다. 근거: `guides/harness-engineering.md` "capability ≠ authorization" + 스키마 수준 필터링
+  - ⚠️ 2026-11-01: 실제 `agents/impl-correctness.md` frontmatter 에는 `isolation: worktree` 가 남아 있어(`modules/team-registry.md` 도 worktree) 위 서술과 불일치한다(F-460). frontmatter 를 지울지 가이드를 고칠지는 플러그인 플랜에서 정한다
 
 ### 8.5 기타 유용한 필드
 
@@ -462,7 +472,7 @@ isolation: worktree
 | `maxTurns` | 에이전트 턴 수 제한 | Supporting 에이전트의 과도한 분석 방지 |
 | `disallowedTools` | 도구 차단 (denylist) | `tools` allowlist의 보완 |
 | `permissionMode` | 에이전트별 권한 | 전 리뷰·분석·**changeset 생산** 에이전트 → `plan`(read-only). ⛔ `acceptEdits`는 **디스크를 실제로 쓰는 에이전트에만**. ⛔⛔ **Workflow 경로에서는 이 필드가 무효다** — 워크플로 서브에이전트는 세션 permission mode와 무관하게 `acceptEdits`로 실행되고 파일 편집이 자동 승인된다 [verified: `llm-references.md` §1.1b /workflows]. 워크플로 워커의 유일한 강제 수단은 **스키마 수준 `tools:` 제거**다 |
-| `mcpServers` | 에이전트별 MCP | review-arch → serena만, review-quality → serena + context7 |
+| `mcpServers` | 에이전트별 MCP | fz 에이전트는 이 필드를 쓰지 않고 `tools:` 에 MCP 도구를 직접 나열한다 — review-arch = codegraph `codegraph_explore` + serena `find_symbol`·`find_referencing_symbols`·`get_symbols_overview` + context7 `query-docs`, review-quality = 같은 구성에서 `get_symbols_overview` 제외 (2026-11-01 `agents/review-arch.md`·`agents/review-quality.md` frontmatter 대조 — 구판 예시 "review-arch → serena만, review-quality → serena + context7" 은 실제와 달랐다) |
 | `background: true` | 항상 백그라운드 | 탐색/캐싱 에이전트에 적합 |
 
 ---

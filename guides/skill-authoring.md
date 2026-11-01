@@ -1,6 +1,6 @@
 # 스킬 작성 실전 가이드
 
-> **Sources (last audited: 2026-09-06 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조 · 이전 감사 2026-09-06 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
 >
 > fz-* 스킬 생태계에서 새 스킬을 설계하고 작성하기 위한 실무 가이드.
 > 이론이 아닌 실행 중심. 모든 예시는 기존 17+ 스킬 생태계 기반.
@@ -49,7 +49,7 @@
 
 ### Eval (품질 평가)
 
-- `/fz-skill eval fz-{name}` → Static Analysis(8항목, 자동) + Triggering Test(반자동) 실행
+- `/fz-skill eval fz-{name}` → Static Analysis(8항목, 자동) + Runtime Trigger Eval(skill-creator `run_eval.py` 로 `claude -p` 실측 — 기본 포함, 미설치 시 SKIP) + Triggering Test(반자동 — Runtime 미실행 시 폴백) + 리뷰형 스킬 2단계 eval(리뷰·검증형 스킬만) 실행. 구성 정본은 `skills/fz-skill/SKILL.md` § eval — 스킬 품질 평가
 - 목표: FAIL 0개, WARN ≤2개
 - `/skill-creator` Eval 모드로 보완적 평가 (다른 관점의 독립 측정)
 - A/B 비교: description 변경 시 `skill-testing.md` §7 프로토콜 적용
@@ -67,7 +67,7 @@
   - **E**liminate: 주기적으로 사용하지 않는 지침을 가지치기한다
 - 500줄 이하를 유지한다 — 넘으면 모듈로 분리한다
 - **⛔ 트리밍 비저하 원칙**: 줄 수 축소가 실행 품질 저하를 일으키면 트리밍 의미가 없다. §3의 "트리밍 비저하 원칙" 참조
-- **⛔ DELETE/MERGE-default (편집 operating rule)**: 스킬/가이드/모듈을 *편집*할 때 DELETE 또는 MERGE를 기본값으로 먼저 검토한다. 순수 additive 변경(기존 삭제·병합 없이 추가만)은 삭제/병합 counterpart를 동반하거나 명시적 정당화가 있어야 한다. 이유: 규칙 누적은 adherence tax(IFScale 500규칙→68%)이고, literal-following 모델(Opus 4.8 이후)에서 bloat 비용이 더 크다 — 추가 충동마다 "무엇을 지울 수 있나"를 먼저 묻는 것이 self-correcting 하네스의 조건. (memory 18차 rule(3)의 skill-body 강제)
+- **⛔ DELETE/MERGE-default (편집 operating rule)**: 스킬/가이드/모듈을 *편집*할 때 DELETE 또는 MERGE를 기본값으로 먼저 검토한다. 순수 additive 변경(기존 삭제·병합 없이 추가만)은 삭제/병합 counterpart를 동반하거나 명시적 정당화가 있어야 한다. 이유: 규칙 누적은 adherence tax(IFScale 500규칙→68%)이고, 지시를 문자 그대로 따르는 모델에서 bloat 비용이 더 크다(추론) — 현행 근거는 Opus 5 페이지(Opus 5.5 가 상속)의 literal-following 예시다: "If your review prompt says 'only report high-severity issues' or 'be conservative,' the model might follow that instruction literally and report less" [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] (이전 표기 "Opus 4.8 이후"는 이력 — 2026-09 당시 기준) — 추가 충동마다 "무엇을 지울 수 있나"를 먼저 묻는 것이 self-correcting 하네스의 조건. (memory 18차 rule(3)의 skill-body 강제)
   - **Opus 5가 이 규칙을 강화한다**: 공식 프롬프팅 가이드가 *제거*를 명시 지시한다 — 검증 지시("include a final verification step" / "use a subagent to verify" / "double-check your answer")를 **삭제**하라, *"removing them reduces wasted tokens **with no loss in quality**"* [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. 모델이 내재화한 행동에 지시를 겹치면 중복 실행이 된다. ⚠️ 단 §llm-references §4-2의 *외부 verifier·교차검증 원칙*은 별개 — 삭제 대상은 **모델에게 자기재확인을 시키는 문구**뿐.
 - **⚠️ Sibling-Convention Check (편집 operating rule, candidate)**: fz 자산에 candidate·검증·관측 항목을 *추가*할 때, 기존 동류 항목(예: fz-review 검증 4-N/4-O, promotion-ledger L-series)의 표기 템플릿을 먼저 grep해 일치시킨다 — `⚠️` 마커 · 「활성 강제 X」 · 「N sessions 후 결정」 등. 이유: 동류 컨벤션을 안 보고 새 표기를 즉흥 생성하면 일관성 붕괴 + 강제성 오인(candidate가 ⛔/blocking으로 오동작). 결정론 grep이라 즉시 가능. evidence: OBS-16 환류 세션 ①(fz-review 검증5/Gate) candidate 표기 불일치 catch — `feedback_fz_self_reference_blindspot` 발현1(활용 갭). ⚠️ candidate(1 session) — 활성 강제 X, 5 sessions 후 active(⛔) 재판정.
 
@@ -91,7 +91,7 @@ Claude가 100+ 스킬 중 하나를 선택하는 유일한 근거 = **descriptio
 1. **3인칭 서술**: "I can help you" (X) → "Processes files" (O)
 2. **한국어 설명 + 영어 트리거 혼용**: 매칭률 극대화
 3. **구체적 키워드**: 일반적인 단어보다 도메인 특화 키워드 사용
-4. **1024자 이하**: 시스템 프롬프트 공간 제한
+4. **1024자 이하**: Agent Skills 스펙의 `description` 필드 상한(이식용 저자 규칙) [verified: https://agentskills.io/specification]. Claude Code 리스팅은 이와 별개로 `description`+`when_to_use` 합계를 1,536자에서 자르므로 핵심 용도를 앞에 둔다 [verified: https://code.claude.com/docs/en/skills] (이전 사유 "시스템 프롬프트 공간 제한"은 이력 — 2026-09 당시 기준)
 
 ### Few-shot 예시
 
@@ -118,9 +118,10 @@ GOOD: "버그 수정 경량 스킬. 원인 분석 → 수정 → 빌드 검증�
 
 - 시스템 프롬프트에 포함된다 → 스킬 발견 용도
 - 최소화: `name` + `description`만으로 Claude가 선택할 수 있어야 한다
-- description 1024자 이하 엄수
+- description 1024자 이하 엄수 — 1024자는 Agent Skills 스펙 필드 상한이고 [verified: https://agentskills.io/specification], Claude Code 리스팅 절단은 `description`+`when_to_use` 합계 1,536자다 [verified: https://code.claude.com/docs/en/skills] (두 수치는 다른 규칙 — §2 작성 규칙 4)
 - 여기서 정보가 과하면 모든 요청에 불필요한 토큰이 소비된다
 - 스킬 多 시 description이 listing budget에 맞춰 자동 축약 — `skillListingBudgetFraction` / `SLASH_COMMAND_TOOL_CHAR_BUDGET`로 조정 [verified: code.claude.com/docs/en/skills]
+  - 예산은 모델 컨텍스트 윈도우의 1%이고, 넘치면 **가장 덜 호출한 스킬의 description 부터** 뺀다 — "The budget scales at 1% of the model's context window. When the listing overflows, Claude Code drops descriptions starting with the skills you invoke least" [verified: https://code.claude.com/docs/en/skills]. ⚠️ 플러그인 스킬은 `skillOverrides` 대상이 아니다 — `/plugin` 으로 관리한다 [verified: https://code.claude.com/docs/en/skills]
 - `disable-model-invocation: true` → 자동 로드 차단(수동 `/name`만 invoke) [verified: 동]
 
 ### Level 2: SKILL.md 본문 (관련 시 로드)
@@ -145,7 +146,7 @@ GOOD: "버그 수정 경량 스킬. 원인 분석 → 수정 → 빌드 검증�
 
 **500줄 초과 시 우선순위**: 삭제보다 **모듈 분리**(`modules/`)를 먼저 시도한다.
 
-> **모델 전이 강건성** (2026-07 추가 — 위 삭제 금지 3개의 외부 수렴 근거): 절차적 규칙(체크리스트·Gate·Step)이 서술적 prose 조언보다 모델 교체에 강건하다 — "'factual 구조는 전이되나 prose 전략은 전이 안 됨'(2604.25850), AdaCoM의 '유사 능력 에이전트 간 전이가 최선'이 시사하듯, 하네스가 모델·태스크·도메인을 넘어 얼마나 이식되는지가 미해결." [외부: harness-paper §6 미해결과제4 — 원 논문 미대조]. 함의: 스킬 작성 시 절차적 체크리스트 > prose 조언, 모델 교체·재배선(예: Fable 5) 시 스킬 회귀 점검 축으로 활용. ⚠️ 근거 등급 낮음 — 2604.25850은 배경 논문(서베이 CONFIRMED 86편 밖). 기존 원칙 보강이지 신규 규칙 아님.
+> **모델 전이 강건성** (2026-07 추가 — 위 삭제 금지 3개의 외부 수렴 근거): 절차적 규칙(체크리스트·Gate·Step)이 서술적 prose 조언보다 모델 교체에 강건하다 — "'factual 구조는 전이되나 prose 전략은 전이 안 됨'(2604.25850), AdaCoM의 '유사 능력 에이전트 간 전이가 최선'이 시사하듯, 하네스가 모델·태스크·도메인을 넘어 얼마나 이식되는지가 미해결." [외부: harness-paper §6 미해결과제4 — 원 논문 미대조] → 2026-11-01 원문 대조(2604.25850 부분만): 문장은 실재한다 — "Ablations localize the gain to tools, middleware, and long-term memory rather than the system prompt, suggesting factual harness structure transfers while prose-level strategy does not." [arxiv preprint, 2026-04, v4]. 단 논문의 '구조'는 도구·미들웨어·장기 메모리이고 시스템 프롬프트가 아니다 — 스킬 본문 안의 체크리스트 > prose 로 옮기는 아래 함의는 **fz 의 추론**이다. AdaCoM 은 arXiv ID 가 없어 [미검증: 원문 미취득]. 함의(추론): 스킬 작성 시 절차적 체크리스트 > prose 조언, 모델 교체·재배선(예: Fable 5) 시 스킬 회귀 점검 축으로 활용. ⚠️ 근거 등급 낮음 — 2604.25850은 배경 논문(서베이 CONFIRMED 86편 밖). 기존 원칙 보강이지 신규 규칙 아님.
 
 ### Level 3: References (필요 시 Read)
 
@@ -242,7 +243,7 @@ Step 1: ContentDetailBuilder 생성 (DI: ContentRepository, ImageCacheUseCase)
 
 ### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
 
-**Fable 5 (2026-06-09 GA)** 는 짧은 지시로 대부분 행동을 조향할 수 있다 — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5] → 과격·모호한 지시가 그대로 적용될 위험. **GPT-6 계열**도 같은 방향 — "what used to require a lot of handholding and scaffolding no longer does" · 스킬 설명은 짧게 [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra] (Astra 대상 글 — 현행 Sol 적용은 [미검증]). 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: 동 Fable 5 문서]). **Opus 5.5 (2026-09-22 GA — Opus 5 패턴 상속)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. ⚠️ 2026-09-06 정정: 이전 근거였던 "Claude 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
+**Fable 5 (2026-06-09 GA · 현행 Legacy — still available)** 는 짧은 지시로 대부분 행동을 조향할 수 있다 — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5] → 과격·모호한 지시가 그대로 적용될 위험. **GPT-6 Astra**(2026-09-11 블로그 — 이전 표기 "GPT-6 계열"은 이력)도 같은 방향 — "what used to require a lot of handholding and scaffolding no longer does" · 스킬 설명은 짧게 [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra] (Astra 대상 글 — 현행 Sol 적용은 [미검증]). 같은 글이 모델 차이를 인정한다 — "Guidance that helps Sol or Luna may overconstrain GPT-6 Astra, so consider which models will use the instructions you leave behind." [verified: https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra]. 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: 동 Fable 5 문서]) — 이 문장은 Fable 5 페이지에만 있고 Fable 5.1 페이지에는 없다(철회 문구도 없다) [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5#recommended-scaffolding-changes]. **Opus 5.5 (2026-09-22 GA — Opus 5 패턴 상속)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. ⚠️ 2026-09-06 정정: 이전 근거였던 "Claude 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
 
 ```
 BAD:  "CRITICAL: You MUST ALWAYS use this tool"
@@ -323,13 +324,13 @@ metadata:
 
 ### 언제 팀을 구성하는가?
 
-| SOLO | TEAM |
+| light — Lead 경로 (이력: SOLO) | full — Workflow 멀티에이전트 (이력: TEAM — 2026-09-25 일몰) |
 |------|------|
 | 단순 작업 (1 파일, 명확한 지시) | 복잡 작업 (여러 모듈, 설계 결정) |
 | 빠른 피드백 필요 | 다관점 검증 필요 |
 | fz-fix (대부분), fz-search (기본) | fz-plan, fz-code, fz-review |
 
-SOLO가 기본이다. 팀이 필요한 근거가 없으면 SOLO로 실행한다.
+SOLO가 기본이다. 팀이 필요한 근거가 없으면 SOLO로 실행한다. (이력 — 2026-10-19 이전 규칙.) 현행: 스킬이 Workflow 를 띄우기 직전 light · full 을 묻고 Lead 가 크기로 추천한다 — 명시 인자·신호어·자율 모드면 묻지 않는다. 정본 `modules/mode-gate.md` § 언제 묻나 · § 스킬별 light · full · § 사용자 결정.
 
 ### 팀 구성 패턴
 
@@ -414,7 +415,7 @@ git grep -n "$HOME" -- 'skills/*' 'modules/*' 'guides/*'   # 0건이어야 한�
 ### 품질 평가 항목
 
 - [ ] `/fz-skill eval fz-{name}` Static Analysis FAIL 0개인가?
-- [ ] Triggering Test 정확도 ≥90%인가?
+- [ ] Triggering Test 정확도 ≥90%인가? (fz 실측 현황은 이 목표에 못 미친다 — `guides/skill-testing.md` § 1.1 Triggering Test — 트리거 정확도 측정)
 - [ ] `/skill-creator` Eval로 보완 평가를 수행했는가? (권장)
 
 ### Utility 스킬 예외
@@ -473,7 +474,7 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 | Cross-Model Verification | 독립 모델 교차검증 | fz-gpt (GPT CLI로 독립 검증) |
 
 fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 — 호출은 정문 `scripts/gpt-call.sh <kind>` — 모드 · 스키마는 kind 가 정한다)과
-3-Tier 디스커버리 스킬 체인(fz-reviewer, fz-architect, fz-guardian, fz-challenger, fz-searcher, fz-fixer)을
+3-Tier 디스커버리 스킬 체인(역할 스킬 8종 — fz-reviewer, fz-architect, fz-guardian, fz-challenger, fz-searcher, fz-fixer, fz-drift, fz-planner · 정본은 `gpt-skills/` 디렉터리와 `scripts/gpt_kinds.py` 생성 표 · 이전 표기 6종은 이력)을
 결합하여 Main Agent와 독립된 교차검증을 수행한다.
 
 ### 패턴 구분 정리
@@ -537,7 +538,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
   - ⛔ **비ASCII 본문은 손으로 이스케이프하지 않는다** — MCP 도구 파라미터는 UTF-8 문자열을 그대로 받는다. `\uXXXX` 수동 변환은 안전장치가 아니라 **오류원**이다: 5천 자 한국어를 이스케이프해 보낸 호출이 **200 성공 + 본문 11곳 손상**으로 끝난 실측이 있다. 짧은 본문에서는 재현되지 않아 길이가 늘수록 위험하다.
   - ⛔ 외부 시스템(JIRA·GitHub·Slack)에 비ASCII 본문을 기록한 직후 **반환 본문을 1회 스캔**한다. 이 층에는 빌드도 린트도 없어 *성공 응답이 정확한 산출물을 뜻하지 않는다* — 유일한 오라클이 반환값 확인이다. 파일로 먼저 쓴 뒤 그 내용을 보내는 경로가 있으면 그쪽이 안전하다.
-- agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정), effort 생략 시 세션 effort 가 아니라 **워커 모델 기본**으로 돈다(Opus 5.5 = `medium` — 2026-09-25 실측 2회, Lead 세션은 `xhigh`). 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. 제거한 콜은 모델 기본 effort 로 돈다는 점을 결과 보고에 적는다. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 — ⛔ **차단이 아니라 "요청 시 검출"이다.** `/fz-manage check`가 호출할 때만 돌고, 실제 차단은 훅 설치 시에만 성립한다(훅은 `settings.json` = 사용자 소관, `modules/governance.md` § Hook 최소 강제 권고)
+- agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정 — 이력, 2026-09 당시 서술. 정정: `agentType` 을 준 호출은 에이전트 정의 `model:` 이 이겨 fz 에서는 sonnet(= Sonnet 5.5)으로 강등되고, `agentType` 도 없을 때만 세션 모델을 따른다. "2배"는 출력·캐시쓰기 단가에만 맞다 — `guides/model-guide.md` § 서브에이전트 · 워크플로), effort 생략 시 세션 effort 가 아니라 **워커 모델 기본**으로 돈다(Opus 5.5 = `medium` — 2026-09-25 실측 2회, Lead 세션은 `xhigh`). 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. 제거한 콜은 모델 기본 effort 로 돈다는 점을 결과 보고에 적는다. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 — ⛔ **차단이 아니라 "요청 시 검출"이다.** `/fz-manage check`가 호출할 때만 돌고, 실제 차단은 훅 설치 시에만 성립한다(훅은 `settings.json` = 사용자 소관, `modules/governance.md` § Hook 최소 강제 권고)
 - **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `effort: EFFORT` — 값은 args.effort 로 받은 **Lead 세션 effort**(미지정 `'xhigh'` · 2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort). Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**. **Opus 5.5 는 기본 `medium`·같은 effort 에서 사고량 증가** [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] — fz 의 워커 effort 는 Lead 세션 effort 를 따른다(2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort · 이전: 2026-09-25 `xhigh` 유지 · 하향 sweep 종결).
   - ⛔ **상수 일괄 교체 금지**: 공식이 *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* 을 요구. **sweep 등록·기록 위치는 `experiment-log.md` §5.8 ⑥**(세션 effort sweep — plan, 2026-09-11 신설)이며 ①(frontmatter)은 철회된 사료라 대상이 아니다. 측정 주체는 `scripts/fz_wf_metrics.py`(stage별 wall·out_tok·thinking·advisor·so_retries) + `scripts/fz_telemetry_report.py --plan-segments`(Lead·GPT 층 분리) 다 — 사전등록만 하고 재는 주체가 없으면 표가 빈 채로 남는다(실측: 두 달). 측정 없이 `xhigh`→`high`로 치환하는 건 근거 없는 값을 근거 없는 값으로 바꾸는 것. **워크로드별 sweep 후** 스테이지 성격(생산/판정/탐색)에 맞춰 차등 배정. 미측정 상태의 기본값 = **현행 유지**(2026-10-19 부터 워커 값은 Lead 세션 effort 이므로 이 규칙은 Lead 세션 effort 를 바꿀 때 적용된다).
   - **[2026-09-06 추가] Fable 5.1 갱신**: 이월 금지가 세대를 건너서도 반복 적용된다 — "Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. Lead(Fable 5.1)에도 동일 적용 — Fable 5·Opus 5에서 측정한 sweep 결과를 그대로 이월하지 않는다.
@@ -603,7 +604,8 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 **세션 설정 상속** [verified: 프로브 `wf_e7136199-140`, 2026-08-08]
 - ⛔ **워커는 세션 `advisorModel`을 상속한다.** 1-agent 프로브(`model:'opus'`)가 advisor를 실제 호출해 응답을 받았다 — `{"advisor_tool_available":true,"call_succeeded":true}`. 즉 fz의 opus 워커 전부가 advisor를 호출할 수 있다.
-  - **비용 계측 불가**: advisor 호출은 `usage.server_tool_use`에 기록되지 않는다(워커 트랜스크립트 `agent-*.jsonl`에서도 동일). `governance.md §사각지대` 참조 — `opus 동시 ≤3` envelope이 advisor 지출을 bound하지 않는다.
+  - **비용 계측 불가**(이력 — 2026-08-08 당시 판정): advisor 호출은 `usage.server_tool_use`에 기록되지 않는다(워커 트랜스크립트 `agent-*.jsonl`에서도 동일). `governance.md §사각지대` 참조 — `opus 동시 ≤3` envelope이 advisor 지출을 bound하지 않는다.
+    - 2026-11-01 정정 — '불가'는 아니다. 공식 문서상 advisor 호출은 advisor 모델 단가로 과금되는 별도 하위 추론이고 `usage.iterations[]` 의 `type: "advisor_message"` 항목으로 보고된다(top-level `usage` 에는 합산되지 않는다) — "Advisor calls run as a separate sub-inference billed at the advisor model's rates. Usage is reported in the `usage.iterations[]` array" [verified: https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool]. 단 fz 트랜스크립트에는 `iterations` 가 없는 세션이 있어 그것으로 세면 과소 집계된다 — `scripts/fz_wf_metrics.py` 는 호출 수를 `advisor_tool_result`·`server_tool_use`(name=advisor) 블록으로 센다(그 스크립트의 측정 규약 · 2026-09-11 정정 이력). envelope 이 advisor 지출을 bound 하지 않는다는 위 판정은 그대로다.
   - ⛔ **ad-hoc 프로브 작성 시 advisor 호출을 유도하는 지시를 넣지 말 것** — 계측되지 않는 지출이 된다(도구 가용성 실증 같은 명시적 목적 제외).
 - ⛔ **`CLAUDE_CODE_SUBAGENT_MODEL`은 `opts.model`을 override한다** — *"the model Claude Code uses for all subagents, agent teams, and **agents in a workflow** … overrides the per-invocation `model` parameter and the subagent definition's `model` frontmatter"* [verified: /model-config]. 즉 **본 §12의 "model 명시 의무"를 무력화할 수 있는 유일한 변수**다. 워커 모델이 예상과 다르면 **1순위로 이 env var를 확인**하고, `inherit`로 정상 해석에 복귀시킨다.
 
@@ -654,7 +656,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 ### intentContext 규약 (과제 목적 전달)
 
-워커 프롬프트/args에 과제 목적 3요소를 전달하는 것을 권장한다 — 목적을 알면 워커가 관련 정보를 스스로 연결하고 의도를 오추론하지 않는다 (공식 Fable 5 Intent context: "Give the reason, not only the request").
+워커 프롬프트/args에 과제 목적 3요소를 전달하는 것을 권장한다 — 목적을 알면 워커가 관련 정보를 스스로 연결하고 의도를 오추론하지 않는다 (공식 Fable 5 Intent context: "Give the reason, not only the request" — 이 문장은 Fable 5(Legacy) 페이지에만 있다 [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5#give-the-reason-not-only-the-request]. 전 모델 공통 근거는 best-practices 페이지의 같은 취지 문장이다: "Providing context or motivation behind your instructions, such as explaining to Claude why such behavior is important, can give Claude more information about your goals and help it deliver more targeted responses." [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices#add-context-to-improve-performance]).
 
 - **3요소**: (1) larger task — 지금 과제가 속한 상위 작업 · (2) 누구를 위한 것 — 수요자 · (3) 산출물이 가능하게 하는 것 — 이 산출물로 다음에 무엇을 하는가
 - **구현 선례**: review-live·peer-review는 `intentContext`를 **필수 args**로 받아(둘 다 누락 시 fail-fast `mode:'fallback'`) TARGET 문자열에 주입; plan-collaborative는 **선택 args**로 받아 CTX 목적 축에 조건부 주입 (`input.intentContext ? '[과제 목적] …' : ''`)
