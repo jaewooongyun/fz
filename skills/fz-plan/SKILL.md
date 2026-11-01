@@ -36,7 +36,6 @@ metadata:
 ## 개요
 
 > ⛔ Phase 0 (Work Dir Pre-flight) → Phase 0b (Context) → Phase 0c (Constraint Probe Pre-flight) → Phase 0.5 (Direction Challenge) → Phase 0.7 (Sprint Contract, TEAM 5+ Step) → Phase 1 (Deep Planning) → Phase 2 (Validation) ↔ Phase 3 (Feedback) → Gate 2 → /fz-code
-> 루프 프리미티브: Plan-Execute + Evaluator-Optimizer (H6, Inside the Scaffold)
 
 요구사항 구조 분해 + 영향 범위 분석. Serena 심볼 도구 기반 정밀 탐색.
 
@@ -87,14 +86,10 @@ metadata:
 
 > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
 
-> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
-> Collaborative Design 패턴의 평탄화 구현은 `workflows/plan-collaborative.js` 로 남아 있다 — **롤백 경로**다(아래 ⛔ 배선 전환). 기본 실행은 아래 스크립트다.
 > **스크립트: `workflows/plan-lean2.js`** (플러그인 루트 상대) — **4콜 2단계**: 전체 플랜 ∥ edge 적대 ∥ impact+arch(동시 3) → 델타 병합.
 > agents/의 plan-structure·plan-edge-case·plan-impact·plan-merge 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > 동시 opus ≤3(Lead 세션 fable은 별도)는 Stage 1 의 3-병렬이 상한을 **정확히** 채워 구조적으로 보장한다. rate-limit 시 순차화 폴백(governance.md).
->
-> ⛔ **2026-09-12 배선 전환 (6단계 9콜 → 2단계 4콜)** — wall · 노이즈 바닥 · 채택 판정은 `experiment-log.md` §5.9 가 정본이다. ⛔ 근거는 전부 **N=1** 이고 run-to-run 분산이 구조 간 차이보다 컸다 — 실사용 3회 관찰 후 재평가한다.
-> · **롤백**: 아래 절차 2.5·3 의 스크립트명을 `plan-collaborative.js` 로 되돌리면 끝이다 — 파일은 그대로 남겨 둔다.
+> ⛔ **배선 전환 롤백**: 아래 절차 2.5·3 의 스크립트명을 `plan-collaborative.js` 로 되돌리면 끝이다(파일은 남겨 둔다) — 전환 근거(2026-09-12 · N=1 · 실사용 3회 관찰 후 재평가): `experiment-log.md` §5.9
 
 ### 실행 절차 (Lead)
 
@@ -107,7 +102,6 @@ metadata:
    - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / GPT)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고) / `effort`=1.2 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
 2.5. **준비** (⛔ 매 호출 사전 복사 — 거부 왕복을 없앤다):
-   실측(2026-09-11, 3건 전부): 플러그인 루트 경로로 첫 호출이 거부되고 WORK_DIR 복사본으로 재호출해 성공했다 — 거부 1회가 매번 낭비된다(텔레메트리 `n_workflow=2` 의 정체).
    매 호출 `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비**를 **선행**한다 — 경로 판정(실제 경로 · 세그먼트 경계) · self-contained 확인 · cp 덮어쓰기 · `cmp -s`:
    `grep -c '^import\|require(' {플러그인 루트}/workflows/plan-lean2.js` 가 `0` 임을 확인(⛔ 무출력은 0이 아니라 경로 오류) → 복사 → 바이트 일치 → 그 경로로 **1회** 호출:
    ```bash
@@ -132,7 +126,6 @@ metadata:
      심볼 census 는 자동으로 붙는다(요청당 상위 3개 · positive control 동반). `RESOLVED` 는 질문형으로 판별되지 않은 요청이다 — 판별은 어휘 규칙이라 내포 질문(…인지 확인 필요 · …여부)도 `RESOLVED` 로 남을 수 있으니 Lead 는 `RESOLVED` 도 요청 문장과 census 가 맞는지 훑는다. 질문형(…가 해석되는가 · 분포·비율·수를 묻는 꼴)은 census 를 붙인 채 `UNRESOLVED`(단어 census, 질문 미답)로 남는다. `UNRESOLVED` 항목은 Lead 가 직접 재거나 판단한다. ⛔ 미해소 항목은 plan 에 **그 사실을 적는다** — 조용히 비워두지 않는다
    - ⛔ `directionEscalation` 이 **null 이 아니면** → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용).
      `{ verdict, alternatives }` 형태이며 `directionVerdict` 가 `RECONSIDER`·`REDIRECT` 일 때만 실린다.
-     ⛔ **필드다, 반환 모드가 아니다** — 현행 배선(`plan-lean2.js`)은 방향 판정을 full 콜 안에서 하므로 정상 경로와 반환 형태를 가르지 않는다.
      (롤백해 `plan-collaborative.js` 를 쓰면 그쪽은 `mode:'direction_escalation'` 으로 온다 — 두 형태를 모두 받는다.)
    - `mode:'fallback'` (두 배선 공통) → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`·`agent null` 에만 이 값을 돌려준다 —
      도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 experiment-log 기록
@@ -146,16 +139,7 @@ metadata:
    ```
    ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 않는다. ⛔ 같은 runId 에 `--mcp-audit` 도 돌린다 — 배선이 죽으면 MCP 호출이 0이 되는데 산출물에는 표시가 없다(exit 1=배선 의심 · 2=미판정, **둘 다 통과 아님**)
 
-**6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거. Workflow stage에 동일 적용):
-
-| 렌즈 | 스크립트 위치 | 핵심 질문 |
-|------|--------------|----------|
-| plan-structure (설계+분해) | Stage 1 전체 플랜 (Stage 2 병합은 도구 없는 plan-merge) | "어떻게 나누고 만들 것인가?" · 방향 판정도 이 콜이 함께 낸다 |
-| plan-edge-case (경계) | Stage 1 적대 렌즈 | "어디서 깨지는가?" — ⭐ 측정상 고유 기여가 가장 큰 렌즈 |
-| plan-impact (영향+아키) | Stage 1 통합 렌즈 | "어디까지 퍼지는가 · 기존 패턴과 맞는가?" — `secondaryHosts`·`existingTestSuites` 를 schema 로 명시 요구 |
-| GPT verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |
-
-> 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
+> 렌즈 설계(Stage 1 = 전체 플랜 ∥ edge 적대 ∥ impact+arch · Phase 2 = Lead 의 GPT verify — 같은 질문 금지): `references/rationale.md` § 차별화된 렌즈
 
 ---
 
@@ -276,8 +260,6 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 8. ⛔ Transformation Spec 작성 (패턴 변환 Step 시)
 9. ⛔ 계획 파일 기록 (compact recovery)
 
-> 각 절차 상세는 `modules/plan-deep-planning.md` 참조. 트리밍 비저하 원칙(single source: `guides/prompt-optimization.md` §1 보충 3a)으로 Gate 1 + Why(H1)는 본 SKILL에 보존.
-
 ### Gate 1: Plan Ready
 > **Why (H1)**: 영향 범위가 불완전하면 구현 시 예상 외 파일을 건드리게 되고, 리뷰에서도 범위 밖 변경을 놓친다.
 - [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
@@ -344,12 +326,6 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 검증 도구로 계획 검증 위임
 ```
 
-검증이 수행하는 작업:
-- 계획 전송 (cross-model 검증)
-- 응답 파싱
-- Issue Tracker에 이슈 자동 기록
-- 이슈 요약 반환
-
 3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 — light · full 모두 — `modules/gates.md` 배선 1):
    Phase 1 반환의 `steps[]`를 JSON으로 임시 기록한 뒤 변환한다. ⛔ **이 단계가 없으면 원장이 생기지 않아 배선 2·3이 전부 no-op이다.**
    ```bash
@@ -401,11 +377,9 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
    ⛔ **이슈 0건 승인이어도 이 기록은 발화한다.** `### Gate 2 전제조건`이 본 Phase보다 앞에 있어, 피드백이 없으면 본 Phase를 건너뛰어 `plan-final`이 생성되지 않는 경로가 생긴다.
    - **WORK_DIR 존재(티켓 폴더 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` + `index.md` 업데이트
      ⛔ **`plan-v{N}` 은 변경 이력이고 `plan-final.md` 는 승인본이다 — 승인 시 `plan-final.md`·`plan/steps.json`·`gates/plan.md` 를 같은 버전으로 완전 재생성한다**(해당 구역만 고쳐 쓰는 것도 허용 — 요구는 *결과가 단일 최신 상태*라는 것).
-     이유: `/fz-code` Phase 0.4 는 `plan-final.md` **하나만** 복원하고 RTM 도 그 문서 안에서 갱신된다(`modules/rtm.md`). 이전 본문과 수정 delta 를 나란히 남기면 폐기된 Step·verify 가 함께 복원돼 구현이 무엇을 따라야 할지 갈린다.
    - **Serena fallback**: `write_memory("fz:checkpoint:plan-final", …)` — ⛔ 요약 문자열이 아니라 **계약 필드**를 담는다:
      `{steps:[{id,title,files,verify}], swiftDecisions:{swiftUI,isolation,transform}, rtm:[…], verdict}`
      — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?, tools?}` 또는 `{kind:'manual', criterion}` (정의: `workflows/plan-lean2.js` VerifySpec · 배선: `modules/gates.md`)
-     (요약만 저장하면 `/fz-code` Phase 0.4의 구조 검사가 판정 불가)
 
 4.5. **⛔ 원장 확정** (draft 원장이 있을 때): Phase 2 판정(3.2)을 반영해 `gates/plan.draft.md` → `gates/plan.md` 로 복사한 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --finalize {WORK_DIR}/gates/plan.md` 를 돌린다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 도장을 찍고 `APPROVED: yes` 를 남긴다. ⛔ 도장이 없으면 승인 계약이 존재하지 않는다(검사는 있으나 발급이 없어 한 번도 발화하지 않았다). `revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 `MANUAL:`로 전환. 이어 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --set-state planned {WORK_DIR}/gates/plan.md` — 승인·미착수라 Stop hook 이 ABANDON 없이 통과시킨다(진행 기록이 있으면 거부 · `/fz-code` Phase 0.4 가 `active` 로 연다). 확정 후 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status {WORK_DIR}/gates/plan.md`.
    exit별 행동 — `0` 진행 · `1` 미충족 보고 후 진행(작업 중 정상 상태) · `2` **인프라 경고 후 진행**(경로·인터프리터 문제이지 원장 결함이 아니다) · `3` **미통과 차단**(확정 원장이 계약을 위반하면 안 된다).

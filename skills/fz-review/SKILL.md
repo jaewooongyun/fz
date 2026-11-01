@@ -442,8 +442,6 @@ Gate 5 통과 후:
   GOOD: Transformation Spec의 실행 스레드/에러 경로/파라미터 키 3축 모두 일치 확인
 ```
 
-> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
-
 ## Boundaries
 
 **Will**: 3중 검증(Claude+GPT+sc:analyze), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리

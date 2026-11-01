@@ -73,8 +73,6 @@ metadata:
 — 리뷰 깊이는 모드 게이트(light = Tier 1 · full = Tier 2) 또는 `--tier` 로 정한다. 신호어(정본 `modules/mode-gate.md` § 신호어)는
 모드 게이트의 light 로 읽는다 — 이 자리의 `--light`(해설 Standard)와 섞이면 해설이 조용히 바뀌므로, 이 표가 유일한 판별 근거다.
 
-`--deep`은 두 축을 동시에 켠다(리뷰 Cross-Critique + 해설 Deep). 기존 배선이며 변경하지 않았다.
-
 ## Prerequisites
 
 - Tier 2/3 Analyze는 네이티브 Workflow 도구 필요 (`workflows/peer-review.js`) — 미가용 시 SOLO 리뷰 폴백(`mode:'fallback'`) (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
@@ -106,8 +104,6 @@ metadata:
 
 ### WORK_DIR 초기화 (Gather 첫 번째 단계)
 
-WORK_DIR이 없으면 이후 모든 산출물 저장이 실패한다. Gather 시작 시 반드시 첫 번째로 실행.
-
 ```bash
 mkdir -p "${WORK_DIR}" && WORK_DIR="$(cd "${WORK_DIR}" && pwd)" && echo "${WORK_DIR}"   # ⛔ 절대경로로 확정 — cwd 는 도구 호출 사이에 리셋된다
 ```
@@ -135,15 +131,11 @@ bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/gather.sh" \
   --work-dir "${WORK_DIR}" --target {PR번호|브랜치} [--base BRANCH]
 ```
 
-산출: `diff.patch` · `requirements.md` · `base-behavior.md` + `base/` · `head/`(GPT 독립 첫 패스 입력) · `base-manifest.tsv` · **`review-surface.md`** · `numstat.txt` · `risk.json`
-
-⭐ 이동 리팩토링(신규 파일 + 그만큼의 삭제)이면 **`evidence-move-drift.md`** 가 함께 나온다 — ⛔ **동등성과 별개 축**이다. 다중집합 차가 "값 표현식 변화 0" 을 보여도 이동이 만든 문서·구조 드리프트는 거기 없다(실측 #4774: 동등성 통과 후 단독 리뷰 0건 · 3렌즈가 regression 3건).
+산출: `diff.patch` · `requirements.md` · `base-behavior.md` + `base/` · `head/`(GPT 독립 첫 패스 입력) · `base-manifest.tsv` · **`review-surface.md`** · `numstat.txt` · `risk.json` · ⭐ 이동 리팩토링(신규 파일 + 그만큼의 삭제)이면 **`evidence-move-drift.md`** 도 — ⛔ **동등성과 별개 축**이다(근거: `references/rationale.md` § 이동 드리프트)
 
 ⛔ **손으로 나눠 호출하지 않는다.** 병목은 fan-out 이 아니라 Lead 의 순차 도구 호출이다 — 결정론 구간을 한 번에 끝낸다. exit `2` 사용법 · `3` 대상 해석 실패 · `4` 수집 실패 — 셋 다 **산출물을 남기지 않는다**(staging 경유). ⛔ exit **`5`** 는 다르다: **base 원본 전건 실패**이고 **산출물을 남긴다**(diff 는 유효하고 origin 근거만 없다). 진행 여부는 Lead 판단, 진행하면 전 issue `origin` 을 `미지정` 으로 둔다 — 2·3·4 처럼 지우지 않는다.
 
-⛔ **`review-surface.md` 를 먼저 읽는다.** base 가 분기점보다 앞서 있으면 이미 base 에 있는 커밋이 diff 에 다시 나타나 Tier 와 리뷰 표면이 함께 부풀려진다(실측 #4766: 2.9배). `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다. 상세·한계: `modules/peer-review-tiers.md` § 리뷰 표면 진단
-
-⛔ **읽고 끝내지 않는다 — `review-surface.patch` 를 `reviewSurfacePatchPath` 로 넘긴다.** 진단 파일(`review-surface.md`)만 넘기면 무력하다: 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없다. gather 가 중복 커밋을 제외한 patch 를 함께 만들므로 그것이 1차 리뷰 대상이고 전량 `diffPath` 는 부풀림 확인용 보조다 (`modules/peer-review-workflow.md` 절차 1).
+⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md` § 리뷰 표면 진단). ⛔ **읽고 끝내지 않는다 — `review-surface.patch` 를 `reviewSurfacePatchPath` 로 넘긴다**(1차 리뷰 대상 · 전량 `diffPath` 는 부풀림 확인용 보조 — `modules/peer-review-workflow.md` 절차 1). 근거: `references/rationale.md` § 리뷰 표면
 
 ⛔ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-mapping` 은 Lead 가 채운다 (`modules/peer-review-tiers.md` § canonical set). ⛔ **패턴·일관성 이슈를 낼 때 `convention-samples` 를 건너뛰지 않는다** — 관례를 위반으로 판정하는 것도, 관례 이탈을 지적하는 것도 같은 N:M 카운트를 요구한다(실측: "형제 2곳이 다르다"로 적었는데 전수는 4:1이었다).
 
@@ -170,17 +162,13 @@ PR title/body에서 JIRA 티켓 ID 추출 + acceptance criteria 수집. JIRA 연
 
 코드로 확정할 수 없는 주장에는 "무엇을 보면 판별되는지"를 함께 적는다 — 방법을 모르면 그 지적은 판정 불가로 남는다.
 
-⛔ **"코드로 확정할 수 없다" 는 두 가지다** [F-285 — `major` 6건 전부 철회]. ①배선 미확정(`A→B→C` 를 grep 으로 못 잡음)은 이 규칙이 잡지만, ②**증상 미확정**(배선은 확정되는데 그 귀결이 사용자에게 **무엇으로 보이는지**가 코드에 없음)은 통째로 게이트 밖이다. 배선을 끝까지 따라가면 주장 전체가 확정된 느낌이 들어 oracle 을 적을 필요를 못 느낀다 — 실측 6건이 전부 ②였고, 배선 4단계가 모두 사실인데 **그 값을 그리는 화면이 그 시점에 계층에 없었다**.
-
-⛔ 따라서 `severity` 가 `minor` 이상이면 **증상 관측 지점** 두 칸을 채운다. 비면 `suggestion` 강등 (Gate 4.7-S 가 기계 판정): `symptom_screen` = 증상이 보이는 구체 화면·뷰 이름 / `symptom_reach` = 그 화면이 그 상태로 떠 있게 되는 사용자 동작. ⛔ `화면` 칸은 "값이 흐른다" 가 아니라 **"그 값을 그리는 뷰가 그 시점에 계층에 있는가"** 를 묻는다.
+⛔ 배선이 확정돼도 **증상**(사용자에게 무엇으로 보이는지)은 코드에 없을 수 있으므로(근거: `references/rationale.md` § 증상 미확정 · F-285) `severity` 가 `minor` 이상이면 **증상 관측 지점** 두 칸을 채운다. 비면 `suggestion` 강등 (Gate 4.7-S 가 기계 판정): `symptom_screen` = 증상이 보이는 구체 화면·뷰 이름 / `symptom_reach` = 그 화면이 그 상태로 떠 있게 되는 사용자 동작. ⛔ `화면` 칸은 "값이 흐른다" 가 아니라 **"그 값을 그리는 뷰가 그 시점에 계층에 있는가"** 를 묻는다.
 
 - View 변경 → 시뮬레이터/실기기(+review-quality 집중 지시) · 런타임 순서·타이밍 → DEBUG 로그 캡처 지점 · 서버 계약 → curl 재현
 
 ### 2.6. Code Evidence Collection → `${WORK_DIR}/evidence/`
 
 > 참조: `modules/evidence-collection.md` — 수집 절차 상세 (a~d)
->
-> 에이전트는 Bash/git show 접근 불가. Orchestrator가 사전에 실제 코드를 수집하여 에이전트에게 데이터로 전달한다.
 
 ```bash
 mkdir -p ${WORK_DIR}/evidence
@@ -199,9 +187,7 @@ mkdir -p ${WORK_DIR}/evidence
 ### 2.7-2.8. Caller Analysis + Convention Sampling
 
 > 참조: `modules/evidence-collection.md` — 섹션 e (Caller Analysis), 섹션 f (Convention Sampling)
->
-> ⛔ init/DI 패턴 변경이 있는 PR에서 필수. "선언부만 보고 판단" 방지.
-> 관측 사례: 선언부가 깔끔해도 caller 가 더러우면 의미가 없다. convention 패턴을 위반으로 지적하면 안 된다.
+> ⛔ init/DI 패턴 변경이 있는 PR에서 필수 — "선언부만 보고 판단" 방지 · convention 패턴을 위반으로 지적하지 않는다.
 
 ### 3. 원본 동작 수집 → `${WORK_DIR}/base-behavior.md`
 
@@ -271,9 +257,6 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 
 에이전트에게 **가설이 아닌 데이터만** 전달한다. Orchestrator의 해석·추측은 렌즈의 독립성을 파괴한다.
 
-> 관측 사례: Lead가 "이 값은 서버가 준다"는 추정을 브리프에 적었고 렌즈 2/3이 그것을 사실로 받아 오탐을 냈다. 실제로는 클라이언트 하드코딩이었다.
-> 다른 사례: Lead가 영향 범위 후보를 목록으로 적어 넣자 렌즈 둘이 **같은 목록을 되돌려줬다**. 3렌즈 합의처럼 보이지만 독립 확증이 아니다.
-
 ```
 ⛔ 금지: "이 값은 원래 서버가 주던 것" / "X가 누락된 것 같습니다" / "A·B·C가 영향받을 것"
 ✅ 허용: "forceUpdate 에서 `_, _` destructuring. evidence/producer-consumer.md 참조"
@@ -305,8 +288,7 @@ sequential-thinking으로 Confidence Matrix를 계산한다 (Tier 별 생성 여
 
 ### 1. 결측 에이전트 처리
 
-Lead 보정 **불필요** — `peer-review.js`가 `reviews`를 `.filter(Boolean)`으로 구성해 실패 에이전트는 이미 빠져 있고, `PeerReviewSchema`에 `agent_status`가 없어 `partial`은 표현되지 않는다. Lead가 볼 것은 `reviews.length`뿐 — ⛔ 스크립트는 **전부 null일 때만** fallback을 반환하므로(`peer-review.js`의 `reason: 'stage1 all null'` 분기) 1-review 경로가 실재한다:
-3 → 3-vote / 2 → 2-vote 모드(§3) / **1 → 투표 불가. 단독 렌즈 결과이므로 Confidence Matrix를 만들지 않고 `[단일 렌즈 — 교차검증 없음]` 태그와 함께 보고하며, 이슈 confidence는 ×0.7 감쇠** / 0 → `mode:'fallback'`(Tier 하위 전환) — ⛔ 이 투표 산식은 Tier 3 기준이다(`modules/peer-review-gates.md` § MergeContract § 9)
+Lead 보정 **불필요** — 실패 에이전트는 `reviews` 에서 이미 빠져 있고 1-review 경로가 실재한다(근거: `references/rationale.md` § 결측 에이전트). `reviews.length` 별: 3 → 3-vote / 2 → 2-vote 모드(§3) / **1 → 투표 불가. 단독 렌즈 결과이므로 Confidence Matrix를 만들지 않고 `[단일 렌즈 — 교차검증 없음]` 태그와 함께 보고하며, 이슈 confidence는 ×0.7 감쇠** / 0 → `mode:'fallback'`(Tier 하위 전환) — ⛔ 이 투표 산식은 Tier 3 기준이다(`modules/peer-review-gates.md` § MergeContract § 9)
 
 ### 2. Origin 기반 Severity 보정
 
@@ -378,8 +360,6 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 ### 5. ⛔ CHECKPOINT — 산출물 저장 (Compact Recovery)
 
 > **⛔ Synthesize 완료 직후, Deliver 단계로 넘어가기 전에 반드시 Write 도구로 저장하세요. 저장 전 대화 출력 금지.**
-
-Synthesize 결과를 파일로 영속화한다. 대화 컨텍스트가 compact되어도 Read로 복원 가능.
 
 ```
 ${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 라인 — 투표 적용 Tier 는 modules/peer-review-gates.md § MergeContract § 9)
@@ -465,8 +445,6 @@ BAD (작업 컨텍스트 오염):
 GOOD:
 git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 → 현재 컨텍스트 보존.
 ```
-
-> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
 
 ## Boundaries
 

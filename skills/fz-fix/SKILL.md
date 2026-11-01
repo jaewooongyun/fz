@@ -279,8 +279,6 @@ GOOD (--gpt 위임 패턴):
 
 ---
 
-> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
-
 ## Boundaries
 
 /ralph-loop 한도 후에도 실패하면 근본 원인을 재분석한다. 복잡도 초과 시 즉시 전환한다.

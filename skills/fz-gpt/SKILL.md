@@ -198,8 +198,6 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 
 ---
 
-> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
-
 ## Boundaries
 
 GPT CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행한다.

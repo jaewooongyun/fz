@@ -37,7 +37,6 @@ metadata:
 ## 개요
 
 > ⛔ Phase 0 (Work Dir Pre-flight) → Phase 1 (Problem Framing) → Phase 1.5 (Constraint Probe) → Phase 2 (Landscape Exploration) ↔ 사용자 대화 → Phase 3 (Path Mapping) → Phase 4 (Handoff)
-> 루프 프리미티브: Tree Search (Adversarial Discovery) (H6, Inside the Scaffold)
 
 - 발산 중심 (Fan-out): 가능한 경로를 넓게 탐색
 - Reject-Extract-Propose 프로토콜: 거절 → 조건 추출 → 대안 제시를 한 턴에
@@ -45,22 +44,9 @@ metadata:
 - **제약이 아닌 조건**: "불가"가 아니라 "이 경로를 선택하면 이런 비용이 든다"
 - 코드 탐색 연동: 각 경로의 실현 가능성 확인
 
-## 사용 시점
-
-```bash
-/fz-discover "이 기능을 어떻게 구현하면 좋을까?"         # 불명확한 요구사항 정제
-/fz-discover "이 두 방법 중 어느게 나을까?"              # 트레이드오프 비교
-/fz-discover "이렇게 사용해도 맞는지 확인해줘"          # 검증 요청
-/fz-discover "이 방식에 놓치고 있는게 있을까?"          # 맹점 탐지
-/fz-discover "A랑 B 차이점이 뭐야?"                    # 비교 질문
-/fz-discover "이 설계 어떻게 생각해?"                    # 의견 요청
-/fz-discover "팀원이 이런 우려를 제기했는데"              # 우려 기반 제약 발견
-```
-
 ## Prerequisites
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 폴백 (에러 대응 표) (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
-- 참조: `guides/agent-team-guide.md` §8 (TEAM 공식 사양 — 패턴 canonical 문서용, pilot 기간 실행 경로 아님)
 
 ## 모듈 참조
 
@@ -91,8 +77,6 @@ metadata:
 
 ## 팀 에이전트 모드 (Workflow 오케스트레이션 — pilot)
 
-> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 pilot.
-> Adversarial Constraint Discovery 패턴의 라운드 의미론(만들고-부수기)은 `workflows/discover-adversarial.js` 가 구현한다.
 > 스크립트: `workflows/discover-adversarial.js` (플러그인 루트 상대 경로) — agents/의 plan-structure·review-arch 정의를 agentType(`fz:` 네임스페이스)으로 재사용.
 
 ### 발동 조건
@@ -116,17 +100,6 @@ metadata:
 5. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `experiment-log.md` Workflow tracing 섹션에 수동 append
 6. **--deep cross-model**: Workflow 완료 후 Lead가 `/fz-gpt verify` 별도 실행 (스크립트 내 cross-provider 스폰 금지)
 
-### TEAM 추론 품질 3원칙 보존 (guides/prompt-optimization.md §다양성 매핑)
-
-| 원칙 | Workflow 보존 방식 |
-|------|-------------------|
-| Round 1 독립성 (sycophancy 방어) | 구조적 보장 — R1/렌즈 경로 생성 호출에 피어 데이터 미주입 (η-1 정신 계승, 정규식 검사 불필요화) |
-| Task Brief 5요소 | agent() 프롬프트 = [역할][문제/컨텍스트][목표] + schema(=Deliverable) + OVERRIDE(=Constraints) |
-| 합의/불합의 명시 | `conditions[].mutability`(locked/unlocked) + evidence·confidence로 표현 |
-
-> Workflow 추가 보장: 실패 에이전트 = null 명시(silent fail 불가) · 출력 스키마 강제 · resume 캐시 · 종료 핸드셰이크 부재(자동 정리). Reflection Rate는 cross-check 포함 시만 해당(--deep GPT 후행 검증).
-> 통신 기록: `discover-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
-
 ---
 
 ## 핵심 추론 프로토콜: Reject-Extract-Propose (REP)
@@ -145,12 +118,6 @@ GOOD: "proxy에 @Published는 안 됩니다.
 한 턴에 세 가지를 모두 포함: (1) 거절 (2) 왜 안 되는지 제약 추출 (3) 그 제약을 피하는 대안.
 
 ### 규칙 2: 본질이 같은 옵션은 합치기
-
-```
-BAD:  "방법 A: init 파라미터, 방법 B: Environment. 어떤 걸 선택하시겠어요?"
-GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본질적으로 같습니다.
-       기존 패턴(selectedBandItem, isVisible)은 init 파라미터를 사용하므로 일관성상 파라미터."
-```
 
 겉보기 다른 옵션이 같은 메커니즘이면 하나로 합치고, 진짜 다른 축만 분리.
 
@@ -292,7 +259,6 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - 코드 탐색으로 조건의 실재 여부 확인
    - 불변 = hard constraint (기술적 불가능) → 표기: 🔒
    - 가변 = soft preference (관성적 판단, 비용 문제) → 표기: 🔓
-   - 이 구분이 plan의 판단 자유도를 결정함
 
 4. **Landscape Map 갱신**:
    - 각 경로별: 전제조건 + 비용 + 리스크 + 조건 충족도
@@ -459,8 +425,6 @@ GOOD (본질 같은 옵션 합치기):
 ```
 
 ---
-
-> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
 
 ## Boundaries
 

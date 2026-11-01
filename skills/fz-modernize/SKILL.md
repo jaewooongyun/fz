@@ -165,7 +165,6 @@ metadata:
    - 산출: `missing-audit-date`(외부 출처 인용하나 감사일자 없음) · `stale-audit`(경과 초과) · `stale-model-ref`(구세대 모델명만 있고 현행 미언급)
    - **현행 모델명은 `guides/llm-references.md`의 `모델 정책: <X> only`에서 자동 파싱**(SSOT) — 새 모델 출시 시 그 한 줄만 갱신하면 lint가 따라온다
    - ⛔ **한계**: 최신성 ≠ 정확성. lint가 clean이어도 내용 검증은 별도 (Phase 1 probe 소관)
-   > 본 lint가 기존 `last audited` grep + `MODEL_PATTERN` grep을 대체한다 (수동 2건 → 결정론적 1건).
 
 2. **lint 미포괄 패턴 grep** (태그·인용):
    ```bash
@@ -235,11 +234,7 @@ bash "${FZ_PLUGIN_ROOT:?FZ_PLUGIN_ROOT 미설정 - 같은 Bash 호출에서 초�
 
 ```bash
 #!/usr/bin/env bash
-# ⛔ 프로세스 치환을 쓴다 — `rg | while` 는 루프가 서브셸이라 카운터가 밖으로 전파되지 않는다.
-#    이전 판은 VIOLATION 을 **인쇄만 하고 exit 0** 이었다(F-216 N5): 위반을 찾고도 게이트가 통과했다.
-# ⛔ `rg` 를 쓰지 않는다 — 이 환경의 rg 는 **zsh 셸 함수**라 bash 에서 command not found 다.
-#    그러면 while 이 빈 입력을 읽어 violations=0 → 통과. 측정 실패와 위반 0 이 같은 출력이 된다.
-# ⛔ positive control 필수: 검사 대상이 0건인지 도구가 죽은 것인지 구별한다.
+# ⛔ 프로세스 치환(서브셸 카운터 소실 방지) · `/usr/bin/grep`(rg 는 zsh 함수) · positive control 필수 — 근거: skills/fz-modernize/references/rationale.md § AC9
 control=$(/usr/bin/grep -hoE '\[verified:' guides/*.md | wc -l | tr -d ' ')
 [ "$control" -gt 0 ] || { echo "AC9 UNRUN — positive control 0건 (경로·도구 확인)"; exit 2; }
 violations=0
@@ -424,8 +419,6 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 
 ---
 
-> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
-
 ## Boundaries
 
 **Will**:
@@ -466,22 +459,4 @@ Phase 6 통과 후:
 - 교훈 발견 → `/sc:sc-save --type learnings` (feedback_*.md 저장)
 - 티켓 폴더 산출물 보존 → 새 세션에서 `index.md` Resume Trigger로 복원
 
----
-
-## 관련 메모리 (자동 참조)
-
-이 스킬은 다음 교훈을 핵심 작동 원리로 사용한다:
-
-- **17차** (메타 분석 TEAM에도 GPT 교차 검증 자동 삽입 필수)
-- **18차** (GPT 3회 한도, 누적 시 사용자 에스컬레이션)
-- **16차** (분석자가 분석 대상의 실수를 재현하는 메타 패턴)
-- **23차** (Self-review blind spot — Cross-model이 마지막 안전망)
-- **31차** (Plan-before-Probe Anti-Pattern 금지)
-- **32차** (Probe Coverage Gap — 3-axes sub-checklist 의무)
-- **33차** (Recommendation Default Bias — implementation-ready 시점부터 implementation 우선)
-- **34차** (첫 round 옵션 시각화 — 4-axes table)
-- **36차** (팀 공유 영역 자동 변경 금지 — 외부 reference URL 변경 시 합의 의무)
-- **40차** (단순 요청 over-engineering 방지 — simplified mode trigger)
-- **Bash background+redirect 교훈** (xargs 병렬 패턴 강제)
-
-각 Phase의 Gate가 위 교훈을 enforcement한다.
+> N차 교훈 범례: `references/rationale.md` § 관련 메모리

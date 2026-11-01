@@ -26,8 +26,6 @@ metadata:
 
 # /fz - 유니버셜 오케스트레이터 (v3)
 
-> **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** `platform.claude.com` prompting-claude-fable-5-1 · arxiv 2606.08878 — 본문에 `[verified: …]` 인라인 표기 승계. ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
-
 > **행동 원칙**: 자연어 요청을 분석하여 복잡도 기반으로 최적의 스킬 파이프라인 + 팀 구성 + 모델 배정을 자동 결정하고, 사용자 승인 후 실행한다.
 
 ## 개요
@@ -40,7 +38,6 @@ metadata:
 - **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(Fable 5.1) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
 - **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 값은 Lead 세션 effort · `modules/mode-gate.md` § effort) — fable 판단 지점 3곳과 별개
 - **3-Tier 모델**: **Fable 5.1**(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
-  > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `effort: EFFORT` — Lead 세션 effort 를 args 로 전달(미지정 `xhigh` · 2026-10-19 · `modules/mode-gate.md` § effort). 공식 출발점: **Fable 5.1 `high` · Opus 5.5 `medium`(Opus 5 는 `high`)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
 - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모든 스킬에 GPT CLI 포함 → cross-model 상호검증(끔 · CLI 없음 → `[GPT 미사용 — 사유]` — `modules/gpt-strategy.md` § GPT 미사용)
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
 - **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + GPT 교차검증
@@ -169,11 +166,7 @@ metadata:
 3. **후보 스킬 목록 생성**: 매칭된 스킬 + confidence 점수
 4. **추가 신호 추출**: 복잡도 평가를 위한 부가 정보
 
-> ⛔ **Phase 1 이 읽는 트리거 소스는 `modules/intent-registry.md` 다.** 스킬 YAML 의
-> `intent-triggers` 는 스킬 자체 문서이며 `fz-skill` eval 이 소비한다 — 두 곳이 어긋나면
-> `/fz` 는 registry 만 보므로, **스킬을 추가·수정할 때 registry 도 함께 고쳐야 한다**.
-> 담긴 것: 스킬 트리거 · 파이프라인 전용 트리거 · 구어체 보강 · Confidence 판정.
-> ⛔ 현재 이 동기화를 강제하는 기계 검사는 없다 (2026-08-25 시도했으나 오라클이 부정확해 철회).
+> ⛔ **Phase 1 이 읽는 트리거 소스는 `modules/intent-registry.md` 다** — 스킬 YAML `intent-triggers` 는 `fz-skill` eval 용 문서이므로 **스킬을 추가·수정할 때 registry 도 함께 고친다**(동기화 기계 검사 없음 · 근거: `references/rationale.md` § 트리거 소스).
 
 ### 추가 신호 추출
 
@@ -246,8 +239,7 @@ Phase 1 매칭 0  →  3.1 트리거 대조
                                      3.2 는 "최종 목표 스킬"을 입력으로 요구하는데 그것이 없다
 ```
 
-⛔ **total-miss 에서 3.2 로 내려가지 않는다.** 목표 스킬 없이 `provides`/`needs` 역추적을
-시작하면 임의 파이프라인이 구성된다 — `references/test-spec.md` 가 그것을 0건으로 못 박는다.
+⛔ **total-miss 에서 3.2 로 내려가지 않는다.**
 
 ### 3.2 동적 파이프라인 구성 (폴백)
 
@@ -276,7 +268,7 @@ Phase 1 매칭 0  →  3.1 트리거 대조
 5. 미일치 시 동적 구성 적용
 ```
 
-> 워커 컨텍스트 전달 명세(무엇을 워커에 알릴지)를 팀 확정 시 재검토 — 오케스트레이션 프롬프팅은 코딩과 별개의 취약 능력 [외부: harness-paper §4-F, PerspectiveGap 2606.08878 — 평균 pass 14.9%, 원 논문 미대조]. ⚠️ 2026-11-01 정정(M7): 14.9% 는 v1 abstract 수치다(이력) [arxiv preprint, 2026-06, v1]. 현행 v2 abstract 는 *"average combined pass rate of only 17.2%"* 다 [arxiv preprint, 2026-06, v2].
+> 워커 컨텍스트 전달 명세(무엇을 워커에 알릴지)를 팀 확정 시 재검토한다 — 근거: `references/rationale.md` § 오케스트레이션 프롬프팅 취약성
 
 ### 3.4 교차 검증 게이트 주입
 
@@ -291,11 +283,6 @@ code-changes 생산 중 → ✓ friction-detect (매 Step, fz-code 내장)
 code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ implication-scan (제거/리팩 시) + ✓ gpt check (GPT 켬 — light · full)
 commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-commit · fz-pr 에 자동 배선 없음)
 ```
-
-> **direction-challenge**: review-direction 에이전트가 접근 방향 자체를 도전 (PROCEED/RECONSIDER/REDIRECT 판정). fz-plan TEAM Phase 0.5.
-> **stress-test**: fz-plan의 설계 스트레스 테스트(다중성/소비자/복잡도이동/경계/접근경계).
-> **friction-detect**: fz-code의 구현 마찰 감지(분기폭증/코드반복/소비자판별/workaround/잔존패턴).
-> **enforcement**: Plan의 Anti-Pattern Constraints 기반 금지 패턴 Grep + Module Boundary 검증. 리팩토링 파이프라인에서만 삽입.
 
 ### Gate 3: Pipeline + Team Resolved
 - [ ] 파이프라인 확정?
@@ -336,7 +323,6 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 
 ### 5.2 Workflow Execution
 
-> 멀티에이전트 실행은 네이티브 Workflow 결정적 스크립트가 소유한다 (TEAM 일몰, Wave 4). 스크립트가 fan-out/수렴/라운드를 구현 — P2P SendMessage 없음.
 > 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본).
 
 각 스킬은 자신의 `workflows/{skill}-{pattern}.js`를 소유한다. Lead는 스킬의 Workflow를 호출하고 반환(구조화 출력)을 통합한다. Lead는 퍼실리테이터 (호출 + 게이트 실행 + 통합).
@@ -363,20 +349,11 @@ Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④�
 
 ### 스킬별 통신 패턴
 
-| 스킬 | 통신 패턴 | 핵심: 에이전트 간 직접 대화 |
-|------|----------|--------------------------|
-| fz-discover | Adversarial Constraint Discovery — (pilot: `workflows/discover-adversarial.js` Workflow 대체, P2P 아님) | plan-structure ↔ review-arch 만들고 부수며 제약 발견 |
-| fz-plan | Collaborative Design — (기본 `workflows/plan-lean2.js` · 롤백 `workflows/plan-collaborative.js` Workflow 대체, P2P 아님) | review-direction → plan-structure 방향 도전 (Phase 0.5) + plan-structure ↔ peers 만들면서 토론 |
-| fz-code | Pair Programming — (Wave 3: `workflows/code-pair.js` Workflow 대체, P2P 아님) | impl-correctness ↔ review-arch 구현 중 실시간 질문/검토 |
-| fz-review | Live Review — (Wave 1: `workflows/review-live.js` Workflow 대체, P2P 아님) | review-arch ↔ review-quality 분석하면서 발견 공유 |
-| fz-search --deep | Cross-Verify — (Wave 1: `workflows/search-cross-verify.js` Workflow 대체, P2P 아님) | search-symbolic ↔ search-pattern 발견 즉시 교차 확인 |
-| fz-fix (복잡) | Pair Programming (경량) — (`workflows/code-pair.js` mode=light) | impl-correctness ↔ Lead 수정/검증 |
+스킬별 Workflow 스크립트 — fz-discover `workflows/discover-adversarial.js` · fz-plan `workflows/plan-lean2.js`(롤백 `workflows/plan-collaborative.js`) · fz-code `workflows/code-pair.js` · fz-review `workflows/review-live.js` · fz-search --deep `workflows/search-cross-verify.js` · fz-fix(복잡) `workflows/code-pair.js` mode=light (P2P 시절 통신 패턴 이력: `references/rationale.md` § 스킬별 통신 패턴)
 
 ### 개별 스킬 TEAM 모드 (핵심 패턴)
 
 > 각 스킬 SKILL.md의 "팀 에이전트 모드" 섹션 참조.
-
-실사용에서는 풀 사이클보다 **개별 스킬을 반복 실행**하는 것이 일반적입니다.
 
 ### 5.3 BATCH Execution
 

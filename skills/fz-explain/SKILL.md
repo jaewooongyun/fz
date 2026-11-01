@@ -175,8 +175,6 @@ GOOD:
 
 ---
 
-> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
-
 ---
 
 ## Boundaries
