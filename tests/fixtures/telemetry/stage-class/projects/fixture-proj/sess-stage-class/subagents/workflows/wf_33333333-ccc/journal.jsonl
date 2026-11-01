@@ -1,0 +1,3 @@
+{"type":"launched"}
+{"type":"started","key":"v2:pl-merge","agentId":"ag-merge","label":"lean2-merge:8811b9","phase":"Delta merge"}
+{"type":"result","key":"v2:pl-merge","agentId":"ag-merge","result":{"stepAmendments":[{"stepId":"S1","change":"split"}],"openQuestions":[]}}

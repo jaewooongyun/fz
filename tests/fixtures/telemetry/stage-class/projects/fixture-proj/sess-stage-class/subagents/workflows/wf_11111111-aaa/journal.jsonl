@@ -1,0 +1,9 @@
+{"type":"launched"}
+{"type":"started","key":"v2:rl-arch","agentId":"ag-arch","label":"stage1-arch","phase":"Stage 1"}
+{"type":"started","key":"v2:rl-unknown","agentId":"ag-unknown","phase":"Stage 1"}
+{"type":"result","key":"v2:rl-arch","agentId":"ag-arch","result":{"issues":[{"id":"A1","severity":"major","title":"layer leak"},{"id":"A2","severity":"minor","title":"naming"}],"strengths":[],"overall_assessment":"ok","axisCoverage":{"structure":"covered"}}}
+{"type":"result","key":"v2:rl-unknown","agentId":"ag-unknown","result":{"score":3,"verdictText":"n/a"}}
+{"type":"started","key":"v2:rl-qoa","agentId":"ag-qoa","label":"stage2-quality-on-arch","phase":"Stage 2"}
+{"type":"result","key":"v2:rl-qoa","agentId":"ag-qoa","result":{"adjustments":[{"id":"A1","newSeverity":"major","note":"","verdict":"agree"},{"id":"A2","newSeverity":"major","note":"raise","verdict":"adjust"},{"id":"A3","newSeverity":"minor","note":"not reachable","verdict":"false_positive"},{"id":"A4","newSeverity":"minor","note":"","verdict":"agree"}],"additions":[{"id":"Q9","severity":"minor","title":"missing guard"}]}}
+{"type":"started","key":"v2:rl-counter","agentId":"ag-counter","label":"stage3-counter","phase":"Stage 3"}
+{"type":"result","key":"v2:rl-counter","agentId":"ag-counter","result":{"challenges":[{"target":"A1","verdict":"uphold","note":""},{"target":"A2","verdict":"refute","note":"guarded upstream"},{"target":"Q9","verdict":"uphold","note":""}],"missedFindings":[{"id":"C1","title":"race"},{"id":"C2","title":"leak"}]}}

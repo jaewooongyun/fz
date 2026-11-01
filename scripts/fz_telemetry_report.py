@@ -13,7 +13,7 @@
   · 지연은 직전 `user` 엔트리와 `assistant` 엔트리의 timestamp 차분이다. 사용자 입력 대기가
     섞일 수 있어 30분 초과는 잘랐다. 도구 실행 시간은 포함하지 않는다.
   · 워크플로 wall-time은 `agent-*.jsonl` mtime 최소~최대 차분이라 근사다(`[근사]` 표기).
-  · 스테이지 판별은 result **키 집합** 휴리스틱이다. 미매치 키 집합은 부록에 전수 열거한다.
+  · 스테이지 판별은 started 줄 라벨 → 형제 meta.json agentType → result **키 집합** 휴리스틱 순이다. 셋 다 못 가르면 `unknown` 이고 그 키 집합은 부록에 전수 열거한다.
 
 Python 3.9 stdlib 전용.
 """
@@ -48,7 +48,7 @@ PRICES = {
 EXCLUDED_MODELS = ("<synthetic>", "<fallback>", "?")
 
 # ── journal result 키 집합 → 스테이지 (계약 Step 4 STAGE_SIGNATURES) ──────────
-# 판정 = 필수 키 집합의 **부분집합 포함**. 앞에 놓인 것이 먼저 이긴다(구체적인 것 우선).
+# 판정 = 필수 키 집합의 **부분집합 포함**. 앞에 놓인 것이 먼저 이긴다(구체적인 것 우선). 보고 경로에서는 classify_stage(§2b)의 (c) 폴백이다 — 라벨 · agentType 이 먼저 가른다.
 STAGE_SIGNATURES = (
     (("issues", "overall_assessment", "strengths"), "review1"),
     (("finding_id", "refuted", "reason"), "counter"),
@@ -369,7 +369,7 @@ def count_verdicts(result):
 
 
 def classify_result(result):
-    """result dict → (stage, 기여도 카운터). 미매치는 ('other', keys)."""
+    """result dict → (stage, 기여도 카운터). 미매치는 ('other', keys) — 서명 단계 표지다. 보고 경로는 classify_stage(§2b)가 이를 unknown 으로 바꾼다."""
     if not isinstance(result, dict):
         return "other", None
     keys = set(result.keys())
@@ -410,6 +410,7 @@ def collect_journals(projects_root, since, until, wf_id_to_name):
                 "adjustments": 0,
                 "additions": 0,
                 "results": 0,
+                "stage_judgments": {},  # stage → {판정 칸…, additions} — 교차·counter 만, additions 는 판정 밖 (F-462)
             },
         )
         row["runs"] += 1
@@ -445,6 +446,13 @@ def _wall_seconds(folder):
 
 
 def _read_journal(journal, row, unknown):
+    # ⛔ result 줄에는 분류 근거가 없다 — `started` 줄이 agentId · label 을, 형제 `agent-<agentId>.meta.json` 이
+    #    agentType 을 든다. result 만 읽으면 키 집합 추측만 남는다(F-462). started 는 같은 에이전트의 result 보다
+    #    먼저 쓰이고, 재시도는 새 agentId 로 started 를 다시 쓴다(실표본 tests/fixtures/wf-metrics/journal-replay).
+    folder = os.path.dirname(journal)
+    labels_by_agent = {}
+    labels_by_key = {}   # agentId 가 빠진 result 의 폴백 — key 는 재시도에도 같다
+    agent_types = {}
     try:
         handle = open(journal, "r", errors="replace")
     except OSError:
@@ -457,11 +465,23 @@ def _read_journal(journal, row, unknown):
                 obj = json.loads(line)
             except ValueError:
                 continue
+            if obj.get("type") == "started":
+                label = obj.get("label")
+                if isinstance(label, str):
+                    if isinstance(obj.get("agentId"), str):
+                        labels_by_agent[obj["agentId"]] = label
+                    if isinstance(obj.get("key"), str):
+                        labels_by_key[obj["key"]] = label
+                continue
             if obj.get("type") != "result":
                 continue
             row["results"] += 1
             result = obj.get("result")
-            stage, unknown_keys = classify_result(result)
+            agent_id = obj.get("agentId")
+            label = labels_by_agent.get(agent_id) if isinstance(agent_id, str) else None
+            if label is None and isinstance(obj.get("key"), str):
+                label = labels_by_key.get(obj["key"])
+            stage, unknown_keys = classify_stage(result, label, _agent_type(folder, agent_id, agent_types))
             row["stages"][stage] += 1
             if unknown_keys is not None:
                 unknown[unknown_keys] += 1
@@ -474,7 +494,18 @@ def _read_journal(journal, row, unknown):
             #    `adjustments[].verdict`(교차)·top-level `refuted`(refute 스테이지) 세 형태를
             #    실측했다(2026-09-06: refuted 33 · uphold/refute 23 · agree/adjust/false_positive 226).
             #    최상위 `refuted` 만 세면 peer-review 의 counter 기여도가 0 으로 찍힌다(측정 실패).
-            overturn, uphold, adjust = count_verdicts(result)
+            judgments = count_judgments(stage, result)
+            if judgments is None:
+                overturn, uphold, adjust = count_verdicts(result)
+            else:
+                # 교차·counter 는 형태별 판정에서 합계를 낸다 — peer delta 교차는 verdict 문자열이 없어 트리 걷기로는
+                # (0, 0, 0) 이고(F-462), additions 원소는 판정이 아니다. agree·uphold → uphold · false_positive·refute → overturn.
+                overturn = judgments.get("false_positive", 0) + judgments.get("refute", 0)
+                uphold = judgments.get("agree", 0) + judgments.get("uphold", 0)
+                adjust = judgments["adjust"]
+                sj = row["stage_judgments"].setdefault(stage, dict.fromkeys(JUDGMENT_FIELDS[stage] + ("additions",), 0))
+                for field, value in judgments.items():
+                    sj[field] += value
             row["overturn"] += overturn
             row["uphold"] += uphold
             row["adjust"] += adjust
@@ -487,6 +518,164 @@ def _read_journal(journal, row, unknown):
                 value = result.get(field)
                 if isinstance(value, list):
                     row[field] += len(value)
+            if stage == "counter" and isinstance(result.get("missedFindings"), list):
+                row["additions"] += len(result["missedFindings"])   # counter 의 새 지적 — 판정 칸 밖 additions (F-462)
+
+
+# ── 2b. 스테이지 판별 · 교차/counter 판정 (F-462) ─────────────────────────────
+# 판별 순서: (a) started 줄 라벨 줄기 → (b) 형제 meta.json agentType → (c) STAGE_SIGNATURES → (d) unknown.
+# ⛔ 키 서명만으로는 실 review-live · peer-review · plan-lean2 결과를 못 가른다(2026-11-01 실 journal 49건):
+#    search 렌즈 `{findings}` · counter `{challenges, missedFindings}` · plan-lean2 결과가 other 로 샜고,
+#    peer delta 교차는 cross 로 잡혀도 판정이 (0, 0, 0) 이었다.
+# ⛔ 라벨은 **정확 일치**만 쓴다 — `stage1-*`→렌즈 · `stage2-*`→교차 같은 접두 규칙 금지. code-pair 는
+#    stage1-impl(changeset) · stage2-review*(verify), plan-collaborative 는 stage1-draft · stage2-impact 로 같은 접두를
+#    다른 뜻에 쓴다(workflows/*.js label 실측). 표에 없는 라벨은 다음 단계로 넘어간다.
+# ⛔ 라벨을 바꾸면 그 결과는 unknown 이 아니라 (c) 서명 스테이지(review1 · cross)로 조용히 빠진다 —
+#    tests/fixtures/telemetry/stage-class 의 label-drift 칸이 표의 라벨이 workflows/*.js 에 그대로 있는지 본다.
+# ⛔ `review1` 은 라벨 없는 journal 의 Stage 1 렌즈가 (c) 에서 받는 이름이다 — 라벨이 있으면 같은 형태가 `lens` 다.
+#    (c) 에서 `lens` 로 바꾸지 않는다: 그 서명이 렌즈에만 붙는지 확인되지 않았고, (c) 는 옛 journal 을 옛 이름대로
+#    두는 단계다. 라벨 있는 실행과 없는 실행이 섞인 기간이면 §3 · §3b · §3c 에서 두 행으로 갈린다.
+LABEL_STAGE = {
+    "stage1-arch": "lens",
+    "stage1-quality": "lens",
+    "stage1-correctness": "lens",
+    "stage1-symbolic": "lens",
+    "stage1-pattern": "lens",
+    "stage2-arch-on-quality": "cross",
+    "stage2-quality-on-arch": "cross",
+    "stage2-arch-on-peers": "cross",
+    "stage2-quality-on-peers": "cross",
+    "stage2-sym-on-pat": "cross",
+    "stage2-pat-on-sym": "cross",
+    "stage3-counter": "counter",
+    "stage3-merge": "merge",
+    "lean2-full": "plan-full",
+    "lean2-edge": "plan-edge",
+    "lean2-impact-arch": "plan-impact",
+    "lean2-merge": "plan-merge",
+}
+# agentType 은 스크립트가 넘길 때만 `workflow-subagent` 가 아니다. 한 스테이지에만 쓰이는 것만 둔다 —
+# review-arch·quality·correctness(렌즈·교차 겸용) · plan-structure · plan-edge-case · plan-impact(여러 워크플로의
+# 분석·교차 겸용)는 스테이지를 정하지 못한다.
+AGENT_TYPE_STAGE = {
+    "fz:review-counter": "counter",
+    "fz:plan-merge": "plan-merge",
+}
+# 교차·counter 판정 칸. additions 는 판정이 아니라 새 지적이라 칸 밖에 따로 센다.
+JUDGMENT_FIELDS = {
+    "cross": ("agree", "adjust", "false_positive"),
+    "counter": ("uphold", "adjust", "refute"),
+}
+# search 교차의 동의 어휘는 `confirmed` 다(workflows/search-cross-verify.js CrossSchema verdict enum).
+# ⛔ 공용 UPHOLD_WORDS 에 넣지 않는다 — count_verdicts 트리 걷기를 쓰는 다른 스테이지의 의미가 바뀐다. search 분기에서만 넓힌다.
+SEARCH_UPHOLD_WORDS = UPHOLD_WORDS | {"confirmed"}
+RE_AGENT_ID = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def label_stem(label):
+    """`judge:8811b9` → `judge`. 라벨이 없거나 문자열이 아니면 None."""
+    if not isinstance(label, str):
+        return None
+    return label.split(":", 1)[0].strip() or None
+
+
+def _agent_type(folder, agent_id, cache):
+    """`<folder>/agent-<agentId>.meta.json` 의 agentType. 없거나 못 읽으면 None — 분류는 다음 단계로 넘어간다."""
+    if not isinstance(agent_id, str) or not RE_AGENT_ID.match(agent_id):
+        return None
+    if agent_id not in cache:
+        cache[agent_id] = None
+        try:
+            with open(os.path.join(folder, "agent-%s.meta.json" % agent_id), "r", errors="replace") as handle:
+                meta = json.load(handle)
+        except (OSError, ValueError):
+            meta = None
+        if isinstance(meta, dict) and isinstance(meta.get("agentType"), str):
+            cache[agent_id] = meta["agentType"]
+    return cache[agent_id]
+
+
+def classify_stage(result, label=None, agent_type=None):
+    """(stage, 미매치 키) — (a) 라벨 줄기 → (b) agentType → (c) 키 서명(`classify_result`) → (d) `unknown`.
+
+    미매치 키는 (d) 에서만 채운다(dict 아닌 result 는 `<타입명>` 한 원소). ⛔ (d) 를 `other` 로 되돌리지 말 것 —
+    `other` 는 '분류했는데 기타' 로 읽혀 분류 실패가 보이지 않는다(F-462). `classify_result` 의 'other' 는
+    서명 단계 안의 미매치 표지로 남는다(tests/telemetry/stage_signatures_keys.py 가 그 값으로 판별 불가 쌍을 가른다).
+    """
+    stage = LABEL_STAGE.get(label_stem(label))
+    if stage is None and isinstance(agent_type, str):
+        stage = AGENT_TYPE_STAGE.get(agent_type)
+    if stage is not None:
+        return stage, None
+    stage, keys = classify_result(result)
+    if stage != "other":
+        return stage, None
+    if keys is None:
+        keys = ("<%s>" % type(result).__name__,)
+    return "unknown", keys
+
+
+def _list_or_empty(value):
+    return value if isinstance(value, list) else []
+
+
+def _scalar_ids(values):
+    """스칼라 id 집합 — bool · None · 컨테이너는 뺀다."""
+    return {v for v in values if isinstance(v, (str, int)) and not isinstance(v, bool)}
+
+
+def _vocab_counts(items, upheld, overturned, uphold_words=UPHOLD_WORDS):
+    """[{verdict}] → {upheld, adjust, overturned}. 어휘 밖 값은 세지 않는다(기본 어휘는 `count_verdicts` 와 같다)."""
+    out = {upheld: 0, "adjust": 0, overturned: 0}
+    for item in _list_or_empty(items):
+        verdict = item.get("verdict") if isinstance(item, dict) else None
+        if not isinstance(verdict, str):
+            continue
+        if verdict in uphold_words:
+            out[upheld] += 1
+        elif verdict in ADJUST_WORDS:
+            out["adjust"] += 1
+        elif verdict in OVERTURN_WORDS:
+            out[overturned] += 1
+    return out
+
+
+def count_judgments(stage, result):
+    """교차·counter result → {판정 칸…, additions}. 다른 스테이지 · dict 아님은 None.
+
+    교차 세 형태(2026-11-01 실 journal):
+      · review-live 쌍 `adjustments[{id, newSeverity, note, verdict}]` — verdict 를 공용 어휘로 센다
+      · peer-review delta `{reviewedIds, adjustments, rejections}` — verdict 문자열이 없다. 규칙은
+        workflows/peer-review.js `expandCrossDelta` 와 같다: agree = reviewedIds(중복 제거) 중 adjustments ·
+        rejections 의 id 에 없는 것 · adjust = len(adjustments) · false_positive = len(rejections). 차집합이라 음수가 없다.
+      · search 쌍 `reviewed[{id, note, verdict}]` — 동의 어휘가 `confirmed` 다(SEARCH_UPHOLD_WORDS)
+    counter: `challenges[].verdict` uphold · refute + 옛 refute 워커의 최상위 `refuted` bool.
+    additions = len(additions) (+ counter 는 len(missedFindings)) — 판정 칸에 섞지 않는다.
+    """
+    if stage not in JUDGMENT_FIELDS or not isinstance(result, dict):
+        return None
+    if stage == "counter":
+        out = _vocab_counts(result.get("challenges"), "uphold", "refute")
+        if result.get("refuted") is True:
+            out["refute"] += 1
+        elif result.get("refuted") is False:
+            out["uphold"] += 1
+        out["additions"] = len(_list_or_empty(result.get("additions"))) + len(_list_or_empty(result.get("missedFindings")))
+        return out
+    if isinstance(result.get("reviewedIds"), list):
+        adjusted, rejected = _list_or_empty(result.get("adjustments")), _list_or_empty(result.get("rejections"))
+        judged = _scalar_ids(e.get("id") for e in adjusted + rejected if isinstance(e, dict))
+        out = {
+            "agree": len(_scalar_ids(result["reviewedIds"]) - judged),
+            "adjust": len(adjusted),
+            "false_positive": len(rejected),
+        }
+    elif isinstance(result.get("reviewed"), list):
+        out = _vocab_counts(result["reviewed"], "agree", "false_positive", SEARCH_UPHOLD_WORDS)
+    else:
+        out = _vocab_counts(result.get("adjustments"), "agree", "false_positive")
+    out["additions"] = len(_list_or_empty(result.get("additions")))
+    return out
 
 
 # ── 3. fz-findings frontmatter ──────────────────────────────────────────────
@@ -866,6 +1055,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
                 "results": row.get("results", 0),
                 "stages": dict(row.get("stages", {})),
                 "stage_verdicts": {k: dict(v) for k, v in sorted(row.get("stage_verdicts", {}).items())},
+                "stage_judgments": {k: dict(v) for k, v in sorted(row.get("stage_judgments", {}).items())},
                 "issues": row.get("issues", 0),
                 "overturn": row.get("overturn", 0),
                 "uphold": row.get("uphold", 0),
@@ -1042,6 +1232,22 @@ def render_markdown(payload):
             lines.append("| %s | %s | %d | %d | %d | %d |" % (
                 row["workflow"], stage, row["stages"].get(stage, 0), sv["overturn"], sv["uphold"], sv["adjust"]))
     lines.append("")
+    lines.append("### 3c. 교차·counter 판정 (additions 는 판정 밖)")
+    lines.append("")
+    lines.append("| 워크플로 | 스테이지 | agree·uphold | adjust | false_positive·refute | additions |")
+    lines.append("|---|---|---|---|---|---|")
+    for row in payload["workflows"]:
+        for stage, sj in sorted((row.get("stage_judgments") or {}).items()):
+            lines.append("| %s | %s | %d | %d | %d | %d |" % (
+                row["workflow"], stage, sj.get("agree", sj.get("uphold", 0)), sj.get("adjust", 0),
+                sj.get("false_positive", sj.get("refute", 0)), sj.get("additions", 0)))
+    lines.append("")
+    lines.append("> peer-review delta 교차는 verdict 문자열이 없어 agree 를 `reviewedIds` 중 adjustments · rejections 의 id 에 없는 것의 수로 낸다"
+                 "(workflows/peer-review.js `expandCrossDelta` 와 같은 규칙). search 교차의 `confirmed` 는 agree 다. counter 의 additions 는 `missedFindings` 를 포함한다.")
+    lines.append(">")
+    lines.append("> `review1` 은 started 라벨이 없는 journal 의 Stage 1 렌즈와 같은 형태다(라벨이 있으면 `lens`). "
+                 "라벨 있는 실행과 없는 실행이 섞인 기간이면 §3 · §3b · §3c 에서 두 행으로 갈린다.")
+    lines.append("")
 
     lines.append("## 4. fz-findings")
     lines.append("")
@@ -1156,7 +1362,7 @@ def render_markdown(payload):
         lines.append("")
     lines.append("전체 effort 분포: " + (" · ".join("%s:%d" % kv for kv in sorted(payload["effort_all"].items(), key=lambda kv: -kv[1])) or "-"))
     lines.append("")
-    lines.append("미매치 result 키 집합 (`unknown_result_shapes` — 다음 어댑터 확장 입력):")
+    lines.append("미매치 result 키 집합 (스테이지 `unknown` · `unknown_result_shapes` — 다음 어댑터 확장 입력):")
     lines.append("")
     if payload["unknown_result_shapes"]:
         for entry in payload["unknown_result_shapes"]:
@@ -1326,6 +1532,40 @@ def self_test():
     check("스테이지 changeset", classify_result({"files": [], "summary": "", "buildExpectation": ""})[0], "changeset")
     check("스테이지 verify", classify_result({"issues": [], "verdict": "ok"})[0], "verify")
     check("스테이지 other", classify_result({"zzz": 1})[0], "other")
+    # 보고 경로 classify_stage (F-462) — 라벨 줄기 → agentType → 키 서명 → unknown
+    check("라벨 줄기 — `:` 뒤 접미를 뗀다", label_stem("judge:8811b9"), "judge")
+    check("라벨 렌즈가 키 서명보다 먼저", classify_stage({"issues": [], "overall_assessment": "", "strengths": []}, "stage1-arch")[0], "lens")
+    check("라벨 search 렌즈 {findings}", classify_stage({"findings": []}, "stage1-symbolic")[0], "lens")
+    check("라벨 search 교차 {reviewed}", classify_stage({"reviewed": [], "additions": []}, "stage2-pat-on-sym")[0], "cross")
+    check("라벨 접미 붙은 정확 일치", classify_stage({"stepAmendments": []}, "lean2-merge:8811b9")[0], "plan-merge")
+    check("접두 규칙 없음 — code-pair stage2-review 는 키 서명(verify)", classify_stage({"issues": [], "verdict": "ok"}, "stage2-review")[0], "verify")
+    check("접두 규칙 없음 — code-pair stage1-impl 은 키 서명(changeset)",
+          classify_stage({"files": [], "summary": "", "buildExpectation": ""}, "stage1-impl")[0], "changeset")
+    check("agentType — 라벨이 표에 없을 때", classify_stage({"challenges": [], "missedFindings": []}, "judge:1", "fz:review-counter")[0], "counter")
+    check("agentType 기본값은 단서가 아니다", classify_stage({"zzz": 1}, None, "workflow-subagent"), ("unknown", ("zzz",)))
+    check("라벨 없는 옛 journal 은 키 서명", classify_stage({"adjustments": [], "additions": []})[0], "cross")
+    check("미매치 = unknown + 키 집합", classify_stage({"zzz": 1}), ("unknown", ("zzz",)))
+    check("dict 아님 = unknown + 타입", classify_stage("x"), ("unknown", ("<str>",)))
+    check("판정 peer delta — agree 는 reviewedIds 중 판정 안 된 id",
+          count_judgments("cross", {"reviewedIds": ["A", "B", "C", "D"], "adjustments": [{"id": "B"}], "rejections": [{"id": "C"}], "additions": [1]}),
+          {"agree": 2, "adjust": 1, "false_positive": 1, "additions": 1})
+    # workflows/peer-review.js expandCrossDelta 와 같은 값 — reviewedIds 중복 · reviewedIds 밖 판정 id(X) · 조정과 기각 양쪽의 id(B)
+    check("판정 peer delta — expandCrossDelta 와 같은 agree",
+          count_judgments("cross", {"reviewedIds": ["A", "A", "B"], "adjustments": [{"id": "B"}, {"id": "X"}], "rejections": [{"id": "B"}]}),
+          {"agree": 1, "adjust": 2, "false_positive": 1, "additions": 0})
+    check("판정 search 교차 — 동의 어휘 confirmed",
+          count_judgments("cross", {"reviewed": [{"id": "S1", "verdict": "confirmed"}, {"id": "S2", "verdict": "false_positive"}], "additions": []}),
+          {"agree": 1, "adjust": 0, "false_positive": 1, "additions": 0})
+    check("판정 counter — missedFindings 는 additions",
+          count_judgments("counter", {"challenges": [{"target": "A", "verdict": "uphold"}, {"target": "B", "verdict": "refute"}], "missedFindings": [1, 2]}),
+          {"uphold": 1, "adjust": 0, "refute": 1, "additions": 2})
+    check("판정 — 교차·counter 밖 스테이지는 None", count_judgments("lens", {"issues": []}), None)
+    meta_dir = tempfile.mkdtemp(prefix="fz-telemetry-meta-")
+    with open(os.path.join(meta_dir, "agent-m1.meta.json"), "w") as handle:
+        json.dump({"agentType": "fz:review-counter", "description": "stage3-counter"}, handle)
+    check("meta.json agentType 읽기", _agent_type(meta_dir, "m1", {}), "fz:review-counter")
+    check("meta.json 없음 = None", _agent_type(meta_dir, "m2", {}), None)
+    check("agentId 경로 문자 거부", _agent_type(meta_dir, "../m1", {}), None)
     check("이름 정규화 scriptPath", norm_wf_name("/a/b/code-pair.js"), "code-pair")
     check("이름 정규화 인라인", norm_wf_name("fz-gap-audit-4axes-wf_beb7ee07-261.js"), "fz-gap-audit-4axes")
     check("단가 접두 일치", price_for("claude-opus-5-20260801"), PRICES["claude-opus-5"])
