@@ -76,7 +76,8 @@ EXPECTED_CELLS = {
     "for-loop-plain-body-owned": 1, "for-loop-tilde-unknown": 1, "for-loop-then-source": 1,
     "for-loop-cd-inherited-unknown": 1, "for-loop-ifs-unknown": 1,
     "for-loop-option-var": 1, "for-loop-alt-expansion": 1, "for-loop-sourced-ifs-unknown": 1, "var-option-owned": 1,
-    "for-loop-stateful-var": 1, "for-loop-stateful-cd": 1,
+    "for-loop-stateful-var": 1, "for-loop-stateful-cd": 1, "for-loop-var-head-cd": 1, "for-loop-arith-side-effect": 1,
+    "for-loop-dashdash-head": 1, "for-loop-unbound-literal": 1,
 }
 
 
@@ -404,6 +405,24 @@ try:
     for_cell("for-loop-stateful-cd",
              lambda a, b, cl, c: f'{G_LINE}\ncd {top(a)}; for X in gates/plan.md gates/plan.md; do python3 "$G" --only S1 "$X"; cd {top(b)}; done',
              never=both)
+    # 리뷰 R2 — 명령 머리가 변수(`"$C"` = cd)면 무엇을 부르는지 모른다 · 산술 확장은 인자 자리에서 변수를 바꾼다
+    for_cell("for-loop-var-head-cd",
+             lambda a, b, cl, c: f'{G_LINE}\nC=cd; cd {top(a)}; for X in gates/plan.md gates/plan.md; do python3 "$G" --only S1 "$X"; "$C" {top(b)}; done',
+             never=both)
+    # GPT validate 잔여 — `command --` 뒤 변수 머리 · 지원 밖 루프 안에서 루프 변수를 안 쓰는 상대 경로(반복마다 폴더가 다르다)
+    for_cell("for-loop-dashdash-head",
+             lambda a, b, cl, c: f'{G_LINE}\nC=cd; cd {top(a)}; for X in gates/plan.md gates/plan.md; do python3 "$G" --only S1 "$X"; command -- "$C" {top(b)}; done',
+             never=both)
+    for_cell("for-loop-unbound-literal",
+             lambda a, b, cl, c: f'{G_LINE}\ncd {top(a)}; for i in 1 2; do python3 "$G" --only S1 gates/plan.md; cd {top(b)}; done',
+             never=both)
+    with Cell("for-loop-arith-side-effect") as c:
+        t1, t2 = c.ledger("T1-own"), c.ledger("T2-own")
+        c.run(f'{G_LINE}\nD=1; for X in gates/plan.md gates/plan.md; do python3 "$G" --only S1 "{c.cwd}/T$D-own/$X"; : "$((D+=1))"; done')
+        rc, reason, err = c.hook()
+        r = reason or ""
+        check("for-loop-arith-side-effect", "대상 미상 쓰기" in err or (f"미충족 게이트: {t1} — " in r and f"미충족 게이트: {t2} — " in r),
+              "산술 확장이 반복마다 원장(T1 · T2)을 바꾼다 — T1 로만 보지 않는다", f"rc={rc} {err[-300:]}")
     for_cell("for-loop-sourced-ifs-unknown",
              lambda a, b, cl, c: f"{G_LINE}\nprintf '%s=:\\nLIST=%s:%s\\n' I''FS {a} {b} > {c.cwd}/i.env; . {c.cwd}/i.env; "
                                  f'for X in $LIST; do python3 "$G" --only S1 "$X"; done', unknown=True)

@@ -135,6 +135,9 @@ LOOP_BODY_BANNED = frozenset((".", "source", "eval", "exec", "break", "continue"
 LOOP_STATEFUL = frozenset(("cd", "pushd", "popd", "export", "unset", "read", "declare", "typeset", "local", "readonly",
                            "let", "shift", "getopts", "mapfile", "readarray", "set", "shopt", "alias", "unalias", "trap",
                            "umask", "hash", "enable", "builtin"))
+# 인자 자리에서도 셸 상태를 바꾸는 확장 — 산술(`$((D+=1))`) · 기본값 대입(`${X:=…}` · `${X=…}`). 명령 머리가 변수(`"$C" …`)인
+# 몸체는 무엇을 부르는지 모르므로 위 목록과 대조할 수 없다 — 둘 다 지원 밖(리뷰 R2)
+LOOP_SIDE_EFFECT_RE = re.compile(r"\$\(\(|\$\{\w+:?=")
 # `. FILE` · `source FILE` — 그 파일의 대입을 env 에 더한다(F-422). 파일은 훅이 도는 **지금** 의 내용이다
 SOURCE_RE = re.compile(r"^\s*(?:\.|source)\s+[\"']?([^\s\"';&|]+)")
 SOURCE_ANY_RE = re.compile(r"(?:^|[;&|(])\s*(?:\.|source)\s+\S", re.M)
@@ -449,11 +452,12 @@ def _loop_spans(segs: list) -> dict:
             # 루프 변수 이름이 확장(`$NAME` · `${NAME…}`) 밖에서 나오면(`X=` · `read X` · `printf -v X`) 지원 밖이다
             bare = re.sub(r"\$\{?%s(?![A-Za-z0-9_])" % re.escape(name), "", body)
             ws = _words(body)
-            head = next((w for w in ws if w not in _CMD_PREFIX_WORDS), "")
+            head = next((w for w in ws if w not in _CMD_PREFIX_WORDS and not w.startswith("-")), "")   # `command -- "$C"`
             if (LOOP_COMPOUND_RE.match(body) or LOOP_BODY_BANNED & set(ws)
                     or re.search(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(name), bare)
-                    or re.match(r"^\w+\+?=", head) or head in LOOP_STATEFUL or (head == "printf" and "-v" in ws)):
-                ok = False                 # 상태를 바꾸는 몸체 — 다음 반복의 값 · 폴더가 달라진다(GPT check 후속 5)
+                    or re.match(r"^\w+\+?=", head) or head in LOOP_STATEFUL or (head == "printf" and "-v" in ws)
+                    or "$" in head or "`" in head or LOOP_SIDE_EFFECT_RE.search(body)):
+                ok = False                 # 상태를 바꾸는 몸체 — 다음 반복의 값 · 폴더가 달라진다(GPT check 후속 5 · 리뷰 R2)
         spans[i] = (name, end, ok and end is not None)
     return spans
 
@@ -517,6 +521,8 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
     source_missing = False                 # 이 명령이 source 한 파일 중 못 읽은 것이 있다 — 그 뒤 `"$G"` 는 판정기일 수 있다
     segs = SEGMENT_SPLIT_RE.split(body)
     spans = _loop_spans(segs)
+    # 지원 밖 루프의 몸체 — 반복마다 상태(폴더 · 변수)가 달라질 수 있어 루프 변수를 안 쓰는 원장 인자도 한 값으로 못 정한다(리뷰 R2)
+    unbound = {j for s, (_n, e, ok) in spans.items() if not ok for j in range(s + 1, len(segs) if e is None else e)}
     bind = None                            # (이름, 값들, 짝 done index) — 지원 루프의 몸체 안에서만
     for i, seg in enumerate(segs):
         if bind and i >= bind[2]:
@@ -548,7 +554,7 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
             if call is None or not call[0] or call[1] is None:
                 continue
             path = call[1] if call[1].startswith("/") or not cur_dir else f"{cur_dir}/{call[1]}"
-            if not _RESOLVED_PATH_RE.match(path) or not call[2]:          # 허용 목록은 `cd` 접두를 붙인 최종 경로에 건다
+            if not _RESOLVED_PATH_RE.match(path) or not call[2] or i in unbound:   # 허용 목록은 `cd` 접두를 붙인 최종 경로에 건다
                 missed = call[1]
             else:
                 out.append(path)
