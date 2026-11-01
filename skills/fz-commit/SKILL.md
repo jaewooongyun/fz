@@ -21,14 +21,14 @@ metadata:
 
 ## 규칙 참조
 
-CLAUDE.md `## Git Workflow` 섹션에 커밋 규칙이 정의되어 있으면 해당 규칙을 따른다.
-없으면 Conventional Commits 표준을 따른다.
+CLAUDE.md 에 팀 커밋 스킬이 선언되어 있으면(절 제목과 무관 — 스킬 경로나 이름) 그 스킬로 위임한다. 없으면 Conventional Commits 표준을 따른다.
+정본: `modules/governance.md` § 팀 스킬 위임 — 커밋은 사용자가 이 턴에 요청했을 때만 한다.
 
 ---
 
 ## 사용 도구
 
-`/sc:sc-git` 스킬을 사용하여 커밋을 실행합니다.
+팀 커밋 스킬이 없을 때만 `/sc:sc-git` 으로 커밋한다(위 § 규칙 참조 — 요청 없는 커밋은 하지 않는다).
 
 ---
 
@@ -79,7 +79,7 @@ CLAUDE.md `## Git Workflow` 섹션에 커밋 규칙이 정의되어 있으면 �
 
 | Given | When | Then | 유형 |
 |-------|------|------|------|
-| staged 변경 존재 + 티켓 ID 인자 전달 (또는 CLAUDE.md `## Git Workflow` 규칙 존재) | `/fz-commit "<TICKET-ID>"` | Conventional Commit 형식 + 티켓 prefix 포함 커밋 생성 성공(git commit exit 0) + 커밋 해시·메시지 요약 출력 | normal |
+| staged 변경 존재 + 티켓 ID 인자 전달 (또는 CLAUDE.md 에 팀 커밋 규칙 · 스킬 선언 존재) | `/fz-commit "<TICKET-ID>"` | Conventional Commit 형식 + 티켓 prefix 포함 커밋 생성 성공(git commit exit 0) + 커밋 해시·메시지 요약 출력 | normal |
 | 서로 무관한 여러 기능 변경이 함께 staged | `/fz-commit` | 변경 파일 목록 출력 + 커밋 단위 분리 제안 제시 + 사용자 확인 대기(자동 커밋 0건) | edge-case |
 | staged 목록에 `.swiftlint.yml`/`.github/`/`Package.swift`/`*.xcconfig` 등 보호 파일 포함 | `/fz-commit` | PROTECTED_PATTERN grep으로 보호 파일 감지 → 자동 커밋 차단 + 사용자 승인(AskUserQuestion) 요청(승인 전 커밋 0건) | edge-case |
 | staged 파일 없음(`git diff --cached` 비어 있음) | `/fz-commit` | "staged 파일 없음" 안내 + `git status` 확인 요청, 커밋 미실행(커밋 0건) | failure |
@@ -91,7 +91,7 @@ CLAUDE.md `## Git Workflow` 섹션에 커밋 규칙이 정의되어 있으면 �
 **Will**:
 - Conventional Commits 형식으로 커밋 메시지 생성
 - JIRA 티켓 ID를 커밋 prefix에 포함
-- CLAUDE.md `## Git Workflow` 규칙 우선 적용
+- CLAUDE.md 의 팀 커밋 규칙 · 스킬 선언 우선 적용(절 제목 무관 — `modules/governance.md` § 팀 스킬 위임)
 - 커밋 단위 판단 및 분리 제안
 
 **Will Not**:

@@ -76,7 +76,7 @@
 | High (≥80) | 트리거 2개+ 매칭, 단일 파이프라인 | Phase 2로 자동 진행 |
 | Medium (50-79) | 트리거 1개 매칭 or 복수 파이프라인 경쟁 | AskUserQuestion 필수 |
 | Low (<50) | 부분 매칭 or 키워드 1개 | AskUserQuestion 필수 |
-| Zero | 매칭 없음 | `/sc:sc-recommend` → 재매핑 → 여전히 없으면 AskUserQuestion |
+| Zero | 매칭 없음 | `/fz` Phase 3.1 resolver-only(파이프라인 트리거 대조) → total-miss 면 AskUserQuestion. ⛔ 3.2 동적 구성 · 다른 추천기로 재매핑하지 않는다(절차 `skills/fz/SKILL.md` § 3.1) |
 
 **동점 처리**: 파이프라인 점수 차 < 15점 → 동점으로 간주 → AskUserQuestion.
 
