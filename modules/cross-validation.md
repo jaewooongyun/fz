@@ -16,6 +16,7 @@
 - [Reflection Rate (Authoritative Source)](#reflection-rate-authoritative-source)
 - [Gate 절차적 강제](#gate-절차적-강제)
 - [품질 에스컬레이션](#품질-에스컬레이션)
+- [재검증 라운드 상한](#재검증-라운드-상한)
 - [검증 게이트 시각화](#검증-게이트-시각화)
 - [공유 유틸리티](#공유-유틸리티)
 - [참조 스킬](#참조-스킬)
@@ -274,6 +275,26 @@ Gate 실패 시: 해당 단계를 "완료"로 표시할 수 없다. 반드시 �
 | gpt check 실패 | 모든 모드 | Lead 가 지적을 수정 → 빌드 → 같은 kind 재검증 (fz-code 8.5 · fz-fix Step 4) |
 | 검증 실패 (반복) | SOLO | 사용자에게 `/fz-review` 제안 |
 | Reflection Rate < 80% (N≥10 — § Reflection Rate threshold) | 모든 모드 | /ralph-loop 래더 → 한도 후 사용자 에스컬레이션 (fz-review Phase 6) |
+
+## 재검증 라운드 상한
+
+> 이 절이 정본이다 — 같은 산출물을 GPT 로 몇 번까지 다시 검증하는가. 집행은 코드다: 정문 `scripts/gpt-call.sh` 가 어댑터를 띄우기 직전에 `scripts/gpt_rounds.py reserve` 로 슬롯을 예약하고 EXIT 에서 `finish` 로 끝맺는다(binary 규칙은 스크립트 — `guides/skill-authoring.md`). 상한 값의 코드 출처는 `gpt_rounds.py` 의 `FAMILY_CAP` 이다. 다른 스킬 · 모듈은 횟수를 다시 적지 않고 이 절을 가리킨다.
+
+| 항목 | 규칙 |
+|---|---|
+| 세는 호출 | 호출자가 env `FZ_GPT_ARTIFACT=<산출물 계열>` 을 밝힌 정문 호출만 — 값이 없으면 정문은 원장을 건드리지 않는다. ⛔ 세는 kind(`gpt_rounds.py` 의 `KIND_SLOTS`)로 산출물을 검증하는 호출 줄은 `FZ_GPT_ARTIFACT=` 를 반드시 붙인다 — 빠진 줄은 상한 밖이고 정문은 알리지 않는다 |
+| 키 | 산출물 계열(`plan` · `guide-plan` · `code`) × kind 계열 — 검증 계열(`verify` · `verify-gates` · `verify-cross` · `modernize-verify` · `validate`) 누적 **3** 라운드 · `independent-plan` **1** · 계약(`sprint-contract`) **2**(작성 1 · modify 재확인 1) |
+| 단위 | 호출이 아니라 라운드다. 한 라운드의 필수 kind(fz-plan Phase 2 의 `verify` ∥ `verify-gates` · fz-review 5.5 의 `validate` · `verify-gates`)는 같은 라운드의 별도 슬롯이다 — 가장 최근 라운드에 그 슬롯이 비어 있으면 거기 들고, 차 있으면 다음 라운드를 연다. 상한은 라운드 번호가 아니라 살아 있는(예약 · 완료) 라운드 개수로 잰다 |
+| 일찍 멈춤 | 같은 슬롯의 직전 유효 판정과 입력 manifest 가 같고, 그 판정 파일(`--out` · `--out-dir`)이 끝맺을 때 그대로이고, 그 뒤 새 근거가 없으면 거부한다(`same-input` — stderr 에 그 판정 파일). 판정 파일이 사라졌거나 바뀌었으면 거부하지 않는다(다시 읽을 판정이 없다). manifest = kind · 산출물 버전(env `FZ_GPT_ARTIFACT_VERSION`) · 입력 파일 내용(프롬프트 · 감사 · 요구 · 첨부 · 스냅숏) · 검토 대상 코드(`--cd` · `--repo` 의 HEAD + 작업 트리 diff + 추적 안 된 파일) — 코드만 바뀌어도 새 입력이다. 분류 밖 입력이 있거나 일부를 못 읽으면 manifest 는 unknown 이고 같은 입력 판정만 건너뛴다 |
+| 새 근거 | Lead 가 `gpt_rounds.py evidence --new-evidence <파일> --kind <kind>` 로 남긴다 — 같은 입력의 재라운드를 연다. 상한은 열지 않는다 |
+| 예산 소진 | 상한을 넘는 라운드는 거부한다(`budget-exhausted`) — 미해결로 보고하고 통과로 적지 않는다. `gpt_rounds.py status` 의 `unresolved` 가 그 키를 보인다 |
+| 소비 | 유효 판정(어댑터 exit 0)만 라운드를 쓴다. 통신 실패 · 스키마 위반 재시도(12~14) · 런처 실패(15~17) · 신호 · exit 18(GPT 미사용 — 실패 아님)은 쓰지 않는다. `verify-gates` 사후 대조(`--verdict-check`) 실패 뒤 1회 재호출은 env `FZ_GPT_RECALL=post-check` 로 부른다 — 직전 판정의 라운드를 잇고 라운드를 쓰지 않는다(라운드당 1회 · 넘으면 `recall-used`) |
+| 동시성 | 원장 단위 잠금(`<원장>.lock`) 아래서 검사와 예약만 원자적으로 하고 실행은 잠금 밖이다. 상태는 reserved · completed · failed · aborted — 주인 프로세스가 죽은(또는 24시간 넘은) 예약은 다음 예약이 aborted(orphan)로 회수한다 |
+| 저장 | `{WORK_DIR}/gpt-rounds.json`(env `FZ_WORK_DIR`) — 없으면 `${FZ_RUN_STATE:-~/.fz/runs}/<pipeline_id>/gpt-rounds.json`(pipeline_id 는 `scripts/run_metrics.py` 규칙 그대로) · 발견 색인 `${FZ_RUN_STATE:-~/.fz/runs}/gpt-rounds-index.jsonl`. 재개(새 셸) · 다른 스킬 · 다른 호출자도 같은 원장을 본다 |
+| 거부 신호 | 정문 exit 19 · stderr `GPT-ROUNDS: <사유> — …` — 어댑터를 띄우지 않았다. `same-input` 이고 이번 `--out` 이 직전 판정 파일이면 정문은 그 파일을 지우지 않는다(그 판정이 답이다). 그 밖의 거부는 다른 거부처럼 래퍼 kind 의 옛 `--out` 을 지운다 — 옛 결과를 새 판정으로 읽지 않게. 원장을 판정하지 못하면 11 이다(측정 실패 · 0건 아님) |
+
+- ⛔ 재라운드 프롬프트에서 GPT 에게 앞 라운드 지적이 반영됐는지 확인하라고 시키지 않는다 — 반영 대조는 Lead 몫이다(앵커드 재검증 · F-508). GPT 는 새 입력을 처음 보듯 판정한다
+- 회귀: `python3 scripts/gpt_rounds.py --self-test` — cap-3 · same-input-stop · budget-exhausted · lock-reserve · orphan-recovery. case 앞에서 `KIND_SLOTS` · 입력 분류가 레지스트리(`scripts/gpt-kinds.json`)와 맞는지 본다
 
 ---
 

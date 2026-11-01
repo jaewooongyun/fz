@@ -20,12 +20,21 @@
 #   무시한 채 시작한다) 3초 뒤 KILL 한다. 잠금은 정상 · 실패 · 신호 어느 쪽이든 EXIT 에서 푼다.
 #   ⛔ 정문을 배경 작업(`&`)으로 띄우면 INT 가 무시된 채 들어와 bash 가 INT 를 trap 하지 못한다 — 그때 중단은 TERM 으로 보낸다.
 #
+# 라운드(정본 modules/cross-validation.md § 재검증 라운드 상한 · 판정 scripts/gpt_rounds.py): env FZ_GPT_ARTIFACT(plan · guide-plan · code)가
+#   있는 호출만 센다 — 없으면 판정기를 부르지 않는다. 어댑터 직전에 reserve(원장 잠금 안에서 검사 + 슬롯 예약만 · 실행은 잠금 밖) ·
+#   EXIT 에서 finish(rc) — 소비 여부는 판정기가 rc 로 정한다. 예약 전에 끝난 호출(사용법 · 레지스트리 · 같은 --out · 합성 실패)은
+#   원장을 건드리지 않는다. 거부(19)도 옛 OUT 을 지우되, 판정기가 ROUND-KEEP-OUT 을 내면(같은 입력 · 이번 --out 이 직전 판정 파일)
+#   남긴다 — 그 판정이 답이다. 같이 읽는 env: FZ_WORK_DIR · FZ_GPT_ARTIFACT_VERSION · FZ_GPT_RECALL=post-check
+#
 # exit: 어댑터의 exit 를 그대로 넘긴다(10~17 을 다시 매기지 않는다 — 측정 실패를 0건으로 만들지 않는다).
 #       18 = GPT 미사용 — 어댑터가 CLI 를 부르지 않았다(세션 선택 off · 입력 --model off · GPT CLI 없음 · stderr 'GPT-OFF: <사유> — …').
 #            측정 실패가 아니다 — 소비자는 그 단계를 건너뛰고 [GPT 미사용 — 사유] 를 남긴다(정본 modules/gpt-strategy.md § GPT 미사용).
 #            판정은 어댑터 몫이다 — 정문은 --model 값을 그대로 넘기고(E1) 사용법 거부(10 · 11)가 그보다 먼저다
 #       정문 자신: 10 사용법(모르는 kind · 입력 누락/금지/미지 · 실험 kind 에 --experimental 없음 · 같은 --out 동시 · 상위 폴더 없음)
-#                  11 레지스트리 · 의존성(python3 없음 · 레지스트리 손상 · resolver 오류 · 합성 실패 · 어댑터 없음) · 128+N 신호
+#                  11 레지스트리 · 의존성(python3 없음 · 레지스트리 손상 · resolver 오류 · 합성 실패 · 어댑터 없음 · 라운드 원장 판정 불가) · 128+N 신호
+#                  19 재검증 라운드 거부 — stderr 'GPT-ROUNDS: <budget-exhausted|same-input|recall-used> — …' · 어댑터를 띄우지 않았다.
+#                     측정 실패도 통과도 아니다 — budget-exhausted 는 미해결로 보고한다(정본 modules/cross-validation.md § 재검증 라운드 상한).
+#                     FZ_GPT_ARTIFACT 값 · FZ_WORK_DIR 폴더가 틀리면 10 이다
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -34,9 +43,13 @@ die() { echo "GPT-CALL-FAIL($1): $2" >&2; exit "$1"; }
 #   어댑터가 이번 call_id 행 없이 끝나도(런처가 래퍼를 띄우기 전에 거부) 같은 행을 남긴다 — 행 = 호출 1:1.
 #   어댑터에는 call_id · 라벨(= kind)을 env 로 넘긴다 — 독립 kind 는 런처를 거쳐 래퍼까지 이어진다
 KIND="${1:--}" CALL_T0="$(date -u +%Y-%m-%dT%H:%M:%SZ)" CALL_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}"
-LOCKP="" OWN_LOCK="" CHILD="" GOT_SIG="" PD=""
+LOCKP="" OWN_LOCK="" CHILD="" GOT_SIG="" PD="" ROUND_LEDGER="" ROUND_SLOT=""
 on_exit() {
   local rc="$1" dir="${FZ_TELEMETRY_DIR:-${HOME:-}/.fz/telemetry}"
+  if [ -n "$ROUND_SLOT" ]; then   # 라운드 끝맺음 — 소비 여부는 판정기가 rc 로 정한다
+    python3 "$HERE/gpt_rounds.py" finish --ledger "$ROUND_LEDGER" --slot "$ROUND_SLOT" --rc "$rc" > /dev/null \
+      || echo "GPT-CALL-WARN: 라운드 끝맺음 실패(slot $ROUND_SLOT) — 예약이 남아 다음 예약이 고아로 회수한다(이 판정은 세지 않는다)" >&2
+  fi
   [ -n "$OWN_LOCK" ] && rm -rf "$LOCKP"
   [ -n "$PD" ] && rm -rf "$PD"
   if [ -d "$dir" ] && { [ -z "$CHILD" ] || ! grep -qF $'\t'"$CALL_ID"$'\t' "$dir/gpt-calls.tsv" 2>/dev/null; }; then
@@ -95,6 +108,28 @@ fi
 [ -f "$HERE/$ADAPTER" ] || { stale_cleanup; iso_cleanup; die 11 "어댑터 없음: $HERE/$ADAPTER"; }
 if [ -f "$PD/compose.json" ]; then
   python3 "$HERE/gpt_kinds.py" compose --plan-dir "$PD" || { stale_cleanup; iso_cleanup; die 11 "프롬프트 합성 실패"; }
+fi
+# 재검증 라운드 상한(정본 modules/cross-validation.md § 재검증 라운드 상한 · 판정 scripts/gpt_rounds.py) — FZ_GPT_ARTIFACT 를 밝힌 호출만 센다.
+#   여기서 예약하고(원장 잠금 안에서 검사 + 예약만) 어댑터는 잠금 밖에서 돈다. 끝맺음은 on_exit 다.
+#   거부(19)는 다른 거부처럼 옛 OUT 을 지우되 ROUND-KEEP-OUT(같은 입력 · 이번 --out 이 직전 판정 파일)이면 남긴다 — 판정은 판정기 몫이다
+if [ -n "${FZ_GPT_ARTIFACT:-}" ]; then
+  ROUND_OUT="$(python3 "$HERE/gpt_rounds.py" reserve --owner-pid "$$" --call-id "$CALL_ID" -- "$@")"; ROUND_RC=$?
+  ROUND_UNTRACKED="" ROUND_KEEP_OUT=""
+  while IFS= read -r line; do
+    case "$line" in
+      ROUND-LEDGER=*) ROUND_LEDGER="${line#ROUND-LEDGER=}" ;;
+      ROUND-SLOT=*) ROUND_SLOT="${line#ROUND-SLOT=}" ;;
+      ROUND-UNTRACKED=*) ROUND_UNTRACKED=1 ;;
+      ROUND-KEEP-OUT=1) ROUND_KEEP_OUT=1 ;;
+    esac
+  done <<< "$ROUND_OUT"
+  case "$ROUND_RC" in
+    0) { [ -n "$ROUND_SLOT" ] && [ -n "$ROUND_LEDGER" ]; } || [ -n "$ROUND_UNTRACKED" ] \
+         || { ROUND_SLOT=""; stale_cleanup; iso_cleanup; die 11 "라운드 예약 결과가 비었다(판정기 exit 0): $ROUND_OUT"; } ;;
+    19) [ -n "$ROUND_KEEP_OUT" ] || stale_cleanup; iso_cleanup; exit 19 ;;   # 거부 — 사유는 판정기가 stderr 에 남겼다
+    10) stale_cleanup; iso_cleanup; exit 10 ;;                                # 사용법(FZ_GPT_ARTIFACT 값 · FZ_WORK_DIR 폴더 등)
+    *) ROUND_SLOT=""; stale_cleanup; iso_cleanup; die 11 "라운드 원장 판정 실패(판정기 exit $ROUND_RC) — 측정 실패 · 0건 아님" ;;
+  esac
 fi
 stale_cleanup
 

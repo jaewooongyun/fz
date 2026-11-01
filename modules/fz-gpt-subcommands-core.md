@@ -11,6 +11,7 @@
 > ⛔ **아래 예시는 전부 정문(`scripts/gpt-call.sh <kind>`) 호출이다** — 호출자는 kind 와 입력(`--cd` · `--out` · `--prompt-file` …)만 쓴다. 모드 · 역할 스킬 · schema · 고정 플래그는 레지스트리 `scripts/gpt-kinds.json` 이 정한다(생성 표: `skills/fz-gpt/SKILL.md`). 모델·effort 는 적지 않는다(`modules/gpt-strategy.md` § 모델·effort 선택). ⛔ 래퍼 · GPT CLI 를 직접 부르지 않는다.
 > 정문이 부르는 래퍼(`scripts/gpt-exec.sh`)가 `modules/fz-gpt-bash-hygiene.md` 의 교훈을 대신 처리한다: `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `--out` readback + `--` 구분자 + (review 모드) §5.5 Base Verification Gate.
 > 프롬프트는 `--prompt-file` 로만 받는다 — 아래 `P_*` 는 앞 줄에서 heredoc 으로 쓴 임시 파일이다. 읽기 전용은 래퍼가 모든 호출에 `-c sandbox_mode="read-only"` 로 **강제**한다(사용자 config 보다 우선) — 옛 `--sandbox read-only` 플래그는 쓰지 않는다.
+> 같은 산출물의 재검증(verify · verify-gates · validate · verify-cross 재호출) 횟수 · 같은 입력 멈춤 · verify-gates 사후 대조 뒤 재호출(`FZ_GPT_RECALL=post-check`)은 `modules/cross-validation.md` § 재검증 라운드 상한 이 정본이다 — 정문이 세고 넘치면 exit 19 다.
 
 ## review -- 코드 리뷰 (주력)
 

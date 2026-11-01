@@ -204,6 +204,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # stdout 한 줄 — 그
 - 켬이면 필수 단계는 `run` · `config` 에서 건너뛰지 않는다. 명시 플래그 단계는 플래그가 없으면 decide 도 부르지 않는다. 명시 호출은 사용자가 부를 때만 decide 를 부른다
 - 표에 GPT 단계를 더하면 그 스킬 문서에도 decide 줄을 둔다 — `tests/fixtures/gpt/branch` 의 `all-consumers-use-common` 이 GPT kind 를 부르는 스킬마다 decide 또는 이 절을 가리키는지 본다(스킬 단위다 — 호출 자리마다의 검사는 아니다)
 - 이 표는 산문이다 — kind 레지스트리(`scripts/gpt-kinds.json`)의 `callers` 와 행을 잇는 기계 검사는 없다. 표를 고치면 레지스트리 호출자와 함께 본다
+- **재검증 횟수**: 같은 산출물의 GPT 재검증 횟수 · 같은 입력 멈춤 · 예산 소진(미해결 — 통과 아님) · 거부(정문 exit 19)는 정본 `modules/cross-validation.md` § 재검증 라운드 상한 을 따른다
 
 ## GPT 미사용 (off · CLI 없음)
 
