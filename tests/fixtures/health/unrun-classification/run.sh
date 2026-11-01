@@ -5,7 +5,7 @@
 #   최상위   check_single_source       → `UNRUN:` 표지 + exit 2          ⏸ 미실행
 #            check_failure_table       → 표지 없는 exit 2                ⛔ 실패
 #            plan_integrity_check      → `UNRUN:` 표지 + traceback + exit 2 ⛔ 실패 (세탁 금지)
-#   :도구 루프 check_k_cluster --self-test → `UNRUN:` 표지 + exit 2      ⏸ 미실행
+#   :도구 루프 check_symptom_anchor --self-test → `UNRUN:` 표지 + exit 2      ⏸ 미실행
 #   회귀 러너 fixture 표지 exit 2(⏸) · fixture 표지 없는 exit 2(⛔) · tests/workflows 표지 exit 2(⏸)
 #   종합     실패와 미실행을 둘 다 보고하고 exit 2(미실행 우선 — 기존 규약)
 # 기준 트리(이분 판정)는 같은 plant 에서 표지 있는 exit 2 를 ⛔ 로 적어 이 fixture 가 exit 1 이다.
@@ -57,8 +57,8 @@ stub("check_failure_table.py",
 stub("plan_integrity_check.py",
      "print('UNRUN: planted-pi 측정 불가')\n"
      "try:\n    raise RuntimeError('planted-pi')\nexcept RuntimeError:\n    traceback.print_exc()\nsys.exit(2)\n")
-stub("check_k_cluster.py",
-     "print('UNRUN: planted-kc self-test 측정 불가'); sys.exit(2)\n")
+stub("check_symptom_anchor.py",
+     "print('UNRUN: planted-sa self-test 측정 불가'); sys.exit(2)\n")
 
 def runner(rel, text):
     p = c / rel
@@ -84,7 +84,7 @@ fail = 0
 # ⛔ 표 구조가 없으면 준비 실패(3)다 — 사전조건에서 멈춘 health-check 는 행이 0 이라 모든 단언이 '행 없음' 으로 1 이 된다.
 #    두 트리 모두에 있어야 하는 행(표지와 무관하게 이름만)이 하나라도 없으면 3 으로 끝낸다.
 ROWS = [l for l in lines if l[:1] in "✅⛔⏸"]
-NEED = ["단일 출처 계약", "실패 처방 표 계약", "plan 계약 왕복", "레지스트리 도구 self-test (check_k_cluster)", "회귀 오라클"]
+NEED = ["단일 출처 계약", "실패 처방 표 계약", "plan 계약 왕복", "레지스트리 도구 self-test (check_symptom_anchor)", "회귀 오라클"]
 missing = [n for n in NEED if not any(l.split(" ", 1)[1].startswith(n + " ") for l in ROWS if " " in l)]
 if len(ROWS) < 30 or missing:
     print(f"SETUP 표 구조 이상 — 행 {len(ROWS)}개 · 없는 행 {missing}")
@@ -100,7 +100,7 @@ def check(name, mark, code, has, hasnt=()):
 check("단일 출처 계약", "⏸", "UNRUN", ["UNRUN: planted-ss"])
 check("실패 처방 표 계약", "⛔", "1", ["UNRUN 표지 없는 exit 2"])
 check("plan 계약 왕복", "⛔", "1", ["exit 2 + traceback"], ["미실행"])
-check("레지스트리 도구 self-test (check_k_cluster)", "⏸", "UNRUN", ["UNRUN: planted-kc"])
+check("레지스트리 도구 self-test (check_symptom_anchor)", "⏸", "UNRUN", ["UNRUN: planted-sa"])
 check("회귀 오라클", "⛔", "1", ["unmarked-exit2"], ["unrun-marked", "zz-planted-unrun.js"])
 check("회귀 오라클 미실행", "⏸", "UNRUN", ["unrun-marked", "zz-planted-unrun.js", "2/3"], ["unmarked-exit2"])
 for want in ("실행되지 못한 검사", "추가로 실패한 검사도 있다"):
