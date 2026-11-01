@@ -10,6 +10,7 @@
 - [언제 묻나](#언제-묻나)
 - [신호어](#신호어)
 - [측정](#측정)
+- [기록](#기록)
 - [질문 형식](#질문-형식)
 - [스킬별 light · full](#스킬별-light--full)
 - [GPT 는 모드와 독립](#gpt-는-모드와-독립)
@@ -67,11 +68,29 @@
 
 | 결과 | exit | 대화형 | 비대화형 |
 |---|---|---|---|
-| 성공 | 0 | 추천을 달고 묻는다 | 추천대로 + 기록 |
-| 측정 불가(git 실패 · 빈 diff) | 2 | 추천 없이 "측정 불가" 를 보이고 묻는다 | light + 기록 |
+| 성공 | 0 | 추천을 달고 묻는다 → 고른 모드로 [기록](#기록) | 추천대로 + [기록](#기록) |
+| 측정 불가(git 실패 · 빈 diff) | 2 | 추천 없이 "측정 불가" 를 보이고 묻는다 → 고른 모드로 [기록](#기록) | light + [기록](#기록) |
 | 입력 오류(인자 · 파일 없음) | 10 | 입력을 고쳐 1회 재실행, 또 실패면 측정 불가와 같게 | 같음 |
 
 `--estimate` 는 full 이 더하는 Workflow 구간의 이 환경 기록 중앙값과 N 이다(`scripts/fz_telemetry_report.py` · 근사 · 20초 상한). 실패하거나 N 이 0 이면 "실측 없음" 으로 보인다.
+
+## 기록
+
+모드가 정해지면 그 실행을 `scripts/run_metrics.py` 로 남긴다 — 위 결과 계약의 "기록" 이 이것이다. 저장은 `${FZ_RUN_STATE:-~/.fz/runs}/<pipeline>/runs.jsonl` 한 곳이고 시도 1회가 1행이다(스킬 · 모드 · 추천 · 상태 · 실효 model · effort · 시각). 프롬프트 · 본문 · 토큰은 담지 않는다.
+
+| 시점 | 명령 |
+|---|---|
+| 모드가 정해진 직후 — 질문(5)으로 정했든 묻지 않는 경로(1~4)로 정했든 | `python3 "${FZ_PLUGIN_ROOT}/scripts/run_metrics.py" start --skill {스킬} --mode light\|full --recommended light\|full\|none --source arg\|fz\|signal\|autonomous\|gate [--work-dir {WORK_DIR}]` |
+| 완료 보고 직전 | `python3 "${FZ_PLUGIN_ROOT}/scripts/run_metrics.py" end --skill {스킬} [--work-dir {WORK_DIR}] --status completed\|interrupted\|failed [--workflow-run-id wf_…]` |
+
+- `--source` 는 위 「언제 묻나」 의 순번이다 — 1 명시 인자 `arg` · 2 `/fz` 경유 `fz` · 3 신호어 `signal` · 4 자율 · 질문 도구 없음 `autonomous` · 5 질문 `gate`. `--recommended` 는 `mode_gate.py` 결과의 `recommend` 이고, 게이트를 돌리지 않았거나 측정 불가(exit 2)면 `none`
+- fz-peer-review 는 Tier 0 · 1 을 `light`, Tier 2 · 3 을 `full` 로 적는다
+- fz-fix 는 게이트(팀 에이전트 모드 0)가 모든 실행의 경로에 있지 않다 — 게이트 없이 Mode A 로 시작하면 Mode A 첫 줄에서 `--mode light --recommended none` 으로 `start` 하고(`--source` 없음), 게이트를 거쳤으면 게이트 줄에서만 `start` 한다
+- `--work-dir` 는 WORK_DIR 이 있을 때만, `start` 와 `end` 에 같은 값으로 준다(없으면 세션 단위로 묶인다). `--workflow-run-id` 는 full 경로 Workflow 결과의 `Transcript dir` 끝 `wf_…` 다(여럿이면 마지막)
+- 재개: 같은 WORK_DIR 에서 같은 스킬을 다시 `start` 하면 같은 run_id 의 다음 attempt 가 되고, `end` 없이 남은 앞 시도는 `interrupted` 1행으로 닫힌다. 같은 실행 안에서 모드를 바꿔 다시 `start` 해도(예: fz-fix Mode A 에서 팀 모드 게이트로 넘어감) 같다 — 앞 시도는 `interrupted`, 바꾼 모드는 다음 attempt
+- 완료 보고 없이 끝나면(포기 · 실패 보고 · 사용자 중단) 그 보고 직전에 `--status failed` 또는 `interrupted` 로 `end` 한다. `end` 가 끝내 불리지 않은 시도는 리포트에 「열린 채 남은 시도」로 따로 센다(완료 · 중단 · 실패 어디에도 넣지 않는다)
+- 기록 실패(쓰기 불가 · 디스크 오류)는 stderr 에 `RUN_METRICS_UNAVAILABLE <사유>` 를 남기고 exit 0 이다 — 스킬 진행을 막지 않는다. 같은 시도에 `end` 를 두 번 불러도 1행이다(두 번째는 `already ended`)
+- 집계: `scripts/fz_telemetry_report.py` 리포트의 「실행 기록」 절(스킬 · 모드별 실행 · 완료 · 중단 · 실패 · wall 중앙값 · 열린 채 남은 시도) · 행 목록은 `--runs-json`
 
 ## 질문 형식
 

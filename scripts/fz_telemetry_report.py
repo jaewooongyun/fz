@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """fz_telemetry_report.py — 이미 기록된 데이터만 읽어 하네스 부하 리포트를 만드는 집계기.
 
-⛔ 이 스크립트는 **새로 기록하지 않는다.** 입력 4종은 전부 다른 주체가 이미 쓴 것이다:
+⛔ 이 스크립트는 **새로 기록하지 않는다.** 입력 5종은 전부 다른 주체가 이미 쓴 것이다:
   1. 트랜스크립트 `~/.claude/projects/**/*.jsonl` — Claude Code가 쓴다
   2. 워크플로 journal `…/subagents/workflows/wf_*/journal.jsonl` — Workflow 도구가 쓴다
   3. fz-findings `entries/F-*.md` frontmatter — 사람이 쓴다
   4. `measure_constraint_load.py` 표1 — 호출 시 계산된다(정적)
+  5. 실행 기록 `${FZ_RUN_STATE:-~/.fz/runs}/*/runs.jsonl` — `run_metrics.py` 가 쓴다(스킬 실행 시도 1회 = 1행)
 중복 소스를 만들지 않는 것이 계측의 1차 제약이다(plan §2).
 
 한계(정직성):
@@ -64,6 +65,7 @@ RE_WF_DIR = re.compile(r"Transcript dir:\s*(\S+)")
 RE_WF_SCRIPT = re.compile(r"Script file:\s*(\S+)")
 RE_INLINE_NAME = re.compile(r"name:\s*['\"]([^'\"]+)['\"]")
 
+DEFAULT_RUN_STATE = "~/.fz/runs"  # 사용자 중립 기본값 — 개인 경로는 env FZ_RUN_STATE 로 (run_metrics.py 와 같은 이름 · 같은 값)
 DEFAULT_TELEMETRY_DIR = "~/.fz/telemetry"  # 사용자 중립 기본값 — 개인 경로는 env FZ_TELEMETRY_DIR 로 (governance:146)
 DEFAULT_FINDINGS_DIR = os.environ.get("FZ_FINDINGS_DIR", "")  # 비우면 §4 findings 절은 "미설정"으로 표기 (개인 레지스트리 경로는 배포물에 두지 않는다)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -991,8 +993,127 @@ def read_last_snapshot(telemetry_dir):
     return dict(zip(header, lines[-1].split("\t")))
 
 
+# ── 4b. 실행 기록 (run_metrics.py 가 쓴 runs.jsonl) ──────────────────────────
+RUN_SCHEMA = 1                                           # run_metrics.py 와 같은 이름 · 같은 값
+RUN_STATUSES = ("completed", "interrupted", "failed")    # run_metrics.py 와 같은 이름 · 같은 값
+RUN_OPEN_STALE_HOURS = 24.0                              # run_metrics.py sweep 기본값과 같은 이름 · 같은 값
+RUN_REQUIRED = ("run_id", "attempt", "skill", "mode", "status", "started_at")
+
+
+def _run_ts(value):
+    """ISO 시각 → aware datetime. 시간대 없는 값은 UTC 로 읽는다 — aware 와 섞어 비교하면 TypeError 다."""
+    when = parse_ts(value)
+    if when is not None and when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.timezone.utc)
+    return when
+
+
+def collect_runs(runs_root, since=None, until=None):
+    """`<runs_root>/*/runs.jsonl` → {rows, unreadable, files, open, open_stale}. since/until(aware datetime)이 있으면 started_at 이 그 안인 행만.
+
+    ⛔ 못 읽은 것은 버리지 않고 센다 — 깨진 줄 · 모르는 schema · 필수 키 없음 · started_at 판독 실패 · 열리지 않는 파일.
+       unreadable 은 기간과 무관하다(기간을 판정할 수 없는 행이다).
+    open 은 `<runs_root>/*/open/*.json` 표지 수다 — start 뒤 end 가 불리지 않은 시도(지금 상태 · 기간 무관)이고, open_stale 은 그중
+    표지 mtime 이 RUN_OPEN_STALE_HOURS 보다 오래된 것이다. 표지는 세기만 하고 닫지 않는다(이 스크립트는 기록하지 않는다).
+    """
+    out = {"rows": [], "unreadable": 0, "files": 0, "open": 0, "open_stale": 0}
+    for path in sorted(glob.glob(os.path.join(runs_root, "*", "runs.jsonl"))):
+        out["files"] += 1
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                lines = handle.read().splitlines()
+        except OSError:
+            out["unreadable"] += 1
+            continue
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except ValueError:
+                out["unreadable"] += 1
+                continue
+            if (not isinstance(row, dict) or type(row.get("schema")) is not int or row["schema"] != RUN_SCHEMA
+                    or any(key not in row for key in RUN_REQUIRED)):
+                out["unreadable"] += 1
+                continue
+            started = _run_ts(row.get("started_at"))
+            if started is None:
+                out["unreadable"] += 1
+                continue
+            if (since is not None and started < since) or (until is not None and started >= until):
+                continue
+            out["rows"].append(row)
+    out["rows"].sort(key=lambda r: _run_ts(r.get("started_at")))
+    now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    for marker in sorted(glob.glob(os.path.join(runs_root, "*", "open", "*.json"))):
+        out["open"] += 1
+        try:
+            age = now - os.stat(marker).st_mtime
+        except OSError:
+            continue
+        if age > RUN_OPEN_STALE_HOURS * 3600.0:
+            out["open_stale"] += 1
+    return out
+
+
+def summarize_runs(collected):
+    """스킬 · 모드별 실행 · 완료 · 중단 · 실패 수와 완료 행 wall 중앙값(분). 중단 행은 끝 시각을 몰라 wall 에 넣지 않는다."""
+    groups = {}
+    for row in collected["rows"]:
+        group = groups.setdefault((str(row.get("skill")), str(row.get("mode"))),
+                                  {"n": 0, "completed": 0, "interrupted": 0, "failed": 0, "walls": []})
+        group["n"] += 1
+        status = row.get("status")
+        if status in RUN_STATUSES:
+            group[status] += 1
+        if status == "completed":
+            start, end = _run_ts(row.get("started_at")), _run_ts(row.get("ended_at"))
+            if start is not None and end is not None and end >= start:
+                group["walls"].append((end - start).total_seconds() / 60.0)
+    by_skill_mode = []
+    for (skill, mode), group in sorted(groups.items()):
+        walls = group["walls"]
+        by_skill_mode.append({
+            "skill": skill,
+            "mode": mode,
+            "n": group["n"],
+            "completed": group["completed"],
+            "interrupted": group["interrupted"],
+            "failed": group["failed"],
+            "wall_median_min": round(med(walls), 1) if walls else None,
+        })
+    return {"n": len(collected["rows"]), "by_skill_mode": by_skill_mode, "unreadable": collected["unreadable"],
+            "open": collected["open"], "open_stale": collected["open_stale"]}
+
+
+def render_runs_section(runs):
+    """§7 줄 목록 — runs 는 summarize_runs 결과."""
+    lines = ["## 7. 실행 기록", ""]
+    lines.append("> `run_metrics.py` 가 남긴 스킬 실행 시도 1회 = 1행이다(기간은 started_at 기준). wall 은 완료 행의 "
+                 "started_at ~ ended_at 차분이고, 중단 행은 끝 시각을 몰라 wall 에 넣지 않는다.")
+    lines.append("")
+    lines.append("| 스킬 | 모드 | 실행 | 완료 | 중단 | 실패 | wall 중앙값 |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for row in runs["by_skill_mode"]:
+        lines.append("| %s | %s | %d | %d | %d | %d | %s |" % (
+            row["skill"], row["mode"], row["n"], row["completed"], row["interrupted"], row["failed"],
+            (fmt(row["wall_median_min"]) + "분") if row["wall_median_min"] is not None else "n/a"))
+    if not runs["by_skill_mode"]:
+        lines.append("| - | - | 0 | 0 | 0 | 0 | n/a |")
+    lines.append("")
+    if runs["open"]:
+        lines.append("열린 채 남은 시도 %d(그중 %d시간 넘은 것 %d) — start 뒤 end 가 불리지 않은 시도다(지금 상태 · 기간 무관). "
+                     "위 표의 완료 · 중단 · 실패 어디에도 들어 있지 않다." % (runs["open"], int(RUN_OPEN_STALE_HOURS), runs["open_stale"]))
+        lines.append("")
+    if runs["unreadable"]:
+        lines.append("읽지 못한 행 %d — 깨진 줄 · 모르는 schema · 필수 키 없는 행은 위 표에 없다(미측정)." % runs["unreadable"])
+        lines.append("")
+    return lines
+
+
 # ── 5. 렌더링 ───────────────────────────────────────────────────────────────
-def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot):
+def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot, runs):
     models = []
     for key in sorted(agg.by_model, key=lambda k: -agg.by_model[k]["out"]):
         counter = agg.by_model[key]
@@ -1115,6 +1236,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
             {"keys": list(keys), "n": count} for keys, count in sorted(unknown.items(), key=lambda kv: -kv[1])
         ],
         "snapshot_baseline": last_snapshot.get("date") if last_snapshot else None,
+        "runs": runs,
     }
 
 
@@ -1370,6 +1492,7 @@ def render_markdown(payload):
     else:
         lines.append("- 없음")
     lines.append("")
+    lines.extend(render_runs_section(payload["runs"]))
     return "\n".join(lines) + "\n"
 
 
@@ -1386,8 +1509,9 @@ def run_report(args):
     static_rows, static_err = collect_static_load(os.path.expanduser(args.plugin_root))
     telemetry_dir = os.path.expanduser(args.telemetry_dir)
     last_snapshot = read_last_snapshot(telemetry_dir)
+    runs = summarize_runs(collect_runs(os.path.expanduser(args.runs_root), since, until))
 
-    payload = build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot)
+    payload = build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot, runs)
 
     if args.out:
         out_path = os.path.expanduser(args.out)
@@ -1581,6 +1705,21 @@ def self_test():
 
     base = tempfile.mkdtemp(prefix="fz-telemetry-selftest-")
     projects_root, findings_dir = _write_selftest_tree(base)
+    runs_root = os.path.join(base, "runs")
+    os.makedirs(os.path.join(runs_root, "p1", "open"), exist_ok=True)
+    with open(os.path.join(runs_root, "p1", "runs.jsonl"), "w") as handle:   # 행 2 · 깨진 줄 1 · 모르는 schema 1
+        handle.write(json.dumps({"schema": 1, "run_id": "r1", "attempt": 1, "skill": "fz-plan", "mode": "light", "status": "completed",
+                                 "started_at": "2026-08-01T00:00:00Z", "ended_at": "2026-08-01T00:10:00Z"}) + "\n")
+        handle.write(json.dumps({"schema": 1, "run_id": "r1", "attempt": 2, "skill": "fz-plan", "mode": "light", "status": "interrupted",
+                                 "started_at": "2026-08-02T00:00:00Z", "ended_at": None}) + "\n")
+        handle.write("{깨진 줄\n")
+        handle.write(json.dumps({"schema": 99, "run_id": "r9", "attempt": 1, "skill": "fz-plan", "mode": "light", "status": "completed",
+                                 "started_at": "2026-08-01T00:00:00Z"}) + "\n")
+    for marker in ("aaaaaaaaaaaa.1.json", "bbbbbbbbbbbb.1.json"):   # 열린 표지 2 — bbbb 는 24시간 넘게 열린 것
+        with open(os.path.join(runs_root, "p1", "open", marker), "w") as handle:
+            handle.write("{}")
+    stale_epoch = parse_day("2026-08-01").timestamp()
+    os.utime(os.path.join(runs_root, "p1", "open", "bbbbbbbbbbbb.1.json"), (stale_epoch, stale_epoch))
     args = argparse.Namespace(
         since="2026-07-24",
         until="2026-09-06",
@@ -1589,6 +1728,7 @@ def self_test():
         findings_dir=findings_dir,
         plugin_root=os.path.join(base, "no-such-plugin"),
         telemetry_dir=os.path.join(base, "telemetry"),
+        runs_root=runs_root,
         out=os.path.join(base, "telemetry", "reports", "out.md"),
         json=False,
     )
@@ -1650,6 +1790,15 @@ def self_test():
     check("열거 실패 = 미측정 표시", gone["enumeration_error"] is not None and gone["outflow"]["error"] is not None, True)
     static_rows, static_err = collect_static_load(args.plugin_root)
     check("정적 부하 n/a", static_rows == {} and static_err is not None, True)
+    runs = collect_runs(runs_root, since, until)
+    check("실행 기록 — 읽은 행 2 · 못 읽은 행 2(깨진 줄 · schema 99)", (len(runs["rows"]), runs["unreadable"]), (2, 2))
+    check("실행 기록 — 열린 표지 2 · 24시간 넘은 것 1", (runs["open"], runs["open_stale"]), (2, 1))
+    check("실행 기록 — 스킬·모드 묶음 · wall 은 완료 행만", summarize_runs(runs)["by_skill_mode"],
+          [{"skill": "fz-plan", "mode": "light", "n": 2, "completed": 1, "interrupted": 1, "failed": 0, "wall_median_min": 10.0}])
+    late = collect_runs(runs_root, parse_day("2026-08-02"), until)
+    check("실행 기록 — 기간 밖 행은 빠지고 못 읽은 행 · 열린 표지는 그대로 센다", (len(late["rows"]), late["unreadable"], late["open"]), (1, 2, 2))
+    no_runs = collect_runs(os.path.join(base, "없는-runs"))
+    check("실행 기록 — 루트 없음 = 0행 · 열린 표지 0", (no_runs["rows"], no_runs["open"]), ([], 0))
 
     # --json 경로도 실제로 실행한다 — 한 번도 안 돈 직렬화는 검증된 것이 아니다.
     args_json = argparse.Namespace(**vars(args))
@@ -1666,10 +1815,13 @@ def self_test():
     check("단가 미등록 경고 줄", "단가 미등록 모델: claude-unknown-9×2" in md, True)
     check("단가 미등록 없으면 경고 줄 없음", "단가 미등록 모델" in render_markdown(payload), False)
     check("JSON 왕복 — 분모", payload["denominators"]["assistant_messages"], 1)
+    check("JSON 왕복 — 실행 기록 n · unreadable · open", (payload["runs"]["n"], payload["runs"]["unreadable"], payload["runs"]["open"]), (2, 2, 2))
 
     with open(args.out) as handle:
         text = handle.read()
     check("리포트에 §3 표 존재", "## 3. 워크플로별 실행과 스테이지 기여도" in text, True)
+    check("리포트에 §7 실행 기록", "## 7. 실행 기록" in text, True)
+    check("리포트 §7 — 열린 채 남은 시도", "열린 채 남은 시도 2(그중 24시간 넘은 것 1)" in text, True)
     check("리포트에 0건 경고 문구 없음(분모>0)", "측정 실패를 먼저 의심하라" in text, False)
     check("모델에게 지시하는 문장 0", ("반드시 " in text) or ("하라." in text), False)
 
@@ -1796,6 +1948,13 @@ def main(argv):
         default=os.environ.get("FZ_TELEMETRY_DIR", DEFAULT_TELEMETRY_DIR),
         help="저장 루트 (env FZ_TELEMETRY_DIR)",
     )
+    parser.add_argument(
+        "--runs-root",
+        default=os.environ.get("FZ_RUN_STATE") or DEFAULT_RUN_STATE,
+        help="실행 기록 루트 — run_metrics.py 가 쓰는 <루트>/<pipeline>/runs.jsonl (env FZ_RUN_STATE)",
+    )
+    parser.add_argument("--runs-json", action="store_true",
+                        help="실행 기록 행(started_at 순 · 기간 무관)을 stdout JSON 으로 내고 끝낸다 — 다른 집계는 하지 않는다")
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--plan-segments", metavar="SESSION_PREFIX",
                         help="세션의 /fz-plan 1회를 Lead 생성·GPT 대기·피드백 통합으로 분리 (plan-final S9c)")
@@ -1803,6 +1962,9 @@ def main(argv):
 
     if args.self_test:
         return self_test()
+    if args.runs_json:
+        print(json.dumps(collect_runs(os.path.expanduser(args.runs_root))["rows"], ensure_ascii=False, indent=1))
+        return 0
     if args.plan_segments:
         return plan_segments(args.projects_root, args.plan_segments)
     if args.until is None:

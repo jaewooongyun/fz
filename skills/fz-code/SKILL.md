@@ -108,7 +108,7 @@ metadata:
 
 각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
 
-0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" code --steps {WORK_DIR}/plan/steps.json --estimate code-pair`(없으면 `--plan-doc` · `--no-plan`) 로 추천을 달고 묻는다. **light** 면 이 루프 대신 Lead 가 구현 절차로 Step 마다 직접 구현한다(아래 light 모드) · **full** 이면 이 루프
+0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" code --steps {WORK_DIR}/plan/steps.json --estimate code-pair`(없으면 `--plan-doc` · `--no-plan`) 로 추천을 달고 묻는다. **light** 면 이 루프 대신 Lead 가 구현 절차로 Step 마다 직접 구현한다(아래 light 모드) · **full** 이면 이 루프 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 
 1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
    ⛔ 아래 넷도 **같은 파일에 요약해 넣는다** — 별도 arg 를 만들지 않고 기존 `contextPath` 하나로 전달한다:
@@ -461,7 +461,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 
 ## Completion → Next
 
-Gate 3 통과 후:
+Gate 3 통과 후(완료 보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
 ```bash
 /fz-review "구현한 코드 리뷰해줘"
 ```

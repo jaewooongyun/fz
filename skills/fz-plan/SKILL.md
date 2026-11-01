@@ -100,7 +100,7 @@ metadata:
 
 > ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 ~ 2.5)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 추가 탐색 · 문서 조회)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 플랜(2.7)은 백그라운드 한 줄이라 그대로 직전에 두고(S23), Phase 0.7 Sprint Contract 는 Workflow 입력이 될 수 있어 순서를 바꾸지 않는다. 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/plan/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
-1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): readScope 를 `{WORK_DIR}/plan/read-scope.txt`(한 줄 1경로)로 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" plan --read-scope {그 파일} --new-arch yes|no --estimate plan-lean2` 로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 1 을 Lead 가 수행한 뒤 Phase 2·3·원장으로 간다(아래 light 모드) · **full** 이면 이어간다
+1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): readScope 를 `{WORK_DIR}/plan/read-scope.txt`(한 줄 1경로)로 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" plan --read-scope {그 파일} --new-arch yes|no --estimate plan-lean2` 로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 1 을 Lead 가 수행한 뒤 Phase 2·3·원장으로 간다(아래 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**) — ⛔ 정본은 `modules/project-rules.md` 다(절차 · 레코드 형식 · 검증기):
    원문 색인(`extract_project_rules.py`) → 규칙 레코드(모델이 각자) → `check_project_rules.py --check` 통과본만 쓴다. `archConstraints` 는 그 **호환 투영**이다(`--project-arch` — 4축 `architecturePattern` / `uiStack` / `dependencyDirection` / `naming` + 그 축의 `conflicts`).
    - 미확정 축 → `null` + `gaps`(Probe Coverage Gap). 코드 실측(grep) 1회로 보완을 시도하고(`authority: 관례` — 코드를 인용), 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
@@ -487,7 +487,7 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 
 ## Completion → Next
 
-Gate 2 통과 후:
+Gate 2 통과 후(완료 보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
 ```bash
 /fz-code "검증된 계획대로 구현해줘"
 ```

@@ -102,7 +102,7 @@ metadata:
 ### 실행 절차 (Lead)
 
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/discover/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
-1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" discover --complexity {점수} --estimate discover-adversarial` 로 추천을 달고 묻는다. **light** 면 2~4 를 건너뛰고 SOLO 탐색으로 간다 · **full** 이면 이어간다
+1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" discover --complexity {점수} --estimate discover-adversarial` 로 추천을 달고 묻는다. **light** 면 2~4 를 건너뛰고 SOLO 탐색으로 간다 · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다)
 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js && cmp -s {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
@@ -397,7 +397,7 @@ GOOD: "두 방법 모두 BandScope가 외부 Binding을 받는 것이므로 본�
    - PR 코멘트 시: 제약 매트릭스 + 결정 근거를 읽기 쉬운 형태로 가공
    - 기록 시: `mcp__plugin_fz_serena__write_memory` → 결정사항 영속화
 
-3. **완료 보고**:
+3. **완료 보고** (직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
 
    ```markdown
    /fz-discover 완료

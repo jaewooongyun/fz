@@ -463,7 +463,7 @@ def c_telemetry(b):
         out_json = b / f"tel-{tag}.json"
         rc, out, _ = run(["--findings-dir", root / "entries", "--projects-root", b / "projects", "--telemetry-dir", b / "tel",
                           "--plugin-root", TREE, "--since", "2026-01-01", "--until", "2026-12-31", "--json", "--out", out_json],
-                         script=TEL)
+                         env={"FZ_RUN_STATE": str(b / "no-runs")}, script=TEL)
         try:
             f = json.loads(out_json.read_text(encoding="utf-8"))["findings"]
             return rc, (f["n"], f["total_files"], f["skipped_no_frontmatter"]), out

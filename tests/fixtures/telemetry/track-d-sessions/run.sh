@@ -85,7 +85,7 @@ def render(entries, lock=None):
                                 "--since", "2026-09-01", "--until", "2026-10-31", "--out", str(out_md),
                                 "--projects-root", f"{tmp}/projects", "--findings-dir", str(reg / "entries"),
                                 "--plugin-root", f"{tmp}/no-plugin", "--telemetry-dir", f"{tmp}/telemetry"],
-                               capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
+                               capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", FZ_RUN_STATE=f"{tmp}/no-runs"),
                                stdin=subprocess.DEVNULL, timeout=120)
         finally:
             if target:

@@ -243,7 +243,7 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 > ⛔ Gather Step 5 직후 필수 실행 — 측정 → 추천(`scripts/mode_gate.py peer`) → 질문(명시 인자 · 신호어 · `/fz` 경유 · `--tier` 면 묻지 않는다).
 > **실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED · 위험 카테고리는 추천 근거): `modules/peer-review-tiers.md` "## 모드 선택 (측정 · 추천 · 질문)" → "### 자동 선택 실행 bash" 참조 (SSOT 단일 지점, L18 규칙).
 
-상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조.
+상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조. Tier 가 정해지면 기록 `run_metrics.py start`(Tier 0·1 = light · 2·3 = full — `modules/mode-gate.md` § 기록).
 
 #### Few-shot
 ```
@@ -487,4 +487,4 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (gpt 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다** — 단 exit 18(`GPT-OFF`)은 GPT 미사용이라 `solo (gpt 실패)` 강등 · ×0.7 감쇠 대상이 아니고 `[GPT 미사용 — 사유]` 만 적는다(`modules/gpt-strategy.md` § GPT 미사용), GPT timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
 
 ## Completion → Next
-`--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계.
+`--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계. Deliver(문서 저장 · `--post` 게시와 착지 검증 포함)가 끝나면 기록 `run_metrics.py end`(`modules/mode-gate.md` § 기록).

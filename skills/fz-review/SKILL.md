@@ -97,7 +97,7 @@ metadata:
 
 > ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 · 2)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 참조 무결성 확인 · L3 에이전트)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 첫 패스(2.5)는 백그라운드 한 줄이라 그대로 직전에 둔다(S22). 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
 1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12)
-1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 결과로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 5 Lead 3중 검증으로 간다(아래 light 모드) · **full** 이면 이어간다
+1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 결과로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 5 Lead 3중 검증으로 간다(아래 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {diff.patch} --deny {WORK_DIR} [--rules-index {원문 색인}] …` — 켜면 Workflow args 에 `locatedFindings: true` 를 함께 준다(위치 필드가 없는 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다). ⛔ 규칙 레코드(`projectRulesPath`)는 런처에 넘기지 않는다(exit 11). 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
@@ -404,7 +404,7 @@ Gate 5 통과 후:
    - ⊕ `--render`(기본 off)면 이슈 목록을 손으로 다시 쓰지 않는다 — 판정·문장만 `{WORK_DIR}/review/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review {WORK_DIR}/review/review.json --diff {WORK_DIR}/review/diff.patch --out-dir {WORK_DIR}/review` 가 `review-report.md` 를 만든다(PR 이 없으면 payload 는 만들지 않는다). review.json 형식은 `render_review.py --example` 이 내는 최소 예시를 따른다 — 렌더러 코드를 다시 읽지 않는다. 미지정이면 위 절차 그대로다
 5. **Git 연계** (사용자 확인 후): `/fz-commit` → `/fz-pr`
 
-완료 보고: 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계
+완료 보고(직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록): 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계
 
 ### Harness Metrics (v3.8+)
 

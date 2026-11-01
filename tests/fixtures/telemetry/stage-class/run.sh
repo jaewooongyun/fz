@@ -29,7 +29,7 @@ trap 'rm -rf "$TMP"' EXIT
 cp -R "$HERE/projects" "$TMP/projects" || { echo "UNRUN: fixture 복사 실패"; exit 2; }
 find "$TMP/projects" -name journal.jsonl -exec touch -t 202610150000 {} + || { echo "UNRUN: journal mtime 고정 실패"; exit 2; }
 OUT="$TMP/report.json"
-LOG=$(PYTHONDONTWRITEBYTECODE=1 python3 -B "$ROOT/scripts/fz_telemetry_report.py" \
+LOG=$(PYTHONDONTWRITEBYTECODE=1 FZ_RUN_STATE="$TMP/no-runs" python3 -B "$ROOT/scripts/fz_telemetry_report.py" \
   --projects-root "$TMP/projects" --since 2026-10-01 --until 2026-10-31 --json --out "$OUT" \
   --findings-dir "$TMP/no-findings" --plugin-root "$TMP/no-plugin" --telemetry-dir "$TMP/telemetry" 2>&1 </dev/null)
 RC=$?

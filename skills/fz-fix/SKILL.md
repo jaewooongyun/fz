@@ -136,7 +136,7 @@ metadata:
 
 ## Mode A: 버그 수정 (Bug Fix)
 
-빠른 수정-빌드 사이클로 버그를 해결합니다.
+빠른 수정-빌드 사이클로 버그를 해결합니다. 아래 팀 에이전트 모드 0 의 모드 게이트를 거치지 않고 여기서 시작하면 먼저 기록 `run_metrics.py start --skill fz-fix --mode light --recommended none`(`modules/mode-gate.md` § 기록) — 게이트를 거쳐 왔으면 거기서 이미 기록했으니 다시 부르지 않는다.
 
 > **프로젝트 규칙**: CLAUDE.md `## Code Conventions` 섹션을 따른다.
 
@@ -202,7 +202,7 @@ metadata:
 
 ### 실행 절차 (Lead)
 
-0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): code-pair 를 부를 상황이면 먼저 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" fix --files {수정 대상 파일 수} --estimate code-pair` 로 추천을 달고 묻는다. **light** 면 Mode A Bug Fix Step 1-4 를 Lead 가 직접 한다(Workflow 없음 · `--gpt` 는 그대로) · **full** 이면 이어간다
+0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): code-pair 를 부를 상황이면 먼저 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" fix --files {수정 대상 파일 수} --estimate code-pair` 로 추천을 달고 묻는다. **light** 면 Mode A Bug Fix Step 1-4 를 Lead 가 직접 한다(Workflow 없음 · `--gpt` 는 그대로) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 1. **args 조립**: `mode:'light'` / `stepSpec`={id,title,goal,files,verify,**complexity**, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 시 `split_required`. 임계값 single source=상수)} / `effort`=0 결과 `effort.value`(lead-effort — null 이면 넣지 않는다) / `contextPath`(버그 분석 요약 파일) / `changesetTarget` / `buildFeedback`(재시도 시)
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
@@ -312,7 +312,7 @@ GOOD (--gpt 위임 패턴):
 
 ## Completion → Next
 
-- 버그 수정 완료: 사용자에게 보고 + 테스트 방법 안내
+- 버그 수정 완료: 사용자에게 보고 + 테스트 방법 안내(보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록)
 - 복잡한 수정: `/fz-review` 제안
 - 탐색 필요: `/fz-search` 제안
 - 탐색 후 변경 필요: `/fz-plan` 또는 `/fz-code` 제안
