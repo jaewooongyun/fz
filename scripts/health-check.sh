@@ -13,9 +13,14 @@
 #   · 각 검사의 exit 을 **개별 캡처**해 표로 보고하고, 하나라도 실패면 **비0**으로 종료한다
 #   · lint 의 SKIP(THRESHOLD·SEMANTIC) 건수를 **따로 표기**한다 — ⛔ SKIP 은 PASS 가 아니다
 #
-# usage: health-check.sh [--strict-freshness] [--realmode-only]
+# usage: health-check.sh [--strict-freshness] [--realmode-only] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]
 #   --strict-freshness : 최신성 findings 가 있으면 실패로 취급 (기본: 경고)
 #   --realmode-only    : 0.5 실모드 블록만 돌리고 멈춘다 — 배선 fixture 전용, 초록으로 끝나지 않는다(실패 1 · 그 외 2)
+#   --changed <경로>   : 바뀐 경로(반복 가능) — scripts/health_select.py 가 검사를 고른다. 전부 문서면 부분 실행, 아니면 전체
+#   --changed-from <파일> : 바뀐 경로 목록 파일(한 줄에 하나 — `git diff --name-only` 출력 그대로)
+#   --ship             : 출하 — 경로와 무관하게 전체 실행(출하 게이트는 언제나 전체다)
+#   --select-only      : 선택 결과(HEALTH-SELECT 줄)만 출력하고 exit 0 — 검사를 돌리지 않는다
+#   ⛔ 네 인자가 없으면 이전과 같은 전체 실행이다. 부분 실행은 출하 게이트가 아니다 — 표 아래 `⛔ 부분 실행(PARTIAL)` 줄이 표시다
 # exit: 0=전 검사 통과 / 1=검사 실패 있음 / 2=사전조건 실패
 set -u
 
@@ -29,15 +34,28 @@ fi
 # ⛔ 인자 루프 — `$1`만 보면 `--bogus --strict-freshness` 가 조용히 non-strict 로 돈다 (ISSUE-010)
 STRICT_FRESHNESS=0
 REALMODE_ONLY=0
+SELECT=0 SELECT_ONLY=0 SEL_ARGS=() CHANGED=()   # 경로별 선택(H2-9) — 네 인자 중 하나라도 있어야 SELECT=1 이 된다
+USAGE="health-check.sh [--strict-freshness] [--realmode-only] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]"
 while [ $# -gt 0 ]; do
   case "$1" in
     --strict-freshness) STRICT_FRESHNESS=1; shift ;;
     --realmode-only) REALMODE_ONLY=1; shift ;;
-    *) echo "⛔ 알 수 없는 인자: $1 (사용법: health-check.sh [--strict-freshness] [--realmode-only])" >&2; exit 2 ;;
+    --changed) [ $# -ge 2 ] || { echo "⛔ --changed 에 경로가 없다 (사용법: $USAGE)" >&2; exit 2; }
+               SELECT=1; CHANGED+=("$2"); shift 2 ;;
+    --changed-from) [ $# -ge 2 ] || { echo "⛔ --changed-from 에 파일이 없다 (사용법: $USAGE)" >&2; exit 2; }
+                    SELECT=1; SEL_ARGS+=(--from-file "$2"); shift 2 ;;
+    --ship) SELECT=1; SEL_ARGS+=(--ship); shift ;;
+    --select-only) SELECT=1; SELECT_ONLY=1; shift ;;
+    *) echo "⛔ 알 수 없는 인자: $1 (사용법: $USAGE)" >&2; exit 2 ;;
   esac
 done
+# ⛔ 실모드 단독 실행은 배선 fixture 전용이다 — 경로 선택과 섞으면 어느 쪽이 도는지 호출자가 알 수 없다
+if [ "$REALMODE_ONLY" -eq 1 ] && [ "$SELECT" -eq 1 ]; then
+  echo "⛔ --realmode-only 는 --changed · --changed-from · --ship · --select-only 와 함께 쓰지 않는다 (사용법: $USAGE)" >&2; exit 2
+fi
 
 NAMES=() CODES=() NOTES=()
+LINT_OUT="" SKIP_N=0   # 보고 꼬리가 읽는다 — 부분 실행이 계약 lint 를 건너뛰어도 set -u 에 걸리지 않게
 UNRUN=0     # 실행되지 못한 검사 수 — ⛔ 0이 아니면 "전 검사 통과"라 말하지 않는다
 record() { NAMES+=("$1"); CODES+=("$2"); NOTES+=("$3"); }
 # ⛔ 3분 판정 (F-335 ⑬): exit 2 이면서 줄 맨 앞 `UNRUN` 표지가 있을 때만 미실행이다. 표지 없는 exit 2 와
@@ -66,6 +84,123 @@ record3() {
   esac
 }
 
+# ── 공용 검사 블록 (H2-9) — 전체 실행은 각 절 자리에서, 부분 실행(--changed)은 0.1 선택 블록에서 **같은 함수**를 부른다.
+#    ⛔ 본문을 두 벌로 두지 않는다 — 한 벌만 고치면 부분 실행의 표가 전체 실행과 다르게 읽힌다.
+#    절의 신설 근거 주석은 호출 자리에 남아 있다.
+chk_contract_lint() {
+  LINT_OUT="$(python3 "$ROOT/scripts/lint_contracts.py" 2>&1)"; LINT_CODE=$?
+  SKIP_N="$(printf '%s\n' "$LINT_OUT" | grep -c '^   ⏸' || true)"
+  case "$LINT_CODE" in
+    0) record "계약 lint"      0 "위반 0건 · SKIP ${SKIP_N}항목" ;;
+    1) record "계약 lint"      1 "위반 있음 — 아래 상세" ;;
+    *) record "계약 lint" "$LINT_CODE" "⛔ configuration/parse error — 검사기 자체 고장 (PASS도 SKIP도 아님)" ;;
+  esac
+}
+chk_doc_freshness() {
+  FRESH_OUT="$(cd "$ROOT" && python3 scripts/lint_doc_freshness.py 2>&1)"; FRESH_CODE=$?
+  FRESH_N="$(printf '%s\n' "$FRESH_OUT" | grep -oE '총 [0-9]+건' | grep -oE '[0-9]+' || echo 0)"
+  if [ "$STRICT_FRESHNESS" -eq 1 ] && [ "${FRESH_N:-0}" -gt 0 ]; then
+    record "출처 최신성" 1 "findings ${FRESH_N}건 (--strict-freshness)"
+  else
+    record "출처 최신성" "$FRESH_CODE" "findings ${FRESH_N}건 (경고 — exit 에 미반영)"
+  fi
+}
+chk_runners() {   # 인자: 러너 경로들 — 0개면 미실행(전체 실행의 글롭 오타 감지). 부분 실행은 1개 이상일 때만 부른다
+  if command -v node >/dev/null 2>&1; then
+    T_TOTAL=0 T_FAIL=0 T_BAD="" T_UN=0 T_UNLIST=""
+    # 러너 하나를 3분 판정한다 — 출력을 버리면 UNRUN 표지를 볼 수 없다(F-335 ⑬)
+    t_one() {
+      T_TOTAL=$((T_TOTAL + 1))
+      classify "$1" "$2"
+      case $? in
+        0) ;;
+        2) T_UN=$((T_UN + 1)); T_UNLIST="$T_UNLIST $3" ;;
+        *) T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $3" ;;
+      esac
+    }
+    # 인자 = 러너 경로(전체 실행은 4.6 의 세 글롭 · 부분 실행은 선택된 러너). .js 먼저 · run.sh 다음 — 전체 실행의 순서와 같다
+    for f in "$@"; do
+      case "$f" in *.js) ;; *) continue ;; esac
+      [ -f "$f" ] || continue
+      t_out="$(cd "$ROOT" && node "$f" 2>&1)"; t_one $? "$t_out" "$(basename "$f")"
+    done
+    for r in "$@"; do
+      case "$r" in */run.sh) ;; *) continue ;; esac
+      [ -f "$r" ] || continue
+      t_out="$(cd "$ROOT" && bash "$r" 2>&1)"; t_one $? "$t_out" "$(basename "$(dirname "$r")")"
+    done
+    # ⛔ 실패와 미실행이 함께 있으면 둘 다 보고한다 — 한 행은 ⛔ 와 ⏸ 를 함께 표시할 수 없어 미실행 행을 따로 둔다
+    if [ "$T_TOTAL" -eq 0 ]; then
+      UNRUN=$((UNRUN + 1))
+      record "회귀 오라클" UNRUN "미실행 — 러너 0개 발견 (경로 오타 의심, ⛔ PASS 아님)"
+    else
+      [ "$T_FAIL" -gt 0 ] && record "회귀 오라클" 1 "⛔ ${T_FAIL}/${T_TOTAL} 실패 —$T_BAD"
+      if [ "$T_UN" -gt 0 ]; then
+        UNRUN=$((UNRUN + 1))
+        record "회귀 오라클 미실행" UNRUN "UNRUN 표지 exit 2 ${T_UN}/${T_TOTAL} —$T_UNLIST · 통과 $((T_TOTAL - T_FAIL - T_UN)) (⛔ PASS 아님)"
+      fi
+      [ "$T_FAIL" -eq 0 ] && [ "$T_UN" -eq 0 ] && record "회귀 오라클" 0 "${T_TOTAL}개 전건 통과"
+    fi
+  else
+    UNRUN=$((UNRUN + 1))
+    record "회귀 오라클" UNRUN "미실행 — node 부재 (⛔ PASS 아님)"
+  fi
+}
+chk_single_source() {
+  SS="$(cd "$ROOT" && python3 scripts/check_single_source.py 2>&1)"; SS_CODE=$?
+  record3 "단일 출처 계약" "$SS_CODE" "$SS" \
+    "$(printf '%s\n' "$SS" | grep -E 'canonical=' | tail -1)" \
+    "⛔ $(printf '%s\n' "$SS" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
+}
+chk_recurrence() {
+  LR_OUT="$( (python3 "$ROOT/scripts/lint_recurrence.py" --self-test && python3 "$ROOT/scripts/lint_recurrence.py" --root "$ROOT") 2>&1)"; LR_CODE=$?
+  record3 "재발 방지 lint" "$LR_CODE" "$LR_OUT" \
+    "$(printf '%s\n' "$LR_OUT" | grep -E '^lint_recurrence: ' | tail -1) · $(printf '%s\n' "$LR_OUT" | grep -E 'self-test: PASS')" \
+    "⛔ $(printf '%s\n' "$LR_OUT" | grep -E ': FAIL|: UNRUN|self-test: FAIL' | head -3 | tr '\n' ' ')"
+}
+report_and_exit() {   # $1 = 부분 실행 표지 줄 — 비면 전체 실행이다(이전 판과 같은 출력)
+  echo
+  printf "%-22s %-6s %s\n" "검사" "exit" "비고"
+  printf "%-22s %-6s %s\n" "──────────────────────" "─────" "────────────────────────────"
+  # ⛔ 4R ISSUE-001: UNRUN 행을 exit 0 으로 기록해 **✅ 가 찍혔다**. 미실행은 `-` 로 표기하고
+  #    ✅(통과)·⛔(실패)와 **3분** 한다. 총평은 실패·미실행 **양쪽**을 반영한다.
+  FAILED=0
+  for i in "${!NAMES[@]}"; do
+    code="${CODES[$i]}"
+    if [ "$code" = "UNRUN" ]; then mark="⏸"
+    elif [ "$code" -ne 0 ]; then mark="⛔"; FAILED=1
+    else mark="✅"; fi
+    printf "%s %-20s %-6s %s\n" "$mark" "${NAMES[$i]}" "$code" "${NOTES[$i]}"
+  done
+
+  echo
+  echo "⛔ SKIP(THRESHOLD·SEMANTIC) ${SKIP_N}항목은 **PASS가 아니다** — Lead가 별도 판정하고 보고에 남긴다."
+  # 부분 실행 표지는 총평 **앞**에 둔다 — 초록 총평만 읽고 출하 게이트로 오인하지 않게
+  if [ -n "${1:-}" ]; then echo; echo "$1"; fi
+  # ⛔ 4R ISSUE-001: FAILED 분기가 먼저 exit 1 을 반환해 UNRUN 총평이 보고되지 않았다.
+  #    미실행이 있으면 **먼저** 알린다 — "일부 검사를 못 돌렸다"가 더 근본적인 상태다.
+  if [ "$UNRUN" -ne 0 ]; then
+    echo
+    echo "⛔ 실행되지 못한 검사 ${UNRUN}건 — **전 검사 통과라고 말할 수 없다**"
+    [ "$FAILED" -ne 0 ] && { echo "── 계약 lint 전체 출력 ──"; printf '%s\n' "$LINT_OUT"; \
+                             echo; echo "⛔ 추가로 실패한 검사도 있다"; }
+    echo "(exit 2: 사전조건 미충족)"
+    exit 2
+  fi
+  if [ "$FAILED" -ne 0 ]; then
+    echo
+    echo "── 계약 lint 전체 출력 ──"
+    # ⛔ ISSUE-010: 이전 판은 `── 위반` 마커부터만 출력해 **configuration error·traceback 을 숨겼다**
+    #    (마커가 없는 실패는 상세 구획이 빈칸으로 나왔다). 전체를 낸다.
+    printf '%s\n' "$LINT_OUT"
+    echo
+    echo "⛔ 실패한 검사가 있다 (exit 1)"
+    exit 1
+  fi
+  echo "✅ 전 검사 통과 (exit 0)"
+  exit 0
+}
+
 echo "══════════════════════════════════════════════════════════════"
 echo "fz 건강 체크 — root $ROOT"
 echo "══════════════════════════════════════════════════════════════"
@@ -75,9 +210,53 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
+
+# ── 0.1 경로별 검사 선택 (H2-9 · GPT H-015) — `--changed*` · `--ship` · `--select-only` 가 있을 때만 돈다(없으면 이 블록을 통째로 건너뛴다)
+#    선택은 scripts/health_select.py 가 러너 원문에서 매번 계산한다 — 손으로 고치는 '경로 → 검사' 표가 없다(표는 러너가 새 경로를
+#    읽기 시작해도 그대로라 조용히 낡는다). mode=full 이면 선택 머리줄만 찍고 아래 전체 실행으로 내려간다. mode=subset 이면
+#    고른 검사만 위 공용 함수로 돌리고 같은 표로 보고한 뒤 같은 규칙(0 · 1 · 2)으로 끝난다.
+#    ⛔ 부분 실행은 출하 게이트가 아니다 — 총평 앞 PARTIAL 줄이 표시다. 출하는 --ship(= 전체)이다.
+#    ⛔ 선택기 출력이 계약(첫 줄 mode · 아는 검사 이름 · 실재 러너 · full 이면 check 줄 0 · subset 이면 1+)을 어기면 exit 2 다 —
+#       깨진 선택을 조용히 전체나 부분으로 바꿔 돌리지 않는다.
+if [ "$SELECT" -eq 1 ]; then
+  SEL_OUT="$(python3 "$ROOT/scripts/health_select.py" ${SEL_ARGS[@]+"${SEL_ARGS[@]}"} -- ${CHANGED[@]+"${CHANGED[@]}"})"; SEL_CODE=$?
+  [ "$SEL_CODE" -eq 0 ] || { echo "⛔ 검사 선택기 실패 exit $SEL_CODE — 판정 불가" >&2; exit 2; }
+  printf '%s\n' "$SEL_OUT"
+  SEL_MODE="$(printf '%s\n' "$SEL_OUT" | sed -n '1s/^HEALTH-SELECT mode=\([a-z]*\) reason=.*/\1/p')"
+  SEL_LIST=()
+  while IFS= read -r c; do
+    [ -n "$c" ] || continue
+    case "$c" in
+      lint_contracts.py|lint_recurrence.py|lint_doc_freshness.py|check_single_source.py) ;;
+      tests/workflows/*.js|tests/lib/*.test.js|tests/fixtures/*/*/run.sh)
+        [ -f "$ROOT/$c" ] || { echo "⛔ 선택기 출력 계약 위반 — 없는 러너: $c" >&2; exit 2; } ;;
+      *) echo "⛔ 선택기 출력 계약 위반 — 모르는 검사: $c" >&2; exit 2 ;;
+    esac
+    SEL_LIST+=("$c")
+  done < <(printf '%s\n' "$SEL_OUT" | sed -n 's/^HEALTH-SELECT check=\([^ ]*\).*/\1/p')
+  case "$SEL_MODE" in
+    full)   [ "${#SEL_LIST[@]}" -eq 0 ] || { echo "⛔ 선택기 출력 계약 위반 — mode=full 인데 check 줄이 있다" >&2; exit 2; } ;;
+    subset) [ "${#SEL_LIST[@]}" -gt 0 ] || { echo "⛔ 선택기 출력 계약 위반 — mode=subset 인데 check 줄이 없다" >&2; exit 2; } ;;
+    *) echo "⛔ 선택기 출력 계약 위반 — 첫 줄에 HEALTH-SELECT mode=full|subset 이 없다" >&2; exit 2 ;;
+  esac
+  [ "$SELECT_ONLY" -eq 1 ] && exit 0
+  if [ "$SEL_MODE" = subset ]; then
+    want() { local c; for c in "${SEL_LIST[@]}"; do [ "$c" = "$1" ] && return 0; done; return 1; }
+    SEL_RUNNERS=()
+    for c in "${SEL_LIST[@]}"; do case "$c" in tests/*) SEL_RUNNERS+=("$ROOT/$c") ;; esac; done
+    # 표 순서는 전체 실행과 같다 — 1 계약 lint · 3 출처 최신성 · 4.6 회귀 오라클 · 단일 출처 · 4.8j 재발 방지.
+    # ⛔ 고른 러너가 0개면 회귀 오라클 행을 두지 않는다 — '러너 0개 = 미실행' 은 전체 실행의 글롭 오타 감지다
+    want lint_contracts.py && chk_contract_lint
+    want lint_doc_freshness.py && chk_doc_freshness
+    [ "${#SEL_RUNNERS[@]}" -gt 0 ] && chk_runners "${SEL_RUNNERS[@]}"
+    want check_single_source.py && chk_single_source
+    want lint_recurrence.py && chk_recurrence
+    report_and_exit "⛔ 부분 실행(PARTIAL) — 출하 게이트 아님 · 선택 ${#SEL_LIST[@]}개"
+  fi
+fi
 
 # ── 0.5 실모드 불변식 (A5-01·A5-03) ───────────────────────────────
 # ⛔ self-test 는 **검사기**가 멀쩡한지만 본다 — 트리를 보지 않으면 값 강등이 그대로 통과한다.
@@ -151,13 +330,7 @@ if [ "$REALMODE_ONLY" -eq 1 ]; then
 fi
 
 # ── 1. 계약 lint (양성 대조 + 통합 fixture 선행 → exit 2 = 검사기 고장)
-LINT_OUT="$(python3 "$ROOT/scripts/lint_contracts.py" 2>&1)"; LINT_CODE=$?
-SKIP_N="$(printf '%s\n' "$LINT_OUT" | grep -c '^   ⏸' || true)"
-case "$LINT_CODE" in
-  0) record "계약 lint"      0 "위반 0건 · SKIP ${SKIP_N}항목" ;;
-  1) record "계약 lint"      1 "위반 있음 — 아래 상세" ;;
-  *) record "계약 lint" "$LINT_CODE" "⛔ configuration/parse error — 검사기 자체 고장 (PASS도 SKIP도 아님)" ;;
-esac
+chk_contract_lint
 
 # ── 1.5 diff 파서 hunk 상태 선언
 #    ⛔ 신설 근거: 같은 결함이 한 세션에 4번 났다 — hunk 안팎에서 뜻이 다른 `+`/`-` 접두사를
@@ -222,13 +395,7 @@ case "$LEDGER_CODE" in
 esac
 
 # ── 3. 외부 출처 최신성 (⛔ 기본은 경고 — findings 가 있어도 exit 0 이므로 건수를 따로 본다)
-FRESH_OUT="$(cd "$ROOT" && python3 scripts/lint_doc_freshness.py 2>&1)"; FRESH_CODE=$?
-FRESH_N="$(printf '%s\n' "$FRESH_OUT" | grep -oE '총 [0-9]+건' | grep -oE '[0-9]+' || echo 0)"
-if [ "$STRICT_FRESHNESS" -eq 1 ] && [ "${FRESH_N:-0}" -gt 0 ]; then
-  record "출처 최신성" 1 "findings ${FRESH_N}건 (--strict-freshness)"
-else
-  record "출처 최신성" "$FRESH_CODE" "findings ${FRESH_N}건 (경고 — exit 에 미반영)"
-fi
+chk_doc_freshness
 
 # ── 4.5 gpt 플래그 호환성
 # ⛔ 신설 근거: `check-gpt-flags.sh` 는 review 경로가 거부하는 플래그를 잡는 회귀 게이트인데
@@ -272,43 +439,9 @@ fi
 #    회귀가 나도 통합 건강 체크가 초록으로 통과한다.
 # ⛔ 러너를 **0개 발견**한 경우는 PASS 가 아니라 미실행이다: 경로 오타·디렉터리 이동이
 #    "전건 통과" 로 인쇄되는 것이 정확히 막으려는 실패다(0건은 측정 실패를 먼저 의심).
-if command -v node >/dev/null 2>&1; then
-  T_TOTAL=0 T_FAIL=0 T_BAD="" T_UN=0 T_UNLIST=""
-  # 러너 하나를 3분 판정한다 — 출력을 버리면 UNRUN 표지를 볼 수 없다(F-335 ⑬)
-  t_one() {
-    T_TOTAL=$((T_TOTAL + 1))
-    classify "$1" "$2"
-    case $? in
-      0) ;;
-      2) T_UN=$((T_UN + 1)); T_UNLIST="$T_UNLIST $3" ;;
-      *) T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $3" ;;
-    esac
-  }
-  # tests/lib/*.test.js — 라이브러리(가짜 런타임 로더)의 테스트. 라이브러리 파일 자체는 이 글롭 밖이다
-  for f in "$ROOT"/tests/workflows/*.js "$ROOT"/tests/lib/*.test.js; do
-    [ -f "$f" ] || continue
-    t_out="$(cd "$ROOT" && node "$f" 2>&1)"; t_one $? "$t_out" "$(basename "$f")"
-  done
-  for r in "$ROOT"/tests/fixtures/*/*/run.sh; do
-    [ -f "$r" ] || continue
-    t_out="$(cd "$ROOT" && bash "$r" 2>&1)"; t_one $? "$t_out" "$(basename "$(dirname "$r")")"
-  done
-  # ⛔ 실패와 미실행이 함께 있으면 둘 다 보고한다 — 한 행은 ⛔ 와 ⏸ 를 함께 표시할 수 없어 미실행 행을 따로 둔다
-  if [ "$T_TOTAL" -eq 0 ]; then
-    UNRUN=$((UNRUN + 1))
-    record "회귀 오라클" UNRUN "미실행 — 러너 0개 발견 (경로 오타 의심, ⛔ PASS 아님)"
-  else
-    [ "$T_FAIL" -gt 0 ] && record "회귀 오라클" 1 "⛔ ${T_FAIL}/${T_TOTAL} 실패 —$T_BAD"
-    if [ "$T_UN" -gt 0 ]; then
-      UNRUN=$((UNRUN + 1))
-      record "회귀 오라클 미실행" UNRUN "UNRUN 표지 exit 2 ${T_UN}/${T_TOTAL} —$T_UNLIST · 통과 $((T_TOTAL - T_FAIL - T_UN)) (⛔ PASS 아님)"
-    fi
-    [ "$T_FAIL" -eq 0 ] && [ "$T_UN" -eq 0 ] && record "회귀 오라클" 0 "${T_TOTAL}개 전건 통과"
-  fi
-else
-  UNRUN=$((UNRUN + 1))
-  record "회귀 오라클" UNRUN "미실행 — node 부재 (⛔ PASS 아님)"
-fi
+# tests/lib/*.test.js — 라이브러리(가짜 런타임 로더)의 테스트. 라이브러리 파일 자체는 이 글롭 밖이다
+# ⛔ 세 글롭은 scripts/health_select.py 의 RUNNER_GLOBS 와 같아야 한다 — 다르면 선택기가 고른 러너를 여기서 모른다
+chk_runners "$ROOT"/tests/workflows/*.js "$ROOT"/tests/lib/*.test.js "$ROOT"/tests/fixtures/*/*/run.sh
 
 # ── 4.7 G8 문체 게이트 fixture 계약 ────────────────────────────
 # ⛔ 신설 근거: `negative-clean.md` 가 "오검출 0/8" 을 기대값으로 적어 두고 **한 번도
@@ -447,7 +580,7 @@ fi
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds; do
+for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   record3 "레지스트리 도구 self-test ($FS)" "$FS_CODE" "$FS_OUT" \
     "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)" \
@@ -500,10 +633,7 @@ record3 "plan 계약 왕복" "$PI_CODE" "$PI" \
 
 # ── 단일 출처 계약 (C4) ───────────────────────────────────────
 # ⛔ 정수 단언이다 — "있다/없다" 는 두 벌로 늘어난 것을 놓친다.
-SS="$(cd "$ROOT" && python3 scripts/check_single_source.py 2>&1)"; SS_CODE=$?
-record3 "단일 출처 계약" "$SS_CODE" "$SS" \
-  "$(printf '%s\n' "$SS" | grep -E 'canonical=' | tail -1)" \
-  "⛔ $(printf '%s\n' "$SS" | grep -E 'VIOLATION|UNRUN|⛔' | tail -1)"
+chk_single_source
 
 # ── 워크플로 advisor 억제 계약 (A-ADV) ─────────────────────────
 # ⛔ 워커는 세션 advisorModel 을 상속하고 끌 수단이 없다 — OVERRIDE 상수의 금지 문구가 유일한 억제다.
@@ -604,10 +734,7 @@ record3 "하네스 계측기 self-test" "$HM_CODE" "$HM_OUT" \
 # ── 4.8j 재발 방지 lint 7종 (B6) ──────────────────────────────────
 # ⛔ self-test 먼저 — 검사기 고장을 "위반 0"으로 읽지 않는다. 트리 실행의 UNRUN(대상 0개)은 PASS 가 아니다(exit 2).
 #    모듈 500줄 초과는 경고(WARN)라 exit 0 이다(F-485) — 실패는 SKILL 500줄 · 사본 불일치 · TEAM 지시 · 끊긴 참조 · 개수 불일치.
-LR_OUT="$( (python3 "$ROOT/scripts/lint_recurrence.py" --self-test && python3 "$ROOT/scripts/lint_recurrence.py" --root "$ROOT") 2>&1)"; LR_CODE=$?
-record3 "재발 방지 lint" "$LR_CODE" "$LR_OUT" \
-  "$(printf '%s\n' "$LR_OUT" | grep -E '^lint_recurrence: ' | tail -1) · $(printf '%s\n' "$LR_OUT" | grep -E 'self-test: PASS')" \
-  "⛔ $(printf '%s\n' "$LR_OUT" | grep -E ': FAIL|: UNRUN|self-test: FAIL' | head -3 | tr '\n' ' ')"
+chk_recurrence
 
 # ── 4.9 codegraph stale 검사기 self-test ──────────────────────────
 #    ⛔ 여기서 재는 것은 **검사기의 건강성**이지 인덱스 신선도가 아니다.
@@ -644,41 +771,4 @@ else
 fi
 
 # ── 보고
-echo
-printf "%-22s %-6s %s\n" "검사" "exit" "비고"
-printf "%-22s %-6s %s\n" "──────────────────────" "─────" "────────────────────────────"
-# ⛔ 4R ISSUE-001: UNRUN 행을 exit 0 으로 기록해 **✅ 가 찍혔다**. 미실행은 `-` 로 표기하고
-#    ✅(통과)·⛔(실패)와 **3분** 한다. 총평은 실패·미실행 **양쪽**을 반영한다.
-FAILED=0
-for i in "${!NAMES[@]}"; do
-  code="${CODES[$i]}"
-  if [ "$code" = "UNRUN" ]; then mark="⏸"
-  elif [ "$code" -ne 0 ]; then mark="⛔"; FAILED=1
-  else mark="✅"; fi
-  printf "%s %-20s %-6s %s\n" "$mark" "${NAMES[$i]}" "$code" "${NOTES[$i]}"
-done
-
-echo
-echo "⛔ SKIP(THRESHOLD·SEMANTIC) ${SKIP_N}항목은 **PASS가 아니다** — Lead가 별도 판정하고 보고에 남긴다."
-# ⛔ 4R ISSUE-001: FAILED 분기가 먼저 exit 1 을 반환해 UNRUN 총평이 보고되지 않았다.
-#    미실행이 있으면 **먼저** 알린다 — "일부 검사를 못 돌렸다"가 더 근본적인 상태다.
-if [ "$UNRUN" -ne 0 ]; then
-  echo
-  echo "⛔ 실행되지 못한 검사 ${UNRUN}건 — **전 검사 통과라고 말할 수 없다**"
-  [ "$FAILED" -ne 0 ] && { echo "── 계약 lint 전체 출력 ──"; printf '%s\n' "$LINT_OUT"; \
-                           echo; echo "⛔ 추가로 실패한 검사도 있다"; }
-  echo "(exit 2: 사전조건 미충족)"
-  exit 2
-fi
-if [ "$FAILED" -ne 0 ]; then
-  echo
-  echo "── 계약 lint 전체 출력 ──"
-  # ⛔ ISSUE-010: 이전 판은 `── 위반` 마커부터만 출력해 **configuration error·traceback 을 숨겼다**
-  #    (마커가 없는 실패는 상세 구획이 빈칸으로 나왔다). 전체를 낸다.
-  printf '%s\n' "$LINT_OUT"
-  echo
-  echo "⛔ 실패한 검사가 있다 (exit 1)"
-  exit 1
-fi
-echo "✅ 전 검사 통과 (exit 0)"
-exit 0
+report_and_exit
