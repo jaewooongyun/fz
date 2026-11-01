@@ -158,6 +158,12 @@ chk_recurrence() {
     "$(printf '%s\n' "$LR_OUT" | grep -E '^lint_recurrence: ' | tail -1) · $(printf '%s\n' "$LR_OUT" | grep -E 'self-test: PASS')" \
     "⛔ $(printf '%s\n' "$LR_OUT" | grep -E ': FAIL|: UNRUN|self-test: FAIL' | head -3 | tr '\n' ' ')"
 }
+# 퇴역 slash command 참조(H1-3) — 설치 · 활성화되지 않은 명령을 산문 · 표 · 코드 블록이 부르면 실패. 전체 실행에만 있다
+chk_retired_commands() {
+  RC_OUT="$(python3 "$ROOT/scripts/check_retired_commands.py" --root "$ROOT" 2>&1)"; RC_CODE=$?
+  record3 "퇴역 명령 참조" "$RC_CODE" "$RC_OUT" "$(printf '%s\n' "$RC_OUT" | tail -1)" \
+    "⛔ $(printf '%s\n' "$RC_OUT" | grep -E ' → ' | head -2 | tr '\n' ' ')"
+}
 report_and_exit() {   # $1 = 부분 실행 표지 줄 — 비면 전체 실행이다(이전 판과 같은 출력)
   echo
   printf "%-22s %-6s %s\n" "검사" "exit" "비고"
@@ -210,7 +216,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py check_retired_commands.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -580,7 +586,7 @@ fi
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select; do
+for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select check_retired_commands; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   record3 "레지스트리 도구 self-test ($FS)" "$FS_CODE" "$FS_OUT" \
     "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)" \
@@ -735,6 +741,7 @@ record3 "하네스 계측기 self-test" "$HM_CODE" "$HM_OUT" \
 # ⛔ self-test 먼저 — 검사기 고장을 "위반 0"으로 읽지 않는다. 트리 실행의 UNRUN(대상 0개)은 PASS 가 아니다(exit 2).
 #    모듈 500줄 초과는 경고(WARN)라 exit 0 이다(F-485) — 실패는 SKILL 500줄 · 사본 불일치 · TEAM 지시 · 끊긴 참조 · 개수 불일치.
 chk_recurrence
+chk_retired_commands
 
 # ── 4.9 codegraph stale 검사기 self-test ──────────────────────────
 #    ⛔ 여기서 재는 것은 **검사기의 건강성**이지 인덱스 신선도가 아니다.

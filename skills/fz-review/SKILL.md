@@ -370,7 +370,7 @@ N (GPT 제기 이슈 수) >= 10 ?
 ├─ NO  → preliminary — Rate는 measurement only, verdict 보류 → Gate 5의 Rate 항목 N/A 처리
 └─ YES → Reflection Rate >= 80%?
          ├─ YES → Gate 5 통과 (완료)
-         └─ NO  → /ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
+         └─ NO  → 에스컬레이션 래더 적용 (참조: modules/execution-modes.md · Workflow 반환 실패는 guides/skill-authoring.md §12)
 ```
 > 정본: `modules/cross-validation.md §Reflection Rate threshold`. ⛔ N<10에서 Rate 미달을 이유로 반복 루프를 돌리지 않는다 (통계적 소음).
 

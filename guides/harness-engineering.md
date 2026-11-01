@@ -366,7 +366,7 @@ Layer 4: Optimization — 토큰 예산에 맞춰 압축/선택
 | **Doom-loop 감지** | 무한 반복 방지 | 같은 에러 3회 반복 → 자동 중단 | 중단 → 사용자 에스컬레이션 |
 | **에스컬레이션 래더** | 단계별 상승 | Retry → Simplify → Replan → User | 최종 → 사용자 결정 |
 
-**에스컬레이션 래더 상세** (fz의 /ralph-loop 패턴):
+**에스컬레이션 래더 상세** (fz 의 `modules/execution-modes.md` 래더 · Workflow 실패는 `guides/skill-authoring.md` §12):
 
 ```
 Level 1: 동일 전략으로 재시도 (최대 2회)

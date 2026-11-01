@@ -271,10 +271,10 @@ Gate 실패 시: 해당 단계를 "완료"로 표시할 수 없다. 반드시 �
 
 | 상황 | 모드 | 대응 |
 |------|------|------|
-| 빌드 실패 | 모든 모드 | /ralph-loop 에스컬레이션 래더 (modules/execution-modes.md) |
+| 빌드 실패 | 모든 모드 | 에스컬레이션 래더 (`modules/execution-modes.md` · Workflow 반환 실패는 `guides/skill-authoring.md` §12) |
 | gpt check 실패 | 모든 모드 | Lead 가 지적을 수정 → 빌드 → 같은 kind 재검증 (fz-code 8.5 · fz-fix Step 4) |
 | 검증 실패 (반복) | SOLO | 사용자에게 `/fz-review` 제안 |
-| Reflection Rate < 80% (N≥10 — § Reflection Rate threshold) | 모든 모드 | /ralph-loop 래더 → 한도 후 사용자 에스컬레이션 (fz-review Phase 6) |
+| Reflection Rate < 80% (N≥10 — § Reflection Rate threshold) | 모든 모드 | 에스컬레이션 래더 → 한도 후 사용자 에스컬레이션 (fz-review Phase 6 · §12 L4) |
 
 ## 재검증 라운드 상한
 

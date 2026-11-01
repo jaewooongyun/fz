@@ -360,7 +360,7 @@ metadata:
 
 참조: `modules/build.md` — 에러 유형별 대응표, 빌드-수정 반복 패턴
 
-/ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
+에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
 
 ---
 
@@ -443,7 +443,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 |------|------|------|
 | XcodeBuildMCP 실패 | Bash로 xcodebuild 직접 | 수동 빌드 |
 | Serena 연결 실패 | Edit + Write 직접 수정 | 수동 편집 |
-| 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
+| 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
 | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
 | **advisor 스톨** (워커가 advisor 호출 → 응답 없이 런타임이 6회 시도 · 관측: 첫 시도 37.5분, 재시도마다 15~17분) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_54f2f1d3-8c5`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분). 판정 데이터(F-161·F-191): 문구 없음 13 run/78 agent 에서 advisor 66회, 문구 있음 65 run/318 agent 에서 0회 — 관측 연관이다. 두 구간은 advisor 모델과 워커 세대도 함께 다르다(교란). 같은 조건 대조군이 없어 인과는 미확정이다. 삭제 조건은 '문구 든 실행에서 호출이 줄지 않음' 이고, 결론은 **삭제 조건 미충족 = 유지**다. 측정 수단은 `fz_wf_metrics.py --wf` 의 `advisor_stalled`(결과 없는 호출 수)다 — `advisor` 열은 결과 블록만 세어 스톨 run 을 0 으로 읽는다 | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
 

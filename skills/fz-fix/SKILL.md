@@ -179,7 +179,7 @@ metadata:
 
 참조: `modules/build.md` — 빌드 검증 패턴
 
-/ralph-loop 에스컬레이션 래더 적용 (참조: modules/execution-modes.md)
+에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
 
 ### Step 4: Verify Fix (필수)
 
@@ -284,7 +284,7 @@ GOOD (/fz-gpt check 위임 패턴):
 
 ## Boundaries
 
-/ralph-loop 한도 후에도 실패하면 근본 원인을 재분석한다. 복잡도 초과 시 즉시 전환한다.
+래더 한도(`modules/execution-modes.md`) 뒤에도 실패하면 근본 원인을 재분석한다(§12 L4 — 사용자 에스컬레이션). 복잡도 초과 시 즉시 전환한다.
 
 ⛔ **Surgical 수정**: 버그 수정은 직접 요청·명백히 필요한 변경만 — 주변 코드를 함께 정리하지 않는다(빠른 수정일수록 drive-by cleanup 위험↑). 범위 외 개선점은 보고만, 실행 금지. [verified: claude-4-best-practices — "A bug fix doesn't need surrounding code cleaned up"]
 
@@ -306,7 +306,7 @@ GOOD (/fz-gpt check 위임 패턴):
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | Serena 연결 실패 | Grep + Glob 폴백 | 수동 탐색 |
-| 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
+| 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
 | 심볼 못 찾음 | 패턴 검색 전환 | Grep 폴백 |
 | 복잡도 초과 | /fz-plan 전환 | 사용자 상담 |
 | /fz-gpt check verdict 미반환 (decide `run` · `config` 로 부른 뒤) | warning 처리 + 빌드 검증 결과로 진행 | 사용자 보고 |

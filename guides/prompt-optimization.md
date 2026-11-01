@@ -683,7 +683,7 @@ fz 적용:
 | **ReAct** | 관찰 → 추론 → 행동 반복 | fz-search, fz-fix (SOLO) |
 | **Generate-Test-Repair** | 생성 → 테스트 → 실패 시 수정 | fz-code (빌드 검증 루프) |
 | **Plan-Execute** | 계획 수립 → 순차 실행 | fz-plan → fz-code |
-| **Multi-Attempt Retry** | 동일 작업 N회 시도, 최선 선택 | /ralph-loop 에스컬레이션 래더 |
+| **Multi-Attempt Retry** | 동일 작업 N회 시도, 최선 선택 | 에스컬레이션 래더(`modules/execution-modes.md` · §12) |
 | **Tree Search** | 여러 경로 탐색 후 최적 선택 | fz-discover (Adversarial Discovery) |
 
 11/13 에이전트가 복수 프리미티브를 조합한다. fz도 Plan-Execute + Generate-Test-Repair를 기본으로, TEAM 모드에서 Multi-Attempt를 추가.

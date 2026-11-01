@@ -2,7 +2,7 @@
 
 > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** `code.claude.com/docs/en/code-review` — 인용 원문에 `verified 2026-08-08` 표기 승계. ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
 
-> /batch, /simplify, /ralph-loop 통합 정책. 스킬에서 참조.
+> /batch, /simplify, LOOP(Gate 반복) 통합 정책. 스킬에서 참조.
 
 ## 목차
 
@@ -21,7 +21,7 @@
 | 모드 | 도구 | 트리거 | 용도 |
 |------|------|--------|------|
 | BATCH | /batch | 독립 작업 3개+, --batch 플래그 | worktree 격리 병렬 실행 |
-| LOOP | /ralph-loop | Gate 반복 예상, --loop 플래그 | 자동 반복 + 에스컬레이션 |
+| LOOP | Lead 반복 | Gate 반복 예상, --loop 플래그 | 래더 한도까지 반복 + 에스컬레이션 |
 | SIMPLIFY | /simplify | Step 완료 후 (선택) | 코드 정리 + 과잉 설계 감지 |
 
 ## BATCH 모드 상세
@@ -66,7 +66,7 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 
 ## LOOP 모드 상세
 
-- /ralph-loop 파라미터: `--max-iterations N --completion-promise "GATE_PASSED"`
+- 반복 주체는 Lead 다 — 아래 스킬별 표의 상한(max-iterations)까지 같은 세션에서 Gate 를 다시 돈다(설치형 반복 플러그인은 쓰지 않는다). Workflow 반환이 fallback · split_required 면 `guides/skill-authoring.md` §12 실패 복구 사다리(L1~L4)
 - 에스컬레이션 래더 (각 반복마다 전략 상승):
 
 ### 에스컬레이션 래더 (스킬별 구체화)

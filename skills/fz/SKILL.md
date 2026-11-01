@@ -68,7 +68,7 @@ metadata:
 | `--team` | 팀 에이전트 모드 강제 (opus Primary + N×sonnet) |
 | `--deep` | --team + 교차 검증 강화 |
 | `--batch` | worktree 병렬 실행 강제 (/batch) |
-| `--loop` | 자동 반복 강제 (/ralph-loop) |
+| `--loop` | Gate 반복 모드 강제 — Lead 가 래더 한도까지 다시 돈다(`modules/execution-modes.md` · §12) |
 
 ---
 
@@ -393,9 +393,9 @@ Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④�
 ```
 Gate 실패 시:
 ├─ SOLO → AskUserQuestion (재시도/스킵/중단)
-├─ TEAM → 에이전트에게 이슈 전달 → /ralph-loop 에스컬레이션 래더
+├─ full(Workflow) → `guides/skill-authoring.md` §12 실패 복구 사다리(L1~L4)
 ├─ BATCH → 실패 worktree만 재실행
-└─ 모든 모드 → /ralph-loop 한도 후 사용자 에스컬레이션
+└─ 모든 모드 → 래더 한도 뒤 사용자 에스컬레이션(§12 L4)
 ```
 
 ### 파이프라인 완료 보고
@@ -422,7 +422,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 - 개별 스킬 TEAM 모드 지원
 - 파이프라인 시각화 + 사용자 확인
 - BATCH worktree 병렬 실행 (--no-pr, fz-pr로 위임)
-- /ralph-loop 자동 반복 + 에스컬레이션 래더
+- Gate 반복 + 에스컬레이션 래더(`modules/execution-modes.md` · §12)
 
 **Will Not**:
 - 스킬 자체 로직 수행 (스킬 SKILL.md 지침에 위임)
