@@ -21,6 +21,9 @@ const { execFileSync } = require('child_process')
 
 const ROOT = path.join(__dirname, '..', '..')
 const WF = path.join(ROOT, 'workflows')
+// 노출을 거둔 워크플로 — 측정 재현용으로 tests/fixtures/workflows/ 에 바이트 그대로 둔다(H1-9). 분류표 검사는 그 자리에서 계속한다
+const RETIRED = { 'plan-lean.js': path.join(ROOT, 'tests', 'fixtures', 'workflows') }
+const dirOf = f => RETIRED[f] || WF
 const EXPECTED = {
   'plan-lean2.js': ['L1-full', 'L1-edge', 'L1-impact', 'L2-merge'],
   'plan-lean.js': ['L1-full', 'L1-edge', 'L2-merge'],
@@ -43,7 +46,7 @@ function unrun(msg) { console.log(`UNRUN  ${msg}`); process.exit(2) }
 
 function roles(file) {
   const out = []
-  for (const line of fs.readFileSync(path.join(WF, file), 'utf8').split('\n')) {
+  for (const line of fs.readFileSync(path.join(dirOf(file), file), 'utf8').split('\n')) {
     if (/^\s*(\/\/|\*)/.test(line)) continue          // 주석의 [역할] 은 프롬프트가 아니다
     const re = /\[역할\]\s*/g
     let m
@@ -56,7 +59,8 @@ function roles(file) {
   return out
 }
 
-const files = fs.readdirSync(WF).filter(f => f.endsWith('.js')).sort()
+const files = fs.readdirSync(WF).filter(f => f.endsWith('.js'))
+  .concat(Object.keys(RETIRED).filter(f => fs.existsSync(path.join(RETIRED[f], f)))).sort()
 if (!files.length) unrun(`workflows/*.js 0건 — ${WF}`)
 const byFile = Object.fromEntries(files.map(f => [f, roles(f)]))
 
@@ -99,7 +103,7 @@ for (const f of files) {
   }
 }
 for (const f of [...Object.keys(EXPECTED), ...UNLABELED]) {
-  if (!files.includes(f)) check(f, false, '분류표의 워크플로가 실재한다', `workflows/${f} 없음 — 분류표를 고친다`)
+  if (!files.includes(f)) check(f, false, '분류표의 워크플로가 실재한다', `${path.relative(ROOT, dirOf(f))}/${f} 없음 — 분류표를 고친다`)
 }
 
 const required = judged.required

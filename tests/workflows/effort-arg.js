@@ -73,7 +73,8 @@ function baseFile(wf, tmp) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-effort-arg-'))
   try {
     for (const wf of WFS) {
-      const file = path.join(ROOT, 'workflows', `${wf}.js`)
+      // plan-lean 은 노출을 거두고 tests/fixtures/workflows/ 로 옮겼다(H1-9) — 기준 SHA 쪽은 옛 경로 그대로 읽는다
+      const file = wf === 'plan-lean' ? path.join(ROOT, 'tests', 'fixtures', 'workflows', 'plan-lean.js') : path.join(ROOT, 'workflows', `${wf}.js`)
       const unset = await callsAt(file, wf, {})
       const high = await callsAt(file, wf, { effort: 'high' })
       const bad = await callsAt(file, wf, { effort: 'turbo' })

@@ -54,7 +54,7 @@ bash scripts/setup-hooks.sh
 - `agents/` — fz 에이전트 (15개)
 - `modules/` — 공유 모듈 (47개). ⛔ **실행 절차만** 둔다 — 라운드 의미론의 *역사적 출처*(TEAM 사료 6종)는 2026-09-21 `docs/history/` 로 옮겼다가(B9/S13) 2026-09-25 삭제했다(결정: `modules/promotion-ledger.md` § TEAM 일몰). 사료를 실행 절차와 같은 자리에 두면 읽는 사람이 절차로 오독한다
 - `guides/` — 가이드 문서 (9개)
-- `workflows/` — 결정적 멀티에이전트 스크립트 (9개)
+- `workflows/` — 결정적 멀티에이전트 스크립트 (8개)
 - `templates/` — 스킬/에이전트/모듈/CLAUDE.md 템플릿
 - `gpt-skills/` — GPT 네이티브 스킬 (8개)
 - `gpt-agents/` — GPT 역할 파일 — 독립 첫 패스 리뷰의 렌즈 역할(opt-in: `setup-gpt-skills.sh --gpt-agents` · `gpt-call.sh independent-review … --gpt-agents`)

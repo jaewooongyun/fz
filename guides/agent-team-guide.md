@@ -260,7 +260,7 @@ GOOD (Mesh / Peer-to-Peer):
 
 | 파이프라인 | Primary (opus) | 실질 워커 (opus) | 단순 워커 (sonnet) |
 |-----------|----------------|------------------|--------------------|
-| plan-* (`plan-lean2.js` 기본 · `plan-lean.js` · `plan-collaborative.js` 롤백) | plan-structure | plan-edge-case, plan-impact(lean2·collaborative), plan-merge(lean2), review-arch(collaborative) | -- (direction=fable ×2, collaborative) |
+| plan-* (`plan-lean2.js` 기본 · `plan-lean.js`(측정 재현용 — `tests/fixtures/workflows/`) · `plan-collaborative.js` 롤백) | plan-structure | plan-edge-case, plan-impact(lean2·collaborative), plan-merge(lean2), review-arch(collaborative) | -- (direction=fable ×2, collaborative) |
 | code-* (`code-pair.js`) | impl-correctness | review-arch, impl-quality(full) | -- |
 | review-* (`review-live.js` · `peer-review.js`) | review-arch | review-quality, review-counter, review-correctness(peer-review 만) | -- |
 | discover (`discover-adversarial.js`) | plan-structure | -- | plan-structure(lens fan-out), review-arch(cost) |
