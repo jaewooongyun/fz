@@ -73,7 +73,9 @@ EXPECTED_CELLS = {
     "for-loop-after-done-use": 1, "for-loop-continue-unknown": 1, "for-loop-nested-unknown": 1, "for-loop-glob-unknown": 1,
     "for-loop-charclass-unknown": 1, "for-loop-brace-unknown": 1, "for-loop-source-reassign": 1, "for-loop-multiword-list-unknown": 1,
     "only-charclass-unknown": 1, "for-loop-conditional-reassign": 1, "for-loop-function-reassign": 1,
-    "for-loop-plain-body-owned": 1, "for-loop-tilde-unknown": 1, "for-loop-then-source": 1,
+    "for-loop-plain-body-owned": 1, "for-loop-tilde-home": 1, "for-loop-then-source": 1,
+    "cd-tilde-plan-doc": 1, "assign-tilde-owned": 1, "space-path-owned": 1, "redirect-unresolved-unknown": 1,
+    "home-reassign-owned": 1, "quoted-pattern-not-unknown": 1,
     "for-loop-cd-inherited-unknown": 1, "for-loop-ifs-unknown": 1,
     "for-loop-option-var": 1, "for-loop-alt-expansion": 1, "for-loop-sourced-ifs-unknown": 1, "var-option-owned": 1,
     "for-loop-stateful-var": 1, "for-loop-stateful-cd": 1, "for-loop-var-head-cd": 1, "for-loop-arith-side-effect": 1,
@@ -377,9 +379,45 @@ try:
     # 허용 목록(F-458) — 평범한 몸체는 여전히 소유로 푼다(양성 대조: 허용 목록을 더 조이다 지원 꼴을 미상으로 떨어뜨리면 FAIL)
     for_cell("for-loop-plain-body-owned",
              lambda a, b, cl, c: f'{G_LINE}\nfor X in {a}; do echo x; python3 "$G" --only S1 "$X"; done', owned="a")
-    # GPT check 후속 2 — `~` 는 셸이 전개한다 · `then .` 접두 source 도 루프 변수를 바꾼다
-    for_cell("for-loop-tilde-unknown",
-             lambda a, b, cl, c: f'{G_LINE}\nfor X in ~/A-own/gates/plan.md; do python3 "$G" --only S1 "$X"; done', unknown=True)
+    # `~` 는 셸처럼 훅의 HOME 으로 푼다(GPT check 후속 2 는 '미상' 으로 막았고, 그 뒤 실 transcript 에서 과차단 · 소유 놓침이 나왔다)
+    def home_cell(name, cmd, check_fn, what):
+        with Cell(name) as c:
+            a, cl = c.ledger("A-own"), c.ledger("C-foreign")
+            c.env["HOME"] = str(c.cwd)                 # ~ = cwd — 셸과 훅이 같은 HOME
+            c.run(cmd(a, cl, c))
+            rc, reason, err = c.hook()
+            check(name, check_fn(a, cl, rc, reason or "", err), what, f"rc={rc} {err[-300:]}")
+    owned_a = lambda a, cl, rc, r, err: (rc == 2 and f"미충족 게이트: {a} — " in r and "대상 미상 쓰기" not in err  # noqa: E731
+                                         and f"미충족 게이트: {cl} — " not in r)
+    home_cell("for-loop-tilde-home", lambda a, cl, c: f'{G_LINE}\nfor X in ~/A-own/gates/plan.md; do python3 "$G" --only S1 "$X"; done',
+              owned_a, "루프 값 `~/…` 를 HOME 으로 풀어 A 소유 · 대상 미상 0")
+    home_cell("assign-tilde-owned", lambda a, cl, c: f'{G_LINE}\nW=~/A-own; python3 "$G" --only S1 "$W/gates/plan.md"',
+              owned_a, "`W=~/…` 대입을 HOME 으로 풀어 A 소유(실 transcript 94e1129c 꼴)")
+    home_cell("cd-tilde-plan-doc", lambda a, cl, c: f'{G_LINE}\nmkdir -p ~/doc; cd ~/doc && printf x > a.md && cp a.md plan.md',
+              lambda a, cl, rc, r, err: rc == 0 and "대상 미상 쓰기" not in err,
+              "`cd ~/…` 뒤 원장 아닌 plan.md 복사는 대상 미상이 아니다(실 transcript 46f93dab 꼴 — 과차단 금지)")
+    with Cell("space-path-owned") as c:                 # 리뷰 R6 — 따옴표로 묶은 공백 든 원장 경로
+        a, cl = c.ledger("A own"), c.ledger("C-foreign")
+        c.run(f'{G_LINE}\npython3 "$G" --only S1 "{a}"')
+        rc, reason, err = c.hook()
+        check("space-path-owned", owned_a(a, cl, rc, reason or "", err), "공백 든 원장 경로를 소유로 · 대상 미상 0", f"rc={rc} {err[-300:]}")
+    with Cell("home-reassign-owned") as c:              # 명령이 HOME 을 바꾸면 `~` 는 그 값이다(훅의 HOME 이 아니다)
+        a, cl = c.ledger("A-own"), c.ledger("C-foreign")
+        c.run(f'{G_LINE}\nHOME={str(a).rsplit("/gates/", 1)[0]}; python3 "$G" --only S1 ~/gates/plan.md')
+        rc, reason, err = c.hook()
+        check("home-reassign-owned", owned_a(a, cl, rc, reason or "", err), "명령이 대입한 HOME 으로 `~` 를 풀어 A 소유", f"rc={rc} {err[-300:]}")
+    with Cell("quoted-pattern-not-unknown") as c:       # 따옴표 안 리다이렉트는 데이터(검색 패턴) — 대상 미상으로 올리지 않는다
+        a, cl = c.ledger("A-own"), c.ledger("C-foreign")
+        c.run('grep -n \'cat > "$F/gates/plan.md"\' README.md 2>/dev/null; true')
+        rc, reason, err = c.hook()
+        check("quoted-pattern-not-unknown", rc == 0 and "대상 미상 쓰기" not in err, "검색 패턴 속 `cat >` 는 쓰기가 아니다 — 남의 C 에 안 막힌다",
+              f"rc={rc} {err[-300:]}")
+    with Cell("redirect-unresolved-unknown") as c:      # 리다이렉트 대상도 허용 목록 — 못 푼 경로는 소유 아님이 아니라 미상
+        a, cl = c.ledger("A-own"), c.ledger("C-foreign")
+        c.run(f'printf "x\\n" >> "$NOPE_UNSET/gates/plan.md" 2>/dev/null; true')
+        rc, reason, err = c.hook()
+        check("redirect-unresolved-unknown", rc == 2 and "대상 미상 쓰기" in err, "못 푼 리다이렉트 대상 → 대상 미상(fail-closed)",
+              f"rc={rc} {err[-300:]}")
     for_cell("for-loop-then-source",
              lambda a, b, cl, c: f"{G_LINE}\nprintf 'X=%s\\n' {b} > {c.cwd}/x.env; for X in {a}; do if true; then . {c.cwd}/x.env; fi; "
                                  f'python3 "$G" --only S1 "$X"; done', never=not_a)
