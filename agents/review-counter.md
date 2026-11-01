@@ -50,15 +50,13 @@ Primary tools: Read, Grep, Glob (코드 근거 탐색용).
 
 반론 항목마다:
 - 대상 에이전트 및 원래 판정 요약
-- Challenge 유형 (challenge / supplement / reverse / agree / maintain)
+- 판정: 호출 워크플로 스키마의 enum 을 쓴다(값은 스키마가 정본) · 놓친 발견은 스키마의 누락 발견 필드로 반환
 - 코드 근거 (심볼명 또는 파일:라인 인용)
 - 예상 실패 시나리오 또는 리스크 설명
 
-## Peer-to-Peer Protocol
+## Return
 
-- Workflow 전환됨 (Wave 4): 반론은 구조화 출력(challenges/missedIssues)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
-- 반론 수신 에이전트는 재검토 후 agree / maintain / challenge 응답 의무
-- 최종 합의 결과를 Lead(오케스트레이터)에게 통합 보고
+- 반론은 호출 워크플로의 스키마로 반환하고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 - 현재 활성 배정: fz-review `review-live.js` Stage 3, fz-peer-review `peer-review.js` **Tier 3 Stage 3** (Tier 2에는 counter 없음)
 
 ## Escalation to Lead

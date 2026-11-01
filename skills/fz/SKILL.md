@@ -136,7 +136,7 @@ metadata:
 
 4. **교훈 사전 로드** (강제, 모든 파이프라인):
    - SOLO: `modules/lead-action-default.md` Trigger Matrix 매칭 → 매칭된 메모리 ID + 적용 패턴 명시 출력
-   - TEAM: memory-curator 에이전트 **모든 TEAM 모드**에서 포함
+   - full: memory-curator 회상은 Lead 가 Workflow 밖에서 한다(fz-plan · fz-code 실행 절차의 Lead 책임)
    - **의무 출력 형식**: `Active Recall: [ID-N차] → {매칭 패턴} → {추론된 행동}` (3-step chain)
      - 예: `Active Recall: [40차] → "확인해줘" + 검토 산출물 존재 → full 파이프라인 차단, light mode`
    - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄). 단, 산출물이 전수/카운트/부정 주장 예정이면 abbreviated여도 `Read(modules/cross-validation.md §Coverage Gate)` 후 적용 (light = 절차 생략이지 검증 생략 아님). ⛔ **부정 주장이면 §Negative-Result Gate 도 함께** — 범위 대 도구 유효성은 다른 축이다

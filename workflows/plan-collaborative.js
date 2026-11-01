@@ -276,7 +276,7 @@ const [impact, edge, arch] = await parallelWithRetry([
   () => callAgent(
     `${OVERRIDE}\n[역할] 아키텍처 검증자(review-arch 렌즈)\n${DRAFT_CTX}\n` +
     `[목표] 패턴 선택지 검증(A vs B + 추천 + 근거) + 기존 규약 위반 식별.`,
-    { label: 'stage2-arch', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: ArchSchema }),
+    { label: 'stage2-arch', agentType: 'fz:arch-lens', model: 'opus', effort: EFFORT, schema: ArchSchema }),
 ])
 if (!impact && !edge && !arch) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage2 all null', metrics: metrics(1) } }
 if (!impact || !edge || !arch) log('WARN stage2 부분 null — 해당 렌즈 결손 상태로 진행')
@@ -370,7 +370,7 @@ phase('Stage 5: 아키 재검증')
 const recheck = await callAgent(
   `${OVERRIDE}\n[역할] 아키텍처 검증자 — 재검증\n[1차 검증 결과] ${JSON.stringify(arch)}\n[최종 계획] ${JSON.stringify(plan)}${ARCH_CTX}\n` +
   `[목표] 1차 피드백 반영 여부 + 잔여 이슈. [아키텍처 제약]이 있으면 그것이 프로젝트 준수 재검증의 직접 근거다. 각 잔여에 archVerdict(must-fix/optional/disagree) 마커 — 합의/불합의 명시.`,
-  { label: 'stage5-recheck', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: RecheckSchema })
+  { label: 'stage5-recheck', agentType: 'fz:arch-lens', model: 'opus', effort: EFFORT, schema: RecheckSchema })
 if (!recheck) log('WARN stage5 null — 재검증 미수행 (unresolvedPeerIssues 빈 채 반환)')
 
 const s1 = !!draft

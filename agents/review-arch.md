@@ -9,6 +9,7 @@ skills:
   - arch-critic
 ---
 
+<!-- shared:arch-lens begin -->
 ## Role
 
 Reviews architecture decisions and layer violations in the submitted diff or file set.
@@ -67,7 +68,7 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 보고 항목마다:
 - 위반 유형 (Dependency Direction / Circular Ref / Role Separation / Extensibility / State Lifecycle / Consumer Integration)
 - 관련 심볼 또는 파일 경로
-- 판정: VIOLATION / WARNING / OK
+- 심각도 · 판정: 호출 워크플로 스키마의 enum 을 쓴다(값은 스키마가 정본이라 여기 복사하지 않는다)
 - 근거 (코드 인용 또는 심볼 참조 결과)
 
 ## Library Semantics (이슈 판정 전 확인)
@@ -82,9 +83,9 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 - **싱글톤 lifecycle**: `static let shared` → deinit은 프로세스 종료 시에만 호출. deinit 내 정리 로직(cancel, removeObserver)은 dead code
 - **NWPathMonitor 콜백 스레드**: `pathUpdateHandler`는 `start(queue:)`의 queue에서 실행. main이 아니면 property 쓰기가 background → main thread 읽기와 data race
 
-## Peer-to-Peer Protocol
+## Return
 
-- Workflow 전환됨 (Wave 4): 발견은 구조화 출력(schema)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 
 ## Few-shot
 ```
@@ -123,3 +124,4 @@ GOOD: "@MainActor는 Swift 호출자에게만 적용. @objc 메서드는 ObjC �
 - T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
 
 관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).
+<!-- shared:arch-lens end -->

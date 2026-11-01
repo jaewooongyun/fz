@@ -138,7 +138,7 @@ function evalCostThunk(pathBundle, lensLabel) {
     `[경로] ${JSON.stringify(pathBundle)}\n` +
     `[채점축] 각 경로 cost/risk(low/mid/high) + 조건 불변성(locked/unlocked) 1회 판정 + 근거 코드 인용(evidence) + 확신도(confidence). ` +
     `부수지 말고 비용을 밝힌다.`,
-    { label: `cost-${lensLabel}`, agentType: 'fz:review-arch', model: 'sonnet', effort: EFFORT, schema: CostRiskSchema })
+    { label: `cost-${lensLabel}`, agentType: 'fz:arch-lens', model: 'sonnet', effort: EFFORT, schema: CostRiskSchema })
 }
 
 // ════════════════════════════════════════════════════════════════

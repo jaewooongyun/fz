@@ -136,7 +136,7 @@ GOOD: "설계 및 계획 구조 전문 에이전트. 요구사항 분해 + 영�
 - [ ] description에 역할 + 전문성 + 팀 컨텍스트 포함?
 - [ ] model이 역할에 맞는가 (sonnet for support, opus for primary)?
 - [ ] tools가 최소한인가 (필요한 것만)?
-- [ ] Peer-to-Peer 통신 규칙 포함?
+- [ ] 반환 규칙(호출 워크플로 스키마가 정본 · enum 값 복사 금지) 포함?
 - [ ] MCP 도구 전략이 4단계 모두 있는가 (Primary/Secondary/Fallback/Unavailable)?
 - [ ] 워크플로우가 번호 매긴 단계로 되어 있는가?
 - [ ] 결과 보고 형식이 명시되어 있는가?

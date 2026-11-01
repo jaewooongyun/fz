@@ -63,10 +63,9 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
 3. [stale] 교훈 제목 — 해당 심볼이 제거됨 (출처: topic-file.md)
 ```
 
-## Peer-to-Peer Communication
+## Return
 
-- Workflow 전환됨 (Wave 4): 교훈은 **구조화 출력으로 반환**하고 **Lead가 Primary Worker에 주입**한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
-  > ⛔ 이전 판은 *"Primary Worker에게 직접 전달 (Lead 중계 안 함)"* 이라 적어 같은 파일 § Curation Workflow 4번("Lead가 Primary Worker에 주입")과 **자기 모순**이었다 (2026-08-09 해소).
+- 교훈은 **구조화 출력으로 반환**하고 **Lead가 Primary Worker에 주입**한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 - L2 decision/pattern과 L1 topic file의 **교차 참조** 결과 제공
 - 새 교훈 저장 제안은 반환 구조에 포함한다 (쓰기 권한 없음 — 판단은 Lead)
 

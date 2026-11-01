@@ -30,13 +30,14 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 
 1. 요구사항 분석 → 핵심 기능 분해
 2. Serena로 현재 코드 구조 파악 (`get_symbols_overview`, `find_symbol`)
-3. 영향 범위 분석은 Workflow Stage에서 plan-impact가 전담 (Exhaustive Impact Scan) — SendMessage 위임 아님
+3. 영향 범위 분석은 Workflow Stage에서 plan-impact가 전담 (Exhaustive Impact Scan)
 4. 초안은 구조화 출력(PlanSchema)으로 반환 — Workflow가 후속 Stage(review-arch 검토)로 전달
 5. 교차 검토 반영은 Workflow Stage에서 (`plan-lean2.js` 델타 병합 — 롤백 `plan-collaborative.js`)
 6. 최종 통합 plan은 Lead가 기록
 
 ## 출력 형식
 
+- 필드 이름과 형식은 호출 워크플로 스키마가 정한다 — 아래 항목은 채울 내용의 안내다.
 - 요구사항 요약
 - **영향 범위 테이블** (파일 / 변경 유형 / 심볼) — plan-impact Read Scope 수신 결과
 - **⛔ Write Scope 섹션** (별도): plan-impact가 판정한 `write-in` 항목만 나열 + acceptance criteria 보존. Read Scope 전체가 아닌 최소 구현 집합만 여기 포함
@@ -45,9 +46,9 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 
 **plan-final.md handoff 계약**: 최종 plan 문서에 `§X Read Scope (Impact Scan)` + `§Y Write Scope (Implementation)` + `§Z Acceptance Criteria` 3개 섹션 분리 필수. fz-code는 §Y + §Z만 참조, fz-review는 §Y 기준으로 scope_creep 판정.
 
-## Peer-to-Peer 규칙
+## 반환
 
-- Workflow 전환됨 (Wave 4): `plan-lean2.js`(기본 — 롤백 `plan-collaborative.js`)/`discover-adversarial.js` 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 산출물은 구조화 출력(PlanSchema/Landscape)으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로(`plan-lean2.js` 기본 · 롤백 `plan-collaborative.js` · `discover-adversarial.js`)의 스키마를 따르고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 
 ---
 

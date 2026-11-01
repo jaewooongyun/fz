@@ -20,14 +20,15 @@
 | plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | opus | — | — | — | 실질 워커 |
 | plan-impact | plan | 영향 범위 전담 (Exhaustive Impact Scan a~f) | sonnet | opus | project | — | — | Impact Scanner · 실질 워커 |
 | plan-merge | plan | 델타 병합 전용 — 탐색 도구 없이 입력 JSON 만 접는다 (plan-lean2 Stage 2) | sonnet | opus | — | — | — | 실질 워커 · 도구 0 (F-345) |
-| impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | worktree | Primary |
+| impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | — | Primary · 쓰기 도구 없음 — changeset 만 반환(F-460) |
 | impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | opus | — | — | — | 실질 워커 |
-| review-arch | review | 아키텍처 결정 + 레이어 위반 | sonnet | opus | project | arch-critic | — | Primary |
+| review-arch | review | 아키텍처 결정 + 레이어 위반 | sonnet | opus | project | arch-critic | — | Primary · 리뷰 워크플로(review-live · peer-review) 전용 |
+| arch-lens | review, implement, plan | review-arch 와 같은 본문 · arch-critic 사전주입 없음 | sonnet | opus | — | — | — | 정의 `agents/arch-lens.md` · 리뷰 밖 호출처(code-pair · discover-adversarial · plan-collaborative) — F-459 |
 | review-quality | review | 코드 품질 + Dead Code + 성능 | sonnet | opus | project | code-auditor | — | 실질 워커 |
 | review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | opus | — | — | — | fz-code TEAM + fz-review Phase 4.5 · 실질 워커 |
 | review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | opus | — | — | — | direction-challenge 판단 지점(Workflow=fable) |
 | review-counter | review | 반론 + Devil's Advocate | sonnet | opus | — | — | — | 실질 워커 |
-| memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | — | user | — | — | 모든 TEAM 모드 참여 |
+| memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | — | user | — | — | full 경로의 Lead 회상(Workflow 밖 — fz-plan · fz-code 실행 절차의 Lead 책임) |
 
 ---
 

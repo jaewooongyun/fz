@@ -32,7 +32,7 @@ Verifies that the implementation matches the stated requirements and plan.
 - 상태 전이가 완전한가 (모든 입력 경우를 처리하는가)
 - 조건 분기 누락 (else/default 누락 등)
 - **Function Responsibility Audit** (함수 제거 / 호출 중단 감지 시):
-  1. 원본 body는 브리프의 base 경로(Lead가 Gather에서 prefetch)에서 Read한다 — SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `guides/agent-team-guide.md` §2). 브리프에 base가 없으면 `originBodyRequest`(파일 경로) 필드로 반환 → Lead가 resolve 후 재주입.
+  1. 원본 body는 브리프의 base 경로(Lead가 Gather에서 prefetch)에서 Read한다 (채널 우선순위 원칙, `guides/agent-team-guide.md` §2). 브리프에 base가 없으면 `originBodyRequest`(파일 경로) 필드로 반환 → Lead가 resolve 후 재주입.
   2. Lead는 **PR base ref** (`origin/{base_branch}` 또는 `git merge-base HEAD @{upstream}`)를 resolve하여 `git show ${BASE_REF}:filepath`로 prefetch (⛔ `HEAD^` 하드코딩 금지 — stacked/multi-commit 리뷰에서 잘못된 baseline 위험. 단일 commit local mode에서만 `HEAD^` 폴백 허용)
   3. 원본 body를 조건 분기 1개 = 책임 1개로 분해
   4. Scalability: ≤ 20줄 자동 분해, 21-100줄 sampling + AskUserQuestion, 100+ 줄 사용자 에스컬레이션
@@ -54,7 +54,7 @@ Verifies that the implementation matches the stated requirements and plan.
 보고 항목마다:
 - 위반 유형 (Missing Requirement / Logic Error / Missing Edge Case / Incomplete State)
 - 관련 심볼 또는 파일 경로
-- 판정: MISSING / INCORRECT / OK
+- 심각도 · 판정: 호출 워크플로 스키마의 enum 을 쓴다(값은 스키마가 정본이라 여기 복사하지 않는다)
 - 근거 (계획 항목과 코드 간 대응 관계 명시)
 
 ## Context-Specific Behavior
@@ -64,11 +64,9 @@ Verifies that the implementation matches the stated requirements and plan.
 | **fz-code** | 기능 정확성 감시 (sonnet) | 구현 중 요구사항 충족 여부 실시간 검증. impl-correctness에게 누락 요구사항/로직 오류 직접 전달. |
 | **fz-review** | 정확성 리뷰 (sonnet) | Requirement Coverage + Logic Correctness 관점 분석. review-arch와 발견 공유. |
 
-## Peer-to-Peer Protocol
+## Return
 
-- 팀 내 피어에게 발견 즉시 공유 (정확성 이슈가 다른 Lens와 연결된 경우)
-- 피어로부터 피드백을 수신하면 재검토 후 agree / maintain으로 응답
-- 전체 합의 후 Lead(오케스트레이터)에게 통합 보고
+- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 
 ## Escalation to Lead
 - 요구사항과 구현 간 불일치가 의도적인지 판단 불가 시

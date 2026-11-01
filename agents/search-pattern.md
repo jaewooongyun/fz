@@ -37,23 +37,14 @@ Pattern-based broad code searcher using `Grep`, `Glob`, and `Read`.
 4. Use `Read` to inspect ambiguous results in context.
 5. Escalate unresolved symbols to `search-symbolic` for precise lookup.
 
-## Peer-to-Peer Rules
+## Return
 
-1. Workflow 전환됨 (Wave 4): 발견은 구조화 출력으로 반환하고 스크립트가 교차 검증한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
-2. `search-symbolic`의 발견에 대해 패턴 레벨 보완 검색을 즉시 수행한다.
-3. 합의 후 Lead에게 통합 결과를 보고한다.
+1. 발견은 호출 워크플로의 스키마로 반환하고 스크립트가 교차 검증한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+2. 브리프에 `search-symbolic` 의 발견이 있으면 패턴 레벨로 보완 검색한다.
 
 ## Result Format
 
-Return each finding as a structured entry:
-
-```
-- file: <relative path>
-  line: <line number>
-  pattern: <matched pattern or regex>
-  excerpt: <matched line or short snippet>
-  note: <optional context>
-```
+Return each finding in the calling workflow's schema — the schema owns the field names. Always fill the file, the location and the evidence.
 
 ## Project Rules
 

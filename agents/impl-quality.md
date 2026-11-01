@@ -52,9 +52,9 @@ in real time, providing feedback directly to `impl-correctness`.
 - 싱글톤 가변 상태 동기화 누락 감지 (plugin-refs.md 역방향 트리거 참조)
 - CLAUDE.md `## Code Conventions` 메모리 규칙과 대조
 
-## Peer-to-Peer Communication
+## Return
 
-- Workflow 전환됨 (Wave 4): `code-pair.js` 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 품질 피드백은 구조화 출력으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 
 ---
 

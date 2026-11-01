@@ -57,14 +57,15 @@ tools: Read, Grep, Glob, mcp__codegraph__codegraph_explore, mcp__plugin_fz_seren
 
 ## 출력 형식
 
+- 필드 이름과 형식은 호출 워크플로 스키마가 정한다 — 아래 항목은 채울 내용의 안내다.
 - 발굴된 엣지 케이스 목록 (범주별 분류)
 - 각 케이스의 발생 가능성 및 영향도
 - 계획에서 누락된 처리 항목
 - 권고 대응 방안
 
-## Peer-to-Peer 규칙
+## 반환
 
-- Workflow 전환됨 (Wave 4): `plan-lean2.js`(기본 — 롤백 `plan-collaborative.js`) 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 엣지 케이스는 구조화 출력으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로(`plan-lean2.js` 기본 · 롤백 `plan-collaborative.js`)의 스키마를 따르고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 
 ---
 

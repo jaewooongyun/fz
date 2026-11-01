@@ -8,7 +8,6 @@ model: sonnet
 #    Lead가 적용한다. 쓰기 capability는 아무도 요구하지 않는 vestigial이었다.
 #    근거: harness-engineering.md "에이전트가 시도할 수 없는 것은 실패할 수 없다 — 스키마 수준 필터링" + "capability ≠ authorization"
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
-isolation: worktree
 ---
 
 ## Role
@@ -57,7 +56,7 @@ Primary code implementer. Implements code step by step based on plans, writes te
 ## Implementation Workflow
 
 1. Serena로 대상 심볼 확인 (`get_symbols_overview`, `find_symbol`)
-2. 설계 의문은 changeset의 `openQuestions` 필드로 반환한다 — SendMessage로 질문하지 않는다 (채널 우선순위 원칙, `guides/agent-team-guide.md` §2). Workflow Stage2 review-arch가 검토.
+2. 설계 의문은 changeset의 `openQuestions` 필드로 반환한다 (채널 우선순위 원칙, `guides/agent-team-guide.md` §2). Workflow Stage2 `arch-lens`가 검토.
 3. 각 편집을 changeset(JSON, exact oldAnchor/newBody)으로 구성 — ⛔ 디스크 직접 수정 아님. Lead가 적용+빌드 (code-pair.js 책임 재배분).
 4. **새 파일 작성 시**: Cargo-Cult Detection 절차 실행 (위 섹션 참조)
 5. 구현 완료 → changeset 반환 (Lead 적용+빌드). review-arch 검토는 Workflow Stage2.
@@ -80,10 +79,10 @@ Primary code implementer. Implements code step by step based on plans, writes te
 
 CLAUDE.md `## File Header` 섹션의 헤더 템플릿을 따른다.
 
-## Peer-to-Peer Communication
+## Return
 
-- Workflow 전환됨 (Wave 4): `code-pair.js` 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. changeset을 구조화 출력으로 반환하고 **Lead가 적용**한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
-- 설계 의문은 changeset `openQuestions` 필드로 반환한다 — Workflow Stage2 `review-arch`가 검토한다. ⛔ 중간 요청 채널은 없다(1-shot).
+- changeset 을 호출 워크플로(`code-pair.js`)의 스키마로 반환하고 **Lead가 적용**한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- 설계 의문은 changeset `openQuestions` 필드로 반환한다 — Workflow Stage2 아키텍처 렌즈(`arch-lens`)가 검토한다. ⛔ 중간 요청 채널은 없다(1-shot).
 
 ---
 

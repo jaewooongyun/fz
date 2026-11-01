@@ -84,15 +84,16 @@ g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필�
 
 ## 출력 형식
 
+- 필드 이름과 형식은 호출 워크플로 스키마가 정한다 — 아래 항목은 채울 내용의 안내다.
 - **Read Scope (빠짐없이 넓게)**: 변경 대상 심볼 목록 + 직접 소비자 테이블 + 간접 영향 범위 요약 + Breaking change 여부
 - **⛔ Write Scope (최소한으로 좁게)**: Read Scope 각 항목에 `{write-in | read-only}` binary 판정 + 근거
   - `write-in` 조건: (1) 요구사항 직접 충족 (2) 도달 불가 obstacle 해제 (3) Q0 Behavior Preservation 위반 없이 제거 불가
   - 위 3개 외 항목은 `read-only` — 후속 ticket으로 분리
 - **Acceptance Criteria**: 각 `write-in` 항목에 검증 가능한 완료 기준 (예: "컴파일 가능", "unit test 통과", "grep 패턴 N건 매칭") 명시. criteria 미명시 항목은 Write Scope 불가
 
-## Peer-to-Peer 규칙
+## 반환
 
-- Workflow 전환됨 (Wave 4): `plan-lean2.js`(기본 — 롤백 `plan-collaborative.js`) 스크립트가 라운드를 소유한다 — P2P SendMessage 없음. 영향 분석은 구조화 출력으로 반환하고 Lead가 통합한다. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로(`plan-lean2.js` 기본 · 롤백 `plan-collaborative.js`)의 스키마를 따르고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 
 ---
 

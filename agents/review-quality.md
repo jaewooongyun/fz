@@ -79,7 +79,7 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 보고 항목마다:
 - 위반 유형 (SRP / DRY / Deprecated API / Dead Code / Performance / Concurrency)
 - 관련 심볼 또는 파일 경로
-- 판정: VIOLATION / WARNING / OK
+- 심각도 · 판정: 호출 워크플로 스키마의 enum 을 쓴다(값은 스키마가 정본이라 여기 복사하지 않는다)
 - 근거 (코드 인용 또는 API 참조 결과)
 
 ## Library Semantics (이슈 판정 전 확인)
@@ -96,9 +96,9 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - **비동기 기본값**: 비동기 데이터 소스로 채워지는 property의 기본값 → 소비자 guard/if 분기 영향 평가. `= false`가 부팅 시 차단 유발 가능
 - **API 내부 retention**: context7 query-docs로 API 파라미터 내부 retention 확인 후 중복 멤버변수 판별
 
-## Peer-to-Peer Protocol
+## Return
 
-- Workflow 전환됨 (Wave 4): 발견은 구조화 출력(schema)으로 반환하고 Lead가 통합한다 — P2P SendMessage 없음. 브리프 명시 채널 우선 (`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
 
 ## Few-shot
 ```

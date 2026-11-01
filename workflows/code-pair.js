@@ -22,6 +22,8 @@
 //     buildFeedback이 args를 바꿔 캐시 키 불일치 [선례: ts 제거 — resume 캐시 미스 유발]).
 //
 // [설계 — TEAM pair-programming 패턴 평탄화]
+//   ⛔ 아키텍처 렌즈의 agentType 은 `fz:arch-lens` — review-arch 와 같은 본문에서 arch-critic 사전주입(19KB, 리뷰 전용)만 뺀 정의다(F-459).
+//      라벨 · 프롬프트의 'review-arch' 는 렌즈 이름이라 그대로 둔다(fz_wf_metrics 가 프롬프트 문구로 단계를 추정한다).
 //   full(fz-code): Stage1 impl(opus) changeset → Stage2 **병렬 2렌즈**(review-arch + impl-quality, opus) →
 //     Stage3 impl(opus) 이슈 반영 수정 — **조건부**: review pass면 Stage3 생략 (3-call).
 //     계획 표기 '고정 3-call'은 unresolved #2가 잠정 부정확 지적 — pass 경로 dead-call 제거가 정직
@@ -203,7 +205,7 @@ if (needReview) {
     // 병렬 2렌즈 — 서로 다른 질문(아키 적합성 vs 코드베이스 패턴 일관성). 같은 질문 중복 금지.
     const [archReview, qualityReview] = await parallel([
       () => callAgent(archPrompt,
-        { label: 'stage2-review-arch', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: ReviewSchema }),
+        { label: 'stage2-review-arch', agentType: 'fz:arch-lens', model: 'opus', effort: EFFORT, schema: ReviewSchema }),
       () => callAgent(
         `${OVERRIDE}\n[역할] 구현 품질 검토자(impl-quality 렌즈)\n${STEP}\n[changeset] ${JSON.stringify(changeset)}\n` +
         `[목표] Codebase Pattern Consistency — 이 편집이 **놓인 자리**가 일관적인지 본다.\n` +
@@ -232,7 +234,7 @@ if (needReview) {
     }
   } else {
     review = await callAgent(archPrompt,
-      { label: 'stage2-review', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: ReviewSchema })
+      { label: 'stage2-review', agentType: 'fz:arch-lens', model: 'opus', effort: EFFORT, schema: ReviewSchema })
     // ⛔ light 도 렌즈 회계에 넣는다 — 빠뜨리면 검토가 성공해도 lensesCompleted 가 0 이라 s2 가 항상 false 다.
     lensesCompleted = review ? 1 : 0
     if (!review) { deadLenses.push('review-arch'); log('WARN stage2 null — 검토 미수행 (changeset 원안 반환, residualIssues에 명시)') }
