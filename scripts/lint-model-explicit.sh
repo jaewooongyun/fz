@@ -59,13 +59,18 @@ EXPECTED_FABLE=3
 #   값 변경이 정당한 경우(sweep/ablation 통과)엔 baseline 파일도 함께 갱신한다 — 근거는 experiment-log.
 if [ -n "$BASELINE" ]; then
   [ -f "$BASELINE" ] || { echo "❌ --baseline 파일이 없다: $BASELINE" >&2; exit 2; }
-  python3 - "$BASELINE" "$WORKFLOWS_DIR" <<'PY'
+  python3 - "$BASELINE" "$WORKFLOWS_DIR" "$(dirname "$SCRIPT_DIR")" <<'PY'
 import json, re, sys, glob, os
-baseline_path, wf_dir = sys.argv[1], sys.argv[2]
+baseline_path, wf_dir, root = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(baseline_path, encoding="utf-8") as fh:
     want = json.load(fh).get("calls") or {}
 got, dups = {}, []
-for f in sorted(glob.glob(os.path.join(wf_dir, "*.js"))):
+# 노출을 거두고 tests/fixtures/workflows/ 로 옮긴 워크플로(H1-9 — plan-lean.js)의 기준선 키는 덮어쓰지 않고 그 자리에서 대조한다(경로 매핑).
+# ⛔ 정본 기준선과 대조할 때만 — 그 키를 담은 것이 정본이다. 다른 기준선 파일(fixture 의 합성 기준선)에 이 루트의 파일을 섞으면 없는 호출이 생긴다
+files = sorted(glob.glob(os.path.join(wf_dir, "*.js")))
+if os.path.realpath(baseline_path) == os.path.realpath(os.path.join(root, "tests", "fixtures", "model-effort-baseline.json")):
+    files += sorted(glob.glob(os.path.join(root, "tests", "fixtures", "workflows", "*.js")))
+for f in files:
     for i, line in enumerate(open(f, encoding="utf-8"), 1):
         # ⛔ label 없는 호출도 센다(F-335 ⑲) — 빼면 baseline 에 없는 호출이 비교 밖에서 돈다. 키는 아래 `line{i}` 다
         if "agentType:" not in line:
