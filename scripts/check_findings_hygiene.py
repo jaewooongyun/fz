@@ -130,6 +130,22 @@ def _eject_module():
     return mod
 
 
+# 엔트리 본문에 남은 작성 명령(F-456) — heredoc 으로 엔트리를 쓴 셸 명령의 꼬리(`EOF` · `echo "기록 …"` · `wc -l "$F"`)가 본문이 됐다
+WRITER_LINE = re.compile(r'^(?:echo "기록|wc -l "\$F"|cat > "\$F")')
+WRITER_AFTER_EOF = re.compile(r"^(?:echo|wc -l|tail)\b")
+
+
+def _writer_leak(text: str):
+    """펜스 밖 첫 작성 명령 잔재 (줄 번호, 줄) — 없으면 None. `EOF` 는 바로 다음 줄이 echo · wc -l · tail 일 때만 잔재다."""
+    free = list(_fence_free(text))
+    for k, (n, line) in enumerate(free):
+        if WRITER_LINE.match(line):
+            return n, line
+        if line == "EOF" and k + 1 < len(free) and free[k + 1][0] == n + 1 and WRITER_AFTER_EOF.match(free[k + 1][1]):
+            return n, line
+    return None
+
+
 def _fence_free(text: str):
     """(줄 번호, 줄) — 펜스 밖 줄만."""
     fence = False
@@ -340,6 +356,14 @@ def _strict_axes(root: pathlib.Path, texts: dict, live_slugs: set, live_ids: set
             dumps.append(f"{d}: {len(lines)}줄 · 첫 줄 :{lines[0][0]} `{lines[0][1][:60]}`")
     show("펜스 밖 INDEX 덤프(^=== · ^NN:| F-NNN)", dumps)
     counts["INDEX 덤프"] = len(dumps)
+    # 엔트리 본문의 작성 명령 잔재(F-456) — entries · .archive. 펜스 안 인용은 보지 않는다
+    leaks = []
+    for d in sorted(docs):
+        hit = _writer_leak(docs[d])
+        if hit:
+            leaks.append(f"{d}:{hit[0]} `{hit[1][:60]}`")
+    show("엔트리 본문의 작성 명령 잔재(EOF→echo · echo \"기록 · wc -l \"$F\" — F-456)", leaks)
+    counts["작성 명령"] = len(leaks)
     return counts, unjudged
 
 

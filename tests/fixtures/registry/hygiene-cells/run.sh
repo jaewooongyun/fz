@@ -330,9 +330,48 @@ def c_consumer(b):
           f"INDEX 부재 + 중복 ID: --audit exit 1(위반 우선) · `AUDIT: … → exit 1` (실제 {rc_v})", out_v)
 
 
+# ── F-456 — 엔트리 본문의 작성 명령 잔재 ───────────────────────────────────────────────
+LEAK_AXIS = "엔트리 본문의 작성 명령 잔재"
+
+
+def _leaky(b, tail):
+    root = build(b)
+    s2 = slug_of("F-002")
+    p = root / "entries" / f"{s2}.md"
+    p.write_text(p.read_text(encoding="utf-8") + tail, encoding="utf-8")
+    return root, s2
+
+
+def c_writer_leak(b):
+    root, s2 = _leaky(b, '\necho "기록: $F"\nwc -l "$F"\n')
+    rc, out = strict(root)
+    expect_violation("writer-leak", out, rc, LEAK_AXIS, "`echo \"기록` 줄")
+    check("writer-leak", f"{s2}:" in out, "위반에 파일:줄", out)
+
+
+def c_writer_leak_eof_echo(b):
+    # 실제 레지스트리 꼴(F-046:65) — `EOF` 바로 뒤 echo · 셸 주석
+    root, s2 = _leaky(b, '\nEOF\necho "F-002 작성: $(wc -l < entries/F-002.md)줄"\n\n# INDEX 갱신\n')
+    rc, out = strict(root)
+    expect_violation("writer-leak-eof-echo", out, rc, LEAK_AXIS, "`EOF` → echo")
+
+
+def c_writer_leak_fenced(b):
+    root, _ = _leaky(b, '\n```bash\nEOF\necho "기록: $F"\nwc -l "$F"\n```\n')
+    rc, out = strict(root)
+    check("writer-leak-fenced", rc == 0 and has_line(out, "OK: 불변식 충족"), f"펜스 안 같은 줄은 인용이다 — exit 0 · OK (실제 {rc})", out)
+
+
+def c_writer_leak_default_mode(b):
+    root, _ = _leaky(b, '\necho "기록: $F"\n')
+    rc, out = hyg(root)
+    expect_violation("writer-leak-default-mode", out, rc, LEAK_AXIS, "기본 모드(strict 없음)도 같은 축")
+
+
 CELLS = {"control": c_control, "orphan": c_orphan, "out-of-queue": c_out_of_queue, "applied-conflict": c_applied_conflict,
          "dup-title": c_dup_title, "dup-h1-body": c_dup_h1_body, "index-dump": c_index_dump, "unrun": c_unrun,
-         "consumer": c_consumer}
+         "consumer": c_consumer, "writer-leak": c_writer_leak, "writer-leak-eof-echo": c_writer_leak_eof_echo,
+         "writer-leak-fenced": c_writer_leak_fenced, "writer-leak-default-mode": c_writer_leak_default_mode}
 picked = []
 for tok in [t for t in CELLS_ARG.replace(" ", ",").split(",") if t] or list(CELLS):
     if tok not in CELLS:
