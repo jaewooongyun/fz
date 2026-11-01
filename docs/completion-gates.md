@@ -127,7 +127,7 @@ print('현재 Stop 항목:', len(d.get('hooks', {}).get('Stop', [])))"
 아래 형태를 쓴다. 캐시에서 최신 하나를 고르고, 없으면 통과한다.
 
 ```bash
-H="$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | tail -1)"
+H="$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | sort -V | tail -1)"
 [ -n "$H" ] || exit 0
 exec python3 "$H"
 ```
@@ -138,7 +138,7 @@ exec python3 "$H"
 
 ```bash
 H="$HOME/dev/fz-plugin/scripts/gate_stop_hook.py"
-[ -f "$H" ] || H="$(ls -d "$HOME"/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | tail -1)"
+[ -f "$H" ] || H="$(ls -d "$HOME"/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | sort -V | tail -1)"
 [ -n "$H" ] || exit 0
 exec python3 "$H"
 ```
@@ -180,7 +180,7 @@ export FZ_GATES_LEDGER=/path/to/PRJ-1234/gates/plan.md    # 여러 개는 : 로 
         "hooks": [
           {
             "type": "command",
-            "command": "H=\"$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | tail -1)\"; [ -n \"$H\" ] || exit 0; exec python3 \"$H\""
+            "command": "H=\"$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | sort -V | tail -1)\"; [ -n \"$H\" ] || exit 0; exec python3 \"$H\""
           }
         ]
       }
