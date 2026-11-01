@@ -580,6 +580,67 @@ def collect_findings(findings_dir, since, until):
     # 열거가 실패했으면 배출도 재지 않는다 — 부모 폴더 추정이 엉뚱한 APPLIED.md 를 읽는다
     root = None if out["enumeration_error"] else os.path.dirname(os.path.normpath(findings_dir))
     out["outflow"] = _collect_outflow(root, since, until)
+    out["track_d"] = _collect_track_d(None if out["enumeration_error"] else findings_dir)
+    return out
+
+
+RE_RECUR_PHRASE = re.compile(r"(F-\d{3}[a-z]?)[^\n]{0,40}재발|재발[^\n]{0,40}(F-\d{3}[a-z]?)")
+
+
+def _collect_track_d(findings_dir):
+    """트랙 D 후보 — 같은 `failure_class`(README §4) 묶음의 서로 다른 `date` 수(관측일). 기간 창과 무관하다.
+
+    관측일은 세션 수가 아니다 — 자정을 넘긴 한 세션은 2일, 같은 날 별개 세션 둘은 1일이다.
+    ⛔ `recurs_of` 는 묶지 않는다(같은 축이어도 원인이 다를 수 있다) — 클래스가 다른 간선만 `related` 로 보인다.
+    ⛔ 본문 '재발' 언급도 잇지 않는다 — 클래스가 다른 대상을 가리키는 엔트리 수만 `unlinked` 로 센다.
+    """
+    out = {"candidates": [], "related": [], "unlinked": 0, "unmeasured": []}
+    if not findings_dir:
+        return out
+    members = {}
+    arc = os.path.join(os.path.dirname(os.path.normpath(findings_dir)), ".archive")
+    for folder, archived in ((findings_dir, False), (arc, True)):
+        try:
+            names = sorted(e.name for e in os.scandir(folder) if re.match(r"^F-\d{3}", e.name) and e.name.endswith(".md"))
+        except FileNotFoundError:
+            continue                       # archive 가 없는 레지스트리 — 빈 것이 맞다
+        except OSError as e:
+            out["unmeasured"].append("%s 열거 %s" % (os.path.basename(folder), type(e).__name__))
+            continue
+        for name in names:
+            path = os.path.join(folder, name)
+            try:                           # 한 번만 읽는다 — 못 읽은 엔트리는 frontmatter 없음과 섞지 않고 미측정으로 센다
+                text = open(path, encoding="utf-8", errors="replace").read()
+            except OSError as e:
+                out["unmeasured"].append("%s %s" % (name, type(e).__name__))
+                continue
+            meta = _parse_frontmatter(text.splitlines(keepends=True))
+            if meta is None:
+                continue
+            fid = re.match(r"^F-\d{3}[a-z]?", name).group(0)
+            body = text.split("\n---\n", 1)[1] if "\n---\n" in text else ""
+            day = str(meta.get("date") or "")
+            root = re.match(r"^\[?\s*(F-\d{3}[a-z]?)", str(meta.get("recurs_of") or ""))
+            members[fid] = {"class": str(meta.get("failure_class") or ""), "archived": archived,
+                            "day": day if re.match(r"^\d{4}-\d{2}-\d{2}$", day) else None,
+                            "recurs_of": root.group(1) if root else None,
+                            "refs": {a or b for a, b in RE_RECUR_PHRASE.findall(body)} - {fid}}
+    groups = collections.defaultdict(list)
+    for fid, m in members.items():
+        if m["class"]:
+            groups[m["class"]].append(fid)
+        cls_of = lambda other: members.get(other, {}).get("class")  # noqa: E731
+        if m["recurs_of"] and cls_of(m["recurs_of"]) != m["class"]:
+            out["related"].append({"id": fid, "recurs_of": m["recurs_of"]})
+        if any(cls_of(ref) != m["class"] or not m["class"] for ref in m["refs"]):
+            out["unlinked"] += 1
+    for cls, ids in groups.items():
+        days = {members[i]["day"] for i in ids if members[i]["day"]}
+        if len(days) >= 2 and any(not members[i]["archived"] for i in ids):
+            out["candidates"].append({"class": cls, "days": len(days), "members": [
+                {"id": i, "date": members[i]["day"] or "-", "archived": members[i]["archived"]}
+                for i in sorted(ids, key=lambda i: (members[i]["day"] or "", i))]})
+    out["candidates"].sort(key=lambda c: (-c["days"], c["class"]))
     return out
 
 
@@ -646,19 +707,24 @@ def _read_frontmatter(path):
         handle = open(path, "r", errors="replace")
     except OSError:
         return None
-    meta = {}
     with handle:
-        first = handle.readline()
-        if first.strip() != "---":
-            return None
-        for line in handle:
-            if line.rstrip("\n") == "---":   # 열 0 의 `---` 만 끝이다 — 위생 검사기 FM 정규식과 같은 규칙(들여쓴 `  ---` 는 끝이 아니다)
-                break
-            match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", line.rstrip("\n"))
-            if match:
-                # ⛔ 템플릿 시절 `class: hole   # hole | miss …` 꼴 주석이 값에 섞여 있었다(2026-10-29 실측 51줄)
-                value = re.sub(r"\s{2,}#\s.*$", "", match.group(2))
-                meta[match.group(1)] = value.strip().strip('"')
+        return _parse_frontmatter(handle)
+
+
+def _parse_frontmatter(lines):
+    """줄 묶음(파일 핸들 · 리스트) → frontmatter dict. 첫 줄이 `---` 가 아니면 None."""
+    lines = iter(lines)
+    if next(lines, "").strip() != "---":
+        return None
+    meta = {}
+    for line in lines:
+        if line.rstrip("\n") == "---":   # 열 0 의 `---` 만 끝이다 — 위생 검사기 FM 정규식과 같은 규칙(들여쓴 `  ---` 는 끝이 아니다)
+            break
+        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", line.rstrip("\n"))
+        if match:
+            # ⛔ 템플릿 시절 `class: hole   # hole | miss …` 꼴 주석이 값에 섞여 있었다(2026-10-29 실측 51줄)
+            value = re.sub(r"\s{2,}#\s.*$", "", match.group(2))
+            meta[match.group(1)] = value.strip().strip('"')
     return meta
 
 
@@ -839,6 +905,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
             "axis": dict(findings["axis"]),
             "backlog": {k: (dict(v) if isinstance(v, collections.Counter) else v) for k, v in findings["backlog"].items()},
             "outflow": {k: (dict(v) if isinstance(v, collections.Counter) else v) for k, v in findings["outflow"].items()},
+            "track_d": findings["track_d"],
             "enumeration_error": findings["enumeration_error"],
         },
         "static_load": static,
@@ -1008,6 +1075,25 @@ def render_markdown(payload):
     lines.append("")
     lines.append("> ⭐ 판단·절차 갈래(axis ≠ tool)가 대기에 쌓이고 배출이 tool 로만 일어나면, 릴리즈 `Closes:` 밖의 출구"
                  "(README §1 수동 배출)가 돌지 않는 것이다.")
+    lines.append("")
+    track = findings["track_d"]
+    lines.append("### 트랙 D 후보 (같은 failure_class · 관측일 2+ · live 1+ · 기간 무관)")
+    lines.append("")
+    lines.append("> 관측일은 엔트리 `date` 의 서로 다른 날 수다 — 세션 수가 아니다(자정을 넘긴 한 세션은 2일 · 같은 날 별개 세션 둘은 1일)."
+                 " 별개 세션은 Lead 가 엔트리의 세션 · 맥락 줄로 확인해 이 줄과 함께 인용한다.")
+    lines.append("")
+    if track["unmeasured"]:
+        lines.append("> ⛔ 일부 미측정 — 아래 목록은 빠진 엔트리가 있을 수 있다: " + " · ".join(track["unmeasured"]))
+        lines.append("")
+    for cand in track["candidates"]:
+        lines.append("- `%s` — 트랙 D 후보(관측일 %d · 별개 세션 미확인): %s" % (cand["class"], cand["days"], " · ".join(
+            "%s %s%s" % (m["id"], m["date"], "(archive)" if m["archived"] else "") for m in cand["members"])))
+    if not track["candidates"]:
+        lines.append("- 없음")
+    lines.append("")
+    lines.append("관련(`recurs_of` · 클래스 다름 · 원인 다를 수 있음 · 세지 않음) %d: %s" % (
+        len(track["related"]), " · ".join("%s → %s" % (r["id"], r["recurs_of"]) for r in track["related"]) or "-"))
+    lines.append("본문 '재발' 언급 미계수 %d — 클래스가 다른 엔트리를 가리켜 잇지 않았다" % track["unlinked"])
     lines.append("")
 
     lines.append("## 5. 정적 부하 (floor / ceiling)")
