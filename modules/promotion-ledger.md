@@ -125,7 +125,7 @@
 - ⚡ 조치 (2026-06-02, OBS-09 관측 #2): fz-code:277 신호에 **색/style-run/정렬 enumeration + data>render(childOrder) clause 확장** + **`figma 텍스트 미대조` candidate 신호 신설**(text-content 2세션, candidate 유지). plan 시점 Node Inventory(회고 §5-A)는 **DEFERRED 유지** — code 시점 enumeration gap은 277의 '사전 토큰 테이블 exhaustive 신뢰 → 누락 항목 답습' clause로 cover. 42차 caveat는 *구조 데이터 부재(flattened IMAGE)* 한정으로 재범위화 (구조 데이터 존재 노드값 읽기는 결정론적). 적용: {작업 폴더}/OBS-09/fz-enhancement/plan.md (TEAM plan+review)
 - ⚡ 조치 (2026-08-03, 관측 #3): ① fz-code:276의 blanket 문장("raw 노드값 그대로 적용")을 **축별 분기로 대체** — direct property는 raw 직접 / 요소 간 실효 거리는 경계 사이 gap·padding 합산(⚠️ spacer·절대배치·음수간격·modifier 순서 개재 시 단순 합 불성립 → 렌더 판정) / raw 미표현 축은 렌더 스냅샷. ② **측정 아티팩트 provenance 3필드 표준** — figma 측정 산출물 헤더에 `file key` + `node ID` + `실측일` 고정. 선례 `OBS-23-work/figma-code-diff-01:3`은 기재, `OBS-18-work/figma-measure-exhaustive.md:3`은 미기재 → **후속 세션이 동일 스냅샷 여부를 판정 불가**(본 세션 실측 실패로 확인). ③ **Adapter(합성값 자동 diff)는 미착수** — figma node ↔ SwiftUI expression 매핑 계약 부재 [외부: GPT verify rejected — `내부 GPT 검증 기록`]. 재설계(figma calculator + mapping manifest 2단 분리) 후 재제안.
 - ⚠️ **경합 가설 미해소 (2026-08-03)**: `figma-measure-exhaustive.md`(07-24 16:08)가 정정(07-29 04:10)보다 앞서 존재했으나, 두 산출물의 node 집합이 다르다(`114292…` vs file `6T8hjmMGw8xKd95NC32yKg` node `6725-121653`). **(가) 표가 stale 스펙 / (나) 합성 누락** 중 판정 불가 — provenance 부재가 원인. Figma `/design/` URL 확보 시 결판 가능. ⛔ 어느 쪽도 확정 서술 금지.
-- 승격 목표 (트랙 A): figma 작업 세션 5회 관측 후 신호 활성 (memory-guide line 43). GPT verify = 활성 전 권장 게이트. **현재 3/5 — 2건 남음.** ⛔ **활성 전 필수**: 회귀 fixture 1개(`parent gap 12 + child padding 24 → effective 36` 검출 / direct property는 직접 비교 / raw 미표현 축은 render-required / external 관측에 4-classify 없으면 lint 실패) — `harness-engineering.md:799` 규율1(회귀·반증 게이트 통과분만 수용). 현재 **oracle 0개** [외부: GPT review `codex-review-out.md:10091-10100`].
+- 승격 목표 (트랙 A): figma 작업 세션 5회 관측 후 신호 활성 (memory-guide line 43). GPT verify = 활성 전 권장 게이트. **현재 3/5 — 2건 남음.** ⛔ **활성 전 필수**: 회귀 fixture 1개(`parent gap 12 + child padding 24 → effective 36` 검출 / direct property는 직접 비교 / raw 미표현 축은 render-required / external 관측에 4-classify 없으면 lint 실패) — `harness-engineering.md § 5.5 자기진화 하네스와 회귀 게이트` 규율1(회귀·반증 게이트 통과분만 수용). 현재 **oracle 0개** [외부: GPT review `codex-review-out.md:10091-10100`].
 
 ### L-2: fz-code 구현시점 reuse 게이트 (41차 enforcement plan→code 이동)
 - 관측 #1: OBS-08 (catch #3,6,7 — helper 중복 작성)
@@ -276,7 +276,7 @@
 - generalize: broad (언어·도메인 무관 — 모든 구조/경계 포크) | 과적합 위험: 中 (판정이 사람 해석에 의존)
 - 근거: [verified: `skills/fz-plan/SKILL.md:229` Gate 0.5 체크 항목 · `modules/lead-action-default.md:16` Trigger Matrix 행 — 두 소비자가 같은 신호를 참조]
 - ⛔ **활성 차단: evidence 2 sessions → candidate.** active 전환 = 트랙 A **5 sessions**
-- ⛔ **본 항목 신설 사유는 새 규칙이 아니라 카운터 귀속 복구다.** 이전에는 두 소비자가 임계 권위를 본 원장으로 지목하면서 실제 관측 카운터는 **플러그인 밖 작성자 로컬 메모리**를 참조했다 — 배포본만 가진 사용자는 그 카운터를 읽을 수 없다. `guides/skill-authoring.md:395-412`(작성자 환경의 개인 메모리 내용은 배포물에 넣지 않는다) 위반이며, 권위와 카운터가 다른 경계에 있으면 관측이 발생해도 카운트가 오르지 않는다
+- ⛔ **본 항목 신설 사유는 새 규칙이 아니라 카운터 귀속 복구다.** 이전에는 두 소비자가 임계 권위를 본 원장으로 지목하면서 실제 관측 카운터는 **플러그인 밖 작성자 로컬 메모리**를 참조했다 — 배포본만 가진 사용자는 그 카운터를 읽을 수 없다. `guides/skill-authoring.md § 이식성 — 플러그인은 배포물이다`(작성자 환경의 개인 메모리 내용은 배포물에 넣지 않는다) 위반이며, 권위와 카운터가 다른 경계에 있으면 관측이 발생해도 카운트가 오르지 않는다
 - ⚠️ 관측 요약만 옮겼다 — 개인 경로·파일명은 옮기지 않는다(같은 규약)
 - ⛔ **외부 채점 미이행**: 본 항목은 카운터 귀속 복구이며 새 판정 규칙을 도입하지 않으므로 §5.5 규율 2의 대상이 아니다. 단 5 sessions 도달 시 활성 판정에는 외부 채점 1회를 요구한다(트랙 A 준용)
 - ⛔ **활성 전 필수 (§5.5 규율 1)**: 회귀 fixture 0개. 설계 = (가)/(나) 오분류 사례에서 검출되고 정당한 위임에서 미검출되는 쌍

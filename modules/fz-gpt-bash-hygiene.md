@@ -56,7 +56,7 @@ fi
 
 **증상**: GPT CLI `exec` 를 `--profile <NAME>` 으로 부르면 `sandbox: read-only`로 force. Profile 설계 전체 무효화.
 
-**원인**: GPT CLI 0.124.0 은 실행 path가 `trust_level = "trusted"`로 명시되지 않으면 **"untrusted directory" 취급**.
+**원인**: GPT CLI 0.124.0 은 실행 path가 `trust_level = "trusted"`로 명시되지 않으면 **"untrusted directory" 취급**. (이력 — 0.124.0 당시 관찰. 2026-11-01 정정: `approval_policy = "untrusted"` 는 0.149.0 에서 폐지됐고, 0.150.0 부터 신뢰하지 않는 프로젝트는 프로젝트 AGENTS.md·`.codex/` 층을 쓰지 않는다 — *"Untrusted projects no longer supply project-level AGENTS.md instructions, and managed deny-read rules remain enforced after permission changes."* 신뢰 설정은 `projects.<path>.trust_level` [verified: https://learn.chatgpt.com/docs/changelog])
 
 **필수 config** (`~/.codex/config.toml`):
 ```toml

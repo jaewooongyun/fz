@@ -68,7 +68,7 @@ L3 결과가 Workflow와 동시에 진행될 때의 피드백 흐름:
    → 해당 렌즈 워커가 재분석 → severity 조정 + 연쇄 이슈 식별
 4. **이미 진행 중인 invoke**: Lead가 직접 Issue Tracker에 merge (반환 후 통합)
 
-⛔ **P2P 채널 없음**: `SendMessage`는 v2.1.178부터 부재이고 Workflow 워커는 1-shot이다 — 실행 중 워커에게 끼어들 수 없다. 피드백 전달 단위는 **invoke 경계**다.
+⛔ **P2P 채널 없음**: Workflow 워커는 `SendMessage` 를 쓰지 않는 1-shot이다(OVERRIDE 블록 — P2P 통신 없음) — 실행 중 워커에게 끼어들 수 없다. 피드백 전달 단위는 **invoke 경계**다. (2026-11-01 정정 — 이전 판의 "`SendMessage`는 v2.1.178부터 부재"는 틀렸다. 2.1.178 이 없앤 것은 `TeamCreate`/`TeamDelete` 이고 `SendMessage` 는 현존한다 — `guides/skill-troubleshooting.md` § 3.4 에이전트 통신 실패)
 
 ### ⛔ Anti-Pattern
 - L3 에이전트를 TeamCreate로 스폰 금지 (2.5-Turn에 범용 에이전트 참여 = 품질 저하)

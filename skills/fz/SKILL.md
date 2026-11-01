@@ -281,7 +281,7 @@ Phase 1 매칭 0  →  3.1 트리거 대조
 5. 미일치 시 동적 구성 적용
 ```
 
-> 워커 컨텍스트 전달 명세(무엇을 워커에 알릴지)를 팀 확정 시 재검토 — 오케스트레이션 프롬프팅은 코딩과 별개의 취약 능력 [외부: harness-paper §4-F, PerspectiveGap 2606.08878 — 평균 pass 14.9%, 원 논문 미대조].
+> 워커 컨텍스트 전달 명세(무엇을 워커에 알릴지)를 팀 확정 시 재검토 — 오케스트레이션 프롬프팅은 코딩과 별개의 취약 능력 [외부: harness-paper §4-F, PerspectiveGap 2606.08878 — 평균 pass 14.9%, 원 논문 미대조]. ⚠️ 2026-11-01 정정(M7): 14.9% 는 v1 abstract 수치다(이력) [arxiv preprint, 2026-06, v1]. 현행 v2 abstract 는 *"average combined pass rate of only 17.2%"* 다 [arxiv preprint, 2026-06, v2].
 
 ### 3.4 교차 검증 게이트 주입
 

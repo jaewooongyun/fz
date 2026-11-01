@@ -93,7 +93,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | TEAM (diff에 새 타입 정의 포함 시) |
 | code-changes 생산 | SC 빌드 진단 | `/sc:sc-troubleshoot --fix` 자동 | 빌드 2회 연속 실패 시 |
 | planning 생산 | SC 공수 추정 | `/sc:sc-estimate --breakdown` | plan + 복잡도 4+ |
-| review 포함 | L3 결과 반영 | Lead가 **다음 Workflow invoke의 args/브리프에 주입** — ⛔ `SendMessage` 부재(v2.1.178~) + Workflow 워커는 1-shot이라 중간 채널 없음 | Workflow (L3 이슈 1건+, 다음 스테이지 전) |
+| review 포함 | L3 결과 반영 | Lead가 **다음 Workflow invoke의 args/브리프에 주입** — ⛔ Workflow 워커는 `SendMessage` 를 쓰지 않는 1-shot(OVERRIDE — P2P 통신 없음)이라 중간 채널 없음 (2026-11-01 정정 — 이전 표기 "`SendMessage` 부재(v2.1.178~)"는 틀렸다. 2.1.178 이 없앤 것은 `TeamCreate`/`TeamDelete`) | Workflow (L3 이슈 1건+, 다음 스테이지 전) |
 | code 포함 | Supporting 진행도 체크 | review-correctness → impl-correctness RTM 체크 | TEAM (3+ Step 50% 시점) |
 | review 시작 전 | Scope Expansion 검증 | plan 영향 범위 ⊇ discover 범위 확인. plan이 더 좁으면 warning | discover 산출물 존재 시 |
 | code 시작 전 | 시야 축소 감지 | plan 영향 범위 vs discover 범위 비교 → 좁으면 마찰 신호 | discover 산출물 존재 시 |

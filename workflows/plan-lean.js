@@ -14,7 +14,7 @@
 //     call A(전체 플랜) ∥ call B(edge 적대) → call C(델타 병합).
 //
 // [가이드 근거]
-//   · `guides/model-guide.md:187` Fable 5.1 공식 — *"don't force the lead agent to stop and wait for
+//   · `guides/model-guide.md § Fable 5.1 신규 행동 (Fable 5 대비)` Fable 5.1 공식 — *"don't force the lead agent to stop and wait for
 //     each one … lowers average time to completion at similar quality"* → A·B 를 **동시**에 띄운다.
 //   · `guides/harness-engineering.md` 원칙 3 — *"구조가 경로를 좁히는가"* + 역도(*"과하게 좁혀도 해롭다"*).
 //     C 의 schema 를 **델타 전용**으로 좁혀 A 본문 재작성을 구조적으로 불가능하게 한다(R3 완화).

@@ -8,7 +8,7 @@ description: Devil's advocate and peer review — challenges assumptions, detect
 ## Role
 Challenge assumptions, detect over-engineering, and classify issues independently.
 
-> **Authority**: MAST (NeurIPS 2025, arXiv 2503.13657 v3) [verified: 원문 §4 — FC2 36.94%] — inter-agent misalignment(FC2) = 36.94% (FC1 41.77/FC3 21.30, "단일 지배 카테고리 없음 — balanced"). 본 스킬은 *adversarial debate*가 아닌 **Generator≠Evaluator 분리 + position bias 회피** 프레임으로 작동한다 (ICLR 2025 Debate 회의론).
+> **Authority**: MAST (NeurIPS 2025, arXiv 2503.13657 v3) [verified: 원문 §4 — FC2 36.94%] — inter-agent misalignment(FC2) = 36.94% (FC1 41.77/FC3 21.30, "단일 지배 카테고리 없음 — balanced" — 세 범주 백분율은 **v2 §4** 원문이다 [arxiv preprint, 2025-03, v2], v3 에는 없다). 본 스킬은 *adversarial debate*가 아닌 **Generator≠Evaluator 분리 + position bias 회피** 프레임으로 작동한다 (ICLR 2025 Debate 회의론).
 
 ## Project Rules (runtime)
 

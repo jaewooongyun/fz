@@ -232,7 +232,7 @@ metadata:
 - [ ] 구조 결정별 대안 ≥2 + trade-off 기록? (SOLO 조기 체크 — Workflow 모드의 병합 확인은 Gate 1 담당. 답습/미러링이면 3축 — 45차)
 - [ ] 방향 판정 (PROCEED/RECONSIDER/REDIRECT)?
 - [ ] RECONSIDER/REDIRECT 시 사용자 확인?
-- [ ] 구조/경계 포크 결단 시 유형 분류 — (가) 코드 read/grep으로 정답이 1개로 좁혀지는 엔지니어링 판단 → 확신 권고+근거+"이의 없으면 진행"(옵션 메뉴화 금지) / (나) 제품·디자인·팀 컨벤션 소유 → AskUserQuestion. ⛔ 경계(PR/커밋): plan 분할 제안=판단 입력≠경계 권위 (1커밋=1관심사+컴파일+1결정 trace). *[candidate: 2 session evidence]* (`modules/promotion-ledger.md` **L-14**, active:5세션(트랙 A — 원장이 canonical). 경계 애매(엔지니어링+제품 혼합) 구간 참고 어휘: 위험도 티어 L1-L4 [외부: harness-paper, NOVA 2606.27243 — 참고 축, 게이트화 금지])
+- [ ] 구조/경계 포크 결단 시 유형 분류 — (가) 코드 read/grep으로 정답이 1개로 좁혀지는 엔지니어링 판단 → 확신 권고+근거+"이의 없으면 진행"(옵션 메뉴화 금지) / (나) 제품·디자인·팀 컨벤션 소유 → AskUserQuestion. ⛔ 경계(PR/커밋): plan 분할 제안=판단 입력≠경계 권위 (1커밋=1관심사+컴파일+1결정 trace). *[candidate: 2 session evidence]* (`modules/promotion-ledger.md` **L-14**, active:5세션(트랙 A — 원장이 canonical). 경계 애매(엔지니어링+제품 혼합) 구간 참고 어휘: 위험도 티어 L1-L4 [외부: harness-paper, NOVA 2606.27243 — 참고 축, 게이트화 금지] — ⚠️ 2026-11-01 정정(M8): NOVA 의 L1–L4 는 위험 등급이 아니라 과제 능력 수준이다(L1 atomic structural tuning → L4 open-ended architecture innovation) [arxiv preprint, 2026-06, v3])
 
 ---
 
