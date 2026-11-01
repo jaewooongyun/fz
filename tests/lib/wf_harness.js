@@ -12,7 +12,9 @@
 // ⛔ 폭주 방지: agent 호출이 cap 을 넘으면 그 뒤 호출은 끝나지 않는 promise 가 되고 watchdog 이 run() 을
 //    reject 한다 — 던지게 두면 parallel 이 삼켜 마이크로태스크 루프가 타이머까지 굶긴다.
 // ⛔ tests/lib 는 health-check 자동 러너(tests/workflows/*.js · tests/fixtures/*/*/run.sh) 밖이다 — 라이브러리다.
-// ⛔ 한계: budget.spent() 는 항상 0 이다 — 토큰 소비를 흉내 내지 않는다. budget 분기를 시험하는 소비자가 생기면 그때 넣는다.
+// ⛔ budget — budgetPerCall 을 주면 spent() = 지금까지 낸 agent 호출 수 × budgetPerCall(호출 시점에 센다 — 응답을 기다리는 콜 포함),
+//    remaining() = budgetTotal − spent() 다. 주지 않으면 spent() 는 항상 0 이고 remaining() 은 budgetTotal(null 이면 Infinity) 그대로다 —
+//    토큰 소비를 흉내 내지 않는다. 소비자: tests/workflows/swarm-budget.js(잔여 예산 가드).
 'use strict'
 const fs = require('fs')
 
@@ -51,11 +53,11 @@ function fakeMath() {
 /**
  * @param {string} file  workflows/*.js 경로
  * @param {{args?: any, responder: (prompt: string, opts: object, index: number) => any,
- *          budgetTotal?: number|null, cap?: number, timeoutMs?: number}} o
+ *          budgetTotal?: number|null, budgetPerCall?: number, cap?: number, timeoutMs?: number}} o
  * @returns {Promise<{result: any, calls: object[], logs: string[], phases: string[]}>}
  */
 async function run(file, o) {
-  const { args, responder, budgetTotal = null, cap = 500, timeoutMs = 10000 } = o
+  const { args, responder, budgetTotal = null, budgetPerCall = 0, cap = 500, timeoutMs = 10000 } = o
   const calls = [], logs = [], phases = []
   let runaway = false
   const agent = async (prompt, opts = {}) => {
@@ -77,7 +79,8 @@ async function run(file, o) {
   }))
   const phase = t => { phases.push(t) }
   const log = m => { logs.push(String(m)) }
-  const budget = { total: budgetTotal, spent: () => 0, remaining: () => (budgetTotal == null ? Infinity : budgetTotal) }
+  const spent = () => calls.length * budgetPerCall
+  const budget = { total: budgetTotal, spent, remaining: () => (budgetTotal == null ? Infinity : budgetTotal - spent()) }
   const workflow = async () => { throw new Error('wf_harness: workflow() 중첩 호출은 지원하지 않는다') }
 
   const fn = new AsyncFunction('agent', 'parallel', 'pipeline', 'phase', 'log', 'args', 'budget', 'workflow',

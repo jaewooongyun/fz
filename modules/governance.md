@@ -203,7 +203,7 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 
 | 정보 | Truth-of-Source | 동기화 대상 |
 |------|----------------|------------|
-| **팀 구성 (에이전트 목록)** | **`workflows/*.js`의 `agentType` 인자** | team-registry.md, patterns/*.md — ⛔ 스킬 YAML `team-agents`는 **2026-08-09 제거**(런타임 효과 0이었다) |
+| **팀 구성 (에이전트 목록)** | **`workflows/*.js`의 `agentType` 인자** — ⛔ 단서: `workflows/swarm.js` 만 고정하지 않고 args 로 받는다(스크립트 `READ_ONLY_AGENTS` 안만 · 밖이면 콜 0 fallback — 그 호출의 팀 구성 정본은 그 목록과 args) | team-registry.md, patterns/*.md — ⛔ 스킬 YAML `team-agents`는 **2026-08-09 제거**(런타임 효과 0이었다) |
 | **모델 배정** | **`workflows/*.js`의 `opts.model`** | agents/*.md(기본값 표기만), team-registry.md `promoted` 열. 감시 = `scripts/lint-model-explicit.sh` · ⛔ 스킬 YAML `model-strategy`는 **제거** |
 | **opus 동시 상한** | **`guides/model-guide.md` §5** | governance.md kill-switch 행, agent-team-guide.md, skill-authoring.md §12 |
 | **YAML 필수 필드** | **본 문서 § 스킬 최소 기준** (L1 공식 4 + L2 fz 정책 2) | fz-manage check #1, skill-troubleshooting.md #1, templates/skill-template.md |

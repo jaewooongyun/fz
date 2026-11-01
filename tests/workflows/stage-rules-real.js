@@ -28,7 +28,7 @@ const EXPECTED = {
   'peer-review.js': ['R1-arch', 'R1-quality', 'R1-correct', 'R2-arch', 'R2-quality', 'R3-counter'],
   'plan-collaborative.js': ['S0', 'S0-reb', 'S0-fin', 'S1', 'S2-impact', 'S2-edge', 'S2-arch', 'S3-imp', 'S3-edge', 'S4', 'S5'],
 }
-const UNLABELED = ['code-pair.js', 'discover-adversarial.js', 'search-cross-verify.js']
+const UNLABELED = ['code-pair.js', 'discover-adversarial.js', 'search-cross-verify.js', 'swarm.js']
 // 완주 오라클의 스킬 → 그 스킬이 기본으로 부르는 워크플로(SKILL.md 에 `workflows/<파일>` 로 적혀 있어야 한다)
 const SKILL_WF = { 'fz-plan': 'plan-lean2.js', 'fz-review': 'review-live.js', 'fz-peer-review': 'peer-review.js' }
 

@@ -38,6 +38,7 @@
     "command": { "required": true }, "find": { "required": true },
     "sed":     { "required": true }, "sort": { "required": true },
     "wc":      { "required": true },
-    "cmp":     { "required": true,  "note": "Workflow 준비 — 원본 ↔ WORK_DIR 복사본 바이트 일치(guides/skill-authoring.md §12 0단계)" }
+    "cmp":     { "required": true,  "note": "Workflow 준비 — 원본 ↔ WORK_DIR 복사본 바이트 일치(guides/skill-authoring.md §12 0단계)" },
+    "tar":     { "required": false, "note": "swarm 고정 트리 준비 — git archive | tar -xf - (guides/skill-authoring.md §12 공용 읽기 전용 swarm 절) · 부재 시 swarm 만 못 한다" }
   }
 }

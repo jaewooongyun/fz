@@ -3,7 +3,8 @@
 //                     ② 허용값 밖('turbo') → { mode: 'fallback' } · 콜 0
 //                     ③ 미지정 → 전 콜 'xhigh' · 콜 입력(label · agentType · model · effort · schema · prompt)이 기준 트리와 바이트 동일
 // ⛔ effort 는 품질 옵션 묶음(default-off-regression.js OPTIONS)이 아니라 **별도 축**이다 — 그 레지스트리에 넣으면
-//    default-arms.js 가 옵션 on/off 섞임으로 판정한다. 이 파일이 축 전체를 본다(modules/mode-gate.md § effort).
+//    default-arms.js 가 옵션 on/off 섞임으로 판정한다. 이 파일이 축을 본다(modules/mode-gate.md § effort) — 단 swarm.js 는 tests/workflows/swarm-budget.js 가 본다
+//    (sha-missing-respawn: 미지정 xhigh · opus-concurrency: high 전달 · args-fallback: turbo → 콜 0). ③ 기준 SHA 에 swarm.js 가 없어 MIN_ARGS 에 넣으면 UNRUN 이다.
 // ⛔ 콜이 실제로 effort 식별자를 쓰는지(리터럴이 남지 않았는지)는 lint-model-explicit.sh --baseline 이 정적으로 본다 — 여기서는 런타임 전달을 본다.
 // 기준 소스: env FZ_EFFORT_BASE_TREE 의 workflows/ → 없으면 이 저장소 이력의 `git show ${FZ_EFFORT_BASE_SHA:-26c42d3}:workflows/<wf>.js`.
 //   둘 다 없으면 ③ 의 기준 대조는 UNRUN(exit 2) 이다 — 통과가 아니다.

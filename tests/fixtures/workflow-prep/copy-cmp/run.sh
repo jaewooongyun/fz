@@ -1,5 +1,5 @@
 #!/bin/bash
-# Workflow 준비 계약 fixture — `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비** 블록과 소비자 9곳의 준비 줄을
+# Workflow 준비 계약 fixture — `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비** 블록과 소비자 10곳의 준비 줄을
 # 문서에서 꺼내 **실제로 실행**한다. 문구 존재가 아니라 행동(종료 코드 · 복사본 바이트 · 만들지 말아야 할 파일)을 본다.
 #   --cells prep   0단계 블록(placeholder 를 임시 폴더로 치환)을 셀마다 돌린다
 #     없음         복사본이 없다 → exit 0 · 원본과 바이트 일치
@@ -10,7 +10,7 @@
 #     import       원본에 require( 가 있다 → 비0 · 복사본 0 (self-contained 확인)
 #     실워크플로   이 트리 workflows/*.js 전부를 원본으로 → exit 0 · 바이트 일치 (import 가 생기면 그 스킬은 운영에서 매 호출 L4)
 #     cp 실패      쓰기 불가 WORK_DIR → 비0 · cmp 로 넘어가 통과하지 않는다 (종료 코드 확인)
-#   --cells sites  소비자 9곳(skills 7 · modules 2 — 목록 고정)의 실제 준비 줄마다: scriptPath 가 같은 basename 의
+#   --cells sites  소비자 10곳(skills 7 · modules 2 · guides 1 — 목록 고정)의 실제 준비 줄마다: scriptPath 가 같은 basename 의
 #                  `{WORK_DIR}` 복사본 · 준비 줄이 호출 줄보다 앞 · §12 0단계(경로 판정) 참조 · 준비 명령을 꺼내
 #                  없음/stale 로 돌려 exit 0 + 바이트 일치 · 없는 WORK_DIR 에서 비0 → `SITE-OK <파일>` 한 줄
 #   --cells all    둘 다 (기본 — 인자 없이 도는 회귀 글롭 경로)
@@ -19,7 +19,7 @@
 # 바이트 일치는 문서가 아니라 이 fixture 가 따로 잰다(filecmp) — 블록이 스스로 내린 판정을 믿지 않는다.
 # 기준 트리(0단계 · 준비 줄 없음, 플러그인 루트 직접 호출)는 셀이 블록을 못 찾아 exit 1.
 # ⛔ 셀 집합 대조(F-408): prep 을 돌렸으면 판정한 셀 이름이 위 8셀(`PREP_CELLS`)과 정확히 같아야 한다 — root 권한으로 cp 실패 셀을
-#    만들 수 없으면 그 셀은 `skipped` 로 따로 센다. 끝 줄 `CELLS n=<수> ran=<…> skipped=<…>`(sites 를 돌렸으면 `sites=<OK>/9` 도).
+#    만들 수 없으면 그 셀은 `skipped` 로 따로 센다. 끝 줄 `CELLS n=<수> ran=<…> skipped=<…>`(sites 를 돌렸으면 `sites=<OK>/10` 도).
 # exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패(인자 · 트리 · 임시 폴더 · 단언기 고장)
 #   ⛔ 준비 실패를 1 로 내면 '기준 트리 exit 1' 이 결함 재현 없이 통과한다 — 그래서 3 이다.
 # usage: run.sh [--tree <플러그인 루트>] [--variant contract|plan] [--cells prep|sites|all]
@@ -57,7 +57,8 @@ GUIDE = os.path.join(TREE, "guides", "skill-authoring.md")
 FAIL = []
 PREP_CELLS = ("없음", "stale", "정상", "형제 접두사", "symlink", "import", "실워크플로", "cp 실패")   # 셀 이름 고정(F-408)
 RAN, SKIPPED = [], []             # 판정한 prep 셀(첫 단언 순) · root 로 건너뛴 셀
-# 소비자 9곳 — (파일, 부르는 워크플로 basename, allowed-tools 를 가진 SKILL). 목록을 고정한다: 사이트가 줄면 SITE-OK 가 9 에 못 미친다
+# 소비자 10곳 — (파일, 부르는 워크플로 basename, allowed-tools 를 가진 SKILL — 정본 사이트 하나를 여러 SKILL 이 따르면 그 튜플).
+# 목록을 고정한다: 사이트가 줄면 SITE-OK 가 10 에 못 미친다
 SITES = [
     ("skills/fz-code/SKILL.md", "code-pair.js", "skills/fz-code/SKILL.md"),
     ("skills/fz-discover/SKILL.md", "discover-adversarial.js", "skills/fz-discover/SKILL.md"),
@@ -68,6 +69,9 @@ SITES = [
     ("skills/fz/SKILL.md", "{skill}-{pattern}.js", "skills/fz/SKILL.md"),
     ("modules/peer-review-workflow.md", "peer-review.js", "skills/fz-peer-review/SKILL.md"),
     ("modules/peer-review-tiers.md", "peer-review.js", "skills/fz-peer-review/SKILL.md"),
+    # swarm — 준비 · 호출 줄은 가이드 한 곳(§12 공용 읽기 전용 swarm 절)에 있고, 그 줄을 따르는 소비자 SKILL 3개의 권한을 함께 본다
+    ("guides/skill-authoring.md", "swarm.js",
+     ("skills/fz-review/SKILL.md", "skills/fz-peer-review/SKILL.md", "skills/fz-modernize/SKILL.md")),
 ]
 SAFE_PATH = re.compile(r"[A-Za-z0-9_./-]+")
 TMP_ROOT = os.path.realpath(tempfile.mkdtemp(prefix="fz-copy-cmp-"))
@@ -279,8 +283,9 @@ def one_site(rel, base, consumer):
     if CONTRACT:
         if not m.group(4) or m.group(5) != m.group(1) or m.group(6) != m.group(3):
             why.append("contract: 준비 줄이 `cp 원본 복사본 && cmp -s 원본 복사본` 꼴이 아니다")
-        if "Bash(cmp *)" not in allowed_tools(consumer):
-            why.append(f"contract: {consumer} allowed-tools 에 Bash(cmp *) 가 없다")
+        for cons in (consumer if isinstance(consumer, tuple) else (consumer,)):
+            if "Bash(cmp *)" not in allowed_tools(cons):
+                why.append(f"contract: {cons} allowed-tools 에 Bash(cmp *) 가 없다")
         if not inventory_has_cmp():
             why.append("contract: schemas/tool-inventory.json 에 cmp 선언이 없다")
     if "{" not in base and not os.path.isfile(os.path.join(TREE, "workflows", base)):

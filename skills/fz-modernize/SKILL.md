@@ -6,11 +6,11 @@ description: >-
 user-invocable: true
 argument-hint: "[probe|audit|plan|verify|execute|validate|full|light] [target]"
 allowed-tools: >-
-  Read, Edit, Write, Bash, Bash(*/scripts/gpt-call.sh*), Grep, Glob,
+  Read, Edit, Write, Bash, Bash(*/scripts/gpt-call.sh*), Bash(grep *), Bash(cp *), Bash(cmp *), Grep, Glob,
   WebSearch, WebFetch,
   mcp__plugin_fz_serena__write_memory, mcp__plugin_fz_serena__read_memory,
   mcp__sequential-thinking__sequentialthinking,
-  Task, TaskCreate, TaskUpdate,
+  Task, TaskCreate, TaskUpdate, Workflow,
   Skill
 metadata:
   provides: [doc-modernization]
@@ -171,7 +171,7 @@ metadata:
    grep -nE "\[미검증|미검증:|Deprecated|deprecated|outdated" guides/*.md
    grep -nE "arxiv|arXiv" guides/*.md
    ```
-3. **각 stale 항목 → 해소 자료 매핑**:
+3. **각 stale 항목 → 해소 자료 매핑**: (선택 — 항목이 많고 서로 독립이면 항목 대조를 `workflows/swarm.js` 조각으로 돌린다: Lead 가 `git archive <sha>` 로 대상 커밋의 고정 트리를 `{WORK_DIR}` 에 풀고 args `tree` + 조각마다 `sha` · `method`(판정 기준)를 넘기며 대조할 probe 자료는 브리프에 싣는다 · 준비는 §12 0단계 cp → cmp -s · 준비 · 호출 줄 정본 = `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절)
    - probe-report의 어느 자료로 해소?
    - A1 직접 진술 가능? A5 해석으로 supporting? 또는 partially-verified?
 4. **`audit/audit-report.md` 작성** (template: `skills/fz-modernize/templates/audit-report.md`)

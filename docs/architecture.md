@@ -7,7 +7,7 @@ fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
 ├── skills/          22개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
 ├── agents/          15개 — plan-structure, impl-correctness, review-arch ...
-├── workflows/       8개 — 네이티브 Workflow 결정적 스크립트 (discover-adversarial, plan-collaborative, code-pair ...)
+├── workflows/       9개 — 네이티브 Workflow 결정적 스크립트 (discover-adversarial, plan-collaborative, code-pair, swarm ...)
 ├── modules/         47개 — gates(완료 게이트 SSOT), pipelines, cross-validation, lead-action-default, gpt-strategy, memory-guide, fz-gpt-bash-hygiene, fz-gpt-subcommands-core/aux ...
 │   (TEAM 사료 — team-core·patterns 5종 — 는 2026-09-21 이동 후 2026-09-25 삭제. 결정: `modules/promotion-ledger.md` § TEAM 일몰)
 ├── guides/          9개 — prompt-optimization, skill-authoring, harness-engineering, agent-team-guide, skill-testing, model-guide, llm-references ...
@@ -54,5 +54,6 @@ Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌�
 | /fz-plan | plan-collaborative.js | direction 도전 → 초안 → 3렌즈+CC 교차 → 통합 (9-11 call) |
 | /fz-code, /fz-fix | code-pair.js | impl changeset(디스크 미수정) → 조건부 검토 → Lead 적용 (1-3 call) |
 | /fz-peer-review | peer-review.js | arch/quality/correctness 3-병렬 → (deep) 교차 + counter DA (3 or 6-call) |
+| /fz-review · /fz-peer-review · /fz-modernize (선택 — 독립 조각 검사) | swarm.js | 주 Workflow 반환 뒤 · 고정 트리(SHA 1개) 읽기 전용 워커 조각당 1 · 동시 ≤3 묶음 → sha/method 미기록 결과 폐기 · 1회 재스폰 → 조각당 표 1행 PASS/ISSUES/BLOCKED (≤ 2×maxFragments call · budget 가드 · 정본 사이트 `guides/skill-authoring.md` §12 swarm 절) |
 
 > TEAM(TeamCreate+SendMessage P2P) 모드는 v4.22.0에서 **일몰 완료** — 실제 TeamCreate 호출부 0건. `patterns/*.md`는 canonical 라운드 의미론으로 보존. 규약: `guides/skill-authoring.md` §12.

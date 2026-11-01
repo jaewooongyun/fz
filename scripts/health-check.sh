@@ -102,12 +102,12 @@ if command -v node >/dev/null 2>&1; then
   WT_SELF="$(node "$ROOT/scripts/check_wf_text.js" --self-test 2>&1)"; WT_SELF_CODE=$?
   WT_PAR="$(node "$ROOT/scripts/check_wf_text.js" --section-has 'Phase 2: Plan Validation' '불변 입력' '별도 출력' '양쪽 완료' 'schema' "$ROOT/skills/fz-plan/SKILL.md" 2>&1)"; WT_PAR_CODE=$?
   WT_ORD="$(node "$ROOT/scripts/check_wf_text.js" --order-in-section '실행 절차 (Lead)' 'cp {플러그인 루트}/workflows/plan-lean2.js' 'Workflow({ scriptPath' "$ROOT/skills/fz-plan/SKILL.md" 2>&1)"; WT_ORD_CODE=$?
-  # ⛔ 준비 순서(cp → cmp -s → 복사본 호출)는 fz-plan 하나가 아니라 소비자 9곳(skills 7 · modules 2)을 다 본다 — modules 사이트가 자동 배선 검사 밖이었다
+  # ⛔ 준비 순서(cp → cmp -s → 복사본 호출)는 fz-plan 하나가 아니라 소비자 10곳(skills 7 · modules 2 · guides 1 — swarm 정본 사이트)을 다 본다 — modules 사이트가 자동 배선 검사 밖이었다
   WT_SITE="$(bash "$ROOT/tests/fixtures/workflow-prep/copy-cmp/run.sh" --tree "$ROOT" --cells sites 2>&1)"; WT_SITE_CODE=$?; WT_SITE_N=$(printf '%s\n' "$WT_SITE" | grep -c '^SITE-OK ')
-  if [ "$WT_SELF_CODE" -eq 0 ] && [ "$WT_PAR_CODE" -eq 0 ] && [ "$WT_ORD_CODE" -eq 0 ] && [ "$WT_SITE_CODE" -eq 0 ] && [ "$WT_SITE_N" -eq 9 ]; then
-    record "문구 배선" 0 "fz-plan ${WT_PAR%% *} · ${WT_ORD%% *} · 준비 사이트 ${WT_SITE_N}/9 · $(printf '%s\n' "$WT_SELF" | tail -1)"
+  if [ "$WT_SELF_CODE" -eq 0 ] && [ "$WT_PAR_CODE" -eq 0 ] && [ "$WT_ORD_CODE" -eq 0 ] && [ "$WT_SITE_CODE" -eq 0 ] && [ "$WT_SITE_N" -eq 10 ]; then
+    record "문구 배선" 0 "fz-plan ${WT_PAR%% *} · ${WT_ORD%% *} · 준비 사이트 ${WT_SITE_N}/10 · $(printf '%s\n' "$WT_SELF" | tail -1)"
   else
-    record "문구 배선" 1 "⛔ $(printf '%s\n' "$WT_SELF" "$WT_PAR" "$WT_ORD" "$WT_SITE" | grep -E 'FAIL' | head -2 | tr '\n' ' ') (준비 사이트 ${WT_SITE_N}/9)"
+    record "문구 배선" 1 "⛔ $(printf '%s\n' "$WT_SELF" "$WT_PAR" "$WT_ORD" "$WT_SITE" | grep -E 'FAIL' | head -2 | tr '\n' ' ') (준비 사이트 ${WT_SITE_N}/10)"
   fi
 else
   UNRUN=$((UNRUN + 2))

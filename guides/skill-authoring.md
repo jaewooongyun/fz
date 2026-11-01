@@ -550,7 +550,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 > 신설 정당화 (DELETE/MERGE-default): 위 배치·호출 규약 bullet 들은 *스크립트가 어디에 사는가*(플러그인 루트 절대경로)를 정한다 — 표기가 옳은데도 **도구가 그 경로 읽기를 거부하는** 경우는 다루지 않아 기존 bullet 흡수 불가.
 > ⛔ **근본 해결이 아니다.** fz 가 고칠 수 있는 결함이 아니라 **도구별 경로 게이트**다 — 같은 경로를 `Bash`·`Read` 는 읽는다. 플러그인 루트가 세션 working directory 이거나 additional directory 면 애초에 발생하지 않는다. 아래는 그 조건이 아닐 때의 **세션 한정 우회**이며, 조건이 사라지면 이 블록도 함께 삭제한다.
 
-**0단계 — 준비** (⛔ 매 호출 · 거부를 기다리지 않는다). 플러그인 루트 직접 호출은 실사용 세션(대상 레포가 working directory)에서 매번 거부됐다 — 우회가 통한 3회는 1차 경로가 3회 틀렸다는 뜻이다. 그래서 소비자 9곳(`skills/` 7 · `modules/` 2)과 fz-plan 은 원본이 아니라 **준비한 복사본**을 부른다. 아래 블록이 **exit 0** 일 때만 `Workflow({ scriptPath: '{WORK_DIR}/{파일}.js', args })` 를 부른다:
+**0단계 — 준비** (⛔ 매 호출 · 거부를 기다리지 않는다). 플러그인 루트 직접 호출은 실사용 세션(대상 레포가 working directory)에서 매번 거부됐다 — 우회가 통한 3회는 1차 경로가 3회 틀렸다는 뜻이다. 그래서 소비자 10곳(`skills/` 7 · `modules/` 2 · `guides/` 1 — 아래 공용 읽기 전용 swarm 절)과 fz-plan 은 원본이 아니라 **준비한 복사본**을 부른다. 아래 블록이 **exit 0** 일 때만 `Workflow({ scriptPath: '{WORK_DIR}/{파일}.js', args })` 를 부른다:
 
 ```bash
 S=$(cd "{세션 디렉터리}" && pwd -P) && D=$(cd "{WORK_DIR}" && pwd -P) &&
@@ -565,7 +565,7 @@ S=$(cd "{세션 디렉터리}" && pwd -P) && D=$(cd "{WORK_DIR}" && pwd -P) &&
 - **cp 덮어쓰기 · 종료 코드** — 매 호출 원본을 **같은 basename** 으로 `{WORK_DIR}` 루트에 덮어쓴다. stale 복사본이 남지 않고, 텔레메트리(`scripts/fz_telemetry_report.py` 의 `norm_wf_name`)가 basename 으로 워크플로를 센다. `&&` 사슬이라 `cp` 가 비0 이면 뒤가 돌지 않는다.
 - **`cmp -s`** — 호출 직전 원본과 복사본이 바이트 단위로 같아야 한다. 같지 않으면 부르지 않는다.
 - ⛔ **비0 이면 어느 단계든 복사본을 부르지 않는다 — L4**(사용자 에스컬레이션). 원본 경로 직접 호출로 되돌리거나 SOLO 로 직행하지 않는다 — 스크립트가 시작조차 안 한 실패라 사다리 L1~L3 도 아니다.
-- 이 블록은 `tests/fixtures/workflow-prep/copy-cmp/run.sh` 가 셀(없음 · stale · 정상 · 형제 접두사 · symlink · import · 실워크플로 · cp 실패)로 실행하고, `--cells sites` 가 소비자 9곳의 준비 줄을 실제로 돌린다. ⛔ 블록이나 소비자 준비 줄을 고치면 그 fixture 를 함께 돈다.
+- 이 블록은 `tests/fixtures/workflow-prep/copy-cmp/run.sh` 가 셀(없음 · stale · 정상 · 형제 접두사 · symlink · import · 실워크플로 · cp 실패)로 실행하고, `--cells sites` 가 소비자 10곳의 준비 줄을 실제로 돌린다. ⛔ 블록이나 소비자 준비 줄을 고치면 그 fixture 를 함께 돈다.
 
 준비(0단계) 없이 원본 경로를 부르면 `Workflow` 호출이 스크립트를 실행하지 못하고 이렇게 거부될 수 있다:
 
@@ -589,6 +589,18 @@ scriptPath must be a script path this tool returned, or a file you can already r
 
 - ⛔ **복사본은 산출물이 아니다** — 원본이 바뀌면 stale 이 된다. WORK_DIR 밖으로 옮기거나 커밋하지 않는다. 0단계가 매 호출 덮어쓰고 `cmp -s` 로 확인하므로 원본을 고쳐도 다음 호출은 새 본을 부른다.
 - ⛔ **소비자 SKILL.md 에 권한이 없으면 0단계와 2·3 단계가 실행되지 않는다** — `allowed-tools` 에 `Bash(grep *)`·`Bash(cp *)`·`Bash(cmp *)` 를 둔다(`cmp` 는 `schemas/tool-inventory.json` 에도 선언한다). 위 배치·호출 규약의 `Workflow` 추가 의무와 같은 계약이며, 없으면 준비는 정확히 그것이 필요한 상황에서 죽는다. 경로 판정의 `cd`·`pwd -P` 는 셸 내장이다 [미검증: 권한 규칙이 명령 치환 안의 내장을 따로 묻는지 — 실세션 관측 전]. [실측: 2026-09-03 — `Workflow` 를 가진 소비자 9곳 전부에 두 권한이 0이었다]
+
+#### 공용 읽기 전용 swarm — `workflows/swarm.js` (정본 호출 사이트)
+
+> 신설 정당화 (DELETE/MERGE-default): 소비자 SKILL.md 3곳(fz-review 절차 4 · fz-peer-review Will Not · fz-modernize Phase 2 절차 3)은 한 줄 포인터만 둔다 — 준비 줄과 호출 줄을 셋에 베끼면 한 곳만 고쳐진다. 실행할 줄은 여기 한 곳에 두고 `tests/fixtures/workflow-prep/copy-cmp/run.sh --cells sites` 가 이 사이트를 세 소비자의 권한과 함께 돌린다.
+
+- **언제 (선택)**: 서로 독립인 조각(발견 · 주장 · stale 항목 · diff 조각)을 조각마다 **한 SHA 의 고정 트리**만 읽어 판정할 수 있을 때. 조각 = `{ id, brief, sha, method }` — `sha` 는 브리프가 **주는** 입력이고 워커는 그것을 결과에 기록한다(워커는 git 을 돌리지 않는다). 기록이 빠진 결과는 스크립트가 버리고 그 조각을 한 번만 다시 띄운다
+- ⛔ **순서 — 주 Workflow(review-live · peer-review 등)가 반환한 뒤에 띄운다.** opus 동시 ≤3 은 세션 전역이다(정본 `guides/model-guide.md` §5) — swarm 의 concurrency 상한 3 은 swarm 안만 막는다. 다른 Workflow 가 도는 동안 띄우면 합이 상한을 넘는다
+
+1. **준비** (위 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/swarm.js {WORK_DIR}/swarm.js && cmp -s {플러그인 루트}/workflows/swarm.js {WORK_DIR}/swarm.js` 가 exit 0 일 때만 이어간다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+2. **고정 트리**: `git -C {GIT_ROOT} archive --prefix=swarm-tree-{sha}/ {sha} | tar -xf - -C {WORK_DIR}` 가 exit 0 이고 `{WORK_DIR}/swarm-tree-{sha}` 가 생겼을 때만 이어간다(파이프의 종료 코드는 tar 의 것이라 git 실패를 가릴 수 있다). args `tree` = 그 절대 경로 — 한 번 부를 때 SHA 하나, SHA 가 여럿이면 트리마다 따로 부른다. 권한: 소비자 `allowed-tools` 의 `Bash(git -C * archive *)` · `Bash(tar -xf - -C *)`(무제한 `Bash` 면 그것) · `tar` 는 `schemas/tool-inventory.json` 에 선언돼 있다
+3. **호출**: `Workflow({ scriptPath: '{WORK_DIR}/swarm.js', args: { fragments, tree, effort } })` — `effort` = Lead 세션 effort(lead-effort · null 이면 넣지 않는다 — `modules/mode-gate.md` § effort). 선택 인자 `maxFragments`(기본 12) · `maxAgents`(기본 = 상한 2 × 돌릴 조각) · `concurrency`(기본 = 상한 3) · `agentType`(스크립트 `READ_ONLY_AGENTS` 안만 — 기본 `fz:review-correctness`)
+4. **반환**: `table` = 입력 조각마다 정확히 1행(`PASS` · `ISSUES` · `BLOCKED` — BLOCKED `reason` 은 budget · no-sha-method · worker-null · bad-status · worker-blocked). `mode:'fallback'` 이면 아래 § 실패 복구 사다리의 판별 표 — ⛔ SOLO 직행 아님
 
 ### resume 계약 + advisor 상속 (2026-08-08 신설)
 

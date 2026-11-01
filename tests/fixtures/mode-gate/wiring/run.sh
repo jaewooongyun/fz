@@ -185,10 +185,10 @@ def cell_discover_auto():
     order_in(rel, "실행 절차 (Lead)", "mode_gate.py", "Workflow({ scriptPath")
 
 
-# Workflow 를 부르는 곳 — 준비 사이트 9곳(tests/fixtures/workflow-prep/copy-cmp --cells sites) + fz-plan
+# Workflow 를 부르는 곳 — 준비 사이트 10곳(tests/fixtures/workflow-prep/copy-cmp --cells sites · guides 1 = swarm 정본 사이트) + fz-plan
 EFFORT_SITES = ["skills/fz-code/SKILL.md", "skills/fz-discover/SKILL.md", "skills/fz-fix/SKILL.md", "skills/fz-pr-digest/SKILL.md",
                 "skills/fz-review/SKILL.md", "skills/fz-search/SKILL.md", "skills/fz/SKILL.md", "modules/peer-review-workflow.md",
-                "modules/peer-review-tiers.md", "skills/fz-plan/SKILL.md"]
+                "modules/peer-review-tiers.md", "skills/fz-plan/SKILL.md", "guides/skill-authoring.md"]
 EFFORT_RE = re.compile(r"`?effort`?[^\n]*(lead-effort|mode_gate\.py|mode-gate\.json)")
 
 
