@@ -37,6 +37,7 @@ IDX_ROW = re.compile(r"^\|\s*\*{0,2}(F-\d{3}[a-z]?)\*{0,2}\s*\|", re.M)
 QUEUE_HEAD = re.compile(r"^##\s+대기열(\s|$)")
 SECTION_HEAD = re.compile(r"^#{1,2}\s")       # 대기열 절은 다음 `#`·`##` 제목에서 끝난다(`###` 는 안쪽)
 FENCE = re.compile(r"^\s*(```|~~~)")
+FENCE_RUN = re.compile(r"^\s*(`{3,}|~{3,})")    # `_fence_free` — 여는 펜스의 문자 · 길이를 기억한다
 DUMP_LINE = re.compile(r"^(=== |\d+:\| F-\d{3})")
 TITLE_LINE = re.compile(r"^title:\s*(.*?)\s*$", re.M)
 H1_ID = re.compile(r"^F-\d{3}[a-z]?\s*[—·:\-]*\s*")
@@ -132,29 +133,50 @@ def _eject_module():
 
 # 엔트리 본문에 남은 작성 명령(F-456) — heredoc 으로 엔트리를 쓴 셸 명령의 꼬리(`EOF` · `echo "기록 …"` · `wc -l "$F"`)가 본문이 됐다
 WRITER_LINE = re.compile(r'^(?:echo "기록|wc -l "\$F"|cat > "\$F")')
-WRITER_AFTER_EOF = re.compile(r"^(?:echo|wc -l|tail)\b")
+# heredoc 종결자(`EOF` · `MD` · `PY` · `ENTRY` · `F91_EOF` …) 바로 다음 줄이 셸 명령이면 잔재다 — 확인 출력(echo · wc · tail ·
+# ls · grep)뿐 아니라 이어진 쓰기 스크립트(INDEX 를 고치는 `python3 - <<'PY'` · 다음 엔트리를 쓰는 `cat > …` · `mv` · `cd … &&`)도
+# 같다. 첫 판은 종결자 `EOF` · 다음 줄 앞의 셋만 봐서 46곳을 놓쳤다(리뷰 R1)
+HEREDOC_END = re.compile(r"^[A-Z][A-Z0-9_]{1,15}$")
+WRITER_AFTER_EOF = re.compile(r"^(?:(?:echo|wc -l|tail|ls|cd|mv|grep)\b|cat >|python3? -(?:\s|$))")
 
 
 def _writer_leak(text: str):
-    """펜스 밖 첫 작성 명령 잔재 (줄 번호, 줄) — 없으면 None. `EOF` 는 바로 다음 줄이 echo · wc -l · tail 일 때만 잔재다."""
+    """펜스 밖 첫 작성 명령 잔재 (줄 번호, 줄) — 없으면 None.
+
+    종결자 줄은 ① 빈 줄만 사이에 두고(펜스를 건너뛰지 않는 연속 줄) 셸 명령(`WRITER_AFTER_EOF`)이 이어지거나 ② 본문 끝에 홀로
+    남았을 때 잔재다 — `EOF` · 빈 줄 · `cat > "$FD/F-077-…"`(다음 엔트리) 와 본문 끝의 `EOF` 가 실제 레지스트리 꼴이다(리뷰 R1).
+    """
+    raw = text.splitlines()
     free = list(_fence_free(text))
     for k, (n, line) in enumerate(free):
         if WRITER_LINE.match(line):
             return n, line
-        if line == "EOF" and k + 1 < len(free) and free[k + 1][0] == n + 1 and WRITER_AFTER_EOF.match(free[k + 1][1]):
+        if not HEREDOC_END.match(line):
+            continue
+        if not any(x.strip() for x in raw[n:]):       # 본문 끝은 원문 기준 — 뒤에 펜스 블록만 있는 줄은 끝이 아니다
+            return n, line
+        j = next((j for j in range(k + 1, len(free)) if free[j][1].strip()), None)
+        if j is not None and free[j][0] == n + (j - k) and WRITER_AFTER_EOF.match(free[j][1]):
             return n, line
     return None
 
 
 def _fence_free(text: str):
-    """(줄 번호, 줄) — 펜스 밖 줄만."""
-    fence = False
+    """(줄 번호, 줄) — 펜스 밖 줄만.
+
+    닫는 펜스는 여는 펜스와 같은 문자 · 같거나 긴 길이 · 뒤가 공백뿐일 때만이다(CommonMark). 네 백틱 펜스 안에 인용한 세 백틱
+    예시를 경계로 읽으면 인용한 명령이 펜스 밖으로 나와 정상 엔트리가 위반이 된다(리뷰 R3).
+    """
+    fence = None
     for n, line in enumerate(text.splitlines(), 1):
-        if FENCE.match(line):
-            fence = not fence
-            continue
-        if not fence:
+        m = FENCE_RUN.match(line)
+        if fence is None:
+            if m:
+                fence = m.group(1)
+                continue
             yield n, line
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
+            fence = None
 
 
 def _doc_keys(text: str):
@@ -362,7 +384,7 @@ def _strict_axes(root: pathlib.Path, texts: dict, live_slugs: set, live_ids: set
         hit = _writer_leak(docs[d])
         if hit:
             leaks.append(f"{d}:{hit[0]} `{hit[1][:60]}`")
-    show("엔트리 본문의 작성 명령 잔재(EOF→echo · echo \"기록 · wc -l \"$F\" — F-456)", leaks)
+    show("엔트리 본문의 작성 명령 잔재(EOF→셸 명령 · echo \"기록 · wc -l \"$F\" — F-456)", leaks)
     counts["작성 명령"] = len(leaks)
     return counts, unjudged
 
