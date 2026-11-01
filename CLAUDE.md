@@ -18,6 +18,7 @@
 4. `git tag vX.Y.Z` + `git push origin --tags`
 5. (선택) `gh release create vX.Y.Z`
 6. ⛔ 릴리즈 노트·CHANGELOG 는 **마지막 게이트(health-check · `check_release_sync.sh`) 뒤에 고치지 않는다** — 고쳤으면 게이트를 다시 돌린 뒤 발행한다. 노트의 검증 수치는 마지막 재실행 출력에서 옮긴다 (F-311: 게이트 뒤에 노트를 줄여 템플릿 게이트가 깨진 채 발행됐다)
+7. ⛔ 다른 워크트리에서 출하했으면 **세션이 읽는 로드 체크아웃**(`--plugin-dir` 대상)을 태그로 옮기고 대조한다 — `git -C <로드 체크아웃> merge --ff-only vX.Y.Z` 다음 `python3 scripts/check_loaded_version.py --loaded-root <로드 체크아웃>` 이 `LOADED_OK` 여야 한다 (F-507: 로드 체크아웃을 안 옮겨 4일간 옛 판이 돌았다)
 
 > **version bump 누락 시 `plugin update`가 "already at latest"로 스킵됨. 반드시 올릴 것.**
 

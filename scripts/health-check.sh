@@ -75,7 +75,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh mode_gate.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh mode_gate.py check_loaded_version.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -575,6 +575,23 @@ if [ -f "$ROOT/scripts/fz_snapshot.py" ]; then
 else
   UNRUN=$((UNRUN+1))
   record "정적 부하 추세" UNRUN "미실행 — fz_snapshot.py 부재 (⛔ PASS 아님)"
+fi
+
+# ── 4.8h 로드 체크아웃 대조 (경고 전용 · F-507) ───────────────────
+# ⛔ 로드본이 뒤처진 것은 이 트리의 결함이 아니라 **배포 상태**다 — exit 에 반영하지 않는다(4.8 과 같은 이유).
+#    검사기 고장(self-test 실패)만 판정 불가로 센다. 로드 루트는 사용자마다 달라 env FZ_LOADED_ROOT 로만 받는다.
+LV_SELF="$(python3 "$ROOT/scripts/check_loaded_version.py" --self-test 2>&1)"; LV_SELF_CODE=$?
+if [ "$LV_SELF_CODE" -ne 0 ]; then
+  record "로드본 대조" 2 "⛔ 검사기 self-test 실패 — 판정 불가 ($(printf '%s\n' "$LV_SELF" | tail -1))"
+  UNRUN=$((UNRUN+1))
+elif [ -n "${FZ_LOADED_ROOT:-}" ]; then
+  LV_OUT="$(python3 "$ROOT/scripts/check_loaded_version.py" 2>&1 | head -1)"
+  case "$LV_OUT" in
+    LOADED_OK*|LOADED_AHEAD*) record "로드본 대조" 0 "$LV_OUT" ;;
+    *) record "로드본 대조" 0 "⚠️ $LV_OUT (경고, 실패 아님)" ;;
+  esac
+else
+  record "로드본 대조" 0 "FZ_LOADED_ROOT 미지정 — 대조 생략 · $(printf '%s\n' "$LV_SELF" | tail -1)"
 fi
 
 # ── 4.9 codegraph stale 검사기 self-test ──────────────────────────
