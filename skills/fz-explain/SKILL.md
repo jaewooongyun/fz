@@ -175,10 +175,7 @@ GOOD:
 
 ---
 
-## 테스트 케이스
-
-> 상세: `references/test-spec.md`
-> fixture: `references/fixtures/positive-defects.md` (검출) · `negative-clean.md` (과잉 검출)
+> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
 
 ---
 

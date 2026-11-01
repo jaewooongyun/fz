@@ -39,3 +39,7 @@
 | 탐색 축 결과 0건(도구 오류로 인한 위음성) | `/fz-pr-digest 1234 --tutor` | 0건을 사실로 확정하지 않고 다른 도구로 재확인 수행, 재확인 후에도 0건이면 그 사실을 §7-E에 기록 | failure |
 | peer-review 연계, 플래그 미지정 | `/fz-peer-review 3394 --explain` | Tutor 티어 진입(Standard 아님) + peer-review WORK_DIR에 `pr-digest-tutor.md` 저장 | normal |
 | peer-review 연계, `--light` 병기 | `/fz-peer-review 3394 --explain --light` | Standard 티어 진입 + `pr-digest-standard.md` 생성(기존 동작 보존) | normal |
+
+## SKILL.md 에서 옮긴 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)

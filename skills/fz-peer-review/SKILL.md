@@ -466,9 +466,7 @@ GOOD:
 git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 → 현재 컨텍스트 보존.
 ```
 
-## 테스트 케이스
-
-> 상세: `skills/fz-peer-review/references/test-spec.md` (Triggering + Functional)
+> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
 
 ## Boundaries
 

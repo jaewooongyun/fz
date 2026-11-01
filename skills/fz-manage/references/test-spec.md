@@ -28,3 +28,7 @@
 | `skills/*/SKILL.md` + `agents/*.md` 존재 | `/fz-manage check` | 17개 검증 항목 전부 판정 출력 + "총 점수: N%" 산출 (YAML 필수 필드·MCP 유효성·metadata.provides/metadata.needs 체인·크기·깨진 참조 등 각 항목 OK/WARN/FAIL) | normal |
 | Relevance Scorer 결과 ≥ 0.70 모듈이 5개 미만 | `/fz-manage reflect-to-module <feedback_file>` | Gate 발동 → "threshold 낮춰서 재실행?" 사용자 확인 요청, 자동 적용 0건 (사용자 명시 승인 전 Edit 차단) | edge-case |
 | 한 SKILL.md의 YAML frontmatter 손상 | `/fz-manage list` | YAML 파싱 실패 보고 + 수동 확인 폴백 안내 (에러 대응 테이블) | failure |
+
+## SKILL.md 에서 옮긴 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)

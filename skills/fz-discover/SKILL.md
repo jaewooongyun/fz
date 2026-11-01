@@ -460,9 +460,7 @@ GOOD (본질 같은 옵션 합치기):
 
 ---
 
-## 테스트 케이스
-
-> 상세: `references/test-spec.md` (Triggering + Functional)
+> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
 
 ## Boundaries
 

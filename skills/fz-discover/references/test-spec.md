@@ -23,3 +23,7 @@
 | 한 경로가 우세해 보이는 비교 질문 (Few-shot BAD 유발 조건) | `/fz-discover "A랑 B 중 뭐가 나아?"` | Phase 3 산출물이 단일 "유일한 해"로 수렴하지 않음 — Trade-off Table에 경로 ≥2개 유지 + 🔒/🔓 구분, 경로 "선택/결론" 문장 부재 (Gate 3 통과, 결론은 plan 위임) | edge-case |
 | Phase 1 제약 매트릭스에 primitive 의존 가정(CLI flag 등) 존재, 3 axes(존재 / 권한·경계 / 결과 contract) 중 일부 미검증 | `/fz-discover "이렇게 flag 하나로 처리해도 괜찮을까?"` | Gate 1.5(Constraints Verified) 미통과 → Phase 2 Landscape 진입 차단, 또는 미검증 axis 가정을 explicit assumption tag 처리 후 Phase 2 차원에서 제외 | edge-case |
 | Serena MCP 연결 실패 | `/fz-discover "이 모듈 구조를 어떻게 잡을까?"` | Serena 도구 에러 감지 → Grep+Glob 폴백으로 코드 탐색 지속해 Gate 1(Problem Framed) 통과(스킬 중단 없음), 둘 다 불가 시 코드 없이 원칙 기반 추론으로 진행 | failure |
+
+## SKILL.md 에서 옮긴 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)

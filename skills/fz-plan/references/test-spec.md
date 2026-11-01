@@ -33,3 +33,7 @@
 | 모드 게이트에서 light 선택(또는 `light` 인자 · 신호어) + 단순 추가 작업 | `/fz-plan light "버튼 추가 계획 가볍게"` | plan-lean2 미기동 · Phase 1 Lead 수행 → Phase 2(GPT verify ∥ verify-gates · 끈 세션이면 `[GPT 미사용]`) · Phase 3 · 원장 · plan-final.md 는 full 과 같다 (단 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 생략 불가) | edge-case |
 | Serena MCP 연결 실패 | `/fz-plan "이 기능 영향 범위 분석해줘"` | 에러 대응에 따라 Grep + Glob 폴백으로 심볼 탐색 전환(Serena 미사용) → Phase 0b 계속 진행 | failure |
 | 네이티브 Workflow 도구 미가용 (팀 에이전트 모드 불가) | `/fz-plan "5+ Step 대규모 기능 계획해줘"` | SOLO 계획 수립으로 폴백 + 폴백 사유 experiment-log 기록 → Phase 1 산출물 정상 생성 | failure |
+
+## SKILL.md 에서 옮긴 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)

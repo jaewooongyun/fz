@@ -427,9 +427,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 
 ---
 
-## 테스트 케이스
-
-> 상세: `references/test-spec.md` (Triggering + Functional)
+> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
 
 ## Boundaries
 

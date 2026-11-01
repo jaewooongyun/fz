@@ -424,9 +424,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 
 ---
 
-## 테스트 케이스
-
-> 상세: `references/test-spec.md` (Triggering + Functional)
+> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
 
 ## Boundaries
 

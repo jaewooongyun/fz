@@ -29,3 +29,7 @@
 | Probe 결과 특정 stale 항목 해소 자료가 Tier 3(A5) 단독 | Phase 3 Plan 작성 → Phase 5 Execute | AC9 grep VIOLATION 0건 — 해당 line이 `[verified: A5]` 단독이 아닌 `[partially-verified: A5; …]`로 기록 → Gate 5 통과 | edge-case |
 | Plan v1/v2/v3 모두 GPT needs_revision (누적 3/3) | Phase 4 Verify 4회차 진입 시점 | GPT 4회차 미실행 + 사용자 에스컬레이션 발생 → Gate 4 '누적 카운터 ≤3' 충족 | failure |
 | `probe/probe-report.md` 부재(Probe 미실행) | `/fz-modernize plan "update-plan v1 작성"` | `plan/update-plan.md` 미생성 + Probe(Phase 1) 선행 안내 → Plan-before-Probe 차단 | failure |
+
+## SKILL.md 에서 옮긴 테스트 케이스
+
+> 상세: `references/test-spec.md` (Triggering + Functional)

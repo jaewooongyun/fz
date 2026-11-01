@@ -92,3 +92,8 @@ SKILL.md 크기            ≤500줄
 
 ⛔ 한쪽만으로는 판정이 서지 않는다. positive 만 있으면 과잉 검출을 못 재고,
 negative 만 있으면 검출력을 못 잰다.
+
+## SKILL.md 에서 옮긴 테스트 케이스
+
+> 상세: `references/test-spec.md`
+> fixture: `references/fixtures/positive-defects.md` (검출) · `negative-clean.md` (과잉 검출)

@@ -435,9 +435,7 @@ Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체
 
 ---
 
-## 테스트 케이스
-
-> 상세: `references/test-spec.md` (Triggering + Functional)
+> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
 
 ## Boundaries
 
