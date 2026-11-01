@@ -187,14 +187,14 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # stdout 한 줄 — 그
 
 | 구분 | 단계 (kind) | 비고 |
 |---|---|---|
-| 켬이면 필수 | fz-plan Phase 2 `verify` ∥ `verify-gates`(draft 원장이 있을 때 · `--gpt-independent` 면 `verify` 자리를 `verify-cross`) | 끈 세션의 원장 판정은 아래 § fz-plan 원장 |
+| 켬이면 필수 | fz-plan full 2.7 `independent-plan`(기본 — 끄기 `--no-gpt-independent`) · Phase 2 `verify` ∥ `verify-gates`(draft 원장이 있을 때 · 2.7 을 띄웠으면 `verify` 자리를 `verify-cross`) | 끈 세션의 원장 판정은 아래 § fz-plan 원장 |
 | 켬이면 필수 | fz-code 8.5 `check` | |
 | 켬이면 필수 | fz-fix Step 4 `check` · 빌드 LOOP 한도의 보조 진단 `check` | 2026-11-01 사용자 결정 — `--gpt` opt-in 을 없앴다. check 는 외부 전송이 아니다 |
 | 켬이면 필수 | fz-review Phase 5 `review` · 5.5 `validate` · 5.5 `verify-gates`(확정 원장이 있을 때) | Phase 5 직전 `availability-probe`(불능 판별)도 같은 decide 줄을 따른다 — `skip` 이면 probe 도 부르지 않는다. `--gpt-independent` 면 Phase 5 `review` 자리를 병합이 맡는다 |
-| 켬이면 필수 | fz-modernize Phase 4 `modernize-verify` · light 의 `micro-eval` | 자기 적용 계약의 "non-skippable" 은 켠 세션의 뜻이다 |
+| 켬이면 필수 | fz-modernize full Phase 3 `independent-plan`(초안과 동시 — 실패 · 거부면 Phase 4 그대로) · Phase 4 `modernize-verify` · light 의 `micro-eval` | 자기 적용 계약의 "non-skippable" 은 켠 세션의 뜻이다 |
 | 켬이면 필수 | fz-peer-review Tier 1 · 2 · 3 의 GPT 자리 — 독립 첫 패스(`independent-review` · `--no-gpt-independent` 면 `peer-challenger`) · Tier 3 `peer-da` | Tier 0 은 GPT 가 없다(`--tier 0` 명시 때만 — `modules/peer-review-tiers.md`). 끈 세션이면 강등 · 감쇠 없이 표기만 |
 | 켬이면 필수 | fz-manage reflect-to-module Step 4 reviewer(`/fz-gpt`) | `--skip-gpt` 는 DRY-RUN 전용이다 — GPT 미사용 `skip` 과 다르다 |
-| 명시 플래그 | fz-review `--gpt-independent`(`independent-review`) · fz-plan `--gpt-independent`(`independent-plan`) | 플래그가 있을 때만 — 있으면 decide 를 거친다 |
+| 명시 플래그 | fz-review `--gpt-independent`(`independent-review`) | 플래그가 있을 때만 — 있으면 decide 를 거친다 |
 | 명시 플래그 | fz-discover `--deep` `verify` | 같다 |
 | 명시 플래그 | fz-peer-review `--tier 0 --gpt` — Tier 0 을 Tier 1 로 올려 GPT 자리를 둔다 | 올린 뒤의 GPT 자리는 위 fz-peer-review 행(켬이면 필수)이다 |
 | 명시 호출 | commit · PR 전 `check` | 사용자가 부를 때만이다(`skills/fz/SKILL.md` § 3.4). 그때도 decide 를 먼저 부르고, `skip reason=off-user` 면 위 'off 세션의 한 호출' 순서다 |
@@ -204,7 +204,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # stdout 한 줄 — 그
 - 켬이면 필수 단계는 `run` · `config` 에서 건너뛰지 않는다. 명시 플래그 단계는 플래그가 없으면 decide 도 부르지 않는다. 명시 호출은 사용자가 부를 때만 decide 를 부른다
 - 표에 GPT 단계를 더하면 그 스킬 문서에도 decide 줄을 둔다 — `tests/fixtures/gpt/branch` 의 `all-consumers-use-common` 이 GPT kind 를 부르는 스킬마다 decide 또는 이 절을 가리키는지 본다(스킬 단위다 — 호출 자리마다의 검사는 아니다)
 - 이 표는 산문이다 — kind 레지스트리(`scripts/gpt-kinds.json`)의 `callers` 와 행을 잇는 기계 검사는 없다. 표를 고치면 레지스트리 호출자와 함께 본다
-- **재검증 횟수**: 같은 산출물의 GPT 재검증 횟수 · 같은 입력 멈춤 · 예산 소진(미해결 — 통과 아님) · 거부(정문 exit 19)는 정본 `modules/cross-validation.md` § 재검증 라운드 상한 을 따른다
+- **재검증 횟수**: 같은 산출물의 GPT 재검증 횟수 · 같은 입력 멈춤 · 예산 소진(미해결 — 통과 아님) · 거부(정문 exit 19)는 정본 `modules/cross-validation.md` § 재검증 라운드 상한 을 따른다 — 세는 kind 의 호출 줄은 `FZ_GPT_ARTIFACT=<산출물 계열>` · `FZ_WORK_DIR`(작업 폴더)를 단다. 계열과 작업 폴더는 호출자가 정한다(공용 레시피는 호출자 표 — `modules/fz-gpt-subcommands-core.md`) · 빠진 줄은 `gpt_kinds.py lint --consumers` 가 실패시킨다 · fz-discover `--deep` 의 `verify` 는 산출물 계열 밖이라 세지 않는다(`ARTIFACT=` 빈 값). 거부(19)면 다시 부르지 않는다 — `same-input` 은 stderr 가 가리킨 직전 판정 파일을 쓰고, 그 밖은 그 키를 미해결로 보고한다(`gpt_rounds.py status`). 독립 첫 패스(`independent-plan`)의 거부는 그 단계를 건너뛸 뿐이다 — 통과로도 검증 미해결로도 적지 않는다(fz-plan 실행 절차 2.7)
 
 ## GPT 미사용 (off · CLI 없음)
 
@@ -239,7 +239,7 @@ GPT 는 모드와 독립이다(`modules/mode-gate.md` § GPT 는 모드와 독�
 3. 대체 검증을 더하지 않는다 — **표기만**이다(2026-10-19 사용자 결정 · Gate 2). GPT 를 끈 것은 사용자이므로 fresh-context Claude 검증 같은 숨은 비용을 붙이지 않는다
 4. 병합(`scripts/review_merge.py`)은 `--gpt` 대신 `--gpt-unavailable "GPT 미사용 — <사유>"` 로 부른다. exit 18 감사를 `--gpt` 로 넘기면 병합이 exit 1 로 거부한다
 5. Reflection Rate 는 N/A 다 — GPT 이슈 0건이 아니라 GPT 부재다. 기준 미달로 읽지 않는다
-6. `--gpt-independent` · Sprint Contract(kind `sprint-contract`)는 건너뛴다 — 각각 `[GPT 미사용 — 사유]`
+6. 독립 첫 패스(fz-plan · fz-modernize full 기본 · `--gpt-independent`) · Sprint Contract(kind `sprint-contract`)는 건너뛴다 — 각각 `[GPT 미사용 — 사유]`
 
 ### fz-plan 원장 (verify-gates 없음)
 

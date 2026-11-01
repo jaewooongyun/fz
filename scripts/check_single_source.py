@@ -79,6 +79,18 @@ FACTS = [
         "reference_re": r"mode-gate\.md",
         "mention_re": r"신호어",
     },
+    {
+        # 재검증 라운드 상한의 소유자는 판정기 하나다 — 정본 절(modules/cross-validation.md)이 표로 보이고 스킬 · 모듈 · 정문은 가리키기만
+        "name": "GPT 재검증 라운드 상한 (gpt_rounds.py FAMILY_CAP)",
+        "canonical_file": "scripts/gpt_rounds.py",
+        "canonical_re": r"^FAMILY_CAP = ",
+        "consumer_globs": ["scripts/gpt-call.sh", "scripts/gpt_kinds.py", "scripts/gpt-kinds.json", "skills/*/SKILL.md",
+                           "skills/*/references/*.md", "modules/*.md", "guides/*.md"],
+        # 재복제 = 계열 상한 사전을 다시 쓰는 코드 선언 — 정본 절의 산문 표는 선언이 아니라 그 값의 문서다
+        "declaration_re": r"\bFAMILY_CAP\s*=|[\"'](verify|independent|contract)[\"']\s*:\s*\d",
+        "reference_re": r"gpt_rounds\.py|재검증 라운드 상한",
+        "mention_re": r"FAMILY_CAP",
+    },
 ]
 
 
@@ -229,6 +241,12 @@ def self_test() -> int:
          files=dict(launcher, **{"scripts/gpt-kinds.json": '{"kinds": {"k": {"timeout": 900}}}\n'}))
     case("total-canonical-changed", None, "x\n", "VIOLATION", "정본 선언 수 0", facts=TOTAL,
          files=dict(launcher, **{"scripts/gpt_independent.sh": 'ARM="" TIMEOUT=900 REQ=""\n'}))
+    # ⑪~⑫ 재검증 라운드 상한 — 판정기만 계열 상한을 갖는다. 정문 · resolver · 레지스트리 · 문서가 그 사전을 다시 쓰면 재복제다
+    CAP = [f for f in FACTS if "FAMILY_CAP" in f["name"]]
+    rounds = {"scripts/gpt_rounds.py": 'FAMILY_CAP = {"verify": 3, "independent": 1, "contract": 2}\n', "scripts/gpt-call.sh": "# 정문\n"}
+    case("cap-single-source", None, "x\n", "PASS", facts=CAP, files=rounds)
+    case("cap-gate-redeclares", None, "x\n", "VIOLATION", "소비자 선언 수 1", facts=CAP,
+         files=dict(rounds, **{"scripts/gpt-call.sh": 'CAP=\'{"verify": 3}\'\n'}))
 
     for f in fails:
         print(f"  FAIL {f}")

@@ -12,19 +12,19 @@
 
 ## 절차 (fz-plan Phase 0.7 — 실행 절차 5.5 · 5.7)
 
-> 위치: ① GPT 독립 플랜(켰을 때) ∥ Workflow → ② 잠정 플랜 · 방향 정지(RECONSIDER/REDIRECT · `degraded` 면 fz-plan 실행 절차 4 대로 멈춘다) → ③ 합치기 → Lead 의 Phase 1 몫(Gate 1 · 1.5) **뒤**, ⑥ Phase 2 verify ∥ verify-gates **앞**. 계획 단계의 첫 GPT 호출은 ① 이고 Contract 는 그 뒤의 호출이다. "Phase 0.7" 은 이력상 이름으로 남은 번호다.
+> 위치: ① GPT 독립 플랜(full 기본 — fz-plan `--no-gpt-independent` 면 없다) ∥ Workflow → ② 잠정 플랜 · 방향 정지(RECONSIDER/REDIRECT · `degraded` 면 fz-plan 실행 절차 4 대로 멈춘다) → ③ 합치기 → Lead 의 Phase 1 몫(Gate 1 · 1.5) **뒤**, ⑥ Phase 2 verify ∥ verify-gates **앞**. 계획 단계의 첫 GPT 호출은 ① 이고 Contract 는 그 뒤의 호출이다. "Phase 0.7" 은 이력상 이름으로 남은 번호다.
 
 ④ **Sprint Contract** (발동 시 · 직전 decide — fz-plan 실행 절차 5.5):
 
 1. **입력**: 잠정 플랜(Phase 1 을 마친 plan-v{N} — `steps` · `acceptanceCriteria` · `writeScope`) + `directionVerdict`(② 를 통과한 방향 판정) + 요구사항 원문 (+ discover 산출물 있으면) → GPT
 
-2. **GPT Sprint Contract 작성** (kind `sprint-contract` — `scripts/gpt-call.sh sprint-contract` · architect 본문 주입):
+2. **GPT Sprint Contract 작성** (kind `sprint-contract` — `FZ_GPT_ARTIFACT=plan FZ_WORK_DIR={WORK_DIR} scripts/gpt-call.sh sprint-contract` · architect 본문 주입 · 계약 계열 — 횟수 · 거부(exit 19)는 `modules/cross-validation.md` § 재검증 라운드 상한):
    - 출력: `{WORK_DIR}/plan/sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`
    - 형식: 아래 schema 참조
 
 3. **Claude 동의/수정** (Lead):
    - **agree** → ⑤
-   - **modify** → Sprint Contract 수정안 작성 + GPT re-verify 1회 (한도) → ⑤
+   - **modify** → Sprint Contract 수정안 작성 + GPT re-verify 1회 (한도 — 2 와 같은 정문 줄 · 같은 `FZ_GPT_ARTIFACT=plan` · `FZ_WORK_DIR` 라 계약 계열의 두 번째 라운드로 든다) → ⑤
    - **reject** → ② 로 돌아간다 — 거부 사유를 방향 정지 규칙(사용자 확인)에 실어 보고한다
 
 ⑤ **반영 · 재생성** (fz-plan 실행 절차 5.7 — 이 규칙은 여기 한 곳에만 적는다): 합의본을 plan 의 Success Criteria 로 import 하고, 그 결과 기준 · 범위 · 금지 기준(`success_criteria` · `scope_boundary` · `anti_criteria`) 중 하나라도 잠정 플랜과 달라지면 plan-v{N+1} · RTM · draft 원장(고친 `{WORK_DIR}/plan/steps.json` → `gate_check.py --from-plan` → `{WORK_DIR}/gates/plan.draft.md`)을 같은 합의본에서 **다시 만든다**. ⑥ verify ∥ verify-gates 는 이 스냅샷을 읽는다(fz-plan Phase 2 3.1 은 다시 만든 원장을 덮어쓰지 않는다) — 옛 plan 에 대한 판정을 새 plan 의 승인 근거로 쓰지 않는다.

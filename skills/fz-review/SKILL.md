@@ -54,7 +54,7 @@ metadata:
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-- ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다
+- ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다 · 정문 exit 19(`GPT-ROUNDS:` 재검증 라운드 거부)면 다시 부르지 않는다 — `same-input` 은 stderr 가 가리킨 직전 판정 파일을 쓰고, 그 밖(`budget-exhausted` · `recall-used`)은 그 키를 미해결로 보고한다(`python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_rounds.py" status --work-dir {WORK_DIR}` — 통과 아님 · 정본 `modules/cross-validation.md` § 재검증 라운드 상한)
 
 ## 모듈 참조
 
@@ -343,7 +343,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 >
 > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
 >
-> 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 검증"` 실행 → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
+> 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 검증"` 실행(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` — `modules/fz-gpt-subcommands-core.md` § validate 호출자) → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
 
 ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
 
@@ -357,8 +357,8 @@ python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --reverify {WORK_DIR}/gates/pl
 - `--reverify`는 이미 `- [x]`인 게이트도 실행하고, 통과 못 하면 `- [ ]` + `EVIDENCE: pending`(재실행 전 진행 기록이 있던 게이트는 `pending; demoted`)으로 **강등**한다
 - ⛔ `--status`는 재검증이 아니다 — 파싱만 하고 과거 증거를 그대로 읽는다
 - `/fz-gpt validate`(fz-guardian)의 `resolved/partially_resolved/unresolved/**regressed**` 4축에서 `regressed`가 0이 아니면 통합 차단 — 기존 `gpt_verification_schema` 유지
-- 원장이 있으면 **`verify-gates`를 추가 호출**해(같은 decide 판정 — `skip` 이면 부르지 않고 `[GPT 미사용 — 사유]`) 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산출물이다). 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates
-- ⛔ 응답은 `--verdict-check {응답.json} {WORK_DIR}/gates/plan.md` 로 전수 판정을 확인한다. exit 1이면 재호출 1회 후 **미판정으로 기록**
+- 원장이 있으면 **`verify-gates`를 추가 호출**해(같은 decide 판정 — `skip` 이면 부르지 않고 `[GPT 미사용 — 사유]`) 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산출물이다). 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` · `LEDGER={WORK_DIR}/gates/plan.md` — validate 와 같은 라운드의 게이트 슬롯)
+- ⛔ 응답은 `--verdict-check {응답.json} {WORK_DIR}/gates/plan.md` 로 전수 판정을 확인한다. exit 1이면 재호출 1회(`FZ_GPT_RECALL=post-check` — 그 라운드를 잇고 라운드를 쓰지 않는다 · `modules/fz-gpt-subcommands-core.md` § 사후 검증 블록) 후 **미판정으로 기록**
 - ⛔ validate를 대체하지 않는다 — 4축 역검증과 게이트 판정은 관심사가 다르다
 - 전 게이트 충족 시 `--set-state closed` (전진은 조건부 — 미충족이면 거부된다)
 

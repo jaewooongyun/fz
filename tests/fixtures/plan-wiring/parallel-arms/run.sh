@@ -16,7 +16,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 T0="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }; T="$(cd "$T0" && pwd -P)"; trap 'rm -rf "$T"' EXIT
 
 capture() {   # $1 = core 모듈 파일 → stdout 에 정규화한 CLI 인자 JSON(실패면 빈 출력 · exit 1)
-  local src="$1" w="$T/cap"; rm -rf "$w"; mkdir -p "$w/repo" "$w/home" "$w/tel" "$w/codex/skills/fz-architect"
+  local src="$1" w="$T/cap"; rm -rf "$w"; mkdir -p "$w/repo" "$w/home" "$w/tel" "$w/wd" "$w/codex/skills/fz-architect"
   git -C "$w/repo" init -q 2>/dev/null
   # 고정 본문은 Tier 2a 자리($CODEX_HOME/skills/fz-architect)에 둔다 — 정문(gpt-call.sh)의 resolver 가 그 경로를 고른다.
   #   옛 모듈(호출부가 get_gpt_skill_path 를 부르던 판)을 --capture 할 때도 같은 파일을 가리켜 두 판의 마커 줄이 같은 경로를 적는다
@@ -32,7 +32,11 @@ print(s[j:s.index("\n```", j)])
 PY
   } > "$w/verify.sh" || return 1
   local ok_json='{"schemaVersion":"1.1","review_id":"fixture","timestamp":"2026-09-29T00:00:00Z","review_type":"plan_validation","issues":[],"summary":{"total_issues":0,"by_severity":{"critical":0,"major":0,"minor":0,"suggestion":0},"by_category":""},"verdict":"approved","overall_feedback":"ok","strengths":[]}'
-  env -u FZ_GPT_CHOICE_DIR CODEX_HOME="$w/codex" HOME="$w/home" PATH="$R/tests/fixtures/gpt/_shim:$PATH" W="$w" STUB_SKILL="$w/codex/skills/fz-architect/SKILL.md" FZ_PLUGIN_ROOT="$R" GIT_ROOT="$w/repo" \
+  # 호출자 = fz-plan Phase 2(core § verify 호출자 표 — ARTIFACT=plan · 작업 폴더). 라운드 원장 · 발견 색인이 임시 폴더에만 남게
+  #   바깥 셸의 run-state(FZ_RUN_STATE · 세션 id) · 계열 env 를 지운다
+  env -u FZ_GPT_CHOICE_DIR -u FZ_RUN_STATE -u CLAUDE_CODE_SESSION_ID -u FZ_GPT_ARTIFACT -u FZ_GPT_RECALL -u FZ_GPT_ARTIFACT_VERSION -u FZ_WORK_DIR \
+    CODEX_HOME="$w/codex" HOME="$w/home" PATH="$R/tests/fixtures/gpt/_shim:$PATH" W="$w" STUB_SKILL="$w/codex/skills/fz-architect/SKILL.md" FZ_PLUGIN_ROOT="$R" GIT_ROOT="$w/repo" \
+    ARTIFACT=plan WORK_DIR="$w/wd" \
     FZ_SHIM_CAPTURE="$w/argv.json" FZ_SHIM_OUTPUT="$ok_json" FZ_TELEMETRY_DIR="$w/tel" bash "$w/verify.sh" > "$w/log" 2>&1 || { cat "$w/log" >&2; return 1; }
   python3 - "$w/argv.json" "$w" "$R" <<'PY'
 import json, sys

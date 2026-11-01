@@ -11,7 +11,7 @@
 > ⛔ **아래 예시는 전부 정문(`scripts/gpt-call.sh <kind>`) 호출이다** — 호출자는 kind 와 입력(`--cd` · `--out` · `--prompt-file` …)만 쓴다. 모드 · 역할 스킬 · schema · 고정 플래그는 레지스트리 `scripts/gpt-kinds.json` 이 정한다(생성 표: `skills/fz-gpt/SKILL.md`). 모델·effort 는 적지 않는다(`modules/gpt-strategy.md` § 모델·effort 선택). ⛔ 래퍼 · GPT CLI 를 직접 부르지 않는다.
 > 정문이 부르는 래퍼(`scripts/gpt-exec.sh`)가 `modules/fz-gpt-bash-hygiene.md` 의 교훈을 대신 처리한다: `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `--out` readback + `--` 구분자 + (review 모드) §5.5 Base Verification Gate.
 > 프롬프트는 `--prompt-file` 로만 받는다 — 아래 `P_*` 는 앞 줄에서 heredoc 으로 쓴 임시 파일이다. 읽기 전용은 래퍼가 모든 호출에 `-c sandbox_mode="read-only"` 로 **강제**한다(사용자 config 보다 우선) — 옛 `--sandbox read-only` 플래그는 쓰지 않는다.
-> 같은 산출물의 재검증(verify · verify-gates · validate · verify-cross 재호출) 횟수 · 같은 입력 멈춤 · verify-gates 사후 대조 뒤 재호출(`FZ_GPT_RECALL=post-check`)은 `modules/cross-validation.md` § 재검증 라운드 상한 이 정본이다 — 정문이 세고 넘치면 exit 19 다.
+> 같은 산출물의 재검증(verify · verify-gates · validate · verify-cross 재호출) 횟수 · 같은 입력 멈춤 · verify-gates 사후 대조 뒤 재호출(`FZ_GPT_RECALL=post-check`)은 `modules/cross-validation.md` § 재검증 라운드 상한 이 정본이다 — 정문이 세고 넘치면 exit 19 다. 세는 kind 의 아래 호출 줄은 env `FZ_GPT_ARTIFACT=<산출물 계열>` · `FZ_WORK_DIR` 를 단다 — 계열과 작업 폴더는 **호출자가 정한다**(§ verify · § verify-gates · § validate 호출자 표 · 단일 호출자 레시피 § resume 교차 는 `plan`). 빠진 줄은 상한 밖이라 `gpt_kinds.py lint --consumers` 가 실패한다. exit 19 면 다시 부르지 않는다(`same-input` 은 stderr 가 가리킨 직전 판정 파일을 쓴다).
 
 ## review -- 코드 리뷰 (주력)
 
@@ -35,7 +35,16 @@ fz-plan의 Phase 2. **kind `verify` — 래퍼 exec · architect 본문 주입 �
 
 ⛔ **verify 는 Claude 가 쓴 계획을 받아 대조한다** — 입력에 계획 본문이 있고, 합격은 Q1~Q8 판정과 issues 다. 계획을 보지 않고 요구 원문만으로 GPT 가 자기 계획을 세우는 것은 `independent-plan` 이다(`modules/fz-gpt-subcommands-aux.md` § independent-plan). 둘을 같은 검증으로 세지 않는다(F-471 · F-508).
 
+⛔ **산출물 계열(`ARTIFACT`)과 작업 폴더(`WORK_DIR`)는 호출자가 정한다** — 이 레시피는 여러 호출자가 같이 쓴다. 계열을 밝힌 호출만 재검증 라운드 상한(`modules/cross-validation.md` § 재검증 라운드 상한)에 센다.
+
+| 호출자 | `ARTIFACT` | `WORK_DIR` |
+|---|---|---|
+| fz-plan Phase 2 | `plan` | 티켓 작업 폴더 — 같은 라운드의 `verify-gates` 와 한 원장(`{WORK_DIR}/gpt-rounds.json`) |
+| fz-discover `--deep` · 직접 `/fz-gpt verify` | 빈 값(`ARTIFACT=`) — 산출물 계열 밖이라 세지 않는다 | 없어도 된다 |
+
 ```bash
+: "${ARTIFACT?호출자가 산출물 계열을 정한다 — 위 호출자 표(빈 값이면 세지 않는다)}"
+: "${ARTIFACT:+${WORK_DIR:?세는 호출은 작업 폴더 원장에 남긴다 — 호출자가 WORK_DIR 를 정한다}}"
 cat > "$P_VERIFY" <<EOF
 이 구현 계획을 검증하라.
 CLAUDE.md ## Code Conventions 섹션의 가이드라인을 참조하라.
@@ -63,10 +72,10 @@ Q8 함의 커버리지: 계획이 지시의 "문자적 범위"뿐 아니라 "의
 계획의 리스크 매트릭스가 빈약하거나 누락된 경우 반드시 지적하라.
 Anti-Pattern Constraints가 있으면 각 금지 패턴의 실효성을 검증하라.
 EOF
-"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$REVIEW_FILE" --prompt-file "$P_VERIFY"
+FZ_GPT_ARTIFACT="$ARTIFACT" FZ_WORK_DIR="${WORK_DIR:-}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$REVIEW_FILE" --prompt-file "$P_VERIFY"
 ```
 
-### resume 교차 (fz-plan Phase 2 · opt-in `--gpt-independent`)
+### resume 교차 (fz-plan Phase 2 · 2.7 독립 플랜을 띄운 run — full 기본)
 
 독립 플래너(kind `independent-plan` · `--keep-iso`)의 세션을 이어 위 틀(Q1–Q8 · `gpt_review_schema`)로 Claude 플랜을 검증한다 — 플래너가 이미 읽은 맥락을 다시 읽지 않는다. ⛔ 세션 파일이 없으면 위 기본 `verify` 다 — 그 프롬프트 · 인자는 바뀌지 않는다(`tests/fixtures/plan-wiring/parallel-arms/run.sh` 가 가짜 CLI 로 대조한다).
 
@@ -75,7 +84,7 @@ EOF
 #   (오염 15 · 6축 14 · planner 거부 17 로 끝난 run 은 런처가 세션 파일을 지운다).
 # ⛔ resume 은 --inject-skill 을 받지 않는다 — 정문이 architect 본문을 P_VERIFY 앞에 붙여 $P_CROSS 에 쓰고 --gpt-skill-path 로 판정만 받는다.
 #    격리 홈(CODEX_HOME=<iso>/gpt-home)은 이 호출의 래퍼에만 주고, 끝나면 런처 cleanup 으로 지운다(E3 — 인증은 링크뿐이다)
-"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify-cross --audit "$AUDIT" --cd "$GIT_ROOT" --out "$REVIEW_FILE" \
+FZ_GPT_ARTIFACT=plan FZ_WORK_DIR="${WORK_DIR:?fz-plan 작업 폴더 — 라운드 원장 자리}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify-cross --audit "$AUDIT" --cd "$GIT_ROOT" --out "$REVIEW_FILE" \
   --prompt-file "$P_VERIFY" --prompt-out "$P_CROSS"
 ```
 - ⛔ 감사에 `sessionFile` 이 없으면(런처가 `--keep-iso` 없이 돌았거나 실패했다) 정문이 resume 하지 않고 10 으로 끝낸다 — 그때 `iso` 가 있으면 같은 cleanup 으로 지운다. 호출자는 기본 `verify` 로 간다
@@ -87,20 +96,22 @@ EOF
 
 발동: 원장이 있을 때만. 원장이 없으면 게이트 판정이 무의미하다.
 
-⛔ **대상 원장은 호출자가 정한다** — 특정 파일명에 묶지 않는다.
+⛔ **대상 원장 · 산출물 계열 · 작업 폴더는 호출자가 정한다** — 특정 파일명에 묶지 않는다. 작업 폴더(`WORK_DIR`)는 라운드 원장 `{WORK_DIR}/gpt-rounds.json` 의 자리다 — 같은 라운드의 `verify` · `validate` 와 같은 폴더여야 한 원장에 든다(`modules/cross-validation.md` § 재검증 라운드 상한).
 
-| 호출자 | 원장 | 시점 |
-|---|---|---|
-| fz-plan Phase 2 | `{WORK_DIR}/gates/plan.draft.md` | 확정 **전** — 판정을 반영해 확정한다 |
-| fz-review Phase 5.5 | `{WORK_DIR}/gates/plan.md` | 확정 **후** — 변경된 코드 기준 재판정 |
+| 호출자 | 원장 | 시점 | 계열(`ARTIFACT`) |
+|---|---|---|---|
+| fz-plan Phase 2 | `{WORK_DIR}/gates/plan.draft.md` | 확정 **전** — 판정을 반영해 확정한다 | `plan` |
+| fz-review Phase 5.5 | `{WORK_DIR}/gates/plan.md` | 확정 **후** — 변경된 코드 기준 재판정 | `code` |
 
 ```bash
 : "${LEDGER:?호출자가 원장 경로를 정한다 — plan: gates/plan.draft.md · review: gates/plan.md}"
+: "${ARTIFACT:?호출자가 산출물 계열을 정한다 — fz-plan Phase 2: plan · fz-review Phase 5.5: code}"
+: "${WORK_DIR:?호출자가 작업 폴더를 정한다 — 라운드 원장이 그 폴더에 남는다}"
 [ -f "$LEDGER" ] || exit 0   # 원장 없으면 이 호출 자체를 생략
 
 # ⛔ 정본 경로로 부른다 — 상대 경로는 cwd 가 플러그인 루트가 아닐 때 조용히 깨진다
 #    (`FZ_PLUGIN_ROOT` 는 `scripts/resolve-plugin-root.sh` 로 해석한다). 역할 없음 · gpt_gate_verdict_schema 는 레지스트리 몫이다
-"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify-gates --cd "$GIT_ROOT" --out "$GATE_VERDICT_FILE" --prompt-file "$PROMPT"
+FZ_GPT_ARTIFACT="$ARTIFACT" FZ_WORK_DIR="$WORK_DIR" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify-gates --cd "$GIT_ROOT" --out "$GATE_VERDICT_FILE" --prompt-file "$PROMPT"
 ```
 
 프롬프트에 **원장 경로와 내용을 함께** 넣는다. 현재 `verify` 템플릿에는 WORK_DIR·ledger 변수가 없어 그대로는 게이트를 볼 수 없다.
@@ -123,7 +134,12 @@ id·title·kind 는 원장 줄과 **글자 그대로** 복사하라(축약·요�
 이 대조는 **눈으로 하지 않는다** — 판정기가 한다.
 
 ```bash
-python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check "$GATE_VERDICT_FILE" "$LEDGER"
+python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check "$GATE_VERDICT_FILE" "$LEDGER" || {
+  # 사후 대조 실패 뒤 1회만 다시 부른다 — FZ_GPT_RECALL=post-check 는 직전 판정의 라운드를 잇고 라운드를 쓰지 않는다(라운드당 1회).
+  #   계열 · 작업 폴더는 위 verify-gates 호출과 같다 — 새 셸이라 비었으면 여기서 멈춘다(빈 계열은 원장 밖으로 샌다)
+  FZ_GPT_RECALL=post-check FZ_GPT_ARTIFACT="${ARTIFACT:?verify-gates 와 같은 계열}" FZ_WORK_DIR="${WORK_DIR:?verify-gates 와 같은 작업 폴더}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify-gates --cd "$GIT_ROOT" --out "$GATE_VERDICT_FILE" --prompt-file "$PROMPT"
+  python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check "$GATE_VERDICT_FILE" "$LEDGER"   # 다시 1 이면 미판정으로 기록한다
+}
 ```
 
 | 검사 | 왜 필요한가 |
@@ -133,13 +149,17 @@ python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check "$GATE_VERDICT
 | `(id, title, kind)` 일치 | ⛔ id 만 보면 **stale 응답**이 통과한다. 제목이 바뀌어도 id 는 그대로여서 옛 oracle 판정이 새 oracle 에 붙는다 |
 | `summary` 를 배열에서 **재계산**해 비교 | 신고값을 믿으면 보고가 거짓이 된다. 음수끼리 상쇄해 합계만 맞추는 것도 막는다 |
 
-exit 1 이면 재호출 1회 후 **미판정으로 기록**하고 Lead가 판단한다 — 조용히 통과시키지 않는다.
+exit 1 이면 위 블록대로 재호출 1회(`FZ_GPT_RECALL=post-check` — 정본 `modules/cross-validation.md` § 재검증 라운드 상한) 후 다시 1 이면 **미판정으로 기록**하고 Lead가 판단한다 — 조용히 통과시키지 않는다.
 
 ## validate -- 피드백 역검증
 
 fz-review의 Phase 5.5. **kind `validate` — 래퍼 exec · guardian 본문 주입 · `gpt_verification_schema`(레지스트리).** 역할 본문을 찾지 못하면 정문이 폴백 지시를 붙인다.
 
+⛔ 산출물 계열(`ARTIFACT`)과 작업 폴더(`WORK_DIR`)는 호출자가 정한다 — fz-review Phase 5.5 는 `code` · 티켓 작업 폴더(같은 라운드의 `verify-gates` 와 한 원장), 직접 `/fz-gpt validate` 는 빈 값(`ARTIFACT=` — 재검증 라운드 상한에 세지 않는다).
+
 ```bash
+: "${ARTIFACT?호출자가 산출물 계열을 정한다 — fz-review Phase 5.5: code · 직접 호출: 빈 값}"
+: "${ARTIFACT:+${WORK_DIR:?세는 호출은 작업 폴더 원장에 남긴다 — 호출자가 WORK_DIR 를 정한다}}"
 cat > "$P_VALIDATE" <<EOF
 피드백 반영 여부를 검증하라.
 CLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.
@@ -150,7 +170,7 @@ $ORIGINAL_ISSUES
 ## 적용된 수정
 $FIXES_APPLIED
 EOF
-"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" validate --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE"
+FZ_GPT_ARTIFACT="$ARTIFACT" FZ_WORK_DIR="${WORK_DIR:-}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" validate --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE"
 ```
 
 **/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.

@@ -135,7 +135,8 @@ if "--out" in a and a.index("--out") + 1 < len(a):
 '''
 # ⛔ bash 머리 — 옛 형태는 대역을 직접 실행하고 정문은 어댑터를 `bash <어댑터>` 로 띄운다. 둘 다 같은 Python 을 돌린다
 STUB = "#!/bin/bash\nexec python3 -c " + shlex.quote(STUB_PY) + ' "$@"\n'
-FIXED = {"AFFECTED_SYMBOLS": "", "MAJOR_ISSUES_COUNT": "1", "HAS_FIXABLE_ISSUES": "true"}   # 호출 분기에 들어가는 전제
+# ARTIFACT — core § verify · § validate 레시피의 호출자 계열(가드가 정해져 있기를 요구한다 · 값이 틀리면 정문 10)
+FIXED = {"AFFECTED_SYMBOLS": "", "MAJOR_ISSUES_COUNT": "1", "HAS_FIXABLE_ISSUES": "true", "ARTIFACT": "plan"}   # 호출 분기에 들어가는 전제
 ENV_GIVEN = {"FZ_PLUGIN_ROOT", "HOME", "PATH"}
 RUN_N = [0]
 
@@ -149,8 +150,9 @@ def replay(body):
     stub = w / "plugin/scripts/gpt-exec.sh"
     stub.write_text(STUB, encoding="utf-8")
     stub.chmod(0o755)
-    # 정문 형태: 대역 루트에 정문 · resolver · 레지스트리 · schemas 링크. resolver 는 Tier 2a($CODEX_HOME/skills = w/skills)의 고정 본문을 고른다
-    for name in ("gpt-call.sh", "gpt_kinds.py", "gpt-kinds.json"):
+    # 정문 형태: 대역 루트에 정문 · resolver · 레지스트리 · 라운드 판정기(gpt_rounds.py · run_metrics.py) · schemas 링크.
+    #   resolver 는 Tier 2a($CODEX_HOME/skills = w/skills)의 고정 본문을 고른다. 계열(FZ_GPT_ARTIFACT)을 단 호출 줄은 정문이 판정기를 부른다
+    for name in ("gpt-call.sh", "gpt_kinds.py", "gpt-kinds.json", "gpt_rounds.py", "run_metrics.py"):
         if (TREE / "scripts" / name).is_file():
             (w / "plugin/scripts" / name).symlink_to(TREE / "scripts" / name)
     if (TREE / "schemas").is_dir():

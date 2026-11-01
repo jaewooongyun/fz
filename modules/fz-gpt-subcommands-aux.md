@@ -99,14 +99,14 @@ EOF
 > **C4 원칙**: Claude의 중간 작업물(계획 텍스트)을 전달하지 않는다. 요구사항만 공유.
 > **비교**: 결과는 JSON 한 객체다(`gpt-skills/fz-planner` 출력 형식 — `status` · `steps` · `riskMatrix` · `divergencePoints` · `projectRules`). `status` 가 `rejected` 면 계획이 아니다 — `reason` 을 보고 입력을 고친다. 차이표는 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {workflow-result.json} --gpt "$PLAN_FILE"` 로 만든다
 
-## independent-plan · independent-review -- 격리 첫 패스 (fz-peer-review 기본 · fz-review · fz-plan 은 opt-in `--gpt-independent`)
+## independent-plan · independent-review -- 격리 첫 패스 (fz-peer-review · fz-plan full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`)
 
 Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. 규약은 `modules/cross-validation.md` § 독립 첫 패스.
 
 ⛔ **independent-plan 은 계획 대조가 아니다** — Claude 계획을 보지 않고 요구 원문 · 원문 색인 · 대상 저장소만으로 자기 계획을 세운다. 합격은 독립 계획 스키마 통과와 오염 감사 0 이고, 두 계획의 차이 판정은 `plan_divergence.py` 와 Lead 가 한다. 계획을 받아 검증하는 것은 `verify` 다(F-471).
 
 ```bash
-"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-plan --requirement "$REQ_FILE" [--sprint-contract F] [--rules-index "$WORK_DIR/rules/index.json"] \
+FZ_GPT_ARTIFACT="${ARTIFACT:?호출자의 산출물 계열 — fz-plan: plan · fz-modernize: guide-plan}" FZ_WORK_DIR="$WORK_DIR" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-plan --requirement "$REQ_FILE" [--sprint-contract F] [--rules-index "$WORK_DIR/rules/index.json"] \
   [--repo "$GIT_ROOT"] --deny "$WORK_DIR" [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
 "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-review --diff "$REVIEW_DIFF" --base "$WORK_DIR/base" --head "$WORK_DIR/head" --deny "$WORK_DIR" \
   [--pr-meta "$WORK_DIR/pr-meta.json"] [--rules-index "$WORK_DIR/rules/index.json"] [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
@@ -121,7 +121,7 @@ Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. �
 - `--pr-meta` 는 PR 입력일 때 gather 가 만든 `pr-meta.json`(작성자가 쓴 제목 · 본문)이다. ⛔ Lead 가 채운 `requirements.md` 는 넘기지 않는다 — Lead 의 해석이 GPT 에 닿는다(InputHygiene)
 - 산출: `.json` · `.md` · `.audit.json`(rollout 수 · spawn 수 · 격리 적용 · 적중) · `.rollouts/`
 - exit: 0 성공 · 10 사용법 · 같은 --out 동시 실행 · 11 사전조건 · 12~14 래퍼 측정 실패(14 는 6축 후검사도) · 15 오염 · 16 시간 초과 · 17 planner 거부 — ⛔ 10~17 은 결과 0건이 아니다. 18 은 GPT 미사용(실패 아님 · 감사 `"gptOff"`) — `modules/gpt-strategy.md` § GPT 미사용
-- 횟수: independent-plan 재호출 상한 · 세지 않는 출구(실패 · exit 18) · 넘칠 때의 정문 exit 19 는 정본 `modules/cross-validation.md` § 재검증 라운드 상한
+- 횟수: independent-plan 재호출 상한 · 세지 않는 출구(실패 · exit 18) · 넘칠 때의 정문 exit 19 는 정본 `modules/cross-validation.md` § 재검증 라운드 상한 — 호출 줄의 `ARTIFACT` 는 호출자의 산출물 계열이다(fz-plan `plan` · fz-modernize `guide-plan` — 비면 가드가 멈춘다) · exit 19 면 다시 띄우지 않는다(처리는 호출 스킬 — fz-plan 실행 절차 2.7 · fz-modernize Phase 3 1.5)
 - ⛔ 옵션을 켜지 않으면 위 `plan` 서브커맨드 경로가 그대로다
 
 ### review — Lead 순서
@@ -167,7 +167,8 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 |------|----------------|
 | /fz-review | Phase 5 → final (PR 전) |
 | /fz-pr | PR 생성 전 → final |
-| /fz-plan | cross-check → plan (독립 비교 · `--gpt-independent` 면 independent-plan), micro-eval (claim 재평가) |
+| /fz-plan | cross-check → plan (독립 비교), full 2.7 → independent-plan (기본 · `--no-gpt-independent` 로 끈다), micro-eval (claim 재평가) |
+| /fz-modernize | full Phase 3 1.5 → independent-plan (초안과 동시 · 실패 · 거부면 Phase 4 modernize-verify) |
 | /fz (drift-check · `modules/pipelines.md` §15) | drift (전체 스캔) |
 
 ## 설계 원칙

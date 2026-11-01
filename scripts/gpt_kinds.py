@@ -25,6 +25,7 @@ usage:
   gpt_kinds.py lint --consumers [--allowed-tools] [--root DIR] [--only FILE...]
                                            --allowed-tools: a skill that may call GPT has Bash(*/scripts/gpt-call.sh*)
                                            markdown ```bash blocks must not hand-assemble wrapper / launcher calls
+                                           a counted-kind call line (gpt_rounds.py KIND_SLOTS) carries FZ_GPT_ARTIFACT=
   gpt_kinds.py table --write|--check [--root DIR]
                                            the generated blocks in skills/fz-gpt/SKILL.md (kind count · roles · kinds)
   gpt_kinds.py --self-test
@@ -33,6 +34,7 @@ exit: 0 ok · 10 usage (unknown kind, missing / unknown / forbidden input, exper
       bad audit) · 11 registry or dependency failure (unreadable registry, missing schema, internal error).
       ⛔ never 1 or 2 — those mean something else elsewhere in fz (XE-02).
 """
+import ast
 import glob
 import json
 import os
@@ -577,6 +579,92 @@ def lint_allowed_tools(root=ROOT):
     return v, n
 
 
+# ── round-cap wiring (C-S05): a counted-kind call line names its artifact family ──────────────────────────────────────
+# Canonical: modules/cross-validation.md § 재검증 라운드 상한. The gate counts a call only when the caller sets FZ_GPT_ARTIFACT —
+# a call line without it is outside the cap and the gate says nothing, so this lint does. Counted kinds = the KIND_SLOTS keys of the
+# linted tree's scripts/gpt_rounds.py, read as a literal (counted_kinds — never imported). A call line is `gpt-call.sh <counted kind>`
+# followed by an input (`--…`) on the same line, prose or ```bash alike (skill steps name their calls in prose); a mention without
+# inputs is not. Every page under CONSUMER_DIRS is in scope — a new page is checked by default.
+ROUND_ENV = "FZ_GPT_ARTIFACT="
+# Line-level exemptions (page, line regex, why) — generic call-form examples, not pipeline call sites. A row covers only the lines
+# its regex matches, and a row that matches no counted call line in its scanned page is stale and fails the lint (audited like
+# consumer_allow / lint_allow), so an example cannot shield a real call line on the same page.
+ROUND_EXEMPT = (
+    ("skills/fz-gpt/SKILL.md", r'gpt-call\.sh" verify --cd "\$GIT_ROOT" --out "\$F" --prompt-file P ',
+     "call form of an explicit /fz-gpt verify (custom instruction) - not a pipeline artifact"),
+    ("modules/fz-gpt-bash-hygiene.md", r'gpt-call\.sh" verify --cd "\$WORK_DIR" --out "\$RESULT_FILE" --prompt-file /tmp/gpt-prompt\.txt',
+     "hygiene template kept as a reference of what the wrapper does"),
+    ("modules/fz-gpt-bash-hygiene.md", r'gpt-call\.sh" verify --cd "\$GIT_ROOT" --out "\$F" --prompt-file P \[--model M\]',
+     "section 8 interface synopsis - the exec form with its optional flags"),
+    ("modules/cross-validation.md", r'gpt-call\.sh" verify --cd "\$GIT_ROOT" --out "\$OUT" --prompt-file "\$P"\s*$',
+     "call-contract example - the contract line points counted calls to the round-cap section"),
+)
+
+
+def counted_kinds(root=ROOT):
+    """-> sorted counted kinds: the keys of KIND_SLOTS in <root>/scripts/gpt_rounds.py, read with ast.literal_eval.
+    ⛔ Do not import gpt_rounds (here or at module top): it imports this module at its own top (sys.path + `import gpt_kinds`), so
+    an import is a cycle, and it would run another tree's module code (sys.path, dont_write_bytecode, a second gpt_kinds).
+    Missing, unparsable or not a literal -> Broken (measured nothing, not zero call lines)."""
+    path = os.path.join(root, "scripts", "gpt_rounds.py")
+    try:
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read(), path)
+    except (OSError, SyntaxError, ValueError) as e:
+        raise Broken(f"round lint: KIND_SLOTS unreadable from {path}: {type(e).__name__}: {e}")
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "KIND_SLOTS" for t in node.targets):
+            try:
+                slots = ast.literal_eval(node.value)
+            except (ValueError, TypeError, SyntaxError) as e:
+                raise Broken(f"round lint: KIND_SLOTS in {path} is not a literal: {e}")
+            if not isinstance(slots, dict) or not slots:
+                raise Broken(f"round lint: KIND_SLOTS in {path} is empty or not a dict")
+            return sorted(slots)
+    raise Broken(f"round lint: no top-level KIND_SLOTS assignment in {path}")
+
+
+def round_call_re(kinds):
+    """`gpt-call.sh <kind> --…` — longest kind first so verify-gates is not read as verify."""
+    alt = "|".join(re.escape(k) for k in sorted(kinds, key=len, reverse=True))
+    return re.compile(r'gpt-call\.sh["\']?\s+(' + alt + r')(?![-\w])\s+--')
+
+
+def lint_rounds(root=ROOT, only=None, kinds=None, exempt=ROUND_EXEMPT):
+    """-> (violations, counted call lines checked). Exempt lines are not counted; an exempt row that matches no counted call line in
+    a scanned page is stale (a violation)."""
+    rx = round_call_re(counted_kinds(root) if kinds is None else kinds)
+    if only:
+        files = list(only)
+    else:
+        files = sorted(os.path.relpath(f, root) for d in CONSUMER_DIRS
+                       for f in glob.glob(os.path.join(root, d, "**", "*.md"), recursive=True))
+    v, n, used = [], 0, set()
+    for rel in files:
+        path = os.path.join(root, rel)
+        if not os.path.isfile(path):
+            v.append(f"{rel}: file not found")
+            continue
+        for i, line in enumerate(open(path, encoding="utf-8", errors="replace").read().split("\n"), 1):
+            for m in rx.finditer(line):
+                if ROUND_ENV in line[:m.start()]:
+                    n += 1
+                    continue
+                rows = [j for j, (page, line_re, _) in enumerate(exempt) if page == rel and re.search(line_re, line)]
+                if rows:
+                    used.update(rows)
+                    continue
+                n += 1
+                v.append(f"{rel}:{i}: `gpt-call.sh {m.group(1)}` call line without {ROUND_ENV}<family> — outside the round cap "
+                         f"(modules/cross-validation.md § 재검증 라운드 상한): {line.strip()[:100]}")
+    for j, (page, _, why) in enumerate(exempt):
+        if page in files and j not in used:
+            v.append(f"round exempt row {j} ({page}): matches no counted call line — stale, drop it or fix its regex")
+        if not why.strip():
+            v.append(f"round exempt row {j} ({page}): no reason — an unaudited exemption is a bypass")
+    return v, n
+
+
 # ── generated tables in skills/fz-gpt/SKILL.md ───────────────────────────────────────────────────────────────────────
 TABLE_DOC = os.path.join("skills", "fz-gpt", "SKILL.md")
 BLOCK_NAMES = ("count", "roles", "kinds")
@@ -876,6 +964,37 @@ def self_test():
                ("ok", lambda v: any("E1-E8" in x for x in v)))
         expect("allow row for a missing file is a violation", lambda: lint_allow(dict(reg, consumer_allow=[{"file": "modules/nope.md", "line_re": "x", "exception": "E6", "reason": "r"}]), cr),
                ("ok", lambda v: any("file missing" in x for x in v)))
+        # round-cap wiring: a counted-kind call line carries FZ_GPT_ARTIFACT= on that line (bash or prose) · a mention without inputs
+        #   and an uncounted kind are not call lines · an exempt row covers only its own lines and goes stale when unused ·
+        #   KIND_SLOTS is read from the tree's gpt_rounds.py as a literal (missing or non-literal -> broken)
+        try:
+            rk = counted_kinds(ROOT)
+        except Broken:
+            rk = ["independent-plan", "validate", "verify", "verify-gates"]   # the read cell below fails; keep the others meaningful
+        rmd = os.path.join(cr, "modules", "r.md")
+        open(rmd, "w").write('```bash\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify-gates --cd "$G" --out "$O" --prompt-file "$P"\n```\n'
+                             'launch `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-plan --requirement R --arm gpt` in the background\n')
+        expect("rounds: call lines without the family caught (bash + prose)", lambda: lint_rounds(cr, ["modules/r.md"], rk, ()),
+               ("ok", lambda r: len(r[0]) == 2 and r[1] == 2))
+        open(rmd, "w").write('```bash\nFZ_GPT_ARTIFACT=plan FZ_WORK_DIR="$W" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$G" --out "$O" --prompt-file "$P"\n'
+                             '"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd "$G" --out "$O" --base main\n```\n'
+                             'the exec form (`gpt-call.sh verify`) is only named here\n')
+        expect("rounds: family given · uncounted kind · bare mention -> clean", lambda: lint_rounds(cr, ["modules/r.md"], rk, ()),
+               ("ok", lambda r: r[0] == [] and r[1] == 1))
+        open(rmd, "w").write('FZ_GPT_ARTIFACT=plan is exported above\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" validate --cd "$G" --out "$O" --prompt-file "$P"\n')
+        expect("rounds: the family sits on the call line itself", lambda: lint_rounds(cr, ["modules/r.md"], rk, ()), ("ok", lambda r: len(r[0]) == 1))
+        open(rmd, "w").write('"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$G" --out "$F" --prompt-file "$P"\n'
+                             '"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" validate --cd "$G" --out "$F" --prompt-file "$Q"\n')
+        own = (("modules/r.md", r'--prompt-file "\$P"$', "example"),)
+        expect("rounds: an exempt row covers only its own line", lambda: lint_rounds(cr, ["modules/r.md"], rk, own),
+               ("ok", lambda r: len(r[0]) == 1 and "validate" in r[0][0] and r[1] == 1))
+        expect("rounds: an exempt row that matches nothing is stale", lambda: lint_rounds(cr, ["modules/r.md"], rk, (("modules/r.md", "no-such-line", "x"),)),
+               ("ok", lambda r: any("stale" in x for x in r[0])))
+        expect("rounds: KIND_SLOTS read from the tree", lambda: counted_kinds(ROOT),
+               ("ok", lambda k: {"verify", "verify-gates", "independent-plan"} <= set(k)))
+        expect("rounds: tree without gpt_rounds.py -> broken", lambda: counted_kinds(cr), ("broken",))
+        open(os.path.join(cr, "scripts", "gpt_rounds.py"), "w").write("KIND_SLOTS = dict(verify=1)\n")
+        expect("rounds: KIND_SLOTS not a literal -> broken", lambda: counted_kinds(cr), ("broken",))
         # table: missing markers fail · write then check passes · a registry change makes check fail
         os.makedirs(os.path.join(cr, "skills", "fz-gpt"))
         doc = os.path.join(cr, "skills", "fz-gpt", "SKILL.md")
@@ -951,13 +1070,20 @@ def main(argv):
         reg = load(os.path.join(root, "scripts", "gpt-kinds.json"))
         v, nf, nb = lint_consumers(root, only, reg)
         v += lint_allow(reg, root)
+        try:
+            vr, nr = lint_rounds(root, only)
+        except Broken as e:
+            vr, nr = [str(e)], 0
+        if not vr and nr == 0 and not only:
+            vr = ["round lint: no counted-kind call line under skills · modules · guides — measured nothing"]
+        v += vr
         nt = 0
         if tools:
             vt, nt = lint_allowed_tools(root)
             v += vt
         for x in v:
             print("LINT", x)
-        print("GPT-KINDS-CONSUMERS", "OK" if not v else f"FAIL ({len(v)})", f"files={nf} bash-blocks={nb}" + (f" gpt-skills={nt}" if tools else ""))
+        print("GPT-KINDS-CONSUMERS", "OK" if not v else f"FAIL ({len(v)})", f"files={nf} bash-blocks={nb} round-calls={nr}" + (f" gpt-skills={nt}" if tools else ""))
         return 0 if not v and nb > 0 else 11
     if argv[:1] == ["table"] and len(argv) in (2, 4) and argv[1] in ("--write", "--check") and (len(argv) == 2 or argv[2] == "--root"):
         root = os.path.abspath(argv[3]) if len(argv) == 4 else ROOT

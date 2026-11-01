@@ -280,7 +280,7 @@ Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워�
 - (이력 — TEAM 시절 기준) 모든 TEAM 구성에 GPT CLI가 포함됐다. 현행: GPT 호출은 스킬·단계별 kind 로 배선된다 — 정본 `scripts/gpt-kinds.json` · 생성 표 `skills/fz-gpt/SKILL.md` § 서브커맨드.
 - **Lead가 직접** `/fz-gpt`를 실행한다 (에이전트가 GPT를 직접 호출하지 않음).
 - Claude (opus/sonnet) + GPT (다른 모델)의 교차 검증으로 blind spot을 보완한다.
-- ⊕ **독립 첫 패스**(fz-peer-review 기본 · fz-review · fz-plan 은 opt-in `--gpt-independent`): GPT 가 Claude 산출을 보기 **전에** 같은 입력으로 따로 리뷰 · 플랜한다(`scripts/gpt_independent.sh` — 강제 격리). 합치는 것은 스크립트다(`review_merge.py` · `plan_divergence.py`) — 교차 검증은 그 뒤의 일이다. 규약 `modules/cross-validation.md` § 독립 첫 패스
+- ⊕ **독립 첫 패스**(fz-peer-review · fz-plan full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`): GPT 가 Claude 산출을 보기 **전에** 같은 입력으로 따로 리뷰 · 플랜한다(`scripts/gpt_independent.sh` — 강제 격리). 합치는 것은 스크립트다(`review_merge.py` · `plan_divergence.py`) — 교차 검증은 그 뒤의 일이다. 규약 `modules/cross-validation.md` § 독립 첫 패스
 
 ### 검증 게이트 삽입 위치
 

@@ -151,11 +151,11 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 | **plan** | 래퍼 exec | 독립 플랜 (Claude 와 교차 비교, C4 원칙) | /fz-plan cross-check · /fz plan-parallel (modules/pipelines.md §16) |
 | **micro-eval** | 래퍼 exec | 단일 주장 독립 재평가 (claim-type 라우팅) | modules/cross-validation.md Gate |
 | **sprint-contract** | 래퍼 exec | Sprint Contract 초안 (성공 기준) | /fz-plan Phase 0.7 |
-| **independent-plan** | 런처 plan | 격리 첫 패스 플랜 (opt-in --gpt-independent) | /fz-plan 2.7 |
+| **independent-plan** | 런처 plan | 격리 첫 패스 플랜 (full 기본 — fz-plan 끄기 --no-gpt-independent) | /fz-plan 2.7 · /fz-modernize Phase 3 |
 | **independent-review** | 런처 review | 격리 첫 패스 리뷰 | /fz-peer-review (기본) · /fz-review (opt-in --gpt-independent) |
 | **final-deep** | 래퍼 resume | final 심화 — final 세션을 잇는다 | 명시 호출 전용(`/fz-gpt final-deep`) |
 | **final-da** | 래퍼 exec | final 의 DA 패스 | 명시 호출 전용(`/fz-gpt final-da`) |
-| **verify-cross** | 래퍼 resume | 독립 플래너 세션을 이어 같은 틀로 교차 검증 | /fz-plan Phase 2 (--gpt-independent) |
+| **verify-cross** | 래퍼 resume | 독립 플래너 세션을 이어 같은 틀로 교차 검증 | /fz-plan Phase 2 (2.7 독립 플랜 뒤) |
 | **search** | 래퍼 exec | 심볼 탐색 보조 | validate 보조 |
 | **fix-suggest** | 래퍼 exec | 수정 제안 (fixable 이슈) | check 후속 |
 | **peer-challenger** | 래퍼 exec | PR 리뷰 challenger (Tier 1-3) | /fz-peer-review |

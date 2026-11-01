@@ -71,3 +71,11 @@
 - **발동 조건이 세 곳에서 달랐다** — 일몰한 TEAM 모드를 조건으로 쓴 곳도 있었다. 지금은 `modules/sprint-contract.md` § 발동 조건 한 곳이다
 - **자리를 Phase 1 · 1.5 뒤 · Phase 2 바로 앞(실행 절차 5.5 · 5.7)으로 정한 이유** — 재생성이 만든 plan · 원장을 Phase 2 가 곧바로 읽게 하려는 것이다. 스트레스 테스트 · RTM 검증(실행 절차 5)이 재생성 뒤에 오면 그 수정이 원장에 실리지 않는다. 그래서 Gate 1 · 1.5 는 잠정 플랜을, Phase 2 는 합의본을 반영한 plan 을 판정하고, 3.1 은 5.7 이 다시 만든 원장을 덮어쓰지 않는다
 - 사용자 결정(H.5-①): Contract 를 없애지 않고 실제로 발동하게 고친 뒤 측정한다. 독립 플랜은 더 이상 합의본(`--sprint-contract`)을 받지 않는다 — 런처 옵션(`scripts/gpt_independent.sh plan --sprint-contract`)은 남아 있고 fz-plan 쪽 호출자는 없다
+
+## 독립 플랜 기본 on (2026-11-01 · 사용자 결정 Q3)
+
+- full 계획 실행의 첫 GPT 호출은 독립 플랜(실행 절차 2.7)이고 플래그 없이 돈다 — 독립 계획이 먼저 서고 계획 대조(Phase 2 resume 교차 · `verify`)는 그 뒤의 보조다(F-508). 앞 라운드 지적이 반영됐는지의 대조는 GPT 가 아니라 Lead 가 한다
+- 롤백은 플래그 하나다 — `--no-gpt-independent` 면 2.7 · 4.5 가 빠지고 Phase 2 는 기본 `verify` 다. light 에는 처음부터 2.7 이 없다(Phase 2 는 기본 `verify`). 옛 켜기 플래그를 줘도 기본과 같다
+- '기본' 의 단위는 티켓이다 — 독립 계열 상한이 1 이고 2.7 호출 줄의 `FZ_GPT_ARTIFACT=plan FZ_WORK_DIR={WORK_DIR}` 가 이 호출을 티켓 작업 폴더 원장에 센다. 같은 티켓에서 full 을 다시 돌리면 2.7 은 정문 exit 19 다 — 입력이 같으면(`same-input`) 직전 독립 플랜이 답이고, 바뀌었으면(`budget-exhausted`) 2.7 · 4.5 를 건너뛰고 기본 `verify` 로 간다
+- 독립 첫 패스는 검증이 아니다 — 그 거부를 통과로도 계획의 미해결로도 적지 않고 `[독립 플랜 없음 — GPT-ROUNDS: <사유>]` 만 남긴다(`gpt_rounds.py status` 의 `plan/independent` `unresolved` 는 검증 공백이 아니다)
+- 상한 · 세지 않는 실패 · 정문 거부(exit 19)의 정본은 `modules/cross-validation.md` § 재검증 라운드 상한 이다

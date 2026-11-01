@@ -86,7 +86,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | code-changes 생산 전 | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 수행(fz-code 실행 절차 7) | full |
 | review 시작 전 | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 수행(fz-review 실행 절차 5) | full |
 | planning 생산 (Phase 1 뒤 · 계획 검증 전) | Sprint Contract | kind `sprint-contract`(GPT 초안 → Lead 합의) + 합의본 반영 재생성 — fz-plan 실행 절차 5.5 · 5.7 | `modules/sprint-contract.md` § 발동 조건 + 직전 decide(`gpt-strategy.md` § 단계 실행 판정) |
-| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ `--gpt-independent` 로 resume 교차를 마쳤으면 생략) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
+| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ fz-plan full 2.7 독립 플랜 뒤 resume 교차(`verify-cross`)를 마쳤으면 생략) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
 | review 포함 | 다관점 리뷰 | review-arch + review-quality(review-live Workflow) + GPT | full — review-live Workflow (GPT 는 켠 세션이면 light 도 — fz-review Phase 5) |
 | search 포함 | 교차 검증 | search-symbolic + search-pattern (search-cross-verify Workflow — GPT 단계 없음) | --deep |
 | commit/pr 포함 | Pre-ship gate | `fz-gpt check` — 명시 호출 전용(fz-commit · fz-pr 에 자동 배선 없음) | 명시 호출 때 GPT 켬(`gpt-strategy.md` § 단계 실행 판정 — 그때도 decide) |
@@ -140,7 +140,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 ### 계획 생산 파이프라인
 
 ```
-[계획 스텝 — full: ① Workflow(방향 판정 포함) ∥ GPT 독립 플랜(켰을 때) → ② 잠정 플랜 + 방향 판정(RECONSIDER/REDIRECT · degraded 면 정지) → ③ 합치기 → Lead 몫(memory-recall informational · 스트레스 테스트 · RTM · Gate 1 · 1.5) / light: direction challenge(Lead · fz-plan Phase 0.5) → Phase 1] → sprint contract (full · 발동 시 · 직전 decide — ④ 초안 · 합의 → ⑤ 재생성) → gpt verify ∥ verify-gates (⑥ · GPT 켬) → [코드 스텝]
+[계획 스텝 — full: ① Workflow(방향 판정 포함) ∥ GPT 독립 플랜(full 기본) → ② 잠정 플랜 + 방향 판정(RECONSIDER/REDIRECT · degraded 면 정지) → ③ 합치기 → Lead 몫(memory-recall informational · 스트레스 테스트 · RTM · Gate 1 · 1.5) / light: direction challenge(Lead · fz-plan Phase 0.5) → Phase 1] → sprint contract (full · 발동 시 · 직전 decide — ④ 초안 · 합의 → ⑤ 재생성) → gpt verify ∥ verify-gates (⑥ · GPT 켬) → [코드 스텝]
 ```
 
 > direction challenge: 접근 방향 자체를 도전한다(PROCEED/RECONSIDER/REDIRECT) — full 은 plan-lean2 전체 플랜 콜이 `directionVerdict` 로 함께 내고(롤백 plan-collaborative 는 Stage 0 review-direction) light 는 Lead 가 fz-plan Phase 0.5 로 한다. 순서 정본: `skills/fz-plan/SKILL.md` 실행 절차(4 → 4.5 → 5 → 5.5 → 5.7 → Phase 2) · Contract 발동: `modules/sprint-contract.md` § 발동 조건.
@@ -363,7 +363,7 @@ export FZ_PLUGIN_ROOT
 - ✅ 이미 스크립트 안에서 호출하는 경우(자기 `dirname`을 아는 경우)는 ①이 불필요하다:
   `FZ_PLUGIN_ROOT="$("$(dirname "${BASH_SOURCE[0]}")/resolve-plugin-root.sh")"`
 
-**호출 계약** (⛔ 호출부 전부 이 형태 — kind 와 입력만 쓴다):
+**호출 계약** (⛔ 호출부 전부 이 형태 — kind 와 입력만 쓴다 · 세는 kind 로 산출물을 검증하는 호출 줄은 앞에 env `FZ_GPT_ARTIFACT=<산출물 계열>` · `FZ_WORK_DIR` 를 더 단다 — § 재검증 라운드 상한 · 아래 예시는 형태만 보인다):
 ```bash
 printf '%s\n' "{과제 지시}" > "$P"
 "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$OUT" --prompt-file "$P"
@@ -375,7 +375,7 @@ printf '%s\n' "{과제 지시}" > "$P"
 ⛔ **`setup-gpt-skills.sh` 는 Tier 2a 심볼릭(`gpt-skills/`)을 만든다 — 디스커버리의 필수 조건은 아니다.** 미실행이어도 resolver(`scripts/gpt_kinds.py`)가 자기 위치의 번들 `SKILL.md`(Tier 2b)를 돌려주고, 번들이 없으면 Tier 3 로 폴백한다. setup 이 더하는 것은 GPT CLI 가 자기 스킬 폴더에서 역할 스킬을 스스로 싣게 하는 것이다.
 ⛔ Claude 스킬(`skills/`)을 그 폴더에 링크하면 GPT 가 역할 스킬 대신 Claude 스킬을 고른다(A2-02 실측: 링크 확장 뒤 fz-reviewer 로드 28세션 중 26회 → 31세션 중 1회). 그래서 setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 `skills/` 를 가리키는 링크는 이름과 무관하게 지운다.
 
-### 독립 첫 패스 — `scripts/gpt_independent.sh` (fz-peer-review 기본 · fz-review · fz-plan 은 opt-in `--gpt-independent`)
+### 독립 첫 패스 — `scripts/gpt_independent.sh` (fz-peer-review · fz-plan full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`)
 
 위 호출 계약의 GPT 는 대상 저장소와 **같은 디스크**를 본다 — 작업 폴더의 Claude 산출물과 `~/.claude/projects` 로그도 읽을 수 있다. 첫 패스를 Claude 결과와 독립으로 돌려야 할 때(SC-1)는 런처를 쓴다.
 
@@ -384,7 +384,7 @@ printf '%s\n' "{과제 지시}" > "$P"
 - rollout 을 전부 감사한다 — HOME deny 가 없거나 금지 경로 · 홈 재귀 검색이 있으면 exit 15 와 `.contaminated` 다. 읽는 대상이 명령에 없는 읽기가 있어 읽기 로그만으로는 "안 읽었다"를 증명할 수 없다 — 감사는 보조다
 - review 의 `--gpt-agents`(opt-in)는 역할 파일(`gpt-agents/`)로 두 렌즈 역할을 spawn 한다. 하위 에이전트는 부모와 같은 권한 프로필을 강제받는다(S11 ⑤ · R-G1 S1 실측 — 자식 turn_context 에 HOME deny). 부모 이력을 물려받는지는 `spawn_agent` 의 `fork_turns` 를 모델이 매번 고른다(S1 관측 2건 모두 `none`) — 부모가 격리돼 있어 어느 쪽이든 독립은 유지된다. `--gpt-agents` 가 없으면 프롬프트로 하위 에이전트를 금지하고 감사가 spawn 수를 기록한다 — 지시 + 기록이고 강제가 아니다(spawn 도구는 노출된다 — F-436)
 - 산출은 `<arm>-<run>.json`(`schemas/gpt_independent_{plan,review}_schema.json`) · `.md` · `.audit.json` · `.rollouts/` 다. 호출법은 `modules/fz-gpt-subcommands-aux.md` § independent-plan · independent-review
-- 기본값은 스킬마다 다르다 — fz-peer-review 는 기본으로 쓰고(`--no-gpt-independent` 로 끈다 · S25p · S27 판정 뒤 v4.42.0), fz-review · fz-plan 은 `--gpt-independent` 로 켠다. 쓰지 않는 경로에서는 위 호출 계약이 그대로다
+- 기본값은 스킬마다 다르다 — fz-peer-review 는 기본으로 쓰고(`--no-gpt-independent` 로 끈다 · S25p · S27 판정 뒤 v4.42.0), fz-plan · fz-modernize 는 full 에서 기본으로 쓰고(fz-plan 은 `--no-gpt-independent` 로 끈다 · 2026-11-01 사용자 결정 Q3), fz-review 는 `--gpt-independent` 로 켠다. 쓰지 않는 경로에서는 위 호출 계약이 그대로다
 
 ## 참조 스킬
 

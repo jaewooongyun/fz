@@ -53,7 +53,7 @@ metadata:
 ## Prerequisites
 
 - **외부 자료 접근**: WebSearch + WebFetch + GPT CLI (cross-model verify)
-- **GPT CLI**: cross-model 검증 — ⛔ **GPT 단계마다 직전**(light micro-eval · Phase 4): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정 — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · 버전 플로어도 같은 파일). trust_level="trusted" 설정 필요 (30차 교훈)
+- **GPT CLI**: cross-model 검증 — ⛔ **GPT 단계마다 직전**(light micro-eval · full Phase 3 독립 플랜 · Phase 4): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정 — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · 버전 플로어도 같은 파일). trust_level="trusted" 설정 필요 (30차 교훈)
 - **6+ 스텝 자동 티켓 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 티켓 ID
 
 ## 모듈 참조
@@ -201,6 +201,7 @@ metadata:
    - Anti-Pattern Constraints 9개 (AC1-AC9, 아래 §AC 참조)
    - 출처 표기 규약 (Tier 분류 + Status)
    - 검증 게이트 정의 (5c-1 ~ 5d-3)
+1.5. **(full) 초안과 동시에 GPT 독립 플랜** (직전 decide 가 `run`·`config` 면): 요청 원문 · Tier 합의 · `probe/probe-report.md` · `audit/audit-report.md` · AC1-AC9 표를 이은 `{WORK_DIR}/plan/gpt-independent-input.md`(⛔ Lead 초안 `plan/update-plan.md` 는 넣지 않는다)로 `FZ_GPT_ARTIFACT=guide-plan FZ_WORK_DIR={WORK_DIR} "${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-plan --requirement {WORK_DIR}/plan/gpt-independent-input.md --repo {대상 레포} --deny {WORK_DIR} --arm gpt --run-id {run} --out-dir {WORK_DIR}/verify/gpt-independent` 를 background 로 띄운다. 끝나면 v1 Step 을 `{WORK_DIR}/plan/draft-steps.json`(`{steps:[{id, files}]}`)으로 적고 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {WORK_DIR}/plan/draft-steps.json --gpt {WORK_DIR}/verify/gpt-independent/gpt-{run}.json` 차이표의 결정 항목을 Lead 가 v1 에 반영한다. 실패(10~17 · 오염 · planner 거부)나 정문 exit 19(`GPT-ROUNDS:` — 독립 계열은 작업 폴더당 1회)면 다시 띄우지 않고 차이표 없이 Phase 4 `modernize-verify` 로 간다(19 가 `same-input` 이면 stderr 가 가리킨 직전 독립 플랜으로 차이표를 만든다)
 2. **사용자 Phase 4 합의**:
    - 범위 (전체 vs 핵심 1-2개)
    - 깊이 (Reference + 미검증 태그 해소 vs 본문 재구성 vs 새 원칙 추가)
@@ -289,7 +290,7 @@ cat > "$P_MOD" <<EOF
 아래 Plan 을 5 관점으로 검증하고 관점마다 판정과 근거를 제시하라 — Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류) · Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜) · Q3: 출처 매핑 일관성 (Plan ↔ 가이드 line) · Q4: Anti-Pattern Constraints 누락 위험 · Q5: 실행 순서 안전성 (impact-scan 사전 확인). Plan 원문:
 $(cat "{PLAN_PATH}")
 EOF
-"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" modernize-verify --cd "{WORK_DIR}" \
+FZ_GPT_ARTIFACT=guide-plan FZ_WORK_DIR="{WORK_DIR}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" modernize-verify --cd "{WORK_DIR}" \
   --out "{WORK_DIR}/verify/gpt-verify-v{N}-result.json" --prompt-file "$P_MOD"; RC=$?
 rm -f "$P_MOD"   # Plan 원문 사본을 TMPDIR 에 남기지 않는다
 exit "$RC"       # 정문 exit 를 덮지 않는다(hygiene §8)
@@ -447,7 +448,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 | Probe WebSearch 실패 | 재시도 1회 → 사용자에게 직접 자료 요청 | manual probe |
 | GPT CLI 통신 실패 · 래퍼 exit 10~14(측정 실패 — 11·12 선택 복구는 Phase 4 절차 1단) | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
 | decide `skip` · 래퍼 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 · 폴백 없음(`modules/gpt-strategy.md` § GPT 미사용) |
-| GPT 누적 한도 도달 | 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (GPT 권고 점 수정 N건만) |
+| GPT 누적 한도 도달 · 정문 exit 19(`GPT-ROUNDS:` 재검증 라운드 거부 — 정본 `modules/cross-validation.md` § 재검증 라운드 상한) | 다시 부르지 않는다 — `same-input` 은 stderr 가 가리킨 직전 판정 파일을 쓰고, `budget-exhausted` 는 그 키를 미해결로 보고한다(`python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_rounds.py" status --work-dir {WORK_DIR}` — 통과 아님) · 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (GPT 권고 점 수정 N건만) |
 | AC8 broken link 발견 | archive.org 폴백 또는 인용 제거 | 사용자 결정 |
 | Impact Scan line 번호 깨짐 | 모듈에서 path/section 참조로 변경 권고 | 영향 모듈 목록 보고 |
 
