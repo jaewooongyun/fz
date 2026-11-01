@@ -71,17 +71,19 @@ const SwarmResultSchema = {
   },
 }
 
-// 읽기 전용 워커 허용 목록 — 세 조건을 모두 만족하고 실행 중 플러그인(v4.49.0)과 이 트리 양쪽에 있는 에이전트만 둔다(2026-11-01 대조):
+// 읽기 전용 워커 허용 목록 — 아래 조건을 모두 만족하는 에이전트만 둔다(2026-11-01 대조):
 //   ① agents/*.md frontmatter `tools:` 가 비어 있지 않다 — 비면 고정 트리를 못 읽는다(plan-merge 제외)
 //   ② `tools:` 에 Edit · Write · MultiEdit · NotebookEdit · Bash · 쓰기 MCP 가 없고 `memory:` 필드도 없다 — memory 필드는
 //      Read/Write/Edit 를 자동 부여한다(scripts/lint_contracts.py N13 — memory-curator 제외)
 //   ③ 텔레메트리가 agentType 하나로 스테이지를 정하지 않는다 — scripts/fz_telemetry_report.py AGENT_TYPE_STAGE 의 review-counter 를 주면
-//      swarm 결과가 counter 판정 칸으로 세어진다(review-counter 제외). arch-lens 는 이 트리에만 있어 뺀다.
+//      swarm 결과가 counter 판정 칸으로 세어진다(review-counter 제외)
+//   ④ 리뷰 전용 사전주입이 없다 — review-arch 는 arch-critic 을 미리 싣는 리뷰 렌즈라 빼고 같은 본문의 arch-lens 를 둔다(F-459 · B4).
+//      arch-lens 는 v4.50.0 에 생긴 에이전트라, 그 전 판을 불러온 세션은 기본값(review-correctness)으로 부른다
 //   ⛔ 에이전트의 tools · memory 를 바꾸거나 에이전트를 더하면 이 목록을 다시 대조한다 — tests/workflows/swarm-budget.js allowlist-readonly 가
 //      이 목록 = 실제로 받는 agentType 집합이고 그 전부가 ① · ② 를 지키는지 본다. 목록 밖은 콜 0 으로 fallback 이다.
 const READ_ONLY_AGENTS = [
   'fz:impl-correctness', 'fz:impl-quality', 'fz:plan-edge-case', 'fz:plan-impact', 'fz:plan-structure',
-  'fz:review-arch', 'fz:review-correctness', 'fz:review-direction', 'fz:review-quality',
+  'fz:arch-lens', 'fz:review-correctness', 'fz:review-direction', 'fz:review-quality',
   'fz:search-pattern', 'fz:search-symbolic',
 ]
 const DEFAULT_AGENT = 'fz:review-correctness'

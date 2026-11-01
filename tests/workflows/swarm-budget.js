@@ -218,16 +218,16 @@ async function everyFragmentRow(expect) {
 }
 
 async function agentTypeFallback(expect) {
-  // general-purpose = 쓰기 가능 내장 · memory-curator = memory 필드(쓰기 자동 부여) · plan-merge = 빈 tools · arch-lens = 이 트리 전용 ·
+  // general-purpose = 쓰기 가능 내장 · memory-curator = memory 필드(쓰기 자동 부여) · plan-merge = 빈 tools · review-arch = 리뷰 전용 arch-critic 사전주입(B4) ·
   // review-counter = 텔레메트리 단일 스테이지 agentType · 네임스페이스 없음 · 미지
-  const rejected = ['general-purpose', 'fz:memory-curator', 'fz:plan-merge', 'fz:arch-lens', 'fz:review-counter', 'review-correctness', 'fz:no-such-agent']
+  const rejected = ['general-purpose', 'fz:memory-curator', 'fz:plan-merge', 'fz:review-arch', 'fz:review-counter', 'review-correctness', 'fz:no-such-agent']
   for (const agentType of rejected) {
     const r = await go({ fragments: frags(2), tree: TREE, agentType }, () => ok('PASS'))
     expect(r.res.mode === 'fallback' && r.calls.length === 0, `agentType ${agentType} → mode ${r.res.mode} · 콜 ${r.calls.length}`)
   }
-  const ctl = await go({ fragments: frags(2), tree: TREE, agentType: 'fz:review-arch' }, () => ok('PASS'))
-  expect(ctl.res.mode === 'workflow' && ctl.calls.length === 2 && ctl.calls.every(c => c.agentType === 'fz:review-arch'),
-    `대조 fz:review-arch → mode ${ctl.res.mode} · ${ctl.calls.map(c => c.agentType)}`)
+  const ctl = await go({ fragments: frags(2), tree: TREE, agentType: 'fz:arch-lens' }, () => ok('PASS'))
+  expect(ctl.res.mode === 'workflow' && ctl.calls.length === 2 && ctl.calls.every(c => c.agentType === 'fz:arch-lens'),
+    `대조 fz:arch-lens → mode ${ctl.res.mode} · ${ctl.calls.map(c => c.agentType)}`)
   return `거부 ${rejected.length}종 · 대조 1종`
 }
 
