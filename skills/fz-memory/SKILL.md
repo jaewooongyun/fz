@@ -117,6 +117,10 @@ L2 임시키 삭제 + L1 stale 항목 정리 제안 + L3 잔존 티켓 폴더 �
    - 완료된 파이프라인의 티켓 폴더 목록
    - 사용자 확인 후 삭제
 
+5. **승격 원장 candidate 만료 점검** (보고만 — 원장을 쓰거나 지우지 않는다):
+   - `python3 "${FZ_PLUGIN_ROOT}/scripts/candidate_expiry.py" --ledger "${FZ_PLUGIN_ROOT}/modules/promotion-ledger.md"`
+   - `재평가필요` 는 종결 · 연장 · 승격 판단을, `판정불가`(관측 날짜 없음)는 날짜 보강을 사용자에게 묻는다 — 3개월 재평가 규칙(`modules/promotion-ledger.md`)의 실행 지점이다(F-477)
+
 ### Gate: GC Complete
 - [ ] L2 임시키 삭제 완료?
 - [ ] 사용자 확인 항목 처리?

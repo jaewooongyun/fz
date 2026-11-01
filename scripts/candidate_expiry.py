@@ -34,6 +34,11 @@
    S16(레지스트리 stale)은 **일수** 를 쓰는데 대상이 다르다 — 저쪽은 *엔트리 신선도*, 이쪽은
    *승격 시계* 다. 단위를 통일하지 않고 각 대상의 정책 문구를 따른다.
 
+원장 모드 `--ledger FILE` 은 승격 원장(modules/promotion-ledger.md)의 `### L-N:` 항목을 전부 판정해 보고한다.
+  기준일 = 가장 이른 관측일 · 마지막 유효 관측일 = 카운트 보류 · 제외 · 관측 후보가 아닌 관측 중 가장 늦은 날.
+  ⛔ 같은 OBS 세션은 1회로 센다 — 나중에 다시 적어도 그 세션의 첫 날짜만 쓴다(재기록이 시계를 되돌리지 않는다).
+  ⛔ 보고만 한다 — 원장을 쓰거나 지우지 않는다. 처분(종결 · 연장)은 사용자 결정이다.
+
 exit: 0=재평가 0건 · 1=재평가 필요 있음 · 2=판정 불가 있음(⛔ 통과 아님)
 """
 from __future__ import annotations
@@ -41,6 +46,7 @@ from __future__ import annotations
 import argparse
 import calendar
 import datetime
+import re
 import sys
 
 RE_EVAL, KEEP, UNDECIDABLE = "재평가필요", "유지", "판정불가"
@@ -76,6 +82,84 @@ def decide(track, state, base_date, last_eligible, now) -> tuple:
     return KEEP, f"시계 {clock} + {months}개월 = {due} 미도달 (now {now})"
 
 
+ENTRY_RE = re.compile(r"^### (L-\d+):")
+OBS_HEAD_RE = re.compile(r"^### (L-\d+) 관측")
+DATE_RE = re.compile(r"(?:Date:\s*|,\s*)(\d{4}-\d{2}-\d{2})")
+NOT_COUNTED = ("카운트 보류", "카운트 제외", "관측 후보")
+
+
+def parse_ledger(text):
+    """-> [{id, track, state, base, last, n_obs, n_counted}] — `### L-N:` 항목 + `### L-N 관측 …` 보강 절."""
+    entries, order, cur, cur_counted = {}, [], None, True
+    for line in text.splitlines():
+        m, mo = ENTRY_RE.match(line), OBS_HEAD_RE.match(line)
+        if line.startswith("### ") and not m and not mo:
+            cur = None                                   # REJECTED · 다른 절 — 항목 밖
+            continue
+        if m or mo:
+            cur = (m or mo).group(1)
+            if cur not in entries:
+                entries[cur] = {"id": cur, "text": [], "obs": {}}
+                order.append(cur)
+            cur_counted = not (mo and any(k in line for k in NOT_COUNTED))
+            if mo:
+                _add_obs(entries[cur], line, cur_counted)
+            entries[cur]["text"].append(line)
+            continue
+        if cur is None:
+            continue
+        entries[cur]["text"].append(line)
+        if "관측 #" in line:
+            _add_obs(entries[cur], line, cur_counted and not any(k in line for k in NOT_COUNTED))
+    out = []
+    for k in order:
+        e, body = entries[k], "\n".join(entries[k]["text"])
+        dates = [d for d, _ in e["obs"].values()]
+        counted = [d for d, c in e["obs"].values() if c]
+        tm = re.search(r"트랙 ([A-D])", body)
+        state = ("REMOVED" if re.search(r"^### ~~", body, re.M) or "폐기" in body.splitlines()[0]
+                 else "implemented" if "구현됨" in body
+                 else "DEFERRED" if "DEFERRED" in body else "candidate")
+        out.append({"id": k, "track": tm.group(1) if tm else "A", "state": state,
+                    "base": min(dates) if dates else None, "last": max(counted) if counted else None,
+                    "n_obs": len(e["obs"]), "n_counted": len(counted)})
+    return out
+
+
+def _add_obs(entry, line, counted):
+    dm = DATE_RE.search(line)
+    if not dm:
+        return
+    d = datetime.date.fromisoformat(dm.group(1))
+    sm = re.search(r"OBS-\d+", line)
+    key = sm.group(0) if sm else f"line:{len(entry['obs'])}"
+    if key in entry["obs"]:                              # 같은 세션 재기록 — 첫 날짜 유지, 셈은 한 번
+        first, was = entry["obs"][key]
+        entry["obs"][key] = (min(first, d), was or counted)
+    else:
+        entry["obs"][key] = (d, counted)
+
+
+def report_ledger(path, now):
+    try:
+        text = open(path, encoding="utf-8").read()
+    except OSError as e:
+        print(f"❌ 원장을 읽지 못했다: {e}", file=sys.stderr)
+        return 2
+    rows = parse_ledger(text)
+    if not rows:
+        print("❌ 원장에 `### L-N:` 항목이 없다 — 판정 불가", file=sys.stderr)
+        return 2
+    n = dict.fromkeys(EXIT, 0)
+    for r in rows:
+        verdict, why = decide(r["track"], r["state"], r["base"], r["last"], now)
+        n[verdict] += 1
+        print(f"{r['id']}\ttrack={r['track']}\tstate={r['state']}\tbase={r['base']}\tlast={r['last']}\t"
+              f"obs={r['n_obs']}(counted {r['n_counted']})\t→ {verdict} · {why}")
+    print(f"ledger: {len(rows)} entries · {RE_EVAL} {n[RE_EVAL]} · {UNDECIDABLE} {n[UNDECIDABLE]} · {KEEP} {n[KEEP]} (보고만 — 원장은 바꾸지 않는다)")
+    return 2 if n[UNDECIDABLE] else 1 if n[RE_EVAL] else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="candidate 만료 판정")
     ap.add_argument("--track", default="A")
@@ -83,6 +167,7 @@ def main() -> int:
     ap.add_argument("--base-date")
     ap.add_argument("--last-eligible")
     ap.add_argument("--now", help="고정 시각 YYYY-MM-DD (미지정 시 오늘)")
+    ap.add_argument("--ledger", help="승격 원장 파일 — 항목 전부를 판정해 보고(쓰지 않는다)")
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
     if args.self_test:
@@ -98,6 +183,8 @@ def main() -> int:
             raise SystemExit(2)
 
     now = pd(args.now) or datetime.date.today()
+    if args.ledger:
+        return report_ledger(args.ledger, now)
     verdict, why = decide(args.track, args.state, pd(args.base_date), pd(args.last_eligible), now)
     print(f"track={args.track} state={args.state} → {verdict}")
     print(f"  {why}")
