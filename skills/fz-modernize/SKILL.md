@@ -456,7 +456,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 Phase 6 통과 후:
 - 코드 변경 있음 → `/fz-commit` 제안
 - 가이드 변경만 → 사용자 직접 git commit
-- 교훈 발견 → `/sc:sc-save --type learnings` (feedback_*.md 저장)
+- 교훈 발견 → feedback_*.md 저장(`/sc:sc-save --type learnings` 는 선택)
 - 티켓 폴더 산출물 보존 → 새 세션에서 `index.md` Resume Trigger로 복원
 
 > N차 교훈 범례: `references/rationale.md` § 관련 메모리

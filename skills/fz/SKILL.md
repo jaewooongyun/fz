@@ -107,8 +107,8 @@ metadata:
 ### 절차
 
 1. **이전 세션 복원** (새 세션일 때만):
-   - `/sc:sc-load` → Serena 메모리 + SC 체크포인트 복원
-   - 조건: 이전 세션에서 `/sc:sc-save`된 데이터가 있을 때
+   - 티켓 폴더가 있으면 `index.md` 의 `## Essential Context` 를 Read 해 Active Phase · Pending 을 이어받는다 — 복원 원천은 티켓 폴더 산출물이다(3b 와 같은 근거)
+   - `/sc:sc-load` 는 선택 — SuperClaude 를 쓰고 이전에 `/sc:sc-save` 한 데이터가 있을 때만
 
 2. **프로젝트 인덱스 확인**:
    - `PROJECT_INDEX.md` 존재 확인 → 있으면 읽기 (3K 토큰)
@@ -143,7 +143,7 @@ metadata:
    - `Read(modules/context-artifacts.md)` — Artifact Budget Table + 산출물 프로토콜
    - `Read(modules/memory-policy.md)` — 메모리 키 네이밍
 ### Gate 0: Session Ready
-- [ ] 새 세션이면 이전 컨텍스트 복원 시도?
+- [ ] 새 세션이고 티켓 폴더가 있으면 `index.md` Essential Context 를 읽었는가?
 - [ ] 탐색 파이프라인이면 인덱스 확인?
 - [ ] 6+ 스텝 또는 context-heavy이면 티켓 폴더 초기화?
 - [ ] 6+ 스텝 또는 TEAM이면 핵심 모듈 선로드?
@@ -456,8 +456,8 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
    - 참조: `modules/memory-policy.md`
 
 1. **세션 저장** (모든 파이프라인):
-   - `/sc:sc-save --type learnings` → 작업 결과 + 결정사항 영속화
-   - 다음 세션에서 `/sc:sc-load`로 복원 가능
+   - 티켓 폴더가 있으면 `index.md` Essential Context 를 갱신한다 — 다음 세션은 이것으로 복원한다
+   - `/sc:sc-save --type learnings` 는 선택(SuperClaude 를 쓸 때)
 
 2. **상황별 안내**:
    - 코드 변경 있음 → `/fz-commit` 제안
