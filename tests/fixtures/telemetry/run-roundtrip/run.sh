@@ -6,8 +6,11 @@
 #   record-to-report       start → end → `fz_telemetry_report.py --runs-root … --runs-json` 에 그 run_id 가 가짜 트랜스크립트의 model · effort 로 있다
 #   resume-attempt-2       end 없이 다시 start → 같은 run_id 에 attempt 1(interrupted) · 2(completed) 가 둘 다 리포터에 보인다
 #   schema-version         schema 99 행을 섞으면 리포트 JSON runs.unreadable 1 · --runs-json 에는 없다 · 나머지 행 집계는 그대로
-#   run_metrics-self-test  run_metrics.py --self-test(동시 실행 · 중복 end · 중단 · 쓰기 실패 · 본문 복제 · 재개)가 exit 0 · PASS —
+#   run_metrics-self-test  run_metrics.py --self-test(동시 실행 · 중복 end · 중단 · 쓰기 실패 · 본문 복제 · 재개 · Harness 칸)가 exit 0 · PASS —
 #                          health-check 글롭이 도는 것은 이 러너뿐이라 기록기 self-test 를 여기서 회귀 감시한다
+#   harness-metrics-judgement  별도 임시 FZ_RUN_STATE 에 `end --gate-issues · --findings` 로 11회 기록 → 리포트 JSON harness 가
+#                          10회 이슈 0 Gate = neutral-candidate · 10회 이슈 있음 = load-bearing · 9회 = preliminary ·
+#                          findings 합 · 플래그 없는 행은 두 키가 없다(0 이 아니다) — experiment-log.md §5.4 손 기록을 대신하는 판정
 # 출력: case 마다 `<case>: PASS` · `<case>: FAIL <why>`, 끝에 `run-roundtrip: PASS|FAIL`.
 # exit: 0 전건 통과 · 1 단언 실패 · 2 준비 실패(`UNRUN:` — python3 · 스크립트 부재 · 단언기 고장)
 set -u
@@ -137,12 +140,64 @@ with tempfile.TemporaryDirectory(prefix="fz-run-roundtrip-") as td:
          "report rc=%s runs-json rc=%s unreadable=%s listed=%d groups=%s · %s"
          % (rc1, rc2, runs.get("unreadable"), len(listed), groups, (o1 + e1).strip()[-200:]))
 
-    # run_metrics-self-test — 기록기 self-test 6 case 를 이 러너로 회귀 감시한다(내부 self-test 는 자기 임시 FZ_RUN_STATE 를 쓴다)
+    # run_metrics-self-test — 기록기 self-test 7 case 를 이 러너로 회귀 감시한다(내부 self-test 는 자기 임시 FZ_RUN_STATE 를 쓴다)
     rc, out, err = run([RM, "--self-test"])
     lines = out.strip().splitlines()
     case("run_metrics-self-test",
          rc == 0 and bool(lines) and lines[-1].startswith("run_metrics self-test: PASS"),
          "rc=%s · %s" % (rc, (out + err).strip()[-300:]))
+
+    # harness-metrics-judgement — 위 case 들과 섞이지 않게 자기 FZ_RUN_STATE 를 쓴다(schema-version 이 state 의 행 수를 센다)
+    h_state, h_wd = tmp / "state-harness", tmp / "wd-harness"
+    h_env = dict(env, FZ_RUN_STATE=str(h_state))
+    h_rcs = []
+
+    def rmh(*args):
+        proc = subprocess.run([sys.executable, "-B", str(RM)] + [str(a) for a in args] + ["--projects-root", str(projects), "--strict"],
+                              env=h_env, capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
+        h_rcs.append(proc.returncode)
+        return (proc.stdout + proc.stderr).strip()
+
+    # 시도 11회(같은 스킬 · 같은 WORK_DIR — start/end 짝). 1~10: Gate A 이슈 0 · Gate B i%3 · findings 1/2/3. 1~9 만 Gate C. 11: 플래그 없음
+    for i in range(11):
+        rmh("start", "--skill", "fz-review", "--mode", "full", "--recommended", "full", "--source", "gate", "--work-dir", h_wd)
+        flags = []
+        if i < 10:
+            flags = ["--gate-issues", "Gate A=0", "--gate-issues", "Gate B (cross-model)=%d" % (i % 3),
+                     "--findings", "gpt=1,claude=2,convergent=3"]
+        if i < 9:
+            flags += ["--gate-issues", "Gate C=1"]
+        last = rmh("end", "--skill", "fz-review", "--work-dir", h_wd, "--status", "completed", *flags)
+    h_json = tmp / "report-harness.json"
+    rc1, o1, e1 = run([REPORT, "--runs-root", h_state, "--projects-root", empty, "--findings-dir", tmp / "no-findings",
+                       "--plugin-root", tmp / "no-plugin", "--telemetry-dir", tmp / "telemetry-harness", "--json", "--out", h_json])
+    try:
+        payload = json.loads(h_json.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        payload = None
+    harness = payload.get("harness") if isinstance(payload, dict) else None
+    harness = harness if isinstance(harness, dict) else {}
+    gates = sorted((str(g.get("gate")), g.get("runs"), g.get("issues"), g.get("verdict"))
+                   for g in harness.get("gates") or [] if isinstance(g, dict) and g.get("skill") == "fz-review")
+    want_gates = [("Gate A", 10, 0, "neutral-candidate"), ("Gate B (cross-model)", 10, 9, "load-bearing"), ("Gate C", 9, 9, "preliminary")]
+    want_found = {"runs": 10, "gpt_unique_findings": 10, "claude_unique_findings": 20, "convergent_findings": 30, "total_findings": 60}
+    h_runs = (payload.get("runs") or {}).get("n") if isinstance(payload, dict) else None
+    proc = subprocess.run([sys.executable, "-B", str(REPORT), "--runs-root", str(h_state), "--runs-json"], env=h_env,
+                          capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
+    try:
+        h_rows = json.loads(proc.stdout)
+    except ValueError:
+        h_rows = None
+    h_rows = h_rows if isinstance(h_rows, list) else []
+    plain = [r for r in h_rows if isinstance(r, dict) and r.get("attempt") == 11]
+    flagged = [r for r in h_rows if isinstance(r, dict) and r.get("attempt") == 1]
+    case("harness-metrics-judgement",
+         h_rcs == [0] * 22 and rc1 == 0 and proc.returncode == 0 and gates == want_gates and harness.get("findings") == want_found
+         and h_runs == 11 and len(h_rows) == 11 and len(plain) == 1 and "gate_issues" not in plain[0] and "findings" not in plain[0]
+         and len(flagged) == 1 and flagged[0].get("gate_issues") == {"Gate A": 0, "Gate B (cross-model)": 0, "Gate C": 1},
+         "rc=%s report rc=%s runs-json rc=%s gates=%s findings=%s runs.n=%s rows=%d plain keys=%s · %s"
+         % (sorted(set(h_rcs)), rc1, proc.returncode, gates, harness.get("findings"), h_runs, len(h_rows),
+            sorted(set(plain[0]) & {"gate_issues", "findings"}) if plain else None, (last + o1 + e1).strip()[-200:]))
 
 print("run-roundtrip: %s" % ("FAIL" if FAILED else "PASS"))
 sys.exit(1 if FAILED else 0)

@@ -19,6 +19,7 @@
   run_metrics.py start --skill S --mode light|full --recommended light|full|none
                        [--source arg|fz|signal|autonomous|gate] [--work-dir W] [--reason TEXT]
   run_metrics.py end   --skill S [--work-dir W] --status completed|interrupted|failed [--workflow-run-id wf_x]
+                       [--gate-issues GATE=N ...] [--findings gpt=N,claude=N,convergent=N]
   run_metrics.py sweep [--older-than-hours N]
   공통 옵션: --projects-root DIR(기본 ~/.claude/projects — model · effort 판독) · --strict
   run_metrics.py --self-test
@@ -31,6 +32,16 @@ end    열린 표지를 1행으로 닫는다. model = 세션 트랜스크립트�
 sweep  RUN_OPEN_STALE_HOURS(24) 시간보다 오래 열린 표지를 interrupted 로 닫는다. 아무도 닫지 않은 표지는 리포터가 「열린 채 남은 시도」로 센다.
 자동으로 닫은 interrupted 행의 ended_at 은 null 이다 — 멈춘 시각을 모르므로 닫은 시각을 끝으로 쓰지 않는다.
 --source · --reason 은 행 키가 아니라 reason(200자 이하) 한 칸에 `source=…` 로 들어간다.
+
+Harness 칸(experiment-log.md §5.4 손 기록을 대신한다 — 판정은 fz_telemetry_report.py 리포트의 harness):
+  --gate-issues GATE=N   그 시도에서 Gate 하나가 찾은 이슈 수. 여러 번 준다 → 행 gate_issues {GATE: N}.
+                         GATE 는 마지막 `=` 앞(공백 · 괄호 허용 · 64자 이하) · 같은 GATE 두 번은 인자 오류
+  --findings gpt=N,claude=N,convergent=N
+                         교차 검증 발견 수 → 행 findings {gpt_unique_findings, claude_unique_findings,
+                         convergent_findings, total_findings}. 셋 다 준다 — total 은 셋의 합으로 계산하고 받지 않는다
+  ⛔ 주지 않으면 그 키가 행에 없다(0 으로 채우지 않는다 — 이슈 0 은 기록이고 키 없음은 미기록이다).
+     start · sweep 이 자동으로 닫은 interrupted 행에는 두 키가 없다. 선택 키라 schema 는 그대로다
+     (옛 리포터는 모르는 키를 무시하고, 새 리포터는 키 없는 옛 행을 미기록으로 읽는다).
 
 exit: 0 기록 · no-op · 기록 불가(기본) / 1 기록 불가(--strict) · self-test 실패 / 2 인자 오류
 Python 3.9 stdlib 전용.
@@ -75,7 +86,12 @@ SOURCES = ("arg", "fz", "signal", "autonomous", "gate")
 # 행 키 허용 집합 — 이 밖의 키는 쓰지 않는다(원장 게이트가 그 밖의 키를 거부한다)
 ROW_KEYS = ("schema", "run_id", "attempt", "pipeline_id", "skill", "mode", "recommended", "reason", "started_at",
             "ended_at", "status", "model", "effort", "session_id", "work_dir", "workflow_run_id", "plugin_root",
-            "plugin_version", "plugin_sha")
+            "plugin_version", "plugin_sha", "gate_issues", "findings")
+# --findings 의 부분 이름 → 행 findings 키. 키 이름은 experiment-log.md §5.4 · fz_telemetry_report.HARNESS_FINDINGS 와 같다
+FINDINGS_PARTS = {"gpt": "gpt_unique_findings", "claude": "claude_unique_findings", "convergent": "convergent_findings"}
+FINDINGS_TOTAL = "total_findings"
+GATE_MAX = 64
+COUNT_RE = re.compile(r"[0-9]{1,6}")
 MODEL_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:@/[]-")
 
 SKILL_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
@@ -301,10 +317,11 @@ def reason_text(source, reason):
 
 
 def close_marker(pdir: Path, path: Path, run_id: str, attempt: int, status: str, ended_at, env, projects_root,
-                 workflow_run_id=None, sid=None, skill=None):
+                 workflow_run_id=None, sid=None, skill=None, gate_issues=None, findings=None):
     """열린 표지 1개 → 행 1개 append → 표지 삭제. 같은 (run_id, attempt) 행이 이미 있으면 표지만 지우고 None.
 
     호출자가 lock 을 쥔다. append 뒤 삭제 전에 죽으면 다음 호출이 이미 있는 행을 보고 표지만 지운다(중복 행 없음).
+    gate_issues · findings 는 end 가 받은 Harness 칸이다 — None 이면 그 키를 행에 두지 않는다(자동으로 닫는 경로는 넘기지 않는다).
     """
     if attempt in attempts_of(read_rows(pdir, run_id)):
         path.unlink(missing_ok=True)
@@ -334,8 +351,10 @@ def close_marker(pdir: Path, path: Path, run_id: str, attempt: int, status: str,
         "plugin_root": root,
         "plugin_version": version,
         "plugin_sha": sha,
+        "gate_issues": gate_issues,
+        "findings": findings,
     }
-    for optional in ("reason", "workflow_run_id", "plugin_sha"):
+    for optional in ("reason", "workflow_run_id", "plugin_sha", "gate_issues", "findings"):
         if row[optional] is None:
             del row[optional]
     row = {k: row[k] for k in ROW_KEYS if k in row}
@@ -381,7 +400,8 @@ def cmd_end(args, env) -> int:
             close_marker(pdir, path, rid, attempt, "interrupted", None, env, args.projects_root, skill=args.skill)
         attempt, _, path = markers[-1]
         row = close_marker(pdir, path, rid, attempt, args.status, now_iso(), env, args.projects_root,
-                           args.workflow_run_id, session_of(env), skill=args.skill)
+                           args.workflow_run_id, session_of(env), skill=args.skill,
+                           gate_issues=args.gate_issues, findings=args.findings)
     print(f"RUN {rid} attempt {attempt} {args.status}" if row else f"RUN {rid} already ended (attempt {attempt})")
     return 0
 
@@ -430,6 +450,44 @@ def _hours(value: str) -> float:
     return hours
 
 
+def _gate_issue(value: str) -> tuple:
+    """`GATE=N` → (GATE, N). 마지막 `=` 에서 가른다 — Gate 이름에는 공백 · 괄호가 들어간다(fz-review Harness Metrics 표)."""
+    gate, sep, count = value.rpartition("=")
+    gate = " ".join(gate.split())
+    if not sep or not gate or len(gate) > GATE_MAX or not gate.isprintable() or not COUNT_RE.fullmatch(count.strip()):
+        raise argparse.ArgumentTypeError(f"GATE=N(이름 {GATE_MAX}자 이하 · N 은 0 이상 정수) 형식이 아니다: {value!r}")
+    return gate, int(count)
+
+
+class _GateIssues(argparse.Action):
+    """여러 번 받은 `--gate-issues` 를 {GATE: N} 로 모은다. 같은 GATE 가 두 번이면 어느 값인지 모르므로 인자 오류다."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        gate, count = values
+        found = dict(getattr(namespace, self.dest) or {})
+        if gate in found:
+            parser.error(f"{option_string} 에 같은 Gate 가 두 번 있다: {gate!r}")
+        found[gate] = count
+        setattr(namespace, self.dest, found)
+
+
+def _findings(value: str) -> dict:
+    """`gpt=N,claude=N,convergent=N` → 행 findings. 셋 다 받아야 하고 total 은 받지 않고 합으로 계산한다."""
+    parts = {}
+    for item in value.split(","):
+        key, sep, count = item.partition("=")
+        key = key.strip()
+        if not sep or key not in FINDINGS_PARTS or key in parts or not COUNT_RE.fullmatch(count.strip()):
+            raise argparse.ArgumentTypeError(
+                f"gpt=N,claude=N,convergent=N 형식이 아니다(total 은 합으로 계산하므로 받지 않는다): {value!r}")
+        parts[key] = int(count)
+    if set(parts) != set(FINDINGS_PARTS):
+        raise argparse.ArgumentTypeError(f"gpt · claude · convergent 셋을 다 준다 — 빠진 것 {sorted(set(FINDINGS_PARTS) - set(parts))}")
+    row = {FINDINGS_PARTS[key]: parts[key] for key in FINDINGS_PARTS}
+    row[FINDINGS_TOTAL] = sum(parts.values())
+    return row
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="스킬 실행 기록기 — 시도 1회 = runs.jsonl 1행")
     ap.add_argument("--self-test", action="store_true")
@@ -450,6 +508,10 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--work-dir")
     e.add_argument("--status", required=True, choices=RUN_STATUSES)
     e.add_argument("--workflow-run-id", type=_matching(WF_RE, "workflow runId(wf_…)"))
+    e.add_argument("--gate-issues", type=_gate_issue, action=_GateIssues, metavar="GATE=N",
+                   help="Gate 하나의 이슈 수 — 여러 번 준다(experiment-log.md §5.4 · 주지 않으면 미기록)")
+    e.add_argument("--findings", type=_findings, metavar="gpt=N,claude=N,convergent=N",
+                   help="교차 검증 발견 수 — total 은 합으로 계산한다(주지 않으면 미기록)")
     w = sub.add_parser("sweep", parents=[common], help="오래 열린 표지를 interrupted 로 닫는다")
     w.add_argument("--older-than-hours", type=_hours, default=RUN_OPEN_STALE_HOURS)
     return ap
@@ -607,8 +669,31 @@ def self_test() -> int:
                   and re.search(r"^RUN [0-9a-f]{12} attempt 2$", outs[2][1], re.M) is not None)
             return ok, f"rc={[o[0] for o in outs]} rows={got} run_ids={len(run_ids)}"
 
+        def c_harness_fields():
+            st, wd = base / "s-harness", base / "wd-harness"
+            gate_b = "Confident Error (cross-model 불일치)"
+            done = "--status", "completed"
+            outs = [start(st, "fz-review", wd),
+                    cli(st, "end", "--skill", "fz-review", "--work-dir", str(wd), *done, "--gate-issues", "Gate A=0",
+                        "--gate-issues", f"{gate_b}=3", "--findings", "gpt=2, claude=1, convergent=4"),
+                    start(st, "fz-plan", wd), end(st, "fz-plan", wd), start(st, "fz-code", wd)]
+            bad = [cli(st, "end", "--skill", "fz-code", "--work-dir", str(wd), *done, *extra) for extra in (
+                ("--gate-issues", "A=1", "--gate-issues", "A=2"), ("--gate-issues", "A=-1"), ("--gate-issues", "=1"),
+                ("--findings", "gpt=1,claude=2"), ("--findings", "gpt=1,claude=2,convergent=3,total=6"))]
+            rows, _ = rows_of(st)
+            by_skill = {r.get("skill"): r for r in rows}
+            review, plan = by_skill.get("fz-review", {}), by_skill.get("fz-plan", {})
+            want_findings = {"gpt_unique_findings": 2, "claude_unique_findings": 1, "convergent_findings": 4, "total_findings": 7}
+            ok = (all(o[0] == 0 for o in outs) and [b[0] for b in bad] == [2] * len(bad) and len(rows) == 2
+                  and review.get("gate_issues") == {"Gate A": 0, gate_b: 3} and review.get("findings") == want_findings
+                  and "gate_issues" not in plan and "findings" not in plan and "fz-code" not in by_skill)
+            return ok, (f"rc={[o[0] for o in outs]} bad rc={[b[0] for b in bad]} rows={len(rows)} "
+                        f"gate_issues={review.get('gate_issues')} findings={review.get('findings')} "
+                        f"plain keys={sorted(set(plan) & {'gate_issues', 'findings'})}")
+
         cases = (("concurrent", c_concurrent), ("duplicate-end", c_duplicate_end), ("interrupted", c_interrupted),
-                 ("write-failure", c_write_failure), ("no-body-copy", c_no_body_copy), ("resume-attempt", c_resume_attempt))
+                 ("write-failure", c_write_failure), ("no-body-copy", c_no_body_copy), ("resume-attempt", c_resume_attempt),
+                 ("harness-fields", c_harness_fields))
         passed = 0
         for name, fn in cases:
             try:

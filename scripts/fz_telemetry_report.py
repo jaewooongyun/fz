@@ -6,7 +6,8 @@
   2. 워크플로 journal `…/subagents/workflows/wf_*/journal.jsonl` — Workflow 도구가 쓴다
   3. fz-findings `entries/F-*.md` frontmatter — 사람이 쓴다
   4. `measure_constraint_load.py` 표1 — 호출 시 계산된다(정적)
-  5. 실행 기록 `${FZ_RUN_STATE:-~/.fz/runs}/*/runs.jsonl` — `run_metrics.py` 가 쓴다(스킬 실행 시도 1회 = 1행)
+  5. 실행 기록 `${FZ_RUN_STATE:-~/.fz/runs}/*/runs.jsonl` — `run_metrics.py` 가 쓴다(스킬 실행 시도 1회 = 1행 ·
+     gate_issues · findings 칸은 §8 Gate 기여도 판정 = JSON `harness` — experiment-log.md §5.4 손 기록을 대신한다)
 중복 소스를 만들지 않는 것이 계측의 1차 제약이다(plan §2).
 
 한계(정직성):
@@ -998,6 +999,11 @@ RUN_SCHEMA = 1                                           # run_metrics.py 와 �
 RUN_STATUSES = ("completed", "interrupted", "failed")    # run_metrics.py 와 같은 이름 · 같은 값
 RUN_OPEN_STALE_HOURS = 24.0                              # run_metrics.py sweep 기본값과 같은 이름 · 같은 값
 RUN_REQUIRED = ("run_id", "attempt", "skill", "mode", "status", "started_at")
+# Harness 판정(experiment-log.md §5.4 "10건 → 이슈 0건 Gate = Neutral 후보") — 실행 수 경계는
+# modules/cross-validation.md § Reflection Rate threshold 의 N<10 preliminary 와 같다
+HARNESS_MIN_RUNS = 10
+# 행 findings 객체의 키 — run_metrics.py FINDINGS_PARTS · FINDINGS_TOTAL 과 같은 이름(§5.4 의 이름 그대로)
+HARNESS_FINDINGS = ("gpt_unique_findings", "claude_unique_findings", "convergent_findings", "total_findings")
 
 
 def _run_ts(value):
@@ -1087,6 +1093,84 @@ def summarize_runs(collected):
             "open": collected["open"], "open_stale": collected["open_stale"]}
 
 
+def _harness_count(value):
+    return type(value) is int and value >= 0   # bool 은 type 이 int 가 아니라 걸러진다
+
+
+def harness_verdict(runs, issues):
+    """Gate 하나의 판정 — 실행 HARNESS_MIN_RUNS 미만은 preliminary(판정 보류) · 이상에서 이슈 0 = neutral-candidate · 이슈 있음 = load-bearing."""
+    if runs < HARNESS_MIN_RUNS:
+        return "preliminary"
+    return "neutral-candidate" if issues == 0 else "load-bearing"
+
+
+def summarize_harness(rows):
+    """run_metrics.py 행의 gate_issues · findings → experiment-log.md §5.4 계약의 판정(손 기록을 대신한다).
+
+    ⛔ Gate 의 실행 수는 그 Gate 를 적은 행 수다 — 적지 않은 행은 이슈 0 이 아니라 미기록이다. Gate 는 (스킬, 이름)으로 가른다.
+    findings 합도 findings 를 적은 행만 더한다 — 그런 행이 없으면 합은 0 이 아니라 None 이다.
+    형식이 깨진 칸(정수 아님 · 음수 · total 이 세 값의 합과 다름)은 malformed 로 세고 판정에 넣지 않는다.
+    """
+    gates = {}
+    sums = dict.fromkeys(HARNESS_FINDINGS, 0)
+    finding_runs = malformed = 0
+    for row in rows:
+        issues = row.get("gate_issues")
+        if issues is not None:
+            if (isinstance(issues, dict) and issues
+                    and all(isinstance(gate, str) and gate and _harness_count(n) for gate, n in issues.items())):
+                for gate, n in issues.items():
+                    slot = gates.setdefault((str(row.get("skill")), gate), [0, 0])
+                    slot[0] += 1
+                    slot[1] += n
+            else:
+                malformed += 1
+        found = row.get("findings")
+        if found is not None:
+            if (isinstance(found, dict) and all(_harness_count(found.get(key)) for key in HARNESS_FINDINGS)
+                    and found["total_findings"] == sum(found[key] for key in HARNESS_FINDINGS[:3])):
+                finding_runs += 1
+                for key in HARNESS_FINDINGS:
+                    sums[key] += found[key]
+            else:
+                malformed += 1
+    by_gate = [{"skill": skill, "gate": gate, "runs": runs, "issues": issues, "verdict": harness_verdict(runs, issues)}
+               for (skill, gate), (runs, issues) in sorted(gates.items())]
+    findings = {"runs": finding_runs}
+    findings.update((key, sums[key] if finding_runs else None) for key in HARNESS_FINDINGS)
+    return {"min_runs": HARNESS_MIN_RUNS, "gates": by_gate, "findings": findings, "malformed": malformed}
+
+
+def render_harness_section(harness):
+    """§8 줄 목록 — harness 는 summarize_harness 결과."""
+    lines = ["## 8. Gate 기여도 (Harness Metrics)", ""]
+    lines.append("> `run_metrics.py end --gate-issues` 로 남긴 Gate별 이슈 수다(기간은 §7 과 같다). Gate 를 적은 행만 그 Gate 의 "
+                 "실행으로 센다 — 적지 않은 행은 이슈 0 이 아니라 미기록이다. 실행 %d 미만은 preliminary(판정 보류), 그 이상에서 "
+                 "이슈 0 은 neutral-candidate · 이슈가 있으면 load-bearing 이다(experiment-log.md §5.4 · "
+                 "modules/cross-validation.md § Reflection Rate threshold)." % harness["min_runs"])
+    lines.append("")
+    lines.append("| 스킬 | Gate | 실행 | 이슈 합 | 판정 |")
+    lines.append("|---|---|---|---|---|")
+    for row in harness["gates"]:
+        lines.append("| %s | %s | %d | %d | %s |" % (row["skill"], row["gate"].replace("|", "\\|"), row["runs"], row["issues"],
+                                                   row["verdict"]))
+    if not harness["gates"]:
+        lines.append("| - | - | 0 | n/a | 기록 없음 |")
+    lines.append("")
+    found = harness["findings"]
+    if found["runs"]:
+        lines.append("교차 검증 발견(`--findings` 를 적은 실행 %d): gpt_unique %d · claude_unique %d · convergent %d · total %d" % (
+            found["runs"], found["gpt_unique_findings"], found["claude_unique_findings"], found["convergent_findings"],
+            found["total_findings"]))
+    else:
+        lines.append("교차 검증 발견: 기록 없음(`--findings` 를 적은 실행 0 — 발견 0 과 다르다)")
+    lines.append("")
+    if harness["malformed"]:
+        lines.append("형식이 깨진 Harness 칸 %d — 위 표와 합에 넣지 않았다(미측정)." % harness["malformed"])
+        lines.append("")
+    return lines
+
+
 def render_runs_section(runs):
     """§7 줄 목록 — runs 는 summarize_runs 결과."""
     lines = ["## 7. 실행 기록", ""]
@@ -1113,7 +1197,7 @@ def render_runs_section(runs):
 
 
 # ── 5. 렌더링 ───────────────────────────────────────────────────────────────
-def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot, runs):
+def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot, runs, harness):
     models = []
     for key in sorted(agg.by_model, key=lambda k: -agg.by_model[k]["out"]):
         counter = agg.by_model[key]
@@ -1237,6 +1321,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
         ],
         "snapshot_baseline": last_snapshot.get("date") if last_snapshot else None,
         "runs": runs,
+        "harness": harness,
     }
 
 
@@ -1493,6 +1578,7 @@ def render_markdown(payload):
         lines.append("- 없음")
     lines.append("")
     lines.extend(render_runs_section(payload["runs"]))
+    lines.extend(render_harness_section(payload["harness"]))
     return "\n".join(lines) + "\n"
 
 
@@ -1509,9 +1595,11 @@ def run_report(args):
     static_rows, static_err = collect_static_load(os.path.expanduser(args.plugin_root))
     telemetry_dir = os.path.expanduser(args.telemetry_dir)
     last_snapshot = read_last_snapshot(telemetry_dir)
-    runs = summarize_runs(collect_runs(os.path.expanduser(args.runs_root), since, until))
+    collected_runs = collect_runs(os.path.expanduser(args.runs_root), since, until)
+    runs = summarize_runs(collected_runs)
+    harness = summarize_harness(collected_runs["rows"])
 
-    payload = build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot, runs)
+    payload = build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot, runs, harness)
 
     if args.out:
         out_path = os.path.expanduser(args.out)
@@ -1799,6 +1887,27 @@ def self_test():
     check("실행 기록 — 기간 밖 행은 빠지고 못 읽은 행 · 열린 표지는 그대로 센다", (len(late["rows"]), late["unreadable"], late["open"]), (1, 2, 2))
     no_runs = collect_runs(os.path.join(base, "없는-runs"))
     check("실행 기록 — 루트 없음 = 0행 · 열린 표지 0", (no_runs["rows"], no_runs["open"]), ([], 0))
+    # Harness 판정(experiment-log.md §5.4) — A 는 10회 이슈 0 · B 는 10회 이슈 있음 · C 는 9회(경계 바로 아래) · 다른 스킬의 같은 이름 A 는 따로
+    found3 = {"gpt_unique_findings": 1, "claude_unique_findings": 2, "convergent_findings": 3, "total_findings": 6}
+    h_rows = [{"skill": "fz-review", "gate_issues": dict({"A": 0, "B": i % 2}, **({"C": 0} if i < 9 else {})), "findings": found3}
+              for i in range(10)]
+    h_rows += [{"skill": "fz-review"},                                                            # 칸 없는 행 — 미기록
+               {"skill": "fz-plan", "gate_issues": {"A": 4}},
+               {"skill": "fz-review", "gate_issues": {"A": -1}},                                  # 음수
+               {"skill": "fz-review", "gate_issues": {"A": True}},                                # bool
+               {"skill": "fz-review", "findings": dict(found3, total_findings=7)}]                # total ≠ 합
+    harness = summarize_harness(h_rows)
+    check("Harness — Gate 별 실행 · 이슈 · 판정(10회 0건 · 10회 있음 · 9회 · 다른 스킬)",
+          [(g["skill"], g["gate"], g["runs"], g["issues"], g["verdict"]) for g in harness["gates"]],
+          [("fz-plan", "A", 1, 4, "preliminary"), ("fz-review", "A", 10, 0, "neutral-candidate"),
+           ("fz-review", "B", 10, 5, "load-bearing"), ("fz-review", "C", 9, 0, "preliminary")])
+    check("Harness — findings 합은 적은 행만 · 깨진 칸은 malformed", (harness["findings"], harness["malformed"]),
+          ({"runs": 10, "gpt_unique_findings": 10, "claude_unique_findings": 20, "convergent_findings": 30, "total_findings": 60}, 3))
+    empty_h = summarize_harness([{"skill": "fz-review"}])
+    check("Harness — 기록 없음은 0 이 아니라 None", (empty_h["gates"], empty_h["findings"]),
+          ([], {"runs": 0, "gpt_unique_findings": None, "claude_unique_findings": None, "convergent_findings": None, "total_findings": None}))
+    check("Harness — 판정 경계(9 · 10)", [harness_verdict(9, 0), harness_verdict(10, 0), harness_verdict(10, 1)],
+          ["preliminary", "neutral-candidate", "load-bearing"])
 
     # --json 경로도 실제로 실행한다 — 한 번도 안 돈 직렬화는 검증된 것이 아니다.
     args_json = argparse.Namespace(**vars(args))
@@ -1816,12 +1925,20 @@ def self_test():
     check("단가 미등록 없으면 경고 줄 없음", "단가 미등록 모델" in render_markdown(payload), False)
     check("JSON 왕복 — 분모", payload["denominators"]["assistant_messages"], 1)
     check("JSON 왕복 — 실행 기록 n · unreadable · open", (payload["runs"]["n"], payload["runs"]["unreadable"], payload["runs"]["open"]), (2, 2, 2))
+    check("JSON 왕복 — harness(칸 없는 실행 기록 = Gate 0 · findings None)",
+          (payload["harness"]["gates"], payload["harness"]["findings"]["runs"], payload["harness"]["findings"]["total_findings"]),
+          ([], 0, None))
+    md_h = render_markdown(dict(payload, harness=harness))
+    check("리포트 §8 — 판정 행 · 깨진 칸 줄", ("| fz-review | A | 10 | 0 | neutral-candidate |" in md_h,
+                                        "형식이 깨진 Harness 칸 3" in md_h), (True, True))
 
     with open(args.out) as handle:
         text = handle.read()
     check("리포트에 §3 표 존재", "## 3. 워크플로별 실행과 스테이지 기여도" in text, True)
     check("리포트에 §7 실행 기록", "## 7. 실행 기록" in text, True)
     check("리포트 §7 — 열린 채 남은 시도", "열린 채 남은 시도 2(그중 24시간 넘은 것 1)" in text, True)
+    check("리포트에 §8 Gate 기여도 · 기록 없음", ("## 8. Gate 기여도 (Harness Metrics)" in text, "| - | - | 0 | n/a | 기록 없음 |" in text),
+          (True, True))
     check("리포트에 0건 경고 문구 없음(분모>0)", "측정 실패를 먼저 의심하라" in text, False)
     check("모델에게 지시하는 문장 0", ("반드시 " in text) or ("하라." in text), False)
 

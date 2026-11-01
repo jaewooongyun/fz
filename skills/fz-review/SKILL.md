@@ -179,7 +179,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 지표④: 세션 reversal 횟수 (사용자 판정 뒤집기 — 기준선 4회)
 - [ ] 지표⑤: A5 micro-eval 호출 건수 N + confirmed C + false positive F → precision = C/N
 - [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (티켓 폴더 세션 임시) 또는 Serena `fz:metrics:phase-a-session-{N}` (비-티켓 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함
-- [ ] **canonical sink**: 세션 결과를 `experiment-log.md §5.4 Harness Metrics 누적`에 누적 (5 세션 누적 후 B1/B2 진입 판정). 다른 sink는 backlink만 허용 (3중화 금지).
+- [ ] **canonical sink**: 세션 결과는 완료 직전 `run_metrics.py end` 의 `--gate-issues` · `--findings` 로 실행 기록에 남긴다 — B1/B2 진입 판정(Gate 10회부터 neutral-candidate · load-bearing)은 `fz_telemetry_report.py` 의 harness 절이 낸다. 다른 sink는 backlink만 허용 (3중화 금지).
 
 ## Phase 5: Cross-Review (3중 검증)
 > **프로젝트 규칙**: CLAUDE.md `## Code Conventions` 섹션을 따른다.
@@ -409,7 +409,7 @@ Gate 5 통과 후:
 
 ### Harness Metrics (v3.8+)
 
-> **Canonical sink**: 누적 데이터는 `experiment-log.md §5.4`에 기록한다 (B1/B2 진입 판정용). 본 섹션은 세션 보고 형식만 정의하고, 누적은 canonical sink로 backlink.
+> **Canonical sink**: 누적은 실행 기록이다 — 이 표의 Gate 별 이슈 수와 cross-model 발견 수를 `run_metrics.py end --gate-issues … --findings …` 로 넘기면 `fz_telemetry_report.py` 가 Gate 를 판정한다(B1/B2 진입 판정용 · `modules/mode-gate.md` § 기록). 본 섹션은 세션 보고 형식만 정의한다. experiment-log 의 옛 누적 표는 이력이다.
 
 리뷰 완료 보고에 Gate별 이슈 수를 기록한다:
 

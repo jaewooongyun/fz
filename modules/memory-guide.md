@@ -61,7 +61,7 @@
 
 > ⛔ 승격(candidate→active) 임계 canonical = `modules/promotion-ledger.md` Track A (**5 sessions**). 위 ≥3은 별도 모듈 분리(new principle) 자격이지 active 임계가 아님 — 코드 태그 표기도 5세션으로 통일 (2026-07-09 D3).
 
-**Evidence 출처**: `experiment-log.md §5.4` 또는 `fz:checkpoint:*` memory keys. 동일 failure mode가 **별개 세션**에서 관찰돼야 1 count.
+**Evidence 출처**: `scripts/run_metrics.py` 행(`end --gate-issues` · `--findings`) → `scripts/fz_telemetry_report.py` 리포트의 `harness` 판정(§8 Gate 기여도) 또는 `fz:checkpoint:*` memory keys. `experiment-log.md §5.4` 는 손으로 붙이던 시절의 과거 데이터로만 남는다(새 행을 붙이지 않는다). 동일 failure mode가 **별개 세션**에서 관찰돼야 1 count.
 
 **예시**: 31/32/33 = same mode (Lead risk-aversion) → 단일 `lead-action-default.md` merge. 34차+ 후보 시 본 decision tree 먼저 실행.
 

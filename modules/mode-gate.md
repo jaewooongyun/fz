@@ -81,8 +81,9 @@
 | 시점 | 명령 |
 |---|---|
 | 모드가 정해진 직후 — 질문(5)으로 정했든 묻지 않는 경로(1~4)로 정했든 | `python3 "${FZ_PLUGIN_ROOT}/scripts/run_metrics.py" start --skill {스킬} --mode light\|full --recommended light\|full\|none --source arg\|fz\|signal\|autonomous\|gate [--work-dir {WORK_DIR}]` |
-| 완료 보고 직전 | `python3 "${FZ_PLUGIN_ROOT}/scripts/run_metrics.py" end --skill {스킬} [--work-dir {WORK_DIR}] --status completed\|interrupted\|failed [--workflow-run-id wf_…]` |
+| 완료 보고 직전 | `python3 "${FZ_PLUGIN_ROOT}/scripts/run_metrics.py" end --skill {스킬} [--work-dir {WORK_DIR}] --status completed\|interrupted\|failed [--workflow-run-id wf_…] [--gate-issues {Gate}={N} …] [--findings gpt={N},claude={N},convergent={N}]` |
 
+- `--gate-issues` · `--findings` 는 리뷰 계열이 Gate 별 이슈 수와 cross-model 고유 · 일치 발견 수를 남기는 선택 인자다 — 리포터(`fz_telemetry_report.py`)가 Gate 를 10회 기록부터 neutral-candidate · load-bearing 으로 판정한다(그 전은 preliminary · experiment-log §5.4 손 기록을 대체). 없으면 그 키를 남기지 않는다(0 이 아니다)
 - `--source` 는 위 「언제 묻나」 의 순번이다 — 1 명시 인자 `arg` · 2 `/fz` 경유 `fz` · 3 신호어 `signal` · 4 자율 · 질문 도구 없음 `autonomous` · 5 질문 `gate`. `--recommended` 는 `mode_gate.py` 결과의 `recommend` 이고, 게이트를 돌리지 않았거나 측정 불가(exit 2)면 `none`
 - fz-peer-review 는 Tier 0 · 1 을 `light`, Tier 2 · 3 을 `full` 로 적는다
 - fz-fix 는 게이트(팀 에이전트 모드 0)가 모든 실행의 경로에 있지 않다 — 게이트 없이 Mode A 로 시작하면 Mode A 첫 줄에서 `--mode light --recommended none` 으로 `start` 하고(`--source` 없음), 게이트를 거쳤으면 게이트 줄에서만 `start` 한다
