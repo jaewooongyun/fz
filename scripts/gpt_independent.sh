@@ -35,7 +35,7 @@
 # 산출(out-dir): <arm>-<run-id>.json (스키마 출력) · .md (사람용) · .audit.json · .rollouts/ (세션 로그 사본) · .contaminated (오염 시) · .json.session(세션 ID — 감사 sessionFile · --keep-iso 면 감사 iso · resume 입력)
 #   ⛔ 시작할 때 같은 stem 의 옛 산출을 지우고 감사를 'running'(exit null)으로 먼저 쓴다 — 중간에 멈춘 run 의 산출은 병합 · 차이표가 거부한다
 # stderr: 래퍼의 적용값 줄 'GPT-CHOICE model=<값> (출처) effort=<값> (출처)' 을 그대로 한 줄 옮긴다(래퍼가 그 줄 전에 멈추면 없다)
-# exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건 · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
+# exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건(격리 폴더 자리 ${TMPDIR:-/tmp} 가 실제 홈 ~/.claude 아래인 경우 포함 — GPT 호출 전 · F-509) · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
 #       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off. 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
 #          stderr 'GPT-OFF: <사유> — …' · 감사 <stem>.audit.json 에 "exit": 18 · "gptOff": "<사유>"(오염 · 측정 실패 아님 — 병합은 --gpt-unavailable)
@@ -173,8 +173,23 @@ if [ -n "$OFF_WHY" ]; then
   exit 18
 fi
 
-# ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — Claude 산출물이 첫 패스에 들어가면 독립이 아니다)
+# ── 사전 게이트: 격리 폴더 자리(⛔ exit 11 · F-509) — 격리 폴더는 ${TMPDIR:-/tmp} 아래에 생기고 과제 · 권한 프로필이 그 경로를 입력
+#    폴더로 연다. 그 자리가 실제 홈의 ~/.claude 아래면 GPT 가 Claude 로그 · journal 옆에서 돌고, rollout 감사는 GPT 를 부른 **뒤**에야
+#    그 경로(`.claude/`)를 잡는다(호출 비용이 이미 났다). 그래서 mktemp · 래퍼 호출 전에 실경로로 비교해 멈춘다.
+#    ⛔ GPT 미사용 사전 게이트(18) 뒤다 — GPT 를 쓰지 않는 세션은 여기까지 오지 않는다(18 이 11 을 이긴다 · tests/fixtures/gpt/off).
+#    TMPDIR 이 없거나 풀리지 않으면 여기서 판정하지 않는다 — 아래 mktemp 가 11 로 멈춘다. ~/.claude 가 링크여도 실경로로 함께 본다
 REAL_HOME="$(cd "${HOME:?HOME 미설정}" && pwd -P)"
+ISO_PARENT="$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)" || ISO_PARENT=""
+CLAUDE_DIR="$REAL_HOME/.claude"
+CLAUDE_DIR_REAL="$(cd "$CLAUDE_DIR" 2>/dev/null && pwd -P)" || CLAUDE_DIR_REAL="$CLAUDE_DIR"
+if [ -n "$ISO_PARENT" ]; then
+  case "$ISO_PARENT/" in
+    "$CLAUDE_DIR"/*|"$CLAUDE_DIR_REAL"/*)
+      die 11 "격리 폴더가 ~/.claude 아래에 생긴다 — TMPDIR 을 바꾸거나 unset 한다(TMPDIR='${TMPDIR:-}' → $ISO_PARENT · F-509). GPT 를 부르지 않았다" ;;
+  esac
+fi
+
+# ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — Claude 산출물이 첫 패스에 들어가면 독립이 아니다)
 REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)" || die 11 "실제 GPT CLI 홈이 없다: ${CODEX_HOME:-$REAL_HOME/.codex}"
 [ -f "$REAL_GPT_HOME/auth.json" ] || die 11 "인증 파일이 없다: $REAL_GPT_HOME/auth.json (로그인 필요)"
 for f in "$REQ" "$SC" "$RULES" "$DIFF" "$META"; do [ -z "$f" ] || [ -s "$f" ] || die 11 "입력 파일 없음/빈 파일: $f"; done

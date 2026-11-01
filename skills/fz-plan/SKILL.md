@@ -47,7 +47,7 @@ metadata:
 ## Prerequisites
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **첫 GPT 호출 전**(0.7 Sprint Contract · 2.7 독립 플랜 · Phase 2 verify 중 가장 이른 것): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`. 호출에 모델·effort 를 적지 않는다
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **GPT 단계마다 직전**(0.7 Sprint Contract · 2.7 독립 플랜 · Phase 2 verify ∥ verify-gates): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다
 
 ## 모듈 참조
 
@@ -322,7 +322,7 @@ GPT가 구현 시작 **전** "성공 기준" Sprint Contract 작성 → Claude �
 ### 절차
 
 ```bash
-# 계획 검증 실행
+bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/gpt-strategy.md § 단계 실행 판정 — 켬이면 필수): run·config → 아래 verify ∥ verify-gates · skip → [GPT 미사용 — 사유] + 원장 판정은 gpt-strategy.md § fz-plan 원장 · ask → 질문 → set → 다시 decide
 검증 도구로 계획 검증 위임
 ```
 

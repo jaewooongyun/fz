@@ -21,9 +21,10 @@
 | Given | When | Then | type |
 |-------|------|------|------|
 | 크래시 재현 경로 확인됨, 단일 파일 수정 | `/fz-fix "탭 전환 시 listener nil 크래시"` | Step 1c에서 root-cause 식별 → Step 3 빌드 성공(xcodebuild exit 0) → Gate Bug Fix Complete 체크리스트 5/5 통과 | normal |
-| 단순 상수 수정, `--gpt` 옵션 지정 | `/fz-fix "타임아웃 30초로 변경" --gpt` | Step 4에서 `/fz-gpt check` 호출 → verdict=pass 분기로 완료 보고 | normal |
+| 단순 상수 수정, GPT 를 켠 세션(세션 선택 있음) | `/fz-fix "타임아웃 30초로 변경"` | Step 4에서 `gpt-choice.sh decide` → `run` → `/fz-gpt check` 호출 → verdict=pass 분기로 완료 보고 | normal |
+| 단순 상수 수정, GPT 를 끈 세션(세션 선택 off) 또는 GPT CLI 없음 | `/fz-fix "타임아웃 30초로 변경"` | Step 4에서 `gpt-choice.sh decide` → `skip` → GPT check 미호출 + `[GPT 미사용 — 사유]` 표기 후 완료 보고(대체 검증 없음) | edge-case |
 | 분석 결과 수정 대상이 3개+ 파일 | `/fz-fix "여러 모듈 상태 불일치"` | 자동 전환 트리거 발동 → 코드 수정 0줄 + `/fz-code` 전환 제안 보고 | edge-case |
 | 수정 대상이 `static let shared` + 가변 `var`, 동기화 메커니즘 부재 (동시성 키워드 없음) | `/fz-fix "공유 인스턴스 값 깨짐"` | 역방향 트리거 발동 → 수정 전 3패턴 점검 + 동시성 안전성 검증 섹션 활성 | edge-case |
 | Step 1c에서 root-cause 불명확 | `/fz-fix "가끔 화면 멈춤"` | 코드 수정 0줄 + AskUserQuestion 발생 (Step 1c 완료 전 수정 금지) | failure |
-| 빌드 3회 연속 실패 (LOOP 한도 도달) | 수정-빌드 사이클 반복 | 4회차 자동 재시도 중단 + `/fz-gpt check` 보조 진단 1회 → 결과 보고 → AskUser | failure |
+| 빌드 3회 연속 실패 (LOOP 한도 도달) | 수정-빌드 사이클 반복 | 4회차 자동 재시도 중단 + `gpt-choice.sh decide` 판정(`run` · `config` 면 `/fz-gpt check` 보조 진단 1회 · `skip` 이면 `[GPT 미사용 — 사유]`) → 결과 보고 → AskUser | failure |
 | Serena 연결 실패 | `/fz-fix` 탐색 단계(Step 1b) | Grep + Glob 폴백으로 탐색 계속 진행 (중단 없음) | failure |

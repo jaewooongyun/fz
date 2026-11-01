@@ -78,6 +78,8 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 | fz-review | Reflection | 이슈 재확인 | GPT 검증 | AskUser |
 | fz-plan | Stress Test | 계획 수정 | 계획 재작성 | AskUser |
 
+> GPT 칸(fz-fix 3회 실패의 `/fz-gpt check` 보조 진단 · fz-review 2회 실패의 GPT 검증)은 직전 `gpt-choice.sh decide` 가 `run` · `config` 일 때만 부른다 — `skip` 이면 그 칸의 GPT 호출만 빼고 `[GPT 미사용 — 사유]` 를 남긴다(fz-fix 는 바로 AskUser · `modules/gpt-strategy.md` § 단계 실행 판정).
+
 ### 스킬별 LOOP 파라미터
 
 | 스킬 | completion-promise | max-iterations | 대상 Gate |

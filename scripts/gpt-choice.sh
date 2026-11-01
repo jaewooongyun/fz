@@ -14,6 +14,7 @@
 #   gpt-choice.sh set --model <slug|config> --effort <level|config>  검증 뒤 기록 (stdout 'model=… effort=…')
 #   gpt-choice.sh set --model off [--effort <무시>]                  GPT 미사용 기록 (stdout 'model=off effort=off')
 #   gpt-choice.sh config                                             config.toml 최상위 값 (stdout 'model=<값|?> effort=<값|?>')
+#   gpt-choice.sh decide                                             GPT 단계 실행 판정 (stdout 'GPT-DECIDE run|config|skip|ask …' 한 줄)
 #
 # 저장: ${FZ_GPT_CHOICE_DIR:-$HOME/.fz/gpt-choice}/${CLAUDE_CODE_SESSION_ID} — 'model=<slug|config|off>' 'effort=<level|config|off>' 두 줄.
 #   값 config = 그 필드를 넘기지 않는다(config.toml 그대로). `set --model config --effort config` 는 "물었고 config" 센티넬이다.
@@ -35,6 +36,13 @@
 #   config  0=stdout 'model=<값|?> effort=<값|?>'(config.toml 이 없거나 값을 모르면 '?') · 11=python3 없음·판독 실패
 #           래퍼(gpt-exec.sh)의 GPT-CHOICE 줄이 출처 config 인 필드의 값을 이것으로 읽는다 — config 판독 규칙(config_top)의 출처를 한 곳에 둔다.
 #           모델 목록 캐시 · 선택 파일 · 세션 id 를 보지 않는다
+#   decide  stdout 한 줄 — 정본 modules/gpt-strategy.md § 단계 실행 판정. 소비 문서가 GPT 단계 직전에 부르고 그 줄로만 분기한다
+#           0='GPT-DECIDE run model=<…> effort=<…>'(선택 있음 — get 0) · 0='GPT-DECIDE config'(get 4 · 5 — 묻지 않고 config)
+#           18='GPT-DECIDE skip reason=off-user'(세션 선택 off) · 18='GPT-DECIDE skip reason=off-no-cli'(GPT CLI 없음) — 래퍼 · 런처의 18 과 같은 뜻
+#           3='GPT-DECIDE ask'(get 3 — 묻고 set 뒤 다시 decide) · 11='GPT-DECIDE ask'(선택 파일 손상 — 다시 묻고 set)
+#           11=줄 없음(get 이 계약 밖으로 끝났다 — 스크립트 오류) · 10=사용법(인자를 받지 않는다)
+#           같은 env · 선택 파일 · CLI 유무면 같은 줄 · 같은 exit 다 — CLI 없음을 선택 판독보다 먼저 본다(래퍼 사전 게이트와 같은 순서).
+#           판독은 get 그대로이고 부작용도 get 의 것뿐이다(CLI 없음이면 get 을 부르지 않아 off 기록도 없다)
 #   (공통)  10=사용법
 # ⛔ get 은 모델 목록 캐시를 읽지 않는다 — 독립 런처는 격리 CODEX_HOME 에서 래퍼를 띄우므로 캐시가 없을 수 있다.
 #    모델별 검증은 set 한 곳에서 fail-closed 로 하고, get 은 형식·모델 문자셋·effort 화이트리스트만 본다.
@@ -378,6 +386,33 @@ cmd_get() {
   printf 'model=%s effort=%s\n' "$SEL_MODEL" "$SEL_EFFORT"
 }
 
+# GPT 단계 실행 판정 — 정본 modules/gpt-strategy.md § 단계 실행 판정. stdout 한 줄 · exit 는 헤더 decide 행.
+# ⛔ CLI 없음을 선택 판독(get)보다 먼저 본다 — 래퍼 사전 게이트(플래그 off → CLI 없음 → 선택)와 같은 순서다. get 을 먼저 부르면
+#    선택이 없을 때 get 이 off 를 기록해 두 번째 판정이 'off-user' 로 바뀐다(같은 입력 → 다른 줄 · F-487).
+# ⛔ 선택 판독은 cmd_get 을 서브셸로 그대로 쓴다(get 의 exit 가 이 함수를 끝내지 않는다) — 판독 · 검증 규칙을 두 곳에 두지 않는다.
+#    get 의 stderr 안내는 그대로 흘린다(stdout 한 줄만 계약이다).
+cmd_decide() {
+  local out rc
+  [ $# -eq 0 ] || die 10 "decide 는 인자를 받지 않는다: $1"
+  if cli_absent; then
+    printf 'GPT-DECIDE skip reason=off-no-cli\n'
+    exit 18
+  fi
+  out="$(cmd_get)"; rc=$?
+  case "$rc" in
+    0)
+      case "$out" in
+        "model=off effort=off") printf 'GPT-DECIDE skip reason=off-user\n'; exit 18 ;;
+        model=*" effort="*)     printf 'GPT-DECIDE run %s\n' "$out"; exit 0 ;;
+        *) die 11 "decide — get 출력 형식 불량('$out'). 스크립트 오류다 — 다시 묻지 않는다" ;;
+      esac ;;
+    3)   printf 'GPT-DECIDE ask\n'; exit 3 ;;
+    4|5) printf 'GPT-DECIDE config\n'; exit 0 ;;
+    11)  printf 'GPT-DECIDE ask\n'; exit 11 ;;
+    *)   die 11 "decide — get 이 계약 밖 exit $rc 로 끝났다. 스크립트 오류다 — 다시 묻지 않는다" ;;
+  esac
+}
+
 cmd_set() {
   local m="" e="" has_m="" has_e="" rc
   while [ $# -gt 0 ]; do
@@ -424,5 +459,6 @@ case "$SUB" in
   get)     cmd_get ${1+"$@"} ;;
   set)     cmd_set ${1+"$@"} ;;
   config)  cmd_config ${1+"$@"} ;;
-  *)       die 10 "하위 명령은 options|get|set|config — 받은 값: '$SUB'" ;;
+  decide)  cmd_decide ${1+"$@"} ;;
+  *)       die 10 "하위 명령은 options|get|set|config|decide — 받은 값: '$SUB'" ;;
 esac

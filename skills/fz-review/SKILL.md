@@ -54,7 +54,7 @@ metadata:
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-- ⛔ **첫 GPT 호출 전**(2.5 독립 첫 패스 · Phase 5 검증 2 와 그 직전 probe 중 가장 이른 것): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`. 호출에 모델·effort 를 적지 않는다
+- ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다
 
 ## 모듈 참조
 
@@ -100,7 +100,7 @@ metadata:
 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 결과로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 5 Lead 3중 검증으로 간다(아래 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
-2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {diff.patch} --deny {WORK_DIR} [--rules-index {원문 색인}] …` — 켜면 Workflow args 에 `locatedFindings: true` 를 함께 준다(위치 필드가 없는 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다). ⛔ 규칙 레코드(`projectRulesPath`)는 런처에 넘기지 않는다(exit 11). 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
+2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**(직전 `gpt-choice.sh decide` — `skip` 이면 띄우지 않고 병합은 `--gpt-unavailable`): `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {diff.patch} --deny {WORK_DIR} [--rules-index {원문 색인}] …` — 켜면 Workflow args 에 `locatedFindings: true` 를 함께 준다(위치 필드가 없는 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다). ⛔ 규칙 레코드(`projectRulesPath`)는 런처에 넘기지 않는다(exit 11). 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js && cmp -s {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. 복사본은 2.8 준비가 매 호출 만든다(fz-plan 절차 2.5 와 같은 규칙)
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
@@ -213,7 +213,7 @@ mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분�
 /fz-gpt review "코드 리뷰"
 ```
 > ⊕ `--gpt-independent` 면 이 검증을 실행 절차 2.5 · 4.5 가 대신한다 — GPT 가 Claude 산출을 보기 전에 따로 리뷰한 결과를 `review_merge.py` 가 합친다
-> ⊘ GPT 를 끈 세션(정문 exit 18 `GPT-OFF` — 사용자 선택 · CLI 없음)이면 light · full 모두 이 검증을 `[GPT 미사용 — 사유]` 표기로 대신한다 — 실행 실패(아래 불능 분기)와 다르다 · 정본 `modules/gpt-strategy.md` § GPT 미사용
+> ⊘ 직전 `gpt-choice.sh decide`(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수)가 `skip` 이거나 정문이 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음)면 light · full 모두 이 검증을 `[GPT 미사용 — 사유]` 표기로 대신한다 — 실행 실패(아래 불능 분기)와 다르다 · 정본 `modules/gpt-strategy.md` § GPT 미사용
 
 fz-gpt가 수행하는 작업:
 - GPT CLI에 변경 심볼 + diff 전송
@@ -342,7 +342,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 >
 > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
 >
-> 요약: `/fz-gpt validate "피드백 반영 검증"` 실행 → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
+> 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 검증"` 실행 → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
 
 ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
 
@@ -356,7 +356,7 @@ python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --reverify {WORK_DIR}/gates/pl
 - `--reverify`는 이미 `- [x]`인 게이트도 실행하고, 통과 못 하면 `- [ ]` + `EVIDENCE: pending`(재실행 전 진행 기록이 있던 게이트는 `pending; demoted`)으로 **강등**한다
 - ⛔ `--status`는 재검증이 아니다 — 파싱만 하고 과거 증거를 그대로 읽는다
 - `/fz-gpt validate`(fz-guardian)의 `resolved/partially_resolved/unresolved/**regressed**` 4축에서 `regressed`가 0이 아니면 통합 차단 — 기존 `gpt_verification_schema` 유지
-- 원장이 있으면 **`verify-gates`를 추가 호출**해 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산출물이다). 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates
+- 원장이 있으면 **`verify-gates`를 추가 호출**해(같은 decide 판정 — `skip` 이면 부르지 않고 `[GPT 미사용 — 사유]`) 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산출물이다). 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates
 - ⛔ 응답은 `--verdict-check {응답.json} {WORK_DIR}/gates/plan.md` 로 전수 판정을 확인한다. exit 1이면 재호출 1회 후 **미판정으로 기록**
 - ⛔ validate를 대체하지 않는다 — 4축 역검증과 게이트 판정은 관심사가 다르다
 - 전 게이트 충족 시 `--set-state closed` (전진은 조건부 — 미충족이면 거부된다)
@@ -459,7 +459,7 @@ Gate 5 통과 후:
 | 에러 | 대응 | 폴백 |
 |------|------|------|
 | fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백 | Claude 자체 판단 |
-| fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다. probe 성립 = kind `availability-probe`(`gpt-call.sh availability-probe` — 역할 없음 · ephemeral) 가 **non-empty 산출 + exit 0**(⛔ `--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
+| fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다(직전 `gpt-choice.sh decide` 가 `skip` 이면 probe 도 부르지 않고 `[GPT 미사용 — 사유]`). probe 성립 = kind `availability-probe`(`gpt-call.sh availability-probe` — 역할 없음 · ephemeral) 가 **non-empty 산출 + exit 0**(⛔ `--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
 | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |

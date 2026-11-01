@@ -126,7 +126,7 @@ metadata:
    - `'partial'` 이면 그 관점(아키텍처 또는 품질)은 **적용되지 않았다** — 다음 Step 으로 넘어가기 전에 재invoke 할지 Lead 가 판정한다
    - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). ⛔ 여기서 사다리를 재정의하지 않는다
    - **code-pair 고유분만**: ① H5 크기 가드 — `split_required`/`splitSuggested` 시 Step 분할(과대 changeset scaffold collapse 방지) ② 재시도는 `buildFeedback` 포함 **새 invoke**(캐시 키 변경 → resume 비의존) ③ Stage1 null 재시도는 **1회 한정**·일시 장애 의심 시만
-7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5, 회복 시) — Workflow는 "구현+검토 쌍"만 대체
+7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5 — `gpt-choice.sh decide` 판정) — Workflow는 "구현+검토 쌍"만 대체
 8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → `experiment-log.md` §5.7 fz-code 테이블(**2026-07-10 시리즈 — 현행**; 2026-06-05 표는 사료). Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
 
 > 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
@@ -348,13 +348,13 @@ metadata:
 8. **Issue Tracker에 빌드 이슈 기록** (실패 시)
 
 8.5. **⛔ GPT 교차 검증** (GPT 를 켠 세션이면 light · full 모두 — 생략 금지):
-   모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 실행한다.
+   모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기하고(`modules/gpt-strategy.md` § 단계 실행 판정) `run` · `config` 면 실행한다.
    ```bash
    /fz-gpt check "구현 코드 교차 검증"
    ```
    - 에이전트 구현 결과를 cross-model로 검증
    - 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백
-   - GPT 를 끈 세션(정문 exit 18 `GPT-OFF`)이면 `[GPT 미사용 — 사유]` 를 남긴다 — `modules/gpt-strategy.md` § GPT 미사용
+   - decide 가 `skip` 이거나 정문이 exit 18 `GPT-OFF` 면 `[GPT 미사용 — 사유]` 를 남긴다 · `ask` 면 질문 → `set` → 다시 decide — `modules/gpt-strategy.md` § GPT 미사용
 
 ### 빌드 실패 대응
 

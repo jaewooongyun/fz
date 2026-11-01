@@ -4,7 +4,7 @@ description: >-
   버그 수정 + 에러 해결. 빠른 원인 분석과 수정-빌드 사이클.
   예: 고쳐줘, 버그 있어, 크래시 나, 에러 떠, 안 돼 (비사용: 신규 기능 →fz-code, 계획 →fz-plan)
 user-invocable: true
-argument-hint: "[버그/에러 설명] [--gpt]"
+argument-hint: "[버그/에러 설명]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
@@ -66,7 +66,8 @@ metadata:
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
 | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
-| skills/fz-gpt/SKILL.md | --gpt 옵션: cross-model 검증 위임 (check verdict contract) |
+| skills/fz-gpt/SKILL.md | GPT check 위임 — GPT 를 켠 세션이면 필수 (check verdict contract) |
+| modules/gpt-strategy.md | § 단계 실행 판정 — GPT check 직전 `gpt-choice.sh decide` 한 줄로 실행 · 건너뜀을 정한다 |
 
 ## Plugin 참조 (SwiftUI + Swift Concurrency)
 
@@ -187,8 +188,9 @@ metadata:
 - `/sc:sc-analyze` → 빠른 품질 체크
 - `/sc:sc-reflect --type task` → 수정이 근본 원인을 해결했는지 자체 검증
   (트리거: 복잡한 버그 수정 완료 후, 단순 수정은 스킵)
-- (옵션 `--gpt`) `/fz-gpt check` 호출 → cross-model 검증
-  - verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
+- GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다
+  - `run` · `config` → `/fz-gpt check` 호출 → cross-model 검증. verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
+  - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.md` § GPT 미사용) / `ask` → 모델 질문 → `set` → 다시 decide
 - 또는 `/fz-review`로 전환
 
 ---
@@ -202,14 +204,14 @@ metadata:
 
 ### 실행 절차 (Lead)
 
-0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): code-pair 를 부를 상황이면 먼저 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" fix --files {수정 대상 파일 수} --estimate code-pair` 로 추천을 달고 묻는다. **light** 면 Mode A Bug Fix Step 1-4 를 Lead 가 직접 한다(Workflow 없음 · `--gpt` 는 그대로) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
+0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): code-pair 를 부를 상황이면 먼저 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" fix --files {수정 대상 파일 수} --estimate code-pair` 로 추천을 달고 묻는다. **light** 면 Mode A Bug Fix Step 1-4 를 Lead 가 직접 한다(Workflow 없음 · Step 4 GPT check 는 그대로) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 1. **args 조립**: `mode:'light'` / `stepSpec`={id,title,goal,files,verify,**complexity**, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 시 `split_required`. 임계값 single source=상수)} / `effort`=0 결과 `effort.value`(lead-effort — null 이면 넣지 않는다) / `contextPath`(버그 분석 요약 파일) / `changesetTarget` / `buildFeedback`(재시도 시)
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus) → 이슈가 있으면 Stage 3 수정. 1-3 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
 3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke
 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
-   Mode A Bug Fix Step 1-4 직접 진입은 **L4 사용자 승인 후**다. 어느 경로로 가든 **--gpt 처리 책임은 유효**하고,
+   Mode A Bug Fix Step 1-4 직접 진입은 **L4 사용자 승인 후**다. 어느 경로로 가든 **Step 4 GPT check 책임은 유효**하고(§ 단계 실행 판정),
    사유는 experiment-log 에 기록한다
    - **`mode:'split_required'`(또는 `splitSuggested:true`) 우선**: SOLO 폴백 전에 **Step 분할 후 재invoke** (H5 크기 가드 — fz-code 절차 6 사다리 동형). ⛔ Lead=fable 자동 SOLO 금지 — 직접 구현은 사용자 승인 후
 5. **지표 기록**: 세션당 1행 → `experiment-log.md` §5.7 fz-fix 테이블. 단일 Step 다수 — Step 루프 1회면 invoke 1회로 종료. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
@@ -228,7 +230,7 @@ metadata:
 | 코드 탐색/구조 분석 | `/fz-search` |
 | 리뷰 검증 원하는 경우 | `/fz-review` |
 | 3회 이상 수정 반복 | /simplify 시도 → `/fz-plan` 전환 |
-| 빌드 3회 실패 (LOOP 한도) | `/fz-gpt check` 보조 진단 1회 → 결과 보고 → AskUser |
+| 빌드 3회 실패 (LOOP 한도) | `gpt-choice.sh decide` 가 `run` · `config` 면 `/fz-gpt check` 보조 진단 1회(`skip` 이면 `[GPT 미사용 — 사유]`) → 결과 보고 → AskUser |
 
 ---
 
@@ -239,6 +241,7 @@ metadata:
 - [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
 - [ ] 빌드 성공?
 - [ ] 원인-수정 대응 명확?
+- [ ] GPT check 완료 또는 `[GPT 미사용 — 사유]` 표기? (Step 4 — 직전 `gpt-choice.sh decide` 줄 · GPT 를 켠 세션이면 필수)
 - [ ] 아티팩트 기록 완료? (티켓 폴더: `{WORK_DIR}/fix/fix-analysis.md`, 비-티켓 세션: `write_memory("fz:checkpoint:fix-{bug}", "원인: {요약}. 수정: {파일}. 빌드: OK")`)
 
 ---
@@ -272,8 +275,8 @@ BAD (GPT 직접 호출):
 수정: GPT CLI review 모드(`--uncommitted`) 직접 호출
 → fz-fix allowed-tools에 Bash(codex *) 없음. 권한 에러.
 
-GOOD (--gpt 위임 패턴):
-수정: --gpt 옵션 + /fz-gpt check 위임
+GOOD (/fz-gpt check 위임 패턴):
+수정: Step 4 에서 decide 가 run · config 면 /fz-gpt check 위임
 → fz-gpt가 Bash Hygiene/severity 파싱 처리. fz-fix는 verdict 분기만.
 ```
 
@@ -288,7 +291,7 @@ GOOD (--gpt 위임 패턴):
 **Will**:
 - 빠른 버그 수정 + 빌드 검증
 - 복잡도 초과 시 적절한 스킬 전환 제안
-- (옵션 --gpt) /fz-gpt check 호출 위임 (cross-model 검증)
+- GPT 를 켠 세션이면 /fz-gpt check 호출 위임 (cross-model 검증 — § 단계 실행 판정)
 
 **Will Not**:
 - 코드 탐색/구조 분석 (→ /fz-search)
@@ -306,7 +309,8 @@ GOOD (--gpt 위임 패턴):
 | 빌드 반복 실패 | /ralph-loop 래더 (modules/execution-modes.md) | 사용자 에스컬레이션 |
 | 심볼 못 찾음 | 패턴 검색 전환 | Grep 폴백 |
 | 복잡도 초과 | /fz-plan 전환 | 사용자 상담 |
-| /fz-gpt check verdict 미반환 (--gpt 옵션 시) | warning 처리 + 빌드 검증 결과로 진행 | 사용자 보고 |
+| /fz-gpt check verdict 미반환 (decide `run` · `config` 로 부른 뒤) | warning 처리 + 빌드 검증 결과로 진행 | 사용자 보고 |
+| GPT 미사용 (decide `skip` · 호출 exit 18 `GPT-OFF`) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 |
 
 ## Completion → Next
 

@@ -53,7 +53,7 @@ metadata:
 ## Prerequisites
 
 - **외부 자료 접근**: WebSearch + WebFetch + GPT CLI (cross-model verify)
-- **GPT CLI**: cross-model 검증 — ⛔ **첫 GPT 호출 전**(light micro-eval 포함): `modules/gpt-strategy.md` § 모델·effort 선택 — `gpt-choice.sh get` → `options` → `set`(버전 플로어도 같은 파일). trust_level="trusted" 설정 필요 (30차 교훈)
+- **GPT CLI**: cross-model 검증 — ⛔ **GPT 단계마다 직전**(light micro-eval · Phase 4): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정 — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · 버전 플로어도 같은 파일). trust_level="trusted" 설정 필요 (30차 교훈)
 - **6+ 스텝 자동 티켓 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 티켓 ID
 
 ## 모듈 참조
@@ -264,7 +264,7 @@ echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.m
 
 ### 절차
 
-1. **GPT 호출**: 아래 § GPT 호출 한 형태(래퍼 exec · architect 본문 · 5 Q 과제 · `gpt_review_schema`). 래퍼 exit 10~14 는 측정 실패다 — 판정으로 읽지 않는다. exit 18(`GPT-OFF`)은 GPT 미사용이다 — 그 단계는 `[GPT 미사용 — 사유]` 표기만(self-review 폴백 아님 · `modules/gpt-strategy.md` § GPT 미사용). 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그 · 모델·effort 거부 12)는 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 먼저 따르고, 그 밖은 에러 대응 표 'GPT CLI 통신 실패' 행으로 간다
+1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수 · `ask` 면 질문 → `set` → 다시 decide). `run` · `config` 면 아래 § GPT 호출 한 형태(래퍼 exec · architect 본문 · 5 Q 과제 · `gpt_review_schema`). 래퍼 exit 10~14 는 측정 실패다 — 판정으로 읽지 않는다. `skip`(또는 래퍼 exit 18 `GPT-OFF`)은 GPT 미사용이다 — 그 단계는 `[GPT 미사용 — 사유]` 표기만(self-review 폴백 아님 · `modules/gpt-strategy.md` § GPT 미사용). 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그 · 모델·effort 거부 12)는 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 먼저 따르고, 그 밖은 에러 대응 표 'GPT CLI 통신 실패' 행으로 간다
 2. **5 Q 검증 관점** (Plan-specific):
    - Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류)
    - Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜)
@@ -366,7 +366,7 @@ exit "$RC"       # 정문 exit 를 덮지 않는다(hygiene §8)
 | 장치 | 트리거 | 대응 | 출처 |
 |------|------|------|-----|
 | GPT 3회 한도 | needs_revision 누적 3 | 사용자 에스컬레이션 의무 | 18차 |
-| Self-application contract | 대상이 fz-modernize/* 자체 | Phase 4 GPT 검증 non-skippable + 사용자 ASR 의무 | 23차 (16차 meta) |
+| Self-application contract | 대상이 fz-modernize/* 자체 | Phase 4 GPT 검증 non-skippable(GPT 켬일 때 — 끈 세션 · CLI 없음은 decide `skip` → `[GPT 미사용 — 사유]` · `modules/gpt-strategy.md` § 단계 실행 판정) + 사용자 ASR 의무 | 23차 (16차 meta) |
 | Scope Inflation | 변경 LOC > Plan 예상 1.5x | 즉시 중단, 사용자 확인 | 18차 |
 | Speculation Fallacy | "원본/기존/이전" 표현 사용 | git show / Read 실측 후 진술 | CLAUDE.md Verification Discipline |
 | Reflection Gap | Plan 자체 stale 가능 | 5d 시작 전 plan 재검토 1회 | 17차 |
@@ -446,7 +446,7 @@ Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
 |------|------|------|
 | Probe WebSearch 실패 | 재시도 1회 → 사용자에게 직접 자료 요청 | manual probe |
 | GPT CLI 통신 실패 · 래퍼 exit 10~14(측정 실패 — 11·12 선택 복구는 Phase 4 절차 1단) | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
-| 래퍼 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 · 폴백 없음(`modules/gpt-strategy.md` § GPT 미사용) |
+| decide `skip` · 래퍼 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 · 폴백 없음(`modules/gpt-strategy.md` § GPT 미사용) |
 | GPT 누적 한도 도달 | 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (GPT 권고 점 수정 N건만) |
 | AC8 broken link 발견 | archive.org 폴백 또는 인용 제거 | 사용자 결정 |
 | Impact Scan line 번호 깨짐 | 모듈에서 path/section 참조로 변경 권고 | 영향 모듈 목록 보고 |

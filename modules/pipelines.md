@@ -24,6 +24,9 @@
 > ⛔ `TEAM 모드` 열은 **실행 스크립트만** 적는다. 에이전트 구성은 그 스크립트가 소유한다 —
 > 정본 `modules/governance.md` § Truth-of-Source · 에이전트 목록은 `modules/team-registry.md`.
 > 이전 판은 에이전트를 열거해 실제 스폰과 어긋났다(code-only 에 `impl-quality` 누락 · peer-review 가 다른 스크립트를 지목).
+>
+> ⛔ `gpt verify` · `gpt check` 게이트는 GPT 를 켠 세션이면 필수다 — 실행 여부는 그 단계 직전 `gpt-choice.sh decide` 한 줄이 정하고(`skip` 이면 `[GPT 미사용 — 사유]`), 켬이면 필수 · 명시 플래그 · 명시 호출의 구분은 `modules/gpt-strategy.md` § 단계 실행 판정이 정본이다.
+> 표의 `게이트` 행은 대표 표기다 — 게이트 행이 없는 파이프라인(explore-plan · review-only 등)도 체인 스킬의 GPT 단계(예: fz-plan Phase 2 verify · fz-review Phase 5 review · 5.5 validate)를 그대로 갖는다. 전수는 같은 절의 정책 표다.
 
 ### 1. explore
 
@@ -60,7 +63,7 @@
 | 트리거 | `버그.*찾아, 크래시.*원인, 에러.*추적` |
 | 체인 | fz-search → fz-fix |
 | 기본 모드 | SOLO |
-| 게이트 | ✓ build (fz-fix 후) |
+| 게이트 | ✓ build (fz-fix 후) + ✓ gpt check (fz-fix Step 4) |
 
 ### 5. quick-fix
 
@@ -69,7 +72,7 @@
 | 트리거 | `수정, 고쳐, 변경해줘, 바꿔줘` |
 | 체인 | fz-fix |
 | 기본 모드 | SOLO |
-| 게이트 | ✓ build |
+| 게이트 | ✓ build + ✓ gpt check (fz-fix Step 4) |
 
 ### 6. plan-only
 
@@ -79,7 +82,7 @@
 | 체인 | fz-plan |
 | 기본 모드 | SOLO |
 | TEAM 모드 | `workflows/plan-lean2.js` (롤백 경로 `workflows/plan-collaborative.js`) |
-| 게이트 | ✓ direction-challenge (Phase 0.5) + ✓ stress-test(Q1-Q6) |
+| 게이트 | ✓ direction-challenge (Phase 0.5) + ✓ stress-test(Q1-Q6) + ✓ gpt verify (Phase 2) |
 
 ### 7. plan-to-code
 
@@ -89,7 +92,7 @@
 | 체인 | fz-plan → fz-code |
 | 기본 모드 | TEAM |
 | TEAM 모드 | `workflows/plan-lean2.js` → `workflows/code-pair.js` (순차) |
-| 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ build + ✓ implication-scan (조건부) + ✓ gpt check |
+| 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ gpt verify (Phase 2) + ✓ build + ✓ implication-scan (조건부) + ✓ gpt check |
 
 ### 8. code-only
 
@@ -99,7 +102,7 @@
 | 체인 | fz-code |
 | 기본 모드 | SOLO |
 | TEAM 모드 | `workflows/code-pair.js` |
-| 게이트 | ✓ build + ✓ friction-detect |
+| 게이트 | ✓ build + ✓ friction-detect + ✓ gpt check (8.5) |
 
 ### 9. code-to-review
 
@@ -128,7 +131,7 @@
 | 체인 | fz-review → fz-commit → fz-pr |
 | 기본 모드 | TEAM |
 | TEAM 모드 | `workflows/review-live.js` → Lead 커밋/PR (fz-commit·fz-pr 은 Workflow 없음) |
-| 게이트 | ✓ gpt check (커밋 전) |
+| 게이트 | gpt check (커밋 전) — 명시 호출 전용(fz-commit · fz-pr 에 자동 배선 없음 · `skills/fz/SKILL.md` § 3.4) |
 
 ### 12. fix-to-ship
 
@@ -137,7 +140,7 @@
 | 트리거 | `고쳐서.*커밋, 수정.*PR` |
 | 체인 | fz-fix → fz-review → fz-commit |
 | 기본 모드 | SOLO |
-| 게이트 | ✓ build + ✓ gpt check |
+| 게이트 | ✓ build + ✓ gpt check (fz-fix Step 4) |
 
 ### 13. full-cycle
 

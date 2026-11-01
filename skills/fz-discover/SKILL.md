@@ -98,7 +98,7 @@ metadata:
      이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
      L4 사용자 에스컬레이션). Lead 단독 REP 는 **사용자 승인 후**에만. 사유는 experiment-log 에 기록
 5. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `experiment-log.md` Workflow tracing 섹션에 수동 append
-6. **--deep cross-model**: Workflow 완료 후 Lead가 `/fz-gpt verify` 별도 실행 (스크립트 내 cross-provider 스폰 금지)
+6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(명시 플래그 단계 — `modules/gpt-strategy.md` § 단계 실행 판정). `run` · `config` 면 `/fz-gpt verify` 별도 실행 · `skip` 이면 `[GPT 미사용 — 사유]` · `ask` 면 질문 → `set` → 다시 decide (스크립트 내 cross-provider 스폰 금지)
 
 ---
 

@@ -309,7 +309,11 @@ def cell_gpt_cond():
                                            "| Reflection Rate | **필수** (TEAM review) | SOLO 모드"])
     need(read("modules/cross-validation.md"), ["GPT 켬"], "modules/cross-validation.md")
     need(read("skills/fz-discover/SKILL.md"), ["--deep cross-model"], "fz-discover(명시 플래그 --deep GPT 유지)")
-    need(read("skills/fz-fix/SKILL.md"), ["(옵션 `--gpt`) `/fz-gpt check`"], "fz-fix(명시 플래그 --gpt 유지)")
+    # fz-fix GPT check 는 켬이면 필수(2026-11-01 사용자 결정) — 옛 opt-in 문구가 돌아오면 FAIL(기준 트리 음성 대조: 옛 문구가 있어 이 셀이 FAIL)
+    absent("skills/fz-fix/SKILL.md", ["(옵션 `--gpt`) `/fz-gpt check`", "[--gpt]", "--gpt 옵션", "--gpt 처리 책임"])
+    need(read("skills/fz-fix/SKILL.md"), ["GPT 를 켠 세션이면 필수", "§ 단계 실행 판정", "gpt-choice.sh\" decide"], "fz-fix(GPT check — 켬이면 필수 · 공통 판정 decide)")
+    absent("modules/mode-gate.md", ["fz-fix 의 `--gpt` 는 명시 플래그"])
+    need(read("modules/mode-gate.md"), ["fz-fix 의 GPT check 는 켬이면 필수", "§ 단계 실행 판정"], "modules/mode-gate.md § GPT 는 모드와 독립")
 
 
 CELLS = {

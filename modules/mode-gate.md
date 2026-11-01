@@ -124,7 +124,7 @@ light 는 새 모드가 아니라 각 스킬이 이미 가진 **Workflow 없는 
 
 - GPT 를 켠 세션이면 light · full 이 **같은** GPT 단계를 갖는다. 실행 조건은 모드가 아니라 GPT 사용 여부다
 - 끈 세션(`off`) · CLI 미설치면 두 모드 모두 `[GPT 미사용 — 사유]` 를 남기고 이어간다 — 정본 `modules/gpt-strategy.md` § GPT 미사용
-- fz-discover 의 `--deep` GPT verify · fz-fix 의 `--gpt` 는 명시 플래그라 두 모드에서 같다
+- 단계마다 실행 여부는 직전 `gpt-choice.sh decide` 한 줄이 정한다 — 켬이면 필수 · 명시 플래그 구분은 `modules/gpt-strategy.md` § 단계 실행 판정. fz-fix 의 GPT check 는 켬이면 필수(플래그 없음 — 2026-11-01)이고, fz-discover 의 `--deep` GPT verify 는 명시 플래그라 두 모드에서 같다
 
 ## effort
 

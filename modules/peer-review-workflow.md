@@ -1,6 +1,6 @@
 # Peer Review — Tier 2/3 Workflow 실행
 
-> ⛔ **Tier 2/3 전용.** `peer-review-tiers.md` 가 명시하듯 Tier 0/1 은 **sub-agent · GPT 호출이 없다** —
+> ⛔ **Tier 2/3 전용.** Tier 0/1 은 **Workflow(sub-agent)를 쓰지 않는다** — Tier 0 은 GPT 호출도 없고, Tier 1 의 GPT 는 독립 첫 패스 또는 challenger 1회다(`skills/fz-peer-review/SKILL.md` Tier 1 · 실행 판정은 `modules/gpt-strategy.md` § 단계 실행 판정) —
 > 여기 있는 것을 한 번도 쓰지 않는다. `SKILL.md` 에 두면 경량 경로가 매 리뷰마다 읽고 버린다.
 >
 > 추출 근거(2026-08-26): S8 파일럿에서 경량 경로 비용이 병목으로 지목됐고, Tier 0/1 필수 read-set 이
@@ -13,7 +13,7 @@
 
 > TEAM(TeamCreate+SendMessage) → 네이티브 Workflow 전환 (Wave 4). Analyze 코어는 `workflows/peer-review.js`가 소유한다 (결정적 스크립트 — P2P SendMessage 없음). 규약: `guides/skill-authoring.md` §12.
 
-0. **(기본 — `--gpt-independent` 생략 가능 · `--no-gpt-independent` 로 끈다) GPT 독립 첫 패스 — Workflow 와 동시**: `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {review-surface.patch — 없으면 diff.patch} --base … --head … --deny "${WORK_DIR}" [--pr-meta {pr-meta.json}] [--rules-index {원문 색인}]` 를 **Workflow 호출 전에** background 로 띄운다. ⛔ 규칙 레코드(`projectRulesPath`)는 Workflow args 에만 준다 — 런처 `--rules-index` 는 지침 원문 색인이다(같은 파일을 넘기면 exit 11). 순서 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
+0. **(기본 — `--gpt-independent` 생략 가능 · `--no-gpt-independent` 로 끈다) GPT 독립 첫 패스 — Workflow 와 동시**(직전 `gpt-choice.sh decide` — `skip` 이면 띄우지 않고 병합은 `--gpt-unavailable` · `modules/gpt-strategy.md` § 단계 실행 판정): `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {review-surface.patch — 없으면 diff.patch} --base … --head … --deny "${WORK_DIR}" [--pr-meta {pr-meta.json}] [--rules-index {원문 색인}]` 를 **Workflow 호출 전에** background 로 띄운다. ⛔ 규칙 레코드(`projectRulesPath`)는 Workflow args 에만 준다 — 런처 `--rules-index` 는 지침 원문 색인이다(같은 파일을 넘기면 exit 11). 순서 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 0.5. **준비** (Lead · `guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/peer-review.js {WORK_DIR}/peer-review.js && cmp -s {플러그인 루트}/workflows/peer-review.js {WORK_DIR}/peer-review.js` 가 exit 0 일 때만 1 을 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 1. **Workflow 호출** (Lead): `Workflow({ scriptPath: '{WORK_DIR}/peer-review.js', args: { diffPath, intentContext, reviewSurfacePatchPath, reviewSurfacePath, evidencePaths, basePath, deep, structuralContext, effort } })` — `effort` 는 Gather 5.5 `mode-gate.json` 의 `effort.value`(lead-effort — null 이면 뺀다 · `modules/mode-gate.md` § effort) · `structuralContext`는 `modules/review-structural-axes.md`를 Read해 §3 축 + §4 경계 문구 + §6 craft 축(이 스킬 기본 · 롤백 때는 §3+§4 만)을 담는다 (미전달 시 구조 축 미적용) ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - `deep=false` → **Tier 2 (Lite)**: Stage1 3-병렬(arch+quality+correctness) → **트리거 발화 시에만 Stage2 교차**. **3 또는 5-call**(null 재시도 시 최대 6/10). 발화 여부는 반환 `stage2Ran`·`stage2Trigger`. Confidence Matrix 미투표(Lead 단순 병합)

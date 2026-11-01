@@ -282,7 +282,7 @@ Lead가 보고에 추가할 것:
 
 > **도구화**: 메모리 17차(Reflection Gap) 해소 — 누적된 교훈을 *수동으로* fz 모듈에 반영하는 lag 제거.
 > **Pilot 기원**: cargo-cult 방어 Pilot P3 (2026-05-06, 19차 메모리 회귀 테스트 PASS).
-> **MUST 조건**: O3 (Generator ≠ Evaluator) + O9 (Cross-Model Verification) — GPT 외부 검증 필수.
+> **MUST 조건**: O3 (Generator ≠ Evaluator) + O9 (Cross-Model Verification) — GPT 를 켠 세션이면 GPT 외부 검증 필수(`modules/gpt-strategy.md` § 단계 실행 판정). 끈 세션 · CLI 없음이면 Step 4 를 `[GPT 미사용 — 사유]` 로 표기하고 Step 5 표의 GPT Verdict 칸에 남긴다.
 
 ### 사용법
 
@@ -326,7 +326,7 @@ python3 <FZ_ROOT>/skills/fz-manage/scripts/score_relevance.py parsed.json \
 
 #### Step 4: Reviewer (D+5 component, GPT 외부 검증) ⛔ MUST
 
-각 제안에 대해 `/fz-gpt` 호출:
+각 제안에 대해 — 직전에 `bash <FZ_ROOT>/scripts/gpt-choice.sh decide` 한 줄로 분기한다(`run` · `config` → `/fz-gpt` 호출 · `skip` → 부르지 않고 GPT Verdict 칸에 `[GPT 미사용 — 사유]` · `ask` → 질문 → `set` → 다시 decide):
 
 ```
 이 제안이 다음 두 출처에 부합하는가?
@@ -342,7 +342,7 @@ verdict: agree / disagree / partial / needs_verification
 - 제안된 type 분류의 정확성
 ```
 
-⛔ `--skip-gpt`로 건너뛰면 메모리 23차 (self-review blind spot) 재현 위험 — DRY-RUN 한정.
+⛔ `--skip-gpt`로 건너뛰면 메모리 23차 (self-review blind spot) 재현 위험 — DRY-RUN 한정. GPT 미사용 세션의 decide `skip` 은 `--skip-gpt` 가 아니다 — 표기만 하고 Step 5 로 간다.
 
 #### Step 5: 사용자 승인 + 적용
 
@@ -365,7 +365,7 @@ verdict: agree / disagree / partial / needs_verification
 - [ ] Memory Parser 출력 12 필드 모두 추출?
 - [ ] Relevance Scorer threshold 명시 + ≥ 0.70 모듈 < 5개면 사용자 확인 ("threshold 낮춰서 재실행?")
 - [ ] Suggestion Generator self-check 5 체크리스트 통과?
-- [ ] GPT 외부 검증 *모든 제안*에 적용? (O3+O9 MUST)
+- [ ] GPT 외부 검증 *모든 제안*에 적용? (O3+O9 MUST — GPT 켬일 때 · decide `skip` 이면 `[GPT 미사용 — 사유]` 표기)
 - [ ] meta_family ≥ 3 메모리 → A4 P5 후보로 분리 (개별 모듈 변경 보류)
 - [ ] 사용자 명시 승인 후만 적용?
 
