@@ -75,7 +75,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh mode_gate.py check_loaded_version.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py check_k_cluster.py check_host_census.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -593,6 +593,13 @@ elif [ -n "${FZ_LOADED_ROOT:-}" ]; then
 else
   record "로드본 대조" 0 "FZ_LOADED_ROOT 미지정 — 대조 생략 · $(printf '%s\n' "$LV_SELF" | tail -1)"
 fi
+
+# ── 4.8i 하네스 계측기 self-test (H0) ─────────────────────────────
+# ⛔ 모집단 대조기 · 런타임 로드 계측기는 원장과 트랜스크립트를 인자로 받는다 — 여기서는 검사기만 본다(원장 대조는 계획 단계 몫).
+HM_OUT="$( (python3 "$ROOT/scripts/harness_census.py" --self-test && python3 "$ROOT/scripts/measure_runtime_load.py" --self-test) 2>&1)"; HM_CODE=$?
+record3 "하네스 계측기 self-test" "$HM_CODE" "$HM_OUT" \
+  "$(printf '%s\n' "$HM_OUT" | grep -E 'self-test: PASS' | tr '\n' ' ')" \
+  "⛔ $(printf '%s\n' "$HM_OUT" | grep -E 'FAIL' | head -2 | tr '\n' ' ')"
 
 # ── 4.9 codegraph stale 검사기 self-test ──────────────────────────
 #    ⛔ 여기서 재는 것은 **검사기의 건강성**이지 인덱스 신선도가 아니다.
