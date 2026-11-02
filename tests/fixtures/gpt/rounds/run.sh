@@ -282,11 +282,15 @@ case_fourth_round_rejected() {
   want "4번째 CLI 호출" "$(ncli four-4)" 0
   [ ! -e "$O/v4.json" ] || add "거부된 호출의 --out 이 남았다(옛 결과를 새 판정으로 읽는다)"
   want "원장 live 라운드" "$(led live "$W/gpt-rounds.json" plan/verify)" "1,2,3"
+  prompt four-5           # fz-plan Phase 2 꼴 — 고정 --out(3라운드와 같은 파일)으로 다시 부르면 거부돼도 마지막 판정은 남는다
+  gate four-5 verify --cd "$REPO" --out "$O/v3.json" --prompt-file "$T/p-four-5.md"
+  want "같은 --out 5번째 exit · CLI 호출" "$(rc four-5) $(ncli four-5)" "19 0"
+  [ -s "$O/v3.json" ] || add "상한 거부가 같은 --out 의 마지막 판정(v3.json)을 지웠다 — 미해결 보고의 근거가 사라진다"
   ( env -u FZ_WORK_DIR -u FZ_RUN_STATE -u FZ_GPT_ARTIFACT "HOME=$T/home" PYTHONDONTWRITEBYTECODE=1 \
       python3 -B "$ROOT/scripts/gpt_rounds.py" status --work-dir "$W" < /dev/null ) > "$T/four-status.json" 2> "$T/four-status.err"
   st="$(led status "$T/four-status.json" plan/verify)"
   want "status plan/verify" "$st" "unresolved=True rounds_used=3"
-  verdict fourth-round-rejected "$WHY" "1~3라운드 0 · 4번째 exit 19 budget-exhausted · CLI 0 · --out 없음 · status $st"
+  verdict fourth-round-rejected "$WHY" "1~3라운드 0 · 4번째 exit 19 budget-exhausted · CLI 0 · --out 없음 · 같은 --out 거부는 마지막 판정 보존 · status $st"
 }
 
 # ── normal-rounds-2-3 ──────────────────────────────────────────────

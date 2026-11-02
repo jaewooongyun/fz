@@ -291,7 +291,7 @@ Gate 실패 시: 해당 단계를 "완료"로 표시할 수 없다. 반드시 �
 | 소비 | 유효 판정(어댑터 exit 0)만 라운드를 쓴다. 통신 실패 · 스키마 위반 재시도(12~14) · 런처 실패(15~17) · 신호 · exit 18(GPT 미사용 — 실패 아님)은 쓰지 않는다. `verify-gates` 사후 대조(`--verdict-check`) 실패 뒤 1회 재호출은 env `FZ_GPT_RECALL=post-check` 로 부른다 — 직전 판정의 라운드를 잇고 라운드를 쓰지 않는다(라운드당 1회 · 넘으면 `recall-used`) |
 | 동시성 | 원장 단위 잠금(`<원장>.lock`) 아래서 검사와 예약만 원자적으로 하고 실행은 잠금 밖이다. 상태는 reserved · completed · failed · aborted — 주인 프로세스가 죽은(또는 24시간 넘은) 예약은 다음 예약이 aborted(orphan)로 회수한다 |
 | 저장 | `{WORK_DIR}/gpt-rounds.json`(env `FZ_WORK_DIR`) — 없으면 `${FZ_RUN_STATE:-~/.fz/runs}/<pipeline_id>/gpt-rounds.json`(pipeline_id 는 `scripts/run_metrics.py` 규칙 그대로) · 발견 색인 `${FZ_RUN_STATE:-~/.fz/runs}/gpt-rounds-index.jsonl`. 재개(새 셸) · 다른 스킬 · 다른 호출자도 같은 원장을 본다 |
-| 거부 신호 | 정문 exit 19 · stderr `GPT-ROUNDS: <사유> — …` — 어댑터를 띄우지 않았다. `same-input` 이고 이번 `--out` 이 직전 판정 파일이면 정문은 그 파일을 지우지 않는다(그 판정이 답이다). 그 밖의 거부는 다른 거부처럼 래퍼 kind 의 옛 `--out` 을 지운다 — 옛 결과를 새 판정으로 읽지 않게. 원장을 판정하지 못하면 11 이다(측정 실패 · 0건 아님) |
+| 거부 신호 | 정문 exit 19 · stderr `GPT-ROUNDS: <사유> — …` — 어댑터를 띄우지 않았다. `same-input` 이고 이번 `--out` 이 직전 판정 파일이면 정문은 그 파일을 지우지 않는다(그 판정이 답이다). `budget-exhausted` 도 이번 `--out` 이 마지막 판정 파일이면 남긴다(미해결 보고의 근거다). 그 밖의 거부는 다른 거부처럼 래퍼 kind 의 옛 `--out` 을 지운다 — 옛 결과를 새 판정으로 읽지 않게. 원장을 판정하지 못하면 11 이다(측정 실패 · 0건 아님) |
 
 - ⛔ 재라운드 프롬프트에서 GPT 에게 앞 라운드 지적이 반영됐는지 확인하라고 시키지 않는다 — 반영 대조는 Lead 몫이다(앵커드 재검증 · F-508). GPT 는 새 입력을 처음 보듯 판정한다
 - 회귀: `python3 scripts/gpt_rounds.py --self-test` — cap-3 · same-input-stop · budget-exhausted · lock-reserve · orphan-recovery. case 앞에서 `KIND_SLOTS` · 입력 분류가 레지스트리(`scripts/gpt-kinds.json`)와 맞는지 본다

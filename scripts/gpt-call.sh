@@ -111,7 +111,7 @@ if [ -f "$PD/compose.json" ]; then
 fi
 # 재검증 라운드 상한(정본 modules/cross-validation.md § 재검증 라운드 상한 · 판정 scripts/gpt_rounds.py) — FZ_GPT_ARTIFACT 를 밝힌 호출만 센다.
 #   여기서 예약하고(원장 잠금 안에서 검사 + 예약만) 어댑터는 잠금 밖에서 돈다. 끝맺음은 on_exit 다.
-#   거부(19)는 다른 거부처럼 옛 OUT 을 지우되 ROUND-KEEP-OUT(같은 입력 · 이번 --out 이 직전 판정 파일)이면 남긴다 — 판정은 판정기 몫이다
+#   거부(19)는 다른 거부처럼 옛 OUT 을 지우되 ROUND-KEEP-OUT(같은 입력 · 상한 소진에서 이번 --out 이 직전 판정 파일)이면 남긴다 — 판정은 판정기 몫이다
 if [ -n "${FZ_GPT_ARTIFACT:-}" ]; then
   ROUND_OUT="$(python3 "$HERE/gpt_rounds.py" reserve --owner-pid "$$" --call-id "$CALL_ID" -- "$@")"; ROUND_RC=$?
   ROUND_UNTRACKED="" ROUND_KEEP_OUT=""

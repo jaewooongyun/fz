@@ -209,6 +209,14 @@ def excluded(real: str, exclude) -> bool:
     return False
 
 
+def excluded_spec(top: str, exclude) -> list:
+    """diff 에도 같은 제외 — 추적 중인 출력 · 작업 폴더의 변경이 새 입력으로 읽히지 않게. literal 경로(폴더면 그 아래 전부)라
+    'stem' 묶음은 그 파일 자체만 뺀다(OUT.session 같은 형제가 추적되는 경우는 다루지 않는다)."""
+    specs = [f":(exclude,top,literal){rel}" for rel in (os.path.relpath(p, top) for p, _ in exclude)
+             if rel != os.curdir and rel != os.pardir and not rel.startswith(os.pardir + os.sep)]
+    return ["--", "."] + specs if specs else []
+
+
 def code_digest(path: str, exclude) -> str:
     """검토 대상 코드 스냅숏 — HEAD · 작업 트리 diff(스테이징 포함) · 추적 안 된 파일(무시 규칙 밖 · 출력과 원장 제외)."""
     real = os.path.realpath(path)
@@ -219,16 +227,16 @@ def code_digest(path: str, exclude) -> str:
     if probe.returncode != 0:
         return "nogit"      # git 작업 트리가 아니다 — 검토할 코드가 없는 호출(작업 폴더를 --cd 로 준 kind)
     top = os.path.realpath(probe.stdout.strip())
-    h = hashlib.sha256()
+    h, spec = hashlib.sha256(), excluded_spec(top, exclude)
     head = subprocess.run(["git", "-C", top, "rev-parse", "--verify", "-q", "HEAD"], capture_output=True,
                           timeout=GIT_TIMEOUT_SEC)
     if head.returncode == 0:
         h.update(b"head " + head.stdout.strip() + NUL)
-        h.update(_git(top, "diff", *DIFF_FLAGS, "HEAD"))
+        h.update(_git(top, "diff", *DIFF_FLAGS, "HEAD", *spec))
     else:               # 커밋 없는 저장소 — 스테이징 + 작업 트리
         h.update(b"head none" + NUL)
-        h.update(_git(top, "diff", *DIFF_FLAGS, "--cached"))
-        h.update(_git(top, "diff", *DIFF_FLAGS))
+        h.update(_git(top, "diff", *DIFF_FLAGS, "--cached", *spec))
+        h.update(_git(top, "diff", *DIFF_FLAGS, *spec))
     for rel in sorted(x for x in _git(top, "ls-files", "-z", "--others", "--exclude-standard").split(NUL) if x):
         full = os.path.realpath(os.path.join(top, os.fsdecode(rel)))
         if excluded(full, exclude):
@@ -243,6 +251,14 @@ def code_digest(path: str, exclude) -> str:
     return "git:" + h.hexdigest()
 
 
+def prior_outputs(ledger: Path):
+    """원장의 모든 슬롯이 적은 판정 경로 — 저장소 안 --out 이 다음 라운드의 새 입력이 되지 않게. 잠금 밖에서 읽는다(원장은 rename 으로만
+    바뀐다) — 아직 원장에 오르지 않은 병렬 호출의 --out 은 보지 못한다(그때는 새 입력으로 읽혀 거부 쪽이 아니라 새 라운드 쪽이다)."""
+    data = read_ledger(ledger) or {}
+    outs = {s.get("out") for k in (data.get("keys") or {}).values() for s in k.get("slots") or [] if s.get("out")}
+    return [(os.path.realpath(o), "tree" if os.path.isdir(o) else "stem") for o in sorted(outs)]
+
+
 def manifest_of(kind: str, pairs, env, ledger: Path):
     """→ (sha256 | None, 사유). 출력 경로 · 원장은 코드 스냅숏에서 뺀다 — 호출마다 바뀌는 파일이 새 입력으로 읽히지 않게.
     분류 밖 입력은 None(unknown)이다 — 경로 문자열만 해시하면 내용이 바뀐 정당한 재검증을 같은 입력으로 거부한다."""
@@ -250,6 +266,9 @@ def manifest_of(kind: str, pairs, env, ledger: Path):
     for key, value in pairs:
         if key in OUTPUT_INPUTS and value:
             exclude.append((os.path.realpath(value), "tree" if key == "out-dir" else "stem"))
+        elif key == "deny" and value:      # 작업 폴더가 저장소 안이면 그 산출물(plan-v* 등)이 새 입력으로 읽히지 않게
+            exclude.append((os.path.realpath(value), "tree" if os.path.isdir(value) else "stem"))
+    exclude += prior_outputs(ledger)
     parts = []
     try:
         for key, value in pairs:
@@ -458,7 +477,9 @@ def plan_reservation(k: dict, slot: str, manifest, recall: bool, out_real):
         return latest, None
     cap = FAMILY_CAP[k["family"]]
     if len(rounds) >= cap:      # 번호가 아니라 개수 — 실패로 빈 번호는 예산을 먹지 않는다(status rounds_used 와 같은 기준)
-        return None, {"reason": "budget-exhausted", "detail": f"누적 {cap} 라운드를 다 썼다 — 미해결로 보고한다(통과 아님)"}
+        prior = last.get("out") if last else None      # 마지막 판정 = 미해결 보고의 근거 — 같은 --out 이면 정문이 지우지 않는다
+        return None, {"reason": "budget-exhausted", "prior_out": prior, "keep_out": bool(out_real) and out_real == prior,
+                      "detail": f"누적 {cap} 라운드를 다 썼다 — 미해결로 보고한다(통과 아님) · 마지막 판정 {prior or '없음'}"}
     return latest + 1, None
 
 
@@ -781,6 +802,23 @@ def self_test() -> int:
             f1 = run(env_code, vcall(root, "verify", p, "f1", code=repo))
             os.remove(str(root / "out" / "f1.json"))
             f2 = run(env_code, vcall(root, "verify", p, "f2", code=repo))
+            env_g = dict(env, FZ_GPT_ARTIFACT="guide-plan")             # --out 이 저장소 안 — 직전 판정 파일이 새 입력이 되면 안 된다
+            g1 = run(env_g, ["verify", "--cd", str(repo), "--out", str(repo / "verdict-g1.json"), "--prompt-file", p])
+            g2 = run(env_g, ["verify", "--cd", str(repo), "--out", str(repo / "verdict-g2.json"), "--prompt-file", p])
+            wdin = repo / "wdin"                                        # 작업 폴더(--deny)가 저장소 안 — 그 산출물은 입력이 아니다
+            wdin.mkdir()
+            (wdin / "plan-v1.md").write_text("Lead 의 첫 판", encoding="utf-8")
+            proc = subprocess.run(["git", "add", "-f", "wdin/plan-v1.md"], cwd=str(repo), capture_output=True, text=True, timeout=60)
+            if proc.returncode != 0:
+                return False, f"git add 실패(측정 불가): {proc.stderr.strip()[:120]}"
+
+            def ind(run_id):
+                return ["independent-plan", "--requirement", p, "--repo", str(repo), "--deny", str(wdin), "--arm", "gpt",
+                        "--run-id", run_id, "--out-dir", str(root / "out" / run_id)]
+            q1 = run(env_g, ind("q1"))
+            (wdin / "plan-v2.md").write_text("Lead 가 쓴 다음 판", encoding="utf-8")      # 미추적 산출물
+            (wdin / "plan-v1.md").write_text("Lead 가 고친 첫 판", encoding="utf-8")      # 추적 중인 산출물의 변경(diff 쪽)
+            q2 = run(env_g, ind("q2"))
             a_out = str(root / "out" / "a.json")
             ok = (a[:2] == (0, "1")
                   and b[0] == REFUSED and b[2].get("ROUND-REFUSED") == "same-input" and b[2].get("ROUND-PRIOR-OUT") == a_out
@@ -788,9 +826,12 @@ def self_test() -> int:
                   and c[:2] == (0, "2")
                   and d[0] == REFUSED and d[2].get("ROUND-REFUSED") == "same-input" and d[2].get("ROUND-KEEP-OUT") == "1"
                   and e_rc == 0 and "ROUND-EVIDENCE=" in e_out and e[:2] == (0, "3")
-                  and f1[:2] == (0, "1") and f2[:2] == (0, "2"))
+                  and f1[:2] == (0, "1") and f2[:2] == (0, "2")
+                  and g1[:2] == (0, "1") and g2[0] == REFUSED and g2[2].get("ROUND-REFUSED") == "same-input"
+                  and q1[:2] == (0, "1") and q2[0] == REFUSED and q2[2].get("ROUND-REFUSED") == "same-input")
             return ok, (f"a={a[:2]} b=rc{b[0]}/{b[2].get('ROUND-KEEP-OUT')} c={c[:2]} d=rc{d[0]}/{d[2].get('ROUND-KEEP-OUT')} "
-                        f"evidence=rc{e_rc} e={e[:2]} f1={f1[:2]} f2={f2[:2]} {(b[3] + d[3]).strip()[:160]}")
+                        f"evidence=rc{e_rc} e={e[:2]} f1={f1[:2]} f2={f2[:2]} g1={g1[:2]} g2=rc{g2[0]}/{g2[2].get('ROUND-REFUSED')} "
+                        f"q1={q1[:2]} q2=rc{q2[0]}/{q2[2].get('ROUND-REFUSED')} {(b[3] + d[3]).strip()[:160]}")
 
         def c_budget():
             root, env = world("budget")
