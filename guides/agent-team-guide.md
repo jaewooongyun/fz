@@ -260,14 +260,14 @@ GOOD (Mesh / Peer-to-Peer):
 
 | 파이프라인 | Primary (opus) | 실질 워커 (opus) | 단순 워커 (sonnet) |
 |-----------|----------------|------------------|--------------------|
-| plan-* (`plan-lean2.js` 기본 · `plan-lean.js`(측정 재현용 — `tests/fixtures/workflows/`) · `plan-collaborative.js` 롤백) | plan-structure | plan-edge-case, plan-impact(lean2·collaborative), plan-merge(lean2), review-arch(collaborative) | -- (direction=fable ×2, collaborative) |
-| code-* (`code-pair.js`) | impl-correctness | review-arch, impl-quality(full) | -- |
+| plan-* (`plan-lean2.js` 기본 · `plan-lean.js`(측정 재현용 — `tests/fixtures/workflows/`) · `plan-collaborative.js` 롤백) | plan-structure | plan-edge-case, plan-impact(lean2·collaborative), plan-merge(lean2), arch-lens(collaborative) | -- (direction=fable ×2, collaborative) |
+| code-* (`code-pair.js`) | impl-correctness | arch-lens, impl-quality(full) | -- |
 | review-* (`review-live.js` · `peer-review.js`) | review-arch | review-quality, review-counter, review-correctness(peer-review 만) | -- |
-| discover (`discover-adversarial.js`) | plan-structure | -- | plan-structure(lens fan-out), review-arch(cost) |
+| discover (`discover-adversarial.js`) | plan-structure | -- | plan-structure(lens fan-out), arch-lens(cost) |
 | search --deep (`search-cross-verify.js`) | -- | -- | search-symbolic, search-pattern (merge=fable — plan-structure) |
 | bug-hunt (이력 — 해당 `workflows/*.js` 없음, 2026-11-01) | impl-correctness | -- | search-symbolic |
 
-> 2026-11-01 `workflows/*.js` 정적 45콜(label·`agentType`·`model` 명시값)에서 다시 만든 표다. 구판과 다른 점: memory-curator 는 어느 워크플로도 부르지 않는다(recall 전용 — §8.1) · review-correctness 는 `peer-review.js` 에서만 불린다(`code-pair.js` 머리 주석 "review-correctness/memory-curator는 여전히 Lead 경로") · plan-merge(opus, `plan-lean2.js` `lean2-merge`)가 빠져 있었다.
+> 2026-11-01 `workflows/*.js` 정적 43콜(label·`agentType`·`model` 명시값)에서 다시 만든 표다. 구판과 다른 점: memory-curator 는 어느 워크플로도 부르지 않는다(recall 전용 — §8.1) · review-correctness 는 `peer-review.js` · `swarm.js`(기본 워커)에서만 불린다(`code-pair.js` 머리 주석 "review-correctness/memory-curator는 여전히 Lead 경로") · plan-merge(opus, `plan-lean2.js` `lean2-merge`)가 빠져 있었다.
 
 Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워커는 sonnet으로 실행된다 (동시 opus ≤3).
 

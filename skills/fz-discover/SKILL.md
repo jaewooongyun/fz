@@ -76,7 +76,7 @@ metadata:
 
 ## 팀 에이전트 모드 (Workflow 오케스트레이션 — pilot)
 
-> 스크립트: `workflows/discover-adversarial.js` (플러그인 루트 상대 경로) — agents/의 plan-structure·review-arch 정의를 agentType(`fz:` 네임스페이스)으로 재사용.
+> 스크립트: `workflows/discover-adversarial.js` (플러그인 루트 상대 경로) — agents/의 plan-structure·arch-lens 정의를 agentType(`fz:` 네임스페이스)으로 재사용.
 
 ### 발동 조건
 

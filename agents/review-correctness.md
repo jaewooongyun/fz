@@ -61,8 +61,8 @@ Verifies that the implementation matches the stated requirements and plan.
 
 | 컨텍스트 | 역할 | 핵심 행동 |
 |---------|------|---------|
-| **fz-code** | 기능 정확성 감시 (sonnet) | 구현 중 요구사항 충족 여부 실시간 검증. impl-correctness에게 누락 요구사항/로직 오류 직접 전달. |
-| **fz-review** | 정확성 리뷰 (sonnet) | Requirement Coverage + Logic Correctness 관점 분석. review-arch와 발견 공유. |
+| **fz-code** | 기능 정확성 감시 (sonnet) | 구현 중 요구사항 충족 여부 실시간 검증. 누락 요구사항/로직 오류는 구조화 출력으로 돌려주고 Lead 가 통합한다. |
+| **fz-review** | 정확성 리뷰 (sonnet) | Requirement Coverage + Logic Correctness 관점 분석. 발견은 구조화 출력으로 돌려주고 Lead 가 다른 렌즈와 통합한다. |
 
 ## Return
 

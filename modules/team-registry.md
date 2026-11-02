@@ -48,10 +48,10 @@
 
 | 스킬 | Primary | Supporting | 패턴 |
 |------|---------|-----------|------|
-| /fz-discover | plan-structure (O) | review-arch (S) | adversarial |
-| /fz-plan | plan-structure (O) | plan-impact (S), plan-edge-case (S), plan-merge (S), review-arch (S), review-direction (S), memory-curator (S) | collaborative |
-| /fz-code | impl-correctness (O) | review-arch (S), impl-quality (S), review-correctness (S), memory-curator (S) | pair-programming — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
-| /fz-fix | impl-correctness (O) | review-arch (S, 복잡도3+) | pair-programming — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
+| /fz-discover | plan-structure (O) | arch-lens (S) | adversarial |
+| /fz-plan | plan-structure (O) | plan-impact (S), plan-edge-case (S), plan-merge (S), arch-lens (S, 롤백 plan-collaborative 만), review-direction (S, 롤백 plan-collaborative 만), memory-curator (S) | collaborative |
+| /fz-code | impl-correctness (O) | arch-lens (S), impl-quality (S), review-correctness (S), memory-curator (S) | pair-programming — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
+| /fz-fix | impl-correctness (O) | arch-lens (S, 복잡도3+) | pair-programming — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
 | /fz-review | review-arch (O) | review-quality (S), review-counter (S), review-correctness (S, Phase4.5), memory-curator (S) | live-review |
 | /fz-peer-review | review-arch (O) | review-quality (S), review-counter (S) | live-review |
 | /fz-search | — | search-symbolic (S), search-pattern (S) | cross-verify |
