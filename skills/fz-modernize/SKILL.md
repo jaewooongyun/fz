@@ -171,7 +171,7 @@ metadata:
    grep -nE "\[미검증|미검증:|Deprecated|deprecated|outdated" guides/*.md
    grep -nE "arxiv|arXiv" guides/*.md
    ```
-3. **각 stale 항목 → 해소 자료 매핑**: (선택 — 항목이 많고 서로 독립이면 항목 대조를 `workflows/swarm.js` 조각으로 돌린다: Lead 가 `git archive <sha>` 로 대상 커밋의 고정 트리를 `{WORK_DIR}` 에 풀고 args `tree` + 조각마다 `sha` · `method`(판정 기준)를 넘기며 대조할 probe 자료는 브리프에 싣는다 · 준비는 §12 0단계 cp → cmp -s · 준비 · 호출 줄 정본 = `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절)
+3. **각 stale 항목 → 해소 자료 매핑**: (선택 — 항목이 많고 서로 독립이면 항목 대조를 `workflows/swarm.js` 조각으로 돌린다 · 대조할 probe 자료는 브리프에 싣는다 · 준비 · 고정 트리 · 호출은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로)
    - probe-report의 어느 자료로 해소?
    - A1 직접 진술 가능? A5 해석으로 supporting? 또는 partially-verified?
 4. **`audit/audit-report.md` 작성** (template: `skills/fz-modernize/templates/audit-report.md`)

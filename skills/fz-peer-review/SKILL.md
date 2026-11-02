@@ -459,7 +459,7 @@ git worktree add ../app-iOS-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 �
 - 자기 코드 리뷰 (→ `/fz-review`)
 - GPT CLI 직접 호출 (→ 정문 `scripts/gpt-call.sh <kind>` 경유 — `modules/peer-review-tiers.md` § GPT Analyze 호출)
 - Safety/메모리/동시성 심층 분석 (→ CLAUDE.md `## Code Conventions` 위임)
-- ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합. 서로 독립인 조각 검사(발견 · 주장마다 PR head SHA 의 고정 트리로 판정 가능)를 따로 돌릴 때도(선택) standalone Agent() 가 아니라 peer-review.js 반환 **뒤에** `workflows/swarm.js` 를 부른다 — Lead 가 `git archive <sha>` 고정 트리를 `{WORK_DIR}` 에 풀고 args `tree` + 조각마다 `sha` · `method` 를 넘기며, 준비는 §12 0단계 cp → cmp -s 다(준비 · 호출 줄 정본 = `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 · opus 동시 ≤3 은 세션 전역).
+- ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합. 서로 독립인 조각 검사(발견 · 주장마다 PR head SHA 의 고정 트리로 판정 가능)를 따로 돌릴 때도(선택) standalone Agent() 가 아니라 peer-review.js 반환 **뒤에** `workflows/swarm.js` 를 부른다 — 준비 · 고정 트리 · 호출은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로다.
 ## 에러 대응
 
 `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (gpt 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다** — 단 exit 18(`GPT-OFF`)은 GPT 미사용이라 `solo (gpt 실패)` 강등 · ×0.7 감쇠 대상이 아니고 `[GPT 미사용 — 사유]` 만 적는다(`modules/gpt-strategy.md` § GPT 미사용), GPT timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
