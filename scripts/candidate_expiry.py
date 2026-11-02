@@ -85,41 +85,48 @@ def decide(track, state, base_date, last_eligible, now) -> tuple:
 ENTRY_RE = re.compile(r"^### (L-\d+):")
 OBS_HEAD_RE = re.compile(r"^### (L-\d+) 관측")
 DATE_RE = re.compile(r"(?:Date:\s*|,\s*)(\d{4}-\d{2}-\d{2})")
-NOT_COUNTED = ("카운트 보류", "카운트 제외", "관측 후보")
+NOT_COUNTED = ("카운트 보류", "카운트 제외", "카운트 미반영", "관측 후보")
+NOTE_RE = re.compile(r"^\s*-\s")                      # 관측 아래 하위 글머리 — 날짜 없는 제외 표지가 앞 관측을 세지 않게 한다
+STATE_RE = re.compile(r"^\s*-\s*\**상태\**\s*[:：]\s*\**DEFERRED", re.M)   # 항목 상태 줄만 — 하위 조치 문장의 DEFERRED 는 상태가 아니다
 
 
 def parse_ledger(text):
     """-> [{id, track, state, base, last, n_obs, n_counted}] — `### L-N:` 항목 + `### L-N 관측 …` 보강 절."""
-    entries, order, cur, cur_counted = {}, [], None, True
+    entries, order, cur, cur_counted, last = {}, [], None, True, None
     for line in text.splitlines():
         m, mo = ENTRY_RE.match(line), OBS_HEAD_RE.match(line)
         if line.startswith("### ") and not m and not mo:
-            cur = None                                   # REJECTED · 다른 절 — 항목 밖
+            cur, last = None, None                       # REJECTED · 다른 절 — 항목 밖
             continue
         if m or mo:
             cur = (m or mo).group(1)
             if cur not in entries:
-                entries[cur] = {"id": cur, "text": [], "obs": {}}
+                entries[cur] = {"id": cur, "text": [], "recs": []}
                 order.append(cur)
             cur_counted = not (mo and any(k in line for k in NOT_COUNTED))
-            if mo:
-                _add_obs(entries[cur], line, cur_counted)
+            last = _add_obs(entries[cur], line, cur_counted) if mo else None
             entries[cur]["text"].append(line)
             continue
         if cur is None:
             continue
         entries[cur]["text"].append(line)
-        if "관측 #" in line:
-            _add_obs(entries[cur], line, cur_counted and not any(k in line for k in NOT_COUNTED))
+        dated = DATE_RE.search(line)
+        if "관측 #" in line and dated:
+            last = _add_obs(entries[cur], line, cur_counted and not any(k in line for k in NOT_COUNTED))
+        elif dated:
+            last = None                                  # 날짜 있는 다른 기록(관측 후보 등) — 아래 표지는 그 기록 몫이다
+        elif last and NOTE_RE.match(line) and any(k in line for k in NOT_COUNTED):
+            last[2] = False                              # 아래 줄의 '카운트 미반영' · '카운트 보류' — 그 기록 한 줄만
     out = []
     for k in order:
         e, body = entries[k], "\n".join(entries[k]["text"])
+        e["obs"] = _merge(e["recs"])
         dates = [d for d, _ in e["obs"].values()]
         counted = [d for d, c in e["obs"].values() if c]
         tm = re.search(r"트랙 ([A-D])", body)
         state = ("REMOVED" if re.search(r"^### ~~", body, re.M) or "폐기" in body.splitlines()[0]
                  else "implemented" if "구현됨" in body
-                 else "DEFERRED" if "DEFERRED" in body else "candidate")
+                 else "DEFERRED" if STATE_RE.search(body) else "candidate")
         out.append({"id": k, "track": tm.group(1) if tm else "A", "state": state,
                     "base": min(dates) if dates else None, "last": max(counted) if counted else None,
                     "n_obs": len(e["obs"]), "n_counted": len(counted)})
@@ -127,17 +134,23 @@ def parse_ledger(text):
 
 
 def _add_obs(entry, line, counted):
+    """-> 관측 기록 [키, 날짜, 셈](날짜 없으면 None). 셈은 아래 표지가 바꿀 수 있어 OBS 병합은 끝에서 한다(_merge)."""
     dm = DATE_RE.search(line)
     if not dm:
-        return
-    d = datetime.date.fromisoformat(dm.group(1))
+        return None
     sm = re.search(r"OBS-\d+", line)
-    key = sm.group(0) if sm else f"line:{len(entry['obs'])}"
-    if key in entry["obs"]:                              # 같은 세션 재기록 — 첫 날짜 유지, 셈은 한 번
-        first, was = entry["obs"][key]
-        entry["obs"][key] = (min(first, d), was or counted)
-    else:
-        entry["obs"][key] = (d, counted)
+    rec = [sm.group(0) if sm else f"line:{len(entry['recs'])}", datetime.date.fromisoformat(dm.group(1)), counted]
+    entry["recs"].append(rec)
+    return rec
+
+
+def _merge(recs):
+    """-> {키: (첫 날짜, 셈)} — 같은 OBS 재기록은 한 관측이다. 한 기록이라도 세면 센다(재기록의 '미반영'이 원 관측을 지우지 않는다)."""
+    obs = {}
+    for key, d, counted in recs:
+        first, was = obs.get(key, (d, False))
+        obs[key] = (min(first, d), was or counted)
+    return obs
 
 
 def report_ledger(path, now):
