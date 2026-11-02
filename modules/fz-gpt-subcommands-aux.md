@@ -106,7 +106,7 @@ Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. �
 **independent-plan 은 계획 대조가 아니다** — Claude 계획을 보지 않고 요구 원문 · 원문 색인 · 대상 저장소만으로 자기 계획을 세운다. 합격은 독립 계획 스키마 통과와 오염 감사 0 이고, 두 계획의 차이 판정은 `plan_divergence.py` 와 Lead 가 한다. 계획을 받아 검증하는 것은 `verify` 다(F-471).
 
 ```bash
-FZ_GPT_ARTIFACT="${ARTIFACT:?호출자의 산출물 계열 — fz-plan: plan · fz-modernize: guide-plan}" FZ_WORK_DIR="$WORK_DIR" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-plan --requirement "$REQ_FILE" [--sprint-contract F] [--rules-index "$WORK_DIR/rules/index.json"] \
+FZ_GPT_ARTIFACT="${ARTIFACT:?호출자의 산출물 계열 — fz-plan: plan · fz-modernize: guide-plan}" FZ_WORK_DIR="$WORK_DIR" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-plan --requirement "$REQ_FILE" [--rules-index "$WORK_DIR/rules/index.json"] \
   [--repo "$GIT_ROOT"] --deny "$WORK_DIR" [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
 "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-review --diff "$REVIEW_DIFF" --base "$WORK_DIR/base" --head "$WORK_DIR/head" --deny "$WORK_DIR" \
   [--pr-meta "$WORK_DIR/pr-meta.json"] [--rules-index "$WORK_DIR/rules/index.json"] [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"

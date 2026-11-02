@@ -32,7 +32,7 @@ metadata:
 
 - **Probe → Plan 순서 강제** (31차 교훈): 외부 자료 실측 없이 Plan 작성 금지
 - **Tier 1+2 우선** (사용자 합의 시): Tier 3은 supporting only로 격하
-- **GPT 3회 한도** (18차 교훈): 누적 needs_revision 3회 시 사용자 에스컬레이션
+- **GPT 재검증 상한** (18차 교훈): 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한(판정과 무관하게 유효 판정 라운드를 센다) — 소진(정문 exit 19 `budget-exhausted`)하면 사용자 에스컬레이션
 - **Cross-model 안전망** (17차/16차 교훈): 분석자가 분석 대상의 실수를 재현하는 메타 패턴 방지
 - **AC1-AC9 Anti-Pattern Constraints**: 본문 재구성 금지, Tier 3 단독 verified 금지 등
 - **AC8 link 자동 검증**: xargs 병렬 패턴 (sequential while loop 금지 — Bash background+redirect 교훈)
@@ -261,7 +261,7 @@ echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.m
 
 ## Phase 4: Verify (GPT Cross-Model 검증)
 
-**핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **누적 한도 3회**. 모델·effort 는 호출에 적지 않는다 — `modules/gpt-strategy.md` § 모델·effort 선택.
+**핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **재검증 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한**(판정과 무관하게 유효 판정 라운드를 센다). 모델·effort 는 호출에 적지 않는다 — `modules/gpt-strategy.md` § 모델·effort 선택.
 
 ### 절차
 
@@ -274,9 +274,9 @@ echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.m
    - Q5: 실행 순서 안전성 (impact-scan 사전 확인)
 3. **결과 분기** (`gpt_review_schema` 의 `verdict`):
    - approved → Phase 5 진행
-   - needs_revision → v{N+1} 작성 (GPT 카운터 +1)
+   - needs_revision → v{N+1} 작성 (라운드는 정문이 센다 — approved · rejected 도 같다)
    - rejected → 사용자 에스컬레이션 (⛔ v{N+1} 자동 작성 금지)
-4. **누적 한도 도달 (3/3)**: 사용자 에스컬레이션 의무 (18차 교훈)
+4. **재검증 상한 소진** (정문 exit 19 `budget-exhausted` — 처리는 아래 에러 대응 표의 GPT 누적 한도 행): 사용자 에스컬레이션 의무 (18차 교훈)
 
 ### GPT 호출
 
@@ -366,7 +366,7 @@ exit "$RC"       # 정문 exit 를 덮지 않는다(hygiene §8)
 
 | 장치 | 트리거 | 대응 | 출처 |
 |------|------|------|-----|
-| GPT 3회 한도 | needs_revision 누적 3 | 사용자 에스컬레이션 의무 | 18차 |
+| GPT 재검증 상한 | 정문 exit 19 `budget-exhausted`(횟수 정본 `modules/cross-validation.md` § 재검증 라운드 상한 — 판정과 무관하게 유효 라운드를 센다) | 사용자 에스컬레이션 의무 | 18차 |
 | Self-application contract | 대상이 fz-modernize/* 자체 | Phase 4 GPT 검증 non-skippable(GPT 켬일 때 — 끈 세션 · CLI 없음은 decide `skip` → `[GPT 미사용 — 사유]` · `modules/gpt-strategy.md` § 단계 실행 판정) + 사용자 ASR 의무 | 23차 (16차 meta) |
 | Scope Inflation | 변경 LOC > Plan 예상 1.5x | 즉시 중단, 사용자 확인 | 18차 |
 | Speculation Fallacy | "원본/기존/이전" 표현 사용 | git show / Read 실측 후 진술 | CLAUDE.md Verification Discipline |

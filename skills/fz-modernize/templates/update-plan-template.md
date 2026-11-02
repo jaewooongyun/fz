@@ -127,7 +127,7 @@ Phase 5d-final: AC8 link + Impact Scan + 최종 검토
 
 | 장치 | 트리거 | 대응 |
 |------|------|------|
-| GPT 3회 한도 (18차) | needs_revision 누적 3 | 사용자 에스컬레이션 |
+| GPT 재검증 상한 (18차) | 정문 exit 19 `budget-exhausted`(횟수 정본 `modules/cross-validation.md` § 재검증 라운드 상한 — 판정과 무관하게 유효 라운드를 센다) | 사용자 에스컬레이션 |
 | Scope Inflation (18차) | LOC > Plan 예상 1.5x | 즉시 중단 |
 | Speculation 감지 | "원본/기존/이전" | git show / Read 실측 |
 | Reflection Gap (17차) | Plan stale | 5d 시작 전 plan 재검토 |
@@ -137,5 +137,5 @@ Phase 5d-final: AC8 link + Impact Scan + 최종 검토
 
 → Phase 4 (GPT Verify): `skills/fz-modernize/SKILL.md` Phase 4 § GPT 호출 (래퍼 exec · `gpt_review_schema`)
 → approved → Phase 5 (Execute)
-→ needs_revision → v{N+1} 작성 (카운터 +1)
+→ needs_revision → v{N+1} 작성 (라운드는 정문이 센다)
 → rejected → 사용자 에스컬레이션 (v{N+1} 자동 작성 금지)

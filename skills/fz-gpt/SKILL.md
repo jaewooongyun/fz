@@ -21,7 +21,7 @@ metadata:
 # /fz-gpt - GPT 상호검증 스킬
 
 > **행동 원칙**: GPT CLI 를 정문(`scripts/gpt-call.sh <kind>`) 한 경로로 불러 독립적 교차 검증을 수행한다 — 정문이 래퍼(`scripts/gpt-exec.sh`) · 런처(`scripts/gpt_independent.sh`)를 부른다.
-> ⛔ **첫 GPT 호출 전**: `modules/gpt-strategy.md § 모델·effort 선택` — 세션에 한 번 모델·effort 를 묻고(`gpt-choice.sh get` → `options` → `set`) 그 값을 모든 서브커맨드에 적용한다. 서브커맨드별 effort 는 없다.
+> ⛔ **첫 GPT 호출 전**: 단계 직전 `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 세션에 한 번 모델·effort 를 묻고(`options` → `set` — `modules/gpt-strategy.md § 모델·effort 선택`) decide 를 다시 부른다. 그 값을 모든 서브커맨드에 적용한다. 서브커맨드별 effort 는 없다.
 
 > **Authority**:
 > - CLI 버전: OpenAI GPT CLI 공식 docs [verified: official] — 0.124.0+ gpt-5.5 · 0.153.1+ gpt-6-astra(0.153.4가 bundled default로 승격) · 0.157.0+ gpt-6-sol(0.156.1 에서 선택기 추가) · **0.159.0+ gpt-6.1-sol(0.159.1 이 bundled default 로 승격)** — 둘 다 effort 기본값은 medium. 실제 모델은 세션 선택(없으면 `config.toml`)과 CLI 버전에 따른다

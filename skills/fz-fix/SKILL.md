@@ -38,7 +38,7 @@ metadata:
 > 루프 프리미티브: ReAct + Generate-Test-Repair (H6, Inside the Scaffold)
 
 - 빠른 수정-빌드 반복에 최적화
-- 검증 선택적 (복잡할 때만)
+- 수정 검증(Step 4) 필수 — GPT 를 켠 세션이면 GPT check 포함
 - 복잡도 초과 시 자동 전환 제안
 - **코드 탐색만 필요한 경우** → `/fz-search` 사용
 

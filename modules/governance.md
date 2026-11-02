@@ -117,7 +117,7 @@
 |---|---|---|
 | `/fz` 오케스트레이터 | **Phase 4** 사용자 확인 — 모드를 먼저 판정하고, 범위 내 가역만 자동 진행 | **배선됨** |
 | 개별 스킬 직접 진입 (`/fz-review` 등) | 각 스킬의 승인 지점 | ⛔ **미배선** — 아래 참조 (예외: 바로 아래 GPT 모델·effort 질문 행) |
-| GPT 모델·effort 질문 (`/fz` Phase 4 · 개별 스킬의 첫 GPT 호출 직전) | `scripts/gpt-choice.sh get`(`scripts/autonomy_decide.py` 판정 — 선택이 없고 자율이면 exit 4 로 묻지 않고 config · 선택이 있으면 모드와 무관하게 적용) | **배선됨** — 사용자 지목 지점(2026-09-30) |
+| GPT 모델·effort 질문 (`/fz` Phase 4 · 개별 스킬의 첫 GPT 호출 직전) | `/fz` Phase 4 는 `scripts/gpt-choice.sh get` · 개별 스킬은 단계 직전 `gpt-choice.sh decide`(`ask` 면 묻고 `set` 뒤 다시 decide — `modules/gpt-strategy.md` § 단계 실행 판정). 두 길 모두 `get` 판독(`scripts/autonomy_decide.py` 판정 — 선택이 없고 자율이면 exit 4 로 묻지 않고 config · 선택이 있으면 모드와 무관하게 적용) | **배선됨** — 사용자 지목 지점(2026-09-30) |
 | 모드 게이트 (무거운 경로 light · full — `/fz-plan` · `/fz-review` · `/fz-peer-review` · `/fz-code` · `/fz-fix` · `/fz-discover`) | 각 스킬의 Workflow 기동 직전 — `modules/mode-gate.md` § 언제 묻나(`scripts/autonomy_decide.py --action mode_select --in-scope --reversible` · 자율이면 추천대로 진행하고 기록) | **배선됨** — 사용자 지목 지점(2026-10-19) |
 | 워커 실행 (Workflow agent) | `agent()` OVERRIDE 프롬프트 | ⛔ **미배선** — 환경변수는 모델 호출에 전달되지 않는다. 주입이 필요하다 |
 

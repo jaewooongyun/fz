@@ -38,9 +38,9 @@ metadata:
 - **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(Fable 5.1) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
 - **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 값은 Lead 세션 effort · `modules/mode-gate.md` § effort) — fable 판단 지점 3곳과 별개
 - **3-Tier 모델**: **Fable 5.1**(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
-- **GPT 필수 참여**: GPT 를 켠 경우 light · full 모든 스킬에 GPT CLI 포함 → cross-model 상호검증(끔 · CLI 없음 → `[GPT 미사용 — 사유]` — `modules/gpt-strategy.md` § GPT 미사용)
+- **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없고 fz-discover 는 `--deep` 명시 플래그 · commit/pr 은 명시 호출 전용(정본 `modules/gpt-strategy.md` § 단계 실행 판정)(끔 · CLI 없음 → `[GPT 미사용 — 사유]` — `modules/gpt-strategy.md` § GPT 미사용)
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
-- **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + GPT 교차검증
+- **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + GPT 교차검증(fz-search 엔 없음 · fz-discover 는 `--deep` 때만)
 
 ## 사용 시점
 
@@ -277,7 +277,7 @@ Phase 1 매칭 0  →  3.1 트리거 대조
 파이프라인에 검증 게이트를 자동 삽입합니다.
 
 ```
-planning 생산 전 → ✓ direction-challenge (review-direction, TEAM fz-plan Phase 0.5)
+planning 생산 전 → ✓ direction-challenge (fz-plan Phase 0.5 — full: plan-lean2 전체 플랜 콜의 directionVerdict · 롤백 plan-collaborative 만 review-direction · light: Lead)
 planning 생산 후 → ✓ stress-test(Q1-Q5) + ✓ gpt verify (GPT 켬 — light · full)
 code-changes 생산 중 → ✓ friction-detect (매 Step, fz-code 내장)
 code-changes 생산 후 → ✓ build + ✓ enforcement (리팩토링 시) + ✓ implication-scan (제거/리팩 시) + ✓ gpt check (GPT 켬 — light · full)

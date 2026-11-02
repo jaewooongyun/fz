@@ -20,7 +20,7 @@
 
 | Given | When | Then | type |
 |-------|------|------|------|
-| 크래시 재현 경로 확인됨, 단일 파일 수정 | `/fz-fix "탭 전환 시 listener nil 크래시"` | Step 1c에서 root-cause 식별 → Step 3 빌드 성공(xcodebuild exit 0) → Gate Bug Fix Complete 체크리스트 5/5 통과 | normal |
+| 크래시 재현 경로 확인됨, 단일 파일 수정 | `/fz-fix "탭 전환 시 listener nil 크래시"` | Step 1c에서 root-cause 식별 → Step 3 빌드 성공(xcodebuild exit 0) → Gate Bug Fix Complete 체크리스트 6/6 통과 | normal |
 | 단순 상수 수정, GPT 를 켠 세션(세션 선택 있음) | `/fz-fix "타임아웃 30초로 변경"` | Step 4에서 `gpt-choice.sh decide` → `run` → `/fz-gpt check` 호출 → verdict=pass 분기로 완료 보고 | normal |
 | 단순 상수 수정, GPT 를 끈 세션(세션 선택 off) 또는 GPT CLI 없음 | `/fz-fix "타임아웃 30초로 변경"` | Step 4에서 `gpt-choice.sh decide` → `skip` → GPT check 미호출 + `[GPT 미사용 — 사유]` 표기 후 완료 보고(대체 검증 없음) | edge-case |
 | 분석 결과 수정 대상이 3개+ 파일 | `/fz-fix "여러 모듈 상태 불일치"` | 자동 전환 트리거 발동 → 코드 수정 0줄 + `/fz-code` 전환 제안 보고 | edge-case |
