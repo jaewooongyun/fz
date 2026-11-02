@@ -93,15 +93,15 @@ claude plugin update fz@fz-orchestrator
 
 ## Agents
 
-Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈 정의** (v4.12). TEAM P2P 스폰은 v4.22.0에서 일몰 완료.
+Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈 정의** (v4.12). TEAM P2P 스폰은 v4.22.0에서 일몰 완료. 리뷰 밖에서 쓰는 아키텍처 렌즈는 `arch-lens` 다 — `review-arch` 에서 리뷰 전용 사전주입(arch-critic)을 뺀 것이다(v4.50.0).
 
 | 도메인 | Primary (Opus) | Supporting (Sonnet) |
 |--------|:---:|---|
-| **계획** | plan-structure | plan-impact, plan-edge-case, plan-merge(병합 전용 · 도구 없음), review-arch, review-direction |
-| **구현** | impl-correctness | review-arch, impl-quality, review-correctness |
+| **계획** | plan-structure | plan-impact, plan-edge-case, plan-merge(병합 전용 · 도구 없음) · 롤백 plan-collaborative 는 arch-lens, review-direction 도 |
+| **구현** | impl-correctness | arch-lens, impl-quality |
 | **리뷰** | review-arch | review-quality, review-correctness, review-counter |
-| **탐색** | — | search-symbolic, search-pattern |
-| **공통** | — | memory-curator (모든 TEAM 참여) |
+| **탐색** | — | search-symbolic, search-pattern · fz-discover 는 plan-structure, arch-lens |
+| **공통** | — | memory-curator (recall 전용 — 워크플로는 부르지 않는다) · swarm.js 기본 워커 review-correctness |
 
 ---
 
@@ -138,21 +138,20 @@ Workflow 스크립트가 `agentType: 'fz:{name}'`으로 재사용하는 **렌즈
 
 | 가이드 | 줄 | 내용 |
 |--------|---:|------|
-| [`llm-references.md`](guides/llm-references.md) | 170 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
-| [`prompt-optimization.md`](guides/prompt-optimization.md) | 761 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 669 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
-| [`skill-testing.md`](guides/skill-testing.md) | 527 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
-| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 286 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
-| [`agent-team-guide.md`](guides/agent-team-guide.md) | 498 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
-| [`model-guide.md`](guides/model-guide.md) | 314 | 모델 운용 — Lead 는 Fable 5.1, 실질 생산 워커는 Opus 5.5. effort 배정 기준 |
+| [`llm-references.md`](guides/llm-references.md) | 186 | LLM·AI 권위 자료 단일 참조점 — Tier1 공식 · Tier2 arxiv 실증 · Tier3 커뮤니티. 가이드와 스킬 개선의 1차 출처 |
+| [`prompt-optimization.md`](guides/prompt-optimization.md) | 753 | 프롬프트 10원칙 + Context Rot 대응 + Progressive Disclosure |
+| [`skill-authoring.md`](guides/skill-authoring.md) | 683 | 스킬 작성 — YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
+| [`skill-testing.md`](guides/skill-testing.md) | 530 | 스킬 테스팅 — Triggering·Functional 3단계와 테스트 스펙 템플릿 |
+| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 295 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
+| [`agent-team-guide.md`](guides/agent-team-guide.md) | 508 | 에이전트와 팀 구성 — Task Brief, 모델 전략, §8 Workflow 공식 사양 |
+| [`model-guide.md`](guides/model-guide.md) | 325 | 모델 운용 — Lead 는 Fable 5.1, 실질 생산 워커는 Opus 5.5. effort 배정 기준 |
 | [`clean-architecture.md`](guides/clean-architecture.md) | 324 | Dependency Rule 과 SOLID — 레이어 판정 기준 |
-| [`harness-engineering.md`](guides/harness-engineering.md) | 1,359 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
+| [`harness-engineering.md`](guides/harness-engineering.md) | 1,373 | AI 에이전트 하네스 설계 — 게이트·오라클·negative control, NLAH Gap 분석 |
 
 ---
 
-## What's New — v4.49.0
+## What's New — v4.50.0
 
-**차단 목록으로 지은 근사기는 리뷰마다 새 구멍이 났다 — Stop 훅 소유 판정을 허용 목록으로 바꿨다.** `for` 루프 · `~` · 공백 경로로 넘긴 원장을 풀고, 모르는 셸 꼴은 '대상 미상' 으로 막는다(fail-closed).
-원장 `ENV:` 선언(없으면 UNRUN · 승인 해시 안) · 통과 뒤 도구 부재를 `--status` 도 미충족으로 · 엔트리 본문의 작성 명령 잔재를 위생 검사가 센다.
-→ [릴리즈 노트](docs/releases/v4.49.0.md)
-
+**GPT 단계를 한 줄로 판정하고, 재검증 라운드에 상한을 두고, 쓰이지 않는 하네스를 걷었다.** 모든 GPT 단계는 직전 `gpt-choice.sh decide` 한 줄로 정하고, 같은 산출물의 재검증은 정문이 세어 네 번째부터 막는다. 계획의 첫 GPT 호출은 Workflow 와 함께 뜨는 독립 계획이 기본이다.
+31일 동안 쓰이지 않은 의무(sc 세션 저장 · 복원 · 자동 실행 · 설치되지 않은 반복 실행 명령 · 30턴 리마인더)는 걷거나 선택으로 낮췄다. ⛔ 올린 뒤 세션을 다시 시작한다 — 새 에이전트 `arch-lens` 가 등록된다.
+→ [릴리즈 노트](docs/releases/v4.50.0.md)
