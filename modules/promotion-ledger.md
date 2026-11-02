@@ -83,7 +83,7 @@
 
 ### ~~P2-B: fz-fix 자동 전환 + complexity.md 보정~~ — ✅ **구현 완료 종결 (2026-08-24)**
 - 관측 #0: OBS-03 (plan-impact 단독 지적)
-- ⛔ 구현이 먼저 됐다 — `skills/fz-fix/SKILL.md:43 · 217` · 테스트 케이스는 `skills/fz-fix/references/test-spec.md`(2026-11-01 SKILL 에서 옮김)
+- ⛔ 구현이 먼저 됐다 — `skills/fz-fix/SKILL.md` § 개요 "복잡도 초과 시 자동 전환 제안" · § 자동 전환 트리거 · 테스트 케이스는 `skills/fz-fix/references/test-spec.md`(2026-11-01 SKILL 에서 옮김)
 - 처분: **종결**. 사용자 결정 2026-08-24
 
 ### P2-C: general closure-capture retain cycle lens (Claude 경로) — 트랙 C
@@ -570,7 +570,7 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
 |---|:--:|---|
 | **P1-B** Generator≠Evaluator Lead 독립 절차 | ✅ **구현됨** | `modules/scope-challenge.md:78` *"Phase 3.2 Lead 독립 판정"* + `skills/fz-plan/SKILL.md` Phase 3 1b(Scope Challenge — "GPT 결과를 읽기 전 독립 판정") 참조 |
 | **P2-A** Q-S5 Decision Re-open Gate | ✅ **구현됨** | `modules/scope-challenge.md:104` Appendix + `:56` `parent-reopen` 배선 + `skills/fz-plan/SKILL.md` § Phase 3 절차 5 `Refactoring Mode 감지` 발동 조건 |
-| **P2-B** fz-fix 자동 전환 + complexity 보정 | ✅ **구현됨** | `skills/fz-fix/SKILL.md:43 · 217` · 테스트 케이스는 `skills/fz-fix/references/test-spec.md`(2026-11-01 SKILL 에서 옮김) |
+| **P2-B** fz-fix 자동 전환 + complexity 보정 | ✅ **구현됨** | `skills/fz-fix/SKILL.md` § 개요 "복잡도 초과 시 자동 전환 제안" · § 자동 전환 트리거 · 테스트 케이스는 `skills/fz-fix/references/test-spec.md`(2026-11-01 SKILL 에서 옮김) |
 | **P1-C** Drift telemetry (AskUserQuestion) | ⛔ **미구현** | 본 파일 밖 참조 **0건** |
 | **P1-D** Q4 재구성 + rule 11차 컴파일 가능 기준 | ⛔ **미구현** | 본 파일 밖 참조 **0건** |
 

@@ -166,6 +166,7 @@ fz- 스킬 + 에이전트를 일괄 검증합니다.
 ```bash
 {플러그인 루트}/scripts/health-check.sh                 # 전 검사 집계 (exit 0=전부 통과 / 1=실패 있음 / 2=사전조건)
 {플러그인 루트}/scripts/health-check.sh --strict-freshness   # 최신성 findings 도 실패로 취급
+{플러그인 루트}/scripts/health-check.sh --changed <경로>...   # 바뀐 경로로 검사를 고른다(--changed-from <파일> = 목록 파일) — 전부 문서면 부분 실행(출하 게이트 아님) · --ship 은 전체 · --select-only 는 선택 줄(HEALTH-SELECT)만 출력하고 exit 0
 python3 {플러그인 루트}/scripts/fz_telemetry_report.py   # (선택) 기간 계측 리포트 — 판정 아님, 관측용
 ```
 
