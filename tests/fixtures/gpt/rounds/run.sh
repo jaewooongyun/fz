@@ -8,6 +8,7 @@
 #   cross-skill             core § verify 레시피(여러 스킬이 같이 쓴다)를 그대로 돌린다 — 계열 · 작업 폴더는 호출자가 env 로 준다.
 #                           fz-plan Phase 2(ARTIFACT=plan) · fz-review 5.5 verify-gates(code)는 한 작업 폴더 원장의 다른 키에 들고,
 #                           fz-discover --deep(ARTIFACT= 빈 값)은 세지 않는다 · 계열 미정 · 센 호출의 작업 폴더 미정은 CLI 전에 멈춘다
+#                           · 작업 폴더를 빈 값으로 밝힌 센 호출(Serena fallback)은 FZ_RUN_STATE 세션 원장에 센다
 #   fourth-round-rejected   3라운드 뒤 4번째 검증 → exit 19 · stderr 'GPT-ROUNDS: budget-exhausted' · CLI 0 · 그 --out 없음 ·
 #                           `gpt_rounds.py status` 가 그 키를 unresolved 로 보인다(미해결 — 통과 아님)
 #   normal-rounds-2-3       verify ∥ verify-gates 를 동시에 띄워 라운드 1 · 2 · 3 마다 두 슬롯이 같은 라운드에 든다 ·
@@ -209,7 +210,7 @@ case_resume_new_shell() {
 # ── cross-skill ────────────────────────────────────────────────────
 # core § verify 블록(여러 스킬이 같이 쓰는 레시피)을 꺼내 그대로 돌린다 — 계열(ARTIFACT) · 작업 폴더(WORK_DIR)는 호출자 몫이다
 case_cross_skill() {
-  local W="$T/w-cross" O="$T/o-cross" pv="" cv="" res=""
+  local W="$T/w-cross" O="$T/o-cross" pv="" cv="" res="" ev="" eidx=""
   WHY=""
   mkdir -p "$W" "$O" "$T/cwd-plan" "$T/cwd-discover" "$T/cwd-review"
   PYTHONDONTWRITEBYTECODE=1 python3 -B - "$ROOT/modules/fz-gpt-subcommands-core.md" "$T/verify-block.sh" > "$T/vb.out" 2> "$T/vb.err" <<'PY'
@@ -230,11 +231,22 @@ PY
       recipe cs-discover "$T/cwd-discover" "ARTIFACT=" "WORK_DIR=$W" "REVIEW_FILE=$O/discover.json" "P_VERIFY=$T/p-cs-discover.md"
       recipe cs-unset "$T/cwd-discover" "WORK_DIR=$W" "REVIEW_FILE=$O/unset.json" "P_VERIFY=$T/p-cs-unset.md"
       recipe cs-nowd "$T/cwd-plan" "ARTIFACT=plan" "REVIEW_FILE=$O/nowd.json" "P_VERIFY=$T/p-cs-nowd.md"
+      recipe cs-emptywd "$T/cwd-plan" "ARTIFACT=plan" "WORK_DIR=" "REVIEW_FILE=$O/emptywd.json" "P_VERIFY=$T/p-cs-emptywd.md" \
+        "FZ_RUN_STATE=$T/runs-csempty" "CLAUDE_CODE_SESSION_ID=rounds-csempty-1"
       want "레시피 exit(fz-plan · fz-discover)" "$(rc cs-plan) $(rc cs-discover)" "0 0"
       case "$(rc cs-unset)" in 0|"?") add "ARTIFACT 를 정하지 않은 레시피가 exit $(rc cs-unset) — 가드가 CLI 전에 멈춰야 한다" ;; esac
       want "ARTIFACT 미정 CLI 호출" "$(ncli cs-unset)" 0
       case "$(rc cs-nowd)" in 0|"?") add "WORK_DIR 없이 센 레시피가 exit $(rc cs-nowd) — 원장이 세션 루트로 갈리지 않게 멈춰야 한다" ;; esac
       want "WORK_DIR 미정 CLI 호출" "$(ncli cs-nowd)" 0
+      # Serena fallback — WORK_DIR 를 빈 값으로 밝힌 세는 호출은 돌고 세션 원장(FZ_RUN_STATE/<pipeline_id>)에 남는다
+      want "WORK_DIR= 빈 값 레시피 exit" "$(rc cs-emptywd)" 0
+      case "$(ncli cs-emptywd)" in 0|"?") add "WORK_DIR= 빈 값 레시피가 CLI 를 부르지 않았다" ;; esac
+      eidx="$(led index "$T/runs-csempty" -)"
+      case "$eidx" in
+        /*) ev="$(led slots "$eidx" plan/verify)"; want "세션 원장 plan/verify" "$ev" "1:verify:completed" ;;
+        *) add "WORK_DIR= 빈 값 호출의 세션 원장 색인 '$eidx'(FZ_RUN_STATE 아래 원장 한 줄이어야 한다)" ;;
+      esac
+      [ ! -e "$T/cwd-plan/gpt-rounds.json" ] || add "WORK_DIR= 빈 값 호출이 cwd 에 원장을 만들었다"
       ;;
     "FAIL "*) add "${res#FAIL }" ;;
     *) add "블록 추출기가 결과를 내지 못했다 — $(head -c 200 "$T/vb.err" 2>/dev/null | tr '\n' ' ')" ;;
@@ -250,7 +262,7 @@ PY
   want "plan/verify" "$pv" "1:verify:completed"
   want "code/verify" "$cv" "1:verify-gates:completed"
   [ -z "$WHY" ] || add "stderr: $(etail cs-plan) | $(etail cross-review)"
-  verdict cross-skill "$WHY" "한 작업 폴더 원장에 fz-plan plan/verify($pv) · fz-review code/verify($cv) — fz-discover(빈 계열)는 세지 않고 계열 · 작업 폴더 미정 레시피는 CLI 전에 멈춘다"
+  verdict cross-skill "$WHY" "한 작업 폴더 원장에 fz-plan plan/verify($pv) · fz-review code/verify($cv) — fz-discover(빈 계열)는 세지 않고 계열 · 작업 폴더 미정 레시피는 CLI 전에 멈춘다 · WORK_DIR= 빈 값은 세션 원장($ev)"
 }
 
 # ── fourth-round-rejected ──────────────────────────────────────────

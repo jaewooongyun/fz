@@ -343,7 +343,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 >
 > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
 >
-> 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 검증"` 실행(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` — `modules/fz-gpt-subcommands-core.md` § validate 호출자) → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
+> 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 검증"` 실행(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` · 작업 폴더가 없으면 `WORK_DIR=` 빈 값 — `modules/fz-gpt-subcommands-core.md` § validate 호출자) → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
 
 ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
 

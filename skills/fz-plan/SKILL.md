@@ -325,7 +325,7 @@ Phase 번호(0.7)는 이력상 이름이다 — 실행은 Phase 1 · 1.5 뒤 · 
 
 ```bash
 bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/gpt-strategy.md § 단계 실행 판정 — 켬이면 필수): run·config → 아래 verify ∥ verify-gates · skip → [GPT 미사용 — 사유] + 원장 판정은 gpt-strategy.md § fz-plan 원장 · ask → 질문 → set → 다시 decide
-검증 도구로 계획 검증 위임   # core § verify ∥ § verify-gates 를 ARTIFACT=plan · WORK_DIR={WORK_DIR} 로 — modules/fz-gpt-subcommands-core.md 호출자 표
+검증 도구로 계획 검증 위임   # core § verify ∥ § verify-gates 를 ARTIFACT=plan · WORK_DIR={WORK_DIR}(작업 폴더가 없으면 빈 값 — 세션 원장) 로 — modules/fz-gpt-subcommands-core.md 호출자 표
 ```
 
 3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 — light · full 모두 — `modules/gates.md` 배선 1):
