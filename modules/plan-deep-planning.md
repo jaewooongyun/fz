@@ -105,7 +105,7 @@ f. **⛔ Import Removal Symbol Inventory** (import 제거 작업 시 필수):
 - **Evaluator-Optimizer**: Q1-Q6에서 Critical 리스크 2개+ 발견 시 → 계획 자동 재작성 (최대 2회 반복)
   - 1회차: Critical 리스크를 계획에 반영하여 재작성 → 스트레스 테스트 재실행
   - 2회차: 여전히 Critical 2개+ → 사용자 에스컬레이션 (AskUserQuestion: "리스크 수용/계획 변경/중단")
-  - LOOP 모드 파라미터: `completion-promise: STRESS_TEST_PASS`, `max-iterations: 2`
+  - LOOP 모드 파라미터: 완주 신호 `STRESS_TEST_PASS`, `max-iterations: 2`
 
 ### 절차 6. ⛔ RTM 작성 (plan 포함 파이프라인에서 필수 — 참조: `modules/rtm.md`)
 

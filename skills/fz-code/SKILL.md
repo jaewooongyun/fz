@@ -340,7 +340,7 @@ metadata:
    - 비-티켓 세션: `write_memory("fz:checkpoint:code-step{N}", "Step {N}/{M}: {변경 파일}. 빌드: OK/FAIL. 결정: {요약}")`
    형식 참조: `modules/context-artifacts.md`
 
-7. **요구사항 부합 검증** (3+ Step 구현에서만):
+7. **요구사항 부합 검증** (선택 — 3+ Step 구현에서만):
    - `/sc:sc-reflect --type task` → 현재까지의 구현이 계획에 부합하는지 확인
    - 조건: 전체 Step이 3개 이상인 구현의 중간 지점에서 실행
    - 목적: 방향 이탈 조기 발견 → 토큰 낭비 방지
@@ -375,7 +375,7 @@ metadata:
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
-- [ ] SOLO + 3+ 파일 변경이면 `/sc:sc-reflect` 실행했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
+- [ ] SOLO + 3+ 파일 변경에서 `/sc:sc-reflect` 를 실행했으면(선택) 결과를 기록했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
 - [ ] ⛔ GPT 교차 검증 완료? (GPT 를 켠 세션 — light · full 모두 Lead가 /fz-gpt check 실행 · 끈 세션은 `[GPT 미사용]` 기록)
 
 ---

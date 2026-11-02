@@ -73,8 +73,8 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 
 | 스킬 | Gate | 1회 실패 | 2회 실패 | 3회 실패 |
 |------|------|---------|---------|---------|
-| fz-code | build | 에러 직접 수정 | /sc:sc-troubleshoot | /simplify → AskUser |
-| fz-fix | build | 에러 직접 수정 | /sc:sc-troubleshoot | /fz-gpt check 보조 진단 1회 → AskUser |
+| fz-code | build | 에러 직접 수정 | /sc:sc-troubleshoot (선택) | /simplify → AskUser |
+| fz-fix | build | 에러 직접 수정 | /sc:sc-troubleshoot (선택) | /fz-gpt check 보조 진단 1회 → AskUser |
 | fz-review | Reflection | 이슈 재확인 | GPT 검증 | AskUser |
 | fz-plan | Stress Test | 계획 수정 | 계획 재작성 | AskUser |
 
@@ -82,7 +82,7 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 
 ### 스킬별 LOOP 파라미터
 
-| 스킬 | completion-promise | max-iterations | 대상 Gate |
+| 스킬 | 완주 신호 | max-iterations | 대상 Gate |
 |------|-------------------|----------------|----------|
 | fz-plan | STRESS_TEST_PASS | 2 | 설계 스트레스 테스트 (Critical < 2) |
 | fz-code | BUILD_SUCCESS | 3 | 빌드 검증 |
@@ -93,7 +93,7 @@ fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
 
 자율 반복 실행 중에는 turn을 **텍스트 의도 선언만으로** 종료하지 않는다: 마지막 문단이 계획·의도·다음 단계 선언이면 해당 tool call을 실제로 실행하고, 종료는 작업 완료 또는 사용자만 줄 수 있는 입력 대기 시에만 한다. (출처: 공식 Prompting Claude Fable 5 Autonomous reminder 스니펫 — `guides/model-guide.md` § 프롬프트 패턴.)
 
-- **우선 조항 (필수)**: completion-promise 충족 또는 max-iterations 도달 시 → 즉시 중단·보고가 본 리마인더보다 **우선**한다 (loop contract override 금지). "계속 진행"이 완주 계약을 덮지 않는다.
+- **우선 조항 (필수)**: 완주 신호(위 표) 충족 또는 max-iterations 도달 시 → 즉시 중단·보고가 본 리마인더보다 **우선**한다 (loop contract override 금지). "계속 진행"이 완주 계약을 덮지 않는다.
 - **LOOP 한정**: 본 리마인더는 LOOP 모드 자율 운행에만 적용 — 상시 세션에는 미적용 (하네스 중복 회피).
 
 ## SIMPLIFY 게이트 상세
