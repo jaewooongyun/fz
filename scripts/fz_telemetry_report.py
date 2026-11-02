@@ -521,8 +521,8 @@ def _read_journal(journal, row, unknown):
                 value = result.get(field)
                 if isinstance(value, list):
                     row[field] += len(value)
-            if stage == "counter" and isinstance(result.get("missedFindings"), list):
-                row["additions"] += len(result["missedFindings"])   # counter 의 새 지적 — 판정 칸 밖 additions (F-462)
+            if stage == "counter":      # counter 의 새 지적 — 판정 칸 밖 additions (F-462) · review-live missedFindings · peer-review missedIssues
+                row["additions"] += sum(len(result[k]) for k in ("missedFindings", "missedIssues") if isinstance(result.get(k), list))
 
 
 # ── 2b. 스테이지 판별 · 교차/counter 판정 (F-462) ─────────────────────────────
@@ -653,7 +653,7 @@ def count_judgments(stage, result):
         rejections 의 id 에 없는 것 · adjust = len(adjustments) · false_positive = len(rejections). 차집합이라 음수가 없다.
       · search 쌍 `reviewed[{id, note, verdict}]` — 동의 어휘가 `confirmed` 다(SEARCH_UPHOLD_WORDS)
     counter: `challenges[].verdict` uphold · refute + 옛 refute 워커의 최상위 `refuted` bool.
-    additions = len(additions) (+ counter 는 len(missedFindings)) — 판정 칸에 섞지 않는다.
+    additions = len(additions) (+ counter 는 len(missedFindings) · peer-review 는 len(missedIssues)) — 판정 칸에 섞지 않는다.
     """
     if stage not in JUDGMENT_FIELDS or not isinstance(result, dict):
         return None
@@ -663,7 +663,7 @@ def count_judgments(stage, result):
             out["refute"] += 1
         elif result.get("refuted") is False:
             out["uphold"] += 1
-        out["additions"] = len(_list_or_empty(result.get("additions"))) + len(_list_or_empty(result.get("missedFindings")))
+        out["additions"] = sum(len(_list_or_empty(result.get(k))) for k in ("additions", "missedFindings", "missedIssues"))
         return out
     if isinstance(result.get("reviewedIds"), list):
         adjusted, rejected = _list_or_empty(result.get("adjustments")), _list_or_empty(result.get("rejections"))
@@ -1694,7 +1694,7 @@ def _write_selftest_tree(base):
         handle.write(json.dumps({"type": "result", "key": "k2", "agentId": "a2", "result": {"finding_id": "F1", "refuted": True, "reason": "r"}}) + "\n")
         handle.write(json.dumps({"type": "result", "key": "k3", "agentId": "a3", "result": {"adjustments": [{"id": "A1", "verdict": "adjust"}, {"id": "A2", "verdict": "agree"}], "additions": [1, 2]}}) + "\n")
         # peer-review counter 형태 — 판정이 challenges[] 안에 중첩된다(최상위 refuted 없음)
-        handle.write(json.dumps({"type": "result", "key": "k5", "agentId": "a5", "result": {"challenges": [{"target": "A1", "verdict": "refute", "note": ""}, {"target": "A2", "verdict": "uphold", "note": ""}], "missedIssues": []}}) + "\n")
+        handle.write(json.dumps({"type": "result", "key": "k5", "agentId": "a5", "result": {"challenges": [{"target": "A1", "verdict": "refute", "note": ""}, {"target": "A2", "verdict": "uphold", "note": ""}], "missedIssues": [{"id": "CT-1"}]}}) + "\n")
         handle.write(json.dumps({"type": "result", "key": "k4", "agentId": "a4", "result": {"zzz": 1, "yyy": 2}}) + "\n")
     for name in ("agent-a1.jsonl", "agent-a2.jsonl"):
         with open(os.path.join(wf_dir, name), "w") as handle:
@@ -1771,6 +1771,9 @@ def self_test():
     check("판정 counter — missedFindings 는 additions",
           count_judgments("counter", {"challenges": [{"target": "A", "verdict": "uphold"}, {"target": "B", "verdict": "refute"}], "missedFindings": [1, 2]}),
           {"uphold": 1, "adjust": 0, "refute": 1, "additions": 2})
+    check("판정 counter — peer-review missedIssues 도 additions",
+          count_judgments("counter", {"challenges": [{"target": "A", "verdict": "uphold"}], "missedIssues": [1, 2, 3]}),
+          {"uphold": 1, "adjust": 0, "refute": 0, "additions": 3})
     check("판정 — 교차·counter 밖 스테이지는 None", count_judgments("lens", {"issues": []}), None)
     meta_dir = tempfile.mkdtemp(prefix="fz-telemetry-meta-")
     with open(os.path.join(meta_dir, "agent-m1.meta.json"), "w") as handle:
@@ -1840,7 +1843,7 @@ def self_test():
     check("stage_verdicts — cross 스테이지 adjust", wf_rows["code-pair"]["stage_verdicts"].get("cross", {}).get("adjust"), 1)
     check("adjustments", wf_rows["code-pair"]["adjustments"], 2)
     check("count_verdicts 단위", count_verdicts({"a": [{"refuted": False}, {"verdict": "false_positive"}], "verdict": "issues"}), (1, 1, 0))
-    check("additions", wf_rows["code-pair"]["additions"], 2)
+    check("additions", wf_rows["code-pair"]["additions"], 3)   # 교차 additions 2 + peer-review counter missedIssues 1
     check("wall-time 10분", round(wf_rows["code-pair"]["walls"][0] / 60.0), 10)
     check("미매치 형태 1종", list(unknown), [("yyy", "zzz")])
     findings = collect_findings(findings_dir, since, until)
