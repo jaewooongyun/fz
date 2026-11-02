@@ -43,6 +43,7 @@ GLOBS = [   # (id 접두, glob, 이름 뽑기)
     ("gpt-skill", "gpt-skills/*/SKILL.md", lambda p: os.path.basename(os.path.dirname(p))),
     ("template", "templates/*", lambda p: os.path.basename(p)),
     ("schema", "schemas/*.json", lambda p: os.path.basename(p)[:-5]),
+    ("gpt-agent", "gpt-agents/*.toml", lambda p: os.path.basename(p)[:-5]),   # independent-review --gpt-agents 역할 파일
 ]
 
 
@@ -55,7 +56,11 @@ def census(root):
                 out[f"{prefix}:{name(p)}"] = os.path.relpath(p, root)
     reg = os.path.join(root, "scripts", "gpt-kinds.json")
     if os.path.isfile(reg):
-        for k in json.load(open(reg, encoding="utf-8")).get("kinds", {}):
+        d = json.load(open(reg, encoding="utf-8"))
+        kinds = d.get("kinds", {}) if isinstance(d, dict) else None
+        if not isinstance(kinds, dict):
+            raise ValueError("scripts/gpt-kinds.json: kinds 가 객체가 아니다")
+        for k in kinds:
             out[f"kind:{k}"] = "scripts/gpt-kinds.json"
     return out
 
@@ -69,8 +74,10 @@ def cost_tokens(root, rel):
 
 def load_ledger(path):
     d = json.load(open(path, encoding="utf-8"))
-    if d.get("schema") != LEDGER_SCHEMA or not isinstance(d.get("components"), list):
+    if not isinstance(d, dict) or d.get("schema") != LEDGER_SCHEMA or not isinstance(d.get("components"), list):
         raise ValueError(f"ledger schema != {LEDGER_SCHEMA} or no components list")
+    if not all(isinstance(c, dict) and isinstance(c.get("id"), str) for c in d["components"]):
+        raise ValueError("every component must be an object with a string id")   # 깨진 원장은 차이(1)가 아니라 입력 오류(2)다
     ids = [c.get("id") for c in d["components"]]
     dup = sorted({i for i in ids if ids.count(i) > 1})
     if dup:
@@ -120,6 +127,18 @@ def self_test():
         os.remove(os.path.join(d, "agents", "g.md"))
         m, e = check(d, led)
         case("extra-component", e == ["agent:g"] and not m, f"missing={m} extra={e}")
+        os.makedirs(os.path.join(d, "gpt-agents"))
+        open(os.path.join(d, "gpt-agents", "r.toml"), "w").write("x")
+        case("gpt-agent-in-population", "gpt-agent:r" in census(d), f"{sorted(census(d))}")
+        rcs = {}
+        for tag, body in (("list-top", []), ("non-object", {"schema": LEDGER_SCHEMA, "components": [1]}),
+                          ("no-id", {"schema": LEDGER_SCHEMA, "components": [{"id": None}, {"id": "agent:x"}]})):
+            bad = os.path.join(d, f"bad-{tag}.json")
+            json.dump(body, open(bad, "w"))
+            rcs[tag] = main(["--root", d, "--check-ledger", bad])
+        json.dump([], open(os.path.join(d, "scripts", "gpt-kinds.json"), "w"))
+        rcs["list-broken-registry"] = main(["--root", d, "--list"])
+        case("malformed-input-exit-2", set(rcs.values()) == {2}, f"{rcs}")
     print("\n".join(cases))
     print(f"harness_census self-test: {'PASS' if not fails else 'FAIL'} ({len(cases) - len(fails)}/{len(cases)})")
     return 0 if not fails else 1
@@ -136,11 +155,11 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.self_test:
         return self_test()
-    if a.list:
-        for i in sorted(census(a.root)):
-            print(i)
-        return 0
     try:
+        if a.list:
+            for i in sorted(census(a.root)):
+                print(i)
+            return 0
         if a.init_ledger:
             print(f"ledger written: {init_ledger(a.root, a.init_ledger)} components")
             return 0

@@ -173,6 +173,8 @@ FUNCS = {"copies": lint_copies, "project-rules": lint_project_rules, "team-resid
 
 
 def run(root, only=None):
+    if only and only not in FUNCS:      # 오타도 미실행이다 — 0/0 PASS 로 끝나지 않게
+        return {only: ("UNRUN", [], f"모르는 lint 이름 — {' · '.join(LINTS)} 중 하나")}
     results = {}
     for name in LINTS:
         if only and name != only:
@@ -235,6 +237,8 @@ def self_test():
         _mk(d, {**clean, "modules/huge.md": "x\n" * 501})
         st = run(d, only="module-size")["module-size"][0]
         case("module-501-warn", st == "WARN", f"state {st}")
+        res = run(d, only="no-such-lint")
+        case("unknown-only-unrun", summary(res)[1] == 2, f"{ {k: r[0] for k, r in res.items()} } exit {summary(res)[1]}")
     print("\n".join(cases))
     print(f"lint_recurrence self-test: {'PASS' if not fails else 'FAIL'} ({len(cases) - len(fails)}/{len(cases)})")
     return 0 if not fails else 1
