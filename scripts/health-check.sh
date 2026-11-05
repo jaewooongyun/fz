@@ -124,11 +124,21 @@ chk_runners() {   # 인자: 러너 경로들 — 0개면 미실행(전체 실행
       [ -f "$f" ] || continue
       t_out="$(cd "$ROOT" && node "$f" 2>&1)"; t_one $? "$t_out" "$(basename "$f")"
     done
-    for r in "$@"; do
-      case "$r" in */run.sh) ;; *) continue ;; esac
-      [ -f "$r" ] || continue
-      t_out="$(cd "$ROOT" && bash "$r" 2>&1)"; t_one $? "$t_out" "$(basename "$(dirname "$r")")"
-    done
+    # run.sh — scripts/run_runners.py 가 FZ_HEALTH_JOBS(기본 4 · 1 = 옛 직렬) 묶음으로 병렬 실행하고 결과를 입력 순서 파일로 남긴다.
+    #   판정 · 보고는 여기서 순서대로 한다(표 형식 불변). ⛔ 결과 파일이 없으면 UNRUN 으로 센다 — 통과로 읽지 않는다.
+    #   러너는 자기 임시 공간에서만 쓴다(2026-11-05 실측: 공유 HOME · 고정 임시 경로 · 대상 저장소 git 쓰기 0) — 병렬 전제가 깨지면 FZ_HEALTH_JOBS=1
+    local RS=() RR rs_i=0 t_rc
+    for r in "$@"; do case "$r" in */run.sh) [ -f "$r" ] && RS+=("$r") ;; esac; done
+    if [ ${#RS[@]} -gt 0 ]; then
+      RR="$(mktemp -d)"
+      python3 "$ROOT/scripts/run_runners.py" --jobs "${FZ_HEALTH_JOBS:-4}" --cwd "$ROOT" --out-dir "$RR" -- "${RS[@]}" >/dev/null 2>&1
+      for r in "${RS[@]}"; do
+        t_out="$(cat "$RR/$rs_i.out" 2>/dev/null || echo 'UNRUN: 러너 결과 없음 — 병렬 실행기가 기록하지 못했다')"
+        t_rc="$(cat "$RR/$rs_i.rc" 2>/dev/null || echo 2)"
+        t_one "$t_rc" "$t_out" "$(basename "$(dirname "$r")")"; rs_i=$((rs_i + 1))
+      done
+      rm -rf "$RR"
+    fi
     # ⛔ 실패와 미실행이 함께 있으면 둘 다 보고한다 — 한 행은 ⛔ 와 ⏸ 를 함께 표시할 수 없어 미실행 행을 따로 둔다
     if [ "$T_TOTAL" -eq 0 ]; then
       UNRUN=$((UNRUN + 1))
@@ -216,7 +226,7 @@ echo "════════════════════════�
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py check_retired_commands.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_codegraph_fresh.py check_g8_style.py eject_findings.py check_findings_hygiene.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py check_retired_commands.py run_runners.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -586,7 +596,7 @@ fi
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select check_retired_commands; do
+for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select check_retired_commands run_runners; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   record3 "레지스트리 도구 self-test ($FS)" "$FS_CODE" "$FS_OUT" \
     "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)" \
