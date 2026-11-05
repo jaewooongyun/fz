@@ -252,7 +252,7 @@ async function runPass(queue, retry, lastWhy) {
       if (out === DENIED) { denied += 1; rows.set(f.id, blocked(f, 'budget')); return }
       const why = judge(f, out)
       if (!why) { rows.set(f.id, accepted(f, out)); return }
-      if (out) { dropped += 1; log(`WARN swarm-${f.id} 결과 폐기 — ${why}${retry ? ' · 재스폰 뒤라 BLOCKED' : ' → 재스폰 1회'}`) }
+      if (out) { dropped += 1; log(`WARN swarm:${f.id} 결과 폐기 — ${why}${retry ? ' · 재스폰 뒤라 BLOCKED' : ' → 재스폰 1회'}`) }
       if (retry) rows.set(f.id, blocked(f, why))
       else { lastWhy.set(f.id, why); again.push(f) }
     })

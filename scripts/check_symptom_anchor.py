@@ -52,9 +52,12 @@ def check(path: pathlib.Path):
         return UNRUN
 
     # 두 생산자 모양(Lead issues[] · 병합 candidates[])을 check_synthesized.normalize 로 같은 칸에 모은다 — severity 판정 값 = 최종 우선
-    shape, issues, _ = normalize(data)
+    shape, issues, problems = normalize(data)
     if shape is None:
         log(f"UNRUN: issues[] · candidates[] 를 찾을 수 없다 — {path}")
+        return UNRUN
+    if problems:   # ⛔ 깨진 항목(객체 아님 · 별칭 충돌 · 모르는 severity)을 버리고 남은 것만 보면 통과로 읽힌다
+        log(f"UNRUN: 판정할 수 없는 항목 {len(problems)}건 — {problems[0]} (⛔ 통과 아님)")
         return UNRUN
     if not issues:
         why = zero_evidence(data)
@@ -192,6 +195,12 @@ def self_test():
         p.write_text(json.dumps(z), encoding="utf-8")
         assert check(p) == UNRUN, "⛔ GPT 시간 초과 병합본의 0건이 통과했다"
 
+    def c_malformed_entry_unrun(tmp):
+        """⛔ 회귀(S21 GPT): 객체가 아닌 항목을 정규화가 걸러도 나머지만으로 통과하지 않는다."""
+        p = tmp / "mixed.json"
+        p.write_text(json.dumps({"issues": [{"id": "S1", "severity": "suggestion"}, None]}), encoding="utf-8")
+        assert check(p) == UNRUN, "⛔ 깨진 항목을 버리고 통과했다"
+
     def c_merge_shape_effective(tmp):
         """병합본 후보는 effectiveSeverity(최종)로 판정한다 — pre-existing 강등(suggestion)은 면제."""
         m = {"candidates": [{"id": "claude:P1", "severity": "major", "effectiveSeverity": "suggestion", "origin": "pre-existing"}]}
@@ -236,6 +245,7 @@ def self_test():
                  ("empty-issues-unrun", c_empty_unrun),
                  ("zero-with-merge-evidence", c_zero_with_merge_evidence),
                  ("merge-shape-effective", c_merge_shape_effective),
+                 ("malformed-entry-unrun", c_malformed_entry_unrun),
                  ("missing-file-unrun", c_missing_file_unrun),
                  ("bad-json-unrun", c_bad_json_unrun),
                  ("evidence-trace-not-enough", c_evidence_trace_is_not_enough)]:

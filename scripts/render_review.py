@@ -36,7 +36,7 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
   둘 다 파일을 쓰지 않는다. 통과하면 리포트는 ① 이번 PR 버그 ② 구조·품질 제안(non-blocking) ③ 의도 확인 질문 → ④ 참고(E4) → 제외 후보 표 →
   기존 스레드 대조 줄 → 답글 초안(E5 reply) 순이고, pr-comments.md 끝에 답글 초안을 붙인다(payload 밖 — 기존 스레드 답글은 따로 단다).
   추가 키: target{kind, ref, sha}(gather 의 target.json) · candidates(후보 원본 상대 경로) · issue.kind · evidence · repro · measure · refute · covers ·
-  distinctFrom · excluded[{id, what, code E1~E8, reason, covers?, duplicateOf?, reply?, refute?}] — 계약 정본은 check_comment_worthy.py 머리말
+  distinctFrom · gptPass(independent · challenger · none) · excluded[{id, what, code E1~E8, reason, covers?, duplicateOf?, reply?, refute?}] — 계약 정본은 check_comment_worthy.py 머리말
   --self-test
 
 exit: 0=렌더 · 1=거부(구간 선택 필요 · 후보 밖 pick · body 상한 초과) · 2=입력 불가(⛔ 통과 아님 — 빈 JSON · 필수 키 없음)
@@ -278,9 +278,8 @@ def curated_report(r: dict, plans: list, info: dict) -> str:
               + (f" (+{len(x['covers'])} 묶음)" if x.get("covers") else "") + " |" for x in ex]
     lines += ["", "## 기존 스레드 대조", "", info.get("thread_line") or "—", ""]
     replies = [x for x in ex if x.get("code") == "E5" and str(x.get("reply") or "").strip()]
-    if replies:
-        lines += ["## 답글 초안 (E5 — 기존 스레드에 단다)", ""]
-        lines += [f"- 스레드 {x.get('duplicateOf')} ← `{x['id']}`: {str(x['reply']).strip()}" for x in replies] + [""]
+    if replies:   # ⛔ 본문은 넣지 않는다 — 리포트가 payload.body 로 게시되면 답글 초안이 새 리뷰에 실린다(초안은 pr-comments.md 끝 · 로컬)
+        lines += [f"답글 초안 {len(replies)}건 — pr-comments.md 끝(게시 payload 밖 · 기존 스레드에 따로 단다)", ""]
     if r.get("severityNote"):
         lines += ["## Severity 보정 근거", "", r["severityNote"].strip(), ""]
     if r.get("strengths"):
@@ -374,9 +373,16 @@ def run_render(a) -> int:
         return fail(REJECT, "REJECT: --require-curation — excluded 키가 없다(Curate 를 건너뛴 리뷰다 · --no-curate 면 이 플래그 없이 렌더한다)")
     curation = None
     if curated:
+        try:
+            validate(review)   # 공통 계약 먼저 — 깨진 site 가 큐레이션 검사 안에서 예외로 터지지 않게
+        except InputError as e:
+            return fail(UNRUN, f"UNRUN: {e}")
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import check_comment_worthy as ccw   # 렌더 전에 코멘트 가치 계약 — 위반 · 판정 불가면 파일을 쓰지 않는다
-        code, bad, warn, curation = ccw.check_review(review, Path(a.review).resolve().parent)
+        try:
+            code, bad, warn, curation = ccw.check_review(review, Path(a.review).resolve().parent)
+        except Exception as e:   # ⛔ 예외도 fail() 로 — 이전 실행의 payload · 리포트가 지금 리뷰로 남으면 게시된다
+            return fail(UNRUN, f"UNRUN: 코멘트 가치 검사 예외 — {type(e).__name__}: {e}")
         for w in warn:
             print(f"WARN {w}", file=sys.stderr)
         if code:
@@ -668,6 +674,27 @@ def self_test() -> int:
         r = subprocess.run([sys.executable, __file__, "--review", str(f), "--diff", str(diff), "--out-dir", str(tmp / "uncur"), "--require-curation"],
                            capture_output=True, text=True)
         case("require-curation — excluded 없는 review 는 exit 1 · 파일 0", r.returncode == 1 and not any((tmp / "uncur").glob("*")), r.returncode)
+        rep5 = json.loads((ex / "review.json").read_text(encoding="utf-8"))
+        rep5["excluded"].append({"id": "T1", "what": "같은 지적", "code": "E5", "reason": "기존 스레드", "duplicateOf": "77", "reply": "REPLY-DRAFT-MARK"})
+        (ex / "e5.json").write_text(json.dumps(rep5, ensure_ascii=False), encoding="utf-8")
+        r = subprocess.run([sys.executable, __file__, "--review", str(ex / "e5.json"), "--diff", str(diff), "--out-dir", str(tmp / "cur-e5")], capture_output=True, text=True)
+        pay = json.loads((tmp / "cur-e5" / "payload.json").read_text(encoding="utf-8")) if r.returncode == 0 else {}
+        com = (tmp / "cur-e5" / "pr-comments.md").read_text(encoding="utf-8") if r.returncode == 0 else ""
+        case("e5-reply-outside-payload — 답글 초안은 payload.body 에 없고 pr-comments.md 끝에만",
+             r.returncode == 0 and "REPLY-DRAFT-MARK" not in pay.get("body", "") and "REPLY-DRAFT-MARK" in com, (r.returncode, r.stderr[-200:]))
+        br = json.loads((ex / "review.json").read_text(encoding="utf-8"))
+        br.pop("pr")
+        br["target"] = {"kind": "branch", "ref": "feature/curate", "sha": br["target"]["sha"]}
+        (ex / "branch.json").write_text(json.dumps(br, ensure_ascii=False), encoding="utf-8")
+        r = subprocess.run([sys.executable, __file__, "--review", str(ex / "branch.json"), "--diff", str(diff), "--out-dir", str(tmp / "cur-br"), "--require-curation"],
+                           capture_output=True, text=True)
+        case("curated-branch-target — 브랜치 대상(pr 없음 · target.kind branch)은 렌더하고 payload 를 만들지 않는다",
+             r.returncode == 0 and (tmp / "cur-br" / "review-report.md").exists() and not (tmp / "cur-br" / "payload.json").exists(), (r.returncode, r.stderr[-200:]))
+        broken = json.loads((ex / "review.json").read_text(encoding="utf-8"))
+        broken["issues"][0]["sites"][0]["end"] = None
+        (ex / "broken.json").write_text(json.dumps(broken, ensure_ascii=False), encoding="utf-8")
+        r = subprocess.run([sys.executable, __file__, "--review", str(ex / "broken.json"), "--diff", str(diff), "--out-dir", str(tmp / "cur-ok")], capture_output=True, text=True)
+        case("curated-broken-site — 깨진 site 는 UNRUN · 이전 산출물을 지운다", r.returncode == 2 and not any((tmp / "cur-ok").glob("*")), (r.returncode, r.stderr[-200:]))
 
     tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_nodiff, t_empty, t_nopr, t_det, t_limit, t_cli,
              t_example, t_curated]

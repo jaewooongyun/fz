@@ -280,7 +280,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 > `modules/peer-review-workflow.md`. Tier 0/1 은 Workflow 가 없어 **읽지 않는다**(Tier 1 의 GPT 는 아래 절).
 
 ### GPT 독립 첫 패스 (기본 실행 — `--gpt-independent` 생략 가능 · `--no-gpt-independent` 로 끈다)
-- **Workflow 직전에** `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {review-surface.patch — 없으면 diff.patch} --base … --head … --deny "${WORK_DIR}" [--pr-meta {pr-meta.json}] [--rules-index {원문 색인}]` 를 background 로 띄우고(규칙 레코드 `projectRulesPath` 는 Workflow args 에만 — 런처에 넘기면 exit 11), 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py"` 로 합친다. 경로는 **플러그인 루트 기준**이고, Workflow 스크립트는 세션 working directory 밖이면 **사전 복사**한 경로로 부른다
+- **Workflow 직전에** `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {review-surface.patch — 없으면 diff.patch} --base … --head … --deny "${WORK_DIR}" [--pr-meta {pr-meta.json}] [--rules-index {원문 색인}]` 를 background 로 띄우고(규칙 레코드 `projectRulesPath` 는 Workflow args 에만 — 런처에 넘기면 exit 11), 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" … --out "${WORK_DIR}/merged.json"` 으로 합친다(⛔ 병합본은 이 고정 경로 — Curate 후보 원본 · 없으면 렌더가 판정 불가로 멈춘다). 경로는 **플러그인 루트 기준**이고, Workflow 스크립트는 세션 working directory 밖이면 **사전 복사**한 경로로 부른다
 - `--no-gpt-independent` 면 띄우지 않고 GPT challenger(`modules/peer-review-tiers.md` · `gpt-challenger-raw.txt`)를 쓴다 — 병합 없는 옛 경로다
 - 순서 · 거부(오염 · 실패 · stale) 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서. Tier 3 GPT DA 는 병합 뒤다
 
@@ -402,7 +402,7 @@ write_memory("fz:checkpoint:peer-review-synthesize", "PR#{number}: 이슈 {N}개
    - Tier 2/3: 새 맥락 검증자 — `workflows/swarm.js` 를 `agentType: 'fz:review-counter'` 로 부른다. 조각 = 카드 ≤ 8장(넘으면 조각을 나눈다 · maxFragments 12 = 카드 96 상한 — 그 밖은 BLOCKED budget). 브리프 = 카드 id · 카드 본문 · 기존 스레드 스냅샷(고정 트리 밖이라 브리프에 인라인) · method = "카드마다 반박 시도 · 결과를 findings 에 `<카드 id>: upheld|refuted|blocked — 근거` 로"
    - ⛔ Lead 는 **카드 id 집합 = findings 의 id 집합**인지 대조한다 — 누락 · BLOCKED · 예산 부족 카드는 코멘트로 두지 않고 ③ 질문 또는 excluded(E1)로 보낸다. `refute` 칸에 swarm run id 를 인용한다
 3. **판정** — 카드마다 코멘트 또는 제외. 코멘트는 review.json `issues[]`(kind · evidence · repro · symptom_* · measure · origin · suggestion · refute · comment · covers), 제외는 `excluded[]`(`{id, what, code, reason}` · E5 = `duplicateOf` + 선택 `reply` 답글 초안 · E8 = `refute`). 같은 결함을 여러 후보가 말하면 `covers` 로 묶는다 — 한 후보는 소유자 하나다 제외 코드 E1~E8 의 뜻은 검사기 머리말이 정본이다(E1 도달 미확인 · E2 SDK 가정 · E4 원래 있던 문제 · E5 스레드 중복 · E8 반박됨 …)
-4. **review.json 머리** — `target` = `${WORK_DIR}/target.json` 그대로 · `candidates` = `["merged.json", "synthesized-issues.json"]`(review.json 기준 상대 경로 · GPT 없는 Tier 0 은 synthesized 만)
+4. **review.json 머리** — `target` = `${WORK_DIR}/target.json` 그대로 · `candidates` = 독립 패스 병합이 돌았으면(기본) `["merged.json", "synthesized-issues.json"]` · `--no-gpt-independent`(challenger — 병합본 없음) · GPT 없는 Tier 0 은 `["synthesized-issues.json"]`(review.json 기준 상대 경로) · `gptPass` = 이번 실행의 GPT 경로(`independent` · `challenger` · `none` — 같은 작업 폴더에 지난 실행의 `gpt-independent/` 가 남아 있어도 challenger · none 이면 병합본을 요구하지 않는다)
 5. **검사** — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_comment_worthy.py" "${WORK_DIR}/review.json"` 이 exit 0 이어야 Deliver 로 간다(렌더러가 `--require-curation` 으로 같은 검사를 한 번 더 한다). exit 1 은 고친다 · exit 2 는 판정 불가다(⛔ 통과 아님 — target · 후보 원본 · GPT 병합본을 확인한다)
 
 #### Gate Curate
