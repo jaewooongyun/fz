@@ -1,5 +1,28 @@
 # Changelog
 
+### v4.51.0 (2026-11-05) — 피어 리뷰가 코멘트할 것을 고르고, 근거 · 검사 등록 · 라우팅을 기계가 잰다 [MINOR]
+
+피어 리뷰가 후보를 거의 다 코멘트로 올렸다(F-527) — Synthesize 뒤 · Deliver 앞에 Curate 를 넣어 후보마다 코멘트 또는 제외(E1~E8)를 정하고, 렌더 전에 `check_comment_worthy.py` 가 계약을 본다. gather 는 기존 PR 스레드와 리뷰 대상 SHA 를 함께 모은다(F-085).
+손으로 관리하다 어긋난 자리 — 근거 슬롯(33회 중 18회 결손) · health-check 등록(F-529) · 러너 모드(F-354) · 텔레메트리 label(F-531) · 실행 기록(F-532) · 라우팅(F-528) — 에 검사기를 붙였다. 워커 tools 의 codegraph 는 걷고(F-536) 구현 탐색은 Lead 의 Serena `find_implementations` 로 옮겼다(F-535 · Serena `v2.1.0` 고정).
+health-check 러너는 병렬로 돈다(1,058초 → 454초). 출하 리뷰(Lead 3 · GPT 6)의 결함 9건을 이 판에서 고쳤다. 12건을 닫는다. ⛔ 올린 뒤 세션을 다시 시작한다 — 에이전트 tools 변경과 Serena 고정은 새 세션에서 반영된다.
+
+→ [릴리즈 노트](docs/releases/v4.51.0.md)
+
+| ID | 판정 | 근거 | 검증 절차 |
+|---|---|---|---|
+| F-085 | 해결 — gather 가 기존 스레드를 모은다 | S15: `gather.sh` 가 `gh api …/pulls/N/comments --paginate --slurp` · `gh pr view --json reviews,…` → `existing-threads.json`(실패해도 계속 · `unavailable` + GATHER-WARN) · `target.json` | `tests/fixtures/peer-review/gather-pr-mode/run.sh` 셀 4(ok · unavailable · paginate · midpage-fail) |
+| F-354 | 해결 — 무호출 FAIL 모드를 지우고 모드 계약을 기계로 본다 | S12: `render-single-source --default-path-unchanged` · `inject-skill-sites --base`/`--emit-sites` 삭제 · 남은 모드 13개 `# modes:` 선언 | `scripts/check_health_wiring.py --self-test`(`caller-missing-health-call`) · 트리 실행 PASS |
+| F-527 | 해결 — Curate 단계와 계약 검사 | S13~S17: SKILL § Step: Curate · `check_comment_worthy.py` · 렌더 `--require-curation` · `modules/team-facing-writing.md` | 검사기 self-test 35/35 · 렌더러 self-test 29/29 · 실데이터 Curate fixture 6/6(5279 · 5293 · 5266 · legacy · 음성 2) |
+| F-528 | 해결 — 라우팅을 실제 문장으로 잰다 | S18 · S19: `intent_route_probe.py` · 합성 corpus 24문장 · lint #4 승격 · Curate · 이어 하기 · 메타 트리거 · `PR` 토큰 경계 · `코드` 단독 약화 | `tests/fixtures/routing/intent-corpus/run.sh` · lint #4 · 실 corpus 매칭 0 94 → 75/281 · Curate 묶음 18/18 |
+| F-529 | 해결 — 등록 목록을 대조한다 | S11: `check_health_wiring.py`(처리기 = AST 처리 문맥 · 러너 경유 · 감지기 양성 대조) · 미배선 self-test 7 · 존재 목록 누락 7 수정 | 검사기 self-test · health-check 4.9a 행 |
+| F-530 | 해결 — 두 생산자 모양 정규화 · 0건 완결 증거 | S13: `check_synthesized.py` · 증상 검사기가 같은 `normalize()` 를 쓴다 · CHECKPOINT 배선 | self-test 16/16 · 저장본 37개 계약 · 증상 게이트 통과 |
+| F-531 | 해결 — label `<줄기>:<세부>` 규약 | S05: swarm · discover label · LABEL_STAGE 23줄기 · swarm `review-counter` 재허용 | `tests/workflows/swarm-budget.js` · `tests/fixtures/telemetry/stage-class` |
+| F-532 | 해결 — 스킬 이름 정규화 · 활성 시간 | S03 · S04: `canonical_skill()` · 리포터 집계 정규화 · `active_min` | `scripts/run_metrics.py --self-test`(skill-alias · unknown-skill · active-min) |
+| F-533 | 해결 — minor 이상 하한 · 모르는 값 판정 불가 | S02: `BLOCKING` = critical · major · minor · `KNOWN` 밖은 UNRUN | `scripts/check_symptom_anchor.py --self-test`(critical-blocks · unknown-severity-unrun) |
+| F-535 | 해결 — 호출 ∪ 구현을 처방한다 | S08: Lead allowed-tools 에 `find_implementations` · caller-analysis `## 호출` ∪ `## 구현` · dead code 규칙 | `check_evidence_slots.py` 가 `## 구현` TODO 를 거부 |
+| F-536 | 해결 — 워커 codegraph 배선을 걷었다 | S09 · S10: 에이전트 11 · 스킬 9 · 모듈 · 가이드 · 인벤토리 · lint 표본에서 제거 · 근거 묶음은 개인 계층으로 | 현행 파일 codegraph 언급 0(게이트 S09) · `lint_contracts.py` |
+| F-538 | 해결 — 검사기를 플러그인 밖으로 옮기며 WAL 인덱스 읽기를 고쳤다 | S10: `mode=ro` 실패 때 `immutable=1` 로 다시 연다 · self-test WAL 케이스(양성 대조 포함) | 개인 계층 self-test 5/5 · stale-gate fixture 4/4 |
+
 ### v4.50.0 (2026-11-02) — GPT 단계를 한 줄로 판정하고, 재검증 라운드에 상한을 두고, 쓰이지 않는 하네스를 걷었다 [MINOR]
 
 같은 설정으로 돌려도 GPT 단계를 부를지가 스킬마다 산문으로 갈렸다(F-487) — 모든 GPT 단계는 직전 `gpt-choice.sh decide` 한 줄로 정하고, 같은 산출물의 재검증 라운드는 정문이 코드로 센다(누적 3 · 같은 입력이면 멈춤). 계획의 첫 GPT 호출은 Workflow 와 함께 뜨는 독립 계획이 기본이다(F-508).
