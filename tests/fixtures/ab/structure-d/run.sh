@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --emit-frozen caller=manual last-pass=7b89bd4 result=exit 0 · 출력 == 커밋된 frozen.json(2026-11-05 배선 감사)
 # A/B 계측기 구조 셀 (F-335 묶음 d ①~⑧·⑫) — 대상 트리의 scripts/ab_ledger*.py · fz_wf_metrics.py 를 합성 입력으로 돌려 셀마다 판정한다.
 #   health-check 글롭(tests/fixtures/*/*/run.sh)에서 인자 없이 돈다(이 트리). 기준 트리 대조는 `--tree <기준>` 으로 부른다.
 # 입력: 이 트리의 tests/fixtures/ab/mini-ledger(run 8개 — 읽기만, 임시 폴더에 복원) · 같은 폴더 frozen.json(기준 트리에서 얼린 값).

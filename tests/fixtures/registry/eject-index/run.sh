@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --base caller=manual last-pass=7b89bd4 result=--base HEAD · 76 PASS · 셀 17(2026-11-05 배선 감사)
 # 배출 INDEX 정리 · 레지스트리 잠금 fixture (F-372) — 대기열 행 재계산과 잠금을 동작으로 본다.
 #
 # 셀마다 임시 레지스트리를 만들고 eject_findings.py CLI 를 돌려 INDEX.md · .archive · APPLIED · 잠금 파일을 단언한다.

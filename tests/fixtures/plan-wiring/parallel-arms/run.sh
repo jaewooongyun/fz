@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --capture caller=manual last-pass=7b89bd4 result=출력 == verify-default.golden.json(2026-11-05 배선 감사)
 # fz-plan 배선 러너 (S23) — `--gpt-independent` 경로의 순서 · Phase 2 resume 교차 · 기본 verify 불변을 본다.
 #
 # ① 순서 — 독립 플랜 기동(gpt_independent.sh plan) < Workflow 호출 < 합치기(plan_divergence.py)

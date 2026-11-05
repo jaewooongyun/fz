@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --variant caller=manual last-pass=none result=plan 분기는 미구현 — 트리는 contract 만 구현한다(머리말) · 7b89bd4 FAIL 3 예상
 # 승인·미착수(planned) fixture (F-190 · F-159) — 두 SKILL 의 실제 호출 줄을 SKILL.md 에서 뽑아 착수 전 → 착수 후 순서로
 # 재생하고, 판정기 전이표와 Stop 훅이 그 흐름에서 어떻게 판정하는지 동작으로 본다.
 #   approved-unstarted   fz-plan 4.5 줄 재생(cp → 판정기 호출 span 순서대로) → 확정 · planned · ABANDON 0 · 훅 통과(차단 0회)

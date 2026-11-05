@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --expect-fail caller=manual last-pass=none result=음성 대조 — 옛 기준 트리에서만 판정한다(HEAD 는 전 셀 통과라 해당 없음)
 # 모드 게이트 배선 — 스킬·모듈 문서의 **그 자리에** 모드 게이트 계약이 있는가(정적 단언). 셀 단위로 판정한다.
 #   재는 것: 절 안의 토큰 · 순서 · 표 행 · frontmatter 권한. ⛔ 재지 못하는 것: 런타임에 실제로 물었는가 — 실행 스모크가 본다.
 #   인자: [--tree DIR] [--cells a,b,…] [--expect-fail]

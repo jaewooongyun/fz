@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --stale-exit caller=manual last-pass=7b89bd4 result=--stale-exit 1 · 20 PASS(2026-11-05 배선 감사)
 # setup-gpt-skills.sh 링크 계약 러너 (A2-02).
 #
 # 판정: ① GPT 스킬(SKILL.md 가진 gpt-skills/ 전부)이 현 판으로 링크된다 ② 이 플러그인 skills/ 를 가리키는

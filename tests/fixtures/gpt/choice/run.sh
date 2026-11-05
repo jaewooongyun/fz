@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --scope caller=manual last-pass=7b89bd4 result=부분집합 선택 — 기본 실행이 choice · wrapper 를 다 돈다
 # gpt-choice.sh 계약 러너 — 세션 1회 GPT 모델·effort 선택(options · get · set · config)과 래퍼(gpt-exec.sh)의 결정 순서를 합성 입력으로 본다.
 #   --scope choice : get exit 0/3/4/5/11 · set 0/10/11 과 실패 시 파일 미기록 · 원자 기록(tmp+mv) · config config 센티넬 ·
 #                    options JSON 모양(id·label 분리 · effort 교집합 · skip · config effort 미지원 표시) · config 엄격 판독 ·

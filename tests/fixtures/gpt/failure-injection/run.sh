@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --scope caller=manual last-pass=7b89bd4 result=launcher 9 PASS(24.8s)(2026-11-05 배선 감사) · wrapper 는 기본 실행
 # 실패 주입 — GPT 호출 경로의 실패가 "완료" 로 보고되지 않는다.
 #   --scope wrapper (S24a · 기본): 래퍼(gpt-exec.sh)에 CLI 비정상 종료 · 빈 출력 · 스키마 위반을 주입한다.
 #     판정: 래퍼 exit 가 12 / 13 / 14 이고, 성공 표시(GATE-PASS)를 내지 않으며, stderr 에 GATE-FAIL 이 있다.

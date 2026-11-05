@@ -1,8 +1,8 @@
 #!/bin/bash
 # 역할 본문 주입 사이트 재생 fixture (F-335 ㉒) — 호출부가 `cat "$…SKILL_PATH"` 로 본문을 넣던 사이트가 래퍼 `--inject-skill` 로
 # 바뀌었는지 문서 문자열이 아니라 **실제 argv** 로 본다.
-#   ① 사이트 목록: 기준 문서(--base) 의 ```bash 블록에서 `cat "$…SKILL_PATH"` 줄을 찾고, 같은 블록의 `get_gpt_skill_path "<역할>"` 로
-#      (문서 · 제목 · 역할) 고유 사이트를 만든다. --base 가 없으면 이 폴더의 sites.tsv(f500bc9 에서 뽑은 동결본)를 쓴다
+#   ① 사이트 목록: 이 폴더의 sites.tsv — f500bc9 기준 문서의 ```bash 블록에서 `cat "$…SKILL_PATH"` 줄과 같은 블록의
+#      `get_gpt_skill_path "<역할>"` 로 뽑은 (문서 · 제목 · 역할) 고유 사이트 동결본
 #   ② 사이트마다 대상 트리(--tree)의 같은 문서 · 같은 제목 · 같은 역할 Bash 블록을 가짜 래퍼(scripts/gpt-exec.sh 대역 — argv 기록)로
 #      돌려, exec argv 에 `--inject-skill <그 역할 본문 경로>` 가 있고 프롬프트 파일에 본문이 없음(호출부 cat 없음)을 단언한다.
 #      블록은 두 형태다(R-G1 S4~S5 이행 중 공존): 옛 형태 = `get_gpt_skill_path "<역할>"` + 래퍼 직접 호출 · 정문 형태 =
@@ -17,19 +17,17 @@
 # 기대 셀 집합(F-408): harness · 사이트마다 1셀 · 대조 3셀 · floor — 판정한 셀과 정확히 같아야 하고, 끝 줄에 돈 셀 목록 · 수를 찍는다.
 # ⛔ 실제 GPT CLI · 래퍼를 부르지 않는다(FZ_PLUGIN_ROOT 를 임시 대역으로) · HOME 은 임시 폴더 · 블록의 /tmp/ 는 임시 폴더로 바꿔 돌린다.
 # exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패(인자 · 문서 읽기 · 사이트 7 미만 · harness 고장 · 미처리 예외)
-# usage: run.sh [--tree <플러그인 루트>] [--base <기준 루트>] [--emit-sites]
-#   --emit-sites  --base 에서 뽑은 사이트 목록을 TSV 로 찍고 끝낸다(sites.tsv 재생성용)
+# usage: run.sh [--tree <플러그인 루트>]
+#   ⛔ 옛 `--base <기준 루트>` · `--emit-sites`(기준에서 사이트를 다시 뽑기)는 4.51.0 에서 지웠다 — 호출처 0 이었고
+#      `--base HEAD` 는 사이트 0개로 exit 3 · f500bc9 는 10/11 이었다(F-354). 사이트 목록은 동결 sites.tsv 가 정본이다
+# modes: default caller=health
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE="" EMIT=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --tree) [ $# -ge 2 ] || { echo "SETUP --tree 에 경로가 없다"; exit 3; }
             R="$(cd "$2" 2>/dev/null && pwd)" || { echo "SETUP --tree 경로 없음: $2"; exit 3; }; shift 2 ;;
-    --base) [ $# -ge 2 ] || { echo "SETUP --base 에 경로가 없다"; exit 3; }
-            BASE="$(cd "$2" 2>/dev/null && pwd)" || { echo "SETUP --base 경로 없음: $2"; exit 3; }; shift 2 ;;
-    --emit-sites) EMIT=1; shift ;;
     *) echo "SETUP 알 수 없는 인자: $1"; exit 3 ;;
   esac
 done
@@ -38,7 +36,7 @@ command -v python3 >/dev/null 2>&1 || { echo "SETUP python3 부재"; exit 3; }
 T0="$(mktemp -d)" || { echo "SETUP mktemp 실패"; exit 3; }; T="$(cd "$T0" && pwd -P)" || { echo "SETUP 임시 폴더 해석 실패"; exit 3; }
 trap 'rm -rf "${T:?}"' EXIT
 
-PYTHONDONTWRITEBYTECODE=1 python3 -B - "$R" "$BASE" "$HERE/sites.tsv" "$T" "$EMIT" <<'PY'
+PYTHONDONTWRITEBYTECODE=1 python3 -B - "$R" "$HERE/sites.tsv" "$T" <<'PY'
 import json, os, pathlib, re, shlex, subprocess, sys, traceback
 
 
@@ -49,11 +47,10 @@ def _crash(*exc):   # 판정기 고장은 3 — 미처리 예외의 기본 exit 
 
 
 sys.excepthook = _crash
-TREE, BASE, FROZEN, TMP, EMIT = pathlib.Path(sys.argv[1]), sys.argv[2], pathlib.Path(sys.argv[3]), pathlib.Path(sys.argv[4]), sys.argv[5]
+TREE, FROZEN, TMP = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
 DOCS = ("skills/fz-modernize/SKILL.md", "modules/cross-validation.md", "modules/fz-gpt-subcommands-aux.md",
         "modules/fz-gpt-subcommands-core.md", "modules/peer-review-tiers.md")
 FLOOR = 7
-CAT = re.compile(r'cat "\$\{?([A-Z_]*SKILL_PATH)')
 ROLE = re.compile(r'\b([A-Z_]*SKILL_PATH)=\$\(get_gpt_skill_path "([a-z-]+)"')
 EXEC_LINE = re.compile(r'/scripts/gpt-exec\.sh"')
 GATE_LINE = re.compile(r'/scripts/gpt-call\.sh"\s+([a-z][a-z0-9-]*)')
@@ -91,26 +88,6 @@ def blocks(text):
         else:
             cur.append(line)
     return out
-
-
-def sites_of(root):
-    """기준 트리 → 고유 사이트 [(문서, 제목, 역할, 변수, 줄)]."""
-    got, seen = [], set()
-    for doc in DOCS:
-        for head, start, body in blocks(read(root, doc)):
-            roles = {v: r for v, r in ROLE.findall(body)}
-            for off, line in enumerate(body.split("\n")):
-                m = CAT.search(line)
-                if not m:
-                    continue
-                var = m.group(1)
-                if var not in roles:
-                    raise Setup(f"{doc}:{start + off} — cat 하는 {var} 의 get_gpt_skill_path 역할을 같은 블록에서 찾지 못했다")
-                key = (doc, head, roles[var])
-                if key not in seen:
-                    seen.add(key)
-                    got.append((doc, head, roles[var], var, start + off))
-    return got
 
 
 def load_frozen():
@@ -333,25 +310,10 @@ def cell_of(site):
 
 
 def main():
-    if BASE:
-        sites = sites_of(BASE)
-        src = f"--base {BASE}"
-    else:
-        sites = load_frozen()
-        src = f"동결 {FROZEN.name}"
-    if EMIT:
-        if not BASE:
-            raise Setup("--emit-sites 는 --base 가 필요하다")
-        print("# 문서\t제목\t역할\t변수\t기준 줄 — run.sh --base <기준> --emit-sites 로 만든다")
-        for s in sites:
-            print("\t".join(map(str, s)))
-        return 0
+    sites = load_frozen()
+    src = f"동결 {FROZEN.name}"
     if len(sites) < FLOOR:
         raise Setup(f"사이트 {len(sites)}개 < {FLOOR} — 이 기준은 cat 사이트를 가진 판이 아니다({src})")
-    if BASE and FROZEN.is_file():
-        fz = {s[:3] for s in load_frozen()}
-        if fz != {s[:3] for s in sites}:
-            print(f"INFO  --base 사이트 집합이 동결 sites.tsv 와 다르다(이번 판정은 --base 기준) — 빠짐 {sorted(fz - {s[:3] for s in sites})}")
     tree_text = {doc: read(TREE, doc) for doc in DOCS}           # 다섯 문서 읽기 확인 — 못 읽으면 준비 실패
     print(f"사이트 {len(sites)}개 ({src}) · 대상 {TREE}")
 

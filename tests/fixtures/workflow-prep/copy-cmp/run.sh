@@ -1,4 +1,5 @@
 #!/bin/bash
+# modes: --variant caller=manual last-pass=7b89bd4 result=--variant plan · 14 PASS(2026-11-05 배선 감사)
 # Workflow 준비 계약 fixture — `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비** 블록과 소비자 10곳의 준비 줄을
 # 문서에서 꺼내 **실제로 실행**한다. 문구 존재가 아니라 행동(종료 코드 · 복사본 바이트 · 만들지 말아야 할 파일)을 본다.
 #   --cells prep   0단계 블록(placeholder 를 임시 폴더로 치환)을 셀마다 돌린다

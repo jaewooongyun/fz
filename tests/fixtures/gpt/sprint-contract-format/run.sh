@@ -1,4 +1,6 @@
 #!/bin/bash
+# modes: --fixture caller=manual last-pass=7b89bd4 result=9 PASS · 기본 DIR quality/plan-feature(2026-11-05 배선 감사)
+# modes: --live caller=manual last-pass=none result=실제 GPT CLI 호출(네트워크) — 사람 호출 전용
 # Sprint Contract 형식 러너 (S12) — fz-architect 로 Sprint Contract 를 만들 때(modules/sprint-contract.md 절차 2) SC 산출 형식이 유지되는가.
 #
 # 기본 모드(게이트) — GPT 를 부르지 않는다. 결정론이다.
