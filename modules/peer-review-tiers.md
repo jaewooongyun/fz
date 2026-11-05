@@ -31,6 +31,8 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 | **2 (Lite)** | peer-review.js Stage1 (**opus**) | Stage1 (**opus** ×2) | Lead ×1 (§ GPT Analyze 호출) | 미투표 (Lead 병합) · **Stage2 조건부** | **3 또는 5** (트리거 발화 시 5) |
 | **3 (Full)** | Stage1 + Stage2 (**opus**) | Stage1 (**opus** ×2) | Lead ×2 (§ GPT Analyze 호출 + DA) | Workflow Stage2 교차 + Stage3 counter DA | **6** (전부 opus) |
 
+> ⊕ **Curate**(Synthesize 뒤 · Deliver 앞 · 기본 — `--no-curate` 로 끈다): Tier 0/1 = Lead 카드 · Tier 2/3 = swarm 1조각(카드 ≤ 8)마다 `fz:review-counter` — 절차 SKILL.md § Step: Curate · 계약 `scripts/check_comment_worthy.py`
+>
 > ⛔ **모드 게이트**(2026-10-19): light = **Tier 1** · full = **Tier 2** · `--deep` = Tier 3. Tier 0(GPT 없음)은 `--tier 0` 을 명시할 때만이다 — 계약 `modules/mode-gate.md`
 >
 > ⊕ **GPT 독립 첫 패스(기본 — `--gpt-independent` 생략 가능 · `--no-gpt-independent` 면 challenger)**: GPT 슬롯 1 = **독립 리뷰어** — kind `independent-review`(`gpt-call.sh independent-review`) 를 Workflow 와 **병렬**로 띄우고 `review_merge.py` 로 합친다(Tier 1 은 challenger 자리 — Lead 발견을 JSON 으로 써서 병합한다). Tier 3 의 GPT DA(슬롯 2)는 **두 패스가 끝난 뒤**다. 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서

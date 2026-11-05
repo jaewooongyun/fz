@@ -80,6 +80,73 @@ else
   printf '# 요구사항\n\n(브랜치 입력 — PR 메타 없음. Lead 가 티켓에서 채운다)\n' > "$STAGE_DIR/requirements.md"
 fi
 
+# ── 기존 스레드 (F-085) · 리뷰 대상 (R3-004) ────────────────────
+# existing-threads.json — PR 리뷰 코멘트(path · line) · 리뷰 · 대화 코멘트. 실패해도 gather 는 계속한다(status unavailable + GATHER-WARN) —
+#   "스레드가 없다" 와 "못 읽었다" 를 가른다. `--paginate --slurp` 가 한 페이지라도 실패하면(exit≠0) 부분 결과를 버린다.
+#   브랜치 대상은 status not-a-pr. Curate 검사기(scripts/check_comment_worthy.py)가 같은 path ±3줄 스레드와 대조한다
+# target.json — {kind: pr|branch, ref, sha}. 슬롯 검사기 · Curate 검사기가 Serena 트리 @sha · evidence @sha 를 이 sha 와 대조한다
+TH_ERR=""
+if $is_pr; then
+  OR="$(python3 -c "import json,re,sys;u=json.load(open(sys.argv[1])).get('url') or '';m=re.match(r'https?://[^/]+/([^/]+)/([^/]+)/pull/',u);print(m.group(1)+'/'+m.group(2) if m else '')" "$STAGE_DIR/pr-meta.json" 2>/dev/null)"
+  if [ -z "$OR" ]; then
+    TH_ERR="PR url 에서 owner/repo 를 읽지 못했다"
+  elif ! gh api "repos/$OR/pulls/$TARGET/comments" --paginate --slurp > "$STAGE_DIR/.threads-comments.json" 2>/dev/null; then
+    TH_ERR="gh api pulls/$TARGET/comments 실패 — 부분 페이지는 버린다"
+  elif ! gh pr view "$TARGET" --json reviews,comments,latestReviews,reviewDecision > "$STAGE_DIR/.threads-reviews.json" 2>/dev/null; then
+    TH_ERR="gh pr view reviews 실패"
+  fi
+fi
+python3 - "$STAGE_DIR" "$is_pr" "$TH_ERR" "$TARGET" <<'PY' || die 4 "existing-threads · target 기록 실패"
+import json, os, subprocess, sys
+st, is_pr, err, target = sys.argv[1], sys.argv[2] == "true", sys.argv[3], sys.argv[4]
+
+
+def load(name):
+    with open(os.path.join(st, name), encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def login(x):
+    return (x or {}).get("login") if isinstance(x, dict) else None
+
+
+if not is_pr:
+    th = {"status": "not-a-pr", "comments": [], "reviews": [], "reviewDecision": None}
+    r = subprocess.run(["git", "rev-parse", "--verify", target + "^{commit}"], capture_output=True, text=True)
+    tgt = {"kind": "branch", "ref": target, "sha": r.stdout.strip() or None}
+else:
+    tgt = {"kind": "pr", "ref": "pr-" + target, "sha": load("pr-meta.json").get("headRefOid")}
+    th = None
+    if not err:
+        try:
+            pages, rv = load(".threads-comments.json"), load(".threads-reviews.json")
+            if not isinstance(pages, list):
+                raise ValueError("pulls/comments 응답이 배열이 아니다")
+            flat = [c for p in pages for c in p] if all(isinstance(p, list) for p in pages) else pages
+            seen, comments = set(), []
+            for c in flat:
+                if isinstance(c, dict) and c.get("id") not in seen:
+                    seen.add(c.get("id"))
+                    row = {k: c.get(k) for k in ("id", "path", "line", "original_line", "in_reply_to_id")}
+                    row.update({"user": login(c.get("user")), "body": c.get("body"), "created_at": c.get("created_at")})
+                    comments.append(row)
+            reviews = [{"author": login(x.get("author")), "state": x.get("state"), "body": x.get("body"), "submittedAt": x.get("submittedAt")}
+                       for x in rv.get("reviews") or [] if isinstance(x, dict)]
+            conversation = [{"author": login(x.get("author")), "body": x.get("body"), "createdAt": x.get("createdAt")}
+                            for x in rv.get("comments") or [] if isinstance(x, dict)]
+            th = {"status": "ok", "comments": comments, "reviews": reviews, "conversation": conversation, "reviewDecision": rv.get("reviewDecision")}
+        except (OSError, ValueError, AttributeError, TypeError) as e:
+            err = "응답 해석 실패 — " + type(e).__name__
+    if th is None:
+        th = {"status": "unavailable", "reason": err, "comments": [], "reviews": [], "reviewDecision": None}
+        print("GATHER-WARN: existing-threads unavailable — %s (gather 는 계속한다 · Curate 는 스레드 대조 불가로 적는다)" % err, file=sys.stderr)
+with open(os.path.join(st, "existing-threads.json"), "w", encoding="utf-8") as fh:
+    json.dump(th, fh, ensure_ascii=False, indent=1)
+with open(os.path.join(st, "target.json"), "w", encoding="utf-8") as fh:
+    json.dump(tgt, fh, ensure_ascii=False)
+PY
+rm -f "$STAGE_DIR/.threads-comments.json" "$STAGE_DIR/.threads-reviews.json"
+
 [ -s "$STAGE_DIR/diff.patch" ] || die 4 "diff 가 비어 있다 — 대상이 맞는지 확인하라"
 
 # ── base 원본 (origin 판정 근거) ──────────────────────────────
@@ -525,7 +592,7 @@ rm -rf "$STAGE_DIR"
 added=$(awk '{a+=$1} END{print a+0}' "$WORK_DIR/numstat.txt")
 deleted=$(awk '{d+=$2} END{print d+0}' "$WORK_DIR/numstat.txt")
 echo "수집 완료 — base=$BASE / +$added −$deleted / base 원본 ${saved}/${expected}개 · head 원본 ${hsaved}/${hexpected}개"
-echo "  diff.patch · requirements.md · base-behavior.md · base/ · head/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json"
+echo "  diff.patch · requirements.md · base-behavior.md · base/ · head/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json · existing-threads.json · target.json"
 [ -f "$WORK_DIR/evidence-move-drift.md" ] && echo "  ⭐ evidence-move-drift.md — 이동 리팩토링 감지. 동등성과 **별개 축**이다"
 grep -q '⛔ \*\*head 커밋' "$WORK_DIR/review-surface.md" 2>/dev/null && \
   echo "⚠️  중복 커밋 감지 — review-surface.md 를 먼저 읽어라. Tier 판정이 부풀려져 있다"

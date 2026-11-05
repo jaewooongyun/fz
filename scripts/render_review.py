@@ -28,6 +28,15 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
   --review FILE --diff FILE --out-dir DIR   review-report.md · pr-comments.md · render-preview.json · payload.json(pr.headSha 가 있을 때만)
   --example   위 형식의 최소 review JSON 을 stdout 으로 — Lead 가 형식을 이 코드에서 다시 읽지 않게 한다(self-test example-roundtrip 이
               같은 객체를 검증 · 렌더한다)
+  --require-curation   `excluded` 키가 없는 review 를 거부한다(exit 1) — fz-peer-review 기본 경로(Curate)가 이 플래그로 렌더한다.
+              `--no-curate` 일 때만 뺀다 · fz-review `--render` 같은 옛 직접 렌더는 플래그 없이 그대로다
+  --example-curated-dir DIR   큐레이션한 묶음 예시(review.json · merged.json · synthesized-issues.json)를 DIR 에 쓴다 — GPT 전용 후보 포함
+
+큐레이션(review 에 `excluded` 키가 있을 때) — 렌더 **전에** scripts/check_comment_worthy.py 의 계약을 돌린다. 위반이면 exit 1 · 판정 불가면 2 ·
+  둘 다 파일을 쓰지 않는다. 통과하면 리포트는 ① 이번 PR 버그 ② 구조·품질 제안(non-blocking) ③ 의도 확인 질문 → ④ 참고(E4) → 제외 후보 표 →
+  기존 스레드 대조 줄 → 답글 초안(E5 reply) 순이고, pr-comments.md 끝에 답글 초안을 붙인다(payload 밖 — 기존 스레드 답글은 따로 단다).
+  추가 키: target{kind, ref, sha}(gather 의 target.json) · candidates(후보 원본 상대 경로) · issue.kind · evidence · repro · measure · refute · covers ·
+  distinctFrom · excluded[{id, what, code E1~E8, reason, covers?, duplicateOf?, reply?, refute?}] — 계약 정본은 check_comment_worthy.py 머리말
   --self-test
 
 exit: 0=렌더 · 1=거부(구간 선택 필요 · 후보 밖 pick · body 상한 초과) · 2=입력 불가(⛔ 통과 아님 — 빈 JSON · 필수 키 없음)
@@ -217,6 +226,68 @@ def report(r: dict, plans: list) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+CURATED = (("bug",), "① 이번 PR 버그"), (("structure", "quality"), "② 구조·품질 제안 (non-blocking)"), (("intent-question",), "③ 의도 확인 질문")
+
+
+def _cell(v) -> str:
+    return str(v or "—").replace("|", "\\|").replace("\n", " ").strip()
+
+
+def curated_report(r: dict, plans: list, info: dict) -> str:
+    pr = r.get("pr") or {}
+    lines = [f"# PR #{pr['number']} 리뷰" if pr.get("number") is not None else "# 리뷰 보고서", "",
+             f"**판정**: {r['verdict'].strip()}", ""]
+    if r.get("launchSmoke"):
+        lines += [r["launchSmoke"].strip(), ""]
+    if r.get("matrix"):
+        lines += ["## Confidence Matrix", "", r["matrix"].strip(), ""]
+    groups = [[p for p in plans if p["issue"].get("kind") in kinds] for kinds, _ in CURATED]
+    lines += [f"## 코멘트 {len(plans)}건 — " + " · ".join(f"{t.split()[0]} {len(g)}" for (_, t), g in zip(CURATED, groups)), ""]
+    if not plans:
+        lines += ["코멘트할 것 없음 — 후보는 모두 아래 표로 처분했다.", ""]
+    for (_, title), g in zip(CURATED, groups):
+        if not g:
+            continue
+        lines += [f"### {title}", ""]
+        for p in g:
+            i = p["issue"]
+            where = " · ".join(f"`{x['loc']}`" for x in p["sites"])
+            found = i.get("foundBy")
+            found = " · ".join(found) if isinstance(found, list) else (found or "—")
+            conf = i.get("confidence")
+            lines += [MARK.format(i["id"]), f"#### [{i['severity']}] {i['id']}", "",
+                      "| File:line | Origin | Confidence | Found-by |", "|---|---|---|---|",
+                      f"| {where} | {i.get('origin') or '—'} | {'—' if conf is None else conf} | {found} |", "",
+                      f"**What** — {i['what'].strip()}", ""]
+            if i.get("suggestion"):
+                lines += [f"**Suggestion** — {i['suggestion'].strip()}", ""]
+            rp = i.get("repro") if isinstance(i.get("repro"), dict) else None
+            if rp:
+                lines += [f"**재현** — {rp.get('status')} · {str(rp.get('how') or '').strip()}", ""]
+            if i.get("measure"):
+                lines += [f"**측정** — {str(i['measure']).strip()}", ""]
+            if i.get("refute"):
+                lines += [f"**반박 시도** — {str(i['refute']).strip()}", ""]
+    ex = [x for x in r.get("excluded") or [] if isinstance(x, dict)]
+    e4 = [x for x in ex if x.get("code") == "E4"]
+    if e4:
+        lines += ["## ④ 참고 — 원래 있던 문제 (E4 · 이번 PR 과 무관 · 별 티켓 제안)", ""]
+        lines += [f"- `{x['id']}` — {_cell(x.get('what'))} · {_cell(x.get('reason'))}" for x in e4] + [""]
+    lines += [f"## 제외 후보 {len(ex)}건", "", "| id | 한 줄 | 코드 | 근거 |", "|---|---|---|---|"]
+    lines += [f"| `{x['id']}` | {_cell(x.get('what'))} | {x.get('code')} | {_cell(x.get('reason'))}"
+              + (f" (+{len(x['covers'])} 묶음)" if x.get("covers") else "") + " |" for x in ex]
+    lines += ["", "## 기존 스레드 대조", "", info.get("thread_line") or "—", ""]
+    replies = [x for x in ex if x.get("code") == "E5" and str(x.get("reply") or "").strip()]
+    if replies:
+        lines += ["## 답글 초안 (E5 — 기존 스레드에 단다)", ""]
+        lines += [f"- 스레드 {x.get('duplicateOf')} ← `{x['id']}`: {str(x['reply']).strip()}" for x in replies] + [""]
+    if r.get("severityNote"):
+        lines += ["## Severity 보정 근거", "", r["severityNote"].strip(), ""]
+    if r.get("strengths"):
+        lines += ["## 긍정적 측면", ""] + [f"- {s}" for s in r["strengths"]] + [""]
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def pr_comments(r: dict, us: list) -> str:
     pr = r.get("pr") or {}
     lines = [f"# PR #{pr['number']} 코멘트 (복사용)" if pr.get("number") is not None else "# 리뷰 코멘트 (복사용)", ""]
@@ -228,10 +299,14 @@ def pr_comments(r: dict, us: list) -> str:
         part = f" [{u['part']}]" if u["part"] else ""
         body = u["body"] if u["anchor"] else u["body"] + "\n\n" + quote(u["at"])
         lines += [f"## {u['id']}{part} · `{u['at']['loc']}`", "", body, ""]
+    replies = [x for x in r.get("excluded") or [] if isinstance(x, dict) and x.get("code") == "E5" and str(x.get("reply") or "").strip()]
+    if replies:   # 기존 스레드 답글 — 게시 payload 밖이다(새 코멘트가 아니라 그 스레드에 단다)
+        lines += ["## 답글 초안 (기존 스레드 — payload 밖)", ""]
+        lines += [f"- 스레드 {x.get('duplicateOf')}: {str(x['reply']).strip()}" for x in replies] + [""]
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render(review, diff_text: str) -> dict:
+def render(review, diff_text: str, curation: dict | None = None) -> dict:
     validate(review)
     if not re.search(r"^diff --git ", diff_text, re.M):
         raise InputError("diff 에 `diff --git` 헤더가 없다 — 파일 경계를 가를 수 없어 모든 지점이 앵커 불가로 조용히 떨어진다(git diff 출력만 받는다)")
@@ -248,7 +323,7 @@ def render(review, diff_text: str) -> dict:
         plans.append({"issue": i, "sites": xs})
     plans.sort(key=lambda p: SEVERITIES.index(p["issue"]["severity"]))   # 안정 정렬 — 같은 severity 는 JSON 순서
     us = [u for p in plans for u in units(p["issue"], p["sites"])]
-    rep = report(review, plans)
+    rep = curated_report(review, plans, curation or {}) if "excluded" in review else report(review, plans)
     comments, rows = inline(us)
     pr = review.get("pr") or {}
     event = review.get("event", "COMMENT")
@@ -294,8 +369,21 @@ def run_render(a) -> int:
         diff_text = Path(a.diff).read_text(encoding="utf-8", errors="replace")
     except (OSError, ValueError) as e:
         return fail(UNRUN, f"UNRUN: 입력을 읽지 못했다 — {e}")
+    curated = isinstance(review, dict) and "excluded" in review
+    if getattr(a, "require_curation", False) and not curated:
+        return fail(REJECT, "REJECT: --require-curation — excluded 키가 없다(Curate 를 건너뛴 리뷰다 · --no-curate 면 이 플래그 없이 렌더한다)")
+    curation = None
+    if curated:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import check_comment_worthy as ccw   # 렌더 전에 코멘트 가치 계약 — 위반 · 판정 불가면 파일을 쓰지 않는다
+        code, bad, warn, curation = ccw.check_review(review, Path(a.review).resolve().parent)
+        for w in warn:
+            print(f"WARN {w}", file=sys.stderr)
+        if code:
+            return fail(REJECT if code == ccw.VIOLATION else UNRUN,
+                        ("REJECT" if code == ccw.VIOLATION else "UNRUN") + ": 코멘트 가치 검사 — " + " · ".join(bad[:5]))
     try:
-        out = render(review, diff_text)
+        out = render(review, diff_text, curation)
     except InputError as e:
         return fail(UNRUN, f"UNRUN: {e}")
     except Reject as e:
@@ -560,8 +648,29 @@ def self_test() -> int:
         case("example-roundtrip — --example 출력이 예시 객체와 같고 검증 · 렌더를 통과한다(세 산출물의 이슈 id 일치)",
              cli == EXAMPLE and rep == com == pay == want, (r.returncode, rep, com, pay))
 
+    def t_curated():
+        ex = tmp / "curated"
+        subprocess.run([sys.executable, __file__, "--example-curated-dir", str(ex)], capture_output=True, text=True)
+        args = ["--review", str(ex / "review.json"), "--diff", str(diff), "--require-curation"]
+        r = subprocess.run([sys.executable, __file__, *args, "--out-dir", str(tmp / "cur-ok")], capture_output=True, text=True)
+        rep = (tmp / "cur-ok" / "review-report.md").read_text(encoding="utf-8") if r.returncode == 0 else ""
+        case("curated-report — 예시 묶음이 계약을 통과하고 ① · ③ · 제외 표 · 스레드 대조 줄을 그린다(옛 report 경로는 그대로)",
+             r.returncode == 0 and "### ① 이번 PR 버그" in rep and "### ③ 의도 확인 질문" in rep and "## 제외 후보 2건" in rep
+             and "## ④ 참고" in rep and "## 기존 스레드 대조" in rep, (r.returncode, r.stderr[-200:]))
+        bad = json.loads((ex / "review.json").read_text(encoding="utf-8"))
+        bad["issues"][0].pop("evidence")
+        (ex / "bad.json").write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
+        r = subprocess.run([sys.executable, __file__, "--review", str(ex / "bad.json"), "--diff", str(diff), "--out-dir", str(tmp / "cur-bad")],
+                           capture_output=True, text=True)
+        case("curated-violation — 계약 위반이면 exit 1 · 파일 0", r.returncode == 1 and not any((tmp / "cur-bad").glob("*")), (r.returncode, r.stderr[-200:]))
+        f = tmp / "uncur.json"
+        f.write_text(json.dumps(review(base), ensure_ascii=False), encoding="utf-8")
+        r = subprocess.run([sys.executable, __file__, "--review", str(f), "--diff", str(diff), "--out-dir", str(tmp / "uncur"), "--require-curation"],
+                           capture_output=True, text=True)
+        case("require-curation — excluded 없는 review 는 exit 1 · 파일 0", r.returncode == 1 and not any((tmp / "uncur").glob("*")), r.returncode)
+
     tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_nodiff, t_empty, t_nopr, t_det, t_limit, t_cli,
-             t_example]
+             t_example, t_curated]
     try:
         for t in tests:
             try:
@@ -574,6 +683,48 @@ def self_test() -> int:
     return OK if passed == total else REJECT
 
 
+CURATED_SHA = "abc1234def5678"
+# --example-curated-dir — SELF_DIFF · 게이트 합성 patch 의 앵커 가능한 줄(src/a.swift 11-12)만 쓴다. GPT 전용 후보(gpt:G2)는 E2 로 제외
+EXAMPLE_CURATED = {
+    "review.json": {
+        "verdict": "코멘트 1건 · 질문 1건 — 머지를 막을 결함은 없다", "event": "COMMENT",
+        "pr": {"number": 7, "headSha": CURATED_SHA}, "target": {"kind": "pr", "ref": "pr-7", "sha": CURATED_SHA},
+        "candidates": ["merged.json", "synthesized-issues.json"],
+        "issues": [
+            {"id": "A1", "kind": "bug", "severity": "major", "origin": "regression", "confidence": 90, "foundBy": ["claude", "gpt"],
+             "covers": ["claude:C1", "gpt:G1", "S1"], "what": "nil 이면 목록이 비어 보인다(WHY — 새 guard 가 빈 배열을 반환한다)",
+             "suggestion": "nil 일 때 이전 목록을 유지한다", "evidence": ["src/a.swift:11-12@abc1234"],
+             "repro": {"status": "code-determined", "how": "nil 입력 → 11행 guard → 빈 배열"}, "symptom_screen": "목록 화면",
+             "symptom_reach": "탭 진입 → 목록 로드 실패", "refute": "반박 시도 — 호출부 1곳이 nil 을 걸러내는지 확인했으나 거르지 않는다",
+             "comment": "nil 이 들어오면 11행 guard 에서 빈 배열이 반환돼 목록이 비어 보입니다.\n이전 목록을 유지하는 쪽은 어떨지 확인 부탁드립니다.",
+             "sites": [{"path": "src/a.swift", "start": 11, "end": 12}]},
+            {"id": "Q1", "kind": "intent-question", "severity": "suggestion", "origin": "regression",
+             "what": "12행 재시도 횟수 3 이 의도한 값인지", "evidence": ["src/a.swift:12@abc1234"],
+             "refute": "반박 시도 — 요구사항 문서에 값이 없다", "comment": "12행 재시도 3회가 기획 값인지 여쭙습니다.",
+             "sites": [{"path": "src/a.swift", "start": 12, "end": 12}]}],
+        "excluded": [
+            {"id": "claude:C2", "what": "base 에도 있던 강제 언래핑", "code": "E4", "reason": "base 같은 줄 — 이번 PR 무관"},
+            {"id": "gpt:G2", "what": "SDK 콜백이 메인 스레드라는 가정", "code": "E2", "reason": "SDK 내부 동작 가정 — 근거 없음"}],
+        "strengths": ["변경 범위가 요구사항과 맞는다"],
+    },
+    "merged.json": {
+        "schemaVersion": 1, "inputs": {"claude": 2, "gpt": 2, "gptVerdicts": 0, "gptUnavailable": None, "evidenceChecked": True},
+        "candidates": [
+            {"id": "claude:C1", "source": "claude", "lens": "arch", "file": "src/a.swift", "line_range": "11-12", "severity": "major",
+             "origin": "regression", "evidence": "src/a.swift:11", "effectiveSeverity": "major", "foundBy": ["claude"]},
+            {"id": "claude:C2", "source": "claude", "lens": "quality", "file": "src/a.swift", "line_range": "13", "severity": "minor",
+             "origin": "pre-existing", "evidence": "src/a.swift:13", "effectiveSeverity": "suggestion", "foundBy": ["claude"]},
+            {"id": "gpt:G1", "source": "gpt", "lens": None, "file": "src/a.swift", "line_range": "11", "severity": "major",
+             "origin": "regression", "evidence": "src/a.swift:11", "effectiveSeverity": "major", "foundBy": ["gpt"]},
+            {"id": "gpt:G2", "source": "gpt", "lens": None, "file": "src/a.swift", "line_range": "12", "severity": "minor",
+             "origin": "regression", "evidence": "src/a.swift:12", "effectiveSeverity": "minor", "foundBy": ["gpt"]}],
+        "summary": {"candidatesIn": 4, "candidatesOut": 4},
+    },
+    "synthesized-issues.json": {"issues": [{"id": "S1", "severity": "major", "found_by": ["claude", "gpt"], "file": "src/a.swift",
+                                            "line": "11-12", "symptom_screen": "목록 화면", "symptom_reach": "탭 진입 → 목록 로드 실패"}]},
+}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--review")
@@ -581,11 +732,20 @@ def main() -> int:
     ap.add_argument("--out-dir")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--example", action="store_true")
+    ap.add_argument("--require-curation", action="store_true")
+    ap.add_argument("--example-curated-dir", metavar="DIR")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
     if a.example:
         print(json.dumps(EXAMPLE, ensure_ascii=False, indent=2))
+        return OK
+    if a.example_curated_dir:
+        d = Path(a.example_curated_dir)
+        d.mkdir(parents=True, exist_ok=True)
+        for name, obj in EXAMPLE_CURATED.items():
+            (d / name).write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"→ {d}/  " + " · ".join(EXAMPLE_CURATED))
         return OK
     if not (a.review and a.diff and a.out_dir):
         print("UNRUN: --review · --diff · --out-dir 가 모두 필요하다 (또는 --self-test)", file=sys.stderr)

@@ -603,6 +603,8 @@ Lead 가 `crossVerdicts[]` 를 읽고 § 4(Lead 실측의 자격)로 판정한�
 
 §3·§6·§7 가운데 **기계로 결판나는 부분**을 스크립트가 한다. 판정은 Lead 에 남는다.
 
+⊕ 병합본은 `--out "${WORK_DIR}/merged.json"` 으로 남긴다 — Curate 가 `candidates[]` 를 후보 원본으로 읽어 "조용히 사라진 후보" 를 센다(SKILL.md § Step: Curate · `scripts/check_comment_worthy.py`).
+
 스크립트가 하는 일:
 - §3 키로 그룹을 묶는다 — ⛔ 후보를 지우지 않는다(입력 후보 수 = 출력 후보 수, AC-4). 후보 경로는 먼저 diff 경로로 푼다(basename · `./` · git 따옴표 · 탭 꼬리 — `diff_anchors.resolve_path` 와 같은 의미)
 - 그룹마다 누가 찾았는지 귀속한다 — `both` · `claude_only` · `gpt_only`

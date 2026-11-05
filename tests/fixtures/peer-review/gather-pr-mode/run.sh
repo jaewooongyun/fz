@@ -49,9 +49,14 @@
 #   shim-fields-unknown  실재하지 않는 필드는 실 gh 문구(`Unknown JSON field`)로 거부한다
 #   shim-fields-absent   실재 필드라도 고정 응답에 없으면 지어내지 않고 거부한다
 #   shim-fields-gather   gather 의 실제 `--json` 요청이 url · baseRefOid 를 포함하고 shim 이 하나도 거부하지 않는다
+# 셀 (--cells threads) — F-085: 기존 스레드 수집(existing-threads.json) · 리뷰 대상(target.json). 다른 묶음은 빈 페이지 1개를 기본 응답으로 받는다
+#   existing-threads-ok             코멘트 2 · 리뷰 1 → status ok · 정규형 키 · user = login · target.json = {pr, pr-<N>, headRefOid}
+#   existing-threads-unavailable    pulls/comments 응답이 없다(shim 거부) → gather exit 0 · status unavailable · GATHER-WARN · comments 0
+#   existing-threads-paginate       2페이지 · 겹친 id 1 → 평탄화 · id 로 중복 제거(3건)
+#   existing-threads-midpage-fail   첫 페이지만 내고 exit 1 → 부분 결과를 버린다(status unavailable · comments 0)
 # exit: 0 전건 통과 · 1 단언 실패(판정 줄 뒤에만) · 3 준비 실패(인자 · 도구 · 저장소 · 전제)
 #   ⛔ 판정 줄 없이 끝나면(셸 오류 · 중간 종료) 1 이 아니라 3 으로 낸다 — 1 은 단언 실패만 뜻한다.
-# usage: run.sh [--tree <플러그인 트리>] [--cells numstat,base,shim-fields,freshness]   (기본: 이 fixture 가 든 트리 · 전 셀 — health-check 는 인자 없이 부른다)
+# usage: run.sh [--tree <플러그인 트리>] [--cells numstat,base,shim-fields,freshness,threads]   (기본: 이 fixture 가 든 트리 · 전 셀 — health-check 는 인자 없이 부른다)
 set -u
 
 DONE=0 fail=0 TMP=""
@@ -69,7 +74,7 @@ setup_fail() { echo "SETUP $*"; exit 3; }
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || setup_fail "fixture 경로 해석 실패"
 TREE="$(cd "$HERE/../../../.." && pwd)" || setup_fail "기본 트리 해석 실패"
-ALL_GROUPS="numstat base shim-fields freshness"
+ALL_GROUPS="numstat base shim-fields freshness threads"
 CELLS="$(printf '%s' "$ALL_GROUPS" | tr ' ' ',')"   # ⛔ 쉼표로 잇는다 — want() 가 `,<묶음>,` 으로 찾는다(공백으로 이으면 인자 없는 실행이 0셀)
 # 묶음마다 판정해야 하는 셀 — 끝에서 RAN 과 대조한다(원장 CHECK 는 exit 만 보므로 셀 하나를 지워도 통과하던 구멍 · F-408)
 expect_of() {
@@ -78,6 +83,7 @@ expect_of() {
     base) echo "base-stale-local base-upstream-not-base-repo base-tracking-stale base-no-match-fallback base-prefixed-remote" ;;
     shim-fields) echo "shim-fields-real shim-fields-unknown shim-fields-absent shim-fields-gather" ;;
     freshness) echo "stale-in-surface stale-in-behavior head-mismatch-stops remote-rule-aligned head-refspec-forced" ;;
+    threads) echo "existing-threads-ok existing-threads-unavailable existing-threads-paginate existing-threads-midpage-fail" ;;
   esac
 }
 while [ $# -gt 0 ]; do
@@ -232,8 +238,14 @@ json.dump({
         {"path": "docs/b.txt", "additions": 0, "deletions": 0},
         {"path": "assets/logo.bin", "additions": 0, "deletions": 0},
     ],
+    "reviews": [], "comments": [], "latestReviews": [], "reviewDecision": "",
 }, open(out, "w", encoding="utf-8"))
+import os, re
+_m = re.match(r"https?://[^/]+/([^/]+)/([^/]+)/pull/", "https://github.com/base-owner/base-repo/pull/%d" % n)
+if _m:   # 기존 스레드 수집(F-085)의 기본 응답 — 빈 페이지 하나
+    open(os.path.join(os.path.dirname(out), "api-repos-%s-%s-pulls-%d-comments.json" % (_m.group(1), _m.group(2), n)), "w").write("[[]]\n")
 PY
+  [ -n "${RUN_PR_HOOK:-}" ] && "$RUN_PR_HOOK" "$D"   # 셀 묶음이 기본 응답을 손볼 자리(threads)
   (cd "$CL" && FZ_GH_SHIM_DIR="$D" FZ_GH_SHIM_PR="$2" bash "$GATHER" --work-dir "$D/wd" --target "$2") > "$D/out" 2> "$D/err"
   RC=$?
 }
@@ -339,7 +351,12 @@ json.dump({
     "number": n, "title": "fixture PR %d" % n, "body": "fixture", "baseRefName": "main", "baseRefOid": base_oid,
     "headRefName": "feature/pr", "headRefOid": head_oid, "isCrossRepository": True,
     "headRepositoryOwner": {"login": "fork-owner"}, "url": url, "additions": 3, "deletions": 5, "files": [],
+    "reviews": [], "comments": [], "latestReviews": [], "reviewDecision": "",
 }, open(out, "w", encoding="utf-8"))
+import os, re
+_m = re.match(r"https?://[^/]+/([^/]+)/([^/]+)/pull/", url)
+if _m:   # 기존 스레드 수집(F-085)의 기본 응답 — 빈 페이지 하나
+    open(os.path.join(os.path.dirname(out), "api-repos-%s-%s-pulls-%d-comments.json" % (_m.group(1), _m.group(2), n)), "w").write("[[]]\n")
 PY
     REFS0=$(refs_of "$BCL") || setup_fail "$1 ref 목록 실패"
     (cd "$BCL" && FZ_GH_SHIM_DIR="$D" FZ_GH_SHIM_PR="$N_U" bash "$GATHER" --work-dir "$D/wd" --target "$N_U" "${@:5}") > "$D/out" 2> "$D/err"
@@ -544,6 +561,52 @@ PY
   [ "$RC" -eq 0 ] && [ "$has" -eq 1 ] && ok "shim-fields-gather: gather --json 요청에 url · baseRefOid ($req)" \
     || no "shim-fields-gather: gather --json 요청에 url · baseRefOid" "exit $RC · 요청 '${req:-없음}'"
   assert_shim shim-fields-gather
+fi
+
+if want threads; then
+  TH_SLUG="api-repos-base-owner-base-repo-pulls-$N_U-comments"
+  th() { python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(eval(sys.argv[2]))" "$D/wd/existing-threads.json" "$1" 2>/dev/null; }
+  th_ok() {
+    printf '%s\n' '[[{"id":11,"path":"f.txt","line":2,"original_line":2,"in_reply_to_id":null,"user":{"login":"rev"},"body":"b1","created_at":"t1","node_id":"x"},{"id":12,"path":"f.txt","line":3,"user":{"login":"bot"},"body":"b2"}]]' > "$1/$TH_SLUG.json"
+    python3 - "$1/pr.json" <<'PY' || setup_fail "threads pr.json 손질 실패"
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+d.update({"reviews": [{"author": {"login": "rev"}, "state": "COMMENTED", "body": "r1", "submittedAt": "t2"}], "reviewDecision": "REVIEW_REQUIRED"})
+json.dump(d, open(sys.argv[1], "w", encoding="utf-8"))
+PY
+  }
+  th_missing() { rm -f "$1/$TH_SLUG.json"; }
+  th_pages() { printf '%s\n' '[[{"id":21,"path":"a"},{"id":22,"path":"a"}],[{"id":22,"path":"a"},{"id":23,"path":"b"}]]' > "$1/$TH_SLUG.json"; }
+  th_midfail() { printf '%s' '[[{"id":31,"path":"a"}]' > "$1/$TH_SLUG.fail"; }
+
+  RUN_PR_HOOK=th_ok; run_pr existing-threads-ok "$N_U" 3 5
+  if [ "$RC" -eq 0 ] && [ "$(th 'd["status"]')" = "ok" ] && [ "$(th '[c["id"] for c in d["comments"]]')" = "[11, 12]" ] \
+     && [ "$(th 'sorted(d["comments"][0])')" = "['body', 'created_at', 'id', 'in_reply_to_id', 'line', 'original_line', 'path', 'user']" ] \
+     && [ "$(th 'd["comments"][0]["user"]')" = "rev" ] && [ "$(th 'len(d["reviews"])')" = "1" ] && [ "$(th 'd["reviewDecision"]')" = "REVIEW_REQUIRED" ] \
+     && python3 -c "import json,sys;t=json.load(open(sys.argv[1]));sys.exit(0 if t=={'kind':'pr','ref':'pr-$N_U','sha':'$P'} else 1)" "$D/wd/target.json"; then
+    ok "existing-threads-ok: status ok · 코멘트 2(정규형 키 · user=login) · 리뷰 1 · target.json = pr · pr-$N_U · headRefOid"
+  else
+    no "existing-threads-ok: status ok · 정규형 · target.json" "exit $RC · $(head -c 200 "$D/wd/existing-threads.json" 2>/dev/null) · target $(cat "$D/wd/target.json" 2>/dev/null)"
+  fi
+  RUN_PR_HOOK=th_missing; run_pr existing-threads-unavailable "$N_U" 3 5
+  if [ "$RC" -eq 0 ] && [ "$(th 'd["status"]')" = "unavailable" ] && [ "$(th 'len(d["comments"])')" = "0" ] && grep -q '^GATHER-WARN: existing-threads unavailable' "$D/err"; then
+    ok "existing-threads-unavailable: 응답 없음 → gather exit 0 · status unavailable · GATHER-WARN · 코멘트 0"
+  else
+    no "existing-threads-unavailable: gather 계속 · unavailable" "exit $RC · $(th 'd') · $(grep -m1 GATHER-WARN "$D/err")"
+  fi
+  RUN_PR_HOOK=th_pages; run_pr existing-threads-paginate "$N_U" 3 5
+  if [ "$RC" -eq 0 ] && [ "$(th 'd["status"]')" = "ok" ] && [ "$(th '[c["id"] for c in d["comments"]]')" = "[21, 22, 23]" ]; then
+    ok "existing-threads-paginate: 2페이지 평탄화 · 겹친 id 22 중복 제거 → 3건"
+  else
+    no "existing-threads-paginate: 평탄화 · 중복 제거" "exit $RC · $(th '[c["id"] for c in d["comments"]]')"
+  fi
+  RUN_PR_HOOK=th_midfail; run_pr existing-threads-midpage-fail "$N_U" 3 5
+  if [ "$RC" -eq 0 ] && [ "$(th 'd["status"]')" = "unavailable" ] && [ "$(th 'len(d["comments"])')" = "0" ]; then
+    ok "existing-threads-midpage-fail: 중간 페이지 실패 → 부분 결과 버림 · status unavailable · 코멘트 0"
+  else
+    no "existing-threads-midpage-fail: 부분 결과 버림" "exit $RC · $(th 'd')"
+  fi
+  RUN_PR_HOOK=""
 fi
 
 [ -n "$RAN" ] || setup_fail "판정한 셀이 0개 — 셀 선택이 아무것도 고르지 않았다(통과로 읽지 않는다)"

@@ -31,21 +31,14 @@ import sys
 OK, VIOLATION, UNRUN = 0, 1, 2
 # ⛔ N6 루트 앵커 — lint_contracts ANCHOR_LINES 허용 형태와 정확히 일치
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
+from check_synthesized import normalize, zero_evidence  # noqa: E402 — 두 생산자 모양 · 0건 완결 증거를 같은 규칙으로 읽는다(F-530)
 BLOCKING = ("critical", "major", "minor")          # 계약 "minor 이상" — 새 등급이 생기면 여기와 KNOWN 을 같이 고친다
 KNOWN = BLOCKING + ("suggestion", "excluded")       # 그 밖의 값은 판정 불가(UNRUN) — 오타가 조용히 면제되지 않게
 
 
 def log(*a):
     print(*a, file=sys.stderr)
-
-
-def severity_of(issue: dict):
-    """`severity_final` 우선, 없으면 `severity`. 둘 다 없으면 None(판정 불가)."""
-    for k in ("severity_final", "severity"):
-        v = issue.get(k)
-        if isinstance(v, str) and v.strip():
-            return v.strip().lower()
-    return None
 
 
 def check(path: pathlib.Path):
@@ -58,13 +51,18 @@ def check(path: pathlib.Path):
         log(f"UNRUN: 읽기/파싱 실패 — {type(e).__name__}: {e}")
         return UNRUN
 
-    issues = data.get("issues") if isinstance(data, dict) else data
-    if not isinstance(issues, list):
-        log(f"UNRUN: issues 배열을 찾을 수 없다 — {path}")
+    # 두 생산자 모양(Lead issues[] · 병합 candidates[])을 check_synthesized.normalize 로 같은 칸에 모은다 — severity 판정 값 = 최종 우선
+    shape, issues, _ = normalize(data)
+    if shape is None:
+        log(f"UNRUN: issues[] · candidates[] 를 찾을 수 없다 — {path}")
         return UNRUN
     if not issues:
-        log("UNRUN: issues 가 0건 — 측정 실패를 먼저 의심한다")
-        return UNRUN
+        why = zero_evidence(data)
+        if why:
+            log(f"UNRUN: 0건 — 측정 실패를 먼저 의심한다({why})")
+            return UNRUN
+        print("OK: 0건 — 완결 증거 있음(GPT 완료 · 입력 0 · 근거 대조 · 후보 0→0)")
+        return OK
 
     bad, unrated, unknown, blocking = [], [], [], 0
     for i, it in enumerate(issues):
@@ -72,7 +70,7 @@ def check(path: pathlib.Path):
             unrated.append(f"[{i}] 객체가 아니다")
             continue
         iid = it.get("id") or f"[{i}]"
-        sev = severity_of(it)
+        sev = it["severity"]
         if sev is None:
             # ⛔ severity 가 없으면 **통과가 아니라 판정 불가**다. 조용히 넘기면
             #    필드를 지우는 것만으로 게이트를 우회할 수 있다.
@@ -183,6 +181,24 @@ def self_test():
     def c_empty_unrun(tmp):
         assert check(write(tmp, [])) == UNRUN, "⛔ 빈 배열이 통과했다 — 0건은 측정 실패를 먼저 의심"
 
+    def c_zero_with_merge_evidence(tmp):
+        """0건은 병합본의 완결 증거가 있을 때만 통과다 — 같은 수치라도 GPT 가 못 돌았으면 UNRUN."""
+        z = {"inputs": {"claude": 0, "gpt": 0, "gptUnavailable": None, "evidenceChecked": True},
+             "candidates": [], "summary": {"candidatesIn": 0, "candidatesOut": 0}}
+        p = tmp / "zero.json"
+        p.write_text(json.dumps(z), encoding="utf-8")
+        assert check(p) == OK, "증거 있는 0건이 통과하지 못했다"
+        z["inputs"]["gptUnavailable"] = "exit 16"
+        p.write_text(json.dumps(z), encoding="utf-8")
+        assert check(p) == UNRUN, "⛔ GPT 시간 초과 병합본의 0건이 통과했다"
+
+    def c_merge_shape_effective(tmp):
+        """병합본 후보는 effectiveSeverity(최종)로 판정한다 — pre-existing 강등(suggestion)은 면제."""
+        m = {"candidates": [{"id": "claude:P1", "severity": "major", "effectiveSeverity": "suggestion", "origin": "pre-existing"}]}
+        p = tmp / "merged.json"
+        p.write_text(json.dumps(m), encoding="utf-8")
+        assert check(p) == OK, "pre-existing 강등 후보가 증상 칸을 요구받았다"
+
     def c_missing_file_unrun(tmp):
         assert check(tmp / "nope.json") == UNRUN, "파일 부재가 UNRUN 이 아니다"
 
@@ -218,6 +234,8 @@ def self_test():
                  ("excluded-exempt", c_excluded_exempt),
                  ("no-severity-unrun", c_no_severity_unrun),
                  ("empty-issues-unrun", c_empty_unrun),
+                 ("zero-with-merge-evidence", c_zero_with_merge_evidence),
+                 ("merge-shape-effective", c_merge_shape_effective),
                  ("missing-file-unrun", c_missing_file_unrun),
                  ("bad-json-unrun", c_bad_json_unrun),
                  ("evidence-trace-not-enough", c_evidence_trace_is_not_enough)]:

@@ -77,6 +77,8 @@ hunk:  420-428 / 431-440        ← 429-430이 미변경이라 갈라짐
 
 ### 4) payload 조립
 
+> ⊕ 큐레이션한 리뷰(review.json 에 `excluded`)면 payload 의 `comments` 는 `issues[]` 뿐이다 — E5 답글 초안은 payload 밖(pr-comments.md 끝)이고 기존 스레드에 따로 단다.
+
 ```json
 {
   "commit_id": "<PR head SHA>",

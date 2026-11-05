@@ -5,12 +5,14 @@
 # 고정 응답만 낸다. 응답 폴더 FZ_GH_SHIM_DIR 에:
 #   pr.json  `gh pr view --json` 이 낼 필드 값(요청한 필드가 여기 없으면 지어내지 않고 실패한다)
 #   pr.diff  `gh pr diff` 가 낼 본문(그대로 흘린다 — 이 shim 은 diff 를 해석하지 않는다)
+#   api-<slug>.json  `gh api <path> [--paginate] [--slurp]` 응답(slug = path 의 `/` 를 `-` 로). 없으면 거부한다(지어내지 않는다)
+#   api-<slug>.fail  있으면 그 본문(부분 페이지)을 내고 exit 1 — 중간 페이지 실패 재생
 #   gh-calls.log  모든 호출을 `CALL …` 로, 거부한 호출을 `UNSUPPORTED …` 로 덧붙인다(러너가 거부 0 을 단언한다)
 # FZ_GH_SHIM_PR 이 이 shim 이 아는 PR 번호다(다른 번호는 실 gh 처럼 찾지 못한다).
 #
 # ⛔ 필드는 gh 2.87.3 `gh pr view --json` 이 실제로 받는 이름만(I6). 없는 이름(예: `baseRepository`)은
 #    실 gh 처럼 `Unknown JSON field` 로 거부한다 — shim 이 관대하면 실 gh 에서 깨질 호출이 fixture 에서 통과한다.
-# 지원: `gh --version` · `gh pr view <N> --json <f1,f2,…> [-q|--jq .<필드>]` · `gh pr diff <N>`. 나머지는 전부 거부(exit 1).
+# 지원: `gh --version` · `gh pr view <N> --json <f1,f2,…> [-q|--jq .<필드>]` · `gh pr diff <N>` · `gh api <path> [--paginate] [--slurp]`. 나머지는 전부 거부(exit 1).
 import json
 import os
 import sys
@@ -44,6 +46,23 @@ def refuse(msg, extra=""):
     print(msg + extra, file=sys.stderr)
     sys.exit(1)
 
+
+if args[:1] == ["api"]:
+    if len(args) < 2 or any(f not in ("--paginate", "--slurp") for f in args[2:]):
+        refuse("gh-shim: 미지원 api 인자 " + " ".join(args[1:]))
+    slug = args[1].strip("/").replace("/", "-")
+    fail = os.path.join(cell, "api-%s.fail" % slug)
+    if os.path.isfile(fail):
+        with open(fail, encoding="utf-8") as fh:
+            sys.stdout.write(fh.read())
+        print("gh: HTTP 502 — fixture 중간 페이지 실패", file=sys.stderr)
+        sys.exit(1)
+    path = os.path.join(cell, "api-%s.json" % slug)
+    if not os.path.isfile(path):
+        refuse("gh-shim: 고정 응답 api-%s.json 이 없다 — 지어내지 않는다" % slug)
+    with open(path, encoding="utf-8") as fh:
+        sys.stdout.write(fh.read())
+    sys.exit(0)
 
 if args[:2] == ["pr", "diff"]:
     if len(args) != 3:

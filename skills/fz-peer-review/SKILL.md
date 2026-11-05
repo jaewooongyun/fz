@@ -5,7 +5,7 @@ description: >-
   예: 팀원 PR 리뷰해줘, 피어리뷰, PR 검토 (비사용: 자기 코드 →fz-review, PR 해설 →fz-pr-digest)
 user-invocable: true
 disable-model-invocation: true
-argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--gpt-independent | --no-gpt-independent] [--deep] [--post] [--render | --no-render] [--explain [--light|--deep]]"
+argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--gpt-independent | --no-gpt-independent] [--deep] [--post] [--render | --no-render] [--no-curate | --curate-only] [--explain [--light|--deep]]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
@@ -51,7 +51,8 @@ metadata:
 /fz-peer-review 123 --deep            # Cross-Critique 활성화 (추가 ~$0.5-1.5)
 /fz-peer-review 123 --post            # 인라인 라인 앵커로 리뷰 게시
 /fz-peer-review 123 --no-gpt-independent # GPT 독립 첫 패스 끔 — GPT challenger 로 (기본은 켬 · --gpt-independent 는 생략 가능)
-/fz-peer-review 123 --no-render          # 렌더 끔 — 리포트·코멘트를 직접 쓴다 (기본은 켬 · --render 는 생략 가능)
+/fz-peer-review 123 --no-render          # 렌더 끔 — 리포트·코멘트를 직접 쓴다 (기본은 켬 · --render 는 생략 가능) · Curate 도 끈다
+/fz-peer-review 123 --no-curate          # Curate 끔 — 후보를 고르지 않고 렌더한다(옛 경로)
 /fz-peer-review 123 --tier 2          # Tier 강제 지정
 /fz-peer-review 123 --explain         # 리뷰 후 해설 — 기능 흐름 + 동작↔코드 1:1 (Tutor, ~20-30K)
 /fz-peer-review 123 --explain --light # 리뷰 후 해설 — Before/After 중심 (Standard, ~5-8K)
@@ -90,6 +91,8 @@ metadata:
 | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |
 | `modules/peer-review-inline-anchoring.md` | Deliver `--post` 인라인 앵커 게시 7단계 + 확인 게이트 + 다지점 분할(SSOT). `Bash(gh *)`·`Write` 선언이 여기서 쓰인다 |
 | `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
+| `modules/team-facing-writing.md` | 팀원에게 가는 글(코멘트 · 답글 · PR 본문)의 어조 · 형태 — Comment Style Guide 정본 |
+| `scripts/check_comment_worthy.py` | Curate 계약(카드 필드 · E1~E8 · 커버리지) — 렌더러가 `--require-curation` 으로 부른다 |
 | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
 | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4(+§6 craft — 이 스킬은 기본 · 롤백 때는 뺀다)를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
@@ -374,6 +377,8 @@ ${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (마크다운 
 ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 ```
 
+⛔ **저장 직후 계약 검사** (F-530 — 생산자 두 모양 · 0건 완결 증거): `python3 "${FZ_PLUGIN_ROOT}/scripts/check_synthesized.py" "${WORK_DIR}/synthesized-issues.json"` → exit 1(별칭 충돌 · id 없음 · 모르는 severity)이면 고쳐 다시 저장한다. exit 2 는 통과가 아니다 — 0건이면 병합본의 `inputs`(GPT 완료 · 입력 0 · 근거 대조)와 `summary`(후보 0→0)가 있어야 한다. 후보를 손으로 뺀 0건은 0건이 아니라 Curate 의 `excluded` 처분 대상이다.
+
 ⛔ **저장 직후 Gate 4.7-S 를 기계로 돌린다** (F-285 — 문서 규칙만으로는 발화하지 않았다): `python3 "${FZ_PLUGIN_ROOT}/scripts/check_symptom_anchor.py" "${WORK_DIR}/synthesized-issues.json"` → exit 1 이면 그 id 를 `suggestion` 으로 강등하거나 두 칸을 채운다. ⛔ exit 2 는 통과가 아니다(판정 불가). ⛔ `evidence_trace` 가 충실한 것은 통과 근거가 **아니다** — 실측 6건 모두 배선 추적은 완벽했다.
 
 > review-index.md: Phase + Artifacts 목록 기록. Compact 감지 시 이 파일 읽어 산출물 로드 → 중단 지점 재개.
@@ -385,18 +390,32 @@ write_memory("fz:checkpoint:peer-review-synthesize", "PR#{number}: 이슈 {N}개
 
 ---
 
+## Step: Curate (코멘트 가치 선별)
+
+> Synthesize CHECKPOINT(5) 뒤 · Deliver 앞에 **기본으로** 돈다. `--no-curate` 면 건너뛴다(렌더는 `--require-curation` 없이) · `--curate-only` 면 Curate 까지 하고 Deliver 앞에서 멈춘다.
+> `--no-render` 는 `--no-curate` 를 강제한다 — 손으로 쓴 리포트 머리 줄에 `curate=off(no-render)` 를 남겨 건너뛴 사실이 보이게 한다.
+> 계약 정본: `scripts/check_comment_worthy.py` 머리말(카드 필드 · E1~E8 · 커버리지 · covers) · 어조: `modules/team-facing-writing.md`
+
+1. **카드** — 후보(`${WORK_DIR}/merged.json` 의 `candidates[]` ∪ `synthesized-issues.json` 의 이슈)마다 카드 1장: 카드 id(후보 id) · 한 줄 주장 · 근거(`path:line@<target.sha 접두>`) · kind(bug · structure · quality · intent-question) · 재현 상태 · 같은 path ±3줄의 기존 스레드(`existing-threads.json`)
+2. **재검증** — 카드마다 반박을 시도한다
+   - Tier 0/1: Lead 가 카드를 하나씩 반박해 보고 결과를 `refute` 에 적는다(Lead 카드)
+   - Tier 2/3: 새 맥락 검증자 — `workflows/swarm.js` 를 `agentType: 'fz:review-counter'` 로 부른다. 조각 = 카드 ≤ 8장(넘으면 조각을 나눈다 · maxFragments 12 = 카드 96 상한 — 그 밖은 BLOCKED budget). 브리프 = 카드 id · 카드 본문 · 기존 스레드 스냅샷(고정 트리 밖이라 브리프에 인라인) · method = "카드마다 반박 시도 · 결과를 findings 에 `<카드 id>: upheld|refuted|blocked — 근거` 로"
+   - ⛔ Lead 는 **카드 id 집합 = findings 의 id 집합**인지 대조한다 — 누락 · BLOCKED · 예산 부족 카드는 코멘트로 두지 않고 ③ 질문 또는 excluded(E1)로 보낸다. `refute` 칸에 swarm run id 를 인용한다
+3. **판정** — 카드마다 코멘트 또는 제외. 코멘트는 review.json `issues[]`(kind · evidence · repro · symptom_* · measure · origin · suggestion · refute · comment · covers), 제외는 `excluded[]`(`{id, what, code, reason}` · E5 = `duplicateOf` + 선택 `reply` 답글 초안 · E8 = `refute`). 같은 결함을 여러 후보가 말하면 `covers` 로 묶는다 — 한 후보는 소유자 하나다 제외 코드 E1~E8 의 뜻은 검사기 머리말이 정본이다(E1 도달 미확인 · E2 SDK 가정 · E4 원래 있던 문제 · E5 스레드 중복 · E8 반박됨 …)
+4. **review.json 머리** — `target` = `${WORK_DIR}/target.json` 그대로 · `candidates` = `["merged.json", "synthesized-issues.json"]`(review.json 기준 상대 경로 · GPT 없는 Tier 0 은 synthesized 만)
+5. **검사** — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_comment_worthy.py" "${WORK_DIR}/review.json"` 이 exit 0 이어야 Deliver 로 간다(렌더러가 `--require-curation` 으로 같은 검사를 한 번 더 한다). exit 1 은 고친다 · exit 2 는 판정 불가다(⛔ 통과 아님 — target · 후보 원본 · GPT 병합본을 확인한다)
+
+#### Gate Curate
+- [ ] (Tier 2/3) 카드 id 집합 = 재검증 findings id 집합? 누락 · BLOCKED 는 ③ 또는 E1 로 보냈는가?
+- [ ] `check_comment_worthy.py` exit 0?
+
+---
+
 ## Step: Deliver (전달)
 
 ### Comment Style Guide (PR 코멘트 톤)
 
-팀원의 코드를 존중하는 건설적 톤으로 작성한다. 모든 이슈 설명과 PR 코멘트에 적용.
-
-- "~하면 좋겠습니다" (제안형) > "~해야 합니다" (명령형)
-- 문제만 지적하지 말고 "왜 중요한지" 설명 포함
-- 기존 코드의 좋은 점 먼저 언급 후 개선점 제시
-- 불확실한 이슈는 "확인 부탁드립니다" 형태로 질문
-
-톤 템플릿: Major("좋은 접근인데 {기존동작}이 빠진 것 같아요"), Minor("{장점} 잘 되어 있는데 {개선점}도 함께"), Suggestion("사소한 건데 {기존유틸} 활용하면"), [의도 확인]("혹시 {동작}은 의도적으로 제거하신 건가요?")
+정본: `modules/team-facing-writing.md` — 단정하지 않는다 · 코드 펜스 밖 산문 4줄 이하 · 왜 중요한지 한 줄 · 마무리는 확인 요청이나 질문. ⛔ 칭찬으로 지적을 감싸는 틀은 쓰지 않는다(실제 장점은 리포트 「긍정적 측면」에).
 
 ### 출력 전략: 대화 vs 문서 분리
 
@@ -418,7 +437,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 
 - `${WORK_DIR}/pr-comments.md` — 이슈별 부드러운 톤 PR 코멘트 모음 (복사/붙여넣기용)
 - `${WORK_DIR}/*-result.json` — 에이전트/GPT 원본 결과
-- ⊕ 기본으로(`--render` 생략 가능) 리포트·코멘트를 따로 쓰지 않는다 — 판정·문장만 `${WORK_DIR}/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review "${WORK_DIR}/review.json" --diff "${WORK_DIR}/diff.patch" --out-dir "${WORK_DIR}"` 가 위 두 문서와 `payload.json` · `render-preview.json` 을 만든다(줄 앵커는 `skills/fz-peer-review/scripts/diff_anchors.py` · 입력 형식은 렌더러 머리말). ⛔ 위 두 문서를 손으로 다시 쓰지 않는다 — 렌더러 출력이 단일 출처다. `--no-render` 면 렌더러를 부르지 않고 두 문서를 직접 쓴다(옛 경로)
+- ⊕ 기본으로(`--render` 생략 가능) 리포트·코멘트를 따로 쓰지 않는다 — 판정·문장만 `${WORK_DIR}/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review "${WORK_DIR}/review.json" --diff "${WORK_DIR}/diff.patch" --out-dir "${WORK_DIR}" --require-curation` 가 위 두 문서와 `payload.json` · `render-preview.json` 을 만든다(`--require-curation` 은 기본 경로 — `--no-curate` 일 때만 뺀다 · Curate 계약 위반이면 렌더가 파일 없이 멈춘다)(줄 앵커는 `skills/fz-peer-review/scripts/diff_anchors.py` · 입력 형식은 렌더러 머리말). ⛔ 위 두 문서를 손으로 다시 쓰지 않는다 — 렌더러 출력이 단일 출처다. `--no-render` 면 렌더러를 부르지 않고 두 문서를 직접 쓴다(옛 경로)
 
 #### --post 시 — 인라인 앵커 게시
 

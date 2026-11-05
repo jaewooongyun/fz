@@ -52,14 +52,14 @@ bash scripts/setup-hooks.sh
 > ⛔ **형식 고정**: `` - `dir/` — 설명 (N개) `` — #N2는 백틱 경로 뒤의 `(N개` 를 찾는다. 형식이 다르면 **그 카테고리가 조용히 검사에서 빠진다** (2026-08-09 감사 ISSUE-002: `agents/`는 괄호 없어 미검사, `workflows/`는 선언 자체가 없었다).
 - `skills/` — fz 스킬 SKILL.md (22개)
 - `agents/` — fz 에이전트 (15개)
-- `modules/` — 공유 모듈 (47개). ⛔ **실행 절차만** 둔다 — 라운드 의미론의 *역사적 출처*(TEAM 사료 6종)는 2026-09-21 `docs/history/` 로 옮겼다가(B9/S13) 2026-09-25 삭제했다(결정: `modules/promotion-ledger.md` § TEAM 일몰). 사료를 실행 절차와 같은 자리에 두면 읽는 사람이 절차로 오독한다
+- `modules/` — 공유 모듈 (48개). ⛔ **실행 절차만** 둔다 — 라운드 의미론의 *역사적 출처*(TEAM 사료 6종)는 2026-09-21 `docs/history/` 로 옮겼다가(B9/S13) 2026-09-25 삭제했다(결정: `modules/promotion-ledger.md` § TEAM 일몰). 사료를 실행 절차와 같은 자리에 두면 읽는 사람이 절차로 오독한다
 - `guides/` — 가이드 문서 (9개)
 - `workflows/` — 결정적 멀티에이전트 스크립트 (8개)
 - `templates/` — 스킬/에이전트/모듈/CLAUDE.md 템플릿
 - `gpt-skills/` — GPT 네이티브 스킬 (8개)
 - `gpt-agents/` — GPT 역할 파일 — 독립 첫 패스 리뷰의 렌즈 역할(opt-in: `setup-gpt-skills.sh --gpt-agents` · `gpt-call.sh independent-review … --gpt-agents`)
 - `schemas/` — JSON 스키마 (8개 — GPT 응답 7 · Issue Tracker 1) + `tool-inventory.json`
-- `scripts/` — lint·설치·호출·검증·계측 스크립트 (83개). ⛔ diff 라인 접두사(`+`/`-`)로 판정하는 새 파일은 `# diff-parse: hunk-state | not-a-diff | waived` 선언 1줄이 없으면 `health-check` 가 막는다 (`lint_diff_parsers.py` — hunk 안팎에서 접두사 뜻이 달라 같은 결함이 4회 재발했다). ⛔ `setup-gpt-skills.sh` 는 `${CODEX_HOME:-~/.codex}/skills/` 에 GPT 역할 스킬 심볼릭(Tier 2a)을 만든다 — 디스커버리의 필수 조건은 아니다(미실행이어도 resolver `gpt_kinds.py` 가 자기 위치의 번들 본문(Tier 2b)을 돌려준다 · `modules/cross-validation.md` § 역할 스킬 경로). ⛔ gpt 호출은 정문 `scripts/gpt-call.sh <kind>` 경유 의무 — 래퍼 `gpt-exec.sh` · 런처 `gpt_independent.sh` 는 그 어댑터다(`modules/fz-gpt-bash-hygiene.md` §8 · 레지스트리 `scripts/gpt-kinds.json`) · `FZ_PLUGIN_ROOT`는 `resolve-plugin-root.sh`로 해석 (호출부가 정문을 찾는 경로)
+- `scripts/` — lint·설치·호출·검증·계측 스크립트 (85개). ⛔ diff 라인 접두사(`+`/`-`)로 판정하는 새 파일은 `# diff-parse: hunk-state | not-a-diff | waived` 선언 1줄이 없으면 `health-check` 가 막는다 (`lint_diff_parsers.py` — hunk 안팎에서 접두사 뜻이 달라 같은 결함이 4회 재발했다). ⛔ `setup-gpt-skills.sh` 는 `${CODEX_HOME:-~/.codex}/skills/` 에 GPT 역할 스킬 심볼릭(Tier 2a)을 만든다 — 디스커버리의 필수 조건은 아니다(미실행이어도 resolver `gpt_kinds.py` 가 자기 위치의 번들 본문(Tier 2b)을 돌려준다 · `modules/cross-validation.md` § 역할 스킬 경로). ⛔ gpt 호출은 정문 `scripts/gpt-call.sh <kind>` 경유 의무 — 래퍼 `gpt-exec.sh` · 런처 `gpt_independent.sh` 는 그 어댑터다(`modules/fz-gpt-bash-hygiene.md` §8 · 레지스트리 `scripts/gpt-kinds.json`) · `FZ_PLUGIN_ROOT`는 `resolve-plugin-root.sh`로 해석 (호출부가 정문을 찾는 경로)
 - `.claude-plugin/` — plugin.json + marketplace.json
 
 ## Verification Discipline (v3.11+)

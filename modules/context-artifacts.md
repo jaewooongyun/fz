@@ -73,6 +73,10 @@ fz-peer-review는 티켓 폴더와 별도 WORK_DIR을 사용:
 ├── review-index.md
 ├── synthesized-issues.json
 ├── confidence-matrix.md       # 생성 경로는 modules/peer-review-gates.md § MergeContract § 9
+├── merged.json                # review_merge.py 병합본 — Curate 후보 원본
+├── existing-threads.json      # gather 가 모은 기존 스레드(status ok · unavailable · not-a-pr)
+├── target.json                # 리뷰 대상 {kind, ref, sha} — evidence · Serena 트리 @sha 대조 기준
+├── review.json                # 판정 · 코멘트(issues) · 제외(excluded) — 렌더러 단일 출처
 ├── review-report.md
 ├── pr-comments.md
 └── {agent}-result.json        # raw 에이전트 결과 (arch, quality, gpt)

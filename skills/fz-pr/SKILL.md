@@ -53,7 +53,7 @@ metadata:
 | 0 | 현재 상태 감지 (PR 존재 여부, unpushed 커밋 확인) |
 | 1 | Target Branch 결정 (인자 또는 선택) |
 | 2 | Push |
-| 3 | PR 생성 (템플릿 기반) |
+| 3 | PR 생성 (템플릿 기반 — 본문 어조 `modules/team-facing-writing.md`) |
 | 4 | Assignee 설정 |
 | 5 | Reviewer 설정 (`AI/teams.json` 기반) |
 

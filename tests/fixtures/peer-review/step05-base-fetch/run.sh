@@ -79,6 +79,9 @@ def bad(msg, code=1):
     sys.exit(code)
 
 
+if a[:1] == ["api"] and len(a) >= 2 and a[1].endswith("/pulls/%s/comments" % pr) and set(a[2:]) <= {"--paginate", "--slurp"}:
+    print("[[]]")
+    sys.exit(0)
 if a == ["pr", "diff", pr]:
     sys.stdout.write(open(os.path.join(d, "pr.diff"), encoding="utf-8").read())
     sys.exit(0)

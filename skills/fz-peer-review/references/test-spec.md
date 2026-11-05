@@ -8,6 +8,8 @@
 |------|------|----------------------|
 | "팀원 PR 리뷰해줘" | trigger | description '예:' 핵심 유스케이스 |
 | "이거 피어리뷰 좀 해줘" | trigger | description '예:' (피어리뷰) + intent-trigger `피어리뷰` |
+| "123 리뷰하되 코멘트는 고르지 말고" | trigger · `--no-curate` | Curate 끔 — 렌더는 `--require-curation` 없이 |
+| "지난 리뷰 코멘트만 다시 골라줘" | trigger · `--curate-only` | Curate 까지 · Deliver 앞에서 멈춘다 |
 | "이 PR 검토해줘" | trigger | description '예:' (PR 검토) |
 | "동료가 올린 PR 리뷰 부탁해" | trigger | intent-trigger `팀원\|PR.*리뷰` (동료=팀원) |
 | "내가 방금 작성한 코드 리뷰해줘" | NOT trigger | → fz-review (description '비사용: 자기 코드', Will Not '자기 코드 리뷰') |
