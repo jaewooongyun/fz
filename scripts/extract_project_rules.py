@@ -32,7 +32,7 @@ OK, UNRUN = 0, 2
 GUIDE_NAMES = {"CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", "GEMINI.md"}
 GUIDE_PATHS = {".github/copilot-instructions.md"}
 SKIP_DIRS = {".git", "node_modules", ".build", "build", "DerivedData", "Pods", "Carthage", ".venv", "venv",
-             "vendor", "dist", ".next", "target", ".gradle", ".codegraph", "__pycache__"}
+             "vendor", "dist", ".next", "target", ".gradle", "__pycache__"}
 MAX_DEPTH = 6
 
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$")

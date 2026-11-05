@@ -7,7 +7,7 @@ user-invocable: true
 argument-hint: "[리뷰 대상 설명] [light|full] [--render] [--gpt-independent]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
-  mcp__codegraph__codegraph_explore,
+  mcp__plugin_fz_serena__find_implementations,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__write_memory,
@@ -248,7 +248,7 @@ fz-gpt가 수행하는 작업:
 
 ⛔ 「사용처 0」은 부재 주장이고 이 절차의 결론은 **삭제 권고**다. 한 도구의 0건으로 내지 않는다 —
    `find_referencing_symbols` 는 실측 recall 36.9% · **0건 반환 19%** 다(프로토콜 선언과 conformance
-   구현은 서로 다른 선언이라 참조 관계가 아니다). codegraph `implements` 또는 `Grep` 전수와 교차하고,
+   구현은 서로 다른 선언이라 참조 관계가 아니다). `find_implementations` 또는 `Grep` 전수와 교차하고,
    교차 결과를 근거에 함께 적는다. 미교차 0건은 「삭제 권고」가 아니라 「확인 필요」로 낸다.
    정본: `modules/cross-validation.md` § Negative-Result Gate
 ```

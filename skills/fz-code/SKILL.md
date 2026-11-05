@@ -8,7 +8,7 @@ argument-hint: "[구현 대상 설명] [light]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
-  mcp__codegraph__codegraph_explore,
+  mcp__plugin_fz_serena__find_implementations,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__replace_symbol_body,
   mcp__plugin_fz_serena__insert_after_symbol,
@@ -210,7 +210,7 @@ metadata:
 | 기존 함수/메서드 수정 | `mcp__plugin_fz_serena__replace_symbol_body` | 심볼 단위 정밀 수정 |
 | 새 메서드/프로퍼티 추가 | `mcp__plugin_fz_serena__insert_after_symbol` | 기존 심볼 뒤에 삽입 |
 | 파일 시작에 코드 추가 | `mcp__plugin_fz_serena__insert_before_symbol` | import 등 |
-| 심볼 이름 변경 | 정의부 `Edit` + codegraph `codegraph_explore` 로 소비자 전수 열거 후 개별 치환 | ⛔ `rename_symbol` 은 배선에서 뺐다 — dry-run 실측에서 프로토콜 메서드 이름 변경 시 편집 대상이 **선언 1파일뿐**이고 conformance 구현부를 빠뜨렸다(빌드 파손) |
+| 심볼 이름 변경 | 정의부 `Edit` + `find_referencing_symbols`(호출) ∪ `find_implementations`(구현) ∪ `Grep` 전수로 소비자를 열거한 뒤 개별 치환 | ⛔ `rename_symbol` 은 배선에서 뺐다 — dry-run 실측에서 프로토콜 메서드 이름 변경 시 편집 대상이 **선언 1파일뿐**이고 conformance 구현부를 빠뜨렸다(빌드 파손) |
 | 새 파일 생성 | `Write` + `/fz-new-file` | 헤더 규칙 준수 |
 | 복잡한 다중 파일 | `/sc:sc-implement` | SuperClaude 위임 |
 | 단순 텍스트 수정 | `Edit` | 간단한 인라인 수정 |

@@ -461,6 +461,8 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 `✓` 상시 · `⊕` 조건부 · `—` 미수집
 
+⛔ **이 표는 기계가 읽는다** — `scripts/check_evidence_slots.py` 가 머리 줄의 `ID` · `Tier N` 열과 `✓` 표기를 파싱해 요구 슬롯을 정한다. 열 이름이나 표기를 바꾸면 그 검사기의 self-test(`table-tier1`)가 먼저 깨진다.
+
 ⛔ **`deletion-verification` 은 이 표에 없었다** — `skills/fz-peer-review/SKILL.md` § Code Evidence Collection 에는 있는데 여기 열이 빠져 SSOT 가 갈라져 있었다. 두 곳의 ID 집합이 같아야 한다.
 
 ⛔ **Tier 0/1 의 상시 3종은 축소 대상이 아니다.** 이미 최소다 — 여기서 더 줄이면 origin 판정 근거가 사라진다.

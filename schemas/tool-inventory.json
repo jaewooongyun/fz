@@ -11,7 +11,6 @@
 
   "mcp_servers": {
     "plugin_fz_serena": { "form": "plugin", "note": "플러그인 제공 — 런타임이 `plugin_fz_` 접두를 붙인다" },
-    "codegraph":        { "form": "plain",  "note": "참조·영향 반경 Primary" },
     "context7":         { "form": "plain",  "note": "라이브러리 문서" },
     "sequential-thinking": { "form": "plain", "note": "단계 추론" },
     "atlassian-jira":   { "form": "plain",  "note": "REST path 를 받는 범용 도구" },

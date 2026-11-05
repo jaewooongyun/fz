@@ -141,10 +141,19 @@ Orchestrator가 사전에 제공해야 한다.
 - public/internal API 시그니처 변경
 
 수집:
-1. diff에서 신규/변경 init 식별 (함수 시그니처 추출)
-2. `git grep "TypeName(" pr-{PR} -- '*.swift'` → 호출자 파일:라인
-3. 각 호출자의 해당 라인 ±5줄 추출 (default param이 있으면 호출자의 default 값도 포함)
-4. 호출자가 참조하는 concrete 타입 목록 추출
+0. **도구 상태** → `evidence/tools.md` 첫 줄(`scripts/check_evidence_slots.py` 가 읽는다):
+   - 리뷰 대상 SHA(`target.json` 의 `sha` — PR 이면 headRefOid)에 맞춘 워크트리(`git worktree add … pr-{PR}`)에서 `activate_project` 를 부르고 `Serena: active <그 경로> @<그 트리 HEAD sha> (languages: <언어 서버 목록>)` 로 적는다. 언어 목록이 비면 언어 서버가 안 뜬 것이다 — active 로 적지 않는다
+   - 대상 트리에 맞추지 못하면 `[Serena 미사용 — 작업 트리 ≠ 대상]` 처럼 사유를 적고 아래 2·3 을 `git grep … pr-{PR}` 로만 한다(⛔ 다른 트리의 Serena 결과를 근거로 쓰지 않는다)
+   - ⚠️ 번들 Serena 는 git 저장소가 아닌 폴더에서 시작하면 프로젝트 없이 뜬다(`--project-from-cwd` 실패 — F-534) — 활성화를 명시한다
+   - `activate_project` 의 `session` 값은 `initial_instructions` 결과에서 받는다 — v2.0.0 부터 Serena 가 세션을 직접 관리해 이 값 없이는 활성화를 거부한다
+   - 신뢰하지 않은 프로젝트에서는 심볼릭 링크로 들어온 파일을 보지 않는다(v2.0.0) — 링크된 소스의 결과가 0건이면 "참조 없음" 으로 읽기 전에 신뢰 설정(`trusted_project_path_patterns`)부터 확인한다
+1. diff에서 신규/변경 init · protocol 요구사항 식별 (함수 시그니처 추출)
+2. **호출** = `find_referencing_symbols` ∪ `git grep "TypeName(" pr-{PR} -- '*.swift'` → 호출자 파일:라인
+3. **구현** = `find_implementations` ∪ `git grep` 전수 — 프로토콜 메서드 · 오버라이드의 conformance 구현. `find_referencing_symbols` 는 호출 지점만 주고 구현은 주지 않는다(F-535). 해당 없으면 `해당 없음 — <사유>`
+4. 각 호출자의 해당 라인 ±5줄 추출 (default param이 있으면 호출자의 default 값도 포함)
+5. 호출자가 참조하는 concrete 타입 목록 추출
+
+⛔ 파일은 `## 호출` · `## 구현` 두 절로 쓴다 — 검사기가 두 절을 보고 `TODO` 자리표시를 거부한다. 구현 탐색은 **Lead 가 한다** — 리뷰 워커는 이 슬롯을 읽는다(워커 tools 에 Serena 를 늘리지 않는다 — 워커의 Serena 사용 2/345).
 
 형식:
 

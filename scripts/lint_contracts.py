@@ -434,13 +434,13 @@ _INV = _inventory()
 RETIRED_MCP = dict(_INV["retired_mcp_prefixes"])
 DECLARED_SERVERS = set(_INV["mcp_servers"])
 
-# 본문 Primary 는 **축약 이름**이다(`**Primary**: codegraph`) — frontmatter 의 전체 이름과
+# 본문 Primary 는 **축약 이름**이다(`**Primary**: serena`) — frontmatter 의 전체 이름과
 # 직접 대조할 수 없어 **서버 단위**로 맞춘다.
-# ⛔ 실제 문서 형식은 `- **Primary**: codegraph` 다 — 리스트 접두 `- `/`*`/`+` 와 괄호 설명을
+# ⛔ 실제 문서 형식은 `- **Primary**: serena` 다 — 리스트 접두 `- `/`*`/`+` 와 괄호 설명을
 #    허용해야 한다. 이전 판(`^\s*\**Primary`)은 13개 에이전트에서 **매칭 0건**이었고, 그 0을
 #    "위반 없음" 으로 읽으면 축 자체가 죽은 것을 통과로 오인한다 [외부: fz-gpt review #2].
 PRIMARY_LINE = re.compile(r"^\s*(?:[-*+]\s*)?\**\s*Primary\**[^:：\n]{0,24}[:：]\s*(.+)$", re.M)
-PRIMARY_ALIAS = {"serena": "plugin_fz_serena", "codegraph": "codegraph",
+PRIMARY_ALIAS = {"serena": "plugin_fz_serena",
                  "context7": "context7", "sequential-thinking": "sequential-thinking"}
 
 
@@ -1220,11 +1220,11 @@ INTEG_TREE = {
     # (양성) 형식 위반 — 구분자 `__` 가 하나뿐
     "agents/bad_12_syntax.md": "---\nname: b\ntools: mcp__badformat\n---\n\n본문\n",
     # (양성) 본문 Primary 가 지목한 서버가 frontmatter 에 없다
-    "agents/bad_12_primary.md": "---\nname: b\ntools: mcp__context7__query-docs\n---\n\n**Primary**: codegraph — 참조 추적\n",
+    "agents/bad_12_primary.md": "---\nname: b\ntools: mcp__context7__query-docs\n---\n\n**Primary**: serena — 참조 추적\n",
     # (음성) 정상 2형식 — 플러그인 제공 + 일반
-    "agents/ok_12_both.md": "---\nname: o\ntools: mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore\n---\n\n**Primary**: codegraph\n",
+    "agents/ok_12_both.md": "---\nname: o\ntools: mcp__plugin_fz_serena__find_symbol, mcp__context7__query-docs\n---\n\n**Primary**: serena\n",
     # (양성) ⭐ 실제 문서 형식 `- **Primary**: …` — 이전 정규식은 이것을 0건으로 놓쳤다
-    "agents/bad_12_primary_list.md": "---\nname: b\ntools: mcp__context7__query-docs\n---\n\n- **Primary**: codegraph (`codegraph_explore`) — 참조 추적\n",
+    "agents/bad_12_primary_list.md": "---\nname: b\ntools: mcp__context7__query-docs\n---\n\n- **Primary**: serena (`find_symbol`) — 참조 추적\n",
     # (양성, 축4 전용) ⭐ 플러그인 이름 kebab-case — **문법은 통과**하고(형식 위반 줄이 안 나온다)
     #   선언 축만 발화한다. ⚠️ 축4 도입 전에는 음성이었다 — 대조할 인벤토리가 없었기 때문이다.
     #   ⛔ 이 가짜 서버를 인벤토리에 넣지 않는다(시험용 이름으로 실 인벤토리를 오염시킨다).

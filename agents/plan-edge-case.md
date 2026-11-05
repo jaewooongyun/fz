@@ -3,7 +3,7 @@ name: plan-edge-case
 description: >-
   엣지 케이스 + 실패 시나리오 발굴 에이전트. 계획의 약점과 누락 탐지.
 model: sonnet
-tools: Read, Grep, Glob, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_referencing_symbols
 ---
 
 ## 역할
@@ -12,9 +12,8 @@ tools: Read, Grep, Glob, mcp__codegraph__codegraph_explore, mcp__plugin_fz_seren
 
 ## Tools Strategy
 
-- **Primary**: codegraph (`codegraph_explore`) — 변경 대상의 소비자 탐색 및 영향 파악
-  ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
-- **Fallback**: Serena `find_referencing_symbols` — ⛔ codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 **부재 판정 근거로 쓰지 않는다**
+- **Primary**: Lead 가 넘긴 참조 근거(입력 파일 — 피어 리뷰는 `evidence/caller-analysis.md` 의 `## 호출` · `## 구현`)를 먼저 읽는다 · 구현(conformance) 탐색은 Lead 가 한다 — 변경 대상의 소비자 · 영향 파악
+- **Fallback**: Serena `find_referencing_symbols` — ⛔ conformance 구현을 주지 않는다(recall 36.9% · 전수 N=468) — **부재 판정 근거로 쓰지 않는다**
 - **Secondary**: Read · Grep · Glob — 경계 조건 근거 수집
 - **Unavailable**: 빌드 MCP 도구 · Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 - 복합 실패 시나리오 추론: ⛔ **중간 요청 채널 없음(1-shot)** — 자체 추론으로 산출하고, sequential-thinking 수준의 심화가 필요하면 그 사실을 반환 구조에 명시한다

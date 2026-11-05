@@ -4,7 +4,7 @@ description: >-
   아키텍처 렌즈 — review-arch 와 같은 본문에서 arch-critic 사전주입만 뺐다. 리뷰 밖 호출처(code-pair · discover-adversarial · plan-collaborative)가 쓴다. 리뷰 워크플로(review-live · peer-review)는 review-arch.
 model: sonnet
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__codegraph__codegraph_explore, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
 ---
 
 <!-- shared:arch-lens begin -->
@@ -14,10 +14,9 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 ## MCP 도구 전략
 
-- **Primary**: codegraph (`codegraph_explore`) — 참조·conformer·영향 반경
-  ⛔ blast radius 는 `+N more` 로 절단된다 — **개수만 주고 목록은 자른다**. 부재·전수 판정 근거로 쓰지 않는다. 전수가 필요하면 `Grep` 전수와 교차한다
+- **Primary**: Lead 가 넘긴 참조 근거(입력 파일 — 피어 리뷰는 `evidence/caller-analysis.md` 의 `## 호출` · `## 구현`)를 먼저 읽는다 · 구현(conformance) 탐색은 Lead 가 한다
 - **Secondary**: Serena (`find_symbol`, `get_symbols_overview`) — 심볼 정의·파일 구조
-- **Fallback**: Serena `find_referencing_symbols` — ⛔ codegraph 미가용 시에만. recall 36.9%(전수 N=468)라 **부재 판정 근거로 쓰지 않는다**
+- **Fallback**: Serena `find_referencing_symbols` — ⛔ conformance 구현을 주지 않는다(recall 36.9% · 전수 N=468) — **부재 판정 근거로 쓰지 않는다**
 - **Secondary**: context7 (`query-docs` — API 문서, 라이브러리 호환성 확인)
 - **Fallback**: Read, Grep, Glob
 - **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)

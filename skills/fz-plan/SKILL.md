@@ -8,8 +8,8 @@ argument-hint: "[기능/요구사항 설명] [light|full] [--no-gpt-independent]
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
-  mcp__codegraph__codegraph_explore,
   mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__find_implementations,
   mcp__plugin_fz_serena__activate_project,
   mcp__plugin_fz_serena__read_memory,
   mcp__plugin_fz_serena__write_memory,
@@ -171,6 +171,7 @@ metadata:
 4. **대상 모듈 심볼 파악**:
    - `mcp__plugin_fz_serena__get_symbols_overview` → 작업 대상 파일 심볼 구조
    - `mcp__plugin_fz_serena__find_symbol` → 컴포넌트 탐색
+   - `mcp__plugin_fz_serena__find_implementations` → 프로토콜 메서드 · 오버라이드의 구현 — `find_referencing_symbols` 는 호출 지점만 준다(F-535)
 
 5. **이전 Discover 결과 로드** (티켓 폴더(WORK_DIR) 활성 시):
    - `{WORK_DIR}/discover/discover-journal.md` 읽기 → Landscape Map + Trade-off Table + Open Questions 복원

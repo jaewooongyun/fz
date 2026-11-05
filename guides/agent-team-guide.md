@@ -33,11 +33,9 @@ GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS projec
 
 | Tier | 용도 | 예시 |
 |------|------|------|
-| Primary (항상 사용) | 핵심 분석 도구 | codegraph codegraph_explore + serena find_symbol, get_symbols_overview (구판: serena 단독) |
+| Primary (항상 사용) | 핵심 분석 도구 | Lead 가 넘긴 참조 근거 파일 + serena find_symbol, get_symbols_overview — 구현(conformance) 탐색은 Lead 의 serena find_implementations |
 | Secondary (필요 시) | 보조 도구 | context7 query-docs |
 | Unavailable (Workflow `tools:` allowlist 에 없음 — 구판 표기 "Team 제약") | Lead 전용 | Atlassian, XcodeBuild, LSP (일부) |
-
-> ⛔ codegraph blast radius 는 `+N more` 로 절단된다 — 개수만 주고 목록은 자른다. 부재·전수 판정 근거로 쓰지 않는다(2026-11-01 `agents/review-arch.md` § MCP 도구 전략 · `agents/impl-correctness.md` § Tools Strategy 대조).
 
 > Fallback은 명시하지 않는다. `tools:` YAML이 사용 가능한 도구를 선언하므로 Claude가 자연스럽게 폴백한다.
 
@@ -45,7 +43,7 @@ GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS projec
 
 ```markdown
 ## Tools Strategy
-- **Primary**: codegraph codegraph_explore + serena find_symbol, serena get_symbols_overview
+- **Primary**: Lead 가 넘긴 참조 근거 + serena find_symbol, serena get_symbols_overview
 - **Secondary**: context7 query-docs (외부 문서 참조 시)
 - **Unavailable**: 빌드 MCP 도구, Atlassian (Lead에게 요청)
 ```
@@ -472,7 +470,7 @@ isolation: worktree
 | `maxTurns` | 에이전트 턴 수 제한 | Supporting 에이전트의 과도한 분석 방지 |
 | `disallowedTools` | 도구 차단 (denylist) | `tools` allowlist의 보완 |
 | `permissionMode` | 에이전트별 권한 | 전 리뷰·분석·**changeset 생산** 에이전트 → `plan`(read-only). ⛔ `acceptEdits`는 **디스크를 실제로 쓰는 에이전트에만**. ⛔⛔ **Workflow 경로에서는 이 필드가 무효다** — 워크플로 서브에이전트는 세션 permission mode와 무관하게 `acceptEdits`로 실행되고 파일 편집이 자동 승인된다 [verified: `llm-references.md` §1.1b /workflows]. 워크플로 워커의 유일한 강제 수단은 **스키마 수준 `tools:` 제거**다 |
-| `mcpServers` | 에이전트별 MCP | fz 에이전트는 이 필드를 쓰지 않고 `tools:` 에 MCP 도구를 직접 나열한다 — review-arch = codegraph `codegraph_explore` + serena `find_symbol`·`find_referencing_symbols`·`get_symbols_overview` + context7 `query-docs`, review-quality = 같은 구성에서 `get_symbols_overview` 제외 (2026-11-01 `agents/review-arch.md`·`agents/review-quality.md` frontmatter 대조 — 구판 예시 "review-arch → serena만, review-quality → serena + context7" 은 실제와 달랐다) |
+| `mcpServers` | 에이전트별 MCP | fz 에이전트는 이 필드를 쓰지 않고 `tools:` 에 MCP 도구를 직접 나열한다 — review-arch = serena `find_symbol`·`find_referencing_symbols`·`get_symbols_overview` + context7 `query-docs`, review-quality = 같은 구성에서 `get_symbols_overview` 제외 (2026-11-01 `agents/review-arch.md`·`agents/review-quality.md` frontmatter 대조 — 구판 예시 "review-arch → serena만, review-quality → serena + context7" 은 실제와 달랐다) |
 | `background: true` | 항상 백그라운드 | 탐색/캐싱 에이전트에 적합 |
 
 ---

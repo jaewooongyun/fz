@@ -9,8 +9,8 @@ argument-hint: "[PR번호 또는 브랜치명] [--tier N] [--gpt] [--gpt-indepen
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
-  mcp__codegraph__codegraph_explore,
   mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__find_implementations,
   mcp__plugin_fz_serena__activate_project,
   mcp__plugin_fz_serena__read_memory,
   mcp__plugin_fz_serena__write_memory,
@@ -231,6 +231,12 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 
 상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조. Tier 가 정해지면 기록 `run_metrics.py start`(Tier 0·1 = light · 2·3 = full — `modules/mode-gate.md` § 기록).
 
+⛔ **근거 슬롯 검사** — tier.txt 를 쓴 뒤, Analyze · GPT 독립 패스를 띄우기 **전에** 한 번 부른다. `--tier` 는 방금 정한 값을 적는다(재개 실행의 옛 tier.txt 를 믿지 않는다):
+```bash
+python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" "${WORK_DIR}" --tier {5.5 에서 정한 Tier}
+```
+exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다 · `2` 는 판정 불가(⛔ 통과 아님). 요구 슬롯은 `modules/peer-review-tiers.md` § Tier-Adaptive Evidence 의 ✓ 이고, `evidence/tools.md` 첫 줄(Serena 상태 · 리뷰 대상 SHA)과 `caller-analysis.md` 의 `## 호출` · `## 구현` 도 본다 — 절차 `modules/evidence-collection.md`
+
 #### Few-shot
 ```
 BAD: 13줄 PR → Tier 2 Lite Team 디폴트 → ~375K tokens
@@ -241,6 +247,7 @@ GOOD: 13줄 PR → 추천 light → Tier 1(Lead + GPT 독립 첫 패스) → Wor
 - [ ] CHANGED_LINES 계산 완료? (`gh pr view --json additions,deletions` 또는 `git diff --numstat`)
 - [ ] --tier 옵션 우선 적용?
 - [ ] 모드(추천 · 선택 출처)와 Tier 를 tier.txt 에 기록?
+- [ ] `check_evidence_slots.py --tier` exit 0?
 
 ## Step: Analyze (독립 리뷰, 병렬)
 
