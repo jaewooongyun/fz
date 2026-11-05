@@ -85,7 +85,7 @@ RECOMMENDS = ("light", "full", "none")
 SOURCES = ("arg", "fz", "signal", "autonomous", "gate")
 # 행 키 허용 집합 — 이 밖의 키는 쓰지 않는다(원장 게이트가 그 밖의 키를 거부한다)
 ROW_KEYS = ("schema", "run_id", "attempt", "pipeline_id", "skill", "mode", "recommended", "reason", "started_at",
-            "ended_at", "status", "model", "effort", "session_id", "work_dir", "workflow_run_id", "plugin_root",
+            "ended_at", "status", "model", "effort", "active_min", "session_id", "work_dir", "workflow_run_id", "plugin_root",
             "plugin_version", "plugin_sha", "gate_issues", "findings")
 # --findings 의 부분 이름 → 행 findings 키. 키 이름은 experiment-log.md §5.4 · fz_telemetry_report.HARNESS_FINDINGS 와 같다
 FINDINGS_PARTS = {"gpt": "gpt_unique_findings", "claude": "claude_unique_findings", "convergent": "convergent_findings"}
@@ -131,6 +131,81 @@ def pipeline_id(work_dir, env) -> str:
     if sid:
         return "sess-" + sid[:12]
     return "adhoc-" + hashlib.sha1(os.getcwd().encode("utf-8")).hexdigest()[:12]
+
+
+def canonical_skill(name: str) -> str:
+    """`--skill` 정규형 = `skills/` 디렉터리 이름 [F-532]. `plan` 처럼 접두가 빠진 이름은 `fz-plan` 으로 보정한다.
+
+    run_id 가 이 값으로 계산되므로 별칭끼리 한 시도가 된다(예전에는 `plan` 과 `fz-plan` 이 다른 run_id 라 열린 표지를 서로 못 봤다).
+    모르는 이름은 기록하지 않는다 — 추측해 새 칸을 만들면 집계가 다시 갈린다.
+    """
+    skills = SCRIPT_DIR.parent / "skills"
+    known = {p.name for p in skills.iterdir() if (p / "SKILL.md").is_file()} if skills.is_dir() else set()
+    if not known or name in known:
+        return name
+    if f"fz-{name}" in known:
+        return f"fz-{name}"
+    raise Unavailable(f"unknown --skill {name} — skills/ 디렉터리 이름이어야 한다(예: fz-plan)")
+
+
+def _epoch(value):
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def active_minutes(path: Path, started_at, ended_at):
+    """시도 구간의 활성 분 = (ended_at − started_at) − 그 구간 안 사용자 대기의 합집합. 판정할 수 없으면 None(추측하지 않는다).
+
+    사용자 대기 = 세션 트랜스크립트의 `AskUserQuestion` tool_use 시각 → 같은 `tool_use_id` 의 tool_result 시각.
+    대기는 이 시도의 구간으로 잘라 더한다(같은 세션의 다른 시도의 대기를 빼지 않는다). 아래는 None 이다:
+    시각 이상 · 시도 안에서 답이 없는 질문 · 꼬리(TAIL_BYTES)가 시도 시작을 덮지 못함.
+    """
+    a, b = _epoch(started_at), _epoch(ended_at)
+    if a is None or b is None or b < a:
+        return None
+    with open(path, "rb") as fh:
+        fh.seek(0, os.SEEK_END)
+        size = fh.tell()
+        fh.seek(max(0, size - TAIL_BYTES))
+        chunk = fh.read().decode("utf-8", errors="replace")
+    asks, waits, first = {}, [], None
+    for line in chunk.splitlines():
+        if '"timestamp"' not in line:
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        t = _epoch(event.get("timestamp")) if isinstance(event, dict) else None
+        if t is None:
+            continue
+        first = t if first is None else min(first, t)
+        message = event.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        for c in content if isinstance(content, list) else []:
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") == "tool_use" and c.get("name") == "AskUserQuestion":
+                asks[c.get("id")] = t
+            elif c.get("type") == "tool_result" and c.get("tool_use_id") in asks:
+                waits.append((asks.pop(c["tool_use_id"]), t))
+    if first is None or (size > TAIL_BYTES and first > a):
+        return None
+    if any(a <= t <= b for t in asks.values()):
+        return None
+    total, cur = 0.0, None
+    for x, y in sorted((max(x, a), min(y, b)) for x, y in waits if y > a and x < b):
+        if cur is not None and x <= cur[1]:
+            cur[1] = max(cur[1], y)
+            continue
+        if cur is not None:
+            total += cur[1] - cur[0]
+        cur = [x, y]
+    if cur is not None:
+        total += cur[1] - cur[0]
+    return round(((b - a) - total) / 60.0, 1)
 
 
 def run_id_of(pid: str, skill: str) -> str:
@@ -270,6 +345,15 @@ def lead_effort_of(env, sid: str, projects: Path) -> str:
     return value if isinstance(value, str) and value else UNKNOWN
 
 
+def transcript_of(sid: str, projects_root: str):
+    """세션 트랜스크립트 경로 — 없으면 None."""
+    if not sid:
+        return None
+    for path in sorted(Path(os.path.expanduser(projects_root)).glob(f"*/{sid}.jsonl")):
+        return path
+    return None
+
+
 def model_and_effort(env, sid: str, projects_root: str):
     """(model, effort). 세션 id 가 없거나 트랜스크립트를 못 찾거나 못 읽으면 둘 다 unknown — 추측하지 않는다."""
     if not sid:
@@ -316,6 +400,19 @@ def reason_text(source, reason):
     return text[:REASON_MAX] or None
 
 
+def active_of(sid, projects_root, started_at, ended_at):
+    """close_marker 의 active_min — 끝 시각이 없거나(자동 닫음) 트랜스크립트를 못 읽으면 None."""
+    if not ended_at:
+        return None
+    path = transcript_of(sid, projects_root)
+    if path is None:
+        return None
+    try:
+        return active_minutes(path, started_at, ended_at)
+    except OSError:
+        return None
+
+
 def close_marker(pdir: Path, path: Path, run_id: str, attempt: int, status: str, ended_at, env, projects_root,
                  workflow_run_id=None, sid=None, skill=None, gate_issues=None, findings=None):
     """열린 표지 1개 → 행 1개 append → 표지 삭제. 같은 (run_id, attempt) 행이 이미 있으면 표지만 지우고 None.
@@ -345,6 +442,7 @@ def close_marker(pdir: Path, path: Path, run_id: str, attempt: int, status: str,
         "status": status,
         "model": model,
         "effort": effort,
+        "active_min": active_of(sid, projects_root, marker.get("started_at"), ended_at),
         "session_id": sid or None,
         "work_dir": marker.get("work_dir"),
         "workflow_run_id": workflow_run_id,
@@ -577,9 +675,10 @@ def self_test() -> int:
         def c_concurrent():
             st, wd, n = base / "s-concurrent", base / "wd-concurrent", 8
             errors = []
+            names = sorted(p.name for p in (SCRIPT_DIR.parent / "skills").iterdir() if (p / "SKILL.md").is_file())[:n]   # 정규화(F-532)는 모르는 이름을 거부한다
             for phase, extra in (("start", ("--mode", "light", "--recommended", "light", "--source", "gate")),
                                  ("end", ("--status", "completed"))):
-                procs = [subprocess.Popen(argv(phase, "--skill", f"st-skill-{i}", "--work-dir", str(wd), *extra),
+                procs = [subprocess.Popen(argv(phase, "--skill", names[i], "--work-dir", str(wd), *extra),
                                           env=env_for(st), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                           text=True, stdin=subprocess.DEVNULL) for i in range(n)]
                 for proc in procs:
@@ -596,7 +695,7 @@ def self_test() -> int:
 
         def c_duplicate_end():
             st, wd = base / "s-dup", base / "wd-dup"
-            first, second, third = start(st, "fz-x", wd), end(st, "fz-x", wd), end(st, "fz-x", wd)
+            first, second, third = start(st, "fz-search", wd), end(st, "fz-search", wd), end(st, "fz-search", wd)
             rows, bad = rows_of(st)
             ok = ((first[0], second[0], third[0]) == (0, 0, 0) and "already ended" in third[1] and bad == 0
                   and len(rows) == 1 and rows[0].get("status") == "completed")
@@ -604,7 +703,7 @@ def self_test() -> int:
 
         def c_interrupted():
             st, wd = base / "s-int", base / "wd-int"
-            first, second = start(st, "fz-x", wd), start(st, "fz-x", wd)
+            first, second = start(st, "fz-search", wd), start(st, "fz-search", wd)
             rows, _ = rows_of(st)
             row = rows[0] if len(rows) == 1 else {}
             reopened = list(st.glob(f"*/{OPEN_DIR}/*.2.json"))
@@ -626,16 +725,16 @@ def self_test() -> int:
                 roots.append(("read-only", ro))
             try:
                 for label, state in roots:
-                    soft = start(state, "fz-x", base / "wd-wf", strict=False)
-                    hard = start(state, "fz-x", base / "wd-wf", strict=True)
+                    soft = start(state, "fz-search", base / "wd-wf", strict=False)
+                    hard = start(state, "fz-search", base / "wd-wf", strict=True)
                     ok = (ok and soft[0] == 0 and hard[0] == 1
                           and all("RUN_METRICS_UNAVAILABLE" in res[2] for res in (soft, hard)))
                     notes.append(f"{label}: rc={soft[0]} strict rc={hard[0]}")
                 state, wd = base / "s-append", base / "wd-append"
-                opened = start(state, "fz-x", wd)
+                opened = start(state, "fz-search", wd)
                 for folder in state.glob(f"*/{OPEN_DIR}"):
                     (folder.parent / RUNS_FILE).mkdir()   # runs.jsonl 자리에 폴더 — end 의 읽기 · append 가 실패한다
-                soft = end(state, "fz-x", wd, strict=False)
+                soft = end(state, "fz-search", wd, strict=False)
                 ok = ok and opened[0] == 0 and soft[0] == 0 and "RUN_METRICS_UNAVAILABLE" in soft[2]
                 notes.append(f"append: start rc={opened[0]} end rc={soft[0]}")
             finally:
@@ -645,8 +744,8 @@ def self_test() -> int:
 
         def c_no_body_copy():
             st, wd = base / "s-body", base / "wd-body"
-            first = start(st, "fz-x", wd, "--reason", "긴 사유 " * 80)
-            second = end(st, "fz-x", wd)
+            first = start(st, "fz-search", wd, "--reason", "긴 사유 " * 80)
+            second = end(st, "fz-search", wd)
             rows, _ = rows_of(st)
             row = rows[0] if len(rows) == 1 else {}
             extra = sorted(set(row) - set(ROW_KEYS))
@@ -660,7 +759,7 @@ def self_test() -> int:
 
         def c_resume_attempt():
             st, wd = base / "s-resume", base / "wd-resume"
-            outs = [start(st, "fz-x", wd), end(st, "fz-x", wd), start(st, "fz-x", wd), end(st, "fz-x", wd)]
+            outs = [start(st, "fz-search", wd), end(st, "fz-search", wd), start(st, "fz-search", wd), end(st, "fz-search", wd)]
             rows, _ = rows_of(st)
             got = sorted((r.get("attempt"), r.get("status")) for r in rows if type(r.get("attempt")) is int)
             run_ids = {r.get("run_id") for r in rows}
@@ -691,9 +790,46 @@ def self_test() -> int:
                         f"gate_issues={review.get('gate_issues')} findings={review.get('findings')} "
                         f"plain keys={sorted(set(plan) & {'gate_issues', 'findings'})}")
 
+        def c_skill_alias():
+            st = base / "st-alias"
+            wd = base / "wd-alias"
+            wd.mkdir()
+            r1 = start(st, "plan", wd)
+            r2 = end(st, "fz-plan", wd)
+            rows = [json.loads(ln) for f in st.glob("*/runs.jsonl") for ln in f.read_text().splitlines() if ln.strip()]
+            ok = r1[0] == 0 and r2[0] == 0 and len(rows) == 1 and rows[0]["skill"] == "fz-plan"
+            return ok, f"rc={r1[0]},{r2[0]} rows={[r.get('skill') for r in rows]}"
+
+        def c_unknown_skill():
+            st = base / "st-unknown"
+            wd = base / "wd-unknown"
+            wd.mkdir()
+            rc, _, err = start(st, "no-such-skill", wd)
+            ok = rc == 1 and "RUN_METRICS_UNAVAILABLE" in err and "unknown --skill" in err and not list(st.glob("*/open/*"))
+            return ok, f"rc={rc} err={err.strip()[:120]}"
+
+        def c_active_min():
+            t = base / "active.jsonl"
+            def ev(ts, content, role="assistant"):
+                return json.dumps({"type": role, "timestamp": ts, "message": {"role": role, "content": content}})
+            t.write_text("\n".join([
+                ev("2026-01-01T09:59:00Z", [{"type": "text", "text": "x"}]),
+                ev("2026-01-01T10:05:00Z", [{"type": "tool_use", "id": "q1", "name": "AskUserQuestion", "input": {}}]),
+                ev("2026-01-01T10:15:00Z", [{"type": "tool_result", "tool_use_id": "q1", "content": "a"}], "user"),
+                ev("2026-01-01T10:28:00Z", [{"type": "tool_use", "id": "q2", "name": "AskUserQuestion", "input": {}}]),
+                ev("2026-01-01T10:45:00Z", [{"type": "tool_result", "tool_use_id": "q2", "content": "b"}], "user"),
+                ev("2026-01-01T10:50:00Z", [{"type": "tool_use", "id": "q3", "name": "AskUserQuestion", "input": {}}]),
+            ]) + "\n")
+            a = active_minutes(t, "2026-01-01T10:00:00Z", "2026-01-01T10:30:00Z")   # 30 − (10 + 2) = 18
+            b = active_minutes(t, "2026-01-01T10:40:00Z", "2026-01-01T10:48:00Z")   # 8 − 5 = 3
+            c = active_minutes(t, "2026-01-01T10:40:00Z", "2026-01-01T11:00:00Z")   # q3 미응답 → None
+            d = active_minutes(t, "2026-01-01T10:30:00Z", "2026-01-01T10:00:00Z")   # 시각 이상 → None
+            return (a, b, c, d) == (18.0, 3.0, None, None), f"got {(a, b, c, d)}"
+
         cases = (("concurrent", c_concurrent), ("duplicate-end", c_duplicate_end), ("interrupted", c_interrupted),
                  ("write-failure", c_write_failure), ("no-body-copy", c_no_body_copy), ("resume-attempt", c_resume_attempt),
-                 ("harness-fields", c_harness_fields))
+                 ("harness-fields", c_harness_fields), ("skill-alias", c_skill_alias),
+                 ("unknown-skill", c_unknown_skill), ("active-min", c_active_min))
         passed = 0
         for name, fn in cases:
             try:
@@ -717,6 +853,8 @@ def main(argv=None) -> int:
         parser.print_usage(sys.stderr)
         return 2
     try:
+        if getattr(args, "skill", None):
+            args.skill = canonical_skill(args.skill)
         return COMMANDS[args.cmd](args, os.environ)
     except Unavailable as exc:
         why = str(exc)

@@ -138,7 +138,7 @@ function evalCostThunk(pathBundle, lensLabel) {
     `[경로] ${JSON.stringify(pathBundle)}\n` +
     `[채점축] 각 경로 cost/risk(low/mid/high) + 조건 불변성(locked/unlocked) 1회 판정 + 근거 코드 인용(evidence) + 확신도(confidence). ` +
     `부수지 말고 비용을 밝힌다.`,
-    { label: `cost-${lensLabel}`, agentType: 'fz:arch-lens', model: 'sonnet', effort: EFFORT, schema: CostRiskSchema })
+    { label: `cost:${lensLabel}`, agentType: 'fz:arch-lens', model: 'sonnet', effort: EFFORT, schema: CostRiskSchema })
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -188,7 +188,7 @@ async function runDeep() {
     `${OVERRIDE}\n[역할] 경로 생성자 — 렌즈: ${lens}\n[문제] ${input.problem}\n` +
     `[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드)\n[기지 제약] ${JSON.stringify(input.constraintsKnown)}\n` +
     `[목표] ${lens} 관점에서 경로 2-4개 생성 + 전제조건. 탈락 없음.`,
-    { label: `lens-${lens}`, agentType: 'fz:plan-structure', model: 'sonnet', effort: EFFORT, schema: PathSetSchema }))
+    { label: `lens:${lens}`, agentType: 'fz:plan-structure', model: 'sonnet', effort: EFFORT, schema: PathSetSchema }))
   const lensResults = (await parallel(lensThunks)).filter(Boolean)
   if (lensResults.length === 0) { fallbackCount += 1; return { mode: 'fallback', reason: 'all lenses null', metrics: metrics() } }
   if (lensResults.length < lenses.length) log(`WARN 렌즈 ${lenses.length - lensResults.length}개 null (부분 fan-out)`)

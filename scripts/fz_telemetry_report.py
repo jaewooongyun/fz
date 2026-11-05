@@ -556,6 +556,30 @@ LABEL_STAGE = {
     "lean2-edge": "plan-edge",
     "lean2-impact-arch": "plan-impact",
     "lean2-merge": "plan-merge",
+    # ⬇ 2026-11-05 label 규약(F-531) — 워크플로 label 은 이 표의 키 또는 `<키>:<세부>` 다. 스테이지명은 예전 키 서명 판정이 붙이던 이름을 따른다
+    "stage1-impl": "changeset",
+    "stage2-review-arch": "verify",
+    "stage2-review-quality": "verify",
+    "stage2-review": "verify",
+    "stage3-revise": "changeset",
+    "stage0-direction": "plan-direction",
+    "stage0-rebuttal": "plan-direction",
+    "stage0-final": "plan-direction",
+    "stage1-draft": "plan-full",
+    "stage2-impact": "plan-impact",
+    "stage2-edge": "plan-edge",
+    "stage2-arch": "plan-impact",
+    "stage3-impact-on-edge": "cross",
+    "stage3-edge-on-impact": "cross",
+    "stage4-integrate": "plan-merge",
+    "stage5-recheck": "verify",
+    "r1-paths": "discover-paths",
+    "r2-paths": "discover-paths",
+    "landscape": "discover-landscape",
+    "merge": "merge",
+    "lens": "lens",
+    "cost": "discover-cost",
+    "swarm": "swarm",
 }
 # agentType 은 스크립트가 넘길 때만 `workflow-subagent` 가 아니다. 한 스테이지에만 쓰이는 것만 둔다 —
 # review-arch·quality·correctness(렌즈·교차 겸용) · plan-structure · plan-edge-case · plan-impact(여러 워크플로의
@@ -999,6 +1023,15 @@ RUN_SCHEMA = 1                                           # run_metrics.py 와 �
 RUN_STATUSES = ("completed", "interrupted", "failed")    # run_metrics.py 와 같은 이름 · 같은 값
 RUN_OPEN_STALE_HOURS = 24.0                              # run_metrics.py sweep 기본값과 같은 이름 · 같은 값
 RUN_REQUIRED = ("run_id", "attempt", "skill", "mode", "status", "started_at")
+
+
+def canonical_run_skill(name):
+    """run_metrics.canonical_skill 과 같은 규칙 — 과거 행의 별칭(plan → fz-plan)을 집계에서만 합친다(행 파일은 고치지 않는다) [F-532]."""
+    s = str(name)
+    skills = os.path.join(DEFAULT_PLUGIN_ROOT, "skills")
+    if not os.path.isfile(os.path.join(skills, s, "SKILL.md")) and os.path.isfile(os.path.join(skills, "fz-" + s, "SKILL.md")):
+        return "fz-" + s
+    return s
 # Harness 판정(experiment-log.md §5.4 "10건 → 이슈 0건 Gate = Neutral 후보") — 실행 수 경계는
 # modules/cross-validation.md § Reflection Rate threshold 의 N<10 preliminary 와 같다
 HARNESS_MIN_RUNS = 10
@@ -1043,6 +1076,7 @@ def collect_runs(runs_root, since=None, until=None):
                     or any(key not in row for key in RUN_REQUIRED)):
                 out["unreadable"] += 1
                 continue
+            row["skill"] = canonical_run_skill(row["skill"])
             started = _run_ts(row.get("started_at"))
             if started is None:
                 out["unreadable"] += 1

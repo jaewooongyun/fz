@@ -43,7 +43,7 @@ const CASES = [
 const frag = id => ({ id, brief: `조각 ${id} 의 주장을 고정 트리에서 판정한다`, sha: SHA, method: METHOD })
 const frags = (n, prefix) => Array.from({ length: n }, (_, i) => frag(`${prefix || 'F'}${i + 1}`))
 const ok = (status, extra) => Object.assign({ status, sha: SHA, method: METHOD, findings: [], evidence: 'e' }, extra || {})
-const idOf = c => String((c && c.label) || '').replace(/^swarm-/, '')
+const idOf = c => String((c && c.label) || '').replace(/^swarm:/, '')
 const rowsOf = r => (Array.isArray(r.res.table) ? r.res.table : [])
 const byId = r => Object.fromEntries(rowsOf(r).map(x => [x.id, x]))
 
@@ -105,7 +105,7 @@ async function shaMissingRespawn(expect) {
   expect(m.respawns === 4 && m.dropped === 5 && m.nullCount === 0, `metrics ${JSON.stringify(m)} — respawns 4 · dropped 5 · nullCount 0 기대`)
   expect(r.calls.every(c => c.prompt.includes(`read only under ${TREE} (pinned at ${SHA}); method: ${METHOD}`) && c.prompt.includes('record sha and method in your result')),
     '프롬프트에 고정 트리 · sha · method · 기록 의무가 없다')
-  const a = r.calls.filter(c => c.label === 'swarm-A')
+  const a = r.calls.filter(c => c.label === 'swarm:A')
   expect(a.length === 2 && !a[0].prompt.includes('[재스폰]') && a[1].prompt.includes('[재스폰]'), '재스폰 프롬프트 표지가 둘째 콜에만 있어야 한다')
   expect(r.calls.every(c => c.model === 'opus' && c.effort === 'xhigh' && c.agentType === 'fz:review-correctness' && c.schema),
     `콜 opts ${JSON.stringify(r.calls.map(c => [c.model, c.effort, c.agentType]))}`)
@@ -219,8 +219,8 @@ async function everyFragmentRow(expect) {
 
 async function agentTypeFallback(expect) {
   // general-purpose = 쓰기 가능 내장 · memory-curator = memory 필드(쓰기 자동 부여) · plan-merge = 빈 tools · review-arch = 리뷰 전용 arch-critic 사전주입(B4) ·
-  // review-counter = 텔레메트리 단일 스테이지 agentType · 네임스페이스 없음 · 미지
-  const rejected = ['general-purpose', 'fz:memory-curator', 'fz:plan-merge', 'fz:review-arch', 'fz:review-counter', 'review-correctness', 'fz:no-such-agent']
+  // 네임스페이스 없음 · 미지 — ⬇ review-counter 는 2026-11-05 label 규약(F-531)으로 허용으로 옮겼다(아래 대조)
+  const rejected = ['general-purpose', 'fz:memory-curator', 'fz:plan-merge', 'fz:review-arch', 'review-correctness', 'fz:no-such-agent']
   for (const agentType of rejected) {
     const r = await go({ fragments: frags(2), tree: TREE, agentType }, () => ok('PASS'))
     expect(r.res.mode === 'fallback' && r.calls.length === 0, `agentType ${agentType} → mode ${r.res.mode} · 콜 ${r.calls.length}`)
@@ -228,7 +228,10 @@ async function agentTypeFallback(expect) {
   const ctl = await go({ fragments: frags(2), tree: TREE, agentType: 'fz:arch-lens' }, () => ok('PASS'))
   expect(ctl.res.mode === 'workflow' && ctl.calls.length === 2 && ctl.calls.every(c => c.agentType === 'fz:arch-lens'),
     `대조 fz:arch-lens → mode ${ctl.res.mode} · ${ctl.calls.map(c => c.agentType)}`)
-  return `거부 ${rejected.length}종 · 대조 1종`
+  const rc = await go({ fragments: frags(2), tree: TREE, agentType: 'fz:review-counter' }, () => ok('PASS'))
+  expect(rc.res.mode === 'workflow' && rc.calls.length === 2 && rc.calls.every(c => c.agentType === 'fz:review-counter'),
+    `재허용 fz:review-counter → mode ${rc.res.mode} · ${rc.calls.map(c => c.agentType)}`)
+  return `거부 ${rejected.length}종 · 대조 2종(arch-lens · review-counter 재허용)`
 }
 
 async function allowlistReadonly(expect) {

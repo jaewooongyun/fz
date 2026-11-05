@@ -75,15 +75,16 @@ const SwarmResultSchema = {
 //   ① agents/*.md frontmatter `tools:` 가 비어 있지 않다 — 비면 고정 트리를 못 읽는다(plan-merge 제외)
 //   ② `tools:` 에 Edit · Write · MultiEdit · NotebookEdit · Bash · 쓰기 MCP 가 없고 `memory:` 필드도 없다 — memory 필드는
 //      Read/Write/Edit 를 자동 부여한다(scripts/lint_contracts.py N13 — memory-curator 제외)
-//   ③ 텔레메트리가 agentType 하나로 스테이지를 정하지 않는다 — scripts/fz_telemetry_report.py AGENT_TYPE_STAGE 의 review-counter 를 주면
-//      swarm 결과가 counter 판정 칸으로 세어진다(review-counter 제외)
+//   ③ 텔레메트리가 swarm 결과를 label 줄기로 가른다 — label 은 `swarm:<조각 id>` 이고 scripts/fz_telemetry_report.py LABEL_STAGE 의
+//      `swarm` 이 agentType 판정(AGENT_TYPE_STAGE)보다 먼저 걸린다. 예전 `swarm-<id>` 는 줄기가 조각마다 달라 review-counter 를 주면
+//      counter 판정 칸으로 세어졌다(F-531) — 그래서 review-counter 를 뺐던 것을 되돌렸다
 //   ④ 리뷰 전용 사전주입이 없다 — review-arch 는 arch-critic 을 미리 싣는 리뷰 렌즈라 빼고 같은 본문의 arch-lens 를 둔다(F-459 · B4).
 //      arch-lens 는 v4.50.0 에 생긴 에이전트라, 그 전 판을 불러온 세션은 기본값(review-correctness)으로 부른다
 //   ⛔ 에이전트의 tools · memory 를 바꾸거나 에이전트를 더하면 이 목록을 다시 대조한다 — tests/workflows/swarm-budget.js allowlist-readonly 가
 //      이 목록 = 실제로 받는 agentType 집합이고 그 전부가 ① · ② 를 지키는지 본다. 목록 밖은 콜 0 으로 fallback 이다.
 const READ_ONLY_AGENTS = [
   'fz:impl-correctness', 'fz:impl-quality', 'fz:plan-edge-case', 'fz:plan-impact', 'fz:plan-structure',
-  'fz:arch-lens', 'fz:review-correctness', 'fz:review-direction', 'fz:review-quality',
+  'fz:arch-lens', 'fz:review-correctness', 'fz:review-counter', 'fz:review-direction', 'fz:review-quality',
   'fz:search-pattern', 'fz:search-symbolic',
 ]
 const DEFAULT_AGENT = 'fz:review-correctness'
@@ -227,7 +228,7 @@ async function spawn(f, retryWhy) {
   if (retryWhy) respawns += 1
   if (retryWhy === 'worker-null') nullCalls -= 1
   return callAgent(workerPrompt(f, retryWhy),
-    { label: `swarm-${f.id}`, agentType: AGENT_TYPE, model: 'opus', effort: EFFORT, schema: SwarmResultSchema })
+    { label: `swarm:${f.id}`, agentType: AGENT_TYPE, model: 'opus', effort: EFFORT, schema: SwarmResultSchema })
 }
 
 // 한 차례(1차 첫 시도 · 2차 재스폰) — 묶음(≤ room().n)마다 병렬로 돌리고 묶음 앞에서 멈출지 잰다.

@@ -78,7 +78,7 @@ def workflow_sources(root):
 
 
 def label_present(label, sources):
-    needles = ("label: '%s'" % label, 'label: "%s"' % label, "label: `%s`" % label)
+    needles = ("label: '%s'" % label, 'label: "%s"' % label, "label: `%s`" % label, "label: `%s:" % label)   # 마지막 = `<키>:${…}` 동적 label(F-531)
     return any(needle in text for text in sources for needle in needles)
 
 

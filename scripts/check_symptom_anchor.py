@@ -8,8 +8,10 @@
 ⛔ **문서만 고치면 또 안 잡힌다.** F-285 가 정확히 그 사례다 — 규칙은 있었고 발화하지 않았다.
    그래서 기계 검사를 둔다.
 
-판정: `severity_final`(없으면 `severity`)이 major·minor 인 이슈는
-`symptom_screen` 과 `symptom_reach` 둘 다 비어 있지 않아야 한다.
+판정: `severity_final`(없으면 `severity`)이 **minor 이상**(critical · major · minor)인 이슈는
+`symptom_screen` 과 `symptom_reach` 둘 다 비어 있지 않아야 한다 — 계약은 `modules/peer-review-gates.md` 의 "`minor` 이상" 이다.
+⛔ 열거가 아니라 하한이다 [F-533]: 예전 `BLOCKING = (major, minor)` 는 critical 을 빼먹어 가장 심각한 이슈가 검사 없이 통과했다.
+알 수 없는 severity(오타 등)는 통과가 아니라 판정 불가다. `excluded`(Lead 가 제외한 이슈)는 비차단 값으로 인정한다.
 
 exit code:
   0  PASS — 위반 0건
@@ -29,7 +31,8 @@ import sys
 OK, VIOLATION, UNRUN = 0, 1, 2
 # ⛔ N6 루트 앵커 — lint_contracts ANCHOR_LINES 허용 형태와 정확히 일치
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BLOCKING = ("major", "minor")
+BLOCKING = ("critical", "major", "minor")          # 계약 "minor 이상" — 새 등급이 생기면 여기와 KNOWN 을 같이 고친다
+KNOWN = BLOCKING + ("suggestion", "excluded")       # 그 밖의 값은 판정 불가(UNRUN) — 오타가 조용히 면제되지 않게
 
 
 def log(*a):
@@ -63,7 +66,7 @@ def check(path: pathlib.Path):
         log("UNRUN: issues 가 0건 — 측정 실패를 먼저 의심한다")
         return UNRUN
 
-    bad, unrated, blocking = [], [], 0
+    bad, unrated, unknown, blocking = [], [], [], 0
     for i, it in enumerate(issues):
         if not isinstance(it, dict):
             unrated.append(f"[{i}] 객체가 아니다")
@@ -74,6 +77,9 @@ def check(path: pathlib.Path):
             # ⛔ severity 가 없으면 **통과가 아니라 판정 불가**다. 조용히 넘기면
             #    필드를 지우는 것만으로 게이트를 우회할 수 있다.
             unrated.append(iid)
+            continue
+        if sev not in KNOWN:
+            unknown.append(f"{iid}={sev}")
             continue
         if sev not in BLOCKING:
             continue
@@ -89,11 +95,14 @@ def check(path: pathlib.Path):
     for iid, sev, miss in bad:
         print(f"      {iid} ({sev}) — 빈 칸: {', '.join(miss)}")
     print(f"  severity 미표기(판정 불가)      : {len(unrated)}")
+    print(f"  알 수 없는 severity(판정 불가)  : {len(unknown)}")
+    for u in unknown[:5]:
+        print(f"      {u}")
     for u in unrated[:5]:
         print(f"      {u}")
 
-    if unrated:
-        log(f"UNRUN: severity 가 없는 이슈 {len(unrated)}건 — 판정 불가 (⛔ 통과 아님)")
+    if unrated or unknown:
+        log(f"UNRUN: severity 가 없거나({len(unrated)}) 알 수 없는 값({len(unknown)})인 이슈 — 판정 불가 (⛔ 통과 아님)")
         return UNRUN
     if bad:
         log(f"VIOLATION: minor 이상 {len(bad)}건에 증상 관측 지점이 없다 — "
@@ -154,6 +163,18 @@ def self_test():
         it2 = {"id": "X2", "severity": "suggestion", "severity_final": "major"}
         assert check(write(tmp, [it2])) == VIOLATION, "⛔ severity_final 승격을 무시했다"
 
+    def c_critical_blocks(tmp):
+        """⛔ 회귀 F-533: critical 은 minor 이상이다 — 증상 칸이 비면 위반."""
+        assert check(write(tmp, [{"id": "C1", "severity": "critical"}])) == VIOLATION, "⛔ critical 이 검사 없이 통과했다"
+
+    def c_unknown_severity_unrun(tmp):
+        """⛔ 회귀 F-533: 오타 severity 는 면제가 아니라 판정 불가."""
+        assert check(write(tmp, [{"id": "T1", "severity": "majoor"}])) == UNRUN, "⛔ 오타 severity 가 조용히 통과했다"
+
+    def c_excluded_exempt(tmp):
+        it = {"id": "E1", "severity": "major", "severity_final": "excluded"}
+        assert check(write(tmp, [it])) == OK, "excluded 는 비차단인데 걸렸다"
+
     def c_no_severity_unrun(tmp):
         """⛔ severity 를 지우는 것만으로 게이트를 우회할 수 없어야 한다."""
         rc = check(write(tmp, [{"id": "N1", "description": "x"}]))
@@ -192,6 +213,9 @@ def self_test():
                  ("whitespace-is-empty", c_whitespace_is_empty),
                  ("suggestion-exempt", c_suggestion_exempt),
                  ("severity-final-wins", c_severity_final_wins),
+                 ("critical-blocks", c_critical_blocks),
+                 ("unknown-severity-unrun", c_unknown_severity_unrun),
+                 ("excluded-exempt", c_excluded_exempt),
                  ("no-severity-unrun", c_no_severity_unrun),
                  ("empty-issues-unrun", c_empty_unrun),
                  ("missing-file-unrun", c_missing_file_unrun),
