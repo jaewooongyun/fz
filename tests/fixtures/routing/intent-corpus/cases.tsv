@@ -1,0 +1,18 @@
+# 라우팅 합성 corpus (F-528) — 실 요청을 옮기지 않은 중립 문장. scripts/intent_route_probe.py --cases 와 lint #4 가 쓴다
+# 문장 \t 반드시 걸릴 라벨(쉼표 · ∅ = 어느 행에도 안 걸린다 · - = 없음) \t 걸리면 안 될 라벨 \t 메모
+버그 있어서 앱이 죽어 고쳐줘	fz-fix	-	기본 대조
+팀원 PR 리뷰해줘	fz-peer-review	-	PR 토큰 + 리뷰
+PR 올려줘	fz-pr	-	PR 토큰
+session-prompt.md 를 읽고 시작해	-	fz-pr	부분 문자열 함정 — prompt 의 pr
+PRD 문서 요약해줘	-	fz-pr,fz-peer-review	부분 문자열 함정 — PRD
+코멘트 달 만한 것만 남겨줘	fz-peer-review	-	Curate
+가치 있는 코멘트만 골라줘	fz-peer-review	-	Curate · 어순 반대
+is this comment worth posting	fz-peer-review	-	Curate · 영문
+아까 하던 거 계속 진행해줘	(이어 하기)	-	이어 하기
+연결이 끊어졌는데 이어서 해줘	(이어 하기)	-	이어 하기
+finding 쌓인 거 정리해줘	fz-manage	-	메타
+fz 플러그인 고도화 방향 잡아줘	fz-manage	-	메타
+코드 리뷰해줘	fz-review	fz-code	코드 단독 약화 — 리뷰가 주어
+코드 짜줘	fz-code	-	코드 + 작성 동사
+처음부터 끝까지 해줘	full-cycle	fz-code,fz-fix,fz-plan	파이프라인 전용 · 스킬 0
+안녕	∅	-	어느 행에도 안 걸린다

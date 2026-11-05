@@ -28,8 +28,8 @@ metadata:
   provides: [peer-review]
   needs: [none]
   intent-triggers:
-    - "피어리뷰|팀원|PR.*리뷰"
-    - "peer.?review|teammate|PR.*review"
+    - "피어리뷰|팀원|(?<![A-Za-z])PR(?![A-Za-z]).*리뷰|코멘트.*(가치|달 만한|달만한)|(가치|달 만한|달만한).*코멘트"
+    - "peer.?review|teammate|(?<![A-Za-z])PR(?![A-Za-z]).*review|comment.?worth"
 ---
 
 # /fz-peer-review - 팀원 코드 피어 리뷰

@@ -17,8 +17,8 @@ metadata:
   provides: [pr]
   needs: [commit]
   intent-triggers:
-    - "PR|풀리퀘스트"
-    - "PR|pull.?request"
+    - "(?<![A-Za-z])PR(?![A-Za-z])|풀리퀘스트"
+    - "(?<![A-Za-z])PR(?![A-Za-z])|pull.?request"
 ---
 
 # PR Creation Skill

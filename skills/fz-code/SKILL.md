@@ -25,7 +25,7 @@ metadata:
   provides: [code-changes]
   needs: [planning]
   intent-triggers:
-    - "구현|코드|만들어|개발"
+    - "구현|코드.*(짜|작성|구현|만들|추가)|만들어|개발"
     - "implement|code|develop|build"
 ---
 

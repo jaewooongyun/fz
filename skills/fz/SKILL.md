@@ -183,7 +183,7 @@ metadata:
 - [ ] 1개 이상의 스킬이 매칭되었는가? — **0개면 Phase 3.1 을 resolver-only 로 호출했는가?**
       (⛔ `guides/skill-authoring.md` § 파이프라인 매칭 흐름이 규정한 3단 폴백이다.
        Gate 1 에서 바로 질문으로 빠지면 `pipelines.md` 가 잡을 요청까지 막힌다 —
-       실측 예 `타임아웃 30초로 변경` 은 quick-fix 트리거에 있으나 스킬 매칭은 0이었다)
+       실측 예 `처음부터 끝까지 해줘` 는 full-cycle 트리거에 있으나 스킬 매칭은 0이다 — `scripts/intent_route_probe.py --check-skill-example skills/fz/SKILL.md` 가 이 문장이 지금도 참인지 잰다)
 - [ ] Confidence 판정 완료? (Medium/Low이면 AskUserQuestion 실행했는가?)
 - [ ] 동점 파이프라인 있으면 사용자 선택 완료?
 - [ ] 매칭된 스킬 간 의존성이 파악되었는가?

@@ -16,16 +16,16 @@
 |------|-----------|----------|
 | fz-discover | `어떻게.*좋을까\|어디에.*좋을까\|뭐가.*맞을까\|괜찮을까\|트레이드오프\|맞는지\|차이점\|놓치고\|어떻게.*생각\|이렇게.*해도\|방법.*찾\|최적.*찾\|요구.*조건\|제약\|이게.*맞아\|어떤.*방식\|비교.*해줘` | `how.*should\|where.*should\|what.*best\|trade.?off\|difference\|missing\|what.*think` |
 | fz-plan | `계획\|설계\|아키텍처\|요구사항\|리팩토링\|치환\|흡수` | `plan\|design\|architect\|requirement\|migration\|refactor` |
-| fz-code | `구현\|코드\|만들어\|개발` | `implement\|code\|develop\|build` |
+| fz-code | `구현\|코드.*(짜\|작성\|구현\|만들\|추가)\|만들어\|개발` | `implement\|code\|develop\|build` |
 | fz-review | `리뷰\|검증\|품질\|검토` | `review\|validate\|quality` |
 | fz-fix | `수정\|고쳐\|변경\|바꿔\|버그\|크래시\|에러\|되돌리기\|revert\|원상복구` | `fix\|bug\|crash\|error\|revert\|undo\|rollback\|patch` |
 | fz-search | `찾아\|탐색\|구조\|영향\|의존성` | `search\|explore\|structure\|impact\|dependency` |
 | fz-gpt | `gpt\|교차검증` | `gpt\|cross-validate\|verify with gpt` |
 | fz-commit | `커밋` | `commit` |
-| fz-pr | `PR\|풀리퀘스트` | `PR\|pull.?request` |
+| fz-pr | `(?<![A-Za-z])PR(?![A-Za-z])\|풀리퀘스트` | `(?<![A-Za-z])PR(?![A-Za-z])\|pull.?request` |
 | fz-rebase | `리베이스\|브랜치.*최신화\|브랜치.*동기화\|브랜치.*업데이트\|develop.*위로\|롱텀.*브랜치\|리베이스.*(사라\|누락\|덮어)\|(리베이스\|force.?push).*(유실\|덮어씌)` | `rebase\|sync.*branch\|refresh.*branch\|update.*branch` |
-| fz-peer-review | `피어리뷰\|팀원\|PR.*리뷰` | `peer.?review\|teammate\|PR.*review` |
-| fz-pr-digest | `해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선\|PR.*설명\|변경.*설명` | `digest\|what.*changed\|learn` |
+| fz-peer-review | `피어리뷰\|팀원\|(?<![A-Za-z])PR(?![A-Za-z]).*리뷰\|코멘트.*(가치\|달 만한\|달만한)\|(가치\|달 만한\|달만한).*코멘트` | `peer.?review\|teammate\|(?<![A-Za-z])PR(?![A-Za-z]).*review\|comment.?worth` |
+| fz-pr-digest | `해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선\|(?<![A-Za-z])PR(?![A-Za-z]).*설명\|변경.*설명` | `digest\|what.*changed\|learn` |
 | fz-explain | `구조.*설명\|코드.*설명\|어떻게.*동작\|어떤.*역할\|전체.*흐름\|과외\|처음.*보는.*사람` | `explain.*structure\|how.*work\|walkthrough\|tutor\|onboard` |
 | fz-skill | `스킬.*만들\|스킬.*생성\|스킬.*수정\|스킬.*삭제\|에이전트.*만들\|에이전트.*생성\|스킬.*평가\|스킬.*최적화\|description.*최적화\|트리거.*테스트\|트리거.*정확도\|문서.*작성\|글쓰기\|프롬프트.*최적화\|description.*개선\|가이드.*작성` | `create.*skill\|new.*skill\|update.*skill\|delete.*skill\|create.*agent\|new.*agent\|eval.*skill\|optimize.*skill\|optimize.*description\|trigger.*test\|trigger.*accuracy\|document\|write.*skill\|improve.*description\|optimize.*prompt` |
 | fz-manage | `관리\|스킬.*목록\|의존성\|체크\|벤치마크\|일괄.*평가\|건강.*체크\|생태계.*점검\|트리거.*벤치마크\|메모리.*반영\|교훈.*반영` | `manage\|skill.*list\|depend\|check\|benchmark\|batch.*eval\|health.*check\|trigger.*benchmark\|reflect.*module\|lessons.*module` |
@@ -50,7 +50,7 @@
 | full-cycle | `처음부터.*끝까지\|계획부터.*PR\|전체.*사이클` | `full.*cycle\|end.*to.*end` |
 | drift-check | `드리프트\|아키텍처.*점검\|레이어.*위반\|전체.*스캔\|점검해줘\|훑어봐\|전체.*봐줘\|전체.*확인해줘` | `drift\|arch.*check\|full.*scan` |
 | plan-parallel | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` | `independent.*plan\|parallel.*plan\|cross.*plan` |
-| pr-comment-review | `코드레빗\|PR.*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` | `coderabbit\|PR.*comment.*analysis\|external.*review.*comment\|review.*comment\|feedback.*check` |
+| pr-comment-review | `코드레빗\|(?<![A-Za-z])PR(?![A-Za-z]).*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` | `coderabbit\|(?<![A-Za-z])PR(?![A-Za-z]).*comment.*analysis\|external.*review.*comment\|review.*comment\|feedback.*check` |
 
 ## 구어체 보강 트리거
 
@@ -66,6 +66,15 @@
 | fz-skill | `스킬.*개선\|description.*개선\|트리거.*안 됨\|트리거.*안돼\|스킬.*품질\|스킬.*테스트` |
 | fz-manage | `스킬.*상태\|전체.*스킬\|스킬.*몇 개\|의존성.*그래프\|스킬.*건강` |
 | fz-discover | `어떻게 하면\|어떤 방식\|어떤 게 나아\|뭐가 좋아\|고민인데` |
+
+## 이어 하기 · 메타 보강 (2026-11-05 · F-528)
+
+실측(/fz 실제 요청 281건)에서 매칭 0 이던 묶음이다. ⛔ `(이어 하기)` 는 스킬이 아니다 — 걸리면 스킬을 다시 고르지 않고 Phase 0 의 1(이전 세션 복원 — `index.md` Active Phase)로 잇는다. ⛔ `PR` 은 앞뒤가 영문자가 아닐 때만 토큰이다(`prompt` · `PRD` 를 PR 로 읽지 않는다) · `코드` 는 작성 동사와 함께일 때만 fz-code 다(`코드 리뷰` 는 리뷰). 회귀: `tests/fixtures/routing/intent-corpus/cases.tsv`(lint #4)
+
+| 대상 | 패턴 | 메모 |
+|------|------|------|
+| (이어 하기) | `계속\|이어서\|다음.*진행\|끊어졌` | 스킬 재선택 없이 Phase 0 의 1 |
+| fz-manage | `finding.*(쌓인\|정리\|분석)\|fz.*(고도화\|개선)` | fz 생태계 메타 요청 |
 
 ## Confidence 판정 규칙
 

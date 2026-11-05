@@ -36,7 +36,7 @@ ITEMS = [
     ("1",  "DETERMINISTIC", "fz-*",      "YAML 필수 필드 (L1 공식 4 + L2 fz 정책 2) — 정본 modules/governance.md §스킬 최소 기준"),
     ("2",  "SEMANTIC",      "fz-*",      "MCP 유효성 — allowed-tools의 MCP 도구 실존 (서버 상태 의존)"),
     ("3",  "DETERMINISTIC", "fz-*",      "provides/needs 충족 + DAG 사이클 부재"),
-    ("4",  "THRESHOLD",     "fz-*",      "intent-triggers '과도한 겹침' — ⛔ 임계 미정"),
+    ("4",  "DETERMINISTIC", "fz-*",      "intent-triggers 겹침 · 누수 — 합성 corpus(tests/fixtures/routing/intent-corpus/cases.tsv)의 필수 · 금지 라벨을 scripts/intent_route_probe.py 로 판정(F-528 — 임계를 문장 단언으로 정했다)"),
     ("5",  "DETERMINISTIC", "fz-*",      "SKILL.md ≤500줄"),
     ("6",  "DETERMINISTIC", "all",       "깨진 파일 참조"),
     ("7",  "DETERMINISTIC", "agents",    "에이전트 파일 필드 (name/description/model/tools)"),
@@ -92,6 +92,7 @@ DET = {i for i, k, _, _ in ITEMS if k == "DETERMINISTIC"}
 MIN_HITS = {
     "1": 15,     # 스킬 21개 — 보수적
     "3": 15,     # 동일
+    "4": 10,     # 합성 corpus 16문장
     "5": 15,     # 동일
     "6": 300,    # 참조 564건 — 절반 수준
     "7": 10,     # 에이전트 13개
@@ -326,6 +327,22 @@ def chk_3():
         if color.get(s, 0) == 0:
             dfs(s, [s])
     return v, seen
+
+
+def chk_4():
+    """intent-triggers 겹침 · 누수 — 합성 corpus 단언을 intent_route_probe 로 판정한다(F-528). 표가 깨지면 위반 1건(판정 불가 사유)."""
+    import importlib.util
+    probe = ROOT / "scripts" / "intent_route_probe.py"
+    cases = ROOT / "tests" / "fixtures" / "routing" / "intent-corpus" / "cases.tsv"
+    if not probe.is_file() or not cases.is_file():
+        return [f"#4 판정 불가 — {probe.name} 또는 cases.tsv 가 없다"], 0
+    spec = importlib.util.spec_from_file_location("intent_route_probe", probe)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    try:
+        return mod.run_cases(cases, mod.rows_of(ROOT))
+    except mod.Unrun as e:
+        return [f"#4 판정 불가 — {e}"], 0
 
 
 def chk_5():
@@ -1698,7 +1715,7 @@ def chk_N14(root: Path | None = None):
 
 
 CHECKS = {
-    "1": chk_1, "3": chk_3, "5": chk_5, "6": chk_6, "7": chk_7,
+    "1": chk_1, "3": chk_3, "4": chk_4, "5": chk_5, "6": chk_6, "7": chk_7,
     "12": chk_12, "14": chk_14, "16": chk_16, "N12": chk_N12,
     "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
     "N7": chk_N7, "N8": chk_N8, "N9": chk_N9, "N10": chk_N10,
