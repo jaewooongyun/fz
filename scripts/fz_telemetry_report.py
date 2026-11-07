@@ -11,7 +11,10 @@
 중복 소스를 만들지 않는 것이 계측의 1차 제약이다(plan §2).
 
 한계(정직성):
-  · 비용은 **공식 단가 × usage 계산치**이며 실청구가 아니다. 캐시 쓰기는 1h TTL 단가로 고정 가정.
+  · 비용은 **공식 단가 × usage 계산치**이며 실청구가 아니다. 캐시 쓰기는 `usage.cache_creation` 의 5m·1h
+    분해로 계산한다. 분해가 없는 옛 기록과 분해가 합계보다 모자란 몫만 1h 단가로 보고 `assumed_1h` 로 따로 센다.
+  · advisor 는 최상위 usage 에 없다. 호출 수는 `server_tool_use`(name=advisor) id, usage 는
+    `usage.iterations[]` 의 `advisor_message` 로 따로 센다 — iterations 만 세면 호출을 덜 센다(fz_wf_metrics.py 머리말).
   · 지연은 직전 `user` 엔트리와 `assistant` 엔트리의 timestamp 차분이다. 사용자 입력 대기가
     섞일 수 있어 30분 초과는 잘랐다. 도구 실행 시간은 포함하지 않는다.
   · 워크플로 wall-time은 `agent-*.jsonl` mtime 최소~최대 차분이라 근사다(`[근사]` 표기).
@@ -33,17 +36,23 @@ import subprocess
 import sys
 import tempfile
 
-# ── 단가 $/M: (input, cache_write_1h, cache_read, output) ────────────────────
-# 출처: platform.claude.com/docs/en/about-claude/pricing (2026-09-06 확인).
+# ── 단가 $/M: (input, cache_write_1h, cache_read, output, cache_write_5m) ─────
+# 출처: platform.claude.com/docs/en/about-claude/pricing (2026-09-06 확인 · 2026-11-06 재대조:
+#    5m 쓰기 = 입력 ×1.25, 1h 쓰기 = 입력 ×2, 캐시 읽기는 Fable 5.1 ×0.025 · Opus 5.5·Sonnet 5.5 ×0.05 · 나머지 ×0.1).
+# ⛔ 5m 쓰기 열은 **맨 뒤**에 붙였다 — 인덱스 0~3 을 읽는 계산(`call_cost`)과 옛 호출부를 깨지 않으려는 것이다.
+# ⛔ Haiku 5.5 는 프롬프트가 100K 토큰을 넘으면 단가가 5배다(같은 페이지). 아래 행은 100K 이하 단가뿐이다 —
+#    fz 는 haiku 를 쓰지 않아 구간 분기를 두지 않았다. 쓰게 되면 `call_cost` 에서 입력 합계로 가른다.
 # ⛔ evidence/usage_agg.py 의 표와 다르다 — 그 표는 Fable 5.1 캐시읽기를 1.0 으로,
 #    Sonnet 5 를 3/6/0.3/15 로 적어 두었다. 정본은 아래(계약 §Step1).
 PRICES = {
-    "claude-fable-5-1": (10.0, 20.0, 0.25, 50.0),
-    "claude-fable-5": (10.0, 20.0, 1.0, 50.0),
-    "claude-opus-5-5": (4.0, 8.0, 0.2, 20.0),  # whats-new-opus-5-5 (2026-09-25 대조) — 1h 쓰기 = 입력 ×2
-    "claude-opus-5": (5.0, 10.0, 0.5, 25.0),
-    "claude-sonnet-5": (2.0, 4.0, 0.2, 10.0),
-    "claude-opus-4-8": (5.0, 10.0, 0.5, 25.0),
+    "claude-fable-5-1": (10.0, 20.0, 0.25, 50.0, 12.5),
+    "claude-fable-5": (10.0, 20.0, 1.0, 50.0, 12.5),
+    "claude-opus-5-5": (4.0, 8.0, 0.2, 20.0, 5.0),  # whats-new-opus-5-5 (2026-09-25 대조) — 1h 쓰기 = 입력 ×2
+    "claude-opus-5": (5.0, 10.0, 0.5, 25.0, 6.25),
+    "claude-sonnet-5-5": (2.0, 4.0, 0.1, 10.0, 2.5),  # 캐시 읽기 ×0.05 (2026-11-06 pricing 각주 2)
+    "claude-sonnet-5": (2.0, 4.0, 0.2, 10.0, 2.5),
+    "claude-haiku-5-5": (0.1, 0.2, 0.01, 0.5, 0.125),  # 프롬프트 100K 이하 구간
+    "claude-opus-4-8": (5.0, 10.0, 0.5, 25.0, 6.25),
 }
 
 # ⛔ usage 가 비어 있거나 컨텍스트 0인 합성 엔트리는 표에서 뺀다 — 모델 행이 아니다.
@@ -126,6 +135,65 @@ def price_for(model):
     return None
 
 
+def cache_write_split(usage):
+    """(5m, 1h, assumed_1h, warn) — 캐시 쓰기 토큰을 TTL 로 가른다.
+
+    정본은 합계 T=`cache_creation_input_tokens` 다. a=5m · b=1h 는 `usage.cache_creation` 의 분해이고,
+    키가 없으면 '누락'(None), 0 은 '명시적 0' 으로 구분한다.
+      · 둘 다 누락 → 분해가 없는 옛 기록이다. T 전체를 1h 로 보고 경고하지 않는다
+      · 그 밖 → a·b 를 그대로 쓰고 모자란 몫 max(0, T−a−b) 를 1h 로 본다(assumed_1h)
+      · 키 하나만 누락이거나 a+b≠T 면 경고 1 — 초과합(a+b>T)은 분해를 그대로 쓴다
+    """
+    total = usage.get("cache_creation_input_tokens", 0) or 0
+    split = usage.get("cache_creation")
+    a = split.get("ephemeral_5m_input_tokens") if isinstance(split, dict) else None
+    b = split.get("ephemeral_1h_input_tokens") if isinstance(split, dict) else None
+    if a is None and b is None:
+        return 0, 0, total, 0
+    warn = 1 if (a is None or b is None or (a or 0) + (b or 0) != total) else 0
+    a, b = a or 0, b or 0
+    return a, b, max(0, total - a - b), warn
+
+
+def call_cost(price, usage):
+    """(비용 $, assumed_1h 토큰, 경고 수) — 한 요청(또는 advisor iteration)의 usage 를 단가로 환산한다."""
+    tin = usage.get("input_tokens", 0) or 0
+    cr = usage.get("cache_read_input_tokens", 0) or 0
+    out = usage.get("output_tokens", 0) or 0
+    w5, w1, assumed, warn = cache_write_split(usage)
+    cost = (tin * price[0] + (w1 + assumed) * price[1] + cr * price[2] + out * price[3] + w5 * price[4]) / 1e6
+    return cost, assumed, warn
+
+
+def advisor_summary(agg):
+    """advisor 호출 수(tool id) · 결과 수 · usage 관측 호출 · 비용 미측정 호출 · 모델별 usage."""
+    by_model = collections.defaultdict(lambda: collections.Counter())
+    observed = 0
+    for iters in agg.adv_iters.values():
+        for it in iters:
+            observed += 1
+            row = by_model[it.get("model") or "?"]
+            row["calls"] += 1
+            row["input"] += it.get("input_tokens", 0) or 0
+            row["cache_write"] += it.get("cache_creation_input_tokens", 0) or 0
+            row["cache_read"] += it.get("cache_read_input_tokens", 0) or 0
+            row["output"] += it.get("output_tokens", 0) or 0
+            price = price_for(it.get("model") or "?")
+            if price:
+                row["cost_micro"] += int(round(call_cost(price, it)[0] * 1e6))
+            else:
+                row["unpriced"] += 1
+    calls = len(agg.adv_call_ids)
+    return {
+        "calls": calls,
+        "results": len(agg.adv_result_ids),
+        "usage_observed": observed,
+        # ⛔ 0 으로 쓰지 않는다 — 호출은 있는데 usage 가 없는 몫(옛 기록 · iterations 누락)이다
+        "usage_missing": max(0, calls - observed),
+        "by_model": {m: dict(c) for m, c in sorted(by_model.items())},
+    }
+
+
 def norm_wf_name(raw):
     """`/a/b/code-pair.js` · `foo-wf_1234abcd-56f.js` · `foo` → 공통 이름."""
     if not raw:
@@ -174,6 +242,10 @@ class TranscriptAgg(object):
         self.n_files_with_msgs = 0
         self.n_msgs = 0
         self.effort_all = collections.Counter()
+        # advisor — 호출·결과는 블록 id(전역 고유), usage 는 요청 키별 가장 긴 iterations 목록
+        self.adv_call_ids = set()
+        self.adv_result_ids = set()
+        self.adv_iters = {}
 
     def add_file(self, path, since, until):
         self.n_files += 1
@@ -214,6 +286,9 @@ class TranscriptAgg(object):
             #      · usage/지연 → `message.id` (줄 반복을 한 번으로)
             #      · tool_use  → 블록 `id` (⛔ message.id 로 거르면 블록이 통째로 사라진다)
             self._scan_workflow_calls(obj, seen_tool_ids)
+            # ⛔ advisor 도 message.id 중복 건너뛰기보다 **먼저** 본다 — 호출 블록이 같은 메시지의
+            #    두 번째 이후 줄에 있으면 아래 `continue` 가 통째로 버린다(tool_use 와 같은 이유).
+            self._scan_advisor(obj)
             message = obj.get("message") or {}
             usage = message.get("usage") or {}
             if not usage:
@@ -233,6 +308,24 @@ class TranscriptAgg(object):
         if used:
             self.n_files_with_msgs += 1
 
+    def _scan_advisor(self, obj):
+        message = obj.get("message") or {}
+        content = message.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "server_tool_use" and block.get("name") == "advisor" and block.get("id"):
+                    self.adv_call_ids.add(block["id"])
+                elif block.get("type") == "advisor_tool_result" and block.get("tool_use_id"):
+                    self.adv_result_ids.add(block["tool_use_id"])
+        iters = [it for it in ((message.get("usage") or {}).get("iterations") or [])
+                 if isinstance(it, dict) and it.get("type") == "advisor_message"]
+        key = obj.get("requestId") or message.get("id")
+        # 같은 요청의 줄마다 iterations 가 반복된다 — 요청 키로 한 번만, 가장 긴 목록을 남긴다
+        if iters and key is not None and len(iters) > len(self.adv_iters.get(key, ())):
+            self.adv_iters[key] = iters
+
     def _accumulate(self, model, side, obj, usage, stamp, prev_user):
         tin = usage.get("input_tokens", 0) or 0
         cw = usage.get("cache_creation_input_tokens", 0) or 0
@@ -248,9 +341,14 @@ class TranscriptAgg(object):
         counter["out"] += out
         counter["think"] += think
         self.ctx[key].append(tin + cw + cr)
+        w5, w1, _, _ = cache_write_split(usage)
+        counter["cache_w_5m"] += w5
+        counter["cache_w_1h"] += w1
         price = price_for(model)
         if price:
-            cost = (tin * price[0] + cw * price[1] + cr * price[2] + out * price[3]) / 1e6
+            cost, assumed, warn = call_cost(price, usage)
+            counter["cache_w_assumed_1h"] += assumed
+            counter["cache_w_warn"] += warn
             counter["cost_micro"] += int(round(cost * 1e6))
             self.cost_per_call[key].append(cost)
         else:
@@ -1245,6 +1343,10 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
                 "msgs": counter["msgs"],
                 "input": counter["in"],
                 "cache_write": counter["cache_w"],
+                "cache_write_5m": counter["cache_w_5m"],
+                "cache_write_1h": counter["cache_w_1h"],
+                "cache_write_assumed_1h": counter["cache_w_assumed_1h"],
+                "cache_write_warn": counter["cache_w_warn"],
                 "cache_read": counter["cache_r"],
                 "output": counter["out"],
                 "thinking": counter["think"],
@@ -1327,6 +1429,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
         },
         "models": models,
         "unpriced_models": dict(agg.unpriced),
+        "advisor": advisor_summary(agg),
         "skills": skills,
         "workflows": workflows,
         "effort_all": dict(agg.effort_all),
@@ -1410,10 +1513,28 @@ def render_markdown(payload):
         ) + " — 비용 표에서 빠졌다(n/a). `PRICES` 에 행을 추가하라.")
         lines.append("")
     lines.append(
-        "> 비용은 공식 단가 × usage **계산치이며 실청구가 아니다**. 캐시 쓰기는 1h TTL 단가 고정 가정. "
-        "지연은 직전 user 엔트리와의 timestamp 차분(30분 초과 절단)이라 도구 실행 시간을 포함하지 않는다."
+        "> 비용은 공식 단가 × usage **계산치이며 실청구가 아니다**. 캐시 쓰기는 5m·1h 분해로 계산하고, "
+        "분해가 없거나 모자란 몫만 1h 단가로 본다(assumed_1h %s tok · 분해 불일치 경고 %s건). "
+        "지연은 직전 user 엔트리와의 timestamp 차분(30분 초과 절단)이라 도구 실행 시간을 포함하지 않는다." % (
+            "{:,}".format(sum(r.get("cache_write_assumed_1h") or 0 for r in payload["models"])),
+            "{:,}".format(sum(r.get("cache_write_warn") or 0 for r in payload["models"])))
     )
     lines.append("")
+    adv = payload.get("advisor") or {}
+    if adv.get("calls") or adv.get("usage_observed"):
+        lines.append("### advisor (최상위 usage 밖 — 메인 비용에 들어 있지 않다)")
+        lines.append("")
+        lines.append("호출 %s · 완료 결과 %s · usage 관측 %s · **usage 미측정 %s**" % (
+            adv["calls"], adv["results"], adv["usage_observed"], adv["usage_missing"]))
+        lines.append("")
+        lines.append("| advisor 모델 | 관측 호출 | 입력 tok | 캐시읽기 tok | 출력 tok | 비용 |")
+        lines.append("|---|---|---|---|---|---|")
+        for m, r in adv["by_model"].items():
+            cost = ("$%.2f" % (r["cost_micro"] / 1e6)) if r.get("cost_micro") else "n/a"
+            lines.append("| %s | %s | %s | %s | %s | %s |" % (
+                m, r.get("calls", 0), "{:,}".format(r.get("input", 0)), "{:,}".format(r.get("cache_read", 0)),
+                "{:,}".format(r.get("output", 0)), cost))
+        lines.append("")
 
     lines.append("## 2. 스킬별 부하")
     lines.append("")
@@ -1820,13 +1941,65 @@ def self_test():
     check("단가 접두 일치", price_for("claude-opus-5-20260801"), PRICES["claude-opus-5"])
     check("단가 미등록", price_for("claude-unknown-9"), None)
     for mid in ("claude-opus-5-5", "claude-opus-5-5[1m]", "claude-opus-5-5-20260922", "claude-opus-5-5-20260922[1m]"):
-        check("단가 Opus 5.5 " + mid, price_for(mid), (4.0, 8.0, 0.2, 20.0))
+        check("단가 Opus 5.5 " + mid, price_for(mid), (4.0, 8.0, 0.2, 20.0, 5.0))
     check("단가 자식 id 는 부모로 흡수 안 함", price_for("claude-opus-5-6"), None)
     ua = TranscriptAgg()
     ua._accumulate("claude-unknown-9", "main", {}, {"input_tokens": 1, "output_tokens": 1}, None, None)
     ua._accumulate("claude-unknown-9", "main", {}, {"input_tokens": 1, "output_tokens": 1}, None, None)
     check("단가 미등록 호출 수 집계", dict(ua.unpriced), {"claude-unknown-9": 2})
     check("Fable 5.1 캐시읽기 단가", PRICES["claude-fable-5-1"][2], 0.25)
+    check("단가 sonnet-5-5·haiku-5-5 등록", (price_for("claude-sonnet-5-5"), price_for("claude-haiku-5-5")),
+          ((2.0, 4.0, 0.1, 10.0, 2.5), (0.1, 0.2, 0.01, 0.5, 0.125)))
+    sa = TranscriptAgg()
+    sa._accumulate("claude-opus-5-5", "main", {}, {"cache_creation_input_tokens": 100, "cache_creation": {
+        "ephemeral_5m_input_tokens": 40, "ephemeral_1h_input_tokens": 60}}, None, None)
+    sc = sa.by_model[("claude-opus-5-5", "main")]
+    check("캐시 쓰기 5m·1h 분리 계산", (sc["cache_w_5m"], sc["cache_w_1h"], sc["cache_w_assumed_1h"], sc["cache_w_warn"], sc["cost_micro"]),
+          (40, 60, 0, 0, 680))   # 40×$5 + 60×$8 (per MTok) = $680e-6
+    opus = PRICES["claude-opus-5-5"]
+    def _cw(total, split):
+        usage = {"cache_creation_input_tokens": total}
+        if split is not None:
+            usage["cache_creation"] = split
+        cost, assumed, warn = call_cost(opus, usage)
+        return int(round(cost * 1e6)), assumed, warn
+    check("캐시 쓰기 breakdown 없음·0·부분·불일치", [
+        _cw(100, None),                                                              # 옛 기록: 전부 1h
+        _cw(100, {"ephemeral_5m_input_tokens": 40}),                                 # 1h 키 누락: 모자란 60 은 1h
+        _cw(0, {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 0}),    # 명시적 0
+        _cw(100, {"ephemeral_5m_input_tokens": 30, "ephemeral_1h_input_tokens": 50}),  # 합 부족: 20 은 1h
+        _cw(100, {"ephemeral_5m_input_tokens": 60, "ephemeral_1h_input_tokens": 60}),  # 초과합: 분해 그대로
+    ], [(800, 100, 0), (680, 60, 1), (0, 0, 0), (710, 20, 1), (780, 0, 1)])
+    adv_dir = tempfile.mkdtemp(prefix="fz-telemetry-advisor-")
+    adv_path = os.path.join(adv_dir, "s.jsonl")
+    it = [{"type": "message", "input_tokens": 5}, {"type": "advisor_message", "model": "claude-fable-5-1",
+          "input_tokens": 1000, "cache_read_input_tokens": 0, "output_tokens": 10}]
+    rows = [   # r1: 요청 1의 세 줄 — iterations 반복 · 호출 블록은 두 번째 줄(message.id 중복으로 usage 가 건너뛰어지는 줄)
+        {"type": "assistant", "timestamp": "2026-11-06T00:00:01Z", "requestId": "r1", "message": {"id": "m1", "model": "claude-opus-5-5",
+         "usage": {"input_tokens": 5, "iterations": it}, "content": [{"type": "thinking", "thinking": ""}]}},
+        {"type": "assistant", "timestamp": "2026-11-06T00:00:02Z", "requestId": "r1", "message": {"id": "m1", "model": "claude-opus-5-5",
+         "usage": {"input_tokens": 5, "iterations": it}, "content": [{"type": "server_tool_use", "id": "srv1", "name": "advisor", "input": {}}]}},
+        {"type": "assistant", "timestamp": "2026-11-06T00:00:03Z", "requestId": "r1", "message": {"id": "m1", "model": "claude-opus-5-5",
+         "usage": {"input_tokens": 5, "iterations": it}, "content": [{"type": "advisor_tool_result", "tool_use_id": "srv1", "content": {}}]}},
+        # requestId 없음 → message.id m2 로 폴백
+        {"type": "assistant", "timestamp": "2026-11-06T00:00:04Z", "message": {"id": "m2", "model": "claude-opus-5-5",
+         "usage": {"input_tokens": 5, "iterations": it}, "content": [{"type": "server_tool_use", "id": "srv2", "name": "advisor", "input": {}}]}},
+        # m3: 호출은 있는데 iterations 가 없다(usage 미측정 1)
+        {"type": "assistant", "timestamp": "2026-11-06T00:00:05Z", "message": {"id": "m3", "model": "claude-opus-5-5",
+         "usage": {"input_tokens": 5}, "content": [{"type": "server_tool_use", "id": "srv3", "name": "advisor", "input": {}}]}},
+    ]
+    with open(adv_path, "w") as handle:
+        handle.write("\n".join(json.dumps(r) for r in rows) + "\n")
+    aa = TranscriptAgg()
+    aa.add_file(adv_path, parse_ts("2026-11-05T00:00:00Z"), parse_ts("2026-11-07T00:00:00Z"))
+    ad = advisor_summary(aa)
+    fb = ad["by_model"].get("claude-fable-5-1", {})
+    check("advisor iterations 집계·요청 id 중복 제거", (ad["usage_observed"], fb.get("calls"), fb.get("input"), fb.get("cost_micro")),
+          (2, 2, 2000, 21000))   # r1·m2 각 1회 · 1000×$10 + 10×$50 = $10500e-6 씩
+    check("advisor 호출 수=server_tool_use id", (ad["calls"], ad["results"]), (3, 1))
+    check("advisor id 폴백·usage 미측정", (sorted(aa.adv_iters), ad["usage_missing"]), (["m2", "r1"], 1))
+    import shutil as _sh
+    _sh.rmtree(adv_dir, ignore_errors=True)
 
     base = tempfile.mkdtemp(prefix="fz-telemetry-selftest-")
     projects_root, findings_dir = _write_selftest_tree(base)
