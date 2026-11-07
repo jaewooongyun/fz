@@ -6,6 +6,7 @@
 #    한 곳만 올리는 실패가 실제로 있었다(v4.33.0 CHANGELOG "적용은 했는데 커밋하지 않았다").
 #
 # 검사: ① plugin.json == marketplace.json ② CHANGELOG 최상단 == plugin.json
+#       ①-b 하위 플러그인(marketplace 두 번째 항목부터 · 리포 안 폴더) 버전 동기와 바뀐 뒤 버전 올림
 #       ③ 가이드가 sweep 기록 위치(§5.8 ⑥)를 가리키는가 ④ health-check exit 0
 # exit: 0=전부 충족(DOCS_SYNC_OK) / 1=불일치 / 2=대상 부재(측정 실패)
 #
@@ -89,9 +90,69 @@ commit_axis() {   # $1=리포 디렉토리 · $2=선언 버전
   return "$bad"
 }
 
+# ①-b 하위 플러그인 — marketplace 두 번째 항목부터, source 가 이 리포 안 폴더(`./…`)인 것마다 둘을 본다.
+#    · 그 폴더 `.claude-plugin/plugin.json` 의 버전 == marketplace 항목의 버전
+#    · 직전 릴리스 태그(`v*`)에 그 폴더가 있었고 그 뒤 내용이 바뀌었으면(미커밋 · untracked 포함) 버전도 바뀌었다 —
+#      같은 버전이면 `plugin update` 가 바뀐 내용을 건너뛴다. 태그가 없거나 태그에 없던 폴더(새 플러그인)는 넘어간다.
+#    반환: 0=충족 · 1=불일치(사유를 stdout 에) · 2=marketplace 의 plugins 를 읽지 못함
+subplugin_axis() {   # $1=리포 디렉토리
+  python3 - "$1" <<'PY'
+import json, subprocess, sys
+repo = sys.argv[1]
+def git(*args):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+def version_of(text):
+    try:
+        value = json.loads(text)
+    except Exception:
+        return ""
+    return value.get("version", "") if isinstance(value, dict) else ""
+try:
+    with open(f"{repo}/.claude-plugin/marketplace.json", encoding="utf-8") as f:
+        plugins = json.load(f)["plugins"]
+    assert isinstance(plugins, list)
+except Exception:
+    print("  ⚠️ marketplace.json 의 plugins 를 읽지 못했다 — 하위 플러그인 미판정(⛔ 통과 아님)")
+    sys.exit(2)
+found = git("describe", "--tags", "--abbrev=0", "--match", "v*")
+tag = found.stdout.strip() if found.returncode == 0 else ""
+bad = 0
+for entry in plugins[1:]:
+    source = entry.get("source") if isinstance(entry, dict) else None
+    if not isinstance(source, str) or not source.startswith("./"):
+        continue
+    path = source[2:].rstrip("/")
+    name, listed = entry.get("name", path), entry.get("version", "")
+    try:
+        with open(f"{repo}/{path}/.claude-plugin/plugin.json", encoding="utf-8") as f:
+            own = version_of(f.read())
+    except OSError:
+        own = ""
+    if own == "" or own != listed:
+        print(f"  ❌ {name}: {path}/.claude-plugin/plugin.json({own or '읽지 못함'}) ≠ marketplace({listed})")
+        bad = 1
+        continue
+    if tag == "":
+        continue
+    before = git("show", f"{tag}:{path}/.claude-plugin/plugin.json")
+    if before.returncode != 0:
+        continue
+    changed = git("diff", "--quiet", tag, "--", path).returncode != 0 \
+        or git("ls-files", "--others", "--exclude-standard", "--", path).stdout.strip() != ""
+    if changed and version_of(before.stdout) == own:
+        print(f"  ❌ {name}: {tag} 뒤 {path} 가 바뀌었는데 버전이 {own} 그대로다 — plugin update 가 건너뛴다")
+        bad = 1
+sys.exit(bad)
+PY
+}
+
 # ── --self-test — 임시 git 리포로 ⑤의 실패/통과 쌍을 확인한다 ────────────────
 if [ "$MODE" = "self-test" ]; then
   pass=0; failed=0
+  # ⛔ git 단계의 exit code 를 버리지 않는다 — 실패를 삼키면 **위조 픽스처**가 만들어지고
+  #    자기시험이 아무것도 증명하지 않는다 (`lint_contracts` #N5 가 이것을 잡는다).
+  #    ⛔ `mk` 밖에 정의한다 — `mk` 는 `$( )` 서브셸에서 돌아, 그 안에서 정의하면 호출부(③ · ⑧)에 없다.
+  gq() { "$@" >/dev/null 2>&1 || { echo "⛔ 픽스처 준비 실패: $*" >&2; exit 2; }; }
   mk() {   # $1=버전 · stdout=리포 경로 (v$1 을 전부 커밋한 상태)
     local d ver="$1"
     d=$(mktemp -d "${TMPDIR:-/tmp}/fz-relsync.XXXXXX")
@@ -100,9 +161,6 @@ if [ "$MODE" = "self-test" ]; then
     printf '{"plugins": [{"version": "%s"}]}\n' "$ver" > "$d/.claude-plugin/marketplace.json"
     printf '# Changelog\n\n### v%s (2026-01-01) — x\n' "$ver" > "$d/CHANGELOG.md"
     printf '# v%s\n' "$ver" > "$d/docs/releases/v${ver}.md"
-    # ⛔ git 단계의 exit code 를 버리지 않는다 — 실패를 삼키면 **위조 픽스처**가 만들어지고
-    #    자기시험이 아무것도 증명하지 않는다 (`lint_contracts` #N5 가 이것을 잡는다).
-    gq() { "$@" >/dev/null 2>&1 || { echo "⛔ 픽스처 준비 실패: $*" >&2; exit 2; }; }
     gq git -C "$d" init -q
     gq git -C "$d" -c user.email=t@t -c user.name=t add -A
     gq git -C "$d" -c user.email=t@t -c user.name=t commit -qm "v$ver"
@@ -158,6 +216,32 @@ if [ "$MODE" = "self-test" ]; then
   # ⑤ 측정 불가 — git 리포가 아니다. ⛔ 미판정은 통과가 아니다
   R=$(mktemp -d "${TMPDIR:-/tmp}/fz-relsync.XXXXXX"); case_ "not-a-repo" 2 "$R" "1.0.0"; rm -rf "$R"
 
+  # ①-b 하위 플러그인 — v1.0.0 태그 리포에 `mods/sub` 를 둔다. $1=태그 때 둘지(yes/no) · $2=하위 버전
+  sub_files() {   # $1=리포 · $2=하위 plugin.json 버전 · $3=marketplace 하위 버전
+    mkdir -p "$1/mods/sub/.claude-plugin"
+    printf '{"version": "%s"}\n' "$2" > "$1/mods/sub/.claude-plugin/plugin.json"
+    printf '{"plugins": [{"version": "1.0.0"}, {"name": "sub", "source": "./mods/sub", "version": "%s"}]}\n' "$3" > "$1/.claude-plugin/marketplace.json"
+  }
+  case_sub() {   # $1=이름 · $2=기대 반환 · $3=리포
+    local out rc
+    out=$(subplugin_axis "$3"); rc=$?
+    if [ "$rc" = "$2" ]; then pass=$((pass+1))
+    else failed=$((failed+1)); echo "  FAIL $1: 반환 $rc (기대 $2)"; echo "$out" | sed 's/^/        /'; fi
+  }
+  # ⑥ 정상 — 태그 뒤 새로 생긴 하위 플러그인(태그에 없던 폴더)은 버전 올림 검사를 건너뛴다
+  mkr 1.0.0; R="$REPO"; gq git -C "$R" tag v1.0.0
+  sub_files "$R" 0.1.0 0.1.0; case_sub "sub-new-after-tag" 0 "$R"; rm -rf "$R"
+  # ⑦ 결함 — 하위 plugin.json 과 marketplace 항목의 버전이 다르다
+  mkr 1.0.0; R="$REPO"; gq git -C "$R" tag v1.0.0
+  sub_files "$R" 0.1.0 0.2.0; case_sub "sub-version-mismatch" 1 "$R"; rm -rf "$R"
+  # ⑧ 결함 — 태그에 있던 하위 플러그인 내용이 바뀌었는데 버전은 그대로다(untracked 파일 추가)
+  mkr 1.0.0; R="$REPO"; sub_files "$R" 0.1.0 0.1.0
+  gq git -C "$R" -c user.email=t@t -c user.name=t add -A
+  gq git -C "$R" -c user.email=t@t -c user.name=t commit -qm "sub 0.1.0"; gq git -C "$R" tag v1.0.0
+  printf 'x\n' > "$R/mods/sub/new.ts"; case_sub "sub-changed-no-bump" 1 "$R"
+  # ⑨ 정상 — 같은 변경에 두 곳 버전을 함께 올렸다(⑧ 의 대조)
+  sub_files "$R" 0.1.1 0.1.1; case_sub "sub-changed-bumped" 0 "$R"; rm -rf "$R"
+
   echo "self-test $pass/$((pass+failed)) passed"
   [ "$failed" = 0 ] || exit 1
   exit 0
@@ -199,6 +283,7 @@ CV=$(grep -m1 -oE '^### v[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | sed 's/^### v//'
 echo "버전: plugin=$PV · marketplace=$MV · CHANGELOG=$CV"
 [ "$PV" = "$MV" ] || note "plugin.json($PV) ≠ marketplace.json($MV)"
 [ "$PV" = "$CV" ] || note "plugin.json($PV) ≠ CHANGELOG 최상단($CV) — 항목 없이 버전만 올리거나 그 반대"
+subplugin_axis "$ROOT_DIR" || { rc=$?; [ "$rc" = 2 ] && note "하위 플러그인 미판정 — 통과가 아니다" || fail=$((fail + 1)); }
 
 # ③ sweep 결과가 어디로 가는지 가이드가 가리키는가 — 사전등록만 하고 참조가 없으면 표가 미아가 된다
 grep -q '§5.8 ⑥' guides/skill-authoring.md || note "skill-authoring.md 가 sweep 기록 위치(§5.8 ⑥)를 가리키지 않는다"
