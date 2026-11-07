@@ -783,5 +783,33 @@ else
   record "plugin validate" UNRUN "미실행 — claude CLI 부재 (⛔ PASS 아님)"
 fi
 
+# ── 5.1 fz-compact 하위 플러그인 (mods/fz-compact) — 루트 plugin.json 검증은 하위 매니페스트를 보지 않으므로 따로 돈다.
+#    plugin test: rc 0 = 통과 · `(fail)` 줄이 있으면 실패 · 그 밖(하위 명령이 없는 옛 CLI 등)은 미실행(⛔ PASS 아님).
+if command -v claude >/dev/null 2>&1; then
+  FC_VAL="$(bash "$ROOT/scripts/plugin_validate.sh" "$ROOT/mods/fz-compact" 2>&1)"; FC_VAL_CODE=$?
+  record3 "fz-compact validate" "$FC_VAL_CODE" "$FC_VAL" "$(printf '%s\n' "$FC_VAL" | tail -1)" "⛔ $(printf '%s\n' "$FC_VAL" | grep -E 'FAIL|UNRUN' | head -2 | tr '\n' ' ')"
+  FC_TEST="$(cd "$ROOT" && claude plugin test "$ROOT/mods/fz-compact" 2>&1)"; FC_TEST_CODE=$?
+  FC_FAIL="$(printf '%s\n' "$FC_TEST" | grep '^(fail) ' | head -2 | tr '\n' ' ')"
+  if [ "$FC_TEST_CODE" -ne 0 ] && [ -z "$FC_FAIL" ]; then
+    UNRUN=$((UNRUN + 1)); record "fz-compact test" UNRUN "미실행 — plugin test 가 돌지 않았다 (rc $FC_TEST_CODE · ⛔ PASS 아님)"
+  elif [ "$FC_TEST_CODE" -eq 0 ]; then
+    record "fz-compact test" 0 "$(printf '%s\n' "$FC_TEST" | grep -E '^ *[0-9]+ pass' | head -1 | tr -s ' ')"
+  else
+    record "fz-compact test" 1 "⛔ $FC_FAIL"
+  fi
+else
+  UNRUN=$((UNRUN + 2))
+  record "fz-compact validate" UNRUN "미실행 — claude CLI 부재 (⛔ PASS 아님)"
+  record "fz-compact test" UNRUN "미실행 — claude CLI 부재 (⛔ PASS 아님)"
+fi
+# fz-compact guard — hooks/guard.sh(classic PreCompact 차단 훅) 판정 시험 + guard.sh 가 마커 모양을 베낀 register.ts 줄 대조.
+#    POSIX sh 만 쓰고 claude CLI 가 필요 없어 위 분기 밖에서 돈다. 0 = 통과(요약 줄) · 그 밖 = 실패(출력 앞 두 줄).
+FC_GUARD="$(sh "$ROOT/mods/fz-compact/tests/guard_test.sh" 2>&1)"; FC_GUARD_CODE=$?
+if [ "$FC_GUARD_CODE" -eq 0 ]; then
+  record "fz-compact guard" 0 "$(printf '%s\n' "$FC_GUARD" | tail -1)"
+else
+  record "fz-compact guard" 1 "⛔ $(printf '%s\n' "$FC_GUARD" | head -2 | tr '\n' ' ')"
+fi
+
 # ── 보고
 report_and_exit

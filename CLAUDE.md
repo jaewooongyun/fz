@@ -61,6 +61,7 @@ bash scripts/setup-hooks.sh
 - `schemas/` — JSON 스키마 (8개 — GPT 응답 7 · Issue Tracker 1) + `tool-inventory.json`
 - `scripts/` — lint·설치·호출·검증·계측 스크립트 (86개). ⛔ diff 라인 접두사(`+`/`-`)로 판정하는 새 파일은 `# diff-parse: hunk-state | not-a-diff | waived` 선언 1줄이 없으면 `health-check` 가 막는다 (`lint_diff_parsers.py` — hunk 안팎에서 접두사 뜻이 달라 같은 결함이 4회 재발했다). ⛔ `setup-gpt-skills.sh` 는 `${CODEX_HOME:-~/.codex}/skills/` 에 GPT 역할 스킬 심볼릭(Tier 2a)을 만든다 — 디스커버리의 필수 조건은 아니다(미실행이어도 resolver `gpt_kinds.py` 가 자기 위치의 번들 본문(Tier 2b)을 돌려준다 · `modules/cross-validation.md` § 역할 스킬 경로). ⛔ gpt 호출은 정문 `scripts/gpt-call.sh <kind>` 경유 의무 — 래퍼 `gpt-exec.sh` · 런처 `gpt_independent.sh` 는 그 어댑터다(`modules/fz-gpt-bash-hygiene.md` §8 · 레지스트리 `scripts/gpt-kinds.json`) · `FZ_PLUGIN_ROOT`는 `resolve-plugin-root.sh`로 해석 (호출부가 정문을 찾는 경로)
 - `.claude-plugin/` — plugin.json + marketplace.json
+- `mods/` — 선택형 하위 플러그인. 지금은 `fz-compact` 하나다(bg 세션의 로컬 마스킹 압축 · 기본 꺼짐). marketplace 두 번째 항목이고 설치는 따로 한다: `/plugin install fz-compact@fz-orchestrator`. 루트에는 `hooks/` 를 두지 않는다(옛 CLI 가 fz 본체까지 거부할 수 있다). 검증: `bash scripts/plugin_validate.sh mods/fz-compact` · `claude plugin test mods/fz-compact`
 
 ## Verification Discipline (v3.11+)
 

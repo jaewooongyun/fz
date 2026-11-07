@@ -24,6 +24,23 @@
         "code-review"
       ],
       "source": "./"
+    },
+    {
+      "name": "fz-compact",
+      "description": "Optional fz add-on: local masking compaction for background sessions after the prompt cache goes cold. No model calls. Off until enabled.",
+      "repository": "https://github.com/jaewooongyun/fz",
+      "version": "0.1.0",
+      "author": {
+        "name": "Jaewoong Yun"
+      },
+      "license": "MIT",
+      "category": "development",
+      "tags": [
+        "compaction",
+        "context",
+        "background-session"
+      ],
+      "source": "./mods/fz-compact"
     }
   ]
 }
