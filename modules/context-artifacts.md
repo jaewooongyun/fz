@@ -415,7 +415,7 @@ Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이
 
 ### 원칙: Context 여유 = 실행 품질
 
-auto-compact는 맥락 손실을 수반한다. compact 발동을 최대한 늦추면 실행 품질이 유지된다.
+auto-compact는 맥락 손실을 수반한다. 그래서 컨텍스트를 덜 채워 발동 자체를 줄인다. 1M까지 채우라는 뜻이 아니다.
 
 ### Filesystem Discovery > Compaction (Anthropic 공식)
 
