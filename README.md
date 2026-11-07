@@ -19,6 +19,7 @@ AI 개발 워크플로우를 오케스트레이션하는 [Claude Code](https://d
 ```bash
 claude plugin marketplace add jaewooongyun/fz   # 최초 1회
 claude plugin install fz
+claude plugin install fz-compact@fz-orchestrator  # 선택. bg 세션 로컬 마스킹 압축, 기본 꺼짐
 
 claude
 > /fz "안녕"                                     # 응답하면 정상
@@ -74,6 +75,7 @@ bash "$(printf '%s\n' ~/.claude/plugins/cache/fz-orchestrator/fz/*/ | sort -V | 
 ```bash
 claude plugin marketplace update fz-orchestrator
 claude plugin update fz@fz-orchestrator
+claude plugin update fz-compact@fz-orchestrator   # fz-compact 를 설치했을 때만
 ```
 
 업데이트는 GPT 스킬 setup 을 다시 돌리지 않는다. 링크 상태는 위 setup 명령에 `--check` 를 붙여 확인한다.
@@ -173,8 +175,8 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 
 ---
 
-## What's New — v4.51.0
+## What's New — v4.52.0
 
-피어 리뷰가 코멘트할 것을 고르고 근거, 검사 등록, 라우팅을 기계가 잰다. 피어 리뷰는 Synthesize 뒤 Curate 단계에서 후보마다 코멘트할지 제외할지(E1~E8)를 정하고 렌더 전에 계약을 기계로 확인한다. gather 는 기존 PR 스레드도 함께 모은다.
-근거 슬롯, health-check 등록, 러너 모드, 텔레메트리 label, 라우팅에 검사기를 붙였고 health-check 러너는 병렬로 돈다. ⛔ 올린 뒤에는 세션을 다시 시작한다. 에이전트 tools 변경과 Serena `v2.1.0` 고정은 새 세션부터 반영된다.
-→ [릴리즈 노트](docs/releases/v4.51.0.md)
+식은 bg 세션을 모델 호출 없이 줄이는 fz-compact 를 더하고 비용 집계를 바로잡았다. 선택형 하위 플러그인 fz-compact 는 bg 세션이 캐시 1시간을 넘겨 쉬면 오래된 큰 도구 결과를 파일로 옮기고 자리표시자로 바꾼다. 재개해도 같은 자리표시자로 다시 가리고 요약 모델은 부르지 않는다. 기본 꺼짐이고 따로 설치한다.
+텔레메트리 리포터는 캐시 쓰기를 5분과 1시간 단가로 나눠 계산하고 advisor 를 따로 센다. ⛔ Team, Enterprise 조직 계정에서는 fz-compact 가 마스킹하지 못하고, 안전 훅이 엔진 요약으로 떨어지는 것만 막는다.
+→ [릴리즈 노트](docs/releases/v4.52.0.md)

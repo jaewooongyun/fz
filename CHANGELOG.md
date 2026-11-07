@@ -1,5 +1,20 @@
 # Changelog
 
+### v4.52.0 (2026-11-07) — 식은 bg 세션을 모델 호출 없이 줄이는 fz-compact 를 더하고 비용 집계를 바로잡았다 [MINOR]
+
+선택형 하위 플러그인 fz-compact 0.1.0 을 marketplace 두 번째 항목으로 더했다. bg 세션이 프롬프트 캐시 1시간을 넘겨 쉬면 오래된 큰 도구 결과를 spill 파일로 옮기고 자리표시자로 바꾸며, 재개하면 같은 자리표시자로 다시 가린다. 요약 모델은 부르지 않고 기본 꺼짐이며 설치도 따로 한다(`claude plugin install fz-compact@fz-orchestrator`).
+조직 계정에서 내장 보안 플러그인이 compact 훅을 건너뛰게 하면 classic PreCompact 안전 훅이 엔진 요약을 막는다. 텔레메트리 리포터는 캐시 쓰기를 5분 · 1시간 분해대로 계산하고 advisor 를 따로 센다. 셀프 리뷰 뒤 고친 다섯 자리는 실세션으로 다시 돌리지 않았다.
+
+→ [릴리즈 노트](docs/releases/v4.52.0.md)
+
+| 영역 | 변경 | 검증 |
+|---|---|---|
+| fz-compact | `mods/fz-compact` — 유휴 마스킹 · 재개 재마스킹 · 반복 행 제거 · spill Read 허용 · 보존 지침 · 안전 훅 | plugin test 55 · guard 16 · 실세션 10회 · GPT 지적 10건 수정 |
+| 포장 | marketplace 두 번째 항목 · pre-commit `mods/` · health-check 세 줄 | health-check exit 0 |
+| 릴리스 동기 | `check_release_sync.sh` 하위 플러그인 버전 동기 · 바뀐 뒤 올림 · self-test 픽스처 도우미 위치 | self-test 9/9 · 돌연변이 2 |
+| 텔레메트리 | 5분 · 1시간 캐시 쓰기 · `assumed_1h` · advisor 호출 · usage 분리 · Sonnet 5.5 · Haiku 5.5 단가 | self-test 와 fixture 3종 |
+| 정책 문구 | `modules/context-artifacts.md` compact 원칙 | 게이트 A8 |
+
 ### v4.51.0 (2026-11-05) — 피어 리뷰가 코멘트할 것을 고르고, 근거 · 검사 등록 · 라우팅을 기계가 잰다 [MINOR]
 
 피어 리뷰가 후보를 거의 다 코멘트로 올렸다(F-527) — Synthesize 뒤 · Deliver 앞에 Curate 를 넣어 후보마다 코멘트 또는 제외(E1~E8)를 정하고, 렌더 전에 `check_comment_worthy.py` 가 계약을 본다. gather 는 기존 PR 스레드와 리뷰 대상 SHA 를 함께 모은다(F-085).
