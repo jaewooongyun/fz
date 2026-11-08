@@ -208,7 +208,7 @@ metadata:
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus) → 이슈가 있으면 Stage 3 수정. 1-3 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
-3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke
+3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke. ⛔ `reason:'changeset-defect'` fallback 이면 적용하지 않는다 · 적용 뒤 오라클(Serena `find_symbol` `include_body: true` 심볼 재독 · Edit 앵커 · Step 기준 numstat)은 fz-code 절차 4 그대로다 — 조건을 여기 다시 적지 않는다(두 벌이면 한쪽만 고쳐진다)
 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
    Mode A Bug Fix Step 1-4 직접 진입은 **L4 사용자 승인 후**다. 어느 경로로 가든 **Step 4 GPT check 책임은 유효**하고(§ 단계 실행 판정),
    사유는 experiment-log 에 기록한다

@@ -9,6 +9,8 @@
 // 기준 소스: env FZ_EFFORT_BASE_TREE 의 workflows/ → 없으면 이 저장소 이력의 `git show ${FZ_EFFORT_BASE_SHA:-26c42d3}:workflows/<wf>.js`.
 //   둘 다 없으면 ③ 의 기준 대조는 UNRUN(exit 2) 이다 — 통과가 아니다.
 // ⛔ FZ_WF_ROOT 로 기준 트리를 대상으로 돌리면 ① · ② 가 FAIL 이어야 한다(기준은 effort 를 읽지 않는다).
+// code-pair 스키마(S7): code-pair-schema-intended-only — 콜 스키마(키 정렬 JSON) == 기준 스키마 + 의도한 변환(spanLines · required · oldAnchor 설명).
+//   대조군 schema-compare-detects-{unrelated-field,required-change,description-change} — 그 셋을 바꾼 사본은 비교에서 떨어져야 한다.
 'use strict'
 const fs = require('fs')
 const os = require('os')
@@ -55,6 +57,31 @@ async function callsAt(file, wf, extra) {
     schema: String(c.schema), prompt: c.prompt })) }
 }
 
+// code-pair 스키마 바이트 대조(S7) — 하네스 calls[].schema 는 불리언이라 ③ 은 스키마를 보지 않는다. responder 가 opts.schema 를 키 정렬 JSON 으로 남긴다
+const sortedJSON = v => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)
+  ? Object.keys(x).sort().reduce((o, kk) => { o[kk] = x[kk]; return o }, {}) : x))
+async function schemasAt(file) {
+  const seen = {}
+  const CS = { files: [{ path: 'a.js', changeKind: 'modify', symbolEdits: [{ symbol: 'f', intent: 'i', newBody: 'x', spanLines: 0 }], rationale: 'r' }],
+    summary: 's', buildExpectation: 'b' }
+  const ISSUE = { verdict: 'issues', issues: [{ id: 'R1', severity: 'minor', detail: 'd' }] }
+  await run(file, { args: argsOf('code-pair', {}), responder: (p, opts) => {
+    seen[opts.label] = sortedJSON(opts.schema)
+    return JSON.parse(JSON.stringify(opts.label.startsWith('stage2') ? ISSUE : CS))
+  } })
+  return seen
+}
+// 의도한 변환만 — symbolEdits 항목에 spanLines(정수 · required)와 oldAnchor 설명 교정(F-120). 이 밖의 차이는 전부 FAIL 이다
+const editItem = o => o.properties.files.items.properties.symbolEdits.items
+function intended(baseJson) {
+  const o = JSON.parse(baseJson), it = editItem(o)
+  it.required.push('spanLines')
+  it.properties.oldAnchor.description = '교체할 원문 전체(Edit old_string) — 시작 줄만 주면 나머지가 남는다(F-120)'
+  it.properties.spanLines = { type: 'integer', description: 'oldAnchor 가 있는 교체 편집에서 oldAnchor 의 줄 수, 없으면 0' }
+  return sortedJSON(o)
+}
+const mutated = (json, f) => { const o = JSON.parse(json); f(o); return sortedJSON(o) }
+
 function baseFile(wf, tmp) {
   const env = process.env.FZ_EFFORT_BASE_TREE
   if (env) {
@@ -93,6 +120,22 @@ function baseFile(wf, tmp) {
       const base = await callsAt(bf, wf, {})
       const d = firstDiff(unset.calls, base.calls)
       check(`${wf}: ③ 미지정 콜 입력 == 기준(${process.env.FZ_EFFORT_BASE_TREE ? 'FZ_EFFORT_BASE_TREE' : BASE_SHA})`, d === null, d)
+    }
+    const cpBase = baseFile('code-pair', tmp)
+    if (!cpBase) { console.log('UNRUN  code-pair 스키마 대조 — 기준 소스 없음'); unrun += 1 } else {
+      const now = await schemasAt(path.join(ROOT, 'workflows', 'code-pair.js')), was = await schemasAt(cpBase)
+      const CSL = ['stage1-impl', 'stage3-revise'], RVL = ['stage2-review-arch', 'stage2-review-quality']
+      const ok = Object.keys(now).sort().join(',') === Object.keys(was).sort().join(',')
+        && CSL.every(l => now[l] && now[l] === intended(was[l])) && RVL.every(l => now[l] && now[l] === was[l])
+      check('code-pair-schema-intended-only', ok, `콜 ${Object.keys(now)} · 기준 ${Object.keys(was)}`)
+      const want = was['stage1-impl'] ? intended(was['stage1-impl']) : ''
+      const cur = now['stage1-impl'] || '{}'
+      check('schema-compare-detects-unrelated-field', !!want && cur === want
+        && mutated(cur, o => { o.properties.files.items.properties.extra = { type: 'string' } }) !== want, cur === want ? '무관 필드를 더해도 같다고 본다' : '전제 불성립 — 변형 전 스키마부터 의도한 변환과 다르다')
+      check('schema-compare-detects-required-change', !!want && cur === want
+        && mutated(cur, o => { editItem(o).required = editItem(o).required.filter(x => x !== 'spanLines') }) !== want, cur === want ? 'required 변경을 같다고 본다' : '전제 불성립 — 변형 전 스키마부터 의도한 변환과 다르다')
+      check('schema-compare-detects-description-change', !!want && cur === want
+        && mutated(cur, o => { editItem(o).properties.oldAnchor.description = '시작 지점' }) !== want, cur === want ? '설명 변경을 같다고 본다' : '전제 불성립 — 변형 전 스키마부터 의도한 변환과 다르다')
     }
   } finally { fs.rmSync(tmp, { recursive: true, force: true }) }
   console.log(`\neffort 인자 전달 ${fail ? '실패 ' + fail + '건' : unrun ? '미실행 ' + unrun + '건' : '전건 통과'} (워크플로 ${WFS.length} · 대상 ${path.relative(process.cwd(), ROOT) || '.'})`)

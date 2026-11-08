@@ -15,6 +15,7 @@
 //      (ReviewSchema enum 은 워커 출력용이라 pass|issues 만 갖는다 — 두 층을 섞지 않는다).
 //      partial = lensesCompleted < lensesExpected. 그 관점은 적용되지 않았으므로 pass 로 읽으면 안 된다.
 //     | { mode:'fallback', reason, splitSuggested?, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
+//     | { mode:'fallback', reason:'changeset-defect', defects, metrics } → 최종 changeset 에 결함이 남았다 — Lead 는 적용하지 않는다(fz-code 절차 4)
 //     | { mode:'split_required', reason, metrics } → Lead는 Step 분할 후 재invoke.
 //   ⛔ 책임 재배분 (S0, 사용자 승인 OQ1): 에이전트는 디스크를 수정하지 않는다 — changeset JSON만 반환.
 //     Lead가 적용(replace_symbol_body/Edit) + 빌드 검증 + 다음 Step invoke. 부분 적용 후 빌드 실패 시
@@ -56,12 +57,13 @@ const ChangesetSchema = {
           symbolEdits: {
             type: 'array',
             items: {
-              type: 'object', required: ['symbol', 'intent', 'newBody'],
+              type: 'object', required: ['symbol', 'intent', 'newBody', 'spanLines'],
               properties: {
                 symbol: { type: 'string', description: '심볼명 또는 앵커(교체 대상 식별자). create면 "FILE"' },
                 intent: { type: 'string' },
                 newBody: { type: 'string', description: 'Lead가 replace_symbol_body/Edit에 직접 전달 가능한 exact syntax — 의사코드/skeleton/생략(...) 금지' },
-                oldAnchor: { type: 'string', description: 'modify 시 교체 시작 지점 식별 텍스트 (Edit old_string용)' },
+                oldAnchor: { type: 'string', description: '교체할 원문 전체(Edit old_string) — 시작 줄만 주면 나머지가 남는다(F-120)' },
+                spanLines: { type: 'integer', description: 'oldAnchor 가 있는 교체 편집에서 oldAnchor 의 줄 수, 없으면 0' },
               },
             },
           },
@@ -90,6 +92,36 @@ const ReviewSchema = {
       },
     },
   },
+}
+
+// ── changeset 적용 전 검사 (F-120 · F-551) — 순수 함수. ⛔ 워커 자기보고의 일관성까지만 잰다 —
+//    잘린 앵커의 기계 증명은 하지 못한다(Lead 가 적용 뒤 오라클로 본다 — fz-code 절차 4 · fz-fix 절차 3).
+//    ① spanLines ≠ oldAnchor 줄 수(없으면 0) — create · delete 면제  ② newBody 에만 늘어난 '<' + 역슬래시 + 영문자 · '/'
+//    ('[^<\…' 문자 클래스 · '<<\EOF' heredoc 제외)  ③ 읽는 필드 누락 — TypeError 대신 결함으로 센다
+const ESCAPE_RE = /(?<![<^])<\\[A-Za-z\/]/g
+const lineCount = s => (s === '' ? 0 : s.replace(/\n$/, '').split('\n').length)
+const escapes = s => (typeof s === 'string' ? (s.match(ESCAPE_RE) || []).length : 0)
+function changesetDefects(cs) {
+  if (!cs || typeof cs !== 'object' || !Array.isArray(cs.files) || cs.files.length === 0) return ['changeset.files 누락 또는 빈 배열']
+  const out = []
+  cs.files.forEach((f, i) => {
+    const where = `files[${i}]${f && typeof f.path === 'string' ? ` ${f.path}` : ''}`
+    if (!f || typeof f !== 'object' || typeof f.path !== 'string' || !Array.isArray(f.symbolEdits)) { out.push(`${where}: path · symbolEdits 누락`); return }
+    if (f.symbolEdits.length && !['modify', 'create', 'delete'].includes(f.changeKind)) out.push(`${where}: changeKind 누락`)
+    const exempt = f.changeKind === 'create' || f.changeKind === 'delete'
+    f.symbolEdits.forEach((e, j) => {
+      const at = `${where} symbolEdits[${j}]${e && typeof e.symbol === 'string' ? ` ${e.symbol}` : ''}`
+      if (!e || typeof e !== 'object') { out.push(`${at}: 편집이 객체가 아니다`); return }
+      const miss = ['symbol', 'intent', 'newBody'].filter(k => typeof e[k] !== 'string')
+      if (!Number.isInteger(e.spanLines)) miss.push('spanLines')
+      if (miss.length) { out.push(`${at}: 필수 필드 누락 ${miss.join(',')}`); return }
+      const anchor = typeof e.oldAnchor === 'string' ? e.oldAnchor : ''
+      if (!exempt && lineCount(anchor) !== e.spanLines) out.push(`${at}: spanLines ${e.spanLines} ≠ oldAnchor ${lineCount(anchor)}줄 — 시작 줄만 주면 나머지가 남는다(F-120)`)
+      const added = escapes(e.newBody) - escapes(anchor)
+      if (added > 0) out.push(`${at}: newBody 에만 있는 '<\\' 이스케이프 ${added}개 — JSON 이중 이스케이프 의심(F-551)`)
+    })
+  })
+  return out
 }
 
 const SPLIT_THRESHOLD = 600 // 총 newBody 줄수 — C1 실측(≤500 안전)+H5 실사고(~800 실패) 사이 보수값. split_required=Lead 판단 요구(하드 차단 아님). 관측 실패에서 재조정.
@@ -180,6 +212,9 @@ const actualNewBodyLines = (Array.isArray(changeset.files) ? changeset.files : [
     ? f.symbolEdits.reduce((s, e) => s + (typeof e.newBody === 'string' ? e.newBody.split('\n').length : 0), 0)
     : 0), 0)
 if (actualNewBodyLines > SPLIT_THRESHOLD) log(`WARN changeset ~${actualNewBodyLines}줄 > ${SPLIT_THRESHOLD} — 위험 구간 근접, 차기 Step 분할 고려`)
+// Stage 1 결함은 검토 이슈(D…)로 Stage 3 에 넘긴다 — 검토를 생략하는 light 도 같다
+const defectIssues = changesetDefects(changeset).map((d, i) => ({ id: `D${i + 1}`, severity: 'major', detail: `[changeset 검사] ${d}` }))
+if (defectIssues.length) log(`WARN changeset 결함 ${defectIssues.length}건 — Stage 3 재입력`)
 
 // ════════ Stage 2: 검토 (조건부 — full: arch+quality 병렬 2렌즈 / light: complexity>=3일 때 arch 단독) ════════
 // ⚠️ 배선 복구 (2026-08-10): agent-team-guide §팀 구성이 code-* 실질 워커를 review-arch·impl-quality·review-correctness로
@@ -246,10 +281,11 @@ if (needReview) {
 // ════════ Stage 3: 이슈 반영 수정 (조건부 — issues일 때만. pass면 dead-call 제거) ════════
 let finalChangeset = changeset
 // ⛔ verdict 문자열이 아니라 **이슈 존재**로 건다 — partial(렌즈 일부 실패)에서도 나온 이슈는 반영한다.
-if (review && review.issues.length > 0) {
+const s3Issues = [...(review ? review.issues : []), ...defectIssues]
+if (s3Issues.length > 0) {
   phase('Stage 3: 이슈 반영 수정')
   const revised = await callAgent(
-    `${OVERRIDE}\n[역할] 구현자 — 검토 반영\n${STEP}\n[원 changeset] ${JSON.stringify(changeset)}\n[검토 이슈] ${JSON.stringify(review.issues)}\n` +
+    `${OVERRIDE}\n[역할] 구현자 — 검토 반영\n${STEP}\n[원 changeset] ${JSON.stringify(changeset)}\n[검토 이슈] ${JSON.stringify(s3Issues)}\n` +
     `[목표] 이슈를 반영한 수정 changeset. 동의하지 않는 이슈는 그대로 두되 summary에 사유 명시.`,
     { label: 'stage3-revise', agentType: 'fz:impl-correctness', model: 'opus', effort: EFFORT, schema: ChangesetSchema })
   if (revised) finalChangeset = revised
@@ -259,8 +295,15 @@ if (review && review.issues.length > 0) {
 const s1 = !!changeset
 // ⛔ 완주 판정은 객체 존재가 아니라 **렌즈 수**로 한다 (F-216 N1). 의도적 생략은 lensesExpected=0 으로 표현한다.
 const s2 = lensesExpected === 0 ? true : (lensesCompleted === lensesExpected)
-const s3 = (review && review.issues.length > 0) ? (finalChangeset !== changeset) : true // 이슈 없음/생략 = 해당 없음 완주
+const s3 = s3Issues.length > 0 ? (finalChangeset !== changeset) : true // 이슈 없음/생략 = 해당 없음 완주
 const stagesCompleted = [s1, s2, s3].filter(Boolean).length
+// ⛔ 최종 changeset 에 결함이 남으면 적용하지 않는다 — Lead 는 적용을 멈추고 사다리로(§12)
+const defects = changesetDefects(finalChangeset)
+if (defects.length) {
+  fallbackCount += 1
+  log(`FATAL changeset 결함 ${defects.length}건 잔존 — 적용 중단`)
+  return { mode: 'fallback', reason: 'changeset-defect', defects, metrics: metrics(stagesCompleted) }
+}
 log(`완주 ${stagesCompleted}/3 — changeset 파일 ${finalChangeset.files.length}개 / 검토 ${review ? review.verdict : 'skipped'}`)
 
 return {
@@ -275,6 +318,6 @@ return {
   //    'partial' 에서도 살아 있는 렌즈가 낸 이슈는 **반영되지 않았으면 잔존**이다.
   //    이전 술어는 verdict==='issues' 를 요구해 partial + stage3 실패에서 이슈를 통째로 버렸다.
   //    ⛔ Stage3 트리거(`review.issues.length > 0`)와 **같은 식**이어야 한다 — 두 곳이 갈린 것이 이 결함의 형태였다.
-  residualIssues: (review && review.issues.length > 0 && finalChangeset === changeset) ? review.issues : [], // 미반영분 — Lead 판정
+  residualIssues: (s3Issues.length > 0 && finalChangeset === changeset) ? s3Issues : [], // 미반영분 — Lead 판정
   metrics: metrics(stagesCompleted), // Lead: 적용 → 빌드 → §5.7 세션당 1행 집계 (invoke당 N행 발산 방지)
 }

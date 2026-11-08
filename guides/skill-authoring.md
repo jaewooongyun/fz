@@ -644,7 +644,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 |---|---|---|:--:|
 | 1 | **scriptPath 거부** | 에러가 `scriptPath must be a script path this tool returned…` 로 시작 · ⛔ **반환에 `mode` 필드 자체가 없다**(스크립트 미실행 · 에이전트 0 · 산출 0) | § scriptPath 거부 우회 계약 — **사다리 아님** |
 | 2 | **분할 요구** | `mode:'split_required'` · 또는 `mode:'fallback'` + `splitSuggested:true` | **L1** |
-| 3 | **입력 오류** | `mode:'fallback'` + args 파싱 실패·필수 키 누락 (설계된 fail-fast) | **L2** |
+| 3 | **입력 오류** | `mode:'fallback'` + args 파싱 실패·필수 키 누락 (설계된 fail-fast) · `reason:'changeset-defect'`(code-pair 최종 changeset 결함 — `defects` 를 buildFeedback 에 넣어 재invoke) | **L2** |
 | 4 | **일시 장애** | 스테이지 스톨 · 세션/rate limit · 타임아웃 | **L3** |
 | 5 | **스폰 실패** | agent 스폰 예외 · `metrics.agentCalls` 가 0 인데 `mode` 는 정상 | **L3** 우선(일시 장애 의심) → 미해소 시 **L4** |
 | 6 | **렌즈 결손 (degraded)** | `mode:'workflow'` 인데 렌즈가 빠졌다 — 반환 형태가 정상이라 놓치기 쉽다. 워크플로마다 알리는 필드가 다르다: `plan-lean2.js` 는 `degraded:true` · `missingLenses`(비어 있지 않음), `code-pair.js` 는 `reviewVerdict:'partial'`(`lensesCompleted < lensesExpected`) · `residualNote` | ⛔ **완주로 세지 않는다.** **L3** 1회(죽은 렌즈의 null 이 캐시로 재생되면 즉시 같은 결과 — 비용이 거의 없다) → 여전히 degraded 면 **L4**(선택지: 새 invoke 재실행 — 워크플로 1회 전체 비용 · 범위 축소 · 중단). `code-pair.js` 의 `partial` 은 `skills/fz-code/SKILL.md` 반환 처리 6 이 정한다(다음 Step 전 재invoke 여부를 Lead 가 판정) |
