@@ -203,8 +203,32 @@ LOCK_WAIT_ENV = "FZ_REGISTRY_LOCK_WAIT"
 LOCK_WAIT_DEFAULT = 30.0
 
 
+LOCK_FD_ENV = "FZ_REGISTRY_LOCK_FD"      # `--with-lock` 이 자식에게 넘긴 잠금 fd(pass_fds)
+LOCKED_ENV = "FZ_REGISTRY_LOCKED"
+
+
+def _inherited_lock(root: pathlib.Path):
+    """`--with-lock` 의 자식이면 넘겨받은 fd 를 돌려준다 — 같은 잠금 파일이고 실제로 잠겼을 때만.
+
+    ⛔ flock 은 열린 파일 기술 단위다. 자식이 파일을 새로 열어 잡으면 부모가 쥔 잠금과 부딪혀 상한까지 기다린 뒤
+       UNRUN 이 된다(교착). 그래서 부모의 fd 를 이어 쓴다. ⛔ 환경변수만 믿지 않는다 — inode 대조 · 비차단 재잠금.
+    """
+    raw = os.environ.get(LOCK_FD_ENV, "")
+    if not raw.isdigit():
+        return None
+    fd = int(raw)
+    try:
+        a, b = os.fstat(fd), os.stat(root / LOCK_NAME)
+        if (a.st_dev, a.st_ino) != (b.st_dev, b.st_ino):
+            return None
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)   # 같은 기술이면 이미 쥔 잠금 — 바로 성공한다
+    except OSError:
+        return None
+    return fd
+
+
 @contextlib.contextmanager
-def registry_lock(root: pathlib.Path):
+def registry_lock(root: pathlib.Path, want_fd: bool = False):
     """협조 writer 끼리의 배타 구간 — `{root}/.fz-registry.lock` 에 `fcntl.flock(LOCK_EX)` 를 상한 안에서 재시도한다.
 
     ⛔ 잠금은 **프로세스가 쥔다** — 프로세스가 끝나면(SIGKILL 포함) 커널이 푼다. 그래서 이 파일은 지우지
@@ -214,7 +238,12 @@ def registry_lock(root: pathlib.Path):
        `cat >` 처럼 잠금을 모르는 쓰기는 막지 못한다 — INDEX 는 교체 직전 재확인만 한다(`index_sync`).
 
     yield: 잡았으면 True. 상한(`FZ_REGISTRY_LOCK_WAIT` 초, 기본 30)을 넘기거나 파일을 못 열면 False.
+           want_fd 면 (잡았는지, fd) — `--with-lock` 이 자식에게 넘긴다.
     """
+    ifd = _inherited_lock(root)
+    if ifd is not None:
+        yield (True, ifd) if want_fd else True
+        return
     raw = os.environ.get(LOCK_WAIT_ENV, "")
     try:
         wait = float(raw) if raw else LOCK_WAIT_DEFAULT
@@ -223,14 +252,14 @@ def registry_lock(root: pathlib.Path):
     # ⛔ float() 는 'nan' · 'inf' 를 받아들인다 — 그러면 마감이 영영 오지 않아 '상한 안 재시도' 가 무한 대기가 된다
     if wait is None or not math.isfinite(wait) or wait < 0:
         log(f"UNRUN: {LOCK_WAIT_ENV}={raw!r} 는 0 이상의 유한한 초가 아니다 — 아무것도 바꾸지 않았다")
-        yield False
+        yield (False, None) if want_fd else False
         return
     path = root / LOCK_NAME
     try:
         fd = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o644)
     except OSError as e:
         log(f"UNRUN: 레지스트리 잠금 파일을 열 수 없다 — {path}: {e} (아무것도 바꾸지 않았다)")
-        yield False
+        yield (False, None) if want_fd else False
         return
     try:
         deadline = time.monotonic() + wait
@@ -248,7 +277,7 @@ def registry_lock(root: pathlib.Path):
             log(f"UNRUN: 레지스트리 잠금을 {wait:g}초 안에 얻지 못했다 — 다른 협조 writer 가 쓰는 중이다 ({path}). "
                 "아무것도 바꾸지 않았다. ⛔ 잠금 파일을 지우지 마라 — 파일이 있는 것은 잠김이 아니고, "
                 "보유자가 끝나면 커널이 푼다")
-        yield got
+        yield (got, fd) if want_fd else got
     finally:
         os.close(fd)                      # 닫으면 flock 이 풀린다 — 파일은 남긴다
 
@@ -629,6 +658,14 @@ def _eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool, touc
             continue
         if slug not in plan:
             plan.append(slug)
+    # ⛔ 부분 반영은 Closes 로 배출하지 않는다(F-142) — 하나라도 있으면 아래 거부 경로로 전무 처리한다.
+    #    applied 필드가 없는 엔트리는 종전대로 배출한다(필드는 선택이다).
+    for slug in plan:
+        v = _applied_value(by_slug[slug])
+        if v == "partial":
+            rejects.append(f"{slug}: applied: partial — 남은 축이 있다. 새 엔트리로 쪼갠 뒤 full 만 Closes 에 적는다")
+        elif v not in (None, "full"):           # ⛔ 오타 · 따옴표 · 빈 값을 full 로 읽어 배출하지 않는다
+            rejects.append(f"{slug}: applied 값 {v!r} 를 모른다(full · partial 만) — 값을 고친 뒤 배출한다")
 
     print(f"대상 {len(toks)} · 배출 {len(plan)} · skip {len(skipped)} · 거부 {len(rejects)}")
     for s in skipped:
@@ -636,7 +673,7 @@ def _eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool, touc
     for r in rejects:
         print(f"  거부   {r}")
     if rejects:
-        log("REJECT: 모호하거나 없는 토큰이 있다 — 하나도 이동하지 않았다")
+        log("REJECT: 모호하거나 없는 토큰 · 부분 반영 엔트리가 있다 — 하나도 이동하지 않았다")
         touched.clear()
         return REJECT
     if dry:
@@ -691,6 +728,107 @@ def _eject(root: pathlib.Path, note: pathlib.Path, version: str, dry: bool, touc
             f"`--audit {root}` 로 대장·archive 정합을 확인하라")
         return REJECT
     return OK
+
+
+FM_BLOCK = re.compile(r"\A---\n(.*?)\n---", re.S)
+APPLIED_FIELD = re.compile(r"^applied:[ \t]*([^\s#]*)", re.M)
+
+
+def _applied_value(path: pathlib.Path):
+    """엔트리 frontmatter 의 `applied` 값(없으면 None). 못 읽으면 None — 배출 판정은 기존 경로가 맡는다."""
+    try:
+        m = FM_BLOCK.match(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return None
+    a = APPLIED_FIELD.search(m.group(1)) if m else None
+    return a.group(1) if a else None
+
+
+DISPOSE_KINDS = ("works", "subsumed", "rejected")   # APPLIED 넷째 칸 머리어 = telemetry OUTFLOW_KIND 어휘
+
+
+class _InjectedCrash(Exception):
+    """self-test 전용 — 처분 단계 사이에서 끊긴 상황을 만든다."""
+
+
+def dispose(root: pathlib.Path, kind: str, fid: str, reason: str, _crash_at: str | None = None) -> int:
+    """`--dispose` — README §1 수동 처분(works · subsumed · rejected)을 잠금 아래 한 번에 한다.
+
+    순서: archive 로 복사 → 내용 대조 → 원본 삭제 → APPLIED 1행 → INDEX 대기열 행 제거.
+    ⛔ 각 단계는 앞 단계의 흔적을 보고 이어 간다 — 어디서 끊겨도 같은 명령을 다시 돌리면 중복 없이 수렴한다.
+    ⛔ 잠금을 못 잡으면 아무것도 바꾸지 않고 UNRUN.
+    """
+    reason = " ".join(str(reason).split()).replace("|", "/")
+    if kind not in DISPOSE_KINDS or not ID.match(fid or "") or not reason:
+        log(f"REJECT: --dispose {'|'.join(DISPOSE_KINDS)} --id F-NNN --reason '…' 가 필요하다 (받음: {kind!r} {fid!r})")
+        return REJECT
+    entries, archive, applied = root / "entries", root / ".archive", root / "APPLIED.md"
+    if not entries.is_dir():
+        log(f"UNRUN: entries 디렉토리 없음 — {entries}")
+        return UNRUN
+
+    def crash(point):
+        if _crash_at == point:
+            raise _InjectedCrash(point)
+
+    with registry_lock(root) as held:
+        if not held:
+            return UNRUN
+        _, by_id = index_entries(entries)
+        live = by_id.get(fid, [])
+        arc = sorted(s for s in archive_slugs(archive) if SLUG.match(s) and SLUG.match(s).group(1) == fid)
+        if len(live) > 1 or (not live and len(arc) > 1):
+            log(f"REJECT: {fid} 가 여러 파일에 걸려 모호하다 — {', '.join(live or arc)} (아무것도 바꾸지 않았다)")
+            return REJECT
+        if not live and not arc:
+            log(f"REJECT: {fid} 엔트리가 entries · .archive 어디에도 없다")
+            return REJECT
+        slug = live[0] if live else arc[0]          # entries 에 없으면 앞 실행이 삭제까지 했다 — 이어 간다
+        src, dst = entries / f"{slug}.md", archive / f"{slug}.md"
+        if src.exists():
+            archive.mkdir(exist_ok=True)
+            if not dst.exists():
+                tmp = archive / f".{slug}.md.tmp"
+                shutil.copyfile(src, tmp)
+                os.replace(tmp, dst)                # 반쯤 쓴 파일이 archive 이름으로 남지 않는다
+                crash("copied")
+            if src.read_bytes() != dst.read_bytes():
+                log(f"REJECT: archive 에 같은 이름의 다른 내용이 있다 — {dst} (원본을 지우지 않았다)")
+                return REJECT
+            src.unlink()
+            crash("deleted")
+        ap_slugs, _ = applied_records(applied)
+        if slug not in ap_slugs:
+            day = time.strftime("%Y-%m-%d")
+            with applied.open("a", encoding="utf-8") as f:
+                f.write(f"\n| {day} | {slug} | {reason} | {kind} — 수동 처분(--dispose) |\n")
+            crash("applied")
+        rc = index_sync(root, {slug})
+    print(f"처분 {kind}: {slug} → .archive/ · APPLIED 1행 · INDEX 행 정리")
+    return rc
+
+
+def with_lock(root: pathlib.Path, cmd: list) -> int:
+    """`--with-lock ROOT -- 명령…` — 레지스트리 잠금을 쥔 채 명령을 돌리고 그 exit 를 돌려준다.
+
+    자식은 `FZ_REGISTRY_LOCKED=1` 과 잠금 fd(`FZ_REGISTRY_LOCK_FD` · pass_fds)를 받는다 — 자식이 이 스크립트의
+    쓰기(배출 · 처분)를 부르면 같은 잠금을 이어 쓴다. ⛔ 잠금을 못 잡으면 명령을 돌리지 않고 UNRUN.
+    """
+    if not cmd:
+        log("UNRUN: --with-lock ROOT -- 명령 … 의 명령이 없다")
+        return UNRUN
+    if not (root / "entries").is_dir():
+        log(f"UNRUN: entries 디렉토리 없음 — {root / 'entries'} (명령을 돌리지 않았다)")
+        return UNRUN
+    with registry_lock(root, want_fd=True) as (held, fd):
+        if not held:
+            return UNRUN
+        env = dict(os.environ, **{LOCKED_ENV: "1", LOCK_FD_ENV: str(fd)})
+        try:
+            return subprocess.run(cmd, env=env, pass_fds=(fd,)).returncode
+        except OSError as e:
+            log(f"UNRUN: 명령을 실행하지 못했다 — {e}")
+            return UNRUN
 
 
 def prune_index(root: pathlib.Path, keep=frozenset()):
@@ -1557,6 +1695,129 @@ def self_test():
             audit(root, mani)
         assert "INDEX 잔존  F-001-a" in buf.getvalue(), f"⛔ 잔존 행을 보고하지 않았다 — {buf.getvalue()!r}"
 
+    # ── 부분 반영 거부 · 수동 처분(--dispose) · --with-lock (findings-drain S3) ──
+    def snap(root):
+        return {str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+
+    def partial_root(tmp, value="partial"):
+        root, note = mk(tmp, ["F-002-beta"])
+        (root / "entries" / "F-001-alpha.md").write_text(f"---\nstatus: proposed\napplied: {value}\napplied_ref: pending\n---\n# F-001\n",
+                                                         encoding="utf-8")
+        ix(root, ["F-001-alpha", "F-002-beta"])
+        note.write_text("Closes: F-001-alpha, F-002-beta\n", encoding="utf-8")
+        return root, note
+
+    def c_closes_partial_rejected(tmp):
+        root, note = partial_root(tmp)
+        assert eject(root, note, "9.9.9", False) == REJECT, "⛔ applied: partial 이 Closes 에 있는데 거부하지 않았다"
+        assert eject(root, note, "9.9.9", True) == REJECT, "⛔ dry-run 이 부분 반영을 배출 계획으로 냈다"
+
+    def c_closes_partial_no_write(tmp):
+        root, note = partial_root(tmp)
+        before = snap(root)
+        eject(root, note, "9.9.9", False)
+        after = {k: v for k, v in snap(root).items() if k != LOCK_NAME}
+        assert after == before, f"⛔ 거부인데 레지스트리가 바뀌었다 — {sorted(set(after) ^ set(before)) or '내용'}"
+
+    def c_closes_legacy_no_applied(tmp):
+        root, note = mk(tmp, ["F-001-alpha"])
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        assert eject(root, note, "9.9.9", False) == OK and (root / ".archive" / "F-001-alpha.md").is_file(), "⛔ applied 없는 엔트리 배출이 깨졌다"
+
+    def disposed(root, kind, slug="F-001-alpha"):
+        ap = (root / "APPLIED.md").read_text(encoding="utf-8")
+        rows = [ln for ln in ap.splitlines() if f"| {slug} |" in ln]
+        idx = (root / "INDEX.md").read_text(encoding="utf-8")
+        return ((root / ".archive" / f"{slug}.md").is_file(), (root / "entries" / f"{slug}.md").exists(),
+                len(rows), bool(rows) and rows[0].split("|")[4].strip().startswith(kind), f"entries/{slug}.md)" in idx.split("## 다음 ID")[0])
+
+    def dispose_case(kind):
+        def fn(tmp):
+            root, _ = mk(tmp, ["F-001-alpha", "F-002-beta"])
+            ix(root, ["F-001-alpha", "F-002-beta"])
+            assert dispose(root, kind, "F-001", "stub 조건 그대로") == OK, f"⛔ --dispose {kind} 가 OK 가 아니다"
+            assert disposed(root, kind) == (True, False, 1, True, False), f"⛔ 처분 상태 {disposed(root, kind)}"
+        return fn
+
+    def c_dispose_lock_held(tmp):
+        root, _ = mk(tmp, ["F-001-alpha"])
+        ix(root, ["F-001-alpha"])
+        before = snap(root)
+        old = os.environ.get(LOCK_WAIT_ENV)
+        os.environ[LOCK_WAIT_ENV] = "0.2"
+        fd = os.open(str(root / LOCK_NAME), os.O_RDWR | os.O_CREAT, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            rc = dispose(root, "rejected", "F-001", "x")
+        finally:
+            os.close(fd)
+            os.environ.pop(LOCK_WAIT_ENV, None) if old is None else os.environ.__setitem__(LOCK_WAIT_ENV, old)
+        after = {k: v for k, v in snap(root).items() if k != LOCK_NAME}
+        assert rc == UNRUN and after == {k: v for k, v in before.items() if k != LOCK_NAME}, f"⛔ 잠금 점유인데 rc={rc} 또는 바뀜"
+
+    def c_dispose_interrupted(tmp):
+        for point in ("copied", "deleted", "applied"):
+            root, _ = mk(pathlib.Path(tmp) / point, ["F-001-alpha", "F-002-beta"])
+            ix(root, ["F-001-alpha", "F-002-beta"])
+            try:
+                dispose(root, "rejected", "F-001", "x", _crash_at=point)
+                raise AssertionError(f"주입한 끊김({point})이 일어나지 않았다")
+            except _InjectedCrash:
+                pass
+            assert dispose(root, "rejected", "F-001", "x") == OK, f"⛔ {point} 뒤 재실행이 OK 가 아니다"
+            assert dispose(root, "rejected", "F-001", "x") == OK, f"⛔ {point} 뒤 세 번째 실행이 OK 가 아니다"
+            assert disposed(root, "rejected") == (True, False, 1, True, False), f"⛔ {point} 뒤 수렴 실패 {disposed(root, 'rejected')}"
+            assert not list((root / ".archive").glob(".*.tmp")), f"⛔ {point} 뒤 임시 파일이 남았다"
+
+    def c_dispose_unrelated(tmp):
+        root, _ = mk(tmp, ["F-001-alpha", "F-002-beta"], "| 2026-01-01 | F-090-old | 옛 사유 | works |\n")
+        ix(root, ["F-001-alpha", "F-002-beta"])
+        ap0, idx0 = (root / "APPLIED.md").read_text(encoding="utf-8"), (root / "INDEX.md").read_text(encoding="utf-8")
+        assert dispose(root, "works", "F-001", "y") == OK
+        ap1, idx1 = (root / "APPLIED.md").read_text(encoding="utf-8"), (root / "INDEX.md").read_text(encoding="utf-8")
+        assert ap1.startswith(ap0), "⛔ 기존 APPLIED 행이 바뀌었다"
+        assert row("F-002-beta") in idx1 and idx1 == idx0.replace(row("F-001-alpha"), "", 1), "⛔ 무관한 INDEX 행이 바뀌었다"
+        assert (root / "entries" / "F-002-beta.md").read_text(encoding="utf-8") == "# F-002-beta\n", "⛔ 무관한 엔트리가 바뀌었다"
+
+    def c_with_lock_runs(tmp):
+        root, _ = mk(tmp, ["F-001-alpha"])
+        ix(root, ["F-001-alpha"])
+        out = pathlib.Path(tmp) / "child.txt"
+        prog = f"import os,sys; open({str(out)!r},'w').write(os.environ.get({LOCKED_ENV!r},'')); sys.exit(7)"
+        assert with_lock(root, [sys.executable, "-c", prog]) == 7, "⛔ 명령 exit 를 돌려주지 않았다"
+        assert out.read_text() == "1", "⛔ 자식에 FZ_REGISTRY_LOCKED=1 이 없다"
+        old = os.environ.get(LOCK_WAIT_ENV)
+        os.environ[LOCK_WAIT_ENV] = "0.5"
+        try:   # 자식이 같은 잠금을 이어 써야 한다 — 새로 잡으려 하면 부모와 부딪혀 UNRUN 이 된다
+            rc = with_lock(root, [sys.executable, str(pathlib.Path(__file__).resolve()), "--dispose", "rejected",
+                                  "--id", "F-001", "--reason", "nested", "--root", str(root)])
+        finally:
+            os.environ.pop(LOCK_WAIT_ENV, None) if old is None else os.environ.__setitem__(LOCK_WAIT_ENV, old)
+        assert rc == OK and disposed(root, "rejected")[0], f"⛔ 잠금 아래 자식 처분이 실패했다 rc={rc}"
+
+    def c_with_lock_busy(tmp):
+        root, _ = mk(tmp, ["F-001-alpha"])
+        out = pathlib.Path(tmp) / "ran.txt"
+        old = os.environ.get(LOCK_WAIT_ENV)
+        os.environ[LOCK_WAIT_ENV] = "0.2"
+        fd = os.open(str(root / LOCK_NAME), os.O_RDWR | os.O_CREAT, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            rc = with_lock(root, [sys.executable, "-c", f"open({str(out)!r},'w').write('x')"])
+        finally:
+            os.close(fd)
+            os.environ.pop(LOCK_WAIT_ENV, None) if old is None else os.environ.__setitem__(LOCK_WAIT_ENV, old)
+        assert rc == UNRUN and not out.exists(), f"⛔ 잠금 점유인데 명령을 돌렸다 rc={rc}"
+
+    for n, f in [("closes-partial-rejected", c_closes_partial_rejected), ("closes-partial-no-write", c_closes_partial_no_write),
+                 ("closes-legacy-no-applied-ok", c_closes_legacy_no_applied),
+                 ("dispose-rejected-moves", dispose_case("rejected")), ("dispose-works-moves", dispose_case("works")),
+                 ("dispose-subsumed-moves", dispose_case("subsumed")), ("dispose-lock-held-exit2", c_dispose_lock_held),
+                 ("dispose-interrupted-rerun-converges", c_dispose_interrupted), ("dispose-unrelated-rows-unchanged", c_dispose_unrelated),
+                 ("with-lock-runs-command", c_with_lock_runs), ("with-lock-busy-exit2-no-run", c_with_lock_busy)]:
+        cases += 1
+        case(n, f)
+
     for n, f in [("normal", c_normal), ("absent-id", c_absent), ("already-ejected", c_already),
                  ("ambiguous-id-reject", c_ambiguous), ("rerun-idempotent", c_rerun),
                  ("prose-mention-not-row", c_prose_not_row),
@@ -1624,9 +1885,22 @@ def main():
     ap.add_argument("--keep", default="", metavar="ID,...",
                     help="--prune-index 에서 지우지 않을 ID 또는 full slug (쉼표 구분)")
     ap.add_argument("--manifest", type=pathlib.Path)
+    ap.add_argument("--dispose", choices=DISPOSE_KINDS, help="README §1 수동 처분 — --root · --id · --reason 과 함께")
+    ap.add_argument("--id", default="", metavar="F-NNN")
+    ap.add_argument("--reason", default="")
     ap.add_argument("--self-test", action="store_true")
-    a = ap.parse_args()
+    argv = sys.argv[1:]
+    if argv[:1] == ["--with-lock"]:          # `--with-lock ROOT -- 명령…` — 명령 인자를 argparse 가 먹지 않게 먼저 가른다
+        if len(argv) < 3 or argv[2] != "--":
+            log("UNRUN: 사용법 --with-lock ROOT -- 명령 …")
+            return UNRUN
+        return with_lock(pathlib.Path(argv[1]), argv[3:])
+    a = ap.parse_args(argv)
 
+    if a.dispose:
+        if not a.root:
+            ap.error("--dispose 는 --root 가 필요하다")
+        return dispose(a.root, a.dispose, a.id, a.reason)
     if a.keep and not a.prune_index:
         ap.error("--keep 은 --prune-index 와 함께만 쓴다")
     if a.self_test:

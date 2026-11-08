@@ -44,7 +44,11 @@ Closes 항목마다 엔트리 오라클의 충족 근거(명령과 결과)를 �
 - **full slug 로 적는다**: `F-001-artifact-processing-state-assumed`
 - ID 만 적어도 되지만 **같은 번호가 둘 이상이면 거부된다**(현재 중복 ID 11쌍) — 모호한 채 이동하지 않는다
 - 쉼표·공백 구분, 여러 줄 허용
-- 닫은 것이 없으면 **줄을 쓰지 않는다** — 빈 `Closes:` 는 UNRUN(exit 2)이며 통과가 아니다
+- 닫은 것이 없으면 **줄을 쓰지 않는다** — 빈 `Closes:` 는 UNRUN(exit 2)이며 통과가 아니다. 대신 본문에 '닫은 finding 이 없어 …' 표지를 둔다(`check_release_sync.sh --release` ⑥)
+- ⛔ **Closes 줄에는 ID · slug 만 적는다** — 산문 · 괄호 주석 · '(부분)' 같은 표기는 노트 본문으로 옮긴다(`check_release_closes.py` (f) 가 거부)
+- ⛔ 레지스트리 `applied: full` 엔트리는 **전부** 적고 `applied: partial` 은 적지 않는다 — 남은 축을 새 엔트리로 쪼갠 뒤 full 만 닫는다
+- 원장 미등재 트랙 D 후보가 있으면 `Track-D-Review: <failure_class 또는 묶음 F-ID> — 판단` 줄을 둔다
+- 발행 전 `python3 scripts/check_release_closes.py --findings-root <레지스트리> --note <이 노트>` 가 exit 0 이어야 한다
 
 ```bash
 # dry-run 으로 먼저 본다

@@ -11,8 +11,8 @@
 # exit: 0=전부 충족(DOCS_SYNC_OK) / 1=불일치 / 2=대상 부재(측정 실패)
 #
 # 모드:
-#   (없음)      ①~④ — 수동·CI 용. health-check 포함이라 **32초** 걸린다
-#   --release   ①~④ + ⑤ **커밋 축**. 릴리즈 직전 게이트
+#   (없음)      ①~④ — 수동·CI 용. health-check 포함이라 **약 7분 20초** 걸린다(2026-11-08 실측 439s · 14코어)
+#   --release   ①~④ + ⑤ **커밋 축** + ⑥ **findings 축**(노트가 닫은 finding 을 밝혔는가). 릴리즈 직전 게이트
 #   --staged    ⑤만, staged 내용 기준. ⛔ pre-commit 용 — health-check 를 뺀다
 #   --self-test 임시 git 리포로 ⑤의 실패/통과 쌍을 확인
 #
@@ -88,6 +88,22 @@ commit_axis() {   # $1=리포 디렉토리 · $2=선언 버전
   [ -z "$dirty" ] || { echo "  ❌ 버전 선언 파일에 미커밋 수정이 있다:"; echo "$dirty" | sed 's/^/      /'; bad=1; }
 
   return "$bad"
+}
+
+# ⑥ findings 축 — 선언 버전 노트가 **닫은 finding 을 밝혔는가**: `Closes:` 줄 또는 '닫은 finding 없음' 표지(v4.39.0:54 꼴).
+#    ⛔ 레지스트리를 읽지 않는다 — 레지스트리 없는 머신에서도 같은 판정이다. applied ↔ Closes 대조는
+#       check_release_closes.py 를 명시로 돌린다(CLAUDE.md 릴리스 절차).
+#    반환: 0=선언 있음 · 1=선언 없음 · 2=노트 부재(미판정)
+findings_axis() {   # $1=노트 경로
+  local n="$1"
+  [ -f "$n" ] || { echo "  ⚠️ $n 없음 — findings 축 미판정(⛔ 통과 아님)"; return 2; }
+  # ⛔ 템플릿 원문이 두 술어를 이미 충족한다(_TEMPLATE.md 의 자리표시 Closes 줄 · 따옴표 안 표지 안내) — 둘 다 선언이 아니다
+  if grep -E '^Closes:' "$n" | grep -Eq 'F-00[12]-(some|another)-slug'; then
+    echo "  ❌ $n 의 Closes: 줄에 템플릿 자리표시 slug 가 남았다 — 닫은 엔트리로 바꾸거나 줄을 지운다"; return 1
+  fi
+  if grep -Eq '^Closes:' "$n" || grep -Eq "(^|[^'\"])닫은 finding (이 )?없" "$n"; then return 0; fi
+  echo "  ❌ $n 에 Closes: 줄도 '닫은 finding 없음' 표지도 없다 — 닫은 것을 적거나 없음을 밝힌다"
+  return 1
 }
 
 # ①-b 하위 플러그인 — marketplace 두 번째 항목부터, source 가 이 리포 안 폴더(`./…`)인 것마다 둘을 본다.
@@ -242,6 +258,30 @@ if [ "$MODE" = "self-test" ]; then
   # ⑨ 정상 — 같은 변경에 두 곳 버전을 함께 올렸다(⑧ 의 대조)
   sub_files "$R" 0.1.1 0.1.1; case_sub "sub-changed-bumped" 0 "$R"; rm -rf "$R"
 
+  # ⑥ findings 축 — 노트 선언만 본다(레지스트리 무관)
+  case_fx() {   # $1=이름 · $2=기대 반환 · $3=노트 본문(빈 문자열이면 노트 없음)
+    local d out rc
+    d=$(mktemp -d "${TMPDIR:-/tmp}/fz-relsync.XXXXXX")
+    [ -n "$3" ] && printf '%s\n' "$3" > "$d/v9.9.9.md"
+    out=$(findings_axis "$d/v9.9.9.md"); rc=$?
+    rm -rf "$d"
+    if [ "$rc" = "$2" ]; then pass=$((pass+1))
+    else failed=$((failed+1)); echo "  FAIL $1: 반환 $rc (기대 $2)"; echo "$out" | sed 's/^/        /'; fi
+  }
+  case_fx "findings-axis-closes-ok" 0 $'# v9.9.9\n\nCloses: F-001'
+  case_fx "findings-axis-no-finding-marker-ok" 0 $'# v9.9.9\n\n이 릴리즈는 닫은 finding 이 없어 `Closes:` 줄을 쓰지 않는다.'
+  case_fx "findings-axis-missing-fails" 1 $'# v9.9.9\n\n<!-- Closes: 줄 없음 -->\n본문만 있다'
+  # 템플릿 원문 그대로인 노트는 아무것도 선언하지 않았다 — 자리표시 Closes · 따옴표 안 표지 안내가 술어를 채우면 안 된다
+  case_fx "findings-axis-template-verbatim-fails" 1 "$(cat "$ROOT_DIR/docs/releases/_TEMPLATE.md")"
+  case_fx "findings-axis-quoted-marker-fails" 1 $'# v9.9.9\n\n- 닫은 것이 없으면 본문에 \'닫은 finding 이 없어 …\' 표지를 둔다'
+  # 기본 모드는 ⑥ 을 부르지 않고 FZ_FINDINGS_ROOT 도 읽지 않는다 — 실행 확인은 기본 모드 전체 실행(health-check 포함)이 맡는다
+  calls=$(grep -n 'findings_axis "\$' "${BASH_SOURCE[0]}" | grep -v 'case_fx\|out=\$(findings_axis' | cut -d: -f1)
+  dm_ok=1
+  for ln in $calls; do sed -n "$((ln - 1)),${ln}p" "${BASH_SOURCE[0]}" | grep -q 'MODE" = "release"' || dm_ok=0; done
+  [ -n "$calls" ] || dm_ok=0
+  sed -n '/^findings_axis()/,/^}/p' "${BASH_SOURCE[0]}" | grep -q 'FZ_FINDINGS_ROOT' && dm_ok=0
+  if [ "$dm_ok" = 1 ]; then pass=$((pass+1)); else failed=$((failed+1)); echo "  FAIL default-mode-no-registry-ok: ⑥ 호출이 release 가드 밖이거나 레지스트리를 읽는다"; fi
+
   echo "self-test $pass/$((pass+failed)) passed"
   [ "$failed" = 0 ] || exit 1
   exit 0
@@ -306,13 +346,17 @@ fi
 if [ "$MODE" = "release" ]; then
   commit_axis "$ROOT_DIR" "$PV" || { rc=$?; [ "$rc" = 2 ] && note "커밋 축 미판정 — 통과가 아니다" || fail=$((fail + 1)); }
 fi
+# ⑥ findings 축 — `--release` 에서만. 미판정(2)은 통과로 세지 않는다
+if [ "$MODE" = "release" ]; then
+  findings_axis "$ROOT_DIR/docs/releases/v${PV}.md" || { rc=$?; [ "$rc" = 2 ] && note "findings 축 미판정 — 통과가 아니다" || fail=$((fail + 1)); }
+fi
 
 if [ "$fail" -gt 0 ]; then
   echo "릴리즈 동기 불일치 ${fail}건"
   exit 1
 fi
 if [ "$MODE" = "release" ]; then
-  echo "RELEASE_SYNC_OK (버전 3곳 일치 · 가이드→표 참조 4건 · health-check exit 0 · 커밋 축 충족)"
+  echo "RELEASE_SYNC_OK (버전 3곳 일치 · 가이드→표 참조 4건 · health-check exit 0 · 커밋 축 · findings 선언 있음 — applied ↔ Closes 대조는 check_release_closes.py)"
 else
   echo "DOCS_SYNC_OK (버전 3곳 일치 · 가이드→표 참조 4건 · health-check exit 0)"
 fi

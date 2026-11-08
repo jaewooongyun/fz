@@ -421,6 +421,7 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
 
 - ⛔ **승격 완료 → 근거 엔트리 `applied: full`** — 트랙 D 절에 `✅ **승격 완료` 를 적은 판은 그 절 `관측 #` 엔트리에 `applied: full` 을 쓰고, 남은 축은 새 엔트리로 쪼갠다. 배출은 승격 판 노트 `Closes:` 또는 레지스트리 README §1 처분이다. 위생 검사 `--ledger` 가 `승격 완료 근거 잔존` 으로 남은 근거를 센다(이 축이 없어 D-2 근거 F-022 · F-045 · F-098 이 두 달 남았다)
 - ⛔ **반영 기록은 수리한 세션이 쓴다** — 엔트리 frontmatter `applied` · `applied_ref` 와 본문 `## 반영` 절을 같은 세션에 쓴다. 다음 릴리스 노트의 `Closes:` 는 이 기록에서 `applied: full` 만 모은다
+- 대조기: `scripts/check_release_closes.py --findings-root <레지스트리> --note <노트>` — `applied: full` ↔ `Closes:` · partial · `applied_ref` · 승격 잔존 · 미등재 트랙 D 를 발행 전에 본다(레지스트리는 쓰지 않는다)
 
 ### D-2: coverage-unit-mismatch (트랙 D 관측 #1~#3)
 
