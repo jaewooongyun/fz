@@ -1,0 +1,4 @@
+{"type": "permission-mode", "permissionMode": "default", "sessionId": "synthetic"}
+{"type": "file-history-snapshot", "messageId": "m0", "snapshot": {"trackedFileBackups": {}}, "isSnapshotUpdate": false}
+{"type": "attachment", "parentUuid": null, "isSidechain": false, "cwd": "/srv/demo", "sessionId": "synthetic", "version": "2.1.0"}
+{"type": "user", "message": {"role": "user", "content": "hello"}, "sessionId": "synthetic"}

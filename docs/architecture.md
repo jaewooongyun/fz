@@ -18,6 +18,8 @@ fz-plugin/
 ├── tests/           fixtures/gates/ — 판정기 회귀 99케이스 (17범주, 기대 exit·산출물·시간·stdout·stderr)
 │                    fixtures/*/*/run.sh 회귀 오라클(health-check 가 자동 실행) · lib/ 가짜 워크플로 런타임 ·
 │                    workflows/ 완주·실패 주입 · ab/ A/B 원장 통합 · docs/ 문서 계약
+├── mods/            선택형 하위 플러그인 2개(따로 설치) — fz-compact(bg 세션 로컬 마스킹 압축) ·
+│                    fz-guard(Phase 4 승인 · ad-hoc Agent · 메모리만 쓴 교훈을 훅으로 강제 · fail-open)
 └── templates/       스킬/에이전트/CLAUDE.md 생성 템플릿
 ```
 

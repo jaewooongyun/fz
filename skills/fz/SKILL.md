@@ -302,6 +302,7 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 - [ ] 사용자가 승인했는가?
 - [ ] 적극적 확인 원칙 적용 완료? (짧은 요청/범위 확인)
 - [ ] GPT 모델·effort 질문을 정본 `get` 결과 표대로 처리했는가? (GPT 를 부를 수 있는 파이프라인이면 `gpt-choice.sh get` 을 불렀는가)
+- [ ] 승인 질문의 header 가 `Phase 4` 인가? 승인 = 제시한 선택지 중 커스텀이 아닌 것이다. 커스텀 · 자유 입력으로 답하면 변경안을 반영해 다시 Phase 4 질문으로 묻는다 — 기계 강제 = fz-guard(설치한 머신 · `modules/fz-pipeline-proposal.md` § AskUserQuestion 선택지)
 
 ---
 

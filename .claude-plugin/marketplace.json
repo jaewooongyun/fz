@@ -41,6 +41,23 @@
         "background-session"
       ],
       "source": "./mods/fz-compact"
+    },
+    {
+      "name": "fz-guard",
+      "description": "Optional fz add-on: hooks that enforce Phase 4 approval after /fz, confirm ad-hoc agents in fz sessions, and ask for a registry entry when a turn writes an fz lesson to memory. Fails open. Off until installed.",
+      "repository": "https://github.com/jaewooongyun/fz",
+      "version": "0.1.0",
+      "author": {
+        "name": "Jaewoong Yun"
+      },
+      "license": "MIT",
+      "category": "development",
+      "tags": [
+        "hooks",
+        "guard",
+        "enforcement"
+      ],
+      "source": "./mods/fz-guard"
     }
   ]
 }

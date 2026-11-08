@@ -820,5 +820,33 @@ else
   record "fz-compact guard" 1 "⛔ $(printf '%s\n' "$FC_GUARD" | head -2 | tr '\n' ' ')"
 fi
 
+# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 63 케이스) · 허용 목록(채택 표 == guard 상수).
+#    self-test 와 허용 목록은 python3 만 써서 CLI 분기 밖에서 돈다. self-test 는 HOME · 상태 폴더를 임시로 새로 짓는다.
+if command -v claude >/dev/null 2>&1; then
+  FG_VAL="$(bash "$ROOT/scripts/plugin_validate.sh" "$ROOT/mods/fz-guard" 2>&1)"; FG_VAL_CODE=$?
+  record3 "fz-guard validate" "$FG_VAL_CODE" "$FG_VAL" "$(printf '%s\n' "$FG_VAL" | tail -1)" "⛔ $(printf '%s\n' "$FG_VAL" | grep -E 'FAIL|UNRUN' | head -2 | tr '\n' ' ')"
+else
+  UNRUN=$((UNRUN + 1)); record "fz-guard validate" UNRUN "미실행 — claude CLI 부재 (⛔ PASS 아님)"
+fi
+FG_TEST="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/mods/fz-guard/hooks/guard.py" --self-test 2>&1)"; FG_TEST_CODE=$?
+if [ "$FG_TEST_CODE" -eq 0 ]; then
+  record "fz-guard self-test" 0 "$(printf '%s\n' "$FG_TEST" | tail -1)"
+else
+  record "fz-guard self-test" 1 "⛔ $(printf '%s\n' "$FG_TEST" | grep -E '^FAIL|Traceback' | head -2 | tr '\n' ' ')"
+fi
+FG_AL="$(python3 "$ROOT/mods/fz-guard/hooks/guard.py" --check-allowlist "$ROOT/modules/native-agents.md" 2>&1)"; FG_AL_CODE=$?
+record3 "fz-guard allowlist" "$FG_AL_CODE" "$FG_AL" "$FG_AL" "⛔ $FG_AL"
+# 하위 플러그인 전수 — 위 절들은 이름으로 고정돼 있다. 새 mods/<이름>/ 이 이 파일에 없으면 검증 공백이다(AE-37)
+MODS_MISSING=""
+for d in "$ROOT"/mods/*/; do
+  n="$(basename "$d")"
+  grep -q -- "mods/$n" "$ROOT/scripts/health-check.sh" || MODS_MISSING="$MODS_MISSING $n"
+done
+if [ -z "$MODS_MISSING" ]; then
+  record "mods 전수 등록" 0 "$(ls -d "$ROOT"/mods/*/ | wc -l | tr -d ' ')개 모두 health-check 에 있다"
+else
+  record "mods 전수 등록" 1 "⛔ health-check 에 없는 하위 플러그인:$MODS_MISSING"
+fi
+
 # ── 보고
 report_and_exit
