@@ -25,7 +25,8 @@
     "approved": "승인 도장 (APPROVED_ORACLE_HASH) 계약",
     "discover": "원장 탐색 (--discover) — health-check 노출 경로",
     "finalize": "확정 도장 발급 (--finalize) — 도장이 자기 게이트 블록에 박히는가",
-    "baseline": "승인 전 기준선 (--baseline-probe · SIDE_EFFECTS · BASELINE: required 원장의 --finalize)"
+    "baseline": "승인 전 기준선 (--baseline-probe · SIDE_EFFECTS · BASELINE: required 원장의 --finalize)",
+    "pin": "선언형 핀 (PIN · PIN_DIGEST) — 판정 입력 파일을 승인 계약에 묶는다"
   },
   "cases": [
     {
@@ -2143,6 +2144,351 @@
         }
       },
       "why": "새 원장은 기준선을 요구한다 — 헤더를 쓰는 곳이 없으면 --finalize 의 기준선 대조는 한 번도 발화하지 않는다(발급처 없는 계약)"
+    },
+    {
+      "id": "pin-finalize-then-edit-run-refused",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "G1: PIN 파일이 승인 뒤 바뀌었다"
+        ]
+      },
+      "why": "확정 뒤 기대 표를 바꾸면 CHECK 가 여전히 통과해도 그 게이트는 승인한 입력을 재지 않는다 — 재승인 없이 실행하지 않는다"
+    },
+    {
+      "id": "pin-run-then-edit-reverify-refused",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "G1: PIN 파일이 승인 뒤 바뀌었다"
+        ]
+      },
+      "why": "통과 기록 뒤 핀을 바꾸면 --reverify 가 재승인을 요구한다"
+    },
+    {
+      "id": "pin-absent-then-created-refused",
+      "category": "pin",
+      "ledger": "pin/absent.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/later.txt": "now here\n"
+      },
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "G1: PIN 파일이 승인 뒤 바뀌었다"
+        ]
+      },
+      "why": "승인 때 부재(absent)도 기록값이다 — 나중에 생기면 바뀐 것이다"
+    },
+    {
+      "id": "pin-file-edited-unmet",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1"
+        ]
+      },
+      "why": "--status(Stop 훅 경로)는 핀이 바뀐 met 게이트를 미충족으로 읽는다"
+    },
+    {
+      "id": "pin-undeclared-control-unaffected",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--status",
+        "--only",
+        "G2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET"
+        ]
+      },
+      "why": "대조군 — 같은 파일을 읽어도 PIN 을 선언하지 않은 게이트는 같은 변경에 영향받지 않는다(opt-in)"
+    },
+    {
+      "id": "pin-field-probe",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "mode": "oracle-fields",
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ORACLE_INSENSITIVE:none"
+        ]
+      },
+      "why": "PIN · PIN_DIGEST 가 승인 해시에 민감하다 — 승인 뒤 핀 선언이나 기록값을 바꾸면 도장이 깨진다"
+    },
+    {
+      "id": "pin-hook-env-status",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "cli": true,
+      "cli_env": "hook",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1"
+        ]
+      },
+      "why": "Stop 훅 환경(세션 export 없음 · PATH · HOME 만)에서도 ROOT 기준 핀의 변경을 같은 판정으로 읽는다(AE-20)"
+    },
+    {
+      "id": "pin-hook-env-status-met",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "cli": true,
+      "cli_env": "hook",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET"
+        ]
+      },
+      "why": "양성 대조 — 핀이 그대로면 훅 환경에서도 met"
+    },
+    {
+      "id": "pin-env-root-hook-keeps-record",
+      "category": "pin",
+      "ledger": "pin/envroot.md",
+      "env": {
+        "FZ_PIN_FIXTURE_ROOT": "{SANDBOX}"
+      },
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "cli": true,
+      "cli_env": "hook",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET"
+        ]
+      },
+      "why": "${변수}/… 핀은 훅 환경에서 다시 계산할 수 없다 — ENV 선례대로 기록된 판정을 따른다(도장은 기록된 다이제스트라 깨지지 않는다)"
+    },
+    {
+      "id": "pin-env-root-edited-unmet",
+      "category": "pin",
+      "ledger": "pin/envroot.md",
+      "env": {
+        "FZ_PIN_FIXTURE_ROOT": "{SANDBOX}"
+      },
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1"
+        ]
+      },
+      "why": "변수가 있는 세션에서는 ${변수}/… 핀의 변경을 읽는다"
+    },
+    {
+      "id": "pin-restamp-only",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "확정 보강: 게이트 1개(G1)"
+        ],
+        "expect_contains": {
+          "PIN_DIGEST: ": 1
+        }
+      },
+      "why": "판 중 엔트리로 바뀌는 기대 표(F-401)는 --finalize --only 재도장(F-334)으로 고친다 — 핀 기록과 도장을 그 게이트만 다시 쓴다"
+    },
+    {
+      "id": "pin-dir-refused",
+      "category": "pin",
+      "ledger": "pin/dir.md",
+      "mode": "finalize",
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "PIN 은 파일만"
+        ]
+      },
+      "why": "디렉토리 핀은 무엇을 묶는지 모호하다 — 파일만"
+    },
+    {
+      "id": "pin-path-traversal-refused",
+      "category": "pin",
+      "ledger": "pin/bad-parse.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "PIN 경로는"
+        ]
+      },
+      "why": "핀 경로에 .. 금지 — ROOT 밖을 상대 경로로 가리키지 않는다"
+    },
+    {
+      "id": "pin-var-undeclared-refused",
+      "category": "pin",
+      "ledger": "pin/bad-var.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "ENV 선언에 없다"
+        ]
+      },
+      "why": "${변수} 루트는 그 게이트의 ENV 선언에 있어야 한다 — 실행 경로가 변수 부재를 UNRUN 으로 잡는다"
     }
   ],
   "_max_seconds": "선택 필드 — 벽시계 상한(초). ⛔ exit code 만으로는 hang 을 못 잡는다: 손자 프로세스가 파이프를 붙잡아 30초 걸렸는데 exit 는 1로 정상이었다(2026-08-24 실측).",
@@ -2155,5 +2501,6 @@
     "fixture-portability": "⛔ fixture 원장의 `ROOT:`·`CWD:` 는 **커밋한 사람의 클론 경로**다. self-test 가 sandbox 로 재작성하는데, `replace(str(FIXTURES), …)` 만 쓰면 다른 클론이나 플러그인 캐시에서 매칭 0건이 되어 ROOT 가 남의 경로를 가리키고 소유 검사에서 전부 exit 3 이 된다 (2026-08-25 실측: 캐시에서 19/66). 그래서 **경로 모양**(`…/tests/fixtures/gates` 로 끝나는 절대 경로)으로 재작성한다. 회귀 확인 = 저장소를 임의 위치로 복사해 self-test 를 돌린다"
   },
   "_expect_absent": "선택 필드 — sandbox 기준 경로가 없어야 한다 · expect_files 는 있어야 한다. ⛔ '돌리지 않았다'는 출력이 아니라 부작용 부재로 잰다",
-  "_expect_sidecar": "선택 필드 — <원장>.baseline.json 의 게이트별 결과 · 실행 게이트 oracle_hash 가 지금 계약과 같은가"
+  "_expect_sidecar": "선택 필드 — <원장>.baseline.json 의 게이트별 결과 · 실행 게이트 oracle_hash 가 지금 계약과 같은가",
+  "_write_files": "선택 필드 — 사전 단계 뒤 sandbox 기준 경로에 파일을 쓴다 · env 는 케이스 동안의 환경 변수({SANDBOX} 치환) · cli_env: hook 은 PATH · HOME 만 둔 하위 프로세스"
 }

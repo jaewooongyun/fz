@@ -149,8 +149,13 @@ KNOWN_ATTRS = {
     # ⛔ `SIDE_EFFECTS: none|tmp|writes — <사유>` — `--baseline-probe` 가 무변경 트리에서 이 CHECK 를 돌려도 되는가(F-455).
     #    none · tmp 만 돌리고 writes 는 제외 · 미선언은 UNRUN 이다(안전 기본). 선언하면 승인 해시 안이다(ENV 선례)
     "SIDE_EFFECTS",
+    # ⛔ `PIN: <경로>[, …]` — 판정이 기대는 입력 파일(기대 표 · fixture)을 승인에 묶는다(F-408 → F-525 · opt-in). 경로는 ROOT 기준 ·
+    #    절대 · `${ENV 선언 변수}/…` 셋뿐이고 CHECK 에서 추론하지 않는다. `PIN_DIGEST:` 는 `--finalize` 가 쓰는 그 내용 다이제스트다
+    "PIN", "PIN_DIGEST",
 }
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+PIN_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}/(.+)\Z")
+DIGEST_RE = re.compile(r"[0-9a-f]{12}\Z")
 SIDE_EFFECTS_RE = re.compile(r"(none|tmp)\Z|writes[ \t]*[—-][ \t]*\S")
 BASELINE_HEADER = "BASELINE"
 BASELINE_REQUIRED = "required"
@@ -212,6 +217,24 @@ class Gate:
             if not SIDE_EFFECTS_RE.match(self.attrs["SIDE_EFFECTS"].strip()):
                 raise LedgerError(f"{self.id}: SIDE_EFFECTS 는 none · tmp · 'writes — <사유>' 중 하나 — "
                                   f"{self.attrs['SIDE_EFFECTS']!r}")
+        if "PIN" in self.attrs:
+            if not has_check:
+                raise LedgerError(f"{self.id}: PIN 은 CHECK 가 있어야 의미가 있다 — 수동 게이트는 명령을 돌리지 않는다")
+            envs = {t.strip() for t in self.attrs.get("ENV", "").split(",") if t.strip()}
+            for item in pin_items(self):
+                m = PIN_VAR_RE.match(item)
+                rest = m.group(2) if m else item
+                if m and m.group(1) not in envs:
+                    raise LedgerError(f"{self.id}: PIN 루트 변수 {m.group(1)} 이 ENV 선언에 없다 — {item!r}")
+                if "$" in rest or ".." in Path(rest).parts:
+                    raise LedgerError(f"{self.id}: PIN 경로는 ROOT 기준 · 절대 · '${{ENV 변수}}/…' 만 — {item!r}")
+            if not pin_items(self):
+                raise LedgerError(f"{self.id}: PIN 값이 비었다")
+        if "PIN_DIGEST" in self.attrs:
+            if "PIN" not in self.attrs:
+                raise LedgerError(f"{self.id}: PIN_DIGEST 는 PIN 선언과 함께만 — --finalize 가 쓴다")
+            if not DIGEST_RE.match(self.attrs["PIN_DIGEST"].strip()):
+                raise LedgerError(f"{self.id}: PIN_DIGEST 형식 오류 — {self.attrs['PIN_DIGEST']!r}")
         expect = self.attrs.get("EXPECT", "")
         # EXPECT 는 부분 문자열 매칭이다 (Python re 에 타임아웃이 없어 백트래킹을 막을 수 없다).
         # 저자가 정규식으로 착각하면 게이트가 영영 매칭되지 않으므로 알려야 한다.
@@ -565,7 +588,48 @@ def oracle_hash(gate: Gate, cwd: str) -> str:
     # 같은 축 — 기준선 실행 여부가 승인 대상이다. 선언이 없으면 키를 넣지 않아 종전 도장이 그대로다(legacy-ledger-hash-golden)
     if "SIDE_EFFECTS" in gate.attrs:
         fields["side_effects"] = gate.attrs["SIDE_EFFECTS"].strip()
+    # ⛔ 핀은 **기록된** 다이제스트(`PIN_DIGEST:`)를 넣는다 — 지금 파일을 읽어 넣으면 세션 env 가 없는 Stop 훅이
+    #    `${변수}/…` 핀의 도장을 다시 계산하지 못한다(AE-20). 지금 내용과의 대조는 `pin_changed` 가 따로 한다
+    if "PIN" in gate.attrs or "PIN_DIGEST" in gate.attrs:
+        fields["pin"] = ",".join(pin_items(gate))
+        fields["pin_digest"] = gate.attrs.get("PIN_DIGEST", "").strip()
     return sha(json.dumps(fields, sort_keys=True, ensure_ascii=False))
+
+
+def pin_items(gate: Gate) -> list:
+    return [t.strip() for t in gate.attrs.get("PIN", "").split(",") if t.strip()]
+
+
+def pin_digest(gate: Gate, root: str):
+    """선언한 핀 파일 내용의 다이제스트(부재 = absent). `${변수}` 가 지금 환경에 없으면 None — 계산할 수 없다."""
+    parts = []
+    for item in pin_items(gate):
+        m = PIN_VAR_RE.match(item)
+        if m:
+            base = os.environ.get(m.group(1), "")
+            if not base:
+                return None
+            path = Path(base) / m.group(2)
+        else:
+            path = Path(item) if item.startswith("/") else Path(root) / item
+        if path.is_dir():
+            raise LedgerError(f"{gate.id}: PIN 은 파일만 — 디렉토리 {item!r}")
+        try:
+            d = hashlib.sha256(path.read_bytes()).hexdigest()
+        except FileNotFoundError:
+            d = "absent"
+        except OSError as e:
+            raise InfraError(f"{gate.id}: PIN 파일 읽기 실패 — {item}: {e}")
+        parts.append(f"{item}={d}")
+    return sha("|".join(parts))
+
+
+def pin_changed(gate: Gate, ledger) -> bool:
+    """승인 때 기록한 핀 다이제스트와 지금 내용이 다른가. 계산할 수 없으면(Stop 훅 — 세션 env 없음) 기록된 판정을 따른다 — ENV 선례."""
+    if "PIN" not in gate.attrs:
+        return False
+    now = pin_digest(gate, ledger.root)
+    return now is not None and now != gate.attrs.get("PIN_DIGEST", "").strip()
 
 
 def ev_enc(s: str) -> str:
@@ -880,7 +944,7 @@ def gate_block_hash(ledger, gate_id: str) -> str:
 
     | 포함 | 이유 |
     |------|------|
-    | `- [ ] id: 제목` 줄 | ⛔ 제목이 바뀌면 **같은 증거가 다른 주장에 붙는다**. `oracle_hash` 에는 제목이 없지만 게이트 판정의 `measurement_fit` 은 CHECK 를 제목 대비 평가한다 |
+    | `- [ ] id: 제목` 줄 | ⛔ 제목이 바뀌면 **같은 증거가 다른 주장에 붙는다**. 제목은 승인 도장(`oracle_hash`)에도 들어간다 — 범위 정본은 `modules/gates.md` § 승인 계약 |
     | 그 게이트의 속성 줄 전부 | CHECK·EXPECT·CWD·TIMEOUT·MANUAL — oracle 자체 |
     | 그 게이트를 지목한 `ABANDON:` | 도는 중에 포기됐으면 met/unmet 기록이 포기와 모순된다 |
 
@@ -989,6 +1053,8 @@ def gate_state(gate: Gate, ledger=None) -> str:
         approved = gate.attrs.get("APPROVED_ORACLE_HASH")
         if approved and approved != oracle_hash(gate, cwd):
             return "unmet"
+        if pin_changed(gate, ledger):
+            return "unmet"   # 승인 뒤 핀 파일이 바뀌었다 — 그 증거는 지금 입력을 재지 않았다
 
     if gate.is_manual:
         # ⛔ CRITERION_HASH 가 MANUAL 문구에서 실제로 유도되는지 먼저 본다.
@@ -1136,6 +1202,8 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
                 raise LedgerError(
                     f"{gate.id}: APPROVED_ORACLE_HASH 불일치 (선언 {declared} / 실측 {actual})"
                     " — 승인 후 oracle 이 바뀌었다. 재승인이 필요하다")
+        if pin_changed(gate, ledger):
+            raise LedgerError(f"{gate.id}: PIN 파일이 승인 뒤 바뀌었다 — 재승인: --finalize --only {gate.id}")
 
         if not Path(cwd).is_dir():
             raise LedgerError(f"{gate.id}: CWD 가 디렉토리가 아니다 — {cwd}")
@@ -1417,6 +1485,10 @@ def self_test() -> int:
             # ⛔ `pre`(사전 명령)·`edits`(원장 편집) — 도장·증거는 cwd 에 묶여 fixture 에 미리 박을 수 없다.
             #    확정 뒤 게이트 추가(F-334)·기록된 증거로 판정(--status) 같은 여러 단계 사례를 여기서 만든다.
             pre_reason = None
+            # `env` — 케이스 동안만 두는 환경 변수(`{SANDBOX}` 치환). 끝나면 아래 finally 가 되돌린다
+            case_env = {k: v.replace("{SANDBOX}", str(sandbox)) for k, v in (case.get("env") or {}).items()}
+            saved_env = {k: os.environ.get(k) for k in case_env}
+            os.environ.update(case_env)
             for step in case.get("pre") or []:
                 # `{"args": [...], "exit": N}` — 비0 이 정상인 사전 단계(허용 밖 PASS 기준선처럼 기록은 남기고 exit 1)
                 step_args, step_exit = (step["args"], step["exit"]) if isinstance(step, dict) else (step, EXIT_OK)
@@ -1441,6 +1513,10 @@ def self_test() -> int:
                 if "append" in ed:
                     body = body.rstrip("\n") + "\n\n" + ed["append"].rstrip("\n") + "\n"
                 ledger_path.write_text(body, encoding="utf-8")
+            # `write_files` — 사전 단계 뒤 원장 밖 파일을 쓴다(핀 대상 기대 표의 변경 · 생성)
+            for rel, text in (case.get("write_files") or {}).items() if pre_reason is None else []:
+                (sandbox / rel).parent.mkdir(parents=True, exist_ok=True)
+                (sandbox / rel).write_text(text, encoding="utf-8")
             before = ledger_path.read_text(encoding="utf-8") if ledger_path.exists() else None
 
             if case.get("mode") == "from-plan":
@@ -1472,8 +1548,11 @@ def self_test() -> int:
                     captured_err.write(e_s)
                 elif case.get("cli"):
                     # 실제 CLI(하위 프로세스) — 인자 파싱 · 분기 · 종료 코드를 사용자가 부르는 꼴 그대로 잰다
+                    # `cli_env: "hook"` — Stop 훅처럼 세션 export 없이(PATH · HOME 만) 돈다(AE-20)
+                    env = ({"PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", "/")} if case.get("cli_env") == "hook"
+                           else None)
                     p = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve()), *argv, str(ledger_path)],
-                                       stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
+                                       stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120, env=env)
                     code = p.returncode
                     captured.write(p.stdout)
                     captured_err.write(p.stderr)
@@ -1481,6 +1560,11 @@ def self_test() -> int:
                     code = _dispatch(argv + [str(ledger_path)], quiet=False)
             finally:
                 sys.stdout, sys.stderr = saved_out, saved_err
+                for k, v in saved_env.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
             elapsed = time.monotonic() - started
             stdout_text = captured.getvalue()
             stderr_text = captured_err.getvalue()
@@ -1903,6 +1987,22 @@ def finalize(ledger: Ledger, only=None, no_baseline=None) -> int:
         if problems:
             raise LedgerError("BASELINE: required 원장 확정 거부 — " + " · ".join(problems))
         print("기준선 대조 일치")
+    # 핀 다이제스트를 먼저 기록한다 — 도장이 그 기록값을 묶는다(oracle_hash). CAS 는 아래 도장 삽입과 같은 규율
+    for gid in [g.id for g in ledger.gates if g.is_runnable and "PIN" in g.attrs and (wanted is None or g.id in wanted)]:
+        gate = next(g for g in ledger.gates if g.id == gid)
+        d = pin_digest(gate, ledger.root)
+        if d is None:
+            raise LedgerError(f"{gid}: PIN 루트 변수가 지금 환경에 없어 다이제스트를 계산할 수 없다 — export 뒤 다시 확정")
+        rows = ledger_lines(ledger)
+        at = gate.attr_lines.get("PIN_DIGEST")
+        if at is not None:
+            rows[at - 1] = f"  PIN_DIGEST: {d}"
+        else:
+            rows.insert(max(gate.attr_lines.values()), f"  PIN_DIGEST: {d}")
+        if gate_block_hash(load(ledger.path, allow_unstamped=True), gid) != gate_block_hash(ledger, gid):
+            raise LedgerError(f"{gid}: 확정 중 이 게이트가 변경됨 — stale 핀 기록을 거부한다 (CAS 충돌)")
+        write_atomic(ledger.path, "\n".join(rows))
+        ledger = load(ledger.path, allow_unstamped=True)
     lines = ledger_lines(ledger)
     gate_ids = [g.id for g in ledger.gates]
     stamped, skipped, kept = 0, 0, 0
@@ -2192,6 +2292,8 @@ ORACLE_FIELD_PROBES = (
     ("CRITERION", "완전히 다른 합격 조건"),
     ("TIMEOUT", "999"),
     ("SIDE_EFFECTS", "writes — 승인 뒤 바꾼 선언"),
+    ("PIN", "probe/other-table.txt"),
+    ("PIN_DIGEST", "000000000000"),
 )
 
 
