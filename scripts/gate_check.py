@@ -657,6 +657,18 @@ def missing_tools(gate) -> list:
     return [t for t in want if shutil.which(t) is None]
 
 
+def default_budget(ledger, only=None) -> float:
+    """`--budget` 미지정 값 = max(이번 실행 대상 실행 게이트 TIMEOUT 합, 960).
+
+    ⛔ 960 고정이면 TIMEOUT 이 그보다 큰 게이트가 `min(TIMEOUT, budget)` 에서 소리 없이 잘린다(F-446 — 도움말은
+       'TIMEOUT 합' 이라 적고 코드는 960 이었다). 합은 run 이 건너뛸 충족 게이트까지 넣은 상한이다.
+    """
+    wanted = {s.strip() for s in only.split(",") if s.strip()} if only else None
+    total = sum(float(g.attrs.get("TIMEOUT", DEFAULT_TIMEOUT_S)) for g in ledger.gates
+                if g.is_runnable and (wanted is None or g.id in wanted))
+    return max(total, float(DEFAULT_TIMEOUT_S * 8))
+
+
 def run_check(gate: Gate, cwd: str, budget_s: float) -> Result:
     timeout = min(float(gate.attrs.get("TIMEOUT", DEFAULT_TIMEOUT_S)), budget_s)
     out, err = bytearray(), bytearray()
@@ -667,7 +679,7 @@ def run_check(gate: Gate, cwd: str, budget_s: float) -> Result:
         proc = subprocess.Popen(
             gate.attrs["CHECK"], shell=True, cwd=cwd,
             # ⛔ stdin 을 명시적으로 닫는다. 미지정이면 터미널·상위 파이프를 **상속**해
-            #    CHECK 가 입력을 기다리면 게이트당 기본 120초(총 예산 최대 960초)를 잡아먹는다.
+            #    CHECK 가 입력을 기다리면 게이트 TIMEOUT(기본 120초)을 통째로 잡아먹는다(총 예산 기본 = max(TIMEOUT 합, 960)).
             #    unlazy 는 `stdio:['ignore', ...]` 로 같은 것을 한다.
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -1047,6 +1059,11 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
         print(f"⚠️  {ledger.path.name}: STATE planned 인데 {refusal[1]} — 착수 전으로 볼 수 없어 active 로 판정한다",
               file=sys.stderr)
 
+    if mode != "status":
+        print(f"예산 {budget_s:g}초")
+        if budget_s > 600:
+            print(f"NOTE 예산 {budget_s:g}초 > 600 — 도구 전경 실행 상한을 넘을 수 있다. "
+                  "--only 로 나누거나 백그라운드로 돌린다")
     unmet, met, abandoned, deferred, ran, stamp_only = [], [], [], [], 0, 0
     started = time.monotonic()
 
@@ -1193,6 +1210,15 @@ def confirm(ledger: Ledger, gate_id: str) -> int:
     criterion = gate.attrs.get("MANUAL", "")
     expected_hash = sha(criterion)
     declared = gate.attrs.get("CRITERION_HASH", "")
+    # ⛔ 확인을 기록할 자리를 **묻기 전에** 본다(F-440). 이전 판은 EVIDENCE 를 만나면 블록 처리를 끝내서,
+    #    EVIDENCE 가 CRITERION_HASH 보다 앞이거나 줄이 없으면 `[x]` 만 찍고 CONFIRMED 없이 '기록됨' 이라 했다.
+    text = ledger.path.read_text(encoding="utf-8")
+    lines = text.split("\n")
+    start, where = _gate_block(lines, gate_id)
+    bad = [k for k in ("CRITERION_HASH", "EVIDENCE") if len(where.get(k, [])) != 1]
+    if start is None or bad:
+        raise LedgerError(f"{gate_id}: MANUAL 블록에 {' · '.join(bad) or '머리 줄'} 줄이 정확히 1개가 아니다 — "
+                          "확인을 기록할 자리가 없다(원장 무변경). 블록을 고친 뒤 다시 실행한다")
     print(f"확인 조건: {criterion}")
     if declared and declared != expected_hash:
         print(f"⛔ CRITERION_HASH 가 조건과 어긋난다 (선언 {declared} / 실측 {expected_hash})")
@@ -1209,33 +1235,56 @@ def confirm(ledger: Ledger, gate_id: str) -> int:
 
     stamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     token = confirm_token(gate_id, expected_hash, stamp)
-    text = ledger.path.read_text(encoding="utf-8")
     baseline = sha(text)
-    lines, out, target = text.split("\n"), [], None
-    for raw in lines:
-        m = GATE_RE.match(raw)
-        if m and m.group(2) == gate_id:
-            target = gate_id
-            out.append(f"- [x] {gate_id}: {m.group(3)}")
+    head = GATE_RE.match(lines[start])
+    hline, eline = where["CRITERION_HASH"][0], where["EVIDENCE"][0]
+    drop = set(where.get("CONFIRMED", []))      # 기존 확인 줄은 새 것으로 대체
+    out = []
+    for i, raw in enumerate(lines):
+        if i in drop:
             continue
-        if target == gate_id:
-            m2 = ATTR_RE.match(raw)
-            if m2 and m2.group(1) == "CRITERION_HASH":
-                out.append(f"  CRITERION_HASH: {expected_hash}")
-                out.append(f"  CONFIRMED: {stamp} {expected_hash} {token}")
-                continue
-            if m2 and m2.group(1) == "CONFIRMED":
-                continue  # 기존 확인 라인은 새 것으로 대체
-            if m2 and m2.group(1) == "EVIDENCE":
-                out.append("  EVIDENCE: 사용자 직접 확인")
-                target = None
-                continue
+        if i == start:
+            raw = f"- [x] {gate_id}: {head.group(3)}"
+        elif i == hline:
+            raw = f"  CRITERION_HASH: {expected_hash}"
+        elif i == eline:
+            raw = "  EVIDENCE: 사용자 직접 확인"
         out.append(raw)
+        if i == hline:
+            out.append(f"  CONFIRMED: {stamp} {expected_hash} {token}")
     if sha(ledger.path.read_text(encoding="utf-8")) != baseline:
         raise LedgerError(f"{gate_id}: 확인 중 원장이 변경됨 (CAS 충돌)")
     write_atomic(ledger.path, "\n".join(out))
-    print(f"확인 기록됨 — token {token}")
+    # ⛔ 쓴 것을 다시 읽어 판정한다 — '기록됨' 출력은 met 의 증거가 아니다
+    try:
+        fresh = load(ledger.path)
+        again = next((g for g in fresh.gates if g.id == gate_id), None)
+        state = gate_state(again, fresh) if again else "없음"
+    except (LedgerError, InfraError) as e:
+        state = f"재파싱 실패 {e}"
+    if state != "met":
+        print(f"⛔ 확인을 썼지만 다시 읽은 판정이 {state} — CRITERION_HASH · CONFIRMED · EVIDENCE 줄을 확인한다", file=sys.stderr)
+        return EXIT_UNMET
+    print(f"확인 기록됨 — token {token} · 다시 읽은 판정 met")
     return EXIT_OK
+
+
+def _gate_block(lines: list, gate_id: str):
+    """(머리 줄 번호 | None, 속성 이름 → 블록 안 줄 번호 목록). 블록은 다음 게이트 머리 줄에서 끝난다 — 속성 순서와 무관하다."""
+    start, where = None, {}
+    for i, raw in enumerate(lines):
+        m = GATE_RE.match(raw)
+        if m:
+            if start is not None:
+                break
+            if m.group(2) == gate_id:
+                start = i
+            continue
+        if start is not None:
+            m2 = ATTR_RE.match(raw)
+            if m2:
+                where.setdefault(m2.group(1), []).append(i)
+    return start, where
 
 
 # ── self-test (매니페스트 기반) ─────────────────────────────────────────
@@ -1252,6 +1301,27 @@ def sandbox_args(args, sandbox: Path) -> list:
     """
     return [str(sandbox / a[len(FIXTURES_REL):]) if isinstance(a, str) and a.startswith(FIXTURES_REL) else a
             for a in args]
+
+
+def _run_pty(argv, typed: str):
+    """대화형 확인을 진짜 터미널(pty)로 돌린다 — CLI 에 비대화형 확인 경로를 두지 않고 `--confirm` 쓰기 경로를 잰다."""
+    import pty
+    master, slave = pty.openpty()
+    try:
+        p = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), *argv], stdin=slave,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    finally:
+        os.close(slave)
+    try:
+        os.write(master, typed.encode())
+        out, err = p.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out, err = p.communicate()
+        err += "\n⛔ pty 응답 대기 초과"
+    finally:
+        os.close(master)
+    return p.returncode, out, err
 
 
 def want_exit(case: dict) -> int:
@@ -1296,6 +1366,17 @@ def self_test() -> int:
                 md.write_text(body, encoding="utf-8")
 
             ledger_path = sandbox / case["ledger"]
+            if case.get("symlink_root"):
+                # 자기 심볼릭 — TMPDIR 이 /var 같은 심볼릭 아래가 아니어도 '헤더 원문 ≠ 정규 경로' 를 만든다(F-395).
+                # ⛔ 못 만들면 그 케이스의 FAIL 이다 — self-test 전체를 exit 2 로 끝내지 않는다.
+                link = Path(tmp) / "link"
+                try:
+                    os.symlink(sandbox, link)
+                    ledger_path.write_text(ledger_path.read_text(encoding="utf-8").replace(str(sandbox), str(link)),
+                                           encoding="utf-8")
+                except OSError as e:
+                    failed.append(f"{case['id']}: 심볼릭 루트를 만들지 못했다 — {e}")
+                    continue
             # ⛔ `pre`(사전 명령)·`edits`(원장 편집) — 도장·증거는 cwd 에 묶여 fixture 에 미리 박을 수 없다.
             #    확정 뒤 게이트 추가(F-334)·기록된 증거로 판정(--status) 같은 여러 단계 사례를 여기서 만든다.
             pre_reason = None
@@ -1346,6 +1427,10 @@ def self_test() -> int:
                 if argv is None:
                     code = _dispatch(["--discover", str(sandbox / "discover")],
                                      quiet=False)
+                elif case.get("pty_input") is not None:
+                    code, o_s, e_s = _run_pty(argv + [str(ledger_path)], case["pty_input"])
+                    captured.write(o_s)
+                    captured_err.write(e_s)
                 else:
                     code = _dispatch(argv + [str(ledger_path)], quiet=False)
             finally:
@@ -1401,6 +1486,7 @@ def self_test() -> int:
                 if needle not in stderr_text:
                     reasons.append(f"stderr 에 {needle!r} 없음")
             for needle, count in (want.get("expect_contains") or {}).items():
+                needle = needle.replace("{REAL_SANDBOX}", os.path.realpath(sandbox))
                 target = (sandbox / "fromplan" / "generated.md") if case.get("mode") == "from-plan" else ledger_path
                 got = target.read_text(encoding="utf-8").count(needle) if target.exists() else 0
                 if got != count:
@@ -1826,7 +1912,7 @@ def _dispatch(argv, quiet: bool = False) -> int:
     parser.add_argument("--only", metavar="IDS",
                         help="쉼표로 구분한 게이트 id 만 판정 (fz-code 의 Step 단위 실행)")
     parser.add_argument("--budget", type=float, default=None,
-                        help="총 실행 예산(초). 미지정 시 게이트별 TIMEOUT 합")
+                        help="총 실행 예산(초). 미지정 시 max(이번 실행 대상 게이트 TIMEOUT 합, 960)")
 
     try:
         opt = parser.parse_args(argv)
@@ -1887,7 +1973,7 @@ def _dispatch(argv, quiet: bool = False) -> int:
         if opt.set_state:
             return set_state(ledger, opt.set_state)
         mode = "status" if opt.status else ("reverify" if opt.reverify else "run")
-        budget = opt.budget if opt.budget is not None else float(DEFAULT_TIMEOUT_S * 8)
+        budget = opt.budget if opt.budget is not None else default_budget(ledger, opt.only)
         return evaluate(ledger, mode, budget, opt.only)
     except LedgerError as e:
         print(f"INVALID LEDGER: {e}", file=sys.stderr)

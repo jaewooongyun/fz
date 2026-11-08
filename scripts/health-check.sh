@@ -58,6 +58,13 @@ NAMES=() CODES=() NOTES=()
 LINT_OUT="" SKIP_N=0   # 보고 꼬리가 읽는다 — 부분 실행이 계약 lint 를 건너뛰어도 set -u 에 걸리지 않게
 UNRUN=0     # 실행되지 못한 검사 수 — ⛔ 0이 아니면 "전 검사 통과"라 말하지 않는다
 record() { NAMES+=("$1"); CODES+=("$2"); NOTES+=("$3"); }
+# 1분 부하 평균 · 코어 수 — 시작 · 끝 두 줄. 소요 실측(TIMEOUT 산정)을 기계 부하와 함께 읽는다. 못 재면 '?'
+machine_load() {
+  local l c
+  l="$(sysctl -n vm.loadavg 2>/dev/null | awk '{print $2}')"; [ -n "$l" ] || l="$(cut -d' ' -f1 /proc/loadavg 2>/dev/null)"
+  c="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null)"
+  echo "MACHINE-LOAD load=${l:-?} cores=${c:-?}"
+}
 # ⛔ 3분 판정 (F-335 ⑬): exit 2 이면서 줄 맨 앞 `UNRUN` 표지가 있을 때만 미실행이다. 표지 없는 exit 2 와
 #    traceback 은 실패다 — 검사기가 죽은 것을 미실행으로 세탁하지 않는다. 이전 판은 이분(0 · 그 외 1)이라
 #    검사기가 정의한 측정 불가(exit 2 · `UNRUN:`)까지 실패로 적었다.
@@ -188,6 +195,7 @@ report_and_exit() {   # $1 = 부분 실행 표지 줄 — 비면 전체 실행�
     else mark="✅"; fi
     printf "%s %-20s %-6s %s\n" "$mark" "${NAMES[$i]}" "$code" "${NOTES[$i]}"
   done
+  machine_load   # 끝 — exit 분기 앞이라 어느 경로로 끝나도 남는다
 
   echo
   echo "⛔ SKIP(THRESHOLD·SEMANTIC) ${SKIP_N}항목은 **PASS가 아니다** — Lead가 별도 판정하고 보고에 남긴다."
@@ -220,6 +228,7 @@ report_and_exit() {   # $1 = 부분 실행 표지 줄 — 비면 전체 실행�
 echo "══════════════════════════════════════════════════════════════"
 echo "fz 건강 체크 — root $ROOT"
 echo "══════════════════════════════════════════════════════════════"
+machine_load     # 시작 — 소요가 기계 부하 때문인지 가른다(F-446 · F-546: TIMEOUT 산정 근거)
 
 # ── 0. 사전조건 — ⛔ 4R ISSUE-001: python3·lint 스크립트 부재가 "일반 실패"로 분류됐다.
 #    도구·자산 부재는 **미실행**이며 실패와 구별해야 한다.

@@ -1121,10 +1121,11 @@
         "exit": 0,
         "mutates": true,
         "expect_contains": {
-          "cwd=/private/": 1
+          "cwd={REAL_SANDBOX}": 1
         }
       },
-      "why": "⛔ ROOT 검증은 realpath 로 하는데 실행은 헤더 **원문**을 쓰면, 그 사이 심볼릭을 다른 디렉토리로 돌려 CHECK 를 딴 곳에서 돌릴 수 있다(TOCTOU). 증거 서명은 바뀌지 않은 *표기*에만 묶이므로 나중 --status 는 met 으로 읽는다. 검증된 정규 경로를 저장해 실행에 쓴다. ⚠️ **macOS 전용 관측** — `/var → /private/var` 심볼릭에 의존한다. 이 fixture 군은 이미 BSD `sed -i ''` 를 쓰므로 macOS 고정이다(스크립트 자체가 macOS 타겟을 선언한다)"
+      "why": "⛔ ROOT 검증은 realpath 로 하는데 실행은 헤더 **원문**을 쓰면, 그 사이 심볼릭을 다른 디렉토리로 돌려 CHECK 를 딴 곳에서 돌릴 수 있다(TOCTOU). 증거 서명은 바뀌지 않은 *표기*에만 묶이므로 나중 --status 는 met 으로 읽는다. 검증된 정규 경로를 저장해 실행에 쓴다. ⚠️ **macOS 전용 관측** — `/var → /private/var` 심볼릭에 의존한다. 이 fixture 군은 이미 BSD `sed -i ''` 를 쓰므로 macOS 고정이다(스크립트 자체가 macOS 타겟을 선언한다) · 2026-11-08: 하네스가 임시 폴더 안에 자기 심볼릭을 만들고 헤더를 그 링크로 바꾼다(symlink_root) — TMPDIR 이 실폴더여도 같은 TOCTOU 를 잰다(F-395)",
+      "symlink_root": true
     },
     {
       "id": "approved-oracle-fields",
@@ -1609,6 +1610,108 @@
         ]
       },
       "why": "draft 는 일부만 도장하면 부분 도장 원장이 된다 — --only 는 확정 원장 보강 전용이다"
+    },
+    {
+      "id": "manual-missing-lines-refused",
+      "category": "manual",
+      "ledger": "manual/missing-lines.md",
+      "args": [
+        "--confirm",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "확인을 기록할 자리가 없다"
+        ]
+      },
+      "why": "확인을 기록할 줄(CRITERION_HASH · EVIDENCE)이 없으면 묻기 전에 exit 3 · 원장 무변경(F-440). 이전 판은 묻고 나서 [x] 만 찍었다"
+    },
+    {
+      "id": "manual-attr-order-confirm-ok",
+      "category": "manual",
+      "ledger": "manual/attr-order.md",
+      "args": [
+        "--confirm",
+        "G1"
+      ],
+      "pty_input": "y\n",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_contains": {
+          "  CONFIRMED: ": 1,
+          "- [x] G1": 1
+        }
+      },
+      "why": "EVIDENCE 가 CRITERION_HASH 보다 앞이어도 CONFIRMED 를 쓴다 — 이전 판은 EVIDENCE 에서 블록을 끝내 CONFIRMED 없이 '기록됨' 이라 했다(F-440). pty 로 진짜 대화형 입력"
+    },
+    {
+      "id": "manual-confirm-reload-met",
+      "category": "manual",
+      "ledger": "manual/unconfirmed.md",
+      "args": [
+        "--confirm",
+        "G1"
+      ],
+      "pty_input": "y\n",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "다시 읽은 판정 met"
+        ]
+      },
+      "why": "쓴 원장을 다시 읽어 met 일 때만 성공이다 — '기록됨' 출력은 met 의 증거가 아니다"
+    },
+    {
+      "id": "budget-default-sum",
+      "category": "execution",
+      "ledger": "budget/sum-over.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "예산 1600초"
+        ]
+      },
+      "why": "--budget 미지정 = max(TIMEOUT 합, 960) — 960 고정이면 TIMEOUT 큰 게이트가 min(TIMEOUT, budget) 에서 잘린다(F-446)"
+    },
+    {
+      "id": "budget-default-sum-floor",
+      "category": "execution",
+      "ledger": "budget/sum-floor.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "예산 960초"
+        ]
+      },
+      "why": "합이 960 보다 작으면 바닥 960 — 짧은 원장의 예산을 줄이지 않는다"
+    },
+    {
+      "id": "budget-over-600-note",
+      "category": "execution",
+      "ledger": "budget/sum-over.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "NOTE 예산 1600초 > 600"
+        ]
+      },
+      "why": "예산이 600초를 넘으면 --only 분할 · 백그라운드를 권하는 NOTE — 도구 전경 상한에서 잘리는 것을 미리 알린다"
     }
   ],
   "_max_seconds": "선택 필드 — 벽시계 상한(초). ⛔ exit code 만으로는 hang 을 못 잡는다: 손자 프로세스가 파이프를 붙잡아 30초 걸렸는데 exit 는 1로 정상이었다(2026-08-24 실측).",
