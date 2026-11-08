@@ -164,8 +164,54 @@ def source_missing(src) -> bool:
     return not isinstance(src, dict) or not src.get("file") or not isinstance(src.get("line"), int) or not src.get("quote")
 
 
+# ── 형식 검사 (F-537) — 집합 · 사전 연산 전에 컨테이너 · 원소 타입을 본다. 형식 오류는 판정 불가(exit 2)이지 위반이 아니다 ──
+def _need(ok: bool, what: str) -> None:
+    if not ok:
+        raise Unrun(f"rules 형식 오류 — {what}")
+
+
+def _strs(v) -> bool:
+    return v is None or (isinstance(v, list) and all(isinstance(x, str) for x in v))
+
+
+def _source_shape(s, where: str) -> None:
+    if isinstance(s, dict):   # dict 아닌 source 는 V4(출처 없는 규칙)가 위반으로 센다
+        _need(isinstance(s.get("file", ""), str) and isinstance(s.get("quote", ""), str), f"{where}.source 의 file · quote 는 문자열이다")
+        ln = s.get("line")
+        _need(ln is None or (isinstance(ln, int) and not isinstance(ln, bool)), f"{where}.source.line 은 정수다")
+
+
+def validate_shape(rules) -> None:
+    """⛔ 문자열 enum 값이 목록 밖인 것은 형식이 아니라 내용 위반(S)이다 — 여기서는 타입만 본다(해시 불가 · 컨테이너 오류)."""
+    _need(isinstance(rules, dict), f"최상위가 객체가 아니다({type(rules).__name__})")
+    _need(rules.get("axes") is None or isinstance(rules.get("axes"), dict), "axes 는 사전이다")
+    for key in ("rules", "conflicts", "gaps"):
+        _need(rules.get(key) is None or isinstance(rules.get(key), list), f"{key} 는 배열이다")
+    _need(_strs(rules.get("gaps")), "gaps 원소는 축 이름 문자열이다")
+    for i, r in enumerate(rules.get("rules") or []):
+        w = f"rules[{i}]"
+        _need(isinstance(r, dict), f"{w} 는 객체다")
+        for k in ("authority", "axis"):
+            _need(r.get(k) is None or isinstance(r.get(k), str), f"{w}.{k} 는 문자열이다")
+        _source_shape(r.get("source"), w)
+        ap = r.get("appliesTo")
+        _need(ap is None or isinstance(ap, dict), f"{w}.appliesTo 는 객체다")
+        _need(_strs((ap or {}).get("languages")) and _strs((ap or {}).get("paths")), f"{w}.appliesTo 의 languages · paths 는 문자열 배열이다")
+        _need(_strs(r.get("appliedTo")), f"{w}.appliedTo 는 문자열 배열이다")
+    for i, c in enumerate(rules.get("conflicts") or []):
+        w = f"conflicts[{i}]"
+        _need(isinstance(c, dict), f"{w} 는 객체다")
+        _need(c.get("axis") is None or isinstance(c.get("axis"), str), f"{w}.axis 는 문자열이다")
+        _need(c.get("sources") is None or isinstance(c.get("sources"), list), f"{w}.sources 는 배열이다")
+        for j, s in enumerate(c.get("sources") or []):
+            _source_shape(s, f"{w}.sources[{j}]")
+
+
 # ── --check ────────────────────────────────────────────────────────
 def check(rules: dict, index: dict, project) -> list:
+    validate_shape(rules)
+    if not isinstance(index, dict) or not _strs(index.get("files", [])):
+        raise Unrun("index 형식 오류 — 객체이고 files 는 문자열 배열이다")
     v = []
     guide_files = set(index.get("files", []))
     axes = rules.get("axes") or {}
@@ -239,6 +285,7 @@ def check(rules: dict, index: dict, project) -> list:
 
 # ── --project-arch · --compare · --fixtures ────────────────────────
 def project_arch(rules: dict) -> dict:
+    validate_shape(rules)
     axes = rules.get("axes") or {}
     out = {ax: axes.get(ax) for ax in ARCH_AXES}
     out["conflicts"] = [c for c in rules.get("conflicts") or [] if c.get("axis") in ARCH_AXES]
@@ -431,7 +478,34 @@ def self_test() -> int:
             case("--compare 는 구조 비교 — 공백만 다르면 OK · 줄이 다르면 exit 1",
                  r_same.returncode == OK and r_diff.returncode == VIOLATION and "line" in r_diff.stdout, f"{r_same.returncode} {r_diff.returncode} {r_diff.stdout[-120:]}")
 
-        for fn in (t_records, t_examples, t_projection, t_compare):   # ⛔ `t` 는 임시 폴더 Path 다 — 루프 변수로 쓰면 클로저가 덮인다
+        def t_shape():
+            # F-537 — 실제 CLI 로 돌린다(traceback 은 프로세스 출력에만 보인다). 형식 오류 = exit 2 + 필드 사유 · 내용 위반 = 1 · 정상 = 0
+            me = pathlib.Path(__file__).resolve()
+            (t / "idx.json").write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+
+            def cli(name, body, *mode):
+                f = t / f"{name}.json"
+                f.write_text(body if isinstance(body, str) else json.dumps(body, ensure_ascii=False), encoding="utf-8")
+                argv = list(mode) + [str(f)] if mode else ["--check", str(f), "--index", str(t / "idx.json"), "--project", str(proj)]
+                r = subprocess.run([sys.executable, str(me), *argv], capture_output=True, text=True)
+                return r.returncode, r.stdout + r.stderr
+
+            for name, body, field in (
+                    ("rules-gaps-object-exit2", mutated(lambda r: r.update(gaps=[{"axis": "uiStack"}])), "gaps"),
+                    ("rules-gaps-number-exit2", mutated(lambda r: r.update(gaps=[1])), "gaps"),
+                    ("rules-null-exit2", "null", "최상위"),
+                    ("rules-bad-container-exit2", mutated(lambda r: r.update(rules={"R1": r["rules"][0]})), "rules 는 배열"),
+                    ("rules-bad-enum-exit2", mutated(lambda r: r["rules"][0].update(authority={"지침": True})), "authority")):
+                rc, out = cli(name, body)
+                case(name, rc == UNRUN and "Traceback" not in out and field in out, f"exit {rc} · {out.strip()[-160:]}")
+            rc, out = cli("project-arch-malformed-exit2", mutated(lambda r: r["conflicts"].append("naming")), "--project-arch")
+            case("project-arch-malformed-exit2", rc == UNRUN and "Traceback" not in out and "conflicts[" in out, f"exit {rc} · {out.strip()[-160:]}")
+            rc, out = cli("rules-valid-exit0", positive_rules())
+            case("rules-valid-exit0", rc == OK, f"exit {rc} · {out.strip()[-160:]}")
+            rc, out = cli("rules-real-violation-exit1", mutated(lambda r: r["axes"].update(naming="…DTO")))
+            case("rules-real-violation-exit1", rc == VIOLATION and "V2" in out, f"exit {rc} · {out.strip()[-160:]}")
+
+        for fn in (t_records, t_examples, t_projection, t_compare, t_shape):   # ⛔ `t` 는 임시 폴더 Path 다 — 루프 변수로 쓰면 클로저가 덮인다
             try:
                 fn()
             except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다

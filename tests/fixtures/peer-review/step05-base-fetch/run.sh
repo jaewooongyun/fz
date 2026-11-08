@@ -22,6 +22,12 @@
 #   gh-fail                    fork 배치 · gh 인증 실패(shim 이 `pr view` 에 exit 4) — SKILL.md 'gh 실패 → git 폴백' 경로
 #     §0.5 블록 exit 5 · FETCH-PARTIAL(5) · pr-7 = P(head 는 받는다 — 이전 §0.5 와 같다) · upstream/main = C1 그대로(base 이름을
 #     모르니 받지 않는다) · 로컬 main · HEAD · 작업 트리 불변
+#   merge-ref-fallback · merge-ref-stale-refused · merge-ref-oid-unknown-refused · merge-ref-parent-missing-refused (F-542)
+#                              원격에 refs/pull/7/head 가 없고 refs/pull/7/merge 만 있다 — 두 번째 부모 = gh headRefOid 일 때만 pr-7 을 채택
+#     fallback: exit 0 · pr-7 = P · FETCH-NOTE · <원격>/main = C2 · 임시 ref 0  /  나머지: exit 4 · pr-7 없음 · 사유 줄 · 임시 ref 0
+#   merge-ref-checked-out-refused  merge 대체 조건은 맞는데 pr-7 이 다른 워크트리에 체크아웃돼 있다 — exit 4 · 사유 '체크아웃' ·
+#     pr-7 = C1 그대로 · 워크트리 HEAD = C1 · 작업 트리 깨끗(update-ref 는 fetch 의 체크아웃 보호를 건너뛴다)
+#   head-fetch-network-error-exit4  원격 URL 이 닿지 않는다 — 'ref 부재' 가 아니라 통신 실패로 exit 4 · pr-7 없음
 # 끝 — 판정한 셀 집합이 기대 집합(EXPECT)과 정확히 같아야 한다. 셀을 지운 사본은 1(F-408 — 원장 CHECK 는 exit 만 본다)
 # 기준 트리(be8c871)는 Step 0.5 가 PR head 만 upstream 에서 받고 gather 가 로컬 main 을 쓰므로(stale 경고도 없다) exit 1.
 # exit: 0 전건 통과 · 1 단언 실패 · 2 중첩 실행(`UNRUN:`) · 3 준비 실패(인자 · 도구 · 임시 저장소)
@@ -119,7 +125,7 @@ BLOCK="$(awk '/^### 0\.5\./{s=1;next} s&&/^### /{exit} s&&/^```bash/{f=1;next} s
   | sed -e "s/{PR_NUMBER}/$PR/g" -e "s/{PR}/$PR/g")"
 
 fail=0 RAN="" ASSERTS=0
-EXPECT="origin fork stale-origin stale-fork gh-fail"
+EXPECT="origin fork stale-origin stale-fork gh-fail merge-ref-fallback merge-ref-stale-refused merge-ref-oid-unknown-refused merge-ref-parent-missing-refused merge-ref-checked-out-refused head-fetch-network-error-exit4"
 ran() { ASSERTS=$((ASSERTS + 1)); case " $RAN " in *" ${1%%:*} "*) ;; *) RAN="${RAN:+$RAN }${1%%:*}" ;; esac; }
 ok() { ran "$1"; echo "PASS  $1"; }
 no() { ran "$1"; echo "FAIL  $1  — $2"; fail=$((fail + 1)); }
@@ -234,11 +240,65 @@ gh_fail_cell() {
   local_same "$c: 로컬 main · HEAD · 작업 트리 불변 (pull·merge 아님)" "$C1"
 }
 
+# $1=셀 $2=변형 — pull/7/head 를 지우고 merge ref 만 둔다(network 는 원격 URL 을 끊는다). §0.5 블록을 그대로 재생한다
+merge_cell() {
+  local c="$1" kind="$2" rc5 want
+  setup "$TMP/$1" origin
+  if [ "$kind" = network ]; then
+    g "$CL" remote set-url origin "$D/nowhere.git" || exit 3
+  else
+    if [ "$kind" = parent-missing ]; then
+      g "$D/seed" push -q "$D/base.git" "pr:refs/pull/$PR/merge" || { echo "SETUP $c merge ref 실패"; exit 3; }
+    else
+      { g "$D/seed" checkout -q main && g "$D/seed" merge -q --no-ff -m M pr && g "$D/seed" push -q "$D/base.git" "HEAD:refs/pull/$PR/merge"; } \
+        || { echo "SETUP $c merge 커밋 실패"; exit 3; }
+    fi
+    git -C "$D/base.git" update-ref -d "refs/pull/$PR/head" || exit 3
+    case "$kind" in
+      stale) sed -i '' "s/\"headRefOid\":\"$P\"/\"headRefOid\":\"$C1\"/" "$D/pr.json" ;;
+      oid-unknown) sed -i '' "s/\"headRefOid\":\"$P\"/\"headRefOid\":\"\"/" "$D/pr.json" ;;
+      checked-out) { g "$CL" branch "pr-$PR" "$C1" && g "$CL" worktree add -q "$D/wt" "pr-$PR"; } || { echo "SETUP $c 워크트리 실패"; exit 3; } ;;
+    esac
+  fi
+  (cd "$CL" && FZ_STEP05_CELL="$D" FZ_PLUGIN_ROOT="$TREE" PATH="$TMP/shim:$PATH" bash -c "${BLOCK:-exit 127}") > "$D/step05.out" 2>&1
+  rc5=$?
+  [ -z "$(g "$CL" for-each-ref refs/fz-fetch)" ] && ok "$c: 임시 merge ref 를 남기지 않는다" || no "$c: 임시 merge ref 를 남기지 않는다" "$(g "$CL" for-each-ref refs/fz-fetch | head -1)"
+  if [ "$kind" = checked-out ]; then
+    [ "$rc5" -eq 4 ] && grep -q '^FETCH-FAIL(4):.*체크아웃' "$D/step05.out" && ok "$c: exit 4 · 사유 '체크아웃'" \
+      || no "$c: exit 4 · 사유 '체크아웃'" "exit $rc5 · $(tail -1 "$D/step05.out" | cut -c1-140)"
+    [ "$(g "$CL" rev-parse -q --verify "pr-$PR")" = "$C1" ] && [ "$(g "$D/wt" rev-parse HEAD)" = "$C1" ] && [ -z "$(g "$D/wt" status --porcelain)" ] \
+      && ok "$c: 체크아웃된 pr-$PR · 워크트리 HEAD · 작업 트리 불변" \
+      || no "$c: 체크아웃된 pr-$PR · 워크트리 불변" "pr=$(g "$CL" rev-parse --short "pr-$PR") wt=$(g "$D/wt" rev-parse --short HEAD) dirty=$(g "$D/wt" status --porcelain | wc -l)"
+    return
+  fi
+  if [ "$kind" = fallback ]; then
+    [ "$rc5" -eq 0 ] && ok "$c: exit 0" || no "$c: exit 0" "exit $rc5 · $(tail -1 "$D/step05.out" | cut -c1-120)"
+    [ "$(g "$CL" rev-parse -q --verify "pr-$PR")" = "$P" ] && ok "$c: pr-$PR = merge 의 두 번째 부모 = headRefOid" \
+      || no "$c: pr-$PR = headRefOid" "$(g "$CL" rev-parse --short "pr-$PR" 2>/dev/null || echo 없음)"
+    grep -q '^FETCH-NOTE: pull/7/head 가 없어' "$D/step05.out" && ok "$c: FETCH-NOTE 한 줄" || no "$c: FETCH-NOTE 한 줄" "$(tail -2 "$D/step05.out" | tr '\n' '|')"
+    [ "$(g "$CL" rev-parse -q --verify origin/main)" = "$C2" ] && ok "$c: base 도 받았다 (origin/main = C2)" || no "$c: base 도 받았다" "$(g "$CL" rev-parse --short origin/main)"
+    local_same "$c: 로컬 main · HEAD · 작업 트리 불변" "$C1"
+    return
+  fi
+  case "$kind" in
+    stale) want="≠ gh headRefOid" ;; oid-unknown) want="headRefOid 를 확인하지 못했다" ;; parent-missing) want="두 번째 부모가 없다" ;; network) want="통신 · 인증 실패" ;;
+  esac
+  [ "$rc5" -eq 4 ] && grep -q "^FETCH-FAIL(4):.*$want" "$D/step05.out" && ok "$c: exit 4 · 사유 '$want'" \
+    || no "$c: exit 4 · 사유 '$want'" "exit $rc5 · $(tail -1 "$D/step05.out" | cut -c1-140)"
+  g "$CL" rev-parse -q --verify "pr-$PR" >/dev/null && no "$c: pr-$PR 를 만들지 않는다" "$(g "$CL" rev-parse --short "pr-$PR")" || ok "$c: pr-$PR 를 만들지 않는다"
+}
+
 cell origin origin
 cell fork fork
 stale_cell stale-origin origin
 stale_cell stale-fork fork
 gh_fail_cell gh-fail fork
+merge_cell merge-ref-fallback fallback
+merge_cell merge-ref-stale-refused stale
+merge_cell merge-ref-oid-unknown-refused oid-unknown
+merge_cell merge-ref-parent-missing-refused parent-missing
+merge_cell merge-ref-checked-out-refused checked-out
+merge_cell head-fetch-network-error-exit4 network
 
 want_set=$(printf '%s\n' $EXPECT | LC_ALL=C sort -u) got_set=$(printf '%s\n' $RAN | LC_ALL=C sort -u)
 if [ -n "$RAN" ] && [ "$want_set" = "$got_set" ]; then

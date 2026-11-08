@@ -73,6 +73,18 @@ d11 = mk("a11.patch", "diff --git a/.claude-plugin/plugin.json b/.claude-plugin/
        "+++ b/.claude-plugin/plugin.json\n@@ -1 +1 @@\n-a\n+b\n")
 rc, _, o = run(d11, [{"path": ".claude-plugin/plugin.json", "start": 1, "end": 1}, {"path": "./.claude-plugin/plugin.json", "start": 1, "end": 1}])
 check("A11 점으로 시작하는 폴더 · 선두 ./ 만 벗긴다", len((o or {}).get("anchorable", [])) == 2, str((o or {}).get("non_anchorable")))
-print(f"anchors-synthetic: {11 - fails}/11 통과")
+# F-539 — 실제 탭이 든 경로. 헤더는 Git 인용(\t escape)이고 요청은 원문(실제 탭)이다. 같은 diff 의 `dir/a` 는 탭에서 잘린 이름 — 거기 붙으면 오앵커다
+d12 = mk("a12.patch", 'diff --git "a/dir/a\\tb.txt" "b/dir/a\\tb.txt"\n--- "a/dir/a\\tb.txt"\n+++ "b/dir/a\\tb.txt"\n@@ -1,1 +1,2 @@\n x\n+y\n'
+       "diff --git a/dir/a b/dir/a\n--- a/dir/a\n+++ b/dir/a\n@@ -1,1 +1,3 @@\n p\n+q\n+r\n")
+rc, _, o = run(d12, [{"path": "dir/a\tb.txt", "start": 2, "end": 2}])
+a = [(x["path"], x["start_line"], x["line"]) for x in (o or {}).get("anchorable", [])]
+check("tab-path-exact 탭 경로 정확 일치 · 잘린 이름에 안 붙음", rc == 0 and a == [("dir/a\tb.txt", 2, 2)], str(a))
+d13 = mk("a13.patch", "diff --git a/x/util.swift b/x/util.swift\n--- a/x/util.swift\n+++ b/x/util.swift\n@@ -1 +1,2 @@\n a\n+b\n"
+       "diff --git a/y/util.swift b/y/util.swift\n--- a/y/util.swift\n+++ b/y/util.swift\n@@ -1 +1,2 @@\n a\n+b\n")
+rc, _, o = run(d13, [{"path": "util.swift", "start": 2, "end": 2}, {"path": "x/util.swift", "start": 2, "end": 2}])
+na = [(x["path"], x["reason"]) for x in (o or {}).get("non_anchorable", [])]
+a = [x["path"] for x in (o or {}).get("anchorable", [])]
+check("basename-collision 같은 basename 은 되돌림 · 전체 경로는 앵커", na == [("util.swift", "ambiguous_path")] and a == ["x/util.swift"], f"{na} · {a}")
+print(f"anchors-synthetic: {13 - fails}/13 통과")
 sys.exit(1 if fails else 0)
 PY

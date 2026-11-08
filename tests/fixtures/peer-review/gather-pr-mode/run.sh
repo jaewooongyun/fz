@@ -489,11 +489,11 @@ if want freshness; then
   [ -z "$(g "$CR" rev-parse --verify -q "refs/heads/pr-$N_U")" ] && [ "$(g "$CR" rev-parse origin/main)" = "$C1" ] \
     && [ "$(g "$CR" rev-parse upstream/main)" = "$C1" ] && [ -z "$(g "$CR" ls-remote upstream "refs/pull/$N_U/head")" ] \
     || setup_fail "전제 불성립: clone-remote"
-  run_fetch() {   # $1=셀 [$2…=fetch_pr_refs 추가 인자] — 고정 응답(baseRefName · url)으로 clone-remote 에서 부른다
+  run_fetch() {   # $1=셀 [$2…=fetch_pr_refs 추가 인자] — 고정 응답(baseRefName · url · headRefOid)으로 clone-remote 에서 부른다
     D="$TMP/cells/$1"
-    mkdir -p "$D" && python3 - "$D/pr.json" "$N_U" "$BASE_URL" <<'PY2' || setup_fail "$1 pr.json 실패"
+    mkdir -p "$D" && python3 - "$D/pr.json" "$N_U" "$BASE_URL" "$P" <<'PY2' || setup_fail "$1 pr.json 실패"
 import json, sys
-json.dump({"number": int(sys.argv[2]), "baseRefName": "main", "url": sys.argv[3]}, open(sys.argv[1], "w", encoding="utf-8"))
+json.dump({"number": int(sys.argv[2]), "baseRefName": "main", "url": sys.argv[3], "headRefOid": sys.argv[4]}, open(sys.argv[1], "w", encoding="utf-8"))
 PY2
     (cd "$CR" && FZ_GH_SHIM_DIR="$D" FZ_GH_SHIM_PR="$N_U" bash "$FETCH" --target "$N_U" "${@:2}") > "$D/out" 2> "$D/err"
     RC=$?
