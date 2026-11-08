@@ -377,6 +377,9 @@ PY
     done < <(awk -F'\t' '$2 != "" {print $2}' "$D/wd/base-manifest.tsv" 2>/dev/null)
     if [ "$n" -gt 0 ] && [ -z "$bad" ]; then ok "$c: base/ 원본 ${n}개 = ${3:0:7} 의 내용"
     else no "$c: base/ 원본 = ${3:0:7} 의 내용" "대상 ${n}개 · 다른 파일: ${bad:-없음} · base/f.txt=$(tr '\n' '|' < "$D/wd/base/f.txt" 2>/dev/null)"; fi
+    # base-sha.txt — base/ 를 뜬 커밋 그 자체(F-037). Curate 검사기가 regression 근거 @sha 를 이것과 대조한다
+    local bs; bs=$(cat "$D/wd/base-sha.txt" 2>/dev/null)
+    [ "$bs" = "$3" ] && ok "$c: base-sha.txt = base/ 를 뜬 merge-base ${3:0:7}" || no "$c: base-sha.txt = base/ 를 뜬 merge-base ${3:0:7}" "base-sha.txt '${bs:0:12}'"
   }
   assert_diff_same_base() {   # base/ 를 뜬 merge-base 와 diff.patch(gh 계산)의 기준이 같다 — F-240 의 증상은 둘이 갈리는 것
     if [ -n "$BMB" ] && g "$BCL" diff "$BMB" "pr-$N_U" 2>/dev/null | cmp -s - "$D/wd/diff.patch"; then
@@ -416,6 +419,8 @@ if want base; then
     *) no "base-tracking-stale: GATHER-WARN stale (upstream/main ${C1:0:7} ≠ baseRefOid ${C2:0:7})" "${w:-경고 없음}" ;;
   esac
   assert_refs_same base-tracking-stale
+  [ "$(cat "$D/wd/base-sha.txt" 2>/dev/null)" != "$C2" ] && ok "base-tracking-stale: base-sha.txt 는 baseRefOid(${C2:0:7})가 아니라 실제로 쓴 ${C1:0:7} — stale base 대조" \
+    || no "base-tracking-stale: base-sha.txt ≠ baseRefOid" "base-sha.txt 가 baseRefOid 다 — 실제로 쓴 커밋을 적지 않았다"
   [ "$(g "$CT" rev-parse upstream/main)" = "$C1" ] && ok "base-tracking-stale: upstream/main = C1 그대로 (fetch 하지 않는다)" \
     || no "base-tracking-stale: upstream/main = C1 그대로" "$(g "$CT" rev-parse --short upstream/main)"
   line=$(grep -m1 '원격보다 뒤' "$D/wd/review-surface.md" 2>/dev/null)

@@ -364,6 +364,8 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
   "확인 불가" 상태로 INCLUDE하지 않는다.
 ```
 
+**기계 검사 (큐레이션 경로 — F-037)**: Curate 결과 review.json 의 `origin: regression` 이슈는 `evidence`(@head)와 별도로 `base_evidence`(`path:line@sha`)를 둔다. 기준은 **`meta.base_sha` = `base-sha.txt`** 다 — gather.sh 가 base/ 를 실제로 떠 온 커밋(PR · 브랜치 · `--base` 세 경로 공통 · review.json 폴더의 target.json 과 같은 자리)이다. `scripts/check_comment_worthy.py` 와 `scripts/render_review.py`(렌더 전 같은 검사)가 base_evidence @sha · meta.base_sha 를 이 파일과 대조한다 — 파일이 없으면 판정 불가(exit 2), head sha · 낡은 로컬 develop sha 근거는 위반이다. 강점은 `strengths` string[] 그대로 두고 원소마다 `strengthGaps[{claim, uncovered}]`(그 강점이 못 막는 시나리오)를 둔다(F-117 · F-517). ⛔ 이 검사는 `excluded` 키가 있는 큐레이션 리뷰에만 돈다 — 비큐레이션 경로(`--no-curate`)에는 적용되지 않으므로 위 절차를 손으로 지킨다.
+
 ---
 
 ## Gate 4.8: Reactive Error Path Gate (RxSwift/Combine)

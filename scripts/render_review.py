@@ -221,9 +221,22 @@ def report(r: dict, plans: list) -> str:
             lines += [f"**Suggestion** — {i['suggestion'].strip()}", ""]
     if r.get("severityNote"):
         lines += ["## Severity 보정 근거", "", r["severityNote"].strip(), ""]
-    if r.get("strengths"):
-        lines += ["## 긍정적 측면", ""] + [f"- {s}" for s in r["strengths"]] + [""]
+    lines += strength_lines(r)
     return "\n".join(lines).rstrip() + "\n"
+
+
+def strength_lines(r: dict) -> list:
+    """강점 블록 — strengthGaps 가 있으면 그 강점이 못 막는 시나리오를 바로 아래 적는다(F-117 · F-517). 없으면 종전 바이트 그대로."""
+    if not r.get("strengths"):
+        return []
+    gaps = {g["claim"].strip(): str(g.get("uncovered") or "").strip()
+            for g in r.get("strengthGaps") or [] if isinstance(g, dict) and isinstance(g.get("claim"), str)}
+    out = ["## 긍정적 측면", ""]
+    for s in r["strengths"]:
+        out.append(f"- {s}")
+        if gaps.get(str(s).strip()):
+            out.append(f"  - 못 막는 시나리오 — {gaps[str(s).strip()]}")
+    return out + [""]
 
 
 CURATED = (("bug",), "① 이번 PR 버그"), (("structure", "quality"), "② 구조·품질 제안 (non-blocking)"), (("intent-question",), "③ 의도 확인 질문")
@@ -282,8 +295,7 @@ def curated_report(r: dict, plans: list, info: dict) -> str:
         lines += [f"답글 초안 {len(replies)}건 — pr-comments.md 끝(게시 payload 밖 · 기존 스레드에 따로 단다)", ""]
     if r.get("severityNote"):
         lines += ["## Severity 보정 근거", "", r["severityNote"].strip(), ""]
-    if r.get("strengths"):
-        lines += ["## 긍정적 측면", ""] + [f"- {s}" for s in r["strengths"]] + [""]
+    lines += strength_lines(r)
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -696,8 +708,35 @@ def self_test() -> int:
         r = subprocess.run([sys.executable, __file__, "--review", str(ex / "broken.json"), "--diff", str(diff), "--out-dir", str(tmp / "cur-ok")], capture_output=True, text=True)
         case("curated-broken-site — 깨진 site 는 UNRUN · 이전 산출물을 지운다", r.returncode == 2 and not any((tmp / "cur-ok").glob("*")), (r.returncode, r.stderr[-200:]))
 
+    def t_s8():
+        # F-117 · F-517 — 강점 블록 · F-037 — 렌더 경로의 base 대조(check_review 가 review.json 폴더의 base-sha.txt 를 읽는다)
+        ex = tmp / "s8"
+        subprocess.run([sys.executable, __file__, "--example-curated-dir", str(ex)], capture_output=True, text=True)
+        args = ["--review", str(ex / "review.json"), "--diff", str(diff), "--require-curation"]
+        r = subprocess.run([sys.executable, __file__, *args, "--out-dir", str(tmp / "s8-ok")], capture_output=True, text=True)
+        rep = (tmp / "s8-ok" / "review-report.md").read_text(encoding="utf-8") if r.returncode == 0 else ""
+        un = render(review(base, strengthGaps=[{"claim": "s1", "uncovered": "U1"}]), SELF_DIFF)["review-report.md"]
+        case("strength-gaps-rendered — 두 렌더러가 강점 바로 아래 못 막는 시나리오를 그린다",
+             "- 변경 범위가 요구사항과 맞는다\n  - 못 막는 시나리오 — 목록이 빈 채로" in rep and "- s1\n  - 못 막는 시나리오 — U1" in un, (r.returncode, r.stderr[-200:]))
+        plain = render(review(base), SELF_DIFF)["review-report.md"]
+        case("uncurated-strings-unchanged — strengthGaps 없는 비큐레이션 리포트는 종전 강점 블록 그대로", plain.endswith("## 긍정적 측면\n\n- s1\n")
+             and "못 막는" not in plain, plain[-80:])
+        (ex / "base-sha.txt").write_text("feedfacecafe0000000000000000000000000000\n", encoding="utf-8")
+        r1 = subprocess.run([sys.executable, __file__, *args, "--out-dir", str(tmp / "s8-sha")], capture_output=True, text=True)
+        (ex / "base-sha.txt").write_text(CURATED_BASE_SHA + "\n", encoding="utf-8")
+        both = json.loads((ex / "review.json").read_text(encoding="utf-8"))
+        both["meta"]["base_sha"] = "2222222222222222"
+        for i in both["issues"]:
+            i["base_evidence"] = i["base_evidence"].rsplit("@", 1)[0] + "@2222222"
+        (ex / "both.json").write_text(json.dumps(both, ensure_ascii=False), encoding="utf-8")
+        r2 = subprocess.run([sys.executable, __file__, "--review", str(ex / "both.json"), "--diff", str(diff), "--require-curation",
+                             "--out-dir", str(tmp / "s8-both")], capture_output=True, text=True)
+        case("render-rejects-base-sha-mismatch — base-sha.txt 와 다른 근거 · meta 와 근거를 함께 바꾼 입력은 exit 1 · 파일 0",
+             r1.returncode == 1 and r2.returncode == 1 and not any((tmp / "s8-sha").glob("*")) and not any((tmp / "s8-both").glob("*")),
+             (r1.returncode, r2.returncode, r1.stderr[-160:]))
+
     tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_nodiff, t_empty, t_nopr, t_det, t_limit, t_cli,
-             t_example, t_curated]
+             t_example, t_curated, t_s8]
     try:
         for t in tests:
             try:
@@ -711,28 +750,31 @@ def self_test() -> int:
 
 
 CURATED_SHA = "abc1234def5678"
+CURATED_BASE_SHA = "0123456789abcdef0123456789abcdef01234567"   # 예시 base-sha.txt — gather 가 base/ 를 뜬 커밋
 # --example-curated-dir — SELF_DIFF · 게이트 합성 patch 의 앵커 가능한 줄(src/a.swift 11-12)만 쓴다. GPT 전용 후보(gpt:G2)는 E2 로 제외
 EXAMPLE_CURATED = {
     "review.json": {
         "verdict": "코멘트 1건 · 질문 1건 — 머지를 막을 결함은 없다", "event": "COMMENT",
         "pr": {"number": 7, "headSha": CURATED_SHA}, "target": {"kind": "pr", "ref": "pr-7", "sha": CURATED_SHA},
+        "meta": {"base_sha": CURATED_BASE_SHA},
         "candidates": ["merged.json", "synthesized-issues.json"],
         "issues": [
             {"id": "A1", "kind": "bug", "severity": "major", "origin": "regression", "confidence": 90, "foundBy": ["claude", "gpt"],
              "covers": ["claude:C1", "gpt:G1", "S1"], "what": "nil 이면 목록이 비어 보인다(WHY — 새 guard 가 빈 배열을 반환한다)",
-             "suggestion": "nil 일 때 이전 목록을 유지한다", "evidence": ["src/a.swift:11-12@abc1234"],
+             "suggestion": "nil 일 때 이전 목록을 유지한다", "evidence": ["src/a.swift:11-12@abc1234"], "base_evidence": "src/a.swift:11@0123456",
              "repro": {"status": "code-determined", "how": "nil 입력 → 11행 guard → 빈 배열"}, "symptom_screen": "목록 화면",
              "symptom_reach": "탭 진입 → 목록 로드 실패", "refute": "반박 시도 — 호출부 1곳이 nil 을 걸러내는지 확인했으나 거르지 않는다",
              "comment": "nil 이 들어오면 11행 guard 에서 빈 배열이 반환돼 목록이 비어 보입니다.\n이전 목록을 유지하는 쪽은 어떨지 확인 부탁드립니다.",
              "sites": [{"path": "src/a.swift", "start": 11, "end": 12}]},
             {"id": "Q1", "kind": "intent-question", "severity": "suggestion", "origin": "regression",
-             "what": "12행 재시도 횟수 3 이 의도한 값인지", "evidence": ["src/a.swift:12@abc1234"],
+             "what": "12행 재시도 횟수 3 이 의도한 값인지", "evidence": ["src/a.swift:12@abc1234"], "base_evidence": "src/a.swift:12@0123456",
              "refute": "반박 시도 — 요구사항 문서에 값이 없다", "comment": "12행 재시도 3회가 기획 값인지 여쭙습니다.",
              "sites": [{"path": "src/a.swift", "start": 12, "end": 12}]}],
         "excluded": [
             {"id": "claude:C2", "what": "base 에도 있던 강제 언래핑", "code": "E4", "reason": "base 같은 줄 — 이번 PR 무관"},
             {"id": "gpt:G2", "what": "SDK 콜백이 메인 스레드라는 가정", "code": "E2", "reason": "SDK 내부 동작 가정 — 근거 없음"}],
         "strengths": ["변경 범위가 요구사항과 맞는다"],
+        "strengthGaps": [{"claim": "변경 범위가 요구사항과 맞는다", "uncovered": "목록이 빈 채로 캐시되는 재진입 경로는 이 범위가 막지 않는다"}],
     },
     "merged.json": {
         "schemaVersion": 1, "inputs": {"claude": 2, "gpt": 2, "gptVerdicts": 0, "gptUnavailable": None, "evidenceChecked": True},
@@ -772,6 +814,7 @@ def main() -> int:
         d.mkdir(parents=True, exist_ok=True)
         for name, obj in EXAMPLE_CURATED.items():
             (d / name).write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (d / "base-sha.txt").write_text(CURATED_BASE_SHA + "\n", encoding="utf-8")   # gather 산출물 자리 — regression 근거 대조 기준
         print(f"→ {d}/  " + " · ".join(EXAMPLE_CURATED))
         return OK
     if not (a.review and a.diff and a.out_dir):

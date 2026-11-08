@@ -378,6 +378,9 @@ fi
 if [ -n "$HEAD_REF" ]; then
   mb=$(git merge-base "$BASE" "$HEAD_REF" 2>/dev/null) && [ -n "$mb" ] && BASE_REF="$mb"
 fi
+# base-sha.txt — base/ 를 실제로 떠 온 커밋(merge-base · 해석 실패면 base 팁). target.json 과 같은 자리 · PR · 브랜치 · --base 세 경로 공통.
+#   Curate 검사기가 regression 이슈의 base_evidence @sha 와 review.json meta.base_sha 를 이것과 대조한다(F-037 — 낡은 로컬 develop 근거 차단)
+git rev-parse --verify "${BASE_REF}^{commit}" > "$STAGE_DIR/base-sha.txt" 2>/dev/null || die 4 "base-sha 기록 실패 — '${BASE_REF}' 를 커밋으로 풀지 못했다"
 
 # ── 리뷰 표면 진단 (stale merge-base) ────────────────────────
 # ⛔ `diff` 는 merge-base 기준이라, base 가 분기 후 앞서 나가면 **이미 base 에 있는 변경**이
@@ -592,7 +595,7 @@ rm -rf "$STAGE_DIR"
 added=$(awk '{a+=$1} END{print a+0}' "$WORK_DIR/numstat.txt")
 deleted=$(awk '{d+=$2} END{print d+0}' "$WORK_DIR/numstat.txt")
 echo "수집 완료 — base=$BASE / +$added −$deleted / base 원본 ${saved}/${expected}개 · head 원본 ${hsaved}/${hexpected}개"
-echo "  diff.patch · requirements.md · base-behavior.md · base/ · head/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json · existing-threads.json · target.json"
+echo "  diff.patch · requirements.md · base-behavior.md · base/ · head/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json · existing-threads.json · target.json · base-sha.txt"
 [ -f "$WORK_DIR/evidence-move-drift.md" ] && echo "  ⭐ evidence-move-drift.md — 이동 리팩토링 감지. 동등성과 **별개 축**이다"
 grep -q '⛔ \*\*head 커밋' "$WORK_DIR/review-surface.md" 2>/dev/null && \
   echo "⚠️  중복 커밋 감지 — review-surface.md 를 먼저 읽어라. Tier 판정이 부풀려져 있다"

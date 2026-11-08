@@ -11,6 +11,7 @@
 #   M  merge-base      `A...B` 는 merge-base 기준인데 BASE 팁 내용을 읽으면 원본이 아니다
 #   H  hunk 안의 `--- a/x` 를 파일 헤더로 오인하면 남의 경로를 수집한다
 #   Hd head/ 스냅샷(S13 — GPT 독립 첫 패스 입력) — 새 경로로 head 내용을 읽고, 삭제 파일은 빼고, 신규 파일은 넣는다
+#   BS base-sha.txt(F-037) — --base 경로 · 기본 base(feature/* → develop) 경로 모두 base/ 를 뜬 merge-base 이고, 앞서 나간 base 팁 · head 가 아니다
 #
 # exit: 0 전건 통과 / 1 불일치 / 2 실행 오류
 set -uo pipefail
@@ -22,7 +23,8 @@ command -v git >/dev/null 2>&1 || { echo "git 이 없다" >&2; exit 2; }
 
 REPO="$(mktemp -d "${TMPDIR:-/tmp}/fz-gather-test.XXXXXX")" || exit 2
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/fz-gather-work.XXXXXX")" || exit 2
-cleanup() { rm -rf "$REPO" "$WORK"; }
+WORK2="$(mktemp -d "${TMPDIR:-/tmp}/fz-gather-work2.XXXXXX")" || exit 2
+cleanup() { rm -rf "$REPO" "$WORK" "$WORK2"; }
 trap cleanup EXIT
 
 cd "$REPO" || exit 2
@@ -38,6 +40,7 @@ printf 'A slash B_C\n' > a/b_c.txt
 printf 'deep\n' > nested/deep/file.txt
 printf 'keep\n-- a/evil/injected.txt\nkeep2\n' > patchdoc.txt   # H: 지우면 diff 에 `--- a/evil/…` 가 나온다
 git add -A && git commit -qm base
+git branch develop                          # BS: 기본 base 경로(feature/* → develop)의 기준 — 분기점에 머문다
 
 git checkout -q -b feature/t
 printf 'CHANGED\n' > mod.txt
@@ -101,6 +104,17 @@ hbody() { cat "$WORK/head/$1" 2>/dev/null; }
 [ -f "$WORK/head/gone.txt" ] && no "Hd 삭제 파일 제외" "head/gone.txt 가 생겼다" || ok "Hd 삭제 파일 제외"
 [ -f "$WORK/head/evil/injected.txt" ] && no "Hd hunk 내 +++ 오인 없음" "head/evil/injected.txt" || ok "Hd hunk 내 경로 오인 없음"
 [ "$(hbody a_b/c.txt)" = "A_B slash C v2" ] && [ "$(hbody a/b_c.txt)" = "A slash B_C v2" ] && ok "Hd 경로 충돌 없음" || no "Hd 경로 충돌 없음" "[$(hbody a_b/c.txt)] / [$(hbody a/b_c.txt)]"
+
+# BS base-sha.txt — base/ 를 뜬 커밋(merge-base). 앞서 나간 base 팁(stale 대조)도 head 도 아니다
+MB=$(git merge-base main feature/t) TIP=$(git rev-parse main) HD=$(git rev-parse feature/t)
+bs=$(cat "$WORK/base-sha.txt" 2>/dev/null)
+[ "$bs" = "$MB" ] && ok "BS --base 경로 base-sha.txt = merge-base ${MB:0:7}" || no "BS --base 경로 base-sha.txt = merge-base" "[$bs]"
+[ -n "$bs" ] && [ "$bs" != "$TIP" ] && [ "$bs" != "$HD" ] && ok "BS stale 대조 — 앞서 나간 base 팁 · head 가 아니다" \
+  || no "BS stale 대조 — 앞서 나간 base 팁 · head 가 아니다" "[$bs] tip ${TIP:0:7} head ${HD:0:7}"
+bash "$GATHER" --work-dir "$WORK2" --target feature/t >/dev/null 2>"$WORK2.err" || { echo "기본 base 경로 gather 실패" >&2; cat "$WORK2.err" >&2; rm -f "$WORK2.err"; exit 2; }
+rm -f "$WORK2.err"
+bs2=$(cat "$WORK2/base-sha.txt" 2>/dev/null)
+[ "$bs2" = "$(git merge-base develop feature/t)" ] && ok "BS 기본 base(develop) 경로 base-sha.txt = merge-base" || no "BS 기본 base(develop) 경로 base-sha.txt" "[$bs2]"
 
 # 매니페스트 상태 표기
 m="$WORK/base-manifest.tsv"

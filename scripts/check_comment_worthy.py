@@ -10,13 +10,16 @@ issue(코멘트할 것) 필수:
                    (`pr.headSha` 는 게시 메타일 뿐이다 — 브랜치 대상은 pr 이 없다)
   bug              repro{status: reproduced | code-determined, how} · symptom_screen · symptom_reach
   structure|quality measure(관례 표본 N:M · 중복 줄 수 · 결함 위험 — 측정값 없는 구조 제안은 E3)
-  origin           있고 pre-existing 이 아니다(원래 있던 문제는 E4 로 제외 · 리포트 ④ 참고)
+  origin           regression · improvement 중 하나(pre-existing 은 E4 로 제외 · 리포트 ④ · 그 밖 표기는 위반 — F-037 우회 차단)
+  base_evidence    origin=regression 이면 `path:line@sha` — sha 는 review.json meta.base_sha 이고, meta.base_sha 는 review.json 폴더의
+                   base-sha.txt(gather 가 base/ 를 뜬 커밋)와 같다. 그 파일이 없으면 판정 불가(exit 2) · head · 로컬 develop sha 는 위반(F-037)
   suggestion       있다(조치 없는 지적은 E6) — intent-question 은 질문이 조치라 면제
   refute           재검증 기록(반박 시도와 결과)
   comment          코드 펜스 밖 산문 ≤ 4줄 · 마무리 어조(…부탁드립니다 · …여쭙습니다 · ?)가 없으면 WARN(차단 아님)
   duplicateOf      있으면 위반 — 중복은 E5 로 제외한다
   기존 스레드      existing-threads.json(status ok)에 같은 path ±3줄 스레드가 있으면 duplicateOf(→ 제외) 또는 distinctFrom[{thread, why}]
 excluded[]       {id, what, code E1~E8, reason} · E5 = duplicateOf(+선택 reply 답글 초안) · E8 = refute
+strengths        string[] 그대로 · 원소마다 strengthGaps[{claim(= 그 강점), uncovered(그 강점이 못 막는 시나리오 — 비지 않음)}](F-117 · F-517)
   E1 도달 경로 미확인(코드 경로만 있음)       E2 SDK · 바이너리 내부 동작 가정       E3 결함 없는 설계 선호(측정값 없음)
   E4 원래 있던 문제 — 리포트 ④ 참고          E5 기존 스레드와 중복(스레드 id)        E6 작성자가 할 조치가 없음
   E7 작업 트리에서 읽은 사실(대상 SHA 아님)   E8 재검증에서 반박됨(반박 근거 인용)
@@ -37,6 +40,7 @@ import json
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -47,11 +51,18 @@ sys.path.insert(0, SCRIPT_DIR)
 from check_synthesized import normalize  # noqa: E402 — 두 생산자 모양을 같은 규칙으로 읽는다(F-530)
 
 KINDS = ("bug", "structure", "quality", "intent-question")
+ORIGINS = ("regression", "pre-existing", "improvement")    # workflows/peer-review.js finding 스키마 origin enum 과 같다
 CODES = tuple(f"E{n}" for n in range(1, 9))
 REPRO = ("reproduced", "code-determined")
 EVIDENCE_RE = re.compile(r"(?s)^(?P<path>.+):(?P<a>\d+)(?:-(?P<b>\d+))?@(?P<sha>[0-9a-f]{7,40})$")   # 경로는 공백 · @ · : 를 가질 수 있다 — 끝의 :줄@sha 만 떼어 낸다
 CLOSING_RE = re.compile(r"(?:(?:부탁드립니다|여쭙습니다)[.!]?|\?)\s*$")
 NEAR = 3
+SHA_RE = re.compile(r"[0-9a-f]{7,40}\Z")
+BASE_SHA_FILE = "base-sha.txt"   # gather.sh 가 base/ 를 실제로 떠 온 커밋 — review.json 폴더(target.json 과 같은 자리)
+
+
+def _same_sha(a: str, b: str) -> bool:
+    return bool(a) and bool(b) and (a.startswith(b) or b.startswith(a))
 
 
 def _txt(v) -> str:
@@ -133,6 +144,46 @@ def check_review(review: dict, base: pathlib.Path):
     excluded = review.get("excluded")
     if not isinstance(excluded, list):
         return VIOLATION, ["excluded 가 배열이 아니다"], warn, info
+    # ⛔ regression 은 base 커밋에서 보인 근거가 필요하다(F-037) — evidence(@head)만으로는 '원래 없었다' 를 증명하지 못하고,
+    #    base 를 낡은 로컬 develop 으로 읽으면 틀린 근거로 충족된다(F-240). 기준은 gather 가 base/ 를 뜬 커밋 하나다
+    regress = [i for i in issues if i.get("origin") == "regression"]
+    if regress:
+        try:
+            base_sha = (base / BASE_SHA_FILE).read_text(encoding="utf-8").strip().lower()
+        except OSError:
+            return UNRUN, [f"regression 이슈 {len(regress)}건인데 {BASE_SHA_FILE} 가 없다 — base 근거를 대조할 기준이 없다(gather 산출물)"], warn, info
+        if not SHA_RE.match(base_sha):
+            return UNRUN, [f"{BASE_SHA_FILE} 가 커밋 sha 꼴이 아니다 — {base_sha[:20]!r}"], warn, info
+        meta = review.get("meta") if isinstance(review.get("meta"), dict) else {}
+        msha = _txt(meta.get("base_sha")).lower()
+        if not SHA_RE.match(msha):
+            bad.append("meta.base_sha 가 없거나 커밋 sha 꼴이 아니다 — regression 근거의 기준 커밋")
+        elif not _same_sha(msha, base_sha):
+            bad.append(f"meta.base_sha {msha[:12]} ≠ {BASE_SHA_FILE} {base_sha[:12]} — gather 가 base/ 를 뜬 커밋이 아니다(F-037)")
+        for i in regress:
+            be = i.get("base_evidence")
+            bes = [be] if isinstance(be, str) else ([x for x in be if isinstance(x, str)] if isinstance(be, list) else [])
+            ms = [m for m in (EVIDENCE_RE.match(x.strip()) for x in bes) if m]
+            if not ms:
+                bad.append(f"{i.get('id')}: regression 은 base_evidence(`path:line@base-sha`)가 필요하다 — base 커밋에서 없던 것을 보인다(F-037)")
+            elif not any(_same_sha(m["sha"].lower(), base_sha) for m in ms):
+                bad.append(f"{i.get('id')}: base_evidence @sha 가 base {base_sha[:12]} 가 아니다 — head · 로컬 develop 근거는 regression 을 증명하지 못한다")
+    # 강점은 string[] 그대로 · 원소마다 그 강점이 못 막는 시나리오(strengthGaps)를 둔다(F-117 · F-517)
+    if "strengths" in review:
+        st = review.get("strengths")
+        if not isinstance(st, list) or not all(isinstance(s, str) for s in st):
+            bad.append("strengths 는 string[] 이다 — 못 막는 시나리오는 strengthGaps[{claim, uncovered}] 에 둔다")
+        else:
+            gaps_raw = review.get("strengthGaps")
+            if gaps_raw is not None and not isinstance(gaps_raw, list):
+                bad.append("strengthGaps 가 배열이 아니다")
+            gaps = {g["claim"].strip(): _txt(g.get("uncovered")) for g in (gaps_raw if isinstance(gaps_raw, list) else [])
+                    if isinstance(g, dict) and isinstance(g.get("claim"), str)}
+            for s in st:
+                if s.strip() not in gaps:
+                    bad.append(f"강점 {s.strip()[:30]!r} 에 strengthGaps 항목이 없다 — 이 강점이 못 막는 시나리오(uncovered)를 적는다")
+                elif not gaps[s.strip()]:
+                    bad.append(f"강점 {s.strip()[:30]!r} 의 strengthGaps.uncovered 가 비었다")
     owners = {}
     for kind, rows in (("issue", issues), ("excluded", excluded)):
         for x in rows:
@@ -177,8 +228,11 @@ def check_review(review: dict, base: pathlib.Path):
                 bad.append(f"{iid}: bug 는 symptom_screen · symptom_reach 가 필요하다(Gate 4.7-S)")
         if k in ("structure", "quality") and not _txt(i.get("measure")):
             bad.append(f"{iid}: {k} 제안은 measure(관례 표본 N:M · 중복 줄 수 · 결함 위험)가 필요하다 — 없으면 E3")
-        if not _txt(i.get("origin")) or i.get("origin") == "pre-existing":
-            bad.append(f"{iid}: origin 이 없거나 pre-existing — 원래 있던 문제는 E4 로 제외한다(리포트 ④)")
+        if i.get("origin") not in ORIGINS:
+            # ⛔ 어휘를 닫는다 — 'Regression' · 'new-code' 처럼 적으면 regression 의 base 근거 검사(F-037)를 통째로 건너뛴다
+            bad.append(f"{iid}: origin {i.get('origin')!r} 은 정본 어휘({' · '.join(ORIGINS)}) 밖이다")
+        elif i.get("origin") == "pre-existing":
+            bad.append(f"{iid}: origin 이 pre-existing — 원래 있던 문제는 E4 로 제외한다(리포트 ④)")
         if k != "intent-question" and not _txt(i.get("suggestion")):
             bad.append(f"{iid}: suggestion 이 없다 — 작성자가 할 조치가 없으면 E6")
         if not _txt(i.get("refute")):
@@ -229,27 +283,30 @@ def self_test() -> int:
         print(f"{name}: {'PASS' if ok else 'FAIL'}" + ("" if ok else f" — {detail}"))
 
     SHA = "abc1234def5678"
+    BSHA = "0123456789abcdef0123456789abcdef01234567"   # base-sha.txt — gather 가 base/ 를 뜬 커밋
     MERGED = {"inputs": {"claude": 2, "gpt": 1, "gptUnavailable": None, "evidenceChecked": True},
               "candidates": [{"id": "claude:C1", "source": "claude", "severity": "major"},
                              {"id": "claude:C2", "source": "claude", "severity": "minor", "origin": "pre-existing"},
                              {"id": "gpt:G1", "source": "gpt", "severity": "minor"}],
               "summary": {"candidatesIn": 3, "candidatesOut": 3}}
     ISSUE = {"id": "A1", "kind": "bug", "severity": "major", "origin": "regression", "covers": ["claude:C1"],
-             "evidence": [f"src/a.swift:11-12@{SHA[:7]}"], "repro": {"status": "code-determined", "how": "nil 경로"},
+             "evidence": [f"src/a.swift:11-12@{SHA[:7]}"], "base_evidence": f"src/a.swift:11@{BSHA[:7]}", "repro": {"status": "code-determined", "how": "nil 경로"},
              "symptom_screen": "목록", "symptom_reach": "탭 → 목록", "suggestion": "guard 추가", "refute": "반박 실패 — 호출 1곳",
              "comment": "nil 이면 목록이 비어 보입니다.\nguard 를 두면 좋겠습니다. 확인 부탁드립니다.",
              "sites": [{"path": "src/a.swift", "start": 11, "end": 12}]}
-    BASE = {"verdict": "v", "target": {"kind": "pr", "ref": "pr-1", "sha": SHA}, "candidates": ["merged.json"],
+    BASE = {"verdict": "v", "target": {"kind": "pr", "ref": "pr-1", "sha": SHA}, "meta": {"base_sha": BSHA}, "candidates": ["merged.json"],
             "issues": [ISSUE],
             "excluded": [{"id": "claude:C2", "what": "원래 있던 문제", "code": "E4", "reason": "base 에도 같다"},
                          {"id": "gpt:G1", "what": "SDK 가정", "code": "E2", "reason": "SDK 내부 동작 가정"}]}
     with tempfile.TemporaryDirectory() as t:
         seq = [0]
 
-        def run(review, merged=MERGED, threads=None, gpt_dir=False, extra=None):
+        def run(review, merged=MERGED, threads=None, gpt_dir=False, extra=None, base_sha=BSHA, cli=False):
             seq[0] += 1
             d = pathlib.Path(t) / f"c{seq[0]}"
             d.mkdir()
+            if base_sha is not None:
+                (d / BASE_SHA_FILE).write_text(base_sha + "\n", encoding="utf-8")
             for name, obj in (extra or {}).items():
                 (d / name).write_text(json.dumps(obj), encoding="utf-8")
             if merged is not None:
@@ -258,6 +315,10 @@ def self_test() -> int:
                 (d / "existing-threads.json").write_text(json.dumps(threads), encoding="utf-8")
             if gpt_dir:
                 (d / "gpt-independent").mkdir()
+            if cli:   # 실제 CLI — 기본 경로(플래그 없이 review.json 폴더의 base-sha.txt)를 사용자가 부르는 꼴로 잰다
+                (d / "review.json").write_text(json.dumps(review), encoding="utf-8")
+                return subprocess.run([sys.executable, os.path.abspath(__file__), str(d / "review.json")],
+                                      capture_output=True, text=True).returncode, [], [], {}
             return check_review(json.loads(json.dumps(review)), d)
 
         def mod(**kw):
@@ -315,6 +376,25 @@ def self_test() -> int:
         case("declared-independent-without-merged-unrun", run(mod(candidates=["syn.json"], gptPass="independent"), merged=None, extra={"syn.json": MERGED})[0] == UNRUN)
         case("stale-gpt-dir-undeclared-unrun", run(mod(candidates=["syn.json"]), merged=None, gpt_dir=True, extra={"syn.json": MERGED})[0] == UNRUN)
         case("gpt-ran-without-merged-unrun", run(mod(candidates=["syn.json"]), merged=None, gpt_dir=True)[0] == UNRUN)
+        # F-037 — regression 의 base 근거
+        case("regression-without-base-evidence", run(mi(base_evidence=None))[0] == VIOLATION)
+        case("regression-base-evidence-head-sha-rejected", run(mi(base_evidence=f"src/a.swift:11@{SHA[:7]}"))[0] == VIOLATION)
+        case("regression-base-evidence-local-develop-rejected", run(mi(base_evidence="src/a.swift:11@feedfacecafe"))[0] == VIOLATION)
+        r = run(BASE)
+        case("regression-base-evidence-ok", r[0] == OK and not r[1], r[1])
+        case("base-sha-default-review-dir", run(BASE, cli=True)[0] == OK and run(BASE, base_sha="feedfacecafe00", cli=True)[0] == VIOLATION)
+        case("base-sha-missing-unrun", run(BASE, base_sha=None)[0] == UNRUN and run(mi(origin="improvement"), base_sha=None)[0] == OK)
+        case("origin-outside-vocabulary-rejected", run(mi(origin="Regression"))[0] == VIOLATION and run(mi(origin="new-code"))[0] == VIOLATION)
+        wrong = mi(base_evidence="src/a.swift:11@2222222")
+        wrong["meta"] = {"base_sha": "2222222222222222"}
+        case("meta-and-evidence-both-wrong-rejected", run(wrong)[0] == VIOLATION and run(wrong, cli=True)[0] == VIOLATION)
+        # F-117 · F-517 — 강점이 못 막는 시나리오
+        case("strength-gap-missing", run(mod(strengths=["범위가 맞다"]))[0] == VIOLATION)
+        case("strength-gap-empty-uncovered", run(mod(strengths=["범위가 맞다"], strengthGaps=[{"claim": "범위가 맞다", "uncovered": " "}]))[0] == VIOLATION)
+        r = run(mod(strengths=["범위가 맞다"], strengthGaps=[{"claim": "범위가 맞다", "uncovered": "동시 호출 경로는 이 PR 이 막지 않는다"}]))
+        case("strength-gap-ok", r[0] == OK, r[1])
+        case("strengths-string-array-kept", run(mod(strengths=[{"claim": "범위가 맞다"}], strengthGaps=[{"claim": "범위가 맞다", "uncovered": "u"}]))[0] == VIOLATION
+             and r[0] == OK)
     print(f"self-test {passed}/{total} passed")
     return OK if passed == total else 1
 
