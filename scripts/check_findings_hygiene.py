@@ -54,6 +54,17 @@ RECURS_LINE = re.compile(r"^recurs_of:\s*\[?\s*(F-\d{3}[a-z]?)", re.M)
 CANON_LINE = re.compile(r"^canonical:\s*(\S+)", re.M)
 # INDEX 한 줄이 자기 title 보다 남의 title 에 가까운가(F-449). 2026-10-29 실 레지스트리 교정 전 7행 · 뒤 0행에서 정한 값.
 ONELINER_OTHER_MIN, ONELINER_MARGIN, ONELINER_HEAD = 0.6, 0.15, 120
+# 배출 축(README §4 applied · applied_ref · distinct_cause). 셋 다 선택 필드다.
+# ⛔ 이 축들은 [WARN] · [INFO] 표지 줄만 낸다 — 위반 계수와 exit 를 바꾸지 않는다(기존 레지스트리 일괄 위반 방지).
+APPLIED_LINE = re.compile(r"^applied:[ \t]*([^\s#]*)", re.M)
+APPLIED_REF_LINE = re.compile(r"^applied_ref:[ \t]*([^\s#]*)", re.M)
+DISTINCT_LINE = re.compile(r"^distinct_cause:[ \t]*\S", re.M)
+FCLASS_LINE = re.compile(r"^failure_class:[ \t]*([^\s#]+)", re.M)
+DATE_LINE = re.compile(r"^date:[ \t]*(\d{4}-\d{2}-\d{2})", re.M)
+APPLIED_VALUES = ("full", "partial", "none")
+RECURS_ALIGN_FROM = "2026-11-08"   # 이날부터 쓴 엔트리만 클래스 불일치를 WARN 으로 센다 — 그 전은 INFO
+PROMOTED_MARK = "✅ **승격 완료"
+OBS_ID = re.compile(r"\bF-\d{3}[a-z]?\b")
 
 
 
@@ -392,6 +403,90 @@ def _strict_axes(root: pathlib.Path, texts: dict, live_slugs: set, live_ids: set
     return counts, unjudged
 
 
+def promoted_evidence_ids(ledger_text: str) -> set:
+    """원장 `### ` 절 가운데 승격 완료 줄이 있는 절의 `관측 #` 줄 F-ID — 승격이 끝났는데 근거가 남는 축(D-2)."""
+    ids = set()
+    for sec in re.split(r"^### ", ledger_text, flags=re.M)[1:]:
+        if PROMOTED_MARK not in sec:
+            continue
+        for line in sec.splitlines():
+            if line.lstrip("- ").startswith("관측 #"):
+                ids.update(OBS_ID.findall(line))
+    return ids
+
+
+def _drain_axes(arc: pathlib.Path, texts: dict, ledger_text: str | None):
+    """배출 축 넷 — applied 값 · applied_ref 누락 · 승격 완료 근거 잔존 · recurs_of 클래스 정렬.
+
+    ⛔ 전부 표지 줄이다. 판정(exit)은 호출부의 기존 축이 정한다 — S0 동결 사본 대조가 표지 줄을 뺀 출력 불변을 잰다.
+    """
+    fm_of, applied_of, fclass_of = {}, {}, {}
+    for d, t in texts.items():
+        m = FM.match(t)
+        fm_of[d] = m.group(1) if m else ""
+        sid = SLUG.match(d.split("/", 1)[1]).group(1)
+        a = APPLIED_LINE.search(fm_of[d])
+        applied_of[sid] = a.group(1) if a else None
+        c = FCLASS_LINE.search(fm_of[d])
+        fclass_of[sid] = c.group(1) if c else None
+    arc_paths = {}
+    if arc.is_dir():
+        for p in list_md(arc):
+            m = SLUG.match(p.stem)
+            if m:
+                arc_paths.setdefault(m.group(1), p)
+
+    def fclass(tid):
+        if tid in fclass_of:
+            return fclass_of[tid]
+        p = arc_paths.get(tid)
+        if p is None:
+            return None
+        try:
+            m = FM.match(read_or_raise(p))
+        except Unreadable:
+            return None
+        c = FCLASS_LINE.search(m.group(1)) if m else None
+        return c.group(1) if c else None
+
+    bad_val, no_ref, mismatch, legacy = [], [], [], []
+    for d in sorted(fm_of):
+        fm = fm_of[d]
+        sid = SLUG.match(d.split("/", 1)[1]).group(1)
+        val = applied_of[sid]
+        if APPLIED_LINE.search(fm) and val not in APPLIED_VALUES:
+            bad_val.append(f"{d}: applied={val or '(빈 값)'}")
+        r = APPLIED_REF_LINE.search(fm)
+        if val in ("full", "partial") and not (r and r.group(1)):
+            no_ref.append(f"{d}: applied={val} 인데 applied_ref 가 없다")
+        rec = RECURS_LINE.search(fm)
+        if not rec or DISTINCT_LINE.search(fm):
+            continue
+        mine, theirs = fclass_of[sid], fclass(rec.group(1))
+        if mine and theirs and mine != theirs:
+            dt = DATE_LINE.search(fm)
+            row = f"{d}: recurs_of={rec.group(1)} · {mine} ≠ {theirs}"
+            (mismatch if dt and dt.group(1) >= RECURS_ALIGN_FROM else legacy).append(row)
+
+    def show(label, items):
+        print(f"  [WARN] {label}: {len(items)}")
+        for x in items[:5]:
+            print(f"      [WARN] {x}")
+        if len(items) > 5:
+            print(f"      [WARN] … 외 {len(items) - 5}건")
+
+    show("applied 값 위반", bad_val)
+    show("applied_ref 누락", no_ref)
+    if ledger_text is None:
+        print("  [WARN] 승격 완료 근거 잔존: 미판정(--ledger 없음)")
+    else:
+        live = set(applied_of)
+        show("승격 완료 근거 잔존", sorted(i for i in promoted_evidence_ids(ledger_text) if i in live and applied_of[i] != "full"))
+    show("recurs_of 클래스 불일치", mismatch)
+    if legacy:
+        print(f"  [INFO] recurs_of 클래스 불일치({RECURS_ALIGN_FROM} 이전 · 계수 밖): {len(legacy)}")
+
+
 def check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None):
     """`strict` 는 판정을 바꾸지 않는다(E1-7 — 기본 모드 = 옛 `--strict`). 호출부(`--strict` · self-test) 호환용으로 받는다."""
     try:
@@ -529,6 +624,7 @@ def _check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None)
     print(f"  p_id 형식 위반                      : {len(bad_pid)}")
     for b in bad_pid:
         print(f"      {b}")
+    lt = None
     if ledger is None:
         # ⛔ 원장을 안 받았으면 **소속 검사는 미판정**이다 — 통과로 세지 않는다.
         print(f"  p_id 소속(원장 대조)                 : 미판정 (--ledger 미지정) · 부여 {sum(len(v) for v in p_ids.values())}건/{len(p_ids)}종")
@@ -544,6 +640,7 @@ def _check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None)
         for u in unknown:
             print(f"      {u}: {', '.join(p_ids[u][:3])}")
         bad_pid += [f"원장 미등재 p_id {u}" for u in unknown]
+    _drain_axes(arc, texts, lt)
 
     sx, unjudged = _strict_axes(root, texts, {p.stem for p in files}, set(by_id), rows_all, idx_text)
 
@@ -969,6 +1066,112 @@ def self_test():
                  ("malformed-filename", c_malformed_filename),
                  ("underscore-not-entry", c_underscore_not_flagged),
                  ("missing-status-line", c_missing_status)]:
+        cases += 1
+        case(n, f)
+
+    def both(root, ledger=None):
+        """기본 모드와 --strict 가 같은 판정 · 출력을 내는지 원장 인자까지 같이 본다."""
+        got = []
+        for s in (False, True):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = check(root, s, ledger=ledger)
+            got.append((rc, buf.getvalue()))
+        assert got[0] == got[1], f"⛔ 기본 모드와 --strict 가 갈렸다\n{got[0][1]}"
+        return got[1]
+
+    def fm_add(root, slug, extra):
+        edit(root / "entries" / f"{slug}.md", "status: open\n", "status: open\n" + extra)
+
+    def promoted_ledger(tmp, ids):
+        p = pathlib.Path(tmp) / "ledger.md"
+        obs = "".join(f"- 관측 #{k + 1}: **{i}** — 같은 기전\n" for k, i in enumerate(ids))
+        p.write_text(f"# 원장\n\n### D-9: probe (트랙 D 관측 #1)\n\n{obs}- ✅ **승격 완료 (2026-01-01)**: 반영처 = x\n\n### D-10: 대기\n\n- 관측 #1: **F-003**\n",
+                     encoding="utf-8")
+        return p
+
+    def c_applied_value_invalid(tmp):
+        r = full(tmp)
+        fm_add(r, "F-002-beta", "applied: bogus\n")
+        rc, out = both(r)
+        assert rc == OK and "[WARN] applied 값 위반: 1" in out, f"⛔ 비정규 applied 를 놓쳤거나 exit 가 바뀌었다 rc={rc}\n{out}"
+
+    def c_applied_ref_missing(tmp):
+        r = full(tmp)
+        fm_add(r, "F-002-beta", "applied: full\n")
+        rc, out = both(r)
+        assert rc == OK and "[WARN] applied_ref 누락: 1" in out, f"⛔ ref 없는 full 을 놓쳤다 rc={rc}\n{out}"
+
+    def c_applied_ref_pending(tmp):
+        r = full(tmp)
+        fm_add(r, "F-002-beta", "applied: partial\napplied_ref: pending\n")
+        rc, out = both(r)
+        assert rc == OK and "[WARN] applied_ref 누락: 0" in out and "[WARN] applied 값 위반: 0" in out, f"⛔ pending 을 위반으로 셌다\n{out}"
+
+    def c_reflect_heading_only(tmp):
+        r = full(tmp)
+        p = r / "entries" / "F-002-beta.md"
+        p.write_text(p.read_text(encoding="utf-8") + "\n## 반영 (probe · 2026-11-08)\n\n- 일부만 고쳤다\n", encoding="utf-8")
+        rc, out = both(r)
+        for line in ("[WARN] applied 값 위반: 0", "[WARN] applied_ref 누락: 0", "[WARN] recurs_of 클래스 불일치: 0"):
+            assert rc == OK and line in out, f"⛔ 반영 머리만 있는 엔트리가 축에 걸렸다 {line!r}\n{out}"
+
+    def c_promoted_live(tmp):
+        r = full(tmp)
+        rc, out = both(r, promoted_ledger(tmp, ["F-002"]))
+        assert rc == OK and "[WARN] 승격 완료 근거 잔존: 1" in out and "F-002" in out, f"⛔ 승격 완료 근거 잔존을 놓쳤다 rc={rc}\n{out}"
+        assert "F-003" not in out.split("승격 완료 근거 잔존")[1].split("\n  ")[0], "⛔ 승격 안 된 절의 관측을 셌다"
+
+    def c_promoted_applied_ok(tmp):
+        r = full(tmp)
+        fm_add(r, "F-002-beta", "applied: full\napplied_ref: abc1234\n")
+        rc, out = both(r, promoted_ledger(tmp, ["F-002"]))
+        assert rc == OK and "[WARN] 승격 완료 근거 잔존: 0" in out, f"⛔ applied: full 근거를 잔존으로 셌다\n{out}"
+
+    def c_promoted_no_ledger(tmp):
+        rc, out = both(full(tmp))
+        assert rc == OK and "[WARN] 승격 완료 근거 잔존: 미판정(--ledger 없음)" in out, f"⛔ 원장 없이 0 으로 위장했다\n{out}"
+
+    def c_recurs_mismatch_new(tmp):
+        r = full(tmp)
+        fm_add(r, "F-003-gamma", "failure_class: other-class\n")
+        fm_add(r, "F-002-beta", "date: 2026-11-09\nfailure_class: my-class\nrecurs_of: F-003\n")
+        rc, out = both(r)
+        assert rc == OK and "[WARN] recurs_of 클래스 불일치: 1" in out, f"⛔ 새 엔트리의 클래스 불일치를 놓쳤다 rc={rc}\n{out}"
+
+    def c_recurs_mismatch_legacy(tmp):
+        r = full(tmp)
+        fm_add(r, "F-003-gamma", "failure_class: other-class\n")
+        fm_add(r, "F-002-beta", "date: 2026-10-01\nfailure_class: my-class\nrecurs_of: F-003\n")
+        rc, out = both(r)
+        assert rc == OK and "[WARN] recurs_of 클래스 불일치: 0" in out and "[INFO] recurs_of 클래스 불일치(" in out, f"⛔ 옛 엔트리를 WARN 으로 셌다\n{out}"
+
+    def c_recurs_distinct_ok(tmp):
+        r = full(tmp)
+        fm_add(r, "F-003-gamma", "failure_class: other-class\n")
+        fm_add(r, "F-002-beta", "date: 2026-11-09\nfailure_class: my-class\nrecurs_of: F-003\ndistinct_cause: 다른 기전\n")
+        rc, out = both(r)
+        assert rc == OK and "[WARN] recurs_of 클래스 불일치: 0" in out and "[INFO] recurs_of" not in out, f"⛔ distinct_cause 를 무시했다\n{out}"
+
+    def c_new_axes_strict_same(tmp):
+        r = full(tmp)
+        fm_add(r, "F-003-gamma", "failure_class: other-class\napplied: bogus\n")
+        fm_add(r, "F-002-beta", "date: 2026-11-09\nfailure_class: my-class\nrecurs_of: F-003\napplied: full\n")
+        rc, out = both(r, promoted_ledger(tmp, ["F-003"]))   # F-003 은 applied: bogus — 넷 축이 모두 1건씩 난다
+        marked = [ln for ln in out.splitlines() if "[WARN]" in ln or "[INFO]" in ln]
+        assert rc == OK and len(marked) >= 8, f"⛔ 새 축 출력이 모자라다 rc={rc}\n{out}"
+        rest = "\n".join(ln for ln in out.splitlines() if "[WARN]" not in ln and "[INFO]" not in ln)
+        _, clean = both(full(pathlib.Path(tmp) / "clean"), promoted_ledger(pathlib.Path(tmp) / "clean", []))
+        clean_rest = "\n".join(ln for ln in clean.splitlines() if "[WARN]" not in ln and "[INFO]" not in ln)
+        assert rest.replace(str(r), "R") == clean_rest.replace(str(pathlib.Path(tmp) / "clean" / "reg"), "R"), \
+            f"⛔ 표지 줄 밖 출력이 바뀌었다\n{rest}\n---\n{clean_rest}"
+
+    for n, f in [("applied-value-invalid-warn", c_applied_value_invalid), ("applied-ref-missing-warn", c_applied_ref_missing),
+                 ("applied-ref-pending-ok", c_applied_ref_pending), ("reflect-heading-only-no-warn", c_reflect_heading_only),
+                 ("promoted-evidence-live", c_promoted_live), ("promoted-evidence-applied-ok", c_promoted_applied_ok),
+                 ("promoted-evidence-no-ledger-unjudged", c_promoted_no_ledger), ("recurs-class-mismatch-new", c_recurs_mismatch_new),
+                 ("recurs-class-mismatch-legacy-info", c_recurs_mismatch_legacy), ("recurs-distinct-cause-ok", c_recurs_distinct_ok),
+                 ("new-axes-strict-same-output", c_new_axes_strict_same)]:
         cases += 1
         case(n, f)
 

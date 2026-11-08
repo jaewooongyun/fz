@@ -419,6 +419,9 @@ findings 22건 전수 분류 결과 **대다수가 E**다. 현행 4트랙 어디
 
 A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 노트 `Closes:` 로 `scripts/eject_findings.py` 를 돌리면 `entries/` → `.archive/` 이동(삭제가 아니다) · `fz-findings/APPLIED.md` 1행 · `INDEX.md` 대기열 행 제거를 함께 처리한다(기각·흡수의 수동 경로와 동시 쓰기 잠금은 레지스트리 README §1). APPLIED 행에는 노트 이름만 남으므로 반영처(파일:섹션 + 버전 + oracle 결과)는 노트 본문에 적는다. 본 원장에는 등재하지 않는다 — 승격이 아니라 수리이기 때문이다.
 
+- ⛔ **승격 완료 → 근거 엔트리 `applied: full`** — 트랙 D 절에 `✅ **승격 완료` 를 적은 판은 그 절 `관측 #` 엔트리에 `applied: full` 을 쓰고, 남은 축은 새 엔트리로 쪼갠다. 배출은 승격 판 노트 `Closes:` 또는 레지스트리 README §1 처분이다. 위생 검사 `--ledger` 가 `승격 완료 근거 잔존` 으로 남은 근거를 센다(이 축이 없어 D-2 근거 F-022 · F-045 · F-098 이 두 달 남았다)
+- ⛔ **반영 기록은 수리한 세션이 쓴다** — 엔트리 frontmatter `applied` · `applied_ref` 와 본문 `## 반영` 절을 같은 세션에 쓴다. 다음 릴리스 노트의 `Closes:` 는 이 기록에서 `applied: full` 만 모은다
+
 ### D-2: coverage-unit-mismatch (트랙 D 관측 #1~#3)
 
 - 관측 #1: `fz-findings` **F-022** — 패리티 표 항목을 "눈에 띈 것" 으로 만들어 6/6 = 100%, 이틀 뒤 7번째 값 출현. 자체 기록 2세션
