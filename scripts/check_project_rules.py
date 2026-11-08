@@ -212,6 +212,10 @@ def check(rules: dict, index: dict, project) -> list:
     validate_shape(rules)
     if not isinstance(index, dict) or not _strs(index.get("files", [])):
         raise Unrun("index 형식 오류 — 객체이고 files 는 문자열 배열이다")
+    cands = index.get("candidates")
+    if cands is not None and not (index.get("absent") is True and isinstance(cands, list) and all(
+            isinstance(c, dict) and isinstance(c.get("path"), str) and isinstance(c.get("via"), str) for c in cands)):
+        raise Unrun("index 형식 오류 — candidates 는 absent 색인에만 있는 {path, via} 배열이다(F-513)")
     v = []
     guide_files = set(index.get("files", []))
     axes = rules.get("axes") or {}
@@ -295,7 +299,9 @@ def project_arch(rules: dict) -> dict:
 def compare(a: dict, b: dict) -> str | None:
     if a == b:
         return None
-    for k in ("schemaVersion", "absent", "files"):
+    if set(a) != set(b):
+        return f"최상위 키 차이: {sorted(set(a) ^ set(b))}"
+    for k in ("schemaVersion", "absent", "files", "candidates"):
         if a.get(k) != b.get(k):
             return f"{k}: {a.get(k)!r} ≠ {b.get(k)!r}"
     sa, sb = a.get("sections", []), b.get("sections", [])
@@ -505,7 +511,20 @@ def self_test() -> int:
             rc, out = cli("rules-real-violation-exit1", mutated(lambda r: r["axes"].update(naming="…DTO")))
             case("rules-real-violation-exit1", rc == VIOLATION and "V2" in out, f"exit {rc} · {out.strip()[-160:]}")
 
-        for fn in (t_records, t_examples, t_projection, t_compare, t_shape):   # ⛔ `t` 는 임시 폴더 Path 다 — 루프 변수로 쓰면 클로저가 덮인다
+        def t_candidates():
+            # F-513 — absent 색인의 candidates 는 '지침 없음'을 '위반 없음'으로 읽지 않게 하는 신호다. 검증기는 그 모양만 본다
+            cands = dict(absent, candidates=[{"path": "AI/review-guidelines.md", "via": "../CLAUDE.md"}])
+            none = {"schemaVersion": 1, "axes": {}, "gaps": AXES, "conflicts": [], "rules": []}
+            code, v = run(none, idx=cands)
+            case("absent-with-candidates-ok absent + candidates 색인 · 전 축 gaps 레코드는 exit 0", code == OK, f"exit {code} {v}")
+            code, v = run(none, idx=dict(index, candidates=cands["candidates"]))
+            case("candidates-on-present-index-exit2 지침이 있는 색인의 candidates 는 형식 오류", code == UNRUN, f"exit {code} {v}")
+            code, v = run(none, idx=dict(absent, candidates=[{"path": 1}]))
+            case("candidates-bad-shape-exit2 candidates 항목은 {path, via} 문자열", code == UNRUN, f"exit {code} {v}")
+            why = compare(cands, absent)
+            case("compare-extra-key-named 최상위 키가 다르면 그 키를 사유로 낸다", why is not None and "candidates" in why, why)
+
+        for fn in (t_records, t_examples, t_projection, t_compare, t_shape, t_candidates):   # ⛔ `t` 는 임시 폴더 Path 다 — 루프 변수로 쓰면 클로저가 덮인다
             try:
                 fn()
             except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다

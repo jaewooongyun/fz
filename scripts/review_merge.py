@@ -16,6 +16,9 @@ Lead 가 손으로 하던 기계 작업만 한다 — 판정(`include`·`observa
   GPT verdict  reverse → disposition question + oracle(§6 — 이종 검증에 삭제 권한을 주지 않는다). 등급은 hold 이고
                보고서에는 question 에만 싣는다 · challenge → Lead 확인
   contested    교차 판정이 갈린 항목은 원본 severity 와 crossVerdicts 를 그대로 둔다(스크립트가 고르지 않는다)
+  axisCoverage 축마다 한 행 — Claude(finding · none · not_applicable)와 GPT(axis_coverage: found · none · gap)를
+               finding ≡ found > gap > none > not_applicable 로 고른다. 모르는 값은 gap 으로 센다(판정 못 함을 none 에
+               묻지 않는다 · F-514). 양쪽 원래 행(값 · 사유)은 그대로 남긴다. 어느 입력에도 축 정보가 없으면 키가 없다
   입력 계약     severity 는 네 값 · confidence 는 0-100 숫자(없어도 된다) · id 는 겹치지 않는다(reviews 는 겹친 id 에 렌즈를
                붙여 가른다) · verdict 는 §6 네 종류이고 대상이 Claude 후보에 있다 — 어기면 거부. 알아보지 못하는 형태는 exit 2
 
@@ -50,6 +53,9 @@ SEVERITIES = ("critical", "major", "minor", "suggestion")
 GRADES = ("post", "hold", "suggestion")
 VERDICT_KINDS = ("agree", "supplement", "challenge", "reverse")   # §6
 CONFIDENCE_FLOOR = 80                      # OVERRIDE 의 보고 하한과 같은 값 — 여기서는 삭제가 아니라 hold 로 쓴다
+CRAFT_AXES = ("idiom", "naming", "architecture", "ui_structure", "placement", "design_alternative")   # workflows/peer-review.js 와 같다
+AXIS_RANK = {"finding": 3, "found": 3, "gap": 2, "none": 1, "not_applicable": 0}
+AXIS_NAME = {3: "finding", 2: "gap", 1: "none", 0: "not_applicable"}
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 QUOTE_RE = re.compile(r"`([^`\n]+)`")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -269,6 +275,39 @@ def gpt_sidecars(gpt_path: str, diff_path: str) -> None:
         raise Reject(f"stale — GPT 독립 첫 패스가 본 diff({want[:12]})와 병합 diff({got[:12]})가 다르다. 다시 돌리거나 --gpt-unavailable 로 사유를 적는다")
 
 
+def axis_rows(doc, keys) -> list | None:
+    """axisCoverage 행(본문 · reviews[] 렌즈별). 어디에도 없으면 None — 0행과 구분한다."""
+    if not isinstance(doc, dict):
+        return None
+    rows, seen = [], False
+    for part, lens in [(doc, None)] + [(r, r.get("agent")) for r in doc.get("reviews") or [] if isinstance(r, dict)]:
+        k = next((k for k in keys if part.get(k) is not None), None)
+        if k is None:
+            continue
+        if not isinstance(part[k], list):
+            raise Unrun(f"{k} 가 배열이 아니다")
+        seen = True
+        for row in part[k]:
+            if not isinstance(row, dict) or not isinstance(row.get("axis"), str) or not isinstance(row.get("status"), str):
+                raise Unrun(f"{k} 행 형식 오류 — axis · status 는 문자열이다: {str(row)[:80]}")
+            rows.append({"axis": row["axis"], "status": row["status"], "note": row.get("note"), **({"lens": lens} if lens else {})})
+    return rows if seen else None
+
+
+def merge_axes(claude_rows, gpt_rows) -> list | None:
+    """축별 병합 — 판정은 높은 쪽(finding ≡ found > gap > none > not_applicable). 모르는 값은 gap 으로 센다."""
+    if claude_rows is None and gpt_rows is None:
+        return None
+    every = (claude_rows or []) + (gpt_rows or [])
+    out = []
+    for ax in list(CRAFT_AXES) + sorted({r["axis"] for r in every} - set(CRAFT_AXES)):
+        sides = {name: [{k: v for k, v in r.items() if k != "axis"} for r in rows or [] if r["axis"] == ax]
+                 for name, rows in (("claude", claude_rows), ("gpt", gpt_rows))}
+        ranks = [AXIS_RANK.get(r["status"], 2) for side in sides.values() for r in side]
+        out.append({"axis": ax, "status": AXIS_NAME[max(ranks)] if ranks else "gap", **sides})   # 아무도 안 본 축 = gap
+    return out
+
+
 # ── 병합 ───────────────────────────────────────────────────────────
 def axis_key(c):
     return ("craft", c["craftAxis"]) if c.get("craftAxis") else ("defect", c["discoveryAxis"])
@@ -312,7 +351,7 @@ def grade(c: dict) -> str:
     return "hold" if low else "post"
 
 
-def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable) -> dict:
+def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable, axes=None) -> dict:
     cands = [dict(c) for c in claude + gpt]
     by_id = {c["id"]: c for c in cands}
     for c in cands:
@@ -363,7 +402,7 @@ def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable) -> di
     report = {g: [c["id"] for c in out if c["grade"] == g and c["disposition"] != "question"] for g in GRADES}
     report |= {"question": [c["id"] for c in out if c["disposition"] == "question"],
                "leadCheck": [c["id"] for c in out if c["leadCheck"]]}
-    return {
+    result = {
         "schemaVersion": 1,
         "inputs": {"claude": len(claude), "gpt": len(gpt), "gptVerdicts": len(verdicts), "gptUnavailable": gpt_unavailable,
                    "evidenceChecked": texts is not None},
@@ -376,6 +415,9 @@ def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable) -> di
                     "contested": sum(1 for c in out if c.get("crossVerdict") == "contested"),
                     "evidenceUnverified": sum(1 for c in out if c["evidenceVerified"] is False)},
     }
+    if axes is not None:
+        result["axisCoverage"] = axes
+    return result
 
 
 def load(path: str):
@@ -392,12 +434,15 @@ def run_merge(a) -> int:
         raise Unrun("GPT 독립 입력(--gpt)이 없는데 사유(--gpt-unavailable)도 없다 — 조용히 Claude 단독으로 병합하지 않는다")
     if a.gpt:
         gpt_sidecars(a.gpt, a.diff)
-    gpt, verdicts = gpt_candidates(load(a.gpt)) if a.gpt else ([], [])
+    gpt_doc = load(a.gpt) if a.gpt else None
+    gpt, verdicts = gpt_candidates(gpt_doc) if a.gpt else ([], [])
+    claude_doc = load(a.claude)
+    axes = merge_axes(axis_rows(claude_doc, ("axisCoverage",)), axis_rows(gpt_doc, ("axis_coverage", "axisCoverage")))
     try:
         texts = hunk_text(pathlib.Path(a.diff).read_text(encoding="utf-8", errors="replace"))
     except OSError as e:
         raise Unrun(f"diff 를 읽을 수 없다 — {e}")
-    result = merge(claude_candidates(load(a.claude)), gpt, verdicts, texts, None if a.gpt else a.gpt_unavailable.strip())
+    result = merge(claude_candidates(claude_doc), gpt, verdicts, texts, None if a.gpt else a.gpt_unavailable.strip(), axes)
     text = json.dumps(result, ensure_ascii=False, indent=1) + "\n"
     if a.out:
         pathlib.Path(a.out).write_text(text, encoding="utf-8")
@@ -638,7 +683,54 @@ def self_test() -> int:
                  arm("arm-stale", dict(ok_audit, inputs={"diff.patch": "0" * 64})) == REJECT)
             case("sidecar-nohash — 감사에 diff 해시가 없으면 exit 2", arm("arm-nohash", {"exit": 0, "isolationApplied": True}) == UNRUN)
 
-    for t in (t_group, t_evidence, t_paths, t_verdicts, t_attribution, t_grades, t_inputs, t_fixture, t_cli):
+    def t_axes():
+        # F-514 — GPT 의 gap(판정 못 함)이 병합에서 사라지면 Claude 의 none 만 남아 '위반 없음'으로 읽힌다
+        six = lambda tag, **over: [{"axis": a, "status": over.get(a, "none"), "note": f"{tag}-{a}"} for a in CRAFT_AXES]  # noqa: E731
+        C = lambda **over: axis_rows({"issues": [], "axisCoverage": six("c", **over)}, ("axisCoverage",))  # noqa: E731
+        G = lambda **over: axis_rows({"findings": [], "axis_coverage": six("g", **over)}, ("axis_coverage", "axisCoverage"))  # noqa: E731
+        at = lambda rows, a: next(r for r in rows if r["axis"] == a)  # noqa: E731
+        m = merge_axes(C(), G(architecture="gap"))
+        case("axis-gap-over-none GPT gap 은 Claude none 에 묻히지 않는다", at(m, "architecture")["status"] == "gap", at(m, "architecture"))
+        arch = at(m, "architecture")
+        case("axis-gap-reasons-kept 두 쪽 원래 값 · 사유가 남는다",
+             arch["claude"] == [{"status": "none", "note": "c-architecture"}] and arch["gpt"] == [{"status": "gap", "note": "g-architecture"}], arch)
+        m = merge_axes(C(idiom="finding"), G(idiom="gap"))
+        case("axis-found-over-gap 발견은 gap 보다 높다", at(m, "idiom")["status"] == "finding", at(m, "idiom"))
+        case("axis-none-both-none 둘 다 none 이면 none", at(m, "naming")["status"] == "none" and len(m) == len(CRAFT_AXES), m)
+        m = merge_axes(C(), G(ui_structure="partial"))
+        ui = at(m, "ui_structure")
+        case("axis-unknown-value-kept 모르는 값은 원문 그대로 · 병합은 gap(none 으로 낮추지 않는다)",
+             ui["status"] == "gap" and ui["gpt"][0]["status"] == "partial", ui)
+        lens = axis_rows({"reviews": [{"agent": "arch", "issues": [], "axisCoverage": six("c", naming="finding")}]}, ("axisCoverage",))
+        m = merge_axes(lens, G(naming="found"))
+        nm = at(m, "naming")
+        case("axis-finding-equals-found finding ≡ found — 한 축 한 행 · 렌즈 · 원래 값 보존",
+             nm["status"] == "finding" and [r["status"] for r in nm["claude"] + nm["gpt"]] == ["finding", "found"]
+             and nm["claude"][0].get("lens") == "arch" and [r["axis"] for r in m].count("naming") == 1
+             and at(merge_axes(C(), G(naming="found")), "naming")["status"] == "finding", nm)
+        alone = at(merge_axes(C(design_alternative="not_applicable"), None), "design_alternative")
+        masked = at(merge_axes(C(design_alternative="not_applicable"), G(design_alternative="gap")), "design_alternative")
+        case("axis-not-applicable-kept 한쪽만이면 not_applicable 그대로 · gap 을 가리지는 않는다",
+             alone["status"] == "not_applicable" and alone["gpt"] == [] and masked["status"] == "gap", f"{alone} · {masked}")
+        plain = M([issue("A1")])
+        case("axis-missing-input-unchanged 축 정보가 없으면 키가 없다(옛 출력 그대로)",
+             "axisCoverage" not in plain and merge_axes(None, None) is None and axis_rows({"issues": []}, ("axisCoverage",)) is None, list(plain))
+        me = pathlib.Path(__file__).resolve()
+        with tempfile.TemporaryDirectory(prefix="fz-review-merge-axes-") as tmp:
+            t = pathlib.Path(tmp)
+            (t / "diff.patch").write_text(DIFF, encoding="utf-8")
+            (t / "c.json").write_text(json.dumps({"issues": [issue("A1")], "axisCoverage": six("c")}), encoding="utf-8")
+            (t / "g.json").write_text(json.dumps({"findings": [], "axis_coverage": six("g", architecture="gap")}), encoding="utf-8")
+            (t / "bad.json").write_text(json.dumps({"issues": [], "axisCoverage": {"architecture": "none"}}), encoding="utf-8")
+            argv = [sys.executable, str(me), "--diff", str(t / "diff.patch")]
+            p = subprocess.run(argv + ["--claude", str(t / "c.json"), "--gpt", str(t / "g.json"), "--out", str(t / "o.json")], capture_output=True, text=True)
+            got = json.loads((t / "o.json").read_text(encoding="utf-8")).get("axisCoverage") if p.returncode == OK else p.stderr[-160:]
+            case("axis-cli-wired CLI 병합 결과에 GPT axis_coverage 의 gap 이 실린다",
+                 isinstance(got, list) and at(got, "architecture")["status"] == "gap", got)
+            p = subprocess.run(argv + ["--claude", str(t / "bad.json"), "--gpt-unavailable", "시험"], capture_output=True, text=True)
+            case("axis-bad-shape-exit2 axisCoverage 가 배열이 아니면 exit 2", p.returncode == UNRUN and "Traceback" not in p.stderr, p.stderr[-160:])
+
+    for t in (t_group, t_evidence, t_paths, t_verdicts, t_attribution, t_grades, t_inputs, t_fixture, t_cli, t_axes):
         try:
             t()
         except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다
