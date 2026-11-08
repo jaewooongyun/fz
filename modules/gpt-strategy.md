@@ -243,7 +243,7 @@ GPT 는 모드와 독립이다(`modules/mode-gate.md` § GPT 는 모드와 독�
 
 ### fz-plan 원장 (verify-gates 없음)
 
-- 대화형: Phase 2 의 `verify-gates` 를 부르지 않는다. 게이트 원장 판정을 **Gate 2 질문에 합쳐** "게이트 판정: GPT 미사용 — 사용자 확인" 으로 묻고, 답을 `{WORK_DIR}/plan/verify-result.md` 에 기록한 뒤 승인되면 `gate_check.py --finalize` 로 확정한다
+- 대화형: Phase 2 의 `verify-gates` 를 부르지 않는다. 게이트 원장 판정을 **Gate 2 질문에 합쳐** "게이트 판정: GPT 미사용 — 사용자 확인" 으로 묻고, 답을 `{WORK_DIR}/plan/verify-result.md` 에 기록한 뒤 승인되면 `skills/fz-plan/SKILL.md` 4.5 순서대로 `gate_check.py --baseline-probe` 로 기준선을 잰 뒤 `--finalize` 로 확정한다(`BASELINE: required` 원장은 기준선 기록 없이 확정을 거부한다 · 잴 수 없으면 `--finalize --no-baseline <사유>`)
 - 비대화형(질문 도구 없음 · 자율): draft 원장(`gates/plan.draft.md`)을 확정하지 않고 남긴 채 결과에 "원장 미확정 — GPT 미사용 · 사용자 확인 필요" 를 보고한다
 
 ### off 저장 실패 — `--model off`

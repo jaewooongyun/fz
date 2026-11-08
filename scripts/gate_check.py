@@ -669,11 +669,14 @@ def evidence_signature(gate: Gate, cwd: str, exit_code, output: str, env: str) -
 
 # ── 실행기 ──────────────────────────────────────────────────────────────
 class Result:
-    def __init__(self, ok, exit_code, output, error=None, killed=False):
+    def __init__(self, ok, exit_code, output, error=None, killed=False, measured=True):
         self.ok = ok
         self.exit_code = exit_code
         self.output = output
         self.error = error
+        # ⛔ 판정을 냈는가 — 실행 실패 · 출력 초과 · timeout 은 exit+EXPECT 를 재지 못했다. 기준선은 이것을 FAIL 이 아니라
+        #    UNRUN 으로 적는다('변경 전 실패' 와 '못 잼' 이 같은 FAIL 이면 판정 불가가 정상으로 읽힌다)
+        self.measured = measured
         # ⛔ 손자를 강제 종료했는지. 판정을 뒤집지는 않지만(CHECK 계약은 exit+EXPECT 다)
         #    증거에 남겨야 한다 — 프로세스를 새는 CHECK 를 저자가 알아챌 수 있어야 한다.
         self.killed = killed
@@ -770,7 +773,7 @@ def run_check(gate: Gate, cwd: str, budget_s: float) -> Result:
             start_new_session=True,  # 프로세스 그룹 분리 — 손자까지 죽이기 위함
         )
     except OSError as e:
-        return Result(False, None, "", f"실행 실패: {e}")
+        return Result(False, None, "", f"실행 실패: {e}", measured=False)
 
     try:
         pgid = os.getpgid(proc.pid)   # 살아 있을 때 확보 — 종료 후엔 조회 불가
@@ -865,10 +868,10 @@ def run_check(gate: Gate, cwd: str, budget_s: float) -> Result:
 
     if state["overflow"]:
         return Result(False, proc.returncode, combined,
-                      f"출력이 {MAX_OUTPUT_BYTES} 바이트를 초과", killed=forced_kill)
+                      f"출력이 {MAX_OUTPUT_BYTES} 바이트를 초과", killed=forced_kill, measured=False)
     if timed_out:
         return Result(False, proc.returncode, combined,
-                      f"{timeout:.0f}초 timeout", killed=forced_kill)
+                      f"{timeout:.0f}초 timeout", killed=forced_kill, measured=False)
 
     # EXPECT 는 원장 한 줄이라 개행을 담을 수 없다(ATTR_RE 가 줄 단위로 매칭하고
     # render_ledger 가 개행을 거부한다). 그래서 stdout+stderr 를 이어 붙일 때
@@ -1300,12 +1303,13 @@ def confirm(ledger: Ledger, gate_id: str) -> int:
     declared = gate.attrs.get("CRITERION_HASH", "")
     # ⛔ 확인을 기록할 자리를 **묻기 전에** 본다(F-440). 이전 판은 EVIDENCE 를 만나면 블록 처리를 끝내서,
     #    EVIDENCE 가 CRITERION_HASH 보다 앞이거나 줄이 없으면 `[x]` 만 찍고 CONFIRMED 없이 '기록됨' 이라 했다.
-    text = ledger.path.read_text(encoding="utf-8")
-    lines = text.split("\n")
-    start, where = _gate_block(lines, gate_id)
-    bad = [k for k in ("CRITERION_HASH", "EVIDENCE") if len(where.get(k, [])) != 1]
-    if start is None or bad:
-        raise LedgerError(f"{gate_id}: MANUAL 블록에 {' · '.join(bad) or '머리 줄'} 줄이 정확히 1개가 아니다 — "
+    # ⛔ 자리는 파서가 정한다(gate.line · attr_lines — 펜스 · 블록 경계 문법이 한 벌). 자체 스캐너를 두면 펜스 안 예시 줄을
+    #    속성으로 세어 정상 원장을 거부한다(gate_block_hash 와 같은 교훈). 속성 중복은 파서가 이미 거부한다
+    lines = ledger.text.replace("\r\n", "\n").split("\n")
+    bad = [k for k in ("CRITERION_HASH", "EVIDENCE") if k not in gate.attr_lines]
+    head = GATE_RE.match(lines[gate.line - 1])
+    if bad or not head or head.group(2) != gate_id:
+        raise LedgerError(f"{gate_id}: MANUAL 블록에 {' · '.join(bad) or '머리 줄'} 줄이 없다 — "
                           "확인을 기록할 자리가 없다(원장 무변경). 블록을 고친 뒤 다시 실행한다")
     print(f"확인 조건: {criterion}")
     if declared and declared != expected_hash:
@@ -1323,10 +1327,10 @@ def confirm(ledger: Ledger, gate_id: str) -> int:
 
     stamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     token = confirm_token(gate_id, expected_hash, stamp)
-    baseline = sha(text)
-    head = GATE_RE.match(lines[start])
-    hline, eline = where["CRITERION_HASH"][0], where["EVIDENCE"][0]
-    drop = set(where.get("CONFIRMED", []))      # 기존 확인 줄은 새 것으로 대체
+    baseline = sha(ledger.text)                 # ⛔ 파싱한 원문 기준 CAS — 파싱 뒤 · 쓰기 전 변경을 모두 잡는다
+    start = gate.line - 1
+    hline, eline = gate.attr_lines["CRITERION_HASH"] - 1, gate.attr_lines["EVIDENCE"] - 1
+    drop = {gate.attr_lines["CONFIRMED"] - 1} if "CONFIRMED" in gate.attr_lines else set()   # 기존 확인 줄은 새 것으로 대체
     out = []
     for i, raw in enumerate(lines):
         if i in drop:
@@ -1342,7 +1346,7 @@ def confirm(ledger: Ledger, gate_id: str) -> int:
             out.append(f"  CONFIRMED: {stamp} {expected_hash} {token}")
     if sha(ledger.path.read_text(encoding="utf-8")) != baseline:
         raise LedgerError(f"{gate_id}: 확인 중 원장이 변경됨 (CAS 충돌)")
-    write_atomic(ledger.path, "\n".join(out))
+    write_atomic(ledger.path, ledger.newline.join(out))
     # ⛔ 쓴 것을 다시 읽어 판정한다 — '기록됨' 출력은 met 의 증거가 아니다
     try:
         fresh = load(ledger.path)
@@ -1355,24 +1359,6 @@ def confirm(ledger: Ledger, gate_id: str) -> int:
         return EXIT_UNMET
     print(f"확인 기록됨 — token {token} · 다시 읽은 판정 met")
     return EXIT_OK
-
-
-def _gate_block(lines: list, gate_id: str):
-    """(머리 줄 번호 | None, 속성 이름 → 블록 안 줄 번호 목록). 블록은 다음 게이트 머리 줄에서 끝난다 — 속성 순서와 무관하다."""
-    start, where = None, {}
-    for i, raw in enumerate(lines):
-        m = GATE_RE.match(raw)
-        if m:
-            if start is not None:
-                break
-            if m.group(2) == gate_id:
-                start = i
-            continue
-        if start is not None:
-            m2 = ATTR_RE.match(raw)
-            if m2:
-                where.setdefault(m2.group(1), []).append(i)
-    return start, where
 
 
 # ── self-test (매니페스트 기반) ─────────────────────────────────────────
@@ -1875,7 +1861,9 @@ def baseline_probe(ledger: Ledger, allow_pass, budget_s: float) -> int:
                 t0 = time.monotonic()
                 result = run_check(gate, cwd, remaining)
                 elapsed = time.monotonic() - t0
-                res = "PASS" if result.ok else "FAIL"
+                res = "PASS" if result.ok else ("FAIL" if result.measured else "UNRUN")
+                if res == "UNRUN":
+                    reason = "error:" + (result.error or "판정 불가")
         counts[res] = counts.get(res, 0) + 1
         rows[gate.id] = {"result": res, "oracle_hash": h, "elapsed_s": round(elapsed, 3),
                          "timeout_s": timeout, "reason": reason}
@@ -2052,7 +2040,11 @@ def finalize(ledger: Ledger, only=None, no_baseline=None) -> int:
         text = "\n".join(out)
     if no_baseline is not None:
         rows = text.split("\n")
-        hit = next(i for i, raw in enumerate(rows) if re.match(BASELINE_HEADER + r": ?" + BASELINE_REQUIRED + r"\s*$", raw))
+        # ⛔ 헤더는 파서와 같은 규칙(HEADER_RE + strip)으로 찾는다 — 좁은 정규식은 `BASELINE:  required` 를 놓쳐 StopIteration(exit 1)
+        hit = next((i for i, raw in enumerate(rows) for m in [HEADER_RE.match(raw)]
+                    if m and m.group(1) == BASELINE_HEADER and m.group(2).strip() == BASELINE_REQUIRED), None)
+        if hit is None:
+            raise LedgerError(f"{BASELINE_HEADER}: {BASELINE_REQUIRED} 헤더 줄을 찾지 못했다 — 기준선 생략을 기록할 수 없다")
         rows[hit] = f"{BASELINE_HEADER}: {BASELINE_SKIPPED} — {no_baseline.strip()}"
         text = "\n".join(rows)
         print(f"기준선 생략 기록: {no_baseline.strip()}")
