@@ -149,9 +149,9 @@ _VAR_RE = re.compile(r"\$\{(\w+)(?::?[-?=][^}]*)?\}|\$(\w+)")
 GATE_CHECK_NAME = "gate_check.py"
 GATE_OPTS = frozenset(("--status", "--reverify", "--confirm", "--set-state", "--self-test", "--from-plan", "--root", "--out",
                        "--discover", "--cross-session", "--oracle-fields", "--finalize", "--verdict-check", "--only",
-                       "--budget", "--help"))
+                       "--budget", "--baseline-probe", "--allow-pass", "--no-baseline", "--help"))
 GATE_VALUE_OPTS = frozenset(("--confirm", "--set-state", "--from-plan", "--root", "--out", "--discover",
-                             "--verdict-check", "--only", "--budget"))
+                             "--verdict-check", "--only", "--budget", "--allow-pass", "--no-baseline"))
 GATE_WRITE_FLAGS = frozenset(("--finalize", "--confirm", "--set-state", "--only", "--reverify"))
 _PY_RE = re.compile(r"^python[0-9.]*$")
 _ASSIGN_WORD_RE = re.compile(r"^\w+=")
@@ -296,8 +296,9 @@ def _gate_call_writes(flags: set) -> bool:
        `--set-state` 는 `--status` 보다 먼저 분기하므로 같이 있어도 쓰기다. 플래그 없는 기본 실행 · `--only` ·
        `--reverify` 는 CHECK 를 돌려 증거를 쓴다.
     """
-    if flags & {"-h", "--help", "--self-test", "--discover", "--from-plan", "--cross-session", "--oracle-fields"}:
-        return False                      # `--from-plan` 이 쓰는 `--out` 은 WRITE_TARGET_RES 가 따로 본다
+    if flags & {"-h", "--help", "--self-test", "--discover", "--from-plan", "--cross-session", "--oracle-fields",
+                 "--baseline-probe"}:
+        return False                      # `--from-plan` 이 쓰는 `--out` 은 WRITE_TARGET_RES 가 따로 본다 · 기준선은 옆 파일만 쓴다
     if "--finalize" in flags:
         return True
     if "--verdict-check" in flags:

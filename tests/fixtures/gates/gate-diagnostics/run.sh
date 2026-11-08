@@ -49,7 +49,7 @@ for v in FZ_GATES_LEDGER FZ_GATES_OFF FZ_GATES_TRACE FZ_GATES_HOOK_BUDGET_S; do 
 mkledger() {
   mkdir -p "$1" && printf '%s' "$2" > "$1/steps.json" \
     && python3 "$G" --from-plan "$1/steps.json" --root "$1" --out "$1/gates/plan.md" >/dev/null 2>&1 \
-    && python3 "$G" --finalize "$1/gates/plan.md" >/dev/null 2>&1 \
+    && python3 "$G" --finalize --no-baseline "fixture — 기준선 축이 아니다" "$1/gates/plan.md" >/dev/null 2>&1 \
     && python3 "$G" --set-state planned "$1/gates/plan.md" >/dev/null 2>&1 \
     && python3 "$G" --set-state active "$1/gates/plan.md" >/dev/null 2>&1 || setup_fail "원장 준비 실패: $1"
 }

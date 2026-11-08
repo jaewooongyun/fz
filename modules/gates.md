@@ -65,7 +65,7 @@ WORK_DIR 결정은 `modules/context-artifacts.md` Work Dir Resolution을 따른�
 
 **진행 기록** = `- [x]` · 빈 값/`pending` 이 아닌 `EVIDENCE:`(위조·낡은 증거 포함 — 진위가 아니라 흔적을 본다) · `CONFIRMED:`. 진행 기록이 있던 게이트(직전 met · `- [x]` · 증거 흔적 — 재승인으로 unmet 이 된 PASS 포함)가 재실행에서 떨어지면 `EVIDENCE: pending; demoted` 로 남아(reverify 이력) 미착수와 갈린다. ⛔ **잡지 못하는 것(잔존 위험) 두 갈래**: ① 코드를 고치고도 게이트를 한 번도 안 돌렸거나 실패만 한 세션은 흔적이 0 이라 `planned` 로 갈 수 있고 Stop hook 도 통과한다 — 거부 범위를 '진행 기록이 있는 원장' 으로 정한 결과다. ② 진행 중인 원장에서 `/fz-plan` 4.5 를 다시 돌리면 산문 단계 `cp plan.draft.md plan.md` 가 기록을 판정기 밖에서 먼저 덮고, 이어지는 `--finalize` · `--set-state planned` 는 전제(승인 · 기록 0)를 갖춘 원장을 보게 된다. 훅 차단 사유가 `--set-state planned` 를 안내하므로 두 갈래 모두 닿기 쉽다(`tests/fixtures/gates/planned-state` 의 `residual-no-record` · `residual-replan` 셀이 지금 동작을 고정한다).
 
-⛔ **하향 설치 전**: 4.44.0 이하 판정기는 `STATE: planned` 를 모른다 — exit 3 으로 읽어 Stop hook 이 '원장 계약 위반' 으로 막는다. 이전 판으로 되돌리기 전에 `planned` 원장마다 `--set-state active` 를 돌린다. 같은 이유로 R-F4 이전 판정기는 `ENV:` 를 미지 속성(exit 3)으로 읽는다 — 되돌리기 전에 원장의 `ENV:` 줄을 지운다 — `ENV:` 선언은 승인 해시 안이라 지운 게이트는 미충족이 되고, 재확정(`--finalize`)과 재실행이 필요하다.
+⛔ **하향 설치 전**: 4.44.0 이하 판정기는 `STATE: planned` 를 모른다 — exit 3 으로 읽어 Stop hook 이 '원장 계약 위반' 으로 막는다. 이전 판으로 되돌리기 전에 `planned` 원장마다 `--set-state active` 를 돌린다. 같은 이유로 R-F4 이전 판정기는 `ENV:` 를 미지 속성(exit 3)으로 읽는다 — 되돌리기 전에 원장의 `ENV:` 줄을 지운다 — `ENV:` 선언은 승인 해시 안이라 지운 게이트는 미충족이 되고, 재확정(`--finalize`)과 재실행이 필요하다. `SIDE_EFFECTS:` 도 같다 — 4.52.0 이하 판정기는 미지 속성(exit 3)으로 읽으므로 되돌리기 전에 그 줄을 지우고 재확정한다(`BASELINE:` 헤더는 구판이 무시한다).
 
 ⛔ **`ready_for_review`도 미완료다.** fz-code가 끝났다고 원장을 닫으면 fz-review의 재검증이 강등을 수행할 수 없다 — 중간 상태가 그 구멍을 막는다.
 
@@ -189,6 +189,21 @@ CHECK 를 쓰기 전에 **한 줄 묻는다.**
 부수 효과도 하나 더 있었다: 그 게이트는 계약이 아니라 **표면**에 묶여 있어 base 리베이스에서 깨졌다.
 ⭐ **표면을 잠그면 표면이 움직일 때마다 깨진다.** 잠글 것은 *무엇이 참이어야 하는가*지
 *어떤 모양으로 쓰여 있는가*가 아니다.
+
+⛔ **TIMEOUT 은 기준선 실측 소요로 정한다**(F-546) — 주석에 적은 예상 수치가 아니다. 확정 전 `--baseline-probe` 가
+게이트마다 소요를 재고, TIMEOUT 절반을 넘으면 WARN 한다. 같은 프로브가 **무변경 트리에서 이미 PASS** 인 게이트를
+exit 1 로 드러낸다(F-245 — 변경을 재지 않는 게이트). 돌리는 것은 `SIDE_EFFECTS: none|tmp` 선언 게이트뿐이다.
+
+| 선언 | 기준선 | 도장 |
+|---|---|---|
+| `SIDE_EFFECTS: none` · `tmp` | 돌린다 | 선언값이 해시 안 |
+| `SIDE_EFFECTS: writes — <사유>` | EXCLUDED | 선언값이 해시 안 |
+| 미선언 | UNRUN(WARN) | 키 없음(종전 도장) |
+| `MANUAL` | EXCLUDED | 해당 없음 |
+
+`--from-plan` 원장은 `BASELINE: required` 헤더를 단다. 그 원장의 전체 `--finalize` 는 `<원장>.baseline.json` 이
+없거나 낡았거나(oracle 불일치), 허용 밖 PASS 나 UNRUN 이 있으면 exit 3 이다. 잴 수 없으면
+`--finalize --no-baseline <사유>` 가 `BASELINE: skipped — 사유` 를 남긴다. 헤더 없는 기존 원장과 `--only` 보강은 종전 그대로다.
 
 ### `EXPECT:` 문법
 

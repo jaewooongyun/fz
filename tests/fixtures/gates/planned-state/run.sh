@@ -510,7 +510,7 @@ try:
             raise Setup(f"plan JSON 준비 실패: {e}")
         rc, out = c.gc("--from-plan", str(pj), "--root", str(c.r), "--out", str(c.led))
         check(c.name, rc == 0 and c.state() == "active", "생성(--from-plan) STATE active", f"rc={rc} {c.state()} {out[-200:]}")
-        rc, out = c.gc("--finalize", str(c.led))
+        rc, out = c.gc("--finalize", "--no-baseline", "fixture — 기준선 축이 아니다", str(c.led))
         want = "active" if VARIANT == "contract" else "planned"
         check(c.name, rc == 0 and c.state() == want, f"--finalize 뒤 STATE {want}", f"rc={rc} {c.state()} {out[-200:]}")
         rc, out = c.gc("--set-state", "planned", str(c.led))

@@ -76,7 +76,7 @@ sha() { "$PY" -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb")
 mkled() {
   mkdir -p "$1" && printf '%s' "$2" > "$1/steps.json" || setup_fail "steps 쓰기 실패"
   PATH="$WITH" "$PY" "$G" --from-plan "$1/steps.json" --root "$1" --out "$1/gates/plan.md" > "$1/mk.out" 2>&1 || { MKRC=1; return; }
-  PATH="$WITH" "$PY" "$G" --finalize "$1/gates/plan.md" >> "$1/mk.out" 2>&1 || { MKRC=1; return; }
+  PATH="$WITH" "$PY" "$G" --finalize --no-baseline "fixture — 기준선 축이 아니다" "$1/gates/plan.md" >> "$1/mk.out" 2>&1 || { MKRC=1; return; }
   PATH="$WITH" "$PY" "$G" --set-state planned "$1/gates/plan.md" >> "$1/mk.out" 2>&1
   [ "${3:-active}" = active ] && { PATH="$WITH" "$PY" "$G" --set-state active "$1/gates/plan.md" >> "$1/mk.out" 2>&1 || { MKRC=1; return; }; }
   MKRC=0

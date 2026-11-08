@@ -146,8 +146,15 @@ KNOWN_ATTRS = {
     #    통과 증거를 강등했다. CHECK 본문에서 추론하지 않는다(빈 값 · 대입 순서 · 리터럴이 추론을 틀리게 한다).
     #    선언(이름 목록)은 승인 해시 안이다(TOOLS 와 다르다 — `oracle_hash`). 하향 설치 전 이 줄을 지우면 재확정한다(modules/gates.md)
     "ENV",
+    # ⛔ `SIDE_EFFECTS: none|tmp|writes — <사유>` — `--baseline-probe` 가 무변경 트리에서 이 CHECK 를 돌려도 되는가(F-455).
+    #    none · tmp 만 돌리고 writes 는 제외 · 미선언은 UNRUN 이다(안전 기본). 선언하면 승인 해시 안이다(ENV 선례)
+    "SIDE_EFFECTS",
 }
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+SIDE_EFFECTS_RE = re.compile(r"(none|tmp)\Z|writes[ \t]*[—-][ \t]*\S")
+BASELINE_HEADER = "BASELINE"
+BASELINE_REQUIRED = "required"
+BASELINE_SKIPPED = "skipped"
 
 
 class Gate:
@@ -199,6 +206,12 @@ class Gate:
             bad = [t for t in (x.strip() for x in self.attrs["ENV"].split(",")) if not ENV_NAME.match(t)]
             if bad:
                 raise LedgerError(f"{self.id}: ENV 항목이 환경 변수 이름이 아니다 — {bad[0]!r}")
+        if "SIDE_EFFECTS" in self.attrs:
+            if not has_check:
+                raise LedgerError(f"{self.id}: SIDE_EFFECTS 는 CHECK 가 있어야 의미가 있다 — 수동 게이트는 명령을 돌리지 않는다")
+            if not SIDE_EFFECTS_RE.match(self.attrs["SIDE_EFFECTS"].strip()):
+                raise LedgerError(f"{self.id}: SIDE_EFFECTS 는 none · tmp · 'writes — <사유>' 중 하나 — "
+                                  f"{self.attrs['SIDE_EFFECTS']!r}")
         expect = self.attrs.get("EXPECT", "")
         # EXPECT 는 부분 문자열 매칭이다 (Python re 에 타임아웃이 없어 백트래킹을 막을 수 없다).
         # 저자가 정규식으로 착각하면 게이트가 영영 매칭되지 않으므로 알려야 한다.
@@ -392,6 +405,10 @@ class Ledger:
             raise LedgerError(f"CURRENT_RELEASE 형식 오류 — {cur!r}")
         if not cur and any(g.deferred for g in self.gates):
             raise LedgerError("DEFER 가 있는데 CURRENT_RELEASE 헤더가 없다 — 지금이 어느 릴리즈인지 모르면 미룸을 판정할 수 없다")
+        # ⛔ 오타 난 BASELINE 헤더를 종전 원장으로 흘리지 않는다 — 그러면 기준선 요구가 소리 없이 꺼진다
+        bl = self.headers.get(BASELINE_HEADER)
+        if bl is not None and bl != BASELINE_REQUIRED and not re.match(BASELINE_SKIPPED + r"[ \t]*[—-][ \t]*\S", bl):
+            raise LedgerError(f"BASELINE 헤더는 'required' 또는 'skipped — <사유>' — 받은 값 {bl!r}")
         for g in self.gates:
             g.validate()
 
@@ -545,6 +562,9 @@ def oracle_hash(gate: Gate, cwd: str) -> str:
     env_decl = ",".join(t.strip() for t in gate.attrs.get("ENV", "").split(",") if t.strip())
     if env_decl:
         fields["env"] = env_decl
+    # 같은 축 — 기준선 실행 여부가 승인 대상이다. 선언이 없으면 키를 넣지 않아 종전 도장이 그대로다(legacy-ledger-hash-golden)
+    if "SIDE_EFFECTS" in gate.attrs:
+        fields["side_effects"] = gate.attrs["SIDE_EFFECTS"].strip()
     return sha(json.dumps(fields, sort_keys=True, ensure_ascii=False))
 
 
@@ -1324,6 +1344,23 @@ def _run_pty(argv, typed: str):
     return p.returncode, out, err
 
 
+def _sidecar_reasons(ledger_path: Path, want: dict) -> list:
+    """기준선 옆 파일 대조 — 게이트별 결과와, 실행 게이트의 oracle_hash 가 지금 원장의 계약과 같은지."""
+    try:
+        rows = json.loads(baseline_path(ledger_path).read_text(encoding="utf-8"))["gates"]
+        led = load(ledger_path)
+    except (OSError, ValueError, KeyError, LedgerError, InfraError) as e:
+        return [f"기준선 옆 파일을 읽지 못했다 — {e}"]
+    out = []
+    for gid, result in want.items():
+        r, g = rows.get(gid) or {}, next((x for x in led.gates if x.id == gid), None)
+        if r.get("result") != result:
+            out.append(f"기준선 {gid} 결과 {r.get('result')!r} (기대 {result!r})")
+        if g is not None and g.is_runnable and r.get("oracle_hash") != oracle_hash(g, resolve_cwd(g, led)):
+            out.append(f"기준선 {gid} oracle_hash 가 지금 계약과 다르다")
+    return out
+
+
 def want_exit(case: dict) -> int:
     """케이스가 기대하는 exit code. 산출물 재파싱 가드가 `want` 정의 전에 필요하다."""
     return case["expect"]["exit"]
@@ -1381,15 +1418,17 @@ def self_test() -> int:
             #    확정 뒤 게이트 추가(F-334)·기록된 증거로 판정(--status) 같은 여러 단계 사례를 여기서 만든다.
             pre_reason = None
             for step in case.get("pre") or []:
+                # `{"args": [...], "exit": N}` — 비0 이 정상인 사전 단계(허용 밖 PASS 기준선처럼 기록은 남기고 exit 1)
+                step_args, step_exit = (step["args"], step["exit"]) if isinstance(step, dict) else (step, EXIT_OK)
                 o_buf, e_buf = io.StringIO(), io.StringIO()
                 so, se = sys.stdout, sys.stderr
                 sys.stdout, sys.stderr = o_buf, e_buf
                 try:
-                    pc = _dispatch(sandbox_args(step, sandbox) + [str(ledger_path)], quiet=False)
+                    pc = _dispatch(sandbox_args(step_args, sandbox) + [str(ledger_path)], quiet=False)
                 finally:
                     sys.stdout, sys.stderr = so, se
-                if pc != EXIT_OK:
-                    pre_reason = f"사전 단계 {step} exit {pc} — {e_buf.getvalue().strip()[-160:]}"
+                if pc != step_exit:
+                    pre_reason = f"사전 단계 {step_args} exit {pc} (기대 {step_exit}) — {e_buf.getvalue().strip()[-160:]}"
                     break
             for ed in (case.get("edits") or []) if pre_reason is None else []:
                 body = ledger_path.read_text(encoding="utf-8")
@@ -1431,6 +1470,13 @@ def self_test() -> int:
                     code, o_s, e_s = _run_pty(argv + [str(ledger_path)], case["pty_input"])
                     captured.write(o_s)
                     captured_err.write(e_s)
+                elif case.get("cli"):
+                    # 실제 CLI(하위 프로세스) — 인자 파싱 · 분기 · 종료 코드를 사용자가 부르는 꼴 그대로 잰다
+                    p = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve()), *argv, str(ledger_path)],
+                                       stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
+                    code = p.returncode
+                    captured.write(p.stdout)
+                    captured_err.write(p.stderr)
                 else:
                     code = _dispatch(argv + [str(ledger_path)], quiet=False)
             finally:
@@ -1491,6 +1537,15 @@ def self_test() -> int:
                 got = target.read_text(encoding="utf-8").count(needle) if target.exists() else 0
                 if got != count:
                     reasons.append(f"{needle!r} {got}회 (기대 {count}회)")
+            # ⛔ 부작용 축 — 돌리지 않았다는 주장은 출력이 아니라 sentinel 파일의 부재로 잰다
+            for rel in (want.get("expect_absent") or []):
+                if (sandbox / rel).exists():
+                    reasons.append(f"{rel} 가 생겼다 (부재 기대)")
+            for rel in (want.get("expect_files") or []):
+                if not (sandbox / rel).exists():
+                    reasons.append(f"{rel} 가 없다 (존재 기대)")
+            if want.get("expect_sidecar") is not None:
+                reasons.extend(_sidecar_reasons(ledger_path, want["expect_sidecar"]))
             # ⛔ finalize 는 **도장이 자기 게이트 블록 안에** 박혔는지가 판별 축이다.
             #    개수만 세면 밀린 도장도 통과한다 — 삽입 한 줄마다 뒤쪽 스팬이 밀리는
             #    결함은 블록이 그 폭을 흡수하는 동안 exit·건수 어느 축에도 나타나지
@@ -1581,7 +1636,8 @@ def render_ledger(steps, root: str, scope: str, title: str) -> str:
     ⛔ 문자열 verify(구 계약)는 **manual 로 강등**한다. 자연어에서 명령을 지어내면
        제목과 무관한 oracle 이 생긴다 — 이 도구가 막으려는 실패 그 자체다.
     """
-    lines = [f"# Gates: {title}", f"ROOT: {root}", f"STATE: {INITIAL_STATE}"]
+    # ⛔ 새 원장은 승인 전 기준선을 요구한다(F-245 · F-455) — `--finalize` 가 `--baseline-probe` 기록을 대조한다
+    lines = [f"# Gates: {title}", f"ROOT: {root}", f"STATE: {INITIAL_STATE}", f"{BASELINE_HEADER}: {BASELINE_REQUIRED}"]
     if scope:
         lines.append(f"Scope: {scope}")
     lines.append("")
@@ -1689,7 +1745,103 @@ def from_plan(plan_path: Path, root: str, out: Path) -> int:
     return EXIT_OK
 
 
-def finalize(ledger: Ledger, only=None) -> int:
+# ── --baseline-probe (승인 전 기준선 — F-245 무변경 축 · F-455 · F-546) ─────────────────────
+def baseline_path(ledger_path: Path) -> Path:
+    return ledger_path.with_name(ledger_path.name + ".baseline.json")
+
+
+def baseline_probe(ledger: Ledger, allow_pass, budget_s: float) -> int:
+    """실행 게이트 CHECK 를 **무변경 트리**에서 1회 돌려 `<원장>.baseline.json` 에 남긴다 — 원장은 쓰지 않는다.
+
+    ⛔ 구현 전에 이미 PASS 인 게이트는 변경을 재지 않는다(F-245). `--allow-pass` 밖 PASS 는 exit 1 이다.
+    ⛔ 돌리는 것은 `SIDE_EFFECTS: none|tmp` 뿐이다 — writes · MANUAL 은 EXCLUDED, 미선언은 UNRUN(구현 전 트리에 부작용을
+       남기지 않는다 · AE-16). 게이트별 oracle_hash 를 함께 적어 `--finalize` 가 지금 계약과 대조한다.
+    """
+    allowed = {x.strip() for x in (allow_pass or "").split(",") if x.strip()}
+    unknown = allowed - {g.id for g in ledger.gates}
+    if unknown:
+        raise InfraError(f"--allow-pass 에 없는 게이트 id: {', '.join(sorted(unknown))}")
+    started = time.monotonic()
+    rows, counts, bad_pass = {}, {}, []
+    for gate in ledger.gates:
+        if gate_state(gate, ledger) in ("abandoned", "deferred"):
+            continue
+        timeout = float(gate.attrs.get("TIMEOUT", DEFAULT_TIMEOUT_S))
+        se = gate.attrs.get("SIDE_EFFECTS", "").strip()
+        res, reason, elapsed, h = "UNRUN", "", 0.0, None
+        if not gate.is_runnable:
+            res, reason = "EXCLUDED", "manual"
+        else:
+            cwd = resolve_cwd(gate, ledger)
+            h = oracle_hash(gate, cwd)
+            remaining = budget_s - (time.monotonic() - started)
+            if not se:
+                reason = "side-effects-undeclared"
+            elif se.startswith("writes"):
+                res, reason = "EXCLUDED", se
+            elif missing_tools(gate):
+                reason = "tools-missing:" + ",".join(missing_tools(gate))
+            elif missing_env(gate):
+                reason = "env-missing:" + ",".join(missing_env(gate))
+            elif not Path(cwd).is_dir():
+                reason = "cwd-missing"
+            elif remaining <= MIN_PER_CHECK_S:
+                reason = "budget"
+            else:
+                t0 = time.monotonic()
+                result = run_check(gate, cwd, remaining)
+                elapsed = time.monotonic() - t0
+                res = "PASS" if result.ok else "FAIL"
+        counts[res] = counts.get(res, 0) + 1
+        rows[gate.id] = {"result": res, "oracle_hash": h, "elapsed_s": round(elapsed, 3),
+                         "timeout_s": timeout, "reason": reason}
+        print(f"BASELINE {gate.id} {res} elapsed={elapsed:.1f}s timeout={timeout:g}" + (f" reason={reason}" if reason else ""))
+        if res == "UNRUN":
+            print(f"  WARN {gate.id}: 기준선 미실행 — {reason} · BASELINE: required 원장의 --finalize 가 거부한다")
+        if elapsed > timeout / 2:
+            print(f"  WARN {gate.id}: 기준선 소요 {elapsed:.1f}s > TIMEOUT 절반 {timeout / 2:g}s — TIMEOUT 을 실측 소요로 다시 정한다(F-546)")
+        if res == "PASS" and gate.id not in allowed:
+            bad_pass.append(gate.id)
+            print(f"  PASS-ON-UNCHANGED {gate.id}: 구현 전 트리에서 이미 통과 — 변경을 재지 않는다(F-245). 의도면 --allow-pass {gate.id}")
+    out = baseline_path(ledger.path)
+    write_atomic(out, json.dumps({"schema": 1, "allow_pass": sorted(allowed), "gates": rows},
+                                 ensure_ascii=False, indent=1) + "\n")
+    print("기준선: " + " · ".join(f"{k} {counts.get(k, 0)}" for k in ("PASS", "FAIL", "UNRUN", "EXCLUDED")) + f" → {out}")
+    return EXIT_UNMET if bad_pass else EXIT_OK
+
+
+def baseline_problems(ledger: Ledger) -> list:
+    """`BASELINE: required` 원장의 확정 전제 — 기록 부재 · 낡음(oracle 불일치) · 허용 밖 PASS · UNRUN 을 모은다."""
+    p = baseline_path(ledger.path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return [f"기준선 기록 없음 — 먼저 `--baseline-probe {ledger.path}` (측정할 수 없으면 `--no-baseline <사유>`)"]
+    except (OSError, ValueError) as e:
+        return [f"기준선 기록을 읽지 못했다 — {e}"]
+    rows = data.get("gates") if isinstance(data, dict) else None
+    if not isinstance(rows, dict):
+        return ["기준선 기록 형식 오류 — gates 가 없다"]
+    allowed = set(data.get("allow_pass") or [])
+    out = []
+    for g in ledger.gates:
+        if not g.is_runnable or gate_state(g, ledger) in ("abandoned", "deferred"):
+            continue
+        r = rows.get(g.id)
+        if not isinstance(r, dict):
+            out.append(f"{g.id}: 기준선에 없다")
+        elif r.get("oracle_hash") != oracle_hash(g, resolve_cwd(g, ledger)):
+            out.append(f"{g.id}: 기준선이 낡았다 — 측정 뒤 계약이 바뀌었다")
+        elif r.get("result") == "PASS" and g.id not in allowed:
+            out.append(f"{g.id}: 무변경 트리에서 PASS — --allow-pass 밖")
+        elif r.get("result") == "UNRUN":
+            out.append(f"{g.id}: 기준선 UNRUN — {r.get('reason')}")
+        elif r.get("result") not in ("PASS", "FAIL", "EXCLUDED"):
+            out.append(f"{g.id}: 기준선 결과 미상 {r.get('result')!r}")
+    return out
+
+
+def finalize(ledger: Ledger, only=None, no_baseline=None) -> int:
     """draft 를 확정 원장으로 만든다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 를 찍는다.
 
     ⛔ **이것이 없으면 승인 계약이 존재하지 않았다.** `gate_state` 와 `evaluate` 는
@@ -1739,6 +1891,18 @@ def finalize(ledger: Ledger, only=None) -> int:
             raise LedgerError(
                 f"확정 보강 거부 — --only 밖에 도장 없는 게이트 {naked} · 계약이 바뀐 게이트 {changed}. "
                 "바꾼 게이트를 재승인하려면 --only 에 명시한다(다른 게이트를 몰래 재승인하지 않는다)")
+    # ⛔ 기준선은 전체 확정의 전제다. `--only` 보강은 착수 뒤라 무변경 트리가 없다 — 대조하지 않는다
+    required = ledger.headers.get(BASELINE_HEADER) == BASELINE_REQUIRED
+    if no_baseline is not None:
+        if wanted is not None or not required:
+            raise LedgerError("--no-baseline 은 'BASELINE: required' 원장의 전체 확정에만 쓴다")
+        if not no_baseline.strip() or "\n" in no_baseline or "\r" in no_baseline:
+            raise InfraError("--no-baseline 사유가 비었거나 개행이 있다")
+    elif required and wanted is None:
+        problems = baseline_problems(ledger)
+        if problems:
+            raise LedgerError("BASELINE: required 원장 확정 거부 — " + " · ".join(problems))
+        print("기준선 대조 일치")
     lines = ledger_lines(ledger)
     gate_ids = [g.id for g in ledger.gates]
     stamped, skipped, kept = 0, 0, 0
@@ -1786,6 +1950,12 @@ def finalize(ledger: Ledger, only=None) -> int:
         if not done:
             raise LedgerError("STATE 헤더를 찾지 못해 APPROVED 를 넣을 수 없다")
         text = "\n".join(out)
+    if no_baseline is not None:
+        rows = text.split("\n")
+        hit = next(i for i, raw in enumerate(rows) if re.match(BASELINE_HEADER + r": ?" + BASELINE_REQUIRED + r"\s*$", raw))
+        rows[hit] = f"{BASELINE_HEADER}: {BASELINE_SKIPPED} — {no_baseline.strip()}"
+        text = "\n".join(rows)
+        print(f"기준선 생략 기록: {no_baseline.strip()}")
     write_atomic(ledger.path, text)
     load(ledger.path)          # 확정본이 자기 계약을 만족하는지 파서가 판정한다
     if wanted is not None:
@@ -1913,6 +2083,12 @@ def _dispatch(argv, quiet: bool = False) -> int:
                         help="쉼표로 구분한 게이트 id 만 판정 (fz-code 의 Step 단위 실행)")
     parser.add_argument("--budget", type=float, default=None,
                         help="총 실행 예산(초). 미지정 시 max(이번 실행 대상 게이트 TIMEOUT 합, 960)")
+    parser.add_argument("--baseline-probe", action="store_true",
+                        help="승인 전 기준선 — SIDE_EFFECTS none|tmp 게이트를 무변경 트리에서 1회 돌려 <원장>.baseline.json 에 남긴다 "
+                             "(원장 무변경 · 허용 밖 PASS = exit 1)")
+    parser.add_argument("--allow-pass", metavar="IDS", help="--baseline-probe 에서 무변경 PASS 를 허용할 게이트 id (쉼표)")
+    parser.add_argument("--no-baseline", metavar="REASON",
+                        help="--finalize 에서 기준선을 잴 수 없을 때 사유 — 'BASELINE: skipped — 사유' 를 남긴다")
 
     try:
         opt = parser.parse_args(argv)
@@ -1954,6 +2130,16 @@ def _dispatch(argv, quiet: bool = False) -> int:
     if not opt.ledger:
         print("⛔ 원장 경로가 필요하다", file=sys.stderr)
         return EXIT_INFRA
+    # ⛔ 짝 없는 옵션을 조용히 무시하지 않는다 — 무시하면 사용자는 적용됐다고 읽는다
+    if opt.baseline_probe and (opt.finalize or opt.only or opt.reverify or opt.status or opt.confirm or opt.set_state):
+        print("⛔ --baseline-probe 는 단독 모드다 — 다른 판정 · 쓰기 옵션과 함께 쓸 수 없다", file=sys.stderr)
+        return EXIT_INFRA
+    if opt.allow_pass is not None and not opt.baseline_probe:
+        print("⛔ --allow-pass 는 --baseline-probe 와 함께만 쓴다", file=sys.stderr)
+        return EXIT_INFRA
+    if opt.no_baseline is not None and not opt.finalize:
+        print("⛔ --no-baseline 은 --finalize 와 함께만 쓴다", file=sys.stderr)
+        return EXIT_INFRA
 
     stdout = sys.stdout
     if quiet:
@@ -1964,8 +2150,11 @@ def _dispatch(argv, quiet: bool = False) -> int:
             return cross_session(ledger)
         if opt.oracle_fields:
             return oracle_fields(ledger)
+        if opt.baseline_probe:
+            return baseline_probe(ledger, opt.allow_pass,
+                                  opt.budget if opt.budget is not None else default_budget(ledger))
         if opt.finalize:
-            return finalize(ledger, opt.only)
+            return finalize(ledger, opt.only, opt.no_baseline)
         if opt.verdict_check:
             return verdict_check(ledger, opt.verdict_check)
         if opt.confirm:
@@ -2002,6 +2191,7 @@ ORACLE_FIELD_PROBES = (
     ("EXPECT", "tampered"),
     ("CRITERION", "완전히 다른 합격 조건"),
     ("TIMEOUT", "999"),
+    ("SIDE_EFFECTS", "writes — 승인 뒤 바꾼 선언"),
 )
 
 
