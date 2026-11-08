@@ -1,5 +1,21 @@
 # Changelog
 
+### v4.53.0 (2026-11-09) — 고친 finding 이 닫히지 않던 출구를 대조기로 막고 기계 강제 fz-guard 를 더했다 [MINOR]
+
+레지스트리에서 엔트리가 빠지는 길은 노트 `Closes:` 하나인데 무엇을 적을지는 저자의 기억에 달려 있었다(v4.52.0 에서 고친 F-550 을 빠뜨렸다). `check_release_closes.py` 가 노트를 레지스트리 반영 기록과 대조하고 `eject_findings.py` 는 partial 을 배출하지 않는다. 게이트 판정기는 MANUAL 확인 무기록 exit 0 과 예산 기본값, self-test 의 /private 전제를 고쳤고 승인 전 기준선과 `PIN:` 속성을 더했다.
+선택형 하위 플러그인 fz-guard 0.1.0 을 marketplace 세 번째 항목으로 더했다(기본 설치 안 됨). finding 24건을 닫고 16건은 일부 반영으로 열어 두며 279건은 로드맵 R1~R7 로 넘긴다. 커밋마다 돌리는 전체 health-check 는 건너뛰고 부품 self-test 만 돌렸다.
+
+→ [릴리즈 노트](docs/releases/v4.53.0.md)
+
+| 영역 | 변경 | 검증 |
+|---|---|---|
+| 릴리스 출구 | `check_release_closes.py` · eject partial 거부 · `--release` 선언 축 | self-test · fixture 12 |
+| 레지스트리 · 텔레메트리 | 위생 검사 applied 축 · findings-dir 정규화 · 재발 사슬 | self-test |
+| 게이트 판정기 | MANUAL 원자 확인 · 예산 · `--baseline-probe` · `PIN:` · 리뷰 결함 3 | gate self-test 4커밋 |
+| code-pair | changeset 적용 전 결함 검사 | changeset-defects · effort-arg 52 |
+| 피어 리뷰 · 규칙 | Curate base 근거 · 형식 오류 exit 2 · 탭 경로 · merge ref · candidates · gap | self-test · fixture 4 |
+| fz-guard | P4 · AG · FR 훅 | self-test 63 · 라이브 확인 |
+
 ### v4.52.0 (2026-11-07) — 식은 bg 세션을 모델 호출 없이 줄이는 fz-compact 를 더하고 비용 집계를 바로잡았다 [MINOR]
 
 선택형 하위 플러그인 fz-compact 0.1.0 을 marketplace 두 번째 항목으로 더했다. bg 세션이 프롬프트 캐시 1시간을 넘겨 쉬면 오래된 큰 도구 결과를 spill 파일로 옮기고 자리표시자로 바꾸며, 재개하면 같은 자리표시자로 다시 가린다. 요약 모델은 부르지 않고 기본 꺼짐이며 설치도 따로 한다(`claude plugin install fz-compact@fz-orchestrator`).

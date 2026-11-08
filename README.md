@@ -20,6 +20,7 @@ AI 개발 워크플로우를 오케스트레이션하는 [Claude Code](https://d
 claude plugin marketplace add jaewooongyun/fz   # 최초 1회
 claude plugin install fz
 claude plugin install fz-compact@fz-orchestrator  # 선택. bg 세션 로컬 마스킹 압축, 기본 꺼짐
+claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 생략 · ad-hoc 에이전트를 훅으로 막는다
 
 claude
 > /fz "안녕"                                     # 응답하면 정상
@@ -76,6 +77,7 @@ bash "$(printf '%s\n' ~/.claude/plugins/cache/fz-orchestrator/fz/*/ | sort -V | 
 claude plugin marketplace update fz-orchestrator
 claude plugin update fz@fz-orchestrator
 claude plugin update fz-compact@fz-orchestrator   # fz-compact 를 설치했을 때만
+claude plugin update fz-guard@fz-orchestrator     # fz-guard 를 설치했을 때만
 ```
 
 업데이트는 GPT 스킬 setup 을 다시 돌리지 않는다. 링크 상태는 위 setup 명령에 `--check` 를 붙여 확인한다.
@@ -175,8 +177,8 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 
 ---
 
-## What's New — v4.52.0
+## What's New — v4.53.0
 
-식은 bg 세션을 모델 호출 없이 줄이는 fz-compact 를 더하고 비용 집계를 바로잡았다. 선택형 하위 플러그인 fz-compact 는 bg 세션이 캐시 1시간을 넘겨 쉬면 오래된 큰 도구 결과를 파일로 옮기고 자리표시자로 바꾼다. 재개해도 같은 자리표시자로 다시 가리고 요약 모델은 부르지 않는다. 기본 꺼짐이고 따로 설치한다.
-텔레메트리 리포터는 캐시 쓰기를 5분과 1시간 단가로 나눠 계산하고 advisor 를 따로 센다. ⛔ Team, Enterprise 조직 계정에서는 fz-compact 가 마스킹하지 못하고, 안전 훅이 엔진 요약으로 떨어지는 것만 막는다.
-→ [릴리즈 노트](docs/releases/v4.52.0.md)
+고친 finding 이 닫히지 않던 출구를 대조기로 막고 기계 강제 fz-guard 를 더했다. 릴리스 노트 `Closes:` 는 이제 `check_release_closes.py` 가 레지스트리의 `applied: full` 전부와 대조하고, 배출은 일부만 고친 엔트리를 거부한다. 게이트 판정기에는 승인 전 기준선(`--baseline-probe`)과 핀 파일을 묶는 `PIN:` 속성이 생겼다.
+선택형 하위 플러그인 fz-guard 는 Phase 4 승인 전 쓰기를 막고 허용 목록 밖 ad-hoc 에이전트를 묻는다. 교훈을 메모리에만 쓴 턴은 종료를 한 번 막는다. 기본으로 설치되지 않는다. 이 판은 finding 24건을 닫고 279건은 묶음별 로드맵으로 넘긴다.
+→ [릴리즈 노트](docs/releases/v4.53.0.md)
