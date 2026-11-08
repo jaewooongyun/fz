@@ -13,6 +13,9 @@
 #   ledger-rule-line                   modules/promotion-ledger.md 에 인용 규칙 줄
 #   archive-unreadable-flagged         .archive 열거 실패(권한 0) → '일부 미측정' 줄(빈 결과로 보이지 않는다)
 #   archive-file-unreadable-flagged    archive 파일 하나 읽기 실패(권한 0) → 같은 줄에 그 파일 이름
+#   root-normalized                    --findings-dir 에 레지스트리 루트 → entries 입력과 같은 후보 줄 · stderr NOTE (F-313)
+#   mode-gate-root-default             mode_gate 호출 꼴(인자 없음 · FZ_FINDINGS_DIR=루트)도 같은 후보 줄
+#   live-archive-same-id               같은 번호가 live · archive 에 함께 → live 가 묶음에 남는다
 # '나열 안 됨' 셀은 섹션 머리와 two-session 줄이 함께 있어야 PASS 다 — 기능이 없어 아무것도 안 찍힌 것을 통과로 읽지 않는다.
 # exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패(인자 · 트리 · 리포트 traceback · 단언기 고장)
 # ⛔ 실제 레지스트리 · 텔레메트리 경로는 받지 않는다. 트리에 바이트코드를 남기지 않는다.
@@ -64,8 +67,9 @@ ENTRIES = {   # (폴더, ID, date, failure_class, 추가 frontmatter, 본문)
     (".archive", "F-031", "2026-10-03", "archived-only", "", ""),
 }
 
-def render(entries, lock=None):
-    """합성 레지스트리 → 리포트 본문. lock(레지스트리 상대 경로 — 폴더 · 파일)은 렌더 동안 권한 0 으로 둔다(읽기 실패)."""
+def render(entries, lock=None, findings="entries", with_err=False):
+    """합성 레지스트리 → 리포트 본문. lock(레지스트리 상대 경로 — 폴더 · 파일)은 렌더 동안 권한 0 으로 둔다(읽기 실패).
+    findings: entries = --findings-dir reg/entries · root = --findings-dir reg · env-root = 인자 없이 FZ_FINDINGS_DIR=reg(mode_gate 호출 꼴)."""
     with tempfile.TemporaryDirectory() as tmp:
         reg = pathlib.Path(tmp) / "reg"
         for folder, fid, day, cls, extra, body in entries:
@@ -80,12 +84,17 @@ def render(entries, lock=None):
         mode = target.stat().st_mode if target else None
         if target:
             target.chmod(0)
+        fargs = [] if findings == "env-root" else ["--findings-dir", str(reg if findings == "root" else reg / "entries")]
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", FZ_RUN_STATE=f"{tmp}/no-runs")
+        env.pop("FZ_FINDINGS_DIR", None)
+        if findings == "env-root":
+            env["FZ_FINDINGS_DIR"] = str(reg)
         try:
             p = subprocess.run([sys.executable, "-B", str(TREE / "scripts" / "fz_telemetry_report.py"),
                                 "--since", "2026-09-01", "--until", "2026-10-31", "--out", str(out_md),
-                                "--projects-root", f"{tmp}/projects", "--findings-dir", str(reg / "entries"),
+                                "--projects-root", f"{tmp}/projects", *fargs,
                                 "--plugin-root", f"{tmp}/no-plugin", "--telemetry-dir", f"{tmp}/telemetry"],
-                               capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", FZ_RUN_STATE=f"{tmp}/no-runs"),
+                               capture_output=True, text=True, env=env,
                                stdin=subprocess.DEVNULL, timeout=120)
         finally:
             if target:
@@ -93,7 +102,8 @@ def render(entries, lock=None):
         if p.returncode != 0 or "Traceback (most recent call last)" in p.stdout + p.stderr or not out_md.is_file():
             print(f"SETUP 리포트 렌더 실패 rc={p.returncode} · {(p.stdout + p.stderr).strip()[-300:]}")
             sys.exit(3)
-        return out_md.read_text(encoding="utf-8")
+        body = out_md.read_text(encoding="utf-8")
+        return (body, p.stderr) if with_err else body
 
 
 text = render(ENTRIES)
@@ -145,6 +155,24 @@ locked = render({("entries", "F-062", "2026-10-01", "split", "", ""), (".archive
 check("archive-file-unreadable-flagged", "### 트랙 D 후보" in locked and "일부 미측정" in locked and "F-063-x.md" in locked,
       "archive 파일 읽기 실패도 '일부 미측정' 줄에 그 파일 이름으로 드러난다")
 
-print(f"{'OK' if not FAIL else 'FAIL'}: {9 - len(set(FAIL))}/9")
+# 레지스트리 루트를 받으면 CLI 층이 entries/ 로 정규화한다(F-313) — 같은 후보 줄 · NOTE 한 줄
+cands = lambda t: [ln for ln in t.splitlines() if "— 트랙 D 후보(" in ln]   # noqa: E731
+root_text, root_err = render(ENTRIES, findings="root", with_err=True)
+check("root-normalized", alive and cands(root_text) == cands(text) and "NOTE findings-dir → entries/" in root_err,
+      "루트 입력 = entries 입력 후보 줄 · stderr NOTE")
+# mode_gate 는 리포터를 --findings-dir 없이 부른다(env 기본값) — 그 꼴로 루트를 줘도 후보가 비지 않는다
+mg = (TREE / "scripts" / "mode_gate.py").read_text(encoding="utf-8")
+mg_call = next((ln for ln in mg.splitlines() if "reporter, \"--json\"" in ln), "")
+env_text = render(ENTRIES, findings="env-root")
+check("mode-gate-root-default", bool(mg_call) and "--findings-dir" not in mg_call and cands(env_text) == cands(text),
+      f"mode_gate 호출 꼴(인자 없음 · FZ_FINDINGS_DIR=루트) 후보 줄 동일 — {mg_call.strip()[:80]!r}")
+# 같은 번호가 live 와 archive 에 함께 있으면 live 가 이긴다 — archive 가 덮으면 live 묶음이 사라진다
+dup = render({("entries", "F-070", "2026-10-01", "dup-live", "", ""), ("entries", "F-071", "2026-10-02", "dup-live", "", ""),
+              (".archive", "F-070", "2026-09-01", "dup-zombie", "", ""), (".archive", "F-072", "2026-09-02", "dup-zombie", "", "")})
+dl = next((ln for ln in dup.splitlines() if ln.startswith("- `dup-live` — 트랙 D 후보(")), "")
+check("live-archive-same-id", "F-070 2026-10-01 " in dl + " " and "F-070 2026-10-01(archive)" not in dl
+      and not any(ln.startswith("- `dup-zombie`") for ln in dup.splitlines()), f"live F-070 이 묶음에 남는다 — {dl!r}")
+
+print(f"{'OK' if not FAIL else 'FAIL'}: {12 - len(set(FAIL))}/12")
 sys.exit(1 if FAIL else 0)
 PY

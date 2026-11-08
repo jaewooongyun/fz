@@ -804,7 +804,7 @@ def count_judgments(stage, result):
 
 
 # ── 3. fz-findings frontmatter ──────────────────────────────────────────────
-def collect_findings(findings_dir, since, until):
+def collect_findings(findings_dir, since, until, ledger_path=None):
     """`---` 블록에서 date·detector·stage·status·gap_type·harness_verdict 만 읽는다.
 
     ⛔ harness_verdict 는 **읽기만** 한다. 없으면 detector 로 추정:
@@ -900,6 +900,14 @@ def collect_findings(findings_dir, since, until):
     root = None if out["enumeration_error"] else os.path.dirname(os.path.normpath(findings_dir))
     out["outflow"] = _collect_outflow(root, since, until)
     out["track_d"] = _collect_track_d(None if out["enumeration_error"] else findings_dir)
+    td = out["track_d"]
+    td["unregistered"], td["ledger_state"] = [], "미판정(원장 경로 없음)"
+    if ledger_path and not out["enumeration_error"]:
+        try:
+            with open(ledger_path, encoding="utf-8") as handle:
+                td["unregistered"], td["ledger_state"] = unregistered_candidates(td["candidates"], handle.read()), None
+        except OSError as e:
+            td["ledger_state"] = "미판정(원장 읽기 실패 %s)" % type(e).__name__
     return out
 
 
@@ -913,7 +921,7 @@ def _collect_track_d(findings_dir):
     ⛔ `recurs_of` 는 묶지 않는다(같은 축이어도 원인이 다를 수 있다) — 클래스가 다른 간선만 `related` 로 보인다.
     ⛔ 본문 '재발' 언급도 잇지 않는다 — 클래스가 다른 대상을 가리키는 엔트리 수만 `unlinked` 로 센다.
     """
-    out = {"candidates": [], "related": [], "unlinked": 0, "unmeasured": []}
+    out = {"candidates": [], "related": [], "unlinked": 0, "unmeasured": [], "chain_mismatch": []}
     if not findings_dir:
         return out
     members = {}
@@ -937,6 +945,8 @@ def _collect_track_d(findings_dir):
             if meta is None:
                 continue
             fid = re.match(r"^F-\d{3}[a-z]?", name).group(0)
+            if archived and fid in members:
+                continue                   # 같은 번호가 live 에도 있으면 live 가 이긴다 — archive 가 덮으면 live 묶음이 사라진다
             body = text.split("\n---\n", 1)[1] if "\n---\n" in text else ""
             day = str(meta.get("date") or "")
             root = re.match(r"^\[?\s*(F-\d{3}[a-z]?)", str(meta.get("recurs_of") or ""))
@@ -951,6 +961,9 @@ def _collect_track_d(findings_dir):
         cls_of = lambda other: members.get(other, {}).get("class")  # noqa: E731
         if m["recurs_of"] and cls_of(m["recurs_of"]) != m["class"]:
             out["related"].append({"id": fid, "recurs_of": m["recurs_of"]})
+            if m["class"] and cls_of(m["recurs_of"]):   # 두 클래스를 다 알 때만 정렬 후보다
+                out["chain_mismatch"].append({"id": fid, "class": m["class"], "recurs_of": m["recurs_of"],
+                                              "target_class": cls_of(m["recurs_of"])})
         if any(cls_of(ref) != m["class"] or not m["class"] for ref in m["refs"]):
             out["unlinked"] += 1
     for cls, ids in groups.items():
@@ -961,6 +974,50 @@ def _collect_track_d(findings_dir):
                 for i in sorted(ids, key=lambda i: (members[i]["day"] or "", i))]})
     out["candidates"].sort(key=lambda c: (-c["days"], c["class"]))
     return out
+
+
+def ledger_track_d_ids(ledger_text):
+    """원장 `### D-` 절이 인용한 F-ID — 묶음의 ID 하나라도 여기 있으면 등재다."""
+    ids = set()
+    for sec in re.split(r"^### ", ledger_text, flags=re.M)[1:]:
+        if sec.startswith("D-"):
+            ids.update(re.findall(r"\bF-\d{3}[a-z]?\b", sec))
+    return ids
+
+
+def unregistered_candidates(candidates, ledger_text):
+    cited = ledger_track_d_ids(ledger_text)
+    return [c for c in candidates if not any(m["id"] in cited for m in c["members"])]
+
+
+def track_d_unregistered(findings_dir, ledger_path):
+    """릴리스 대조(check_release_closes) 가 빌려 쓰는 공개 함수 — (미등재 후보 목록, 미판정 사유 | None)."""
+    td = _collect_track_d(findings_dir)
+    if td["unmeasured"]:
+        return [], "일부 미측정 — " + " · ".join(td["unmeasured"])
+    try:
+        with open(ledger_path, encoding="utf-8") as handle:
+            text = handle.read()
+    except OSError as e:
+        return [], "원장 읽기 실패 %s" % type(e).__name__
+    return unregistered_candidates(td["candidates"], text), None
+
+
+def normalize_findings_dir(path):
+    """레지스트리 루트를 받으면 entries/ 로 바꾼다(F-313) — (경로, NOTE 또는 None).
+
+    ⛔ 정규화는 CLI 층에서만 한다. collect_findings 는 받은 폴더를 그대로 연다(빈 결과로 끝내지 않는다).
+    """
+    is_entry = lambda e: re.match(r"^F-\d{3}", e.name) and e.name.endswith(".md")  # noqa: E731
+    sub = os.path.join(path, "entries") if path else ""
+    try:
+        if not path or any(is_entry(e) for e in os.scandir(path)) or not os.path.isdir(sub):
+            return path, None
+        if not any(is_entry(e) for e in os.scandir(sub)):
+            return path, None
+    except OSError:
+        return path, None
+    return sub, "NOTE findings-dir → entries/ (%s)" % sub
 
 
 # APPLIED 4열 행(배출 · 수동)의 넷째 칸 머리 → 처리 값. 레거시 6열 대장은 다섯째 칸(`applied` 등)을 그대로 쓴다.
@@ -1677,6 +1734,15 @@ def render_markdown(payload):
     lines.append("관련(`recurs_of` · 클래스 다름 · 원인 다를 수 있음 · 세지 않음) %d: %s" % (
         len(track["related"]), " · ".join("%s → %s" % (r["id"], r["recurs_of"]) for r in track["related"]) or "-"))
     lines.append("본문 '재발' 언급 미계수 %d — 클래스가 다른 엔트리를 가리켜 잇지 않았다" % track["unlinked"])
+    chain = track.get("chain_mismatch") or []
+    lines.append("recurs_of 사슬 — 클래스 불일치(정렬 후보) %d: %s" % (len(chain), " · ".join(
+        "%s(%s) → %s(%s)" % (c["id"], c["class"], c["recurs_of"], c["target_class"]) for c in chain) or "-"))
+    if track.get("ledger_state"):
+        lines.append("트랙 D 후보 — 원장 미등재: %s" % track["ledger_state"])
+    else:
+        unreg = track.get("unregistered") or []
+        lines.append("트랙 D 후보 — 원장 미등재 %d: %s" % (len(unreg), " · ".join(
+            "`%s`(%s)" % (c["class"], " · ".join(m["id"] for m in c["members"])) for c in unreg) or "-"))
     lines.append("")
 
     lines.append("## 5. 정적 부하 (floor / ceiling)")
@@ -1746,7 +1812,8 @@ def run_report(args):
 
     agg = collect_transcripts(os.path.expanduser(args.projects_root), since, until)
     wf_rows, unknown = collect_journals(os.path.expanduser(args.projects_root), since, until, agg.wf_id_to_name)
-    findings = collect_findings(os.path.expanduser(args.findings_dir), since, until)
+    findings = collect_findings(os.path.expanduser(args.findings_dir), since, until,
+                                os.path.join(os.path.expanduser(args.plugin_root), "modules", "promotion-ledger.md"))
     static_rows, static_err = collect_static_load(os.path.expanduser(args.plugin_root))
     telemetry_dir = os.path.expanduser(args.telemetry_dir)
     last_snapshot = read_last_snapshot(telemetry_dir)
@@ -2152,6 +2219,41 @@ def self_test():
     check("리포트에 0건 경고 문구 없음(분모>0)", "측정 실패를 먼저 의심하라" in text, False)
     check("모델에게 지시하는 문장 0", ("반드시 " in text) or ("하라." in text), False)
 
+    # 트랙 D 배출 신호(S2) — 루트 정규화 · recurs_of 사슬 · 원장 미등재 · live 우선 · 계수 규칙 불변
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as td:
+        reg = os.path.join(td, "reg")
+
+        def put(folder, fid, day, cls, extra=""):
+            os.makedirs(os.path.join(reg, folder), exist_ok=True)
+            with open(os.path.join(reg, folder, "%s-x.md" % fid), "w", encoding="utf-8") as h:
+                h.write("---\nid: %s\ndate: %s\nfailure_class: %s\nstatus: open\n%s---\n\n# %s\n" % (fid, day, cls, extra, fid))
+
+        for row in (("entries", "F-101", "2026-10-01", "reg-a"), ("entries", "F-102", "2026-10-02", "reg-a"),
+                    ("entries", "F-103", "2026-10-01", "unreg-b"), ("entries", "F-104", "2026-10-03", "unreg-b"),
+                    ("entries", "F-105", "2026-10-04", "same-day"), ("entries", "F-106", "2026-10-04", "same-day"),
+                    ("entries", "F-107", "2026-10-05", "chain-x", "recurs_of: F-101\n"),
+                    ("entries", "F-108", "2026-10-06", "live-c"), ("entries", "F-109", "2026-10-07", "live-c"),
+                    (".archive", "F-108", "2026-09-01", "zombie-z"), (".archive", "F-110", "2026-09-02", "zombie-z")):
+            put(*row)
+        ent = os.path.join(reg, "entries")
+        check("findings-dir-registry-root-normalized", (normalize_findings_dir(reg)[0], normalize_findings_dir(ent)),
+              (ent, (ent, None)))
+        tdd = _collect_track_d(ent)
+        check("track-d-recurs-chain-listed", [(c["id"], c["class"], c["target_class"]) for c in tdd["chain_mismatch"]],
+              [("F-107", "chain-x", "reg-a")])
+        ledger = os.path.join(td, "ledger.md")
+        with open(ledger, "w", encoding="utf-8") as h:
+            h.write("# 원장\n\n### D-1: reg-a (트랙 D 관측 #1)\n\n- 관측 #1: **F-101**\n\n### 배출 기록\n\n- F-103 은 산문 언급이다\n")
+        unreg, why = track_d_unregistered(ent, ledger)
+        check("track-d-unregistered-listed", (sorted(c["class"] for c in unreg), why), (["live-c", "unreg-b"], None))
+        live_c = next((c for c in tdd["candidates"] if c["class"] == "live-c"), None)
+        check("track-d-live-wins-over-archive",
+              (live_c and [(m["id"], m["archived"]) for m in live_c["members"]], any(c["class"] == "zombie-z" for c in tdd["candidates"])),
+              ([("F-108", False), ("F-109", False)], False))
+        check("track-d-count-rule-unchanged", sorted((c["class"], c["days"]) for c in tdd["candidates"]),
+              [("live-c", 2), ("reg-a", 2), ("unreg-b", 2)])
+
     failed = [c for c in checks if not c[1]]
     for name, ok, got, want in checks:
         print("%s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else "  got=%r want=%r" % (got, want)))
@@ -2289,6 +2391,9 @@ def main(argv):
 
     if args.self_test:
         return self_test()
+    args.findings_dir, note = normalize_findings_dir(os.path.expanduser(args.findings_dir))
+    if note:
+        print(note, file=sys.stderr)
     if args.runs_json:
         print(json.dumps(collect_runs(os.path.expanduser(args.runs_root))["rows"], ensure_ascii=False, indent=1))
         return 0
