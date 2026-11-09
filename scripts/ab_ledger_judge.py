@@ -374,6 +374,18 @@ def row_invalid(row, score, opts):
         why.append(f"AC-1 GPT 배너 {g.get('banners')}/{g.get('ok')} (미연결 {g.get('unlinked')}) — 성공 호출의 model·effort 판정 불가")
     if (g.get("failed") or 0) > 0:
         why.append(f"AC-5 GPT 호출 실패 {g.get('failed')}건 — 실패가 섞인 run 은 대표값이 아니다")
+    if (g.get("launcher_failed") or 0) > 0:
+        why.append(f"AC-5 GPT 런처 실패 {g['launcher_failed']}건(감사 exit ≠ 0) — 실패가 섞인 run 은 대표값이 아니다")
+    sl = row.get("sleep")
+    if isinstance(sl, dict) and sl.get("source"):
+        # 수면(F-326) — 러너가 기록을 넘긴 run 만 본다. 기록이 run 구간을 덮지 못했거나 읽지 못했으면 0 으로 읽지 않는다
+        if type(sl.get("count")) is not int:
+            why.append(f"수면 판정 불가 — {sl.get('note') or '수면 수 없음'}")
+        elif sl["count"] > 0:
+            why.append(f"수면 진입 {sl['count']}회(run 구간) — wall · 동작이 오염된 run")
+    em = row.get("external_mcp")
+    if isinstance(em, dict) and (em.get("returned") or 0) > 0:
+        why.append(f"외부 MCP 내용 유입 {em['returned']}회 {(em.get('tools') or [])[:3]} — fixture 가 통제하지 못한 입력")
     pl = row.get("plugin") or {}
     if not pl.get("tree_hash"):
         why.append("플러그인 트리 해시 없음 — arm 의 트리를 증명하지 못한다")
@@ -414,6 +426,19 @@ def row_invalid(row, score, opts):
         if p.get("dirty") is not False:
             why.append(f"plugin 트리 미커밋 변경(dirty={p.get('dirty')} · 기록 시점 {p.get('at')})")
     return why
+
+
+def treatment_fired(rows):
+    """조건부 arm 의 처치 발동(F-506) → (생략한 run 수, 조건부 반환이 있는 run 수). 생략 표지 키(stage2_skipped ·
+    merge_skipped)가 None 이 아닌 Workflow 반환이 조건부다 — stage2_ran 은 peer-review 가 평소에도 반환해 표지가 못 된다."""
+    cond = fired = 0
+    for r in rows:
+        ws = [w for w in (r.get("wf") or {}).get("runs") or []
+              if w.get("stage2_skipped") is not None or w.get("merge_skipped") is not None]
+        if ws:
+            cond += 1
+            fired += any(w.get("stage2_skipped") or w.get("merge_skipped") for w in ws)
+    return fired, cond
 
 
 def _key_fields(row, score):
@@ -759,6 +784,14 @@ def judge_rows(runs, scores, opts, source_check=None):
                        + (" — " + ", ".join(r["run_id"] for r in vB) if vB else ""))
             worst = max(worst, PASS if good else FAIL)
             continue
+        fired, cond = treatment_fired(vC)
+        if cond:
+            # ⛔ 처치가 한 번도 일어나지 않은 조건부 arm 의 차이는 처치의 효과가 아니다 — arm 라벨을 처치로 읽지 않는다(F-506)
+            if not fired:
+                out.append(f"UNRUN {label}: 처치 미발동 — 판정 불가 (조건부 생략 0/{cond}) — 생략이 일어난 run 이 없다")
+                worst = max(worst, UNRUN)
+                continue
+            out.append(f"  처치 발동 {label}: 조건부 생략 {fired}/{cond}")
         if {"SC-3", "SC-3-smoke", "SC-4", "SC-5", "blind-labels"} & set(req):
             cur_i = opts.get("instrument") or instrument_sha()
             unv = [r["run_id"] for r in vB + vC if not (scores.get(r["run_id"]) or {}).get("verified")

@@ -18,7 +18,9 @@
                    wall{total_s, start, end, mtime_delta_s, workflows[{run_id, wf_s, lead_s, delta_pct}], gpt_s},
                    wf{runs[…], agents, out_tok, turns, advisor, models, efforts, stages, stage2_ran,
                       stages_completed, rejections},
-                   gpt{calls, models, efforts, versions}, state{start_hash, pristine_hash, end_hash, leak, writes},
+                   gpt{calls, models, efforts, versions, launcher, launcher_ok, launcher_failed},
+                   state{start_hash, pristine_hash, end_hash, leak, writes}, sleep{count, source, sha256, note},
+                   external_mcp{calls, returned, errors, empty, tools},
                    complete{ok, why}, sources{…}, collect_args{…}}
   {"type":"score", run_id, kind(review|plan), by_severity, by_axis, …, fixture_sha}
 
@@ -76,7 +78,7 @@ from ab_ledger_collect import (ALLOWED_PLUGIN_WRITES, ANSI_RE, CANON_PATTERN, CA
     REQUIRED_STAGES, REQUIRED_WATCH, SKILL_SCRIPTS, STAGES_BY_SCRIPT, _clock_time, _endpoint_clock_evidence, _evidence_dir,
     _ledger_lock, _state_key, append, append_collect, append_many, apply_endpoint_clock, build_row, collect_spec_args,
     expected_stages_completed, input_commits, input_hash, load, parse_gpt_log, plugin_info, read_endpoint_clock, required_stages,
-    row_origin, snapshot, state_diff, state_hash, state_info, tree_digest, wf_summary)
+    row_origin, snapshot, source_scope_lines, state_diff, state_hash, state_info, tree_digest, wf_summary)
 from ab_ledger_judge import (BLIND_INSTRUCTIONS, BLOCK_START_RE, CITE_RE, CRITERIA, CTX_CAP, IMPLEMENTED, PATH_SCRUB_RE,
     SC7_FIELDS, VERIFY_FIELDS, _artifact_shas, _blocks, _crit_invalid, _dig, _exact, _fixture_source, _items, _js, _key_fields,
     _mean, _one_row_table, _ordered_json, _read_texts, _same_file, _sep_row, _sev, _unchecked_note, blind_pack, blind_unpack,
@@ -170,6 +172,8 @@ def cmd_recollect(a):
     # ⛔ 전부 다시 만든 뒤 한 번에 덧붙인다 — 중간 실패로 계측기 버전이 섞인 원장이 남지 않게(v4.40.0 리뷰)
     news = []
     for row in targets:
+        for ln in source_scope_lines(row):   # 보관 원천 범위를 재구성 전에 보인다(F-423)
+            print(ln)
         try:
             new = build_row(collect_spec_args(row["collect_args"]))   # 옛 형식 행도 CollectSpec 필드로 읽는다
         except Exception as e:   # noqa: BLE001 — 원천 부재·옛 인자 모양 모두 판정 불가다
@@ -496,6 +500,7 @@ def main() -> int:
     p.add_argument("--evidence-dir", help="하네스 반환 사본 폴더 (기본: 원장 옆 evidence/)")
     p.add_argument("--tasks-dir", action="append", help="run 직후 복사한 하네스 tasks/*.output 폴더 (반복)")
     p.add_argument("--endpoint-clock", help="러너 끝점 시계 JSONL(docs/ab-endpoint-clock.md) — 있으면 끝점 = 러너 관측 시각 · mtime 은 교차 대조만")
+    p.add_argument("--sleep-log", help="run 뒤 러너가 남긴 `pmset -g log` 사본(docs/ab-endpoint-clock.md § 수면 기록) — run 구간 수면 진입 수")
     p.set_defaults(func=cmd_collect)
 
     p = sub.add_parser("recollect", help="기록된 원천에서 다시 수집 (계측기 버전이 바뀐 뒤) — 판정 필드 전후 차이 인쇄 · 악화면 exit 1")

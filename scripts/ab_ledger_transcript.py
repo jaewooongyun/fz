@@ -653,6 +653,23 @@ def _bash_writes(cmd, a, cwd, scripts=None):
     return False
 
 
+FZ_MCP_PREFIX = "mcp__plugin_fz_"   # 플러그인이 띄우는 MCP — 측정 대상의 일부다
+
+
+def external_mcp(tool_uses, results):
+    """플러그인 밖 MCP 도구 호출(F-325) → {calls, returned, errors, empty, tools}. 사용자 MCP(Jira 등)를 물려받은 run 은
+    fixture 가 통제하지 못한 입력을 받을 수 있다 — 오류가 아닌 본문이 돌아온 호출(returned)이 하나라도 있으면 judge 가 run 을 뺀다.
+    ⛔ 본문의 뜻은 판독하지 않는다(권한 없음 문구도 본문이다 — 보수 쪽). 결과가 없는 호출은 errors 로 센다(유입 없음).
+    범위: Lead transcript 의 호출만 — Workflow 워커의 호출은 Workflow 폴더에 있고 여기서 세지 않는다."""
+    calls = [u for u in tool_uses if str(u.get("name") or "").startswith("mcp__") and not str(u["name"]).startswith(FZ_MCP_PREFIX)]
+    kinds = collections.Counter()
+    for u in calls:
+        r = results.get(u["id"])
+        kinds["error" if r is None or r["is_error"] else ("content" if (r.get("text") or "").strip() else "empty")] += 1
+    return {"calls": len(calls), "returned": kinds["content"], "errors": kinds["error"], "empty": kinds["empty"],
+            "tools": sorted({u["name"] for u in calls})}
+
+
 def parse_transcript(path, artifacts=(), tasks_dirs=()):
     """Lead transcript 1개 → Lead 층 지표. I/O 는 파일 읽기뿐이다."""
     evs, bad = iter_jsonl(path)
@@ -766,6 +783,10 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
             "return_conflict": bool(ret and ret.get("_conflict")),
             "metrics": ret.get("metrics") if ret and isinstance(ret.get("metrics"), dict) else None,
             "stage2_ran": ret.get("stage2Ran") if ret else None,
+            # 조건부 arm 표지 — 키는 조건부 모드일 때만 반환에 있다(review-live stage2Skipped · plan-lean2 mergeSkipped).
+            #   None = 조건부가 아니다 · False = 조건부인데 생략하지 않았다 · True = 생략했다(F-356 G5 · F-506)
+            "stage2_skipped": (bool(ret["stage2Skipped"]) if ret and "stage2Skipped" in ret else None),
+            "merge_skipped": (bool(ret["mergeSkipped"]) if ret and "mergeSkipped" in ret else None),
             "return_source": src, "output_file": _resolved_output(nt.get("output_file"), tasks_dirs),
             "agent_count": wrapper.get("agentCount") if wrapper else None,
         })
@@ -930,6 +951,7 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
         "artifacts": [dict(x, write=iso(x["write"])) for x in art],
         "workflows": workflows, "gpt": gpt, "cwd": start_cwd, "launcher": _launcher_calls(bash, notifs, results),
         "merge": _merge_summaries(tool_uses, results), "plan_phase2": _plan_phase2(tool_uses, results),
+        "external_mcp": external_mcp(tool_uses, results),
         "queued_followups": queued_followups(evs, prompts[0][1] if prompts else None),
         # ⛔ Lead 작업 폴더 = **세션 시작** cwd(러너가 claude -p 를 띄운 곳). 최빈 cwd 는 잡음이다 — Lead 는 --add-dir 로 받은
         #    플러그인 폴더에 들어가 모듈 · 스크립트를 읽고 부른다(실측 review B1 repo 70:plugin 53 통과 · B2 125:128 무효 ·

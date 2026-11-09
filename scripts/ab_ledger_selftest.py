@@ -6,10 +6,13 @@
 """
 from __future__ import annotations
 
+import datetime
 import glob
 import json
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 
 import fz_wf_metrics as wfm   # noqa: E402 — 형제 모듈(Workflow 폴더 집계)
@@ -17,8 +20,9 @@ from ab_ledger_base import (AXES6, DEFAULT_EFFORT, DEFAULT_MODEL, FAIL, PASS, ST
 from ab_ledger_transcript import (CPMV_RE, GPT_CALL_RE, PHASE2_RE, REAL_HOME_SKILL_RE, _bash_writes, _call_segment, _cd_bases,
     _cmd_views, _exec_of, _follow_moves, _launcher_calls, _launcher_ok, _merge_summaries, _mv_pairs, _plan_phase2,
     _redirect_targets, _resolve_vars, _segments, _shell_part, _writes_path, gpt_home_sessions, parse_transcript, queued_followups)
-from ab_ledger_collect import (CANON_PATTERN, CANON_WATCH, append, append_many, expected_stages_completed, required_stages,
-    state_hash, state_info, wf_summary)
+from ab_ledger_collect import (CANON_PATTERN, CANON_WATCH, _clock_time, append, append_many, expected_stages_completed,
+    launcher_audits, read_endpoint_clock, required_stages, sleep_count, source_scope, source_scope_lines, state_hash, state_info,
+    wf_summary)
 from ab_ledger_judge import (SC7_FIELDS, VERIFY_FIELDS, blind_pack, blind_unpack, cite_spans, judge_rows, near_labels,
     recollect_diff, score_plan, score_review)
 from ab_ledger_gpt import (_sha_file, build_gpt_row, classify_skill_refs, gpt_sc1_problems, gpt_sc2_problems, judge_gpt,
@@ -1245,6 +1249,173 @@ def self_test(case=None):
         finally:
             shutil.rmtree(td, ignore_errors=True)
 
+    def wf_return_events(td, rets):
+        """첫 사람 발화 + Workflow 호출 i · 그 결과(toolUseResult) · 완료 알림(<result> = 반환 JSON) — 합성 transcript 이벤트."""
+        evs = [{"type": "user", "timestamp": "2026-01-01T00:00:00Z", "message": {"content": "/fz:fz-plan"}}]
+        for i, ret in enumerate(rets, 1):
+            tid = f"w{i}"
+            evs += [{"type": "assistant", "timestamp": f"2026-01-01T00:{i:02d}:00Z",
+                     "message": {"id": f"m{i}", "content": [{"type": "tool_use", "id": tid, "name": "Workflow", "input": {}}]}},
+                    {"type": "user", "timestamp": f"2026-01-01T00:{i:02d}:01Z",
+                     "message": {"content": [{"type": "tool_result", "tool_use_id": tid, "content": "started"}]},
+                     "toolUseResult": {"runId": f"wf_{i}", "transcriptDir": os.path.join(td, f"wf{i}"), "workflowName": "plan-lean2"}},
+                    {"type": "user", "timestamp": f"2026-01-01T00:{i:02d}:30Z",
+                     "message": {"content": f"<task-notification>\n<tool-use-id>{tid}</tool-use-id>\n<status>completed</status>\n"
+                                            f"<result>{json.dumps(ret)}</result>\n</task-notification>"}}]
+        return evs
+
+    @reg
+    def f356_merge_skipped_complete():
+        # plan-lean2 mergeMode 'conditional' 이 병합을 생략한 run 은 L2-merge 가 없어도 완주다(G5) — transcript 반환 표지 → 필수 stage
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            m = {"agentCalls": 3, "nullCount": 0, "fallbackCount": 0, "stagesCompleted": 2}
+            p = os.path.join(td, "t.jsonl")
+            _write_lines(p, wf_return_events(td, [{"mode": "workflow", "metrics": m, "mergeSkipped": {"reason": "빈 렌즈"}},
+                                                  {"mode": "workflow", "metrics": m, "mergeSkipped": None},
+                                                  {"mode": "workflow", "metrics": m}]))
+            ws = parse_transcript(p)["workflows"]
+            need = [required_stages(w["name"], w["stage2_ran"], w["tier"], w["merge_skipped"]) for w in ws]
+            got = [w["merge_skipped"] for w in ws]
+            ok = (got == [True, False, None] and "L2-merge" not in need[0] and need[1][-1] == need[2][-1] == "L2-merge"
+                  and expected_stages_completed("plan-lean2", None, None) == 2)
+            return ok, [f"merge_skipped={got} need={need}"]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def f356_launcher_exit_recorded():
+        # ⛔ 배너(스트림 로그) 없이 exit 12 로 끝난 런처도 실패로 센다(F-356 SFH-5) — judge 는 AC-5 로 그 run 을 뺀다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            for name, body in (("ok", '{"exit": 0, "note": "ok"}'), ("dead", '{"exit": 12, "note": "시작 직후 실패"}')):
+                with open(os.path.join(td, name + ".audit.json"), "w", encoding="utf-8") as fh:
+                    fh.write(body)
+            _, launched, ok_n, failed = launcher_audits([td], None, None)
+            rows = base() + [_mk("C1", "C", 2), _mk("C2", "C", 4)]
+            rows[2][0]["gpt"]["launcher_failed"] = 1
+            rc, out = _judge(rows, require=["AC-5"])
+            ok = ([os.path.basename(x) for x in failed] == ["dead.audit.json"] and (launched, ok_n) == (0, 0)
+                  and any(x.startswith("  INVALID C1") and "AC-5 GPT 런처 실패 1건" in x for x in out)
+                  and not any(x.startswith("  INVALID C2") for x in out))
+            return ok, [f"failed={failed} launched={launched} ok={ok_n}"] + out
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def f326_sleep_invalidates():
+        # pmset 기록 — run 구간 수면 진입 1 · 구간 밖 1 · 기록이 run 시작을 덮지 않으면 None(0 으로 읽지 않는다) · judge 는 0 을 요구한다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            log = os.path.join(td, "pmset.log")
+            with open(log, "w", encoding="utf-8") as fh:
+                fh.write("2026-09-26 01:00:00 +0900 Wake                \tWake from Normal Sleep [CDNVA] : due to UserActivity\n"
+                         "2026-09-26 02:50:18 +0900 Sleep               \tEntering Sleep state due to 'Clamshell Sleep':TCPKeepAlive=active\n"
+                         "2026-09-26 04:00:00 +0900 Sleep               \tEntering Sleep state due to 'Maintenance Sleep':TCPKeepAlive=active\n")
+            kst = datetime.timezone(datetime.timedelta(hours=9))
+            s, e = datetime.datetime(2026, 9, 26, 2, 34, tzinfo=kst), datetime.datetime(2026, 9, 26, 3, 30, tzinfo=kst)
+            got = sleep_count(log, s, e)
+            late = sleep_count(log, datetime.datetime(2026, 9, 26, 0, 30, tzinfo=kst), e)   # 기록 첫 줄(01:00)이 시작보다 늦다
+            none = sleep_count(None, s, e)
+            rows = base() + [_mk("C1", "C", 2), _mk("C2", "C", 4), _mk("C3", "C", 6), _mk("C4", "C", 8)]
+            rows[2][0]["sleep"], rows[3][0]["sleep"] = got, late
+            rows[4][0]["sleep"], rows[5][0]["sleep"] = dict(got, count=0), none
+            rc, out = _judge(rows, require=["AC-5"])
+            inval = [x for x in out if x.startswith("  INVALID")]
+            ok = (got["count"] == 1 and late["count"] is None and none["source"] is None
+                  and any(x.startswith("  INVALID C1") and "수면 진입 1회" in x for x in inval)
+                  and any(x.startswith("  INVALID C2") and "수면 판정 불가" in x for x in inval)
+                  and not any(x.startswith(("  INVALID C3", "  INVALID C4")) for x in inval))
+            return ok, [f"got={got} late={late}"] + out
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def f325_external_mcp_invalidates():
+        # 사용자 MCP(Jira) 본문 유입 → returned 1 · 플러그인 MCP · 오류 결과는 유입이 아니다 → judge 가 run 을 뺀다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            calls = [("t1", "mcp__atlassian-jira__jira_get", "issue body", False), ("t2", "mcp__plugin_fz_serena__find_symbol", "sym", False),
+                     ("t3", "mcp__github__get_issue", "Error: not found", True)]
+            evs = [{"type": "user", "timestamp": "2026-01-01T00:00:00Z", "message": {"content": "/fz:fz-peer-review"}}]
+            for i, (tid, name, body, err) in enumerate(calls, 1):
+                evs += [{"type": "assistant", "timestamp": f"2026-01-01T00:{i:02d}:00Z",
+                         "message": {"id": f"m{i}", "content": [{"type": "tool_use", "id": tid, "name": name, "input": {}}]}},
+                        {"type": "user", "timestamp": f"2026-01-01T00:{i:02d}:05Z",
+                         "message": {"content": [{"type": "tool_result", "tool_use_id": tid, "content": body, "is_error": err}]}}]
+            p = os.path.join(td, "t.jsonl")
+            _write_lines(p, evs)
+            em = parse_transcript(p)["external_mcp"]
+            rows = base() + [_mk("C1", "C", 2), _mk("C2", "C", 4)]
+            rows[2][0]["external_mcp"] = em
+            rows[3][0]["external_mcp"] = dict(em, returned=0)
+            rc, out = _judge(rows, require=["AC-5"])
+            ok = ((em["calls"], em["returned"], em["errors"]) == (2, 1, 1)
+                  and em["tools"] == ["mcp__atlassian-jira__jira_get", "mcp__github__get_issue"]
+                  and any(x.startswith("  INVALID C1") and "외부 MCP 내용 유입 1회" in x for x in out)
+                  and not any(x.startswith("  INVALID C2") for x in out))
+            return ok, [str(em)] + out
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def f429_clock_nan_none():
+        # 숫자 t 가 NaN · 범위 밖이면 예외 대신 None → '형식 위반 줄' 로 미완주 사유가 남는다(traceback 없음)
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            line = lambda t: json.dumps({"t": t, "path": "/runs/r1/a.md", "size": 1, "mtime": 1.0, "sha256": "0" * 64})
+            p = os.path.join(td, "clock.jsonl")
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write(line(1e20) + "\n" + line(float("nan")) + "\n")
+            rows_, probs = read_endpoint_clock(p)
+            ok = (_clock_time(1e20) is None and _clock_time(float("nan")) is None and _clock_time(1767225600) is not None
+                  and not rows_ and any("형식 위반 줄 [1, 2]" in x for x in probs))
+            return ok, probs
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
+    def f506_treatment_not_fired():
+        # 조건부 arm(반환에 생략 표지 키)인데 생략 0/M → 처치 미발동 UNRUN · 1 회라도 생략하면 발동 수를 찍고 판정한다
+        def cond_rows(skips):
+            rows = base() + [_mk(f"C{i}", "C", 2 * i) for i in range(1, len(skips) + 1)]
+            for (r, _), sk in zip(rows[2:], skips):
+                r["wf"]["runs"] = [{"run_id": r["run_id"], "stage2_skipped": sk, "merge_skipped": None}]
+            return rows
+        rc0, a = _judge(cond_rows([False, False]), require=["AC-1"])
+        rc1, b = _judge(cond_rows([True, False]), require=["AC-1"])
+        rc2, c = _judge(base() + [_mk("C1", "C", 2), _mk("C2", "C", 4)], require=["AC-1"])   # 조건부 아님(표지 없음) — 그대로
+        ok = (rc0 == UNRUN and any("처치 미발동" in x and "0/2" in x for x in a)
+              and rc1 == PASS and any("조건부 생략 1/2" in x for x in b) and not any("처치 미발동" in x for x in b)
+              and rc2 == PASS and not any("처치" in x for x in c))
+        return ok, a + b + c
+
+    @reg
+    def f423_archive_source_scope():
+        # recollect 는 재구성 전에 원천 범위(보관 사본 · 원래 자리 · 사라짐)를 찍는다 — 원천이 만료돼 깨지기 전에 보인다
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            ev = os.path.join(td, "ab", "evidence")
+            os.makedirs(ev)
+            kept, orig, gone = os.path.join(ev, "t.jsonl"), os.path.join(td, "run", "repo"), os.path.join(td, "run", "wf_gone")
+            os.makedirs(orig)
+            with open(kept, "w", encoding="utf-8") as fh:
+                fh.write("{}\n")
+            led = os.path.join(td, "ab", "ledger.jsonl")
+            row = {"type": "run", "run_id": "R1", "sources": {"transcript": kept, "input_root": orig, "wf_dirs": [gone], "artifacts": []},
+                   "collect_args": {"ledger": led}}
+            sc, lines = source_scope(row), source_scope_lines(row)
+            _write_lines(led, [row])
+            r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "ab_ledger.py"), "recollect",
+                                "--ledger", led], capture_output=True, text=True, timeout=60)
+            ok = ([n for n, _, _ in sc["archived"]] == ["transcript"]
+                  and sorted((n, x) for n, _, x in sc["original"]) == [("input_root", True), ("wf_dirs", False)]
+                  and "보관 사본 1/1" in lines[0] and "원래 자리 1/2 ['input_root']" in lines[0] and "사라짐 1" in lines[0]
+                  and any(gone in x for x in lines[1:]) and "  원천 R1: 보관 사본 1/1" in r.stdout and gone in r.stdout)
+            return ok, lines + r.stdout.splitlines()[:4]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
     names = [case] if case else sorted(cases)
     if case and case not in cases:
         print(f"UNRUN: 모르는 case {case} (있는 것: {', '.join(sorted(cases))})")
@@ -1257,6 +1428,8 @@ def self_test(case=None):
             ok, out = False, [f"예외 {type(e).__name__}: {e}"]
         if ok:
             passed += 1
+            if os.environ.get("FZ_SELFTEST_LIST"):
+                print(f"PASS {n}")   # 게이트 셀 문법(`^PASS <셀>`) — 셀 이름 = 사례 함수 이름의 _ 를 - 로
         else:
             fails.append(n)
             print(f"  FAIL {n}")

@@ -48,11 +48,13 @@ CANON_PATTERN = {"user_sessions": "SESSION-*_issues.json"}
 ALLOWED_PLUGIN_WRITES = ("experiment-log.md",)   # 스킬이 플러그인 루트에 쓰는 지표 파일(RV:103 · PL:139) — 코드 아님
 
 
-def required_stages(script, stage2_ran, tier=None):
-    """건강한 run 에서 반드시 돈 stage — 워크플로 스크립트 이름으로 찾고, 반환이 알려 준 실행 모드(tier·Stage 2)를 따른다."""
+def required_stages(script, stage2_ran, tier=None, merge_skipped=None):
+    """건강한 run 에서 반드시 돈 stage — 워크플로 스크립트 이름으로 찾고, 반환이 알려 준 실행 모드(tier·Stage 2·병합 생략)를 따른다."""
     need = list(STAGES_BY_SCRIPT.get(script, ()))
     if script == "review-live" and stage2_ran is False:   # 조건부 Stage 2 arm 이 '안 돌렸다' 고 반환한 경우만 뺀다
         need = [x for x in need if not x.startswith("R2-")]
+    if script == "plan-lean2" and merge_skipped:   # mergeMode 'conditional' 이 병합을 생략했다고 반환한 경우만 뺀다(F-356 G5)
+        need = [x for x in need if x != "L2-merge"]
     if script == "peer-review":
         if stage2_ran:
             need += ["R2-arch", "R2-quality"]
@@ -266,7 +268,7 @@ COLLECT_SPEC = (("ledger", None), ("workflow", None), ("arm", None), ("run", Non
                 ("release", None), ("run_id", None), ("fixture", None), ("transcript", None), ("artifact", None),
                 ("input_root", None), ("input_json", None), ("state_pristine", None), ("state_start", None),
                 ("state_end", None), ("gpt_log", None), ("gpt_log_dir", None), ("evidence_dir", None), ("tasks_dir", None),
-                ("endpoint_clock", None), ("endpoint_clock_source", None))
+                ("endpoint_clock", None), ("endpoint_clock_source", None), ("sleep_log", None))
 
 
 def collect_spec_args(src):
@@ -282,7 +284,10 @@ def _evidence_dir(a):
 def _clock_time(v):
     """시계 줄의 t → aware datetime(UTC). 숫자는 epoch 초, 문자열은 시간대가 있는 ISO-8601 — 그 밖은 None."""
     if type(v) in (int, float):
-        return datetime.datetime.fromtimestamp(v, datetime.timezone.utc)
+        try:   # NaN · 범위 밖 숫자는 예외 대신 None — 형식 위반 줄로 간다(F-429)
+            return datetime.datetime.fromtimestamp(v, datetime.timezone.utc)
+        except (OverflowError, ValueError, OSError):
+            return None
     t = wfm._ts(v) if isinstance(v, str) else None
     return t if t is not None and t.tzinfo is not None else None
 
@@ -361,6 +366,94 @@ def _endpoint_clock_evidence(a, evdir, dry):
     return (src if dry else copy), orig, sha
 
 
+PMSET_TS_RE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4})\s")
+SLEEP_ENTRY_RE = re.compile(r"\sSleep\s+Entering Sleep\b")
+
+
+def sleep_count(path, start, end):
+    """`pmset -g log` 사본 → run 구간 [start, end] 의 수면 진입 수(F-326) — {count, source, sha256, note}.
+    ⛔ 0 으로 읽지 않는다: 기록을 읽지 못함 · run 구간을 모름 · 기록의 첫 시각이 run 시작보다 늦음(구간을 덮지 않는다) → count None.
+    source 가 None 이면 러너가 기록을 넘기지 않은 run(미측정)이다. 판정은 judge(row_invalid)가 source 가 있는 행만 본다."""
+    out = {"count": None, "source": os.path.abspath(path) if path else None, "sha256": None, "note": None}
+    if not path:
+        return dict(out, note="--sleep-log 없음 — 미측정")
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+    except OSError as e:
+        return dict(out, note=f"읽지 못했다 ({type(e).__name__})")
+    out["sha256"] = hashlib.sha256(data).hexdigest()
+    if start is None or end is None or start.tzinfo is None or end.tzinfo is None:
+        return dict(out, note="run 구간(시간대가 있는 시작 · 끝점)을 모른다")
+    first, n = None, 0
+    for ln in data.decode("utf-8", "replace").splitlines():
+        m = PMSET_TS_RE.match(ln)
+        if not m:
+            continue
+        t = datetime.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S %z")
+        first = t if first is None else min(first, t)
+        if SLEEP_ENTRY_RE.search(ln) and start <= t <= end:
+            n += 1
+    if first is None or first > start:
+        return dict(out, note="기록이 run 시작을 덮지 않는다")
+    return dict(out, count=n)
+
+
+def launcher_audits(dirs, lo, hi):
+    """런처(gpt_independent.sh) 감사 파일 → (배너 목록, 배너 있는 수, 그중 감사 exit 0 수, 실패 감사 경로).
+    ⛔ 실패는 배너와 무관하게 센다 — 시작 직후 exit 10~17 로 끝난 런처는 스트림 로그(배너)가 없어 배너 기준으로 세면 빠진다(F-356 SFH-5)."""
+    banners, launched, ok_n, failed = [], 0, 0, []
+    for d in dirs or []:
+        for au in sorted(pathlib.Path(d).rglob("*.audit.json")):
+            mt = au.stat().st_mtime
+            if (lo is None or mt >= lo) and (hi is None or mt <= hi):
+                ok = _launcher_ok(au)
+                if not ok:
+                    failed.append(str(au))
+                b = parse_gpt_log(str(au)[:-len(".audit.json")] + ".json.stream.log")
+                if b and b["model"] and b["effort"]:
+                    banners.append(dict(b, explicit=True, launcher=True))
+                    launched += 1
+                    ok_n += ok
+    return banners, launched, ok_n, failed
+
+
+def source_scope(row):
+    """원장 행의 원천 → {evidence_dir, archived[(종류, 경로, 있음)], original[(종류, 경로, 있음)]} (F-423).
+    보관 사본(증거 폴더 안)과 원래 자리(transcript · Workflow 폴더 · run 폴더 — 보존 기한이 지나면 사라진다)를 가른다. 존재만 본다."""
+    src, ca = row.get("sources") or {}, row.get("collect_args") or {}
+    led = ca.get("ledger")
+    evdir = ca.get("evidence_dir") or (os.path.join(os.path.dirname(os.path.abspath(led)), "evidence") if led else None)
+    items = []
+    for k in ("transcript", "state_pristine", "state_start", "state_end", "input_root", "input_json"):
+        items.append((k, src.get(k)))
+    for k in ("artifacts", "wf_dirs", "tasks_dirs", "plugin_roots"):
+        items += [(k, p) for p in src.get(k) or []]
+    for k in ("endpoint_clock", "sleep_log"):
+        items.append((k, (src.get(k) or {}).get("path")))
+    for k in ("gpt_log", "gpt_log_dir"):
+        items += [(k, p) for p in ca.get(k) or []]
+    items += [("return_file", w.get("return_file")) for w in (row.get("wf") or {}).get("runs") or []]
+    root = os.path.realpath(evdir) + os.sep if evdir else None
+    arch, orig = [], []
+    for name, p in items:
+        if isinstance(p, str) and p:
+            (arch if root and os.path.realpath(p).startswith(root) else orig).append((name, p, os.path.exists(p)))
+    return {"evidence_dir": evdir, "archived": arch, "original": orig}
+
+
+def source_scope_lines(row):
+    """recollect 머리 줄 — 보관 사본 · 원래 자리(남은 종류) · 사라진 원천(F-423). 재구성 전에 무엇이 남았는지 먼저 보인다."""
+    sc = source_scope(row)
+    miss = [(n, p) for n, p, ok in sc["archived"] + sc["original"] if not ok]
+    left = sorted({n for n, _, ok in sc["original"] if ok})
+    lines = [f"  원천 {row.get('run_id')}: 보관 사본 {sum(ok for _, _, ok in sc['archived'])}/{len(sc['archived'])} · "
+             f"원래 자리 {sum(ok for _, _, ok in sc['original'])}/{len(sc['original'])} {left}(보존 기한이 지나면 사라진다) · "
+             f"사라짐 {len(miss)}"]
+    lines += [f"    사라진 원천 {n}: {p}" for n, p in miss[:8]]
+    return lines
+
+
 def build_row(a, dry=False) -> dict:
     """원천 → 원장 행. dry=True 는 원천 대조용 재구성이다(증거 사본을 쓰지 않는다).
     - Important: 인자는 CollectSpec 필드로 읽는다 — 옛 행의 collect_args 를 그대로 Namespace 로 넘겨도 없는 필드는 기본값이다."""
@@ -390,7 +483,7 @@ def build_row(a, dry=False) -> dict:
             continue
         s = wf_summary(w["dir"])
         entry = {k: w[k] for k in ("run_id", "name", "launch", "done", "status", "lead_s", "return_mode",
-                                   "metrics", "stage2_ran", "return_source", "agent_count")}
+                                   "metrics", "stage2_ran", "stage2_skipped", "merge_skipped", "return_source", "agent_count")}
         entry["summary"] = s
         if w["return_source"] == "output-file":
             # ⛔ /tmp 의 하네스 산출은 지워질 수 있다 — 같은 파일명으로 사본을 남겨 재구성 대조가 찾게 한다
@@ -410,7 +503,7 @@ def build_row(a, dry=False) -> dict:
         if s["journal_empty_results"]:
             why.append(f"{w['run_id']}: 빈·오류 결과 {s['journal_empty_results']}건")
         script = w["name"]   # 워크플로 스크립트 이름 — 완주 오라클의 열쇠(스킬 이름 a.workflow 는 표시만)
-        lost = [x for x in required_stages(script, w["stage2_ran"], w["tier"]) if x not in s["stages"]]
+        lost = [x for x in required_stages(script, w["stage2_ran"], w["tier"], w["merge_skipped"]) if x not in s["stages"]]
         if lost or script not in STAGES_BY_SCRIPT:
             why.append(f"{w['run_id']}: 필수 stage 누락 {lost or f'(필수 stage 표 없음 — 워크플로 스크립트 {script!r})'}")
         exp_sc = expected_stages_completed(script, w["stage2_ran"], w["tier"])
@@ -529,17 +622,8 @@ def build_row(a, dry=False) -> dict:
         banners.append(dict(cand[0][2], explicit=g.get("explicit_effort", False)))
     # ② 런처(gpt_independent.sh) — 격리 폴더에서 돌아 arm 홈에 rollout 이 없다. 감사 옆 스트림 로그 배너로 model · effort 를 본다.
     #    effort 는 런처가 정한다(명시) — F-333 의 환경 기본값 비교에 넣지 않는다
-    launched = launched_ok = 0
-    for d in a.gpt_log_dir or []:
-        for au in sorted(pathlib.Path(d).rglob("*.audit.json")):
-            mt = au.stat().st_mtime
-            if (lo is None or mt >= lo) and (hi is None or mt <= hi):
-                b = parse_gpt_log(str(au)[:-len(".audit.json")] + ".json.stream.log")
-                if b and b["model"] and b["effort"]:
-                    banners.append(dict(b, explicit=True, launcher=True))
-                    launched += 1
-                    if _launcher_ok(au):
-                        launched_ok += 1
+    lb, launched, launched_ok, launcher_failed = launcher_audits(a.gpt_log_dir, lo, hi)
+    banners += lb
     # ③ arm 별 GPT 홈 rollout 과 대조 — 명령과 연결되지 않은 세션(nohup 으로 떼어 띄운 호출)은 model · 버전만 비교에 넣고 수를 남긴다
     run_dir = os.path.dirname(os.path.realpath(a.input_json)) if a.input_json else None
     sessions = gpt_home_sessions(os.path.join(run_dir, "gpt-home")) if run_dir else None
@@ -579,6 +663,7 @@ def build_row(a, dry=False) -> dict:
                 "efforts_default": sorted({b["effort"] for b in banners if not b.get("explicit")}),
                 "versions": sorted({b["version"] for b in banners if b["version"]} | {x["version"] for x in invisible if x["version"]}),
                 "logs": sorted(set(gpt_logs)), "launcher": launched, "launcher_ok": launched_ok,
+                "launcher_failed": len(launcher_failed),
                 "real_home_skill_refs": sum(1 for g in tp["gpt"] if g.get("real_home_skill")),
                 "sessions": None if sessions is None else len(sessions), "invisible": len(invisible)},
         "state": state_info(a.state_pristine, a.state_start, a.state_end, root),
@@ -596,6 +681,18 @@ def build_row(a, dry=False) -> dict:
         row["sources"]["endpoint_clock"] = {k: clock[k] for k in ("path", "original", "sha256")}
         row["wall"]["clock"] = {k: clock[k] for k in ("observations", "parser_end", "parser_mtime_delta_s")}
     row["merge"] = tp.get("merge")
+    # 수면(F-326) — 러너가 넘긴 `pmset -g log` 사본으로 run 구간 수면 진입을 센다. 사본은 증거 폴더에 남겨 recollect 가 같은 값을 낸다
+    sl = sleep_count(getattr(a, "sleep_log", None), tp["start"], tp["end"])
+    if sl["sha256"] and not dry:
+        copy = os.path.join(evdir, f"sleep-log.{sl['sha256'][:16]}.txt")
+        if not _same_path(sl["source"], copy):
+            os.makedirs(evdir, exist_ok=True)
+            shutil.copyfile(sl["source"], copy)
+        row["collect_args"]["sleep_log"] = copy
+        row["sources"]["sleep_log"] = {"path": copy, "original": sl["source"], "sha256": sl["sha256"]}
+        sl = dict(sl, source=copy)
+    row["sleep"] = sl
+    row["external_mcp"] = tp["external_mcp"]   # F-325 — 판정은 judge(row_invalid)
     # S26 — GPT 독립 플랜 wall 이 Workflow wall 을 넘으면 임계 경로가 GPT 로 바뀐 것이다(계획 S26: 기록형 판정)
     lp = [x["wall_s"] for x in tp.get("launcher") or [] if x["mode"] == "plan" and x["wall_s"] is not None]
     ws = [w["lead_s"] for w in tp.get("workflows") or [] if w.get("lead_s") is not None and not w.get("rejected")]

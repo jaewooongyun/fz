@@ -15,7 +15,9 @@ usage:
 runs.jsonl (one arm run per line): task · arm (A0 · A2 · A3 · A4) · rep · exit · spawnAgent · spawnedRoles · childResults ·
   children [{model, effort}] · model · effort · cli · config_sha_normalized · config_sha_raw · tokens · candidates [ids] ·
   started (ISO with a zone) · prereg_sha256 · instrument_sha · merge_loss (task-level, optional) · critical_regressions
-  (optional). spawnAgent / tokens '?' (S6: the rollout could not be read) or missing make the run unmeasured — never 0.
+  (optional) · abort (optional — the error-info field of the rollout's last task_complete; server_overloaded marks a failed run as
+  unmeasured: an infrastructure abort is not the frame's failure — out of the failure rate's numerator and denominator).
+  spawnAgent / tokens '?' (S6: the rollout could not be read) or missing make the run unmeasured — never 0.
   A rerun of the same (task, arm, rep) is allowed once and only after a run that was not ok.
 verdicts: gpt_merge --blind-unpack output (schema gpt-merge-judged/1) — one file per pack, several --verdicts are joined.
   Every candidate of an ok run needs a verdict {label: valid | FP | dup | craft, severity, canonical}. A dup counts for its
@@ -103,11 +105,17 @@ def load_verdicts(docs):
     return out
 
 
+INFRA_ABORTS = ("server_overloaded",)   # error-info field of the rollout's task_complete — a server-side abort (F-441)
+
+
 def run_state(r):
     """-> ok | failed | killed | unmeasured | contaminated | invalid-a4.
-    failed/killed/invalid-a4 count toward the failure rate, never as zero findings; unmeasured is a gap of the instruments."""
+    failed/killed/invalid-a4 count toward the failure rate, never as zero findings; unmeasured is a gap of the instruments or
+    an infrastructure abort (server_overloaded) — out of the failure rate."""
     e = r.get("exit")
     if e != 0:
+        if r.get("abort") in INFRA_ABORTS:
+            return "unmeasured"
         return "failed" if isinstance(e, int) and 10 <= e <= 17 else "killed"
     sp, tok = r.get("spawnAgent"), r.get("tokens")
     if type(sp) is not int or type(tok) not in (int, float):
@@ -202,7 +210,9 @@ def compute(prereg_path, runs, verdicts, frame_arm="A2"):
                     "merge_loss": max(int(r.get("merge_loss") or 0) for r in rs), "critical_regressions": max(int(r.get("critical_regressions") or 0) for r in rs),
                     "tokens_a0": statistics.median([r["tokens"] for r in a0.values()]), "tokens_f": statistics.median([r["tokens"] for r in fr.values()])})
     compared = {p["task"] for p in per}
-    fail = lambda arm: (sum(s in ("failed", "killed", "invalid-a4") for s in states.get(arm, [])) / len(states[arm])) if states.get(arm) else 0.0
+    def fail(arm):
+        ss = [s for s in states.get(arm, []) if s != "unmeasured"]   # instrument gaps · infrastructure aborts are not attempts (F-441)
+        return sum(s in ("failed", "killed", "invalid-a4") for s in ss) / len(ss) if ss else 0.0
     ok_runs = lambda arm: [r for t in compared for r in tasks[t] if r["arm"] == arm and run_state(r) == "ok"]
     m = {"n_valid": len(per), "per_task": per, "excluded": excluded, "frame_arm": frame_arm,
          "unmeasured": sum(s == "unmeasured" for ss in states.values() for s in ss),
@@ -319,6 +329,8 @@ def self_test():
         nonlocal n
         n += 1
         print(f"{'PASS' if ok else 'FAIL'}  [{cid}] {note}")
+        if os.environ.get("FZ_SELFTEST_LIST"):
+            print(f"{'PASS' if ok else 'FAIL'} {cid}")   # gate cell grammar (`^PASS <cell>`) — the bracketed line stays for the gpt fixture readers
         if not ok:
             bad.append(cid)
 
@@ -402,6 +414,11 @@ def self_test():
     cell("rerun-rows", m["n_valid"] == 1 and rejects(lambda: compute(pp, task("t7") + [run(task="t7", arm="A2", rep=2, candidates=["x1"])], v))
          and rejects(lambda: compute(pp, rerun + [run(task="t6", arm="A2", rep=2, exit=13)], v)) and rejects(lambda: compute(pp, after_ok, v)),
          "failed then ok kept · two ok rejected · two reruns rejected · rerun after ok rejected")
+    ov = run(task="tf", arm="A2", rep=1, exit=12, abort="server_overloaded", started=T1)
+    m, _, _ = compute(pp, stamped(task("tf")) + [ov], v)
+    cell("f441-server-overloaded-unmeasured", run_state(ov) == "unmeasured" and run_state(run(exit=12)) == "failed"
+         and m["fail_f"] == 0.0 and m["unmeasured"] == 1 and m["n_valid"] == 1,
+         f"overloaded attempt then ok rerun -> fail_f={m['fail_f']} unmeasured={m['unmeasured']} (a counted failure would give 1/3)")
     cell("n-max", rejects(lambda: compute(pp, [r for i in range(13) for r in task(f"n{i}")], v)), "13 tasks > n_max 12 -> reject")
     cell("verdicts-complete", rejects(lambda: compute(pp, task("t8"), {"x1": v["x1"]})), "x2 not judged -> reject")
     vd = {"x1": {"label": "valid", "severity": "major", "canonical": "c1"}, "x2": {"label": "dup", "canonical": "c1"},

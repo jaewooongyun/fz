@@ -36,6 +36,23 @@ JSONL — 한 줄이 관측 하나다. 러너는 stream-json 이벤트를 받을
 - 행에는 `collect_args.endpoint_clock`(사본) · `collect_args.endpoint_clock_source`(원본) · `sources.endpoint_clock`(사본 경로 · 원본 경로 · sha256)이 남는다(collect_args 는 CollectSpec `collect/1` 필드다).
 - `recollect` 와 `judge --verify-sources` 는 사본을 읽는다 — 원본 시계를 고치거나 지워도 같은 끝점을 다시 만든다. 사본이 없어지면 그 run 은 미완주가 된다(재수집 악화로 드러난다).
 
+## 수면 기록 (`collect --sleep-log`)
+
+덮개를 닫아 생긴 수면은 wall 을 부풀리고 서브프로세스 타임아웃(단조 시계)을 멈춘다. 러너가 run 이 끝난 뒤 `pmset -g log` 출력을 파일로 남겨 `collect --sleep-log FILE` 로 넘기면, collect 는 run 구간(첫 사람 발화 ~ 끝점)의 `Entering Sleep` 줄을 센다.
+
+- 행의 `sleep{count, source, sha256, note}` 에 남는다. 사본은 증거 폴더에 `sleep-log.<sha256 앞 16자>.txt` 로 두고 recollect 는 사본을 읽는다.
+- judge 는 기록을 넘긴 run 에만 0 을 요구한다. 수면 진입이 1회 이상이면 그 run 을 뺀다. 기록을 읽지 못했거나 기록의 첫 시각이 run 시작보다 늦어 구간을 덮지 못하면 0 으로 읽지 않고 `수면 판정 불가` 로 뺀다.
+- 기록을 넘기지 않은 run 은 `count` 가 비어 있고(미측정) 이 검사를 받지 않는다. 그래서 정식 비교는 기록을 요구한다(아래).
+
+## 정식 비교 절차 (`judge --formal`)
+
+기본값을 바꾸거나(KEEP · 승격) 되돌리는(ROLLBACK) 결정의 근거, 그리고 릴리스 노트에 A/B 결과로 싣는 판정은 정식 비교로 낸다. 탐색 · 스모크 · 계측기 디버깅 판정은 `--formal` 없이 돌려도 되지만, `--formal` 없이 낸 판정은 결론으로 인용하지 않는다.
+
+1. 수집 — 각 run 을 러너 끝점 시계(`--endpoint-clock`)와 수면 기록(`--sleep-log`)을 넘겨 collect 한다.
+2. 계측기가 바뀌었으면(`instrument_sha`) 판정 전에 recollect 한다. recollect 는 run 마다 원천 범위(보관 사본 · 원래 자리 · 사라짐)를 먼저 찍는다. 원래 자리 원천(transcript · Workflow 폴더 · run 폴더)은 보존 기한이 지나면 사라지므로 그 전에 돌린다.
+3. 판정 — `judge --formal --verify-sources <종류…>` 로 원천을 다시 읽어 대조하고, 원장에 기준선(B) 행이 있으면 `--plugin-sha <기준선 SHA>` 를 함께 준다. 둘 중 하나가 빠지면 UNRUN exit 2(`FORMAL-SOURCES-MISSING` · `FORMAL-PLUGIN-SHA-MISSING`)다.
+4. 조건부 arm(review-live `stage2:'conditional'` · plan-lean2 `mergeMode:'conditional'`)은 처치 발동 수(`조건부 생략 N/M`)를 결과와 함께 적는다. 생략이 0회면 judge 가 `처치 미발동 — 판정 불가` UNRUN 을 낸다 — 그 arm 의 차이를 처치의 효과로 읽지 않는다.
+
 ## 러너 쪽
 
-시계 파일을 쓰는 것은 A/B 러너(플러그인 밖)다. 이 문서는 플러그인이 읽는 형식과 판정만 정한다 — 러너가 시계를 남기지 않으면 collect 는 `--endpoint-clock` 없이 지금처럼 돈다.
+시계 파일과 수면 기록을 쓰는 것은 A/B 러너(플러그인 밖)다. 이 문서는 플러그인이 읽는 형식과 판정만 정한다 — 러너가 시계를 남기지 않으면 collect 는 `--endpoint-clock` 없이 지금처럼 돈다.
