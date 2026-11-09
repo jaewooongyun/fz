@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# diff-parse: not-a-diff — `startswith("-")` 는 mktemp 인자의 옵션 토큰(-t · -p)을 가르는 데만 쓴다. diff 를 파싱하지 않는다
 """check_external_commands.py — 문서가 호출을 지시하는 **외부 명령이 실재하는가** (B4 / v7 S3).
 
 왜: 스킬·모듈이 GPT CLI 호출 같은 외부 명령을 절차로 적어 두는데, 그 명령이 설치돼
@@ -9,6 +10,13 @@
 실측(2026-09-21): `import`(Python) · `elif`(셸 키워드) · `init_or_use_session`(문서 내 함수)이
 후보 15종 중 3종을 차지했다. 그래서 **선언 목록**(`DECLARED`)을 정본으로 두고,
 문서 스캔은 *선언에 없는 새 명령이 등장했는지* 만 본다(fail-closed).
+
+셸 위험 두 축 (운영 스크립트 scripts/ · skills/*/scripts/ · .githooks/ + 문서 bash 블록 — 위반이면 exit 1):
+  awk-nonascii     awk 프로그램이 비ASCII 문자열 리터럴을 == · != 로 비교하는데 그 줄에 `LC_ALL=C` 가 없다(F-389 —
+                   macOS BSD awk 가 UTF-8 로캘에서 서로 다른 한글 문자열을 같다고 판정한다. 정규식 `~ /^…$/` 은 바르다)
+  mktemp-template  `mktemp -d` 에 템플릿(위치 인자)도 `-p` 도 없다(F-403 — Darwin 은 TMPDIR 을 무시하고 /var/folders 에
+                   만든다. `-t` 만 줘도 같다). 명시 템플릿 `mktemp -d "${TMPDIR:-/tmp}/<이름>.XXXXXX"` 을 쓴다
+  tests/fixtures 의 `mktemp -d` 는 개수만 보고한다(격리를 TMPDIR 에 맡기는 주장이 없는 시험 자료)
 
 exit code:
   0  PASS — 선언된 필수 명령이 전부 실재 · 미선언 신규 명령 0
@@ -67,6 +75,12 @@ CODE_BLOCK = re.compile(r"```(?:bash|sh|shell)\n(.*?)```", re.S)
 #    AC8 의 `rg` 의존(F-224)이 이 사각으로 통과했다. 2글자 셸 키워드(`if`·`fi`·`do`)는 NOT_A_COMMAND 가 걷는다
 FIRST_TOKEN = re.compile(r"^\s*(?:\$ )?([a-z][a-z0-9_.-]{1,})\s", re.M)
 SCAN_GLOBS = ("skills/*/SKILL.md", "modules/*.md", "guides/*.md")
+SHELL_GLOBS = ("scripts/*.sh", "skills/*/scripts/*.sh", ".githooks/*")
+FIXTURE_SHELL_GLOB = "tests/fixtures/**/*.sh"
+FIXTURE_SKIP = {"tests/fixtures/lint/empty-cd-mktemp/run.sh"}   # N14 lint 시험 자료 — mktemp 꼴을 일부러 담는다
+AWK_WORD = re.compile(r"\bawk\b")
+NONASCII_CMP = re.compile(r'(?:==|!=)\s*"[^"\n]*[^\x00-\x7f][^"\n]*"|"[^"\n]*[^\x00-\x7f][^"\n]*"\s*(?:==|!=)')
+MKTEMP = re.compile(r"\bmktemp\b([^)\n;|&`]*)")
 
 
 def log(*a):
@@ -90,6 +104,72 @@ def scan_commands(root: pathlib.Path):
     return found, n
 
 
+def _strip_comments(text: str) -> str:
+    """줄 전체가 주석인 줄을 빈 줄로 — 줄 번호는 지킨다. 주석 속 예시(템플릿 없는 `mktemp -d` 경고문)는 호출이 아니다."""
+    return "\n".join("" if ln.lstrip().startswith("#") else ln for ln in text.split("\n"))
+
+
+def shell_hazards(text: str):
+    """(awk 위반 줄들, mktemp 위반 줄들) — 줄 번호 목록."""
+    awk, mk = [], []
+    for m in AWK_WORD.finditer(text):
+        # 같은 명령(따옴표 밖 줄바꿈까지)의 작은따옴표 구간을 모두 본다 — `-F'\t'` 같은 옵션 인자도 따옴표를 쓴다
+        i, segs = m.end(), []
+        while i < len(text) and text[i] != "\n":
+            if text[i] == "'":
+                j = text.find("'", i + 1)
+                if j < 0:
+                    break
+                segs.append(text[i + 1:j])
+                i = j + 1
+                continue
+            i += 1
+        head = text[text.rfind("\n", 0, m.start()) + 1:m.start()]
+        if any(NONASCII_CMP.search(s) for s in segs) and "LC_ALL=C" not in head:
+            awk.append(text.count("\n", 0, m.start()) + 1)
+    for m in MKTEMP.finditer(text):
+        toks = m.group(1).split()
+        if not any(re.fullmatch(r"-[a-zA-Z]*d[a-zA-Z]*", t) for t in toks):
+            continue
+        rest, skip = [], False
+        for t in toks:
+            if skip:
+                skip = False
+                continue
+            if t in ("-t", "-p"):
+                skip = t == "-t"
+                if t == "-p":
+                    rest.append("-p")
+                continue
+            if not t.startswith("-"):
+                rest.append(t)
+        if not rest:
+            mk.append(text.count("\n", 0, m.start()) + 1)
+    return awk, mk
+
+
+def scan_shell(root: pathlib.Path):
+    """(위반 목록, fixture mktemp 보고 수). 운영 스크립트 + 문서 bash 블록은 위반 · fixture 는 보고만."""
+    viol, n_fixture = [], 0
+    targets = []
+    for g in SHELL_GLOBS:
+        targets += [q for q in sorted(root.glob(g)) if q.is_file()]
+    for q in targets:
+        rel = q.relative_to(root).as_posix()
+        awk, mk = shell_hazards(_strip_comments(q.read_text(encoding="utf-8", errors="replace")))
+        viol += [f"{rel}:{n}: awk-nonascii" for n in awk] + [f"{rel}:{n}: mktemp-template" for n in mk]
+    for g in SCAN_GLOBS:
+        for q in sorted(root.glob(g)):
+            rel = q.relative_to(root).as_posix()
+            for blk in CODE_BLOCK.findall(q.read_text(encoding="utf-8")):
+                awk, mk = shell_hazards(_strip_comments(blk))
+                viol += [f"{rel}(bash 블록): awk-nonascii" for _ in awk] + [f"{rel}(bash 블록): mktemp-template" for _ in mk]
+    for q in sorted(root.glob(FIXTURE_SHELL_GLOB)):
+        if q.relative_to(root).as_posix() not in FIXTURE_SKIP:
+            n_fixture += len(shell_hazards(_strip_comments(q.read_text(encoding="utf-8", errors="replace")))[1])
+    return viol, n_fixture
+
+
 def check(root: pathlib.Path):
     found, nfiles = scan_commands(root)
     if nfiles == 0:
@@ -108,9 +188,14 @@ def check(root: pathlib.Path):
     print(f"  미선언 명령(문서에만 등장)            : {len(undeclared)}")
     for c in undeclared:
         print(f"      {c} — DECLARED 에 추가하거나 NOT_A_COMMAND 로 분류하라")
+    hazards, n_fixture = scan_shell(root)
+    print(f"  셸 위험(awk 비ASCII 비교 · 템플릿 없는 mktemp -d) : {len(hazards)}")
+    for h in hazards:
+        print(f"      {h}")
+    print(f"  (보고) fixture 의 템플릿 없는 mktemp -d      : {n_fixture}")
 
-    if missing_required or undeclared:
-        log(f"VIOLATION: 필수 부재 {len(missing_required)} · 미선언 {len(undeclared)}")
+    if missing_required or undeclared or hazards:
+        log(f"VIOLATION: 필수 부재 {len(missing_required)} · 미선언 {len(undeclared)} · 셸 위험 {len(hazards)}")
         return VIOLATION
     print("OK: 선언된 필수 명령이 전부 실재하고 미선언 명령이 없다")
     return OK
@@ -208,7 +293,40 @@ def self_test():
         rc = check(r)
         assert rc == OK, f"⛔ POSIX 유틸·셸 키워드를 미선언 명령으로 오탐했다 (rc={rc})"
 
-    for n, f in [("clean-passes", c_clean_passes),
+    def c_awk_nonascii(tmp):
+        r = mk(tmp / "r", "# x\n")
+        mk(r, "#!/bin/bash\nawk -F'\\t' '$3 == \"연기\" {print}' f.tsv\n", "scripts/a.sh")
+        assert check(r) == VIOLATION, "⛔ LC_ALL=C 없는 비ASCII awk 비교를 놓쳤다"
+
+    def c_awk_lc_all_ok(tmp):
+        r = mk(tmp / "r", "# x\n")
+        mk(r, "#!/bin/bash\nLC_ALL=C awk -F'\\t' '$3 == \"연기\" {print}' f.tsv\nawk '$3 ~ /^연기$/' f.tsv\n", "scripts/a.sh")
+        assert check(r) == OK, "LC_ALL=C 접두 · 정규식 비교를 위반으로 읽었다"
+
+    def c_mktemp_no_template(tmp):
+        r = mk(tmp / "r", "# x\n")
+        mk(r, "#!/bin/bash\nT=\"$(mktemp -d)\" || exit 1\n", "skills/s/scripts/a.sh")
+        assert check(r) == VIOLATION, "⛔ 템플릿 없는 mktemp -d 를 놓쳤다"
+
+    def c_mktemp_template_ok(tmp):
+        r = mk(tmp / "r", "# x\n")
+        mk(r, '#!/bin/bash\n# 주석: 템플릿 없는 mktemp -d 는 쓰지 않는다\nT="$(mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX")"\nU="$(mktemp -d -p "$TMPDIR")"\n', "scripts/a.sh")
+        assert check(r) == OK, "명시 템플릿 · -p · 주석을 위반으로 읽었다"
+
+    def c_mktemp_t_only(tmp):
+        r = mk(tmp / "r", "# x\n")
+        mk(r, "#!/bin/bash\nT=\"$(mktemp -d -t fz)\"\n", "scripts/a.sh")
+        assert check(r) == VIOLATION, "⛔ -t 만 준 mktemp -d 를 놓쳤다(Darwin 은 TMPDIR 을 무시한다)"
+
+    def c_fixture_reported_only(tmp):
+        r = mk(tmp / "r", "# x\n")
+        mk(r, "#!/bin/bash\nT=\"$(mktemp -d)\"\n", "tests/fixtures/x/run.sh")
+        assert check(r) == OK, "fixture 의 mktemp 는 보고만 한다"
+
+    for n, f in [("f389-awk-nonascii", c_awk_nonascii), ("f389-awk-lc-all-ok", c_awk_lc_all_ok),
+                 ("f403-mktemp-no-template", c_mktemp_no_template), ("f403-mktemp-template-ok", c_mktemp_template_ok),
+                 ("f403-mktemp-t-only", c_mktemp_t_only), ("f403-fixture-reported-only", c_fixture_reported_only),
+                 ("clean-passes", c_clean_passes),
                  ("undeclared-detected", c_undeclared_detected),
                  ("keyword-not-flagged", c_keyword_not_flagged),
                  ("missing-required-detected", c_missing_required_detected),

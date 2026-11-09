@@ -35,6 +35,16 @@ SSOT:
   python3 scripts/lint_doc_freshness.py --days 60
   python3 scripts/lint_doc_freshness.py --json          # 기계 판독
   python3 scripts/lint_doc_freshness.py --strict        # 경고 시 exit 1 (CI/hook용)
+  python3 scripts/lint_doc_freshness.py --pointer-base <ref>   # `파일:N` 포인터가 가리키는 줄 내용이 <ref> 때와 다르면 보고
+
+계약 규칙 (severity error — `--strict` 없이도 exit 1. 문서 숫자 · 등재가 실측과 갈린 것은 경고가 아니다):
+  arxiv-unregistered   트리가 인용하는 arxiv ID ⊆ llm-references.md ∪ harness-engineering.md §참고 문헌 (F-287 —
+                       레지스트리가 둘이라 어느 쪽에도 없는 인용이 생겼다. 새 인용은 llm-references.md §2 에 등재한다)
+  cited-selftest-count docs · examples · modules 가 적은 `gate_stop_hook.py --self-test` 케이스 수 = 실측 (F-426)
+  fixture-case-count   docs/architecture.md 의 판정기 회귀 'N케이스 (M범주)' = manifest 실측 (F-555)
+보고 규칙 (warn):
+  pointer-drift        `--pointer-base <ref>` — 문서의 `파일:N` 포인터가 <ref> 때와 같은 글자인데 대상 N번째 줄 내용이 바뀌었다
+                       (F-305 — 줄 삽입이 포인터를 조용히 밀었다. #N3 는 빈 줄만 본다)
 """
 
 from __future__ import annotations
@@ -42,6 +52,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -180,6 +191,168 @@ def legacy_hits(text: str, cur_toks: list[str]) -> list[str]:
     return sorted(hits)
 
 
+ARXIV_CITE = re.compile(r"(?i)(?:arxiv\.org/(?:abs|pdf)/|arxiv[\s:]*(?:preprint)?[\s,:#]*)(\d{4}\.\d{4,5})(?:v\d+)?")
+ARXIV_EXTS = (".md", ".py", ".js", ".sh", ".json", ".yaml", ".yml")
+# 이력(릴리스 노트 · 실험 기록)과 일부러 지어낸 입력(fixture · 이 파일의 self-test)은 인용이 아니다
+ARXIV_SKIP_DIRS = ("docs/releases/", "tests/fixtures/")
+ARXIV_SKIP_FILES = {"CHANGELOG.md", "experiment-log.md", "scripts/lint_doc_freshness.py"}
+REGISTRY_SECTION = re.compile(r"^#{1,3}[^\n]*참고\s*문헌[^\n]*\n(.*?)(?=^#{1,2} |\Z)", re.S | re.M)
+
+
+def _line_of(text: str, pos: int) -> int:
+    return text.count("\n", 0, pos) + 1
+
+
+def _tree_files(root: Path) -> list:
+    """검사 대상 파일 — 저장소 최상위면 추적 + ignore 되지 않은 새 파일만(`.fz-work/` · `.claude/worktrees/` 같은 로컬 산출물이
+    릴리스 판정을 흔들지 않게). git 이 아니면(설치본) 전체를 순회한다."""
+    if (root / ".git").exists():
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "-co", "--exclude-standard"], capture_output=True)
+        if r.returncode == 0:
+            return sorted(root / p for p in r.stdout.decode("utf-8", "surrogateescape").split("\0") if p)
+    return sorted(root.rglob("*"))
+
+
+def arxiv_findings(root: Path) -> list[dict]:
+    """트리의 arxiv 인용 중 두 레지스트리 어디에도 없는 ID (F-287). 레지스트리 파일이 없으면 판정하지 않는다."""
+    reg_doc = root / "guides" / "llm-references.md"
+    if not reg_doc.is_file():
+        return []
+    reg = set(re.findall(r"\d{4}\.\d{4,5}", reg_doc.read_text(encoding="utf-8", errors="replace")))
+    he = root / "guides" / "harness-engineering.md"
+    if he.is_file():
+        m = REGISTRY_SECTION.search(he.read_text(encoding="utf-8", errors="replace"))
+        if m:
+            reg |= set(re.findall(r"\d{4}\.\d{4,5}", m.group(1)))
+    out = []
+    for q in _tree_files(root):
+        rel = q.relative_to(root).as_posix()
+        if (not q.is_file() or q.suffix not in ARXIV_EXTS or any(s.startswith(".git") for s in q.parts)
+                or rel.startswith(ARXIV_SKIP_DIRS) or rel in ARXIV_SKIP_FILES):
+            continue
+        text = q.read_text(encoding="utf-8", errors="replace")
+        for m in ARXIV_CITE.finditer(text):
+            if m.group(1) not in reg:
+                out.append({"file": f"{rel}:{_line_of(text, m.start())}", "rule": "arxiv-unregistered", "severity": "error",
+                            "detail": f"arxiv {m.group(1)} 이 llm-references.md · harness-engineering.md §참고 문헌 어디에도 없다 — llm-references.md §2 에 등재하거나 인용을 거둔다"})
+    return out
+
+
+HOOK_CITE_NUM = re.compile(r"(\d+)\s*케이스|(\d+)/(\d+)\s*passed")
+
+
+def hook_case_count(root: Path) -> int | None:
+    """`gate_stop_hook.py --self-test` 의 케이스 수 실측 — 끝 줄 `N/M passed` 의 M. 못 재면 None."""
+    hook = root / "scripts" / "gate_stop_hook.py"
+    if not hook.is_file():
+        return None
+    try:
+        r = subprocess.run([sys.executable, str(hook), "--self-test"], cwd=root, capture_output=True, text=True, timeout=180)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    m = re.findall(r"(\d+)/(\d+)\s*passed", r.stdout)
+    return int(m[-1][1]) if m else None
+
+
+def cited_count_findings(root: Path) -> list[dict]:
+    """docs(릴리스 노트 제외) · examples · modules 의 `gate_stop_hook.py --self-test` 케이스 수 인용 = 실측 (F-426)."""
+    sites = []
+    for sub_ in ("docs", "examples", "modules"):
+        for q in sorted((root / sub_).rglob("*")) if (root / sub_).is_dir() else []:
+            rel = q.relative_to(root).as_posix()
+            if not q.is_file() or rel.startswith("docs/releases/"):
+                continue
+            for i, ln in enumerate(q.read_text(encoding="utf-8", errors="replace").split("\n"), 1):
+                if "gate_stop_hook" not in ln or "--self-test" not in ln:
+                    continue
+                tail = ln[ln.index("--self-test"):]
+                m = HOOK_CITE_NUM.search(tail)
+                if m:
+                    sites.append((f"{rel}:{i}", int(m.group(1) or m.group(3))))
+    if not sites:
+        return []
+    real = hook_case_count(root)
+    if real is None:
+        return [{"file": sites[0][0], "rule": "cited-selftest-unmeasured", "severity": "warn",
+                 "detail": "gate_stop_hook.py --self-test 케이스 수를 재지 못했다 — 인용 대조 미판정(⛔ 통과 아님)"}]
+    return [{"file": f, "rule": "cited-selftest-count", "severity": "error",
+             "detail": f"gate_stop_hook --self-test 를 {n}케이스로 적었는데 실측 {real} — 숫자를 고친다"}
+            for f, n in sites if n != real]
+
+
+FIXTURE_CITE = re.compile(r"(\d+)\s*케이스\s*\((\d+)\s*범주")
+
+
+def fixture_count_findings(root: Path) -> list[dict]:
+    """docs/architecture.md 의 판정기 회귀 'N케이스 (M범주)' = tests/fixtures/gates/manifest.json 실측 (F-555)."""
+    doc, man = root / "docs" / "architecture.md", root / "tests" / "fixtures" / "gates" / "manifest.json"
+    if not doc.is_file() or not man.is_file():
+        return []
+    try:
+        cases = json.loads(man.read_text(encoding="utf-8"))["cases"]
+    except (ValueError, KeyError) as e:
+        return [{"file": "tests/fixtures/gates/manifest.json", "rule": "fixture-case-count", "severity": "error",
+                 "detail": f"manifest 를 읽지 못했다 — {type(e).__name__}: {e}"}]
+    n, k = len(cases), len({c.get("category") for c in cases})
+    out = []
+    for i, ln in enumerate(doc.read_text(encoding="utf-8", errors="replace").split("\n"), 1):
+        if "fixtures/gates" not in ln:
+            continue
+        for m in FIXTURE_CITE.finditer(ln):
+            if (int(m.group(1)), int(m.group(2))) != (n, k):
+                out.append({"file": f"docs/architecture.md:{i}", "rule": "fixture-case-count", "severity": "error",
+                            "detail": f"'{m.group(0)}' 로 적었는데 manifest 는 {n}케이스 ({k}범주) — 숫자를 고친다"})
+    return out
+
+
+POINTER = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w.-]+\.(?:md|py|sh|js|json|yaml|tsv)):(\d+)(?!\d)")
+
+
+def pointer_findings(root: Path, ref: str) -> list[dict]:
+    """`파일:N` 포인터가 <ref> 때와 같은 글자로 문서에 있는데 대상 N번째 줄 내용이 바뀌었으면 보고 (F-305).
+
+    - Note: 포인터를 이번에 새로 쓴 문서 줄은 보지 않는다 — 기준 문서에 같은 포인터 글자가 있을 때만 대조한다.
+      대상 경로는 루트 기준 · 없으면 `skills/` 아래로 한 번 더 찾는다(`fz-review/SKILL.md:213` 꼴).
+    """
+    cache: dict[str, list[str] | None] = {}
+
+    def base_lines(rel: str):
+        if rel not in cache:
+            r = subprocess.run(["git", "-C", str(root), "show", f"{ref}:{rel}"], capture_output=True, text=True, errors="replace")
+            cache[rel] = r.stdout.split("\n") if r.returncode == 0 else None
+        return cache[rel]
+
+    out = []
+    for q in sorted(root.rglob("*.md")):
+        rel = q.relative_to(root).as_posix()
+        if any(s.startswith(".git") for s in q.parts) or rel.startswith(("docs/releases/", "tests/fixtures/")) \
+                or rel in ("CHANGELOG.md", "experiment-log.md"):
+            continue
+        text = q.read_text(encoding="utf-8", errors="replace")
+        base_doc = base_lines(rel)
+        if base_doc is None:
+            continue
+        base_text = "\n".join(base_doc)
+        for m in POINTER.finditer(text):
+            tgt, n = m.group(1), int(m.group(2))
+            if m.group(0) not in base_text:
+                continue
+            for cand in (tgt, f"skills/{tgt}"):
+                if (root / cand).is_file():
+                    tgt = cand
+                    break
+            else:
+                continue
+            old = base_lines(tgt)
+            now = (root / tgt).read_text(encoding="utf-8", errors="replace").split("\n")
+            if old is None or not (1 <= n <= len(old)) or not (1 <= n <= len(now)):
+                continue
+            if old[n - 1].strip() != now[n - 1].strip():
+                out.append({"file": f"{rel}:{_line_of(text, m.start())}", "rule": "pointer-drift", "severity": "warn",
+                            "detail": f"`{m.group(0)}` 의 대상 줄이 {ref} 때 {old[n - 1].strip()[:50]!r} → 지금 {now[n - 1].strip()[:50]!r} — 줄 삽입 · 삭제로 밀렸는지 본다"})
+    return out
+
+
 def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
     today = date.today()
     cur, cur_src = current_model(root)
@@ -262,6 +435,9 @@ def lint(root: Path, max_days: int) -> tuple[list[dict], dict]:
                         "file": f"{rel}:{ln}", "rule": "stale-model-heading", "severity": "warn",
                         "detail": f"섹션 제목에 구세대 모델명 {sorted(set(hits))} — 절 전체가 그 모델에 종속돼 읽힌다",
                     })
+
+    # 계약 규칙 — 파일별 최신성 루프와 대상이 다르다(인용 전체 · 숫자 인용)
+    findings += arxiv_findings(root) + cited_count_findings(root) + fixture_count_findings(root)
 
     summary = {
         "current_model": cur_label, "current_model_source": cur_src,
@@ -364,6 +540,68 @@ def self_test():
             fired = any(f["rule"] == "stale-model-ref" and f["file"] == "modules/a.md" for f in lint(root, 90)[0])
             (passed.append(name) if fired == want else failed.append(f"{name}: 발화 {fired} (기대 {want})"))
 
+    # ── 계약 규칙 (F-287 · F-426 · F-555 · F-305) — 임시 루트에서 위반 · 충족 쌍
+    def contract_root(d: Path, ref_ids: str, cite: str, hook_total: int, doc_cases: str):
+        for sub_ in ("guides", "modules", "docs", "examples", "scripts", "tests/fixtures/gates"):
+            (d / sub_).mkdir(parents=True, exist_ok=True)
+        (d / "guides" / "llm-references.md").write_text(f"| arxiv | 제목 |\n| {ref_ids} | x |\n", encoding="utf-8")
+        (d / "modules" / "m.md").write_text(f"근거 (arxiv {cite}) 실증\n", encoding="utf-8")
+        (d / "scripts" / "gate_stop_hook.py").write_text(f"print('stop-hook self-test {hook_total}/{hook_total} passed')\n", encoding="utf-8")
+        (d / "docs" / "completion-gates.md").write_text("python3 scripts/gate_stop_hook.py --self-test   # 40/40 passed\n", encoding="utf-8")
+        (d / "tests/fixtures/gates/manifest.json").write_text(json.dumps({"cases": [{"category": "a"}, {"category": "a"}, {"category": "b"}]}), encoding="utf-8")
+        (d / "docs" / "architecture.md").write_text(f"├── tests/  fixtures/gates/ — 판정기 회귀 {doc_cases}, 기대 exit)\n", encoding="utf-8")
+
+    for name, args_, rule, want in (
+        ("f287-arxiv-unregistered", ("2401.00001", "2401.00002", 40, "3케이스 (2범주"), "arxiv-unregistered", True),
+        ("f287-registered-ok", ("2401.00001", "2401.00001", 40, "3케이스 (2범주"), "arxiv-unregistered", False),
+        ("f426-cited-selftest-count", ("2401.00001", "2401.00001", 41, "3케이스 (2범주"), "cited-selftest-count", True),
+        ("f426-cited-count-ok", ("2401.00001", "2401.00001", 40, "3케이스 (2범주"), "cited-selftest-count", False),
+        ("f555-fixture-case-count", ("2401.00001", "2401.00001", 40, "99케이스 (17범주"), "fixture-case-count", True),
+        ("f555-count-ok", ("2401.00001", "2401.00001", 40, "3케이스 (2범주"), "fixture-case-count", False),
+    ):
+        cases += 1
+        with _tf.TemporaryDirectory() as _d:
+            contract_root(Path(_d), *args_)
+            got = [f for f in lint(Path(_d), 90)[0] if f["rule"] == rule]
+            fired = bool(got) and all(f["severity"] == "error" for f in got)
+            (passed.append(name) if fired == want else failed.append(f"{name}: 발화 {bool(got)} (기대 {want}) {got[:1]}"))
+
+    # F-287 후속 — gitignore 된 로컬 산출물(.fz-work/)의 미등재 인용은 보지 않는다 · ignore 안 된 새 파일의 같은 인용은 본다(대조 셀)
+    cases += 1
+    with _tf.TemporaryDirectory() as _d:
+        d = Path(_d)
+        contract_root(d, "2401.00001", "2401.00001", 40, "3케이스 (2범주")
+        (d / ".gitignore").write_text(".fz-work/\n", encoding="utf-8")
+        (d / ".fz-work").mkdir()
+        (d / ".fz-work" / "w.md").write_text("근거 (arxiv 2401.00009) 실증\n", encoding="utf-8")
+        subprocess.run(["git", "-C", _d, "init", "-q"], capture_output=True)
+        ign = [f["file"] for f in lint(d, 90)[0] if f["rule"] == "arxiv-unregistered"]
+        (d / "modules" / "new.md").write_text("근거 (arxiv 2401.00009) 실증\n", encoding="utf-8")
+        new = [f["file"] for f in lint(d, 90)[0] if f["rule"] == "arxiv-unregistered"]
+        ok = ign == [] and new == ["modules/new.md:1"]
+        (passed.append("f287-gitignored-work-skipped") if ok else failed.append(f"f287-gitignored-work-skipped: ignore {ign} · 새 파일 {new}"))
+
+    # F-305 — 기준 커밋에서 `b.py:2` 를 가리키던 문서 · 대상 위에 줄을 끼우면 보고, 아래를 고치면 조용
+    for name, edit, want in (
+        ("f305-pointer-content-drift", lambda s: "inserted\n" + s, True),
+        ("f305-pointer-same-content-ok", lambda s: s + "tail\n", False),
+    ):
+        cases += 1
+        with _tf.TemporaryDirectory() as _d:
+            d = Path(_d)
+            (d / "guides").mkdir()
+            (d / "guides" / "a.md").write_text("포인터 `scripts/b.py:2` 참조\n", encoding="utf-8")
+            (d / "scripts").mkdir()
+            (d / "scripts" / "b.py").write_text("x = 1\ny = 2\nz = 3\n", encoding="utf-8")
+            g = lambda *a: subprocess.run(["git", "-C", _d, "-c", "user.email=t@t", "-c", "user.name=t", *a], capture_output=True)
+            if any(g(*a).returncode for a in (("init", "-q"), ("add", "-A"), ("commit", "-qm", "base"))):
+                failed.append(f"{name}: 픽스처 git 준비 실패")
+                continue
+            b = d / "scripts" / "b.py"
+            b.write_text(edit(b.read_text(encoding="utf-8")), encoding="utf-8")
+            fired = any(f["rule"] == "pointer-drift" for f in pointer_findings(d, "HEAD"))
+            (passed.append(name) if fired == want else failed.append(f"{name}: 발화 {fired} (기대 {want})"))
+
     print(f"self-test {len(passed)}/{cases} 통과")
     for x in passed:
         print(f"  ok   {x}")
@@ -379,6 +617,7 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="JSON 출력")
     ap.add_argument("--strict", action="store_true", help="경고 있으면 exit 1")
     ap.add_argument("--self-test", action="store_true", help="술어 fixture 실행")
+    ap.add_argument("--pointer-base", metavar="REF", help="`파일:N` 포인터 대상 줄 내용을 REF 와 대조(보고)")
     args = ap.parse_args()
     if args.self_test:
         return self_test()
@@ -389,6 +628,8 @@ def main() -> int:
         return 2
 
     findings, summary = lint(root, args.days)
+    if args.pointer_base:
+        findings += pointer_findings(root, args.pointer_base)
 
     if args.json:
         print(json.dumps({"summary": summary, "findings": findings},
@@ -417,8 +658,11 @@ def main() -> int:
                     print(f"     └ {it['detail']}")
                 print()
         print(f"총 {len(findings)}건")
+        n_err = sum(f["severity"] == "error" for f in findings)
+        if n_err:
+            print(f"⛔ 계약 오류 {n_err}건 — 경고와 달리 exit 1 (문서 숫자 · 등재가 실측과 갈렸다)")
 
-    if args.strict and findings:
+    if any(f["severity"] == "error" for f in findings) or (args.strict and findings):
         return 1
     return 0
 

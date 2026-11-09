@@ -1852,7 +1852,7 @@ def main() -> int:
         except ParseError as e:
             print(f"⛔ #{i} configuration/parse error: {e}", file=sys.stderr)
             return 2
-        except Exception as e:                                  # noqa: BLE001
+        except Exception as e:                                  # noqa: BLE001 — 검사 구현의 예상 밖 예외는 판정 불가(2)다 · 위반(1)으로 읽히지 않게
             print(f"⛔ #{i} 예상 외 오류({type(e).__name__}): {e}", file=sys.stderr)
             return 2
         # ⛔ Negative-Result Gate 요소1 — 후보 수가 하한 미달이면 **순회·수집이 고장난 것**으로 본다

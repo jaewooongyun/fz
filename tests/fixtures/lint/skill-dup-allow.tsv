@@ -1,0 +1,8 @@
+# 스킬 간 300B 이상 같은 줄 허용 목록 — check_rule_copies.py skill-dup 이 읽는다
+# 열: sha12(줄 앞뒤 공백을 뗀 글자의 sha256 앞 12자)<TAB>그 줄이 있어야 하는 스킬들<TAB>사유
+# ⛔ 한 벌만 고치면 해시가 갈려 FAIL 한다 — 나열된 스킬을 함께 고치고 이 행의 해시를 새로 적는다
+fb7adbad7391	arch-critic,code-auditor	피어 리뷰 렌즈 두 스킬이 같은 N 강도 규칙을 각각 싣는다 — 렌즈는 따로 로드된다
+3eb31c33ba5f	arch-critic,code-auditor	피어 리뷰 렌즈 두 스킬의 후보 보존 규칙 — 렌즈는 따로 로드된다
+dd7bf662e79a	fz-code,fz-plan,fz-review	light 경로 검증 경계 — 각 스킬의 light 절차 문서에 있어야 한다(lint #N11)
+22bbc5ed4f11	fz-code,fz-plan,fz-review	Workflow 실패 처방 표 행 — 스킬마다 자기 실패 표를 싣는다(정본 guides/skill-authoring.md §12)
+b86daf2c9a43	fz-code,fz-plan	advisor 스톨 처방 행 — Workflow 를 부르는 두 생산 스킬의 실패 표(정본 guides/skill-authoring.md §12)

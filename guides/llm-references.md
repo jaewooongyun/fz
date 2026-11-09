@@ -89,7 +89,10 @@
 
 ---
 
-## 2. Tier 2 — 학술 (arxiv, 2026-06-28 export API 실증 · 2026-09-06 추가 5행 · 최하단 6행은 2026-09-25 추가)
+## 2. Tier 2 — 학술 (arxiv, 2026-06-28 export API 실증 · 2026-09-06 추가 5행 · 2026-09-25 추가 6행 · 최하단 14행은 2026-11-09 트리 인용 등재)
+
+> ⛔ 트리가 인용하는 arxiv ID 는 이 표 ∪ `harness-engineering.md` §참고 문헌 안에 있어야 한다 — 새 인용은 **이 표**에 등재한다. `lint_doc_freshness.py` 의 arxiv-unregistered 가 잰다(F-287).
+> ℹ️ 최하단 14행의 존재 · 제목 · 1저자 · 날짜는 2026-11-09 export API(`export.arxiv.org/api/query?id_list=…`) 응답 그대로다. 정량 주장 귀속은 각 인용처가 진다.
 
 > ⚠️ 존재·제목·저자·날짜는 API 확인. 각 논문에 귀속된 **정량 주장**은 인용 시 abstract 재확인 권장.
 > ⚠️ **2026-09-06 추가 5행은 획득 경로가 다르다** — export API가 아니라 `curl` raw abstract/HTML 대조(2605.27922·2605.21516·2604.07236) 또는 검색 요약(`[summary]`: 2509.21051·2506.07142)이다(두 행은 2026-11-01 원문 대조로 해소 — 각 행 참조). 1저자는 abstract 페이지 `citation_author` meta 로 채웠다(아래 ℹ️) — 본문 미대조와 저자 meta 확인은 다른 등급이다.
@@ -128,6 +131,20 @@
 | 2608.09290 | OpenCodeReview: Determinism over Non-Determinism for Cost-Effective Agent-Based Code Review | Li (11인) | 2026-08 | 무제한 도구 사용이 리뷰 결과를 불안정하게 만든다 — 결정론 파이프라인이 주류 코딩 에이전트 대비 SEM-F1 최대 2.17배, 토큰 5~15배 절감(AACR-Bench 200 PR). → fz-review 결정론 스테이지 설계 근거. abs meta 대조 2026-09-25 |
 | 2609.15309 | When Agents Slow Down: Test-Time Strategies via Elo-per-token | Liu (9인) | 2026-09 | *"agents can initially convert tokens into Elo faster than independent sampling, but their marginal gains diminish"* — 1억 토큰을 병렬 세션으로 나누면 긴 단일 세션 대비 +264 Elo. → effort·세션 길이 배분(Track M) 참고. abs meta 대조 2026-09-25 |
 | 2608.16068 | CAPO: Constraint-Aware Prompt Optimization for LLM Agents | Dong (4인) | 2026-08 | 운영 제약 하 시스템 프롬프트 최적화(primal-dual) — *"more reliably reaches empirically feasible operating points while improving task performance"*. → 프롬프트 개정 시 제약(길이·비용) 명시 최적화. abs meta 대조 2026-09-25 |
+| 2210.03629 | ReAct: Synergizing Reasoning and Acting in Language Models | Yao | 2022-10 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-searcher · fz-planner |
+| 2303.11366 | Reflexion: Language Agents with Verbal Reinforcement Learning | Shinn | 2023-03 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-fixer |
+| 2307.03172 | Lost in the Middle: How Language Models Use Long Contexts | Liu | 2023-07 | 트리 인용 등재(2026-11-09) — 인용처: guides/prompt-optimization.md · skill-troubleshooting.md |
+| 2309.11495 | Chain-of-Verification Reduces Hallucination in Large Language Models | Dhuliawala | 2023-09 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-fixer · fz-guardian · schemas/gpt_verification_schema.json · skills/fz-gpt |
+| 2505.16997 | X-MAS: Towards Building Multi-Agent Systems with Heterogeneous LLMs | Ye | 2025-05 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-planner · modules/cross-validation.md |
+| 2510.04618 | Agentic Context Engineering: Evolving Contexts for Self-Improving Language Models | Zhang | 2025-10 | 트리 인용 등재(2026-11-09) — 인용처: guides/prompt-optimization.md · docs/rationale |
+| 2510.05156 | VeriGuard: Enhancing LLM Agent Safety via Verified Code Generation | Miculicich | 2025-10 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-guardian · schemas · modules/cross-validation.md |
+| 2510.05381 | Context Length Alone Hurts LLM Performance Despite Perfect Retrieval | Du | 2025-10 | 트리 인용 등재(2026-11-09) — 인용처: modules/memory-policy.md |
+| 2510.07777 | Drift No More? Context Equilibria in Multi-Turn LLM Interactions | Dongre | 2025-10 | 트리 인용 등재(2026-11-09) — 인용처: modules/system-reminders.md |
+| 2512.20845 | MAR:Multi-Agent Reflexion Improves Reasoning Abilities in LLMs | Ozer | 2025-12 | 트리 인용 등재(2026-11-09) — 인용처: skills/fz-review · modules/cross-validation.md |
+| 2601.15300 | Intelligence Degradation in Long-Context LLMs: Critical Threshold Determination via Natural Length Distribution Analysis | Wang | 2026-01 | 트리 인용 등재(2026-11-09) — 인용처: modules/memory-policy.md |
+| 2603.12123 | Cross-Context Review: Improving LLM Output Quality by Separating Production and Review Sessions | Song | 2026-03 | 트리 인용 등재(2026-11-09) — 인용처: guides/skill-testing.md |
+| 2604.03515 | Inside the Scaffold: A Source-Code Taxonomy of Coding Agent Architectures | Rombaut | 2026-04 | 트리 인용 등재(2026-11-09) — 인용처: guides/prompt-optimization.md · docs/rationale |
+| 2606.15903 | Control-Plane Placement Shapes Forgetting: An Architectural Study of Agent Memory Across Thirteen System Configurations | Yang | 2026-06 | 트리 인용 등재(2026-11-09) — 인용처: modules/memory-guide.md |
 
 > ℹ️ 위 5행의 **1저자**는 2026-09-06 `curl https://arxiv.org/abs/<id>` 의 `citation_author` meta 첫 항목이다(저자 수: 12·5·2·7·4). 팩에 없던 값을 raw 페이지로 채운 것이며 추정 기입은 없다.
 

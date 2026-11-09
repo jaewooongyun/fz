@@ -26,6 +26,10 @@
 # diff-parse: not-a-diff — 이 파일의 `startswith("-")` 는 argv 플래그 판별이다.
 #   diff 를 읽지 않으므로 hunk 안팎 구분이 필요 없다.
 #
+# ⛔ G4(어휘 — 등급 A·B 심볼은 첫 등장 시 정의) 의 기계 조각도 --fixture-check 가 negative fixture 에 돈다(F-093 —
+#    negative 가 자기가 재는 기준을 어긴 채 '오검출 0' 을 선언했다). 판정 = 문서가 `경로/Type.ext:N` 으로 인용한
+#    파일의 타입 이름마다 `Type [A]` · `Type [B]` 정의 블록이 있다. 의미 판정(역할 접미사의 파생 B)은 사람 몫이다.
+#
 # 사용: check_g8_style.py [--self-test] [--fixture-check] [파일...]
 # exit: 0 위반 0 / 1 위반 있음 / 2 실행 오류(파일 없음·읽기 실패)
 
@@ -133,9 +137,43 @@ def self_test():
                 bad += 1
         finally:
             os.unlink(p)
+    # F-093 — fixture 계약이 negative 에 G4 를 돈다(정의 블록이 빠지면 fixture_check 가 실패)
+    n_cases = len(SELF_TESTS)
+    flow = "## 흐름\n\n1. 탭\n   → `Sample/ListView.ext:45` `onItemTap`\n\n한 줄 정리: 끝.\n\n## 등장하는 것\n\n```\n"
+    for name, defs, want in (("f093-negative-fixture-g4", "", 1), ("f093-negative-fixture-g4-defined-ok", "ListView [A]\n", 0)):
+        n_cases += 1
+        d = tempfile.mkdtemp()
+        try:
+            fx = os.path.join(d, "skills", "fz-explain", "references", "fixtures")
+            os.makedirs(fx)
+            with io.open(os.path.join(fx, "negative-clean.md"), "w", encoding="utf-8") as fh:
+                fh.write(flow + defs + "```\n")
+            with io.open(os.path.join(fx, "positive-defects.md"), "w", encoding="utf-8") as fh:
+                fh.write("결함 **볼드** 와 **볼드** 와 **볼드** 와 **볼드** 가 한 문단에 있다 — 줄표 — 줄표 — 줄표.\n")
+            keep, sys.stdout = sys.stdout, io.StringIO()
+            try:
+                rc = fixture_check(d)
+            finally:
+                sys.stdout = keep
+        finally:
+            import shutil
+            shutil.rmtree(d, ignore_errors=True)
+        ok = rc == want
+        print("%s  %s (기대 exit %d / 실측 %d)" % ("PASS" if ok else "FAIL", name, want, rc))
+        if not ok:
+            bad += 1
     print("")
-    print("self-test %d/%d passed" % (len(SELF_TESTS) - bad, len(SELF_TESTS)))
+    print("self-test %d/%d passed" % (n_cases - bad, n_cases))
     return 1 if bad else 0
+
+
+POINTER_TYPE = re.compile(r"`[\w./-]*?/?([A-Za-z_]\w*)\.[A-Za-z]+:\d+`")
+DEFINED = re.compile(r"^([A-Za-z_]\w*) \[(?:A|B)\]\s*$", re.M)
+
+
+def g4_undefined(text):
+    """인용 파일의 타입 이름 중 정의 블록이 없는 것 — G4 기계 조각."""
+    return sorted(set(POINTER_TYPE.findall(text)) - set(DEFINED.findall(text)))
 
 
 def fixture_check(root):
@@ -159,6 +197,13 @@ def fixture_check(root):
                                             "0" if rule == "eq0" else "1건 이상"))
         if not ok:
             bad += 1
+        if rule == "eq0":
+            with io.open(f, encoding="utf-8") as fh:
+                undef = g4_undefined(fh.read())
+            print("%s  %-22s G4 미정의 %d건%s" % ("PASS" if not undef else "FAIL", name, len(undef),
+                                                ("" if not undef else " — " + " · ".join(undef))))
+            if undef:
+                bad += 1
     print("")
     print("⏸ SKIP(의미 판정) 2항목: 명사형 제목 · 장식 이모지 — PASS 아님")
     print("fixture 계약 %d/%d 충족" % (len(spec) - bad, len(spec)))
