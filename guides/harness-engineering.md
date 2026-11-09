@@ -21,6 +21,7 @@ Anthropic 공식 엔지니어링 블로그, arxiv 논문, 오픈소스 구현체
 - §4 에이전트 패턴 A-D (Initializer, 3-Agent GAN, Plan→Work→Review, NLAH)
 - §5 실전 원칙
 - §5.5 자기진화 하네스와 회귀 게이트 (2026-07, harness-paper 서베이)
+- §5.6 게이트의 게이트 — 개별 제거 probe · 측정 도구 적대 검토 (F-039 · F-317)
 - §6 Anti-patterns
 - §7 실전 구현 체크리스트 (load-bearing 테스트 포함)
 - §11 측정 지표 + Module Ablation 방법론 (cross-experiment 표는 experiment-log.md 참조)
@@ -744,6 +745,8 @@ Level 3 (강력): Generator ≠ Evaluator + 다른 모델
   예: fz의 Cross-model Verification (Claude + GPT). cross-provider 확장 (Gemini 등)은 측정 데이터 누적 후 결정 (현재 비채택).
 ```
 
+⛔ **기대값 출처를 fixture 에 적는다** — 구현이 기대값을 생성한 fixture(구현을 돌려 나온 출력을 golden 으로 굳힌 것)는 회귀 검출기일 뿐 정답 검증이 아니다. 같은 구현이 Generator 와 Evaluator 를 겸한 셈이다. fixture 에 기대값의 출처(손 판정 · 문서 규칙 · 외부 모델 · 구현 출력)를 표기한다(F-047).
+
 ### 원칙 5: 점진적 진행이 일발 완성보다 낫다
 
 > "한 번에 복잡한 앱을 만들려는 시도는 일관되게 실패한다." — Anthropic 공식 (2025.11)
@@ -812,6 +815,27 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 3. **잦은 갱신 균형추 (SEAGym)**: "잦은 업데이트가 held-out 개선에 실패하거나 유용한 중간 스냅샷이 나중에 붕괴할 수 있음." [arxiv preprint, 2026-06, v1 — SEAGym 2606.17546 abstract 원문 일치, 2026-11-01 대조(C-35) · 이전 "harness-paper §4-B 경유·원 논문 미대조" 단서 해제] → fz의 candidate 유지 규율(즉시 active 승격 안 함)·Lesson Intake evidence 카운팅·메모리 GC가 이미 이 붕괴 방어와 정합 — **현행 유지가 정답**(재설계 유발 금지).
 
 > **경계**: 본 절은 "프레임+가드레일" 서술이지 완전자동 self-evolution 이식 제안이 아니다(fz는 "임의 판단 금지·AskUserQuestion" 규율 유지). falsification의 일반 이론은 서베이가 미해결로 남긴 과제 — "'요행을 정책으로 굳히지 않는' falsification 게이트의 일반 이론이 필요." [외부: harness-paper §6 미해결과제3 — 원 논문 미대조]. fz의 부분 자기수정을 "이 문제 해결"로 격상 금지.
+
+---
+
+## 5.6 게이트의 게이트 — 새 결정론 검사를 믿기 전에 (F-039 · F-317)
+
+새 결정론 검사(lint · self-test 셀 · 원장 CHECK)는 통과하는 순간 신뢰를 얻는다. 그 신뢰가 맞는지는 따로 재야 한다.
+
+**개별 제거 probe** — 검사를 추가할 때 회귀 fixture 와 함께 방어선을 **하나씩** 지운 결과를 남긴다. 형식은 "N종 추가 · N종 개별 관측"이다. 통합 주입은 총계만 보여 "N종 중 M종만 관측된다"를 숨긴다. 비용은 방어선 수 × self-test 1회다. 판정은 아래 표대로 한다.
+
+| 방어선 하나를 지운 결과 | 판정 |
+|---|---|
+| 예측한 fixture 가 FAIL | 유효 검출 |
+| **다른** fixture 가 FAIL | 유효 검출 — 예측이 빗나간 것이지 미검출이 아니다 |
+| self-test 가 완주하지 못함(크래시) | 유효 검출. 단 assert 로 바꾸는 편이 낫다 |
+| 전부 통과 + 요약 줄 정상 인쇄 | **헛돌이** — 그 fixture 는 아무것도 고정하지 않는다 |
+
+⛔ "FAIL 문자열 유무"만으로 판정하면 크래시를 헛돌이로 오독한다.
+
+**측정 도구는 긴 측정 전에 이종 모델 적대 검토를 1회 받는다** — A/B 판정기 · 수집기처럼 몇 시간짜리 측정의 결론을 내는 도구는 self-test 가 green 이어도 fail-open 을 품는다(F-317: self-test 16/16 · 통합 9/9 green 인 판정기에서 GPT 적대 검토가 fail-open 21건을 잡았다). 검토 지적은 **문장 단위가 아니라 불변식 단위**로 반영한다 — 불변식(예: "진성 = 코드로 확인된 결함")을 먼저 쓰고 그 우회로를 다 막는다. 불변식마다 **증거 부재 = 위반**을 같이 쓴다 — "증거가 있으면 대조"는 증거를 안 주면 검사가 빠지는 fail-open 이다.
+
+값싼 검출 9항(테스트가 자기 이름의 축을 보는가)은 `guides/skill-testing.md` § 5 에 있다.
 
 ---
 

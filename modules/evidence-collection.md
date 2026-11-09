@@ -114,6 +114,8 @@ git grep {symbol} pr-${PR_NUMBER} -- '*.swift' '*.m' '*.h'
 
 Count == 0이면 "✅ 완전 제거", > 0이면 "⚠️ 잔존 {N}건"
 
+⛔ **경계를 건넌 rename 도 대상이다(F-034)** — 모듈 · 번들 경계를 건너 옮긴 파일은 `git diff -M` 이 `R`(rename)로 묶어 삭제 목록에 안 나온다. `git diff --no-renames --name-status` 로 `D` 로 잡히는지 한 번 더 뽑아 옛 경로 · 옛 모듈 이름의 잔존도 센다.
+
 ### d. regression 이슈 base 비교용 → `evidence/base-patterns.md`
 
 에이전트가 regression으로 판정할 가능성이 높은 변경 패턴:
@@ -148,7 +150,7 @@ Orchestrator가 사전에 제공해야 한다.
    - `activate_project` 의 `session` 값은 `initial_instructions` 결과에서 받는다 — v2.0.0 부터 Serena 가 세션을 직접 관리해 이 값 없이는 활성화를 거부한다
    - 신뢰하지 않은 프로젝트에서는 심볼릭 링크로 들어온 파일을 보지 않는다(v2.0.0) — 링크된 소스의 결과가 0건이면 "참조 없음" 으로 읽기 전에 신뢰 설정(`trusted_project_path_patterns`)부터 확인한다
 1. diff에서 신규/변경 init · protocol 요구사항 식별 (함수 시그니처 추출)
-2. **호출** = `find_referencing_symbols` ∪ `git grep "TypeName(" pr-{PR} -- '*.swift'` → 호출자 파일:라인
+2. **호출** = `find_referencing_symbols` ∪ `git grep "TypeName(" pr-{PR} -- '*.swift'` → 호출자 파일:라인 · 대상이 프로퍼티면 `<prop> *=` 직접 대입도 세고 함수 호출 집합과의 차집합(대입으로만 바뀌는 자리)을 적는다(F-197)
 3. **구현** = `find_implementations` ∪ `git grep` 전수 — 프로토콜 메서드 · 오버라이드의 conformance 구현. `find_referencing_symbols` 는 호출 지점만 주고 구현은 주지 않는다(F-535). 해당 없으면 `해당 없음 — <사유>`
 4. 각 호출자의 해당 라인 ±5줄 추출 (default param이 있으면 호출자의 default 값도 포함)
 5. 호출자가 참조하는 concrete 타입 목록 추출

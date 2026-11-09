@@ -10,6 +10,7 @@
 - [Verification Cost Tiers](#verification-cost-tiers)
 - [Swift/iOS Domain Tier (도메인 specific 강화)](#swiftios-domain-tier-도메인-specific-강화)
 - [Evidence Source Priority](#evidence-source-priority)
+- [주장과 측정의 대조](#주장과-측정의-대조-p2-i--f-292--f-293)
 - [Verification Protocol (Heavy)](#verification-protocol-heavy)
 - [Context7 활용 (확장)](#context7-활용-확장)
 - [Memory Feedback Loop](#memory-feedback-loop)
@@ -81,10 +82,19 @@ Heavy 트리거: Transformation Spec의 "실행 스레드" 또는 "요청 파라
 |:--------:|------|------|:------:|
 | 1 | 실제 코드 (Read, Grep, Serena) | `[verified: 코드 L{N}]` | 최고 |
 | 2 | 테스트/빌드 결과 (XcodeBuildMCP) | `[verified: 빌드]` | 높음 |
+| 2.5 | 런타임 아티팩트 (로컬 캐시 · `--help` · 서버 응답 · 설치본 파일) | `[verified: runtime]` | 높음 |
 | 3 | 공식 문서 (Context7, 플러그인) | `[verified: Context7]` | 중간 |
 | 4 | 훈련 데이터 | **태그 없음 = unverified** | 최저 |
 
 > 우선순위 1-2는 직접 인정. 3은 문서 내용에 따라 판단. 4는 항상 unverified.
+
+- **런타임 > 문서(F-141)** — enum · 플래그 값을 코드 가드에 넣을 때는 runtime 이 doc 을 이긴다. 문서가 '없다' 고 한 것은 확인 실패이지 부재가 아니다 — 로컬 런타임(캐시 · `--help`)을 한 번 본다
+- **획득 경로 축(F-138)** — 출처의 권위와 별개로 그 내용을 어떻게 얻었는지 적는다: raw(원문 · 실행 출력을 직접 읽음) 또는 summary(요약 계층 — 웹 페치 요약 · 에이전트 보고 · 검색 스니펫). 태그는 `[verified: official · raw]` 꼴이다. ⛔ 규칙 · 수치 · 행동 지침을 바꾸는 인용은 raw 대조 필수다 — summary 만으로는 `[미검증: 요약 계층]` 으로 둔다
+
+## 주장과 측정의 대조 (P2-I · F-292 · F-293)
+
+- **주어 대조(F-292)** — 측정을 인용하기 전에 주장의 주어와 측정의 주어가 같은지 맞춘다. '완료됐다' 를 '0건 · 파일 존재' 같은 대리 오라클로 재면 대리값은 참인데 주장은 거짓일 수 있다
+- **술어 대조(F-293)** — 큰 수가 나와도 표본을 열어 본다. 걸려서는 안 되는 대조 셀(일반 문장 · 무관한 파일)을 함께 돌려 술어가 과매칭하지 않는지 본다 — 대조 심볼은 거짓 음성 방향뿐 아니라 거짓 양성 방향에도 둔다
 
 ## Verification Protocol (Heavy)
 

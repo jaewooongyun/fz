@@ -27,7 +27,7 @@
 | 네임스페이스 | 카테고리 | 예시 | 용도 |
 |------------|---------|------|------|
 | `fz` | `session` | `fz:session:current` | 현재 활성 세션 + 티켓 폴더 WORK_DIR 경로 |
-| `fz` | `artifact` | `fz:artifact:step1` | 파이프라인 단계 산출물 |
+| `fz` | `artifact` | `fz:artifact:step1` | 파이프라인 단계 산출물 · ⛔ 생산자 없음(쓰는 절차 0 — GC 만 남았다) |
 | `fz` | `checkpoint` | `fz:checkpoint:{skill}-{phase}` | Phase 완료 또는 의미 있는 결과 시 경량 저장. 티켓 폴더(WORK_DIR) 미활성 시 유일한 compact recovery 수단. ~3,000자 <!-- 기존: 500자 --> 핵심 결정 요약 (Essential Context 포함) |
 | `fz` | `checkpoint` | `fz:checkpoint:essential` | /fz가 단독 관리. 현재 Active State + Key Decisions + Constraints (~3,000자 <!-- 기존: 500자 -->). 파이프라인 완료 시 삭제 |
 | `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}` | mid-pipeline discover 결과. phase={plan\|code\|review}. 파이프라인 완료 시 삭제 |
@@ -41,9 +41,11 @@
 | `fz` | `checkpoint` | `fz:checkpoint:code-step{N}` | 구현 Step 진행 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:fix-{bug}` | 버그 수정 결과 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:search` | 탐색 결과 (임시) |
-| `fz` | `decision` | `fz:decision:{topic}` | 아키텍처 결정사항 (영속) |
-| `fz` | `pattern` | `fz:pattern:{name}` | 학습된 패턴 (영속) |
-| `fz` | `peer` | `fz:peer:pr-{number}` | 피어 리뷰 결과 (임시) |
+| `fz` | `decision` | `fz:decision:{topic}` | 아키텍처 결정사항 (영속) · ⛔ 생산자 없음(쓰는 절차 0 — memory-curator 읽기만 남았다) |
+| `fz` | `pattern` | `fz:pattern:{name}` | 학습된 패턴 (영속) · ⛔ 생산자 없음(쓰는 절차 0 — memory-curator 읽기만 남았다) |
+| `fz` | `peer` | `fz:peer:pr-{number}` | 피어 리뷰 결과 (임시) · ⛔ 생산자 없음(쓰는 절차 0) |
+| `fz` | `rtm` | `fz:rtm:{Req-ID}` | 비-티켓 세션의 RTM 상태 (`modules/rtm.md` · 임시) |
+| `fz` | `consensus` | `fz:consensus:{YYYYMMDD_HHMMSS}` | 비-티켓 세션의 합의/불일치 요약 (`modules/cross-validation.md` · 임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:peer-review-synthesize` | Synthesize 결과 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:peer-review-deliver` | Deliver 결과 (임시) |
 
@@ -54,6 +56,8 @@
 | `session` | 임시 | 새 세션 시작 시 이전 세션 덮어쓰기 |
 | `artifact` | 임시 | 파이프라인 완료 시 필수 삭제 |
 | `checkpoint` | 임시 | 파이프라인 완료 시 필수 삭제 |
+| `rtm` | 임시 | 파이프라인 완료 시 필수 삭제 |
+| `consensus` | 임시 | 파이프라인 완료 시 필수 삭제 |
 | `decision` | 영속 | `/fz-memory gc --persistent` 시 30일+ 미참조 키 목록화 → 사용자 확인 후 삭제 |
 | `pattern` | 영속 | `/fz-memory gc --persistent` 시 30일+ 미참조 키 목록화 → 사용자 확인 후 삭제 |
 | `peer` | 임시 | 리뷰 완료 후 7일 내 삭제 권장 |
@@ -62,7 +66,7 @@
 
 ```
 파이프라인 완료 시 (Lead 역할):
-1. list_memories() → fz:artifact:*, fz:checkpoint:* 키 수집
+1. list_memories() → fz:artifact:*, fz:checkpoint:*, fz:rtm:*, fz:consensus:* 키 수집
 2. 각 키에 delete_memory() 실행
 3. fz:session:current는 유지 (다음 세션 복원용)
 
@@ -102,10 +106,10 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 | 스킬 | 읽기 | 쓰기 |
 |------|------|------|
 | /fz | `fz:session:current` (복원) | `fz:session:current` (초기화 + work_dir), `fz:checkpoint:essential` |
-| /fz-plan | `fz:session:current` | `fz:checkpoint:plan-direction`, `plan-v{N}`, `plan-verify`, `plan-final` + `fz:decision:{topic}` (영속) |
+| /fz-plan | `fz:session:current` | `fz:checkpoint:plan-direction`, `plan-v{N}`, `plan-verify`, `plan-final` (+ `fz:decision:{topic}` 영속 — ⛔ 생산 절차 없음, 키 표 참조) |
 | /fz-code | `fz:decision:{topic}`, `fz:checkpoint:plan-*` | `fz:checkpoint:code-step{N}` (임시) |
 | /fz-review | `fz:checkpoint:code-*` | `fz:checkpoint:review-issues` (임시) |
-| /fz-fix | `fz:session:current` | `fz:checkpoint:fix-{bug}` (임시) + `fz:pattern:{bug_type}` (영속) |
+| /fz-fix | `fz:session:current` | `fz:checkpoint:fix-{bug}` (임시) (+ `fz:pattern:{bug_type}` 영속 — ⛔ 생산 절차 없음, 키 표 참조) |
 | /fz-search | `fz:decision:{topic}` | `fz:checkpoint:search` (임시) |
 | /fz-discover | `fz:checkpoint:discover-{tag}` | `fz:checkpoint:discover-{tag}` (journal=덮어쓰기, phase=APPEND), `discover-{tag}-final` (수렴) |
 | /fz-memory | `fz:*` (전체 조회) | - (관리 전용, 직접 쓰기 없음) |
