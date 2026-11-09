@@ -26,6 +26,7 @@ exit: 0=충족 · 1=위반 · 2=측정 실패(⛔ 통과 아님 — 스킬 0개 
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import sys
@@ -55,22 +56,33 @@ OLD_REJECT = "Claude plan detected. Provide requirements only"
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 
 
-def baseline():
-    """지침 파일 집합(추출기)과 6축(워크플로) — 두 모델이 같은 정의를 쓰도록 이 트리의 정본에서 읽는다."""
+class AxesChanged(Exception):
+    """CRAFT_AXES 선언은 찾았는데 6개가 아니다 — 내용 위반(1)이다. 선언을 못 찾은 측정 실패(2)와 다르다(F-396)."""
+
+
+def baseline(wf: pathlib.Path | None = None):
+    """지침 파일 집합(추출기)과 6축(워크플로) — 두 모델이 같은 정의를 쓰도록 이 트리의 정본에서 읽는다.
+
+    - Parameters:
+      - wf: 6축을 읽을 워크플로 파일. 기본값은 이 트리의 `workflows/peer-review.js` (self-test 가 사본을 넘긴다).
+    - Throws: 선언을 못 찾거나 읽지 못하면 `RuntimeError`(측정 실패) · 찾았는데 6개가 아니면 `AxesChanged`(위반).
+    """
     sys.path.insert(0, str(HERE))
     try:
         import extract_project_rules as epr
         guides = sorted(epr.GUIDE_NAMES) + sorted(epr.GUIDE_PATHS)
     except (ImportError, AttributeError) as e:
         raise RuntimeError(f"지침 파일 집합을 읽지 못했다(scripts/extract_project_rules.py): {e}")
-    wf = HERE.parent / "workflows" / "peer-review.js"
+    wf = wf or HERE.parent / "workflows" / "peer-review.js"
     try:
         m = re.search(r"const CRAFT_AXES = \[([^\]]*)\]", wf.read_text(encoding="utf-8"))
     except OSError as e:
         raise RuntimeError(f"6축을 읽지 못했다({wf}): {e}")
-    axes = re.findall(r"'([a-z_]+)'", m.group(1)) if m else []
+    if not m:
+        raise RuntimeError(f"CRAFT_AXES 선언을 찾지 못했다({wf})")
+    axes = re.findall(r"'([a-z_]+)'", m.group(1))
     if len(axes) != 6:
-        raise RuntimeError(f"CRAFT_AXES 가 6개가 아니다({wf}): {axes}")
+        raise AxesChanged(f"CRAFT_AXES 가 6개가 아니다({wf}): {axes}")
     return guides, axes
 
 
@@ -187,9 +199,12 @@ def scan(root: pathlib.Path, guides, axes):
     return skills, nfiles, hits
 
 
-def run(root: pathlib.Path) -> int:
+def run(root: pathlib.Path, wf: pathlib.Path | None = None) -> int:
     try:
-        guides, axes = baseline()
+        guides, axes = baseline(wf)
+    except AxesChanged as e:
+        print(f"VIOLATION {e}")
+        return VIOLATION
     except RuntimeError as e:
         print(f"UNRUN: {e}")
         return UNRUN
@@ -208,6 +223,13 @@ def self_test() -> int:
     import tempfile
     passed, fails = 0, []
     guides, axes = baseline()
+    listing = bool(os.environ.get("FZ_SELFTEST_LIST"))
+
+    def ok(name):
+        nonlocal passed
+        passed += 1
+        if listing:
+            print(f"  ok   {name}")
 
     def good(d: pathlib.Path):
         """위반 0 인 최소 트리 — 스킬 넷(reviewer · architect · planner · 팩을 쓰는 other)."""
@@ -271,7 +293,7 @@ def self_test() -> int:
             mutate(d)
             got = rules(d)
             if got == want:
-                passed += 1
+                ok(name)
             else:
                 fails.append(f"{name}: want {want} got {got}")
         except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게
@@ -283,11 +305,30 @@ def self_test() -> int:
         rc = run(empty)
         shutil.rmtree(empty)
         if rc == UNRUN:
-            passed += 1
+            ok("스킬 0개 → 측정 실패")
         else:
             fails.append(f"스킬 0개 → 측정 실패: want {UNRUN} got {rc}")
     except Exception as e:
         fails.append(f"스킬 0개: 예외 {type(e).__name__}: {e}")
+    # ⛔ 6축 선언이 5개면 내용 위반(1) · 선언이 없으면 측정 실패(2) — 둘을 섞지 않는다(F-396)
+    real_wf = (HERE.parent / "workflows" / "peer-review.js").read_text(encoding="utf-8")
+    for name, wf_text, want in (
+        ("f396-portability-axes-violation", re.sub(r"const CRAFT_AXES = \[([^\]]*?),\s*'[a-z_]+'\s*\]", r"const CRAFT_AXES = [\1]", real_wf, count=1), VIOLATION),
+        ("f396-portability-axes-decl-missing-unrun", real_wf.replace("const CRAFT_AXES", "const OTHER_AXES", 1), UNRUN),
+    ):
+        d = pathlib.Path(tempfile.mkdtemp(prefix="fz-gsp-axes-"))
+        try:
+            good(d)
+            (d / "peer-review.js").write_text(wf_text, encoding="utf-8")
+            rc = run(d, d / "peer-review.js")
+            if rc == want:
+                ok(name)
+            else:
+                fails.append(f"{name}: want {want} got {rc}")
+        except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게
+            fails.append(f"{name}: 예외 {type(e).__name__}: {e}")
+        finally:
+            shutil.rmtree(d)
 
     for f in fails:
         print(f"  FAIL {f}")

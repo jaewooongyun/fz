@@ -252,7 +252,7 @@ UPY
 )"
 check "감사 규칙(/Users 저장소 안 검색은 예외 · 홈 · 루트 · 저장소 밖 · 따옴표 패턴 뒤 뿌리 · \`..\` 은 적중 · 산출물 이름은 경로 성분 단위 · 직렬화 따옴표를 걷는다)" "$UNIT" "ALL-OK n=77"
 
-# ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(CLI 는 `[agents] enabled = false` 로 끌 수 있다 — R-G1 S1 실측. 런처 배선은 F-436)
+# ⑤ 하위 에이전트 — rollout 둘 다 감사 · spawn 수를 적는다(가짜 CLI 라 config 의 `[agents] enabled = false` 를 따르지 않는다 — 감사 경로만 본다)
 run sub "$HERE/sample-review-ok.json" "$T/r-parent.jsonl,$T/r-sub.jsonl" review --diff "$IN/diff.patch"
 check "하위 에이전트: exit 0" "$(rc sub)" 0
 check "하위 에이전트: rollout 2 감사" "$(audit sub rollouts)" 2
@@ -312,12 +312,17 @@ AISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-roleson/env.txt")"
   && ok "역할 켬: 격리 홈 agents/ 에 역할 사본 2" || no "역할 켬: 역할 사본이 없다"
 check "역할 켬: 두 역할 spawn 지시" "$(count roleson 'agent_type `fz-review-arch`')" 1
 check "역할 켬: 감사에 spawn 역할" "$(audit roleson spawnedRoles)" "['fz-review-arch', 'fz-review-quality']"
+AON="$(grep -c '^\[agents\]$' "$AISO/gpt-home/config.toml" 2>/dev/null)"
 rm -rf "$AISO"
 run rolesoff "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --keep-iso
 OISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-rolesoff/env.txt")"
 [ ! -e "$OISO/gpt-home/agents" ] && ok "역할 끔: agents 폴더 없음" || no "역할 끔: agents 폴더가 있다"
 check "역할 끔: 하위 에이전트 금지" "$(count rolesoff '하위 에이전트를 만들지 않는다.')" 1
 check "역할 끔: 감사 spawn 0" "$(audit rolesoff spawnAgent)" 0
+AOFF="$(sed -n '/^\[agents\]$/,/^\[/p' "$OISO/gpt-home/config.toml" 2>/dev/null | grep -c '^enabled = false$')"
+# F-436 — 기본(역할 끔)은 격리 config 가 spawn 도구를 끈다 · --gpt-agents 는 그 표가 없다(프롬프트 금지는 경계가 아니다)
+[ "$AOFF" = 1 ] && [ "$AON" = 0 ] && ok "f436-agents-disabled — 역할 끔: [agents] enabled = false · 역할 켬: [agents] 표 없음" \
+  || no "f436-agents-disabled — 역할 끔 enabled=false $AOFF · 역할 켬 [agents] $AON"
 rm -rf "$OISO"
 run rolesplan "" "" plan --requirement "$IN/requirement.md" --gpt-agents
 check "역할 plan: exit 10(review 전용)" "$(rc rolesplan)" 10

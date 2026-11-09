@@ -124,7 +124,14 @@ FZ_GPT_ARTIFACT="$ARTIFACT" FZ_WORK_DIR="$WORK_DIR" "${FZ_PLUGIN_ROOT}/scripts/g
 각 게이트마다 판정 1행. ⛔ 통과한 게이트도 표현하라 — 누락은 미판정이며 통과가 아니다.
 id·title·kind 는 원장 줄과 **글자 그대로** 복사하라(축약·요약 금지 — `--verdict-check` 가 stale 응답으로 거부한다). title 이 100자를 넘어도 그대로 쓴다.
 축: measurement_fit(CHECK 가 제목이 말하는 것을 측정하는가) · noninteractive · rerunnable ·
-    determinism · side_effects(서술)
+    determinism · side_effects(서술) · post_procedure(판 끝 절차 뒤 시점 — 아래)
+[판 끝 절차] {원장 머리 RELEASE_PROCEDURE 원문 — 머리가 없으면 이 줄을 빼고 post_procedure 는 전부 n/a}
+post_procedure: 배출 · 이동 · 버전 올림 같은 판 끝 절차를 마친 뒤 --reverify 로 다시 돌려도 이 CHECK 가 참인가 —
+    holds · breaks(그러면 verdict 는 revise) · unknown. 예: 판 끝에 entries/ 에서 .archive/ 로 옮겨질 ID 를 live 로 단언하는 CHECK 는 breaks
+추가 질문(해당하는 게이트만 — 답은 reason · suggestion 에 적는다):
+- 대체 블록: 기존 블록을 대체하는 구현을 승인하는 CHECK 라면, 대체되는 블록이 불리던 실패 경로마다 기준 · 후보를 재는 셀이 있는가
+- 이름 바꾸기: 새 env · 플래그 이름을 재는 셀이 기본값과 **다른** 값을 주는가 — 같은 값이면 새 이름을 무시하는 구현도 통과한다
+- 선례 재생: 선례를 근거로 쓴 CHECK 가 그 상태의 마지막 쓰기(최종 소비 지점)까지 재생하는가 — 분기 블록에서 멈추면 아래 단락이 덮는 결함이 통과한다
 ```
 
 ### ⛔ 사후 검증 (스키마만으로는 보장되지 않는다)
@@ -148,6 +155,7 @@ python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --verdict-check "$GATE_VERDICT
 | id 집합 일치 + 중복 없음 | ⛔ 개수만 세면 중복이 누락을 가린다 — `G1` 두 번 + `G3` 없음이 3개로 보인다 |
 | `(id, title, kind)` 일치 | ⛔ id 만 보면 **stale 응답**이 통과한다. 제목이 바뀌어도 id 는 그대로여서 옛 oracle 판정이 새 oracle 에 붙는다 |
 | `summary` 를 배열에서 **재계산**해 비교 | 신고값을 믿으면 보고가 거짓이 된다. 음수끼리 상쇄해 합계만 맞추는 것도 막는다 |
+| `post_procedure`(원장 머리 `RELEASE_PROCEDURE` 가 있을 때만) | 지금 시점 판정만으로는 판 끝 절차(배출 · 이동 · 버전 올림)가 CHECK 를 깨는지 안 보인다 — 값이 없거나 n/a 면 거부, breaks 인데 accept 면 거부(F-390) |
 
 exit 1 이면 위 블록대로 재호출 1회(`FZ_GPT_RECALL=post-check` — 정본 `modules/cross-validation.md` § 재검증 라운드 상한) 후 다시 1 이면 **미판정으로 기록**하고 Lead가 판단한다 — 조용히 통과시키지 않는다.
 
@@ -169,6 +177,9 @@ $ORIGINAL_ISSUES
 
 ## 적용된 수정
 $FIXES_APPLIED
+
+## 같은 기제의 다른 상태
+원본 이슈가 지적한 함수 · 분기에서, 수정이 다루지 않은 다른 상태(같은 진입 경로가 읽는 다른 변수 · 낡은 값)에 같은 결함이 남았는지도 본다 — 지적된 이름만 고치고 이웃 값을 두면 같은 경로가 다시 깨진다.
 EOF
 FZ_GPT_ARTIFACT="$ARTIFACT" FZ_WORK_DIR="${WORK_DIR:-}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" validate --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE"
 ```

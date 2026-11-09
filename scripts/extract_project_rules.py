@@ -16,7 +16,9 @@
     링크 출처: --project 상위 폴더(--ancestor-stop 까지 · 기본 $HOME)의 고정 이름 지침 + --link-source FILE
     path = 저장소 상대 경로 · via = 출처의 저장소 상대 경로(예: ../CLAUDE.md)
     ⛔ 링크 경로만 뽑는다 — 출처 본문은 sections 에 넣지 않고, 후보 문서는 열지 않는다(존재만 본다)
-    ⛔ 한계: 다른 경로의 워크트리를 --project 로 주면 상위 링크가 저장소 밖으로 풀려 무시된다
+    ⛔ 한계: 다른 경로의 워크트리를 --project 로 주면 상위 링크가 저장소 밖으로 풀려 무시된다 — 그 수는 아래 dropped_outside 로 남는다
+  - dropped_outside = N — absent 이고 링크가 저장소 밖의 **실재 파일**로 풀려 버린 수(F-560 · 0 이면 키 없음).
+    '없음' 과 '버림' 을 가른다 — modules/project-rules.md 가 gap 으로 읽는다
 
 exit: 0=추출(지침이 없어도 0 — absent:true) · 2=측정 실패(프로젝트 폴더 · 링크 출처를 읽을 수 없다)
 """
@@ -119,9 +121,9 @@ def ancestor_guides(root: pathlib.Path, stop) -> list:
     return out
 
 
-def link_candidates(root: pathlib.Path, sources: list) -> list:
-    """출처에서 링크 경로만 뽑아 root 안의 실제 .md 파일만 낸다. 후보 문서는 열지 않는다."""
-    seen, out = set(), []
+def link_candidates(root: pathlib.Path, sources: list) -> tuple:
+    """출처에서 링크 경로만 뽑아 root 안의 실제 .md 파일만 낸다 → (후보, 저장소 밖으로 풀려 버린 실재 파일 수). 후보 문서는 열지 않는다."""
+    seen, out, outside = set(), [], set()
     for src in sources:
         text = src.read_text(encoding="utf-8", errors="replace")
         via = os.path.relpath(src, root)
@@ -130,12 +132,14 @@ def link_candidates(root: pathlib.Path, sources: list) -> list:
                 target = (src.parent / pathlib.Path(m.group(1)).expanduser()).resolve()
                 try:
                     rel = target.relative_to(root).as_posix()
-                except ValueError:                 # 저장소 밖(심볼릭 링크로 나가는 경우 포함)
+                except ValueError:                 # 저장소 밖(심볼릭 링크로 나가는 경우 포함) — 버리되 센다(F-560)
+                    if target.is_file():
+                        outside.add(target)
                     continue
                 if rel not in seen and target.is_file():
                     seen.add(rel)
                     out.append({"path": rel, "via": pathlib.Path(via).as_posix()})
-    return sorted(out, key=lambda c: c["path"])
+    return sorted(out, key=lambda c: c["path"]), len(outside)
 
 
 def extract(root: pathlib.Path, stop=None, link_sources=()) -> dict:
@@ -145,9 +149,11 @@ def extract(root: pathlib.Path, stop=None, link_sources=()) -> dict:
         sections += sections_of(rel, (root / rel).read_text(encoding="utf-8", errors="replace"))
     out = {"schemaVersion": 1, "absent": not files, "files": files, "sections": sections}
     if not files:                                  # ⛔ 지침이 있으면 키도 없다 — golden · 완전 일치 비교 불변
-        cands = link_candidates(root, ancestor_guides(root, stop) + list(link_sources))
+        cands, dropped = link_candidates(root, ancestor_guides(root, stop) + list(link_sources))
         if cands:
             out["candidates"] = cands
+        if dropped:
+            out["dropped_outside"] = dropped   # ⛔ 0 이면 키도 없다 — 옛 출력 불변
     return out
 
 
@@ -267,13 +273,20 @@ def self_test() -> int:
                 (repo / "AI" / "review-guidelines.md").chmod(0o644)
             got = json.loads(r.stdout) if r.returncode == 0 else {}
             case("ancestor-guide-link-candidates 상위 지침의 저장소 안 링크 → candidates(기본 stop=$HOME)",
-                 got == dict(absent, candidates=want), f"exit {r.returncode} {r.stdout[:160]} {r.stderr[-120:]}")
+                 got == dict(absent, candidates=want, dropped_outside=2), f"exit {r.returncode} {r.stdout[:160]} {r.stderr[-120:]}")
             case("ancestor-body-not-ingested 상위 지침 · 후보 문서 본문은 출력에 없다(후보 문서 잠금에도 exit 0)",
                  r.returncode == 0 and "SENTINEL" not in r.stdout and got.get("sections") == [],
                  f"exit {r.returncode} {r.stderr[-120:]}")
             paths = [c["path"] for c in got.get("candidates", [])]
             case("link-outside-project-ignored 저장소 밖 · 없는 파일 · .md 아님 · 밖으로 나가는 링크는 버린다",
                  paths == ["AI/ai-guidelines.md", "AI/review-guidelines.md"], paths)
+            wt = top / "wt"   # 다른 경로의 워크트리 — 상위 CLAUDE.md 의 app-iOS/AI/… 링크가 메인 체크아웃(top/app-iOS)으로 풀린다
+            (wt / "src").mkdir(parents=True)
+            r = run("--project", str(wt))
+            got = json.loads(r.stdout) if r.returncode == 0 else {}
+            case("f560-out-of-repo-link-signal 저장소 밖으로 풀린 지침 링크 수가 색인에 남는다(dropped_outside) — '없음' 과 '버림' 을 가른다",
+                 r.returncode == 0 and got.get("absent") is True and "candidates" not in got and got.get("dropped_outside") == 4,
+                 f"exit {r.returncode} {r.stdout[:160]}")
 
             solo = pathlib.Path(tmp) / "solo"
             proj = solo / "proj"

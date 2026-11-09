@@ -256,7 +256,7 @@ GPT 를 켠 세션의 실행 실패(10~17 · quota · 네트워크 · `GPT-IDLE`
 
 ## Diff 크기 적응 전략
 
-diff 크기에 따라 GPT 호출 전략을 자동 선택합니다.
+diff 크기에 따라 Lead 가 GPT 호출 전략을 고른다 — **수동 전략(미배선)**: 크기를 재고 전략을 바꾸는 실행 주체(스크립트 · 스킬 단계)는 아직 없다. 아래 측정 블록과 표는 Lead 가 손으로 쓰는 기준이다(F-469).
 
 **크기 측정**:
 ```bash
@@ -281,8 +281,8 @@ DIFF_LINES=$(printf '%s\n' "$DIFF_RAW" \
 
 **Large 전략**: 변경량 상위 10 파일만 상세 리뷰 + 나머지 요약.
 
-**자동 전환 규칙**:
-- `review`, `check`: Small 전략 기본, Medium/Large 시 자동 전환
+**전략 선택 기준**(Lead 판단 — 스크립트가 바꾸지 않는다):
+- `review`, `check`: Small 전략 기본 · Medium/Large 면 Lead 가 위 전략으로 나눠 부른다
 - `final`: 항상 최대 커버리지 (Medium→Full 시도, Large→Key files)
 - `verify`, `validate`: diff 크기 무관 (프롬프트 기반)
 
@@ -317,11 +317,13 @@ DIFF_LINES=$(printf '%s\n' "$DIFF_RAW" \
 
 ## GPT Preamble 표준 (Cnew-3, 2026-05-16)
 
+> ⛔ **보류(미적용 · 미측정)** — 이 표준은 어느 GPT 프롬프트 템플릿에도 들어가 있지 않고(verify · validate · plan 템플릿에서 0건 · F-470), 이 플러그인에서 효과를 잰 적도 없다. 규칙으로 인용하지 않는다.
+
 > ⚠️ 이 표준은 GPT-5.5 시절(2026-05-16)에 세웠다. 현행 GPT-6 Sol 에서의 유효성은 미측정이다 [미검증: GPT-6 Sol 재측정 없음].
 
 > **Authority**: GPT-5 Prompting Guide (OpenAI Cookbook 2026) [verified: official] — "rephrase goal → outline plan → narrate" preamble 패턴 권장.
 
-GPT 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 reasoning 품질 + 일관성 향상:
+OpenAI 가이드가 권하는 3단계 preamble 은 아래와 같다(이 플러그인에서의 효과는 재지 않았다):
 
 ```
 1. Rephrase Goal: 작업 목표를 자기 언어로 1-2문장 재기술
@@ -329,8 +331,8 @@ GPT 호출 시 prompt 시작부에 다음 3단계 preamble을 포함하면 reaso
 3. Narrate: 각 단계 실행 시 결과 narrate (verdict + reasoning)
 ```
 
-**적용 위치**:
-- `fz-gpt` SKILL.md verify/validate/plan 서브커맨드 prompt template
+**넣는다면 후보 위치**(⛔ 지금은 어디에도 없다 — 넣기 전에 고정 입력 A/B 로 템플릿 하나에서 먼저 잰다):
+- `modules/fz-gpt-subcommands-core.md` verify · validate 프롬프트 · `modules/fz-gpt-subcommands-aux.md` plan 프롬프트
 - GPT CLI 네이티브 스킬 (`${CODEX_HOME:-~/.codex}/skills/.system/openai-docs` 활용 가능)
 
 **Few-shot 예시**:

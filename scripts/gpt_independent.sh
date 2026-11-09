@@ -24,7 +24,8 @@
 #             주면 그대로 래퍼로 넘긴다(형식 검증은 래퍼 — 빈 값 · 불량 값이면 래퍼 exit 10). 안 주면 래퍼가 필드마다 정한다 —
 #             Lead 세션 선택(선택 폴더를 실제 홈 기준으로 넘긴다) > 격리 config(실제 config 최상위 model · model_reasoning_effort 두 줄 사본)
 #   --gpt-agents review 전용 — 역할 파일(gpt-agents/*.toml)을 격리 홈 agents/ 에 넣고 두 렌즈 역할(fz-review-arch · fz-review-quality)만
-#             spawn 하게 한다(S14 · opt-in). 없으면 하위 에이전트 금지. 하위 에이전트는 부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
+#             spawn 하게 한다(S14 · opt-in). 없으면 격리 config `[agents] enabled = false` 로 하위 에이전트를 끈다(F-436). 하위 에이전트는
+#             부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
 #   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 는 막는다
 #   --deny    더 막을 폴더(작업 폴더 WORK_DIR 등) — --repo 와 무관하게 권한 프로필 deny 로 넣는다. 권한 프로필은 디스크 전체 읽기에서
 #             HOME · 임시 폴더만 막으므로, HOME 밖 작업 폴더의 Claude 산출은 --deny 가 없으면 읽힌다
@@ -264,7 +265,7 @@ for d in "${SNAPS[@]+"${SNAPS[@]}"}"; do put_dir "$d" "snapshot/$(basename "$d")
 REPO_REAL=""; [ -n "$REPO" ] && REPO_REAL="$(cd "$REPO" && pwd -P)"
 CD="$ISO/input"; [ "$MODE" = "plan" ] && [ -n "$REPO_REAL" ] && CD="$REPO_REAL"
 
-python3 - "$ISO" "$REAL_HOME" "$REAL_GPT_HOME/config.toml" "$REPO_REAL" "$CD" "${DENIES[@]+"${DENIES[@]}"}" <<'PY' || die 11 "격리 config 작성 실패"
+FZ_ISO_AGENTS="$GPT_AGENTS" python3 - "$ISO" "$REAL_HOME" "$REAL_GPT_HOME/config.toml" "$REPO_REAL" "$CD" "${DENIES[@]+"${DENIES[@]}"}" <<'PY' || die 11 "격리 config 작성 실패"
 import json, os, re, sys
 iso, home, real_cfg, repo, cd, denies = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6:]
 q = lambda p: json.dumps(p)          # TOML basic string — JSON 이스케이프와 호환
@@ -293,7 +294,10 @@ if repo:
 for d in denies:   # ⛔ --repo 와 무관 — 프로필은 디스크 전체 읽기에서 출발해 HOME 밖 작업 폴더는 이것이 없으면 읽힌다
     fs.append((os.path.realpath(d), "deny"))
 lines = ['default_permissions = "fz-iso"'] + keep
-lines += ["", "[features]", "memories = false", "", "[permissions.fz-iso]", 'extends = ":read-only"', "", "[permissions.fz-iso.filesystem]"]
+lines += ["", "[features]", "memories = false"]
+if not os.environ.get("FZ_ISO_AGENTS"):   # 하위 에이전트를 구조로 끈다(F-436) — 프롬프트 금지 문장은 경계가 아니다. --gpt-agents 만 켠다
+    lines += ["", "[agents]", "enabled = false"]
+lines += ["", "[permissions.fz-iso]", 'extends = ":read-only"', "", "[permissions.fz-iso.filesystem]"]
 lines += [f"{q(p)} = {q(a)}" for p, a in fs]
 lines += ["", f"[projects.{q(cd)}]", 'trust_level = "trusted"', ""]
 open(os.path.join(iso, "gpt-home", "config.toml"), "w", encoding="utf-8").write("\n".join(lines))
@@ -356,8 +360,8 @@ TIMED_OUT=0; [ -f "$ISO/.timed-out" ] && TIMED_OUT=1
 grep -m1 '^GPT-CHOICE ' "$OUT_DIR/$BASE_NAME.wrapper.log" >&2 2>/dev/null
 grep -m1 '^GPT-OFF: ' "$OUT_DIR/$BASE_NAME.wrapper.log" >&2 2>/dev/null   # 래퍼가 GPT 미사용(18)으로 끝났으면 그 사유 줄도 옮긴다
 
-# ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(기본 경로는 spawn 을 프롬프트로만 금지한다 — CLI 는 `[agents] enabled = false`
-#    로 끌 수 있으나(R-G1 S1 실측) 런처 배선은 측정 뒤 별도 결정이다 · F-436)
+# ── 감사 · 후검사 · 렌더 — rollout 은 세션 폴더의 jsonl **전부**(기본 경로는 격리 config `[agents] enabled = false` 로 spawn 도구를 끈다 —
+#    R-G2 실 CLI exec · resume 프로브 `multi_agent_version: disabled` · F-436. 감사는 그래도 spawn 수를 센다)
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
 FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" "$FRAME" "$FRAME_FILE" <<'PY'

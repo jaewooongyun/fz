@@ -73,6 +73,8 @@ scope_boundary:
 | out_of_scope 너무 광범위 | **modify** → scope 명시 |
 | 의도 자체가 `directionVerdict`(② 방향 판정)와 불일치 | **reject** → ② 재진입 (거부 사유로 사용자 확인) |
 
+⛔ **방어 항목**(지금은 안 깨지지만 대비로 넣는 코드 — nil 초기화 · 가드 · 재시도)을 SC 로 올리려면 실패 경로를 함께 적는다 — 어떤 호출 순서에서 무엇이 틀어지나 + 그 순서가 실제로 도달하는 호출처 근거(파일:줄). 못 적으면 success_criteria 가 아니라 suggestion 으로 내린다(F-438 — 도달 근거 없는 방어가 Step 요구로 굳으면 구현 · 리뷰가 그것을 지키느라 비용을 쓴다). plan-lean2 `defenseFailurePath` 가 같은 규칙을 적대 렌즈 출력에 건다.
+
 ## 자기 적용 규칙 (T2-B 자체에도)
 
 본 modules/sprint-contract.md 작성 시점의 Sprint Contract:

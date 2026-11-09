@@ -12,6 +12,8 @@
 # --live — 실제 GPT CLI 1회(effort high · read-only)로 기록을 새로 만든 뒤 기본 모드를 돈다. 사람이 부른다(게이트는 부르지 않는다)
 #
 # ⛔ 필수 키는 여기 적지 않는다 — modules/sprint-contract.md 의 스키마 블록에서 읽는다(형식 정본이 한 곳이다)
+# ⛔ exit 셋을 섞지 않는다(F-396): 모듈 파일이 없다 = 측정 실패(2) · 파일은 있는데 스키마 블록이 없다 = 내용 위반(1).
+#    FZ_SC_MODULE 은 자기 시험 전용 덮어쓰기다 — 블록 없는 사본으로 자신을 다시 불러 exit 1 을 확인한다.
 # usage: run.sh [--fixture DIR] [--live]
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
@@ -26,7 +28,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$FIXTURE" ] && [ -s "$FIXTURE/requirement.md" ] || { echo "UNRUN: --fixture 에 requirement.md 가 없다: '$FIXTURE'"; exit 2; }
 ARCH="$R/gpt-skills/fz-architect/SKILL.md"
-MOD="$R/modules/sprint-contract.md"
+MOD="${FZ_SC_MODULE:-$R/modules/sprint-contract.md}"
 REC="$HERE/recorded"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 
@@ -34,15 +36,33 @@ fail=0
 ok() { echo "PASS  $1"; }
 no() { echo "FAIL  $1"; fail=1; }
 
+# 자기 시험(F-396) — 블록 없는 모듈 = exit 1 · 없는 모듈 = exit 2. 덮어쓰기로 불린 안쪽 실행은 다시 들어가지 않는다
+if [ -z "${FZ_SC_MODULE:-}" ]; then
+  printf '# Sprint Contract\n\n## Sprint Contract Schema\n\n본문만 있고 yaml 펜스가 없다\n' > "$T/no-block.md"
+  o="$(FZ_SC_MODULE="$T/no-block.md" bash "${BASH_SOURCE[0]}" 2>&1)"; rc=$?
+  if [ "$rc" -eq 1 ] && printf '%s\n' "$o" | grep -q '^FAIL  스키마 블록'; then ok "f396-schema-block-missing-violation"
+  else no "f396-schema-block-missing-violation — exit $rc · $(printf '%s' "$o" | tail -1)"; fi
+  o="$(FZ_SC_MODULE="$T/absent.md" bash "${BASH_SOURCE[0]}" 2>&1)"; rc=$?
+  if [ "$rc" -eq 2 ] && printf '%s\n' "$o" | grep -q '^UNRUN: 모듈 파일이 없다'; then ok "f396-schema-module-missing-unrun"
+  else no "f396-schema-module-missing-unrun — exit $rc · $(printf '%s' "$o" | tail -1)"; fi
+fi
+
 # 스키마 블록(## Sprint Contract Schema 아래 첫 ```yaml 펜스)을 파일로 뽑는다 — 과제 프롬프트와 키 목록의 단일 출처
-python3 - "$MOD" "$T/schema.yaml" <<'PY' || { echo "UNRUN: sprint-contract.md 에서 스키마 블록을 찾지 못했다"; exit 2; }
+[ -f "$MOD" ] || { echo "UNRUN: 모듈 파일이 없다: $MOD"; exit 2; }
+python3 - "$MOD" "$T/schema.yaml" <<'PY'
 import re, sys
 s = open(sys.argv[1], encoding="utf-8").read()
 m = re.search(r"^## Sprint Contract Schema\s*\n+```yaml\n(.*?)\n```", s, re.S | re.M)
 if not m:
-    sys.exit(1)
+    sys.exit(3)
 open(sys.argv[2], "w", encoding="utf-8").write(m.group(1) + "\n")
 PY
+rc=$?
+case "$rc" in
+  0) ;;
+  3) echo "FAIL  스키마 블록: $MOD 에 '## Sprint Contract Schema' 아래 yaml 펜스가 없다"; exit 1 ;;
+  *) echo "UNRUN: 스키마 블록 추출기 exit $rc"; exit 2 ;;
+esac
 
 task() {   # 과제 프롬프트 — --live 와 조립 검사가 같은 함수를 쓴다
   cat <<EOF

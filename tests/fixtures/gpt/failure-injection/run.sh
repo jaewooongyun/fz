@@ -138,6 +138,18 @@ cell "CLI 비정상 종료(exit 1)"  12 "ok" 1
 cell "빈 출력"                  13 ""   0
 cell "스키마 위반"              14 "{}" 0 --schema "$T/schema.json"
 
+# F-255 — 스키마를 무시하고 마크다운으로 답한 리뷰도 exit 14 다. 버리기 전에 열 수 있게 --out 바이트 수 · 첫 줄을 stderr 에 낸다
+d="$T/nonjson"; mkdir -p "$d"
+env FZ_SHIM_OUTPUT="$(printf '## 리뷰\n- P2 cancelled 경로 누락')" FZ_SHIM_EXIT=0 FZ_TELEMETRY_DIR="$d" FZ_GPT_CHOICE_DIR="$T/no-choice" \
+  bash "$WRAP" exec --cd "$T/repo" --out "$d/out.txt" --prompt-file "$T/task.txt" --schema "$T/schema.json" > "$d/stdout" 2> "$d/stderr"
+rc=$?
+nb="$(wc -c < "$d/out.txt" 2>/dev/null | tr -d ' ')"
+if [ "$rc" -eq 14 ] && [ -n "$nb" ] && grep -q "GPT-NONJSON-INFO: --out $nb bytes · 첫 줄: ## 리뷰" "$d/stderr" && grep -q 'GATE-FAIL(14)' "$d/stderr"; then
+  echo "PASS  f255-nonjson-review-info → exit 14 · stderr 에 --out $nb bytes · 첫 줄"
+else
+  echo "FAIL  f255-nonjson-review-info — exit $rc · $(grep -m1 'GPT-NONJSON' "$d/stderr" || echo 'GPT-NONJSON-INFO 없음')"; fail=1
+fi
+
 # --out 상위 폴더 없음 → 사전조건 11 · CLI 미호출 — 전에는 CLI 가 결과를 쓰다 실패해 exit 12 로 원인이 가려졌다
 d="$T/noparent"; mkdir -p "$d"
 env FZ_SHIM_OUTPUT="ok" FZ_SHIM_CAPTURE="$d/argv.json" FZ_TELEMETRY_DIR="$d" FZ_GPT_CHOICE_DIR="$T/no-choice" \

@@ -581,7 +581,9 @@ if [ -n "$SCHEMA" ]; then
   python3 "$(dirname "$0")/validate-gpt-output.py" "$OUT" "$SCHEMA"; VAL_RC=$?
   case "$VAL_RC" in
     0) ;;
-    1) die 14 "출력이 스키마 계약 위반 (측정 실패)" ;;
+    1) # ⛔ 14 는 '답이 없다' 가 아니다 — 스키마를 무시하고 사람이 읽는 글로 답한 리뷰도 여기로 온다(F-255). 버리기 전에 열 수 있게 크기 · 첫 줄을 남긴다
+       echo "GPT-NONJSON-INFO: --out $(wc -c < "$OUT" | tr -d ' ') bytes · 첫 줄: $(head -1 "$OUT" | cut -c1-160) — 형식만 다른 답일 수 있다. 버리기 전에 $OUT 을 연다" >&2
+       die 14 "출력이 스키마 계약 위반 (측정 실패)" ;;
     *) die 11 "스키마 로드·사용법 실패 (validator exit=$VAL_RC) — 출력 문제가 아니다" ;;
   esac
 else
