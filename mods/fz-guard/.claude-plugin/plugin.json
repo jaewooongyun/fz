@@ -1,7 +1,7 @@
 {
   "name": "fz-guard",
-  "version": "0.1.0",
-  "description": "Optional fz add-on: hooks that enforce three fz rules at the tool call - Phase 4 approval before writes after /fz, confirmation for ad-hoc agents in fz sessions, and a registry entry when a turn writes an fz lesson to memory. Fails open on any error. Off by env FZ_GUARD_DISABLE or a flag file.",
+  "version": "0.2.0",
+  "description": "Optional fz add-on: hooks that enforce four fz rules at the tool call - Phase 4 approval before writes (including writing Bash) after /fz, confirmation for ad-hoc agents in fz sessions, a registry entry when a turn writes an fz lesson to memory, and a GPT review (or its skip reason) in fz-review turns plus no retired model name in fz plugin files. Fails open on any error. Off by env FZ_GUARD_DISABLE or a flag file.",
   "author": {
     "name": "Jaewoong Yun"
   },

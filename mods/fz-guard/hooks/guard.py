@@ -2,24 +2,33 @@
 """fz-guard — fz 규칙 셋을 도구 호출 자리에서 기계로 강제하는 classic command 훅 (표준 라이브러리만).
 
 규칙
-  P4  F-368 · F-384 · F-451 — `/fz`(또는 Skill fz) 호출 뒤 Phase 4 승인 전에는 쓰기 도구 · Workflow 를 deny 한다.
+  P4  F-368 · F-384 · F-451 · F-119 · F-553 — `/fz`(또는 Skill fz) 호출 뒤 Phase 4 승인 전에는 쓰기 도구 · Workflow ·
+      쓰는 Bash(리다이렉트 · tee · sed -i · 인터프리터 heredoc)를 deny 한다. 레지스트리 entries/ 와 Phase 0 의
+      WORK_DIR 초기화({cwd}/{티켓 · NOTASK-날짜}/index.md)는 막지 않는다.
       승인 = AskUserQuestion 의 header 가 'Phase 4' 인 질문에 제시한 선택지 라벨(커스텀 · 취소류 제외)로 답한 것.
       창은 연 prompt 안에서만 판정한다 — 승인 없이 그 턴을 끝내면 Stop 을 1회 막는다. 셋 다 interactive(entrypoint=cli)에서만 발화한다.
+      질문 없이 긴 답(LONG_ANSWER 자 이상)으로 끝낸 턴은 Stop 에 경고를 따로 싣는다(F-451 · 차단 아님).
   AG  F-058 · F-119 — fz 세션 표지(/fz · /fz-* · /fz:* · Skill fz*)가 선 세션에서 Agent · Task 의 subagent_type 이
       native 채택 목록(modules/native-agents.md) 밖이면 ask 한다.
-  FR  F-518 — 같은 prompt_id 에서 메모리에 fz 교훈을 쓰고 레지스트리 entries/F-*.md 쓰기가 없으면 Stop 을 1회 막는다.
+  FR  F-518 · F-565 — 같은 prompt_id 에서 메모리에 fz 교훈을 쓰고 레지스트리 entries/F-*.md 쓰기가 없으면 Stop 을 1회 막는다.
+      교훈 토큰은 마크다운 링크 · 백틱을 지운 본문에서 찾는다(링크만 든 MEMORY.md 는 교훈이 아니다).
+  GP  F-094 · F-297 — fz-review 를 부른 턴이 GPT 리뷰 호출도 '[외부: GPT]' · '[GPT 미사용 — 사유]' 줄도 없이 끝나면 Stop 을
+      1회 막는다(interactive 한정). fz 플러그인 파일에 옛 모델 호칭을 넣는 쓰기는 모드와 무관하게 deny 한다 —
+      판별식은 그 저장소의 scripts/check_gpt_surface.py 를 불러 그대로 쓴다(못 부르면 이 판정만 건너뛴다).
+
+상태 정리(F-564) — UserPromptSubmit 마다 마지막 기록이 STALE_DAYS 지난 다른 세션의 상태 · 잠금을 지운다(사건 1회에 최대 PRUNE_MAX).
 
 사건은 훅 입력에서 상태로 기록한다 — ⛔ transcript 는 비동기로 기록돼 현재 사건이 아직 없을 수 있다(공식 훅 문서).
 transcript 에서는 굳은 사실 하나만 읽는다: 첫 줄들의 entrypoint(cli=interactive · sdk-cli=headless · 그 밖=불명).
 
 상태   ${FZ_RUN_STATE:-~/.fz/runs}/fz-guard/<session_id>.json — 세션별 잠금(<session_id>.lock · fcntl.flock)으로
        읽기 · 병합 · 판정 · 저장을 직렬화하고 mkstemp + os.replace 로 원자 교체한다. 플러그인 폴더 안이면 쓰지 않는다
-끄기   env FZ_GUARD_DISABLE=P4,AG,FR|all · 파일 플래그 <상태 폴더>/disable(내용 = 규칙 목록 · 비면 all) — 매 실행 확인
+끄기   env FZ_GUARD_DISABLE=P4,AG,FR,GP|all · 파일 플래그 <상태 폴더>/disable(내용 = 규칙 목록 · 비면 all) — 매 실행 확인
 실패   ⛔ 입력 · 의존성 · 잠금 · 상태 오류는 전부 exit 0 · 결정 없음(fail-open). 진단은 stderr `fz-guard diag:` 로만 낸다
 
 모드
   (인자 없음)                훅 — stdin JSON 하나 → stdout 결정 JSON(없으면 빈 출력) · exit 0
-  --self-test                합성 입력 63 케이스 — `PASS <case>` 줄
+  --self-test                합성 입력 77 케이스 — `PASS <case>` 줄
   --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS 인가 (0 일치 · 1 불일치 · 2 표 없음)
   --make-synthetic BYTES OUT --with-marker|--no-marker   큰 transcript 합성(첫 줄들에 entrypoint 를 둘지)
   --bench FILE               entrypoint 판정 소요 — `mode=<…> elapsed_ms=<n>`
@@ -29,10 +38,12 @@ from __future__ import annotations
 import argparse
 import contextlib
 import fcntl
+import importlib.util
 import json
 import os
 import pathlib
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -41,7 +52,7 @@ import time
 
 HERE = pathlib.Path(__file__).resolve().parent
 PLUGIN_ROOT = HERE.parent
-RULES = ("P4", "AG", "FR")
+RULES = ("P4", "AG", "FR", "GP")
 WRITE_EXACT = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 SERENA_WRITE = re.compile(r"^mcp__.*serena__(replace_symbol_body|insert_after_symbol|insert_before_symbol|replace_content|"
                           r"replace_in_files|rename_symbol|safe_delete_symbol)$")
@@ -51,18 +62,63 @@ AGENT_TOOLS = {"Agent", "Task"}
 ALLOW_AGENTS = {"silent-failure-hunter", "type-design-analyzer", "code-simplifier", "deep-research-agent"}
 PHASE4_HEADER = "Phase 4"
 NOT_APPROVAL = re.compile(r"커스텀|취소|거절|중단|cancel|reject|abort", re.I)
-LESSON = re.compile(r"fz-|F-\d{3}|fz-findings")
+LESSON = re.compile(r"fz-|F-\d{3}")                # fz-findings 는 fz- 에 든다(F-565 — 셋째 대안은 죽은 대안이었다)
+LINK_OR_CODE = re.compile(r"\[[^\]\n]*\]\([^)\n]*\)|`[^`\n]*`")   # F-565 — 링크 · 백틱 안의 스킬 이름은 교훈이 아니다
+WORKDIR_NAME = re.compile(r"^(?:[A-Z]{2,6}-\d{2,5}|NOTASK-\d{8})$")   # modules/context-artifacts.md Work Dir Resolution
+REVIEW_SKILLS = {"fz-review", "fz:fz-review"}
+GPT_CALL = re.compile(r"gpt-call\.sh['\"]?\s+(?:independent-)?review\b")
+GPT_MARK = re.compile(r"\[외부:\s*GPT\]|\[GPT 미사용")
+# Bash 쓰기 판별(F-119) — 따옴표 문자열 · heredoc 본문은 데이터라 지우고 본다
+QUOTED = re.compile(r"'[^'\n]*'|\"(?:\\.|[^\"\\\n])*\"")
+HEREDOC = re.compile(r"(?<!<)<<-?\s*(['\"]?)([A-Za-z_][\w-]*)\1")
+INTERP_HEREDOC = re.compile(r"(?:^|[|;&(\s])(?:python3?|node|bash|sh|zsh|perl|ruby)\b[^|;&\n]*(?<!<)<<-?(?!<)")
+REDIRECT = re.compile(r"(?<![<>&=\\-])(?:\d|&)?>>?\|?[ \t]*([^\s;&|()<>]+)")    # `\>` 는 test 의 문자열 비교다
+# `[[ a > b ]]`(문자열 비교) · `(( n > 0 ))` · `$(( … ))`(산술) 안의 `>` 는 리다이렉트가 아니다 — 지우고 본다.
+# ⛔ 홑대괄호 `[ $a > $b ]` 는 bash 에서 진짜 리다이렉트(파일 $b 생성)라 지우지 않는다
+TEST_EXPR = re.compile(r"\[\[.*?\]\]|\$?\(\(.*?\)\)", re.S)   # 여러 줄 `[[ … ]]` 도 한 덩어리다
+
+
+def _neutral_test(m) -> str:
+    """비교식 · 산술식 안의 `<` `>` 만 지운다 — 그 안에서 **실행되는** 명령 치환(`$(…)` · 백틱)의 리다이렉트는 남긴다
+    (`[[ $(printf x > f) == x ]]` 는 파일을 만든다)."""
+    s = m.group(0)
+    k = 3 if s.startswith("$((") else 2            # 여는 `[[` · `((` · `$((` 자체는 치환이 아니다
+    out, depth, tick, i = [s[:k]], 0, False, k
+    while i < len(s):
+        ch = s[i]
+        if s.startswith("$(", i) and not s.startswith("$((", i):
+            depth += 1
+            out.append("$(")
+            i += 2
+            continue
+        if ch == "`":
+            tick = not tick
+        elif ch == "(" and depth:
+            depth += 1                             # 치환 안의 서브셸 `$( (…) > f)` — 닫는 괄호를 짝지어 센다
+        elif ch == ")" and depth:
+            depth -= 1
+        elif ch in "<>" and not depth and not tick:
+            ch = " "
+        out.append(ch)
+        i += 1
+    return "".join(out)
+TEE = re.compile(r"(?:^|[|;&(])\s*tee\b([^|;&\n]*)")
+SED = re.compile(r"(?:^|[|;&(\s])sed\s+([^|;&\n]*)")
+QUIET = {"/dev/null", "/dev/stdout", "/dev/stderr", "/dev/tty"}
 MEMORY_PATH = re.compile(r"(^|/)\.claude/projects/[^/]+/memory/[^/]+\.md$")
-ENTRY_NAME = re.compile(r"^F-\d+[^/]*\.md$")
+ENTRY_NAME = re.compile(r"^F-\d{3}[a-z]?[^/]*\.md$")
 COMMAND_NAME = re.compile(r"^\s*<command-name>\s*(\S+?)\s*</command-name>")
 PATH_KEYS = ("file_path", "notebook_path", "relative_path", "path", "filePath", "sourcePath", "destinationPath")
 TEXT_KEYS = ("content", "new_string", "new_source", "body", "repl", "new_content")
 PREFIX_BYTES, PREFIX_LINES = 4 << 20, 400        # ⛔ 하드 캡 — 큰 transcript 를 끝까지 읽지 않는다(entrypoint 가 없어도)
 LOCK_TIMEOUT = 3.0
 KEEP_PROMPTS = 64
+STALE_DAYS, PRUNE_MAX = 7, 200                    # F-564 — 이 날수보다 오래 기록이 없는 세션 상태를 지운다
+LONG_ANSWER = 1500                                # F-451 — 승인을 묻기 전 답이 이 글자 수 이상이면 경고
 
 WARN_UNDECIDED = "FZ-GUARD-WARN P4-UNDECIDED"
 WARN_INCOMPLETE = "FZ-GUARD-WARN STATE-INCOMPLETE"
+WARN_LONG = "FZ-GUARD-WARN P4-LONG-ANSWER"
 P4_DENY = ("fz-guard P4 (F-368): this session ran /fz and the Phase 4 approval has not been given. Show the pipeline and ask "
            "the user with AskUserQuestion (header 'Phase 4') before writing files or starting a Workflow. Writes to the "
            "fz-findings registry entries/ are allowed. Autonomous runs start the CLI with FZ_AUTONOMY=autonomous.")
@@ -70,6 +126,10 @@ P4_STOP = ("fz-guard P4 (F-368): /fz ran in this session but the turn is ending 
            "with AskUserQuestion (header 'Phase 4' - options = the pipeline choices) before going on.")
 FR_STOP = ("fz-guard FR (F-518): this turn wrote an fz lesson to a memory file but wrote no registry entry "
            "(fz-findings/entries/F-*.md). Record the finding in the registry this turn, or state in the reply why it is not one.")
+GP_STOP = ("fz-guard GP (F-094): this turn ran fz-review but shows no GPT review - no `gpt-call.sh review` call and no "
+           "'[외부: GPT]' or '[GPT 미사용 — <reason>]' line in the reply. Run the GPT review, or write the skip line with its reason.")
+GP_DENY = ("fz-guard GP (F-297): this write puts the retired model name into an fz plugin file outside the keep rules of "
+           "scripts/check_gpt_surface.py. In fz the model is called GPT. Lines: ")
 
 
 class LockTimeout(Exception):
@@ -135,6 +195,209 @@ def in_registry(path: str, env) -> bool:
 
 def registry_entry(path: str, env) -> bool:
     return in_registry(path, env) and bool(ENTRY_NAME.match(os.path.basename(path)))
+
+
+def workdir_index(path: str, cwd) -> bool:
+    """F-553 — /fz Phase 0 의 WORK_DIR 초기화는 Phase 4 보다 먼저다: {cwd}/{티켓 · NOTASK-날짜}/index.md 만 허용한다."""
+    if not isinstance(cwd, str) or not cwd:
+        return False
+    base = os.path.normpath(os.path.abspath(os.path.expanduser(cwd)))
+    p = os.path.normpath(os.path.join(base, os.path.expanduser(path)))   # ⛔ `..` 를 접은 뒤 판정한다
+    d = os.path.dirname(p)
+    return os.path.basename(p) == "index.md" and bool(WORKDIR_NAME.match(os.path.basename(d))) and os.path.dirname(d) == base
+
+
+def exempt(path: str, env, cwd) -> bool:
+    return in_registry(path, env) or workdir_index(path, cwd)
+
+
+def _keep_subs(m) -> str:
+    """따옴표 문자열은 데이터라 지운다 — 단 큰따옴표 안의 `$( )` · 백틱은 실행되는 코드라 남긴다(`"$(printf x > f)"` 는 파일을 만든다)."""
+    s = m.group(0)
+    if s[0] != '"':
+        return "''"
+    subs, i = [], 0
+    while i < len(s):
+        if s.startswith("$(", i):
+            depth, j = 1, i + 2
+            while j < len(s) and depth:
+                depth += {"(": 1, ")": -1}.get(s[j], 0)
+                j += 1
+            subs.append(s[i:j])
+            i = j
+        elif s[i] == "`":
+            j = s.find("`", i + 1)
+            j = len(s) if j < 0 else j + 1
+            subs.append(s[i:j])
+            i = j
+        else:
+            i += 1
+    return "''" + "".join(" " + x for x in subs)
+
+
+def _command_lines(cmd: str) -> list:
+    """heredoc 본문을 뺀 명령 줄 — 본문은 데이터라 '>' 가 있어도 리다이렉트가 아니다."""
+    lines, out, i = cmd.split("\n"), [], 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+        for m in HEREDOC.finditer(line):
+            while i < len(lines) and lines[i].strip() != m.group(2):
+                i += 1
+            i += 1
+    return out
+
+
+GPT_WRAPPERS = {"bash", "sh", "zsh", "exec", "command", "env", "nohup", "time"}
+SHELL_OPS = {";", "&&", "||", "|", "&", "(", ")", "{", "}", "!", "|&"}
+
+
+def gpt_review_invoked(cmd) -> bool:
+    """명령 자리에서 `gpt-call.sh review | independent-review` 를 실행하는가(F-094).
+
+    grep · echo 인자나 heredoc 본문에 든 언급은 호출이 아니다 — 문자열 검색으로 세면 읽기만 한 턴이 GP 계약을 통과한다.
+    셸 토큰으로 나눠 명령 시작 자리(맨 앞 · 연산자 뒤)의 첫 단어만 본다. 환경 접두(`VAR=값`)와 래퍼(bash · env …) · 래퍼 옵션은 건너뛴다.
+    `( … )` · `$( … )` 이 닫히면 열기 전 자리로 돌아간다(`printf x $(…) gpt-call.sh` 의 gpt-call.sh 는 인자) · 인자 자리의 `!` 는 단어다.
+    토큰화가 실패하면(짝 안 맞는 따옴표) 예전 문자열 판정으로 돌아간다.
+    """
+    if not isinstance(cmd, str) or "gpt-call" not in cmd:
+        return False
+    quoted = []                                    # 따옴표 문자열은 자리표시로 가린다 — 안의 `;` · `|` 는 연산자가 아니다
+
+    def hide(m):
+        quoted.append(m.group(0)[1:-1])
+        return f"__fzq{len(quoted) - 1}__"
+
+    text = QUOTED.sub(hide, "\n".join(_command_lines(cmd))).replace("\n", " ; ")
+    try:
+        lx = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lx.whitespace_split = True
+        toks = list(lx)
+    except ValueError:
+        return bool(GPT_CALL.search(cmd))
+    word = lambda tok: re.sub(r"__fzq(\d+)__", lambda q: quoted[int(q.group(1))], tok)
+    start, wrapped, stack = True, False, []
+    for i, tok in enumerate(toks):
+        if tok == "(":                             # 서브셸 · 치환 안은 명령 자리 — 닫히면 열기 전 자리로 돌아간다
+            stack.append(start)
+            start, wrapped = True, False
+            continue
+        if tok == ")":
+            start, wrapped = (stack.pop() if stack else False), False
+            continue
+        if tok == "!":                             # 명령 자리의 `!` 만 부정 연산자 — 인자 자리면 그냥 단어다(자리를 바꾸지 않는다)
+            continue
+        if tok in SHELL_OPS:
+            start, wrapped = True, False
+            continue
+        if not start:
+            continue
+        if wrapped and tok.startswith("-"):
+            continue                               # 래퍼 옵션(`bash -e` · `time -p`)
+        if re.match(r"^\w+=", tok) or os.path.basename(word(tok)) in GPT_WRAPPERS:
+            wrapped = wrapped or not re.match(r"^\w+=", tok)
+            continue                               # 접두 · 래퍼 — 다음 단어가 아직 명령 자리다
+        start = False
+        if os.path.basename(word(tok)) == "gpt-call.sh" and i + 1 < len(toks) and word(toks[i + 1]) in ("review", "independent-review"):
+            return True
+    return False
+
+
+def bash_write(cmd) -> tuple:
+    """(쓰는가, 대상 경로 목록). 대상을 모르면(인터프리터 heredoc · sed -i · 따옴표 경로) 목록이 비어 면제 판정을 하지 않는다.
+
+    보는 꼴(F-119): 리다이렉트(`>` · `>>` · `&>` — fd 복제 `2>&1` 과 /dev/null 류 제외) · tee · sed -i ·
+    인터프리터(python · node · 셸 · perl · ruby)에 먹인 heredoc — 이 세션들이 승인 전 쓰기에 실제로 쓴 모양이다.
+    ponytail: cp · mv · rm · touch · git apply · `python3 -c` 안의 쓰기는 보지 않는다 — 재발이 관측되면 꼴을 더한다
+    """
+    if not isinstance(cmd, str) or not cmd.strip():
+        return False, []
+    # 비교식은 줄을 넘을 수 있어 이어 붙인 뒤 본다 · `\\` 짝은 글자 하나라 먼저 지운다(`\\>` 는 진짜 리다이렉트, `\>` 는 글자)
+    text = TEST_EXPR.sub(_neutral_test, "\n".join(QUOTED.sub(_keep_subs, ln) for ln in _command_lines(cmd))).replace("\\\\", "  ")
+    lines = text.split("\n")
+    targets, unknown = [], any(INTERP_HEREDOC.search(ln) for ln in lines)
+    for m in REDIRECT.finditer(text):
+        targets.append(m.group(1))
+    for m in TEE.finditer(text):
+        targets += [a for a in m.group(1).split() if not a.startswith("-")]
+    for m in SED.finditer(text):
+        if any(re.match(r"^-[A-Za-z]*i|^--in-place", a) for a in m.group(1).split()):
+            unknown = True
+    targets = [t for t in targets if t not in QUIET]
+    if "''" in targets:                            # 따옴표로 준 경로 — 무엇인지 모른다
+        unknown = True
+    return bool(targets) or unknown, ([] if unknown else targets)
+
+
+def fz_root(path: str, cwd):
+    """경로 위쪽에서 `.claude-plugin/plugin.json` 이름이 fz 인 폴더 — 하위 플러그인(mods/fz-guard)에서 멈추지 않고 끝까지 올라간다."""
+    base = cwd if isinstance(cwd, str) and cwd else os.getcwd()
+    p = pathlib.Path(os.path.normpath(os.path.join(base, os.path.expanduser(path))))
+    for d in p.parents:
+        pj = d / ".claude-plugin" / "plugin.json"
+        try:
+            if pj.is_file() and json.loads(pj.read_text(encoding="utf-8")).get("name") == "fz":
+                return d, p
+        except (OSError, ValueError, AttributeError):
+            continue
+    return None, p
+
+
+def wording_hits(ti: dict, cwd) -> list:
+    """F-297 — fz 플러그인 파일에 넣는 줄 중 보존 규칙 밖 옛 모델 호칭. 판별식 · 제외 · 경계 · 보존 행은 그 저장소의
+    scripts/check_gpt_surface.py 를 불러 그대로 쓴다(사본을 두면 두 곳이 어긋난다)."""
+    text = text_of(ti)
+    if not text:
+        return []
+    hits = []
+    for path in paths_of(ti):
+        root, p = fz_root(path, cwd)
+        if root is None:
+            continue
+        try:
+            spec = importlib.util.spec_from_file_location("fz_gpt_surface", str(root / "scripts" / "check_gpt_surface.py"))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            rel = p.relative_to(root).as_posix()
+            if rel.startswith(tuple(mod.EXCLUDE_PREFIX)) or rel in mod.BOUNDARY or not rel.endswith(tuple(mod.SUFFIXES)):
+                continue
+            keep = set()
+            kf = root / "tests" / "fixtures" / "gpt-surface-keep.tsv"
+            if kf.is_file():
+                keep = {mod.norm(ln.split("\t", 1)[1]) for ln in kf.read_text(encoding="utf-8").split("\n")
+                        if "\t" in ln and ln.split("\t", 1)[0] == rel}
+            hits += [mod.norm(ln) for ln in text.split("\n") if mod.TOKEN.search(ln) and mod.residual(ln) and mod.norm(ln) not in keep]
+        except Exception:                          # noqa: BLE001 — 판별식을 못 부르면 이 규칙만 건너뛴다(fail-open · P4 는 계속 판정)
+            continue
+    return hits
+
+
+def turn_of(st: dict, pid) -> dict:
+    return st["turns"].setdefault(pid, {"memoryLesson": False, "registryWrite": False, "writes": []})
+
+
+def prune(sdir: pathlib.Path, sid: str) -> None:
+    """F-564 — 상태는 세션마다 생긴다. 마지막 기록(json mtime · 없으면 lock mtime)이 STALE_DAYS 지난 다른 세션의 json · lock 을 지운다.
+    ⛔ lock 은 처음 만든 뒤 쓰지 않아 mtime 이 낡는다 — 살아 있는 세션 판정에 lock mtime 을 쓰지 않는다. 플래그 `disable` 은 건드리지 않는다.
+    ponytail: 7일 넘게 쉰 세션이 다시 돌며 잡은 잠금을 지울 수 있다 — 그 세션의 다음 사건은 새 잠금 파일을 만든다"""
+    cutoff = time.time() - STALE_DAYS * 86400
+    stems = sorted({p.stem for p in sdir.iterdir() if p.suffix in (".json", ".lock")} - {sid})
+    gone = 0
+    for stem in stems:
+        if gone >= PRUNE_MAX:
+            break
+        j, lk = sdir / f"{stem}.json", sdir / f"{stem}.lock"
+        try:
+            ref = j if j.exists() else lk
+            if ref.stat().st_mtime >= cutoff:
+                continue
+        except OSError:
+            continue
+        for f in (j, lk):
+            with contextlib.suppress(OSError):
+                f.unlink()
+        gone += 1
 
 
 def session_mode(transcript) -> str:
@@ -276,7 +539,7 @@ def open_window(st: dict, pid) -> None:
         st["window"] = {"promptId": pid, "approved": False, "unparseable": False}
 
 
-def p4_pre(inp: dict, env, st: dict, ti: dict, pid):
+def p4_pre(inp: dict, env, st: dict, ti: dict, pid, paths=None):
     if autonomous(env):
         return None
     if not pid or pid not in st["prompts"]:        # 이 prompt 의 입력을 못 봤다(설치 전 시작 등) — 창 상태를 모른다
@@ -293,14 +556,16 @@ def p4_pre(inp: dict, env, st: dict, ti: dict, pid):
         return warn_once(st, f"undecided-mode:{pid}", f"{WARN_UNDECIDED} — 실행 모드를 판정하지 못했다(transcript entrypoint 없음) · 차단하지 않는다")
     if w.get("unparseable"):
         return warn_once(st, f"undecided-answer:{pid}", f"{WARN_UNDECIDED} — Phase 4 답을 해석하지 못했다 · 차단하지 않는다")
-    paths = paths_of(ti)
-    if paths and all(in_registry(p, env) for p in paths):
-        return None                                # ⛔ 발견 등재(F-518)는 Phase 0~3 중에도 막지 않는다
+    paths = paths_of(ti) if paths is None else paths
+    if paths and all(exempt(p, env, inp.get("cwd")) for p in paths):
+        return None                                # ⛔ 발견 등재(F-518) · Phase 0 WORK_DIR index.md(F-553)는 Phase 0~3 중에도 막지 않는다
     return decision("deny", P4_DENY)
 
 
 def record_answer(inp: dict, st: dict) -> None:
     w = st.get("window")
+    if w:
+        w["asked"] = True                          # F-451 — 승인 전 첫 질문(범위 질문 포함)을 냈다 · header 검사보다 먼저 남긴다
     ti = inp.get("tool_input") if isinstance(inp.get("tool_input"), dict) else {}
     qs = [q for q in ti.get("questions") or [] if isinstance(q, dict) and q.get("header") == PHASE4_HEADER]
     if not w or not qs:
@@ -318,6 +583,12 @@ def record_answer(inp: dict, st: dict) -> None:
         return
     q = qs[0]
     labels = [o.get("label") for o in q.get("options") or [] if isinstance(o, dict)]
+    if answers and q.get("question") not in answers and PHASE4_HEADER not in answers:
+        # F-566 — 답은 왔는데 키가 질문 본문 · header 어느 쪽과도 맞지 않는다. 조용히 not-approved 로 떨어뜨리지 않고
+        #    해석 불가와 같은 fail-open(경고 후 허용)으로 둔다 — verdict 로 어긋남을 남긴다
+        w["unparseable"] = True
+        w["lastResponse"]["verdict"] = "mismatch"
+        return
     a = answers.get(q.get("question"), answers.get(PHASE4_HEADER))
     w["unparseable"] = False
     w["approved"] = isinstance(a, str) and a in labels and not NOT_APPROVAL.search(a)
@@ -327,8 +598,8 @@ def record_answer(inp: dict, st: dict) -> None:
 def record_write(inp: dict, env, st: dict, ti: dict, pid) -> None:
     if not pid:
         return
-    turn = st["turns"].setdefault(pid, {"memoryLesson": False, "registryWrite": False, "writes": []})
-    text = text_of(ti)
+    turn = turn_of(st, pid)
+    text = LINK_OR_CODE.sub("", text_of(ti))      # F-565 — 링크 · 백틱으로만 든 스킬 이름은 교훈 토큰으로 세지 않는다
     for p in paths_of(ti):
         turn["writes"] = (turn["writes"] + [p])[-200:]
         if MEMORY_PATH.search(p) and LESSON.search(text):
@@ -338,16 +609,23 @@ def record_write(inp: dict, env, st: dict, ti: dict, pid) -> None:
 
 
 def on_stop(inp: dict, env, st: dict, pid, off: set, sid: str):
-    if inp.get("stop_hook_active"):
-        return None
-    reasons, warns = [], []
     if autonomous(env):
-        return None                                # ⛔ 자율 실행은 P4 · FR 모두 막지 않는다
+        return None                                # ⛔ 자율 실행은 P4 · FR · GP 모두 막지 않는다
+    reasons, warns = [], []
+    lam = inp.get("last_assistant_message") if isinstance(inp.get("last_assistant_message"), str) else ""
     w = st.get("window")
     turn = st["turns"].get(pid) or {}
     p4 = "P4" not in off and pid in st["prompts"] and w and w.get("promptId") == pid and not w.get("approved")   # 시작을 못 본 prompt = p4_pre 와 같이 무차단
     fr = "FR" not in off and turn.get("memoryLesson") and not turn.get("registryWrite")
-    mode = session_mode(inp.get("transcript_path")) if (p4 or fr) else ""
+    gp = "GP" not in off and turn.get("review") and not turn.get("gpt") and not GPT_MARK.search(lam)
+    long_answer = p4 and not w.get("asked") and len(lam) >= LONG_ANSWER
+    mode = session_mode(inp.get("transcript_path")) if (p4 or fr or gp) else ""
+    if long_answer and mode != "headless":         # F-451 — 차단(P4)과 별개 축의 경고 · 이어진 Stop(stop_hook_active)에서도 1회 낸다
+        m = warn_once(st, f"long-answer:{pid}", f"{WARN_LONG} — Phase 4 승인을 묻기 전에 긴 답({len(lam)}자)으로 턴을 끝냈다(F-451) · 차단하지 않는다")
+        if m:
+            warns.append(m["systemMessage"])
+    if inp.get("stop_hook_active"):
+        return {"systemMessage": " · ".join(warns)} if warns else None
     if p4:
         fp = f"{sid}:P4:{pid}"
         if mode == "interactive" and not w.get("unparseable"):
@@ -363,11 +641,18 @@ def on_stop(inp: dict, env, st: dict, pid, off: set, sid: str):
             reasons.append(FR_STOP)
     elif fr and mode == "unknown":
         warns.append(f"{WARN_UNDECIDED} — 실행 모드를 판정하지 못했다 · 기록 누락(F-518) Stop 을 막지 않는다")
+    if gp and mode == "interactive":               # ⛔ 기존 셋과 같게 interactive 한정 — 자율 run 은 면제다(D-15 트레이드오프)
+        fp = f"{sid}:GP:{pid}"
+        if fp not in st["fingerprints"]:
+            st["fingerprints"].append(fp)
+            reasons.append(GP_STOP)
+    elif gp and mode == "unknown":
+        warns.append(f"{WARN_UNDECIDED} — 실행 모드를 판정하지 못했다 · GPT 리뷰 누락(F-094) Stop 을 막지 않는다")
     out = {}
     if reasons:
         out = {"decision": "block", "reason": " ".join(reasons)}
     if warns:
-        out["systemMessage"] = warns[0]
+        out["systemMessage"] = " · ".join(warns)
     return out or None
 
 
@@ -383,6 +668,8 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
             st["fzSession"] = True
         if opens_window(tok):
             open_window(st, pid)
+        if tok.lstrip("/") in REVIEW_SKILLS and pid:
+            turn_of(st, pid)["review"] = True     # F-094 — 이 턴은 fz-review 다
         return None
     if ev == "PreToolUse":
         if name == "Skill":
@@ -391,7 +678,21 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
                 st["fzSession"] = True
             if skill in ("fz", "fz:fz"):
                 open_window(st, pid)
+            if skill in REVIEW_SKILLS and pid:
+                turn_of(st, pid)["review"] = True
             return None
+        if name == "Bash":
+            cmd = ti.get("command") if isinstance(ti.get("command"), str) else ""
+            if gpt_review_invoked(cmd) and pid:
+                turn_of(st, pid)["gpt"] = True     # F-094 — GPT 리뷰를 불렀다(출력은 Bash 라 PostToolUse 로 못 본다)
+            writes, targets = bash_write(cmd)
+            if writes and "P4" not in off:
+                return p4_pre(inp, env, st, ti, pid, paths=targets)
+            return None
+        if write_tool(name) and "GP" not in off:
+            hits = wording_hits(ti, inp.get("cwd"))
+            if hits:
+                return decision("deny", GP_DENY + " | ".join(h[:120] for h in hits[:3]))
         if name in AGENT_TOOLS:
             if "AG" in off or not st["fzSession"]:
                 return None
@@ -430,6 +731,11 @@ def run(stdin_text: str, env) -> tuple:
     sid = re.sub(r"[^A-Za-z0-9_.-]", "_", str(inp.get("session_id") or ""))[:128]
     if not sid:
         return "", "fz-guard diag: session_id 가 없다 — 통과(fail-open)"
+    if inp.get("hook_event_name") == "PreToolUse" and inp.get("tool_name") == "Bash":
+        ti = inp.get("tool_input") if isinstance(inp.get("tool_input"), dict) else {}
+        cmd = ti.get("command")
+        if not isinstance(cmd, str) or not (bash_write(cmd)[0] or gpt_review_invoked(cmd)):
+            return "", ""                          # ⛔ 읽는 Bash 는 상태를 열지 않는다 — 모든 세션의 모든 Bash 에 잠금 · 저장이 붙지 않게
     try:
         timeout = float(env.get("FZ_GUARD_LOCK_TIMEOUT") or LOCK_TIMEOUT)
     except ValueError:
@@ -443,6 +749,8 @@ def run(stdin_text: str, env) -> tuple:
             return "", (f"fz-guard diag: {why}" if why else "")
         sdir.mkdir(parents=True, exist_ok=True)
         with locked(sdir, sid, timeout):
+            if inp.get("hook_event_name") == "UserPromptSubmit":
+                prune(sdir, sid)                   # F-564 — 입력마다 한 번(도구 사건마다 돌리지 않는다)
             path = sdir / f"{sid}.json"
             st = load_state(path)
             out = handle(inp, env, st, off, sid)
@@ -551,8 +859,8 @@ def self_test() -> int:
         def post(self, tool, ti=None, resp=None):
             return self.send("PostToolUse", tool_name=tool, tool_input=ti or {}, tool_response=resp if resp is not None else {}, tool_use_id="t")
 
-        def stop(self, active=False):
-            return self.send("Stop", stop_hook_active=active)
+        def stop(self, active=False, msg=None):
+            return self.send("Stop", stop_hook_active=active, **({"last_assistant_message": msg} if msg is not None else {}))
 
     def kind(o):
         return ((o or {}).get("hookSpecificOutput") or {}).get("permissionDecision")
@@ -693,9 +1001,207 @@ def self_test() -> int:
         s = fz("c18")
         case("p4-finding-write-allowed", s.pre("Write", {"file_path": reg, "content": "x"}) is None and kind(s.pre("Write", W)) == "deny")
 
+    def B(cmd):
+        return {"command": cmd, "description": "d"}
+
     @cell
-    def c19():
-        case("p4-bash-not-matched", fz("c19").pre("Bash", {"command": "echo x > a.swift"}) is None)
+    def f119a():
+        s = fz("f119a")
+        got = [kind(s.pre("Bash", B(c))) for c in ("echo x > a.swift", "printf y >> /srv/demo/b.swift", 'make 2>&1 >"$T/o0"', "cmd &> out.log")]
+        case("f119-bash-redirect-denied", got == ["deny"] * 4, got)
+
+    @cell
+    def f119b():
+        s = fz("f119b")
+        got = [kind(s.pre("Bash", B(c))) for c in ("sed -i '' 's/a/b/' a.swift", "sed -i.bak -e 's/x/y/' f.md",
+                                                     "find . -name '*.md' | xargs sed -i 's/a/b/'")]
+        case("f119-bash-sed-i-denied", got == ["deny"] * 3, got)
+
+    @cell
+    def f119c():
+        s = fz("f119c")
+        got = [kind(s.pre("Bash", B(c))) for c in ("echo x | tee a.swift", "echo x | tee -a /srv/demo/log.txt")]
+        case("f119-bash-tee-denied", got == ["deny"] * 2, got)
+
+    @cell
+    def f119d():
+        s = fz("f119d")
+        got = [kind(s.pre("Bash", B(c))) for c in ("cat > a.swift <<'EOF'\nlet x = 1\nEOF",
+                                                     "python3 - <<'EOF'\nopen('a.swift', 'w').write('x')\nEOF",
+                                                     "node <<EOF\nrequire('fs').writeFileSync('a', 'x')\nEOF")]
+        case("f119-bash-heredoc-denied", got == ["deny"] * 3, got)
+
+    @cell
+    def f119e():
+        hooks = json.loads((PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
+        rx = [re.compile(h["matcher"]) for h in hooks.get("PreToolUse", []) if h.get("matcher")]
+        hit = lambda name: any(r.search(name) for r in rx)
+        case("f119-hook-routes-bash", bool(rx) and hit("Bash") and hit("Write") and not hit("Read") and not hit("BashOutput"),
+             [r.pattern for r in rx])
+
+    @cell
+    def f368():
+        s = fz("f368")
+        reads = ["cat a.swift", 'grep -n "a > b" a.swift 2>/dev/null', "ls -la > /dev/null 2>&1", "git status 2>&1 | head -5",
+                 "cat <<'EOF'\nprint(1 > 0)\nEOF", "sed -n 1,5p a.swift", "echo x | tee /dev/null", "python3 -c 'print(1>0)'",
+                 "awk -F'\\t' '$1>3' f.tsv", "cmd --flag=x 2>&1 | grep -v '=>'"]
+        got = [s.pre("Bash", B(c)) for c in reads]
+        answered(s, "full (Recommended)")
+        after = s.pre("Bash", B("echo x > a.swift"))
+        case("f368-bash-read-allowed", got == [None] * len(reads) and after is None, f"{got} · 승인 뒤 {after}")
+
+    @cell
+    def f119f():
+        s = fz("f119f")
+        reads = ['[[ "$a" > "$b" ]] && echo y', "(( count > 0 )) && echo ok", "echo $(( 3 > 2 ))", "[ a \\> b ] && echo y",
+                 '[[\n  "$a" > "$b"\n]] && echo y']                          # 여러 줄 비교식
+        got = [s.pre("Bash", B(c)) for c in reads]
+        real = kind(s.pre("Bash", B("[ $a > $b ] && echo y")))
+        # 실제로 쓰는 꼴 — 비교식 안 치환 · 치환 안 서브셸 · 큰따옴표 안 치환 · 역슬래시 짝 뒤 `>`(bash 는 리다이렉트로 본다)
+        writes = ["[[ $(printf x > /tmp/p4-example.txt) == x ]]", "[[ $( (printf x) > /tmp/p4-example.txt) == x ]]",
+                  '[[ "$(printf x > /tmp/p4-example.txt)" == x ]]', "printf x \\\\> /tmp/p4-example.txt"]
+        inner = [kind(s.pre("Bash", B(c))) for c in writes]
+        inner = "deny" if inner == ["deny"] * len(writes) else inner
+        case("f119-bash-test-comparison-allowed", got == [None] * len(reads) and real == "deny" and inner == "deny",
+             f"{got} · 홑대괄호 {real} · 치환 안 쓰기 {inner}")
+
+    @cell
+    def f553a():
+        s = fz("f553a")
+        got = [s.pre("Write", {"file_path": "/srv/demo/TKT-1234/index.md", "content": "x"}),
+               s.pre("Write", {"file_path": "/srv/demo/NOTASK-20261109/index.md", "content": "x"}),
+               s.pre("Bash", B("mkdir -p /srv/demo/TKT-1234 && cat > /srv/demo/TKT-1234/index.md <<'EOF'\n# x\nEOF"))]
+        case("f553-phase0-workdir-allowed", got == [None] * 3, got)
+
+    @cell
+    def f553b():
+        s = fz("f553b")
+        got = [kind(s.pre("Write", {"file_path": p, "content": "x"})) for p in (
+            "/srv/demo/TKT-1234/plan.md", "/srv/demo/src/index.md", "/srv/other/TKT-1234/index.md",
+            "/srv/demo/TKT-1234/../a.swift", "/srv/demo/x/TKT-1234/index.md")]
+        case("f553-outside-workdir-still-denied", got == ["deny"] * 5, got)
+
+    @cell
+    def f564():
+        s = S("f564")
+        sdir = pathlib.Path(s.env["FZ_RUN_STATE"]) / "fz-guard"
+        sdir.mkdir(parents=True)
+        old = time.time() - 30 * 86400
+
+        def put(name, age=old):
+            p = sdir / name
+            p.write_text("{}" if name.endswith(".json") else "", encoding="utf-8")
+            os.utime(p, (age, age))
+        for i in range(12):
+            put(f"old{i}.json")
+            put(f"old{i}.lock")
+        put("orphan.lock")
+        put("live.json", time.time())             # 최근 상태 + 오래 전에 만든 잠금 = 살아 있는 세션
+        put("live.lock")
+        put("disable")
+        (sdir / "disable").write_text("AG\n", encoding="utf-8")
+        s.prompt("평범한 요청", "p1")
+        left = sorted(p.name for p in sdir.iterdir() if p.name.startswith(("old", "orphan")))
+        alive = [n for n in ("live.json", "live.lock", "disable", "s1.json", "s1.lock") if not (sdir / n).exists()]
+        case("f564-stale-state-pruned", len(left) < 1 and not alive, f"남은 낡은 것 {left} · 지워진 살아 있는 것 {alive}")
+
+    @cell
+    def f565a():
+        s = S("f565a")
+        s.prompt("메모리 정리", "p1")
+        s.post("Write", {"file_path": str(pathlib.Path(mem).with_name("MEMORY.md")),
+                         "content": "- [fz-code 사용 메모](feedback_fz_code.md) — `fz-code` 링크\n- [fz-findings 경로](reference_x.md)\n"})
+        case("f565-skill-link-only-not-lesson", s.stop() is None)
+
+    @cell
+    def f565b():
+        s = S("f565b")
+        s.prompt("회고", "p1")
+        s.post("Write", {"file_path": mem, "content": "fz-peer-review 교훈 — 분석만 요청받았다는 예외로 등재를 미뤘다"})
+        o = s.stop()
+        case("f565-f518-still-caught", blocked(o) and "F-518" in o.get("reason", ""), o)
+
+    @cell
+    def f451():
+        long = "분석 결과를 정리한다. " * 200
+        a = fz("f451a")
+        oa = a.stop(msg=long)
+        again = a.stop(active=True, msg=long)
+        b = fz("f451b")
+        answered(b, "full (Recommended)", header="범위")
+        ob = b.stop(msg=long)
+        c = fz("f451c")
+        oc = c.stop(msg="짧은 답")
+        u = fz("f451u", transcript=t_none)
+        ou = u.stop(msg=long)
+        case("f451-long-answer-before-approval-warn", blocked(oa) and warned(oa, WARN_LONG) and again is None and blocked(ob)
+             and not warned(ob, WARN_LONG) and blocked(oc) and not warned(oc, WARN_LONG) and not blocked(ou) and warned(ou, WARN_LONG),
+             f"{oa} · {again} · {ob} · {oc} · {ou}")
+
+    @cell
+    def f094():
+        a = S("f094a")
+        a.prompt("/fz-review 내 코드", "p1")
+        first, second = a.stop(msg="리뷰 끝"), a.stop(msg="리뷰 끝")
+        b = S("f094b")
+        b.prompt("/fz:fz-review", "p1")
+        b.pre("Bash", B('"$R/scripts/gpt-call.sh" review --cd /srv/demo --out x.md'))
+        c = S("f094c")
+        c.prompt("리뷰해줘", "p1")
+        c.pre("Skill", {"skill": "fz:fz-review"})
+        h = S("f094h", transcript=t_sdk)
+        h.prompt("/fz-review", "p1")
+        n = S("f094n")
+        n.prompt("평범한 요청", "p1")
+        rest = [b.stop(msg="리뷰 끝"), c.stop(msg="[GPT 미사용 — CLI 없음] 나머지는 통과"), h.stop(msg="리뷰 끝"), n.stop(msg="끝")]
+        case("f094-review-without-gpt-blocked", blocked(first) and "F-094" in first.get("reason", "") and second is None
+             and rest == [None] * 4, f"{first} · {second} · {rest}")
+
+    @cell
+    def f094m():
+        calls = ['"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd /srv/demo --out x.md --uncommitted',
+                 "cd /srv/demo && FZ_X=1 bash scripts/gpt-call.sh independent-review --diff d.patch > o 2>&1; echo exit=$?",
+                 "bash -e scripts/gpt-call.sh review --cd x", "FZ_X=$(pwd) bash scripts/gpt-call.sh review --cd x"]
+        mentions = ["grep -n 'gpt-call.sh review' modules/fz-gpt-subcommands-core.md", 'echo "gpt-call.sh review"',
+                    "cat > p.md <<'EOF'\n\"$R/gpt-call.sh\" review --cd x\nEOF", 'rg "gpt-call\\.sh review" modules',
+                    "printf '%s\\n' ';' gpt-call.sh review",   # 따옴표 안 `;` 는 연산자가 아니다
+                    "printf '%s\\n' $(printf x) gpt-call.sh review", "echo ! gpt-call.sh review"]   # 치환 뒤 · 인자 `!` 뒤는 인자 자리
+        got = [gpt_review_invoked(c) for c in calls + mentions]
+        s = S("f094m")
+        s.prompt("/fz-review 내 코드", "p1")
+        s.pre("Bash", B(mentions[0] + " > o.txt"))      # 쓰기라 상태 거름망을 지나 기록 줄까지 간다 — 그 줄의 판별을 잰다
+        out = s.stop(msg="리뷰 끝")
+        case("f094-gpt-mention-not-call — 명령 자리의 실행만 GPT 호출로 센다(grep · echo · heredoc · rg 언급은 아니다)",
+             got == [True] * len(calls) + [False] * len(mentions) and blocked(out), f"{got} · {out}")
+
+    @cell
+    def f297():
+        word = "Co" + "dex"                        # ⛔ 이 파일도 표면 검사 대상이다 — 시험 자료의 옛 호칭은 실행 때 만든다
+        root = tmp / "f297" / "plug"
+        (root / ".claude-plugin").mkdir(parents=True)
+        (root / ".claude-plugin" / "plugin.json").write_text('{"name": "fz"}', encoding="utf-8")
+        (root / "mods" / "sub" / ".claude-plugin").mkdir(parents=True)
+        (root / "mods" / "sub" / ".claude-plugin" / "plugin.json").write_text('{"name": "fz-guard"}', encoding="utf-8")
+        (root / "scripts").mkdir()
+        real = PLUGIN_ROOT.parent.parent / "scripts" / "check_gpt_surface.py"
+        if real.is_file():
+            shutil.copyfile(real, root / "scripts" / "check_gpt_surface.py")
+        else:                                      # 설치본(하위 플러그인만 복사)에는 저장소 판별식이 없다 — 같은 API 의 최소판
+            (root / "scripts" / "check_gpt_surface.py").write_text(
+                "import re\nTOKEN = re.compile('co' 'dex', re.I)\nALLOW_RE = re.compile(r'~/\\.co' r'dex[\\w./-]*', re.I)\n"
+                "EXCLUDE_PREFIX = ('tests/fixtures/',)\nBOUNDARY = {'scripts/gpt-exec.sh'}\nSUFFIXES = ('.md', '.sh', '.py')\n"
+                "def norm(t):\n    return re.sub(r'\\s+', ' ', t).strip()\n"
+                "def residual(line):\n    return bool(TOKEN.search(ALLOW_RE.sub('', line)))\n", encoding="utf-8")
+        s = S("f297")
+        s.prompt("문서 고쳐줘", "p1")
+        bad = s.pre("Write", {"file_path": str(root / "guides" / "a.md"), "content": f"{word} CLI 로 교차 검증"})
+        nested = s.pre("Edit", {"file_path": str(root / "mods" / "sub" / "CLAUDE.md"), "old_string": "a", "new_string": f"{word} 리뷰"})
+        others = [s.pre("Write", {"file_path": "/srv/demo/notes.md", "content": f"{word} CLI"}),
+                  s.pre("Write", {"file_path": str(root / "guides" / "a.md"), "content": "설정은 `~/." + word.lower() + "/config.toml`"}),
+                  s.pre("Edit", {"file_path": str(root / "scripts" / "gpt-exec.sh"), "old_string": "a", "new_string": word.lower() + " exec -- x"}),
+                  s.pre("Write", {"file_path": str(root / "guides" / "b.md"), "content": "GPT 로 교차 검증"})]
+        case("f297-gpt-wording-write-denied", kind(bad) == "deny" and "F-297" in bad["hookSpecificOutput"]["permissionDecisionReason"]
+             and kind(nested) == "deny" and others == [None] * 4, f"{bad} · {nested} · {others}")
 
     @cell
     def c20():
@@ -722,9 +1228,19 @@ def self_test() -> int:
              and lr.get("verdict") == "unparseable" and lr.get("raw") == "User answered in some unknown shape", f"{o} {lr}")
 
     @cell
+    def c23b():
+        s = fz("c23b")
+        ti = p4q()
+        s.post("AskUserQuestion", ti, {"questions": ti["questions"], "answers": {"다른 질문 본문": "full (Recommended)"}})
+        o = s.pre("Write", W)
+        lr = last_response(s)
+        case("f566-guard-answer-key-mismatch", kind(o) is None and warned(o, WARN_UNDECIDED) and lr.get("verdict") == "mismatch",
+             f"{o} {lr}")
+
+    @cell
     def c24():
         o = fz("c24").pre("Agent", {"subagent_type": "fz:review-arch", "prompt": "x"})
-        case("agent-adhoc-in-fz-ask", kind(o) == "ask", o)
+        case("f058-ad-hoc-agent-asked", kind(o) == "ask", o)
 
     @cell
     def c25():
@@ -752,7 +1268,7 @@ def self_test() -> int:
         s.prompt("분석해줘", "p1")
         lesson(s)
         o = s.stop()
-        case("stop-memory-only-blocked", blocked(o) and "F-518" in o.get("reason", ""), o)
+        case("f518-memory-only-lesson-blocked", blocked(o) and "F-518" in o.get("reason", ""), o)
 
     @cell
     def c29():
@@ -893,7 +1409,8 @@ def self_test() -> int:
         def direct(text=text, tag=tag, n=n):
             s = S(f"d{n}")
             s.prompt(text, "p1")
-            case(tag, s.pre("Write", W) is None and s.stop() is None)
+            # fz-review 턴의 GPT 누락은 GP(F-094)가 따로 본다 — 이 셀은 P4 창만 잰다
+            case(tag, s.pre("Write", W) is None and s.stop(msg="[외부: GPT] 확인") is None)
         cells.append(direct)
 
     @cell
