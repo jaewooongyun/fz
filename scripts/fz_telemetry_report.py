@@ -1180,6 +1180,37 @@ RUN_OPEN_STALE_HOURS = 24.0                              # run_metrics.py sweep 
 RUN_REQUIRED = ("run_id", "attempt", "skill", "mode", "status", "started_at")
 
 
+def fz_owned_skill(name):
+    """F-312 — fz 플러그인이 소유한 스킬 귀속인가(`fz:` 네임스페이스 · 네임스페이스 없는 `fz` · `fz-*`).
+    호스트 프로젝트 스킬(`tvg:…`) · 다른 플러그인(`koreanizer` 등)은 fz 감사의 대상이 아니다."""
+    s = str(name)
+    return s.split(":", 1)[0] == "fz" if ":" in s else (s == "fz" or s.startswith("fz-"))
+
+
+def skill_scope(by_skill, all_skills=False):
+    """(스킬 표에 넣을 이름, 범위 머리). 기본은 fz 소유만 — 호스트 · 다른 플러그인 · 미귀속(`-`)을 섞으면 fz 감사가
+    호스트 사용량으로 오염된다(F-312: 미귀속 14,327 행이 표 맨 위였다). ⛔ 뺀 것은 숫자로 남긴다 — 포함 + 제외 + 미귀속 = 전체."""
+    msgs = {n: by_skill[n]["msgs"] for n in by_skill}
+    un = msgs.get("-", 0)
+    if all_skills:
+        names = list(msgs)
+        excluded = []
+    else:
+        names = [n for n in msgs if n != "-" and fz_owned_skill(n)]
+        excluded = sorted((n for n in msgs if n != "-" and not fz_owned_skill(n)), key=lambda n: (-msgs[n], n))
+    inc = [n for n in names if n != "-"]
+    return names, {
+        "filter": "all" if all_skills else "fz",
+        "included_skills": len(inc),
+        "included_msgs": sum(msgs[n] for n in inc),
+        "excluded_skills": len(excluded),
+        "excluded_msgs": sum(msgs[n] for n in excluded),
+        "excluded_top": excluded[:5],
+        "unattributed_msgs": un,
+        "total_msgs": sum(msgs.values()),
+    }
+
+
 def canonical_run_skill(name):
     """run_metrics.canonical_skill 과 같은 규칙 — 과거 행의 별칭(plan → fz-plan)을 집계에서만 합친다(행 파일은 고치지 않는다) [F-532]."""
     s = str(name)
@@ -1420,7 +1451,8 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
         )
 
     skills = []
-    for name in sorted(agg.by_skill, key=lambda s: -agg.by_skill[s]["msgs"]):
+    skill_names, scope = skill_scope(agg.by_skill, getattr(args, "all_skills", False))
+    for name in sorted(skill_names, key=lambda s: -agg.by_skill[s]["msgs"]):
         counter = agg.by_skill[name]
         lat_sorted = sorted(agg.skill_lat[name])
         skills.append(
@@ -1488,6 +1520,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
         "unpriced_models": dict(agg.unpriced),
         "advisor": advisor_summary(agg),
         "skills": skills,
+        "skill_scope": scope,
         "workflows": workflows,
         "effort_all": dict(agg.effort_all),
         "findings": {
@@ -1595,6 +1628,17 @@ def render_markdown(payload):
 
     lines.append("## 2. 스킬별 부하")
     lines.append("")
+    sc = payload.get("skill_scope")
+    if sc:
+        # F-312 — 표가 무엇을 뺐는지 머리에 숫자로 둔다. 포함 + 제외 + 미귀속 = 전체 메시지
+        lines.append("범위: %s — 포함 %d 스킬 · %s 메시지 / 제외(호스트 · 다른 플러그인) %d 스킬 · %s 메시지%s / 미귀속 `-` %s 메시지 — 합 %s = 전체 %s"
+                     % ("fz 소유만(전체는 --all-skills)" if sc["filter"] == "fz" else "전체(--all-skills)",
+                        sc["included_skills"], "{:,}".format(sc["included_msgs"]), sc["excluded_skills"], "{:,}".format(sc["excluded_msgs"]),
+                        (" (예: %s)" % " · ".join(sc["excluded_top"])) if sc["excluded_top"] else "",
+                        "{:,}".format(sc["unattributed_msgs"]) if sc["filter"] == "fz" else "0(표에 포함)",
+                        "{:,}".format(sc["included_msgs"] + sc["excluded_msgs"] + sc["unattributed_msgs"]),
+                        "{:,}".format(sc["total_msgs"])))
+        lines.append("")
     lines.append("| 스킬 | 호출 | 출력 tok | thinking% | 캐시읽기 tok | 지연 중앙값 | 지연 p90 | 워커 비율 | effort 분포 |")
     lines.append("|---|---|---|---|---|---|---|---|---|")
     for row in payload["skills"]:
@@ -2198,6 +2242,20 @@ def self_test():
     check("JSON 모델 행 unpriced 필드(등록 모델=False)", payload["models"][0].get("unpriced"), False)
     check("JSON unpriced_models 필드(fixture=없음)", payload.get("unpriced_models"), {})
     md = render_markdown(dict(payload, unpriced_models={"claude-unknown-9": 2}))
+    # F-312 — fz 감사 표에 호스트 프로젝트 · 다른 플러그인 · 미귀속이 섞이지 않는다. 뺀 것은 머리에 숫자로 남는다
+    bs = collections.defaultdict(collections.Counter)
+    for n, m in (("fz:fz-code", 10), ("fz-review", 2), ("tvg:create-tvg-ticket", 5), ("koreanizer", 3), ("-", 7)):
+        bs[n]["msgs"] = m
+    names312, sc312 = skill_scope(bs)
+    names312_all, _ = skill_scope(bs, True)
+    check("f312-host-skill-excluded", (sorted(names312), sorted(names312_all)),
+          (["fz-review", "fz:fz-code"], ["-", "fz-review", "fz:fz-code", "koreanizer", "tvg:create-tvg-ticket"]))
+    head312 = [ln for ln in render_markdown(dict(payload, skill_scope=sc312)).split("\n") if ln.startswith("범위:")]
+    check("f312-excluded-count-header",
+          (sc312["included_msgs"] + sc312["excluded_msgs"] + sc312["unattributed_msgs"] == sc312["total_msgs"] == 27, len(head312),
+           bool(head312) and "제외(호스트 · 다른 플러그인) 2 스킬 · 8 메시지 (예: tvg:create-tvg-ticket · koreanizer)" in head312[0]
+           and "미귀속 `-` 7 메시지 — 합 27 = 전체 27" in head312[0]),
+          (True, 1, True))
     check("단가 미등록 경고 줄", "단가 미등록 모델: claude-unknown-9×2" in md, True)
     check("단가 미등록 없으면 경고 줄 없음", "단가 미등록 모델" in render_markdown(payload), False)
     check("JSON 왕복 — 분모", payload["denominators"]["assistant_messages"], 1)
@@ -2384,6 +2442,8 @@ def main(argv):
     )
     parser.add_argument("--runs-json", action="store_true",
                         help="실행 기록 행(started_at 순 · 기간 무관)을 stdout JSON 으로 내고 끝낸다 — 다른 집계는 하지 않는다")
+    parser.add_argument("--all-skills", action="store_true",
+                        help="스킬 표에 호스트 프로젝트 · 다른 플러그인 · 미귀속까지 넣는다(기본: fz 소유만 — F-312)")
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--plan-segments", metavar="SESSION_PREFIX",
                         help="세션의 /fz-plan 1회를 Lead 생성·GPT 대기·피드백 통합으로 분리 (plan-final S9c)")
