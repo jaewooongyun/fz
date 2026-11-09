@@ -60,7 +60,7 @@ def parse_closes(note: pathlib.Path):
 def index_entries(entries: pathlib.Path):
     """slug -> path, id -> [slug...] 두 색인. id 가 여럿이면 모호하다."""
     by_slug, by_id = {}, {}
-    for p in sorted(entries.glob("*.md")):
+    for p in sorted(q for q in entries.iterdir() if q.suffix == ".md"):   # ⛔ glob 금지 — 권한 오류를 빈 목록으로 돌려준다(F-271)
         stem = p.stem
         m = SLUG.match(stem)
         if not m:
@@ -784,6 +784,13 @@ def dispose(root: pathlib.Path, kind: str, fid: str, reason: str, _crash_at: str
             log(f"REJECT: {fid} 엔트리가 entries · .archive 어디에도 없다")
             return REJECT
         slug = live[0] if live else arc[0]          # entries 에 없으면 앞 실행이 삭제까지 했다 — 이어 간다
+        if not live:
+            # ⛔ 이어 가는 것은 **이 처분**이 끊긴 경우뿐이다 — APPLIED 행이 다른 경로(릴리스 Closes · 다른 kind)면
+            #    이미 닫힌 ID 다. 그 위에 처분을 다시 얹으면 OK 와 성공 줄이 사실과 반대를 말한다(F-561)
+            prior = _applied_row(applied, slug)
+            if prior is not None and not prior.split("|")[4].strip().startswith(f"{kind} — 수동 처분(--dispose)"):
+                log(f"REJECT: {slug} 는 이미 처분됐다 — APPLIED `{prior.strip()}` (--dispose {kind} 를 적용하지 않았다)")
+                return REJECT
         src, dst = entries / f"{slug}.md", archive / f"{slug}.md"
         if src.exists():
             archive.mkdir(exist_ok=True)
@@ -804,8 +811,69 @@ def dispose(root: pathlib.Path, kind: str, fid: str, reason: str, _crash_at: str
                 f.write(f"\n| {day} | {slug} | {reason} | {kind} — 수동 처분(--dispose) |\n")
             crash("applied")
         rc = index_sync(root, {slug})
+    if rc != OK:
+        # ⛔ 성공 줄을 찍지 않는다 — INDEX 정리가 거부 · 판정 불가면 처분은 끝나지 않았다(F-561)
+        log(f"{'REJECT' if rc == REJECT else 'UNRUN'}: 처분 {kind}: {slug} — archive 이동 · APPLIED 행까지 했고 INDEX 행 정리가 끝나지 않았다"
+            " · 같은 명령을 다시 돌리면 이어 간다")
+        return rc
     print(f"처분 {kind}: {slug} → .archive/ · APPLIED 1행 · INDEX 행 정리")
     return rc
+
+
+def _applied_row(applied: pathlib.Path, slug: str):
+    """APPLIED.md 표에서 slug 를 둘째 칸에 둔 첫 행(없으면 None)."""
+    if not applied.is_file():
+        return None
+    for ln in applied.read_text(encoding="utf-8").splitlines():
+        cells = ln.split("|")
+        if len(cells) >= 6 and cells[2].strip().strip("*") == slug:
+            return ln
+    return None
+
+
+NEW_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+NUM_OF = re.compile(r"^F-(\d{3})[a-z]?-")
+
+
+def new_entry(root: pathlib.Path, slug: str, src: pathlib.Path) -> int:
+    """`--new-entry ROOT --slug S --from FILE` — 잠금 아래에서 다음 ID 를 재고 그 ID 로 엔트리를 쓴다(F-398).
+
+    다음 ID = entries · .archive 의 F-NNN 최대 + 1(`INDEX.md` § 다음 ID 의 측정과 같다). 원본의 `F-NNN` 자리표시를 그 ID 로 바꾼다.
+    ⛔ 정리 도구가 잠금을 쥐고 있으면(`--with-lock` 아래 정리) 상한까지 기다린 뒤 **아무것도 쓰지 않고** UNRUN — 정리 중 기록이
+       그 단계 차이에 섞이지 않는다. 잴 때와 쓸 때 사이에 다른 협조 writer 가 끼지 않는다.
+    ⛔ 대상 파일이 이미 있으면 덮지 않고 REJECT(`os.link` 는 있으면 실패한다 · 반쯤 쓴 파일이 엔트리 이름으로 남지 않는다).
+    ⛔ INDEX `## 대기열` 행은 쓰지 않는다 — 레지스트리 README §4 5단계대로 사람이 붙인다.
+    """
+    if not NEW_SLUG.match(slug or ""):
+        log(f"REJECT: --slug 는 소문자 · 숫자 · '-' 의 kebab 이다 (받음: {slug!r})")
+        return REJECT
+    try:
+        body = src.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        log(f"UNRUN: --from 파일을 읽지 못했다 — {src}: {e}")
+        return UNRUN
+    entries, archive = root / "entries", root / ".archive"
+    if not entries.is_dir():
+        log(f"UNRUN: entries 디렉토리 없음 — {entries}")
+        return UNRUN
+    with registry_lock(root) as held:
+        if not held:
+            return UNRUN
+        nums = [int(m.group(1)) for d in (entries, archive) if d.is_dir()
+                for q in d.iterdir() if q.suffix == ".md" for m in [NUM_OF.match(q.name)] if m]
+        fid = f"F-{max(nums, default=0) + 1:03d}"
+        dst = entries / f"{fid}-{slug}.md"
+        tmp = entries / f".{fid}-{slug}.md.tmp"
+        tmp.write_text(body.replace("F-NNN", fid), encoding="utf-8")
+        try:
+            os.link(tmp, dst)
+        except FileExistsError:
+            log(f"REJECT: {dst} 가 이미 있다 — 덮지 않았다")
+            return REJECT
+        finally:
+            tmp.unlink()
+    print(f"새 엔트리 {fid}: entries/{dst.name} — INDEX `## 대기열` 행은 README §4 대로 붙인다")
+    return OK
 
 
 def with_lock(root: pathlib.Path, cmd: list) -> int:
@@ -939,7 +1007,7 @@ def audit_cli(root: pathlib.Path, mani_path: pathlib.Path):
     """
     try:
         hmod = _hygiene_module()
-    except Exception as e:      # 적재 실패 = 판정 불가 — 대장 대조도 이 모듈에 기대므로 돌리지 않는다
+    except Exception as e:      # noqa: BLE001 — 적재 실패 = 판정 불가 — 대장 대조도 이 모듈에 기대므로 돌리지 않는다
         print(f"UNRUN: 위생 검사기를 읽지 못했다 — {type(e).__name__}: {e} (대장 대조도 돌리지 않았다)")
         print(f"AUDIT: 대장 대조 미실행 · 위생 검사 미실행 → exit {UNRUN}")
         return UNRUN
@@ -947,7 +1015,7 @@ def audit_cli(root: pathlib.Path, mani_path: pathlib.Path):
     print("── 위생 검사 (check_findings_hygiene.py 기본 모드 · 같은 ROOT) ──")
     try:
         hy = hmod.check(root, False)
-    except Exception as e:      # 모듈 고장·예상 밖 예외 = 판정 불가
+    except Exception as e:      # noqa: BLE001 — 모듈 고장·예상 밖 예외 = 판정 불가
         print(f"UNRUN: 위생 검사를 돌리지 못했다 — {type(e).__name__}: {e}")
         hy = UNRUN
     final = REJECT if REJECT in (rc, hy) else (UNRUN if UNRUN in (rc, hy) else OK)
@@ -1809,6 +1877,107 @@ def self_test():
             os.environ.pop(LOCK_WAIT_ENV, None) if old is None else os.environ.__setitem__(LOCK_WAIT_ENV, old)
         assert rc == UNRUN and not out.exists(), f"⛔ 잠금 점유인데 명령을 돌렸다 rc={rc}"
 
+    def c_entries_perm_error_unrun(tmp):
+        """F-271 — entries 를 못 세면(권한) 빈 목록이 아니라 UNRUN(exit 2). 실제 chmod 로 잰다 — 주입 지점 = 실제 오류 지점."""
+        root, note = mk(tmp, ["F-001-alpha"])
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        ent = root / "entries"
+        os.chmod(ent, 0)
+        try:
+            try:
+                os.listdir(ent)
+                raise AssertionError("chmod 000 이 열거를 막지 않는다(권한 없는 계정이 아니다) — fixture 전제 불성립")
+            except PermissionError:
+                pass
+            r = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve()), "--root", str(root), "--note", str(note)],
+                               capture_output=True, text=True)
+        finally:
+            os.chmod(ent, 0o755)
+        assert r.returncode == UNRUN and "UNRUN" in r.stderr, f"⛔ 열거 권한 오류가 exit {r.returncode} — {r.stderr[-200:]!r}"
+
+    def run_out(fn):
+        import io
+        so, se = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(so), contextlib.redirect_stderr(se):
+            rc = fn()
+        return rc, so.getvalue(), se.getvalue()
+
+    def c_dispose_line_matches_result(tmp):
+        """F-561 — INDEX 정리가 거부되면 '처분 …' 성공 줄이 없다."""
+        root, _ = mk(tmp, ["F-001-alpha", "F-002-beta"])
+        ix(root, ["F-001-alpha", "F-002-beta"])
+
+        def fake(point, idx):
+            if point == "read":
+                with open(idx, "a", encoding="utf-8") as f:
+                    f.write("| F-990 | 다른 세션 | [F-990](entries/F-990-foreign.md) |\n")
+
+        g = globals()
+        real = g["_test_hook"]
+        g["_test_hook"] = fake
+        try:
+            rc, out, err = run_out(lambda: dispose(root, "rejected", "F-001", "x"))
+        finally:
+            g["_test_hook"] = real
+        assert rc == REJECT, f"⛔ INDEX 정리 거부인데 rc={rc}"
+        assert not [ln for ln in out.splitlines() if ln.startswith("처분 ")], f"⛔ 거부인데 성공 줄을 찍었다 — {out!r}"
+
+    def c_dispose_closed_id_rejected(tmp):
+        """F-561 짝 — 릴리스 Closes 로 이미 배출된 ID 에 --dispose 를 돌리면 이어 가지 않는다(이미 처분됨 · 비0)."""
+        root, note = mk(tmp, ["F-001-alpha", "F-002-beta"])
+        ix(root, ["F-001-alpha", "F-002-beta"])
+        note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
+        assert eject(root, note, "9.9.9", False) == OK
+        ap0 = (root / "APPLIED.md").read_text(encoding="utf-8")
+        rc, out, err = run_out(lambda: dispose(root, "rejected", "F-001", "x"))
+        assert rc == REJECT and "이미 처분됐다" in err, f"⛔ 닫힌 ID 처분 rc={rc} — {err!r}"
+        assert not [ln for ln in out.splitlines() if ln.startswith("처분 ")] and (root / "APPLIED.md").read_text(encoding="utf-8") == ap0, \
+            "⛔ 거부인데 성공 줄을 찍었거나 APPLIED 를 바꿨다"
+
+    def entry_src(tmp):
+        s = pathlib.Path(tmp) / "draft.md"
+        s.write_text("---\nid: F-NNN\nstatus: open\n---\n# F-NNN — 새 결함\n", encoding="utf-8")
+        return s
+
+    def c_new_entry_locked_id(tmp):
+        """F-398 — 다음 ID = entries ∪ .archive 최대 + 1 · 자리표시를 그 ID 로 바꿔 쓴다."""
+        root, _ = mk(tmp, ["F-001-alpha", "F-002-beta"])
+        (root / ".archive").mkdir()
+        (root / ".archive" / "F-007-gone.md").write_text("x\n", encoding="utf-8")
+        rc, out, _err = run_out(lambda: new_entry(root, "fresh-hole", entry_src(tmp)))
+        dst = root / "entries" / "F-008-fresh-hole.md"
+        assert rc == OK and dst.is_file(), f"⛔ 새 엔트리를 쓰지 않았다 rc={rc} — {sorted(q.name for q in (root / 'entries').iterdir())}"
+        assert dst.read_text(encoding="utf-8").startswith("---\nid: F-008\n") and "F-NNN" not in dst.read_text(encoding="utf-8"), "⛔ 자리표시를 바꾸지 않았다"
+        assert not list((root / "entries").glob(".*.tmp")), "⛔ 임시 파일이 남았다"
+
+    def c_new_entry_lock_busy(tmp):
+        """F-398 짝 — 정리가 잠금을 쥐면 아무것도 쓰지 않고 UNRUN."""
+        root, _ = mk(tmp, ["F-001-alpha"])
+        before = sorted(q.name for q in (root / "entries").iterdir())
+        old = os.environ.get(LOCK_WAIT_ENV)
+        os.environ[LOCK_WAIT_ENV] = "0.2"
+        fd = os.open(str(root / LOCK_NAME), os.O_RDWR | os.O_CREAT, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            rc, _o, _e = run_out(lambda: new_entry(root, "fresh", entry_src(tmp)))
+        finally:
+            os.close(fd)
+            os.environ.pop(LOCK_WAIT_ENV, None) if old is None else os.environ.__setitem__(LOCK_WAIT_ENV, old)
+        assert rc == UNRUN and sorted(q.name for q in (root / "entries").iterdir()) == before, f"⛔ 잠금 점유인데 rc={rc} 또는 썼다"
+
+    def c_new_entry_bad_slug(tmp):
+        root, _ = mk(tmp, ["F-001-alpha"])
+        rc, _o, _e = run_out(lambda: new_entry(root, "Bad Slug", entry_src(tmp)))
+        assert rc == REJECT and sorted(q.name for q in (root / "entries").iterdir()) == ["F-001-alpha.md"], f"⛔ 잘못된 slug rc={rc}"
+
+    for n, f in [("f271-perm-error-not-empty", c_entries_perm_error_unrun),
+                 ("f561-dispose-line-matches-result", c_dispose_line_matches_result),
+                 ("f561-closed-id-dispose-rejected", c_dispose_closed_id_rejected),
+                 ("f398-new-entry-locked-id", c_new_entry_locked_id), ("f398-new-entry-lock-busy-unrun", c_new_entry_lock_busy),
+                 ("f398-new-entry-bad-slug-rejected", c_new_entry_bad_slug)]:
+        cases += 1
+        case(n, f)
+
     for n, f in [("closes-partial-rejected", c_closes_partial_rejected), ("closes-partial-no-write", c_closes_partial_no_write),
                  ("closes-legacy-no-applied-ok", c_closes_legacy_no_applied),
                  ("dispose-rejected-moves", dispose_case("rejected")), ("dispose-works-moves", dispose_case("works")),
@@ -1888,6 +2057,10 @@ def main():
     ap.add_argument("--dispose", choices=DISPOSE_KINDS, help="README §1 수동 처분 — --root · --id · --reason 과 함께")
     ap.add_argument("--id", default="", metavar="F-NNN")
     ap.add_argument("--reason", default="")
+    ap.add_argument("--new-entry", type=pathlib.Path, metavar="ROOT",
+                    help="잠금 아래 다음 ID 로 새 엔트리를 쓴다 — --slug · --from 과 함께 (F-398)")
+    ap.add_argument("--slug", default="")
+    ap.add_argument("--from", dest="src", type=pathlib.Path, metavar="FILE", help="--new-entry 본문 — `F-NNN` 자리표시를 배정 ID 로 바꾼다")
     ap.add_argument("--self-test", action="store_true")
     argv = sys.argv[1:]
     if argv[:1] == ["--with-lock"]:          # `--with-lock ROOT -- 명령…` — 명령 인자를 argparse 가 먹지 않게 먼저 가른다
@@ -1896,7 +2069,19 @@ def main():
             return UNRUN
         return with_lock(pathlib.Path(argv[1]), argv[3:])
     a = ap.parse_args(argv)
+    try:
+        return _run(a, ap)
+    except OSError as e:
+        # ⛔ 열거 · 읽기 실패를 빈 목록이나 거부로 읽지 않는다 — 판정 불가다(F-271)
+        log(f"UNRUN: 레지스트리를 읽지 못했다 — {e} (⛔ 통과도 거부도 아니다)")
+        return UNRUN
 
+
+def _run(a, ap):
+    if a.new_entry:
+        if not a.slug or not a.src:
+            ap.error("--new-entry 는 --slug 와 --from 이 필요하다")
+        return new_entry(a.new_entry, a.slug, a.src)
     if a.dispose:
         if not a.root:
             ap.error("--dispose 는 --root 가 필요하다")

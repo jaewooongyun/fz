@@ -61,6 +61,8 @@ APPLIED_REF_LINE = re.compile(r"^applied_ref:[ \t]*([^\s#]*)", re.M)
 DISTINCT_LINE = re.compile(r"^distinct_cause:[ \t]*\S", re.M)
 FCLASS_LINE = re.compile(r"^failure_class:[ \t]*([^\s#]+)", re.M)
 DATE_LINE = re.compile(r"^date:[ \t]*(\d{4}-\d{2}-\d{2})", re.M)
+# 재발 사슬 관측이 이만큼 쌓이고 live 가 남았으면 apply-now 후보로 낸다(F-071 — 관측 3개든 1개든 대기열의 같은 줄에 있었다)
+APPLY_NOW_MIN = 3
 APPLIED_VALUES = ("full", "partial", "none")
 RECURS_ALIGN_FROM = "2026-11-08"   # 이날부터 쓴 엔트리만 클래스 불일치를 WARN 으로 센다 — 그 전은 INFO
 PROMOTED_MARK = "✅ **승격 완료"
@@ -485,6 +487,39 @@ def _drain_axes(arc: pathlib.Path, texts: dict, ledger_text: str | None):
     show("recurs_of 클래스 불일치", mismatch)
     if legacy:
         print(f"  [INFO] recurs_of 클래스 불일치({RECURS_ALIGN_FROM} 이전 · 계수 밖): {len(legacy)}")
+
+    # apply-now 후보 — recurs_of 를 끝까지 따라간 사슬 하나 = 같은 실패의 관측들. archive 를 지난 사슬도 센다
+    rec_of = {}
+    for d, fm in fm_of.items():
+        rec = RECURS_LINE.search(fm)
+        if rec:
+            rec_of[SLUG.match(d.split("/", 1)[1]).group(1)] = rec.group(1)
+    for aid, ap in arc_paths.items():
+        if aid in applied_of:
+            continue
+        try:
+            m = FM.match(read_or_raise(ap))
+        except Unreadable:
+            continue
+        rec = RECURS_LINE.search(m.group(1)) if m else None
+        if rec:
+            rec_of[aid] = rec.group(1)
+
+    def chain_root(x):
+        seen = set()
+        while x in rec_of and x not in seen:
+            seen.add(x)
+            x = rec_of[x]
+        return x
+
+    groups = {}
+    for x in set(rec_of) | set(rec_of.values()):
+        groups.setdefault(chain_root(x), set()).add(x)
+    cands = sorted(f"{r} 관측 {len(m)} — live {', '.join(sorted(i for i in m if i in applied_of))}"
+                   for r, m in groups.items() if len(m) >= APPLY_NOW_MIN and any(i in applied_of for i in m))
+    print(f"  [INFO] apply-now 후보(recurs_of 사슬 관측 ≥{APPLY_NOW_MIN} · live 포함): {len(cands)}")
+    for x in cands[:10]:
+        print(f"      [INFO] {x}")
 
 
 def check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None):
@@ -1165,6 +1200,34 @@ def self_test():
         clean_rest = "\n".join(ln for ln in clean.splitlines() if "[WARN]" not in ln and "[INFO]" not in ln)
         assert rest.replace(str(r), "R") == clean_rest.replace(str(pathlib.Path(tmp) / "clean" / "reg"), "R"), \
             f"⛔ 표지 줄 밖 출력이 바뀌었다\n{rest}\n---\n{clean_rest}"
+
+    def c_apply_now_listed(tmp):
+        """F-071 — recurs_of 사슬 관측 3(live 포함)이면 apply-now 후보로 낸다 · 판정(exit)은 그대로."""
+        r = full(tmp)
+        fm_add(r, "F-002-beta", "recurs_of: F-001\n")
+        fm_add(r, "F-003-gamma", "recurs_of: F-002\n")
+        rc, out = both(r)
+        assert rc == OK and "[INFO] apply-now 후보(recurs_of 사슬 관측 ≥3 · live 포함): 1" in out \
+            and "[INFO] F-001 관측 3 — live F-001, F-002, F-003" in out, f"⛔ 관측 3 사슬을 후보로 내지 않았다 rc={rc}\n{out}"
+
+    def c_apply_now_two_not_listed(tmp):
+        r = full(tmp)
+        fm_add(r, "F-002-beta", "recurs_of: F-001\n")
+        rc, out = both(r)
+        assert rc == OK and "[INFO] apply-now 후보(recurs_of 사슬 관측 ≥3 · live 포함): 0" in out, f"⛔ 관측 2 를 후보로 냈다\n{out}"
+
+    def c_apply_now_through_archive(tmp):
+        """사슬이 archive 를 지나도 센다 — 뿌리가 배출됐어도 live 재발이 남으면 후보다."""
+        r = full(tmp)
+        fm_add(r, "F-002-beta", "recurs_of: F-090\n")
+        fm_add(r, "F-003-gamma", "recurs_of: F-002\n")
+        rc, out = both(r)
+        assert rc == OK and "[INFO] F-090 관측 3 — live F-002, F-003" in out, f"⛔ archive 뿌리 사슬을 놓쳤다\n{out}"
+
+    for n, f in [("f071-apply-now-listed", c_apply_now_listed), ("f071-two-observations-not-listed", c_apply_now_two_not_listed),
+                 ("f071-chain-through-archive", c_apply_now_through_archive)]:
+        cases += 1
+        case(n, f)
 
     for n, f in [("applied-value-invalid-warn", c_applied_value_invalid), ("applied-ref-missing-warn", c_applied_ref_missing),
                  ("applied-ref-pending-ok", c_applied_ref_pending), ("reflect-heading-only-no-warn", c_reflect_heading_only),

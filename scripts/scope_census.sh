@@ -13,9 +13,34 @@
 #   · scope 경로가 겹치면 한 번만 센다(`git grep` pathspec 합집합) — 인쇄도 정렬 · 중복 제거한 목록
 #   · --expect <경로>: 그 경로에 적중이 0이면 exit 2 — 양성 대조(패턴 · 범위가 살아 있는지)
 # exit: 0 인쇄 · 2 --expect 미적중 · 3 사용법 · 저장소 아님 · git 실패(⛔ 0건으로 읽지 않는다)
+#   --self-test: 임시 저장소로 셀 셋 — 고정 목록 밖 루트 폴더(templates/)가 범위 밖 적중으로 나오는가(F-302) 등. exit 0 전건 통과 · 1 실패
 set -u
 
 die() { echo "SCOPE-CENSUS-FAIL($1): $2" >&2; exit "$1"; }
+
+if [ "${1:-}" = "--self-test" ]; then
+  T="$(mktemp -d "${TMPDIR:-/tmp}/fz-scope-census.XXXXXX")" || { echo "SETUP 임시 폴더 실패"; exit 3; }
+  trap 'rm -rf "$T"' EXIT
+  R="$T/repo"
+  mkdir -p "$R/guides" "$R/skills/x" "$R/templates" "$T/plain" && git -C "$R" init -q || { echo "SETUP 임시 저장소 실패"; exit 3; }
+  printf 'see TEAM_DOC_REF here\n' > "$R/guides/a.md"
+  printf 'TEAM_DOC_REF\n' > "$R/skills/x/SKILL.md"
+  printf 'TEAM_DOC_REF\n' > "$R/templates/skill-template.md"
+  fail=0
+  st() { if [ "$2" = 0 ]; then echo "PASS $1"; else echo "FAIL $1: $3"; fail=$((fail + 1)); fi; }
+  # F-302 — 고른 범위가 skills · guides 뿐이어도 루트의 templates/ 적중이 범위 밖 목록에 나온다(고정 목록이 놓치던 것)
+  O="$(bash "$0" --fixed TEAM_DOC_REF --scope guides --scope skills --repo "$R" 2>&1)"
+  printf '%s\n' "$O" | grep -qx '범위 밖 적중: 1 파일' && printf '%s\n' "$O" | grep -qx '  - templates/skill-template.md'
+  st f302-scope-census-root-dirs $? "범위 밖에 templates/ 가 없다 — $(printf '%s' "$O" | tr '\n' ' ' | cut -c1-200)"
+  O="$(bash "$0" --fixed TEAM_DOC_REF --scope . --repo "$R" 2>&1)"
+  printf '%s\n' "$O" | grep -qx '범위 밖 적중: 0 파일'
+  st f302-full-scope-zero-outside $? "전체 범위인데 범위 밖 적중이 0 이 아니다"
+  bash "$0" --fixed TEAM_DOC_REF --scope . --repo "$T/plain" >/dev/null 2>&1; rc=$?
+  [ "$rc" -eq 3 ]
+  st f302-not-a-repo-exit3 $? "저장소가 아닌데 exit $rc"
+  echo "self-test $((3 - fail))/3 passed"
+  [ "$fail" -eq 0 ] && exit 0 || exit 1
+fi
 
 MODE="" PAT="" REPO="." EXPECT="" SCOPES=()
 while [ $# -gt 0 ]; do
