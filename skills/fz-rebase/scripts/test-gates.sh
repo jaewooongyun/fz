@@ -17,7 +17,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 VR="$HERE/verify-rebase.sh"
 # PWD 비교로 가드하므로 경로를 정규화한다 (macOS TMPDIR의 trailing slash → `//` 방지, symlink 해소)
 # ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp -d)"` 는 mktemp 가 실패해도 `cd ""` 가 성공해(bash 3.2) 현재 폴더가 ROOT 가 되고 trap 이 지운다
-ROOT0="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }; ROOT="$(cd "$ROOT0" && pwd -P)"
+ROOT0="$(mktemp -d "${TMPDIR:-/tmp}/fz-rebase-gates.XXXXXX")" || { echo "mktemp 실패" >&2; exit 2; }; ROOT="$(cd "$ROOT0" && pwd -P)"
 trap 'rm -rf "$ROOT"' EXIT
 PASS=0; FAIL=0
 D=""
@@ -57,6 +57,7 @@ assert() {  # $1=시나리오 $2=기대(HALT|OK) $3=실제exit $4=출력
   [ "$code" -eq 0 ] && actual=OK || actual=HALT
   if [ "$actual" = "$expect" ]; then
     PASS=$((PASS+1)); echo "  PASS  $name  (기대 $expect)"
+    if [ -n "${FZ_SELFTEST_LIST:-}" ]; then echo "PASS $name"; fi   # 게이트 셀 문법(`^PASS <셀>`) — 들여쓴 줄은 셀로 안 읽힌다
   else
     FAIL=$((FAIL+1)); echo "  FAIL  $name  (기대 $expect ≠ 실제 $actual)"; echo "$out" | sed 's/^/        /'
   fi
@@ -66,6 +67,7 @@ assert_has() {  # 출력에 특정 문자열이 있어야 함 (WARN 등급 검�
   local name="$1" needle="$2" out="$3"
   if printf '%s' "$out" | grep -q -- "$needle"; then
     PASS=$((PASS+1)); echo "  PASS  $name  ('$needle' 포함)"
+    if [ -n "${FZ_SELFTEST_LIST:-}" ]; then echo "PASS $name"; fi   # 게이트 셀 문법(`^PASS <셀>`) — 들여쓴 줄은 셀로 안 읽힌다
   else
     FAIL=$((FAIL+1)); echo "  FAIL  $name  ('$needle' 없음)"; echo "$out" | sed 's/^/        /'
   fi
@@ -80,6 +82,7 @@ assert_no_warn() {  # $1=시나리오 $2=출력
   cnt=$(printf '%s\n' "$out" | grep -c '^WARN:' || true)
   if [ "${cnt:-0}" -eq 0 ]; then
     PASS=$((PASS+1)); echo "  PASS  $name  (WARN 0건)"
+    if [ -n "${FZ_SELFTEST_LIST:-}" ]; then echo "PASS $name"; fi   # 게이트 셀 문법(`^PASS <셀>`) — 들여쓴 줄은 셀로 안 읽힌다
   else
     FAIL=$((FAIL+1)); echo "  FAIL  $name  (WARN ${cnt}건 — 오경보)"
     printf '%s\n' "$out" | grep '^WARN:' | sed 's/^/        /'
@@ -689,6 +692,43 @@ for badv in foo 0 -1; do
     FAIL=$((FAIL+1)); echo "  FAIL  S35 ${badv} 에서 exit ${CODE}"
   fi
 done
+
+echo "── S39: 같은 파일 안 이동 · 반복 줄 일부 삭제 → 무경보 (F-176 — 되살아남은 줄 개수 3-way 로 판정)"
+newrepo s39
+printf 'alpha_line_one\nrepeat_line_x\nrepeat_line_x\nmove_me_line\nbeta_line_two\nTAIL_BASE\n' > src/A.swift
+g add -A; g commit -qm "base: repeats"
+g branch -f feature
+g checkout -q feature
+printf 'move_me_line\nalpha_line_one\nrepeat_line_x\nbeta_line_two\nTAIL_BASE\n' > src/A.swift
+g add -A; g commit -qm "feature: drop one repeat + move a line"
+g checkout -q develop
+printf 'alpha_line_one\nrepeat_line_x\nrepeat_line_x\nmove_me_line\nbeta_line_two\nTAIL_BASE\nTEAM_ADD_S39\n' > src/A.swift
+g add -A; g commit -qm "team: append"
+g checkout -q feature
+bash "$VR" snapshot develop feature >/dev/null 2>&1
+g rebase --rebase-merges develop >/dev/null 2>&1; finish_rebase >/dev/null 2>&1
+set +e; OUT=$(bash "$VR" audit develop feature 2>&1); CODE=$?; set -e   # set -e 구간 — HALT(비0)가 스크립트를 끝내지 않게
+assert "f176-rebase-3way-line-count" OK "$CODE" "$OUT"
+
+echo "── S39b [개조]: 리베이스 뒤 내가 지운 고유 줄이 되살아남 → HALT (3-way 가 진짜 되살아남은 잡는다)"
+newrepo s39b
+printf 'alpha_line_one\nunique_deleted_line\nbeta_line_two\nTAIL_BASE\n' > src/A.swift
+g add -A; g commit -qm "base: unique"
+g branch -f feature
+g checkout -q feature
+printf 'alpha_line_one\nbeta_line_two\nTAIL_BASE\n' > src/A.swift
+g add -A; g commit -qm "feature: delete unique line"
+g checkout -q develop
+printf 'alpha_line_one\nunique_deleted_line\nbeta_line_two\nTAIL_BASE\nTEAM_ADD_S39B\n' > src/A.swift
+g add -A; g commit -qm "team: append"
+g checkout -q feature
+bash "$VR" snapshot develop feature >/dev/null 2>&1
+g rebase --rebase-merges develop >/dev/null 2>&1; finish_rebase >/dev/null 2>&1
+printf 'alpha_line_one\nunique_deleted_line\nbeta_line_two\nTAIL_BASE\nTEAM_ADD_S39B\n' > src/A.swift
+g add -A; g commit -qm "oops: revive deleted line"
+set +e; OUT=$(bash "$VR" audit develop feature 2>&1); CODE=$?; set -e   # set -e 구간 — HALT(비0)가 스크립트를 끝내지 않게
+assert "f176-revived-line-still-halts" HALT "$CODE" "$OUT"
+assert_has "f176-revived-line-reason" "내가 지운 라인이 되살아남" "$OUT"
 
 echo "── SKILL: 충돌 확인 절차의 정적 계약 (프롬프트 변경 회귀 방지)"
 # ⛔ 이 절차는 스크립트가 아니라 SKILL.md 문장이라 동작 oracle이 없다.

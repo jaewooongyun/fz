@@ -84,6 +84,27 @@ norm_stream() {
          if (length($0) > 3 && $0 !~ /^[[:punct:]]+$/) print }'
 }
 
+# 파일 하나의 정규화 줄 개수 — `줄<TAB>개수`. 그 ref 에 파일이 없으면 빈 출력(개수 0)
+#   ⛔ `git show` 실패(파일 없음 = exit 128)를 흡수한다 — set -euo pipefail 이라 그대로 두면 감사가 128 로 죽는다
+line_counts() {   # $1=ref · $2=경로
+  { git show "$1:$2" 2>/dev/null || :; } | norm_stream | LC_ALL=C sort | LC_ALL=C uniq -c \
+    | LC_ALL=C awk '{ c = $1; sub(/^ *[0-9]+ /, ""); print $0 "\t" c }'
+}
+
+# 되살아남 후보(stdin)를 줄 개수 3-way 불변식으로 거른다 — POST 개수가 dev + old − mb 보다 많은 줄만 진짜 되살아남이다.
+# ⛔ 집합 비교(`comm`)는 같은 파일 안 이동(지우고 다른 자리에 다시 씀)과 반복 줄의 일부 삭제를 '되살아남' 으로 읽었다
+#    (F-176 · 재관측 2026-10-21: 충돌 0 리베이스에서 HALT 24건이 전부 오탐 — 6파일 불변식 불일치 0).
+#    인자: 개수 파일 넷 — mb(merge-base) · old(내 리베이스 전) · dev(base) · post(리베이스 후)
+revived_3way() {
+  LC_ALL=C awk -F'\t' '
+    FILENAME == ARGV[1] { mb[$1] = $2; next }
+    FILENAME == ARGV[2] { od[$1] = $2; next }
+    FILENAME == ARGV[3] { dv[$1] = $2; next }
+    FILENAME == ARGV[4] { ps[$1] = $2; next }
+    { if (ps[$0] + 0 > dv[$0] + od[$0] - mb[$0]) print }
+  ' "$1" "$2" "$3" "$4" -
+}
+
 # unified=0 diff(stdin) → 정규화 라인. side=add(추가) / del(삭제)
 # 헤더는 `diff --git` ~ 첫 `@@` 구간에서만 인식한다. 이유: 내용 라인 "-- foo"가
 # 삭제되면 diff에서 "--- foo"로 보여 헤더로 오인될 수 있다.
@@ -524,6 +545,11 @@ case "$cmd" in
         git diff --unified=0 --no-color --no-ext-diff "$FZ_OLD_MB" "$base" -- "$q"   | diff_lines add | sort -u > "$W/.baseadd"
         git diff --unified=0 --no-color --no-ext-diff "$FZ_OLD_MB" "$base" -- "$q"   | diff_lines del | sort -u > "$W/.basedel"
         git show "${post}:${q}" 2>/dev/null | norm_stream | sort -u > "$W/.postfile" || : > "$W/.postfile"
+        # ② · ④ 의 3-way 개수 — 내 경로(src)는 mb · PRE 쪽, 분할 키(q)는 base · POST 쪽 이름이다
+        line_counts "$FZ_OLD_MB" "$src" > "$W/.c-mb"
+        line_counts "$FZ_PRE" "$src"    > "$W/.c-old"
+        line_counts "$base" "$q"        > "$W/.c-dev"
+        line_counts "$post" "$q"        > "$W/.c-post"
 
         # 경로 접두는 awk로 붙인다 — BSD sed는 치환부 `\t`를 탭으로 해석하지 않고,
         # 경로에 구분자 문자가 있으면 sed 표현식이 깨진다.
@@ -535,7 +561,8 @@ case "$cmd" in
         report_moved "$q" "$W/.moved1" "내"
         # ②내 삭제가 이 파일에 되살아남 (base가 다시 추가한 것은 제외 — base의 결정)
         comm -23 "$W/.mydel" "$W/.baseadd" | sort -u > "$W/.mydel2"
-        comm -12 "$W/.mydel2" "$W/.postfile" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l2"
+        comm -12 "$W/.mydel2" "$W/.postfile" | revived_3way "$W/.c-mb" "$W/.c-old" "$W/.c-dev" "$W/.c-post" \
+          | awk -v p="$q" '{print p "\t" $0}' >> "$W/l2"
         # ③팀원 추가가 트리에 없음 = 팀원 변경 덮어쓰기
         comm -23 "$W/.baseadd" "$W/.postfile" > "$W/.gone3"
         comm -23 "$W/.gone3" "$W/tree-all" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l3"
@@ -543,7 +570,8 @@ case "$cmd" in
         report_moved "$q" "$W/.moved3" "팀원"
         # ④팀원 삭제가 되살아남 (내가 다시 추가한 것은 제외 — 내 의도)
         comm -23 "$W/.basedel" "$W/.myadd" | sort -u > "$W/.basedel2"
-        comm -12 "$W/.basedel2" "$W/.postfile" | awk -v p="$q" '{print p "\t" $0}' >> "$W/l4"
+        comm -12 "$W/.basedel2" "$W/.postfile" | revived_3way "$W/.c-mb" "$W/.c-old" "$W/.c-dev" "$W/.c-post" \
+          | awk -v p="$q" '{print p "\t" $0}' >> "$W/l4"
       done < "$W/overlap"
 
       for pair in "l1:내 추가 라인이 트리에서 사라짐(내 변경 유실)" \
