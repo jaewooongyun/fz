@@ -23,6 +23,9 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent.parent.parent   # 플러그인 루트 — modules/plugin-refs.md 표를 읽는다
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from diff_anchors import unquote_path  # noqa: E402 — 같은 폴더 · git C 스타일 인용 경로 해독(F-412)
@@ -70,6 +73,40 @@ CATEGORIES = {
         "빌드 설정",
     ),
 }
+
+# 관점 카테고리 (round 2 S10) — 위험(Tier 승격)이 아니라 **리뷰 관점 신호**다. categories · detail 에 남고(axis_only) risk 합계에서 빠진다 —
+#   UI · 로그 PR 마다 Tier 가 오르면 승격 신호가 묽어진다. 판정 근거가 아니라 '이 축을 따로 보라' 는 표지다.
+#   analytics(F-515): 새 분기 술어의 입력 클래스(nil · 빈 값 · 스킴)마다 나가는 클릭 · 노출 로그 · 이동. 프로젝트 고유 트래커 이름은
+#     플러그인에 박지 않고 env FZ_RISK_ANALYTICS_TOKENS(정규식 갈래)로 더한다.
+#   animation(F-134): 가역 전환이면 정 · 역재생 두 시간 프로파일이 생긴다 — 코드를 읽어서는 둘째가 보이지 않는다.
+AXIS_CATEGORIES = {
+    "analytics": (
+        r"(?i)(?:analytics|logEvent|trackEvent|sendEvent|tracker|impression|clickLog|logClick)",
+        "분석 이벤트 — 새 분기 술어의 입력 클래스(nil · 빈 값 · 스킴)마다 나가는 로그 · 이동을 따로 본다",
+    ),
+    "animation": (
+        r"(?:\.animation\(|\bwithAnimation\b|\bAnimatable\b|\banimatableData\b|\bUIView\.animate\b|\bCABasicAnimation\b|\btimingFunction\b)",
+        "애니메이션 곡선 — 가역 전환이면 정 · 역재생 시간 프로파일을 둘 다 인쇄해 본다",
+    ),
+}
+
+# 실행 필요 축 (F-258) — 렌즈가 읽기만으로 판정할 수 없는 축. 있으면 Lead 가 격리 프로브를 돌리거나 GPT 에 명시 질문으로 넘긴다.
+#   ⛔ 위험이 아니다 — risk 에 넣지 않는다. 추가 행 순증 토큰만 센다(개명 · 이동 짝은 지운다).
+RUNTIME_AXES = {
+    "on_change": re.compile(r"\.onChange\s*\(|\.onReceive\s*\(|\.task\s*\(\s*id:"),
+    "state_capture": re.compile(r"@State\b|@Binding\b"),
+    "gesture": re.compile(r"\bGesture\b|\w+Gesture\b|\.gesture\s*\(|GestureRecognizer\b"),
+    "state_transition": re.compile(r"\.transition\s*\(|matchedGeometryEffect|\.sheet\s*\(|\.fullScreenCover\s*\(|navigationDestination"),
+}
+
+# 형제 관례 대조 (F-516) — `--head DIR` 를 줄 때만. 바뀐 클로저 · 분기마다 같은 파일의 같은 역할 형제(같은 콜백 이름)가
+#   **모두** 가진 guard 조건 중 이번 것에 없는 것을 원재료로 낸다. 판정은 렌즈 · Lead(Gate 4.9 [관례 이탈]).
+#   형제 2곳 이상일 때만 · 고차 함수(map · filter …)는 역할이 아니라 뺀다.
+ROLE_RE = re.compile(r"(?:\.(\w+)\s*(?:\([^)]*\))?\s*\{|\b(\w+)\s*=\s*\{|\b(\w+)\s*:\s*\{)")
+GUARD_RE = re.compile(r"\bguard\s+(.*?)\s+else\b")
+NOT_ROLES = frozenset("map filter compactMap flatMap forEach reduce sorted sort first contains allSatisfy sink receive "
+                      "then catch async sync main if else switch case default do".split())
+SIBLING_MIN = 2
 
 # 역방향 신호 — 키워드가 없어도 위험한 것.
 # 공유 가변 상태는 `actor`·`@MainActor` 없이도 data race 를 만든다.
@@ -217,7 +254,9 @@ def scan(diff_text):
     #    승격하지 않는다. Tier 승격은 휴리스틱이고 cap 이 Tier 2 이므로 감수한다 —
     #    동시성 표면을 줄이는 변경이 실제로 더 안전하다는 판단이다.
     hits = {}
-    for name, (pattern, label) in CATEGORIES.items():
+    extra = os.environ.get("FZ_RISK_ANALYTICS_TOKENS", "").strip()
+    axis = {k: ((p + "|(?:%s)" % extra) if k == "analytics" and extra else p, lab) for k, (p, lab) in AXIS_CATEGORIES.items()}
+    for name, (pattern, label) in list(CATEGORIES.items()) + list(axis.items()):
         added_tokens = _tally(re.findall(pattern, blob))
         if not added_tokens:
             continue
@@ -247,6 +286,8 @@ def scan(diff_text):
                             for t in ("\n".join(h["added"]) for h in hunks))
             if not companion:
                 hit["low_confidence_only"] = True
+        if name in AXIS_CATEGORIES:
+            hit["axis_only"] = True
         hits[name] = hit
 
     # 역방향: 싱글톤 선언과 가변 프로퍼티가 같은 파일에 있으면 동시성 위험
@@ -264,12 +305,153 @@ def scan(diff_text):
     return {
         "launch_surface": launch_surface(by_file, removed_by_file, hunks),
         "categories": sorted(hits),
-        # ⛔ 저신뢰 단독 카테고리는 risk 에서 뺀다 — detail/categories 에는 남아 사람이 본다.
-        "risk": sum(1 for h in hits.values() if not h.get("low_confidence_only")),
+        # ⛔ 저신뢰 단독 카테고리 · 관점 카테고리(axis_only)는 risk 에서 뺀다 — detail/categories 에는 남아 사람이 본다.
+        "risk": sum(1 for h in hits.values() if not h.get("low_confidence_only") and not h.get("axis_only")),
         "detail": hits,
         "added_lines": len(all_added),
         "files": len(by_file),
+        "runtime_axes": runtime_axes(blob, removed_blob),
+        "doc_contract_deleted": doc_contract_deleted(diff_text),
+        "plugin_refs": plugin_refs(blob),
     }
+
+
+def runtime_axes(blob, removed_blob):
+    """실행 필요 축 — 추가 행에서 순증한 축 이름(정렬)."""
+    return sorted(k for k, rx in RUNTIME_AXES.items() if len(rx.findall(blob)) > len(rx.findall(removed_blob)))
+
+
+def doc_contract_deleted(diff_text):
+    """`///` 주석만 지운 hunk 의 문장(F-013) — 코드는 남고 계약 문장만 사라진 자리. 같은 hunk 에 같은 문장이 다시 들어왔으면 뺀다."""
+    out, path, header, in_hunk, rem, add = [], None, None, False, [], []
+
+    def flush():
+        docs = [l.strip()[3:].strip() for l in rem if l.strip().startswith("///")]
+        code = [l for l in rem if l.strip() and not l.strip().startswith("///")]
+        kept = {l.strip()[3:].strip() for l in add if l.strip().startswith("///")}
+        lost = [d for d in docs if d and d not in kept]
+        if path and lost and not code:
+            out.append({"path": path, "lines": lost})
+
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            flush()
+            rem, add, path, in_hunk, header = [], [], None, False, _header_path(line)
+        elif not in_hunk and line.startswith("+++ "):
+            p = unquote_path(line[4:])
+            p = unquote_path(header) if p == "/dev/null" and header else p
+            path = p[2:] if p.startswith("b/") else p
+        elif line.startswith("@@"):
+            flush()
+            rem, add, in_hunk = [], [], True
+        elif in_hunk and line.startswith("-"):
+            rem.append(line[1:])
+        elif in_hunk and line.startswith("+"):
+            add.append(line[1:])
+    flush()
+    return out
+
+
+def plugin_table():
+    """modules/plugin-refs.md `## 자동 감지 트리거` 표 — [(토큰들, 플러그인, 참조 항목들)]. 표가 단일 출처다(F-520 — 조건을 세 토큰만 박아 뒀다)."""
+    p = ROOT / "modules" / "plugin-refs.md"
+    if not p.is_file():
+        return None
+    rows, on = [], False
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            on = line.strip() == "## 자동 감지 트리거"
+            continue
+        if not (on and line.startswith("|") and "`" in line):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 3:
+            continue
+        toks = [re.sub(r'"[^"]*"\)?$', "", t).rstrip(")") or t for t in re.findall(r"`([^`]+)`", cells[0])]
+        refs = [r.strip() for r in re.split(r"\s*\(", cells[2])[0].split(",") if r.strip()]
+        rows.append((toks, cells[1], refs))
+    return rows
+
+
+def plugin_refs(blob):
+    """추가 행에 표의 토큰이 있으면 그 행의 플러그인 · 참조 항목 — {플러그인: [참조 항목]}. 표가 없으면 None."""
+    rows = plugin_table()
+    if rows is None:
+        return None
+    out = {}
+    for toks, plugin, refs in rows:
+        if any(t and t in blob for t in toks):
+            out.setdefault(plugin, set()).update(refs)
+    return {k: sorted(v) for k, v in sorted(out.items())}
+
+
+def added_new_lines(diff_text):
+    """파일별 추가 행의 새 쪽 줄 번호 집합."""
+    out, path, header, in_hunk, n = {}, None, None, False, 0
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            path, in_hunk, header = None, False, _header_path(line)
+        elif not in_hunk and line.startswith("+++ "):
+            p = unquote_path(line[4:])
+            path = None if p == "/dev/null" else (p[2:] if p.startswith("b/") else p)
+        elif line.startswith("@@"):
+            m = re.search(r"\+(\d+)", line)
+            n, in_hunk = (int(m.group(1)) if m else 0), True
+        elif in_hunk and path:
+            if line.startswith("+"):
+                out.setdefault(path, set()).add(n)
+                n += 1
+            elif not line.startswith("-") and not line.startswith("\\"):
+                n += 1
+    return out
+
+
+def guard_atoms(cond):
+    parts = [" ".join(x.split()) for x in re.split(r",|&&", cond)]
+    return [x for x in parts if x and x not in ("let self", "let self = self", "var self = self")]
+
+
+def convention_deviations(diff_text, head_root):
+    """F-516 — 바뀐 역할 블록의 guard 조건이 형제(같은 파일 · 같은 역할 이름 · 2곳 이상)가 모두 가진 조건을 빠뜨렸으면 그 차."""
+    out = []
+    for path, added in sorted(added_new_lines(diff_text).items()):
+        f = Path(head_root) / path
+        if path.lower().endswith(DOC_SUFFIXES) or not f.is_file():
+            continue
+        lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+        occ = []
+        for i, ln in enumerate(lines):
+            m = ROLE_RE.search(ln)
+            role = next((g for g in m.groups() if g), None) if m else None
+            if not role or role in NOT_ROLES:
+                continue
+            atoms, gline = None, None
+            for j in range(i, min(i + 6, len(lines))):
+                g = GUARD_RE.search(lines[j])
+                if g:
+                    atoms, gline = guard_atoms(g.group(1)), j + 1
+                    break
+            occ.append((role, i + 1, atoms, (i + 1) in added or (gline in added if gline else False)))
+        for role, ln, atoms, changed in occ:
+            sib = [a for r, l2, a, _c in occ if r == role and l2 != ln and a is not None]
+            if not changed or len(sib) < SIBLING_MIN:
+                continue
+            missing = sorted(set.intersection(*[set(a) for a in sib]) - set(atoms or []))
+            if missing:
+                out.append({"path": path, "role": role, "line": ln, "missing": missing, "siblings": len(sib)})
+    return out
+
+
+def convention_md(devs):
+    lines = ["# 형제 관례 대조 — 결정론 수집(판정 아님 · F-516)", "",
+             "> 바뀐 클로저 · 분기마다 같은 파일의 같은 역할 형제(2곳 이상)가 **모두** 가진 guard 조건 중 이번 것에 없는 것이다.",
+             "> 누락인지 의도인지는 렌즈 · Lead 가 정한다 — `modules/peer-review-gates.md` Gate 4.9 `[관례 이탈]`.", ""]
+    if not devs:
+        return "\n".join(lines + ["형제 대비 빠진 guard 조건 없음(대조 가능한 역할 블록 기준)."]) + "\n"
+    for d in devs:
+        lines.append("- `%s:%d` `%s` — 형제 %d곳이 모두 가진 조건 없음: %s"
+                     % (d["path"], d["line"], d["role"], d["siblings"], ", ".join("`%s`" % m for m in d["missing"])))
+    return "\n".join(lines) + "\n"
 
 
 def launch_surface(by_file, removed_by_file, hunks):
@@ -296,9 +478,18 @@ def escalation(risk):
 
 
 def main(argv):
-    args = [a for a in argv[1:] if not a.startswith("--")]
+    args, opts, rest = [], {}, list(argv[1:])
+    while rest:
+        a = rest.pop(0)
+        if a in ("--head", "--convention-md"):
+            if not rest:
+                sys.stderr.write("%s 에 값이 없다\n" % a)
+                return 2
+            opts[a] = rest.pop(0)
+        elif not a.startswith("--"):
+            args.append(a)
     if len(args) != 1:
-        sys.stderr.write("usage: risk_scan.py DIFF_PATH [--json]\n")
+        sys.stderr.write("usage: risk_scan.py DIFF_PATH [--json] [--head HEAD_DIR [--convention-md OUT]]\n")
         return 2
     try:
         with open(args[0], encoding="utf-8", errors="replace") as fh:
@@ -309,6 +500,11 @@ def main(argv):
 
     result = scan(text)
     result["tier_delta"] = escalation(result["risk"])
+    if "--head" in opts and os.path.isdir(opts["--head"]):
+        result["convention_deviations"] = convention_deviations(text, opts["--head"])
+        if "--convention-md" in opts:
+            with open(opts["--convention-md"], "w", encoding="utf-8") as fh:
+                fh.write(convention_md(result["convention_deviations"]))
 
     if "--json" in argv:
         print(json.dumps(result, ensure_ascii=False, indent=1))

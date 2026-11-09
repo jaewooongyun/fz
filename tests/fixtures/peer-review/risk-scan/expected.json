@@ -1,5 +1,5 @@
 {
-  "note": "risk_scan.py 회귀 기대값. ⛔ 눈으로 확인하지 말고 run.sh 로 판정한다. added_lines 는 numstat_fallback 의 독립 python 오라클로 교차 검산 가능하다(같은 diff 를 다른 파서가 센다). 비교 키는 risk · added_lines · tier_delta · files · removed_paths 중 셀에 적힌 것만이다. before_f381 은 F-381 수정 전 트리(be8c871)의 실측 기록이고 비교하지 않는다.",
+  "note": "risk_scan.py 회귀 기대값. ⛔ 눈으로 확인하지 말고 run.sh 로 판정한다. added_lines 는 numstat_fallback 의 독립 python 오라클로 교차 검산 가능하다(같은 diff 를 다른 파서가 센다). 비교 키는 risk · added_lines · tier_delta · files · removed_paths · categories · runtime_axes · doc_contract_deleted · plugin_refs · convention_deviations 중 셀에 적힌 것만이다(`<셀>.head/` 가 있으면 --head 로 넘긴다). before_f381 은 F-381 수정 전 트리(be8c871)의 실측 기록이고 비교하지 않는다.",
   "cases": {
     "negative-interactor": {
       "risk": 0,
@@ -127,6 +127,12 @@
       "files": 1,
       "removed_paths": [],
       "why": "F-412: 비ASCII 이름 문서(docs/인증 메모.md)를 지우고 authManager 를 더한 PR 의 기본 설정(core.quotePath=true) diff. 인용 경로를 풀지 않으면 지운 .md 가 문서 제외를 피해 auth 를 상쇄한다(risk 0 · files 2) — 같은 커밋을 quotepath=false 로 뜨면 risk 1 · files 1"
-    }
+    },
+    "f515-analytics-category": {"categories": ["analytics"], "risk": 0},
+    "f134-animation-category": {"categories": ["animation"], "risk": 0},
+    "f013-doc-comment-contract-deleted": {"doc_contract_deleted": [{"path": "src/Player.swift", "lines": ["반드시 메인 스레드에서 호출한다.", "재생 중이면 먼저 멈춘다."]}], "risk": 0},
+    "f258-runtime-axis-marked": {"runtime_axes": ["gesture", "on_change", "state_capture"]},
+    "f520-plugin-refs-full-table": {"plugin_refs": {"Swift Concurrency": ["performance", "sendable", "tasks"], "SwiftUI Expert": ["latest-apis", "localization", "state-management", "view-structure"]}},
+    "f516-convention-deviation-collected": {"convention_deviations": [{"path": "src/HomeVC.swift", "role": "onVisible", "line": 15, "missing": ["!isVerticalScrolling"], "siblings": 2}]}
   }
 }

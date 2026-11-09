@@ -118,6 +118,53 @@ def parse_hunks(diff_text):
     return files
 
 
+def line_texts(diff_text):
+    """diff 텍스트 → {경로: {'new': {줄번호: 내용}, 'old': {줄번호: 내용}}} — hunk 안 줄의 내용.
+
+    소비자: scripts/render_review.py 의 게시 코멘트 줄 대조(F-069 — 앵커 가능 판정은 줄이 diff 안인지만 보고
+    **맞는 줄인지**는 보지 않는다). 헤더 규칙은 parse_hunks 와 같다(`diff --git` 경계 · 첫 ---/+++ 쌍만 헤더).
+    hunk 안에서 ' ' 는 양쪽, '+' 는 new, '-' 는 old 줄이다. `\\ No newline` 줄은 세지 않는다 · 빈 줄은 문맥 줄로 본다.
+    """
+    out = {}
+    old_path = new_path = None
+    header_done = in_hunk = False
+    on = nn = 0
+    for line in diff_text.splitlines():
+        if DIFF_GIT_RE.match(line):
+            old_path = new_path = None
+            header_done = in_hunk = False
+            continue
+        if not header_done:
+            m = OLD_HDR_RE.match(line)
+            if m and not line.startswith("---- "):
+                old_path = strip_prefix(unquote_path(m.group(1)))
+                continue
+            m = NEW_HDR_RE.match(line)
+            if m:
+                new_path = strip_prefix(unquote_path(m.group(1)))
+                header_done = True
+                for p in (new_path, old_path):
+                    if p and p != "/dev/null":
+                        out.setdefault(p, {"new": {}, "old": {}})
+                continue
+        m = HUNK_RE.match(line)
+        if m:
+            on, nn, in_hunk = int(m.group(1)), int(m.group(3)), True
+            continue
+        if not (header_done and in_hunk):
+            continue
+        tag, body = (line[:1], line[1:]) if line else (" ", "")
+        if tag in (" ", "+") and new_path in out:
+            out[new_path]["new"][nn] = body
+        if tag in (" ", "-") and old_path in out:
+            out[old_path]["old"][on] = body
+        if tag in (" ", "+"):
+            nn += 1
+        if tag in (" ", "-"):
+            on += 1
+    return out
+
+
 def resolve_path(requested, known_paths):
     """리뷰는 basename으로 파일을 부르고 diff는 전체 경로를 쓴다.
 

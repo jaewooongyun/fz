@@ -4,14 +4,14 @@
 //   표준 패턴 3종 적용. 대형 입력(diff/evidence)은 args가 아닌 파일 경로 전달 (§12).
 //   호출(Lead, SKILL.md Analyze Step): Lead가 Gather 산출물(diff/evidence/base-behavior)을 파일로 기록 후
 //     Workflow({ scriptPath: '{WORK_DIR}/peer-review.js',   // 원본 {plugin_root}/workflows/ 를 §12 0단계 준비(cp → cmp -s)로 복사
-//       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, crossOutput? } })
+//       args: { diffPath, intentContext, reviewSurfacePatchPath?, reviewSurfacePath?, evidencePaths?, basePath?, deep?, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, crossOutput?, oracleField?, judgmentSlots? } })
 //   reviewSurfacePatchPath: gather 가 만든 `review-surface.patch`(중복 커밋 제외분). 있으면 **이것이 1차 리뷰 대상**이 되고
 //     `diffPath` 는 부풀림 확인용 보조로 내려간다. ⛔ 렌즈는 Bash·git 이 없어 커밋 해시로 hunk 를 필터할 수 없다 —
 //     진단 파일만 넘기면 무력하다(GPT 리뷰 지적, 2026-09-01).
 //   reviewSurfacePath: `review-surface.md`(진단 산문). patch 와 함께 넘기면 렌즈가 부풀림 규모를 안다.
 //   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
 //     ⛔ arch 렌즈에만 주입된다 — quality/correctness는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
-//   ⛔ 아래 네 옵션(craftAxes · crossRequiredFields · crossOutput · preserveLowConfidence)은 **기본 on**이다(v4.42.0 — S25p peer-review
+//   ⛔ 아래 여섯 옵션(craftAxes · crossRequiredFields · crossOutput · preserveLowConfidence · oracleField · judgmentSlots)은 **기본 on**이다(v4.42.0 — S25p peer-review
 //     판정 PASS). 끄는 값(false · crossOutput 'full')을 주고 structuralContext 에서 §6 을 빼면 모든 콜의 프롬프트·스키마가 기준(v4.39.1)과
 //     바이트 단위로 같다 — 롤백 경로(브리프는 Lead 가 조립한다 — 이 스크립트는 §6 을 거르지 못한다).
 //     review-live 의 같은 이름 옵션은 기본 off 다(S25 미달). 워크플로별 기본값: tests/workflows/default-off-regression.js 의 defaultOn.
@@ -19,6 +19,13 @@
 //     fallback(args invalid)이다 — 끄는 값을 잘못 써서 조용히 기본(on)으로 읽히면 롤백이 실패한 줄 모른다.
 //   craftAxes: craft 6축 판정. 켜지면 arch 렌즈에만 craft 줄과 axisCoverage(6축 필수) 스키마가 들어간다.
 //   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes 가 켜져 있을 때만 효력 · arch 렌즈에만.
+//   oracleField: 켜지면 이슈 항목 스키마(Stage 1 · craft · 교차 additions · counter missedIssues)에 `oracle`(판별 방법) 필수 필드가 붙는다
+//     (F-072 — SKILL.md Gather 2.5 가 oracle 을 요구했는데 스키마에 자리가 없어 description 산문 끝에 섞이고 누락도 통과했다 ·
+//     tests/workflows/review-schemas.js). 사본에만 붙인다 — 끄면 스키마가 기준과 바이트 단위로 같다.
+//   judgmentSlots: 켜지면 판정 한계 칸이 생긴다 — axisCoverage gap · Stage 1 결과 unverifiedPremises(반환 reviews[] 에 그대로 실린다) ·
+//     이슈 limits · Stage 1 동적 축 질문 블록(F-559 · F-448 · F-178 · F-117 · tests/workflows/review-schemas.js). 사본에만 붙인다.
+//   catalogHits: 켜지면(Tier 3) counter 프롬프트에 [점검 카탈로그] 1줄 · 스키마 사본에 catalogHits(catalogId · target · verdict) 필수 칸 —
+//     카탈로그 본문은 agents/review-counter.md. 반환 catalogHits 로 올린다(round 2 S19 · tests/workflows/review-schemas.js).
 //   crossRequiredFields: 켜지면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
 //   crossOutput: 'delta'(기본) 면 Stage 2 교차가 동의를 id 로만(reviewedIds) 내고 조정 · 기각 · 신규만 쓴다(S19b). 'full' 이면 옛 전체 응답이다.
 //     PURE:cross-delta 가 full 모양으로 펴서 병합은 그대로다. 확인 목록에서 빠진 id 는 unreviewed 로 남고 crossCoverage 로 보고한다
@@ -423,7 +430,7 @@ if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: metrics(0) }
 }
-const badOpts = ['craftAxes', 'crossRequiredFields', 'preserveLowConfidence']
+const badOpts = ['craftAxes', 'crossRequiredFields', 'preserveLowConfidence', 'oracleField', 'judgmentSlots', 'catalogHits']
   .filter(k => input[k] != null && ![true, false, 'true', 'false'].includes(input[k]))
   .concat(input.crossOutput != null && !['delta', 'full'].includes(input.crossOutput) ? ['crossOutput'] : [])
   .map(k => `${k}=${JSON.stringify(input[k])}`)
@@ -458,8 +465,55 @@ const structuralLine = input.structuralContext ? `\n[구조 축 — 이 렌즈 �
 // craft 축 — arch 렌즈에만(structuralLine 과 같은 이유 — modules/review-structural-axes.md §2·§6). ⛔ 기본 on — false 로 끄면 빈 문자열이다.
 // ⛔ projectRulesPath 는 craftAxes 의 하위 옵션이다 — craftAxes:false 와 함께 넘겨도 경로를 바꾸지 않는다.
 const craftOn = !(input.craftAxes === false || input.craftAxes === 'false')
+// 판정 한계 칸 — ⛔ 기본 on(false 로 끈다). 블록은 review-live.js 와 같은 글자다(tests/workflows/review-schemas.js 가 두 워크플로를 같이 본다)
+const slotsOn = !(input.judgmentSlots === false || input.judgmentSlots === 'false')
+// 판정 한계 칸 (round 2 S9 · F-559 · F-448 · F-178 · F-117) — 렌즈가 '판정하지 못한 것' 과 '한정이 붙은 것' 을 버리지 않게 하는 칸.
+//    ① axisCoverage status 에 gap(판정 못 함 — none 은 봤는데 없다) ② Stage 1 렌즈 결과 루트에 unverifiedPremises(재지 않은 전제)
+//    ③ 이슈 항목에 limits(한정 문구 — review_merge 가 suggestion 으로 낮춘다) ④ Stage 1 프롬프트에 동적 축 · 설계 대안 질문 블록.
+//    ⛔ 스키마는 **사본**에만 붙인다 — 끄면 모든 콜의 프롬프트 · 스키마가 기준과 바이트 단위로 같다(tests/workflows/default-off-regression.js).
+//    문구는 프롬프트 한 곳에만 길게 쓰고 스키마 설명은 짧게 둔다 — workflows 리터럴 상한(scripts/measure_constraint_load.py --ceiling).
+const AXIS_VOCAB = ['finding', 'none', ...(slotsOn ? ['gap'] : []), 'not_applicable'].join(' · ')
+const GAP_NOTE = !slotsOn ? '' : 'gap=판정 못 함(근거 · 입력 부족) — none(봤는데 없음)과 다르다. '
+const PREMISES_PROP = {
+  type: 'array', description: '코드로 확인하지 않고 기댄 전제 — 없으면 빈 배열',
+  items: {
+    type: 'object', required: ['claim', 'why', 'howToMeasure'],
+    properties: { claim: { type: 'string' }, why: { type: 'string' }, howToMeasure: { type: 'string' }, affects: { type: 'array', items: { type: 'string' } } },
+  },
+}
+const LIMITS_PROP = {
+  type: 'array', description: '있으면 병합이 severity 를 suggestion 으로 낮춘다',
+  items: {
+    type: 'object', required: ['kind', 'note'],
+    properties: { kind: { type: 'string', enum: ['final-state-ok', 'premise-island', 'weak-evidence'] }, note: { type: 'string' } },
+  },
+}
+function withSlots(schema) {
+  if (!slotsOn) return schema
+  const copy = JSON.parse(JSON.stringify(schema))
+  const p = copy.properties || {}
+  if (p.strengths || p.okAreas) {   // Stage 1 렌즈 결과 루트만 — 교차 · counter 응답에는 두지 않는다
+    copy.required = [...copy.required, 'unverifiedPremises']
+    p.unverifiedPremises = PREMISES_PROP
+  }
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    const q = n.properties
+    if (q && q.status && Array.isArray(q.status.enum) && q.status.enum.includes('not_applicable') && !q.status.enum.includes('gap')) {
+      q.status.enum = q.status.enum.flatMap(v => v === 'not_applicable' ? ['gap', v] : [v])
+    }
+    if (q && q.severity && q.evidence && !q.limits) q.limits = LIMITS_PROP
+    for (const v of Object.values(n)) walk(v)
+  })(copy)
+  return copy
+}
+const slotsLine = !slotsOn ? '' :
+  `\n[판정 한계 칸] 확인하지 않은 전제(주석 · SDK · 런타임 상태 · 다른 SDK 버전)에 기댄 판정은 이슈든 정상 판정이든 unverifiedPremises(claim · why · howToMeasure)에, ` +
+  `발견의 한정은 그 이슈 limits 에 kind(final-state-ok=최종 상태 정상 · premise-island=확인 안 한 전제 위 · weak-evidence=근거 약함)로 적는다 — 산문에만 쓰면 병합에서 사라진다.` +
+  `\n[동적 축 질문] 값의 수명(저장소 · set/consume · 상태 플래그)을 다루면 상태 × 사용자 이벤트(재진입 · 뒤로 가기 · 백그라운드 복귀 · 두 번 호출) 조합의 귀결을 따진다 — ` +
+  `깨지면 재현 절차와 함께 이슈로, 못 따지면 unverifiedPremises 로. 설계 대안: 더 단순하거나 기존 패턴인 구현이 있으면 그 이슈 suggestion 에 적는다.`
 const craftLine = !craftOn ? '' :
-  `\n[craft 축 — 이 렌즈 전용] ${CRAFT_AXES.join(' · ')} — 축마다 axisCoverage 에 1행(finding · none · not_applicable, note 에 근거)을 쓴다. ` +
+  `\n[craft 축 — 이 렌즈 전용] ${CRAFT_AXES.join(' · ')} — 축마다 axisCoverage 에 1행(${AXIS_VOCAB}, note 에 근거)을 쓴다. ${GAP_NOTE}` +
   `craft 발견에는 craftAxis 를 단다. severity: ruleRef 가 프로젝트 규칙을 인용할 때만 minor 이상, 그 밖 craft 지적은 suggestion 까지.` +
   (input.projectRulesPath
     ? `\n[프로젝트 규칙 — 이 렌즈 전용] ${input.projectRulesPath} (Read — 검증을 통과한 규칙 레코드. ruleRef 는 그 레코드 id)`
@@ -474,12 +528,30 @@ function craftSummary(issueList, archResult) {
     missingAxes: CRAFT_AXES.filter(ax => !seen.has(ax)),
   }
 }
+// 판별 방법 필드 (F-072) — ⛔ 기본 on(false 로 끈다). 이슈 항목(discoveryAxis · evidence 를 가진 객체)마다 oracle 을 필수로 더한 **사본**을 만든다.
+const oracleOn = !(input.oracleField === false || input.oracleField === 'false')
+const ORACLE_PROP = { type: 'string', description: '판별 방법 — 무엇을 보면 이 주장이 참·거짓으로 갈리는가. 코드로 확정되면 그 path:line, 런타임·시각 관측이 필요하면 무엇을 어떻게 볼지(시뮬레이터 · 로그 · 스크린샷). 모르면 "판별 방법 미상" 이라 쓴다' }
+function withOracle(schema) {
+  if (!oracleOn) return schema
+  const copy = JSON.parse(JSON.stringify(schema))
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    if (Array.isArray(n.required) && n.required.includes('discoveryAxis') && n.properties && n.properties.evidence) {
+      if (!n.required.includes('oracle')) n.required.push('oracle')
+      n.properties.oracle = ORACLE_PROP
+    }
+    for (const v of Object.values(n)) walk(v)
+  })(copy)
+  return copy
+}
+// 재고지 줄의 키 목록 — withOracle 과 같은 규칙(이슈 항목이면 oracle 을 더한다 · 동치는 tests/workflows/cross-required-fields.js 가 보낸 스키마와 대조)
+const oracleKeys = keys => oracleOn && keys.includes('discoveryAxis') && !keys.includes('oracle') ? [...keys, 'oracle'] : keys
 // 교차 스테이지 필수 필드 재고지 (S17) — ⛔ 기본 on(false 로 끈다). 켜면 Stage 2 프롬프트에 additions 항목의 required 키를 **스키마에서 읽어** 적는다.
-//    키 목록을 여기 박지 않는다 — 스키마가 바뀌면 재고지 문구가 저절로 따라간다. 교차 워커가 additions 에 required 필드를
+//    키 목록을 여기 박지 않는다 — 스키마가 바뀌면 재고지 문구가 저절로 따라간다. ⛔ oracleKeys 를 지난다 — 원본 상수 그대로면 보내는 사본(withOracle)의 oracle 이 빠진다. 교차 워커가 additions 에 required 필드를
 //    빠뜨려 스키마 재출력이 났다(4/18 run).
 const crossRequiredOn = !(input.crossRequiredFields === false || input.crossRequiredFields === 'false')
 const crossRequiredLine = !crossRequiredOn ? '' :
-  `\n[필수 필드 — additions] 새 항목마다 ${CrossReviewSchema.properties.additions.items.required.join(' · ')} 를 모두 채운다(스키마 required — 하나라도 빠지면 출력이 거부돼 다시 쓰게 된다)`
+  `\n[필수 필드 — additions] 새 항목마다 ${oracleKeys(CrossReviewSchema.properties.additions.items.required).join(' · ')} 를 모두 채운다(스키마 required — 하나라도 빠지면 출력이 거부돼 다시 쓰게 된다)`
 // 교차 delta 응답 (S19b) — ⛔ 기본 on('full' 이면 끈다). 켜면 교차 스키마를 CrossDeltaSchema 로 바꾸고 응답 모양을 한 줄로 알린다.
 const crossDeltaOn = input.crossOutput !== 'full'
 const crossSchema = crossDeltaOn ? CrossDeltaSchema : CrossReviewSchema
@@ -494,24 +566,38 @@ const lowConfOn = !(input.preserveLowConfidence === false || input.preserveLowCo
 const EARLY_FILTER_DESC = PeerReviewSchema.properties.issues.items.properties.confidence.description
 const LENS_OVERRIDE = !lowConfOn ? OVERRIDE : OVERRIDE.replace('confidence 80 미만은 보고하지 않는다. ',
   '[후보 보존] confidence 는 0-100 값으로 달되 낮다고 빼지 않는다 — 게시 여부는 병합이 정한다. ')
-const lensSchema = schema => !lowConfOn ? schema :
-  JSON.parse(JSON.stringify(schema).split(EARLY_FILTER_DESC).join('0-100 — 낮아도 보고한다(게시 등급은 병합이 정한다)'))
+const lensSchema = schema => withSlots(withOracle(!lowConfOn ? schema :
+  JSON.parse(JSON.stringify(schema).split(EARLY_FILTER_DESC).join('0-100 — 낮아도 보고한다(게시 등급은 병합이 정한다)'))))
+// 점검 카탈로그 (round 2 S19) — 기본 on(이 워크플로의 옵션 묶음). 카탈로그 본문은 agents/review-counter.md(매 spawn 주입)에 있고 여기는
+//    적용 결과 칸만 counter 스키마 **사본**에 붙인다 — false 면 콜 입력이 기준과 바이트 단위로 같다. 항목에 severity · evidence 를 두지 않는다
+const catalogOn = !(input.catalogHits === false || input.catalogHits === 'false')
+const CATALOG_HITS = { type: 'array', description: '점검 카탈로그 중 해당한 항목', items: { type: 'object', required: ['catalogId', 'target', 'verdict'],
+  properties: { catalogId: { type: 'string' }, target: { type: 'string' }, verdict: { type: 'string', enum: ['hit', 'clear', 'unchecked'] } } } }
+const withCatalog = s => {
+  if (!catalogOn) return s
+  const c = JSON.parse(JSON.stringify(s))
+  c.required = [...c.required, 'catalogHits']
+  c.properties.catalogHits = CATALOG_HITS
+  return c
+}
+const catalogLine = !catalogOn ? '' :
+  '\n[점검 카탈로그] 에이전트 정의의 점검 카탈로그를 이 diff 에 대 보고 해당 항목마다 catalogHits(catalogId · target · verdict)에 적는다 — hit 는 반론 · 누락 발견으로도 낸다.'
 
 // ════════ Stage 1: 독립 병렬 리뷰 (3-Model — Round 1 독립성) ════════
 phase('Stage 1: arch/quality/correctness 독립 리뷰')
 const [arch, quality, correctness] = await parallelWithRetry([
   () => callAgent(
     `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${structuralLine}${craftLine}\n` +
-    `[목표] 아키텍처 관점 issues (id는 A1, A2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.`,
+    `[목표] 아키텍처 관점 issues (id는 A1, A2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.${slotsLine}`,
     { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: lensSchema(craftOn ? ArchCraftSchema : PeerReviewSchema) }),
   () => callAgent(
     `${LENS_OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}\n` +
-    `[목표] 품질 관점 issues (id는 Q1, Q2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.`,
+    `[목표] 품질 관점 issues (id는 Q1, Q2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin.${slotsLine}`,
     { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: EFFORT, schema: lensSchema(PeerReviewSchema) }),
   () => callAgent(
     `${LENS_OVERRIDE}\n[역할] 정확성 리뷰어(review-correctness 렌즈) — 요구사항 충족·로직 정확성·엣지 케이스\n${TARGET}\n` +
     `[목표] 정확성 관점 issues (id는 C1, C2...) + strengths(max3) + overall_assessment. 각 issue에 evidence 인용 + origin. ` +
-    `함수 제거/책임 이전 감지 시 base 원본(prefetch)과 대조 — 원본 책임이 어디로 이전됐는지 추적.`,
+    `함수 제거/책임 이전 감지 시 base 원본(prefetch)과 대조 — 원본 책임이 어디로 이전됐는지 추적.${slotsLine}`,
     { label: 'stage1-correctness', agentType: 'fz:review-correctness', model: 'opus', effort: EFFORT, schema: lensSchema(PeerReviewSchema) }),
 ])
 if (!arch && !quality && !correctness) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 all null', metrics: metrics(0) } }
@@ -632,8 +718,8 @@ const allStrengths = [].concat(arch ? arch.strengths : [], quality ? quality.str
 const counter = await callAgent(
   `${LENS_OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
   `[issues] ${JSON.stringify(allIssues)}\n[strengths(정상/우수 판정)] ${JSON.stringify(allStrengths)}\n` +
-  `[목표] (1) 각 issue를 실측 재검증 — 과장/오독이면 refute + 인용. (2) strengths에 "정말 문제 없나?" 반례 탐색 — 반례 발견 시 missedIssues(id CT-X)로. 라인 인용 오류를 특히 의심.`,
-  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: EFFORT, schema: lensSchema(CounterSchema) })
+  `[목표] (1) 각 issue를 실측 재검증 — 과장/오독이면 refute + 인용. (2) strengths에 "정말 문제 없나?" 반례 탐색 — 반례 발견 시 missedIssues(id CT-X)로. 라인 인용 오류를 특히 의심.${catalogLine}`,
+  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: EFFORT, schema: withCatalog(lensSchema(CounterSchema)) })
 if (!counter) log('WARN counter null — DA 패스 미수행 (issues 원판정 유지)')
 
 // ════════ 병합 — 스크립트 binary 규칙 (id-기반 verdict 반영. Confidence Matrix/투표는 Lead) ════════
@@ -696,6 +782,7 @@ return {
   crossAdjustments: { archOnPeers, qualityOnPeers },
   ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본(delta)은 crossCoverage 를 더한다 — 'full'(롤백)이면 반환 모양이 기준과 같다
   strengthChallenges,  // counter의 strength 반례 (Lead 판정 입력)
+  ...(catalogOn ? { catalogHits: counter && Array.isArray(counter.catalogHits) ? counter.catalogHits : [] } : {}),   // false 면 반환 모양이 기준과 같다
   distribution: dist,
   metrics: metrics(stagesCompleted),  // Lead가 experiment-log §5.7 fz-peer-review 테이블 기록
 }

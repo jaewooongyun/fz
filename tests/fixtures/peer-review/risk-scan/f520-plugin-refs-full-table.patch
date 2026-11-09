@@ -1,0 +1,12 @@
+diff --git a/src/Model.swift b/src/Model.swift
+index 1111111..2222222 100644
+--- a/src/Model.swift
++++ b/src/Model.swift
+@@ -1,3 +1,6 @@
+-final class Model {
++@Observable
++final class Model: Sendable {
+     var items: [Int] = []
++    let label = Text("안녕")
++    let feed = AsyncStream<Int> { _ in }
+ }

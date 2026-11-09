@@ -27,7 +27,9 @@
      그것은 대체물이 아니다.
    - ⛔ **`evidencePaths` 는 파일명 하나가 아니라 gather 산출물 목록에서 조달한다** — 존재하는 것을 전부 넘긴다.
      최소 `evidence-move-drift.md`(이동 리팩토링에서 동등성 데이터 `old-new-pairs.md` 와 **다른 축**) ·
-     `old-new-pairs.md` · `convention-samples.md` · `caller-analysis.md`.
+     `evidence-convention.md`(형제 관례 대조 — 바뀐 클로저가 형제가 모두 가진 guard 조건을 빠뜨린 자리 · F-516) ·
+     `base-behavior.md`(base 동작 요약) · `old-new-pairs.md` · `convention-samples.md` · `caller-analysis.md`.
+     gather 가 쓰는 산출물 이름은 이 목록에 있어야 한다 — `tests/fixtures/peer-review/gather-evidence-wiring/run.sh` 가 대조한다(F-055).
      만들고 안 넘기면 무력하다 (실측 #4774: `evidence-brief/` 를 넘기니 렌즈들이 인용했다).
      ⚠️ 파일명을 하나만 열거하면 같은 스크립트가 만드는 **형제 산출물이 조용히 빠진다** — `review-surface.md`
      가 정확히 그렇게 누락돼 있었다.

@@ -94,7 +94,7 @@ metadata:
 | `modules/team-facing-writing.md` | 팀원에게 가는 글(코멘트 · 답글 · PR 본문)의 어조 · 형태 — Comment Style Guide 정본 |
 | `scripts/check_comment_worthy.py` | Curate 계약(카드 필드 · E1~E8 · 커버리지) — 렌더러가 `--require-curation` 으로 부른다 |
 | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
-| `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 (diff에 `@MainActor\|actor\|async` 감지 시) |
+| `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 — gather 의 risk.json `plugin_refs`(그 모듈 `## 자동 감지 트리거` 표 전체를 조건으로 잰 값)가 비지 않으면 그 참조 항목을 Read 하고 review.json `pluginRefsRead[{plugin, refs}]` 에 적는다(F-520 · Curate 검사기가 대조) |
 | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4(+§6 craft — 이 스킬은 기본 · 롤백 때는 뺀다)를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
@@ -163,7 +163,7 @@ PR title/body에서 JIRA 티켓 ID 추출 + acceptance criteria 수집. JIRA 연
 
 ### 2.5. 판별 방법(oracle) 명시  ⛔ **Gather 2.5** — Synthesize 의 `2.5 PR Intent Alignment` 와 다른 절이다
 
-코드로 확정할 수 없는 주장에는 "무엇을 보면 판별되는지"를 함께 적는다 — 방법을 모르면 그 지적은 판정 불가로 남는다.
+코드로 확정할 수 없는 주장에는 "무엇을 보면 판별되는지"를 함께 적는다 — 방법을 모르면 그 지적은 판정 불가로 남는다. Tier 2/3 렌즈는 이슈 스키마의 `oracle` 필수 칸에 쓴다(`workflows/peer-review.js` oracleField · F-072).
 
 ⛔ 배선이 확정돼도 **증상**(사용자에게 무엇으로 보이는지)은 코드에 없을 수 있으므로(근거: `references/rationale.md` § 증상 미확정 · F-285) `severity` 가 `minor` 이상이면 **증상 관측 지점** 두 칸을 채운다. 비면 `suggestion` 강등 (Gate 4.7-S 가 기계 판정): `symptom_screen` = 증상이 보이는 구체 화면·뷰 이름 / `symptom_reach` = 그 화면이 그 상태로 떠 있게 되는 사용자 동작. `화면` 칸은 "값이 흐른다" 가 아니라 **"그 값을 그리는 뷰가 그 시점에 계층에 있는가"** 를 묻는다.
 
@@ -341,8 +341,9 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 │      동일 Gather 데이터를 공유하면 같은 오류에 전원 동의한다 → ⛔ **Fact Verification Gate 재확인.**
 ├─ 2/3 동의: final = avg × 0.9 → INCLUDE (소수 의견 주석)
 │   └─ 소수 반박이 있으면 해당 에이전트의 근거를 우선 검토
-├─ 1/3 동의: final = avg × 0.6 → ≥70 INCLUDE, <70 EXCLUDE
-│   └─ 단독 발견이 직접 파일 Read 기반이면 독립성 HIGH → ×0.7로 상향
+├─ 1/3 동의: 투표 산식을 쓰지 않는다 — 옛 계수(× 0.6 · × 0.7) 뒤 임계 70 은 confidence 상한 100 에서 도달할 수 없었다(F-038)
+│   └─ Lead 가 그 근거 위치를 직접 Read · 결정론 명령으로 확인하고 `[L실측]` 1줄(MergeContract § 4 형식)을 남기면 INCLUDE(final = 그 렌즈 값)
+│      · 확인 못 하면 observation(EXCLUDE 아님 — 렌즈를 나눈 목적이 단독 발견이다) · ⛔ 계수 · 임계를 고치면 상한 100 을 넣어 역산 1회
 └─ 0/3: EXCLUDE
 ```
 
@@ -399,10 +400,10 @@ write_memory("fz:checkpoint:peer-review-synthesize", "PR#{number}: 이슈 {N}개
 1. **카드** — 후보(`${WORK_DIR}/merged.json` 의 `candidates[]` ∪ `synthesized-issues.json` 의 이슈)마다 카드 1장: 카드 id(후보 id) · 한 줄 주장 · 근거(`path:line@<target.sha 접두>`) · kind(bug · structure · quality · intent-question) · 재현 상태 · 같은 path ±3줄의 기존 스레드(`existing-threads.json`)
 2. **재검증** — 카드마다 반박을 시도한다
    - Tier 0/1: Lead 가 카드를 하나씩 반박해 보고 결과를 `refute` 에 적는다(Lead 카드)
-   - Tier 2/3: 새 맥락 검증자 — `workflows/swarm.js` 를 `agentType: 'fz:review-counter'` 로 부른다. 조각 = 카드 ≤ 8장(넘으면 조각을 나눈다 · maxFragments 12 = 카드 96 상한 — 그 밖은 BLOCKED budget). 브리프 = 카드 id · 카드 본문 · 기존 스레드 스냅샷(고정 트리 밖이라 브리프에 인라인) · method = "카드마다 반박 시도 · 결과를 findings 에 `<카드 id>: upheld|refuted|blocked — 근거` 로"
+   - Tier 2/3: 새 맥락 검증자 — `workflows/swarm.js` 를 `agentType: 'fz:review-counter'` 로 부른다. 조각 = 카드 ≤ 8장(넘으면 조각을 나눈다 · maxFragments 12 = 카드 96 상한 — 그 밖은 BLOCKED budget). 브리프 = 카드 id · 카드 본문 · 기존 스레드 스냅샷(고정 트리 밖이라 브리프에 인라인) · method = "카드마다 반박 시도 · 테스트 파일이 diff 에 있으면 연다(Gate 4.10) · 결과를 findings 에 `<카드 id>: upheld|refuted|blocked — 근거` 로"
    - ⛔ Lead 는 **카드 id 집합 = findings 의 id 집합**인지 대조한다 — 누락 · BLOCKED · 예산 부족 카드는 코멘트로 두지 않고 ③ 질문 또는 excluded(E1)로 보낸다. `refute` 칸에 swarm run id 를 인용한다
-3. **판정** — 카드마다 코멘트 또는 제외. 코멘트는 review.json `issues[]`(kind · evidence · repro · symptom_* · measure · origin · suggestion · refute · comment · covers · origin=regression 이면 `base_evidence` = `path:line@<base-sha.txt>`), 제외는 `excluded[]`(`{id, what, code, reason}` · E5 = `duplicateOf` + 선택 `reply` 답글 초안 · E8 = `refute`). 같은 결함을 여러 후보가 말하면 `covers` 로 묶는다 — 한 후보는 소유자 하나다 제외 코드 E1~E8 의 뜻은 검사기 머리말이 정본이다(E1 도달 미확인 · E2 SDK 가정 · E4 원래 있던 문제 · E5 스레드 중복 · E8 반박됨 …)
-4. **review.json 머리** — `target` = `${WORK_DIR}/target.json` 그대로 · `meta.base_sha` = `${WORK_DIR}/base-sha.txt` 그대로(regression 근거의 기준 · F-037) · `strengths` 마다 `strengthGaps[{claim, uncovered}]`(그 강점이 못 막는 시나리오) · `candidates` = 독립 패스 병합이 돌았으면(기본) `["merged.json", "synthesized-issues.json"]` · `--no-gpt-independent`(challenger — 병합본 없음) · GPT 없는 Tier 0 은 `["synthesized-issues.json"]`(review.json 기준 상대 경로) · `gptPass` = 이번 실행의 GPT 경로(`independent` · `challenger` · `none` — 같은 작업 폴더에 지난 실행의 `gpt-independent/` 가 남아 있어도 challenger · none 이면 병합본을 요구하지 않는다)
+3. **판정** — 카드마다 코멘트 또는 제외. 코멘트는 review.json `issues[]`(kind · evidence · repro · symptom_* · measure(관례 표본 N:M 필수) · origin · suggestion · refute · comment · covers · major 이상이면 `chain[{step, grade: code|comment|inference}]` · `severity_basis{kind: output-change|path-only|zero-cases, note}`(주석 · 추론 단계나 경로만 · 사례 0 이면 minor 까지 — F-116 · F-090) · 제안 코드에 새 · SDK 심볼이 있으면 `symbol_notes{이름: new|sdk}`(F-063) · origin=regression 이면 `base_quote`(base 원문 인용 — F-037) · origin=regression 이면 `base_evidence` = `path:line@<base-sha.txt>`), 제외는 `excluded[]`(`{id, what, code, reason}` · E5 = `duplicateOf` + 선택 `reply` 답글 초안 · E8 = `refute`). 같은 결함을 여러 후보가 말하면 `covers` 로 묶는다 — 한 후보는 소유자 하나다 제외 코드 E1~E8 의 뜻은 검사기 머리말이 정본이다(E1 도달 미확인 · E2 SDK 가정 · E4 원래 있던 문제 · E5 스레드 중복 · E8 반박됨 …)
+4. **review.json 머리** — risk.json `runtime_axes`(onChange · @State 캡처 · 제스처 · 상태 전환 — 읽기로 판정 못 하는 축)가 비지 않으면 축마다 `runtimeAxes[{axis, how: probe | gpt | none, note}]`(격리 프로브 · GPT 명시 질문 · 안 함은 사유 · F-258) · `plugin_refs` 가 비지 않으면 `pluginRefsRead[{plugin, refs}]`(F-520) — 둘 다 Curate 검사기가 risk.json 과 대조한다 · `target` = `${WORK_DIR}/target.json` 그대로 · `meta.base_sha` = `${WORK_DIR}/base-sha.txt` 그대로(regression 근거의 기준 · F-037) · `strengths` 마다 `strengthGaps[{claim, uncovered}]`(그 강점이 못 막는 시나리오) · `candidates` = 독립 패스 병합이 돌았으면(기본) `["merged.json", "synthesized-issues.json"]` · `--no-gpt-independent`(challenger — 병합본 없음) · GPT 없는 Tier 0 은 `["synthesized-issues.json"]`(review.json 기준 상대 경로) · `gptPass` = 이번 실행의 GPT 경로(`independent` · `challenger` · `none` — 같은 작업 폴더에 지난 실행의 `gpt-independent/` 가 남아 있어도 challenger · none 이면 병합본을 요구하지 않는다)
 5. **검사** — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_comment_worthy.py" "${WORK_DIR}/review.json"` 이 exit 0 이어야 Deliver 로 간다(렌더러가 `--require-curation` 으로 같은 검사를 한 번 더 한다). exit 1 은 고친다 · exit 2 는 판정 불가다(⛔ 통과 아님 — target · 후보 원본 · GPT 병합본을 확인한다)
 
 #### Gate Curate
@@ -438,6 +439,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 - `${WORK_DIR}/pr-comments.md` — 이슈별 부드러운 톤 PR 코멘트 모음 (복사/붙여넣기용)
 - `${WORK_DIR}/*-result.json` — 에이전트/GPT 원본 결과
 - ⊕ 기본으로(`--render` 생략 가능) 리포트·코멘트를 따로 쓰지 않는다 — 판정·문장만 `${WORK_DIR}/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review "${WORK_DIR}/review.json" --diff "${WORK_DIR}/diff.patch" --out-dir "${WORK_DIR}" --require-curation` 가 위 두 문서와 `payload.json` · `render-preview.json` 을 만든다(`--require-curation` 은 기본 경로 — `--no-curate` 일 때만 뺀다 · Curate 계약 위반이면 렌더가 파일 없이 멈춘다)(줄 앵커는 `skills/fz-peer-review/scripts/diff_anchors.py` · 입력 형식은 렌더러 머리말). ⛔ 위 두 문서를 손으로 다시 쓰지 않는다 — 렌더러 출력이 단일 출처다. `--no-render` 면 렌더러를 부르지 않고 두 문서를 직접 쓴다(옛 경로)
+  - ⊕ 판정 한계 칸(렌더러가 절로 그린다 — 요약해 옮겨 쓰지 않는다): `unverifiedPremises` = Workflow 반환 `reviews[].unverifiedPremises` 에 렌즈 이름(`lens`)을 달아 그대로(`judgmentSlots` 기본 on · F-448) · `axisCoverage` = `merged.json` 의 `axisCoverage` 그대로(gap = 판정 안 함 · F-514 · F-559) · 외부 렌즈(GPT)가 낸 이슈의 `alternatives` · `recommended` 는 원문 그대로 그 issue 에(추천을 다른 말로 바꾸면 렌더러가 거부한다 · F-115) · `--no-curate` 로 렌더할 때 Lead 가 판단으로 뺀 관찰은 `dismissed[{id, what, reason}]` — 리포트 `## Lead 기각 — 의도 확인 후보` 와 synthesized-issues.json disposition exclude + 사유로 남는다(F-517 · 큐레이션 경로는 `excluded` 가 같은 일을 한다)
 
 #### --post 시 — 인라인 앵커 게시
 
@@ -445,8 +447,9 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 
 `앵커 계산(scripts/diff_anchors.py) → 구간 선택(Lead) → non_anchorable은 본문 인용 → payload(top-level body = **review-report.md 전문**) → ⛔확인 게이트 → gh api …/pulls/{N}/reviews → 착지 검증(scripts/verify_landing.py — 판정만. ⛔UNVERIFIED 는 삭제·재게시 금지 · MISMATCH 삭제·재게시는 사용자 확인 뒤)`
 > ⊕ 렌더(기본)와 함께면 앵커 계산부터 payload 조립까지 렌더러가 끝낸다 — 겹치는 hunk 는 review.json 의 site `pick` 으로 Lead 가 고르고(없으면 렌더러가 거부한다), `render-preview.json` 의 `reasons` 가 아래 확인 게이트 (a)(b)(c) 다. 게시·착지 검증은 그대로다
+> ⛔ 게시 직전 렌더는 `--head-sha "$(gh pr view {N} --json headRefOid -q .headRefOid)"` 를 붙인다 — 리뷰 대상 sha 와 다르면 렌더러가 거부한다(F-068 · 리뷰 중 force-push). 인라인 코멘트 전건의 site 에 `expect` 가 있어야 한다(Gate 4.5 · F-069). 프로젝트 응답 언어가 한국어면 `--lang ko`(F-020 — 사용자 대면 산출물 언어)
 
-> ⛔ **확인 게이트** — 미리보기는 항상 출력하되, 차단은 셋 중 하나일 때만: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 (c) 겹치는 hunk 복수로 Lead가 구간 선택.
+> ⛔ **확인 게이트** — 미리보기는 항상 출력한다. 셋 중 하나면 `AskUserQuestion` 으로 승인받은 뒤 게시한다: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 — 대체 형식은 `modules/peer-review-inline-anchoring.md` 5절(코드블록 인용 + `file:line`)을 Read 해 따른다 (c) 겹치는 hunk 복수로 Lead가 구간 선택 (F-073).
 > ⛔ `mcp__github__create_pull_request_review`로 대체 불가 — `comments[]`에 `start_line`·`side`가 없어 범위 하이라이트·LEFT 앵커가 안 된다. 이 스킬만 `Bash(gh *)`를 선언하는 이유.
 
 **비-티켓 세션 Serena Fallback** (WORK_DIR 없을 때):

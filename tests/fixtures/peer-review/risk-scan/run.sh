@@ -4,7 +4,8 @@
 # ⛔ 눈으로 보지 않는다. 표를 읽고 "맞네" 하는 것은 판정이 아니다 —
 #    다음 사람이 같은 표를 다시 읽어야 하고, 기대값이 어디에도 고정되지 않는다.
 #
-# 비교 키: risk · added_lines · tier_delta · files · removed_paths — 셀의 expected 에 적힌 키만 본다.
+# 비교 키: risk · added_lines · tier_delta · files · removed_paths · categories · runtime_axes · doc_contract_deleted · plugin_refs ·
+#   convention_deviations — 셀의 expected 에 적힌 키만 본다. 셀 이름 폴더 `<셀>.head/` 가 있으면 `--head` 로 넘긴다(F-516 형제 대조).
 #   removed_paths = 삭제 행이 1줄 이상 귀속된 경로(정렬). --json 출력에 없는 값이라 risk_scan.py 를 모듈로 읽어
 #   added_lines_by_file 의 removed 키를 본다(F-381 — 수정 전 트리는 삭제 파일을 '/dev/null' 한 키로 모았다).
 # usage: run.sh [--tree <플러그인 트리>]   그 트리의 risk_scan.py 를 이 폴더의 expected.json · patch 로 판정한다
@@ -44,7 +45,8 @@ sys.excepthook = _crash
 sys.dont_write_bytecode = True
 scan, expected_path, here = sys.argv[1], sys.argv[2], sys.argv[3]
 cases = json.load(open(expected_path, encoding="utf-8"))["cases"]
-KEYS = ("risk", "added_lines", "tier_delta", "files", "removed_paths")
+KEYS = ("risk", "added_lines", "tier_delta", "files", "removed_paths", "categories", "runtime_axes", "doc_contract_deleted",
+        "plugin_refs", "convention_deviations")
 
 
 class Prep(Exception):
@@ -67,7 +69,9 @@ try:
         patch = os.path.join(here, name + ".patch")
         if not os.path.exists(patch):
             raise Prep("%s: fixture 파일 없음" % name)
-        r = subprocess.run([sys.executable, "-B", scan, patch, "--json"], capture_output=True, text=True)
+        head = os.path.join(here, name + ".head")
+        r = subprocess.run([sys.executable, "-B", scan, patch, "--json"] + (["--head", head] if os.path.isdir(head) else []),
+                           capture_output=True, text=True)
         if r.returncode != 0:
             raise Prep("%s: risk_scan exit %d — %s" % (name, r.returncode, " ⏎ ".join(r.stderr.strip().splitlines())[-200:]))
         try:

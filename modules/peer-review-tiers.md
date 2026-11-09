@@ -294,7 +294,7 @@ Lead 단독으로 아래 perspectives 를 검토한다 (9 perspectives 중 선�
 
 ⛔ **Level 1 과 Level 2 를 나눈다** — Level 1 은 트리거 스캔이다(공유 가변 상태·비동기 진입점·콜백 스레드를 diff 에서 훑는다). **양성일 때만** Level 2 로 올라가 `modules/safety-audit.md` 의 참조 추적·API 확인까지 수행한다. Level 2 를 상시로 두면 Lead 순차 작업이 늘어 시간 목표와 충돌한다.
 
-⛔ **구조 축은 Lead가 직접 적용한다** — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 위 perspectives 와 **함께** 검토한다. Tier 0/1은 Workflow를 호출하지 않으므로 `args.structuralContext` 경로가 **존재하지 않는다**. 여기서 직접 적용하지 않으면 `<100줄` PR — 실무에서 가장 흔한 규모 — 은 구조 판정이 영구히 0건이다. (Tier 1도 Tier 0와 동일 perspectives 를 쓰므로 본 항목을 승계한다.) 기본으로(`craftAxes` — 이 스킬은 기본 on) 같은 모듈 §6(F~J)도 함께 적용하고, 규칙 레코드(`check_project_rules.py --check` 통과본)와 axisCoverage 표(6축 × finding · gap · none · not_applicable)를 산출물에 남긴다. gap 은 '판정 못 함'이다(근거 문서가 색인에 없다 · 입력이 모자란다) — none(봤는데 없다)과 다르다. GPT 독립 첫 패스는 `axis_coverage` 에 found · none · gap 을 쓴다. `review_merge.py` 가 두 어휘를 finding ≡ found > gap > none > not_applicable 로 축마다 병합하고, 모르는 값은 gap 으로 센다.
+⛔ **구조 축은 Lead가 직접 적용한다** — `modules/review-structural-axes.md` §3(축 5개)+§4(경계 문구)를 Read해 위 perspectives 와 **함께** 검토한다. Tier 0/1은 Workflow를 호출하지 않으므로 `args.structuralContext` 경로가 **존재하지 않는다**. 여기서 직접 적용하지 않으면 `<100줄` PR — 실무에서 가장 흔한 규모 — 은 구조 판정이 영구히 0건이다. (Tier 1도 Tier 0와 동일 perspectives 를 쓰므로 본 항목을 승계한다.) 기본으로(`craftAxes` — 이 스킬은 기본 on) 같은 모듈 §6(F~J)도 함께 적용하고, 규칙 레코드(`check_project_rules.py --check` 통과본)와 axisCoverage 표(6축 × finding · gap · none · not_applicable)를 산출물에 남긴다. gap 은 '판정 못 함'이다(근거 문서가 색인에 없다 · 입력이 모자란다) — none(봤는데 없다)과 다르다. arch 렌즈도 `judgmentSlots`(기본 on)로 gap 을 낸다. 렌더 경로면 review.json `axisCoverage` 에 병합 행을 두면 렌더러가 `## 축 판정` 표를 그린다 — 손으로 그리지 않는다(F-514). GPT 독립 첫 패스는 `axis_coverage` 에 found · none · gap 을 쓴다. `review_merge.py` 가 두 어휘를 finding ≡ found > gap > none > not_applicable 로 축마다 병합하고, 모르는 값은 gap 으로 센다.
 
 sub-agent spawn 없음. GPT 호출 없음 (`--gpt` 옵션 시 Tier 1 절차로 자동 전환).
 
@@ -320,8 +320,8 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 ### Deliver
 - `${WORK_DIR}/review-report.md` 작성 (의무)
 - `${WORK_DIR}/pr-comments.md` 작성 (선택)
-- `${WORK_DIR}/cost-log.json` 자동 작성 (아래 §비용 로깅 참조)
-- ⛔ **축별 집계** — review-report.md 끝에 아래 표를 붙인다.
+- `${WORK_DIR}/cost-log.json` — Lead 가 작성한다(Synthesize 직전 · 아래 §비용 로깅 형식 2 · 쓰는 스크립트는 없다). 렌더 경로면 review.json 에 `"costLog": "cost-log.json"` 을 두면 렌더러가 `## 실측 비용` 절을 그린다(파일이 없으면 UNRUN)
+- ⛔ **축별 집계** — review-report.md 끝에 아래 표를 붙인다. 렌더 경로면 review.json 이슈마다 `axis` 를 적는다 — 렌더러가 이 표를 그린다(큐레이션 경로는 항상 · 손으로 붙이지 않는다 · F-212)
 
 ```markdown
 ## 발견 축 집계

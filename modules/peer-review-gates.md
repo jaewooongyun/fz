@@ -8,7 +8,7 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 - [Module Role (UC-12, v4.7.1)](#module-role-uc-12-v471)
 - [Gate 4.4: Factual Claim Verification (Major+ 이슈)](#gate-44-factual-claim-verification-major-이슈)
 - [Gate 4.4-A: Mapping Fidelity Gate (refactoring PR, v4.4.0)](#gate-44-a-mapping-fidelity-gate-refactoring-pr-v440)
-- [Gate 4.5: Line Verification (Major 이슈만)](#gate-45-line-verification-major-이슈만)
+- [Gate 4.5: Line Verification (리포트 Major 이상 · 게시 코멘트 전건)](#gate-45-line-verification-리포트-major-이상--게시-코멘트-전건)
 - [Gate 4.6: Compiler-Verifiable Claim Gate](#gate-46-compiler-verifiable-claim-gate)
 - [Gate 4.6.5: Inheritance Chain Impact Gate](#gate-465-inheritance-chain-impact-gate)
 - [Gate 4.7: Behavior-Verifiable Claim Gate](#gate-47-behavior-verifiable-claim-gate)
@@ -16,6 +16,7 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 - [Gate 4.7-A: Deleted Logic Migration Check](#gate-47-a-deleted-logic-migration-check)
 - [Gate 4.8: Reactive Error Path Gate (RxSwift/Combine)](#gate-48-reactive-error-path-gate-rxswiftcombine)
 - [Gate 4.9: Call-site & Convention Verification](#gate-49-call-site--convention-verification)
+- [Gate 4.10: Implication Falsification (Major+ 이슈)](#gate-410-implication-falsification-major-이슈)
 - [Session-added Assets Application (Checkpoint 직전)](#session-added-assets-application-checkpoint-직전)
 - [Checkpoint (Gates 완료 후)](#checkpoint-gates-완료-후)
 
@@ -137,7 +138,11 @@ Synthesize 단계에서 실행하는 9가지 검증 게이트.
 
 ---
 
-## Gate 4.5: Line Verification (Major 이슈만)
+## Gate 4.5: Line Verification (리포트 Major 이상 · 게시 코멘트 전건)
+
+트리거는 severity 가 아니라 **게시 대상 여부**다(F-069): (a) 리포트만 → Major 이상 (b) `--post`(payload 를 만든다) → 게시하는 comments[] **전건**(minor · suggestion 포함).
+⛔ 앵커 계산의 입력 줄은 이 게이트를 통과한 값이어야 한다 — `diff_anchors.py` 는 줄이 hunk 안인지만 보고 **맞는 줄인지**는 보지 않는다(엉뚱한 줄도 hunk 안이면 anchorable).
+렌더 경로는 site 마다 `expect`(그 줄에 있어야 할 코드 조각)를 적는다 — `render_review.py` 가 payload 를 만들 때 앵커 구간의 diff 줄과 대조해 없거나 어긋나면 거부한다.
 
 Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 1. `git show pr-{PR_NUMBER}:{FILE}` 로 실제 코드 확인
@@ -239,6 +244,8 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 6. confidence-matrix.md에 기록: behavior_verified: true/false + trace
 ```
 
+⛔ **'이 상태에 갇힌다' 류 주장**은 탈출 경로를 다 세는 것으로 끝나지 않는다 — 그 상태로 들어가는 진입 함수의 **프로덕션 호출자**만 센다(테스트 · 선언 · 주석 제외). 그리고 그 호출부의 가드까지 확인한다(F-243: 호출 9건 중 프로덕션 1건이었고 그 호출부가 이미 막고 있었다).
+
 ### ⛔ 4.7-S: 증상 관측 지점 (F-285 — 6건 전부 철회)
 
 위 절차는 **배선**만 본다 — setter 를 전수로 찾고 guard 를 확인한다. 그런데 배선이 전부
@@ -254,7 +261,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 | 필드 | 묻는 것 | ⛔ 답이 아닌 것 |
 |---|---|---|
 | `symptom_screen` | 그 증상이 보이는 구체 화면·뷰 이름 | "A→B→C 로 값이 흐른다" (배선) |
-| `symptom_reach` | 그 화면이 그 상태로 떠 있게 되는 사용자 동작 | "이론상 가능하다" |
+| `symptom_reach` | 그 화면이 그 상태로 떠 있게 되는 사용자 동작 — 근거는 그 화면 listener 프로토콜 전수 확인 또는 `grep <진입> -- <그 화면 디렉토리>` 결과 (F-262) | "이론상 가능하다" · 공용 라우터에 그 메서드가 있다 |
 
 ```
 채움 → INCLUDE 유지
@@ -274,6 +281,7 @@ jq -r '.issues[]
 ```
 
 출력이 비어야 통과. 한 건이라도 나오면 그 id 를 `suggestion` 으로 내리거나 두 칸을 채운다.
+⛔ 도달 근거가 틀린 것을 발견하면 그 이슈에서 파생된 산출물(리포트 · 코멘트 · 확인 안내)을 **전부** 고친다 — 한 파일만 고치면 나머지가 틀린 경로를 계속 말한다(F-262).
 ⛔ 배선 추적 기록(`evidence_trace`)이 채워져 있다는 것은 이 게이트의 통과 근거가 **아니다** —
 6건 모두 `evidence_trace` 가 충실했다.
 
@@ -419,7 +427,10 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
 2. evidence/convention-samples.md에서 동일 패턴 확인:
    ├─ Convention (3+ 모듈) → severity cap: suggestion + "[프로젝트 convention]"
    ├─ Minority (1-2 모듈) → confidence 유지
-   └─ Novel (0 모듈) → confidence 유지
+   ├─ Novel (0 모듈) → confidence 유지
+   └─ [관례 이탈] 이번 변경만 형제 관례와 다르다(evidence-convention.md 의 '형제가 모두 가진 guard 조건 없음' ·
+      convention-samples 다수 형태의 반대) → **발견 근거로 쓴다** — 빠진 조건이 동작을 바꾸면 bug, 의도를 모르면
+      intent-question. measure 에 형제 N:M 을 적는다. ⛔ 관례는 지적을 깎는 데만 쓰지 않는다(F-516 · F-115 S2)
 
 3. 복합 판정:
    ├─ caller 역효과 + convention → EXCLUDE (이슈 DROP)
@@ -440,6 +451,23 @@ GOOD (Gate 4.9 적용):
   결과: EXCLUDE (caller 역효과 + convention)
   대안 발견: "오히려 누락된 UseCase에 default 추가" (caller 개선 방향)
 ```
+
+---
+
+## Gate 4.10: Implication Falsification (Major+ 이슈)
+
+> F-067 — 렌즈 발견의 **사실**은 4.4~4.9 가 재지만, 그 발견이 무엇을 뜻하는지(`impact` 문장)에는 게이트가 없었다. 사실이 맞아도 함의가 틀리면 major 가 된다.
+
+`severity` 가 `major` 이상인 이슈마다 `impact` 문장의 **부정형을 한 번 시도**한다.
+
+| impact 형태 | 반증 질문 | 실측 |
+|---|---|---|
+| "리뷰어 · 팀이 인지하지 못한다" | 인지 경로가 정말 없나 | diff 의 테스트 · 주석 · 커밋 메시지 |
+| "요구사항 위반이다" | 요구사항 원문의 주체가 이것인가 | 요구사항 원문 재독 |
+| "실수로 섞인 변경이다" | 동반 변경이 있나 | 같은 커밋의 테스트 · 문서 diff |
+| "회귀다" | base 에 그 방어가 정말 있었나 | base 원본(Gate 4.7-A Origin Verification) |
+
+반증되면 severity 를 내리거나 제외하고 근거를 남긴다. ⛔ 테스트 파일이 diff 에 있으면 **연다** — 인지 · 의도 함의는 테스트가 가장 싸게 반증한다(Curate 재검증 브리프에도 같은 지시가 있다).
 
 ---
 
@@ -651,7 +679,7 @@ Lead 에 남는 일: disposition `include` · `observation` · `exclude` 결정(
 | **InputHygiene (C3)** | **생존 — 형태 변경** | Tier 0/1 은 차단이 아니라 **탐지·표시 + 강등**(§ InputHygiene 이 규정) |
 | **MergeContract (C1)** | **생존** | § MergeContract 가 전 경로 SSOT |
 | **Reflection Rate** | **조건부** | GPT 호출이 있을 때만(Tier 1). `N<10` 은 preliminary — verdict 보류 |
-| Confidence Matrix | **미적용** | Tier 0 은 simple checklist · Tier 2 는 미투표 — **설계상 부재** |
+| Confidence Matrix | **Tier 0 미적용 · Tier 1 2-vote** | Tier 0 은 simple checklist · Tier 1 은 § 9 Tier 1 행의 2-vote(Lead + GPT — `modules/peer-review-tiers.md` Tier 1 절차) · Tier 2 는 미투표. Tier 0 · 2 는 **설계상 부재** (F-121) |
 | Stage 2 교차 조정 | **미적용** | Workflow 미사용 경로 |
 
 ⛔ **"미적용"과 "생략"을 구분한다** — 전자는 설계, 후자는 누락(§ MergeContract § 2 `skipped`/`failed` 와 같은 규율). "미수행" 으로 뭉뚱그리면 빠뜨린 것인지 원래 없는 것인지 알 수 없다.

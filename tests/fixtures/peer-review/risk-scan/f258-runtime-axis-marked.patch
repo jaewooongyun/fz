@@ -1,0 +1,13 @@
+diff --git a/src/Pager.swift b/src/Pager.swift
+index 1111111..2222222 100644
+--- a/src/Pager.swift
++++ b/src/Pager.swift
+@@ -1,5 +1,8 @@
+ struct Pager {
++    @State private var page = 0
+     var body: some Body {
+         Stack()
++            .onChange(of: page) { v in sync(v) }
++            .gesture(DragGesture())
+     }
+ }

@@ -1,0 +1,15 @@
+diff --git a/src/HomeVC.swift b/src/HomeVC.swift
+index 1111111..2222222 100644
+--- a/src/HomeVC.swift
++++ b/src/HomeVC.swift
+@@ -11,4 +11,10 @@
+             self.log(2)
+         }
+     }
++    func c() {
++        cellC.onVisible = { [weak self] in
++            guard let self else { return }
++            self.log(3)
++        }
++    }
+ }

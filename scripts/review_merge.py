@@ -13,6 +13,9 @@ Lead 가 손으로 하던 기계 작업만 한다 — 판정(`include`·`observa
                file 이 없거나 diff 에서 경로를 못 푼 후보는 false(hold) + 사유 — 전 파일을 뒤지지 않는다
   게시 등급     post · hold · suggestion — 미확인 근거는 hold(삭제 아님) · craft 는 ruleRef 가 있고 confidence 80 이상일
                때만 post(확신도가 낮으면 suggestion 채널) · pre-existing 은 suggestion 으로 cap(§7) · confidence 80 미만 결함은 hold
+  한정 문구     후보의 limits[{kind, note}] 가 하나라도 있으면 severity 를 suggestion 으로 cap 한다(F-178 — 원 발견자가 단 '최종 상태는
+               정상' · '확인 안 한 전제 위' · '근거 약함' 이 통합에서 떨어지고 severity 만 남았다). 원본 severity 는 남고 severityCap 에
+               사유를 적는다 · kind 는 final-state-ok · premise-island · weak-evidence — 모르는 kind 는 거부(건너뛰면 cap 이 조용히 빠진다)
   GPT verdict  reverse → disposition question + oracle(§6 — 이종 검증에 삭제 권한을 주지 않는다). 등급은 hold 이고
                보고서에는 question 에만 싣는다 · challenge → Lead 확인
   contested    교차 판정이 갈린 항목은 원본 severity 와 crossVerdicts 를 그대로 둔다(스크립트가 고르지 않는다)
@@ -56,6 +59,7 @@ CONFIDENCE_FLOOR = 80                      # OVERRIDE 의 보고 하한과 같�
 CRAFT_AXES = ("idiom", "naming", "architecture", "ui_structure", "placement", "design_alternative")   # workflows/peer-review.js 와 같다
 AXIS_RANK = {"finding": 3, "found": 3, "gap": 2, "none": 1, "not_applicable": 0}
 AXIS_NAME = {3: "finding", 2: "gap", 1: "none", 0: "not_applicable"}
+LIMIT_KINDS = ("final-state-ok", "premise-island", "weak-evidence")   # 하나라도 있으면 severity 상한 suggestion(F-178 · 워크플로 judgmentSlots 의 limits)
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 QUOTE_RE = re.compile(r"`([^`\n]+)`")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -179,6 +183,9 @@ def candidate(item: dict, source: str, lens) -> dict:
     conf = item.get("confidence")
     if conf is not None and (isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0 <= conf <= 100):
         raise Reject(f"{cid} — confidence {conf!r} 는 0-100 숫자가 아니다(문자열이면 확신도 하한을 조용히 비켜 간다)")
+    lim = item.get("limits")
+    if lim is not None and (not isinstance(lim, list) or any(not isinstance(x, dict) or x.get("kind") not in LIMIT_KINDS for x in lim)):
+        raise Reject(f"{cid} — limits 는 [{{kind: {' · '.join(LIMIT_KINDS)}, note}}] 배열이다(모르는 kind 를 건너뛰면 severity cap 이 조용히 빠진다) — {str(lim)[:80]}")
     return {
         "id": cid, "source": source, "lens": lens,
         "file": gpt_path(item.get("file")) if source == "gpt" else item.get("file"),
@@ -191,6 +198,7 @@ def candidate(item: dict, source: str, lens) -> dict:
         "title": item.get("title") or item.get("description"),
         "crossVerdict": item.get("crossVerdict"), "crossVerdicts": item.get("crossVerdicts"),
         "counterVerdict": item.get("counterVerdict"),
+        **({"limits": lim} if lim else {}),
     }
 
 
@@ -356,7 +364,9 @@ def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable, axes=
     by_id = {c["id"]: c for c in cands}
     for c in cands:
         path_why = resolve_file(c, texts)
-        c["effectiveSeverity"] = "suggestion" if c.get("origin") == "pre-existing" else c.get("severity")
+        c["effectiveSeverity"] = "suggestion" if c.get("origin") == "pre-existing" or c.get("limits") else c.get("severity")
+        if c.get("limits"):
+            c["severityCap"] = "limits:" + ",".join(sorted({x["kind"] for x in c["limits"]}))
         c["nonBlocking"] = c.get("origin") == "improvement"
         c["evidenceVerified"], c["evidenceNote"] = evidence_check(c, texts, path_why)
         c["disposition"] = None                      # ⛔ exclude 는 매기지 않는다 — include·observation 도 Lead 판정
@@ -587,6 +597,19 @@ def self_test() -> int:
         r = M([issue("Z1", disposition="exclude")])
         case("no-exclude — 입력이 무엇이든 exclude 를 매기지 않는다", all(c["disposition"] != "exclude" for c in r["candidates"]), r["candidates"])
 
+    def t_limits():
+        # F-178 — 원 발견자의 한정 문구가 통합을 지나도 severity 를 묶는다
+        r = M([issue("H1", limits=[{"kind": "final-state-ok", "note": "사용자가 보는 최종 화면은 같다"}]), issue("H2"),
+               issue("H3", sev="critical", limits=[{"kind": "premise-island", "note": "SDK 동작 가정"},
+                                                                     {"kind": "weak-evidence", "note": "한 줄 인용뿐"}])])
+        got = {c["id"]: (c["severity"], c["effectiveSeverity"], c["grade"], c.get("severityCap")) for c in r["candidates"]}
+        case("f178-limits-cap-severity — limits 가 있으면 effectiveSeverity suggestion · 원본 severity 와 cap 사유가 남는다 · 없는 후보는 그대로",
+             got == {"claude:H1": ("major", "suggestion", "suggestion", "limits:final-state-ok"), "claude:H2": ("major", "major", "post", None),
+                     "claude:H3": ("critical", "suggestion", "suggestion", "limits:premise-island,weak-evidence")}, got)
+        bad = [[{"kind": "looks-fine", "note": "x"}], [{"note": "kind 없음"}], {"kind": "final-state-ok"}, ["final-state-ok"]]
+        case("f178-limits-bad-kind-rejected — 모르는 kind · kind 누락 · 배열 아님은 거부(cap 이 조용히 빠지지 않는다)",
+             all(raises(lambda b=b: candidate(issue("B1", limits=b), "claude", "l"), Reject) for b in bad), bad)
+
     def t_inputs():
         case("input-contract — severity 네 값 밖 · confidence 비숫자 · 0-100 밖 · id 없음은 거부 · confidence 생략은 받는다",
              raises(lambda: candidate(issue("V1", sev="high"), "claude", "l"), Reject)
@@ -730,7 +753,7 @@ def self_test() -> int:
             p = subprocess.run(argv + ["--claude", str(t / "bad.json"), "--gpt-unavailable", "시험"], capture_output=True, text=True)
             case("axis-bad-shape-exit2 axisCoverage 가 배열이 아니면 exit 2", p.returncode == UNRUN and "Traceback" not in p.stderr, p.stderr[-160:])
 
-    for t in (t_group, t_evidence, t_paths, t_verdicts, t_attribution, t_grades, t_inputs, t_fixture, t_cli, t_axes):
+    for t in (t_group, t_evidence, t_paths, t_verdicts, t_attribution, t_grades, t_limits, t_inputs, t_fixture, t_cli, t_axes):
         try:
             t()
         except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다

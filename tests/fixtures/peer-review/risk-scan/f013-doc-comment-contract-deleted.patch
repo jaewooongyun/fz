@@ -1,0 +1,11 @@
+diff --git a/src/Player.swift b/src/Player.swift
+index 1111111..2222222 100644
+--- a/src/Player.swift
++++ b/src/Player.swift
+@@ -1,6 +1,4 @@
+ final class Player {
+-    /// 반드시 메인 스레드에서 호출한다.
+-    /// 재생 중이면 먼저 멈춘다.
+     func stop() {
+         engine.halt()
+     }

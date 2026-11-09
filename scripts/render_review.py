@@ -22,10 +22,32 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
         severityNote(보정 근거) · strengths(배열)
   issue 필수 id · severity(critical · major · minor · suggestion) · what(WHY 포함) · sites
         선택 origin · confidence · foundBy · suggestion · comment(PR 코멘트 톤 — 없으면 what + suggestion)
-  site  필수 path · start · end   선택 side(RIGHT · LEFT, 기본 RIGHT) · pick · note(조각 설명) · quote(diff 밖일 때 인용할 코드)
+  site  필수 path · start · end   선택 side(RIGHT · LEFT, 기본 RIGHT) · pick · note(조각 설명) · quote(diff 밖일 때 인용할 코드) ·
+        expect(그 줄에 있어야 할 코드 조각 — ⛔ payload 를 만들 때 인라인 코멘트 **전건**에 필수 · F-069 아래)
+  issue 선택 axis(발견 축 — code_quality · structure · correctness · runtime_safety · direction · other)
+  review 선택 costLog(review.json 폴더 기준 cost-log.json 상대 경로 — `## 실측 비용` 절 · 파일이 없으면 UNRUN)
+  판정 한계(round 2 S9 — 키가 없으면 옛 바이트 그대로)
+    issue 선택 alternatives[{label, description, pros?, cons?}] · recommended(그 label 중 하나) — 외부 렌즈(GPT)가 낸 대안을 **원문**
+              그대로 옮긴다(F-115 — 자기 말로 요약하면 추천 해법이 사라졌다). recommended 가 label 에 없으면 입력 불가(재서술 차단)
+    review 선택 axisCoverage — review_merge.py 병합 행({axis, status, claude[], gpt[]}) 또는 {axis, status, note} · `## 축 판정` 표.
+              gap 은 '판정 안 함'으로 그린다 — 위반 없음(none)과 섞지 않는다(F-514 · F-559)
+              unverifiedPremises[{claim, why?, howToMeasure?, affects?, lens?}] — 렌즈의 재지 않은 전제 · `## 재지 않은 전제`(F-448)
+              dismissed[{id, what, reason}] — Lead 가 판단으로 뺀 관찰 · `## Lead 기각 — 의도 확인 후보` · synthesized-issues.json 에
+              disposition exclude + disposition_reason(F-517 — 기각이 산출물에 흔적 없이 사라졌다). 큐레이션 excluded 의 reason 도 같은 칸에 싣는다
+
+게시 대상 줄 검증(Gate 4.5 · F-069) — payload 를 만들면(pr.headSha) 앵커가 붙는 코멘트 **전건**(minor · suggestion 포함)의 site 에
+  expect 가 있어야 하고, 그 문구가 앵커 구간의 diff 줄 중 하나에 들어 있어야 한다. 앵커 가능 판정은 줄이 hunk 안인지만 본다 —
+  엉뚱한 줄도 hunk 안이면 anchorable 이다. 없거나 어긋나면 거부(exit 1).
+파생 산출물(F-201) — out-dir 에 synthesized-issues.json 이 있으면 렌더한 판정으로 disposition(include · question · exclude:<코드> · exclude)과
+  최종 severity 를 다시 쓴다(바뀐 값의 처음 값은 `*_initial` 로 보존) · review-index.md 의 렌더 블록(`<!-- fz-render:begin -->`)을
+  다시 쓴다(대상 head · 판정 · 이슈 목록 — 인덱스 파일이 있을 때만 · 렌더러가 새로 만들지 않는다). 재평가로 review.json 을 고치고
+  다시 렌더하면 넷이 함께 바뀐다.
 
 모드
   --review FILE --diff FILE --out-dir DIR   review-report.md · pr-comments.md · render-preview.json · payload.json(pr.headSha 가 있을 때만)
+  --head-sha SHA   게시 직전 다시 읽은 대상 head(`gh pr view N --json headRefOid`) — review 의 pr.headSha · target.sha 와 다르면
+              거부(exit 1 · F-068 — 리뷰 중 force-push 로 대상이 바뀌면 이미 무효인 코멘트를 게시한다)
+  --lang ko   리포트 산문(verdict · what · suggestion · comment · strengths · severityNote)의 한글 비율이 30% 밖이면 거부(F-020)
   --example   위 형식의 최소 review JSON 을 stdout 으로 — Lead 가 형식을 이 코드에서 다시 읽지 않게 한다(self-test example-roundtrip 이
               같은 객체를 검증 · 렌더한다)
   --require-curation   `excluded` 키가 없는 review 를 거부한다(exit 1) — fz-peer-review 기본 경로(Curate)가 이 플래그로 렌더한다.
@@ -64,6 +86,10 @@ ID_RE = re.compile(r"^[A-Za-z0-9:_.\-]+$")
 MARK = "<!-- fz-review:{} -->"             # 세 산출물 대조 · 게시 뒤 착지 검증에서 코멘트와 이슈의 짝을 맞춘다(렌더링에 안 보인다)
 MARK_RE = re.compile(r"<!-- fz-review:([A-Za-z0-9:_.\-]+) -->")
 OUTPUTS = ("review-report.md", "pr-comments.md", "render-preview.json", "payload.json")
+AXES = ("code_quality", "structure", "correctness", "runtime_safety", "direction", "other")   # peer-review.js discoveryAxis 와 같은 이름
+LANG_MIN = 0.3                            # --lang ko — 한글 / (한글 + 라틴 글자). 식별자를 백틱 없이 섞어도 넘고, 영어 산문은 0 근처다
+INDEX_BEGIN, INDEX_END = "<!-- fz-render:begin -->", "<!-- fz-render:end -->"
+STATUS_KO = {"finding": "발견", "found": "발견", "gap": "판정 안 함", "none": "위반 없음", "not_applicable": "해당 없음"}   # Claude · GPT 두 어휘(F-559)
 
 
 class InputError(Exception):
@@ -122,6 +148,26 @@ def validate(r) -> None:
                 raise InputError(f"{iid}: side 는 RIGHT · LEFT 다")
             if "pick" in s and not is_int(s["pick"]):
                 raise InputError(f"{iid}: pick 은 후보 번호(0부터)다")
+            if "expect" in s and not (isinstance(s["expect"], str) and s["expect"].strip()):
+                raise InputError(f"{iid}: expect 는 그 줄에 있어야 할 코드 조각(빈 문자열 아님)이다")
+        if "axis" in i and i["axis"] not in AXES:
+            raise InputError(f"{iid}: axis 는 {' · '.join(AXES)} 중 하나다 — {i['axis']!r}")
+        alts = i.get("alternatives")
+        if alts is not None and (not isinstance(alts, list) or not alts
+                                 or any(not isinstance(a, dict) or not isinstance(a.get("label"), str) or not a["label"].strip() for a in alts)):
+            raise InputError(f"{iid}: alternatives 는 label 이 있는 객체 배열이다(외부 렌즈 원문 — F-115)")
+        if "recommended" in i and i["recommended"] is not None:
+            labels = [a["label"].strip() for a in alts or []]
+            if not isinstance(i["recommended"], str) or i["recommended"].strip() not in labels:
+                raise InputError(f"{iid}: recommended 는 alternatives 의 label 중 하나 그대로다 — {i['recommended']!r} ∉ {labels}(재서술하지 않는다 · F-115)")
+    for key, need in (("unverifiedPremises", ("claim",)), ("axisCoverage", ("axis", "status")), ("dismissed", ("id", "what", "reason"))):
+        if key not in r:
+            continue
+        if not isinstance(r[key], list) or any(not isinstance(x, dict) or any(not isinstance(x.get(k), str) or not x[k].strip() for k in need)
+                                               for x in r[key]):
+            raise InputError(f"{key} 는 {' · '.join(need)} 문자열을 가진 객체 배열이다")
+    if "costLog" in r and not (isinstance(r["costLog"], str) and r["costLog"].strip()):
+        raise InputError("costLog 는 cost-log.json 상대 경로(문자열)다")
 
 
 def loc(path: str, s: dict) -> str:
@@ -195,7 +241,7 @@ def inline(us: list) -> tuple:
     return comments, rows
 
 
-def report(r: dict, plans: list) -> str:
+def report(r: dict, plans: list, cost: dict | None = None) -> str:
     pr = r.get("pr") or {}
     lines = [f"# PR #{pr['number']} 리뷰" if pr.get("number") is not None else "# 리뷰 보고서", "",
              f"**판정**: {r['verdict'].strip()}", ""]
@@ -219,10 +265,99 @@ def report(r: dict, plans: list) -> str:
                   f"**What** — {i['what'].strip()}", ""]
         if i.get("suggestion"):
             lines += [f"**Suggestion** — {i['suggestion'].strip()}", ""]
+        lines += alt_lines(i)
     if r.get("severityNote"):
         lines += ["## Severity 보정 근거", "", r["severityNote"].strip(), ""]
-    lines += strength_lines(r)
+    lines += strength_lines(r) + judgment_lines(r) + axes_lines(r, plans) + cost_lines(cost, r.get("costLog"))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def alt_lines(i: dict) -> list:
+    """외부 렌즈의 대안 · 추천을 원문 그대로(F-115). 없으면 빈 목록 — 옛 바이트 그대로."""
+    if not i.get("alternatives"):
+        return []
+    out = ["**대안** (외부 렌즈 원문)", ""]
+    for a in i["alternatives"]:
+        pc = " · ".join(f"{k} {'; '.join(map(str, a[f]))}" for k, f in (("장점", "pros"), ("단점", "cons")) if a.get(f))
+        out.append(f"- {a['label'].strip()} — {str(a.get('description') or '').strip()}" + (f" ({pc})" if pc else ""))
+    return out + ([""] + [f"**추천** — {i['recommended'].strip()}"] if i.get("recommended") else []) + [""]
+
+
+def premise_lines(r: dict) -> list:
+    """`## 재지 않은 전제` — 렌즈가 확인하지 않고 기댄 전제(F-448). 참 · 거짓에 따라 위 판정이 바뀐다."""
+    ps = r.get("unverifiedPremises") or []
+    if not ps:
+        return []
+    out = [f"## 재지 않은 전제 {len(ps)}건", "", "판정이 기댔지만 코드로 확인하지 않은 전제다 — 참 · 거짓에 따라 위 판정이 바뀔 수 있다.", ""]
+    for x in ps:
+        tail = [f"못 잰 이유: {_cell(x.get('why'))}" if x.get("why") else "", f"판별: {_cell(x.get('howToMeasure'))}" if x.get("howToMeasure") else "",
+                f"기댄 판정: {', '.join(map(str, x['affects']))}" if x.get("affects") else "", f"렌즈: {x['lens']}" if x.get("lens") else ""]
+        out.append(f"- {_cell(x['claim'])}" + (" — " + " · ".join(s for s in tail if s) if any(tail) else ""))
+    return out + [""]
+
+
+def coverage_lines(r: dict) -> list:
+    """`## 축 판정` — axisCoverage(병합 행 또는 한쪽 행). gap 은 '판정 안 함'(F-514) · 모르는 값도 판정 안 함으로 보인다."""
+    rows = r.get("axisCoverage") or []
+    if not rows:
+        return []
+    out = ["## 축 판정", "", "| 축 | 판정 | 근거 |", "|---|---|---|"]
+    for row in rows:
+        st = row["status"]
+        notes = [str(row["note"])] if row.get("note") else []
+        for side in ("claude", "gpt"):
+            notes += [f"{side} {x.get('status')}: {x.get('note') or '—'}" for x in row.get(side) or [] if isinstance(x, dict)]
+        if not notes and ("claude" in row or "gpt" in row):
+            notes = ["어느 입력도 이 축을 보지 않았다"]
+        out.append(f"| {_cell(row['axis'])} | {STATUS_KO.get(st, f'{st}(모르는 값 — 판정 안 함으로 본다)')} | {_cell(' / '.join(notes))} |")
+    return out + [""]
+
+
+def dismissed_lines(r: dict) -> list:
+    """`## Lead 기각 — 의도 확인 후보` — Lead 가 판단으로 뺀 관찰을 사유와 함께 남긴다(F-517)."""
+    ds = r.get("dismissed") or []
+    if not ds:
+        return []
+    out = [f"## Lead 기각 — 의도 확인 후보 {len(ds)}건", "",
+           "Lead 가 판단으로 뺀 관찰이다 — 근거가 관례 · 추정이면 작성자 의도에 따라 뒤집힐 수 있다.", ""]
+    return out + [f"- `{x['id']}` — {_cell(x['what'])} · 기각 사유: {_cell(x['reason'])}" for x in ds] + [""]
+
+
+def judgment_lines(r: dict) -> list:
+    return premise_lines(r) + coverage_lines(r) + dismissed_lines(r)
+
+
+def axes_lines(r: dict, plans: list) -> list:
+    """`## 발견 축 집계` — issue.axis 로 센다(없으면 other). 0건 축도 행을 남긴다(0 이 관측인지 미탐색인지 — tiers.md Tier 1 Deliver).
+
+    큐레이션 리뷰는 항상 · 비큐레이션은 axis 가 하나라도 있을 때만 — 옛 렌더 바이트를 바꾸지 않는다(F-212).
+    """
+    if "excluded" not in r and not any("axis" in p["issue"] for p in plans):
+        return []
+    n = {a: 0 for a in AXES}
+    for p in plans:
+        n[p["issue"].get("axis", "other")] += 1
+    return (["## 발견 축 집계", "", "| 축 | 건수 | 비고 |", "|---|---:|---|"]
+            + [f"| {a} | {n[a]} | {'어디에도 안 맞은 것 · axis 없음 포함' if a == 'other' else ''} |" for a in AXES] + [""])
+
+
+def cost_lines(cost: dict | None, rel: str | None) -> list:
+    """`## 실측 비용` — review.costLog 가 가리키는 cost-log.json(tiers.md § 비용 로깅 형식 2)에서 그린다(F-212)."""
+    if cost is None:
+        return []
+    tier = cost.get("tier") if isinstance(cost.get("tier"), dict) else {}
+    tok = cost.get("tokens") if isinstance(cost.get("tokens"), dict) else {}
+    iss = cost.get("issues") if isinstance(cost.get("issues"), dict) else {}
+    ms = cost.get("duration_ms")
+    dur = f"{int(ms) // 60000}분 {int(ms) % 60000 // 1000}초" if isinstance(ms, (int, float)) else "—"
+    ph = cost.get("phases_ms") if isinstance(cost.get("phases_ms"), dict) else {}
+    phases = " / ".join(f"{k} {int(v) // 1000}초" for k, v in ph.items() if isinstance(v, (int, float)))
+    return ["## 실측 비용", "",
+            f"- Tier: {tier.get('selected', '—')}",
+            f"- Total tokens: {tok.get('total', '—')} (method {tok.get('method', '—')})",
+            f"- Duration: {dur}" + (f"  ← 구간 {phases}" if phases else "  ← ⚠️ 구간 분해 없음(phases_ms)"),
+            "- 이슈 발견 수: " + " / ".join(f"{s} {iss.get(s, 0)}" for s in SEVERITIES),
+            f"- cost-log.json: {rel}", ""]
 
 
 def strength_lines(r: dict) -> list:
@@ -246,7 +381,7 @@ def _cell(v) -> str:
     return str(v or "—").replace("|", "\\|").replace("\n", " ").strip()
 
 
-def curated_report(r: dict, plans: list, info: dict) -> str:
+def curated_report(r: dict, plans: list, info: dict, cost: dict | None = None) -> str:
     pr = r.get("pr") or {}
     lines = [f"# PR #{pr['number']} 리뷰" if pr.get("number") is not None else "# 리뷰 보고서", "",
              f"**판정**: {r['verdict'].strip()}", ""]
@@ -274,6 +409,7 @@ def curated_report(r: dict, plans: list, info: dict) -> str:
                       f"**What** — {i['what'].strip()}", ""]
             if i.get("suggestion"):
                 lines += [f"**Suggestion** — {i['suggestion'].strip()}", ""]
+            lines += alt_lines(i)
             rp = i.get("repro") if isinstance(i.get("repro"), dict) else None
             if rp:
                 lines += [f"**재현** — {rp.get('status')} · {str(rp.get('how') or '').strip()}", ""]
@@ -290,13 +426,33 @@ def curated_report(r: dict, plans: list, info: dict) -> str:
     lines += [f"| `{x['id']}` | {_cell(x.get('what'))} | {x.get('code')} | {_cell(x.get('reason'))}"
               + (f" (+{len(x['covers'])} 묶음)" if x.get("covers") else "") + " |" for x in ex]
     lines += ["", "## 기존 스레드 대조", "", info.get("thread_line") or "—", ""]
+    if info.get("symbol_check"):   # 제안 코드 식별자를 대조하지 못했다 — 검증 통과로 읽히지 않게 리포트에 남긴다(F-063 리뷰)
+        lines += ["## 제안 식별자 대조", "", info["symbol_check"], ""]
     replies = [x for x in ex if x.get("code") == "E5" and str(x.get("reply") or "").strip()]
     if replies:   # ⛔ 본문은 넣지 않는다 — 리포트가 payload.body 로 게시되면 답글 초안이 새 리뷰에 실린다(초안은 pr-comments.md 끝 · 로컬)
         lines += [f"답글 초안 {len(replies)}건 — pr-comments.md 끝(게시 payload 밖 · 기존 스레드에 따로 단다)", ""]
     if r.get("severityNote"):
         lines += ["## Severity 보정 근거", "", r["severityNote"].strip(), ""]
-    lines += strength_lines(r)
+    lines += strength_lines(r) + judgment_lines(r) + axes_lines(r, plans) + cost_lines(cost, r.get("costLog"))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def check_posted_lines(us: list, texts: dict) -> None:
+    """게시 대상 인라인 코멘트 전건의 줄 대조(Gate 4.5 · F-069) — site.expect 가 앵커 구간의 diff 줄 중 하나에 있어야 한다."""
+    for u in us:
+        a = u["anchor"]
+        if not a:
+            continue
+        s = u["at"]["site"]
+        where = f"{u['id']}{' [' + u['part'] + ']' if u['part'] else ''} `{u['at']['loc']}`"
+        want = s.get("expect")
+        if not want:
+            raise Reject(f"{where}: 게시 코멘트에 expect(그 줄에 있어야 할 코드 조각)가 없다 — Gate 4.5 는 severity 와 무관하게 게시 전건이다")
+        side = texts.get(a["path"], {}).get("new" if a["side"] == "RIGHT" else "old", {})
+        got = [side.get(n, "") for n in range(a["start_line"], a["line"] + 1)]
+        if not any(want.strip() in g for g in got):
+            raise Reject(f"{where}: expect {want.strip()[:40]!r} 가 앵커 줄 {a['start_line']}-{a['line']} 에 없다 — 지금 그 줄: "
+                         f"{(got[0].strip() if got else '')[:60]!r} (줄 번호를 git show 로 다시 잰다)")
 
 
 def pr_comments(r: dict, us: list) -> str:
@@ -317,7 +473,7 @@ def pr_comments(r: dict, us: list) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render(review, diff_text: str, curation: dict | None = None) -> dict:
+def render(review, diff_text: str, curation: dict | None = None, cost: dict | None = None) -> dict:
     validate(review)
     if not re.search(r"^diff --git ", diff_text, re.M):
         raise InputError("diff 에 `diff --git` 헤더가 없다 — 파일 경계를 가를 수 없어 모든 지점이 앵커 불가로 조용히 떨어진다(git diff 출력만 받는다)")
@@ -334,9 +490,11 @@ def render(review, diff_text: str, curation: dict | None = None) -> dict:
         plans.append({"issue": i, "sites": xs})
     plans.sort(key=lambda p: SEVERITIES.index(p["issue"]["severity"]))   # 안정 정렬 — 같은 severity 는 JSON 순서
     us = [u for p in plans for u in units(p["issue"], p["sites"])]
-    rep = curated_report(review, plans, curation or {}) if "excluded" in review else report(review, plans)
+    rep = curated_report(review, plans, curation or {}, cost) if "excluded" in review else report(review, plans, cost)
     comments, rows = inline(us)
     pr = review.get("pr") or {}
+    if pr.get("headSha"):
+        check_posted_lines(us, da.line_texts(diff_text))
     event = review.get("event", "COMMENT")
     payload = None
     if pr.get("headSha"):
@@ -393,19 +551,50 @@ def run_render(a) -> int:
         import check_comment_worthy as ccw   # 렌더 전에 코멘트 가치 계약 — 위반 · 판정 불가면 파일을 쓰지 않는다
         try:
             code, bad, warn, curation = ccw.check_review(review, Path(a.review).resolve().parent)
-        except Exception as e:   # ⛔ 예외도 fail() 로 — 이전 실행의 payload · 리포트가 지금 리뷰로 남으면 게시된다
+        except Exception as e:   # noqa: BLE001 — 예외도 fail() 로 — 이전 실행의 payload · 리포트가 지금 리뷰로 남으면 게시된다
             return fail(UNRUN, f"UNRUN: 코멘트 가치 검사 예외 — {type(e).__name__}: {e}")
         for w in warn:
             print(f"WARN {w}", file=sys.stderr)
         if code:
             return fail(REJECT if code == ccw.VIOLATION else UNRUN,
                         ("REJECT" if code == ccw.VIOLATION else "UNRUN") + ": 코멘트 가치 검사 — " + " · ".join(bad[:5]))
+    want = getattr(a, "head_sha", None)
+    if want is not None:          # ⛔ 넘긴 빈 값(`"$(gh pr view …)"` 조회 실패)은 생략이 아니다 — 대조를 건너뛰면 아무 head 에나 게시된다
+        want = want.strip()
+        sides = [(k, v) for k, v in ((("pr.headSha", (review.get("pr") or {}).get("headSha")),
+                                      ("target.sha", (review.get("target") or {}).get("sha"))) if isinstance(review, dict) else ())
+                 if isinstance(v, str) and v.strip()]
+        # 채워진 칸 전부와 맞아야 한다 — Curate 는 target.sha 로 근거를 대조했다. pr.headSha 만 새 head 로 바뀌면 옛 근거가 새 head 에 게시된다
+        off = [f"{k} {v[:12]}" for k, v in sides if min(len(want), len(v)) < 7 or want[:min(len(want), len(v))] != v[:min(len(want), len(v))]]
+        if not want:
+            return fail(REJECT, "REJECT: --head-sha 가 비었다 — 지금 head 조회가 실패했다(빈 값은 대조 생략이 아니다 · F-068)")
+        if not sides or off:
+            return fail(REJECT, f"REJECT: 게시 직전 head {want[:12]} ≠ 리뷰 대상 {' · '.join(off) or '(review 에 pr.headSha · target.sha 없음)'} — "
+                                "리뷰 중 대상이 바뀌었다(force-push 등). `git log --oneline 대상..지금` 으로 차이를 먼저 보고 다시 리뷰한다(F-068)")
+    cost = None
+    if isinstance(review, dict) and isinstance(review.get("costLog"), str):
+        cp = Path(a.review).resolve().parent / review["costLog"]
+        try:
+            cost = json.loads(cp.read_text(encoding="utf-8"))
+            if not isinstance(cost, dict):
+                raise ValueError("객체가 아니다")
+        except (OSError, ValueError) as e:
+            return fail(UNRUN, f"UNRUN: costLog {cp} 를 읽지 못했다 — {e} · `## 실측 비용` 절을 그릴 수 없다(⛔ 통과 아님 · F-212)")
     try:
-        out = render(review, diff_text, curation)
+        out = render(review, diff_text, curation, cost)
     except InputError as e:
         return fail(UNRUN, f"UNRUN: {e}")
     except Reject as e:
         return fail(REJECT, f"REJECT: {e}")
+    if getattr(a, "lang", None) == "ko":
+        ratio = hangul_ratio(review)
+        if ratio < LANG_MIN:
+            return fail(REJECT, f"REJECT: --lang ko 인데 리포트 산문의 한글 비율 {ratio:.0%} < {LANG_MIN:.0%} — 사용자 대면 산출물은 프로젝트 언어로 쓴다"
+                                "(에이전트 지시 언어와 별개 축이다 · F-020)")
+    try:
+        synth = synth_update(d / "synthesized-issues.json", review)
+    except (OSError, ValueError) as e:
+        return fail(UNRUN, f"UNRUN: synthesized-issues.json 을 읽지 못했다 — {e} (파생 산출물을 맞출 수 없다 · F-201)")
     d.mkdir(parents=True, exist_ok=True)
     (d / "review-report.md").write_text(out["review-report.md"], encoding="utf-8")
     (d / "pr-comments.md").write_text(out["pr-comments.md"], encoding="utf-8")
@@ -414,12 +603,96 @@ def run_render(a) -> int:
         (d / "payload.json").write_text(json.dumps(out["payload"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     else:
         (d / "payload.json").unlink(missing_ok=True)   # ⛔ 이전 실행의 payload 가 남아 게시되면 지금 리뷰와 다른 내용이 올라간다
+    if synth is not None:
+        _atomic(d / "synthesized-issues.json", json.dumps(synth, ensure_ascii=False, indent=2) + "\n")
+    if (d / "review-index.md").is_file():   # Lead 가 Synthesize CHECKPOINT 에서 만든 인덱스만 고친다 — 없으면 만들지 않는다(산출물 집합 그대로)
+        _atomic(d / "review-index.md", index_text(d / "review-index.md", review, out["preview"]))
     p = out["preview"]
     print(f"렌더 — 이슈 {p['issues']}건 · 인라인 {len(p['inline'])}건(파일 {len(p['byFile'])}) · 리포트만 {len(p['reportOnly'])}건 · "
           f"event {p['event']} · payload {'있음' if out['payload'] else '없음(pr.headSha 없음)'}")
     print("확인 필요 — " + " · ".join(p["reasons"]) if p["confirmRequired"] else "확인 게이트 해당 없음")
     print(f"→ {d}/  " + " · ".join(f for f in OUTPUTS if (d / f).exists()))
     return OK
+
+
+CODE_SPAN = re.compile(r"`[^`]*`|https?://\S+")
+
+
+def hangul_ratio(r: dict) -> float:
+    """Lead 가 쓴 산문 칸의 한글 비율 — 한글 / (한글 + 라틴 글자). 백틱 코드 · URL 은 뺀다. 산문이 없으면 1.0(판정할 것 없음)."""
+    parts = [r.get("verdict"), r.get("severityNote")] + list(r.get("strengths") or [])
+    for i in r.get("issues") or []:
+        parts += [i.get("what"), i.get("suggestion"), i.get("comment")]
+    text = CODE_SPAN.sub(" ", " ".join(p for p in parts if isinstance(p, str)))
+    ko = sum("\uac00" <= ch <= "\ud7a3" for ch in text)
+    en = sum(ch.isascii() and ch.isalpha() for ch in text)
+    return 1.0 if ko + en == 0 else ko / (ko + en)
+
+
+SYN_FINAL = ("severity_final", "finalSeverity", "effectiveSeverity")
+
+
+def synth_update(path: Path, r: dict):
+    """synthesized-issues.json 을 렌더한 판정에 맞춘 새 객체(없으면 None) — 같은 id · covers 묶음 · excluded 를 본다(F-201)."""
+    if not path.is_file():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    items = data.get("issues") if isinstance(data, dict) and isinstance(data.get("issues"), list) else \
+        data.get("candidates") if isinstance(data, dict) and isinstance(data.get("candidates"), list) else None
+    if items is None:
+        raise ValueError("issues[] · candidates[] 가 없다")
+    want = {}
+    for i in r.get("issues") or []:
+        disp = "question" if i.get("kind") == "intent-question" else "include"
+        for k in [i["id"]] + [c for c in i.get("covers") or [] if isinstance(c, str)]:
+            want[k] = (disp, i["severity"], None)
+    for x in r.get("excluded") or []:          # 묶음 카드는 covers 의 후보까지 같은 처분 — 리포트가 묶음 전체를 뺀다
+        if isinstance(x, dict) and isinstance(x.get("id"), str):
+            for k in [x["id"]] + [c for c in x.get("covers") or [] if isinstance(c, str)]:
+                want.setdefault(k, (f"exclude:{x.get('code')}", None, x.get("reason")))
+    for x in r.get("dismissed") or []:   # Lead 기각 — 사유와 함께 남긴다(F-517)
+        want.setdefault(x["id"], ("exclude", None, x["reason"]))
+    for it in items:
+        if not isinstance(it, dict) or it.get("id") not in want:
+            continue
+        disp, sev, why = want[it["id"]]
+        if it.get("disposition") not in (None, disp):
+            it.setdefault("disposition_initial", it["disposition"])
+        it["disposition"] = disp
+        if why:
+            it["disposition_reason"] = why
+        if sev:
+            key = next((k for k in SYN_FINAL if k in it), None)
+            if key is None and any(k in it for k in ("severity_raw", "rawSeverity")):
+                key = "severity"     # 원본 칸을 따로 적은 Lead 모양에서는 `severity` 가 최종 칸이다(check_synthesized.normalize 와 같은 규칙)
+            now = it.get(key) if key else it.get("severity")
+            if now != sev:
+                if now is not None:
+                    it.setdefault("severity_initial", now)
+                it[key or "severity_final"] = sev
+    return data
+
+
+def index_text(path: Path, r: dict, preview: dict) -> str:
+    """review-index.md — 렌더 블록만 새로 쓰고 Lead 가 쓴 나머지(Phase · Artifacts)는 그대로 둔다(F-201 · F-068 대상 head)."""
+    pr = r.get("pr") or {}
+    head = pr.get("headSha") or (r.get("target") or {}).get("sha") or "—"
+    rows = [f"- {i['id']} [{i['severity']}]" for i in sorted(r["issues"], key=lambda i: SEVERITIES.index(i["severity"]))]
+    block = "\n".join([INDEX_BEGIN, "## 렌더 결과 (render_review.py — 다시 렌더하면 이 블록을 덮는다)", "",
+                       f"- 대상 head: {head}", f"- 판정: {r['verdict'].strip()}",
+                       f"- 이슈 {len(rows)}건 · 제외 {len(r.get('excluded') or [])}건 · 인라인 {len(preview['inline'])}건",
+                       *rows, INDEX_END])
+    old = path.read_text(encoding="utf-8")
+    b, e = old.find(INDEX_BEGIN), old.find(INDEX_END)
+    if b >= 0 and e > b:
+        return old[:b] + block + old[e + len(INDEX_END):]
+    return old.rstrip("\n") + "\n\n" + block + "\n"
+
+
+def _atomic(path: Path, text: str) -> None:
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
 
 
 # ── self-test ──────────────────────────────────────────────────────────────
@@ -455,8 +728,8 @@ EXAMPLE = {
         {"id": "A1", "severity": "major", "origin": "regression", "confidence": 90, "foundBy": ["arch", "gpt"],
          "what": "무엇이 왜 문제인지(WHY 포함)", "suggestion": "어떻게 고칠지",
          "comment": "PR 코멘트 톤 본문 — 없으면 what + suggestion 을 쓴다",
-         "sites": [{"path": "src/a.swift", "start": 11, "end": 12}]},
-        {"id": "Q1", "severity": "minor", "what": "한 줄 지적", "sites": [{"path": "src/b.swift", "start": 2, "end": 2, "note": "조각 설명"}]},
+         "sites": [{"path": "src/a.swift", "start": 11, "end": 12, "expect": "l11"}]},
+        {"id": "Q1", "severity": "minor", "what": "한 줄 지적", "sites": [{"path": "src/b.swift", "start": 2, "end": 2, "note": "조각 설명", "expect": "k2"}]},
     ],
 }
 
@@ -471,6 +744,7 @@ def self_test() -> int:
         print(f"{'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" — {detail}"))
 
     def site(path, start, end, **kw):
+        kw.setdefault("expect", "k" if path.endswith("b.swift") else "l")   # F-069 — 셀이 따로 재지 않는 자리는 줄 접두 글자
         return dict(path=path, start=start, end=end, **kw)
 
     def review(issues, **kw):
@@ -735,8 +1009,186 @@ def self_test() -> int:
              r1.returncode == 1 and r2.returncode == 1 and not any((tmp / "s8-sha").glob("*")) and not any((tmp / "s8-both").glob("*")),
              (r1.returncode, r2.returncode, r1.stderr[-160:]))
 
+    def cli_run(rv, out, *extra):
+        f = tmp / f"{out}.json"
+        f.write_text(json.dumps(rv, ensure_ascii=False), encoding="utf-8")
+        return subprocess.run([sys.executable, __file__, "--review", str(f), "--diff", str(diff), "--out-dir", str(tmp / out), *extra],
+                              capture_output=True, text=True)
+
+    def files_in(out):
+        return sorted(q.name for q in (tmp / out).glob("*")) if (tmp / out).is_dir() else []
+
+    def t_round2():
+        # F-212 — 발견 축 집계 · 실측 비용(규칙끼리 충돌: tiers.md 는 두 절을 요구하는데 렌더 경로에 받을 키가 없었다)
+        ax = json.loads(json.dumps(base))
+        ax[0]["axis"] = "correctness"
+        rep = render(review(ax), SELF_DIFF)["review-report.md"]
+        case("f212-axes-section — axis 가 있으면 발견 축 집계 표(0건 축 행 유지 · axis 없음 = other)",
+             "## 발견 축 집계" in rep and "| correctness | 1 |" in rep and "| direction | 0 |" in rep and "| other | 2 |" in rep, rep[-300:])
+        plain = render(review(base), SELF_DIFF)["review-report.md"]
+        case("f212-axes-absent-unchanged — axis 없는 비큐레이션 리포트는 표를 넣지 않는다(옛 바이트)", "발견 축 집계" not in plain, plain[-120:])
+        (tmp / "cost-log.json").write_text(json.dumps({"tier": {"selected": 1}, "tokens": {"total": 41000, "method": "actual"},
+                                                       "duration_ms": 125000, "phases_ms": {"gather": 30000, "analyze": 60000},
+                                                       "issues": {"major": 1, "minor": 1}}), encoding="utf-8")
+        r = cli_run(review(base, costLog="cost-log.json"), "cost-ok")
+        rep = (tmp / "cost-ok" / "review-report.md").read_text(encoding="utf-8") if r.returncode == 0 else ""
+        case("f212-cost-section — costLog 가 가리키는 cost-log.json 으로 실측 비용 절을 그린다",
+             r.returncode == 0 and "## 실측 비용" in rep and "- Tier: 1" in rep and "- Total tokens: 41000" in rep and "2분 5초" in rep,
+             (r.returncode, r.stderr[-200:]))
+        r = cli_run(review(base, costLog="no-such-cost-log.json"), "cost-miss")
+        case("f212-cost-log-missing-unrun — costLog 파일이 없으면 UNRUN(exit 2) · 파일 0", r.returncode == 2 and files_in("cost-miss") == [],
+             (r.returncode, r.stderr[-200:]))
+        # F-201 — 재평가 뒤 파생 산출물(인덱스 · 구조화 JSON)도 같은 판정으로
+        d = tmp / "reeval"
+        d.mkdir()
+        (d / "review-index.md").write_text("# review-index\n\n- Phase: Deliver\n", encoding="utf-8")
+        (d / "synthesized-issues.json").write_text(json.dumps({"issues": [{"id": "A1", "severity": "major", "disposition": "include"},
+                                                                          {"id": "Z9", "severity": "minor", "disposition": "include"}]}),
+                                                   encoding="utf-8")
+        r1 = cli_run(review(base), "reeval")
+        down = json.loads(json.dumps(base))
+        down[0]["severity"] = "minor"
+        r2 = cli_run(review(down), "reeval")
+        idx = (d / "review-index.md").read_text(encoding="utf-8")
+        case("f201-index-rerendered — 재평가 렌더가 review-index.md 렌더 블록을 덮는다(Lead 줄 유지 · 블록 하나 · 대상 head)",
+             (r1.returncode, r2.returncode) == (0, 0) and idx.count(INDEX_BEGIN) == 1 and "- A1 [minor]" in idx and "- A1 [major]" not in idx
+             and "- Phase: Deliver" in idx and "- 대상 head: abc123" in idx, (r1.returncode, r2.returncode, idx[-300:]))
+        syn = json.loads((d / "synthesized-issues.json").read_text(encoding="utf-8"))
+        a1, z9 = (next(x for x in syn["issues"] if x["id"] == k) for k in ("A1", "Z9"))
+        ccode = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "check_synthesized.py"), str(d / "synthesized-issues.json")],
+                               capture_output=True, text=True).returncode
+        case("f201-synthesized-rerendered — synthesized-issues.json 의 최종 severity 를 렌더 판정으로 다시 쓰고 처음 값을 보존한다(남의 id 무변경 · 계약 통과)",
+             a1.get("severity_final") == "minor" and a1.get("severity_initial") == "major" and z9 == {"id": "Z9", "severity": "minor", "disposition": "include"}
+             and not any(d.glob(".*.tmp")) and ccode == 0, (a1, z9, ccode))
+        # F-068 — 게시 직전 head 대조
+        rv = review(base)
+        rv["pr"] = {"number": 7, "headSha": "abc1234def"}
+        r = cli_run(rv, "head-bad", "--head-sha", "deadbeef00")
+        case("f068-head-mismatch-refused — --head-sha 가 리뷰 대상 sha 와 다르면 exit 1 · 파일 0",
+             r.returncode == 1 and "≠" in r.stderr and files_in("head-bad") == [], (r.returncode, r.stderr[-200:]))
+        r = cli_run(rv, "head-ok", "--head-sha", "abc1234def0000000000")
+        case("f068-head-match-ok — 같은 head(접두 일치)는 렌더한다", r.returncode == 0, (r.returncode, r.stderr[-200:]))
+        r = cli_run(rv, "head-empty", "--head-sha", "")
+        case("f068-empty-head-refused — 넘긴 빈 --head-sha(조회 실패)는 생략이 아니라 거부 · 파일 0",
+             r.returncode == 1 and "비었다" in r.stderr and files_in("head-empty") == [], (r.returncode, r.stderr[-200:]))
+        rt = review(base, target={"kind": "pr", "ref": "pr-7", "sha": "aaaaaaa1111"})
+        rt["pr"] = {"number": 7, "headSha": "bbbbbbb2222"}
+        r = cli_run(rt, "head-target", "--head-sha", "bbbbbbb2222")
+        case("f068-target-sha-also-checked — pr.headSha 만 새 head 와 맞고 target.sha(근거 대조 head)가 다르면 거부",
+             r.returncode == 1 and "target.sha aaaaaaa1111" in r.stderr and files_in("head-target") == [], (r.returncode, r.stderr[-200:]))
+        # F-069 — 게시 코멘트 전건 줄 대조(minor · suggestion 포함)
+        def rejected(rs):
+            try:
+                render(review(rs), SELF_DIFF)
+                return ""
+            except Reject as e:
+                return str(e)
+        wrong = json.loads(json.dumps(base))
+        wrong[1]["sites"][0]["expect"] = "zzz"
+        miss = json.loads(json.dumps(base))
+        del miss[1]["sites"][0]["expect"]
+        case("f069-all-posted-anchored — 게시 코멘트(minor 포함)의 expect 가 앵커 줄에 없거나 빠지면 거부",
+             "Q1" in rejected(wrong) and "Q1" in rejected(miss), (rejected(wrong)[:120], rejected(miss)[:120]))
+        quoted = json.loads(json.dumps(base))
+        del quoted[2]["sites"][0]["expect"]
+        nopr = review(miss)
+        del nopr["pr"]
+        case("f069-unposted-no-check — 앵커 불가 지점(인용) · payload 없는 렌더는 expect 를 요구하지 않는다",
+             rejected(quoted) == "" and render(nopr, SELF_DIFF)["payload"] is None, rejected(quoted)[:120])
+        # F-020 — 사용자 대면 산출물 언어
+        en = review(json.loads(json.dumps(base)), verdict="Comment level only - nothing blocks the merge", strengths=["Scope matches the requirement"])
+        for i in en["issues"]:
+            i["what"] = "The new guard returns an empty array when the input is nil"
+            i.pop("comment", None)
+            i.pop("suggestion", None)
+        r = cli_run(en, "lang-en", "--lang", "ko")
+        case("f020-report-language-mismatch — --lang ko 인데 리포트 산문이 영어면 exit 1 · 파일 0",
+             r.returncode == 1 and "한글 비율" in r.stderr and files_in("lang-en") == [], (r.returncode, r.stderr[-200:]))
+        r = cli_run(review(base), "lang-ko", "--lang", "ko")
+        case("f020-korean-report-ok — 한국어 산문(식별자 섞임)은 통과", r.returncode == 0, (r.returncode, r.stderr[-200:]))
+
+    def t_judgment():
+        # F-514 · F-559 — 병합 axisCoverage 의 gap 행
+        merged = [{"axis": "architecture", "status": "gap", "claude": [{"status": "none", "note": "레이어 위반 없음"}],
+                   "gpt": [{"status": "gap", "note": "지침의 의존 방향이 서로 반대라 판정하지 않았다"}]},
+                  {"axis": "naming", "status": "none", "claude": [{"status": "none", "note": "규칙 준수"}], "gpt": []},
+                  {"axis": "placement", "status": "gap", "claude": [], "gpt": []}]
+        rep = render(review(base, axisCoverage=merged), SELF_DIFF)["review-report.md"]
+        case("f514-gap-row-rendered — 병합 axisCoverage 의 gap 행을 '판정 안 함' 으로 · 양쪽 근거 · 아무도 안 본 축도 행으로 그린다",
+             "## 축 판정" in rep and "| architecture | 판정 안 함 | claude none: 레이어 위반 없음 / gpt gap: 지침의 의존 방향이 서로 반대라 판정하지 않았다 |" in rep
+             and "| naming | 위반 없음 |" in rep and "| placement | 판정 안 함 | 어느 입력도 이 축을 보지 않았다 |" in rep, rep[-500:])
+        plain = render(review(base), SELF_DIFF)["review-report.md"]
+        case("f514-no-coverage-unchanged — 판정 한계 키가 없으면 옛 바이트(세 절 모두 없음)",
+             not any(h in plain for h in ("## 축 판정", "## 재지 않은 전제", "## Lead 기각", "**대안**")), plain[-200:])
+        # F-448 — 재지 않은 전제
+        prem = [{"claim": "27.1 SDK 에서도 같은 접힘 알림이 온다", "why": "렌즈는 27.0 SDK 코드만 읽었다", "howToMeasure": "27.1 시뮬에서 접힘 로그",
+                 "affects": ["A1"], "lens": "arch"}]
+        rep = render(review(base, unverifiedPremises=prem), SELF_DIFF)["review-report.md"]
+        case("f448-premises-rendered — unverifiedPremises 를 `## 재지 않은 전제` 절로 · 이유 · 판별 방법 · 기댄 판정이 함께 실린다",
+             "## 재지 않은 전제 1건" in rep and "- 27.1 SDK 에서도 같은 접힘 알림이 온다 — 못 잰 이유: 렌즈는 27.0 SDK 코드만 읽었다 · 판별: 27.1 시뮬에서 접힘 로그 · 기댄 판정: A1 · 렌즈: arch" in rep,
+             rep[-400:])
+        # F-115 — 외부 렌즈 대안 · 추천 원문 이송
+        alt = json.loads(json.dumps(base))
+        alt[0]["alternatives"] = [{"label": "A: 현재 만료 방식", "description": "그대로 둔다", "pros": ["변경 없음"], "cons": ["누수"]},
+                                  {"label": "B: 범위 기반 정리", "description": "화면 범위를 벗어나면 지운다", "pros": [], "cons": []}]
+        alt[0]["recommended"] = "B: 범위 기반 정리"
+        rep = render(review(alt), SELF_DIFF)["review-report.md"]
+        case("f115-alternatives-rendered — 이슈 아래 대안 label · 설명 · 장단점과 추천 label 을 원문 그대로 싣는다",
+             "**대안** (외부 렌즈 원문)" in rep and "- A: 현재 만료 방식 — 그대로 둔다 (장점 변경 없음 · 단점 누수)" in rep
+             and "- B: 범위 기반 정리 — 화면 범위를 벗어나면 지운다" in rep and "**추천** — B: 범위 기반 정리" in rep, rep[:900])
+        para = json.loads(json.dumps(alt))
+        para[0]["recommended"] = "범위 정리 방식"
+        try:
+            render(review(para), SELF_DIFF)
+            got = "통과"
+        except InputError as e:
+            got = str(e)
+        case("f115-recommended-must-match-label — 추천을 label 아닌 말로 바꿔 쓰면 입력 불가(재서술 차단)", "recommended" in got and got != "통과", got)
+        # F-517 — Lead 기각 관찰
+        dis = [{"id": "L9", "what": "클릭 로그가 노출 로그와 같은 키로 두 번 나간다", "reason": "기존 노출 파이프라인 관례와 같다"}]
+        rep = render(review(base, dismissed=dis), SELF_DIFF)["review-report.md"]
+        d = tmp / "dismiss"
+        d.mkdir()
+        (d / "synthesized-issues.json").write_text(json.dumps({"issues": [{"id": "L9", "severity": "minor", "disposition": "include"},
+                                                                          {"id": "Z8", "severity": "minor", "disposition": "include"}]}),
+                                                   encoding="utf-8")
+        r = cli_run(review(base, dismissed=dis), "dismiss")
+        syn = json.loads((d / "synthesized-issues.json").read_text(encoding="utf-8"))
+        l9, z8 = (next(x for x in syn["issues"] if x["id"] == k) for k in ("L9", "Z8"))
+        case("f517-dismissal-rendered — dismissed 를 리포트 `## Lead 기각 — 의도 확인 후보` 절과 synthesized disposition exclude + disposition_reason 으로 남긴다",
+             "## Lead 기각 — 의도 확인 후보 1건" in rep and "- `L9` — 클릭 로그가 노출 로그와 같은 키로 두 번 나간다 · 기각 사유: 기존 노출 파이프라인 관례와 같다" in rep
+             and r.returncode == 0 and l9.get("disposition") == "exclude" and l9.get("disposition_reason") == "기존 노출 파이프라인 관례와 같다"
+             and l9.get("disposition_initial") == "include" and z8 == {"id": "Z8", "severity": "minor", "disposition": "include"},
+             (r.returncode, r.stderr[-200:], l9, z8))
+
+    def t_synth_sync():
+        # F-201 — 파생 산출물 동기화: Lead 별칭 모양(severity_raw + severity=최종) · 묶음 excluded 카드의 covers
+        d = tmp / "synth-sync"
+        d.mkdir()
+        f = d / "synthesized-issues.json"
+        f.write_text(json.dumps({"issues": [{"id": "A1", "severity_raw": "major", "severity": "minor", "disposition": "include"},
+                                            {"id": "E1", "severity": "minor", "disposition": "include"},
+                                            {"id": "C1", "severity": "minor", "disposition": "include"},
+                                            {"id": "C2", "severity": "minor", "disposition": "include"}]}), encoding="utf-8")
+        syn = synth_update(f, {"issues": [{"id": "A1", "severity": "suggestion"}],
+                               "excluded": [{"id": "E1", "code": "E3", "reason": "같은 뿌리", "covers": ["C1", "C2"]}]})
+        f.write_text(json.dumps(syn, ensure_ascii=False), encoding="utf-8")
+        a1 = syn["issues"][0]
+        ccode = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "check_synthesized.py"), str(f)],
+                               capture_output=True, text=True)
+        case("f201-lead-alias-final-kept — severity_raw 를 적은 Lead 모양은 severity(최종)를 고치고 severity_final 을 새로 만들지 않는다(계약 통과)",
+             a1.get("severity") == "suggestion" and a1.get("severity_raw") == "major" and "severity_final" not in a1
+             and a1.get("severity_initial") == "minor" and ccode.returncode == 0, (a1, ccode.stdout[-200:]))
+        disp = {x["id"]: (x.get("disposition"), x.get("disposition_reason")) for x in syn["issues"][1:]}
+        case("f201-excluded-covers-propagated — 묶음 excluded 카드의 covers 후보도 같은 처분 · 사유",
+             all(v == ("exclude:E3", "같은 뿌리") for v in disp.values()), disp)
+        unv = curated_report({"verdict": "v", "excluded": []}, [], {"thread_line": "t", "symbol_check": "제안 식별자 X 미검증"})
+        ok_ = curated_report({"verdict": "v", "excluded": []}, [], {"thread_line": "t"})
+        case("f063-unverified-symbols-in-report — 대조 못 한 제안 식별자는 리포트에 미검증으로 남는다",
+             "## 제안 식별자 대조" in unv and "미검증" in unv and "제안 식별자 대조" not in ok_, unv[-200:])
+
     tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_nodiff, t_empty, t_nopr, t_det, t_limit, t_cli,
-             t_example, t_curated, t_s8]
+             t_example, t_curated, t_s8, t_round2, t_judgment, t_synth_sync]
     try:
         for t in tests:
             try:
@@ -764,12 +1216,15 @@ EXAMPLE_CURATED = {
              "suggestion": "nil 일 때 이전 목록을 유지한다", "evidence": ["src/a.swift:11-12@abc1234"], "base_evidence": "src/a.swift:11@0123456",
              "repro": {"status": "code-determined", "how": "nil 입력 → 11행 guard → 빈 배열"}, "symptom_screen": "목록 화면",
              "symptom_reach": "탭 진입 → 목록 로드 실패", "refute": "반박 시도 — 호출부 1곳이 nil 을 걸러내는지 확인했으나 거르지 않는다",
+             "base_quote": "return items", "chain": [{"step": "nil 입력", "grade": "code"}, {"step": "11행 guard 가 빈 배열을 반환", "grade": "code"}],
+             "severity_basis": {"kind": "output-change", "note": "목록이 빈 화면으로 바뀐다"},
              "comment": "nil 이 들어오면 11행 guard 에서 빈 배열이 반환돼 목록이 비어 보입니다.\n이전 목록을 유지하는 쪽은 어떨지 확인 부탁드립니다.",
-             "sites": [{"path": "src/a.swift", "start": 11, "end": 12}]},
+             "sites": [{"path": "src/a.swift", "start": 11, "end": 12, "expect": "l11"}]},
             {"id": "Q1", "kind": "intent-question", "severity": "suggestion", "origin": "regression",
              "what": "12행 재시도 횟수 3 이 의도한 값인지", "evidence": ["src/a.swift:12@abc1234"], "base_evidence": "src/a.swift:12@0123456",
+             "base_quote": "let retry = 2",
              "refute": "반박 시도 — 요구사항 문서에 값이 없다", "comment": "12행 재시도 3회가 기획 값인지 여쭙습니다.",
-             "sites": [{"path": "src/a.swift", "start": 12, "end": 12}]}],
+             "sites": [{"path": "src/a.swift", "start": 12, "end": 12, "expect": "l12"}]}],
         "excluded": [
             {"id": "claude:C2", "what": "base 에도 있던 강제 언래핑", "code": "E4", "reason": "base 같은 줄 — 이번 PR 무관"},
             {"id": "gpt:G2", "what": "SDK 콜백이 메인 스레드라는 가정", "code": "E2", "reason": "SDK 내부 동작 가정 — 근거 없음"}],
@@ -803,6 +1258,8 @@ def main() -> int:
     ap.add_argument("--example", action="store_true")
     ap.add_argument("--require-curation", action="store_true")
     ap.add_argument("--example-curated-dir", metavar="DIR")
+    ap.add_argument("--head-sha", metavar="SHA")
+    ap.add_argument("--lang", choices=("ko",))
     a = ap.parse_args()
     if a.self_test:
         return self_test()

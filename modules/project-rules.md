@@ -26,6 +26,7 @@
    - 지침이 없으면 `absent: true` 로 끝난다(exit 0). ⛔ exit 2 는 폴더를 읽지 못한 것이다 — 통과가 아니다
    - absent 인데 저장소 밖 지침이 저장소 안 문서를 가리키면 `candidates: [{path, via}]` 가 붙는다(F-513). 링크 출처는 상위 폴더의 고정 이름 지침(`--ancestor-stop DIR` 까지 · 기본 `$HOME`)과 `--link-source FILE` 이다. 추출기는 링크 경로만 뽑고, 출처 본문과 후보 문서는 색인에 넣지 않는다
    - ⛔ **absent + candidates → architecture 행 gap(사유)**. 지침이 있을 수 있는데 색인에 없다는 뜻이다. '지침 없음'을 '위반 없음'으로 읽지 않는다. 사유에 후보 경로를 적는다. 후보 문서를 규칙 근거로 쓰려면 사용자가 그 문서를 지침으로 확정해야 한다
+   - ⛔ **absent + dropped_outside(N) → architecture 행 gap(사유: 저장소 밖으로 풀린 지침 링크 N개)**. 링크 출처가 저장소 밖 실재 문서를 가리켜 버렸다는 뜻이다 — 다른 경로의 워크트리를 `--project` 로 주면 상위 지침 링크가 메인 체크아웃으로 풀린다. '지침 없음'으로 읽지 않는다(F-560)
    - ⛔ 한계: 다른 경로의 워크트리를 `--project` 로 주면 상위 지침의 링크가 저장소 밖으로 풀려 후보가 0건이 된다
 2. **규칙 레코드** — 모델이 색인(필요하면 코드)을 읽고 §3 형식으로 쓴다
 3. **검증** — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_project_rules.py" --check rules.json --index index.json --project {대상 저장소}`. **exit 0 인 레코드만** 쓴다

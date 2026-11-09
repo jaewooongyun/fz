@@ -1,0 +1,11 @@
+diff --git a/src/Home.swift b/src/Home.swift
+index 1111111..2222222 100644
+--- a/src/Home.swift
++++ b/src/Home.swift
+@@ -1,5 +1,6 @@
+ final class Home {
+     func bind() {
++        if url == nil { logEvent("banner_tap") }
+         reload()
+     }
+ }

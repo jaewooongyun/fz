@@ -76,6 +76,9 @@ else
     esac
   fi
   git rev-parse --verify "$BASE" >/dev/null 2>&1 || die 3 "base '$BASE' 를 찾을 수 없다"
+  # F-566 — 세 점 diff 는 merge-base 가 없으면 실패하는데 stderr 를 버려 'diff 실패' 만 남았다. 사유를 먼저 가른다
+  git merge-base "$BASE" "$TARGET" >/dev/null 2>&1 \
+    || die 3 "merge-base 없음 — '$BASE' 와 '$TARGET' 의 공통 조상을 찾지 못했다(이력 재작성 · 얕은 클론 · 다른 저장소) — --base 를 확인하라"
   git diff "${BASE}...${TARGET}" > "$STAGE_DIR/diff.patch" 2>/dev/null || die 3 "diff 실패"
   printf '# 요구사항\n\n(브랜치 입력 — PR 메타 없음. Lead 가 티켓에서 채운다)\n' > "$STAGE_DIR/requirements.md"
 fi
@@ -381,6 +384,8 @@ fi
 # base-sha.txt — base/ 를 실제로 떠 온 커밋(merge-base · 해석 실패면 base 팁). target.json 과 같은 자리 · PR · 브랜치 · --base 세 경로 공통.
 #   Curate 검사기가 regression 이슈의 base_evidence @sha 와 review.json meta.base_sha 를 이것과 대조한다(F-037 — 낡은 로컬 develop 근거 차단)
 git rev-parse --verify "${BASE_REF}^{commit}" > "$STAGE_DIR/base-sha.txt" 2>/dev/null || die 4 "base-sha 기록 실패 — '${BASE_REF}' 를 커밋으로 풀지 못했다"
+# repo-root.txt — Curate 검사기가 스냅샷(바뀐 파일만) 밖 식별자를 대상 sha 전체 트리에서 찾는다. 못 적으면 그 대조는 미검증이 된다(통과 아님)
+git rev-parse --show-toplevel > "$STAGE_DIR/repo-root.txt" 2>/dev/null || rm -f "$STAGE_DIR/repo-root.txt"
 
 # ── 리뷰 표면 진단 (stale merge-base) ────────────────────────
 # ⛔ `diff` 는 merge-base 기준이라, base 가 분기 후 앞서 나가면 **이미 base 에 있는 변경**이
@@ -429,6 +434,37 @@ git rev-parse --verify "${BASE_REF}^{commit}" > "$STAGE_DIR/base-sha.txt" 2>/dev
     printf '분기점 == base 팁 (또는 head ref 미해석). 중복 진단을 하지 않았다.
 '
   fi
+  # head 축(F-149) — base..head 커밋의 티켓 키가 대상 키(PR 제목 · 브랜치 이름)와 다르면 적는다. `git cherry` 는 base 에 이미 있는
+  #   커밋만 잡아, 미머지 부모 PR 위에 쌓인 스택은 0건 → '전체가 리뷰 대상' 이 된다. ⛔ 자동으로 빼지 않는다(F-089 와 같은 원칙)
+  if [ -n "$HEAD_REF" ]; then
+    if $is_pr; then
+      ref_title="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("title") or "")' "$STAGE_DIR/pr-meta.json" 2>/dev/null)"
+    else
+      ref_title="$TARGET"
+    fi
+    git log --format='%h%x09%s' "${BASE_REF}..${HEAD_REF}" 2>/dev/null | python3 -c '
+import re, sys
+pat = re.compile(r"\b[A-Z][A-Z0-9]{1,9}-[0-9]+\b")
+ref = pat.findall(sys.argv[1])
+rows = [ln.rstrip("\n").split("\t", 1) for ln in sys.stdin if ln.strip()]
+print("\n## head 축 — 커밋 티켓 대조 (F-149)\n")
+if not ref:
+    print("대상 티켓 키 없음(PR 제목 · 브랜치 이름) — 커밋별 대조를 하지 않았다.")
+    sys.exit(0)
+other = []
+for r in rows:
+    h, s = (r + [""])[:2]
+    keys = set(pat.findall(s))
+    if keys and ref[0] not in keys:
+        other.append((h, s))
+if other:
+    print("⚠️ **다른 티켓 커밋 %d개** — 대상 키 `%s` · base..head 커밋 %d개. 스택 PR 이면 아래 커밋은 부모 PR 몫일 수 있다(자동으로 빼지 않는다)." % (len(other), ref[0], len(rows)))
+    for h, s in other:
+        print("- %s %s" % (h, s[:90]))
+else:
+    print("다른 티켓 커밋 없음 — 대상 키 `%s` · base..head 커밋 %d개." % (ref[0], len(rows)))
+' "$ref_title"
+  fi
 } > "$STAGE_DIR/review-surface.md"
 
 # ── 이동 리팩토링 드리프트 (조건부) ──────────────────────────
@@ -454,7 +490,7 @@ fi
 if [ -n "$DRIFT_RANGE" ] && git show "$DRIFT_RANGE" >/dev/null 2>&1; then
   git show "$DRIFT_RANGE" > "$STAGE_DIR/.drift-src.patch" 2>/dev/null || true
   if [ -f "$HERE/move_drift.py" ] && [ -s "$STAGE_DIR/.drift-src.patch" ]; then
-    python3 "$HERE/move_drift.py" "$STAGE_DIR/.drift-src.patch" "$DRIFT_RANGE" \
+    python3 "$HERE/move_drift.py" "$STAGE_DIR/.drift-src.patch" "$DRIFT_RANGE" --files "$STAGE_DIR/numstat.txt" \
       > "$STAGE_DIR/evidence-move-drift.md" 2>/dev/null || rm -f "$STAGE_DIR/evidence-move-drift.md"
   fi
   rm -f "$STAGE_DIR/.drift-src.patch"
@@ -551,7 +587,9 @@ fi
 
 # ── 위험 판정 (auto-tier 입력) ────────────────────────────────
 if [ -f "$HERE/risk_scan.py" ]; then
-  python3 "$HERE/risk_scan.py" "$STAGE_DIR/diff.patch" --json > "$STAGE_DIR/risk.json" 2>/dev/null \
+  # --head: 형제 관례 대조(F-516) — head/ 가 있으면 evidence-convention.md 를 함께 쓴다(렌즈 evidencePaths 입력)
+  python3 "$HERE/risk_scan.py" "$STAGE_DIR/diff.patch" --json --head "$STAGE_DIR/head" --convention-md "$STAGE_DIR/evidence-convention.md" \
+    > "$STAGE_DIR/risk.json" 2>/dev/null \
     || echo '{"risk":null,"note":"risk_scan 실패 — 승격 근거 없음"}' > "$STAGE_DIR/risk.json"
 fi
 
@@ -595,7 +633,7 @@ rm -rf "$STAGE_DIR"
 added=$(awk '{a+=$1} END{print a+0}' "$WORK_DIR/numstat.txt")
 deleted=$(awk '{d+=$2} END{print d+0}' "$WORK_DIR/numstat.txt")
 echo "수집 완료 — base=$BASE / +$added −$deleted / base 원본 ${saved}/${expected}개 · head 원본 ${hsaved}/${hexpected}개"
-echo "  diff.patch · requirements.md · base-behavior.md · base/ · head/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json · existing-threads.json · target.json · base-sha.txt"
+echo "  diff.patch · requirements.md · base-behavior.md · base/ · head/ · base-manifest.tsv · review-surface.md · review-surface.patch(중복 커밋 시) · numstat.txt · risk.json · evidence-convention.md(head/ 가 있을 때) · existing-threads.json · target.json · base-sha.txt"
 [ -f "$WORK_DIR/evidence-move-drift.md" ] && echo "  ⭐ evidence-move-drift.md — 이동 리팩토링 감지. 동등성과 **별개 축**이다"
 grep -q '⛔ \*\*head 커밋' "$WORK_DIR/review-surface.md" 2>/dev/null && \
   echo "⚠️  중복 커밋 감지 — review-surface.md 를 먼저 읽어라. Tier 판정이 부풀려져 있다"

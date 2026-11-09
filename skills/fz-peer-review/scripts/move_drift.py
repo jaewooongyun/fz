@@ -15,7 +15,9 @@
 ⛔ 이 스크립트는 **판정하지 않는다.** 데이터를 만들고, 판정은 렌즈·Lead 가 한다 —
    렌즈는 데이터가 있으면 본다(#4774 에서 evidence-brief 를 주니 인용했다).
 
-usage: move_drift.py DIFF_PATH RANGE_LABEL
+usage: move_drift.py DIFF_PATH RANGE_LABEL [--files NUMSTAT]
+  --files  numstat.txt(추가\t삭제\t경로)의 경로 집합으로 A · B · C 를 거른다 — 판정 대상 patch 에 이 PR 이 바꾸지 않은 파일이 섞이면
+           (base 머지 커밋 등) B · C 에 무관 파일 100여 개가 실렸다(F-123). gather.sh 가 diff.patch 의 numstat 을 넘긴다
 exit: 0 = 이동 감지 + 산출 / 1 = 이동 아님(산출 없음) / 2 = 입력 오류
   ⛔ exit 1 은 실패가 아니다 — "이 PR 은 이동이 아니다" 라는 판정이다.
 """
@@ -81,9 +83,41 @@ def header_block(lines):
     return out
 
 
+def numstat_paths(path):
+    """numstat 경로 열 — 개명 `a => b` · `d/{a => b}/f` 는 양쪽 이름을 다 넣는다."""
+    out = set()
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            cols = line.rstrip("\n").split("\t")
+            if len(cols) < 3 or not cols[2]:
+                continue
+            p = cols[2]
+            m = re.match(r"^(.*)\{(.*) => (.*)\}(.*)$", p)
+            if m:
+                out |= {(m.group(1) + m.group(2) + m.group(4)).replace("//", "/"), (m.group(1) + m.group(3) + m.group(4)).replace("//", "/")}
+            elif " => " in p:
+                out |= set(p.split(" => ", 1))
+            else:
+                out.add(p)
+    return out
+
+
 def main(argv):
+    argv = list(argv)
+    keep = None
+    if "--files" in argv:
+        k = argv.index("--files")
+        if k + 1 >= len(argv):
+            sys.stderr.write("--files 에 numstat 경로가 없다\n")
+            return 2
+        try:
+            keep = numstat_paths(argv[k + 1])
+        except OSError as exc:
+            sys.stderr.write("numstat 을 읽을 수 없다: %s\n" % exc)
+            return 2
+        del argv[k:k + 2]
     if len(argv) < 3:
-        sys.stderr.write("usage: move_drift.py DIFF_PATH RANGE_LABEL\n")
+        sys.stderr.write("usage: move_drift.py DIFF_PATH RANGE_LABEL [--files NUMSTAT]\n")
         return 2
     try:
         text = open(argv[1], encoding="utf-8", errors="replace").read()
@@ -92,6 +126,8 @@ def main(argv):
         return 2
 
     new_files, add, rem = parse(text)
+    if keep is not None:
+        new_files, add, rem = ({f: v for f, v in d.items() if f in keep} for d in (new_files, add, rem))
     # ⛔ 이동 판정: **신규 파일이 실제로 생겼고** 기존 파일에서 그만큼 지워졌다.
     #    비율만 쓰면 개명 PR 이 걸린다 — 신규 파일 존재를 필수 조건으로 둔다.
     deleted = sum(len(v) for v in rem.values())
