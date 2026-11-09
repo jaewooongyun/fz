@@ -3,7 +3,7 @@ name: review-quality
 description: >-
   코드 품질 + Dead Code + 성능 리뷰 에이전트. 기능 분리, API 사용, 성능 평가.
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 skills:
   - code-auditor
 ---
@@ -33,19 +33,20 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 - 사용처 0인 코드 역추적 → 삭제 대상 보고 (find_referencing_symbols)
 - **리팩토링 완성도** (리팩토링 커밋에만): 미참조 심볼 잔존 여부 확인 (심볼 참조 카운팅)
 - **삭제 vs 이동 판별**: diff에서 코드 삭제 발견 시 "누락"으로 즉단하지 않는다. 모듈화/리팩토링에서 레이어 간 이동(Interactor→UseCase 등)은 정상. PR diff 전체에서 동일 로직의 이동 여부를 반드시 확인 후 판정
-- 코딩 표준 준수 — CLAUDE.md `## Code Conventions` 참조
-- CLAUDE.md `## Code Conventions` 의 네이밍/포맷 규칙 위반 확인
+- 코딩 표준 준수 — CLAUDE.md 코딩 규칙 절 참조
+- CLAUDE.md 코딩 규칙 절의 네이밍/포맷 규칙 위반 확인
+- ⛔ CLAUDE.md 절은 제목이 아니라 **내용으로** 찾는다 — 프로젝트마다 제목이 다르다(예: 플러그인 · 최소 타겟 정보가 여러 절에 흩어진 프로젝트). 찾지 못한 규칙은 응답에 `[규칙 미발견: {무엇}]` 으로 적는다 — 그 규칙 없이 조용히 진행하지 않는다 (F-252)
 
 ### 3. Performance Awareness
 
 - 성능에 부정적 영향을 주는 패턴이 있는가? (메인 스레드 부하, 메모리 누수, 비효율적 연산)
 
-### 4. UI Framework Quality (CLAUDE.md `## Plugins`에 UI 프레임워크 플러그인 명시 시)
+### 4. UI Framework Quality (CLAUDE.md 플러그인·최소 타겟 정보에 UI 프레임워크 플러그인 명시 시)
 
 - SwiftUI: `swiftui-expert` 플러그인 기준 — state 관리, view 구조, 성능 패턴
-- 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md `## Plugins` 참조)
+- 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md 플러그인·최소 타겟 정보 참조)
 
-### 5. Concurrency Safety (동시성 코드 포함 시 **또는 역방향 감지 트리거 활성 시**, CLAUDE.md `## Plugins` 참조)
+### 5. Concurrency Safety (동시성 코드 포함 시 **또는 역방향 감지 트리거 활성 시**, CLAUDE.md 플러그인·최소 타겟 정보 참조)
 
 - actor isolation 경계 위반 여부
 - Sendable conformance 적절성

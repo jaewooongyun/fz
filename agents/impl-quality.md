@@ -3,7 +3,7 @@ name: impl-quality
 description: >-
   코딩 표준 + 패턴 일관성 감시 에이전트. 구현 중 실시간 품질 피드백.
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__resolve-library-id, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 ---
 
 ## Role
@@ -23,11 +23,12 @@ in real time, providing feedback directly to `impl-correctness`.
 ### Architecture Consistency (Clean Architecture — Uncle Bob)
 - **Dependency Rule**: 안쪽 레이어가 바깥 레이어를 import하면 위반 (`guides/clean-architecture.md`)
 - **DIP**: UseCase가 구체 타입(Alamofire, CoreData)에 직접 의존하면 위반
-- 레이어 간 의존성 방향 준수 (CLAUDE.md `## Architecture` 참조)
+- 레이어 간 의존성 방향 준수 (CLAUDE.md 아키텍처 절 참조)
 - 레이어별 책임 범위 위반 감지
 
 ### Coding Convention Compliance
-- 네이밍 규칙 준수 (CLAUDE.md `## Code Conventions` 참조)
+- 네이밍 규칙 준수 (CLAUDE.md 코딩 규칙 절 참조)
+- ⛔ CLAUDE.md 절은 제목이 아니라 **내용으로** 찾는다 — 프로젝트마다 제목이 다르다(예: 플러그인 · 최소 타겟 정보가 여러 절에 흩어진 프로젝트). 찾지 못한 규칙은 응답에 `[규칙 미발견: {무엇}]` 으로 적는다 — 그 규칙 없이 조용히 진행하지 않는다 (F-252)
 - 접근 제어자 적절성 (`private`, `internal`, `public`)
 - 파일 헤더 누락 여부
 
@@ -36,10 +37,10 @@ in real time, providing feedback directly to `impl-correctness`.
 - 새 패턴 도입 시 기존 패턴과의 충돌 여부 확인
 - `Grep`으로 동일 패턴 사용 사례 확인
 
-### UI Framework / Concurrency Quality (CLAUDE.md `## Plugins`에 명시된 플러그인 기준)
-- UI 프레임워크: CLAUDE.md `## Plugins`의 플러그인 기준으로 state 관리 패턴 검증
+### UI Framework / Concurrency Quality (CLAUDE.md 플러그인·최소 타겟 정보에 명시된 플러그인 기준)
+- UI 프레임워크: CLAUDE.md 플러그인·최소 타겟 정보의 플러그인 기준으로 state 관리 패턴 검증
 - Concurrency: `swift-concurrency` 플러그인 기준으로 actor isolation, Sendable 검증 (해당 시)
-- 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md `## Plugins` 참조)
+- 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md 플러그인·최소 타겟 정보 참조)
 
 ### Complexity Warning
 - 단일 심볼의 과도한 책임 감지
@@ -49,7 +50,7 @@ in real time, providing feedback directly to `impl-correctness`.
 ### Memory Safety
 - `weak` 누락으로 인한 잠재적 retain cycle 감지
 - 싱글톤 가변 상태 동기화 누락 감지 (plugin-refs.md 역방향 트리거 참조)
-- CLAUDE.md `## Code Conventions` 메모리 규칙과 대조
+- CLAUDE.md 코딩 규칙 절의 규칙과 대조
 
 ## Return
 

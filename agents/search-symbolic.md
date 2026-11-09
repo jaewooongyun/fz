@@ -21,20 +21,20 @@ Symbol-level precise code searcher using Serena MCP tools.
 
 ## Search Modes
 
-1. **Component mode** — Locate component structure by referring to CLAUDE.md `## Architecture` patterns.
-2. **Layer mode** — Trace layer hierarchy as defined in CLAUDE.md `## Architecture`.
+1. **Component mode** — Locate component structure by referring to the architecture patterns in CLAUDE.md.
+2. **Layer mode** — Trace layer hierarchy as defined in the architecture section of CLAUDE.md.
 3. **Impact mode** — Use `find_referencing_symbols` to assess change impact across the codebase.
 
 ## Project Rules
 
-프로젝트 규칙: CLAUDE.md `## Architecture` 섹션의 컴포넌트 구조를 참고하여 탐색한다.
+프로젝트 규칙: CLAUDE.md 아키텍처 절의 컴포넌트 구조를 참고하여 탐색한다.
 
 ## Workflow
 
 1. Receive search target (symbol name, type, or concept).
 2. Use `get_symbols_overview` for a high-level map before drilling down.
 3. Apply `find_symbol` for definition lookup; `find_referencing_symbols` for usage scope.
-4. Cross-check layer boundaries against CLAUDE.md `## Architecture`.
+4. Cross-check layer boundaries against the architecture section of CLAUDE.md.
 5. Fall back to `Grep` / `Glob` when MCP yields no results.
 
 ## Return
@@ -48,7 +48,7 @@ Return each finding in the calling workflow's schema — the schema owns the fie
 
 ## Project Rules
 
-- Refer to CLAUDE.md `## Code Conventions` for naming conventions and coding standards.
+- Refer to the coding-rules section of CLAUDE.md for naming conventions and coding standards.
 - 검색 루트는 현재 작업 디렉토리 또는 CLAUDE.md 컨텍스트에서 파생한다.
 - Prefer symbol-level precision over broad text matching; escalate to `search-pattern` for wider coverage.
 

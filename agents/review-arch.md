@@ -4,7 +4,7 @@ description: >-
   아키텍처 결정 + 레이어 위반 리뷰 에이전트. 설계 결정과 확장성 평가.
 model: sonnet
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 skills:
   - arch-critic
 ---
@@ -29,21 +29,21 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 - **Dependency Rule**: 의존성은 반드시 안쪽으로만 (Entity ← UseCase ← Adapter ← Framework)
 - **SOLID 위반 감지**: SRP(변경 이유 2+), OCP(switch/if 분기 증가), DIP(안쪽이 바깥 import)
-- 프로젝트 아키텍처 패턴 준수 여부 — CLAUDE.md `## Architecture` 참조
+- 프로젝트 아키텍처 패턴 준수 여부 — CLAUDE.md 아키텍처 절 참조
 - 레이어 간 의존성 방향 (상위 레이어 → 하위 레이어만 허용)
 - 컴포넌트 역할 분리가 CLAUDE.md 기준을 따르는가
 - 상세 원칙: `guides/clean-architecture.md` 참조
 
 ### 2. UI Framework Architecture (CLAUDE.md에 UI 프레임워크 명시 시)
-- CLAUDE.md `## Plugins` 참조: UI 프레임워크별 플러그인 기준으로 state 관리 패턴 검증
-- 최소 타겟 제약 준수 (CLAUDE.md `## Plugins` 참조)
+- CLAUDE.md 플러그인·최소 타겟 정보 참조: UI 프레임워크별 플러그인 기준으로 state 관리 패턴 검증
+- 최소 타겟 제약 준수 (CLAUDE.md 플러그인·최소 타겟 정보 참조)
 - SwiftUI 프로젝트: `swiftui-expert` 플러그인, View-ViewModel 분리, RIBs 정합성
 - ⊕ 워크플로가 `[프로젝트 규칙 — 이 렌즈 전용]` 줄(craftAxes 옵션 — `modules/project-rules.md`)을 주면 UI 프레임워크·상태 관리 기준은 그 규칙 레코드가 정하고, 위 `## Plugins` 기준보다 우선한다. 그 줄이 없으면 위 기준 그대로다
 
 ### 3. Extensibility
 
 - 프로토콜(인터페이스) 기반 추상화 적절성
-- 구체 타입 직접 참조 여부 — CLAUDE.md `## Architecture`의 레이어 규칙 위반 여부
+- 구체 타입 직접 참조 여부 — CLAUDE.md 아키텍처 절의 레이어 규칙 위반 여부
 
 ### 4. State Lifecycle Alignment
 

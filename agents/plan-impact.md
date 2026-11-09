@@ -54,8 +54,8 @@ g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필�
 
 ## 프로젝트 규칙
 
-- 아키텍처: CLAUDE.md `## Architecture` 섹션의 패턴과 레이어 규칙을 따른다.
-- 코딩 표준: CLAUDE.md `## Code Conventions` 섹션을 따른다.
+- 아키텍처: CLAUDE.md 아키텍처 절의 패턴과 레이어 규칙을 따른다.
+- 코딩 표준: CLAUDE.md 코딩 규칙 절을 따른다.
 
 ## 분석 범위
 

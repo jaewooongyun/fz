@@ -64,9 +64,15 @@ Plan에 Anti-Pattern Constraints 있는 경우 실행. 절차:
    - severity: Critical (리팩토링 목표 무력화)
 4. 모든 금지 패턴이 0 매칭이어야 통과
 
+⛔ 문법 규칙(예: weak unwrap 금지)은 이름 grep 0건을 통과로 읽지 않는다 — 형태로 넓히고 이름으로 좁힌다(F-004).
+   프로젝트 규칙이 weak unwrap 금지를 선언하면 `python3 "${FZ_PLUGIN_ROOT}/scripts/collect_weak_unwrap.py" <변경 Swift 파일 + weak 선언 파일>`
+   로 후보를 전수로 모은다(if · guard · while · `cond, let` · `else if cond, let` · 축약 · case let). 0건이면 출력의 형태 목록을 그대로 적는다
+   — '이 형태 목록에서 0건' 이지 '위반 없음' 이 아니다.
+
 체크리스트:
 - [ ] Anti-Pattern Constraints의 모든 금지 패턴이 코드베이스에서 0건인가?
 - [ ] 금지 패턴의 변형(alias, 간접 참조 등)도 검사했는가?
+- [ ] weak unwrap 금지 규칙이 있으면 collect_weak_unwrap.py 후보를 전수 판정했는가?
 ```
 
 ### 검증 4-G: Protocol Conformance (프로토콜 적합성 검증)

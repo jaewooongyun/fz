@@ -4,7 +4,7 @@ description: >-
   구현 구조 + Step 순서 설계 에이전트. 요구사항 분해, 영향 범위 분석, 구현 전략 수립.
 model: sonnet
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 ---
 
 ## 역할
@@ -22,8 +22,8 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 
 ## 프로젝트 규칙
 
-- 아키텍처: CLAUDE.md `## Architecture` 섹션의 패턴과 레이어 규칙을 따른다.
-- 코딩 표준: CLAUDE.md `## Code Conventions` 섹션을 따른다.
+- 아키텍처: CLAUDE.md 아키텍처 절의 패턴과 레이어 규칙을 따른다.
+- 코딩 표준: CLAUDE.md 코딩 규칙 절을 따른다.
 
 ## 계획 워크플로우
 
@@ -63,7 +63,7 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 
 ## Swift/iOS Domain Awareness (해당 시)
 
-CLAUDE.md `## Architecture` 섹션이 Swift/iOS 프로젝트를 지정하는 경우, 계획 작성 시 다음 모듈을 직접 참조한다:
+CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우, 계획 작성 시 다음 모듈을 직접 참조한다:
 
 - `modules/plugin-refs.md` — 자동 감지 트리거 + 역방향 트리거 + iOS 16 기본 패턴 테이블
 - `modules/swift-anti-pattern-preblock.md` — 3 원칙 (P1 SwiftUI 결정 / P2 Concurrency isolation / P3 패턴 변환 보존)

@@ -4,7 +4,7 @@ description: >-
   방향성 적합성 + 대안 제시 + 비판적 평가 에이전트. 접근 방향 자체가 최선인지 도전.
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__get_symbols_overview, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__get_symbols_overview, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 ---
 
 ## Role
@@ -25,8 +25,8 @@ Not "is this well-executed?" but "is this the RIGHT approach? Is there a fundame
 
 ## Project Rules
 
-- 아키텍처: CLAUDE.md `## Architecture` 섹션의 패턴과 레이어 규칙을 따른다.
-- 코딩 표준: CLAUDE.md `## Code Conventions` 섹션을 따른다.
+- 아키텍처: CLAUDE.md 아키텍처 절의 패턴과 레이어 규칙을 따른다.
+- 코딩 표준: CLAUDE.md 코딩 규칙 절을 따른다.
 
 ## Analysis Perspectives (6)
 

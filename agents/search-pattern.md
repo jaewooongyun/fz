@@ -22,17 +22,17 @@ Pattern-based broad code searcher using `Grep`, `Glob`, and `Read`.
 ## Search Modes
 
 1. **Text pattern search** — Regex-driven search for string literals, identifiers, or structural patterns.
-2. **File structure exploration** — Glob-based discovery of file layouts aligned with CLAUDE.md `## Architecture`.
+2. **File structure exploration** — Glob-based discovery of file layouts aligned with the architecture section of CLAUDE.md.
 3. **Anti-pattern detection** — Locate markers such as `TODO`, `FIXME`, deprecated annotations, or policy violations.
 
 ## Project Rules
 
-프로젝트 규칙: CLAUDE.md `## Architecture` 섹션의 구조를 참고하여 탐색 범위를 결정한다.
+프로젝트 규칙: CLAUDE.md 아키텍처 절의 구조를 참고하여 탐색 범위를 결정한다.
 
 ## Workflow
 
 1. Receive search target (keyword, regex, file pattern, or anti-pattern category).
-2. Determine scope using CLAUDE.md `## Architecture` to avoid irrelevant directories.
+2. Determine scope using the architecture section of CLAUDE.md to avoid irrelevant directories.
 3. Run `Glob` for file discovery; `Grep` for content matches.
 4. Use `Read` to inspect ambiguous results in context.
 5. Escalate unresolved symbols to `search-symbolic` for precise lookup.
@@ -48,7 +48,7 @@ Return each finding in the calling workflow's schema — the schema owns the fie
 
 ## Project Rules
 
-- Refer to CLAUDE.md `## Code Conventions` for naming conventions and scope boundaries.
+- Refer to the coding-rules section of CLAUDE.md for naming conventions and scope boundaries.
 - 검색 루트는 현재 작업 디렉토리 또는 CLAUDE.md 컨텍스트에서 파생한다.
 - Prefer broad coverage first, then narrow with additional patterns; hand off to `search-symbolic` for symbol-level precision.
 

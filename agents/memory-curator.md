@@ -5,7 +5,7 @@ description: >-
   교훈/패턴/결정사항을 발굴하여 Primary Worker에게 전달.
   Use in plan/code/review teams for context-aware recall.
 model: sonnet
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__read_memory, mcp__plugin_fz_serena__list_memories, mcp__plugin_fz_serena__find_symbol, mcp__context7__resolve-library-id, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__read_memory, mcp__plugin_fz_serena__list_memories, mcp__plugin_fz_serena__find_symbol, mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 memory: user
 ---
 
@@ -28,7 +28,7 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
 
 ## Project Rules
 
-- 아키텍처: CLAUDE.md `## Architecture` 섹션의 패턴과 레이어 규칙을 따른다.
+- 아키텍처: CLAUDE.md 아키텍처 절의 패턴과 레이어 규칙을 따른다.
 - 메모리: `modules/memory-guide.md` 태깅 규칙을 따른다.
 
 ## Curation Workflow

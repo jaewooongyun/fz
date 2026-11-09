@@ -12,6 +12,7 @@
   "mcp_servers": {
     "plugin_fz_serena": { "form": "plugin", "note": "플러그인 제공 — 런타임이 `plugin_fz_` 접두를 붙인다" },
     "context7":         { "form": "plain",  "note": "라이브러리 문서" },
+    "plugin_context7_context7": { "form": "plugin", "note": "공식 마켓플레이스 context7 플러그인으로 깔았을 때의 등록 이름 — agents tools 에 context7 이름과 함께 둔다(F-544 · 없는 이름은 무시된다)" },
     "sequential-thinking": { "form": "plain", "note": "단계 추론" },
     "atlassian-jira":   { "form": "plain",  "note": "REST path 를 받는 범용 도구" },
     "github":           { "form": "plain",  "note": "PR·이슈" }

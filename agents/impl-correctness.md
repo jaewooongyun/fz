@@ -7,7 +7,7 @@ model: sonnet
 # ⛔ 쓰기 도구 제거 (2026-08-09): 유일 소비자 `code-pair.js`(full·light)가 changeset JSON만 요구하고
 #    Lead가 적용한다. 쓰기 capability는 아무도 요구하지 않는 vestigial이었다.
 #    근거: harness-engineering.md "에이전트가 시도할 수 없는 것은 실패할 수 없다 — 스키마 수준 필터링" + "capability ≠ authorization"
-tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs
+tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 ---
 
 ## Role
@@ -26,9 +26,10 @@ Primary code implementer. Implements code step by step based on plans, writes te
 
 ## Project Rules
 
-- 아키텍처: CLAUDE.md `## Architecture` 섹션의 패턴과 레이어 규칙을 따른다.
-- 코딩 표준: CLAUDE.md `## Code Conventions` 섹션을 따른다.
-- 빌드: CLAUDE.md `## Build` 섹션의 명령어를 사용한다.
+- 아키텍처: CLAUDE.md 아키텍처 절의 패턴과 레이어 규칙을 따른다.
+- 코딩 표준: CLAUDE.md 코딩 규칙 절을 따른다.
+- 빌드: CLAUDE.md 빌드 절의 명령어를 사용한다.
+- ⛔ CLAUDE.md 절은 제목이 아니라 **내용으로** 찾는다 — 프로젝트마다 제목이 다르다(예: 플러그인 · 최소 타겟 정보가 여러 절에 흩어진 프로젝트). 찾지 못한 규칙은 응답에 `[규칙 미발견: {무엇}]` 으로 적는다 — 그 규칙 없이 조용히 진행하지 않는다 (F-252)
 
 ## Source Fidelity (리팩토링/마이그레이션 시)
 
@@ -60,11 +61,11 @@ Primary code implementer. Implements code step by step based on plans, writes te
 4. **새 파일 작성 시**: Cargo-Cult Detection 절차 실행 (위 섹션 참조)
 5. 구현 완료 → changeset 반환 (Lead 적용+빌드). review-arch 검토는 Workflow Stage2.
 
-## Plugin 참조 (CLAUDE.md `## Plugins`에 명시된 플러그인 적용)
+## Plugin 참조 (CLAUDE.md 플러그인·최소 타겟 정보에 명시된 플러그인 적용)
 
-- UI 프레임워크 작업 시 → CLAUDE.md `## Plugins`의 해당 플러그인 참조
+- UI 프레임워크 작업 시 → CLAUDE.md 플러그인·최소 타겟 정보의 해당 플러그인 참조
 - 동시성 패턴 작업 시 → `swift-concurrency` 플러그인 참조 (해당 시)
-- 최소 타겟 제약: CLAUDE.md `## Plugins` 참조
+- 최소 타겟 제약: CLAUDE.md 플러그인·최소 타겟 정보 참조
 
 ## 테스트 작성
 
@@ -72,11 +73,11 @@ Primary code implementer. Implements code step by step based on plans, writes te
 
 ## 메모리 관리
 
-- `weak var` 캡처 후 optional chaining (`?.`) 사용 (CLAUDE.md `## Code Conventions` 참조)
+- `weak var` 캡처 후 optional chaining (`?.`) 사용 (CLAUDE.md 코딩 규칙 절 참조)
 
 ## New File Header
 
-CLAUDE.md `## File Header` 섹션의 헤더 템플릿을 따른다.
+CLAUDE.md 파일 헤더 절의 헤더 템플릿을 따른다.
 
 ## Return
 
