@@ -1,0 +1,131 @@
+id	path	kind	text
+# 문서로 고친 finding 의 계약 — 검사기 scripts/check_finding_contracts.py · 열: F-ID 경로 종류(has|lacks|count=N) 문구
+F-417	modules/gates.md	has	MANUAL 게이트는 사유를 criterion 에 적는다
+F-346	skills/fz-plan/SKILL.md	has	입력 파일은 `{steps:[…], rtm:[…]}` 객체 또는 steps 배열이다
+F-476	skills/fz-pr-digest/SKILL.md	has	목차 정본 = `modules/explanation-output.md`
+F-476	skills/fz-pr-digest/SKILL.md	lacks	B. 동작↔코드 1:1 매핑 (동작 하나당 블록 하나
+F-287	guides/llm-references.md	has	트리가 인용하는 arxiv ID 는 이 표 ∪ `harness-engineering.md` §참고 문헌 안에 있어야 한다
+F-072	modules/peer-review-tiers.md	has	cost-log.json` — Lead 가 작성한다
+F-072	modules/peer-review-tiers.md	lacks	cost-log.json` 자동 작성
+F-069	modules/peer-review-gates.md	has	트리거는 severity 가 아니라 **게시 대상 여부**다
+F-069	modules/peer-review-gates.md	lacks	## Gate 4.5: Line Verification (Major 이슈만)
+F-115	skills/fz-peer-review/SKILL.md	has	`alternatives` · `recommended` 는 원문 그대로 그 issue 에
+F-517	skills/fz-peer-review/SKILL.md	has	Lead 가 판단으로 뺀 관찰은 `dismissed[{id, what, reason}]`
+F-514	modules/peer-review-tiers.md	has	렌더러가 `## 축 판정` 표를 그린다
+F-516	modules/peer-review-gates.md	has	[관례 이탈] 이번 변경만 형제 관례와 다르다
+F-520	skills/fz-peer-review/SKILL.md	has	그 모듈 `## 자동 감지 트리거` 표 전체를 조건으로 잰 값
+F-520	skills/fz-peer-review/SKILL.md	lacks	(diff에 `@MainActor\|actor\|async` 감지 시)
+F-004	modules/review-checks.md	has	'이 형태 목록에서 0건' 이지 '위반 없음' 이 아니다
+F-428	docs/ab-endpoint-clock.md	has	## 정식 비교 절차 (`judge --formal`)
+F-428	docs/ab-endpoint-clock.md	has	`--formal` 없이 낸 판정은 결론으로 인용하지 않는다
+F-326	docs/ab-endpoint-clock.md	has	judge 는 기록을 넘긴 run 에만 0 을 요구한다
+F-506	docs/ab-endpoint-clock.md	has	그 arm 의 차이를 처치의 효과로 읽지 않는다
+F-415	modules/fz-gpt-subcommands-core.md	has	대체되는 블록이 불리던 실패 경로마다 기준 · 후보를 재는 셀이 있는가
+F-405	modules/fz-gpt-subcommands-core.md	has	새 env · 플래그 이름을 재는 셀이 기본값과 **다른** 값을 주는가
+F-413	modules/fz-gpt-subcommands-core.md	has	그 상태의 마지막 쓰기(최종 소비 지점)까지 재생하는가
+F-522	modules/fz-gpt-subcommands-core.md	has	수정이 다루지 않은 다른 상태(같은 진입 경로가 읽는 다른 변수 · 낡은 값)
+F-445	skills/fz-plan/SKILL.md	has	착수 전 `extract_project_rules.py` 원문 색인 1회
+F-470	modules/gpt-strategy.md	has	**보류(미적용 · 미측정)**
+F-470	modules/gpt-strategy.md	lacks	- `fz-gpt` SKILL.md verify/validate/plan 서브커맨드 prompt template
+F-469	modules/gpt-strategy.md	has	**수동 전략(미배선)**
+F-469	modules/gpt-strategy.md	lacks	자동 전환
+F-469	modules/gpt-strategy.md	lacks	GPT 호출 전략을 자동 선택합니다
+F-362	workflows/plan-lean2.js	has	줄 번호가 있는 심볼은 다시 Read 하지 않는다
+F-438	modules/sprint-contract.md	has	못 적으면 success_criteria 가 아니라 suggestion 으로 내린다
+F-438	agents/plan-edge-case.md	has	못 적으면 선택 사항이다
+F-026	modules/cross-validation.md	has	실패 모드가 다른 조달원
+F-026	modules/promotion-ledger.md	has	관측 #3: **F-026 재관측**
+F-076	modules/cross-validation.md	has	부재 주장의 근거 경로에 쓰지 않는다
+F-127	modules/cross-validation.md	has	두 시점 대조(F-127)
+F-140	modules/cross-validation.md	has	필터 없는 수와 차집합을 함께 인쇄
+F-140	modules/cross-validation.md	has	같은 필터가 복사된 자리
+F-209	modules/cross-validation.md	has	분자 · 분모 · 기간을 한 줄에 쓰고
+F-225	modules/cross-validation.md	has	이름 정규식의 하이픈 누락
+F-225	modules/cross-validation.md	has	대조 기준 집합의 출처와 크기
+F-226	modules/cross-validation.md	has	또는 비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)
+F-226	modules/lead-reasoning.md	has	어휘 9개 + 비율 주장
+F-226	modules/system-reminders.md	has	어휘 9개 + 비율 주장
+F-226	skills/fz-search/SKILL.md	has	비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)
+F-226	skills/fz-discover/SKILL.md	has	비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)
+F-034	modules/evidence-collection.md	has	경계를 건넌 rename 도 대상이다
+F-035	modules/cross-validation.md	has	코퍼스가 측정 대상 자신을 포함
+F-057	modules/cross-validation.md	has	도구 답 영역 ≠ 질문 영역
+F-054	modules/cross-validation.md	has	단정하기 전에 정본 호출을 1회 시험한다
+F-066	modules/cross-validation.md	has	무필터 조회 수와 대조하고 두 필터를 동시에 쓰지 않는다
+F-091	modules/cross-validation.md	has	비ASCII 패턴을 `perl -e` 인라인에
+F-099	modules/cross-validation.md	has	커버리지 미검증
+F-099	modules/promotion-ledger.md	has	관측 #2: `fz-findings` **F-099**
+F-293	modules/uncertainty-verification.md	has	큰 수가 나와도 표본을 열어 본다
+F-293	modules/uncertainty-verification.md	has	걸려서는 안 되는 대조 셀
+F-292	modules/uncertainty-verification.md	has	주어 대조(F-292)
+F-138	modules/uncertainty-verification.md	has	획득 경로 축(F-138)
+F-138	modules/uncertainty-verification.md	has	raw 대조 필수
+F-141	modules/uncertainty-verification.md	has	runtime 이 doc 을 이긴다
+F-402	modules/cross-validation.md	has	실행 직전 잔존 0 단언
+F-017	modules/lead-reasoning.md	has	`catch` 본문(부수효과 포함)을 코드로 인용
+F-009	modules/cross-validation.md	has	error-path
+F-197	modules/evidence-collection.md	has	직접 대입도 세고
+F-283	modules/cross-validation.md	has	언어 의미론 주장(`try?`
+F-283	modules/cross-validation.md	has	관찰 모드 해제
+F-283	modules/cross-validation.md	lacks	Runtime Claim Gate) [관찰 모드]
+F-025	guides/skill-testing.md	has	존재 검사(새 문구가 있다)와 부재 검사(옛 문구가 없다)를 쌍으로
+F-039	guides/harness-engineering.md	has	## 5.6 게이트의 게이트
+F-047	guides/harness-engineering.md	has	fixture 에 기대값의 출처(손 판정 · 문서 규칙 · 외부 모델 · 구현 출력)를 표기한다
+F-418	modules/gates.md	has	계획 이탈은 그 턴에 원장 문언을 고친다
+F-444	modules/gates.md	has	'기본 흐름 변경 0' 류는 직접 지표로 잰다
+F-447	modules/gates.md	has	버그 수정 Step 은 변이 셀을 갖는다
+F-447	skills/fz-code/SKILL.md	has	버그 수정 Step 이면 **변이 셀**
+F-230	skills/fz-code/SKILL.md	has	UI · 제스처 · 애니메이션 Step 이면 visual oracle
+F-230	skills/fz-code/SKILL.md	has	visual oracle 승격 token
+F-230	skills/fz-code/SKILL.md	has	Step 마다 visual oracle 충족?
+F-230	modules/gates.md	has	실행 오라클이 필요한 Step 은 미충족으로 남는다
+F-231	skills/fz-code/SKILL.md	has	`git diff` **본문**(`--stat` 아님)
+F-236	skills/fz-code/SKILL.md	has	**전수 재분류**해 건수(분모)를 보고
+F-174	skills/fz-code/SKILL.md	has	관례 역방향 | 내가 도입하는 관용구
+F-237	skills/fz-review/SKILL.md	has	**이동 래퍼에만 적용**한다
+F-122	guides/skill-testing.md	has	**예외를 넣으면 세 케이스를 만든다**
+F-042	skills/fz-review/SKILL.md	has	자기 설계 판단 · 위험 추정은 넣지 않는다
+F-112	modules/build.md	has	스킴 이름은 configuration 을 보장하지 않는다
+F-298	modules/gates.md	has	CHECK 안에서 다른 인터프리터로 넘기는 텍스트
+F-228	guides/skill-authoring.md	has	agents 편집은 같은 세션에 반영되지 않는다
+F-233	guides/skill-authoring.md	has	`/clear` 는 새 세션이 아니다
+F-264	modules/governance.md	has	푸시된 커밋을 다시 쓰는 일
+F-023	skills/fz-search/SKILL.md	has	`→ /fz-explain`
+F-023	skills/fz-search/SKILL.md	lacks	`/sc:sc-explain`
+F-023	skills/fz-discover/SKILL.md	lacks	`/sc:sc-explain`
+F-067	modules/peer-review-gates.md	has	## Gate 4.10: Implication Falsification
+F-067	skills/fz-peer-review/SKILL.md	has	테스트 파일이 diff 에 있으면 연다(Gate 4.10)
+F-243	modules/peer-review-gates.md	has	진입 함수의 **프로덕션 호출자**만 센다
+F-262	modules/peer-review-gates.md	has	그 화면 listener 프로토콜 전수 확인
+F-125	modules/build.md	has	최소 세로 · 가로 둘 다
+F-252	agents/impl-correctness.md	lacks	CLAUDE.md `##
+F-252	agents/impl-quality.md	lacks	CLAUDE.md `##
+F-252	agents/review-quality.md	lacks	CLAUDE.md `##
+F-252	agents/impl-correctness.md	has	`[규칙 미발견: {무엇}]`
+F-121	modules/peer-review-gates.md	has	Tier 1 은 § 9 Tier 1 행의 2-vote
+F-121	skills/fz-code/SKILL.md	has	정본 안에서 같은 대상을 말하는 진술끼리
+F-121	skills/fz-review/SKILL.md	has	정본 안에서 같은 대상을 말하는 진술끼리
+F-038	skills/fz-peer-review/SKILL.md	lacks	→ ≥70 INCLUDE, <70 EXCLUDE
+F-038	skills/fz-peer-review/SKILL.md	has	`[L실측]` 1줄(MergeContract § 4 형식)을 남기면 INCLUDE
+F-317	guides/harness-engineering.md	has	측정 도구는 긴 측정 전에 이종 모델 적대 검토를 1회 받는다
+F-419	modules/gates.md	has	리뷰 처분은 위치를 가리킨다
+F-073	skills/fz-peer-review/SKILL.md	has	셋 중 하나면 `AskUserQuestion` 으로 승인받은 뒤 게시한다
+F-073	modules/peer-review-inline-anchoring.md	has	변형 — 원인 지점 앵커
+F-199	guides/skill-authoring.md	has	해소 오라클은 '직접 호출 거부 0' 이 아니다
+F-199	guides/skill-authoring.md	has	설정 파일에 경로가 있다는 사실은 대리 지표
+F-239	skills/fz-commit/SKILL.md	has	사용자가 분할 단위를 말하면 그 말이 기본값이다
+F-005	agents/review-counter.md	has	| F-005 | 코드에 상한 · 하한 상수가 있으면
+F-082	agents/review-counter.md	has	| F-082 | 지적하려는 누락이
+F-088	agents/review-counter.md	has	| F-088 | 본문 · 의도가 선언한 동작 변경을 전부 열거
+F-173	agents/review-counter.md	has	| F-173 | 사용 위치 · 방식을 바꾼 심볼은
+F-263	agents/review-counter.md	has	| F-263 | regression 이라 부르기 전에
+F-365	agents/review-counter.md	has	| F-365 | 표현식을 다른 표현식으로 바꾼 자리
+F-367	agents/review-counter.md	has	| F-367 | 바뀐 presenter · listener 메서드
+F-556	agents/review-counter.md	has	| F-556 | 함수를 다시 쓴 수정
+F-027	agents/plan-edge-case.md	has	| F-027 | 제안이 들여오는 새 키 · 상태가
+F-044	agents/plan-edge-case.md	has	| F-044 | 대상의 실행 경로를 먼저 열거했는가
+F-170	agents/plan-edge-case.md	has	| F-170 | 오래 가는 base 위 작업이면
+F-280	agents/plan-edge-case.md	has	| F-280 | 새 호출 지점이 대상과 다른 파일이면
+F-371	agents/plan-edge-case.md	has	| F-371 | 기존 술어를 재사용하면
+F-521	agents/plan-edge-case.md	has	| F-521 | 바꾼 사실을 다른 표현으로 함께 쓰던 코드
+F-543	agents/plan-edge-case.md	has	| F-543 | 문제 계열을 한 문장으로 쓰고

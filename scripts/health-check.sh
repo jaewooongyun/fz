@@ -13,11 +13,13 @@
 #   · 각 검사의 exit 을 **개별 캡처**해 표로 보고하고, 하나라도 실패면 **비0**으로 종료한다
 #   · lint 의 SKIP(THRESHOLD·SEMANTIC) 건수를 **따로 표기**한다 — ⛔ SKIP 은 PASS 가 아니다
 #
-# usage: health-check.sh [--strict-freshness] [--realmode-only] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]
+# usage: health-check.sh [--strict-freshness] [--realmode-only] [--block <ledgers|gate-selftest>] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]
 #   --strict-freshness : 최신성 findings 가 있으면 실패로 취급 (기본: 경고)
 #   --realmode-only    : 0.5 실모드 블록만 돌리고 멈춘다 — 배선 fixture 전용, 초록으로 끝나지 않는다(실패 1 · 그 외 2)
+#   --block <이름>     : 그 블록 하나만 돌리고 멈춘다 — fixture 전용, 초록으로 끝나지 않는다(실패 1 · 그 외 2)
+#                        ledgers = 2.7 게이트 원장(tests/fixtures/health/own-ledgers) · gate-selftest = 2.5 게이트 self-test(tests/fixtures/health/gate-fail-detail)
 #   --changed <경로>   : 바뀐 경로(반복 가능) — scripts/health_select.py 가 검사를 고른다. 전부 문서면 부분 실행, 아니면 전체
-#   --changed-from <파일> : 바뀐 경로 목록 파일(한 줄에 하나 — `git diff --name-only` 출력 그대로)
+#   --changed-from <파일> : 바뀐 경로 목록 파일(한 줄에 하나 — `git diff --name-only` 출력 그대로 · `--name-status` 면 이동 · 삭제가 있을 때 전체)
 #   --ship             : 출하 — 경로와 무관하게 전체 실행(출하 게이트는 언제나 전체다)
 #   --select-only      : 선택 결과(HEALTH-SELECT 줄)만 출력하고 exit 0 — 검사를 돌리지 않는다
 #   ⛔ 네 인자가 없으면 이전과 같은 전체 실행이다. 부분 실행은 출하 게이트가 아니다 — 표 아래 `⛔ 부분 실행(PARTIAL)` 줄이 표시다
@@ -34,12 +36,17 @@ fi
 # ⛔ 인자 루프 — `$1`만 보면 `--bogus --strict-freshness` 가 조용히 non-strict 로 돈다 (ISSUE-010)
 STRICT_FRESHNESS=0
 REALMODE_ONLY=0
+BLOCK=""
 SELECT=0 SELECT_ONLY=0 SEL_ARGS=() CHANGED=()   # 경로별 선택(H2-9) — 네 인자 중 하나라도 있어야 SELECT=1 이 된다
-USAGE="health-check.sh [--strict-freshness] [--realmode-only] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]"
+USAGE="health-check.sh [--strict-freshness] [--realmode-only] [--block <ledgers|gate-selftest>] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]"
 while [ $# -gt 0 ]; do
   case "$1" in
     --strict-freshness) STRICT_FRESHNESS=1; shift ;;
     --realmode-only) REALMODE_ONLY=1; shift ;;
+    --block) case "${2:-}" in
+               ledgers|gate-selftest) BLOCK="$2"; shift 2 ;;
+               *) echo "⛔ --block 은 ledgers · gate-selftest 중 하나다: '${2:-}' (사용법: $USAGE)" >&2; exit 2 ;;
+             esac ;;
     --changed) [ $# -ge 2 ] || { echo "⛔ --changed 에 경로가 없다 (사용법: $USAGE)" >&2; exit 2; }
                SELECT=1; CHANGED+=("$2"); shift 2 ;;
     --changed-from) [ $# -ge 2 ] || { echo "⛔ --changed-from 에 파일이 없다 (사용법: $USAGE)" >&2; exit 2; }
@@ -53,11 +60,20 @@ done
 if [ "$REALMODE_ONLY" -eq 1 ] && [ "$SELECT" -eq 1 ]; then
   echo "⛔ --realmode-only 는 --changed · --changed-from · --ship · --select-only 와 함께 쓰지 않는다 (사용법: $USAGE)" >&2; exit 2
 fi
+if [ -n "$BLOCK" ] && { [ "$SELECT" -eq 1 ] || [ "$REALMODE_ONLY" -eq 1 ]; }; then
+  echo "⛔ --block 은 단독으로만 쓴다 (사용법: $USAGE)" >&2; exit 2
+fi
 
 NAMES=() CODES=() NOTES=()
 LINT_OUT="" SKIP_N=0   # 보고 꼬리가 읽는다 — 부분 실행이 계약 lint 를 건너뛰어도 set -u 에 걸리지 않게
 UNRUN=0     # 실행되지 못한 검사 수 — ⛔ 0이 아니면 "전 검사 통과"라 말하지 않는다
 record() { NAMES+=("$1"); CODES+=("$2"); NOTES+=("$3"); }
+# 실패 상세 — 비고가 '아래 상세' 라고 가리키는 줄을 모은다. report_and_exit 가 실패 때 찍는다(F-394: 가리키는 상세가 비어 있었다)
+DETAIL_OUT=""
+detail() {   # $1=검사 이름 · $2=상세 줄
+  [ -n "$2" ] || return 0
+  DETAIL_OUT="${DETAIL_OUT}[$1]"$'\n'"$2"$'\n'
+}
 # 1분 부하 평균 · 코어 수 — 시작 · 끝 두 줄. 소요 실측(TIMEOUT 산정)을 기계 부하와 함께 읽는다. 못 재면 '?'
 machine_load() {
   local l c
@@ -108,8 +124,12 @@ chk_doc_freshness() {
   FRESH_N="$(printf '%s\n' "$FRESH_OUT" | grep -oE '총 [0-9]+건' | grep -oE '[0-9]+' || echo 0)"
   if [ "$STRICT_FRESHNESS" -eq 1 ] && [ "${FRESH_N:-0}" -gt 0 ]; then
     record "출처 최신성" 1 "findings ${FRESH_N}건 (--strict-freshness)"
+  elif [ "$FRESH_CODE" -eq 1 ]; then
+    # 계약 규칙(arxiv 등재 · self-test 수 인용 · fixture 수)은 경고가 아니다 — lint 가 --strict 없이도 exit 1 을 낸다
+    record "출처 최신성" 1 "⛔ $(printf '%s\n' "$FRESH_OUT" | grep -E '^⛔ 계약 오류' | tail -1) — 아래 상세"
+    detail "출처 최신성" "$(printf '%s\n' "$FRESH_OUT" | grep -E -A2 '^■ (arxiv-unregistered|cited-selftest-count|fixture-case-count)' | head -20)"
   else
-    record "출처 최신성" "$FRESH_CODE" "findings ${FRESH_N}건 (경고 — exit 에 미반영)"
+    record "출처 최신성" "$FRESH_CODE" "findings ${FRESH_N}건 (경고 — exit 에 미반영 · 계약 오류만 exit 1)"
   fi
 }
 chk_runners() {   # 인자: 러너 경로들 — 0개면 미실행(전체 실행의 글롭 오타 감지). 부분 실행은 1개 이상일 때만 부른다
@@ -137,7 +157,7 @@ chk_runners() {   # 인자: 러너 경로들 — 0개면 미실행(전체 실행
     local RS=() RR rs_i=0 t_rc
     for r in "$@"; do case "$r" in */run.sh) [ -f "$r" ] && RS+=("$r") ;; esac; done
     if [ ${#RS[@]} -gt 0 ]; then
-      RR="$(mktemp -d)"
+      RR="$(mktemp -d "${TMPDIR:-/tmp}/fz-health-runners.XXXXXX")"
       python3 "$ROOT/scripts/run_runners.py" --jobs "${FZ_HEALTH_JOBS:-4}" --cwd "$ROOT" --out-dir "$RR" -- "${RS[@]}" >/dev/null 2>&1
       for r in "${RS[@]}"; do
         t_out="$(cat "$RR/$rs_i.out" 2>/dev/null || echo 'UNRUN: 러너 결과 없음 — 병렬 실행기가 기록하지 못했다')"
@@ -176,6 +196,51 @@ chk_recurrence() {
     "⛔ $(printf '%s\n' "$LR_OUT" | grep -E ': FAIL|: UNRUN|self-test: FAIL' | head -3 | tr '\n' ' ')"
 }
 # 퇴역 slash command 참조(H1-3) — 설치 · 활성화되지 않은 명령을 산문 · 표 · 코드 블록이 부르면 실패. 전체 실행에만 있다
+chk_ledgers() {   # 2.7 게이트 원장 상태 — 탐색 기준은 호출 CWD(작업 트리에 원장이 있다)
+  local out code last own foreign
+  out="$(python3 "$ROOT/scripts/gate_check.py" --discover "$PWD" 2>&1)"; code=$?
+  last="$(printf '%s\n' "$out" | tail -1)"
+  case "$code" in
+    0) record "게이트 원장 상태" 0 "$last" ;;
+    3)
+      # F-265 — 계약 위반 원장 중 이 플러그인 트리 · 이 세션 WORK_DIR(FZ_WORK_DIR) 밖의 것은 다른 티켓의 상태다(플러그인 결함이
+      #    아니다). 실패에서 빼고 제외 수를 낸다. 위반 줄 = gate_check --discover 의 `⛔ 계약 위반 <경로>: …`
+      read -r own foreign <<<"$(printf '%s\n' "$out" | ROOT="$ROOT" python3 -c '
+import os, sys
+pre = "\u26d4 계약 위반 "
+roots = [os.path.realpath(r) for r in (os.environ["ROOT"], os.environ.get("FZ_WORK_DIR", "")) if r]
+own = foreign = 0
+for line in sys.stdin:
+    if not line.startswith(pre):
+        continue
+    p = os.path.realpath(line[len(pre):].split(": ", 1)[0])
+    if any(p == r or p.startswith(r + os.sep) for r in roots):
+        own += 1
+    else:
+        foreign += 1
+print(own, foreign)')"
+      if [ "$(( ${own:-0} + ${foreign:-0} ))" -eq 0 ]; then
+        record "게이트 원장 상태" 1 "$last — 원장이 계약을 위반한다(위반 줄을 읽지 못해 소유를 가르지 못했다)"
+      elif [ "${own:-0}" -gt 0 ]; then
+        record "게이트 원장 상태" 1 "$last — 원장이 계약을 위반한다(소유 $own · 다른 티켓 제외 ${foreign:-0})"
+      else
+        record "게이트 원장 상태" 0 "$last — 계약 위반 ${foreign}건은 다른 티켓 원장이라 판정에서 제외(플러그인 결함 아님 · 제외 ${foreign})"
+      fi ;;
+    *) record "게이트 원장 상태" "$code" "⛔ 탐색 실행 불가 (PASS도 SKIP도 아님)" ;;
+  esac
+}
+
+chk_gate_selftest() {
+  GATE_OUT="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/scripts/gate_check.py" --self-test 2>&1)"; GATE_CODE=$?
+  GATE_LAST="$(printf '%s\n' "$GATE_OUT" | tail -1)"
+  case "$GATE_CODE" in
+    0) record "게이트 self-test"      0 "$GATE_LAST" ;;
+    1) record "게이트 self-test"      1 "$GATE_LAST — 아래 상세"
+       detail "게이트 self-test" "$(printf '%s\n' "$GATE_OUT" | grep -E '^ *FAIL' | head -20)" ;;
+    *) record "게이트 self-test" "$GATE_CODE" "⛔ 매니페스트·fixture 부재 (PASS도 SKIP도 아님)" ;;
+  esac
+}
+
 chk_retired_commands() {
   RC_OUT="$(python3 "$ROOT/scripts/check_retired_commands.py" --root "$ROOT" 2>&1)"; RC_CODE=$?
   record3 "퇴역 명령 참조" "$RC_CODE" "$RC_OUT" "$(printf '%s\n' "$RC_OUT" | tail -1)" \
@@ -206,13 +271,15 @@ report_and_exit() {   # $1 = 부분 실행 표지 줄 — 비면 전체 실행�
   if [ "$UNRUN" -ne 0 ]; then
     echo
     echo "⛔ 실행되지 못한 검사 ${UNRUN}건 — **전 검사 통과라고 말할 수 없다**"
-    [ "$FAILED" -ne 0 ] && { echo "── 계약 lint 전체 출력 ──"; printf '%s\n' "$LINT_OUT"; \
+    [ "$FAILED" -ne 0 ] && { [ -n "$DETAIL_OUT" ] && { echo "── 실패 상세 ──"; printf '%s' "$DETAIL_OUT"; }; \
+                             echo "── 계약 lint 전체 출력 ──"; printf '%s\n' "$LINT_OUT"; \
                              echo; echo "⛔ 추가로 실패한 검사도 있다"; }
     echo "(exit 2: 사전조건 미충족)"
     exit 2
   fi
   if [ "$FAILED" -ne 0 ]; then
     echo
+    [ -n "$DETAIL_OUT" ] && { echo "── 실패 상세 ──"; printf '%s' "$DETAIL_OUT"; echo; }
     echo "── 계약 lint 전체 출력 ──"
     # ⛔ ISSUE-010: 이전 판은 `── 위반` 마커부터만 출력해 **configuration error·traceback 을 숨겼다**
     #    (마커가 없는 실패는 상세 구획이 빈칸으로 나왔다). 전체를 낸다.
@@ -235,9 +302,25 @@ machine_load     # 시작 — 소요가 기계 부하 때문인지 가른다(F-4
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_g8_style.py eject_findings.py check_findings_hygiene.py check_release_closes.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py check_retired_commands.py run_runners.py check_evidence_slots.py gpt_ab_decide.py gpt_merge.py plan_integrity_check.py check_health_wiring.py fz_snapshot.py fz_stop_telemetry.py fz_telemetry_report.py run_metrics.py check_synthesized.py check_comment_worthy.py intent_route_probe.py; do
+for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_g8_style.py eject_findings.py check_findings_hygiene.py check_release_closes.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py check_retired_commands.py run_runners.py check_evidence_slots.py gpt_ab_decide.py gpt_merge.py plan_integrity_check.py check_health_wiring.py fz_snapshot.py fz_stop_telemetry.py fz_telemetry_report.py run_metrics.py check_synthesized.py check_comment_worthy.py intent_route_probe.py check_finding_contracts.py check_unrun_except.py check_rule_copies.py check_marker_leak.py collect_env_axes.py call_set_diff.py check_moved_code.py scope_census.sh collect_weak_unwrap.py check_applied_escapes.py check_pr_template.py check_review_diff.py check_unmeasured_handoff.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
+
+# ⛔ `--block <이름>` 은 그 블록 하나만 돌리고 멈춘다 — fixture 전용이며 초록으로 끝나지 않는다(--realmode-only 와 같은 규칙)
+if [ -n "$BLOCK" ]; then
+  NAMES=() CODES=() NOTES=()
+  case "$BLOCK" in
+    ledgers) chk_ledgers ;;
+    gate-selftest) chk_gate_selftest ;;
+  esac
+  code="${CODES[0]}"
+  if [ "$code" != 0 ]; then mark="⛔"; else mark="✅"; fi
+  printf '%s %s | %s | %s\n' "$mark" "${NAMES[0]}" "$code" "${NOTES[0]}"
+  [ -n "$DETAIL_OUT" ] && { echo "── 실패 상세 ──"; printf '%s' "$DETAIL_OUT"; }
+  echo "⛔ 부분 실행(--block $BLOCK) — 나머지 검사를 돌리지 않았다 (PASS 아님)"
+  [ "$code" = 1 ] && exit 1
+  exit 2
+fi
 
 # ── 0.1 경로별 검사 선택 (H2-9 · GPT H-015) — `--changed*` · `--ship` · `--select-only` 가 있을 때만 돈다(없으면 이 블록을 통째로 건너뛴다)
 #    선택은 scripts/health_select.py 가 러너 원문에서 매번 계산한다 — 손으로 고치는 '경로 → 검사' 표가 없다(표는 러너가 새 경로를
@@ -384,14 +467,7 @@ record "model·effort 명시" "$MODEL_CODE" "$(printf '%s\n' "$MODEL_OUT" | tail
 #    이 검사가 없으면 gate_check.py 가 회귀해도 통합 건강 체크가 통과한다.
 #    ⛔ 루트 **밖**에서 돌린다 — self-test 결과는 호출 위치와 무관해야 한다. `cd "$ROOT"` 로 돌리던
 #       시절에는 루트 기준 상대 경로가 cwd 로 풀리는 결함(F-338 — 루트 밖이면 verdict-* 11개 FAIL)이 보이지 않았다.
-GATE_OUT="$(cd "${TMPDIR:-/tmp}" && python3 "$ROOT/scripts/gate_check.py" --self-test 2>&1)"; GATE_CODE=$?
-GATE_LAST="$(printf '%s\n' "$GATE_OUT" | tail -1)"
-case "$GATE_CODE" in
-  0) record "게이트 self-test"      0 "$GATE_LAST" ;;
-
-  1) record "게이트 self-test"      1 "$GATE_LAST — 아래 상세" ;;
-  *) record "게이트 self-test" "$GATE_CODE" "⛔ 매니페스트·fixture 부재 (PASS도 SKIP도 아님)" ;;
-esac
+chk_gate_selftest
 
 # ── 2.6 Stop hook 계약 (게이트 2차 계층) ─────────────────────────────
 # ⛔ hook 은 등록해야 발동하지만 계약(stdin JSON → exit + stderr)은 **등록 없이**
@@ -411,13 +487,8 @@ esac
 #    ⛔ 원장 **계약 위반**(exit 3)만 실패다 — fz 가 만든 원장이 자기 계약을 어긴 것은
 #    plugin 자산 결함이고 그것이 health-check 의 관심사다.
 # ⛔ 탐색 기준은 호출 CWD 다(플러그인 루트가 아니다) — 작업 트리에 원장이 있다.
-LEDGER_OUT="$(python3 "$ROOT/scripts/gate_check.py" --discover "$PWD" 2>&1)"; LEDGER_CODE=$?
-LEDGER_LAST="$(printf '%s\n' "$LEDGER_OUT" | tail -1)"
-case "$LEDGER_CODE" in
-  0) record "게이트 원장 상태"      0 "$LEDGER_LAST" ;;
-  3) record "게이트 원장 상태"      1 "$LEDGER_LAST — 원장이 계약을 위반한다" ;;
-  *) record "게이트 원장 상태" "$LEDGER_CODE" "⛔ 탐색 실행 불가 (PASS도 SKIP도 아님)" ;;
-esac
+# ⛔ 다른 티켓 원장의 계약 위반은 노출만 한다(F-265) — chk_ledgers
+chk_ledgers
 
 # ── 3. 외부 출처 최신성 (⛔ 기본은 경고 — findings 가 있어도 exit 0 이므로 건수를 따로 본다)
 chk_doc_freshness
@@ -605,7 +676,7 @@ fi
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene check_release_closes migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select check_retired_commands run_runners check_evidence_slots fz_snapshot fz_stop_telemetry fz_telemetry_report lint_contracts lint_doc_freshness run_metrics check_health_wiring check_synthesized check_comment_worthy intent_route_probe; do
+for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene check_release_closes migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select check_retired_commands run_runners check_evidence_slots fz_snapshot fz_stop_telemetry fz_telemetry_report lint_contracts lint_doc_freshness run_metrics check_health_wiring check_synthesized check_comment_worthy intent_route_probe check_finding_contracts check_unrun_except check_rule_copies check_marker_leak collect_env_axes call_set_diff check_moved_code collect_weak_unwrap check_applied_escapes check_pr_template check_review_diff check_unmeasured_handoff; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   record3 "레지스트리 도구 self-test ($FS)" "$FS_CODE" "$FS_OUT" \
     "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)" \
@@ -690,6 +761,20 @@ record3 "GPT 스킬 이식성" "$GP_CODE" "$GP" \
   "$(printf '%s\n' "$GP" | grep -E '^gpt-skill-portability' | tail -1)" \
   "⛔ $(printf '%s\n' "$GP" | grep -E 'VIOLATION|UNRUN' | head -1)"
 
+# ── 넓은 except 의 UNRUN 사유 (F-396) ────────────────────────
+# ⛔ 넓은 except 가 UNRUN 을 내면 내용 이상까지 '판정 불가' 로 덮인다 — 넓게 잡는 자리는 `noqa: BLE001 — 사유` 를 적는다.
+UE="$(cd "$ROOT" && python3 scripts/check_unrun_except.py 2>&1)"; UE_CODE=$?
+record3 "넓은 except UNRUN 사유" "$UE_CODE" "$UE" \
+  "$(printf '%s\n' "$UE" | grep -E '^unrun-except' | tail -1)" \
+  "⛔ $(printf '%s\n' "$UE" | grep -E 'VIOLATION|UNRUN' | head -1)"
+
+# ── 같은 규칙 사본 대조 (F-476 · F-557 · F-563 · F-481) ──────
+# ⛔ 한 규칙의 사본(정규식 리터럴 · 훅 matcher · 스킬 간 블록 · Serena 키 표)이 갈라지면 한쪽만 고쳐진다 — 실제 트리에서 상시 대조한다.
+RC="$(cd "$ROOT" && python3 scripts/check_rule_copies.py 2>&1)"; RC_CODE=$?
+record3 "규칙 사본 대조" "$RC_CODE" "$RC" \
+  "$(printf '%s\n' "$RC" | grep -E '^rule-copies' | tail -1)" \
+  "⛔ $(printf '%s\n' "$RC" | grep -E 'VIOLATION|UNRUN' | head -1)"
+
 # ── 릴리즈 동기 검사기 self-test (B1/S7) ──────────────────────
 # ⛔ **`--self-test` 만 부른다.** 기본·`--release` 모드는 health-check 를 **자기가 호출하므로**
 #    여기서 부르면 무한 재귀가 된다. self-test 경로는 그보다 앞에서 exit 하므로 안전하다.
@@ -697,6 +782,13 @@ RS="$(cd "$ROOT" && bash scripts/check_release_sync.sh --self-test 2>&1)"; RS_CO
 record3 "릴리즈 동기 self-test" "$RS_CODE" "$RS" \
   "$(printf '%s\n' "$RS" | grep -E '^self-test' | tail -1)" \
   "⛔ $(printf '%s\n' "$RS" | grep -E 'FAIL|self-test|픽스처' | tail -1)"
+
+# ── 범위 census self-test (F-302) ─────────────────────────────
+# 좁힌 범위와 저장소 전체를 함께 세는 도구 — 고정 목록 밖 루트 폴더(templates/ 등)가 범위 밖 적중으로 나오는지 임시 저장소로 잰다.
+SCN="$(cd "$ROOT" && bash scripts/scope_census.sh --self-test 2>&1)"; SCN_CODE=$?
+record3 "범위 census self-test" "$SCN_CODE" "$SCN" \
+  "$(printf '%s\n' "$SCN" | grep -E '^self-test' | tail -1)" \
+  "⛔ $(printf '%s\n' "$SCN" | grep -E 'FAIL|SETUP' | head -1)"
 
 # ── 4.10 baseline 기준점 (B15) ────────────────────────────────
 # ⛔ self-test 만 돌린다. `--verify` 를 여기 넣으면 **트리를 고칠 때마다 빨개진다** —
@@ -820,7 +912,7 @@ else
   record "fz-compact guard" 1 "⛔ $(printf '%s\n' "$FC_GUARD" | head -2 | tr '\n' ' ')"
 fi
 
-# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 63 케이스) · 허용 목록(채택 표 == guard 상수).
+# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 77 케이스) · 허용 목록(채택 표 == guard 상수).
 #    self-test 와 허용 목록은 python3 만 써서 CLI 분기 밖에서 돈다. self-test 는 HOME · 상태 폴더를 임시로 새로 짓는다.
 if command -v claude >/dev/null 2>&1; then
   FG_VAL="$(bash "$ROOT/scripts/plugin_validate.sh" "$ROOT/mods/fz-guard" 2>&1)"; FG_VAL_CODE=$?
@@ -836,16 +928,21 @@ else
 fi
 FG_AL="$(python3 "$ROOT/mods/fz-guard/hooks/guard.py" --check-allowlist "$ROOT/modules/native-agents.md" 2>&1)"; FG_AL_CODE=$?
 record3 "fz-guard allowlist" "$FG_AL_CODE" "$FG_AL" "$FG_AL" "⛔ $FG_AL"
-# 하위 플러그인 전수 — 위 절들은 이름으로 고정돼 있다. 새 mods/<이름>/ 이 이 파일에 없으면 검증 공백이다(AE-37)
+# 하위 플러그인 전수 — 위 절들은 이름으로 고정돼 있다. 새 mods/<이름>/ 이 검증 없이 지나가면 공백이다(AE-37)
+# ⛔ 이 파일 소스를 grep 하지 않는다(F-563 — 주석에 이름만 있어도 통과했다). 이 실행에서 `<이름> …` 검증 행이
+#    UNRUN 이 아닌 값으로 남았는지 본다 — 실제로 돈 검증만 센다
 MODS_MISSING=""
 for d in "$ROOT"/mods/*/; do
-  n="$(basename "$d")"
-  grep -q -- "mods/$n" "$ROOT/scripts/health-check.sh" || MODS_MISSING="$MODS_MISSING $n"
+  n="$(basename "$d")" ran=0
+  for i in "${!NAMES[@]}"; do
+    case "${NAMES[$i]}" in "$n "*) [ "${CODES[$i]}" != UNRUN ] && ran=1 ;; esac
+  done
+  [ "$ran" = 1 ] || MODS_MISSING="$MODS_MISSING $n"
 done
 if [ -z "$MODS_MISSING" ]; then
-  record "mods 전수 등록" 0 "$(ls -d "$ROOT"/mods/*/ | wc -l | tr -d ' ')개 모두 health-check 에 있다"
+  record "mods 전수 등록" 0 "$(ls -d "$ROOT"/mods/*/ | wc -l | tr -d ' ')개 모두 이 실행에서 검증 행이 있다"
 else
-  record "mods 전수 등록" 1 "⛔ health-check 에 없는 하위 플러그인:$MODS_MISSING"
+  record "mods 전수 등록" 1 "⛔ 이 실행에서 검증이 돌지 않은 하위 플러그인:$MODS_MISSING"
 fi
 
 # ── 보고

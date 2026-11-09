@@ -17,6 +17,9 @@ self-test 루프가 부르는 스크립트(`gpt_merge` · `gpt_ab_decide`)를 �
      목록에 없으면 부재가 "명령 없음" 오류로 묻힌다
   ⑤ 러너 모드 계약(F-354): 러너가 받는 모드 플래그(경로 · 셀 부분집합 선택 제외)마다 `# modes:` 선언 — caller=health · release 면
      그 진입점에 러너 경로 + 플래그 호출이 있고, manual 이면 last-pass=<sha|none> + result. 호출 한 줄을 지우면 여기서 걸린다
+  ⑥ GPT CLI 의존 선언(F-411): 실제 GPT CLI 에 닿을 수 있는 러너(주석 밖에 health-check.sh · check-gpt-flags.sh · GPT CLI 실행 파일 직접 호출 류 ·
+     가짜 CLI `_shim` 없음)는 머리말 `# gpt-cli: real|none — <사유 10자+>` 한 줄을 단다. 오프라인 워커 · 리뷰어에게 돌리게 할지
+     이 줄로 가린다. 닿지 않는 러너의 선언은 낡은 선언(위반)
 
 exit code: 0 PASS · 1 VIOLATION · 2 UNRUN(health-check 부재 · 존재 목록 · 루프 파싱 실패 — ⛔ 통과 아님)
 Python 3.9 stdlib 전용.
@@ -50,6 +53,8 @@ SHA_OR_NONE = re.compile(r"^(?:[0-9a-f]{7,40}|none)$")
 RELEASE_ENTRIES = ("scripts/check_release_sync.sh", "docs/completion-gates.md")
 DEFAULT_GLOB = re.compile(r"^chk_runners .*tests/fixtures/\*/\*/run\.sh", re.M)
 LOOP = re.compile(r"^for (\w+) in ([^;\n]+); do\n(.*?)^done", re.M | re.S)
+GPT_CLI_TRIGGER = re.compile(r"health-check\.sh|check-gpt-flags\.sh|\bcodex\s+(?:exec|review|login|--version|--help)\b")
+GPT_CLI_DECL = re.compile(r"^# gpt-cli: (real|none) — (.{10,})$")
 
 
 def log(*a):
@@ -151,6 +156,25 @@ def calls_in(text: str, direct_re: re.Pattern):
     return direct, loops
 
 
+def gpt_cli_violations(root: pathlib.Path):
+    """⑥ 실제 GPT CLI 에 닿을 수 있는 러너의 의존 선언(F-411) → (위반 목록, 선언 수)."""
+    bad, n = [], 0
+    for r in sorted(root.glob("tests/fixtures/*/*/run.sh")):
+        rel = r.parent.relative_to(root / "tests" / "fixtures").as_posix()
+        lines = r.read_text(encoding="utf-8", errors="replace").splitlines()
+        code = [ln for ln in lines if not ln.lstrip().startswith("#")]
+        hit = any(GPT_CLI_TRIGGER.search(ln) for ln in code) and not any("_shim" in ln for ln in code)
+        decl = [ln for ln in lines if ln.startswith("# gpt-cli:")]
+        n += len(decl)
+        if len(decl) > 1 or any(not GPT_CLI_DECL.match(ln) for ln in decl):
+            bad.append(f"{rel}: `# gpt-cli:` 형식 밖 — `# gpt-cli: real|none — <사유 10자+>` 한 줄")
+        elif hit and not decl:
+            bad.append(f"{rel}: 실제 GPT CLI 에 닿을 수 있는데(health-check · check-gpt-flags · GPT CLI 실행 파일) `# gpt-cli:` 선언이 없다 — real|none 과 사유")
+        elif decl and not hit:
+            bad.append(f"{rel}: `# gpt-cli:` 를 선언했는데 GPT CLI 에 닿는 호출이 없다(낡은 선언)")
+    return bad, n
+
+
 def check(root: pathlib.Path):
     hc = root / "scripts" / "health-check.sh"
     if not hc.is_file():
@@ -207,8 +231,10 @@ def check(root: pathlib.Path):
         if name not in exist:
             bad.append(f"존재 목록에 `{name}` 없음 — health-check 가 self-test 로 부르는데 사전조건이 부재를 잡지 못한다")
     mbad, mdecl = mode_violations(root, text)
-    bad += mbad
-    print(f"health-check 배선 — 처리기 {len(hand)} · health-check 실행 {len(hc_runs)} · 러너 경유 {len(set(by_runner) - hc_runs)} · 제외 {len(exempt)} · 러너 모드 선언 {mdecl}")
+    gbad, gdecl = gpt_cli_violations(root)
+    bad += mbad + gbad
+    print(f"health-check 배선 — 처리기 {len(hand)} · health-check 실행 {len(hc_runs)} · 러너 경유 {len(set(by_runner) - hc_runs)} · 제외 {len(exempt)} · 러너 모드 선언 {mdecl}"
+          f" · GPT CLI 선언 {gdecl}")
     for b in bad:
         print(f"  ✗ {b}")
     return VIOLATION if bad else OK
@@ -277,6 +303,12 @@ def self_test() -> int:
             r_subset = check(tree(t, HCD, {"a.py": PY, "b.py": PY}, {"x/m": '#!/bin/bash\ncase "${1:-}" in\n  --tree|--cells) : ;;\nesac\n'}))
             r_strline = check(tree(t, HCD, {"a.py": PY, "b.py": PY}, {"x/m": '#!/bin/bash\nX=(\n  "if \'--planted\' in sys.argv:"\n)\n'}))
             r_default_noglob = check(tree(t, HC, {"a.py": PY, "b.py": PY}, {"x/m": '#!/bin/bash\n# modes: default caller=health\n'}))
+            gr = lambda body: check(tree(t, HC, {"a.py": PY, "b.py": PY}, {"x/h": "#!/bin/bash\n" + body}))   # noqa: E731
+            r_gpt = (gr('bash "$C/scripts/health-check.sh"\n'),
+                     gr('# gpt-cli: real — 사본에서 health-check 전체를 돈다\nbash "$C/scripts/health-check.sh"\n'),
+                     gr('# gpt-cli: none — 부분 실행만 한다고 적었다\necho hi\n'),
+                     gr('export PATH="$R/tests/fixtures/gpt/_shim:$PATH"\ncodex exec x\n'),
+                     gr('# gpt-cli: real\nbash "$C/scripts/health-check.sh"\n'))
             r_nohc = check(pathlib.Path(t) / "absent")
             r_blind = check(tree(t, HC, {"a.py": DOC, "b.py": PY}))
             r_noloop = check(tree(t, "for f in a.py; do :; done\n", {"a.py": PY}))
@@ -307,6 +339,8 @@ def self_test() -> int:
     case("subset-flags-exempt", r_subset == OK, r_subset)
     case("string-line-not-mode", r_strline == OK, r_strline)
     case("default-needs-runner-glob", r_default_noglob == VIOLATION, r_default_noglob)
+    case("f411-runner-gpt-dependency", r_gpt == (VIOLATION, OK, VIOLATION, OK, VIOLATION),
+         f"미선언 · 선언 · 낡은 선언 · shim · 사유 없음 → {r_gpt}")
     case("no-health-check-unrun", r_nohc == UNRUN, r_nohc)
     case("no-calls-unrun", r_noloop == UNRUN, r_noloop)
     case("detector-blind-unrun", r_blind == UNRUN, r_blind)
