@@ -28,6 +28,15 @@
 //   mergeMode: ⛔ 기본 'always'(기준선 불변 — 미지정도 always). 'conditional' 이면 Stage 1 두 렌즈의 **의미 필드**(MERGE_SIGNAL_FIELDS)가
 //     전부 비고 미해결 요청이 0 일 때만 병합 콜을 생략하고 mergeSkipped{reason} 을 반환한다(S18b · tests/workflows/plan-lean2-merge-arm.js).
 //     렌즈가 하나라도 null 이거나 필드 하나라도 차 있으면 병합한다(fail-open). 기본값 전환은 A/B(S26) 뒤다.
+//   edgeAxes: 적대 렌즈의 '필수 축'(문자열 배열 · F-383). 미지정 · 빈 배열이면 기본 축(UI 화면 과제용) 그대로 — 비UI 과제(스크립트 · 문서 ·
+//     플러그인 인프라)는 Lead 가 과제 · 프로젝트 규칙에서 축을 유도해 넘긴다(UI 축을 강제하지 않는다). 문자열이 아닌 원소는 fallback
+//   defenseFailurePath: true 면 적대 렌즈가 방어 항목(defense:true)에 failurePath(호출 순서 + 도달 근거)를 함께 낸다(F-438 · 기본 off — A/B 전).
+//     failurePath 없는 방어는 스크립트가 demoted:'suggestion' 으로 표시하고 병합은 그것을 Step 요구로 접지 않는다
+//   noRereadContext: true 면 네 콜의 코드 컨텍스트 줄에 '줄 번호가 있는 심볼은 다시 Read 하지 않는다' 를 붙인다(F-362 · 기본 off — 효과 측정 전)
+//   minSteps: 양의 정수면 full 반환의 steps 수가 그보다 적을 때 부분 제출로 보고 fallback 'partial-submit' 으로 끝낸다(F-146 —
+//     스키마는 항목 수를 재지 못한다). 콜 입력은 바꾸지 않는다
+//   catalogHits: true 면 적대 렌즈 프롬프트에 [점검 카탈로그] 1줄 · 스키마 사본에 catalogHits(catalogId · target · verdict) 필수 칸 —
+//     카탈로그 본문은 agents/plan-edge-case.md. 반환 catalogHits 로 올린다(round 2 S19 · 기본 off — 효과 측정 전 · tests/workflows/review-schemas.js)
 
 export const meta = {
   name: 'plan-lean2',
@@ -166,12 +175,44 @@ if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
   return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: { agentCalls: 0, nullCount: 0, fallbackCount: 1, stagesCompleted: 0 } }
 }
 
+// 옵션(S13) — 미지정이면 콜 입력이 바뀌지 않는다(tests/workflows/default-off-regression.js OPTIONS · minSteps 는 콜 입력 밖의 사후 검사)
+const EDGE_AXES = input.edgeAxes == null || (Array.isArray(input.edgeAxes) && input.edgeAxes.length === 0) ? null : input.edgeAxes
+if (EDGE_AXES && !(Array.isArray(EDGE_AXES) && EDGE_AXES.every(a => typeof a === 'string' && a.trim()))) {
+  log(`FATAL args invalid — edgeAxes=${JSON.stringify(input.edgeAxes)}: 비어 있지 않은 문자열 배열. fallback`)
+  return { mode: 'fallback', reason: `args invalid: edgeAxes=${JSON.stringify(input.edgeAxes)}`, metrics: { agentCalls: 0, nullCount: 0, fallbackCount: 1, stagesCompleted: 0 } }
+}
+if (input.minSteps != null && !(Number.isInteger(input.minSteps) && input.minSteps > 0)) {
+  log(`FATAL args invalid — minSteps=${JSON.stringify(input.minSteps)}: 양의 정수. fallback`)
+  return { mode: 'fallback', reason: `args invalid: minSteps=${JSON.stringify(input.minSteps)}`, metrics: { agentCalls: 0, nullCount: 0, fallbackCount: 1, stagesCompleted: 0 } }
+}
+const DEFENSE = input.defenseFailurePath === true
+const NO_REREAD = input.noRereadContext === true
+const REREAD_RULE = ' — 줄 번호가 있는 심볼은 다시 Read 하지 않는다. 검증이 필요하면 그 줄만 offset · limit 로 읽는다'
+const EDGE_DEFENSE_SCHEMA = JSON.parse(JSON.stringify(EdgeSchema))
+Object.assign(EDGE_DEFENSE_SCHEMA.properties.edgeCases.items.properties, {
+  defense: { type: 'boolean', description: '방어 항목 — 지금은 안 깨지지만 대비로 넣자는 코드(nil 초기화 · 가드 · 재시도)면 true' },
+  failurePath: { type: 'string', description: '방어 항목이면 필수 — 어떤 호출 순서에서 무엇이 틀어지나 + 그 순서가 실제로 도달하는 호출처 근거(파일:줄). 300자 이내' },
+})
+// 점검 카탈로그 (round 2 S19) — ⛔ 기본 off. 카탈로그 본문은 agents/plan-edge-case.md(매 spawn 주입)에 있고 여기는 적용 결과 칸만
+//    적대 렌즈 스키마 **사본**에 붙인다(방어 스키마와 함께 켤 수 있다). 병합 신호 필드(MERGE_SIGNAL_FIELDS)에는 넣지 않는다
+const catalogOn = input.catalogHits === true
+const CATALOG_HITS = { type: 'array', description: '점검 카탈로그 중 해당한 항목', items: { type: 'object', required: ['catalogId', 'target', 'verdict'],
+  properties: { catalogId: { type: 'string' }, target: { type: 'string' }, verdict: { type: 'string', enum: ['hit', 'clear', 'unchecked'] } } } }
+const withCatalog = s => {
+  if (!catalogOn) return s
+  const c = JSON.parse(JSON.stringify(s))
+  c.required = [...c.required, 'catalogHits']
+  c.properties.catalogHits = CATALOG_HITS
+  return c
+}
+const UI_AXES = '좌표계·공간 정렬 · 상태 최신성(등록/해제 누락) · 회전·기기별 차이 · 대상이 트리에서 빠진 뒤 · 가시성과 조작 가능성의 불일치 · 타이밍(시작 임계) · 애니메이션 진행 중의 중간 상태 · 기존 소비자와의 상호작용'
+
 const AC = input.archConstraints || null
 const ARCH_CTX = AC ? `\n[아키텍처 제약] ${JSON.stringify({
   architecturePattern: AC.architecturePattern, uiStack: AC.uiStack,
   dependencyDirection: AC.dependencyDirection, naming: AC.naming, conflicts: AC.conflicts,
 })}` : ''
-const CTX = `[요구사항] ${input.requirement}\n[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드)\n[기지 제약] ${JSON.stringify(input.constraintsKnown || [])}` + ARCH_CTX +
+const CTX = `[요구사항] ${input.requirement}\n[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드${NO_REREAD ? REREAD_RULE : ''})\n[기지 제약] ${JSON.stringify(input.constraintsKnown || [])}` + ARCH_CTX +
   (input.intentContext ? `\n[과제 목적] ${input.intentContext}` : '') +
   (input.discoverJournalPath ? `\n[discover 산출물] ${input.discoverJournalPath} (참고 — 전제 아님, 🔒불변 조건만 제약 채택)` : '')
 
@@ -197,10 +238,12 @@ const [full, edge, impactArch] = await parallel([
   () => callAgent(
     `${OVERRIDE}\n[역할] 경계 케이스 적대자 — 이 접근이 **어디서 깨지는가**만 판다. 계획을 쓰지 않는다.\n${CTX}\n` +
     `[목표] 경계 케이스와 실패 시나리오. ⛔ 일반론 금지 — 각 항목이 **어느 파일·심볼·줄에서** 깨지는지 코드로 특정한다.\n` +
-    `필수 축: 좌표계·공간 정렬 · 상태 최신성(등록/해제 누락) · 회전·기기별 차이 · 대상이 트리에서 빠진 뒤 · 가시성과 조작 가능성의 불일치 · 타이밍(시작 임계) · 애니메이션 진행 중의 중간 상태 · 기존 소비자와의 상호작용.\n` +
+    `필수 축: ${EDGE_AXES ? EDGE_AXES.join(' · ') : UI_AXES}.\n` +
+    (DEFENSE ? `⛔ 방어 항목(지금은 안 깨지지만 대비로 넣자는 코드 — nil 초기화 · 가드 · 재시도)은 defense:true 와 failurePath(어떤 호출 순서에서 무엇이 틀어지나 + 그 순서가 실제로 도달하는 호출처 근거)를 함께 적는다. failurePath 를 못 적으면 방어가 아니라 선택 사항이다.\n` : '') +
+    (catalogOn ? `[점검 카탈로그] 에이전트 정의의 점검 카탈로그를 이 계획 · 요구에 대 보고 해당 항목마다 catalogHits(catalogId · target · verdict)에 적는다 — hit 는 edgeCases 로도 낸다.\n` : '') +
     `⛔ **선존 결함**을 만나면 latentDefects 로 분리한다 — 이번 변경의 회귀로 오귀속되면 검증이 틀린 결론을 낸다.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.`,
-    { label: 'lean2-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: EFFORT, schema: EdgeSchema }),
+    { label: 'lean2-edge', agentType: 'fz:plan-edge-case', model: 'opus', effort: EFFORT, schema: withCatalog(DEFENSE ? EDGE_DEFENSE_SCHEMA : EdgeSchema) }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 영향 범위 + 아키텍처 검증자 — **이 변경이 어디까지 퍼지는가**와 **기존 패턴과 맞는가**를 함께 본다. 계획을 쓰지 않는다.\n${CTX}\n` +
     `[목표]\n` +
@@ -219,7 +262,22 @@ const [full, edge, impactArch] = await parallel([
 if (!full) {
   return { mode: 'fallback', reason: 'full plan null', metrics: { agentCalls, nullCount: nullCalls, fallbackCount: 1, stagesCompleted: 0 } }
 }
+// 부분 제출(F-146) — 스키마는 항목 수를 재지 못한다. 요구 수를 아는 호출(minSteps)만 본다 · 병합 콜을 쓰기 전에 끝낸다
+if (input.minSteps && (full.steps || []).length < input.minSteps) {
+  log(`⛔ 부분 제출 — steps ${(full.steps || []).length} < minSteps ${input.minSteps}`)
+  return { mode: 'fallback', reason: `partial-submit: steps ${(full.steps || []).length} < minSteps ${input.minSteps}`,
+    metrics: { agentCalls, nullCount: nullCalls, fallbackCount: 1, stagesCompleted: 0 } }
+}
 if (!edge) log('WARN edge null')
+// 방어 항목 강등(F-438) — failurePath 없는 방어는 선택 사항이다. 병합 입력 · 반환에 demoted 로 남긴다(옵션을 켰을 때만)
+let demoted = 0
+if (DEFENSE && edge && Array.isArray(edge.edgeCases)) {
+  edge.edgeCases = edge.edgeCases.map(e => {
+    if (!(e && e.defense === true && !(typeof e.failurePath === 'string' && e.failurePath.trim()))) return e
+    demoted += 1
+    return Object.assign({}, e, { demoted: 'suggestion' })
+  })
+}
 if (!impactArch) log('WARN impact-arch null')
 
 // ── 병합 조건부 생략 (S18b) — ⛔ 기본 always. 생략은 두 렌즈가 모두 반환됐고 의미 필드가 전부 빌 때뿐이다.
@@ -254,6 +312,7 @@ if ((edge || impactArch) && !mergeSkipped) {
     `3. stepAmendments — 기존 Step 의 title·files·verify·approach 중 **무엇을 어떻게**. 각 항목에 어느 발견이 요구하는지 명시. ⛔ patternVerdicts 가 미검증 전제를 설계로 제거하는 방법을 냈으면 그것을 해당 Step 의 amendment 로 반영한다.\n` +
     `4. implicationRegister — 제거/리팩토링 함의 {type: exec|obs}. 없으면 빈 배열.\n` +
     `5. unresolved — 접을 수 없어 사용자 판단이 필요한 것.\n` +
+    (demoted ? `⛔ demoted:'suggestion' 항목 ${demoted}개는 도달 근거(failurePath) 없는 방어다 — Step 요구(addedEdgeCases · stepAmendments)로 접지 말고 unresolved 에 "선택 사항" 으로 남긴다.\n` : '') +
     `⛔ 이미 계획에 있는 내용을 다시 적지 말 것 — 델타가 아니면 값이 0이다.\n` +
     `⛔ 이 콜에는 탐색 도구가 없다 — 위 코드 컨텍스트 파일도 읽지 않는다. 입력 JSON 만으로 접고, 근거가 입력에 없어 접을 수 없으면 unresolved 에 적는다.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.`,
@@ -295,5 +354,7 @@ return {
   missingLenses,
   degraded,
   ...(mergeConditional ? { mergeSkipped } : {}),   // ⛔ 기본 경로의 반환 모양은 그대로 둔다
+  ...(DEFENSE ? { demotedDefenses: demoted } : {}),
+  ...(catalogOn ? { catalogHits: edge && Array.isArray(edge.catalogHits) ? edge.catalogHits : [] } : {}),   // ⛔ 기본 반환 모양 불변
   metrics: { agentCalls, nullCount: nullCalls, fallbackCount: 0, stagesCompleted },
 }

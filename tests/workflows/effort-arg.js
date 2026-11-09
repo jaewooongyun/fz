@@ -2,6 +2,7 @@
 //   셀(워크플로마다): ① effort 'high' → 실행된 전 콜 effort 'high' · 콜 구성(label)은 미지정과 같다
 //                     ② 허용값 밖('turbo') → { mode: 'fallback' } · 콜 0
 //                     ③ 미지정 → 전 콜 'xhigh' · 콜 입력(label · agentType · model · effort · schema · prompt)이 기준 트리와 바이트 동일
+//                        (기본 on 옵션이 있는 워크플로는 그 옵션을 모두 끈 롤백 경로로 대조하고, 기본 경로는 ③b 미지정 == 'xhigh' 명시)
 // ⛔ effort 는 품질 옵션 묶음(default-off-regression.js OPTIONS)이 아니라 **별도 축**이다 — 그 레지스트리에 넣으면
 //    default-arms.js 가 옵션 on/off 섞임으로 판정한다. 이 파일이 축을 본다(modules/mode-gate.md § effort) — 단 swarm.js 는 tests/workflows/swarm-budget.js 가 본다
 //    (sha-missing-respawn: 미지정 xhigh · opus-concurrency: high 전달 · args-fallback: turbo → 콜 0). ③ 기준 SHA 에 swarm.js 가 없어 MIN_ARGS 에 넣으면 UNRUN 이다.
@@ -17,7 +18,7 @@ const os = require('os')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const { run } = require('../lib/wf_harness')
-const { SCENARIOS, BASE_ARGS, firstDiff } = require('./default-off-regression')
+const { SCENARIOS, BASE_ARGS, firstDiff, OPTIONS } = require('./default-off-regression')
 
 const ROOT = process.env.FZ_WF_ROOT || path.join(__dirname, '..', '..')
 const BASE_SHA = process.env.FZ_EFFORT_BASE_SHA || '26c42d3'
@@ -43,6 +44,13 @@ function check(name, cond, got) {
 }
 
 // 시나리오가 있는 워크플로는 default-off-regression 의 첫 시나리오 args 를 얹는다(응답 표는 쓰지 않는다 — 전 콜 null 로 첫 단계만)
+// ③ 기준 대조는 그 워크플로의 기본 on 옵션을 모두 끈 **롤백 경로**에서 한다 — 기본 on 옵션이 바꾼 프롬프트(round 2 S9 judgmentSlots 등)는
+//    그 옵션의 시험(default-off-regression.js · 옵션 전용 테스트)이 본다. 미지정 기본 경로는 ③b(미지정 == effort 'xhigh' 명시)가 effort 축만 본다.
+//    ⛔ 기준 트리가 모르는 옵션 이름은 기준 쪽에서 무시된다 — 양쪽에 같은 인자를 넘긴다(F-559 동결 해제: 기본 경로 프롬프트를 이 SHA 에 묶지 않는다).
+function rollbackArgs(wf) {
+  return Object.assign({}, ...Object.values(OPTIONS).filter(o => (o.defaultOn || []).includes(wf)).map(o => o.off))
+}
+
 function argsOf(wf, extra) {
   const sc = (SCENARIOS[wf] || [])[0]
   return Object.assign({}, MIN_ARGS[wf], sc ? sc.args : {}, extra)
@@ -117,9 +125,16 @@ function baseFile(wf, tmp) {
 
       const bf = baseFile(wf, tmp)
       if (!bf) { console.log(`UNRUN  ${wf}: ③ 기준 트리 대조 — 기준 소스 없음(FZ_EFFORT_BASE_TREE 미지정 · git show ${BASE_SHA} 실패)`); unrun += 1; continue }
-      const base = await callsAt(bf, wf, {})
-      const d = firstDiff(unset.calls, base.calls)
-      check(`${wf}: ③ 미지정 콜 입력 == 기준(${process.env.FZ_EFFORT_BASE_TREE ? 'FZ_EFFORT_BASE_TREE' : BASE_SHA})`, d === null, d)
+      const roll = rollbackArgs(wf)
+      const rolled = Object.keys(roll).length > 0
+      const base = await callsAt(bf, wf, roll)
+      const d = firstDiff((rolled ? await callsAt(file, wf, roll) : unset).calls, base.calls)
+      check(`${wf}: ③ 미지정 콜 입력 == 기준(${process.env.FZ_EFFORT_BASE_TREE ? 'FZ_EFFORT_BASE_TREE' : BASE_SHA})${rolled ? ' — 기본 on 옵션 롤백 경로' : ''}`, d === null, d)
+      if (rolled) {
+        const x = await callsAt(file, wf, { effort: 'xhigh' })
+        const dx = firstDiff(unset.calls, x.calls)
+        check(`${wf}: ③b 기본 경로 — 미지정 콜 입력 == effort 'xhigh' 명시`, dx === null, dx)
+      }
     }
     const cpBase = baseFile('code-pair', tmp)
     if (!cpBase) { console.log('UNRUN  code-pair 스키마 대조 — 기준 소스 없음'); unrun += 1 } else {

@@ -9,6 +9,8 @@
 #     형제 접두사  WORK_DIR=<세션>-x (문자열 접두사만 같다) → 비0 · 복사본 0 / 대조: WORK_DIR=<세션> 자신 → exit 0
 #     symlink      WORK_DIR=<세션>/link → 범위 밖 → 비0 · 밖에 복사본 0 / 대조: 세션 안을 가리키는 link → exit 0
 #     import       원본에 require( 가 있다 → 비0 · 복사본 0 (self-contained 확인)
+#     agentType 미등록  로드된 플러그인 agents/ 에 arch-lens 가 없다 → 비0 · 복사본 0 · 이름 출력 / 대조: 같은 루트 → exit 0
+#                  (F-511 — 줄 `f511-agenttype-unregistered` 를 따로 찍는다)
 #     실워크플로   이 트리 workflows/*.js 전부를 원본으로 → exit 0 · 바이트 일치 (import 가 생기면 그 스킬은 운영에서 매 호출 L4)
 #     cp 실패      쓰기 불가 WORK_DIR → 비0 · cmp 로 넘어가 통과하지 않는다 (종료 코드 확인)
 #   --cells sites  소비자 10곳(skills 7 · modules 2 · guides 1 — 목록 고정)의 실제 준비 줄마다: scriptPath 가 같은 basename 의
@@ -19,7 +21,8 @@
 # --variant plan: cmp 는 이 fixture 안에서만 쓴다 — 문서에는 cp 와 종료 코드 확인만 요구한다
 # 바이트 일치는 문서가 아니라 이 fixture 가 따로 잰다(filecmp) — 블록이 스스로 내린 판정을 믿지 않는다.
 # 기준 트리(0단계 · 준비 줄 없음, 플러그인 루트 직접 호출)는 셀이 블록을 못 찾아 exit 1.
-# ⛔ 셀 집합 대조(F-408): prep 을 돌렸으면 판정한 셀 이름이 위 8셀(`PREP_CELLS`)과 정확히 같아야 한다 — root 권한으로 cp 실패 셀을
+#   f544           prep 과 함께: agents/*.md tools 의 `mcp__context7__X` 마다 공식 플러그인 이름 `mcp__plugin_context7_context7__X` 가 있다(F-544)
+# ⛔ 셀 집합 대조(F-408): prep 을 돌렸으면 판정한 셀 이름이 위 9셀(`PREP_CELLS`)과 정확히 같아야 한다 — root 권한으로 cp 실패 셀을
 #    만들 수 없으면 그 셀은 `skipped` 로 따로 센다. 끝 줄 `CELLS n=<수> ran=<…> skipped=<…>`(sites 를 돌렸으면 `sites=<OK>/10` 도).
 # exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패(인자 · 트리 · 임시 폴더 · 단언기 고장)
 #   ⛔ 준비 실패를 1 로 내면 '기준 트리 exit 1' 이 결함 재현 없이 통과한다 — 그래서 3 이다.
@@ -56,7 +59,7 @@ TREE, VARIANT, CELLS = sys.argv[1], sys.argv[2], sys.argv[3]
 CONTRACT = VARIANT == "contract"
 GUIDE = os.path.join(TREE, "guides", "skill-authoring.md")
 FAIL = []
-PREP_CELLS = ("없음", "stale", "정상", "형제 접두사", "symlink", "import", "실워크플로", "cp 실패")   # 셀 이름 고정(F-408)
+PREP_CELLS = ("없음", "stale", "정상", "형제 접두사", "symlink", "import", "agentType 미등록", "실워크플로", "cp 실패")   # 셀 이름 고정(F-408)
 RAN, SKIPPED = [], []             # 판정한 prep 셀(첫 단언 순) · root 로 건너뛴 셀
 # 소비자 10곳 — (파일, 부르는 워크플로 basename, allowed-tools 를 가진 SKILL — 정본 사이트 하나를 여러 SKILL 이 따르면 그 튜플).
 # 목록을 고정한다: 사이트가 줄면 SITE-OK 가 10 에 못 미친다
@@ -132,10 +135,11 @@ def prep_block():
     return b.group(1), ""
 
 
-def fill(block, sess, work, plug, name):
-    out = (block.replace("{세션 디렉터리}", sess).replace("{WORK_DIR}", work)
+def fill(block, sess, work, plug, name, loaded=None):
+    out = (block.replace("{세션 디렉터리}", sess).replace("{WORK_DIR}", work).replace("{로드된 플러그인 루트}", loaded or plug)
            .replace("{플러그인 루트}", plug).replace("{파일}", name))
-    left = re.findall(r"(?<!\$)\{[^{}\s$]+\}", out)   # ${…} 는 셸 확장이다 — placeholder 가 아니다
+    # ${…} 는 셸 확장 · `{ …; }` 셸 묶음은 $ · 따옴표를 품는다 — placeholder 가 아니다. placeholder 는 공백을 품을 수 있다({플러그인 루트})
+    left = re.findall(r"(?<!\$)\{[^{}$\"\n]+\}", out)
     return out, left
 
 
@@ -144,7 +148,35 @@ def plugin_root(tag, body=None, name="wf"):
     os.makedirs(os.path.join(p, "workflows"))
     with open(os.path.join(p, "workflows", name + ".js"), "wb") as fh:
         fh.write(real_workflow() if body is None else body)
+    os.makedirs(os.path.join(p, "agents"))   # 0단계가 agentType 을 대조한다(F-511) — 이 트리의 에이전트 이름으로 빈 정의를 둔다
+    for a in os.listdir(os.path.join(TREE, "agents")):
+        if a.endswith(".md"):
+            open(os.path.join(p, "agents", a), "w").close()
     return p
+
+
+def context7_both_names():
+    """F-544 — 번들 밖 MCP 는 설치 경로마다 등록 이름이 다르다. tools 에 한 이름만 두면 다른 이름으로 깐 세션의 워커에 조용히 안 온다."""
+    bad, pairs = [], 0
+    adir = os.path.join(TREE, "agents")
+    for n in sorted(os.listdir(adir)):
+        if not n.endswith(".md"):
+            continue
+        with open(os.path.join(adir, n), encoding="utf-8") as fh:
+            m = re.search(r"^tools:(.*)$", fh.read(), re.M)
+        tools = [t.strip() for t in m.group(1).split(",")] if m else []
+        for t in tools:
+            if t.startswith("mcp__context7__"):
+                twin = "mcp__plugin_context7_context7__" + t[len("mcp__context7__"):]
+                if twin in tools:
+                    pairs += 1
+                else:
+                    bad.append(f"{n} {t}")
+    ok = not bad
+    print(("PASS  " if ok else "FAIL  ") + f"f544-context7-both-names — agents tools 의 mcp__context7__X 마다 공식 플러그인 이름 병기(짝 {pairs})"
+          + ("" if ok else " · 빠짐 " + ", ".join(bad)))
+    if not ok:
+        FAIL.append("f544-context7-both-names")
 
 
 def cells_prep():
@@ -155,12 +187,12 @@ def cells_prep():
         check("prep", "cmp -s" in block, "contract: 블록이 원본 ↔ 복사본 `cmp -s` 를 한다")
     check("prep", re.search(r"(?m)^\s*cp\s", block) is not None or " cp " in block, "블록이 cp 로 덮어쓴다")
     _, left = fill(block, "/s", "/w", "/p", "f")
-    if not check("prep", not left, "블록의 placeholder 가 넷({세션 디렉터리}·{WORK_DIR}·{플러그인 루트}·{파일})뿐이다", f"남은 것: {left}"):
+    if not check("prep", not left, "블록의 placeholder 가 다섯({세션 디렉터리}·{WORK_DIR}·{플러그인 루트}·{로드된 플러그인 루트}·{파일})뿐이다", f"남은 것: {left}"):
         return
     src_of = lambda plug: os.path.join(plug, "workflows", "wf.js")
 
-    def go(cell, sess, work, plug):
-        cmd, _ = fill(block, sess, work, plug, "wf")
+    def go(cell, sess, work, plug, loaded=None):
+        cmd, _ = fill(block, sess, work, plug, "wf", loaded)
         return run(cmd, TMP_ROOT)
 
     # 없음
@@ -208,6 +240,19 @@ def cells_prep():
     rc, out = go("import", sess, work, plug)
     check("CELL import", rc != 0 and not os.path.exists(os.path.join(work, "wf.js")),
           f"원본에 require( → 비0 · 복사본 0 (exit {rc})", out)
+    # agentType 미등록 — 개발 트리 워크플로를 옛 플러그인을 불러온 세션에서 부른다(F-511: 새 agentType fz:arch-lens 가 없어 렌즈가 죽었다)
+    sess = fresh("c9/sess"); work = os.path.join(sess, "wd"); os.makedirs(work)
+    plug = plugin_root("c9/plug"); old = plugin_root("c9/loaded")
+    gone = os.path.join(old, "agents", "arch-lens.md")
+    if os.path.exists(gone):
+        os.remove(gone)
+    rc, out = go("agentType 미등록", sess, work, plug, old)
+    ok511 = check("CELL agentType 미등록", b"fz:arch-lens" in real_workflow() and rc != 0 and not os.path.exists(os.path.join(work, "wf.js"))
+                  and "arch-lens" in out, f"로드된 플러그인에 arch-lens 없음 → 비0 · 복사본 0 · 빠진 이름 출력 (exit {rc})", out)
+    rc, out = go("agentType 미등록 대조", sess, work, plug, plug)
+    ok511 = check("CELL agentType 미등록", rc == 0 and filecmp.cmp(src_of(plug), os.path.join(work, "wf.js"), shallow=False),
+                  f"대조 — 로드된 루트 = 플러그인 루트 → exit 0 · 일치 (exit {rc})", out) and ok511
+    print(("PASS  " if ok511 else "FAIL  ") + "f511-agenttype-unregistered — 0단계가 사본의 agentType ⊆ 로드된 플러그인 agents/*.md 를 대조한다")
     # 실워크플로 — 이 트리의 workflows/*.js 전부가 0단계를 통과하는가(하나라도 import 가 생기면 운영에서 그 스킬은 매 호출 L4 다)
     sess = fresh("c8/sess"); work = os.path.join(sess, "wd"); os.makedirs(work)
     names = sorted(f[:-3] for f in os.listdir(os.path.join(TREE, "workflows")) if f.endswith(".js"))
@@ -337,9 +382,10 @@ tail = []
 try:
     if CELLS in ("prep", "all"):
         cells_prep()
+        context7_both_names()
         got = RAN + SKIPPED
         check("prep cell-set", sorted(got) == sorted(PREP_CELLS) and len(got) == len(set(got)),
-              "판정한 prep 셀 이름 = 고정 8셀(없음 · stale · 정상 · 형제 접두사 · symlink · import · 실워크플로 · cp 실패 — root SKIP 은 따로)",
+              "판정한 prep 셀 이름 = 고정 9셀(없음 · stale · 정상 · 형제 접두사 · symlink · import · agentType 미등록 · 실워크플로 · cp 실패 — root SKIP 은 따로)",
               f"없음={sorted(set(PREP_CELLS) - set(got))} · 뜻밖={sorted(set(got) - set(PREP_CELLS))}")
         tail.append(f"n={len(RAN)} ran={','.join(RAN) or '-'} skipped={','.join(SKIPPED) or '-'}")
     if CELLS in ("sites", "all"):

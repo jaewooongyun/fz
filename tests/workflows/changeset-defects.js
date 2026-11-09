@@ -2,7 +2,7 @@
 //   Stage 1 결함은 검토 이슈(D…)로 Stage 3 에 들어가고(light 포함), 최종 changeset 에 남으면 fallback 'changeset-defect' 다.
 // 셀:
 //   span-mismatch-sent-to-revise      full · 검토 pass 인데 spanLines ≠ oldAnchor 줄 수 → Stage 3 프롬프트에 D1 · 수정본 반환
-//   escape-introduced-sent-to-revise  newBody 에만 '<\/' → D1(F-551) · 수정본 반환
+//   escape-introduced-sent-to-revise  newBody 에만 태그 앞 역슬래시('<\task-notification>') → D1(F-551) · 수정본 반환
 //   defect-remaining-fallback         Stage 3 수정본에도 결함 → { mode:'fallback', reason:'changeset-defect', defects }
 //   escape-already-in-anchor-ok       oldAnchor 에 같은 꼴이 같은 수 → 결함 아님 · Stage 3 없음
 //   create-without-anchor-ok          create · oldAnchor 없음 · spanLines 아무 값 → span 면제
@@ -15,6 +15,9 @@
 //                                     되돌림 감도가 없다(Lead 절차 문서의 식이 맞는지만 본다 — 리뷰 Q-3)
 //   apply-oracle-doc-contract         적용 오라클 문서 계약 — skills/*/SKILL.md 에 'oldAnchor 0회'(삽입 · 감싸기에서 틀린 지시) 0건 ·
 //                                     fz-code 절차 4 에 적용 전 앵커 1회 · Step 직전 numstat · 심볼 편집 제외 · fz-fix 는 fz-code 를 가리킨다
+//   f120-span-lines-mismatch          F-120 재현 모양 — 앵커 1줄 · spanLines 2 · 끝 줄바꿈 앵커 'a\nb\n' 에 spanLines 3 → 결함 · Stage 3 /
+//                                     끝 줄바꿈 하나는 줄로 세지 않는다('a\nb\n' · spanLines 2 → 결함 아님)
+//   f558-valid-escape-not-counted     정상 소스의 '<\/'(JS 문자열 · 정규식) · r"<\w+>" 는 이스케이프로 세지 않는다 — Stage 3 없음
 // ⛔ 구판(검사 없는 code-pair)에서는 결함 셀이 FAIL 이다 — FZ_WF_ROOT 로 기준 트리를 대상으로 돌린다.
 // exit: 0 전건 통과 · 1 단언 실패
 'use strict'
@@ -28,7 +31,8 @@ const ROOT = process.env.FZ_WF_ROOT || path.join(__dirname, '..', '..')
 const WF = path.join(ROOT, 'workflows', 'code-pair.js')
 const CELLS = ['span-mismatch-sent-to-revise', 'escape-introduced-sent-to-revise', 'defect-remaining-fallback', 'escape-already-in-anchor-ok',
   'create-without-anchor-ok', 'delete-without-anchor-ok', 'clean-changeset-unchanged', 'light-no-review-defect-revise',
-  'missing-field-is-defect', 'regex-heredoc-not-defect', 'numstat-oracle-matches-span', 'apply-oracle-doc-contract']
+  'missing-field-is-defect', 'regex-heredoc-not-defect', 'numstat-oracle-matches-span', 'apply-oracle-doc-contract',
+  'f120-span-lines-mismatch', 'f558-valid-escape-not-counted']
 
 const args = (mode, complexity) => ({ mode, stepSpec: { id: 'S1', title: 't', goal: 'g', files: ['a.js'], verify: { kind: 'manual', criterion: 'c' }, complexity },
   contextPath: '/tmp/c.md', changesetTarget: 'repo' })
@@ -58,7 +62,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   `${labels(r)} · mode ${r.result && r.result.mode}`)
 
   r = await run(WF, { args: args('light', 1), responder: responder({
-    'stage1-impl': cs([edit({ oldAnchor: 'return "</div>"', newBody: 'return "<\\/div>"', spanLines: 1 })]), 'stage3-revise': CLEAN }) })
+    'stage1-impl': cs([edit({ oldAnchor: 'x <task-notification>', newBody: 'x <\\task-notification>', spanLines: 1 })]), 'stage3-revise': CLEAN }) })
   check('escape-introduced-sent-to-revise', stage3Prompt(r).includes('F-551') && r.result.mode === 'workflow' && same(r.result.changeset, CLEAN),
     `${labels(r)} · mode ${r.result && r.result.mode}`)
 
@@ -120,6 +124,21 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   const lack = need.filter(s => !code.includes(s))
   check('apply-oracle-doc-contract', stale.length === 0 && lack.length === 0 && fix.includes('fz-code 절차 4 그대로'),
     `stale ${stale.join(',') || '-'} · fz-code 누락 ${lack.join(' | ') || '-'} · fz-fix 위임 ${fix.includes('fz-code 절차 4 그대로')}`)
+
+  // F-120 — 시작 줄만 준 앵커(1줄)로 두 줄을 바꾸겠다는 편집 · 끝 줄바꿈 변형
+  r = await run(WF, { args: args('light', 1), responder: responder({
+    'stage1-impl': cs([edit({ oldAnchor: 'L372', newBody: 'n1\nn2', spanLines: 2 }), edit({ oldAnchor: 'a\nb\n', newBody: 'x', spanLines: 3 })]),
+    'stage3-revise': CLEAN }) })
+  const r120 = await run(WF, { args: args('light', 1), responder: responder({
+    'stage1-impl': cs([edit({ oldAnchor: 'a\nb\n', newBody: 'x\ny', spanLines: 2 })]) }) })
+  check('f120-span-lines-mismatch', stage3Prompt(r).includes('spanLines 2 ≠ oldAnchor 1줄') && stage3Prompt(r).includes('spanLines 3 ≠ oldAnchor 2줄')
+    && r.result.mode === 'workflow' && labels(r120) === 'stage1-impl' && r120.result.mode === 'workflow',
+  `${labels(r)} · 끝 줄바꿈 대조 ${labels(r120)}`)
+
+  // F-558 — 정상 소스의 '<\/' 는 JSON 이중 이스케이프가 아니다
+  r = await run(WF, { args: args('light', 1), responder: responder({
+    'stage1-impl': cs([edit({ symbol: 'FILE', newBody: "const re = /<\\/div>/\nconst s = '<\\/script>'\nconst p = r\"<\\w+>\"", spanLines: 0 })], 'create') }) })
+  check('f558-valid-escape-not-counted', labels(r) === 'stage1-impl' && r.result.mode === 'workflow', `${labels(r)} · mode ${r.result && r.result.mode}`)
 
   const setOk = ran.join(',') === CELLS.join(',')
   console.log(`${setOk ? 'PASS' : 'FAIL'}  cell-set: 판정한 셀 = 기대 셀(${CELLS.length})`)

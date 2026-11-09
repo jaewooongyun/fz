@@ -42,6 +42,11 @@ const OPTIONS = {
   //   confidence 를 얹는다. OVERRIDE 가 모든 콜에 있어 applies 가 없다
   preserveLowConfidence: { workflows: ['peer-review', 'review-live'], on: { preserveLowConfidence: true }, off: { preserveLowConfidence: false },
     defaultOn: PEER_ON },
+  // peer-review 만 — 이슈 항목 스키마에 oracle(판별 방법) 필수 필드(F-072). 프롬프트는 그대로, 스키마 사본만 바뀐다
+  oracleField: { workflows: ['peer-review'], on: { oracleField: true }, off: { oracleField: false }, defaultOn: PEER_ON },
+  // 두 워크플로 — 판정 한계 칸(axisCoverage gap · unverifiedPremises · limits · 동적 축 질문 · F-559 · F-448 · F-178 · F-117).
+  //   Stage 1 프롬프트 · 렌즈 스키마 사본이 바뀐다. review-live 는 기본 off(S25 판정 전 · default-arms.js decided off)
+  judgmentSlots: { workflows: ['peer-review', 'review-live'], on: { judgmentSlots: true }, off: { judgmentSlots: false }, defaultOn: PEER_ON },
   // review-live 만 — peer-review 는 기본 스키마에 위치 필드가 있다. Stage 1 두 콜의 스키마만 바뀐다
   locatedFindings: { workflows: ['review-live'], on: { locatedFindings: true }, off: { locatedFindings: false } },
   // R-C 속도 arm — 켜면 병합 콜을 뺄 수 있다(structural)
@@ -53,11 +58,20 @@ const OPTIONS = {
   // R-C 교차 delta — 콜 수는 그대로, Stage 2 교차의 스키마 · 프롬프트만 바뀐다(동치는 tests/workflows/cross-delta-arm.js)
   crossOutput: { workflows: ['peer-review', 'review-live'], on: { crossOutput: 'delta' }, off: { crossOutput: 'full' },
     defaultOn: PEER_ON, applies: sc => sc.stage2 },
+  // S13 — plan-lean2 적대 렌즈의 필수 축을 과제에서 받는다(F-383). 빈 배열은 미지정과 같다(기본 UI 축)
+  edgeAxes: { workflows: ['plan-lean2'], on: { edgeAxes: ['스크립트 종료 코드', '부분 입력'] }, off: { edgeAxes: [] } },
+  // S13 — 방어 항목 failurePath(F-438). 켜면 edge 스키마 사본과 프롬프트 한 줄이 바뀐다
+  defenseFailurePath: { workflows: ['plan-lean2'], on: { defenseFailurePath: true }, off: { defenseFailurePath: false } },
+  // S13 — 렌즈 재독 억제 문장(F-362 · 효과 측정 전). 켜면 네 콜의 코드 컨텍스트 줄이 바뀐다
+  noRereadContext: { workflows: ['plan-lean2'], on: { noRereadContext: true }, off: { noRereadContext: false } },
   // R-C 사전 수집 스냅샷 — Stage 1 두 프롬프트에만 닿는다(콜 수 그대로). 빈 문자열은 미지정과 같다
   snapshotDir: { workflows: ['review-live'], on: { snapshotDir: '/tmp/fz-snapshot' }, off: { snapshotDir: '' } },
   // B11 측정 arm — '켬' 은 counter 를 끈 arm 이다(이름과 반대). 켜면 Stage 3 콜을 뺀다(structural)
   counter: { workflows: ['review-live'], on: { counter: 'off' }, off: { counter: 'opus' },
     structural: 'tests/workflows/review-live-counter-arm.js' },
+  // S19 — 렌즈 에이전트 정의의 점검 카탈로그 적용 결과 칸. counter(review-live · peer-review Tier 3) · 적대 렌즈(plan-lean2)에만 닿는다
+  catalogHits: { workflows: ['peer-review', 'review-live', 'plan-lean2'], on: { catalogHits: true }, off: { catalogHits: false },
+    defaultOn: PEER_ON, applies: sc => !sc.name.startsWith('Tier 2') },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }
@@ -193,6 +207,18 @@ module.exports = { OPTIONS, SCENARIOS, BASE_ARGS, callsOf, firstDiff }
 
 if (require.main === module) (async () => {
   const argv = process.argv.slice(2)
+  // F-406 — UNRUN 경로가 임시 폴더를 남기지 않는다: 전용 TMPDIR 에서 기준 소스가 없는 자식을 돌려 남은 fz-default-off-* 를 센다
+  if (!process.env.FZ_DEFAULT_OFF_CHILD) {
+    const box = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-f406-'))
+    try {
+      const { spawnSync } = require('child_process')
+      const r = spawnSync(process.execPath, [__filename, '--option', 'mergeMode'], { encoding: 'utf8',
+        env: Object.assign({}, process.env, { FZ_DEFAULT_OFF_CHILD: '1', TMPDIR: box, FZ_REGRESSION_BASE_TREE: path.join(box, 'no-such-tree') }) })
+      const left = fs.readdirSync(box).filter(n => n.startsWith('fz-default-off-'))
+      check('f406-unrun-leaves-no-tmp — 기준 소스 없음(UNRUN exit 2) 뒤 임시 폴더 0', r.status === 2 && /UNRUN/.test(r.stdout || '') && left.length === 0,
+        `exit ${r.status} · 남은 폴더 ${left.length}`)
+    } finally { fs.rmSync(box, { recursive: true, force: true }) }
+  }
   const asked = argv.flatMap((a, i) => (a === '--option' ? [argv[i + 1]] : []))
   const names = argv.includes('--all-rb-options') || asked.length === 0 ? Object.keys(OPTIONS) : asked
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-default-off-'))
@@ -207,7 +233,8 @@ if (require.main === module) (async () => {
       bases = Object.fromEntries(wfs.map(wf => [wf, baseFile(wf, tmp)]))
     } catch (e) {
       console.log(`UNRUN  기준 소스를 얻지 못했다 — ${e.message.split('\n')[0]} (⛔ 통과 아님)`)
-      process.exit(2)
+      process.exitCode = 2   // ⛔ process.exit 는 바깥 finally(임시 폴더 정리)를 건너뛴다(F-406) — 돌아가서 정리한 뒤 2 로 끝난다
+      return
     }
     for (const name of names) {
       const opt = OPTIONS[name]

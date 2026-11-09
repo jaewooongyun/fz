@@ -96,9 +96,10 @@ const ReviewSchema = {
 
 // ── changeset 적용 전 검사 (F-120 · F-551) — 순수 함수. ⛔ 워커 자기보고의 일관성까지만 잰다 —
 //    잘린 앵커의 기계 증명은 하지 못한다(Lead 가 적용 뒤 오라클로 본다 — fz-code 절차 4 · fz-fix 절차 3).
-//    ① spanLines ≠ oldAnchor 줄 수(없으면 0) — create · delete 면제  ② newBody 에만 늘어난 '<' + 역슬래시 + 영문자 · '/'
-//    ('[^<\…' 문자 클래스 · '<<\EOF' heredoc 제외)  ③ 읽는 필드 누락 — TypeError 대신 결함으로 센다
-const ESCAPE_RE = /(?<![<^])<\\[A-Za-z\/]/g
+//    ① spanLines ≠ oldAnchor 줄 수(없으면 0) — create · delete 면제  ② newBody 에만 늘어난 태그 모양 '<' + 역슬래시 + 이름 + 공백 · '>' · '/'
+//    ('[^<\…' 문자 클래스 · '<<\EOF' heredoc 제외 · 정상 소스의 '<' + 역슬래시 + '/' — JS 문자열 · 정규식 — 도 세지 않는다 F-558)
+//    ③ 읽는 필드 누락 — TypeError 대신 결함으로 센다. 적용 뒤 파일은 scripts/check_applied_escapes.py 가 같은 식으로 본다(F-551)
+const ESCAPE_RE = /(?<![<^])<\\[A-Za-z][\w-]*(?=[\s>\/])/g
 const lineCount = s => (s === '' ? 0 : s.replace(/\n$/, '').split('\n').length)
 const escapes = s => (typeof s === 'string' ? (s.match(ESCAPE_RE) || []).length : 0)
 function changesetDefects(cs) {
