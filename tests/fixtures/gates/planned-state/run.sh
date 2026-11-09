@@ -157,7 +157,8 @@ def extract():
 
 def materialize(cmd, work, step="S1"):
     out = cmd.replace("{WORK_DIR}", str(work)).replace("{StepID}", step)
-    left = re.findall(r"\{[^}]*\}", out.replace("${FZ_PLUGIN_ROOT}", ""))
+    # `${…}` 는 셸 확장이지 문서 자리표시가 아니다 — 6.4 의 `${A:+,$A}`(앞 줄 --affected-by 결과)는 재생 셸에서 비어 `--only S1` 이 된다
+    left = re.findall(r"(?<!\$)\{[^}]*\}", out)
     if left:
         raise Setup(f"치환 못 한 자리표시 {left} — {cmd}")
     return out

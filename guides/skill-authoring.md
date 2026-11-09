@@ -538,6 +538,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
   - ⛔ **비ASCII 본문은 손으로 이스케이프하지 않는다** — MCP 도구 파라미터는 UTF-8 문자열을 그대로 받는다. `\uXXXX` 수동 변환은 안전장치가 아니라 **오류원**이다: 5천 자 한국어를 이스케이프해 보낸 호출이 **200 성공 + 본문 11곳 손상**으로 끝난 실측이 있다. 짧은 본문에서는 재현되지 않아 길이가 늘수록 위험하다.
   - ⛔ 외부 시스템(JIRA·GitHub·Slack)에 비ASCII 본문을 기록한 직후 **반환 본문을 1회 스캔**한다. 이 층에는 빌드도 린트도 없어 *성공 응답이 정확한 산출물을 뜻하지 않는다* — 유일한 오라클이 반환값 확인이다. 파일로 먼저 쓴 뒤 그 내용을 보내는 경로가 있으면 그쪽이 안전하다.
+- ⛔ **반환 배열 최소 길이는 스크립트가 잰다**(F-146) — StructuredOutput 스키마는 항목 수를 재지 못해 출력 상한에 걸린 부분 제출(steps 3/19)이 통과한다. 요구 수를 아는 호출은 args 로 넘기고(plan-lean2 `minSteps`) 스크립트가 반환 직후 `length < 요구 수` 면 `{mode:'fallback', reason:'partial-submit: …'}` 로 돌려준다 — 받은 쪽은 분할(L1) 뒤 다시 부른다
 - agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정 — 이력, 2026-09 당시 서술. 정정: `agentType` 을 준 호출은 에이전트 정의 `model:` 이 이겨 fz 에서는 sonnet(= Sonnet 5.5)으로 강등되고, `agentType` 도 없을 때만 세션 모델을 따른다. "2배"는 출력·캐시쓰기 단가에만 맞다 — `guides/model-guide.md` § 서브에이전트 · 워크플로), effort 생략 시 세션 effort 가 아니라 **워커 모델 기본**으로 돈다(Opus 5.5 = `medium` — 2026-09-25 실측 2회, Lead 세션은 `xhigh`). 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. 제거한 콜은 모델 기본 effort 로 돈다는 점을 결과 보고에 적는다. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 — ⛔ **차단이 아니라 "요청 시 검출"이다.** `/fz-manage check`가 호출할 때만 돌고, 실제 차단은 훅 설치 시에만 성립한다(훅은 `settings.json` = 사용자 소관, `modules/governance.md` § Hook 최소 강제 권고)
 - **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `effort: EFFORT` — 값은 args.effort 로 받은 **Lead 세션 effort**(미지정 `'xhigh'` · 2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort). Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**. **Opus 5.5 는 기본 `medium`·같은 effort 에서 사고량 증가** [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] — fz 의 워커 effort 는 Lead 세션 effort 를 따른다(2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort · 이전: 2026-09-25 `xhigh` 유지 · 하향 sweep 종결).
   - ⛔ **상수 일괄 교체 금지**: 공식이 *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* 을 요구. **sweep 등록·기록 위치는 `experiment-log.md` §5.8 ⑥**(세션 effort sweep — plan, 2026-09-11 신설)이며 ①(frontmatter)은 철회된 사료라 대상이 아니다. 측정 주체는 `scripts/fz_wf_metrics.py`(stage별 wall·out_tok·thinking·advisor·so_retries) + `scripts/fz_telemetry_report.py --plan-segments`(Lead·GPT 층 분리) 다 — 사전등록만 하고 재는 주체가 없으면 표가 빈 채로 남는다(실측: 두 달). 측정 없이 `xhigh`→`high`로 치환하는 건 근거 없는 값을 근거 없는 값으로 바꾸는 것. **워크로드별 sweep 후** 스테이지 성격(생산/판정/탐색)에 맞춰 차등 배정. 미측정 상태의 기본값 = **현행 유지**(2026-10-19 부터 워커 값은 Lead 세션 effort 이므로 이 규칙은 Lead 세션 effort 를 바꿀 때 적용된다).
@@ -549,6 +550,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 
 > 신설 정당화 (DELETE/MERGE-default): 위 배치·호출 규약 bullet 들은 *스크립트가 어디에 사는가*(플러그인 루트 절대경로)를 정한다 — 표기가 옳은데도 **도구가 그 경로 읽기를 거부하는** 경우는 다루지 않아 기존 bullet 흡수 불가.
 > ⛔ **근본 해결이 아니다.** fz 가 고칠 수 있는 결함이 아니라 **도구별 경로 게이트**다 — 같은 경로를 `Bash`·`Read` 는 읽는다. 플러그인 루트가 세션 working directory 이거나 additional directory 면 애초에 발생하지 않는다. 아래는 그 조건이 아닐 때의 **세션 한정 우회**이며, 조건이 사라지면 이 블록도 함께 삭제한다.
+> ⛔ **해소 오라클은 '직접 호출 거부 0' 이 아니다**(F-199 — 설정을 바꾸지 않기로 정했다): 이 블록의 해소 오라클은 **소비자 전부가 0단계 복사 + `cmp` 를 거치는가**다(`tests/fixtures/workflow-prep/copy-cmp/run.sh --cells sites`). 설정 파일에 경로가 있다는 사실은 대리 지표라 판정에 쓰지 않는다(F-376 — 설정을 넣은 뒤에도 직접 호출은 10/10 거부됐다). 설정으로 풀기로 하면 새 세션의 실호출 거부 0 을 잰 뒤에만 이 블록을 지운다.
 
 **0단계 — 준비** (⛔ 매 호출 · 거부를 기다리지 않는다). 플러그인 루트 직접 호출은 실사용 세션(대상 레포가 working directory)에서 매번 거부됐다 — 우회가 통한 3회는 1차 경로가 3회 틀렸다는 뜻이다. 그래서 소비자 10곳(`skills/` 7 · `modules/` 2 · `guides/` 1 — 아래 공용 읽기 전용 swarm 절)과 fz-plan 은 원본이 아니라 **준비한 복사본**을 부른다. 아래 블록이 **exit 0** 일 때만 `Workflow({ scriptPath: '{WORK_DIR}/{파일}.js', args })` 를 부른다:
 
@@ -556,16 +558,21 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 S=$(cd "{세션 디렉터리}" && pwd -P) && D=$(cd "{WORK_DIR}" && pwd -P) &&
   case "$D/" in "${S%/}"/*) ;; *) false ;; esac &&
   test "$(grep -c '^import\|require(' "{플러그인 루트}/workflows/{파일}.js")" = 0 &&
+  M=$(grep -oE "['\`]fz:[a-z0-9-]+" "{플러그인 루트}/workflows/{파일}.js" | sort -u | while read -r a; do
+        [ -f "{로드된 플러그인 루트}/agents/${a#*fz:}.md" ] || echo "${a#*fz:}"; done) &&
+  { [ -z "$M" ] || { echo "agentType 미등록(로드된 플러그인 agents/ 에 없다): $M" >&2; false; }; } &&
   cp "{플러그인 루트}/workflows/{파일}.js" "$D/{파일}.js" &&
   cmp -s "{플러그인 루트}/workflows/{파일}.js" "$D/{파일}.js"
 ```
 
 - **경로 판정** — `{세션 디렉터리}` 는 세션 working directory 또는 additional directory 중 `{WORK_DIR}` 를 품는 쪽이다. 두 경로를 `pwd -P` 로 편 **실제 경로**(realpath)로, **경로 세그먼트 경계**에서 비교한다(`"$D/"` 가 `"$S/"` 로 시작). ⛔ 문자열 접두사 비교 금지 — `/a/work-x` 는 `/a/work` 를 문자열 접두사로 갖지만 하위가 아니고(형제 접두사), `{WORK_DIR}` 가 범위 밖을 가리키는 symlink 면 실제 경로가 밖으로 나온다. 같은 판정의 코드 선례는 `scripts/gate_check.py` 의 `os.path.commonpath` 다.
 - **self-contained 확인** — 아래 2단계의 식 그대로다. 무출력(경로 오류)은 `0` 이 아니라서 `test` 가 거짓이 된다.
+- **agentType 등록 대조**(F-511) — 사본이 부르는 `fz:` agentType 마다 `{로드된 플러그인 루트}/agents/{이름}.md` 가 있어야 한다. `{로드된 플러그인 루트}` 는 지금 읽고 있는 SKILL.md 가 속한 플러그인의 루트다(스킬 Base directory 의 두 단계 위 — 에이전트 정의가 등록된 곳). 보통 `{플러그인 루트}` 와 같다. 다를 때가 문제다 — 개발 워크트리의 워크플로를 옛 설치본을 불러온 세션에서 부르면 새 agentType 의 렌즈는 시작도 못 하고 죽는데 워크플로는 partial 로 Stage 3 까지 돈다. 빠진 이름을 stderr 에 찍고 비0 → L4.
+- ⛔ **agents 편집은 같은 세션에 반영되지 않는다**(F-228 · F-233) — `agents/*.md` 를 고친 효과는 CLI 를 다시 띄운 새 프로세스에서만 잰다. 같은 세션에서 렌즈 동작으로 편집 효과를 판정하면 미판정이다. `/clear` 는 새 세션이 아니다 — 같은 프로세스라 에이전트 정의를 다시 읽지 않는다.
 - **cp 덮어쓰기 · 종료 코드** — 매 호출 원본을 **같은 basename** 으로 `{WORK_DIR}` 루트에 덮어쓴다. stale 복사본이 남지 않고, 텔레메트리(`scripts/fz_telemetry_report.py` 의 `norm_wf_name`)가 basename 으로 워크플로를 센다. `&&` 사슬이라 `cp` 가 비0 이면 뒤가 돌지 않는다.
 - **`cmp -s`** — 호출 직전 원본과 복사본이 바이트 단위로 같아야 한다. 같지 않으면 부르지 않는다.
 - ⛔ **비0 이면 어느 단계든 복사본을 부르지 않는다 — L4**(사용자 에스컬레이션). 원본 경로 직접 호출로 되돌리거나 SOLO 로 직행하지 않는다 — 스크립트가 시작조차 안 한 실패라 사다리 L1~L3 도 아니다.
-- 이 블록은 `tests/fixtures/workflow-prep/copy-cmp/run.sh` 가 셀(없음 · stale · 정상 · 형제 접두사 · symlink · import · 실워크플로 · cp 실패)로 실행하고, `--cells sites` 가 소비자 10곳의 준비 줄을 실제로 돌린다. ⛔ 블록이나 소비자 준비 줄을 고치면 그 fixture 를 함께 돈다.
+- 이 블록은 `tests/fixtures/workflow-prep/copy-cmp/run.sh` 가 셀(없음 · stale · 정상 · 형제 접두사 · symlink · import · agentType 미등록 · 실워크플로 · cp 실패)로 실행하고, `--cells sites` 가 소비자 10곳의 준비 줄을 실제로 돌린다. ⛔ 블록이나 소비자 준비 줄을 고치면 그 fixture 를 함께 돈다.
 
 준비(0단계) 없이 원본 경로를 부르면 `Workflow` 호출이 스크립트를 실행하지 못하고 이렇게 거부될 수 있다:
 

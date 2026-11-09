@@ -450,7 +450,7 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 파이프라인 완료 후:
 
 0. **GC 실행** (필수):
-   - L2: `list_memories()` → `fz:artifact:*`, `fz:checkpoint:*` 키 수집 → 각 `delete_memory()` 실행
+   - L2: `list_memories()` → `fz:artifact:*`, `fz:checkpoint:*`, `fz:rtm:*`, `fz:consensus:*` 키 수집 → 각 `delete_memory()` 실행
    - `fz:checkpoint:essential` 명시적 삭제: `delete_memory("fz:checkpoint:essential")`
    - L1: 새 교훈 발생 여부 판단 → 있으면 topic file에 태깅하여 저장
    - L1 저장 시 `modules/memory-guide.md` 정책 준수: `[skill: X]` `[status: Y]` `[priority: Z]` 태깅

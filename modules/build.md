@@ -58,7 +58,8 @@
 
 - [ ] 빌드 성공?
 - [ ] 빌드 경고 최소화?
-- [ ] UI/제스처/애니 변경 Step이면 visual oracle 충족? (launch_app_sim+screenshot 또는 실기기 — build-pass≠완료, fz-review:283 동일 기준) [verified: llm-references — UI는 shell 검사 불가]
+- [ ] UI/제스처/애니 변경 Step이면 visual oracle 충족? — 범위는 이 변경이 닿는 화면 전부, 최소 세로 · 가로 둘 다 (F-125: 가로에서만 그려지는 자식이 세로 확인을 통과했다) (launch_app_sim+screenshot 또는 실기기 — build-pass≠완료, fz-review:283 동일 기준) [verified: llm-references — UI는 shell 검사 불가]
+- [ ] 특정 build configuration(예: Release) 검증을 주장하면 그 configuration 산출물(`Build/Products/<Configuration>` 류)이 생겼는가? — 스킴 이름은 configuration 을 보장하지 않는다. 성공 status 만으로 판정하지 않는다 (F-112)
 - [ ] 관련 테스트 통과? (테스트 존재 시)
 
 ## 참조 스킬

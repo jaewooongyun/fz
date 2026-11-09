@@ -152,6 +152,7 @@ metadata:
    - `mcp__plugin_fz_serena__find_symbol` → 의심 심볼 찾기
    - `mcp__plugin_fz_serena__find_referencing_symbols` → 호출 관계 파악
 2. 원인 후보를 2-3개로 좁힘
+3. **회귀면 환경 축도 모은다**: `python3 "${FZ_PLUGIN_ROOT}/scripts/collect_env_axes.py" {정상 ref} {회귀 ref} --repo {GIT_ROOT}` — 컴파일 가드 · 타이머 · 네트워크 · 빌드 설정 · 툴체인 버전 줄 변화가 나온다(F-075 · F-080). ⛔ 후보 목록이다 — 증상 어휘 검색과 따로 보고 판정은 Step 1c 에서 한다
 
 ### Step 1c: Root-Cause — 증상이 아닌 원인 추적
 

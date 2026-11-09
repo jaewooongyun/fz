@@ -285,6 +285,24 @@ test-spec:
 - Phase/Gate 변경 → Functional Test 재실행
 - 모듈 참조 변경 → 참조 무결성 확인 (`/fz-manage check`)
 
+### 문서 계약은 존재와 부재를 쌍으로 (F-025)
+
+옛 문구를 새 문구로 바꾼 변경의 문서 계약은 **존재 검사(새 문구가 있다)와 부재 검사(옛 문구가 없다)를 쌍으로** 둔다. 존재만 보면 새 문구를 덧붙이고 옛 문구를 남긴 상태도 통과한다. fz 의 문서 계약 표(`tests/fixtures/docs/finding-contracts.tsv`)는 `has` · `lacks` 로 이 쌍을 적는다.
+
+### 테스트가 자기 이름의 축을 보는가 — 값싼 검출 9항 (F-122)
+
+v4.25.0 에서 열 번 만난 실패(테스트가 자기 이름의 축을 못 본다)에서 나온 여덟 항목에 9항을 더했다. 새 self-test 셀 · 회귀 fixture 를 쓸 때 대조한다.
+
+1. **방어선을 개별로 제거해** 각각 어느 테스트가 잡는지 확인한다. 통합 주입은 총계만 보여 "N종 중 M종만 관측"을 숨긴다(판정 표: `guides/harness-engineering.md` §5.6)
+2. 같은 exit 을 내는 검사가 둘 이상이면 결과 코드로 구분하지 않는다 — 거부 *사유*를 assert 한다
+3. 테스트의 setup 동작이 관측 대상 밖만 건드리는지 확인한다
+4. 타이밍 테스트는 옛 동작의 한계값 2배 이상으로 잡는다
+5. `replace` 계열은 치환 건수를 assert 한다. 성공 메시지에 *계산값*이 아니라 *관측값*을 찍는다
+6. 수정과 검산은 술어를 공유하지 않는다. 검산이 더 넓은 술어를 쓰고, 수정은 고정점까지 반복한다
+7. 경로 · 깊이 · 이름에 패턴을 쓰는 코드는 그 패턴의 **경계마다** fixture 를 만든다
+8. "이 축은 관측 불가"라고 쓸 때 **왜 불가인지** 한 번 더 묻는다. 불가 사유가 대상의 *성질*이면 한계이고, 대상의 *결함*이면 고칠 것이다
+9. **예외를 넣으면 세 케이스를 만든다** — (a) 예외 없음 (b) 예외 전량 (c) 예외를 가장 넓게 해석한 인접 입력. 1 · 2항은 "구현이 있나"만 묻는다 — 예외가 먹는 입력 집합의 **경계**는 (c)만 잰다(F-122: 두 변이를 다 돌리고도 예외 범위가 과했다)
+
 ---
 
 ## 6. Eval 자동화 — `/fz-skill eval` 연계
@@ -499,7 +517,7 @@ python3 scripts/fz_snapshot.py --diff                                           
 | 질문 | 지표 | 판정 |
 |---|---|---|
 | 워커 effort `xhigh`→`high` 해도 되나 | 같은 입력 짝 비교(§8.1): critical·major 손실 0 AND (시간 or 토큰) ≥10%↓ | `modules/peer-review-tiers.md` 짝 비교 절차 그대로 |
-| 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) **과 `adjust`**(어댑터 `verdict adjust` [verified: `scripts/fz_telemetry_report.py:339,409`]) 수, 워크플로 **N≥20** 실행 | overturn 0~1 **AND** adjust 0~1 이면 제거 A/B 후보(0~1 임계는 **잠정 휴리스틱**) — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
+| 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) **과 `adjust`**(어댑터 `verdict adjust` [verified: `scripts/fz_telemetry_report.py:440,510`]) 수, 워크플로 **N≥20** 실행 | overturn 0~1 **AND** adjust 0~1 이면 제거 A/B 후보(0~1 임계는 **잠정 휴리스틱**) — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
 | 규칙 감량이 품질을 떨어뜨렸나 | 감량 전후 fz-findings `detector: user` 월별 건수 + events `user_correction_signal` 비율 | 증가하면 되돌림 |
 | floor 성장이 지연을 늘리나 | `snapshots.tsv` floor × 스킬별 지연 중앙값 상관 | 상관 없으면 감량 우선순위 ↓ |
 | events 의 0 은 저부하인가 | `measurement` 필드 — `complete` 만 카운트로 읽는다 | `incomplete`·`unattributable`·`no_transcript` 는 분모에서 뺀다 |

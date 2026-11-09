@@ -259,10 +259,7 @@ ${WORK_DIR}/pr-digest-{light|standard|deep|tutor}.md  <- 전체 해설 문서
 
   Tutor: (사양 = modules/explanation-protocol.md §7 · PR 고유분 = references/tutor-mode.md)
   - Standard 섹션 (한 줄 요약 · 변경 의도 · 변경 파일 상세)
-  - A. 기능 전체 흐름 (진입점→소비자, 단계마다 파일 인용 + 이번 PR 좌표 표시)
-  - B. 동작↔코드 1:1 매핑 (동작 하나당 블록 하나 — ⛔표 금지)
-  - C. 구조 근거 (왜 protocol·왜 주입 + 직접 생성했다면 생길 문제)
-  - D. 탐색 경계 (홉·예산으로 잘린 것 — ⛔없어도 섹션은 쓴다)
+  - A~E 절 — 목차 정본 = `modules/explanation-output.md` (여기 베끼지 않는다 · PR 좌표 표시는 references/tutor-mode.md)
 ```
 
 peer-review 연계 시:

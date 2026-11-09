@@ -73,7 +73,7 @@ metadata:
 |----------|-----------|------|
 | 탐색 시작 전 | `/sc:sc-index-repo` | 프로젝트 구조 빠른 파악 (3K 토큰, 최초 1회) |
 | 구조 분석 | `/sc:sc-analyze` | 탐색 결과의 아키텍처 품질 분석 |
-| 설명 요청 | `/sc:sc-explain` | 탐색된 코드/구조 교육적 설명 |
+| 설명 요청 | `→ /fz-explain` | 탐색된 코드/구조 설명 — 동작↔코드 1:1 매핑 (F-023) |
 | 복잡한 탐색 후 | `→ /fz-fix` | 수정이 필요한 경우 전환 |
 | 설계 필요 시 | `→ /fz-plan` | 구조 변경 계획 수립 |
 
@@ -336,7 +336,7 @@ PlayerBuilder → PlayerInteractor → VideoUseCase → VideoRepository → Netw
 - [ ] 대상 심볼/패턴 파악 완료?
 - [ ] 영향 범위 식별?
 - [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
-- [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")이면** Coverage Gate 통과? (단위 U 확정 후 M/`N_U` 보고 — canonical: `modules/cross-validation.md` § Coverage Gate 절차 0, ⛔ 어휘 9개 동기)
+- [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)이면** Coverage Gate 통과? (단위 U 확정 후 M/`N_U` 보고 — canonical: `modules/cross-validation.md` § Coverage Gate 절차 0, ⛔ 어휘 9개 동기)
 - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
 
 ---

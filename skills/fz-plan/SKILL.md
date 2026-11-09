@@ -100,7 +100,7 @@ metadata:
    원문 색인(`extract_project_rules.py`) → 규칙 레코드(모델이 각자) → `check_project_rules.py --check` 통과본만 쓴다. `archConstraints` 는 그 **호환 투영**이다(`--project-arch` — 4축 `architecturePattern` / `uiStack` / `dependencyDirection` / `naming` + 그 축의 `conflicts`).
    - 미확정 축 → `null` + `gaps`(Probe Coverage Gap). 코드 실측(grep) 1회로 보완을 시도하고(`authority: 관례` — 코드를 인용), 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
    - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / GPT)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
-2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고) / `effort`=1.2 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
+2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고) / `edgeAxes`=적대 렌즈 필수 축(⛔ 비UI 과제 — 스크립트 · 문서 · 플러그인 인프라 — 면 과제 · 프로젝트 규칙에서 축을 유도해 넘긴다. 미지정이면 UI 화면 과제용 기본 축이 들어간다 · F-383) / `minSteps`=요구 분해로 아는 최소 Step 수(있으면 — 부분 제출을 fallback 으로 받는다 · F-146) / `effort`=1.2 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
 2.5. **준비** (⛔ 매 호출 사전 복사 — 거부 왕복을 없앤다):
    매 호출 `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비**를 **선행**한다 — 경로 판정(실제 경로 · 세그먼트 경계) · self-contained 확인 · cp 덮어쓰기 · `cmp -s`:
    `grep -c '^import\|require(' {플러그인 루트}/workflows/plan-lean2.js` 가 `0` 임을 확인(⛔ 무출력은 0이 아니라 경로 오류) → 복사 → 바이트 일치 → 그 경로로 **1회** 호출:
@@ -333,8 +333,10 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
    Phase 1 반환의 `steps[]`를 JSON으로 임시 기록한 뒤 변환한다 — 실행 절차 5.7 이 원장을 이미 다시 만들었으면 그 원장을 그대로 쓴다(반환 `steps[]` 로 덮어쓰지 않는다 — Phase 2 는 합의본 스냅샷을 읽는다). ⛔ **이 단계가 없으면 원장이 생기지 않아 배선 2·3이 전부 no-op이다.**
    ```bash
    python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" \
-     --from-plan {WORK_DIR}/plan/steps.json --root {WORK_DIR} --out {WORK_DIR}/gates/plan.draft.md
+     --from-plan {WORK_DIR}/plan/steps.json --root {WORK_DIR} --out {WORK_DIR}/gates/plan.draft.md \
+     [--impl-root {구현 트리}]
    ```
+   입력 파일은 `{steps:[…], rtm:[…]}` 객체 또는 steps 배열이다 — 다른 최상위 모양은 exit 2 다(F-346). 코드가 WORK_DIR 밖 형제 워크트리에 있으면 `--impl-root` 를 붙인다 — CHECK 는 `FZ_IMPL_ROOT` 로 그 트리를 받는다(F-347). 생성 뒤 나오는 `⚠️` 경고(제목 · 기준 토큰 · 체인 · 산출물 · RTM · MANUAL 사유)는 `modules/gates.md` 배선 1 이 정본이다 — 경고를 읽고 steps 를 고친 뒤 다시 만든다
    `FZ_PLUGIN_ROOT`는 `scripts/resolve-plugin-root.sh`로 해석한다 — ⛔ 상대 경로(`scripts/…`)는 대상 레포에 그 파일이 없어 exit 2(인프라 통과)로 **조용히 강제력이 사라진다**.
 
 3.2. **⛔ 게이트 판정** (draft 원장이 있을 때 — `modules/gates.md` 배선 1):
@@ -448,6 +450,7 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 ### light 모드 (모드 게이트 — `modules/mode-gate.md`)
 
 진입: 실행 절차 1.2 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+- ⛔ 착수 전 `extract_project_rules.py` 원문 색인 1회 — 실행 절차 1.5 와 같은 계약이다(`check_project_rules.py --check` 통과본의 `conflicts[]` 가 비지 않으면 사용자 1회 보고). light 라고 지침 사이 모순(예: Claude · GPT 지침의 의존 방향이 반대)을 건너뛰지 않는다
 - plan-lean2 를 띄우지 않고 Phase 1 (Deep Planning)을 Lead 가 수행한다 — Phase 0.5 · 스트레스 테스트 Q1-Q6 · RTM 은 그대로(발동 조건대로) · Phase 0.7 Sprint Contract 는 열리지 않는다(발동 조건이 full — `modules/sprint-contract.md`) · 2.7 독립 플랜도 없다(Phase 2 는 기본 `verify`). 새 아키텍처 결정이면 1.2 가 full 을 추천한다
 - Phase 2 (GPT verify ∥ verify-gates) · Phase 3 · 원장(3.1 · 4.5) · `plan-final.md` 는 full 과 같다 — GPT 단계도 같다(끈 세션이면 `[GPT 미사용]` · 원장 판정은 Gate 2 확인으로)
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)

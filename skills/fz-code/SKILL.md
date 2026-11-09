@@ -119,7 +119,7 @@ metadata:
 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - Stage 1 impl(opus) changeset → Stage 2 **검토**(full: arch-lens + impl-quality **병렬 2렌즈**, opus / light: arch 단독) → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, full 3-4 call · light 1-3 call)
-4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유). ⛔ 반환이 `mode:'fallback'` · `reason:'changeset-defect'` 면 적용하지 않는다(`defects` 를 buildFeedback 에 넣어 재invoke). **적용 뒤 오라클**(워크플로 검사는 자기보고 일관성까지만 잰다 — 시작 줄만 준 앵커가 spanLines 와 자기일관이면 통과하므로, 남은 옛 줄은 diff 본문 확인과 절차 5 빌드가 잡는다): replace_symbol_body 는 대상 심볼을 Serena `find_symbol`(`include_body: true`)로 다시 읽어 본문 == newBody · Edit 는 **적용 전** 파일에 oldAnchor 1회 · 적용 뒤 newBody 1회(newBody 가 oldAnchor 를 품는 삽입 · 감싸기는 적용 뒤 oldAnchor 가 남는 것이 정상) · 증감은 **이 Step 적용 직전에 잰** `git diff --numstat -- <파일>`(미추적 파일은 줄 수)과의 차 = 그 파일 Edit 편집의 Σ(newBody 줄 − spanLines) — replace_symbol_body 편집이 섞인 파일은 numstat 을 대조하지 않는다(그 편집의 spanLines 는 0 이다) · Bash/python 인라인 편집은 뒤에 diff 본문을 보고 삽입 앵커 개수 1(F-231). 어긋나면 그 편집을 되돌리고 재invoke
+4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유). ⛔ 반환이 `mode:'fallback'` · `reason:'changeset-defect'` 면 적용하지 않는다(`defects` 를 buildFeedback 에 넣어 재invoke). **적용 뒤 오라클**(워크플로 검사는 자기보고 일관성까지만 잰다 — 시작 줄만 준 앵커가 spanLines 와 자기일관이면 통과하므로, 남은 옛 줄은 diff 본문 확인과 절차 5 빌드가 잡는다): replace_symbol_body 는 대상 심볼을 Serena `find_symbol`(`include_body: true`)로 다시 읽어 본문 == newBody · Edit 는 **적용 전** 파일에 oldAnchor 1회 · 적용 뒤 newBody 1회(newBody 가 oldAnchor 를 품는 삽입 · 감싸기는 적용 뒤 oldAnchor 가 남는 것이 정상) · 증감은 **이 Step 적용 직전에 잰** `git diff --numstat -- <파일>`(미추적 파일은 줄 수)과의 차 = 그 파일 Edit 편집의 Σ(newBody 줄 − spanLines) — replace_symbol_body 편집이 섞인 파일은 numstat 을 대조하지 않는다(그 편집의 spanLines 는 0 이다) · Bash/python 인라인 편집은 뒤에 diff 본문을 보고 삽입 앵커 개수 1(F-231). 어긋나면 그 편집을 되돌리고 재invoke · 적용한 파일 전부에 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_applied_escapes.py" --base HEAD <파일…>` — exit 1 이면 태그 앞 이스케이프(`<\task-notification>` 꼴)가 새로 생긴 것이다(JSON 이중 이스케이프가 파일에 풀린 흔적 · F-551). 그 편집을 되돌리고 재invoke · exit 2 는 측정 실패다(통과 아님)
 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead
    - ⛔ **렌즈 회계를 먼저 본다** (F-216 N1): `lensesCompleted` < `lensesExpected` 면 `reviewVerdict` 가 `'partial'` 로 오고 `residualNote` 에 죽은 렌즈 이름이 담긴다. 이전 판은 렌즈 하나가 죽어도 `'pass'` + 완주 3/3 을 인쇄해 **검토 절반이 빠진 것을 반환값만으로는 알 수 없었다**.
@@ -185,6 +185,7 @@ metadata:
 > 발동: CLAUDE.md `## Architecture`가 Swift/iOS 지정 + **Phase 0.4에서 복원된 plan**에 D/E/F/G/H token 1건 이상 발견 시. 비Swift/iOS는 스킵.
 > (token 게이팅은 `swift-pattern-detection.md` Read라는 **비싼 스캔**만 제어한다. 경량 구조 검사는 Phase 0.4가 무조건 수행.)
 > 본문: `modules/swift-pattern-detection.md` 참조 (Level 3) — 5 원칙(D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환 / ⚠️H figma 대조 *candidate*) + 각 원칙 token + 발동 행동 + Few-shot. **G는 Phase 1.5 P3와 mirror로 cross-skill consistency 보장**.
+> ⛔ **visual oracle 승격 token**: plan 에 `제스처` · `gesture` · `UIViewRepresentable` · `hitTest` · `ZStack` 이 있으면 그 Step 은 visual oracle 이 **필수**다(구현 절차 2 의 □ 항목 · Gate 3) — 이 token 들은 D~H 어디에도 없어 UI Step 이 약한 게이트로 남았다 (F-230)
 > ⛔ **H 발동 token은 plan 어휘가 아니라 작업 성격**: figma 노드 조회 · UI 수치(spacing/padding/gap/size/radius/opacity) 작성·수정 · 색/폰트 토큰 지정 · 디자인 검수 대응 — plan에 명시가 없어도 이 작업을 하면 발동한다 (H만 단독 발동해도 모듈 Read).
 
 ### Gate 0.5: Swift Pattern Pre-detection 통과
@@ -241,6 +242,9 @@ metadata:
      - □ 빌드 성공 (modules/build.md)
      - □ 시그니처 변경 시: conformance 보존 확인 (`find_referencing_symbols`)
      - □ 타입 변경 시: caller 1개 샘플 확인 (의도대로 호출되는지)
+     - □ UI · 제스처 · 애니메이션 Step 이면 visual oracle — 앱을 띄워 그 화면을 본다(launch_app_sim + screenshot 또는 실기기 · 범위는 `modules/build.md` Gate 체크리스트). 빌드 · 정적 검사 통과는 완료가 아니다. 못 보면 그 Step 은 **미충족**으로 남긴다(원장은 MANUAL · 사유 `기계화 불가` — `modules/gates.md` § 원장 운용 규율) (F-230: 검증 6단계를 다 통과했는데 화면에서는 아무 일도 없었다)
+     - □ Bash · python 인라인 편집이면 `git diff` **본문**(`--stat` 아님)을 읽고 삽입 앵커가 1회인지 확인 (F-231)
+     - □ 소비자를 정본에 맞추는 Step 이면 먼저 정본 안에서 같은 대상을 말하는 진술끼리 맞는지 본다 — 정본이 두 말을 하면 정합 작업이 그 모호함을 소비자로 복제한다 (F-121)
    - /simplify 자동 트리거: 새 함수 3개+ 또는 100줄+ 추가 시 (modules/execution-modes.md)
    - ⛔ RTM 갱신: 해당 Step의 Req-ID를 `implemented`로 갱신 (참조: modules/rtm.md)
 
@@ -270,6 +274,7 @@ metadata:
    | 에러 경로 축소 | 원본 switch/catch 분기 N개 → After catch < N개. `== .case(value)` 비교 사용 | enum associated value 무시. `if case` 패턴 매칭 필수 |
    | 퀄리티 역행 | After 줄 수 > Before 2배. 원본 추상화(struct/helper/extension)가 인라인 해체 | 리팩토링이 코드 악화. protocol extension/convenience 검토 |
    | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견. 단 동일 패턴이 코드베이스 3곳+ 존재하면 convention 간주 — 보고 생략(예: 로컬 UseCase 생성). 단 같은 RIB scope에서 Component가 주입 제공하는 dependency를 Interactor가 동일하게 재생성하면 convention 무관 보고 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지(범위 외 정리 금지 [verified: claude-4-best-practices]). Gate 3 전 일괄 보고 |
+   | 관례 역방향 | 내가 도입하는 관용구 · 격리 단언 · 헬퍼 우회가 **같은 종류 자리**(같은 override · 같은 콜백 · 같은 생명주기 지점)에서 몇 번째인지 N/M 을 분모와 함께 인쇄한다(분모 = 그 자리를 grep 으로 센 수). 분자가 1(나 혼자)이면 보고 | 저장소 전체 빈도를 자리별 빈도로 착각했다(F-174: 전체 59회 · 그 자리에서는 1/1 — 저장소는 그 자리용 헬퍼를 이미 갖고 있었다). 위 행의 '3곳+ = convention' 은 남의 패턴을 인정하는 정방향이고 이 행은 내 방식을 재는 역방향이다 |
    | 동기화 부재 | singleton/shared 타입에 `var` 추가/수정 시, `@MainActor`/`actor`/lock/serial queue 보호 없음 | data race 위험 — plugin-refs.md 역방향 트리거 참조. 동시성 보호 메커니즘 추가 필요 |
    | 싱글톤 deinit | `static let shared` 타입에 `deinit` 작성 시 | deinit은 호출되지 않음 — 정리가 필요하면 명시적 `tearDown()` 메서드 사용 |
    | 기본값 소비자 영향 | 비동기 채워지는 property에 기본값(`= false`, `= nil`) 설정 시 | 소비자가 첫 콜백 전에 읽으면 기본값으로 분기 — guard/if 패턴 영향 확인 |
@@ -312,6 +317,8 @@ metadata:
 5. **(선택) /simplify 게이트**: 코드 변경이 있을 때 `/simplify focus on {step-context}` (참조: modules/execution-modes.md)
 
 6. **매 Step 완료 후 빌드 검증**: 참조 `modules/build.md`
+   - 마커 누출: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_marker_leak.py" --repo {GIT_ROOT} --base {base}` — exit 1 이면 대상 저장소 주석에 들어간 fz 마커(⛔ · ✅ · **강조**)를 그 저장소 주석 관례로 바꾼다 · 2 는 UNRUN(통과 아님) (F-175)
+   - 대체 Step 이면: `python3 "${FZ_PLUGIN_ROOT}/scripts/call_set_diff.py" {레거시 파일} {신규 파일}` — `LEGACY-ONLY` 호출마다 옮겼는지 · 일부러 뺐는지 Step 기록에 적는다 (F-126)
 
 6.3. **⛔ Behavioral Equivalence Check** (Transformation Spec이 있는 Step 완료 후):
    - Plan의 Transformation Spec 로드 → 원본 코드 Read
@@ -327,9 +334,14 @@ metadata:
    Step 완료 선언 **전** 해당 Step 게이트를 실행한다. 실패면 다음 Step으로 진행하지 않는다.
    ```bash
    G="${FZ_PLUGIN_ROOT}/scripts/gate_check.py"                     # resolve-plugin-root.sh 로 해석
-   python3 "$G" --only {StepID} {WORK_DIR}/gates/plan.md            # ⛔ 해당 Step 게이트만
+   A="$(python3 "$G" --affected-by {이 Step 이 바꾼 파일,…} {WORK_DIR}/gates/plan.md | sed -n 's/^AFFECTED: //p')"
+   python3 "$G" --only "{StepID}${A:+,$A}" {WORK_DIR}/gates/plan.md   # ⛔ 해당 Step 게이트 + 바뀐 파일이 근거인 앞 게이트
    python3 "$G" --set-state ready_for_review {WORK_DIR}/gates/plan.md   # 전 Step 완료 시
    ```
+   `--affected-by` 는 바뀐 파일의 경로 · basename 을 CHECK · CRITERION · PIN 에 담은 **충족** 게이트 id 를 낸다(읽기 전용) — 뒤 Step 이 앞 Step 게이트의 근거 코드나 공유 스크립트를 바꿔도 그 게이트가 다시 돈다(F-349 · F-552)
+   - 버그 수정 Step 이면 **변이 셀**: 수정의 핵심 호출을 지운(되돌린) 사본에서 그 Step 테스트가 FAIL 하는지 한 번 잰다 — 통과하면 테스트가 수정을 보지 않는다(F-447: 떼어 낸 판정 함수만 부르는 테스트가 본체를 지워도 통과했다 · 정본 `modules/gates.md` § 원장 운용 규율)
+   - 게이트를 오탐으로 판정하면 그 게이트가 잡은 대상 집합을 새 기준으로 **전수 재분류**해 건수(분모)를 보고하고, 계획이 `파일:줄` 로 지목한 항목은 `git diff` 로 하나씩 확인해 Step 기록에 적는다(F-236: '과잉 55건' 안에 진짜 갭 1건이 섞여 있었다)
+   - 플러그인 저장소 작업이면 Step 경계의 health 검사를 표적 테스트 통과로 갈음하지 않는다 — `git diff --name-status {base} > {WORK_DIR}/code/changed.txt` 뒤 `bash "${FZ_PLUGIN_ROOT}/scripts/health-check.sh" --changed-from {WORK_DIR}/code/changed.txt`. 파일을 옮기거나 지운 Step 이면 `scripts/health_select.py` 가 전체 실행을 고른다(F-512 — 이동 단계의 기준선 lint 실패를 다음 작업자가 전체 실행에서야 잡았다)
    ⛔ **상대 경로 금지** — 설치된 플러그인에서는 대상 레포에 `scripts/gate_check.py`가 없다. exit 2(인프라 통과)로 떨어져 강제력이 조용히 사라진다.
    - 원장 부재 · `ROOT:` 불일치 · `STATE: closed` → no-op (기존 경로 무회귀) · `STATE: planned` → exit 3 (Phase 0.4 착수 전환 누락)
    - `--set-state`는 **전 게이트 충족 시만** 전진한다 — 실행 게이트만 통과하고 MANUAL이 미확인이면 거부된다
@@ -371,6 +383,7 @@ metadata:
 - [ ] 빌드 성공? (프로젝트 빌드 검증 통과)
 - [ ] 빌드 경고 최소화?
 - [ ] 아키텍처 패턴 준수?
+- [ ] ⛔ UI · 제스처 · 애니메이션 Step 이 있으면 Step 마다 visual oracle 충족? — 못 본 Step 은 완료가 아니라 미충족으로 보고한다 (F-230 · `modules/build.md` Gate 체크리스트와 같은 기준)
 - [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)

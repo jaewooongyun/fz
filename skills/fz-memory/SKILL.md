@@ -100,7 +100,7 @@ L2 임시키 삭제 + L1 stale 항목 정리 제안 + L3 잔존 티켓 폴더 �
 ### 절차
 
 1. **L2 임시키 GC**:
-   - `list_memories()` → `fz:artifact:*`, `fz:checkpoint:*` 수집
+   - `list_memories()` → `fz:artifact:*`, `fz:checkpoint:*`, `fz:rtm:*`, `fz:consensus:*` 수집
    - 각 키에 `delete_memory()` 실행
    - `fz:session:current`는 유지
 

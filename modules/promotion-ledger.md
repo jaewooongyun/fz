@@ -89,7 +89,7 @@
 ### P2-C: general closure-capture retain cycle lens (Claude 경로) — 트랙 C
 - 관측 #0: OBS-10 (CodeRabbit Major1 — sheetRef 강한 캡처 cycle, fz-review 6-Layer 통과)
 - finding-source: external(CodeRabbit) — 4-classify: valid-suggestion
-- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. GPT `gpt-skills/fz-reviewer/SKILL.md:36-37`엔 일반 retain cycle lens 존재 (Claude/GPT 비대칭).
+- 내용: Claude 검증 경로에 일반 closure-capture retain cycle lens 부재 — `safety-audit.md`(4-J)는 동시성 전용(retain cycle 미언급), fz-review 검증 5는 listener/delegate 누수만 다룸 → 일반 "저장 프로퍼티 보유 closure가 self 강한 캡처" 미커버. GPT `gpt-skills/fz-reviewer/SKILL.md:38-39`엔 일반 retain cycle lens 존재 (Claude/GPT 비대칭).
 - generalize: narrow (Swift closure) | 과적합 위험: 中 (Grep 패턴 FP — 패턴 정교화 선행)
 - ⛔ 활성 차단: evidence 1세션 [memory-guide:45] → candidate. safety-audit Grep 검출 lens active 전환은 트랙 A 기준 **5세션+** 누적 후 (트랙 C 정의 = 트랙 A 준용과 일치). memory-guide:44의 `≥3 sessions`는 별도 모듈 분리 자격이지 active 임계값 아님.
 - ⚡ 앵커 배선 (2026-08-31): `skills/fz-review/SKILL.md` "⛔ retain cycle 점검" 블록 문구에 **P2-C candidate `active=false`** 를 부착했다. ⛔ **새 게이트를 만들지 않았다** — 그 방어는 이미 있었고(GPT 부재 시 이종 parity 복원) 원장 항목만 자산에서 도달 불가였다. 앵커가 없으면 관측 #1 이 발생해도 카운트를 올릴 지점이 없다
@@ -401,6 +401,7 @@ E 성격(하네스 결함 · 측정 실패 · 판정 오류 · 게이트 위음�
 - 값싼 검출: 실패 경로를 주장할 때 `catch` 본문 **코드 인용 강제**(요약 금지)
 - ⛔ **활성 차단: 회귀 fixture 0개.** 트랙 D 조건 3개 중 세션 수만 충족했다. fixture 설계 = "catch 본문 미인용 상태로 전파 주장이 통과하는가"를 검출
 - 승격 목표: 회귀 fixture 1개 + 외부 채점 1회 → active 판정
+- 2026-11-09(round 2): 값싼 검출 규칙만 `modules/lead-reasoning.md` § 추정 → 사실 오류 「실패 경로 주장」과 Coverage Gate 단위(error-path)에 넣었다 — ⛔ 회귀 fixture 0개 그대로라 active 아님(F-009 · F-017 partial)
 
 ### ⛔ 트랙 D 신설 전 상태 (2026-08-24 실측 — 신설 근거)
 
@@ -452,6 +453,9 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
     (`guides/harness-engineering.md` § 문서 규약 · `guides/agent-team-guide.md` § Same-model Cross-Verify).
 - **채점자가 승격 목표를 보강**했다 — 교체 문구에 세 조건을 추가로 요구: ① *"'다른 조달원' 의 독립성 정의"* (명령만 달라도 같은 정규식·파서·후보 목록이면 같은 누락을 공유한다) ② *"`Σ부분=전체` 는 전체 N 이 부분합과 **독립적으로** 확보된 경우에만 검산"* (아니면 항등식) ③ **fail-closed** — *"독립 분모를 얻지 못하면 100% 로 통과시키지 말고 '커버리지 미검증' 으로 보고"*
 - 승격 목표 (트랙 D): 별개 세션 1건 추가 후 절차 6 처방 교체("재실행" → "실패 모드가 다른 조달원, 또는 독립 조달된 전체와의 `Σ부분=전체`") + 위 ①②③ 포함. 외부 채점은 D-2 회차에서 이미 수행됨
+- 관측 #2: `fz-findings` **F-099** (2026-08-31 — F-026 과 다른 세션) — 측정 스크립트가 조용히 부분만 재고 전체로 보고했다. 별개 세션 2건 충족
+- 관측 #3: **F-026 재관측** (2026-10-19 — 비-0 분모 계열)
+- ✅ 2026-11-09(round 2): 절차 6 처방 교체 완료 — `modules/cross-validation.md` § Coverage Gate 6항(실패 모드가 다른 조달원 · 독립 N 과 `Σ부분=전체` · 못 구하면 커버리지 미검증 — ①②③ 포함)
 
 ### OBS-02 잔여 항목 처분 (2026-09-01)
 
@@ -513,7 +517,7 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
 | `P2-F` | 에이전트 정의는 세션 시작에 고정된다 | 이름 동일 ×2 | `F-228`·`F-233` |
 | `P2-G` | 같은 사실의 **선언처를 전수**로 본다 | 처방 공유 — 검사가 선언처 하나만 본다 | `F-287`·`F-289` |
 | `P2-H` | 측정 도구의 **무응답을 대상의 정상으로 읽지 않는다** | 처방 공유 — 도구 부재·검사기 중단이 같은 오귀속 | `F-288`·`F-290` |
-| `P2-I` | 주장과 측정의 **주어·술어를 대조**한다 | 처방 공유 — 주어 불일치(F-292)·술어 과매칭(F-293) | `F-292`·`F-293` |
+| `P2-I` | 주장과 측정의 **주어·술어를 대조**한다 | 처방 공유 — 주어 불일치(F-292)·술어 과매칭(F-293) | `F-292`·`F-293` — ✅ 승격 2026-11-09(round 2 사용자 승인): `modules/uncertainty-verification.md` § 주장과 측정의 대조 |
 
 **관측 카운트**: 전 항목 **관측 #1** (같은 세션에서 등재됐으므로 `같은 세션 다발은 1 count`).
 ⛔ P2→P1 은 **eligible session 1건 + `/fz-gpt verify` approved + 사용자 승인** 이며 아직 충족되지 않았다.

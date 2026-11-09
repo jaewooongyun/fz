@@ -96,10 +96,12 @@ metadata:
 ### 실행 절차 (Lead)
 
 > ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 · 2)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 참조 무결성 확인 · L3 에이전트)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 첫 패스(2.5)는 백그라운드 한 줄이라 그대로 직전에 둔다(S22). 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
-1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12)
+1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12) · ⛔ 기록 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_review_diff.py" --diff {WORK_DIR}/review/diff.patch --repo {GIT_ROOT} --work-dir {WORK_DIR}` — exit 1 이면 `MISSING` 신규 파일을 덧붙이고 다시 돈다(F-270: 신규 파일을 빠뜨려 변경의 60% 가 리뷰 밖에 있었다) · exit 2 는 대조 불가(통과 아님)
+1.2. **이동 후보 표시**: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_moved_code.py" {BASE} WORKTREE --repo {GIT_ROOT}`(리뷰 대상이 커밋 범위면 `WORKTREE` 대신 그 끝 커밋) — `MOVE-CANDIDATE` 파일은 신규 코드로 읽기 전에 BASE 의 출처를 본다(F-078 · 신규성 판정은 사람)
 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 결과로 추천을 달고 묻는다. **light** 면 2~4.5 를 건너뛰고 Phase 5 Lead 3중 검증으로 간다(아래 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
-2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
+2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계 — ⛔ `plan-final.md` 등에서 온 자기 설계 판단 · 위험 추정은 넣지 않는다: 렌즈가 내 판단을 확인만 하게 된다 · F-042) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
+   - ⊕ (`judgmentSlots` · 기본 off — 이 워크플로의 옵션 묶음은 S25 판정 전까지 off) `judgmentSlots: true` 면 렌즈가 재지 않은 전제 · 한정 문구 · 동적 축 질문 답을 낸다 — 반환 `unverifiedPremises` 를 Phase 5 판정 입력으로 읽고, finding `limits` 가 있으면 그 지적은 suggestion 까지다(peer-review 병합기와 같은 규칙 · F-448 · F-178)
 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**(직전 `gpt-choice.sh decide` — `skip` 이면 띄우지 않고 병합은 `--gpt-unavailable`): `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {diff.patch} --deny {WORK_DIR} [--rules-index {원문 색인}] …` — 켜면 Workflow args 에 `locatedFindings: true` 를 함께 준다(위치 필드가 없는 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다). ⛔ 규칙 레코드(`projectRulesPath`)는 런처에 넘기지 않는다(exit 11). 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js && cmp -s {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. 복사본은 2.8 준비가 매 호출 만든다(fz-plan 절차 2.5 와 같은 규칙)
@@ -207,6 +209,8 @@ Grep → 변경 후 패턴 일관성
 mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분석 (요구사항별 충족 여부 단계별 검증)
 ```
 
+⛔ 소비자를 정본에 맞춘 변경이면 정본 안에서 같은 대상을 말하는 진술끼리 먼저 대조한다 — 정본이 두 말을 하면 정합 작업이 그 모호함을 소비자로 복제한다 (F-121)
+
 ### ⛔ 검증 2: GPT 코드 리뷰 (필수 — 생략 금지)
 
 ```bash
@@ -279,7 +283,7 @@ Plan에 Transformation Spec이 포함된 경우, diff가 Spec 요구사항을 �
    - 추상화: Spec "protocol extension" → diff에 extension?
    - 인스턴스: Spec "stored property" → diff에 선언?
    - ⛔ Zero-Exception Thread: diff에서 Transformation Spec "실행 스레드"가 main queue인 변환이 @MainActor 없이 구현되었으면 → "thread_violation" (Critical)
-   - ⛔ Wrapper Scope Minimality: @MainActor 블록 내 각 문장이 MainActor 컨텍스트를 필요로 하는지 확인. 불필요 문장 포함 → "wrapper_overscope" (Major) [ablation: scope-min-v1]
+   - ⛔ Wrapper Scope Minimality: @MainActor 블록 내 각 문장이 MainActor 컨텍스트를 필요로 하는지 확인. 불필요 문장 포함 → "wrapper_overscope" (Major) [ablation: scope-min-v1] · ⛔ **이동 래퍼에만 적용**한다(`Task { @MainActor }` · `MainActor.run` — 문장을 다른 격리로 옮긴다). `MainActor.assumeIsolated` 같은 단언은 대상이 아니다 — 오라클: "이 클로저를 지우면 런타임 동작이 바뀌는가?" 바뀌면 이동, 컴파일만 통과하면 단언 (F-237)
    - ⛔ Parameter Presence: 원본 대비 키 추가 → "parameter_addition" (Major)
    - ⛔ Default-Deny enforcement: Spec의 기술적 주장에 [verified] 태그 없음 → violation
 3. 불일치 → "transformation_deviation" (severity: Major)
@@ -329,7 +333,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] Concurrency Safety Audit 통과? (싱글톤 가변 상태 동기화, 콜백 스레드, @Published 스레드 — modules/safety-audit.md)
 - [ ] ⛔ Concurrency Safety Audit **실행 여부** 확인? (diff에 class/struct 타입 변경이 포함되면 safety-audit.md 절차 실행 필수 — "해당 없음" 판정에도 판정 근거 명시)
 - [ ] ⛔ Zero-Exception Thread Rule 통과? (main queue 변환에 @MainActor 누락 없음)
-- [ ] ⛔ Wrapper Scope Minimality 통과? (@MainActor 블록 내 불필요 문장 없음) [ablation: scope-min-v1]
+- [ ] ⛔ Wrapper Scope Minimality 통과? (이동 래퍼 블록 내 불필요 문장 없음 — 단언 API 제외 · F-237) [ablation: scope-min-v1]
 - [ ] ⛔ 요청 파라미터 키 동등성 통과? (원본 대비 추가/삭제 키 없음)
 - [ ] ⛔ Default-Deny 통과? (Spec 기술적 주장에 [verified] 태그 존재)
 - [ ] ⚠️ Swift Naming Compliance 권장 통과? (검증 4-N **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
@@ -391,6 +395,7 @@ N (GPT 제기 이슈 수) >= 10 ?
 - [ ] Reflection Rate — **N≥10이면 ≥80%, N<10이면 `preliminary` 기록 후 N/A** (정본: `cross-validation.md §Reflection Rate threshold`)
 - [ ] 최대 반복 횟수 미초과?
 - [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] ⛔ `[미측정: 자동화 불가]` 시나리오마다 수동 이관 줄(`수동 이관: 요청 · 결과 · 거절`)이 있는가? — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_unmeasured_handoff.py" {리뷰 보고}` exit 0 (F-524: 측정 못 한 구역을 넘기지 않아 그 구역의 결함을 팀원이 찾았다)
 
 ### 비-티켓 세션 Checkpoint (Phase 5 완료 후)
 - 비-티켓 세션 모드: `write_memory("fz:checkpoint:review-issues", "이슈 {N}개. Critical: {요약}. Reflection Rate: {X}%")`
