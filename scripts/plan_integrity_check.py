@@ -14,6 +14,10 @@
         rationale·file 에 `신규`/`new` 표기가 있는 것이며, 표기 없는 범위 밖 파일은 여전히 위반이다.
     · `steps[].verify` 가 VerifySpec 계약을 지키는가   (command=criterion+command+expect · manual=criterion)
     · id 가 유일한가                                    (중복은 개수 검사를 무력화한다)
+  `--plan-doc` (plan 마크다운 — plan-v{N} · plan-final) 에서 재는 것(round 2 S17):
+    · `경로:줄` 바로 뒤 따옴표 인용이 그 원문 줄과 같은가(F-432 — 렌즈가 규칙을 반대로 인용했다 · `--root` 가 있을 때)
+    · "F-NNN 이 기록한" 꼴 근거 문장의 문단에 엔트리 원문 줄 포인터(`entries/F-NNN-*.md:줄`)가 있는가(F-453 — 기억으로 인용했다)
+    · 보강 표지 `⊕` 가 남았는가 · Step 제목 id 가 겹치는가(F-315 — 중간본도 단일 최신 상태로 접는다)
   ⛔ 재지 못하는 것: 계획이 **요구사항을 충족하는가** · 그 파일이 실제로 존재하는가 ·
      verify 가 제목이 말하는 것을 측정하는가. 앞의 둘은 Lead·GPT 판정이고, 마지막은
      `gpt-exec.sh verify-gates` 의 measurement_fit 축이다.
@@ -142,6 +146,87 @@ def check(doc: dict) -> tuple:
     return v, notes
 
 
+# ── plan 문서(마크다운) 검사 — round 2 S17 ────────────────────────────────
+QUOTE_AFTER_REF = re.compile(r"`?([\w./-]+\.[A-Za-z]\w{0,5}):(\d+)`?[\s—–:·-]{0,4}[\"“「]([^\"”」\n]{4,})[\"”」]")
+FINDING_CLAIM = re.compile(r"F-(\d{3})\s*(?:이|가|은|는|의)?\s*(?:기록한|지목한|적은|보고한|남긴|에 따르면|에 기록된)")
+STEP_HEADING = re.compile(r"^#{2,4}\s+(S\d+[a-z]?)\b", re.M)
+AMEND_MARK = "⊕"
+
+
+def _flat(s: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"\*\*|`", "", s)).strip()
+
+
+def _lines_of(path: str):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read().split("\n")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def check_doc(text: str, root=None, findings=None) -> tuple:
+    """plan 마크다운 — (violations, notes). root · findings 가 없으면 그 대조는 unavailable 로 남긴다(통과가 아니다)."""
+    v, notes = [], []
+    quoted = 0
+    for m in QUOTE_AFTER_REF.finditer(text):           # F-432 — 인용은 원문 줄과 글자가 같아야 한다(의역은 따옴표에 넣지 않는다)
+        path, line, quote = m.group(1), int(m.group(2)), m.group(3)
+        quoted += 1
+        reg = re.match(r"(?:.*/)?entries/(F-\d{3}.*)$", path)   # 레지스트리 포인터는 --findings-dir 기준이다
+        base, rel = (findings, reg.group(1)) if reg else (root, path)
+        if not base:
+            continue
+        lines = _lines_of(os.path.join(base, rel))
+        if lines is None:
+            v.append(f"인용 대상을 열 수 없다: {path}:{line}")
+            continue
+        window = _flat(" ".join(lines[max(0, line - 1):line + 2]))
+        if _flat(quote) not in window:
+            src = _flat(lines[line - 1]) if 0 < line <= len(lines) else "(줄 없음)"
+            v.append(f"{path}:{line} 인용이 원문과 다르다 — 인용 {quote[:60]!r} · 원문 {src[:80]!r}")
+    if quoted and not (root and findings):
+        notes.append(f"따옴표 인용 {quoted}건 — --root · --findings-dir 중 없는 쪽의 원문 대조 unavailable")
+    for para in re.split(r"\n\s*\n", text):           # F-453 — finding 을 근거로 쓴 문장은 같은 문단에 원문 줄 포인터
+        for m in FINDING_CLAIM.finditer(para):
+            fid = m.group(1)
+            ptr = re.search(r"entries/(F-%s[^\s:`)\"]*\.md):(\d+)" % fid, para)
+            if not ptr:
+                v.append(f"F-{fid} 을 근거로 쓴 문장에 엔트리 원문 줄 인용(entries/F-{fid}-*.md:줄)이 없다 — 기억으로 인용하지 않는다")
+                continue
+            if findings:
+                lines = _lines_of(os.path.join(findings, ptr.group(1)))
+                if lines is None or not (0 < int(ptr.group(2)) <= len(lines)):
+                    v.append(f"F-{fid} 포인터 {ptr.group(1)}:{ptr.group(2)} 가 레지스트리에서 열리지 않는다")
+    if FINDING_CLAIM.search(text) and not findings:
+        notes.append("--findings-dir 가 없어 finding 포인터의 실재 대조 unavailable")
+    amend = [i + 1 for i, ln in enumerate(text.split("\n")) if AMEND_MARK in ln]
+    if amend:                                          # F-315 — 중간본에 보강 표지가 남으면 옛 문구와 새 문구가 함께 산다
+        v.append(f"보강 표지 ⊕ 가 {len(amend)}줄 남았다(줄 {amend[:5]}) — plan-v{{N}} 도 단일 최신 상태로 접는다")
+    ids = STEP_HEADING.findall(text)
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    if dup:
+        v.append(f"Step 제목 id 중복: {dup}")
+    return v, notes
+
+
+def run_doc(path: str, root=None, findings=None, quiet: bool = False) -> int:
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        if not quiet:
+            print(f"FAIL: plan 문서를 읽을 수 없다: {path} ({type(exc).__name__})")
+        return 1
+    v, notes = check_doc(text, root, findings)
+    if not quiet:
+        for n in notes:
+            print(f"  ⚠️ {n}")
+        for x in v:
+            print(f"  VIOLATION {x}")
+        print((f"integrity=FAIL ({len(v)} 위반) " if v else "INTEGRITY_PASS ") + os.path.basename(path))
+    return 1 if v else 0
+
+
 def run_one(path: str, quiet: bool = False) -> int:
     try:
         with open(path, "r", encoding="utf-8") as fh:
@@ -187,13 +272,34 @@ def self_test(fixture_dir: str) -> int:
             passed += 1
         else:
             fails.append(f"{os.path.basename(b)} 가 통과했다 (음성 실패 — 위반을 못 잡는다)")
+    doc = os.path.join(fixture_dir, "doc")
+    listing = bool(os.environ.get("FZ_SELFTEST_LIST"))
+    if os.path.isdir(doc):                              # plan 문서 셀(round 2 S17) — 셀마다 양성(good.md) 대조를 함께 본다
+        root, ents = os.path.join(doc, "root"), os.path.join(doc, "entries")
+
+        def doc_v(name):
+            with open(os.path.join(doc, name), "r", encoding="utf-8") as fh:
+                return check_doc(fh.read(), root, ents)[0]
+        good_v = doc_v("good.md")
+        for cell, name, need in (("f432-plan-quote-mismatch", "bad-quote.md", ("인용이 원문과 다르다",)),
+                                 ("f453-finding-claim-unquoted", "bad-finding.md", ("엔트리 원문 줄 인용", "레지스트리에서 열리지 않는다")),
+                                 ("f315-amend-marker-left", "bad-amend.md", ("보강 표지 ⊕", "Step 제목 id 중복"))):
+            got = doc_v(name)
+            ok = not good_v and all(any(n in x for x in got) for n in need)
+            if ok:
+                passed += 1
+                if listing:
+                    print(f"PASS {cell}")
+            else:
+                fails.append(f"{cell} — 위반 {got} · good.md {good_v}")
+                print(f"FAIL {cell}: 위반 {got} · good.md {good_v}")
     for f in fails:
         print(f"  FAIL {f}")
     total = passed + len(fails)
     if fails:
         print(f"plan_integrity self-test {passed}/{total} passed")
         return 1
-    print(f"INTEGRITY_SELFTEST_OK (양성 1 · 음성 {len(bads)} — {passed}/{total})")
+    print(f"INTEGRITY_SELFTEST_OK (양성 1 · 음성 {len(bads)} · 문서 셀 {3 if os.path.isdir(doc) else 0} — {passed}/{total})")
     return 0
 
 
@@ -201,9 +307,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="plan 반환의 참조 무결성 검사")
     ap.add_argument("target", nargs="?", help="workflow-result.json 경로")
     ap.add_argument("--self-test", metavar="FIXTURE_DIR", help="fixture 디렉토리로 양성·음성 self-test")
+    ap.add_argument("--plan-doc", metavar="MD", help="plan 마크다운(plan-v{N} · plan-final) 검사 — 인용 · finding 근거 · 단일 최신 상태")
+    ap.add_argument("--root", help="--plan-doc 의 `경로:줄` 인용을 대조할 저장소 루트")
+    ap.add_argument("--findings-dir", help="--plan-doc 의 finding 포인터를 대조할 레지스트리 entries/")
     args = ap.parse_args()
     if args.self_test:
         return self_test(args.self_test)
+    if args.plan_doc:
+        return run_doc(args.plan_doc, args.root, args.findings_dir)
     if not args.target:
         ap.print_help()
         return 2
