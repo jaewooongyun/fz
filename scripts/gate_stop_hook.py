@@ -43,8 +43,10 @@ no-op으로 걸러낸다.
 tool_use 가 있으면 이 세션의 원장이다. `--status`(`--only` 와 함께여도) · `--discover` 같은 읽기는 소유가 아니다.
 원장 인자가 변수면 같은 명령의 대입과 그 명령이 source 한 파일의 대입으로 푼다(F-422). 남의 미충족 원장은
 **경고로만** 인쇄한다.
-⛔ transcript 를 못 읽거나, 원장을 쓰는 판정기 호출인데 원장 인자를 풀지 못하면('대상 미상 쓰기') 전 원장을
-판정한다(fail-closed) — 소유를 모를 때 통과시키면 자기 원장도 놓친다. `FZ_GATES_LEDGER` 명시 지정은 소유 판정을
+⛔ transcript 를 못 읽으면 전 원장을 판정한다(fail-closed) — 소유를 모를 때 통과시키면 자기 원장도 놓친다. 원장을 쓰는
+판정기 호출인데 원장 인자를 풀지 못하면('대상 미상 쓰기') 그 쓰기가 돌던 폴더(transcript 줄의 cwd) 아래 원장과, 그 명령
+글자에 적힌 원장 경로 리터럴(`L=$(realpath ../w/gates/plan.md)` 의 `../w/gates/plan.md`)을 그 폴더 기준으로 푼 원장을 판정한다 —
+글자에 원장 경로가 없는 밖의 원장은 막지 않는다(F-554 · 잔존: `$(find ..)` 처럼 경로를 글자로 쓰지 않은 폴더 밖 쓰기). `FZ_GATES_LEDGER` 명시 지정은 소유 판정을
 건너뛴다(명시가 우선).
 
 **발견 상한 없음 · 소유 원장 먼저 (F-378 · F-404).** 발견한 원장 전부에 소유 판정을 하고, 소유 원장을 예산(45초)
@@ -120,6 +122,24 @@ CD_RE = re.compile(r"^\s*[({]?\s*(?:cd|pushd)\s+[\"']?([^\s\"';&|()]+)")
 ASSIGN_RE = re.compile(r"^\s*(?:export\s+)?(\w+)=[\"']?([^\s\"';&|]+)")
 # 따옴표 값에 공백이 있으면 ASSIGN_RE 는 첫 단어만 잡는다 — 그 변수는 미상으로 둔다(`LIST="A B"` 를 A 로 믿지 않는다)
 MULTIWORD_ASSIGN_RE = re.compile(r"^\s*(?:export\s+)?\w+=([\"'])[^\"']*\s")
+# 세그먼트 앞머리의 `NAME=값` 하나 — 따옴표 값 · `$( )` · 백틱 값을 한 단어로 본다(셸 단어 규칙의 근사)
+_PREFIX_ASSIGN_RE = re.compile(r"""\s*\w+=(?:"(?:\\.|[^"\\])*"|'[^']*'|\$\([^)]*\)|`[^`]*`|[^\s;&|"'`])*""")
+
+
+def _temp_env_prefix(seg: str) -> bool:
+    """`NAME=값 명령 …` 인가 — 앞머리 대입 뒤에 명령 단어가 오면 그 대입은 그 명령의 환경일 뿐 셸 변수가 아니다.
+    셸은 인자(`"$NAME"`)를 대입 **전** 값으로 편다 — env 에 먼저 넣으면 다른 원장을 소유로 읽는다(F-554 리뷰).
+    `export` 뒤 단어는 전부 이름 · 대입이라 명령이 아니다."""
+    if re.match(r"\s*export\s", seg):
+        return False
+    pos = 0
+    while True:
+        m = _PREFIX_ASSIGN_RE.match(seg, pos)
+        if not m or m.end() == pos:
+            break
+        pos = m.end()
+    rest = seg[pos:].strip()
+    return bool(rest) and not rest.startswith("#")
 SEGMENT_SPLIT_RE = re.compile(r"\n|;|&&|\|\||\|")
 # `for NAME in …` 루프(F-457) — 몸체 조각에서만 값을 대입한다. 지원 밖(몸체 재대입 · break · continue · 중첩 · done 없음)과
 # done 뒤는 미상이다 — 실제 값은 셸만 안다(break 뒤 값 · 몸체 재대입이 마지막 값 추정을 틀리게 한다).
@@ -147,11 +167,13 @@ _VAR_RE = re.compile(r"\$\{(\w+)(?::?[-?=][^}]*)?\}|\$(\w+)")
 # 판정기 호출 — 원장을 쓰는 플래그(F-377). 이름은 판정기 파일명. 옵션 어휘(`GATE_OPTS` — argparse 의 `--help` 포함)와 값을 받는
 # 옵션은 `gate_check._dispatch` 의 add_argument 와 같다 — self-test 가 판정기 소스와 두 집합을 대조한다(갈리면 새 쓰기 옵션을 놓친다)
 GATE_CHECK_NAME = "gate_check.py"
-GATE_OPTS = frozenset(("--status", "--reverify", "--confirm", "--set-state", "--self-test", "--from-plan", "--root", "--out",
-                       "--discover", "--cross-session", "--oracle-fields", "--finalize", "--verdict-check", "--only",
+GATE_OPTS = frozenset(("--status", "--reverify", "--confirm", "--set-state", "--self-test", "--from-plan", "--root", "--out", "--impl-root",
+                       "--discover", "--cross-session", "--oracle-fields", "--finalize", "--verdict-check", "--affected-by",
+                       "--criterion-drift", "--only",
                        "--budget", "--baseline-probe", "--allow-pass", "--no-baseline", "--help"))
-GATE_VALUE_OPTS = frozenset(("--confirm", "--set-state", "--from-plan", "--root", "--out", "--discover",
-                             "--verdict-check", "--only", "--budget", "--allow-pass", "--no-baseline"))
+GATE_VALUE_OPTS = frozenset(("--confirm", "--set-state", "--from-plan", "--root", "--out", "--impl-root", "--discover",
+                             "--verdict-check", "--affected-by", "--criterion-drift", "--only", "--budget", "--allow-pass",
+                             "--no-baseline"))
 GATE_WRITE_FLAGS = frozenset(("--finalize", "--confirm", "--set-state", "--only", "--reverify"))
 _PY_RE = re.compile(r"^python[0-9.]*$")
 _ASSIGN_WORD_RE = re.compile(r"^\w+=")
@@ -396,7 +418,7 @@ def _source_env(path_tok: str, env: dict, cur_dir, cwd) -> bool:
     """`. FILE` · `source FILE` — 그 파일의 `NAME=값` · `export NAME=값` 줄을 env 에 더한다(F-422).
 
     ⛔ 훅이 도는 **지금** 의 파일 내용이다 — 세션 뒤 파일이 바뀌거나 지워지면 그 대입은 풀리지 않고, 그 변수를 원장
-       인자로 쓴 판정기 쓰기는 '대상 미상 쓰기' 로 간다(전 원장 판정). 한 단계만 따라가고 크기 상한을 둔다.
+       인자로 쓴 판정기 쓰기는 '대상 미상 쓰기' 로 간다(그 쓰기가 돌던 폴더 아래 원장 판정). 한 단계만 따라가고 크기 상한을 둔다.
     경로는 같은 명령의 대입 → 남은 `$HOME` 등은 훅 환경(Bash 도구 셸과 HOME 이 같다) → `~` 순으로 푼다. ⛔ 훅 환경 · `~` 는
     source 경로에만 쓴다 — 원장 인자에 훅 환경을 섞으면 명령 밖 변수(셸 프로필)를 '풀린 것' 으로 읽는다.
     반환: 파일을 읽었는가.
@@ -484,7 +506,10 @@ def _loop_spans(segs: list) -> dict:
             # 루프 변수 이름이 확장(`$NAME` · `${NAME…}`) 밖에서 나오면(`X=` · `read X` · `printf -v X`) 지원 밖이다
             bare = re.sub(r"\$\{?%s(?![A-Za-z0-9_])" % re.escape(name), "", body)
             ws = _words(body)
-            head = next((w for w in ws if w not in _CMD_PREFIX_WORDS and not w.startswith("-")), "")   # `command -- "$C"`
+            cmd_ws = list(ws)
+            while len(cmd_ws) > 1 and re.match(r"^\w+=", cmd_ws[0]):
+                cmd_ws.pop(0)              # `VAR=값 명령` 의 앞머리는 그 명령에만 붙는 환경이다 — 셸 상태가 아니다(대입만 있는 몸체는 남는다)
+            head = next((w for w in cmd_ws if w not in _CMD_PREFIX_WORDS and not w.startswith("-")), "")   # `command -- "$C"`
             if (LOOP_COMPOUND_RE.match(body) or LOOP_BODY_BANNED & set(ws)
                     or re.search(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(name), bare)
                     or re.match(r"^\w+\+?=", head) or head in LOOP_STATEFUL or (head == "printf" and "-v" in ws)
@@ -504,12 +529,14 @@ def _bind_expand(token: str, env: dict, bind) -> list:
 def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
     """Bash 명령이 **쓰기 대상으로 지목한** 원장 경로들.
 
-    `unknown` 에 list 를 주면 원장을 쓰는 판정기 호출인데 원장 인자를 풀지 못한 것(`"$L"` 의 L 미상)을 모은다 —
-    호출부가 그 세션을 '대상 미상 쓰기' 로 보고 전 원장을 판정한다(fail-closed). `cwd` 는 상대 경로 `source` 의 기준이다.
+    `unknown` 에 list 를 주면 원장을 쓰는 판정기 호출인데 원장 인자를 풀지 못한 것(`"$L"` 의 L 미상)을 `(인자, 그 시점의 cd
+    대상 | None)` 으로 모은다 — 호출부가 그 세션을 '대상 미상 쓰기' 로 보고 그 명령이 돌던 폴더 아래 원장을 판정한다
+    (fail-closed · F-554). `cwd` 는 상대
+    경로 `source` 의 기준이다(transcript 줄의 cwd — 없으면 훅의 cwd).
 
     - Important: 근사기의 전제(F-458) — 이 밖의 정보가 필요한 꼴은 받아들인 한계다:
       단어 분리는 기본 IFS(명령 · source 한 파일이 IFS 를 바꾸면 루프는 미상) · 변수 값은 같은 명령의 대입과 source 한
-      파일(훅이 도는 지금의 내용)에서만 안다(물려받은 환경 · 셸 프로필 · alias 는 모른다) · 함수 · eval 은 따라가지 않는다 ·
+      파일(훅이 도는 지금의 내용), 그리고 훅 프로세스의 환경에서 안다(셸 프로필 · alias 는 모른다) · 함수 · eval 은 따라가지 않는다 ·
       판정기는 파일명으로 가린다(PATH 가림 · 링크 이름은 모른다) · 앞머리 `~` 는 훅의 HOME 으로 푼다(`_tilde`). 원장 인자 ·
       루프 값 · 리다이렉트와 cp · mv 대상은 허용 목록(`_RESOLVED_PATH_RE`)에 맞는 최종 경로일 때만 '풀렸다' 이고, 그 밖은
       '대상 미상' 이다.
@@ -578,7 +605,7 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
             source_missing |= not _source_env(msrc.group(1), env, cur_dir, cwd)
             continue
         masg = ASSIGN_RE.match(seg)
-        if masg:
+        if masg and not _temp_env_prefix(seg):
             _assign(seg, masg, env)
         # 단어를 전부 푼 뒤 판정기 인자를 가른다 — 변수로 들어온 옵션(`"$OPT"`)이 원장 자리로 잡히지 않는다. 루프 몸체면 값마다
         words, missed = _words(seg), None
@@ -592,7 +619,7 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
             else:
                 out.append(path)
         if missed is not None and unknown is not None:
-            unknown.append(missed)
+            unknown.append((missed, cur_dir))
         for rx in WRITE_TARGET_RES:
             for mt in rx.finditer(seg):
                 raw = mt.group(1)
@@ -604,7 +631,7 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
                     # (`rg 'cat > "$F/gates/plan.md"'`) — 미상으로 올리지 않는다(과차단 금지)
                     if not _RESOLVED_PATH_RE.match(tok) or i in unbound:
                         if unknown is not None and not _in_quotes(seg, mt.start()):
-                            unknown.append(raw)
+                            unknown.append((raw, cur_dir))
                     else:
                         out.append(tok)
     # 인터프리터 heredoc 이 파일을 쓰면, **그 본문 안에** 등장한 원장을 이 세션이 쓴
@@ -628,9 +655,14 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
 def _expand(token: str, env: dict) -> str:
     """같은 명령(과 그 명령이 source 한 파일) 안의 대입만 푼다 — `$W/gates/plan.md` 형태(실측 #14·#21).
 
-    `$NAME` · `${NAME}` · `${NAME:?…}` 꼴. 모르는 이름은 그대로 둔다(호출부가 '풀리지 않음' 으로 본다).
+    `$NAME` · `${NAME}` · `${NAME:?…}` 꼴. 명령 안에서 대입하지 않은 이름은 훅 프로세스의 환경(세션이 물려받은 HOME ·
+    TMPDIR · 설정 env)에서 찾는다(F-458 — `D="$HOME/…"; cd "$D" && … "$D/gates/plan.md"` 가 대상 미상으로 과차단됐다).
+    비었거나 모르는 이름은 그대로 둔다(호출부가 '풀리지 않음' 으로 본다).
     """
-    return _VAR_RE.sub(lambda m: env.get(m.group(1) or m.group(2), m.group(0)), token)
+    def _one(m):
+        name = m.group(1) or m.group(2)
+        return env[name] if name in env else (os.environ.get(name) or m.group(0))
+    return _VAR_RE.sub(_one, token)
 
 
 def _same_ledger(token: str, ledger_resolved: Path, cwd: Path) -> bool:
@@ -689,6 +721,10 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
                 content = msg.get("content") if isinstance(msg, dict) else None
                 if not isinstance(content, list):
                     continue
+                # F-554 — 상대 경로는 그 명령이 돌던 폴더(transcript 줄의 `cwd` — Bash 작업 폴더는 호출 사이에 이어진다)로 푼다.
+                #    훅이 받은 cwd 로 풀면 앞 호출에서 `cd` 한 뒤의 `gates/plan.md` 가 엉뚱한 원장을 가리킨다
+                ev_cwd = ev.get("cwd")
+                base = Path(ev_cwd) if isinstance(ev_cwd, str) and ev_cwd.startswith("/") else cwd
                 for blk in content:
                     if not (isinstance(blk, dict) and blk.get("type") == "tool_use"):
                         continue
@@ -699,12 +735,19 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
                     if name in WRITE_TOOLS:
                         target = str(inp.get("file_path") or "")
                         for led, res in resolved.items():
-                            if _same_ledger(target, res, cwd):
+                            if _same_ledger(target, res, base):
                                 owned.add(led)
                     elif name == "Bash":
-                        tokens = _bash_write_targets(str(inp.get("command") or ""), cwd, unknown)
+                        unk, cmd_s = [], str(inp.get("command") or "")
+                        tokens = _bash_write_targets(cmd_s, base, unk)
+                        for t, d in unk:
+                            # 같은 명령의 cd 를 반영한 폴더를 기준에 더한다(원래 폴더는 남긴다 — 후보를 줄이지 않는다).
+                            # cd 대상을 못 풀었으면 그 쓰기가 어디서 돌았는지 모른다 — None 은 전 원장(fail-closed)
+                            bs = (base,) if d is None else None if re.search(r"[$`*?\[]", d) else \
+                                (base, Path(d) if d.startswith("/") else base / d)
+                            unknown.append((t, bs, cmd_s))
                         for led, res in resolved.items():
-                            if any(_same_ledger(t, res, cwd) for t in tokens):
+                            if any(_same_ledger(t, res, base) for t in tokens):
                                 owned.add(led)
                 if len(owned) == len(ledgers):
                     break
@@ -712,10 +755,41 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
         return None, f"transcript 읽기 실패({type(exc).__name__}) — 전 원장 판정"
     if unknown and len(owned) < len(ledgers):
         # ⛔ 원장을 쓰는 판정기 호출인데 어느 원장인지 모른다 — 조용히 '다른 세션의 원장' 으로 보내면 그 쓰기의 미충족이
-        #    통과한다. transcript 를 못 읽은 경우와 같이 전 원장을 판정하고 사유에 FZ_GATES_LEDGER 출구를 준다.
-        sample = ", ".join(sorted(set(unknown))[:3])
-        return None, f"대상 미상 쓰기 {len(unknown)}건(원장 인자 {sample} 를 풀지 못했다) — 소유 판정 불가, 전 원장 판정"
+        #    통과한다(F-377 · F-422 — fail-open 의 비용은 한도가 없고, fail-closed 의 비용은 루프 방어가 2회로 묶는다).
+        #    F-554 — 후보는 **그 쓰기가 돌던 폴더 아래 원장** + **그 명령 글자에 적힌 원장 경로 리터럴을 그 폴더 기준으로 푼 원장**
+        #    (`L=$(realpath ../w/gates/plan.md)` 처럼 `..` 이나 명령 치환으로 폴더 밖을 가리켜도 글자가 남는다). 둘 다 아닌 원장은
+        #    막지 않는다 — 남의 원장으로 종료를 막지 않는다. 잔존: 경로를 글자로 쓰지 않은 폴더 밖 쓰기(`$(find ..)`)
+        #    F-554 리뷰 — 폴더는 같은 명령의 `cd` 를 반영하고(못 푼 cd · 글롭 cd 는 전 원장), 명령에 적힌 폴더 경로
+        #    (`..` · 절대 · `~/` — `$(find ../w …)` · `$(find /abs/w …)`) 아래 원장도 후보다. 잔존: 폴더를 변수로만 넘긴 쓰기(`$(find "$X" …)`)
+        cand = {led for led, res in resolved.items() for _t, bs, c in unknown if _unknown_hits(res, bs, c)}
+        sample = ", ".join(sorted({t for t, _b, _c in unknown})[:3])
+        return owned | cand, (f"대상 미상 쓰기 {len(unknown)}건(원장 인자 {sample} 를 풀지 못했다) — 그 쓰기가 돌던 폴더(cd 반영) 아래 · "
+                              f"명령에 적힌 원장 경로 · 폴더 아래로 원장 {len(cand)}개를 이 세션 원장으로 판정한다(그 밖의 원장은 막지 않는다)")
     return owned, ""
+
+
+# 명령 글자 속 원장 경로 리터럴 — 변수 · 따옴표 · 명령 치환 경계에서 끊는다(`$D/gates/plan.md` 의 `$D` 는 들어오지 않는다)
+LEDGER_LITERAL = re.compile(r"[^\s'\"=;&|()<>`$]*plan(?:\.draft)?\.md")
+# 명령 글자 속 폴더 경로 단어 — `..` 로 시작(`../w` · `..`) · 절대(`/abs/w`) · `~/` — `...` · `a..b` · URL 의 `//` · 홀로 선 `/` 는 아니다
+PATH_DIR_RE = re.compile(r"(?<![^\s'\"=(])(?:\.\.(?=[/\s'\";&|)]|$)|~(?=/)|/(?=[\w.~-]))[^\s'\"=;&|()<>`$]*")
+
+
+def _unknown_hits(res: Path, bases, cmd: str) -> bool:
+    """미상 쓰기 한 건이 원장 `res` 를 후보로 만드는가 — `bases` None 은 어디서 돌았는지 모르는 쓰기(전 원장)."""
+    if bases is None:
+        return True
+    lits, ups = LEDGER_LITERAL.findall(cmd), [os.path.expanduser(u) for u in PATH_DIR_RE.findall(cmd)]
+    return any(_under(res, b) or any(_same_ledger(x, res, b) for x in lits) or any(_under(res, b / u) for u in ups)
+               for b in bases)
+
+
+def _under(path: Path, base: Path) -> bool:
+    """`path` 가 `base` 폴더 아래인가 — 둘 다 해석 후 비교(심볼릭 · `/var` → `/private/var`)."""
+    try:
+        Path(path).resolve().relative_to(Path(base).resolve())
+        return True
+    except (OSError, RuntimeError, ValueError):
+        return False
 
 
 def _line_may_write(line: str) -> bool:
@@ -1062,13 +1136,35 @@ SELF_TEST_CASES = (
     ("multi-unmet",      "multi",          {}, {}, 2, "— G1, G2, G3, G4, G5, G6, G7, G8 …외 3건"),
     # ⛔ **판정기 쓰기 호출도 소유다** (F-377) — `--only` · 기본 실행 · `$L` 변수 경로 · source 한 env 파일(F-422, 명령
     #    줄에 'gates' · 'plan.md' · 판정기 이름이 없다 — 선필터가 줄을 버리면 이 케이스가 통과한다). 짝: `--status --only`
-    #    는 읽기라 소유가 아니다. 원장 인자를 못 풀면 '대상 미상 쓰기' 로 전 원장 판정(fail-closed).
+    #    는 읽기라 소유가 아니다. 원장 인자를 못 풀면 '대상 미상 쓰기' 로 그 쓰기가 돌던 폴더 아래 원장 판정(fail-closed · F-554).
     ("owned-only",       "unmet",          {"transcript": "only"}, {}, 2, '"decision": "block"'),
     ("owned-default",    "unmet",          {"transcript": "default"}, {}, 2, '"decision": "block"'),
     ("owned-var-L",      "unmet",          {"transcript": "var-L"}, {}, 2, '"decision": "block"'),
     ("owned-sourced",    "unmet",          {"transcript": "sourced"}, {}, 2, '"decision": "block"'),
     ("foreign-status-only", "unmet",       {"transcript": "status-only"}, {}, 0, "다른 세션의 원장"),
+    # 원장 인자를 못 푼 쓰기 — 그 쓰기가 돌던 폴더 아래 원장은 이 세션 원장으로 판정한다(fail-closed · F-377)
     ("unknown-target",   "unmet",          {"transcript": "unknown"}, {}, 2, "대상 미상 쓰기"),
+    # F-554 — 그 쓰기가 원장 밖 폴더에서 돌았으면 후보가 없다: 남의 원장으로 막지 않는다(사유만) · 상대 경로는 transcript 줄의 cwd 로 푼다
+    ("f554-unresolvable-not-blocking", "unmet", {"transcript": "unknown-elsewhere"}, {}, 0, "대상 미상 쓰기"),
+    ("f554-var-ledger-resolved", "unmet",  {"transcript": "rel-evcwd"}, {}, 2, '"decision": "block"'),
+    # 루프 몸체가 환경 접두(`VAR=1 python3 gate_check.py …`)로 시작해도 지원 루프다 — 다른 폴더에서 `cd 티켓 &&` 로 돈 자기 원장을 소유로 막는다
+    ("loop-env-prefix-owned", "unmet",     {"transcript": "loop-env-prefix"}, {}, 2, '"decision": "block"'),
+    # 미상 쓰기가 폴더 밖 원장을 글자로 가리킨다(`../TICKET-0000/gates/plan.md`) — 그 원장은 후보다(막는다)
+    ("f554-unknown-literal-outside-cwd", "unmet", {"transcript": "unknown-literal-outside"}, {}, 2, "대상 미상 쓰기"),
+    # 미상 쓰기가 `..` 폴더를 뒤져 원장을 찾는다(`$(find ../TICKET-0000 -name plan.md)`) — 글자에 원장 경로가 없어도 그 폴더 아래는 후보다
+    ("f554-unknown-find-parent", "unmet",  {"transcript": "unknown-find-parent"}, {}, 2, "대상 미상 쓰기"),
+    # 같은 명령에서 cd 한 뒤의 상대 경로(`cd 티켓 && L=$(realpath gates/plan.md)`) — cd 대상 아래도 후보다
+    ("f554-unknown-after-cd", "unmet",     {"transcript": "unknown-after-cd"}, {}, 2, "대상 미상 쓰기"),
+    # cd 대상을 못 풀었다 — 그 쓰기가 어디서 돌았는지 모르므로 전 원장(fail-closed)
+    ("f554-unknown-cd-unresolved", "unmet", {"transcript": "unknown-cd-unresolved"}, {}, 2, "대상 미상 쓰기"),
+    # 절대 경로로 폴더 밖을 뒤진다(`$(find /abs/TICKET-0000 …)`) — 그 폴더 아래도 후보다
+    ("f554-unknown-find-abs", "unmet",     {"transcript": "unknown-find-abs"}, {}, 2, "대상 미상 쓰기"),
+    # 글롭 cd(`cd …/TICKET-000?`) — 어느 폴더인지 확정되지 않았다(전 원장)
+    ("f554-unknown-cd-glob", "unmet",      {"transcript": "unknown-cd-glob"}, {}, 2, "대상 미상 쓰기"),
+    # `L=값 명령 "$L"` — 앞머리 대입은 그 명령의 환경이라 인자는 대입 전 값으로 편다(셸 규칙). 먼저 반영하면 남의 경로를 소유로 읽고 자기 원장을 놓친다
+    ("temp-prefix-arg",  "unmet",          {"transcript": "temp-prefix-arg"}, {}, 2, '"decision": "block"'),
+    # F-458 — 값이 물려받은 환경 변수에서 오는 `D=…; cd "$D" && … "$D/gates/plan.md"` 꼴도 소유다
+    ("f458-cd-var-ledger-owned", "unmet",  {"transcript": "cd-env-var"}, {}, 2, '"decision": "block"'),
     # ⛔ **예산 소진은 통과가 아니다** (F-378 · F-404) — 소유 원장을 판정하지 못하면 미판정 수를 사유로 막는다.
     ("budget-undecided", "unmet",          {"transcript": "write"}, {"FZ_GATES_HOOK_BUDGET_S": "0"}, 2, "소유 원장 1개 미판정"),
 )
@@ -1131,9 +1227,11 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
     `Write` tool_use, `bash` 는 `--finalize` Bash tool_use. 진단 세션이 남의 원장 경로를
     인용하는 것이 소유로 잡히면 안 되므로 `none` 에도 경로를 넣는다."""
     tp = root / "transcript.jsonl"
-    def tool_use(name, inp):
-        return json.dumps({"type": "assistant", "message": {"content": [
-            {"type": "tool_use", "name": name, "input": inp}]}}, ensure_ascii=False)
+    def tool_use(name, inp, cwd=None):
+        ev = {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": name, "input": inp}]}}
+        if cwd is not None:
+            ev["cwd"] = str(cwd)
+        return json.dumps(ev, ensure_ascii=False)
     lines = [json.dumps({"type": "user", "message": {"content": f"미충족 게이트: {ledger}"}},
                         ensure_ascii=False),
              tool_use("Bash", {"command": f"grep -n STATE {ledger}"})]
@@ -1174,6 +1272,41 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
         lines.append(tool_use("Bash", {"command": f"python3 gate_check.py --status --only G1 {ledger}"}))
     elif kind == "unknown":
         lines.append(tool_use("Bash", {"command": 'python3 gate_check.py --only G1 "$LEDGER_FROM_PROFILE"'}))
+    elif kind == "unknown-elsewhere":
+        lines.append(tool_use("Bash", {"command": 'python3 gate_check.py --only G1 "$LEDGER_FROM_PROFILE"'}, cwd=root / "elsewhere"))
+    elif kind == "loop-env-prefix":
+        lines.append(tool_use("Bash", {"command": f"cd {ledger.parent.parent} && for s in G1 G2; do FZ_X=1 python3 gate_check.py --only $s gates/plan.md; done"},
+                              cwd=root / "elsewhere"))
+    elif kind == "unknown-literal-outside":
+        lines.append(tool_use("Bash", {"command": 'L=$(realpath ../TICKET-0000/gates/plan.md) && python3 gate_check.py --finalize "$L"'},
+                              cwd=root / "elsewhere"))
+    elif kind == "unknown-find-parent":
+        lines.append(tool_use("Bash", {"command": 'L=$(find ../TICKET-0000 -name plan.md -print -quit) && python3 gate_check.py --finalize "$L"'},
+                              cwd=root / "elsewhere"))
+    elif kind == "unknown-after-cd":
+        lines.append(tool_use("Bash", {"command": f'cd {ledger.parent.parent} && L=$(realpath gates/plan.md) && python3 gate_check.py --finalize "$L"'},
+                              cwd=root / "elsewhere"))
+    elif kind == "unknown-find-abs":
+        lines.append(tool_use("Bash", {"command": f'L=$(find {ledger.parent.parent} -name plan.md -print -quit) && python3 gate_check.py --finalize "$L"'},
+                              cwd=root / "elsewhere"))
+    elif kind == "unknown-cd-glob":
+        lines.append(tool_use("Bash", {"command": f'cd {str(ledger.parent.parent)[:-1]}? && python3 gate_check.py --finalize gates/plan.md'},
+                              cwd=root / "elsewhere"))
+    elif kind == "unknown-cd-unresolved":
+        lines.append(tool_use("Bash", {"command": 'cd "$FZ_PROBE_UNSET_DIR" && python3 gate_check.py --finalize gates/plan.md'},
+                              cwd=root / "elsewhere"))
+    elif kind == "temp-prefix-arg":
+        lines.append(tool_use("Bash", {"command": 'L=../TICKET-0000/gates/plan.md; for s in G1 G2; do '
+                                                  'L=../OTHER/gates/plan.md python3 gate_check.py --only "$s" "$L"; done'},
+                              cwd=root / "elsewhere"))
+    elif kind == "rel-evcwd":
+        # 앞 호출에서 `cd …/TICKET-0000` 한 뒤의 상대명 — 명령 안에 cd 가 없고 transcript 줄의 cwd 만 그 폴더다
+        lines.append(tool_use("Bash", {"command": "python3 gate_check.py --finalize gates/plan.md"}, cwd=ledger.parent.parent))
+    elif kind == "cd-env-var":
+        # 줄의 cwd 는 원장 밖 — 환경으로 풀지 못하면 대상 미상이 되고 후보도 0 이라(F-554) 막지 않는다. 풀어야 소유로 막는다
+        lines.append(tool_use("Bash", {"command": 'D="$FZ_HOOK_PROBE_ROOT/TICKET-0000"; cd "$D" && '
+                                                  'python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --finalize "$D/gates/plan.md"'},
+                              cwd=root / "elsewhere"))
     elif kind == "py-c":
         # ⛔ heredoc 이 아닌 인터프리터 인자. 이 형태를 놓치면 자기 원장을 이렇게 만든
         #    세션이 소유 0 이 되어 미충족 게이트를 남긴 채 끝난다(fail-open).
@@ -1212,8 +1345,11 @@ def self_test() -> int:
     decl = re.findall(r'add_argument\(\s*"(--[\w-]+)"([^)]*)', src)
     opts = {n for n, _ in decl} | {"--help"}
     vals = {n for n, rest in decl if 'action="store_true"' not in rest}
+    listing = bool(os.environ.get("FZ_SELFTEST_LIST"))
     if decl and opts == GATE_OPTS and vals == GATE_VALUE_OPTS:
         passed += 1
+        if listing:
+            print("  ok   gate-vocab")
     else:
         failed.append(f"gate-vocab: 판정기 어휘 불일치 — 없음 {sorted(opts - GATE_OPTS)} · 뜻밖 {sorted(GATE_OPTS - opts)} · "
                       f"값 옵션 없음 {sorted(vals - GATE_VALUE_OPTS)} · 뜻밖 {sorted(GATE_VALUE_OPTS - vals)}")
@@ -1236,6 +1372,7 @@ def self_test() -> int:
             for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV):
                 child.pop(var, None)
             child.update(env)
+            child["FZ_HOOK_PROBE_ROOT"] = str(d)        # cd-env-var — 물려받은 환경 변수로 원장 폴더를 준다(F-458)
             shots = REPEAT_CASES.get(name, 1)
             for shot in range(shots):
                 if name in MUTATE_CASES and shot > 0:
@@ -1267,6 +1404,8 @@ def self_test() -> int:
                 failed.append(f"{name}: {'; '.join(why)}")
             else:
                 passed += 1
+                if listing:
+                    print(f"  ok   {name}")
         finally:
             shutil.rmtree(d, ignore_errors=True)
     shutil.rmtree(home, ignore_errors=True)

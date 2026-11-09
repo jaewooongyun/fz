@@ -1,4 +1,5 @@
 #!/bin/bash
+# gpt-cli: real — --changed 실행이 고른 블록에 §4.5 check-gpt-flags(실제 GPT CLI --help)가 들 수 있다
 # health-check 경로별 검사 선택 fixture (H2-9 · GPT H-015) — 선택 규칙과 부분 실행 표지를 동작으로 본다.
 #
 # 이 트리의 health-check 를 인자만 바꿔 부른다(대부분 `--select-only` — 검사를 돌리지 않아 빠르다).

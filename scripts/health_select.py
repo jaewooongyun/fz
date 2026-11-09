@@ -12,6 +12,8 @@
   · 문서 = guides/ · modules/ · skills/ · docs/ 아래 `.md` 와 루트 CLAUDE.md · README.md · CHANGELOG.md
   · 부분(subset) — 경로가 전부 문서일 때: 문서 lint 4종(항상) + 바뀐 문서에 기대는 러너
   ⛔ 분류는 경로 **문자열**로만 한다 — 지운 파일도 바뀐 경로다(존재 여부를 보지 않는다).
+  · `git diff --name-status` 줄(`R100<탭>옛<탭>새` · `D<탭>경로` · `M<탭>경로`)도 받는다 — 이동(R) · 복사(C) · 삭제(D)가
+    하나라도 있으면 전체다(F-512 — 파일을 옮긴 단계에서 표적 테스트 통과를 경계 검사로 갈음해 기준선 lint 실패를 놓쳤다)
 
 러너가 문서 P(최상위 폴더 T · 파일 이름 B)에 기대는가 — 러너 원문 묶음 중 한 파일이라도
   ① 이름: P 나 B 를 적었다
@@ -227,12 +229,26 @@ def depends(text: str, doc: str):
     return None
 
 
+STATUS_RE = re.compile(r"([ACDMRTUX])(\d*)\t(.+)\Z")
+
+
 def decide(paths: list[str], ship: bool, root: Path):
     """-> (mode, reason, [(check, by)])."""
     if ship:
         return "full", "ship", []
     if not paths:
         return "full", "empty", []
+    plain = []
+    for p in paths:
+        m = STATUS_RE.match(p)
+        if m is None:
+            plain.append(p)
+            continue
+        parts = m.group(3).split("\t")
+        if m.group(1) in "RCD":
+            return "full", f"move-or-delete:{m.group(1)}:{parts[0]}", []
+        plain.extend(parts)
+    paths = plain
     rels = [norm(p, root) for p in paths]
     other = [(p, kind(r)) for p, r in zip(paths, rels) if kind(r) != "doc"]
     if other:
@@ -319,6 +335,10 @@ def self_test() -> int:
         ("group-lib-is-runner-source", ["guides/z.md"], False, "subset", "doc-only:1",
          lints | {"tests/fixtures/h/uselib/run.sh"}, {"tests/fixtures/g/unrelated/run.sh"}),
         ("deleted-doc-still-doc", [f"{T}/gone.md"], False, "subset", "doc-only:1", lints, {"tests/fixtures/g/names/run.sh"}),
+        # F-512 — `--name-status` 의 이동 · 삭제는 문서끼리여도 전체다 · 수정(M)만이면 이름만 준 것과 같다
+        ("f512-move-selects-full", [f"R100\t{T}/a.md\t{T}/b.md"], False, "full", "move-or-delete:R", set(), set()),
+        ("f512-delete-selects-full", ["D\tguides/g.md"], False, "full", "move-or-delete:D", set(), set()),
+        ("f512-name-status-modify-subset", ["M\tguides/g.md"], False, "subset", "doc-only:1", lints, set()),
     ]
     fails = []
     with tempfile.TemporaryDirectory() as d:
@@ -342,6 +362,8 @@ def self_test() -> int:
                 bad.append(f"잘못 선택 {sorted(must_not & got)}")
             if bad:
                 fails.append(f"{name}: " + " · ".join(bad))
+            elif os.environ.get("FZ_SELFTEST_LIST"):
+                print(f"  ok   {name}")
     for f in fails:
         print(f"  FAIL {f}")
     print(f"self-test {len(cases) - len(fails)}/{len(cases)} passed")
