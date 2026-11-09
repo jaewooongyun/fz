@@ -4,13 +4,19 @@
 # diff-parse: hunk-state — staged diff 의 추가 줄을 hunk 상태(`@@`)로 고른다. 파일 헤더 `+++ b/…` 는 첫 `@@` 앞이라 빠진다
 #
 # Codex Round 2 unique finding 반영: staged diff 추가 라인만 검사하여
-# 기존 잔존 정당 reference (예: ~/dev/fz-plugin/...)는 self-block하지 않음.
+# 기존 잔존 정당 reference (예: 홈 아래 이 저장소 경로)는 self-block하지 않음.
 
 set -euo pipefail
 
-# In-scope 패턴 (CHANGELOG/docs/releases는 historical reference 보존)
-# Round 3 U3 fix: README.md + CLAUDE.md root docs 포함 (v4.5.1 root cause)
-SCOPED_RE='^(README\.md|CLAUDE\.md|skills|agents|modules|gpt-skills|schemas|templates|guides|\.claude-plugin|mods)'
+# 검사 범위 = 예외(EXEMPT_RE)를 뺀 모든 파일. 예외는 historical reference 를 보존하는 CHANGELOG.md · docs/releases/ 둘뿐이다.
+# ⛔ 화이트리스트(옛 SCOPED_RE)는 새 폴더를 조용히 통과시켰다 — tests/ · scripts/ · workflows/ 가 무검사였다(F-056).
+#    예외 나열 방식이면 새 폴더는 기본 검사 대상이다.
+EXEMPT_RE='^(CHANGELOG\.md|docs/releases/)'
+# 자리표시자 사용자 — 픽스처 · 예시의 관례 경로라 막지 않는다(그 줄에 다른 사용자 경로가 함께 있으면 그것은 막는다).
+#   전환 직전 실측(2026-11-09 · 새로 들어온 727파일): 차단 패턴 매치 110건(109줄) = 자리표시자 102 · 훅 픽스처의 차단 대역
+#   fixture-user 7 · 이 훅 7행 주석의 저장소 경로 1(같은 변경에서 경로 모양을 뺐다) · 실제 사용자 경로 0. 마스크가 없으면 자리표시자 102건 같은 줄이 추가될 때마다 오탐이다.
+#   ⛔ fixture-user 는 넣지 않는다 — 훅 픽스처가 '막혀야 할 경로' 로 쓰는 대역이다
+PLACEHOLDER_RE='/Users/(example|someone|Shared|u|x)/|~/dev/gone/'
 
 # ⛔ 원인별 플래그. 하나로 뭉치면 **막은 이유와 안내가 어긋난다** — 버전 불일치로 막고
 #    경로 안내를 인쇄하는 오귀속이 실제로 났다(같은 부류: 도구 부재를 문법 오류로 인쇄).
@@ -19,15 +25,15 @@ PATH_VIOLATION=0
 # 차단 패턴: user-specific 절대 경로
 USER_PATH_RE='/Users/[a-zA-Z0-9_-]+/|~/dev/[a-zA-Z0-9_-]+/'
 
-# 변경 파일 중 in-scope만 — ⛔ NUL 구분 · 인용 끔 · rename 포함(F-410). 공백 경로를 단어로 가르거나(`for FILE in $CHANGED`),
-#   비ASCII 경로의 core.quotePath 따옴표가 SCOPED_RE 를 비껴가거나, rename(R)이 빠지면 그 파일의 사용자 경로가 그대로 통과했다.
+# 변경 파일 중 예외가 아닌 것 — ⛔ NUL 구분 · 인용 끔 · rename 포함(F-410). 공백 경로를 단어로 가르거나(`for FILE in $CHANGED`),
+#   비ASCII 경로의 core.quotePath 따옴표가 범위 정규식을 비껴가거나, rename(R)이 빠지면 그 파일의 사용자 경로가 그대로 통과했다.
 #   rename 은 옛 경로와 함께 -M 으로 비교한다 — 새 경로만 주면 파일 전체가 추가 줄이 되어 기존 정당 참조까지 막는다.
 EXIT=0
 while IFS= read -r -d '' ST; do
   OLD=""
   case "$ST" in R*) IFS= read -r -d '' OLD || break ;; esac   # rename 은 옛 경로 · 새 경로 두 항목이다
   IFS= read -r -d '' FILE || break
-  printf '%s\n' "$FILE" | grep -qE "$SCOPED_RE" || continue
+  if printf '%s\n' "$FILE" | grep -qE "$EXEMPT_RE"; then continue; fi
   # Staged diff에서 추가된 라인만 — hunk 상태로 고른다. ⛔ 접두사 정규식(`+` 다음이 `+` 아님)은
   #   내용이 `+` 로 시작하는 추가 줄(diff 에서 `++…` · `+++…`)을 헤더로 오인해 놓쳤다(F-380).
   #   헤더 `+++ b/…` 는 첫 `@@` 앞이고, 추가 줄은 hunk 안에서 언제나 `+` 로 시작한다
@@ -39,7 +45,7 @@ while IFS= read -r -d '' ST; do
     EXIT=1
     continue
   fi
-  ADDED_VIOLATIONS=$(printf '%s\n' "$ADDED" | grep -nE "$USER_PATH_RE" || true)
+  ADDED_VIOLATIONS=$(printf '%s\n' "$ADDED" | sed -E "s#${PLACEHOLDER_RE}#<placeholder>/#g" | grep -nE "$USER_PATH_RE" || true)
   if [ -n "$ADDED_VIOLATIONS" ]; then
     echo "⛔ fz pre-commit: ${FILE}에 user-specific 절대 경로 신규 추가:"
     echo "$ADDED_VIOLATIONS"
@@ -64,7 +70,8 @@ fi
 if [ "$PATH_VIOLATION" = "1" ]; then
   echo ""
   echo "차단 패턴: /Users/{user}/, ~/dev/{user}/"
-  echo "예외: CHANGELOG.md, docs/releases/ (historical reference)"
+  echo "예외: CHANGELOG.md, docs/releases/ (historical reference) — 그 밖의 모든 파일을 검사한다"
+  echo "      자리표시자 경로(/Users/example/ 등 — 훅의 PLACEHOLDER_RE)는 막지 않는다"
   echo "      기존 잔존 reference (이미 commit된 라인) — 추가 라인만 검사"
   echo ""
   echo "Bypass (정당 사유 시): git commit --no-verify (권장 안 함, commit message에 사유 명시)"

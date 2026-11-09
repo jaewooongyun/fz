@@ -1,4 +1,5 @@
 #!/bin/bash
+# gpt-cli: real — 사본에서 health-check 전체를 돈다(§4.5 check-gpt-flags 가 실제 GPT CLI 의 --help 를 부른다)
 # health-check 3분 판정 fixture (F-335 ⑬) — 판정 불가를 동작으로 본다.
 #
 # 트리 사본 한 벌에 판정 지점마다 검사기 하나씩 심고 health-check 전체를 한 번 돌린다.

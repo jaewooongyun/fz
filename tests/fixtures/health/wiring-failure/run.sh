@@ -1,4 +1,5 @@
 #!/bin/bash
+# gpt-cli: none — health-check 를 --realmode-only 로만 부른다(§4.5 에 닿지 않는다)
 # health-check 실모드 배선 fixture (A5-03) — 배선이 장식이 아님을 **동작으로** 본다.
 #
 # 트리 사본 한 벌에 `health-check.sh --realmode-only` 를 두 번 돌린다.

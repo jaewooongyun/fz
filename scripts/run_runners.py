@@ -36,7 +36,7 @@ def run_one(i: int, runner: str, cwd: str, out_dir: str) -> None:
         else:
             p = subprocess.run(["bash", runner], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             rc, out = p.returncode, p.stdout.decode("utf-8", "replace")
-    except Exception as e:   # ⛔ 실행기 예외도 결과로 남긴다 — 빠진 러너는 통과처럼 보인다
+    except Exception as e:   # noqa: BLE001 — 실행기 예외도 결과로 남긴다 — 빠진 러너는 통과처럼 보인다
         rc, out = UNRUN, f"UNRUN: 실행기 예외 — {type(e).__name__}: {e}\n"
     with open(os.path.join(out_dir, f"{i}.out"), "w", encoding="utf-8") as fh:
         fh.write(out)

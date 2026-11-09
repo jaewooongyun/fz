@@ -1,4 +1,5 @@
 #!/bin/bash
+# gpt-cli: real — 사본에서 health-check 전체를 돈다(§4.5 check-gpt-flags 가 실제 GPT CLI 의 --help 를 부른다)
 # 회귀 러너 병렬 실행 fixture — health-check `chk_runners` 가 병렬(FZ_HEALTH_JOBS)로 돌아도 직렬과 판정이 같은가를 동작으로 본다.
 #
 # 트리 사본 한 벌에서 기존 러너를 모두 지우고 합성 러너만 심어 health-check 를 세 번 돌린다.

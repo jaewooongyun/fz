@@ -21,6 +21,7 @@ exit: 0=충족 · 1=위반 · 2=측정 실패(⛔ 통과 아님)
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import sys
@@ -29,6 +30,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import md_section  # noqa: E402 — 형제 모듈(절 추출 공용 · F-335 ⑰)
 
 OK, VIOLATION, UNRUN = 0, 1, 2
+
+
+class ContentError(ValueError):
+    """문서는 읽었고 절도 찾았는데 **내용**이 계약을 어긴다 — 위반(1)이다. 측정 실패(2)가 아니다(F-396)."""
+
+
 DEFAULT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 GUIDE = "guides/skill-authoring.md"
@@ -87,7 +94,7 @@ def table_rows(sec: str) -> list:
         head = tb[0]
         if "상태" in head and "처방" in head:
             if chosen is not None:
-                raise ValueError("판별 표(헤더에 상태·처방)가 둘 이상이다 — 정본이 갈린다")
+                raise ContentError("판별 표(헤더에 상태·처방)가 둘 이상이다 — 정본이 갈린다")
             chosen = tb
     if chosen is None:
         raise ValueError("판별 표를 찾지 못했다 (헤더에 `상태` 와 `처방` 이 있는 표)")
@@ -103,7 +110,11 @@ def table_rows(sec: str) -> list:
 def audit(root: pathlib.Path) -> dict:
     guide = read(root, GUIDE)
     sec = section_of(guide)
-    rows = table_rows(sec)
+    try:
+        rows = table_rows(sec)
+    except ContentError as e:
+        # ⛔ 내용 이상을 UNRUN 으로 내면 '판정 불가' 로 읽혀 고칠 대상이 가려진다(F-396)
+        return {"violations": [f"① {e}"], "expected": len(STATES), "validated": 0, "rows": 0}
     v = []
 
     # ① 상태별 고유 행
@@ -175,9 +186,25 @@ def self_test() -> int:
     passed, fails = 0, []
     real = read(DEFAULT_ROOT, GUIDE)
     cons = read(DEFAULT_ROOT, CONSUMER)
+    listing = bool(os.environ.get("FZ_SELFTEST_LIST"))
+
+    def ok(name):
+        nonlocal passed
+        passed += 1
+        if listing:
+            print(f"  ok   {name}")
+
+    def dup_table(text):
+        """판별 표 블록을 바로 뒤에 한 번 더 붙인다 — 같은 절 안에 표가 둘이 된다."""
+        head = next(t for t in split_tables(section_of(text)) if "상태" in t[0] and "처방" in t[0])[0]
+        ls = text.splitlines(keepends=True)
+        i = next(k for k, ln in enumerate(ls) if ln.strip() == head)
+        j = i
+        while j < len(ls) and ls[j].strip().startswith("|"):
+            j += 1
+        return "".join(ls[:j] + ["\n"] + ls[i:j] + ls[j:])
 
     def case(name, guide_text, cons_text, want_violation: bool, needle=None):
-        nonlocal passed
         d = pathlib.Path(tempfile.mkdtemp(prefix="fz-ft-"))
         try:
             (d / "guides").mkdir(); (d / "skills" / "fz").mkdir(parents=True)
@@ -193,7 +220,7 @@ def self_test() -> int:
                     if want_msg and want_msg not in str(e):
                         fails.append(f"{name}: 예외 문구에 {want_msg!r} 없음 — {e}")
                     else:
-                        passed += 1
+                        ok(name)
                 else:
                     fails.append(f"{name}: 예외 {type(e).__name__}: {e}")
                 return
@@ -209,7 +236,7 @@ def self_test() -> int:
             elif needle and not needle.startswith("UNRUN") and not any(needle in x for x in r["violations"]):
                 fails.append(f"{name}: 위반 사유에 {needle!r} 없음 — {r['violations'][:2]}")
             else:
-                passed += 1
+                ok(name)
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
@@ -238,6 +265,9 @@ def self_test() -> int:
     case("table-missing",
          "# guide\n\n### ⛔ 실패 복구 사다리\n\n| 단계 | 조건 | 행동 |\n|---|---|---|\n| L1 | x | y |\n\n승인\n",
          cons, True, "UNRUN:판별 표를 찾지 못했다")
+    # ⑧ ⛔ 판별 표가 **둘** — 문서를 읽었고 절도 찾았다. 내용 이상이므로 위반이다(F-396).
+    #    옛 동작은 이것을 UNRUN 으로 냈다 — 판정 불가로 읽혀 고칠 대상이 가려진다.
+    case("f396-failure-table-content-violation", dup_table(real), cons, True, "둘 이상")
 
     for f in fails:
         print(f"  FAIL {f}")

@@ -26,6 +26,14 @@ operative(게이트/체크리스트/절차) vs justification(근거/인용/서�
   python3 scripts/measure_constraint_load.py --json          # 기계 판독용 JSON
   python3 scripts/measure_constraint_load.py --refs fz-plan  # 조건부 판정 근거 감사
   python3 scripts/measure_constraint_load.py --sections modules/foo.md
+  python3 scripts/measure_constraint_load.py [ROOT] --ceiling tests/fixtures/constraint-ceiling.json   # 동결값 대조
+  python3 scripts/measure_constraint_load.py [ROOT] --freeze  tests/fixtures/constraint-ceiling.json   # 지금 값으로 동결
+
+상한(F-139 — floor 를 잰 뒤 6주 만에 +19~89% 자랐는데 측정만 하는 도구라 아무 게이트도 울리지 않았다):
+  --ceiling FILE 은 세 범위를 동결값과 대조한다 — 스킬별 floor · agents/*.md 본문 · 워크플로 직접 프롬프트(workflows/*.js 의
+  문자열 리터럴). 어느 하나라도 동결값 × (1 + headroom_pct/100) 을 넘거나 동결값에 없는 항목이 생기면 exit 1.
+  ⛔ 상한을 올리는 것은 `--freeze` 로 **의도해서** 한다 — 판 전후 값은 리뷰 기록에 남긴다.
+  exit: 0 상한 안 · 1 초과 · 2 동결 파일을 읽지 못함(⛔ 통과 아님)
 
 근거: guides/harness-engineering.md §7 Ablation 프로세스 + §11 측정 지표. 본 도구는 그
 프레임의 COST 축 계측기다. VALUE 축은 experiment-log.md Phase 5에 누적한다.
@@ -56,6 +64,41 @@ JUSTIFICATION_PAT = re.compile(
 def est_tokens(text: str) -> int:
     """거친 토큰 추정 (chars/4). 정밀 토크나이저 없이 상대 비교용."""
     return len(text) // 4
+
+
+def js_string_chars(src: str) -> int:
+    """JS 소스의 문자열 리터럴(' · " · `) 내용 글자 수 — 워크플로가 워커에게 보내는 직접 프롬프트의 대리값.
+
+    - Note: 주석(`//` · `/* */`)은 건너뛴다. 정규식 리터럴은 코드로 본다 — 그 안의 따옴표가 문자열을 열면
+      줄바꿈에서 닫히지 않은 ' · " 문자열을 버린다. 판 사이 **상대 비교**용이라 같은 규칙을 쓰는 것이 정확도보다 중요하다.
+    """
+    i, n, total = 0, len(src), 0
+    while i < n:
+        c = src[i]
+        if src.startswith("//", i):
+            j = src.find("\n", i)
+            i = n if j < 0 else j + 1
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif c in "'\"`":
+            j, buf = i + 1, 0
+            while j < n and src[j] != c:
+                if src[j] == "\\":
+                    j += 2
+                    buf += 1
+                    continue
+                if src[j] == "\n" and c != "`":
+                    buf = -1
+                    break
+                j += 1
+                buf += 1
+            if buf > 0:
+                total += buf
+            i = j + 1
+        else:
+            i += 1
+    return total
 
 
 def classify_lines(text: str) -> dict:
@@ -241,7 +284,113 @@ def collect_doc_stats(root: Path) -> dict[str, dict]:
     return stats
 
 
+def measure(root: Path):
+    """(docs, skill_load) — modules/guides 통계와 스킬별 hot-path 로드(floor · ceiling)."""
+    docs = collect_doc_stats(root)
+    skills_dir = root / "skills"
+    skill_load: dict[str, dict] = {}
+    for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+        name = skill_md.parent.name
+        refs = ref_files_in_skill(skill_md)
+        lines = tokens = 0                       # ceiling: load 버킷 전체
+        u_lines = u_tokens = u_count = 0         # floor: load & unconditional
+        n_load = n_cat = n_cit = 0
+        excluded_tokens = 0                      # catalog+citation (로드 아님)
+        for ref, meta in refs.items():
+            if ref not in docs:
+                continue
+            docs[ref]["referenced_by"].append(name)
+            if meta["bucket"] != "load":
+                excluded_tokens += docs[ref]["tokens"]
+                n_cat += meta["bucket"] == "catalog"
+                n_cit += meta["bucket"] == "citation"
+                continue
+            n_load += 1
+            lines += docs[ref]["lines"]
+            tokens += docs[ref]["tokens"]
+            if not meta["conditional"]:
+                u_count += 1
+                u_lines += docs[ref]["lines"]
+                u_tokens += docs[ref]["tokens"]
+        skill_load[name] = {
+            "ref_count": len(refs), "load_refs": n_load,
+            "catalog_refs": n_cat, "citation_refs": n_cit,
+            "lines": lines, "tokens": tokens, "excluded_tokens": excluded_tokens,
+            # P2: 무조건 로드 subset = "실제 최소 로드"의 하한
+            "uncond_count": u_count, "uncond_lines": u_lines, "uncond_tokens": u_tokens,
+            "cond_tokens": tokens - u_tokens,
+            "refs_detail": {k: {"bucket": v["bucket"], "conditional": v["conditional"],
+                                "sites": v["sites"]} for k, v in refs.items()},
+        }
+    return docs, skill_load
+
+
+def load_scopes(root: Path, skill_load: dict) -> dict:
+    """상한 대조 범위 셋 — 스킬 floor · agents 본문 · 워크플로 직접 프롬프트(모두 ~tokens)."""
+    return {
+        "skills_floor": {n: d["uncond_tokens"] for n, d in skill_load.items()},
+        "agents": {p.stem: est_tokens(p.read_text(encoding="utf-8", errors="replace"))
+                   for p in sorted((root / "agents").glob("*.md"))},
+        "workflows": {p.stem: js_string_chars(p.read_text(encoding="utf-8", errors="replace")) // 4
+                      for p in sorted((root / "workflows").glob("*.js"))},
+    }
+
+
+def cmd_freeze(scopes: dict, path: Path) -> int:
+    """지금 값을 동결한다. 기존 파일의 headroom_pct 는 보존한다."""
+    head = 10
+    if path.is_file():
+        try:
+            head = json.loads(path.read_text(encoding="utf-8")).get("headroom_pct", head)
+        except (OSError, ValueError):
+            pass
+    body = {"_note": "measure_constraint_load.py --freeze 가 쓴다 — 손으로 고치지 않는다. 상한 = 값 × (1 + headroom_pct/100)",
+            "headroom_pct": head, **scopes}
+    path.write_text(json.dumps(body, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"FROZEN {path} · " + " · ".join(f"{k} {len(v)}개 합 {sum(v.values())}" for k, v in scopes.items()))
+    return 0
+
+
+def cmd_ceiling(scopes: dict, path: Path) -> int:
+    try:
+        frozen = json.loads(path.read_text(encoding="utf-8"))
+        head = float(frozen["headroom_pct"])
+        assert all(isinstance(frozen[k], dict) for k in scopes)
+    except (OSError, ValueError, KeyError, TypeError, AssertionError) as e:
+        print(f"UNRUN: 동결 파일을 읽지 못했다 — {path}: {type(e).__name__}: {e} (⛔ 통과 아님)")
+        return 2
+    bad = []
+    for scope, cur in scopes.items():
+        for name, val in sorted(cur.items()):
+            if name not in frozen[scope]:
+                bad.append(f"FAIL {scope}/{name}: 동결값에 없는 항목 (~{val} tok) — 의도한 추가면 --freeze 로 다시 동결한다")
+                continue
+            limit = int(frozen[scope][name] * (1 + head / 100))
+            if val > limit:
+                bad.append(f"FAIL {scope}/{name}: ~{val} tok > 동결 {frozen[scope][name]} × {1 + head / 100:.2f} = {limit}")
+    for b in bad:
+        print(b)
+    total = {k: sum(v.values()) for k, v in scopes.items()}
+    print(f"ceiling: headroom {head:g}% · " + " · ".join(f"{k} {total[k]}/{sum(frozen[k].values())}" for k in scopes)
+          + f" · 초과 {len(bad)}")
+    return 1 if bad else 0
+
+
+def _take_opt(name: str) -> str | None:
+    """`name VALUE` 를 argv 에서 꺼낸다 — 값이 위치 인자(ROOT)로 읽히지 않게."""
+    if name not in sys.argv:
+        return None
+    i = sys.argv.index(name)
+    if i + 1 >= len(sys.argv):
+        print(f"UNRUN: {name} 에 파일 경로가 없다")
+        sys.exit(2)
+    val = sys.argv[i + 1]
+    del sys.argv[i:i + 2]
+    return val
+
+
 def main() -> None:
+    ceiling_path, freeze_path = _take_opt("--ceiling"), _take_opt("--freeze")
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     as_json = "--json" in sys.argv
     root = Path(__file__).resolve().parent.parent
@@ -301,46 +450,14 @@ def main() -> None:
     if not skills_dir.is_dir():
         sys.exit(f"skills/ 없음: {root} — PLUGIN_ROOT 인자를 확인하세요.")
 
-    docs = collect_doc_stats(root)
+    docs, skill_load = measure(root)
+    scopes = load_scopes(root, skill_load)
 
-    # 스킬별 hot-path 정적 로드 + 역참조 채우기
-    skill_load: dict[str, dict] = {}
-    for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
-        name = skill_md.parent.name
-        refs = ref_files_in_skill(skill_md)
-        lines = tokens = 0                       # ceiling: load 버킷 전체
-        u_lines = u_tokens = u_count = 0         # floor: load & unconditional
-        n_load = n_cat = n_cit = 0
-        excluded_tokens = 0                      # catalog+citation (로드 아님)
-        for ref, meta in refs.items():
-            if ref not in docs:
-                continue
-            docs[ref]["referenced_by"].append(name)
-            if meta["bucket"] != "load":
-                excluded_tokens += docs[ref]["tokens"]
-                n_cat += meta["bucket"] == "catalog"
-                n_cit += meta["bucket"] == "citation"
-                continue
-            n_load += 1
-            lines += docs[ref]["lines"]
-            tokens += docs[ref]["tokens"]
-            if not meta["conditional"]:
-                u_count += 1
-                u_lines += docs[ref]["lines"]
-                u_tokens += docs[ref]["tokens"]
-        skill_load[name] = {
-            "ref_count": len(refs), "load_refs": n_load,
-            "catalog_refs": n_cat, "citation_refs": n_cit,
-            "lines": lines, "tokens": tokens, "excluded_tokens": excluded_tokens,
-            # P2: 무조건 로드 subset = "실제 최소 로드"의 하한
-            "uncond_count": u_count, "uncond_lines": u_lines, "uncond_tokens": u_tokens,
-            "cond_tokens": tokens - u_tokens,
-            "refs_detail": {k: {"bucket": v["bucket"], "conditional": v["conditional"],
-                                "sites": v["sites"]} for k, v in refs.items()},
-        }
-
+    if freeze_path or ceiling_path:
+        sys.exit(cmd_freeze(scopes, Path(freeze_path)) if freeze_path else cmd_ceiling(scopes, Path(ceiling_path)))
     if as_json:
-        print(json.dumps({"skills": skill_load, "docs": docs}, ensure_ascii=False, indent=2))
+        print(json.dumps({"skills": skill_load, "docs": docs, "agents": scopes["agents"],
+                          "workflows": scopes["workflows"]}, ensure_ascii=False, indent=2))
         return
 
     # ── 사람 판독 리포트 ──
@@ -371,6 +488,13 @@ def main() -> None:
         print(f"{rel:<42}{d['lines']:>6}{d['operative']:>5}{d['justification']:>6}{d['just_pct']:>6}%{n_ref:>5}")
 
     # 강등 후보 추천: justification 절대량 상위 + hot-path 노출 낮은 순
+    print("\n■ 표3: 스킬 밖 부하 — agents/*.md 본문 · 워크플로 직접 프롬프트(문자열 리터럴)")
+    print("  워커는 agent 정의 전문과 워크플로가 조립한 프롬프트를 받는다 — 스킬 floor 에 안 잡히는 부하다")
+    for scope in ("agents", "workflows"):
+        vals = scopes[scope]
+        print(f"  {scope:<10} {len(vals):>3}개 · 합 ~{sum(vals.values())} tok · 최대 "
+              + (max(vals.items(), key=lambda x: x[1])[0] if vals else "-"))
+
     print("\n■ 강등 PoC 후보 (justification 절대량 ↑, 단 VALUE 측정 전 제거 금지)")
     cands = sorted(
         docs.items(),

@@ -8,12 +8,19 @@
 # 검사: ① plugin.json == marketplace.json ② CHANGELOG 최상단 == plugin.json
 #       ①-b 하위 플러그인(marketplace 두 번째 항목부터 · 리포 안 폴더) 버전 동기와 바뀐 뒤 버전 올림
 #       ③ 가이드가 sweep 기록 위치(§5.8 ⑥)를 가리키는가 ④ health-check exit 0
+#       ②-b README · CHANGELOG 의 노트 절 참조(§N · § 이름 · '이름' 절)가 그 노트 제목에 있다(F-421)
+#       ②-c 직전 태그(v*) 대비 파일 모드 변경 0 — 허용 목록 tests/fixtures/release-mode-allow.txt(F-427)
 # exit: 0=전부 충족(DOCS_SYNC_OK) / 1=불일치 / 2=대상 부재(측정 실패)
+# diff-parse: hunk-state — neutralize_axis 는 `diff --git` 헤더 구간과 `@@` hunk 를 구분해 hunk 안 `+` 줄만 추가 줄로 센다
 #
 # 모드:
 #   (없음)      ①~④ — 수동·CI 용. health-check 포함이라 **약 7분 20초** 걸린다(2026-11-08 실측 439s · 14코어)
 #   --release   ①~④ + ⑤ **커밋 축** + ⑥ **findings 축**(노트가 닫은 finding 을 밝혔는가). 릴리즈 직전 게이트
 #   --staged    ⑤만, staged 내용 기준. ⛔ pre-commit 용 — health-check 를 뺀다
+#   --neutralize-diff <ref> [--rules <파일>]
+#               ⑦만 — <ref> 대비 추가 줄(미추적 파일 포함) × 중립화 규칙 적중 0 (F-420). `--release` 는 직전 태그 대비로 ⑦ 을 함께 돈다
+#               내장 규칙은 프로젝트를 드러내지 않는 모양만 본다(개인 홈 경로 · 허용 밖 메일 도메인 · 티켓 키 꼴).
+#               회사 · 앱 이름 같은 사내 규칙은 공개 트리에 두지 않는다 — `--rules`(또는 FZ_NEUTRALIZE_RULES) 파일에 한 줄 한 정규식
 #   --self-test 임시 git 리포로 ⑤의 실패/통과 쌍을 확인
 #
 # ⛔ **커밋 축을 기본 모드에 넣지 않는 이유**: pre-commit 은 *커밋하려는 중* 이라
@@ -23,13 +30,19 @@
 #    이것이 원래 실패 모드(v4.33.0 "적용은 했는데 커밋하지 않았다")의 정확한 오라클이다.
 set -uo pipefail
 
-MODE=""
+MODE="" NREF="" NRULES="${FZ_NEUTRALIZE_RULES:-}"
 case "${1:-}" in
   --release)   MODE="release" ;;
   --staged)    MODE="staged" ;;
   --self-test) MODE="self-test" ;;
+  --neutralize-diff)
+    MODE="neutralize"; NREF="${2:-}"
+    [ -n "$NREF" ] || { echo "❌ --neutralize-diff 에 기준 ref 가 없다"; exit 2; }
+    if [ "${3:-}" = "--rules" ]; then
+      NRULES="${4:-}"; [ -f "$NRULES" ] || { echo "❌ --rules 파일이 없다: '${NRULES}'"; exit 2; }
+    elif [ -n "${3:-}" ]; then echo "❌ 알 수 없는 인자: $3"; exit 2; fi ;;
   "")          MODE="default" ;;
-  *) echo "❌ 알 수 없는 인자: $1 (사용: [--release|--staged|--self-test])"; exit 2 ;;
+  *) echo "❌ 알 수 없는 인자: $1 (사용: [--release|--staged|--self-test|--neutralize-diff <ref> [--rules <파일>]])"; exit 2 ;;
 esac
 #   루트는 **자기 위치**에서 해석한다 (`BASH_SOURCE[0]` — `$0` 는 source 시 호출자를 가리킨다)
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -162,6 +175,197 @@ sys.exit(bad)
 PY
 }
 
+# ②-b 노트 절 참조 — README · CHANGELOG 가 노트의 절을 번호(§2) · 이름(§ 남은 것) · 따옴표('X' 절)로 가리키면 그 절이 노트에 있어야 한다.
+#    노트는 줄 안의 `docs/releases/vX.md` 가 있으면 그것, 없으면 CHANGELOG 는 가장 가까운 위 `### vX` 절 · README 는 최상단 버전.
+#    이름 대조: 노트 제목에서 괄호 · ` — ` 뒤를 뗀 앞부분으로 참조 문장이 시작하면 해소(`§ 남은 것에 적었다` → `## 남은 것 (가이드 갱신)`).
+#    ⛔ 노트 제목을 고친 뒤 옛 제목을 가리키는 요약이 남던 실패(F-421 — README:154 · CHANGELOG 두 곳)를 잡는다
+#    반환: 0=충족 · 1=끊긴 참조(사유를 stdout 에) · 2=CHANGELOG 부재
+note_ref_axis() {   # $1=리포 디렉토리
+  python3 - "$1" <<'PY'
+import os, re, sys
+repo = sys.argv[1]
+SEC_RE = re.compile(r"(?:릴리[즈스]\s*노트|docs/releases/v(\d+\.\d+\.\d+)\.md`?)\s*§\s*(\S.*)")
+QUO_RE = re.compile(r"(?:노트(?:의)?|docs/releases/v(\d+\.\d+\.\d+)\.md`?)\s*'([^'\n]+)'\s*절")
+VER_RE = re.compile(r"^###\s+v(\d+\.\d+\.\d+)")
+FENCE_RE = re.compile(r"^\s*(```|~~~)")
+
+def norm(s):
+    return re.sub(r"[`*]", "", s).strip()
+
+def core(h):
+    return re.split(r"\s+—\s+|\s*\(", norm(h), maxsplit=1)[0].strip()
+
+cache = {}
+def heads(ver):
+    if ver not in cache:
+        p = os.path.join(repo, "docs", "releases", f"v{ver}.md")
+        if not os.path.isfile(p):
+            cache[ver] = None
+        else:
+            out, fence = [], False
+            for ln in open(p, encoding="utf-8"):
+                if FENCE_RE.match(ln):
+                    fence = not fence
+                    continue
+                m = re.match(r"^#{1,6}\s+(.*)", ln)
+                if m and not fence:
+                    out.append(norm(m.group(1)))
+            cache[ver] = out
+    return cache[ver]
+
+def sec_ok(hs, rest):
+    rest = norm(rest)
+    m = re.match(r"(\d+)(?!\d)", rest)
+    if m:
+        return any(re.match(rf"(?:§\s*)?{m.group(1)}(?:[.)]|\s|$)", h) for h in hs)
+    return any(core(h) and rest.startswith(core(h)) for h in hs)
+
+def quote_ok(hs, name):
+    name = norm(name)
+    return any(name == core(h) or name in h for h in hs)
+
+cl = os.path.join(repo, "CHANGELOG.md")
+if not os.path.isfile(cl):
+    print("  ⚠️ CHANGELOG.md 없음 — 노트 절 참조 미판정(⛔ 통과 아님)")
+    sys.exit(2)
+lines = open(cl, encoding="utf-8").read().split("\n")
+top = next((m.group(1) for m in map(VER_RE.match, lines) if m), None)
+bad = 0
+for rel in ("README.md", "CHANGELOG.md"):
+    p = os.path.join(repo, rel)
+    if not os.path.isfile(p):
+        continue
+    cur, fence = (top if rel == "README.md" else None), False
+    for i, ln in enumerate(open(p, encoding="utf-8").read().split("\n"), 1):
+        if FENCE_RE.match(ln):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        vm = VER_RE.match(ln)
+        if vm and rel == "CHANGELOG.md":
+            cur = vm.group(1)
+            continue
+        for rx, ok in ((SEC_RE, sec_ok), (QUO_RE, quote_ok)):
+            for m in rx.finditer(ln):
+                ver = m.group(1) or cur
+                if ver is None:
+                    continue
+                hs = heads(ver)
+                if hs is None:
+                    print(f"  ❌ {rel}:{i}: 노트 v{ver} 가 없다 — 절 참조 '{m.group(2)[:40]}' 를 확인할 곳이 없다")
+                    bad = 1
+                elif not ok(hs, m.group(2)):
+                    print(f"  ❌ {rel}:{i}: 노트 v{ver} 에 '{norm(m.group(2))[:40]}' 절이 없다 — 노트 제목을 고친 뒤 옛 이름이 남았다")
+                    bad = 1
+sys.exit(bad)
+PY
+}
+
+# ②-c 파일 모드 — 직전 태그(v*) 대비 `mode change` 가 허용 목록 밖에 있으면 불일치(F-427: 원자 교체가 0755 를 0644 로 바꿨는데
+#    검증 경로는 모두 `bash <파일>` 이라 실행 비트 없이도 돌았다). 태그가 없으면 건너뛴다(subplugin_axis 와 같은 규칙).
+#    허용 목록 = tests/fixtures/release-mode-allow.txt(한 줄 한 경로 · `#` 주석) — 없으면 빈 목록.
+#    반환: 0=충족 · 1=허용 밖 모드 변경 · 2=git 리포 아님
+mode_axis() {   # $1=리포 디렉토리
+  local repo="$1" tag allow="$1/tests/fixtures/release-mode-allow.txt" hits bad=0 path
+  git -C "$repo" rev-parse --verify HEAD >/dev/null 2>&1 \
+    || { echo "  ⚠️ git 리포가 아니거나 커밋이 없다 — 모드 축 미판정(⛔ 통과 아님)"; return 2; }
+  tag="$(git -C "$repo" describe --tags --abbrev=0 --match 'v*' 2>/dev/null)" || { echo "  ⚠️ v* 태그 없음 — 모드 축 건너뜀"; return 0; }
+  hits="$(git -C "$repo" -c core.quotepath=off diff --summary "$tag" -- . 2>/dev/null | sed -n 's/^ mode change [0-7]* => [0-7]* //p')"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if [ -f "$allow" ] && grep -vE '^[[:space:]]*(#|$)' "$allow" | grep -qxF -- "$path"; then continue; fi
+    echo "  ❌ $tag 뒤 파일 모드가 바뀌었다: $path — 의도한 변경이면 tests/fixtures/release-mode-allow.txt 에 적는다"; bad=1
+  done <<< "$hits"
+  return "$bad"
+}
+
+# ⑦ 중립화 — <ref> 대비 추가 줄(미추적 파일 포함)에 공개 저장소에 두면 안 되는 식별자가 있는가(F-420).
+#    내장 규칙은 모양만 본다 — 개인 홈 경로 · 허용 밖 메일 도메인 · 티켓 키 꼴(대문자 2~6 + 숫자 3~6, 허용 접두 제외).
+#    사내 이름 규칙은 $3 파일(한 줄 한 정규식 · `#` 주석)로만 받는다 — 규칙 자체가 프로젝트를 드러내므로 트리에 두지 않는다.
+#    반환: 0=적중 0 · 1=적중(파일:줄: 규칙 — 토큰) · 2=ref 를 풀지 못함 · 규칙 파일 오류
+neutralize_axis() {   # $1=리포 · $2=기준 ref · $3=사내 규칙 파일(빈 값 가능)
+  python3 - "$1" "$2" "${3:-}" <<'PY'
+import os, re, subprocess, sys
+repo, ref, rules_path = sys.argv[1], sys.argv[2], sys.argv[3]
+
+def git(*a):
+    return subprocess.run(["git", "-C", repo, "-c", "core.quotepath=off", *a], capture_output=True, text=True, errors="replace")
+
+if git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").returncode != 0:
+    print(f"  ⚠️ 기준 ref 를 풀지 못했다: {ref} — 중립화 축 미판정(⛔ 통과 아님)")
+    sys.exit(2)
+HOME_RE = re.compile(r"/(?:Users|home)/(?!example/|you/|user/|me/|\{user\}/|<user>/|USER/|\$USER/)[A-Za-z0-9._-]+/")
+MAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})")
+MAIL_OK = ("example.com", "example.org", "example.net", "users.noreply.github.com", "anthropic.com")
+KEY_RE = re.compile(r"(?<![A-Za-z0-9_-])([A-Z]{2,6})-\d{3,6}(?![A-Za-z0-9_])")
+KEY_OK = {"TKT", "TICKET", "ISO", "CVE", "RFC", "UTF", "SHA", "PEP", "GHSA"}
+rules = []
+if rules_path:
+    try:
+        for n, ln in enumerate(open(rules_path, encoding="utf-8"), 1):
+            ln = ln.rstrip("\n")
+            if ln.strip() and not ln.lstrip().startswith("#"):
+                rules.append((f"사내 규칙 {n}", re.compile(ln)))
+    except (OSError, re.error) as e:
+        print(f"  ⚠️ 사내 규칙 파일을 읽지 못했다: {rules_path} — {e} (⛔ 통과 아님)")
+        sys.exit(2)
+
+def hits(text):
+    out = [("개인 홈 경로", m.group(0)) for m in HOME_RE.finditer(text)]
+    out += [("메일 주소", m.group(0)) for m in MAIL_RE.finditer(text)
+            if not any(m.group(1).lower() == d or m.group(1).lower().endswith("." + d) for d in MAIL_OK)]
+    out += [("티켓 키 꼴", m.group(0)) for m in KEY_RE.finditer(text) if m.group(1) not in KEY_OK]
+    out += [(name, m.group(0)) for name, rx in rules for m in rx.finditer(text)]
+    return out
+
+added = []   # (경로, 줄 번호, 내용)
+d = git("diff", "-U0", "--no-color", "--no-ext-diff", "--text", ref, "--", ".")
+if d.returncode != 0:
+    print(f"  ⚠️ git diff 실패: {d.stderr.strip()[:120]} — 중립화 축 미판정(⛔ 통과 아님)")
+    sys.exit(2)
+path, in_hunk, new_no = None, False, 0
+for ln in d.stdout.split("\n"):
+    if ln.startswith("diff --git "):
+        path, in_hunk = None, False
+        continue
+    if not in_hunk:
+        if ln.startswith("+++ "):
+            tgt = ln[4:]
+            path = None if tgt == "/dev/null" else (tgt[2:] if tgt.startswith("b/") else tgt)
+        elif ln.startswith("@@"):
+            m = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", ln)
+            in_hunk, new_no = True, int(m.group(1)) if m else 0
+        continue
+    if ln.startswith("@@"):
+        m = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", ln)
+        new_no = int(m.group(1)) if m else 0
+    elif ln.startswith("+"):
+        if path:
+            added.append((path, new_no, ln[1:]))
+        new_no += 1
+    elif ln.startswith(" "):
+        new_no += 1
+    elif ln.startswith("diff --git "):
+        in_hunk = False
+untracked = git("ls-files", "--others", "--exclude-standard", "-z").stdout.split("\0")
+for rel in filter(None, untracked):
+    try:
+        with open(os.path.join(repo, rel), encoding="utf-8") as fh:
+            for n, line in enumerate(fh, 1):
+                added.append((rel, n, line.rstrip("\n")))
+    except (OSError, UnicodeDecodeError):
+        continue   # 바이너리 · 읽기 불가 — 텍스트 식별자 규칙의 대상이 아니다
+bad = 0
+for rel, n, text in added:
+    for name, tok in hits(text):
+        print(f"  ❌ {rel}:{n}: {name} — {tok}")
+        bad = 1
+print(f"  중립화: {ref} 대비 추가 줄 {len(added)} · 사내 규칙 {len(rules)}개{'' if rules else '(미지정 — 내장 모양 규칙만)'}")
+sys.exit(bad)
+PY
+}
+
 # ── --self-test — 임시 git 리포로 ⑤의 실패/통과 쌍을 확인한다 ────────────────
 if [ "$MODE" = "self-test" ]; then
   pass=0; failed=0
@@ -195,10 +399,11 @@ if [ "$MODE" = "self-test" ]; then
       || { echo "⛔ 픽스처 리포가 만들어지지 않았다: '${REPO}'" >&2; exit 2; }
   }
 
+  ok_() { pass=$((pass+1)); [ -n "${FZ_SELFTEST_LIST:-}" ] && echo "PASS $1"; return 0; }   # 통과 줄 — 게이트가 셀 이름으로 센다
   case_() {   # $1=이름 · $2=기대 반환 · $3=리포 · $4=선언버전
     local out rc
     out=$(commit_axis "$3" "$4"); rc=$?
-    if [ "$rc" = "$2" ]; then pass=$((pass+1))
+    if [ "$rc" = "$2" ]; then ok_ "$1"
     else failed=$((failed+1)); echo "  FAIL $1: 반환 $rc (기대 $2)"; echo "$out" | sed 's/^/        /'; fi
   }
 
@@ -241,7 +446,7 @@ if [ "$MODE" = "self-test" ]; then
   case_sub() {   # $1=이름 · $2=기대 반환 · $3=리포
     local out rc
     out=$(subplugin_axis "$3"); rc=$?
-    if [ "$rc" = "$2" ]; then pass=$((pass+1))
+    if [ "$rc" = "$2" ]; then ok_ "$1"
     else failed=$((failed+1)); echo "  FAIL $1: 반환 $rc (기대 $2)"; echo "$out" | sed 's/^/        /'; fi
   }
   # ⑥ 정상 — 태그 뒤 새로 생긴 하위 플러그인(태그에 없던 폴더)은 버전 올림 검사를 건너뛴다
@@ -265,7 +470,7 @@ if [ "$MODE" = "self-test" ]; then
     [ -n "$3" ] && printf '%s\n' "$3" > "$d/v9.9.9.md"
     out=$(findings_axis "$d/v9.9.9.md"); rc=$?
     rm -rf "$d"
-    if [ "$rc" = "$2" ]; then pass=$((pass+1))
+    if [ "$rc" = "$2" ]; then ok_ "$1"
     else failed=$((failed+1)); echo "  FAIL $1: 반환 $rc (기대 $2)"; echo "$out" | sed 's/^/        /'; fi
   }
   case_fx "findings-axis-closes-ok" 0 $'# v9.9.9\n\nCloses: F-001'
@@ -280,7 +485,55 @@ if [ "$MODE" = "self-test" ]; then
   for ln in $calls; do sed -n "$((ln - 1)),${ln}p" "${BASH_SOURCE[0]}" | grep -q 'MODE" = "release"' || dm_ok=0; done
   [ -n "$calls" ] || dm_ok=0
   sed -n '/^findings_axis()/,/^}/p' "${BASH_SOURCE[0]}" | grep -q 'FZ_FINDINGS_ROOT' && dm_ok=0
-  if [ "$dm_ok" = 1 ]; then pass=$((pass+1)); else failed=$((failed+1)); echo "  FAIL default-mode-no-registry-ok: ⑥ 호출이 release 가드 밖이거나 레지스트리를 읽는다"; fi
+  if [ "$dm_ok" = 1 ]; then ok_ "default-mode-no-registry-ok"; else failed=$((failed+1)); echo "  FAIL default-mode-no-registry-ok: ⑥ 호출이 release 가드 밖이거나 레지스트리를 읽는다"; fi
+
+  # 축 판정 공용 — $1=이름 · $2=기대 반환 · 나머지=부를 함수와 인자
+  case_ax() {
+    local name="$1" want="$2" out rc; shift 2
+    out=$("$@"); rc=$?
+    if [ "$rc" = "$want" ]; then ok_ "$name"
+    else failed=$((failed+1)); echo "  FAIL $name: 반환 $rc (기대 $want)"; echo "$out" | sed 's/^/        /'; fi
+  }
+
+  # ②-b 노트 절 참조(F-421) — 노트 제목 둘(무엇이 바뀌었나 · 2. 검증)과 CHANGELOG 한 줄
+  nr() {   # $1=CHANGELOG 본문 줄 · stdout 없음 · 전역 R 에 리포
+    R=$(mktemp -d "${TMPDIR:-/tmp}/fz-relsync.XXXXXX"); mkdir -p "$R/docs/releases"
+    printf '# v1.0.0 — x\n\n## 무엇이 바뀌었나\n\n## 2. 검증\n\n## 남은 것 (가이드 갱신)\n' > "$R/docs/releases/v1.0.0.md"
+    printf '# Changelog\n\n### v1.0.0 (2026-01-01) — x\n\n%s\n' "$1" > "$R/CHANGELOG.md"
+  }
+  nr "자세한 표는 릴리즈 노트 § 무엇을 고쳤나 에 있다"; case_ax "f421-note-section-ref-missing" 1 note_ref_axis "$R"; rm -rf "$R"
+  nr "자세한 표는 릴리즈 노트 § 무엇이 바뀌었나 에 있다"; case_ax "f421-note-section-ref-ok" 0 note_ref_axis "$R"; rm -rf "$R"
+  nr "남은 일은 릴리즈 노트 § 남은 것에 적었다"; case_ax "f421-note-section-prefix-ok" 0 note_ref_axis "$R"; rm -rf "$R"
+  nr "결과는 릴리즈 노트 §3 표"; case_ax "f421-note-section-number-missing" 1 note_ref_axis "$R"; rm -rf "$R"
+  nr "결과는 릴리즈 노트 §2 표"; case_ax "f421-note-section-number-ok" 0 note_ref_axis "$R"; rm -rf "$R"
+  nr "근거: docs/releases/v1.0.0.md 'Closes 줄 규약' 절"; case_ax "f421-quoted-section-missing" 1 note_ref_axis "$R"; rm -rf "$R"
+  nr "근거: docs/releases/v2.0.0.md '무엇이 바뀌었나' 절"; case_ax "f421-note-file-missing" 1 note_ref_axis "$R"; rm -rf "$R"
+  # 실제 트리 — 지금 README · CHANGELOG 의 참조가 모두 풀린다(이 검사가 막을 회귀의 출발점)
+  case_ax "f421-real-tree-refs-ok" 0 note_ref_axis "$ROOT_DIR"
+
+  # ②-c 모드 변경(F-427) — 태그 v1.0.0 의 0755 스크립트를 0644 로
+  mkr 1.0.0; R="$REPO"; printf '#!/bin/bash\n' > "$R/run.sh"; chmod 755 "$R/run.sh"
+  gq git -C "$R" -c user.email=t@t -c user.name=t add -A; gq git -C "$R" -c user.email=t@t -c user.name=t commit -qm s
+  gq git -C "$R" tag v1.0.0; chmod 644 "$R/run.sh"
+  case_ax "f427-mode-change-flagged" 1 mode_axis "$R"
+  mkdir -p "$R/tests/fixtures"; printf '# 의도한 변경\nrun.sh\n' > "$R/tests/fixtures/release-mode-allow.txt"
+  case_ax "f427-mode-change-allowlisted" 0 mode_axis "$R"
+  chmod 755 "$R/run.sh"; rm -rf "$R/tests"; case_ax "f427-no-mode-change-ok" 0 mode_axis "$R"; rm -rf "$R"
+
+  # ⑦ 중립화(F-420) — ⛔ 시험 문자열은 쪼개 쓴다. 이 파일도 추가 줄로 검사되므로 원문 그대로면 자기 자신이 걸린다
+  HOMEP="/Us""ers/alice/work"; MAILP="bob@""corp-mail.io"; KEYP="AB""C-1234"
+  mkr 1.0.0; R="$REPO"; printf 'base %s\n' "$HOMEP" > "$R/old.txt"
+  gq git -C "$R" -c user.email=t@t -c user.name=t add -A; gq git -C "$R" -c user.email=t@t -c user.name=t commit -qm base
+  case_ax "f420-base-line-not-counted" 0 neutralize_axis "$R" HEAD ""
+  printf '경로 %s\n' "$HOMEP" >> "$R/CHANGELOG.md"; case_ax "f420-added-line-neutralize-hit" 1 neutralize_axis "$R" HEAD ""
+  gq git -C "$R" checkout -q -- CHANGELOG.md
+  printf '문의 %s\n' "$MAILP" > "$R/new.md"; case_ax "f420-untracked-file-scanned" 1 neutralize_axis "$R" HEAD ""
+  printf '티켓 %s · 중립 TKT-5743 · 예시 /Us''ers/example/x\n' "$KEYP" > "$R/new.md"; case_ax "f420-ticket-key-shape-hit" 1 neutralize_axis "$R" HEAD ""
+  printf '중립 TKT-5743 · 예시 /Us''ers/example/x · noreply@''example.com\n' > "$R/new.md"; case_ax "f420-neutral-tokens-ok" 0 neutralize_axis "$R" HEAD ""
+  printf '(?i)acme\n' > "$R/../fz-relsync-rules.$$"; printf 'Acme 앱\n' > "$R/new.md"
+  case_ax "f420-private-rules-file" 1 neutralize_axis "$R" HEAD "$R/../fz-relsync-rules.$$"; rm -f "$R/../fz-relsync-rules.$$"
+  case_ax "f420-bad-ref-unrun" 2 neutralize_axis "$R" no-such-ref ""
+  rm -rf "$R"
 
   echo "self-test $pass/$((pass+failed)) passed"
   [ "$failed" = 0 ] || exit 1
@@ -309,6 +562,16 @@ if [ "$MODE" = "staged" ]; then
   exit 0
 fi
 
+# ── --neutralize-diff — ⑦만 ─────────────────────────────────────────────────
+if [ "$MODE" = "neutralize" ]; then
+  neutralize_axis "$ROOT_DIR" "$NREF" "$NRULES"; rc=$?
+  case "$rc" in
+    0) echo "NEUTRALIZE_OK ($NREF 대비 추가 줄 적중 0)" ;;
+    1) echo "⛔ 중립화 규칙 적중 — 공개 저장소에 두기 전에 중립 표기로 바꾼다" ;;
+  esac
+  exit "$rc"
+fi
+
 for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json CHANGELOG.md \
          guides/skill-authoring.md guides/model-guide.md scripts/health-check.sh; do
   [ -f "$f" ] || { echo "❌ 대상 부재: $f (측정 실패)"; exit 2; }
@@ -324,6 +587,8 @@ echo "버전: plugin=$PV · marketplace=$MV · CHANGELOG=$CV"
 [ "$PV" = "$MV" ] || note "plugin.json($PV) ≠ marketplace.json($MV)"
 [ "$PV" = "$CV" ] || note "plugin.json($PV) ≠ CHANGELOG 최상단($CV) — 항목 없이 버전만 올리거나 그 반대"
 subplugin_axis "$ROOT_DIR" || { rc=$?; [ "$rc" = 2 ] && note "하위 플러그인 미판정 — 통과가 아니다" || fail=$((fail + 1)); }
+note_ref_axis "$ROOT_DIR" || { rc=$?; [ "$rc" = 2 ] && note "노트 절 참조 미판정 — 통과가 아니다" || fail=$((fail + 1)); }
+mode_axis "$ROOT_DIR" || { rc=$?; [ "$rc" = 2 ] && note "모드 축 미판정 — 통과가 아니다" || fail=$((fail + 1)); }
 
 # ③ sweep 결과가 어디로 가는지 가이드가 가리키는가 — 사전등록만 하고 참조가 없으면 표가 미아가 된다
 grep -q '§5.8 ⑥' guides/skill-authoring.md || note "skill-authoring.md 가 sweep 기록 위치(§5.8 ⑥)를 가리키지 않는다"
@@ -346,6 +611,12 @@ fi
 if [ "$MODE" = "release" ]; then
   commit_axis "$ROOT_DIR" "$PV" || { rc=$?; [ "$rc" = 2 ] && note "커밋 축 미판정 — 통과가 아니다" || fail=$((fail + 1)); }
 fi
+# ⑦ 중립화 축 — `--release` 에서만, 직전 태그 대비. 태그가 없으면 미판정이다(릴리스는 직전 출하와 대조한다)
+if [ "$MODE" = "release" ]; then
+  LTAG="$(git -C "$ROOT_DIR" describe --tags --abbrev=0 --match 'v*' 2>/dev/null)"
+  if [ -z "$LTAG" ]; then note "중립화 축 미판정 — v* 태그가 없다(통과가 아니다)"
+  else neutralize_axis "$ROOT_DIR" "$LTAG" "$NRULES" || { rc=$?; [ "$rc" = 2 ] && note "중립화 축 미판정 — 통과가 아니다" || fail=$((fail + 1)); }; fi
+fi
 # ⑥ findings 축 — `--release` 에서만. 미판정(2)은 통과로 세지 않는다
 if [ "$MODE" = "release" ]; then
   findings_axis "$ROOT_DIR/docs/releases/v${PV}.md" || { rc=$?; [ "$rc" = 2 ] && note "findings 축 미판정 — 통과가 아니다" || fail=$((fail + 1)); }
@@ -356,7 +627,7 @@ if [ "$fail" -gt 0 ]; then
   exit 1
 fi
 if [ "$MODE" = "release" ]; then
-  echo "RELEASE_SYNC_OK (버전 3곳 일치 · 가이드→표 참조 4건 · health-check exit 0 · 커밋 축 · findings 선언 있음 — applied ↔ Closes 대조는 check_release_closes.py)"
+  echo "RELEASE_SYNC_OK (버전 3곳 일치 · 가이드→표 참조 4건 · 노트 절 참조 · 모드 변경 0 · health-check exit 0 · 커밋 축 · 중립화 · findings 선언 있음 — applied ↔ Closes 대조는 check_release_closes.py)"
 else
-  echo "DOCS_SYNC_OK (버전 3곳 일치 · 가이드→표 참조 4건 · health-check exit 0)"
+  echo "DOCS_SYNC_OK (버전 3곳 일치 · 가이드→표 참조 4건 · 노트 절 참조 · 모드 변경 0 · health-check exit 0)"
 fi

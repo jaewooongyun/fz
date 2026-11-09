@@ -12,7 +12,7 @@
 #     clean          추가 줄 '+ ok' · 빈 줄                  → 통과 (오탐 대조)
 #     header-path    새 파일 modules/Users/fixture-user/n.md(내용 깨끗) → 통과 — 헤더 '+++ b/…' 는 추가 줄이 아니다
 #     deleted        기준선의 '+ old /Users/fixture-user/…' 줄 삭제 → 통과 — 지운 줄은 추가 줄이 아니다
-#     out-of-scope   범위 밖 notes/x.md 의 plus-lead 줄       → 통과 — 훅 범위(SCOPED_RE)는 그대로다
+#     out-of-scope   예외 CHANGELOG.md 의 plus-lead 줄        → 통과 — 예외(EXEMPT_RE)는 검사하지 않는다(범위 판정 자체는 precommit-scope 픽스처 · F-056)
 #     rename-path    rename(R) 된 파일에 추가한 사용자 경로 → 차단 — 기준 훅은 --diff-filter=ACM 이라 R 을 뺀다(F-410)
 #     rename-existing-ok  기존 줄에 정당 참조가 있는 파일을 rename + 깨끗한 줄 추가 → 통과 — 옛 경로와 -M 비교
 #     space-path     'modules/a b.md' 의 사용자 경로 → 차단 — 기준 훅은 `for FILE in $CHANGED` 가 공백에서 가른다
@@ -104,7 +104,7 @@ printf 'base line\n' > "$R/modules/note.md" && git -C "$R" add modules/note.md |
 hook deleted 0 "$R"
 
 newrepo out-of-scope "base line"
-mkdir -p "$R/notes" && printf '%s\n' "+ see $U/dev/x" > "$R/notes/x.md" && git -C "$R" add -A || exit 3
+printf '%s\n' "+ see $U/dev/x" > "$R/CHANGELOG.md" && git -C "$R" add -A || exit 3
 hook out-of-scope 0 "$R"
 
 # ── F-410 파일 열거 셀 — rename · 공백 경로 · 비ASCII 경로 · color.ui=always (기준 훅은 넷 다 통과시킨다) ──
