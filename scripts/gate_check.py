@@ -61,6 +61,10 @@ STATES = ("active", "ready_for_review", "closed")
 #    전제가 간선이 아니라 튜플 위치에서 우연히 나온다. 그래서 STATE 전이는 아래 표가 **간선마다 전제를** 적는다.
 PLANNED = "planned"
 STATE_VALUES = (PLANNED,) + STATES      # 파서가 받는 값 — 순서 산술에는 쓰지 않는다
+# `released <tag>`(F-344) — 릴리스 시점 사실을 박은 원장. 실행 · `--reverify` 는 CHECK 를 다시 돌리지 않고 기록으로 판정한다
+#    (그 시점 SHA · 버전을 박은 CHECK 는 이후 어떤 트리에서도 재통과할 수 없다 — 다시 돌리면 FAIL 강등만 남는다)
+RELEASED = "released"
+RELEASED_RE = re.compile(r"released[ \t]+(\S+)\Z")
 # 진입 경로는 한 곳에서 정한다: 원장 생성(`render_ledger` · 손으로 쓴 draft)은 INITIAL_STATE, `--finalize` 는 STATE 를
 # **쓰지 않는다**(확정은 승인이지 착수 판정이 아니다 — 진행 기록이 있는 원장을 다시 확정해도 planned 가 되지 않는다),
 # planned 는 `--set-state planned` 한 경로(아래 간선과 그 전제)로만 들어간다.
@@ -74,6 +78,9 @@ TRANSITIONS = {
     ("closed", "active"): (None, "←"),
     ("active", PLANNED): ("approved-no-work", "←"),                   # /fz-plan 4.5 — 승인 · 진행 기록 0
     (PLANNED, "active"): (None, "→"),                                 # /fz-code Phase 0.4 — 착수는 완료 주장이 아니다
+    ("closed", RELEASED): ("all-met-none-deferred", "→"),             # 릴리스 뒤 시점 고정(F-344)
+    (RELEASED, "closed"): (None, "←"),
+    (RELEASED, "active"): (None, "←"),
 }
 # 진행 기록이 있던 게이트가 재실행에서 떨어졌다는 기록(reverify 이력). `pending` 으로 되돌리면 미착수와 구별되지 않는다
 DEMOTED_EVIDENCE = "pending; demoted"
@@ -152,6 +159,9 @@ KNOWN_ATTRS = {
     # ⛔ `PIN: <경로>[, …]` — 판정이 기대는 입력 파일(기대 표 · fixture)을 승인에 묶는다(F-408 → F-525 · opt-in). 경로는 ROOT 기준 ·
     #    절대 · `${ENV 선언 변수}/…` 셋뿐이고 CHECK 에서 추론하지 않는다. `PIN_DIGEST:` 는 `--finalize` 가 쓰는 그 내용 다이제스트다
     "PIN", "PIN_DIGEST",
+    # ⛔ `ONCE: <사유>` — 1회성 게이트(동결 기준선 쓰기 등). 충족 뒤 `--reverify` 가 다시 돌리지 않는다(F-235 — 다시 돌려
+    #    동결 기준선을 덮어쓰고 그 오염이 다른 게이트 판정을 느슨하게 했다). `--only` 로 이름을 대면 돈다. 선언은 승인 해시 안이다
+    "ONCE",
 }
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 PIN_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}/(.+)\Z")
@@ -171,6 +181,7 @@ class Gate:
         self.attrs = {}
         self.abandoned_reason = None
         self.deferred = None          # (릴리즈, 이유) — `DEFER:` 줄
+        self.impl_root = ""           # 원장 헤더 IMPL_ROOT — 승인 도장이 묶는다(F-347)
         # ⛔ 이 게이트가 차지하는 원장 라인 번호(1-기반). **파서가 SSOT다.**
         #    별도 스캐너를 쓰면 파서와 문법이 갈린다 — 펜스 안의 예시가
         #    `- [ ] G1:` 모양이면 파서는 무시하는데 스캐너는 게이트로 읽어
@@ -196,7 +207,7 @@ class Gate:
             raise LedgerError(f"{self.id}: CHECK/EXPECT 도 MANUAL 도 없다")
         if has_check and self.is_manual:
             raise LedgerError(f"{self.id}: CHECK 와 MANUAL 을 함께 쓸 수 없다")
-        for key in ("CHECK", "EXPECT", "MANUAL", "TOOLS", "ENV"):
+        for key in ("CHECK", "EXPECT", "MANUAL", "TOOLS", "ENV", "ONCE"):
             if key in self.attrs and not self.attrs[key].strip():
                 raise LedgerError(f"{self.id}: {key} 값이 비었다")
         # ⛔ **선언인데 발화하지 않는 형태를 막는다.** 수동 게이트는 셸 명령을 돌리지
@@ -289,6 +300,7 @@ class Ledger:
         self.newline = "\r\n" if "\r\n" in text else "\n"
         self.headers = {}
         self.root = None          # _validate 가 정규화해 채운다
+        self.release_tag = ""     # STATE: released <tag> 의 태그(F-344)
         self.gates = []
         self._parse()
         self._validate()
@@ -410,6 +422,11 @@ class Ledger:
         #    다른 디렉토리로 돌려 CHECK 를 딴 곳에서 돌릴 수 있다(TOCTOU). 증거 서명은
         #    바뀌지 않은 *표기*에만 묶이므로 나중 --status 는 met 으로 읽는다.
         self.root = real
+        impl = self.headers.get("IMPL_ROOT")
+        if impl is not None and not os.path.isabs(impl.strip()):
+            raise LedgerError(f"IMPL_ROOT 는 절대경로여야 한다 — {impl!r} (F-347)")
+        for g in self.gates:
+            g.impl_root = (impl or "").strip()
         # ⛔ 확정본이면 실행 게이트 **전부** 도장이 있어야 한다. 일부만 찍히면
         #    안 찍힌 게이트는 CHECK 를 바꿔도 통과하므로, 부분 도장은 무도장보다 위험하다
         #    (도장이 있으니 보호받는다고 읽힌다).
@@ -421,8 +438,10 @@ class Ledger:
                     f"확정 원장인데 승인 도장 없는 실행 게이트: {naked} — 그 게이트만 도장: "
                     f"`--finalize --only {','.join(naked)}` (다른 게이트의 계약이 바뀌었으면 거부된다)")
         state = self.headers.get("STATE")
-        if state not in STATE_VALUES:
-            raise LedgerError(f"STATE 는 {'/'.join(STATE_VALUES)} 중 하나 — 받은 값 {state!r}")
+        rel = RELEASED_RE.match(state or "")
+        self.release_tag = rel.group(1) if rel else ""
+        if state not in STATE_VALUES and not rel:
+            raise LedgerError(f"STATE 는 {'/'.join(STATE_VALUES)} · released <tag> 중 하나 — 받은 값 {state!r}")
         cur = self.headers.get("CURRENT_RELEASE", "").strip()
         if cur and not RELEASE_RE.match(cur):
             raise LedgerError(f"CURRENT_RELEASE 형식 오류 — {cur!r}")
@@ -437,7 +456,7 @@ class Ledger:
 
     @property
     def state(self) -> str:
-        return self.headers["STATE"]
+        return RELEASED if self.release_tag else self.headers["STATE"]
 
 
 def load(path: Path, allow_unstamped: bool = False) -> Ledger:
@@ -476,6 +495,22 @@ def _skipped(path: Path, base: Path) -> bool:
     except ValueError:
         return False
     return any(seg in SKIP_DIRS for seg in parts)
+
+
+def ledger_name_warning(path: Path) -> str:
+    """`gates/` 아래 원장 이름이 발견 규약(`plan.md` · `plan.draft.md`) 밖이면 경고 문장(F-384) — 아니면 빈 문자열.
+
+    Stop 훅 · `--discover` 는 `LEDGER_GLOBS`(`gates/plan.md`)로만 찾는다. 다른 이름의 원장은 미충족이 남아도
+    세션 종료 판정에서 조용히 빠진다 — `FZ_GATES_LEDGER` 로 지정했으면 경고하지 않는다.
+    """
+    p = path.resolve()
+    if p.parent.name != "gates" or p.name in ("plan.md", "plan.draft.md"):
+        return ""
+    listed = {str(Path(c.strip()).resolve()) for c in os.environ.get(LEDGER_ENV, "").split(os.pathsep) if c.strip()}
+    if str(p) in listed:
+        return ""
+    return (f"WARN 원장 이름 {p.name}: Stop 훅 · --discover 는 gates/plan.md 만 찾는다 — 이 원장의 미충족은 "
+            f"세션 종료 판정에서 빠진다(F-384) · plan.md 로 두거나 {LEDGER_ENV} 로 지정한다")
 
 
 def find_ledgers(cwd, env_raw: str = "") -> tuple:
@@ -590,6 +625,13 @@ def oracle_hash(gate: Gate, cwd: str) -> str:
         fields["side_effects"] = gate.attrs["SIDE_EFFECTS"].strip()
     # ⛔ 핀은 **기록된** 다이제스트(`PIN_DIGEST:`)를 넣는다 — 지금 파일을 읽어 넣으면 세션 env 가 없는 Stop 훅이
     #    `${변수}/…` 핀의 도장을 다시 계산하지 못한다(AE-20). 지금 내용과의 대조는 `pin_changed` 가 따로 한다
+    # 같은 축 — CHECK 가 어느 구현 트리에서 도는지가 승인 대상이다(F-347). 헤더가 없으면 키를 넣지 않아 종전 도장이 그대로다
+    #    (실행 때 환경의 FZ_IMPL_ROOT 가 이기는 것은 PATH 처럼 운영자의 명시 행위다 — 도장이 아니라 증거 쪽 축)
+    if gate.impl_root:
+        fields["impl_root"] = gate.impl_root
+    # 같은 축 — `--reverify` 를 건너뛰는 선언(F-235)이다. 승인 뒤 더하면 재검증에서 빠져나간다
+    if "ONCE" in gate.attrs:
+        fields["once"] = gate.attrs["ONCE"].strip()
     if "PIN" in gate.attrs or "PIN_DIGEST" in gate.attrs:
         fields["pin"] = ",".join(pin_items(gate))
         fields["pin_digest"] = gate.attrs.get("PIN_DIGEST", "").strip()
@@ -618,6 +660,8 @@ def pin_digest(gate: Gate, root: str):
             d = hashlib.sha256(path.read_bytes()).hexdigest()
         except FileNotFoundError:
             d = "absent"
+            # F-566 — 부재도 승인 기록값이지만(나중에 생길 표), 오타면 핀이 '없음' 을 승인한다. 조용히 넘기지 않는다
+            print(f"WARN {gate.id}: PIN 경로 {item} 가 없다 — 오타라면 핀이 '없음' 을 승인한다(F-566)", file=sys.stderr)
         except OSError as e:
             raise InfraError(f"{gate.id}: PIN 파일 읽기 실패 — {item}: {e}")
         parts.append(f"{item}={d}")
@@ -709,12 +753,25 @@ def _drain(stream, sink: bytearray, lock: threading.Lock, state: dict) -> None:
 
 
 
-def missing_env(gate) -> list:
-    """`ENV:` 로 선언된 환경 변수 중 없거나 빈 것(F-342). 선언이 없으면 빈 목록 — 선언한 게이트에만 발화한다."""
+def missing_env(gate, env=None) -> list:
+    """`ENV:` 로 선언된 환경 변수 중 없거나 빈 것(F-342). 선언이 없으면 빈 목록 — 선언한 게이트에만 발화한다.
+    `env` 는 CHECK 에 실제로 넘길 환경(impl_env) — 원장이 넣어 주는 값도 있는 것으로 센다."""
     decl = gate.attrs.get("ENV", "").strip()
     if not decl:
         return []
-    return [t for t in (x.strip() for x in decl.split(",")) if t and not os.environ.get(t)]
+    src = os.environ if env is None else env
+    return [t for t in (x.strip() for x in decl.split(",")) if t and not src.get(t)]
+
+
+def impl_env(ledger):
+    """원장 `IMPL_ROOT` 를 CHECK 의 `FZ_IMPL_ROOT` 로 넣는 환경(F-347) — 환경에 비지 않은 값이 이미 있으면 그대로 둔다(None).
+
+    ⛔ 원장 ROOT 는 WORK_DIR 이고 코드는 형제 워크트리일 때, 넣는 곳이 없으면 구현된 Step 이 UNRUN 으로 나온다.
+    """
+    impl = (ledger.headers.get("IMPL_ROOT") or "").strip() if ledger is not None else ""
+    if not impl or os.environ.get("FZ_IMPL_ROOT"):
+        return None
+    return dict(os.environ, FZ_IMPL_ROOT=impl)
 
 
 def tool_drift(gate, ledger, state=None) -> list:
@@ -750,13 +807,38 @@ def default_budget(ledger, only=None) -> float:
     ⛔ 960 고정이면 TIMEOUT 이 그보다 큰 게이트가 `min(TIMEOUT, budget)` 에서 소리 없이 잘린다(F-446 — 도움말은
        'TIMEOUT 합' 이라 적고 코드는 960 이었다). 합은 run 이 건너뛸 충족 게이트까지 넣은 상한이다.
     """
+    return max(timeout_total(ledger, only), float(DEFAULT_TIMEOUT_S * 8))
+
+
+def timeout_total(ledger, only=None) -> float:
+    """이번 실행 대상 실행 게이트의 TIMEOUT 합 — 실제로 걸릴 수 있는 시간의 상한."""
     wanted = {s.strip() for s in only.split(",") if s.strip()} if only else None
-    total = sum(float(g.attrs.get("TIMEOUT", DEFAULT_TIMEOUT_S)) for g in ledger.gates
-                if g.is_runnable and (wanted is None or g.id in wanted))
-    return max(total, float(DEFAULT_TIMEOUT_S * 8))
+    return sum(float(g.attrs.get("TIMEOUT", DEFAULT_TIMEOUT_S)) for g in ledger.gates
+               if g.is_runnable and (wanted is None or g.id in wanted))
 
 
-def run_check(gate: Gate, cwd: str, budget_s: float) -> Result:
+SHELL_ERR_RE = re.compile(r"^[^\n]*: [Ii]s a directory[ \t]*$", re.M)
+CMD_MISSING_RE = re.compile(r"^[^\n]*: (?:command )?not found[ \t]*$", re.M)
+
+
+def shell_trace(result) -> str:
+    """판정을 믿을 수 없는 CHECK 출력 — UNRUN 사유 한 줄, 없으면 빈 문자열.
+
+    F-229: 통과했는데 `…: Is a directory` — 이스케이프 안 된 백틱 · 잘못 푼 경로가 다른 것을 재고도 EXPECT 를 낸다.
+    F-409: `…: command not found` 또는 exit 127 — TOOLS 를 선언하지 않은 도구가 없어 카운터 0 으로 거짓 PASS
+           (또는 실패를 '게이트가 깨졌다' 로 오귀속)한다. 선언 여부와 무관하게 본다.
+    """
+    out = result.output or ""
+    m = SHELL_ERR_RE.search(out) if result.ok else None
+    if m:
+        return m.group(0).strip()[:120]
+    m = CMD_MISSING_RE.search(out)
+    if m:
+        return m.group(0).strip()[:120]
+    return "exit 127" if result.exit_code == 127 else ""
+
+
+def run_check(gate: Gate, cwd: str, budget_s: float, env=None) -> Result:
     timeout = min(float(gate.attrs.get("TIMEOUT", DEFAULT_TIMEOUT_S)), budget_s)
     out, err = bytearray(), bytearray()
     lock = threading.Lock()
@@ -764,7 +846,7 @@ def run_check(gate: Gate, cwd: str, budget_s: float) -> Result:
 
     try:
         proc = subprocess.Popen(
-            gate.attrs["CHECK"], shell=True, cwd=cwd,
+            gate.attrs["CHECK"], shell=True, cwd=cwd, env=env,
             # ⛔ stdin 을 명시적으로 닫는다. 미지정이면 터미널·상위 파이프를 **상속**해
             #    CHECK 가 입력을 기다리면 게이트 TIMEOUT(기본 120초)을 통째로 잡아먹는다(총 예산 기본 = max(TIMEOUT 합, 960)).
             #    unlazy 는 `stdio:['ignore', ...]` 로 같은 것을 한다.
@@ -1132,6 +1214,11 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
     if ledger.state == "closed":
         print(f"{ledger.path.name}: STATE closed — no-op")
         return EXIT_OK
+    if ledger.state == RELEASED and mode != "status":
+        # F-344 — 시점 고정 CHECK 를 다시 돌려 FAIL · 강등으로 쓰지 않는다. 판정은 `--status` 와 같다(기록 증거)
+        print(f"{ledger.path.name}: STATE released {ledger.release_tag} — 시점 고정 원장: CHECK 를 다시 돌리지 않고 "
+              "기록으로 판정한다(F-344)")
+        mode = "status"
     if ledger.state == PLANNED:
         # ⛔ planned 는 **판정(`--status`, Stop hook 경로)에서만** no-op 이다. 실행은 착수다 — 착수 전 원장에
         #    증거를 쓰면 '착수 전' 이 거짓이 된다. 그래서 실행·`--only` 는 막고 `--set-state active` 를 요구한다.
@@ -1150,7 +1237,8 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
 
     if mode != "status":
         print(f"예산 {budget_s:g}초")
-        if budget_s > 600:
+        # F-562 — 기본 예산 바닥이 960 이라 `budget_s > 600` 은 늘 참이었다(10초 원장에도 NOTE). 실제로 걸릴 수 있는 시간으로 판정한다
+        if min(budget_s, timeout_total(ledger, only)) > 600:
             print(f"NOTE 예산 {budget_s:g}초 > 600 — 도구 전경 실행 상한을 넘을 수 있다. "
                   "--only 로 나누거나 백그라운드로 돌린다")
     unmet, met, abandoned, deferred, ran, stamp_only = [], [], [], [], 0, 0
@@ -1186,10 +1274,17 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
             (met if state == "met" else unmet).append(gate)
             if state != "met":
                 print(f"  UNMET {gate.id}: {gate.title}")
+            elif ledger.state == RELEASED:
+                print(f"  RELEASED {gate.id}: {ledger.release_tag} 기록 판정 — 다시 돌리지 않았다")
             continue
 
         # ⛔ `--only` 로 이름을 댄 게이트는 충족이어도 다시 돈다(F-330) — 고친 뒤 그 게이트를 지목한 호출이 옛 도장만
         #    읽고 통과하면 '재실행 PASS' 로 오독한다. 떨어지면 아래 FAIL 경로가 강등 기록을 남긴다
+        if mode == "reverify" and state == "met" and "ONCE" in gate.attrs and not only:
+            met.append(gate)
+            stamp_only += 1
+            print(f"  ONCE  {gate.id}: 1회성 게이트 — --reverify 가 다시 돌리지 않는다(기록 판정 · {gate.attrs['ONCE']} · F-235)")
+            continue
         if mode == "run" and state == "met" and not only:
             met.append(gate)
             # ⛔ 조용히 건너뛰지 않는다 — "ALL MET" 을 재실행으로 읽는 오독(F-330)을 막는다
@@ -1229,14 +1324,15 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
             print(f"  UNRUN {gate.id}: 필요 도구 부재 — {', '.join(gone)} (⛔ 실패 아님, 미판정)")
             continue
         # 환경 변수 부재도 같은 자리 · 같은 처리다(F-342) — CHECK 를 돌리지 않고 원장을 건드리지 않는다
-        gone = missing_env(gate)
+        run_env = impl_env(ledger)
+        gone = missing_env(gate, run_env)
         if gone:
             unmet.append(gate)
             print(f"  UNRUN {gate.id}: 필요 환경 변수 부재 — {', '.join(gone)} (⛔ 실패 아님, 미판정)")
             continue
 
         baseline = gate_block_hash(load(ledger.path), gate.id)
-        result = run_check(gate, cwd, remaining)
+        result = run_check(gate, cwd, remaining, run_env)
         ran += 1
 
         env_digest = env_fingerprint()
@@ -1248,6 +1344,12 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
         if result.killed:
             # 판정은 안 뒤집지만 흔적을 남긴다 — CHECK 가 프로세스를 새고 있다.
             print(f"  KILL  {gate.id}: 잔존 손자를 강제 종료했다 — CHECK 가 프로세스를 남긴다")
+        trace = shell_trace(result)
+        if trace:
+            # 판정을 믿을 수 없는 출력 — 도구 부재와 같은 자리 · 같은 처리(원장 무변경 · 통과 아님)
+            unmet.append(gate)
+            print(f"  UNRUN {gate.id}: CHECK 출력에 셸 오류 흔적 — {trace} (⛔ 통과 아님, 미판정)")
+            continue
         if result.ok:
             apply_result(ledger.path, baseline, gate.id, True, evidence)
             # ⛔ 쓴 것을 디스크에서 다시 읽어 판정한다. writeback 이 잘못 써도
@@ -1508,7 +1610,8 @@ def self_test() -> int:
             if case.get("mode") == "from-plan":
                 # 변환 케이스 — 입력은 plan JSON 이고 산출물은 새 원장이다.
                 out = sandbox / "fromplan" / "generated.md"
-                argv = ["--from-plan", str(ledger_path), "--root", str(sandbox), "--out", str(out)]
+                argv = ["--from-plan", str(ledger_path), "--root", str(sandbox), "--out", str(out)] + \
+                    sandbox_args(case.get("args", []), sandbox)
             elif case.get("mode") == "finalize":
                 # 확정 경로 — 입력 원장이 그대로 산출물이다(제자리 도장).
                 argv = ["--finalize"] + sandbox_args(case.get("args", []), sandbox)
@@ -1544,6 +1647,9 @@ def self_test() -> int:
                     captured_err.write(p.stderr)
                 else:
                     code = _dispatch(argv + [str(ledger_path)], quiet=False)
+            except Exception as e:      # noqa: BLE001 — 케이스 하나의 예외가 나머지 픽스처 측정을 끊지 않게 그 케이스의 FAIL 로 남긴다
+                code = None
+                pre_reason = (pre_reason + ", " if pre_reason else "") + f"처리 안 된 예외 {type(e).__name__}: {e}"
             finally:
                 sys.stdout, sys.stderr = saved_out, saved_err
                 for k, v in saved_env.items():
@@ -1594,6 +1700,10 @@ def self_test() -> int:
             for needle in (want.get("expect_stdout") or []):
                 if needle not in stdout_text:
                     reasons.append(f"stdout 에 {needle!r} 없음")
+            # 오탐 축 — 경고가 **나지 않아야** 하는 입력(가드된 for 루프 · 사유 있는 MANUAL)
+            for needle in (want.get("expect_stdout_absent") or []):
+                if needle in stdout_text:
+                    reasons.append(f"stdout 에 {needle!r} 가 있다 (부재 기대)")
             # ⛔ stderr 축 — 거부 **사유**는 stderr 로 나간다. exit 3 을 내는 파서 검사가
             #    여럿이라 exit 만으로는 어느 방어선이 발화했는지 구분되지 않는다.
             #    실측(2026-08-25): 절대경로 검사를 제거해도 뒤의 is_dir 검사가 같은 exit 3 을
@@ -1645,6 +1755,9 @@ def self_test() -> int:
                                 f"{g.id}: 도장이 자기 oracle 과 다르다 ({got_stamp} != {want_stamp})")
             if not reasons:
                 passed += 1
+                # 케이스 이름 출력 — 게이트 CHECK 가 셀 하나하나를 통과 줄로 센다(요약 줄만으로는 어느 셀이 돌았는지 모른다)
+                if os.environ.get("FZ_SELFTEST_LIST"):
+                    print(f"  ok   {case['id']}")
             else:
                 failed.append(f"{case['id']}: " + ", ".join(reasons))
 
@@ -1698,7 +1811,7 @@ def tools_of(verify: dict, gid: str) -> list:
     return out
 
 
-def render_ledger(steps, root: str, scope: str, title: str) -> str:
+def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "") -> str:
     """plan 의 steps[] 를 원장 Markdown 으로 변환한다.
 
     ⛔ 산문 절차가 아니라 스크립트인 이유: 변환이 결정론적이고, 산문으로 두면
@@ -1708,12 +1821,17 @@ def render_ledger(steps, root: str, scope: str, title: str) -> str:
     """
     # ⛔ 새 원장은 승인 전 기준선을 요구한다(F-245 · F-455) — `--finalize` 가 `--baseline-probe` 기록을 대조한다
     lines = [f"# Gates: {title}", f"ROOT: {root}", f"STATE: {INITIAL_STATE}", f"{BASELINE_HEADER}: {BASELINE_REQUIRED}"]
+    # ⛔ 코드가 형제 워크트리에 있으면 CHECK 가 그 경로를 알아야 한다(F-347) — 실행 때 FZ_IMPL_ROOT 로 들어간다(impl_env)
+    if impl_root:
+        lines.insert(2, f"IMPL_ROOT: {impl_root}")
     if scope:
         lines.append(f"Scope: {scope}")
     lines.append("")
 
     demoted = []
     for step in steps:
+        if not isinstance(step, dict):
+            raise InfraError(f"steps[] 원소가 객체가 아니다 — {type(step).__name__} (F-346)")
         gid = str(step.get("id", "")).strip()
         if not gid:
             raise InfraError("step 에 id 가 없다")
@@ -1779,11 +1897,253 @@ def render_ledger(steps, root: str, scope: str, title: str) -> str:
     return "\n".join(lines)
 
 
-def from_plan(plan_path: Path, root: str, out: Path) -> int:
+MANUAL_REASONS = ("자기 승인 금지", "사용자 결정", "기계화 불가", "self-approval", "user decision", "not mechanizable")
+SYMBOL_TOKEN = re.compile(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*(?:\(\))?\Z")
+WORKDIR_READ = re.compile(r"(?:\$\{FZ_WORK_DIR\}|\$FZ_WORK_DIR|\{FZ_WORK_DIR\})/([^\s\"'`;|&)]+)")
+ABSENCE_GREP = re.compile(r"!\s*grep\b[^;&|]*[\"']?\$\{?(?:R|FZ_IMPL_ROOT)\}?/")
+CHAIN_HEAD = re.compile(r"(?:^|[\s;&|(])(?:for|while|until|if|elif|case)\s")
+CHAIN_BODY = re.compile(r"\s*(?:do|then|else)\b\s*")
+CHAIN_END = re.compile(r"\s*(?:done|fi|esac)\b")
+CHAIN_GUARD = re.compile(r"\|\|\s*(?:exit|return|false)\b")
+CHAIN_SAFE = re.compile(r"\s*(?:\w+=|set\b|trap\b|export\b|local\b|:\s*$|true\s*$)")
+
+
+def _segments(cmd: str) -> list:
+    """`;` 로 끊은 최상위 조각 — 따옴표 · 괄호 · 중괄호 안의 `;` 와 `;;` 는 끊지 않는다."""
+    segs, buf, depth, quote, i = [], [], 0, None, 0
+    while i < len(cmd):
+        ch = cmd[i]
+        if ch == "\\" and quote != "'" and i + 1 < len(cmd):
+            buf.append(cmd[i:i + 2])
+            i += 2
+            continue
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "'\"":
+            quote = ch
+        elif ch in "({":
+            depth += 1
+        elif ch in ")}":
+            depth = max(0, depth - 1)
+        elif ch == ";" and depth == 0:
+            if cmd[i + 1:i + 2] == ";":
+                buf.append(";;")
+                i += 2
+                continue
+            segs.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    segs.append("".join(buf))
+    return segs
+
+
+def _unguarded(cmd: str) -> list:
+    """`;` 로 이은 앞 명령 중 실패해도 뒤가 도는 것(F-295) — 루프 · 조건 머리 · 대입 · `set -e` 아래는 뺀다."""
+    if re.search(r"(?:^|[\s;&])set\s+-[a-z]*e", cmd):
+        return []
+    out = []
+    for seg in _segments(cmd)[:-1]:
+        s = seg.strip()
+        m = CHAIN_BODY.match(s)
+        if m:
+            s = s[m.end():]
+        if not s or CHAIN_HEAD.search(" " + s) or CHAIN_END.match(s) or CHAIN_SAFE.match(s) or CHAIN_GUARD.search(s):
+            continue
+        out.append(s)
+    return out
+
+
+def _bare_backtick(cmd: str) -> bool:
+    """작은따옴표 밖의 이스케이프 안 된 백틱이 있는가(F-229) — 셸이 명령 치환으로 돌린다."""
+    quote, i = None, 0
+    while i < len(cmd):
+        ch = cmd[i]
+        if ch == "\\" and quote != "'":
+            i += 2
+            continue
+        if quote == "'":
+            if ch == "'":
+                quote = None
+        elif ch == "'" and quote is None:
+            quote = "'"
+        elif ch == '"':
+            quote = None if quote == '"' else '"'
+        elif ch == "`":
+            return True
+        i += 1
+    return False
+
+
+def _norm_file(f) -> str:
+    f = re.sub(r"\s*\(.*\)\s*$", "", str(f)).strip()
+    f = re.sub(r"^(?:\{(?:FZ_)?WORK_DIR\}|\$\{?(?:FZ_)?WORK_DIR\}?)/", "", f)
+    return f.rstrip("/")
+
+
+def _old_checks(text: str) -> dict:
+    """옛 원장의 게이트별 CHECK — 파서를 거치지 않는다(draft · 깨진 원장도 대조 대상이다)."""
+    out, cur = {}, None
+    for line in text.replace("\r\n", "\n").split("\n"):
+        m = GATE_RE.match(line)
+        if m:
+            cur = m.group(2)
+        elif cur and line.startswith("  CHECK: "):
+            out[cur] = line[len("  CHECK: "):]
+        elif not line.strip():
+            cur = None
+    return out
+
+
+def plan_lints(steps, rtm, old_checks: dict) -> list:
+    """원장 생성 때의 경고 — 차단하지 않는다. 사람이 읽는 제목 · 기준과 기계가 도는 command 의 어긋남을 드러낸다.
+
+    ⛔ 경고만 하는 이유: 토큰이 command 밖에서 재지는 정당한 경우(fixture 안 단언)를 가를 수 없다.
+    """
+    warns = []
+    ids = [str(s.get("id", "")) for s in steps]
+    for i, s in enumerate(steps):
+        gid, v = s.get("id"), s.get("verify")
+        if isinstance(v, str):
+            v = {"kind": "manual", "criterion": v}
+        if not isinstance(v, dict):
+            continue
+        title, crit = str(s.get("title", "")), str(v.get("criterion", ""))
+        if v.get("kind") == "manual":
+            # F-417 — 사유 없는 MANUAL 은 기계화할 수 있는 점검까지 사람에게 넘긴다
+            if not any(r in crit for r in MANUAL_REASONS):
+                warns.append(f"⚠️  {gid}: MANUAL 사유가 없다 — criterion 에 {' · '.join(MANUAL_REASONS[:3])} 중 하나를 적는다"
+                             "(기계화할 수 있으면 command 로 · F-417)")
+            continue
+        if v.get("kind") != "command":
+            continue
+        cmd, expect = str(v.get("command", "")), str(v.get("expect", ""))
+        # F-245 · F-294 — 제목이 약속한 백틱 토큰이 command 에 없다
+        missing = [t for t in re.findall(r"`([^`]+)`", title) if t not in cmd]
+        if missing:
+            warns.append(f"⚠️  {gid}: 제목 토큰 {' · '.join('`' + t + '`' for t in missing)} 이 command 에 없다 — "
+                         "제목 · criterion 에만 있으면 기계가 재지 않는다(F-245 · F-294)")
+        # F-294 · F-245 — criterion 이 지목한 토큰 · 심볼이 command 에 없다
+        for t in re.findall(r"`([^`]+)`", crit):
+            base = t[:-2] if t.endswith("()") else t
+            if base in cmd:
+                continue
+            if SYMBOL_TOKEN.match(t) and re.search(r"[_.(]|[a-z][A-Z]", t):
+                warns.append(f"⚠️  {gid}: 지목 심볼 `{t}` 를 command 가 부르지 않는다 — 그 심볼에 결함을 넣어도 통과한다(F-245)")
+            else:
+                warns.append(f"⚠️  {gid}: 기준 토큰 `{t}` 이 command 에 없다 — criterion 에만 있으면 기계가 재지 않는다(F-294)")
+        # F-294 역방향 — 개정이 CHECK 에서 뺀 토큰이 제목 · 기준에 남았다
+        old = old_checks.get(str(gid), "")
+        if old:
+            stale = sorted({t for t in re.findall(r"`([^`]+)`", title + " " + crit) if t in old and t not in cmd})
+            if stale:
+                warns.append(f"⚠️  {gid}: 역방향 — 옛 CHECK 가 재던 {' · '.join('`' + t + '`' for t in stale)} 을 "
+                             "새 command 가 재지 않는데 제목 · 기준에 남았다(F-294)")
+        # F-295 — 성공 토큰 echo 가 여럿이면 앞 체인이 실패해도 뒤 echo 가 EXPECT 를 낸다
+        if expect:
+            n = len(re.findall(r"\becho\s+[\"']?" + re.escape(expect), cmd))
+            if n >= 2:
+                warns.append(f"⚠️  {gid}: 성공 토큰 echo 가 {n}개 — 앞 체인이 실패해도 뒤 echo 가 EXPECT 를 낸다(F-295)")
+        if _bare_backtick(cmd):
+            warns.append(f"⚠️  {gid}: command 에 이스케이프 안 된 백틱 — 셸이 명령 치환으로 돌려 다른 것을 잰다"
+                         "(정규식이면 \\` 또는 작은따옴표 · F-229)")
+        for seg in _unguarded(cmd):
+            warns.append(f"⚠️  {gid}: ; 로 이은 앞 명령 `{seg[:48]}` 에 || exit 가 없다 — 실패해도 다음 명령이 돈다(F-295)")
+        # F-296 — 읽는 WORK_DIR 산출물을 만드는 Step 이 앞에 없다
+        made = [_norm_file(f) for p in steps[:i + 1] for f in (p.get("files") or []) if isinstance(p, dict)]
+        for raw in WORKDIR_READ.findall(cmd):
+            path = re.split(r"[*?\[]", raw)[0].rstrip("/")
+            if path and not any(n and (path == n or path.startswith(n + "/") or n.startswith(path + "/")) for n in made):
+                warns.append(f"⚠️  {gid}: command 가 읽는 $FZ_WORK_DIR/{path} 를 만드는 Step 이 없다 — "
+                             "앞선 Step 의 files 에 없다(F-296)")
+        # F-341 — [기본 off] Step 의 CHECK 가 작업 트리 부재를 단언한다
+        if "기본 off" in title + crit and ABSENCE_GREP.search(cmd):
+            warns.append(f"⚠️  {gid}: [기본 off] 인데 command 가 작업 트리 부재를 단언한다(! grep … \"$R/…\") — "
+                         "기본 off 는 트리 상태가 아니라 설정 기본값으로 잰다(F-341)")
+    # F-238 — RTM 요구가 어느 Step 에도 매핑되지 않았다
+    if isinstance(rtm, list):
+        mapped = {}
+        for row in rtm:
+            if not isinstance(row, dict):
+                continue
+            req = str(row.get("reqId") or "").strip()
+            if not req:
+                continue
+            sid = row.get("stepId")
+            hit = any(str(x).strip() in ids for x in (sid if isinstance(sid, list) else [sid]) if x)
+            mapped[req] = mapped.get(req, False) or hit
+        for req, hit in mapped.items():
+            if not hit:
+                warns.append(f"⚠️  RTM: 요구 {req} 가 어느 Step 에도 매핑되지 않았다 — stepId 가 steps[] 밖이다(F-238)")
+    return warns
+
+
+def affected_by(ledger: Ledger, spec: str) -> int:
+    """바뀐 파일이 근거인 **충족** 게이트 id — fz-code 6.4 가 Step 게이트와 함께 `--only` 에 더한다(읽기 전용).
+
+    F-349: 뒤 Step 이 앞 Step 게이트의 근거 코드를 옮겨도 그 게이트는 다시 돌지 않았다.
+    F-552: 공유 스크립트는 다른 소비자 게이트가 경로 대신 이름(`"$S/x.sh"`)으로 부른다 — basename 으로도 대조한다.
+    """
+    files = [f.strip() for f in spec.split(",") if f.strip()]
+    if not files:
+        raise InfraError("--affected-by 에 경로가 없다 — 쉼표로 구분한 파일 경로")
+    hits = []
+    for g in ledger.gates:
+        if gate_state(g, ledger) != "met":
+            continue
+        hay = " ".join(g.attrs.get(k, "") for k in ("CHECK", "CRITERION", "PIN"))
+        why = []
+        for f in files:
+            toks = [f]
+            base = os.path.basename(f.rstrip("/"))
+            if base and base != f:
+                toks.append(base)
+            m = next((t for t in toks if t in hay), None)
+            if m:
+                why.append(f"{f}({m})")
+        if why:
+            hits.append(g.id)
+            print(f"  AFFECTED {g.id}: {' · '.join(why)}")
+    print(f"AFFECTED: {','.join(hits)}")
+    return EXIT_OK
+
+
+def criterion_drift(ledger: Ledger, phrases_path: str) -> int:
+    """리뷰가 틀렸다고 고친 옛 오라클 문구가 승인 원장의 CRITERION 에 남은 게이트 — 재도장 후보(F-568 · 읽기 전용).
+
+    문구 파일은 한 줄에 하나(빈 줄 · `#` 줄 무시). 후보가 있으면 exit 1 · 없으면 0.
+    """
+    try:
+        lines = Path(phrases_path).read_text(encoding="utf-8").split("\n")
+    except OSError as e:
+        raise InfraError(f"--criterion-drift 문구 파일을 읽지 못했다 — {e}")
+    phrases = [x.strip() for x in lines if x.strip() and not x.lstrip().startswith("#")]
+    if not phrases:
+        raise InfraError("--criterion-drift 문구 파일이 비었다")
+    hits = []
+    for g in ledger.gates:
+        text = g.attrs.get("CRITERION", "") + " " + g.attrs.get("MANUAL", "")
+        found = [ph for ph in phrases if ph in text]
+        if found:
+            hits.append(g.id)
+            print(f"  DRIFT {g.id}: CRITERION 에 옛 문구 {found[0]!r} — 재도장 후보(--finalize --only {g.id})")
+    print(f"CRITERION_DRIFT: {','.join(hits) if hits else 'none'}")
+    return EXIT_UNMET if hits else EXIT_OK
+
+
+def from_plan(plan_path: Path, root: str, out: Path, impl_root: str = "") -> int:
     try:
         data = json.loads(plan_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         raise InfraError(f"plan 읽기/파싱 실패: {e}")
+    # F-346 — steps 배열만 넘겨도 받는다 · 다른 최상위 모양은 traceback(exit 1 = 미충족과 같은 코드)이 아니라 exit 2
+    if isinstance(data, list):
+        data = {"steps": data}
+    elif not isinstance(data, dict):
+        raise InfraError(f"plan 최상위는 {{steps:[…]}} 객체 또는 steps 배열이다 — 받은 모양 {type(data).__name__} (F-346)")
     steps = data.get("steps")
     if not isinstance(steps, list) or not steps:
         raise InfraError("plan.steps 가 비었다 — 게이트 0개 원장은 만들지 않는다")
@@ -1791,10 +2151,17 @@ def from_plan(plan_path: Path, root: str, out: Path) -> int:
     root_real = os.path.realpath(root)
     if not Path(root_real).is_dir():
         raise InfraError(f"--root 가 디렉토리가 아니다: {root_real}")
+    impl_real = os.path.realpath(impl_root) if impl_root else ""
+    if impl_real and not Path(impl_real).is_dir():
+        raise InfraError(f"--impl-root 가 디렉토리가 아니다: {impl_real}")
 
     text = render_ledger(steps, root_real,
                          str(data.get("scope", "")).strip(),
-                         str(data.get("title", "")).strip() or out.stem)
+                         str(data.get("title", "")).strip() or out.stem, impl_real)
+    try:
+        old_text = out.read_text(encoding="utf-8") if out.is_file() else ""
+    except OSError:
+        old_text = ""
     out.parent.mkdir(parents=True, exist_ok=True)
     write_atomic(out, text)
 
@@ -1802,16 +2169,8 @@ def from_plan(plan_path: Path, root: str, out: Path) -> int:
     #    "만들었다"가 아니라 파서가 판정한다.
     load(out)
     print(f"원장 생성: {out} (게이트 {len(steps)}개)")
-    # ⛔ 제목이 약속한 백틱 토큰이 command 에 없으면 경고한다(F-245 · F-294) — 제목 · criterion 에만 있는 요구는
-    #    기계가 재지 않는다. 경고만 한다: 토큰이 command 밖에서 재지는 정당한 경우(fixture 안 단언)를 가를 수 없다.
-    for s in steps:
-        v = s.get("verify") if isinstance(s, dict) else None
-        if not isinstance(v, dict) or v.get("kind") != "command":
-            continue
-        missing = [t for t in re.findall(r"`([^`]+)`", str(s.get("title", ""))) if t not in str(v.get("command", ""))]
-        if missing:
-            print(f"⚠️  {s.get('id')}: 제목 토큰 {' · '.join('`' + t + '`' for t in missing)} 이 command 에 없다 — "
-                  "제목 · criterion 에만 있으면 기계가 재지 않는다(F-245 · F-294)")
+    for w in plan_lints(steps, data.get("rtm"), _old_checks(old_text)):
+        print(w)
     return EXIT_OK
 
 
@@ -1851,15 +2210,15 @@ def baseline_probe(ledger: Ledger, allow_pass, budget_s: float) -> int:
                 res, reason = "EXCLUDED", se
             elif missing_tools(gate):
                 reason = "tools-missing:" + ",".join(missing_tools(gate))
-            elif missing_env(gate):
-                reason = "env-missing:" + ",".join(missing_env(gate))
+            elif missing_env(gate, impl_env(ledger)):
+                reason = "env-missing:" + ",".join(missing_env(gate, impl_env(ledger)))
             elif not Path(cwd).is_dir():
                 reason = "cwd-missing"
             elif remaining <= MIN_PER_CHECK_S:
                 reason = "budget"
             else:
                 t0 = time.monotonic()
-                result = run_check(gate, cwd, remaining)
+                result = run_check(gate, cwd, remaining, impl_env(ledger))
                 elapsed = time.monotonic() - t0
                 res = "PASS" if result.ok else ("FAIL" if result.measured else "UNRUN")
                 if res == "UNRUN":
@@ -2075,8 +2434,10 @@ def set_state(ledger: Ledger, target: str) -> int:
        fz-code 가 Step 마다 게이트를 돌렸으므로 증거가 최신이다. 증거가 낡았다고 의심되면
        `--reverify` 를 먼저 돌리는 것이 호출자 책임이다.
     """
-    if target not in STATE_VALUES:
-        raise InfraError(f"STATE 는 {'/'.join(STATE_VALUES)} 중 하나 — 받은 값 {target!r}")
+    rel = RELEASED_RE.match(target)
+    if target not in STATE_VALUES and not rel:
+        raise InfraError(f"STATE 는 {'/'.join(STATE_VALUES)} · 'released <tag>' 중 하나 — 받은 값 {target!r}")
+    line_value, target = target, (RELEASED if rel else target)
 
     # ⛔ 판정은 **디스크 최신본**으로 한다. 인자로 받은 ledger 는 호출 전 파스라
     #    그 사이 편집된 내용을 반영하지 못한다 (2026-08-24 실측: 파스 후 게이트를 unmet 으로
@@ -2130,7 +2491,7 @@ def set_state(ledger: Ledger, target: str) -> int:
     lines, out, done = text.split("\n"), [], False
     for raw in lines:
         if not done and raw.startswith("STATE:"):
-            out.append(f"STATE: {target}")
+            out.append(f"STATE: {line_value}")
             done = True
             continue
         out.append(raw)
@@ -2161,6 +2522,9 @@ def _dispatch(argv, quiet: bool = False) -> int:
                         help="plan steps[] 를 원장으로 변환 (--root, --out 필수)")
     parser.add_argument("--root", metavar="DIR", help="--from-plan 의 WORK_DIR (realpath 로 정규화)")
     parser.add_argument("--out", metavar="FILE", help="--from-plan 의 출력 원장 경로")
+    parser.add_argument("--impl-root", metavar="DIR",
+                        help="--from-plan 의 구현 트리 — 원장 헤더 IMPL_ROOT 로 남기고 CHECK 실행 때 FZ_IMPL_ROOT 로 넣는다"
+                             "(환경에 이미 있으면 환경 우선 · F-347)")
     parser.add_argument("--discover", metavar="DIR",
                         help="DIR 하위 확정 원장을 찾아 상태 요약 (health-check 용). 미충족은 exit 0 + 건수 · 계약 위반만 exit 3)")
     parser.add_argument("--cross-session", action="store_true",
@@ -2171,6 +2535,10 @@ def _dispatch(argv, quiet: bool = False) -> int:
                         help="draft 확정 — 실행 게이트마다 APPROVED_ORACLE_HASH 도장 + APPROVED 헤더")
     parser.add_argument("--verdict-check", metavar="RESPONSE_JSON",
                         help="verify-gates 응답이 원장을 전수 판정했는지 대조 (게이트 수·id 집합·summary 합계)")
+    parser.add_argument("--affected-by", metavar="FILES",
+                        help="쉼표로 구분한 바뀐 파일 — 그 경로 · basename 을 CHECK · CRITERION · PIN 에 담은 충족 게이트 id (읽기 전용 · F-349 · F-552)")
+    parser.add_argument("--criterion-drift", metavar="PHRASES_FILE",
+                        help="옛 오라클 문구 파일(한 줄 하나) — CRITERION 에 남은 게이트를 재도장 후보로 낸다 (읽기 전용 · F-568)")
     parser.add_argument("--only", metavar="IDS",
                         help="쉼표로 구분한 게이트 id 만 판정 (fz-code 의 Step 단위 실행)")
     parser.add_argument("--budget", type=float, default=None,
@@ -2202,7 +2570,7 @@ def _dispatch(argv, quiet: bool = False) -> int:
         if quiet:
             sys.stdout = open(os.devnull, "w")
         try:
-            return from_plan(Path(opt.from_plan), opt.root, Path(opt.out))
+            return from_plan(Path(opt.from_plan), opt.root, Path(opt.out), opt.impl_root or "")
         except LedgerError as e:
             print(f"INVALID LEDGER: {e}", file=sys.stderr)
             return EXIT_INVALID
@@ -2232,6 +2600,12 @@ def _dispatch(argv, quiet: bool = False) -> int:
     if opt.no_baseline is not None and not opt.finalize:
         print("⛔ --no-baseline 은 --finalize 와 함께만 쓴다", file=sys.stderr)
         return EXIT_INFRA
+    if opt.impl_root is not None:
+        print("⛔ --impl-root 는 --from-plan 과 함께만 쓴다 — 실행 원장은 헤더 IMPL_ROOT 를 읽는다", file=sys.stderr)
+        return EXIT_INFRA
+    name_warn = ledger_name_warning(Path(opt.ledger))
+    if name_warn:
+        print(name_warn, file=sys.stderr)
 
     stdout = sys.stdout
     if quiet:
@@ -2249,6 +2623,10 @@ def _dispatch(argv, quiet: bool = False) -> int:
             return finalize(ledger, opt.only, opt.no_baseline)
         if opt.verdict_check:
             return verdict_check(ledger, opt.verdict_check)
+        if opt.affected_by:
+            return affected_by(ledger, opt.affected_by)
+        if opt.criterion_drift:
+            return criterion_drift(ledger, opt.criterion_drift)
         if opt.confirm:
             return confirm(ledger, opt.confirm)
         if opt.set_state:
@@ -2276,6 +2654,7 @@ def _dispatch(argv, quiet: bool = False) -> int:
 VERDICT_VALUES = ("accept", "revise", "demote_to_manual")
 VERDICT_FIELDS = ("id", "title", "kind", "measurement_fit", "noninteractive",
                   "rerunnable", "determinism", "side_effects", "verdict", "reason")
+POST_PROCEDURE_VALUES = ("holds", "breaks", "unknown")   # 원장 머리 RELEASE_PROCEDURE 가 있을 때 요구한다(F-390) — n/a 는 그때 거부
 
 
 ORACLE_FIELD_PROBES = (
@@ -2286,6 +2665,7 @@ ORACLE_FIELD_PROBES = (
     ("SIDE_EFFECTS", "writes — 승인 뒤 바꾼 선언"),
     ("PIN", "probe/other-table.txt"),
     ("PIN_DIGEST", "000000000000"),
+    ("ONCE", "승인 뒤 더한 1회성 선언"),
 )
 
 
@@ -2474,6 +2854,18 @@ def verdict_check(ledger: Ledger, response_path: str) -> int:
             reasons.append(f"gates[{n}]({g.get('id')}) 필드 누락 {missing}")
         if g.get("verdict") not in VERDICT_VALUES:
             reasons.append(f"gates[{n}]({g.get('id')}) verdict 값 이상: {g.get('verdict')!r}")
+
+    # 판 끝 절차 뒤 시점(F-390) — 원장 머리 RELEASE_PROCEDURE 가 있을 때만 축 값을 요구한다(없으면 옛 응답 그대로 통과)
+    if ledger.headers.get("RELEASE_PROCEDURE"):
+        for n, g in enumerate(gates):
+            if not isinstance(g, dict):
+                continue
+            pp = g.get("post_procedure")
+            if pp not in POST_PROCEDURE_VALUES:
+                reasons.append(f"gates[{n}]({g.get('id')}) post_procedure {pp!r} — 원장에 RELEASE_PROCEDURE 가 있다: "
+                               f"판 끝 절차 뒤에도 참인가({' · '.join(POST_PROCEDURE_VALUES)})")
+            elif pp == "breaks" and g.get("verdict") == "accept":
+                reasons.append(f"gates[{n}]({g.get('id')}) 판 끝 절차 뒤 깨지는 CHECK 를 accept 했다 — revise 여야 한다")
 
     ledger_map = {g.id: (g.title, "manual" if g.is_manual else "command")
                   for g in ledger.gates}

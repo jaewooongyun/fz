@@ -1,0 +1,10 @@
+{
+  "_note": "--from-plan 백틱 lint 회귀 입력 (F-229). B1 = 큰따옴표 안 백틱(명령 치환) · B2 = 작은따옴표 안 백틱(글자 그대로 — 경고 없음)",
+  "title": "from-plan 백틱",
+  "steps": [
+    { "id": "B1", "title": "큰따옴표 안 백틱", "files": ["f.txt"],
+      "verify": { "kind": "command", "criterion": "f.txt 에 패턴이 있다", "command": "grep -Eq \"a`b`c\" f.txt && echo B1_OK", "expect": "B1_OK" } },
+    { "id": "B2", "title": "작은따옴표 안 백틱", "files": ["f.txt"],
+      "verify": { "kind": "command", "criterion": "f.txt 에 글자 백틱이 있다", "command": "grep -Fq 'a`b' f.txt && echo B2_OK", "expect": "B2_OK" } }
+  ]
+}

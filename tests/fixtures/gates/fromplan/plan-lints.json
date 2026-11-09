@@ -1,0 +1,32 @@
+{
+  "_note": "--from-plan lint 회귀 입력 (F-294 · F-245 · F-295 · F-296 · F-238 · F-341 · F-417). 경고만 낸다 — 원장은 만든다. L4 · L6 · M2 · R-1 은 경고가 나지 않아야 하는 짝이다.",
+  "title": "from-plan lint",
+  "steps": [
+    { "id": "L1", "title": "기준 토큰과 지목 심볼", "files": ["scripts/tool.py"],
+      "verify": { "kind": "command", "criterion": "tool.py 가 `--strict` 로 돌고 `parse_rows()` 가 행을 센다",
+                  "command": "python3 tool.py && echo L1_OK", "expect": "L1_OK" } },
+    { "id": "L2", "title": "성공 토큰 두 번", "files": ["a"],
+      "verify": { "kind": "command", "criterion": "a 가 있다",
+                  "command": "test -f a && echo L2_OK || echo L2_OK", "expect": "L2_OK" } },
+    { "id": "L3", "title": "가드 없는 체인", "files": ["b"],
+      "verify": { "kind": "command", "criterion": "b 가 돈다", "command": "false; echo L3_OK", "expect": "L3_OK" } },
+    { "id": "L4", "title": "가드된 루프", "files": ["c"],
+      "verify": { "kind": "command", "criterion": "루프 전부 통과",
+                  "command": "for f in a b; do test -n \"$f\" || exit 1; done && echo L4_OK", "expect": "L4_OK" } },
+    { "id": "L5", "title": "만드는 Step 이 없는 산출물", "files": ["scripts/x.py"],
+      "verify": { "kind": "command", "criterion": "보고서가 있다",
+                  "command": "test -f \"$FZ_WORK_DIR/code/report.md\" && echo L5_OK", "expect": "L5_OK" } },
+    { "id": "L6", "title": "자기 files 가 만든 산출물", "files": ["{WORK_DIR}/code/made.md (신설)"],
+      "verify": { "kind": "command", "criterion": "made 가 있다",
+                  "command": "test -f \"${FZ_WORK_DIR}/code/made.md\" && echo L6_OK", "expect": "L6_OK" } },
+    { "id": "L7", "title": "[기본 off] 새 옵션", "files": ["config.json"],
+      "verify": { "kind": "command", "criterion": "기본 off 를 지킨다",
+                  "command": "R=\"${FZ_IMPL_ROOT:?}\" && ! grep -q newopt \"$R/config.json\" && echo L7_OK", "expect": "L7_OK" } },
+    { "id": "M1", "title": "사유 없는 수동", "verify": { "kind": "manual", "criterion": "사람이 화면을 본다" } },
+    { "id": "M2", "title": "사유 있는 수동", "verify": { "kind": "manual", "criterion": "사용자 결정 — 배포 시점을 사람이 고른다" } }
+  ],
+  "rtm": [
+    { "reqId": "R-1", "requirement": "기준 토큰", "stepId": "L1", "verify": "L1", "status": "pending" },
+    { "reqId": "R-2", "requirement": "사라진 축", "stepId": "S9", "verify": "없음", "status": "pending" }
+  ]
+}

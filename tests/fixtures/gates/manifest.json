@@ -2551,6 +2551,524 @@
         ]
       },
       "why": "${변수} 루트는 그 게이트의 ENV 선언에 있어야 한다 — 실행 경로가 변수 부재를 UNRUN 으로 잡는다"
+    },
+    {
+      "id": "f294-criterion-token-missing",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L1: 기준 토큰 `--strict` 이 command 에 없다"
+        ]
+      },
+      "why": "F-294 — 제목만이 아니라 criterion 의 백틱 토큰도 command 와 대조한다. 기준에만 있는 요구는 기계가 재지 않는다"
+    },
+    {
+      "id": "f294-reverse-token-stale",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L1: 역방향 — 옛 CHECK 가 재던 `--strict`"
+        ]
+      },
+      "why": "F-294 역방향 — 개정이 CHECK 에서 뺀 토큰이 제목 · 기준에 남았다. 옛 원장(--out 이 이미 있을 때)의 CHECK 와 대조한다",
+      "write_files": {
+        "fromplan/generated.md": "- [ ] L1: 옛 판\n  CHECK: python3 tool.py --strict && echo L1_OK\n"
+      }
+    },
+    {
+      "id": "f245-named-symbol-unchecked",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L1: 지목 심볼 `parse_rows()` 를 command 가 부르지 않는다"
+        ]
+      },
+      "why": "F-245 — criterion 이 지목한 함수 · 심볼을 command 가 부르지 않으면 그 심볼에 결함을 넣어도 통과한다. 백틱 식별자만 잰다(결함 주입 일반화는 --baseline-probe 축)"
+    },
+    {
+      "id": "f295-multi-success-token",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L2: 성공 토큰 echo 가 2개"
+        ]
+      },
+      "why": "F-295 — 성공 토큰 echo 가 여럿이면 앞 체인이 실패해도 뒤 echo 가 EXPECT 를 낸다"
+    },
+    {
+      "id": "f295-unguarded-chain",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L3: ; 로 이은 앞 명령 `false` 에 || exit 가 없다"
+        ],
+        "expect_stdout_absent": [
+          "L4: ; 로 이은"
+        ]
+      },
+      "why": "F-295 — `;` 로 이은 앞 명령이 실패해도 다음 명령이 돈다. 가드된 for 루프(L4)는 경고하지 않는다"
+    },
+    {
+      "id": "f296-consumer-path-unproduced",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L5: command 가 읽는 $FZ_WORK_DIR/code/report.md 를 만드는 Step 이 없다"
+        ],
+        "expect_stdout_absent": [
+          "L6: command 가 읽는"
+        ]
+      },
+      "why": "F-296 — 뒤 Step 이 읽는 WORK_DIR 산출물을 만드는 Step 이 없다. 자기 files 에 있는 산출물(L6)은 경고하지 않는다"
+    },
+    {
+      "id": "f238-rtm-req-unmapped",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "RTM: 요구 R-2 가 어느 Step 에도 매핑되지 않았다"
+        ],
+        "expect_stdout_absent": [
+          "요구 R-1 가"
+        ]
+      },
+      "why": "F-238 — plan 의 RTM 요구가 Step 매핑 없이 사라져도 세는 검사가 없었다. 매핑된 R-1 은 경고하지 않는다"
+    },
+    {
+      "id": "f341-default-off-absence-grep",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L7: [기본 off] 인데 command 가 작업 트리 부재를 단언한다"
+        ]
+      },
+      "why": "F-341 — [기본 off] Step 의 CHECK 가 작업 트리 부재(! grep … \"$R/…\")를 단언하면 Step 자신의 기본 off 와 모순된다"
+    },
+    {
+      "id": "f417-manual-reason-missing",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "M1: MANUAL 사유가 없다"
+        ],
+        "expect_stdout_absent": [
+          "M2: MANUAL 사유가 없다"
+        ]
+      },
+      "why": "F-417 — 사유(자기 승인 금지 · 사용자 결정 · 기계화 불가) 없는 MANUAL 은 기계화할 수 있는 점검까지 사람에게 넘긴다. 사유 있는 M2 는 경고하지 않는다"
+    },
+    {
+      "id": "f346-list-input-normalized",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-list.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "- [ ] G1: 배열 입력": 1
+        }
+      },
+      "why": "F-346 — steps 배열(list)만 넘겨도 원장을 만든다. 예전엔 AttributeError traceback 으로 exit 1(미충족과 같은 코드)이 났다"
+    },
+    {
+      "id": "f346-bad-shape-exit2",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-bad-shape.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 2,
+        "mutates": false,
+        "expect_stderr": [
+          "최상위"
+        ]
+      },
+      "why": "F-346 짝 — 객체도 배열도 아닌 최상위 모양은 입력 오류(exit 2)다. 미충족(exit 1)으로 읽히면 안 된다"
+    },
+    {
+      "id": "f347-impl-root-recorded",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-input.json",
+      "mode": "from-plan",
+      "args": [
+        "--impl-root",
+        "tests/fixtures/gates/fromplan"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "IMPL_ROOT: {REAL_SANDBOX}/fromplan": 1
+        }
+      },
+      "why": "F-347 — 코드가 형제 워크트리에 있으면 --impl-root 를 원장 헤더 IMPL_ROOT 로 남긴다(realpath)"
+    },
+    {
+      "id": "f347-impl-root-injected",
+      "category": "execution",
+      "ledger": "impl-root/injected.md",
+      "env": {
+        "FZ_IMPL_ROOT": ""
+      },
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "PASS  G1"
+        ]
+      },
+      "why": "F-347 — 원장 IMPL_ROOT 가 CHECK 의 FZ_IMPL_ROOT 로 들어간다. 넣는 곳이 없으면 구현된 Step 이 UNRUN(ENV: FZ_IMPL_ROOT 부재)이 된다"
+    },
+    {
+      "id": "f347-env-wins",
+      "category": "execution",
+      "ledger": "impl-root/injected.md",
+      "env": {
+        "FZ_IMPL_ROOT": "{SANDBOX}/impl-root"
+      },
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "FAIL  G1"
+        ]
+      },
+      "why": "F-347 짝 — 환경에 비지 않은 FZ_IMPL_ROOT 가 있으면 환경이 이긴다(기준선을 무변경 트리로 돌릴 때). 표지 파일이 없는 경로라 FAIL 이다 · 진행 기록이 없던 게이트의 첫 FAIL 은 원장을 쓰지 않는다(gates.md 진행 기록 정의)"
+    },
+    {
+      "id": "f384-ledger-name-warn",
+      "category": "cli",
+      "ledger": "ledger-name/gates/plan-v2.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stderr": [
+          "WARN 원장 이름 plan-v2.md"
+        ]
+      },
+      "why": "F-384 — Stop 훅 · --discover 는 gates/plan.md 만 찾는다. 다른 이름의 원장은 미충족이 남아도 세션 종료 판정에서 빠진다"
+    },
+    {
+      "id": "f347-impl-root-stamped",
+      "category": "approved",
+      "ledger": "impl-root/injected.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "impl-root/tree",
+            "impl-root"
+          ]
+        }
+      ],
+      "args": [
+        "--reverify"
+      ],
+      "env": {
+        "FZ_IMPL_ROOT": ""
+      },
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "APPROVED_ORACLE_HASH 불일치"
+        ]
+      },
+      "why": "F-347 — IMPL_ROOT 는 CHECK 가 도는 트리를 바꾸므로 승인 도장이 묶는다. 확정 뒤 헤더를 다른 트리로 바꾸면 도장이 어긋나 거부한다"
+    },
+    {
+      "id": "f229-backtick-warn",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-backtick.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "B1: command 에 이스케이프 안 된 백틱"
+        ],
+        "expect_stdout_absent": [
+          "B2: command 에 이스케이프 안 된 백틱"
+        ]
+      },
+      "why": "F-229 — 큰따옴표 안 백틱은 셸이 명령 치환으로 돌려 게이트가 제 제목과 다른 것을 잰다. 작은따옴표 안 백틱(B2)은 글자 그대로라 경고하지 않는다"
+    },
+    {
+      "id": "f229-shell-error-unrun",
+      "category": "execution",
+      "ledger": "shell-trace/is-dir.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNRUN G1: CHECK 출력에 셸 오류 흔적"
+        ]
+      },
+      "why": "F-229 — 통과 토큰을 냈어도 출력에 `Is a directory` 가 있으면 다른 것을 잰 것이다. PASS 대신 미판정(원장 무변경)"
+    },
+    {
+      "id": "f409-undeclared-cmd-not-found-unrun",
+      "category": "execution",
+      "ledger": "shell-trace/cmd-missing.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNRUN G1: CHECK 출력에 셸 오류 흔적",
+          "fz_absent_tool_q9:"
+        ]
+      },
+      "why": "F-409 — TOOLS 를 선언하지 않은 도구가 없으면 카운터 0 으로 거짓 PASS 한다. `command not found` · exit 127 흔적은 미판정이다"
+    },
+    {
+      "id": "f235-once-skipped-on-reverify",
+      "category": "reverify",
+      "ledger": "once/once.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ONCE  G1: 1회성 게이트"
+        ]
+      },
+      "why": "F-235 — 1회성 쓰기 게이트를 --reverify 가 다시 돌려 동결 기준선을 덮어썼다. ONCE 게이트는 충족 뒤 건너뛰고 표시한다(원장 무변경)"
+    },
+    {
+      "id": "f562-budget-note-only-over",
+      "category": "execution",
+      "ledger": "budget/sum-floor.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "예산 960초"
+        ],
+        "expect_stdout_absent": [
+          "NOTE 예산"
+        ]
+      },
+      "why": "F-562 — 기본 예산 바닥이 960 이라 10초 게이트 하나짜리 원장에도 NOTE 가 떠 신호가 없었다. 실제 TIMEOUT 합이 600 을 넘을 때만 낸다(짝: budget-over-600-note)"
+    },
+    {
+      "id": "f568-criterion-drift-listed",
+      "category": "approved",
+      "ledger": "drift/ledger.md",
+      "args": [
+        "--criterion-drift",
+        "tests/fixtures/gates/drift/old-phrases.txt"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "DRIFT G1: CRITERION 에 옛 문구",
+          "CRITERION_DRIFT: G1"
+        ],
+        "expect_stdout_absent": [
+          "DRIFT G2"
+        ]
+      },
+      "why": "F-568 — 리뷰가 틀렸다고 고친 옛 오라클 문구가 승인 원장 CRITERION 에 남았다. 재도장 후보 id 를 낸다(읽기 전용)"
+    },
+    {
+      "id": "f344-released-gate-not-failed",
+      "category": "state",
+      "ledger": "released/ledger.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "STATE: active",
+            "STATE: released v1.0.0"
+          ]
+        }
+      ],
+      "write_files": {
+        "released/released.flag": "x\n"
+      },
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "STATE released v1.0.0",
+          "RELEASED G1"
+        ]
+      },
+      "why": "F-344 — 릴리스 시점 사실을 박은 CHECK 는 이후 트리에서 재통과할 수 없다. released 원장의 --reverify 는 FAIL · 강등 대신 기록으로 판정한다(--status 와 같다)"
+    },
+    {
+      "id": "f344-set-state-released",
+      "category": "state",
+      "ledger": "released/ledger.md",
+      "pre": [
+        [
+          "--reverify"
+        ],
+        [
+          "--set-state",
+          "ready_for_review"
+        ],
+        [
+          "--set-state",
+          "closed"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "released v1.0.0"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_contains": {
+          "STATE: released v1.0.0": 1
+        }
+      },
+      "why": "F-344 짝 — closed → released <tag> 간선(전 게이트 충족 · 미룸 0). STATE 줄에 태그가 남는다"
+    },
+    {
+      "id": "f349-affected-by-path",
+      "category": "reverify",
+      "ledger": "affected/ledger.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [
+        "--affected-by",
+        "scripts/foo.py"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "  AFFECTED G1: scripts/foo.py(scripts/foo.py)",
+          "AFFECTED: G1"
+        ],
+        "expect_stdout_absent": [
+          "AFFECTED G3"
+        ]
+      },
+      "why": "F-349 — 뒤 Step 이 앞 Step 게이트의 근거 코드를 옮겨도 그 게이트는 다시 돌지 않았다. 바뀐 경로를 담은 충족 게이트 id 를 낸다"
+    },
+    {
+      "id": "f552-affected-by-basename",
+      "category": "reverify",
+      "ledger": "affected/ledger.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [
+        "--affected-by",
+        "tools/bar.sh"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "  AFFECTED G2: tools/bar.sh(bar.sh)"
+        ],
+        "expect_stdout_absent": [
+          "AFFECTED G3"
+        ]
+      },
+      "why": "F-552 — 공유 스크립트의 다른 소비자는 경로 대신 이름(`$S/bar.sh`)으로 부른다. basename 으로도 대조한다"
+    },
+    {
+      "id": "f566-pin-path-missing-warn",
+      "category": "pin",
+      "ledger": "pin/absent.md",
+      "mode": "finalize",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stderr": [
+          "WARN G1: PIN 경로 pin/later.txt 가 없다"
+        ]
+      },
+      "why": "F-566 — PIN 경로가 없으면 조용히 'absent' 로 기록했다. 부재는 정당한 기록값이지만(나중에 생길 표) 오타일 수 있어 경고한다"
     }
   ],
   "_max_seconds": "선택 필드 — 벽시계 상한(초). ⛔ exit code 만으로는 hang 을 못 잡는다: 손자 프로세스가 파이프를 붙잡아 30초 걸렸는데 exit 는 1로 정상이었다(2026-08-24 실측).",
@@ -2564,5 +3082,6 @@
   },
   "_expect_absent": "선택 필드 — sandbox 기준 경로가 없어야 한다 · expect_files 는 있어야 한다. ⛔ '돌리지 않았다'는 출력이 아니라 부작용 부재로 잰다",
   "_expect_sidecar": "선택 필드 — <원장>.baseline.json 의 게이트별 결과 · 실행 게이트 oracle_hash 가 지금 계약과 같은가",
-  "_write_files": "선택 필드 — 사전 단계 뒤 sandbox 기준 경로에 파일을 쓴다 · env 는 케이스 동안의 환경 변수({SANDBOX} 치환) · cli_env: hook 은 PATH · HOME 만 둔 하위 프로세스"
+  "_write_files": "선택 필드 — 사전 단계 뒤 sandbox 기준 경로에 파일을 쓴다 · env 는 케이스 동안의 환경 변수({SANDBOX} 치환) · cli_env: hook 은 PATH · HOME 만 둔 하위 프로세스",
+  "_expect_stdout_absent": "선택 필드 — stdout 에 문자열이 없어야 한다. 경고 lint 의 오탐 축(가드된 루프 · 사유 있는 MANUAL 은 경고하지 않는다)"
 }

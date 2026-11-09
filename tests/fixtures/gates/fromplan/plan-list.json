@@ -1,0 +1,4 @@
+[
+  { "id": "G1", "title": "배열 입력",
+    "verify": { "kind": "command", "criterion": "steps 배열만 넘겨도 원장이 생긴다", "command": "echo list ok", "expect": "list ok" } }
+]
