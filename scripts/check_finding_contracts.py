@@ -6,6 +6,7 @@
 
 표: tests/fixtures/docs/finding-contracts.tsv — 열 `id  path  kind  text` (탭 구분 · `#` 줄은 주석)
   kind = has      — path 에 text 가 1번 이상 있다
+         has:replace — has 와 같다 + 대체 변경 표지: 같은 ID · 같은 path 에 옛 문구 lacks 짝이 있어야 한다(--audit-pairs 가 잰다)
          lacks    — path 에 text 가 없다(대체 변경의 옛 문구)
          count=N  — path 에 text 가 정확히 N번 있다(사본 수 고정)
   path 는 플러그인 루트 기준 상대 경로
@@ -14,6 +15,9 @@
   check_finding_contracts.py [--root DIR] [--table TSV] [--ids F-NNN[:k],…]
     --ids 를 주면 그 ID 들만 본다. ID 마다 행이 k 개(기본 1) 이상이고 전부 충족해야 통과다.
     --ids 가 없으면 표의 모든 행을 본다.
+  check_finding_contracts.py --audit-pairs [--root DIR] [--table TSV]
+    대체 표지 has:replace 마다 같은 ID · 같은 path 의 lacks 짝이 있는가(없으면 1) + 표 전수 감사 줄(has 중 짝 있는 행 ·
+    존재만 보는 행 · 그 ID 들). F-025: 새 문구 존재만 재는 계약은 옛 문구가 함께 남아도 통과한다 — 대체 변경이면 짝을 단다
   check_finding_contracts.py --self-test
 
 exit: 0 충족 · 1 위반(문구 부재 · 잔존 · 횟수 · 행 부족 · 모르는 ID) · 2 UNRUN(표 · 대상 파일 부재 · 형식 오류 — ⛔ 통과 아님)
@@ -33,7 +37,7 @@ OK, VIOLATION, UNRUN = 0, 1, 2
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_TABLE = "tests/fixtures/docs/finding-contracts.tsv"
 ID_RE = re.compile(r"F-\d{3}[a-z]?\Z")
-KIND_RE = re.compile(r"(has|lacks|count=(\d+))\Z")
+KIND_RE = re.compile(r"(has(?::replace)?|lacks|count=(\d+))\Z")
 
 
 class Unrun(Exception):
@@ -62,7 +66,7 @@ def check_row(root: Path, path: str, kind: str, text: str):
     if not p.is_file():
         raise Unrun(f"대상 파일이 없다: {path}")
     n = p.read_text(encoding="utf-8").count(text)
-    if kind == "has":
+    if kind in ("has", "has:replace"):
         return None if n >= 1 else f"{path}: 문구 없음 — {text[:60]!r}"
     if kind == "lacks":
         return None if n == 0 else f"{path}: 옛 문구 {n}회 남음 — {text[:60]!r}"
@@ -107,6 +111,25 @@ def run(root: Path, table: Path, ids_spec: str | None) -> int:
     return VIOLATION if bad else OK
 
 
+def audit_pairs(table: Path) -> int:
+    try:
+        rows = load(table)
+    except Unrun as e:
+        print(f"UNRUN: {e}")
+        return UNRUN
+    lacks = {(fid, path) for _, fid, path, kind, _ in rows if kind == "lacks"}
+    has = [(n, fid, path, kind) for n, fid, path, kind, _ in rows if kind.startswith("has")]
+    unpaired = [(n, fid, path) for n, fid, path, kind in has if kind == "has:replace" and (fid, path) not in lacks]
+    for n, fid, path in unpaired:
+        print(f"FAIL {fid}: {table.name}:{n} 대체 표지 has:replace 인데 같은 경로({path}) lacks 짝이 없다 — 옛 문구가 남아도 통과한다(F-025)")
+    only = sorted({fid for _, fid, path, _ in has if (fid, path) not in lacks})
+    paired = sum(1 for _, fid, path, _ in has if (fid, path) in lacks)
+    print(f"AUDIT has {len(has)} — 같은 경로 lacks 짝 {paired} · 대체 표지 {sum(1 for h in has if h[3] == 'has:replace')} · "
+          f"짝 없는 대체 표지 {len(unpaired)} · 존재만 보는 행 {len(has) - paired}(ID {len(only)}개 — 대체 변경이었다면 lacks 짝을 단다)")
+    print("AUDIT 존재만 보는 ID: " + " ".join(only))
+    return VIOLATION if unpaired else OK
+
+
 def self_test() -> int:
     cases = []
 
@@ -127,6 +150,22 @@ def self_test() -> int:
     import contextlib
     import io
     passed, failed = 0, []
+    with tempfile.TemporaryDirectory() as d:   # r3 F-025 — 대체 표지 has 의 lacks 짝 감사
+        t = Path(d) / "c.tsv"
+        res = {}
+        for name, body in (("paired", "F-001\td.md\thas:replace\t새\nF-001\td.md\tlacks\t옛\nF-002\td.md\thas\tx"),
+                           ("unpaired", "F-001\td.md\thas:replace\t새\nF-001\te.md\tlacks\t옛"),
+                           ("plain-has", "F-002\td.md\thas\tx")):
+            t.write_text("id\tpath\tkind\ttext\n" + body + "\n", encoding="utf-8")
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                res[name] = (audit_pairs(t), buf.getvalue())
+        ok = (res["paired"][0] == OK and res["unpaired"][0] == VIOLATION and "lacks 짝이 없다" in res["unpaired"][1]
+              and res["plain-has"][0] == OK and "존재만 보는 행 1" in res["paired"][1] and "AUDIT 존재만 보는 ID: F-002" in res["paired"][1])
+        print(("PASS " if ok else "  FAIL ") + "r3-f025-audit-pairs" + ("" if ok else f" — {res}"))
+        passed += ok
+        if not ok:
+            failed.append("r3-f025-audit-pairs")
     for name, files, table, ids, want_rc, want_out in cases:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -146,7 +185,7 @@ def self_test() -> int:
                 failed.append(f"{name}: rc={rc}(기대 {want_rc}) 출력={out.strip()[:120]!r}")
     for f in failed:
         print(f"  FAIL {f}")
-    print(f"self-test {passed}/{len(cases)} passed")
+    print(f"self-test {passed}/{len(cases) + 1} passed")
     return OK if not failed else VIOLATION
 
 
@@ -156,10 +195,13 @@ def main() -> int:
     ap.add_argument("--table", default=None)
     ap.add_argument("--ids", default=None, metavar="F-NNN[:k],…")
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--audit-pairs", action="store_true")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
     root = Path(a.root)
+    if a.audit_pairs:
+        return audit_pairs(Path(a.table) if a.table else root / DEFAULT_TABLE)
     return run(root, Path(a.table) if a.table else root / DEFAULT_TABLE, a.ids)
 
 

@@ -341,7 +341,7 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 │      동일 Gather 데이터를 공유하면 같은 오류에 전원 동의한다 → ⛔ **Fact Verification Gate 재확인.**
 ├─ 2/3 동의: final = avg × 0.9 → INCLUDE (소수 의견 주석)
 │   └─ 소수 반박이 있으면 해당 에이전트의 근거를 우선 검토
-├─ 1/3 동의: 투표 산식을 쓰지 않는다 — 옛 계수(× 0.6 · × 0.7) 뒤 임계 70 은 confidence 상한 100 에서 도달할 수 없었다(F-038)
+├─ 1/3 동의: 투표 산식을 쓰지 않는다 — 옛 계수(0.6 배 · 0.7 배) 뒤 임계 70 은 confidence 상한 100 에서 도달할 수 없었다(F-038)
 │   └─ Lead 가 그 근거 위치를 직접 Read · 결정론 명령으로 확인하고 `[L실측]` 1줄(MergeContract § 4 형식)을 남기면 INCLUDE(final = 그 렌즈 값)
 │      · 확인 못 하면 observation(EXCLUDE 아님 — 렌즈를 나눈 목적이 단독 발견이다) · ⛔ 계수 · 임계를 고치면 상한 100 을 넣어 역산 1회
 └─ 0/3: EXCLUDE

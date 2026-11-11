@@ -16,7 +16,11 @@
 
 usage: check_release_notes.py --ids A1-04,A2-02 [--require verdict,evidence,procedure] [--changelog F] [--version X.Y.Z]
        check_release_notes.py --table-complete [--changelog F] [--version X.Y.Z]   # 표가 있으면 모든 행의 요구 칸이 차 있어야 한다
+       check_release_notes.py --judge-summary JUDGE_OUT --notes docs/releases/vX.Y.Z.md   # A/B 조건부 arm 생략 N/M 대조(F-506)
        check_release_notes.py --self-test
+--judge-summary: ab_ledger.py judge 출력의 조건부 arm 줄(`처치 발동 <라벨>: 조건부 생략 N/M` · `UNRUN <라벨>: 처치 미발동 — 판정 불가
+  (조건부 생략 0/M)`)마다 노트가 그 라벨과 같은 `생략 N/M` 을 한 줄에 적었는가 · 0/M arm 을 언급한 줄은 모두 `판정 불가` 로 적었는가.
+  (F-506: 생략 0회였던 arm 을 노트가 '360s 느림' 으로만 적어 '교차를 건너뛰니 느렸다' 로 읽혔다) 조건부 arm 줄이 없으면 2.
 exit: 0=충족(--table-complete 는 finding 표가 없는 절도 0) · 1=누락 · 2=판정 불가(파일·버전 절 부재 · --ids 모드의 표 부재 ·
       ID 머리행의 요구 열 누락)
 
@@ -48,6 +52,47 @@ def section(text, version):
 
 def cells(line):
     return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+JUDGE_ARM = re.compile(r"^(?:UNRUN (?P<a>.+?): 처치 미발동 — 판정 불가 \(조건부 생략 0/(?P<m0>\d+)\)"
+                       r"|\s*처치 발동 (?P<b>.+?): 조건부 생략 (?P<n>\d+)/(?P<m>\d+))", re.M)
+
+
+def judge_arms(summary):
+    """판정기 출력 → {arm 라벨: (생략한 run 수, 조건부 run 수)}."""
+    return {m.group("a") or m.group("b"): (0, int(m.group("m0"))) if m.group("a") else (int(m.group("n")), int(m.group("m")))
+            for m in JUDGE_ARM.finditer(summary)}
+
+
+def skip_mismatches(notes, arms):
+    bad = []
+    for arm, (n, m) in arms.items():
+        lines = [l for l in notes.split("\n") if arm in l]
+        if not any(re.search(rf"생략 {n}/{m}(?!\d)", l) for l in lines):     # 수 쌍 전체 — `3/6` 이 `3/60` 의 앞머리로 통과하지 않는다
+            got = sorted(set(re.findall(r"생략 \d+/\d+", " ".join(lines))))
+            bad.append(f"{arm}: 판정기와 같은 '생략 {n}/{m}' 을 라벨과 한 줄에 적지 않았다" + (f" — 노트는 {got}" if got else ""))
+        if n == 0:
+            loose = [l.strip()[:80] for l in lines if "판정 불가" not in l]
+            if loose:
+                bad.append(f"{arm}: 처치가 한 번도 발동하지 않았는데(생략 0/{m}) '판정 불가' 없이 적은 줄 — {loose[0]}")
+    return bad
+
+
+def check_skips(summary_path, notes_path):
+    try:
+        arms = judge_arms(open(summary_path, encoding="utf-8").read())
+        notes = open(notes_path, encoding="utf-8").read()
+    except OSError as e:
+        print(f"UNRUN: 판정기 출력 · 노트를 읽지 못했다 — {e.__class__.__name__}: {e}")
+        return UNRUN
+    if not arms:
+        print(f"UNRUN: {summary_path} 에 조건부 arm 줄(`조건부 생략 N/M`)이 없다 — 대조할 것이 없다(⛔ 통과 아님)")
+        return UNRUN
+    bad = skip_mismatches(notes, arms)
+    for b in bad:
+        print(f"  MISSING {b}")
+    print(f"release-notes: 조건부 arm {len(arms)} · 생략 표기 불일치 {len(bad)}")
+    return MISSING if bad else OK
 
 
 def check(changelog, version, ids, require, table_complete=False):
@@ -150,9 +195,24 @@ def self_test():
                 passed += 1
             else:
                 fails.append(f"{name}: got {got}")
+    judge = ("UNRUN fz-review[pr-a]: 처치 미발동 — 판정 불가 (조건부 생략 0/6) — 생략이 일어난 run 이 없다\n"
+             "  INVALID r9 — 입력 해시 불일치\n  처치 발동 fz-plan[feature]: 조건부 생략 3/6\n")
+    arms = judge_arms(judge)
+    good = "- fz-review[pr-a] C′: 생략 0/6 — 처치 미발동이라 효과 판정 불가\n- fz-plan[feature]: 생략 3/6 · 품질 게이트 통과\n"
+    bads = [good.replace("생략 0/6 — 처치 미발동이라 효과 판정 불가", "360s 느렸다"),                 # 생략 표기 없음
+            good.replace("생략 0/6 — 처치 미발동이라 효과 판정 불가", "생략 0/6 · 360s 느렸다"),       # 0/M 을 효과로 적음
+            good.replace("생략 3/6", "생략 2/6"),                                                  # 판정기와 다른 수
+            good.replace("생략 3/6", "생략 3/60"),                                                 # 판정기 수가 앞머리일 뿐인 다른 수
+            good + "- fz-review[pr-a] 는 271s 느렸다\n"]                                         # 0/M arm 의 다른 줄이 효과를 말함
+    ok = arms == {"fz-review[pr-a]": (0, 6), "fz-plan[feature]": (3, 6)} and not skip_mismatches(good, arms) \
+        and all(skip_mismatches(b, arms) for b in bads)
+    print(("PASS  " if ok else "FAIL  ") + "r3-f506-notes-match-judge-summary — 노트의 '생략 N/M' 이 판정기 요약과 같고 0/M arm 은 판정 불가로만 쓴다"
+          + ("" if ok else f" — arms {arms} · 통과본 {skip_mismatches(good, arms)} · 거부 {[bool(skip_mismatches(b, arms)) for b in bads]}"))
+    if not ok:
+        fails.append("r3-f506-notes-match-judge-summary")
     for f in fails:
         print(f"  FAIL {f}")
-    print(f"self-test {passed}/{len(cases) + len(tc)} passed")
+    print(f"self-test {passed + ok}/{len(cases) + len(tc) + 1} passed")
     return OK if not fails else MISSING
 
 
@@ -164,9 +224,16 @@ def main():
     ap.add_argument("--version")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--table-complete", action="store_true")
+    ap.add_argument("--judge-summary")
+    ap.add_argument("--notes")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
+    if a.judge_summary or a.notes:
+        if not (a.judge_summary and a.notes):
+            print("UNRUN: --judge-summary 와 --notes 를 함께 준다")
+            return UNRUN
+        return check_skips(a.judge_summary, a.notes)
     if not a.ids and not a.table_complete:
         print("UNRUN: --ids 가 필요하다")
         return UNRUN

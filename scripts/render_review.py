@@ -662,14 +662,16 @@ def synth_update(path: Path, r: dict):
         if why:
             it["disposition_reason"] = why
         if sev:
-            key = next((k for k in SYN_FINAL if k in it), None)
-            if key is None and any(k in it for k in ("severity_raw", "rawSeverity")):
-                key = "severity"     # 원본 칸을 따로 적은 Lead 모양에서는 `severity` 가 최종 칸이다(check_synthesized.normalize 와 같은 규칙)
-            now = it.get(key) if key else it.get("severity")
-            if now != sev:
-                if now is not None:
+            # 최종 별칭이 둘 이상이면 전부 고친다 — 하나만 고치면 별칭끼리 어긋나 check_synthesized 가 충돌로 거부한다(F-201 · ISSUE-202624)
+            keys = [k for k in SYN_FINAL if k in it]
+            if not keys and any(k in it for k in ("severity_raw", "rawSeverity")):
+                keys = ["severity"]  # 원본 칸을 따로 적은 Lead 모양에서는 `severity` 가 최종 칸이다(check_synthesized.normalize 와 같은 규칙)
+            now = it.get(keys[0]) if keys else it.get("severity")
+            if any(it.get(k) != sev for k in keys or ["severity_final"]):
+                if now is not None and now != sev:
                     it.setdefault("severity_initial", now)
-                it[key or "severity_final"] = sev
+                for k in keys or ["severity_final"]:
+                    it[k] = sev
     return data
 
 
@@ -1182,6 +1184,20 @@ def self_test() -> int:
         disp = {x["id"]: (x.get("disposition"), x.get("disposition_reason")) for x in syn["issues"][1:]}
         case("f201-excluded-covers-propagated — 묶음 excluded 카드의 covers 후보도 같은 처분 · 사유",
              all(v == ("exclude:E3", "같은 뿌리") for v in disp.values()), disp)
+        g = d / "aliases.json"
+        g.write_text(json.dumps({"issues": [{"id": "M1", "severity": "major", "severity_final": "major", "effectiveSeverity": "major"}]}),
+                     encoding="utf-8")
+        renders = []
+        for _ in range(2):   # 같은 판정으로 두 번 — 두 번째 렌더가 첫 렌더와 같아야 한다(재평가 뒤 다시 렌더해도 흔들리지 않는다)
+            g.write_text(json.dumps(synth_update(g, {"issues": [{"id": "M1", "severity": "minor"}]}), ensure_ascii=False), encoding="utf-8")
+            renders.append(g.read_text(encoding="utf-8"))
+        m1 = json.loads(renders[0])["issues"][0]
+        gcode = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "check_synthesized.py"), str(g)],
+                               capture_output=True, text=True)
+        case("r3-f201-all-severity-aliases — 최종 별칭(severity_final · effectiveSeverity)이 모두 major 인 후보를 minor 로 재평가하면 둘 다 minor"
+             " · 계약 통과 · 두 번째 렌더가 첫 렌더와 같다",
+             m1.get("severity_final") == "minor" and m1.get("effectiveSeverity") == "minor" and m1.get("severity_initial") == "major"
+             and gcode.returncode == 0 and renders[0] == renders[1], (m1, gcode.stdout[-200:], renders[0] == renders[1]))
         unv = curated_report({"verdict": "v", "excluded": []}, [], {"thread_line": "t", "symbol_check": "제안 식별자 X 미검증"})
         ok_ = curated_report({"verdict": "v", "excluded": []}, [], {"thread_line": "t"})
         case("f063-unverified-symbols-in-report — 대조 못 한 제안 식별자는 리포트에 미검증으로 남는다",
