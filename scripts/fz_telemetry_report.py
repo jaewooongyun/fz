@@ -1211,6 +1211,56 @@ def skill_scope(by_skill, all_skills=False):
     }
 
 
+def skill_routes(plugin_root=None):
+    """스킬마다 도달 경로(F-148) — 'manual-only'(`disable-model-invocation: true` — 자동 로드만 막고 수동 호출은 된다 ·
+    guides/skill-authoring.md) · 'agent-preload'(`user-invocable: false` 또는 agents/*.md `skills:` 경유) · 'auto'.
+    사용 0 을 '미사용' 으로 읽어도 되는 것은 auto 뿐이다 — 다른 경로의 0 은 그 경로에서의 0 이다(재관측 F-503)."""
+    root = plugin_root or DEFAULT_PLUGIN_ROOT
+    preload = set()
+    for f in sorted(glob.glob(os.path.join(root, "agents", "*.md"))):
+        try:
+            head = open(f, encoding="utf-8").read().split("\n---", 1)[0]
+        except OSError:
+            continue
+        m = re.search(r"^skills:\s*\n((?:\s+-\s*\S+\s*\n?)+)", head, re.M)
+        preload |= {x.split(":")[-1] for x in re.findall(r"-\s*(\S+)", m.group(1))} if m else set()
+    out = {}
+    for f in sorted(glob.glob(os.path.join(root, "skills", "*", "SKILL.md"))):
+        name = os.path.basename(os.path.dirname(f))
+        try:
+            head = open(f, encoding="utf-8").read().split("\n---", 1)[0]
+        except OSError:
+            continue
+        if re.search(r"^disable-model-invocation:\s*true\b", head, re.M):
+            out[name] = "manual-only"
+        elif re.search(r"^user-invocable:\s*false\b", head, re.M) or name in preload:
+            out[name] = "agent-preload"
+        else:
+            out[name] = "auto"
+    return out
+
+
+def skill_table_lines(rows):
+    """스킬별 부하 표 — 경로 열과 '사용 0' 표기(F-148). auto 가 아닌 경로의 0 은 미사용 판정 불가다."""
+    lines = ["| 스킬 | 경로 | 호출 | 출력 tok | thinking% | 캐시읽기 tok | 지연 중앙값 | 지연 p90 | 워커 비율 | effort 분포 |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
+    for row in rows:
+        effort = " · ".join("%s:%d" % (k, v) for k, v in sorted(row["effort"].items(), key=lambda kv: -kv[1]))
+        route = row.get("route") or "?"
+        calls = "{:,}".format(row["msgs"])
+        if not row["msgs"]:
+            calls = "0" if route == "auto" else "0 (이 경로의 0 — 미사용 판정 불가)"
+        lines.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            row["skill"], route, calls, "{:,}".format(row["output"]),
+            (fmt(row["thinking_pct"], 0) + "%") if row["thinking_pct"] is not None else "n/a",
+            "{:,}".format(row["cache_read"]),
+            (fmt(row["latency_median_s"]) + "s") if row["latency_median_s"] is not None else "n/a",
+            (fmt(row["latency_p90_s"]) + "s") if row["latency_p90_s"] is not None else "n/a",
+            (fmt(row["worker_pct"], 0) + "%") if row["worker_pct"] is not None else "n/a",
+            effort or "-"))
+    return lines
+
+
 def canonical_run_skill(name):
     """run_metrics.canonical_skill 과 같은 규칙 — 과거 행의 별칭(plan → fz-plan)을 집계에서만 합친다(행 파일은 고치지 않는다) [F-532]."""
     s = str(name)
@@ -1451,6 +1501,7 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
         )
 
     skills = []
+    routes = skill_routes(os.path.expanduser(getattr(args, "plugin_root", None) or DEFAULT_PLUGIN_ROOT))   # 보고 대상 플러그인(정적 부하 · 원장과 같은 루트)
     skill_names, scope = skill_scope(agg.by_skill, getattr(args, "all_skills", False))
     for name in sorted(skill_names, key=lambda s: -agg.by_skill[s]["msgs"]):
         counter = agg.by_skill[name]
@@ -1467,8 +1518,13 @@ def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err
                 "latency_p90_s": round(pct(lat_sorted, 0.9), 1) if lat_sorted else None,
                 "worker_pct": round(100.0 * counter["worker_msgs"] / counter["msgs"], 1) if counter["msgs"] else None,
                 "effort": dict(agg.skill_effort[name]),
+                "route": routes.get(name.split(":")[-1]),
             }
         )
+    seen = {n.split(":")[-1] for n in skill_names}
+    for name in sorted(r for r in routes if r not in seen and fz_owned_skill(r)):   # 사용 0 인 fz 스킬도 행으로 둔다(경로와 함께)
+        skills.append({"skill": name, "msgs": 0, "output": 0, "thinking_pct": None, "cache_read": 0, "cache_write": 0,
+                       "latency_median_s": None, "latency_p90_s": None, "worker_pct": None, "effort": {}, "route": routes[name]})
 
     workflows = []
     names = set(wf_rows) | set(agg.wf_calls)
@@ -1639,24 +1695,7 @@ def render_markdown(payload):
                         "{:,}".format(sc["included_msgs"] + sc["excluded_msgs"] + sc["unattributed_msgs"]),
                         "{:,}".format(sc["total_msgs"])))
         lines.append("")
-    lines.append("| 스킬 | 호출 | 출력 tok | thinking% | 캐시읽기 tok | 지연 중앙값 | 지연 p90 | 워커 비율 | effort 분포 |")
-    lines.append("|---|---|---|---|---|---|---|---|---|")
-    for row in payload["skills"]:
-        effort = " · ".join("%s:%d" % (k, v) for k, v in sorted(row["effort"].items(), key=lambda kv: -kv[1]))
-        lines.append(
-            "| %s | %s | %s | %s | %s | %s | %s | %s | %s |"
-            % (
-                row["skill"],
-                "{:,}".format(row["msgs"]),
-                "{:,}".format(row["output"]),
-                (fmt(row["thinking_pct"], 0) + "%") if row["thinking_pct"] is not None else "n/a",
-                "{:,}".format(row["cache_read"]),
-                (fmt(row["latency_median_s"]) + "s") if row["latency_median_s"] is not None else "n/a",
-                (fmt(row["latency_p90_s"]) + "s") if row["latency_p90_s"] is not None else "n/a",
-                (fmt(row["worker_pct"], 0) + "%") if row["worker_pct"] is not None else "n/a",
-                effort or "-",
-            )
-        )
+    lines.extend(skill_table_lines(payload["skills"]))
     lines.append("")
 
     lines.append("## 3. 워크플로별 실행과 스테이지 기여도")
@@ -2143,6 +2182,10 @@ def self_test():
     )
     rc = run_report(args)
     check("run_report exit", rc, 0)
+    with open(args.out, encoding="utf-8") as fh:
+        md148 = fh.read()
+    # F-148 배선 — 사용 0 행 · 경로 열은 --plugin-root 의 스킬에서 온다(스킬 없는 루트면 경로 붙은 사용 0 행이 없다)
+    check("r3-f148-routes-follow-plugin-root", ("| auto | 0 |" in md148, "| manual-only | 0 (" in md148), (False, False))
 
     since = parse_day(args.since)
     until = parse_day(args.until) + datetime.timedelta(days=1)
@@ -2312,7 +2355,23 @@ def self_test():
         check("track-d-count-rule-unchanged", sorted((c["class"], c["days"]) for c in tdd["candidates"]),
               [("live-c", 2), ("reg-a", 2), ("unreg-b", 2)])
 
-    failed = [c for c in checks if not c[1]]
+    # F-148 — 도달 경로 열 · auto 가 아닌 경로의 0 은 미사용 판정 불가
+    with tempfile.TemporaryDirectory() as t:
+        for name, head in (("a", ""), ("b", "disable-model-invocation: true\n"), ("c", "user-invocable: false\n"), ("d", "")):
+            os.makedirs(os.path.join(t, "skills", name))
+            with open(os.path.join(t, "skills", name, "SKILL.md"), "w", encoding="utf-8") as fh:
+                fh.write("---\nname: %s\n%s---\n본문\n" % (name, head))
+        os.makedirs(os.path.join(t, "agents"))
+        with open(os.path.join(t, "agents", "x.md"), "w", encoding="utf-8") as fh:
+            fh.write("---\nname: x\nskills:\n  - d\n---\n본문\n")
+        routes = skill_routes(t)
+        base = {"output": 0, "thinking_pct": None, "cache_read": 0, "latency_median_s": None, "latency_p90_s": None, "worker_pct": None, "effort": {}}
+        rows = [dict(base, skill=n, msgs=m, route=routes.get(n)) for n, m in (("a", 0), ("b", 0), ("c", 3))]
+        tbl = {ln.split(" | ")[0].lstrip("| "): ln for ln in skill_table_lines(rows)[2:]}
+        check("r3-f148-route-annotated — 사용 표에 도달 경로 열 · manual-only · agent-preload 의 0 은 미사용 판정 불가로 적는다",
+              (routes, "| auto | 0 |" in tbl["a"], "| manual-only | 0 (이 경로의 0 — 미사용 판정 불가) |" in tbl["b"], "| agent-preload | 3 |" in tbl["c"]),
+              ({"a": "auto", "b": "manual-only", "c": "agent-preload", "d": "agent-preload"}, True, True, True))
+    failed = [c for c in checks if not c[1]]          # 모든 단언 뒤에 센다 — 앞에서 세면 뒤 단언의 FAIL 이 exit 0 으로 빠진다(r3 8.5 2차)
     for name, ok, got, want in checks:
         print("%s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else "  got=%r want=%r" % (got, want)))
     print("%d/%d passed" % (len(checks) - len(failed), len(checks)))

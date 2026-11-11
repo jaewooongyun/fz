@@ -151,6 +151,9 @@ QUOTE_AFTER_REF = re.compile(r"`?([\w./-]+\.[A-Za-z]\w{0,5}):(\d+)`?[\s—–:·
 FINDING_CLAIM = re.compile(r"F-(\d{3})\s*(?:이|가|은|는|의)?\s*(?:기록한|지목한|적은|보고한|남긴|에 따르면|에 기록된)")
 STEP_HEADING = re.compile(r"^#{2,4}\s+(S\d+[a-z]?)\b", re.M)
 AMEND_MARK = "⊕"
+COUNT_CLAIM = re.compile(r"(?<![\w.-])\d[\d,.]*\s?(?:건|개(?!월)|곳|줄|행|파일|회|번|배|초|%|토큰|케이스|셀)")   # 단위 뒤 조사 · 서술어는 붙는다(12개다)
+PATH_LINE_CLAIM = re.compile(r"[\w./-]+\.[A-Za-z]\w{0,5}:\d+")
+CLAIM_EVIDENCE = re.compile(r"\[verified:|code-context(?:\.md)?(?::\d+|#[\w-]+)")
 
 
 def _flat(s: str) -> str:
@@ -209,6 +212,21 @@ def check_doc(text: str, root=None, findings=None) -> tuple:
     return v, notes
 
 
+def unverified_claims(text: str) -> list:
+    """F-185 — 수치 · 건수(`12건`) · 경로 줄(`a.py:30`) 주장 중 같은 줄에 `[verified:` 나 code-context 행 참조가 없는 것 → [(줄, 원문)].
+    위반이 아니라 WARN 이다 — 주장마다 출처를 달라는 신호이고, 판정(사실인가)은 Lead · GPT 몫이다. 코드 블록 · 인라인 코드 안 숫자는 주장이 아니다."""
+    out, fence = [], False
+    for i, ln in enumerate(text.split("\n"), 1):
+        if ln.lstrip().startswith("```"):
+            fence = not fence
+            continue
+        if fence or CLAIM_EVIDENCE.search(ln):
+            continue
+        if COUNT_CLAIM.search(re.sub(r"`[^`]*`", "", ln)) or PATH_LINE_CLAIM.search(ln):
+            out.append((i, ln.strip()))
+    return out
+
+
 def run_doc(path: str, root=None, findings=None, quiet: bool = False) -> int:
     try:
         with open(path, "r", encoding="utf-8") as fh:
@@ -221,6 +239,11 @@ def run_doc(path: str, root=None, findings=None, quiet: bool = False) -> int:
     if not quiet:
         for n in notes:
             print(f"  ⚠️ {n}")
+        claims = unverified_claims(text)
+        for ln, s in claims:
+            print(f"  WARN 미검증 주장 줄 {ln}: {s[:100]}")
+        if claims:
+            print(f"  WARN 미검증 주장 {len(claims)}건 — 같은 줄에 [verified: 출처] 나 code-context 행 참조를 단다(위반 아님 · exit 무관)")
         for x in v:
             print(f"  VIOLATION {x}")
         print((f"integrity=FAIL ({len(v)} 위반) " if v else "INTEGRITY_PASS ") + os.path.basename(path))
@@ -293,13 +316,24 @@ def self_test(fixture_dir: str) -> int:
             else:
                 fails.append(f"{cell} — 위반 {got} · good.md {good_v}")
                 print(f"FAIL {cell}: 위반 {got} · good.md {good_v}")
+        with open(os.path.join(doc, "claims.md"), "r", encoding="utf-8") as fh:   # F-185 — 경고 줄 집합이 정확히 근거 없는 두 줄
+            text = fh.read()
+        got = [ln for ln, _s in unverified_claims(text)]
+        cell = "r3-f185-prose-claim-unverified-warn"
+        if got == [5, 8] and check_doc(text)[0] == []:
+            passed += 1
+            if listing:
+                print(f"PASS {cell}")
+        else:
+            fails.append(f"{cell} — 경고 줄 {got} (기대 [5, 8])")
+            print(f"FAIL {cell}: 경고 줄 {got} (기대 [5, 8])")
     for f in fails:
         print(f"  FAIL {f}")
     total = passed + len(fails)
     if fails:
         print(f"plan_integrity self-test {passed}/{total} passed")
         return 1
-    print(f"INTEGRITY_SELFTEST_OK (양성 1 · 음성 {len(bads)} · 문서 셀 {3 if os.path.isdir(doc) else 0} — {passed}/{total})")
+    print(f"INTEGRITY_SELFTEST_OK (양성 1 · 음성 {len(bads)} · 문서 셀 {4 if os.path.isdir(doc) else 0} — {passed}/{total})")
     return 0
 
 

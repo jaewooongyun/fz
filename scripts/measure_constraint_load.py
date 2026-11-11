@@ -25,6 +25,8 @@ operative(게이트/체크리스트/절차) vs justification(근거/인용/서�
   python3 scripts/measure_constraint_load.py [PLUGIN_ROOT]
   python3 scripts/measure_constraint_load.py --json          # 기계 판독용 JSON
   python3 scripts/measure_constraint_load.py --refs fz-plan  # 조건부 판정 근거 감사
+  python3 scripts/measure_constraint_load.py --refs fz-plan --diff-refs BEFORE.md   # 이동 전 SKILL.md 와 무조건 참조 · floor 차(F-151)
+  python3 scripts/measure_constraint_load.py --self-test
   python3 scripts/measure_constraint_load.py --sections modules/foo.md
   python3 scripts/measure_constraint_load.py [ROOT] --ceiling tests/fixtures/constraint-ceiling.json   # 동결값 대조
   python3 scripts/measure_constraint_load.py [ROOT] --freeze  tests/fixtures/constraint-ceiling.json   # 지금 값으로 동결
@@ -376,6 +378,88 @@ def cmd_ceiling(scopes: dict, path: Path) -> int:
     return 1 if bad else 0
 
 
+# 수치를 인용하는 쪽이 정의를 같이 보게 출력 머리에 둔다(F-145 — floor 를 "스킬 로드 전체" 로 읽은 일이 재관측됐다)
+FLOOR_DEFINITION = ("정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · "
+                    "ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정")
+
+
+def uncond_loads(skill_md: Path, docs_: dict) -> dict:
+    """무조건 로드 참조 {rel: ~tokens} — floor 의 구성원."""
+    return {r: docs_[r]["tokens"] for r, m in ref_files_in_skill(skill_md).items()
+            if m["bucket"] == "load" and not m["conditional"] and r in docs_}
+
+
+def diff_refs_lines(before_md: Path, now_md: Path, docs_: dict) -> list:
+    """이동 · 분리의 floor 이득 반사실(F-151) — 빠지는 무조건 참조 목록이 비면 이득 0 이다(본문 줄 감소는 floor 가 아니다)."""
+    b, a = uncond_loads(before_md, docs_), uncond_loads(now_md, docs_)
+    gone, new = sorted(set(b) - set(a)), sorted(set(a) - set(b))
+    out = [f"diff-refs {before_md.name} → 지금: floor {sum(b.values())} → {sum(a.values())} ~tokens (차 {sum(a.values()) - sum(b.values()):+d})"]
+    out += [f"  - 빠진 무조건 참조 {r} ~{b[r]} tok" for r in gone] or ["  빠진 무조건 참조 없음 — 이 변경의 floor 이득 0"]
+    out += [f"  + 생긴 무조건 참조 {r} ~{a[r]} tok" for r in new]
+    return out
+
+
+def refs_report(root: Path, skill: str, before: Path | None = None) -> list:
+    """`--refs <skill>` 출력 줄 — 정의 줄 · floor/ceiling · 참조별 판정 근거(· `--diff-refs` 면 반사실)."""
+    skill_md = root / "skills" / skill / "SKILL.md"
+    refs = ref_files_in_skill(skill_md)
+    docs_ = collect_doc_stats(root)
+    ld = {r: m for r, m in refs.items() if m["bucket"] == "load" and r in docs_}
+    u = sum(docs_[r]["tokens"] for r, m in ld.items() if not m["conditional"])
+    t = sum(docs_[r]["tokens"] for r in ld)
+    ex = sum(docs_[r]["tokens"] for r, m in refs.items() if m["bucket"] != "load" and r in docs_)
+    out = [f"참조 판정: skills/{skill}/SKILL.md", FLOOR_DEFINITION,
+           f"  floor(무조건 로드) {u} / ceiling(로드 전체) {t} ~tokens  · 로드 아님(카탈로그·출처표기) {ex} 제외"]
+    if before is not None:
+        out += diff_refs_lines(before, skill_md, docs_)
+    out += ["⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).",
+            "   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).", "-" * 78]
+    order = {"load": 0, "citation": 1, "catalog": 2}
+    for rel, meta in sorted(refs.items(), key=lambda x: (order[x[1]["bucket"]], x[1]["conditional"])):
+        tok = docs_.get(rel, {}).get("tokens", 0)
+        if meta["bucket"] == "load":
+            tag = "로드/조건부" if meta["conditional"] else "로드/무조건"
+        else:
+            tag = "카탈로그  " if meta["bucket"] == "catalog" else "출처표기  "
+        out.append(f"[{tag}] {rel:<38} ~{tok:>6} tok")
+        for st in meta["sites"]:
+            mark = {"catalog": "  ·", "citation": "  ~"}.get(st["bucket"], "  ?" if st["conditional"] else "  !")
+            out.append(f"   {mark} L{st['line']}: {st['text']}")
+    return out
+
+
+def self_test() -> int:
+    import tempfile
+    results = []
+
+    def case(name, ok, got=""):
+        results.append(bool(ok))
+        print(f"PASS {name}" if ok else f"FAIL {name} — {got}")
+
+    with tempfile.TemporaryDirectory() as t:
+        root = Path(t)
+        for d in ("modules", "guides", "skills/x"):
+            (root / d).mkdir(parents=True)
+        (root / "modules" / "a.md").write_text("a " * 400, encoding="utf-8")
+        (root / "modules" / "b.md").write_text("b " * 200, encoding="utf-8")
+        now = root / "skills" / "x" / "SKILL.md"
+        now.write_text("# x\n\n## 절차\n\n1. `Read(modules/b.md)` 로드\n", encoding="utf-8")
+        before = root / "before.md"
+        before.write_text("# x\n\n## 절차\n\n1. `Read(modules/a.md)` 로드\n2. `Read(modules/b.md)` 로드\n", encoding="utf-8")
+        moved = root / "moved.md"                 # 본문만 줄었고 무조건 참조는 그대로인 이동
+        moved.write_text(now.read_text(encoding="utf-8") + "\n## 옮길 절\n\n긴 설명 줄\n" * 5, encoding="utf-8")
+        rep = refs_report(root, "x")
+        case("r3-f145-definition-header — --refs 출력 머리에 floor 정의(무조건 참조 문서 토큰 합 · SKILL.md 본문 제외)가 있다",
+             rep[1] == FLOOR_DEFINITION and "SKILL.md 본문 제외" in rep[1], rep[:2])
+        gone, same = refs_report(root, "x", before), refs_report(root, "x", moved)
+        ok = (any("빠진 무조건 참조 modules/a.md" in ln for ln in gone) and not any("이득 0" in ln for ln in gone)
+              and any("(차 -" in ln for ln in gone) and any("이득 0" in ln for ln in same) and any("(차 +0)" in ln for ln in same))
+        case("r3-f151-diff-refs-lists-removed — --diff-refs 가 빠지는 무조건 참조와 floor 차를 내고 · 빠지는 것이 없으면 이득 0", ok,
+             [ln for ln in gone + same if "diff-refs" in ln or "참조" in ln][:6])
+    print(f"self-test {sum(results)}/{len(results)} passed (measure_constraint_load)")
+    return 0 if all(results) else 1
+
+
 def _take_opt(name: str) -> str | None:
     """`name VALUE` 를 argv 에서 꺼낸다 — 값이 위치 인자(ROOT)로 읽히지 않게."""
     if name not in sys.argv:
@@ -390,7 +474,9 @@ def _take_opt(name: str) -> str | None:
 
 
 def main() -> None:
-    ceiling_path, freeze_path = _take_opt("--ceiling"), _take_opt("--freeze")
+    if "--self-test" in sys.argv:
+        sys.exit(self_test())
+    ceiling_path, freeze_path, diff_path = _take_opt("--ceiling"), _take_opt("--freeze"), _take_opt("--diff-refs")
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     as_json = "--json" in sys.argv
     root = Path(__file__).resolve().parent.parent
@@ -411,38 +497,14 @@ def main() -> None:
             print(f"{flag:>7} {s['lines']:>6} {s['op_density']:>8}  {'  '*(s['level']-2 if s['level']>=2 else 0)}{s['header']}")
         return
 
-    # --refs <skill>: 참조별 조건부 판정 근거 출력 (휴리스틱 감사용)
+    # --refs <skill>: 참조별 조건부 판정 근거 출력 (휴리스틱 감사용) · --diff-refs BEFORE 면 이동 전 SKILL.md 와 반사실(F-151)
     if "--refs" in sys.argv:
         skill = args[0] if args else ""
-        skill_md = root / "skills" / skill / "SKILL.md"
-        if not skill_md.is_file():
-            sys.exit(f"사용: --refs fz-plan  (없음: {skill_md})")
-        refs = ref_files_in_skill(skill_md)
-        docs_ = collect_doc_stats(root)
-        ld = {r: m for r, m in refs.items() if m["bucket"] == "load" and r in docs_}
-        u = sum(docs_[r]["tokens"] for r, m in ld.items() if not m["conditional"])
-        t = sum(docs_[r]["tokens"] for r in ld)
-        ex = sum(docs_[r]["tokens"] for r, m in refs.items()
-                 if m["bucket"] != "load" and r in docs_)
-        print(f"참조 판정: skills/{skill}/SKILL.md")
-        print(f"  floor(무조건 로드) {u} / ceiling(로드 전체) {t} ~tokens"
-              f"  · 로드 아님(카탈로그·출처표기) {ex} 제외")
-        print("⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).")
-        print("   조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).")
-        print("-" * 78)
-        order = {"load": 0, "citation": 1, "catalog": 2}
-        for rel, meta in sorted(refs.items(),
-                                key=lambda x: (order[x[1]["bucket"]], x[1]["conditional"])):
-            tok = docs_.get(rel, {}).get("tokens", 0)
-            if meta["bucket"] == "load":
-                tag = "로드/조건부" if meta["conditional"] else "로드/무조건"
-            else:
-                tag = "카탈로그  " if meta["bucket"] == "catalog" else "출처표기  "
-            print(f"[{tag}] {rel:<38} ~{tok:>6} tok")
-            for s in meta["sites"]:
-                mark = {"catalog": "  ·", "citation": "  ~"}.get(
-                    s["bucket"], "  ?" if s["conditional"] else "  !")
-                print(f"   {mark} L{s['line']}: {s['text']}")
+        if not (root / "skills" / skill / "SKILL.md").is_file():
+            sys.exit(f"사용: --refs fz-plan  (없음: {root / 'skills' / skill / 'SKILL.md'})")
+        if diff_path and not Path(diff_path).is_file():
+            sys.exit(f"UNRUN: --diff-refs 파일이 없다 — {diff_path}")
+        print("\n".join(refs_report(root, skill, Path(diff_path) if diff_path else None)))
         return
 
     root = Path(args[0]).resolve() if args else root
@@ -468,6 +530,7 @@ def main() -> None:
     print("=" * 78)
 
     print("\n■ 표1: 스킬별 hot-path 로드 — 무조건(floor) vs 조건부(ceiling)")
+    print("  " + FLOOR_DEFINITION)
     print("  floor = 조건 마커 없는 참조만 = 그 스킬을 부르면 **항상** 드는 비용")
     print("  ceiling = 전체 정적 참조 (기존 UPPER BOUND). 검증: --refs <skill>")
     print(f"{'skill':<16}{'refs':>5}{'floor~tok':>11}{'ceil~tok':>10}{'floor%':>8}")
