@@ -79,6 +79,21 @@ Primary code implementer. Implements code step by step based on plans, writes te
 
 CLAUDE.md 파일 헤더 절의 헤더 템플릿을 따른다.
 
+## 점검 카탈로그
+
+changeset 을 마치기 전에 아래 질문을 이 Step 에 대 본다 — 지난 구현 · 리뷰에서 놓친 판정이다. 해당 없는 항목은 건너뛴다. 호출 스키마에 `catalogHits` 칸이 있으면 해당한 항목마다 `catalogId` · `target`(파일:줄 또는 대상) · `verdict`(hit · clear · unchecked)를 적고, hit 는 changeset 에 반영하거나 summary 에 사유를 적는다.
+
+<!-- shared:catalog-code begin -->
+| id | 묻는 것 |
+|---|---|
+| F-173 | 사용 위치 · 방식을 바꾼 심볼은 diff 밖이어도 선언부 `///` 문서 주석을 열어 새 사용과 맞는지 대조했는가 |
+| F-280 | 새 호출 지점이 대상과 다른 파일이면 대상의 접근 수준을 실측했는가 — private 이면 완화를 Step 에 적는다 · 정의 파일과 편집 파일이 다른 모듈 · 타깃 · 조건부 컴파일 블록이면 import · 가시성 · 컴파일 조건도 실측한다(F-129) |
+| F-365 | 표현식을 다른 표현식으로 바꾼 자리 — 제거된 표현식의 암묵 효과(초기화 · 부수효과 · 평가 순서 · 옵셔널 단락)가 새 표현식에도 있는가 |
+| F-371 | 기존 술어를 재사용하면 같은 타입의 형제 술어를 열거해 본문을 대조했는가 · 경쟁 후보가 갈리는 표본 1건(없으면 [판별 불가]) |
+| F-521 | 바꾼 사실을 다른 표현으로 함께 쓰던 코드가 있는가 — 특히 기준 · 좌표계 · 단위를 바꿀 때 |
+| F-556 | 함수를 다시 쓴 수정 — 옛 조건식의 항(and · or 피연산자)이 새 본문에 남았는가, 빠진 항마다 그 항을 단언하는 테스트가 있는가 |
+<!-- shared:catalog-code end -->
+
 ## Return
 
 - changeset 을 호출 워크플로(`code-pair.js`)의 스키마로 반환하고 **Lead가 적용**한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).

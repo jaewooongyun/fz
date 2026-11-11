@@ -65,7 +65,7 @@ CLIPATH="$T/fakebin:$NOCLI"
 # ── 입력 — 검토 대상 저장소(커밋 없는 git) · 스키마를 통과하는 가짜 응답(gpt_review_schema · gate verdict)
 REPO="$T/repo"
 { mkdir -p "$REPO" && git -C "$REPO" init -q 2>/dev/null && echo a > "$REPO/a.txt"; } || { echo "UNRUN  검토 대상 저장소를 만들지 못했다"; exit 2; }
-VERIFY_JSON='{"schemaVersion":"1.1","review_id":"fixture","timestamp":"2026-09-29T00:00:00Z","review_type":"plan_validation","issues":[],"summary":{"total_issues":0,"by_severity":{"critical":0,"major":0,"minor":0,"suggestion":0},"by_category":""},"verdict":"approved","overall_feedback":"ok","strengths":[]}'
+VERIFY_JSON='{"schemaVersion":"1.1","review_id":"fixture","timestamp":"2026-09-29T00:00:00Z","review_type":"plan_validation","issues":[],"summary":{"total_issues":0,"by_severity":{"critical":0,"major":0,"minor":0,"suggestion":0},"by_category":""},"verdict":"approved","overall_feedback":"ok","strengths":[],"catalogHits":[]}'
 GATES_JSON='{"schemaVersion":"1.0","ledger":"plan.draft.md","gates":[],"summary":{"total":0,"accept":0,"revise":0,"demote_to_manual":0}}'
 
 # 판독기 — 원장 · status JSON · 발견 색인을 한 줄로(없으면 no-file · no-key — 빈 값이 0 으로 읽히지 않게)

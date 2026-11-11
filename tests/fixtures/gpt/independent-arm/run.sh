@@ -285,7 +285,7 @@ sleep 1; tagged_alive "$RUNTAG-hangterm" && no "TERM 무시 자손: KILL 되지 
 tagged_kill "$RUNTAG-hangterm" KILL
 
 # ⑧ planner 거부 → exit 17
-printf '%s' '{"status":"rejected","reason":"claude_plan_detected","approach":"-","affectedFiles":{"new":0,"modified":0},"steps":[],"riskMatrix":[],"stressTest":[],"implicationRegister":[],"divergencePoints":[],"projectRules":{"axes":{"architecturePattern":null,"uiStack":null,"dependencyDirection":null,"naming":null,"placement":null,"conventions":null},"rules":[],"conflicts":[],"gaps":[]}}' > "$T/rejected.json"
+printf '%s' '{"status":"rejected","reason":"claude_plan_detected","approach":"-","affectedFiles":{"new":0,"modified":0},"steps":[],"riskMatrix":[],"stressTest":[],"implicationRegister":[],"divergencePoints":[],"projectRules":{"axes":{"architecturePattern":null,"uiStack":null,"dependencyDirection":null,"naming":null,"placement":null,"conventions":null},"rules":[],"conflicts":[],"gaps":[]},"catalogHits":[]}' > "$T/rejected.json"
 run rej "$T/rejected.json" "$T/r-ok.jsonl" plan --requirement "$IN/requirement.md"
 check "planner 거부: exit 17" "$(rc rej)" 17
 check "planner 거부: 세션을 넘기지 않는다(sessionFile null · 세션 파일 삭제)" \

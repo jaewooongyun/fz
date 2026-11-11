@@ -6,7 +6,10 @@
 //     Workflow({ scriptPath: '{WORK_DIR}/code-pair.js',   // 원본 {plugin_root}/workflows/ 를 §12 0단계 준비(cp → cmp -s)로 복사
 //   ⛔ verify 는 VerifySpec 객체다 ({kind:'command'|'manual', …} — plan-collaborative.js 정의).
 //      본 스크립트는 stepSpec 을 **해석하지 않고** 프롬프트에 통째 전달하므로 형태 변경에 무관하다.
-//       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify:VerifySpec, complexity, estimatedNewBodyLines?}, contextPath, buildFeedback?, changesetTarget } })
+//       args: { mode: 'full'|'light', stepSpec: {id,title,goal,files,verify:VerifySpec, complexity, estimatedNewBodyLines?}, contextPath, buildFeedback?, changesetTarget, catalogHits? } })
+//   catalogHits: ⛔ 기본 off. true 면 Stage 1 프롬프트에 [점검 카탈로그] 1줄 · changeset 스키마 사본에 catalogHits(catalogId · target · verdict) 필수 칸 —
+//     카탈로그 본문은 templates/check-catalog-code.md(agents/impl-correctness.md 공용 블록). 반환 catalogHits 로 올리고 catalog_hits_report.py 가 센다
+//     (round 3 S3 · tests/workflows/review-schemas.js r3-catalog-code-pair-switch-*)
 //       estimatedNewBodyLines?: Lead 추정 총 newBody 줄수 — SPLIT_THRESHOLD(600) 초과 시 pre-flight가 스폰 전 split_required 반환(H5). 미제공 시 가드 skip(하위호환).
 //   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, lensesExpected, lensesCompleted,
@@ -171,6 +174,13 @@ if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
 }
 // buildFeedback type guard: 빈 문자열('')은 "피드백 없음"이 아닌 유효 입력과 구분 (E:E15 계열)
 const buildFeedback = (typeof input.buildFeedback === 'string' && input.buildFeedback.length > 0) ? input.buildFeedback : null
+// 점검 카탈로그 — 기본 off(기본 스키마 · 반환 모양 불변 · effort-arg.js code-pair-schema-intended-only). Stage 1 스키마 사본에만 붙인다
+const catalogOn = input.catalogHits === true
+const CATALOG_HITS = { type: 'array', description: '점검 카탈로그 중 해당한 항목', items: { type: 'object', required: ['catalogId', 'target', 'verdict'],
+  properties: { catalogId: { type: 'string' }, target: { type: 'string' }, verdict: { type: 'string', enum: ['hit', 'clear', 'unchecked'] } } } }
+const Stage1Schema = catalogOn
+  ? (c => { c.required = [...c.required, 'catalogHits']; c.properties.catalogHits = CATALOG_HITS; return c })(JSON.parse(JSON.stringify(ChangesetSchema)))
+  : ChangesetSchema
 
 const STEP = `[Step 명세] ${JSON.stringify(input.stepSpec)}\n[컨텍스트] 요약 파일: ${input.contextPath} (Read로 로드)\n[변경 대상 레포] ${input.changesetTarget}` +
   (buildFeedback ? `\n[이전 적용 빌드 피드백] ${buildFeedback}` : '')
@@ -190,8 +200,9 @@ const changeset = await callAgent(
   `${OVERRIDE}\n[역할] 구현자(impl-correctness 렌즈)\n${STEP}\n` +
   `[목표] Step 목표를 달성하는 changeset 생산. 각 symbolEdit의 newBody는 Lead가 그대로 적용 가능한 exact syntax ` +
   `(의사코드·생략 금지). 대상 파일을 Read해 현재 상태 기준으로 작성. buildExpectation은 검증 가능 형태로.` +
-  (buildFeedback ? ' 이전 빌드 피드백의 오류를 우선 해소.' : ''),
-  { label: 'stage1-impl', agentType: 'fz:impl-correctness', model: 'opus', effort: EFFORT, schema: ChangesetSchema })
+  (buildFeedback ? ' 이전 빌드 피드백의 오류를 우선 해소.' : '') +
+  (catalogOn ? '\n[점검 카탈로그] 에이전트 정의의 점검 카탈로그를 이 Step 에 대 보고 해당 항목마다 catalogHits(catalogId · target · verdict)에 적는다 — hit 는 changeset 에 반영하거나 summary 에 사유를 적는다.' : ''),
+  { label: 'stage1-impl', agentType: 'fz:impl-correctness', model: 'opus', effort: EFFORT, schema: Stage1Schema })
 if (!changeset) {
   fallbackCount += 1
   // 크기 프록시(files>=4 OR complexity===5)면 split 힌트. ⚠️ null=무조건 split 아님 —
@@ -320,5 +331,6 @@ return {
   //    이전 술어는 verdict==='issues' 를 요구해 partial + stage3 실패에서 이슈를 통째로 버렸다.
   //    ⛔ Stage3 트리거(`review.issues.length > 0`)와 **같은 식**이어야 한다 — 두 곳이 갈린 것이 이 결함의 형태였다.
   residualIssues: (s3Issues.length > 0 && finalChangeset === changeset) ? s3Issues : [], // 미반영분 — Lead 판정
+  ...(catalogOn ? { catalogHits: Array.isArray(changeset.catalogHits) ? changeset.catalogHits : [] } : {}),   // ⛔ 기본 반환 모양 불변
   metrics: metrics(stagesCompleted), // Lead: 적용 → 빌드 → §5.7 세션당 1행 집계 (invoke당 N행 발산 방지)
 }

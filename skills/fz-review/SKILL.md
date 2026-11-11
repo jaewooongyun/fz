@@ -458,6 +458,7 @@ Gate 5 통과 후:
 진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
 - review-live 를 띄우지 않고 Phase 5 Lead 3중 검증 · Phase 5.5 역방향 검증 · Reflection Rate 를 그대로 한다 — GPT 단계는 full 과 같다(끈 세션이면 `[GPT 미사용]`) · 산출물도 full 과 같다
 - ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
+- 점검 카탈로그: `templates/check-catalog-review.md` 를 Read 해 리뷰 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 리뷰 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <review 산출물> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-review.md"` 로 잰다
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
 
 ## 에러 대응

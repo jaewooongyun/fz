@@ -13,7 +13,8 @@
     "summary",
     "verdict",
     "overall_feedback",
-    "strengths"
+    "strengths",
+    "catalogHits"
   ],
   "additionalProperties": false,
   "properties": {
@@ -280,6 +281,40 @@
         "type": "string"
       },
       "description": "코드/계획의 강점"
+    },
+    "catalogHits": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "점검 카탈로그(역할 스킬 Check Catalog) 중 해당한 항목. null 은 카탈로그 블록을 받지 못한 경로다(catalog_hits_report.py 가 경로 단위 unchecked 로 센다). 해당 항목이 없으면 빈 배열",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "catalogId",
+          "target",
+          "verdict"
+        ],
+        "properties": {
+          "catalogId": {
+            "type": "string",
+            "description": "카탈로그 행 id(F-NNN)"
+          },
+          "target": {
+            "type": "string",
+            "description": "파일:줄 또는 대상 — unchecked 면 이유"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "hit",
+              "clear",
+              "unchecked"
+            ]
+          }
+        }
+      }
     }
   }
 }

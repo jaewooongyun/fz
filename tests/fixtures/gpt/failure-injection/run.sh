@@ -48,7 +48,7 @@ PY
   roll "$T/r-ok.jsonl" 1 "cat requirement.md"
   roll "$T/r-claude.jsonl" 1 "cat /x/.claude/projects/p/a.jsonl"
   roll "$T/r-nodeny.jsonl" 0 "cat requirement.md"
-  printf '%s' '{"status":"rejected","reason":"claude_plan_detected","approach":"-","affectedFiles":{"new":0,"modified":0},"steps":[],"riskMatrix":[],"stressTest":[],"implicationRegister":[],"divergencePoints":[],"projectRules":{"axes":{"architecturePattern":null,"uiStack":null,"dependencyDirection":null,"naming":null,"placement":null,"conventions":null},"rules":[],"conflicts":[],"gaps":[]}}' > "$T/rejected.json"
+  printf '%s' '{"status":"rejected","reason":"claude_plan_detected","approach":"-","affectedFiles":{"new":0,"modified":0},"steps":[],"riskMatrix":[],"stressTest":[],"implicationRegister":[],"divergencePoints":[],"projectRules":{"axes":{"architecturePattern":null,"uiStack":null,"dependencyDirection":null,"naming":null,"placement":null,"conventions":null},"rules":[],"conflicts":[],"gaps":[]},"catalogHits":[]}' > "$T/rejected.json"
   printf '{"issues": []}\n' > "$T/claude.json"
   printf '{"plan": {"steps": [{"id": "S1", "title": "t", "files": ["src/orders/order_service.ts"]}], "rtm": [], "riskMatrix": []}}\n' > "$T/claude-plan.json"
 

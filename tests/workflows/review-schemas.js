@@ -18,6 +18,8 @@
 //   catalog-hits-counter-schema  (S19) counter 콜 — review-live catalogHits:true · peer-review 기본(deep) 에서 스키마 사본에 catalogHits(catalogId ·
 //                              target · verdict — severity · evidence 없음) · 프롬프트 [점검 카탈로그] · 반환 catalogHits. 끄면(review-live 기본 · peer false) 셋 다 없다 · Stage 1 · 교차엔 없다
 //   catalog-hits-edge-schema   (S19) plan-lean2 적대 렌즈 — catalogHits:true 면 스키마 · 프롬프트에 칸 · 방어 스키마와 함께 켜도 둘 다 남는다 · 기본엔 없다 · 다른 콜엔 없다
+//   r3-catalog-code-pair-switch-off-default  (round 3 S3) code-pair 기본 — Stage 1 스키마 · 프롬프트 · 반환 어디에도 catalogHits 가 없다
+//   r3-catalog-code-pair-switch-on-recorded  catalogHits:true — Stage 1 스키마 필수 칸 · 프롬프트 [점검 카탈로그] · 반환 catalogHits(구현 콜 값) · 검토 · 수정 콜엔 없다
 'use strict'
 const fs = require('fs')
 const path = require('path')
@@ -200,6 +202,25 @@ async function capture(wf, extra, resp) {
     && noCatalog(edgeS(leanDef)) && !edgeP(leanDef).includes(MARK)
     && others(leanOn).length > 0 && others(leanOn).every(k => noCatalog(leanOn.schemas[k])),
     `켬 ${hasCatalog(edgeS(leanOn))} · 방어와 함께 ${hasCatalog(edgeS(leanBoth))} · 기본 ${noCatalog(edgeS(leanDef))} · 다른 콜 ${others(leanOn)}`)
+
+  // ── round 3 S3 · code-pair 카탈로그 스위치 ──
+  const CP = { mode: 'full', stepSpec: { id: 'S1', title: 't', goal: 'g', files: ['a'], verify: { kind: 'manual', criterion: 'c' }, complexity: 3 },
+    contextPath: '/tmp/context.md', changesetTarget: '/tmp/changeset.json' }
+  const CS = { files: [{ path: 'a.swift', changeKind: 'modify', symbolEdits: [{ symbol: 'f', intent: 'i', oldAnchor: 'func f() { old() }', newBody: 'func f() {}', spanLines: 1 }], rationale: 'r' }],
+    summary: 's', buildExpectation: 'b' }
+  const CP_RESP = { 'stage1-impl': { ...CS, catalogHits: [HIT] }, 'stage2-review-arch': { verdict: 'issues', issues: [{ id: 'I1', severity: 'minor', detail: 'd' }] },
+    'stage2-review-quality': { verdict: 'pass', issues: [] }, 'stage3-revise': CS }
+  const cpOff = await capture('code-pair', CP, CP_RESP)
+  const cpOn = await capture('code-pair', { ...CP, catalogHits: true }, CP_RESP)
+  const cpLater = c => Object.keys(c.schemas).filter(k => k !== 'stage1-impl')
+  check('r3-catalog-code-pair-switch-off-default',
+    noCatalog(cpOff.schemas['stage1-impl']) && !(cpOff.prompts['stage1-impl'] || '').includes(MARK) && !!cpOff.result && !('catalogHits' in cpOff.result),
+    `스키마 ${noCatalog(cpOff.schemas['stage1-impl'])} · 반환 ${cpOff.result && Object.keys(cpOff.result)}`)
+  check('r3-catalog-code-pair-switch-on-recorded',
+    hasCatalog(cpOn.schemas['stage1-impl']) && (cpOn.prompts['stage1-impl'] || '').includes(MARK)
+    && !!cpOn.result && JSON.stringify(cpOn.result.catalogHits) === JSON.stringify([HIT])
+    && cpLater(cpOn).length > 0 && cpLater(cpOn).every(k => noCatalog(cpOn.schemas[k])),
+    `스키마 ${hasCatalog(cpOn.schemas['stage1-impl'])} · 반환 ${JSON.stringify(cpOn.result && cpOn.result.catalogHits)} · 다른 콜 ${cpLater(cpOn)}`)
 
   console.log(`review-schemas: ${fail ? 'FAIL' : 'OK'} (${total - fail}/${total})`)
   process.exit(fail ? 1 : 0)

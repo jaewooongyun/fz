@@ -28,7 +28,7 @@ ARM = os.path.join(R, "tests", "fixtures", "gpt", "independent-arm")
 ISO_RE = re.compile(r"/[^\s\"'\n]*?/fz-gpt-iso\.[A-Za-z0-9]{6}")
 REVIEW_OK = json.dumps({"schemaVersion": "1.1", "review_id": "s0", "timestamp": "2026-10-12T00:00:00Z", "review_type": "plan_validation",
                         "issues": [], "summary": {"total_issues": 0, "by_severity": {"critical": 0, "major": 0, "minor": 0, "suggestion": 0}, "by_category": ""},
-                        "verdict": "approved", "overall_feedback": "ok", "strengths": []})
+                        "verdict": "approved", "overall_feedback": "ok", "strengths": [], "catalogHits": []})
 
 
 class Env:

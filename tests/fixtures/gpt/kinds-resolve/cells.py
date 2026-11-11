@@ -201,7 +201,7 @@ def cells(env, tag0):
     rej = json.dumps({"status": "rejected", "reason": "claude_plan_detected", "approach": "-", "affectedFiles": {"new": 0, "modified": 0}, "steps": [],
                       "riskMatrix": [], "stressTest": [], "implicationRegister": [], "divergencePoints": [],
                       "projectRules": {"axes": {a: None for a in ("architecturePattern", "uiStack", "dependencyDirection", "naming", "placement", "conventions")},
-                                       "rules": [], "conflicts": [], "gaps": []}})
+                                       "rules": [], "conflicts": [], "gaps": []}, "catalogHits": []})
     kd = env.kdir("x17", "independent-plan")
     p, _, _ = gate(env, kd, 'independent-plan --requirement "$K/requirement.md" --arm gpt --run-id x --out-dir "$K/out"', shim_output=rej,
                    rollouts=[env.rollout(f"{kd}/r.jsonl", "cat requirement.md")])

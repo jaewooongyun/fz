@@ -75,7 +75,7 @@ def doc(version="1.1", sd="scope-in", drop=False):
             "review_type": "code_review", "issues": [issue],
             "summary": {"total_issues": 1, "by_severity": {"critical": 0, "major": 1, "minor": 0, "suggestion": 0},
                         "by_category": "logic_error 1"},
-            "verdict": "needs_revision", "overall_feedback": "fixture", "strengths": []}
+            "verdict": "needs_revision", "overall_feedback": "fixture", "strengths": [], "catalogHits": []}
 
 
 def run(tmp, name, obj):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""재발 방지 lint 7종 (B6) — 고친 문서 결함이 다시 생기면 잡는다.
+"""재발 방지 lint 8종 (B6) — 고친 문서 결함이 다시 생기면 잡는다.
 
 결함을 고치기만 하면 다시 생긴다. 등재된 결함마다 기계 검사를 하나씩 둔다.
 
@@ -12,11 +12,12 @@
 | module-size | 모듈 500줄 초과는 분리 검토 **경고**(실패 아님) · SKILL.md 500줄 초과는 실패 | F-485 |
 | broken-refs | "<대상>: <모듈 경로> 참조" 의 대상 이름이 그 파일에 없다(앵커 없는 산문 참조) | F-474 |
 | count-mismatch | "**N개 …**" 머리말 바로 아래 표의 행 수가 N 이 아니다 | F-479 |
+| catalog-required | 점검 카탈로그(templates/check-catalog-*.md)가 있어야 할 경로에 없다 — Workflow 워커 · GPT 역할 스킬은 공용 블록 · light Lead 는 템플릿 Read 지시 | F-005 외 PROMPT 15 |
 
 ⛔ 미실행은 PASS 가 아니다 — 검사 대상이 0개면 그 lint 는 UNRUN 이고 전체도 PASS 가 아니다.
 
 usage: lint_recurrence.py [--root R] [--only NAME]   ·   --self-test
-출력: lint 마다 `<name>: PASS|WARN|FAIL|UNRUN …` · 끝에 `lint_recurrence: k/7 PASS`
+출력: lint 마다 `<name>: PASS|WARN|FAIL|UNRUN …` · 끝에 `lint_recurrence: k/8 PASS`
 exit: 0 전부 PASS(WARN 포함) · 1 위반 · 2 미실행 있음
 """
 from __future__ import annotations
@@ -29,8 +30,16 @@ import tempfile
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(SCRIPT_DIR)
-LINTS = ("copies", "project-rules", "team-residue", "head-declaration", "module-size", "broken-refs", "count-mismatch")
-TEMPLATES = {"review-core": "templates/review-shared-block.md", "project-rules": "templates/project-rules-block.md"}
+LINTS = ("copies", "project-rules", "team-residue", "head-declaration", "module-size", "broken-refs", "count-mismatch", "catalog-required")
+TEMPLATES = {"review-core": "templates/review-shared-block.md", "project-rules": "templates/project-rules-block.md",
+             "catalog-plan": "templates/check-catalog-plan.md", "catalog-review": "templates/check-catalog-review.md",
+             "catalog-code": "templates/check-catalog-code.md"}
+# 점검 카탈로그가 있어야 할 곳(round 3 S3) — copies 는 있는 사본이 같은지만 본다. 빠진 경로는 여기서 잡는다
+CATALOG_BLOCKS = {"catalog-plan": ("agents/plan-edge-case.md", "gpt-skills/fz-planner/SKILL.md", "gpt-skills/fz-architect/SKILL.md"),
+                  "catalog-review": ("agents/review-counter.md", "gpt-skills/fz-reviewer/SKILL.md"),
+                  "catalog-code": ("agents/impl-correctness.md", "gpt-skills/fz-fixer/SKILL.md")}
+CATALOG_READS = {"skills/fz-plan/SKILL.md": "templates/check-catalog-plan.md", "skills/fz-review/SKILL.md": "templates/check-catalog-review.md",
+                 "skills/fz-code/SKILL.md": "templates/check-catalog-code.md"}   # light Lead — Workflow 가 없어 템플릿을 직접 Read 한다
 SHARED = re.compile(r"<!-- shared:([\w-]+) begin -->\n(.*?)<!-- shared:\1 end -->", re.S)
 OPERATIVE = ("agents/*.md", "skills/*/SKILL.md", "modules/*.md")
 TEAM_RE = re.compile(r"TeamCreate|SendMessage|-team\.md")   # 일몰된 장치를 쓰라는 실행 지시 — "TEAM" 은 지금도 full 추천 모드의 이름이라 대상이 아니다
@@ -167,9 +176,25 @@ def lint_count_mismatch(root):
     return v, f"개수 머리말 {n}건"
 
 
+def lint_catalog_required(root):
+    if not any(os.path.isfile(os.path.join(root, TEMPLATES[n])) for n in CATALOG_BLOCKS):
+        return None, "점검 카탈로그 템플릿 0개"
+    v = [f"{n}: 원문 {TEMPLATES[n]} 없음" for n in CATALOG_BLOCKS if not os.path.isfile(os.path.join(root, TEMPLATES[n]))]
+    for name, paths in CATALOG_BLOCKS.items():
+        for rel in paths:
+            p = os.path.join(root, rel)
+            if not os.path.isfile(p) or not any(m.group(1) == name for m in SHARED.finditer(_read(p))):
+                v.append(f"{rel}: shared:{name} 블록 없음 — 이 경로의 워커가 카탈로그를 받지 못한다")
+    for rel, tpl in CATALOG_READS.items():
+        p = os.path.join(root, rel)
+        if not os.path.isfile(p) or tpl not in _read(p):
+            v.append(f"{rel}: {tpl} Read 지시 없음 — light Lead 경로가 카탈로그를 받지 못한다")
+    return v, f"블록 경로 {sum(len(x) for x in CATALOG_BLOCKS.values())} · Read 경로 {len(CATALOG_READS)}"
+
+
 FUNCS = {"copies": lint_copies, "project-rules": lint_project_rules, "team-residue": lint_team_residue,
          "head-declaration": lint_head_declaration, "module-size": lint_module_size, "broken-refs": lint_broken_refs,
-         "count-mismatch": lint_count_mismatch}
+         "count-mismatch": lint_count_mismatch, "catalog-required": lint_catalog_required}
 
 
 def run(root, only=None):
@@ -209,6 +234,13 @@ def self_test():
         "skills/s/SKILL.md": blk("review-core", "core\n") + "**2개 렌즈**\n\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n",
         mod + "m.md": "# m\n일반 모듈\nFinal Report 형식\n", mod + "u.md": "2. **Final Report 생성**: " + ref_m + "\n> 상세 원칙: " + ref_m + "\nTeamCreate 는 일몰됐다\n",
     }
+    for n, paths in CATALOG_BLOCKS.items():          # 카탈로그 원문 · 블록 배치 · light Read 지시(합성)
+        clean[TEMPLATES[n]] = f"| {n} |\n"
+        for rel in paths:
+            base = blk("project-rules", "rules\n") if rel.startswith("gpt-skills/") else ""   # GPT 스킬은 project-rules lint 도 받는다
+            clean[rel] = clean.get(rel, base) + blk(n, f"| {n} |\n")
+    for rel, tpl in CATALOG_READS.items():
+        clean[rel] = f"light: {tpl} 를 Read 한다\n"
     seeded = {
         "copies": {"agents/y.md": blk("pair", "DIFFERENT\n")},
         "project-rules": {"gpt-skills/b/SKILL.md": "no block\n"},
@@ -218,6 +250,7 @@ def self_test():
         "module-size": {"skills/big/SKILL.md": "x\n" * 501},
         "broken-refs": {mod + "r.md": "2. **Missing Section 생성**: " + ref_m + "\n"},
         "count-mismatch": {"skills/c/SKILL.md": "**3개 렌즈**\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"},
+        "catalog-required": {"gpt-skills/fz-fixer/SKILL.md": "블록 없음\n"},
     }
     with tempfile.TemporaryDirectory() as d:
         _mk(d, clean)
