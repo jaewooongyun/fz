@@ -37,6 +37,7 @@
 | `@Observable`, `@Bindable`, `@Environment` | SwiftUI Expert | state-management, latest-apis |
 | `body: some View`, `.modifier`, `ViewModifier` | SwiftUI Expert | view-structure, performance-patterns |
 | `Text("리터럴")`, `String(localized:)`, `LocalizedStringKey`, 로컬라이즈 문자열 변경 | SwiftUI Expert | localization, view-structure (⚠️ 오버로드: 리터럴=`LocalizedStringKey` 로컬라이즈 vs 변수:String=`StringProtocol` 미로컬라이즈) |
+| `withAnimation`, `.animation(`, `.transition(`, `Animatable`, `animatableData` | SwiftUI Expert | animation-basics, animation-transitions, animation-advanced |
 | `async`, `await`, `Task {`, `Task.detached` | Swift Concurrency | async-await-basics, tasks |
 | `@MainActor`, `actor `, `nonisolated` | Swift Concurrency | actors |
 | `Sendable`, `@Sendable`, `sending` | Swift Concurrency | sendable |

@@ -12,6 +12,7 @@ Each pattern names the **correct** repair, not the symptom-suppressing one.
 - **`@State` missing `private`**: add `private`. Do NOT change it to `@StateObject` (different ownership semantics).
 - **`@Observable` (iOS 17+) without `#available`**: when the minimum target is lower, wrap the call site in `if #available(iOS 17, *)` and provide a fallback (`ObservableObject` + `@StateObject`). Do NOT downgrade to `ObservableObject` if iOS 17+ is the actual minimum target.
 - **`onChange` signature mismatch**: match the minimum target — `{ newValue in }` before iOS 17, `{ old, new in }` from iOS 17. Do NOT introduce iOS 17+ syntax without `#available`.
+- **Floating-point → `Int` in layout math**: `Int(_:)` traps on `.infinity`, `.nan` or an out-of-range value, and a custom `Layout` may be proposed `.infinity` or `nil` in either dimension. Check `isFinite` and the range (or handle the `nil` / `.infinity` proposal) before converting. Do NOT clamp after the conversion — the trap happens inside `Int(_:)`.
 - **Passive View violation**: a view body calling a repository/service directly. Move the call to the component that owns data loading. Do NOT just wrap it in `Task { ... }` inside the view body — that masks the violation.
 
 ## Concurrency repair patterns

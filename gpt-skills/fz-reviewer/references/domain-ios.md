@@ -12,6 +12,8 @@
 - `body` is pure: no side effects, no network calls, no direct state mutation
 - `ForEach` needs stable identity (`Identifiable` or an explicit `id:`)
 - `onChange`: `{ newValue in }` before iOS 17 · `{ old, new in }` from iOS 17 (`#available` when the target is lower)
+- A custom `Layout`'s `sizeThatFits(proposal:subviews:cache:)` may be called several times in one pass with `.zero`, `.infinity` and `.unspecified` (`nil`) proposals, also one dimension at a time (a horizontal stack may propose a fixed height with an infinite width) — Apple docs, `Layout.sizeThatFits`
+- `Int(_:)` from a `Double` or `CGFloat` traps at runtime when the value is `.infinity`, `.nan` or outside `Int`'s range; `Int(exactly:)` returns `nil` instead
 
 ## RIBs (only with `import RIBs`)
 - `didBecomeActive`: start Rx subscriptions, load initial data
