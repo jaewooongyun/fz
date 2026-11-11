@@ -281,10 +281,11 @@ Stage 2 는 상대 렌즈 issue 에 `agree`/`adjust`/`false_positive` 를 매기
 
 ### Gather
 - WORK_DIR 초기화 + diff 수집 (SKILL.md Gather Step 0-5 그대로)
-- Tier-Adaptive evidence (3개만):
+- Tier-Adaptive evidence (3개 + gather 산출 형제 대조):
   - `${WORK_DIR}/requirements.md` (PR title/body, JIRA acceptance criteria)
   - `${WORK_DIR}/evidence/old-new-pairs.md` (변경 함수 페어)
   - `${WORK_DIR}/base-behavior.md` (base 코드, origin 판정 근거)
+  - 형제 관례 대조: `${WORK_DIR}/evidence-convention.md` — gather 가 Tier 결정 전에 이미 쓴다(추가 수집 0 · `head/` 가 없으면 파일이 없다 · F-516)
 - 생략: producer-consumer, base-patterns, convention-samples, caller-analysis, semantic-mapping
 - Fact Verification Gate **전건 유지** (SKILL.md Gather Step 4)
   > ⛔ 경로가 가볍다고 약화하지 않는다. 렌즈가 없어 배포 반경은 작지만 **틀린 Fact 를 반박할 주체도 없다** — 교정 기회가 0 이라 오히려 더 필요하다. 부담도 작다: 상시 evidence 가 3~4종이라 Fact 수 자체가 적다.
@@ -302,6 +303,11 @@ Lead 단독으로 아래 perspectives 를 검토한다 (9 perspectives 중 선�
 **조건부 2**
 6. Refactoring Completeness — 리팩토링·치환·제거가 diff 에 있을 때
 7. Dependency Impact — import·DI·초기화 경로가 바뀔 때
+
+**형제 대조 1** (Tier 무관 — F-516)
+8. Sibling Convention — `evidence-convention.md` 를 발견 입력으로 읽고 행마다 Gate 4.9 `[관례 이탈]` 로 판정한다(INCLUDE 이슈가 없어도). 빠진 guard 가 동작을 바꾸면 bug, 의도를 모르면 intent-question 이고 measure 에 형제 N:M 을 적는다. 파일이 없으면 review-report 에 `형제 대조 UNRUN — head/ 없음` 을 남긴다(0건으로 적지 않는다)
+
+⛔ **형제 대조를 경량 경로에 두는 이유**: 형제가 모두 가진 guard 를 이번 변경만 빠뜨린 자리는 변경 크기와 무관하다. PR 5266(Tier 1)에서 팀원이 짚은 형제 guard 누락이 Lead 단독 분석에서 나오지 않았다 — 수집기는 있었는데 이 절차가 그 파일을 가리키지 않았다. 수집은 gather 가 Tier 결정 전에 이미 하므로 더해지는 비용은 읽기뿐이다.
 
 ⛔ **Concurrency Safety 가 상시인 이유**: `<100줄` 이라도 `Task {}` 하나로 data race 가 생기고 크래시로 이어진다. 그런데 auto-tier 승격(`risk_scan.py`)은 동시성 토큰이 **순증할 때**와 역방향 신호 하나(`static let`/`static var shared` + 저장 `var` 가 같은 파일의 추가 행에 함께 — 들여쓰기 근사 · 삭제 행에도 같은 조합이 있으면 개명으로 보고 제외)만 본다. 그 밖의 키워드 없는 동시성 위험(예: `static let shared` 가 아닌 경로로 공유되는 가변 상태)은 승격 신호가 없고, `--tier` 를 명시하면 승격 자체가 돌지 않는다. 즉 그런 위험은 Tier 0 에 남고, 여기서 보지 않으면 아무도 보지 않는다.
 
@@ -359,10 +365,10 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 ### Gather
 - Tier 0 + 추가 evidence 1개: `${WORK_DIR}/evidence/base-patterns.md`
-- 합 4개 (requirements + old-new-pairs + base-behavior + base-patterns)
+- 합 4개 (requirements + old-new-pairs + base-behavior + base-patterns) + gather 산출 형제 대조 `evidence-convention.md`(Tier 0 과 같다)
 
 ### Analyze
-- Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2)
+- Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2 + 형제 대조 1)
 - + GPT challenger 1회 — 호출은 § GPT Analyze 호출 한 형태다(래퍼 exec · `gpt_peer_review_schema` · 산출 `${WORK_DIR}/gpt-challenger-result.json`)
 - ⛔ 래퍼 exit 10~14 는 전부 측정 실패다(스키마 계약 위반 14 포함 — "이슈 0건" 아님). 선택 관련 실패(래퍼 stderr 의 `CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그, 모델·effort 거부 12)는 먼저 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 따른다. 그 밖이거나 처방 뒤에도 실패면 `skills/fz-peer-review/SKILL.md` § 에러 대응의 Tier 1 GPT 실패 규칙(`solo (gpt 실패)` — 실질 Tier 0 강등)으로 간다 · ⛔ exit 18(`GPT-OFF` — 사용자 선택 · CLI 없음)은 실패가 아니다 — GPT 칸 `[GPT 미사용 — 사유]` · 병합 `--gpt-unavailable` · 강등 · 감쇠 없음(`modules/gpt-strategy.md` § GPT 미사용)
 - ⊕ 기본으로(`--no-gpt-independent` 면 위 challenger) 위 challenger 대신 `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review` 를 쓴다 — 허용 입력만 격리 폴더로 들어가 Lead 요약 · 가설이 GPT 에 닿지 않는다. Synthesize 에서 Lead 발견을 `{"issues": […]}` 로 써서 `review_merge.py --claude … --out "${WORK_DIR}/merged.json"` 로 합친다(병합본 고정 경로 — Curate 후보 원본 · 모양 · 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4)

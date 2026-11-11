@@ -414,7 +414,7 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
 > caller(ViewModel)가 오히려 더 많은 concrete 타입을 참조 (역방향 문제).
 > 선언부 분석만으로는 실제 영향을 알 수 없다.
 
-**대상**: INCLUDE 이슈 중 init/DI/API 설계 관련 전체
+**대상**: INCLUDE 이슈 중 init/DI/API 설계 관련 전체 + `evidence-convention.md` 의 행 전부(INCLUDE 이슈 유무와 무관 — F-516)
 
 **처리 절차**:
 ```
@@ -681,6 +681,7 @@ Lead 에 남는 일: disposition `include` · `observation` · `exclude` 결정(
 | **Reflection Rate** | **조건부** | GPT 호출이 있을 때만(Tier 1). `N<10` 은 preliminary — verdict 보류 |
 | Confidence Matrix | **Tier 0 미적용 · Tier 1 2-vote** | Tier 0 은 simple checklist · Tier 1 은 § 9 Tier 1 행의 2-vote(Lead + GPT — `modules/peer-review-tiers.md` Tier 1 절차) · Tier 2 는 미투표. Tier 0 · 2 는 **설계상 부재** (F-121) |
 | Stage 2 교차 조정 | **미적용** | Workflow 미사용 경로 |
+| **4.9 `[관례 이탈]` 형제 대조** | **생존** | 형제가 모두 가진 guard 를 이번 변경만 빠뜨린 자리는 크기와 무관하다 — gather 가 Tier 결정 전에 수집한다(F-516 · PR 5266 Tier 1 누락) |
 
 ⛔ **"미적용"과 "생략"을 구분한다** — 전자는 설계, 후자는 누락(§ MergeContract § 2 `skipped`/`failed` 와 같은 규율). "미수행" 으로 뭉뚱그리면 빠뜨린 것인지 원래 없는 것인지 알 수 없다.
 

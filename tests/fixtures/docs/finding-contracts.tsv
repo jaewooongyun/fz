@@ -13,6 +13,12 @@ F-115	skills/fz-peer-review/SKILL.md	has	`alternatives` · `recommended` 는 원
 F-517	skills/fz-peer-review/SKILL.md	has	Lead 가 판단으로 뺀 관찰은 `dismissed[{id, what, reason}]`
 F-514	modules/peer-review-tiers.md	has	렌더러가 `## 축 판정` 표를 그린다
 F-516	modules/peer-review-gates.md	has	[관례 이탈] 이번 변경만 형제 관례와 다르다
+F-516	modules/peer-review-tiers.md	has	형제 관례 대조: `${WORK_DIR}/evidence-convention.md` — gather 가 Tier 결정 전에 이미 쓴다
+F-516	modules/peer-review-tiers.md	has	`evidence-convention.md` 를 발견 입력으로 읽고 행마다 Gate 4.9 `[관례 이탈]` 로 판정한다(INCLUDE 이슈가 없어도)
+F-516	modules/peer-review-tiers.md	has	파일이 없으면 review-report 에 `형제 대조 UNRUN — head/ 없음` 을 남긴다(0건으로 적지 않는다)
+F-516	modules/peer-review-tiers.md	has	Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2 + 형제 대조 1)
+F-516	modules/peer-review-gates.md	has	`evidence-convention.md` 의 행 전부(INCLUDE 이슈 유무와 무관 — F-516)
+F-516	modules/peer-review-gates.md	has	| **4.9 `[관례 이탈]` 형제 대조** | **생존** |
 F-520	skills/fz-peer-review/SKILL.md	has:replace	그 모듈 `## 자동 감지 트리거` 표 전체를 조건으로 잰 값
 F-520	skills/fz-peer-review/SKILL.md	lacks	(diff에 `@MainActor\|actor\|async` 감지 시)
 F-004	modules/review-checks.md	has	'이 형태 목록에서 0건' 이지 '위반 없음' 이 아니다
