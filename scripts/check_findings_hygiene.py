@@ -67,6 +67,11 @@ APPLIED_VALUES = ("full", "partial", "none")
 RECURS_ALIGN_FROM = "2026-11-08"   # 이날부터 쓴 엔트리만 클래스 불일치를 WARN 으로 센다 — 그 전은 INFO
 PROMOTED_MARK = "✅ **승격 완료"
 OBS_ID = re.compile(r"\bF-\d{3}[a-z]?\b")
+# 재관측 모순 · 일괄 판정 문구(S9) — 표지 줄만 낸다. 열어 둠 처분 줄은 `## 다음 판 판정` 절의 `- 열어 둠: 사유` 꼴이다
+REOBS_HEAD = re.compile(r"^#{2,3}\s*재관측\b", re.M)
+OPEN_DISP = re.compile(r"^- 열어 둠:\s*(.+?)\s*$", re.M)
+NO_OBS = re.compile(r"관측이 없다|관측 없음|관측이 없었다")
+BOILER_MIN = 5   # 같은 열어 둠 사유가 이만큼이면 엔트리마다 판정하지 않고 일괄로 적은 흔적이다(round 2: 28건이 한 문구)
 
 
 
@@ -520,6 +525,29 @@ def _drain_axes(arc: pathlib.Path, texts: dict, ledger_text: str | None):
     print(f"  [INFO] apply-now 후보(recurs_of 사슬 관측 ≥{APPLY_NOW_MIN} · live 포함): {len(cands)}")
     for x in cands[:10]:
         print(f"      [INFO] {x}")
+
+    # 재관측 모순 — 재관측 절이나 recurs_of 유입이 있는데 가장 최근 열어 둠 처분이 '관측 없음' 류다(round 2 OPEN 판정 누락).
+    # ⛔ 위치를 보지 않는다 — 본문 전체를 본다. F-171 은 재관측 절(65행)이 '이번 판에는 관측이 없다' 판정(71행)보다 앞이었다
+    inbound = {}
+    for src, dst in rec_of.items():
+        inbound.setdefault(dst, set()).add(src)
+    contra, reasons = [], {}
+    for d in sorted(texts):
+        sid = SLUG.match(d.split("/", 1)[1]).group(1)
+        text = "\n".join(ln for _, ln in _fence_free(texts[d]))
+        disp = OPEN_DISP.findall(text)
+        if not disp:
+            continue
+        reasons.setdefault(disp[-1], []).append(sid)
+        if not NO_OBS.search(disp[-1]):
+            continue
+        why = (["재관측 절"] if REOBS_HEAD.search(text) else []) + \
+              ([f"recurs_of 유입 {', '.join(sorted(inbound[sid]))}"] if inbound.get(sid) else [])
+        if why:
+            contra.append(f"{d}: {' · '.join(why)} — 최근 처분 '{disp[-1][:48]}'")
+    show("재관측 · 관측 없음 처분 모순", contra)
+    show(f"같은 열어 둠 사유 ≥{BOILER_MIN}",
+         sorted(f"{len(v)}건 '{k[:48]}' — {', '.join(sorted(v)[:6])}" for k, v in reasons.items() if len(v) >= BOILER_MIN))
 
 
 def check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None):
@@ -1223,6 +1251,66 @@ def self_test():
         fm_add(r, "F-003-gamma", "recurs_of: F-002\n")
         rc, out = both(r)
         assert rc == OK and "[INFO] F-090 관측 3 — live F-002, F-003" in out, f"⛔ archive 뿌리 사슬을 놓쳤다\n{out}"
+
+    DISP = ("\n## 다음 판 판정 (2026-11-09 round 2)\n\n"
+            "- 열어 둠: 데이터 — 엔트리 처방이 두 번째 관측 또는 측정을 조건으로 건다. 이번 판에는 관측이 없다\n")
+    REOBS = "\n## 재관측 2026-11-10 — 같은 기제\n\n두 번째 관측 본문\n"
+
+    def append(root, slug, extra):
+        p = root / "entries" / f"{slug}.md"
+        p.write_text(p.read_text(encoding="utf-8") + extra, encoding="utf-8")
+
+    def c_r3_reobs_after(tmp):
+        """재관측 절이 열어 둠('관측 없음') 처분 뒤에 붙었다 — 대기 사유가 풀린 후보. 펜스 안 인용 절은 세지 않는다."""
+        r = full(tmp)
+        append(r, "F-002-beta", DISP + REOBS)
+        append(r, "F-003-gamma", DISP + "\n```\n## 재관측 2026-11-10 — 인용\n```\n")
+        rc, out = both(r)
+        assert rc == OK and "[WARN] 재관측 · 관측 없음 처분 모순: 1" in out and "entries/F-002-beta: 재관측 절" in out, \
+            f"⛔ 처분 뒤 재관측을 놓쳤거나 펜스 안 인용을 셌다 rc={rc}\n{out}"
+
+    def c_r3_reobs_before(tmp):
+        """F-171 꼴 — 재관측 절이 '관측이 없다' 판정보다 앞에 있다. 판정 뒤만 보는 검사는 놓친다."""
+        r = full(tmp)
+        append(r, "F-002-beta", REOBS + DISP)
+        rc, out = both(r)
+        assert rc == OK and "[WARN] 재관측 · 관측 없음 처분 모순: 1" in out and "entries/F-002-beta: 재관측 절" in out, \
+            f"⛔ 판정보다 앞의 재관측 절을 놓쳤다 rc={rc}\n{out}"
+
+    def c_r3_recurs_inbound(tmp):
+        """다른 엔트리가 recurs_of 로 가리키는데(재발 유입) 처분은 '관측 없음' 이다."""
+        r = full(tmp)
+        fm_add(r, "F-003-gamma", "recurs_of: F-002\n")
+        append(r, "F-002-beta", DISP)
+        rc, out = both(r)
+        assert rc == OK and "[WARN] 재관측 · 관측 없음 처분 모순: 1" in out and "entries/F-002-beta: recurs_of 유입 F-003" in out, \
+            f"⛔ recurs_of 유입을 놓쳤다 rc={rc}\n{out}"
+
+    def c_r3_boilerplate(tmp):
+        """같은 열어 둠 사유가 BOILER_MIN 건이면 WARN · 하나 모자라면 0."""
+        r = full(tmp)
+        extra = [("F-004-delta", "| F-004 | x | [F-004](entries/F-004-delta.md) |\n"),
+                 ("F-005-epsilon", "| F-005 | x | [F-005](entries/F-005-epsilon.md) |\n")]
+        for s in LIVE:
+            append(r, s, DISP)
+        for s, row in extra:
+            (r / "entries" / f"{s}.md").write_text(entry_text(s, f"제목 {s}", f"머리 {s}", body(s)), encoding="utf-8")
+            edit(r / "INDEX.md", "| F-003 | x | [F-003](entries/F-003-gamma.md) |\n",
+                 "| F-003 | x | [F-003](entries/F-003-gamma.md) |\n" + row)
+        append(r, "F-004-delta", DISP)
+        rc4, out4 = both(r)
+        append(r, "F-005-epsilon", DISP)
+        rc5, out5 = both(r)
+        want = f"[WARN] 같은 열어 둠 사유 ≥{BOILER_MIN}"
+        assert rc4 == rc5 == OK and f"{want}: 0" in out4 and f"{want}: 1" in out5 and "5건 '데이터 — " in out5, \
+            f"⛔ 일괄 사유 문턱이 어긋났다 rc={rc4}/{rc5}\n{out5}"
+
+    for n, f in [("r3-reobserve-contradicts-latest-open", c_r3_reobs_after),
+                 ("r3-reobserve-before-open-still-caught", c_r3_reobs_before),
+                 ("r3-recurs-inbound-contradicts-open", c_r3_recurs_inbound),
+                 ("r3-boilerplate-open-reason-warn", c_r3_boilerplate)]:
+        cases += 1
+        case(n, f)
 
     for n, f in [("f071-apply-now-listed", c_apply_now_listed), ("f071-two-observations-not-listed", c_apply_now_two_not_listed),
                  ("f071-chain-through-archive", c_apply_now_through_archive)]:
