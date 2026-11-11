@@ -177,7 +177,7 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 
 ---
 
-## What's New — v4.55.0
+## What's New — v4.56.0
 
-다시 관측된 구멍을 도구로 닫고 남은 finding 91건을 다시 판정해 54건을 닫았다. fz-guard와 세션 종료 훅, 리뷰 제안 검사의 셸 · JS 판별을 허용 목록 토크나이저 하나로 옮겼고 fz-plan light 도 GPT 독립 플랜을 기본으로 띄운다. fz-guard 0.3.0 은 설정한 보호 경로 아래에서 도는 Bash 를 묻는다(기본 꺼짐).
-→ [릴리즈 노트](docs/releases/v4.55.0.md)
+리뷰 · 계획 · 구현의 full 은 "큼 AND 복잡" 일 때만 추천하고 그때만 묻는다. 추천 light 와 측정 불가는 묻지 않고 light 로 진행하며 한 줄로 알린다. 질문할 사람이 없으면 추천이 full 이어도 light 로 가고 원래 추천을 기록에 남긴다. `/fz` 는 사용자가 명시로 고른 모드만 넘기고, peer-review light 도 형제 관례 대조를 읽는다.
+→ [릴리즈 노트](docs/releases/v4.56.0.md)
