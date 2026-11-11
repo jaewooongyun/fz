@@ -62,6 +62,10 @@ OK, VIOLATION, UNRUN = 0, 1, 2
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from check_synthesized import normalize  # noqa: E402 — 두 생산자 모양을 같은 규칙으로 읽는다(F-530)
+try:                                                       # 공용 토크나이저(F-458) — JS 템플릿 보간식 경계를 정한다
+    import shell_tokens  # noqa: E402
+except Exception:                                          # noqa: BLE001 — 권한 · 구문 오류도 같다
+    shell_tokens = None
 
 KINDS = ("bug", "structure", "quality", "intent-question")
 ORIGINS = ("regression", "pre-existing", "improvement")    # workflows/peer-review.js finding 스키마 origin enum 과 같다
@@ -94,20 +98,119 @@ CODE_WORDS = frozenset(
 # 제안 코드의 문자열 · 주석은 식별자가 아니다 — 한 번에 훑어 먼저 시작한 쪽을 지운다(문자열 속 `//` 를 주석으로 보지 않는다).
 # 문자열: 큰 · 작은따옴표와 JS 템플릿(백틱). 주석: `//` · `/* */` · 뒤에 공백이 오는 `#`(Python · 셸) — `#if` · `#selector` 는 Swift 지시어라 남긴다
 _LEX_S = r'(?P<s>"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'|`(?:\\.|[^`\\])*`)'
-CODE_LEXEME = re.compile(_LEX_S + r'|(?P<c>//[^\n]*|/\*.*?\*/|(?<![\w#])#(?=[ \t]|$)[^\n]*)', re.S | re.M)
+CODE_LEXEME = re.compile(_LEX_S + r'|(?P<c>//[^\n\r\u2028\u2029]*|/\*.*?\*/|(?<![\w#])#(?=[ \t]|$)[^\n]*)', re.S | re.M)   # JS 줄 주석은 CR · U+2028 · U+2029 에서도 끝난다
 # 펜스 언어가 `#` 주석 언어면 `#` 은 붙어 있어도 주석이다(`#Connection refused`)
-CODE_LEXEME_HASH = re.compile(_LEX_S + r'|(?P<c>//[^\n]*|/\*.*?\*/|#[^\n]*)', re.S | re.M)
+CODE_LEXEME_HASH = re.compile(_LEX_S + r'|(?P<c>//[^\n\r\u2028\u2029]*|/\*.*?\*/|#[^\n]*)', re.S | re.M)
 HASH_LANGS = {"python", "py", "sh", "bash", "zsh", "shell", "console", "ruby", "rb", "yaml", "yml", "toml", "perl", "r"}
 
 
-def _strip_lexemes(code: str, hash_comments: bool) -> str:
-    """문자열 · 주석을 지운다 — JS 템플릿은 정적 글자만 지우고 실행되는 `${…}` 는 남긴다(보간식의 미지 함수도 대조한다)."""
-    def rep(m):
+UNLEXED = "__fz_unlexed_template__"   # 못 읽은 템플릿 자리 — 트리에 없는 이름이라 미지 심볼로 걸린다(fail-open 아님)
+REGEX_PREFIX_WORDS = frozenset(("typeof", "instanceof", "in", "of", "new", "delete", "void", "return", "throw", "case", "do", "else", "yield", "await"))
+# 정규식 리터럴(`/…/`)을 따지는 펜스 언어 — 언어 표시 없는 펜스 · 인라인 코드 · 산문 꼴 펜스의 `/`(경로 · `A/B`)까지 정규식 위험으로 보면
+# 코드 펜스의 4분의 1이 못 읽음이 됐다(실사용 대조 — scripts/judge_corpus_diff.py fence). 그 밖 언어의 `//` 든 정규식 뒤 심볼은 주석으로 읽혀
+# 빠질 수 있다 — 과잉 거부 쪽 대가가 커서 받아들인 한계다
+REGEX_LANGS = frozenset(("js", "javascript", "ts", "typescript", "jsx", "tsx", "mjs", "cjs"))
+REGEX_PAREN_WORDS = frozenset(("if", "while", "for", "with"))   # 이 낱말의 조건 괄호 뒤 `/` 는 정규식 리터럴이다(`if (x) /re/`)
+
+
+def _division(prev: str) -> bool:
+    """`prev` 바로 뒤의 `/` 가 나눗셈인가 — 피연산자(식별자 · 숫자 · `]` · 문자열 끝 · 짝이 조건 괄호가 아닌 `)`) 뒤다."""
+    if prev[-1:] in ("]", '"', "'", "`"):
+        return True
+    word = re.search(r"[A-Za-z0-9_$]+$", prev)
+    if word is not None:
+        return word.group(0) not in REGEX_PREFIX_WORDS
+    if prev[-1:] != ")":
+        return False
+    depth = 0
+    for i in range(len(prev) - 1, -1, -1):
+        depth += {")": 1, "(": -1}.get(prev[i], 0)
+        if depth == 0:
+            kw = re.search(r"(?:\bfor\s+await|([A-Za-z_$][A-Za-z0-9_$]*))\s*$", prev[:i])   # `for await (…)` 도 조건 괄호다
+            return not (kw and (kw.group(1) is None or kw.group(1) in REGEX_PAREN_WORDS))
+    return False                                          # 짝 `(` 를 못 찾았다 — 정규식일 수 있다(보수)
+
+
+def _regex_start(prev: str) -> bool:
+    """`prev` 바로 뒤의 `/` 가 확실히 정규식 리터럴의 시작인가 — 본문을 지워도 되는 자리만 본다. `_division` 의 False 는 '정규식일 수
+    있다' 는 보수 답이라(`}` · `++` 뒤도 False) 지우는 근거가 못 된다 — 지우면 나눗셈 사이 식별자가 사라진다(fail-open)."""
+    p = prev.rstrip()
+    word = re.search(r"[A-Za-z0-9_$]+$", p)
+    if word is not None and p[:word.start()].rstrip().endswith("."):
+        return False                                      # `obj.return / x /` — 속성 이름은 키워드가 아니다(피연산자 뒤 나눗셈)
+    return not p or p[-1] in "=(,:[!?;&|{" or (word is not None and word.group(0) in REGEX_PREFIX_WORDS)
+
+
+def _regex_risk(before: str, gap: str, tail: bool = False, spans=None) -> bool:
+    """바깥 JS 코드의 홀로 선 `/` 가 렉심 경계를 넘는 정규식 리터럴일 수 있는가 — 그 안의 `//` · `/*` · 따옴표를 주석 · 문자열로 읽으면
+    뒤 템플릿의 보간식이 통째로 사라진다(`/[//]/` · r3 4차 ISSUE-005). 나눗셈 자리(`_division`)는 보지 않는다. 정규식으로 읽어도 몸이
+    `gap` 안 같은 줄에서 닫히면 그 몸에는 주석 · 문자열 시작이 없다(있었다면 `gap` 이 거기서 끊겼다) — 줄이 먼저 끝나면 정규식이 아니다.
+    몸이 `gap` 끝(다음 렉심)까지 이어질 때만 위험이다 — 코드 끝(`tail`)이면 가릴 것이 없다. 닫힌 몸의 닫는 `/` 는 다시 여는 `/` 로
+    보지 않는다(`/\d+/` 의 닫는 `/` 앞 `+` 가 정규식 시작 자리로 읽히던 과잉 거부 · r3 8.5 2차)."""
+    k = gap.find("/")
+    while k >= 0:
+        if _division((before + gap[:k]).rstrip()):
+            k = gap.find("/", k + 1)
+            continue
+        j, cls = k + 1, False
+        while j < len(gap) and gap[j] not in "\n\r  ":
+            c = gap[j]
+            if c == "\\":
+                j += 2
+                continue
+            if cls:
+                cls = c != "]"
+            elif c == "[":
+                cls = True
+            elif c == "/":
+                break
+            j += 1
+        if j >= len(gap) and not tail:
+            return True
+        if spans is not None and j < len(gap) and gap[j] == "/" and _regex_start(before + gap[:k]):
+            e = re.match(r"[a-z]*", gap[j + 1:]).end()
+            spans.append((k, j + 1 + e))                  # 닫힌 정규식 리터럴(플래그 포함) — 본문은 패턴 글자다(식별자가 아니다)
+        k = gap.find("/", j + 1)
+    return False
+
+
+def _strip_lexemes(code: str, hash_comments: bool, regex: bool = False) -> str:
+    """문자열 · 주석을 지운다 — JS 템플릿은 정적 글자만 지우고 실행되는 `${…}` 는 남긴다(보간식의 미지 함수도 대조한다).
+
+    템플릿의 끝과 보간식 경계는 공용 토크나이저가 정한다(F-458) — 중첩 중괄호(`${wrap({}) + missingHelper()}`) · 보간식 안
+    문자열 · 템플릿을 따라간다. 보간식은 같은 규칙으로 다시 벗긴다 — 그 안의 문자열(`${"Connection refused"}`)은 심볼이 아니다.
+    ⛔ 못 읽으면(닫히지 않은 보간식 · 토크나이저 없음) `UNLEXED` 를 남긴다 — 정규식 추출로 돌아가 미지 함수를 흘리지 않는다."""
+    rx, out, i = CODE_LEXEME_HASH if hash_comments else CODE_LEXEME, [], 0
+
+    def gap(text, tail=False):                           # 정규식 리터럴은 JS 계열 펜스만 따진다(REGEX_LANGS)
+        spans = []
+        risky = regex and not hash_comments and _regex_risk("".join(out), text, tail, spans)
+        for a, b in reversed(spans):
+            text = text[:a] + '""' + text[b:]
+        out.append(text + (" " + UNLEXED + " " if risky else ""))
+    while True:
+        m = rx.search(code, i)
+        if not m:
+            gap(code[i:], tail=True)
+            return "".join(out)
+        gap(code[i:m.start()])
         s = m.group("s")
         if not s:
-            return " "
-        return '""' + ("".join(" " + x for x in re.findall(r"\$\{([^}]*)\}", s)) if s.startswith("`") else "")
-    return (CODE_LEXEME_HASH if hash_comments else CODE_LEXEME).sub(rep, code)
+            out.append(" ")
+            i = m.end()
+        elif not s.startswith("`"):
+            out.append('""')
+            i = m.end()
+        else:
+            r = shell_tokens.js_template(code, m.start()) if shell_tokens is not None else None
+            if r is None or shell_tokens.is_unknown(r):
+                out.append('"" ' + UNLEXED + " ")
+                i = m.end()
+            else:
+                out.append('""' + "".join(" " + _strip_lexemes(e, hash_comments, regex) for e in r[1]))
+                i = r[0]
+
+
 REPO_ROOT_FILE = "repo-root.txt"   # gather.sh 가 적은 저장소 루트 — head/ · base/ 는 바뀐 파일만이라 그 밖 식별자는 대상 sha 전체에서 찾는다
 BASE_SHA_FILE = "base-sha.txt"   # gather.sh 가 base/ 를 실제로 떠 온 커밋 — review.json 폴더(target.json 과 같은 자리)
 
@@ -202,7 +305,7 @@ def code_idents(text: str) -> set:
     """백틱 · 코드 펜스 안의 식별자(3글자 이상 · 키워드 · 흔한 표준 타입 제외)."""
     fences = [(m.group(1).lower(), m.group(2)) for m in re.finditer(r"```(\w*)(.*?)```", text, re.S)]
     ticks = [("", s) for s in re.findall(r"`([^`\n]+)`", re.sub(r"```.*?```", " ", text, flags=re.S))]
-    ids = {x for lang, s in fences + ticks for x in IDENT_RE.findall(_strip_lexemes(s, lang in HASH_LANGS))}
+    ids = {x for lang, s in fences + ticks for x in IDENT_RE.findall(_strip_lexemes(s, lang in HASH_LANGS, lang in REGEX_LANGS))}
     return {x for x in ids if len(x) > 2 and x not in CODE_WORDS}
 
 
@@ -576,6 +679,48 @@ def self_test() -> int:
              and lit('```\nthrow new Error("x"); rollOneStep()\n```') == VIOLATION
              and lit('```\n#selector(rollOneStep)\n```') == VIOLATION
              and lit('```js\nrollStep(`${missingHelper()}`)\n```') == VIOLATION)   # 템플릿 보간식은 실행되는 코드다
+        nested = [lit('```js\nrollStep(`${rollStep({}) + missingHelper()}`)\n```'),
+                  lit('```js\nrollStep(`${1 // c\r + missingHelper()\n}`)\n```'),        # 줄 주석은 CR 에서 끝난다(r3 ISSUE-005)
+                  lit('```js\nrollStep() // c\rmissingHelper()\n```')]
+        # 보간식 안 중첩 중괄호 뒤의 미지 함수도 대조한다(ISSUE-202622)
+        case("r3-f063-template-nested-brace", nested == [VIOLATION] * 3, nested)
+        strs = [lit('```js\nrollStep(`${"Connection refused"}`)\n```'), lit('```js\nrollStep(`${rollStep("a}b")} ok`)\n```')]
+        # 보간식 안 문자열은 심볼이 아니다 · 그 안의 } 는 보간식을 닫지 않는다(ISSUE-202607)
+        case("r3-f063-template-string-literal",
+             strs == [OK, OK], strs)
+        unread = [lit('```js\nrollStep(`${rollStep()`)\n```'),
+                  lit('```js\nrollStep(`${/[}]/.test("}") ? missingHelper() : 0}`)\n```'),   # 정규식 리터럴(r3 ISSUE-004)
+                  lit('```js\nrollStep(`${typeof /[}]/ + missingHelper()}`)\n```'),          # 키워드 뒤 정규식(r3 2차 ISSUE-003)
+                  lit('```js\nconst re = /[//]/; rollStep(`${missingHelper()}`)\n```')]        # 바깥 정규식 리터럴 안 //(r3 4차 ISSUE-005)
+        # 못 읽은 보간식은 미지 심볼이다(fail-open 아님)
+        case("r3-unknown-final-comment-worthy",
+             unread == [VIOLATION] * 4 and UNLEXED in code_idents('```js\nrollStep(`${rollStep()`)\n```')
+             and UNLEXED in code_idents('```js\nconst re = /[//]/; const t = `${missingHelper()}`;\n```'), unread)
+        # 흔한 나눗셈 · 경로 꼴은 못 읽음이 아니다 — 조건 괄호가 아닌 `)` 뒤 `/` 는 나눗셈 · 정규식은 JS 계열 펜스만 · 몸이 같은 줄에서
+        # 닫히는 정규식은 렉심을 가리지 않는다(실사용 대조에서 펜스의 4분의 1이 못 읽음이던 회귀). 조건 괄호 뒤 정규식은 그대로 못 읽음
+        divs = [lit('```swift\nlet w = (rollStep() - 1) / 2\n```'), lit('```kotlin\nval r = rollStep(rollStep) / 2\n```'),
+                lit('```js\nconst h = (rollStep() - 1) / 2 // half\n```'), lit('```\n~/rollStep "rollStep"\n```'),
+                lit('`~/rollStep "x"`'), lit('```ts\nconst m = /^a(?:b)?$/i; rollStep("x")\n```'),
+                lit('```js\nconst re = /\\d+/; rollStep("x")\n```'), lit('```js\nconst re = /x*/g; rollStep("x")\n```')]   # 닫는 / 앞 연산자(r3 8.5 2차)
+        case("r3-s1-division-and-paths-lexed",
+             divs == [OK] * 8 and UNLEXED in code_idents('```js\nif (x) /[//]/.test(s); const t = `${missingHelper()}`;\n```'), divs)
+        # 수정 전 트리(002df3b)의 옛 추출이 찾던 식별자 — 새 추출도 전부 찾는다(보간식 안 문자열을 심볼에서 뺀 고침은 위 셀이 잰다)
+        before = {"```js\nrollStep(`${missingHelper()}`)\n```": {"missingHelper", "rollStep"},
+                  "```\nconst m = `Connection ${id} refused`; rollStep()\n```": {"rollStep"},
+                  "```js\nrollStep(`${rollStep()} done`)\n```": {"rollStep"},
+                  "```js\nrollStep(`${wrap({}) + missingHelper()}`)\n```": {"rollStep", "wrap"}}
+        lost = {k: sorted(v - code_idents(k)) for k, v in before.items() if not v <= code_idents(k)}
+        case("r3-replaced-path-parity-comment-worthy", not lost, lost)
+        js = lambda s: code_idents("```js\n" + s + "\n```")   # noqa: E731
+        got = js('async function scan() { for await (const item of ["/"]) /[//]/.test(item) && missingHelper(item); } scan();')
+        case("r3-s1-r6-012-for-await-paren", UNLEXED in got, sorted(got))   # `for await (…)` 뒤 / 는 정규식 — 그 안 // 를 주석으로 읽지 않는다
+        got = [js("const pattern = /neverInRepo/; pattern.test(value);"), js("const pat = /abcdefXyz/gimsu; pat.test(value);"),
+               js("const r = x++ / missingHelper() / 2;"), js("const r = total / count / scale;")]
+        case("r3-s1-r6-014-regex-body-stripped",   # 확실한 정규식 시작 자리의 닫힌 본문 · 플래그는 식별자가 아니다 · 나눗셈 사이 식별자는 남는다
+             got == [{"pattern", "test", "value"}, {"pat", "test", "value"}, {"missingHelper"}, {"total", "count", "scale"}], [sorted(x) for x in got])
+        got = [js("const result = obj.return / missingHelper() / 2;"), js("const r = a?.typeof / missingHelper() / 2;")]
+        case("r3-s1-r7-property-keyword-division",   # `.` 뒤 키워드 철자는 속성 이름 — 그 뒤 / 는 나눗셈이라 지우지 않는다(GPT check r7 P2)
+             all("missingHelper" in x for x in got), [sorted(x) for x in got])
         case("f063-no-head-not-checked", run(mi(suggestion="`rollOneStep()` 을 부른다"))[0] == OK)
         case("f037-regression-without-base-quote", run(mi(base_quote=None))[0] == VIOLATION)
         rk = {"risk.json": {"risk": 0, "plugin_refs": {"SwiftUI Expert": ["state-management"]}, "runtime_axes": ["gesture"]}}

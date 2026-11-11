@@ -182,6 +182,17 @@ class Cell:
         try:
             d.mkdir(parents=True)
             shutil.copy2(HOOK, d / "gate_stop_hook.py")
+            # 훅은 옆 폴더의 공용 토크나이저를 import 한다(F-458) — 사본에 없으면 모든 Bash 가 '대상 미상' 이 되어 원장 전부가 후보다.
+            # 토크나이저 이전 트리(기준 probe)에는 없으므로 있을 때만 복사한다
+            if (HOOK.parent / "shell_tokens.py").is_file():
+                shutil.copy2(HOOK.parent / "shell_tokens.py", d / "shell_tokens.py")
+            # 훅은 쓰기 자리를 플러그인 루트의 fz-guard 판정(mods/fz-guard/hooks/guard.py — 옆 토크나이저 사본을 쓴다)에서 받는다(S1 구조
+            # 전환). 사본에 없으면 모든 Bash 가 '대상 미상' 이 되어 원장 전부가 후보다 — 있을 때만 같은 상대 자리에 복사한다
+            g = HOOK.parent.parent / "mods" / "fz-guard" / "hooks"
+            if (g / "guard.py").is_file():
+                (d.parent / "mods" / "fz-guard" / "hooks").mkdir(parents=True)
+                for n in ("guard.py", "shell_tokens.py"):
+                    shutil.copy2(g / n, d.parent / "mods" / "fz-guard" / "hooks" / n)
             (d / "gate_check.py").write_text(SHIM.format(real=str(GC)), encoding="utf-8")
         except OSError as e:
             raise Setup(f"shim 준비 실패: {e}")
