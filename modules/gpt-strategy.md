@@ -239,7 +239,7 @@ GPT 는 모드와 독립이다(`modules/mode-gate.md` § GPT 는 모드와 독�
 3. 대체 검증을 더하지 않는다 — **표기만**이다(2026-10-19 사용자 결정 · Gate 2). GPT 를 끈 것은 사용자이므로 fresh-context Claude 검증 같은 숨은 비용을 붙이지 않는다
 4. 병합(`scripts/review_merge.py`)은 `--gpt` 대신 `--gpt-unavailable "GPT 미사용 — <사유>"` 로 부른다. exit 18 감사를 `--gpt` 로 넘기면 병합이 exit 1 로 거부한다
 5. Reflection Rate 는 N/A 다 — GPT 이슈 0건이 아니라 GPT 부재다. 기준 미달로 읽지 않는다
-6. 독립 첫 패스(fz-plan · fz-modernize full 기본 · `--gpt-independent`) · Sprint Contract(kind `sprint-contract`)는 건너뛴다 — 각각 `[GPT 미사용 — 사유]`
+6. 독립 첫 패스(fz-plan light · full 기본 · fz-modernize full 기본 · `--gpt-independent`) · Sprint Contract(kind `sprint-contract`)는 건너뛴다 — 각각 `[GPT 미사용 — 사유]`
 
 ### fz-plan 원장 (verify-gates 없음)
 

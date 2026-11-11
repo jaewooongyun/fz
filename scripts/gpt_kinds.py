@@ -211,6 +211,9 @@ def resolve(kind, tokens, env=None, cwd=None, root=ROOT, reg=None):
             raise Usage(f"audit {got['audit']} has no sessionFile — the planner run was not kept or did not pass; run verify instead")
         if not iso:
             raise Usage(f"audit {got['audit']} has no iso — the planner run was not kept (--keep-iso)")
+        if not os.path.isdir(iso):
+            # F-578 — an earlier resume cross already cleaned this isolation dir (E3). Same exit as no session: the caller falls back to verify
+            raise Usage(f"audit {got['audit']} iso {iso} is gone — an earlier verify-cross cleaned it; run verify instead")
         plan["codex_home"] = os.path.join(iso, "gpt-home")
         clash = {os.path.realpath(x) for x in (out, out + ".session", got["audit"], got["prompt-file"])}
         if os.path.realpath(got["prompt-out"]) in clash:   # the wrapper erases OUT before it reads the prompt; the rest are inputs
@@ -809,6 +812,8 @@ def self_test():
         good = res[0] == want[0] and (len(want) < 2 or want[1](res[1]))
         if not good:
             fails.append(f"{name}: got {res[0]} {str(res[1])[:160]}")
+        elif os.environ.get("FZ_SELFTEST_LIST") and name.startswith("r3-"):
+            print(f"PASS {name}")   # gate cell line — round 3 cells only (the rest keep the summary line)
 
     t = tempfile.mkdtemp(prefix="fz-gptkinds-st.")
     try:
@@ -905,6 +910,11 @@ def self_test():
         expect("verify-cross plan", vc, ("ok", lambda p: p["codex_home"].endswith("fz-gpt-iso.ABCDEF/gpt-home") and p["cleanup_iso"].endswith("fz-gpt-iso.ABCDEF")
                                           and p["compose"]["to"] == sample["prompt-out"] and p["argv"][p["argv"].index("--session-file") + 1] == sample["session-file"]
                                           and "--gpt-skill-path" in p["argv"]))
+        # F-578 — a second Phase 2 round reuses the audit after the first resume cleaned the iso: usage (10), not a measurement failure (12)
+        os.rename(os.path.join(t, "fz-gpt-iso.ABCDEF"), os.path.join(t, "fz-gpt-iso.GONE00"))
+        expect("r3-f578-cleaned-iso-is-usage-10", vc, ("usage", lambda m: "is gone" in m and "run verify instead" in m))
+        os.rename(os.path.join(t, "fz-gpt-iso.GONE00"), os.path.join(t, "fz-gpt-iso.ABCDEF"))
+        expect("verify-cross plan after restore", vc, ("ok",))
         json.dump({"iso": os.path.join(t, "fz-gpt-iso.ABCDEF"), "sessionFile": None}, open(sample["audit"], "w"))
         expect("verify-cross without session", vc, ("usage",))
         # lint on the shipped registry

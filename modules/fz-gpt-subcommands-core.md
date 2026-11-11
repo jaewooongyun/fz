@@ -75,7 +75,7 @@ EOF
 FZ_GPT_ARTIFACT="$ARTIFACT" FZ_WORK_DIR="${WORK_DIR:-}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$REVIEW_FILE" --prompt-file "$P_VERIFY"
 ```
 
-### resume 교차 (fz-plan Phase 2 · 2.7 독립 플랜을 띄운 run — full 기본)
+### resume 교차 (fz-plan Phase 2 · 2.7 독립 플랜을 띄운 run — light · full 기본)
 
 독립 플래너(kind `independent-plan` · `--keep-iso`)의 세션을 이어 위 틀(Q1–Q8 · `gpt_review_schema`)로 Claude 플랜을 검증한다 — 플래너가 이미 읽은 맥락을 다시 읽지 않는다. ⛔ 세션 파일이 없으면 위 기본 `verify` 다 — 그 프롬프트 · 인자는 바뀌지 않는다(`tests/fixtures/plan-wiring/parallel-arms/run.sh` 가 가짜 CLI 로 대조한다).
 
@@ -88,6 +88,7 @@ FZ_GPT_ARTIFACT=plan FZ_WORK_DIR="${WORK_DIR:?fz-plan 작업 폴더 — 라운�
   --prompt-file "$P_VERIFY" --prompt-out "$P_CROSS"
 ```
 - ⛔ 감사에 `sessionFile` 이 없으면(런처가 `--keep-iso` 없이 돌았거나 실패했다) 정문이 resume 하지 않고 10 으로 끝낸다 — 그때 `iso` 가 있으면 같은 cleanup 으로 지운다. 호출자는 기본 `verify` 로 간다
+- ⛔ 앞 라운드 resume 교차가 격리 폴더를 지웠으면(플랜을 고친 뒤 두 번째 Phase 2 — 감사의 `iso` 가 이미 없다) 정문이 같은 10 으로 끝낸다 — 호출자는 같은 폴백대로 기본 `verify` 로 간다(F-578 · 옛 판은 12 측정 실패였다)
 - resume 은 래퍼가 `sandbox_mode="read-only"` 를 넘겨 격리 프로필의 deny 를 덮는다(F-348) — 이 단계는 교차 검증이라 독립이 아니어도 된다. 독립은 첫 패스의 몫이다
 
 ## verify-gates -- 게이트 원장 판정 (fz-plan Phase 2 추가 호출)
@@ -214,15 +215,12 @@ fi
 
 | verdict | 조건 | 호출자 권장 행동 |
 |---------|------|----------------|
-| `pass` | critical/major issue 0건 | 다음 단계 진행 |
-| `warn` | warning issue 1건+ but critical/major 0건 | 사용자 보고 + 진행 옵션 |
-| `fail` | critical/major issue 1건+ | 차단, 사용자 결정 필수 |
+| `pass` | 지적 0건 — 지적이 없다는 문장이 있다 | 다음 단계 진행 |
+| `warn` | `[P2]` · `[P3]` 또는 minor · suggestion 지적 1건+ · fail 신호 0건 | 사용자 보고 + 진행 옵션 |
+| `fail` | `[P0]` · `[P1]` 또는 critical · major 지적 1건+ | 차단, 사용자 결정 필수 |
+| `unrun` | 파일 없음 · 빈 파일 · 판정 신호가 없는 본문 | 본문을 읽고 판정한다 — 지적 0 으로 읽지 않는다 |
 
-**판정 grep** (`$REVIEW_FILE`에 적용, `grep -Eiq`로 case-insensitive 강제):
-- `grep -Eiq 'severity.*(critical|major)' "$REVIEW_FILE"` 매칭 → `fail`
-- 위 매칭 0건 + `grep -Eiq 'severity.*(minor|suggestion)' "$REVIEW_FILE"` 매칭 → `warn`
-- 둘 다 0건 + 파일 존재 + 비어있지 않음 → `pass`
-- 파일 없음 또는 빈 파일 → `warn` (false PASS 방지)
+**판정**: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_verdict.py" "$REVIEW_FILE"` 가 stdout 한 줄로 위 넷 중 하나를 낸다. 손 grep 으로 대신하지 않는다 — check 는 리뷰 모드 자유 서식이라 지적 머리가 `- [P2] 제목 — 경로:줄` 꼴이고 `severity` 낱말이 없다. severity 낱말만 보던 옛 grep 은 지적 6건이 든 출력을 pass 로 읽었다(F-581).
 
 > severity enum: `critical | major | minor | suggestion` (review schemas 정의). `warn`/`warning`은 매칭 대상 아님.
 

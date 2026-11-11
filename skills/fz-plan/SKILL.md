@@ -47,7 +47,7 @@ metadata:
 ## Prerequisites
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(full 기본 · 계획 단계의 첫 GPT 호출) · 5.5 Sprint Contract(발동 시) · Phase 2 verify ∥ verify-gates): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다 · 정문 exit 19(`GPT-ROUNDS:` 재검증 라운드 거부)면 다시 부르지 않는다 — `same-input` 은 stderr 가 가리킨 직전 판정 파일을 쓰고, 그 밖(`budget-exhausted` · `recall-used`)은 그 키를 미해결로 보고한다(`python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_rounds.py" status --work-dir {WORK_DIR}` — 통과 아님 · 2.7 독립 플랜은 2.7 대로 건너뛴다 · 정본 `modules/cross-validation.md` § 재검증 라운드 상한)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(light · full 기본 · 계획 단계의 첫 GPT 호출) · 5.5 Sprint Contract(발동 시) · Phase 2 verify ∥ verify-gates): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다 · 정문 exit 19(`GPT-ROUNDS:` 재검증 라운드 거부)면 다시 부르지 않는다 — `same-input` 은 stderr 가 가리킨 직전 판정 파일을 쓰고, 그 밖(`budget-exhausted` · `recall-used`)은 그 키를 미해결로 보고한다(`python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_rounds.py" status --work-dir {WORK_DIR}` — 통과 아님 · 2.7 독립 플랜은 2.7 대로 건너뛴다 · 정본 `modules/cross-validation.md` § 재검증 라운드 상한)
 
 ## 모듈 참조
 
@@ -108,7 +108,7 @@ metadata:
    cp {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js && cmp -s {플러그인 루트}/workflows/plan-lean2.js {WORK_DIR}/plan-lean2.js
    ```
    ⛔ 0단계가 비0 이면(경로 판정 불확정 포함) 복사본을 부르지 않는다 — **L4**(원본 경로 직접 호출·SOLO 로 낮추지 않는다). ⛔ 복사본은 산출물이 아니다 — 매 호출 덮어써서 stale 이 남지 않는다(§12).
-2.7. **GPT 독립 플랜 (full 기본 — 끄기 `--no-gpt-independent`) — Workflow 와 함께 띄운다(계획 단계의 첫 GPT 호출)**: `FZ_GPT_ARTIFACT=plan FZ_WORK_DIR={WORK_DIR} "${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-plan --requirement {요구 원문} [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 두 팔은 입력이 다르고(GPT = 요구 원문 · 지침 원문 색인 · 대상 레포 / Claude = 2 의 args) 서로의 플랜을 보지 않는다 — Sprint Contract(5.5)는 이 뒤라 넘기지 않는다. `--no-gpt-independent` 면 2.7 · 4.5 를 건너뛰고 Phase 2 는 기본 `verify` 다(롤백 한 플래그 · 옛 켜기 플래그를 줘도 기본과 같다). 정문 exit 19(`GPT-ROUNDS:`)면 다시 띄우지 않는다 — `same-input` 이면 stderr 가 가리킨 직전 독립 플랜으로 4.5 를 합치고, 그 밖(`budget-exhausted` — 독립 계열은 티켓 원장에 1회)이면 `[독립 플랜 없음 — GPT-ROUNDS: <사유>]` 를 남기고 2.7 · 4.5 를 건너뛴다(검증 미해결로 세지 않는다). 19 면 Phase 2 는 기본 `verify` 다 — 근거 `references/rationale.md` § 독립 플랜 기본 on. 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
+2.7. **GPT 독립 플랜 (light · full 기본 — 끄기 `--no-gpt-independent` · 두 모드 공통) — Workflow 와 함께 띄운다(light 는 Lead Phase 1 과 함께 · 계획 단계의 첫 GPT 호출)**: `FZ_GPT_ARTIFACT=plan FZ_WORK_DIR={WORK_DIR} "${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-plan --requirement {요구 원문} [--rules-index {원문 색인}] --repo {대상 레포} --deny {WORK_DIR} --keep-iso --arm gpt --run-id {run} --out-dir {WORK_DIR}/plan/gpt-independent` 를 background 로 띄운다(`--keep-iso` — Phase 2 resume 교차가 그 세션을 잇는다). 두 팔은 입력이 다르고(GPT = 요구 원문 · 지침 원문 색인 · 대상 레포 / Claude = 2 의 args) 서로의 플랜을 보지 않는다 — Sprint Contract(5.5)는 이 뒤라 넘기지 않는다. `--no-gpt-independent` 면 2.7 · 4.5 를 건너뛰고 Phase 2 는 기본 `verify` 다(롤백 한 플래그 · 옛 켜기 플래그를 줘도 기본과 같다). 정문 exit 19(`GPT-ROUNDS:`)면 다시 띄우지 않는다 — `same-input` 이면 stderr 가 가리킨 직전 독립 플랜으로 4.5 를 합치고, 그 밖(`budget-exhausted` — 독립 계열은 티켓 원장에 1회)이면 `[독립 플랜 없음 — GPT-ROUNDS: <사유>]` 를 남기고 2.7 · 4.5 를 건너뛴다(검증 미해결로 세지 않는다). 19 면 Phase 2 는 기본 `verify` 다 — 근거 `references/rationale.md` § 독립 플랜 기본 on. 경로는 **플러그인 루트 기준**(`scripts/resolve-plugin-root.sh`)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - **Stage 1 (동시 3, opus)**: 전체 플랜(방향 판정·readScope/writeScope·steps·rtm·antiPattern 포함) ∥ edge 적대 렌즈 ∥ impact+arch 렌즈
      → **Stage 2 (opus)**: 델타 병합(탐색 도구 없는 `fz:plan-merge` — 입력 JSON 만 접는다) — ⛔ 병합 콜의 schema 는 **델타 전용**(`stepAmendments`·`addedEdgeCases`·`addedImpact`)이라 본문을 다시 쓸 수 없다. **4 call**
@@ -168,6 +168,7 @@ metadata:
    - `mcp__plugin_fz_serena__read_memory` → 결정사항, 잔여 이슈 로드
 3. **프로젝트 활성화**:
    - `mcp__plugin_fz_serena__activate_project` → LSP 서버 활성화
+   - ⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile plan {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
 4. **대상 모듈 심볼 파악**:
    - `mcp__plugin_fz_serena__get_symbols_overview` → 작업 대상 파일 심볼 구조
    - `mcp__plugin_fz_serena__find_symbol` → 컴포넌트 탐색
@@ -183,6 +184,7 @@ metadata:
 
 ### Gate 0b: Context Ready
 - [ ] 프로젝트 활성화 완료?
+- [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile plan` exit 0? (WORK_DIR 없는 세션은 건너뜀을 보고)
 - [ ] 대상 심볼 구조 파악?
 - [ ] 이전 컨텍스트 로드 + 아키텍처 제약 추출·conflict 상태 확인? (각각 해당 시)
 
@@ -268,6 +270,8 @@ metadata:
 - [ ] ⛔ 요청 파라미터 키 목록이 원본과 일치하는가?
 - [ ] 구조 결정 옵션 테이블 포함 + 사용자 보고 제시? (Workflow 모드면 `directionAlternatives` 병합 확인. 답습/미러링이면 3축 필수 — 45차)
 - [ ] ⛔ 계획 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] 플랜 산문의 수치 · 건수 · `경로:줄` 주장에 출처를 달았는가? (F-185 — WARN 은 차단이 아니다. 줄마다 `[verified: 출처]` 나 code-context 행 참조를 달거나 주장을 고친다)
+      Evidence: `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_integrity_check.py" --plan-doc {WORK_DIR}/plan/plan-v{N}.md` → WARN 미검증 주장 {N}건
 
 > **Gate 증거 첨부** (H2 원칙 — self-check 보완): 결정론적 도구 출력이 있는 Gate 항목은
 > `Evidence:` 행에 도구 결과 요약을 기록한다. self-check "완료?"보다 도구 출력이 신뢰할 수 있다.
@@ -320,7 +324,7 @@ Phase 번호(0.7)는 이력상 이름이다 — 실행은 Phase 1 · 1.5 뒤 · 
 > 3. **양쪽 완료 대기** — 두 로그에 종료 표시가 모두 나온 뒤 판정한다. 한쪽만 보고 진행하면 나머지가 조용히 버려진다.
 > 4. **schema 검증 후 사용** — 각 응답을 `--output-schema` 계약으로 받고, `verify-gates` 는 `gate_check.py --verdict-check` 사후 대조까지 통과해야 판정으로 인정한다(⛔ 게이트 수 ≠ 판정 수이면 미판정).
 > ⛔ 버전 불일치(호출 사이에 plan 이 수정됨) 시 **재검증**한다 — 옛 plan 에 대한 판정을 새 plan 의 승인 근거로 쓰지 않는다.
-> ⊕ 2.7 독립 플랜을 띄웠으면(full 기본) `verify` 자리를 **resume 교차**가 맡는다 — kind `verify-cross`(`FZ_GPT_ARTIFACT=plan FZ_WORK_DIR={WORK_DIR} gpt-call.sh verify-cross --audit {감사}`)가 독립 플래너 세션을 `resume --session-file {감사 sessionFile}` 로 이어 같은 Q1–Q8 · `gpt_review_schema` 로 검증한다(`modules/fz-gpt-subcommands-core.md` § resume 교차). 위 네 계약은 그대로이고 `verify-gates` 와 동시에 돈다. 세션 파일이 없으면 기본 `verify` 다.
+> ⊕ 2.7 독립 플랜을 띄웠으면(light · full 기본) `verify` 자리를 **resume 교차**가 맡는다 — 4.5 차이표(`plan_divergence.py --out`)를 P_VERIFY 의 플랜 본문 뒤에 붙여 함께 넘긴다 — kind `verify-cross`(`FZ_GPT_ARTIFACT=plan FZ_WORK_DIR={WORK_DIR} gpt-call.sh verify-cross --audit {감사}`)가 독립 플래너 세션을 `resume --session-file {감사 sessionFile}` 로 이어 같은 Q1–Q8 · `gpt_review_schema` 로 검증한다(`modules/fz-gpt-subcommands-core.md` § resume 교차). 위 네 계약은 그대로이고 `verify-gates` 와 동시에 돈다. 세션 파일이 없으면 기본 `verify` 다.
 
 ### 절차
 
@@ -451,8 +455,9 @@ Transformation Spec "실행 스레드: main(@MainActor)" + [verified] 태그 →
 
 진입: 실행 절차 1.2 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
 - ⛔ 착수 전 `extract_project_rules.py` 원문 색인 1회 — 실행 절차 1.5 와 같은 계약이다(`check_project_rules.py --check` 통과본의 `conflicts[]` 가 비지 않으면 사용자 1회 보고). light 라고 지침 사이 모순(예: Claude · GPT 지침의 의존 방향이 반대)을 건너뛰지 않는다
-- plan-lean2 를 띄우지 않고 Phase 1 (Deep Planning)을 Lead 가 수행한다 — Phase 0.5 · 스트레스 테스트 Q1-Q6 · RTM 은 그대로(발동 조건대로) · Phase 0.7 Sprint Contract 는 열리지 않는다(발동 조건이 full — `modules/sprint-contract.md`) · 2.7 독립 플랜도 없다(Phase 2 는 기본 `verify`). 새 아키텍처 결정이면 1.2 가 full 을 추천한다
+- plan-lean2 를 띄우지 않고 Phase 1 (Deep Planning)을 Lead 가 수행한다 — Phase 0.5 · 스트레스 테스트 Q1-Q6 · RTM 은 그대로(발동 조건대로) · Phase 0.7 Sprint Contract 는 열리지 않는다(발동 조건이 full — `modules/sprint-contract.md`) · ⛔ 2.7 GPT 독립 플랜은 full 과 같이 기본으로 띄운다 — Lead 가 Phase 1 을 시작할 때 백그라운드로(끄기 `--no-gpt-independent` · 두 모드 공통). 4.5 합치기는 `plan_divergence.py --claude {WORK_DIR}/plan/steps.json`(Lead 가 쓴 steps.json 에 `riskMatrix` 를 함께 적는다 — 없으면 위험 대조가 판정 불가다)로 차이표만 붙이고(`plan_apply_delta` 는 Workflow 반환이 없어 건너뛴다) 그 차이표를 Phase 2 resume 교차(`verify-cross`) 입력에 싣는다 · 끈 run 은 기본 `verify`. 새 아키텍처 결정이면 1.2 가 full 을 추천한다
 - Phase 2 (GPT verify ∥ verify-gates) · Phase 3 · 원장(3.1 · 4.5) · `plan-final.md` 는 full 과 같다 — GPT 단계도 같다(끈 세션이면 `[GPT 미사용]` · 원장 판정은 Gate 2 확인으로)
+- 점검 카탈로그: `templates/check-catalog-plan.md` 를 Read 해 플랜에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 플랜에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <plan-v{N}.md> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-plan.md"` 로 잰다
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
 
 ## 에러 대응

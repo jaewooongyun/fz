@@ -12,7 +12,7 @@
 
 ## 절차 (fz-plan Phase 0.7 — 실행 절차 5.5 · 5.7)
 
-> 위치: ① GPT 독립 플랜(full 기본 — fz-plan `--no-gpt-independent` 면 없다) ∥ Workflow → ② 잠정 플랜 · 방향 정지(RECONSIDER/REDIRECT · `degraded` 면 fz-plan 실행 절차 4 대로 멈춘다) → ③ 합치기 → Lead 의 Phase 1 몫(Gate 1 · 1.5) **뒤**, ⑥ Phase 2 verify ∥ verify-gates **앞**. 계획 단계의 첫 GPT 호출은 ① 이고 Contract 는 그 뒤의 호출이다. "Phase 0.7" 은 이력상 이름으로 남은 번호다.
+> 위치: ① GPT 독립 플랜(light · full 기본 — fz-plan `--no-gpt-independent` 면 없다) ∥ Workflow → ② 잠정 플랜 · 방향 정지(RECONSIDER/REDIRECT · `degraded` 면 fz-plan 실행 절차 4 대로 멈춘다) → ③ 합치기 → Lead 의 Phase 1 몫(Gate 1 · 1.5) **뒤**, ⑥ Phase 2 verify ∥ verify-gates **앞**. 계획 단계의 첫 GPT 호출은 ① 이고 Contract 는 그 뒤의 호출이다. "Phase 0.7" 은 이력상 이름으로 남은 번호다.
 
 ④ **Sprint Contract** (발동 시 · 직전 decide — fz-plan 실행 절차 5.5):
 

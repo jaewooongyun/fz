@@ -99,7 +99,7 @@ EOF
 > **C4 원칙**: Claude의 중간 작업물(계획 텍스트)을 전달하지 않는다. 요구사항만 공유.
 > **비교**: 결과는 JSON 한 객체다(`gpt-skills/fz-planner` 출력 형식 — `status` · `steps` · `riskMatrix` · `divergencePoints` · `projectRules`). `status` 가 `rejected` 면 계획이 아니다 — `reason` 을 보고 입력을 고친다. 차이표는 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {workflow-result.json} --gpt "$PLAN_FILE"` 로 만든다
 
-## independent-plan · independent-review -- 격리 첫 패스 (fz-peer-review · fz-plan full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`)
+## independent-plan · independent-review -- 격리 첫 패스 (fz-peer-review · fz-plan light · full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`)
 
 Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. 규약은 `modules/cross-validation.md` § 독립 첫 패스.
 

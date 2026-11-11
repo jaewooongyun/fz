@@ -15,7 +15,9 @@
   위험       riskMatrix[].risk 를 글자 bigram 겹침(Jaccard)으로 짝짓는다 — 임계 미만은 짝 없는 한쪽 위험이다
 
 입력
-  --claude FILE  plan-lean2 반환(workflow-result.json — plan 을 읽는다) 또는 plan 객체
+  --claude FILE  plan-lean2 반환(workflow-result.json — plan 을 읽는다) 또는 plan 객체(light 의 steps.json — Lead 가 쓴
+                 steps · rtm · riskMatrix). 작업 폴더 산출물(`{WORK_DIR}/…`)은 레포 변경 대상이 아니라 대조에서 뺀다 ·
+                 riskMatrix 칸이 없으면 위험 대조는 판정 불가다(GPT 위험을 한쪽 위험으로 세지 않는다)
   --gpt FILE     GPT 독립 플랜 JSON — steps[{file | files, action?, why?}] · riskMatrix[{risk}]
                  (gpt-skills/fz-planner 출력 형식의 Steps · Risk Matrix 두 절을 옮긴 모양이다)
                  ⛔ contaminated: true 이거나 contamination 사유가 있으면 거부한다 — 독립 첫 패스가 아니다(AC-2)
@@ -124,8 +126,16 @@ def collect(pairs, gpt: bool = False) -> dict:
     return out
 
 
+WORKDIR_FILE = re.compile(r"^`?(?:\{(?:FZ_)?WORK_DIR\}|\$\{?FZ_WORK_DIR\}?)/")   # light steps.json 의 작업 폴더 산출물
+
+
+def step_files(step: dict) -> list:
+    """Step 의 레포 변경 대상 칸 — 작업 폴더 산출물은 뺀다(파일 대조 · 요구 대조가 같은 목록을 쓴다)."""
+    return [f for f in step.get("files") or [] if not WORKDIR_FILE.match(str(f).strip())]
+
+
 def claude_files(plan: dict) -> dict:
-    return collect([(f, str(s.get("id", "?"))) for s in plan["steps"] if isinstance(s, dict) for f in s.get("files") or []]
+    return collect([(f, str(s.get("id", "?"))) for s in plan["steps"] if isinstance(s, dict) for f in step_files(s)]
                    + [(w.get("file"), "writeScope") for w in plan.get("writeScope") or [] if isinstance(w, dict)])
 
 
@@ -184,7 +194,7 @@ def requirement_rows(plan: dict, gfiles: dict) -> list:
         if not found:
             rows.append(dict(base, files=[], verdict="판정 불가 — 없는 Step"))
             continue
-        fs = sorted({e for s in found for f in (s.get("files") or []) for e in entries(f)})
+        fs = sorted({e for s in found for f in step_files(s) for e in entries(f)})
         if not fs:
             rows.append(dict(base, files=[], verdict="판정 불가 — Step 에 파일이 없다"))
         elif not any(hit(p, d, gfiles) for p, d in fs):
@@ -202,9 +212,10 @@ def diverge(claude_doc, gpt_doc) -> dict:
     c_only = [{"file": f + ("/" if cf[f]["dir"] else ""), "where": cf[f]["where"]} for f in sorted(cf) if not hit(f, cf[f]["dir"], gf)]
     g_only = [{"file": g + ("/" if gf[g]["dir"] else ""), "where": gf[g]["where"]} for g in sorted(gf) if not hit(g, gf[g]["dir"], cf)]
     reqs = requirement_rows(cp, gf)
-    pairs, c_risk, g_risk = pair_risks(risks(cp), risks(gp))
+    risk_on = isinstance(cp.get("riskMatrix"), list)
+    pairs, c_risk, g_risk = pair_risks(risks(cp), risks(gp)) if risk_on else ([], [], [])
     return {"files": {"claudeOnly": c_only, "gptOnly": g_only}, "requirements": reqs, "rtmPresent": bool(cp.get("rtm")),
-            "risks": {"claudeOnly": c_risk, "gptOnly": g_risk, "paired": pairs},
+            "risks": {"claudeOnly": c_risk, "gptOnly": g_risk, "paired": pairs}, "riskMatrixPresent": risk_on,
             "summary": {"filesClaudeOnly": len(c_only), "filesGptOnly": len(g_only),
                         "requirementsUncovered": sum(r["verdict"].startswith("미커버") for r in reqs),
                         "requirementsUndetermined": sum(r["verdict"].startswith("판정 불가") for r in reqs),
@@ -219,8 +230,9 @@ def render(d: dict) -> str:
     s = d["summary"]
     lines = ["# Claude ↔ GPT 독립 플랜 차이표", "",
              f"파일 한쪽 {s['filesClaudeOnly'] + s['filesGptOnly']}(Claude {s['filesClaudeOnly']} · GPT {s['filesGptOnly']}) · "
-             f"요구 미커버 {s['requirementsUncovered']} · 판정 불가 {s['requirementsUndetermined']} · "
-             f"위험 한쪽 {s['risksClaudeOnly'] + s['risksGptOnly']}(Claude {s['risksClaudeOnly']} · GPT {s['risksGptOnly']}) — "
+             f"요구 미커버 {s['requirementsUncovered']} · 판정 불가 {s['requirementsUndetermined']} · " +
+             (f"위험 한쪽 {s['risksClaudeOnly'] + s['risksGptOnly']}(Claude {s['risksClaudeOnly']} · GPT {s['risksGptOnly']}) — "
+              if d.get("riskMatrixPresent", True) else "위험 대조 판정 불가 — ") +
              "어느 쪽이 옳은지는 Lead 가 정한다", "", "## 파일 — 한쪽에만 있는 변경 대상", ""]
     rows = [(x["file"], " · ".join(x["where"]), "—") for x in d["files"]["claudeOnly"]] + \
            [(x["file"], "—", " · ".join(x["where"])) for x in d["files"]["gptOnly"]]
@@ -240,7 +252,10 @@ def render(d: dict) -> str:
     lines += ["", "## 위험 — 글자 겹침으로 짝을 찾지 못한 것", "",
               "⛔ 짝이 없다는 것은 **표현이 달랐다**는 뜻일 뿐이다 — 같은 위험을 다르게 썼을 수 있으니 Lead 가 의미로 대조한다.", ""]
     one = [(cell(t), "Claude") for t in d["risks"]["claudeOnly"]] + [(cell(t), "GPT") for t in d["risks"]["gptOnly"]]
-    lines += (["| 위험 | 쪽 |", "|---|---|"] + [f"| {t} | {side} |" for t, side in one]) if one else ["없음 — 모든 위험이 짝지어졌다."]
+    if not d.get("riskMatrixPresent", True):
+        lines.append("Claude riskMatrix 가 없다 — 위험 대조는 판정 불가다(⛔ GPT 위험을 한쪽 위험으로 세지 않는다 · light 는 steps.json 에 riskMatrix 를 적는다).")
+    else:
+        lines += (["| 위험 | 쪽 |", "|---|---|"] + [f"| {t} | {side} |" for t, side in one]) if one else ["없음 — 모든 위험이 짝지어졌다."]
     if d["risks"]["paired"]:
         lines += ["", f"## 짝지은 위험 — 글자 bigram 유사도 {RISK_MATCH} 이상", "", "| Claude | GPT | 유사도 |", "|---|---|---|"]
         lines += [f"| {cell(p['claude'])} | {cell(p['gpt'])} | {p['similarity']} |" for p in d["risks"]["paired"]]
@@ -450,7 +465,23 @@ def self_test() -> int:
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    for t in (t_files, t_paths, t_tail, t_rtm, t_multi, t_risks, t_contam, t_inputs, t_no_rtm, t_bare, t_render, t_det, t_cli):
+    def t_light():
+        # light — Lead 가 쓴 steps.json(설명 붙은 파일 칸 · 작업 폴더 산출물 · 최상위 riskMatrix)을 받는다 · riskMatrix 칸이 없으면 위험은 판정 불가
+        c, g = samples()
+        light = {"title": "light", "steps": [dict(s, files=[f"{f} (설명 — light 가 붙인다)" for f in s.get("files") or []]
+                                                  + ["{FZ_WORK_DIR}/code/removal-cells-S1.tsv", "{WORK_DIR}/ab/prereg.json (S10)"])
+                                             for s in c["plan"]["steps"]],
+                 "rtm": c["plan"].get("rtm"), "riskMatrix": c["plan"]["riskMatrix"]}
+        d, base = diverge(light, g), diverge(c, g)
+        bare = dict(light)
+        del bare["riskMatrix"]
+        t = render(diverge(bare, g))
+        case("r3-divergence-accepts-light-steps — light steps.json 의 차이표가 plan-lean2 반환과 같고 riskMatrix 없으면 위험 판정 불가",
+             d["files"] == base["files"] and d["risks"] == base["risks"] and d["requirements"] == base["requirements"]
+             and "위험 대조 판정 불가" in t and "Claude riskMatrix 가 없다" in t and "| GPT |" not in t.split("## 위험")[1],
+             (d["files"], t[-400:]))
+
+    for t in (t_files, t_paths, t_tail, t_rtm, t_multi, t_risks, t_contam, t_inputs, t_no_rtm, t_bare, t_render, t_det, t_cli, t_light):
         try:
             t()
         except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다

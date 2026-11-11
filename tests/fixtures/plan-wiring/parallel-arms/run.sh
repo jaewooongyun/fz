@@ -5,7 +5,10 @@
 # ① 순서 — 독립 플랜 기동(gpt_independent.sh plan) < Workflow 호출 < 합치기(plan_divergence.py)
 # ② Phase 2 절에 resume 교차(resume --session-file)와 병렬 계약 네 토큰이 있다(check_wf_text --section-has)
 # ③ 기본 verify 불변 — core 모듈 § verify 의 bash 블록을 고정 입력 · 가짜 CLI 로 **실제로 돌려** CLI 인자(프롬프트 포함)를
-#    verify-default.golden.json 과 바이트 단위로 대조한다. golden 은 S23 직전 모듈에서 `--capture` 로 잡았고, verify 가 본문을
+#    verify-default.golden.json 과 바이트 단위로 대조한다.
+# ④ light 도 독립 플랜 기본 on(S13 · 2026-11-10) — light 절 · 2.7 · Phase 2 문구(셀 r3-light-independent-plan-launched ·
+#    r3-light-verify-cross-resumes · r3-light-no-gpt-independent-off)
+# ⑤ light 재생 — light_replay.py: 차이표 → P_VERIFY → 정문 verify-cross → 가짜 CLI 인자 · 둘째 라운드 10 → verify 폴백(F-578) golden 은 S23 직전 모듈에서 `--capture` 로 잡았고, verify 가 본문을
 #    `--inject-skill` 로 넘기게 된 판(F-335 ㉒ — 프롬프트 앞 마커 줄 · `---` 만 달라졌다)에서 `bash run.sh --capture modules/fz-gpt-subcommands-core.md` 로 다시 잡았다
 #    (`bash run.sh --capture <(git show <기준>:modules/fz-gpt-subcommands-core.md)`). fz-discover --deep 도 같은 verify 를 쓴다.
 # ⛔ 실제 GPT CLI · 사용자 홈을 건드리지 않는다 — PATH 앞에 tests/fixtures/gpt/_shim · HOME 은 임시 폴더.
@@ -32,7 +35,7 @@ j = s.index("```bash\n", i) + len("```bash\n")
 print(s[j:s.index("\n```", j)])
 PY
   } > "$w/verify.sh" || return 1
-  local ok_json='{"schemaVersion":"1.1","review_id":"fixture","timestamp":"2026-09-29T00:00:00Z","review_type":"plan_validation","issues":[],"summary":{"total_issues":0,"by_severity":{"critical":0,"major":0,"minor":0,"suggestion":0},"by_category":""},"verdict":"approved","overall_feedback":"ok","strengths":[]}'
+  local ok_json='{"schemaVersion":"1.1","review_id":"fixture","timestamp":"2026-09-29T00:00:00Z","review_type":"plan_validation","issues":[],"summary":{"total_issues":0,"by_severity":{"critical":0,"major":0,"minor":0,"suggestion":0},"by_category":""},"verdict":"approved","overall_feedback":"ok","strengths":[],"catalogHits":[]}'
   # 호출자 = fz-plan Phase 2(core § verify 호출자 표 — ARTIFACT=plan · 작업 폴더). 라운드 원장 · 발견 색인이 임시 폴더에만 남게
   #   바깥 셸의 run-state(FZ_RUN_STATE · 세션 id) · 계열 env 를 지운다
   env -u FZ_GPT_CHOICE_DIR -u FZ_RUN_STATE -u CLAUDE_CODE_SESSION_ID -u FZ_GPT_ARTIFACT -u FZ_GPT_RECALL -u FZ_GPT_ARTIFACT_VERSION -u FZ_WORK_DIR \
@@ -75,6 +78,31 @@ elif [ "$got" = "$(cat "$HERE/verify-default.golden.json")" ]; then
 else
   no "기본 verify: CLI 인자가 golden 과 다르다 — $(diff <(printf '%s\n' "$got") "$HERE/verify-default.golden.json" | head -4 | tr '\n' ' ')"
 fi
+
+# ④ light 문구 — light 절(`### light 모드` ~ 다음 제목)을 뽑아 본다
+light="$(python3 - "$R/$P" <<'PY'
+import re, sys
+t = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"^### light 모드.*?(?=^#{2,3} )", t, re.S | re.M)
+print(m.group(0) if m else "")
+PY
+)"
+has() { printf '%s' "$1" | /usr/bin/grep -qF -- "$2"; }
+if [ -n "$light" ] && has "$light" '2.7 GPT 독립 플랜은 full 과 같이 기본으로 띄운다' && has "$light" 'Phase 1 을 시작할 때 백그라운드로' \
+   && ! /usr/bin/grep -qF '2.7 독립 플랜도 없다' "$R/$P" && /usr/bin/grep -qF '2.7. **GPT 독립 플랜 (light · full 기본' "$R/$P"; then
+  ok "r3-light-independent-plan-launched"
+else no "r3-light-independent-plan-launched — light 절 · 2.7 머리에 '독립 플랜 기본(light · full)' 문구가 없거나 옛 문구가 남았다"; fi
+if has "$light" 'Phase 2 resume 교차(`verify-cross`)' && has "$light" 'plan_divergence.py --claude {WORK_DIR}/plan/steps.json' \
+   && /usr/bin/grep -qF '2.7 독립 플랜을 띄웠으면(light · full 기본) `verify` 자리를 **resume 교차**가 맡는다 — 4.5 차이표' "$R/$P"; then
+  ok "r3-light-verify-cross-resumes"
+else no "r3-light-verify-cross-resumes — light 절 또는 Phase 2 에 resume 교차 · 차이표 입력 문구가 없다"; fi
+if has "$light" '끄기 `--no-gpt-independent` · 두 모드 공통' && has "$light" '끈 run 은 기본 `verify`' \
+   && /usr/bin/grep -qF -- '[--no-gpt-independent]' "$R/$P"; then
+  ok "r3-light-no-gpt-independent-off"
+else no "r3-light-no-gpt-independent-off — light 의 끄기 플래그 · 끈 run 의 기본 verify 문구가 없다"; fi
+
+# ⑤ light 재생 — 통과 줄은 light_replay.py 가 낸다
+python3 -B "$HERE/light_replay.py" || fail=1
 
 echo
 [ "$fail" = 0 ] && echo "plan-wiring parallel-arms: 전건 통과" || echo "plan-wiring parallel-arms: 실패"

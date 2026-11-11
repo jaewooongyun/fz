@@ -86,7 +86,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | code-changes 생산 전 | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 수행(fz-code 실행 절차 7) | full |
 | review 시작 전 | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 수행(fz-review 실행 절차 5) | full |
 | planning 생산 (Phase 1 뒤 · 계획 검증 전) | Sprint Contract | kind `sprint-contract`(GPT 초안 → Lead 합의) + 합의본 반영 재생성 — fz-plan 실행 절차 5.5 · 5.7 | `modules/sprint-contract.md` § 발동 조건 + 직전 decide(`gpt-strategy.md` § 단계 실행 판정) |
-| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ fz-plan full 2.7 독립 플랜 뒤 resume 교차(`verify-cross`)를 마쳤으면 생략) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
+| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ fz-plan 2.7 독립 플랜(light · full 기본) 뒤 resume 교차(`verify-cross`)를 마쳤으면 생략) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
 | review 포함 | 다관점 리뷰 | review-arch + review-quality(review-live Workflow) + GPT | full — review-live Workflow (GPT 는 켠 세션이면 light 도 — fz-review Phase 5) |
 | search 포함 | 교차 검증 | search-symbolic + search-pattern (search-cross-verify Workflow — GPT 단계 없음) | --deep |
 | commit/pr 포함 | Pre-ship gate | `fz-gpt check` — 명시 호출 전용(fz-commit · fz-pr 에 자동 배선 없음) | 명시 호출 때 GPT 켬(`gpt-strategy.md` § 단계 실행 판정 — 그때도 decide) |
@@ -140,7 +140,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 ### 계획 생산 파이프라인
 
 ```
-[계획 스텝 — full: ① Workflow(방향 판정 포함) ∥ GPT 독립 플랜(full 기본) → ② 잠정 플랜 + 방향 판정(RECONSIDER/REDIRECT · degraded 면 정지) → ③ 합치기 → Lead 몫(memory-recall informational · 스트레스 테스트 · RTM · Gate 1 · 1.5) / light: direction challenge(Lead · fz-plan Phase 0.5) → Phase 1] → sprint contract (full · 발동 시 · 직전 decide — ④ 초안 · 합의 → ⑤ 재생성) → gpt verify ∥ verify-gates (⑥ · GPT 켬) → [코드 스텝]
+[계획 스텝 — full: ① Workflow(방향 판정 포함) ∥ GPT 독립 플랜(기본) → ② 잠정 플랜 + 방향 판정(RECONSIDER/REDIRECT · degraded 면 정지) → ③ 합치기 → Lead 몫(memory-recall informational · 스트레스 테스트 · RTM · Gate 1 · 1.5) / light: direction challenge(Lead · fz-plan Phase 0.5) → Phase 1 ∥ GPT 독립 플랜(기본) → 합치기(차이표)] → sprint contract (full · 발동 시 · 직전 decide — ④ 초안 · 합의 → ⑤ 재생성) → gpt verify ∥ verify-gates (⑥ · GPT 켬) → [코드 스텝]
 ```
 
 > direction challenge: 접근 방향 자체를 도전한다(PROCEED/RECONSIDER/REDIRECT) — full 은 plan-lean2 전체 플랜 콜이 `directionVerdict` 로 함께 내고(롤백 plan-collaborative 는 Stage 0 review-direction) light 는 Lead 가 fz-plan Phase 0.5 로 한다. 순서 정본: `skills/fz-plan/SKILL.md` 실행 절차(4 → 4.5 → 5 → 5.5 → 5.7 → Phase 2) · Contract 발동: `modules/sprint-contract.md` § 발동 조건.
@@ -375,7 +375,7 @@ printf '%s\n' "{과제 지시}" > "$P"
 ⛔ **`setup-gpt-skills.sh` 는 Tier 2a 심볼릭(`gpt-skills/`)을 만든다 — 디스커버리의 필수 조건은 아니다.** 미실행이어도 resolver(`scripts/gpt_kinds.py`)가 자기 위치의 번들 `SKILL.md`(Tier 2b)를 돌려주고, 번들이 없으면 Tier 3 로 폴백한다. setup 이 더하는 것은 GPT CLI 가 자기 스킬 폴더에서 역할 스킬을 스스로 싣게 하는 것이다.
 ⛔ Claude 스킬(`skills/`)을 그 폴더에 링크하면 GPT 가 역할 스킬 대신 Claude 스킬을 고른다(A2-02 실측: 링크 확장 뒤 fz-reviewer 로드 28세션 중 26회 → 31세션 중 1회). 그래서 setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 `skills/` 를 가리키는 링크는 이름과 무관하게 지운다.
 
-### 독립 첫 패스 — `scripts/gpt_independent.sh` (fz-peer-review · fz-plan full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`)
+### 독립 첫 패스 — `scripts/gpt_independent.sh` (fz-peer-review · fz-plan light · full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`)
 
 위 호출 계약의 GPT 는 대상 저장소와 **같은 디스크**를 본다 — 작업 폴더의 Claude 산출물과 `~/.claude/projects` 로그도 읽을 수 있다. 첫 패스를 Claude 결과와 독립으로 돌려야 할 때(SC-1)는 런처를 쓴다.
 
@@ -626,7 +626,7 @@ GOOD: rg X | wc -l → 11 → 잘림 없이 11줄 직접 확인 후 "사용처 1
 | 이름 정규식의 하이픈 누락 | `[a-z_]+` · `\w+` 로 이름을 뽑으면 `fz-code` · `plan-lean2` 같은 하이픈 이름이 잘리거나 빠진다 → 그 이름은 '없음' 으로 집계된다(F-225) | — (문자 클래스에 `-` · 하이픈 이름을 양성 대조로) |
 | `\|\| echo "0건"` · `\|\| true` | 명령이 실패해도 '0건' · 성공으로 남는다 — 부재 주장의 근거 경로에 쓰지 않는다. 같은 명령 · 같은 플래그로 반드시 걸리는 대조 심볼을 함께 돌린다(F-076) | — |
 | 코퍼스가 측정 대상 자신을 포함 | 어휘 · 규칙의 출현 수를 세는 코퍼스에 그 정의 파일(규칙 문서 · 탐지기 · 시험 픽스처)이 들어 있으면 정의 자체가 적중으로 세어진다. 정의 파일을 뺀 코퍼스로 다시 재고 두 수를 함께 적는다(F-035) | — |
-| 도구 답 영역 ≠ 질문 영역 | 로컬 추적 ref(`origin/x`)는 원격의 현재가 아니다(`git ls-remote` 로 본다). `ps` 에 없다는 것은 정상 종료가 아니다(완료 표지 · 로그 끝으로 본다) — 도구가 답하는 영역이 질문과 같은지 먼저 맞춘다(F-057) | — |
+| 도구 답 영역 ≠ 질문 영역 | 로컬 추적 ref(`origin/x`)는 원격의 현재가 아니다(`git ls-remote` 로 본다). `ps` 에 없다는 것은 정상 종료가 아니다(완료 표지 · 로그 끝으로 본다). PR · 이슈 상태(`state:CLOSED` · `mergedAt:null`)는 그 PR 의 영역이다 — 코드가 들어갔는지는 `git log` · `git grep <ref>` 로 본다(F-102). 도구가 답하는 영역이 질문과 같은지 먼저 맞춘다(F-057) | — |
 | 도구 제약을 시험 없이 단정 | "이 도구는 X 를 못 한다" 를 문서 · 기억으로 단정하고 복제 경로를 만들었다 — 단정하기 전에 정본 호출을 1회 시험한다. 워크플로 경로는 §12 0단계(`cp` + `cmp`, 실패면 L4)가 이미 시험한다(F-054) | — |
 | MCP 검색 필터 병용 | glob 과 pattern 같은 필터를 함께 주면 조건이 겹쳐 0건이 나온다 — 무필터 조회 수와 대조하고 두 필터를 동시에 쓰지 않는다(F-066) | — |
 | 비ASCII 패턴을 `perl -e` 인라인에 | 로캘 · 인코딩 처리로 한글 패턴이 조용히 매칭에 실패한다 — `python3` 로 바꾸고 다른 도구로 같은 대조 심볼을 확인한다(F-091) | — |
