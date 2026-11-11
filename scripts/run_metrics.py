@@ -82,7 +82,8 @@ TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 MODES = ("light", "full")
 RECOMMENDS = ("light", "full", "none")
-SOURCES = ("arg", "fz", "signal", "autonomous", "gate")
+# modules/mode-gate.md § 언제 묻나 순번 — default = 추천 light · 측정 불가라 묻지 않고 light(5). 질문 행(gate)과 섞으면 "몇 번 물었나" 를 못 잰다
+SOURCES = ("arg", "fz", "signal", "autonomous", "gate", "default")
 # 행 키 허용 집합 — 이 밖의 키는 쓰지 않는다(원장 게이트가 그 밖의 키를 거부한다)
 ROW_KEYS = ("schema", "run_id", "attempt", "pipeline_id", "skill", "mode", "recommended", "reason", "started_at",
             "ended_at", "status", "model", "effort", "active_min", "session_id", "work_dir", "workflow_run_id", "plugin_root",
@@ -757,6 +758,16 @@ def self_test() -> int:
             return ok, (f"rows={len(rows)} extra={extra} reason_len={len(reason)} model={row.get('model')!r} "
                         f"effort={row.get('effort')!r} canary_copied={CANARY in blob}")
 
+        def c_source_default():
+            st, wd = base / "s-default", base / "wd-default"
+            outs = [cli(st, "start", "--skill", "fz-review", "--mode", "light", "--recommended", "none", "--source", "default",
+                        "--work-dir", str(wd), "--reason", "측정 불가 — 묻지 않음"), end(st, "fz-review", wd)]
+            rows, _ = rows_of(st)
+            row = rows[0] if len(rows) == 1 else {}
+            ok = (all(o[0] == 0 for o in outs) and row.get("mode") == "light" and row.get("recommended") == "none"
+                  and str(row.get("reason", "")).startswith("source=default"))
+            return ok, f"rc={[o[0] for o in outs]} rows={len(rows)} row={ {k: row.get(k) for k in ('mode', 'recommended', 'reason')} }"
+
         def c_resume_attempt():
             st, wd = base / "s-resume", base / "wd-resume"
             outs = [start(st, "fz-search", wd), end(st, "fz-search", wd), start(st, "fz-search", wd), end(st, "fz-search", wd)]
@@ -827,7 +838,8 @@ def self_test() -> int:
             return (a, b, c, d) == (18.0, 3.0, None, None), f"got {(a, b, c, d)}"
 
         cases = (("concurrent", c_concurrent), ("duplicate-end", c_duplicate_end), ("interrupted", c_interrupted),
-                 ("write-failure", c_write_failure), ("no-body-copy", c_no_body_copy), ("resume-attempt", c_resume_attempt),
+                 ("write-failure", c_write_failure), ("no-body-copy", c_no_body_copy), ("source-default", c_source_default),
+                 ("resume-attempt", c_resume_attempt),
                  ("harness-fields", c_harness_fields), ("skill-alias", c_skill_alias),
                  ("unknown-skill", c_unknown_skill), ("active-min", c_active_min))
         passed = 0
