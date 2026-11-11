@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import collections
 import hashlib
 import json
 import os
@@ -38,6 +39,29 @@ def _sha_file(p):
     return h.hexdigest()
 
 
+def _tree_hash(d):
+    """런처(gpt_independent.sh 의 tree_hash)와 같은 폴더 해시 — 상대 경로 + 내용 · 링크는 따라가지 않고 링크 값으로.
+    ⛔ 규칙을 바꾸지 않는다 — 셀 r3-s14-dir-input-rehash 가 런처 파일의 정의를 꺼내 이 함수와 대조한다."""
+    h = hashlib.sha256()
+    for root, dirs, files in sorted(os.walk(d)):
+        dirs.sort()
+        for f in sorted(files) + sorted(x for x in dirs if os.path.islink(os.path.join(root, x))):
+            p = os.path.join(root, f)
+            body = b"L" + os.readlink(p).encode() if os.path.islink(p) else hashlib.sha256(open(p, "rb").read()).digest()
+            h.update(os.path.relpath(p, d).encode() + b"\0" + body)
+    return h.hexdigest()
+
+
+def input_hash_ok(name, path, recorded) -> bool:
+    """수집 인자의 입력 원본을 다시 재 감사 기록과 같은가 — 이름이 `/` 로 끝나면 폴더(base/ · head/ · snapshot/<이름>/)다.
+    폴더를 파일로 재면 정상 run 이 늘 hash_ok=False 로 거부된다(S14 2차 ISSUE-010 — F-430 --gpt-agents 측정을 막았다)."""
+    if not recorded:
+        return False
+    if name.endswith("/"):
+        return os.path.isdir(path) and _tree_hash(path) == recorded
+    return os.path.isfile(path) and _sha_file(path) == recorded
+
+
 def tree_hash(d):
     """폴더 안 파일 전부의 (상대 경로, 내용 해시) → 한 해시. 없는 폴더는 None."""
     if not d or not os.path.isdir(d):
@@ -63,15 +87,41 @@ def scan_gpt_rollouts(rdir):
     ⛔ session_meta 의 계정 식별자(creator_*)는 읽지도 싣지도 않는다 — 판정에 쓰지 않고 원장에 남기면 안 되는 값이다."""
     files = sorted(pathlib.Path(rdir).rglob("*.jsonl")) if rdir and os.path.isdir(rdir) else []
     out = {"files": [str(f) for f in files], "markers": [], "bodies": {}, "cmds": [], "workdirs": [], "host_skills": [],
-           "skill_roots": [], "spawn": 0, "turn_contexts": 0}
+           "skill_roots": [], "spawn": 0, "turn_contexts": 0, "calls": 0}
+    # 형식 위반 — 못 읽은 줄 · 형이 틀린 칸을 버리거나 기본값으로 메우지 않는다. 규칙은 실제 rollout(71파일 · 11,109줄)에서 위반 0 인 것만
+    fmt = collections.Counter()
+    bodies = 0
     for f in files:
+        metas = 0
         with open(f, encoding="utf-8", errors="replace") as fh:
             for ln in fh:
+                if not ln.strip():
+                    continue
                 try:
                     r = json.loads(ln)
                 except ValueError:
+                    r = None
+                if not isinstance(r, dict) or not isinstance(r.get("type"), str) or not isinstance(r.get("payload"), dict):
+                    fmt["line"] += 1
                     continue
-                typ, p = r.get("type"), r.get("payload") or {}
+                typ, p = r["type"], r["payload"]
+                metas += typ == "session_meta"
+                if typ == "response_item" and not isinstance(p.get("type"), str):
+                    fmt["response_item.type"] += 1
+                if typ == "response_item" and p.get("type") == "message" and not (
+                        isinstance(p.get("role"), str) and isinstance(p.get("content"), list)):
+                    fmt["message"] += 1
+                if typ == "response_item" and p.get("type") == "custom_tool_call" and not isinstance(p.get("input"), str):
+                    fmt["custom_tool_call.input"] += 1
+                # 다른 호출 꼴도 판정에 쓰는 칸이 있어야 한다 — 인자를 잃은 호출을 명령 0 건으로 읽지 않는다(S14 r4 ISSUE-006 · 실측 978 위반 0)
+                if typ == "response_item" and p.get("type") == "function_call" and not (
+                        isinstance(p.get("name"), str) and isinstance(p.get("arguments"), str)):
+                    fmt["function_call.arguments"] += 1
+                if typ == "response_item" and p.get("type") == "local_shell_call" and not isinstance(p.get("action"), dict):
+                    fmt["local_shell_call.action"] += 1
+                if typ == "world_state" and isinstance(p.get("state"), dict) and isinstance(p["state"].get("host_skills"), dict) \
+                        and isinstance(p["state"]["host_skills"].get("body"), str):
+                    bodies += 1
                 if typ == "turn_context":
                     out["turn_contexts"] += 1
                 elif typ == "world_state":
@@ -89,6 +139,7 @@ def scan_gpt_rollouts(rdir):
                                 rest = t[t.index("[fz-gpt-skill-injected]"):].split("\n", 1)
                                 out["bodies"].setdefault(m.group(1), rest[1] if len(rest) > 1 else "")
                 elif typ == "response_item" and p.get("type") in ("custom_tool_call", "function_call", "local_shell_call"):
+                    out["calls"] += 1
                     if p.get("name") == "spawn_agent":
                         out["spawn"] += 1
                     raw = p.get("input") if p.get("input") is not None else (p.get("arguments") or p.get("action") or "")
@@ -112,9 +163,50 @@ def scan_gpt_rollouts(rdir):
                         wds = [j.get("workdir") if isinstance(j, dict) else None] * len(got)
                     out["cmds"] += got
                     out["workdirs"] += wds
+        if not metas:
+            fmt["session_meta"] += 1     # 파일마다 하나(실측 71/71)
+    if files and not bodies:
+        fmt["world_state.host_skills"] += 1   # host 스킬 목록을 든 world_state 가 없다(실측 71/71 파일에 있다)
     out["host_skills"] = sorted(set(out["host_skills"]))
     out["skill_roots"] = sorted(set(out["skill_roots"]))
+    out["format_problems"] = dict(fmt)
     return out
+
+
+# 런처 감사(gpt_independent.sh) 칸 — 실측 현재 형식 감사 71/71 에 모두 있고 형이 같다. 계수 셋은 rollout 을 다시 센 값과 같다(71/71)
+AUDIT_FIELDS = {"mode": str, "exit": int, "note": str, "timedOut": bool, "isolationApplied": bool, "spawnAgent": int, "hits": list,
+                "inputs": dict, "toolCalls": int, "rollouts": int, "turnContexts": int, "wrapperExit": int}
+# 첫 패스 출력 항목에서 판정이 읽는 칸(스키마 required 의 부분집합 · schemas/gpt_independent_review_schema.json)
+OUTPUT_ITEM_KEYS = {"issues": ("id", "severity", "ruleSource"), "craft": ("id", "severity", "ruleSource", "craftAxis", "ruleRef"),
+                    "axis_coverage": ("axis", "status")}
+
+
+def gpt_source_problems(audit, doc, scan) -> dict:
+    """감사 · 첫 패스 출력 · rollout 판독의 형식 위반과 감사 계수 ↔ 재계수 불일치 → {이름: 수}. 빈 dict 면 형식대로다."""
+    p = collections.Counter(scan.get("format_problems") or {})
+    if not isinstance(audit, dict):
+        return dict(p, audit=1)
+    for k, t in AUDIT_FIELDS.items():
+        v = audit.get(k)
+        if not isinstance(v, t) or (t is int and isinstance(v, bool)):
+            p["audit." + k] += 1
+    for k, got in (("rollouts", len(scan["files"])), ("turnContexts", scan["turn_contexts"]), ("toolCalls", scan["calls"]),
+                   ("spawnAgent", scan["spawn"])):   # S14 r4 ISSUE-008 · 실측 감사 65 일치
+        if isinstance(audit.get(k), int) and audit[k] != got:
+            p["audit." + k + "≠rollout"] += 1   # rollout 줄이 빠졌거나 다른 run 의 사본이다
+    if doc is not None:
+        pr = doc.get("projectRules") if isinstance(doc, dict) else None
+        if not isinstance(doc, dict) or not isinstance(doc.get("verdict", doc.get("status")), str) or not (
+                isinstance(pr, dict) and all(isinstance(pr.get(k), list) for k in ("rules", "conflicts", "gaps"))) or any(
+                doc.get(k) is not None and not isinstance(doc.get(k), list) for k in ("issues", "craft", "axis_coverage")):
+            p["output"] += 1
+        # 판정이 읽는 항목 칸 — 스키마 required 중 summarize_gpt_output 이 쓰는 것. 빠진 칸을 '규칙 근거 없음' 으로 읽지 않는다(S14 r4 ISSUE-007 · 실측 417항목 위반 0)
+        for kind, req in OUTPUT_ITEM_KEYS.items():
+            items = doc.get(kind) if isinstance(doc, dict) else None
+            n = sum(1 for x in items or [] if not (isinstance(x, dict) and all(k in x for k in req)))
+            if n:
+                p["output." + kind] += n
+    return dict(p)
 
 
 def classify_skill_refs(scan, tree_root):
@@ -193,10 +285,13 @@ def build_gpt_row(args, tree_root=None):
     audit = read_json(stem + ".audit.json")
     doc = read_json(out) if os.path.isfile(out) else None
     scan = scan_gpt_rollouts(stem + ".rollouts")
+    problems = gpt_source_problems(audit, doc, scan)
+    if not isinstance(audit, dict):
+        raise ValueError("감사 파일이 객체가 아니다")
     cls = classify_skill_refs(scan, tree)
-    inputs = audit.get("inputs") or {}
+    inputs = audit.get("inputs") if isinstance(audit.get("inputs"), dict) else {}
     given = dict(args.get("inputs") or {})
-    hash_ok = {n: (os.path.isfile(p) and _sha_file(p) == inputs.get(n)) for n, p in given.items()}
+    hash_ok = {n: input_hash_ok(n, p, inputs.get(n)) for n, p in given.items()}
     plugin_root = os.path.realpath(args["plugin_root"])
     summ = summarize_gpt_output(doc, args["mode"]) if doc is not None else None
     lead = read_json(args["lead_rules"]) if args.get("lead_rules") else None
@@ -214,21 +309,52 @@ def build_gpt_row(args, tree_root=None):
                      "skill_roots": scan["skill_roots"], "refs": cls["refs"], "bad_refs": cls["bad"],
                      "claude_listed": cls["claude_listed"], "spawn": scan["spawn"], "cmd_count": len(scan["cmds"]),
                      "turn_contexts": scan["turn_contexts"]},
+            "agents": agents_record(args, scan, audit),
+            "format_problems": problems,
             "output": summ,
             "rules_compare": rules_compare(summ, lead) if (summ is not None and lead is not None) else None,
             "collect_args": dict(args)}
 
 
-def gpt_sc1_problems(g):
-    """SC-1 · AC-2 셀 조건(노트 §17 ①~⑤) — 행 하나의 위반 목록. (종류, 문장) — 종류 AC-2 는 Claude 쪽 유입."""
-    au, sc, sk, ip = g.get("audit") or {}, g.get("scan") or {}, g.get("skills") or {}, g.get("inputs") or {}
+def agents_record(args, scan, audit):
+    """다렌즈 처치(--gpt-agents)의 요청과 실제 spawn 을 따로 남긴다(F-356) — 요청했는데 spawn 0 이면 처치가 일어나지 않은 행이다."""
+    return {"requested": bool(args.get("gpt_agents")), "spawned": int(scan.get("spawn") or 0)}   # 재계수만 — 감사 값으로 메우지 않는다(S14 r4 ISSUE-008)
+
+
+def gpt_audit_problems(g):
+    """감사 · 격리 · 입력(이름 집합 · 재해시) — 매트릭스 셀(SC-1)과 규칙 fixture 행(SC-2)이 함께 쓴다(F-356 SFH-4).
+    ⛔ 빈 hash_ok 는 통과가 아니다 — 입력을 재해시하지 않은 행이다(all({}.values()) 는 참이다)."""
+    au, ip = g.get("audit") or {}, g.get("inputs") or {}
     p = []
+    if g.get("format_problems"):
+        p.append(("SC-1", f"원천 형식 위반 {g['format_problems']} — 빠지거나 형이 틀린 칸 · 감사 계수 ≠ rollout 재계수"))
+    if au.get("mode") != g.get("mode"):
+        # ⛔ 감사가 기록한 실제 mode 와 수집 --mode 가 다르면 그 셀의 첫 패스가 아니다(S14 r3 ISSUE-005)
+        p.append(("SC-1", f"감사 mode {au.get('mode')} ≠ 수집 mode {g.get('mode')}"))
     if au.get("exit") != 0:
         p.append(("SC-1", f"감사 exit {au.get('exit')} ({au.get('note')})"))
     if au.get("timedOut"):
         p.append(("SC-1", "시간 초과"))
     if not au.get("isolationApplied"):
         p.append(("SC-1", "격리 미적용"))
+    if ip.get("claude_named"):
+        p.append(("AC-2", f"Claude 산출물 이름 입력 {ip['claude_named']}"))
+    if sorted(ip.get("names") or []) != sorted(ip.get("given") or []):
+        p.append(("SC-1", f"입력 이름 집합 불일치 — 감사 {sorted(ip.get('names') or [])} · 수집 {sorted(ip.get('given') or [])}"))
+    hok = ip.get("hash_ok")
+    if not isinstance(hok, dict) or not hok:
+        p.append(("SC-1", "입력 재해시 기록 없음(hash_ok 빈 칸)"))
+    else:
+        bad_hash = sorted(n for n, ok in hok.items() if not ok)
+        if bad_hash:
+            p.append(("SC-1", f"입력 해시 불일치 {bad_hash}"))
+    return p
+
+
+def gpt_sc1_problems(g):
+    """SC-1 · AC-2 셀 조건(노트 §17 ①~⑤) — 행 하나의 위반 목록. (종류, 문장) — 종류 AC-2 는 Claude 쪽 유입."""
+    au, sc, sk = g.get("audit") or {}, g.get("scan") or {}, g.get("skills") or {}
+    p = gpt_audit_problems(g)
     if au.get("hits"):
         p.append(("AC-2", f"rollout 금지 참조 {au['hits']}건(Claude 산출물)"))
     if (sc.get("spawn") or au.get("spawnAgent") or 0) and not (g.get("collect_args") or {}).get("gpt_agents"):
@@ -249,11 +375,6 @@ def gpt_sc1_problems(g):
         p.append(("SC-1", f"주입 본문 ≠ 검증 트리 gpt-skills {bm}"))
     if not sk.get("tree_hash") or sk.get("plugin_hash") != sk.get("tree_hash"):
         p.append(("SC-1", "런처 PLUGIN_ROOT 의 gpt-skills ≠ 검증 트리"))
-    if ip.get("claude_named"):
-        p.append(("AC-2", f"Claude 산출물 이름 입력 {ip['claude_named']}"))
-    bad_hash = sorted(n for n, ok in (ip.get("hash_ok") or {}).items() if not ok)
-    if bad_hash:
-        p.append(("SC-1", f"입력 해시 불일치 {bad_hash}"))
     return p
 
 
@@ -360,10 +481,18 @@ def load_gpt(ledger):
 
 
 def _fixture_docs(fixtures_root, fx):
-    d = os.path.join(fixtures_root, fx)
-    lab = read_json(os.path.join(d, "labels.json")) if os.path.isfile(os.path.join(d, "labels.json")) else {}
-    idx = read_json(os.path.join(d, "expected-index.json")) if os.path.isfile(os.path.join(d, "expected-index.json")) else {}
-    return lab, idx
+    """규칙 fixture 오라클(labels.json · expected-index.json) → (labels, index, 읽지 못한 사유 | None).
+    ⛔ 없거나 읽지 못한 오라클을 빈 dict 로 두지 않는다 — 기대가 비면 위반을 못 찾아 PASS 가 된다(미판정이어야 한다)."""
+    d, docs = os.path.join(fixtures_root or "", fx), []
+    for name in ("labels.json", "expected-index.json"):
+        try:
+            v = read_json(os.path.join(d, name))
+        except (OSError, ValueError) as e:
+            return None, None, f"{name} 를 읽지 못했다 ({type(e).__name__})"
+        if not isinstance(v, dict) or not v:
+            return None, None, f"{name} 가 비었거나 객체가 아니다"
+        docs.append(v)
+    return docs[0], docs[1], None
 
 
 def judge_gpt(gpts, req, envs, fixtures_root):
@@ -374,11 +503,17 @@ def judge_gpt(gpts, req, envs, fixtures_root):
         nonlocal worst
         worst = max(worst, rc)
     rows = sorted(gpts.values(), key=lambda g: g["run_id"])
+    # ⛔ 다른 계측기(또는 지문 없이)로 모은 행은 이 계측기로 판정하지 않는다 — 빼고 센다. 칸이 비면 아래 '행 없음' UNRUN(S14 2차 ISSUE-007)
+    cur = instrument_sha()
+    stale = sorted(g["run_id"] for g in rows if g.get("instrument_sha") != cur)
+    if stale:
+        out.append(f"  제외 {len(stale)}: 계측기 지문이 현재({cur})와 다르거나 없다 {stale[:5]} — 다시 collect-gpt")
+        rows = [g for g in rows if g.get("instrument_sha") == cur]
     rule_fx = set(RULE_FIXTURES.values())
     if {"SC-1", "AC-2"} & set(req):
         if not envs:
             return UNRUN, ["UNRUN: SC-1 · AC-2 는 --envs(예: isolated,installed)가 필요하다 — 매트릭스를 정하지 않으면 한 환경만 보고 통과한다"]
-        ac2 = []
+        ac2, ac2_unjudged = [], []
         for env in envs:
             for mode in ("plan", "review"):
                 cell = [g for g in rows if g.get("env") == env and g.get("mode") == mode and g.get("fixture") not in rule_fx]
@@ -386,9 +521,19 @@ def judge_gpt(gpts, req, envs, fixtures_root):
                 if not cell:
                     out.append(f"UNRUN SC-1 [{label}]: gpt-pass 행 없음 — collect-gpt 로 첫 패스 산출을 싣는다")
                     bump(UNRUN)
+                    ac2_unjudged.append(label)
+                    continue
+                no_out = sorted(g["run_id"] for g in cell if g.get("output") is None)
+                if no_out:
+                    # ⛔ 첫 패스 출력이 없는 행을 통과시키지 않는다 — 규칙 fixture 행과 같은 규칙(출력 없음 = 미판정)
+                    out.append(f"UNRUN SC-1 [{label}]: 출력 없음(스키마 JSON 을 읽지 못했다) {no_out}")
+                    bump(UNRUN)
+                    ac2_unjudged.append(label)
                     continue
                 probs = {g["run_id"]: gpt_sc1_problems(g) for g in cell}
                 ac2 += [f"{k}: {t}" for k, ps in probs.items() for c, t in ps if c == "AC-2"]
+                # 감사 · 격리 · 입력 이름 집합 · 재해시가 틀린 행은 AC-2 도 판정할 수 없다 — SC-1 을 안 물어도 막는다
+                ac2 += [f"{g['run_id']}: 감사 — {t}" for g in cell for c, t in gpt_audit_problems(g) if c == "SC-1"]
                 bad = {k: [t for c, t in ps if c == "SC-1"] for k, ps in probs.items()}
                 bad = {k: v for k, v in bad.items() if v}
                 if "SC-1" in req:
@@ -399,9 +544,15 @@ def judge_gpt(gpts, req, envs, fixtures_root):
                         f"{len(cell)} 행 · 감사 exit 0 · 격리 · hits 0 · 마커 · 격리 홈 사본 · 주입 본문 = 트리 gpt-skills — "
                         + ", ".join(sorted(probs))))
         if "AC-2" in req:
-            bump(FAIL if ac2 else PASS)
-            out.append(f"{'FAIL' if ac2 else 'PASS'} AC-2: " + (" | ".join(ac2) if ac2 else
-                       "Claude 스킬 노출 · 참조 0 · Claude 산출물 입력 · 참조 0"))
+            if ac2:
+                bump(FAIL)
+                out.append("FAIL AC-2: " + " | ".join(ac2))
+            elif ac2_unjudged:
+                bump(UNRUN)
+                out.append(f"UNRUN AC-2: 판정하지 못한 셀 {ac2_unjudged} — 빈 셀은 'Claude 유입 0' 의 증거가 아니다")
+            else:
+                bump(PASS)
+                out.append("PASS AC-2: Claude 스킬 노출 · 참조 0 · Claude 산출물 입력 · 참조 0")
     if {"SC-2", "AC-3"} & set(req):
         for short, fx in RULE_FIXTURES.items():
             cell = [g for g in rows if g.get("fixture") == fx and g.get("mode") == "review"]
@@ -409,17 +560,22 @@ def judge_gpt(gpts, req, envs, fixtures_root):
                 out.append(f"UNRUN SC-2 [{fx}]: gpt-pass 행 없음 — 규칙 fixture 의 review 첫 패스를 싣는다")
                 bump(UNRUN)
                 continue
-            lab, idx = _fixture_docs(fixtures_root, fx)
+            lab, idx, why = _fixture_docs(fixtures_root, fx)
+            if why:
+                out.append(f"UNRUN SC-2 [{fx}]: fixture 오라클 없음 — {why}")
+                bump(UNRUN)
+                continue
             for g in cell:
                 if g.get("output") is None:
                     out.append(f"UNRUN SC-2 [{fx}] {g['run_id']}: 출력 없음(스키마 JSON 을 읽지 못했다)")
                     bump(UNRUN)
                     continue
                 probs, gaps = gpt_sc2_problems(g, lab, idx)
+                aud = [f"감사 — {t}" for _, t in gpt_audit_problems(g)]   # F-356 — 규칙 fixture 행도 감사 · 격리 · 입력을 본다
                 for crit in ("SC-2", "AC-3"):
                     if crit not in req:
                         continue
-                    mine = [t for c, t in probs if c == crit]
+                    mine = aud + [t for c, t in probs if c == crit]
                     bump(FAIL if mine else PASS)
                     out.append(f"{'FAIL' if mine else 'PASS'} {crit} [{fx}] {g['run_id']}: "
                                + ("; ".join(mine) if mine else "위반 0"))

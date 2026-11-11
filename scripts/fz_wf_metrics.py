@@ -105,6 +105,29 @@ def _stage_of(role: str) -> str:
     return "?"
 
 
+FZ_MCP_PREFIX = "mcp__plugin_fz_"   # 플러그인이 띄우는 MCP — 측정 대상의 일부다(외부 MCP 가 아니다)
+
+
+def is_external_mcp(name) -> bool:
+    return str(name or "").startswith("mcp__") and not str(name).startswith(FZ_MCP_PREFIX)
+
+
+def mcp_result_kind(is_error, content) -> str:
+    """외부 MCP 결과 종류(F-325) — 오류 · 본문(content) · 빈 결과. Lead · 워커 판독이 함께 쓴다(한 곳에서만 판정).
+    본문의 뜻은 판독하지 않는다(권한 없음 문구도 본문 — 보수 쪽). ⛔ 텍스트가 아닌 블록(이미지 · 리소스 …)도 본문이다 —
+    텍스트만 보면 스크린숏 결과가 빈 결과로 읽혀 외부 입력 유입이 0 이 된다. 결과가 아예 없는 호출은 이 함수 밖 — unresolved."""
+    if is_error:
+        return "error"
+    if isinstance(content, str):
+        return "content" if content.strip() else "empty"
+    for b in content or []:
+        if not isinstance(b, dict):
+            return "content"
+        if b.get("type", "text") != "text" or str(b.get("text") or "").strip():
+            return "content"
+    return "empty"
+
+
 def read_agent(path: str) -> dict:
     """agent-*.jsonl 1개 → 지표. 파싱 불가 줄은 세고 버린다(조용히 넘기지 않는다).
 
@@ -127,6 +150,11 @@ def read_agent(path: str) -> dict:
     total_lines = 0
     msg_models = {}
     effort_raw = {}
+    ext_mcp = {}   # (세션, 호출 id) → [도구, 결과 종류] — 결과가 오지 않은 호출은 unresolved(미측정 — 유입 없음으로 읽지 않는다)
+    resolved, orphans = set(), 0   # 이을 호출 기록이 없는 결과 — 어느 도구인지 모르므로 외부 MCP 를 미측정으로 만든다(S14 2차 ISSUE-004)
+    fmt = collections.Counter()    # 형식 위반 — 빠지거나 형이 틀린 칸을 기본값으로 메우지 않는다(S14 구조 전환 · 결함 주입 tests/ab/faults.py)
+    uuids, parents = set(), []
+    present = collections.defaultdict(set)   # 비합성 stop 줄의 model · effort · content 유무 — 한 파일 안에서 섞이면 칸이 빠진 것이다
     with open(path, "r", encoding="utf-8", errors="replace") as fh:
         for line in fh:
             # raw `"effort"` 계수는 JSON 경로를 추측하지 않는다 — 파싱 불가 줄까지 모든 줄에서 센다(--sweep-row)
@@ -143,6 +171,7 @@ def read_agent(path: str) -> dict:
             if not isinstance(ev, dict):
                 bad_lines += 1
                 continue
+            fmt.update(event_format(ev, uuids, parents, present))
             ts = _ts(ev.get("timestamp"))
             if ts is not None:
                 if first is None:
@@ -169,7 +198,14 @@ def read_agent(path: str) -> dict:
                     for b in content:
                         if not isinstance(b, dict) or b.get("type") != "tool_result":
                             continue
-                        name = pending.pop(b.get("tool_use_id"), None)
+                        tid = b.get("tool_use_id")
+                        name = pending.pop(tid, None)
+                        if name is None and tid not in resolved:
+                            orphans += 1           # 호출 줄이 빠진 결과 · 이미 이은 결과의 중복 사본은 세지 않는다
+                        resolved.add(tid)
+                        key = (ev.get("sessionId") or "", tid)
+                        if is_external_mcp(name) and key in ext_mcp:
+                            ext_mcp[key][1] = mcp_result_kind(b.get("is_error"), b.get("content"))
                         if name == "StructuredOutput":
                             body = json.dumps(b.get("content", ""), ensure_ascii=False)
                             if b.get("is_error") or "InputValidationError" in body:
@@ -199,8 +235,13 @@ def read_agent(path: str) -> dict:
                             # ⛔ 이름별로 센다 — 총 건수만으로는 *어느* 도구가 안 불렸는지 모른다
                             nm = b.get("name") or "(unnamed)"
                             tool_names[nm] = tool_names.get(nm, 0) + 1
+                            if is_external_mcp(nm):
+                                ext_mcp.setdefault((ev.get("sessionId") or "", b.get("id") or f"anon-{total_lines}"), [nm, "unresolved"])
                             if b.get("name") == "StructuredOutput":
                                 so_calls += 1
+    fmt.update(file_format(uuids, parents, present))
+    if orphans:
+        fmt["orphan_result"] = orphans   # 호출 줄이 빠진 결과 — 실측(워커 3,151파일) 0
     dur = (last - first).total_seconds() if first and last else None
     turns = len(usage_by_id)
     out_tok = sum(u.get("output_tokens") or 0 for u in usage_by_id.values())
@@ -234,7 +275,76 @@ def read_agent(path: str) -> dict:
         "total_lines": total_lines,
         "msg_models": list(msg_models.values()),
         "effort_raw": effort_raw,
+        "mcp_external": [{"session": k[0], "id": k[1], "name": v[0], "kind": v[1]} for k, v in ext_mcp.items()],
+        "orphan_results": orphans,
+        "format_problems": dict(fmt),
     }
+
+
+def event_format(ev, uuids, parents, present) -> list:
+    """이벤트 한 줄의 형식 위반 이름들 — 계측기가 읽는 칸이 빠졌거나 형이 틀렸다. 규칙은 실제 로그(워커 3,151파일 · 응답 76,208줄)에서
+    위반 0 인 것만 둔다. ⛔ 빈 객체(`{}` — 실측 2건)는 형식이 아니다."""
+    if not ev:
+        return []
+    out = []
+    t = ev.get("type")
+    if not isinstance(t, str):
+        return ["type"]
+    if isinstance(ev.get("uuid"), str):
+        uuids.add(ev["uuid"])
+    if ev.get("parentUuid") is not None:
+        parents.append(ev.get("parentUuid"))
+    if t not in ("user", "assistant"):
+        return out
+    msg = ev.get("message")
+    if not isinstance(msg, dict):
+        return [t + ".message"]
+    if _ts(ev.get("timestamp")) is None:
+        out.append(t + ".timestamp")
+    content = msg.get("content")
+    if t == "user":
+        if not isinstance(content, (str, list)):
+            out.append("user.content")
+        for b in content if isinstance(content, list) else []:
+            if not isinstance(b, dict) or not isinstance(b.get("type"), str):
+                out.append("user.block")
+            elif b["type"] == "tool_result":
+                if not isinstance(b.get("tool_use_id"), str):
+                    out.append("tool_result.tool_use_id")
+                # 본문이 없거나 is_error 형이 틀린 결과를 빈 결과 · 오류로 읽지 않는다(실측 tool_result 95,678 위반 0)
+                if not isinstance(b.get("content"), (str, list)) or not isinstance(b.get("is_error", False), bool):
+                    out.append("tool_result.content")
+        return out
+    if not isinstance(msg.get("id"), str):
+        out.append("assistant.id")
+    if content is not None and not isinstance(content, list):
+        out.append("assistant.content")
+    if content == []:   # 블록 없는 응답 줄 — 실측 0(워커 3,028파일 · 대화 기록 460파일) · 끝 블록(StructuredOutput)만 지운 꼴
+        out.append("assistant.content-empty")
+    for b in content if isinstance(content, list) else []:
+        if not isinstance(b, dict) or not isinstance(b.get("type"), str):
+            out.append("assistant.block")
+        elif b["type"] == "tool_use" and not (isinstance(b.get("id"), str) and isinstance(b.get("name"), str)
+                                             and isinstance(b.get("input"), dict)):
+            out.append("tool_use")
+    if msg.get("stop_reason") is not None:
+        u = msg.get("usage")
+        if not isinstance(msg.get("stop_reason"), str) or not isinstance(u, dict) or type(u.get("output_tokens")) is not int:
+            out.append("assistant.usage")
+        if msg.get("model") != "<synthetic>":
+            for k, v in (("model", msg.get("model")), ("effort", ev.get("effort")), ("content", content)):
+                present[k].add(v is not None)
+                if v is not None and not isinstance(v, str if k != "content" else list):
+                    out.append("assistant." + k)
+    return out
+
+
+def file_format(uuids, parents, present) -> list:
+    """파일 단위 형식 위반 — 이은 부모 uuid 가 파일에 없다(줄이 빠졌다) · 비합성 stop 줄의 model · effort · content 유무가 섞였다
+    (실측 섞임 0 · 백그라운드 세션 로그는 셋 다 없는 압축 형식이다). ⛔ uuid 가 없는 형식에서 줄째 삭제 · 마지막 줄 삭제는 못 잡는다."""
+    out = ["parentUuid"] * sum(1 for p in parents if p not in uuids)
+    out += [k + "-mixed" for k, v in present.items() if v == {True, False}]
+    return out
 
 
 def _empty_result(r) -> bool:
@@ -258,7 +368,7 @@ def read_journal(folder: str) -> dict:
     - Note: 읽기 실패(OSError)는 `read_error` 로 남기고 읽은 데까지의 값을 돌려준다(예외로 죽지 않는다).
     """
     out = {"exists": False, "read_error": False, "result_chars": {}, "events": None, "results": 0, "started": 0,
-           "empty": 0}
+           "empty": 0, "bad_lines": 0}
     path = os.path.join(folder, "journal.jsonl")
     if not os.path.isfile(path):
         return out
@@ -269,13 +379,16 @@ def read_journal(folder: str) -> dict:
             for line in fh:
                 if '"type": "result"' in line or '"type":"result"' in line:
                     out["results"] += 1
+                if not line.strip():
+                    continue
                 try:
                     ev = json.loads(line)
                 except ValueError:
+                    ev = None
+                t = ev.get("type") if isinstance(ev, dict) else None
+                if not isinstance(t, str) or (t in ("started", "failed", "result") and not isinstance(ev.get("agentId"), str)):
+                    out["bad_lines"] += 1   # ⛔ 못 읽은 줄은 버리지 않는다 — 실패 기록이었을 수 있다(S14 r3 ISSUE-004)
                     continue
-                if not isinstance(ev, dict):
-                    continue
-                t = ev.get("type")
                 if t in ("started", "failed", "result"):
                     evs.append((t, ev.get("key"), ev.get("agentId")))
                 if t == "started":
@@ -357,6 +470,15 @@ def _span(agents):
     return (max(a["last"] for a in timed) - min(a["first"] for a in timed)).total_seconds()
 
 
+def _journal_ids_match(events, agents) -> bool:
+    if events is None:
+        return False
+    ids = sorted(a["file"].replace("agent-", "").replace(".jsonl", "") for a in agents)
+    st = sorted(str(e[2]) for e in events if e[0] == "started")
+    rs = sorted(str(e[2]) for e in events if e[0] == "result")
+    return bool(ids) and st == ids and rs == ids
+
+
 def read_wf(folder: str) -> dict:
     """wf_* 폴더 1개 → 집계. 실패 사유는 `errors` 로 반환한다(예외로 죽지 않는다)."""
     errors = []
@@ -371,6 +493,10 @@ def read_wf(folder: str) -> dict:
             errors.append(f"{os.path.basename(f)}: {type(exc).__name__}")
     # journal 반환 길이 — 완결 턴이 없는 agent 의 산출 유무 판정 근거. ⛔ journal 은 여기서 한 번만 읽는다(F-335 ⑤)
     jn = read_journal(folder)
+    if jn["read_error"]:
+        errors.append("journal 읽기 실패")
+    if jn["bad_lines"]:
+        errors.append(f"journal 파싱 불가 · 형식 위반 줄 {jn['bad_lines']}건")
     jr = jn["result_chars"]
     for a in agents:
         aid = a["file"].replace("agent-", "").replace(".jsonl", "")
@@ -413,6 +539,9 @@ def read_wf(folder: str) -> dict:
     bad = sum(a["bad_lines"] for a in agents)
     if bad:
         errors.append(f"파싱 불가 줄 {bad}건")
+    for a in agents:
+        if a["format_problems"]:
+            errors.append(f"{a['file']}: 형식 위반 {a['format_problems']}")
     by_stage = collections.defaultdict(list)
     for a in agents:
         by_stage[a["stage"]].append(a)
@@ -467,6 +596,9 @@ def read_wf(folder: str) -> dict:
         "journal_results": results,
         "journal_started": jn["started"],
         "journal_empty_results": jn["empty"],
+        # agentId 대응 — started · result 이벤트의 agentId 가 로그 파일 agent 집합과 각각 한 번씩 같은가. 건수만 보면 같은 agent 의
+        # 중복 result 가 다른 agent 의 누락을 메운다(S14 2차 ISSUE-003). journal 을 못 읽으면 False(대응을 모른다)
+        "journal_ids_match": _journal_ids_match(jn["events"], agents),
         # --sweep-row 의 effort 칸 — agent 트랜스크립트 raw 줄의 `"effort"` 계수 · 파일 수(못 연 파일 포함)
         "effort_raw": {"counts": effort_raw, "files": len(files)},
         "tokens_partial": bool(unavail),

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import glob
+import hashlib
 import json
 import os
 import shutil
@@ -33,6 +34,14 @@ from ab_ledger_gpt import (_sha_file, build_gpt_row, classify_skill_refs, gpt_sc
 INSTR_NOW = instrument_sha()
 
 
+
+def _art(path):
+    """collect 가 남기는 산출물 기록 꼴 — 경로 · 내용 sha256 · 크기(blind-pack · score 가 읽은 내용과 대조한다)."""
+    with open(path, "rb") as fh:
+        b = fh.read()
+    return [{"path": path, "sha256": hashlib.sha256(b).hexdigest(), "bytes": len(b)}]
+
+
 def _mk(run_id, arm, order, crit=1, major=2, wall=1000.0, **kw):
     """판정기용 최소 유효 run + score."""
     row = {"type": "run", "run_id": run_id, "workflow": kw.get("workflow", "fz-review"), "arm": arm,
@@ -52,7 +61,7 @@ def _mk(run_id, arm, order, crit=1, major=2, wall=1000.0, **kw):
                       "source": kw.get("psource", f"/src/{arm}"),
                       "source_tree_hash": kw.get("psource_tree", kw.get("tree", "tB" if arm == "B" else "tC"))},
            "artifacts": [{"path": f"/runs/{run_id}/a.md", "sha256": f"a-{run_id}"}],
-           "injected": {"User": "u", "Project": "p", "AutoMem": None}, "instrument_sha": "i1",
+           "injected": {"User": "u", "Project": "p", "AutoMem": None}, "instrument_sha": INSTR_NOW,
            "input": {"hash": kw.get("input", "h1"), "root": kw.get("root", f"/runs/{run_id}/repo"), "tree_hash": "it1"},
            "wall": {"total_s": wall, "mtime_delta_s": 0.4, "workflows": [{"run_id": "w", "wf_s": 600, "lead_s": 610,
                                                                           "delta_pct": 1.64}]},
@@ -74,7 +83,7 @@ def _judge(rows_scores, **opt):
     opts = {"model": DEFAULT_MODEL, "effort": DEFAULT_EFFORT, "phase": opt.get("phase"), "arm": opt.get("arm", "C"),
             "release": opt.get("release"), "workflows": ["fz-review"], "min_runs": opt.get("min_runs", 2),
             "runs": opt.get("runs", 1), "plugin_sha": opt.get("plugin_sha"), "require": opt.get("require", []),
-            "envs": opt.get("envs"), "options_on": False, "require_passed": None}
+            "envs": opt.get("envs"), "options_on": False, "require_passed": None, "formal": opt.get("formal", False)}
     return judge_rows(runs, scores, opts)
 
 
@@ -897,9 +906,6 @@ def self_test(case=None):
         with open(os.path.join(run, "diff.patch"), "w", encoding="utf-8") as fh:
             fh.write("diff\n")
         iso = "/private/tmp/fz-gpt-iso.T/gpt-home/skills"
-        with open(os.path.join(run, "g.audit.json"), "w", encoding="utf-8") as fh:
-            json.dump({"mode": "review", "exit": 0, "note": "ok", "timedOut": False, "isolationApplied": True, "spawnAgent": 0,
-                       "hits": [], "inputs": {"diff.patch": _sha_file(os.path.join(run, "diff.patch"))}}, fh)
         with open(os.path.join(run, "g.json"), "w", encoding="utf-8") as fh:
             json.dump({"verdict": "approved", "issues": [], "craft": [], "axis_coverage": [],
                        "projectRules": {"rules": [], "conflicts": [], "gaps": []}}, fh)
@@ -909,6 +915,11 @@ def self_test(case=None):
         cmds = [f'tools.exec_command({{cmd:"cat {iso}/fz-reviewer/references/domain-ios.md"}})']
         if bad:
             cmds.append('tools.exec_command({cmd:"cat ~/.codex/skills/fz-reviewer/SKILL.md"})')
+        # 감사 계수는 런처가 rollout 을 센 값이다(gpt_independent.sh) — 수집기가 다시 세 대조한다
+        with open(os.path.join(run, "g.audit.json"), "w", encoding="utf-8") as fh:
+            json.dump({"mode": "review", "exit": 0, "note": "ok", "timedOut": False, "isolationApplied": True, "spawnAgent": 0,
+                       "hits": [], "inputs": {"diff.patch": _sha_file(os.path.join(run, "diff.patch"))},
+                       "toolCalls": len(cmds), "rollouts": 1, "turnContexts": 1, "wrapperExit": 0}, fh)
         _write_lines(os.path.join(run, "g.rollouts", "r.jsonl"), [
             {"type": "session_meta", "payload": {"id": "s1", "creator_account_id": "ACCT-SECRET", "creator_user_id": "USER-SECRET"}},
             {"type": "world_state", "payload": {"state": {"host_skills": {"body": host}}}},
@@ -973,7 +984,12 @@ def self_test(case=None):
         try:
             args, tree = _gpt_fixture(td)
             rows = {}
+            audit = args["out"][: -len(".json")] + ".audit.json"
             for mode in ("plan", "review"):
+                with open(audit, encoding="utf-8") as fh:   # 감사는 그 첫 패스의 실제 mode 를 적는다(S14 r3 ISSUE-005)
+                    au = json.load(fh)
+                with open(audit, "w", encoding="utf-8") as fh:
+                    json.dump(dict(au, mode=mode), fh)
                 r = build_gpt_row(dict(args, mode=mode, run_id=f"t:isolated:{mode}"), tree)
                 rows[r["run_id"]] = r
             rc, out = judge_gpt(rows, ["SC-1", "AC-2"], ["isolated", "installed"], td)
@@ -1215,7 +1231,7 @@ def self_test(case=None):
             for rid, cite in (("RA", "App/A.swift:1"), ("RB", "App/B.swift:1")):
                 ap_ = os.path.join(td, f"{rid}.md")
                 open(ap_, "w").write(f"- `{cite}` 지적\n")
-                rows.append({"run_id": rid, "fixture": "r", "sources": {"artifacts": [ap_]}, "artifacts": []})
+                rows.append({"run_id": rid, "fixture": "r", "sources": {"artifacts": [ap_]}, "artifacts": _art(ap_)})
             pack, _ = blind_pack(rows, fxr, "s")
             files = sorted(pack["fixtures"]["r"]["source"]["files"])
             return files == ["App/A.swift", "App/B.swift"], [str(files)]
@@ -1235,7 +1251,7 @@ def self_test(case=None):
                 ap_ = os.path.join(td, f"{rid}.md")
                 with open(ap_, "w", encoding="utf-8") as fh:
                     fh.write(f"- `App/A.swift:11` 이름 문제 (/Users/someone/{rid}/x)\n")
-                rows.append({"run_id": rid, "arm": "B", "fixture": "r", "sources": {"artifacts": [ap_]}})
+                rows.append({"run_id": rid, "arm": "B", "fixture": "r", "sources": {"artifacts": [ap_]}, "artifacts": _art(ap_)})
             pack, key = blind_pack(rows, fxr, "salt")
             blob = json.dumps(pack, ensure_ascii=False)
             leak = [s for s in ("RUNID-ALPHA", "RUNID-BETA", "/Users/", '"arm"') if s in blob]
@@ -1291,7 +1307,7 @@ def self_test(case=None):
             for name, body in (("ok", '{"exit": 0, "note": "ok"}'), ("dead", '{"exit": 12, "note": "시작 직후 실패"}')):
                 with open(os.path.join(td, name + ".audit.json"), "w", encoding="utf-8") as fh:
                     fh.write(body)
-            _, launched, ok_n, failed = launcher_audits([td], None, None)
+            _, launched, ok_n, failed, _seen = launcher_audits([td], None, None)
             rows = base() + [_mk("C1", "C", 2), _mk("C2", "C", 4)]
             rows[2][0]["gpt"]["launcher_failed"] = 1
             rc, out = _judge(rows, require=["AC-5"])
@@ -1415,6 +1431,10 @@ def self_test(case=None):
             return ok, lines + r.stdout.splitlines()[:4]
         finally:
             shutil.rmtree(td, ignore_errors=True)
+
+    # ── round 3 S14 사례는 ab_ledger_selftest_r3.py 에 있다(이 파일 1500줄 상한 · structure-d split-size)
+    import ab_ledger_selftest_r3
+    ab_ledger_selftest_r3.register(reg, base)
 
     names = [case] if case else sorted(cases)
     if case and case not in cases:

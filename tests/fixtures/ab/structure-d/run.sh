@@ -20,7 +20,8 @@
 #   ⑦ history-kinds F               collect → recollect → collect 를 쌓으면 show --history 가 collect#1 · recollect · collect#2 순, judge 는 마지막 행
 #     history-legacy-winner C       origin 없는 옛 행 원장에서 load() 승자가 마지막 행 · show 가 돈다
 #   ⑧ formal-requires-sources F     judge --formal 에서 --verify-sources · --plugin-sha 결손이 각각 UNRUN exit 2 + 태그
-#     formal-with-sources F         둘이 있으면 --formal 없는 호출과 exit · 판정 줄이 같고 머리 줄(formal:) 하나만 더한다
+#     formal-with-sources F         둘이 있고 행마다 수면 증거가 있으면 --formal 없는 호출과 exit · 판정 줄이 같고 머리 줄(formal:) 하나만
+#                                   더한다 · 수면 증거 없는 원장에서는 --formal 이 그 행을 '수면 증거 없음' 으로 뺀다(F-326)
 #     legacy-argv-unchanged C       mini-ledger judge argv 11종의 stdout · exit 가 기준에서 얼린 바이트와 같다(임시 폴더 접두만 토큰)
 #   ⑫ clock-endpoint F              파서가 모르는 쓰기(make)로 끝난 run 에 시계를 주면 complete=True · wall.end = 시계 시각
 #     clock-overrides-stale-parser F  파서가 앞선 쓰기를 잡고 진짜 마지막 쓰기는 시계에만 있을 때 끝점 = 시계 · mtime 교차 통과
@@ -730,15 +731,35 @@ def cell_formal_requires_sources():
 def cell_formal_with_sources():
     m = mini_ledger()
     argvs = dict(judge_argvs(m))
-    pairs = []
+
+    def slept(argv):
+        # 원장 사본의 run 행마다 수면 증거(0회)를 심는다 — mini_ledger 원본은 legacy-argv-unchanged 가 얼린 바이트라 두고 사본만
+        out = []
+        for x in argv:
+            if x.startswith(m["ledger"]) and os.path.isfile(x):
+                cp = x + ".slept"
+                with open(cp, "w", encoding="utf-8") as fh:
+                    for r in rows_of(x):
+                        if r.get("type") == "run":
+                            r["sleep"] = {"source": "fixture-sleep-log", "count": 0}
+                        fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+                x = cp
+            out.append(x)
+        return out
+
+    pairs, unslept = [], []
     for name in ("baseline-valid-2-of-6", "baseline-min-3-fails"):
-        plain, formal = judge_out(argvs[name]), judge_out(argvs[name] + ["--formal"])
+        a = slept(argvs[name])
+        plain, formal = judge_out(a), judge_out(a + ["--formal"])
         pairs.append((name, plain, formal))
+        unslept.append((name, judge_out(argvs[name] + ["--formal"])))
     if all(f[0] == 2 and not f[1].strip() for _, _, f in pairs):
         raise Cell("no-formal-flag", "judge 가 --formal 을 모른다(argparse 거부 exit 2)")
     bad = [n for n, p, f in pairs if not (f[0] == p[0] and f[1].splitlines()[:1] and f[1].splitlines()[0].startswith("formal: ")
                                           and f[1].splitlines()[1:] == p[1].splitlines())]
-    return not bad, f"exit (plain, formal) {[(p[0], f[0]) for _, p, f in pairs]} · 머리 줄 하나 외 다른 출력 {bad or '없음'}"
+    nosleep = [n for n, (c, o) in unslept if "수면 증거 없음" not in o]
+    return not bad and not nosleep, (f"수면 증거 있는 사본 exit (plain, formal) {[(p[0], f[0]) for _, p, f in pairs]} · "
+                                     f"머리 줄 하나 외 다른 출력 {bad or '없음'} · 수면 증거 없는 원장에서 사유 빠짐 {nosleep or '없음'}")
 
 
 def obs_judges():

@@ -16,6 +16,10 @@ import re
 import shlex
 
 import fz_wf_metrics as wfm   # noqa: E402 — 형제 모듈(Workflow 폴더 집계)
+try:
+    import shell_tokens          # 공용 셸 토크나이저 — 명령 자리 판정(런처 · Phase 2 호출). 계측기 지문에 든다(INSTRUMENTS)
+except ImportError:              # ⛔ 정규식으로 돌아가지 않는다 — 런처 · Phase 2 는 미측정이 된다
+    shell_tokens = None
 from ab_ledger_base import (iso, iter_jsonl, norm_model, read_json, secs, sha_text)
 
 
@@ -148,12 +152,34 @@ def _load_return(nt, tasks_dirs=()):
         except ValueError:
             res = None
     if note is not None:
-        if isinstance(res, dict) and (res.get("metrics") != note.get("metrics") or res.get("mode") != note.get("mode")):
+        if isinstance(res, dict) and any(res.get(k) != note.get(k) for k in RETURN_KEYS):
             note = dict(note, _conflict=True)   # ⛔ 두 원천의 반환이 다르면 어느 쪽도 믿지 않는다(build_row 가 미완주 처리)
         return note, wrap, "notification" + ("+output-file" if wrap else "")
     if wrap is not None:
         return (res if isinstance(res, dict) else None), wrap, "output-file"
     return None, None, None
+
+
+# 완료 판정에 쓰는 반환 칸 — 알림과 래퍼가 하나라도 다르면 둘 다 믿지 않는다(S14 r4 ISSUE-002)
+RETURN_KEYS = ("metrics", "mode", "tier", "stage2Ran", "stage2Skipped", "mergeSkipped")
+
+
+def _skip_ok(v) -> bool:
+    """조건부 생략 표지(stage2Skipped · mergeSkipped)의 정본 형 — null · bool · {reason: 문자열}(review-live.js · plan-lean2.js)."""
+    return v is None or isinstance(v, bool) or (isinstance(v, dict) and isinstance(v.get("reason"), str))
+
+
+def _wrapper_ok(w) -> bool:
+    """하네스 래퍼(tasks/*.output) = {agentCount: int, result: dict | JSON 문자열(dict), result.metrics: dict}."""
+    if not isinstance(w, dict) or type(w.get("agentCount")) is not int:
+        return False
+    r = w.get("result")
+    if isinstance(r, str):
+        try:
+            r = json.loads(r)
+        except ValueError:
+            return False
+    return isinstance(r, dict) and isinstance(r.get("metrics"), dict)
 
 
 def _writes_path(cmd, base):
@@ -520,19 +546,19 @@ def _merge_summaries(tool_uses, results):
 REAL_HOME_SKILL_RE = re.compile(r"(?:\$HOME|\$\{HOME\}|~|/Users/[^/\s'\"]+)/\.codex/skills/")
 
 
-SH_HEREDOC_RE = re.compile(r"(?:^|[;&|(]\s*|\s)(?:bash|sh|zsh)(?:\s+-[A-Za-z]+)*\s*<<-?\s*(['\"]?)([A-Za-z_]\w*)\1[^\n]*\n", re.M)
-
-
 def _shell_heredoc_bodies(cmd):
     """셸에 먹이는 heredoc(`bash <<'BASH' … BASH`)의 본문 — 데이터가 아니라 **셸 명령**이다.
     실측(plan-removal B1): 명령 전체를 bash heredoc 으로 감싸 `python3 $W/plan/make_final.py … plan-final.md` 를 실행했는데,
-    heredoc 본문을 지우는 _shell_part 가 그 명령을 통째로 버려 끝점을 놓쳤다."""
-    out = []
-    for m in SH_HEREDOC_RE.finditer(cmd):
-        rest = cmd[m.end():]
-        end = re.search(rf"^{re.escape(m.group(2))}\s*$", rest, re.M)
-        out.append(rest[:end.start()] if end else rest)
-    return out
+    heredoc 본문을 지우는 _shell_part 가 그 명령을 통째로 버려 끝점을 놓쳤다.
+    명령 자리의 셸(bash · sh · zsh · 스크립트 인자 없음)에 붙은 heredoc 만 본다 — 데이터 heredoc 본문 안의 `bash <<` 글자는 코드가
+    아니다(S14 r4 ISSUE-003). 못 읽은 명령(Unknown · 토크나이저 없음)은 본문을 내지 않는다(호출자가 원문 모양으로 미측정을 센다)."""
+    toks = shell_tokens.lex(cmd) if shell_tokens is not None else None
+    cs = shell_tokens.commands(toks) if toks is not None and not shell_tokens.is_unknown(toks) else None
+    if cs is None or shell_tokens.is_unknown(cs):
+        return []
+    return [r.heredoc["body"] for c in cs if c.name is not None and not c.deferred and not c.unsure
+            and os.path.basename(c.name.text) in ("bash", "sh", "zsh") and not [w for w in c.args if not w.text.startswith("-")]
+            for r in c.redirs if r.heredoc and r.op in ("<<", "<<-") and isinstance(r.heredoc.get("body"), str)]
 
 
 def _cmd_views(cmd):
@@ -569,8 +595,51 @@ def queued_followups(evs, first_prompt):
     return n
 
 
-# 정문 형태(gpt-call.sh independent-plan|review)도 같은 런처 호출이다 — mode 는 plan · review 로 정규화한다(P-11)
+# 정문 형태(gpt-call.sh independent-plan|review)도 같은 런처 호출이다 — mode 는 plan · review 로 정규화한다(P-11).
+# ⛔ 이 정규식은 '런처 글자가 있는가' 만 본다 — 실행인지(명령 자리)는 공용 토크나이저가 정한다(_shell_calls)
 LAUNCHER_RE = re.compile(r"gpt_independent\.sh[\"']?\s+(plan|review)\b|gpt-call\.sh[\"']?\s+independent-(plan|review)\b")
+_LAUNCHER = {"gpt_independent.sh": {"plan": "plan", "review": "review"},
+             "gpt-call.sh": {"independent-plan": "plan", "independent-review": "review"}}
+
+
+def _shell_calls(cmd: str, hint, pick):
+    """Bash 명령 하나에서 실제로 실행되는 호출 → (호출 목록, 미측정 수). 명령 자리는 shell_tokens.commands(shells=True) 한 곳이
+    정한다(래퍼 · 예약어 · 셸 경유 — `if bash …` · `/usr/bin/time -p bash …` · `caffeinate -i bash …`). 검색 인자 · 주석 · 다른 명령의
+    인자 안 언급은 실행이 아니다(`rg 'gpt-call.sh verify' docs` — r3 ISSUE-006). pick(이름 basename, 인자 글자) → 값 | None.
+    ⛔ 못 읽은 꼴(Unknown) · 확신 없는 명령(unsure) · 함수 본문 안(deferred) · 토크나이저 import 실패에 hint 글자가 있으면 0 이 아니라
+    미측정이다. 모양(원문 · 줄 이음 · 변수 펼침 · bash heredoc 본문)마다 재서 가장 많이 잡힌 하나를 쓴다(같은 호출의 다른 모양이다)."""
+    best, best_u, unsure = [], 0, 0
+    for v in _cmd_views(cmd):
+        # 따옴표 · 역슬래시를 뺀 글자로 거른다 — `gpt-call.sh 'independent-review'` 도 토크나이저까지 간다(S14 r4 ISSUE-004)
+        if not hint.search(re.sub(r"[\"'\\\\]", "", v)):
+            continue
+        cs = shell_tokens.commands(shell_tokens.lex(v), shells=True) if shell_tokens is not None else None
+        if cs is None or shell_tokens.is_unknown(cs):
+            unsure = max(unsure, 1)
+            continue
+        got, u = [], 0
+        for c in cs:
+            words = ([c.name] if c.name is not None else []) + list(c.args)
+            base = os.path.basename(c.name.text) if c.name is not None else ""
+            # 이름의 폴더 부분만 펼쳐지는 꼴(`"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh"`)은 파일 이름이 글자라 확정이다
+            if c.unsure or c.deferred or re.search(r"[$`]", base):
+                # 단어를 내지 못한 확신 없는 명령(`caffeinate -dims bash …` — 모르는 래퍼 옵션)은 그 모양의 글자로 본다
+                u += bool(hint.search(" ".join(w.text for w in words)) or (not words and hint.search(re.sub(r"[\"'\\\\]", "", v))))
+                continue
+            if c.name is not None:
+                val = pick(base, [w.text for w in c.args])
+                if val is not None:
+                    got.append(val)
+        if len(got) > len(best) or (got and len(got) == len(best) and u > best_u):
+            best, best_u = got, u
+        unsure = max(unsure, u)
+    # 모양 하나라도 확정 호출을 냈으면 그 모양이 이긴다 — 못 읽은 모양은 같은 호출의 다른 표기다. 단 이긴 모양 **안의** 확신 없는 호출
+    # (함수 본문 · 모르는 래퍼 옵션)은 확정 호출과 별개 호출이라 미측정으로 남긴다(S14 r4 ISSUE-005)
+    return best, (best_u if best else unsure)
+
+
+def _launcher_pick(name, args):
+    return _LAUNCHER.get(name, {}).get(args[0]) if args else None
 
 
 def _launcher_calls(bash, notifs, results):
@@ -578,26 +647,38 @@ def _launcher_calls(bash, notifs, results):
     도구 결과(포그라운드). ⛔ 읽기(`sed -n … gpt_independent.sh`)는 모드 인자가 없어 걸리지 않는다."""
     out = []
     for u in bash:
-        m = None
-        for v in _cmd_views(str(u["input"].get("command") or "")):
-            m = LAUNCHER_RE.search(_shell_part(v))
-            if m:
-                break
-        if not m:
+        # 한 Bash 안의 호출을 모두 센다 · 판정 못 한 호출은 mode 없는 미완료 호출 1건 — launcher_unmeasured 가 미측정으로 센다
+        modes, unsure = _shell_calls(str(u["input"].get("command") or ""), LAUNCHER_RE, _launcher_pick)
+        if not modes and not unsure:
             continue
         nt, res = notifs.get(u["id"]) or {}, results.get(u["id"]) or {}
         done = nt.get("ts") or res.get("ts")
-        out.append({"mode": m.group(1) or m.group(2), "launch": iso(u["ts"]), "done": iso(done), "wall_s": secs(u["ts"], done)})
+        # 완료 = 완료 알림, 또는 포그라운드 호출의 도구 결과. 백그라운드 호출의 즉시 응답(접수)은 완료가 아니다
+        fin = bool(nt.get("ts")) or (bool(res.get("ts")) and not u["input"].get("run_in_background"))
+        # ⛔ 호출마다 한 행 — 둘째 호출이 감사 전에 실패하면 감사 수가 호출 수보다 적어 미측정이 된다(S14 2차 ISSUE-002)
+        out += [{"mode": m, "launch": iso(u["ts"]), "done": iso(done), "wall_s": secs(u["ts"], done),
+                 "completed": fin} for m in modes]
+        out += [{"mode": None, "launch": iso(u["ts"]), "done": None, "wall_s": None, "completed": False, "unsure": True}] * unsure
     return out
 
 
+def _phase2_pick(name, args):
+    if name == "gpt-exec.sh" and args and (args[0] == "resume" or (args[0] == "exec" and any("gpt_review_schema" in a for a in args))):
+        return True
+    return True if name == "gpt-call.sh" and args and args[0] in ("verify", "verify-cross") else None
+
+
 def _plan_phase2(tool_uses, results):
-    """fz-plan Phase 2 GPT 검증을 실행했는가 — B 는 verify(gpt_review_schema), C 는 resume 교차. 실패한 호출은 세지 않는다."""
+    """fz-plan Phase 2 GPT 검증을 실행했는가 — B 는 verify(gpt_review_schema), C 는 resume 교차. 실패한 호출은 세지 않는다.
+    True = 실행 · False = 흔적 없음 · None = 판정 불가(Phase 2 글자가 있는데 명령을 읽지 못했다 — 0 이 아니라 미측정)."""
+    unsure = False
     for u in tool_uses:
-        if u["name"] == "Bash" and not (results.get(u["id"]) or {}).get("is_error") \
-                and any(PHASE2_RE.search(_shell_part(v)) for v in _cmd_views(str(u["input"].get("command") or ""))):
-            return True
-    return False
+        if u["name"] == "Bash" and not (results.get(u["id"]) or {}).get("is_error"):
+            got, un = _shell_calls(str(u["input"].get("command") or ""), PHASE2_RE, _phase2_pick)
+            if got:
+                return True
+            unsure = unsure or bool(un)
+    return None if unsure else False
 
 
 def _launcher_ok(audit):
@@ -621,11 +702,16 @@ def gpt_home_sessions(home):
     out = []
     for f in sorted(pathlib.Path(d).rglob("*.jsonl")):
         m = e = v = sid = None
+        bad = 0
         with open(f, encoding="utf-8", errors="replace") as fh:
             for ln in fh:
                 try:
                     r = json.loads(ln)
                 except ValueError:
+                    bad += ln.strip() != ""
+                    continue
+                if not isinstance(r, dict):
+                    bad += 1
                     continue
                 pl = r.get("payload") or {}
                 if r.get("type") == "session_meta":
@@ -633,7 +719,9 @@ def gpt_home_sessions(home):
                     v, sid = pl.get("cli_version"), pl.get("session_id") or pl.get("id")
                 elif r.get("type") == "turn_context" and m is None:
                     m, e = pl.get("model"), pl.get("effort")
-        if m and e:
+        if bad:   # 못 읽은 줄이 있는 세션 — 모델 · 세션을 모른다. 0 건으로 빼지 않고 표지로 남긴다(S14 r4 ISSUE-009 · 실측 1,458파일 위반 0)
+            out.append({"model": None, "effort": None, "version": None, "session": None, "bad_lines": bad, "file": f.name})
+        elif m and e:
             out.append({"model": m, "effort": e, "version": v, "session": sid})
     return out
 
@@ -653,35 +741,54 @@ def _bash_writes(cmd, a, cwd, scripts=None):
     return False
 
 
-FZ_MCP_PREFIX = "mcp__plugin_fz_"   # 플러그인이 띄우는 MCP — 측정 대상의 일부다
+FZ_MCP_PREFIX = wfm.FZ_MCP_PREFIX
 
 
-def external_mcp(tool_uses, results):
-    """플러그인 밖 MCP 도구 호출(F-325) → {calls, returned, errors, empty, tools}. 사용자 MCP(Jira 등)를 물려받은 run 은
-    fixture 가 통제하지 못한 입력을 받을 수 있다 — 오류가 아닌 본문이 돌아온 호출(returned)이 하나라도 있으면 judge 가 run 을 뺀다.
-    ⛔ 본문의 뜻은 판독하지 않는다(권한 없음 문구도 본문이다 — 보수 쪽). 결과가 없는 호출은 errors 로 센다(유입 없음).
-    범위: Lead transcript 의 호출만 — Workflow 워커의 호출은 Workflow 폴더에 있고 여기서 세지 않는다."""
-    calls = [u for u in tool_uses if str(u.get("name") or "").startswith("mcp__") and not str(u["name"]).startswith(FZ_MCP_PREFIX)]
-    kinds = collections.Counter()
-    for u in calls:
-        r = results.get(u["id"])
-        kinds["error" if r is None or r["is_error"] else ("content" if (r.get("text") or "").strip() else "empty")] += 1
-    return {"calls": len(calls), "returned": kinds["content"], "errors": kinds["error"], "empty": kinds["empty"],
-            "tools": sorted({u["name"] for u in calls})}
+def external_mcp_calls(tool_uses, mcp_results):
+    """Lead transcript 의 플러그인 밖 MCP 호출(F-325) → [{session, id, name, kind}]. 결과는 (세션, 호출 id)로 찾는다 —
+    호출 id 만 쓰면 다른 세션의 같은 id 결과가 덮어쓴다. 결과가 없는 호출은 unresolved(미측정 — judge 가 run 을 뺀다)."""
+    return [{"session": u.get("session") or "", "id": u.get("id"), "name": u["name"],
+             "kind": mcp_results.get((u.get("session") or "", u.get("id")), "unresolved")}
+            for u in tool_uses if wfm.is_external_mcp(u.get("name"))]
+
+
+def mcp_summary(calls, workflows=0, unmeasured=()):
+    """호출 목록 → {calls, returned, errors, empty, tools, workflows, unmeasured}. 같은 (세션, 호출 id)는 한 번만 센다.
+    사용자 MCP(Jira 등)를 물려받은 run 은 fixture 가 통제하지 못한 입력을 받을 수 있다 — 본문이 돌아온 호출(returned)이
+    하나라도 있으면 judge 가 run 을 뺀다. unmeasured = 워커 로그를 읽지 못한 Workflow(0 이 아니라 미측정 — judge 가 run 을 뺀다)."""
+    uniq = {}
+    for c in calls:
+        uniq.setdefault((c.get("session") or "", c["id"]) if c.get("id") else ("anon", len(uniq)), c)
+    kinds = collections.Counter(c["kind"] for c in uniq.values())
+    return {"calls": len(uniq), "returned": kinds["content"], "errors": kinds["error"], "empty": kinds["empty"],
+            "unresolved": kinds["unresolved"], "tools": sorted({c["name"] for c in uniq.values()}), "workflows": workflows, "unmeasured": sorted(str(x) for x in unmeasured)}
+
+
+def external_mcp(tool_uses, mcp_results):
+    """Lead transcript 만의 집계(워커는 collect 가 Workflow 폴더 판독과 합친다 — external_mcp_merge)."""
+    return mcp_summary(external_mcp_calls(tool_uses, mcp_results))
 
 
 def parse_transcript(path, artifacts=(), tasks_dirs=()):
     """Lead transcript 1개 → Lead 층 지표. I/O 는 파일 읽기뿐이다."""
     evs, bad = iter_jsonl(path)
     per_id, usage_by_id, advisor_ids, versions = {}, {}, set(), set()
-    tool_uses, results = [], {}
+    tool_uses, results, mcp_results = [], {}, {}
     roots, skills = set(), set()
     injected, injected_paths = {}, {}
     prompts = []
     notifs = {}
     cwds = collections.Counter()
     start_cwd = None
+    # 형식 위반 — 계측기가 읽는 칸이 빠졌거나 형이 틀린 줄은 기본값으로 메우지 않고 미완주 사유로 올린다(S14 구조 전환 · tests/ab/faults.py).
+    #   규칙은 실제 Lead transcript(80개 · 응답 28,245줄)에서 위반 0 인 것만 둔다 — 워커 판독과 같은 함수(fz_wf_metrics.event_format)
+    fmt, uuids, parents, present = collections.Counter(), set(), [], collections.defaultdict(set)
     for n, ev in enumerate(evs):
+        fmt.update(wfm.event_format(ev, uuids, parents, present))
+        if ev.get("type") == "attachment" and not (isinstance(ev.get("attachment"), dict) and isinstance(ev["attachment"].get("type"), str)):
+            fmt["attachment"] += 1
+        if ev.get("type") == "queue-operation" and ev.get("content") is not None and not isinstance(ev.get("content"), str):
+            fmt["queue-operation.content"] += 1   # content 가 없는 enqueue 는 정상이다(실측 825건 중 119건)
         if ev.get("type") in ("user", "assistant") and ev.get("cwd"):
             cwds[ev["cwd"]] += 1
             start_cwd = start_cwd or ev["cwd"]
@@ -715,7 +822,10 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
                 elif not old["result"] and rec["result"]:
                     old["result"] = rec["result"]
         att = ev.get("attachment") if isinstance(ev.get("attachment"), dict) else {}
-        if att.get("type") == "instructions" and not injected:
+        if att.get("type") == "instructions" and not (isinstance(att.get("files"), list) and all(
+                isinstance(f, dict) and isinstance(f.get("type"), str) and isinstance(f.get("content"), str) for f in att["files"])):
+            fmt["attachment.files"] += 1
+        elif att.get("type") == "instructions" and not injected:
             for f in att.get("files") or []:
                 k = f.get("type") or "?"
                 injected.setdefault(k, sha_text(f.get("content") or ""))
@@ -733,8 +843,12 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
                 if b.get("type") == "advisor_tool_result":
                     advisor_ids.add(b.get("tool_use_id") or f"anon-{n}")
                 elif b.get("type") == "tool_use":
+                    inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+                    if (b.get("name") == "Bash" and not isinstance(inp.get("command"), str)) or (
+                            b.get("name") in WRITE_TOOLS and not isinstance(inp.get("file_path", inp.get("notebook_path")), str)):
+                        fmt["tool_use.input"] += 1
                     tool_uses.append({"ts": t, "id": b.get("id"), "name": b.get("name"),
-                                      "input": b.get("input") or {}, "cwd": ev.get("cwd") or ""})
+                                      "input": b.get("input") or {}, "cwd": ev.get("cwd") or "", "session": ev.get("sessionId") or ""})
         text = None
         if ev.get("type") == "user" and not ev.get("isMeta"):
             if isinstance(content, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
@@ -745,6 +859,7 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
                             x.get("text") or "" for x in (c or []) if isinstance(x, dict))
                         results[b.get("tool_use_id")] = {"ts": t, "is_error": bool(b.get("is_error")),
                                                          "tur": ev.get("toolUseResult"), "text": body}
+                        mcp_results[(ev.get("sessionId") or "", b.get("tool_use_id"))] = wfm.mcp_result_kind(b.get("is_error"), c)
             elif isinstance(content, str):
                 text = content
             elif isinstance(content, list):
@@ -756,6 +871,16 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
             if not prompts or prompts[-1][1] != text:
                 prompts.append((t, text))
 
+    fmt.update(wfm.file_format(uuids, parents, present))
+    use_ids = {u["id"] for u in tool_uses}
+    fmt["orphan_result"] += sum(1 for k in results if k not in use_ids)   # 호출 줄이 빠진 결과 — 실측 0(S14 r3 ISSUE-002)
+    for u in tool_uses:
+        r = results.get(u["id"])
+        tur = r.get("tur") if r else None
+        if u["name"] == "Workflow" and r and not r["is_error"] and not (isinstance(tur, dict) and all(
+                isinstance(tur.get(k), str) for k in ("runId", "transcriptDir", "workflowName"))):
+            fmt["workflow.toolUseResult"] += 1
+    fmt = +fmt
     models = collections.Counter(norm_model(m) for m, _ in per_id.values() if m and m != "<synthetic>")
     efforts = collections.Counter(e for m, e in per_id.values() if e and m != "<synthetic>")
     bash = [u for u in tool_uses if u["name"] == "Bash"]
@@ -775,6 +900,11 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
         tur = r.get("tur") if isinstance(r.get("tur"), dict) else {}
         nt = notifs.get(u["id"]) or {}
         ret, wrapper, src = _load_return(nt, tasks_dirs)
+        if nt.get("output_file") and not _wrapper_ok(wrapper):
+            fmt["workflow.output"] += 1   # 알림이 가리킨 하네스 래퍼를 못 읽었거나 형이 틀렸다 — 세 계수 대조가 조용히 빠지지 않게(실측 28/28 정상)
+        for k in ("stage2Skipped", "mergeSkipped"):
+            if ret and k in ret and not _skip_ok(ret[k]):
+                fmt["workflow.return." + k] += 1   # "false" 같은 문자열을 생략으로 읽지 않는다(S14 r4 ISSUE-002)
         workflows.append({
             "tool_use_id": u["id"], "launch": iso(u["ts"]), "rejected": bool(r.get("is_error")),
             "run_id": tur.get("runId"), "dir": tur.get("transcriptDir"), "name": tur.get("workflowName"),
@@ -933,6 +1063,7 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
     deltas = [x["mtime"] - x["write"].timestamp() for x in art if x["write"] and x["mtime"] is not None]
     return {
         "bad_lines": bad,
+        "format_problems": dict(fmt),
         "lead": {
             "model": models.most_common(1)[0][0] if len(models) == 1 else (None if not models else "mixed"),
             "models": dict(models), "effort": efforts.most_common(1)[0][0] if len(efforts) == 1 else
@@ -951,7 +1082,8 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
         "artifacts": [dict(x, write=iso(x["write"])) for x in art],
         "workflows": workflows, "gpt": gpt, "cwd": start_cwd, "launcher": _launcher_calls(bash, notifs, results),
         "merge": _merge_summaries(tool_uses, results), "plan_phase2": _plan_phase2(tool_uses, results),
-        "external_mcp": external_mcp(tool_uses, results),
+        "external_mcp": external_mcp(tool_uses, mcp_results),
+        "external_mcp_calls": external_mcp_calls(tool_uses, mcp_results),
         "queued_followups": queued_followups(evs, prompts[0][1] if prompts else None),
         # ⛔ Lead 작업 폴더 = **세션 시작** cwd(러너가 claude -p 를 띄운 곳). 최빈 cwd 는 잡음이다 — Lead 는 --add-dir 로 받은
         #    플러그인 폴더에 들어가 모듈 · 스크립트를 읽고 부른다(실측 review B1 repo 70:plugin 53 통과 · B2 125:128 무효 ·

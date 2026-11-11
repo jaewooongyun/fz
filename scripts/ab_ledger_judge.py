@@ -7,13 +7,15 @@ from __future__ import annotations
 
 import argparse
 import collections
+import hashlib
 import json
+import math
 import os
 import re
 import statistics
 
-from ab_ledger_base import (AXES6, AXES_ALLOWED, DEFAULT_EFFORT, DEFAULT_MODEL, FAIL, GATED, GPT_PASS_CRIT, LINE_TOL,
-    MTIME_TOL_S, PASS, SEVERITIES, UNRUN, WALL_XCHECK_PCT, instrument_sha, norm_model, read_json, sha_text)
+from ab_ledger_base import (AXES6, AXES_ALLOWED, CORPUS_GUARD_EXTRA, DEFAULT_EFFORT, DEFAULT_MODEL, FAIL, GATED, GPT_PASS_CRIT,
+    INSTRUMENTS, LINE_TOL, MTIME_TOL_S, PASS, SEVERITIES, UNRUN, WALL_XCHECK_PCT, instrument_sha, norm_model, read_json, sha_text)
 from ab_ledger_collect import (build_row, collect_spec_args)
 
 
@@ -289,13 +291,9 @@ def blind_pack(rows, fixtures_root, salt):
     for r in rows:
         anon = "X" + sha_text(salt + r["run_id"])[:8]
         key[anon] = r["run_id"]
-        texts = []
-        for pth in (r.get("sources") or {}).get("artifacts") or []:
-            try:
-                with open(pth, encoding="utf-8", errors="replace") as fh:
-                    texts.append(fh.read())
-            except OSError:
-                texts.append("")
+        texts = _read_texts(r)
+        if texts is None:
+            raise ValueError(f"{r['run_id']}: 산출물을 못 읽었거나 collect 기록과 내용이 다르다 — 꾸러미에 넣지 않는다")
         fxdir = os.path.join(fixtures_root, r.get("fixture") or "")
         if os.path.isfile(os.path.join(fxdir, "labels.json")):
             labels = read_json(os.path.join(fxdir, "labels.json"))
@@ -376,7 +374,18 @@ def row_invalid(row, score, opts):
         why.append(f"AC-5 GPT 호출 실패 {g.get('failed')}건 — 실패가 섞인 run 은 대표값이 아니다")
     if (g.get("launcher_failed") or 0) > 0:
         why.append(f"AC-5 GPT 런처 실패 {g['launcher_failed']}건(감사 exit ≠ 0) — 실패가 섞인 run 은 대표값이 아니다")
+    if (g.get("launcher_unmeasured") or 0) > 0:
+        why.append(f"AC-5 GPT 런처 미측정 {g['launcher_unmeasured']}건 — 완료 알림 또는 감사 파일이 없다(실행 0 으로 읽지 않는다)")
+    cur_i = opts.get("instrument") or instrument_sha()
+    if not str(row.get("instrument_sha") or "").strip():
+        why.append("계측기 지문 없음 — 어느 계측기로 잰 행인지 증명하지 못한다(지문 비교 전에 뺀다)")
+    elif row.get("instrument_sha") != cur_i:
+        # ⛔ 모든 기준에서 — 지금 계측기와 다른 지문의 행끼리 같으면 묶음 대조로는 못 뺀다(S14 r3 ISSUE-001: 네 행 모두 0000…)
+        why.append(f"instrument 불일치 — 행 {row.get('instrument_sha')} · 현재 {cur_i} (recollect 필요)")
     sl = row.get("sleep")
+    if opts.get("formal") and not (isinstance(sl, dict) and sl.get("source")):
+        # F-326 — 정식 비교에서 수면 기록이 없는 run 은 '수면 0' 이 아니라 미측정이다(증거 부재 = 위반 · §5.6)
+        why.append("수면 증거 없음 — 정식 비교는 run 구간 수면 기록(--sleep-log)이 있는 run 만 잰다(미측정)")
     if isinstance(sl, dict) and sl.get("source"):
         # 수면(F-326) — 러너가 기록을 넘긴 run 만 본다. 기록이 run 구간을 덮지 못했거나 읽지 못했으면 0 으로 읽지 않는다
         if type(sl.get("count")) is not int:
@@ -386,6 +395,10 @@ def row_invalid(row, score, opts):
     em = row.get("external_mcp")
     if isinstance(em, dict) and (em.get("returned") or 0) > 0:
         why.append(f"외부 MCP 내용 유입 {em['returned']}회 {(em.get('tools') or [])[:3]} — fixture 가 통제하지 못한 입력")
+    if isinstance(em, dict) and (em.get("unresolved") or 0) > 0:
+        why.append(f"외부 MCP 결과 미확인 {em['unresolved']}회 — 결과가 없는 호출은 유입 0 의 증거가 아니다(미측정)")
+    if isinstance(em, dict) and em.get("unmeasured"):
+        why.append(f"외부 MCP 미측정 — 워커 로그를 읽지 못한 Workflow {em['unmeasured'][:3]}(0 건으로 읽지 않는다)")
     pl = row.get("plugin") or {}
     if not pl.get("tree_hash"):
         why.append("플러그인 트리 해시 없음 — arm 의 트리를 증명하지 못한다")
@@ -417,7 +430,7 @@ def row_invalid(row, score, opts):
             why.append(f"wall_workflow 두 자 차이 {w['delta_pct']}% > {WALL_XCHECK_PCT}% "
                        f"({w.get('run_id')}: 에이전트 {w.get('wf_s')}s · Lead {w.get('lead_s')}s)")
     md = wall.get("mtime_delta_s")
-    if md is None or abs(md) > MTIME_TOL_S:
+    if not isinstance(md, (int, float)) or not math.isfinite(md) or abs(md) > MTIME_TOL_S:   # NaN 은 어떤 비교도 거짓이다(S14 2차 ISSUE-006)
         why.append(f"최종 산출물 mtime 교차 실패 Δ={md}s (허용 {MTIME_TOL_S}s)")
     if opts.get("plugin_sha"):
         p = row.get("plugin") or {}
@@ -443,7 +456,8 @@ def treatment_fired(rows):
 
 def _key_fields(row, score):
     lead, inj, g = row.get("lead") or {}, row.get("injected") or {}, row.get("gpt") or {}
-    k = {"input-hash": (row.get("input") or {}).get("hash"), "instrument": row.get("instrument_sha"),
+    # 계측기 지문은 키에 넣지 않는다 — 행 무효 사유가 모든 행을 현재 지문과 대조하므로 유효한 행의 지문은 하나뿐이다
+    k = {"input-hash": (row.get("input") or {}).get("hash"),
          "injected": (inj.get("User"), inj.get("Project"), inj.get("AutoMem")),
          "cli": tuple(lead.get("cli_versions") or ()),
          # arm 마다 트리가 하나여야 한다 — 키 이름에 arm 을 넣어 B·C 풀을 나눈다
@@ -464,6 +478,41 @@ def _ordered_json(v):
     return json.dumps(v, sort_keys=True)
 
 
+def freeze_corpus(spec):
+    """측정 코퍼스 → (동결 기록 | None, 거부 사유). 거부가 하나라도 있으면 기록을 내지 않는다(F-443). 형식 오류는 ValueError."""
+    its = spec.get("input_tree_sha") if isinstance(spec, dict) else None
+    tasks = spec.get("tasks") if isinstance(spec, dict) else None
+    if not (isinstance(its, str) and re.fullmatch(r"[0-9a-f]{40}", its)) or not isinstance(tasks, list) or not tasks:
+        raise ValueError("입력 형식 — input_tree_sha(40자 hex) · tasks[] 1개 이상")
+    guard = {"scripts/" + n for n in INSTRUMENTS} | set(CORPUS_GUARD_EXTRA)
+    bad, seen = [], set()
+    for t in tasks:
+        tid = t.get("id") if isinstance(t, dict) else None
+        if not (isinstance(tid, str) and tid) or tid in seen:
+            bad.append(f"과제 id 가 없거나 겹친다 — {str(t)[:60]}")
+            continue
+        seen.add(tid)
+        dp = t.get("diff_paths")
+        if not isinstance(dp, list) or not dp or not all(isinstance(x, str) for x in dp):
+            bad.append(f"{tid}: diff_paths 가 없다 — 계측기 겹침을 확인하지 못한다")
+        elif any(os.path.isabs(x) or x.startswith("~") or os.path.normpath(x).split(os.sep)[0] == ".." for x in dp):
+            # 보호 목록은 저장소 상대 경로다 — 절대 · 저장소 밖 표현은 교집합이 비어 보호를 우회한다(S14 2차 ISSUE-008)
+            bad.append(f"{tid}: diff_paths 는 저장소 상대 경로여야 한다(절대 · ~ · .. 거부) — `git diff --name-only` 출력을 쓴다")
+        else:
+            hit = sorted(guard & {os.path.normpath(x) for x in dp})
+            if hit:
+                bad.append(f"{tid}: diff 가 계측기 · 측정 런처를 건드린다 {hit} — 측정이 계측기를 리뷰하게 된다 · 코퍼스에서 뺀다")
+        sm = t.get("a0_smoke") if isinstance(t.get("a0_smoke"), dict) else {}
+        if not re.fullmatch(r"[0-9a-f]{64}", str(sm.get("sha256") or "")):
+            bad.append(f"{tid}: A0 스모크 결과 해시(sha256)가 없다 — 스모크로 한 번 돌린 뒤에만 동결한다")
+        elif type(sm.get("audit_hits")) is not int or sm["audit_hits"] != 0:
+            bad.append(f"{tid}: A0 스모크 감사 적중 {sm.get('audit_hits')!r} — 0 이어야 동결한다")
+    if bad:
+        return None, bad
+    return {"schema": 1, "input_tree_sha": its, "instrument_sha": instrument_sha(),
+            "tasks": [{"id": t["id"], "a0_smoke_sha256": t["a0_smoke"]["sha256"]} for t in tasks]}, []
+
+
 def group_invalid(rows, scores, roots_first=None):
     """비교 묶음 안에서 입력·계측기·주입 지침·CLI·GPT 배너·채점표·arm 별 플러그인 트리가 같아야 한다(다수와 다르면 무효).
     C 트리가 B 트리와 같으면 C 무효(같은 트리끼리 비교) · 입력 저장소 경로가 겹치면 뒤 run 무효(재사용)."""
@@ -481,7 +530,7 @@ def group_invalid(rows, scores, roots_first=None):
         for r in pool:
             if _ordered_json(keys[r["run_id"]][f]) != ref:
                 tag = "input-hash" if f == "input-hash" else f"{f} 불일치"
-                out[r["run_id"]].append(f"{tag} — 묶음 다수와 다르다" + (" (recollect 필요)" if f == "instrument" else ""))
+                out[r["run_id"]].append(f"{tag} — 묶음 다수와 다르다")
     btrees = collections.Counter((r.get("plugin") or {}).get("tree_hash") for r in rows if r.get("arm") == "B")
     bref = btrees.most_common(1)[0][0] if btrees else None
     for r in rows:
@@ -825,7 +874,10 @@ VERIFY_FIELDS = {
                    "lead.followup_prompts", "plugin.roots", "plugin.sha", "plugin.tree_hash", "injected",
                    "wall.total_s", "wall.start", "wall.end", "wall.mtime_delta_s", "artifacts", "gpt.calls", "gpt.ok",
                    "gpt.failed", "gpt.unlinked", "gpt.banners", "gpt.models", "gpt.efforts", "gpt.efforts_default", "gpt.versions",
-                   "plugin.dirty", "plugin.source", "plugin.source_tree_hash", "input.prompt_sha"),
+                   "plugin.dirty", "plugin.source", "plugin.source_tree_hash", "input.prompt_sha",
+                   # row_invalid 가 읽는 필드는 전부 원천 대조에 든다(셀 r3-adv-verify-covers-invalidation-fields)
+                   "gpt.launcher", "gpt.launcher_ok", "gpt.launcher_failed", "gpt.launcher_unmeasured",
+                   "sleep.count", "sleep.note", "sleep.sha256", "external_mcp", "merge"),
     "wf-metrics": ("wf.agents", "wf.out_tok", "wf.turns", "wf.so_retries", "wf.advisor", "wf.models", "wf.efforts",
                    "wf.stages", "wf.stage2_ran", "wall.workflows", "complete.ok"),
     "start-state": ("state.start_hash", "state.pristine_hash", "state.leak", "state.problems"),
@@ -881,11 +933,17 @@ def _artifact_shas(row):
 
 
 def _read_texts(row):
+    """산출물 본문 목록 — 하나라도 못 읽거나 내용이 collect 가 기록한 sha256 과 다르면 None(채점 · 꾸러미에 쓰지 않는다).
+    못 읽은 산출물을 빈 글로 채우면 남은 요약만으로 지적 0 · verified 로 채점된다(S14 2차 ISSUE-001)."""
+    want = {os.path.abspath(x["path"]): x.get("sha256") for x in row.get("artifacts") or [] if isinstance(x, dict) and x.get("path")}
     texts = []
     for pth in (row.get("sources") or {}).get("artifacts") or []:
         try:
-            with open(pth, encoding="utf-8", errors="replace") as fh:
-                texts.append(fh.read())
+            with open(pth, "rb") as fh:
+                b = fh.read()
         except OSError:
-            texts.append("")
+            return None
+        if not want.get(os.path.abspath(pth)) or hashlib.sha256(b).hexdigest() != want[os.path.abspath(pth)]:
+            return None
+        texts.append(b.decode("utf-8", errors="replace"))
     return texts

@@ -20,7 +20,7 @@
                       stages_completed, rejections},
                    gpt{calls, models, efforts, versions, launcher, launcher_ok, launcher_failed},
                    state{start_hash, pristine_hash, end_hash, leak, writes}, sleep{count, source, sha256, note},
-                   external_mcp{calls, returned, errors, empty, tools},
+                   external_mcp{calls, returned, errors, empty, tools, workflows, unmeasured},
                    complete{ok, why}, sources{…}, collect_args{…}}
   {"type":"score", run_id, kind(review|plan), by_severity, by_axis, …, fixture_sha}
 
@@ -35,6 +35,11 @@
     교차하고 5% 를 넘으면 그 run 은 무효다. 두 값과 차이를 함께 인쇄한다.
   · 입력 해시 = sha256(fixture 이름 · fixture 저장소 main/feature 커밋 · 첫 사람 발화). build-repo.sh 가 커밋
     신원·시각을 고정하므로 같은 fixture 는 같은 SHA 를 낸다. 플러그인 트리 해시는 freeze_baseline 헬퍼로 따로 잰다.
+
+계측기 신원 (F-317 · F-443)
+  --instrument-hash    지문(instrument_sha) 한 줄 — 사전등록 · 동결 기록에 남겨 계측기 수정 전후 숫자를 같은 기준선으로 비교하지 않는다
+  --list-instruments   지문이 읽는 파일(scripts/…) — 이종 적대 재검토의 대상 목록(check_adversarial_record --target)
+  freeze-corpus        측정 코퍼스 동결 — 과제 diff 가 계측기 · 측정 런처를 건드리거나 A0 스모크(감사 적중 0) 결과 해시가 없으면 거부
 
 exit: 0=PASS · 1=FAIL · 2=UNRUN(측정 불가·미구현 기준 — ⛔ 통과로 읽지 않는다)
 
@@ -63,12 +68,13 @@ import freeze_baseline as fb  # noqa: E402 — 형제 모듈(트리 파일 목�
 import fz_wf_metrics as wfm   # noqa: E402 — 형제 모듈(Workflow 폴더 집계)
 
 # 실행 코드는 형제 모듈(ab_ledger_*.py)에 있다. 이 파일은 CLI 진입점이고, 모듈 속성으로 읽는 소비자(tests · 외부 재생 러너)를 위해 하위 모듈의 이름을 그대로 다시 내보낸다.
+from ab_ledger_base import instrument_files  # noqa: E402 — F-317 계측기 신원(--list-instruments)
 from ab_ledger_base import (AXES6, AXES_ALLOWED, DEFAULT_EFFORT, DEFAULT_MODEL, FAIL, GATED, GPT_PASS_CRIT, INSTRUMENTS,
     LINE_TOL, MTIME_TOL_S, PASS, PHASES, SCHEMA, SEVERITIES, SOURCE_KINDS, STATE_SCHEMA, UNRUN, WALL_XCHECK_PCT, instrument_sha,
     iso, iter_jsonl, norm_model, read_json, secs, sha_obj, sha_text)
 from ab_ledger_transcript import (ARGV_BIND_RE, ARGV_DIRECT_RE, ASSIGN_RE, BASE_DIR_RE, CD_RE, CPMV_RE, FOR_RE, FSTR_WRITE_RE,
     GPT_CALL_RE, GPT_OUT_RE, HEREDOC_RE, INLINE_PY_RE, LAUNCHER_RE, NOTIF_RE, PHASE2_RE, PY_ARGV_RE, PY_EXE_RE, PY_SCRIPT_RE,
-    REAL_HOME_SKILL_RE, REDIRECT_RE, RENDER_OUTPUTS, SH_HEREDOC_RE, VAR_RE, WRITE_HINT_RE, WRITE_TOOLS, _argv_writes,
+    REAL_HOME_SKILL_RE, REDIRECT_RE, RENDER_OUTPUTS, VAR_RE, WRITE_HINT_RE, WRITE_TOOLS, _argv_writes,
     _argv_written, _bash_writes, _call_segment, _cd_bases, _cmd_views, _exec_of, _expand_vars, _follow_moves,
     _fstring_argv_targets, _heredoc_scripts, _launcher_calls, _launcher_ok, _load_return, _merge_summaries, _mv_pairs,
     _plan_phase2, _redirect_targets, _render_outputs, _resolve_vars, _resolved_output, _same_path, _script_argv_writes,
@@ -85,6 +91,7 @@ from ab_ledger_judge import (BLIND_INSTRUCTIONS, BLOCK_START_RE, CITE_RE, CRITER
     cand_id, cite_spans, crit_blind_labels, crit_critical_path, crit_crossover, crit_gpt_wf_wall, crit_sc3, crit_sc4, crit_sc5,
     crit_sc6, crit_sc7, fixture_files, group_invalid, judge_rows, near_labels, plan_items, recollect_diff, resolve_cited,
     row_invalid, rule_files, score_plan, score_review, select, verify_sources)
+from ab_ledger_judge import freeze_corpus  # noqa: E402 — F-443 코퍼스 동결 판정
 from ab_ledger_gpt import (EVIDENCE_KINDS, GPT_BAD_INPUT_RE, GPT_CMD_STR_RE, GPT_MARKER_RE, GPT_SKILL_REF_RE, GPT_WORKDIR_RE,
     IOS_VOCAB_RE, LABEL_TO_RULE_AXIS, RULE_FIXTURES, SEV_RANK, _body_matches, _fixture_docs, _index_sections, _js_unquote,
     _rule_src, _sha_file, _src_in_section, build_gpt_row, classify_skill_refs, gpt_sc1_problems, gpt_sc2_problems, judge_gpt,
@@ -131,6 +138,7 @@ def cmd_input(a):
             # 사본이 선언된 원본의 충실한 복제인가(B = 기준 트리 · C = 작업 트리)
             rec["plugin"]["source"] = os.path.realpath(a.plugin_source)
             rec["plugin"]["source_tree_hash"] = tree_digest(a.plugin_source)
+    rec["sha256"] = sha_obj(rec)   # 자기 해시 — collect 가 다시 재서 빠지거나 바뀐 칸을 잡는다(S14 결함 주입)
     with open(a.out, "w", encoding="utf-8") as fh:
         json.dump(rec, fh, ensure_ascii=False, indent=1)
     print(f"input {a.fixture}: " + " · ".join(f"{k}={v[:10]}" for k, v in commits.items())
@@ -145,7 +153,13 @@ def cmd_collect(a):
     if not os.path.isfile(a.transcript):
         print(f"UNRUN: transcript 없음 — {a.transcript}")
         return UNRUN
-    row = append_collect(a.ledger, build_row(collect_spec_args(a)))
+    try:
+        new = build_row(collect_spec_args(a))
+        json.dumps(new, ensure_ascii=False, sort_keys=True)   # 형이 틀린 원천 값이 섞인 행(정렬 불가 키)도 쓰기 전에 거른다
+    except Exception as e:   # noqa: BLE001 — 원천 형식이 계측기 가정 밖이다(빠진 칸 · 틀린 형) — 행을 쓰지 않는다(recollect 와 같다)
+        print(f"UNRUN: {a.run_id or a.run} 수집 실패 {type(e).__name__}: {e} — 원장에 아무것도 덧붙이지 않았다")
+        return UNRUN
+    row = append_collect(a.ledger, new)
     c = row["complete"]
     print(f"collect {row['run_id']}: complete={c['ok']} wall_total={row['wall']['total_s']}s "
           f"lead_out={row['lead']['out_tok']} wf_agents={row['wf']['agents']} input={str(row['input']['hash'])[:12]}")
@@ -216,6 +230,10 @@ def cmd_score(a):
     for row in targets:
         fx = os.path.join(a.fixtures_root, row["fixture"] or "")
         texts = _read_texts(row)
+        if texts is None:
+            print(f"UNRUN {row['run_id']}: 산출물을 못 읽었거나 collect 기록과 내용이 다르다 — 채점하지 않는다")
+            rc = UNRUN
+            continue
         cur = _artifact_shas(row)
         v = verdicts.get(row["run_id"]) if vdoc else None
         if v is not None and varts.get(row["run_id"]) != cur:
@@ -336,7 +354,7 @@ def cmd_judge(a):
         return rc
     opts = {"model": a.model, "effort": a.effort, "phase": a.phase, "arm": a.arm, "release": a.release,
             "workflows": wfs, "min_runs": a.min_runs, "runs": a.runs, "plugin_sha": a.plugin_sha,
-            "require": req, "envs": a.envs, "options_on": a.options_on, "require_passed": a.require_passed}
+            "require": req, "envs": a.envs, "options_on": a.options_on, "require_passed": a.require_passed, "formal": a.formal}
     rc, lines = judge_rows(runs, scores, opts, (lambda r: verify_sources(r, kinds)) if kinds else None)
     for x in lines:
         print(x)
@@ -395,8 +413,9 @@ def cmd_collect_gpt(a):
             "lead_rules": os.path.abspath(a.lead_rules) if a.lead_rules else None, "gpt_agents": bool(a.gpt_agents)}
     try:
         row = build_gpt_row(args)
-    except (OSError, ValueError) as e:
-        print(f"UNRUN: 원천을 읽지 못했다 — {e}")
+        json.dumps(row, ensure_ascii=False, sort_keys=True)
+    except Exception as e:   # noqa: BLE001 — 원천을 못 읽었거나 형식이 계측기 가정 밖이다 — 행을 쓰지 않는다(collect 와 같다)
+        print(f"UNRUN: 원천을 읽지 못했다 — {type(e).__name__}: {e}")
         return UNRUN
     append(a.ledger, row)
     pr = gpt_sc1_problems(row)
@@ -459,9 +478,28 @@ def cmd_verify_evidence(a):
     return rc
 
 
+def cmd_freeze_corpus(a):
+    try:
+        rec, bad = freeze_corpus(read_json(a.tasks))
+    except (OSError, ValueError) as e:
+        print(f"UNRUN: 과제 목록을 읽지 못했다 — {e}")
+        return UNRUN
+    for b in bad:
+        print(f"REJECT {b}")
+    if rec is None:
+        return FAIL
+    with open(a.out, "w", encoding="utf-8") as fh:
+        json.dump(rec, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    print(f"freeze: 과제 {len(rec['tasks'])} · 입력 트리 {rec['input_tree_sha'][:12]} · 계측기 {rec['instrument_sha']} → {a.out}")
+    return PASS
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="A/B 원장 — 수집·채점·판정 (exit 0 PASS · 1 FAIL · 2 UNRUN)")
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--instrument-hash", action="store_true", help="계측기 지문 한 줄")
+    ap.add_argument("--list-instruments", action="store_true", help="지문이 읽는 계측기 파일(scripts/…) — 적대 재검토 대상")
     ap.add_argument("--case", help="self-test 사례 하나만")
     sub = ap.add_subparsers(dest="cmd")
 
@@ -552,6 +590,11 @@ def main() -> int:
                    help="정식 비교 — --verify-sources 필수 · 원장에 B 행이 있으면 --plugin-sha 필수(없으면 UNRUN exit 2)")
     p.set_defaults(func=cmd_judge)
 
+    p = sub.add_parser("freeze-corpus", help="측정 코퍼스 동결(F-443) — 계측기를 건드린 과제 · A0 스모크 해시 없는 과제는 거부")
+    p.add_argument("--tasks", required=True, help="{input_tree_sha, tasks[{id, diff_paths[], a0_smoke{sha256, audit_hits}}]}")
+    p.add_argument("--out", required=True, help="동결 기록 JSON(ab/freeze.json)")
+    p.set_defaults(func=cmd_freeze_corpus)
+
     p = sub.add_parser("show", help="원장 요약")
     p.add_argument("--ledger", required=True)
     p.add_argument("--history", metavar="RUN_ID", help="그 run 의 행 이력 — 재측정(collect#n) · 재수집(recollect) · 옛 행(legacy)")
@@ -584,6 +627,12 @@ def main() -> int:
     if a.self_test:
         import ab_ledger_selftest   # ⛔ self-test 일 때만 싣는다 — 실행 경로에 들이면 지문 밖 코드가 판정에 섞인다
         return ab_ledger_selftest.self_test(a.case)
+    if a.instrument_hash:
+        print(instrument_sha())
+        return PASS
+    if a.list_instruments:
+        print("\n".join("scripts/" + os.path.basename(x) for x in instrument_files()))
+        return PASS
     if not getattr(a, "func", None):
         ap.print_help()
         return UNRUN

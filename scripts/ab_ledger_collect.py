@@ -11,6 +11,7 @@ import contextlib
 import datetime
 import hashlib
 import json
+import math
 import os
 import pathlib
 import re
@@ -21,7 +22,7 @@ import freeze_baseline as fb  # noqa: E402 — 형제 모듈(트리 파일 목�
 import fz_wf_metrics as wfm   # noqa: E402 — 형제 모듈(Workflow 폴더 집계)
 from ab_ledger_base import (MTIME_TOL_S, SCHEMA, STATE_SCHEMA, instrument_sha, iso, iter_jsonl, norm_model, read_json, secs,
     sha_obj)
-from ab_ledger_transcript import (_launcher_ok, _same_path, gpt_home_sessions, parse_transcript)
+from ab_ledger_transcript import (_launcher_ok, _same_path, gpt_home_sessions, mcp_summary, parse_transcript)
 
 
 # 반환·하네스 계수가 없을 때의 대체 완주 오라클 — 건강한 run 에서 **항상** 도는 stage (base 트리 실측)
@@ -94,6 +95,7 @@ def wf_summary(folder):
     return {
         "run_id": w["wf"], "dir": folder, "n_agents": w["n_agents"], "journal_results": w["journal_results"],
         "journal_started": w["journal_started"], "journal_empty_results": w["journal_empty_results"],
+        "journal_ids_match": w.get("journal_ids_match") is True,
         "wall_s": w["wall"], "critical_path_s": w["critical_path"], "advisor": w["advisor"],
         "out_tok": w["out_tok"], "thinking": w["thinking"], "turns": sum(a["turns"] for a in w["agents"]),
         "so_retries": w["so_retries"], "so_errors": w["so_errors"], "stages": w["stages_seen"],
@@ -102,7 +104,24 @@ def wf_summary(folder):
         "workers": [{"stage": a["stage"], "out_tok": a["out_tok"], "turns": a["turns"], "tools": a["tools"],
                      "dur_s": a["dur"]} for a in w["agents"]],
         "models": dict(models), "efforts": dict(efforts),
+        # F-325 — 워커의 플러그인 밖 MCP 호출. 워커 로그를 못 읽었으면(agent-*.jsonl 0건 · 읽기 오류) 0 이 아니라 미측정이다
+        "mcp_external": [c for a in w["agents"] for c in a.get("mcp_external") or []],
+        "mcp_unmeasured": not w["agents"] or any(x.startswith("agent-") for x in w["errors"])   # journal 없음 등은 워커 로그 문제가 아니다
+        or any(a.get("orphan_results", 1) for a in w["agents"]),   # 호출 줄이 빠진 결과 — 어느 도구인지 모른다(S14 2차 ISSUE-004)
     }
+
+
+def external_mcp_merge(lead_calls, wf_runs):
+    """F-325 — 플러그인 밖 MCP 호출을 Lead 와 Workflow 워커 transcript 에서 함께 센다(같은 세션 · 호출 id 는 한 번).
+    워커 로그를 읽지 못한 Workflow(폴더 없음 · 로그 0건 · 읽기 오류)는 unmeasured 에 적는다 — judge 가 그 run 을 뺀다."""
+    calls, unmeasured = list(lead_calls or []), []
+    for e in wf_runs:
+        s = e.get("summary")
+        if s is None or s.get("mcp_unmeasured"):
+            unmeasured.append(e.get("run_id"))
+        else:
+            calls += s.get("mcp_external") or []
+    return mcp_summary(calls, len(wf_runs), unmeasured)
 
 
 def snapshot(watch: dict) -> dict:
@@ -124,6 +143,23 @@ def snapshot(watch: dict) -> dict:
             files[p.name] = fb.hash_file(p)
         out[name] = {"path": str(p), "pattern": pattern or None, "exists": p.exists(), "files": files}
     return {"schema": STATE_SCHEMA, "watch": out, "hash": state_hash(out)}
+
+
+def input_record_ok(inp) -> bool:
+    """`input` 이 쓴 기록 그대로인가 — 자기 해시(sha256)가 나머지 칸을 다시 잰 값과 같다(빠지거나 형이 바뀐 칸 · 해시 없는 옛 기록은 거짓)."""
+    return isinstance(inp, dict) and inp.get("sha256") == sha_obj({k: v for k, v in inp.items() if k != "sha256"})
+
+
+def snapshot_ok(snap) -> bool:
+    """snapshot() 이 쓴 모양 그대로인가 — schema · 감시 이름마다 {path, pattern, exists, files} 형 · 기록한 hash == 다시 잰 hash."""
+    if not isinstance(snap, dict) or snap.get("schema") != STATE_SCHEMA or not isinstance(snap.get("watch"), dict):
+        return False
+    for v in snap["watch"].values():
+        if not (isinstance(v, dict) and isinstance(v.get("path"), str) and isinstance(v.get("pattern"), (str, type(None)))
+                and type(v.get("exists")) is bool and isinstance(v.get("files"), dict)
+                and all(isinstance(k, str) and isinstance(h, str) for k, h in v["files"].items())):
+            return False
+    return snap.get("hash") == state_hash(snap["watch"])
 
 
 def _state_key(v):
@@ -151,6 +187,11 @@ def state_info(pristine, start, end, input_root=None):
         e = read_json(end) if end else None
     except (OSError, ValueError):
         e = None
+    bad = [w for w, x in (("pristine", p), ("start", s), ("end", e)) if (x is not None or w != "end") and not snapshot_ok(x)]
+    if bad:
+        # ⛔ 구조가 틀렸거나 해시가 다른 스냅샷은 비교하지 않는다 — 빠진 감시 이름 · 파일을 '변화 없음' 으로 읽지 않는다
+        return {"start_hash": None, "pristine_hash": None, "end_hash": None, "leak": None, "writes": None,
+                "problems": [f"{w} 스냅샷 형식 · 해시 불일치" for w in bad]}
     snaps = [("pristine", p), ("start", s)] + ([("end", e)] if e else [])
     problems = [f"{which} 에 감시 이름 {n} 없음" for which, snap in snaps
                 for n in REQUIRED_WATCH if n not in (snap.get("watch") or {})]
@@ -255,6 +296,9 @@ def parse_gpt_log(path):
         m = re.search(r"\bv(\d+\.\d+\.\d+)\s*$", line)
         if m and seps == 0 and not info["version"]:
             info["version"] = m.group(1)
+    # 배너가 덜 됐으면(줄이 빠지거나 잘렸으면) 배너 없음이다 — 빈 칸을 남긴 채 비교에 싣지 않는다. 실측 로그 655개 위반 0
+    if seps < 2 or not all(info.values()) or not re.fullmatch(r"[A-Za-z0-9][\w.\-]*", info["model"]) or not re.fullmatch(r"[a-z]+", info["effort"]):
+        return None
     return info
 
 
@@ -310,7 +354,7 @@ def read_endpoint_clock(path):
             o = None
         t = _clock_time(o.get("t")) if isinstance(o, dict) else None
         if not (t is not None and isinstance(o.get("path"), str) and os.path.isabs(o["path"]) and type(o.get("size")) is int
-                and type(o.get("mtime")) in (int, float) and isinstance(o.get("sha256"), str)
+                and type(o.get("mtime")) in (int, float) and math.isfinite(o["mtime"]) and isinstance(o.get("sha256"), str)
                 and re.fullmatch(r"[0-9a-f]{64}", o["sha256"])):
             bad.append(i)
             continue
@@ -372,7 +416,8 @@ SLEEP_ENTRY_RE = re.compile(r"\sSleep\s+Entering Sleep\b")
 
 def sleep_count(path, start, end):
     """`pmset -g log` 사본 → run 구간 [start, end] 의 수면 진입 수(F-326) — {count, source, sha256, note}.
-    ⛔ 0 으로 읽지 않는다: 기록을 읽지 못함 · run 구간을 모름 · 기록의 첫 시각이 run 시작보다 늦음(구간을 덮지 않는다) → count None.
+    ⛔ 0 으로 읽지 않는다: 기록을 읽지 못함 · run 구간을 모름 · 기록의 첫 시각이 run 시작보다 늦음 · 마지막 시각(캡처 —
+       `pmset -g log` 은 캡처 시각 줄로 끝난다)이 run 끝보다 이름(구간을 덮지 않는다) → count None.
     source 가 None 이면 러너가 기록을 넘기지 않은 run(미측정)이다. 판정은 judge(row_invalid)가 source 가 있는 행만 본다."""
     out = {"count": None, "source": os.path.abspath(path) if path else None, "sha256": None, "note": None}
     if not path:
@@ -385,28 +430,36 @@ def sleep_count(path, start, end):
     out["sha256"] = hashlib.sha256(data).hexdigest()
     if start is None or end is None or start.tzinfo is None or end.tzinfo is None:
         return dict(out, note="run 구간(시간대가 있는 시작 · 끝점)을 모른다")
-    first, n = None, 0
-    for ln in data.decode("utf-8", "replace").splitlines():
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:              # 깨진 바이트를 대체 문자로 읽으면 그 줄의 수면 진입을 놓치고 0 을 확정한다(S14 2차 ISSUE-005)
+        return dict(out, note="기록이 UTF-8 이 아니다 — 깨진 줄의 수면 진입을 셀 수 없다(미측정)")
+    first, last, n = None, None, 0
+    for ln in text.splitlines():
         m = PMSET_TS_RE.match(ln)
         if not m:
             continue
         t = datetime.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S %z")
         first = t if first is None else min(first, t)
+        last = t if last is None else max(last, t)
         if SLEEP_ENTRY_RE.search(ln) and start <= t <= end:
             n += 1
     if first is None or first > start:
         return dict(out, note="기록이 run 시작을 덮지 않는다")
+    if last < end:
+        return dict(out, note="기록이 run 끝을 덮지 않는다(캡처가 run 끝보다 이르다)")
     return dict(out, count=n)
 
 
 def launcher_audits(dirs, lo, hi):
-    """런처(gpt_independent.sh) 감사 파일 → (배너 목록, 배너 있는 수, 그중 감사 exit 0 수, 실패 감사 경로).
+    """런처(gpt_independent.sh) 감사 파일 → (배너 목록, 배너 있는 수, 그중 감사 exit 0 수, 실패 감사 경로, 창 안 감사 파일 수).
     ⛔ 실패는 배너와 무관하게 센다 — 시작 직후 exit 10~17 로 끝난 런처는 스트림 로그(배너)가 없어 배너 기준으로 세면 빠진다(F-356 SFH-5)."""
-    banners, launched, ok_n, failed = [], 0, 0, []
+    banners, launched, ok_n, failed, seen = [], 0, 0, [], 0
     for d in dirs or []:
         for au in sorted(pathlib.Path(d).rglob("*.audit.json")):
             mt = au.stat().st_mtime
             if (lo is None or mt >= lo) and (hi is None or mt <= hi):
+                seen += 1
                 ok = _launcher_ok(au)
                 if not ok:
                     failed.append(str(au))
@@ -415,7 +468,13 @@ def launcher_audits(dirs, lo, hi):
                     banners.append(dict(b, explicit=True, launcher=True))
                     launched += 1
                     ok_n += ok
-    return banners, launched, ok_n, failed
+    return banners, launched, ok_n, failed, seen
+
+
+def launcher_unmeasured(calls, seen):
+    """transcript 의 런처 호출 ↔ 감사 파일 대조 → 미측정 호출 수 = max(완료 알림이 없는 호출, 감사 파일보다 많은 호출).
+    한 호출을 두 번 세지 않는다(끝나지 않은 호출은 감사도 없다). ⛔ 감사가 없는 런처를 '실행 0 · 실패 0' 으로 읽지 않는다."""
+    return max(sum(1 for x in calls if not x.get("completed")), len(calls) - seen, 0)
 
 
 def source_scope(row):
@@ -475,6 +534,8 @@ def build_row(a, dry=False) -> dict:
                  "parser_end": iso(parser_end), "parser_mtime_delta_s": parser_delta}
     if tp["bad_lines"]:
         why.append(f"transcript 파싱 불가 줄 {tp['bad_lines']}")
+    if tp["format_problems"]:
+        why.append(f"transcript 형식 위반 {tp['format_problems']} — 빠지거나 형이 틀린 칸을 기본값으로 메우지 않는다")
     if not tp["start"]:
         why.append("첫 사람 발화 없음")
     wf_runs, walls = [], []
@@ -528,12 +589,14 @@ def build_row(a, dry=False) -> dict:
                     (w["agent_count"] is not None and w["agent_count"] != exp):
                 why.append(f"{w['run_id']}: agents={s['n_agents']} started={s['journal_started']} "
                            f"results={s['journal_results']} agentCalls={exp} harness={w['agent_count']} — 완주 오라클 불일치")
+            elif not s["journal_ids_match"]:
+                why.append(f"{w['run_id']}: started · result · 로그의 agentId 가 일대일이 아니다 — 중복 result 가 누락을 메울 수 있다")
         else:
             # 대체 오라클 — 반환을 못 읽었다(알림 잘림 + output-file 소실). 시작=결과=폴더 + 필수 stage(위)
             entry["oracle"] = "journal+stages"
             if script == "peer-review":
                 why.append(f"{w['run_id']}: 반환 없이는 실행 모드(tier·Stage 2)를 확인할 수 없다 — peer-review 는 대체 오라클 불가")
-            if not (s["journal_started"] == s["journal_results"] == s["n_agents"]) or not s["n_agents"]:
+            if not (s["journal_started"] == s["journal_results"] == s["n_agents"]) or not s["n_agents"] or not s["journal_ids_match"]:
                 why.append(f"{w['run_id']}: 반환 없음 · started={s['journal_started']} results={s['journal_results']} "
                            f"agents={s['n_agents']} — 대체 오라클 불충족")
         wf_s, lead_s = s["wall_s"], w["lead_s"]
@@ -555,7 +618,14 @@ def build_row(a, dry=False) -> dict:
     plugin["roots"] = roots
     if len(roots) != 1:
         why.append(f"플러그인 경로 {len(roots)}개(1개여야 한다): {roots}")
-    inp = read_json(a.input_json) if a.input_json and os.path.isfile(a.input_json) else None
+    try:
+        inp = read_json(a.input_json) if a.input_json and os.path.isfile(a.input_json) else None
+    except (OSError, ValueError):
+        inp = None
+    if inp is not None and not input_record_ok(inp):
+        # ⛔ `input` 이 쓴 자기 해시와 다르다 — 칸이 빠졌거나 형이 바뀐 기록을 기본값으로 읽지 않는다(해시 없는 옛 기록도 같다)
+        why.append(f"입력 기록 형식 · 자기 해시 불일치 {a.input_json}")
+        inp = None
     if inp is None:
         # ⛔ 증거 부재 = 위반 — run 전 입력 신원(clean·트리 해시·플러그인)이 없으면 입력을 증명하지 못한다
         why.append(f"입력 기록 없음 {a.input_json}")
@@ -622,11 +692,15 @@ def build_row(a, dry=False) -> dict:
         banners.append(dict(cand[0][2], explicit=g.get("explicit_effort", False)))
     # ② 런처(gpt_independent.sh) — 격리 폴더에서 돌아 arm 홈에 rollout 이 없다. 감사 옆 스트림 로그 배너로 model · effort 를 본다.
     #    effort 는 런처가 정한다(명시) — F-333 의 환경 기본값 비교에 넣지 않는다
-    lb, launched, launched_ok, launcher_failed = launcher_audits(a.gpt_log_dir, lo, hi)
+    lb, launched, launched_ok, launcher_failed, audits_seen = launcher_audits(a.gpt_log_dir, lo, hi)
     banners += lb
     # ③ arm 별 GPT 홈 rollout 과 대조 — 명령과 연결되지 않은 세션(nohup 으로 떼어 띄운 호출)은 model · 버전만 비교에 넣고 수를 남긴다
     run_dir = os.path.dirname(os.path.realpath(a.input_json)) if a.input_json else None
     sessions = gpt_home_sessions(os.path.join(run_dir, "gpt-home")) if run_dir else None
+    bad_home = [x["file"] for x in sessions or [] if x.get("bad_lines")]
+    if bad_home:
+        why.append(f"GPT 홈 rollout 파싱 불가 줄 {bad_home[:3]} — 그 세션의 모델 · 버전을 모른다(0 건으로 빼지 않는다)")
+        sessions = [x for x in sessions if not x.get("bad_lines")]
     linked = {b.get("session") for b in banners if b.get("session")}
     invisible = [x for x in (sessions or []) if x["session"] not in linked]
     gw = [g["wall_s"] for g in tp["gpt"] if g["wall_s"] is not None]
@@ -664,6 +738,7 @@ def build_row(a, dry=False) -> dict:
                 "versions": sorted({b["version"] for b in banners if b["version"]} | {x["version"] for x in invisible if x["version"]}),
                 "logs": sorted(set(gpt_logs)), "launcher": launched, "launcher_ok": launched_ok,
                 "launcher_failed": len(launcher_failed),
+                "launcher_unmeasured": launcher_unmeasured(tp.get("launcher") or [], audits_seen),
                 "real_home_skill_refs": sum(1 for g in tp["gpt"] if g.get("real_home_skill")),
                 "sessions": None if sessions is None else len(sessions), "invisible": len(invisible)},
         "state": state_info(a.state_pristine, a.state_start, a.state_end, root),
@@ -692,7 +767,7 @@ def build_row(a, dry=False) -> dict:
         row["sources"]["sleep_log"] = {"path": copy, "original": sl["source"], "sha256": sl["sha256"]}
         sl = dict(sl, source=copy)
     row["sleep"] = sl
-    row["external_mcp"] = tp["external_mcp"]   # F-325 — 판정은 judge(row_invalid)
+    row["external_mcp"] = external_mcp_merge(tp.get("external_mcp_calls"), wf_runs)   # F-325 — Lead + 워커 · 판정은 judge(row_invalid)
     # S26 — GPT 독립 플랜 wall 이 Workflow wall 을 넘으면 임계 경로가 GPT 로 바뀐 것이다(계획 S26: 기록형 판정)
     lp = [x["wall_s"] for x in tp.get("launcher") or [] if x["mode"] == "plan" and x["wall_s"] is not None]
     ws = [w["lead_s"] for w in tp.get("workflows") or [] if w.get("lead_s") is not None and not w.get("rejected")]
@@ -702,7 +777,9 @@ def build_row(a, dry=False) -> dict:
     row["lead"]["queued_followups"] = tp.get("queued_followups", 0)
     if tp.get("queued_followups"):
         why.append(f"후속 턴이 모델 작업 중에 끼어들었다 {tp['queued_followups']}회(queued_command) — 표준 후속 턴 계약 위반")
-    if a.workflow == "fz-plan" and not tp.get("plan_phase2"):
+    if a.workflow == "fz-plan" and tp.get("plan_phase2") is None:
+        why.append("plan Phase 2 GPT 검증 판정 불가(호출 글자가 있는 명령을 읽지 못했다) — 미측정")
+    elif a.workflow == "fz-plan" and not tp.get("plan_phase2"):
         why.append("plan Phase 2 GPT 검증 흔적 없음(verify · resume 교차 미실행) — 절차 미완주")
     row["complete"] = {"ok": not why, "why": why}
     return row

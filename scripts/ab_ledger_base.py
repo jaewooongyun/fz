@@ -27,7 +27,16 @@ PHASES = ("baseline", "release-smoke", "change")
 #    판정 코드가 아니고, 넣으면 self-test 만 고쳐도 지문이 바뀌어 채점 행이 낡는다. ⛔ 실행 모듈을 새로 나누면 여기에 더한다
 #    (빠뜨리면 그 모듈을 고쳐도 지문이 그대로다 — fail-open). 형제 모듈은 정적 import 만 쓴다(문자열 동적 적재 금지).
 INSTRUMENTS = ("ab_ledger.py", "ab_ledger_base.py", "ab_ledger_transcript.py", "ab_ledger_collect.py", "ab_ledger_judge.py",
-               "ab_ledger_gpt.py", "fz_wf_metrics.py", "freeze_baseline.py")
+               "ab_ledger_gpt.py", "fz_wf_metrics.py", "freeze_baseline.py",
+               "shell_tokens.py")   # 런처 · Phase 2 호출의 명령 자리 판정(S14 구조 전환) — guard · Stop 훅과 같은 토크나이저
+# F-443 — 측정 코퍼스 과제가 건드리면 동결을 거부하는 파일 = 지문 파일 + 측정 런처 · 감사(지문 밖이다 — 판정 코드가 아니다).
+#   E1 코퍼스에 독립 런처의 rollout 감사를 고친 커밋이 과제로 들어가, GPT 가 그 diff 를 리뷰하며 감사를 직접 돌려 오염이 났다
+# ⛔ 진입점(gpt-call.sh)과 런처(gpt_independent.sh · gpt-exec.sh)가 부르는 스크립트 · 표까지 — 하나라도 빠지면 그 파일을 고친 과제가
+#    동결된다. 저장소 상대 경로로 적는다(scripts/ 밖 파일이 있다 — S14 2차 ISSUE-009). 런처가 새 파일을 부르면 여기에 더한다
+#    (셀 r3-adv-corpus-guard-launcher-closure 가 런처 셋과 그 .sh 가 부르는 파일을 저장소 전체에서 찾아 대조한다)
+CORPUS_GUARD_EXTRA = ("scripts/gpt-call.sh", "scripts/gpt_independent.sh", "scripts/gpt-exec.sh", "scripts/gpt_kinds.py",
+                      "scripts/gpt-kinds.json", "scripts/gpt_rounds.py", "scripts/gpt-choice.sh", "scripts/autonomy_decide.py",
+                      "scripts/validate-gpt-output.py", "scripts/extract_project_rules.py", "skills/fz-peer-review/scripts/diff_anchors.py")
 # 구현한 run 기준 목록(IMPLEMENTED)은 판정 표 CRITERIA 의 키다 — ab_ledger_judge.py. S27 의 SC-1 · SC-2 · AC-2 · AC-3 은
 #    run 행이 아니라 gpt-pass 행(런처 첫 패스)을 판정한다 — `GPT_PASS_CRIT` · judge_gpt(run 기준과 섞지 않는다).
 SOURCE_KINDS = ("transcript", "wf-metrics", "start-state", "input-hash", "instrument-sha")
@@ -79,9 +88,17 @@ def iter_jsonl(path):
     return evs, bad
 
 
-def instrument_sha() -> str:
+def instrument_files(base: str = SCRIPT_DIR) -> list:
+    """지문이 읽는 계측기 파일 — `--list-instruments`(적대 재검토 대상)와 instrument_sha 가 이 목록 하나를 쓴다.
+
+    - Important: 둘이 다른 목록을 보면 재검토 밖 파일을 고쳐도 지문이 그대로거나, 지문 밖 파일을 재검토하게 된다.
+    """
+    return [os.path.join(base, n) for n in INSTRUMENTS]
+
+
+def instrument_sha(base: str = SCRIPT_DIR) -> str:
     h = hashlib.sha256()
-    for n in INSTRUMENTS:
-        with open(os.path.join(SCRIPT_DIR, n), "rb") as fh:
-            h.update(n.encode("utf-8") + b"\0" + fh.read())
+    for p in instrument_files(base):
+        with open(p, "rb") as fh:
+            h.update(os.path.basename(p).encode("utf-8") + b"\0" + fh.read())
     return h.hexdigest()[:16]
