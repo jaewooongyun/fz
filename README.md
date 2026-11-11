@@ -20,7 +20,7 @@ AI 개발 워크플로우를 오케스트레이션하는 [Claude Code](https://d
 claude plugin marketplace add jaewooongyun/fz   # 최초 1회
 claude plugin install fz
 claude plugin install fz-compact@fz-orchestrator  # 선택. bg 세션 로컬 마스킹 압축, 기본 꺼짐
-claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 생략 · ad-hoc 에이전트를 훅으로 막는다
+claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 생략 · ad-hoc 에이전트를 훅으로 막고, 설정한 보호 경로 아래 Bash 를 묻는다
 
 claude
 > /fz "안녕"                                     # 응답하면 정상
@@ -177,8 +177,7 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 
 ---
 
-## What's New — v4.54.0
+## What's New — v4.55.0
 
-검사 장치의 오판을 고쳤다. 세션 종료 훅은 명령이 돈 폴더와 환경으로 원장 경로를 풀어, 다른 작업의 원장으로 종료를 막지 않는다. fz-guard 0.2.0 은 Phase 4 승인 전 Bash 쓰기도 막고, GPT 리뷰는 실제로 실행한 호출만 센다. 피어 리뷰는 게시 직전 head 조회가 비면 거부하고, 바뀌지 않은 파일의 함수를 없는 이름으로 거부하지 않는다.
-미해결 finding 279건을 모두 판정해 149건을 닫았다. 일부만 고친 48건은 남은 부분을 적어 열어 두었다.
-→ [릴리즈 노트](docs/releases/v4.54.0.md)
+다시 관측된 구멍을 도구로 닫고 남은 finding 91건을 다시 판정해 54건을 닫았다. fz-guard와 세션 종료 훅, 리뷰 제안 검사의 셸 · JS 판별을 허용 목록 토크나이저 하나로 옮겼고 fz-plan light 도 GPT 독립 플랜을 기본으로 띄운다. fz-guard 0.3.0 은 설정한 보호 경로 아래에서 도는 Bash 를 묻는다(기본 꺼짐).
+→ [릴리즈 노트](docs/releases/v4.55.0.md)

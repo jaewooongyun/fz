@@ -1,5 +1,25 @@
 # Changelog
 
+### v4.55.0 (2026-11-11) — 다시 관측된 구멍을 도구로 닫고 남은 finding 91건을 다시 판정했다 [MINOR]
+
+다시 관측된 구멍을 검사 도구로 닫았다. fz-guard와 세션 종료 훅, 리뷰 제안 검사의 셸 · JS 판별은 허용 목록 토크나이저 하나로 옮겼고 fz-plan light 도 GPT 독립 플랜을 기본으로 띄운다.
+finding 54건을 닫는다. 토크나이저와 A/B 계측기는 적대 확인 라운드를 다시 돌리지 않고 지적마다 처분해 닫았다. 커밋마다는 바뀐 부품의 self-test 를 돌렸고 전체 health-check 는 마지막 트리에서 한 번 돌렸다.
+
+→ [릴리즈 노트](docs/releases/v4.55.0.md)
+
+| 영역 | 변경 | 검증 |
+|---|---|---|
+| fz-guard 0.3.0 | 보호 경로 확인(기본 꺼짐) · 허용 목록 토크나이저 이관 · 읽기 표 밖 이름은 대상 미상 쓰기 | self-test 109 |
+| 셸 · JS 판별 | 세션 종료 훅과 리뷰 제안 검사가 공용 토크나이저를 쓴다 · 판정 차이 대조 도구 | self-test 70 · 69 · 27 |
+| A/B 계측기 | 계측기 신원 · 워커 외부 MCP · 수면 증거 · 결함 주입 하네스 | self-test 143 · 변이 1,658 실패 0 |
+| 적대 검토 닫기 | 지적별 처분과 계약 경계 표(`--policy dispositioned`) | self-test 10 |
+| 점검 카탈로그 | 템플릿 정본과 공용 블록 · 판정 기록 검사 · 경로별 적중 집계 | self-test |
+| 재관측 승격 | 측정기 정의 · `--diff-refs` · 도달 경로 · 산문 수치 WARN · `removal_history.py` | self-test 116 · fixture 11 |
+| 러너 · 검사기 | 준비 실패 분리 · 미실행 잔존은 미충족 · severity 별칭 · 노트 생략 수 대조 | self-test |
+| 단계 간 이송 | `--risks` · `--scenario-check` · 증거 profile | gate self-test 173 |
+| fz-plan light | GPT 독립 플랜 기본 켜짐 | self-test · fixture |
+| GPT check 판정 | `[P0]`~`[P3]` 머리를 세고 읽지 못하면 unrun | self-test 3 |
+
 ### v4.54.0 (2026-11-09) — 검사 장치의 오판을 고치고 쌓인 finding 279건을 모두 판정했다 [MINOR]
 
 세션 종료 훅이 다른 작업의 원장으로 종료를 막거나 자기 원장을 놓치던 자리, fz-guard 가 Bash 쓰기와 GPT 호출을 잘못 세던 자리, 피어 리뷰가 head 조회 실패를 넘기고 정상 제안을 거부하던 자리를 고쳤다. 게이트 판정기는 셸 오류를 판정 불가로 가르고 기준 문장과 CHECK 를 생성 때 대조한다.
