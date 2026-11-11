@@ -1,4 +1,5 @@
 #!/bin/bash
+# runner: timing-sensitive — 준비 동기화 창이 초 단위다 · run_runners 가 병렬 묶음 뒤 혼자 돌리고 준비 실패(SETUP exit 3)면 한 번 다시 돈다(F-575)
 # 진행 감시(idle watchdog) 러너 — F-364(+F-147) · SC-10. 가짜 CLI(../_shim/codex)로 래퍼 scripts/gpt-exec.sh 의 진행 감시와
 # 독립 런처 scripts/gpt_independent.sh 와의 맞물림을 본다.
 #
