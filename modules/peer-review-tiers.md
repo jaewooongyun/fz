@@ -50,10 +50,11 @@ SIGNIFICANT_LINES = 추가 + 삭제 − 생성 파일 줄   (rename 은 차감�
 CHANGED_FILES     = 변경 파일 수
 위험 카테고리     = skills/fz-peer-review/scripts/risk_scan.py 의 risk
 
---tier N              → 그 Tier (묻지 않는다)
---deep                → Tier 3
-모드 인자 · /fz · 신호어 → light = Tier 1 · full = Tier 2 (묻지 않는다)
-그 밖                 → mode_gate.py peer 추천을 달고 묻는다 → light = Tier 1 · full = Tier 2
+--tier N              → 그 Tier (재지 않는다)
+--deep                → full = Tier 3 (명시 인자 — 재지 않는다)
+모드 인자 · /fz 명시 선택 · 신호어 → light = Tier 1 · full = Tier 2 (묻지 않는다)
+그 밖                 → mode_gate.py peer 로 잰다 — 추천 full 일 때만 묻는다(질문 전 자율 판정)
+                        추천 light · 측정 불가 → 묻지 않고 light + 통보 → light = Tier 1 · full = Tier 2
 ```
 
 > 이전에는 줄 수 경계(100/200/500)로 Tier 0/1/2 를 자동으로 정하고 위험 카테고리로 +1/+2 승격했다. 지금은 셋 다 **추천 근거**이고 Tier 를 직접 바꾸지 않는다(2026-10-19 사용자 결정 — `modules/mode-gate.md` § 사용자 결정). 추천 임계 숫자는 `scripts/mode_gate.py` 상수가 정본이다.
@@ -120,15 +121,16 @@ fi
 CHANGED_LINES=$((ADDED + DELETED))
 SIGNIFICANT_LINES=$((CHANGED_LINES - GENERATED_LINES))  # rename은 실 편집 가능성 있어 *차감 안 함* (보수적)
 [ "$SIGNIFICANT_LINES" -lt 0 ] && SIGNIFICANT_LINES=0
-# 2. 모드 — --tier 명시가 최우선(묻지 않는다). 그 밖은 추천 → 질문 → light = Tier 1 · full = Tier 2
-#    MODE 는 Lead 가 미리 정할 수 있다: 모드 인자(light · full · --solo = light · --team = full) · /fz 경유 · 신호어 — 그러면 묻지 않는다
+# 2. 모드 — --tier 명시가 최우선(묻지 않는다). 그 밖은 추천 → 추천 full 일 때만 질문 → light = Tier 1 · full = Tier 2
+#    MODE 는 Lead 가 미리 정할 수 있다: 모드 인자(light · full · --solo = light · --team = full) · /fz 명시 선택 · 신호어 — 그러면 묻지 않는다
 #    정본: modules/mode-gate.md(언제 묻나 · 질문 형식) · scripts/mode_gate.py(추천 임계)
+[[ "$OPTS" == *"--deep"* ]] && [ -z "${MODE:-}" ] && { MODE=full; MODE_SRC="--deep"; }   # 명시 인자(§ 언제 묻나 1) — 묻지 않는다
 if [ -n "$TIER_OPT" ]; then
   TIER=$TIER_OPT; MODE_SRC="--tier"   # 사용자 명시 → 그대로. 위험 근거도 쓰지 않는다
 else
   if [ -n "${TIER_AUTO_BLOCKED:-}" ]; then
-    # ⛔ 판정 불가(BASE 부재 · diff 실패) — 변경량 0 으로 읽어 가볍게 기울지 않는다(F-385). 추천 없이 묻는다
-    GATE_ARGS="peer --unmeasured"
+    # ⛔ 판정 불가(BASE 부재 · diff 실패) — 변경량 0 으로 읽어 가볍게 기울지 않는다(F-385). 추천 없이 light + '측정 불가' 통보
+    GATE_ARGS="peer --unmeasured"; RISK_CATS="측정 불가"   # risk.json 은 읽지 않는다(측정 못 한 diff · 지난 실행의 값일 수 있다) · 지우지도 않는다(launch smoke 등이 읽는다)
   else
     # 위험 카테고리는 추천 근거다(Tier 를 직접 올리지 않는다). ⛔ 인라인 grep 금지 — § 위험 판정. 경로는 절대경로로 해석한다
     if ! python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/risk_scan.py" "${WORK_DIR}/diff.patch" --json > "${WORK_DIR}/risk.json"; then
@@ -136,15 +138,26 @@ else
     fi
     GATE_ARGS="peer --lines $SIGNIFICANT_LINES --files $CHANGED_FILES"
     [ -f "${WORK_DIR}/risk.json" ] && GATE_ARGS="$GATE_ARGS --risk-json ${WORK_DIR}/risk.json"
+    RISK_CATS=$(python3 -c "import json,sys;print(' · '.join(json.load(open(sys.argv[1])).get('categories') or []) or '없음')" "${WORK_DIR}/risk.json" 2>/dev/null || echo "측정 불가")
   fi
   python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" $GATE_ARGS --estimate peer-review > "${WORK_DIR}/mode-gate.json"
   REC=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('recommend') or '')" "${WORK_DIR}/mode-gate.json" 2>/dev/null)
-  if [ -z "${MODE:-}" ]; then
-    # 질문에 보일 것: 추천 · 근거 · 위험 카테고리(risk.json categories) · full 의 Workflow 구간 추정 · rename 위주(SIGNIFICANT 10 미만 + rename)면 그 사실
-    MODE=$(AskUserQuestion "peer-review 모드 — 추천 ${REC:-없음(측정 불가)} · 근거 mode-gate.json · rename 줄 $RENAMED_LINES")
-    MODE_SRC="질문"
-    # 답이 없으면(비대화 · 자율 · 거부) 추천대로, 추천도 없으면 light — modules/mode-gate.md § 언제 묻나
-    [ -z "$MODE" ] && { MODE="${REC:-light}"; MODE_SRC="자동(추천 ${REC:-없음})"; }
+  if [ -z "${MODE:-}" ] && [ "$REC" = full ]; then
+    # § 언제 묻나 6 — 질문 전에 자율인지 본다. exit 0(PROCEED)만 자율 → 묻지 않고 light(추천 full 은 tier.txt · 기록에 남는다)
+    if python3 "${FZ_PLUGIN_ROOT}/scripts/autonomy_decide.py" --action mode_select --in-scope --reversible >/dev/null 2>&1; then
+      MODE=light; MODE_SRC="자율(추천 full)"
+      echo "▶ light 로 진행 — 추천 full · 근거 mode-gate.json · 위험 $RISK_CATS · 질문 불가(자율 모드)"
+    else
+      # 질문에 보일 것: 근거(큼 · 복잡 두 절) · 위험 카테고리 · full 의 Workflow 구간 추정 · rename 위주(SIGNIFICANT 10 미만 + rename)면 그 사실
+      MODE=$(AskUserQuestion "peer-review 를 full 로 할까요? — 추천 full · 근거 mode-gate.json · 위험 $RISK_CATS · rename 줄 $RENAMED_LINES" 2>/dev/null)
+      MODE_SRC="질문"
+      # 답이 light · full 이 아니면(질문 도구 없음 · 거부 · 오류 · 빈 답) 질문할 사람이 없다 — light(§ 언제 묻나 4 · 추천 full 은 남긴다)
+      case "$MODE" in light|full) ;; *) MODE=light; MODE_SRC="질문 불가(추천 full)"; echo "▶ light 로 진행 — 추천 full · 위험 $RISK_CATS · 질문 불가(답 없음)";; esac
+    fi
+  elif [ -z "${MODE:-}" ]; then
+    # § 언제 묻나 5 — 추천 light · 측정 불가는 묻지 않는다. 측정 불가를 '추천 light' 로 적지 않는다
+    MODE=light; MODE_SRC="통보(추천 ${REC:-없음})"
+    echo "▶ light 로 진행 — 추천 ${REC:-없음(측정 불가)} · 근거 mode-gate.json · 위험 $RISK_CATS"
   else
     MODE_SRC="${MODE_SRC:-인자}"
   fi
