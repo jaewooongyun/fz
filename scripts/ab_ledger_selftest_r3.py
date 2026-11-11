@@ -937,7 +937,7 @@ def register(reg, base):
             os.makedirs(repo)
             with open(os.path.join(repo, "a.txt"), "w", encoding="utf-8") as fh:
                 fh.write("a\n")
-            g = ["git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"]
+            g = ["git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]
             for c in (["init", "-q", "-b", "main"], ["add", "-A"], ["commit", "-q", "-m", "x"]):
                 subprocess.run(g + c, capture_output=True, check=True)
             p = cli("input", "--root", repo, "--fixture", "fx", "--out", out, "--plugin-root", repo, "--plugin-source", repo)

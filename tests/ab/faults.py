@@ -46,8 +46,8 @@ PLUGIN = os.path.dirname(os.path.dirname(HERE))
 FIX = os.path.join(PLUGIN, "tests", "fixtures", "ab", "mini-ledger")
 BUILD = os.path.join(PLUGIN, "tests", "fixtures", "quality", "_lib", "build_repo.sh")
 sys.path.insert(0, os.path.join(PLUGIN, "scripts"))
-GIT_ENV = {"GIT_AUTHOR_NAME": "fixture", "GIT_COMMITTER_NAME": "fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
-           "GIT_COMMITTER_EMAIL": "fixture@example.invalid", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+GIT_ENV = {"GIT_AUTHOR_NAME": "fixture", "GIT_COMMITTER_NAME": "fixture", "GIT_AUTHOR_EMAIL": "fixture@example.com",
+           "GIT_COMMITTER_EMAIL": "fixture@example.com", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
            "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"}
 RID, PEER = "B1", "B2"
 CORRUPT = ("break-line", "insert-broken", "break-file")

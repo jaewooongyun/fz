@@ -299,7 +299,8 @@ HOME_RE = re.compile(r"/(?:Users|home)/(?!example/|you/|user/|me/|\{user\}/|<use
 MAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})")
 MAIL_OK = ("example.com", "example.org", "example.net", "users.noreply.github.com", "anthropic.com")
 KEY_RE = re.compile(r"(?<![A-Za-z0-9_-])([A-Z]{2,6})-\d{3,6}(?![A-Za-z0-9_])")
-KEY_OK = {"TKT", "TICKET", "ISO", "CVE", "RFC", "UTF", "SHA", "PEP", "GHSA"}
+# ISSUE 는 fz 스키마(gpt_verification · issue_tracker 의 `^ISSUE-[0-9]{3,}$`)가 정한 지적 id 이름공간이다 — 사내 티켓 키가 아니다
+KEY_OK = {"TKT", "TICKET", "ISO", "CVE", "RFC", "UTF", "SHA", "PEP", "GHSA", "ISSUE"}
 rules = []
 if rules_path:
     try:
@@ -530,6 +531,8 @@ if [ "$MODE" = "self-test" ]; then
   printf '문의 %s\n' "$MAILP" > "$R/new.md"; case_ax "f420-untracked-file-scanned" 1 neutralize_axis "$R" HEAD ""
   printf '티켓 %s · 중립 TKT-5743 · 예시 /Us''ers/example/x\n' "$KEYP" > "$R/new.md"; case_ax "f420-ticket-key-shape-hit" 1 neutralize_axis "$R" HEAD ""
   printf '중립 TKT-5743 · 예시 /Us''ers/example/x · noreply@''example.com\n' > "$R/new.md"; case_ax "f420-neutral-tokens-ok" 0 neutralize_axis "$R" HEAD ""
+  printf '지적 ISSUE-001 · ISSUE-202616\n' > "$R/new.md"; case_ax "r3-issue-id-namespace-ok" 0 neutralize_axis "$R" HEAD ""
+  printf '지적 ISSUE-001 · 티켓 %s\n' "$KEYP" > "$R/new.md"; case_ax "r3-issue-allow-keeps-other-keys" 1 neutralize_axis "$R" HEAD ""
   printf '(?i)acme\n' > "$R/../fz-relsync-rules.$$"; printf 'Acme 앱\n' > "$R/new.md"
   case_ax "f420-private-rules-file" 1 neutralize_axis "$R" HEAD "$R/../fz-relsync-rules.$$"; rm -f "$R/../fz-relsync-rules.$$"
   case_ax "f420-bad-ref-unrun" 2 neutralize_axis "$R" no-such-ref ""

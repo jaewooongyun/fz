@@ -1721,7 +1721,7 @@ def self_test() -> int:
              got == [True] * 8 and out is None, f"{got} · {out}")
 
     prot = str(tmp / "prot")
-    SKILL_READ = {"file_path": "/home/u/.claude/plugins/cache/fz/fz/4.55.0/skills/fz-review/SKILL.md"}
+    SKILL_READ = {"file_path": "/home/user/.claude/plugins/cache/fz/fz/4.55.0/skills/fz-review/SKILL.md"}
 
     def bash_at(s, cmd, cwd="/srv/demo"):
         return s.send("PreToolUse", tool_name="Bash", tool_input={"command": cmd}, tool_use_id="t", cwd=cwd)
@@ -1949,25 +1949,25 @@ def self_test() -> int:
 
     @cell
     def r3_s1_r6_003():
-        got = [bash_write(c, "/srv/demo") for c in ("env -Cmods touch ABC-123/index.md", "env --chdir=mods touch ABC-123/index.md",
-                                                    "touch ABC-123/index.md")]
+        got = [bash_write(c, "/srv/demo") for c in ("env -Cmods touch TKT-123/index.md", "env --chdir=mods touch TKT-123/index.md",
+                                                    "touch TKT-123/index.md")]
         case("r3-s1-r6-003-attached-chdir — 붙여 쓴 -C값도 폴더를 옮긴다(상대 대상 미상) · 옮기지 않으면 대상이 보인다",
-             got == [(True, []), (True, []), (True, ["ABC-123/index.md"])], got)
+             got == [(True, []), (True, []), (True, ["TKT-123/index.md"])], got)
 
     @cell
     def r3_s1_r6_004():
-        got = [bash_write(c, "/srv/demo") for c in ("mv src.py ABC-123/index.md", "mv -f a b c/")]
+        got = [bash_write(c, "/srv/demo") for c in ("mv src.py TKT-123/index.md", "mv -f a b c/")]
         case("r3-s1-r6-004-mv-source — mv 는 원본도 지운다(피연산자 전부가 쓰기 대상)",
-             got == [(True, ["src.py", "ABC-123/index.md"]), (True, ["a", "b", "c/"])], got)
-        got = [bash_write(c, "/srv/demo") for c in ("cp -R source ABC-123/index.md", "cp -pa s d", "cp -rf s d", "cp a.md ABC-123/index.md")]
+             got == [(True, ["src.py", "TKT-123/index.md"]), (True, ["a", "b", "c/"])], got)
+        got = [bash_write(c, "/srv/demo") for c in ("cp -R source TKT-123/index.md", "cp -pa s d", "cp -rf s d", "cp a.md TKT-123/index.md")]
         case("r3-s1-r6-004-cp-recursive — 재귀 cp 는 대상 아래 하위 경로를 모른다(대상 미상) · 단일 cp 는 마지막 인자",
-             got == [(True, []), (True, []), (True, []), (True, ["ABC-123/index.md"])], got)
+             got == [(True, []), (True, []), (True, []), (True, ["TKT-123/index.md"])], got)
 
     @cell
     def r3_s1_r6_005():
-        got = [bash_write(c, "/srv/demo") for c in ("mkdir -p ABC-123 > ABC-123", "mkdir -p ABC-123 2>/dev/null", "mkdir -p ABC-123")]
+        got = [bash_write(c, "/srv/demo") for c in ("mkdir -p TKT-123 > TKT-123", "mkdir -p TKT-123 2>/dev/null", "mkdir -p TKT-123")]
         case("r3-s1-r6-005-mkdir-redirect — WORK_DIR mkdir 면제는 피연산자만이다(같은 명령의 리다이렉트는 따로 판정) · /dev/null 은 그대로 면제",
-             got == [(True, ["ABC-123"]), (False, []), (False, [])], got)
+             got == [(True, ["TKT-123"]), (False, []), (False, [])], got)
 
     @cell
     def r3_parity():
