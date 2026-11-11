@@ -25,7 +25,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "^(AskUserQuestion|Write|Edit|MultiEdit|NotebookEdit|mcp__.*serena__(replace_symbol_body|insert_after_symbol|insert_before_symbol|replace_content|replace_in_files|rename_symbol|safe_delete_symbol)|mcp__xcode__Xcode(Write|Update|MV|RM|MakeDir))$",
+        "matcher": "^(AskUserQuestion|Read|Write|Edit|MultiEdit|NotebookEdit|mcp__.*serena__(replace_symbol_body|insert_after_symbol|insert_before_symbol|replace_content|replace_in_files|rename_symbol|safe_delete_symbol)|mcp__xcode__Xcode(Write|Update|MV|RM|MakeDir))$",
         "hooks": [
           {
             "type": "command",
