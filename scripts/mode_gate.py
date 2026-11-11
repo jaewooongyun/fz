@@ -4,8 +4,10 @@
 
 ⛔ 왜 스크립트인가: 크기 조건이 산문에만 있으면 집행되지 않는다(fz-review light 의 '5파일·100LOC' 는 재는 코드가 없었다).
    추천 임계는 **이 파일이 정본**이다 — modules/mode-gate.md 는 언제 묻고 무엇을 보이는지(계약)를, 이 파일은 숫자를 가진다.
-⛔ 추천은 라벨이다 — 사용자가 매번 고른다(질문 생략 경로는 modules/mode-gate.md). 그래서 임계는 초기값이고 실사용으로 고친다.
-⛔ 측정 실패를 "작다 → light" 로 읽지 않는다 — git 실패 · 빈 diff 는 exit 2 UNRUN 이고 recommend 는 null 이다.
+⛔ full 은 "큼 AND 복잡" 일 때만 추천한다 — 한 절만 채우면 light. 추천이 full 일 때만 묻고 light · 측정 불가는 묻지 않는다
+   (언제 묻나 정본 modules/mode-gate.md). 임계는 초기값이고 실사용으로 고친다.
+⛔ 측정 실패를 "작다 → light" 로 읽지 않는다 — git 실패 · 빈 diff 는 exit 2 UNRUN 이고 recommend 는 null 이다
+   (호출자는 light 로 진행하되 '측정 불가' 를 통보한다 — 추천이 있었던 것처럼 적지 않는다).
 
 사용:
   mode_gate.py review   (--diff PATCH | --numstat FILE)               [--estimate WF]
@@ -39,13 +41,15 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # ── 추천 임계 (정본) ──────────────────────────────────────────────────────────
 # 리뷰 계열 — Workflow 시간은 입력 크기에 약하게만 반응한다. 그래서 임계는 시간이 아니라 "여러 렌즈가 볼 가치" 기준이다
-REVIEW_LINES_FULL = 500     # 유효 줄(생성 파일 제외) — peer-review 의 비용 경고 경계와 같은 값
-REVIEW_FILES_FULL = 20
-PEER_RISK_FULL = 2          # risk_scan.py 의 위험 카테고리 수 — 승격 대입이 아니라 추천 근거
-PLAN_FILES_FULL = 15        # readScope 파일 수
-PLAN_MODULES_FULL = 3       # readScope 의 서로 다른 모듈(경로 앞 두 마디) 수
-CODE_COMPLEXITY_FULL = 4    # Step complexity(1-5) 최댓값
-CODE_STEPS_FULL = 10        # complexity 가 없을 때만 — Step 수만 보면 문서 위주 작업도 full 이 된다
+# ⛔ review · peer · plan · code 는 full = 큼 AND 복잡(and_rule). 한 절만 크면 light — full 은 몇 배 느린데 품질 차이가
+#    작았다(사용자 결정 2026-11-12 · OR 결합에서 peer 48건 중 15건이 full 추천 → AND 에서 1건)
+REVIEW_LINES_FULL = 1000    # 큼 — 유효 줄(생성 파일 제외)
+REVIEW_FILES_FULL = 20      # 복잡 — 넓게 퍼진 변경
+PEER_RISK_FULL = 2          # 복잡 — risk_scan.py 의 위험 카테고리 수 · 승격 대입이 아니라 추천 근거
+PLAN_FILES_FULL = 30        # 큼 — readScope 파일 수
+PLAN_MODULES_FULL = 5       # 복잡 — readScope 의 서로 다른 모듈(경로 앞 두 마디) 수 · 새 아키텍처 결정도 복잡
+CODE_COMPLEXITY_FULL = 4    # 복잡 — Step complexity(1-5) 최댓값
+CODE_STEPS_FULL = 10        # 큼 — Step 수. complexity 가 없으면 복잡을 잴 수 없어 light(Step 수만 보면 문서 위주 작업도 full 이 된다)
 FIX_FILES_FULL = 3
 DISCOVER_COMPLEXITY_FULL = 4   # /fz 5차원 복잡도(modules/complexity.md) — 기존 TEAM 경계와 같은 값
 
@@ -119,35 +123,61 @@ def module_of(p: str) -> str:
     return "/".join(parts[:2]) if len(parts) > 2 else (parts[0] if parts else "")
 
 
+def repo_relative(p: str) -> tuple[str, str] | None:
+    """readScope 한 줄을 (저장소 루트, 루트 기준 상대경로)로 — 같은 파일을 절대 · 상대로 적어도 같은 모듈이 된다(F-586).
+
+    절대경로는 가장 가까운 `.git`(폴더 · 파일 — 워크트리) 조상이 루트다. 못 찾으면 None(루트 불명). 상대경로의 루트는 "".
+    ⛔ 입력 경로들의 공통 조상을 루트로 쓰지 않는다 — 그러면 같은 파일도 함께 적힌 경로에 따라 모듈 수가 달라진다.
+    - Important: 입력 규약 — 상대경로 줄은 한 저장소 기준이고 다른 저장소는 절대경로로 적는다. 절대 루트가 하나면 상대경로를
+      그 저장소로 읽는다. 절대 루트가 여럿인데 상대경로가 섞이면 어느 저장소인지 몰라 모듈 수를 미상으로 둔다(rec_plan).
+      ⛔ cwd 로 풀지 않는다 — 같은 read-scope 가 실행 위치에 따라 다른 값을 낸다.
+    """
+    p = p.strip()
+    if not p.startswith("/"):
+        return "", p
+    path = Path(p)
+    for parent in path.parents:
+        if (parent / ".git").exists():
+            return str(parent), path.relative_to(parent).as_posix()
+    return None
+
+
 # ── 추천 ─────────────────────────────────────────────────────────────────────
+def and_rule(big: tuple[bool, str], cx: tuple[bool, str]) -> tuple[str, list]:
+    """full = 큼 AND 복잡. 두 절의 충족 여부를 모두 근거로 남긴다 — light 면 어느 절이 빠졌는지 보인다."""
+    rec = "full" if big[0] and cx[0] else "light"
+    return rec, [f"큼 {'충족' if big[0] else '미충족'} — {big[1]}", f"복잡 {'충족' if cx[0] else '미충족'} — {cx[1]}"]
+
+
+def cmp(v, limit) -> str:
+    return f"{v} {'≥' if v >= limit else '<'} {limit}"
+
+
 def rec_review(m: dict, risk: int | None = None) -> tuple[str, list]:
-    why = []
-    if m["lines"] >= REVIEW_LINES_FULL:
-        why.append(f"유효 {m['lines']}줄 ≥ {REVIEW_LINES_FULL}")
-    if m["files"] >= REVIEW_FILES_FULL:
-        why.append(f"파일 {m['files']} ≥ {REVIEW_FILES_FULL}")
-    if risk is not None and risk >= PEER_RISK_FULL:
-        why.append(f"위험 카테고리 {risk} ≥ {PEER_RISK_FULL}")
-    if why:
-        return "full", why
-    tail = f" · 위험 카테고리 {risk}" if risk is not None else ""
-    return "light", [f"유효 {m['lines']}줄 · 파일 {m['files']}{tail} — 임계 미만"]
+    files_hit = m["files"] >= REVIEW_FILES_FULL
+    risk_hit = risk is not None and risk >= PEER_RISK_FULL
+    cx = [f"파일 {cmp(m['files'], REVIEW_FILES_FULL)}"] + ([f"위험 카테고리 {cmp(risk, PEER_RISK_FULL)}"] if risk is not None else [])
+    return and_rule((m["lines"] >= REVIEW_LINES_FULL, f"유효 {m['lines']}줄 {'≥' if m['lines'] >= REVIEW_LINES_FULL else '<'} {REVIEW_LINES_FULL}"),
+                    (files_hit or risk_hit, " · ".join(cx)))
 
 
 def rec_plan(files: list, new_arch: bool) -> tuple[dict, str, list]:
-    uniq = sorted({f.strip() for f in files if f.strip()})
-    mods = sorted({module_of(f) for f in uniq if module_of(f)})
-    m = {"files": len(uniq), "modules": len(mods), "new_architecture": new_arch}
-    why = []
-    if m["files"] >= PLAN_FILES_FULL:
-        why.append(f"readScope 파일 {m['files']} ≥ {PLAN_FILES_FULL}")
-    if m["modules"] >= PLAN_MODULES_FULL:
-        why.append(f"모듈 {m['modules']} ≥ {PLAN_MODULES_FULL}")
-    if new_arch:
-        why.append("새 아키텍처 결정")
-    if why:
-        return m, "full", why
-    return m, "light", [f"readScope 파일 {m['files']} · 모듈 {m['modules']} — 임계 미만"]
+    raw = [f.strip() for f in files if f.strip()]
+    pairs = [repo_relative(f) for f in raw]
+    # 루트가 하나면 절대 · 상대 표기를 하나로 합친다. 여럿이면 루트를 붙여 센다 — 다른 저장소의 같은 상대경로는 다른 파일이다
+    multi = len({pr[0] for pr in pairs if pr and pr[0]}) > 1
+    # 절대 루트가 여럿이면 상대경로는 귀속 불가(입력 규약 밖) — 절대경로의 같은 상대경로와 겹치면 별칭으로 보고 한 번만 센다
+    abs_rels = {pr[1] for pr in pairs if pr and pr[0]}
+    loose = multi and any(pr and not pr[0] for pr in pairs)
+    uniq = {(pr if multi else pr[1]) if pr else f for f, pr in zip(raw, pairs) if not (multi and pr and not pr[0] and pr[1] in abs_rels)}
+    mods = None if None in pairs or loose else len({(pr[0] if multi else "", module_of(pr[1])) for pr in pairs if module_of(pr[1])})
+    m = {"files": len(uniq), "modules": mods, "new_architecture": new_arch}
+    mod_hit = mods is not None and mods >= PLAN_MODULES_FULL
+    why_none = ".git 없는 절대경로" if None in pairs else "절대 루트 여럿 + 상대경로 — 상대경로의 저장소"
+    mod_txt = f"모듈 수 미상({why_none} — 루트 불명)" if mods is None else f"모듈 {cmp(mods, PLAN_MODULES_FULL)}"
+    rec, why = and_rule((m["files"] >= PLAN_FILES_FULL, f"readScope 파일 {cmp(m['files'], PLAN_FILES_FULL)}"),
+                        (mod_hit or new_arch, f"{mod_txt} · {'새 아키텍처 결정' if new_arch else '새 아키텍처 아님'}"))
+    return m, rec, why
 
 
 def rec_code(steps: list | None) -> tuple[dict, str, list]:
@@ -155,12 +185,11 @@ def rec_code(steps: list | None) -> tuple[dict, str, list]:
         return {"steps": 0, "max_complexity": None}, "light", ["승인 plan 없음 — 계획 없는 구현"]
     cx = [s.get("complexity") for s in steps if isinstance(s, dict) and isinstance(s.get("complexity"), (int, float))]
     m = {"steps": len(steps), "max_complexity": max(cx) if cx else None}
-    if cx and max(cx) >= CODE_COMPLEXITY_FULL:
-        return m, "full", [f"Step complexity 최댓값 {max(cx)} ≥ {CODE_COMPLEXITY_FULL}"]
-    if not cx and len(steps) >= CODE_STEPS_FULL:
-        return m, "full", [f"complexity 없음 · Step {len(steps)} ≥ {CODE_STEPS_FULL}"]
-    basis = f"complexity 최댓값 {max(cx)}" if cx else "complexity 없음"
-    return m, "light", [f"Step {len(steps)} · {basis} — 임계 미만"]
+    if not cx:
+        return m, "light", [f"Step {len(steps)} · complexity 없음 — 복잡을 잴 수 없어 light(Step complexity 는 fz-plan 이 싣는다)"]
+    rec, why = and_rule((len(steps) >= CODE_STEPS_FULL, f"Step {cmp(len(steps), CODE_STEPS_FULL)}"),
+                        (max(cx) >= CODE_COMPLEXITY_FULL, f"complexity 최댓값 {cmp(max(cx), CODE_COMPLEXITY_FULL)}"))
+    return m, rec, why
 
 
 def load_steps(args) -> list | None:
@@ -375,26 +404,31 @@ def self_test() -> int:
             return str(t / name)
 
         small = w("small.txt", "10\t2\ta.swift\n3\t0\tb.swift\n")
-        big = w("big.txt", "400\t200\ta.swift\n")
+        long1 = w("long1.txt", "800\t400\ta.swift\n")
         many = w("many.txt", "".join(f"1\t0\tf{i}.swift\n" for i in range(20)))
-        gen = w("gen.txt", "600\t0\tPackage.resolved\n5\t1\ta.swift\n")
+        wide = w("wide.txt", "".join(f"50\t0\tf{i}.swift\n" for i in range(20)))
+        gen = w("gen.txt", "1200\t0\tPackage.resolved\n5\t1\ta.swift\n")
         risk2 = w("risk.json", json.dumps({"risk": 2, "tier_delta": 2}))
         empty = w("empty.patch", "")
         junk = w("junk.patch", "이것은 diff 가 아니다\n")
         c, o = evaluate(["review", "--numstat", small], base_env)
         check("작은 numstat → light", c == OK and o["recommend"] == "light", o)
-        c, o = evaluate(["review", "--numstat", big], base_env)
-        check("유효 600줄 → full", c == OK and o["recommend"] == "full", o)
+        c, o = evaluate(["review", "--numstat", long1], base_env)
+        check("유효 1200줄 · 1파일 → light(큼만)", c == OK and o["recommend"] == "light" and "복잡 미충족" in o["reasons"][1], o)
         c, o = evaluate(["review", "--numstat", many], base_env)
-        check("파일 20 → full", o["recommend"] == "full", o)
+        check("파일 20 · 20줄 → light(복잡만)", o["recommend"] == "light" and "큼 미충족" in o["reasons"][0], o)
+        c, o = evaluate(["review", "--numstat", wide], base_env)
+        check("유효 1000줄 · 파일 20 → full", o["recommend"] == "full" and o["reasons"][0].startswith("큼 충족"), o)
         c, o = evaluate(["review", "--numstat", gen], base_env)
-        check("생성 파일 줄은 빼고 센다 → light", o["recommend"] == "light" and o["metrics"]["generated_lines"] == 600, o)
+        check("생성 파일 줄은 빼고 센다 → light", o["recommend"] == "light" and o["metrics"]["generated_lines"] == 1200, o)
         c, o = evaluate(["peer", "--numstat", small, "--risk-json", risk2], base_env)
-        check("peer 위험 카테고리 2 → full", o["recommend"] == "full", o)
+        check("peer 위험 2 · 작은 변경 → light", o["recommend"] == "light", o)
+        c, o = evaluate(["peer", "--lines", "1000", "--files", "4", "--risk-json", risk2], base_env)
+        check("peer 1000줄 · 위험 2 → full", o["recommend"] == "full", o)
         c, o = evaluate(["peer", "--lines", "120", "--files", "4"], base_env)
         check("peer 측정값 120줄 4파일 → light", c == OK and o["recommend"] == "light", o)
-        c, o = evaluate(["peer", "--lines", "800", "--files", "4"], base_env)
-        check("peer 측정값 800줄 → full", o["recommend"] == "full", o)
+        c, o = evaluate(["peer", "--lines", "999", "--files", "25"], base_env)
+        check("peer 999줄 · 25파일 → light(경계 직전)", o["recommend"] == "light", o)
         c, o = evaluate(["peer", "--unmeasured"], base_env)
         check("peer 측정 불가 → exit 2 · recommend null", c == UNRUN and o["recommend"] is None, (c, o))
         c, o = evaluate(["peer", "--lines", "10"], base_env)
@@ -408,21 +442,42 @@ def self_test() -> int:
         c, o = evaluate(["nope"], base_env)
         check("모르는 하위 명령 → exit 10", c == BAD_INPUT, c)
 
-        rs = w("rs.txt", "\n".join(f"skills/x/f{i}.md" for i in range(16)))
-        rs3 = w("rs3.txt", "skills/a/SKILL.md\nmodules/b.md\nscripts/c.py\nworkflows/d.js\n")
-        rs_small = w("rs_small.txt", "skills/a/SKILL.md\nskills/a/x.md\n")
-        check("readScope 16 파일 → full", evaluate(["plan", "--read-scope", rs], base_env)[1]["recommend"] == "full")
-        check("readScope 모듈 3+ → full", evaluate(["plan", "--read-scope", rs3], base_env)[1]["recommend"] == "full")
-        check("새 아키텍처 → full", evaluate(["plan", "--read-scope", rs_small, "--new-arch", "yes"], base_env)[1]["recommend"] == "full")
-        check("작은 readScope → light", evaluate(["plan", "--read-scope", rs_small], base_env)[1]["recommend"] == "light")
+        def plan(paths, arch="no"):
+            return evaluate(["plan", "--read-scope", w(f"rs{len(paths)}-{arch}.txt", "\n".join(paths)), "--new-arch", arch], base_env)[1]
 
-        st_cx = w("cx.json", json.dumps({"steps": [{"id": "S1", "complexity": 2}, {"id": "S2", "complexity": 4}]}))
-        st_many = w("many.json", json.dumps({"steps": [{"id": f"S{i}"} for i in range(12)]}))
-        st_few = w("few.json", json.dumps([{"id": f"S{i}"} for i in range(6)]))
+        one_mod = [f"skills/x/f{i}.md" for i in range(30)]
+        five_mod = [f"pkg/m{i % 5}/f{i}.md" for i in range(30)]
+        check("readScope 30 · 1모듈 → light(큼만)", plan(one_mod)["recommend"] == "light")
+        check("readScope 30 · 5모듈 → full", plan(five_mod)["recommend"] == "full")
+        check("readScope 30 · 새 아키텍처 → full", plan(one_mod, "yes")["recommend"] == "full")
+        check("readScope 16 · 5모듈 · 새 아키텍처 → light(복잡만)", plan(five_mod[:16], "yes")["recommend"] == "light")
+        repo = t / "repo"
+        (repo / ".git").mkdir(parents=True)
+        rel3 = ["skills/a/SKILL.md", "modules/b.md", "scripts/c.py"]
+        o_abs = plan([str(repo / p) for p in rel3] + rel3)
+        check("절대(.git 있음) · 상대 같은 파일 → 모듈 3 · 파일 3", o_abs["metrics"]["modules"] == 3 and o_abs["metrics"]["files"] == 3, o_abs)
+        repo2 = t / "repo2"
+        (repo2 / ".git").mkdir(parents=True)
+        o_two = plan([str(repo / p) for p in rel3] + [str(repo2 / p) for p in rel3])
+        check("두 저장소 같은 상대경로 → 파일 6 · 모듈 6", o_two["metrics"]["files"] == 6 and o_two["metrics"]["modules"] == 6, o_two)
+        o_loose = plan([str(repo / p) for p in rel3] + [str(repo2 / p) for p in rel3] + rel3)
+        check("절대 루트 둘 + 상대 별칭 → 파일 6 · 모듈 null(루트 불명)",
+              o_loose["metrics"]["files"] == 6 and o_loose["metrics"]["modules"] is None and "루트 불명" in o_loose["reasons"][1], o_loose)
+        o_nogit = plan([str(t / "norepo" / f"pkg/m{i % 5}/f{i}.md") for i in range(30)])
+        check(".git 없는 절대경로 → 모듈 null · 새 아키텍처 아니면 light",
+              o_nogit["metrics"]["modules"] is None and o_nogit["recommend"] == "light" and "루트 불명" in o_nogit["reasons"][1], o_nogit)
+        check(".git 없는 절대경로 · 30 · 새 아키텍처 → full",
+              plan([str(t / "norepo" / f"x/f{i}.md") for i in range(30)], "yes")["recommend"] == "full")
+
+        def steps_file(n, cx=None, name="s"):
+            return w(f"{name}.json", json.dumps({"steps": [dict({"id": f"S{i}"}, **({"complexity": cx} if cx else {})) for i in range(n)]}))
+
         doc = w("plan-light.md", "## S1 a\n## S2 b\n### Step 3 c\n")
-        check("complexity 4 → full", evaluate(["code", "--steps", st_cx], base_env)[1]["recommend"] == "full")
-        check("complexity 없음 · Step 12 → full", evaluate(["code", "--steps", st_many], base_env)[1]["recommend"] == "full")
-        check("complexity 없음 · Step 6 → light", evaluate(["code", "--steps", st_few], base_env)[1]["recommend"] == "light")
+        check("complexity 4 · Step 10 → full", evaluate(["code", "--steps", steps_file(10, 4, "c1")], base_env)[1]["recommend"] == "full")
+        check("complexity 4 · Step 2 → light(복잡만)", evaluate(["code", "--steps", steps_file(2, 4, "c2")], base_env)[1]["recommend"] == "light")
+        check("complexity 3 · Step 12 → light(큼만)", evaluate(["code", "--steps", steps_file(12, 3, "c3")], base_env)[1]["recommend"] == "light")
+        check("complexity 없음 · Step 12 → light", evaluate(["code", "--steps", steps_file(12, None, "c4")], base_env)[1]["recommend"] == "light")
+        check("배열 steps · Step 6 → light", evaluate(["code", "--steps", w("few.json", json.dumps([{"id": f"S{i}"} for i in range(6)]))], base_env)[1]["recommend"] == "light")
         c, o = evaluate(["code", "--plan-doc", doc], base_env)
         check("옛 plan 문서 Step 머리 3개", o["metrics"]["steps"] == 3 and o["recommend"] == "light", o)
         check("plan 없음 → light", evaluate(["code", "--no-plan"], base_env)[1]["recommend"] == "light")
