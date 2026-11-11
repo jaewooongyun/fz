@@ -37,6 +37,8 @@
 //     스키마는 항목 수를 재지 못한다). 콜 입력은 바꾸지 않는다
 //   catalogHits: true 면 적대 렌즈 프롬프트에 [점검 카탈로그] 1줄 · 스키마 사본에 catalogHits(catalogId · target · verdict) 필수 칸 —
 //     카탈로그 본문은 agents/plan-edge-case.md. 반환 catalogHits 로 올린다(round 2 S19 · 기본 off — 효과 측정 전 · tests/workflows/review-schemas.js)
+//   stepComplexity: true 면 lean2-full 스키마의 Step 칸에 complexity(1-5 · 선택) · 프롬프트 Step 칸 나열에 complexity(F-587 — fz-code 모드 게이트 입력).
+//     ⛔ 기본 off — 끄면 Step 칸 · 프롬프트가 기준과 같다(롤백 경로). fz-plan 생산 호출은 켠다
 
 export const meta = {
   name: 'plan-lean2',
@@ -80,7 +82,7 @@ const PlanSchema = {
   type: 'object',
   required: ['steps', 'readScope', 'writeScope', 'acceptanceCriteria', 'riskMatrix', 'rtm', 'openQuestions'],
   properties: {
-    steps: { type: 'array', items: { type: 'object', required: ['id', 'title', 'files', 'verify'], properties: { id: { type: 'string' }, title: { type: 'string' }, files: { type: 'array', items: { type: 'string' } }, verify: VerifySpec } } },
+    steps: { type: 'array', items: { type: 'object', required: ['id', 'title', 'files', 'verify'], properties: { id: { type: 'string' }, title: { type: 'string' }, files: { type: 'array', items: { type: 'string' } }, complexity: { type: 'integer', minimum: 1, maximum: 5, description: 'Step 구현 난이도 1-5(modules/complexity.md) — fz-code 모드 게이트가 읽는다 · 선택 칸' }, verify: VerifySpec } } },
     readScope: { type: 'array', items: { type: 'string' }, description: '§X — 영향 스캔 전체' },
     writeScope: { type: 'array', items: { type: 'object', required: ['file', 'rationale'], properties: { file: { type: 'string' }, rationale: { type: 'string' } } }, description: '§Y — 실제 변경 + 근거 (Read→Write 자동 번역 금지)' },
     acceptanceCriteria: { type: 'array', items: { type: 'string' }, description: '§Z — Step 완료 기준' },
@@ -193,6 +195,14 @@ Object.assign(EDGE_DEFENSE_SCHEMA.properties.edgeCases.items.properties, {
   defense: { type: 'boolean', description: '방어 항목 — 지금은 안 깨지지만 대비로 넣자는 코드(nil 초기화 · 가드 · 재시도)면 true' },
   failurePath: { type: 'string', description: '방어 항목이면 필수 — 어떤 호출 순서에서 무엇이 틀어지나 + 그 순서가 실제로 도달하는 호출처 근거(파일:줄). 300자 이내' },
 })
+// Step complexity (F-587) — ⛔ 기본 off. 선언(PlanSchema)에는 칸이 있고, 꺼지면 호출 스키마 **사본**에서 뺀다(롤백 경로 = 기준)
+const stepCxOn = input.stepComplexity === true
+const withStepCx = s => {
+  if (stepCxOn) return s
+  const c = JSON.parse(JSON.stringify(s))
+  delete c.properties.steps.items.properties.complexity
+  return c
+}
 // 점검 카탈로그 (round 2 S19) — ⛔ 기본 off. 카탈로그 본문은 agents/plan-edge-case.md(매 spawn 주입)에 있고 여기는 적용 결과 칸만
 //    적대 렌즈 스키마 **사본**에 붙인다(방어 스키마와 함께 켤 수 있다). 병합 신호 필드(MERGE_SIGNAL_FIELDS)에는 넣지 않는다
 const catalogOn = input.catalogHits === true
@@ -224,7 +234,7 @@ const [full, edge, impactArch] = await parallel([
     `[목표] 한 번에 전부:\n` +
     `1. directionVerdict(PROCEED/RECONSIDER/REDIRECT) + directionAlternatives 2개 이상 — 근거 인용. ⛔ 기각된 대안을 1안으로 되살리지 말 것.\n` +
     `2. §X readScope(영향 스캔 전체) / §Y writeScope(실제 변경 + 각 근거 — readScope 자동 복사 금지) / §Z acceptanceCriteria 3-섹션 분리\n` +
-    `3. steps: Step 분해(id/title/files/verify).\n` +
+    `3. steps: Step 분해(${stepCxOn ? 'id/title/files/verify/complexity). complexity 는 Step 구현 난이도 1-5 — fz-code 가 full 여부를 이 값으로 잰다.' : 'id/title/files/verify).'}\n` +
     `   ⛔ **첫 Step 은 "수정 전 오라클"** 이다 — 변경 전 상태(재현 여부·현재 동작·기준 수치)를 기록한다. 그것이 없으면 "현행 유지" 요구를 무엇과 비교할지 없다.\n` +
     `4. rtm: 요구사항 분해 각 행 {reqId, requirement 원문, stepId, verify, status:'pending'}\n` +
     `5. riskMatrix · antiPatternConstraints(기각 대안 재도입 차단 grep) · openQuestions(사용자 결정 필요만)\n` +
@@ -234,7 +244,7 @@ const [full, edge, impactArch] = await parallel([
     `   ⛔ 경로를 하드코딩하지 말 것 — 구현 트리 루트를 파라미터로 받아 쓴다(다른 트리에서 실행 불가가 되면 게이트가 죽는다).\n` +
     `7. ⛔ **회귀 축(기존 동작 보존)은 변경이 공유하는 코드 경로를 전부 훑는다** — 같은 인식기·같은 정책·같은 진입점을 쓰는 **다른 기능**이 무엇인지 찾아 검증 셀에 넣는다. 요구에 적힌 것만 보지 말 것.\n` +
     `⛔ 출력 형식: StructuredOutput 인자는 **유효한 JSON** — 문자열 값 안의 백슬래시·따옴표를 손으로 이스케이프하지 말 것.`,
-    { label: 'lean2-full', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: FullSchema }),
+    { label: 'lean2-full', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: withStepCx(FullSchema) }),
   () => callAgent(
     `${OVERRIDE}\n[역할] 경계 케이스 적대자 — 이 접근이 **어디서 깨지는가**만 판다. 계획을 쓰지 않는다.\n${CTX}\n` +
     `[목표] 경계 케이스와 실패 시나리오. ⛔ 일반론 금지 — 각 항목이 **어느 파일·심볼·줄에서** 깨지는지 코드로 특정한다.\n` +

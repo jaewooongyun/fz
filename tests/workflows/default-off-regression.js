@@ -72,6 +72,8 @@ const OPTIONS = {
   // S19 — 렌즈 에이전트 정의의 점검 카탈로그 적용 결과 칸. counter(review-live · peer-review Tier 3) · 적대 렌즈(plan-lean2)에만 닿는다
   catalogHits: { workflows: ['peer-review', 'review-live', 'plan-lean2'], on: { catalogHits: true }, off: { catalogHits: false },
     defaultOn: PEER_ON, applies: sc => !sc.name.startsWith('Tier 2') },
+  // F-587 — lean2-full 스키마 사본의 Step 칸 complexity · 프롬프트 Step 칸 나열. 끄면 기준과 같다
+  stepComplexity: { workflows: ['plan-lean2'], on: { stepComplexity: true }, off: { stepComplexity: false } },
 }
 
 const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }
