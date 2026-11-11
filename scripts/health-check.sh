@@ -81,15 +81,17 @@ machine_load() {
   c="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null)"
   echo "MACHINE-LOAD load=${l:-?} cores=${c:-?}"
 }
-# ⛔ 3분 판정 (F-335 ⑬): exit 2 이면서 줄 맨 앞 `UNRUN` 표지가 있을 때만 미실행이다. 표지 없는 exit 2 와
-#    traceback 은 실패다 — 검사기가 죽은 것을 미실행으로 세탁하지 않는다. 이전 판은 이분(0 · 그 외 1)이라
-#    검사기가 정의한 측정 불가(exit 2 · `UNRUN:`)까지 실패로 적었다.
+# ⛔ 3분 판정 (F-335 ⑬ · F-575): 표지가 있을 때만 미실행이다 — exit 2 + 줄 맨 앞 `UNRUN`(검사기의 측정 불가) ·
+#    exit 3 + 줄 맨 앞 `SETUP`(러너의 준비 실패). 표지 없는 exit 2 · 3 과 traceback 은 실패다 — 검사기가 죽은 것을
+#    미실행으로 세탁하지 않는다. 이전 판은 exit 3 을 회귀와 같은 실패로 셌다 — 호스트 부하로 준비 창을 놓친 러너가
+#    릴리스 게이트를 실패시켰고 표만으로는 회귀와 부하를 가를 수 없었다(F-575). ⛔ 미실행도 통과가 아니다(아래 총평 규칙).
+#    exit 3 술어는 scripts/run_runners.py setup_failure(시간 민감 러너 재시도)와 같다 — 함께 고친다.
 # return: 0 통과 · 1 실패 · 2 미실행
 classify() {
   [ "$1" -eq 0 ] && return 0
-  [ "$1" -eq 2 ] || return 1
   printf '%s\n' "$2" | grep -qF 'Traceback (most recent call last)' && return 1
-  printf '%s\n' "$2" | grep -qE '^UNRUN[: ]' && return 2
+  [ "$1" -eq 2 ] && printf '%s\n' "$2" | grep -qE '^UNRUN[: ]' && return 2
+  [ "$1" -eq 3 ] && printf '%s\n' "$2" | grep -qE '^SETUP( |:|$)' && return 2
   return 1
 }
 # record3 <이름> <exit> <출력> <통과 비고> <실패 비고> — classify 결과대로 기록한다(미실행은 UNRUN 을 센다)
@@ -98,10 +100,11 @@ record3() {
   case $? in
     0) record "$1" 0 "$4" ;;
     2) UNRUN=$((UNRUN + 1))
-       record "$1" UNRUN "미실행 — $(printf '%s\n' "$3" | grep -E '^UNRUN[: ]' | head -1) (⛔ PASS 아님)" ;;
-    *) local why=""
-       if [ "$2" -eq 2 ]; then
-         printf '%s\n' "$3" | grep -qF 'Traceback (most recent call last)' && why=' · exit 2 + traceback — 실패로 센다' || why=' · UNRUN 표지 없는 exit 2 — 실패로 센다'
+       record "$1" UNRUN "미실행 — $(printf '%s\n' "$3" | grep -E '^(UNRUN[: ]|SETUP( |:|$))' | head -1) (⛔ PASS 아님)" ;;
+    *) local why="" mk=UNRUN
+       if [ "$2" -eq 2 ] || [ "$2" -eq 3 ]; then
+         [ "$2" -eq 3 ] && mk=SETUP
+         printf '%s\n' "$3" | grep -qF 'Traceback (most recent call last)' && why=" · exit $2 + traceback — 실패로 센다" || why=" · $mk 표지 없는 exit $2 — 실패로 센다"
        fi
        record "$1" 1 "$5$why" ;;
   esac
@@ -134,12 +137,12 @@ chk_doc_freshness() {
 }
 chk_runners() {   # 인자: 러너 경로들 — 0개면 미실행(전체 실행의 글롭 오타 감지). 부분 실행은 1개 이상일 때만 부른다
   if command -v node >/dev/null 2>&1; then
-    T_TOTAL=0 T_FAIL=0 T_BAD="" T_UN=0 T_UNLIST=""
+    T_TOTAL=0 T_FAIL=0 T_BAD="" T_UN=0 T_UNLIST="" T_CLS=0 T_RETRY="" T_LOAD=""
     # 러너 하나를 3분 판정한다 — 출력을 버리면 UNRUN 표지를 볼 수 없다(F-335 ⑬)
     t_one() {
       T_TOTAL=$((T_TOTAL + 1))
-      classify "$1" "$2"
-      case $? in
+      classify "$1" "$2"; T_CLS=$?
+      case $T_CLS in
         0) ;;
         2) T_UN=$((T_UN + 1)); T_UNLIST="$T_UNLIST $3" ;;
         *) T_FAIL=$((T_FAIL + 1)); T_BAD="$T_BAD $3" ;;
@@ -154,7 +157,7 @@ chk_runners() {   # 인자: 러너 경로들 — 0개면 미실행(전체 실행
     # run.sh — scripts/run_runners.py 가 FZ_HEALTH_JOBS(기본 4 · 1 = 옛 직렬) 묶음으로 병렬 실행하고 결과를 입력 순서 파일로 남긴다.
     #   판정 · 보고는 여기서 순서대로 한다(표 형식 불변). ⛔ 결과 파일이 없으면 UNRUN 으로 센다 — 통과로 읽지 않는다.
     #   러너는 자기 임시 공간에서만 쓴다(2026-11-05 실측: 공유 HOME · 고정 임시 경로 · 대상 저장소 git 쓰기 0) — 병렬 전제가 깨지면 FZ_HEALTH_JOBS=1
-    local RS=() RR rs_i=0 t_rc
+    local RS=() RR rs_i=0 t_rc t_meta t_name RN
     for r in "$@"; do case "$r" in */run.sh) [ -f "$r" ] && RS+=("$r") ;; esac; done
     if [ ${#RS[@]} -gt 0 ]; then
       RR="$(mktemp -d "${TMPDIR:-/tmp}/fz-health-runners.XXXXXX")"
@@ -162,7 +165,12 @@ chk_runners() {   # 인자: 러너 경로들 — 0개면 미실행(전체 실행
       for r in "${RS[@]}"; do
         t_out="$(cat "$RR/$rs_i.out" 2>/dev/null || echo 'UNRUN: 러너 결과 없음 — 병렬 실행기가 기록하지 못했다')"
         t_rc="$(cat "$RR/$rs_i.rc" 2>/dev/null || echo 2)"
-        t_one "$t_rc" "$t_out" "$(basename "$(dirname "$r")")"; rs_i=$((rs_i + 1))
+        t_meta="$(cat "$RR/$rs_i.meta" 2>/dev/null)"; t_name="$(basename "$(dirname "$r")")"
+        t_one "$t_rc" "$t_out" "$t_name"; rs_i=$((rs_i + 1))
+        case " $t_meta " in *" retried=1 "*) T_RETRY="$T_RETRY $t_name" ;; esac
+        # 실패 · 미실행 러너는 실행 시작 · 끝의 1분 부하를 상세로 남긴다 — 회귀와 호스트 부하를 가르는 근거(F-575).
+        # ⛔ 행 본문에는 넣지 않는다 — 실행마다 값이 달라 같은 판정의 행이 달라진다(parallel-runners 가 직렬 · 병렬 행을 대조한다)
+        [ "$T_CLS" -eq 0 ] || T_LOAD="$T_LOAD · $t_name $(printf '%s' "$t_meta" | sed -nE 's/^load_start=([^ ]*) load_end=([^ ]*) .*/\1→\2/p')"
       done
       rm -rf "$RR"
     fi
@@ -171,12 +179,14 @@ chk_runners() {   # 인자: 러너 경로들 — 0개면 미실행(전체 실행
       UNRUN=$((UNRUN + 1))
       record "회귀 오라클" UNRUN "미실행 — 러너 0개 발견 (경로 오타 의심, ⛔ PASS 아님)"
     else
-      [ "$T_FAIL" -gt 0 ] && record "회귀 오라클" 1 "⛔ ${T_FAIL}/${T_TOTAL} 실패 —$T_BAD"
+      RN="${T_RETRY:+ · 준비 실패 뒤 단독 재시도:$T_RETRY}"
+      [ "$T_FAIL" -gt 0 ] && record "회귀 오라클" 1 "⛔ ${T_FAIL}/${T_TOTAL} 실패 —$T_BAD$RN"
       if [ "$T_UN" -gt 0 ]; then
         UNRUN=$((UNRUN + 1))
-        record "회귀 오라클 미실행" UNRUN "UNRUN 표지 exit 2 ${T_UN}/${T_TOTAL} —$T_UNLIST · 통과 $((T_TOTAL - T_FAIL - T_UN)) (⛔ PASS 아님)"
+        record "회귀 오라클 미실행" UNRUN "미실행 표지(UNRUN exit 2 · SETUP exit 3) ${T_UN}/${T_TOTAL} —$T_UNLIST · 통과 $((T_TOTAL - T_FAIL - T_UN))$RN (⛔ PASS 아님)"
       fi
-      [ "$T_FAIL" -eq 0 ] && [ "$T_UN" -eq 0 ] && record "회귀 오라클" 0 "${T_TOTAL}개 전건 통과"
+      [ "$T_FAIL" -eq 0 ] && [ "$T_UN" -eq 0 ] && record "회귀 오라클" 0 "${T_TOTAL}개 전건 통과$RN"
+      detail "회귀 오라클" "${T_LOAD:+러너 1분 부하(시작→끝) — ${T_LOAD# · }}"
     fi
   else
     UNRUN=$((UNRUN + 1))
@@ -302,7 +312,7 @@ machine_load     # 시작 — 소요가 기계 부하 때문인지 가른다(F-4
 for dep in python3 git; do
   command -v "$dep" >/dev/null 2>&1 || { echo "⛔ 사전조건 부재: $dep" >&2; exit 2; }
 done
-for f in lint_contracts.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_g8_style.py eject_findings.py check_findings_hygiene.py check_release_closes.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py check_retired_commands.py run_runners.py check_evidence_slots.py gpt_ab_decide.py gpt_merge.py plan_integrity_check.py check_health_wiring.py fz_snapshot.py fz_stop_telemetry.py fz_telemetry_report.py run_metrics.py check_synthesized.py check_comment_worthy.py intent_route_probe.py check_finding_contracts.py check_unrun_except.py check_rule_copies.py check_marker_leak.py collect_env_axes.py call_set_diff.py check_moved_code.py scope_census.sh collect_weak_unwrap.py check_applied_escapes.py check_pr_template.py check_review_diff.py check_unmeasured_handoff.py; do
+for f in lint_contracts.py shell_tokens.py check_adversarial_record.py removal_history.py measure_constraint_load.py check_catalog_hits.py catalog_hits_report.py lint-model-explicit.sh lint_doc_freshness.py gate_check.py gate_stop_hook.py lint_diff_parsers.py check-gpt-flags.sh check_g8_style.py eject_findings.py check_findings_hygiene.py check_release_closes.py freeze_baseline.py migrate_findings_frontmatter.py check_symptom_anchor.py check_external_commands.py check_global_budget.py check_asset_census.py check_release_sync.sh fz_wf_metrics.py report_stale_findings.py autonomy_decide.py check_failure_table.py check_single_source.py candidate_expiry.py check_wf_advisor_ban.py check_gpt_surface.py check_quality_fixtures.py ab_ledger.py check_ab_protocol.py check_wf_syntax.js check_wf_text.js plugin_validate.sh check_release_notes.py extract_project_rules.py check_project_rules.py review_merge.py plan_apply_delta.py plan_divergence.py plan_resolve_impact_requests.py check_gpt_skill_portability.py review_snapshot.sh md_section.py ab_ledger_base.py ab_ledger_transcript.py ab_ledger_collect.py ab_ledger_judge.py ab_ledger_gpt.py ab_ledger_selftest.py ab_ledger_selftest_r3.py gpt_kinds.py gpt-call.sh gpt_rounds.py mode_gate.py check_loaded_version.py harness_census.py measure_runtime_load.py check_report_regen.py lint_recurrence.py counter_adapter.py health_select.py check_retired_commands.py run_runners.py check_evidence_slots.py gpt_ab_decide.py gpt_merge.py plan_integrity_check.py check_health_wiring.py fz_snapshot.py fz_stop_telemetry.py fz_telemetry_report.py run_metrics.py check_synthesized.py check_comment_worthy.py intent_route_probe.py check_finding_contracts.py check_unrun_except.py check_rule_copies.py check_marker_leak.py collect_env_axes.py call_set_diff.py check_moved_code.py scope_census.sh collect_weak_unwrap.py check_applied_escapes.py check_pr_template.py check_review_diff.py check_unmeasured_handoff.py check_verdict.py judge_corpus_diff.py; do
   [ -f "$ROOT/scripts/$f" ] || { echo "⛔ 검사 스크립트 부재: scripts/$f" >&2; exit 2; }
 done
 
@@ -537,6 +547,8 @@ fi
 #    "전건 통과" 로 인쇄되는 것이 정확히 막으려는 실패다(0건은 측정 실패를 먼저 의심).
 # tests/lib/*.test.js — 라이브러리(가짜 런타임 로더)의 테스트. 라이브러리 파일 자체는 이 글롭 밖이다
 # ⛔ 세 글롭은 scripts/health_select.py 의 RUNNER_GLOBS 와 같아야 한다 — 다르면 선택기가 고른 러너를 여기서 모른다
+# tests/fixtures/health/mutation-neighbors/run.sh 도 이 글롭으로 돈다 — fallback 을 지나는 기존 셀이 방어를 지운 사본에서 여전히
+#   실패하는가를 매번 다시 잰다. fallback 의미를 바꾼 수정이 이웃 셀을 공허 통과로 만들면 SURVIVOR 로 실패한다(F-573)
 chk_runners "$ROOT"/tests/workflows/*.js "$ROOT"/tests/lib/*.test.js "$ROOT"/tests/fixtures/*/*/run.sh
 
 # ── 4.7 G8 문체 게이트 fixture 계약 ────────────────────────────
@@ -676,12 +688,27 @@ fi
 # ⛔ 신설 근거: `chk_12` 는 lint_contracts 에 배선했으면서 **새 스크립트 2종의 self-test 는
 #    통합 검사에서 한 번도 돌지 않았다**(비대칭). 배선 안 된 검사는 회귀를 못 잡는다.
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
-for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene check_release_closes migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select check_retired_commands run_runners check_evidence_slots fz_snapshot fz_stop_telemetry fz_telemetry_report lint_contracts lint_doc_freshness run_metrics check_health_wiring check_synthesized check_comment_worthy intent_route_probe check_finding_contracts check_unrun_except check_rule_copies check_marker_leak collect_env_axes call_set_diff check_moved_code collect_weak_unwrap check_applied_escapes check_pr_template check_review_diff check_unmeasured_handoff; do
+for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene check_release_closes migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select check_retired_commands run_runners check_evidence_slots fz_snapshot fz_stop_telemetry fz_telemetry_report lint_contracts lint_doc_freshness run_metrics check_health_wiring check_synthesized check_comment_worthy intent_route_probe check_finding_contracts check_unrun_except check_rule_copies check_marker_leak collect_env_axes call_set_diff check_moved_code collect_weak_unwrap check_applied_escapes check_pr_template check_review_diff check_unmeasured_handoff removal_history measure_constraint_load check_catalog_hits catalog_hits_report check_verdict judge_corpus_diff; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
   record3 "레지스트리 도구 self-test ($FS)" "$FS_CODE" "$FS_OUT" \
     "$(printf '%s\n' "$FS_OUT" | grep -E '^self-test' | tail -1)" \
     "⛔ $(printf '%s\n' "$FS_OUT" | grep -E 'FAIL|self-test' | tail -1)"
 done
+
+# ── 4.9c 공용 셸 · JS 토크나이저 (F-458) · 적대 재검토 기록 판정기 (F-329) ─────
+# ⛔ 세 소비자(fz-guard · Stop 훅 · check_comment_worthy)가 같은 토크나이저를 부른다. fz-guard 설치본은 하위 플러그인 폴더만
+#    복사되므로 mods/fz-guard/hooks/ 에 바이트까지 같은 사본을 둔다 — 어긋나면 두 판정이 갈린다(cmp 로 잰다).
+for TS in shell_tokens check_adversarial_record; do
+  TS_OUT="$(cd "$ROOT" && python3 "scripts/$TS.py" --self-test 2>&1)"; TS_CODE=$?
+  record3 "토크나이저 · 적대 기록 self-test ($TS)" "$TS_CODE" "$TS_OUT" \
+    "$(printf '%s\n' "$TS_OUT" | tail -1)" \
+    "⛔ $(printf '%s\n' "$TS_OUT" | grep -E '^FAIL|Traceback' | head -2 | tr '\n' ' ')"
+done
+if cmp -s "$ROOT/scripts/shell_tokens.py" "$ROOT/mods/fz-guard/hooks/shell_tokens.py"; then
+  record "토크나이저 fz-guard 사본" 0 "scripts/shell_tokens.py 와 바이트 일치"
+else
+  record "토크나이저 fz-guard 사본" 1 "⛔ mods/fz-guard/hooks/shell_tokens.py 가 scripts/shell_tokens.py 와 다르다 — cp 로 맞춘다"
+fi
 
 # ── 4.9a health-check 배선 대조 (F-529) ─────────────────────────
 # ⛔ 위 등록 목록(존재 확인 · self-test 루프)은 손으로 관리한다 — `--self-test` 를 가진 스크립트가 어디서도 안 돌거나
@@ -912,7 +939,7 @@ else
   record "fz-compact guard" 1 "⛔ $(printf '%s\n' "$FC_GUARD" | head -2 | tr '\n' ' ')"
 fi
 
-# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 77 케이스) · 허용 목록(채택 표 == guard 상수).
+# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 98 케이스) · 허용 목록(채택 표 == guard 상수).
 #    self-test 와 허용 목록은 python3 만 써서 CLI 분기 밖에서 돈다. self-test 는 HOME · 상태 폴더를 임시로 새로 짓는다.
 if command -v claude >/dev/null 2>&1; then
   FG_VAL="$(bash "$ROOT/scripts/plugin_validate.sh" "$ROOT/mods/fz-guard" 2>&1)"; FG_VAL_CODE=$?
