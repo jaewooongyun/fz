@@ -79,12 +79,12 @@ metadata:
 
 ### 발동 조건
 
-모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modules/complexity.md` — 아래 SOLO vs TEAM 판단표)로 추천을 달고 묻는다 — light = SOLO 탐색. 사용자 대화형 탐색(Phase 2 ↔ 사용자)은 본 모드와 무관하게 SOLO가 담당 — Workflow는 **비대화 다라운드 탐색만** 대체한다.
+모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modules/complexity.md` — 아래 SOLO vs TEAM 판단표)로 추천한다 — 추천 full 일 때만 묻고 그 밖은 묻지 않고 light + 통보 · light = SOLO 탐색. 사용자 대화형 탐색(Phase 2 ↔ 사용자)은 본 모드와 무관하게 SOLO가 담당 — Workflow는 **비대화 다라운드 탐색만** 대체한다.
 
 ### 실행 절차 (Lead)
 
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/discover/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
-1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 경유면 묻지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" discover --complexity {점수} --estimate discover-adversarial` 로 추천을 달고 묻는다. **light** 면 2~4 를 건너뛰고 SOLO 탐색으로 간다 · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
+1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" discover --complexity {점수} --estimate discover-adversarial` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 2~4 를 건너뛰고 SOLO 탐색으로 간다 · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다)
 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js && cmp -s {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약

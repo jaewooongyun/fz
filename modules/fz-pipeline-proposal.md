@@ -45,37 +45,28 @@
 ## AskUserQuestion 선택지
 
 > **Default 결정 알고리즘** (review-arch MUST-1 + GPT 검증 §5 MUST-1 합의):
-> Phase 3 결정은 **추천**이다 — Phase 4 에서 사용자가 스킬별 모드(light · full)를 고르고, 그 선택을 스킬에 인자(`light` · `full`)로 넘긴다. 스킬은 다시 묻지 않는다(`modules/mode-gate.md` § 언제 묻나).
+> Phase 3 결정(SOLO/TEAM)은 스킬 모드를 정하지 않는다 — 파이프라인 · 팀 구성 참고다. 모드는 각 스킬 게이트가 실측으로 정한다(추천 full 일 때만 그때 묻는다 — `modules/mode-gate.md` § 언제 묻나). Phase 4 는 사용자가 **명시로 고른** 모드만 스킬 인자(`light` · `full`)로 넘긴다(2026-11-12).
 
 ### Phase 4 Default 결정 알고리즘
 
-| 조건 | Phase 4 First Option (Default) | 비고 |
-|------|------------------------------|------|
-| Phase 3 결정 = TEAM (complexity ≥ 4) | **full (Phase 3 추천)** | light 는 2번 선택지 |
-| Phase 3 결정 = SOLO + 40차 신호 매칭 (lead-action-default.md) | **light (Phase 3 추천)** | full 은 2번 선택지 |
-| 사용자 `--deep` / `--team` / `--solo` · `light` / `full` 명시 | **사용자 명시 선택 유지 (override)** — 묻지 않는다 | Lead 재권장 금지 |
+| 조건 | Phase 4 선택지 | 비고 |
+|------|---------------|------|
+| 기본 | **파이프라인 승인** — 모드 선택지를 두지 않는다 | 모드는 스킬 게이트가 잰다 |
+| 사용자 `--deep` / `--team` / `--solo` · `light` / `full` 명시 | **사용자 명시 선택 유지 (override)** — 그 모드를 인자로 넘긴다 | Lead 재권장 금지 |
+| 커스텀 구성에서 사용자가 모드를 지정 | 그 모드를 인자로 넘긴다 | 명시 선택 |
 
-### 선택지 형식 (조건별)
+### 선택지 형식
 
-**단순 요청 컨텍스트** (Phase 3 SOLO + 40차 매칭):
 ```
-1. light (Recommended — 단순 요청)
-2. full (Workflow — 확장 검증 필요 시)
-3. 커스텀 구성
-```
-
-**복잡 / 명시 컨텍스트** (Phase 3 TEAM 또는 --deep/--team override):
-```
-1. [Phase 3 추천] (Recommended)
-2. 모드 변경 (full ↔ light)
-3. 커스텀 구성
+1. [파이프라인] (Recommended) — 모드는 각 스킬이 재서 정한다(full 추천일 때만 그때 묻는다)
+2. 커스텀 구성 (스킬 · 모드 지정)
 ```
 
 ### 규칙
 
 - ⛔ 사용자 명시 선택 후 Lead 재권장 금지 (edge-cases Failure 4-2 완화)
 - ⛔ 실행 중 complexity 또는 catch 누적 신호로 full 이 필요해 보이면 **자동 전환하지 않고 묻는다** (Failure 4-3 완화 · 2026-10-19 사용자 결정 — `modules/mode-gate.md`)
-- ⛔ Phase 4 에서 사용자가 고른 모드가 Phase 3 추천을 이긴다 — 그 선택을 스킬 인자로 넘긴다 (이전 규칙 'Phase 4 역전 불가'는 2026-10-19 갈음)
+- ⛔ Phase 4 는 사용자가 명시로 고른 모드만 스킬 인자로 넘긴다 — Phase 3 의 SOLO/TEAM 을 모드 인자로 바꿔 넘기지 않는다. 직접 호출과 `/fz` 경유가 같은 게이트로 판정된다 (2026-11-12 · 이전 규칙 'Phase 4 에서 고른 추천 모드를 인자로'와 'Phase 4 역전 불가'를 갈음)
 - GPT 모델·effort 질문은 이 AskUserQuestion 에 합친다(GPT 를 부를 수 있는 파이프라인에서 `gpt-choice.sh get` 이 묻기로 나올 때) — 판정·질문 형식 정본 `modules/gpt-strategy.md` § 모델·effort 선택
 - ⛔ AskUserQuestion 한 번은 **최대 4문항**이다 — 파이프라인 · 범위 확인 질문에 GPT 두 질문을 더해 넘치면 정본 규칙대로 나눈다
 - ⛔ 파이프라인 승인 질문의 header 는 `Phase 4` 로 고정한다. 승인 = 제시한 선택지 중 커스텀이 아닌 것을 고른 답이다. 범위 확인 · GPT 질문은 다른 header 를 쓴다(승인이 아니다). 커스텀 구성 · 자유 입력으로 답하면 변경안을 반영해 **다시 Phase 4 질문으로** 묻는다 — 그 답은 아직 승인이 아니다

@@ -295,7 +295,7 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 
 결정된 파이프라인, 팀 구성, 모델 배정을 시각화하고 사용자 승인을 받습니다.
 
-> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행하고 무엇을 묻고 무엇을 막는지는 `modules/governance.md` § 자율 모드가 정본이고 판정은 `scripts/autonomy_decide.py` 가 한다(commit · push 는 모드와 무관하게 막는다). **GPT 모델·effort**: 확정 파이프라인에 GPT 를 부를 수 있는 스킬이 있으면(모르면 묻는다) `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" get` 을 부르고 정본의 `get` 결과 표대로 한다 — 묻기로 나오면 모델·effort 질문 2개를 이 AskUserQuestion 에 합치고 답을 `set` 한다(자율 판정도 `get` 이 한다). 선택이 있으면 제안 시각화에 표시만 한다 — 정본 `modules/gpt-strategy.md` § 모델·effort 선택 ⛔ **모드**: Phase 3 의 SOLO/TEAM 은 스킬별 light/full **추천**이다 — 이 질문에서 사용자가 고른 모드를 스킬에 인자(`light` · `full`)로 넘기고, 스킬은 다시 묻지 않는다(`modules/mode-gate.md`).
+> 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행하고 무엇을 묻고 무엇을 막는지는 `modules/governance.md` § 자율 모드가 정본이고 판정은 `scripts/autonomy_decide.py` 가 한다(commit · push 는 모드와 무관하게 막는다). **GPT 모델·effort**: 확정 파이프라인에 GPT 를 부를 수 있는 스킬이 있으면(모르면 묻는다) `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" get` 을 부르고 정본의 `get` 결과 표대로 한다 — 묻기로 나오면 모델·effort 질문 2개를 이 AskUserQuestion 에 합치고 답을 `set` 한다(자율 판정도 `get` 이 한다). 선택이 있으면 제안 시각화에 표시만 한다 — 정본 `modules/gpt-strategy.md` § 모델·effort 선택 ⛔ **모드**: Phase 3 의 SOLO/TEAM 은 스킬 모드를 정하지 않는다 — 파이프라인 · 팀 구성 참고다. 사용자가 이 질문에서 **명시로 고른** 모드만 스킬에 인자(`light` · `full`)로 넘긴다. 고르지 않았으면 인자 없이 넘기고 각 스킬 게이트가 재서 정한다(추천 full 일 때만 그때 묻는다 — `modules/mode-gate.md` § 언제 묻나 2). 직접 호출과 `/fz` 경유가 같은 게이트로 판정된다.
 
 ### Gate 4: Pipeline Approved
 - [ ] 파이프라인 + 팀 구성 시각화 출력 완료?
@@ -315,7 +315,7 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 ```
 각 단계:
 1. Read(skills/{스킬}/SKILL.md) → 해당 스킬의 지침 로드
-2. 스킬 지침에 따라 실행 (도구 호출, MCP 사용 등)
+2. 스킬 지침에 따라 실행 (도구 호출, MCP 사용 등) — 스킬의 모드 게이트도 그대로 거친다(명시 인자가 없으면 스킬이 재서 정한다)
 3. 대화 컨텍스트에 산출물 축적 → 다음 단계가 자연 참조
 4. Gate 체크 → 통과 시 다음 단계, 실패 시 중단/계속 선택
 ```
@@ -327,6 +327,8 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 > 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본).
 
 각 스킬은 자신의 `workflows/{skill}-{pattern}.js`를 소유한다. Lead는 스킬의 Workflow를 호출하고 반환(구조화 출력)을 통합한다. Lead는 퍼실리테이터 (호출 + 게이트 실행 + 통합).
+
+⛔ **5.2 는 스킬 게이트를 건너뛰는 길이 아니다** — TEAM 이어도 각 단계는 5.1 처럼 스킬 SKILL.md 를 읽고 그 스킬의 모드 게이트를 거친다. Workflow 는 그 스킬의 최종 모드가 full 일 때만 부른다. light 면 스킬의 light 절차로 간다(`modules/mode-gate.md` § 스킬별 light · full).
 
 ```
 0. 준비(§12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): cp {플러그인 루트}/workflows/{skill}-{pattern}.js {WORK_DIR}/{skill}-{pattern}.js && cmp -s {플러그인 루트}/workflows/{skill}-{pattern}.js {WORK_DIR}/{skill}-{pattern}.js   → exit 0 일 때만 1 · 비0 이면 L4

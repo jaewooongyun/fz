@@ -43,7 +43,7 @@ metadata:
 - **9개 관점**: Architecture Decision, Extensibility, Over-Engineering, Functional Decomposition, Modern API, Dependency Impact, **Refactoring Completeness**, **Concurrency Safety** (동시성 코드 포함 시), **Requirements Alignment**
 - **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 single source) + GPT challenger(**Tier 1·2·3 상시** — SSOT는 `modules/peer-review-tiers.md` § Tier 구성 표. Tier 0은 `--gpt` 시 Tier 1 전환)
 - **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정 (적용 Tier·산식은 `modules/peer-review-gates.md` § MergeContract § 9)
-- **모드 게이트 + Tier**: 크기·위험으로 추천 → 질문 → light = Tier 1 · full = Tier 2 · `--deep` = Tier 3 · `--tier 0` 명시 = Tier 0 (`modules/mode-gate.md`) + 폴백 체인
+- **모드 게이트 + Tier**: 크기·위험으로 추천 → 추천 full(큼 AND 복잡)일 때만 질문 · 그 밖은 묻지 않고 light + 통보 → light = Tier 1 · full = Tier 2 · `--deep` = Tier 3 · `--tier 0` 명시 = Tier 0 (`modules/mode-gate.md`) + 폴백 체인
 
 ```bash
 /fz-peer-review 123                   # PR #123 리뷰
@@ -229,7 +229,7 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 
 ### 5.5. Tier Determination (모드 게이트)
 
-> ⛔ Gather Step 5 직후 필수 실행 — 측정 → 추천(`scripts/mode_gate.py peer`) → 질문(명시 인자 · 신호어 · `/fz` 경유 · `--tier` 면 묻지 않는다).
+> ⛔ Gather Step 5 직후 필수 실행 — 측정 → 추천(`scripts/mode_gate.py peer`) → 추천 full 일 때만 질문(그 밖은 묻지 않고 light + 통보 · 명시 인자 · 신호어 · `/fz` 명시 선택 · `--tier` 면 재지 않는다).
 > **실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED · 위험 카테고리는 추천 근거): `modules/peer-review-tiers.md` "## 모드 선택 (측정 · 추천 · 질문)" → "### 자동 선택 실행 bash" 참조 (SSOT 단일 지점, L18 규칙).
 
 상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조. Tier 가 정해지면 기록 `run_metrics.py start`(Tier 0·1 = light · 2·3 = full — `modules/mode-gate.md` § 기록).

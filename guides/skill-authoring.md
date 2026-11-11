@@ -330,7 +330,7 @@ metadata:
 | 빠른 피드백 필요 | 다관점 검증 필요 |
 | fz-fix (대부분), fz-search (기본) | fz-plan, fz-code, fz-review |
 
-SOLO가 기본이다. 팀이 필요한 근거가 없으면 SOLO로 실행한다. (이력 — 2026-10-19 이전 규칙.) 현행: 스킬이 Workflow 를 띄우기 직전 light · full 을 묻고 Lead 가 크기로 추천한다 — 명시 인자·신호어·자율 모드면 묻지 않는다. 정본 `modules/mode-gate.md` § 언제 묻나 · § 스킬별 light · full · § 사용자 결정.
+SOLO가 기본이다. 팀이 필요한 근거가 없으면 SOLO로 실행한다. (이력 — 2026-10-19 이전 규칙.) 현행: 스킬이 Workflow 를 띄우기 직전 크기를 재서 추천이 full(큼 AND 복잡)일 때만 묻고, 그 밖은 묻지 않고 light 로 진행한다 — 명시 인자·신호어면 재지 않는다. 정본 `modules/mode-gate.md` § 언제 묻나 · § 스킬별 light · full · § 사용자 결정.
 
 ### 팀 구성 패턴
 

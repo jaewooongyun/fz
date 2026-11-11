@@ -101,17 +101,37 @@ def absent(rel, phrases):
         raise Fail(f"{rel} 에 옛 문구: {', '.join(hit)}")
 
 
+def absent_in(text, phrases, where):
+    hit = [ph for ph in phrases if ph in text]
+    if hit:
+        raise Fail(f"{where} 에 옛 문구: {', '.join(hit)}")
+
+
 # ── 셀 ────────────────────────────────────────────────────────────────────────
 def cell_module():
+    # 2026-11-12 — 추천 full 일 때만 묻는다 · light · 측정 불가는 통보하고 light · 질문 불가면 light + 추천 보존 · /fz 는 명시 선택만
     m = read("modules/mode-gate.md")
-    for h in ("## 목차", "## 참조 스킬", "## 언제 묻나", "## 신호어", "## 측정", "## 질문 형식", "## 설계 원칙"):
+    for h in ("## 목차", "## 참조 스킬", "## 언제 묻나", "## 신호어", "## 측정", "## 기록", "## 질문 형식", "## 사용자 결정", "## 설계 원칙"):
         if not re.search(rf"^{re.escape(h)}\s*$", m, re.M):
             raise Fail(f"mode-gate.md 절 없음: {h}")
-    need(section(m, "언제 묻나"), ["명시 인자", "/fz", "신호어", "autonomy_decide.py --action mode_select", "질문 도구를 쓸 수 없는", "light 로 진행"], "§ 언제 묻나")
+    when = section(m, "언제 묻나")
+    need(when, ["명시 인자", "명시로 고른", "신호어", "질문 도구를 쓸 수 없는", "light 로 진행", "**묻는 것은 6 뿐이다.**",
+                'autonomy_decide.py" --action mode_select --in-scope --reversible', "exit 0(PROCEED)만 자율",
+                "추천 light · 측정 불가", "측정 불가는 추천이 아니다", "`--recommended full`"], "§ 언제 묻나")
+    if not re.search(r"^4\. \*\*자율 모드 또는 질문 도구를 쓸 수 없는 실행\*\*", when, re.M):
+        raise Fail("§ 언제 묻나 4 가 자율 · 질문 도구 없음이 아니다 — gpt-strategy.md · tests/fixtures/gpt/off 가 이 번호를 참조한다")
+    absent_in(when, ["추천대로 진행", "자동 선택: 추천", "5. **그 밖**", "사용자가 고른 모드를 인자로 받는다"], "§ 언제 묻나")
     need(section(m, "신호어"), ["정본 목록", "그냥", "가볍게", "`--seq` 단독은 신호어가 아니다"], "§ 신호어")
-    need(section(m, "측정"), ["mode_gate.py", "| 2 |", "측정 불가", "| 10 |", "입력 오류"], "§ 측정")
-    need(section(m, "질문 형식"), ["(Recommended)", "gpt-strategy.md"], "§ 질문 형식")
-    need(section(m, "사용자 결정"), ["2026-10-19"], "§ 사용자 결정")
+    meas = section(m, "측정")
+    need(meas, ["mode_gate.py", "| 추천 full |", "| 추천 light |", "| 2 |", "측정 불가", "| 10 |", "입력 오류", "`default`", "`gate`", "추천 full 보존"], "§ 측정")
+    absent_in(meas, ["추천을 달고 묻는다", "추천 없이 \"측정 불가\" 를 보이고 묻는다", "추천대로 +"], "§ 측정")
+    rec = section(m, "기록")
+    need(rec, ["autonomous\\|default\\|gate", "5 추천 light · 측정 불가로 묻지 않음 `default`", "6 질문 `gate`", "`full` 로 적는다"], "§ 기록")
+    absent_in(rec, ["질문(5)", "경로(1~4)", "5 질문 `gate`"], "§ 기록")
+    ask = section(m, "질문 형식")
+    need(ask, ["추천이 full 일 때만", "full (Recommended)", "gpt-strategy.md", "추천 light · 측정 불가는 묻지 않는다"], "§ 질문 형식")
+    absent_in(ask, ["{추천 모드} (Recommended)", "측정 불가(exit 2)면 `(Recommended)` 를 달지 않는다"], "§ 질문 형식")
+    need(section(m, "사용자 결정"), ["2026-10-19", "2026-11-12", "추천이 full 일 때만 묻는다", "큼 AND 복잡", "질문 불가면 추천 모드 그대로 진행", "명시로 고른"], "§ 사용자 결정")
     g = read("modules/governance.md")
     table_row(section(g, "적용 경로", "governance.md"), "mode-gate.md", "governance § 적용 경로")
     table_row(section(g, "Truth-of-Source", "governance.md"), "mode_gate.py", "governance § Truth-of-Source")
@@ -119,6 +139,57 @@ def cell_module():
         row = next((ln for ln in read(rel).split("\n") if ln.startswith("|") and key in ln), None)
         if row is None or "mode-gate.md" not in row:
             raise Fail(f"{rel} 의 신호어 행이 모듈을 가리키지 않는다")
+
+
+# 소비 문서 — 게이트 줄이 2026-11-12 계약(full 만 질문 · 그 밖은 통보하고 light · /fz 명시 선택만)을 가리키고 임계 숫자를 복제하지 않는가
+GATE_LINES = [("skills/fz-plan/SKILL.md", "1.2. **모드 게이트**"), ("skills/fz-review/SKILL.md", "1.5. **모드 게이트**"),
+              ("skills/fz-code/SKILL.md", "0. **모드 게이트**"), ("skills/fz-fix/SKILL.md", "0. **모드 게이트**"),
+              ("skills/fz-discover/SKILL.md", "1.5. **모드 게이트**")]
+THRESH = re.compile(r"1,?000 ?줄|20 ?파일|파일 20|30 ?파일|5 ?모듈|모듈 5")
+
+
+def no_thresh(text, where):
+    m = THRESH.search(text)
+    if m:
+        raise Fail(f"{where} 에 임계 숫자 복제 '{m.group(0)}' — 정본 scripts/mode_gate.py")
+
+
+def line_with(rel, key, starts=True):
+    ln = next((x for x in read(rel).split("\n") if (x.startswith(key) if starts else key in x)), None)
+    if ln is None:
+        raise Fail(f"{rel} 에 '{key}' 줄 없음")
+    return ln
+
+
+def cell_consumers():
+    for rel, key in GATE_LINES:
+        ln = line_with(rel, key)
+        need(ln, ["추천 full 일 때만 묻는다", "light + 통보", "명시로 고른 모드면 재지 않는다", "§ 언제 묻나 5 · 6"], f"{rel} 게이트 줄")
+        absent_in(ln, ["추천을 달고 묻", "`/fz` 경유면 묻지 않는다"], f"{rel} 게이트 줄")
+        no_thresh(ln, f"{rel} 게이트 줄")
+    disc = section(read("skills/fz-discover/SKILL.md"), "발동 조건", "fz-discover")
+    need(disc, ["추천 full 일 때만 묻고"], "fz-discover § 발동 조건")
+    absent_in(disc, ["추천을 달고 묻"], "fz-discover § 발동 조건")
+    peer = "skills/fz-peer-review/SKILL.md"
+    ln = line_with(peer, "모드 게이트 + Tier", starts=False)
+    need(ln, ["추천 full(큼 AND 복잡)일 때만 질문", "light + 통보"], f"{peer} 요약 줄")
+    t55 = section(read(peer), "5.5. Tier Determination", peer)
+    need(t55, ["추천 full 일 때만 질문", "light + 통보"], f"{peer} § 5.5")
+    absent_in(t55, ["`/fz` 경유 · `--tier` 면 묻지 않는다"], f"{peer} § 5.5")
+    no_thresh(ln + t55, peer)
+    for rel in ("skills/fz-plan/SKILL.md", "skills/fz-review/SKILL.md", "skills/fz-code/SKILL.md"):
+        no_thresh(section(read(rel), "light 모드", rel), f"{rel} § light 모드")
+    plan_light = section(read("skills/fz-plan/SKILL.md"), "light 모드", "fz-plan")
+    need(plan_light, ["크고 복잡할 때"], "fz-plan § light 모드")
+    absent_in(plan_light, ["새 아키텍처 결정이면 1.2 가 full"], "fz-plan § light 모드")
+    gov = line_with("modules/governance.md", "| 모드 게이트 (무거운 경로")
+    need(gov, ["추천 full 일 때만 묻는다", "추천 full 을 기록에 보존", "2026-11-12"], "governance 모드 게이트 행")
+    absent_in(gov, ["자율이면 추천대로"], "governance 모드 게이트 행")
+    no_thresh(gov, "governance 모드 게이트 행")
+    gd = line_with("guides/skill-authoring.md", "현행: 스킬이 Workflow", starts=False)
+    need(gd, ["추천이 full(큼 AND 복잡)일 때만 묻고"], "guides/skill-authoring.md")
+    absent_in(gd, ["light · full 을 묻고"], "guides/skill-authoring.md")
+    no_thresh(gd, "guides/skill-authoring.md")
 
 
 def cell_review_order():
@@ -211,9 +282,21 @@ def cell_effort_docs():
 
 
 def cell_fz_phase4():
-    need(section(read("skills/fz/SKILL.md"), "Phase 4: User Confirmation", "skills/fz/SKILL.md"), ["modules/mode-gate.md", "인자"], "fz SKILL § Phase 4")
-    absent("modules/fz-pipeline-proposal.md", ["역전 금지", "TEAM 자동 전환"])
-    need(read("modules/complexity.md"), ["추천", "modules/mode-gate.md"], "modules/complexity.md")
+    # 2026-11-12 — /fz 는 명시 선택만 인자로 · 그 밖은 스킬 게이트가 잰다 · Phase 5 는 스킬 게이트를 건너뛰지 않는다
+    fz = read("skills/fz/SKILL.md")
+    p4 = section(fz, "Phase 4: User Confirmation", "skills/fz/SKILL.md")
+    need(p4, ["modules/mode-gate.md", "인자", "**명시로 고른** 모드만", "스킬 모드를 정하지 않는다", "같은 게이트로 판정"], "fz SKILL § Phase 4")
+    absent_in(p4, ["사용자가 고른 모드를 스킬에 인자", "스킬은 다시 묻지 않는다"], "fz SKILL § Phase 4")
+    need(section(fz, "5.1 SOLO Execution", "skills/fz/SKILL.md"), ["모드 게이트도 그대로 거친다"], "fz SKILL § 5.1")
+    need(section(fz, "5.2 Workflow Execution", "skills/fz/SKILL.md"), ["5.2 는 스킬 게이트를 건너뛰는 길이 아니다", "최종 모드가 full 일 때만"], "fz SKILL § 5.2")
+    rel = "modules/fz-pipeline-proposal.md"
+    sel = section(read(rel), "AskUserQuestion 선택지", rel)
+    need(sel, ["**명시로 고른** 모드만", "모드 선택지를 두지 않는다", "Phase 3 의 SOLO/TEAM 을 모드 인자로 바꿔 넘기지 않는다"], f"{rel} § AskUserQuestion 선택지")
+    absent_in(sel, ["full (Phase 3 추천)", "light (Phase 3 추천)", "모드 변경 (full ↔ light)", "light (Recommended — 단순 요청)", "스킬은 다시 묻지 않는다"], f"{rel} § AskUserQuestion 선택지")
+    absent(rel, ["역전 금지", "TEAM 자동 전환"])
+    cx = read("modules/complexity.md")
+    need(cx, ["modules/mode-gate.md", "스킬 모드(light · full)는 정하지 않는다"], "modules/complexity.md")
+    absent_in(cx, ["SOLO(= light) / TEAM(= full) **추천**"], "modules/complexity.md")
 
 
 PERMS = {  # 스킬 → (python3 scripts, gpt-choice) 필요 여부 — 계획 S7 표
@@ -319,6 +402,7 @@ def cell_gpt_cond():
 
 CELLS = {
     "module": cell_module,
+    "consumers": cell_consumers,
     "review-order": cell_review_order,
     "review-light": cell_review_light,
     "peer-tier": cell_peer_tier,
