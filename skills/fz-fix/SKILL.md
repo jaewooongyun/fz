@@ -6,6 +6,7 @@ description: >-
 user-invocable: true
 argument-hint: "[버그/에러 설명]"
 allowed-tools: >-
+  mcp__plugin_fz_serena__activate_project,
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__replace_symbol_body,
@@ -116,6 +117,9 @@ metadata:
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
 - [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
+- [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile fix` exit 0? (아래 · WORK_DIR 없는 세션은 건너뜀을 보고)
+
+⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile fix {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
 
 ---
 

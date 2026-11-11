@@ -1811,6 +1811,9 @@ def tools_of(verify: dict, gid: str) -> list:
     return out
 
 
+VERIFY_KEYS = frozenset(("kind", "criterion", "command", "expect", "cwd", "tools", "env", "timeout", "side_effects"))
+
+
 def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "") -> str:
     """plan 의 steps[] 를 원장 Markdown 으로 변환한다.
 
@@ -1859,6 +1862,10 @@ def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "")
         kind = verify.get("kind")
         if kind not in ("command", "manual"):
             raise InfraError(f"{gid}: verify.kind 는 command|manual — 받은 값 {kind!r}")
+        extra = sorted(set(verify) - VERIFY_KEYS)
+        if extra:   # F-579 — 모르는 칸을 조용히 버리지 않는다(원장에 옮겨지지 않는다는 사실을 남긴다)
+            print(f"⚠️ {gid}: verify 의 모르는 칸 {extra} — 원장에 옮기지 않는다(VerifySpec 칸: {', '.join(sorted(VERIFY_KEYS))})",
+                  file=sys.stderr)
 
         lines.append(f"- [ ] {gid}: {stitle}")
         if kind == "command":
@@ -1885,6 +1892,17 @@ def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "")
             envs = env_of(verify, gid)
             if envs:
                 lines.append(f"  ENV: {', '.join(envs)}")
+            # F-579 — 플랜이 적은 시간 한도 · 부작용 선언을 버리지 않는다(버리면 TIMEOUT 은 기본 120초가 되고 기준선 프로브는 UNRUN 이다)
+            to = verify.get("timeout")
+            if to is not None:
+                if type(to) is not int or not (1 <= to <= 86400):
+                    raise InfraError(f"{gid}: verify.timeout 은 1..86400 정수 초다 — 받은 값 {to!r}")
+                lines.append(f"  TIMEOUT: {to}")
+            se = verify.get("side_effects")
+            if se is not None:
+                if not isinstance(se, str) or "\n" in se or "\r" in se or not SIDE_EFFECTS_RE.match(se.strip()):
+                    raise InfraError(f"{gid}: verify.side_effects 는 none · tmp · 'writes — <사유>' 중 하나 — 받은 값 {se!r}")
+                lines.append(f"  SIDE_EFFECTS: {se.strip()}")
         else:
             lines.append(f"  MANUAL: {criterion}")
             lines.append(f"  CRITERION_HASH: {sha(criterion)}")
@@ -2066,19 +2084,79 @@ def plan_lints(steps, rtm, old_checks: dict) -> list:
     # F-238 — RTM 요구가 어느 Step 에도 매핑되지 않았다
     if isinstance(rtm, list):
         mapped = {}
-        for row in rtm:
+        for n, row in enumerate(rtm, 1):
             if not isinstance(row, dict):
                 continue
             req = str(row.get("reqId") or "").strip()
             if not req:
+                # F-576 — 조용히 건너뛰면 매핑 검사가 한 번도 돌지 않았는데 통과처럼 보인다
+                warns.append(f"⚠️  RTM: {n}번째 행에 reqId 가 없다 — 매핑을 검사하지 못했다(정본 꼴 reqId · stepId · F-576)")
                 continue
             sid = row.get("stepId")
-            hit = any(str(x).strip() in ids for x in (sid if isinstance(sid, list) else [sid]) if x)
+            parts = sid if isinstance(sid, list) else RTM_STEP_SPLIT.split(str(sid or ""))
+            hit = any(str(x).strip() in ids for x in parts if str(x).strip())
             mapped[req] = mapped.get(req, False) or hit
         for req, hit in mapped.items():
             if not hit:
                 warns.append(f"⚠️  RTM: 요구 {req} 가 어느 Step 에도 매핑되지 않았다 — stepId 가 steps[] 밖이다(F-238)")
     return warns
+
+
+# F-576 — stepId 문자열("S1,S2")을 형제 도구와 같은 구분자로 나눈다(plan_divergence.STEP_SPLIT · plan_integrity_check 와 같은 표기)
+RTM_STEP_SPLIT = re.compile(r"[,·/]| and ")
+
+
+# ── --scenario-check (CRITERION 시나리오 manifest ↔ 검사기 관측 · F-526) ──────────────────────
+SCENARIO_LINE = re.compile(r"^SCENARIO\s+(\S+)\s+(\S+)\s*$")
+
+
+def scenario_check(manifest: Path, observed: str, want_sha: str) -> int:
+    """시나리오 manifest(기대 ID — 지시서를 쓰기 전에 확정 · 승인 CHECK 가 sha 를 인자로 고정) ↔ 검사기 관측 줄 `SCENARIO <id> <산출 파일>`.
+
+    미충족: 기대 ≠ 관측 집합(누락 · 유령) · 중복 ID · 빈 산출물 연결(없음 · 0 바이트) · producer 형식 불일치 · 승인 뒤 manifest 변경.
+    F-526: 계획 → CRITERION → 지시서 → 검사기로 시나리오 목록을 손으로 옮기다 push → fold → pop 이 조용히 빠졌다 —
+    지시서와 검사기를 같은 사람이 같은 턴에 써서 서로를 검증하지 못했다. 규약은 modules/gates.md § 시나리오 ID 규약.
+    """
+    if not want_sha:
+        print("INFRA: --scenario-check 는 --manifest-sha(승인 때 적은 manifest sha256 앞 12자)가 필요하다", file=sys.stderr)
+        return EXIT_INFRA
+    try:
+        raw = manifest.read_bytes()
+        doc = json.loads(raw.decode("utf-8"))
+        obs_text = Path(observed).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError, ValueError) as e:
+        print(f"INFRA: 시나리오 대조 입력을 읽지 못했다 — {e}", file=sys.stderr)
+        return EXIT_INFRA
+    scen = doc.get("scenarios") if isinstance(doc, dict) else None
+    ids = [str(x.get("id") or "").strip() for x in scen if isinstance(x, dict)] if isinstance(scen, list) else []
+    if not ids or not all(ids) or len(ids) != len(scen):
+        print("INFRA: manifest 의 scenarios[] 가 비었거나 id 없는 항목이 있다 — 대조할 기대가 없다", file=sys.stderr)
+        return EXIT_INFRA
+    problems = []
+    got_sha = hashlib.sha256(raw).hexdigest()[:12]
+    if got_sha != want_sha:
+        problems.append(f"MANIFEST-CHANGED 승인 sha {want_sha} ≠ 지금 {got_sha} — 승인 뒤 기대 시나리오가 바뀌었다")
+    problems += [f"MANIFEST-DUP {d}" for d in sorted({x for x in ids if ids.count(x) > 1})]
+    seen, base = [], Path(observed).resolve().parent
+    for n, line in enumerate(obs_text.splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        m = SCENARIO_LINE.match(line)
+        if not m:
+            problems.append(f"PRODUCER-FORMAT {n}행 {line.strip()[:60]!r} — `SCENARIO <id> <산출 파일>` 꼴이 아니다")
+            continue
+        sid, art = m.groups()
+        seen.append(sid)
+        f = Path(art) if os.path.isabs(art) else base / art
+        if not f.is_file() or f.stat().st_size == 0:
+            problems.append(f"SCENARIO-EMPTY {sid} — 산출 파일 {art} 이 없거나 비었다")
+    problems += [f"SCENARIO-DUP {d}" for d in sorted({x for x in seen if seen.count(x) > 1})]
+    problems += [f"SCENARIO-MISSING {x} — 기대 시나리오를 검사기가 관측하지 않았다" for x in ids if x not in seen]
+    problems += [f"SCENARIO-GHOST {x} — manifest 에 없는 시나리오" for x in sorted(set(seen) - set(ids))]
+    for x in problems:
+        print(x)
+    print(f"scenario-check: 기대 {len(ids)} · 관측 {len(seen)} · 문제 {len(problems)}")
+    return EXIT_UNMET if problems else EXIT_OK
 
 
 def affected_by(ledger: Ledger, spec: str) -> int:
@@ -2539,6 +2617,9 @@ def _dispatch(argv, quiet: bool = False) -> int:
                         help="쉼표로 구분한 바뀐 파일 — 그 경로 · basename 을 CHECK · CRITERION · PIN 에 담은 충족 게이트 id (읽기 전용 · F-349 · F-552)")
     parser.add_argument("--criterion-drift", metavar="PHRASES_FILE",
                         help="옛 오라클 문구 파일(한 줄 하나) — CRITERION 에 남은 게이트를 재도장 후보로 낸다 (읽기 전용 · F-568)")
+    parser.add_argument("--scenario-check", metavar="OBSERVED",
+                        help="위치 인자의 시나리오 manifest(JSON) ↔ 검사기 관측 파일(`SCENARIO <id> <산출 파일>` 줄) 대조(F-526)")
+    parser.add_argument("--manifest-sha", metavar="SHA", help="--scenario-check 의 승인 manifest sha256 앞 12자")
     parser.add_argument("--only", metavar="IDS",
                         help="쉼표로 구분한 게이트 id 만 판정 (fz-code 의 Step 단위 실행)")
     parser.add_argument("--budget", type=float, default=None,
@@ -2562,6 +2643,11 @@ def _dispatch(argv, quiet: bool = False) -> int:
     # ⛔ ledger 위치 인자 요구보다 **먼저** — discover 는 디렉토리를 받는다
     if opt.discover:
         return discover(opt.discover)
+    if opt.scenario_check:
+        if not opt.ledger:
+            print("⛔ --scenario-check 는 위치 인자로 시나리오 manifest 를 받는다", file=sys.stderr)
+            return EXIT_INFRA
+        return scenario_check(Path(opt.ledger), opt.scenario_check, opt.manifest_sha or "")
     if opt.from_plan:
         if not opt.root or not opt.out:
             print("⛔ --from-plan 은 --root 와 --out 이 필요하다", file=sys.stderr)

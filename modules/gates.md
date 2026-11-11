@@ -13,6 +13,7 @@
 - [스킬 배선 5지점](#스킬-배선-5지점)
 - [이탈 경로](#이탈-경로)
 - [원장 운용 규율](#원장-운용-규율)
+- [시나리오 ID 규약](#시나리오-id-규약)
 - [릴리스 경계](#릴리스-경계)
 - [승인 계약 (APPROVED_ORACLE_HASH)](#승인-계약-approved_oracle_hash)
 - [관측 (FZ_GATES_TRACE)](#관측-fz_gates_trace)
@@ -260,7 +261,7 @@ lock을 지금 넣지 않는 이유는 설계가 필요하기 때문이다. `wri
 
 ### 1. fz-plan — 생성
 
-Phase 1 산출 시 `steps[].verify`를 읽어 `{WORK_DIR}/gates/plan.draft.md`를 만든다. `verify.kind`가 `command`면 `CHECK:`/`EXPECT:`, `manual`이면 `MANUAL:`+`CRITERION_HASH:`. `verify.tools`가 있으면 `TOOLS:`로 옮긴다 — ⛔ VerifySpec이 `additionalProperties: false`라 스키마에 필드가 없으면 plan 저자가 채울 수 없다(`workflows/plan-collaborative.js`가 정의, `plan-lean2.js`도 같은 필드).
+Phase 1 산출 시 `steps[].verify`를 읽어 `{WORK_DIR}/gates/plan.draft.md`를 만든다. `verify.kind`가 `command`면 `CHECK:`/`EXPECT:`, `manual`이면 `MANUAL:`+`CRITERION_HASH:`. `verify.tools`가 있으면 `TOOLS:`로 옮긴다 — ⛔ VerifySpec이 `additionalProperties: false`라 스키마에 필드가 없으면 plan 저자가 채울 수 없다(`workflows/plan-collaborative.js`가 정의, `plan-lean2.js`도 같은 필드). `verify.timeout`(1..86400 정수 초) · `verify.side_effects`(none · tmp · `writes — <사유>`)가 있으면 `TIMEOUT:` · `SIDE_EFFECTS:`로 옮기고, 모르는 칸은 stderr 로 경고한다(F-579 — 버리면 TIMEOUT 은 기본 120초 · 기준선 프로브는 UNRUN 이었다). 두 칸은 Lead 가 쓰는 steps.json(light)에서 채운다 — Workflow VerifySpec 스키마에는 아직 없다.
 
 Phase 2의 `verify-gates`가 **게이트마다 판정 1개**를 낸다 — "이 `CHECK:`가 제목이 말하는 것을 측정하는가" + noninteractive·rerunnable·side-effect·determinism. Phase 3에서 판정을 반영해 `plan.md`로 확정하고 `--set-state planned` 로 승인·미착수를 남긴다(계획만 하고 끝나는 세션이 Stop hook 에 막히지 않는다).
 
@@ -350,7 +351,7 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 
 ⛔ **설치 주의 6항은 `docs/completion-gates.md`가 정본이다** — 배열 추가 · hook 병렬 실행 · 캐시 경로의 버전(하드코딩하면 업데이트 후 조용히 꺼진다) · `python3` 3.9+ 부재 시 fail-open · `~/.fz/stop-hook-state.json` 생성 · 탐색 깊이 3 한계.
 
-검증: `python3 scripts/gate_stop_hook.py --self-test` (**48케이스** — 판정기 옵션 어휘 대조(gate-vocab — 훅의 옵션 집합 = 판정기 add_argument) · no-gates-dir · 깊이 1~4 · draft-only · skip-git · closed-passes · approved · planned-passes · planned-reason(셋째 선택지) · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard ×2 · **소유 판정 17종**: foreign-ledger·foreign-heredoc-cite·foreign-py-c-read·foreign-status-only 통과 / owned-ledger·owned-redirect·owned-bash·owned-bash-cd·owned-bash-var·owned-py-heredoc·owned-py-c·owned-only·owned-default·owned-var-L·owned-sourced 차단 / transcript-missing·unknown-target fail-closed 차단 · multi-unmet 사유의 미충족 id 목록 · budget-undecided 예산 소진 차단 · 대상 미상 · 대입 판정 8종: unknown-literal-outside-cwd(명령 글자 속 폴더 밖 원장) · unknown-find-parent(`..` 폴더 아래) · unknown-find-abs(절대 경로 폴더 아래) · unknown-after-cd(같은 명령 cd 뒤 상대 경로) · unknown-cd-unresolved(못 푼 cd — 전 원장) · unknown-cd-glob(글롭 cd — 전 원장) · loop-env-prefix-owned(`VAR=값` 접두 루프 몸체) · temp-prefix-arg(접두 대입은 인자 풀이에 쓰지 않는다) 차단). 동작 fixture: `tests/fixtures/gates/write-ownership`(쓰기·읽기 짝) · `tests/fixtures/gates/discover-limit`(원장 1·9·10·80 · 예산 소진). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
+검증: `python3 scripts/gate_stop_hook.py --self-test` (**70케이스** — 판정기 옵션 어휘 대조(gate-vocab — 훅의 옵션 집합 = 판정기 add_argument) · no-gates-dir · 깊이 1~4 · draft-only · skip-git · closed-passes · approved · planned-passes · planned-reason(셋째 선택지) · kill-switch · 오배선 · bad-cwd · env-missing · loop-guard ×2 · **소유 판정 17종**: foreign-ledger·foreign-heredoc-cite·foreign-status-only 통과 / owned-ledger·owned-redirect·owned-bash·owned-bash-cd·owned-bash-var·owned-py-heredoc·owned-py-c·named-py-c-read-candidate(읽기 표 밖 이름은 코드를 읽지 않는다)·owned-only·owned-default·owned-var-L·owned-sourced 차단 / transcript-missing·unknown-target fail-closed 차단 · multi-unmet 사유의 미충족 id 목록 · budget-undecided 예산 소진 차단 · 대상 미상 · 대입 판정 8종: unknown-literal-outside-cwd(명령 글자 속 폴더 밖 원장) · unknown-find-parent(`..` 폴더 아래) · unknown-find-abs(절대 경로 폴더 아래) · unknown-after-cd(같은 명령 cd 뒤 상대 경로) · unknown-cd-unresolved(못 푼 cd — 전 원장) · unknown-cd-glob(글롭 cd — 전 원장) · loop-env-prefix-owned(`VAR=값` 접두 루프 몸체) · temp-prefix-arg(접두 대입은 인자 풀이에 쓰지 않는다) 차단 · 공용 토크나이저 아홉(F-458): r3-f554-dotdot-mid-unknown(`./../w` 도 폴더 밖) · r3-f554-find-var-unknown(`$(find "$X" …)` — 전 원장) · r3-unknown-final-stop-hook(표 밖 꼴은 원장 쓰기 후보) · r3-f458-heredoc-unknown-stop-hook(heredoc 본문의 표 밖 꼴) · r3-f458-heredoc-exec-stop-hook(따옴표 없는 heredoc 본문 치환의 쓰기) · r3-f458-ansi-hidden-stop-hook(`$'…'` 로 감춘 원장 경로) · r3-f458-quoted-ledger-stop-hook(따옴표가 낀 원장 경로) · r3-f458-heredoc-quote-marker-stop-hook(따옴표 안 `<<EOF` 가 뒤 명령을 삼키지 않는다) · r3-replaced-path-parity-stop-hook(수정 전 차단 케이스가 그대로 차단) · r3-s1-funcdef-stop-hook-unknown(함수 본문 안 쓰기는 대상 미상) · 구조 전환 여섯(읽기 표 밖 이름 = 이름 미상 쓰기 · fz-guard write_sites 공유): r3-s1-touch-ledger-owned(touch 대상) · r3-s1-dash-c-named(dash -c) · r3-s1-bash-c-cd-named(`bash -c 'cd 폴더; …'` 안 폴더 + 원장 글자) · r3-s1-funcdef-read-foreign(읽기만 하는 함수는 남의 원장) · r3-s1-named-no-literal-foreign(원장 글자 없는 이름 미상은 후보가 없다) · r3-s1-spliced-quote-named(따옴표를 이어 붙인 원장 글자도 후보) · 처분 닫기 여섯(F-582 · 셸이 실제로 하는 일): r3-s1-r6-006-cd-chain(이어진 상대 cd 를 쌓는다) · r3-s1-r6-006-subshell-cd-restored(서브셸 cd 는 괄호를 나오면 되돌린다) · r3-s1-r6-007-cd-redirect(cd 줄의 리다이렉트 대상) · r3-s1-r6-008-env-ledger(훅 환경 변수 값인 원장 경로) · r3-s1-r6-008-env-ledger-named(그 변수를 읽기 표 밖 이름에 넘기면 대상 미상) · r3-s1-r6-009-second-assign(두 번째 접두 대입)). 동작 fixture: `tests/fixtures/gates/write-ownership`(쓰기·읽기 짝) · `tests/fixtures/gates/discover-limit`(원장 1·9·10·80 · 예산 소진). health-check 2.6에 배선돼 있다. ⛔ hook 등록 자체는 사용자 소관이므로 **계약까지가 우리가 닫을 수 있는 경계**다.
 
 ### 5. health-check — 노출 (hook 미설치 머신)
 
@@ -393,6 +394,15 @@ Lead가 Workflow 반환을 통합할 때 워커 자기보고 대신 게이트를
 3. **버그 수정 Step 은 변이 셀을 갖는다** — 수정의 핵심 호출을 지운 트리에서 그 테스트가 FAIL 해야 한다. 떼어 낸 판정 함수만 부르는 테스트는 본체를 지워도 통과한다. verify-gates 가 '동작을 재지 않는다'(measurement_fit 미달)고 판정하면 측정을 더하거나 사유와 함께 MANUAL 로 내린다 — ⛔ 게이트 제목을 좁혀 판정에 맞추지 않는다(F-447).
 4. **실행 오라클이 필요한 Step 은 미충족으로 남는다** — UI · 제스처 · 애니메이션 Step 처럼 화면을 봐야 판정되는 Step 은 명령 게이트로 재지 못한다. MANUAL(사유 `기계화 불가`)로 두고 사람이 확인하기 전까지 미충족이다. 빌드 · 정적 검사 PASS 로 그 Step 을 충족 처리하지 않는다(F-230).
 5. **리뷰 처분은 위치를 가리킨다** — Step 기록에 리뷰 지적의 처분을 적을 때 '반영' 은 수정 위치(`파일:줄`)와 함께, '다른 Step 범위' 는 그 Step 의 대상 목록에서 그 항목을 가리킨다. Step 을 마칠 때 '반영' 행을 diff 와 한 번 대조한다(F-419 — 두 처분이 사실과 달랐다).
+
+## 시나리오 ID 규약
+
+CRITERION 이 시나리오 여럿(복귀 경로 · 화면 상태 …)을 요구하는 Step 은 목록을 손으로 옮기지 않는다. 계획 → CRITERION → 작업자 지시서 → 검사기로 세 번 옮기다 한 경로가 조용히 빠졌다 — 지시서와 검사기를 같은 사람이 같은 턴에 써서 서로를 검증하지 못했다(F-526).
+
+1. **기대 ID 는 지시서를 쓰기 전에 확정한다** — `{WORK_DIR}/<step>/scenarios.json` = `{"scenarios": [{"id", "title"}]}`. CRITERION 은 ID 로 시나리오를 부른다.
+2. **검사기(producer)는 관측한 시나리오를 한 줄씩 낸다** — `SCENARIO <id> <산출 파일>`(산출 파일은 관측 파일 기준 상대 경로 · 비지 않은 파일).
+3. **CHECK 는 manifest 해시를 인자로 고정한다** — `gate_check.py --scenario-check <관측 파일> --manifest-sha <sha256 앞 12자> <scenarios.json>`. 승인 뒤 manifest 를 바꾸면 해시가 달라 통과하지 못한다.
+4. **미충족**: 기대 ≠ 관측 집합(누락 `SCENARIO-MISSING` · 유령 `SCENARIO-GHOST`) · 중복 ID · 빈 산출물 연결 · producer 형식 불일치 · `MANIFEST-CHANGED`. 자동화로 재지 못하는 시나리오는 manifest 에서 빼지 않고 사유와 함께 MANUAL 게이트로 사람에게 넘긴다.
 
 ## 릴리스 경계
 

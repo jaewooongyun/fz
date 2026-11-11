@@ -26,7 +26,8 @@
     "discover": "원장 탐색 (--discover) — health-check 노출 경로",
     "finalize": "확정 도장 발급 (--finalize) — 도장이 자기 게이트 블록에 박히는가",
     "baseline": "승인 전 기준선 (--baseline-probe · SIDE_EFFECTS · BASELINE: required 원장의 --finalize)",
-    "pin": "선언형 핀 (PIN · PIN_DIGEST) — 판정 입력 파일을 승인 계약에 묶는다"
+    "pin": "선언형 핀 (PIN · PIN_DIGEST) — 판정 입력 파일을 승인 계약에 묶는다",
+    "scenario": "시나리오 manifest 대조(--scenario-check · F-526) — 기대 = 관측 집합 · 승인 sha 고정"
   },
   "cases": [
     {
@@ -1298,6 +1299,26 @@
         }
       },
       "why": "⛔ 발급처가 없으면 계약이 죽는다 — CRITERION 이 검사 3곳을 갖고도 한 번도 발화하지 않았던 것과 같은 실패다. 리스트·쉼표문자열 두 형태가 옮겨지고 중복은 접히며, 미선언 게이트에는 줄이 생기지 않는다(TOOLS: 총 2회)"
+    },
+    {
+      "id": "fromplan-timeout-side-effects-carried",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-timeout.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "TIMEOUT: 900": 1,
+          "SIDE_EFFECTS: tmp": 1,
+          "TIMEOUT:": 1
+        },
+        "expect_stderr": [
+          "모르는 칸 ['budget_note']"
+        ]
+      },
+      "why": "F-579 — 플랜의 verify.timeout · side_effects 를 버리면 원장 TIMEOUT 은 기본 120초가 되고 기준선 프로브는 UNRUN 이다. 선언한 게이트에만 줄이 생기고(TIMEOUT 총 1회) 모르는 칸은 stderr 로 경고한다"
     },
     {
       "id": "fromplan-tools-injection",
@@ -3069,6 +3090,79 @@
         ]
       },
       "why": "F-566 — PIN 경로가 없으면 조용히 'absent' 로 기록했다. 부재는 정당한 기록값이지만(나중에 생길 표) 오타일 수 있어 경고한다"
+    },
+    {
+      "id": "r3-gatecheck-rtm-split",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-rtm.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "RTM: 요구 R-2 가 어느 Step 에도 매핑되지 않았다"
+        ],
+        "expect_stdout_absent": [
+          "요구 R-1 가",
+          "요구 R-3 가"
+        ]
+      },
+      "why": "F-576 — stepId 문자열 \"G1,G2\" · \"G1 · G2\" 를 나누지 않아 여러 Step 요구를 거짓 경고했다. R-2(steps[] 밖)는 경고 대조"
+    },
+    {
+      "id": "r3-gatecheck-rtm-no-reqid-warn",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-rtm.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "RTM: 4번째 행에 reqId 가 없다"
+        ]
+      },
+      "why": "F-576 — reqId 없는 행을 조용히 건너뛰어 매핑 검사가 돌지 않은 채 통과처럼 보였다"
+    },
+    {
+      "id": "r3-f526-scenario-set-mismatch-fails",
+      "category": "scenario",
+      "ledger": "scenario/manifest.json",
+      "pre": [
+        {
+          "args": [
+            "--scenario-check",
+            "tests/fixtures/gates/scenario/observed-full.txt",
+            "--manifest-sha",
+            "d0673474bba0"
+          ],
+          "exit": 0
+        }
+      ],
+      "edits": [
+        {
+          "replace": [
+            "\"push 중 접고 pop\"",
+            "\"push 중 접고 pop(승인 뒤 고침)\""
+          ]
+        }
+      ],
+      "args": [
+        "--scenario-check",
+        "tests/fixtures/gates/scenario/observed-tab-only.txt",
+        "--manifest-sha",
+        "d0673474bba0"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "SCENARIO-MISSING push-fold-pop",
+          "MANIFEST-CHANGED"
+        ]
+      },
+      "why": "F-526 — 탭 · 페이지 복귀만 돈 관측에서 push → fold → pop 누락을 잡고, 승인 뒤 manifest 를 바꾸면 통과하지 못한다. 사전 단계 = 전체 관측 · 승인 sha 는 exit 0(대조)"
     }
   ],
   "_max_seconds": "선택 필드 — 벽시계 상한(초). ⛔ exit code 만으로는 hang 을 못 잡는다: 손자 프로세스가 파이프를 붙잡아 30초 걸렸는데 exit 는 1로 정상이었다(2026-08-24 실측).",

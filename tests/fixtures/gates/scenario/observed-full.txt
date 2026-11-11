@@ -1,0 +1,4 @@
+# 검사기 관측 — SCENARIO <id> <산출 파일>
+SCENARIO tab-return artifacts/tab.txt
+SCENARIO page-return artifacts/page.txt
+SCENARIO push-fold-pop artifacts/pfp.txt

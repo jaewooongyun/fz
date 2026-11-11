@@ -349,6 +349,7 @@ metadata:
 6.5. **⛔ 아티팩트 기록** (항상 — compact recovery 필수):
    각 구현 Step 완료 후 진행 상태를 기록한다.
    - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/code/step-{N}.md` + `progress.md` + `index.md` 업데이트
+   - ⛔ `step-{N}.md` 에 `## 기각한 위험` 절 — 구현 중 검토하고 기각한 위험마다 ``- `R-n` — <기제 이름> · 근거: <기각 근거> · 재현: <재현 경로>`` 한 줄, 없으면 `없음` 한 줄. fz-pr 이 행을 PR 본문으로 옮기고 `check_pr_template.py --risks` 가 그 이송을 잰다(F-523 — "드문 경우" 로 넘긴 위험이 Step · 리뷰 · PR 어디에도 남지 않아 리뷰어가 같은 기제를 다시 찾았다)
    - 비-티켓 세션: `write_memory("fz:checkpoint:code-step{N}", "Step {N}/{M}: {변경 파일}. 빌드: OK/FAIL. 결정: {요약}")`
    형식 참조: `modules/context-artifacts.md`
 
@@ -385,6 +386,7 @@ metadata:
 - [ ] 아키텍처 패턴 준수?
 - [ ] ⛔ UI · 제스처 · 애니메이션 Step 이 있으면 Step 마다 visual oracle 충족? — 못 본 Step 은 완료가 아니라 미충족으로 보고한다 (F-230 · `modules/build.md` Gate 체크리스트와 같은 기준)
 - [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] ⛔ Step 산출물마다 `## 기각한 위험` 절(위험 행 또는 `없음`)을 남겼는가? (F-523 — 비면 PR 이송 검사가 대조 불가로 멈춘다)
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
@@ -448,6 +450,7 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 진입: 팀 모드 실행 절차 0 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
 - code-pair 를 띄우지 않고 Plan 의 **모든** Step 을 Lead 가 구현 절차(1~8.5)대로 직접 구현한다 — Step 마다 빌드 · 원장 게이트(6.4) · 마찰 감지 그대로
 - GPT 교차 검증(8.5)은 full 과 같다(끈 세션이면 `[GPT 미사용]`)
+- 점검 카탈로그: `templates/check-catalog-code.md` 를 Read 해 Step 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 Step 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <code/step-N.md> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-code.md"` 로 잰다
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
 
 ## 에러 대응

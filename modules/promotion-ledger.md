@@ -402,6 +402,7 @@ E 성격(하네스 결함 · 측정 실패 · 판정 오류 · 게이트 위음�
 - ⛔ **활성 차단: 회귀 fixture 0개.** 트랙 D 조건 3개 중 세션 수만 충족했다. fixture 설계 = "catch 본문 미인용 상태로 전파 주장이 통과하는가"를 검출
 - 승격 목표: 회귀 fixture 1개 + 외부 채점 1회 → active 판정
 - 2026-11-09(round 2): 값싼 검출 규칙만 `modules/lead-reasoning.md` § 추정 → 사실 오류 「실패 경로 주장」과 Coverage Gate 단위(error-path)에 넣었다 — ⛔ 회귀 fixture 0개 그대로라 active 아님(F-009 · F-017 partial)
+- 2026-11-10(round 3): 회귀 fixture 1개 — `tests/fixtures/evidence/profiles/run.sh` 셀 `r3-f009-d1-middle-catch-uncited-fails`(양성 2 검출 · 음성 2 통과를 따로 채점) · 검사 = `check_evidence_slots.py` ⑤(`evidence/error-paths.md` 층마다 인용 · catch 본문). ⛔ 승격 목표의 외부 채점 1회가 남아 active 아님 — 원장 조건대로 그 뒤 판정한다
 
 ### ⛔ 트랙 D 신설 전 상태 (2026-08-24 실측 — 신설 근거)
 
@@ -487,7 +488,7 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
 | 항목 | 자산의 기존 방어 | 조치 |
 |---|---|---|
 | **P2-C** | ✅ `fz-review/SKILL.md` "⛔ retain cycle 점검" 블록 | 앵커 부착 완료 |
-| D-1 | ⛔ **0건** — `catch` 본문 인용 강제 방어 없음(`modules/evidence-collection.md:117` 은 base 대조 축) | **보류** |
+| D-1 | 회귀 fixture 1 · 검사 `check_evidence_slots.py` ⑤(catch 본문 인용 — 2026-11-10) · 외부 채점 0 | **보류**(외부 채점 대기) |
 | L-5 | ⛔ **0건** — 상보 연산 쌍(expand↔collapse) 방어 없음 | **보류** |
 | L-10 | ⛔ **0건** — path prefix 실측 대조 방어 없음 | **보류** |
 | L-12 | ⛔ **0건** — 규칙 이식 근거 태깅 방어 없음(`pre-existing` origin 은 다른 축) | **보류** |

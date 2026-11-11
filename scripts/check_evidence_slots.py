@@ -15,6 +15,13 @@
      (앞부분 일치 · 7자 이상) — 작업 트리가 리뷰 대상이 아니면 Serena 결과는 근거가 아니다.
   ④ `evidence/caller-analysis.md` 가 있으면 `## 호출` · `## 구현` 두 절이 다 있고, 각 절은 내용 또는 `해당 없음 — <사유>` 다.
      `TODO` 자리표시는 거부한다(개인 도구가 `## 구현` 을 TODO 로 남겨 Lead 가 채우게 한다).
+  ⑤ `evidence/error-paths.md` 가 있으면 에러 전파 주장(`## 주장: …`)마다 체인의 층(`- 층 N <심볼>: <파일>:<줄> \`코드\``)이
+     전부 코드 인용을 갖는다. `catch` 층은 catch 본문까지 인용한다 — 중간 층을 읽지 않고 '전파 확정' 을 적으면 catch 의 부수효과
+     (nil 반환 · 다른 에러로 정규화)가 결론을 뒤집는다(F-009 · 승격 원장 D-1).
+
+profile(`--profile`): peer-review(기본 — ①~⑤) · plan · discover · fix(③ · ⑤ — 참조 탐색을 하는 스킬의 첫 단계 활성 기록 · F-534).
+  plan · discover · fix 의 ③ 대상 = `target.json` 의 `root`(세션 대상 트리 — 같은 경로여야 한다) · `sha`(있으면 앞부분 일치).
+  `[Serena 미사용 — 사유]` 는 통과 · 기록 없음 · 다른 트리 활성 · 빈 언어 목록은 위반이다.
 
 exit code:
   0  PASS
@@ -43,6 +50,11 @@ TIER_KEY = re.compile(r"(?i)\btier\s*[=:]?\s*([0-3])\b")
 TIER_BARE = re.compile(r"^\s*([0-3])\s*$")
 TOOLS_ACTIVE = re.compile(r"^Serena: active (\S.*?) @([0-9a-f]{7,40}) \(languages: ([^)]*)\)\s*$")
 TOOLS_UNUSED = re.compile(r"^\[Serena 미사용 — (\S.*)\]\s*$")
+PROFILES = ("peer-review", "plan", "discover", "fix")
+CLAIM_HEAD = re.compile(r"^##\s+주장:\s*(\S.*)$")
+LAYER = re.compile(r"^-\s*층\s*(\d+)\b([^:]*):\s*(.*)$")
+CITE = re.compile(r"\S+:\d+\s+`([^`]+)`")
+CATCH_BODY = re.compile(r"\bcatch\b[^{}]*\{\s*[^}\s]")   # catch 뒤 블록의 본문 — 앞 do 블록의 본문은 catch 본문이 아니다(r3 8.5 2차)
 SKIP_LINE = re.compile(r"^\s*-\s*([a-z-]+)\s*:\s*(\S.*)$")
 
 
@@ -110,10 +122,85 @@ def sections(text: str):
     return {k: "\n".join(v).strip() for k, v in out.items()}
 
 
-def check(work: str, tier_arg, doc_path: str = TIERS_DOC):
+def tools_problems(work: str, profile: str) -> list:
+    """③ Serena 활성 기록 — 첫 줄 형식 · 언어 · 대상 일치. peer-review 는 target.json sha, 나머지는 root(+sha)."""
+    tools = os.path.join(work, "evidence", "tools.md")
+    first = open(tools, encoding="utf-8").readline().rstrip("\n") if os.path.isfile(tools) else None
+    act = TOOLS_ACTIVE.match(first) if first else None
+    if first is None:
+        return ["evidence/tools.md 없음 — 첫 줄에 Serena 상태를 적는다"]
+    if not act:
+        return [] if TOOLS_UNUSED.match(first) else [f"tools.md 첫 줄 형식 밖 — {first[:80]!r}"]
+    bad = []
+    if not act.group(3).strip():
+        bad.append("tools.md: languages 가 비었다 — 언어 서버가 안 떴다(미활성)")
+    try:
+        tgt = json.load(open(os.path.join(work, "target.json"), encoding="utf-8"))
+    except (OSError, ValueError):
+        tgt = None
+    tgt = tgt if isinstance(tgt, dict) else {}
+    sha, at = str(tgt.get("sha") or "").lower(), act.group(2)
+    if profile != "peer-review":
+        root = str(tgt.get("root") or "")
+        if not root:
+            bad.append("tools.md 가 Serena active 인데 target.json 의 root(세션 대상 트리)가 없다 — 대상 일치를 판정할 수 없다")
+        elif os.path.realpath(act.group(1).strip()) != os.path.realpath(root):
+            bad.append(f"tools.md: Serena 활성 트리 {act.group(1).strip()} ≠ 대상 트리 {root} — 대상 트리에서 다시 켠다")
+        if sha and not (sha.startswith(at) or at.startswith(sha)):
+            bad.append(f"tools.md: Serena 트리 @{at} ≠ 대상 {sha[:12]}")
+        return bad
+    if not sha or len(sha) < 7:
+        bad.append("tools.md 가 Serena active 인데 target.json 의 sha 를 못 읽었다 — 대상 일치를 판정할 수 없다")
+    elif not (sha.startswith(at) or at.startswith(sha)):
+        bad.append(f"tools.md: Serena 트리 @{at} ≠ 리뷰 대상 {sha[:12]} — 대상 트리에서 다시 켜거나 `[Serena 미사용 — 작업 트리 ≠ 대상]`")
+    return bad
+
+
+def error_path_problems(work: str) -> list:
+    """⑤ 에러 전파 주장 — 층마다 코드 인용 · catch 층은 본문까지(F-009). 파일이 없으면 주장이 없는 것이다."""
+    p = os.path.join(work, "evidence", "error-paths.md")
+    if not os.path.isfile(p):
+        return []
+    bad, claim, layers = [], None, []
+
+    def close():
+        if claim is None:
+            return
+        if not layers:
+            bad.append(f"error-paths: 주장 '{claim[:40]}' 에 층이 없다 — 체인의 층을 적는다")
+        cited = 0
+        for n, label, rest in layers:
+            m = CITE.search(rest)
+            if not m:
+                bad.append(f"error-paths: '{claim[:40]}' 층 {n}{label} 인용 없음 — 파일:줄 과 코드를 적는다(읽지 않은 층은 확정 근거가 아니다)")
+            elif "catch" in m.group(1) and not CATCH_BODY.search(m.group(1)):
+                bad.append(f"error-paths: '{claim[:40]}' 층 {n}{label} catch 본문 미인용 — catch 의 부수효과가 결론을 뒤집을 수 있다")
+            else:
+                cited += 1
+        print(f"  에러 전파 주장 '{claim[:40]}': 인용 {cited}/{len(layers)} 층")
+    for ln in open(p, encoding="utf-8").read().split("\n"):
+        h = CLAIM_HEAD.match(ln)
+        if h:
+            close()
+            claim, layers = h.group(1), []
+            continue
+        m = LAYER.match(ln.strip())
+        if m and claim is not None:
+            layers.append((m.group(1), m.group(2).rstrip(), m.group(3)))
+    close()
+    return bad
+
+
+def check(work: str, tier_arg, doc_path: str = TIERS_DOC, profile: str = "peer-review"):
     if not os.path.isdir(work):
         log(f"UNRUN: WORK_DIR 없음 — {work}")
         return UNRUN
+    if profile != "peer-review":
+        bad = tools_problems(work, profile) + error_path_problems(work)
+        print(f"근거 검사 — profile {profile}")
+        for b in bad:
+            print(f"  ✗ {b}")
+        return VIOLATION if bad else OK
     tp = os.path.join(work, "tier.txt")
     file_tier = tier_from_text(open(tp, encoding="utf-8", errors="replace").read()) if os.path.isfile(tp) else None
     tier = tier_arg if tier_arg is not None else file_tier
@@ -135,26 +222,7 @@ def check(work: str, tier_arg, doc_path: str = TIERS_DOC):
         if i not in skip:
             bad.append(f"슬롯 `{i}` 없음 — 파일을 채우거나 evidence/skipped.md 에 `- {i}: <사유>`")
 
-    tools = os.path.join(work, "evidence", "tools.md")
-    first = open(tools, encoding="utf-8").readline().rstrip("\n") if os.path.isfile(tools) else None
-    act = TOOLS_ACTIVE.match(first) if first else None
-    if first is None:
-        bad.append("evidence/tools.md 없음 — 첫 줄에 Serena 상태를 적는다")
-    elif act:
-        if not act.group(3).strip():
-            bad.append("tools.md: languages 가 비었다 — 언어 서버가 안 떴다(미활성)")
-        sha = None
-        try:
-            sha = str(json.load(open(os.path.join(work, "target.json"), encoding="utf-8")).get("sha") or "").lower()
-        except (OSError, ValueError, AttributeError):
-            pass
-        at = act.group(2)
-        if not sha or len(sha) < 7:
-            bad.append("tools.md 가 Serena active 인데 target.json 의 sha 를 못 읽었다 — 대상 일치를 판정할 수 없다")
-        elif not (sha.startswith(at) or at.startswith(sha)):
-            bad.append(f"tools.md: Serena 트리 @{at} ≠ 리뷰 대상 {sha[:12]} — 대상 트리에서 다시 켜거나 `[Serena 미사용 — 작업 트리 ≠ 대상]`")
-    elif not TOOLS_UNUSED.match(first):
-        bad.append(f"tools.md 첫 줄 형식 밖 — {first[:80]!r}")
+    bad += tools_problems(work, "peer-review")
 
     ca = os.path.join(work, "evidence", "caller-analysis.md")
     if os.path.isfile(ca):
@@ -167,6 +235,7 @@ def check(work: str, tier_arg, doc_path: str = TIERS_DOC):
                 bad.append(f"caller-analysis.md: `## {name}` 이 비었다 — 내용 또는 `해당 없음 — <사유>`")
             elif "TODO" in body:
                 bad.append(f"caller-analysis.md: `## {name}` 에 TODO 자리표시 — Lead 가 채운다")
+    bad += error_path_problems(work)
 
     print(f"근거 슬롯 검사 — Tier {tier} · 요구 {len(req)}종 · skipped {len(skip)}")
     for b in bad:
@@ -236,6 +305,27 @@ def self_test() -> int:
         case("tools-missing", check(d, None) == VIOLATION)
         case("table-missing-unrun", check(mk("nodoc"), None, os.path.join(t, "absent.md")) == UNRUN)
         case("workdir-missing-unrun", check(os.path.join(t, "absent"), 1) == UNRUN)
+
+        # F-534 — plan · discover · fix 첫 단계 활성 기록: 없음 · 다른 트리 · 빈 언어 = 위반 · 명시적 미사용 · 대상 트리 활성 = 통과
+        def prof(name, tools, root):
+            d = os.path.join(t, name)
+            os.makedirs(os.path.join(d, "evidence"))
+            json.dump({"root": root, "sha": "abc1234def0"}, open(os.path.join(d, "target.json"), "w"))
+            if tools is not None:
+                open(os.path.join(d, "evidence", "tools.md"), "w").write(tools)
+            return d
+        tree, other = os.path.join(t, "tree"), os.path.join(t, "other")
+        os.makedirs(tree)
+        os.makedirs(other)
+        got = {}
+        for pf in ("plan", "discover", "fix"):
+            got[pf] = (check(prof(f"{pf}-none", None, tree), None, profile=pf),
+                       check(prof(f"{pf}-other", f"Serena: active {other} @abc1234 (languages: swift)\n", tree), None, profile=pf),
+                       check(prof(f"{pf}-nolang", f"Serena: active {tree} @abc1234 (languages: )\n", tree), None, profile=pf),
+                       check(prof(f"{pf}-unused", "[Serena 미사용 — 비 git 작업 폴더 · 대상 트리 없음]\n", tree), None, profile=pf),
+                       check(prof(f"{pf}-ok", f"Serena: active {tree} @abc1234 (languages: swift, python)\n", tree), None, profile=pf))
+        case("r3-f534-activate-record-three-profiles",
+             all(v == (VIOLATION, VIOLATION, VIOLATION, OK, OK) for v in got.values()), got)
     print(f"self-test {passed}/{total} passed")
     return OK if passed == total else 1
 
@@ -244,6 +334,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("work_dir", nargs="?")
     ap.add_argument("--tier", type=int, choices=(0, 1, 2, 3))
+    ap.add_argument("--profile", choices=PROFILES, default="peer-review",
+                    help="plan · discover · fix = 첫 단계 활성 기록 · 에러 전파 인용만(Tier 슬롯 없음 · F-534)")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
@@ -251,7 +343,7 @@ def main() -> int:
     if not a.work_dir:
         log("UNRUN: WORK_DIR 인자가 필요하다")
         return UNRUN
-    return check(a.work_dir, a.tier)
+    return check(a.work_dir, a.tier, profile=a.profile)
 
 
 if __name__ == "__main__":

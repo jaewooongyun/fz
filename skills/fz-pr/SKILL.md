@@ -65,7 +65,8 @@ metadata:
 
 ```bash
 python3 "${FZ_PLUGIN_ROOT}/scripts/check_pr_template.py" --template .github/pull_request_template.md --body - \
-  [--allow-missing "<'해당 없으면 지우라' 는 지시가 있는 섹션>"]... [--allow-extra "<의도해 더한 섹션>"]... <<'EOF'
+  [--allow-missing "<'해당 없으면 지우라' 는 지시가 있는 섹션>"]... [--allow-extra "<의도해 더한 섹션>"]... \
+  [--risks {WORK_DIR}/code/step-N.md]... <<'EOF'
 <PR 본문>
 EOF
 ```
@@ -73,6 +74,7 @@ EOF
 - exit 0 일 때만 PR 을 만든다. exit 1(`MISSING` · `EXTRA`)이면 본문을 템플릿 틀로 고친다 — 섹션을 지우거나 새 계층(`### 리뷰 포인트` 등)을 신설하지 않는다
 - 허용 목록에는 **템플릿이 지시한 삭제** · 사용자가 요청한 추가만 넣는다. 결과 줄(`pr-template: … missing=0 extra=0`)을 완료 보고에 싣는다
 - exit 2 는 대조 불가(템플릿 · 본문을 못 읽음 · 템플릿에 섹션 0개)다 — 통과로 적지 않는다
+- ⛔ **구현 단계 기각 위험 이송 (F-523)**: fz-code Step 산출물(`{WORK_DIR}/code/step-*.md`)이 있으면 전부 `--risks` 로 넘긴다. 각 `## 기각한 위험` 행의 ID 와 **기제 이름**을 본문에 그대로 옮긴다 — 템플릿에 확인 못 한 항목을 적는 절이 있으면 그 절, 없으면 변경 사항 절. 이웃 시나리오 이름만 적으면 리뷰어가 같은 기제를 다시 찾는다. 빠지면 exit 1 `RISK-MISSING`. 템플릿이 없는 저장소는 `--template` 없이 `--risks` 로 이송만 잰다
 
 ---
 

@@ -1,0 +1,17 @@
+{
+ "_note": "시나리오 manifest 대조 입력(F-526) — 기대 ID 는 지시서를 쓰기 전에 확정한다. r3-f526-scenario-set-mismatch-fails 가 쓴다.",
+ "scenarios": [
+  {
+   "id": "tab-return",
+   "title": "탭 복귀"
+  },
+  {
+   "id": "page-return",
+   "title": "페이지 복귀"
+  },
+  {
+   "id": "push-fold-pop",
+   "title": "push 중 접고 pop"
+  }
+ ]
+}
