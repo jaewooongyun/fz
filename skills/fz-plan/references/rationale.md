@@ -1,0 +1,81 @@
+# fz-plan 근거 · 이력
+
+> SKILL.md 에서 옮긴 근거 · 이력 · 사례 문단이다(B1 · 2026-11-01). 실행 규칙은 SKILL.md 에 남아 있다 — 이 파일은 왜 그 규칙인지를 설명한다.
+
+## 루프 프리미티브 표지
+
+> 루프 프리미티브: Plan-Execute + Evaluator-Optimizer (H6, Inside the Scaffold)
+
+## TEAM → Workflow 전환(Wave 2)
+
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 2 전환.
+> Collaborative Design 패턴의 평탄화 구현은 `workflows/plan-collaborative.js` 로 남아 있다 — **롤백 경로**다(아래 ⛔ 배선 전환). 기본 실행은 아래 스크립트다.
+
+## 배선 전환 근거(2026-09-12)
+
+>
+> ⛔ **2026-09-12 배선 전환 (6단계 9콜 → 2단계 4콜)** — wall · 노이즈 바닥 · 채택 판정은 `experiment-log.md` §5.9 가 정본이다. ⛔ 근거는 전부 **N=1** 이고 run-to-run 분산이 구조 간 차이보다 컸다 — 실사용 3회 관찰 후 재평가한다.
+> · **롤백**: 아래 절차 2.5·3 의 스크립트명을 `plan-collaborative.js` 로 되돌리면 끝이다 — 파일은 그대로 남겨 둔다.
+
+## 사전 복사 실측(2026-09-11)
+
+   실측(2026-09-11, 3건 전부): 플러그인 루트 경로로 첫 호출이 거부되고 WORK_DIR 복사본으로 재호출해 성공했다 — 거부 1회가 매번 낭비된다(텔레메트리 `n_workflow=2` 의 정체).
+
+## directionEscalation 이 필드인 이유
+
+     ⛔ **필드다, 반환 모드가 아니다** — 현행 배선(`plan-lean2.js`)은 방향 판정을 full 콜 안에서 하므로 정상 경로와 반환 형태를 가르지 않는다.
+
+## 차별화된 렌즈
+
+**6개 차별화된 렌즈** (같은 질문 금지 — ICLR 2025 근거. Workflow stage에 동일 적용):
+
+| 렌즈 | 스크립트 위치 | 핵심 질문 |
+|------|--------------|----------|
+| plan-structure (설계+분해) | Stage 1 전체 플랜 (Stage 2 병합은 도구 없는 plan-merge) | "어떻게 나누고 만들 것인가?" · 방향 판정도 이 콜이 함께 낸다 |
+| plan-edge-case (경계) | Stage 1 적대 렌즈 | "어디서 깨지는가?" — ⭐ 측정상 고유 기여가 가장 큰 렌즈 |
+| plan-impact (영향+아키) | Stage 1 통합 렌즈 | "어디까지 퍼지는가 · 기존 패턴과 맞는가?" — `secondaryHosts`·`existingTestSuites` 를 schema 로 명시 요구 |
+| GPT verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |
+
+## 통신 기록 · TEAM 일몰
+
+
+> 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
+
+## Gate 1 을 SKILL 에 남기는 이유
+
+> 각 절차 상세는 `modules/plan-deep-planning.md` 참조. 트리밍 비저하 원칙(single source: `guides/prompt-optimization.md` §1 보충 3a)으로 Gate 1 + Why(H1)는 본 SKILL에 보존.
+
+## verify 내부 동작
+
+검증이 수행하는 작업:
+- 계획 전송 (cross-model 검증)
+- 응답 파싱
+- Issue Tracker에 이슈 자동 기록
+- 이슈 요약 반환
+
+## plan-final 하나만 남기는 이유
+
+     이유: `/fz-code` Phase 0.4 는 `plan-final.md` **하나만** 복원하고 RTM 도 그 문서 안에서 갱신된다(`modules/rtm.md`). 이전 본문과 수정 delta 를 나란히 남기면 폐기된 Step·verify 가 함께 복원돼 구현이 무엇을 따라야 할지 갈린다.
+
+## 요약만 저장하면 안 되는 이유
+
+     (요약만 저장하면 `/fz-code` Phase 0.4의 구조 검사가 판정 불가)
+
+## Sprint Contract 를 잠정 플랜 뒤로 옮긴 이유 (2026-11-01 · F-468)
+
+옛 자리(Phase 0.5 뒤 · Phase 1 앞 · 2.7 독립 플랜보다 먼저)에서는 full 모드 Contract 가 돌 수 없었다.
+
+- **입력이 없었다** — 요구한 Phase 0.5 방향 판정은 full 에서 plan-lean2 전체 플랜 콜이 내므로 Workflow 가 돌아와야 생긴다. plan-lean2 args 에도 Contract 자리가 없다(Workflow 입력이 아니다)
+- **발동 조건을 셀 수 없었다** — "5+ Step" 은 Workflow 가 `steps[]` 를 돌려준 뒤에야 알 수 있는데 Gate 0.7 이 Phase 1 을 막았다
+- **import 대상이 나중에 생겼다** — Success Criteria 를 넣을 plan 은 Workflow 반환 뒤에 쓰인다
+- **발동 조건이 세 곳에서 달랐다** — 일몰한 TEAM 모드를 조건으로 쓴 곳도 있었다. 지금은 `modules/sprint-contract.md` § 발동 조건 한 곳이다
+- **자리를 Phase 1 · 1.5 뒤 · Phase 2 바로 앞(실행 절차 5.5 · 5.7)으로 정한 이유** — 재생성이 만든 plan · 원장을 Phase 2 가 곧바로 읽게 하려는 것이다. 스트레스 테스트 · RTM 검증(실행 절차 5)이 재생성 뒤에 오면 그 수정이 원장에 실리지 않는다. 그래서 Gate 1 · 1.5 는 잠정 플랜을, Phase 2 는 합의본을 반영한 plan 을 판정하고, 3.1 은 5.7 이 다시 만든 원장을 덮어쓰지 않는다
+- 사용자 결정(H.5-①): Contract 를 없애지 않고 실제로 발동하게 고친 뒤 측정한다. 독립 플랜은 더 이상 합의본(`--sprint-contract`)을 받지 않는다 — 런처 옵션(`scripts/gpt_independent.sh plan --sprint-contract`)은 남아 있고 fz-plan 쪽 호출자는 없다
+
+## 독립 플랜 기본 on (2026-11-01 · 사용자 결정 Q3 — light 까지 2026-11-10)
+
+- 계획 실행(light · full)의 첫 GPT 호출은 독립 플랜(실행 절차 2.7)이고 플래그 없이 돈다 — 독립 계획이 먼저 서고 계획 대조(Phase 2 resume 교차 · `verify`)는 그 뒤의 보조다(F-508). 앞 라운드 지적이 반영됐는지의 대조는 GPT 가 아니라 Lead 가 한다
+- 롤백은 플래그 하나다 — `--no-gpt-independent` 면 2.7 · 4.5 가 빠지고 Phase 2 는 기본 `verify` 다. light 도 2.7 을 기본으로 띄운다 — GPT 단계는 모드와 독립이다(10-19 결정 · `modules/mode-gate.md`)라 light 만 독립 첫 패스를 빼면 계획 대조만 남는다(F-508 · 2026-11-10 사용자 요구). 옛 켜기 플래그를 줘도 기본과 같다
+- '기본' 의 단위는 티켓이다 — 독립 계열 상한이 1 이고 2.7 호출 줄의 `FZ_GPT_ARTIFACT=plan FZ_WORK_DIR={WORK_DIR}` 가 이 호출을 티켓 작업 폴더 원장에 센다. 같은 티켓에서 full 을 다시 돌리면 2.7 은 정문 exit 19 다 — 입력이 같으면(`same-input`) 직전 독립 플랜이 답이고, 바뀌었으면(`budget-exhausted`) 2.7 · 4.5 를 건너뛰고 기본 `verify` 로 간다
+- 독립 첫 패스는 검증이 아니다 — 그 거부를 통과로도 계획의 미해결로도 적지 않고 `[독립 플랜 없음 — GPT-ROUNDS: <사유>]` 만 남긴다(`gpt_rounds.py status` 의 `plan/independent` `unresolved` 는 검증 공백이 아니다)
+- 상한 · 세지 않는 실패 · 정문 거부(exit 19)의 정본은 `modules/cross-validation.md` § 재검증 라운드 상한 이다

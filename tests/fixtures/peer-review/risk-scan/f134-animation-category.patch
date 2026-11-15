@@ -1,0 +1,12 @@
+diff --git a/src/Sheet.swift b/src/Sheet.swift
+index 1111111..2222222 100644
+--- a/src/Sheet.swift
++++ b/src/Sheet.swift
+@@ -1,6 +1,6 @@
+ struct Sheet: View {
+     @State var open = false
+     var body: some View {
+-        Button("x") { open.toggle() }
++        Button("x") { withAnimation(.easeIn) { open.toggle() } }
+     }
+ }

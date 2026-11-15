@@ -1,0 +1,378 @@
+---
+name: fz-search
+description: >-
+  코드 탐색 + 의존성 추적. Serena 심볼 기반 정밀 검색.
+  예: 찾아줘, 탐색해줘, 어디 있어?, 누가 쓰고 있어? (비사용: 접근 방식 탐색 →fz-discover; search=코드 위치)
+user-invocable: true
+argument-hint: "[검색 대상] [--mode arch|layer|impact|pattern] [--deep]"
+allowed-tools: >-
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__activate_project,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__context7__resolve-library-id,
+  mcp__context7__query-docs,
+  LSP,
+  Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Workflow
+
+metadata:
+  provides: [search-results, architecture-analysis]
+  needs: [none]
+  intent-triggers:
+    - "찾아|탐색|구조|영향|의존성"
+    - "search|explore|structure|impact|dependency"
+---
+
+# /fz-search - 코드 탐색 & 구조 분석 스킬
+
+> **행동 원칙**: Read-Only 탐색으로 코드 구조를 정확하게 파악한다. 병렬 교차 검증(`--deep`)으로 신뢰도를 높이고, 구조화된 결과로 다음 행동을 안내한다.
+
+## 개요
+
+> ⛔ Phase 0 (Work Dir Pre-flight) → 4가지 모드: arch | layer | impact | pattern
+> 2가지 실행 방식: 순차(기본) | 병렬 교차 검증(--deep)
+> 루프 프리미티브: ReAct (H6, Inside the Scaffold)
+
+- CLAUDE.md `## Directory Structure`의 git-root 기준으로 탐색
+- 프로젝트 아키텍처 구조를 이해하는 전용 탐색
+- Symbolic(Serena) + Pattern(Grep/Glob) 이중 경로
+- **코드 수정 절대 금지** (Read-Only)
+
+## 사용 시점
+
+```bash
+/fz-search "OrderDetail 모듈 구조"                 # arch 모드 자동
+/fz-search "Auth 데이터 흐름"                         # layer 모드 자동
+/fz-search "AuthRepository 영향 범위"                 # impact 모드 자동
+/fz-search "싱글톤 패턴 찾아줘"                       # pattern 모드 자동
+/fz-search --mode arch "Checkout"                       # 모드 명시
+/fz-search --deep "OrderDetail 모듈 구조"           # 병렬 교차 검증
+```
+
+## Prerequisites
+
+- 교차 검증 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 기본 모드(순차) 폴백
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
+## 모듈 참조
+
+| 모듈 | 용도 |
+|------|------|
+| modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+| modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
+
+## Plugin 참조 (SwiftUI)
+
+> 참조: `modules/plugin-refs.md` — SwiftUI Expert 섹션 (탐색 시 View 구조/패턴 판단 기준)
+
+## sc: 활용 (SuperClaude 연계)
+
+| 모드/상황 | sc: 명령어 | 용도 |
+|----------|-----------|------|
+| 탐색 시작 전 | `/sc:sc-index-repo` | 프로젝트 구조 빠른 파악 (3K 토큰, 최초 1회) |
+| 구조 분석 | `/sc:sc-analyze` | 탐색 결과의 아키텍처 품질 분석 |
+| 설명 요청 | `→ /fz-explain` | 탐색된 코드/구조 설명 — 동작↔코드 1:1 매핑 (F-023) |
+| 복잡한 탐색 후 | `→ /fz-fix` | 수정이 필요한 경우 전환 |
+| 설계 필요 시 | `→ /fz-plan` | 구조 변경 계획 수립 |
+
+---
+
+## ⛔ Phase 0: Work Dir Pre-flight (반성 4차 — 누락 방지)
+
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+
+### Gate 0: Work Dir Ready
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
+
+---
+
+## 탐색 시작 전: 프로젝트 인덱스 활용
+
+모드 실행 전, 프로젝트 전체 구조를 빠르게 파악합니다.
+
+### 절차
+
+1. **PROJECT_INDEX.md 확인**:
+   - 존재 → 읽기 (3K 토큰으로 프로젝트 전체 구조 파악)
+   - 미존재 → `/sc:sc-index-repo` 실행 제안 (사용자 승인 시 생성)
+2. **인덱스 기반 탐색 범위 결정**:
+   - 모듈/디렉토리 구조를 미리 파악 → 불필요한 전체 탐색 방지
+   - 대상 모듈 위치를 빠르게 특정
+
+> **토큰 절감**: 인덱스 없이 탐색 시 58K+ 토큰 vs 인덱스 활용 시 3K + 집중 탐색
+
+---
+
+## 4가지 탐색 모드
+
+### 모드 자동 판별
+
+| 모드 | 트리거 키워드 | 목적 |
+|------|-------------|------|
+| **arch** | 모듈, Component, 구조, 동작, 화면, Router, Interactor, Builder | 기능별 아키텍처 구조 전체 탐색 |
+| **layer** | "데이터 흐름", "레이어", API, Repository, UseCase, Workflow | 레이어 간 데이터 흐름 추적 |
+| **impact** | "영향", "변경", "참조", "누가 쓰는", "사이드이펙트" | 심볼 변경 시 영향 범위 분석 (depth 2) |
+| **pattern** | "패턴", "찾아", "검색", "안티패턴", "컨벤션" | 코드 패턴/컨벤션 프로젝트 전체 검색 |
+
+> 모드 판별이 모호할 경우 → `AskUserQuestion`으로 확인
+
+---
+
+## Mode: arch -- 아키텍처 구조 탐색
+
+기능별 아키텍처의 전체 구조와 하위 컴포넌트 관계를 탐색합니다.
+CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴에 따라 탐색합니다.
+
+### Serena 도구 호출 (Symbolic)
+
+```
+1. find_symbol({Feature}*)                 → 주요 컴포넌트 구조 확인
+2. find_referencing_symbols({Feature}*)     → 하위 컴포넌트 연결 파악
+3. get_symbols_overview({Feature}*.swift)   → 전체 심볼 개요
+```
+
+### Grep/Glob 도구 호출 (Pattern)
+
+```
+1. Glob(**/{Feature}*.swift)              → 관련 파일 디스커버리
+2. Grep({Feature} protocol)               → 프로토콜 사용처
+3. Grep(관련 attach/detach/register 패턴)  → 연결/해제 호출 위치
+```
+
+### 출력 항목
+
+- 아키텍처 트리 구조 (ASCII)
+- 컴포넌트별 역할 요약
+- 하위 컴포넌트 목록 및 연결 방식
+- 프로토콜/인터페이스 구조
+
+---
+
+## Mode: layer -- 데이터 흐름 추적
+
+레이어 간 데이터 흐름을 추적합니다. CLAUDE.md `## Architecture`에 정의된 레이어 구조를 따릅니다.
+
+### Serena 도구 호출 (Symbolic)
+
+```
+1. Grep({Target}API)                → API 엔드포인트 검색
+2. find_symbol({Target}Repository)                → Repository 구현체
+3. find_referencing_symbols({Target}Repository)    → Repository 소비자
+4. find_symbol({Target}UseCase)                   → UseCase 구현체
+5. find_referencing_symbols({Target}UseCase)       → UseCase 소비자
+```
+
+### Grep/Glob 도구 호출 (Pattern)
+
+```
+1. Grep(class.*{Target}.*Repository)    → Repository 구현 검색
+2. Grep(class.*{Target}.*UseCase)       → UseCase 구현 검색
+3. Grep({Target}.*Workflow|{Target}.*Interactor) → 상위 소비자 검색
+```
+
+### 출력 항목
+
+- 레이어 흐름도 (ASCII): 프로젝트 아키텍처 레이어 순서대로
+- 각 레이어의 구현체와 프로토콜
+- DTO → Entity 변환 위치
+- 의존성 주입 경로
+
+---
+
+## Mode: impact -- 영향 범위 분석
+
+심볼 변경 시 영향받는 파일과 심볼을 depth 2까지 추적합니다.
+
+### Serena 도구 호출 (Symbolic)
+
+```
+1. find_symbol({Symbol})                            → 대상 심볼 확인
+2. find_referencing_symbols({Symbol})                → 1차 참조자
+3. find_referencing_symbols({1차 참조 심볼들})        → 2차 참조자 (depth 2)
+4. get_symbols_overview({Symbol이 있는 파일})         → 파일 컨텍스트
+```
+
+### Grep/Glob 도구 호출 (Pattern)
+
+```
+1. Grep({Symbol}, files_with_matches)              → 텍스트 레벨 참조
+2. Grep(protocol.*{Symbol}|extension.*{Symbol})     → 프로토콜/익스텐션
+3. Grep({Symbol}.*\(|{Symbol}\.)                    → 호출/접근 패턴
+```
+
+### 출력 항목
+
+- 영향 범위 그래프 (ASCII): 대상 → 1차 → 2차
+- 직접 참조 파일 목록 (1차)
+- 간접 참조 파일 목록 (2차)
+- 변경 시 주의 사항
+
+---
+
+## Mode: pattern -- 코드 패턴 검색
+
+정규식 기반으로 프로젝트 전체에서 코드 패턴/컨벤션을 검색합니다.
+
+### Serena 도구 호출 (Symbolic)
+
+```
+1. Grep({regex})                     → 심볼릭 패턴 검색
+2. get_symbols_overview({결과 파일들})               → 결과 파일의 심볼 컨텍스트
+```
+
+### Grep/Glob 도구 호출 (Pattern)
+
+```
+1. Grep({regex}, output_mode: content, -C: 3)      → 컨텍스트 포함 검색
+2. Grep({regex}, output_mode: count)                → 발생 빈도 통계
+```
+
+### 출력 항목
+
+- 매칭 결과 목록 (파일, 라인, 컨텍스트)
+- 발생 빈도 통계
+- 패턴 분포 (모듈/디렉토리별)
+- 안티패턴 시 개선 제안
+
+---
+
+## 병렬 교차 검증 (`--deep` 모드 — Workflow 오케스트레이션 pilot)
+
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
+> Cross-Verify 패턴은 `workflows/search-cross-verify.js` 가 평탄화 구현한다.
+> 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern·**plan-structure** 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+> **모델 배정**: Stage 1·2는 `search-*`(sonnet 성격 — retrieval·breadth), **Stage 3 병합은 `plan-structure` 렌즈 + `fable`** — 3-Tier 정책의 *수렴 merge* 판단 지점 3곳 중 하나다(`scripts/lint-model-explicit.sh`의 `fable=3`에 계상).
+
+### 실행 절차 (Lead)
+
+1. **args 조립**: `query`=탐색 질의 원문 / `codeContext`=탐색 허용 범위(경로·디렉토리 — 명시적으로 한정) / `effort`=`python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" lead-effort` 의 `effort.value`(null 이면 뺀다 · `modules/mode-gate.md` § effort) — `--deep` 은 명시 opt-in 이라 모드 질문은 없다
+1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/search-cross-verify.js {WORK_DIR}/search-cross-verify.js && cmp -s {플러그인 루트}/workflows/search-cross-verify.js {WORK_DIR}/search-cross-verify.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+   - Stage 1 독립 병렬(symbolic+pattern, 피어 미주입) → Stage 2 교차(FP 판정+보완) → **Stage 3 병합(`fable` — 수렴 merge 판단 지점)** → 등급은 스크립트 binary 규칙. 총 5-call
+3. **반환 처리**: `mode:'workflow'` → results(신뢰도 포함)를 출력 형식으로 정리 / `mode:'fallback'` → 기본 모드(순차) 수행 + 사유 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 기록(규약: `experiment-log.md` 머리 문단)
+4. **지표 기록**: `return.metrics`(agentCalls/nullCount/stages/fallback) + wall-clock(Lead 측정) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-search 테이블
+
+### 신뢰도 등급 (canonical: cross-verify.md — 본 표가 구버전 출처-기준 표를 대체)
+
+| 등급 | 조건 | 의미 |
+|------|------|------|
+| ★★★ | Symbolic + Pattern 모두 발견 | 교차 확인 완료 (최고 신뢰) |
+| ★★ | 한쪽 발견 + 교차 검증 통과(confirmed) | 검증된 단독 발견 |
+| ★ | 한쪽 발견 + 교차 미확인 | 노이즈 가능 — 수동 확인 권장 |
+
+### 기본 모드 (--deep 없이)
+
+Orchestrator가 Serena → Grep 순차 실행합니다.
+- 빠르지만 교차 검증 없음
+- 신뢰도 등급 미표시
+- 대부분의 탐색에 충분
+
+---
+
+## 출력 형식 (모든 모드 공통)
+
+```markdown
+## {대상} {모드} 탐색 결과
+
+### 파일 목록
+| # | 파일 | 역할 | 신뢰도 |
+|---|------|------|--------|
+| 1 | Feature/Router.swift | 네비게이션 | ★★★ |
+| 2 | Feature/Interactor.swift | 비즈니스 로직 | ★★★ |
+
+### 의존성/흐름 그래프
+(모드별 ASCII 다이어그램)
+
+### 핵심 발견
+- 발견1: ...
+- 발견2: ...
+
+### 다음 행동 제안
+-> /fz-fix, /fz-plan, /fz-code (상황에 따라)
+```
+
+> `--deep` 모드에서만 신뢰도 열이 표시됩니다.
+
+---
+
+## Few-shot 예시
+
+```
+BAD (불충분한 결과):
+CheckoutInteractor 찾음. 3개 파일에서 사용됨.
+→ 의존성 방향, 영향 범위 분석 없음
+
+GOOD:
+## 탐색: CheckoutInteractor 의존성 분석
+### 심볼
+- 정의: Sources/Checkout/CheckoutInteractor.swift:15
+- 프로토콜: CheckoutInteractable (Router listener)
+### 의존성 체인
+CheckoutBuilder → CheckoutInteractor → ProductUseCase → ProductRepository → NetworkService
+### 영향 범위 (CheckoutInteractor 수정 시)
+- 직접: CheckoutBuilder.swift (DI 변경), CheckoutInteractorTests.swift
+- 간접: HomeRouter.swift (child RIB 인터페이스 변경 시)
+- 테스트: CheckoutInteractorTests.swift (Mock 업데이트 필요)
+```
+
+### ⛔ 아티팩트 기록 (항상)
+
+탐색 완료 후 결과를 기록한다.
+- 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/search/search-result.md` + `index.md` 업데이트
+- 비-티켓 세션: `write_memory("fz:checkpoint:search", "모드: {mode}. 발견: {N}개 심볼. 핵심: {요약}")`
+
+## Gate: Search Complete
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
+- [ ] 대상 심볼/패턴 파악 완료?
+- [ ] 영향 범위 식별?
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)이면** Coverage Gate 통과? (단위 U 확정 후 M/`N_U` 보고 — canonical: `modules/cross-validation.md` § Coverage Gate 절차 0, ⛔ 어휘 9개 동기)
+- [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
+
+---
+
+> 테스트 케이스 · 시나리오: `references/test-spec.md` (§ SKILL.md 에서 옮긴 테스트 케이스)
+
+## Boundaries
+
+**Read-Only**: 이 스킬은 코드를 수정하지 않습니다.
+
+**Will**:
+- 4가지 모드의 코드 탐색 (arch, layer, impact, pattern)
+- 병렬 교차 검증 (--deep 모드)
+- 구조화된 출력 (테이블, ASCII 그래프)
+- 다음 행동 제안 (/fz-fix, /fz-plan, /fz-code)
+
+**Will Not**:
+- 코드 수정 (→ /fz-fix 또는 /fz-code)
+- 빌드 실행 (→ /fz-fix 또는 /fz-code)
+- 코드 리뷰 (→ /fz-review)
+- 세션/Issue Tracker 관리 (→ /fz-manage)
+
+## 에러 대응
+
+| 에러 | 대응 | 폴백 |
+|------|------|------|
+| find_symbol 실패 | Grep 전환 | Glob 폴백 |
+| --deep 팀 생성 실패 | 순차 모드 자동 전환 | 단일 에이전트 실행 |
+| 결과 과다 (>200건) | head_limit + 파일 필터 | 모듈/디렉토리 필터 안내 |
+| 모드 판별 모호 | AskUserQuestion | 사용자 선택 |
+| Serena 연결 실패 | Grep + Glob 전용 | 패턴 검색만 수행 |
+
+## Completion → Next
+
+- 구조 파악 완료 → 사용자에게 결과 보고
+- 수정 필요 발견 → `/fz-fix` 제안 (간단) 또는 `/fz-plan` 제안 (복잡)
+- 구현 필요 → `/fz-code` 제안
+- 리뷰 필요 → `/fz-review` 제안
+- 탐색 심화 필요 → `/fz-search --deep` 제안

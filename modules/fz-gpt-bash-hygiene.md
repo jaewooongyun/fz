@@ -1,0 +1,269 @@
+# fz-gpt Bash 호출 Hygiene (29차/30차 교훈)
+
+> **Scope of Applicability**: `fz-gpt` SKILL.md의 모든 Bash 예시 (review/verify/validate/check/final/commit/adversarial/drift/plan/micro-eval). 다른 스킬은 본 모듈을 직접 참조하지 않으며, fz-gpt 위임을 통해 간접 적용된다.
+>
+> **Purpose**: GPT CLI(`exec`·`review` 서브커맨드)를 Bash 도구로 부를 때의 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch 등을 방지하는 표준 절차. ⛔ **호출은 §8 정문(`scripts/gpt-call.sh <kind>`) 경유** — §1~§7 은 정문이 부르는 래퍼(`scripts/gpt-exec.sh`)가 내부에서 처리하는 교훈이며, 직접 호출 예시가 아니다.
+
+## 목차
+
+- §1 Stdin 닫기 의무 (`< /dev/null`) — hang 방지
+- §2 Trusted Directory 확인 + Skip Flag
+- §3 `-o` 파일 출력 시 stdout buffering
+- §4 Background Task 의무 영역
+- §5 ⛔ Trust Level 필수 (30차, Critical)
+- §5.5 Base Verification Gate (git diff 분석 호출 시)
+- §6 Standard Hygiene Wrapper Template (복붙용 — ⛔ §8 스크립트로 대체됨)
+- §7 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자 필수)
+- §8 ⛔ **정문 `scripts/gpt-call.sh` 경유 의무 — 래퍼 `scripts/gpt-exec.sh` 는 그 어댑터** — 사전 플래그 게이트 + 사후 측정 게이트 (본 절이 정본 호출 경로)
+
+## 1. Stdin 닫기 의무 (`< /dev/null`)
+
+**증상**: GPT CLI 0.124.0 이 `Reading additional input from stdin...`에서 무한 대기. 13분 hang 후에도 응답 없음.
+
+**원인**: Bash pipe 로 GPT CLI `exec` 를 부르면 stdin 이 열린 채 전달됨 → CLI 가 대화형 입력을 기대 → 무한 hang.
+
+**래퍼 처리**: `scripts/gpt-exec.sh` 는 review·exec·resume **모든** 호출 끝에 `< /dev/null` 을 붙여 stdin 을 닫는다. ⛔ 파이프로 CLI 를 직접 부르지 않는다(❌ `… "prompt" 2>&1 | tail -20` 은 hang).
+
+## 2. Trusted Directory 확인 + Skip Flag
+
+**증상**: `Not inside a trusted directory and --skip-git-repo-check was not specified.` 에러로 즉시 종료.
+
+**원인**: PROJECT_ROOT ≠ GIT_ROOT dual-root 구조에서 GPT CLI 가 git repo 외부 실행을 거부.
+
+**래퍼 처리**: `scripts/gpt-exec.sh` 사전 게이트 4 가 `--cd` 가 git repo 밖이면 `--skip-git-repo-check` 를 자동으로 붙인다. 판정 로직:
+```bash
+# 자동 판정 (래퍼 내부와 같은 로직)
+if git -C "$WORK_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+  SKIP_FLAG=""
+else
+  SKIP_FLAG="--skip-git-repo-check"
+fi
+```
+
+## 3. `-o` 파일 출력 시 stdout buffering 주의
+
+**관찰**: `-o /path/to/output.md`로 결과를 파일에 쓰면 stdout에는 진행 stream만 출력. 실제 결과는 `-o` 파일에서 Read.
+
+**래퍼 처리**: `--out FILE` 을 CLI 의 `-o` 로 넘기고, 진행 stream 은 `${OUT}.stream.log` 로 분리한다. 결과는 `--out` 파일을 Read 한다.
+
+## 4. Background Task 의무 영역
+
+**조건**: effort 가 아니라 입력 크기 · 호출 종류로 정한다(`modules/gpt-strategy.md` § 모델·effort 선택) — Plan 300줄+ 입력은 5-8분 소요(frontier 모델 · high effort 실측)이고, 독립 런처 · 심화 resume 도 오래 돈다. Bash foreground는 timeout 위험.
+
+**패턴**: `run_in_background: true` + `ScheduleWakeup`으로 비동기 처리.
+
+## 5. ⛔ Trust Level 필수 (30차 교훈, Critical)
+
+**증상**: GPT CLI `exec` 를 `--profile <NAME>` 으로 부르면 `sandbox: read-only`로 force. Profile 설계 전체 무효화.
+
+**원인**: GPT CLI 0.124.0 은 실행 path가 `trust_level = "trusted"`로 명시되지 않으면 **"untrusted directory" 취급**. (이력 — 0.124.0 당시 관찰. 2026-11-01 정정: `approval_policy = "untrusted"` 는 0.149.0 에서 폐지됐고, 0.150.0 부터 신뢰하지 않는 프로젝트는 프로젝트 AGENTS.md·`.codex/` 층을 쓰지 않는다 — *"Untrusted projects no longer supply project-level AGENTS.md instructions, and managed deny-read rules remain enforced after permission changes."* 신뢰 설정은 `projects.<path>.trust_level` [verified: https://learn.chatgpt.com/docs/changelog])
+
+**필수 config** (`~/.codex/config.toml`):
+```toml
+[projects."<absolute path to GIT_ROOT>"]
+trust_level = "trusted"
+
+[projects."<absolute path to PROJECT_ROOT>"]
+trust_level = "trusted"
+
+[projects."<absolute path to fz-plugin dev>"]
+trust_level = "trusted"
+```
+
+**fz-gpt 호출 시 적용 범위**:
+- **Profile 사용 시 (--profile)**: trust_level 없으면 sandbox 무효화
+- **래퍼 경로**: `gpt-exec.sh` 는 `--profile` 을 쓰지 않고 `-c sandbox_mode="read-only"` 를 강제한다 — 이 절은 **`--profile` 을 직접 쓸 때만** 해당한다 (`sandbox_permissions` 는 CLI 0.157 이 무시한다고 출력)
+- **대안 폴백**: `-c 'projects."<path>".trust_level="trusted"'` inline override
+
+**`--skip-git-repo-check` vs trust_level**:
+- `--skip-git-repo-check`: git repo check 우회만
+- `trust_level = "trusted"`: GPT CLI sandbox 정책에 직접 영향
+
+**판정 logic**:
+```bash
+if ! grep -qE "\[projects\." ~/.codex/config.toml; then
+  echo "WARNING: trust_level 미설정"
+fi
+```
+
+## 5.5 Base Verification Gate (pre-flight, git diff 분석 포함 호출 시)
+
+> GPT 메타 분석 발견: branch/HEAD 출력만으로 부족, 변경 파일 목록까지 포함 필수.
+
+```bash
+# Pre-flight: branch / HEAD / base 확인
+CURRENT_BRANCH=$(git -C "$WORK_DIR" branch --show-current 2>/dev/null || echo "?")
+HEAD_COMMIT=$(git -C "$WORK_DIR" rev-parse --short HEAD 2>/dev/null || echo "?")
+EXPECTED_BRANCH="${EXPECTED_BRANCH:-$CURRENT_BRANCH}"
+
+if [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ] && [ -n "$EXPECTED_BRANCH" ]; then
+  echo "⛔ Branch mismatch: current=$CURRENT_BRANCH, expected=$EXPECTED_BRANCH"
+  exit 1
+fi
+
+if echo "$@" | grep -q -- "--base"; then
+  BASE=$(echo "$@" | sed -n 's/.*--base \([^ ]*\).*/\1/p')
+  git -C "$WORK_DIR" merge-base "$BASE" HEAD >/dev/null 2>&1 || {
+    echo "⛔ Base '$BASE' invalid or unreachable from HEAD"
+    exit 1
+  }
+fi
+
+# ⛔ 카운트는 **잘리지 않은 전체 집합**에서 센다. 표시만 자른다 (자른 목록으로 세면 카운트가 틀린다)
+CHANGED_FILES=$(git -C "$WORK_DIR" diff --name-only "${BASE:-HEAD~1}"..HEAD 2>/dev/null)
+CHANGED_COUNT=$(printf '%s\n' "$CHANGED_FILES" | grep -c . || true)
+
+echo "▶ GPT 분석 대상 — branch=$CURRENT_BRANCH commit=$HEAD_COMMIT base=${BASE:-HEAD~1}"
+echo "▶ 변경 파일 ${CHANGED_COUNT}개 (앞 10개만 표시):"
+printf '%s\n' "$CHANGED_FILES" | head -10
+```
+
+**규칙**:
+- ⛔ 위 Gate 통과 후에만 GPT 호출 — 래퍼 review 모드는 이 Gate 를 사전 게이트 5 로 **내장**한다
+- ⛔ GPT 결과 인용 시 `[분석 기준: branch=X, HEAD=Y, base=Z, changed_files=N개]` 태그 의무
+- ⛔ EXPECTED_BRANCH 주입: 호출자가 *명시 환경변수 설정 필수*
+- ⛔ 단순 파일 분석 (git diff 미포함) 호출에는 Gate 적용 **제외**
+
+## 6. Standard Hygiene Wrapper Template
+
+> ⛔ **본 절은 §8 래퍼 `scripts/gpt-exec.sh`로 대체됐다** — 아래 템플릿은 래퍼가 무엇을 하는지 읽기 위한 **참조**로 남긴다. 호출은 §8 정문(`scripts/gpt-call.sh`)을 경유한다 (복붙 템플릿은 호출자가 붙이지 않으면 작동하지 않고, 실측상 누락이 재발했다).
+>
+> 6 hygiene rules (1-5 + 7: `--` 구분자) + zsh glob 회피 + output readback 통합.
+
+```bash
+# 1. 프롬프트 파일화 (zsh glob 회피 — 정규식·따옴표·여러 줄을 셸이 해석하지 않게)
+cat > /tmp/gpt-prompt.txt << 'EOF'
+...your prompt...
+EOF
+# 2. 정문 호출 — kind 를 고른다(생성 표 skills/fz-gpt/SKILL.md). 정문이 부르는 래퍼가 stdin close·`-o`·`--` 구분자·skip flag·
+#    read-only sandbox 를 조립한다 (§1~§7 의 교훈 · §8)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$WORK_DIR" --out "$RESULT_FILE" --prompt-file /tmp/gpt-prompt.txt
+# 3. 결과는 Read 로 $RESULT_FILE · 입력 300줄 이상 · 오래 도는 호출이면 run_in_background (§4 — 기준은 effort 가 아니다)
+```
+
+## 7. 프롬프트 선두 하이픈 clap 오파싱 (`--` 구분자)
+
+**증상**: GPT CLI `exec` 의 positional 프롬프트가 하이픈으로 시작하면(예: SKILL.md YAML frontmatter의 `---` 3연속) clap이 이를 플래그로 오해석 → usage 에러로 즉시 종료.
+
+**원인**: clap은 end-of-options(`--`) 미지정 시 하이픈 선두 인자를 옵션으로 파싱.
+
+**래퍼 처리**: `exec [flags]` 뒤에 `--` 를 넣고 그 뒤에 프롬프트 인자를 둔다 — `scripts/gpt-exec.sh` 가 exec·resume 호출에서 `-- "$(cat PROMPT_FILE)"` 로 조립한다.
+
+**관찰**: 에러 캡처 시 `tail` 파이프 금지(clap 에러 본문 잘림 → 진단 지연), 전체 리다이렉트(`> log 2>&1`) 사용. (2026-07-09 harness-paper 세션 실측 — SKILL.md 주입 시 재현)
+
+## 8. ⛔ 정문 `scripts/gpt-call.sh` 경유 의무 — 래퍼 `scripts/gpt-exec.sh` 는 그 어댑터다 (래퍼 2026-08-09 · 정문 R-G1 2026-10 — **본 절이 정본 호출 경로**)
+
+> 경로 기준은 **플러그인 루트**다 — `scripts/resolve-plugin-root.sh` 로 해석한 `${FZ_PLUGIN_ROOT}` 를 앞에 붙인다. 스킬 base directory 기준으로 읽으면 `skills/fz-gpt/scripts/` 를 찾다가 파일 없음에서 막힌다.
+
+> ⛔ **호출자는 정문만 부른다** — `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" <kind> [입력…]`. 모드 · 역할 스킬 · schema · 고정 플래그는 레지스트리(`scripts/gpt-kinds.json`)가 정하고 `scripts/gpt_kinds.py` 가 푼다. 래퍼(`gpt-exec.sh`) · 런처(`gpt_independent.sh`)를 마크다운 레시피에서 직접 부르지 않는다 — `gpt_kinds.py lint --consumers` 가 bash 블록을 검사한다(등록 예외 E1~E8 은 레지스트리 `consumer_allow`).
+> 정문은 정책 플래그(`--schema` · `--inject-skill` · `--gpt-skill(-path)` · `--ephemeral` · `-c` · `-p` · `--profile` · `--ignore-user-config` · `--config-permissions`)를 10 으로 거부하고, 어댑터의 exit(10~17 · 18)를 다시 매기지 않고 넘긴다. 같은 `--out` 동시 호출은 정문 잠금이 10 으로 막는다. 18(stderr `GPT-OFF:`)은 측정 실패가 아니라 GPT 미사용이다 — `modules/gpt-strategy.md` § GPT 미사용.
+
+> §1~§7을 손으로 조립하지 않는다. `guides/skill-authoring.md` §11 판정("결과가 binary(pass/fail)인가? → 스크립트")이 본 모듈 전체에 적용된다 — hygiene 규칙은 전부 binary다.
+
+**신설 근거 (실측 2건, 2026-08-09 세션)**:
+
+| 실패 | 지식은 어디 있었나 | 왜 안 막혔나 |
+|---|---|---|
+GPT CLI `exec review --uncommitted "<prompt>"` → **exit 2** | `modules/fz-gpt-subcommands-core.md` §review "⚠️ `review`는 flag-only" 경고가 (당시 문구) "함께 주면 인자 충돌"을 이미 명시 | 산문 경고는 **호출 시점에 읽혀야** 작동한다. 호출자가 §6 템플릿을 붙이지 않고 손으로 조립했다 |
+래퍼가 GPT CLI exit=2 를 **0으로 보고** | — (규칙 자체가 없었다) | 마지막 문장(`wc \|\| echo`)의 exit이 태스크 exit으로 올라갔다. §1~§7에 **사후 검증 규칙이 없다** |
+
+⛔ 두 번째가 더 위험하다: **측정 실패가 "이슈 0건"으로 읽힌다.** exit≠0 / 빈 출력은 *깨끗한 리뷰*가 아니라 *리뷰 부재*다.
+
+### 인터페이스
+
+```bash
+# --model M · --effort E: 보통 넘기지 않는다 — 정본 modules/gpt-strategy.md § 모델·effort 선택 (필드마다 플래그 > 세션 선택 > config.toml)
+# review 계열: 대상 선택은 입력으로만 (프롬프트 불가 — review 모드 kind 는 --prompt-file 을 받지 않는다)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd "$GIT_ROOT" --out "$F" --uncommitted [--title T] [--model M] [--effort E]
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" check  --cd "$GIT_ROOT" --out "$F"            # --uncommitted --ephemeral 은 kind 가 고정한다
+
+# exec 계열: 커스텀 지시가 필요할 때 (diff는 프롬프트에 인라인)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$F" --prompt-file P [--model M] [--effort E]
+
+# resume: 이전 호출이 남긴 `${OUT}.session` 으로 **그 세션**을 잇는다 (⛔ --last 금지 — 사이에 다른 실행이 끼면 엉뚱한 세션)
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" final-deep --cd "$GIT_ROOT" --out "$F2" --prompt-file P --session-file "$F.session"
+```
+- 어댑터(래퍼) 자체의 인자 · exit 계약은 `scripts/gpt-exec.sh` 머리말이 정본이다 — 아래 절들은 정문이 부르는 그 어댑터의 동작이다
+
+### 스킬 본문 판정과 주입 (`--gpt-skill-path` · `--inject-skill` — A2-03 · F-335)
+
+플래그 하나가 모드마다 뜻이 달랐다(주입 · 계측 · WARN). 지금은 둘로 나뉜다.
+
+| 플래그 | 뜻 | 모드 |
+|---|---|---|
+| `--gpt-skill-path P` | 계측 — 호출부가 해석한 SKILL.md 경로 | 전 모드 |
+| `--inject-skill F` | 주입 — 본문을 프롬프트 **앞**에 넣는다 | exec 전용 |
+
+- `--gpt-skill-path` 는 넣지 않는다. `exec`·`resume` 에서는 그 본문이 최종 프롬프트에 들어 있는지만 판정해 `injected` 열에 적는다. 호출부가 본문을 직접 넣는 호출(이어 받는 세션에 본문이 없는 `resume` — `modules/fz-gpt-subcommands-core.md` § resume 교차)은 이것만 넘긴다. 호출 계약(`modules/cross-validation.md`)의 exec 는 `--inject-skill` 을 넘긴다
+- `--inject-skill` 은 마커 줄 `[fz-gpt-skill-injected] <스킬> (<스킬 폴더 절대경로>)` + 본문 + `---` 을 앞에 붙인다. 폴더 경로는 본문의 상대 경로(`references/domain-*.md`)를 풀기 위한 것이다. GPT 의 스킬 자동 선택에 기대지 않는 결정론 경로다. ⛔ **멱등** — **본문 전체**가 이미 있으면 넣지 않는다. 제목으로 판정하지 않는다 — 번들 스킬 8개 모두 첫 제목 다음 줄이 `## Role` 이라 구별되지 않는다
+- ⛔ `resume` · `review` 에 `--inject-skill` 을 주면 exit 10 이다. resume 은 세션 이력에 본문이 이미 있어 다시 넣으면 두 번이 되고, review 는 프롬프트가 없다. 두 플래그가 서로 다른 파일을 가리켜도 exit 10 이다
+- `review` 호출은 `--gpt-skill reviewer` 만 넘긴다. reviewer 는 fz 스킬 가운데 유일하게 CLI 가 암묵 호출하는 스킬이다(나머지 7개는 `agents/openai.yaml` 의 `policy.allow_implicit_invocation: false`). 옛 표지 `--gpt-skill-path unknown` 도 받지만 WARN 은 없다
+- 경로가 있는데 파일이 없거나 비었으면 exit 11(`exec`·`resume` — 두 플래그 모두). 빈 문자열은 "해석 실패 → 일반 프롬프트 폴백" 이라 `fallback=1` 로 남긴다
+- 텔레메트리(`gpt-skill-usage.tsv`, 헤더 없음) 9열: ts · mode · requested · resolved · fallback · exit · **injected** · **cli_version** · **end**(진행 감시가 끊었으면 `idle`, 아니면 `-` — 옛 행은 6 또는 8열이다). ⛔ 이 파일은 스킬을 계측하는 호출(`--gpt-skill` · 스킬 경로)만 쓴다 — 모든 호출에서 정체 종료와 CLI 실패를 가르는 표지는 stderr 의 `GATE-FAIL(12): GPT-IDLE` 토큰이다. `resolved` 는 `--gpt-skill-path`(없으면 `--inject-skill`) 경로다. `fallback` 은 review 행에서 `-` 다 — 폴백 개념이 없다. `injected` 는 최종 프롬프트에 본문이 들어 있는가다(래퍼가 넣었든 호출부가 넣었든 1 · review 는 항상 0). 스킬 사용 지표는 이 열이 1 인 호출만 센다
+
+### 격리 호출 (`--config-permissions` — F-348)
+
+래퍼는 모든 호출에 `-c sandbox_mode="read-only"` 를 붙인다(사용자 config 가 쓰기 가능이어도 검증 호출이 쓰지 못하게). 그런데 이 값은 config 의 권한 프로필(`default_permissions`)을 **덮는다** — 프로필의 경로 deny 가 지워져 막아 둔 파일이 읽힌다(실측 2026-09-28).
+
+- `--config-permissions` 를 주면 `sandbox_mode` · `sandbox_permissions` 를 넘기지 않고 `$CODEX_HOME/config.toml` 의 프로필을 쓴다. 독립 첫 패스 런처(`scripts/gpt_independent.sh`)가 쓰는 경로다
+- 호출 전에 확인한다 — `default_permissions` 가 첫 table 앞에 있고, 그 프로필이 `extends = ":read-only"` 다. 아니면 exit 11 이다. 쓰기 금지는 그 프로필이 맡는다
+- 옵션을 주지 않은 호출의 인자 모양은 황금값으로 고정돼 있다 — 세션 선택이 없으면 모델·effort 를 넘기지 않는다(`tests/fixtures/gpt/config-permissions/run.sh`). 선택이 있으면 두 경로(기본 · `--config-permissions`)가 같이 받는다 — 래퍼가 ARGS 재대입 뒤에 붙인다(`tests/fixtures/gpt/choice/run.sh` --scope wrapper)
+
+### 사전 게이트 (호출 전 거부)
+
+1. **플래그 상호 배타** — `review` + `--prompt-file` → exit 10. `exec` + `--base/--uncommitted/--commit` → exit 10
+2. **필수 인자** — `review`는 스코프 1개 필수 · `exec`는 `--prompt-file` 필수 · 양쪽 `--cd`/`--out` 필수
+3. **경로 실재** — `--cd` 디렉토리 · 프롬프트·스키마 파일 비어있지 않음 · `exec`·`resume` 의 `--gpt-skill-path`·`--inject-skill` 파일 · `gpt` 설치 (exit 11)
+4. **trust_level** — 미설정 시 경고(§5). ⛔ 차단은 아니다 — inline override 경로가 있다
+5. **git repo 판정** → `--skip-git-repo-check` 자동 부착(§2)
+6. **값 옵션 arity** — 값 없는 `--cd`/`--out`/… → exit 10 (⛔ 없으면 `set -u`가 exit **1**로 죽어 문서와 어긋난다)
+7. **스코프 단일성** — `--base`/`--uncommitted`/`--commit` 중복 지정 → exit 10 (배열로 보관해 단어분할·glob 차단)
+8. **§5.5 Base Verification Gate 내장** — ⛔ **`review` 모드 + git repo 일 때만 발동한다.** `exec` 모드는 diff를 프롬프트에 인라인하므로 게이트가 적용되지 않는다 → **호출자가 분석 기준(branch·HEAD·대상 집합)을 프롬프트에 직접 명시할 의무**가 있다 (3라운드 감사 ISSUE-011). ⛔ `--expected-branch` 는 **옵션**이다 — 정본 모듈이 주입을 요구하므로 호출자가 명시해야 하며, 미지정 시 브랜치 검증은 수행되지 않는다. ⛔ `--commit` 의 merge 커밋은 `show --name-only`가 부모 선택에 따라 달라진다 — 정확한 대상이 필요하면 `--base` 를 쓴다.
+   나머지 보장: — `review` + git repo일 때: branch·HEAD 출력 · `--expected-branch` 불일치 → exit 11 · `--base`는 `rev-parse --verify` + **`merge-base --is-ancestor`**(⛔ `merge-base A B`는 공통조상 존재만 증명) · 스코프별 변경 파일 집합 **분리 산출** + ⛔ **잘리기 전에 카운트**
+
+### 사후 게이트 (결과 해석 전 — 신설분)
+
+| 순서 | 검사 | 실패 시 exit | 의미 |
+|:--:|---|:--:|---|
+| 0 | 진행 정체 없음 — 실행 중 스트림 로그(`${OUT}.stream.log`) 크기가 `FZ_GPT_IDLE_SEC`(기본 900 · 0 = 끔)초 동안 그대로면 래퍼가 CLI 자손 트리를 TERM → KILL | **12** | 측정 실패 — 메시지 머리 토큰 `GPT-IDLE` · 텔레메트리 9열 `idle` 로 CLI 실패와 가른다 |
+| 1 | `gpt` 종료코드 == 0 | **12** | 측정 실패 |
+| 2 | `-o` 파일 존재 + 비어있지 않음 | **13** | 측정 실패 |
+| 3 | `--schema` 지정 시 **스키마 계약** 충족 (`scripts/validate-gpt-output.py`) | **14** | 측정 실패 |
+| 4 | **cwd 오염 없음** — 호출 전후 `git status --porcelain` 동일 | 경고 | 위임 프로세스가 대상 repo에 파일을 남겼다 |
+
+⛔ **게이트 4의 근거**: `--cd`로 지정한 디렉토리는 위임 프로세스의 **쓰기 대상**이기도 하다. 팀 레포를 `--cd`로 준 호출이 산출물 17개를 그 안에 남긴 실측이 있다(gitignore 미적용). 2026-09-25 부터 래퍼가 read-only 를 강제해 쓰기는 막힌다 — 게이트 4 는 그 강제가 회귀로 풀렸을 때를 잡는 확인으로 남긴다.
+
+```bash
+BEFORE="$(git -C "$CD" status --porcelain 2>/dev/null)"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" <kind> ... ; RC=$?
+AFTER="$(git -C "$CD" status --porcelain 2>/dev/null)"
+[ "$BEFORE" = "$AFTER" ] || echo "WARN: cwd 오염 — 새 파일을 개인 경로로 옮겨라: $(diff <(printf '%s' "$BEFORE") <(printf '%s' "$AFTER") | grep '^>')" >&2
+```
+
+⛔ 게이트 3은 **문법이 아니라 계약**을 본다 — required·type·enum·`additionalProperties`·`$ref`를 재귀 검사한다. 1차 구현은 `json.load` 성공만 봐서 **`{}` 가 `GATE-PASS issues=0` 으로 통과**했다(감사 ISSUE-013). ⛔ `jsonschema` 부재(실측)로 표준 라이브러리 부분집합 구현 — 미지원 키워드(oneOf/allOf/pattern 등)는 검사하지 않고 통과시키며 그 범위를 스크립트 docstring에 명시한다.
+
+- 통과 시 `GATE-PASS json_ok issues=N verdict=V` (또는 `text_ok bytes=N`)를 **stdout에 출력**한다 — 호출자가 결과 유효성을 눈으로 확인할 수 있다
+- ⛔ **exit 10~14는 전부 측정 실패다** — "이슈 0건"·"승인"으로 해석 금지. 실패 시 `${OUT}.stream.log`를 Read
+- ⛔ **exit 18 은 측정 실패가 아니다** — GPT 미사용(세션 선택 off · `--model off` · GPT CLI 없음)이라 래퍼가 CLI 를 부르지 않았다. 사후 게이트까지 가지 않고 stderr 머리가 `GPT-OFF:` 다. 그 단계를 건너뛰고 `[GPT 미사용 — 사유]` 를 남긴다(정본 `modules/gpt-strategy.md` § GPT 미사용)
+- ⛔ `GPT-CALL-FAIL(10): 같은 --out 이 이미 실행 중이다(또는 이전 실행의 잠금이 남았다)` 인데 같은 `--out` 의 다른 실행이 없으면 앞선 정문이 trap 없이 끝난 것이다(SIGKILL 등) — 그 실행의 GPT CLI 프로세스가 남지 않았는지 확인한 뒤 메시지의 `<OUT>.lock` 폴더를 `rmdir` 한다
+- ⛔ 호출자는 스크립트 exit을 **마지막 문장으로 두거나 변수에 담아라** — 뒤에 `wc`/`echo`를 붙이면 그 exit이 덮는다 (본 절 신설을 유발한 실패)
+
+### 검증 상태 (양성 대조 — 2026-08-09 실측)
+
+사전 게이트 8종 전부 발화(exit 10×6 / 11×2) + 성공 경로 `GATE-PASS text_ok` exit 0. ⛔ 통과만 확인한 게이트는 무용하므로 **발화 가능성**을 함께 실측했다 (`modules/cross-validation.md` §Negative-Result Gate).
+
+---
+
+## 참조 스킬
+
+| 스킬 | 참조 이유 |
+|------|----------|
+| /fz-gpt | 본 모듈의 직접 소비자 — 모든 서브커맨드가 본 hygiene 준수 |
+| /fz | GPT 호출 게이트 주입 시 본 hygiene 인용 |
+| /fz-plan | TEAM 모드 GPT verify 호출 시 본 hygiene 준수 |
+| /fz-review | TEAM 모드 GPT check 호출 시 본 hygiene 준수 |
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (필요 시 *명시 Read* — 자동 로드 X. GPT 검증 §추가 발견 정정)
+- 200줄 한도 — 본 모듈은 *실용 wrapper 포함*으로 약간 초과 가능

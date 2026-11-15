@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gpt_peer_review_schema.json",
+  "title": "GPT Peer Review Response Schema",
+  "description": "피어 리뷰 에이전트(arch-critic, code-auditor, gpt-challenger)의 구조화된 응답 형식. base_issue_schema 참조. LLM-PeerReview ensemble 패턴 (다관점 reviewer + Generator≠Evaluator 분리) 기반. Anthropic Three-Agent Harness (InfoQ 2026-04) 정합. OpenAI Structured Outputs 규격 준수.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "agent",
+    "agent_status",
+    "status_reason",
+    "issues",
+    "challenges",
+    "strengths",
+    "overall_assessment"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": [
+        "1.1"
+      ],
+      "description": "스키마 버전. 1.1 만 받는다 — issues[].scope_disposition 필수 분류(OBS-03 v2.2). 1.0(null 호환)은 퇴역 (F-216 N4 · DG-15.peer=same)"
+    },
+    "agent": {
+      "type": "string",
+      "description": "에이전트 ID (예: arch-critic, code-auditor, gpt-challenger)"
+    },
+    "agent_status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "partial",
+        "failed"
+      ],
+      "description": "에이전트 실행 상태: ok(정상), partial(부분 실패), failed(전체 실패)"
+    },
+    "status_reason": {
+      "type": "string",
+      "description": "상태 설명 (예: '정상', 'pre-cache 부분 실패, import_graph 누락')"
+    },
+    "issues": {
+      "type": "array",
+      "description": "발견된 이슈 목록 (최대 10개)",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "perspective",
+          "file",
+          "line_range",
+          "severity",
+          "confidence",
+          "origin",
+          "description",
+          "impact",
+          "suggestion",
+          "alternatives",
+          "recommended",
+          "evidence_trace",
+          "scope_disposition",
+          "symptom_screen",
+          "symptom_reach",
+          "compiler_verifiable",
+          "ruleSource"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "이슈 고유 식별자 (예: ARCH-001, CODE-003)"
+          },
+          "scope_disposition": {
+            "type": "string",
+            "enum": [
+              "scope-in",
+              "scope-out",
+              "invariant-risk",
+              "parent-reopen",
+              "improvement"
+            ],
+            "description": "이슈 scope 분류 (필수 — null 금지). origin과 매핑: regression→scope-in, pre-existing→scope-out, improvement→improvement. parent-reopen은 Q-S5 발동 시 (P2-A)"
+          },
+          "perspective": {
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/unified_category 의 서브셋 (peer-review 관점용)",
+            "type": "string",
+            "enum": [
+              "architecture",
+              "extensibility",
+              "over_engineering",
+              "decomposition",
+              "modern_api",
+              "dependency",
+              "performance",
+              "refactoring_completeness",
+              "concurrency_safety",
+              "requirements_alignment"
+            ],
+            "description": "리뷰 관점 (unified_category의 peer-review 서브셋)"
+          },
+          "file": {
+            "type": "string",
+            "description": "이슈가 발견된 파일 경로"
+          },
+          "line_range": {
+            "type": "string",
+            "description": "라인 범위 (예: '45-60' 또는 '72')"
+          },
+          "severity": {
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/severity",
+            "type": "string",
+            "enum": [
+              "critical",
+              "major",
+              "minor",
+              "suggestion"
+            ],
+            "description": "심각도: critical(즉시 수정), major(수정 권장), minor(선택적), suggestion(제안)"
+          },
+          "confidence": {
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/confidence",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "이슈 신뢰도 0-100 (높을수록 확실)"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "regression",
+              "pre-existing",
+              "improvement"
+            ],
+            "description": "이슈 출처: regression(PR이 만든 새 문제), pre-existing(원본에도 있던 동작), improvement(개선 여지)"
+          },
+          "description": {
+            "type": "string",
+            "description": "문제 설명 (400자 이내). 왜 문제인지(WHY) 포함 필수. 단순 '누락'/'중복' 서술이 아닌, 기존 동작과의 차이 + 발생 조건 + 결과를 포함."
+          },
+          "impact": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "실제 사용자/시스템에 미치는 영향 (major 이상 필수, minor 이하 null). 예: '분석 데이터 단절로 쿠폰 사용량 지표 추적 불가'"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "수정 제안 (300자 이내)"
+          },
+          "alternatives": {
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/alternatives",
+            "type": [
+              "array",
+              "null"
+            ],
+            "description": "대안 비교 (major 이상, minor 이하는 null)",
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "description",
+                "pros",
+                "cons"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "대안 명칭 (예: A: 현재 구현)"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "접근 방식 설명"
+                },
+                "pros": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "recommended": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "추천 대안 label (minor 이하는 null)"
+          },
+          "evidence_trace": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "코드 추적 증거 (major 이상 필수, minor 이하 null). 실제 코드베이스의 코드 경로를 step-by-step으로 보여주어 문제를 시각적으로 증명한다. 각 step에 파일:라인 출처와 인라인 주석으로 데이터 타입/값 변화를 표시. 텍스트 설명 대신 코드가 스스로 증명하도록 작성."
+          },
+          "symptom_screen": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "증상이 보이는 구체 화면·뷰 이름. ⛔ 배선 경로(A→B→C)는 답이 아니다 — 그 값을 그리는 뷰가 그 시점에 계층에 있는가 [F-285]"
+          },
+          "symptom_reach": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "그 화면이 그 상태로 떠 있게 되는 사용자 동작. severity minor 이상이면 필수 — 비면 suggestion 으로 강등 [F-285]"
+          },
+          "compiler_verifiable": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "주장을 컴파일러 · 정적 검사로 판정할 수 있으면 true (fz-challenger 지시 — Lead Gate 4.6 이 컴파일 검증 대상을 고를 때 참고). 해당 없으면 null [F-466]"
+          },
+          "ruleSource": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "project",
+              "plugin-default",
+              null
+            ],
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/rule_source",
+            "description": "근거 규칙의 출처 — project(대상 프로젝트 규칙) · plugin-default(도메인 팩 기본값 — severity 는 suggestion 이하) · 규칙 근거가 없으면 null [F-466]"
+          }
+        }
+      }
+    },
+    "challenges": {
+      "type": "array",
+      "description": "Lead 발견 목록에 대한 판정 — Tier 1·2·3 challenger 와 DA 공통 (발견 목록이 주어지면 각 id 마다)",
+      "items": {
+        "type": "object",
+        "required": [
+          "target_issue_id",
+          "action",
+          "reason",
+          "compiler_verifiable",
+          "ruleSource"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "target_issue_id": {
+            "type": "string",
+            "description": "대상 이슈 ID (예: ARCH-001)"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "agree",
+              "challenge",
+              "supplement",
+              "reverse"
+            ],
+            "description": "판정: agree(동의), challenge(반박-confidence 20% 감소), supplement(보완), reverse(역전 — 원래 이슈를 지우지 않는다: 병합 계약에 따라 question 으로 전환되니 판별 근거를 reason 에 적는다)"
+          },
+          "reason": {
+            "type": "string",
+            "description": "판정 근거"
+          },
+          "compiler_verifiable": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "주장을 컴파일러 · 정적 검사로 판정할 수 있으면 true (fz-challenger 지시 — Lead Gate 4.6 이 컴파일 검증 대상을 고를 때 참고). 해당 없으면 null [F-466]"
+          },
+          "ruleSource": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "project",
+              "plugin-default",
+              null
+            ],
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/rule_source",
+            "description": "근거 규칙의 출처 — project(대상 프로젝트 규칙) · plugin-default(도메인 팩 기본값 — severity 는 suggestion 이하) · 규칙 근거가 없으면 null [F-466]"
+          }
+        }
+      }
+    },
+    "strengths": {
+      "type": "array",
+      "description": "코드의 강점 (최대 3개)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "overall_assessment": {
+      "type": "string",
+      "enum": [
+        "excellent",
+        "good",
+        "needs_improvement",
+        "major_concerns"
+      ],
+      "description": "전체 평가: excellent(우수), good(양호), needs_improvement(개선 필요), major_concerns(심각한 문제)"
+    }
+  }
+}

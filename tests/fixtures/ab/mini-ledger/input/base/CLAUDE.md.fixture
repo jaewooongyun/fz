@@ -1,0 +1,5 @@
+# 규칙
+
+## Architecture
+
+- View 는 저장소를 직접 부르지 않는다

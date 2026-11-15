@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gpt_review_schema.json",
+  "title": "GPT Review Response Schema",
+  "description": "GPT review/verify/validate/check/final/commit 응답 형식. OpenAI Structured Outputs 규격 준수.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "review_id",
+    "timestamp",
+    "review_type",
+    "issues",
+    "summary",
+    "verdict",
+    "overall_feedback",
+    "strengths",
+    "catalogHits"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": [
+        "1.1"
+      ],
+      "description": "스키마 버전. v1.1에서 scope_disposition 필드 추가 (OBS-03 v2.2)"
+    },
+    "review_id": {
+      "type": "string",
+      "description": "리뷰 고유 식별자 (예: REV-001)"
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "리뷰 생성 시각 (ISO 8601)"
+    },
+    "review_type": {
+      "type": "string",
+      "enum": [
+        "plan_validation",
+        "code_review",
+        "verification"
+      ],
+      "description": "리뷰 유형"
+    },
+    "issues": {
+      "type": "array",
+      "description": "발견된 이슈 목록",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "severity",
+          "category",
+          "description",
+          "location",
+          "suggestion",
+          "confidence",
+          "code_snippet",
+          "alternatives",
+          "recommended",
+          "scope_disposition"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "scope_disposition": {
+            "type": "string",
+            "enum": [
+              "scope-in",
+              "scope-out",
+              "invariant-risk",
+              "parent-reopen",
+              "improvement"
+            ],
+            "description": "이슈 scope 분류 (v1.1+). Lead/GPT 독립 판정 후 채택. modules/scope-challenge.md 참조"
+          },
+          "id": {
+            "type": "string",
+            "description": "이슈 고유 식별자 (예: ISSUE-001)"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "major",
+              "minor",
+              "suggestion"
+            ],
+            "description": "심각도"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "architecture",
+              "extensibility",
+              "over_engineering",
+              "decomposition",
+              "modern_api",
+              "dependency",
+              "performance",
+              "refactoring_completeness",
+              "concurrency_safety",
+              "requirements_alignment",
+              "logic_error",
+              "security",
+              "memory",
+              "thread_safety",
+              "style",
+              "documentation",
+              "testing",
+              "scope_creep",
+              "other"
+            ],
+            "description": "이슈 분류"
+          },
+          "description": {
+            "type": "string",
+            "description": "문제점 상세 설명"
+          },
+          "location": {
+            "type": "object",
+            "required": [
+              "file",
+              "symbol",
+              "line_range"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string",
+                "description": "파일 경로"
+              },
+              "symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "심볼 이름"
+              },
+              "line_range": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "라인 범위 (예: 10-25)"
+              }
+            }
+          },
+          "suggestion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "수정 제안"
+          },
+          "confidence": {
+            "type": "integer",
+            "description": "이슈 신뢰도 0-100",
+            "minimum": 0,
+            "$comment": "→ gpt_base_issue_schema.json#/$defs/confidence (값 인라인 — lint #N1 이 정합 검사)",
+            "maximum": 100
+          },
+          "code_snippet": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "관련 코드 스니펫"
+          },
+          "alternatives": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "description": "대안 비교",
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "description",
+                "pros",
+                "cons"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "대안 명칭"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "접근 방식 설명"
+                },
+                "pros": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "recommended": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "추천 대안 label"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "total_issues",
+        "by_severity",
+        "by_category"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "total_issues": {
+          "type": "integer",
+          "description": "총 이슈 수"
+        },
+        "by_severity": {
+          "type": "object",
+          "required": [
+            "critical",
+            "major",
+            "minor",
+            "suggestion"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "description": "critical 수"
+            },
+            "major": {
+              "type": "integer",
+              "description": "major 수"
+            },
+            "minor": {
+              "type": "integer",
+              "description": "minor 수"
+            },
+            "suggestion": {
+              "type": "integer",
+              "description": "suggestion 수"
+            }
+          }
+        },
+        "by_category": {
+          "type": "string",
+          "description": "카테고리별 이슈 수 요약"
+        }
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "needs_revision",
+        "rejected"
+      ],
+      "description": "최종 판정"
+    },
+    "overall_feedback": {
+      "type": "string",
+      "description": "전체적인 피드백"
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "코드/계획의 강점"
+    },
+    "catalogHits": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "점검 카탈로그(역할 스킬 Check Catalog) 중 해당한 항목. null 은 카탈로그 블록을 받지 못한 경로다(catalog_hits_report.py 가 경로 단위 unchecked 로 센다). 해당 항목이 없으면 빈 배열",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "catalogId",
+          "target",
+          "verdict"
+        ],
+        "properties": {
+          "catalogId": {
+            "type": "string",
+            "description": "카탈로그 행 id(F-NNN)"
+          },
+          "target": {
+            "type": "string",
+            "description": "파일:줄 또는 대상 — unchecked 면 이유"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "hit",
+              "clear",
+              "unchecked"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

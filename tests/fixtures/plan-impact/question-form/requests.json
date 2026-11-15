@@ -1,0 +1,10 @@
+{
+ "_comment": "[Q] 질문형(예/아니오 · 분포) — census 만으로는 답이 아니다 → UNRESOLVED(단어 census, 질문 미답). [S] 위치 · 호출자 수 — census 가 답한다 → RESOLVED. Q1 은 ' — ' 뒤에 문맥이 붙은 실측 꼴, S1 은 resolver self-test 와 같은 문장",
+ "impactRequests": [
+  "[Q1] 격리 clone(origin)을 만들 때 커밋 abc1234 가 해석되는가 — 뒤에 붙은 문맥",
+  "[Q2] `extractBody` 는 origin 의 base 에서 해석되는가",
+  "[Q3] `extractBody` 호출이 모듈별로 어떻게 분포하는가?",
+  "[S1] base 원본의 `extractBody` 호출자 수 확인 필요",
+  "[S2] `extractBody` 정의 위치 확인 필요"
+ ]
+}

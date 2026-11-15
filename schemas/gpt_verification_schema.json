@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gpt_verification_schema.json",
+  "title": "GPT Verification Response Schema",
+  "description": "GPT가 피드백 반영 여부를 검증한 후 반환하는 구조화된 응답 형식. VeriGuard dual-stage verification (arXiv 2510.05156, Pre-action Gate + Runtime Gate) + Chain-of-Verification (CoVe, arXiv 2309.11495) 패턴 기반. issue_resolutions가 Pre-action Gate, feedback_reflection_rate가 Runtime Gate에 대응. OpenAI Structured Outputs 규격 준수.",
+  "type": "object",
+  "required": [
+    "verification_id",
+    "original_review_id",
+    "issue_resolutions",
+    "feedback_reflection_rate",
+    "verdict",
+    "timestamp",
+    "iteration",
+    "new_issues_found",
+    "verification_summary",
+    "recommendations"
+  ],
+  "properties": {
+    "verification_id": {
+      "type": "string",
+      "pattern": "^VER-[0-9]{3,}$",
+      "description": "검증 고유 식별자 (예: VER-001)"
+    },
+    "timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "검증 생성 시각 (ISO 8601)"
+    },
+    "original_review_id": {
+      "type": "string",
+      "pattern": "^REV-[0-9]{3,}$",
+      "description": "검증 대상 원본 리뷰 ID"
+    },
+    "iteration": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "현재 반복 횟수"
+    },
+    "issue_resolutions": {
+      "type": "array",
+      "description": "각 이슈별 해결 상태",
+      "items": {
+        "type": "object",
+        "required": [
+          "issue_id",
+          "resolution_status",
+          "verification_notes",
+          "remaining_work"
+        ],
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "pattern": "^ISSUE-[0-9]{3,}$",
+            "description": "원본 이슈 ID"
+          },
+          "resolution_status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "partially_resolved",
+              "unresolved",
+              "regressed"
+            ],
+            "description": "해결 상태: resolved(완전 해결), partially_resolved(부분 해결), unresolved(미해결), regressed(악화)"
+          },
+          "verification_notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "검증 상세 노트"
+          },
+          "remaining_work": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "남은 작업 설명 (partially_resolved/unresolved 시)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "new_issues_found": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "검증 중 새로 발견된 이슈 (gpt_review_schema의 issues 축약형 — 필드는 id·severity·category·description·location·suggestion 6개뿐이고 scope_disposition·confidence 등은 없다. id 형식·category·location 제약도 다르다)",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "severity",
+          "category",
+          "description",
+          "location",
+          "suggestion"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^ISSUE-[0-9]{3,}$"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "major",
+              "minor",
+              "suggestion"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "file": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "line_range": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "file",
+              "symbol",
+              "line_range"
+            ]
+          },
+          "suggestion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "feedback_reflection_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "피드백 반영률 (0.0 ~ 1.0). 계산식: (resolved×1.0 + partially_resolved×0.5) / total_issues"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "needs_work",
+        "fail"
+      ],
+      "description": "검증 결과: pass(통과, Rate≥80%), needs_work(추가 작업 필요), fail(실패)"
+    },
+    "verification_summary": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "검증 결과 요약"
+    },
+    "recommendations": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "description": "추가 권장 사항"
+    }
+  },
+  "additionalProperties": false
+}

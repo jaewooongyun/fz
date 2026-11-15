@@ -1,0 +1,41 @@
+{
+  "title": "TOOLS 발급",
+  "scope": "VerifySpec 의 tools 선언이 원장 속성으로 옮겨진다",
+  "steps": [
+    {
+      "id": "G1",
+      "title": "리스트로 선언",
+      "verify": {
+        "kind": "command",
+        "criterion": "빌드가 성공한다",
+        "command": "printf hello",
+        "expect": "hello",
+        "tools": [
+          "git",
+          "python3"
+        ]
+      }
+    },
+    {
+      "id": "G2",
+      "title": "쉼표 문자열로 선언",
+      "verify": {
+        "kind": "command",
+        "criterion": "린트 위반이 없다",
+        "command": "printf ok",
+        "expect": "ok",
+        "tools": "git, git, grep"
+      }
+    },
+    {
+      "id": "G3",
+      "title": "선언 없음",
+      "verify": {
+        "kind": "command",
+        "criterion": "테스트가 통과한다",
+        "command": "printf t",
+        "expect": "t"
+      }
+    }
+  ]
+}

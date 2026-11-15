@@ -1,0 +1,1 @@
+openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 요약하라

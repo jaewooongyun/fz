@@ -1,0 +1,324 @@
+---
+name: fz-fix
+description: >-
+  버그 수정 + 에러 해결. 빠른 원인 분석과 수정-빌드 사이클.
+  예: 고쳐줘, 버그 있어, 크래시 나, 에러 떠, 안 돼 (비사용: 신규 기능 →fz-code, 계획 →fz-plan)
+user-invocable: true
+argument-hint: "[버그/에러 설명]"
+allowed-tools: >-
+  mcp__plugin_fz_serena__activate_project,
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__replace_symbol_body,
+  mcp__plugin_fz_serena__insert_after_symbol,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__sequential-thinking__sequentialthinking,
+  mcp__context7__resolve-library-id,
+  mcp__context7__query-docs,
+  mcp__plugin_fz_serena__get_diagnostics_for_file,
+  LSP,
+  Edit, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow
+metadata:
+  provides: [code-changes]
+  needs: [none]
+  intent-triggers:
+    - "수정|고쳐|버그|크래시|에러"
+    - "fix|bug|crash|error|patch"
+---
+
+# /fz-fix - 버그 수정 스킬
+
+> **행동 원칙**: 빠른 수정-빌드 사이클로 버그를 해결한다. 복잡도가 초과하면 즉시 적절한 스킬로 전환을 제안한다.
+
+## 개요
+
+> 탐색 → 분석 → 수정 → 빌드 (실패 시 반복) → 리뷰(선택)
+> 루프 프리미티브: ReAct + Generate-Test-Repair (H6, Inside the Scaffold)
+
+- 빠른 수정-빌드 반복에 최적화
+- 수정 검증(Step 4) 필수 — GPT 를 켠 세션이면 GPT check 포함
+- 복잡도 초과 시 자동 전환 제안
+- **코드 탐색만 필요한 경우** → `/fz-search` 사용
+
+## 사용 시점
+
+```bash
+/fz-fix "API 응답이 null일 때 크래시 발생"     # 버그 수정
+/fz-fix "타임아웃을 30초로 변경해줘"            # 간단한 수정
+# 코드 탐색이 필요하면 → /fz-search "CheckoutRIB 구조"
+```
+
+## Prerequisites
+
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
+## 모듈 참조
+
+| 모듈 | 용도 |
+|------|------|
+| modules/build.md | 빌드 검증 |
+| modules/execution-modes.md | LOOP 실행 모드 |
+| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+| modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
+| modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+| modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
+| modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
+| skills/fz-gpt/SKILL.md | GPT check 위임 — GPT 를 켠 세션이면 필수 (check verdict contract) |
+| modules/gpt-strategy.md | § 단계 실행 판정 — GPT check 직전 `gpt-choice.sh decide` 한 줄로 실행 · 건너뜀을 정한다 |
+
+## Plugin 참조 (SwiftUI + Swift Concurrency)
+
+> 참조: `modules/plugin-refs.md` — SwiftUI Expert(수정 시) + Swift Concurrency(수정 시) 섹션
+> SwiftUI View 작업 시 `swiftui-expert` 플러그인 패턴 참조
+> **최소 타겟 제약**: CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API 사용 시 availability 가드 필수
+> 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
+
+### ⛔ 역방향 트리거 (absence-pattern detection)
+
+> 참조: `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 부재해도 다음 패턴이 감지되면 안전성 분석을 활성화한다.
+
+수정 대상이 다음 3 패턴 중 하나라도 해당하면 동시성 안전성 검증 의무:
+
+1. **싱글톤 가변 상태**: `static let shared` + 가변 stored property (`var X: T`) — 동기화 메커니즘(`@MainActor` / `actor` / `NSLock` / `OSAllocatedUnfairLock` / serial queue) 부재 시 data race 위험. 수정 시 동기화 추가 또는 actor 전환 검토.
+
+2. **콜백 스레드 모호**: completion handler / `pathUpdateHandler` / delegate callback 내부에 `DispatchQueue.main` / `@MainActor` 보호 부재 — 콜백 실행 스레드 ≠ 소비자 스레드 가능성. context7로 API 콜백 스레드 확인 후 수정.
+
+3. **ObservableObject + @Published + @MainActor 부재**: `@Published var` 쓰기가 background 스레드에서 발생할 수 있는데 클래스/메서드에 `@MainActor` 부재 — UI 스레드 위반 런타임 경고. 수정 시 `@MainActor` 추가 또는 `await MainActor.run` 래핑.
+
+수정 자체가 안티패턴 도입할 위험이 있으므로 fix 시작 전 위 3 패턴 사전 점검 의무.
+
+## sc: 활용 (SuperClaude 연계)
+
+| Mode/상황 | sc: 명령어 | 용도 |
+|----------|-----------|------|
+| 버그 수정 | `/sc:sc-troubleshoot` | 에러 원인 진단(선택) |
+| 복잡한 에러 | `/sc:sc-explain` | 프레임워크/라이브러리 깊은 에러 교육적 설명 |
+| 수정 후 | `/sc:sc-analyze` | 수정 코드 빠른 품질 체크 |
+| 복잡한 수정 후 | `/sc:sc-reflect --type task` | 근본 원인 해결 여부 자체 검증 |
+| 코드 탐색 필요 | `→ /fz-search` | 전용 탐색 스킬로 전환 |
+| 복잡도 초과 | `→ /fz-plan` 또는 `→ /fz-code` | 스킬 전환 |
+
+---
+
+## ⛔ Phase 0: Work Dir Pre-flight
+
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+
+### Gate 0: Work Dir Ready
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
+- [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile fix` exit 0? (아래 · WORK_DIR 없는 세션은 건너뜀을 보고)
+
+⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile fix {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
+
+---
+
+### 티켓 폴더 컨텍스트 로딩 (티켓 폴더(WORK_DIR) 활성 시):
+- `{WORK_DIR}/fix/fix-analysis.md` 읽기 → 이전 수정 분석 복원 (있으면)
+- `{WORK_DIR}/search/search-result.md` 읽기 → fz-search 탐색 결과 (있으면)
+
+---
+
+### revert/되돌리기 감지
+
+지시에 "되돌리기", "revert", "원상복구", "undo", "롤백" 키워드 감지 시:
+→ `cross-validation.md § origin-equivalence` 게이트 활성
+→ 키워드 기반이 아닌 **상태 기반**으로 범위 정의 (참조: `modules/lead-reasoning.md`)
+→ 완료 후 원본과의 동등성(origin-equivalence) 확인 필수
+
+---
+
+## Mode A: 버그 수정 (Bug Fix)
+
+빠른 수정-빌드 사이클로 버그를 해결합니다. 아래 팀 에이전트 모드 0 의 모드 게이트를 거치지 않고 여기서 시작하면 먼저 기록 `run_metrics.py start --skill fz-fix --mode light --recommended none`(`modules/mode-gate.md` § 기록) — 게이트를 거쳐 왔으면 거기서 이미 기록했으니 다시 부르지 않는다.
+
+> **프로젝트 규칙**: CLAUDE.md `## Code Conventions` 섹션을 따른다.
+
+### Step 1a: Reproduce — 재현 조건 확인
+
+1. **증상 파악**: 에러 메시지, 크래시 로그, 재현 경로 먼저 확인
+2. 재현 가능한 정확한 경로를 식별 (UI 흐름, API 호출 순서 등)
+
+### Step 1b: Isolate — 최소 범위로 좁히기
+
+1. **관련 코드 탐색** (Serena):
+   - `Grep` → 에러 메시지/키워드 검색
+   - `mcp__plugin_fz_serena__find_symbol` → 의심 심볼 찾기
+   - `mcp__plugin_fz_serena__find_referencing_symbols` → 호출 관계 파악
+2. 원인 후보를 2-3개로 좁힘
+3. **회귀면 환경 축도 모은다**: `python3 "${FZ_PLUGIN_ROOT}/scripts/collect_env_axes.py" {정상 ref} {회귀 ref} --repo {GIT_ROOT}` — 컴파일 가드 · 타이머 · 네트워크 · 빌드 설정 · 툴체인 버전 줄 변화가 나온다(F-075 · F-080). ⛔ 후보 목록이다 — 증상 어휘 검색과 따로 보고 판정은 Step 1c 에서 한다
+
+### Step 1c: Root-Cause — 증상이 아닌 원인 추적
+
+1. **구조적 추론** (복잡한 버그):
+   - `mcp__sequential-thinking__sequentialthinking` → 5 Whys 기법
+   - `/sc:sc-troubleshoot` → 진단(선택)
+   - `/sc:sc-explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명
+2. **⛔ Step 1c 완료 전 코드 수정 금지**. root-cause가 불명확하면 AskUserQuestion.
+
+### Step 2: 수정
+
+⛔ **패턴 변환 감지** (수정이 비동기/네트워크/UI 패턴 변환을 포함할 때):
+- `modules/code-transform-validation.md` 참조. 원본 런타임 특성(스레드, 에러) 확인 후 수정
+- Context7로 원본 API 동작 확인. 수정 후 Behavioral Equivalence Check 수행
+
+| 상황 | 도구 |
+|------|------|
+| 심볼 수정 | `mcp__plugin_fz_serena__replace_symbol_body` |
+| 코드 추가 | `mcp__plugin_fz_serena__insert_after_symbol` |
+| 간단 수정 | `Edit` |
+| 복잡한 수정 | `/sc:sc-troubleshoot` |
+
+### Step 3: 빌드 검증
+
+참조: `modules/build.md` — 빌드 검증 패턴
+
+에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
+
+### Step 4: Verify Fix (필수)
+
+수정이 재현 경로(Step 1a)에서 문제를 해결했는지 확인:
+- `mcp__plugin_fz_serena__find_referencing_symbols` → 참조 무결성 확인
+- `/sc:sc-analyze` → 빠른 품질 체크
+- `/sc:sc-reflect --type task` → 수정이 근본 원인을 해결했는지 자체 검증
+  (트리거: 복잡한 버그 수정 완료 후, 단순 수정은 스킵)
+- GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다
+  - `run` · `config` → `/fz-gpt check` 호출 → cross-model 검증. verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
+  - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.md` § GPT 미사용) / `ask` → 모델 질문 → `set` → 다시 decide
+- 또는 `/fz-review`로 전환
+
+---
+
+## 팀 에이전트 모드 (복잡한 버그 — Workflow 오케스트레이션, Wave 3)
+
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체. 복잡한 버그(여러 파일, 아키텍처 영향)에서 활성화.
+> Pair Programming(경량)은 `workflows/code-pair.js` 가 평탄화 구현한다.
+> 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.md` §12.
+> ⛔ 책임 재배분 (사용자 승인): 에이전트는 changeset JSON만 반환 — **Lead가 적용 + 빌드 검증**.
+
+### 실행 절차 (Lead)
+
+0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" fix --files {수정 대상 파일 수} --estimate code-pair` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 Mode A Bug Fix Step 1-4 를 Lead 가 직접 한다(Workflow 없음 · Step 4 GPT check 는 그대로) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
+1. **args 조립**: `mode:'light'` / `stepSpec`={id,title,goal,files,verify,**complexity**, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 시 `split_required`. 임계값 single source=상수)} / `effort`=0 결과 `effort.value`(lead-effort — null 이면 넣지 않는다) / `contextPath`(버그 분석 요약 파일) / `changesetTarget` / `buildFeedback`(재시도 시)
+   - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
+1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus) → 이슈가 있으면 Stage 3 수정. 1-3 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke. ⛔ `reason:'changeset-defect'` fallback 이면 적용하지 않는다 · 적용 뒤 오라클(Serena `find_symbol` `include_body: true` 심볼 재독 · Edit 앵커 · Step 기준 numstat)은 fz-code 절차 4 그대로다 — 조건을 여기 다시 적지 않는다(두 벌이면 한쪽만 고쳐진다)
+4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
+   Mode A Bug Fix Step 1-4 직접 진입은 **L4 사용자 승인 후**다. 어느 경로로 가든 **Step 4 GPT check 책임은 유효**하고(§ 단계 실행 판정),
+   사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 에 기록한다(규약: `experiment-log.md` 머리 문단)
+   - **`mode:'split_required'`(또는 `splitSuggested:true`) 우선**: SOLO 폴백 전에 **Step 분할 후 재invoke** (H5 크기 가드 — fz-code 절차 6 사다리 동형). ⛔ Lead=fable 자동 SOLO 금지 — 직접 구현은 사용자 승인 후
+5. **지표 기록**: 세션당 1행 → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-fix 테이블. 단일 Step 다수 — Step 루프 1회면 invoke 1회로 종료. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
+
+---
+
+## 복잡도 판단 및 스킬 전환
+
+### 자동 전환 트리거
+
+| 신호 | 전환 대상 |
+|------|----------|
+| 3개+ 파일 수정 필요 | `/fz-code` |
+| 아키텍처 변경 필요 | `/fz-plan` |
+| 새 모듈 생성 | `/fz-plan` → `/fz-code` |
+| 코드 탐색/구조 분석 | `/fz-search` |
+| 리뷰 검증 원하는 경우 | `/fz-review` |
+| 3회 이상 수정 반복 | /simplify 시도 → `/fz-plan` 전환 |
+| 빌드 3회 실패 (LOOP 한도) | `gpt-choice.sh decide` 가 `run` · `config` 면 `/fz-gpt check` 보조 진단 1회(`skip` 이면 `[GPT 미사용 — 사유]`) → 결과 보고 → AskUser |
+
+---
+
+---
+
+## Gate: Bug Fix Complete
+- [ ] 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
+- [ ] 빌드 성공?
+- [ ] 원인-수정 대응 명확?
+- [ ] GPT check 완료 또는 `[GPT 미사용 — 사유]` 표기? (Step 4 — 직전 `gpt-choice.sh decide` 줄 · GPT 를 켠 세션이면 필수)
+- [ ] 아티팩트 기록 완료? (티켓 폴더: `{WORK_DIR}/fix/fix-analysis.md`, 비-티켓 세션: `write_memory("fz:checkpoint:fix-{bug}", "원인: {요약}. 수정: {파일}. 빌드: OK")`)
+
+---
+
+## Few-shot 예시
+
+```
+BAD (원인 분석 없이 수정):
+증상: "탭 전환 시 크래시"
+수정: guard let 추가
+→ 근본 원인(nil 상태 도달 경로) 미분석. 증상만 숨김.
+
+GOOD (원인 분석 → 수정 → 빌드):
+증상: "탭 전환 시 크래시"
+Phase 1: 크래시 로그 분석 → HomeInteractor.didBecomeActive()에서 nil
+Phase 2: find_symbol → listener가 detach 후 nil인데 호출됨 → weak var 미적용
+Phase 3: weak var + optional chaining 적용 → 빌드 성공
+```
+
+```
+BAD (복잡 버그에 fz-fix 사용):
+"5개 모듈에 걸친 상태 불일치 버그"
+→ 영향 범위가 넓어 fz-fix 범위 초과. /fz-search → /fz-plan → /fz-code가 적절.
+
+GOOD (복잡도 초과 시 전환):
+Phase 1 분석 후 영향 범위 3개 모듈+ → "복잡도 초과. /fz-search로 전환 권장" 보고.
+```
+
+```
+BAD (GPT 직접 호출):
+수정: GPT CLI review 모드(`--uncommitted`) 직접 호출
+→ fz-fix allowed-tools에 Bash(codex *) 없음. 권한 에러.
+
+GOOD (/fz-gpt check 위임 패턴):
+수정: Step 4 에서 decide 가 run · config 면 /fz-gpt check 위임
+→ fz-gpt가 Bash Hygiene/severity 파싱 처리. fz-fix는 verdict 분기만.
+```
+
+---
+
+## Boundaries
+
+래더 한도(`modules/execution-modes.md`) 뒤에도 실패하면 근본 원인을 재분석한다(§12 L4 — 사용자 에스컬레이션). 복잡도 초과 시 즉시 전환한다.
+
+⛔ **Surgical 수정**: 버그 수정은 직접 요청·명백히 필요한 변경만 — 주변 코드를 함께 정리하지 않는다(빠른 수정일수록 drive-by cleanup 위험↑). 범위 외 개선점은 보고만, 실행 금지. [verified: claude-4-best-practices — "A bug fix doesn't need surrounding code cleaned up"]
+
+**Will**:
+- 빠른 버그 수정 + 빌드 검증
+- 복잡도 초과 시 적절한 스킬 전환 제안
+- GPT 를 켠 세션이면 /fz-gpt check 호출 위임 (cross-model 검증 — § 단계 실행 판정)
+
+**Will Not**:
+- 코드 탐색/구조 분석 (→ /fz-search)
+- 새 기능 구현 (→ /fz-plan + /fz-code)
+- 대규모 리팩토링 (→ /fz-plan)
+- 풀 코드 리뷰 (→ /fz-review)
+- GPT CLI 직접 호출 (→ /fz-gpt 위임)
+- **팀 공유 영역 자동 변경 (36차)**: fast fix 시에도 `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` 등 팀 영역 보호. 사용자 명시 합의 없이 자동 변경 금지
+
+## 에러 대응
+
+| 에러 | 대응 | 폴백 |
+|------|------|------|
+| Serena 연결 실패 | Grep + Glob 폴백 | 수동 탐색 |
+| 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
+| 심볼 못 찾음 | 패턴 검색 전환 | Grep 폴백 |
+| 복잡도 초과 | /fz-plan 전환 | 사용자 상담 |
+| /fz-gpt check verdict 미반환 (decide `run` · `config` 로 부른 뒤) | warning 처리 + 빌드 검증 결과로 진행 | 사용자 보고 |
+| GPT 미사용 (decide `skip` · 호출 exit 18 `GPT-OFF`) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 |
+
+## Completion → Next
+
+- 버그 수정 완료: 사용자에게 보고 + 테스트 방법 안내(보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록)
+- 복잡한 수정: `/fz-review` 제안
+- 탐색 필요: `/fz-search` 제안
+- 탐색 후 변경 필요: `/fz-plan` 또는 `/fz-code` 제안

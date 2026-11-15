@@ -1,0 +1,8 @@
+피드백 반영 여부를 검증하라.
+CLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.
+
+## 원본 이슈
+ISSUES-FIXED
+
+## 적용된 수정
+FIXES-FIXED

@@ -1,0 +1,4 @@
+위 리뷰 결과에서 수정이 필요한 이슈에 대해 Root Cause와 Fix Strategy를 제시하라.
+## 이슈 목록
+ISSUES-FIXED
+파일을 수정하지 마라(읽기 전용 분석).

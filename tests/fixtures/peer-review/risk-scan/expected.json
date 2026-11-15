@@ -1,0 +1,138 @@
+{
+  "note": "risk_scan.py 회귀 기대값. ⛔ 눈으로 확인하지 말고 run.sh 로 판정한다. added_lines 는 numstat_fallback 의 독립 python 오라클로 교차 검산 가능하다(같은 diff 를 다른 파서가 센다). 비교 키는 risk · added_lines · tier_delta · files · removed_paths · categories · runtime_axes · doc_contract_deleted · plugin_refs · convention_deviations 중 셀에 적힌 것만이다(`<셀>.head/` 가 있으면 --head 로 넘긴다). before_f381 은 F-381 수정 전 트리(be8c871)의 실측 기록이고 비교하지 않는다.",
+  "cases": {
+    "negative-interactor": {
+      "risk": 0,
+      "why": "`actor` 가 `Interactor` 부분 문자열 + 삭제된 `Task {}` — 둘 다 이 PR 의 위험이 아니다",
+      "added_lines": 3
+    },
+    "negative-doc-only": {
+      "risk": 0,
+      "added_lines": 0,
+      "why": "문서에 적힌 auth·token·public func 는 런타임 위험이 아니다. 파일 자체를 수집에서 뺀다"
+    },
+    "negative-local-var": {
+      "risk": 0,
+      "why": "싱글톤은 있으나 `var` 가 메서드 로컬이다 — 공유 가변 상태가 아니다",
+      "added_lines": 6
+    },
+    "positive-actor": {
+      "risk": 1,
+      "why": "실제 `actor` 선언 + `@MainActor` + `async`",
+      "added_lines": 5
+    },
+    "positive-concurrency": {
+      "risk": 1,
+      "why": "역방향 신호 — 키워드 없이 `static let shared` + 저장 `var`",
+      "added_lines": 6
+    },
+    "positive-identifier-substring": {
+      "risk": 1,
+      "why": "⛔ 회귀 방지: `authManager`·`tokenProvider`·`sessionStore` 는 식별자 **내부** 등장이 신호다. 일괄 단어경계를 걸면 이 셋을 통째로 놓친다",
+      "added_lines": 3
+    },
+    "positive-hunk-plus-no-loss": {
+      "risk": 1,
+      "added_lines": 2,
+      "why": "⛔ 회귀 방지: hunk 안의 `++ actor` 를 파일 헤더로 오인하면 추가 행을 잃는다. `added_lines` 가 핵심 — risk 보다 손실 여부를 본다"
+    },
+    "negative-rename-pair": {
+      "risk": 0,
+      "why": "⛔ 회귀 방지: `-@MainActor var isGiftWrapped` / `+@MainActor var includesGiftWrap` 는 개명 짝이다. 추가 라인만 보면 concurrency 1건 — 실측에서 작은 PR 을 Tier 1→2 로 올렸다(agent 0콜→3콜). net 증가 0 이면 이 PR 이 만든 위험이 아니다",
+      "added_lines": 2
+    },
+    "negative-rename-singleton": {
+      "risk": 0,
+      "why": "⛔ 회귀 방지: 역방향 신호(`static let shared` + 저장 `var`)가 **삭제 쪽에도** 있다 — 프로퍼티 개명이지 새 공유 가변 상태가 아니다",
+      "added_lines": 2
+    },
+    "positive-net-new-concurrency": {
+      "risk": 1,
+      "why": "net 판정이 정탐을 죽이지 않는지 — `@MainActor` 는 1:1 개명이지만 `async`·`await` 가 **순증**이므로 승격한다",
+      "added_lines": 4
+    },
+    "positive-intra-category-substitution": {
+      "risk": 1,
+      "why": "⛔ 회귀 방지: `-await other()` / `+Task { detached() }` 는 concurrency **합계**가 1:1 이라 카테고리 단위 net 으로는 미발화했다. 구조적 동시성 → 비구조적 전환은 **새 위험**이다. 토큰별로 세면 `task {` 가 1>0 이라 잡힌다",
+      "added_lines": 1
+    },
+    "negative-session-only": {
+      "risk": 0,
+      "added_lines": 2,
+      "why": "F-165: `session` 을 지역 변수명으로만 쓴 PR(실측). 고신뢰 auth 토큰 0 → auth 카테고리 미성립. ⛔ samples 에는 session 이 남아 사람이 판정할 근거가 된다"
+    },
+    "positive-session-with-netnew-auth-same-hunk": {
+      "risk": 1,
+      "added_lines": 2,
+      "why": "같은 hunk 에 net-new `authManager` 동반 → auth 성립. session 이 아니라 auth 토큰이 카테고리를 세운다"
+    },
+    "positive-session-plus-netnew-auth-other-hunk": {
+      "risk": 1,
+      "added_lines": 2,
+      "why": "⛔ 다른 hunk 여도 net-new auth 는 그 자체로 정당한 신호다 — hunk 거리와 무관하게 성립. 저신뢰 판정은 **저신뢰 토큰만 순증했을 때**만 발동한다"
+    },
+    "positive-session-near-renamed-auth": {
+      "risk": 1,
+      "added_lines": 2,
+      "why": "auth 는 개명이라 net 0(순증 아님)이지만 **같은 hunk** 에 있다 → 인증 코드를 편집하는 중의 session 이므로 성립. 여기서 hunk 근접이 갈린다"
+    },
+    "negative-session-far-from-renamed-auth": {
+      "risk": 0,
+      "added_lines": 2,
+      "why": "auth 개명(net 0)이 **다른 hunk** 에 있고 session 만 순증 → 미성립. 위 케이스와 짝이며 hunk 로직이 죽은 코드가 아님을 증명한다"
+    },
+    "negative-deleted-file-path": {
+      "risk": 0,
+      "added_lines": 0,
+      "files": 1,
+      "removed_paths": ["Sources/Legacy Cache.swift"],
+      "before_f381": {"files": 1, "removed_paths": ["/dev/null"]},
+      "why": "F-381 오라클: 코드 파일 1개 삭제(경로에 공백). `+++ /dev/null` 이라 경로는 `diff --git` 헤더에만 있다 — 삭제 행이 실제 경로로 귀속돼야 한다. 기준 트리는 '/dev/null' 로 모았다"
+    },
+    "positive-deleted-doc-unmasks-netnew": {
+      "risk": 1,
+      "tier_delta": 1,
+      "added_lines": 3,
+      "files": 1,
+      "removed_paths": [],
+      "before_f381": {"risk": 0, "tier_delta": 0, "files": 2, "removed_paths": ["/dev/null"]},
+      "why": "⛔ 의도된 Tier 변경(EC-28 · IR-10): 문서 `docs/auth-notes.md` 를 지우고 `authManager` 코드를 더한 PR. 기준 트리는 지운 .md 의 auth·token 이 '/dev/null' 키로 문서 제외를 피해 추가 auth 를 상쇄했다(risk 0 · tier_delta +0). 실제 경로면 .md 가 빠져 auth 가 순증한다(risk 1 · tier_delta +1)"
+    },
+    "negative-deleted-files-and-doc": {
+      "risk": 0,
+      "added_lines": 1,
+      "files": 3,
+      "removed_paths": ["Sources/Keep.swift", "Sources/OldA.swift", "Sources/OldB.swift"],
+      "before_f381": {"files": 2, "removed_paths": ["/dev/null", "Sources/Keep.swift"]},
+      "why": "코드 2개 · 문서 1개 삭제 + 코드 1개 수정. 삭제 파일마다 제 경로로 귀속되고(기준은 '/dev/null' 하나로 합쳐 files 2) 지운 문서는 문서 접미사 필터로 빠진다"
+    },
+    "negative-rename-file-pair": {
+      "risk": 0,
+      "added_lines": 1,
+      "files": 1,
+      "removed_paths": ["Sources/NewName.swift"],
+      "why": "회귀: git rename(similarity 72%) 안의 `-@MainActor var isOld` / `+@MainActor var isNew` 개명 짝. 삭제 행은 전처럼 `+++ b/` 새 경로에 붙는다 — 헤더 경로는 `+++ /dev/null` 일 때만 쓴다"
+    },
+    "negative-binary-delete-add": {
+      "risk": 0,
+      "added_lines": 0,
+      "files": 0,
+      "removed_paths": [],
+      "why": "회귀: binary 삭제 1 · 추가 1(`Binary files … differ`, `+++` 없음). 헤더만 있는 블록은 파일로 세지 않는다 — 전과 같다"
+    },
+    "positive-quoted-nonascii-doc-unmasks-netnew": {
+      "risk": 1,
+      "tier_delta": 1,
+      "added_lines": 3,
+      "files": 1,
+      "removed_paths": [],
+      "why": "F-412: 비ASCII 이름 문서(docs/인증 메모.md)를 지우고 authManager 를 더한 PR 의 기본 설정(core.quotePath=true) diff. 인용 경로를 풀지 않으면 지운 .md 가 문서 제외를 피해 auth 를 상쇄한다(risk 0 · files 2) — 같은 커밋을 quotepath=false 로 뜨면 risk 1 · files 1"
+    },
+    "f515-analytics-category": {"categories": ["analytics"], "risk": 0},
+    "f134-animation-category": {"categories": ["animation"], "risk": 0},
+    "f013-doc-comment-contract-deleted": {"doc_contract_deleted": [{"path": "src/Checkout.swift", "lines": ["반드시 메인 스레드에서 호출한다.", "주문 처리 중이면 먼저 멈춘다."]}], "risk": 0},
+    "f258-runtime-axis-marked": {"runtime_axes": ["gesture", "on_change", "state_capture"]},
+    "f520-plugin-refs-full-table": {"plugin_refs": {"Swift Concurrency": ["performance", "sendable", "tasks"], "SwiftUI Expert": ["latest-apis", "localization", "state-management", "view-structure"]}},
+    "f516-convention-deviation-collected": {"convention_deviations": [{"path": "src/StoreVC.swift", "role": "onSelect", "line": 15, "missing": ["!isCheckoutLocked"], "siblings": 2}]}
+  }
+}

@@ -1,0 +1,475 @@
+---
+name: fz-review
+description: >-
+  자기 코드 3중 검증(Claude+GPT+sc:analyze) + 역방향 검증.
+  예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR →fz-peer-review, 직접 수정 →fz-fix)
+user-invocable: true
+argument-hint: "[리뷰 대상 설명] [light|full] [--render] [--gpt-independent]"
+allowed-tools: >-
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__find_implementations,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__edit_memory,
+  mcp__plugin_fz_serena__list_memories,
+  mcp__sequential-thinking__sequentialthinking,
+  mcp__plugin_fz_serena__get_diagnostics_for_file,
+  LSP,
+  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(git -C * archive *), Bash(tar -xf - -C *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
+metadata:
+  provides: [review-results]
+  needs: [code-changes]
+  intent-triggers:
+    - "리뷰|검증|품질|검토"
+    - "review|validate|quality|check"
+---
+
+# /fz-review - 리뷰 + 품질 보증 스킬
+
+> **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2512.20845(MAR) · `code.claude.com/docs/en/{best-practices, sub-agents}`. ⚠️ 이 감사에서 **레지스트리 미등재 4종** 발견 — `2510.05381` · `2510.07777` · `2512.20845` · `2601.15300` (`guides/llm-references.md` · `guides/harness-engineering.md` §참고문헌 둘 다에 없다). ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
+
+> **행동 원칙**: 3중 검증(Claude+GPT+sc:analyze)으로 코드 품질을 확보하고, GPT 역방향 검증으로 피드백 반영을 정량화한다. 검증 결과가 기준 미달이면 반복 개선한다.
+>
+> **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.md` 사전 참조. **Decision Tree (evidence ≥ 3 sessions) + 태깅 (`[skill:][status:][priority:]`) + MEMORY.md 200줄 한도** 모두 검증. 사후 catch 방지 (Layer 1+2+3 systematic weakness 차단).
+
+## 개요
+
+> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 5 (3중 검증: Serena // /fz-gpt review // /sc:sc-analyze) → Phase 5.5 (/fz-gpt validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
+> 루프 프리미티브: Evaluator-Optimizer + Multi-Attempt Retry (H6, Inside the Scaffold)
+
+3중 검증(Claude+GPT+sc:analyze) + 역방향 검증 + Reflection Rate 정량화.
+⛔ **threshold gating은 `N≥10`에서만** — `N<10`은 `preliminary`(measurement only, verdict 보류)다. **정본 = `modules/cross-validation.md §Reflection Rate threshold`** (`:203` `N<10 → verdict 보류` · `:212` `N≥10에서만 ≥80% gating, N=0이면 vacuous pass`). 본 스킬은 정본을 인용하며 자체 임계를 정의하지 않는다.
+
+> 이론 근거: MAR — Multi-Agent Reflexion (arxiv 2512.20845) — **acting/diagnosing/critiquing/aggregating 역할 분리**가 단일 에이전트 self-review보다 정확도 높음. fz의 Claude(acting) + GPT(critiquing/diagnosing) + Lead(aggregating) 역할 분리와 구조적 정합.
+> 보강 근거: OpenCodeReview (arxiv 2608.09290 [arxiv preprint, 2026-08]) — 리뷰 에이전트의 약점은 *"non-determinism--unbounded tool use makes review outcomes unstable"* 이고, 결정론 쪽으로 옮긴 구성이 SEM-F1 최대 2.17x · 토큰 5-15x 절감 → fz 리뷰 루프가 판정을 스크립트 oracle(게이트)에 두는 근거.
+
+```bash
+/fz-review "구현한 코드 리뷰해줘"     /fz-review "현재 Reflection Rate 얼마야?"
+/fz-review "GPT 피드백 반영, 재검증" /fz-review "Gate 5 통과 확인해줘"
+```
+
+## Prerequisites
+
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+- ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · `skip` 이면 그 자리에 `[GPT 미사용 — 사유]`. 호출에 모델·effort 를 적지 않는다 · 정문 exit 19(`GPT-ROUNDS:` 재검증 라운드 거부)면 다시 부르지 않는다 — `same-input` 은 stderr 가 가리킨 직전 판정 파일을 쓰고, 그 밖(`budget-exhausted` · `recall-used`)은 그 키를 미해결로 보고한다(`python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_rounds.py" status --work-dir {WORK_DIR}` — 통과 아님 · 정본 `modules/cross-validation.md` § 재검증 라운드 상한)
+
+## 모듈 참조
+
+| 모듈 | 용도 |
+|------|------|
+| modules/session.md | 세션 감지, Issue Tracker 연동 |
+| modules/build.md | 빌드 검증 |
+| modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
+| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+| modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+| modules/rtm.md | RTM 검증 — Phase 4.5에서 Req-ID 상태 확인 |
+| modules/native-agents.md | L3 에이전트 스폰 — Phase 5 병렬 검증 |
+| modules/safety-audit.md | 검증 4-J Concurrency Safety Audit — 역방향 안전성 감사 |
+| modules/uncertainty-verification.md | 4-K enforcement — [verified] 없는 주장 violation 판정 |
+| modules/cross-validation.md | 검증 게이트 + 외부 피드백 검증 + 런타임 주장 검증 + Coverage Gate + Reflection Rate 정본 |
+| modules/review-structural-axes.md | 구조 판정 5축 (fz-peer-review 공유). ⛔ Phase 5 전 **Read 후** §3+§4를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
+
+## Plugin 참조 (SwiftUI + Swift Concurrency)
+> 참조: `modules/plugin-refs.md` — SwiftUI Expert + Swift Concurrency (리뷰 시) 섹션
+> diff에 `@MainActor|actor|async|@Observable` 감지 시 해당 플러그인 참조. **역방향 트리거**: 동시성 키워드 없어도 `static let shared` + `var` 등 감지 시 Concurrency Safety 적용
+> **iOS 16 minimum target 검증**: diff에 iOS 17+ API (`@Observable`, `@Bindable`, onChange new signature) 사용 시 `#available` 가드 존재 여부 검증 의무.
+
+## sc: 활용 (SuperClaude 연계)
+
+| Phase | sc: 명령어 | 용도 |
+|-------|-----------|------|
+| 5 | `/sc:sc-analyze`, `/fz-gpt review`, `/sc:sc-spec-panel` | 품질분석, GPT 리뷰, 스펙 패널 |
+| 5.5 | `/fz-gpt validate` | 역검증 |
+| 6 | `/sc:sc-improve`, `/sc:sc-cleanup`, `/sc:sc-reflect` | 개선, 정리, 자체검증 |
+| 7 | `/sc:sc-test` | 최종 테스트 검증 |
+## 팀 에이전트 모드 (Review Squad)
+
+> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
+
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
+> Live Review 패턴은 `workflows/review-live.js` 가 평탄화 구현한다.
+> 스크립트: `workflows/review-live.js` (플러그인 루트 상대) — agents/의 review-arch·review-quality·review-counter 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+
+### 실행 절차 (Lead)
+
+> ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 · 2)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 참조 무결성 확인 · L3 에이전트)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 첫 패스(2.5)는 백그라운드 한 줄이라 그대로 직전에 둔다(S22). 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
+1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12) · ⛔ 기록 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_review_diff.py" --diff {WORK_DIR}/review/diff.patch --repo {GIT_ROOT} --work-dir {WORK_DIR}` — exit 1 이면 `MISSING` 신규 파일을 덧붙이고 다시 돈다(F-270: 신규 파일을 빠뜨려 변경의 60% 가 리뷰 밖에 있었다) · exit 2 는 대조 불가(통과 아님)
+1.2. **이동 후보 표시**: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_moved_code.py" {BASE} WORKTREE --repo {GIT_ROOT}`(리뷰 대상이 커밋 범위면 `WORKTREE` 대신 그 끝 커밋) — `MOVE-CANDIDATE` 파일은 신규 코드로 읽기 전에 BASE 의 출처를 본다(F-078 · 신규성 판정은 사람)
+1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 2~4.5 를 건너뛰고 Phase 5 Lead 3중 검증으로 간다(아래 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
+   - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
+2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계 — ⛔ `plan-final.md` 등에서 온 자기 설계 판단 · 위험 추정은 넣지 않는다: 렌즈가 내 판단을 확인만 하게 된다 · F-042) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
+   - ⊕ (`judgmentSlots` · 기본 off — 이 워크플로의 옵션 묶음은 S25 판정 전까지 off) `judgmentSlots: true` 면 렌즈가 재지 않은 전제 · 한정 문구 · 동적 축 질문 답을 낸다 — 반환 `unverifiedPremises` 를 Phase 5 판정 입력으로 읽고, finding `limits` 가 있으면 그 지적은 suggestion 까지다(peer-review 병합기와 같은 규칙 · F-448 · F-178)
+2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**(직전 `gpt-choice.sh decide` — `skip` 이면 띄우지 않고 병합은 `--gpt-unavailable`): `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {diff.patch} --deny {WORK_DIR} [--rules-index {원문 색인}] …` — 켜면 Workflow args 에 `locatedFindings: true` 를 함께 준다(위치 필드가 없는 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다). ⛔ 규칙 레코드(`projectRulesPath`)는 런처에 넘기지 않는다(exit 11). 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
+2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js && cmp -s {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약. 복사본은 2.8 준비가 매 호출 만든다(fz-plan 절차 2.5 와 같은 규칙)
+   - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
+3.5. **기본 GPT review 동시 기동**(F-473): Workflow 를 띄운 직후 Phase 5 검증 2 의 GPT review 를 background 로 함께 띄운다 — 입력이 diff 범위라 Workflow 반환을 기다릴 이유가 없다. 직전 `gpt-choice.sh decide` 가 `run` · `config` 면 `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd {GIT_ROOT} --out {WORK_DIR}/review/gpt-review.md --base {BASE}`(`modules/fz-gpt-subcommands-core.md` § review) · `skip` 이면 `[GPT 미사용 — 사유]`. 2.5 독립 첫 패스를 띄운 run 에는 이 단계가 없다(4.5 가 대신)
+4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기. SOLO 3중 검증은 **L4 사용자 승인 후**. 사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 기록(규약: `experiment-log.md` 머리 문단) · (선택) 서로 독립인 조각 검사(조각마다 한 SHA 의 고정 트리로 판정 가능)를 따로 돌릴 때는 이 반환 **뒤에** `workflows/swarm.js` 를 부른다 — 준비 · 고정 트리 · 호출은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로다
+4.5. **(`--gpt-independent`) 병합**: 두 패스가 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환} --gpt {독립 첫 패스 .json} --diff {같은 diff.patch}` — 런처 옆 파일로 오염 · 실패 · stale 을 거부한다. 결과가 Phase 5 [병렬 2] GPT 리뷰를 대신한다(두 번 부르지 않는다)
+5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + GPT validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
+6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-review 테이블. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
+### 티켓 폴더 컨텍스트 로딩 (티켓 폴더(WORK_DIR) 활성 시):
+- `{WORK_DIR}/plan/plan-final.md` 읽기 → 승인된 계획 복원
+- `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
+- `{WORK_DIR}/code/step-*.md` 읽기 → 전체 구현 Step 상세 (1M context 활용)
+- `{WORK_DIR}/discover/discover-review.md` 읽기 → mid-pipeline discover 결과 (있으면)
+- ~~`{WORK_DIR}/code/code-team.md`~~ ⛔ **Workflow 모드에서 미생성** — transcript(runId)가 대체한다(`skills/fz-code/SKILL.md` 통신 기록). 읽을 파일이 없다
+
+### ⛔ 모듈화 리뷰 원칙 (Modularization Review Scope)
+
+> **원칙**: 리뷰 범위 = 패키지 코드 + 앱 측 소비자 코드 + 진입점. 경계 양쪽을 모두 검증.
+
+Lead가 리뷰 대상 구성 시 필수 포함:
+1. **패키지 내부 코드**
+2. **앱 측 소비자 코드**: `Grep("import {모듈명}")` → 소비자 파일 목록. 사용 패턴이 설계 의도와 일치하는지
+3. **진입점 코드**: AppDelegate, SceneDelegate, UIWindow extension 등 (글로벌 hook 포함)
+
+TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진입점]: {AppDelegate 등}`
+
+---
+
+## ⛔ Phase 0: Work Dir Pre-flight (반성 4차)
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 1 전에 반드시 실행.**
+
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+
+### Gate 0: Work Dir Ready
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
+
+## Phase 4.5: Requirements Alignment (요구사항 부합)
+### 절차
+
+```
+1. ⛔ RTM 기반 기계적 확인 (참조: modules/rtm.md):
+   - plan-final.md 또는 Serena memory에서 RTM 로드
+   - 모든 Req-ID가 implemented 상태인지 확인
+   - pending 잔존 → requirements_gap 이슈
+2. 요구사항 목록화 → 체크리스트
+   - 세션 내 task/plan에서 구현 대상 추출
+   - 커밋 메시지에서 의도 추출
+3. diff에서 각 요구사항 구현 여부 확인
+   - Serena find_symbol → 신규 심볼이 요구사항에 매핑되는지
+4. 미구현/부분구현 → 이슈 (category: requirements_gap)
+5. 범위 외 변경 → 이슈 (category: scope_creep). **⛔ plan-final.md §Y Write Scope 존재 시 diff 파일 ⊆ §Y 검증 필수** (없으면 plan 기반 소프트 판정)
+```
+
+### 체크리스트
+
+- [ ] 세션 task/plan의 모든 요구사항이 구현되었는가?
+- [ ] 커밋 메시지에 명시된 변경이 실제 diff에 반영되었는가?
+- [ ] 범위 외 변경 (scope creep)이 포함되어 있지 않은가? (§Y Write Scope 정의 시 diff ⊆ §Y 검증)
+
+### ⛔ B3: Follow-up 아티팩트 재검증 + Phase A 효과 측정 (v3.2.2)
+
+**Follow-up 재검증** (follow-up-tasks.md / codex-review*.md / plan-v*.md 인용 시):
+- [ ] 판단 날짜 + 근거 유형(실측/추정/외부 리뷰) 분류
+- [ ] 추정/외부 리뷰 기반 → 현재 시점 재실측 (`git show`/`Read`/`grep`)
+- [ ] 재실측 결과 ≠ 아티팩트 → 업데이트 이슈 생성 (category: artifact_stale)
+- [ ] 참조: `${CLAUDE_PROJECT_DIR}/memory/<교훈>.md`, `cross-validation.md § Follow-up Re-audit Gate` (Phase B1/B2 후 활성)
+
+**Phase A 효과 측정** (B1/B2 진입 조건 5개 지표 1:1 매핑):
+- [ ] 지표①: T6/T7 발동 건수 + Speculation-to-Fact Fallacy 차단 사례 (세션당)
+- [ ] 지표②: 실제 사전 차단 사례 (발동 후 실측으로 뒤집기 방지된 실증)
+- [ ] 지표③: `[verified]` / `[미검증]` 태그 빈도 + 무태그 과거 주장("원본/기존/이전/D{N} 이전") 위반 건수
+- [ ] 지표④: 세션 reversal 횟수 (사용자 판정 뒤집기 — 기준선 4회)
+- [ ] 지표⑤: A5 micro-eval 호출 건수 N + confirmed C + false positive F → precision = C/N
+- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (티켓 폴더 세션 임시) 또는 Serena `fz:metrics:phase-a-session-{N}` (비-티켓 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함
+- [ ] **canonical sink**: 세션 결과는 완료 직전 `run_metrics.py end` 의 `--gate-issues` · `--findings` 로 실행 기록에 남긴다 — B1/B2 진입 판정(Gate 10회부터 neutral-candidate · load-bearing)은 `fz_telemetry_report.py` 의 harness 절이 낸다. 다른 sink는 backlink만 허용 (3중화 금지).
+
+## Phase 5: Cross-Review (3중 검증)
+> **프로젝트 규칙**: CLAUDE.md `## Code Conventions` 섹션을 따른다.
+
+### 병렬 검증 전략
+
+```
+Phase 5: Cross-Review (5+2 검증)
+├─ [병렬 1] Claude + Serena: 참조 무결성 검증
+├─ [병렬 2] → /fz-gpt review: GPT 코드 리뷰
+├─ [병렬 3] /sc:sc-analyze: 정적 분석
+├─ [병렬 4] L3 silent-failure-hunter: 에러 처리 스캔 (조건부 — modules/native-agents.md)
+└─ [병렬 5] L3 type-design-analyzer: 타입 설계 평가 (조건부 — modules/native-agents.md)
+
+    ↓ 모든 결과 수집
+
+Results Merge & Dedup → Issue Tracker 통합
+```
+
+### 검증 1: Claude + Serena (참조 무결성)
+
+```
+mcp__plugin_fz_serena__find_referencing_symbols → 변경된 심볼의 모든 참조 확인
+Grep → 변경 후 패턴 일관성
+mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분석 (요구사항별 충족 여부 단계별 검증)
+```
+
+⛔ 소비자를 정본에 맞춘 변경이면 정본 안에서 같은 대상을 말하는 진술끼리 먼저 대조한다 — 정본이 두 말을 하면 정합 작업이 그 모호함을 소비자로 복제한다 (F-121)
+
+### ⛔ 검증 2: GPT 코드 리뷰 (필수 — 생략 금지)
+
+```bash
+# 독립 스킬로 위임
+/fz-gpt review "코드 리뷰"
+```
+> ⊕ `--gpt-independent` 면 이 검증을 실행 절차 2.5 · 4.5 가 대신한다 — GPT 가 Claude 산출을 보기 전에 따로 리뷰한 결과를 `review_merge.py` 가 합친다 · full 이면 실행 절차 3.5 가 Workflow 와 함께 띄운 결과를 읽는다(다시 부르지 않는다)
+> ⊘ 직전 `gpt-choice.sh decide`(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수)가 `skip` 이거나 정문이 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음)면 light · full 모두 이 검증을 `[GPT 미사용 — 사유]` 표기로 대신한다 — 실행 실패(아래 불능 분기)와 다르다 · 정본 `modules/gpt-strategy.md` § GPT 미사용
+
+fz-gpt가 수행하는 작업:
+- GPT CLI에 변경 심볼 + diff 전송
+- JSON 응답 파싱 → Issue Tracker 자동 기록
+- 이슈 요약 반환
+
+> **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=Fable 5.1) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: GPT]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 미가용 시 /sc:sc-analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
+>
+> **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. GPT CLI 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(Agent·/sc:sc-analyze)로 **상속되지 않는다**.
+> **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 규모는 그 근거 밖이다.
+> **⛔ retain cycle 점검 (rank3b, 2026-06-18 · 원장 `promotion-ledger.md` **P2-C** candidate `active=false`)**: fresh-context 검증자는 retain cycle 검사 시 `gpt-skills/fz-reviewer/SKILL.md` Memory and Resource Management(소유자를 강하게 잡는 closure·콜백·구독)와, Swift 저장소면 `references/domain-ios.md` 의 `[weak self]` 항목을 명시 적용한다 — GPT 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
+> **보조 이종 소스 (rank6)**: PR이 열려 있으면 `/fz` pr-comment-review로 CodeRabbit 코멘트를 보조 이종 소스로 활용 가능 (강제 아닌 Lead 판단).
+
+### 검증 3: SuperClaude 정적 분석
+
+```
+/sc:sc-analyze → 코드 품질, 보안, 성능, 아키텍처 종합 분석
+```
+
+### 검증 4: Refactoring Completeness (리팩토링 완성도)
+
+> 3중 리뷰가 모두 diff 기반이므로 "안 바뀐 dead code"를 놓침. 이 검증이 유일하게 diff **밖**을 봄.
+
+```
+절차: 새 심볼 식별→대체 의도 추론→대상 사용처 역추적(find_referencing_symbols)→deprecated 검색→사용처 0이면 "삭제 권고"
+
+체크리스트:
+- [ ] 이전 심볼 사용처 0 → 삭제 대상?
+- [ ] deprecated 코드 중 사용처 0?
+- [ ] 삭제 대상의 의존 코드도 정리?
+
+⛔ 「사용처 0」은 부재 주장이고 이 절차의 결론은 **삭제 권고**다. 한 도구의 0건으로 내지 않는다 —
+   `find_referencing_symbols` 는 실측 recall 36.9% · **0건 반환 19%** 다(프로토콜 선언과 conformance
+   구현은 서로 다른 선언이라 참조 관계가 아니다). `find_implementations` 또는 `Grep` 전수와 교차하고,
+   교차 결과를 근거에 함께 적는다. 미교차 0건은 「삭제 권고」가 아니라 「확인 필요」로 낸다.
+   정본: `modules/cross-validation.md` § Negative-Result Gate
+```
+
+### 검증 4-D~4-H: 조건부 정밀 검증 → `modules/review-checks.md`
+
+> 모듈화/리팩토링/마이그레이션 시 실행. 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
+> 4-D Constraint Matrix · 4-E Module Boundary+Consumer · 4-F Anti-Pattern Enforcement · 4-G Protocol Conformance · 4-H Source Fidelity
+
+### 검증 4-I: Implication Coverage (함의 커버리지) — `modules/lead-reasoning.md` 참조. 제거/리팩토링 시 실행. 검증 4는 diff 안(judge), 4-I는 지시→diff 밖(auditor). 완료 보고에 "관찰 사항" 추가(§5).
+
+### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 가변 상태 동기화+비대칭 동기화(L1 필수) + 콜백 스레드/@Published/기본값/SDK 래퍼/Task 프로퍼티 쓰기/check-then-act(L2 권장) 검사.
+
+### 검증 4-N/4-O/4-P: candidate self-check → `modules/review-checks.md`
+
+> ⚠️ candidate (evidence 1 session, 활성 강제 X — 5 sessions 후 결정). 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
+> 4-N Swift Naming Compliance · 4-O Session-added Assets Application · **4-P Post-State Consistency**(편집 라인이 놓인 *자리*의 일관성 — **(diff 안 스코프 × 일관성 질문)** 셀. `guides/harness-engineering.md` §12 **R8-A**, candidate)
+
+### 검증 4-K: Transformation Equivalence (코드 변환 동등성 — Plan에 Transformation Spec 있을 때)
+
+Plan에 Transformation Spec이 포함된 경우, diff가 Spec 요구사항을 준수하는지 검증. 참조: `modules/code-transform-validation.md`
+
+```
+1. Plan Transformation Spec 로드
+2. diff 변환 ↔ Spec 대조:
+   - 스레드: Spec "@MainActor 필수" → diff에 @MainActor 존재?
+   - 에러: Spec "분기 N개" → diff catch 분기 = N?
+   - 추상화: Spec "protocol extension" → diff에 extension?
+   - 인스턴스: Spec "stored property" → diff에 선언?
+   - ⛔ Zero-Exception Thread: diff에서 Transformation Spec "실행 스레드"가 main queue인 변환이 @MainActor 없이 구현되었으면 → "thread_violation" (Critical)
+   - ⛔ Wrapper Scope Minimality: @MainActor 블록 내 각 문장이 MainActor 컨텍스트를 필요로 하는지 확인. 불필요 문장 포함 → "wrapper_overscope" (Major) [ablation: scope-min-v1] · ⛔ **이동 래퍼에만 적용**한다(`Task { @MainActor }` · `MainActor.run` — 문장을 다른 격리로 옮긴다). `MainActor.assumeIsolated` 같은 단언은 대상이 아니다 — 오라클: "이 클로저를 지우면 런타임 동작이 바뀌는가?" 바뀌면 이동, 컴파일만 통과하면 단언 (F-237)
+   - ⛔ Parameter Presence: 원본 대비 키 추가 → "parameter_addition" (Major)
+   - ⛔ Default-Deny enforcement: Spec의 기술적 주장에 [verified] 태그 없음 → violation
+3. 불일치 → "transformation_deviation" (severity: Major)
+```
+
+### 검증 5: UI/UX Refactoring Safety
+
+View 파일 변경 포함 시 추가 검증:
+
+```
+View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
+
+검증 항목:
+- SwiftUI View body 구조 변경 → 레이아웃 영향
+- @State/@Binding 변경 → 데이터 흐름 무결성
+- Listener/Delegate 변경 → 메모리 누수 패턴 (CLAUDE.md 금지 패턴)
+- **완료기준 (UI/제스처/애니메이션 동작 변경 시)**: 빌드 통과 ≠ 완료. visual oracle(launch_app_sim + screenshot · 실기기 시각 확인) 미충족 시 "완료" 선언 지양 — fz는 런타임 동작을 정적으로 못 봄(자동 실행 불가 = 사람 영역, 🔒 강제 게이트 불가). 기존 'screenshot 권고'를 evidence 3 sessions(38차 OBS-07 · OBS-10 · OBS-16) 기반으로 강화.
+```
+
+### 검증 6: Spec Panel 스펙 부합 (조건부)
+
+새 모듈 생성이 포함된 변경사항에서만 실행:
+
+```
+/sc:sc-spec-panel --mode critique --focus requirements|architecture
+```
+
+- 트리거: diff에 새 Router/Interactor/Builder 파일 포함 시
+- 전문가 패널이 스펙 부합 여부, 아키텍처 결정의 타당성 리뷰
+- 결과: Issue Tracker에 spec_concern 카테고리로 기록
+
+### Gate 4: Review Passed
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
+- [ ] 참조 무결성 확인? (Serena)
+- [ ] ⛔ GPT 리뷰 통과? (**Critical 0건 + Major는 결함(회귀·버그·영향범위)에 한해 차단** — ⛔ 구조 개선 제안은 major여도 **non-blocking**. `ReviewFindingsSchema`에 `origin`이 없어 기계 판별이 불가하므로 **Lead가 결함/개선을 판정**한다. 이 구분이 없으면 "제안"이 강제 수정이 된다. GPT 실행 자체는 필수)
+- [ ] /sc:sc-analyze 통과? (심각한 문제 없음)
+- [ ] Constraint Matrix Compliance 통과? (제약 매트릭스 부합, /fz-discover 산출물 있을 때)
+- [ ] Refactoring Completeness 통과? (deprecated dead code 없음)
+- [ ] Module Boundary 통과? (access control이 의도와 일치)
+- [ ] ⛔ 타입 소속 검증 통과? (각 public type의 관심사가 모듈 책임에 부합)
+- [ ] Anti-Pattern Enforcement 통과? (금지 패턴 0건, Plan에 Constraints 있을 때)
+- [ ] UI/UX Safety 통과? (UI/제스처/애니메이션 변경 시 visual oracle 권장 — 빌드통과≠완료, fz 자동 불가=사람 영역. evidence 3 sessions 강화)
+- [ ] Spec Panel 통과? (새 모듈 시, 스펙 부합 확인)
+- [ ] Protocol Conformance 통과? (시그니처 변경 시, 프로토콜 선언부 동기화 확인)
+- [ ] Source Fidelity 통과? (리팩토링 시, 원본 대비 추가된 파라미터/로직 없음)
+- [ ] Transformation Equivalence 통과? (Spec 있을 때, 스레드/에러/추상화 요구사항 준수)
+- [ ] Concurrency Safety Audit 통과? (싱글톤 가변 상태 동기화, 콜백 스레드, @Published 스레드 — modules/safety-audit.md)
+- [ ] ⛔ Concurrency Safety Audit **실행 여부** 확인? (diff에 class/struct 타입 변경이 포함되면 safety-audit.md 절차 실행 필수 — "해당 없음" 판정에도 판정 근거 명시)
+- [ ] ⛔ Zero-Exception Thread Rule 통과? (main queue 변환에 @MainActor 누락 없음)
+- [ ] ⛔ Wrapper Scope Minimality 통과? (이동 래퍼 블록 내 불필요 문장 없음 — 단언 API 제외 · F-237) [ablation: scope-min-v1]
+- [ ] ⛔ 요청 파라미터 키 동등성 통과? (원본 대비 추가/삭제 키 없음)
+- [ ] ⛔ Default-Deny 통과? (Spec 기술적 주장에 [verified] 태그 존재)
+- [ ] ⚠️ Swift Naming Compliance 권장 통과? (검증 4-N **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
+- [ ] ⚠️ Session-added Assets Application 권장 통과? (검증 4-O **candidate** — 활성 강제 X, 5 sessions 관측 후 결정)
+- [ ] ⛔ 형제 관례 판정이 **양방향**인가? (관례 존중 + 선례 이전 가능성 — `modules/review-structural-axes.md` §E. light 는 Workflow 미호출이라 Lead 가 직접 적용)
+- [ ] ⚠️ Post-State Consistency 권장 통과? (검증 4-P **candidate** — 활성 강제 X. **형제 균일성 게이트 통과 시에만** 발화, 접근수준·소유권 축 제외)
+
+## Phase 5.5: Feedback Verification (역방향 검증)
+
+> **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). 추가 verify round는 명시적 critical 발견 시에만.
+>
+> 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
+>
+> 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 검증"` 실행(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` · 작업 폴더가 없으면 `WORK_DIR=` 빈 값 — `modules/fz-gpt-subcommands-core.md` § validate 호출자) → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
+
+### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
+
+Lead가 Workflow 반환을 통합할 때 **워커 자기보고 대신 게이트를 재실행**한다.
+
+```bash
+python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --reverify {WORK_DIR}/gates/plan.md
+```
+⛔ `FZ_PLUGIN_ROOT`는 `scripts/resolve-plugin-root.sh`로 해석한다 — 상대 경로는 대상 레포에서 exit 2로 조용히 통과한다.
+
+- `--reverify`는 이미 `- [x]`인 게이트도 실행하고, 통과 못 하면 `- [ ]` + `EVIDENCE: pending`(재실행 전 진행 기록이 있던 게이트는 `pending; demoted`)으로 **강등**한다
+- ⛔ `--status`는 재검증이 아니다 — 파싱만 하고 과거 증거를 그대로 읽는다
+- `/fz-gpt validate`(fz-guardian)의 `resolved/partially_resolved/unresolved/**regressed**` 4축에서 `regressed`가 0이 아니면 통합 차단 — 기존 `gpt_verification_schema` 유지
+- 원장이 있으면 **`verify-gates`를 추가 호출**해(같은 decide 판정 — `skip` 이면 부르지 않고 `[GPT 미사용 — 사유]`) 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산출물이다). 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` · `LEDGER={WORK_DIR}/gates/plan.md` — validate 와 같은 라운드의 게이트 슬롯)
+- ⛔ 응답은 `--verdict-check {응답.json} {WORK_DIR}/gates/plan.md` 로 전수 판정을 확인한다. exit 1이면 재호출 1회(`FZ_GPT_RECALL=post-check` — 그 라운드를 잇고 라운드를 쓰지 않는다 · `modules/fz-gpt-subcommands-core.md` § 사후 검증 블록) 후 **미판정으로 기록**
+- ⛔ validate를 대체하지 않는다 — 4축 역검증과 게이트 판정은 관심사가 다르다
+- 전 게이트 충족 시 `--set-state closed` (전진은 조건부 — 미충족이면 거부된다)
+
+## Phase 6: Iterative Improvement
+### 반복 조건
+
+```
+N (GPT 제기 이슈 수) >= 10 ?
+├─ NO  → preliminary — Rate는 measurement only, verdict 보류 → Gate 5의 Rate 항목 N/A 처리
+└─ YES → Reflection Rate >= 80%?
+         ├─ YES → Gate 5 통과 (완료)
+         └─ NO  → 에스컬레이션 래더 적용 (참조: modules/execution-modes.md · Workflow 반환 실패는 guides/skill-authoring.md §12)
+```
+> 정본: `modules/cross-validation.md §Reflection Rate threshold`. ⛔ N<10에서 Rate 미달을 이유로 반복 루프를 돌리지 않는다 (통계적 소음).
+
+### 절차
+
+1. **미해결 이슈 로드**: Issue Tracker에서 미해결 이슈 추출
+2. **이슈 수정** (Lead 직접 — `review-live.js`는 수정 에이전트를 스폰하지 않는다): `mcp__plugin_fz_serena__replace_symbol_body` → 심볼 단위 수정, `/sc:sc-improve` → 복잡한 개선
+3. **빌드 재검증**: 참조 `modules/build.md` — 빌드 검증 절차
+4. **Issue Tracker 상태 업데이트**: addressed로 변경
+5. **Phase 5.5로 돌아가 재검증**: `/fz-gpt validate`
+
+### 사용자 에스컬레이션
+반복 한도 도달 시: 상태 보고(총/해결/미해결/Rate) + 선택지(DEFERRED / 추가 반복 / 수동 해결 / 중단)
+
+### Gate 5: Final Quality
+- [ ] 모든 Critical 이슈 수정 완료?
+- [ ] 최종 빌드 성공? (modules/build.md 절차)
+- [ ] Reflection Rate — **N≥10이면 ≥80%, N<10이면 `preliminary` 기록 후 N/A** (정본: `cross-validation.md §Reflection Rate threshold`)
+- [ ] 최대 반복 횟수 미초과?
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] ⛔ `[미측정: 자동화 불가]` 시나리오마다 수동 이관 줄(`수동 이관: 요청 · 결과 · 거절`)이 있는가? — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_unmeasured_handoff.py" {리뷰 보고}` exit 0 (F-524: 측정 못 한 구역을 넘기지 않아 그 구역의 결함이 리뷰 뒤에 발견됐다)
+
+### 비-티켓 세션 Checkpoint (Phase 5 완료 후)
+- 비-티켓 세션 모드: `write_memory("fz:checkpoint:review-issues", "이슈 {N}개. Critical: {요약}. Reflection Rate: {X}%")`
+
+## Phase 7: Completion (완료 처리)
+
+Gate 5 통과 후:
+1. **잔여 작업 확인**: sequential-thinking → 완료 체크리스트 (Gate 통과, 미해결 이슈, 범위 외 변경)
+2. **최종 이슈 보고 정리**: Issue Tracker 이슈를 상태별로 묶는다(상태 정의 `modules/session.md` § 이슈 상태 머신) — 보고 형식은 4번 아티팩트(`self-review.md` · `--render` 면 `review.json`)다(F-474)
+3. **세션 저장**: `write_memory` (작업 요약 + 결정사항 + 변경 심볼)
+4. **아티팩트 기록** (티켓 폴더(WORK_DIR) 활성 시): `{WORK_DIR}/review/self-review.md` + `index.md` 업데이트
+   - ⊕ `--render`(기본 off)면 이슈 목록을 손으로 다시 쓰지 않는다 — 판정·문장만 `{WORK_DIR}/review/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review {WORK_DIR}/review/review.json --diff {WORK_DIR}/review/diff.patch --out-dir {WORK_DIR}/review` 가 `review-report.md` 를 만든다(PR 이 없으면 payload 는 만들지 않는다). review.json 형식은 `render_review.py --example` 이 내는 최소 예시를 따른다 — 렌더러 코드를 다시 읽지 않는다. 미지정이면 위 절차 그대로다
+5. **Git 연계** (사용자 확인 후): `/fz-commit` → `/fz-pr`
+
+완료 보고(직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록): 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계
+
+### Harness Metrics (v3.8+)
+
+> **Canonical sink**: 누적은 실행 기록이다 — 이 표의 Gate 별 이슈 수와 cross-model 발견 수를 `run_metrics.py end --gate-issues … --findings …` 로 넘기면 `fz_telemetry_report.py` 가 Gate 를 판정한다(B1/B2 진입 판정용 · `modules/mode-gate.md` § 기록). 본 섹션은 세션 보고 형식만 정의한다. experiment-log 의 옛 누적 표는 이력이다.
+
+리뷰 완료 보고에 Gate별 이슈 수를 기록한다:
+
+```markdown
+## Harness Metrics
+| Gate | 이슈 발견 | 상세 |
+|------|:---------:|------|
+| 4-K Transformation | {N} | {요약} |
+| Zero-Exception Thread | {N} | {요약} |
+| Parameter Presence | {N} | {요약} |
+| Wrapper Scope Minimality | {N} | {요약} |
+| Default-Deny violation | {N} | {요약} |
+| Confident Error (cross-model 불일치) | {N} | Claude {판정} vs GPT {판정} |
+```
+
+---
+
+## Few-shot 예시
+
+```
+예시 1 — 리뷰 완료 보고:
+  BAD:  "리뷰 완료. 문제 없음." → 근거 없음, Rate 없음
+  GOOD: 이슈 N개 + Reflection Rate: X/Y (ZZ%) + GPT 교차 검증 결과
+
+예시 2 — Anti-Pattern 잔존 검증 (검증 4-F → 절차: modules/review-checks.md):
+  BAD:  diff 삭제 라인만 확인 → "패턴 제거" 판정 (다른 파일에 잔존)
+  GOOD: Plan의 Anti-Pattern Constraints Grep 패턴으로 변경 파일 + 관련 모듈 전수 검색 → 매칭 0 확인
+
+예시 3 — Source Fidelity (검증 4-H → 절차: modules/review-checks.md, 리팩토링/마이그레이션):
+  BAD:  컴파일+테스트 통과 → "동작 유지" 판정 (`.done` main queue → 일반 Task 미감지)
+  GOOD: Transformation Spec의 실행 스레드/에러 경로/파라미터 키 3축 모두 일치 확인
+```
+
+## Boundaries
+
+**Will**: 3중 검증(Claude+GPT+sc:analyze), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리
+**Will Not**: 대규모 구현 (→ /fz-code), GPT 직접 호출 (→ /fz-gpt), 계획 수립 (→ /fz-plan)
+
+### light 모드 (모드 게이트 — `modules/mode-gate.md`)
+
+진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+- review-live 를 띄우지 않고 Phase 5 Lead 3중 검증 · Phase 5.5 역방향 검증 · Reflection Rate 를 그대로 한다 — GPT 단계는 full 과 같다(끈 세션이면 `[GPT 미사용]`) · 산출물도 full 과 같다
+- ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
+- 점검 카탈로그: `templates/check-catalog-review.md` 를 Read 해 리뷰 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 리뷰 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <review 산출물> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-review.md"` 로 잰다
+- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
+
+## 에러 대응
+
+| 에러 | 대응 | 폴백 |
+|------|------|------|
+| fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백 | Claude 자체 판단 |
+| fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다(직전 `gpt-choice.sh decide` 가 `skip` 이면 probe 도 부르지 않고 `[GPT 미사용 — 사유]`). probe 성립 = kind `availability-probe`(`gpt-call.sh availability-probe` — 역할 없음 · ephemeral) 가 **non-empty 산출 + exit 0**(`--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
+| Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
+| Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
+| Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
+
+## Completion → Next
+Gate 5 통과 후: `/fz-commit` → `/fz-pr`

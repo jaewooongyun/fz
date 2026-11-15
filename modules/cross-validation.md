@@ -1,0 +1,709 @@
+# 교차 검증 주입 전략
+
+> **Sources (last audited: 2026-09-25 — 모델 사실 축: Opus 5.5 상속·think-carefully 권고 1문단 · 원칙 A3 에 2607.08065 · 교차 검증 대상 GPT 표기만 대조. 나머지는 2026-07-25 대조 그대로):** `guides/llm-references.md` §1 정본 대조 완료 (Opus 5 "검증 지시 삭제" 지침 대비 게이트 존치 경계 성문화 포함).
+>
+> fz Phase 3에서 파이프라인에 검증 게이트를 자동 삽입. 모든 모드에서 최소한의 검증 보장.
+> 핵심 원칙: GPT 사용 여부가 GPT 단계를 정한다 — 켠 세션이면 코드/계획 생산에 GPT CLI 가 light · full 모두 필수 참여(full = Claude 에이전트 N + GPT 1 · light = Lead + GPT 1), 끈 세션 · CLI 없음이면 두 모드 모두 `[GPT 미사용 — 사유]` 표기(`modules/gpt-strategy.md` § GPT 미사용 · `modules/mode-gate.md` § GPT 는 모드와 독립). 탐색 파이프라인(fz-search)에는 GPT 단계가 없다 — fz-discover 는 `--deep` 일 때 GPT verify(명시 플래그)다. 단계마다 실행 여부는 직전 `gpt-choice.sh decide` 한 줄이 정한다 — 켬이면 필수 · 명시 플래그 · 명시 호출 구분의 정본은 `modules/gpt-strategy.md` § 단계 실행 판정.
+
+## 목차
+
+- [이론 근거 — Heterogeneity + Blind-spot Complementarity (T1-E)](#이론-근거--heterogeneity--blind-spot-complementarity-t1-e)
+- [검증 유형별 전략](#검증-유형별-전략)
+- [검증 게이트 자동 삽입 규칙](#검증-게이트-자동-삽입-규칙)
+- [외부 모델 포함 원칙 (GPT 켬이면 필수)](#외부-모델-포함-원칙-gpt-켬이면-필수)
+- [Cross-Model Verification (2-Model)](#cross-model-verification-2-model)
+- [경량 검증 게이트](#경량-검증-게이트)
+- [Reflection Rate (Authoritative Source)](#reflection-rate-authoritative-source)
+- [Gate 절차적 강제](#gate-절차적-강제)
+- [품질 에스컬레이션](#품질-에스컬레이션)
+- [재검증 라운드 상한](#재검증-라운드-상한)
+- [검증 게이트 시각화](#검증-게이트-시각화)
+- [공유 유틸리티](#공유-유틸리티)
+- [참조 스킬](#참조-스킬)
+- [GPT 검증 결과 보존 정책](#gpt-검증-결과-보존-정책)
+- [Implication Scan 게이트](#implication-scan-게이트)
+- [Follow-up Re-audit Gate (Phase B1/B2 활성 시)](#follow-up-re-audit-gate-phase-b1b2-활성-시)
+- [origin-equivalence 게이트 (revert 전용)](#origin-equivalence-게이트-revert-전용)
+- [외부 피드백 검증 (External Feedback Gate)](#외부-피드백-검증-external-feedback-gate)
+- [런타임 동작 주장 검증 (Runtime Claim Gate)](#런타임-동작-주장-검증-runtime-claim-gate)
+- [SOLO 모드 검증 게이트 요약](#solo-모드-검증-게이트-요약)
+- [Coverage Gate (문서/파일 분석 전수 보장)](#coverage-gate-문서파일-분석-전수-보장)
+- [Negative-Result Gate (0건·부재 주장의 도구 유효성)](#negative-result-gate-0건부재-주장의-도구-유효성)
+- [Transformation & Publication Gate (변환 검증의 독립성 · 공개 표면)](#transformation--publication-gate-변환-검증의-독립성--공개-표면)
+- [설계 원칙](#설계-원칙)
+
+---
+
+## 이론 근거 — Heterogeneity + Blind-spot Complementarity (T1-E)
+
+> fz의 GPT 교차 검증은 "debate / adversarial review" 프레임이 아닌 **"Self-preference bias 상쇄 + 이종 blind spot 보완 + Generator≠Evaluator 강제"** 프레임으로 이해.
+
+### 4 메커니즘
+
+| 메커니즘 | 출처 | fz 적용 |
+|---------|------|--------|
+| **Self-preference bias 상쇄** | 2025 LLM-as-Judge 연구 다수 — 같은 모델이 자기 출력을 우호적으로 평가 (메모리 23차 Self-review blind spot 메커니즘) | Generator (Claude) ≠ Evaluator (GPT) 강제. fz-gpt `verify`/`check`가 이 분리의 구체화 |
+| **이종 blind spot 보완** | MoA "collaborativeness" (Wang 2024, ICLR 2025 Spotlight, +7.6pp AlpacaEval) | Claude family blind spot을 GPT family가 catch (15차/23차 패턴 — GPT 단독 발견 누적 사례) |
+| **Generator≠Evaluator 강제** | Anthropic Harness Engineering H2 (2026-03) — "Self-evaluation is unreliable"; fresh-context verifier > self-critique [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents] | GPT 를 켠 세션이면 light · full 모두 GPT 필수 참여. 모드와 무관하게 결정론적 도구 호출 (Q-OBSERVE 경량). GPT 불능(켰는데 실패) 시 fresh-context Claude 검증자가 self-review blind spot(23차)을 부분 보강 — 동종 한계 명시. GPT 미사용(off · CLI 없음)은 표기만(`modules/gpt-strategy.md` § GPT 미사용) |
+| **Position bias 회피** | Order effect on judgment (LLM-Judge 연구) | T1-G ensemble: 출력 randomize + Source label anonymize (CP-1 Step 3 규칙 5/6/7) |
+
+### "Debate 프레임" 회의론 (X-3 기각 근거)
+
+ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원됨. "Adversarial debate"가 아닌 **"이종 모델 다관점 + Lead 종합"** 프레임이 학술적으로 더 정확. fz는 X-3 ("Debate 확장")을 기각하고 본 프레임 채택.
+
+### 적용 가이드
+
+- **fz-gpt 모든 서브커맨드** = Generator≠Evaluator 분리 구현체
+- **T1-G ensemble** = MoA-Lite 2-layer 를 **설계 목표**로 둔다 — 기본 흐름은 GPT 를 한 번 부르므로 구현돼 있지 않다. 질문 틀이 다른 GPT 호출(다각도)은 실험 kind(`scripts/gpt-kinds.json` · `--experimental`)로만 돌며 측정(E1) 뒤에 기본값을 정한다
+- **η-1** = Position bias 회피의 prompt-level 강화 (TEAM 사료의 Gate 1.0 Independence Verified로 구현 — 사료 2026-09-25 삭제)
+- **Reflection Rate 측정** = 이종 blind spot 보완 효과 정량화 (T1-B §5.5 schema)
+
+### 학술 참조
+
+- LLM-as-Judge self-preference: 2025 다수 연구
+- MoA collaborativeness: Wang 2024, ICLR 2025 Spotlight
+- Harness Self-eval unreliability: Anthropic 2026-03 (Planner/Generator/Evaluator)
+- Debate 회의론: ICLR 2025 Blogposts
+
+---
+
+## 검증 유형별 전략
+
+| 파이프라인 카테고리 | 검증 유형 | 메커니즘 | 모드 조건 |
+|-------------------|----------|---------|----------|
+| code-changes 생산 | 빌드 검증 | modules/build.md 절차 | 모든 모드 |
+| code-changes 생산 | simplify check (선택) | /simplify | 모든 모드 |
+| code-changes 생산 | GPT check | `fz-gpt check` (팀 내 병렬) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
+| code-changes 생산 (리팩토링) | enforcement 검증 | Anti-Pattern Grep + Module Boundary | 모든 모드 (Plan에 Constraints 있을 때) |
+| code-changes 생산 (모듈화/캡슐화) | consumer quality 검증 | 소비자 파일 전수 수집 + 사용 패턴 + 진입점 검증 | 모든 모드 (모듈화 작업 시) |
+| code-changes 생산 (시그니처 변경) | protocol conformance 검증 | find_referencing_symbols → 프로토콜 요구사항 양방향 확인 | 모든 모드 |
+| code-changes 생산 (init 변경) | inheritance DI conformance | base_class_hierarchy → subclass init + 화면별 dependency 확인 (Gate 4.6.5) | 모든 모드 (init 변경 시) |
+| code-changes 생산 (제거/리팩토링) | implication-scan | lead-reasoning.md § Implication Scan | 모든 모드 (1차/2차 트리거) |
+| code-changes 생산 (모든) | Q-OBSERVE 경량 | lead-reasoning.md § 상시 경량 | 모든 모드 (상시) |
+| revert 작업 | origin-equivalence | lead-reasoning.md + cross-validation.md § origin-equivalence | 모든 모드 (revert 키워드) |
+| planning 생산 | 방향성 검증 (Phase 0.5) | full: plan-lean2 전체 플랜 콜이 잠정 플랜과 함께 `directionVerdict` 를 낸다(롤백 plan-collaborative 는 Stage 0 review-direction) · light: Lead(`modules/plan-direction-preflight.md`) | fz-plan Phase 0.5 발동 조건대로(light · full) |
+| planning 생산 (Workflow 반환 뒤) | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 반환 후 수행(fz-plan 실행 절차 5) | full |
+| code-changes 생산 전 | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 수행(fz-code 실행 절차 7) | full |
+| review 시작 전 | 교훈 회상 | memory-curator recall — Lead 가 Workflow 밖에서 수행(fz-review 실행 절차 5) | full |
+| planning 생산 (Phase 1 뒤 · 계획 검증 전) | Sprint Contract | kind `sprint-contract`(GPT 초안 → Lead 합의) + 합의본 반영 재생성 — fz-plan 실행 절차 5.5 · 5.7 | `modules/sprint-contract.md` § 발동 조건 + 직전 decide(`gpt-strategy.md` § 단계 실행 판정) |
+| planning 생산 | 계획 검증 | `fz-gpt verify` (팀 내 병렬 · ⊕ fz-plan 2.7 독립 플랜(light · full 기본) 뒤 resume 교차(`verify-cross`)를 마쳤으면 생략) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
+| review 포함 | 다관점 리뷰 | review-arch + review-quality(review-live Workflow) + GPT | full — review-live Workflow (GPT 는 켠 세션이면 light 도 — fz-review Phase 5) |
+| search 포함 | 교차 검증 | search-symbolic + search-pattern (search-cross-verify Workflow — GPT 단계 없음) | --deep |
+| commit/pr 포함 | Pre-ship gate | `fz-gpt check` — 명시 호출 전용(fz-commit · fz-pr 에 자동 배선 없음) | 명시 호출 때 GPT 켬(`gpt-strategy.md` § 단계 실행 판정 — 그때도 decide) |
+| fix 포함 | 수정 검증 | `fz-gpt check` (fz-fix Step 4 — 플래그 없음) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
+| review 포함 | L3 에러 처리 스캔 | silent-failure-hunter (Agent background) | fz-review Phase 5 병렬 4 — diff에 에러처리 코드 포함 시(`modules/native-agents.md` 조건표) |
+| review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | fz-review Phase 5 병렬 5 — diff에 새 타입 정의 포함 시(`modules/native-agents.md` 조건표) |
+| code-changes 생산 | SC 빌드 진단 | `/sc:sc-troubleshoot --fix`(선택) | 빌드 2회 연속 실패 시 |
+| planning 생산 | SC 공수 추정 | `/sc:sc-estimate --breakdown` | plan + 복잡도 4+ |
+| review 포함 | L3 결과 반영 | Lead가 **다음 Workflow invoke의 args/브리프에 주입** — ⛔ Workflow 워커는 `SendMessage` 를 쓰지 않는 1-shot(OVERRIDE — P2P 통신 없음)이라 중간 채널 없음 (2026-11-01 정정 — 이전 표기 "`SendMessage` 부재(v2.1.178~)"는 틀렸다. 2.1.178 이 없앤 것은 `TeamCreate`/`TeamDelete`) | Workflow (L3 이슈 1건+, 다음 스테이지 전) |
+| review 시작 전 | Scope Expansion 검증 | plan 영향 범위 ⊇ discover 범위 확인. plan이 더 좁으면 warning | discover 산출물 존재 시 |
+| code 시작 전 | 시야 축소 감지 | plan 영향 범위 vs discover 범위 비교 → 좁으면 마찰 신호 | discover 산출물 존재 시 |
+| planning 생산 (패턴 변환) | transformation spec | code-transform-validation.md Spec 작성 + Context7 확인 | 모든 모드 (패턴 변환 시) |
+| code-changes 생산 (패턴 변환) | behavioral equivalence | Spec 대비 구현 대조 (스레드/에러/추상화) | 모든 모드 (Spec 있을 때) |
+| review 포함 (패턴 변환) | transformation equivalence (4-K) | Spec 대비 diff 대조 | 모든 모드 (Spec 있을 때) |
+| planning 생산 (Spec v3.8) | spec-verify | GPT가 Spec의 기술적 정확성 검증 (스레드 모델, 파라미터 의미론, Default-Deny) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
+| cross-model 불일치 감지 | confident-error | Claude vs GPT 판정 불일치 → 교훈 기록 + 상세 분석 (uncertainty-verification.md) | 자동 |
+| code/review (Spec v3.8) | default-deny enforcement | Spec 기술적 주장에 [verified] 없으면 fail-closed | 모든 모드 (spec-version 3.8) |
+| 외부 피드백 수신 시 | external-feedback-verify | Read(시그니처) + 기존 패턴 대조 → valid/invalid 판정 | 모든 모드 |
+| 런타임 동작 단정 시 | runtime-claim-verify | Bash Swift 스크립트 실행 또는 "미검증" 표기 | 모든 모드 [관찰] |
+
+---
+
+## 검증 게이트 자동 삽입 규칙
+
+> ⚠️ **Opus 5 경계선 (2026-07-25) — 이 게이트들은 존치한다.** Opus 5 공식 프롬프팅 가이드는 *검증 지시를 삭제하라*고 명시한다("include a final verification step" / "use a subagent to verify" / "double-check your answer" → 제거 시 *"no loss in quality"*) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. 그러나 **삭제 대상은 *모델에게 자기 작업을 재확인시키는 프롬프트 문구*** 다.
+>
+> ⚠️ **Opus 5.5 (2026-09-25) — 이 방침을 뒤집지 않는다(상속).** *"Existing Claude Opus 5 prompts should perform well without changes, and the patterns in Prompting Claude Opus 5 remain a reasonable starting point."* 5.5 가 새로 권하는 것은 chat 시스템 프롬프트의 think-carefully 문구 제거다 — *"In chat applications, if your system prompt contains instructions that tell Claude to think carefully before answering, consider removing them for Claude Opus 5.5."* 이것도 **모델에게 주는 문구**가 대상이고, 아래 결정론적 게이트·이종 검증자와는 무관하다 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5]
+>
+> 아래 게이트는 성격이 다르다 — **① 하네스가 실행하는 결정론적 oracle**(build·enforcement·implication-scan: 모델 판단이 아니라 도구 실행) **② 이종 모델 교차검증**(gpt check/verify: 동종 self-eval이 못 잡는 blind-spot) **③ 다른 관점의 독립 분석**(direction challenge, review-arch/quality). 셋 다 자기재확인이 아니므로 **일괄 제거 금지**. 단 존치 근거의 종류가 다르다 — ①은 결과가 결정적이라 비용만 보면 되고, ②③은 모델을 한 번 더 부르는 단계라 **개별 존치를 효과로 판정**한다: 단계별 검증된 발견(critical·major)·오탐·비용을 `/fz-review` Harness Metrics → 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.4 에 누적하고(규약: `experiment-log.md` 머리 문단), 발견 0 이 이어지는 단계는 축소 후보로 올린다.
+>
+> ⛔ 반대로, 워커 프롬프트 안에 "마지막에 스스로 검증하라" 류 문구가 있다면 그건 제거 대상이다. **게이트(구조) ≠ 지시(문구)** — 이 구분을 흐리면 load-bearing 게이트가 사라진다.
+
+### 코드 생산 파이프라인
+
+```
+[코드 생산 스텝] → build → conformance (시그니처 변경 시) → enforcement (리팩토링 시) → consumer quality (모듈화 시) → implication-scan (제거/리팩토링 시) → gpt check (GPT 켬) → [다음 스텝]
+
+예시 (fix-ship, TEAM):
+  /fz-fix → build → gpt check (fz-fix Step 4 · GPT 켬) → /fz-commit → /fz-pr
+
+예시 (plan-to-code, 리팩토링, TEAM):
+  /fz-plan → gpt verify → /fz-code → build → enforcement → gpt check
+
+예시 (quick-fix, SOLO):
+  /fz-fix → build → gpt check (GPT 켬 · 끔이면 [GPT 미사용 — 사유]) → 완료
+```
+
+> enforcement: Plan에 Anti-Pattern Constraints가 있을 때만 삽입.
+> gpt check · gpt verify: GPT 를 켠 세션이면 필수 — 단계 직전 `gpt-choice.sh decide` 줄로 가르고 `skip` 이면 `[GPT 미사용 — 사유]`(정본 `modules/gpt-strategy.md` § 단계 실행 판정).
+
+### 계획 생산 파이프라인
+
+```
+[계획 스텝 — full: ① Workflow(방향 판정 포함) ∥ GPT 독립 플랜(기본) → ② 잠정 플랜 + 방향 판정(RECONSIDER/REDIRECT · degraded 면 정지) → ③ 합치기 → Lead 몫(memory-recall informational · 스트레스 테스트 · RTM · Gate 1 · 1.5) / light: direction challenge(Lead · fz-plan Phase 0.5) → Phase 1 ∥ GPT 독립 플랜(기본) → 합치기(차이표)] → sprint contract (full · 발동 시 · 직전 decide — ④ 초안 · 합의 → ⑤ 재생성) → gpt verify ∥ verify-gates (⑥ · GPT 켬) → [코드 스텝]
+```
+
+> direction challenge: 접근 방향 자체를 도전한다(PROCEED/RECONSIDER/REDIRECT) — full 은 plan-lean2 전체 플랜 콜이 `directionVerdict` 로 함께 내고(롤백 plan-collaborative 는 Stage 0 review-direction) light 는 Lead 가 fz-plan Phase 0.5 로 한다. 순서 정본: `skills/fz-plan/SKILL.md` 실행 절차(4 → 4.5 → 5 → 5.5 → 5.7 → Phase 2) · Contract 발동: `modules/sprint-contract.md` § 발동 조건.
+
+### 리뷰 포함 파이프라인
+
+fz-review가 이미 3중 검증을 수행하므로 추가 삽입 없음.
+TEAM 모드에서는 review-arch/review-quality가 팀 에이전트로 독립 다관점 분석.
+
+---
+
+## 외부 모델 포함 원칙 (GPT 켬이면 필수)
+
+> 핵심: GPT 를 켠 세션이면 코드/계획 생산에 GPT 필수 — light · full 같다(TEAM = Claude 에이전트(N) + GPT(1)). 끈 세션 · CLI 없음이면 `modules/gpt-strategy.md` § GPT 미사용(표기만). 단계 직전 판정은 같은 파일 § 단계 실행 판정(`gpt-choice.sh decide`).
+> **A3 (동종 합의 ≠ 독립검증)**: 동종 모델 에이전트 N명의 합의는 독립 검증이 아니다 — 같은 맹점을 공유하고 wrong-majority에 conform한다(debate ceiling). cross-model(GPT) 체크 후에만 합의를 신뢰하고, lone correct dissent를 majority보다 우선 검토한다 [verified: arxiv 2503.13657 MAST — inter-agent misalignment]. 교차 모델 합의도 정확성의 증거는 아니다 — *"Agreement is not accuracy: a model can agree with itself, and different models can agree with each other, out of shared bias"*, 합의는 약한 양의 예측자(rho 0.20~0.59) [arxiv 2607.08065, arxiv preprint 2026-07] → GPT 동의는 판정이 아니라 **대조할 근거**로 읽는다. (memory 23차 — self-review blind spot, cross-model이 마지막 안전판)
+> 근거:
+> - X-MAS(arxiv 2505.16997) — **이종 모델 조합이 동종보다 우수** (MATH +8.4%, AIME +47% 성능 향상). `[verified: 2차 research, 논문 abstract 확인 2026-04-21]`
+> - VeriGuard(arxiv 2510.05156) — **dual-stage verification** (Pre-action Gate + Runtime Gate 이중 구조)이 단일 검증보다 우수. fz의 ✓ stress-test + ✓ gpt check 2단계와 구조적 정합
+
+| 스킬 | GPT | GPT 스킬 |
+|------|-------|-----------|
+| /fz-plan | `fz-gpt verify` | architect |
+| /fz-code | `fz-gpt check` | reviewer |
+| /fz-review | `fz-gpt validate` | guardian |
+| /fz-fix | `fz-gpt check` | reviewer |
+
+> GPT 3-Tier 디스커버리: CLAUDE.md `## GPT Skills`(Tier 1) → 글로벌 fz-*(Tier 2) → 인라인(Tier 3).
+
+---
+
+> 이론 근거: VeriGuard dual-stage verification + MAR (arxiv 2512.20845) 역할 분리 — generator와 verifier 모델/역할이 다를 때 false positive/negative 모두 감소.
+
+## Cross-Model Verification (2-Model)
+
+Claude + GPT 교차 검증:
+
+| 트리거 | 프로바이더 |
+|--------|-----------|
+| code-changes (GPT 켬 — light · full) | GPT check |
+| planning (GPT 켬 — light · full) | GPT verify |
+| `final` · `--deep` | GPT |
+| 불일치 시 | AskUserQuestion (사용자 판단) |
+
+### Disagreement 기록
+- 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/verify/consensus-{YYYYMMDD_HHMMSS}.md` (timestamp suffix로 같은 날 다중 session overwrite 방지)
+- 비-티켓 세션: `write_memory("fz:consensus:{YYYYMMDD_HHMMSS}", "합의/불일치 요약")` (상수 key 대신 timestamp suffix)
+
+---
+
+## 경량 검증 게이트
+
+| 모드 | 코드 생산 후 검증 | 계획 생산 후 검증 |
+|------|-----------------|-----------------|
+| SOLO (light) | 빌드 + GPT check | GPT verify |
+| TEAM | 빌드 + GPT check + 에이전트 확인 | GPT verify |
+| TEAM --deep | 빌드 + GPT | GPT verify |
+
+> GPT 칸은 GPT 사용 여부로 정한다 — 켠 세션이면 모드와 무관하게 돌고, 끈 세션 · CLI 없음이면 두 모드 모두 `[GPT 미사용 — 사유]` 로 남긴다(`modules/gpt-strategy.md` § GPT 미사용 · 단계 직전 판정은 § 단계 실행 판정).
+
+> GPT 모델·effort: 정본 `modules/gpt-strategy.md` § 모델·effort 선택 — 트리거·모드(`final` · `--deep` 포함)로 바꾸지 않는다. Review Gate OFF 도 그 절이다.
+
+---
+
+### micro-eval 호출 트리거 (공통)
+
+다음 조건 중 하나 충족 시 `/fz-gpt micro-eval` 자동 호출 후보:
+
+- 단일 사실 주장에 `[verified]`/`[미검증]` 태그 명시 불가 (검증 도구 즉시 사용 불가)
+- Claim-Type이 factual / tool-behavior / external-state 분류 (즉, 코드/문서/외부 상태 사실 주장)
+- fz-plan / fz-code / fz-review 모든 파이프라인에서 공통 활용 (특정 단계 한정 아님)
+
+명령 형식:
+```bash
+/fz-gpt micro-eval "주장 원문" [컨텍스트]
+```
+
+응답: `verdict: agree | disagree | partial | needs_verification` (참조: `modules/fz-gpt-subcommands-aux.md § micro-eval` 섹션 — 2026-05-27 모듈 분리로 경로 갱신)
+
+`needs_verification` 시: `modules/uncertainty-verification.md` Default-Deny 차단으로 연계.
+
+---
+
+## Reflection Rate (Authoritative Source)
+
+> 본 섹션이 fz 생태계 Reflection Rate **threshold/gating 정책**의 **단일 진실 원천**(authoritative source)입니다. 계산식 정밀 정의(partially_resolved 0.5 가중치 포함)는 `schemas/gpt_verification_schema.json`이 canonical. 다른 모듈/SKILL.md는 본 섹션으로 backlink만 허용 (history rewrite 금지, 기존 본문은 유지).
+
+**계산식**: Reflection Rate = (GPT가 제기한 이슈 N개 중 Claude가 수정 반영한 수) / N × 100% (정밀 계산식 — `partially_resolved`에 0.5 가중 — 은 `schemas/gpt_verification_schema.json` canonical). **N=0 (GPT가 이슈 0개 제기) 시 `N/A`로 기록** — division-by-zero 방지 + 기준 미달 판정 아님 (vacuously passes).
+
+**분모 한정 (2026-09-29 적용 · 사용자 결정 · IR-07)**: N 은 GPT 가 제기한 **결함 이슈**다. craft 항목(`craftAxis` 가 있는 항목 — GPT 독립 첫 패스의 `craft` 배열 포함)은 분모에 넣지 않고 **별 채널**로 제기 수 · 반영 수를 따로 적는다. craft 는 대부분 suggestion 이라 반영하지 않는 것이 정상이고, 분모에 넣으면 Rate 가 낮아져 Phase 6 반복이 는다.
+- ⛔ 적용일 전 기록(experiment-log 의 과거 Rate 행)은 전체 분모다 — 두 시기를 비교할 때는 분모가 바뀐 것을 함께 적는다
+- R-C 한 Wave 동안은 **두 분모를 함께** 적는다(`결함 N · Rate` / `전체 N · Rate`) — 한정이 판정을 바꾼 사례가 보이게 한다
+
+### Reflection Rate threshold (Sample Size Confidence Gate)
+
+| Sample N | Status | Verdict 가능 |
+|----------|--------|------------|
+| N < 10 | **preliminary** | ❌ verdict 보류 — measurement only. threshold 80%는 N≥10 데이터 누적 후 재설정 |
+| 10 ≤ N < 30 | provisional | ⚠️ 점수 + 95% CI 발표 |
+| N ≥ 30 | stable | ✅ trend analysis 가능 |
+
+**왜**: N=3-5 sample에서 73%-86% 변동 관측. 통계적 유의성 부재 → 작은 표본에서 threshold gating 시 false positive/negative 위험.
+
+| GPT | Reflection Rate 추적 | 기준 |
+|------|---------------------|------|
+| 미사용 (off · CLI 없음) | 추적 없음 — N/A(GPT 이슈 0건이 아니라 GPT 부재) | 사용자 직접 판단 |
+| 켬 (light · full) | Reflection Rate 추적 (N<10이면 preliminary) | N≥10에서만 ≥80% gating. N=0이면 vacuous pass |
+
+> 예시 1 (N≥10): GPT 5 이슈 / Claude 4 반영 → 80% (provisional or stable, threshold pass)
+> 예시 2 (N<10, current): N=5에서 81-86% → preliminary, no verdict gating
+> 예시 3: GPT 0 이슈 → N/A (vacuous pass)
+
+---
+
+## Gate 절차적 강제
+
+검증 게이트는 "권고"가 아닌 **절차적 강제**다. 스킵 불가 조건:
+
+| 게이트 | 강제 수준 | 스킵 조건 |
+|--------|----------|----------|
+| build | **필수** (코드 변경 시) | 코드 변경 없는 문서 전용 파이프라인만 예외 |
+| gpt check | **필수** (GPT 켠 코드/계획 — light · full) | GPT 미사용(decide `skip` — off · CLI 없음 · `[GPT 미사용 — 사유]` 표기 · `gpt-strategy.md` § 단계 실행 판정) 또는 탐색(--deep 없음) |
+| stress-test | **필수** (fz-plan) | discover 결과에서 이미 검증된 제약은 재검증 생략 |
+| Reflection Rate | **필수** (GPT 켠 review — light · full) | GPT 미사용(N/A) |
+
+Gate 실패 시: 해당 단계를 "완료"로 표시할 수 없다. 반드시 재시도/수정/사용자 에스컬레이션 중 하나를 수행해야 한다.
+
+## 품질 에스컬레이션
+
+| 상황 | 모드 | 대응 |
+|------|------|------|
+| 빌드 실패 | 모든 모드 | 에스컬레이션 래더 (`modules/execution-modes.md` · Workflow 반환 실패는 `guides/skill-authoring.md` §12) |
+| gpt check 실패 | 모든 모드 | Lead 가 지적을 수정 → 빌드 → 같은 kind 재검증 (fz-code 8.5 · fz-fix Step 4) |
+| 검증 실패 (반복) | SOLO | 사용자에게 `/fz-review` 제안 |
+| Reflection Rate < 80% (N≥10 — § Reflection Rate threshold) | 모든 모드 | 에스컬레이션 래더 → 한도 후 사용자 에스컬레이션 (fz-review Phase 6 · §12 L4) |
+
+## 재검증 라운드 상한
+
+> 이 절이 정본이다 — 같은 산출물을 GPT 로 몇 번까지 다시 검증하는가. 집행은 코드다: 정문 `scripts/gpt-call.sh` 가 어댑터를 띄우기 직전에 `scripts/gpt_rounds.py reserve` 로 슬롯을 예약하고 EXIT 에서 `finish` 로 끝맺는다(binary 규칙은 스크립트 — `guides/skill-authoring.md`). 상한 값의 코드 출처는 `gpt_rounds.py` 의 `FAMILY_CAP` 이다. 다른 스킬 · 모듈은 횟수를 다시 적지 않고 이 절을 가리킨다.
+
+| 항목 | 규칙 |
+|---|---|
+| 세는 호출 | 호출자가 env `FZ_GPT_ARTIFACT=<산출물 계열>` 을 밝힌 정문 호출만 — 값이 없으면 정문은 원장을 건드리지 않는다. ⛔ 세는 kind(`gpt_rounds.py` 의 `KIND_SLOTS`)로 산출물을 검증하는 호출 줄은 `FZ_GPT_ARTIFACT=` 를 반드시 붙인다 — 빠진 줄은 상한 밖이고 정문은 알리지 않는다 |
+| 키 | 산출물 계열(`plan` · `guide-plan` · `code`) × kind 계열 — 검증 계열(`verify` · `verify-gates` · `verify-cross` · `modernize-verify` · `validate`) 누적 **3** 라운드 · `independent-plan` **1** · 계약(`sprint-contract`) **2**(작성 1 · modify 재확인 1) |
+| 단위 | 호출이 아니라 라운드다. 한 라운드의 필수 kind(fz-plan Phase 2 의 `verify` ∥ `verify-gates` · fz-review 5.5 의 `validate` · `verify-gates`)는 같은 라운드의 별도 슬롯이다 — 가장 최근 라운드에 그 슬롯이 비어 있으면 거기 들고, 차 있으면 다음 라운드를 연다. 상한은 라운드 번호가 아니라 살아 있는(예약 · 완료) 라운드 개수로 잰다 |
+| 일찍 멈춤 | 같은 슬롯의 직전 유효 판정과 입력 manifest 가 같고, 그 판정 파일(`--out` · `--out-dir`)이 끝맺을 때 그대로이고, 그 뒤 새 근거가 없으면 거부한다(`same-input` — stderr 에 그 판정 파일). 판정 파일이 사라졌거나 바뀌었으면 거부하지 않는다(다시 읽을 판정이 없다). manifest = kind · 산출물 버전(env `FZ_GPT_ARTIFACT_VERSION`) · 입력 파일 내용(프롬프트 · 감사 · 요구 · 첨부 · 스냅숏) · 검토 대상 코드(`--cd` · `--repo` 의 HEAD + 작업 트리 diff + 추적 안 된 파일) — 코드만 바뀌어도 새 입력이다. 분류 밖 입력이 있거나 일부를 못 읽으면 manifest 는 unknown 이고 같은 입력 판정만 건너뛴다 |
+| 새 근거 | Lead 가 `gpt_rounds.py evidence --new-evidence <파일> --kind <kind>` 로 남긴다 — 같은 입력의 재라운드를 연다. 상한은 열지 않는다 |
+| 예산 소진 | 상한을 넘는 라운드는 거부한다(`budget-exhausted`) — 미해결로 보고하고 통과로 적지 않는다. `gpt_rounds.py status` 의 `unresolved` 가 그 키를 보인다 |
+| 소비 | 유효 판정(어댑터 exit 0)만 라운드를 쓴다. 통신 실패 · 스키마 위반 재시도(12~14) · 런처 실패(15~17) · 신호 · exit 18(GPT 미사용 — 실패 아님)은 쓰지 않는다. `verify-gates` 사후 대조(`--verdict-check`) 실패 뒤 1회 재호출은 env `FZ_GPT_RECALL=post-check` 로 부른다 — 직전 판정의 라운드를 잇고 라운드를 쓰지 않는다(라운드당 1회 · 넘으면 `recall-used`) |
+| 동시성 | 원장 단위 잠금(`<원장>.lock`) 아래서 검사와 예약만 원자적으로 하고 실행은 잠금 밖이다. 상태는 reserved · completed · failed · aborted — 주인 프로세스가 죽은(또는 24시간 넘은) 예약은 다음 예약이 aborted(orphan)로 회수한다 |
+| 저장 | `{WORK_DIR}/gpt-rounds.json`(env `FZ_WORK_DIR`) — 없으면 `${FZ_RUN_STATE:-~/.fz/runs}/<pipeline_id>/gpt-rounds.json`(pipeline_id 는 `scripts/run_metrics.py` 규칙 그대로) · 발견 색인 `${FZ_RUN_STATE:-~/.fz/runs}/gpt-rounds-index.jsonl`. 재개(새 셸) · 다른 스킬 · 다른 호출자도 같은 원장을 본다 |
+| 거부 신호 | 정문 exit 19 · stderr `GPT-ROUNDS: <사유> — …` — 어댑터를 띄우지 않았다. `same-input` 이고 이번 `--out` 이 직전 판정 파일이면 정문은 그 파일을 지우지 않는다(그 판정이 답이다). `budget-exhausted` 도 이번 `--out` 이 마지막 판정 파일이면 남긴다(미해결 보고의 근거다). 그 밖의 거부는 다른 거부처럼 래퍼 kind 의 옛 `--out` 을 지운다 — 옛 결과를 새 판정으로 읽지 않게. 원장을 판정하지 못하면 11 이다(측정 실패 · 0건 아님) |
+
+- ⛔ 재라운드 프롬프트에서 GPT 에게 앞 라운드 지적이 반영됐는지 확인하라고 시키지 않는다 — 반영 대조는 Lead 몫이다(앵커드 재검증 · F-508). GPT 는 새 입력을 처음 보듯 판정한다
+- 회귀: `python3 scripts/gpt_rounds.py --self-test` — cap-3 · same-input-stop · budget-exhausted · lock-reserve · orphan-recovery. case 앞에서 `KIND_SLOTS` · 입력 분류가 레지스트리(`scripts/gpt-kinds.json`)와 맞는지 본다
+
+---
+
+## 검증 게이트 시각화
+
+Phase 4(User Confirmation)에서 검증 게이트도 함께 표시.
+
+```markdown
+| # | 스킬 | 역할 | 실행자 | 모델 |
+|---|------|------|--------|------|
+| 1 | /fz-plan | 구현 계획 | plan-structure | opus |
+| 2 | gpt verify | 계획 검증 | Lead | gpt |
+| 3 | /fz-code | 점진적 구현 | impl-correctness | opus |
+| 4 | build | 빌드 검증 | Lead | — |
+| 5 | gpt check | 교차 검증 | Lead | gpt |
+| 6 | /fz-commit | 커밋 | Lead | opus |
+```
+
+---
+
+## 공유 유틸리티
+
+> 분리 후보: 3개+ 스킬에서 참조 시 독립 `modules/shared-utils.md`로 추출 검토 (governance.md 모듈 분리 기준 참조)
+
+### GIT_ROOT 추출
+
+```bash
+GIT_ROOT_REL=$(grep -A 5 "^## Directory Structure" CLAUDE.md 2>/dev/null | \
+  grep -i "git.root" | awk -F: '{print $2}' | xargs)
+GIT_ROOT="${GIT_ROOT_REL:-.}"
+```
+
+### 역할 스킬 경로 — 3-Tier 디스커버리 (`scripts/gpt_kinds.py skill-path`)
+
+역할 스킬(`gpt-skills/fz-<역할>/SKILL.md`)의 경로는 resolver 한 곳이 정한다 — `scripts/gpt_kinds.py` 의 `skill_path()` 가 유일한 구현이고, 정문(`scripts/gpt-call.sh`)이 kind 마다 부른다. 호출부는 경로를 다루지 않는다.
+
+Tier 1: 호출자 cwd 의 `CLAUDE.md` `## GPT Skills` 테이블 → Tier 2a: `${CODEX_HOME:-~/.codex}/skills/fz-<역할>` (setup 심볼릭 또는 기존 설치) → Tier 2b: 플러그인 번들 `gpt-skills/fz-<역할>` → Tier 3: kind 의 `fallback_prompt`(레지스트리)를 프롬프트 앞에 붙인다.
+
+- 해석은 **호출자의 cwd · env 기준**이다 — 정문이 cwd 를 바꾸기 전에 resolver 를 부른다(Tier 1 이 대상 프로젝트를 본다). verify-cross 의 격리 `CODEX_HOME` 은 경로를 정한 **뒤** 래퍼에만 준다(격리 홈이 Tier 2a 에 새지 않는다)
+- 직접 확인: `python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_kinds.py" skill-path architect` — 빈 줄이면 Tier 3 다
+- 이력: 2026-08-09 이전 판은 Tier 2b 에서 이름만 돌려줘 호출자가 없는 경로를 `cat` 했다 · 같은 날 경로 반환으로 고쳤다 · R-G1(2026-10) 에서 마크다운 인라인 함수를 resolver 로 옮겼다
+
+### ⛔ `FZ_PLUGIN_ROOT` 초기화 (정문 경로 전제 — 미설정 시 호출부가 정문을 찾지 못한다)
+
+> **신설 근거 (2026-08-09 외부 감사 ISSUE-009)**: 위 함수와 8개 호출부가 `FZ_PLUGIN_ROOT`를 **소비**하는데 레포 어디에도 **할당이 없었다**(실측: 소비 10곳 / 할당 0곳). 전부 빈 문자열이 전달되어 `[ -n "$PLUGIN_ROOT" ]`가 false → **Tier 2b가 항상 건너뛰어졌다.** Tier 2b 파손을 고치려던 변경이 목표를 달성하지 못한 상태였다.
+
+⛔ **GPT 호출(`scripts/gpt-call.sh`) 전에 반드시 1회 실행한다** — 호출부가 정문을 찾는 경로다(resolver 는 자기 위치에서 Tier 2b 를 해석하므로 역할 경로에는 이 값이 필요 없다). 절차는 **2단계**다 — ①Lead가 스크립트의 절대경로를 만들고 ②스크립트가 자기 위치에서 루트를 해석한다.
+
+⛔ **부트스트랩 순환 주의**: 셸 스니펫만으로는 해결되지 않는다. `{스킬 base directory}` 같은 토큰은 **치환되지 않는 리터럴**이라 `cd`가 실패한다 (2026-08-09 감사 ISSUE-PLAN-001). 첫 절대경로는 **Lead가 대화 컨텍스트에서** 만든다.
+
+**① Lead 절차 (셸 아님)**: 스킬 주입 헤더 `Base directory for this skill: …/skills/fz-gpt` 를 읽고 `../..` 를 적용해 **플러그인 루트 절대경로**를 얻는다. 그 값으로 아래 `<PLUGIN_ROOT_ABS>` 를 채운다.
+
+**② 셸 (실행 가능)**:
+```bash
+# 자기 위치에서 루트를 해석하고 마커로 fail-closed 검증한다 (exit 2 = 루트 아님)
+FZ_PLUGIN_ROOT="$(<PLUGIN_ROOT_ABS>/scripts/resolve-plugin-root.sh)" || {
+  echo "WARN: FZ_PLUGIN_ROOT 해석 실패 — 정문 경로가 없다. GPT 호출은 불능 분기로 간다(측정 실패 · 0건 아님)" >&2
+  FZ_PLUGIN_ROOT=""
+}
+export FZ_PLUGIN_ROOT
+```
+
+- ⛔ **빈 값으로 정문을 부르지 말 것**: `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh"` 가 `/scripts/gpt-call.sh` 가 되어 exit 127 로 끝난다 — 10~17 계약 밖이라 측정 실패로도 읽히지 않는다. 비면 호출하지 않고 불능 분기(`skills/fz-review/SKILL.md` 검증 2)로 간다
+- ⛔ 스크립트는 `BASH_SOURCE[0]`을 쓴다 — `$0`은 `source` 시 **호출자**를 가리켜 오해석된다
+- ✅ (이력) 정문 이전에는 Tier 2a(심볼릭)가 있으면 미설정이 **무증상**이었다 — 지금은 미설정이면 정문 경로가 없어 첫 호출에서 드러난다
+- ✅ 이미 스크립트 안에서 호출하는 경우(자기 `dirname`을 아는 경우)는 ①이 불필요하다:
+  `FZ_PLUGIN_ROOT="$("$(dirname "${BASH_SOURCE[0]}")/resolve-plugin-root.sh")"`
+
+**호출 계약** (⛔ 호출부 전부 이 형태 — kind 와 입력만 쓴다 · 세는 kind 로 산출물을 검증하는 호출 줄은 앞에 env `FZ_GPT_ARTIFACT=<산출물 계열>` · `FZ_WORK_DIR` 를 더 단다 — § 재검증 라운드 상한 · 아래 예시는 형태만 보인다):
+```bash
+printf '%s\n' "{과제 지시}" > "$P"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" verify --cd "$GIT_ROOT" --out "$OUT" --prompt-file "$P"
+```
+- 모드 · 역할 · 스키마 · 고정 플래그는 kind 가 정한다(`scripts/gpt-kinds.json` · 생성 표 `skills/fz-gpt/SKILL.md`). 정문이 역할 경로를 해석해 래퍼 `--inject-skill` 로 넘긴다 — exec 전용 · 본문 전체가 이미 있으면 넣지 않는다 · 스킬 폴더 경로 마커로 본문의 상대 경로(`references/…`)가 풀린다(`modules/fz-gpt-bash-hygiene.md` § 스킬 본문 판정과 주입). ⛔ 호출부가 본문을 `cat` 으로 또 넣지 않는다 — 넣는 곳이 둘이면 어느 쪽이 빠져도 드러나지 않는다(F-335). 경로를 못 찾으면 정문이 kind 의 `fallback_prompt` 를 프롬프트 앞에 붙인다
+- ⛔ `resume` 은 `--inject-skill` 을 받지 않는다 — 이어 받는 세션에 본문이 없는 resume 교차는 kind `verify-cross` 가 맡는다(정문이 본문을 앞에 붙이고 `--gpt-skill-path` 로 판정만 받는다 — `modules/fz-gpt-subcommands-core.md` § resume 교차)
+- ⛔ 정책 플래그(`--schema` · `--inject-skill` · `--gpt-skill(-path)` · `--ephemeral` · `-c` · `-p` · `--profile` · `--ignore-user-config` · `--config-permissions`)를 넘기면 정문이 10 으로 거부한다. `--model` · `--effort` 는 그대로 넘긴다(E1 — 판정은 래퍼)
+
+⛔ **`setup-gpt-skills.sh` 는 Tier 2a 심볼릭(`gpt-skills/`)을 만든다 — 디스커버리의 필수 조건은 아니다.** 미실행이어도 resolver(`scripts/gpt_kinds.py`)가 자기 위치의 번들 `SKILL.md`(Tier 2b)를 돌려주고, 번들이 없으면 Tier 3 로 폴백한다. setup 이 더하는 것은 GPT CLI 가 자기 스킬 폴더에서 역할 스킬을 스스로 싣게 하는 것이다.
+⛔ Claude 스킬(`skills/`)을 그 폴더에 링크하면 GPT 가 역할 스킬 대신 Claude 스킬을 고른다(A2-02 실측: 링크 확장 뒤 fz-reviewer 로드 28세션 중 26회 → 31세션 중 1회). 그래서 setup 은 `gpt-skills/` 만 링크하고, 이 플러그인 `skills/` 를 가리키는 링크는 이름과 무관하게 지운다.
+
+### 독립 첫 패스 — `scripts/gpt_independent.sh` (fz-peer-review · fz-plan light · full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`)
+
+위 호출 계약의 GPT 는 대상 저장소와 **같은 디스크**를 본다 — 작업 폴더의 Claude 산출물과 `~/.claude/projects` 로그도 읽을 수 있다. 첫 패스를 Claude 결과와 독립으로 돌려야 할 때(SC-1)는 런처를 쓴다.
+
+- 허용 입력만 격리 폴더에 복사한다 — 요구사항 원문 · 합의 Sprint Contract · PR 메타 · diff · `base/` · `head/` 스냅샷 · 지침 원문 색인 · 소비자 스냅샷. Claude 산출물 이름(`code-context*` · `plan-v*` · `*workflow-result*` · 리뷰 산출물)이나 `~/.claude` 아래 경로가 들어오면 exit 15 다
+- 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` 는 deny, 격리 폴더(와 `--repo`)만 read 다
+- rollout 을 전부 감사한다 — HOME deny 가 없거나 금지 경로 · 홈 재귀 검색이 있으면 exit 15 와 `.contaminated` 다. 읽는 대상이 명령에 없는 읽기가 있어 읽기 로그만으로는 "안 읽었다"를 증명할 수 없다 — 감사는 보조다
+- review 의 `--gpt-agents`(opt-in)는 역할 파일(`gpt-agents/`)로 두 렌즈 역할을 spawn 한다. 하위 에이전트는 부모와 같은 권한 프로필을 강제받는다(S11 ⑤ · R-G1 S1 실측 — 자식 turn_context 에 HOME deny). 부모 이력을 물려받는지는 `spawn_agent` 의 `fork_turns` 를 모델이 매번 고른다(S1 관측 2건 모두 `none`) — 부모가 격리돼 있어 어느 쪽이든 독립은 유지된다. `--gpt-agents` 가 없으면 프롬프트로 하위 에이전트를 금지하고 감사가 spawn 수를 기록한다 — 지시 + 기록이고 강제가 아니다(spawn 도구는 노출된다 — F-436)
+- 산출은 `<arm>-<run>.json`(`schemas/gpt_independent_{plan,review}_schema.json`) · `.md` · `.audit.json` · `.rollouts/` 다. 호출법은 `modules/fz-gpt-subcommands-aux.md` § independent-plan · independent-review
+- 기본값은 스킬마다 다르다 — fz-peer-review 는 기본으로 쓰고(`--no-gpt-independent` 로 끈다 · S25p · S27 판정 뒤 v4.42.0), fz-plan · fz-modernize 는 full 에서 기본으로 쓰고(fz-plan 은 `--no-gpt-independent` 로 끈다 · 2026-11-01 사용자 결정 Q3), fz-review 는 `--gpt-independent` 로 켠다. 쓰지 않는 경로에서는 위 호출 계약이 그대로다
+
+## 참조 스킬
+
+| 스킬 | 참조 이유 |
+|------|----------|
+| /fz-gpt | 검증 게이트 + 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`) |
+| /fz | 파이프라인 검증 게이트 자동 삽입 |
+| modules/lead-reasoning.md | Implication Scan + origin-equivalence 추론 원칙 |
+| modules/system-reminders.md | Instruction fade-out 대응 트리거 정책 |
+
+## GPT 검증 결과 보존 정책
+
+> 1M context 활용: 요약 + 원본 분리 (Progressive Disclosure)
+
+- **티켓 폴더(WORK_DIR) 활성**: `verify-result.md` (요약 3K, Hydration 대상) + `verify-result-full.md` (원본, drill-down용)
+- **비-티켓 세션**: Serena checkpoint 요약만 (기존 동작)
+- 다음 Phase 스킬은 `verify-result.md` 요약을 Read. 상세 확인 시 `-full.md` drill-down.
+
+---
+
+## Implication Scan 게이트
+
+> 참조: `modules/lead-reasoning.md` — 추론 원칙, 카테고리 분류, 자문 체크리스트, Register 형식
+
+### 트리거
+
+- **1차**: 제거/삭제/이동/이관/마이그레이션/리팩토링/DI변경/revert
+- **2차**: 프로토콜/access control/init·signature/모듈경계 변경
+- **상시**: Q-OBSERVE (모든 코드 변경에서 경량 스캔)
+
+### 파이프라인 위치
+
+```
+planning 후 → [implication-map] → stress-test → gpt verify
+code-changes 후 → build → [implication-scan] → gpt check
+```
+
+### 절차
+
+1. `lead-reasoning.md` 자문 체크리스트 실행 (Q-WHY/Q-COMPLETE/Q-EFFECT)
+2. `find_referencing_symbols` → 변경 심볼의 참조자 중 "이 변경을 위해 추가된" 코드 식별
+3. 실행 함의 발견 → [함의-A] 보고 + 사용자 확인
+4. 관찰 함의 발견 → [함의-B] 기록 (최대 2건, 출력은 Gate 완료 시)
+
+---
+
+## Follow-up Re-audit Gate (Phase B1/B2 활성 시)
+
+> 트리거: 과거 판단 아티팩트 (`follow-up-tasks.md`, `codex-review*.md`, `plan-v*.md`) 인용 시 (T7 트리거 연계)
+
+### 절차
+
+1. 해당 아티팩트 파일 현재 시점 Read (내용 변경 여부 diff 확인)
+2. 변경 있음 → 재실측 후 최신 상태 기준 판정 (`git show`/`Read`/`grep` 실측)
+3. 변경 없음 → `[verified: 재확인 YYYY-MM-DD]` 태그 부착
+4. 재실측 불가 시 → `[아카이브: 재실측 불가, 작성 시점 YYYY-MM-DD]` 태그 + 보고
+
+### 외부 memory 경로 정책 (단일 변수)
+
+`memory/feedback_*.md` 류 외부 아티팩트 참조 시 `${CLAUDE_PROJECT_DIR}/memory/...` 변수형 절대 경로만 허용. glob (`*`) 사용 금지.
+
+```
+✅ ${CLAUDE_PROJECT_DIR}/memory/<교훈>.md
+❌ ~/.claude/projects/*/memory/feedback_*.md  (glob 사용)
+❌ memory/<교훈>.md  (상대 경로)
+```
+
+참조: `${CLAUDE_PROJECT_DIR}/memory/<교훈>.md` (Follow-up 재감사 교훈)
+
+---
+
+## origin-equivalence 게이트 (revert 전용)
+
+> 트리거: "되돌리기", "revert", "원상복구", "undo", "롤백"
+
+⛔ 되돌릴 대상 = "키워드"가 아닌 "원본 상태 전체"
+
+1. 원본 커밋/상태 식별 (`git show {commit}^` 또는 기준 파일)
+2. 범위 = 대상 커밋이 추가한 모든 변경 (상태 복원)
+3. 완료 기준: 원본과의 동등성 확인
+
+체크리스트:
+- [ ] 원본 상태를 정확히 식별했는가?
+- [ ] 키워드 기반이 아닌 상태 기반으로 범위 정의했는가?
+- [ ] 원본과의 동등성(origin-equivalence) 확인했는가?
+
+---
+
+## 외부 피드백 검증 (External Feedback Gate)
+
+> 하네스 원칙 4 적용: Generator≠Evaluator — 외부 피드백에 결정론적 검증 삽입
+
+트리거: CodeRabbit, GPT, 팀원이 "파라미터 누락/타입 불일치/동작 변경/컨벤션·로컬라이즈·규칙 적용" 지적 시
+⛔ diff만 보고 동의/반박 금지.
+
+절차:
+1. Read(해당 함수 시그니처) — 오버로드 구분 포함
+2. 기존 동일 패턴(이전 PR, 같은 시리즈 이전 커밋) 대조
+3. 판정: valid / invalid / needs-investigation + 근거 1줄
+
+**Why:** OBS-01 세션에서 CodeRabbit이 "includeGiftWrap: false 누락" 지적 → diff만 보고 수긍 → 실제로 OldOrderResponse 오버로드에 해당 파라미터가 존재하지 않았음. 같은 세션에서 2건 발생.
+
+---
+
+## 런타임 동작 주장 검증 (Runtime Claim Gate)
+
+> 하네스 NLAH-A: 비결정론적 추론 → 결정론적 어댑터(Bash) 교체
+
+트리거: "~는 안전하다", "~로 변환된다", "타입 캐스팅이 ~" 등 런타임 동작 단정 · 언어 의미론 주장(`try?` 결과의 옵셔널 평탄화 · 이중 옵셔널 · 캐스팅 실패 값 — F-283)
+조건: Swift 타입 시스템, Foundation API 동작, NSNumber 브리징 등 저수준 주장
+
+절차:
+1. 가능하면 Bash Swift 스크립트로 실제 실행하여 확인
+2. 실행 불가능하면 → "미검증 (추론)" 표기 후 사용자에게 고지
+
+> 관찰 모드 해제(2026-11-09): '2건+ 재발 시 강화' 조건을 F-283 이 채웠다 — `try?` 를 이중 옵셔널로 읽어 guard 를 '무력' 으로 오판했고 판정 방향이 반대였다. 첫 사건은 OBS-01 의 캐스팅 헬퍼.
+
+**Why:** 캐스팅 헬퍼의 Bool/Int 변환 안전성을 직관으로 "안전하다" 판단 → 취소 → Bash 테스트로 위험 확인. 실행 검증이 있었으면 1번에 끝났음.
+
+---
+
+## SOLO 모드 검증 게이트 요약
+
+> 하네스 원칙 4 + Gap G-R1: SOLO에서도 **결정론적 도구 호출**로 최소 Generator≠Evaluator 분리
+
+SOLO 모드에서는 에이전트 스폰 없이 결정론적 도구로 검증한다. GPT 교차 검증은 모드가 아니라 GPT 사용 여부를 따른다 — 켠 세션이면 SOLO(light)도 같은 GPT 단계를 돈다(`modules/mode-gate.md` § GPT 는 모드와 독립).
+
+| 상황 | 검증 방법 | 참조 |
+|------|----------|------|
+| 외부 피드백 판정 | ⛔ Read(함수 시그니처) + 패턴 대조 필수 | § External Feedback Gate |
+| 런타임 동작 주장 | Bash 실행 가능하면 실행, 불가면 "미검증" 표기 | § Runtime Claim Gate |
+| 3+ 파일 변경 후 자기 평가 | `/sc:sc-reflect`(선택) | fz-code sc: 테이블 |
+| 시그니처 변경 | `find_referencing_symbols` → conformance 확인 | 검증 유형별 전략 테이블: protocol conformance |
+| "전체/모든" 키워드 분석 | ⛔ Coverage Gate: 단위 U 확정 → 전체 `N_U`, 검사 M, M/`N_U` 비율 보고 | § Coverage Gate |
+| 결론 보고 전 | Q-SCOPE + Q-COVERAGE 자문 의무. "분석하지 않은 영역" 명시 | lead-reasoning.md §3 |
+
+⛔ SOLO에서 **하지 않는 것** (AP1 과도한 구조화 방지):
+- 에이전트 스폰 (TEAM 전용)
+- stress-test Q1-Q6 (fz-plan TEAM 전용)
+- 주관적 평가 분리가 필요하면 → TEAM 모드 전환 제안
+
+---
+
+## Coverage Gate (문서/파일 분석 전수 보장)
+
+> 트리거: 사용자 요청에 "전체", "모든", "생태계", "전수" 키워드 포함 시 — **또는 요청 어휘와 무관하게 산출물(보고)이 전수/카운트/부정 주장("~뿐", "N곳", "N개", "나머지는", "전부")을 생성할 때** (요청 어휘만 보면 "확인해줘"형 light 요청의 전수 산출물을 놓침) — **또는 비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)을 쓸 때**(F-226: 비율만 적으면 분모가 무엇인지 보이지 않는다)
+> 본 트리거 정의가 **canonical** — Q-COVERAGE(lead-reasoning.md §3)·fz-search/fz-discover Gate·T8(system-reminders.md)은 이를 미러. 어휘 변경 시 4곳 동기화.
+> 근거: 2026-04-16 세션에서 모델이 95개 중 25개만 읽고 "완료" 보고 / 2026-06-12 전수 주장 오판 — `rg|head -5` 잘린 출력 "2곳뿐" 단정 4턴 생존 (실제 11곳)
+
+### 절차
+
+0. **커버리지 단위 확정**: 조사 전에 **전수 주장의 대상 단위 U**(file / section / rule / usage-site / parameter / error-path — 실패 · 전파 경로 주장은 경로 위 `catch` 본문까지가 단위다, F-009)를 정하고, U의 전체 목록과 전체 수 `N_U`를 수집한다. ⛔ 결과 건수(예: "위반 0건")를 커버리지 단위로 삼지 않는다 — 단위는 전수 주장이 **겨누는 대상**이지 그 대상을 세어 나온 결과가 아니다. 파일 전수 주장은 `file`, 절 전수 주장은 `section`을 쓴다.
+1. **대상 파일 목록**: `Glob` 또는 `find` → 읽어야 할 **대상 파일 수 F** 수집. F는 실행 비용 지표이며 `N_U`와 별개다 — U=section이면 파일 하나에 U가 여럿 들어간다.
+2. **전략 선택** (F 기준):
+   - F ≤ 30 → 직접 전수 읽기
+   - 30 < F ≤ 100 → 병렬 에이전트 분배 (전수)
+   - F > 100 → AskUserQuestion ("100개+ 파일. 전수/범위 한정 중 선택?")
+3. **완료 보고에 커버리지 명시** (단위 U 기준):
+   ```
+   단위: {U}
+   Coverage: {검사한 U 수}/{N_U} = {비율}%
+   누락 {U}: {목록 또는 "없음"}
+   ```
+4. 비율 < 100% → 누락 사유 명시 필수 · ⛔ **범주 대조(F-490)**: 비교 · 분석 보고의 커버리지 표는 대상 저장소의 범주 열거(예: `git ls-files | cut -d/ -f1 | sort | uniq -c`)와 대조해 읽지 않은 범주도 `0/N` 행으로 남긴다 — 범주를 빼면 비율이 높아 보이고 2항의 F > 100 질문도 발화하지 않는다
+5. **명령 출력 커버리지** (파일 분석 없는 순수 grep/rg 조사는 1-4항 대신 본 항부터 적용): 근거 수집 명령에 `head`/`tail` 잘림 금지. 출력이 길면 자르지 말고 `wc -l` 총계 병기 + "잘림" 명시.
+   - **두 시점 대조(F-127)**: 전 · 후(두 커밋 · 두 실행)를 대조하는 입력은 전수로 뽑아 `sort` 한 뒤 비교하고 양쪽 개수를 함께 인쇄한다. `git status` · `git diff --name-status` 처럼 그 비교 전용 오라클이 있으면 그것을 먼저 쓴다
+6. **집계 검산식**: 분할 합계 주장(부분합 존재)은 검산식 명시·일치 의무 (예: `80 = 58 + 6 + 14 + 2`). 단순 단일 카운트는 **실패 모드가 다른 조달원**으로 다시 잰다(F-026 · F-099 — 같은 명령 재실행은 같은 누락을 다시 낸다. 다른 도구 · 다른 파서 · 다른 후보 목록이어야 독립이다), 또는 독립으로 구한 전체 N 과 `Σ부분 = 전체` 를 대조한다(N 이 부분합과 같은 조달원이면 항등식이다). 독립 분모를 못 구하면 100% 로 적지 않고 **커버리지 미검증**으로 보고한다. ⛔ **정규식·쿼리 불완전로 인한 가짜 교차확인은 본 항이 담당하지 않는다** — 수신처는 `§ Negative-Result Gate`(2026-08-09 신설)다. 이전 문구는 *"T8 리마인더 범위 밖, 본 항이 담당"* 이라 적었으나 그 구현은 **존재한 적이 없고**, `system-reminders.md` T8 도 이미 Negative-Result Gate 를 지목한다(*"도구 유효성…은 §Negative-Result Gate"*). 본 항은 **범위**(분모·부분합)를, Negative-Result Gate 가 **도구 유효성**을 본다. ⛔ **수치 재생성(F-493)**: 보고의 수치 표는 행마다 원천에서 그 값을 다시 내는 명령을 `재생성` 칸에 적고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_report_regen.py" {보고}` 로 확인한다 — 부분합이 보존되는 분류 오류는 검산식(합 = 전체)을 그대로 통과한다
+7. **분류 완전성** *[candidate: 1 session evidence]* (scope 판정이 산출물에 포함될 때 — sweep/discovery가 항목을 in_scope/out_of_scope/migrated 분류): 기각(out_of_scope/migrated) 항목 수 명시 + 무작위 N=min(3, 전체기각수) 표본 adversarial 재검(반례 탐색 → 발견 시 재분류). **분류 단위 = 사용 site(call/usage site), file 전체 아님** — 혼재 파일(in-scope+out-scope site 공존) 허용. (BAD: 파일 통째 out 판정 → 내부 in-scope site 폐기 / GOOD: site별 분리 판정). [evidence:1 OBS-15, active:5세션(트랙 A — promotion-ledger.md canonical)]
+
+8. **결정 이력 대조(F-492)**: 변경을 제안하는 보고는 제안마다 그 대상의 결정 이력을 먼저 grep 한다 — `CHANGELOG.md` · `docs/releases/` · `modules/promotion-ledger.md`(철회 · REJECTED) · A/B 판정 기록. 메모리 회상만으로 '걸리는 결정 없음' 이라 적지 않는다(철회된 변경이 그대로 다시 제안된다)
+9. **발견 턴 등재(F-491)**: 분석 중 하네스 결함을 발견하면 그 턴에 발견 레지스트리에 등재한다 — 대기열 크기는 미룰 사유가 아니다. 완료 보고 전에 '이번 작업에서 발견한 결함 · 등재 id' 를 한 줄로 대조한다
+10. **비율 표기(F-209)**: 비율은 분자 · 분모 · 기간을 한 줄에 쓰고(`12/40 = 30% · 2026-10-01~10-31`), 측정기가 무엇을 세는지 한 줄로 정의한다 — 같은 이름의 비율이 측정기마다 다른 것을 센다
+
+```
+BAD:  rg X | head -5 → "사용처 2곳뿐"   (잘린 5줄을 전수로 단정)
+GOOD: rg X | wc -l → 11 → 잘림 없이 11줄 직접 확인 후 "사용처 11곳"
+```
+
+### Gate 조건
+- [ ] 커버리지 단위 U 확정? (결과 건수를 단위로 삼지 않았는가)
+- [ ] 단위 U 전수 목록 생성? (`N_U`)
+- [ ] 전략 선택 (F 기준 — 직접/병렬/범위 확인)?
+- [ ] 완료 보고에 **단위 U** + Coverage 비율 명시?
+- [ ] 근거 명령 출력 잘림 없음? (또는 head 없이 `wc -l` 병기)
+- [ ] 분할 합계 주장이면 검산식 일치? (단일 카운트는 N/A)
+- [ ] scope 판정 산출물이면 기각 항목 수 명시 + 표본(≤3) adversarial 재검 + 분류 단위=site? *[candidate: 1 session evidence]*
+- [ ] 커버리지 표가 대상 저장소 범주 열거와 대조됐는가? (읽지 않은 범주 `0/N` 행 — F-490)
+- [ ] 수치 표에 행마다 재생성 명령이 있고 `check_report_regen.py` 가 통과했는가? (F-493)
+- [ ] 변경 제안마다 결정 이력(CHANGELOG · 릴리스 노트 · 승격 원장 · A/B 기록) grep 을 했는가? (F-492)
+- [ ] 이번 작업에서 발견한 결함이 모두 등재됐는가? (발견 턴 등재 — F-491)
+- [ ] 비율 주장이면 같은 문장에 N/M · 기간 · 측정기 정의가 있는가? (F-226 · F-209)
+
+> 상시 경량 self-check Q-COVERAGE(lead-reasoning.md §3)는 본 Gate의 미러 — 어휘 변경 시 본 canonical과 동기화.
+
+---
+
+## Negative-Result Gate (0건·부재 주장의 도구 유효성)
+
+> ⛔ **`system-reminders.md` T8이 위임한 수신처다.** T8은 *"정규식 불완전(가짜 교차확인)은 Coverage Gate 검산식 담당"*이라 명시하는데 그 구현이 없었다(2026-08-09 신설). Coverage Gate가 **범위**(N개 중 M개)를 보고, 본 Gate가 **도구 유효성**을 본다.
+> 근거: 단일 세션에서 12 인스턴스 실측 — 그중 *0건 자체를 의심해서* 잡은 건 **0건**이다. 전부 외부 지적·우연한 재측정·도구 에러메시지로 발견됐다. 즉 자기 점검으로는 잡히지 않는다(`guides/harness-engineering.md` H1 자문 NO).
+
+**발동**: "0건" · "부재" · "전부" · "~뿐" 을 **산출물의 결론**으로 쓸 때.
+⛔ **면제**: 탐색 중 중간 grep. (범위를 좁히지 않으면 모든 grep에 붙어 IFScale 과부하가 된다 — Coverage Gate의 "산출물 기준" 트리거 규약과 동형)
+
+### 3요소
+
+**1. Positive control** — 동일 명령이 **반드시 매칭되는 케이스**에서 non-zero를 내는지 먼저 확인한다.
+> 0건은 「대상 부재」와 「도구 고장」을 구별하지 못한다. 도구가 작동함을 먼저 증명하라.
+
+**2. 신호 보존** — 측정 명령을 `>/dev/null 2>&1`로 감싸지 않고 **exit code를 판정에 포함**한다.
+> 스크립트의 fail-closed 거부가 0건으로 오독된다. 선례: `scripts/lint_doc_freshness.py`는 잘못된 루트에서 `⛔ 플러그인 루트가 아님`을 stderr로 내고 **exit 2**로 거부한다 — stderr를 버리면 이 거부가 "0건"이 된다.
+
+**3. 귀속 라벨** — 다중 대상 스캔 출력에 **대상 식별자**를 포함한다.
+> 라벨 없는 집계는 잘못된 사이트에 귀속된다.
+
+> ⛔ **범위를 좁힌 0건 · N건은 저장소 전체 수를 같이 적는다** — `bash "${FZ_PLUGIN_ROOT}/scripts/scope_census.sh" --fixed <패턴> --scope <경로>… [--expect <양성 대조 경로>]` 가 좁힌 범위와 `git grep --untracked` 전체의 파일 · 줄 수와 범위 밖 적중 경로를 한 출력에 낸다(F-452: 문서 경로만 세어 '언급 없음 253건' · 전체 202 · 코드 인용 70 — F-030 재발).
+> ⛔ **필터로 대상 목록을 만들면**(`grep -v` · glob · 확장자 · 경로 접두) 필터 없는 수와 차집합을 함께 인쇄하고, 같은 필터가 복사된 자리(다른 스크립트 · 문서 속 명령)를 `git grep` 으로 확인한다(F-140 — 한 곳의 필터가 고쳐져도 사본이 같은 누락을 낸다).
+
+### 알려진 함정 (실측된 것만)
+
+| 함정 | 증상 | 기계 검출 |
+|---|---|---|
+| `grep -E` 안의 `\|` | ERE에서 alternation 아님 → **항상 0건**. ⚠️ BRE(`grep` 무옵션)의 `\|`는 정당 | `lint_contracts.py` **#N4** |
+| `git grep -E` 안의 `\b` | git 의 기본 정규식 엔진은 GNU grep 처럼 `\b`를 처리하지 않는다 → **에러·경고 없이 0건**. 단어 경계가 필요하면 plain 패턴으로 뽑고 눈으로 거른다 | — |
+| 파일명으로 심볼 grep | `CheckoutSheetOptions.swift` 의 *파일명*으로 타입을 찾으면 0건이 **보장**된다. 삭제 대상이 파일명인지 타입명인지 먼저 구분하고, `git show <ref>:<file> \| grep -E '^\s*(public\|open)'` 로 선언 심볼을 추출한다 | — |
+| zsh unquoted `--include=*.md` | 글로빙되어 `no matches found` → 거짓 0건 | — (셸 세션) |
+| macOS `timeout` 부재 | 측정 도구 부재를 대상 실패로 오독 | — |
+| `cmd \|\| echo "실패"` | `\|\|` 는 exit 127(도구 부재)과 1(진짜 실패)을 **구별하지 않는다** → 부재가 대상 결함으로 인쇄된다. 실측: `/usr/bin/node` 가 없어 8건 통과를 "문법 오류 8건"으로 보고 | — (절대경로 대신 `command -v`) |
+| 검사기가 예외로 **중단** | 요약 줄(`N/N passed`)이 안 찍히는데, `FAIL` 만 grep 하면 *무신호* 와 *전건 통과* 가 같아 보인다. 어블레이션에서 헛돌이 오판으로 이어졌다 | — (`^self-test` 실재를 먼저 본다) |
+| `awk '/A/,/B/'` 범위 | 끝 헤더에서 멈춰 **구간을 못 읽음** | — |
+| 한글/영문 표기 누락 정규식 | `Gate`만 찾고 `게이트`를 놓침 | — |
+| `>/dev/null 2>&1` + exit 무시 | fail-closed 거부를 0건으로 오독 | **#N5** |
+| CWD 의존 상대경로 | 다른 디렉토리에서 다른 결과 | **#N6** |
+| LSP references 0건 (`textDocument/references`) | Swift 프로토콜 **선언**과 그 **conformance 구현**은 서로 다른 선언이라 참조 관계가 아니다 → 구현체가 안 잡힌다. 전수 실측: recall **36.9%**(N=468 동명이인 배제) · 0건 반환 **19%** · 손검증 `StoreDetailPresentable/bindCoupon` 는 구현이 있는데 0건 | — (Serena `find_implementations` ∪ `Grep` 전수로 교차 — F-535) |
+| 흔한 메서드명으로 만든 ground truth | `popViewController`·`evaluateJavaScript`·`detachChild`·`build`·`update`·`present` 처럼 **프레임워크 표준 API 와 동명**이면 텍스트 매칭이 무관한 호출을 전부 긁어 분모가 부푼다 — 정확한 도구가 **낮은 점수로 보인다**. 호출 **수신자 타입**으로 거르거나 동명 정의 개수를 먼저 센다 | — (수신자 분류) |
+| 프로토콜 선언을 구현으로 집계 | `protocol` 블록 안의 `func x()` 는 **선언**이지 구현이 아니다. 파일:줄만 보면 갈리지 않는다 — 직전 최상위 선언(컨테이너)을 함께 확인한다 | — (컨테이너 확인) |
+| 리뷰 하위 컬렉션 `/pulls/{N}/reviews/{id}/comments` 로 앵커 대조 | 이 응답은 `line`·`side`·`start_*` 를 **null** 로 주고 `position`·`diff_hunk` 만 채운다 — 정상 게시가 전건 불일치로 읽혀 삭제 직전까지 갔다(F-150 · F-256 · F-282). 하위 컬렉션은 id 수집에만 쓰고 필드는 `/pulls/comments/{id}` 개별 조회로 본다 | `skills/fz-peer-review/scripts/verify_landing.py` |
+| 필드 null 을 값 불일치로 확정 | null 은 "다르다" 가 아니라 "이 응답이 그 값을 안 줬다" 일 수 있다. POST 와 조회 사이 PR head 가 움직이면 두 경우다 — 코멘트가 outdated 면 개별 조회도 `line` 이 null 이고 `original_line` 만 남는다(→ `UNVERIFIED`), 새 head 로 이월되면 `line` 이 다시 매겨지고 `commit_id` 가 전진한다(→ 응답 `original_commit_id` 가 payload `commit_id` 와 같을 때만 `original_line`·`original_start_line` 으로 대조, 아니면 `UNVERIFIED` — 다시 매긴 `line` 을 불일치로 확정하지 않는다 [미검증: 실 GitHub 의 이월 재매핑 — 실 API UNRUN]). 이 게이트의 발동 어휘(`0건`·`부재`)에 null 은 없다 — 판정은 `UNVERIFIED` 이고 삭제·재게시하지 않는다 | `verify_landing.py` `UNVERIFIED` |
+| 이름 정규식의 하이픈 누락 | `[a-z_]+` · `\w+` 로 이름을 뽑으면 `fz-code` · `plan-lean2` 같은 하이픈 이름이 잘리거나 빠진다 → 그 이름은 '없음' 으로 집계된다(F-225) | — (문자 클래스에 `-` · 하이픈 이름을 양성 대조로) |
+| `\|\| echo "0건"` · `\|\| true` | 명령이 실패해도 '0건' · 성공으로 남는다 — 부재 주장의 근거 경로에 쓰지 않는다. 같은 명령 · 같은 플래그로 반드시 걸리는 대조 심볼을 함께 돌린다(F-076) | — |
+| 코퍼스가 측정 대상 자신을 포함 | 어휘 · 규칙의 출현 수를 세는 코퍼스에 그 정의 파일(규칙 문서 · 탐지기 · 시험 픽스처)이 들어 있으면 정의 자체가 적중으로 세어진다. 정의 파일을 뺀 코퍼스로 다시 재고 두 수를 함께 적는다(F-035) | — |
+| 도구 답 영역 ≠ 질문 영역 | 로컬 추적 ref(`origin/x`)는 원격의 현재가 아니다(`git ls-remote` 로 본다). `ps` 에 없다는 것은 정상 종료가 아니다(완료 표지 · 로그 끝으로 본다). PR · 이슈 상태(`state:CLOSED` · `mergedAt:null`)는 그 PR 의 영역이다 — 코드가 들어갔는지는 `git log` · `git grep <ref>` 로 본다(F-102). 도구가 답하는 영역이 질문과 같은지 먼저 맞춘다(F-057) | — |
+| 도구 제약을 시험 없이 단정 | "이 도구는 X 를 못 한다" 를 문서 · 기억으로 단정하고 복제 경로를 만들었다 — 단정하기 전에 정본 호출을 1회 시험한다. 워크플로 경로는 §12 0단계(`cp` + `cmp`, 실패면 L4)가 이미 시험한다(F-054) | — |
+| MCP 검색 필터 병용 | glob 과 pattern 같은 필터를 함께 주면 조건이 겹쳐 0건이 나온다 — 무필터 조회 수와 대조하고 두 필터를 동시에 쓰지 않는다(F-066) | — |
+| 비ASCII 패턴을 `perl -e` 인라인에 | 로캘 · 인코딩 처리로 한글 패턴이 조용히 매칭에 실패한다 — `python3` 로 바꾸고 다른 도구로 같은 대조 심볼을 확인한다(F-091) | — |
+| 보내지 않은 필드를 필수로 대조 | 단일 줄 코멘트는 `start_line`·`start_side` 를 보내지 않아 응답의 두 값이 null 이다 — 그 둘까지 대조하면 정상 게시가 불일치·미확인으로 읽힌다. 필수 필드는 payload 에 넣은 것만이다 | `verify_landing.py` (payload 모양 기준) |
+
+### Gate 조건
+
+- [ ] "0건/부재/전부"가 산출물 결론에 있는가? (없으면 N/A)
+- [ ] 있으면 **positive control** 수행 + 결과 명시?
+- [ ] 측정 명령의 **exit code**를 판정에 포함? (`2`는 PASS도 SKIP도 아님)
+- [ ] **에이전트·도구가 기대와 어긋나며 *이유*를 적었다면 그 이유를 먼저 검증?** 불일치는 상대의 실패가 아니라 *둘 중 하나가 틀렸다*는 신호다 — 기준(정답표·기대값) 쪽을 먼저 의심한다
+- [ ] 다중 대상 스캔이면 출력에 **대상 라벨** 포함?
+- [ ] 위 함정 표의 해당 항목을 점검? (기계 검출 가능분은 `lint_contracts.py`가 담당)
+- [ ] 부재(누락 · 미등록 · 고아)를 세는 스크립트가 **대조 기준 집합의 출처와 크기**를 출력하는가? (F-225 — 기준 집합이 비거나 잘리면 '누락 0' 이 참처럼 보인다)
+
+> ⛔ **SKIP ≠ PASS**: 스크립트가 판정하지 않은 항목(THRESHOLD·SEMANTIC)은 별도 판정하고 그 사실을 보고에 남긴다.
+
+### 측정 실행 규율 (F-402)
+
+측정 도구의 부작용(정리 신호 · 명령 치환)이 측정값을 바꾼다. 0 이나 '효과 없음' 은 측정 실패를 먼저 의심한다.
+
+- **실행 직전 잔존 0 단언** — 잔존(프로세스 · 임시 파일 · 포트)을 실행 전후로 비교하는 측정은 매 실행 직전에 잔존 0 을 확인한다. 앞 실행이 남긴 것을 뒷 실행 값으로 센다
+- **정리는 KILL** — 실행 사이 정리는 `pkill -9`. TERM 을 무시하도록 만든 대상은 기본 신호로 지워지지 않는다
+- **태그 계수** — 계수 대상에 실행마다 다른 표지(고유 인자 · 태그)를 붙여 그 실행 것만 센다
+- **rc 는 실행 직후 변수에** — `printf '%s' "$(…):$?"` 처럼 명령 치환 뒤에 읽은 `$?` 는 늘 0 이다
+- **원장 상태는 판정기 출력으로** — 완료 Step 수를 손으로 세지 않고 `gate_check.py --status` 를 인용한다(Lead 완료 ≠ 원장 met)
+- 시험 근거: `tests/fixtures/gpt/idle-watchdog/run.sh`(감시자의 KILL 승격 · 잔존 계수)
+
+---
+
+### 경계 — 이 게이트가 닿지 않는 곳 (2026-09-16 결정)
+
+전역 Serena 설정(`~/.serena/serena_config.yml` 의 `excluded_tools`)은 **편집하지 않는다.**
+`find_referencing_symbols` 의 강등은 에이전트 `tools:` 와 스킬 `allowed-tools:` 층에서만 한다.
+
+이유는 둘이다. ① 차단 실효가 이미 그 층에 있다 — 워커와 fz 스킬 활성 세션은 배선만으로 덮인다.
+② 전역 제외는 **폴백 보존 결정과 충돌한다**: 서버가 도구를 노출하지 않으면 frontmatter 에 적어도
+바인딩되지 않으므로, 워커가 호출 지점을 찾는 마지막 심볼 도구까지 함께 죽는다.
+
+⛔ **따라서 구멍이 남는다** — fz 스킬이 비활성인 Lead 세션과 fz 밖 세션. 그 두 곳에서는
+강등되지 않은 참조 탐색 도구가 그대로 보인다. 거기서의 규율은 설정이 아니라 이 문서다:
+**0건을 부재의 근거로 쓰지 않는다**(recall 36.9% · 전수 N=468). 근거·절차는 위 Gate 조건.
+
+## Transformation & Publication Gate (변환 검증의 독립성 · 공개 표면)
+
+> 근거: 2026-09-27 공개 이력 재작성(F-336 · F-337). 1차 리허설은 PASS 였지만 변환 규칙이 놓친 표기 변형(대소문자 · ref 이름 · 사람이 손으로 바꾼 파일명)이 남아 있었다. 릴리스 본문과 새 커밋의 신원은 계획 밖이었다. 전부 **검증이 변환 규칙을 되풀이한** 자리였다.
+
+**발동**: 규칙 기반 일괄 변환(치환 · 중립화 · 마이그레이션 · 이력 재작성)을 검증할 때 · 공개 범위에서 무언가를 지울 때.
+
+### 1. 독립 탐지기
+
+변환의 검증기에는 변환 규칙과 **정의를 공유하지 않는 탐지기**가 최소 1개 있어야 한다.
+> 같은 규칙을 양쪽에 적용한 동등 비교("규칙 적용한 원본 == 결과")는 규칙이 결정적이라는 것까지만 증명한다. 규칙에 없는 것은 양쪽에 똑같이 남아 **일치**로 나온다.
+> 예: 대소문자 무시 · 부분 문자열(긴 이름 안의 이름) · URL 호스트 · 메일 도메인 · 사람이 손으로 바꾼 것(규칙에 없다)
+
+### 2. 최종 인자 그대로 리허설
+
+리허설은 **최종 명령의 인자 집합 그대로** 돌린다. 값만 다른 인자(경로 · SHA)는 흉내 입력으로 채운다.
+> 분기를 가르는 인자(예: `vX.Y.Z` → 태그 경로)를 빼면 그 분기는 미검증이다. 시험 저장소는 실제 저장소의 표준 밖 ref · pack 구성까지 닮지 않는다 — 실제 대상에서도 끝에 assert 를 둔다(fail-closed)
+
+### 3. 공개 표면 3칸
+
+공개 노출은 "도구가 무엇을 고치나" 대신 **공개 글이 어디에 사는가**로 센다. 칸마다 실측 수를 적고, 0 도 적는다.
+
+| 칸 | 예 |
+|---|---|
+| 저장소 객체 | 커밋 · 트리 · 태그 메시지 · ref 이름 · 작성자 신원 |
+| 호스팅 DB | 릴리스 본문·제목 · 이슈 · PR · 댓글 · 위키 · Actions 로그 |
+| 앞으로 쓸 주체 | 커밋 신원 설정 · 다른 clone · 옛 이력을 쥔 로컬 ref |
+
+### Gate 조건
+
+- [ ] 규칙과 정의를 공유하지 않는 탐지기를 1개 이상 돌렸는가?
+- [ ] 리허설이 최종 명령의 인자 집합을 모두 탔는가? (분기 인자 포함)
+- [ ] 공개 표면 3칸을 칸마다 실측했는가? (0 포함)
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (필요 시에만 로드)
+- 모듈이므로 줄 수 제한 없음

@@ -1,0 +1,11 @@
+diff --git a/Sources/Mixed.ext b/Sources/Mixed.ext
+--- a/Sources/Mixed.ext
++++ b/Sources/Mixed.ext
+@@ -1,3 +1,6 @@
+ final class Mixed {
+-    @MainActor var a: Bool { true }
++    @MainActor var b: Bool { true }
++    func run() async {
++        await other()
++    }
+ }

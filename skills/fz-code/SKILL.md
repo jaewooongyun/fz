@@ -1,0 +1,471 @@
+---
+name: fz-code
+description: >-
+  코드 구현 + 빌드 검증. 계획 기반 점진적 구현과 매 Step 빌드 검증.
+  예: 구현해줘, 코드 짜줘, 만들어줘, 개발해줘, 빌드해줘 (비사용: 버그 수정 →fz-fix, 계획·설계 →fz-plan)
+user-invocable: true
+argument-hint: "[구현 대상 설명] [light]"
+allowed-tools: >-
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_implementations,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__replace_symbol_body,
+  mcp__plugin_fz_serena__insert_after_symbol,
+  mcp__plugin_fz_serena__insert_before_symbol,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__edit_memory,
+  mcp__context7__resolve-library-id,
+  mcp__context7__query-docs,
+  mcp__plugin_fz_serena__get_diagnostics_for_file,
+  LSP,
+  Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow
+metadata:
+  provides: [code-changes]
+  needs: [planning]
+  intent-triggers:
+    - "구현|코드.*(짜|작성|구현|만들|추가)|만들어|개발"
+    - "implement|code|develop|build"
+---
+
+# /fz-code - 구현 + 빌드 검증 스킬
+
+> **행동 원칙**: 검증된 계획을 기반으로 점진적으로 코드를 구현하고, 매 Step마다 빌드 검증을 수행한다. 빌드 성공을 확인한 후 다음 Step으로 진행한다.
+>
+> ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.md` 사전 참조. **Decision Tree (evidence ≥ 3 sessions) + 태깅 (`[skill:][status:][priority:]`) + MEMORY.md 200줄 한도** 모두 검증. 사후 catch 방지 (Layer 1+2+3 systematic weakness 차단).
+
+## 개요
+
+> ⛔ Phase 0 (Work Dir Pre-flight) → Step N 구현 → 빌드 검증 → (실패: 에러 수정 → 재빌드) → Gate 3 → /fz-review
+> 루프 프리미티브: Generate-Test-Repair + Plan-Execute (H6, Inside the Scaffold)
+
+- 점진적 구현 + 매 Step 빌드 검증
+- 프로젝트 빌드 검증
+- 리뷰 검증은 `/fz-review`로 위임 가능
+
+## 사용 시점
+
+```bash
+/fz-code "검증된 계획대로 구현해줘"
+/fz-code "Step 1만 먼저 구현해줘"
+/fz-code "빌드 에러 수정해줘"
+/fz-code "Gate 3 통과 확인해줘"
+```
+
+## Prerequisites
+
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 구현 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
+- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+
+## 모듈 참조
+
+| 모듈 | 용도 |
+|------|------|
+| modules/session.md | 세션 감지, Issue Tracker 연동 |
+| modules/build.md | 빌드 검증 |
+| modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
+| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+| modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
+| modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+| modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
+| modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
+| modules/code-transform-validation.md | 코드 변환 동등성 — BEC 절차 + 마찰 신호 (패턴 변환 시) |
+| modules/uncertainty-verification.md | BEC fail-closed — [verified] 없는 주장 구현 전 검증 강제 |
+| modules/lead-reasoning.md | Implication Scan — 제거/리팩토링 시 의미론적 완결성 |
+| modules/system-reminders.md | Instruction fade-out 대응 — 트리거 기반 리마인더 |
+
+## Plugin 참조 (SwiftUI + Swift Concurrency)
+
+> 참조: `modules/plugin-refs.md` — SwiftUI Expert(구현 시) + Swift Concurrency(구현 시) 섹션
+> SwiftUI View 작업 시 `swiftui-expert` 플러그인 패턴 참조
+> **최소 타겟 제약**: CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API 사용 시 availability 가드 필수
+> 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
+> **역방향 트리거**: `modules/plugin-refs.md` "역방향 감지 트리거" 참조. `@MainActor`/`actor` 등이 없어도 싱글톤+가변상태 감지 시 안전성 분석 활성화
+
+## sc: 활용 (SuperClaude 연계)
+
+| 조건 | sc: 명령어 | 쓰는 방식 |
+|------|-----------|----------|
+| 빌드 **2회 연속** 실패 | `/sc:sc-troubleshoot --fix` | 선택 |
+| 5+ 파일 변경한 Step | `/sc:sc-analyze --focus quality` | **자동 제안** |
+| SOLO + 3+ 파일 변경 | `/sc:sc-reflect --type correctness` | 선택 |
+| 3+ Step 구현 중간점 | `/sc:sc-reflect --type task` | 선택 |
+| 복잡한 다중 파일 구현 | `/sc:sc-implement` | 수동 |
+| API 불확실 | Context7 + `/sc:sc-explain` | 수동 |
+
+## 팀 에이전트 모드
+
+> 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
+
+> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 3 전환.
+> Pair Programming 패턴은 `workflows/code-pair.js` 가 평탄화 구현한다.
+> 스크립트: `workflows/code-pair.js` (mode='full') — agents/의 impl-correctness·arch-lens 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
+> ⛔ **책임 재배분 (사용자 승인)**: 에이전트는 디스크를 수정하지 않는다 — changeset JSON(exact syntax) 반환 → **Lead가 적용 + 빌드 검증**. "구현 중 즉석 질문"의 실시간성은 Step 경계로 양자화됨 (수용된 trade-off).
+> ✅ **2026-08-09부터 스키마 수준 보장**: `agents/impl-correctness.md` `tools:`에서 **쓰기 도구를 전부 제거**했다 — 이전에는 프롬프트 금지(OVERRIDE 문구)만이 방어였고 capability는 남아 있었다. 이제 *시도 자체가 불가*하다. 근거: `guides/harness-engineering.md` "에이전트가 시도할 수 없는 것은 실패할 수 없다 — 런타임 체크가 아닌 스키마 수준 필터링" + "capability ≠ authorization".
+
+### 실행 절차 (Lead — Step 루프 소유)
+
+각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
+
+0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" code --steps {WORK_DIR}/plan/steps.json --estimate code-pair`(없으면 `--plan-doc` · `--no-plan`) 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 이 루프 대신 Lead 가 구현 절차로 Step 마다 직접 구현한다(아래 light 모드) · **full** 이면 이 루프 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
+
+1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
+   ⛔ 아래 넷도 **같은 파일에 요약해 넣는다** — 별도 arg 를 만들지 않고 기존 `contextPath` 하나로 전달한다:
+   `code/phase-0.5-detection.md`(Swift token 검출 + 대응 step) · `discover/discover-journal.md` 의 🔒 불변 제약 ·
+   `plan/direction-challenge.md` 의 방향 판정 · `plan/verify-result.md` 의 미해소 이슈(있으면).
+   ⚠️ 만들기만 하고 넘기지 않으면 무력하다 — 렌즈는 `contextPath` 밖 파일을 열 수 없다.
+2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 참조),complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `effort`=0 결과 `effort.value`(lead-effort — null 이면 넣지 않는다) · `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
+2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+   - Stage 1 impl(opus) changeset → Stage 2 **검토**(full: arch-lens + impl-quality **병렬 2렌즈**, opus / light: arch 단독) → Stage 3 이슈 반영 수정 (**조건부** — pass면 생략, full 3-4 call · light 1-3 call)
+4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유). ⛔ 반환이 `mode:'fallback'` · `reason:'changeset-defect'` 면 적용하지 않는다(`defects` 를 buildFeedback 에 넣어 재invoke). **적용 뒤 오라클**(워크플로 검사는 자기보고 일관성까지만 잰다 — 시작 줄만 준 앵커가 spanLines 와 자기일관이면 통과하므로, 남은 옛 줄은 diff 본문 확인과 절차 5 빌드가 잡는다): replace_symbol_body 는 대상 심볼을 Serena `find_symbol`(`include_body: true`)로 다시 읽어 본문 == newBody · Edit 는 **적용 전** 파일에 oldAnchor 1회 · 적용 뒤 newBody 1회(newBody 가 oldAnchor 를 품는 삽입 · 감싸기는 적용 뒤 oldAnchor 가 남는 것이 정상) · 증감은 **이 Step 적용 직전에 잰** `git diff --numstat -- <파일>`(미추적 파일은 줄 수)과의 차 = 그 파일 Edit 편집의 Σ(newBody 줄 − spanLines) — replace_symbol_body 편집이 섞인 파일은 numstat 을 대조하지 않는다(그 편집의 spanLines 는 0 이다) · Bash/python 인라인 편집은 뒤에 diff 본문을 보고 삽입 앵커 개수 1(F-231). 어긋나면 그 편집을 되돌리고 재invoke · 적용한 파일 전부에 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_applied_escapes.py" --base HEAD <파일…>` — exit 1 이면 태그 앞 이스케이프(`<\task-notification>` 꼴)가 새로 생긴 것이다(JSON 이중 이스케이프가 파일에 풀린 흔적 · F-551). 그 편집을 되돌리고 재invoke · exit 2 는 측정 실패다(통과 아님)
+5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
+6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead
+   - ⛔ **렌즈 회계를 먼저 본다** (F-216 N1): `lensesCompleted` < `lensesExpected` 면 `reviewVerdict` 가 `'partial'` 로 오고 `residualNote` 에 죽은 렌즈 이름이 담긴다. 이전 판은 렌즈 하나가 죽어도 `'pass'` + 완주 3/3 을 인쇄해 **검토 절반이 빠진 것을 반환값만으로는 알 수 없었다**.
+   - `'partial'` 이면 그 관점(아키텍처 또는 품질)은 **적용되지 않았다** — 다음 Step 으로 넘어가기 전에 재invoke 할지 Lead 가 판정한다
+   - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). ⛔ 여기서 사다리를 재정의하지 않는다
+   - **code-pair 고유분만**: ① H5 크기 가드 — `split_required`/`splitSuggested` 시 Step 분할(과대 changeset scaffold collapse 방지) ② 재시도는 `buildFeedback` 포함 **새 invoke**(캐시 키 변경 → resume 비의존) ③ Stage1 null 재시도는 **1회 한정**·일시 장애 의심 시만
+7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5 — `gpt-choice.sh decide` 판정) — Workflow는 "구현+검토 쌍"만 대체
+8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-code 테이블(**2026-07-10 시리즈 — 현행**; 2026-06-05 표는 사료 · 규약: `experiment-log.md` 머리 문단). Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
+
+> 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
+
+---
+
+## ⛔ Phase 0: Work Dir Pre-flight
+
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
+2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+
+### Gate 0: Work Dir Ready
+- [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
+- [ ] index.md 존재 확인 완료? (없으면 생성)
+
+---
+
+## Phase 0.4: Plan Handoff Preflight
+
+> 발동: plan 기반 구현 해당 시. 탐색·단순 수정은 스킵.
+> ⛔ **Phase 0.5보다 먼저 실행** — Phase 0.5의 token 스캔과 아래 구조 검사가 이 복원 결과를 입력으로 받는다. 이후 절차에서 plan을 다시 로드하지 않는다(모든 복원 시도를 여기서 종료).
+
+1. **승인 plan 복원** — 아래 순서로 첫 성공을 채택한다:
+
+   | 모드 | 소스 |
+   |------|------|
+   | 동일 세션 연속 | 대화 컨텍스트 (별도 로드 불요) |
+   | 티켓 폴더 / NOTASK | `{WORK_DIR}/plan/plan-final.md` → 없으면 `{WORK_DIR}/plan/plan-light.md` (WORK_DIR은 Gate 0에서 결정) |
+   | Serena fallback | `read_memory("fz:checkpoint:plan-final")` |
+
+   전 소스 실패 시 → plan 없는 구현으로 진행하되 **그 사실을 보고**한다 (차단 아님).
+
+2. **plan 구조 검사** (마찰 신호 — ⛔ Gate 차단 아님):
+   복원된 plan의 **작업 범위**(변경 파일·Step 기준)가 아래 요소를 건드리면 대응 결정이 plan에 있는지 확인한다.
+
+   | 작업 범위에 포함 | plan에 있어야 하는 결정 | Serena fallback 필드 |
+   |------|------|------|
+   | SwiftUI View | owner / availability / View 책임 | `swiftDecisions.swiftUI` |
+   | Concurrency (`actor`·`@MainActor`·async) | isolation 범위 | `swiftDecisions.isolation` |
+   | 패턴 변환 (마이그레이션·치환) | 원본 동작 보존 | `swiftDecisions.transform` |
+
+   누락 시 → 마찰 신호 **"plan 계약 미충족"** 보고 후 계속 (판단은 사용자).
+   ⛔ 이 검사는 D/E/F/G token 발견 여부와 **무관하게** 실행한다 — 결정이 빠진 plan은 token도 없으므로, token 게이팅 하에 두면 검사가 스스로 비활성화된다.
+3. **원장 착수** (`{WORK_DIR}/gates/plan.md` 가 `STATE: planned` 일 때 — fz-plan 4.5 가 승인·미착수로 남긴 원장): `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --set-state active {WORK_DIR}/gates/plan.md` — 착수는 증명 불요. ⛔ planned 인 채로는 6.4 `--only` 가 exit 3 으로 거부된다(착수 전 원장에는 증거를 쓰지 않는다).
+
+---
+
+## Phase 0.5: Swift Pattern Pre-detection (Swift/iOS 프로젝트 한정)
+
+> 발동: CLAUDE.md `## Architecture`가 Swift/iOS 지정 + **Phase 0.4에서 복원된 plan**에 D/E/F/G/H token 1건 이상 발견 시. 비Swift/iOS는 스킵.
+> (token 게이팅은 `swift-pattern-detection.md` Read라는 **비싼 스캔**만 제어한다. 경량 구조 검사는 Phase 0.4가 무조건 수행.)
+> 본문: `modules/swift-pattern-detection.md` 참조 (Level 3) — 5 원칙(D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환 / ⚠️H figma 대조 *candidate*) + 각 원칙 token + 발동 행동 + Few-shot. **G는 Phase 1.5 P3와 mirror로 cross-skill consistency 보장**.
+> ⛔ **visual oracle 승격 token**: plan 에 `제스처` · `gesture` · `UIViewRepresentable` · `hitTest` · `ZStack` 이 있으면 그 Step 은 visual oracle 이 **필수**다(구현 절차 2 의 □ 항목 · Gate 3) — 이 token 들은 D~H 어디에도 없어 UI Step 이 약한 게이트로 남았다 (F-230)
+> ⛔ **H 발동 token은 plan 어휘가 아니라 작업 성격**: figma 노드 조회 · UI 수치(spacing/padding/gap/size/radius/opacity) 작성·수정 · 색/폰트 토큰 지정 · 디자인 검수 대응 — plan에 명시가 없어도 이 작업을 하면 발동한다 (H만 단독 발동해도 모듈 Read).
+
+### Gate 0.5: Swift Pattern Pre-detection 통과
+- [ ] Swift/iOS 프로젝트? (아니면 skip)
+- [ ] `modules/swift-pattern-detection.md` Read 완료? (D/E/F/G/H 원칙 5개 token 스캔)
+- [ ] 발견된 trigger 모두 plugin-refs.md 매칭 + 대응 명시?
+- [ ] F (위험 패턴) 발견 시 안전성 메커니즘이 step에 포함?
+- [ ] G (패턴 변환) 발견 시 원본 동작 보존이 step에 명시?
+- [ ] ⚠️ H (figma 대조) 발견 시 축 분류 후 방법 선택? *(candidate — 강제 X, 미충족은 기록만)*
+- 미통과 시 → ⛔ 구현 절차 진입 차단 (H 제외)
+
+발동 시 행동: trigger 매칭 결과를 `{WORK_DIR}/code/phase-0.5-detection.md`에 기록 (티켓 폴더(WORK_DIR) 활성 시) 또는 Serena `fz:checkpoint:phase-0.5` (비-티켓 세션).
+
+---
+
+> **임의 판단 금지**: 구현 중 "이게 맞겠지"라는 추측이 필요한 상황에서는 코드를 작성하지 않고 AskUserQuestion으로 사용자에게 확인한다.
+> 이유: 추측 기반 판단은 리뷰에서도 잡히지 않는 미묘한 동작 변경을 만든다.
+
+## 구현 도구 선택 기준
+
+| 상황 | 도구 | 비고 |
+|------|------|------|
+| 기존 함수/메서드 수정 | `mcp__plugin_fz_serena__replace_symbol_body` | 심볼 단위 정밀 수정 |
+| 새 메서드/프로퍼티 추가 | `mcp__plugin_fz_serena__insert_after_symbol` | 기존 심볼 뒤에 삽입 |
+| 파일 시작에 코드 추가 | `mcp__plugin_fz_serena__insert_before_symbol` | import 등 |
+| 심볼 이름 변경 | 정의부 `Edit` + `find_referencing_symbols`(호출) ∪ `find_implementations`(구현) ∪ `Grep` 전수로 소비자를 열거한 뒤 개별 치환 | ⛔ `rename_symbol` 은 배선에서 뺐다 — dry-run 실측에서 프로토콜 메서드 이름 변경 시 편집 대상이 **선언 1파일뿐**이고 conformance 구현부를 빠뜨렸다(빌드 파손) |
+| 새 파일 생성 | `Write` + `/fz-new-file` | 헤더 규칙 준수 |
+| 복잡한 다중 파일 | `/sc:sc-implement` | SuperClaude 위임 |
+| 단순 텍스트 수정 | `Edit` | 간단한 인라인 수정 |
+
+---
+
+## 구현 절차
+
+> **프로젝트 규칙**: CLAUDE.md `## Architecture` 섹션을 따른다.
+
+1. **세션 감지**: 참조 `modules/session.md`
+
+1.5. **티켓 폴더 컨텍스트 로딩** (티켓 폴더(WORK_DIR) 활성 시):
+   - plan-final: **Phase 0.4에서 복원된 것을 사용** — ⛔ 여기서 다시 로드하지 않는다 (늦은 로드는 Phase 0.4/0.5의 검사를 건너뛴 뒤 plan을 얻는 순서 역전을 만든다)
+   - `{WORK_DIR}/plan/direction-challenge.md` 읽기 → 방향 판정 + 대안 비교 (있으면)
+   - `{WORK_DIR}/discover/discover-journal.md` 읽기 → 제약 조건 복원 (있으면)
+   - `{WORK_DIR}/discover/discover-code.md` 읽기 → mid-pipeline discover 결과 (있으면)
+   - `{WORK_DIR}/code/progress.md` 읽기 → 진행 상태 복원 (있으면)
+   - 최신 `{WORK_DIR}/code/step-N.md` 읽기 → 마지막 구현 상세 (있으면)
+
+1.6. **⛔ Scope Expansion 확인** (discover 결과 + plan-final.md 모두 존재 시):
+   - plan-final.md의 영향 범위 파일 목록 vs discover journal의 언급 범위 비교
+   - plan 영향 범위가 discover 범위보다 **좁으면** → ⚠️ 마찰 신호 "시야 축소 위험" 보고
+   - plan이 discover보다 넓거나 같으면 → OK (Scope Expansion 작동 확인)
+
+2. **계획의 각 Step을 순서대로 구현**
+   - 각 Step 완료 시 확인 (다음 Step 전제조건):
+     - □ 빌드 성공 (modules/build.md)
+     - □ 시그니처 변경 시: conformance 보존 확인 (`find_referencing_symbols`)
+     - □ 타입 변경 시: caller 1개 샘플 확인 (의도대로 호출되는지)
+     - □ UI · 제스처 · 애니메이션 Step 이면 visual oracle — 앱을 띄워 그 화면을 본다(launch_app_sim + screenshot 또는 실기기 · 범위는 `modules/build.md` Gate 체크리스트). 빌드 · 정적 검사 통과는 완료가 아니다. 못 보면 그 Step 은 **미충족**으로 남긴다(원장은 MANUAL · 사유 `기계화 불가` — `modules/gates.md` § 원장 운용 규율) (F-230: 검증 6단계를 다 통과했는데 화면에서는 아무 일도 없었다)
+     - □ Bash · python 인라인 편집이면 `git diff` **본문**(`--stat` 아님)을 읽고 삽입 앵커가 1회인지 확인 (F-231)
+     - □ 소비자를 정본에 맞추는 Step 이면 먼저 정본 안에서 같은 대상을 말하는 진술끼리 맞는지 본다 — 정본이 두 말을 하면 정합 작업이 그 모호함을 소비자로 복제한다 (F-121)
+   - /simplify 자동 트리거: 새 함수 3개+ 또는 100줄+ 추가 시 (modules/execution-modes.md)
+   - ⛔ RTM 갱신: 해당 Step의 Req-ID를 `implemented`로 갱신 (참조: modules/rtm.md)
+
+3. **구현 마찰 감지** (Implementation Friction Detection):
+   각 Step 구현 중 아래 신호 감지 시 멈추고 사용자에게 보고:
+
+   | 마찰 신호 | 감지 기준 | 의미 |
+   |----------|----------|------|
+   | 분기 폭증 | 같은 대상에 대한 switch/if/enum case 3개+ | 추상화가 변형을 통합하지 못함 |
+   | 코드 반복 | 유사 구조의 코드를 복사-수정 3회+ | 공통 추상화 필요. 내 편집이 만든 중복 정리는 drive-by 아님(편집의 완결) |
+   | 소비자 판별 로직 | ViewModel/Listener에 "어떤 X인지" 판별 코드 발생 | 하위 복잡도가 상위로 전이됨 |
+   | workaround | 계획에 없던 우회 코드 작성 | 설계와 현실의 불일치 |
+   | 잔존 패턴 | Plan의 Anti-Pattern Constraints에 명시된 금지 패턴이 기존 코드에 여전히 존재 | 리팩토링 미완성 — 해당 패턴 제거/대체 필요 |
+   | 불필요한 영속화 | UserDefaults/Keychain/CoreData에 저장하는 코드 작성 시, 해당 상태가 컴포넌트 라이프사이클(RIBs Interactor 생존 기간)로 충분한데 영속 저장소에 중복 저장 | 앱 재시작 후에도 유지해야 하는지 먼저 확인. A/B 테스트 배정값 등 외부 시스템 관리 값은 로컬 캐싱 금지 |
+   | 파라미터 미전달 | 래퍼 함수 시그니처에 파라미터가 있지만, 내부 SDK/라이브러리 호출에 해당 파라미터를 전달하지 않음 | 파라미터가 무시되어 기능이 무효화됨 — SDK API의 해당 오버로드 존재 여부 확인 필수 |
+   | 검증 유보 | TODO/FIXME로 "나중에 전환", "추후 적용" 등 검증 없이 현재 구현을 정당화하는 주석 작성 | 이미 가능한 작업을 지연시킴 — 주석 작성 전에 실제로 불가능한지 SDK/API 확인 필수 |
+   | 주석-추상화 불일치 | (축1) 범용 유틸/래퍼 클래스에 특정 기능 맥락의 주석 작성 (예: 범용 A/B 테스트 래퍼에 "카드형 Default" 주석) · ⊕ **(축2) 내가 쓴 doc 주석이 "같은 술어"·"같은 조건"·"함께" 를 선언했는데 코드가 그 술어를 N개로 나눠 쓰고 있다** — 코드가 자기 문서와 어긋난 상태다. 값싼 보조 오라클이며 위 `통합 후보` 신호를 못 잡을 때 걸린다 (`F-286`: 주석은 *"배경 딤도 같은 술어를 본다"* 인데 코드는 세 항) | 주석의 추상화 수준이 코드의 추상화 수준과 일치해야 함 — 범용 코드엔 범용 주석 |
+   | 프로토콜 시그니처 불일치 | 메서드 시그니처 변경(파라미터 추가/제거/타입 변경) 시, `find_referencing_symbols`로 해당 메서드가 프로토콜 요구사항인지 자동 확인. 프로토콜 요구사항이면 선언부도 함께 변경되는지 검증. Swift 디폴트 파라미터(`= value`)는 프로토콜 적합성을 만족시키지 않음 — 별도 오버로드 필요 | RIBs에서 ViewController가 PresentableListener를 선언하고 Interactor가 구현하므로 파일이 분리됨. 시그니처만 변경하면 clean build에서 실패 |
+   | 모듈 경계 위반 | 모듈에 추가하는 타입이 도메인 특화 필드(비즈니스명), 하드코딩 UI 문자열, 또는 모듈 미사용 pass-through를 포함 | 도메인 로직이 인프라 모듈에 침투 — Plan의 Concern Classification과 대조. "이 타입이 여기 맞나?" 질문 |
+   | Import Orphan | import 제거 후 해당 모듈의 타입/typealias가 코드에 잔존 (빌드 시 "cannot find type" 에러 예정) | 치환 패턴 테이블 누락 — Plan의 Symbol Inventory와 대조하여 해당 심볼의 대체 방법 확인 |
+   | 원본 미존재 추가 | 리팩토링/마이그레이션에서 원본에 없던 파라미터, 로직, 타입을 추가하려 할 때. optional 파라미터에 기본값(nil)이 있는데 명시적으로 채우는 행위 포함 | 원본 동작 변경 위험 — AskUserQuestion 필수 |
+   | 원본 버그 발견 | 모듈화/리팩토링 중 원본 코드의 버그를 발견 (dead code, 도달 불가 분기, 잘못된 순서 등) | "원본과 동일"로 방치 금지 — AskUserQuestion으로 수정 여부 확인. 혼자 판단하여 dismiss 금지 |
+   | 파라미터 키 불일치 | 원본 API에 없던 키 추가 또는 삭제. nil → default value 전송 포함 | omit ≠ explicit default — 서버 동작 변경 가능. AskUserQuestion: "이 키 추가가 의도적인가?" |
+   | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가 잔존 | [Q-WHY] "이 구조가 추가된 이유가 해소됐는가?" find_referencing_symbols로 확인. 참조: modules/lead-reasoning.md §7 |
+   | 스레드 컨텍스트 불일치 | Plan Transformation Spec에 "@MainActor 필수" → 구현이 일반 Task. 원본이 main queue(PromiseKit .done 등)인데 After가 background Task | 원본 main queue 미보존 — `@MainActor Task` 필요. 참조: `modules/code-transform-validation.md` |
+   | 래퍼 범위 과잉 | @MainActor/do-catch/Task 블록 내에 해당 컨텍스트 불필요 문장 포함. 원본 `.done { UI업데이트; 데이터변환 }` → After `MainActor.run { UI업데이트; 데이터변환 }` 전체 래핑 | 기계적 1:1 변환 — 문장별 컨텍스트 필요성 판단 후 최소 범위 분리. 참조: `modules/code-transform-validation.md` [ablation: scope-min-v1] |
+   | 에러 경로 축소 | 원본 switch/catch 분기 N개 → After catch < N개. `== .case(value)` 비교 사용 | enum associated value 무시. `if case` 패턴 매칭 필수 |
+   | 퀄리티 역행 | After 줄 수 > Before 2배. 원본 추상화(struct/helper/extension)가 인라인 해체 | 리팩토링이 코드 악화. protocol extension/convenience 검토 |
+   | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견. 단 동일 패턴이 코드베이스 3곳+ 존재하면 convention 간주 — 보고 생략(예: 로컬 UseCase 생성). 단 같은 RIB scope에서 Component가 주입 제공하는 dependency를 Interactor가 동일하게 재생성하면 convention 무관 보고 | [함의-B] 형식으로 기록(modules/lead-reasoning.md §5). 실행 금지(범위 외 정리 금지 [verified: claude-4-best-practices]). Gate 3 전 일괄 보고 |
+   | 관례 역방향 | 내가 도입하는 관용구 · 격리 단언 · 헬퍼 우회가 **같은 종류 자리**(같은 override · 같은 콜백 · 같은 생명주기 지점)에서 몇 번째인지 N/M 을 분모와 함께 인쇄한다(분모 = 그 자리를 grep 으로 센 수). 분자가 1(나 혼자)이면 보고 | 저장소 전체 빈도를 자리별 빈도로 착각했다(F-174: 전체 59회 · 그 자리에서는 1/1 — 저장소는 그 자리용 헬퍼를 이미 갖고 있었다). 위 행의 '3곳+ = convention' 은 남의 패턴을 인정하는 정방향이고 이 행은 내 방식을 재는 역방향이다 |
+   | 동기화 부재 | singleton/shared 타입에 `var` 추가/수정 시, `@MainActor`/`actor`/lock/serial queue 보호 없음 | data race 위험 — plugin-refs.md 역방향 트리거 참조. 동시성 보호 메커니즘 추가 필요 |
+   | 싱글톤 deinit | `static let shared` 타입에 `deinit` 작성 시 | deinit은 호출되지 않음 — 정리가 필요하면 명시적 `tearDown()` 메서드 사용 |
+   | 기본값 소비자 영향 | 비동기 채워지는 property에 기본값(`= false`, `= nil`) 설정 시 | 소비자가 첫 콜백 전에 읽으면 기본값으로 분기 — guard/if 패턴 영향 확인 |
+   | 외부 피드백 무검증 수긍/기각 | 외부 도구/리뷰어의 "파라미터 누락" 등 지적에 함수 시그니처 확인 없이 동의 **또는 기각(dismiss)**. ⊕ **근거 종류(provenance) 미분류**: 지적의 근거가 (i)코드/런타임 사실 (ii)사용자·팀 승인 제품결정(권한) (iii)**에이전트 자신이 쓴 계획/문서** (iv)일반론·선호 중 무엇인지 판정 없이 수용 | Read(시그니처) + 기존 패턴 대조 필수 — cross-validation.md § External Feedback Gate (동의·기각 양방향). ⊕ **provenance 랭킹**: (i)(ii) 최우선 · (iii)이 **코드 근거와 충돌하면 문서를 고친다**(자작 문서가 코드를 판정하면 순환) · (iv)는 기존 컨벤션에 종속. 근거: `guides/harness-engineering.md` §12 R8-A 파생규율 + `promotion-ledger` L-11 동축 |
+   | SDK 래퍼 부분 분석 | 외부 SDK 객체의 `?.` 메서드 중 일부만 nil 동작 분석하고 나머지 건너뜀. "안전" 결론으로 추가 분석 중단 | 같은 객체의 모든 `?.` 메서드 nil 동작 + 서버 관점 전수 분석. 참조: `modules/lead-reasoning.md` §1.5 |
+   | Task 내부 프로퍼티 쓰기 | `Task { }` 블록 내에서 `self.property = value`를 `MainActor.run` 밖에서 실행. 특히 리뷰어 조언으로 MainActor 범위를 줄일 때 순수 연산과 side effect를 분류하지 않고 함께 밖으로 이동 | 각 문장을 순수 연산(파싱, 변환)과 side effect(프로퍼티 할당, UI)로 분류. side effect는 소비자 스레드 확인 후 배치. 참조: `modules/lead-reasoning.md` §1.5 |
+   | 핵심 시나리오 보류 | PR이 해결하려는 원래 문제(버그, 크래시)의 재현 시나리오 중 하나가 "다음 PR에서 수정"으로 보류됨. 특히 race condition 수정에서 경합 시나리오 일부만 해결 | PR 목표와 보류 시나리오를 대조. 원래 버그가 보류 시나리오에서 재현 가능하면 → 현재 PR에서 해결 필수 또는 AskUserQuestion |
+   | Redundant Import | 새 파일 작성 시 추가하는 각 `import {Module}` 문에 대해 그 모듈의 알려진 심볼이 파일 내에서 grep 0건 | 형제 파일 패턴 답습 의혹 (cargo-cult). 이유: 형제 파일의 import는 형제 파일의 *사용 심볼*이 정당화한 결과이며, 새 파일은 *자신의 사용 심볼*로 자체 정당화 필요. 검증: 새 파일 작성 후 각 import에 대해 `Grep("ModuleName\.\w+\|<known_typealias>")` 실행 → 0건이면 마찰 보고 (제거/유지 결정은 사용자/GPT 최종) |
+
+   보고 형식:
+   ```
+   ⚠️ 구현 마찰 감지
+
+   **신호**: {감지된 마찰 유형}
+   **위치**: {파일:심볼}
+   **현상**: {구체적 현상}
+   **플랜 재검토 추천**: 예/아니오
+   ```
+
+   > 사용자가 "계속"이라고 해야 진행. 마찰 감지 시 무시 강행 금지.
+   > ⚠️ **`*[candidate: N session evidence]*` 태그 신호는 예외**(목록: `references/friction-candidates.md`): 권장 self-check이며 "무시 강행 금지"의 강제 대상이 *아니다* (memory-guide line 43 "활성 rule 등록 ❌" + fz-review 4-N "권장 self-check, Gate 차단 아님" 정합). 5 sessions 관측 후 활성 결정 시 비로소 강제 신호로 전환.
+
+   **잔존 패턴 사전 검사** (Anti-Pattern Constraints가 있는 Plan에서만):
+   Plan에 Anti-Pattern Constraints 테이블이 포함된 경우, 구현 시작 전 + 각 Step 완료 후에
+   해당 Grep 패턴으로 코드베이스를 검사합니다.
+
+   ```
+   절차:
+   1. Plan의 Anti-Pattern Constraints 테이블에서 "검증 Grep 패턴" 컬럼 추출
+   2. 각 패턴에 대해 Grep 실행 (대상: 변경 파일 + 관련 모듈)
+   3. 매칭 발견 시 → "잔존 패턴" 마찰 신호로 보고
+   4. 모든 잔존 패턴이 제거/대체될 때까지 해당 Step 완료 불가
+   ```
+
+4. **API 문법 확인** (불확실할 때 + SDK 래퍼 작성 시 필수):
+   - `mcp__context7__query-docs` → 정확한 문법/시그니처
+   - `/sc:sc-explain` → API 사용법 설명
+   - **SDK 래퍼 원칙**: 래퍼 함수의 모든 파라미터가 내부 SDK 호출에 전달되는지 확인. SDK에 해당 파라미터를 받는 오버로드가 있는지 반드시 검증
+
+5. **(선택) /simplify 게이트**: 코드 변경이 있을 때 `/simplify focus on {step-context}` (참조: modules/execution-modes.md)
+
+6. **매 Step 완료 후 빌드 검증**: 참조 `modules/build.md`
+   - 마커 누출: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_marker_leak.py" --repo {GIT_ROOT} --base {base}` — exit 1 이면 대상 저장소 주석에 들어간 fz 마커(⛔ · ✅ · **강조**)를 그 저장소 주석 관례로 바꾼다 · 2 는 UNRUN(통과 아님) (F-175)
+   - 대체 Step 이면: `python3 "${FZ_PLUGIN_ROOT}/scripts/call_set_diff.py" {레거시 파일} {신규 파일}` — `LEGACY-ONLY` 호출마다 옮겼는지 · 일부러 뺐는지 Step 기록에 적는다 (F-126)
+
+6.3. **⛔ Behavioral Equivalence Check** (Transformation Spec이 있는 Step 완료 후):
+   - Plan의 Transformation Spec 로드 → 원본 코드 Read
+   - Spec "실행 스레드" ↔ 구현의 Task/@MainActor 대조
+   - Spec "에러 처리" ↔ 구현의 catch 분기 수 + 패턴 대조
+   - Spec "추상화 수준" ↔ 구현 줄 수 대조
+   - 불일치 → 마찰 보고 → 사용자 확인. 참조: `modules/code-transform-validation.md`
+   - ⛔ Spec "실행 스레드" ↔ @MainActor: Zero-Exception 기계적 확인. 원본 main queue → After @MainActor 보장 (범위는 필요 문장에만 한정 — `code-transform-validation.md` Scope Minimality 단서)
+   - ⛔ Spec "요청 파라미터" ↔ 키 목록: 추가/삭제 0건 확인
+   - ⛔ [verified] 태그 확인 (fail-closed): Spec에 [verified] 없는 주장 → 구현 전 검증 강제 (uncertainty-verification.md)
+
+6.4. **⛔ 게이트 판정** (원장이 있을 때 — `modules/gates.md` 배선 2):
+   Step 완료 선언 **전** 해당 Step 게이트를 실행한다. 실패면 다음 Step으로 진행하지 않는다.
+   ```bash
+   G="${FZ_PLUGIN_ROOT}/scripts/gate_check.py"                     # resolve-plugin-root.sh 로 해석
+   A="$(python3 "$G" --affected-by {이 Step 이 바꾼 파일,…} {WORK_DIR}/gates/plan.md | sed -n 's/^AFFECTED: //p')"
+   python3 "$G" --only "{StepID}${A:+,$A}" {WORK_DIR}/gates/plan.md   # ⛔ 해당 Step 게이트 + 바뀐 파일이 근거인 앞 게이트
+   python3 "$G" --set-state ready_for_review {WORK_DIR}/gates/plan.md   # 전 Step 완료 시
+   ```
+   `--affected-by` 는 바뀐 파일의 경로 · basename 을 CHECK · CRITERION · PIN 에 담은 **충족** 게이트 id 를 낸다(읽기 전용) — 뒤 Step 이 앞 Step 게이트의 근거 코드나 공유 스크립트를 바꿔도 그 게이트가 다시 돈다(F-349 · F-552)
+   - 버그 수정 Step 이면 **변이 셀**: 수정의 핵심 호출을 지운(되돌린) 사본에서 그 Step 테스트가 FAIL 하는지 한 번 잰다 — 통과하면 테스트가 수정을 보지 않는다(F-447: 떼어 낸 판정 함수만 부르는 테스트가 본체를 지워도 통과했다 · 정본 `modules/gates.md` § 원장 운용 규율)
+   - 게이트를 오탐으로 판정하면 그 게이트가 잡은 대상 집합을 새 기준으로 **전수 재분류**해 건수(분모)를 보고하고, 계획이 `파일:줄` 로 지목한 항목은 `git diff` 로 하나씩 확인해 Step 기록에 적는다(F-236: '과잉 55건' 안에 진짜 갭 1건이 섞여 있었다)
+   - 플러그인 저장소 작업이면 Step 경계의 health 검사를 표적 테스트 통과로 갈음하지 않는다 — `git diff --name-status {base} > {WORK_DIR}/code/changed.txt` 뒤 `bash "${FZ_PLUGIN_ROOT}/scripts/health-check.sh" --changed-from {WORK_DIR}/code/changed.txt`. 파일을 옮기거나 지운 Step 이면 `scripts/health_select.py` 가 전체 실행을 고른다(F-512 — 이동 단계의 기준선 lint 실패를 다음 작업자가 전체 실행에서야 잡았다)
+   ⛔ **상대 경로 금지** — 설치된 플러그인에서는 대상 레포에 `scripts/gate_check.py`가 없다. exit 2(인프라 통과)로 떨어져 강제력이 조용히 사라진다.
+   - 원장 부재 · `ROOT:` 불일치 · `STATE: closed` → no-op (기존 경로 무회귀) · `STATE: planned` → exit 3 (Phase 0.4 착수 전환 누락)
+   - `--set-state`는 **전 게이트 충족 시만** 전진한다 — 실행 게이트만 통과하고 MANUAL이 미확인이면 거부된다
+
+6.5. **⛔ 아티팩트 기록** (항상 — compact recovery 필수):
+   각 구현 Step 완료 후 진행 상태를 기록한다.
+   - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/code/step-{N}.md` + `progress.md` + `index.md` 업데이트
+   - ⛔ `step-{N}.md` 에 `## 기각한 위험` 절 — 구현 중 검토하고 기각한 위험마다 ``- `R-n` — <기제 이름> · 근거: <기각 근거> · 재현: <재현 경로>`` 한 줄, 없으면 `없음` 한 줄. fz-pr 이 행을 PR 본문으로 옮기고 `check_pr_template.py --risks` 가 그 이송을 잰다(F-523 — "드문 경우" 로 넘긴 위험이 Step · 리뷰 · PR 어디에도 남지 않아 리뷰어가 같은 기제를 다시 찾았다)
+   - 비-티켓 세션: `write_memory("fz:checkpoint:code-step{N}", "Step {N}/{M}: {변경 파일}. 빌드: OK/FAIL. 결정: {요약}")`
+   형식 참조: `modules/context-artifacts.md`
+
+7. **요구사항 부합 검증** (선택 — 3+ Step 구현에서만):
+   - `/sc:sc-reflect --type task` → 현재까지의 구현이 계획에 부합하는지 확인
+   - 조건: 전체 Step이 3개 이상인 구현의 중간 지점에서 실행
+   - 목적: 방향 이탈 조기 발견 → 토큰 낭비 방지
+
+8. **Issue Tracker에 빌드 이슈 기록** (실패 시)
+
+8.5. **⛔ GPT 교차 검증** (GPT 를 켠 세션이면 light · full 모두 — 생략 금지):
+   모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기하고(`modules/gpt-strategy.md` § 단계 실행 판정) `run` · `config` 면 실행한다.
+   ```bash
+   /fz-gpt check "구현 코드 교차 검증"
+   ```
+   - 에이전트 구현 결과를 cross-model로 검증
+   - 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백
+   - decide 가 `skip` 이거나 정문이 exit 18 `GPT-OFF` 면 `[GPT 미사용 — 사유]` 를 남긴다 · `ask` 면 질문 → `set` → 다시 decide — `modules/gpt-strategy.md` § GPT 미사용
+
+### 빌드 실패 대응
+
+참조: `modules/build.md` — 에러 유형별 대응표, 빌드-수정 반복 패턴
+
+에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
+
+---
+
+## Gate 3: Implementation Complete
+
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
+- [ ] 모든 Step 구현 완료?
+- [ ] 빌드 성공? (프로젝트 빌드 검증 통과)
+- [ ] 빌드 경고 최소화?
+- [ ] 아키텍처 패턴 준수?
+- [ ] ⛔ UI · 제스처 · 애니메이션 Step 이 있으면 Step 마다 visual oracle 충족? — 못 본 Step 은 완료가 아니라 미충족으로 보고한다 (F-230 · `modules/build.md` Gate 체크리스트와 같은 기준)
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] ⛔ Step 산출물마다 `## 기각한 위험` 절(위험 행 또는 `없음`)을 남겼는가? (F-523 — 비면 PR 이송 검사가 대조 불가로 멈춘다)
+- [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
+- [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
+- [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
+- [ ] SOLO + 3+ 파일 변경에서 `/sc:sc-reflect` 를 실행했으면(선택) 결과를 기록했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
+- [ ] ⛔ GPT 교차 검증 완료? (GPT 를 켠 세션 — light · full 모두 Lead가 /fz-gpt check 실행 · 끈 세션은 `[GPT 미사용]` 기록)
+
+---
+
+## Few-shot 예시
+
+```
+BAD (마찰 무시):
+Step 3 완료. if-else 5개 추가.
+→ 분기 폭증 감지 안 함
+
+GOOD:
+Step 3 마찰 감지: OrderType 분기 5개 → Strategy 패턴 검토 필요
+- 현재: switch orderType { case .delivery: ... case .pickup: ... case .gift: ... }
+- 원인: OrderDetailInteractor가 모든 타입을 직접 처리
+- 제안: OrderDetailStrategy 프로토콜 + 타입별 구현 분리
+- 판단: Step 4에서 분리 진행 (3개 이상 분기는 전략 패턴)
+
+BAD (원본 미존재 추가):
+// 원본: multipartFormData.append(fileURL, withName: "file")
+.init(data: try Data(contentsOf: fileURL), name: "file",
+      fileName: "file", mimeType: "application/octet-stream")
+→ 원본에 fileName/mimeType 없음. 임의 추가.
+
+GOOD:
+.init(data: try Data(contentsOf: fileURL), name: "file")
+→ optional 파라미터는 원본에 없으면 생략. 추가 필요 시 AskUserQuestion.
+```
+
+```
+BAD (빌드 미검증 진행):
+Step 2 코드 작성 완료 → 바로 Step 3 착수.
+→ 매 Step 빌드 검증 누락. Step 3에서 누적 에러, 원인 Step 격리 불가.
+
+GOOD:
+Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
+→ clean build가 다음 Step 전제조건. 실패 시 해당 Step에서 격리·수정.
+```
+
+## Boundaries
+
+빌드 성공을 확인한 후 다음 Step으로 진행한다.
+
+**Will**:
+- 검증된 계획 기반 점진적 코드 구현
+- Serena 심볼 도구 활용 정밀 편집
+- 프로젝트 빌드 검증
+- 빌드 에러 자동 수정
+
+**Will Not**:
+- 계획 없이 대규모 코드 생성 (→ /fz-plan)
+- 코드 리뷰/검증 (→ /fz-review)
+- **팀 공유 영역 자동 변경 (36차)**: `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` / pre-commit hook 등 변경 시 사용자 명시 합의 의무. CLAUDE.md "팀 공유 영역" 정의 우선, 부재 시 fallback list 적용
+
+### light 모드 (모드 게이트 — `modules/mode-gate.md`)
+
+진입: 팀 모드 실행 절차 0 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+- code-pair 를 띄우지 않고 Plan 의 **모든** Step 을 Lead 가 구현 절차(1~8.5)대로 직접 구현한다 — Step 마다 빌드 · 원장 게이트(6.4) · 마찰 감지 그대로
+- GPT 교차 검증(8.5)은 full 과 같다(끈 세션이면 `[GPT 미사용]`)
+- 점검 카탈로그: `templates/check-catalog-code.md` 를 Read 해 Step 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 Step 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <code/step-N.md> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-code.md"` 로 잰다
+- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
+
+## 에러 대응
+
+| 에러 | 대응 | 폴백 |
+|------|------|------|
+| XcodeBuildMCP 실패 | Bash로 xcodebuild 직접 | 수동 빌드 |
+| Serena 연결 실패 | Edit + Write 직접 수정 | 수동 편집 |
+| 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
+| Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
+| **advisor 스톨** (워커가 advisor 호출 → 응답 없이 런타임이 6회 시도 · 관측: 첫 시도 37.5분, 재시도마다 15~17분) | ⛔ **결정론 차단 불가** — `agent()` 에 도구 제외·타임아웃 옵션이 없고 `agentType` 의 `tools:` 도 advisor 를 막지 못한다 [verified: 프로브 `wf_00000000-008`]. OVERRIDE 문구가 유일한 완화이고 **잔여 위험을 수용한 상태다**(실측 최악 117분). 판정 데이터(F-161·F-191): 문구 없음 13 run/78 agent 에서 advisor 66회, 문구 있음 65 run/318 agent 에서 0회 — 관측 연관이다. 두 구간은 advisor 모델과 워커 세대도 함께 다르다(교란). 같은 조건 대조군이 없어 인과는 미확정이다. 삭제 조건은 '문구 든 실행에서 호출이 줄지 않음' 이고, 결론은 **삭제 조건 미충족 = 유지**다. 측정 수단은 `fz_wf_metrics.py --wf` 의 `advisor_stalled`(결과 없는 호출 수)다 — `advisor` 열은 결과 블록만 세어 스톨 run 을 0 으로 읽는다 | 세션 `advisorModel` 해제 — ⛔ Lead 의 advisor 도 함께 사라진다 |
+
+## Completion → Next
+
+Gate 3 통과 후(완료 보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
+```bash
+/fz-review "구현한 코드 리뷰해줘"
+```

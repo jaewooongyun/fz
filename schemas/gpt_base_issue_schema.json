@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gpt_base_issue_schema.json",
+  "title": "GPT Base Issue Schema",
+  "description": "review/peer-review 스키마 공통 issue 정의. 두 스키마에서 $ref로 참조. severity/unified_category 분류는 MAST taxonomy (NeurIPS 2025, arXiv 2503.13657) 14 failure modes 3 카테고리 (system design / inter-agent misalignment / task verification) 기반. OpenAI Structured Outputs 규격 준수.",
+  "$defs": {
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "major", "minor", "suggestion"],
+      "description": "심각도: critical(즉시 수정), major(수정 권장), minor(선택적), suggestion(제안)"
+    },
+    "confidence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "이슈 신뢰도 0-100 (높을수록 확실). Confidence Matrix 투표 시 사용."
+    },
+    "rule_source": {
+      "type": "string",
+      "enum": ["project", "plugin-default"],
+      "description": "규칙 출처 — project = 대상 저장소 지침·관례를 인용한 발견(ruleRef 필수) · plugin-default = GPT 스킬 도메인 팩(references/domain-*.md)에서만 나온 발견(상한 suggestion). 값은 소비 스키마에 인라인한다(gpt_independent_review_schema.json)"
+    },
+    "location": {
+      "type": "object",
+      "description": "문제 위치 정보",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "파일 경로"
+        },
+        "symbol": {
+          "type": "string",
+          "description": "심볼 이름 (클래스, 함수 등)"
+        },
+        "line_range": {
+          "type": "string",
+          "pattern": "^[0-9]+-[0-9]+$|^[0-9]+$",
+          "description": "라인 범위 (예: 10-25 또는 단일 라인 10)"
+        }
+      }
+    },
+    "alternatives": {
+      "type": "array",
+      "description": "대안 비교 (major 이상, optional)",
+      "items": {
+        "type": "object",
+        "required": ["label", "description", "pros", "cons"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "description": "대안 명칭 (예: A: 현재 구현)" },
+          "description": { "type": "string", "description": "접근 방식 설명" },
+          "pros": { "type": "array", "items": { "type": "string" } },
+          "cons": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "unified_category": {
+      "type": "string",
+      "enum": [
+        "architecture",
+        "extensibility",
+        "over_engineering",
+        "decomposition",
+        "modern_api",
+        "dependency",
+        "performance",
+        "refactoring_completeness",
+        "concurrency_safety",
+        "requirements_alignment",
+        "logic_error",
+        "security",
+        "memory",
+        "thread_safety",
+        "style",
+        "documentation",
+        "testing",
+        "scope_creep",
+        "other"
+      ],
+      "description": "통합 이슈 분류. review의 category + peer-review의 perspective 합집합. 두 스키마 모두 이 목록에서 선택."
+    }
+  }
+}

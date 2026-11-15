@@ -1,0 +1,15 @@
+{"type":"launched"}
+{"type":"started","key":"v2:06bdeddf2a292e8940d24fb2847d88234dc85d7cd751d4cc7dbc471692aadf38","agentId":"a0000000000000001","label":"lean2-full","phase":"생산+적대+영향 (동시 3)"}
+{"type":"started","key":"v2:e746930ae6f2edc3960ce37732f433485b3778fc1505cd0032449a572d9a52a9","agentId":"a0000000000000002","label":"lean2-edge","phase":"생산+적대+영향 (동시 3)"}
+{"type":"started","key":"v2:a7658bc0aa393cc01251354d81f73210adf4ad94ae7336c99b0e9bfe1d852197","agentId":"a0000000000000003","label":"lean2-impact-arch","phase":"생산+적대+영향 (동시 3)"}
+{"type":"failed","key":"v2:e746930ae6f2edc3960ce37732f433485b3778fc1505cd0032449a572d9a52a9","agentId":"a0000000000000002"}
+{"type":"failed","key":"v2:a7658bc0aa393cc01251354d81f73210adf4ad94ae7336c99b0e9bfe1d852197","agentId":"a0000000000000003"}
+{"type":"failed","key":"v2:06bdeddf2a292e8940d24fb2847d88234dc85d7cd751d4cc7dbc471692aadf38","agentId":"a0000000000000001"}
+{"type":"started","key":"v2:06bdeddf2a292e8940d24fb2847d88234dc85d7cd751d4cc7dbc471692aadf38","agentId":"a0000000000000004","label":"lean2-full","phase":"생산+적대+영향 (동시 3)"}
+{"type":"started","key":"v2:a7658bc0aa393cc01251354d81f73210adf4ad94ae7336c99b0e9bfe1d852197","agentId":"a0000000000000005","label":"lean2-impact-arch","phase":"생산+적대+영향 (동시 3)"}
+{"type":"started","key":"v2:e746930ae6f2edc3960ce37732f433485b3778fc1505cd0032449a572d9a52a9","agentId":"a0000000000000006","label":"lean2-edge","phase":"생산+적대+영향 (동시 3)"}
+{"type":"result","key":"v2:e746930ae6f2edc3960ce37732f433485b3778fc1505cd0032449a572d9a52a9","agentId":"a0000000000000006","result":{"edgeCases":[],"impactNotes":[],"latentDefects":[]}}
+{"type":"result","key":"v2:a7658bc0aa393cc01251354d81f73210adf4ad94ae7336c99b0e9bfe1d852197","agentId":"a0000000000000005","result":{"impactFiles":[],"patternVerdicts":[],"secondaryHosts":[],"existingTestSuites":[],"hiddenDependencies":[],"deadCode":[],"originBodyRequests":[],"violations":[]}}
+{"type":"result","key":"v2:06bdeddf2a292e8940d24fb2847d88234dc85d7cd751d4cc7dbc471692aadf38","agentId":"a0000000000000004","result":{"directionVerdict":"","directionAlternatives":[],"readScope":[],"writeScope":[],"acceptanceCriteria":[],"steps":[],"rtm":[],"riskMatrix":[],"antiPatternConstraints":[],"openQuestions":[],"implicationRegister":[]}}
+{"type":"started","key":"v2:4f9863913c9b46ba8f15baccdc4c61d5e8d03f943213ff2621aeb04f6d9877f9","agentId":"a0000000000000007","label":"lean2-merge","phase":"델타 병합"}
+{"type":"result","key":"v2:4f9863913c9b46ba8f15baccdc4c61d5e8d03f943213ff2621aeb04f6d9877f9","agentId":"a0000000000000007","result":{"addedEdgeCases":[],"addedImpact":[],"stepAmendments":[],"implicationRegister":[],"unresolved":[]}}

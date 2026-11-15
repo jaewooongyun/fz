@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# fz-plugin pre-commit: 공개 저장소에 두면 안 되는 식별자(개인 경로 · 메일 · 티켓 키 꼴 · PR 번호 꼴 · 합성 목록 밖 워크플로 실행 ID · 비공개 규칙) 차단 + 버전 선언 동기
+# H1 원칙 (모델이 혼자 못하는 것) 구현 — deterministic check.
+# diff-parse: not-a-diff — 이 훅은 diff 를 읽지 않는다. 추가 줄 추출과 판정은 누수 규칙 정본(scripts/leak_rules.py --staged)이 한다
+#
+# Codex Round 2 unique finding 반영: staged diff 추가 라인만 검사하여
+# 기존 잔존 정당 reference (예: 홈 아래 이 저장소 경로)는 self-block하지 않음.
+
+set -euo pipefail
+
+# 검사 범위 = 모든 파일 — 예외를 두지 않는다. 변경 기록 · 릴리스 노트 · 측정 기록 · 승격 원장도 공개 저장소에 실리므로, 예외로 둔
+#   파일로는 식별자가 검사 없이 나간다. ⛔ 화이트리스트(옛 SCOPED_RE)는 새 폴더를 조용히 통과시켰다(F-056).
+# ⛔ 판정은 정본에 모두 넘긴다 — 훅에 규칙 사본 · 파일 목록을 두지 않는다(사본은 한 벌만 고쳐진다). 변경 목록 · 추가 줄 추출 ·
+#    바이너리 판별 · rename 짝짓기(-M · F-410) · 색 설정 무시 · 자리표시자 통과는 정본의 스테이징 축이 한다.
+# ⛔ 정본은 훅 위치 기준으로 찾는다 — cwd 는 커밋하는 저장소이고 그 안에 scripts/ 가 있다는 보장이 없다. 없으면 배선이 끊긴 것이라 막는다
+LEAK_RULES="$(dirname "$0")/../scripts/leak_rules.py"
+
+# ⛔ 원인별 플래그. 하나로 뭉치면 **막은 이유와 안내가 어긋난다** — 버전 불일치로 막고
+#    경로 안내를 인쇄하는 오귀속이 실제로 났다(같은 부류: 도구 부재를 문법 오류로 인쇄).
+#    LEAK_STATE: clean · hit(적중) · unrun(정본이 판정 불가 · 종료 코드와 끝 줄이 어긋남) · unwired(정본 · python3 를 찾지 못함)
+LEAK_STATE=clean
+LEAK_RC=0
+EXIT=0
+
+if [ ! -f "$LEAK_RULES" ]; then
+  echo "⛔ fz pre-commit: 누수 규칙 정본을 찾지 못했다($LEAK_RULES) — 배선이 끊겨 판정할 수 없어 커밋을 막는다"
+  LEAK_STATE=unwired
+elif ! command -v python3 >/dev/null 2>&1; then
+  echo "⛔ fz pre-commit: python3 를 찾지 못했다 — 누수 규칙 정본을 돌릴 수 없어 커밋을 막는다"
+  LEAK_STATE=unwired
+else
+  # 정본 exit: 0 = 쟀고 적중 0(끝 줄 LEAK_CLEAN) · 1 = 적중(끝 줄 LEAK_HIT) · 2 = 판정 불가. ⛔ 종료 코드와 끝 줄을 함께 본다 —
+  #   파이썬 예외도 exit 1 이라 종료 코드만 보면 충돌을 적중으로 안내한다(출하 게이트 leak_note 와 같은 판정).
+  #   `|| LEAK_RC=$?` — set -e 아래에서 0 아닌 종료가 훅을 그 자리에서 끝내지 않게 받는다.
+  #   --hook-policy: 비공개 규칙을 env FZ_NEUTRALIZE_RULES > git 설정 fz.neutralizeRules 에서 찾고, 없으면 유지관리자 표지(git 설정
+  #   fz.maintainer)가 참일 때 판정 불가 · 아니면 내장 규칙만 보고 안내 한 줄
+  LEAK_OUT="$(python3 "$LEAK_RULES" --staged --hook-policy)" || LEAK_RC=$?
+  [ -z "$LEAK_OUT" ] || printf '%s\n' "$LEAK_OUT"
+  NL=$'\n'
+  LEAK_LAST=${LEAK_OUT##*$NL}
+  case "$LEAK_RC:$LEAK_LAST" in
+    "0:LEAK_CLEAN "*) ;;
+    "1:LEAK_HIT "*) LEAK_STATE=hit ;;
+    *) LEAK_STATE=unrun ;;
+  esac
+fi
+case "$LEAK_STATE" in
+  hit) echo "⛔ fz pre-commit: 스테이징한 추가 줄이나 새 파일 · 폴더 이름에 공개 저장소에 두면 안 되는 식별자가 있다(위 ❌ 줄)"; EXIT=1 ;;
+  unrun) echo "⛔ fz pre-commit: 누수 검사 미판정(정본 exit $LEAK_RC — 위 출력의 UNRUN 줄 · 오류) — 판정할 수 없어 커밋을 막는다"; EXIT=1 ;;
+  unwired) EXIT=1 ;;
+esac
+
+# ── 버전 선언 3곳 동기 (B1/S7) ──────────────────────────────────────────────
+# ⛔ `--staged` 를 쓴다. 기본 모드는 health-check 를 포함해 몇 분이 걸려서(소요는 검사기 머리말) 매 커밋에 둘 수 없고,
+#    `--release` 의 커밋 축은 깨끗한 워킹트리를 요구하는데 지금은 커밋하려는 중이다.
+#    이 모드는 버전 선언 파일이 staged 일 때만 발화하고, 아니면 즉시 통과한다.
+# ⛔ 검사기는 커밋하는 저장소(cwd)에서 찾는다 — 이 검사기는 자기 위치의 저장소만 본다. 훅 위치 기준으로 찾으면 훅 폴더를 함께 쓰는
+#    다른 작업 트리에서 훅 쪽 저장소의 인덱스를 검사한다(누수 규칙 정본은 cwd 를 검사해서 훅 위치 기준이 맞다).
+# ⛔ 검사기 부재를 통과로 세지 않는다 — 이 저장소가 버전을 선언하면(.claude-plugin/plugin.json 이 작업 트리나 인덱스에 있다) 배선이
+#    끊긴 것이라 막는다. 선언이 없는 저장소는 맞출 버전이 없으니 알리고 지나간다. 이 훅을 빌려 쓰는 저장소도 같은 규칙이다 — 버전을
+#    선언한 저장소(다른 플러그인)가 검사기 없이 이 훅을 쓰면 커밋마다 막힌다(검사기를 두거나 자기 훅을 쓴다)
+if [ -f scripts/check_release_sync.sh ]; then
+  if ! bash scripts/check_release_sync.sh --staged; then
+    EXIT=1
+  fi
+else
+  # git ls-files --error-unmatch 는 추적하지 않는 경로에 1 을 낸다. 그 밖의 값은 git 이 답하지 못한 것(저장소 손상 등)이라
+  #   '선언 없음' 으로 읽지 않고 막는다 — 모르는 것을 통과로 세지 않는다
+  DECL=0
+  [ -e .claude-plugin/plugin.json ] || { git ls-files --error-unmatch .claude-plugin/plugin.json >/dev/null 2>&1 || DECL=$?; }
+  case "$DECL" in
+    0) echo "⛔ fz pre-commit: 버전 선언(.claude-plugin/plugin.json)이 있는데 scripts/check_release_sync.sh 가 없다 — 버전 동기를 판정할 수 없어 커밋을 막는다"
+       EXIT=1 ;;
+    1) echo "ℹ️ fz pre-commit: 버전 선언(.claude-plugin/plugin.json)이 없는 저장소 — 버전 동기 검사는 해당 없음" ;;
+    *) echo "⛔ fz pre-commit: 버전 선언(.claude-plugin/plugin.json)이 인덱스에 있는지 git ls-files 가 답하지 못했다(exit $DECL) — 선언 여부를 판정할 수 없어 커밋을 막는다"
+       EXIT=1 ;;
+  esac
+fi
+
+if [ "$LEAK_STATE" = hit ] || [ "$LEAK_STATE" = unrun ]; then
+  echo ""
+  echo "검사 범위: 모든 파일(예외 없음) — 인덱스가 HEAD 에 더한 줄과 새로 생긴 파일의 경로 이름(윗폴더 포함)만 본다(이미 커밋된 줄 · 작업 트리에만 있는 것은 보지 않는다)"
+  echo "검사 축: 개인 홈 경로 · 개인 작업 폴더 경로 · 허용 밖 메일 · 티켓 키 꼴 · PR 번호 꼴 · 예약 번호 밖 자리표시자 · 합성 목록 밖 워크플로 실행 ID · 비공개 규칙"
+  echo "통과: 자리표시 경로(정본의 DOC_HOME_NAMES · DOC_DEV_NAMES) · 예약 번호(0 으로 시작하는 3~5자리)를 쓴 자리표시자 ·"
+  echo "      합성 실행 ID(정본의 SYNTHETIC_RUN_IDS — 실제 실행 ID 는 줄여 적은 것도 그 목록의 값으로 바꾼다)"
+  echo "미판정도 막는다: 바이너리 파일(추가 · 수정 · 삭제) · UTF-8 이 아닌 줄 · git 실패 · 비공개 규칙 파일 경로를 줬는데 읽지 못함 ·"
+  echo "      유지관리자 표지(git 설정 fz.maintainer)가 있는데 비공개 규칙 파일이 없거나 규칙이 0개"
+fi
+if [ "$LEAK_STATE" != clean ]; then
+  echo ""
+  echo "Bypass (정당 사유 시): git commit --no-verify (권장 안 함, commit message에 사유 명시)"
+  echo "  우회는 커밋 훅 전체(누수 검사 · 버전 동기)를 건너뛴다 — 그 커밋은 push 훅이 내보낼 때, 출하 게이트가 출하 범위(직전 출하 태그 뒤"
+  echo "  HEAD 까지)에 들 때 같은 정본으로 다시 본다. 두 관문을 모두 지나지 않는 경로(훅 없는 push)에서는 다시 보지 않는다"
+fi
+exit "$EXIT"

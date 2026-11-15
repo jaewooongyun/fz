@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+
+# Python (fz-excalidraw)
+__pycache__/
+*.pyc
+.venv/
+uv.lock
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Build
+.build/
+
+# fz 런타임 work dir + 원시 텔레메트리 — experiment-log.md 는 프로토콜만 추적한다(측정 기록 · traces 는 저장소 밖 ${FZ_RUN_STATE:-~/.fz/runs} · 아래 traces 줄은 옛 경로 대비)
+.fz-work/
+experiment-log-traces.jsonl
+
+# Claude Code 세션 산출물 — worktree는 리포 루트에 상주해 재귀 스캔을 오염시킨다
+# (예: `grep -r .` 이 worktree 사본까지 중복 계상 → 카운트 주장 왜곡)
+.claude/worktrees/
+
+# 코드 탐색 도구(Serena)의 로컬 프로젝트 상태 — 머신마다 만들어지는 작업 파일이다(공개 트리에 두지 않는다)
+.serena/

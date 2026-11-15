@@ -1,0 +1,206 @@
+diff --git a/Packages/CheckoutKit/Sources/CheckoutKit/Flow/CheckoutEngine.swift b/Packages/CheckoutKit/Sources/CheckoutKit/Flow/CheckoutEngine.swift
+index 0000001..0000101 100644
+--- a/Packages/CheckoutKit/Sources/CheckoutKit/Flow/CheckoutEngine.swift
++++ b/Packages/CheckoutKit/Sources/CheckoutKit/Flow/CheckoutEngine.swift
+@@ -22,7 +22,7 @@ // CheckoutEngine 합성 hunk
+     // CheckoutEngine: 문맥 L22→L22 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L23→L23 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L24→L24 — 합성 fixture 본문
+-    let legacyCheckoutEngineValue25 = legacyCompute(step: 25)
++    let nextCheckoutEngineValue25 = compute(step: 25, mode: .synthetic)
+     // CheckoutEngine: 문맥 L26→L26 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L27→L27 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L28→L28 — 합성 fixture 본문
+@@ -41,6 +41,8 @@ // CheckoutEngine 합성 hunk
+     // CheckoutEngine: 문맥 L41→L41 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L42→L42 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L43→L43 — 합성 fixture 본문
++    let nextCheckoutEngineValue44 = compute(step: 44, mode: .synthetic)
++    let nextCheckoutEngineValue45 = compute(step: 45, mode: .synthetic)
+     // CheckoutEngine: 문맥 L44→L46 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L45→L47 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L46→L48 — 합성 fixture 본문
+@@ -58,8 +60,5 @@ // CheckoutEngine 합성 hunk
+     // CheckoutEngine: 문맥 L58→L60 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L59→L61 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L60→L62 — 합성 fixture 본문
+-    let legacyCheckoutEngineValue61 = legacyCompute(step: 61)
+-    let legacyCheckoutEngineValue62 = legacyCompute(step: 62)
+-    let legacyCheckoutEngineValue63 = legacyCompute(step: 63)
+     // CheckoutEngine: 문맥 L64→L63 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L65→L64 — 합성 fixture 본문
+@@ -97,10 +96,10 @@ // CheckoutEngine 합성 hunk
+     // CheckoutEngine: 문맥 L97→L96 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L98→L97 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L99→L98 — 합성 fixture 본문
+-    let legacyCheckoutEngineValue100 = legacyCompute(step: 100)
++    let nextCheckoutEngineValue99 = compute(step: 99, mode: .synthetic)
+     // CheckoutEngine: 문맥 L101→L100 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L102→L101 — 합성 fixture 본문
+-    let legacyCheckoutEngineValue103 = legacyCompute(step: 103)
++    let nextCheckoutEngineValue102 = compute(step: 102, mode: .synthetic)
+     // CheckoutEngine: 문맥 L104→L103 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L105→L104 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L106→L105 — 합성 fixture 본문
+@@ -133,24 +132,24 @@ // CheckoutEngine 합성 hunk
+     // CheckoutEngine: 문맥 L133→L132 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L134→L133 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L135→L134 — 합성 fixture 본문
+-    let legacyCheckoutEngineValue136 = legacyCompute(step: 136)
+-    let legacyCheckoutEngineValue137 = legacyCompute(step: 137)
++    let nextCheckoutEngineValue135 = compute(step: 135, mode: .synthetic)
++    let nextCheckoutEngineValue136 = compute(step: 136, mode: .synthetic)
+     // CheckoutEngine: 문맥 L138→L137 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L139→L138 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L140→L139 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L141→L140 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L142→L141 — 합성 fixture 본문
+-    let legacyCheckoutEngineValue143 = legacyCompute(step: 143)
++    let nextCheckoutEngineValue142 = compute(step: 142, mode: .synthetic)
+     // CheckoutEngine: 문맥 L144→L143 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L145→L144 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L146→L145 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L147→L146 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L148→L147 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L149→L148 — 합성 fixture 본문
+-    let legacyCheckoutEngineValue150 = legacyCompute(step: 150)
+-    let legacyCheckoutEngineValue151 = legacyCompute(step: 151)
++    let nextCheckoutEngineValue149 = compute(step: 149, mode: .synthetic)
++    let nextCheckoutEngineValue150 = compute(step: 150, mode: .synthetic)
+     // CheckoutEngine: 문맥 L152→L151 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L153→L152 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L154→L153 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L155→L154 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L156→L155 — 합성 fixture 본문
+@@ -171,7 +170,37 @@ // CheckoutEngine 합성 hunk
+     // CheckoutEngine: 문맥 L171→L170 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L172→L171 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L173→L172 — 합성 fixture 본문
++    let nextCheckoutEngineValue173 = compute(step: 173, mode: .synthetic)
++    let nextCheckoutEngineValue174 = compute(step: 174, mode: .synthetic)
++    let nextCheckoutEngineValue175 = compute(step: 175, mode: .synthetic)
++    let nextCheckoutEngineValue176 = compute(step: 176, mode: .synthetic)
++    let nextCheckoutEngineValue177 = compute(step: 177, mode: .synthetic)
++    let nextCheckoutEngineValue178 = compute(step: 178, mode: .synthetic)
++    let nextCheckoutEngineValue179 = compute(step: 179, mode: .synthetic)
++    let nextCheckoutEngineValue180 = compute(step: 180, mode: .synthetic)
++    let nextCheckoutEngineValue181 = compute(step: 181, mode: .synthetic)
++    let nextCheckoutEngineValue182 = compute(step: 182, mode: .synthetic)
++    let nextCheckoutEngineValue183 = compute(step: 183, mode: .synthetic)
++    let nextCheckoutEngineValue184 = compute(step: 184, mode: .synthetic)
++    let nextCheckoutEngineValue185 = compute(step: 185, mode: .synthetic)
++    let nextCheckoutEngineValue186 = compute(step: 186, mode: .synthetic)
++    let nextCheckoutEngineValue187 = compute(step: 187, mode: .synthetic)
++    let nextCheckoutEngineValue188 = compute(step: 188, mode: .synthetic)
++    let nextCheckoutEngineValue189 = compute(step: 189, mode: .synthetic)
++    let nextCheckoutEngineValue190 = compute(step: 190, mode: .synthetic)
++    let nextCheckoutEngineValue191 = compute(step: 191, mode: .synthetic)
++    let nextCheckoutEngineValue192 = compute(step: 192, mode: .synthetic)
++    let nextCheckoutEngineValue193 = compute(step: 193, mode: .synthetic)
++    let nextCheckoutEngineValue194 = compute(step: 194, mode: .synthetic)
++    let nextCheckoutEngineValue195 = compute(step: 195, mode: .synthetic)
++    let nextCheckoutEngineValue196 = compute(step: 196, mode: .synthetic)
++    let nextCheckoutEngineValue197 = compute(step: 197, mode: .synthetic)
++    let nextCheckoutEngineValue198 = compute(step: 198, mode: .synthetic)
++    let nextCheckoutEngineValue199 = compute(step: 199, mode: .synthetic)
++    let nextCheckoutEngineValue200 = compute(step: 200, mode: .synthetic)
++    let nextCheckoutEngineValue201 = compute(step: 201, mode: .synthetic)
++    let nextCheckoutEngineValue202 = compute(step: 202, mode: .synthetic)
+     // CheckoutEngine: 문맥 L174→L203 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L175→L204 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L176→L205 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L177→L206 — 합성 fixture 본문
+@@ -221,7 +250,6 @@ // CheckoutEngine 합성 hunk
+     // CheckoutEngine: 문맥 L221→L250 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L222→L251 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L223→L252 — 합성 fixture 본문
+-    let legacyCheckoutEngineValue224 = legacyCompute(step: 224)
+     // CheckoutEngine: 문맥 L225→L253 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L226→L254 — 합성 fixture 본문
+     // CheckoutEngine: 문맥 L227→L255 — 합성 fixture 본문
+diff --git a/Packages/CheckoutKit/Sources/CheckoutKit/Flow/CheckoutContext.swift b/Packages/CheckoutKit/Sources/CheckoutKit/Flow/CheckoutContext.swift
+index 0000002..0000102 100644
+--- a/Packages/CheckoutKit/Sources/CheckoutKit/Flow/CheckoutContext.swift
++++ b/Packages/CheckoutKit/Sources/CheckoutKit/Flow/CheckoutContext.swift
+@@ -9,7 +9,7 @@ // CheckoutContext 합성 hunk
+     // CheckoutContext: 문맥 L9→L9 — 합성 fixture 본문
+     // CheckoutContext: 문맥 L10→L10 — 합성 fixture 본문
+     // CheckoutContext: 문맥 L11→L11 — 합성 fixture 본문
+-    let legacyCheckoutContextValue12 = legacyCompute(step: 12)
++    let nextCheckoutContextValue12 = compute(step: 12, mode: .synthetic)
+     // CheckoutContext: 문맥 L13→L13 — 합성 fixture 본문
+     // CheckoutContext: 문맥 L14→L14 — 합성 fixture 본문
+     // CheckoutContext: 문맥 L15→L15 — 합성 fixture 본문
+@@ -37,6 +37,7 @@ // CheckoutContext 합성 hunk
+     // CheckoutContext: 문맥 L37→L37 — 합성 fixture 본문
+     // CheckoutContext: 문맥 L38→L38 — 합성 fixture 본문
+     // CheckoutContext: 문맥 L39→L39 — 합성 fixture 본문
++    let nextCheckoutContextValue40 = compute(step: 40, mode: .synthetic)
+     // CheckoutContext: 문맥 L40→L41 — 합성 fixture 본문
+     // CheckoutContext: 문맥 L41→L42 — 합성 fixture 본문
+     // CheckoutContext: 문맥 L42→L43 — 합성 fixture 본문
+diff --git a/Packages/CheckoutKit/Sources/CheckoutKit/Flow/Views/CartSummaryView.swift b/Packages/CheckoutKit/Sources/CheckoutKit/Flow/Views/CartSummaryView.swift
+index 0000003..0000103 100644
+--- a/Packages/CheckoutKit/Sources/CheckoutKit/Flow/Views/CartSummaryView.swift
++++ b/Packages/CheckoutKit/Sources/CheckoutKit/Flow/Views/CartSummaryView.swift
+@@ -18,6 +18,9 @@ // CartSummaryView 합성 hunk
+     // CartSummaryView: 문맥 L18→L18 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L19→L19 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L20→L20 — 합성 fixture 본문
++    let nextCartSummaryViewValue21 = compute(step: 21, mode: .synthetic)
++    let nextCartSummaryViewValue22 = compute(step: 22, mode: .synthetic)
++    let nextCartSummaryViewValue23 = compute(step: 23, mode: .synthetic)
+     // CartSummaryView: 문맥 L21→L24 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L22→L25 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L23→L26 — 합성 fixture 본문
+@@ -52,9 +55,7 @@ // CartSummaryView 합성 hunk
+     // CartSummaryView: 문맥 L52→L55 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L53→L56 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L54→L57 — 합성 fixture 본문
+-    let legacyCartSummaryViewValue55 = legacyCompute(step: 55)
+-    let legacyCartSummaryViewValue56 = legacyCompute(step: 56)
+     // CartSummaryView: 문맥 L57→L58 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L58→L59 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L59→L60 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L60→L61 — 합성 fixture 본문
+@@ -88,7 +89,8 @@ // CartSummaryView 합성 hunk
+     // CartSummaryView: 문맥 L88→L89 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L89→L90 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L90→L91 — 합성 fixture 본문
+-    let legacyCartSummaryViewValue91 = legacyCompute(step: 91)
++    let nextCartSummaryViewValue92 = compute(step: 92, mode: .synthetic)
++    let nextCartSummaryViewValue93 = compute(step: 93, mode: .synthetic)
+     // CartSummaryView: 문맥 L92→L94 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L93→L95 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L94→L96 — 합성 fixture 본문
+@@ -99,8 +101,9 @@ // CartSummaryView 합성 hunk
+     // CartSummaryView: 문맥 L99→L101 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L100→L102 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L101→L103 — 합성 fixture 본문
+-    let legacyCartSummaryViewValue102 = legacyCompute(step: 102)
+-    let legacyCartSummaryViewValue103 = legacyCompute(step: 103)
++    let nextCartSummaryViewValue104 = compute(step: 104, mode: .synthetic)
++    let nextCartSummaryViewValue105 = compute(step: 105, mode: .synthetic)
++    let nextCartSummaryViewValue106 = compute(step: 106, mode: .synthetic)
+     // CartSummaryView: 문맥 L104→L107 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L105→L108 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L106→L109 — 합성 fixture 본문
+@@ -127,7 +130,6 @@ // CartSummaryView 합성 hunk
+     // CartSummaryView: 문맥 L127→L130 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L128→L131 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L129→L132 — 합성 fixture 본문
+-    let legacyCartSummaryViewValue130 = legacyCompute(step: 130)
+     // CartSummaryView: 문맥 L131→L133 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L132→L134 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L133→L135 — 합성 fixture 본문
+@@ -160,6 +162,10 @@ // CartSummaryView 합성 hunk
+     // CartSummaryView: 문맥 L160→L162 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L161→L163 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L162→L164 — 합성 fixture 본문
++    let nextCartSummaryViewValue165 = compute(step: 165, mode: .synthetic)
++    let nextCartSummaryViewValue166 = compute(step: 166, mode: .synthetic)
++    let nextCartSummaryViewValue167 = compute(step: 167, mode: .synthetic)
++    let nextCartSummaryViewValue168 = compute(step: 168, mode: .synthetic)
+     // CartSummaryView: 문맥 L163→L169 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L164→L170 — 합성 fixture 본문
+     // CartSummaryView: 문맥 L165→L171 — 합성 fixture 본문

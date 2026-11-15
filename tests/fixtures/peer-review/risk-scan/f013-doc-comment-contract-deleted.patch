@@ -1,0 +1,11 @@
+diff --git a/src/Checkout.swift b/src/Checkout.swift
+index 1111111..2222222 100644
+--- a/src/Checkout.swift
++++ b/src/Checkout.swift
+@@ -1,6 +1,4 @@
+ final class Checkout {
+-    /// 반드시 메인 스레드에서 호출한다.
+-    /// 주문 처리 중이면 먼저 멈춘다.
+     func stop() {
+         processor.halt()
+     }

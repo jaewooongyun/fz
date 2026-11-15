@@ -1,0 +1,29 @@
+{
+  "title": "TIMEOUT · SIDE_EFFECTS 발급",
+  "scope": "VerifySpec 의 timeout · side_effects 가 원장 속성으로 옮겨지고 모르는 칸은 경고된다(F-579)",
+  "steps": [
+    {
+      "id": "G1",
+      "title": "한도 · 부작용 선언",
+      "verify": {
+        "kind": "command",
+        "criterion": "오래 걸리는 검사가 통과한다",
+        "command": "printf ok",
+        "expect": "ok",
+        "timeout": 900,
+        "side_effects": "tmp",
+        "budget_note": 3
+      }
+    },
+    {
+      "id": "G2",
+      "title": "선언 없음",
+      "verify": {
+        "kind": "command",
+        "criterion": "짧은 검사가 통과한다",
+        "command": "printf ok",
+        "expect": "ok"
+      }
+    }
+  ]
+}

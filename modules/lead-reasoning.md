@@ -1,0 +1,286 @@
+# Lead Implication Reasoning
+
+> Lead가 작업 결과를 보고하기 전에 "표면 처리를 넘는 추론"을 수행하는 공통 모듈.
+> 참조: fz-code(마찰 감지), fz-review(검증 4-I), fz-plan(Register 출력), fz-gpt(Q8), cross-validation.md(게이트 삽입)
+
+## 목차
+
+- [1. 추론 원칙: Literal vs Semantic Scope](#1-추론-원칙-literal-vs-semantic-scope)
+- [1.5. 추론 원칙: Conclusion Scope Verification](#15-추론-원칙-conclusion-scope-verification)
+- [2. 카테고리 분류](#2-카테고리-분류)
+- [3. 자문 체크리스트](#3-자문-체크리스트)
+- [4. Implication Register (plan artifact)](#4-implication-register-plan-artifact)
+- [5. 보고 템플릿](#5-보고-템플릿)
+- [6. 모드](#6-모드)
+- [7. 변경 유형별 구조적 잔존물 체크리스트](#7-변경-유형별-구조적-잔존물-체크리스트)
+- [8. 트리거 조건](#8-트리거-조건)
+- [9. 검증 4 vs 4-I 경계](#9-검증-4-vs-4-i-경계)
+- [참조 스킬](#참조-스킬)
+
+---
+
+## 1. 추론 원칙: Literal vs Semantic Scope
+
+- **Literal Scope**: 지시에 등장한 키워드를 직접 처리
+  - 예: "networkService 제거" → `networkService` 포함 코드 삭제
+- **Semantic Scope**: 지시의 의도가 달성되기 위해 필연적으로 따라오는 작업
+  - 예: "DI 제거" → DI를 위해 추가된 `override init`, stored property, convenience init도 제거 대상
+
+**원칙**: Literal 실행은 최소 조건, Semantic 실행은 완전 조건. 차이가 잔존 코드를 만든다.
+
+---
+
+## 1.5. 추론 원칙: Conclusion Scope Verification
+
+**결론 범위 불일치**: "안전하다/문제없다/OK" 결론에 도달했을 때, 그 결론의 범위가 원래 질문의 범위와 일치하는지 검증한다.
+
+### 부분 → 전체 오류 (Partial-to-Whole Fallacy)
+
+한 측면의 긍정적 결론이 전체 평가를 대체하는 오류.
+
+```
+BAD:  experimentClient?.variation() → nil → 기본값 "A" → "안전" → 분석 종료
+      → setUserId() nil 동작(userId 유실) 미분석
+
+GOOD: experimentClient?.variation() → nil → 클라이언트 기본값 "A"
+      experimentClient?.setUserId() → nil → 서버가 식별자 없음으로 거부
+      experimentClient?.track() → nil → 이벤트 유실
+      → 클라이언트 안전 / 서버 데이터 유실 → 부분적 안전
+```
+
+**원칙**: "안전하다" 결론 도달 시 → "이 결론이 다루지 않는 측면은?" 자문. 같은 객체/모듈의 다른 메서드, 다른 이해관계자(클라이언트/서버/대시보드)를 명시적으로 나열.
+
+### 현재 → 본질 오류 (Contingent-to-Inherent Fallacy)
+
+현재 조건에서의 안전을 본질적 안전으로 취급하는 오류.
+
+```
+BAD:  "현재 호출부 1곳 → 동시 접근 없음 → thread-safe"
+      → public 싱글톤 메서드에 호출부가 추가되면 즉시 unsafe
+
+GOOD: "public 싱글톤 메서드 → 누구든 어디서든 호출 가능 → 본질적으로 thread-safe 구조 필수"
+```
+
+**원칙**: 안전성 판단은 "현재 사용 방식"이 아닌 "이 코드의 접근성과 설계"로. public = 미래 호출부 가정 필수. 싱글톤 = 다중 스레드 접근 가정 필수.
+
+### 연산 분류 오류 (Operation Classification Fallacy)
+
+한 블록 내의 "순수 연산"과 "side effect"를 같은 스레드 안전성 범주로 취급하는 오류.
+
+```
+BAD:  "JSON 파싱은 순수 연산 → 프로퍼티 할당도 MainActor 불필요"
+      → 파싱(순수: 입력→출력, 외부 상태 변경 없음)과 할당(side effect: self.property 변경)은 다른 범주
+      → 프로퍼티 할당을 background에서 실행하면 Main thread 소비자와 data race
+
+GOOD: "JSON 파싱은 background OK. 프로퍼티 할당은 소비자 스레드를 확인 후 결정"
+      → 파싱: let json = try JSONSerialization... (순수 → 어디서든 OK)
+      → 할당: self.requestId = value (side effect → 소비자가 Main이면 MainActor 필요)
+```
+
+**원칙**: 코드 블록을 "MainActor 밖으로 이동"할 때, 블록 내 각 문장을 순수 연산(외부 상태 무변경)과 side effect(프로퍼티 할당, UI 갱신, 알림 발송)로 분류. side effect는 소비자 스레드를 확인 후 배치.
+
+### 추정 → 사실 오류 (Speculation-to-Fact Fallacy)
+
+검증되지 않은 추론을 사실로 단정하는 오류. 특히 과거 상태, 수치, 외부 판정 인용에서 발생.
+
+```
+BAD:  "D2 이전 코드는 `.catch { _ in }`이 아니라 오류 처리가 있었다"
+      → git show 미확인. 추정을 사실로 기술.
+      → 실제 원본도 동일 패턴 → 4회 reversal.
+
+BAD:  "GPT는 1.5-2건 차단을 예상한다"
+      → GPT 원문은 "1건 확실 + 1건 가능". 재수치화로 정확성 손실.
+
+GOOD: "D2 이전 코드 [verified: git show <sha>^:{file}] — `.catch { _ in }` 동일 패턴"
+      "GPT 원문 [/tmp/verify.md L19]: '1건 확실 + 1건 가능' — 재수치화 금지"
+```
+
+**원칙**: 과거 상태/수치/외부 판정 인용 시 세 가지 필수 조치.
+1. **저비용 실측**: `git show`, `Read`, `grep` 1회로 확인 가능하면 반드시 실측 후 주장
+2. **미검증 태그**: 실측 불가능하면 `[미검증: 이유]` 태그 부착 (사실 주장 금지)
+3. **원문 보존**: 외부 판정(GPT/팀원)은 원문 그대로 + `[GPT 원문]` 태그. 재수치화/재포장 금지
+
+**실패 경로 주장**(F-009 · F-017): 실패 · 전파 경로를 주장할 때는 경로 위 각 async 호출의 `catch` 본문(부수효과 포함)을 코드로 인용한다 — `throws` 시그니처나 `do` 블록만 보고 단정하지 않는다(요약 금지). ⛔ 이 규칙을 지켰는지 보는 회귀 fixture 는 아직 없다(승격 원장 D-1 — active 아님).
+
+**발동 조건** (답변 생성 직전 자체 체크):
+- "원본/기존/이전/D{N} 이전" + 과거 행동/상태 주장
+- 수치 주장 ("N회", "X%", "$Y") + 실측 출처 링크 없음
+- 외부 판정 인용 + 원문/출처 태그 없음
+
+**Fail-Closed**: `memory-curator` 로드나 `system-reminders` T6/T7 발동 여부와 무관하게, Lead는 답변 생성 직전 위 표현 검출 → 실측 또는 `[미검증]` 태그 의무화.
+
+### 복합 오류 (Compound Fallacy) — 엣지 케이스
+
+두 오류가 결합되면 검출이 더 어려워진다.
+
+```
+BAD:  "현재 호출부 1곳 → 동시 접근 없음" + "앱 크래시 안 함 → 안전"
+      → Contingent-to-Inherent + Partial-to-Whole 복합
+      → 미래 호출부 미고려 + 서버 데이터 유실 미분석
+
+GOOD: "public 싱글톤 → 다중 접근 가정" + "클라이언트/서버/대시보드 각각 평가"
+      → 본질적 안전성 기준 적용 + 이해관계자별 독립 평가
+```
+
+---
+
+## 2. 카테고리 분류
+
+### Execution Implication (실행 함의)
+
+빠지면 작업이 절반만 완료된 상태.
+
+- 지시된 작업의 논리적 완결을 위해 필수
+- 리터럴 범위 밖이지만 같은 의도 범위 안
+- 빠지면 dead code / 불일관성 / 빌드 경고가 남음
+- **정책**: 사용자 확인 후 포함 (status: `needs_user_confirmation` → `approved`)
+
+판별: "이것 없이 '완료'라고 할 수 있는가?" → **No**이면 실행 함의
+
+### Observation Implication (관찰 함의)
+
+범위 외 독립적 개선 기회.
+
+- 지시 범위와 직접 연결되지 않음
+- 독립적으로 판단이 필요한 설계/아키텍처 이슈
+- 현재 지시에서 건드리지 않아도 지시가 완결됨
+- **정책**: 보고만. 실행 금지 (status: `report_only`)
+
+판별: "이것 없이 '완료'라고 할 수 있는가?" → **Yes**이면 관찰 함의
+
+### 경계 판단
+
+- 의심스러우면 **관찰 함의로 분류** (과잉 실행 방지)
+- 함의 확신 불가 → **AskUserQuestion** (임의 판단 금지 원칙)
+- 함의 2건+ 확인 필요 → 일괄 보고 (개별 질문 남발 금지)
+
+---
+
+## 3. 자문 체크리스트
+
+### 전체 모드 (1차/2차 트리거 해당 시)
+
+```
+[Q-WHY]      이 코드가 존재하게 된 이유는? 그 이유가 해소되면 이 코드도 불필요한가?
+[Q-COMPLETE]  이것 없이 "완료"라고 할 수 있는가?
+[Q-EFFECT]    이 변경으로 역할을 잃은 코드가 있는가?
+             → find_referencing_symbols로 참조자 확인. "이 변경을 위해 추가된" 코드가 있으면 실행 함의.
+```
+
+### 상시 경량 (모든 코드 변경)
+
+```
+[Q-OBSERVE]   지시와 무관하게, 탐색 중 설계 문제를 발견했는가?
+             → 발견 시 [함의-B] 형식 기록. 실행 금지. 보고 상한: 최대 2건.
+[Q-SCOPE]     "안전/OK" 결론의 범위가 질문 전체를 커버하는가?
+             → 같은 객체의 다른 메서드, 다른 이해관계자(클라이언트/서버)를 분석했는가?
+             → "이 결론이 다루지 않는 측면은?" 명시. 빈 답변 = 분석 부족 의심.
+[Q-INHERENT]  이 판단은 본질적 속성인가, 현재 조건인가?
+             → "현재 N곳/현재 단일 스레드/현재 사용하지 않음" = 현재 조건 (불안정)
+             → "private/actor/lock 보호/프로토콜 제약" = 본질적 속성 (안정)
+[Q-COVERAGE]  분석 범위가 "전체/모든/생태계/전수"이거나 보고가 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부")을 포함하거나 비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)을 하는데, 실제로 전체를 다뤘는가? (canonical: cross-validation.md §Coverage Gate 트리거 — ⛔ 어휘 9개 + 비율 주장 전부 canonical과 동기)
+             → Glob/find 결과 N개 중 분석한 M개. M/N < 100%면 누락 목록 명시.
+             → 근거 명령에 head/tail 잘림이 있으면 전수 주장 금지 — wc -l 재실행.
+             → "분석하지 않은 영역"이 빈 목록이면 분석 부족 의심.
+[Q-NEGATIVE]  "0건/부재/전부"를 결론으로 쓰는가? → 도구가 작동함을 먼저 증명(positive control) + exit code 판정 포함 + 다중 대상이면 라벨 (canonical: cross-validation.md §Negative-Result Gate)
+```
+
+---
+
+## 4. Implication Register (plan artifact)
+
+plan 출력에 포함하여 code→review까지 cross-phase 전달.
+
+| ID | Type | Trigger | Locus | Reason | Policy | Status |
+|----|------|---------|-------|--------|--------|--------|
+| IMP-1 | exec | DI 제거 | CheckoutBuilder.override init | DI를 위해 추가된 구조 | confirm | pending |
+| IMP-2 | obs | 작업 중 발견 | CouponUseCase.maxRetries | caller 주입 = DIP 위반 | report | report_only |
+
+- **exec** 항목: plan의 Step에 명시. code에서 승인 후 구현. review에서 누락 검증.
+- **obs** 항목: plan의 별도 "관찰 사항" 섹션. code에서 수정 금지. review에서 보고 존재 확인.
+- Status: `pending` → `approved` (사용자 확인) / `dismissed` (사용자 거부) / `report_only` (관찰)
+
+---
+
+## 5. 보고 템플릿
+
+### [함의-A] 실행 함의
+
+```
+[함의-A] 실행 함의 발견
+
+목적 코드: {파일:심볼}
+함의 이유: "{지시}"가 완료되면 이 코드의 존재 이유({이유})가 해소됨.
+제안 행동: {삭제/수정} 필요
+포함 여부: 사용자 확인 요청
+```
+
+### [함의-B] 관찰 함의
+
+```
+[함의-B] 관찰 함의 (현재 작업 범위 외)
+
+발견 위치: {파일:심볼}
+관찰 내용: {구체적 현상}
+아키텍처 의미: {왜 문제인지}
+권장 행동: 별도 티켓 권장
+현재 작업 영향: 없음 (진행 계속 가능)
+```
+
+---
+
+## 6. 모드
+
+| 모드 | 조건 | 실행 범위 |
+|------|------|----------|
+| **전체** | 1차/2차 트리거 해당 | Q-WHY + Q-COMPLETE + Q-EFFECT + 상시(Q-OBSERVE, Q-SCOPE, Q-INHERENT) |
+| **최소** | urgency 신호 ("빠르게", "급해") | 실행 함의(컴파일 직결)만. 관찰은 파일 저장만, 출력 안 함 |
+| **revert** | revert/되돌리기 작업 | 실행 함의 비활성. 관찰만 선택적 허용. "원본에도 존재하던 패턴" 제외 |
+
+---
+
+## 7. 변경 유형별 구조적 잔존물 체크리스트
+
+plan의 Anti-Pattern Constraints 작성 시 참조.
+
+| 변경 유형 | 확인할 잔존물 | Grep 패턴 예시 |
+|----------|-------------|---------------|
+| DI 제거 | override init, stored property, convenience init, DI용 protocol | `override init` |
+| 프로토콜 삭제 | conformance 선언, extension, 메서드 구현 | `: {Protocol}` |
+| 클래스 계층 변경 | override 메서드, super 호출, 하위 init | `override func`, `super.` |
+| import 제거 | typealias, utility 타입 잔존 사용 | (Symbol Inventory) |
+| 싱글톤 → DI | .shared 호출, 글로벌 접근 경로 | `.shared` |
+
+---
+
+## 8. 트리거 조건
+
+### 1차 트리거 (전체 Implication Scan)
+
+지시 키워드: `제거`, `삭제`, `이동`, `이관`, `마이그레이션`, `리팩토링`, `DI 변경`, `revert`
+
+### 2차 트리거 (전체 Implication Scan)
+
+변경 유형: `프로토콜 변경`, `access control 변경`, `init/signature 변경`, `모듈 경계 변경`
+
+### 상시 (Q-OBSERVE + Q-SCOPE + Q-INHERENT)
+
+모든 코드 변경 + 문서/파일 전체 분석에서 경량 스캔. 안전성 결론의 범위 검증(§1.5) + 분석 커버리지 검증(Q-COVERAGE)을 포함.
+
+---
+
+## 9. 검증 4 vs 4-I 경계
+
+> **검증 4 (Refactoring Completeness)**: diff 기준 — "새 심볼이 기존을 대체했는가? deprecated dead code?" → **구조적 완결성** (judge)
+> **검증 4-I (Implication Coverage)**: 지시 기준 — "지시의 의미론적 범위 전체가 diff에 포함됐는가?" → **의미론적 완결성** (auditor)
+> 검증 4는 diff **안**을 보고, 4-I는 지시에서 diff **밖**으로 시야를 확장한다.
+
+## 참조 스킬
+
+| 스킬/모듈 | 참조 이유 |
+|----------|----------|
+| fz-code | 마찰 감지 테이블 — 구조적 잔존물 + 관찰 보고 의무 |
+| fz-review | 검증 4-I + 완료 보고 관찰 섹션 |
+| fz-plan | Implication Register 출력 + Anti-Pattern 가이드 참조 |
+| fz-gpt | Q8 함의 커버리지 |
+| cross-validation.md | Implication Scan 게이트 + origin-equivalence |

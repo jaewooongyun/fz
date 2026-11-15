@@ -1,0 +1,506 @@
+# Agent & Team Configuration Guide
+
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조: §1 MCP 도구 계층화 표·예시 · §3 실행 전환 인용문의 워크플로 개수 · §4 Fable 5.1 비용 행·모델 승격 매트릭스(`workflows/*.js` 콜사이트 재생성) · §5 TEAM 서술·검증 게이트 표(`scripts/gpt-kinds.json` 생성 표 대조) · §6 서브에이전트 과다·coupled fan-out 행 · §8 Agent Teams 사양 블록·8.2 프리로드·8.4 impl-correctness 주석·8.5 `mcpServers` 행만 대조. 나머지는 이전 감사 그대로 — 2026-09-25 모델 사실 축(Fable 5.1 비용 결론의 Opus 5.5 재산정 포인터 · 서브에이전트 과다 행의 Opus 5.5 caveat 행) · 그 밖 2026-09-06 대조):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용(MAST 등 arxiv)은 개별 `[verified:]` 태그 참조.
+>
+> fz-* 스킬 생태계에서 에이전트 작성 및 (역사적) 팀 구성을 위한 종합 가이드.
+> 에이전트는 `agents/*.md`에 위치하며, agentType(`fz:`)으로 `workflows/*.js` Workflow가 재사용한다.
+>
+> ⛔ **TEAM 일몰 (Wave 4)**: TeamCreate+SendMessage 실행 경로는 전면 네이티브 Workflow로 대체됨. 이 가이드의 TeamCreate/SendMessage/2.5-Turn 예시(§2/§3/§7)는 이제 **역사적 의미론 기록으로만** 유효하다.
+> ⛔ **SOLO 폴백 절차로 참조하지 않는다** — SOLO에는 에이전트가 없어 P2P 절차가 실행 자체 불가이고, 사용 이력 0건이다.
+> 폴백 정본 = `guides/skill-authoring.md` §12 실패 복구 사다리 L1~L4. 신규 멀티에이전트 스킬은 `guides/skill-authoring.md` §12(Workflow 규약)를 따른다. §1 에이전트 작성법 + §2 채널 우선순위 원칙은 현행 유효.
+
+---
+
+## 1. 에이전트 작성법
+
+### 역할 선언 패턴
+
+1줄로 시작한다: `"You are a {role} for {domain/project}."`
+
+구체적 역할 + 도메인을 명시해야 한다.
+
+```
+BAD:  "You are a helpful assistant."
+GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS project."
+```
+
+- 역할이 모호하면 에이전트가 범용 응답을 생성한다.
+- 도메인을 명시하면 MCP 도구 선택과 분석 깊이가 달라진다.
+
+### MCP 도구 계층화
+
+에이전트가 사용하는 도구는 4-tier로 계층화한다.
+
+| Tier | 용도 | 예시 |
+|------|------|------|
+| Primary (항상 사용) | 핵심 분석 도구 | Lead 가 넘긴 참조 근거 파일 + serena find_symbol, get_symbols_overview — 구현(conformance) 탐색은 Lead 의 serena find_implementations |
+| Secondary (필요 시) | 보조 도구 | context7 query-docs |
+| Unavailable (Workflow `tools:` allowlist 에 없음 — 구판 표기 "Team 제약") | Lead 전용 | Atlassian, XcodeBuild, LSP (일부) |
+
+> Fallback은 명시하지 않는다. `tools:` YAML이 사용 가능한 도구를 선언하므로 Claude가 자연스럽게 폴백한다.
+
+에이전트 파일에 Primary, Secondary, Unavailable만 선언한다:
+
+```markdown
+## Tools Strategy
+- **Primary**: Lead 가 넘긴 참조 근거 + serena find_symbol, serena get_symbols_overview
+- **Secondary**: context7 query-docs (외부 문서 참조 시)
+- **Unavailable**: 빌드 MCP 도구, Atlassian (Lead에게 요청)
+```
+
+### 중요: Team Agent 도구 제약
+
+Team 에이전트는 일부 MCP 도구를 직접 호출할 수 없다:
+
+- **Atlassian (JIRA)** -- Lead에게 요청하여 이슈 조회/생성
+- **빌드 MCP 도구** -- Lead에게 요청하여 빌드/테스트 실행
+- **일부 LSP 도구** -- Lead가 빌드 검증 후 결과 공유
+
+에이전트가 이 도구들이 필요한 경우 **구조화 출력의 요청 필드로 반환**하고 Lead가 수행한다.
+
+```
+// 에이전트 반환 (schema 필드) — ⛔ SendMessage 아님
+{ "needsLeadAction": [{ "kind": "build", "target": "MyApp scheme", "files": ["…"] }] }
+```
+
+> ⛔ 구판은 `SendMessage(lead)` 호출을 처방했다. Workflow 경로에는 P2P 채널이 없고
+> (`guides/skill-authoring.md` §12 OVERRIDE 블록이 명시 금지), 반환값이 유일한 출력 채널이다.
+
+### 모델 선택 기준
+
+| 역할 | 기본 모델 | 승격 조건 | 승격 모델 |
+|------|----------|----------|----------|
+| Lead / Workflow 판단 지점 | fable | -- | -- |
+| Primary Worker | sonnet | 특정 팀에서 핵심 생산자 | opus |
+| Supporting (실질 분석·생산) | sonnet | 계획·구현·리뷰 산출물 생산·분석 | opus |
+| Supporting (retrieval·breadth) | sonnet | -- | -- |
+
+승격 예시:
+
+- **plan-structure**: plan / plan-to-code / full-cycle 팀에서 opus로 승격
+- **impl-correctness**: code / code-to-review / full-cycle 팀에서 opus로 승격
+- **review-arch**: review-only / peer-review 팀에서 opus로 승격
+
+에이전트 파일 `model:` 은 **기본값**(sonnet)을 유지하고, 실제 배정은 스크립트가 호출마다 명시한다:
+
+```js
+// workflows/{skill}-{pattern}.js — ⛔ 이것이 모델 배정의 정본이다
+await agent(prompt, { agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh', schema: … })
+```
+
+### Same-model Cross-Verify Reflection Rate 정책 (UC-5, v4.8.0)
+
+> Single source: `guides/skill-troubleshooting.md` §3 위반 대응표의 "동종 모델 맹점" 행 (heading-based anchor — 줄번호 참조는 drift, 2026-07-18 실측 L214→L215 어긋남 교정).
+> 본 §은 Reflection Rate 측정 시 가중치 정책만 정의.
+
+**Canonical Rule (exclusion)**:
+- **동종 모델 cross-verify** (search-symbolic ↔ search-pattern 양쪽 sonnet, review-arch ↔ review-quality 양쪽 opus 등):
+  - **Headline Reflection Rate에서 제외**
+  - 이유: 같은 모델은 같은 지식 갭 공유 → false high reflection rate 방지
+- **이종 모델 cross-verify** (Claude ↔ GPT/GPT, sonnet ↔ opus):
+  - Headline Reflection Rate에 포함 (full credit, weight 1.0)
+
+**Auxiliary Weighted Rate (별도 보고)**:
+- 동종 모델 발견을 가중치 0.5로 헌정 표시할 보조 지표
+- experiment-log §5.5 schema 확장: `weighted_rate_pct` 필드 (canonical headline_rate_pct와 분리)
+- 두 metric은 **혼용 금지** — canonical은 exclusion, weighted는 auxiliary 별도 컬럼
+
+### 승격 메커니즘 상세
+
+> ⛔ **역사적 의미론 — 실행 처방 아님.** `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 존재하지 않고 fz 실행 경로 호출부도 0건이다. 현행 실행 = `workflows/*.js` `agent()` (`guides/skill-authoring.md` §12).
+
+
+승격은 **TeamCreate 시 Lead가 명시적으로 model 파라미터를 지정**하여 이루어진다:
+- 에이전트 파일의 `model: sonnet`은 **기본값** (SOLO 모드, 또는 Supporting 역할 시)
+- TeamCreate에서 Primary Worker로 지정될 때 Lead가 `model: opus`로 오버라이드
+- ⛔ **실제 모델은 `workflows/*.js`의 `opts.model`이 결정한다** (정본: `modules/governance.md` § Truth-of-Source). `team-registry.md` `promoted` 열과 에이전트 `model:` 은 **기본값 표기**이며 스크립트가 override한다 — `modules/peer-review-tiers.md`가 이 override를 이미 문서화한다
+- ⛔ 에이전트 파일의 `# 승격: …` 주석은 **2026-08-09 제거**됐다 — 5곳 중 2곳(`review-counter` "미승격, sonnet 유지" ↔ 실제 opus / `review-direction` "opus 승격" ↔ 실제 fable)이 실제 배정과 어긋나 있었다. 4중 선언(주석·registry·`model-strategy`·스크립트)을 스크립트 단일 정본으로 수렴
+
+```
+예시:
+  TeamCreate("plan-feature-x")
+  → plan-structure: model=opus (promoted-model=opus이므로)
+  → review-arch: model=sonnet (promoted-model 없음)
+  → review-direction: model=sonnet (기본), Phase 0.5에서 순차 opus 승격
+```
+
+### Agent 파일 체크리스트
+
+- [ ] name: `{domain}-{specialty}` (예: `plan-structure`, `review-arch`)
+- [ ] description: role + expertise + team context
+- [ ] model: 기본 sonnet — ⛔ 실제 배정은 `workflows/*.js` `opts.model`이 정본 (에이전트 주석 아님, 2026-08-09 제거됨)
+- [ ] tools: 최소 필요 도구만 (4-tier 전략 포함)
+- [ ] 출력 채널 규칙 포함 (⛔ P2P SendMessage 아님 — Workflow OVERRIDE 블록이 P2P를 금지한다)
+- [ ] MCP 도구 4-tier 전략 포함
+- [ ] 워크플로우 번호 매김 (Step 1, 2, 3...)
+- [ ] 결과 보고 형식 명시 (Markdown 구조)
+
+Agent 템플릿: `templates/agent-template.md`를 기반으로 작성한다.
+
+---
+
+## 2. 팀 설계법
+
+> ⛔ **역사적 의미론 — 실행 처방 아님.** `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 존재하지 않고 fz 실행 경로 호출부도 0건이다. 현행 실행 = `workflows/*.js` `agent()` (`guides/skill-authoring.md` §12).
+
+
+### TeamCreate 패턴
+
+```
+TeamCreate("{skill}-{feature}")
++-- Lead (Opus): 오케스트레이션 + 게이트 실행 + 중재
++-- Primary Worker (Opus): 핵심 생산 (plan-structure 또는 impl-correctness)
++-- Supporting N (Sonnet): 검증/비평 (review-arch, review-quality 등)
++-- GPT CLI: cross-model 검증 (Lead가 fz-gpt 실행)
+```
+
+팀 이름은 `{skill}-{feature}` 형식을 따른다 (예: `plan-auth-refactor`, `code-checkout-fix`).
+
+### 핵심 원칙: Mesh Topology (Hub-and-Spoke 아님)
+
+```
+BAD (Hub-and-Spoke):
+  Agent A --> Lead --> Agent B --> Lead --> Agent A
+  (모든 메시지가 Lead를 거침 --> 병목 + 컨텍스트 손실)
+
+GOOD (Mesh / Peer-to-Peer):
+  Agent A <--> Agent B (직접 SendMessage)
+  Agent B <--> Agent C (직접 SendMessage)
+  합의 --> Lead에게 보고
+  (Lead는 퍼실리테이터, 중재자, 게이트 실행자)
+```
+
+에이전트 간 직접 통신이 기본이다. Lead를 거치지 않는다.
+
+### 2.5-Turn Protocol 핵심 규칙
+
+| 규칙 | 내용 | 근거 |
+|------|------|------|
+| **Round 1 독립성** | 피어 초안을 보기 전에 자기 분석을 완성해야 함 | Sycophancy(동조) 방어 |
+| **Round 0.5 보고** | [합의 항목] + [불합의 항목]을 반드시 분리 기재 | Lead가 교차 검증 상태 파악 |
+| **Primary 전달 의무** | Supporting 발견을 중계 시 원문 핵심을 그대로 인용 | 요약/축소로 인한 정보 손실 방지 |
+| **CC 옵션** | Supporting이 Primary에게 보내는 메시지를 다른 Supporting에게 동시 CC 가능 | 정보 전파 지연 방지 |
+
+### Task Brief 5요소 (에이전트에게 작업 배정 시 필수)
+
+```
+[Role] 당신의 역할은 {역할}입니다
+[Context] {작업 배경 + 이전 단계 결과}
+[Goal] {구체적 목표 + 측정 가능한 완료 조건}
+[Constraints] {건드리지 말 것 + 규칙}
+[Deliverable] {기대 산출물 형식}
+```
+
+### Lead의 역할
+
+1. **퍼실리테이터**: 문제 전파, 컨텍스트 공유, 작업 시작 지시
+2. **모니터링**: 에이전트 진행 상황 추적
+3. **중재**: 교착 상태 해소 (3라운드 초과 시 개입)
+4. **게이트 실행**: 빌드 검증, GPT 검증 등 Lead-only 작업
+5. **사용자 소통**: 결과 보고, 승인 요청
+
+### Lead가 하지 않는 것
+
+- 모든 메시지의 중계자 역할 (에이전트끼리 직접 SendMessage)
+- 직접 코드 작성 (Primary Worker에 위임)
+- 상세 분석 수행 (Supporting 에이전트에 위임)
+
+### 채널 우선순위 원칙 (브리프 > 에이전트 기본 지시)
+
+에이전트 정의의 기본 통신/출력 지시(예: Peer-to-Peer Protocol의 SendMessage)보다 **스폰 브리프가 명시한 채널이 항상 우선**한다. 브리프가 출력 채널(파일 Write / 구조화 반환 / final message)을 지정하면, 에이전트 정의의 SendMessage 기본 지시는 그 브리프 범위에서 무효화된다.
+
+- 근거: 스폰 컨텍스트(백그라운드 subagent, Workflow agentType, native Agent())에 따라 SendMessage가 미바인딩일 수 있다. 에이전트가 정의의 기본 채널을 브리프보다 우선하면 미바인딩 컨텍스트에서 호출이 실패한다.
+- 이중 강제: (1) 에이전트 작성 시 본 원칙 준수 (2) Workflow는 OVERRIDE 블록으로 런타임 재강제 (`skill-authoring.md` §12).
+- ⛔ 이 원칙은 SendMessage 제거 후에도 유효하다 — 근본 원인은 특정 도구가 아니라 "기본 지시가 브리프를 override"하는 우선순위이므로, native Agent()/L3 경로에도 동일 적용된다.
+
+---
+
+## 3. 통신 패턴 5가지
+
+> 상세 구현은 각 `workflows/*.js`(평탄화 구현)가 정본이다 (사료 2026-09-25 삭제 — 결정: `modules/promotion-ledger.md` § TEAM 일몰). 아래는 빠른 매핑만.
+
+| 패턴 | 스킬 | 현행 동작 (스크립트가 단계 결과를 다음 단계 입력으로 넘긴다 — 에이전트 간 직접 대화 없음) | 구현 스크립트 |
+|------|------|------------------------------|------|
+| Collaborative Design | fz-plan | plan-structure 설계안 → review-arch 검토 → 병합 (다단계 — 롤백 경로) | `workflows/plan-collaborative.js` (fz-plan 기본은 `plan-lean2.js` — 협업 패턴은 롤백 경로) |
+| Pair Programming | fz-code | impl-correctness changeset → review-arch·impl-quality 병렬 검토 → 조건부 수정 (Step 단위 — `skills/fz-code/SKILL.md`) | `workflows/code-pair.js` |
+| Live Review | fz-review | review-arch ∥ review-quality → 교차 severity 조정 → review-counter DA (`skills/fz-review/SKILL.md`) | `workflows/review-live.js` |
+| Adversarial Constraint Discovery | fz-discover | plan-structure(생성) 결과를 review-arch(파괴) 가 받아 제약을 드러낸다 — 라운드마다 스크립트가 전달 | `workflows/discover-adversarial.js` |
+| Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ∥ search-pattern(텍스트) → 서로의 결과를 교차 확인 | `workflows/search-cross-verify.js` |
+
+> **실행 전환 (Wave 1-4, 완료)**: 위 5 패턴의 구현은 `workflows/{discover-adversarial,plan-collaborative,review-live,code-pair,search-cross-verify}.js` 결정적 Workflow다 — fz-plan 기본 실행은 `plan-lean2.js` 이고 `plan-collaborative.js` 는 롤백 경로다(P2P SendMessage 아님 — 라운드 의미론은 스크립트가 구현). 규약: `guides/skill-authoring.md` §12.
+> - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:79` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — `workflows/*.js` 가 전 패턴을 덮는다(2026-11-01 기준 8개 — 개수는 디렉터리가 정본, 구판 표기 "6개").
+> - `TeamCreate`/`TeamDelete` 도구는 v2.1.178부터 **존재하지 않으며**, fz 실행 경로에도 호출부가 **0건**이다 [verified: `grep -rn "TeamCreate(" workflows/ scripts/` → 0]. 본 가이드의 TeamCreate 예시(§2/§3/§7)는 **역사적 의미론 기록**이다 — ⛔ SOLO 폴백 절차로 참조하지 않는다(머리 경고).
+
+공통: 에이전트끼리 직접 대화하지 않는다 — 스크립트가 단계 결과를 다음 단계 입력으로 넘긴다. 병합은 워크플로마다 다르다 — 스크립트 안의 통합 단계(예: plan-collaborative·search-cross-verify)가 하거나, 반환 뒤 Lead 가 한다. 최종 판정은 Lead 가 한다. 옛 P2P 라운드·토폴로지 상세를 담던 TEAM 사료는 삭제됐다(위 "상세 구현은 각 `workflows/*.js`" 인용문).
+
+---
+
+## 4. 모델 전략
+
+### 3-Tier 원칙
+
+| Tier | 모델 | 역할 | 비용 |
+|------|------|------|------|
+| Tier 1 (판단) | fable | Lead 세션 + Workflow 판단 지점 3곳(plan direction ×2 · search merge) | 최상 |
+| Tier 2 (실질 워커) | opus | Primary Worker + 실질 분석·생산 에이전트 | 높음 |
+| Tier 3 (단순) | sonnet | retrieval·breadth 성격 (search 탐색, discover lens fan-out, memory-curator) | 중간 |
+
+- **haiku**: 이 프로젝트에서 미사용. 고성능 추론이 목표이므로 품질 저하 불가.
+- **동시 opus ≤3 원칙**: 팀당 동시 opus 인스턴스를 3개 이하로 유지한다 (Lead 세션 fable은 별도 카운트).
+  - **순차 승격** 허용: 병렬 opus 스폰은 순차 승격으로도 상한(≤3)을 넘지 않도록 유지한다.
+  - 예외: full-cycle / plan-to-code 파이프라인에서 plan과 code 각각 Primary가 다르므로 순차적으로 opus를 사용한다.
+- **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단.
+- **Fable 5.1 (2026-09-01 GA, Lead 모델)**: 판단 tier 모델, 출력·캐시쓰기 단가는 opus 5의 2배($10/$50 vs $5/$25)나 **캐시 읽기는 $0.25/MTok로 opus 5($0.50)의 절반** — 캐시 지배 세션에서는 "2배" 진술이 성립하지 않는다(fz 실측 2026-09-06: 동일 트래픽을 Fable 5.1 단가로 환산 시 opus 대비 **+9%**). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/model-guide.md` §5. ⚠️ 2026-09-06 정정: "opus의 2배" 단정은 출력·캐시쓰기 단가에만 참이다. 위 비교는 Opus 5 단가 기준이다(이력 — 2026-09-06 당시 기준). 워커 Opus 5.5($4/$20·캐시 읽기 $0.20) 대비 단가 배율은 입력·출력 2.5배·캐시 읽기 1.25배이고, +9% 실측의 Opus 5.5 기준 재산정은 미실시(선택 과제 — `guides/model-guide.md` §5 가격 비교). 가격 정본은 `guides/llm-references.md` § 1.2 모델 프롬프팅의 about-claude/pricing 행 [verified: https://platform.claude.com/docs/en/about-claude/pricing].
+
+### 모델 승격 매트릭스
+
+상세 내용은 `modules/team-registry.md` 참조.
+
+| 파이프라인 | Primary (opus) | 실질 워커 (opus) | 단순 워커 (sonnet) |
+|-----------|----------------|------------------|--------------------|
+| plan-* (`plan-lean2.js` 기본 · `plan-lean.js`(측정 재현용 — `tests/fixtures/workflows/`) · `plan-collaborative.js` 롤백) | plan-structure | plan-edge-case, plan-impact(lean2·collaborative), plan-merge(lean2), arch-lens(collaborative) | -- (direction=fable ×2, collaborative) |
+| code-* (`code-pair.js`) | impl-correctness | arch-lens, impl-quality(full) | -- |
+| review-* (`review-live.js` · `peer-review.js`) | review-arch | review-quality, review-counter, review-correctness(peer-review 만) | -- |
+| discover (`discover-adversarial.js`) | plan-structure | -- | plan-structure(lens fan-out), arch-lens(cost) |
+| search --deep (`search-cross-verify.js`) | -- | -- | search-symbolic, search-pattern (merge=fable — plan-structure) |
+| bug-hunt (이력 — 해당 `workflows/*.js` 없음, 2026-11-01) | impl-correctness | -- | search-symbolic |
+
+> 2026-11-01 `workflows/*.js` 정적 43콜(label·`agentType`·`model` 명시값)에서 다시 만든 표다. 구판과 다른 점: memory-curator 는 어느 워크플로도 부르지 않는다(recall 전용 — §8.1) · review-correctness 는 `peer-review.js` · `swarm.js`(기본 워커)에서만 불린다(`code-pair.js` 머리 주석 "review-correctness/memory-curator는 여전히 Lead 경로") · plan-merge(opus, `plan-lean2.js` `lean2-merge`)가 빠져 있었다.
+
+Primary와 실질 분석·생산 워커는 opus, retrieval·breadth 단순 워커는 sonnet으로 실행된다 (동시 opus ≤3).
+
+---
+
+## 5. GPT 통합
+
+### cross-model 상호검증 원칙
+
+- (이력 — TEAM 시절 기준) 모든 TEAM 구성에 GPT CLI가 포함됐다. 현행: GPT 호출은 스킬·단계별 kind 로 배선된다 — 정본 `scripts/gpt-kinds.json` · 생성 표 `skills/fz-gpt/SKILL.md` § 서브커맨드.
+- **Lead가 직접** `/fz-gpt`를 실행한다 (에이전트가 GPT를 직접 호출하지 않음).
+- Claude (opus/sonnet) + GPT (다른 모델)의 교차 검증으로 blind spot을 보완한다.
+- ⊕ **독립 첫 패스**(fz-peer-review · fz-plan light · full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`): GPT 가 Claude 산출을 보기 **전에** 같은 입력으로 따로 리뷰 · 플랜한다(`scripts/gpt_independent.sh` — 강제 격리). 합치는 것은 스크립트다(`review_merge.py` · `plan_divergence.py`) — 교차 검증은 그 뒤의 일이다. 규약 `modules/cross-validation.md` § 독립 첫 패스
+
+### 검증 게이트 삽입 위치
+
+> 정본은 `scripts/gpt-kinds.json` 이고 kind·호출자 전체 표는 `skills/fz-gpt/SKILL.md` § 서브커맨드의 생성 표(gpt-kinds:kinds)다. 아래는 주요 게이트만 2026-11-01 그 표와 대조해 고쳤다 — 구판은 code 완료 후·commit 전을 모두 `check` 로 적었다.
+
+| 시점 | GPT 명령 | 대상 |
+|------|-----------|------|
+| plan 완료 후 (/fz-plan Phase 2) | `/fz-gpt verify` (+ `verify-gates`) | 설계 검증: 제약 위반, 누락 확인 |
+| 코드 리뷰 (/fz-review Phase 5) | `/fz-gpt review` | 코드 리뷰 (주력) |
+| 커밋 전 (/fz-fix) | `/fz-gpt check` | 커밋 전 빠른 검증 (verdict contract) |
+| PR 전 (/fz-pr 전) | `/fz-gpt final` (major 가 있으면 `final-deep` · `final-da`) | PR 전 최종 리뷰 |
+
+### GPT 결과 처리 흐름
+
+```
+Lead --> /fz-gpt verify --> GPT 결과 수신
+  결과가 PASS --> 다음 단계 진행
+  결과가 FAIL --> Lead가 buildFeedback 포함해 해당 Step 재invoke (⛔ SendMessage 아님)
+    --> 수정 후 재검증
+```
+
+GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 사용자에게 보고한다.
+
+---
+
+## 6. Anti-Patterns
+
+| Anti-Pattern | 이유 | 대안 |
+|-------------|------|------|
+| Hub-and-Spoke | 병목 + 컨텍스트 손실 | Mesh (Peer-to-Peer) |
+| 단순 작업에 서브에이전트 과다 | coordination 오버헤드 (이력 — Opus 4.8 당시 기준: 4.8은 breadth엔 수백 parallel subagent 지원하나 단순작업엔 비효율 [verified: anthropic.com/news/claude-opus-4-8]). **Opus 5에서 위험도 상승** — 모델이 위임을 *과다* 시도한다(4.8은 반대로 under-reach) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] | SOLO for simple tasks + **명시 캡**. 하네스측 상한: **동시 20**(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, v2.1.217)·**depth 3**(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, v2.1.219) — 이 20·3 은 **Agent 도구 풀** 상한이다. Workflow 에이전트는 여기 포함되지 않고 자체 상한(**동시 16·실행당 1,000**)을 따르며, fz 실행 경로는 이 Workflow 풀이다 [verified: https://code.claude.com/docs/en/sub-agents] [verified: https://code.claude.com/docs/en/workflows] — fz governance(**opus 동시 ≤3** — 정본 `guides/model-guide.md` §5)는 이보다 보수적. ⛔ 세션 생애 200 캡(`…MAX_SUBAGENTS_PER_SESSION`)은 **v2.1.224에서 제거**됐다 — 누적 스폰 제약은 더 이상 없고 **동시·depth만 남는다** |
+| ↳ Opus 5.5 (현행 워커) | 5.5 프롬프팅 페이지에는 subagent 캡 절이 없지만 Opus 5 패턴을 상속한다 — *"the patterns in Prompting Claude Opus 5 remain a reasonable starting point"* → **캡 절 부재는 캡 폐기 근거가 아니다**. 장기 자율 런에는 시간 예산 신호를 권한다 — *"give the model a time budget: have your harness add a short line at the end of each message … giving the elapsed time"* [verified: prompting-claude-opus-5-5] | 위 명시 캡 유지 + elapsed 시간 신호 |
+| coupled 작업 fan-out | tightly-coupled 구현/리팩토링은 병렬 분해 시 MAST 실패(inter-agent misalignment·task verification 범주) [verified: https://arxiv.org/abs/2503.13657v3 "Why Do Multi-Agent LLM Systems Fail?" — 14 modes / 3 범주, Cemri Berkeley, v3, NeurIPS 2025]. 추론 토큰을 같게 두면 단일 에이전트가 멀티에이전트와 같거나 낫다는 결과는 다중 홉 추론 과제에서 나왔다 [arxiv preprint, 2026-04: 2604.02460 — 다중 홉 추론, 코딩 과제 아님 · vN 미기록]. (이력 — 구판은 "동일 토큰예산서 우위 소멸"을 MAST 태그 하나로 묶었으나 MAST v1~v3 에 동일 예산 주장은 없다) | single-thread 구성 + fan-out 시 prior-agent trace 공유 (task blurb 아님) |
+| standalone Task | 통신 불가, 고립된 작업 | Workflow `agent()` 사용 (`skill-authoring.md` §12) — ⛔ `TeamCreate`는 v2.1.178부터 존재하지 않는다 |
+| Lead가 직접 생산 | 역할 혼재, 오케스트레이션 품질 저하 | Primary Worker에 위임 |
+| 모든 에이전트 opus | 비용 초과, 불필요한 자원 사용 | 3-Tier (판단=fable · 실질 워커=opus 동시 ≤3 · retrieval·breadth=sonnet) |
+| 에이전트 간 Lead 중계 | 지연 + 컨텍스트 손실 | (구) 직접 SendMessage — ⛔ 현행 Workflow엔 P2P 없음. 스테이지 분리로 해소 |
+| MCP 도구 무분별 사용 | 실패 시 복구 불가 | 4-tier 도구 전략 |
+| 승격 조건 미명시 | 팀마다 모델이 달라 혼란 | `workflows/*.js` `opts.model`에 명시 (⛔ 에이전트 주석은 2026-08-09 제거) |
+
+---
+
+## 7. 새 에이전트 추가 체크리스트
+
+새 에이전트를 추가할 때 다음을 확인한다:
+
+- [ ] `templates/agent-template.md` 기반으로 작성했는가?
+- [ ] 기존 에이전트와 역할 중복이 없는가?
+  - plan-structure: 설계/계획 구조
+  - plan-edge-case: 경계 케이스 분석
+  - plan-impact: 영향 범위 분석
+  - review-arch: 아키텍처 비평
+  - review-quality: 코드 품질 감사
+  - review-correctness: 정확성 검증
+  - review-counter: 역방향 검증
+  - review-direction: 방향성 도전, PROCEED/RECONSIDER/REDIRECT 판정
+  - impl-correctness: 코드 구현
+  - impl-quality: 구현 품질
+  - search-symbolic: AST/LSP 기반 탐색
+  - search-pattern: 텍스트 패턴 기반 탐색
+- [ ] MCP 도구 4-tier 전략을 명시했는가?
+- [ ] 출력 채널 규칙을 포함했는가? (⛔ P2P SendMessage 아님 — `skill-authoring.md` §12 OVERRIDE)
+- [ ] 모델 배정을 **`workflows/*.js` `opts.model`에 명시**했는가? (⛔ 에이전트 주석 아님 — `scripts/lint-model-explicit.sh`가 검출)
+- [ ] `/fz-manage check` 통과 (에이전트 건강 체크 #7, #8)?
+- [ ] `guides/prompt-optimization.md` 10대 원칙을 준수하는가?
+
+### 추가 시 업데이트 필요 항목
+
+새 에이전트가 기존 팀에 참여하는 경우:
+
+1. `modules/team-registry.md`에 에이전트 1줄 추가
+2. 관련 `workflows/*.js` 스크립트의 `agent()` 구성 업데이트 (⛔ TeamCreate 아님)
+3. 해당 `workflows/*.js` 스테이지의 입출력 계약(schema) 업데이트 (⛔ P2P 규칙 아님)
+4. 모델 승격 매트릭스 업데이트 (Section 4 참조)
+
+### 현재 에이전트 요약
+
+| 에이전트 | Domain | 기본 모델 | 전문 영역 |
+|---------|--------|----------|----------|
+| plan-structure | plan | sonnet (opus 승격) | 설계, 계획, 구조화 |
+| plan-edge-case | plan | sonnet | 경계 케이스 발견 |
+| plan-impact | plan | sonnet | 영향 범위 분석 |
+| review-arch | review | sonnet (opus 승격) | 아키텍처 비평, 설계 검증 |
+| review-quality | review | sonnet | 코드 품질, 컨벤션 감사 |
+| review-correctness | review, implement | sonnet | 정확성, 로직 검증 (fz-code TEAM 배정) |
+| review-counter    | review    | sonnet             | 역방향 검증, 반박 |
+| review-direction  | review    | sonnet (opus 승격) | 방향성 도전, PROCEED/RECONSIDER/REDIRECT 판정 |
+| impl-correctness | implement | sonnet (opus 승격) | 코드 구현, 리팩토링 |
+| impl-quality | implement | sonnet | 구현 품질, 최적화 |
+| search-symbolic | search | sonnet | AST/LSP 심볼 탐색 |
+| search-pattern | search | sonnet | 텍스트 패턴 탐색 |
+| memory-curator | memory | sonnet | 교훈 발굴, 컨텍스트 매칭 |
+
+전체 에이전트 capabilities: `modules/team-registry.md` 참조.
+
+---
+
+## 8. Agent Frontmatter 고급 기능 (v2.1+)
+
+> Source: Claude Code 공식 Sub-agents/Agent Teams 문서 (2026-03, v2.1.32+). 기존 fz 에이전트에 점진적으로 적용.
+> **(이력 — fz 미사용) 공식 사양** [verified: 2차 research 2026-04-21, code.claude.com/docs/en/agent-teams]:
+> ⛔ 아래는 **Claude Code 플랫폼 기능의 사실 서술**이지 fz 처방이 아니다 — fz 실행 경로는 Workflow이며 P2P 채널을 쓰지 않는다.
+> - 활성화 flag: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+> - 팀 크기: **hard limit 명시 없음, 3-5 teammates 권장**
+> - 통신: SendMessage peer-to-peer, shared task list, file locking
+> - Hooks 연계: `TeammateIdle`, `TaskCreated`, `TaskCompleted` events (Gate 강제에 활용 가능)
+> - 2026-11-01 재대조: Agent teams 는 여전히 실험 기능·기본 비활성(위 flag), 3~5명 권장이다. 켜면 이름 붙인 서브에이전트가 팀원이 될 수 있다 — fz 는 켜지 않는다 [verified: https://code.claude.com/docs/en/agent-teams]
+
+### 8.1 Persistent Memory (`memory` 필드)
+
+에이전트가 세션 간 학습 내용을 영속 저장한다. `~/.claude/agent-memory/{name}/` (user) 또는 `.claude/agent-memory/{name}/` (project).
+
+```yaml
+---
+name: example-agent
+memory: project
+---
+```
+
+- 에이전트가 MEMORY.md를 자동 관리 (200줄 제한, 자동 큐레이션)
+- ⛔ **fz 워크플로 에이전트에는 쓰지 않는다** (2026-09-26, A2-01). 두 가지가 충돌한다:
+  1. `memory` 필드는 **Read/Write/Edit 도구를 자동 부여**한다(Claude Code sub-agents 문서 · 2026-09-25 감사에서 로더 코드로 확인 · 런타임 에이전트 목록에서도 `memory` 필드가 있는 5개만 Write·Edit 를 가졌다). Workflow 에이전트는 디스크를 쓰지 않는 계약이다(`agents/impl-correctness.md` 등 — changeset 을 반환하고 Lead 가 적용). 필드 하나가 스키마로 막은 쓰기 권한을 되살린다
+  2. 한 run 이 쓴 에이전트 메모리를 다음 run 이 읽는다(실측: 실험 run 의 메모리를 이후 run 이 25회 읽었다) — 같은 입력의 반복 측정(A/B)이 서로 다른 입력이 된다
+- 예외: `memory-curator`(`memory: user`) — 워크플로가 부르지 않는 recall 전용 에이전트다. A/B 측정 중에는 부르지 않는다
+- 재유입 방지: `scripts/lint_contracts.py` #N13 이 `agents/`(memory-curator 제외)·`templates/` 의 `memory:` 를 막는다. 위 예시 블록은 기능 설명이라 검사 범위 밖이다
+
+### 8.2 Skills Preloading (`skills` 필드)
+
+에이전트 context에 스킬 내용을 사전 주입한다. Read(SKILL.md) 턴이 불필요해진다.
+
+```yaml
+---
+name: impl-correctness
+skills:
+  - fz-code
+---
+```
+
+- 스킬 전체 내용이 시스템 프롬프트에 포함됨 — 2026-11-01 재대조: 전체 내용 주입·`skills:` 의 처음 32개까지 [verified: https://code.claude.com/docs/en/sub-agents]
+- 부모 대화의 스킬을 상속하지 않음 — 명시적 선언 필요. 원문: *"It doesn't see your conversation history, the skills you've already invoked, or the files Claude has already read."* [verified: https://code.claude.com/docs/en/sub-agents]
+- **주의**: 스킬 내용이 context를 소비하므로 필요한 스킬만 선별
+
+### 8.3 Per-Agent Hooks (`hooks` 필드)
+
+에이전트별 라이프사이클 훅으로 자동 품질 게이트를 구현한다.
+
+```yaml
+---
+name: {쓰기 도구를 가진 에이전트}
+hooks:
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "./scripts/lint-check.sh"
+---
+```
+
+⛔ **예시 주체 정정 (2026-08-09)**: 이전 판은 이 예시의 `name:`을 `impl-correctness`로 썼다. `impl-correctness`는 `tools:`에서 **쓰기 도구가 전부 제거**됐으므로(changeset JSON만 반환, 적용은 Lead) `Edit`/`Write` PostToolUse 훅은 **영원히 발화하지 않는다** — 예시가 존재하지 않는 조합을 보여주고 있었다. 쓰기 도구를 실제로 가진 에이전트에만 적용되는 패턴이다.
+
+| 이벤트 | 용도 | 예시 |
+|--------|------|------|
+| PreToolUse | 도구 사용 전 검증 | Bash 명령 화이트리스트 |
+| PostToolUse | 도구 사용 후 검증 | 편집 후 린트 실행 |
+| Stop | 에이전트 완료 시 | 최종 출력 형식 검증 |
+
+- **팀 훅**: `TeammateIdle` (exit 2=계속 작업), `TaskCompleted` (exit 2=완료 차단)은 settings.json에서 정의
+
+### 8.4 Worktree Isolation (`isolation` 필드)
+
+에이전트가 격리된 git worktree에서 실행된다. 파일 충돌 방지.
+
+```yaml
+---
+name: {디스크를 수정하는 에이전트}
+isolation: worktree
+---
+```
+
+- 변경 없으면 worktree 자동 정리
+- **적용**: 디스크를 **직접 수정하는** 에이전트의 병렬 실행 시 충돌 방지
+- ⛔ **예시 주체 정정 (2026-08-09, 감사 ISSUE-009)**: 이전 판은 `impl-correctness`를 예시로 썼다. `impl-correctness`는 `tools:`에서 **쓰기 도구가 전부 제거**됐고 산출물이 **changeset JSON**이며 적용은 Lead다(`workflows/code-pair.js`) — 디스크를 수정하지 않으므로 worktree 격리가 **불필요**하다. 근거: `guides/harness-engineering.md` "capability ≠ authorization" + 스키마 수준 필터링
+  - ⚠️ 2026-11-01: 실제 `agents/impl-correctness.md` frontmatter 에는 `isolation: worktree` 가 남아 있어(`modules/team-registry.md` 도 worktree) 위 서술과 불일치한다(F-460). frontmatter 를 지울지 가이드를 고칠지는 플러그인 플랜에서 정한다
+
+### 8.5 기타 유용한 필드
+
+| 필드 | 용도 | fz 활용 |
+|------|------|---------|
+| `maxTurns` | 에이전트 턴 수 제한 | Supporting 에이전트의 과도한 분석 방지 |
+| `disallowedTools` | 도구 차단 (denylist) | `tools` allowlist의 보완 |
+| `permissionMode` | 에이전트별 권한 | 전 리뷰·분석·**changeset 생산** 에이전트 → `plan`(read-only). ⛔ `acceptEdits`는 **디스크를 실제로 쓰는 에이전트에만**. ⛔⛔ **Workflow 경로에서는 이 필드가 무효다** — 워크플로 서브에이전트는 세션 permission mode와 무관하게 `acceptEdits`로 실행되고 파일 편집이 자동 승인된다 [verified: `llm-references.md` §1.1b /workflows]. 워크플로 워커의 유일한 강제 수단은 **스키마 수준 `tools:` 제거**다 |
+| `mcpServers` | 에이전트별 MCP | fz 에이전트는 이 필드를 쓰지 않고 `tools:` 에 MCP 도구를 직접 나열한다 — review-arch = serena `find_symbol`·`find_referencing_symbols`·`get_symbols_overview` + context7 `query-docs`, review-quality = 같은 구성에서 `get_symbols_overview` 제외 (2026-11-01 `agents/review-arch.md`·`agents/review-quality.md` frontmatter 대조 — 구판 예시 "review-arch → serena만, review-quality → serena + context7" 은 실제와 달랐다) |
+| `background: true` | 항상 백그라운드 | 탐색/캐싱 에이전트에 적합 |
+
+---
+
+## Quick Reference
+
+```
+에이전트 작성:
+  1. agent-template.md 복사
+  2. 역할 1줄 선언
+  3. 도구 4-tier 명시
+  4. 통신 규칙 추가
+  5. 체크리스트 확인
+  6. team-registry.md에 등록
+
+팀 구성 (⛔ 역사 — 현행은 workflows/*.js agent()):
+  1. (구) TeamCreate("{skill}-{feature}")
+  2. Lead(fable) + Primary(opus) + 실질 워커(opus, 동시 ≤3) + 단순 워커(sonnet) + GPT
+  3. (구) Mesh topology — 현행 Workflow는 P2P 없음
+  4. Lead = 퍼실리테이터/게이트/중재자
+
+통신 (⛔ 아래 2줄은 역사 — 현행 Workflow엔 P2P 채널이 없다):
+  (구) 에이전트 --> SendMessage(에이전트)  (직접)
+  (구) 합의 --> SendMessage(lead)          (보고)
+  현행: 에이전트 --> 구조화 반환(schema) --> Lead가 통합
+  Lead --> /fz-gpt                  (검증 게이트)
+
+고급 (§8):
+  memory: project → 세션 간 학습 (⛔ 워크플로 에이전트 금지 — §8.1)
+  skills: [fz-code] → 스킬 사전 주입
+  hooks: PostToolUse → 자동 품질 게이트
+  isolation: worktree → 코드 수정 격리
+```

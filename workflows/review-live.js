@@ -1,0 +1,616 @@
+// workflows/review-live.js — fz-review 교차 리뷰 (TEAM live-review 대체, Wave 1)
+//
+// [API 계약 — verified: guides/skill-authoring.md §12 + pilot 실측]
+//   표준 패턴 3종 적용. 대형 입력(diff)은 args가 아닌 파일 경로 전달 (§12 — args 직렬화 한계 회피).
+//   호출(Lead, SKILL.md 절차): Lead가 diff를 파일로 기록 후
+//     Workflow({ scriptPath: '{WORK_DIR}/review-live.js',   // 원본 {plugin_root}/workflows/ 를 §12 0단계 준비(cp → cmp -s)로 복사
+//       args: { diffPath, intentContext, structuralContext?, craftAxes?, projectRulesPath?, crossRequiredFields?, locatedFindings?, stage2?, crossOutput?, preserveLowConfidence?, snapshotDir?, counter?, judgmentSlots? } })
+//   structuralContext: 구조 축 브리프(modules/review-structural-axes.md §3+§4를 Lead가 Read해 전달).
+//     ⛔ arch 렌즈에만 주입된다 — quality는 결함 축 유지(회귀 방어) + A/B 검증 범위 일치.
+//   craftAxes: craft 6축 판정 — ⛔ 기본 off(R-B). true 면 arch 렌즈에만 craft 줄 · axisCoverage(6축 필수) · craftAxis · ruleRef 가 들어간다.
+//     미지정·false 면 모든 콜의 프롬프트·스키마가 이전과 바이트 단위로 같다.
+//   locatedFindings: §3 병합 키 — ⛔ 기본 off(R-C S16c). true 면 Stage 1 두 렌즈 finding 에 line_range · discoveryAxis 선택 필드가 생긴다.
+//     craft 와 다른 관심사라 따로 켠다 — craft 효과를 A/B 로 잴 때는 두 arm 모두 켜서 병합 키 효과를 지운다. 미지정·false 면 바이트 단위로 같다.
+//   projectRulesPath: 검증을 통과한 규칙 레코드(JSON — modules/project-rules.md) 경로. craftAxes:true 일 때만 효력 · arch 렌즈에만.
+//   judgmentSlots: 판정 한계 칸 — ⛔ 기본 off(이 워크플로의 옵션 묶음은 S25 판정 전까지 off · tests/workflows/default-arms.js).
+//     true 면 peer-review.js 와 같은 블록 — axisCoverage gap(craftAxes 와 함께일 때) · Stage 1 unverifiedPremises(반환 unverifiedPremises 로 모은다) ·
+//     finding limits · Stage 1 동적 축 질문 블록(F-559 · F-448 · F-178 · F-117 · tests/workflows/review-schemas.js). 미지정 · false 면 바이트 단위로 같다.
+//   stage2: ⛔ 기본 'always'(기준선 불변 — 미지정도 always). 'conditional' 이면 peer-review 의 D1 트리거(PURE:stage2-trigger 복제)로 Stage 2 를 판정한다.
+//     위치 미상 major 가 하나라도 있으면 발화한다(fail-open). 생략하면 stage2Skipped{reason}. Stage 3 counter 는 항상 돈다
+//     (S19 · tests/workflows/review-live-stage2-arm.js). 기본값 전환은 A/B(S25 C' arm) 뒤다.
+//     ⛔ 생략하면 교차 additions(상대 렌즈가 놓친 finding 보충)도 없다 — 그 손실은 S25 가 SC-3 으로 잰다.
+//   crossRequiredFields: ⛔ 기본 off(R-B). true 면 Stage 2 교차 프롬프트에 additions 항목의 required 키(스키마에서 읽음)를 적는다(tests/workflows/cross-required-fields.js).
+//   crossOutput: ⛔ 기본 'full'(미지정도 full). 'delta' 면 Stage 2 교차가 동의를 id 로만(reviewedIds) 내고 조정 · 기각 · 신규만 쓴다(S19b).
+//     PURE:cross-delta 가 full 모양으로 펴서 병합은 그대로다. 확인 목록에서 빠진 id 는 unreviewed 로 남고 crossCoverage 로 보고한다
+//     (tests/workflows/cross-delta-arm.js). 기본값 전환은 S25 가 SC-3 · SC-4 · AC-4 를 통과할 때만이다.
+//   preserveLowConfidence: ⛔ 기본 off(R-C S22 · peer-review S16b 와 같은 옵션). 켜면 다섯 콜 프롬프트에 `[후보 보존]` 문장을 더하고
+//     finding 스키마 사본에 confidence(0-100) 선택 필드를 얹는다. 렌즈 스킬(arch-critic · code-auditor)의 '자체 confidence 80% 미만
+//     미보고' 는 그 문장이 있을 때만 풀린다 — 게시 여부는 review_merge 가 정한다(tests/workflows/low-confidence-preserved.js).
+//   snapshotDir: ⛔ 기본 off(R-C S22b). scripts/review_snapshot.sh 산출 폴더를 주면 Stage 1 두 렌즈에 '스냅샷 우선' 1줄 — 미지정 · 빈 문자열이면
+//     바이트 단위로 같다(tests/workflows/review-live-snapshot-arm.js). 효과(워커 턴 · 출력 · SC-3)는 S25 가 잰다.
+//   catalogHits: ⛔ 기본 off(이 워크플로의 옵션 묶음은 S25 판정 전까지 off). true 면 Stage 3 counter 프롬프트에 [점검 카탈로그] 1줄 · 스키마 사본에
+//     catalogHits(catalogId · target · verdict) 필수 칸 — 카탈로그 본문은 agents/review-counter.md. 반환 catalogHits 로 올린다(round 2 S19 · tests/workflows/review-schemas.js).
+//   counter: ⛔ 기본 'opus'(미지정도 opus — 기준선 불변). 'off' 는 counter 대 GPT DA 측정 arm(B11 · M2) 전용이다 — Stage 3 콜을 빼고
+//     반환에 counterSkipped:'arm' 과 metrics.stagesExpected 2 를 단다(완주 2/2 — counter null 실패의 '3 중 2' 와 다르다).
+//     그 run 의 DA 는 Lead 가 정문 peer-da 로 돌리고 scripts/counter_adapter.py(prepare → convert → merge)가 이 스크립트와 같은 병합 규칙으로
+//     합친다. GPT 실패는 arm 무효다. 그 밖의 값은 fallback — 조용히 opus 로 읽지 않는다(tests/workflows/review-live-counter-arm.js).
+//   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
+//   반환: { mode:'workflow', findings:[...{finalSeverity, crossVerdict, counterVerdict}], okAreas, metrics }
+//     또는 { mode:'fallback', reason, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
+//   Workflow 외부(Lead 책임 유지): L3 통합 / review-correctness(RTM 시 Phase 4.5) / GPT validate(Phase 5.5) / wall-clock.
+//
+// [설계 — TEAM live-review 패턴 평탄화]
+//   Stage1 독립 병렬: review-arch(opus) + review-quality(opus) — Round 1 독립성 (opus 동시 2 + Lead=fable).
+//   Stage2 교차: 상대 findings에 id-기반 severity 조정/FP 판정 (live-review Round 2 동형, opus 2).
+//   Stage3 counter: DA 패스 — findings 반론 + okAreas 도전 (live-review.md L16 기존 Supporting — ablation Verifier 재판정 레이어 아님).
+//   병합: 스크립트 binary 규칙 (id-기반 verdict 반영 — §11/§12 분류: 기계 작업).
+//   budget 가드: 해당 없음 — 고정 5-call(가변 fan-out 없음). §12 거버넌스 단서 참조.
+
+export const meta = {
+  name: 'review-live',
+  description: 'fz-review 교차 리뷰 — arch/quality 독립 병렬 → id-기반 교차 조정 → counter DA → 스크립트 병합. 5-call',
+}
+
+const ReviewFindingsSchema = {
+  type: 'object', required: ['findings', 'okAreas'],
+  properties: {
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['id', 'severity', 'category', 'title', 'detail', 'evidence'],
+        properties: {
+          id: { type: 'string', description: '리뷰어 내 고유 id (예: A1, Q3)' },
+          severity: { type: 'string', enum: ['critical', 'major', 'minor', 'suggestion'] },
+          category: { type: 'string' },
+          title: { type: 'string' },
+          detail: { type: 'string' },
+          file: { type: 'string' },
+          evidence: { type: 'string', description: '실제 diff/파일 인용 — 추측 금지' },
+        },
+      },
+    },
+    okAreas: { type: 'array', items: { type: 'string' }, description: '정상 판정 영역 (counter 도전 입력)' },
+  },
+}
+
+const CrossReviewSchema = {
+  type: 'object', required: ['adjustments', 'additions'],
+  properties: {
+    adjustments: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['id', 'verdict', 'note'],
+        properties: {
+          id: { type: 'string', description: '상대 리뷰어의 finding id' },
+          verdict: { type: 'string', enum: ['agree', 'adjust', 'false_positive'] },
+          newSeverity: { type: 'string', enum: ['critical', 'major', 'minor', 'suggestion'] },
+          note: { type: 'string', description: 'false_positive/adjust는 실측 인용 필수' },
+        },
+      },
+    },
+    additions: ReviewFindingsSchema.properties.findings,
+  },
+}
+
+// 교차 delta 응답 (S19b) — ⛔ 기본 off(crossOutput 미지정 = full). 동의는 id 만(reviewedIds) 쓰고 조정 · 기각 · 신규만 적는다.
+//    additions 는 full 과 같은 스키마를 참조한다. expandCrossDelta(PURE:cross-delta)가 full 모양으로 펴서 병합에 넘긴다.
+const CrossDeltaSchema = {
+  type: 'object', required: ['reviewedIds', 'adjustments', 'rejections', 'additions'],
+  properties: {
+    reviewedIds: { type: 'array', items: { type: 'string' }, description: '확인한 상대 id 전부 — 동의는 여기에만 둔다' },
+    adjustments: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['id', 'newSeverity', 'note'],
+        properties: {
+          id: { type: 'string' },
+          newSeverity: CrossReviewSchema.properties.adjustments.items.properties.newSeverity,
+          note: { type: 'string', description: '조정 근거 — 실측 인용 필수' },
+        },
+      },
+    },
+    rejections: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['id', 'note'],
+        properties: { id: { type: 'string' }, note: { type: 'string', description: 'false_positive 근거 — 실측 인용 필수' } },
+      },
+    },
+    additions: CrossReviewSchema.properties.additions,
+  },
+}
+
+const CounterSchema = {
+  type: 'object', required: ['challenges', 'missedFindings'],
+  properties: {
+    challenges: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['target', 'verdict', 'note'],
+        properties: {
+          target: { type: 'string', description: 'finding id 또는 okArea 문구' },
+          verdict: { type: 'string', enum: ['uphold', 'refute'] },
+          note: { type: 'string' },
+        },
+      },
+    },
+    missedFindings: ReviewFindingsSchema.properties.findings,
+  },
+}
+
+// craft 6축 — ⛔ tests/fixtures/quality 의 AXES6(SC-4 채점 축)과 같은 목록·순서다. peer-review.js · modules/review-structural-axes.md §6
+//    과 함께 tests/workflows/craft-axes.js 가 일치를 단언한다. 한 줄 리터럴로 둔다(그 테스트가 이 줄을 추출한다).
+const CRAFT_AXES = ['idiom', 'naming', 'architecture', 'ui_structure', 'placement', 'design_alternative']
+
+// 위치 · craft 스키마 — ⛔ ReviewFindingsSchema 를 고치지 않고 **새 객체**로 만든다. CrossReviewSchema.additions ·
+//    CounterSchema.missedFindings 가 findings 하위 객체를 참조로 공유해서, 원본을 고치면 새 필드가 전 렌즈로 샌다.
+//    위치 스키마는 Stage 1 finding 에 위치·발견 축 선택 필드를 둔다 — peer-review.js 와 같은 discoveryAxis 목록(MergeContract §3 dedup 키).
+const LocatedFindingItems = {
+  ...ReviewFindingsSchema.properties.findings.items,
+  properties: {
+    ...ReviewFindingsSchema.properties.findings.items.properties,
+    line_range: { type: 'string' },
+    discoveryAxis: {
+      type: 'string',
+      enum: ['code_quality', 'structure', 'correctness', 'runtime_safety', 'direction', 'other'],
+      description: '발견 축. code_quality=품질·dead code·성능 / structure=설계·레이어·확장성 / correctness=로직·요구사항·엣지 / runtime_safety=동시성·메모리·크래시 / direction=접근 방향 대안 / other=위 어디에도 안 맞음',
+    },
+  },
+}
+const LocatedFindingsSchema = {
+  ...ReviewFindingsSchema,
+  properties: { ...ReviewFindingsSchema.properties, findings: { ...ReviewFindingsSchema.properties.findings, items: LocatedFindingItems } },
+}
+// craft 는 arch 렌즈 전용 — 기반 스키마(위치 필드가 있든 없든)에 craftAxis · ruleRef · axisCoverage 만 얹는다
+const archCraftSchema = base => ({
+  ...base,
+  required: [...base.required, 'axisCoverage'],
+  properties: {
+    ...base.properties,
+    findings: {
+      ...base.properties.findings,
+      items: {
+        ...base.properties.findings.items,
+        properties: {
+          ...base.properties.findings.items.properties,
+          craftAxis: { type: 'string', enum: CRAFT_AXES, description: 'craft 축 발견이면 그 축 — 결함 발견이면 비운다' },
+          ruleRef: { type: 'string', description: '인용한 프로젝트 규칙 레코드 id — 규칙 없이 낸 craft 지적이면 비운다' },
+        },
+      },
+    },
+    axisCoverage: {
+      type: 'array', minItems: CRAFT_AXES.length,
+      description: '6축 각각의 판정 — 발견이 없어도 축마다 1행(none·not_applicable 는 note 에 이유)',
+      items: {
+        type: 'object', required: ['axis', 'status', 'note'],
+        properties: {
+          axis: { type: 'string', enum: CRAFT_AXES },
+          status: { type: 'string', enum: ['finding', 'none', 'not_applicable'] },
+          note: { type: 'string' },
+        },
+      },
+    },
+  },
+})
+
+const OVERRIDE =
+  '[Workflow 모드 오버라이드] P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시는 적용하지 않는다. ' +
+  '에이전트 정의의 Phase 절차·티켓 폴더(WORK_DIR)·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
+  '이 프롬프트의 [리뷰 대상]/[변경 의도]만이 과제의 전부다. ' +
+  '무관한 작업 폴더(티켓 폴더·토픽 폴더 등)를 읽지 말 것. 파일 접근은 [리뷰 대상] diff 파일과 그 안에 나열된 변경 파일만. ' +
+  '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. 실행 제안 금지: git 상태변경(commit/push 등)·raw GPT CLI 호출은 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
+  '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다). 출력은 schema 준수 JSON.'
+
+// ── args 방어 파싱 + fail-fast (§12 표준 패턴 2) ──
+const input = (() => {
+  if (args && typeof args === 'object') return args
+  if (typeof args === 'string') { try { return JSON.parse(args) } catch (e) { return null } }
+  return null
+})()
+
+let agentCalls = 0
+let nullCalls = 0
+let fallbackCount = 0
+async function callAgent(prompt, opts) {
+  agentCalls += 1
+  const out = await agent(prompt, opts)
+  if (!out) { nullCalls += 1; log(`WARN ${opts.label} null`) }
+  return out
+}
+function metrics(stagesCompleted) {
+  return { agentCalls, nullCount: nullCalls, fallbackCount, stagesCompleted }
+}
+
+if (!input || !input.diffPath || !input.intentContext) {
+  log(`FATAL args invalid (typeof=${typeof args}) — diffPath/intentContext 필수. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: typeof=${typeof args}`, metrics: metrics(0) }
+}
+// effort = Lead 세션 effort(args.effort — modules/mode-gate.md § effort). 미지정이면 'xhigh'(기준선 불변), 허용값 밖이면 fallback
+const EFFORT = input.effort === undefined ? 'xhigh' : input.effort
+if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
+  log(`FATAL args invalid — effort=${JSON.stringify(input.effort)}: low · medium · high · xhigh · max. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: metrics(0) }
+}
+// counter = Stage 3 DA 담당(B11). 미지정이면 'opus'(기준선 불변). 'off' 는 측정 arm 전용 — 허용값 밖이면 fallback
+const COUNTER = input.counter === undefined ? 'opus' : input.counter
+if (!['opus', 'off'].includes(COUNTER)) {
+  log(`FATAL args invalid — counter=${JSON.stringify(input.counter)}: opus · off. fallback`)
+  fallbackCount += 1
+  return { mode: 'fallback', reason: `args invalid: counter=${JSON.stringify(input.counter)}`, metrics: metrics(0) }
+}
+const counterOff = COUNTER === 'off'
+
+const TARGET = `[리뷰 대상] diff 파일: ${input.diffPath} (Read로 로드)\n[변경 의도] ${input.intentContext}`
+// 구조 축 브리프 — arch 렌즈에만 주입 (modules/review-structural-axes.md §2).
+// quality는 결함 축을 유지해야 하고, A/B 검증도 review-arch 1개로만 이뤄졌다.
+const structuralLine = input.structuralContext ? `\n[구조 축 — 이 렌즈 전용] ${input.structuralContext}` : ''
+// craft 축 — arch 렌즈에만(structuralLine 과 같은 이유 — modules/review-structural-axes.md §2·§6). ⛔ 기본 off — 꺼지면 빈 문자열이다.
+// ⛔ projectRulesPath 는 craftAxes 의 하위 옵션이다 — craftAxes 없이 넘겨도 기본 경로를 바꾸지 않는다.
+const craftOn = input.craftAxes === true || input.craftAxes === 'true'
+// 판정 한계 칸 — ⛔ 기본 off. 블록은 peer-review.js 와 같은 글자다(tests/workflows/review-schemas.js 가 두 워크플로를 같이 본다)
+const slotsOn = input.judgmentSlots === true || input.judgmentSlots === 'true'
+// 판정 한계 칸 (round 2 S9 · F-559 · F-448 · F-178 · F-117) — 렌즈가 '판정하지 못한 것' 과 '한정이 붙은 것' 을 버리지 않게 하는 칸.
+//    ① axisCoverage status 에 gap(판정 못 함 — none 은 봤는데 없다) ② Stage 1 렌즈 결과 루트에 unverifiedPremises(재지 않은 전제)
+//    ③ 이슈 항목에 limits(한정 문구 — review_merge 가 suggestion 으로 낮춘다) ④ Stage 1 프롬프트에 동적 축 · 설계 대안 질문 블록.
+//    ⛔ 스키마는 **사본**에만 붙인다 — 끄면 모든 콜의 프롬프트 · 스키마가 기준과 바이트 단위로 같다(tests/workflows/default-off-regression.js).
+//    문구는 프롬프트 한 곳에만 길게 쓰고 스키마 설명은 짧게 둔다 — workflows 리터럴 상한(scripts/measure_constraint_load.py --ceiling).
+const AXIS_VOCAB = ['finding', 'none', ...(slotsOn ? ['gap'] : []), 'not_applicable'].join(' · ')
+const GAP_NOTE = !slotsOn ? '' : 'gap=판정 못 함(근거 · 입력 부족) — none(봤는데 없음)과 다르다. '
+const PREMISES_PROP = {
+  type: 'array', description: '코드로 확인하지 않고 기댄 전제 — 없으면 빈 배열',
+  items: {
+    type: 'object', required: ['claim', 'why', 'howToMeasure'],
+    properties: { claim: { type: 'string' }, why: { type: 'string' }, howToMeasure: { type: 'string' }, affects: { type: 'array', items: { type: 'string' } } },
+  },
+}
+const LIMITS_PROP = {
+  type: 'array', description: '있으면 병합이 severity 를 suggestion 으로 낮춘다',
+  items: {
+    type: 'object', required: ['kind', 'note'],
+    properties: { kind: { type: 'string', enum: ['final-state-ok', 'premise-island', 'weak-evidence'] }, note: { type: 'string' } },
+  },
+}
+function withSlots(schema) {
+  if (!slotsOn) return schema
+  const copy = JSON.parse(JSON.stringify(schema))
+  const p = copy.properties || {}
+  if (p.strengths || p.okAreas) {   // Stage 1 렌즈 결과 루트만 — 교차 · counter 응답에는 두지 않는다
+    copy.required = [...copy.required, 'unverifiedPremises']
+    p.unverifiedPremises = PREMISES_PROP
+  }
+  ;(function walk(n) {
+    if (!n || typeof n !== 'object') return
+    const q = n.properties
+    if (q && q.status && Array.isArray(q.status.enum) && q.status.enum.includes('not_applicable') && !q.status.enum.includes('gap')) {
+      q.status.enum = q.status.enum.flatMap(v => v === 'not_applicable' ? ['gap', v] : [v])
+    }
+    if (q && q.severity && q.evidence && !q.limits) q.limits = LIMITS_PROP
+    for (const v of Object.values(n)) walk(v)
+  })(copy)
+  return copy
+}
+const slotsLine = !slotsOn ? '' :
+  `\n[판정 한계 칸] 확인하지 않은 전제(주석 · SDK · 런타임 상태 · 다른 SDK 버전)에 기댄 판정은 이슈든 정상 판정이든 unverifiedPremises(claim · why · howToMeasure)에, ` +
+  `발견의 한정은 그 이슈 limits 에 kind(final-state-ok=최종 상태 정상 · premise-island=확인 안 한 전제 위 · weak-evidence=근거 약함)로 적는다 — 산문에만 쓰면 병합에서 사라진다.` +
+  `\n[동적 축 질문] 값의 수명(저장소 · set/consume · 상태 플래그)을 다루면 상태 × 사용자 이벤트(재진입 · 뒤로 가기 · 백그라운드 복귀 · 두 번 호출) 조합의 귀결을 따진다 — ` +
+  `깨지면 재현 절차와 함께 이슈로, 못 따지면 unverifiedPremises 로. 설계 대안: 더 단순하거나 기존 패턴인 구현이 있으면 그 이슈 suggestion 에 적는다.`
+const locatedOn = input.locatedFindings === true || input.locatedFindings === 'true'
+// 발견 단계 후보 보존 (S22) — ⛔ 기본 off. peer-review 와 달리 OVERRIDE 에 바꿀 조기 필터 문장이 없다(필터는 렌즈 스킬에만 있다) —
+//    표지 문장을 **덧붙이고**, finding 스키마는 **사본**에만 confidence 를 얹는다. ReviewFindingsSchema 는 교차 additions ·
+//    counter missedFindings 가 참조로 공유해서 원본을 고치면 끈 경로까지 샌다. 끄면 원본 객체를 그대로 넘겨 바이트 단위로 같다.
+const lowConfOn = input.preserveLowConfidence === true || input.preserveLowConfidence === 'true'
+const LENS_OVERRIDE = !lowConfOn ? OVERRIDE : `${OVERRIDE} [후보 보존] confidence 는 0-100 값으로 달되 낮다고 빼지 않는다 — 게시 여부는 병합이 정한다.`
+function withConfidence(node) {
+  if (Array.isArray(node)) { node.forEach(withConfidence); return }
+  if (!node || typeof node !== 'object') return
+  const p = node.properties
+  if (p && p.severity && p.evidence && p.category && !p.confidence) {
+    p.confidence = { type: 'number', description: '0-100 — 낮아도 보고한다(게시 등급은 병합이 정한다)' }
+  }
+  Object.values(node).forEach(withConfidence)
+}
+const lensSchema = schema => {
+  if (!lowConfOn) return withSlots(schema)
+  const copy = JSON.parse(JSON.stringify(schema))
+  withConfidence(copy)
+  return withSlots(copy)
+}
+// 점검 카탈로그 (round 2 S19) — ⛔ 기본 off. 카탈로그 본문은 agents/review-counter.md(매 spawn 주입)에 있고 여기는 적용 결과 칸만
+//    counter 스키마 **사본**에 붙인다 — 끄면 콜 입력이 기준과 바이트 단위로 같다. 항목에 severity · evidence 를 두지 않는다(발견 항목으로 읽힌다)
+const catalogOn = input.catalogHits === true || input.catalogHits === 'true'
+const CATALOG_HITS = { type: 'array', description: '점검 카탈로그 중 해당한 항목', items: { type: 'object', required: ['catalogId', 'target', 'verdict'],
+  properties: { catalogId: { type: 'string' }, target: { type: 'string' }, verdict: { type: 'string', enum: ['hit', 'clear', 'unchecked'] } } } }
+const withCatalog = s => {
+  if (!catalogOn) return s
+  const c = JSON.parse(JSON.stringify(s))
+  c.required = [...c.required, 'catalogHits']
+  c.properties.catalogHits = CATALOG_HITS
+  return c
+}
+const catalogLine = !catalogOn ? '' :
+  '\n[점검 카탈로그] 에이전트 정의의 점검 카탈로그를 이 diff 에 대 보고 해당 항목마다 catalogHits(catalogId · target · verdict)에 적는다 — hit 는 반론 · 누락 발견으로도 낸다.'
+// 사전 수집 스냅샷 (S22b) — ⛔ 기본 off. snapshotDir 를 주면 Stage 1 두 렌즈 프롬프트에 경로와 '스냅샷 우선' 1줄을 더한다.
+//    스냅샷은 scripts/review_snapshot.sh 가 결정론으로 만든다(Lead 가 고르지 않는다). 교차 · counter 는 Stage 1 산출을 보므로 그대로다.
+const snapshotOn = typeof input.snapshotDir === 'string' && input.snapshotDir.trim() !== ''
+const snapshotLine = !snapshotOn ? '' :
+  `\n[사전 수집 스냅샷] ${input.snapshotDir} — diff.patch · manifest.tsv · base/ · head/ (· project-rules.json). 스냅샷으로 판정할 수 있는 것은 추가로 Read 하지 않는다(스냅샷 우선)`
+const stage1Schema = locatedOn ? LocatedFindingsSchema : ReviewFindingsSchema
+const craftLine = !craftOn ? '' :
+  `\n[craft 축 — 이 렌즈 전용] ${CRAFT_AXES.join(' · ')} — 축마다 axisCoverage 에 1행(${AXIS_VOCAB}, note 에 근거)을 쓴다. ${GAP_NOTE}` +
+  `craft 발견에는 craftAxis 를 단다. severity: ruleRef 가 프로젝트 규칙을 인용할 때만 minor 이상, 그 밖 craft 지적은 suggestion 까지.` +
+  (input.projectRulesPath
+    ? `\n[프로젝트 규칙 — 이 렌즈 전용] ${input.projectRulesPath} (Read — 검증을 통과한 규칙 레코드. ruleRef 는 그 레코드 id)`
+    : `\n[프로젝트 규칙] 없음 — 규칙 인용 지적 금지 — 코드 근거만`)
+function craftSummary(findingList, archResult) {
+  const rows = archResult && Array.isArray(archResult.axisCoverage) ? archResult.axisCoverage : null
+  const seen = new Set((rows || []).map(r => r && r.axis))
+  return {
+    counts: Object.fromEntries(CRAFT_AXES.map(ax => [ax, findingList.filter(f => f.craftAxis === ax).length])),
+    axisCoverage: rows,
+    // ⛔ 행 수가 아니라 축으로 센다 — 같은 축을 여섯 번 적어도 스키마 minItems 6 은 통과한다
+    missingAxes: CRAFT_AXES.filter(ax => !seen.has(ax)),
+  }
+}
+// 교차 스테이지 필수 필드 재고지 (S17) — ⛔ 기본 off. 켜면 Stage 2 프롬프트에 additions 항목의 required 키를 **스키마에서 읽어** 적는다.
+//    키 목록을 여기 박지 않는다 — 스키마가 바뀌면 재고지 문구가 저절로 따라간다. 교차 워커가 additions 에 required 필드를
+//    빠뜨려 스키마 재출력이 났다(4/18 run). 효과(so_retries 0)는 R-C 의 S25 가 fz_wf_metrics 로 잰다.
+const crossRequiredOn = input.crossRequiredFields === true || input.crossRequiredFields === 'true'
+const crossRequiredLine = !crossRequiredOn ? '' :
+  `\n[필수 필드 — additions] 새 항목마다 ${CrossReviewSchema.properties.additions.items.required.join(' · ')} 를 모두 채운다(스키마 required — 하나라도 빠지면 출력이 거부돼 다시 쓰게 된다)`
+// 교차 delta 응답 (S19b) — ⛔ 기본 off. 켜면 교차 스키마를 CrossDeltaSchema 로 바꾸고 응답 모양을 한 줄로 알린다.
+const crossDeltaOn = input.crossOutput === 'delta'
+const crossSchema = crossDeltaOn ? CrossDeltaSchema : CrossReviewSchema
+const crossDeltaLine = !crossDeltaOn ? '' :
+  `\n[응답 모양 — delta] 위 목록에서 확인한 id 를 전부 reviewedIds 에 적는다. 동의는 reviewedIds 에만 두고 따로 쓰지 않는다. ` +
+  `조정은 adjustments(id · newSeverity · note), 기각(false_positive)은 rejections(id · note — 실측 인용 필수)에 쓴다. 동의한 항목을 다시 서술하지 않는다.`
+
+// ════════ Stage 1: 독립 병렬 리뷰 (Round 1 독립성) ════════
+phase('Stage 1: arch/quality 독립 리뷰')
+const [arch, quality] = await parallel([
+  () => callAgent(
+    `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성\n${TARGET}${snapshotLine}${structuralLine}${craftLine}\n` +
+    `[목표] 아키텍처 관점 findings (id는 A1, A2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.${slotsLine}`,
+    { label: 'stage1-arch', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: lensSchema(craftOn ? archCraftSchema(stage1Schema) : stage1Schema) }),
+  () => callAgent(
+    `${LENS_OVERRIDE}\n[역할] 품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능·일관성\n${TARGET}${snapshotLine}\n` +
+    `[목표] 품질 관점 findings (id는 Q1, Q2...) + 정상 판정 okAreas. 각 finding에 evidence 인용.${slotsLine}`,
+    { label: 'stage1-quality', agentType: 'fz:review-quality', model: 'opus', effort: EFFORT, schema: lensSchema(stage1Schema) }),
+])
+if (!arch && !quality) { fallbackCount += 1; return { mode: 'fallback', reason: 'stage1 both null', metrics: metrics(0) } }
+if (!arch || !quality) log('WARN stage1 한쪽 null — 단독 진행 (교차 조정 생략)')
+
+// id 네임스페이스 강제 — 리뷰어 간 id 충돌 방지 (리뷰 C-3 교정: 프롬프트 지시가 아닌 스크립트 보장)
+if (arch) arch.findings = arch.findings.map(f => ({ ...f, id: `A:${f.id}` }))
+if (quality) quality.findings = quality.findings.map(f => ({ ...f, id: `Q:${f.id}` }))
+
+// ── Stage 2 조건부 실행 (S19) — ⛔ 기본 always. 아래 PURE 블록은 peer-review.js 의 같은 이름 블록과 **글자까지 같아야** 한다 —
+//    tests/workflows/s2-stage2-trigger.js 가 단언한다(복제 드리프트 방어). 블록 안 주석도 원본 그대로 둔다.
+//    ⛔ review-live 는 위치 미상 major 도 발화시킨다(fail-open) — 기본 스키마 finding 에는 line_range 가 없어(locatedFindings 가 꺼져 있으면)
+//       major 는 전부 위치 미상이다. peer-review 의 "판단 불가는 발화시키지 않는다" 를 그대로 쓰면 major 가 교차 없이 지나간다.
+// >>> PURE:stage2-trigger — ⛔ 이 마커 사이는 **순수 함수**다(런타임 의존 없음).
+//     tests/workflows/s2-stage2-trigger.js 가 이 블록을 **추출해 실행**한다 —
+//     복사본을 두면 원본이 바뀔 때 테스트가 과거를 검증한다. 마커를 지우지 말 것.
+const SEVERITY_RANK = { critical: 3, major: 2, minor: 1, suggestion: 0 }
+
+// ⛔ 범위를 min-max 로 뭉치지 않는다. `41, 293-295` 를 41–295 로 만들면
+//    사이의 무관한 finding 이 전부 "같은 자리"가 되어 교차 조정이 오발화한다.
+//    (진단에서 같은 방식이 과대 병합을 낳는 것을 이미 관측했다.)
+//    구간 **목록**으로 파싱하고 하나라도 겹치면 같은 자리로 본다.
+function lineSpans(range) {
+  const text = String(range || '')
+  if (!text.trim()) return []
+  const spans = []
+  for (const part of text.split(/[,;]/)) {
+    const nums = part.match(/\d+/g)
+    if (!nums) continue
+    const ints = nums.map(Number)
+    spans.push([Math.min(...ints), Math.max(...ints)])
+  }
+  return spans
+}
+
+function spansOverlap(a, b) {
+  for (const x of a) for (const y of b) if (x[0] <= y[1] && y[0] <= x[1]) return true
+  return false
+}
+
+// ⛔ `line_range` 는 스키마상 **optional** 이다(required 에 없음). 위치를 모르는 finding 을
+//    "짝 없음"으로 처리하면 major 하나가 무조건 Stage 2 를 발화시켜 opus 2콜을 부른다.
+//    위치 미상은 **판단 불가**이지 단독이 아니다 — 아래 sameSite 는 false 를 주되
+//    unpairedMajor 집계에서는 별도로 제외한다.
+function hasLocation(x) {
+  return !!x.file && lineSpans(x.line_range).length > 0
+}
+
+// ⛔ `sameAxis` 는 **severityConflicts 에만** 쓴다. `MergeContract § 3` 이 dedup 키를
+//    `파일 + line_range 겹침 + discoveryAxis` 로 규정하고 **"축이 다르면 같은 자리라도 별건"** 이라
+//    못박는데, 트리거가 축을 안 보면 같은 세션의 두 규칙이 모순이 된다.
+//    실측(PR): severityConflicts 7건 중 **5건(71%)이 축이 다른 별건**이었다 —
+//    세 렌즈가 신규 파일 **헤더 라인(23-27)** 에 서로 다른 주제를 앵커해 위치만 겹쳤다.
+// ⚠️ 축이 **없으면** 비교를 건너뛴다(= 현행 동작). fail-close 하면 "덜 발화" 쪽이고,
+//    아래 임계 주석대로 놓치는 쪽이 더 비싸다. 스키마상 required 지만 방어적으로 둔다.
+// ⛔ `unpairedMajor` 에는 쓰지 않는다 — 단독 major 는 축과 무관하게 교차가 필요하다.
+function sameAxis(x, y) {
+  if (!x.discoveryAxis || !y.discoveryAxis) return true
+  return x.discoveryAxis === y.discoveryAxis
+}
+
+function sameSite(x, y) {
+  if (!hasLocation(x) || !hasLocation(y) || x.file !== y.file) return false
+  return spansOverlap(lineSpans(x.line_range), lineSpans(y.line_range))
+}
+
+function stage2Trigger(reviewList) {
+  const flat = []
+  for (const r of reviewList) for (const i of r.issues) flat.push({ agent: r.agent, i })
+
+  let severityConflicts = 0
+  for (let a = 0; a < flat.length; a += 1) {
+    for (let b = a + 1; b < flat.length; b += 1) {
+      if (flat[a].agent === flat[b].agent) continue
+      if (!sameSite(flat[a].i, flat[b].i)) continue
+      if (!sameAxis(flat[a].i, flat[b].i)) continue   // 축이 다르면 별건 — MergeContract § 3
+      if (flat[a].i.severity !== flat[b].i.severity) severityConflicts += 1
+    }
+  }
+
+  let unpairedMajor = 0
+  let unlocatedMajor = 0
+  for (let a = 0; a < flat.length; a += 1) {
+    if ((SEVERITY_RANK[flat[a].i.severity] || 0) < 2) continue
+    if (!hasLocation(flat[a].i)) { unlocatedMajor += 1; continue }   // 판단 불가 — 발화시키지 않는다
+    const paired = flat.some((o, b) => b !== a && o.agent !== flat[a].agent && sameSite(flat[a].i, o.i))
+    if (!paired) unpairedMajor += 1
+  }
+
+  return {
+    fire: severityConflicts >= 1 || unpairedMajor >= 1,
+    severityConflicts,   // ⛔ 같은 자리 **+ 같은 축** 만 센다 (교차축 공존은 별건)
+    unpairedMajor,       //    축 무관 — 단독 major 는 축과 상관없이 교차 대상
+    unlocatedMajor,   // 위치 미상이라 판정에서 뺀 수 — 0 이 아니면 리포트에 남긴다
+  }
+}
+// <<< PURE:stage2-trigger
+const stage2Conditional = input.stage2 === 'conditional'
+const liveTrigger = stage2Conditional && arch && quality
+  ? stage2Trigger([{ agent: 'arch', issues: arch.findings }, { agent: 'quality', issues: quality.findings }])
+  : null
+const stage2Skipped = liveTrigger && !liveTrigger.fire && liveTrigger.unlocatedMajor === 0
+  ? { reason: 'conditional — 같은 자리 · 같은 축 severity 이견 0 · 단독 major 0 · 위치 미상 major 0' }
+  : null
+if (stage2Skipped) log(`Stage 2 생략 — ${stage2Skipped.reason}`)
+
+// >>> PURE:cross-delta — ⛔ 이 마커 사이는 **순수 함수**다. peer-review.js 와 review-live.js 에 **같은 글자로** 있다 —
+//     tests/workflows/cross-delta-arm.js 가 추출해 실행하고 두 사본이 같은지 단언한다. 한쪽만 고치지 말 것.
+//     delta 응답(동의는 reviewedIds 에만 둔다)을 기존 병합이 읽는 full 모양 { adjustments, additions } 로 편다 — 병합 코드는 그대로다.
+//     ⛔ 확인 목록(expectedIds)에 있는데 reviewedIds · adjustments · rejections 어디에도 없는 id 를 agree 로 채우지 않는다 —
+//        full 모드에서 판정이 빠진 id 와 같이 unreviewed 로 남고 missing 으로 보고된다(전수 확인 보존).
+//     ⛔ agree 에는 note 가 없다 — 출력을 줄이는 몫이 이것이다. 판정 필드와 adjust · false_positive 의 note 는 full 과 같다.
+function expandCrossDelta(delta, expectedIds) {
+  if (!delta) return { result: null, missing: null }
+  const list = k => (Array.isArray(delta[k]) ? delta[k] : [])
+  const judged = new Set(list('adjustments').concat(list('rejections')).map(e => e.id))
+  const agreed = [...new Set(list('reviewedIds'))].filter(id => !judged.has(id))
+  const reviewed = new Set(agreed.concat([...judged]))
+  return {
+    result: {
+      adjustments: agreed.map(id => ({ id, verdict: 'agree' }))
+        .concat(list('adjustments').map(a => ({ id: a.id, verdict: 'adjust', newSeverity: a.newSeverity, note: a.note })))
+        .concat(list('rejections').map(r => ({ id: r.id, verdict: 'false_positive', note: r.note }))),
+      additions: list('additions'),
+    },
+    missing: (expectedIds || []).filter(id => !reviewed.has(id)),
+  }
+}
+// <<< PURE:cross-delta
+
+// ════════ Stage 2: 교차 조정 (id-기반 — live-review Round 2) ════════
+phase('Stage 2: 교차 severity 조정')
+let archOnQuality = null
+let qualityOnArch = null
+let crossCoverage = null   // crossOutput='delta' 일 때만 — 렌즈별 reviewedIds 누락 id(null = 렌즈 결손)
+if (arch && quality && !stage2Skipped) {
+  const cross = await parallel([
+    () => callAgent(
+      `${LENS_OVERRIDE}\n[역할] 아키텍처 리뷰어 — 교차 조정\n${TARGET}\n[상대(품질) findings] ${JSON.stringify(quality.findings)}\n` +
+      `[목표] 각 finding의 아키텍처 함의로 severity 조정(adjust+newSeverity)/동의(agree)/기각(false_positive — 실측 인용 필수). 놓친 아키텍처 finding은 additions(id A-X)로.${crossRequiredLine}${crossDeltaLine}`,
+      { label: 'stage2-arch-on-quality', agentType: 'fz:review-arch', model: 'opus', effort: EFFORT, schema: lensSchema(crossSchema) }),
+    () => callAgent(
+      `${LENS_OVERRIDE}\n[역할] 품질 리뷰어 — 교차 보충\n${TARGET}\n[상대(아키) findings] ${JSON.stringify(arch.findings)}\n` +
+      `[목표] 각 finding의 품질/성능 영향 보충으로 verdict 반환. 놓친 품질 finding은 additions(id Q-X)로.${crossRequiredLine}${crossDeltaLine}`,
+      { label: 'stage2-quality-on-arch', agentType: 'fz:review-quality', model: 'opus', effort: EFFORT, schema: lensSchema(crossSchema) }),
+  ])
+  archOnQuality = cross[0]
+  qualityOnArch = cross[1]
+  if (crossDeltaOn) {
+    const a = expandCrossDelta(archOnQuality, quality.findings.map(f => f.id))
+    const q = expandCrossDelta(qualityOnArch, arch.findings.map(f => f.id))
+    archOnQuality = a.result
+    qualityOnArch = q.result
+    crossCoverage = { arch: a.missing, quality: q.missing }
+    const lost = [a.missing, q.missing].filter(Boolean).reduce((n, m) => n + m.length, 0)
+    if (lost) log(`WARN 교차 delta — reviewedIds 에 없는 상대 id ${lost}건 (unreviewed 로 남긴다)`)
+  }
+  if (archOnQuality) archOnQuality.additions = archOnQuality.additions.map(f => ({ ...f, id: `XA:${f.id}` }))
+  if (qualityOnArch) qualityOnArch.additions = qualityOnArch.additions.map(f => ({ ...f, id: `XQ:${f.id}` }))
+  if (!archOnQuality || !qualityOnArch) log('WARN stage2 부분 null — 해당 측 조정 미반영')
+}
+
+// ════════ Stage 3: Counter DA (okAreas 도전 + findings 반론) ════════
+phase('Stage 3: counter DA')
+const allFindings = []
+  .concat(arch ? arch.findings : [], quality ? quality.findings : [])
+  .concat(archOnQuality ? archOnQuality.additions : [], qualityOnArch ? qualityOnArch.additions : [])
+const allOkAreas = [].concat(arch ? arch.okAreas : [], quality ? quality.okAreas : [])
+if (counterOff) log('Stage 3 생략 — counter off(측정 arm) · DA 는 Lead 가 GPT 로 돌린다(scripts/counter_adapter.py)')
+const counter = counterOff ? null : await callAgent(
+  `${LENS_OVERRIDE}\n[역할] 반론자(review-counter 렌즈) — Devil's Advocate\n${TARGET}\n` +
+  `[findings] ${JSON.stringify(allFindings)}\n[okAreas(정상 판정)] ${JSON.stringify(allOkAreas)}\n` +
+  `[목표] (1) 각 finding을 실측 재검증 — 과장/오독이면 refute + 인용. (2) okAreas에 "정말 OK인가?" 반례 탐색 — 반례 발견 시 missedFindings(id C-X)로. 라인 인용 오류를 특히 의심.${catalogLine}`,
+  { label: 'stage3-counter', agentType: 'fz:review-counter', model: 'opus', effort: EFFORT, schema: withCatalog(lensSchema(CounterSchema)) })
+if (!counter && !counterOff) log('WARN counter null — DA 패스 미수행 (findings 원판정 유지)')
+
+// ════════ 병합 — 스크립트 binary 규칙 (id-기반 verdict 반영) ════════
+const adjustMap = {}
+for (const c of [archOnQuality, qualityOnArch].filter(Boolean)) {
+  for (const a of c.adjustments) adjustMap[a.id] = a
+}
+const counterMap = {}
+if (counter) for (const ch of counter.challenges) counterMap[ch.target] = ch
+
+const findings = allFindings.map((f) => {
+  const adj = adjustMap[f.id]
+  const ctr = counterMap[f.id]
+  return {
+    ...f,
+    finalSeverity: adj && adj.verdict === 'adjust' && adj.newSeverity ? adj.newSeverity : f.severity,
+    crossVerdict: adj ? adj.verdict : 'unreviewed',
+    crossNote: adj ? adj.note : undefined,
+    counterVerdict: ctr ? ctr.verdict : 'unchallenged',
+    counterNote: ctr ? ctr.note : undefined,
+    // false_positive/refute여도 제거하지 않음 — 최종 기각은 Lead 판정 (live-review.md Lead 역할 보존)
+  }
+}).concat(counter ? counter.missedFindings.map(f => ({ ...f, id: `C:${f.id}`, finalSeverity: f.severity, crossVerdict: 'counter_found', counterVerdict: 'uphold' })) : [])
+
+// okArea 도전 보존 (리뷰 C-1 교정 — finding id에 매칭되지 않는 challenge는 okArea 도전)
+const findingIds = new Set(findings.map(f => f.id))
+const okAreaChallenges = counter ? counter.challenges.filter(ch => !findingIds.has(ch.target)) : []
+
+const dist = {
+  critical: findings.filter(f => f.finalSeverity === 'critical').length,
+  major: findings.filter(f => f.finalSeverity === 'major').length,
+  minor: findings.filter(f => f.finalSeverity === 'minor').length,
+  suggestion: findings.filter(f => f.finalSeverity === 'suggestion').length,
+  fpFlagged: findings.filter(f => f.crossVerdict === 'false_positive' || f.counterVerdict === 'refute').length,
+  // 구조 축 주입 여부 — structuralContext는 optional이라 누락 시 에러 없이 꺼진다. 반환값으로 판별 가능하게 남긴다.
+  structuralAxes: !!input.structuralContext,
+}
+if (craftOn) {
+  dist.craftAxes = craftSummary(findings, arch)
+  log(`craft 축 — ${CRAFT_AXES.map(ax => `${ax} ${dist.craftAxes.counts[ax]}`).join(' / ')} · axisCoverage ${dist.craftAxes.axisCoverage ? dist.craftAxes.axisCoverage.length + '행' : '⛔없음'}${dist.craftAxes.missingAxes.length ? ` · ⛔빠진 축 ${dist.craftAxes.missingAxes.join('·')}` : ''}`)
+}
+log(`findings ${findings.length}건 — critical ${dist.critical} / major ${dist.major} / minor ${dist.minor} / suggestion ${dist.suggestion} / FP·refute 플래그 ${dist.fpFlagged} / 구조축 ${dist.structuralAxes ? 'ON' : '⛔OFF'} (최종 기각은 Lead)`)
+
+// stagesCompleted = 완전 완주한 stage 수 (리뷰 Q2 교정 — stage2 미완주+stage3 완주 시 오보고 방지)
+const s1full = !!(arch && quality)
+const s2full = !!(archOnQuality && qualityOnArch) || !!stage2Skipped   // 조건에 따라 생략한 교차는 할 일이 없어 끝난 것이다
+const s3full = !!counter
+const stagesCompleted = [s1full, s2full, s3full].filter(Boolean).length
+return {
+  mode: 'workflow',
+  findings,
+  okAreas: allOkAreas,
+  okAreaChallenges, // counter의 okArea 반례 (Lead 판정 입력)
+  distribution: dist,
+  ...(crossDeltaOn ? { crossCoverage } : {}),   // ⛔ 기본 반환 모양 불변
+  ...(stage2Conditional ? { stage2Ran: !!(archOnQuality || qualityOnArch), stage2Trigger: liveTrigger, stage2Skipped } : {}),   // ⛔ 기본 반환 모양 불변
+  ...(counterOff ? { counterSkipped: 'arm' } : {}),   // ⛔ 기본 반환 모양 불변 — arm 생략을 counter 실패와 가른다
+  // 재지 않은 전제 — 렌즈별 출처를 달아 Lead 에게 올린다(F-448 · 반증 · 판정 입력). ⛔ 기본 반환 모양 불변
+  ...(slotsOn ? { unverifiedPremises: [['arch', arch], ['quality', quality]]
+    .flatMap(([lens, r]) => (r && Array.isArray(r.unverifiedPremises) ? r.unverifiedPremises : []).map(x => ({ ...x, lens }))) } : {}),
+  ...(catalogOn ? { catalogHits: counter && Array.isArray(counter.catalogHits) ? counter.catalogHits : [] } : {}),   // ⛔ 기본 반환 모양 불변
+  // Lead가 experiment-log §5.7 fz-review 테이블 기록. arm 은 기대 단계가 2 다(Stage 3 을 일부러 뺐다)
+  metrics: counterOff ? { ...metrics(stagesCompleted), stagesExpected: 2 } : metrics(stagesCompleted),
+}

@@ -1,0 +1,144 @@
+# 실행 모드 확장 (Execution Modes)
+
+> **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** `code.claude.com/docs/en/code-review` — 인용 원문에 `verified 2026-08-08` 표기 승계. ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
+
+> /batch, /simplify, LOOP(Gate 반복) 통합 정책. 스킬에서 참조.
+
+## 목차
+
+- [3가지 실행 모드](#3가지-실행-모드)
+- [BATCH 모드 상세](#batch-모드-상세)
+- [LOOP 모드 상세](#loop-모드-상세)
+- [SIMPLIFY 게이트 상세](#simplify-게이트-상세)
+- [모드 결정 플로우](#모드-결정-플로우)
+- [참조 스킬](#참조-스킬)
+- [설계 원칙](#설계-원칙)
+
+---
+
+## 3가지 실행 모드
+
+| 모드 | 도구 | 트리거 | 용도 |
+|------|------|--------|------|
+| BATCH | /batch | 독립 작업 3개+, --batch 플래그 | worktree 격리 병렬 실행 |
+| LOOP | Lead 반복 | Gate 반복 예상, --loop 플래그 | 래더 한도까지 반복 + 에스컬레이션 |
+| SIMPLIFY | /simplify | Step 완료 후 (선택) | 코드 정리 + 과잉 설계 감지 |
+
+## BATCH 모드 상세
+
+- /batch 호출 시 `--no-pr` 필수 (PR은 fz-pr로)
+- 각 worktree = 독립 SOLO 실행 (TeamCreate 미사용)
+- Lead가 N개 worktree 오케스트레이션 → 결과 merge
+- TEAM과 배타적: BATCH일 때 TeamCreate 불필요
+
+### BATCH 적합 조건
+
+| 조건 | 예시 |
+|------|------|
+| 독립 파일 수정 3개+ | 에이전트/모듈 12개 일괄 수정 |
+| 동일 패턴 반복 적용 | 용어 통일, 섹션 추가 등 |
+| 파일 간 의존성 없음 | 각 파일이 독립적으로 수정 가능 |
+
+### BATCH 부적합 조건
+
+- 파일 간 의존성 있음 (A 수정이 B에 영향)
+- 2개 이하 파일 변경
+- 코드 생성 (빌드 검증 필요)
+- 새 코드 생성 (RIB, 모듈 등 아키텍처 판단 필요)
+- review-arch 검증이 필요한 구조적 변경
+
+### BATCH merge 후 통합 게이트 (필수)
+
+모든 worktree merge 완료 후 반드시 수행:
+1. 프로젝트 전체 빌드 (modules/build.md)
+2. 빌드 실패 시: 충돌 파일 식별 → 수동 해결 → 재빌드
+3. 빌드 성공 → 파이프라인 다음 스킬 진행
+4. (선택) /sc:sc-analyze → merge 후 정적 분석
+
+### BATCH 자동 제안
+
+fz-plan 또는 fz-code에서 아래 조건 감지 시 제안 (강제 아님):
+
+| 조건 | 제안 |
+|------|------|
+| plan에 독립 Step 3개+ | "/batch 병렬 실행 가능" 제안 |
+| 동일 패턴 반복 3회+ | "/batch 전환" 제안 |
+
+## LOOP 모드 상세
+
+- 반복 주체는 Lead 다 — 아래 스킬별 표의 상한(max-iterations)까지 같은 세션에서 Gate 를 다시 돈다(설치형 반복 플러그인은 쓰지 않는다). Workflow 반환이 fallback · split_required 면 `guides/skill-authoring.md` §12 실패 복구 사다리(L1~L4)
+- 에스컬레이션 래더 (각 반복마다 전략 상승):
+
+### 에스컬레이션 래더 (스킬별 구체화)
+
+| 스킬 | Gate | 1회 실패 | 2회 실패 | 3회 실패 |
+|------|------|---------|---------|---------|
+| fz-code | build | 에러 직접 수정 | /sc:sc-troubleshoot (선택) | /simplify → AskUser |
+| fz-fix | build | 에러 직접 수정 | /sc:sc-troubleshoot (선택) | /fz-gpt check 보조 진단 1회 → AskUser |
+| fz-review | Reflection | 이슈 재확인 | GPT 검증 | AskUser |
+| fz-plan | Stress Test | 계획 수정 | 계획 재작성 | AskUser |
+
+> GPT 칸(fz-fix 3회 실패의 `/fz-gpt check` 보조 진단 · fz-review 2회 실패의 GPT 검증)은 직전 `gpt-choice.sh decide` 가 `run` · `config` 일 때만 부른다 — `skip` 이면 그 칸의 GPT 호출만 빼고 `[GPT 미사용 — 사유]` 를 남긴다(fz-fix 는 바로 AskUser · `modules/gpt-strategy.md` § 단계 실행 판정).
+
+### 스킬별 LOOP 파라미터
+
+| 스킬 | 완주 신호 | max-iterations | 대상 Gate |
+|------|-------------------|----------------|----------|
+| fz-plan | STRESS_TEST_PASS | 2 | 설계 스트레스 테스트 (Critical < 2) |
+| fz-code | BUILD_SUCCESS | 3 | 빌드 검증 |
+| fz-fix | FIX_VERIFIED | 3 | 빌드 검증 |
+| fz-review | REFLECTION_80 | 3 | Reflection Rate ≥ 80% (N≥10에서만 gating — 참조: `modules/cross-validation.md § Reflection Rate threshold`) |
+
+### autonomous-reminder (Fable 5, LOOP 한정)
+
+자율 반복 실행 중에는 turn을 **텍스트 의도 선언만으로** 종료하지 않는다: 마지막 문단이 계획·의도·다음 단계 선언이면 해당 tool call을 실제로 실행하고, 종료는 작업 완료 또는 사용자만 줄 수 있는 입력 대기 시에만 한다. (출처: 공식 Prompting Claude Fable 5 Autonomous reminder 스니펫 — `guides/model-guide.md` § 프롬프트 패턴.)
+
+- **우선 조항 (필수)**: 완주 신호(위 표) 충족 또는 max-iterations 도달 시 → 즉시 중단·보고가 본 리마인더보다 **우선**한다 (loop contract override 금지). "계속 진행"이 완주 계약을 덮지 않는다.
+- **LOOP 한정**: 본 리마인더는 LOOP 모드 자율 운행에만 적용 — 상시 세션에는 미적용 (하네스 중복 회피).
+
+## SIMPLIFY 게이트 상세
+
+> ℹ️ **`/simplify` 현행 사양 (v2.1.154+, verified 2026-08-08)**: *"From v2.1.154, `/simplify` runs a separate **cleanup-only** review that applies fixes **without hunting for bugs**. If you scripted `/simplify` for bug-finding, switch to `/code-review --fix`."* [code.claude.com/docs/en/code-review]
+> - ✅ **fz 용도와 정합** — 아래 게이트는 과잉 추상화·복잡도·패치 누적 품질을 겨냥하므로 cleanup-only 범위 안이다. 공식 경고 대상인 *버그 찾기* 용도가 아니다 → **재배선 불필요**.
+> - ⛔ 버그 탐지가 필요한 지점에 `/simplify`를 쓰지 말 것 — `/code-review --fix`가 그 역할이다.
+> - ⚠️ `/simplify`는 `/docs/en/commands` 번들 스킬 표에 **행이 없다**(`/code-review` 행에서 참조만 됨) → 아래 `focus` 파라미터 사양은 **[미검증]**이며 동작 이상 시 1순위 확인 대상.
+
+- /simplify는 **2단계 트리거** 시스템
+
+### 필수 gate (스킵 불가, 자동 실행)
+1. Step에서 새 함수/메서드 3개+ 생성 → 과잉 추상화 감지
+2. Step에서 100줄+ 코드 추가 → 복잡도 감소 필요
+3. 3회 빌드 실패 후 성공 → 패치 누적 품질 저하
+
+### 선택 suggestion (사용자 스킵 가능)
+1. fz-code Step 완료 후 (위 조건 미해당 시)
+2. fz-review 시작 전 (pre-review cleanup)
+
+### 설계 의도 보존
+- `focus` 파라미터에 Plan의 핵심 설계 결정을 포함한다
+- 예: `/simplify focus on "Strategy 패턴 유지, UseCase 분리 보존"`
+- Plan의 Anti-Pattern Constraints에 명시된 구조는 simplify가 변경하지 않는다
+- 결과: 수정 적용 → 빌드 Gate 재확인
+
+## 모드 결정 플로우
+
+| 합산 | 기본 모드 | 실행 모드 | 조건 |
+|------|----------|----------|------|
+| 0-3 | SOLO | STANDARD | 기본 |
+| 0-3 | SOLO | BATCH | --batch 또는 독립 작업 3개+ |
+| 4+ | TEAM | STANDARD | 기본 |
+| 4+ | TEAM | LOOP | --loop 또는 Gate 반복 예상 |
+
+## 참조 스킬
+
+| 스킬 | 참조 이유 |
+|------|----------|
+| /fz | 모드 결정 + 실행 오케스트레이션 |
+| /fz-code | LOOP(빌드 Gate) + SIMPLIFY(Step 후) |
+| /fz-fix | LOOP(빌드 Gate) |
+| /fz-review | LOOP(Reflection Rate) + SIMPLIFY(pre-review) |
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (BATCH/LOOP 트리거 시에만 로드)
+- 500줄 이하 유지

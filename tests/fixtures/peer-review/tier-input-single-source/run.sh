@@ -1,0 +1,320 @@
+#!/bin/bash
+# Tier 판정 입력의 **단일 출처** 회귀 판정 — 문서 안 bash 블록을 추출해 실행한다.
+#
+# ⛔ 여기서 막는 것은 "같은 값을 다시 받는" 경로다. `gather.sh` 가 이미 `pr-meta.json` 에
+#    `additions,deletions,files` 를 한 번에 저장하는데 Tier 판정이 `gh pr view` 를 다시 부르면
+#    ① 네트워크 4회 ② gather 시점과 Tier 시점 사이 force-push 시 **두 값이 갈린다**.
+#
+# ⭐ 선례: `scripts/gate_check.py` 가 마크다운 원장(`gates/plan.md`)의 `CHECK:` 선언을 파싱해
+#    실행하고 `tests/fixtures/gates/parser/*.md` 67케이스가 그것을 잰다. 문서 안 선언을
+#    실행 대상으로 재는 것은 이 저장소의 확립된 방식이다.
+#
+# 회귀 4종:
+#   S  snapshot 우선   pr-meta.json 이 있으면 gh 재조회 0회여야 한다
+#   V  값 동등          snapshot 경로와 gh 경로가 같은 Tier 를 내야 한다
+#   F  폴백 보존        snapshot 이 없으면 gh 경로가 살아 있어야 한다(gather 미경유 직접 호출)
+#   branch  브랜치 입력 diff 실패(F-385) — 문서의 브랜치 분기 블록(`# branch input` ~ `fi` + `CHANGED_LINES=` 줄)을 뽑아
+#           임시 git 리포(BASE=develop 존재 · 원격 없음 · GIT_ALLOW_PROTOCOL=file · AskUserQuestion stub)에서 실행한다.
+#           없는 INPUT(feature/no-such-branch)은 0줄이 아니라 '⛔ diff 실패' 표지 + 판정 불가 표시, 정상 브랜치는 실제 변경량.
+#           ⛔ 기준 블록(`2>/dev/null | awk … END{print a+0}`)은 CHANGED_LINES=0 으로 진행한다 — 이 셀이 FAIL(exit 1)
+#           모드 단락(`# 2. 모드` — modules/mode-gate.md · 2026-11-12)까지 돌리면: 판정 불가는 **묻지 않고** light = TIER=1 + '측정 불가' 통보
+#           (mode_gate.py peer --unmeasured) · 정상 브랜치는 추천 light → 묻지 않고 TIER=1 · MODE=full 이 정해져 있으면 TIER=2 ·
+#           --tier 0 명시면 TIER=0. 예전 단언 "판정 불가 → Tier 단락 뒤에도 TIER=2" 는 이 계약으로 옮겼다(측정 실패를 작음으로 읽지 않는 것은 그대로다)
+#   mode    펜스 bash 블록 **전체**(`### 자동 선택 실행 bash` 의 ```bash ~ ```)를 tier.txt rationale 까지 실행한다(2026-11-12 —
+#           추천 full 일 때만 질문 · 질문 전 autonomy_decide · 빈 답 · 도구 없음 → light · --deep 단독 = full).
+#           입력 경로 3개(snapshot pr-meta.json · PR 번호 gh stub · branch) × 질문 · 자율 · 명시 인자 사례
+#
+# usage: run.sh [--tree <플러그인 트리>] [--cells S,V,F,branch,mode]   (기본: 이 fixture 가 든 트리 · 전 셀 — health-check 는 인자 없이 부른다)
+#   --tree 는 읽을 문서(modules/peer-review-tiers.md)만 바꾼다
+# exit: 0 전건 통과 / 1 불일치 / 2 실행 오류
+#   ⛔ 판정 줄 없이 끝나면(셸 오류 등) 1 이 아니라 2 로 낸다 — 1 은 단언 불일치만 뜻한다
+set -uo pipefail
+
+DONE=0 TMP=""
+finish() {
+  local rc=$?
+  [ -n "$TMP" ] && rm -rf "${TMP:?}"
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ] && [ "$DONE" -ne 1 ]; then
+    echo "판정 줄 없이 끝났다(exit $rc) — 불일치(1)가 아니라 실행 오류 2 로 낸다" >&2
+    exit 2
+  fi
+  exit "$rc"
+}
+trap finish EXIT
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TREE="$HERE/../../../.."
+CELLS="S,V,F,branch,mode"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tree) [ $# -ge 2 ] || { echo "--tree 에 경로가 없다" >&2; exit 2; }
+            TREE="$(cd "$2" 2>/dev/null && pwd)" || { echo "--tree 경로 없음: $2" >&2; exit 2; }; shift 2 ;;
+    --cells) [ $# -ge 2 ] || { echo "--cells 에 값이 없다" >&2; exit 2; }; CELLS="$2"; shift 2 ;;
+    *) echo "알 수 없는 인자: $1" >&2; exit 2 ;;
+  esac
+done
+for c in $(printf '%s' "$CELLS" | tr ',' ' '); do
+  case "$c" in S|V|F|branch|mode) ;; *) echo "알 수 없는 셀: $c (지원: S,V,F,branch,mode)" >&2; exit 2 ;; esac
+done
+want() { case ",$CELLS," in *",$1,"*) return 0 ;; esac; return 1; }
+DOC="$TREE/modules/peer-review-tiers.md"
+[ -f "$DOC" ] || { echo "peer-review-tiers.md 를 찾을 수 없다: $DOC" >&2; exit 2; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 이 없다" >&2; exit 2; }
+
+TMP="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }
+
+FAIL=0
+pass() { printf 'PASS  %-34s %s\n' "$1" "$2"; }
+fail() { printf 'FAIL  %-34s %s\n' "$1" "$2"; FAIL=1; }
+
+# ── S: snapshot 우선 — 문서에 분기가 선언돼 있는가 ────────────────
+if ! want S; then :
+elif command grep -q 'META="\${WORK_DIR:-\$STAGE_DIR}/pr-meta.json"' "$DOC" \
+   && command grep -q 'Tier 입력 = gather snapshot' "$DOC"; then
+  pass "S snapshot 우선 분기" "pr-meta.json 을 1차 입력으로 선언"
+else
+  fail "S snapshot 우선 분기" "선언 부재 — Tier 가 gh 를 다시 부른다"
+fi
+
+# ── V: 값 동등 — snapshot 파싱이 gh 와 같은 값을 내는가 ───────────
+if want V; then
+cat > "$TMP/pr-meta.json" <<'JSON'
+{
+  "baseRefName": "develop",
+  "headRefName": "feature/x",
+  "additions": 120,
+  "deletions": 30,
+  "files": [
+    {"path": "a/Foo.swift", "additions": 100, "deletions": 20},
+    {"path": "Package.resolved", "additions": 15, "deletions": 5},
+    {"path": "b/Bar.swift", "additions": 5, "deletions": 5, "previous_filename": "b/Old.swift"}
+  ]
+}
+JSON
+
+s_add=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('additions',0))" "$TMP/pr-meta.json")
+s_del=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('deletions',0))" "$TMP/pr-meta.json")
+s_gen=$(python3 -c "
+import json,re,sys
+d=json.load(open(sys.argv[1]))
+pat=re.compile(r'(package-lock|pnpm-lock|yarn-lock|Package\.resolved|Gemfile\.lock|Cargo\.lock|\.pbxproj|\.storyboard)$')
+print(sum(f.get('additions',0)+f.get('deletions',0) for f in d.get('files',[]) if pat.search(f.get('path',''))))
+" "$TMP/pr-meta.json")
+s_ren=$(python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1]))
+print(sum(f.get('additions',0)+f.get('deletions',0) for f in d.get('files',[])
+          if f.get('previous_filename') or f.get('previousFilename')))
+" "$TMP/pr-meta.json")
+
+# 기대: add=120 del=30 gen=20(Package.resolved 15+5) ren=10(Old→Bar 5+5)
+# 유효 변경 = (120+30) - 20 - 10 = 120 → Tier 1 (100-200)
+eff=$(( (s_add + s_del) - s_gen - s_ren ))
+if [ "$s_add" -eq 120 ] && [ "$s_del" -eq 30 ] && [ "$s_gen" -eq 20 ] && [ "$s_ren" -eq 10 ] && [ "$eff" -eq 120 ]; then
+  pass "V 값 동등 (snapshot 파싱)" "add=$s_add del=$s_del gen=$s_gen ren=$s_ren → 유효 $eff → Tier 1"
+else
+  fail "V 값 동등 (snapshot 파싱)" "기대 120/30/20/10/120, 실측 $s_add/$s_del/$s_gen/$s_ren/$eff"
+fi
+fi   # want V
+
+# ── F: 폴백 보존 — gather 미경유 직접 호출 경로가 살아 있는가 ─────
+# ⛔ negative 성격 — snapshot 우선으로 바꾸면서 gh 경로를 지우면 gather 없는 호출이 죽는다
+if ! want F; then :
+elif command grep -q 'snapshot 부재 폴백' "$DOC" \
+   && command grep -qE '^\s+ADDED=\$\(gh pr view' "$DOC"; then
+  pass "F 폴백 보존 (negative)" "snapshot 부재 시 gh 경로가 살아 있다"
+else
+  fail "F 폴백 보존 (negative)" "gh 폴백이 사라졌다 — gather 미경유 호출이 0 을 받는다"
+fi
+
+# ── branch: 브랜치 입력의 diff 실패를 변경량 0 으로 읽지 않는가 (F-385) ─────
+# ⛔ 문서 블록을 **그대로** 실행한다 — 문서와 실행체가 어긋나면 여기서 드러난다.
+#    추출: `# branch input` 줄부터 그 뒤 첫 `fi`(0열) 앞까지 + 그 뒤 첫 `CHANGED_LINES=` 줄. 어느 쪽이든 못 찾으면 실행 오류(2)
+if want branch; then
+  BLOCK=$(awk 'index($0, "# branch input") {s = 1} s && /^fi$/ {exit} s' "$DOC")
+  CL_LINE=$(awk 's && /^CHANGED_LINES=/ {print; exit} index($0, "# branch input") {s = 1}' "$DOC")
+  # 모드 단락: CHANGED_LINES= 줄 다음부터 `# 2. 모드` 블록의 0열 `fi` 까지 — 판정 불가가 추천 없이 묻는지 · 답 없으면 light 인지 본다
+  TAIL=$(awk 'c && /^fi$/ && t {print; exit} c {print} c && index($0, "# 2. 모드") {t = 1} s && /^CHANGED_LINES=/ {c = 1} index($0, "# branch input") {s = 1}' "$DOC")
+  [ -n "$BLOCK" ] && [ -n "$CL_LINE" ] && [ -n "$TAIL" ] || { echo "브랜치 분기 블록 추출 실패: $DOC" >&2; exit 2; }
+  R="$TMP/repo"
+  mkdir -p "$TMP/home" && : > "$TMP/gitconfig" || exit 2
+  export HOME="$TMP/home" GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 GIT_ALLOW_PROTOCOL=file
+  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+  { git init -q -b develop "$R" && git -C "$R" config user.email t@t.t && git -C "$R" config user.name t \
+    && for i in 1 2 3 4 5 6 7 8 9 10; do printf 'line %d\n' "$i"; done > "$R/a.txt" \
+    && printf 'moved body\n' > "$R/old.txt" \
+    && git -C "$R" add -A && git -C "$R" commit -qm base \
+    && git -C "$R" checkout -q -b feature/ok \
+    && sed -e '/^line 3$/d' -e '/^line 4$/d' "$R/a.txt" > "$R/a.tmp" && mv "$R/a.tmp" "$R/a.txt" \
+    && for i in 1 2 3 4 5; do printf 'new %d\n' "$i"; done >> "$R/a.txt" \
+    && git -C "$R" mv old.txt new.txt && git -C "$R" add -A && git -C "$R" commit -qm feature \
+    && git -C "$R" checkout -q develop; } >/dev/null 2>&1 || { echo "임시 git 리포 준비 실패" >&2; exit 2; }
+  [ -z "$(git -C "$R" remote)" ] || { echo "전제 불성립 — 원격이 있다" >&2; exit 2; }
+  ! git -C "$R" rev-parse -q --verify feature/no-such-branch >/dev/null || { echo "전제 불성립 — 없는 브랜치가 있다" >&2; exit 2; }
+  # $1=INPUT [$2=full — 모드 단락까지] [$3…=추가 env(MODE=full · TIER_OPT=0)] — 블록을 실행하고 RESULT 줄을 낸다.
+  #   AskUserQuestion 은 stub(호출을 기록하고 빈 답 = 비대화). 모드 단락은 이 트리의 mode_gate.py 를 부른다(WORK_DIR 은 임시)
+  mkdir -p "$TMP/wd" || exit 2
+  run_block() {
+    local tail_=""; [ "${2:-}" = full ] && tail_="$TAIL"
+    (cd "$R" && env -u BASE -u TIER -u TIER_OPT -u MODE -u MODE_SRC -u OPTS INPUT="$1" ASK_LOG="$TMP/ask.log" FZ_PLUGIN_ROOT="$TREE" WORK_DIR="$TMP/wd" FZ_MODE_GATE_ESTIMATE_SEC=1 FZ_AUTONOMY=interactive "${@:3}" bash -c '
+AskUserQuestion() { printf "%s\n" "$*" >> "$ASK_LOG"; }
+'"$BLOCK"'
+'"$CL_LINE"'
+'"$tail_"'
+printf "RESULT TIER=%s CHANGED_LINES=%s ADDED=%s DELETED=%s RENAMED_LINES=%s REC=%s MODE=%s\n" "${TIER:-unset}" "$CHANGED_LINES" "$ADDED" "$DELETED" "$RENAMED_LINES" "${REC-unset}" "${MODE:-unset}"
+' 2>&1)
+  }
+  : > "$TMP/ask.log"
+  out_bad=$(run_block feature/no-such-branch)
+  res_bad=$(printf '%s\n' "$out_bad" | command grep -m1 '^RESULT ')
+  if printf '%s\n' "$out_bad" | command grep -qF '⛔ diff 실패 — Tier 자동 판정 불가'; then
+    pass "branch 없는 INPUT: diff 실패 표지" "feature/no-such-branch → '⛔ diff 실패 — Tier 자동 판정 불가'"
+  else
+    fail "branch 없는 INPUT: diff 실패 표지" "표지 없음 — ${res_bad:-RESULT 없음} (0줄로 진행)"
+  fi
+  case "$res_bad" in
+    *"TIER=2 "*) pass "branch 없는 INPUT: TIER=2" "$res_bad" ;;
+    *) fail "branch 없는 INPUT: TIER=2" "${res_bad:-RESULT 없음}" ;;
+  esac
+  : > "$TMP/ask.log"
+  out_full=$(run_block feature/no-such-branch full)
+  res_full=$(printf '%s\n' "$out_full" | command grep -m1 '^RESULT ')
+  case "$res_full" in
+    *"TIER=1 "*"REC= MODE=light"*) pass "branch 없는 INPUT: 측정 불가 → light" "$res_full" ;;
+    *) fail "branch 없는 INPUT: 측정 불가 → light" "${res_full:-RESULT 없음}" ;;
+  esac
+  # 2026-11-12 — 측정 불가는 묻지 않고 light + 통보(§ 언제 묻나 5). 측정 불가를 '추천 light' 로 적지 않는다
+  if [ ! -s "$TMP/ask.log" ] && printf '%s\n' "$out_full" | command grep -qF '▶ light 로 진행 — 추천 없음(측정 불가)'; then
+    pass "branch 없는 INPUT: 질문 0 · '측정 불가' 통보" "$(printf '%s\n' "$out_full" | command grep -m1 '▶ light')"
+  else
+    fail "branch 없는 INPUT: 질문 0 · '측정 불가' 통보" "질문 $(wc -l < "$TMP/ask.log" | tr -d ' ') · $(head -1 "$TMP/ask.log" 2>/dev/null)"
+  fi
+  : > "$TMP/ask.log"
+  out_okf=$(run_block feature/ok full)
+  res_okf=$(printf '%s\n' "$out_okf" | command grep -m1 '^RESULT ')
+  case "$res_okf" in
+    *"TIER=1 "*"REC=light MODE=light"*) [ ! -s "$TMP/ask.log" ] && pass "branch 정상 브랜치: 추천 light → 질문 0 · TIER=1" "$res_okf" \
+                                          || fail "branch 정상 브랜치: 추천 light → 질문 0 · TIER=1" "질문 $(head -1 "$TMP/ask.log")" ;;
+    *) fail "branch 정상 브랜치: 추천 light → 질문 0 · TIER=1" "${res_okf:-RESULT 없음}" ;;
+  esac
+  : > "$TMP/ask.log"
+  res_full2=$(run_block feature/ok full MODE=full | command grep -m1 '^RESULT ')
+  res_t0=$(run_block feature/ok full TIER_OPT=0 | command grep -m1 '^RESULT ')
+  case "$res_full2" in *"TIER=2 "*) ok1=1 ;; *) ok1=0 ;; esac
+  case "$res_t0" in *"TIER=0 "*) ok2=1 ;; *) ok2=0 ;; esac
+  if [ "$ok1" = 1 ] && [ "$ok2" = 1 ] && [ ! -s "$TMP/ask.log" ]; then
+    pass "branch 명시 MODE=full · --tier 0: 묻지 않음" "full → TIER=2 · --tier 0 → TIER=0 · 질문 0"
+  else
+    fail "branch 명시 MODE=full · --tier 0: 묻지 않음" "$res_full2 / $res_t0 / 질문 $(wc -l < "$TMP/ask.log")"
+  fi
+  out_ok=$(run_block feature/ok)
+  res_ok=$(printf '%s\n' "$out_ok" | command grep -m1 '^RESULT ')
+  if [ "$res_ok" = "RESULT TIER=unset CHANGED_LINES=7 ADDED=5 DELETED=2 RENAMED_LINES=5 REC=unset MODE=unset" ] \
+     && ! printf '%s\n' "$out_ok" | command grep -qF '⛔ diff 실패'; then
+    pass "branch 정상 브랜치: 실제 변경량" "$res_ok"
+  else
+    fail "branch 정상 브랜치: 실제 변경량" "기대 TIER=unset CHANGED_LINES=7 ADDED=5 DELETED=2 RENAMED_LINES=5 REC=unset MODE=unset · 실측 ${res_ok:-RESULT 없음}"
+  fi
+  [ ! -s "$TMP/ask.log" ] && pass "branch AskUserQuestion 호출 0" "feature/* → BASE=develop (stub 미호출)" \
+    || fail "branch AskUserQuestion 호출 0" "$(head -1 "$TMP/ask.log")"
+fi
+
+# ── mode: 펜스 블록 전체 — 추천 full 일 때만 질문 (2026-11-12) ───────────────────
+# ⛔ 블록 **전체**를 tier.txt rationale 까지 실행한다 — 분기 블록에서 멈추면 아래 단락이 덮는 결함이 통과한다.
+#    추출: `### 자동 선택 실행 bash` 뒤 첫 ```bash ~ ```. 못 찾으면 실행 오류(2).
+#    stub: AskUserQuestion = 호출 기록 + env ASK_ANSWER 로 답(NO_ASK=1 이면 정의하지 않는다 — 질문 도구 없음) · gh = 큰 PR 값
+if want mode; then
+  BLOCK_ALL=$(awk 'index($0, "### 자동 선택 실행 bash") {h = 1; next} h && /^```bash/ {s = 1; next} s && /^```$/ {exit} s' "$DOC")
+  [ -n "$BLOCK_ALL" ] || { echo "자동 선택 bash 블록 추출 실패: $DOC" >&2; exit 2; }
+  MR="$TMP/mrepo"
+  mkdir -p "$TMP/mhome" "$TMP/bin" && : > "$TMP/mgitconfig" || exit 2
+  { git init -q -b develop "$MR" && git -C "$MR" config user.email t@t.t && git -C "$MR" config user.name t \
+    && echo base > "$MR/base.txt" && git -C "$MR" add -A && git -C "$MR" commit -qm base \
+    && git -C "$MR" checkout -q -b feature/big \
+    && for i in $(seq 1 20); do for j in $(seq 1 50); do echo "line $j"; done > "$MR/f$i.txt"; done \
+    && git -C "$MR" add -A && git -C "$MR" commit -qm big && git -C "$MR" checkout -q develop; } \
+    >/dev/null 2>&1 || { echo "mode 셀 임시 git 리포 준비 실패" >&2; exit 2; }
+  cat > "$TMP/bin/gh" <<'SH'
+#!/bin/bash
+printf '%s\n' "$*" >> "$GH_LOG"
+case "$*" in
+  *"--json additions"*) echo 1200 ;;
+  *"--json deletions"*) echo 0 ;;
+  *".files | length"*) echo 22 ;;
+  *"select(.path"*) echo 0 ;;
+  *"--json files"*) echo '{"files":[]}' ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$TMP/bin/gh" || exit 2
+  meta() {  # $1 폴더 $2 추가 줄 $3 파일 수 — gather 의 pr-meta.json 모양
+    mkdir -p "$1" && python3 -c "import json,sys;n=int(sys.argv[3]);a=int(sys.argv[2]);json.dump({'additions':a,'deletions':0,'files':[{'path':f'f{i}.swift','additions':a//n,'deletions':0} for i in range(n)]},open(sys.argv[1]+'/pr-meta.json','w'))" "$1" "$2" "$3"
+  }
+  snap() { cp -R "$2" "$TMP/w-$1" && printf '%s' "$TMP/w-$1"; }   # $1 사례 이름 $2 pr-meta 원본 폴더
+  run_all() {  # $1 INPUT $2 WORK_DIR(pr-meta.json 이 있으면 snapshot 경로) $3… 추가 env
+    : > "$TMP/mask.log"; : > "$TMP/gh.log"; mkdir -p "$2"
+    (cd "$MR" && env -u BASE -u TIER -u TIER_OPT -u MODE -u MODE_SRC -u OPTS -u STAGE_DIR -u REC -u NO_ASK -u ASK_ANSWER \
+      HOME="$TMP/mhome" GIT_CONFIG_GLOBAL="$TMP/mgitconfig" GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 \
+      INPUT="$1" WORK_DIR="$2" ASK_LOG="$TMP/mask.log" GH_LOG="$TMP/gh.log" PATH="$TMP/bin:$PATH" \
+      FZ_PLUGIN_ROOT="$TREE" FZ_MODE_GATE_ESTIMATE_SEC=1 FZ_AUTONOMY=interactive "${@:3}" bash -c '
+if [ -z "${NO_ASK:-}" ]; then AskUserQuestion() { printf "%s\n" "$*" >> "$ASK_LOG"; printf "%s" "${ASK_ANSWER:-}"; }; fi
+'"$BLOCK_ALL"'
+printf "RESULT TIER=%s\n" "$(head -1 "$WORK_DIR/tier.txt" 2>/dev/null)"
+tail -1 "$WORK_DIR/tier.txt" 2>/dev/null
+' 2>&1)
+  }
+  mcase() {  # $1 이름 $2 기대 TIER $3 기대 질문 수 $4 출력 $5… 출력에 있어야 할 문자열(! 로 시작하면 없어야 한다)
+    local name="$1" tier="$2" asks="$3" out="$4" got miss="" n; shift 4
+    got=$(printf '%s\n' "$out" | sed -n 's/^RESULT TIER=//p' | head -1)
+    local q; q=$(wc -l < "$TMP/mask.log" | tr -d ' ')
+    for n in "$@"; do
+      case "$n" in
+        !*) printf '%s\n' "$out" | command grep -qF -- "${n#!}" && miss="$miss [있음:${n#!}]" ;;
+        *) printf '%s\n' "$out" | command grep -qF -- "$n" || miss="$miss [없음:$n]" ;;
+      esac
+    done
+    if [ "$got" = "$tier" ] && [ "$q" = "$asks" ] && [ -z "$miss" ]; then pass "mode $name" "TIER=$got · 질문 $q"
+    else fail "mode $name" "TIER=${got:-없음}(기대 $tier) · 질문 $q(기대 $asks)$miss"; fi
+  }
+  meta "$TMP/m-small" 120 1
+  meta "$TMP/m-big" 1500 25
+  o=$(run_all 101 "$(snap 101 "$TMP/m-small")")
+  mcase "snapshot 추천 light → 통보" 1 0 "$o" "Tier 입력 = gather snapshot" "▶ light 로 진행 — 추천 light" "recommend=light" "risk_scan 실패"
+  o=$(run_all 102 "$(snap 102 "$TMP/m-big")" ASK_ANSWER=full)
+  mcase "snapshot 추천 full + 답 full" 2 1 "$o" "recommend=full" "via 질문" "!▶ light"
+  o=$(run_all 103 "$(snap 103 "$TMP/m-big")" ASK_ANSWER=)
+  mcase "snapshot 추천 full + 빈 답 → light" 1 1 "$o" "recommend=full" "질문 불가(추천 full)"
+  o=$(run_all 104 "$(snap 104 "$TMP/m-big")" NO_ASK=1)
+  mcase "snapshot 추천 full + 질문 도구 없음 → light" 1 0 "$o" "recommend=full" "질문 불가(추천 full)"
+  o=$(run_all 105 "$(snap 105 "$TMP/m-big")" FZ_AUTONOMY=autonomous ASK_ANSWER=full)
+  mcase "snapshot 추천 full + 자율 → 묻지 않고 light" 1 0 "$o" "recommend=full" "자율(추천 full)"
+  o=$(run_all 123 "$TMP/w-gh" ASK_ANSWER=full)
+  if command grep -q -- '--json additions' "$TMP/gh.log"; then
+    mcase "gh 경로(snapshot 없음) 추천 full + 답 full" 2 1 "$o" "recommend=full" "!Tier 입력 = gather snapshot"
+  else
+    fail "mode gh 경로(snapshot 없음)" "gh stub 이 불리지 않았다"
+  fi
+  o=$(run_all feature/big "$TMP/w-br" FZ_AUTONOMY=autonomous)
+  mcase "branch 추천 full + 자율 → light" 1 0 "$o" "recommend=full" "files=20"
+  o=$(run_all feature/no-such-branch "$TMP/w-bad")
+  mcase "branch 측정 불가 → 통보" 1 0 "$o" "⛔ diff 실패" "▶ light 로 진행 — 추천 없음(측정 불가)" "recommend=none"
+  mkdir -p "$TMP/w-bad2" && echo '{"categories":["stale-cat"]}' > "$TMP/w-bad2/risk.json" && o=$(run_all feature/no-such-branch "$TMP/w-bad2")
+  mcase "branch 측정 불가 + 옛 risk.json → 위험도 측정 불가" 1 0 "$o" "위험 측정 불가" "!stale-cat"
+  o=$(run_all 106 "$(snap 106 "$TMP/m-small")" OPTS=--deep)
+  mcase "--deep 단독 → full = Tier 3" 3 0 "$o" "via --deep"
+  o=$(run_all 107 "$(snap 107 "$TMP/m-small")" MODE=full)
+  mcase "명시 MODE=full → Tier 2" 2 0 "$o" "via 인자"
+  o=$(run_all 108 "$(snap 108 "$TMP/m-small")" TIER_OPT=0)
+  mcase "명시 --tier 0 → Tier 0" 0 0 "$o" "via --tier"
+fi
+
+echo ""
+DONE=1
+if [ "$FAIL" -eq 0 ]; then
+  echo "0 건 실패"
+  echo "⛔ 실전 1회 남음 — gather snapshot SHA 와 Tier 기록 SHA 일치 확인은 실제 PR 리뷰에서만 된다"
+  exit 0
+else
+  echo "⛔ 불일치 발생"
+  exit 1
+fi

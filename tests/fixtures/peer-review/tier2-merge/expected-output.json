@@ -1,0 +1,274 @@
+{
+ "note": "Expected final dispositions after Lead merge (Tier 2, no voting). Judgement fields only — all free text and source identifiers removed.",
+ "tier": 2,
+ "verdict": "needs_improvement",
+ "issues_count": 14,
+ "dropped_candidates": 8,
+ "unverified": 4,
+ "issues": [
+  {
+   "id": "I1",
+   "file": "SourceFile1.ext",
+   "line_range": "1332-1343",
+   "severity": "major",
+   "origin": "regression",
+   "confidence": 73,
+   "votes": {
+    "count": "3/3",
+    "seeded": true
+   },
+   "basis": "CV+IO",
+   "found_by": [
+    "review-arch",
+    "review-quality",
+    "review-correctness",
+    "lead"
+   ],
+   "gpt_verdict": "challenge"
+  },
+  {
+   "id": "I2",
+   "file": "SourceFile1.ext",
+   "line_range": "1773-1786",
+   "severity": "판정보류",
+   "origin": "regression",
+   "confidence": 58,
+   "votes": {
+    "count": "3/3",
+    "seeded": false
+   },
+   "basis": "IO",
+   "found_by": [
+    "review-arch",
+    "review-quality",
+    "review-correctness"
+   ],
+   "gpt_verdict": "reverse"
+  },
+  {
+   "id": "I3",
+   "file": "SourceFile1.ext",
+   "line_range": "1179",
+   "severity": "major",
+   "origin": "regression",
+   "confidence": 80,
+   "votes": {
+    "count": "4/4",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-arch",
+    "review-quality",
+    "review-correctness",
+    "gpt-challenger",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I4",
+   "file": "SourceFile2.ext",
+   "line_range": "1476-1488",
+   "severity": "minor",
+   "origin": "regression",
+   "confidence": 83,
+   "votes": {
+    "count": "2/4",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-quality",
+    "gpt-challenger",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I5",
+   "file": "SourceFile1.ext",
+   "line_range": "1376-1383, 1731-1747",
+   "severity": "minor",
+   "origin": "regression",
+   "confidence": 82,
+   "votes": {
+    "count": "2/4",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-arch",
+    "gpt-challenger",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I6",
+   "file": "SourceFile1.ext",
+   "line_range": "1408-1413",
+   "severity": "minor",
+   "origin": "regression",
+   "confidence": 71,
+   "votes": {
+    "count": "3/3",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-arch",
+    "review-quality",
+    "review-correctness",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I7",
+   "file": "SourceFile1.ext",
+   "line_range": "1843-1872",
+   "severity": "minor",
+   "origin": "regression",
+   "confidence": 90,
+   "votes": {
+    "count": "1/3",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-correctness",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I8",
+   "file": "SourceFile1.ext",
+   "line_range": "1750-1771",
+   "severity": "suggestion",
+   "origin": "regression",
+   "confidence": 60,
+   "votes": {
+    "count": "2/3",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-quality",
+    "review-correctness"
+   ],
+   "gpt_verdict": "reverse"
+  },
+  {
+   "id": "I9",
+   "file": "SourceFile3.ext",
+   "line_range": "1141, 1199-1201, 1219, 1223, 1228-1229, 1252, 1393-1394",
+   "severity": "suggestion",
+   "origin": "regression",
+   "confidence": 77,
+   "votes": {
+    "count": "4/4",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-arch",
+    "review-quality",
+    "review-correctness",
+    "gpt-challenger",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I10",
+   "file": "SourceFile1.ext",
+   "line_range": "1336-1341",
+   "severity": "suggestion",
+   "origin": "regression",
+   "confidence": 85,
+   "votes": {
+    "count": "1/3",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-correctness",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I11",
+   "file": "SourceFile2.ext",
+   "line_range": "2103-2136",
+   "severity": "suggestion",
+   "origin": "regression",
+   "confidence": 79,
+   "votes": {
+    "count": "2/3",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-arch",
+    "review-quality",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I12",
+   "file": "SourceFile1.ext",
+   "line_range": "1773-1786, 1814-1824",
+   "severity": "minor",
+   "origin": "regression",
+   "confidence": 75,
+   "votes": {
+    "count": "1/3",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "review-correctness",
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I13",
+   "file": "SourceFile1.ext",
+   "line_range": "1814-1824",
+   "severity": "minor",
+   "origin": "regression",
+   "confidence": 80,
+   "votes": {
+    "count": "Lead",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "lead"
+   ],
+   "gpt_verdict": null
+  },
+  {
+   "id": "I14",
+   "file": "SourceFile1.ext",
+   "line_range": "1376-1422",
+   "severity": "suggestion",
+   "origin": "regression",
+   "confidence": 75,
+   "votes": {
+    "count": "Lead",
+    "seeded": false
+   },
+   "basis": "CV",
+   "found_by": [
+    "lead"
+   ],
+   "gpt_verdict": null
+  }
+ ]
+}

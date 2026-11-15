@@ -1,0 +1,244 @@
+# 사전 정의 파이프라인 (Pipelines)
+
+> /fz Phase 3에서 의도 키워드와 매칭하는 사전 정의 파이프라인 19개.
+
+## 목차
+
+- [참조 스킬](#참조-스킬)
+- [파이프라인 목록](#파이프라인-목록)
+- [동적 파이프라인 구성](#동적-파이프라인-구성)
+- [설계 원칙](#설계-원칙)
+
+---
+
+## 참조 스킬
+
+| 스킬 | 참조 이유 |
+|------|----------|
+| /fz | Phase 3 파이프라인 해결 |
+| /fz-manage | 파이프라인 의존성 그래프 조회 |
+| /fz-skill | provides/needs 체인 검증 |
+
+## 파이프라인 목록
+
+> ⛔ `TEAM 모드` 열은 **실행 스크립트만** 적는다. 에이전트 구성은 그 스크립트가 소유한다 —
+> 정본 `modules/governance.md` § Truth-of-Source · 에이전트 목록은 `modules/team-registry.md`.
+> 이전 판은 에이전트를 열거해 실제 스폰과 어긋났다(code-only 에 `impl-quality` 누락 · peer-review 가 다른 스크립트를 지목).
+>
+> `gpt verify` · `gpt check` 게이트는 GPT 를 켠 세션이면 필수다 — 실행 여부는 그 단계 직전 `gpt-choice.sh decide` 한 줄이 정하고(`skip` 이면 `[GPT 미사용 — 사유]`), 켬이면 필수 · 명시 플래그 · 명시 호출의 구분은 `modules/gpt-strategy.md` § 단계 실행 판정이 정본이다.
+> 표의 `게이트` 행은 대표 표기다 — 게이트 행이 없는 파이프라인(explore-plan · review-only 등)도 체인 스킬의 GPT 단계(예: fz-plan Phase 2 verify · fz-review Phase 5 review · 5.5 validate)를 그대로 갖는다. 전수는 같은 절의 정책 표다.
+
+### 1. explore
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `찾아, 탐색, 구조, 영향, 의존성` |
+| 체인 | fz-search |
+| 기본 모드 | SOLO |
+| TEAM 모드 | `workflows/search-cross-verify.js` |
+
+### 2. explore-plan
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `찾아.*계획, 분석.*설계, 탐색.*후.*계획` |
+| 체인 | fz-search → fz-plan |
+| 기본 모드 | SOLO |
+| TEAM 모드 | `workflows/search-cross-verify.js` → `workflows/plan-lean2.js` (순차) |
+
+### 3. discover
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `어떻게.*좋을까, 트레이드오프, 뭐가.*맞을까` |
+| 체인 | fz-discover |
+| 기본 모드 | SOLO |
+| TEAM 모드 | `workflows/discover-adversarial.js` |
+
+### 4. bug-hunt
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `버그.*찾아, 크래시.*원인, 에러.*추적` |
+| 체인 | fz-search → fz-fix |
+| 기본 모드 | SOLO |
+| 게이트 | ✓ build (fz-fix 후) + ✓ gpt check (fz-fix Step 4) |
+
+### 5. quick-fix
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `수정, 고쳐, 변경해줘, 바꿔줘` |
+| 체인 | fz-fix |
+| 기본 모드 | SOLO |
+| 게이트 | ✓ build + ✓ gpt check (fz-fix Step 4) |
+
+### 6. plan-only
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `계획, 설계, 아키텍처` |
+| 체인 | fz-plan |
+| 기본 모드 | SOLO |
+| TEAM 모드 | `workflows/plan-lean2.js` (롤백 경로 `workflows/plan-collaborative.js`) |
+| 게이트 | ✓ direction-challenge (Phase 0.5) + ✓ stress-test(Q1-Q6) + ✓ gpt verify (Phase 2) |
+
+### 7. plan-to-code
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `계획.*구현, 설계.*개발, 만들어줘` |
+| 체인 | fz-plan → fz-code |
+| 기본 모드 | TEAM |
+| TEAM 모드 | `workflows/plan-lean2.js` → `workflows/code-pair.js` (순차) |
+| 게이트 | ✓ direction-challenge + ✓ stress-test + ✓ gpt verify (Phase 2) + ✓ build + ✓ implication-scan (조건부) + ✓ gpt check |
+
+### 8. code-only
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `구현, 코드, 개발` (계획 이미 있을 때) |
+| 체인 | fz-code |
+| 기본 모드 | SOLO |
+| TEAM 모드 | `workflows/code-pair.js` |
+| 게이트 | ✓ build + ✓ friction-detect + ✓ gpt check (8.5) |
+
+### 9. code-to-review
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `구현.*리뷰, 만들고.*검토` |
+| 체인 | fz-code → fz-review |
+| 기본 모드 | TEAM |
+| TEAM 모드 | `workflows/code-pair.js` → `workflows/review-live.js` (순차) + Lead 후속(Phase 4.5 correctness · memory recall) |
+| 게이트 | ✓ build + ✓ implication-scan (조건부) + ✓ gpt check |
+
+### 10. review-only
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `리뷰, 검증, 품질` |
+| 체인 | fz-review |
+| 기본 모드 | SOLO |
+| TEAM 모드 | `workflows/review-live.js` + Lead 후속(Phase 4.5 correctness · memory recall) |
+
+### 11. review-to-ship
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `리뷰.*커밋, 검토.*PR` |
+| 체인 | fz-review → fz-commit → fz-pr |
+| 기본 모드 | TEAM |
+| TEAM 모드 | `workflows/review-live.js` → Lead 커밋/PR (fz-commit·fz-pr 은 Workflow 없음) |
+| 게이트 | gpt check (커밋 전) — 명시 호출 전용(fz-commit · fz-pr 에 자동 배선 없음 · `skills/fz/SKILL.md` § 3.4) |
+
+### 12. fix-to-ship
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `고쳐서.*커밋, 수정.*PR` |
+| 체인 | fz-fix → fz-review → fz-commit |
+| 기본 모드 | SOLO |
+| 게이트 | ✓ build + ✓ gpt check (fz-fix Step 4) |
+
+### 13. full-cycle
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `처음부터.*끝까지, 계획부터.*PR` |
+| 체인 | fz-plan → fz-code → fz-review → fz-commit → fz-pr |
+| 기본 모드 | TEAM |
+| TEAM 모드 | 단계별 스크립트 순차 — `workflows/plan-lean2.js` → `workflows/code-pair.js` → `workflows/review-live.js` |
+| 게이트 | 전체 게이트 자동 삽입 |
+| 특수 | opus Primary 2개 원칙 예외 (단계별 순차이므로 동시 아님) |
+
+### 14. peer-review
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `피어리뷰, PR.*리뷰, 팀원.*코드` |
+| 체인 | fz-peer-review |
+| 기본 모드 | SOLO |
+| TEAM 모드 | `workflows/peer-review.js` (Tier 2/3 Analyze) |
+
+### 15. drift-check
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `드리프트\|아키텍처.*점검\|레이어.*위반\|전체.*스캔\|점검해줘\|훑어봐\|전체.*봐줘\|전체.*확인해줘` |
+| 체인 | fz-gpt drift |
+| 기본 모드 | SOLO |
+| 실행자 | Lead → GPT drift (fz-drift 스킬) |
+| 권장 시점 | PR 전, 대규모 리팩토링 후 |
+
+### 16. plan-parallel
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` |
+| 체인 | fz-gpt plan |
+| 기본 모드 | SOLO |
+| 실행자 | Lead → GPT plan (fz-planner 스킬) |
+| 주의 | **C4 원칙**: Claude 계획 텍스트 전달 금지. 요구사항만 공유 |
+| 출력 | Claude 계획과 교차 비교용 독립 계획서 |
+
+### 17. memory-audit
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `메모리.*정리\|메모리.*관리\|메모리.*감사\|교훈.*회상\|memory.*audit\|memory.*gc` |
+| 체인 | fz-memory audit → (선택) fz-memory gc |
+| 기본 모드 | SOLO |
+| 게이트 | 없음 |
+
+### 18. skill-optimize
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `스킬.*최적화\|description.*최적화\|트리거.*개선\|스킬.*트리거\|optimize.*skill\|trigger.*improve` |
+| 체인 | fz-skill eval → fz-skill optimize |
+| 기본 모드 | SOLO |
+| 게이트 | ✓ Runtime Trigger Eval (skill-creator run_eval.py) |
+| 특수 | skill-creator 미설치 시 eval만 실행 (optimize 스킵 + 설치 안내) |
+
+### 19. pr-comment-review
+
+| 항목 | 값 |
+|------|---|
+| 트리거 | `코드레빗\|PR.*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` |
+| 체인 | (내부 절차) classify-all → verify-each → user-confirm → import-to-ledger |
+| 기본 모드 | SOLO |
+| 게이트 | ✓ external-feedback-verify (각 코멘트별) |
+| 특수 | 하이브리드 경량 파이프라인. External Feedback Gate 의무 적용 |
+
+**절차**:
+1. **classify-all**: PR 코멘트 전체 fetch (`gh api`) → 심각도 분류 (critical/major/minor/nitpick) + 피드백 신뢰도 4단계 (project-rule/valid-suggestion/preference/needs-review)
+2. **verify-each**: 각 코멘트에 External Feedback Gate 적용 — Read(함수 시그니처) + 기존 패턴 대조 → valid/invalid/needs-investigation 판정
+3. **user-confirm**: 코멘트별 판정 + 대응 초안 테이블(어조 `modules/team-facing-writing.md`) → 사용자 승인 → (선택) GitHub 답변 포스트
+4. **import-to-ledger** (트랙 C 펜): user-confirm에서 valid/needs-investigation으로 승인된 항목 중, 이번 세션이 `/fz-review --deep` 이후 외부 리뷰어가 발견한 fz-miss면 → (a) fz-review Issue Tracker에 append (severity/category/file/line/description), (b) `promotion-ledger.md` 트랙 C 관측 기록 (finding-source: external + 4-classify 분류). user-confirm 승인 게이트가 기록 전 사람 확인 보장 (precision ~55% FP 차단). fz-miss 아니면(외부가 새 이슈만 제기) skip. 단 트랙 C *활성화 카운트*엔 4-classify가 project-rule/valid-suggestion인 항목만 반영 — verify-each 판정축(valid/needs-investigation)과 신뢰도축(4-classify)은 독립이라 import돼도 count 제외 가능.
+
+---
+
+## 동적 파이프라인 구성
+
+사전 정의 19개에 매칭되지 않을 때 provides/needs 그래프로 자동 구성:
+
+```
+provides/needs 체인:
+needs=none (진입점): fz-plan, fz-search, fz-fix, fz-discover
+needs=planning:      fz-code
+needs=code-changes:  fz-review, fz-commit
+needs=commit:        fz-pr
+```
+
+알고리즘:
+1. 최종 목표 스킬의 metadata.needs 확인
+2. 그 토큰을 metadata.provides 하는 스킬 역추적 (재귀)
+3. 토폴로지 정렬 → 선형 파이프라인
+4. 끊어진 체인 → AskUserQuestion
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (/fz Phase 3에서만 로드)
+- 500줄 이하 유지
+- 파이프라인 추가/수정 시 fz SKILL.md 사용 예시와 동기화

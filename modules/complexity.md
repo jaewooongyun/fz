@@ -1,0 +1,55 @@
+# 5차원 복잡도 평가
+
+> **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2503.13657(MAST) · 2606.13733. ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
+
+> /fz Phase 2에서 참조. 5차원 점수 합산 → SOLO / TEAM — 파이프라인 · 팀 구성 참고다. 스킬 모드(light · full)는 정하지 않는다 — 각 스킬 게이트가 실측으로 추천하고 추천 full 일 때만 묻는다(2026-11-12 — `modules/mode-gate.md` § 언제 묻나 2).
+
+## 5차원 점수 계산
+
+각 차원 0-2점, 합산 0-10점:
+
+| 차원 | 0점 | 1점 | 2점 |
+|------|-----|-----|-----|
+| Scope | 단일 파일/함수 | 모듈/패키지 단위 | 시스템/다중 서비스 |
+| Depth | 단순 변경 (값, 텍스트) | 로직/알고리즘 변경 | 아키텍처/패턴 변경 |
+| Risk | 독립적, 롤백 쉬움 | 일부 컴포넌트 영향 | 광범위 영향, 롤백 어려움 |
+| Novelty | 기존 패턴 재사용 | 부분 새 패턴 도입 | 완전 새 설계/도입 |
+| Verification | 눈으로 확인 가능 | 빌드/테스트 필요 | 다중 검증/Cross-model 필요 |
+
+## 모드 결정
+
+| 합산 | 모드 | 실행 방식 |
+|------|------|---------|
+| 0-3 | SOLO | Lead(fable) 단독, 순차 실행 |
+| 4+ | TEAM | Lead(fable) + Primary(opus) + 워커 opus/sonnet (동시 opus ≤3) |
+
+> **SOLO + Supporting 하이브리드**: SOLO 모드(0-3)에서도 특정 스킬은 조건부 Supporting 에이전트를 1명 추가할 수 있다.
+> 이 경우 TeamCreate는 사용하지 않고, Lead가 Supporting을 Agent로 직접 스폰한다.
+> 예: fz-fix (복잡도 3+) → impl-correctness + review-arch (team-registry.md 참조)
+
+## Parallelizable 판별 (TEAM 진입 시 modifier — 별도 게이트 아님)
+
+TEAM(4+)으로 판정돼도, 작업이 **tightly-coupled**(상호의존 결정이 많음 — 대부분의 구현/리팩토링)이면 fan-out 대신 **single-thread 구성 + 다관점 검증**을 권고한다. multi-agent fan-out은 **parallel + read-heavy + 단일 컨텍스트 초과**(탐색/리뷰/감사) 작업에서만 이득이 크다. 이유: coupled 작업의 병렬 분해는 MAST 실패 모드(inter-agent misalignment·task verification 범주)를 유발하고 동일 토큰 예산에서 우위가 사라진다 [verified: arxiv 2503.13657 "Why Do Multi-Agent LLM Systems Fail?" — Cemri]. (2026-11-01 정정(M1) — MAST 가 받치는 것은 실패 범주뿐이고 v1~v3 에 동일 예산 주장은 없다. 추론 토큰을 같게 두면 단일 에이전트가 멀티에이전트와 같거나 낫다는 결과는 다중 홉 추론 과제에서 나왔다 [arxiv preprint, 2026-04: 2604.02460 — 다중 홉 추론, 코딩 과제 아님 · vN 미기록]) 이 판별은 5차원 점수를 *대체하지 않고* TEAM 실행 형태(fan-out vs single-thread)를 조정하는 modifier다. 분할이 요구하는 **정보 전달량(정보병목)이 큰 경우도 동일** — 워커 추가 대신 태스크 재구조화를 우선한다 [외부: harness-paper §4-F, arXiv 2606.13733 — 원 논문 미대조; 상세: `guides/harness-engineering.md` §10 역방향 게이트].
+
+## Override 플래그 우선순위
+
+점수 무관 강제 적용.
+
+| 플래그 | 모드 | 실행 모드 |
+|-------|------|---------|
+| `--solo` | SOLO 강제 | STANDARD |
+| `--team` | TEAM 강제 | STANDARD |
+| `--deep` | TEAM 강제 | STANDARD + 교차 검증 강화 |
+| `--batch` | SOLO 유지 | BATCH (worktree 병렬) |
+| `--loop` | TEAM 유지 | LOOP (자동 반복 + 에스컬레이션) |
+
+## 실행 모드 자동 분기
+
+| 조건 | 실행 모드 |
+|------|---------|
+| SOLO + `--batch` | BATCH |
+| SOLO + 독립 대상 3개+ | BATCH |
+| TEAM + `--loop` | LOOP |
+| TEAM + Gate 반복 예상 | LOOP |
+
+> 상세: `modules/execution-modes.md`

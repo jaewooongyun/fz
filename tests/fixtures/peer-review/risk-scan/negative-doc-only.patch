@@ -1,0 +1,7 @@
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1,4 @@
+ # Docs
++Use auth token for the public func endpoint.
++See migration and schema notes.

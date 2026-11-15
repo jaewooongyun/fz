@@ -1,0 +1,14 @@
+{
+  "serena": {
+    "command": "uvx",
+    "args": [
+      "--from",
+      "git+https://github.com/oraios/serena@v2.1.0",
+      "serena",
+      "start-mcp-server",
+      "--context",
+      "claude-code",
+      "--project-from-cwd"
+    ]
+  }
+}

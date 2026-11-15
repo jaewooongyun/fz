@@ -1,0 +1,167 @@
+# Serena Memory 관리 정책
+
+> **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2601.15300 · 2510.05381(EMNLP 2025 Findings) · `platform.claude.com` memory-tool. ⚠️ 이 감사에서 **레지스트리 미등재 4종** 발견 — `2510.05381` · `2510.07777` · `2512.20845` · `2601.15300` (`guides/llm-references.md` · `guides/harness-engineering.md` §참고문헌 둘 다에 없다). ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
+
+> 모든 fz-* 스킬이 참조하는 Serena Memory 키 네이밍 + GC 정책
+
+## 목차
+
+- [키 네이밍 컨벤션](#키-네이밍-컨벤션)
+- [수명 정책 (GC)](#수명-정책-gc)
+- [GC 실행 방법](#gc-실행-방법)
+- [읽기/쓰기 권한 가이드](#읽기쓰기-권한-가이드)
+- [암묵적 결합 (Implicit Coupling)](#암묵적-결합-implicit-coupling)
+- [스킬별 메모리 활용 패턴](#스킬별-메모리-활용-패턴)
+- [참조 스킬](#참조-스킬)
+- [Context 계층 요약](#context-계층-요약)
+- [설계 원칙](#설계-원칙)
+
+---
+
+## 키 네이밍 컨벤션
+
+```
+{namespace}:{category}:{identifier}
+```
+
+| 네임스페이스 | 카테고리 | 예시 | 용도 |
+|------------|---------|------|------|
+| `fz` | `session` | `fz:session:current` | 현재 활성 세션 + 티켓 폴더 WORK_DIR 경로 |
+| `fz` | `artifact` | `fz:artifact:step1` | 파이프라인 단계 산출물 · ⛔ 생산자 없음(쓰는 절차 0 — GC 만 남았다) |
+| `fz` | `checkpoint` | `fz:checkpoint:{skill}-{phase}` | Phase 완료 또는 의미 있는 결과 시 경량 저장. 티켓 폴더(WORK_DIR) 미활성 시 유일한 compact recovery 수단. ~3,000자 <!-- 기존: 500자 --> 핵심 결정 요약 (Essential Context 포함) |
+| `fz` | `checkpoint` | `fz:checkpoint:essential` | /fz가 단독 관리. 현재 Active State + Key Decisions + Constraints (~3,000자 <!-- 기존: 500자 -->). 파이프라인 완료 시 삭제 |
+| `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}` | mid-pipeline discover 결과. phase={plan\|code\|review}. 파이프라인 완료 시 삭제 |
+| `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}-final` | discover 수렴 완료 시 최종 결과. `-final` suffix는 동일 phase 키를 덮어쓰지 않고 수렴 상태를 별도 보존 |
+| `fz` | `checkpoint` | `fz:checkpoint:review-issues` | fz-review Phase 5 완료 후 이슈 요약. 비-티켓 세션 모드 전용 |
+| `fz` | `checkpoint` | `fz:checkpoint:implication-{skill}` | Implication Scan 결과 (비-티켓 세션 시). 실행/관찰 함의 요약. 파이프라인 완료 시 삭제 |
+| `fz` | `checkpoint` | `fz:checkpoint:plan-direction` | 방향 판정 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:plan-v{N}` | 계획 버전 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:plan-verify` | 검증 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:plan-final` | 최종 승인 계획 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:code-step{N}` | 구현 Step 진행 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:fix-{bug}` | 버그 수정 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:search` | 탐색 결과 (임시) |
+| `fz` | `decision` | `fz:decision:{topic}` | 아키텍처 결정사항 (영속) · ⛔ 생산자 없음(쓰는 절차 0 — memory-curator 읽기만 남았다) |
+| `fz` | `pattern` | `fz:pattern:{name}` | 학습된 패턴 (영속) · ⛔ 생산자 없음(쓰는 절차 0 — memory-curator 읽기만 남았다) |
+| `fz` | `peer` | `fz:peer:pr-{number}` | 피어 리뷰 결과 (임시) · ⛔ 생산자 없음(쓰는 절차 0) |
+| `fz` | `rtm` | `fz:rtm:{Req-ID}` | 비-티켓 세션의 RTM 상태 (`modules/rtm.md` · 임시) |
+| `fz` | `consensus` | `fz:consensus:{YYYYMMDD_HHMMSS}` | 비-티켓 세션의 합의/불일치 요약 (`modules/cross-validation.md` · 임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:peer-review-synthesize` | Synthesize 결과 (임시) |
+| `fz` | `checkpoint` | `fz:checkpoint:peer-review-deliver` | Deliver 결과 (임시) |
+
+## 수명 정책 (GC)
+
+| 카테고리 | 수명 | GC 시점 |
+|---------|------|---------|
+| `session` | 임시 | 새 세션 시작 시 이전 세션 덮어쓰기 |
+| `artifact` | 임시 | 파이프라인 완료 시 필수 삭제 |
+| `checkpoint` | 임시 | 파이프라인 완료 시 필수 삭제 |
+| `rtm` | 임시 | 파이프라인 완료 시 필수 삭제 |
+| `consensus` | 임시 | 파이프라인 완료 시 필수 삭제 |
+| `decision` | 영속 | `/fz-memory gc --persistent` 시 30일+ 미참조 키 목록화 → 사용자 확인 후 삭제 |
+| `pattern` | 영속 | `/fz-memory gc --persistent` 시 30일+ 미참조 키 목록화 → 사용자 확인 후 삭제 |
+| `peer` | 임시 | 리뷰 완료 후 7일 내 삭제 권장 |
+
+## GC 실행 방법
+
+```
+파이프라인 완료 시 (Lead 역할):
+1. list_memories() → fz:artifact:*, fz:checkpoint:*, fz:rtm:*, fz:consensus:* 키 수집
+2. 각 키에 delete_memory() 실행
+3. fz:session:current는 유지 (다음 세션 복원용)
+
+> 이 절차는 /fz Completion의 **필수 Gate**다 (선택이 아님). GC 미실행 시 다음 세션에서 stale 키가 context를 오염시킨다.
+```
+
+## 읽기/쓰기 권한 가이드
+
+| 스킬 | Read | Write | Edit | Delete | List |
+|------|------|-------|------|--------|------|
+| /fz (오케스트레이터) | O | O | O | O | O |
+| /fz-plan | O | O | O | - | O |
+| /fz-code | O | O | O | - | - |
+| /fz-review | O | O | O | - | O |
+| /fz-fix | O | O | - | - | - |
+| /fz-search | O | O | - | - | - |
+| /fz-gpt | O | O | - | - | - |
+| /fz-discover | O | O | O | - | O |
+| /fz-memory | O | O | O | O | O |
+| /fz-manage | O | - | - | - | O |
+| /fz-peer-review | O | O | - | - | - |
+
+## 암묵적 결합 (Implicit Coupling)
+
+키 간 순서 의존성이 존재한다. 이를 인지하지 못하면 복원 시 데이터 불일치가 발생한다.
+
+| 의존 관계 | 설명 |
+|----------|------|
+| `session:current` → `artifact:*` | artifact 키의 work_dir 해석이 session:current에 의존 |
+| `checkpoint:plan-*` → `checkpoint:code-*` | code checkpoint는 plan 결과를 전제 |
+| `decision:*` → `artifact:*` | artifact가 decision을 참조할 수 있음 |
+
+GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락이 소실된다. GC 순서: artifact → checkpoint → session(유지).
+
+## 스킬별 메모리 활용 패턴
+
+| 스킬 | 읽기 | 쓰기 |
+|------|------|------|
+| /fz | `fz:session:current` (복원) | `fz:session:current` (초기화 + work_dir), `fz:checkpoint:essential` |
+| /fz-plan | `fz:session:current` | `fz:checkpoint:plan-direction`, `plan-v{N}`, `plan-verify`, `plan-final` (+ `fz:decision:{topic}` 영속 — ⛔ 생산 절차 없음, 키 표 참조) |
+| /fz-code | `fz:decision:{topic}`, `fz:checkpoint:plan-*` | `fz:checkpoint:code-step{N}` (임시) |
+| /fz-review | `fz:checkpoint:code-*` | `fz:checkpoint:review-issues` (임시) |
+| /fz-fix | `fz:session:current` | `fz:checkpoint:fix-{bug}` (임시) (+ `fz:pattern:{bug_type}` 영속 — ⛔ 생산 절차 없음, 키 표 참조) |
+| /fz-search | `fz:decision:{topic}` | `fz:checkpoint:search` (임시) |
+| /fz-discover | `fz:checkpoint:discover-{tag}` | `fz:checkpoint:discover-{tag}` (journal=덮어쓰기, phase=APPEND), `discover-{tag}-final` (수렴) |
+| /fz-memory | `fz:*` (전체 조회) | - (관리 전용, 직접 쓰기 없음) |
+| /fz-manage | `fz:session:current` | - (읽기 전용 조회) |
+| /fz-peer-review | `fz:checkpoint:peer-review-*` | `fz:checkpoint:peer-review-synthesize` (임시), `peer-review-deliver` (임시) |
+
+## 참조 스킬
+
+| 스킬 | 참조 이유 |
+|------|----------|
+| /fz | 세션 초기화 + GC 실행 + checkpoint:essential 관리 |
+| /fz-memory | 전체 메모리 관리 (audit/gc/recall/organize/remind) |
+| /fz-plan | checkpoint:plan-* + decision 키 쓰기 |
+| /fz-code | checkpoint:code-step{N} 쓰기 |
+| /fz-review | checkpoint:review-issues 쓰기 |
+| /fz-fix | checkpoint:fix-{bug} + pattern 키 쓰기 |
+| /fz-search | checkpoint:search 쓰기 |
+| /fz-gpt | session 키 읽기 |
+| /fz-discover | checkpoint:discover-{tag} 쓰기 + 결정사항 영속화 |
+| /fz-manage | session/checkpoint 읽기 + list (관리 조회) |
+| /fz-peer-review | checkpoint:peer-review-synthesize/deliver 쓰기 |
+
+## Context 계층 요약
+
+> **근거 — 왜 계층화가 필요한가**: 1M context window는 **safety net이지 strategy가 아니다**. Intelligence Degradation in Long-Context LLMs (arxiv 2601.15300) + Context Length Alone Hurts (arxiv 2510.05381, EMNLP 2025 Findings) — 컨텍스트 확대 자체가 모델 성능을 저하시킴. 따라서 L1/L2/L3 분리는 "용량 부족 대응"이 아니라 "집중 > 분산" 원칙의 구조적 강제.
+
+| 계층 | 도구 | 상세 |
+|------|------|------|
+| L1 Hot | auto-memory (MEMORY.md) | 세션 간 영속. 프로젝트 수준 교훈/패턴/규칙. `modules/memory-guide.md` 정책 준수 |
+| L2 Structured | Serena Memory (`fz:*`) | 세션 내 임시. 파이프라인 진행 상태/체크포인트 (~3,000자 <!-- 기존: 500자 -->). compact recovery 수단 |
+| L3 File Artifact | 티켓 폴더 파일 | 세션 내 상세. 무제한 크기 구조화 산출물. L3=canonical, L2=cursor |
+
+> L1.5: Serena decision/pattern 키는 L2 임시가 아닌 영속. GC 대상 아님.
+
+### Claude Memory tool과의 관계
+
+> 참조: Anthropic 공식 Memory tool (file-system-based memory, https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool). Opus 4.x는 file-system 기반 메모리 활용도가 높음 — 도구를 새로 추가한 것이 아니라 **활용**이 강함.
+
+공식 Memory tool은 **client-side 도구** — 저장 backend/위치는 **사용자/애플리케이션이 제어**. "across conversations"/"persist between sessions" 지원. 기능적으로 fz의 L3 (티켓 폴더 + `.claude/projects/.../memory/`)와 **중복 가능성** 존재:
+
+| 관점 | fz 자체 구현 (L1/L3) | Claude Memory tool |
+|------|----------------------|---------------------|
+| 저장소 | `MEMORY.md` + 티켓 폴더 + Serena | 클라이언트/애플리케이션 관리 backend |
+| 관리 | fz 파이프라인 + memory-guide.md 정책 | 도구 구성 + 모델 사용 패턴 |
+| 세션 | cross-session (파일 기반) | cross-session 가능 (backend 구성에 따름) |
+| 이식성 | Claude Code 독립 | Claude API/Code 공통 |
+
+**현재 정책**: fz는 자체 L1/L2/L3 유지. 이유 — (a) 명시적 정책/태깅 제어, (b) Serena MCP와 직접 연동, (c) fz 파이프라인 Gate 연계. **미래 전환 판단 기준**: Memory tool을 fz L1.5 수준 정책(태깅/GC/읽기 권한)으로 감싸는 어댑터를 만들 가치가 생기면 재검토. [미검증: 2026-04 시점 공식 문서 기반, 실사용 실측 부재]
+
+상세: `modules/context-artifacts.md` 참조 / L1 관리: `modules/memory-guide.md` 참조
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (필요 시에만 로드)
+- 500줄 이하 유지

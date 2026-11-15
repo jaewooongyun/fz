@@ -1,0 +1,74 @@
+commit 0000000000000000000000000000000000000000
+Author: Example Dev <dev@example.com>
+Date:   Thu Jan 1 00:00:00 2026 +0000
+
+    refactor(summary): 제스처 구현을 전용 파일로 분리
+
+    - 인터랙터의 제스처 구독과 종료 핸들러를 SummaryInteractor+Gesture 로 이동
+    - 파일 경계를 넘게 된 gestureStream 을 실험 빌드 한정으로 개방
+
+diff --git a/Sources/Summary/SummaryInteractor+Gesture.ext b/Sources/Summary/SummaryInteractor+Gesture.ext
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/Sources/Summary/SummaryInteractor+Gesture.ext
+@@ -0,0 +1,22 @@
++//
++//  SummaryInteractor+Gesture.ext
++//  Summary
++//
++//  Created by Example Dev on 01/01/26.
++//  Copyright © 2026 Example. All rights reserved.
++//
++//  `SummaryPresentable` 의 제스처 이벤트를 이 파일이 구독한다.
++//
++
++#if EXPERIMENT
++extension SummaryInteractor {
++    // MARK: - Gesture
++    func subscribeGesture() {
++        gestureStream
++            .sink { [weak self] event in
++                self?.handleGesture(event)
++            }
++            .store(in: &cancellables)
++    }
++
++    func handleGesture(_ event: GestureEvent) {
++        switch event {
++        case .began: beginTracking()
++        case .ended: endTracking()
++        }
++    }
++}
++#endif
+diff --git a/Sources/Summary/SummaryInteractor.ext b/Sources/Summary/SummaryInteractor.ext
+index 2222222..3333333 100644
+--- a/Sources/Summary/SummaryInteractor.ext
++++ b/Sources/Summary/SummaryInteractor.ext
+@@ -12,24 +12,3 @@ final class SummaryInteractor {
+-    private func subscribeGesture() {
+-        gestureStream
+-            .sink { [weak self] event in
+-                self?.handleGesture(event)
+-            }
+-            .store(in: &cancellables)
+-    }
+-
+-    private func handleGesture(_ event: GestureEvent) {
+-        switch event {
+-        case .began: beginTracking()
+-        case .ended: endTracking()
+-        }
+-    }
+-
+-    private func beginTracking() {
+-        tracking = true
+-    }
+-
+-    private func endTracking() {
+-        tracking = false
+-    }
++    var gestureStream: AnyPublisher<GestureEvent, Never> {
++        gestureSubject.eraseToAnyPublisher()
++    }

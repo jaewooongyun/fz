@@ -1,0 +1,17 @@
+diff --git a/Sources/Login.swift b/Sources/Login.swift
+new file mode 100644
+index 0000000..62c09ed
+--- /dev/null
++++ b/Sources/Login.swift
+@@ -0,0 +1,3 @@
++final class Login {
++    let authManager = 1
++}
+diff --git "a/docs/\354\235\270\354\246\235 \353\251\224\353\252\250.md" "b/docs/\354\235\270\354\246\235 \353\251\224\353\252\250.md"
+deleted file mode 100644
+index a8041b1..0000000
+--- "a/docs/\354\235\270\354\246\235 \353\251\224\353\252\250.md"	
++++ /dev/null
+@@ -1,2 +0,0 @@
+-# 인증 메모
+-Rotate the auth token before release.

@@ -1,0 +1,18 @@
+{
+ "summary": "review-live",
+ "agentCount": 5,
+ "logs": [],
+ "result": {
+  "mode": "workflow",
+  "findings": [],
+  "okAreas": [],
+  "metrics": {
+   "agentCalls": 5,
+   "nullCount": 0,
+   "fallbackCount": 0,
+   "stagesCompleted": 3
+  }
+ },
+ "totalTokens": 5000,
+ "totalToolCalls": 10
+}

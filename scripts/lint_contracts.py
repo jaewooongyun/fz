@@ -1,0 +1,1895 @@
+#!/usr/bin/env python3
+"""fz 플러그인 계약 lint — `fz-manage check` 의 결정론 판정기.
+
+⛔ 본 스크립트가 **검사 항목의 SSOT**다. SKILL.md는 항목 표를 재정의하지 않고 `--list`에 위임한다.
+   이유: 항목을 두 곳에 쓰면 드리프트한다 (플러그인 자체 감사에서 F-5·F-19로 실측된 실패 모드).
+
+판정자 3분류 (guides/skill-authoring.md §11 "결과가 binary(pass/fail)인가? → 스크립트"):
+  DETERMINISTIC — 스크립트가 판정
+  THRESHOLD     — 임계/문법 미정 → SKIP (정하면 DETERMINISTIC 승격)
+  SEMANTIC      — 의미 판단 → SKIP (사람/모델 소관)
+
+exit code (⛔ 3분 — modules/cross-validation.md §Negative-Result Gate 요소2):
+  0 = 위반 없음
+  1 = 위반 있음
+  2 = configuration/parse error  ⛔ PASS도 SKIP도 아니다
+
+Python 표준 라이브러리 전용. 루트는 자기 위치에서 해석한다(CWD 비의존).
+"""
+from __future__ import annotations
+import argparse
+import ast
+import json
+import os
+import re
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent   # scripts/ → 플러그인 루트
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 항목 레지스트리 (SSOT)
+# ─────────────────────────────────────────────────────────────────────────────
+ITEMS = [
+    # id,   판정자,          대상,        설명
+    ("1",  "DETERMINISTIC", "fz-*",      "YAML 필수 필드 (L1 공식 4 + L2 fz 정책 2) — 정본 modules/governance.md §스킬 최소 기준"),
+    ("2",  "SEMANTIC",      "fz-*",      "MCP 유효성 — allowed-tools의 MCP 도구 실존 (서버 상태 의존)"),
+    ("3",  "DETERMINISTIC", "fz-*",      "provides/needs 충족 + DAG 사이클 부재"),
+    ("4",  "DETERMINISTIC", "fz-*",      "intent-triggers 겹침 · 누수 — 합성 corpus(tests/fixtures/routing/intent-corpus/cases.tsv)의 필수 · 금지 라벨을 scripts/intent_route_probe.py 로 판정(F-528 — 임계를 문장 단언으로 정했다)"),
+    ("5",  "DETERMINISTIC", "fz-*",      "SKILL.md ≤500줄"),
+    ("6",  "DETERMINISTIC", "all",       "깨진 파일 참조"),
+    ("7",  "DETERMINISTIC", "agents",    "에이전트 파일 필드 (name/description/model/tools)"),
+    ("8",  "SEMANTIC",      "agents",    "Team 불가 MCP 참조 — 판정에 런타임 지식 필요"),
+    ("9",  "SEMANTIC",      "fz-*",      "테스트 케이스 충분성 — 존재는 세지만 충분성은 의미 판단"),
+    ("10", "SEMANTIC",      "fz-*",      "Triggering 테스트 3개+ — 품질은 의미 판단"),
+    ("11", "SEMANTIC",      "infra",     "skill-creator 설치 — 외부 환경"),
+    ("12", "DETERMINISTIC", "agents",    "MCP 도구명 — **4축**: 2형식 문법 + retired 접두 재등장 + 인벤토리 선언 정합 + 본문 Primary ↔ frontmatter 서버 정합 (⛔ 실제 **가용성**(서버가 떠 있는가)만 #2 SEMANTIC 소관 — 정적으로 닫히지 않는다. 선언 여부는 여기서 닫는다)"),
+    # ⛔ 2026-08-09 DETERMINISTIC→SEMANTIC 강등: `agents/*.md`의 `CLAUDE.md ## Architecture` 는
+    #    **소비 프로젝트의** CLAUDE.md를 뜻한다(에이전트는 대상 프로젝트 지침을 읽는다).
+    #    플러그인 자신의 CLAUDE.md로 해석하면 89건 전부 오탐 — 정적으로 구별 불가.
+    ("13", "SEMANTIC",      "all",       "CLAUDE.md 섹션 참조 유효성 — ⛔ 참조 대상이 소비 프로젝트인지 플러그인 자신인지 정적 구별 불가"),
+    ("14", "DETERMINISTIC", "modules",   "100줄+ 모듈의 목차 존재"),
+    ("16", "DETERMINISTIC", "agents",    "team-registry ↔ agents/ 양방향 일치"),
+    ("17", "THRESHOLD",     "fz-*",      "Gate Evidence 패턴 — ⛔ 정규식 미정"),
+    ("N1", "DETERMINISTIC", "schemas",   "gpt_base_issue $defs 값이 소비 스키마와 일치 — severity enum + confidence 경계 (⛔ 값은 **인라인**한다: fz 스키마는 `$ref` 를 쓰지 않는다(실측 0건) — 본 검사가 인라인 정합을 본다)"),
+    ("N2", "DETERMINISTIC", "infra",     "인벤토리 선언 ↔ 실측 카운트 — `CLAUDE.md` + `docs/architecture.md` 트리 표기 **양쪽** (한 곳만 보면 나머지가 조용히 낡는다)"),
+    ("N3", "DETERMINISTIC", "all",       "줄번호 인용 — 대상 파일 실재 + 행 범위 내 + **빈 줄 아님** (⛔ 인용 *내용*의 정합은 여전히 검사하지 않는다 — 빈 줄만이 내용 판단 없이 닫히는 결정론 조각이다)"),
+    ("N4", "DETERMINISTIC", "all",       "ERE alternation 오용 — `grep -E` 같은 줄의 `\\|`"),
+    ("N5", "DETERMINISTIC", "scripts",   "측정 명령의 신호 폐기 (`>/dev/null 2>&1` + exit 미사용)"),
+    ("N6", "DETERMINISTIC", "scripts",   "루트 앵커 — **줄 단위 화이트리스트**(fail-closed). ⛔ 일반 분석 아님: 미지 형태는 거부하고 `ANCHOR_LINES` 에 명시 추가한다. `.sh` 는 첫 `<<` 이후를 데이터로 취급"),
+    ("N7", "DETERMINISTIC", "all",       "셸 변수 정의-사용 불일치 — `[ ]`/`[[ ]]` × 인용/비인용 `-n`/`-z` 한정 (⛔ 범위 외: heredoc 내부·멀티라인 테스트·`${VAR:-기본값}`은 의도적 제외)"),
+    ("N8", "DETERMINISTIC", "all",       "목차 앵커 해소 — GitHub slug + occupied 충돌 루프 + GFM fence 제외 (⛔ 범위 외: heading 내 inline markup·HTML)"),
+    # ⛔ #N9 신설 근거 (2026-08-20 가이드 전수 감사): `§N.M` 참조 462건 중 어떤 검사도 해소를
+    #    확인하지 않았다. 실측으로 두 형태의 성질이 갈렸다 —
+    #    ⚠️ 아래 수치는 **모집단이 다르다** — (a)/(b)는 도입 판정용 프로브(guides·modules·skills·
+    #       agents·templates 한정)이고, 본 검사의 실제 순회는 `walk_files()` 전체라 seen=149다.
+    #    (a) `` `X.md` §N `` cross-file: 프로브 121건 → 위반 1, 오탐 0  → **본 검사가 담당**
+    #    (b) 파일명 없는 `§N` self-file: 프로브 329건 → 위반 119(36%) → ⛔ **미도입**.
+    #        대부분 다른 문서·논문의 절을 문맥상 축약한 표기(`§2.4`=OpenDev 논문, `§5.7`=experiment-log)라
+    #        정적으로 대상 문서를 특정할 수 없다. 도입하면 오탐률이 #13 강등 선례(89건)를 재현한다.
+    ("N12", "DETERMINISTIC", "all",     "`/sc:` 네임스페이스 형식 — `/sc:sc-*` 만 유효 (v4.35.0 에서 86곳을 고쳤는데 **지키는 검사가 없었다**. B14: done 판정의 오라클이 `mcp__serena__` 0건이었고 그것은 다른 대상을 잰다)"),
+    ("N11", "DETERMINISTIC", "skills", "경량 경로 검증 계약 — light/tier 경로를 가진 스킬은 **그 경로 절차가 있는 문서**에 어떤 검증이 살아남는지 선언한다. ⛔ 절차를 모듈로 위임하면 그 모듈에도 있어야 한다 — SKILL.md 에만 적으면 위임 절차를 따르는 Lead 가 못 본다 (실측: Coverage Gate 가 `### 4. Confidence Matrix 출력` 안에 있는데 Tier 0 은 그 섹션을 건너뛴다)"),
+    ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 gpt 응답이 아니다)"),
+    ("N13", "DETERMINISTIC", "agents",   "memory 필드 재도입 금지 — `agents/`(memory-curator 제외)·`templates/` 에 `^memory:` 0 (A2-01·AC-7: 필드가 Read/Write/Edit 를 자동 부여해 Workflow 에이전트의 쓰기 없음 계약과 충돌하고, 세션 간 기록이 A/B 입력을 오염시킨다. guides 의 기능 설명 예시는 범위 밖)"),
+    ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
+    ("N14", "DETERMINISTIC", "all",      "빈 mktemp 치환 cd — 실행 코드(.sh·.py·.js)의 `cd`/`pushd` 인자가 `$(mktemp …)` 치환 0 (F-355: mktemp 가 실패하면 `cd \"\"` 가 성공해 현재 폴더가 임시 폴더가 되고 정리가 그 폴더를 지운다. ⛔ 범위 외: 주석·`.sh` 따옴표 구분자 heredoc 본문·`.md` 의 BAD 예시 — 설명이다 · 결과를 확인 없이 변수로 받은 뒤 `cd \"$d\"` 하는 두 줄 꼴)"),
+]
+DET = {i for i, k, _, _ in ITEMS if k == "DETERMINISTIC"}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MIN_HITS — 각 검사가 최소 몇 개의 후보를 봐야 하는가 (순회 회귀 탐지)
+#
+# 왜 필요한가 (2026-08-09 외부 감사 ISSUE-001·002): `hits`는 *본 후보 수*라 패턴이나
+#   순회가 고장나도 0이 아니어서 `OK [검사 대상 N]`이 찍혔다. 실제로 #N2는 INV에 5개를
+#   등재하고도 **3개만** 검사하며 통과했다 — 선언 형식 불일치를 조용히 skip했기 때문이다.
+#   fixture는 *판정 로직*을 지키고, MIN_HITS는 *순회·수집*을 지킨다 (두 층).
+#
+# ⛔ 하한은 **보수적**으로 둔다 — 파일을 정당하게 삭제해도 즉시 깨지지 않도록.
+#    미달 시 exit 2 메시지가 "트리 변화인가 도구 고장인가"를 묻는다.
+# ⛔ 새 DETERMINISTIC 항목은 MIN_HITS를 **함께** 선언해야 한다 (구조 불변식이 강제).
+# ─────────────────────────────────────────────────────────────────────────────
+MIN_HITS = {
+    "1": 15,     # 스킬 21개 — 보수적
+    "3": 15,     # 동일
+    "4": 10,     # 합성 corpus 16문장
+    "5": 15,     # 동일
+    "6": 300,    # 참조 564건 — 절반 수준
+    "7": 10,     # 에이전트 13개
+    "14": 20,    # 목차 보유 모듈 30개
+    "16": 10,    # 에이전트 13개
+    # ⛔ #12 는 agents + skills 의 `tools:`/`allowed-tools:` 를 함께 본다 — 실측 34파일.
+    #    보수적으로 10. 0 으로 두면 walk 실패가 "위반 0건" 으로 조용히 통과한다(fail-open).
+    "12": 10,
+    # ⛔ #N12 는 `/sc:` 토큰을 센다 — 실측 20종(고유). 보수적으로 10.
+    #    0 으로 두면 walk 실패가 "위반 0건" 으로 통과한다 — B14 가 고치려는 바로 그 형태다.
+    "N12": 10,
+    # ⛔ #N1·#N2는 **여유 0**이 의도된 설계다. 하한은 *최소*이므로 항목 추가는 발화하지 않고
+    #    **삭제만** 발화한다 — 소비 스키마나 INV 카테고리가 줄면 그때는 검토가 옳다.
+    #    ⚠️ 미래 편집자: 여유가 0이라고 낮추지 말 것. 낮추면 "조용히 검사에서 빠짐"이 다시 가능해진다.
+    "N13": 10,   # agents 13 + templates — 순회가 죽으면 '위반 0건' 으로 통과한다(fail-open)
+    "N1": 4,     # 소비 스키마 4개 — 삭제 시 발화(의도)
+    "N2": 5,     # INV 카테고리 5개 전부 검사돼야 한다 (S6에서 3→5, 선언 형식 통일과 원자적)
+    "N3": 10,    # 줄번호 인용 32건
+    "N4": 15,    # grep -E 줄 29건
+    # ⛔ N5·N6 는 하한만으로 "한 언어 계열 소실"을 못 잡는다(py 전멸 시 sh 6개가 남아 통과) —
+    #    그 방어는 **통합 fixture 의 계열별 픽스처**(bad_n6.py + bad_n6.sh)가 담당한다 (ISSUE-007)
+    "N5": 5,     # 스크립트 10개
+    "N6": 5,     # 스크립트 10개
+    "N7": 5,     # 셸 테스트 15건
+    "N8": 100,   # 목차 앵커 237건
+    "N9": 50,    # cross-file § 참조 **실측 seen=149** (walk_files 전체) — 34%로 보수적
+    "N10": 10,   # 배선된 응답 스키마 4개 × 객체 3~6 = 17 (실측) — 보수적으로 10
+    "N11": 3,    # 경량 경로 보유 스킬 **실측 5**(fz-code·fz-plan·fz-review·fz-modernize·fz-peer-review)
+                 #   ⛔ 0 으로 두면 walk 실패 시 대상 0개로 조용히 통과한다(fail-open)
+                 #   ⛔ 121은 도입 판정 프로브(5개 디렉토리 한정) 값이니 하한 근거로 쓰지 말 것
+    "N14": 70,   # 실행 코드의 `cd`/`pushd` 줄 **실측 147**(2026-10-08 · .sh 139 · .py 8 · .js 0 — 자기 파일 제외 · 지금 값은 `--only N14` 의 검사 대상) — 절반 이하로 보수적. 하한은 순회·확장자 집합
+                 #   붕괴를 잡는다 — 주석·heredoc 과잉 제거(fail-open)는 하한 위에서도 남으므로 self-test·통합 fixture 가 잡는다
+}
+
+
+SKIP_DIRS = {".git", "worktrees", "node_modules", ".fz-work", "__pycache__"}
+SKIP_REL_PARTS = ("docs/releases/",)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 공통 유틸
+# ─────────────────────────────────────────────────────────────────────────────
+def walk_files(*exts: str, root: Path | None = None):
+    """⛔ `root` 는 **통합 fixture 전용** 주입점 (S8) — 기본값은 전역 ROOT로 동작 호환을 유지한다.
+
+    신설 근거(외부 감사 ISSUE-PLAN-003): 술어 fixture + MIN_HITS 만으로는 end-to-end가 아니다.
+      잘못된 파일 순회 · 잘못된 디렉토리 제외 · 잘못된 블록 문맥 · 결과 반전이 전부 통과한다.
+      ⇒ 임시 트리를 주입해 `chk_*` 를 **통째로** 호출하고 위반 위치·건수를 단정한다.
+    """
+    base = root or ROOT
+    for dp, dns, fns in os.walk(base):
+        dns[:] = [d for d in dns if d not in SKIP_DIRS]
+        for fn in fns:
+            p = Path(dp) / fn
+            rel = p.relative_to(base).as_posix()
+            if any(s in rel for s in SKIP_REL_PARTS):
+                continue
+            if exts and not fn.endswith(exts):
+                continue
+            yield rel, p
+
+
+def read(p: Path) -> str:
+    return p.read_text(encoding="utf-8", errors="replace")
+
+
+NESTED_KEY = "_metadata"   # ⛔ `_` 시작 — frontmatter 키 정규식(`[A-Za-z]…`)과 충돌 불가
+NESTED_SUB = re.compile(r"^ {2,}([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$")
+
+
+def frontmatter(p: Path):
+    """(dict, 본문줄수). frontmatter 미존재/미종료는 None 반환 → 호출자가 parse error 처리.
+
+    ⛔ `metadata:` 블록의 **1단계 하위 키**는 별도 dict 로 모아 `d[NESTED_KEY]` 에 담는다
+       (조회는 `fm_get()` 경유 — S7 에서 최상위 폴백 회수). 표준 들여쓰기는 **2-스페이스**이고
+       [실측 272/272], `^ {2,}` 는 더 깊은 `key:` 줄도 1단계로 받아 폭 차이에 깨지지 않는다.
+    ⛔ 분기는 **`metadata` 블록 안에서만** 갈린다 — 그 밖의 연속행 접기는 종전과 같은 경로를
+       탄다(REQ_L1·에이전트 frontmatter·#N* 검사의 입력 불변).
+    """
+    lines = read(p).split("\n")
+    if not lines or lines[0].strip() != "---":
+        return None, len(lines)
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    if end is None:
+        return None, len(lines)
+    d, key = {}, None
+    nested, nkey = {}, None
+    for l in lines[1:end]:
+        m = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$", l)
+        sub = NESTED_SUB.match(l) if key == "metadata" else None
+        if m:
+            key, nkey = m.group(1), None
+            d[key] = m.group(2).strip()
+        elif sub:
+            nkey = sub.group(1)
+            nested[nkey] = sub.group(2).strip()
+        elif key == "metadata" and nkey and l.strip():
+            nested[nkey] += " " + l.strip()
+        elif key and l.strip():
+            d[key] += " " + l.strip()
+    if nested:
+        d[NESTED_KEY] = nested
+    n = len(lines) - (1 if lines and lines[-1] == "" else 0)
+    return d, n
+
+
+def fm_get(fm: dict, key: str, default=None):
+    """frontmatter 조회 — **`metadata:` 하위만** (S4 하위호환 창은 S7 에서 회수).
+
+    ⛔ 최상위 폴백을 지웠다: L2 fz 정책 키(`provides`·`needs`·`intent-triggers`)의 정본
+       위치는 `metadata:` 하위 하나뿐이며, 최상위에 남은 키는 #1 에서 누락으로 잡힌다.
+       정본 선언 = `modules/governance.md` § 스킬 최소 기준.
+    ⛔ L1 공식 4키는 이 함수를 거치지 않는다 — `chk_1` 이 `fm` 최상위를 직접 본다.
+    """
+    return fm.get(NESTED_KEY, {}).get(key, default)
+
+
+def find_named_defs(node, name: str, path: str = "") -> list[tuple[str, dict]]:
+    """`name` 키의 정의 노드를 모두 수집한다 (범용 — severity·confidence 등)."""
+    out: list[tuple[str, dict]] = []
+    if isinstance(node, dict):
+        for k, val in node.items():
+            if k == name and isinstance(val, dict):
+                out.append((f"{path}/{name}", val))
+            out += find_named_defs(val, name, f"{path}/{k}")
+    elif isinstance(node, list):
+        for idx, x in enumerate(node):
+            out += find_named_defs(x, name, f"{path}[{idx}]")
+    return out
+
+
+def find_severity_defs(node, path: str = "") -> list[tuple[str, dict]]:
+    """JSON 트리를 순회해 `severity` 정의 노드를 모두 수집한다 (enum · `$ref` 양쪽).
+
+    ⛔ 정규식으로 `critical` 포함 enum을 찾던 1차 방식은 *critical 삭제*를 탐지하지 못했다 (ISSUE-004).
+    ⛔ 2차(inline enum만 인정)는 **`$ref` 로 base를 재사용하는 정당한 형태를 위반으로 만들었다** —
+       그게 SSOT를 지키는 방식인데도 (ISSUE-005 / ISSUE-PLAN-005). 이제 `$ref` 를 resolve한다.
+    """
+    out: list[tuple[str, dict]] = []
+    if isinstance(node, dict):
+        for k, val in node.items():
+            if k == "severity" and isinstance(val, dict):
+                out.append((f"{path}/severity", val))
+            out += find_severity_defs(val, f"{path}/{k}")
+    elif isinstance(node, list):
+        for idx, x in enumerate(node):
+            out += find_severity_defs(x, f"{path}[{idx}]")
+    return out
+
+
+def resolve_ref(ref: str, base_doc: dict, base_name: str):
+    """`file#/a/b` 또는 `#/a/b` 를 따라간다. 반환: (enum 또는 None, 오류 메시지 또는 None).
+
+    ⛔ 로드/경로 실패는 **조용히 통과시키지 않는다** — 호출자가 ParseError로 승격한다.
+    """
+    file_part, _, frag = ref.partition("#")
+    if file_part and Path(file_part).name != base_name:
+        return None, f"알 수 없는 `$ref` 대상 파일: {file_part} (base는 {base_name})"
+    cur = base_doc
+    for seg in [s for s in frag.split("/") if s]:
+        if not isinstance(cur, dict) or seg not in cur:
+            return None, f"`$ref` 경로 미해소: {ref}"
+        cur = cur[seg]
+    if not isinstance(cur, dict) or not isinstance(cur.get("enum"), list):
+        return None, f"`$ref` 대상에 enum 부재: {ref}"
+    return cur["enum"], None
+
+
+SKILLS = sorted((ROOT / "skills").glob("*/SKILL.md"))
+AGENTS = sorted((ROOT / "agents").glob("*.md"))
+MODULES = sorted((ROOT / "modules").rglob("*.md"))
+SCRIPTS = sorted(p for p in (ROOT / "scripts").glob("*") if p.is_file())
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 검사 구현 — 각 함수는 (violations, positive_control_hits) 반환
+#   positive_control_hits: 검사기가 실제로 무언가를 봤다는 증거 (0이면 도구 고장 의심)
+# ─────────────────────────────────────────────────────────────────────────────
+REQ_L1 = ("name", "description", "user-invocable", "allowed-tools")
+REQ_L2 = ("provides", "needs")
+
+
+def chk_1():
+    v, seen = [], 0
+    for p in SKILLS:
+        name = p.parent.name
+        fm, _ = frontmatter(p)
+        if fm is None:
+            raise ParseError(f"skills/{name}/SKILL.md: frontmatter 파싱 실패")
+        seen += 1
+        miss = ([f for f in REQ_L1 if f not in fm]
+                + [f for f in REQ_L2 if fm_get(fm, f) is None])   # ⛔ L2 는 `metadata:` 하위**만** (S7 창 회수)
+        if miss:
+            v.append(f"skills/{name}/SKILL.md: 필수 필드 누락 {miss}")
+    return v, seen
+
+
+def chk_3():
+    prov, need, seen = {}, {}, 0
+    for p in SKILLS:
+        name = p.parent.name
+        fm, _ = frontmatter(p)
+        if fm is None:
+            raise ParseError(f"skills/{name}: frontmatter 파싱 실패")
+        seen += 1
+        prov[name] = re.findall(r"[A-Za-z][A-Za-z0-9_-]*", fm_get(fm, "provides", ""))
+        need[name] = [t for t in re.findall(r"[A-Za-z][A-Za-z0-9_-]*", fm_get(fm, "needs", "")) if t != "none"]
+    producer = defaultdict(set)
+    for s, ts in prov.items():
+        for t in ts:
+            producer[t].add(s)
+    v = [f"{s}: needs '{t}' — provides 하는 스킬 없음" for s, ts in need.items() for t in ts if t not in producer]
+    # DAG 사이클
+    edges = defaultdict(set)
+    for s, ts in need.items():
+        for t in ts:
+            edges[s] |= producer.get(t, set())
+    color = {}
+
+    def dfs(u, stack):
+        color[u] = 1
+        for w in edges.get(u, ()):
+            if w == u:
+                v.append(f"자기 순환: {u}")
+            elif color.get(w) == 1:
+                v.append("사이클: " + " -> ".join(stack + [w]))
+            elif color.get(w, 0) == 0:
+                dfs(w, stack + [w])
+        color[u] = 2
+
+    for s in prov:
+        if color.get(s, 0) == 0:
+            dfs(s, [s])
+    return v, seen
+
+
+def chk_4():
+    """intent-triggers 겹침 · 누수 — 합성 corpus 단언을 intent_route_probe 로 판정한다(F-528). 표가 깨지면 위반 1건(판정 불가 사유)."""
+    import importlib.util
+    probe = ROOT / "scripts" / "intent_route_probe.py"
+    cases = ROOT / "tests" / "fixtures" / "routing" / "intent-corpus" / "cases.tsv"
+    if not probe.is_file() or not cases.is_file():
+        return [f"#4 판정 불가 — {probe.name} 또는 cases.tsv 가 없다"], 0
+    spec = importlib.util.spec_from_file_location("intent_route_probe", probe)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    try:
+        return mod.run_cases(cases, mod.rows_of(ROOT))
+    except mod.Unrun as e:
+        return [f"#4 판정 불가 — {e}"], 0
+
+
+def chk_5():
+    v, seen = [], 0
+    for p in SKILLS:
+        _, n = frontmatter(p)
+        seen += 1
+        if n > 500:
+            v.append(f"skills/{p.parent.name}/SKILL.md: {n}줄 > 500")
+    return v, seen
+
+
+PATHREF = re.compile(
+    r"`((?:guides|modules|skills|workflows|agents|scripts|schemas|examples|templates|gpt-skills)"
+    r"/[A-Za-z0-9_./\-]+\.(?:md|js|py|sh|json))`"
+)
+# 의도된 플레이스홀더·예시 (본 감사에서 FP로 판정된 것 — 근거는 plan/plan-final.md S9)
+REF_ALLOW = {
+    "modules/X.md", "templates/X.md",
+    "modules/shared-utils.md",            # forward-looking 후보 (governance 게이트)
+    "modules/scope-drift-monitor.md",     # 기각된 제안 기록 (docs/design — "옵션 B 채택, §4.4에 흡수")
+    "scripts/check_patterns.sh",          # skill-authoring §11 표의 예시
+    "scripts/parse_build_log.sh",         # 동
+}
+
+
+def chk_6():
+    existing = {rel for rel, _ in walk_files()}
+    v, seen = [], 0
+    for rel, p in walk_files(".md", ".js", ".py"):
+        if rel == "CHANGELOG.md":
+            continue
+        for i, line in enumerate(read(p).split("\n"), 1):
+            for m in PATHREF.finditer(line):
+                seen += 1
+                t = m.group(1)
+                if t not in existing and t not in REF_ALLOW:
+                    v.append(f"{rel}:{i}: 깨진 참조 `{t}`")
+    return v, seen
+
+
+def chk_7():
+    v, seen = [], 0
+    for p in AGENTS:
+        fm, _ = frontmatter(p)
+        if fm is None:
+            raise ParseError(f"agents/{p.name}: frontmatter 파싱 실패")
+        seen += 1
+        miss = [f for f in ("name", "description", "model", "tools") if f not in fm]
+        if miss:
+            v.append(f"agents/{p.name}: 필드 누락 {miss}")
+    return v, seen
+
+
+SECREF = re.compile(r"CLAUDE\.md\s*`##\s*([^`]+)`")
+
+
+# ⛔ `chk_13` 제거 (2026-08-10, 3라운드 감사 ISSUE-008): 항목 13은 SEMANTIC(스크립트 판정 대상 아님)인데
+#    `CHECKS` 에 등록돼 있어 **도달 불가 구현 15줄**이 남아 있었다. 새 레지스트리 불변식이 이를 검출했다.
+#    판정 근거는 항목 설명에 있다 — 참조 대상이 소비 프로젝트인지 플러그인 자신인지 정적 구별 불가.
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #12 MCP 도구명 — 3축 (문법 · retired 재등장 · Primary 정합)
+#
+# 왜 필요한가: 같은 클래스가 **세 서버째** 손으로 고쳐졌다 — `/sc:` 네임스페이스(v4.35.0 86곳) ·
+#   Serena 런타임 접두(v4.35.0 148곳) · LSP·JIRA(v4.36.0 18곳). 매번 배선이 죽어 있었고
+#   오류는 나지 않았다: `tools:` 는 목록이 **전부** 미해결일 때만 launch 가 실패하므로
+#   `Read, Grep, Glob` 이 살아 있으면 MCP 항목만 조용히 빠진다(워커 251회 Serena 호출 0).
+#
+# ⛔ 전체 문법을 정하지 않는다 — 아래 3축만 결정론으로 닫고 나머지는 SKIP 으로 **인쇄**한다.
+#   축3(실제 가용성)은 #2 SEMANTIC 소관이다: 문법이 맞아도 등록되지 않은 서버는 여기서 못 잡는다.
+#
+# 형식 2종 [verified: code.claude.com/docs/en/mcp · 실측 27 고유 토큰]:
+#   플러그인 제공 — mcp__plugin_<plugin>_<server>__<tool>
+#   일반         — mcp__<server>__<tool>
+#   ⛔ 도구명에 하이픈이 들어간다(`mcp__context7__query-docs`) — 문자 클래스에 포함해야 한다.
+MCP_TOKEN = re.compile(r"mcp__[A-Za-z0-9_-]+(?:__[A-Za-z0-9_-]+)?")
+# ⛔ 플러그인 이름은 **kebab-case** 를 허용한다 [verified: code.claude.com/docs/en/plugins-reference].
+#    이전 판은 `plugin_[A-Za-z0-9]+_` 라 `mcp__plugin_my-plugin_server__tool` 을 위반으로 잡았다
+#    (현재 트리는 플러그인명이 `fz` 라 오탐 0 — 다른 플러그인 도입 시 발화했을 잠재 오탐).
+MCP_OK = re.compile(r"^mcp__(?:plugin_[A-Za-z0-9-]+_[A-Za-z0-9-]+|[A-Za-z0-9-]+)__[A-Za-z0-9_-]+$")
+
+# ⛔ retired 접두 — 과거 드리프트로 **이미 고친** 이름이다. 문법만으로는 정상 형식과
+#   구분되지 않으므로(둘 다 `mcp__<a>__<b>`) 명시 목록이 유일한 판별 수단이다.
+#   재등장 = 회귀. 새 드리프트를 고칠 때마다 여기에 한 줄 추가한다.
+# ⛔ **하드코딩하지 않는다.** 목록이 소비자마다 흩어지면 한 곳만 고쳐진다 —
+#    N4 가 기록한 *"세 서버째 손으로 고쳤고 검사는 없다"* 가 그 증상이다.
+#    단일 출처: `schemas/tool-inventory.json` (S3·S6·S20 이 같은 파일을 읽는다).
+def _inventory() -> dict:
+    """도구 인벤토리. ⛔ 부재·파싱 실패는 **빈 목록이 아니라 예외**다 —
+    빈 목록으로 폴백하면 retired 축과 선언 축이 조용히 죽고 '위반 0건' 이 된다."""
+    q = ROOT / "schemas" / "tool-inventory.json"
+    try:
+        with open(q, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError) as e:
+        # ⛔ exit 2 = 설정/파싱 오류. PASS 도 SKIP 도 아니다 (이 파일의 3분 규약).
+        print(f"⛔ 도구 인벤토리를 읽지 못했다 — {q}: {type(e).__name__}: {e}\n"
+              f"   #12 의 retired·선언 축이 이 파일에 의존한다. 빈 목록으로 넘기면 축이 조용히 죽는다.",
+              file=sys.stderr)
+        raise SystemExit(2)
+
+
+_INV = _inventory()
+RETIRED_MCP = dict(_INV["retired_mcp_prefixes"])
+DECLARED_SERVERS = set(_INV["mcp_servers"])
+
+# 본문 Primary 는 **축약 이름**이다(`**Primary**: serena`) — frontmatter 의 전체 이름과
+# 직접 대조할 수 없어 **서버 단위**로 맞춘다.
+# ⛔ 실제 문서 형식은 `- **Primary**: serena` 다 — 리스트 접두 `- `/`*`/`+` 와 괄호 설명을
+#    허용해야 한다. 이전 판(`^\s*\**Primary`)은 13개 에이전트에서 **매칭 0건**이었고, 그 0을
+#    "위반 없음" 으로 읽으면 축 자체가 죽은 것을 통과로 오인한다 [외부: fz-gpt review #2].
+PRIMARY_LINE = re.compile(r"^\s*(?:[-*+]\s*)?\**\s*Primary\**[^:：\n]{0,24}[:：]\s*(.+)$", re.M)
+PRIMARY_ALIAS = {"serena": "plugin_fz_serena",
+                 "context7": "context7", "sequential-thinking": "sequential-thinking"}
+
+
+def _mcp_servers(tools_field) -> set[str]:
+    """frontmatter tools: 에서 서버 부분만 뽑는다."""
+    raw = tools_field if isinstance(tools_field, str) else " ".join(map(str, tools_field or []))
+    out = set()
+    for t in MCP_TOKEN.findall(raw):
+        m = re.match(r"^mcp__([A-Za-z0-9_-]+)__", t)
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+def chk_12(root: Path | None = None):
+    v, seen, primary_seen = [], 0, 0
+    base = root or ROOT
+    if root is None:
+        targets = list(AGENTS) + list(SKILLS)
+    else:
+        targets = sorted((root / "agents").glob("*.md")) + sorted((root / "skills").glob("*/SKILL.md"))
+    for p in targets:
+        # ⛔ frontmatter() 의 두 번째 반환은 본문 **줄수(int)** 다 — 텍스트가 아니다.
+        fm, _ = frontmatter(p)
+        if fm is None:
+            continue
+        body = read(p)
+        seen += 1
+        rel = p.relative_to(base).as_posix()
+        decl = fm.get("tools") or fm.get("allowed-tools") or ""
+        decl_raw = decl if isinstance(decl, str) else " ".join(map(str, decl))
+        # 축1 — 문법: frontmatter 와 본문의 모든 mcp 토큰
+        for tok in set(MCP_TOKEN.findall(decl_raw)) | set(MCP_TOKEN.findall(body)):
+            if not MCP_OK.match(tok):
+                v.append(f"{rel}: MCP 도구명 형식 위반 `{tok}` — mcp__<server>__<tool> 또는 mcp__plugin_<plugin>_<server>__<tool>")
+            # 축2 — retired 재등장
+            for bad, fix in RETIRED_MCP.items():
+                if tok.startswith(bad):
+                    v.append(f"{rel}: retired MCP 접두 `{bad}` 재등장 ({tok}) → {fix}")
+            # 축4 — **선언 정합**: 서버가 인벤토리에 있는가.
+            # ⛔ 문법 축과 다르다 — `mcp__nosuchserver__x` 는 문법이 맞고 선언이 없다.
+            # ⛔ 가용성 축과도 다르다 — 여기는 *우리가 선언했는가* 를 정적으로 닫고,
+            #    *실제로 떠 있는가* 는 #2(SEMANTIC) 가 본다. 선언에 없는 이름은
+            #    오타이거나 배선 누락이므로 정적으로 잡힌다(계획 C1: "문법만으로는
+            #    '문법은 맞지만 등록되지 않은 서버' 를 못 잡는다").
+            # ⛔ retired 토큰은 제외한다 — 같은 사실이 두 줄로 인쇄되고, 사람이 할 일은
+            #    "인벤토리에 추가" 가 아니라 "새 이름으로 교체" 다(retired 축이 그것을 준다).
+            if MCP_OK.match(tok) and not any(tok.startswith(b) for b in RETIRED_MCP):
+                srv = _mcp_servers(tok)
+                for sv in srv:
+                    if sv not in DECLARED_SERVERS:
+                        v.append(f"{rel}: 미선언 MCP 서버 `{sv}` ({tok}) — "
+                                 f"`schemas/tool-inventory.json` 의 mcp_servers 에 없다. "
+                                 f"오타이거나 인벤토리 갱신 누락이다")
+        # 축3 — 본문 Primary ↔ frontmatter 서버 정합
+        if decl_raw:
+            have = _mcp_servers(decl_raw)
+            for m in PRIMARY_LINE.finditer(body):
+                primary_seen += 1
+                line = m.group(1).lower()
+                for alias, server in PRIMARY_ALIAS.items():
+                    if alias in line and server not in have:
+                        v.append(f"{rel}: 본문 Primary 가 `{alias}` 를 지목하나 frontmatter 에 `mcp__{server}__*` 가 없다")
+    # ⛔ 축 3 이 한 건도 안 돌면 **측정 실패**다 — 파일 수(seen)는 그것을 증명하지 않는다.
+    if primary_seen == 0 and seen > 0:
+        v.append(f"#12 축3(Primary 정합) 미작동 — Primary 선언 {primary_seen}건 / 대상 {seen}파일. 정규식이 실제 형식을 놓쳤을 수 있다")
+    return v, seen
+
+
+TOC = re.compile(r"^#+\s*(목차|Index|Contents|TOC)\b", re.M)
+
+
+def chk_14():
+    v, seen = [], 0
+    for p in MODULES:
+        txt = read(p)
+        n = txt.count("\n") + 1
+        if n < 100:
+            continue
+        seen += 1
+        if not TOC.search(txt):
+            v.append(f"{p.relative_to(ROOT).as_posix()}: {n}줄인데 목차 없음")
+    return v, seen
+
+
+
+
+
+
+# ⛔ 따옴표 키(`"memory": project`)도 YAML 에서 같은 키다 — 맨 앞 `memory:` 만 보면 재도입을 놓친다(GPT R-A 검토 001)
+MEMORY_FIELD = re.compile(r"^[\"']?memory[\"']?\s*:\s*\S", re.M)
+MEMORY_EXEMPT = {"memory-curator"}   # 워크플로가 부르지 않는 recall 전용 — A/B 중에는 부르지 않는다
+
+
+def chk_N13():
+    """#N13 — `agents/`(memory-curator 제외)·`templates/` 의 `memory:` 필드. 가이드 §8.1 이 이유를 설명한다."""
+    v, seen = [], 0
+    files = [p for p in AGENTS] + sorted((ROOT / "templates").glob("*.md"))
+    for p in files:
+        tpl = p.parent.name == "templates"
+        lines = read(p).split("\n")
+        span = _frontmatter_span(lines, template=tpl)
+        if not span:
+            continue   # ⛔ frontmatter 를 못 찾은 파일은 검사한 것이 아니다 — 분모에 넣지 않는다(v4.40.0 리뷰: 템플릿 0줄 검사)
+        seen += 1
+        if not tpl and p.stem in MEMORY_EXEMPT:
+            continue
+        for i in span:
+            if MEMORY_FIELD.match(lines[i]):
+                v.append(f"{p.parent.name}/{p.name}:{i + 1}: memory 필드 — Workflow 계약(쓰기 없음)과 A/B 입력 고정을 깬다(guides/agent-team-guide.md §8.1)")
+    return v, seen
+
+
+def _frontmatter_span(lines, template=False):
+    """frontmatter 줄 범위(0 기준) — 맨 앞 `---`~`---` 만 본다(본문의 예시 코드는 필드가 아니다 — GPT R-A 2라운드 001).
+    템플릿은 1행이 제목이고 frontmatter 예시가 ```yaml 펜스 안에 있다 — 펜스 안 `---`~`---` 를 본다."""
+    if lines and lines[0].strip() == "---":
+        end = next((j for j in range(1, len(lines)) if lines[j].strip() == "---"), None)
+        return range(1, end) if end else range(0)
+    if template:
+        f0 = next((j for j, l in enumerate(lines) if l.strip().startswith("```yaml")), None)
+        a0 = next((j for j in range(f0 + 1, len(lines)) if lines[j].strip() == "---"), None) if f0 is not None else None
+        a1 = next((j for j in range(a0 + 1, len(lines)) if lines[j].strip() in ("---", "```")), None) if a0 is not None else None
+        return range(a0 + 1, a1) if a1 else range(0)
+    return range(0)
+
+
+def chk_16():
+    reg = ROOT / "modules" / "team-registry.md"
+    if not reg.exists():
+        raise ParseError("modules/team-registry.md 부재")
+    listed = set(re.findall(r"^\|\s*([a-z][a-z0-9-]+)\s*\|", read(reg), re.M))
+    actual = {p.stem for p in AGENTS}
+    v = []
+    for a in sorted(actual - listed):
+        v.append(f"agents/{a}.md: team-registry.md 미등재")
+    for a in sorted(listed - actual):
+        if a in {"에이전트", "스킬"}:
+            continue
+        v.append(f"team-registry.md: '{a}' 등재됐으나 agents/{a}.md 부재")
+    return v, len(actual)
+
+
+def chk_N1():
+    sd = ROOT / "schemas"
+    base = sd / "gpt_base_issue_schema.json"
+    if not base.exists():
+        raise ParseError("schemas/gpt_base_issue_schema.json 부재")
+    try:
+        bd = json.loads(read(base))
+    except json.JSONDecodeError as e:
+        raise ParseError(f"gpt_base_issue_schema.json JSON 파싱 실패: {e}")
+    sev = bd.get("$defs", {}).get("severity", {}).get("enum")
+    if not sev:
+        raise ParseError("base 스키마에 $defs.severity.enum 부재")
+    # ⛔ 대상은 **issue 스키마**다 — base 의 severity/confidence 를 소비하는 것들.
+    #    2026-08-24 정정: 본 검사가 `schemas/*.json` 전부를 issue 로 가정해,
+    #    게이트 처분(accept/revise/demote_to_manual)을 담는 `gpt_gate_verdict_schema` 를
+    #    "severity 부재" 위반으로 만들었다. severity(문제 심각도)와 verdict(게이트 처분)는 축이 다르다.
+    #    비-issue 스키마는 **파일명으로 제외하지 않는다** — 새 issue 스키마가 severity 를 빠뜨리면
+    #    여전히 잡아야 하므로, `issues` 배열 보유 여부로 판별한다.
+    # issue 스키마인지 **내용으로** 판정한다 — 파일명 목록은 새 스키마마다
+    # 린터를 고치게 만든다(주석이 거부한 바로 그 결합).
+    def _is_issue_schema(doc) -> bool:
+        props = (doc.get("properties") or {})
+        node = props.get("issues") or props.get("new_issues_found")
+        return isinstance(node, dict) and node.get("type") == "array"
+    v, seen = [], 0
+    for f in sorted(sd.glob("*.json")):
+        if f.name == base.name:
+            continue
+        try:
+            doc = json.loads(read(f))
+        except json.JSONDecodeError as e:
+            raise ParseError(f"{f.name} JSON 파싱 실패: {e}")
+        defs = find_severity_defs(doc)
+        if not defs:
+            if not _is_issue_schema(doc):
+                continue  # issue 스키마가 아니다 — 대조 대상 자체가 없다
+            seen += 1
+            v.append(f"schemas/{f.name}: severity 정의 부재 — base와 대조 불가 (⛔ skip 아님)")
+            continue
+        for path, node in defs:
+            seen += 1
+            if isinstance(node.get("enum"), list):
+                got = node["enum"]
+            elif isinstance(node.get("$ref"), str):
+                got, err = resolve_ref(node["$ref"], json.loads(read(base)), base.name)
+                if err:
+                    v.append(f"schemas/{f.name}{path}: {err}")
+                    continue
+            else:
+                v.append(f"schemas/{f.name}{path}: enum도 `$ref`도 없다 — 대조 불가")
+                continue
+            if got != sev:
+                v.append(f"schemas/{f.name}{path}: severity enum {got} ≠ base {sev}")
+
+        # ⛔ 2026-08-10 확장 (4라운드 감사 ISSUE-004): severity **만** 보던 탓에
+        #    `gpt_review_schema` 의 `confidence` 가 base 의 `minimum/maximum` 을 잃은 채
+        #    통과했고 → `confidence: 101` 이 검증기를 통과했다. **경계도 정합 대상**이다.
+        base_doc = json.loads(read(base))
+        for cname, keys in (("confidence", ("minimum", "maximum")),):
+            bdefs = find_named_defs(base_doc, cname)
+            if not bdefs:
+                continue
+            want = {k: bdefs[0][1].get(k) for k in keys if k in bdefs[0][1]}
+            if not want:
+                continue
+            for path, node in find_named_defs(doc, cname):
+                seen += 1
+                got = {k: node.get(k) for k in want}
+                if got != want:
+                    v.append(f"schemas/{f.name}{path}: {cname} 경계 {got} ≠ base {want}")
+    return v, seen
+
+
+# ⛔ 선언 카운트를 갖는 디렉토리는 전부 등재한다 — scripts/는 2026-08-09에 한 세션 안에서
+#    6→7로 늘며 CLAUDE.md가 stale해졌다(미등재 탓에 #N2가 침묵). 새 디렉토리 카운트 추가 시 여기도 추가.
+INV = {
+    # ⛔ `skills` 는 두 문서가 모두 카운트를 적는데 INV 에 없어 **검사 밖이었다**
+    #    (실측 2026-09-21: architecture.md 를 99개로 바꿔도 통과했다)
+    "skills": lambda: len([q for q in (ROOT / "skills").iterdir() if q.is_dir()]),
+    "modules": lambda: len(MODULES),
+    "guides": lambda: len(list((ROOT / "guides").glob("*.md"))),
+    "scripts": lambda: len(SCRIPTS),
+    "agents": lambda: len(AGENTS),
+    "workflows": lambda: len(list((ROOT / "workflows").glob("*.js"))),
+}
+
+
+# ⛔ 인벤토리 선언은 **CLAUDE.md 한 곳이 아니다** — `docs/architecture.md` 의 트리 표기도
+#    같은 수를 적는다. 실측(2026-09-21): 그쪽 6개 중 **5개가 어긋나 있었다**(skills 21→22 ·
+#    modules 42→45 · workflows 6→8 · scripts 13→33 · patterns 이동 미반영). 한 곳만 검사하면
+#    나머지가 조용히 낡는다 — 같은 클래스가 `INDEX.md` 「다음 ID」에서도 났다(fz-findings F-032).
+INV_DOCS = {
+    "CLAUDE.md":           r"`{key}/`[^\n]*?\((\d+)\s*개",          # - `skills/` — 설명 (22개)
+    "docs/architecture.md": r"├──\s*{key}/\s+(\d+)개",                # ├── skills/    22개
+}
+
+
+def chk_N2():
+    v, seen = [], 0
+    for doc, pat_tpl in INV_DOCS.items():
+        dp = ROOT / doc
+        if not dp.exists():
+            raise ParseError(f"{doc} 부재")
+        txt = read(dp)
+        for key, counter in INV.items():
+            m = re.search(pat_tpl.replace("{key}", re.escape(key)), txt)
+            seen += 1
+            if not m:
+                if doc != "CLAUDE.md":
+                    # architecture.md 는 전 디렉토리를 적지 않는다 — 적힌 것만 대조한다
+                    continue
+                v.append(f"{doc}: `{key}/` 카운트 선언 부재 또는 형식 불일치 "
+                         f"— 형식은 `` - `{key}/` — 설명 (N개) `` (⛔ skip 아님)")
+                continue
+            declared, actual = int(m.group(1)), counter()
+            if declared != actual:
+                v.append(f"{doc}: `{key}/` 선언 {declared}개 ≠ 실측 {actual}개")
+    return v, seen
+
+
+def _chk_N2_legacy():
+    cm = ROOT / "CLAUDE.md"
+    if not cm.exists():
+        raise ParseError("CLAUDE.md 부재")
+    txt = read(cm)
+    v, seen = [], 0
+    for key, counter in INV.items():
+        m = re.search(rf"`{key}/`[^\n]*?\((\d+)\s*개", txt)
+        seen += 1
+        if not m:
+            # ⛔ 2026-08-09 정정 (외부 감사 ISSUE-002): 이전에는 `continue` 로 **조용히 skip**했다.
+            #    INV에 5개를 등재하고도 `agents/`(괄호 없음)·`workflows/`(선언 부재) 2개가 빠져
+            #    `[검사 대상 3]`으로 통과했다 — 선언을 지우면 enforcement가 사라지는 구조였다.
+            v.append(f"CLAUDE.md: `{key}/` 카운트 선언 부재 또는 형식 불일치 "
+                     f"— 형식은 `` - `{key}/` — 설명 (N개) `` (⛔ skip 아님)")
+            continue
+        declared, actual = int(m.group(1)), counter()
+        if declared != actual:
+            v.append(f"CLAUDE.md: `{key}/` 선언 {declared}개 ≠ 실측 {actual}개")
+    return v, seen
+
+
+CITE = re.compile(r"([A-Za-z0-9_./\-]+\.(?:md|js|py|sh|json)):(\d+)")
+
+
+def chk_N3():
+    """인용의 **구조**만 판정한다 — 파일 실재 · 행 범위 · 빈 줄 여부.
+
+    ⛔ 인용 *내용*의 정합(그 줄이 정말 그 주장을 뒷받침하는가)은 여전히 사람 몫이다.
+       빈 줄만 예외인 이유: 내용을 읽지 않고도 오류임이 확정되는 유일한 조각이다.
+    """
+    by_base = defaultdict(list)
+    for rel, _ in walk_files():
+        by_base[Path(rel).name].append(rel)
+    existing = {rel for rel, _ in walk_files()}
+    v, seen = [], 0
+    for rel, p in walk_files(".md", ".js"):
+        if rel == "CHANGELOG.md":
+            continue
+        for i, line in enumerate(read(p).split("\n"), 1):
+            for m in CITE.finditer(line):
+                raw, num = m.group(1).lstrip("./"), int(m.group(2))
+                target = raw if raw in existing else (by_base[Path(raw).name][0]
+                                                     if len(by_base.get(Path(raw).name, [])) == 1 else None)
+                if target is None:
+                    continue
+                seen += 1
+                tl = read(ROOT / target).split("\n")
+                if num > len(tl):
+                    v.append(f"{rel}:{i}: → {target}:{num} 범위 초과 (파일 {len(tl)}줄)")
+                elif not tl[num - 1].strip():
+                    # ⛔ 빈 줄 인용 (2026-08-20 신설): 인용 *내용*의 정합은 여전히 사람 몫이나,
+                    #    **빈 줄을 가리키는 인용**은 내용을 읽지 않고도 오류다 — 대상 문서가
+                    #    편집되며 앵커가 공백으로 흘러간 상태다. 이것이 이 검사에서 내용 판단
+                    #    없이 닫히는 유일한 결정론 조각이라 여기까지만 자동화한다.
+                    v.append(f"{rel}:{i}: → {target}:{num} 은 **빈 줄** — 앵커가 밀렸다")
+    return v, seen
+
+
+# ⛔ #N8 신설 근거 (2026-08-09 외부 감사 ISSUE-014 + **본 세션의 자기 오류**):
+#    ① 24개 모듈에 추가한 목차의 앵커 8개가 실제 heading과 불일치 ② 그걸 고치려고 쓴 첫 스크립트가
+#    `\s+ → -` 로 **공백 연속을 합쳐** 14곳을 새로 깨뜨렸다. GitHub slugger는 구두점 제거 후
+#    **공백 하나당 하이픈 하나**다 (`A + B` → `a--b`). 사람이 slug를 손으로 맞추면 또 틀린다.
+GH_STRIP = re.compile(r"[^\w \-]", re.UNICODE)
+# GFM fence 여닫이 — ⛔ ``` 만 보면 부족하다 (외부 감사 ISSUE-PLAN-008):
+#   `~~~` · 4-backtick 이상 · 최대 3칸 인덴트 · **닫는 fence는 여는 것과 같은 문자이고 길이가 ≥** 여야 한다.
+FENCE_OPEN = re.compile(r"^( {0,3})(`{3,}|~{3,})")
+# 닫는 fence — 뒤에 fence 문자 외 내용이 있으면 닫지 못한다 (```python 은 여는 것)
+FENCE_CLOSE = re.compile(r"^( {0,3})(`{3,}|~{3,})\s*$")
+# 단락 줄 — setext 밑줄이 붙을 수 있는 유일한 선행 문맥.
+#   ⛔ 리스트(`- ` `* ` `+ ` `1. `)·인용(`>`)·heading(`#`)·표(`|`)·들여쓴 코드(4칸)·빈 줄은 제외.
+# ⛔ 4라운드 ISSUE-008 정정: 마커는 **뒤에 공백이 있을 때만** 리스트/heading 이다.
+#    `-foo`·`*emphasis*`·`#hashtag` 는 **단락**이므로 setext 밑줄을 받을 수 있다.
+PARAGRAPH_LINE = re.compile(r"^ {0,3}(?!([-*+]|>|#{1,6}|\d+[.)])(\s|$))\S")
+
+
+def gh_slug(heading: str) -> str:
+    """GitHub slugger: 소문자화 → 영숫자/공백/하이픈/`_` 외 제거 → 공백 각각을 하이픈으로."""
+    return GH_STRIP.sub("", heading.strip().lower()).replace(" ", "-")
+
+
+def iter_headings(txt: str):
+    """fenced 코드 블록 **밖**의 heading 텍스트만 순서대로 낸다.
+
+    ⛔ 신설 근거: 1차 구현은 fence 안의 `## …` 도 heading으로 셌다 — 목차가 실재하지 않는
+       앵커를 가리켜도 '해소됨'으로 보일 수 있었다 (외부 감사 ISSUE-007).
+    """
+    fence: str | None = None
+    prev: str | None = None
+    for line in txt.split("\n"):
+        if fence is None:
+            m = FENCE_OPEN.match(line)
+            if m:
+                fence = m.group(2)
+                prev = None
+                continue
+        else:
+            m = FENCE_CLOSE.match(line)
+            # ⛔ 닫는 fence 는 **같은 문자 + 길이 ≥ + 뒤에 fence 문자 외 내용 없음**.
+            #    3라운드 감사 ISSUE-004: 접두만 보면 ```python 이 기존 ``` 를 닫아버렸다.
+            if m and m.group(2)[0] == fence[0] and len(m.group(2)) >= len(fence):
+                fence = None
+            continue
+        h = re.match(r"^ {0,3}(#{2,6})\s+(.*?)\s*$", line)
+        if h:
+            # ⛔ ATX 닫는 해시 제거 — `## Foo ##` 의 GitHub slug 는 `foo` 다 (ISSUE-004)
+            yield re.sub(r"\s+#+\s*$", "", h.group(2))
+            prev = None
+            continue
+        # setext heading — 직전 줄이 **단락**이고 이 줄이 `===`/`---` 이면 heading 이다 (ISSUE-004)
+        # ⛔ GFM 은 setext 밑줄이 **단락**만 뒤따르게 허용한다. 리스트 항목·인용·표·heading 뒤의
+        #    `---` 는 thematic break 다 — 이를 setext 로 읽으면 **유령 heading**이 생기고,
+        #    존재하지 않는 절을 가리키는 목차 앵커가 "해소됨"으로 통과한다 (Lead 자체 발견, 2026-08-10).
+        if prev and re.match(r"^ {0,3}(=+|-+)\s*$", line):
+            yield prev.strip()
+            prev = None
+            continue
+        prev = line if PARAGRAPH_LINE.match(line) else None
+
+
+def gh_anchors(txt: str) -> dict:
+    """slug → heading. 중복은 **github-slugger의 occupied-slug 루프**를 따른다.
+
+    ⛔ 1차 구현은 `slug-N` 을 만들고 그것이 이미 점유됐는지 확인하지 않아 덮어썼다:
+       `Foo`/`Foo`/`Foo-1` → foo, foo-1 (2개) — GitHub는 foo, foo-1, **foo-1-1** (3개).
+       [외부: GPT — github-slugger 2.0.0 occupied-slug 루프 검증 통과]
+    """
+    out: dict[str, str] = {}
+    counts: dict[str, int] = {}
+    for heading in iter_headings(txt):
+        base = gh_slug(heading)
+        slug = base
+        if slug in out:
+            n = counts.get(base, 0)
+            while True:
+                n += 1
+                slug = f"{base}-{n}"
+                if slug not in out:                # ⛔ 점유됐으면 계속 증가시킨다
+                    break
+            counts[base] = n
+        out[slug] = heading
+    return out
+
+
+TOC_LINK = re.compile(r"\]\(#([^)]+)\)")
+
+
+def chk_N8(root: Path | None = None):
+    v, seen = [], 0
+    for rel, p in walk_files(".md", root=root):
+        txt = read(p)
+        if "## 목차" not in txt:
+            continue
+        valid = gh_anchors(txt)
+        rest = txt.split("## 목차", 1)[1]
+        block = rest.split("\n##", 1)[0] if "\n##" in rest else rest
+        for line in block.split("\n"):
+            m = TOC_LINK.search(line)
+            if not m:
+                continue
+            seen += 1
+            if m.group(1) not in valid:
+                v.append(f"{rel}: 목차 앵커 `#{m.group(1)}` 가 어떤 heading으로도 해소되지 않는다")
+    return v, seen
+
+
+# ⛔ #N7 신설 근거 (2026-08-09 외부 감사 ISSUE-008): `get_codex_skill()` → `get_gpt_skill_path()`
+#    전환에서 **할당은 `_SKILL_PATH`로 바뀌고 조건문은 옛 `_SKILL`을 검사**하는 스니펫이 3곳 남았다
+#    (`SEARCHER_SKILL`·`FIXER_SKILL`·`CHALLENGER_SKILL`). `[ -n "$미정의" ]`는 false라 searcher 보조·
+#    fixer 보조·final DA가 **조용히 실행되지 않았다.** 사람 눈으로 한 번 잡고도 3곳을 놓쳤으므로 기계화한다.
+# ⛔ `local`/`export`/`declare`/`readonly` 접두를 포함한다 — 누락 시 `local SKILL=`가 미할당으로 오판된다
+#    (첫 실행에서 cross-validation.md:317·325 오탐 2건. 대상이 아니라 도구가 틀렸다)
+# 할당 인정 형태 — ⛔ 2026-08-09 S3 확장 (외부 감사 ISSUE-006):
+#   `local`/`export`/`declare`/`readonly` 접두(1차) + `read`·`printf -v`·`for X in`(2차).
+#   누락하면 정당한 할당을 미할당으로 오판한다(1차에서 `local SKILL=` 오탐 2건 실측).
+ASSIGN = re.compile(
+    r"^\s*(?:local|export|declare|readonly)?\s*([A-Z][A-Z0-9_]*)="      # X= / local X=
+    r"|^\s*read\s+(?:-\w+\s+)*([A-Z][A-Z0-9_]*)"                        # read X
+    r"|^\s*printf\s+-v\s+([A-Z][A-Z0-9_]*)"                            # printf -v X
+    r"|^\s*for\s+([A-Z][A-Z0-9_]*)\s+in\b"                             # for X in …
+)
+# 검사 형태 — `[ ]`/`[[ ]]` × 인용/비인용 × `-n`/`-z`.
+# ⛔ `${VAR:-default}`는 **의도적으로 제외**한다 — 기본값을 공급하므로 미정의가 결함이 아니다.
+#    (`\}` 를 이름 직후에 요구하여 `:-`/`:=`/`:?` 형태를 배제)
+TESTED = re.compile(
+    r'\[\[?\s*-[nz]\s+"?(?:\$([A-Z][A-Z0-9_]*)\b|\$\{([A-Z][A-Z0-9_]*)\})'
+)
+# 환경/외부 주입 변수 — 스니펫 안에 할당이 없어도 정당하다.
+# ⛔ 알려진 한계 (외부 감사 ISSUE-006): 전역 허용목록이라 **여기 등재된 이름은
+#    로컬 할당이 삭제·개명돼도 통과한다**(예: `SKIP_FLAG`). 제거하면 오탐이 폭증하므로
+#    유지하되, 이 목록에 이름을 추가하는 것은 그 변수의 회귀 탐지를 포기하는 것이다.
+EXTERNAL_OK = {
+    "FZ_PLUGIN_ROOT", "GIT_ROOT", "PROJECT_ROOT", "HOME", "CODEX_HOME", "SHARED_MODULES",
+    "BASE_BRANCH", "PLAN_CONTENT", "AFFECTED_SYMBOLS", "HAS_FIXABLE_ISSUES",
+    "MAJOR_ISSUES_COUNT", "REVIEW_FILE", "DA_REVIEW_FILE", "RESULT_FILE", "WORK_DIR",
+    "EXPECTED_BRANCH", "SKIP_FLAG", "PLUGIN_AVAILABLE", "CLAUDE_PROJECT_DIR",
+    "TIER_OPT",   # peer-review 사용자 명시 옵션 — 블록 바깥에서 주입된다
+}
+
+
+def chk_N7(root: Path | None = None):
+    """마크다운 ```bash 블록 안에서 `[ -n "$VAR" ]`를 검사하는데 같은 블록에 `VAR=` 할당이 없는 경우."""
+    v, seen = [], 0
+    for rel, p in walk_files(".md", root=root):
+        if rel == "CHANGELOG.md":
+            continue
+        lines = read(p).split("\n")
+        in_block, start, assigned = False, 0, set()
+        for i, line in enumerate(lines, 1):
+            if re.match(r"\s*```(bash|sh|shell)\b", line):
+                in_block, start, assigned = True, i, set()
+                continue
+            if in_block and re.match(r"\s*```\s*$", line):
+                in_block = False
+                continue
+            if not in_block:
+                continue
+            m = ASSIGN.match(line)
+            if m:
+                assigned.add(next(g for g in m.groups() if g))
+            for t2 in TESTED.finditer(line):
+                name = t2.group(1) or t2.group(2)
+                seen += 1
+                if name in assigned or name in EXTERNAL_OK:
+                    continue
+                v.append(f"{rel}:{i}: `${name}`를 검사하는데 같은 bash 블록(:{start}~)에 "
+                         f"`{name}=` 할당이 없다 — 오타/이름 변경 잔존 의심")
+    return v, seen
+
+
+ERE_BAD = re.compile(r"grep\s+(?:-\w+\s+)*-\w*E\w*\b")
+
+
+def chk_N4(root: Path | None = None):
+    """ERE에서 `\\|`는 alternation이 아니다 — 항상 매칭 실패한다.
+    ⚠️ BRE(`grep` 무옵션)의 `\\|`는 정당하므로 `grep -E` **같은 줄**만 본다."""
+    self_rel = Path(__file__).resolve().relative_to(ROOT).as_posix()
+    v, seen = [], 0
+    for rel, p in walk_files(".md", ".sh", ".py", root=root):
+        if rel == "CHANGELOG.md":
+            continue
+        # ⛔ 자기 참조 제외 — 검사기의 *설명 문구*가 검사 대상 패턴을 포함한다 (첫 실행에서 3건 오탐)
+        if rel == self_rel:
+            continue
+        for i, line in enumerate(read(p).split("\n"), 1):
+            if not ERE_BAD.search(line):
+                continue
+            # ⛔ 마크다운 표 행 제외 — 표 셀 안의 `\|`는 **파이프 이스케이프**이지 ERE가 아니다
+            #    (verify-evidence-matrix.md:11 `curl -s "$url" \| grep -iE` 가 실제 오탐이었다)
+            if line.lstrip().startswith("|"):
+                continue
+            seen += 1
+            if "\\|" in line:
+                v.append(f"{rel}:{i}: `grep -E` 같은 줄의 `\\|` — ERE alternation 아님 (항상 0건)")
+    return v, seen
+
+
+SC_NS = re.compile(r"/sc:([a-z][a-z0-9-]*)")
+
+
+def chk_N12(root: Path | None = None):
+    """`/sc:` 네임스페이스는 `/sc:sc-*` 형태만 유효하다.
+
+    ⛔ **왜 필요한가**: v4.35.0 이 86곳을 고쳤으나 그 형태를 **지키는 검사가 없었다**.
+       B14 가 지적한 done 판정의 한계가 이것이다 — 오라클이 `mcp__serena__` 0건이었고
+       그것은 `/sc:` 치환과 **다른 대상을 잰다**. 0건은 고쳐진 증거가 아니라 다른 것의 증거였다.
+    """
+    self_rel = Path(__file__).resolve().relative_to(ROOT).as_posix()
+    v, seen = [], 0
+    for rel, p in walk_files(".md", ".sh", ".py", ".js", root=root):
+        if rel == "CHANGELOG.md" or rel.startswith("docs/releases/"):
+            continue          # 사료 — 옛 형태가 남는 것이 정상이다
+        if rel == self_rel:
+            continue          # ⛔ 자기 참조 제외 — 이 설명 문구가 대상 패턴을 담는다
+        for i, line in enumerate(read(p).split("\n"), 1):
+            for m in SC_NS.finditer(line):
+                seen += 1
+                if not m.group(1).startswith("sc-"):
+                    v.append(f"{rel}:{i}: `/sc:{m.group(1)}` — `/sc:sc-{m.group(1)}` 형태여야 한다")
+    return v, seen
+
+
+def chk_N5(root: Path | None = None):
+    v, seen = [], 0
+    scripts = (sorted(p for p in (root / "scripts").glob("*") if p.is_file())
+               if root else SCRIPTS)
+    for p in scripts:
+        if p.name == Path(__file__).name:
+            continue
+        seen += 1
+        txt = read(p)
+        for i, line in enumerate(txt.split("\n"), 1):
+            if ">/dev/null 2>&1" not in line and "> /dev/null 2>&1" not in line:
+                continue
+            # 같은 줄 또는 다음 2줄에서 exit code를 쓰는지
+            ctx = "\n".join(txt.split("\n")[i - 1:i + 2])
+            if not re.search(r"\$\?|returncode|check=|\|\||&&|if\s", ctx):
+                v.append(f"scripts/{p.name}:{i}: 측정 신호 폐기 — exit code 미사용")
+    return v, seen
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #N6 루트 앵커 — **줄 단위 화이트리스트**(.py/.sh 공통). fail-closed.
+#
+# ⛔ 설계 전환 (2026-08-10, 4라운드 감사 ISSUE-005·006 + GPT C3):
+#   3차 구현은 `.py` 를 `ast` 로 **일반 분석**했다. 그 방향은 실패했다 —
+#     · `from evil import Path as P` → `P(__file__)` 통과 (ImportFrom.module 미검증)
+#     · `X().resolve(__file__)` 통과 (임의 attr 이름이 화이트리스트와 충돌)
+#     · 고치려면 import 해소·스코프·shadowing 분석이 따라온다 (반응적 확장)
+#   그리고 `.sh` 의 heredoc 제거도 POSIX 규칙(정확 일치 / `<<-` 탭만 / `<<\EOF` / 다중)을
+#   재구현하려다 3방향으로 틀렸다.
+#   ⇒ **일반 분석을 포기한다.** 대상은 우리 스크립트 **10개**(.py 4 · .sh 6)뿐이므로
+#      *실제로 쓰는 루트 해석 줄*을 정확히 열거하고, **미지 형태는 거부**한다.
+#      새 형태가 필요하면 여기 추가한다 — 그게 명시 승인이다.
+#
+# ⛔ heredoc: 종료 규칙을 재구현하지 않는다. `<<` 가 보이면 **그 줄 이후 전체를 데이터로 취급**
+#    (fail-closed). 앵커는 heredoc **앞**에 있어야 한다 — 과도하게 숨기는 방향은 안전하다.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 허용 형태 — 정확히 이 형태의 **한 줄**이 있어야 한다 (양끝 공백만 무시)
+ANCHOR_LINES = [
+    # .py — 자기 위치에서 루트 해석
+    re.compile(r"^[A-Za-z_]\w* = Path\(__file__\)\.resolve\(\)(\.parent)*\s*(#.*)?$"),
+    re.compile(r"^[A-Za-z_]\w* = Path\(__file__\)\.parent(\.parent)*\s*(#.*)?$"),
+    re.compile(r"^[A-Za-z_]\w* = os\.path\.dirname\(os\.path\.abspath\(__file__\)\)\s*(#.*)?$"),
+    re.compile(r"^[A-Za-z_]\w* = os\.path\.dirname\(__file__\)\s*(#.*)?$"),
+    # .sh — 자기 위치 또는 git 루트
+    re.compile(r'^[A-Z_]\w*="\$\(\s*cd\s+"\$\(\s*dirname\s+"\$\{?BASH_SOURCE\[0\]\}?"\s*\)"'
+               r'\s*&&\s*pwd(\s+-P)?\s*\)"\s*$'),
+    # ⛔ 2026-08-10 Lead 자체 발견: 이전 판은 `[A-Z_]*="$(cd "…" && pwd)"` 를 **경로 무관**하게 허용해
+    #    `X="$(cd "/tmp" && pwd)"` 나 `$HOME` 도 루트 앵커로 인정했다 — fail-closed 화이트리스트에
+    #    내가 직접 구멍을 냈다. **자기 위치에서 유도한 경로만** 허용한다.
+    re.compile(r'^[A-Z_]\w*="\$\(\s*cd\s+"\$(\{?BASH_SOURCE\[0\]\}?|0|\{?\w*(?:DIR|ROOT|dir|root)\w*\}?)'
+               r'[^"]*"\s*&&\s*pwd(\s+-P)?\s*\)"\s*$'),
+    re.compile(r'^[A-Z_]\w*="\$\(\s*dirname\s+"\$0"\s*\)"\s*$'),
+    re.compile(r'^[A-Z_]\w*="\$\(\s*cd\s+"\$\(\s*dirname\s+"\$0"\s*\)"\s*&&\s*pwd(\s+-P)?\s*\)"\s*$'),
+    re.compile(r'^(cd\s+|[A-Z_]\w*=)"\$\(\s*git rev-parse --show-toplevel\s*\)"\s*$'),
+]
+# CWD·인수 루트를 쓰되 **마커로 fail-closed 검증**하는 형태 (형태 b)
+ROOT_MARKER = re.compile(r'["\']?(guides|skills|gpt-skills)["\']?\s*\)?\s*(?:/|\)\s*)?'
+                         r'\.?(?:is_dir|exists)\(\)'
+                         r'|-d\s+"?\$?\{?\w*(?:ROOT|root)\w*\}?/(guides|skills|gpt-skills)')
+NONZERO_EXIT = re.compile(r"return\s+[1-9]|exit\s+[1-9]|sys\.exit\(\s*[1-9]")
+# 명시 면제 — 루트를 아예 참조하지 않는 스크립트. 상단 20줄 + 사유 10자+
+WAIVER = re.compile(r"lint:no-root-anchor\s*[—:-]\s*(\S.{9,})")
+
+
+def code_lines(txt: str, suffix: str) -> list[str]:
+    """검사 대상 '코드 줄'. 주석 제거 + `.sh` 는 **첫 `<<` 이후 전체를 데이터로 취급**(fail-closed)."""
+    out: list[str] = []
+    for line in txt.split("\n"):
+        if suffix == ".sh" and "<<" in line:
+            out.append(re.sub(r"(^|\s)#.*$", r"\1", line))
+            break                                   # ⛔ 이후는 heredoc 가능성 → 전부 버린다
+        out.append(re.sub(r"(^|\s)#.*$", r"\1", line))
+    return out
+
+
+def anchored_line(txt: str, suffix: str) -> bool:
+    """허용 형태에 **정확히** 매칭되는 줄이 있는가 (fail-closed)."""
+    return any(any(p.match(l.strip()) for p in ANCHOR_LINES)
+               for l in code_lines(txt, suffix))
+
+
+def n6_ok(txt: str, suffix: str) -> bool:
+    """루트 해석이 안전한가. ⛔ chk_N6 와 self-test 가 **같은 함수**를 쓴다.
+
+    허용 3형태:
+      (a) `ANCHOR_LINES` 중 하나와 **정확히 일치하는 줄** (주석·문자열·heredoc 은 제외됨)
+      (b) 마커(`guides`/`skills`/`gpt-skills`) 검사 + 3줄 내 비0 종료
+      (c) 상단 20줄 내 `# lint:no-root-anchor — 사유(10자+)`
+    """
+    if anchored_line(txt, suffix):
+        return True
+    lines = code_lines(txt, suffix)
+    for i, line in enumerate(lines):
+        if ROOT_MARKER.search(line) and NONZERO_EXIT.search("\n".join(lines[i:i + 3])):
+            return True
+    return bool(WAIVER.search("\n".join(txt.split("\n")[:20])))
+
+
+def chk_N6(root: Path | None = None):
+    v, seen = [], 0
+    scripts = sorted(p for p in ((root / "scripts") if root else (ROOT / "scripts")).glob("*")
+                     if p.is_file()) if root else SCRIPTS
+    for p in scripts:
+        if p.suffix not in (".py", ".sh"):
+            continue
+        seen += 1
+        if not n6_ok(read(p), p.suffix):
+            v.append(f"scripts/{p.name}: 루트 해석 불안전 — (a) 허용 형태 줄과 정확히 일치 · (b) 마커 검사 + 3줄 내 비0 종료 · (c) 상단 20줄 내 `# lint:no-root-anchor — 사유(10자+)` 중 하나도 없다 (허용 형태는 ANCHOR_LINES 에 명시 추가한다)")
+    return v, seen
+
+
+class ParseError(Exception):
+    pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 양성 대조 (self-test) — ⛔ 패턴이 곧 검사인 항목에 한정
+#
+# 왜 필요한가: `hits`(검사 대상 수)는 *본 후보 수*이지 *탐지 능력*이 아니다. 패턴이 고장나도
+#   후보는 세어지므로 `OK [검사 대상 N]`이 찍힌다. 실제로 #15는 `head -n 5`를 못 잡는 채
+#   13개 후보를 세며 통과했고(ISSUE-003), #N6는 주석 속 토큰으로 통과했다(ISSUE-005).
+# 왜 4개만인가: `guides/harness-engineering.md` §6 AP1(과도한 구조화) — 정규식이 판정의 전부인
+#   항목만 fixture가 이득이다. 구조 순회형(#N1·N2·N16)은 파싱 실패가 곧 ParseError로 드러난다.
+# ─────────────────────────────────────────────────────────────────────────────
+SELF_TESTS: list[tuple[str, str, bool, str]] = [
+    # (항목, 입력, 매칭 기대, 설명)
+    ("N13", "memory: project",                True,  "frontmatter 의 memory 필드"),
+    ("N13", '"memory": project',              True,  "따옴표 키도 같은 필드"),
+    ("N13", "# memory: 필드를 넣지 않는다",       False, "주석은 필드가 아니다(템플릿의 금지 안내)"),
+    ("N13", "TEMPLATE_FENCE",                 True,  "템플릿 ```yaml 펜스 안 frontmatter 의 memory 필드도 잡는다"),
+    ("N13", "TEMPLATE_NO_FM",                 False, "frontmatter 없는 파일은 검사 구간이 0줄 — 분모에 넣지 않는다"),
+    ("N4", 'grep -E "^(a\\|b)" f',           True,  "ERE에서 `\\|`는 alternation 아님"),
+    ("N4", 'grep -E "^(a|b)" f',             False, "정상 ERE"),
+    ("N4", 'grep "a\\|b" f',                 False, "BRE의 `\\|`는 정당"),
+    ("N5", "cmd >/dev/null 2>&1",            True,  "신호 폐기 후보"),
+    ("N5", "cmd > /dev/null 2>&1",           True,  "공백 변형"),
+    ("N5", "cmd 2>/dev/null",                False, "stderr만 → 후보 아님"),
+    ("N6", "root = Path(__file__).resolve().parent", True,  "(a) .py 허용 형태"),
+    ("N6", "d = os.path.dirname(__file__)",   True,  "(a) .py os.path 형태"),
+    ("N6", '__file__ = "fake"',              False, "⛔ 재바인딩 — 허용 형태 아님"),
+    ("N6", 'x = f"{__file__}"',              False, "⛔ f-string 내부"),
+    ("N6", 'marker = "BASH_SOURCE"',         False, "⛔ 문자열 리터럴"),
+    ("N6", "log.debug(__file__)",            False, "⛔ 무관한 읽기"),
+    ("N6", "from evil import Path as P\nr = P(__file__)", False,
+                                                    "⛔ 악성 출처 alias (4R ISSUE-005)"),
+    ("N6", 'D="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"', True, "(a) .sh 허용 형태"),
+    ("N6", 'DIR="$(dirname "$0")"',          True,  "(a) .sh dirname"),
+    ("N6", 'echo "BASH_SOURCE[0]"',          False, "⛔ .sh 언급만"),
+    ("N6", 'cat <<EOF\nDIR="$(dirname "$0")"\nEOF', False,
+                                                    "⛔ heredoc 본문 (4R ISSUE-006)"),
+    ("N6", "if err:\n    return 2",          False, "⛔ 무관한 비0 종료"),
+    ("N6", 'if not (root / "guides").is_dir():\n    return 2', True,
+                                                    "(b) 마커 + 비0 종료"),
+    ("N6", 'if not (root / "guides").is_dir():\n    warn()', False,
+                                                    "⛔ 마커만 — fail-closed 아님"),
+    ("N6", "# lint:no-root-anchor — 경로를 인수로 받는다", True, "(c) 사유 있는 면제"),
+    ("N6", "# lint:no-root-anchor",          False, "⛔ 사유 없는 면제"),
+    ("N1", "REF_OK",                         True,  "정상 `$ref` → base enum resolve"),
+    ("N1", "REF_WRONG_PATH",                 True,  "⛔ 오참조 경로 → 위반 메시지"),
+    ("N1", "REF_WRONG_FILE",                 True,  "⛔ 알 수 없는 대상 파일 → 위반 메시지"),
+    ("N7", 'if [ -n "$VAR" ]; then',         True,  "인용 단일 대괄호"),
+    ("N7", 'if [ -z "$VAR" ]; then',         True,  "-z"),
+    ("N7", 'if [[ -n $VAR ]]; then',         True,  "⛔ 이중 대괄호 + 비인용 — 1차에서 미탐"),
+    ("N7", 'if [ -n $VAR ]; then',           True,  "⛔ 단일 대괄호 비인용 — 1차에서 미탐"),
+    ("N7", 'if [ -n "${VAR}" ]; then',       True,  "중괄호"),
+    ("N7", 'if [ -n "${VAR:-x}" ]; then',    False, "⛔ 기본값 공급 — 의도적 제외"),
+    ("N7", 'read VAR',                       True,  "read 할당 인정"),
+    ("N7", 'printf -v VAR "%s" x',           True,  "printf -v 할당 인정"),
+    ("N7", 'for VAR in a b; do',             True,  "for 할당 인정"),
+    ("N8", "## A + B",                       True,  "⛔ 구두점 제거로 생긴 공백 2개 → 하이픈 2개"),
+    ("N8", "## Plain Head",                  True,  "단일 공백 → 하이픈 1개"),
+    ("N8", "COLLISION",                      True,  "⛔ Foo/Foo/Foo-1 → foo, foo-1, foo-1-1 (occupied 루프)"),
+    ("N8", "FENCE_BACKTICK",                 True,  "⛔ ``` 안 heading 제외"),
+    ("N8", "FENCE_TILDE",                    True,  "⛔ ~~~ 안 heading 제외"),
+    ("N8", "FENCE_LONG",                     True,  "⛔ 4-backtick 안의 ``` 는 닫지 못한다"),
+    ("N8", "FENCE_INDENT",                   True,  "⛔ 인덴트된 fence도 fence다"),
+    ("N8", "SETEXT_PARA",                    True,  "단락 + --- → setext heading"),
+    ("N8", "SETEXT_LIST",                    True,  "⛔ 리스트 + --- → thematic break (유령 heading 금지)"),
+    ("N8", "SETEXT_QUOTE",                   True,  "⛔ 인용 + --- → 유령 금지"),
+    ("N8", "ATX_TRAILING_HASH",              True,  "`## Foo ##` → foo"),
+    ("N8", "FENCE_UNCLOSED",                 True,  "미종료 fence 내부 heading 제외"),
+    # #N14 — 접두 `py:`·`js:`·`md:` 는 확장자(없으면 .sh). 양성 = 위반 줄이 있다
+    ("N14", 'ISO="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/fz-gpt-iso.XXXXXX")" && pwd -P)" || die 11 "격리 폴더 생성 실패"',
+                                              True,  "v4.42.0 이전 런처 원형(db7c411^ gpt_independent.sh)"),
+    ("N14", 'T="$(cd "$(mktemp -d)" && pwd -P)"; trap \'rm -rf "$T"\' EXIT', True, "러너 원형 — trap 이 현재 폴더를 지운다"),
+    ("N14", 'cd "$(mktemp -d)" || exit 2   # 재현 줄',  True,  "뒤 주석은 앞 코드를 가리지 않는다(E1-0 재현 줄)"),
+    ("N14", 'pushd "$(mktemp -d)" >/dev/null', True,  "pushd 변형"),
+    ("N14", 'cd "$(mktemp -d -t fz-x)"',        True,  "mktemp -d -t 변형"),
+    ("N14", 'cd $(mktemp -d)',                  True,  "따옴표 없음 — 빈 치환이면 인자 없는 cd 가 HOME 으로 간다"),
+    ("N14", 'cd "`mktemp -d`"',                 True,  "백틱 치환"),
+    ("N14", 'cd -P -- "$(mktemp -d)"',          True,  "옵션 · `--` 뒤"),
+    ("N14", 'cd "$(TMPDIR=/x mktemp -d)"',      True,  "치환 안 환경 접두"),
+    ("N14", 'py:subprocess.run("cd \\"$(mktemp -d)\\" && make", shell=True)', True, ".py 의 셸 문자열"),
+    ("N14", "js:execSync('cd \"$(mktemp -d)\" && make')", True, ".js 의 셸 문자열"),
+    ("N14", "cat <<'EOF' > ok.txt\nx\nEOF\ncd \"$(mktemp -d)\"", True, "닫힌 heredoc 뒤의 코드는 본다"),
+    ("N14", "cat <<EOF\nx\ncd \"$(mktemp -d)\"", True, "⛔ 종결자 없는 `<<` 는 heredoc 으로 접지 않는다(미탐 방향)"),
+    ("N14", 'while read -r l; do :; done <<< EOF\ncd "$(mktemp -d)"\nEOF', True,
+                                              "`<<<` here-string 은 heredoc 이 아니다 — 뒤 줄이 낱말과 같아도 접지 않는다"),
+    ("N14", '# ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp -d)"` 는 mktemp 가 실패해도 `cd ""` 가 성공해',
+                                              False, "주석 — 고친 자리의 설명문(현 트리 4곳)"),
+    ("N14", "cat > bad.sh <<'EOF'\ncd \"$(mktemp -d)\"\nEOF", False, "heredoc 본문 BAD 예시는 데이터"),
+    ("N14", "\tcat <<-'EOF'\n\tcd \"$(mktemp -d)\"\n\tEOF", False, "`<<-'EOF'` 따옴표 탭 종결자 — 본문은 데이터"),
+    ("N14", "\tcat <<-EOF\n\tcd \"$(mktemp -d)\"\n\tEOF", True, "⛔ 따옴표 없는 `<<-EOF` 본문은 생성 셸이 `$(…)` 를 실행한다 — 코드로 본다"),
+    ("N14", "cat > g.sh <<EOF\nX=\"$(cd \"$(mktemp -d)\" && pwd -P)\"\nEOF", True, "⛔ 따옴표 없는 `<<EOF` 본문 — 현재 폴더 경로가 생성물에 박힌다"),
+    ("N14", "cat > g.sh <<\\EOF\ncd \"$(mktemp -d)\"\nEOF", False, "`<<\\EOF` 는 따옴표 구분자와 같다(확장 없음)"),
+    ("N14", 'T0="$(mktemp -d)" || { echo "mktemp 실패" >&2; exit 2; }; T="$(cd "$T0" && pwd -P)"',
+                                              False, "안전 꼴 — 결과를 따로 받고 실패면 멈춘다(현 러너)"),
+    ("N14", 'd=$(mktemp -d) || exit 1\ncd "${d:?}"', False, "안전 꼴 — `:?` 로 빈 값을 막는다"),
+    ("N14", 'cd "$(dirname "$0")"',             False, "mktemp 가 아닌 치환"),
+    ("N14", 'abcd "$(mktemp -d)"',              False, "낱말 안의 cd 는 cd 가 아니다"),
+    ("N14", 'py:# cd "$(mktemp -d)" 는 쓰지 않는다', False, ".py 주석"),
+    ("N14", 'js:// cd "$(mktemp -d)" 는 쓰지 않는다', False, ".js 주석"),
+    ("N14", 'md:```bash\ncd "$(mktemp -d)"\n```', False, ".md BAD 예시 — 대상 확장자가 아니다"),
+]
+SELF_TEST_COUNT = len(SELF_TESTS)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 통합 fixture — 임시 트리에 known-bad 파일을 놓고 `chk_*` 를 **통째로** 호출한다.
+#
+# ⛔ 술어 fixture가 못 잡는 회귀를 잡는다 (외부 감사 ISSUE-PLAN-003):
+#    잘못된 파일 순회 · 잘못된 확장자 필터 · 잘못된 디렉토리 제외 · 결과 반전 ·
+#    `([], 그럴듯한 hits)` 반환. 위반의 **정확한 위치와 건수**를 단정한다.
+# ─────────────────────────────────────────────────────────────────────────────
+INTEG_TREE = {
+    # ── #12 MCP 도구명 3축 (2026-09-18 신설) ─────────────────────────────────
+    # ⛔ 이 다섯은 **축마다 하나씩** 이다. 축이 죽으면 그 줄만 조용히 사라지므로
+    #    양성 3 + 음성 2 를 함께 둔다 — 음성이 없으면 "전부 위반" 으로 뒤집혀도 통과한다.
+    # (양성) retired 접두 재등장 — 문법은 정상이라 문법 축으로는 못 잡는다
+    "agents/bad_12_retired.md": "---\nname: b\ntools: mcp__serena__find_symbol\n---\n\n본문\n",
+    # (양성) 형식 위반 — 구분자 `__` 가 하나뿐
+    "agents/bad_12_syntax.md": "---\nname: b\ntools: mcp__badformat\n---\n\n본문\n",
+    # (양성) 본문 Primary 가 지목한 서버가 frontmatter 에 없다
+    "agents/bad_12_primary.md": "---\nname: b\ntools: mcp__context7__query-docs\n---\n\n**Primary**: serena — 참조 추적\n",
+    # (음성) 정상 2형식 — 플러그인 제공 + 일반
+    "agents/ok_12_both.md": "---\nname: o\ntools: mcp__plugin_fz_serena__find_symbol, mcp__context7__query-docs\n---\n\n**Primary**: serena\n",
+    # (양성) ⭐ 실제 문서 형식 `- **Primary**: …` — 이전 정규식은 이것을 0건으로 놓쳤다
+    "agents/bad_12_primary_list.md": "---\nname: b\ntools: mcp__context7__query-docs\n---\n\n- **Primary**: serena (`find_symbol`) — 참조 추적\n",
+    # (양성, 축4 전용) ⭐ 플러그인 이름 kebab-case — **문법은 통과**하고(형식 위반 줄이 안 나온다)
+    #   선언 축만 발화한다. ⚠️ 축4 도입 전에는 음성이었다 — 대조할 인벤토리가 없었기 때문이다.
+    #   ⛔ 이 가짜 서버를 인벤토리에 넣지 않는다(시험용 이름으로 실 인벤토리를 오염시킨다).
+    "agents/bad_12_kebab_undeclared.md": "---\nname: o\ntools: mcp__plugin_my-plugin_server__tool\n---\n\n본문\n",
+    # (양성) ⛔ 문법은 맞고 **인벤토리에 선언되지 않은** 서버 — 축4 가 잡는다.
+    #        ⚠️ **경계가 이동했다**: 인벤토리(`schemas/tool-inventory.json`)가 생기기 전에는
+    #        대조할 것이 없어 통과가 정답이었고 이 fixture 가 음성이었다. 이제 선언 여부는
+    #        정적으로 닫히므로 양성이다. #2 에 남는 것은 *선언됐으나 실제로 안 떠 있는* 경우뿐이다.
+    "agents/bad_12_undeclared.md": "---\nname: b\ntools: mcp__nosuchserver__sometool\n---\n\n본문\n",
+    # #15: 잘림 + 3줄 뒤 카운트 → 위반 1
+    # #N12: `/sc:` 네임스페이스 → 위반 1 (양성) + 정상형 1 (음성 — "전부 위반" 뒤집힘 방어)
+    "modules/bad_n12.md": '실행: `/sc:analyze` 로 본다\n정상형: `/sc:sc-analyze` 도 함께 쓴다\n',
+    # #N4: grep -E 같은 줄의 `\|` → 위반 1
+    "modules/bad_n4.md": 'run: grep -E "^(a\\|b)" f\n',
+    # #N7: 할당 없는 $VAR 검사 → 위반 1
+    "modules/bad_n7.md": '```bash\nif [ -n "$NOPE" ]; then echo x; fi\n```\n',
+    # #N8: 목차 앵커 미해소 → 위반 1
+    "modules/bad_n8.md": '# T\n\n## 목차\n\n- [없는절](#없는절)\n\n## 실제절\n\n본문\n',
+    # #N6: 앵커·면제 없는 스크립트 → 위반 2 (⛔ **언어 계열별로 각 1개** — 한 계열 순회가 죽으면 잡힌다)
+    "scripts/bad_n6.sh": '#!/bin/bash\ncd ./somewhere\necho hi\n',
+    "scripts/bad_n6.py": 'import os\nroot = os.getcwd()\nprint(root)\n',
+    # #N5: 측정 신호 폐기(exit code 미사용) → **계열별 각 1개** (4R ISSUE-009)
+    "scripts/bad_n5.sh": '#!/bin/bash\nDIR="$(dirname "$0")"\ngrep -q x f >/dev/null 2>&1\necho done\n',
+    "scripts/bad_n5.py": 'from pathlib import Path\nroot = Path(__file__).parent\n'
+                         'import subprocess\nsubprocess.run(["x"], stdout=None) >/dev/null 2>&1\n',
+    # #N4 · #N7 도 계열별로 (스캔 대상이 .md/.sh/.py 인데 fixture 가 .md 뿐이었다)
+    "scripts/bad_n4.sh": '#!/bin/bash\nDIR="$(dirname "$0")"\ngrep -E "^(a\\|b)" f\n',
+    "scripts/bad_n4.py": 'from pathlib import Path\nroot = Path(__file__).parent\n'
+                         '# run: grep -E "^(x\\|y)" f\n',
+    # ⛔ SKIP_DIRS 미끼 — 제외 로직이 죽으면 여기가 세어져 카운트가 어긋난다
+    # ⛔ SKIP 미끼 — 제외 로직이 죽으면 여기가 세어져 카운트가 어긋난다.
+    #    내용은 **#N4·#N7 을 발동**시킨다 (2026-08-10 감사 ISSUE-009: 미끼가 #15 만 검증했다)
+    "worktrees/decoy/modules/bad_n4.md": 'run: grep -E "^(a\\|b)" f\n',
+    "node_modules/decoy_n4.md": 'run: grep -E "^(c\\|d)" f\n',
+    "docs/releases/decoy_n7.md": '```bash\nif [ -n "$GONE" ]; then echo x; fi\n```\n',
+    # #N9: cross-file § 앵커. 대상에 §1(번호형)·§5.7(§ 접두형)을 **둘 다** 두는 것이 핵심이다 —
+    #      `re.M` 누락(앵커 전멸)·`§?` 누락(§ 접두 미인식) 회귀를 **정상 대조군 2건이** 잡는다
+    #      (구현 중 실측: 두 결함이 각각 142/142·11/12 오탐을 냈고 fixture 없이는 조용히 통과했다)
+    "modules/target_n9.md": '# T\n\n## 1. 정상절\n\n본문\n\n## §5.7 § 접두절\n\n본문\n\n### 3) 괄호형 절\n\n본문\n',
+    "modules/bad_n9.md": '`target_n9.md` §1 정상\n`target_n9.md` §5.7 § 접두 정상\n`target_n9.md` §3 괄호형 정상\n`target_n9.md` §9 부재\n',
+    # #N14: 빈 mktemp 치환 cd → **계열별 각 1개 이상**(.sh 2 · .py 1 · .js 1). 같은 파일에 음성(주석 · heredoc 본문 ·
+    #       안전 꼴)을 함께 둬 '전부 위반' 뒤집힘과 주석·heredoc 처리 소실을 같이 잡는다.
+    #       ⛔ scripts/ 밖에 둔다 — scripts/ 의 .sh/.py 는 #N5·#N6 대상이라 그 건수가 바뀐다
+    "tests/bad_n14.sh": '#!/bin/bash\n# 설명 주석 cd "$(mktemp -d)" 는 데이터다\ncat > ex.sh <<\'EOF\'\n'
+                        'cd "$(mktemp -d)"\nEOF\nT0="$(mktemp -d)" || exit 2; T="$(cd "$T0" && pwd -P)"\n'
+                        'X="$(cd "$(mktemp -d)" && pwd -P)"\npushd "$(mktemp -d -t fz)"\n',
+    "tests/bad_n14.py": 'import subprocess\nsubprocess.run(\'cd "$(mktemp -d)" && true\', shell=True)\n'
+                        '# cd "$(mktemp -d)" 는 쓰지 않는다\n',
+    "tests/bad_n14.js": '// cd "$(mktemp -d)" 는 쓰지 않는다\n'
+                        'require("child_process").execSync(\'cd "$(mktemp -d)" && true\');\n',
+    # (음성) .md BAD 예시 — 대상 확장자가 아니다 · SKIP 미끼 2종(제외 디렉터리 · docs/releases/)
+    "modules/ok_n14.md": '```bash\ncd "$(mktemp -d)"\n```\n',
+    "node_modules/decoy_n14.sh": 'cd "$(mktemp -d)"\n',
+    "docs/releases/decoy_n14.sh": 'cd "$(mktemp -d)"\n',
+    # 정상 대조군 — 위반 0이어야 한다
+    "modules/ok.md": '# T\n\n## 목차\n\n- [실제절](#실제절)\n\n## 실제절\n\n본문\n',
+    "scripts/ok.py": 'from pathlib import Path\nroot = Path(__file__).resolve().parent\n',
+}
+# ⛔ 위반 **건수 + 정확한 위치**를 단정한다 (3라운드 감사 ISSUE-006: 건수만 보면
+#    잘못된 파일을 잡아도 통과한다). 위치는 `rel:line` 접두로 대조한다.
+INTEG_EXPECT = {
+    "N12": ["modules/bad_n12.md"],
+           "12": ["agents/bad_12_retired.md", "agents/bad_12_syntax.md", "agents/bad_12_primary.md",
+           "agents/bad_12_primary_list.md", "agents/bad_12_undeclared.md", "agents/bad_12_kebab_undeclared.md"],
+    "N4": ["modules/bad_n4.md:1", "scripts/bad_n4.sh:3", "scripts/bad_n4.py:3"],
+    "N5": ["scripts/bad_n5.sh:3", "scripts/bad_n5.py:4"],
+    "N6": ["scripts/bad_n6.py", "scripts/bad_n6.sh"],
+    "N7": ["modules/bad_n7.md:2"],
+    "N8": ["modules/bad_n8.md"],
+    "N9": ["modules/bad_n9.md:4"],
+    "N14": ["tests/bad_n14.sh:7", "tests/bad_n14.sh:8", "tests/bad_n14.py:2", "tests/bad_n14.js:2"],
+}
+
+
+def run_integration_tests() -> list[str]:
+    """실패 메시지 목록 반환 (빈 목록 = 전부 통과).
+
+    ⛔ 3라운드 감사(ISSUE-006) 정정 3건:
+      ① `tempfile.TemporaryDirectory()` 가 예외를 던지면 main 을 탈출해 **exit 1** 이 됐다
+         (읽기 전용 환경에서 실측) — configuration error 는 exit 2 여야 한다 → 예외를 메시지로 변환
+      ② 위반 **건수만** 단정해 잘못된 파일을 잡아도 통과했다 → **정확한 위치**를 단정
+      ③ `#N5` 누락 + `#N6` 가 셸 픽스처만 있어 **파이썬 계열 순회 소실**이 통과했다 → 계열별 픽스처
+    """
+    import tempfile
+    fails: list[str] = []
+    try:
+        td_ctx = tempfile.TemporaryDirectory()
+    except Exception as e:                                            # noqa: BLE001
+        return [f"임시 트리 생성 실패({type(e).__name__}: {e}) — 통합 fixture 실행 불가"]
+    with td_ctx as td:
+        root = Path(td)
+        try:
+            for rel, body in INTEG_TREE.items():
+                fp = root / rel
+                fp.parent.mkdir(parents=True, exist_ok=True)
+                fp.write_text(body, encoding="utf-8")
+            (root / "guides").mkdir(exist_ok=True)      # 루트 마커
+        except OSError as e:
+            return [f"임시 트리 기록 실패({e}) — 통합 fixture 실행 불가"]
+
+        for item, want_locs in INTEG_EXPECT.items():
+            try:
+                v, hits = CHECKS[item](root=root)
+            except TypeError:
+                fails.append(f"#{item}: root 주입 미지원 — 통합 fixture 불가")
+                continue
+            except Exception as e:                                    # noqa: BLE001
+                fails.append(f"#{item}: 통합 실행 예외 {type(e).__name__}: {e}")
+                continue
+            if len(v) != len(want_locs):
+                fails.append(f"#{item} 통합 fixture: 위반 {len(v)}건 (기대 {len(want_locs)}) "
+                             f"hits={hits} → {v}")
+                continue
+            for want in want_locs:
+                # ⛔ 4R ISSUE-009: `startswith` 는 ':3' 이 ':30' 에 매칭됐다 → **경계**를 요구한다
+                if not any(msg == want or msg.startswith(want + ":") or msg.startswith(want + " ")
+                           for msg in v):
+                    fails.append(f"#{item} 통합 fixture: 기대 위치 '{want}' 미검출 → {v}")
+            if hits == 0:
+                fails.append(f"#{item} 통합 fixture: 후보 0 — 순회가 트리를 못 봤다")
+    return fails
+
+
+def run_self_tests() -> list[str]:
+    """실패 메시지 목록 반환 (빈 목록 = 전부 통과)."""
+    fails = []
+    for item, src, want, why in SELF_TESTS:
+        if item == "N1":
+            base_doc = {"$defs": {"severity": {"enum": ["critical", "major", "minor", "suggestion"]}}}
+            if src == "REF_OK":
+                enum, err = resolve_ref("gpt_base_issue_schema.json#/$defs/severity",
+                                        base_doc, "gpt_base_issue_schema.json")
+                got = err is None and enum == ["critical", "major", "minor", "suggestion"]
+            elif src == "REF_WRONG_PATH":
+                enum, err = resolve_ref("#/$defs/nope", base_doc, "gpt_base_issue_schema.json")
+                got = enum is None and err is not None
+            else:                                     # REF_WRONG_FILE
+                enum, err = resolve_ref("other.json#/$defs/severity",
+                                        base_doc, "gpt_base_issue_schema.json")
+                got = enum is None and err is not None
+        elif item == "N13":
+            if src == "TEMPLATE_FENCE":
+                ls = "# T\n\n```yaml\n---\nname: x\nmemory: user\n---\n```\n".split("\n")
+                got = any(MEMORY_FIELD.match(ls[i]) for i in _frontmatter_span(ls, template=True))
+            elif src == "TEMPLATE_NO_FM":
+                got = bool(_frontmatter_span("# T\n\n본문 memory: user\n".split("\n"), template=True))
+            else:
+                got = bool(MEMORY_FIELD.search(src))
+        elif item == "N4":
+            got = bool(ERE_BAD.search(src)) and "\\|" in src
+        elif item == "N5":
+            got = (">/dev/null 2>&1" in src) or ("> /dev/null 2>&1" in src)
+        elif item == "N7":
+            # 검사 형태 fixture는 TESTED, 할당 형태 fixture는 ASSIGN을 본다
+            if src.startswith(("read ", "printf ", "for ")):
+                got = bool(ASSIGN.match(src))
+            else:
+                got = bool(TESTED.search(src))
+        elif item == "N8":
+            if src == "COLLISION":
+                a = gh_anchors("## Foo\n## Foo\n## Foo-1\n")
+                got = sorted(a) == ["foo", "foo-1", "foo-1-1"]
+            elif src == "FENCE_BACKTICK":
+                a = gh_anchors("## Real\n```\n## Fake\n```\n")
+                got = "fake" not in a and "real" in a
+            elif src == "FENCE_TILDE":
+                a = gh_anchors("## Real\n~~~\n## Fake\n~~~\n")
+                got = "fake" not in a and "real" in a
+            elif src == "FENCE_LONG":
+                # 4-backtick 블록 안의 ``` 는 닫지 못하므로 그 뒤 heading도 fence 안이다
+                a = gh_anchors("## Real\n````\n## Fake\n```\n## Also\n````\n")
+                got = "fake" not in a and "also" not in a and "real" in a
+            elif src == "SETEXT_PARA":
+                got = sorted(gh_anchors("단락 텍스트\n---\n")) == ["단락-텍스트"]
+            elif src == "SETEXT_LIST":
+                # ⛔ GFM: setext 밑줄은 **단락**만 뒤따른다 — 리스트 뒤 `---` 는 thematic break
+                got = gh_anchors("- 리스트\n---\n") == {}
+            elif src == "SETEXT_QUOTE":
+                got = gh_anchors("> 인용\n---\n") == {}
+            elif src == "ATX_TRAILING_HASH":
+                got = sorted(gh_anchors("## Foo ##\n")) == ["foo"]
+            elif src == "FENCE_UNCLOSED":
+                a = gh_anchors("## Real\n```\n## Fake\n")
+                got = "fake" not in a and "real" in a
+            elif src == "FENCE_INDENT":
+                a = gh_anchors("## Real\n   ```\n   ## Fake\n   ```\n")
+                got = "fake" not in a and "real" in a
+            else:
+                # slug 왕복: heading → slug
+                expect = {"## A + B": "a--b", "## Plain Head": "plain-head"}[src]
+                got = gh_slug(src[3:]) == expect
+        elif item == "N6":
+            # ⛔ chk_N6와 **동일 함수**를 호출한다 — fixture가 별도 로직을 검사하면 드리프트한다
+            got = n6_ok(src, ".sh" if ("$" in src or src.startswith("echo ")) else ".py")
+        elif item == "N14":
+            # ⛔ chk_N14 와 **같은 술어**(n14_hits)와 같은 확장자 집합(N14_EXTS)을 쓴다
+            sfx, body = ("." + src[:2], src[3:]) if src[:3] in ("py:", "js:", "md:") else (".sh", src)
+            got = sfx in N14_EXTS and bool(n14_hits(body, sfx)[0])
+        else:                                                     # pragma: no cover
+            fails.append(f"#{item}: self-test 라우팅 미구현")
+            continue
+        if got != want:
+            fails.append(f"#{item} 양성대조 실패 ({why}): {src!r} → 기대 {want}, 실제 {got}")
+    return fails
+
+
+# ⛔ #N9 — cross-file 섹션 앵커. 파일명이 **명시된** `§N` 만 본다 (ITEMS 주석의 (a)/(b) 구분 참조).
+SECREF = re.compile(r"`([A-Za-z0-9_./\-]+\.md)`\s*§([0-9]+(?:\.[0-9]+)*)")
+# heading 앞머리의 번호 토큰: `## 5. fz…` → '5' · `### 1.2 Harness…` → '1.2'
+# ⛔ `re.M` 필수 — 없으면 `^`가 문자열 시작으로만 해석돼 첫 줄만 보고, 앵커 집합이 비어
+#    **검사 대상 전건이 FAIL** 한다 (구현 중 실측: 당시 순회 기준 142/142 오탐 — 현행 seen=149).
+# ⛔ `§?` 필수 — fz 문서는 번호 heading 두 형식이 공존한다: `## 5.1 JSON Plan 실험`(번호만)과
+#    `## §5.7 Workflow Tracing`(§ 접두, experiment-log.md). 후자를 놓치면 그 문서를 가리키는
+#    참조 11건이 통째로 오탐이 된다 (구현 중 실측).
+# ⛔ 구분자는 `.` `공백` `)` **셋만**이다. 실측(2026-08-20) 구분자 분포:
+#      `.` 202 · 공백 59 · `-` 13 · `차` 7 · `)` 5 · `b` 4 · `가` 2 · 기타 4
+#    `-`/`차`/`가`/`대`/`런`/`요`/`단`은 번호가 아니라 **낱말의 일부**다
+#    (`2.5-Turn Protocol` · `1차 트리거` · `3가지 실행 모드` · `10대 원칙` · `6런타임책임`).
+#    이들까지 허용하면 `## 3가지 실행 모드`가 §3 앵커로 등록돼 **없는 절이 해소된다** — 확장 금지.
+#    `b`(`## 1b.` `## 3b.`)는 조치 불요: SECREF가 `§1b`에서 `1`만 캡처하고 `## 1.`이 공존한다.
+HEADNUM = re.compile(r"^#{1,6}\s+§?\s*([0-9]+(?:\.[0-9]+)*)[.)\s]", re.M)
+
+
+def chk_N10(root: Path | None = None):
+    """structured-output strict 준수.
+
+    OpenAI structured output 은 두 조건을 요구한다 — 모든 object 노드에
+    `additionalProperties: false`, 그리고 `required` 가 `properties` 의 **전 키**를 포함.
+    optional 필드는 nullable 타입(`["string","null"]`)으로 표현한다.
+
+    ⛔ 하나라도 어기면 API 가 `invalid_json_schema` 400 을 낸다 — 스키마가 **로드조차
+       되지 않는다.** 실측(2026-08-25): `gpt_gate_verdict_schema` 와
+       `gpt_verification_schema` 가 이 상태였고, 후자는 `validate`(fz-review Phase 5.5)
+       가 쓰는 스키마라 그 경로가 구조적으로 실행 불가였다. 파일이 존재하고 JSON 으로
+       파싱되면 통과했으므로 어느 검사도 잡지 못했다.
+
+    ⛔ **대상은 사용처가 정한다.** 파일명 목록(#N1 의 과거 결합)도, top-level
+       `properties` 유무도 기준이 아니다 — `issue_tracker_schema.json` 은 top-level
+       properties 를 갖지만 Issue Tracker **산출물** 형식이고 gpt 응답이 아니다.
+       `gpt_base_issue_schema.json` 은 `$defs` 참조용이다. 실제 전달되는 것만 본다.
+
+    ⛔ `type` 이 리스트인 객체도 대상이다. nullable 로 만들면 `"object"` →
+       `["object","null"]` 이 되므로 `== "object"` 로 판정하면 **자기가 nullable 로
+       만든 노드를 놓친다** (실측: `new_issues_found.items.properties.location`).
+    """
+    root = root or ROOT
+    sd = root / "schemas"
+    if not sd.is_dir():
+        raise ParseError("schemas/ 디렉토리 부재")
+
+    # 사용처 수집 — 마크다운·셸·JS 전체에서 스키마 인자를 찾는다
+    used = set()
+    pat = re.compile(r"(?:--output-schema|--schema)\s+[\"']?(?:[^\s\"']*/)?([a-z_]+\.json)")
+    # ⛔ 배선처만 훑는다. 전 트리를 훑으면 `docs/releases/`·`CHANGELOG.md` 의 **산문**이
+    #    배선으로 오인된다 — "`--schema schemas/foo.json` 이 깨져 있었다" 같은 문장 하나로
+    #    은퇴한 스키마가 검사 대상에 편입된다. MIN_HITS 는 축소만 잡고 확대는 못 잡는다.
+    WIRING_DIRS = ("modules", "skills", "scripts", "workflows", "agents", "gpt-skills")
+    candidates = []
+    for sub in WIRING_DIRS:
+        base = root / sub
+        if base.is_dir():
+            candidates += [f for f in base.rglob("*") if f.is_file()]
+    for f in candidates:
+        if f.suffix not in (".md", ".sh", ".js", ".py"):
+            continue
+        if "/node_modules/" in str(f) or "/.git/" in str(f):
+            continue
+        try:
+            body = read(f)
+        except (OSError, UnicodeDecodeError):
+            continue
+        used.update(pat.findall(body))
+    # ⛔ 레지스트리의 kinds.*.schema 도 사용처다 — 정문(scripts/gpt-call.sh)이 그 값을 --schema 로 넘긴다. 레시피 문자열이
+    #    정문 호출로 바뀌면 위 grep 에서 사라지므로, 여기서 세지 않으면 그 스키마가 strict 검사에서 조용히 빠진다(XE-12)
+    reg = root / "scripts" / "gpt-kinds.json"
+    if reg.is_file():
+        try:
+            kinds = json.loads(read(reg)).get("kinds") or {}
+        except ValueError as e:
+            raise ParseError(f"scripts/gpt-kinds.json 판독 실패: {e}")
+        used.update(Path(k["schema"]).name for k in kinds.values() if isinstance(k, dict) and isinstance(k.get("schema"), str))
+
+    def is_object(node) -> bool:
+        ty = node.get("type")
+        return ty == "object" or (isinstance(ty, list) and "object" in ty)
+
+    v, seen, skipped = [], 0, []
+    for f in sorted(sd.glob("*.json")):
+        if f.name not in used:
+            skipped.append(f.name)
+            continue
+        try:
+            doc = json.loads(read(f))
+        except json.JSONDecodeError as e:
+            raise ParseError(f"{f.name} JSON 파싱 실패: {e}")
+
+        def walk(node, path="$"):
+            nonlocal seen
+            if isinstance(node, dict):
+                if is_object(node) and isinstance(node.get("properties"), dict):
+                    seen += 1
+                    if node.get("additionalProperties") is not False:
+                        v.append(f"schemas/{f.name} {path}: additionalProperties 가 false 가 아니다 "
+                                 f"({node.get('additionalProperties')!r}) — strict 모드 거부")
+                    gap = sorted(set(node["properties"]) - set(node.get("required") or []))
+                    if gap:
+                        v.append(f"schemas/{f.name} {path}: required 에 없는 properties {gap} — "
+                                 "optional 은 nullable 타입 + required 로 표현한다")
+                for k, val in node.items():
+                    walk(val, f"{path}.{k}")
+            elif isinstance(node, list):
+                for i, val in enumerate(node):
+                    walk(val, f"{path}[{i}]")
+        walk(doc)
+
+    # ⛔ 반환 계약은 `(violations, hits:int)` 다 — 형제 검사 전부 그렇고 main 이 hits 를
+    #    MIN_HITS 와 **수치 비교**한다. 문자열을 넣으면 TypeError 로 exit 2 가 된다(실측).
+    #    미배선 정보는 위반이 아니므로 stderr 로 따로 알린다.
+    if skipped:
+        print(f"   ℹ️  #N10 배선 없어 미검사: {', '.join(skipped)}", file=sys.stderr)
+    return v, seen
+
+
+# ⛔ 경량 경로 **식별**은 추측하지 않는다. 실측으로 두 형태만 인정한다:
+#   (a) `### light 모드` / `## light 모드` 섹션 — fz-code·fz-plan·fz-review·fz-modernize
+#   (b) 실행 절차를 `*-tiers.md` 모듈로 위임 — fz-peer-review
+# ⛔ 단순히 "Tier" 를 **언급**하는 것은 경로가 아니다. 실측 오탐 2건:
+#   `code-auditor` "Tier 1 — 필수(위반 시 반드시 지적)" = 심각도 등급
+#   `fz-gpt` "Tier 1(CLAUDE.md 테이블) → Tier 2" = 디스커버리 등급
+# ⛔ 헤딩만 보면 미탐이 난다 — `fz-modernize` 는 `- **light 모드 (40차)**:` 불릿로 적는다
+#    (`## Boundaries` 안). 헤딩·볼드 라벨 둘 다 인정한다.
+LIGHT_SECTION = re.compile(r"^#{2,3} +light 모드|^\s*[-*] +\*\*light 모드", re.M)
+TIERS_DELEGATE = re.compile(r"modules/([a-z0-9-]*tiers)\.md")
+# 선언 형식은 **관례를 따른다** — 형제 4스킬이 이미 쓰는 문구다. 새 마커를 발명하지 않는다.
+LIGHT_CONTRACT = re.compile(r"생략 불가")
+
+
+def light_path_of(text: str) -> tuple[bool, str | None]:
+    """(경량 경로 보유 여부, 위임 모듈 상대경로 또는 None)"""
+    delegated = TIERS_DELEGATE.search(text)
+    if delegated:
+        return True, f"modules/{delegated.group(1)}.md"
+    return bool(LIGHT_SECTION.search(text)), None
+
+
+def chk_N11(root: Path | None = None):
+    base = root or ROOT
+    v, seen = [], 0
+    for rel, p in walk_files(".md", root=root):
+        if not (rel.startswith("skills/") and rel.endswith("SKILL.md")):
+            continue
+        text = read(p)
+        has_light, delegate = light_path_of(text)
+        if not has_light:
+            continue
+        seen += 1
+        # 위임이 있으면 **위임 대상**이 선언을 져야 한다. SKILL.md 만으로는 부족하다 —
+        # Lead 가 위임 절차를 따를 때 SKILL.md 의 그 줄에 도달하지 않는다.
+        target_rel = delegate or rel
+        target_text = read(base / target_rel) if delegate else text
+        if not LIGHT_CONTRACT.search(target_text):
+            where = f"{target_rel} (위임 대상)" if delegate else rel
+            v.append(f"{rel}: 경량 경로를 갖는데 검증 계약 선언이 없다 → {where}"
+                     f" 에 `…는 경량 경로에서도 생략 불가` 1줄")
+    return v, seen
+
+
+def chk_N9(root: Path | None = None):
+    base = root or ROOT
+    by_base = defaultdict(list)
+    for rel, _ in walk_files(root=root):
+        by_base[Path(rel).name].append(rel)
+    existing = {rel for rel, _ in walk_files(root=root)}
+    anchors: dict[str, set[str]] = {}
+
+    def nums(target: str) -> set[str]:
+        if target not in anchors:
+            anchors[target] = {m.group(1) for m in HEADNUM.finditer(read(base / target))}
+        return anchors[target]
+
+    v, seen = [], 0
+    for rel, p in walk_files(".md", root=root):
+        if rel == "CHANGELOG.md":
+            continue
+        for i, line in enumerate(read(p).split("\n"), 1):
+            for m in SECREF.finditer(line):
+                raw, sec = m.group(1).lstrip("./"), m.group(2)
+                cands = by_base.get(Path(raw).name, [])
+                target = raw if raw in existing else (cands[0] if len(cands) == 1 else None)
+                if target is None:
+                    continue
+                seen += 1
+                if sec not in nums(target):
+                    v.append(f"{rel}:{i}: → `{target}` §{sec} — 대상 문서에 해당 번호 heading 부재")
+    return v, seen
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #N14 빈 mktemp 치환 cd (F-355)
+#
+# ⛔ 신설 근거: `X="$(cd "$(mktemp -d)" && pwd -P)"` 꼴은 mktemp 가 실패하면 안쪽 치환이 빈 문자열이 되고
+#    bash 3.2 의 `cd ""` 가 성공해 X 가 **현재 폴더**가 된다 — 정리 단계(`rm -rf "$X"` · trap)가 그 폴더를
+#    지웠다(따옴표가 없으면 인자 없는 `cd` 라 HOME 으로 간다). v4.42.0(db7c411 · 4fba0db)이 복사로 퍼진
+#    4곳을 고쳤으나 같은 꼴을 막는 검사가 없었다(F-355 '남은 구멍').
+# 범위: 실행 코드 `.sh`·`.py`·`.js`. 주석과 `.sh` 의 **따옴표 구분자** heredoc 본문(`<<'EOF'` · `<<"EOF"` · `<<\EOF`)은
+#    뺀다 — 고친 자리의 설명 주석과 fixture 의 BAD 예시가 그곳에 산다. ⛔ 따옴표 없는 `<<EOF` · `<<-EOF` 본문은 코드로
+#    본다 — 생성하는 셸이 그 자리에서 `$(…)` 를 실행하므로 mktemp 실패 시 현재 폴더 경로가 생성물에 박힌다.
+#    `.md`(모듈·레지스트리 INDEX 의 BAD 예시)는 보지 않는다.
+# ⛔ heredoc 은 **종결자 줄을 찾았을 때만** 건너뛴다. N6 의 '첫 `<<` 뒤 전부 버림' 은 앵커를 찾는 N6 에는
+#    안전 방향이지만 위험 꼴을 찾는 이 검사에서는 미탐 방향이다. `<<<` here-string 은 heredoc 이 아니다.
+# 안전 꼴(음성): 결과를 따로 받아 실패를 멈춘다 — `d="$(mktemp -d)" || exit 1` 뒤 `cd "${d:?}"`.
+# ⛔ 범위 외(미탐): 확인 없이 받은 변수로 cd 하는 두 줄 꼴 · 줄 이음(`\`)으로 나뉜 cd · 인터프리터에 먹이는
+#    **따옴표** heredoc(`python3 - <<'PY'` · `bash <<'EOF'`) 본문 · 큰따옴표 안에서 이스케이프된 `\$(`(`eval "cd \"\$(…)\""`)
+#    · `${T:-$(mktemp -d)}` 같은 기본값 확장 · 중첩 치환(`$(dirname "$(mktemp)")`) · `\cd` · 따옴표 안 ` #` 뒤의 코드 ·
+#    확장자 없는 스크립트. 오탐 가능(눈에 보이는 실패): .sh 문자열 속 설명 · 한 줄 here-string · 한 줄에 여러 heredoc.
+# ─────────────────────────────────────────────────────────────────────────────
+N14_EXTS = (".sh", ".py", ".js")
+# cd/pushd 바로 앞 경계 — 줄 시작 · 공백 · 셸 구분자 · 치환 여는 괄호 · 따옴표(.py/.js 셸 문자열)
+_N14_LEAD = r"(?:^|[\s;&|(`'\"{!])"
+N14_CD = re.compile(_N14_LEAD + r"(?:cd|pushd)\s")
+N14_BAD = re.compile(_N14_LEAD + r"(?:cd|pushd)\s+(?:-[A-Za-z]+\s+)*(?:--\s+)?\\?[\"']?(?:\$\(|`)[^()`]*?\bmktemp\b")
+N14_COMMENT = {".sh": re.compile(r"(^|\s)#.*$"), ".py": re.compile(r"(^|\s)#.*$"),
+               ".js": re.compile(r"(^|\s)//.*$")}
+N14_HEREDOC = re.compile(r"(?<!<)<<(?!<)(-?)\s*(?:'([^']+)'|\"([^\"]+)\"|(\\)?([A-Za-z_][A-Za-z0-9_]*))")
+
+
+def n14_code_lines(txt: str, suffix: str) -> list[tuple[int, str]]:
+    """(줄 번호, 주석을 뗀 코드). `.sh` 는 종결자가 있는 **따옴표 구분자** heredoc 본문만 건너뛴다(따옴표 없는 본문은 코드)."""
+    lines, strip = txt.split("\n"), N14_COMMENT.get(suffix)
+    out, i = [], 0
+    while i < len(lines):
+        code = strip.sub(r"\1", lines[i]) if strip else lines[i]
+        out.append((i + 1, code))
+        m = N14_HEREDOC.search(code) if suffix == ".sh" else None
+        if m:
+            word, dash = m.group(2) or m.group(3) or m.group(5), m.group(1) == "-"
+            quoted = bool(m.group(2) or m.group(3) or m.group(4))
+            end = next((j for j in range(i + 1, len(lines))
+                        if (lines[j].lstrip("\t") if dash else lines[j]) == word), None)
+            if quoted and end is not None:
+                i = end + 1          # 본문과 종결자 줄은 데이터다
+                continue
+        i += 1
+    return out
+
+
+def n14_hits(txt: str, suffix: str) -> tuple[list[int], int]:
+    """(위반 줄 번호, `cd`/`pushd` 코드 줄 수). ⛔ chk_N14 와 self-test 가 **같은 함수**를 쓴다."""
+    bad, seen = [], 0
+    for n, code in n14_code_lines(txt, suffix):
+        if N14_CD.search(code):
+            seen += 1
+            if N14_BAD.search(code):
+                bad.append(n)
+    return bad, seen
+
+
+def chk_N14(root: Path | None = None):
+    self_rel = Path(__file__).resolve().relative_to(ROOT).as_posix()
+    v, seen = [], 0
+    for rel, p in walk_files(*N14_EXTS, root=root):
+        if rel == self_rel:
+            continue          # ⛔ 자기 참조 제외 — 정규식·self-test·통합 fixture 문자열이 대상 꼴을 담는다
+        bad, n = n14_hits(read(p), p.suffix)
+        seen += n
+        v += [f"{rel}:{i}: `cd`/`pushd` 인자가 `$(mktemp …)` 치환 — mktemp 가 실패하면 빈 인자로 cd 가 "
+              f"성공해(bash 3.2 `cd \"\"`) 현재 폴더가 임시 폴더가 되고 정리가 그 폴더를 지운다 → 결과를 "
+              f"따로 받아 실패를 멈춘다: `d=\"$(mktemp -d)\" || exit 1` 뒤 `cd \"${{d:?}}\"` (F-355)"
+              for i in bad]
+    return v, seen
+
+
+CHECKS = {
+    "1": chk_1, "3": chk_3, "4": chk_4, "5": chk_5, "6": chk_6, "7": chk_7,
+    "12": chk_12, "14": chk_14, "16": chk_16, "N12": chk_N12,
+    "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
+    "N7": chk_N7, "N8": chk_N8, "N9": chk_N9, "N10": chk_N10,
+    "N11": chk_N11, "N13": chk_N13, "N14": chk_N14,
+}
+
+
+def check_registry_invariants() -> list[str]:
+    """레지스트리 자체의 구조 불변식. ⛔ 위반은 configuration error(exit 2)다.
+
+    신설 근거(2026-08-09 ISSUE-002): 등재만 하고 검사되지 않는 항목이 조용히 존재할 수 있었다.
+    """
+    v = []
+    id_list = [i for i, _, _, _ in ITEMS]
+    ids = set(id_list)
+    # ⛔ 중복 id — set 으로 접으면 놓친다 (3라운드 감사 ISSUE-008)
+    seen_once: set[str] = set()
+    for i in id_list:
+        if i in seen_once:
+            v.append(f"ITEMS에 중복 id '{i}' — 뒤 항목이 앞 항목을 가린다")
+        seen_once.add(i)
+    for k in CHECKS:
+        if k not in ids:
+            v.append(f"CHECKS['{k}'] 가 ITEMS에 없다 — 레지스트리 불일치")
+        elif k not in DET:
+            # ⛔ SKIP 판정자에 구현이 있으면 "판정하지 않는다"는 선언과 모순된다
+            v.append(f"CHECKS['{k}'] 는 구현이 있는데 판정자가 DETERMINISTIC 이 아니다 — SKIP 선언과 모순")
+    for i in sorted(DET):
+        if i not in CHECKS:
+            v.append(f"#{i} 는 DETERMINISTIC인데 CHECKS 구현이 없다")
+        if i not in MIN_HITS:
+            v.append(f"#{i} 는 DETERMINISTIC인데 MIN_HITS 선언이 없다 (순회 회귀 무방비)")
+    for i in MIN_HITS:
+        if i not in DET:
+            v.append(f"MIN_HITS['{i}'] 가 DETERMINISTIC 항목이 아니다")
+        # ⛔ 4R ISSUE-010: 0·음수는 존재 검사를 통과하면서 하한을 **무력화**한다
+        if not isinstance(MIN_HITS[i], int) or MIN_HITS[i] < 1:
+            v.append(f"MIN_HITS['{i}'] = {MIN_HITS[i]!r} — 1 이상의 정수여야 한다 (하한 무력화 방지)")
+    # ⛔ 4R ISSUE-010: `kind` 오타(예: "DETERMINSTIC")는 DET 집합에서 빠져 **조용히 SKIP** 된다
+    for i, kind, _, _ in ITEMS:
+        if kind not in ("DETERMINISTIC", "THRESHOLD", "SEMANTIC"):
+            v.append(f"#{i}: 알 수 없는 판정자 '{kind}' — 오타면 조용히 SKIP 된다")
+    return v
+
+
+def cmd_list() -> int:
+    print("=" * 78)
+    print("fz 계약 lint — 검사 항목 (본 스크립트가 SSOT)")
+    print("=" * 78)
+    for i, kind, target, desc in ITEMS:
+        mark = {"DETERMINISTIC": "✅", "THRESHOLD": "⏸", "SEMANTIC": "👤"}[kind]
+        print(f"{mark} #{i:<3s} [{kind:13s}] {target:8s} {desc}")
+    d = sum(1 for _, k, _, _ in ITEMS if k == "DETERMINISTIC")
+    t = sum(1 for _, k, _, _ in ITEMS if k == "THRESHOLD")
+    s = sum(1 for _, k, _, _ in ITEMS if k == "SEMANTIC")
+    print()
+    print(f"총 {len(ITEMS)}항목 — DETERMINISTIC {d} / THRESHOLD {t}(SKIP) / SEMANTIC {s}(SKIP)")
+    print("⏸ THRESHOLD = 임계/문법을 정하면 DETERMINISTIC 승격  ·  👤 SEMANTIC = 사람/모델 판정")
+    print()
+    print("exit: 0=위반 없음 · 1=위반 있음 · 2=configuration/parse error(⛔ PASS·SKIP 아님)")
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="fz 플러그인 계약 lint")
+    ap.add_argument("--list", action="store_true", help="검사 항목 + 판정자 출력 (SSOT)")
+    ap.add_argument("--only", help="쉼표 구분 항목 id만 실행 (예: 14,N4)")
+    ap.add_argument("--self-test", action="store_true", help="양성 대조만 실행하고 종료")
+    ap.add_argument("--agents-root", help="agents/ 대신 검사할 폴더(음성 대조용 사본)")
+    a = ap.parse_args()
+    if a.agents_root:
+        global AGENTS
+        AGENTS = sorted(Path(a.agents_root).glob("*.md"))
+
+    if a.list:
+        return cmd_list()
+
+    if not (ROOT / "guides").is_dir() or not (ROOT / "skills").is_dir():
+        print(f"⛔ 플러그인 루트 해석 실패: {ROOT}", file=sys.stderr)
+        return 2
+
+    # ⛔ 양성 대조를 **항상** 선행한다 (Negative-Result Gate 요소1의 실체).
+    #    `hits`는 *본 후보 수*라 패턴이 고장나도 0이 아니다 — 실제로 #15가 `head -n 5`를
+    #    놓친 채 `OK [검사 대상 13]`을 냈다 (ISSUE-001·003). fixture 실패는 configuration error다.
+    inv_fail = check_registry_invariants()
+    if inv_fail:
+        print("⛔ 레지스트리 구조 불변식 위반 (configuration error)", file=sys.stderr)
+        for m in inv_fail:
+            print(f"   {m}", file=sys.stderr)
+        return 2
+
+    it_fail = run_integration_tests()
+    if it_fail:
+        print("⛔ 통합 fixture 실패 — 검사기의 순회·수집이 고장났다", file=sys.stderr)
+        for m in it_fail:
+            print(f"   {m}", file=sys.stderr)
+        return 2
+
+    st_fail = run_self_tests()
+    if st_fail:
+        print("⛔ 양성 대조 실패 — 검사기가 고장났다 (결과를 '위반 0건'으로 읽지 말 것)", file=sys.stderr)
+        for m in st_fail:
+            print(f"   {m}", file=sys.stderr)
+        return 2
+    if a.self_test:
+        print(f"양성 대조 {SELF_TEST_COUNT}건 + 통합 fixture {len(INTEG_EXPECT)}검사({sum(len(x) for x in INTEG_EXPECT.values())} 위치) 전부 통과")
+        return 0
+
+    only = {x.strip() for x in a.only.split(",")} if a.only else None
+    if only:
+        # ⛔ 오타 하나로 enforcement 전체가 조용히 무력해지던 결함 차단 (ISSUE-002):
+        #    이전에는 `--only DOES_NOT_EXIST`가 검사 0개를 돌리고 "위반 0건" exit 0을 냈다.
+        unknown = sorted(only - {i for i, _, _, _ in ITEMS})
+        if unknown:
+            print(f"⛔ 알 수 없는 --only 항목 id: {unknown} — `--list`로 확인", file=sys.stderr)
+            return 2
+        if not (only & DET):
+            print(f"⛔ --only {sorted(only)}에 DETERMINISTIC 항목이 없다 — 검사 대상 0", file=sys.stderr)
+            return 2
+
+    violations, skipped, under_floor = [], [], []
+    print("=" * 78)
+    print(f"fz 계약 lint — root {ROOT}")
+    print("=" * 78)
+
+    for i, kind, target, desc in ITEMS:
+        if only and i not in only:
+            continue
+        if kind != "DETERMINISTIC":
+            skipped.append((i, kind, desc))
+            continue
+        try:
+            v, hits = CHECKS[i]()
+        except ParseError as e:
+            print(f"⛔ #{i} configuration/parse error: {e}", file=sys.stderr)
+            return 2
+        except Exception as e:                                  # noqa: BLE001 — 검사 구현의 예상 밖 예외는 판정 불가(2)다 · 위반(1)으로 읽히지 않게
+            print(f"⛔ #{i} 예상 외 오류({type(e).__name__}): {e}", file=sys.stderr)
+            return 2
+        # ⛔ Negative-Result Gate 요소1 — 후보 수가 하한 미달이면 **순회·수집이 고장난 것**으로 본다
+        floor = MIN_HITS.get(i)
+        if floor is not None and hits < floor:
+            under_floor.append((i, hits, floor))
+        status = "OK  " if not v else f"FAIL({len(v)})"
+        print(f"{status} #{i:<3s} {desc[:56]:<56s} [검사 대상 {hits}]")
+        violations += [(i, x) for x in v]
+
+    print()
+    if skipped:
+        print("── SKIP (스크립트 판정 대상 아님 — ⛔ PASS 아님)")
+        for i, kind, desc in skipped:
+            print(f"   ⏸ #{i:<3s} [{kind}] {desc[:70]}")
+        print()
+    if under_floor:
+        print("⛔ 검사 대상 수가 하한 미달 — configuration error (Negative-Result Gate 요소1)",
+              file=sys.stderr)
+        for i, hits, floor in under_floor:
+            print(f"   #{i}: 후보 {hits}개 < 하한 {floor}개", file=sys.stderr)
+        print("   ⛔ 판별: 트리에서 대상이 정당하게 줄었는가(→ MIN_HITS 하향) "
+              "아니면 순회·수집이 고장났는가(→ 코드 수정)? **결과를 '위반 0건'으로 읽지 말 것.**",
+              file=sys.stderr)
+        return 2
+    if violations:
+        print(f"── 위반 {len(violations)}건")
+        cur = None
+        for i, msg in violations:
+            if i != cur:
+                print(f"  #{i}")
+                cur = i
+            print(f"     {msg}")
+        return 1
+    print("위반 0건")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

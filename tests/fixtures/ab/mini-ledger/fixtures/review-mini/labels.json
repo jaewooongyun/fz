@@ -1,0 +1,39 @@
+{
+ "fixture": "review-mini",
+ "kind": "review",
+ "platform": "ios",
+ "issues": [
+  {
+   "id": "L1",
+   "axis": "idiom",
+   "severity": "critical",
+   "file": "App/Foo.swift",
+   "line_start": 10,
+   "line_end": 12
+  },
+  {
+   "id": "L2",
+   "axis": "naming",
+   "severity": "major",
+   "file": "App/Foo.swift",
+   "line_start": 20,
+   "line_end": 20
+  },
+  {
+   "id": "L3",
+   "axis": "architecture",
+   "severity": "major",
+   "file": "App/Foo.swift",
+   "line_start": 30,
+   "line_end": 32
+  },
+  {
+   "id": "L4",
+   "axis": "placement",
+   "severity": "minor",
+   "file": "App/Foo.swift",
+   "line_start": 40,
+   "line_end": 40
+  }
+ ]
+}

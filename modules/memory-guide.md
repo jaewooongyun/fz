@@ -1,0 +1,139 @@
+# L1 Auto Memory 관리 정책
+
+> MEMORY.md + topic file 관리 정책. 모든 fz-* 스킬이 교훈 저장/회상 시 참조.
+
+## 목차
+
+- [MEMORY.md 구조 규칙](#memorymd-구조-규칙)
+- [Topic File 네이밍 컨벤션](#topic-file-네이밍-컨벤션)
+- [Write Policy](#write-policy)
+- [Lesson Intake Decision Tree](#lesson-intake-decision-tree)
+- [Tagging Convention](#tagging-convention)
+- [Staleness Policy](#staleness-policy)
+- [L1 ↔ L2 ↔ L3 경계](#l1--l2--l3-경계)
+- [참조 스킬](#참조-스킬)
+- [Claude Memory tool과의 관계](#claude-memory-tool과의-관계)
+- [설계 원칙](#설계-원칙)
+
+---
+
+## MEMORY.md 구조 규칙
+
+- **역할**: 인덱스 + 핵심 사실 요약 (상세는 topic file로 분리)
+- **한도**: 200줄 이하 (truncation 방지)
+- **형식**: 섹션별 2-3줄 요약 + `[topic-file.md](topic-file.md)` 링크
+- **금지**: 세션별 임시 상태, 미검증 추론, CLAUDE.md와 중복 정보
+
+## Topic File 네이밍 컨벤션
+
+```
+{domain}.md — 예: peer-review-learnings.md, gpt-learnings.md
+{domain}-{sub}.md — 예: prompt-optimization.md, skill-changelog.md
+```
+
+- 파일 위치: `~/.claude/projects/{project}/memory/`
+- 하나의 도메인에 하나의 파일. 날짜별 분리 금지.
+- MEMORY.md에서 반드시 링크 참조.
+
+## Write Policy
+
+| 써야 할 것 | 쓰지 말아야 할 것 |
+|-----------|----------------|
+| 여러 세션에서 확인된 안정된 패턴 | 한 번의 관찰에서 나온 추측 |
+| 아키텍처 결정과 그 근거 | 진행 중인 작업의 임시 상태 |
+| 실전에서 검증된 교훈 (PR 리뷰 등) | CLAUDE.md에 이미 있는 정보 |
+| 도구/CLI 버전 및 설정 | 일반적 프로그래밍 지식 |
+| 사용자가 명시적으로 기억하라고 한 것 | 코드 스니펫 (파일 경로로 참조) |
+
+**키잉 규칙 (교훈 서술 방식)**: 교훈은 도구·맥락 한정이 아닌 **실패 클래스**로 서술 — 같은 실패 클래스의 다른 발현에서 recall되도록. 예: "GPT 출력 head 금지" ✕ → "전수 주장 근거 수집 시 출력 잘림 금지" ○. (위 표의 도구/CLI 버전·설정 기록 항목과 무관 — 본 규칙은 교훈 제목·서술 방식만 대상)
+
+## Lesson Intake Decision Tree
+
+> 새 교훈 후보 발생 시 기존 principle에 manifestation 추가 vs 새 principle 분리 결정 트리.
+> 목적: 단일 principle에 무관한 manifestation 강제 stuffing 차단 (GPT Q1).
+> UC-10 (v4.7.0): lesson-intake.md 내용 본 모듈로 흡수(파일 제거됨).
+
+| 신규 교훈 후보 | 판정 | 행동 |
+|--------------|------|------|
+| Same failure mode as existing principle | **merge** | manifestation row 추가 (예: `lead-action-default.md` Trigger Matrix) |
+| Different mode + evidence ≥ 3 sessions | **new principle** | 별도 모듈 생성. **Moratorium 종료 후에만** |
+| Different mode + evidence < 3 sessions | **candidate** | 5 sessions 관측 후 재판정. **활성 rule 등록 ❌** |
+
+> ⛔ 승격(candidate→active) 임계 canonical = `modules/promotion-ledger.md` Track A (**5 sessions**). 위 ≥3은 별도 모듈 분리(new principle) 자격이지 active 임계가 아님 — 코드 태그 표기도 5세션으로 통일 (2026-07-09 D3).
+
+**Evidence 출처**: `scripts/run_metrics.py` 행(`end --gate-issues` · `--findings`) → `scripts/fz_telemetry_report.py` 리포트의 `harness` 판정(§8 Gate 기여도) 또는 `fz:checkpoint:*` memory keys. `experiment-log.md §5.4` 는 손으로 붙이던 시절의 과거 데이터로만 남는다(새 행을 붙이지 않는다). 동일 failure mode가 **별개 세션**에서 관찰돼야 1 count.
+
+**예시**: 31/32/33 = same mode (Lead risk-aversion) → 단일 `lead-action-default.md` merge. 34차+ 후보 시 본 decision tree 먼저 실행.
+
+## Tagging Convention
+
+topic file의 각 교훈 항목에 태그를 삽입하여 recall 시 매칭에 활용.
+
+```markdown
+## 1. 교훈 제목
+[skill: fz-plan, fz-code] [status: pending] [priority: P1]
+
+교훈 내용...
+```
+
+| 태그 | 값 | 용도 |
+|------|---|------|
+| `[skill: ...]` | fz-plan, fz-code, fz-review 등 | recall 시 현재 스킬과 매칭 |
+| `[status: ...]` | applied, pending, deferred | 개선 반영 여부 추적 |
+| `[priority: ...]` | P0, P1, P2 | 우선순위 |
+
+## Staleness Policy
+
+- 30일+ 미참조 항목: `/fz-memory audit` 시 감사 대상으로 표시
+- `[status: applied]` 항목: 적용 확인 후 6개월 지나면 아카이브 후보
+- 아카이브/삭제는 사용자 확인 필수
+
+### GC 평가축 (recall이 아니라 forgetting)
+
+GC 품질은 recall/staleness만이 아니라 다음 2축으로 점검한다:
+- (a) **intent-aware deletion 정확도**: 삭제해야 할 stale/모순 항목을 실제로 지웠는가
+- (b) **contradiction persistence**: 모순 항목이 잔존하지 않는가
+
+근거: "프로덕션 실패는 recall이 아니라 forgetting 실패인데 기존 벤치는 recall만 측정." [외부: harness-paper §4-E, ForgetEval arXiv 2606.15903 — 원 논문 미대조]
+
+- fz 함의: `/fz-memory audit`에 "모순 탐지" 체크 1행 권고.
+- MemClaw 4실패모드 중 leakage/provenance는 단일 사용자 환경이라 범위 밖 — forgetting/contradiction만 채택.
+
+## L1 ↔ L2 ↔ L3 경계
+
+| 계층 | 도구 | 저장 대상 | 수명 |
+|------|------|----------|------|
+| L1 (Auto Memory) | MEMORY.md + topic files | 영속적 사실, 교훈, 패턴 | 영구 (사용자 관리) |
+| L1.5 (Serena Persistent) | `fz:decision:*`, `fz:pattern:*` | 아키텍처 결정, 학습 패턴 | 영속 (GC 미대상) |
+| L2 (Serena Memory) | `fz:checkpoint:*`, `fz:artifact:*` | 파이프라인 내 단기 전달 | 임시 (GC로 정리) |
+| L3 (File Artifact) | 티켓 폴더 파일 | 구조화된 상세 산출물 | 세션 내 (Read로 복원) |
+
+- L1은 **세션을 넘어 유지**되는 지식 (교훈, 패턴, 결정)
+- L2는 **파이프라인 내에서만** 유효한 상태 (artifact, checkpoint)
+- L3는 **무제한 크기** 구조화 산출물 — L3=canonical, L2=cursor (위치 표시)
+- L1.5 persistent 키는 L1 승격 후보 (30일+ 유지 시 topic file로 승격 고려)
+- 상세: `modules/context-artifacts.md` (L3 구조), `modules/memory-policy.md` (L1.5/L2 키)
+
+## 참조 스킬
+
+| 스킬 | 참조 이유 |
+|------|----------|
+| /fz-memory | 전체 메모리 관리 (audit/gc/recall/organize/remind) |
+| /fz | Completion에서 L1 저장 판단 |
+
+## Claude Memory tool과의 관계
+
+**Claude Memory tool**은 client-side file-system-based memory로 cross-session 유지를 지원한다 (Anthropic release notes: "better at writing and using file-system-based memory" + "across conversations").
+
+**fz의 L1 (auto memory)와의 차이**:
+- **Claude Memory tool**: Anthropic 클라이언트 단의 메모리 (CLI/Web 등 진입점에서 관리)
+- **fz L1 (auto memory)**: `~/.claude/projects/*/memory/` 파일 시스템 + topic 태깅 + 세션 GC 정책 (fz 특화)
+- 두 시스템은 **독립적으로 작동**하며, fz는 자체 메모리 정책을 우선한다
+- 향후 Claude Memory tool 연계 어댑터 옵션 검토 가능 (현재는 별도 운영)
+
+상세: `modules/memory-policy.md` "Claude Memory tool과의 관계" 섹션 참조
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (필요 시에만 로드)
+- 500줄 이하 유지

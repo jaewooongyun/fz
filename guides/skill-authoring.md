@@ -1,0 +1,690 @@
+# 스킬 작성 실전 가이드
+
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조 · 이전 감사 2026-09-06 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
+>
+> fz-* 스킬 생태계에서 새 스킬을 설계하고 작성하기 위한 실무 가이드.
+> 이론이 아닌 실행 중심. 모든 예시는 기존 17+ 스킬 생태계 기반.
+
+---
+
+## 1. 스킬 라이프사이클
+
+```
+설계 → 작성 → 테스트 → eval → 배포 → 진화
+  ↑                                     |
+  └──────── 피드백 ────────────────────┘
+```
+
+### 설계
+
+- 2-3개 유스케이스를 먼저 식별한다 (Anthropic 권고: 유스케이스 먼저)
+- 유스케이스 없이 스킬부터 만들면 범위가 흐려진다
+- 기존 스킬과 겹치는지 확인: `/fz-manage check` 실행
+
+#### Single Task First 워크플로우 (공식 권고)
+
+스킬을 작성하기 전에, 스킬 없이 단일 도전적 작업을 반복한다.
+성공할 때까지 반복한 후, 성공 패턴을 스킬로 추출한다.
+
+1. 스킬 없이 실제 작업 수행
+2. 실패/비효율 지점 기록
+3. 성공할 때까지 반복 (Claude의 in-context learning 활용)
+4. 성공 패턴을 SKILL.md로 추출
+5. 3개 평가 시나리오로 검증 (`guides/skill-testing.md` §1)
+
+### 작성
+
+- `templates/skill-template.md` 기반으로 시작한다
+- 템플릿의 모든 필드를 채운 후 불필요한 부분을 제거한다
+- 빈 필드를 남기지 않는다 — 명시적으로 `none`을 적는다
+
+### 테스트
+
+- 3개 평가 시나리오를 정의한다 (정상, 경계, 실패)
+- 직접 호출로 결과를 확인한다: `/fz-{name} {시나리오}`
+- 파이프라인 내에서도 테스트한다: `/fz` 경유 호출
+- 상세 테스트 방법론: `guides/skill-testing.md` 참조
+- Ask Claude 디버깅: `guides/skill-testing.md` §3 참조
+- 트러블슈팅: `guides/skill-troubleshooting.md` 참조
+
+### Eval (품질 평가)
+
+- `/fz-skill eval fz-{name}` → Static Analysis(8항목, 자동) + Runtime Trigger Eval(skill-creator `run_eval.py` 로 `claude -p` 실측 — 기본 포함, 미설치 시 SKIP) + Triggering Test(반자동 — Runtime 미실행 시 폴백) + 리뷰형 스킬 2단계 eval(리뷰·검증형 스킬만) 실행. 구성 정본은 `skills/fz-skill/SKILL.md` § eval — 스킬 품질 평가
+- 목표: FAIL 0개, WARN ≤2개
+- `/skill-creator` Eval 모드로 보완적 평가 (다른 관점의 독립 측정)
+- A/B 비교: description 변경 시 `skill-testing.md` §7 프로토콜 적용
+
+### 배포
+
+- `skills/{name}/SKILL.md`에 배치한다
+- `/fz-manage check`로 건강 체크 — 전체 통과 필수
+
+### 진화
+
+- ACE 패턴을 따른다:
+  - **A**nalyze: 실패 기록을 수집하고 패턴을 찾는다
+  - **C**orrect: 점진적으로 편집한다 (대규모 재작성 금지)
+  - **E**liminate: 주기적으로 사용하지 않는 지침을 가지치기한다
+- 500줄 이하를 유지한다 — 넘으면 모듈로 분리한다
+- **⛔ 트리밍 비저하 원칙**: 줄 수 축소가 실행 품질 저하를 일으키면 트리밍 의미가 없다. §3의 "트리밍 비저하 원칙" 참조
+- **⛔ DELETE/MERGE-default (편집 operating rule)**: 스킬/가이드/모듈을 *편집*할 때 DELETE 또는 MERGE를 기본값으로 먼저 검토한다. 순수 additive 변경(기존 삭제·병합 없이 추가만)은 삭제/병합 counterpart를 동반하거나 명시적 정당화가 있어야 한다. 이유: 규칙 누적은 adherence tax(IFScale 500규칙→68%)이고, 지시를 문자 그대로 따르는 모델에서 bloat 비용이 더 크다(추론) — 현행 근거는 Opus 5 페이지(Opus 5.5 가 상속)의 literal-following 예시다: "If your review prompt says 'only report high-severity issues' or 'be conservative,' the model might follow that instruction literally and report less" [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5] (이전 표기 "Opus 4.8 이후"는 이력 — 2026-09 당시 기준) — 추가 충동마다 "무엇을 지울 수 있나"를 먼저 묻는 것이 self-correcting 하네스의 조건. (memory 18차 rule(3)의 skill-body 강제)
+  - **Opus 5가 이 규칙을 강화한다**: 공식 프롬프팅 가이드가 *제거*를 명시 지시한다 — 검증 지시("include a final verification step" / "use a subagent to verify" / "double-check your answer")를 **삭제**하라, *"removing them reduces wasted tokens **with no loss in quality**"* [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. 모델이 내재화한 행동에 지시를 겹치면 중복 실행이 된다. ⚠️ 단 §llm-references §4-2의 *외부 verifier·교차검증 원칙*은 별개 — 삭제 대상은 **모델에게 자기재확인을 시키는 문구**뿐.
+- **⚠️ Sibling-Convention Check (편집 operating rule, candidate)**: fz 자산에 candidate·검증·관측 항목을 *추가*할 때, 기존 동류 항목(예: fz-review 검증 4-N/4-O, promotion-ledger L-series)의 표기 템플릿을 먼저 grep해 일치시킨다 — `⚠️` 마커 · 「활성 강제 X」 · 「N sessions 후 결정」 등. 이유: 동류 컨벤션을 안 보고 새 표기를 즉흥 생성하면 일관성 붕괴 + 강제성 오인(candidate가 ⛔/blocking으로 오동작). 결정론 grep이라 즉시 가능. evidence: OBS-16 환류 세션 ①(fz-review 검증5/Gate) candidate 표기 불일치 catch — 자기 참조 맹점 교훈 발현1(활용 갭). ⚠️ candidate(1 session) — 활성 강제 X, 5 sessions 후 active(⛔) 재판정.
+
+---
+
+## 2. Description 작성법 (가장 중요)
+
+Claude가 100+ 스킬 중 하나를 선택하는 유일한 근거 = **description**.
+
+### 필수 포함 요소
+
+| 요소 | 설명 | 예시 |
+|------|------|------|
+| **무엇** | 핵심 기능 1줄 | "코드 구현 + 빌드 검증 스킬" |
+| **언제** | 사용 조건 | "Use when implementing new features" |
+| **언제 아닌지** | 부정 트리거 + 대안 스킬 | "Do NOT use for bug fixes (use fz-fix)" |
+| **키워드** | 한국어 + 영어 혼용 | "구현, 코드, implement, code" |
+
+### 작성 규칙
+
+1. **3인칭 서술**: "I can help you" (X) → "Processes files" (O)
+2. **한국어 설명 + 영어 트리거 혼용**: 매칭률 극대화
+3. **구체적 키워드**: 일반적인 단어보다 도메인 특화 키워드 사용
+4. **1024자 이하**: Agent Skills 스펙의 `description` 필드 상한(이식용 저자 규칙) [verified: https://agentskills.io/specification]. Claude Code 리스팅은 이와 별개로 `description`+`when_to_use` 합계를 1,536자에서 자르므로 핵심 용도를 앞에 둔다 [verified: https://code.claude.com/docs/en/skills] (이전 사유 "시스템 프롬프트 공간 제한"은 이력 — 2026-09 당시 기준)
+
+### Few-shot 예시
+
+```
+BAD:  "Helps with code"
+      → 너무 모호. 모든 코딩 스킬과 충돌.
+
+BAD:  "I help developers write better code and find bugs"
+      → 1인칭 사용. 기능 범위 불명확. 부정 트리거 없음.
+
+GOOD: "버그 수정 경량 스킬. 원인 분석 → 수정 → 빌드 검증의 빠른 사이클.
+       Use when fixing bugs, resolving crashes, correcting errors.
+       Do NOT use for new feature implementation (use fz-code)."
+      → 핵심 기능 명확. 긍정/부정 트리거 모두 포함. 대안 스킬 명시.
+```
+
+---
+
+## 3. Progressive Disclosure 실전 가이드
+
+스킬 정보를 3단계로 나눠 필요한 시점에만 로드한다.
+
+### Level 1: YAML Frontmatter (항상 로드)
+
+- 시스템 프롬프트에 포함된다 → 스킬 발견 용도
+- 최소화: `name` + `description`만으로 Claude가 선택할 수 있어야 한다
+- description 1024자 이하 엄수 — 1024자는 Agent Skills 스펙 필드 상한이고 [verified: https://agentskills.io/specification], Claude Code 리스팅 절단은 `description`+`when_to_use` 합계 1,536자다 [verified: https://code.claude.com/docs/en/skills] (두 수치는 다른 규칙 — §2 작성 규칙 4)
+- 여기서 정보가 과하면 모든 요청에 불필요한 토큰이 소비된다
+- 스킬 多 시 description이 listing budget에 맞춰 자동 축약 — `skillListingBudgetFraction` / `SLASH_COMMAND_TOOL_CHAR_BUDGET`로 조정 [verified: code.claude.com/docs/en/skills]
+  - 예산은 모델 컨텍스트 윈도우의 1%이고, 넘치면 **가장 덜 호출한 스킬의 description 부터** 뺀다 — "The budget scales at 1% of the model's context window. When the listing overflows, Claude Code drops descriptions starting with the skills you invoke least" [verified: https://code.claude.com/docs/en/skills]. ⚠️ 플러그인 스킬은 `skillOverrides` 대상이 아니다 — `/plugin` 으로 관리한다 [verified: https://code.claude.com/docs/en/skills]
+- `disable-model-invocation: true` → 자동 로드 차단(수동 `/name`만 invoke) [verified: 동]
+
+### Level 2: SKILL.md 본문 (관련 시 로드)
+
+- 실행 지침을 담는다 → **500줄 이하** 유지 (Context Rot 과학적 근거)
+- 핵심만 포함한다: Phase, Gate, Boundaries
+- 부수적 내용은 경로만 명시한다:
+  ```
+  빌드 검증 세부 절차는 `modules/build.md` 참조.
+  ```
+- 500줄 초과 시 증상: Claude가 후반부 지침을 무시하기 시작한다
+
+#### ⛔ 트리밍 비저하 원칙
+
+> ⛔ **Single source**: `guides/prompt-optimization.md` §1 보충 3a (UC-7, v4.7.0).
+> 본 위치는 reference + 핵심 3 bullet만 유지. 삭제 금지/압축 허용 전체 정의는 single source를 따른다.
+
+**삭제 금지 핵심 3개** (single source 참조):
+- Gate 체크리스트 항목 — 삭제하면 검증 단계 스킵
+- Few-shot BAD/GOOD 예시 — 삭제하면 행동 정확도 하락
+- 절차적 Step (순서 중요한 다단계) — 삭제하면 Step 누락
+
+**500줄 초과 시 우선순위**: 삭제보다 **모듈 분리**(`modules/`)를 먼저 시도한다.
+
+> **모델 전이 강건성** (2026-07 추가 — 위 삭제 금지 3개의 외부 수렴 근거): 절차적 규칙(체크리스트·Gate·Step)이 서술적 prose 조언보다 모델 교체에 강건하다 — "'factual 구조는 전이되나 prose 전략은 전이 안 됨'(2604.25850), AdaCoM의 '유사 능력 에이전트 간 전이가 최선'이 시사하듯, 하네스가 모델·태스크·도메인을 넘어 얼마나 이식되는지가 미해결." [외부: harness-paper §6 미해결과제4 — 원 논문 미대조] → 2026-11-01 원문 대조(2604.25850 부분만): 문장은 실재한다 — "Ablations localize the gain to tools, middleware, and long-term memory rather than the system prompt, suggesting factual harness structure transfers while prose-level strategy does not." [arxiv preprint, 2026-04, v4]. 단 논문의 '구조'는 도구·미들웨어·장기 메모리이고 시스템 프롬프트가 아니다 — 스킬 본문 안의 체크리스트 > prose 로 옮기는 아래 함의는 **fz 의 추론**이다. AdaCoM 은 arXiv ID 가 없어 [미검증: 원문 미취득]. 함의(추론): 스킬 작성 시 절차적 체크리스트 > prose 조언, 모델 교체·재배선(예: Fable 5) 시 스킬 회귀 점검 축으로 활용. ⚠️ 근거 등급 낮음 — 2604.25850은 배경 논문(서베이 CONFIRMED 86편 밖). 기존 원칙 보강이지 신규 규칙 아님.
+
+### Level 3: References (필요 시 Read)
+
+- `modules/*.md`, `guides/*.md` 등 공유 파일
+- Claude가 Read 도구로 직접 읽는다 (자동 로딩 아님)
+- **1단계 깊이만**: SKILL.md → ref.md (O), ref.md → detail.md (X)
+- 100줄 이상 파일에는 목차를 포함한다
+- **플러그인 루트 상대 경로**: `modules/build.md` (not `../../modules/build.md`)
+
+### 디렉토리 구조 예시
+
+```
+skills/fz-code/
+├── SKILL.md          ← Level 2 (500줄 이하)
+└── (단순 스킬은 하위 디렉토리 없음)
+
+modules/      ← Level 3 (공유 모듈)
+├── gates.md
+├── cross-validation.md
+├── team-registry.md
+└── ...
+
+guides/       ← Level 3 (공유 가이드)
+├── prompt-optimization.md
+├── agent-team-guide.md
+└── ...
+```
+
+---
+
+## 4. 프롬프트 작성 최적화 원칙
+
+§2(Description), §3(Progressive Disclosure)에서 다루지 않은 핵심 원칙.
+상세 Before/After 예시와 이론: `guides/prompt-optimization.md` 참조.
+
+### 원칙 1: Claude가 모르는 것만 추가
+
+일반 지식을 반복하면 토큰만 소비하고 Context Rot을 가속한다.
+프로젝트 고유 정보(네이밍 규칙, 아키텍처 결정, 내부 API 사용법)만 포함한다.
+
+```
+BAD:  "Swift의 struct는 값 타입이고 class는 참조 타입입니다..."
+GOOD: "이 프로젝트에서 ViewModel은 class (RIBs Interactor 내장), View 데이터 모델은 struct"
+```
+
+### 원칙 4: 자유도를 작업 위험도에 맞춰라
+
+| 위험도 | 자유도 | 지시 방식 |
+|--------|--------|-----------|
+| 높음 (DB, API breaking) | 낮음 | 정확한 스크립트, 명령어 그대로 실행 |
+| 중간 (기능 구현) | 중간 | 패턴 제시 + 변형 허용 |
+| 낮음 (탐색, 문서화) | 높음 | 가이드라인만 제시, 판단 위임 |
+
+### 원칙 4a: 원칙+이유로 프레이밍
+
+"X이면 Y를 하라" 대신 "Z를 추구하라. 이유: W"로 작성한다.
+Claude는 이유에서 유사 상황으로 일반화한다. 체크리스트 행 추가 충동이 들면, 원칙 하나로 대체한다.
+
+```
+BAD:  "continuation bridge가 있고 native async가 있으면 → bridge를 제거하라"
+GOOD: "동일 동작을 가장 적은 코드로 표현하는 것이 진짜 최소 변경이다."
+```
+
+### 원칙 5: Few-shot 예시 > 장문 설명
+
+3줄의 BAD/GOOD 대비 예시가 30줄의 설명보다 효과적이다.
+
+- `## Few-shot 예시` 섹션에 BAD/GOOD 대비 쌍 ≥3개 포함
+- BAD: 잘못된 접근 + 왜 나쁜지 (→ 주석)
+- GOOD: 올바른 접근 + 왜 좋은지 (→ 주석)
+- 엣지 케이스 최소 1개 포함
+- `<example>` 태그 또는 코드 블록으로 구분
+
+```
+BAD (구조 분해 부족):
+Step 1: OrderDetailRIB 만들기
+→ 영향 분석 없음, Step이 막연
+
+GOOD:
+Step 1: OrderDetailBuilder 생성 (DI: OrderRepository, ReceiptCacheUseCase)
+→ 의존성 명시, 생성 대상 구체적
+```
+
+### 원칙 6: 피드백 루프 내장
+
+생성만 하고 검증하지 않으면 오류가 누적된다.
+
+- Gate 조건을 체크리스트 형태로 명시한다
+- 실패 시 구체적 행동을 명시한다 (재시도/스킵/에스컬레이션)
+- "validate → fix → repeat" 패턴을 적용한다
+- 최대 반복 횟수를 설정한다 (무한 루프 방지)
+- **Gate는 절차적 강제**: 스킵 불가. 실패 시 해당 단계를 "완료"로 표시할 수 없다 (`modules/cross-validation.md` 참조)
+- **Evaluator-Optimizer 패턴**: stress-test 등에서 Critical 2개+ 발견 시 자동 재작성 (최대 2회). 초과 시 사용자 에스컬레이션
+
+### 원칙 8: 과격 표현 제거 (instruction-following 일관성)
+
+**Fable 5 (2026-06-09 GA · 현행 Legacy — still available)** 는 짧은 지시로 대부분 행동을 조향할 수 있다 — "steer most behaviors with a brief instruction rather than enumerating each behavior by name" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5] → 과격·모호한 지시가 그대로 적용될 위험. **GPT-6 Astra**(2026-09-11 블로그 — 이전 표기 "GPT-6 계열"은 이력)도 같은 방향 — "what used to require a lot of handholding and scaffolding no longer does" · 스킬 설명은 짧게 [verified: developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra] (Astra 대상 글 — 현행 Sol 적용은 [미검증]). 같은 글이 모델 차이를 인정한다 — "Guidance that helps Sol or Luna may overconstrain GPT-6 Astra, so consider which models will use the instructions you leave behind." [verified: https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra]. 이전 모델용 과잉 절차 지시는 출력 품질을 저하시킬 수 있다 ("often too prescriptive... can degrade output quality" [verified: 동 Fable 5 문서]) — 이 문장은 Fable 5 페이지에만 있고 Fable 5.1 페이지에는 없다(철회 문구도 없다) [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5#recommended-scaffolding-changes]. **Opus 5.5 (2026-09-22 GA — Opus 5 패턴 상속)** 는 여기에 **스코프 확장** 경향이 더해진다 — 요청하지 않은 단계를 추가하거나 과제 자체를 재해석할 수 있어, 좁은 과제에는 범위를 명시 제약할 것 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]. ⚠️ 2026-09-06 정정: 이전 근거였던 "Claude 4.8은 지시를 일관되게 따른다"[verified: anthropic.com/news/claude-opus-4-8]는 2세대 전 announcement라 단독 근거로 부적절 — Fable 5 인용으로 교체.
+
+```
+BAD:  "CRITICAL: You MUST ALWAYS use this tool"
+GOOD: "Use this tool when reading or modifying files"
+```
+
+- "CRITICAL", "MUST ALWAYS", "NEVER EVER" → 자연스러운 표현으로 대체
+- Anti-laziness가 필요하면 SKILL.md가 아닌 user prompt 쪽에 배치
+- 참조: `guides/prompt-optimization.md` 동일 원칙 8 (instruction-following 일관성 상세)
+
+---
+
+## 5. provides/needs 체인 설계
+
+`/fz` 오케스트레이터가 provides/needs로 동적 파이프라인을 구성한다.
+
+### 기존 토큰 레지스트리
+
+전체 목록은 `templates/skill-template.md`의 레지스트리 섹션 참조.
+
+### 설계 규칙
+
+| 규칙 | 설명 | 예시 |
+|------|------|------|
+| `needs: [none]` | 진입점 스킬 | fz-plan, fz-search, fz-fix |
+| `needs: [planning]` | 선행 스킬 필요 | fz-code (fz-plan 이후) |
+| 새 토큰 추가 시 | 레지스트리에도 반드시 추가 | `templates/skill-template.md` |
+| 순환 금지 | A→B→A 형태 불가 | provides/needs 그래프 DAG 유지 |
+
+### 파이프라인 매칭 흐름
+
+```
+사용자 요청
+  → /fz intent 분석
+  → intent-triggers 매칭
+  → 사전 정의 파이프라인 (modules/pipelines.md) 매칭
+  → 미매칭 시 provides/needs 그래프로 동적 구성
+```
+
+---
+
+## 6. intent-triggers 작성법
+
+### 규칙
+
+1. 한국어 + 영어 각각 1줄 이상 작성한다
+2. 정규식 패턴을 사용한다 (`|` 구분)
+3. 다른 스킬과 중복을 최소화한다
+4. 구체적 키워드를 우선한다 (일반적인 단어는 충돌 위험)
+
+### 예시
+
+```yaml
+metadata:
+  intent-triggers:
+    - "계획|설계|아키텍처|요구사항"     # 한국어
+    - "plan|design|architect"            # 영어
+```
+
+### 나쁜 예시
+
+```yaml
+metadata:
+  intent-triggers:
+    - "코드|개발"        # 너무 광범위 — fz-code, fz-fix, fz-review 모두 해당
+    - "help|do"          # 의미 없음 — 모든 요청에 매칭
+```
+
+### 중복 체크 방법
+
+```bash
+/fz-manage check   # intent-triggers 중복 검증 (항목 #4)
+```
+
+---
+
+## 7. 팀 에이전트 모드 설계
+
+### 언제 팀을 구성하는가?
+
+| light — Lead 경로 (이력: SOLO) | full — Workflow 멀티에이전트 (이력: TEAM — 2026-09-25 일몰) |
+|------|------|
+| 단순 작업 (1 파일, 명확한 지시) | 복잡 작업 (여러 모듈, 설계 결정) |
+| 빠른 피드백 필요 | 다관점 검증 필요 |
+| fz-fix (대부분), fz-search (기본) | fz-plan, fz-code, fz-review |
+
+SOLO가 기본이다. 팀이 필요한 근거가 없으면 SOLO로 실행한다. (이력 — 2026-10-19 이전 규칙.) 현행: 스킬이 Workflow 를 띄우기 직전 크기를 재서 추천이 full(큼 AND 복잡)일 때만 묻고, 그 밖은 묻지 않고 light 로 진행한다 — 명시 인자·신호어면 재지 않는다. 정본 `modules/mode-gate.md` § 언제 묻나 · § 스킬별 light · full · § 사용자 결정.
+
+### 팀 구성 패턴
+
+⛔ **스킬 YAML `team-agents`는 2026-08-09 제거됐다** — Wave 4 전환 후 팀 구성을 결정하지 않는 선언이었다. 구성은 **스크립트가 소유**한다 (정본: `modules/governance.md` § Truth-of-Source):
+
+```js
+// workflows/{skill}-{pattern}.js
+await agent(prompt, { label: 'stage1-impl', agentType: 'fz:impl-correctness',
+                      model: 'opus', effort: 'xhigh', schema: ChangesetSchema })
+```
+
+- Primary Worker는 1명만 지정한다
+- Supporting은 필요한 만큼 추가하되 3명 이하를 권장한다
+- 에이전트 파일은 `agents/`에 존재해야 한다
+- 에이전트 목록: `modules/team-registry.md` 참조
+
+### 통신 패턴 선택
+
+| 패턴 | 적용 스킬 | 핵심 동작 | 구현 스크립트 |
+|------|-----------|-----------|----------|
+| Collaborative Design | fz-plan | 만들면서 토론 | `workflows/plan-collaborative.js` (fz-plan 기본은 `plan-lean2.js`) |
+| Pair Programming | fz-code | 구현 중 실시간 피드백 | `workflows/code-pair.js` |
+| Live Review | fz-review | 분석하면서 발견 공유 | `workflows/review-live.js` |
+| Adversarial Discovery | fz-discover | 만들고 부수며 제약 발견 | `workflows/discover-adversarial.js` |
+| Cross-Verify | fz-search | 발견 즉시 교차 확인 | `workflows/search-cross-verify.js` |
+
+자세한 내용: `guides/agent-team-guide.md`
+
+---
+
+## 8. 모델 전략
+
+| 역할 | 모델 | 근거 |
+|------|------|------|
+| Lead (오케스트레이터) | fable | 최종 판단, 게이트 실행 |
+| 판단 지점 (workflow merge·direction) | fable | capability-sensitive 단일 호출 (정적 3지점, lint `EXPECTED_FABLE=3`) |
+| 실질 분석·생산 워커 | opus | 계획·코드·설계·리뷰·비평 품질 |
+| 단순 (retrieval·breadth) 워커 | sonnet | 비용 효율, 충분한 품질 |
+| haiku | **미사용** | 프로젝트 정책 |
+
+### 승격 규칙
+
+- SOLO 모드: Lead(세션 모델, 보통 fable) 직접 수행 — 재배선 정책 비적용
+- 워커 모델은 **작업 실질 기준** 배정: 실질 분석·생산 = opus / 단순 retrieval·breadth = sonnet — "Supporting은 항상 sonnet"은 폐기(검증·비평도 실질이면 opus, 예: peer-review CC·review-live counter)
+- 판단 지점(workflow merge·direction)만 fable (정적 3지점 고정, lint `EXPECTED_FABLE=3`)
+- 상세·근거: `guides/model-guide.md` § 5 (fz 생태계 적용 전략)
+
+---
+
+## 9. fz 생태계 통합 체크리스트
+
+새 스킬을 추가할 때 아래 항목을 모두 확인한다.
+
+### 필수 항목
+
+- [ ] `templates/skill-template.md` 기반으로 작성했는가?
+- [ ] description에 무엇/언제/언제 아닌지/키워드가 모두 포함되었는가?
+- [ ] provides/needs가 기존 체인과 정합하는가?
+- [ ] intent-triggers가 기존 스킬과 중복이 없는가?
+- [ ] `/fz-manage check` 전체 통과하는가?
+- [ ] ⛔ **작성자 환경에만 있는 것을 넣지 않았는가?** (아래 § 이식성)
+
+### 이식성 — 플러그인은 배포물이다
+
+읽는 사람은 작성자의 디렉터리도, 메모리 파일도, 어떤 저장소를 다뤘는지도 모른다. 그 사람에게 의미가 닿지 않는 것은 넣지 않는다.
+
+| ⛔ 넣지 않는다 | ✅ 넣어도 된다 |
+|---|---|
+| 작성자 홈·작업 폴더 절대경로 | 플러그인 루트 기준 상대경로, `{WORK_DIR}` 같은 플레이스홀더 |
+| 개인 메모리 파일의 *내용* | 메모리 *체계*를 설명하는 서술 |
+| 특정 저장소의 코드·경로·티켓 고유 데이터 | **상황 예시** — 무슨 일이 일어나는지 보여주는 정도 |
+| 실행 산출물 원본 | 판정 필드만 남기고 식별자를 치환한 fixture |
+
+경계는 **"작성자 환경을 몰라도 이해되는가"** 하나다. `Interactor`가 `actor`의 부분 문자열이라 grep이 오탐한다는 설명은 프레임워크 표준 용어라 통하고, 그 오탐이 어느 PR에서 났는지는 통하지 않는다.
+
+```bash
+git grep -n "$HOME" -- 'skills/*' 'modules/*' 'guides/*'   # 0건이어야 한다 (셸이 확장하므로 실경로만 잡힌다)
+```
+
+⚠️ 작업 로그(`experiment-log.md` — 프로토콜만 싣는다 · 측정 기록은 저장소 밖 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md`)와 승격 원장도 예외가 아니다. 관측 사례는 예약 번호 자리표시자(0 으로 시작하는 3~5자리)나 합성 이름으로 가리키고 티켓·PR 식별자와 경로를 쓰지 않는다 — 커밋 훅이 모든 파일의 추가 줄에서 이 꼴을 막는다.
+
+### 품질 평가 항목
+
+- [ ] `/fz-skill eval fz-{name}` Static Analysis FAIL 0개인가?
+- [ ] Triggering Test 정확도 ≥90%인가? (fz 실측 현황은 이 목표에 못 미친다 — `guides/skill-testing.md` § 1.1 Triggering Test — 트리거 정확도 측정)
+- [ ] `/skill-creator` Eval로 보완 평가를 수행했는가? (권장)
+
+### Utility 스킬 예외
+
+Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot 면제.
+단, 아래 항목은 필수: Description 4요소, Boundaries, 에러 대응 테이블.
+상세: `modules/governance.md` — Utility 스킬 예외 섹션.
+
+### 상황별 항목
+
+- [ ] 파이프라인에 포함되는 스킬이면 `modules/pipelines.md`에 추가했는가?
+- [ ] 팀 에이전트가 필요하면 `agents/`에 에이전트 파일이 존재하는가?
+- [ ] 새 provides 토큰을 정의했으면 `templates/skill-template.md` 레지스트리에 추가했는가?
+- [ ] 500줄을 초과하면 공유 모듈(`modules/`)로 분리했는가?
+- [ ] ⛔ Phase 0 Work Dir Pre-flight가 포함되어 있는가? (`modules/context-artifacts.md` → Work Dir Resolution)
+- [ ] 티켓 폴더 컨텍스트 로딩(Hydration Set)이 `modules/context-artifacts.md` Upstream Hydration Sets와 일치하는가?
+
+### 프롬프트 최적화 (§4 기반)
+
+- [ ] Claude가 이미 아는 일반 지식을 설명하고 있지 않은가? (원칙 1)
+- [ ] 위험도에 맞는 자유도를 설정했는가? (원칙 4)
+- [ ] 행동 가이드가 "원칙+이유" 형태인가? if-then 테이블이 아닌가? (원칙 4a)
+- [ ] Few-shot BAD/GOOD 대비 쌍이 3개 이상 포함되어 있는가? (원칙 5)
+- [ ] 에러 대응 테이블이 포함되어 있는가?
+- [ ] 검증 Gate가 내장되어 있는가? (원칙 6)
+- [ ] 과격한 표현("CRITICAL", "MUST ALWAYS")을 자연어로 대체했는가? (원칙 8)
+
+### 문서 구조
+
+- [ ] SKILL.md 본문이 500줄 이하인가?
+- [ ] Level 3 참조가 1단계 깊이를 넘지 않는가?
+- [ ] 모든 파일 참조 경로가 플러그인 루트 상대 경로인가? (`.claude/` prefix 금지)
+
+> 상세 Before/After 예시와 이론: `guides/prompt-optimization.md` 참조.
+
+---
+
+## 10. 스킬 설계 패턴 5가지 (Anthropic 공식)
+
+스킬이 **무엇을** 하는가의 아키타입. §7의 팀 통신 패턴(에이전트가 **어떻게** 협업하는가)과 구별된다.
+
+| 패턴 | 적용 시점 | fz 적용 예시 |
+|------|----------|-------------|
+| Sequential Workflow | 순서 중요한 다단계 | fz-code (Phase별 순차 구현) |
+| Multi-MCP Coordination | 여러 MCP 서비스 조율 | fz-plan (Serena+Context7+sequential-thinking) |
+| Iterative Refinement | 품질 개선 반복 | fz-review (3중 검증 루프) |
+| Context-Aware Tool Selection | 상황별 도구 선택 | fz-search (symbolic vs pattern 자동 선택) |
+| Domain-Specific Intelligence | 도메인 지식 임베딩 | fz-peer-review (리뷰 가이드라인 임베딩) |
+
+### Cross-Model Verification (fz 확장 패턴)
+
+기존 5패턴에 추가되는 fz 고유 패턴:
+
+| 패턴 | 적용 시점 | fz 적용 예시 |
+|------|----------|-------------|
+| Cross-Model Verification | 독립 모델 교차검증 | fz-gpt (GPT CLI로 독립 검증) |
+
+fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 — 호출은 정문 `scripts/gpt-call.sh <kind>` — 모드 · 스키마는 kind 가 정한다)과
+3-Tier 디스커버리 스킬 체인(역할 스킬 8종 — fz-reviewer, fz-architect, fz-guardian, fz-challenger, fz-searcher, fz-fixer, fz-drift, fz-planner · 정본은 `gpt-skills/` 디렉터리와 `scripts/gpt_kinds.py` 생성 표 · 이전 표기 6종은 이력)을
+결합하여 Main Agent와 독립된 교차검증을 수행한다.
+
+### 패턴 구분 정리
+
+```
+스킬 설계 패턴 (§10)    = "스킬이 무엇을 하는가"의 아키타입
+팀 통신 패턴 (§7)       = "에이전트가 어떻게 협업하는가"의 프로토콜
+교차모델 검증 (fz-gpt) = "독립 모델이 어떻게 상호검증하는가"의 프로토콜
+```
+
+---
+
+## 11. Deterministic Script 활용
+
+> "Code is deterministic; language interpretation isn't." — Anthropic 공식
+
+검증이 중요한 스킬에서는 언어 지시 대신 스크립트를 번들한다.
+
+| 사용 시점 | 예시 |
+|----------|------|
+| 데이터 형식 검증 | `scripts/validate.py --input {file}` |
+| 빌드 결과 파싱 | `scripts/parse_build_log.sh` |
+| 패턴 검증 (Anti-Pattern Constraints) | `scripts/check_patterns.sh` |
+| GPT 응답 스키마 검증 | `schemas/gpt_review_schema.json` |
+
+### scripts/ 디렉토리 규칙
+
+- `skills/{name}/scripts/`에 배치한다
+
+> **예외 — 소비자가 여럿인 결정론적 검사.** 스킬 2개 이상이 같은 스크립트를 부르면 리포 루트 `scripts/`에 둔다. 스킬 하위에 두면 나머지 소비자가 형제 스킬의 내부를 가로질러 참조하고, 그 스킬을 지우면 무관한 스킬이 깨진다. 예: `scripts/gate_check.py`(fz-plan·fz-code·fz-review) · `scripts/gpt-exec.sh`.
+- 스크립트 자체는 토큰을 소비하지 않는다 (실행 결과만 소비)
+- SKILL.md에서 명시적 경로로 참조한다
+- JSON 스키마는 `schemas/`에 배치한다 (fz-gpt의 `--output-schema` 활용)
+
+### 스크립트 vs 언어 지시 판단 기준
+
+```
+결과가 binary(pass/fail)인가? → 스크립트
+결과가 해석이 필요한가?       → 언어 지시
+결과가 구조화된 JSON인가?     → --output-schema (fz-gpt 패턴)
+```
+
+> §12와의 경계: 본 §11은 *스킬 내부 binary 검증 보조* 스크립트를 다룬다. 에이전트를 스폰하는 *오케스트레이션* 스크립트는 §12 참조.
+
+## 12. Workflow 오케스트레이션 (TEAM 대체 — 결정적 멀티에이전트)
+
+> 신설 정당화 (additive — DELETE/MERGE-default §3 충족): §7(팀 통신 패턴)은 TEAM 일몰 경로로 deprecated 예정이고, §11은 binary 검증 보조로 관심사가 다름(오케스트레이션 아님) — 기존 섹션 흡수 불가. pilot(fz-discover, 2026-06-05) 실측으로 검증된 계약만 수록.
+
+네이티브 Workflow 도구(결정적 JS 스크립트가 에이전트 fan-out/수렴을 소유)로 TEAM(TeamCreate+SendMessage)을 대체할 때의 규약.
+
+### 표준 패턴 3종 (전 스크립트 의무 — pilot 실측 검증)
+
+1. **OVERRIDE 블록**: agentType 재사용 시 모든 agent() 프롬프트 선두에 — "P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시 미적용. 에이전트 정의의 Phase 절차·티켓 폴더·이전 세션·메모리 컨텍스트 로딩도 미적용 — 이 프롬프트의 입력만이 과제 전부. 무관 작업 폴더 읽기 금지. 최종 텍스트가 반환값(1-shot raw data). ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다)." [근거: pilot invoke #1 — 에이전트 정의의 컨텍스트 로딩이 args를 압도해 무관 폴더 anchoring] [advisor 문구 근거: 워커는 세션 `advisorModel` 을 상속하고 네이티브 차단 수단이 없다(`modules/governance.md` 운용 규칙 5) — 표준에 문구가 없던 시기 워크플로 4개가 누락해 `scripts/check_wf_advisor_ban.py` 가 표준을 강제한다]
+2. **args 방어 파싱 + fail-fast**: scriptPath 호출 시 args가 JSON **문자열**로 도착한다 [실측: probe wf_00000000-002, typeof=string] → `typeof args === 'string' ? JSON.parse(args) : args` + 필수 키 누락 시 에이전트 스폰 전 `{mode:'fallback'}` 즉시 반환 (fabrication 방지)
+3. **agentType 네임스페이스**: 플러그인 에이전트는 `fz:` prefix 필수 [실측: S0 — 'plan-structure' not found / 'fz:plan-structure' 동작]
+
+### 배치·호출 규약
+
+- 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
+- 호출(Lead): 아래 § scriptPath 거부 우회 계약의 **0단계 준비**(매 호출) 뒤 복사본을 부른다 — `Workflow({ scriptPath: '{WORK_DIR}/....js', args })`. 원본은 `{플러그인 루트}/workflows/....js` 다. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
+- 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
+  - ⛔ **비ASCII 본문은 손으로 이스케이프하지 않는다** — MCP 도구 파라미터는 UTF-8 문자열을 그대로 받는다. `\uXXXX` 수동 변환은 안전장치가 아니라 **오류원**이다: 5천 자 한국어를 이스케이프해 보낸 호출이 **200 성공 + 본문 11곳 손상**으로 끝난 실측이 있다. 짧은 본문에서는 재현되지 않아 길이가 늘수록 위험하다.
+  - ⛔ 외부 시스템(JIRA·GitHub·Slack)에 비ASCII 본문을 기록한 직후 **반환 본문을 1회 스캔**한다. 이 층에는 빌드도 린트도 없어 *성공 응답이 정확한 산출물을 뜻하지 않는다* — 유일한 오라클이 반환값 확인이다. 파일로 먼저 쓴 뒤 그 내용을 보내는 경로가 있으면 그쪽이 안전하다.
+- ⛔ **반환 배열 최소 길이는 스크립트가 잰다**(F-146) — StructuredOutput 스키마는 항목 수를 재지 못해 출력 상한에 걸린 부분 제출(steps 3/19)이 통과한다. 요구 수를 아는 호출은 args 로 넘기고(plan-lean2 `minSteps`) 스크립트가 반환 직후 `length < 요구 수` 면 `{mode:'fallback', reason:'partial-submit: …'}` 로 돌려준다 — 받은 쪽은 분할(L1) 뒤 다시 부른다
+- agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정 — 이력, 2026-09 당시 서술. 정정: `agentType` 을 준 호출은 에이전트 정의 `model:` 이 이겨 fz 에서는 sonnet(= Sonnet 5.5)으로 강등되고, `agentType` 도 없을 때만 세션 모델을 따른다. "2배"는 출력·캐시쓰기 단가에만 맞다 — `guides/model-guide.md` § 서브에이전트 · 워크플로), effort 생략 시 세션 effort 가 아니라 **워커 모델 기본**으로 돈다(Opus 5.5 = `medium` — 2026-09-25 실측 2회, Lead 세션은 `xhigh`). 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. 제거한 콜은 모델 기본 effort 로 돈다는 점을 결과 보고에 적는다. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 — ⛔ **차단이 아니라 "요청 시 검출"이다.** `/fz-manage check`가 호출할 때만 돌고, 실제 차단은 훅 설치 시에만 성립한다(훅은 `settings.json` = 사용자 소관, `modules/governance.md` § Hook 최소 강제 권고)
+- **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `effort: EFFORT` — 값은 args.effort 로 받은 **Lead 세션 effort**(미지정 `'xhigh'` · 2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort). Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**. **Opus 5.5 는 기본 `medium`·같은 effort 에서 사고량 증가** [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] — fz 의 워커 effort 는 Lead 세션 effort 를 따른다(2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort · 이전: 2026-09-25 `xhigh` 유지 · 하향 sweep 종결).
+  - ⛔ **상수 일괄 교체 금지**: 공식이 *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* 을 요구. **sweep 사전등록(임계 · arm)은 `experiment-log.md` §5.8 ⑥, 측정 행 기록은 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 의 같은 절**(세션 effort sweep — plan, 2026-09-11 신설 · 규약: `experiment-log.md` 머리 문단)이며 ①(frontmatter)은 철회된 사료라 대상이 아니다. 측정 주체는 `scripts/fz_wf_metrics.py`(stage별 wall·out_tok·thinking·advisor·so_retries) + `scripts/fz_telemetry_report.py --plan-segments`(Lead·GPT 층 분리) 다 — 사전등록만 하고 재는 주체가 없으면 표가 빈 채로 남는다(실측: 두 달). 측정 없이 `xhigh`→`high`로 치환하는 건 근거 없는 값을 근거 없는 값으로 바꾸는 것. **워크로드별 sweep 후** 스테이지 성격(생산/판정/탐색)에 맞춰 차등 배정. 미측정 상태의 기본값 = **현행 유지**(2026-10-19 부터 워커 값은 Lead 세션 effort 이므로 이 규칙은 Lead 세션 effort 를 바꿀 때 적용된다).
+  - **[2026-09-06 추가] Fable 5.1 갱신**: 이월 금지가 세대를 건너서도 반복 적용된다 — "Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. Lead(Fable 5.1)에도 동일 적용 — Fable 5·Opus 5에서 측정한 sweep 결과를 그대로 이월하지 않는다.
+  - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [실측 2026-10-19 1회: per-call `opts.effort` 가 세션 값을 이긴다 — Lead `xhigh` 세션에서 `'high'` 로 부른 워커 transcript effort 6/6 = `high`. env · frontmatter 대비는 미측정 · 문서화된 체인은 `env var > frontmatter > 세션`이며 per-call opts는 미명시]
+  - ⛔ **effort로 응답 길이를 줄이려 하지 말 것** — Opus 5에서 effort는 사고량을 조절할 뿐 가시 응답 길이를 신뢰성 있게 줄이지 못한다. 길이는 프롬프트로. [verified: 동 effort 문서]
+
+#### ⛔ scriptPath 거부 우회 계약 (도구 경로 게이트)
+
+> 신설 정당화 (DELETE/MERGE-default): 위 배치·호출 규약 bullet 들은 *스크립트가 어디에 사는가*(플러그인 루트 절대경로)를 정한다 — 표기가 옳은데도 **도구가 그 경로 읽기를 거부하는** 경우는 다루지 않아 기존 bullet 흡수 불가.
+> ⛔ **근본 해결이 아니다.** fz 가 고칠 수 있는 결함이 아니라 **도구별 경로 게이트**다 — 같은 경로를 `Bash`·`Read` 는 읽는다. 플러그인 루트가 세션 working directory 이거나 additional directory 면 애초에 발생하지 않는다. 아래는 그 조건이 아닐 때의 **세션 한정 우회**이며, 조건이 사라지면 이 블록도 함께 삭제한다.
+> ⛔ **해소 오라클은 '직접 호출 거부 0' 이 아니다**(F-199 — 설정을 바꾸지 않기로 정했다): 이 블록의 해소 오라클은 **소비자 전부가 0단계 복사 + `cmp` 를 거치는가**다(`tests/fixtures/workflow-prep/copy-cmp/run.sh --cells sites`). 설정 파일에 경로가 있다는 사실은 대리 지표라 판정에 쓰지 않는다(F-376 — 설정을 넣은 뒤에도 직접 호출은 10/10 거부됐다). 설정으로 풀기로 하면 새 세션의 실호출 거부 0 을 잰 뒤에만 이 블록을 지운다.
+
+**0단계 — 준비** (⛔ 매 호출 · 거부를 기다리지 않는다). 플러그인 루트 직접 호출은 실사용 세션(대상 레포가 working directory)에서 매번 거부됐다 — 우회가 통한 3회는 1차 경로가 3회 틀렸다는 뜻이다. 그래서 소비자 10곳(`skills/` 7 · `modules/` 2 · `guides/` 1 — 아래 공용 읽기 전용 swarm 절)과 fz-plan 은 원본이 아니라 **준비한 복사본**을 부른다. 아래 블록이 **exit 0** 일 때만 `Workflow({ scriptPath: '{WORK_DIR}/{파일}.js', args })` 를 부른다:
+
+```bash
+S=$(cd "{세션 디렉터리}" && pwd -P) && D=$(cd "{WORK_DIR}" && pwd -P) &&
+  case "$D/" in "${S%/}"/*) ;; *) false ;; esac &&
+  test "$(grep -c '^import\|require(' "{플러그인 루트}/workflows/{파일}.js")" = 0 &&
+  M=$(grep -oE "['\`]fz:[a-z0-9-]+" "{플러그인 루트}/workflows/{파일}.js" | sort -u | while read -r a; do
+        [ -f "{로드된 플러그인 루트}/agents/${a#*fz:}.md" ] || echo "${a#*fz:}"; done) &&
+  { [ -z "$M" ] || { echo "agentType 미등록(로드된 플러그인 agents/ 에 없다): $M" >&2; false; }; } &&
+  cp "{플러그인 루트}/workflows/{파일}.js" "$D/{파일}.js" &&
+  cmp -s "{플러그인 루트}/workflows/{파일}.js" "$D/{파일}.js"
+```
+
+- **경로 판정** — `{세션 디렉터리}` 는 세션 working directory 또는 additional directory 중 `{WORK_DIR}` 를 품는 쪽이다. 두 경로를 `pwd -P` 로 편 **실제 경로**(realpath)로, **경로 세그먼트 경계**에서 비교한다(`"$D/"` 가 `"$S/"` 로 시작). ⛔ 문자열 접두사 비교 금지 — `/a/work-x` 는 `/a/work` 를 문자열 접두사로 갖지만 하위가 아니고(형제 접두사), `{WORK_DIR}` 가 범위 밖을 가리키는 symlink 면 실제 경로가 밖으로 나온다. 같은 판정의 코드 선례는 `scripts/gate_check.py` 의 `os.path.commonpath` 다.
+- **self-contained 확인** — 아래 2단계의 식 그대로다. 무출력(경로 오류)은 `0` 이 아니라서 `test` 가 거짓이 된다.
+- **agentType 등록 대조**(F-511) — 사본이 부르는 `fz:` agentType 마다 `{로드된 플러그인 루트}/agents/{이름}.md` 가 있어야 한다. `{로드된 플러그인 루트}` 는 지금 읽고 있는 SKILL.md 가 속한 플러그인의 루트다(스킬 Base directory 의 두 단계 위 — 에이전트 정의가 등록된 곳). 보통 `{플러그인 루트}` 와 같다. 다를 때가 문제다 — 개발 워크트리의 워크플로를 옛 설치본을 불러온 세션에서 부르면 새 agentType 의 렌즈는 시작도 못 하고 죽는데 워크플로는 partial 로 Stage 3 까지 돈다. 빠진 이름을 stderr 에 찍고 비0 → L4.
+- ⛔ **agents 편집은 같은 세션에 반영되지 않는다**(F-228 · F-233) — `agents/*.md` 를 고친 효과는 CLI 를 다시 띄운 새 프로세스에서만 잰다. 같은 세션에서 렌즈 동작으로 편집 효과를 판정하면 미판정이다. `/clear` 는 새 세션이 아니다 — 같은 프로세스라 에이전트 정의를 다시 읽지 않는다.
+- **cp 덮어쓰기 · 종료 코드** — 매 호출 원본을 **같은 basename** 으로 `{WORK_DIR}` 루트에 덮어쓴다. stale 복사본이 남지 않고, 텔레메트리(`scripts/fz_telemetry_report.py` 의 `norm_wf_name`)가 basename 으로 워크플로를 센다. `&&` 사슬이라 `cp` 가 비0 이면 뒤가 돌지 않는다.
+- **`cmp -s`** — 호출 직전 원본과 복사본이 바이트 단위로 같아야 한다. 같지 않으면 부르지 않는다.
+- ⛔ **비0 이면 어느 단계든 복사본을 부르지 않는다 — L4**(사용자 에스컬레이션). 원본 경로 직접 호출로 되돌리거나 SOLO 로 직행하지 않는다 — 스크립트가 시작조차 안 한 실패라 사다리 L1~L3 도 아니다.
+- 이 블록은 `tests/fixtures/workflow-prep/copy-cmp/run.sh` 가 셀(없음 · stale · 정상 · 형제 접두사 · symlink · import · agentType 미등록 · 실워크플로 · cp 실패)로 실행하고, `--cells sites` 가 소비자 10곳의 준비 줄을 실제로 돌린다. ⛔ 블록이나 소비자 준비 줄을 고치면 그 fixture 를 함께 돈다.
+
+준비(0단계) 없이 원본 경로를 부르면 `Workflow` 호출이 스크립트를 실행하지 못하고 이렇게 거부될 수 있다:
+
+```
+scriptPath must be a script path this tool returned, or a file you can already read
+  (the working directory or a directory you have added): {플러그인 루트}/workflows/peer-review.js
+```
+
+> 콜론 뒤에는 실제 절대경로가 온다 — 여기서는 이식성 때문에 치환했다(§ 이식성).
+
+⛔ **이 거부는 `mode:'fallback'` 이 아니다.** 스크립트가 시작조차 못 한 상태라 **반환에 `mode` 필드 자체가 없다**(에이전트 0 · 산출 0). `fallback` 으로 읽어 SOLO 로 강등하면 멀티에이전트 경로가 조용히 사라진다 — 아래 실패 복구 사다리 L1~L4 어디에도 해당하지 않는다.
+
+**우회 4단계** (⛔ 순서 고정 — 2를 건너뛰면 의존이 끊긴 복사본을 실행한다 · ⛔ 거부된 경로가 이미 0단계의 `{WORK_DIR}` 복사본이면 1~4 를 반복하지 않고 L4(사용자 에스컬레이션) — 같은 복사를 다시 해도 같은 게이트에 걸린다):
+
+1. **판별** — 에러가 `scriptPath must be a script path this tool returned, or a file you can already read` 로 시작하면 이 케이스다. 표기 문제가 아니므로 경로 표기를 고쳐 쓰는 것으로는 통과하지 않는다.
+2. **self-contained 확인** — `grep -c '^import\|require(' {플러그인 루트}/workflows/{파일}.js` 가 `0` 이어야 복사가 안전하다. ⛔ 이 식이 보는 것은 **모듈 import 부재 하나**다 — `__dirname` 기준 경로·상대 파일 읽기는 걸리지 않으니 눈으로 함께 본다. ⛔ 무출력은 `0` 이 아니라 경로 오류(측정 실패)다. 0 이 아니거나 상대 접근이 보이면 **복사하지 말고** L4(사용자 에스컬레이션)로 간다.
+3. **검증 후 복사** — 먼저 목적지를 본다: 0단계의 **경로 판정**이다 — `{WORK_DIR}` 의 실제 경로가 세션 working directory(또는 additional directory)의 실제 경로 **안**(경로 세그먼트 경계)에 있어야 한다. 위 거부 메시지가 읽을 수 있다고 말하는 범위가 그 둘뿐이다. ⛔ 문자열 접두사로 비교하지 않는다(형제 접두사 · 범위 밖 symlink). ⛔ 둘 중 하나라도 확정하지 못하면 **'하위 아님' 으로 처리한다** — 미확정을 '하위' 로 읽으면 어차피 거부될 복사를 그대로 진행한다(측정 실패는 통과가 아니다). `/tmp/fz-peer-review/` 같은 폴백 WORK_DIR [실측: `skills/fz-peer-review/SKILL.md` L105 "쓰기 불가 시 `/tmp/fz-peer-review/` 폴백"]은 그 밖이라 **복사본도 같은 게이트에 걸린다** — 복사하지 말고 L4(사용자 에스컬레이션)로 간다. 판정을 통과했을 때만 0단계 블록의 `cp` → `cmp -s` 로 `{WORK_DIR}/{파일}.js` 를 만든다 — 그 목적지라야 도구가 읽는다. ⛔ **목적지는 `{WORK_DIR}` 루트다 — 하위 디렉터리를 만들지 않는다.** `cp` 는 부모 디렉터리를 만들지 못하는데 아래 권한 bullet 이 요구하는 것은 `Bash(grep *)`·`Bash(cp *)`·`Bash(cmp *)` 뿐이라 `mkdir` 을 가정할 수 없다 — 없는 하위 경로로 복사하면 4단계 재시도 **전에** `No such file or directory` 로 죽는다. 평탄화의 이름 충돌 위험은 워크플로 스크립트명이 고유해(`code-pair.js` 등) 낮다.
+4. **재시도** — `Workflow({ scriptPath: '{WORK_DIR}/{파일}.js', args })`. 복사본이 원본과 같으면 resume·캐시도 그대로 동작한다.
+
+[실측: 2026-09-03 세션 — 플러그인 루트 경로는 거부되고 `{WORK_DIR}/code/code-pair.js` 복사본 경로는 **6 invoke 전부 성공**(agent 17 · error 0 · resume 정상)] ⛔ 그 경로의 `code/` 는 복사 **이전에 이미 존재했다** — `cp` 가 부모를 만든 증거가 아니다. 계약이 `{WORK_DIR}` 루트를 쓰는 이유다.
+
+- ⛔ **복사본은 산출물이 아니다** — 원본이 바뀌면 stale 이 된다. WORK_DIR 밖으로 옮기거나 커밋하지 않는다. 0단계가 매 호출 덮어쓰고 `cmp -s` 로 확인하므로 원본을 고쳐도 다음 호출은 새 본을 부른다.
+- ⛔ **소비자 SKILL.md 에 권한이 없으면 0단계와 2·3 단계가 실행되지 않는다** — `allowed-tools` 에 `Bash(grep *)`·`Bash(cp *)`·`Bash(cmp *)` 를 둔다(`cmp` 는 `schemas/tool-inventory.json` 에도 선언한다). 위 배치·호출 규약의 `Workflow` 추가 의무와 같은 계약이며, 없으면 준비는 정확히 그것이 필요한 상황에서 죽는다. 경로 판정의 `cd`·`pwd -P` 는 셸 내장이다 [미검증: 권한 규칙이 명령 치환 안의 내장을 따로 묻는지 — 실세션 관측 전]. [실측: 2026-09-03 — `Workflow` 를 가진 소비자 9곳 전부에 두 권한이 0이었다]
+
+#### 공용 읽기 전용 swarm — `workflows/swarm.js` (정본 호출 사이트)
+
+> 신설 정당화 (DELETE/MERGE-default): 소비자 SKILL.md 3곳(fz-review 절차 4 · fz-peer-review Will Not · fz-modernize Phase 2 절차 3)은 한 줄 포인터만 둔다 — 준비 줄과 호출 줄을 셋에 베끼면 한 곳만 고쳐진다. 실행할 줄은 여기 한 곳에 두고 `tests/fixtures/workflow-prep/copy-cmp/run.sh --cells sites` 가 이 사이트를 세 소비자의 권한과 함께 돌린다.
+
+- **언제 (선택)**: 서로 독립인 조각(발견 · 주장 · stale 항목 · diff 조각)을 조각마다 **한 SHA 의 고정 트리**만 읽어 판정할 수 있을 때. 조각 = `{ id, brief, sha, method }` — `sha` 는 브리프가 **주는** 입력이고 워커는 그것을 결과에 기록한다(워커는 git 을 돌리지 않는다). 기록이 빠진 결과는 스크립트가 버리고 그 조각을 한 번만 다시 띄운다
+- ⛔ **순서 — 주 Workflow(review-live · peer-review 등)가 반환한 뒤에 띄운다.** opus 동시 ≤3 은 세션 전역이다(정본 `guides/model-guide.md` §5) — swarm 의 concurrency 상한 3 은 swarm 안만 막는다. 다른 Workflow 가 도는 동안 띄우면 합이 상한을 넘는다
+
+1. **준비** (위 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/swarm.js {WORK_DIR}/swarm.js && cmp -s {플러그인 루트}/workflows/swarm.js {WORK_DIR}/swarm.js` 가 exit 0 일 때만 이어간다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+2. **고정 트리**: `git -C {GIT_ROOT} archive --prefix=swarm-tree-{sha}/ {sha} | tar -xf - -C {WORK_DIR}` 가 exit 0 이고 `{WORK_DIR}/swarm-tree-{sha}` 가 생겼을 때만 이어간다(파이프의 종료 코드는 tar 의 것이라 git 실패를 가릴 수 있다). args `tree` = 그 절대 경로 — 한 번 부를 때 SHA 하나, SHA 가 여럿이면 트리마다 따로 부른다. 권한: 소비자 `allowed-tools` 의 `Bash(git -C * archive *)` · `Bash(tar -xf - -C *)`(무제한 `Bash` 면 그것) · `tar` 는 `schemas/tool-inventory.json` 에 선언돼 있다
+3. **호출**: `Workflow({ scriptPath: '{WORK_DIR}/swarm.js', args: { fragments, tree, effort } })` — `effort` = Lead 세션 effort(lead-effort · null 이면 넣지 않는다 — `modules/mode-gate.md` § effort). 선택 인자 `maxFragments`(기본 12) · `maxAgents`(기본 = 상한 2 × 돌릴 조각) · `concurrency`(기본 = 상한 3) · `agentType`(스크립트 `READ_ONLY_AGENTS` 안만 — 기본 `fz:review-correctness`)
+4. **반환**: `table` = 입력 조각마다 정확히 1행(`PASS` · `ISSUES` · `BLOCKED` — BLOCKED `reason` 은 budget · no-sha-method · worker-null · bad-status · worker-blocked). `mode:'fallback'` 이면 아래 § 실패 복구 사다리의 판별 표 — ⛔ SOLO 직행 아님
+
+### resume 계약 + advisor 상속 (2026-08-08 신설)
+
+> 신설 정당화 (DELETE/MERGE-default): 본 §12는 배치·호출·model/effort·산출물·intentContext를 이미 소유하나 **중단 후 재개**와 **워커가 상속하는 세션 설정**을 다루지 않았다 — 기존 하위절 흡수 불가. 둘 다 실측으로 확인된 계약만 수록.
+
+**resume** [verified: code.claude.com/docs/en/workflows]
+- `Workflow({ scriptPath, resumeFromRunId })` — 변경되지 않은 `agent()` 호출의 **최장 prefix가 캐시로 즉시 반환**되고 첫 변경 지점부터 재실행된다. 같은 스크립트 + 같은 args = 100% 캐시 히트.
+- ⛔ **재생 순서 규칙**: *"Cached results stop at the first agent that didn't finish, and **every agent that started after that one runs again, even if it completed**."* → 팬아웃 중간에 멈추면 뒤에 시작된 완료분까지 전부 재실행된다.
+- ⚠️ **설계 함의**: 공식 결론은 *"**다수의 작은 에이전트가 하나의 큰 에이전트보다 진행을 더 보존한다**"* 이다. fz의 현행 워크플로는 **소수의 큰 에이전트 + 스테이지 배리어** 구조라 이 방향과 반대다 — 스테이지 세분화의 이득은 **미측정**이며 재검토 대상으로 남긴다.
+- **경계**: resume은 **동일 Claude Code 세션 내에서만** 동작한다. CC를 종료하면 다음 세션은 워크플로를 처음부터 시작한다 → 장기 워크플로는 티켓 폴더 아티팩트가 여전히 1차 복원 수단이다.
+- **진단**: `<transcriptDir>/journal.jsonl`이 agent별 **실제 반환값**을 1줄씩 기록한다. ⛔ 빈 결과·이상 결과 원인 규명 시 **추측 금지, journal 먼저 Read**.
+- ⛔ 스크립트 결정성 요구와 한 세트다 — `Date.now()`/`Math.random()`/무인자 `new Date()`는 **throw**된다(resume을 깨뜨리므로).
+
+**세션 설정 상속** [verified: 프로브 `wf_00000000-001`, 2026-08-08]
+- ⛔ **워커는 세션 `advisorModel`을 상속한다.** 1-agent 프로브(`model:'opus'`)가 advisor를 실제 호출해 응답을 받았다 — `{"advisor_tool_available":true,"call_succeeded":true}`. 즉 fz의 opus 워커 전부가 advisor를 호출할 수 있다.
+  - **비용 계측 불가**(이력 — 2026-08-08 당시 판정): advisor 호출은 `usage.server_tool_use`에 기록되지 않는다(워커 트랜스크립트 `agent-*.jsonl`에서도 동일). `governance.md §사각지대` 참조 — `opus 동시 ≤3` envelope이 advisor 지출을 bound하지 않는다.
+    - 2026-11-01 정정 — '불가'는 아니다. 공식 문서상 advisor 호출은 advisor 모델 단가로 과금되는 별도 하위 추론이고 `usage.iterations[]` 의 `type: "advisor_message"` 항목으로 보고된다(top-level `usage` 에는 합산되지 않는다) — "Advisor calls run as a separate sub-inference billed at the advisor model's rates. Usage is reported in the `usage.iterations[]` array" [verified: https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool]. 단 fz 트랜스크립트에는 `iterations` 가 없는 세션이 있어 그것으로 세면 과소 집계된다 — `scripts/fz_wf_metrics.py` 는 호출 수를 `advisor_tool_result`·`server_tool_use`(name=advisor) 블록으로 센다(그 스크립트의 측정 규약 · 2026-09-11 정정 이력). envelope 이 advisor 지출을 bound 하지 않는다는 위 판정은 그대로다.
+  - ⛔ **ad-hoc 프로브 작성 시 advisor 호출을 유도하는 지시를 넣지 말 것** — 계측되지 않는 지출이 된다(도구 가용성 실증 같은 명시적 목적 제외).
+- ⛔ **`CLAUDE_CODE_SUBAGENT_MODEL`은 `opts.model`을 override한다** — *"the model Claude Code uses for all subagents, agent teams, and **agents in a workflow** … overrides the per-invocation `model` parameter and the subagent definition's `model` frontmatter"* [verified: /model-config]. 즉 **본 §12의 "model 명시 의무"를 무력화할 수 있는 유일한 변수**다. 워커 모델이 예상과 다르면 **1순위로 이 env var를 확인**하고, `inherit`로 정상 해석에 복귀시킨다.
+
+### 산출물·거버넌스 계약
+
+- 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — ⛔ `mode='fallback'` 이면 **아래 § 실패 복구 사다리의 판별 표로 분기**한다(SOLO 직행 아님 — `fallback` 하나에 분할 요구·입력 오류·실행 실패가 함께 담긴다). wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
+- 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / **opus 동시 ≤3** (워커 기준 — Lead는 fable, fan-out은 sonnet. **정본 = `guides/model-guide.md` §5** — ⛔ 여기서 값을 재정의하지 않는다) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
+- 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
+- 검증 oracle: `node scripts/check_wf_syntax.js --root {플러그인 루트}`(AsyncFunction 컴파일 + `export const meta` 첫 문장 — health-check 가 같은 검사를 돈다. ⛔ 직접 `node --check` 는 판별력 0 이고, 함수로 감싼 파싱은 본문이 `})` 로 탈출하면 통과할 수 있어 판정에 쓰지 않는다) + **실 invoke ≥1** + 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 지표 기록
+
+### ⛔ 실패 복구 사다리 (`mode:'fallback'` · 스톨 — **본 절이 정본**)
+
+> 신설 근거(2026-08-09): 이전에는 5개 스킬이 폴백 절차로 TEAM 사료(team-core + patterns, 679줄 — 2026-09-25 삭제)를 지목했으나 그 내용은 `TeamCreate`/`SendMessage` **P2P 절차**였다 — SOLO에는 에이전트가 없어 **실행 자체가 불가능**했다. 그런데 실측상 실패는 2회 발생하고 **두 번 다 아래 사다리로 복구**됐다(`experiment-log.md` §5.7 fz-code #1 · fz-review #8). `team-core` 사용 이력은 **0건**이다.
+> 즉 본 절은 새 프로토콜을 발명하는 것이 아니라 **이미 작동한 복구 경로를 성문화**한다.
+
+#### ⛔ 먼저 상태를 판별한다 — 7종 (2026-09-18 · degraded 행 2026-09-27)
+
+> 신설 근거: 같은 §12 안에서 산출물 계약이 *"`fallback` 이면 SOLO 폴백"* 을 무조건으로 지시하고
+> 사다리는 L1·L2 를 먼저 요구했다 — **문면이 상충했다**. 그리고 소비자(`skills/fz/SKILL.md` 에러표)는
+> 스폰 실패를 SOLO 폴백으로 직행시켰는데 사다리에는 그 상태가 **없었다**. 아래 표가 정본이다.
+> ⛔ 새 단계를 만들지 않는다 — 판별만 더하고 처방은 기존 L1~L4 로 보낸다.
+
+| # | 상태 | 판별 근거 (반환·에러의 관측 가능한 형태) | 처방 |
+|---|---|---|:--:|
+| 1 | **scriptPath 거부** | 에러가 `scriptPath must be a script path this tool returned…` 로 시작 · ⛔ **반환에 `mode` 필드 자체가 없다**(스크립트 미실행 · 에이전트 0 · 산출 0) | § scriptPath 거부 우회 계약 — **사다리 아님** |
+| 2 | **분할 요구** | `mode:'split_required'` · 또는 `mode:'fallback'` + `splitSuggested:true` | **L1** |
+| 3 | **입력 오류** | `mode:'fallback'` + args 파싱 실패·필수 키 누락 (설계된 fail-fast) · `reason:'changeset-defect'`(code-pair 최종 changeset 결함 — `defects` 를 buildFeedback 에 넣어 재invoke) | **L2** |
+| 4 | **일시 장애** | 스테이지 스톨 · 세션/rate limit · 타임아웃 | **L3** |
+| 5 | **스폰 실패** | agent 스폰 예외 · `metrics.agentCalls` 가 0 인데 `mode` 는 정상 | **L3** 우선(일시 장애 의심) → 미해소 시 **L4** |
+| 6 | **렌즈 결손 (degraded)** | `mode:'workflow'` 인데 렌즈가 빠졌다 — 반환 형태가 정상이라 놓치기 쉽다. 워크플로마다 알리는 필드가 다르다: `plan-lean2.js` 는 `degraded:true` · `missingLenses`(비어 있지 않음), `code-pair.js` 는 `reviewVerdict:'partial'`(`lensesCompleted < lensesExpected`) · `residualNote` | ⛔ **완주로 세지 않는다.** **L3** 1회(죽은 렌즈의 null 이 캐시로 재생되면 즉시 같은 결과 — 비용이 거의 없다) → 여전히 degraded 면 **L4**(선택지: 새 invoke 재실행 — 워크플로 1회 전체 비용 · 범위 축소 · 중단). `code-pair.js` 의 `partial` 은 `skills/fz-code/SKILL.md` 반환 처리 6 이 정한다(다음 Step 전 재invoke 여부를 Lead 가 판정) |
+| 7 | **알 수 없는 반환** | 위 여섯 중 어느 판별에도 걸리지 않음 (`mode` 값이 예상 밖이거나 metrics 부재) | **L4 직행** — ⛔ 판정 불가를 추측으로 메우지 않는다 |
+
+⛔ **일곱 중 어느 것도 SOLO 직행이 아니다.** Lead 단독 SOLO 수행은 **L4 에서 사용자 승인 후에만**
+성립한다(Lead=fable 자동 SOLO 금지). 소비자 문서가 이 표와 다르게 적으면 **이 표가 이긴다**.
+
+| 단계 | 조건 | 행동 | 실측 선례 |
+|:--:|---|---|---|
+| **L1** | `mode:'split_required'` 또는 `mode:'fallback'`+`splitSuggested:true` | **Step 분할 후 재invoke** (과대 changeset scaffold collapse 방어 — H5) | — |
+| **L2** | `mode:'fallback'` + 입력 오류 (args 파싱·필수 키 누락) | **입력 수정 후 재invoke.** ⛔ 워크플로 실패가 아니라 **설계된 fail-fast**다 | §5.7 fz-code #1 (2026-07-10, args 유니코드 이스케이프 깨짐 → 수정 후 회복) |
+| **L3** | 스테이지 스톨·일시 장애(세션/rate limit) | **`resume` 우선** — `Workflow({ scriptPath, resumeFromRunId })`. 변경 없는 agent()의 최장 prefix가 캐시 재생된다 | §5.7 fz-review #8 (2026-07-20, 초회 7287s 스톨 → resume 부분 재시도 성공) |
+| **L4** | L1~L3 미해소 | **사용자 에스컬레이션** — 선택지(재시도/범위축소/중단) 제시. ⛔ **Lead 단독 SOLO 수행은 사용자 승인 후에만** (Lead=fable 자동 SOLO 금지) | — |
+
+- ⛔ **호출 자체가 거부된 경우는 이 사다리가 아니다** — 반환에 `mode` 가 없다(스크립트 미실행). § scriptPath 거부 우회 계약으로 간다. `mode:'fallback'` 으로 읽어 SOLO 로 강등하는 것이 정확히 막으려는 실패다
+- ⛔ **`resume`은 동일 Claude Code 세션 내에서만** 동작한다 — 세션이 끝났으면 L3를 건너뛰고 티켓 폴더 아티팩트로 복원한다
+- ⛔ **재시도는 `buildFeedback` 등을 args에 넣어 캐시 키를 바꾼다** (resume 비의존 경로)
+- ⛔ **진단은 추측 금지** — `<transcriptDir>/journal.jsonl`이 agent별 실제 반환값을 기록한다. 빈 결과·이상 결과는 journal을 먼저 Read
+- TEAM 사료(team-core + patterns 5종)는 **2026-09-25 삭제**됐다 — 결정: `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰. 폴백 실행 절차는 위 사다리뿐이다
+
+### intentContext 규약 (과제 목적 전달)
+
+워커 프롬프트/args에 과제 목적 3요소를 전달하는 것을 권장한다 — 목적을 알면 워커가 관련 정보를 스스로 연결하고 의도를 오추론하지 않는다 (공식 Fable 5 Intent context: "Give the reason, not only the request" — 이 문장은 Fable 5(Legacy) 페이지에만 있다 [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5#give-the-reason-not-only-the-request]. 전 모델 공통 근거는 best-practices 페이지의 같은 취지 문장이다: "Providing context or motivation behind your instructions, such as explaining to Claude why such behavior is important, can give Claude more information about your goals and help it deliver more targeted responses." [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices#add-context-to-improve-performance]).
+
+- **3요소**: (1) larger task — 지금 과제가 속한 상위 작업 · (2) 누구를 위한 것 — 수요자 · (3) 산출물이 가능하게 하는 것 — 이 산출물로 다음에 무엇을 하는가
+- **구현 선례**: review-live·peer-review는 `intentContext`를 **필수 args**로 받아(둘 다 누락 시 fail-fast `mode:'fallback'`) TARGET 문자열에 주입; plan-collaborative는 **선택 args**로 받아 CTX 목적 축에 조건부 주입 (`input.intentContext ? '[과제 목적] …' : ''`)
+- **OVERRIDE 오염 방어와의 관계**: intentContext는 **프롬프트 내부에 포함되는 정보**이지 외부 컨텍스트 pull이 아니다. OVERRIDE 블록(§ 표준 패턴 3종 1)이 금지하는 것은 에이전트 정의의 티켓 폴더·이전 세션·메모리 자동 로딩이며, Lead가 args로 명시 전달한 목적은 이에 해당하지 않는다 — 오염원이 아니라 과제 정의의 일부
+
+### TEAM 추론 품질 3원칙 보존 매핑 (prompt-optimization §다양성)
+
+| 원칙 | Workflow 보존 |
+|------|--------------|
+| Round 1 독립성 | 초기 생성 호출에 피어 데이터 미주입 (구조적 보장) |
+| Task Brief 5요소 | [역할][문제/컨텍스트][목표] + schema(=Deliverable) + OVERRIDE(=Constraints) |
+| 합의/불합의 명시 | schema 필드로 표현 (예: mutability/severity + evidence) |

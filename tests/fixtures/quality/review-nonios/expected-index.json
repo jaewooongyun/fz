@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "absent": false,
+  "files": [
+    "AGENTS.md"
+  ],
+  "sections": [
+    {
+      "file": "AGENTS.md",
+      "line": 1,
+      "endLine": 2,
+      "level": 1,
+      "heading": "Orders Service — 기여 지침",
+      "bodyLine": null,
+      "quote": ""
+    },
+    {
+      "file": "AGENTS.md",
+      "line": 3,
+      "endLine": 7,
+      "level": 2,
+      "heading": "Architecture",
+      "bodyLine": 5,
+      "quote": "- 헥사고날(포트·어댑터). `src/domain/` 은 `src/application/`·`src/adapters/` 를 import 하지 않는다. 의존은 바깥(adapters) → 안(application → domain) 한 방향이다\n- 유스케이스는 `src/application/` 에 두고 포트(`…Port` 인터페이스)만 주입받는다. HTTP 어댑터(`src/adapters/http/`)는 요청 변환만 하고 업무 규칙을 두지 않는다"
+    },
+    {
+      "file": "AGENTS.md",
+      "line": 8,
+      "endLine": 12,
+      "level": 2,
+      "heading": "Conventions",
+      "bodyLine": 10,
+      "quote": "- 파일명은 kebab-case, 클래스·타입은 PascalCase 다. default export 를 쓰지 않는다\n- Promise 는 반드시 `await` 하거나 반환한다 — 버려진 Promise 금지\n- 금액은 정수 minor unit(원 단위 정수)으로 다룬다. 부동소수점 연산 금지"
+    }
+  ]
+}

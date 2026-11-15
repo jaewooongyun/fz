@@ -1,0 +1,7 @@
+아래 PR 변경을 검증하라. 파일을 수정하지 마라(읽기 전용 분석).
+- issues[]: evidence 로 독립 발견 — 각 이슈에 Origin Classification(regression/pre-existing/improvement). base class init/willSet 변경이면 subclass 를 찾는다(Inheritance Chain)
+- challenges[]: 아래 발견 목록의 각 id 에 agree|challenge|supplement|reverse 판정과 근거
+발견 목록(id 포함):
+(없음 — Lead 발견 0건)
+Evidence(인라인 — 규칙 원문 색인 포함):
+EVIDENCE-FIXED

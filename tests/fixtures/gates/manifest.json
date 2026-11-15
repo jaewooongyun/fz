@@ -1,0 +1,3181 @@
+{
+  "_note": "gate_check.py --self-test 의 입력. ⛔ 이 파일이 케이스 목록의 SSOT — 스크립트에 케이스를 하드코딩하지 않는다.",
+  "_mutates": "원장 파일 내용이 실행 전후로 달라지는가. ⛔ 체커가 썼는지가 아니라 파일이 바뀌었는지다 — CHECK 자신이 원장을 수정하는 케이스가 있다.",
+  "_exit": {
+    "0": "satisfied",
+    "1": "unmet — 판정 결과 (timeout·출력초과·EXPECT불일치·exit≠0 포함)",
+    "2": "infrastructure — 사용법 오류·파일 부재·인터프리터 문제 (⛔ 원장 자체의 parse error 아님)",
+    "3": "invalid-ledger — fz가 만든 원장의 계약 위반 (평가 불가 = 통과 아님)"
+  },
+  "_categories": {
+    "parser": "원장 문법 위반 — 전부 exit 3, mutation 없음",
+    "execution": "CHECK 실행과 EXPECT 판정",
+    "writeback": "결과 기록의 원자성과 경쟁 조건",
+    "reverify": "기록된 증거의 재검증과 강등",
+    "manual": "MANUAL 게이트 상태 머신",
+    "cli": "인자 처리 — 사용법 오류는 exit 2 (원장 오류 3과 구분)",
+    "hook": "⛔ 비어 있음 — 2차 계층(S14)에서 추가",
+    "merge": "⛔ 비어 있음 — 2차 계층(S16)에서 추가",
+    "fromplan": "plan steps[] → 원장 변환 (--from-plan)",
+    "state": "STATE 전이표 — 전진은 전 게이트 충족 조건부, 역행은 자유, active→planned 는 승인 + 진행 기록 0, planned→active 는 증명 불요",
+    "forgery": "증거·토큰 위조와 수명주기 우회 — 2026-08-24 코드 리뷰가 실증한 false-green 경로",
+    "root": "ROOT 소유 검증 + 실행 환경 격리",
+    "expect": "EXPECT 문법 판별 — 경로 리터럴 vs 정규식",
+    "verdict": "verify-gates 응답의 전수 판정 대조 (--verdict-check)",
+    "approved": "승인 도장 (APPROVED_ORACLE_HASH) 계약",
+    "discover": "원장 탐색 (--discover) — health-check 노출 경로",
+    "finalize": "확정 도장 발급 (--finalize) — 도장이 자기 게이트 블록에 박히는가",
+    "baseline": "승인 전 기준선 (--baseline-probe · SIDE_EFFECTS · BASELINE: required 원장의 --finalize)",
+    "pin": "선언형 핀 (PIN · PIN_DIGEST) — 판정 입력 파일을 승인 계약에 묶는다",
+    "scenario": "시나리오 manifest 대조(--scenario-check · F-526) — 기대 = 관측 집합 · 승인 sha 고정"
+  },
+  "cases": [
+    {
+      "id": "parser-no-gates",
+      "category": "parser",
+      "ledger": "parser/no-gates.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "게이트 0개 원장은 ALL MET이 아니라 오류다"
+    },
+    {
+      "id": "parser-duplicate-id",
+      "category": "parser",
+      "ledger": "parser/duplicate-id.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "3스킬이 같은 원장을 만지므로 id 충돌이 실제로 가능하다"
+    },
+    {
+      "id": "parser-check-without-expect",
+      "category": "parser",
+      "ledger": "parser/check-without-expect.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "부분 runnable 게이트 — exit 0만으로 통과시키면 무엇이 나왔는지 안 본다"
+    },
+    {
+      "id": "parser-expect-without-check",
+      "category": "parser",
+      "ledger": "parser/expect-without-check.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "대칭 케이스 — 실행할 것이 없는데 기대값만 있다"
+    },
+    {
+      "id": "parser-blank-abandon-reason",
+      "category": "parser",
+      "ledger": "parser/blank-abandon-reason.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "이유 없는 포기는 조용한 게이트 삭제와 같다"
+    },
+    {
+      "id": "parser-cwd-traversal",
+      "category": "parser",
+      "ledger": "parser/cwd-traversal.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "CWD 의 .. 는 WORK_DIR 밖으로 탈출한다 — unlazy 는 OWNS 에만 가드가 있고 CWD 엔 없다"
+    },
+    {
+      "id": "parser-regex-expect",
+      "category": "parser",
+      "ledger": "parser/regex-expect.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "정규식 미지원 — Python re 에 타임아웃이 없어 파멸적 백트래킹을 막을 수 없다"
+    },
+    {
+      "id": "parser-missing-root",
+      "category": "parser",
+      "ledger": "parser/missing-root.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "ROOT 는 검증 키다. 없으면 이 원장이 어느 WORK_DIR 것인지 확인할 수 없다"
+    },
+    {
+      "id": "parser-bad-state",
+      "category": "parser",
+      "ledger": "parser/bad-state.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "STATE 는 planned/active/ready_for_review/closed 넷뿐 — 미지 값은 수명주기 판정 불가 (planned 는 수명주기 순서 밖이라 전이표가 간선마다 전제를 정한다)"
+    },
+    {
+      "id": "exec-pass",
+      "category": "execution",
+      "ledger": "execution/pass.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 5
+      },
+      "why": "정상 경로 — 체크박스와 EVIDENCE 가 기록된다"
+    },
+    {
+      "id": "exec-nonzero-with-token",
+      "category": "execution",
+      "ledger": "execution/nonzero-with-token.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "실패한 프로세스가 에러 텍스트에 성공 토큰을 담아도 통과하지 못한다"
+    },
+    {
+      "id": "exec-zero-without-token",
+      "category": "execution",
+      "ledger": "execution/zero-without-token.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "exit 0 은 실행됐다만 증명한다 — 무엇이 나왔는지는 별개다"
+    },
+    {
+      "id": "exec-timeout",
+      "category": "execution",
+      "ledger": "execution/timeout.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "max_seconds": 4
+      },
+      "why": "timeout 은 인프라가 아니라 판정이다 — 시간이 없었다는 것은 통과가 아니다"
+    },
+    {
+      "id": "exec-orphan-descendant",
+      "category": "execution",
+      "ledger": "execution/orphan-descendant.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "max_seconds": 6
+      },
+      "why": "셸을 벗어난 손자가 파이프를 붙잡으면 정산이 영원히 안 온다 — killpg + stdio drain 이 있어야 통과"
+    },
+    {
+      "id": "exec-output-overflow",
+      "category": "execution",
+      "ledger": "execution/output-overflow.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "max_seconds": 15
+      },
+      "why": "상한 초과는 경성 실패이고, 보존은 앞부분이다 — 첫 실패 진단이 앞에 있다"
+    },
+    {
+      "id": "writeback-oracle-changed",
+      "category": "writeback",
+      "ledger": "writeback/oracle-changed.md",
+      "expect": {
+        "exit": 3,
+        "mutates": true
+      },
+      "why": "CHECK 자신이 sed 로 원장을 바꾼다 — 체커는 그 위에 덮어쓰기를 거부한다(CAS)"
+    },
+    {
+      "id": "writeback-sibling-edited",
+      "category": "writeback",
+      "ledger": "writeback/sibling-edited.md",
+      "expect": {
+        "exit": 1,
+        "mutates": true,
+        "expect_contains": {
+          "sig=": 1
+        }
+      },
+      "why": "무관한 형제 편집이 writeback 을 죽이면 안 된다(ISSUE-015). CAS 범위를 전체 파일에서 **대상 게이트 블록**으로 좁힌 뒤 G1 은 met, G2(MANUAL 미확인)만 unmet 이라 exit 1. `sig=` 1회로 writeback 이 실제로 일어났음을 확인한다 — exit 만으로는 '안 죽었다'와 '썼다'가 구분되지 않는다. ⛔ 이 fixture 는 원래 `sed 's/G2: 원래 제목/…/'` 였는데 **그 패턴이 G1 자기 CHECK 줄에도 있어** 자기를 고쳤다(2026-08-25 발견). 이름은 sibling 인데 실제로는 oracle-changed 와 같은 축을 봤다 — 그래서 CAS 를 좁힌 뒤에도 exit 3 을 유지해 수정이 관측되지 않았다."
+    },
+    {
+      "id": "reverify-demote",
+      "category": "reverify",
+      "ledger": "reverify/demote.md",
+      "expect": {
+        "exit": 1,
+        "mutates": true
+      },
+      "why": "이미 [x] 인 게이트도 재실행한다 — 통과 못 하면 [ ] 로 되돌린다"
+    },
+    {
+      "id": "reverify-still-green",
+      "category": "reverify",
+      "ledger": "reverify/still-green.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true
+      },
+      "why": "재현되는 성공은 유지되되 EVIDENCE 는 이번 실행의 것으로 갱신된다"
+    },
+    {
+      "id": "reverify-oracle-hash-mismatch",
+      "category": "reverify",
+      "ledger": "reverify/oracle-hash-mismatch.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "실행 사이에 CHECK 를 쉬운 명령으로 바꾸는 경로를 막는다 — 모델이 자기 게이트를 완화할 수 있다"
+    },
+    {
+      "id": "manual-unconfirmed",
+      "category": "manual",
+      "ledger": "manual/unconfirmed.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "CONFIRMED 없는 MANUAL 은 미충족이다 — 차단 대상에서 제외하면 어려운 게이트를 MANUAL 로 미는 우회로가 된다"
+    },
+    {
+      "id": "manual-criterion-changed",
+      "category": "manual",
+      "ledger": "manual/criterion-changed.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "확인 조건이 바뀌면 이전 확인은 무효다. ⛔ MANUAL 은 실행할 CHECK 가 없어 체커가 파일을 쓰지 않는다 — 판정만 unmet 으로 뒤집힌다"
+    },
+    {
+      "id": "cli-status-no-execute",
+      "category": "cli",
+      "ledger": "execution/pass.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "--status 는 파싱만 한다 — 미충족 게이트가 있으므로 1이되 원장은 불변이다"
+    },
+    {
+      "id": "cli-missing-file",
+      "category": "cli",
+      "ledger": "__nonexistent__.md",
+      "expect": {
+        "exit": 2,
+        "mutates": false
+      },
+      "why": "파일 부재는 인프라다 — 원장 자체의 계약 위반(3)과 구분한다"
+    },
+    {
+      "id": "cli-mode-conflict",
+      "category": "cli",
+      "ledger": "execution/pass.md",
+      "args": [
+        "--status",
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 2,
+        "mutates": false
+      },
+      "why": "사용법 오류는 configuration 쪽이므로 2다 — lint_contracts.py 의 3분 구조와 같다"
+    },
+    {
+      "id": "fromplan-verifyspec-roundtrip",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-input.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "EVIDENCE: pending": 3,
+          "MANUAL:": 2,
+          "CHECK:": 1
+        }
+      },
+      "why": "VerifySpec command/manual 과 구 계약 문자열 3형태가 각각 CHECK/EXPECT · MANUAL+CRITERION_HASH · manual 강등으로 변환되고, 생성된 원장이 파서를 통과해야 한다. ⛔ 문자열에서 명령을 지어내면 제목과 무관한 oracle 이 생긴다 — 강등이 정직한 처리다"
+    },
+    {
+      "id": "state-forward-blocked",
+      "category": "state",
+      "ledger": "state/forward-blocked.md",
+      "args": [
+        "--set-state",
+        "ready_for_review"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "실행 게이트가 통과해도 MANUAL 미확인이면 전진을 거부한다. ⛔ 이 검사가 없으면 fz-code 가 미충족 상태로 원장을 닫아 fz-review 의 강등이 영원히 발화하지 못한다"
+    },
+    {
+      "id": "state-backward-free",
+      "category": "state",
+      "ledger": "state/backward-free.md",
+      "args": [
+        "--set-state",
+        "active"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true
+      },
+      "why": "역행은 증명 없이 허용한다 — 전진은 '끝났다'는 주장이라 증명이 필요하지만 역행은 '다시 열겠다'이고, 막으면 재작업이 막힌다"
+    },
+    {
+      "id": "state-planned-enter",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "planned"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "STATE: active ← planned"
+        ],
+        "expect_contains": {
+          "STATE: planned": 1
+        }
+      },
+      "why": "F-190 — 확정만 하고 구현을 시작하지 않은 원장은 착수 전(planned)으로 남긴다. 상태값이 없으면 계획만 하고 끝내는 세션이 Stop hook 에 막히고, 출구가 ABANDON(거짓 기록)뿐이다"
+    },
+    {
+      "id": "state-planned-needs-approval",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "args": [
+        "--set-state",
+        "planned"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: not-approved"
+        ]
+      },
+      "why": "planned 는 '승인·미착수' 다 — 확정 전 draft 를 planned 로 두면 승인받지 않은 원장이 hook 판정에서 빠진다"
+    },
+    {
+      "id": "state-planned-work-recorded",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--only",
+          "G1"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "planned"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: work-recorded"
+        ]
+      },
+      "why": "F-190 — 진행 기록(PASS 증거)이 있는 원장을 미착수로 되돌리면 Stop hook 을 피하는 자기 선언 우회로가 된다. ⛔ 상태값을 수명주기 순서에 넣고 역행을 자유로 두면 이 전이가 증명 없이 통과한다"
+    },
+    {
+      "id": "state-planned-demoted-recorded",
+      "category": "state",
+      "ledger": "state/planned-demoted.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "planned"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: work-recorded"
+        ]
+      },
+      "why": "강등 기록(`EVIDENCE: pending; demoted` — reverify 이력)도 진행 기록이다. `pending` 과 같게 읽으면 재실행이 통과 기록을 지운 원장이 착수 전으로 돌아간다"
+    },
+    {
+      "id": "state-planned-status-noop",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "STATE planned — 착수 전"
+        ]
+      },
+      "why": "Stop hook 은 `--status` 로 판정한다 — 착수 전 원장의 미충족은 앞으로 할 일의 정의이지 이 세션이 남긴 빚이 아니다"
+    },
+    {
+      "id": "state-planned-run-refused",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "--set-state active"
+        ]
+      },
+      "why": "planned 원장의 실행은 착수다 — 착수 전 원장에 증거를 쓰면 '착수 전' 이 거짓이 된다. 실행 전에 `--set-state active` 를 요구한다"
+    },
+    {
+      "id": "state-planned-only-refused",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "--set-state active"
+        ]
+      },
+      "why": "fz-code 6.4 의 Step 실행(`--only`)도 같다 — Phase 0.4 착수 전환을 건너뛴 세션은 여기서 멈춘다(fail-closed)"
+    },
+    {
+      "id": "state-planned-confirm-refused",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--confirm",
+        "G3"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "확인을 기록하지 않는다"
+        ]
+      },
+      "why": "MANUAL 확인도 진행 기록이다 — planned 원장에 쓰면 전제(진행 기록 0)가 깨진 채 no-op 으로 남는다"
+    },
+    {
+      "id": "state-planned-to-active",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "active"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "STATE: planned → active"
+        ],
+        "expect_contains": {
+          "STATE: active": 1
+        }
+      },
+      "why": "착수(planned → active)는 완료 주장이 아니다 — 미충족 게이트가 있어도 증명 없이 허용한다(fz-code Phase 0.4)"
+    },
+    {
+      "id": "state-planned-no-skip",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "ready_for_review"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: no-edge"
+        ]
+      },
+      "why": "전이표에 없는 간선은 거부한다 — planned 에서 갈 수 있는 곳은 active 뿐이다. 순서 산술이면 '비인접 전진' 이라는 엉뚱한 사유가 나온다"
+    },
+    {
+      "id": "state-planned-hand-edit-judged",
+      "category": "state",
+      "ledger": "state/planned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--set-state",
+          "planned"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "- [ ] G1: 첫 구현",
+            "- [x] G1: 첫 구현"
+          ]
+        }
+      ],
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1"
+        ],
+        "expect_stderr": [
+          "active 로 판정"
+        ]
+      },
+      "why": "손편집으로 전제가 깨진 planned(진행 흔적이 있다)는 no-op 이 아니라 active 로 판정한다 — `--set-state` 를 거치지 않은 STATE 줄이 hook 을 무력화하지 못하게 전이와 판정이 같은 전제를 쓴다"
+    },
+    {
+      "id": "reverify-demote-marks",
+      "category": "reverify",
+      "ledger": "reverify/flip.md",
+      "pre": [
+        [
+          "--only",
+          "G1"
+        ]
+      ],
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": true,
+        "expect_contains": {
+          "EVIDENCE: pending; demoted": 1,
+          "- [x] G1": 0
+        }
+      },
+      "why": "진행 기록이 있던 게이트(직전 met · `- [x]` · 증거 흔적)가 재실행에서 떨어지면 강등 기록을 남긴다 — `pending` 으로 되돌리면 미착수와 구별되지 않아 진행 기록이 사라진다(planned 전제). 첫 실행 FAIL 은 `pending` 그대로다(writeback-evidence-missing 등)"
+    },
+    {
+      "id": "writeback-evidence-missing",
+      "category": "writeback",
+      "ledger": "writeback/evidence-missing.md",
+      "expect": {
+        "exit": 1,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "EVIDENCE:": 1
+        }
+      },
+      "why": "EVIDENCE 라인이 없으면 체크박스만 [x] 가 되고 gate_state 는 '증거 없음'으로 unmet 을 반환한다 — PASS 를 출력하고도 --status 가 UNMET 이라 전진이 영구 차단된다. ⛔ 기존 28케이스는 모든 fixture 가 EVIDENCE 를 갖고 있어 이 경로를 관측하지 못했다 (2026-08-24 코드 리뷰 중 실측). G2 는 형제 블록 침범 여부를 함께 본다"
+    },
+    {
+      "id": "forgery-fake-evidence",
+      "category": "forgery",
+      "ledger": "forgery/fake-evidence.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "형식 없는 증거(`EVIDENCE: forged`)는 exit 키 파싱에서 걸린다. ⛔ 서명 검증 자체를 관측하는 것은 forgery-fake-signature 다 — 두 케이스는 **다른 방어선**을 본다"
+    },
+    {
+      "id": "forgery-fake-token",
+      "category": "forgery",
+      "ledger": "forgery/fake-token.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "CRITERION_HASH 는 원장에 적힌 공개값이라 복사 가능하다. 토큰을 재계산해 대조하지 않으면 `CONFIRMED: fake <공개hash> fake` 로 MANUAL 을 통과시킬 수 있다"
+    },
+    {
+      "id": "forgery-closed-noop",
+      "category": "forgery",
+      "ledger": "forgery/closed-noop.md",
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "max_seconds": 10
+      },
+      "why": "STATE: closed 는 no-op 이다. 문서가 선언한 수명주기 가드를 실행체가 보지 않으면 닫힌 원장이 기존 fz 경로를 회귀시킨다"
+    },
+    {
+      "id": "forgery-skip-transition",
+      "category": "forgery",
+      "ledger": "forgery/skip-transition.md",
+      "args": [
+        "--set-state",
+        "closed"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: non-adjacent-transition"
+        ]
+      },
+      "why": "active → closed 직행을 거부한다. 허용하면 fz-review 재검증과 guardian 이 통째로 생략된다. ⛔ 인접 전이 검사가 게이트 충족 검사보다 **앞**에 있어 미충족 상태에서도 이 방어선이 발화한다 — 순서가 뒤집히면 이 케이스가 게이트 검사에 먼저 걸려 인접 전이를 관측하지 못한다(2026-08-24 음성 대조로 확인한 순서 의존성)"
+    },
+    {
+      "id": "forgery-fake-signature",
+      "category": "forgery",
+      "ledger": "forgery/fake-signature.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false
+      },
+      "why": "형식(sig/exit/cwd/output)은 완벽하고 서명값만 지어냈다. **서명 재계산 검증을 직접 관측하는 유일한 케이스** — forgery-fake-evidence 는 그 앞 파싱 단계에서 걸려 이 방어선에 도달하지 않는다"
+    },
+    {
+      "id": "root-relative",
+      "category": "root",
+      "ledger": "root/relative.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "절대경로여야"
+        ]
+      },
+      "why": "modules/gates.md 가 'realpath 절대경로'를 선언하는데 파서는 존재만 봤다 — 상대경로가 통과하면 ROOT 불일치 no-op 규칙이 성립하지 않는다 ⛔ exit 만으로는 뒤의 is_dir 검사와 구분되지 않아 stderr 사유를 함께 본다(실측: 검사 제거 후에도 통과했다)"
+    },
+    {
+      "id": "root-traversal",
+      "category": "root",
+      "ledger": "root/traversal.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "traversal"
+        ]
+      },
+      "why": "`..` 로 같은 곳을 가리켜도 거부한다. ⛔ 단 realpath **일치**는 요구하지 않는다 — macOS 의 /var→/private/var 처럼 정상 경로도 심볼릭을 거친다(fixture 21건이 이것으로 깨졌다)"
+    },
+    {
+      "id": "root-stdin-wait",
+      "category": "root",
+      "ledger": "root/stdin-wait.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "max_seconds": 3
+      },
+      "why": "stdin 미지정이면 터미널·상위 파이프를 상속해 CHECK 가 입력을 기다린다 — 게이트당 기본 120초를 잡아먹는다. DEVNULL 로 즉시 종료(실측 0.0초). ⛔ max_seconds 가 이 축의 유일한 관측 수단이다"
+    },
+    {
+      "id": "root-foreign",
+      "category": "root",
+      "ledger": "root/foreign.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "ROOT 하위에 없다"
+        ]
+      },
+      "why": "evaluate docstring 과 modules/gates.md 가 'ROOT 불일치 no-op'를 선언하는데 소유 일치 검사가 코드에 없었다. ⛔ 이 케이스만이 그 검사를 관측한다 — 다른 root fixture 는 isabs/traversal/is_dir 에서 먼저 걸려 소유 검사를 제거해도 37/37 통과했다(2026-08-25 실측). ROOT=/usr 는 실재·정규·절대라 앞 검사를 전부 통과한다"
+    },
+    {
+      "id": "expect-literal-path",
+      "category": "expect",
+      "ledger": "expect/literal-path.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true
+      },
+      "why": "`startswith('/')` 거부는 `/tmp/result` 같은 정당한 경로 리터럴까지 막았다. 이 케이스는 통과 + 실제 매칭까지 관측한다"
+    },
+    {
+      "id": "expect-ambiguous-slash",
+      "category": "expect",
+      "ledger": "expect/ambiguous-slash.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stderr": [
+          "정규식으로도 읽히는 모양"
+        ]
+      },
+      "why": "`/var/log/` 는 디렉토리 경로와 무플래그 정규식이 **같은 모양**이라 판정 근거가 없다. ⛔ 거부가 아니라 리터럴 취급 + 경고 — 두 실패의 방향이 다르다. 정규식을 리터럴로 보면 게이트가 빨갛게 실패해 저자가 알아채지만, 경로를 거부하면 원장 검증에서 통째로 막힌다"
+    },
+    {
+      "id": "expect-regex-flags",
+      "category": "expect",
+      "ledger": "expect/regex-flags.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "정규식 문법"
+        ]
+      },
+      "why": "`/…/i` 는 플래그 문자만 뒤따라 정규식 의도가 분명하다. 리터럴로 두면 게이트가 영영 매칭되지 않는다"
+    },
+    {
+      "id": "exec-late-descendant",
+      "category": "execution",
+      "ledger": "execution/late-descendant.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 8,
+        "expect_contains": {
+          "LATE_OK": 3
+        }
+      },
+      "why": "고정 `DRAIN_GRACE_S`(1.0초)는 게이트가 선언한 TIMEOUT 을 무시해 정상적인 지연 출력을 잘랐다(ISSUE-012). ⛔ 제안식 `min(DRAIN_GRACE_S, 잔여)` 는 상수가 1.0 이라 **어떤 경우에도 1초를 못 넘겨** 이 케이스에 도달 불가였다 — 산술로 확인 안 하고 acceptance 에 넣었던 것이다. deadline 을 공유하고 EXPECT 매칭 시 즉시 끊는다 ⛔ 카운트는 원장 **전체** 기준이라 3회다 — CHECK 줄·EXPECT 줄·증거의 output 꼬리. 잘리면 2회가 되므로 3 vs 2 가 판별 축이다(내가 1로 썼다가 self-test 가 잡았다) ⚠️ 지연을 2초로 뒀을 때는 옛 코드가 **타이밍으로 겨우 통과**했다 — 스레드 2개를 각각 1초 join 하면 합계 2초라 딱 걸렸다. 4초로 늘려 여유를 없앴다"
+    },
+    {
+      "id": "exec-leaky-pass",
+      "category": "execution",
+      "ledger": "execution/leaky-pass.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 7,
+        "expect_contains": {
+          "killed=descendant": 1
+        }
+      },
+      "why": "exit 0 + EXPECT 매칭이라 PASS 인데 손자를 강제 종료했다(ISSUE-008). 판정은 안 뒤집는다 — CHECK 계약은 exit+EXPECT 이고 서버를 띄우는 정당한 CHECK 를 실패시키면 안 된다. 대신 증거에 `killed=descendant` 를 남겨 저자가 알아챌 수 있게 한다. ⛔ exit 축으로는 관측 불가 — expect_contains 만이 이 축을 본다"
+    },
+    {
+      "id": "verdict-match",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/match.json"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "VERDICT OK (3/3"
+        ]
+      },
+      "why": "3게이트 원장에 3판정 — 정상 경로. 실제 gpt 응답으로도 검산했다(2026-08-25 gate-e2e)"
+    },
+    {
+      "id": "verdict-empty",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/empty.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "게이트 수 0 != 원장 3"
+        ]
+      },
+      "why": "⛔ 스키마는 `gates: []` 를 통과시킨다 — 빈 배열이 '문제 없음'으로 읽히면 판정 자체가 사라진다"
+    },
+    {
+      "id": "verdict-partial",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/partial.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "미판정 ['G3']"
+        ]
+      },
+      "why": "통과한 게이트를 빼면 N/N 대조가 성립하지 않는다 — 누락은 미판정이지 통과가 아니다"
+    },
+    {
+      "id": "verdict-dup",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/dup.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "중복 id"
+        ]
+      },
+      "why": "⛔ 개수만 세면 중복이 누락을 가린다 — G1 두 번 + G3 없음이 3개로 보인다. 집합 비교가 필요한 이유"
+    },
+    {
+      "id": "verdict-fake-sum",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/fake-sum.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "summary.accept 9 != 실측 3"
+        ]
+      },
+      "why": "응답이 신고한 summary 를 믿으면 보고가 거짓이 된다. ⛔ 배열에서 **재계산해 비교**한다 — 신고값 대조만으로는 스스로 일관된 거짓을 못 잡는다"
+    },
+    {
+      "id": "verdict-ghost",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/ghost.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "원장에 없는 id ['G9']"
+        ]
+      },
+      "why": "개수는 맞는데 원장에 없는 id 가 섞였다 — G3 는 미판정인데 총계가 맞아 보인다"
+    },
+    {
+      "id": "parser-fenced-example",
+      "category": "parser",
+      "ledger": "parser/fenced-example.md",
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_contains": {
+          "- [x] G1: 진짜 게이트": 1,
+          "- [ ] G1: 예시 안의 가짜 게이트": 1,
+          "EVIDENCE: sig=": 1
+        }
+      },
+      "why": "⛔ writeback 이 자체 스캐너로 라인을 찾으면 파서가 무시하는 **펜스 내부**의 `- [ ] G1:` 예시까지 고친다. 실측(2026-08-25): 예시가 `- [x]` 로 바뀌고 증거가 2곳에 박혔다 — 같은 서명이 두 주장에 붙었다. 파서 스팬을 SSOT 로 쓰면 막힌다. expect_contains 3항이 각각: 진짜만 체크됨 · 가짜는 원형 유지 · 증거 1곳"
+    },
+    {
+      "id": "verdict-stale",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/stale.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "제목이 원장과 다르다"
+        ]
+      },
+      "why": "⛔ id 집합만 보면 stale 응답이 통과한다. 원장 제목이 바뀌어도 id 는 그대로이므로 옛 oracle 을 보고 낸 판정이 새 oracle 에 붙는다. `(id, title, kind)` 삼중으로 묶는다"
+    },
+    {
+      "id": "verdict-wrong-kind",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/wrong-kind.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "kind 가 원장과 다르다"
+        ]
+      },
+      "why": "MANUAL 게이트를 command 로 판정하면 noninteractive 축이 무의미해진다 — 원장의 kind 와 대조한다"
+    },
+    {
+      "id": "verdict-neg-sum",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/neg-sum.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "음수"
+        ]
+      },
+      "why": "⛔ 음수끼리 상쇄하면 합계만 맞출 수 있다 (5 + -2 + 0 = 3). 각 항의 음이 아닌 정수 여부를 본다"
+    },
+    {
+      "id": "verdict-bad-field",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/bad-field.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "필드 누락"
+        ]
+      },
+      "why": "스키마는 required 를 만족시키지만 빈 문자열은 통과한다 — reason 이 비면 판정 근거가 없다"
+    },
+    {
+      "id": "verdict-bad-verdict",
+      "category": "verdict",
+      "ledger": "verdict/ledger.md",
+      "args": [
+        "--verdict-check",
+        "tests/fixtures/gates/verdict/bad-verdict.json"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "verdict 값 이상"
+        ]
+      },
+      "why": "스키마 enum 을 우회한 응답(수동 편집·다른 모델)이 들어올 수 있다. 호출자가 값을 확인한다"
+    },
+    {
+      "id": "approved-oracle-swapped",
+      "category": "approved",
+      "ledger": "approved/oracle-swapped.md",
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "APPROVED_ORACLE_HASH 불일치"
+        ]
+      },
+      "why": "⛔ 승인 계약이 **한 번도 발화하지 않았다** — 검사 코드는 3곳에 있는데 도장을 발급하는 곳이 없어 필드가 원장에 안 들어갔다(011 과 같은 부류). 실측(2026-08-25): 승인된 CHECK 를 `echo <기대문자열>` 로 바꿔도 PASS 였다.\n⭐ 도장은 **실제 계산값**이다(더미 0 이 아니다). 승인 해시에서 환경(SHELL·PATH)을 빼서 머신 독립이 됐고, `CWD:` 를 고정하니 결정론적이 되어 정적 fixture 에 유효한 도장을 넣을 수 있다. 이전엔 더미 해시라 '불일치'가 아니라 '아무 값과도 불일치'를 보고 있었다 — 대조 로직을 실제로 관측하지 못했다"
+    },
+    {
+      "id": "approved-partial-stamp",
+      "category": "approved",
+      "ledger": "approved/partial-stamp.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "승인 도장 없는 실행 게이트"
+        ]
+      },
+      "why": "부분 도장은 무도장보다 위험하다 — 도장이 있으니 보호받는다고 읽히는데 안 찍힌 게이트는 CHECK 를 바꿔도 통과한다. `APPROVED: yes` 면 전수 요구"
+    },
+    {
+      "id": "exec-boundary-synthesis",
+      "category": "execution",
+      "ledger": "execution/boundary-synthesis.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 9,
+        "expect_contains": {
+          "EVIDENCE: sig=": 1
+        }
+      },
+      "why": "⛔ `_matched()` 가 stdout·stderr 를 **개행 없이 이어 붙이면** 경계에서 needle 을 합성한다 — stdout=`he` + stderr=`llo` 가 EXPECT=`hello` 에 걸려 조기 kill 이 일어나고, 3초 뒤 오는 **진짜 hello 를 잃어** 불필요한 FAIL 이 된다. EXPECT 는 개행을 담을 수 없으므로 스트림별 검색이 최종 판정(`stdout + 개행 + stderr`)과 정확히 같은 의미다. ⛔ exit 축으로만 관측된다 — 옛 코드는 exit 1, 새 코드는 exit 0 ⚠️ 첫 fixture 는 진짜 hello 를 **stdout** 에 뒀는데, 앞의 `he` 와 붙어 `hehello` 가 되어 조기 kill 없이도 자기 스트림에서 매칭됐다 — 주입해도 통과했다(관측 실패). 조각과 진짜 출력을 다른 스트림으로 분리해야 경계 합성만이 판별된다"
+    },
+    {
+      "id": "writeback-semicolon-output",
+      "category": "writeback",
+      "ledger": "writeback/semicolon-output.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_contains": {
+          "%3B": 2
+        }
+      },
+      "why": "증거는 `sig=…; exit=…; output=…` 이고 `parse_evidence` 는 `;` 로 쪼갠다. 정상 출력에 `;` 가 있으면 파싱이 잘려 **재계산 서명이 어긋나고 통과한 게이트가 unmet 으로 읽힌다**(fail-red). `ev_enc`/`ev_dec` 역함수 쌍으로 escape 한다. `%3B` 2회 = 출력의 세미콜론 2개가 인코딩됐다는 관측"
+    },
+    {
+      "id": "root-canonical-cwd",
+      "category": "root",
+      "ledger": "root/canonical-cwd.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_contains": {
+          "cwd={REAL_SANDBOX}": 1
+        }
+      },
+      "why": "⛔ ROOT 검증은 realpath 로 하는데 실행은 헤더 **원문**을 쓰면, 그 사이 심볼릭을 다른 디렉토리로 돌려 CHECK 를 딴 곳에서 돌릴 수 있다(TOCTOU). 증거 서명은 바뀌지 않은 *표기*에만 묶이므로 나중 --status 는 met 으로 읽는다. 검증된 정규 경로를 저장해 실행에 쓴다. ⚠️ **macOS 전용 관측** — `/var → /private/var` 심볼릭에 의존한다. 이 fixture 군은 이미 BSD `sed -i ''` 를 쓰므로 macOS 고정이다(스크립트 자체가 macOS 타겟을 선언한다) · 2026-11-08: 하네스가 임시 폴더 안에 자기 심볼릭을 만들고 헤더를 그 링크로 바꾼다(symlink_root) — TMPDIR 이 실폴더여도 같은 TOCTOU 를 잰다(F-395)",
+      "symlink_root": true
+    },
+    {
+      "id": "approved-oracle-fields",
+      "category": "approved",
+      "ledger": "approved/oracle-fields.md",
+      "mode": "oracle-fields",
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ORACLE_INSENSITIVE:none"
+        ]
+      },
+      "why": "⛔ 이 축은 원장 fixture 로 관측할 수 없다 — `oracle_hash` 가 `path_fingerprint()` 와 `SHELL` 을 포함해 머신마다 값이 달라 정적 원장에 유효한 도장을 넣어 둘 수 없다. 순수 함수 대조로 본다: CHECK·EXPECT·CRITERION·TIMEOUT·제목 각각을 바꿔 해시가 변하는지. 한 필드라도 무감각하면 승인 후 그 필드를 자유롭게 바꿀 수 있다 — CRITERION 이 빠져 있었다면 '무엇을 재는가'를 바꿔도 도장이 유효하다"
+    },
+    {
+      "id": "parser-dup-state",
+      "category": "parser",
+      "ledger": "parser/dup-state.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "헤더 STATE 중복 선언"
+        ]
+      },
+      "why": "⛔ 실질 false-green — 마지막 선언이 이기는 규칙이면 `STATE: closed` 를 한 줄 append 해서 원장 전체를 no-op 으로 만들 수 있다. `ABANDON:` 처럼 흔적이 남는 이탈로가 아니라 **조용한 무력화**다 (2026-08-25 실측: exit 0 으로 통과했다)"
+    },
+    {
+      "id": "parser-dup-root",
+      "category": "parser",
+      "ledger": "parser/dup-root.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "헤더 ROOT 중복 선언"
+        ]
+      },
+      "why": "ROOT 중복은 실행 디렉토리를 바꾼다. 소유 검사가 우연히 잡을 수는 있지만(ROOT 하위 아님) ROOT 를 상위 디렉토리로 바꾸면 그 검사도 통과한다 — 중복 자체를 거부해야 한다"
+    },
+    {
+      "id": "parser-orphan-attr",
+      "category": "parser",
+      "ledger": "parser/orphan-attr.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "게이트에 속하지 않은 속성"
+        ]
+      },
+      "why": "fail-closed 위반이었다 — 오타로 게이트 줄이 빠지면 그 게이트의 CHECK 가 통째로 사라지는데 파서가 아무 말도 하지 않았다. 게이트 수가 줄어든 것을 알아챌 오라클이 없다"
+    },
+    {
+      "id": "approved-cross-session",
+      "category": "approved",
+      "ledger": "approved/cross-session.md",
+      "mode": "cross-session",
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "CROSS_SESSION:OK"
+        ]
+      },
+      "why": "⛔ 실측(2026-08-25): `oracle_hash` 에 `SHELL`·`PATH` 가 들어 있어 PATH 만 바꿔도 exit 3(차단)이었다. fz-plan 이 세션 A 에서 도장을 찍고 fz-code 가 세션 B 에서 실행하는 것은 **설계된 흐름**이다 — compact · 다음 날 · 다른 터미널 · direnv/nvm shim. 증거 서명도 같은 병으로 통과한 게이트가 unmet 으로 읽혔다. 두 해시의 목적이 다르다: 승인 도장은 '승인한 oracle'(환경 제외), 증거 서명은 '어느 환경에서 나왔나'(환경 포함, 단 **기록된** 값으로 재계산). ⛔ 한 프로세스 안에서 환경을 바꿔야 하므로 원장 fixture 로는 볼 수 없다"
+    },
+    {
+      "id": "discover-mixed",
+      "category": "discover",
+      "ledger": "verdict/ledger.md",
+      "mode": "discover",
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stdout": [
+          "  미충족 ",
+          "— ['G1']",
+          "미충족 1",
+          "계약위반 1"
+        ]
+      },
+      "why": "hook 미설치 머신에서 미충족 원장이 보이는 **유일한 경로**다. 충족(closed)·미충족(active)·계약위반(헤더 중복) 세 트리를 함께 두어 세 분류가 다 발화하는지 본다. ⛔ 미충족은 exit 에 반영되지 않는다(작업 중 정상 상태) — 계약 위반만 exit 3. `lint_doc_freshness` 선례: findings 가 있어도 exit 0, 건수만 보고 ⛔ 기대 문자열이 `\"미충족\"` 하나였을 때는 상세 줄 제거를 관측하지 못했다 — 요약줄에도 `미충족 0` 이 나오기 때문이다(2026-08-25 실측). 상세 줄에만 있는 형태(`  미충족 <경로> — ['G1']`)와 요약 수치(`미충족 1`)를 나눠서 본다"
+    },
+    {
+      "id": "finalize-stamp-placement",
+      "category": "finalize",
+      "ledger": "finalize/eight-gates.md",
+      "mode": "finalize",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "실행 게이트 8개에 승인 도장, manual 1개 제외"
+        ],
+        "expect_contains": {
+          "APPROVED_ORACLE_HASH: ": 8,
+          "APPROVED: yes": 1
+        }
+      },
+      "why": "⛔ `--finalize` 를 실행하는 케이스가 **0건**이었다 — mode 분포가 기본 62 · from-plan 1 · oracle-fields 1 · cross-session 1 · discover 1 이라 도장 발급 경로 자체가 회귀 없이 방치됐다. 도장은 한 줄씩 삽입되는데 루프가 시작 시점 `Gate` 객체의 줄 번호를 계속 쓰면 n번째 도장이 (n−1)줄 앞에 박힌다. ⛔ 블록을 벗어나는 조건은 **n > 그 게이트의 속성 수 + 1** 이다 — 그 전까지는 자기 블록 안에 떨어져 exit·건수 어느 축에도 나타나지 않는다. 이 fixture 는 실행 8 + manual 1 이고, 속성 4개짜리 G6 이 6번째 실행 게이트(n=6 > 4+1)라 여기서 처음 블록을 벗어난다. ⛔ **깨질 수 있는 쌍은 G6 의 속성 수와 실행 게이트 중 서수(序數)** 이지 헤더 배치가 아니다 — anchor 와 삽입 index 가 함께 밀리므로 관측은 절대 줄 번호에 무관하다. G6 에 `TIMEOUT:` 등을 더해 속성을 늘리면 관측 지점이 뒤로 밀리고, 실행 게이트를 **5개 이하**로 줄이면 관측이 사라진다(6개까지는 G6 이 여전히 6번째 실행 게이트라 그대로 관측된다). 실전 관측(2026-09-02): 실행 게이트 10개 원장에서 `게이트에 속하지 않은 속성 APPROVED_ORACLE_HASH (line 69)` exit 3. manual 을 중간에 둔 것은 건너뛴 게이트가 밀림에 기여하지 않는 것까지 함께 재기 위함이다. 파일명의 eight 는 **실행** 게이트 수다"
+    },
+    {
+      "id": "execution-tools-absent-unrun",
+      "category": "execution",
+      "ledger": "execution/tools-absent-unrun.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNRUN",
+          "fz-nonexistent-tool-xyz",
+          "미판정"
+        ]
+      },
+      "why": "도구 부재는 실패가 아니라 미판정이다 — shell=True 라 돌리면 exit 127 이 FAIL 로 오귀속된다(F-288 동류). CHECK 는 통과할 내용이므로 차단이 빠지면 exit 0 + 원장 mutate 로 뒤집힌다"
+    },
+    {
+      "id": "execution-tools-present-runs",
+      "category": "execution",
+      "ledger": "execution/tools-present-runs.md",
+      "expect": {
+        "exit": 0,
+        "mutates": true
+      },
+      "why": "선언이 존재하는 도구면 평소대로 판정한다 — 차단이 과발화하면 통과 게이트가 미판정이 된다. 파서가 미지 속성을 exit 3 으로 막으므로 TOOLS 수용도 이 케이스가 함께 증명한다"
+    },
+    {
+      "id": "execution-tools-vanished-keeps-evidence",
+      "category": "execution",
+      "ledger": "execution/tools-vanished-keeps-evidence.md",
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNRUN"
+        ],
+        "expect_contains": {
+          "sig=": 1
+        }
+      },
+      "why": "도구가 사라져도 벌어둔 증거를 pending 으로 덮지 않는다 — 강등하면 로컬 셸의 --reverify 한 번이 CI 에서 얻은 증거를 지운다(oracle_hash 가 PATH 를 뺀 것과 같은 축: 세션마다 환경이 다른 것은 설계된 흐름이다). ⛔ mutates 만으로는 헛돈다 — 미체크 픽스처는 공짜로 충족하므로 sig= 잔존을 함께 건다"
+    },
+    {
+      "id": "fromplan-tools-emitted",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-tools.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "TOOLS: git, python3": 1,
+          "TOOLS: git, grep": 1,
+          "TOOLS:": 2
+        }
+      },
+      "why": "⛔ 발급처가 없으면 계약이 죽는다 — CRITERION 이 검사 3곳을 갖고도 한 번도 발화하지 않았던 것과 같은 실패다. 리스트·쉼표문자열 두 형태가 옮겨지고 중복은 접히며, 미선언 게이트에는 줄이 생기지 않는다(TOOLS: 총 2회)"
+    },
+    {
+      "id": "fromplan-timeout-side-effects-carried",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-timeout.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "TIMEOUT: 900": 1,
+          "SIDE_EFFECTS: tmp": 1,
+          "TIMEOUT:": 1
+        },
+        "expect_stderr": [
+          "모르는 칸 ['budget_note']"
+        ]
+      },
+      "why": "F-579 — 플랜의 verify.timeout · side_effects 를 버리면 원장 TIMEOUT 은 기본 120초가 되고 기준선 프로브는 UNRUN 이다. 선언한 게이트에만 줄이 생기고(TIMEOUT 총 1회) 모르는 칸은 stderr 로 경고한다"
+    },
+    {
+      "id": "fromplan-tools-injection",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-tools-injection.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 2,
+        "mutates": false,
+        "expect_stderr": [
+          "verify.tools"
+        ]
+      },
+      "why": "plan 은 모델이 쓴다 — 도구 이름에 개행을 심으면 원장이 ABANDON 으로 파싱돼 ALL MET 이 된다(2026-08-24 동종 실측). 명령 이름 화이트리스트로 fail-closed"
+    },
+    {
+      "id": "parser-tools-on-manual-gate",
+      "category": "parser",
+      "ledger": "parser/tools-on-manual-gate.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "수동 게이트는 셸 명령을 돌리지 않아 TOOLS 가 no-op 이다 — 사람 눈엔 전제가 선언된 것처럼 보인다. 검사 코드가 있어도 발급처가 없어 한 번도 발화하지 않았던 CRITERION 과 같은 부류"
+    },
+    {
+      "id": "parser-tools-empty-value",
+      "category": "parser",
+      "ledger": "parser/tools-empty-value.md",
+      "expect": {
+        "exit": 3,
+        "mutates": false
+      },
+      "why": "빈 선언은 아무 도구도 요구하지 않는 것과 구별되지 않는다 — CHECK/EXPECT/MANUAL 이 이미 같은 이유로 빈 값을 거부한다"
+    },
+    {
+      "id": "defer-later-release-not-run",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-a.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "DEFER G2: R-B",
+          "deferred: 1",
+          "reran: 1"
+        ],
+        "expect_contains": {
+          "EVIDENCE: pending": 1
+        }
+      },
+      "why": "F-328 — 뒤 릴리즈 게이트는 포기가 아니라 예정이다. 지금 릴리즈가 아니면 돌리지 않고(돌면 실패하는 CHECK) 미충족으로도 세지 않는다"
+    },
+    {
+      "id": "defer-current-release-runs",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-b.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": true,
+        "expect_stdout": [
+          "FAIL  G2"
+        ]
+      },
+      "why": "미룬 릴리즈가 CURRENT_RELEASE 가 되면 DEFER 는 효력이 없다 — 그 게이트를 평소처럼 판정한다"
+    },
+    {
+      "id": "defer-status-blocks-current-unmet",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-a.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1",
+          "DEFER G2: R-B",
+          "UNMET: 1 (met: 0, abandoned: 0, deferred: 1)"
+        ]
+      },
+      "why": "F-328 오라클 전반부 — 이번 릴리즈 미충족만으로 막는다. 미룬 게이트는 막는 사유에서 빠진다(미충족 1 = G1 뿐)"
+    },
+    {
+      "id": "defer-status-hook-path",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-a.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET (1 met, abandoned: 0, deferred: 1)"
+        ]
+      },
+      "why": "Stop hook 은 --status 의 exit 만 본다 — 미룬 게이트가 있어도 지금 릴리즈를 다 채웠으면 막지 않아야 한다(F-328 오라클)"
+    },
+    {
+      "id": "defer-without-current-release",
+      "category": "defer",
+      "ledger": "defer/no-current-release.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "CURRENT_RELEASE 헤더가 없다"
+        ]
+      },
+      "why": "지금이 어느 릴리즈인지 모르면 미룸을 판정할 수 없다 — 조용히 전부 미룬 것으로 읽지 않는다(fail-closed)"
+    },
+    {
+      "id": "defer-abandon-conflict",
+      "category": "defer",
+      "ledger": "defer/abandon-and-defer.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "함께 쓸 수 없다"
+        ]
+      },
+      "why": "예정(DEFER)과 포기(ABANDON)는 서로 다른 기록이다 — 한 게이트에 둘 다 있으면 어느 쪽인지 원장이 말하지 못한다"
+    },
+    {
+      "id": "defer-malformed",
+      "category": "defer",
+      "ledger": "defer/malformed.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "DEFER 형식"
+        ]
+      },
+      "why": "릴리즈·이유가 빠진 DEFER 가 산문으로 흘러가면 미룸이 없던 일이 된다 — 거부한다"
+    },
+    {
+      "id": "defer-blocks-close",
+      "category": "defer",
+      "ledger": "defer/two-gates-r-a.md",
+      "pre": [
+        [
+          "--reverify"
+        ],
+        [
+          "--set-state",
+          "ready_for_review"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "closed"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "REJECT: deferred-gates"
+        ]
+      },
+      "why": "원장을 닫으면 뒤 릴리즈의 수용 기준이 기록 없이 사라진다 — 미룬 게이트가 남으면 closed 전이를 거부한다(ready_for_review 는 허용)"
+    },
+    {
+      "id": "run-mode-stamp-only-visible",
+      "category": "run",
+      "ledger": "amend/two-gates-draft.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "MET   G1",
+          "MET   G2",
+          "reran: 0, stamp-only: 2"
+        ]
+      },
+      "why": "F-330 — 기본 실행은 충족 게이트를 다시 돌리지 않는다. 그 사실이 출력에 없으면 \"ALL MET\" 을 재실행으로 읽는다"
+    },
+    {
+      "id": "finalize-only-new-gate",
+      "category": "finalize",
+      "ledger": "amend/two-gates-draft.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "append": "- [ ] G3: 확정 뒤 더한 게이트\n  CRITERION: G3 이 통과한다\n  CHECK: echo g3 ok\n  EXPECT: g3 ok\n  EVIDENCE: pending"
+        }
+      ],
+      "args": [
+        "--only",
+        "G3"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "확정 보강: 게이트 1개(G3)",
+          "나머지 실행 게이트 2개"
+        ],
+        "expect_contains": {
+          "APPROVED_ORACLE_HASH: ": 3,
+          "APPROVED: yes": 1
+        }
+      },
+      "why": "F-334 — 확정 원장에 게이트를 더하면 그 게이트만 도장이 필요하다. 헤더를 지우고 전부 다시 찍는 우회는 다른 게이트의 변경까지 재승인한다"
+    },
+    {
+      "id": "finalize-only-refuses-changed-other",
+      "category": "finalize",
+      "ledger": "amend/two-gates-draft.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "append": "- [ ] G3: 확정 뒤 더한 게이트\n  CRITERION: G3 이 통과한다\n  CHECK: echo g3 ok\n  EXPECT: g3 ok\n  EVIDENCE: pending"
+        },
+        {
+          "replace": [
+            "  CHECK: echo g1 ok",
+            "  CHECK: echo g1 changed"
+          ]
+        }
+      ],
+      "args": [
+        "--only",
+        "G3"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "계약이 바뀐 게이트 ['G1']"
+        ]
+      },
+      "why": "F-334 오라클 — 새 게이트 보강에 끼워 다른 게이트의 바뀐 계약을 재승인하지 않는다"
+    },
+    {
+      "id": "finalize-approved-naked-message",
+      "category": "finalize",
+      "ledger": "amend/two-gates-draft.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "append": "- [ ] G3: 확정 뒤 더한 게이트\n  CRITERION: G3 이 통과한다\n  CHECK: echo g3 ok\n  EXPECT: g3 ok\n  EVIDENCE: pending"
+        }
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "--finalize --only G3"
+        ]
+      },
+      "why": "거부 문구가 권하는 명령은 실제로 되는 절차여야 한다 — 이전 문구는 같은 읽기에서 막히는 `--finalize` 를 권했다"
+    },
+    {
+      "id": "finalize-only-draft-refused",
+      "category": "finalize",
+      "ledger": "amend/two-gates-draft.md",
+      "mode": "finalize",
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "확정 원장을 보강할 때만"
+        ]
+      },
+      "why": "draft 는 일부만 도장하면 부분 도장 원장이 된다 — --only 는 확정 원장 보강 전용이다"
+    },
+    {
+      "id": "manual-missing-lines-refused",
+      "category": "manual",
+      "ledger": "manual/missing-lines.md",
+      "args": [
+        "--confirm",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "확인을 기록할 자리가 없다"
+        ]
+      },
+      "why": "확인을 기록할 줄(CRITERION_HASH · EVIDENCE)이 없으면 묻기 전에 exit 3 · 원장 무변경(F-440). 이전 판은 묻고 나서 [x] 만 찍었다"
+    },
+    {
+      "id": "manual-attr-order-confirm-ok",
+      "category": "manual",
+      "ledger": "manual/attr-order.md",
+      "args": [
+        "--confirm",
+        "G1"
+      ],
+      "pty_input": "y\n",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_contains": {
+          "  CONFIRMED: ": 1,
+          "- [x] G1": 1
+        }
+      },
+      "why": "EVIDENCE 가 CRITERION_HASH 보다 앞이어도 CONFIRMED 를 쓴다 — 이전 판은 EVIDENCE 에서 블록을 끝내 CONFIRMED 없이 '기록됨' 이라 했다(F-440). pty 로 진짜 대화형 입력"
+    },
+    {
+      "id": "manual-fenced-attrs-confirm-ok",
+      "category": "manual",
+      "ledger": "manual/fenced-attrs.md",
+      "args": [
+        "--confirm",
+        "G1"
+      ],
+      "pty_input": "y\n",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_contains": {
+          "  CONFIRMED: ": 1,
+          "- [x] G1": 1,
+          "  CRITERION_HASH: abc": 1,
+          "  EVIDENCE: pending": 1
+        }
+      },
+      "why": "마지막 MANUAL 게이트 뒤 펜스 안의 속성 꼴 줄은 블록이 아니다 — 자리는 파서(gate.line · attr_lines)가 정한다. 자체 스캐너는 펜스 안 줄을 세어 정상 원장을 exit 3 으로 거부했다(리뷰 G5 · A1). 펜스 안 두 줄은 그대로 남아야 한다"
+    },
+    {
+      "id": "manual-confirm-reload-met",
+      "category": "manual",
+      "ledger": "manual/unconfirmed.md",
+      "args": [
+        "--confirm",
+        "G1"
+      ],
+      "pty_input": "y\n",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "다시 읽은 판정 met"
+        ]
+      },
+      "why": "쓴 원장을 다시 읽어 met 일 때만 성공이다 — '기록됨' 출력은 met 의 증거가 아니다"
+    },
+    {
+      "id": "budget-default-sum",
+      "category": "execution",
+      "ledger": "budget/sum-over.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "예산 1600초"
+        ]
+      },
+      "why": "--budget 미지정 = max(TIMEOUT 합, 960) — 960 고정이면 TIMEOUT 큰 게이트가 min(TIMEOUT, budget) 에서 잘린다(F-446)"
+    },
+    {
+      "id": "budget-default-sum-floor",
+      "category": "execution",
+      "ledger": "budget/sum-floor.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "예산 960초"
+        ]
+      },
+      "why": "합이 960 보다 작으면 바닥 960 — 짧은 원장의 예산을 줄이지 않는다"
+    },
+    {
+      "id": "budget-over-600-note",
+      "category": "execution",
+      "ledger": "budget/sum-over.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "NOTE 예산 1600초 > 600"
+        ]
+      },
+      "why": "예산이 600초를 넘으면 --only 분할 · 백그라운드를 권하는 NOTE — 도구 전경 상한에서 잘리는 것을 미리 알린다"
+    },
+    {
+      "id": "baseline-pass-on-unchanged-refused",
+      "category": "baseline",
+      "ledger": "baseline/probe.md",
+      "args": [
+        "--baseline-probe"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "BASELINE B2 PASS",
+          "PASS-ON-UNCHANGED B2"
+        ]
+      },
+      "why": "F-245 — 구현 전 트리에서 이미 통과하는 게이트는 변경을 재지 않는다. 허용 밖 PASS 는 exit 1 이고 원장은 쓰지 않는다"
+    },
+    {
+      "id": "baseline-allow-pass-ok",
+      "category": "baseline",
+      "ledger": "baseline/probe.md",
+      "args": [
+        "--baseline-probe",
+        "--allow-pass",
+        "B2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "BASELINE B2 PASS",
+          "기준선: PASS 1 · FAIL 2 · UNRUN 1 · EXCLUDED 2"
+        ]
+      },
+      "why": "의도된 무변경 PASS(회귀 방지 게이트)는 --allow-pass 로 이름을 대면 통과한다"
+    },
+    {
+      "id": "baseline-oracle-hash-recorded",
+      "category": "baseline",
+      "ledger": "baseline/probe.md",
+      "args": [
+        "--baseline-probe",
+        "--allow-pass",
+        "B2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_sidecar": {
+          "B1": "FAIL",
+          "B2": "PASS",
+          "B3": "EXCLUDED",
+          "B4": "UNRUN",
+          "B5": "FAIL",
+          "M1": "EXCLUDED"
+        }
+      },
+      "why": "<원장>.baseline.json 에 게이트별 결과와 oracle_hash — --finalize 가 지금 계약과 대조하는 근거다"
+    },
+    {
+      "id": "baseline-skips-manual-and-side-effect",
+      "category": "baseline",
+      "ledger": "baseline/probe.md",
+      "args": [
+        "--baseline-probe",
+        "--allow-pass",
+        "B2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "BASELINE M1 EXCLUDED",
+          "BASELINE B3 EXCLUDED",
+          "reason=writes — sentinel 파일을 쓴다"
+        ],
+        "expect_absent": [
+          "sentinel-writes"
+        ]
+      },
+      "why": "MANUAL 과 'SIDE_EFFECTS: writes' 는 돌리지 않는다 — 출력이 아니라 sentinel 부재로 잰다(AE-16)"
+    },
+    {
+      "id": "side-effects-writes-skipped-sentinel",
+      "category": "baseline",
+      "ledger": "baseline/probe.md",
+      "cli": true,
+      "args": [
+        "--baseline-probe",
+        "--allow-pass",
+        "B2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "BASELINE B3 EXCLUDED"
+        ],
+        "expect_absent": [
+          "sentinel-writes",
+          "sentinel-undeclared"
+        ],
+        "expect_files": [
+          "sentinel-tmp-ran"
+        ]
+      },
+      "why": "실제 CLI(하위 프로세스)를 거쳐도 writes · 미선언은 sentinel 을 남기지 않고 tmp 는 돈다"
+    },
+    {
+      "id": "side-effects-undeclared-unrun",
+      "category": "baseline",
+      "ledger": "baseline/probe.md",
+      "args": [
+        "--baseline-probe",
+        "--allow-pass",
+        "B2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "BASELINE B4 UNRUN",
+          "reason=side-effects-undeclared",
+          "WARN B4: 기준선 미실행"
+        ],
+        "expect_absent": [
+          "sentinel-undeclared"
+        ]
+      },
+      "why": "SIDE_EFFECTS 미선언은 돌리지 않는다(안전 기본) — UNRUN · WARN 이고 확정이 거부한다"
+    },
+    {
+      "id": "side-effects-tmp-run",
+      "category": "baseline",
+      "ledger": "baseline/probe.md",
+      "args": [
+        "--baseline-probe",
+        "--allow-pass",
+        "B2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "BASELINE B5 FAIL"
+        ],
+        "expect_files": [
+          "sentinel-tmp-ran"
+        ]
+      },
+      "why": "'SIDE_EFFECTS: tmp' 는 돈다 — sentinel 이 실행을 증명한다"
+    },
+    {
+      "id": "side-effects-attr-hash-legacy-unchanged",
+      "category": "baseline",
+      "ledger": "baseline/golden-plus.md",
+      "pre": [
+        [
+          "--finalize",
+          "--only",
+          "G2"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "  SIDE_EFFECTS: none",
+            "  SIDE_EFFECTS: tmp"
+          ]
+        }
+      ],
+      "args": [
+        "--reverify",
+        "--only",
+        "G2"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "G2: APPROVED_ORACLE_HASH 불일치"
+        ]
+      },
+      "why": "사전 단계 `--finalize --only G2` 는 G1(구판 도장)이 신판 해시와 같아야 통과한다(계약이 바뀐 게이트 거부). 이어 G2 의 선언값을 바꾸면 도장이 깨진다 — 선언은 해시 안 · 미선언은 종전 그대로"
+    },
+    {
+      "id": "finalize-requires-baseline",
+      "category": "baseline",
+      "ledger": "baseline/required.md",
+      "mode": "finalize",
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "BASELINE: required 원장 확정 거부",
+          "기준선 기록 없음"
+        ]
+      },
+      "why": "BASELINE: required 원장은 기준선 기록 없이 확정하지 않는다"
+    },
+    {
+      "id": "finalize-with-baseline-ok",
+      "category": "baseline",
+      "ledger": "baseline/required.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--baseline-probe"
+        ]
+      ],
+      "args": [],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "기준선 대조 일치"
+        ],
+        "expect_contains": {
+          "APPROVED: yes": 1,
+          "BASELINE: required": 1
+        }
+      },
+      "why": "양성 대조 — 기준선을 잰 뒤 계약이 그대로면 확정한다"
+    },
+    {
+      "id": "finalize-no-baseline-reason-recorded",
+      "category": "baseline",
+      "ledger": "baseline/required.md",
+      "mode": "finalize",
+      "args": [
+        "--no-baseline",
+        "외부 장비가 있어야 잰다"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "기준선 생략 기록"
+        ],
+        "expect_contains": {
+          "BASELINE: skipped — 외부 장비가 있어야 잰다": 1,
+          "BASELINE: required": 0
+        }
+      },
+      "why": "잴 수 없으면 사유를 원장에 남기고 확정한다 — 생략이 흔적 없이 사라지지 않는다"
+    },
+    {
+      "id": "finalize-no-baseline-spaced-header",
+      "category": "baseline",
+      "ledger": "baseline/required-spaced.md",
+      "mode": "finalize",
+      "args": [
+        "--no-baseline",
+        "외부 장비가 있어야 잰다"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "기준선 생략 기록"
+        ],
+        "expect_contains": {
+          "BASELINE: skipped — 외부 장비가 있어야 잰다": 1,
+          "BASELINE:  required": 0
+        }
+      },
+      "why": "파서는 헤더 값을 strip 해 'BASELINE:  required'(공백 둘)도 required 로 읽는다 — 교체도 같은 규칙이어야 한다. 좁은 정규식은 StopIteration traceback(exit 1 = 미충족 오독)을 냈다(리뷰 Q6 · Q-4 · L3-12)"
+    },
+    {
+      "id": "finalize-stale-baseline-refused",
+      "category": "baseline",
+      "ledger": "baseline/required.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--baseline-probe"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "  CHECK: echo not-yet",
+            "  CHECK: echo changed"
+          ]
+        }
+      ],
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "R1: 기준선이 낡았다"
+        ]
+      },
+      "why": "기준선을 잰 뒤 CHECK 를 바꾸면 그 기준선은 지금 계약을 재지 않았다"
+    },
+    {
+      "id": "finalize-pass-outside-allow-refused",
+      "category": "baseline",
+      "ledger": "baseline/required-pass.md",
+      "mode": "finalize",
+      "pre": [
+        {
+          "args": [
+            "--baseline-probe"
+          ],
+          "exit": 1
+        }
+      ],
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "P1: 무변경 트리에서 PASS"
+        ]
+      },
+      "why": "프로브가 exit 1 을 내고도 기록은 남는다 — 확정은 그 기록의 허용 밖 PASS 를 거부한다"
+    },
+    {
+      "id": "baseline-slow-check-warn",
+      "category": "baseline",
+      "ledger": "baseline/slow.md",
+      "args": [
+        "--baseline-probe"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "max_seconds": 15,
+        "expect_stdout": [
+          "BASELINE S1 FAIL",
+          "WARN S1: 기준선 소요"
+        ]
+      },
+      "why": "F-546 — 기준선 소요가 TIMEOUT 절반을 넘으면 WARN. TIMEOUT 은 주석 수치가 아니라 실측 소요로 정한다"
+    },
+    {
+      "id": "baseline-timeout-unrun",
+      "category": "baseline",
+      "ledger": "baseline/timeout.md",
+      "args": [
+        "--baseline-probe"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "max_seconds": 15,
+        "expect_stdout": [
+          "BASELINE S1 UNRUN",
+          "reason=error:1초 timeout",
+          "WARN S1: 기준선 미실행"
+        ]
+      },
+      "why": "기준선에서 timeout · 출력 초과 · 실행 실패는 '변경 전 실패'(FAIL)가 아니라 판정 불가(UNRUN)다 — FAIL 로 적으면 baseline_problems 가 정상으로 받아 --finalize 가 '기준선 일치' 를 낸다(리뷰 L3-3)"
+    },
+    {
+      "id": "baseline-unrun-warn",
+      "category": "baseline",
+      "ledger": "baseline/unrun.md",
+      "args": [
+        "--baseline-probe"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "BASELINE U1 UNRUN",
+          "reason=tools-missing:fz-no-such-tool-xyz",
+          "BASELINE U2 UNRUN",
+          "reason=env-missing:FZ_BASELINE_SURELY_UNSET",
+          "WARN U1",
+          "WARN U2"
+        ]
+      },
+      "why": "도구 · 환경 부재는 실패가 아니라 미실행이다(S20 · F-342 와 같은 축) — WARN 이고 프로브는 exit 0"
+    },
+    {
+      "id": "legacy-ledger-finalize-unchanged",
+      "category": "baseline",
+      "ledger": "finalize/eight-gates.md",
+      "mode": "finalize",
+      "args": [],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "실행 게이트 8개에 승인 도장, manual 1개 제외"
+        ],
+        "expect_contains": {
+          "BASELINE": 0
+        },
+        "expect_absent": [
+          "finalize/eight-gates.md.baseline.json"
+        ]
+      },
+      "why": "BASELINE 헤더 없는 기존 원장의 확정은 종전 그대로 — 기준선을 요구하지도 쓰지도 않는다"
+    },
+    {
+      "id": "legacy-ledger-hash-golden",
+      "category": "baseline",
+      "ledger": "baseline/golden.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET"
+        ]
+      },
+      "why": "1ed8415 판정기가 계산한 도장(a5f3c2e9f6f5)과 증거 서명(e270624cffb0)을 박은 원장 — CWD: / 로 머신 무관. 신판이 미선언 게이트의 해시 · 서명 · --status 를 바꾸면 UNMET 이 된다"
+    },
+    {
+      "id": "finalize-all-unrun-refused",
+      "category": "baseline",
+      "ledger": "baseline/required-undeclared.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--baseline-probe"
+        ]
+      ],
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "U1: 기준선 UNRUN",
+          "U2: 기준선 UNRUN"
+        ]
+      },
+      "why": "전부 미선언이면 기준선이 아무것도 재지 않았다 — 확정 거부"
+    },
+    {
+      "id": "finalize-undeclared-gate-refused",
+      "category": "baseline",
+      "ledger": "baseline/required-mixed.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--baseline-probe"
+        ]
+      ],
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "U1: 기준선 UNRUN — side-effects-undeclared"
+        ]
+      },
+      "why": "하나라도 미선언이면 그 게이트는 기준선이 없다 — 나머지가 FAIL 기준선을 가져도 확정 거부"
+    },
+    {
+      "id": "fromplan-writes-baseline-required",
+      "category": "baseline",
+      "ledger": "fromplan/plan-input.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "BASELINE: required": 1
+        }
+      },
+      "why": "새 원장은 기준선을 요구한다 — 헤더를 쓰는 곳이 없으면 --finalize 의 기준선 대조는 한 번도 발화하지 않는다(발급처 없는 계약)"
+    },
+    {
+      "id": "pin-finalize-then-edit-run-refused",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "G1: PIN 파일이 승인 뒤 바뀌었다"
+        ]
+      },
+      "why": "확정 뒤 기대 표를 바꾸면 CHECK 가 여전히 통과해도 그 게이트는 승인한 입력을 재지 않는다 — 재승인 없이 실행하지 않는다"
+    },
+    {
+      "id": "pin-run-then-edit-reverify-refused",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "G1: PIN 파일이 승인 뒤 바뀌었다"
+        ]
+      },
+      "why": "통과 기록 뒤 핀을 바꾸면 --reverify 가 재승인을 요구한다"
+    },
+    {
+      "id": "pin-absent-then-created-refused",
+      "category": "pin",
+      "ledger": "pin/absent.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/later.txt": "now here\n"
+      },
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "G1: PIN 파일이 승인 뒤 바뀌었다"
+        ]
+      },
+      "why": "승인 때 부재(absent)도 기록값이다 — 나중에 생기면 바뀐 것이다"
+    },
+    {
+      "id": "pin-file-edited-unmet",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1"
+        ]
+      },
+      "why": "--status(Stop 훅 경로)는 핀이 바뀐 met 게이트를 미충족으로 읽는다"
+    },
+    {
+      "id": "pin-undeclared-control-unaffected",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--status",
+        "--only",
+        "G2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET"
+        ]
+      },
+      "why": "대조군 — 같은 파일을 읽어도 PIN 을 선언하지 않은 게이트는 같은 변경에 영향받지 않는다(opt-in)"
+    },
+    {
+      "id": "pin-field-probe",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "mode": "oracle-fields",
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ORACLE_INSENSITIVE:none"
+        ]
+      },
+      "why": "PIN · PIN_DIGEST 가 승인 해시에 민감하다 — 승인 뒤 핀 선언이나 기록값을 바꾸면 도장이 깨진다"
+    },
+    {
+      "id": "pin-hook-env-status",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "cli": true,
+      "cli_env": "hook",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1"
+        ]
+      },
+      "why": "Stop 훅 환경(세션 export 없음 · PATH · HOME 만)에서도 ROOT 기준 핀의 변경을 같은 판정으로 읽는다(AE-20)"
+    },
+    {
+      "id": "pin-hook-env-status-met",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "cli": true,
+      "cli_env": "hook",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET"
+        ]
+      },
+      "why": "양성 대조 — 핀이 그대로면 훅 환경에서도 met"
+    },
+    {
+      "id": "pin-env-root-hook-keeps-record",
+      "category": "pin",
+      "ledger": "pin/envroot.md",
+      "env": {
+        "FZ_PIN_FIXTURE_ROOT": "{SANDBOX}"
+      },
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "cli": true,
+      "cli_env": "hook",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ALL MET"
+        ]
+      },
+      "why": "${변수}/… 핀은 훅 환경에서 다시 계산할 수 없다 — ENV 선례대로 기록된 판정을 따른다(도장은 기록된 다이제스트라 깨지지 않는다)"
+    },
+    {
+      "id": "pin-env-root-edited-unmet",
+      "category": "pin",
+      "ledger": "pin/envroot.md",
+      "env": {
+        "FZ_PIN_FIXTURE_ROOT": "{SANDBOX}"
+      },
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNMET G1"
+        ]
+      },
+      "why": "변수가 있는 세션에서는 ${변수}/… 핀의 변경을 읽는다"
+    },
+    {
+      "id": "pin-restamp-only",
+      "category": "pin",
+      "ledger": "pin/pinned.md",
+      "mode": "finalize",
+      "pre": [
+        [
+          "--finalize"
+        ],
+        [
+          "--reverify"
+        ]
+      ],
+      "write_files": {
+        "pin/table.txt": "row-ok\nrow-new\n"
+      },
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "확정 보강: 게이트 1개(G1)"
+        ],
+        "expect_contains": {
+          "PIN_DIGEST: ": 1
+        }
+      },
+      "why": "판 중 엔트리로 바뀌는 기대 표(F-401)는 --finalize --only 재도장(F-334)으로 고친다 — 핀 기록과 도장을 그 게이트만 다시 쓴다"
+    },
+    {
+      "id": "pin-dir-refused",
+      "category": "pin",
+      "ledger": "pin/dir.md",
+      "mode": "finalize",
+      "args": [],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "PIN 은 파일만"
+        ]
+      },
+      "why": "디렉토리 핀은 무엇을 묶는지 모호하다 — 파일만"
+    },
+    {
+      "id": "pin-path-traversal-refused",
+      "category": "pin",
+      "ledger": "pin/bad-parse.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "PIN 경로는"
+        ]
+      },
+      "why": "핀 경로에 .. 금지 — ROOT 밖을 상대 경로로 가리키지 않는다"
+    },
+    {
+      "id": "pin-var-undeclared-refused",
+      "category": "pin",
+      "ledger": "pin/bad-var.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "ENV 선언에 없다"
+        ]
+      },
+      "why": "${변수} 루트는 그 게이트의 ENV 선언에 있어야 한다 — 실행 경로가 변수 부재를 UNRUN 으로 잡는다"
+    },
+    {
+      "id": "f294-criterion-token-missing",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L1: 기준 토큰 `--strict` 이 command 에 없다"
+        ]
+      },
+      "why": "F-294 — 제목만이 아니라 criterion 의 백틱 토큰도 command 와 대조한다. 기준에만 있는 요구는 기계가 재지 않는다"
+    },
+    {
+      "id": "f294-reverse-token-stale",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L1: 역방향 — 옛 CHECK 가 재던 `--strict`"
+        ]
+      },
+      "why": "F-294 역방향 — 개정이 CHECK 에서 뺀 토큰이 제목 · 기준에 남았다. 옛 원장(--out 이 이미 있을 때)의 CHECK 와 대조한다",
+      "write_files": {
+        "fromplan/generated.md": "- [ ] L1: 옛 판\n  CHECK: python3 tool.py --strict && echo L1_OK\n"
+      }
+    },
+    {
+      "id": "f245-named-symbol-unchecked",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L1: 지목 심볼 `parse_rows()` 를 command 가 부르지 않는다"
+        ]
+      },
+      "why": "F-245 — criterion 이 지목한 함수 · 심볼을 command 가 부르지 않으면 그 심볼에 결함을 넣어도 통과한다. 백틱 식별자만 잰다(결함 주입 일반화는 --baseline-probe 축)"
+    },
+    {
+      "id": "f295-multi-success-token",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L2: 성공 토큰 echo 가 2개"
+        ]
+      },
+      "why": "F-295 — 성공 토큰 echo 가 여럿이면 앞 체인이 실패해도 뒤 echo 가 EXPECT 를 낸다"
+    },
+    {
+      "id": "f295-unguarded-chain",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L3: ; 로 이은 앞 명령 `false` 에 || exit 가 없다"
+        ],
+        "expect_stdout_absent": [
+          "L4: ; 로 이은"
+        ]
+      },
+      "why": "F-295 — `;` 로 이은 앞 명령이 실패해도 다음 명령이 돈다. 가드된 for 루프(L4)는 경고하지 않는다"
+    },
+    {
+      "id": "f296-consumer-path-unproduced",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L5: command 가 읽는 $FZ_WORK_DIR/code/report.md 를 만드는 Step 이 없다"
+        ],
+        "expect_stdout_absent": [
+          "L6: command 가 읽는"
+        ]
+      },
+      "why": "F-296 — 뒤 Step 이 읽는 WORK_DIR 산출물을 만드는 Step 이 없다. 자기 files 에 있는 산출물(L6)은 경고하지 않는다"
+    },
+    {
+      "id": "f238-rtm-req-unmapped",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "RTM: 요구 R-2 가 어느 Step 에도 매핑되지 않았다"
+        ],
+        "expect_stdout_absent": [
+          "요구 R-1 가"
+        ]
+      },
+      "why": "F-238 — plan 의 RTM 요구가 Step 매핑 없이 사라져도 세는 검사가 없었다. 매핑된 R-1 은 경고하지 않는다"
+    },
+    {
+      "id": "f341-default-off-absence-grep",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L7: [기본 off] 인데 command 가 작업 트리 부재를 단언한다"
+        ]
+      },
+      "why": "F-341 — [기본 off] Step 의 CHECK 가 작업 트리 부재(! grep … \"$R/…\")를 단언하면 Step 자신의 기본 off 와 모순된다"
+    },
+    {
+      "id": "f417-manual-reason-missing",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "M1: MANUAL 사유가 없다"
+        ],
+        "expect_stdout_absent": [
+          "M2: MANUAL 사유가 없다"
+        ]
+      },
+      "why": "F-417 — 사유(자기 승인 금지 · 사용자 결정 · 기계화 불가) 없는 MANUAL 은 기계화할 수 있는 점검까지 사람에게 넘긴다. 사유 있는 M2 는 경고하지 않는다"
+    },
+    {
+      "id": "f346-list-input-normalized",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-list.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "- [ ] G1: 배열 입력": 1
+        }
+      },
+      "why": "F-346 — steps 배열(list)만 넘겨도 원장을 만든다. 예전엔 AttributeError traceback 으로 exit 1(미충족과 같은 코드)이 났다"
+    },
+    {
+      "id": "f346-bad-shape-exit2",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-bad-shape.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 2,
+        "mutates": false,
+        "expect_stderr": [
+          "최상위"
+        ]
+      },
+      "why": "F-346 짝 — 객체도 배열도 아닌 최상위 모양은 입력 오류(exit 2)다. 미충족(exit 1)으로 읽히면 안 된다"
+    },
+    {
+      "id": "f347-impl-root-recorded",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-input.json",
+      "mode": "from-plan",
+      "args": [
+        "--impl-root",
+        "tests/fixtures/gates/fromplan"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "IMPL_ROOT: {REAL_SANDBOX}/fromplan": 1
+        }
+      },
+      "why": "F-347 — 코드가 형제 워크트리에 있으면 --impl-root 를 원장 헤더 IMPL_ROOT 로 남긴다(realpath)"
+    },
+    {
+      "id": "f347-impl-root-injected",
+      "category": "execution",
+      "ledger": "impl-root/injected.md",
+      "env": {
+        "FZ_IMPL_ROOT": ""
+      },
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "PASS  G1"
+        ]
+      },
+      "why": "F-347 — 원장 IMPL_ROOT 가 CHECK 의 FZ_IMPL_ROOT 로 들어간다. 넣는 곳이 없으면 구현된 Step 이 UNRUN(ENV: FZ_IMPL_ROOT 부재)이 된다"
+    },
+    {
+      "id": "f347-env-wins",
+      "category": "execution",
+      "ledger": "impl-root/injected.md",
+      "env": {
+        "FZ_IMPL_ROOT": "{SANDBOX}/impl-root"
+      },
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "FAIL  G1"
+        ]
+      },
+      "why": "F-347 짝 — 환경에 비지 않은 FZ_IMPL_ROOT 가 있으면 환경이 이긴다(기준선을 무변경 트리로 돌릴 때). 표지 파일이 없는 경로라 FAIL 이다 · 진행 기록이 없던 게이트의 첫 FAIL 은 원장을 쓰지 않는다(gates.md 진행 기록 정의)"
+    },
+    {
+      "id": "f384-ledger-name-warn",
+      "category": "cli",
+      "ledger": "ledger-name/gates/plan-v2.md",
+      "args": [
+        "--status"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stderr": [
+          "WARN 원장 이름 plan-v2.md"
+        ]
+      },
+      "why": "F-384 — Stop 훅 · --discover 는 gates/plan.md 만 찾는다. 다른 이름의 원장은 미충족이 남아도 세션 종료 판정에서 빠진다"
+    },
+    {
+      "id": "f347-impl-root-stamped",
+      "category": "approved",
+      "ledger": "impl-root/injected.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "impl-root/tree",
+            "impl-root"
+          ]
+        }
+      ],
+      "args": [
+        "--reverify"
+      ],
+      "env": {
+        "FZ_IMPL_ROOT": ""
+      },
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "APPROVED_ORACLE_HASH 불일치"
+        ]
+      },
+      "why": "F-347 — IMPL_ROOT 는 CHECK 가 도는 트리를 바꾸므로 승인 도장이 묶는다. 확정 뒤 헤더를 다른 트리로 바꾸면 도장이 어긋나 거부한다"
+    },
+    {
+      "id": "f229-backtick-warn",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-backtick.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "B1: command 에 이스케이프 안 된 백틱"
+        ],
+        "expect_stdout_absent": [
+          "B2: command 에 이스케이프 안 된 백틱"
+        ]
+      },
+      "why": "F-229 — 큰따옴표 안 백틱은 셸이 명령 치환으로 돌려 게이트가 제 제목과 다른 것을 잰다. 작은따옴표 안 백틱(B2)은 글자 그대로라 경고하지 않는다"
+    },
+    {
+      "id": "f229-shell-error-unrun",
+      "category": "execution",
+      "ledger": "shell-trace/is-dir.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNRUN G1: CHECK 출력에 셸 오류 흔적"
+        ]
+      },
+      "why": "F-229 — 통과 토큰을 냈어도 출력에 `Is a directory` 가 있으면 다른 것을 잰 것이다. PASS 대신 미판정(원장 무변경)"
+    },
+    {
+      "id": "f409-undeclared-cmd-not-found-unrun",
+      "category": "execution",
+      "ledger": "shell-trace/cmd-missing.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "UNRUN G1: CHECK 출력에 셸 오류 흔적",
+          "fz_absent_tool_q9:"
+        ]
+      },
+      "why": "F-409 — TOOLS 를 선언하지 않은 도구가 없으면 카운터 0 으로 거짓 PASS 한다. `command not found` · exit 127 흔적은 미판정이다"
+    },
+    {
+      "id": "f235-once-skipped-on-reverify",
+      "category": "reverify",
+      "ledger": "once/once.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "ONCE  G1: 1회성 게이트"
+        ]
+      },
+      "why": "F-235 — 1회성 쓰기 게이트를 --reverify 가 다시 돌려 동결 기준선을 덮어썼다. ONCE 게이트는 충족 뒤 건너뛰고 표시한다(원장 무변경)"
+    },
+    {
+      "id": "f562-budget-note-only-over",
+      "category": "execution",
+      "ledger": "budget/sum-floor.md",
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "예산 960초"
+        ],
+        "expect_stdout_absent": [
+          "NOTE 예산"
+        ]
+      },
+      "why": "F-562 — 기본 예산 바닥이 960 이라 10초 게이트 하나짜리 원장에도 NOTE 가 떠 신호가 없었다. 실제 TIMEOUT 합이 600 을 넘을 때만 낸다(짝: budget-over-600-note)"
+    },
+    {
+      "id": "f568-criterion-drift-listed",
+      "category": "approved",
+      "ledger": "drift/ledger.md",
+      "args": [
+        "--criterion-drift",
+        "tests/fixtures/gates/drift/old-phrases.txt"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "DRIFT G1: CRITERION 에 옛 문구",
+          "CRITERION_DRIFT: G1"
+        ],
+        "expect_stdout_absent": [
+          "DRIFT G2"
+        ]
+      },
+      "why": "F-568 — 리뷰가 틀렸다고 고친 옛 오라클 문구가 승인 원장 CRITERION 에 남았다. 재도장 후보 id 를 낸다(읽기 전용)"
+    },
+    {
+      "id": "f344-released-gate-not-failed",
+      "category": "state",
+      "ledger": "released/ledger.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "STATE: active",
+            "STATE: released v1.0.0"
+          ]
+        }
+      ],
+      "write_files": {
+        "released/released.flag": "x\n"
+      },
+      "args": [
+        "--reverify"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "STATE released v1.0.0",
+          "RELEASED G1"
+        ]
+      },
+      "why": "F-344 — 릴리스 시점 사실을 박은 CHECK 는 이후 트리에서 재통과할 수 없다. released 원장의 --reverify 는 FAIL · 강등 대신 기록으로 판정한다(--status 와 같다)"
+    },
+    {
+      "id": "f344-set-state-released",
+      "category": "state",
+      "ledger": "released/ledger.md",
+      "pre": [
+        [
+          "--reverify"
+        ],
+        [
+          "--set-state",
+          "ready_for_review"
+        ],
+        [
+          "--set-state",
+          "closed"
+        ]
+      ],
+      "args": [
+        "--set-state",
+        "released v1.0.0"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_contains": {
+          "STATE: released v1.0.0": 1
+        }
+      },
+      "why": "F-344 짝 — closed → released <tag> 간선(전 게이트 충족 · 미룸 0). STATE 줄에 태그가 남는다"
+    },
+    {
+      "id": "f349-affected-by-path",
+      "category": "reverify",
+      "ledger": "affected/ledger.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [
+        "--affected-by",
+        "scripts/foo.py"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "  AFFECTED G1: scripts/foo.py(scripts/foo.py)",
+          "AFFECTED: G1"
+        ],
+        "expect_stdout_absent": [
+          "AFFECTED G3"
+        ]
+      },
+      "why": "F-349 — 뒤 Step 이 앞 Step 게이트의 근거 코드를 옮겨도 그 게이트는 다시 돌지 않았다. 바뀐 경로를 담은 충족 게이트 id 를 낸다"
+    },
+    {
+      "id": "f552-affected-by-basename",
+      "category": "reverify",
+      "ledger": "affected/ledger.md",
+      "pre": [
+        [
+          "--reverify"
+        ]
+      ],
+      "args": [
+        "--affected-by",
+        "tools/bar.sh"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "  AFFECTED G2: tools/bar.sh(bar.sh)"
+        ],
+        "expect_stdout_absent": [
+          "AFFECTED G3"
+        ]
+      },
+      "why": "F-552 — 공유 스크립트의 다른 소비자는 경로 대신 이름(`$S/bar.sh`)으로 부른다. basename 으로도 대조한다"
+    },
+    {
+      "id": "f566-pin-path-missing-warn",
+      "category": "pin",
+      "ledger": "pin/absent.md",
+      "mode": "finalize",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stderr": [
+          "WARN G1: PIN 경로 pin/later.txt 가 없다"
+        ]
+      },
+      "why": "F-566 — PIN 경로가 없으면 조용히 'absent' 로 기록했다. 부재는 정당한 기록값이지만(나중에 생길 표) 오타일 수 있어 경고한다"
+    },
+    {
+      "id": "r3-gatecheck-rtm-split",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-rtm.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "RTM: 요구 R-2 가 어느 Step 에도 매핑되지 않았다"
+        ],
+        "expect_stdout_absent": [
+          "요구 R-1 가",
+          "요구 R-3 가"
+        ]
+      },
+      "why": "F-576 — stepId 문자열 \"G1,G2\" · \"G1 · G2\" 를 나누지 않아 여러 Step 요구를 거짓 경고했다. R-2(steps[] 밖)는 경고 대조"
+    },
+    {
+      "id": "r3-gatecheck-rtm-no-reqid-warn",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-rtm.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "RTM: 4번째 행에 reqId 가 없다"
+        ]
+      },
+      "why": "F-576 — reqId 없는 행을 조용히 건너뛰어 매핑 검사가 돌지 않은 채 통과처럼 보였다"
+    },
+    {
+      "id": "r3-f526-scenario-set-mismatch-fails",
+      "category": "scenario",
+      "ledger": "scenario/manifest.json",
+      "pre": [
+        {
+          "args": [
+            "--scenario-check",
+            "tests/fixtures/gates/scenario/observed-full.txt",
+            "--manifest-sha",
+            "c7546eb6870d"
+          ],
+          "exit": 0
+        }
+      ],
+      "edits": [
+        {
+          "replace": [
+            "\"push 중 백그라운드 뒤 pop\"",
+            "\"push 중 백그라운드 뒤 pop(승인 뒤 고침)\""
+          ]
+        }
+      ],
+      "args": [
+        "--scenario-check",
+        "tests/fixtures/gates/scenario/observed-tab-only.txt",
+        "--manifest-sha",
+        "c7546eb6870d"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "SCENARIO-MISSING push-background-pop",
+          "MANIFEST-CHANGED"
+        ]
+      },
+      "why": "F-526 — 탭 · 페이지 복귀만 돈 관측에서 push → background → pop 누락을 잡고, 승인 뒤 manifest 를 바꾸면 통과하지 못한다. 사전 단계 = 전체 관측 · 승인 sha 는 exit 0(대조)"
+    }
+  ],
+  "_max_seconds": "선택 필드 — 벽시계 상한(초). ⛔ exit code 만으로는 hang 을 못 잡는다: 손자 프로세스가 파이프를 붙잡아 30초 걸렸는데 exit 는 1로 정상이었다(2026-08-24 실측).",
+  "_expect_contains": "선택 필드 — 산출물에 문자열이 정확히 N회 나타나는가. ⛔ exit/mutates 만으로는 '썼는데 잘못 썼다'를 못 본다 (EVIDENCE 미삽입이 exit 1 + mutates True 를 만족했다).",
+  "_expect_stdout": "선택 필드 — stdout 에 문자열이 나타나는가. ⛔ exit code 가 같은 두 방어선을 구분한다 (인접전이 거부와 미충족 거부는 둘 다 exit 1 이다).",
+  "_notes": {
+    "recheck-unobserved": "⛔ evaluate() 의 사후 재확인(쓴 것을 디스크에서 다시 읽어 met 판정)은 회귀 fixture 가 없다. 관측하려면 writeback 이 잘못 쓰는 상태를 만들어야 하는데, 그 경로들(EVIDENCE 미삽입·스팬 오류)은 각각 별도 fixture 로 이미 닫혀 있어 재현 입력이 없다. 방어 심층화(defense in depth)로 유지하고 미관측임을 여기 명시한다 — '통과했다'가 '관측됐다'를 뜻하지 않는다",
+    "finalize-manual-stamp-unobserved": "⛔ self_test 의 finalize 사후 검사에 있는 `manual 인데 도장이 박혔다` 분기는 이 fixture 로 발화하지 않는다. 결함 코드에서도 M1 블록에는 도장이 들어가지 않기 때문이다 — M1 직전인 G5(5번째 실행 게이트, 밀림 4줄)의 도장은 자기 CRITERION 줄 뒤에 떨어지고, 다음 삽입인 G6 은 M1 을 지나친 뒤쪽에서 블록을 벗어난다. 수정 코드에서는 manual 이 애초에 skipped 로 건너뛰어져 도장 대상이 아니다. 방어 심층화(defense in depth)로 유지하고 미관측임을 여기 명시한다 — `recheck-unobserved` 와 같은 부류다",
+    "discover-mode": "⛔ `--discover` 는 **디렉토리**를 받으므로 `mode: \"discover\"` 케이스가 `tests/fixtures/gates/discover/` 를 대상으로 돌린다. 그 하위에 충족·미충족·계약위반 세 트리가 `<sub>/gates/plan.md` 배치로 있다. ⛔ 다른 fixture 원장은 파일명이 `plan.md` 가 아니라 탐색 대상이 아니다 — sandbox 전체를 대상으로 돌리려던 첫 시도가 0건이었던 이유다",
+    "fixture-portability": "⛔ fixture 원장의 `ROOT:`·`CWD:` 는 **커밋한 사람의 클론 경로**다. self-test 가 sandbox 로 재작성하는데, `replace(str(FIXTURES), …)` 만 쓰면 다른 클론이나 플러그인 캐시에서 매칭 0건이 되어 ROOT 가 남의 경로를 가리키고 소유 검사에서 전부 exit 3 이 된다 (2026-08-25 실측: 캐시에서 19/66). 그래서 **경로 모양**(`…/tests/fixtures/gates` 로 끝나는 절대 경로)으로 재작성한다. 회귀 확인 = 저장소를 임의 위치로 복사해 self-test 를 돌린다"
+  },
+  "_expect_absent": "선택 필드 — sandbox 기준 경로가 없어야 한다 · expect_files 는 있어야 한다. ⛔ '돌리지 않았다'는 출력이 아니라 부작용 부재로 잰다",
+  "_expect_sidecar": "선택 필드 — <원장>.baseline.json 의 게이트별 결과 · 실행 게이트 oracle_hash 가 지금 계약과 같은가",
+  "_write_files": "선택 필드 — 사전 단계 뒤 sandbox 기준 경로에 파일을 쓴다 · env 는 케이스 동안의 환경 변수({SANDBOX} 치환) · cli_env: hook 은 PATH · HOME 만 둔 하위 프로세스",
+  "_expect_stdout_absent": "선택 필드 — stdout 에 문자열이 없어야 한다. 경고 lint 의 오탐 축(가드된 루프 · 사유 있는 MANUAL 은 경고하지 않는다)"
+}

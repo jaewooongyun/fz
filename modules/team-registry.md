@@ -1,0 +1,96 @@
+# Team Registry
+
+> Capability 기반 동적 팀 구성. 스킬이 도메인을 지정하면 에이전트가 자동 수집된다.
+> 새 에이전트 추가 시 이 레지스트리에 1줄 추가만으로 반영.
+
+---
+
+## 에이전트 Capabilities
+
+> **model 컬럼 해석**: `default` = frontmatter 기본값, `promoted` = Lead가 스폰 시 승격하는 모델.
+> 실질 분석·생산 에이전트의 frontmatter는 `model: sonnet`이지만, 스폰 시 Lead가 `model: "opus"`를 명시적으로 전달한다.
+> 이 설계는 "동시 opus ≤3" 거버넌스를 Lead가 직접 제어하기 위함이다.
+> **fable** (운용 — 2026-07-06 해제): Lead 세션이 `/model fable`로 전환해 운용하며, Workflow 판단 지점 3곳(`workflows/search-cross-verify.js:173` merge · `workflows/plan-collaborative.js:229`/`:167` direction)만 explicit `'fable'` 지정. Agent default/promoted 체계(Primary=opus)는 유지. 동시 상한 fable 1(Lead 세션 제외). 감시는 `scripts/lint-model-explicit.sh`. 재배선 상세는 `guides/model-guide.md` §5.
+
+| 에이전트 | domain | lens | default | promoted | memory | skills | isolation | 비고 |
+|---------|--------|------|---------|----------|--------|--------|-----------|------|
+| search-symbolic | search | 심볼 정밀 탐색 (정의/참조/타입) | sonnet | — | — | — | — | Serena 도구 |
+| search-pattern | search | 텍스트 패턴 넓은 범위 탐색 | sonnet | — | — | — | — | Grep/Glob 도구 |
+| plan-structure | plan | 구현 구조 + Step 순서 설계 | sonnet | opus | project | — | — | Primary |
+| plan-edge-case | plan | 엣지 케이스 + 실패 시나리오 발굴 | sonnet | opus | — | — | — | 실질 워커 |
+| plan-impact | plan | 영향 범위 전담 (Exhaustive Impact Scan a~f) | sonnet | opus | project | — | — | Impact Scanner · 실질 워커 |
+| plan-merge | plan | 델타 병합 전용 — 탐색 도구 없이 입력 JSON 만 접는다 (plan-lean2 Stage 2) | sonnet | opus | — | — | — | 실질 워커 · 도구 0 (F-345) |
+| impl-correctness | implement | 구현 정확성 + 테스트 작성 | sonnet | opus | project | — | — | Primary · 쓰기 도구 없음 — changeset 만 반환(F-460) |
+| impl-quality | implement | 코딩 표준 + 패턴 일관성 감시 | sonnet | opus | — | — | — | 실질 워커 |
+| review-arch | review | 아키텍처 결정 + 레이어 위반 | sonnet | opus | project | arch-critic | — | Primary · 리뷰 워크플로(review-live · peer-review) 전용 |
+| arch-lens | review, implement, plan | review-arch 와 같은 본문 · arch-critic 사전주입 없음 | sonnet | opus | — | — | — | 정의 `agents/arch-lens.md` · 리뷰 밖 호출처(code-pair · discover-adversarial · plan-collaborative) — F-459 |
+| review-quality | review | 코드 품질 + Dead Code + 성능 | sonnet | opus | project | code-auditor | — | 실질 워커 |
+| review-correctness | review, implement | 기능 정확성 + 요구사항 충족 | sonnet | opus | — | — | — | fz-code TEAM + fz-review Phase 4.5 · 실질 워커 |
+| review-direction | review | 방향성 적합성 + 대안 제시 + 비판적 평가 | sonnet | opus | — | — | — | direction-challenge 판단 지점(Workflow=fable) |
+| review-counter | review | 반론 + Devil's Advocate | sonnet | opus | — | — | — | 실질 워커 |
+| memory-curator | memory | 교훈 발굴 + 컨텍스트 매칭 | sonnet | — | user | — | — | full 경로의 Lead 회상(Workflow 밖 — fz-plan · fz-code 실행 절차의 Lead 책임) |
+
+---
+
+## 매칭 알고리즘
+
+```
+1. 스킬이 도메인을 지정 (예: fz-plan → domain: plan)
+2. 레지스트리에서 해당 domain의 모든 에이전트 수집
+3. promoted=opus인 에이전트 = 실질 분석·생산 워커 (Lead가 스폰 시 model:"opus" 전달). 그중 비고 "Primary" = 토폴로지 허브(도메인당 1명)
+4. promoted 없는(sonnet) 에이전트 = retrieval·breadth 단순 워커. 동시 opus ≤3 상한 준수
+5. 팀 크기에 따라 토폴로지 결정:
+   - 2명 → Mesh
+   - 3명+ → Star-enhanced (Supporting → Primary 경유)
+```
+
+## 스킬 → 도메인 매핑
+
+| 스킬 | Primary | Supporting | 패턴 |
+|------|---------|-----------|------|
+| /fz-discover | plan-structure (O) | arch-lens (S) | adversarial |
+| /fz-plan | plan-structure (O) | plan-impact (S), plan-edge-case (S), plan-merge (S), arch-lens (S, 롤백 plan-collaborative 만), review-direction (S, 롤백 plan-collaborative 만), memory-curator (S) | collaborative |
+| /fz-code | impl-correctness (O) | arch-lens (S), impl-quality (S), review-correctness (S), memory-curator (S) | pair-programming — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
+| /fz-fix | impl-correctness (O) | arch-lens (S, 복잡도3+) | pair-programming — (Wave 3: `workflows/code-pair.js` Workflow 대체 실행) |
+| /fz-review | review-arch (O) | review-quality (S), review-counter (S), review-correctness (S, Phase4.5), memory-curator (S) | live-review |
+| /fz-peer-review | review-arch (O) | review-quality (S), review-counter (S) | live-review |
+| /fz-search | — | search-symbolic (S), search-pattern (S) | cross-verify |
+| /fz-memory | — | memory-curator (S) | solo/team |
+
+## Truth-of-Source
+
+⛔ **팀 구성의 단일 진실 원천은 `workflows/*.js`의 `agentType` 인자다.**
+스킬 YAML `team-agents` 필드는 **2026-08-09 제거**됐다 — Wave 4 전환 후 팀 구성을 결정하지 않는 선언(런타임 효과 0)이었다.
+본 레지스트리와 `patterns/*.md`는 **스크립트와** 동기화를 유지한다. 불일치 발견 시 **스크립트 기준**으로 나머지를 수정한다.
+단서 — `workflows/swarm.js` 만 agentType 을 args 로 받는다. 허용은 스크립트 `READ_ONLY_AGENTS`(`tools:` 가 비어 있지 않고 쓰기 도구도 `memory:` 필드도 없으며 텔레메트리 단일 스테이지 agentType 이 아닌 에이전트 · 기본 review-correctness) 안만이고 밖이면 콜 0 fallback 이다 — 정본 행 단서는 `modules/governance.md` § Truth-of-Source.
+
+> 참조: `modules/governance.md` — Truth-of-Source 정책 (모델 배정·팀 구성·상한·필수 필드 4항목 정본)
+
+## 확장 가이드
+
+새 에이전트 추가:
+1. `agents/{name}.md` 에이전트 파일 생성 — `tools:` · `memory:` 를 바꾸거나 새 에이전트를 swarm 워커로 쓰려면 `workflows/swarm.js` `READ_ONLY_AGENTS` 를 다시 대조한다(`tests/workflows/swarm-budget.js` allowlist-readonly 가 목록 안 에이전트의 쓰기 도구 · `memory:` 를 막는다)
+2. 이 레지스트리의 Capabilities 테이블에 1줄 추가
+3. 해당 도메인의 스킬에서 자동 수집됨 (서브셋 지정 시 추가 필요)
+
+새 도메인 추가:
+1. 에이전트 파일 + 레지스트리 등록
+2. `patterns/` 디렉토리에 통신 패턴 파일 추가
+3. 해당 스킬의 `workflows/{skill}-{pattern}.js`에 `agentType: 'fz:{name}'` 스테이지 추가
+
+## 참조 스킬
+
+| 스킬 | 참조 이유 |
+|------|----------|
+| /fz-plan | plan 도메인 에이전트 수집 |
+| /fz-code | implement 도메인 에이전트 수집 |
+| /fz-review | review 도메인 에이전트 수집 |
+| /fz-peer-review | review 도메인 에이전트 수집 |
+| /fz-search | search 도메인 에이전트 수집 |
+| /fz-discover | plan 도메인 서브셋 에이전트 수집 |
+| /fz-memory | memory 도메인 에이전트 수집 |
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (필요 시에만 로드)
+- 500줄 이하 유지

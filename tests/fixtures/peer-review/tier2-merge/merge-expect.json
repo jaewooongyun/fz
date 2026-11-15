@@ -1,0 +1,5 @@
+{
+  "note": "결정론 병합(S20 · MergeContract §10)의 기대 수 — stage1-input.json 24건을 모두 보존하고 14개 그룹으로 묶는다. scripts/review_merge.py --check-fixture 가 대조한다",
+  "candidates": 24,
+  "groups": 14
+}

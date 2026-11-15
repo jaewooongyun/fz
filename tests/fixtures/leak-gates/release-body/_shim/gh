@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+# 가짜 gh CLI — tests/fixtures/leak-gates/release-body 러너 전용. 실제 gh 를 부르지 않고 네트워크도 쓰지 않는다.
+# 러너가 이 파일을 임시 폴더에 gh 로 복사해 PATH 맨 앞에 두고 부른다 — 진짜 gh · GitHub 로 새지 않게.
+#
+# 응답은 env 로만 받는다(러너가 셀마다 정한다 · 없는 값은 지어내지 않고 거부한다):
+#   FZ_GH_SHIM_LOG    호출을 `CALL …` 로, 거부한 호출을 `UNSUPPORTED …` 로 덧붙이는 파일(러너가 호출 수 · 거부 0 을 단언한다).
+#                     없으면 러너 밖 호출이라 거부한다
+#   FZ_GH_SHIM_TAG    이 가짜가 아는 태그 — 다른 태그는 그 태그의 릴리스가 없는 경우로 답한다(`release not found` · exit 1)
+#   FZ_GH_SHIM_TITLE  발행된 제목(name)
+#   FZ_GH_SHIM_BODY   발행된 본문(body)이 든 파일(UTF-8)
+#   FZ_GH_SHIM_EXIT   0 이 아니면 stdout 없이 그 값으로 끝난다 — 인증 만료 · 오프라인처럼 gh 가 본문을 돌려주지 못한 경우
+#   FZ_GH_SHIM_RAW    1 이면 JSON 대신 본문 파일을 그대로 낸다(JSON 이 아닌 출력)
+# 지원: `gh --version` · `gh release view <태그> --json <필드,…>`(필드는 body · name · tagName 만). 나머지 호출은 전부 거부(exit 1).
+# ⛔ 실제 gh 의 필드 목록 · 판 번호 · 오류 문구와 같다고 보장하지 않는다 — 세 필드 밖의 필드는 실제 gh 가 받는 이름이어도
+#    `gh-shim: 미지원 필드` 로 거부하고 거부를 기록한다(정본이 `name,body` 밖을 요청하면 러너의 거부 0 단언이 잡는다). stderr 의
+#    `release not found` · `HTTP 401 …` 은 러너가 사유 전달을 단언하는 고정 글자다. 실제 gh 가 어떤 필드를 받는지는 이 가짜로
+#    증명하지 않는다
+import json
+import os
+import sys
+
+FIELDS = ("body", "name", "tagName")
+
+args = sys.argv[1:]
+if args == ["--version"]:
+    print("gh version 0.0.0 (fixture shim)")
+    sys.exit(0)
+
+env = os.environ
+log_path = env.get("FZ_GH_SHIM_LOG", "")
+if not log_path:
+    print("gh-shim: FZ_GH_SHIM_LOG 미설정 — 러너 밖 호출을 거부한다", file=sys.stderr)
+    sys.exit(1)
+log = open(log_path, "a", encoding="utf-8")
+log.write("CALL " + " ".join(args) + "\n")
+log.flush()
+
+
+def refuse(msg):
+    log.write("UNSUPPORTED " + msg + "\n")
+    log.flush()
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+
+if len(args) != 5 or args[:2] != ["release", "view"] or args[3] != "--json":
+    refuse("gh-shim: 미지원 호출 " + " ".join(args))
+tag, fields = args[2], args[4].split(",")
+unknown = [f for f in fields if f not in FIELDS]
+if unknown:
+    refuse("gh-shim: 미지원 필드 %s — 이 가짜는 %s 만 낸다" % (",".join(unknown), " · ".join(FIELDS)))
+code = env.get("FZ_GH_SHIM_EXIT", "0")
+if code not in ("", "0"):
+    print("HTTP 401: Bad credentials (fixture shim — 인증 만료 · 오프라인 흉내)", file=sys.stderr)
+    sys.exit(int(code))
+if tag != env.get("FZ_GH_SHIM_TAG", ""):
+    print("release not found", file=sys.stderr)
+    sys.exit(1)
+body_path = env.get("FZ_GH_SHIM_BODY", "")
+if not os.path.isfile(body_path):
+    refuse("gh-shim: FZ_GH_SHIM_BODY 파일이 없다 — 지어내지 않는다")
+with open(body_path, "rb") as fh:
+    raw = fh.read()
+if env.get("FZ_GH_SHIM_RAW", "0") == "1":
+    sys.stdout.buffer.write(raw)
+    sys.exit(0)
+vals = {"body": raw.decode("utf-8"), "name": env.get("FZ_GH_SHIM_TITLE", ""), "tagName": tag}
+sys.stdout.buffer.write(json.dumps({f: vals[f] for f in fields}, ensure_ascii=False).encode("utf-8") + b"\n")
+sys.exit(0)

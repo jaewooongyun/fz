@@ -1,0 +1,29 @@
+{
+ "App/Foo.swift:11": {
+  "real": true,
+  "label_ids": [
+   "L1"
+  ]
+ },
+ "Foo.swift:20": {
+  "real": true,
+  "label_ids": [
+   "L2"
+  ]
+ },
+ "App/Foo.swift:30-32": {
+  "real": true,
+  "label_ids": [
+   "L3"
+  ]
+ },
+ "App/Foo.swift:40": {
+  "real": true,
+  "label_ids": [
+   "L4"
+  ]
+ },
+ "App/Foo.swift:30": {
+  "real": false
+ }
+}

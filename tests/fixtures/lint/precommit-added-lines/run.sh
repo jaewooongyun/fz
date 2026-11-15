@@ -1,0 +1,311 @@
+#!/bin/bash
+# diff-parse: not-a-diff — 이 러너는 diff 를 파싱하지 않는다. 합성 훅 본문을 문자열로 임시 트리에 쓰고, 트리의 훅·lint 를 실행해 exit·JSON 만 본다
+# pre-commit 추가 줄 판정 · 확장자 없는 훅의 diff 파서 lint 편입 (F-380 · DG-12=approve).
+#
+# ⛔ 훅을 **실제로 돌린다** — 임시 git 저장소에 합성 staged 변경을 만들고, 트리의 `.githooks/pre-commit` 을 그 저장소를
+#    cwd 로 실행한다. 임시 저장소에 core.hooksPath 를 걸지 않고 커밋도 훅 경유로 하지 않는다(기준선 커밋만 임시 저장소 안).
+#    바깥 git 설정(전역 · 시스템)을 끊는다 — 사용자의 hooksPath · color · diff 설정이 판정을 바꾸지 않게.
+#   음성 토큰(가짜 사용자 홈 `$U` · 티켓 키 꼴 `$KEY` · PR 번호 꼴 `$PRN`)은 실행할 때 이어 붙인다 — 이 파일 자신이 누수 검사
+#   (--tree · 출하 게이트)에 걸리지 않게. 훅은 판정을 훅 위치 기준의 정본(scripts/leak_rules.py --staged --hook-policy)에 넘긴다 —
+#   임시 저장소에 scripts/ 가 없어도 트리의 정본이 돈다. 막을 때 훅의 exit 는 언제나 1 이다(적중 · 미판정 모두). 막은 이유 글자를
+#   함께 주는 셀(아래 '이유')은 그 글자가 출력에 있는지도 본다 — 다른 이유로 막혀 통과하지 않게.
+#   훅 셀 (검사 범위 = 모든 파일 · 예외 없음 · 차단 패턴은 가짜 사용자 홈 `$U` — 정본의 자리표시 이름에 없다):
+#     plus-lead      추가 줄 '+ see $U/…'  (diff 줄 '++ see …')  → 차단(exit 1) — 기준 훅은 놓친다
+#     plusplus-lead  추가 줄 '++ $U/…'     (diff 줄 '+++ $U/…') → 차단 — 헤더 모양이지만 hunk 안이다
+#     dash-lead      추가 줄 '- see $U/…'  → 차단 (대조 — 두 트리 모두)
+#     clean          추가 줄 '+ ok' · 빈 줄                  → 통과 (오탐 대조)
+#     header-path    새 파일 modules$U/n.md(내용 깨끗) → 차단(이유 `경로 이름`) — 새 파일 · 폴더 이름도 본다(경로 이름 축)
+#     header-path-one-hit      같은 실행의 적중 줄(`  ❌ `)이 하나뿐 — 헤더 '+++ b/…' 는 추가 줄이 아니다(줄 번호 적중 0)
+#     header-path-placeholder  자리표시 이름 폴더의 새 파일 → 통과 (오탐 대조)
+#     deleted        기준선의 '+ old $U/…' 줄 삭제 → 통과 — 지운 줄은 추가 줄이 아니다
+#     changelog-scoped          CHANGELOG.md 의 plus-lead 줄 → 차단(이유 `$U/`) — 예외가 없다(범위 판정 자체는 precommit-scope 픽스처 · F-056)
+#     ticket-in-experiment-log  experiment-log.md 의 티켓 키 꼴 → 차단(이유 `$KEY`) — 이 파일도 예외가 아니다
+#     pr-number-in-ledger       modules/promotion-ledger.md 의 PR 번호 꼴 → 차단(이유 `$PRN`) — 승격 원장도 예외가 아니다
+#     reserved-placeholder-ok   예약 번호(0 으로 시작하는 번호) 자리표시자 · PR 번호 → 통과
+#     rename-path    rename(R) 된 파일에 추가한 사용자 경로 → 차단 — 기준 훅은 --diff-filter=ACM 이라 R 을 뺀다(F-410)
+#     rename-existing-ok  기존 줄에 정당 참조가 있는 파일을 rename + 깨끗한 줄 추가 → 통과 — 옛 경로와 -M 비교
+#     space-path     'modules/a b.md' 의 사용자 경로 → 차단 — 기준 훅은 `for FILE in $CHANGED` 가 공백에서 가른다
+#     nonascii-path  'modules/한글 노트.md' → 차단 — 기준 훅은 core.quotePath 따옴표가 SCOPED_RE 를 비껴간다
+#     color-always   저장소 color.ui=always → 차단 — 기준 훅은 색 코드 때문에 추가 줄이 0이다
+#     partial-stage-index-hit      인덱스에만 있는 사용자 경로(작업 트리에서는 지웠다) → 차단(이유 `$U/`) — 훅은 인덱스의 추가 줄을 본다
+#     partial-stage-worktree-only  작업 트리에만 있는 사용자 경로(스테이징 안 함) → 통과 — 커밋에 들지 않는 줄은 보지 않는다
+#     list-fail           git 심이 목록 호출(--numstat · --name-status · --name-only)을 실패시킨다 · 내용 깨끗 → 차단(미판정 · 이유 'git 심')
+#     extract-fail-hit    git 심이 추가 줄 추출(-U0)을 실패시킨다 · 위반 내용 → 차단(미판정 · 이유 'git 심')
+#     extract-fail-clean  같은 심 · 내용 깨끗 — 목록 열거는 성공하고 추출만 실패한다 → 차단(미판정 · 이유 'git 심')
+#     names-fail          git 심이 새 경로 목록(--name-only)만 실패시킨다 · 내용 깨끗 → 차단(미판정 · 이유 = 정본의 그 호출 실패 문구)
+#     maintainer-no-rules  임시 저장소 git 설정 fz.maintainer=true · 비공개 규칙 없음 · 내용 깨끗 → 차단(미판정 · 이유 = 정본의 표지 사유 문구)
+#     host-xdg-attributes-ignored  호스트의 XDG git 속성 파일(`* binary`)을 준 자식 실행 → exit 0 — 격리가 XDG 설정 폴더도 끊는다
+#   lint 셀 (판정 확장자는 lint --json 결과의 ext 로 본다 — scan 경로를 거친 값이다. 기준 lint 는 확장자 없는 파일을 스캔하지 않아 mini 셀이 'absent'):
+#     live           트리의 훅은 diff 를 읽지 않는다 — 트리 자신의 lint --json 결과에 .githooks/pre-commit 이 없고 UNKNOWN 0
+#     mini-bad       임시 트리(트리의 lint 사본) — 선언 없는 합성 훅 .githooks/pre-commit · 확장자 없는 셔뱅 도구 tests/…/_shim/ 5종
+#                    → 전부 위반 · exit 1
+#     mini-ext       같은 결과의 판정 확장자 — 훅(bash) .sh · tool(sh) .sh · pytool(python3) .py · nodetool(node) .js ·
+#                    awktool(awk -f) .awk · pltool(perl, 그 밖) .sh
+#     mini-jsnote    node 정상 대조 — 셔뱅 node · diff 접두사 표현이 `//` 주석에만 → 대상 아님(.sh 로 읽으면 위반)
+#     mini-data      셔뱅 없는 확장자 없는 데이터 · 바이너리는 대상 아님 · UNKNOWN 0
+#     mini-good      같은 임시 트리에 트리의 실제 훅을 넣고 셔뱅 도구 5종을 지우면(jsnote · 데이터 · 바이너리는 남는다) → exit 0
+# exit: 0 전건 통과 · 1 단언 실패 · 2 중첩 실행(`UNRUN:`) · 3 준비 실패(인자 · 도구 · 임시 저장소)
+#   ⛔ 기능 부재(훅이 놓침 · lint 가 스캔 안 함)는 단언 실패(1)다 — 준비 실패(3)와 섞으면 '기준 exit 1' 판별이 무너진다.
+# ⛔ 중첩 가드: 도는 동안 FZ_PRECOMMIT_FIXTURE=1. 안에서 다시 불리면 `UNRUN:` 을 내고 exit 2.
+# usage: run.sh [--tree <플러그인 트리>]   (기본: 이 fixture 가 든 트리 — health-check 는 인자 없이 부른다)
+set -u
+if [ -n "${FZ_PRECOMMIT_FIXTURE:-}" ]; then
+  echo "UNRUN: 중첩 실행 — 바깥 precommit-added-lines 가 도는 중"
+  exit 2
+fi
+TREE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." 2>/dev/null && pwd)"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tree) [ $# -ge 2 ] || { echo "SETUP --tree 에 경로가 없다"; exit 3; }
+            TREE="$(cd "$2" 2>/dev/null && pwd)" || { echo "SETUP --tree 경로 없음: $2"; exit 3; }; shift 2 ;;
+    *) echo "SETUP 알 수 없는 인자: $1"; exit 3 ;;
+  esac
+done
+for c in git python3; do command -v "$c" >/dev/null 2>&1 || { echo "SETUP $c 부재"; exit 3; }; done
+HOOK="$TREE/.githooks/pre-commit" LINT="$TREE/scripts/lint_diff_parsers.py"
+[ -f "$HOOK" ] && [ -f "$LINT" ] || { echo "SETUP 훅 또는 lint 없음: $TREE"; exit 3; }
+
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/fz-precommit.XXXXXX")" || { echo "SETUP 임시 폴더 실패"; exit 3; }
+trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$TMP/home" "$TMP/xdg" || exit 3
+: > "$TMP/gitconfig" || exit 3
+# XDG 설정 폴더도 끊는다 — git 은 거기서 기본 속성 · 무시 파일을 읽는다(속성 파일의 `binary` 는 추가 줄을 바이너리로 바꾼다)
+export HOME="$TMP/home" GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 FZ_PRECOMMIT_FIXTURE=1 \
+  XDG_CONFIG_HOME="$TMP/xdg"
+# 비공개 규칙 env 도 끊는다 — 유지관리자 머신의 규칙 파일이 셀 판정(내장 규칙만 · maintainer-no-rules)을 바꾸지 않게
+# 부모 git 의 설정 주입 두 길(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT)도 끊는다 — 남으면 임시 저장소의 커밋이 호스트 설정(서명 강제 등)에
+#   끌려가 준비가 실패한다(저장소 설정으로는 덮이지 않는다 — 명령줄 설정이 가장 높다)
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE FZ_NEUTRALIZE_RULES GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
+# 음성 토큰은 실행할 때 이어 붙인다 — 가짜 사용자 홈 · 티켓 키 꼴 · PR 번호 꼴
+U="/Us""ers/fixture-user"
+KEY="AB""C-4821"
+PRN="PR"" 4821"
+
+fail=0; nh=0; nl=0
+count() { case "$1" in hook\ *) nh=$((nh + 1)) ;; lint\ *) nl=$((nl + 1)) ;; esac; }
+ok() { echo "PASS  $1"; count "$1"; }
+no() { echo "FAIL  $1  — $2"; fail=$((fail + 1)); count "$1"; }
+
+# $1=이름 $2=기준선 modules/note.md 내용 — 기준선 커밋 하나(훅 경유 아님)
+newrepo() {
+  local r="$TMP/$1"
+  git init -q "$r" && git -C "$r" config user.email f@f.f && git -C "$r" config user.name f \
+    && git -C "$r" config commit.gpgsign false && mkdir -p "$r/modules" \
+    && printf '%s\n' "$2" > "$r/modules/note.md" && git -C "$r" add -A && git -C "$r" commit -qm base \
+    || { echo "SETUP 임시 저장소 $1 실패"; exit 3; }
+  R="$r"
+}
+# $1=셀 $2=기대 exit $3=저장소 [$4=PATH 앞에 둘 폴더(git 심) · 빈 값 = 없음] [$5=출력에 있어야 할 글자 — 막은 이유 대조]
+#   트리의 훅을 저장소 cwd 로 직접 실행한다
+hook() {
+  (cd "$3" && PATH="${4:+$4:}$PATH" bash "$HOOK") > "$3.out" 2>&1
+  local rc=$?
+  if [ "$rc" -ne "$2" ]; then
+    no "hook $1: exit $2 기대" "exit $rc · $(grep -m1 -E 'pre-commit|⛔' "$3.out" | cut -c1-120)"
+  elif [ -n "${5:-}" ] && ! grep -qF -- "$5" "$3.out"; then
+    no "hook $1: exit $2 · 출력에 '$5' 기대" "출력에 없다 · $(grep -m1 -E 'pre-commit|⛔' "$3.out" | cut -c1-120)"
+  else
+    ok "hook $1: exit $2"
+  fi
+}
+# $1=셀 $2=추가할 줄 — modules/note.md 끝에 붙여 stage
+appendcell() {
+  newrepo "$1" "base line"
+  printf '%s\n' "$2" >> "$R/modules/note.md" && git -C "$R" add modules/note.md || { echo "SETUP stage 실패 $1"; exit 3; }
+}
+
+appendcell plus-lead "+ see $U/dev/x";        hook plus-lead 1 "$R"
+appendcell plusplus-lead "++ $U/dev/x";       hook plusplus-lead 1 "$R"
+appendcell dash-lead "- see $U/dev/x";        hook dash-lead 1 "$R"
+appendcell clean "+ ok"
+printf '\n' >> "$R/modules/note.md" && git -C "$R" add modules/note.md || exit 3
+hook clean 0 "$R"
+
+newrepo header-path "base line"
+mkdir -p "$R/modules$U" && printf 'clean\n' > "$R/modules$U/n.md" \
+  && git -C "$R" add -A || exit 3
+hook header-path 1 "$R" "" "경로 이름"
+if [ "$(grep -c '^  ❌ ' "$R.out")" = 1 ]; then ok "hook header-path-one-hit: 적중 1줄"; else no "hook header-path-one-hit: 적중 1줄 기대" "$(grep -c '^  ❌ ' "$R.out")줄"; fi
+newrepo header-path-placeholder "base line"
+mkdir -p "$R/modules${U%/*}/example" && printf 'clean\n' > "$R/modules${U%/*}/example/n.md" \
+  && git -C "$R" add -A || exit 3
+hook header-path-placeholder 0 "$R"
+
+newrepo deleted "+ old $U/dev/x"
+printf 'base line\n' > "$R/modules/note.md" && git -C "$R" add modules/note.md || exit 3
+hook deleted 0 "$R"
+
+# ── 예외 없음 — CHANGELOG · 측정 기록 · 승격 원장도 모든 검사 축을 받는다. 예약 번호 자리표시자는 통과한다 ──
+newrepo changelog-scoped "base line"
+printf '%s\n' "+ see $U/dev/x" > "$R/CHANGELOG.md" && git -C "$R" add -A || exit 3
+hook changelog-scoped 1 "$R" "" "$U/"
+newrepo ticket-in-experiment-log "base line"
+{ printf '%s\n' "| 관측 | $KEY 재현 |" > "$R/experiment-log.md" && git -C "$R" add -A; } || exit 3
+hook ticket-in-experiment-log 1 "$R" "" "$KEY"
+newrepo pr-number-in-ledger "base line"
+{ printf '%s\n' "- 승격 근거: $PRN" > "$R/modules/promotion-ledger.md" && git -C "$R" add -A; } || exit 3
+hook pr-number-in-ledger 1 "$R" "" "$PRN"
+newrepo reserved-placeholder-ok "base line"
+{ printf '%s\n' "작업 폴더 TKT-0042/index.md · TICKET-000 · PR #0123" >> "$R/modules/note.md" && git -C "$R" add modules/note.md; } || exit 3
+hook reserved-placeholder-ok 0 "$R"
+
+# ── F-410 파일 열거 셀 — rename · 공백 경로 · 비ASCII 경로 · color.ui=always (기준 훅은 넷 다 통과시킨다) ──
+#    rename 셀의 기준선은 여러 줄이다 — 한 줄짜리에 한 줄을 더하면 유사도가 rename 문턱(50%)에 걸린다
+BODY="$(printf 'line %s\n' 1 2 3 4 5 6 7 8 9 10)"
+newrepo rename-path "$BODY"
+{ git -C "$R" mv modules/note.md modules/renamed.md && printf '%s\n' "+ see $U/dev/x" >> "$R/modules/renamed.md" && git -C "$R" add -A; } || exit 3
+hook rename-path 1 "$R"
+# 대조 — 기존 줄에 있던 정당 참조는 rename 만으로 '추가 줄' 이 되지 않는다(옛 경로와 -M 비교)
+newrepo rename-existing-ok "$BODY
++ old $U/dev/x"
+{ git -C "$R" mv modules/note.md modules/renamed.md && printf 'clean\n' >> "$R/modules/renamed.md" && git -C "$R" add -A; } || exit 3
+hook rename-existing-ok 0 "$R"
+newrepo space-path "base line"
+{ printf '%s\n' "+ see $U/dev/x" > "$R/modules/a b.md" && git -C "$R" add -A; } || exit 3
+hook space-path 1 "$R"
+newrepo nonascii-path "base line"
+{ printf '%s\n' "+ see $U/dev/x" > "$R/modules/한글 노트.md" && git -C "$R" add -A; } || exit 3
+hook nonascii-path 1 "$R"
+newrepo color-always "base line"
+{ git -C "$R" config color.ui always && printf '%s\n' "+ see $U/dev/x" >> "$R/modules/note.md" && git -C "$R" add modules/note.md; } || exit 3
+hook color-always 1 "$R"
+
+# ── 부분 스테이징 — 훅은 인덱스의 추가 줄을 본다. 작업 트리에만 있는 줄은 커밋에 들지 않는다 ──
+newrepo partial-stage-index-hit "base line"
+{ printf '%s\n' "+ see $U/dev/x" >> "$R/modules/note.md" && git -C "$R" add modules/note.md \
+  && printf 'base line\n' > "$R/modules/note.md"; } || exit 3
+hook partial-stage-index-hit 1 "$R" "" "$U/"
+newrepo partial-stage-worktree-only "base line"
+{ printf 'clean\n' >> "$R/modules/note.md" && git -C "$R" add modules/note.md \
+  && printf '%s\n' "+ see $U/dev/x" >> "$R/modules/note.md"; } || exit 3
+hook partial-stage-worktree-only 0 "$R"
+
+# ── 판정 불가는 막는다 — PATH 앞의 git 심이 이름이 맞는 호출만 실패시키고 나머지는 진짜 git 으로 넘긴다.
+#    목록 심은 목록 꼴 셋(--numstat · --name-status · --name-only)을 모두 실패시킨다 — 훅이 어느 꼴로 목록을 뽑든 그 실패를
+#    통과로 읽으면 list-fail 이 잡는다. 추출 심은 추가 줄 추출(-U0)만 실패시킨다 — 목록 열거는 성공한다. 셋 다 막은 이유(심의
+#    실패 문구)가 출력에 있어야 한다 ──
+REAL_GIT="$(command -v git)" || { echo "SETUP git 경로"; exit 3; }
+# $1=심 폴더 $2=실패시킬 인자 꼴(case 패턴)
+mkshim() {
+  mkdir -p "$1" && printf '%s\n' '#!/bin/sh' 'for a in "$@"; do' \
+    "  case \"\$a\" in $2) echo \"git 심: \$a 호출을 실패시킨다\" >&2; exit 128 ;; esac" 'done' "exec \"$REAL_GIT\" \"\$@\"" \
+    > "$1/git" && chmod +x "$1/git" || { echo "SETUP git 심 $1"; exit 3; }
+}
+mkshim "$TMP/shim-list" '--numstat|--name-status|--name-only'
+mkshim "$TMP/shim-extract" '-U0'
+# 이름 심 — 새 경로 목록(--name-only)만 실패시킨다(변경 목록 · 추가 줄 추출은 성공). 이유는 정본이 그 호출의 실패로 낸 문구로 본다 —
+#   버전 동기 검사도 --name-only 를 부르므로 심의 문구만으로는 어느 호출이 막았는지 가르지 못한다
+mkshim "$TMP/shim-names" '--name-only'
+appendcell list-fail "+ ok";                  hook list-fail 1 "$R" "$TMP/shim-list" "git 심"
+appendcell extract-fail-hit "+ see $U/dev/x"; hook extract-fail-hit 1 "$R" "$TMP/shim-extract" "git 심"
+appendcell extract-fail-clean "+ ok";         hook extract-fail-clean 1 "$R" "$TMP/shim-extract" "git 심"
+appendcell names-fail "+ ok";                 hook names-fail 1 "$R" "$TMP/shim-names" "git diff --name-only 실패"
+
+# ── 유지관리자 표지 — 저장소 git 설정 fz.maintainer=true 인데 비공개 규칙이 없으면(env 는 위에서 끊었다) 내용이 깨끗해도 미판정으로 막는다 ──
+newrepo maintainer-no-rules "base line"
+{ git -C "$R" config fz.maintainer true && printf 'clean\n' >> "$R/modules/note.md" && git -C "$R" add modules/note.md; } || exit 3
+hook maintainer-no-rules 1 "$R" "" "유지관리자 표지가 있는데 비공개 규칙 파일이 없다"
+
+# ── lint 셀 ──────────────────────────────────────────────────
+# $1=lint 스크립트 $2=--json 출력 파일 — exit 를 돌려준다
+# ⛔ lint 의 traceback 은 위반(exit 1)이 아니라 측정 불가 — 3 으로 끝낸다(오류 없는 비정상 종료가 1 로 새지 않게)
+lintjson() {
+  python3 "$1" --json > "$2" 2> "$2.err"; local r=$?
+  if grep -q "Traceback (most recent call last)" "$2.err"; then echo "SETUP lint traceback — $(tail -n 1 "$2.err")"; exit 3; fi
+  return $r
+}
+# $1=JSON $2=파일 상대경로 — 그 파일의 "verdict ext mode" 를 한 줄로(없으면 'absent').
+#   ext = lint 가 정한 판정 확장자(scan 경로의 --json 결과 · 키가 없는 lint 는 '-')
+verdict() {
+  python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));r=[x for x in d["results"] if x["file"]==sys.argv[2]];print(("%s %s %s"%(r[0]["verdict"],r[0].get("ext") or "-",r[0]["mode"] or "-")) if r else "absent")' "$1" "$2" \
+    || { echo "SETUP lint --json 파싱 실패"; exit 3; }
+}
+
+# $1=JSON — lint 가 판정하지 못한(UNKNOWN) 파일 수
+nunknown() {
+  python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))["unknown"]))' "$1"
+}
+
+lintjson "$LINT" "$TMP/live.json"; rc=$?
+[ "$rc" -le 1 ] || { echo "SETUP 트리 lint exit $rc (UNKNOWN)"; exit 3; }
+v=$(verdict "$TMP/live.json" ".githooks/pre-commit") || { echo "$v"; exit 3; }
+nlu=$(nunknown "$TMP/live.json") || exit 3
+# 트리의 훅은 diff 를 읽지 않는다(추출 · 판정은 정본) — lint 결과에 없어야 한다. 확장자 없는 훅이 lint 에 편입되는지는 mini-bad 가 합성 훅으로 본다
+if [ "$v" = absent ] && [ "$nlu" = 0 ]; then
+  ok "lint live: 트리의 훅은 diff 를 읽지 않는다 — lint 결과에 .githooks/pre-commit 이 없고 UNKNOWN 0"
+else
+  no "lint live: 트리의 훅은 diff 를 읽지 않는다 — lint 결과에 .githooks/pre-commit 이 없고 UNKNOWN 0" "hook=$v · unknown=$nlu"
+fi
+
+M="$TMP/mini" X="$TMP/mini/tests/fixtures/x"
+mkdir -p "$M/scripts" "$M/.githooks" "$X/_shim" || exit 3
+cp "$LINT" "$M/scripts/lint_diff_parsers.py" || exit 3
+printf '%s\n' '#!/usr/bin/env bash' 'git diff --cached -U0 | grep -E "^\+[^+]"' > "$M/.githooks/pre-commit" || exit 3
+# 확장자 없는 셔뱅 도구 5종 — 전부 선언 없는 diff 접두사 판정 코드(→ 위반). 셔뱅 인터프리터별 기대 판정 확장자는 아래 표
+printf '%s\n' '#!/bin/sh' "grep '^+' \"\$1\"" > "$X/_shim/tool" || exit 3
+printf '%s\n' '#!/usr/bin/env python3' 'import sys' 'for l in sys.stdin:' '    if l.startswith("+"):' '        print(l)' > "$X/_shim/pytool" || exit 3
+printf '%s\n' '#!/usr/bin/env node' 'for (const l of require("fs").readFileSync(0, "utf8").split("\n")) if (l.startsWith("+")) console.log(l);' > "$X/_shim/nodetool" || exit 3
+printf '%s\n' '#!/usr/bin/awk -f' '/^\+/ { print }' > "$X/_shim/awktool" || exit 3
+printf '%s\n' '#!/usr/bin/perl' 'while (<>) { print if /^\+/ }' > "$X/_shim/pltool" || exit 3
+# node 정상 대조 — diff 접두사 표현이 `//` 주석 줄에만 있다. .js 로 읽으면 주석이 걷혀 파서 아님(결과에 없음),
+#   .sh 로 읽으면 `//` 줄이 코드로 남아 위반이다 — 셔뱅 판정을 전부 .sh 로 내는 lint 를 행동으로 거부한다
+printf '%s\n' '#!/usr/bin/env node' '// if (l.startsWith("+")) — 설명 속 예시다. 이 도구는 diff 를 읽지 않는다' 'console.log("ok");' > "$X/jsnote" || exit 3
+printf '%s\n' "grep '^+' 셔뱅 없는 데이터" > "$X/data" || exit 3
+printf '\377\376\000\001\n' > "$X/blob" || exit 3
+lintjson "$M/scripts/lint_diff_parsers.py" "$TMP/mini.json"; rc=$?
+[ "$rc" -le 2 ] || { echo "SETUP mini lint exit $rc"; exit 3; }
+vh=$(verdict "$TMP/mini.json" ".githooks/pre-commit") || { echo "$vh"; exit 3; }; vj=$(verdict "$TMP/mini.json" "tests/fixtures/x/jsnote") || { echo "$vj"; exit 3; }
+vd=$(verdict "$TMP/mini.json" "tests/fixtures/x/data") || { echo "$vd"; exit 3; }; vb=$(verdict "$TMP/mini.json" "tests/fixtures/x/blob") || { echo "$vb"; exit 3; }
+nu=$(nunknown "$TMP/mini.json") || exit 3
+bad_v="" bad_e=""
+eh="${vh#* }"; eh="${eh%% *}"
+[ "$vh" != absent ] && [ "$eh" = .sh ] || bad_e="$bad_e hook=${eh}(기대 .sh)"
+for t in tool:.sh pytool:.py nodetool:.js awktool:.awk pltool:.sh; do
+  n="${t%%:*}" want="${t#*:}"
+  v=$(verdict "$TMP/mini.json" "tests/fixtures/x/_shim/$n") || { echo "$v"; exit 3; }
+  [ "${v%% *}" = violation ] || bad_v="$bad_v $n=$v"
+  e="${v#* }"; e="${e%% *}"
+  [ "$v" != absent ] && [ "$e" = "$want" ] || bad_e="$bad_e $n=${e}(기대 $want)"
+done
+if [ "$rc" -eq 1 ] && [ "${vh%% *}" = violation ] && [ -z "$bad_v" ]; then
+  ok "lint mini-bad: 선언 없는 .githooks 훅 · 확장자 없는 셔뱅 도구 5종(sh · python3 · node · awk · perl)이 위반 (exit 1)"
+else
+  no "lint mini-bad: 선언 없는 .githooks 훅 · 확장자 없는 셔뱅 도구 5종이 위반 (exit 1)" "exit $rc · hook=$vh ·$bad_v"
+fi
+if [ -z "$bad_e" ]; then
+  ok "lint mini-bad: 셔뱅 판정 확장자 python→.py · node→.js · awk→.awk · sh·perl→.sh · 훅 bash→.sh"
+else
+  no "lint mini-bad: 셔뱅 판정 확장자 python→.py · node→.js · awk→.awk · sh·perl→.sh · 훅 bash→.sh" "$bad_e"
+fi
+if [ "$vj" = absent ]; then
+  ok "lint mini-bad: node 정상 대조 — '//' 주석에만 접두사 표현 → 대상 아님(.js 주석 규칙으로 읽힌다)"
+else
+  no "lint mini-bad: node 정상 대조 — '//' 주석에만 접두사 표현 → 대상 아님" "jsnote=$vj ('//' 주석 줄을 코드로 읽었다 — .js 주석 규칙 미적용)"
+fi
+if [ "$vd" = absent ] && [ "$vb" = absent ] && [ "$nu" = 0 ]; then
+  ok "lint mini-bad: 셔뱅 없는 확장자 없는 파일(데이터 · 바이너리)은 대상 아님 · UNKNOWN 0"
+else
+  no "lint mini-bad: 셔뱅 없는 확장자 없는 파일은 대상 아님 · UNKNOWN 0" "data=$vd · blob=$vb · unknown=$nu"
+fi
+
+cp "$HOOK" "$M/.githooks/pre-commit" \
+  && rm -f "$X/_shim/tool" "$X/_shim/pytool" "$X/_shim/nodetool" "$X/_shim/awktool" "$X/_shim/pltool" || exit 3
+lintjson "$M/scripts/lint_diff_parsers.py" "$TMP/mini2.json"; rc=$?
+if [ "$rc" -eq 0 ]; then ok "lint mini-good: 트리의 실제 훅 · node 정상 대조 · 데이터 · 바이너리만 있으면 exit 0"
+else no "lint mini-good: 트리의 실제 훅 · node 정상 대조 · 데이터 · 바이너리만 있으면 exit 0" "exit $rc · hook=$(verdict "$TMP/mini2.json" .githooks/pre-commit) · jsnote=$(verdict "$TMP/mini2.json" tests/fixtures/x/jsnote)"; fi
+
+# 호스트의 XDG git 속성 파일 — `* binary` 가 읽히면 추가 줄이 전부 바이너리로 보여 통과 셀이 미판정으로 막힌다. 자식 실행으로 본다
+#   (중첩 가드는 풀어서 부른다 — 자식이 다시 건다. 자식은 이 셀을 돌지 않는다)
+if [ -z "${FZ_PRECOMMIT_ADDED_CHILD:-}" ]; then
+  mkdir -p "$TMP/host-xdg/git" && printf '* binary\n' > "$TMP/host-xdg/git/attributes" || exit 3
+  #   부모 git 의 설정 주입(서명 강제 + 실패하는 서명 프로그램 — 두 길)도 함께 준다 — 끊지 않으면 임시 저장소의 커밋이 실패해 준비 실패(3)다
+  env -u FZ_PRECOMMIT_FIXTURE FZ_PRECOMMIT_ADDED_CHILD=1 XDG_CONFIG_HOME="$TMP/host-xdg" GIT_CONFIG_PARAMETERS="'commit.gpgsign=true' 'gpg.program=false'" GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=true GIT_CONFIG_KEY_1=gpg.program GIT_CONFIG_VALUE_1=false \
+    bash "${BASH_SOURCE[0]}" --tree "$TREE" > "$TMP/child.out" 2>&1; rc=$?
+  if [ "$rc" -eq 0 ]; then ok "hook host-xdg-attributes-ignored: 호스트의 XDG git 속성 파일(\`* binary\`)이 셀 판정을 바꾸지 않는다"
+  else no "hook host-xdg-attributes-ignored: 호스트의 XDG git 속성 파일이 셀 판정을 바꾸지 않는다" "자식 exit $rc · $(grep -m 2 '^FAIL' "$TMP/child.out" | tr '\n' ' ' | cut -c1-240)"; fi
+fi
+
+echo
+echo "$fail 건 실패"
+[ "$fail" -eq 0 ] || exit 1
+echo "PRECOMMIT_ADDED_LINES_OK 훅 ${nh}셀 · lint ${nl}셀"

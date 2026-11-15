@@ -1,0 +1,112 @@
+# Intent Registry
+
+> /fz Phase 1에서 참조. 스킬별 트리거 패턴 + Confidence 판정 규칙.
+> Progressive Disclosure Level 3 (/fz Phase 1에서만 로드).
+
+## 목차
+
+- [스킬별 intent-triggers 레지스트리](#스킬별-intent-triggers-레지스트리)
+- [파이프라인 전용 트리거](#파이프라인-전용-트리거)
+- [구어체 보강 트리거](#구어체-보강-트리거)
+- [Confidence 판정 규칙](#confidence-판정-규칙)
+
+## 스킬별 intent-triggers 레지스트리
+
+| 스킬 | 한국어 패턴 | 영문 패턴 |
+|------|-----------|----------|
+| fz-discover | `어떻게.*좋을까\|어디에.*좋을까\|뭐가.*맞을까\|괜찮을까\|트레이드오프\|맞는지\|차이점\|놓치고\|어떻게.*생각\|이렇게.*해도\|방법.*찾\|최적.*찾\|요구.*조건\|제약\|이게.*맞아\|어떤.*방식\|비교.*해줘` | `how.*should\|where.*should\|what.*best\|trade.?off\|difference\|missing\|what.*think` |
+| fz-plan | `계획\|설계\|아키텍처\|요구사항\|리팩토링\|치환\|흡수` | `plan\|design\|architect\|requirement\|migration\|refactor` |
+| fz-code | `구현\|코드.*(짜\|작성\|구현\|만들\|추가)\|만들어\|개발` | `implement\|code\|develop\|build` |
+| fz-review | `리뷰\|검증\|품질\|검토` | `review\|validate\|quality` |
+| fz-fix | `수정\|고쳐\|변경\|바꿔\|버그\|크래시\|에러\|되돌리기\|revert\|원상복구` | `fix\|bug\|crash\|error\|revert\|undo\|rollback\|patch` |
+| fz-search | `찾아\|탐색\|구조\|영향\|의존성` | `search\|explore\|structure\|impact\|dependency` |
+| fz-gpt | `gpt\|교차검증` | `gpt\|cross-validate\|verify with gpt` |
+| fz-commit | `커밋` | `commit` |
+| fz-pr | `(?<![A-Za-z])PR(?![A-Za-z])\|풀리퀘스트` | `(?<![A-Za-z])PR(?![A-Za-z])\|pull.?request` |
+| fz-rebase | `리베이스\|브랜치.*최신화\|브랜치.*동기화\|브랜치.*업데이트\|develop.*위로\|롱텀.*브랜치\|리베이스.*(사라\|누락\|덮어)\|(리베이스\|force.?push).*(유실\|덮어씌)` | `rebase\|sync.*branch\|refresh.*branch\|update.*branch` |
+| fz-peer-review | `피어리뷰\|팀원\|(?<![A-Za-z])PR(?![A-Za-z]).*리뷰\|코멘트.*(가치\|달 만한\|달만한)\|(가치\|달 만한\|달만한).*코멘트` | `peer.?review\|teammate\|(?<![A-Za-z])PR(?![A-Za-z]).*review\|comment.?worth` |
+| fz-pr-digest | `해설\|이해\|학습\|뭐가.*바뀐\|어떻게.*개선\|(?<![A-Za-z])PR(?![A-Za-z]).*설명\|변경.*설명` | `digest\|what.*changed\|learn` |
+| fz-explain | `구조.*설명\|코드.*설명\|어떻게.*동작\|어떤.*역할\|전체.*흐름\|과외\|처음.*보는.*사람` | `explain.*structure\|how.*work\|walkthrough\|tutor\|onboard` |
+| fz-skill | `스킬.*만들\|스킬.*생성\|스킬.*수정\|스킬.*삭제\|에이전트.*만들\|에이전트.*생성\|스킬.*평가\|스킬.*최적화\|description.*최적화\|트리거.*테스트\|트리거.*정확도\|문서.*작성\|글쓰기\|프롬프트.*최적화\|description.*개선\|가이드.*작성` | `create.*skill\|new.*skill\|update.*skill\|delete.*skill\|create.*agent\|new.*agent\|eval.*skill\|optimize.*skill\|optimize.*description\|trigger.*test\|trigger.*accuracy\|document\|write.*skill\|improve.*description\|optimize.*prompt` |
+| fz-manage | `관리\|스킬.*목록\|의존성\|체크\|벤치마크\|일괄.*평가\|건강.*체크\|생태계.*점검\|트리거.*벤치마크\|메모리.*반영\|교훈.*반영` | `manage\|skill.*list\|depend\|check\|benchmark\|batch.*eval\|health.*check\|trigger.*benchmark\|reflect.*module\|lessons.*module` |
+| fz-modernize | `최신화\|모더나이제이션\|모더나이즈\|가이드 업데이트\|문서 갱신\|문서 업데이트\|stale 정리\|deprecated 정리\|구버전 정리\|새 모델 출시\|최신 모델` | `modernize\|reference 업데이트\|[Oo]pus ?-?5\|[Ss]onnet ?-?5\|[Ff]able ?-?5\|GPT.*5\.\d\|[Oo]pus.*4\\.\\d` |
+| fz-recording | `녹음\|회의록\|녹취\|(화자\|음성\|오디오\|파일\|m4a\|mp3\|wav).*분리\|화자\|STT\|음성` | `recording\|meeting.*notes\|transcri\|diariz\|speaker` |
+| fz-memory | `메모리.*정리\|메모리.*관리\|메모리.*감사\|교훈.*회상\|기억.*떠올려` | `memory.*audit\|memory.*gc\|memory.*recall\|memory.*organize\|cleanup.*memory` |
+
+## 파이프라인 전용 트리거
+
+⛔ 아래는 **스킬이 아니라 파이프라인**이다. 스킬 YAML 에 자리가 없어 여기 둔다.
+
+⛔ **"모든 파이프라인 트리거의 정본" 이 아니다.** 19종 전부가 `modules/pipelines.md` 에
+자기 `트리거` 행을 갖고 있고(19/19 실측), `/fz` Phase 3.1 이 그것을 읽는다. 이 표에 있는
+넷은 **Phase 1 이 먼저 잡아야** 하는 것들이다 — Phase 1 매칭이 0 이면 3.1 resolver-only 로
+내려가므로, 스킬 어휘와 겹치지 않는 파이프라인은 여기 없으면 Phase 1 에서 새어 나간다.
+
+⛔ 나머지 15종을 여기 옮겨 적지 않는다. 같은 트리거가 두 파일에 있으면 서서히 어긋난다 —
+`pipelines.md` 가 파이프라인 트리거의 정본이고, 이 표는 Phase 1 선행 매칭용 부분집합이다.
+
+| 파이프라인 | 한국어 패턴 | 영문 패턴 |
+|-----------|-----------|----------|
+| full-cycle | `처음부터.*끝까지\|계획부터.*PR\|전체.*사이클` | `full.*cycle\|end.*to.*end` |
+| drift-check | `드리프트\|아키텍처.*점검\|레이어.*위반\|전체.*스캔\|점검해줘\|훑어봐\|전체.*봐줘\|전체.*확인해줘` | `drift\|arch.*check\|full.*scan` |
+| plan-parallel | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` | `independent.*plan\|parallel.*plan\|cross.*plan` |
+| pr-comment-review | `코드레빗\|(?<![A-Za-z])PR(?![A-Za-z]).*코멘트.*분석\|외부.*리뷰.*코멘트\|리뷰.*코멘트.*확인\|피드백.*확인` | `coderabbit\|(?<![A-Za-z])PR(?![A-Za-z]).*comment.*analysis\|external.*review.*comment\|review.*comment\|feedback.*check` |
+
+## 구어체 보강 트리거
+
+기존 스킬 트리거에 구어체/복합 표현을 보강합니다:
+
+| 스킬 | 추가 패턴 (구어체) |
+|------|-----------------|
+| fz-plan | `뭐부터.*시작\|어디서.*시작\|순서.*알려줘\|뭘.*해야\|어떻게.*만들면` |
+| fz-code | `짜줘\|작성해줘\|만들어봐\|코딩해줘\|개발해줘` |
+| fz-fix | `안 돼\|안됨\|이상해\|왜 이래\|문제있어\|오류남` |
+| fz-review | `괜찮아?\|문제없어?\|이거 어때\|잘 된 거야?\|맞게 했어?` |
+| fz-search | `어디 있어\|어디에 있\|어디서 쓰이\|누가 쓰는` |
+| fz-skill | `스킬.*개선\|description.*개선\|트리거.*안 됨\|트리거.*안돼\|스킬.*품질\|스킬.*테스트` |
+| fz-manage | `스킬.*상태\|전체.*스킬\|스킬.*몇 개\|의존성.*그래프\|스킬.*건강` |
+| fz-discover | `어떻게 하면\|어떤 방식\|어떤 게 나아\|뭐가 좋아\|고민인데` |
+
+## 이어 하기 · 메타 보강 (2026-11-05 · F-528)
+
+실측(/fz 실제 요청 281건)에서 매칭 0 이던 묶음이다. ⛔ `(이어 하기)` 는 스킬이 아니다 — 걸리면 스킬을 다시 고르지 않고 Phase 0 의 1(이전 세션 복원 — `index.md` Active Phase)로 잇는다. ⛔ `PR` 은 앞뒤가 영문자가 아닐 때만 토큰이다(`prompt` · `PRD` 를 PR 로 읽지 않는다) · `코드` 는 작성 동사와 함께일 때만 fz-code 다(`코드 리뷰` 는 리뷰). 회귀: `tests/fixtures/routing/intent-corpus/cases.tsv`(lint #4)
+
+| 대상 | 패턴 | 메모 |
+|------|------|------|
+| (이어 하기) | `(계속\|이어서)\s*(진행\s*해\|해\s*줘\|해\s*주세요\|하자\|가자)\|다음\s*(스텝\|단계\|step)\s*(진행\s*해\|해\s*줘\|하자\|가자)` | 스킬 재선택 없이 Phase 0 의 1 — 복원할 Active Phase 가 있을 때만 · 다른 스킬 행이 같이 걸리면 그 스킬을 따른다 |
+| fz-manage | `finding.*(쌓인\|정리\|분석)\|fz.*(고도화\|개선)` | fz 생태계 메타 요청 |
+
+## Confidence 판정 규칙
+
+매칭 후 신뢰도를 평가하여 애매하면 반드시 묻는다.
+
+| Confidence | 조건 | 행동 |
+|-----------|------|------|
+| High (≥80) | 트리거 2개+ 매칭, 단일 파이프라인 | Phase 2로 자동 진행 |
+| Medium (50-79) | 트리거 1개 매칭 or 복수 파이프라인 경쟁 | AskUserQuestion 필수 |
+| Low (<50) | 부분 매칭 or 키워드 1개 | AskUserQuestion 필수 |
+| Zero | 매칭 없음 | `/fz` Phase 3.1 resolver-only(파이프라인 트리거 대조) → total-miss 면 AskUserQuestion. 3.2 동적 구성 · 다른 추천기로 재매핑하지 않는다(절차 `skills/fz/SKILL.md` § 3.1) |
+
+**동점 처리**: 파이프라인 점수 차 < 15점 → 동점으로 간주 → AskUserQuestion.
+
+**짧은 요청 규칙**: 요청 길이 < 10글자 or 동사 없음 → 의도 재확인 AskUserQuestion 먼저.
+
+### Medium/Low confidence 질문 형식
+
+```
+Q: "다음 중 어떤 작업을 원하시나요?"
+옵션:
+  1. {파이프라인 A} — {한 줄 설명} (Recommended: confidence {N})
+  2. {파이프라인 B} — {한 줄 설명} (confidence {N})
+  3. 직접 설명해주세요
+```
+
+### 짧은 요청 의도 재확인 형식
+
+```
+Q: "'{요청 원문}' — 어떤 게 필요하신가요?"
+옵션:
+  1. {가장 likely한 해석}
+  2. {두 번째 해석}
+  3. 직접 설명
+```

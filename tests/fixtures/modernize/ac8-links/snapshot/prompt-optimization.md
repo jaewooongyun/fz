@@ -1,0 +1,1 @@
+> - **GPT CLI Changelog (OpenAI)** — Browser + Auto Review Agent + GPT-5.5(0.124.0) · GPT-6 Astra(0.153.1) · **GPT-6 Sol·Luna**(0.156.1 에서 모델 선택기 추가 2026-09-23 · 0.157.0 정식 추가 2026-09-25 · CLI 기본 `gpt-6-sol` medium) · GPT-6.1 Sol(0.159.0 추가 · 0.159.1 bundled default, 2026-09-29) 통합. https://learn.chatgpt.com/docs/changelog

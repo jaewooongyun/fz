@@ -1,0 +1,12 @@
+Reading additional input from stdin...
+OpenAI GPT-CLI v0.159.2
+--------
+[1mworkdir:[0m @RUN@/repo
+[1mmodel:[0m gpt-6.1-sol
+[1mprovider:[0m openai
+[1mapproval:[0m never
+[1msandbox:[0m read-only
+[1mreasoning effort:[0m high
+[1mreasoning summaries:[0m none
+[1msession id:[0m 00000000-0000-7000-8000-000000000004
+--------

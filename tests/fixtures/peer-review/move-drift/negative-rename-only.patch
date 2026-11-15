@@ -1,0 +1,31 @@
+commit 0000000000000000000000000000000000000000
+Author: Example Dev <dev@example.com>
+Date:   Thu Jan 1 00:00:00 2026 +0000
+
+    refactor(summary): 선물 포장 값의 이름을 정리
+
+    - 포장 여부를 답하는 값을 isGiftWrapped 에서 includesGiftWrap 으로 변경
+    - 옵션을 적용하는 헬퍼 파라미터는 usesGiftWrap 으로 둔다
+
+diff --git a/Sources/Summary/SummaryViewController.ext b/Sources/Summary/SummaryViewController.ext
+index aaaaaaa..bbbbbbb 100644
+--- a/Sources/Summary/SummaryViewController.ext
++++ b/Sources/Summary/SummaryViewController.ext
+@@ -5,7 +5,7 @@ final class SummaryViewController {
+-    var isGiftWrapped: Bool {
++    var includesGiftWrap: Bool {
+         traitCollection.horizontalSizeClass == .regular
+     }
+ 
+-    func applyConstraints(isGiftWrapped: Bool) {
++    func applyConstraints(usesGiftWrap: Bool) {
+         layoutGuide.activate()
+     }
+diff --git a/Sources/Summary/SummaryPresenter.ext b/Sources/Summary/SummaryPresenter.ext
+index ccccccc..ddddddd 100644
+--- a/Sources/Summary/SummaryPresenter.ext
++++ b/Sources/Summary/SummaryPresenter.ext
+@@ -3,5 +3,5 @@ protocol SummaryPresentable {
+-    var isGiftWrapped: Bool { get }
++    var includesGiftWrap: Bool { get }
+ }

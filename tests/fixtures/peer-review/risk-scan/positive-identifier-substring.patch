@@ -1,0 +1,7 @@
+diff --git a/S.ext b/S.ext
+--- a/S.ext
++++ b/S.ext
+@@ -1,3 +1,6 @@
++    private let authManager = AuthManager()
++    let tokenProvider = TokenProvider()
++    var sessionStore: SessionStore?

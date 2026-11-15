@@ -1,0 +1,348 @@
+// 워크플로별 기본값 회귀 (R-B · R-C) — 옵션을 주지 않으면 워크플로의 모든 콜 입력이 그 워크플로의 기본값과 바이트 단위로 같다.
+//   기본 off 워크플로: 미지정 == 기준 트리. 기본 on 워크플로(레지스트리 `defaultOn` — v4.42.0 peer-review): 미지정 == 켠 값.
+//   기본 off 워크플로는 옵션마다 끄는 값(off) == 기준. 기본 on 워크플로는 **기본 on 옵션을 모두 끄면** == 기준이다 — 롤백 경로
+//   (하나만 끄면 나머지가 켜져 있어 기준이 아니다 — 옵션마다는 '끔 != 켬' 으로 배선을 본다).
+//   ⛔ 이 검사는 Workflow 층만 본다 — 모든 arm 에 같은 합성 structuralContext 를 넣는다. 실제 롤백은 Lead 가 브리프에서 §6 도 빼야 한다
+//     (modules/review-structural-axes.md — 브리프는 Lead 가 조립해 스크립트가 거르지 못한다).
+//   레지스트리는 tests/workflows/default-arms.js 가 재사용한다(require — 실행부는 직접 실행할 때만 돈다).
+//
+// ⛔ 비교 대상은 **콜 입력**(label · prompt · schema · model · effort · agentType)이다. 반환값은 비교하지 않는다 —
+//    R-A 가 peer-review Tier 2 반환의 완주 수 계산을 고쳤다(프롬프트·스키마는 그대로). 반환까지 비교하면 그 수정이 회귀로 보인다.
+//    하네스의 calls 는 스키마를 불리언으로만 남기므로 responder 가 opts.schema 를 직렬화해 잡는다.
+// ⛔ 기준 소스(앞이 이긴다 — resolveBase, effort-arg.js 도 이것을 쓴다): env FZ_REGRESSION_BASE_TREE 의 workflows/<wf>.js
+//    → env FZ_REGRESSION_BASE_SHA 의 이 저장소 이력 `git show <sha>:workflows/<wf>.js` → 둘 다 없을 때만 저장소 고정본
+//    tests/fixtures/workflow-base/default-off/workflows/<wf>.js.base(커밋 13755a6 의 workflows/*.js 와 콜 입력이 같다 — 이력 없는 사본에서도 돈다.
+//    .js 가 아니어서 .js 글롭 검사가 옛 원문을 훑지 않는다 — 임시 <wf>.base.js 로 써서 넘긴다).
+//    명시한 선택자(빈 값 포함)를 읽지 못하면 고정본으로 내려가지 않고 UNRUN(exit 2)이다. 고정본이 없어도 UNRUN 이다. 검사 이름의 `기준(…)` 이 출처다.
+//    ⛔ 고정본은 두 가지 편집만 받는다 — 콜 입력 밖(주석)의 치환과, workflows/*.js 에 똑같이 적용한 문자열 치환. 유래 커밋과의 차이는 이 둘뿐이어야 한다.
+//       의도한 기본 경로 변경은 고정본을 고쳐 맞추지 않고 아래 INTENDED 변환으로 적는다 — 고정본을 고쳐 FAIL 을 지우면 회귀가 가려진다.
+//    health-check 러너는 env 를 비우지 않고 부른다 — 호출자 env 를 그대로 물려받는다. 그래서 전용 이름만 읽는다: 범용 FZ_BASE_TREE · FZ_BASE_SHA 는
+//    A/B 기준 arm · 게이트 환경이 다른 뜻으로 내보낸다(F-363). 새 이름 없이 옛 이름만 있으면 WARN 줄을 내고 고정본으로 돈다.
+// ⛔ 옵션마다 세 가지를 본다: 미지정 == 기준(defaultOn 이면 미지정 == 켬) · false == 기준 · true != 기준(옵션이 실제로 배선돼 있다 — 헛돌이 방어).
+//    옵션이 닿지 않는 경로(예: Stage 2 가 없는 Tier 2 미발화)에서는 셋째를 true == 기준 으로 본다 — 옵션이 엉뚱한 경로로 새지 않는다.
+// ⛔ `structural` 옵션(R-C 속도 arm)은 켜면 콜을 빼는 것이 목적이다 — 켠 쪽 두 검사(!= 기준 · 콜 구성 동일)를 여기서 하지 않고
+//    그 값이 가리키는 전용 테스트가 본다. 미지정 == 기준 · off == 기준 은 똑같이 본다.
+// 인자: --option NAME(여러 번) · --all-rb-options · 인자 없음 = 등록된 옵션 전부(health-check 러너가 인자 없이 돈다).
+'use strict'
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { execFileSync } = require('child_process')
+const { run } = require('../lib/wf_harness')
+
+const ROOT = path.join(__dirname, '..', '..')
+// 기준 선택자(resolveBase) — pinnedSha 는 고정본의 유래(검사 이름의 출처 표기)일 뿐 git 에서 읽지 않는다
+const BASE_SEL = { tree: 'FZ_REGRESSION_BASE_TREE', sha: 'FZ_REGRESSION_BASE_SHA', gitRoot: ROOT,
+  pinnedDir: path.join(__dirname, '..', 'fixtures', 'workflow-base', 'default-off', 'workflows'), pinnedSha: '13755a6' }
+
+// 옵션 레지스트리 — 새 옵션(S16b · S17 …)은 여기에 한 줄 더한다. 없는 이름을 부르면 FAIL 이다.
+// defaultOn: 그 옵션이 **기본으로 켜진** 워크플로(v4.42.0 — S25p 판정 PASS 인 peer-review 만). 나머지 워크플로는 기본 off 다.
+//   ⛔ 바꾸려면 측정 판정이 먼저다 — tests/workflows/default-arms.js 가 원장 판정과 이 값을 대조한다.
+const PEER_ON = ['peer-review']
+const OPTIONS = {
+  craftAxes: { workflows: ['peer-review', 'review-live'], on: { craftAxes: true }, off: { craftAxes: false }, defaultOn: PEER_ON },
+  crossRequiredFields: { workflows: ['peer-review', 'review-live'], on: { crossRequiredFields: true }, off: { crossRequiredFields: false },
+    defaultOn: PEER_ON, applies: sc => sc.stage2 },   // Stage 2 교차 프롬프트에만 닿는다
+  // 두 워크플로 — 렌즈 에이전트가 미리 올리는 스킬(arch-critic · code-auditor)의 '자체 confidence 80% 미만이면 보고하지 않는다' 는
+  //   [후보 보존] 문장에만 풀린다. peer-review 는 OVERRIDE 문장을 바꾸고, review-live(R-C S22)는 문장을 덧붙이고 스키마 사본에
+  //   confidence 를 얹는다. OVERRIDE 가 모든 콜에 있어 applies 가 없다
+  preserveLowConfidence: { workflows: ['peer-review', 'review-live'], on: { preserveLowConfidence: true }, off: { preserveLowConfidence: false },
+    defaultOn: PEER_ON },
+  // peer-review 만 — 이슈 항목 스키마에 oracle(판별 방법) 필수 필드(F-072). 프롬프트는 그대로, 스키마 사본만 바뀐다
+  oracleField: { workflows: ['peer-review'], on: { oracleField: true }, off: { oracleField: false }, defaultOn: PEER_ON },
+  // 두 워크플로 — 판정 한계 칸(axisCoverage gap · unverifiedPremises · limits · 동적 축 질문 · F-559 · F-448 · F-178 · F-117).
+  //   Stage 1 프롬프트 · 렌즈 스키마 사본이 바뀐다. review-live 는 기본 off(S25 판정 전 · default-arms.js decided off)
+  judgmentSlots: { workflows: ['peer-review', 'review-live'], on: { judgmentSlots: true }, off: { judgmentSlots: false }, defaultOn: PEER_ON },
+  // review-live 만 — peer-review 는 기본 스키마에 위치 필드가 있다. Stage 1 두 콜의 스키마만 바뀐다
+  locatedFindings: { workflows: ['review-live'], on: { locatedFindings: true }, off: { locatedFindings: false } },
+  // R-C 속도 arm — 켜면 병합 콜을 뺄 수 있다(structural)
+  mergeMode: { workflows: ['plan-lean2'], on: { mergeMode: 'conditional' }, off: { mergeMode: 'always' },
+    structural: 'tests/workflows/plan-lean2-merge-arm.js' },
+  // R-C 속도 arm — 켜면 교차 2콜을 뺄 수 있다(structural)
+  stage2: { workflows: ['review-live'], on: { stage2: 'conditional' }, off: { stage2: 'always' },
+    structural: 'tests/workflows/review-live-stage2-arm.js' },
+  // R-C 교차 delta — 콜 수는 그대로, Stage 2 교차의 스키마 · 프롬프트만 바뀐다(동치는 tests/workflows/cross-delta-arm.js)
+  crossOutput: { workflows: ['peer-review', 'review-live'], on: { crossOutput: 'delta' }, off: { crossOutput: 'full' },
+    defaultOn: PEER_ON, applies: sc => sc.stage2 },
+  // S13 — plan-lean2 적대 렌즈의 필수 축을 과제에서 받는다(F-383). 빈 배열은 미지정과 같다(기본 UI 축)
+  edgeAxes: { workflows: ['plan-lean2'], on: { edgeAxes: ['스크립트 종료 코드', '부분 입력'] }, off: { edgeAxes: [] } },
+  // S13 — 방어 항목 failurePath(F-438). 켜면 edge 스키마 사본과 프롬프트 한 줄이 바뀐다
+  defenseFailurePath: { workflows: ['plan-lean2'], on: { defenseFailurePath: true }, off: { defenseFailurePath: false } },
+  // S13 — 렌즈 재독 억제 문장(F-362 · 효과 측정 전). 켜면 네 콜의 코드 컨텍스트 줄이 바뀐다
+  noRereadContext: { workflows: ['plan-lean2'], on: { noRereadContext: true }, off: { noRereadContext: false } },
+  // R-C 사전 수집 스냅샷 — Stage 1 두 프롬프트에만 닿는다(콜 수 그대로). 빈 문자열은 미지정과 같다
+  snapshotDir: { workflows: ['review-live'], on: { snapshotDir: '/tmp/fz-snapshot' }, off: { snapshotDir: '' } },
+  // B11 측정 arm — '켬' 은 counter 를 끈 arm 이다(이름과 반대). 켜면 Stage 3 콜을 뺀다(structural)
+  counter: { workflows: ['review-live'], on: { counter: 'off' }, off: { counter: 'opus' },
+    structural: 'tests/workflows/review-live-counter-arm.js' },
+  // S19 — 렌즈 에이전트 정의의 점검 카탈로그 적용 결과 칸. counter(review-live · peer-review Tier 3) · 적대 렌즈(plan-lean2)에만 닿는다
+  catalogHits: { workflows: ['peer-review', 'review-live', 'plan-lean2'], on: { catalogHits: true }, off: { catalogHits: false },
+    defaultOn: PEER_ON, applies: sc => !sc.name.startsWith('Tier 2') },
+  // F-587 — lean2-full 스키마 사본의 Step 칸 complexity · 프롬프트 Step 칸 나열. 끄면 기준과 같다
+  stepComplexity: { workflows: ['plan-lean2'], on: { stepComplexity: true }, off: { stepComplexity: false } },
+}
+
+const BASE_ARGS = { diffPath: '/tmp/diff.patch', intentContext: '합성 의도', structuralContext: '합성 구조 축 브리프' }
+// 경로가 다른 시나리오 — peer-review 는 Tier 2(트리거 미발화 · 발화)와 Tier 3 을 다 탄다
+const SCENARIOS = {
+  'peer-review': [
+    { name: 'Tier 2 · 트리거 미발화', args: {}, fire: false, stage2: false },
+    { name: 'Tier 2 · 트리거 발화', args: {}, fire: true, stage2: true },
+    { name: 'Tier 3 · deep', args: { deep: true }, fire: true, stage2: true },
+  ],
+  'review-live': [{ name: '기본', args: {}, fire: false, stage2: true }],
+  // 둘째 경로 = Stage 1 의미 필드가 전부 빈 응답 — mergeMode 'conditional' 이 병합을 실제로 빼는 경로다(없으면 켬 == 끔 이라
+  //   default-arms.js 가 plan-lean2 의 기본값을 판정하지 못한다)
+  'plan-lean2': [{ name: '기본', args: { requirement: '합성 요구', codeContextPath: '/tmp/code-context.md' }, fire: false, stage2: false },
+    { name: 'Stage 1 의미 필드 빔', args: { requirement: '합성 요구', codeContextPath: '/tmp/code-context.md' }, fire: false, stage2: false, quiet: true }],
+}
+
+function responses(wf, fire, quiet) {
+  const major = { id: 'Q1', file: 'a.swift', line_range: '10-12', severity: 'major', perspective: 'p', discoveryAxis: 'code_quality',
+    origin: 'regression', description: 'd', evidence: 'e', confidence: 90 }
+  if (wf === 'peer-review') {
+    return {
+      'stage1-arch': { issues: [], strengths: ['s'], overall_assessment: 'o' },
+      'stage1-quality': { issues: fire ? [major] : [], strengths: [], overall_assessment: 'o' },
+      'stage1-correctness': { issues: [], strengths: [], overall_assessment: 'o' },
+      'stage2-arch-on-peers': { adjustments: [], additions: [] },
+      'stage2-quality-on-peers': { adjustments: [], additions: [] },
+      'stage3-counter': { challenges: [], missedIssues: [] },
+    }
+  }
+  if (wf === 'plan-lean2') {
+    return {
+      'lean2-full': { directionVerdict: 'PROCEED', directionAlternatives: [], steps: [{ id: 'S1', title: 't', files: ['a'] }], readScope: [], writeScope: [] },
+      'lean2-edge': { edgeCases: quiet ? [] : [{ id: 'E1', case: 'c', failureScenario: 'f', whereItBreaks: 'w' }], impactNotes: [], latentDefects: [] },
+      'lean2-impact-arch': { impactFiles: [], patternVerdicts: [] },
+      'lean2-merge': { addedEdgeCases: [], addedImpact: [], stepAmendments: [], implicationRegister: [], unresolved: [] },
+    }
+  }
+  return {
+    'stage1-arch': { findings: [{ id: 'A1', severity: 'minor', category: 'c', title: 't', detail: 'd', evidence: 'e' }], okAreas: ['ok'] },
+    'stage1-quality': { findings: [], okAreas: [] },
+    'stage2-arch-on-quality': { adjustments: [], additions: [] },
+    'stage2-quality-on-arch': { adjustments: [], additions: [] },
+    'stage3-counter': { challenges: [], missedFindings: [] },
+  }
+}
+
+async function callsOf(file, wf, scenario, extraArgs) {
+  const calls = []
+  const table = responses(wf, scenario.fire, scenario.quiet)
+  await run(file, {
+    args: Object.assign({}, BASE_ARGS, scenario.args, extraArgs),
+    responder: (prompt, opts) => {
+      calls.push({ label: opts.label, agentType: opts.agentType, model: opts.model, effort: opts.effort,
+                   schema: JSON.stringify(opts.schema || null), prompt })
+      return table[opts.label] ? JSON.parse(JSON.stringify(table[opts.label])) : null
+    },
+  })
+  return calls
+}
+
+// ⛔ R-D 의도된 기본 경로 변경 — 기준 트리의 콜 입력을 이 변환으로 옮긴 뒤 비교한다. 그 밖의 차이는 여전히 회귀다.
+//    변환은 정확한 치환이다 — 기준 콜이 전제(옛 agentType · 앵커 문장 있음 · 새 줄 없음)와 다르면 던져서 실패한다(변환이 헛돌면 회귀를 가린다).
+//    S32(plan-lean2 병합 콜 무탐색 · F-345): agentType plan-structure → plan-merge · 계약 한 줄. 새 모양은 plan-lean2-merge-no-explore.js 가 본다.
+const MERGE_CONTRACT = '⛔ 이 콜에는 탐색 도구가 없다 — 위 코드 컨텍스트 파일도 읽지 않는다. 입력 JSON 만으로 접고, 근거가 입력에 없어 접을 수 없으면 unresolved 에 적는다.\n'
+const MERGE_AT = '⛔ 출력 형식: StructuredOutput 인자는 유효한 JSON.'
+// R-F4 F4-2(F-342): VerifySpec 에 env — 기준 lean2-full 스키마의 VerifySpec `tools` 바로 뒤에 `env` 를 넣는다. 새 모양의 정본은
+//   workflows/plan-lean2.js VerifySpec 이다(설명 문구가 어긋나면 이 비교가 실패한다 — 그것이 맞다). 기준에 tools 가 없거나 env 가 이미 있으면 던진다.
+const ENV_PROP = { type: 'array', items: { type: 'string' },
+  description: 'command 가 ${NAME:?} 등으로 요구하는 환경 변수 이름 (예: ["FZ_IMPL_ROOT"]). 없거나 비면 게이트를 돌리지 않고 미판정으로 남긴다 — 통과 증거를 강등하지 않기 위함(F-342)' }
+function addEnv(node, hit) {
+  if (Array.isArray(node)) return node.map(n => addEnv(n, hit))
+  if (!node || typeof node !== 'object') return node
+  const out = {}
+  for (const [k, v] of Object.entries(node)) {
+    out[k] = addEnv(v, hit)
+    if (k === 'tools' && v && v.type === 'array' && String(v.description || '').startsWith('command 가 필요로 하는 외부 명령')) {
+      if ('env' in node) throw new Error('기준 VerifySpec 에 이미 env 가 있다 — 기준 트리가 R-F4 이후인지 본다')
+      out.env = ENV_PROP
+      hit.n++
+    }
+  }
+  return out
+}
+const INTENDED = {
+  'plan-lean2': {
+    'lean2-full': c => {
+      const hit = { n: 0 }
+      const schema = addEnv(JSON.parse(c.schema), hit)
+      if (hit.n < 1) throw new Error('기준 lean2-full 스키마에 VerifySpec tools 가 없다 — F4-2 변환 전제와 다르다')
+      return Object.assign({}, c, { schema: JSON.stringify(schema) })
+    },
+    'lean2-merge': c => {
+      if (c.agentType !== 'fz:plan-structure' || c.prompt.split(MERGE_AT).length !== 2 || c.prompt.includes(MERGE_CONTRACT)) {
+        throw new Error(`기준 lean2-merge 콜이 S32 변환 전제와 다르다(agentType ${c.agentType}) — 기준 트리가 S32 이전인지 본다`)
+      }
+      return Object.assign({}, c, { agentType: 'fz:plan-merge', prompt: c.prompt.replace(MERGE_AT, MERGE_CONTRACT + MERGE_AT) })
+    },
+  },
+}
+const intended = (wf, calls) => calls.map(c => ((INTENDED[wf] || {})[c.label] ? INTENDED[wf][c.label](c) : c))
+
+// 기준 원문 하나를 고른다 — 머리말의 순서(트리 > SHA > 고정본)와 '명시한 선택자는 고정본으로 내려가지 않는다' 의 유일한 구현이다.
+//   effort-arg.js 도 자기 sel 로 이것을 부른다 — 이력에 묶인 러너가 늘면 이 본문을 복사하지 않고 이것을 부른다.
+//   sel = { tree · sha: 선택자 env 이름, gitRoot: git show 를 돌릴 저장소, pinnedDir: 고정본 폴더, pinnedSha: 고정본의 유래(출처 표기) }
+//   반환 { file, from } — SHA · 고정본 원문은 tmp/<wf>.base.js 로 써서 넘긴다(하네스는 .js 를 읽는다).
+//   ⛔ 읽지 못하면 던진다 — 호출자가 UNRUN(exit 2)으로 끝낸다. 빈 값도 명시다: 미지정으로 읽으면 조용히 고정본으로 가고,
+//      빈 트리 값을 경로로 쓰면 path.join('', 'workflows') 가 cwd 의 workflows/ 를 기준으로 읽는다.
+function resolveBase(wf, tmp, sel) {
+  const tree = process.env[sel.tree], sha = process.env[sel.sha]
+  const noFallback = '명시한 선택자는 고정본으로 내려가지 않는다'
+  if (tree !== undefined) {
+    if (!tree) throw new Error(`${sel.tree} 가 빈 값이다 — ${noFallback}`)
+    const f = path.join(tree, 'workflows', `${wf}.js`)
+    if (!fs.existsSync(f)) throw new Error(`${sel.tree} 에 ${wf}.js 가 없다 — ${f} (${noFallback})`)
+    // 있는 것과 읽히는 것은 다르다 — 그 자리가 폴더이거나 권한이 없으면 하네스가 UNRUN 갈래 밖에서 읽다 던져 exit 1(회귀)로 읽힌다
+    try { fs.readFileSync(f, 'utf8') } catch (e) { throw new Error(`${sel.tree} 의 ${wf}.js 를 읽지 못했다 — ${f}: ${e.code || e.message} (${noFallback})`) }
+    return { file: f, from: sel.tree }
+  }
+  let src
+  if (sha !== undefined) {
+    if (!sha) throw new Error(`${sel.sha} 가 빈 값이다 — ${noFallback}`)
+    try {
+      src = execFileSync('git', ['-C', sel.gitRoot, 'show', `${sha}:workflows/${wf}.js`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (e) {
+      throw new Error(`git show ${sha}:workflows/${wf}.js 실패(${sel.sha}) — ${String(e.stderr || e.message).trim().split('\n')[0]} (${noFallback})`)
+    }
+  } else {
+    const p = path.join(sel.pinnedDir, `${wf}.js.base`)
+    if (!fs.existsSync(p)) throw new Error(`저장소 고정본이 없다 — ${p}`)
+    src = fs.readFileSync(p, 'utf8')
+  }
+  const f = path.join(tmp, `${wf}.base.js`)
+  fs.writeFileSync(f, src)
+  return { file: f, from: sha !== undefined ? `git ${sha}(${sel.sha})` : `고정본 ${sel.pinnedSha}` }
+}
+
+function baseFile(wf, tmp) { return resolveBase(wf, tmp, BASE_SEL) }
+
+function firstDiff(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const x = a[i], y = b[i]
+    if (!x || !y) return `콜 수 ${a.length} ≠ ${b.length}`
+    for (const k of ['label', 'agentType', 'model', 'effort', 'schema', 'prompt']) if (x[k] !== y[k]) return `${i}번 콜(${x.label}) ${k} 다름`
+  }
+  return null
+}
+
+const labels = calls => calls.map(c => c.label).sort().join(',')   // ⛔ 옵션은 콜을 더하거나 빼지 않는다 — 콜별 검사는 빠진 콜을 못 본다
+let fail = 0
+function check(name, cond, got) {
+  console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${cond ? '' : ` — ${got}`}`)
+  if (!cond) fail += 1
+}
+
+module.exports = { OPTIONS, SCENARIOS, BASE_ARGS, callsOf, firstDiff, resolveBase }
+
+if (require.main === module) (async () => {
+  const argv = process.argv.slice(2)
+  // F-406 — UNRUN 경로가 임시 폴더를 남기지 않는다: 전용 TMPDIR 에서 기준 소스가 없는 자식을 돌려 남은 fz-default-off-* 를 센다
+  if (!process.env.FZ_DEFAULT_OFF_CHILD) {
+    const box = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-f406-'))
+    try {
+      const { spawnSync } = require('child_process')
+      const r = spawnSync(process.execPath, [__filename, '--option', 'mergeMode'], { encoding: 'utf8',
+        env: Object.assign({}, process.env, { FZ_DEFAULT_OFF_CHILD: '1', TMPDIR: box, FZ_REGRESSION_BASE_TREE: path.join(box, 'no-such-tree') }) })
+      const left = fs.readdirSync(box).filter(n => n.startsWith('fz-default-off-'))
+      check('f406-unrun-leaves-no-tmp — 기준 소스 없음(UNRUN exit 2) 뒤 임시 폴더 0', r.status === 2 && /UNRUN/.test(r.stdout || '') && left.length === 0,
+        `exit ${r.status} · 남은 폴더 ${left.length}`)
+      // 빈 값도 명시한 선택자다 — 미지정으로 읽어 고정본으로 내려가면 자식이 끝까지 돌아 exit 0 이다
+      const emptyEnv = Object.assign({}, process.env, { FZ_DEFAULT_OFF_CHILD: '1', TMPDIR: box, FZ_REGRESSION_BASE_SHA: '' })
+      delete emptyEnv.FZ_REGRESSION_BASE_TREE
+      const em = spawnSync(process.execPath, [__filename, '--option', 'mergeMode'], { encoding: 'utf8', env: emptyEnv })
+      check('empty-selector-unrun — FZ_REGRESSION_BASE_SHA 빈 값은 고정본으로 내려가지 않는다(UNRUN exit 2)', em.status === 2 && /^UNRUN .*빈 값/m.test(em.stdout || ''),
+        `exit ${em.status}`)
+      // 읽지 못하는 SHA 도 명시한 선택자다 — 고정본으로 내려가면 자식이 끝까지 돌아 exit 0 이다
+      const bad = spawnSync(process.execPath, [__filename, '--option', 'mergeMode'], { encoding: 'utf8',
+        env: Object.assign({}, emptyEnv, { FZ_REGRESSION_BASE_SHA: '0000000' }) })
+      check('unreadable-selector-unrun — 읽지 못하는 FZ_REGRESSION_BASE_SHA 는 고정본으로 내려가지 않는다(UNRUN exit 2)', bad.status === 2 && /^UNRUN /m.test(bad.stdout || ''),
+        `exit ${bad.status}`)
+      // 있지만 읽지 못하는 기준(워크플로 자리에 폴더) — 없는 것과 같은 UNRUN 이다. 하네스가 읽다 던지면 exit 1(회귀)로 읽힌다
+      const dirTree = path.join(box, 'dir-tree')
+      for (const wf of OPTIONS.mergeMode.workflows) fs.mkdirSync(path.join(dirTree, 'workflows', `${wf}.js`), { recursive: true })
+      const ur = spawnSync(process.execPath, [__filename, '--option', 'mergeMode'], { encoding: 'utf8',
+        env: Object.assign({}, process.env, { FZ_DEFAULT_OFF_CHILD: '1', TMPDIR: box, FZ_REGRESSION_BASE_TREE: dirTree }) })
+      check('unreadable-tree-file-unrun — 기준 트리의 워크플로 자리가 폴더면 고정본으로 내려가지 않는다(UNRUN exit 2)',
+        ur.status === 2 && /^UNRUN .*읽지 못했다/m.test(ur.stdout || ''), `exit ${ur.status}`)
+    } finally { fs.rmSync(box, { recursive: true, force: true }) }
+  }
+  const asked = argv.flatMap((a, i) => (a === '--option' ? [argv[i + 1]] : []))
+  const names = argv.includes('--all-rb-options') || asked.length === 0 ? Object.keys(OPTIONS) : asked
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-default-off-'))
+  const rolledBack = new Set()   // 롤백 검사는 (워크플로 · 경로)마다 한 번
+  const typoChecked = new Set()  // 값 검증은 (옵션 · 워크플로)마다 한 번
+  let bases
+  const env = process.env   // 옛 이름은 있는지만 본다 — 그 값은 기준에 쓰지 않는다(조용한 기본값 복귀만 알린다)
+  if (!env.FZ_REGRESSION_BASE_SHA && !env.FZ_REGRESSION_BASE_TREE && (env.FZ_BASE_SHA || env.FZ_BASE_TREE)) console.log('WARN: FZ_BASE_* 는 무시된다 — FZ_REGRESSION_BASE_*')
+  try {
+    const wfs = [...new Set(names.flatMap(n => (OPTIONS[n] ? OPTIONS[n].workflows : [])))]
+    try {
+      bases = Object.fromEntries(wfs.map(wf => [wf, baseFile(wf, tmp)]))
+    } catch (e) {
+      console.log(`UNRUN  기준 소스를 얻지 못했다 — ${e.message.split('\n')[0]} (⛔ 통과 아님)`)
+      process.exitCode = 2   // ⛔ process.exit 는 바깥 finally(임시 폴더 정리)를 건너뛴다(F-406) — 돌아가서 정리한 뒤 2 로 끝난다
+      return
+    }
+    for (const name of names) {
+      const opt = OPTIONS[name]
+      if (!opt) { check(`옵션 ${name} 이 레지스트리에 있다`, false, `등록된 옵션: ${Object.keys(OPTIONS).join(', ')}`); continue }
+      for (const wf of opt.workflows) {
+        const work = path.join(ROOT, 'workflows', `${wf}.js`)
+        for (const sc of SCENARIOS[wf]) {
+          const base = intended(wf, await callsOf(bases[wf].file, wf, sc, {}))
+          const unset = await callsOf(work, wf, sc, {})
+          const off = await callsOf(work, wf, sc, opt.off)
+          const on = await callsOf(work, wf, sc, opt.on)
+          const tag = `${name} · ${wf} · ${sc.name}`
+          const reaches = !opt.applies || opt.applies(sc)
+          if ((opt.defaultOn || []).includes(wf)) {
+            // 기본 on — 같은 워크플로의 다른 기본 on 옵션도 켜져 있어, 이 옵션 하나만 끈 결과는 기준이 아니다.
+            //   그래서 옵션마다는 '미지정 == 켬' 과 '끔 != 켬'(배선)을 보고, 롤백(기본 on 을 전부 끔 == 기준)은 경로마다 1회 아래에서 본다
+            check(`${tag}: 미지정 == ${JSON.stringify(opt.on)}(기본 on) — 콜 ${on.length}개`, on.length > 0 && firstDiff(unset, on) === null, firstDiff(unset, on) || '콜 0개')
+            if (reaches) check(`${tag}: ${JSON.stringify(opt.off)} != 켬(옵션이 배선돼 있다)`, firstDiff(off, on) !== null, '꺼도 콜 입력이 같다 — 헛돌이')
+            else check(`${tag}: ${JSON.stringify(opt.off)} == 켬(이 경로에는 옵션이 닿지 않는다)`, firstDiff(off, on) === null, firstDiff(off, on))
+            const key = `${wf}|${sc.name}`
+            if (!rolledBack.has(key)) {
+              rolledBack.add(key)
+              const allOff = Object.assign({}, ...Object.values(OPTIONS).filter(o => (o.defaultOn || []).includes(wf)).map(o => o.off))
+              const back = await callsOf(work, wf, sc, allOff)
+              check(`${wf} · ${sc.name}: 기본 on 옵션을 모두 끔 ${JSON.stringify(allOff)} == 기준(${bases[wf].from} · 롤백 경로)`, firstDiff(back, base) === null, firstDiff(back, base))
+            }
+            if (!typoChecked.has(`${name}|${wf}`)) {
+              typoChecked.add(`${name}|${wf}`)
+              // 끄는 값을 잘못 쓰면 조용히 기본(on)으로 읽히지 않는다 — fallback(args invalid) · 콜 0 (리뷰 F8 — 옛 판은 오타를 on 으로 읽었다)
+              const v = Object.values(opt.on)[0]
+              const typo = { [name]: typeof v === 'boolean' ? 'off' : String(v).toUpperCase() }
+              const table = responses(wf, sc.fire, sc.quiet), seen = []
+              const r = (await run(work, { args: Object.assign({}, BASE_ARGS, sc.args, typo),
+                responder: (p, o) => { seen.push(o.label); return table[o.label] ? JSON.parse(JSON.stringify(table[o.label])) : null } })).result
+              check(`${name} · ${wf}: 모르는 값 ${JSON.stringify(typo)} → fallback(args invalid) · 콜 0`,
+                r.mode === 'fallback' && /args invalid/.test(r.reason || '') && seen.length === 0, JSON.stringify({ mode: r.mode, reason: r.reason, calls: seen.length }))
+              if (typeof v === 'boolean') {
+                const strOff = await callsOf(work, wf, sc, { [name]: 'false' })
+                check(`${name} · ${wf}: 문자열 'false' == false(값 검증이 문자열 형식을 막지 않는다)`, strOff.length > 0 && firstDiff(strOff, off) === null, firstDiff(strOff, off) || '콜 0개')
+              }
+            }
+          } else {
+            check(`${tag}: 미지정 == 기준(${bases[wf].from}) — 콜 ${base.length}개`, base.length > 0 && firstDiff(unset, base) === null, firstDiff(unset, base) || '콜 0개')
+            check(`${tag}: ${JSON.stringify(opt.off)} == 기준`, firstDiff(off, base) === null, firstDiff(off, base))
+            if (opt.structural) {
+              check(`${tag}: ${JSON.stringify(opt.on)} 은 콜 구성을 바꿀 수 있다 — 켠 동작은 ${opt.structural} 가 본다(여기서는 실행만)`, on.length > 0, '켜니 콜 0개')
+              continue
+            }
+            if (reaches) check(`${tag}: ${JSON.stringify(opt.on)} != 기준(옵션이 배선돼 있다)`, firstDiff(on, base) !== null, '켜도 콜 입력이 같다 — 헛돌이')
+            else check(`${tag}: ${JSON.stringify(opt.on)} == 기준(이 경로에는 옵션이 닿지 않는다)`, firstDiff(on, base) === null, firstDiff(on, base))
+          }
+          check(`${tag}: ${JSON.stringify(opt.on)} 의 콜 구성(label 다중집합) == 기준`, on.length > 0 && labels(on) === labels(base), `켬 ${labels(on)} · 기준 ${labels(base)}`)
+        }
+      }
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
+  console.log(`\n기본값 회귀 ${fail ? '실패 ' + fail + '건' : '전건 통과'} (옵션 ${names.join(', ')})`)
+  process.exit(fail ? 1 : 0)
+})().catch(e => { console.log(`FAIL  실행 오류 — ${e.message}`); process.exit(1) })

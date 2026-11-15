@@ -1,0 +1,15 @@
+diff --git a/src/StoreVC.swift b/src/StoreVC.swift
+index 1111111..2222222 100644
+--- a/src/StoreVC.swift
++++ b/src/StoreVC.swift
+@@ -11,4 +11,10 @@
+             self.log(2)
+         }
+     }
++    func c() {
++        productCellC.onSelect = { [weak self] in
++            guard let self else { return }
++            self.log(3)
++        }
++    }
+ }

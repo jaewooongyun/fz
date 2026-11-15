@@ -1,0 +1,206 @@
+# Swift Pattern Pre-detection (Code 단계)
+
+> Code 구현 시작 전 plan을 스캔하여 Swift/iOS 안티패턴 trigger를 사전 감지하는 모듈.
+> fz-code Phase 0.5에서 참조한다 (Level 3 — 필요 시 Read).
+
+## 목차
+
+- [발동 조건](#발동-조건)
+- [행동 원칙 (원칙+이유 형태)](#행동-원칙-원칙이유-형태)
+- [Gate (fz-code Phase 0.5에서 사용)](#gate-fz-code-phase-05에서-사용)
+- [발동 결과 기록](#발동-결과-기록)
+- [검증 명령 (외부 grep용)](#검증-명령-외부-grep용)
+- [설계 원칙](#설계-원칙)
+
+---
+
+## 발동 조건
+
+CLAUDE.md `## Architecture`가 Swift/iOS 프로젝트 + plan-final.md / plan-v*.md에 다음 trigger 중 하나 발견 시 활성:
+- SwiftUI / Concurrency 키워드 신규 도입
+- 위험 패턴 (싱글톤 가변 / 콜백 / @Published)
+- 패턴 변환 (PromiseKit / defer-await / enum catch)
+
+비Swift/iOS 프로젝트는 스킵.
+
+## 행동 원칙 (원칙+이유 형태)
+
+> 본 모듈은 9개 if-then trigger가 아닌 **5개 원칙**으로 구성된다.
+> 각 원칙은 plan에서 검색할 token + 발동 시 행동을 제공한다.
+> 출처: `guides/prompt-optimization.md` 원칙 4a + Phase 1.5 mirror 원칙.
+
+---
+
+### 원칙 D: SwiftUI 패턴 도입 감지 → swiftui-expert 플러그인 적극 참조
+
+**이유**: SwiftUI 패턴 신규 도입 시 state ownership / View 책임 / 렌더링 영향 분석이 누락되면 Passive View 위반, 불필요한 재렌더링, deprecated API 사용 같은 안티패턴이 implementation에 박힌다.
+
+**plan 검색 token**: `@State`, `@Observable`, `@StateObject`, `@ObservedObject`, `@Binding`, `@Bindable`, `body: some View`, `View 변경`, `SwiftUI/UIKit`, `UIKit/SwiftUI`
+
+**발동 시 행동**:
+- `modules/plugin-refs.md` "SwiftUI Expert" 섹션 적극 참조
+- state ownership / iOS 16/17 분기 / Passive View 위반 사전 검증
+- 변환 작업이면 UIViewRepresentable / UIHostingController 경계 검증
+
+---
+
+### 원칙 E: Concurrency 패턴 도입 감지 → swift-concurrency 플러그인 적극 참조
+
+**이유**: 동시성 키워드 신규 도입은 isolation 설계 + cancellation + Sendable 경계의 동시 결정을 요구. 일부만 결정하면 컴파일러 경고 또는 런타임 data race.
+
+**plan 검색 token**: `@MainActor`, `actor`, `Sendable`, `@Sendable`, `sending`, `async let`, `TaskGroup`, `AsyncStream`, `AsyncSequence`, `thread model`, `GCD.*Concurrency`, `DispatchQueue.*Actor`, `MainActor.assumeIsolated`, `nonisolated`(생명주기 콜백 맥락)
+
+**발동 시 행동**:
+- `modules/plugin-refs.md` "Swift Concurrency" 섹션 적극 참조
+- isolation scope 검증 (메서드 단위 vs 클래스 단위)
+- cancellation / 결과 합성 / Sendable 경계 검증
+- thread model 변경이면 원본 스레드 보장 추적 + Zero-Exception 적용
+
+---
+
+### 원칙 F: 위험 패턴 (역방향 — 키워드 부재해도 발동)
+
+**이유**: 동시성 키워드가 plan에 명시 안 됐어도 위험 패턴(싱글톤 가변, 콜백, @Published)이 추가되면 data race / UI 스레드 위반 가능. v3.6 역방향 트리거의 implementation 단계 적용.
+
+**plan 검색 token**: `static let shared`, completion handler 추가, delegate callback 추가, `ObservableObject`, `@Published var` (특히 `@MainActor` 부재)
+
+**발동 시 행동**:
+- 싱글톤 + 가변 stored property → 동기화(@MainActor / actor / lock / serial queue) step 의무
+- 콜백 패턴 추가 → 콜백 실행 스레드 보호(`DispatchQueue.main` 또는 `@MainActor`) 의무
+- `@Published` 추가 + 클래스 `@MainActor` 부재 → @MainActor 추가 step 의무
+
+**Few-shot**:
+
+```
+BAD:
+  Plan: ReachabilityWatcher 싱글톤에 currentNetworkStatus: NetworkStatus 추가
+  Code 시작 → ReachabilityWatcher.shared.currentNetworkStatus = .connected (background thread)
+  → data race. plan에서 동기화 step 누락.
+
+GOOD:
+  Plan: ReachabilityWatcher 싱글톤에 currentNetworkStatus 추가
+    - Step N: ReachabilityWatcher.swift에 @MainActor 적용 (또는 actor 전환)
+    - Step N+1: 모든 readers/writers를 main thread context로 이동 (역방향 트리거 발동)
+  Code 시작 → @MainActor 보호된 currentNetworkStatus 안전 갱신
+```
+
+---
+
+### 원칙 G: 패턴 변환 (Phase 1.5 P3와 mirror)
+
+**이유**: Plan 단계에서 P3로 차단했어도 Code 단계에서 동일 패턴이 재발견될 수 있음. Phase 0.5는 Phase 1.5의 정합성 보장 layer.
+
+**plan 검색 token**: `.done`, `.then(on: .main)`, `defer { ... await ... }`, `defer.*await`, enum catch에 `== .case(`, `withCheckedContinuation`
+
+**발동 시 행동**:
+- PromiseKit `.done` 변환 → `Task { @MainActor in }` 사용 검증 (일반 Task 반려)
+- `defer { await ... }` 시도 발견 → 컴파일 에러 사전 차단 + 대안(try? + 순차 실행) 적용
+- enum catch `==` 비교 → `if case let` 패턴 매칭으로 변경
+- continuation 사용 → context7로 native async API 부재 확인 후 정당화
+
+**Few-shot**:
+
+```
+BAD:
+  Plan: PromiseKit firstly { ... }.done { updateUI() } → async/await 변환
+  Code: Task { let data = try await fetch(); updateUI() }
+  → 원본 main queue → After 일반 Task. main queue 보장 손실.
+
+GOOD:
+  Plan: PromiseKit firstly { ... }.done { updateUI() } → async/await 변환
+  Code: Task { @MainActor in let data = try await fetch(); updateUI() }
+  → 원본 main queue 보존
+```
+
+---
+
+### 원칙 H: 디자인 소스(figma) 대조 — 축마다 방법이 다르다
+
+**이유**: figma 노드값을 하나씩 옳게 읽어도 **화면에 보이는 값과 다를 수 있다**. 렌더 간격은 여러 노드값의 합성 결과이고, 일부 축은 API 응답에 값 자체가 없다. 단일 "노드값 대조" 규칙으로 뭉뚱그리면 두 경우를 모두 놓친다.
+
+**작업 검색 token**: figma 노드 조회, UI 수치(spacing/margin/padding/gap/size/radius/opacity) 작성·수정, 색·폰트 토큰 지정, 디자인 검수 대응
+
+**발동 시 행동** — 축을 먼저 분류한 뒤 방법을 고른다:
+
+| 축 | 방법 |
+|---|---|
+| **direct property** (fill·opacity·radius·size·font·childOrder) | raw 노드값 **그대로 적용**. render 눈대중 override 금지 |
+| **요소 간 실효 거리** | 두 요소 경계 **사이를 실제로 통과하는** gap·padding만 걸어가며 합산. ⚠️ flexible spacer·절대배치·음수 간격·modifier 순서가 개재하면 단순 합이 성립하지 않으므로 **그 경우는 렌더로 판정** |
+| **raw 미표현 축** (네이티브 리스트 marker geometry, glyph, raster 실렌더 등) | API에 값이 없음 → **렌더 스냅샷이 유일 oracle** |
+
+**provenance 의무**: 측정 산출물 헤더에 `file key` + `node ID` + `실측일`. 미기재 시 후속 세션이 동일 스냅샷 여부를 판정할 수 없다.
+
+**Few-shot**:
+
+```
+BAD:
+  figma 노드 padding 24 확인 → 코드 .padding(.top, 24) → "일치" 판정
+  → 실제 렌더 간격은 부모 stack의 gap 12가 더해진 36. 노드값은 맞았는데 화면이 틀림.
+
+GOOD:
+  두 요소 경계를 걸어가며 합산: root gap 12 + section padding 24 = 36
+  → 코드 24와 불일치 검출 → 36으로 수정
+```
+
+```
+BAD (edge — raw 미표현 축):
+  불릿 닷 크기를 figma API로 조회 → 응답에 크기 필드 없음 → "figma에 값이 없으니 현행 유지"
+  → 네이티브 리스트 서식이라 렌더는 •인데 데이터는 하이픈. 실제로는 불일치.
+
+GOOD:
+  raw에 값이 없는 축으로 분류 → 빌드 스크린샷 ↔ figma 렌더 대조로 판정
+```
+
+⚠️ *candidate (`promotion-ledger` L-1 트랙 A 3/5)* — 활성 강제 X. **활성 전 회귀 fixture 필수** (현재 oracle 0개).
+
+---
+
+## Gate (fz-code Phase 0.5에서 사용)
+
+본 trigger가 plan에 1건 이상 발견되면 plugin-refs.md 강제 참조 + 안티패턴 점검 후 구현 절차 진입.
+
+- [ ] Swift/iOS 프로젝트? (아니면 skip)
+- [ ] D/E/F/G/H token plan 스캔 완료?
+- [ ] 발견된 trigger 모두 plugin-refs.md 매칭 + 대응 명시?
+- [ ] F (위험 패턴) 발견 시 안전성 메커니즘이 step에 포함?
+- [ ] G (패턴 변환) 발견 시 원본 동작 보존이 step에 명시?
+- [ ] ⚠️ H (figma 대조) 발견 시 축 분류(direct / 실효 거리 / raw 미표현) 후 방법 선택? *(candidate — 강제 X)*
+- 미통과 시 → ⛔ 구현 절차 진입 차단. **단 H는 candidate이므로 차단 대상 제외** — 미충족은 기록만 (활성 전환 후 차단 대상 편입)
+
+## 발동 결과 기록
+
+- 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/code/phase-0.5-detection.md`에 발견된 token + 대응 step 매핑
+- 비-티켓 세션: `write_memory("fz:checkpoint:phase-0.5", "trigger: {tokens}. 대응: {steps}")`
+
+## 검증 명령 (외부 grep용)
+
+```bash
+# ⛔ 각 단언에 `|| exit 1` 을 직접 붙인다. `set -e` 에 의존하지 않는 이유:
+#    ① 이 블록을 도구 셸(zsh)에 붙여넣으면 errexit 이 걸리지 않아 **실패해도 성공 토큰이 찍힌다**
+#    ② 이전 판은 순차 나열이라 **마지막 명령의 종료 상태**가 블록 전체 상태였다(F-216 N7)
+#    ⛔ 부정 단언은 `if grep -q X; then exit 1; fi` — `! grep` 은 errexit 아래 무력하다.
+# ⛔ grep 은 절대경로. 이 환경의 `grep`/`rg` 는 셸 함수일 수 있다.
+R="$(bash scripts/resolve-plugin-root.sh)" || { echo "UNRUN — 루트 해석 실패"; exit 2; }
+F="$R/skills/fz-code/SKILL.md"
+M="$R/modules/swift-pattern-detection.md"
+test -f "$F" || { echo "UNRUN — $F 없음"; exit 2; }
+test -f "$M" || { echo "UNRUN — $M 없음"; exit 2; }
+# Phase 0.5 reference 존재
+/usr/bin/grep -q 'Phase 0\.5.*Swift Pattern Pre-detection' "$F" || { echo "FAIL: Phase 0.5 참조 없음"; exit 1; }
+/usr/bin/grep -q 'modules/swift-pattern-detection\.md' "$F"      || { echo "FAIL: 모듈 지목 없음"; exit 1; }
+/usr/bin/grep -q 'Gate 0\.5' "$F"                                || { echo "FAIL: Gate 0.5 없음"; exit 1; }
+# 본 모듈에 5 원칙 (D/E/F/G/H) + Few-shot 존재
+N=$(/usr/bin/grep -Ec '^### 원칙 [DEFGH]' "$M"); test "$N" -eq 5 || { echo "FAIL: 원칙 $N/5"; exit 1; }
+/usr/bin/grep -q 'BAD:' "$M"  || { echo "FAIL: BAD Few-shot 없음"; exit 1; }
+/usr/bin/grep -q 'GOOD:' "$M" || { echo "FAIL: GOOD Few-shot 없음"; exit 1; }
+# Phase 1.5 P3와 mirror — 패턴 변환 trigger 명시 (F3 fix)
+/usr/bin/grep -qE 'PromiseKit|defer.*await|enum catch' "$M" || { echo "FAIL: 변환 trigger 없음"; exit 1; }
+echo "SWIFT_PATTERN_CONTRACT_OK (원칙 ${N}/5)"
+```
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (필요 시에만 로드)
+- 9 if-then trigger → 4 원칙+이유로 압축
+- 원칙 G가 Phase 1.5 P3와 explicit mirror — Cross-skill consistency 보장 (F3 fix)
+- BAD/GOOD Few-shot 의무 (원칙 F + G 각각 1쌍)

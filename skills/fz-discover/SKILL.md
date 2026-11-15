@@ -1,0 +1,463 @@
+---
+name: fz-discover
+description: >-
+  접근 방식 탐색 + 트레이드오프 비교. 요구사항이 불명확할 때 제약 기반 탐색.
+  예: 어떻게 하면 좋을까?, 트레이드오프 비교, 방식이 여러 개인데 (비사용: 방향 확정 후 계획 →fz-plan, 코드 위치 →fz-search)
+user-invocable: true
+argument-hint: "[해결하고 싶은 문제/질문]"
+allowed-tools: >-
+  mcp__plugin_fz_serena__find_symbol,
+  mcp__plugin_fz_serena__get_symbols_overview,
+  mcp__plugin_fz_serena__find_referencing_symbols,
+  mcp__plugin_fz_serena__activate_project,
+  mcp__plugin_fz_serena__read_memory,
+  mcp__plugin_fz_serena__write_memory,
+  mcp__plugin_fz_serena__edit_memory,
+  mcp__plugin_fz_serena__list_memories,
+  mcp__context7__resolve-library-id,
+  mcp__context7__query-docs,
+  mcp__sequential-thinking__sequentialthinking,
+  Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow
+metadata:
+  provides: [landscape-map, trade-off-table, open-questions]
+  needs: [none]
+  intent-triggers:
+    - "어떻게.*좋을까|어디에.*좋을까|뭐가.*맞을까|괜찮을까"
+    - "방법.*찾|최적.*찾|요구.*조건|제약|트레이드오프"
+    - "이게.*맞아|이렇게.*해도|어떤.*방식|비교.*해줘"
+    - "맞는지|차이점|놓치고|어떻게.*생각"
+    - "how.*should|where.*should|what.*best|trade.?off|difference|missing|what.*think"
+---
+
+# /fz-discover - 풍경 탐색 + 경로 매핑 스킬
+
+> **행동 원칙**: 문제가 불명확할 때, 가능한 경로들의 풍경(landscape)을 탐색하고 각 경로의 비용/리스크/전제조건을 매핑한다. **결론을 내리지 않는다** — 결론은 plan이 내린다.
+
+## 개요
+
+> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 1 (Problem Framing) → Phase 1.5 (Constraint Probe) → Phase 2 (Landscape Exploration) ↔ 사용자 대화 → Phase 3 (Path Mapping) → Phase 4 (Handoff)
+
+- 발산 중심 (Fan-out): 가능한 경로를 넓게 탐색
+- Reject-Extract-Propose 프로토콜: 거절 → 조건 추출 → 대안 제시를 한 턴에
+- Landscape Map: 경로 N개 + 각각의 전제조건/비용/리스크
+- **제약이 아닌 조건**: "불가"가 아니라 "이 경로를 선택하면 이런 비용이 든다"
+- 코드 탐색 연동: 각 경로의 실현 가능성 확인
+
+## Prerequisites
+
+- 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 폴백 (에러 대응 표) (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
+
+## 모듈 참조
+
+| 모듈 | 용도 |
+|------|------|
+| guides/skill-authoring.md §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본) |
+| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+| modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
+| modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
+| modules/lead-reasoning.md | Speculation-to-Fact Fallacy (§1.5) — 탐색 결과 주장 시 [verified] 태그 |
+| modules/uncertainty-verification.md | Default-Deny — 증거 없는 옵션/제약 주장 차단 |
+
+## sc: 활용 (SuperClaude 연계)
+
+| Phase | sc: 명령어 | 용도 |
+|-------|-----------|------|
+| Phase 1 | `/sc:sc-analyze` | 기존 코드/아키텍처 분석으로 암묵적 제약 사전 식별 |
+| Phase 2 | `/sc:sc-brainstorm` | 후보 옵션 발산이 필요할 때 |
+| Phase 2 | `/fz-explain` | 기존 패턴/규칙 설명 (F-023) |
+| Phase 2 | L3 `deep-research-agent` | 외부 기술/라이브러리 조사 (modules/native-agents.md) |
+| Phase 3 | `/sc:sc-reflect` | 수렴된 결과 자체 검증 |
+| Phase 4 | `→ /fz-plan` | 정제된 요구사항으로 구현 계획 수립 |
+
+## Plugin 참조
+
+> 참조: `modules/plugin-refs.md` — SwiftUI Expert(상태 관리 결정 시) + Swift Concurrency(동시성 관련 제약 시)
+
+## 팀 에이전트 모드 (Workflow 오케스트레이션 — pilot)
+
+> 스크립트: `workflows/discover-adversarial.js` (플러그인 루트 상대 경로) — agents/의 plan-structure·arch-lens 정의를 agentType(`fz:` 네임스페이스)으로 재사용.
+
+### 발동 조건
+
+모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modules/complexity.md` — 아래 SOLO vs TEAM 판단표)로 추천한다 — 추천 full 일 때만 묻고 그 밖은 묻지 않고 light + 통보 · light = SOLO 탐색. 사용자 대화형 탐색(Phase 2 ↔ 사용자)은 본 모드와 무관하게 SOLO가 담당 — Workflow는 **비대화 다라운드 탐색만** 대체한다.
+
+### 실행 절차 (Lead)
+
+1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/discover/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
+1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" discover --complexity {점수} --estimate discover-adversarial` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 2~4 를 건너뛰고 SOLO 탐색으로 간다 · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
+2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다)
+2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js && cmp -s {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
+3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+   - default: lean 5-call — 경로생성(opus) → 비용평가(sonnet) → R2 추가경로 → R2 비용 → 합성(opus). TEAM 2-agent 비용 동급대
+   - --deep: 렌즈 3 fan-out(sonnet, 독립 생성) → 병합(opus, 탈락 금지) → 경로별 평가(동시 ≤4 chunk) → 합성. budget 가드 내장
+4. **반환 처리**:
+   - `mode: 'workflow'` → `landscape`(Trade-off Table + Open Questions)를 Phase 2/3 사용자 대화 입력으로 사용. Lead가 `discover-journal.md` 기록 (canonical 경로 무변경)
+   - `mode: 'fallback'` → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`(입력 오류)와 `agent null`(일시 장애)에만
+     이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
+     L4 사용자 에스컬레이션). Lead 단독 REP 는 **사용자 승인 후**에만. 사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 에 기록(규약: `experiment-log.md` 머리 문단)
+5. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` Workflow tracing 섹션에 수동 append
+6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(명시 플래그 단계 — `modules/gpt-strategy.md` § 단계 실행 판정). `run` · `config` 면 `/fz-gpt verify` 별도 실행(`ARTIFACT=` 빈 값 — 산출물 계열 밖이라 재검증 라운드 상한에 세지 않는다 · `modules/fz-gpt-subcommands-core.md` § verify 호출자 표) · `skip` 이면 `[GPT 미사용 — 사유]` · `ask` 면 질문 → `set` → 다시 decide (스크립트 내 cross-provider 스폰 금지)
+
+---
+
+## 핵심 추론 프로토콜: Reject-Extract-Propose (REP)
+
+모든 Phase에서 적용하는 3가지 추론 규칙:
+
+### 규칙 1: 거절할 때 즉시 대안 제시
+
+```
+BAD:  "proxy에 @Published는 안 됩니다."
+GOOD: "proxy에 @Published는 안 됩니다.
+       이유: objectWillChange가 모든 관찰 뷰를 재렌더링 (제약 C1).
+       대안: plain Dictionary로 비반응형 저장 → @State에서 반응형 미러링."
+```
+
+한 턴에 세 가지를 모두 포함: (1) 거절 (2) 왜 안 되는지 제약 추출 (3) 그 제약을 피하는 대안.
+
+### 규칙 2: 본질이 같은 옵션은 합치기
+
+겉보기 다른 옵션이 같은 메커니즘이면 하나로 합치고, 진짜 다른 축만 분리.
+
+### 규칙 3: 새 제약 발견 시 기존 옵션 재평가
+
+```
+새 제약 "OrderViewModel이 없다" 발견
+→ 기존 옵션 중 "ViewModel에 @Published" 방안 즉시 탈락
+→ 제약 매트릭스에 추가
+→ 남은 후보만으로 재수렴
+```
+
+---
+
+## ⛔ Phase 0: Work Dir Resolution
+
+> 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+
+**Phase 1 시작 전에 반드시 실행:**
+
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출 (예: `[TKT-1234]`)
+2. 패턴 있으면 → **무조건 자동 저장**:
+   - `{CWD}/{TICKET}/` 폴더 존재 확인 → 없으면 `mkdir -p` + index.md 생성
+   - `{CWD}/{TICKET}/discover/` 서브폴더 생성
+   - WORK_DIR 설정
+2b. index.md 존재 시 → Active Phase 읽기 → DISCOVER_TAG 설정 (없으면 "journal")
+   - Active Phase = "plan" → DISCOVER_TAG = "plan"
+   - Active Phase = "code" → DISCOVER_TAG = "code"
+   - Active Phase = "review" → DISCOVER_TAG = "review"
+   - Active Phase = "discover" 또는 없음 → DISCOVER_TAG = "journal"
+3. 패턴 없으면:
+   a. 브랜치명에서 `[A-Z]{2,6}-\d{2,5}` 추출 시도 → 있으면 2번과 동일
+   b. 없으면 → **AskUserQuestion**: "이 작업의 산출물을 파일로 저장할까요?"
+      - 예 → `{CWD}/NOTASK-{YYYYMMDD}/discover/` 생성 + WORK_DIR 설정
+      - 아니오 → Serena Memory fallback (경량)
+
+### Gate 0: Work Dir Ready
+- [ ] ⛔ 인자/브랜치에서 티켓 패턴 체크 완료?
+- [ ] 티켓 패턴 있으면 폴더 자동 생성 완료?
+- [ ] 패턴 없으면 사용자에게 저장 여부 질문 완료?
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
+- [ ] DISCOVER_TAG 설정됨? (index.md Active Phase 기반)
+- [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile discover` exit 0? (아래 · WORK_DIR 없는 세션은 건너뜀을 보고)
+
+⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile discover {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
+
+---
+
+## Phase 1: Problem Framing
+
+사용자 질문에서 핵심 문제를 추출하고, 코드 탐색으로 암묵적 제약을 사전 식별합니다.
+
+### 절차
+
+1. **문제 추출**:
+   - 사용자 질문에서 핵심 결정 사항(decision point) 식별
+   - "어디에 저장?" → 상태 관리 결정
+   - "어떤 방식?" → 패턴 선택 결정
+
+2. **관련 코드 탐색**:
+   - `mcp__plugin_fz_serena__find_symbol` → 언급된 타입/심볼 구조 확인
+   - `mcp__plugin_fz_serena__get_symbols_overview` → 주변 심볼 컨텍스트
+   - `mcp__plugin_fz_serena__find_referencing_symbols` → 영향 범위 파악
+   - `Grep` → 기존 유사 패턴 검색
+
+3. **암묵적 제약 사전 식별**:
+   - CLAUDE.md `## Architecture` 섹션에서 오는 제약
+   - 아키텍처 패턴에서 오는 제약
+   - 기존 코드 패턴에서 오는 일관성 제약
+
+4. **초기 제약 매트릭스 구성**:
+
+   ```markdown
+   | # | 제약 | 출처 | 확신도 |
+   |---|------|------|--------|
+   | C1 | ... | 아키텍처 원칙 | 높음 |
+   | C2 | ... | 코드 탐색 | 중간 |
+   ```
+
+### Gate 1: Problem Framed
+- [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
+- [ ] 핵심 결정 사항이 명확하게 식별되었는가?
+- [ ] 관련 코드 구조를 탐색했는가?
+- [ ] 초기 제약이 1개 이상 식별되었는가?
+- [ ] "전체/모든/생태계/전수" 분석 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)이면** Coverage Gate 통과? (단위 U 확정 후 대상 `N_U`개, 분석 M개, M/`N_U` = {비율}% — canonical: `modules/cross-validation.md` § Coverage Gate 절차 0, ⛔ 어휘 9개 동기)
+- [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
+- [ ] scope 판정(in/out 분류) 포함 시: 기각 표본 adversarial 재검 + site 단위 분류 — Coverage Gate § 절차 **step 7** 통과? (위 일반 커버리지 항목과 별개) *[candidate: 1 session evidence]*
+
+---
+
+## Phase 1.5: Constraint Probe (Plan-Before-Probe 방어)
+
+> Phase 1 제약 매트릭스에서 primitive 의존 가정(CLI flag / config key / value enum / env)은 실측으로 검증. 추측된 제약 위에 Plan 작성 시 실측마다 Plan 무력화. 참조: `Plan-before-Probe 교훈`.
+
+### 절차
+
+1. **가정 추출**: Phase 1 제약 매트릭스에서 primitive 의존 가정 분리
+   - **가정의 3 axes 점검** (32차 방어 — Probe Coverage Gap):
+     - (a) **존재 가정**: primitive 작동 verify? (existence)
+     - (b) **권한/경계 가정**: 호출 측 `allowed-tools` / `Bash(*)` 패턴 호출 허용? (boundary)
+     - (c) **결과 contract 가정**: verdict/format 호출자 해석과 일치? (contract)
+   - 3 axes 모두 enumerate. 미검증 axis는 Phase 2 차원 제외 또는 explicit assumption tag.
+2. **실측 방법** (가정 × axis 별):
+   - 실제 명령 실행 + `--help` grep (axis a)
+   - 호출 측 SKILL.md frontmatter `allowed-tools` 검사 (axis b)
+   - 결과 형식/verdict enum 명세 검사 또는 정의 (axis c)
+   - Binary string scan (`strings $(which CLI)`)
+   - Negative control (invalid value → enum error로 valid values enumerate)
+3. **결과 기록**: `probe-constraints.md` 또는 저널에 각 가정 × axis별 `[verified: result]` 또는 `[미검증: 이유]`
+4. **Phase 2 입력 정제**: 3 axes 모두 verified 가정만 Landscape 차원 포함, 부분 미검증은 explicit assumption tag로 차원 포함 또는 제외
+
+### Gate 1.5: Constraints Verified
+- [ ] primitive 의존 가정 모두 분류?
+- [ ] 각 가정의 **3 axes** (존재 / 권한·경계 / 결과 contract) 모두 분류 완료? (32차 방어)
+- [ ] verified 가정 × axis에 실측 명령/출력 첨부?
+- [ ] 미검증 axis는 Phase 2 차원에서 제외 또는 explicit assumption tag?
+- 미통과 시 → ⛔ Phase 2 Landscape 차단. /fz-plan Gate 0c의 입력으로 활용 — 3 axes verified 가정만 Plan 차원에 포함.
+
+---
+
+## Phase 2: Landscape Exploration
+
+가능한 경로들을 넓게 탐색하고, 각 경로의 비용/리스크/전제조건을 매핑합니다.
+**탈락시키지 않는다** — "이 경로를 선택하면 이런 비용이 든다"로 기록.
+
+### 절차 (매 라운드)
+
+1. **경로 제시** (2-4개):
+   - 각 경로의 작동 방식 간결 설명
+   - 각 경로의 **전제조건** (이 경로가 성립하려면 필요한 것)
+   - 각 경로의 **비용** (추가 작업량, 복잡도 증가, 유지보수 부담)
+   - 각 경로의 **리스크** (실패 가능성, 미지의 영역)
+   - REP 규칙 2 적용: 본질이 같은 경로는 합침
+
+2. **사용자 피드백 수집**:
+   - 직접 질문 또는 팀원 우려 → 새 **조건**으로 변환 (제약이 아닌 조건)
+   - "보일러플레이트가 너무 많지 않을까?" → 조건: caller 보일러플레이트가 적은 경로 선호
+   - "모든 화면에서 해야 하나?" → 조건: 범용성 요구 (경로별 범용성 비용 비교)
+
+3. **조건의 불변성 검증** (핵심 추가):
+   - 발견된 조건에 대해: **"이 조건은 진짜 불변인가? 무시하면 어떻게 되는가?"**
+   - 코드 탐색으로 조건의 실재 여부 확인
+   - 불변 = hard constraint (기술적 불가능) → 표기: 🔒
+   - 가변 = soft preference (관성적 판단, 비용 문제) → 표기: 🔓
+
+4. **Landscape Map 갱신**:
+   - 각 경로별: 전제조건 + 비용 + 리스크 + 조건 충족도
+   - **어떤 경로도 탈락시키지 않음** — 비용이 높은 경로도 "비용 X를 감수하면 가능"으로 유지
+   - 새 조건 발견 시 모든 경로에 대해 영향 재평가
+
+5. **충분성 판단**:
+   - 경로들의 차이가 명확하고 사용자가 방향을 잡음 → Phase 3으로
+   - 경로 간 비용 차이가 불분명 → 추가 탐색 라운드
+   - 사용자가 plan 전환을 결정 → Phase 3으로
+
+6. **⛔ 저널 갱신** (항상 — compact recovery 필수):
+   `discover-{DISCOVER_TAG}.md` 갱신:
+   - DISCOVER_TAG = "journal" → **전체 덮어쓰기** (매 라운드). compact 후 이 파일 하나만 Read하면 전체 복원.
+   - DISCOVER_TAG = plan|code|review → **APPEND** + topic header (동일 phase 다중 discover 지원)
+   - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` + `{WORK_DIR}/index.md` 업데이트
+     - journal: 파일 전체를 매 라운드 갱신 (~2K tokens). 상세하게 기록: 제약 매트릭스, 생존/탈락 후보, 핵심 결정 흐름, 미결 질문.
+     - phase: APPEND + `## Topic: {질문 요약}` header. 1K tokens 초과 시 이전 topic 압축.
+     - Round History는 유지하지 않음 — 탈락 후보 사유가 롤백 근거 역할.
+   - 비-티켓 세션: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}", "제약 {N}개: {C1~CN}. 생존: {후보}. 핵심 추론: {요약}")` (매 라운드 덮어쓰기)
+   형식 참조: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)"
+
+### discover-journal 형식
+
+> 형식 상세 + 예시: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)" 참조.
+> 원칙: "이것만 읽으면 대화 없이도 판단할 수 있는" 수준의 상세도 유지.
+> 필수 섹션: 제약 매트릭스, 생존 후보, 탈락 후보(사유), 미결 질문.
+
+### 라운드 대화 출력 (사용자에게 보여주는 형식)
+
+매 라운드: 새 제약 테이블 + 후보 평가 매트릭스(C1~CN × 후보) + 다음 질문.
+
+### Gate 2: Constraints Sufficient
+- [ ] 핵심 제약이 3개 이상 식별되었는가?
+- [ ] 생존 후보가 1-2개로 좁혀졌는가?
+- [ ] 사용자가 추가 우려를 제기하지 않았는가?
+- [ ] Phase 1.5 Constraint Probe 결과 반영? (verified 가정만 차원에 포함, 미검증 제외)
+
+---
+
+## Phase 3: Path Mapping
+
+탐색된 경로들을 정리하고, plan이 판단할 수 있는 형태로 매핑합니다.
+**⛔ 결론을 내리지 않는다** — 경로 선택은 plan의 몫.
+
+### 절차
+
+1. **Landscape Map 최종 정리**:
+   - `mcp__sequential-thinking__sequentialthinking` → 각 경로가 성립하는 조건과 비용을 정리
+   - 경로별: 전제조건 + 비용 + 리스크 + 조건 충족도
+
+2. **Trade-off Table 생성**:
+
+   ```markdown
+   | 경로 | 전제조건 | 비용 | 리스크 | 추천 상황 |
+   |------|---------|------|--------|----------|
+   | A | ... | 낮음 | 낮음 | 단순한 경우 |
+   | B | ... | 중간 | 중간 | 확장성 필요 시 |
+   | C | ... | 높음 | 낮음 | 장기 유지보수 중시 |
+   ```
+
+3. **Open Questions 정리**:
+   - 아직 답이 안 나온 질문들 (plan이 탐색해야 할 것)
+   - 조건의 불변성이 불확실한 항목 (🔓 표기된 것)
+   - 코드 탐색으로도 확인하지 못한 것
+
+4. **⛔ 저널 최종 갱신** (항상):
+   - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` 최종 갱신 + `{WORK_DIR}/index.md` 업데이트
+   - 비-티켓 세션: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}-final", "경로 {N}개. 조건: {요약}. 열린질문: {N}개")`
+
+### Gate 3: Paths Mapped
+- [ ] 경로가 2개 이상 매핑되었는가?
+- [ ] 각 경로의 전제조건/비용/리스크가 명시되었는가?
+- [ ] 조건의 불변성(🔒/🔓)이 구분되었는가?
+- [ ] 열린 질문이 정리되었는가?
+- [ ] ⛔ 아티팩트 기록 완료?
+
+---
+
+## Phase 4: Handoff
+
+산출물을 다음 스킬로 전달하거나, 독립적으로 완료합니다.
+
+### 핸드오프 경로
+
+| 상황 | 다음 스킬 | 전달 내용 |
+|------|----------|----------|
+| 구현 계획 필요 | `/fz-plan` | 정제된 요구사항 + 제약 매트릭스 |
+| 즉시 구현 가능 | `/fz-code` | 결정 근거 + 요구사항 (단순한 경우) |
+| PR 코멘트 작성 | 직접 출력 | 결정 근거를 코멘트 형식으로 가공 |
+| 토론 결과 기록 | Serena memory | 결정사항 + 제약 영속화 |
+
+> 티켓 폴더(WORK_DIR) 활성 시: 다음 스킬이 `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md`의 Current State 섹션을 읽어 컨텍스트를 복원한다. (DISCOVER_TAG = index.md Active Phase 기반: journal|plan|code|review)
+
+### 절차
+
+1. **상황 판단**: 사용자 의도에 따라 핸드오프 경로 결정
+
+2. **산출물 전달**:
+   - `/fz-plan`으로 전환 시: 정제된 요구사항이 /fz-plan Phase 1의 입력이 됨
+     - /fz-plan은 "요구사항 구조 분해" 단계를 건너뛰고 "영향 분석"부터 시작
+   - PR 코멘트 시: 제약 매트릭스 + 결정 근거를 읽기 쉬운 형태로 가공
+   - 기록 시: `mcp__plugin_fz_serena__write_memory` → 결정사항 영속화
+
+3. **완료 보고** (직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
+
+   ```markdown
+   /fz-discover 완료
+
+   **문제**: {원래 질문 요약}
+   **제약**: {N}개 발견 (Phase 1: {X}개, 대화: {Y}개)
+   **결론**: {채택된 해 한 줄 요약}
+   **라운드**: {N}회
+
+   **다음 단계**:
+   - /fz-plan → 구현 계획 수립
+   - /fz-code → 직접 구현 (단순한 경우)
+   ```
+
+---
+
+## SOLO vs TEAM 판단
+
+| 기준 | SOLO | TEAM |
+|------|------|------|
+| 예상 제약 수 | 2-3개 | 5개+ |
+| 범위 | 단일 모듈/파일 | 여러 모듈/레이어 |
+| 아키텍처 판단 | 불필요 | 필요 |
+| 사용자 즉시 피드백 | 가능 | 사용자 대기 가능 |
+| 예시 | "이 함수를 어떻게 리팩토링?" | "상태 관리를 어떻게?" |
+
+---
+
+## Few-shot 예시
+
+```
+BAD (결론 강제):
+사용자: "상태 관리를 어떻게 하면 좋을까?"
+답변: "C1, C2 제약에 의해 @StateObject가 유일한 해입니다."
+→ 제약을 발견한 게 아니라 결론을 강제. plan이 다른 경로를 탐색할 여지 없음.
+
+GOOD (풍경 탐색 + 경로 비교):
+사용자: "상태 관리를 어떻게 하면 좋을까?"
+Phase 1: find_symbol → 기존 ViewModel 구조 확인, 기존 패턴(@Published + Combine) 식별
+→ 코드 기반 조건: 기존 Combine 패턴(🔓 관성, 전환 가능), RIBs Interactor 구조(🔒 아키텍처)
+Round 1: 경로 탐색
+  경로 A(@StateObject): 비용 낮음, 전제=ViewModel 존재, 리스크=RIBs 패턴과 불일치
+  경로 B(Interactor→Subject): 비용 중간, 전제=Combine 유지, 리스크=보일러플레이트
+  경로 C(직접 @State): 비용 낮음, 전제=단순 UI, 리스크=복잡해지면 리팩 필요
+→ 사용자 "보일러플레이트 걱정" → 조건 추가: 경로별 보일러플레이트 비용 비교
+Round 2: 각 경로의 보일러플레이트 비용 구체화 (탈락 없이 비교)
+→ Phase 3: Trade-off Table + Open Questions → plan이 최적 경로 선택
+```
+
+```
+BAD (본질 같은 옵션 분리):
+"방법 1: init 파라미터 주입, 방법 2: Environment 주입. 어떤 걸 선택?"
+→ 두 방법 모두 외부 주입이라는 동일 메커니즘. 진짜 다른 축 없이 분리.
+
+GOOD (본질 같은 옵션 합치기):
+"두 방법 모두 외부 주입이므로 본질적으로 동일합니다.
+기존 패턴(init 파라미터)과 일관성 유지 → init 파라미터 채택.
+진짜 다른 축은 '외부 주입 vs 내부 생성'입니다."
+```
+
+---
+
+## Boundaries
+
+**Will**:
+- 대화를 통한 제약조건 발견 + 요구사항 정제
+- Reject-Extract-Propose 프로토콜 적용
+- 제약 매트릭스 점진적 구축
+- 코드 탐색 기반 제약 검증
+- 정제된 요구사항 → /fz-plan, /fz-code 핸드오프
+- PR 코멘트 형태의 결정 근거 출력
+
+**Will Not**:
+- 코드 직접 수정 (→ /fz-fix 또는 /fz-code)
+- 구현 계획 수립 (→ /fz-plan)
+- 빌드 실행 (→ /fz-code)
+- 명확한 요구사항의 단순 설계 (→ /fz-plan)
+
+## 에러 대응
+
+| 에러 | 대응 | 폴백 |
+|------|------|------|
+| 사용자 응답 없이 수렴 불가 | 현재까지의 제약 매트릭스 출력 + 판단 보류 | AskUserQuestion |
+| 장기 대화 (5라운드+) | context budget 상태 안내 + 아티팩트 기록 확인 | 계속 진행 |
+| Serena 연결 실패 | Grep + Glob 폴백 | 코드 없이 원칙 기반 추론 |
+| Workflow **도구 미가용**(호출 자체 거부) | SOLO REP + 사유 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 기록 | Lead 단독 REP 실행 |
+| `mode: 'fallback'` 반환(실행 중 실패) | ⛔ SOLO 아님 — `guides/skill-authoring.md` §12 판별 표로 분기 | L1~L3 후 미해소면 L4 |
+| 모든 후보 탈락 | 제약 완화 제안 | 사용자에게 제약 우선순위 질문 |
+
+## Completion → Next
+
+수렴 완료 후:
+```bash
+/fz-plan "정제된 요구사항대로 계획 세워줘"   # 구현 계획으로 전환
+/fz-code "결정대로 구현해줘"                 # 단순한 경우 직접 구현
+```

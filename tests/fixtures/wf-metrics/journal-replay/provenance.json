@@ -1,0 +1,68 @@
+{
+ "cli_version": "Claude Code 2.1.292 (agent transcript version)",
+ "captured_at": "실행 2026-10-07T08:57:05Z~2026-10-08T00:59:52Z · 스크럽 2026-10-10",
+ "source": "plan-lean2 Workflow run — 1단 병렬 agent 3개가 실패하고 다음 날 같은 runId 로 재개됐다(F-387 재시도 · journal launched 1 · started 7 · failed 3 · result 4)",
+ "scrub": "journal.jsonl 은 이벤트 전부를 순서 · 기록 형식(공백 없는 JSON) 그대로 — type · key(→ 대체 `v2:` 해시) · agentId(→ 대체값) · label · phase(플러그인 워크플로 문구). result 는 최상위 키만 남기고 값을 비웠다. agent transcript 는 시각 있는 첫 · 끝 이벤트 · `[역할]` 줄 · 완결 턴(stop_reason · usage.output_tokens · 대체 message id — content 블록은 버림)만 — wall · 크리티컬 패스 · 턴 · 출력 토큰을 재는 데 필요한 만큼. meta.json 은 원문 그대로(agentType · description · workflowPhase · model …)",
+ "samples": [
+  {
+   "file": "samples/wf/journal.jsonl",
+   "sha256": "f09dbec79a73e0edb662db7ecf2f30f4856537dc4846a0e660fc9e3acd8f4e89"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000001.jsonl",
+   "sha256": "834a030d9b8554a8f642a3fdea65d4c541399fb17cdf03a23e97c96a769bb705"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000001.meta.json",
+   "sha256": "6f3d65a3ff53c9ed117acec73c9549c669f1c54e364c8b3e8668ccf1b5336df2"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000002.jsonl",
+   "sha256": "fc71215acb0dcb024abbf0b873e44fbfebbf16b965d854cdb4e705bf3eb44504"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000002.meta.json",
+   "sha256": "fa1ed4f033b81ad5588a957fd2363d6882f0b79fb5d0849fc225d27432479f8d"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000003.jsonl",
+   "sha256": "f3c4d697dcd06c05d2e86e01ef0f75ae63e253f0c40bc763a9f313e2f819b46f"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000003.meta.json",
+   "sha256": "08aa765eb965ebb83ec504b01649a10e14bcf3f779d48c943074852edef64e1e"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000004.jsonl",
+   "sha256": "39f8737145ece29f9290518b7c5e33a3159a189829d5ba33ec8b44f24e25aa1e"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000004.meta.json",
+   "sha256": "6f3d65a3ff53c9ed117acec73c9549c669f1c54e364c8b3e8668ccf1b5336df2"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000005.jsonl",
+   "sha256": "5fae36cb40203317dce4eaae9b114eae25ff90009c535c0f12e6c1981b294ace"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000005.meta.json",
+   "sha256": "08aa765eb965ebb83ec504b01649a10e14bcf3f779d48c943074852edef64e1e"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000006.jsonl",
+   "sha256": "2301e4895038d9b284590227635a8c57d859ec4ba6570bd1e6872936f58c09e3"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000006.meta.json",
+   "sha256": "fa1ed4f033b81ad5588a957fd2363d6882f0b79fb5d0849fc225d27432479f8d"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000007.jsonl",
+   "sha256": "8fa5b828f1c886b14d25173fe7d96fd6189ffd90a29c4666dae6e9c2a1217a6f"
+  },
+  {
+   "file": "samples/wf/agent-a0000000000000007.meta.json",
+   "sha256": "1f7105cc2fec96b60380c1edd5e03f1dd5f2a75ba7c6c177e6d7d9ed632eece4"
+  }
+ ]
+}

@@ -1,0 +1,548 @@
+# 스킬 테스팅 가이드
+
+> fz-* 스킬의 품질을 측정 가능하게 보장하는 테스트 방법론.
+> **근거**: Anthropic Agent Skills 공식 + 검증 기반 테스트 원칙(verifier oracle · fresh-context 검증).
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조 · 이전 감사 2026-09-06) — Tier 1:** code.claude.com/docs/en/{skills, sub-agents, best-practices, changelog, plugin-evals} · platform.claude.com/.../prompting-claude-opus-5 · .../prompting-claude-opus-5-5 · .../effort. 권위 자료 단일 참조점: `guides/llm-references.md`.
+
+---
+
+## 0. 검증 기반 테스트 원칙 (verified)
+
+스킬 테스트의 신뢰성은 두 원칙에서 나온다:
+
+1. **oracle은 객관 pass/fail로** — "looks done" 자가판정은 환각을 통과시킨다. Functional Test의 합격 판정은 test/build exit code·lint·script diff 같은 **실행 가능한 pass/fail**로 닫는다 [verified: code.claude.com/docs/en/best-practices].
+2. **검증자 ≠ 구현자** — 스킬 출력을 그 스킬을 만든 컨텍스트가 채점하면 안 된다. **fresh-context 검증자**(별도 세션/에이전트가 diff+기준만 보고 판정)가 self-critique보다 우월 [verified: code.claude.com/docs/en/sub-agents].
+   - 근거 문장(2026-11-01 정정): 공식 문장은 Fable 5(Legacy) 페이지(platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5)의 "Separate, fresh-context verifier subagents tend to outperform self-critique." [미검증: 원문 재대조 필요]. 실증은 약하다 — 새 세션 2차 리뷰(F1 28.6%)가 **같은 세션 2차 리뷰**(21.7%)보다 낫지만, 단일 같은 세션 리뷰(27.1%)와는 유의차가 없다 — "a second review helps only when it happens in a fresh session: CCR (F1 28.6%) outperforms a second review in the same session (SR2, 21.7%)" [arxiv preprint, 2026-03, v2] (arXiv 2603.12123 Cross-Context Review · 단일 저자 · 27.1% 비교는 v2 abstract 에만 있다). '우월'은 같은 세션 재검토 대비로 좁혀 읽는다.
+
+> 이 두 원칙이 아래 §1~§8 전 절차의 바탕이다.
+
+---
+
+## 1. 테스트 3단계 프레임워크
+
+### 1.1 Triggering Test — 트리거 정확도 측정
+
+스킬이 올바른 쿼리에서 트리거되는지 확인한다.
+
+**절차:**
+1. should-trigger + should-NOT-trigger 쿼리 목록을 작성한다 (최소 10개)
+2. 각 쿼리를 Claude에 입력하고 스킬 트리거 여부를 기록한다
+3. 트리거율을 계산한다: `정확 트리거 수 / 전체 테스트 수`
+4. 목표: 관련 쿼리의 90% 이상에서 정확 트리거
+   - ⚠️ fz 실측은 이 목표에 크게 못 미친다: `claude -p` Runtime Trigger Eval 13개 스킬 전체 35/81(43%) · should-trigger 0% · should-NOT-trigger 100% · description 을 바꿔도 43%→44% (v2.5 · 2026-03-20 실증 — `skills/fz-skill/references/skill-creator-integration.md` § 적용 범위 및 한계). 목표 수치의 재정의(`claude plugin eval` 채택 여부 — §8.3)는 아직 정하지 않았다
+
+> ⚠️ 스킬이 많으면 description이 listing budget에 맞춰 자동 축약되어 트리거 정확도가 떨어질 수 있다 — `skillListingBudgetFraction`/`SLASH_COMMAND_TOOL_CHAR_BUDGET` 확인 [verified: code.claude.com/docs/en/skills].
+
+**Few-shot: fz-fix 트리거 테스트**
+
+| 쿼리 | 예상 | 비고 |
+|------|------|------|
+| "버그 고쳐줘" | trigger | 핵심 유스케이스 |
+| "크래시 원인 찾아줘" | trigger | 디버깅 |
+| "이 에러 해결해줘" | trigger | 에러 수정 |
+| "빌드 실패 고쳐줘" | trigger | 빌드 에러 |
+| "새 기능 만들어줘" | NOT trigger | → fz-code |
+| "코드 리뷰해줘" | NOT trigger | → fz-review |
+| "아키텍처 설계해줘" | NOT trigger | → fz-plan |
+
+**Few-shot: fz-gpt 트리거 테스트**
+
+| 쿼리 | 예상 | 비고 |
+|------|------|------|
+| "코드 교차검증해줘" | trigger | 핵심 유스케이스 |
+| "codex로 리뷰해줘" | trigger | 명시적 도구 지정 |
+| "PR 전 최종 검증" | trigger | final 서브커맨드 |
+| "계획 검증해줘" | trigger | verify 서브커맨드 |
+| "코드 직접 고쳐줘" | NOT trigger | → fz-fix |
+| "새 스킬 만들어줘" | NOT trigger | → fz-skill |
+
+### 1.2 Functional Test — Given/When/Then 형식
+
+스킬이 유효한 출력을 생성하는지 확인한다.
+
+**테스트 요소:**
+- 유효 출력 생성 확인
+- 에러 핸들링 동작 확인
+- 엣지 케이스 커버리지
+
+> ⭐ **합격 oracle (§0-1)**: "Then"은 가능한 한 객관 pass/fail로 기술한다 — "빌드 통과"(exit code), "lint 0 경고", "Gate 체크리스트 N/N". 주관 판정("잘 동작함")은 fresh-context 검증자(§0-2)에 맡긴다.
+
+**Few-shot: fz-code Functional Test**
+
+| Given | When | Then |
+|-------|------|------|
+| 계획 문서가 존재 | `/fz-code "Phase 1 구현"` | Phase별 코드 생성 + 빌드 통과 |
+| 계획 없이 호출 | `/fz-code "구현해줘"` | 계획 부재 경고 + fz-plan 안내 |
+| 빌드 실패 발생 | 구현 중 컴파일 에러 | 에러 분석 + 자동 수정 시도 (최대 3회) |
+
+**Few-shot: fz-gpt Functional Test**
+
+| Given | When | Then |
+|-------|------|------|
+| Git diff 존재 | `/fz-gpt review` | `scripts/gpt-call.sh review --base` 실행 + 이슈 보고 |
+| GPT CLI 미설치 | `/fz-gpt review` | 정문 exit 18 `GPT-OFF` 감지 + `[GPT 미사용 — CLI 없음]` 표기 — 대체 검증 없음 |
+| major 이상 이슈 발견 (이전 표기 "Critical" 은 이력) | `/fz-gpt final` | `final-deep`(같은 세션 심화) · `final-da`(DA 패스) 실행 — 조건 `major > 0`, 정본 `modules/fz-gpt-subcommands-aux.md` § final -- PR 전 최종 리뷰 |
+| 3-Tier 스킬 부재 | `/fz-gpt verify` | Tier 3 인라인 프롬프트로 폴백 |
+
+### 1.3 Performance Comparison — Before/After 비교
+
+스킬 없이 vs 스킬 있을 때를 비교 측정한다.
+
+**측정 항목:**
+- 메시지 수 (API 라운드트립)
+- 토큰 소비량
+- 작업 완료율
+- 사용자 개입 횟수
+
+**비교 테이블 템플릿:**
+
+| 항목 | 스킬 없이 | 스킬 있을 때 | 개선율 |
+|------|----------|-------------|--------|
+| 메시지 수 | {N} | {M} | {%} |
+| 토큰 소비 | {X}K | {Y}K | {%} |
+| 작업 완료 | {성공/실패/부분} | {성공/실패/부분} | — |
+| 사용자 개입 | {N}회 | {M}회 | {%} |
+| API 실패율 | {N}% | {M}% | {%} |
+
+---
+
+## 2. 성공 기준 템플릿
+
+### 2.1 정량 기준
+
+| 기준 | 목표 | 측정 방법 |
+|------|------|----------|
+| 트리거 정확도 | ≥90% | §1.1 Triggering Test (fz 실측 현황 — §1.1 절차 4 의 ⚠️) |
+| 도구 호출 효율 | 불필요 호출 ≤2개 | 실행 로그 분석 |
+| 실패율 | ≤10% | 10회 반복 실행 |
+| Gate 통과율 | 100% (필수 Gate) | Phase별 체크리스트 확인 |
+
+### 2.2 정성 기준
+
+| 기준 | 확인 방법 |
+|------|----------|
+| 사용자 개입 불필요 | 정상 케이스에서 추가 질문 없이 완료 |
+| 세션 간 일관성 | 동일 입력에 대해 3회 실행 시 동일 결과 구조 |
+| 올바른 스킬 위임 | Will Not 영역 요청 시 정확한 대안 스킬 안내 |
+| GPT 검증 일관성 | fz-gpt 교차검증 결과와 fz-review 결과 일치도 ≥80% |
+
+---
+
+## 3. "Ask Claude" 디버깅 기법
+
+스킬이 기대대로 작동하지 않을 때, Claude 자체를 디버깅 도구로 활용한다.
+
+### 방법
+
+1. Claude에게 질문한다:
+   ```
+   "fz-{name} 스킬은 언제 쓰는 거야?"
+   ```
+
+2. Claude의 응답을 분석한다:
+   - description을 정확히 인용하는가?
+   - 핵심 유스케이스를 올바르게 설명하는가?
+   - 부정 트리거(Do NOT use)를 정확히 인식하는가?
+
+3. 누락된 트리거 키워드를 발견한다:
+   - Claude가 특정 유스케이스를 언급하지 않으면 → description에 해당 키워드 부재
+   - Claude가 잘못된 유스케이스를 언급하면 → description이 모호함
+
+4. description을 조정하고 재테스트한다
+
+### Few-shot: fz-gpt Ask Claude 디버깅
+
+```
+Q: "fz-gpt 스킬은 언제 쓰는 거야?"
+A (기대): "GPT CLI를 통한 독립적 코드/계획 검증... gpt-call.sh review, gpt-call.sh verify..."
+A (문제): "코드를 수정할 때 쓰는 스킬입니다" ← 잘못된 인식!
+→ description에 "검증만 수행, 코드 수정 안 함" 강화 필요
+```
+
+### 반복 루프
+
+```
+description 조정 → "Ask Claude" 질문 → 인식 확인 → 트리거 테스트 → 반복
+```
+
+---
+
+## 4. 스킬별 테스트 스펙 템플릿
+
+YAML 기반으로 테스트 케이스를 정의한다. SKILL.md에 직접 포함하거나 별도 파일로 관리한다.
+
+> 표(markdown table) 형식도 허용 — §1.1/§1.2 예시 및 기존 스킬(fz-memory·fz-recording) 컨벤션. 필드(triggering should/should-NOT · functional Given/When/Then · type · oracle) 충족이 기준.
+
+### 형식
+
+```yaml
+test-spec:
+  name: fz-{name}
+  version: 1.0
+
+  triggering:
+    should-trigger:
+      - query: "{트리거 쿼리 1}"
+        reason: "핵심 유스케이스"
+      - query: "{트리거 쿼리 2}"
+        reason: "보조 유스케이스"
+    should-not-trigger:
+      - query: "{비관련 쿼리}"
+        redirect: "fz-{other}"
+        reason: "스킬 범위 밖"
+
+  functional:
+    - given: "{초기 조건}"
+      when: "/fz-{name} \"{입력}\""
+      then: "{예상 결과 — 가능하면 pass/fail oracle}"
+      type: normal
+
+    - given: "{엣지 조건}"
+      when: "/fz-{name} \"{입력}\""
+      then: "{예상 결과}"
+      type: edge-case
+
+    - given: "{실패 조건}"
+      when: "/fz-{name} \"{입력}\""
+      then: "{에러 핸들링}"
+      type: failure
+
+  performance:
+    baseline:
+      messages: null      # 스킬 없이 측정
+      tokens: null
+    with-skill:
+      messages: null      # 스킬 있을 때 측정
+      tokens: null
+
+  success-criteria:
+    trigger-accuracy: "≥90%"
+    gate-pass-rate: "100%"
+    failure-rate: "≤10%"
+```
+
+### GPT 스킬 테스트 스펙 예시
+
+```yaml
+test-spec:
+  name: fz-gpt
+  version: 1.0
+
+  triggering:
+    should-trigger:
+      - query: "codex로 리뷰해줘"
+        reason: "명시적 도구 호출"
+      - query: "교차검증 실행"
+        reason: "핵심 기능"
+      - query: "PR 전 최종 검증해줘"
+        reason: "final 서브커맨드"
+    should-not-trigger:
+      - query: "코드 직접 수정해줘"
+        redirect: "fz-fix"
+        reason: "검증만 수행"
+
+  functional:
+    - given: "Git diff 존재, GPT CLI 설치됨"
+      when: "/fz-gpt review"
+      then: "gpt-call.sh review 실행 + 이슈 리포트 생성"
+      type: normal
+
+    - given: "GPT CLI 미설치"
+      when: "/fz-gpt review"
+      then: "정문 exit 18 GPT-OFF 감지 + [GPT 미사용 — CLI 없음] 표기 (대체 검증 없음)"
+      type: edge-case
+
+    - given: "3-Tier 디스커버리에서 Tier 1 부재"
+      when: "/fz-gpt verify"
+      then: "Tier 2 → Tier 3 순차 폴백"
+      type: edge-case
+```
+
+---
+
+## 5. 테스트 실행 가이드
+
+### 단계별 실행
+
+```
+1. Triggering Test 먼저 실행
+   → 트리거 정확도 <90% → description 수정 후 재테스트
+
+2. Functional Test 실행
+   → 실패 케이스 → Phase/Gate 로직 검토
+
+3. Performance Comparison 실행
+   → 개선 미달 → 스킬 구조 재검토
+
+4. GPT 교차검증 (fz-gpt 대상 스킬인 경우)
+   → /fz-gpt verify로 스킬 로직 독립 검증
+```
+
+### 회귀 테스트
+
+스킬 수정 후 반드시 기존 테스트를 재실행한다:
+- description 변경 → Triggering Test 재실행
+- Phase/Gate 변경 → Functional Test 재실행
+- 모듈 참조 변경 → 참조 무결성 확인 (`/fz-manage check`)
+
+### 문서 계약은 존재와 부재를 쌍으로 (F-025)
+
+옛 문구를 새 문구로 바꾼 변경의 문서 계약은 **존재 검사(새 문구가 있다)와 부재 검사(옛 문구가 없다)를 쌍으로** 둔다. 존재만 보면 새 문구를 덧붙이고 옛 문구를 남긴 상태도 통과한다. fz 의 문서 계약 표(`tests/fixtures/docs/finding-contracts.tsv`)는 `has` · `lacks` 로 이 쌍을 적는다.
+
+### 테스트가 자기 이름의 축을 보는가 — 값싼 검출 9항 (F-122)
+
+v4.25.0 에서 열 번 만난 실패(테스트가 자기 이름의 축을 못 본다)에서 나온 여덟 항목에 9항을 더했다. 새 self-test 셀 · 회귀 fixture 를 쓸 때 대조한다.
+
+1. **방어선을 개별로 제거해** 각각 어느 테스트가 잡는지 확인한다. 통합 주입은 총계만 보여 "N종 중 M종만 관측"을 숨긴다(판정 표: `guides/harness-engineering.md` §5.6)
+2. 같은 exit 을 내는 검사가 둘 이상이면 결과 코드로 구분하지 않는다 — 거부 *사유*를 assert 한다
+3. 테스트의 setup 동작이 관측 대상 밖만 건드리는지 확인한다
+4. 타이밍 테스트는 옛 동작의 한계값 2배 이상으로 잡는다
+5. `replace` 계열은 치환 건수를 assert 한다. 성공 메시지에 *계산값*이 아니라 *관측값*을 찍는다
+6. 수정과 검산은 술어를 공유하지 않는다. 검산이 더 넓은 술어를 쓰고, 수정은 고정점까지 반복한다
+7. 경로 · 깊이 · 이름에 패턴을 쓰는 코드는 그 패턴의 **경계마다** fixture 를 만든다
+8. "이 축은 관측 불가"라고 쓸 때 **왜 불가인지** 한 번 더 묻는다. 불가 사유가 대상의 *성질*이면 한계이고, 대상의 *결함*이면 고칠 것이다
+9. **예외를 넣으면 세 케이스를 만든다** — (a) 예외 없음 (b) 예외 전량 (c) 예외를 가장 넓게 해석한 인접 입력. 1 · 2항은 "구현이 있나"만 묻는다 — 예외가 먹는 입력 집합의 **경계**는 (c)만 잰다(F-122: 두 변이를 다 돌리고도 예외 범위가 과했다)
+
+---
+
+## 6. Eval 자동화 — `/fz-skill eval` 연계
+
+`/fz-skill eval`과 `/fz-manage benchmark`가 이 가이드의 테스트 프레임워크를 자동화합니다.
+
+### 6.1 Static Analysis (자동)
+
+YAML + 본문 구조를 자동 검증합니다. `/fz-skill eval`의 8항목 체크리스트가 이것을 실행합니다.
+
+| 검증 항목 | 기준 | 대응 테스트 |
+|----------|------|------------|
+| Description 품질 | what+when+when-not+한영 | §3 Ask Claude 기법의 자동화 |
+| YAML 완전성 | 필수 필드 존재 | §4 test-spec의 전제조건 |
+| 크기 제한 | ≤500줄 | Progressive Disclosure 준수 |
+| Few-shot 예시 | ≥3개 (BAD/GOOD 쌍) | §1.2 Functional Test 커버리지 |
+| Gate 체크리스트 | Phase별 Gate 존재 | §2.1 Gate 통과율 |
+| Boundaries | Will/Will Not + 대안 | §1.1 should-NOT-trigger 근거 |
+| 과격 표현 | CRITICAL 등 부재 | 프롬프트 최적화 원칙 #8 |
+| 에러 대응 | 테이블 존재 | §1.2 failure type 커버리지 |
+
+### 6.2 Triggering Test 자동화 (반자동)
+
+`/fz-skill eval`이 description에서 쿼리를 자동 생성하고 자체 판단합니다.
+
+```
+자동 생성 로직:
+1. description에서 핵심 키워드 추출 → should-trigger 5개 생성
+2. Boundaries Will Not에서 → should-NOT-trigger 3개 생성
+3. Claude가 각 쿼리에 대해 "이 스킬이 트리거되어야 하는가?" 자체 판단
+4. 결과를 사용자에게 확인 요청
+```
+
+이 방식은 §3 "Ask Claude" 기법을 체계적으로 자동화한 것입니다.
+
+### 6.3 Diff Eval
+
+`/fz-skill eval --diff`가 수정 전/후를 비교합니다.
+
+| 비교 항목 | 측정 방법 |
+|----------|----------|
+| Description 키워드 커버리지 | 수정 전/후 키워드 수 비교 |
+| 크기 변화 | 줄 수 증감 |
+| 섹션 추가/제거 | 헤딩 기반 diff |
+| Static Analysis 점수 변화 | 수정 전/후 8항목 점수 비교 |
+
+### 6.4 리뷰형 스킬 Eval — coverage / verification 2단계 분리 (verified)
+
+fz-review·fz-gpt처럼 *스스로 finding을 내는* 스킬은 단일 점수로 평가하면 recall과 precision이 뒤섞인다. 2단계로 분리한다 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8 — "Code review harnesses" 섹션 · **Opus 5에서도 동일 유지**: "If your review prompt says 'only report high-severity issues' or 'be conservative,' the model may follow that instruction literally and report less; ask it to report everything and filter in a separate pass instead" — prompting-claude-opus-5]:
+
+1. **coverage 단계**: 스킬이 *모든* 후보 finding을 보고하는지 (불확실·저severity 포함). "be conservative/don't nitpick" 지시를 너무 충실히 따르면 recall이 떨어진다 — coverage 단계에선 필터링 금지.
+2. **verification 단계**: 별도 fresh-context 검증자(§0-2)가 각 finding의 실재성·severity를 판정해 선별. recall(coverage)과 precision(verification)을 *다른 단계*에서 측정.
+
+> 측정: coverage = 알려진 결함 N개 중 보고된 수 / verification = 보고 중 실재 비율. 단일 "정확도"로 합치지 않는다.
+
+---
+
+## 7. A/B 비교 프로토콜 — Description 최적화
+
+### 목적
+
+description 변경이 실제 트리거 정확도에 미치는 영향을 측정합니다.
+
+### 절차
+
+```
+1. 현재 description 스냅샷 (A 버전)
+2. description 수정 (B 버전)
+3. 동일 쿼리 세트로 A/B 각각 Triggering Test 실행
+4. 정확도 비교 → B가 높으면 채택, 아니면 롤백
+```
+
+### 비교 테이블
+
+```markdown
+## A/B 비교: fz-{name} description
+
+| 쿼리 | A (현재) | B (수정) | 변화 |
+|------|---------|---------|------|
+| "{쿼리 1}" | trigger (O) | trigger (O) | 동일 |
+| "{쿼리 2}" | NOT (X) | trigger (O) | 개선 |
+| "{쿼리 3}" | trigger (O) | NOT (X) | 퇴보 |
+
+A 정확도: 7/8 (87%)
+B 정확도: 8/8 (100%)
+판정: B 채택
+```
+
+### `/skill-creator` 연계
+
+Anthropic 내장 `/skill-creator`의 Improve 모드가 description 최적화를 제안할 수 있습니다.
+A/B 비교 시 `/skill-creator`의 제안을 B 버전으로 테스트하면 효과적입니다.
+
+```bash
+/skill-creator   # Improve 모드로 description 최적화 제안 받기
+# → 제안된 description을 B 버전으로 A/B 비교 실행
+```
+
+---
+
+## 8. Task-Outcome Benchmark (실제 repo·실행 검증)
+
+스킬이 트리거되느냐(§1)·description이 정확하냐(§7)를 넘어, **스킬이 실제 코딩 결과를 개선하는가**(VALUE 축)를 측정하는 프로토콜. §0의 두 원칙(객관 oracle + fresh-context 검증자)을 실제 과제에 적용한다.
+
+### 왜 별도 절차인가
+
+- `scripts/measure_constraint_load.py`는 COST(무엇이 비싼가)만 측정하고, "제거해도 에러가 안 느는가"(VALUE)는 **paired A/B + 회귀 라벨링이 필요하다**고 스스로 명시한다. §8이 그 VALUE 축이다.
+- §6.4(리뷰형 eval)의 coverage/verification은 리뷰 finding의 recall/precision 계약이지 **생성 코드의 task-success oracle이 아니다** — 대체 불가한 별도 갭.
+
+### 지표 계층 (⛔ LOC-primary 금지)
+
+| 계층 | 지표 | 판정 |
+|------|------|------|
+| **1차 (VALUE)** | task acceptance assertion/test 통과 = 생성 코드 실행 검증 | 객관 pass/fail (§0 원칙 1) |
+| **결과** | 회귀 라벨(resolved/regressed) + 완료율 | — |
+| **2차 (효율)** | LOC(git diff added-lines) · 토큰 · 시간 | 1차 통과분에 한해 비교 |
+
+> ⛔ 1차 oracle 없이 LOC만 비교하면 "task-outcome"이 아니라 "코드량 비교"다 — 그럴 땐 이름을 낮춰라.
+
+### same-agent A/B 격리 프로토콜 (수동)
+
+- **동일 에이전트**를 skill 유/무로 real public repo @고정커밋에 실제 티켓 수행. **baseline arm 정의 (canonical)**: skill 미적용 동일 에이전트 — 신규 스킬은 without-skill, 기존 스킬 개선은 old-skill(이전 버전); chatty bare 모델 아님
+- arm×run마다: 동일 고정 커밋의 **독립 worktree/clone** · 고정 model/effort/tool-budget · 빌드·의존성 캐시 정책 · timeout · **비신뢰 코드 실행 sandbox(safety tier)**
+- **오염 탐지 (canonical)**: baseline arm이 skill·always-on 룰셋에 접근 안 했는지 확인 — 플러그인의 SessionStart/SubagentStart 훅이 baseline arm에도 발화해 gap이 0으로 수렴한 오염 사례 있음 (arm 격리 필수). in-session 서브에이전트 A/B(예: skill-creator `--full`)의 오염 판정도 본 절이 single source.
+- **채점·집계 계약**: (a) **fresh-context 채점자** — 별도 세션/에이전트가 diff + acceptance test만 보고 판정(§0 원칙 2), (b) 오염 감지된 pair = `invalid/exploratory`로 **제외**, (c) task별 (with-skill, baseline) **paired 2×2**: (with pass, baseline fail)=resolved · (with fail, baseline pass)=regressed · 동일 결과=neutral, (d) 완료율 = with-skill pass task 수 / **오염 제외 후 유효 task 수**, (e) `n≥4 → median`은 **2차 효율 지표(LOC·토큰·시간)에만** 적용 — 1차 성공률·회귀는 비율/카운트로 집계. 워크스페이스 보존 → 오프라인 rescore
+
+> ⛔ **이건 방법론이다** — 실측이 필요할 때 이렇게 하라. clone/worktree/sandbox 자동 조립 러너 구축은 `guides/harness-engineering.md` §6 AP1(과잉구조화) 대상이며, 실제 스킬 회귀가 반복 관측된 뒤 사용자 결정으로 착수한다.
+
+### 8.1 effort sweep (§8의 특화 — arm 설정만 다름)
+
+**발동 조건**: 새 모델 전환 시. Opus 5 공식이 요구한다 — *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* [verified: platform.claude.com/docs/en/build-with-claude/effort]. 채점·집계·오염 탐지는 §8 계약을 그대로 상속하고, **arm 설정 방법만** 아래로 대체한다. (Opus 5.5 도 같은 요구 — "Re-run your effort sweep rather than carrying a setting over" [verified: whats-new-opus-5-5])
+
+**⛔ arm은 세션 레벨로 설정한다 — `workflows/*.js`의 per-call `opts.effort`를 수정하지 말 것** (sweep arm 설정용 규칙이다. 2026-10-19 부터 워크플로는 per-call `opts.effort` 에 Lead 세션 effort 를 싣는다 — 세션 arm 을 바꾸면 워커도 따라간다 · `modules/mode-gate.md` § effort)
+
+| 레이어 | 우선순위 | 근거 |
+|---|---|---|
+| `CLAUDE_CODE_EFFORT_LEVEL` env var | **최상위** | *"The environment variable takes precedence over all other methods"* [verified: code.claude.com/docs/en/model-config] |
+| skill/subagent frontmatter `effort` | 세션 위 | *"Frontmatter effort … overriding the session level but not the environment variable"* [verified: 동] |
+| Workflow `agent()` per-call `opts.effort` | **세션 위** (실측 1회 · env · frontmatter 대비는 미측정) | 공식이 per-invocation **`model`** 파라미터는 실재 레이어로 명시하나(`CLAUDE_CODE_SUBAGENT_MODEL`이 "overrides the per-invocation `model` parameter"), **effort는 동일 서술이 없다**. 2026-10-19 실측: Lead 세션 `xhigh` 에서 `opts.effort: 'high'` 로 부른 code-pair 워커(Opus 5.5)의 transcript `effort` 6/6 = `high` — per-call 값이 세션 값을 이긴다 |
+| `settings.json` `effortLevel` (세션) | 기본 | *"a starting default, not enforcement"* [verified: 동] |
+
+> **이유**: per-call `opts.effort`의 지위가 미확정이므로, 그것으로 arm을 가르면 **arm이 실제로 갈렸는지 알 수 없다**. 미검증 메커니즘 위에 측정을 세우지 않는다. 현행 fz는 `.js` 45곳(8개 워크플로 — 2026-10-19 부터 per-call `opts.effort` 에 Lead 세션 effort 를 싣는다, 미지정 시 `'xhigh'`)과 작성자 환경의 사용자 `settings.json` `effortLevel` 이 **모두 `xhigh`** 였다(2026-09-06 실측 — 이력) — 두 값이 같으면 어느 쪽이 이기든 결과가 같아 이 모호성이 드러나지 않는다. (이전 판의 작성자 `settings.json` 줄번호는 이식성 규칙으로 뺐다 — `guides/skill-authoring.md` § 이식성 — 플러그인은 배포물이다.) ⚠️ 사용자 settings 의 top-level `effortLevel` 은 Opus 5.5 에 적용되지 않는다는 서술이 Claude Code model-config 문서(code.claude.com/docs/en/model-config)에 있다 [미검증: 원문 재대조 필요] — 사실이면 Opus 5.5 세션에서는 위 '같은 값' 전제부터 성립하지 않는다.
+
+**⛔ arm 적용 검증 (필수 — 매 run)**: Claude Code는 트랜스크립트 최상위에 `effort` 필드를 기록한다(v2.1.212+). run 직후 확인해 **의도한 arm이 실제 적용됐는지** 대조한다. 불일치 pair는 §8 오염 규칙에 따라 `invalid`로 **제외**.
+
+> **왜 형식이 아닌가** [verified: 실측 CC 2.1.220 · opus-5]: **무효 effort 값은 에러를 내지 않고 조용히 무시된다.** `CLAUDE_CODE_EFFORT_LEVEL=bogus`가 통과하며 하위 층 값이 그대로 남는다 — 검증 없이 env var만 세팅하면 **arm이 갈리지 않은 채 측정이 진행된다.** 기준선을 바꿔 확인함: settings 기본 `medium` + env `bogus` → `medium` 잔존, env `high` → `high` 적용.
+> 부수: `--settings`는 사용자 `settings.json`과 **병합**된다(미지정 키는 사용자 값 유지) — A/B 격리 시 의도한 키를 명시할 것. `{}`를 줘도 사용자 effortLevel이 살아남는다.
+> ⚠️ 재현 함정: 자기 세션 transcript는 계속 쓰이므로 `ls -t | head -1`은 headless run 파일을 못 찾는다 → **파일 집합 diff + 자기 세션 ID 제외**로 신규 파일을 특정할 것.
+
+**⛔ `ultracode`는 arm 값이 아니다** [verified: 실측 CC 2.1.220]: env var·`settings.json` **양 층에서 무효값과 구별 불가하게 무시된다**(기본 `medium`에 `ultracode` 주면 `medium` 잔존 — xhigh 아님). 따라서 `ultracode` on/off를 **비대화식 paired arm으로 만들 수 없다**. 대화식 세션 토글 전용이며, 그 상태를 headless run에 물려주는 경로는 확인되지 않았다.
+
+```bash
+# arm 설정 (택1) — .js 미변경
+# ⛔ 비대화식에서 Workflow 를 돌리면 **천장 해제를 같이 준다**. `claude -p` 는 백그라운드
+#    작업을 600초에 끊고, 잘린 run 은 exit 0 · 오류 키워드 0건으로 짧은 wall 을 인쇄한다
+#    (2026-09-13 실측: 22분 워크플로가 wall=621.9s 로 나와 baseline 의 -54% 로 보였다).
+CLAUDE_CODE_EFFORT_LEVEL=medium CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 claude -p ...
+/effort medium                                # 대화식 세션
+
+# 완주 오라클 (⛔ wall 을 읽기 전에) — 선언 콜 수와 대조한다
+python3 scripts/fz_wf_metrics.py --wf <wf_id> --expect-agents <선언 콜 수>
+
+# arm 적용 검증 (run 직후)
+python3 - <<'PY'
+import json,glob,os,collections
+# ⛔ mtime 최댓값은 자기 세션 파일을 집는다 (바로 위 '재현 함정' 그대로다).
+#    run 전후 **파일 집합 diff** + 자기 세션 ID 제외로 신규 파일을 특정한다.
+#    사전:  find ~/.claude/projects -name '*.jsonl' | sort > /tmp/pre.txt
+import subprocess
+pre=set(open("/tmp/pre.txt").read().split())
+now=set(subprocess.run(["find",os.path.expanduser("~/.claude/projects"),"-name","*.jsonl"],
+                       capture_output=True,text=True).stdout.split())
+new=[f for f in now-pre if os.environ.get("SELF_SESSION_ID","\0") not in f]
+for p in new:
+    c=collections.Counter(json.loads(l).get("effort") for l in open(p,errors="replace")
+                          if '"effort"' in l)
+    print(p, dict(c))   # 의도한 arm 값만 나와야 정상 (워커 파일까지 전부)
+PY
+```
+
+**arm 선정**: Opus 5 공식 출발점이 `high`(기본)이고 `low`/`medium`이 비용·지연의 1차 레버이므로 최소 `{low, medium, high}` 3-arm. `xhigh`는 demanding coding/agentic 대조군으로 추가. (이 근거는 이력 — Opus 5 기준.) 현행 Opus 5.5 근거: 기본 effort 가 `medium` 이고 [verified: https://platform.claude.com/docs/en/build-with-claude/effort] "Claude Opus 5.5 at `medium` matches or exceeds Claude Opus 5 at `high` on coding and knowledge-work evaluations" · "Reserve `xhigh` and `max` for work where you've measured a quality gain." [verified: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5#calibrate-effort] — 같은 3-arm 을 `medium` 출발점 기준으로 읽고, `xhigh` 는 측정된 이득이 있는지 확인하는 대조군이다.
+
+**Opus 5.5 보정**: 공식 기본이 `medium`(Opus 5 는 `high`)이고 같은 effort 에서 사고량이 늘어난다(`xhigh`·`max` 에서 두드러짐) — "A request that omits `effort` runs at `medium`; on Claude Opus 5 it ran at `high`." · "At the same effort setting the model tends to think more per turn than Claude Opus 5, most of all at `xhigh` and `max`." [verified: whats-new-opus-5-5]. fz 는 `xhigh` 유지를 택해(사용자 결정 2026-09-25 — 이력) 5.5 sweep 은 하지 않았다 — 재개하면 `experiment-log.md` 에 새 절을 만든다. 현행은 2026-10-19 사용자 결정으로 **워커 effort = Lead 세션 effort** 다(`modules/mode-gate.md` § 사용자 결정 · § effort). 5.5 sweep 은 이 결정 뒤에도 하지 않았다.
+
+**대상 스킬 우선순위**: `measure_constraint_load.py` 의 **floor 큰 순** — 순위는 고를 때마다 다시 뽑는다: `python3 scripts/measure_constraint_load.py`(기계 판독은 `--json`). 이전 판에 적었던 floor 수치는 측정 시점과 함께 낡아서 뺐다. floor가 큰 스킬일수록 effort 변화의 절대 효과가 크다.
+
+⛔ **sweep 결과로 곧바로 `.js`를 고치지 말 것**: arm이 세션 레벨이었으므로 결론도 세션/frontmatter 레벨에 적용한다. per-call 배선 변경은 위 `[미검증]` 해소가 **선행**이다. (2026-10-19 Lead effort 전달은 값을 바꾸지 않는 배선이다 — per-call 실효는 실행 스모크에서 워커 transcript effort 로 확인한다)
+
+### 8.2 계측 데이터와 짝 맞추기
+
+§8의 arm 비교는 **run 밖에 남은 기록**으로 검산한다. 데이터 위치 3종:
+
+| 소스 | 경로 | 담는 것 |
+|---|---|---|
+| 트랜스크립트 | `~/.claude/projects/**/*.jsonl` | `usage`·`timestamp`·`effort`·`attributionSkill`·`isSidechain` |
+| 워크플로 journal | `…/<session>/subagents/workflows/wf_*/journal.jsonl` | 스테이지별 `result`(findings·verdict) |
+| Stop 훅 이벤트 | `$FZ_TELEMETRY_DIR/events.jsonl` (기본 `~/.fz/telemetry`) | 턴당 도구 수·문구 발화 수·정정 신호(**약한 신호**) |
+
+```bash
+python3 scripts/fz_telemetry_report.py --since YYYY-MM-DD --until YYYY-MM-DD   # 집계 리포트
+python3 scripts/fz_snapshot.py                                                  # 정적 부하 1행 기록
+python3 scripts/fz_snapshot.py --diff                                           # 직전 대비 floor 증감
+```
+
+- **조인 키는 `prompt_id`** 다. events.jsonl 의 한 줄이 트랜스크립트의 어느 턴인지는 `prompt_id`로만 확정된다(`session_id`는 여러 턴을 묶는다). arm 짝을 맞출 때 이 키로 붙인다.
+- ⛔ **arm 적용 검증(§8.1)을 대체하지 않는다.** 계측은 사후 기록이고, arm 이 실제로 갈렸는지는 여전히 트랜스크립트 `effort` 필드 대조로 확인한다.
+- ⛔ **분모 0건은 "부하 없음"이 아니라 측정 실패다.** 리포트 부록이 분모(세션·메시지·journal·findings 수)를 함께 인쇄하므로 그 줄을 먼저 본다.
+- ⛔ **adjust 가 많아도 A/B 필요성은 사라지지 않는다.** 실측 peer-review `cross`(N=20 · overturn 1 · adjust 41)는 후보 *제외* 근거가 아니라 후속 검증 대상이다. adjust 는 `newSeverity` 를 필수로 요구하지 않아 건수가 유효 조정과 1:1 이 아니다 [verified: `workflows/peer-review.js` `CrossReviewSchema.properties.adjustments` — newSeverity 정의 :87 · required 는 :105 의 별도 스키마].
+  - 2026-11-01 정정 — '필수가 아니다'는 `crossOutput: 'full'` 경로의 `CrossReviewSchema` 에만 맞다. 현행 기본 경로(`crossOutput !== 'full'` — 2026-10-01 기본 on)는 `CrossDeltaSchema` 를 쓰고 그 `adjustments` 는 `newSeverity` 가 required 다(`workflows/peer-review.js` 의 `crossDeltaOn` · `crossSchema` 선택). 위 N=20 기록은 2026-09-07 에 적혔고 `CrossDeltaSchema` 는 2026-09-28 에 생겼으므로 full 스키마 경로의 기록이다. 결론(adjust 건수가 A/B 필요성을 없애지 않는다)은 그대로다.
+- **판정 기준표 (정본 — 이 표가 배포물이다)**. 데이터는 이 기준을 만족할 때만 결론을 낸다:
+
+| 질문 | 지표 | 판정 |
+|---|---|---|
+| 워커 effort `xhigh`→`high` 해도 되나 | 같은 입력 짝 비교(§8.1): critical·major 손실 0 AND (시간 or 토큰) ≥10%↓ | `modules/peer-review-tiers.md` 짝 비교 절차 그대로 |
+| 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) **과 `adjust`**(어댑터 `verdict adjust` [verified: `scripts/fz_telemetry_report.py:440,510`]) 수, 워크플로 **N≥20** 실행 | overturn 0~1 **AND** adjust 0~1 이면 제거 A/B 후보(0~1 임계는 **잠정 휴리스틱**) — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
+| 규칙 감량이 품질을 떨어뜨렸나 | 감량 전후 fz-findings `detector: user` 월별 건수 + events `user_correction_signal` 비율 | 증가하면 되돌림 |
+| floor 성장이 지연을 늘리나 | `snapshots.tsv` floor × 스킬별 지연 중앙값 상관 | 상관 없으면 감량 우선순위 ↓ |
+| events 의 0 은 저부하인가 | `measurement` 필드 — `complete` 만 카운트로 읽는다 | `incomplete`·`unattributable`·`no_transcript` 는 분모에서 뺀다 |
+
+---
+
+### 8.3 공식 플러그인 eval (`claude plugin eval`)
+
+Claude Code 2.1.269+ 가 플러그인 기여도를 재는 공식 수단을 제공한다 [verified: code.claude.com/docs/en/plugin-evals].
+
+- **WITH / W/OUT Δ** — "Each case's runs are repeated with no plugin loaded by default, and you get two scores, WITH and W/OUT. Their difference, Δ, is what the plugin contributed. If a case scores 1.0 both with and without the plugin, the plugin isn't what made it pass."
+- **채점기** — regex · tool_used · tool_order · file_exists(추가 모델 호출 없음) · llm/baseline(judge 모델 호출). `claude plugin eval init` 이 케이스와 채점기를 제안한다
+- **CI** — `--model`·`--judge-model` 고정, `--threshold` 설정, exit code 로 게이트
+
+**§8 과의 관계**: 이 도구의 baseline arm 은 "플러그인 미로드" 다. §8 same-agent A/B 격리 프로토콜의 **대조군 설계를 공식 도구로 대체할 후보**이지만, 훅·전역 설정 오염을 이 도구가 어떻게 차단하는지는 문서에 없다 [미검증: 격리 범위]. 채택 전 §8 의 arm 적용 검증(트랜스크립트 effort 필드 대조)과 같은 방식으로 **W/OUT arm 이 실제로 플러그인 없이 돌았는지** 1회 실측한다.
+
+
+## 참조
+
+- 권위 자료 단일 참조점: `guides/llm-references.md` (Tier 1/2/3)
+- 스킬 작성법: `guides/skill-authoring.md`
+- 트러블슈팅: `guides/skill-troubleshooting.md`
+- 프롬프트 최적화: `guides/prompt-optimization.md`
+- GPT 교차검증: `skills/fz-gpt/SKILL.md`
+- 스킬 품질 평가: `/fz-skill eval` (`skills/fz-skill/SKILL.md`)
+- 일괄 벤치마크: `/fz-manage benchmark` (`skills/fz-manage/SKILL.md`)
+- Anthropic 공식 평가: `/skill-creator` (Eval/Improve/Benchmark 모드)
+- Tier 1 출처: code.claude.com/docs/en/{skills, sub-agents, best-practices}

@@ -1,0 +1,177 @@
+# fz-gpt 서브커맨드 (Aux 5개) — final / adversarial / drift / plan / micro-eval
+
+> **Scope of Applicability**: `fz-gpt` SKILL.md의 보조 서브커맨드 5개. PR 전 최종 리뷰 (final), Devil's Advocate (adversarial), 아키텍처 드리프트 (drift), 독립 플랜 (plan), 단일 주장 재평가 (micro-eval).
+>
+> ⛔ `commit`·`config` 는 2026-09-06 제거됐다 — 정의만 있고 호출 배선이 0건이었다(전수 대조, positive control `drift` 4곳으로 패턴 생존 확인).
+> 단일 커밋 검증 기능 자체는 `scripts/gpt-call.sh review --commit SHA` 로 살아 있다.
+>
+> **Purpose**: Core 4개(`modules/fz-gpt-subcommands-core.md` — review/verify/validate/check) 외의 보조 서브커맨드 정의.
+
+## 목차
+
+- **final** — PR 전 최종 리뷰 (resume --session-file 심화)
+- **adversarial** — Devil's Advocate 리뷰
+- **drift** — 아키텍처 드리프트 전체 스캔
+- **plan** — 독립 플랜 생성 (C4 원칙)
+- **micro-eval** — 단일 주장 독립 재평가 (claim-type 라우팅)
+
+> ⛔ **아래 예시는 전부 정문(`scripts/gpt-call.sh <kind>`) 호출이다** — 호출자는 kind 와 입력만 쓴다. 모드 · 역할 스킬 · schema · 고정 플래그는 `scripts/gpt-kinds.json` 이 정한다(생성 표: `skills/fz-gpt/SKILL.md`). 모델·effort 는 적지 않는다(`modules/gpt-strategy.md` § 모델·effort 선택). ⛔ 래퍼 · GPT CLI 를 직접 부르지 않는다.
+> 정문이 부르는 래퍼(`scripts/gpt-exec.sh`)가 `modules/fz-gpt-bash-hygiene.md` 의 교훈을 대신 처리한다: `< /dev/null` (29차 hang 방지) + trust check (30차) + skip flag + `--out` readback + `--` 구분자 + (review 모드) §5.5 Base Verification Gate.
+> 프롬프트는 `--prompt-file` 로만 받는다 — 아래 `P_*` 는 앞 줄에서 heredoc 으로 쓴 임시 파일이다.
+
+## final -- PR 전 최종 리뷰
+
+모든 커밋의 누적 변경을 최고 정밀도로 종합 리뷰합니다.
+
+```bash
+# 1차: 전체 리뷰 — review 모드(diff 범위 결정론 · base 검증 게이트 · reviewer 는 CLI 암묵 선택). 공유 모듈도 읽는다
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" final --cd "$GIT_ROOT" --out "$REVIEW_FILE" --base "$BASE_BRANCH" \
+  --title "[TICKET] PR 전 최종 리뷰"
+
+# 2차 (major+ 이슈 존재 시): 1차 세션을 이어 심화 검증
+if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
+  cat > "$P_DEEP" <<EOF
+위 리뷰에서 발견된 major 이슈 ${MAJOR_ISSUES_COUNT}건을 심화 검증하라.
+각 이슈에 대해: 1) 재현 가능성 2) 영향 범위 3) false positive 여부를 판단하라.
+EOF
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" final-deep --cd "$GIT_ROOT" --out "$REVIEW_DEEP_FILE" --prompt-file "$P_DEEP" \
+    --session-file "${REVIEW_FILE}.session"
+fi
+```
+
+> ⚠️ DA·adversarial 의 옛 `--sandbox read-only` 는 래퍼가 대신한다 — `gpt-exec.sh` 가 **모든** 호출에 `-c sandbox_mode="read-only"` 를 강제한다(사용자 config 보다 우선). 프롬프트의 "파일을 수정하지 마라" 는 보조 문구다.
+> `resume --session-file`: 1차 리뷰 컨텍스트를 유지한 채 심화 검증. false positive 감소 (세션 지정 이유: `modules/fz-gpt-bash-hygiene.md` §8).
+
+**/fz-challenger DA 모드**: `final` 완료 후 major 이상 이슈가 발견되면 DA(Devil's Advocate) 패스를 추가 실행하여 false positive를 제거한다.
+
+```bash
+if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
+  cat > "$P_DA" <<EOF
+아래 리뷰 이슈 목록에 대해 Devil's Advocate 분석을 수행하라.
+각 이슈에 agree|challenge|supplement|reverse 판정과 근거를 제시하라. 파일을 수정하지 마라(읽기 전용 분석).
+## 이슈 목록
+$MAJOR_ISSUES
+EOF
+  "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" final-da --cd "$GIT_ROOT" --out "$DA_REVIEW_FILE" --prompt-file "$P_DA"   # challenger 본문 · gpt_peer_review_schema 는 레지스트리
+fi
+```
+
+## adversarial -- Devil's Advocate 리뷰
+
+설계 결정에 도전하는 적대적 리뷰. final의 DA 패스를 독립 실행 가능.
+
+```bash
+echo "현재 변경사항의 설계 결정에 Devil's Advocate 분석을 수행하라. 파일을 수정하지 마라(읽기 전용 분석)." > "$P_DA"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" adversarial --cd "$GIT_ROOT" --out "$DA_REVIEW_FILE" --prompt-file "$P_DA"
+```
+
+## drift -- 아키텍처 드리프트 전체 스캔
+
+전체 코드베이스를 1M context로 스캔하여 아키텍처 드리프트를 감지합니다.
+
+```bash
+cat > "$P_DRIFT" <<EOF
+전체 코드베이스를 스캔하여 아키텍처 드리프트를 감지하라.
+Critical → Major → Minor 순으로 보고하라.
+EOF
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" drift --cd "$GIT_ROOT" --out "$DRIFT_REPORT_FILE" --prompt-file "$P_DRIFT"
+# 역할 본문을 찾지 못하면 정문이 레지스트리의 폴백 지시를 프롬프트 앞에 붙인다
+```
+
+> **권장 실행 시점**: PR 전, 대규모 리팩토링 후.
+
+## plan -- 독립 플랜 생성 (Claude와 교차 비교)
+
+요구사항을 기반으로 Claude 계획과 독립적으로 플랜을 생성합니다.
+
+```bash
+REQUIREMENTS="$1"
+cat > "$P_PLAN" <<EOF
+## 요구사항
+${REQUIREMENTS}
+
+위 요구사항에 대해 독립적으로 구현 계획을 수립하라.
+Claude 계획을 전달받지 않았으므로 코드베이스를 직접 탐색하여 계획하라.
+EOF
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" plan --cd "$GIT_ROOT" --out "$PLAN_FILE" --prompt-file "$P_PLAN"
+```
+
+> **C4 원칙**: Claude의 중간 작업물(계획 텍스트)을 전달하지 않는다. 요구사항만 공유.
+> **비교**: 결과는 JSON 한 객체다(`gpt-skills/fz-planner` 출력 형식 — `status` · `steps` · `riskMatrix` · `divergencePoints` · `projectRules`). `status` 가 `rejected` 면 계획이 아니다 — `reason` 을 보고 입력을 고친다. 차이표는 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {workflow-result.json} --gpt "$PLAN_FILE"` 로 만든다
+
+## independent-plan · independent-review -- 격리 첫 패스 (fz-peer-review · fz-plan light · full · fz-modernize full 기본 · fz-review 는 opt-in `--gpt-independent`)
+
+Claude 결과와 독립인 첫 패스를 강제 격리 아래에서 돌린다. 규약은 `modules/cross-validation.md` § 독립 첫 패스.
+
+**independent-plan 은 계획 대조가 아니다** — Claude 계획을 보지 않고 요구 원문 · 원문 색인 · 대상 저장소만으로 자기 계획을 세운다. 합격은 독립 계획 스키마 통과와 오염 감사 0 이고, 두 계획의 차이 판정은 `plan_divergence.py` 와 Lead 가 한다. 계획을 받아 검증하는 것은 `verify` 다(F-471).
+
+```bash
+FZ_GPT_ARTIFACT="${ARTIFACT:?호출자의 산출물 계열 — fz-plan: plan · fz-modernize: guide-plan}" FZ_WORK_DIR="$WORK_DIR" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-plan --requirement "$REQ_FILE" [--rules-index "$WORK_DIR/rules/index.json"] \
+  [--repo "$GIT_ROOT"] --deny "$WORK_DIR" [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
+"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" independent-review --diff "$REVIEW_DIFF" --base "$WORK_DIR/base" --head "$WORK_DIR/head" --deny "$WORK_DIR" \
+  [--pr-meta "$WORK_DIR/pr-meta.json"] [--rules-index "$WORK_DIR/rules/index.json"] [--snapshot DIR]... --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
+```
+
+- 역할 본문은 격리 사본 `gpt-skills/fz-planner` · `fz-reviewer` 를 래퍼 `--inject-skill` 로 넣는다. 모델·effort 기본값은 없다 — `--model` · `--effort` 를 주지 않으면 Lead 세션 선택 > 격리 config(실제 config 최상위 두 줄 사본) 순이다(`modules/gpt-strategy.md` § 모델·effort 선택)
+- `--gpt-agents`(review 전용 · opt-in) — 역할 파일 `gpt-agents/*.toml` 을 격리 홈에 넣고 두 렌즈 역할(`fz-review-arch` · `fz-review-quality`)만 spawn 하게 한다. 감사의 `spawnedRoles` 에 역할 이름이 남는다. 없으면 격리 config 에 `[agents] enabled = false` 를 넣어 spawn 도구를 끈다(F-436 — CLI 0.159.2 exec · resume 실측 `multi_agent_version: disabled`). 프롬프트의 금지 문장과 감사의 spawn 수 기록은 그대로 둔다
+- `--repo` 는 복사하지 않고 권한 프로필 read 로 연다 — 그 안의 `.claude` · `.fz-work` 와 `--deny` 는 막는다. review 의 `head/` 는 `skills/fz-peer-review/scripts/gather.sh` 가 만든다
+- `--deny "$WORK_DIR"` 는 늘 준다 — 권한 프로필은 디스크 전체 읽기에서 HOME · 임시 폴더만 막는다. 작업 폴더가 HOME 밖이거나 저장소 안이면 Claude 산출이 읽힌다
+- `--rules-index` 는 지침 **원문 색인**이다(`extract_project_rules.py` 출력 — `modules/project-rules.md`). ⛔ 규칙 레코드(`projectRulesPath`)를 넘기면 런처가 모양으로 판별해 exit 11 로 거부한다 — Claude 의 해석이 GPT 첫 패스의 원문이 되기 때문이다
+- `$REVIEW_DIFF` 는 `review-surface.patch`(gather 가 중복 커밋을 뺀 patch)가 있으면 그것, 없으면 `diff.patch` 다 — Claude 렌즈의 1차 리뷰 대상과 같아야 두 패스가 같은 범위를 본다. 병합 `--diff` 도 이 파일이다. `head/` 는 그대로 쓴다(표면의 상위 집합이다)
+- `--pr-meta` 는 PR 입력일 때 gather 가 만든 `pr-meta.json`(작성자가 쓴 제목 · 본문)이다. ⛔ Lead 가 채운 `requirements.md` 는 넘기지 않는다 — Lead 의 해석이 GPT 에 닿는다(InputHygiene)
+- 산출: `.json` · `.md` · `.audit.json`(rollout 수 · spawn 수 · 격리 적용 · 적중) · `.rollouts/`
+- exit: 0 성공 · 10 사용법 · 같은 --out 동시 실행 · 11 사전조건 · 12~14 래퍼 측정 실패(14 는 6축 후검사도) · 15 오염 · 16 시간 초과 · 17 planner 거부 — ⛔ 10~17 은 결과 0건이 아니다. 18 은 GPT 미사용(실패 아님 · 감사 `"gptOff"`) — `modules/gpt-strategy.md` § GPT 미사용
+- 횟수: independent-plan 재호출 상한 · 세지 않는 출구(실패 · exit 18) · 넘칠 때의 정문 exit 19 는 정본 `modules/cross-validation.md` § 재검증 라운드 상한 — 호출 줄의 `ARTIFACT` 는 호출자의 산출물 계열이다(fz-plan `plan` · fz-modernize `guide-plan` — 비면 가드가 멈춘다) · exit 19 면 다시 띄우지 않는다(처리는 호출 스킬 — fz-plan 실행 절차 2.7 · fz-modernize Phase 3 1.5)
+- ⛔ 옵션을 켜지 않으면 위 `plan` 서브커맨드 경로가 그대로다
+
+### review — Lead 순서
+
+fz-peer-review(기본 실행)와 fz-review(`--gpt-independent` · 기본 off)가 함께 쓰는 정본이다. 두 스킬과 Tier 표는 이 절을 가리킨다.
+
+1. **Workflow 직전에** 런처를 `run_in_background` 로 띄운다 — 두 패스가 동시에 돈다. GPT 는 허용 입력만 받아 Claude 산출을 보지 않는다
+2. 입력을 나눠 준다 — 규칙 레코드(`projectRulesPath`)는 Workflow args 에만, 지침 원문 색인은 런처 `--rules-index` 에만 준다(같은 파일이 아니다 — 위 bullet). fz-review 는 Workflow args 에 `locatedFindings: true` 를 함께 준다 — 위치 필드(`line_range`)가 없는 Claude 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다
+3. ⛔ GPT 팔이 끝나기 전에는 대상 트리를 고치지 않는다 — 감사(`.audit.json` 의 `inputs`)가 GPT 가 본 diff 의 sha256 을 남기고, 병합이 `--diff` 와 대조해 다르면 stale 로 거부한다
+4. 두 패스가 끝나면 병합한다: `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환 JSON} --gpt {out-dir}/gpt-{run}.json --diff {런처 --diff 와 같은 파일}`. 옆 파일(`.contaminated` · `.audit.json`)이 오염 · 실패 · stale 을 말하면 exit 1(거부)이다. 런처가 10~17 로 끝났으면 `--gpt` 대신 `--gpt-unavailable "exit {n} — {note}"` 로, 18(GPT 미사용)이면 `--gpt-unavailable "GPT 미사용 — <사유>"` 로 부른다(사유 = `GPT-OFF:` 줄 · `modules/gpt-strategy.md` § GPT 미사용). Tier 1(Workflow 없음)은 Lead 발견을 `{"issues": [{id, severity, file, line_range, discoveryAxis, title, evidence}]}` 로 `{WORK_DIR}/review/lead-findings.json` 에 써서 `--claude` 로 준다 — evidence 는 diff 원문을 백틱으로 인용한다(병합이 그 hunk 에서 다시 찾는다 · 계약은 `review_merge.py` 머리말 입력 계약)
+5. 병합 결과가 기존 GPT 리뷰 호출(fz-review Phase 5 [병렬 2] · fz-peer-review GPT challenger)을 대신한다 — 두 번 부르지 않는다. Tier 3 GPT DA 는 병합 뒤 한 번이다
+- 경로는 **플러그인 루트 기준**이다 — `FZ_PLUGIN_ROOT` 는 `scripts/resolve-plugin-root.sh` 로 푼다(상대 경로는 대상 레포에서 조용히 빗나간다)
+
+## micro-eval -- 단일 주장 독립 재평가 (Claim-Type 라우팅)
+
+단일 주장(severity 판단, 분류, 사실 주장 등)을 GPT로 빠르게 독립 재평가합니다.
+Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-Type 라우팅의 "분류/심각도 판단" 카테고리를 처리.
+
+**사용 시점**:
+- Claude가 Critical/Major로 판정한 이슈가 실제 그 심각도인지 재확인
+- 외부(팀원/GPT 이전 응답) 지적의 유효성 빠른 확인
+- "이 주장이 맞는가?" 형태의 단일 이슈 검증
+- cross-validation.md Claim-Type 라우팅에서 분류/심각도 판단 → micro-eval로 흐름
+
+**호출**: `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" micro-eval --cd "$GIT_ROOT" --out "$MICRO_FILE" --prompt-file "$P_MICRO"` — kind `micro-eval` 이 다음을 정한다:
+- skill: `challenger` 본문 주입(경로는 정문이 해석) · 프롬프트 첫 줄이 "단일 주장을 독립 판정하라" 다(역할 본문이 없어도 지시가 남는다)
+- 고정: `--ephemeral` (경량 — 세션 미저장) · 스키마 없음(산문 계약 — XE-08)
+- 입력: `${CLAIM}` + `${CONTEXT_HINT}`
+- 출력: `verdict (agree | disagree | partial | needs_verification) + reasoning (1-3문장) + missing_evidence`
+
+**verdict 의미**:
+- `agree` / `disagree` / `partial`: 주장 정확/틀림/일부
+- `needs_verification`: 증거 부족 — 답변 차단 (Anti-Pattern #6, BEC fail-closed)
+
+> **의미론적 결합**: `needs_verification` verdict = `modules/uncertainty-verification.md` Default-Deny 조건(증거 부족). BEC fail-closed 차단 의미와 동일. micro-eval 결과가 `needs_verification`이면 해당 주장은 fz-plan/fz-code의 `[verified]` 태그 게이트에서 자동 차단된다.
+
+> **사용 시점**: 단일 심각도/분류 주장 → full review 대신 경량 호출로 교차 검증.
+> **비용**: `[미검증: 운영 초기 호출 후 기준선 설정]` — Phase A 운영 후 실측.
+
+## 참조 스킬
+
+| 스킬 | 사용 서브커맨드 |
+|------|----------------|
+| /fz-review | Phase 5 → final (PR 전) |
+| /fz-pr | PR 생성 전 → final |
+| /fz-plan | cross-check → plan (독립 비교), full 2.7 → independent-plan (기본 · `--no-gpt-independent` 로 끈다), micro-eval (claim 재평가) |
+| /fz-modernize | full Phase 3 1.5 → independent-plan (초안과 동시 · 실패 · 거부면 Phase 4 modernize-verify) |
+| /fz (drift-check · `modules/pipelines.md` §15) | drift (전체 스캔) |
+
+## 설계 원칙
+
+- Progressive Disclosure Level 3 (fz-gpt 호출 시 *명시 Read*. 자동 로드 X — GPT 검증 §추가 발견 정정)
+- 200줄 한도 — 본 모듈은 7개 서브커맨드 + 보조 자료로 한도 약간 초과 가능

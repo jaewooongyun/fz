@@ -1,0 +1,3 @@
+{"type":"launched"}
+{"type":"started","key":"v2:pr-peers","agentId":"ag-peers","label":"stage2-arch-on-peers","phase":"Stage 2"}
+{"type":"result","key":"v2:pr-peers","agentId":"ag-peers","result":{"reviewedIds":["P1","P2","P3","P4","P5"],"adjustments":[{"id":"P2","newSeverity":"minor","note":"downgrade"}],"rejections":[{"id":"P4","reason":"not reachable"}],"additions":[{"id":"N1","title":"a"},{"id":"N2","title":"b"},{"id":"N3","title":"c"}]}}

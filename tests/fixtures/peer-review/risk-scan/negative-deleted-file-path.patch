@@ -1,0 +1,11 @@
+diff --git a/Sources/Legacy Cache.swift b/Sources/Legacy Cache.swift
+deleted file mode 100644
+index 928530c..0000000
+--- a/Sources/Legacy Cache.swift	
++++ /dev/null
+@@ -1,5 +0,0 @@
+-final class LegacyCache {
+-    static let shared = LegacyCache()
+-    var items: [String] = []
+-    func load() async {}
+-}

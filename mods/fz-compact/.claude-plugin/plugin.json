@@ -1,0 +1,72 @@
+{
+  "name": "fz-compact",
+  "version": "0.1.0",
+  "description": "Local masking compaction for background sessions: after the prompt cache goes cold, large old tool results move to local files and are replaced by short placeholders. No model calls. Off until enabled.",
+  "author": {
+    "name": "Jaewoong Yun"
+  },
+  "repository": "https://github.com/jaewooongyun/fz",
+  "license": "MIT",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable fz-compact",
+      "description": "Turns the plugin on. Off, or with any setting out of its range, it starts no timer, queues no /compact and appends no guidance.",
+      "default": false
+    },
+    "idleGuardMinutes": {
+      "type": "number",
+      "title": "Idle minutes before masking",
+      "description": "Minutes a background session must stay idle before its old tool results are masked; by default just past the one-hour prompt cache. A number of at least 1.",
+      "default": 61
+    },
+    "idleMinTokens": {
+      "type": "number",
+      "title": "Minimum context tokens",
+      "description": "Idle masking is queued, and a resume masks results not masked before, only when the context holds at least this many tokens; a resume whose session reports no size counts the conversation's characters at four a token. A number of at least 1.",
+      "default": 200000
+    },
+    "keepRecentUserTurns": {
+      "type": "number",
+      "title": "Recent prompts kept",
+      "description": "Tool results at or after the oldest of this many latest prompts you sent are never masked; background task notifications and local command output do not count. A whole number of at least 1.",
+      "default": 6
+    },
+    "minMaskChars": {
+      "type": "number",
+      "title": "Minimum result size",
+      "description": "Tool results shorter than this many characters are kept. A whole number of at least 1.",
+      "default": 1200
+    },
+    "minNetReductionPercent": {
+      "type": "number",
+      "title": "Minimum saving (percent)",
+      "description": "A masking that would save less than this percent of the conversation's characters (message text, tool-call arguments and tool results) is skipped. A number from 0 to 100.",
+      "default": 20
+    },
+    "minNetReductionTokens": {
+      "type": "number",
+      "title": "Minimum saving (tokens)",
+      "description": "A masking that would save fewer than this many tokens (four characters each) is skipped. A number of at least 0.",
+      "default": 50000
+    },
+    "remaskOnResume": {
+      "type": "boolean",
+      "title": "Mask again on resume",
+      "description": "When a background session resumes, mask again the results masked before it stopped, or mask anew after a long idle.",
+      "default": true
+    },
+    "spillDir": {
+      "type": "string",
+      "title": "Spill folder",
+      "description": "Absolute folder that keeps the original tool results; a relative path or / alone is refused and turns the plugin off. Empty: ~/.claude/fz-compact/spill. Reads of the spill files fz-compact recorded there are allowed without asking, so use a folder kept for this alone.",
+      "default": ""
+    },
+    "spillRetentionDays": {
+      "type": "number",
+      "title": "Spill retention (days)",
+      "description": "Spill files older than this many days are removed at session start. A number of at least 1.",
+      "default": 30
+    }
+  }
+}

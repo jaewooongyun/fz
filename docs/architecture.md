@@ -1,0 +1,61 @@
+# 아키텍처
+
+디렉토리 구조와 오케스트레이션 흐름, 멀티에이전트 실행 방식.
+
+```
+fz-plugin/
+├── .claude-plugin/  plugin.json + marketplace.json
+├── skills/          22개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
+├── agents/          15개 — plan-structure, impl-correctness, review-arch ...
+├── workflows/       8개 — 네이티브 Workflow 결정적 스크립트 (discover-adversarial, plan-lean2, code-pair, swarm ...)
+├── modules/         48개 — gates(완료 게이트 SSOT), pipelines, cross-validation, lead-action-default, gpt-strategy, memory-guide, fz-gpt-bash-hygiene, fz-gpt-subcommands-core/aux ...
+│   (TEAM 사료 — team-core·patterns 5종 — 는 2026-09-21 이동 후 2026-09-25 삭제. 결정: `modules/promotion-ledger.md` § TEAM 일몰)
+├── guides/          9개 — prompt-optimization, skill-authoring, harness-engineering, agent-team-guide, skill-testing, model-guide, llm-references ...
+├── gpt-skills/    8개 — GPT 네이티브 스킬 + Authority 인용 + Memory Lesson inline (fz-reviewer, fz-architect ...)
+├── gpt-agents/  GPT 역할 파일 — 독립 리뷰 렌즈(fz-review-arch · fz-review-quality) · opt-in
+├── schemas/         8개 — JSON 스키마 (GPT 응답 7 · Issue Tracker 1) + tool-inventory.json
+├── scripts/         109개 — gate_check(완료 판정기) · gate_stop_hook(종료 차단) · lint 3 · gpt-exec · health-check ...
+├── tests/           fixtures/gates/ — 판정기 회귀 173케이스 (20범주, 기대 exit·산출물·시간·stdout·stderr)
+│                    fixtures/*/*/run.sh 회귀 오라클(health-check 가 자동 실행) · lib/ 가짜 워크플로 런타임 ·
+│                    workflows/ 완주·실패 주입 · ab/ A/B 원장 통합 · docs/ 문서 계약
+├── mods/            선택형 하위 플러그인 2개(따로 설치) — fz-compact(bg 세션 로컬 마스킹 압축) ·
+│                    fz-guard(Phase 4 승인 · ad-hoc Agent · 메모리만 쓴 교훈을 훅으로 강제 · fail-open)
+└── templates/       스킬/에이전트/CLAUDE.md 생성 템플릿
+```
+
+## 오케스트레이션 플로우
+
+```
+자연어 요청
+    ↓
+Phase 0  Session Bootstrap ─── sc:load, 인덱스, PRJ 폴더
+Phase 1  Intent Analysis ───── 키워드 → intent-triggers 매칭
+Phase 2  Complexity ─────────── 5차원 평가 → SOLO(0-3) / TEAM(4+)
+Phase 3  Pipeline + Team ────── 19개 파이프라인 매칭 + 에이전트 배정
+Phase 4  User Confirmation ─── 시각화 → 승인
+Phase 5  Execute ────────────── 스킬 체인 실행 + Gate 검증
+    ↓
+완료: GC → sc:save → 다음 행동 안내
+```
+
+## 멀티에이전트 실행 — 네이티브 Workflow
+
+```
+Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/Gate 실행
+    │
+    └── workflows/*.js ─── 결정적 스크립트가 stage 오케스트레이션
+        agent(agentType: 'fz:plan-structure', schema) → 스키마 강제 JSON 반환
+        데이터는 스크립트 경유 (P2P 통신 유실·팀 정리 실패가 구조적으로 불가능)
+```
+
+| 스킬 | 스크립트 | 구조 |
+|------|---------|------|
+| /fz-discover | discover-adversarial.js | lean 5-call / --deep 렌즈 3 fan-out |
+| /fz-search --deep | search-cross-verify.js | 심볼/패턴 독립 병렬 → 교차 FP 제거 → 병합 (5-call) |
+| /fz-review | review-live.js | arch/quality 병렬 → id-기반 교차 → counter DA (5-call) |
+| /fz-plan | plan-lean2.js (롤백 plan-collaborative.js) | 전체 플랜 ∥ edge 적대 ∥ impact+arch → 델타 병합 (4콜 2단계) |
+| /fz-code, /fz-fix | code-pair.js | impl changeset(디스크 미수정) → 조건부 검토 → Lead 적용 (1-3 call) |
+| /fz-peer-review | peer-review.js | arch/quality/correctness 3-병렬 → (deep) 교차 + counter DA (3 or 6-call) |
+| /fz-review · /fz-peer-review · /fz-modernize (선택 — 독립 조각 검사) | swarm.js | 주 Workflow 반환 뒤 · 고정 트리(SHA 1개) 읽기 전용 워커 조각당 1 · 동시 ≤3 묶음 → sha/method 미기록 결과 폐기 · 1회 재스폰 → 조각당 표 1행 PASS/ISSUES/BLOCKED (≤ 2×maxFragments call · budget 가드 · 정본 사이트 `guides/skill-authoring.md` §12 swarm 절) |
+
+> TEAM(TeamCreate+SendMessage P2P) 모드는 v4.22.0에서 **일몰 완료** — 실제 TeamCreate 호출부 0건. `patterns/*.md` 등 TEAM 사료는 2026-09-25 삭제했고 라운드 의미론은 각 `workflows/*.js` 가 대신한다(`modules/promotion-ledger.md` § TEAM 일몰). 규약: `guides/skill-authoring.md` §12.

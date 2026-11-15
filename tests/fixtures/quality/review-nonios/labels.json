@@ -1,0 +1,132 @@
+{
+ "fixture": "review-nonios",
+ "kind": "review",
+ "platform": "typescript",
+ "base_branch": "main",
+ "head_branch": "feature",
+ "guidelines": [
+  "AGENTS.md"
+ ],
+ "axes_required": [
+  "idiom",
+  "naming",
+  "architecture",
+  "placement",
+  "design_alternative"
+ ],
+ "not_applicable_axes": [
+  "ui_structure"
+ ],
+ "issues": [
+  {
+   "id": "N1",
+   "axis": "architecture",
+   "severity": "major",
+   "file": "src/domain/refund.ts",
+   "side": "RIGHT",
+   "line_start": 1,
+   "line_end": 1,
+   "anchor": "import { PostgresOrderRepository }",
+   "rule_ref": "AGENTS.md#Architecture",
+   "summary": "domain 이 adapters(PostgresOrderRepository)를 import — 의존 방향 역전"
+  },
+  {
+   "id": "N2",
+   "axis": "correctness",
+   "severity": "major",
+   "file": "src/application/refund-order.ts",
+   "side": "RIGHT",
+   "line_start": 17,
+   "line_end": 17,
+   "anchor": "this.repo.save(order);",
+   "rule_ref": "AGENTS.md#Conventions",
+   "summary": "save 를 await 하지 않는다 — 저장 실패가 유실되고 응답이 저장보다 먼저 나간다"
+  },
+  {
+   "id": "N3",
+   "axis": "correctness",
+   "severity": "major",
+   "file": "src/domain/refund.ts",
+   "side": "RIGHT",
+   "line_start": 10,
+   "line_end": 10,
+   "anchor": "order.totalAmount * (1 - policy.feeRate)",
+   "rule_ref": "AGENTS.md#Conventions",
+   "summary": "금액을 부동소수점으로 계산 — 정수 minor unit 규약 위반, 반올림 오차"
+  },
+  {
+   "id": "N4",
+   "axis": "correctness",
+   "severity": "major",
+   "file": "src/adapters/http/order-controller.ts",
+   "side": "RIGHT",
+   "line_start": 17,
+   "line_end": 20,
+   "anchor": "const result = await this.refundOrder.execute",
+   "rule_ref": null,
+   "summary": "환불 가능 기간 검사 전에 상태를 REFUNDED 로 저장한다 — 409 를 돌려줘도 주문은 이미 환불 처리됨"
+  },
+  {
+   "id": "N5",
+   "axis": "naming",
+   "severity": "minor",
+   "file": "src/adapters/http/refundHelper.ts",
+   "side": "RIGHT",
+   "line_start": 3,
+   "line_end": 3,
+   "anchor": "export default function canRefund",
+   "rule_ref": "AGENTS.md#Conventions",
+   "summary": "파일명 camelCase(refundHelper.ts) — 규약은 kebab-case"
+  },
+  {
+   "id": "N6",
+   "axis": "idiom",
+   "severity": "minor",
+   "file": "src/adapters/http/refundHelper.ts",
+   "side": "RIGHT",
+   "line_start": 3,
+   "line_end": 3,
+   "anchor": "export default function canRefund",
+   "rule_ref": "AGENTS.md#Conventions",
+   "summary": "default export — 규약상 금지"
+  },
+  {
+   "id": "N7",
+   "axis": "placement",
+   "severity": "minor",
+   "file": "src/adapters/http/refundHelper.ts",
+   "side": "RIGHT",
+   "line_start": 4,
+   "line_end": 6,
+   "anchor": "if (order.status !== 'PAID')",
+   "rule_ref": "AGENTS.md#Architecture",
+   "summary": "환불 가능 여부(업무 규칙)를 HTTP 어댑터에 두었다 — application 또는 domain 으로"
+  },
+  {
+   "id": "N8",
+   "axis": "design_alternative",
+   "severity": "suggestion",
+   "file": "src/application/refund-order.ts",
+   "side": "RIGHT",
+   "line_start": 13,
+   "line_end": 15,
+   "anchor": "if (order.status !== 'PAID')",
+   "rule_ref": null,
+   "summary": "Order.assertMutable 처럼 상태 검증을 도메인 메서드(assertRefundable)로 두면 어댑터·유스케이스 중복이 사라진다"
+  },
+  {
+   "id": "N9",
+   "axis": "correctness",
+   "severity": "major",
+   "file": "src/adapters/http/refundHelper.ts",
+   "side": "RIGHT",
+   "line_start": 7,
+   "line_end": 7,
+   "anchor": "const days = (requestedAt.getTime() - Date.now())",
+   "rule_ref": null,
+   "summary": "환불 가능 기간을 requestedAt − 현재 시각으로 계산한다 — 주문(결제) 시각을 보지 않아 기간 검사가 항상 통과한다"
+  }
+ ],
+ "conflicts": [],
+ "forbidden_rule_citations": []
+}

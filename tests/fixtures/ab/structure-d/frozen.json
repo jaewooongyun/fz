@@ -1,0 +1,923 @@
+{
+ "clock_absent": {
+  "b1": {
+   "complete": {
+    "ok": true,
+    "why": []
+   },
+   "exit": 0,
+   "wall": {
+    "end": "2026-01-01T00:25:02+00:00",
+    "mtime_delta_s": 0.0,
+    "total_s": 1502.0
+   }
+  },
+  "make": {
+   "complete": {
+    "ok": false,
+    "why": [
+     "최종 산출물 기록 이벤트 없음"
+    ]
+   },
+   "exit": 0,
+   "wall": {
+    "end": null,
+    "mtime_delta_s": null,
+    "total_s": null
+   }
+  },
+  "stale": {
+   "complete": {
+    "ok": true,
+    "why": []
+   },
+   "exit": 0,
+   "wall": {
+    "end": "2026-01-01T00:25:02+00:00",
+    "mtime_delta_s": 903.0,
+    "total_s": 1502.0
+   }
+  }
+ },
+ "judges": [
+  [
+   "baseline-valid-2-of-6",
+   0,
+   "  INVALID B3 — AC-1 Lead effort high≠xhigh\n  INVALID B4 — AC-5 미완주 — wf_b4: 완료 알림 없음·상태 None · wall_workflow 교차 불가 wf_b4 (에이전트 1193.0s · Lead Nones)\n  INVALID B5 — AC-7 시작 상태가 기준과 다르다: ['user_agent_memory']\n  INVALID B6 — input-hash — 묶음 다수와 다르다\nPASS baseline-runs fz-review[review-mini]: 유효 2/6 (필요 2) — B1, B2\njudge: PASS (phase=baseline · require=baseline-runs · verify-sources=transcript,wf-metrics,start-state,input-hash,instrument-sha)\n"
+  ],
+  [
+   "baseline-min-3-fails",
+   1,
+   "  INVALID B3 — AC-1 Lead effort high≠xhigh\n  INVALID B4 — AC-5 미완주 — wf_b4: 완료 알림 없음·상태 None · wall_workflow 교차 불가 wf_b4 (에이전트 1193.0s · Lead Nones)\n  INVALID B5 — AC-7 시작 상태가 기준과 다르다: ['user_agent_memory']\n  INVALID B6 — input-hash — 묶음 다수와 다르다\nFAIL baseline-runs fz-review[review-mini]: 유효 2/6 (필요 3) — B1, B2\njudge: FAIL (phase=baseline · require=baseline-runs · verify-sources=transcript,wf-metrics,start-state,input-hash,instrument-sha)\n"
+  ],
+  [
+   "baseline-wrong-plugin-sha",
+   1,
+   "  INVALID B1 — plugin SHA 84207188cade≠deadbeef\n  INVALID B2 — plugin SHA 84207188cade≠deadbeef\n  INVALID B3 — AC-1 Lead effort high≠xhigh · plugin SHA 84207188cade≠deadbeef\n  INVALID B4 — AC-5 미완주 — wf_b4: 완료 알림 없음·상태 None · wall_workflow 교차 불가 wf_b4 (에이전트 1193.0s · Lead Nones) · plugin SHA 84207188cade≠deadbeef\n  INVALID B5 — AC-7 시작 상태가 기준과 다르다: ['user_agent_memory'] · plugin SHA 84207188cade≠deadbeef\n  INVALID B6 — plugin SHA 84207188cade≠deadbeef · input-hash — 묶음 다수와 다르다\nFAIL baseline-runs fz-review[review-mini]: 유효 0/6 (필요 2)\njudge: FAIL (phase=baseline · require=baseline-runs · verify-sources=transcript,wf-metrics,start-state,input-hash,instrument-sha)\n"
+  ],
+  [
+   "tampered-row-caught-by-sources",
+   1,
+   "  INVALID B1 — 원천 불일치 lead.out_tok: 행 1 · 원천 2550\n  INVALID B3 — AC-1 Lead effort high≠xhigh\n  INVALID B4 — AC-5 미완주 — wf_b4: 완료 알림 없음·상태 None · wall_workflow 교차 불가 wf_b4 (에이전트 1193.0s · Lead Nones)\n  INVALID B5 — AC-7 시작 상태가 기준과 다르다: ['user_agent_memory']\n  INVALID B6 — input-hash — 묶음 다수와 다르다\nFAIL baseline-runs fz-review[review-mini]: 유효 1/6 (필요 2) — B2\njudge: FAIL (phase=baseline · require=baseline-runs · verify-sources=transcript,wf-metrics,start-state,input-hash,instrument-sha)\n"
+  ],
+  [
+   "tampered-wall-caught-by-sources",
+   1,
+   "  INVALID B2 — 원천 불일치 wall.total_s: 행 1.0 · 원천 1504.0\n  INVALID B3 — AC-1 Lead effort high≠xhigh\n  INVALID B4 — AC-5 미완주 — wf_b4: 완료 알림 없음·상태 None · wall_workflow 교차 불가 wf_b4 (에이전트 1193.0s · Lead Nones)\n  INVALID B5 — AC-7 시작 상태가 기준과 다르다: ['user_agent_memory']\n  INVALID B6 — input-hash — 묶음 다수와 다르다\nFAIL baseline-runs fz-review[review-mini]: 유효 1/6 (필요 2) — B1\njudge: FAIL (phase=baseline · require=baseline-runs · verify-sources=transcript,wf-metrics,start-state,input-hash,instrument-sha)\n"
+  ],
+  [
+   "baseline-rejects-other-criteria",
+   2,
+   "UNRUN: baseline phase 는 baseline-runs 만 판정한다 — 받은 기준 ['SC-3']. ⛔ 받고 무시하지 않는다\njudge: UNRUN (phase=baseline · require=SC-3 · verify-sources=transcript,wf-metrics,start-state,input-hash,instrument-sha)\n"
+  ],
+  [
+   "smoke-R-A-pass",
+   0,
+   "  INVALID B3 — AC-1 Lead effort high≠xhigh\n  INVALID B4 — AC-5 미완주 — wf_b4: 완료 알림 없음·상태 None · wall_workflow 교차 불가 wf_b4 (에이전트 1193.0s · Lead Nones)\n  INVALID B5 — AC-7 시작 상태가 기준과 다르다: ['user_agent_memory']\n  INVALID B6 — input-hash — 묶음 다수와 다르다\nPASS SC-3-smoke fz-review[review-mini]: critical B=[1, 1] C=[1] N=0 loss=0 ≤ N | major B=[2, 1] C=[1] N=1 loss=0.5 ≤ N\njudge: PASS (phase=release-smoke · require=SC-3-smoke)\n"
+  ],
+  [
+   "smoke-R-Z-fail",
+   1,
+   "  INVALID B3 — AC-1 Lead effort high≠xhigh\n  INVALID B4 — AC-5 미완주 — wf_b4: 완료 알림 없음·상태 None · wall_workflow 교차 불가 wf_b4 (에이전트 1193.0s · Lead Nones)\n  INVALID B5 — AC-7 시작 상태가 기준과 다르다: ['user_agent_memory']\n  INVALID B6 — input-hash — 묶음 다수와 다르다\nFAIL SC-3-smoke fz-review[review-mini]: critical B=[1, 1] C=[0] N=0 loss=1 > N | major B=[2, 1] C=[1] N=1 loss=0.5 ≤ N\njudge: FAIL (phase=release-smoke · require=SC-3-smoke)\n"
+  ],
+  [
+   "unimplemented-criterion-unrun",
+   2,
+   "UNRUN: 미구현 기준 ['SC-8'] — 구현 스텝(S25~S27)에서 추가한다. ⛔ 받고 무시하지 않는다\njudge: UNRUN (phase=change · require=SC-8)\n"
+  ],
+  [
+   "verify-evidence-unrun",
+   2,
+   "UNRUN: --require 는 ('session-log', 'input-hash', 'gpt-skills-only', 'marker', 'no-claude-artifacts', 'rules-compare') 중에서 — 받은 값 []\n"
+  ],
+  [
+   "show-pins-measured-values",
+   0,
+   "B1                                 order=1 complete=True wall=1502.0 Δmt=0.0 lead_out=2550 msgs=4 wf_out=5000 turns=10 crit=1 major=2 gpt=1(gpt-6-sol:xhigh) Δwf=0.58%\nB2                                 order=3 complete=True wall=1504.0 Δmt=0.0 lead_out=2550 msgs=4 wf_out=5000 turns=10 crit=1 major=1 gpt=1(gpt-6-sol:xhigh) Δwf=0.58%\nB3                                 order=5 complete=True wall=1506.0 Δmt=0.0 lead_out=2550 msgs=4 wf_out=5000 turns=10 crit=1 major=2 gpt=1(gpt-6-sol:xhigh) Δwf=0.58%\nB4                                 order=6 complete=False wall=1507.0 Δmt=0.0 lead_out=2550 msgs=4 wf_out=5000 turns=10 crit=None major=None gpt=1(gpt-6-sol:xhigh) Δwf=None%\nB5                                 order=7 complete=True wall=1508.0 Δmt=0.0 lead_out=2550 msgs=4 wf_out=5000 turns=10 crit=1 major=2 gpt=1(gpt-6-sol:xhigh) Δwf=0.58%\nB6                                 order=8 complete=True wall=1509.0 Δmt=0.0 lead_out=2550 msgs=4 wf_out=5000 turns=10 crit=1 major=2 gpt=1(gpt-6-sol:xhigh) Δwf=0.58%\nS1                                 order=9 complete=True wall=1510.0 Δmt=0.0 lead_out=2550 msgs=4 wf_out=5000 turns=10 crit=1 major=1 gpt=1(gpt-6-sol:xhigh) Δwf=0.58%\nS2                                 order=10 complete=True wall=1511.0 Δmt=0.0 lead_out=2550 msgs=4 wf_out=5000 turns=10 crit=0 major=1 gpt=1(gpt-6-sol:xhigh) Δwf=0.58%\n"
+  ]
+ ],
+ "stages": {
+  "table": {
+   "fz-peer-review|False|2": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct"
+    ],
+    1
+   ],
+   "fz-peer-review|False|3": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct",
+     "R3-counter"
+    ],
+    3
+   ],
+   "fz-peer-review|False|None": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct"
+    ],
+    null
+   ],
+   "fz-peer-review|None|2": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct"
+    ],
+    1
+   ],
+   "fz-peer-review|None|3": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct",
+     "R3-counter"
+    ],
+    3
+   ],
+   "fz-peer-review|None|None": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct"
+    ],
+    null
+   ],
+   "fz-peer-review|True|2": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct",
+     "R2-arch",
+     "R2-quality"
+    ],
+    2
+   ],
+   "fz-peer-review|True|3": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct",
+     "R2-arch",
+     "R2-quality",
+     "R3-counter"
+    ],
+    3
+   ],
+   "fz-peer-review|True|None": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R1-correct",
+     "R2-arch",
+     "R2-quality"
+    ],
+    null
+   ],
+   "fz-plan|False|2": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-plan|False|3": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-plan|False|None": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-plan|None|2": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-plan|None|3": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-plan|None|None": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-plan|True|2": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-plan|True|3": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-plan|True|None": [
+    [
+     "L1-full",
+     "L1-edge",
+     "L1-impact",
+     "L2-merge"
+    ],
+    2
+   ],
+   "fz-review|False|2": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R3-counter"
+    ],
+    2
+   ],
+   "fz-review|False|3": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R3-counter"
+    ],
+    2
+   ],
+   "fz-review|False|None": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R3-counter"
+    ],
+    2
+   ],
+   "fz-review|None|2": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R2-arch",
+     "R2-quality",
+     "R3-counter"
+    ],
+    3
+   ],
+   "fz-review|None|3": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R2-arch",
+     "R2-quality",
+     "R3-counter"
+    ],
+    3
+   ],
+   "fz-review|None|None": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R2-arch",
+     "R2-quality",
+     "R3-counter"
+    ],
+    3
+   ],
+   "fz-review|True|2": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R2-arch",
+     "R2-quality",
+     "R3-counter"
+    ],
+    3
+   ],
+   "fz-review|True|3": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R2-arch",
+     "R2-quality",
+     "R3-counter"
+    ],
+    3
+   ],
+   "fz-review|True|None": [
+    [
+     "R1-arch",
+     "R1-quality",
+     "R2-arch",
+     "R2-quality",
+     "R3-counter"
+    ],
+    3
+   ]
+  },
+  "view": {
+   "fz-peer-review": [
+    "R1-arch",
+    "R1-quality",
+    "R1-correct"
+   ],
+   "fz-plan": [
+    "L1-full",
+    "L1-edge",
+    "L1-impact",
+    "L2-merge"
+   ],
+   "fz-review": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ]
+  }
+ },
+ "wf_summary": {
+  "wf_b1": {
+   "advisor": 0,
+   "bad_lines": 0,
+   "critical_path_s": 1189.0,
+   "dir": "@W@/mini/fx/raw/wf/wf_b1",
+   "efforts": {
+    "xhigh": 10
+   },
+   "errors": [],
+   "journal_empty_results": 0,
+   "journal_results": 5,
+   "journal_started": 5,
+   "models": {
+    "claude-opus-5-5": 10
+   },
+   "n_agents": 5,
+   "out_tok": 5000,
+   "run_id": "wf_b1",
+   "so_errors": 0,
+   "so_retries": 0,
+   "stages": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ],
+   "thinking": 0,
+   "tokens_partial": false,
+   "turns": 10,
+   "wall_s": 1193.0,
+   "workers": [
+    {
+     "dur_s": 528.0,
+     "out_tok": 1000,
+     "stage": "R1-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 537.0,
+     "out_tok": 1000,
+     "stage": "R1-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 279.0,
+     "out_tok": 1000,
+     "stage": "R2-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 298.0,
+     "out_tok": 1000,
+     "stage": "R2-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 354.0,
+     "out_tok": 1000,
+     "stage": "R3-counter",
+     "tools": 2,
+     "turns": 2
+    }
+   ]
+  },
+  "wf_b2": {
+   "advisor": 0,
+   "bad_lines": 0,
+   "critical_path_s": 1189.0,
+   "dir": "@W@/mini/fx/raw/wf/wf_b2",
+   "efforts": {
+    "xhigh": 10
+   },
+   "errors": [],
+   "journal_empty_results": 0,
+   "journal_results": 5,
+   "journal_started": 5,
+   "models": {
+    "claude-opus-5-5": 10
+   },
+   "n_agents": 5,
+   "out_tok": 5000,
+   "run_id": "wf_b2",
+   "so_errors": 0,
+   "so_retries": 0,
+   "stages": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ],
+   "thinking": 0,
+   "tokens_partial": false,
+   "turns": 10,
+   "wall_s": 1193.0,
+   "workers": [
+    {
+     "dur_s": 528.0,
+     "out_tok": 1000,
+     "stage": "R1-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 537.0,
+     "out_tok": 1000,
+     "stage": "R1-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 279.0,
+     "out_tok": 1000,
+     "stage": "R2-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 298.0,
+     "out_tok": 1000,
+     "stage": "R2-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 354.0,
+     "out_tok": 1000,
+     "stage": "R3-counter",
+     "tools": 2,
+     "turns": 2
+    }
+   ]
+  },
+  "wf_b3": {
+   "advisor": 0,
+   "bad_lines": 0,
+   "critical_path_s": 1189.0,
+   "dir": "@W@/mini/fx/raw/wf/wf_b3",
+   "efforts": {
+    "xhigh": 10
+   },
+   "errors": [],
+   "journal_empty_results": 0,
+   "journal_results": 5,
+   "journal_started": 5,
+   "models": {
+    "claude-opus-5-5": 10
+   },
+   "n_agents": 5,
+   "out_tok": 5000,
+   "run_id": "wf_b3",
+   "so_errors": 0,
+   "so_retries": 0,
+   "stages": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ],
+   "thinking": 0,
+   "tokens_partial": false,
+   "turns": 10,
+   "wall_s": 1193.0,
+   "workers": [
+    {
+     "dur_s": 528.0,
+     "out_tok": 1000,
+     "stage": "R1-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 537.0,
+     "out_tok": 1000,
+     "stage": "R1-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 279.0,
+     "out_tok": 1000,
+     "stage": "R2-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 298.0,
+     "out_tok": 1000,
+     "stage": "R2-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 354.0,
+     "out_tok": 1000,
+     "stage": "R3-counter",
+     "tools": 2,
+     "turns": 2
+    }
+   ]
+  },
+  "wf_b4": {
+   "advisor": 0,
+   "bad_lines": 0,
+   "critical_path_s": 1189.0,
+   "dir": "@W@/mini/fx/raw/wf/wf_b4",
+   "efforts": {
+    "xhigh": 10
+   },
+   "errors": [],
+   "journal_empty_results": 0,
+   "journal_results": 5,
+   "journal_started": 5,
+   "models": {
+    "claude-opus-5-5": 10
+   },
+   "n_agents": 5,
+   "out_tok": 5000,
+   "run_id": "wf_b4",
+   "so_errors": 0,
+   "so_retries": 0,
+   "stages": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ],
+   "thinking": 0,
+   "tokens_partial": false,
+   "turns": 10,
+   "wall_s": 1193.0,
+   "workers": [
+    {
+     "dur_s": 528.0,
+     "out_tok": 1000,
+     "stage": "R1-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 537.0,
+     "out_tok": 1000,
+     "stage": "R1-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 279.0,
+     "out_tok": 1000,
+     "stage": "R2-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 298.0,
+     "out_tok": 1000,
+     "stage": "R2-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 354.0,
+     "out_tok": 1000,
+     "stage": "R3-counter",
+     "tools": 2,
+     "turns": 2
+    }
+   ]
+  },
+  "wf_b5": {
+   "advisor": 0,
+   "bad_lines": 0,
+   "critical_path_s": 1189.0,
+   "dir": "@W@/mini/fx/raw/wf/wf_b5",
+   "efforts": {
+    "xhigh": 10
+   },
+   "errors": [],
+   "journal_empty_results": 0,
+   "journal_results": 5,
+   "journal_started": 5,
+   "models": {
+    "claude-opus-5-5": 10
+   },
+   "n_agents": 5,
+   "out_tok": 5000,
+   "run_id": "wf_b5",
+   "so_errors": 0,
+   "so_retries": 0,
+   "stages": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ],
+   "thinking": 0,
+   "tokens_partial": false,
+   "turns": 10,
+   "wall_s": 1193.0,
+   "workers": [
+    {
+     "dur_s": 528.0,
+     "out_tok": 1000,
+     "stage": "R1-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 537.0,
+     "out_tok": 1000,
+     "stage": "R1-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 279.0,
+     "out_tok": 1000,
+     "stage": "R2-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 298.0,
+     "out_tok": 1000,
+     "stage": "R2-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 354.0,
+     "out_tok": 1000,
+     "stage": "R3-counter",
+     "tools": 2,
+     "turns": 2
+    }
+   ]
+  },
+  "wf_b6": {
+   "advisor": 0,
+   "bad_lines": 0,
+   "critical_path_s": 1189.0,
+   "dir": "@W@/mini/fx/raw/wf/wf_b6",
+   "efforts": {
+    "xhigh": 10
+   },
+   "errors": [],
+   "journal_empty_results": 0,
+   "journal_results": 5,
+   "journal_started": 5,
+   "models": {
+    "claude-opus-5-5": 10
+   },
+   "n_agents": 5,
+   "out_tok": 5000,
+   "run_id": "wf_b6",
+   "so_errors": 0,
+   "so_retries": 0,
+   "stages": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ],
+   "thinking": 0,
+   "tokens_partial": false,
+   "turns": 10,
+   "wall_s": 1193.0,
+   "workers": [
+    {
+     "dur_s": 528.0,
+     "out_tok": 1000,
+     "stage": "R1-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 537.0,
+     "out_tok": 1000,
+     "stage": "R1-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 279.0,
+     "out_tok": 1000,
+     "stage": "R2-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 298.0,
+     "out_tok": 1000,
+     "stage": "R2-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 354.0,
+     "out_tok": 1000,
+     "stage": "R3-counter",
+     "tools": 2,
+     "turns": 2
+    }
+   ]
+  },
+  "wf_s1": {
+   "advisor": 0,
+   "bad_lines": 0,
+   "critical_path_s": 1189.0,
+   "dir": "@W@/mini/fx/raw/wf/wf_s1",
+   "efforts": {
+    "xhigh": 10
+   },
+   "errors": [],
+   "journal_empty_results": 0,
+   "journal_results": 5,
+   "journal_started": 5,
+   "models": {
+    "claude-opus-5-5": 10
+   },
+   "n_agents": 5,
+   "out_tok": 5000,
+   "run_id": "wf_s1",
+   "so_errors": 0,
+   "so_retries": 0,
+   "stages": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ],
+   "thinking": 0,
+   "tokens_partial": false,
+   "turns": 10,
+   "wall_s": 1193.0,
+   "workers": [
+    {
+     "dur_s": 528.0,
+     "out_tok": 1000,
+     "stage": "R1-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 537.0,
+     "out_tok": 1000,
+     "stage": "R1-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 279.0,
+     "out_tok": 1000,
+     "stage": "R2-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 298.0,
+     "out_tok": 1000,
+     "stage": "R2-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 354.0,
+     "out_tok": 1000,
+     "stage": "R3-counter",
+     "tools": 2,
+     "turns": 2
+    }
+   ]
+  },
+  "wf_s2": {
+   "advisor": 0,
+   "bad_lines": 0,
+   "critical_path_s": 1189.0,
+   "dir": "@W@/mini/fx/raw/wf/wf_s2",
+   "efforts": {
+    "xhigh": 10
+   },
+   "errors": [],
+   "journal_empty_results": 0,
+   "journal_results": 5,
+   "journal_started": 5,
+   "models": {
+    "claude-opus-5-5": 10
+   },
+   "n_agents": 5,
+   "out_tok": 5000,
+   "run_id": "wf_s2",
+   "so_errors": 0,
+   "so_retries": 0,
+   "stages": [
+    "R1-arch",
+    "R1-quality",
+    "R2-arch",
+    "R2-quality",
+    "R3-counter"
+   ],
+   "thinking": 0,
+   "tokens_partial": false,
+   "turns": 10,
+   "wall_s": 1193.0,
+   "workers": [
+    {
+     "dur_s": 528.0,
+     "out_tok": 1000,
+     "stage": "R1-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 537.0,
+     "out_tok": 1000,
+     "stage": "R1-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 279.0,
+     "out_tok": 1000,
+     "stage": "R2-arch",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 298.0,
+     "out_tok": 1000,
+     "stage": "R2-quality",
+     "tools": 2,
+     "turns": 2
+    },
+    {
+     "dur_s": 354.0,
+     "out_tok": 1000,
+     "stage": "R3-counter",
+     "tools": 2,
+     "turns": 2
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,87 @@
+{
+ "transcript": "samples/lead.jsonl",
+ "gpt_log_dir": "repo",
+ "tasks_dir": "tasks",
+ "files": [
+  {
+   "path": "repo/X-1/plan/gpt-verify.r1.json.stream.log",
+   "from": "samples/logs/gpt-verify.r1.json.stream.log",
+   "mtime": 1790925366.1447396
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify-gates.r1.json.stream.log",
+   "from": "samples/logs/gpt-verify-gates.r1.json.stream.log",
+   "mtime": 1790924928.5121624
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify.json.stream.log",
+   "from": "samples/logs/gpt-verify.json.stream.log",
+   "mtime": 1790926664.420617
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify-gates.json.stream.log",
+   "from": "samples/logs/gpt-verify-gates.json.stream.log",
+   "mtime": 1790926387.121296
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify.r1.json",
+   "text": "{\"scrubbed\": true}\n",
+   "mtime": 1790925366.1425772
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify.r1.log",
+   "text": "GATE-PASS contract_ok issues=12 verdict=needs_revision\nVERIFY_EXIT=0\n",
+   "mtime": 1790925366.4646695
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify-gates.r1.json",
+   "text": "{\"scrubbed\": true}\n",
+   "mtime": 1790924928.5111377
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify-gates.r1.log",
+   "text": "GATE-PASS contract_ok issues=? verdict=None\nGATES_EXIT=0\n",
+   "mtime": 1790924928.7416282
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify.json",
+   "text": "{\"scrubbed\": true}\n",
+   "mtime": 1790926664.4191453
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify.log",
+   "text": "GATE-PASS contract_ok issues=10 verdict=needs_revision\nVERIFY_EXIT=0\n",
+   "mtime": 1790926664.7375093
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify-gates.json",
+   "text": "{\"scrubbed\": true}\n",
+   "mtime": 1790926387.1199734
+  },
+  {
+   "path": "repo/X-1/plan/gpt-verify-gates.log",
+   "text": "GATE-PASS contract_ok issues=? verdict=None\nGATES_EXIT=0\n",
+   "mtime": 1790926387.3544233
+  },
+  {
+   "path": "tasks/b7o6ys869.output",
+   "text": "VERIFY_EXIT=VERIFY_EXIT=0\n\n[exited with code 0]\n",
+   "mtime": 1790925366.48569
+  },
+  {
+   "path": "tasks/bt1qrsb1m.output",
+   "text": "GATES_EXIT=0\n\n[exited with code 0]\n",
+   "mtime": 1790924928.7593262
+  },
+  {
+   "path": "tasks/byhmur3nd.output",
+   "text": "GATE-PASS contract_ok issues=10 verdict=needs_revision\nVERIFY_EXIT=0\n\n[exited with code 0]\n",
+   "mtime": 1790926664.755431
+  },
+  {
+   "path": "tasks/b8vjuz3hg.output",
+   "text": "GATE-PASS contract_ok issues=? verdict=None\nGATES_EXIT=0\n\n[exited with code 0]\n",
+   "mtime": 1790926387.384339
+  }
+ ]
+}

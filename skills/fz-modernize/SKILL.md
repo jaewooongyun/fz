@@ -1,0 +1,463 @@
+---
+name: fz-modernize
+description: >-
+  가이드/문서 모더나이제이션 — 외부 최신 자료(Tier 1+2)로 갱신 + stale 항목 정리 + 정량 검증 (GPT 3회 + AC8 link).
+  예: 최신화, 가이드 업데이트, 모더나이제이션, 문서 갱신, stale 정리 (비사용: 코드 구현 →fz-code, 스킬 구조 →fz-skill)
+user-invocable: true
+argument-hint: "[probe|audit|plan|verify|execute|validate|full|light] [target]"
+allowed-tools: >-
+  Read, Edit, Write, Bash, Bash(*/scripts/gpt-call.sh*), Bash(grep *), Bash(cp *), Bash(cmp *), Grep, Glob,
+  WebSearch, WebFetch,
+  mcp__plugin_fz_serena__write_memory, mcp__plugin_fz_serena__read_memory,
+  mcp__sequential-thinking__sequentialthinking,
+  Task, TaskCreate, TaskUpdate, Workflow,
+  Skill
+metadata:
+  provides: [doc-modernization]
+  needs: [none]
+  intent-triggers:
+    - "최신화|모더나이제이션|모더나이즈|modernize"
+    - "가이드 업데이트|문서 갱신|문서 업데이트|reference 업데이트"
+    - "stale 정리|deprecated 정리|구버전 정리"
+    - "[Oo]pus ?-?5|[Oo]pus.*4\\.\\d|[Ss]onnet ?-?5|[Ff]able ?-?5|GPT.*5\\.\\d|새 모델 출시|최신 모델"
+---
+
+# /fz-modernize - 가이드 모더나이제이션 스킬
+
+> **행동 원칙**: 기존 가이드/문서를 외부 최신 자료(Tier 1+2)로 갱신하면서 stale 항목을 정리한다. 6-phase 파이프라인으로 Probe → Audit → Plan → Verify → Execute → Validate를 순차 실행하며, 각 phase에 정량 검증 게이트를 삽입한다.
+
+## 개요
+
+> Phase 0 (티켓 폴더) → Phase 1 (Probe) → Phase 2 (Audit) → Phase 3 (Plan) → Phase 4 (Verify) → Phase 5 (Execute) → Phase 6 (Validate)
+
+- **Probe → Plan 순서 강제** (31차 교훈): 외부 자료 실측 없이 Plan 작성 금지
+- **Tier 1+2 우선** (사용자 합의 시): Tier 3은 supporting only로 격하
+- **GPT 재검증 상한** (18차 교훈): 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한(판정과 무관하게 유효 판정 라운드를 센다) — 소진(정문 exit 19 `budget-exhausted`)하면 사용자 에스컬레이션
+- **Cross-model 안전망** (17차/16차 교훈): 분석자가 분석 대상의 실수를 재현하는 메타 패턴 방지
+- **AC1-AC9 Anti-Pattern Constraints**: 본문 재구성 금지, Tier 3 단독 verified 금지 등
+- **AC8 link 자동 검증**: xargs 병렬 패턴 (sequential while loop 금지 — Bash background+redirect 교훈)
+
+## 사용 시점
+
+```bash
+/fz-modernize "fz 가이드 8개를 Opus 5 출시 후 최신화"          # → full 파이프라인
+/fz-modernize light "그냥 가볍게 최신화"                       # → Phase 1+2 + GPT micro-eval (40차 simplified mode, 카운터 1 소비)
+/fz-modernize probe "guides/harness-engineering.md"           # → Phase 1만
+/fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
+/fz-modernize plan "audit 결과 기반 update-plan v1 작성"       # → Phase 3만
+/fz-modernize verify "Plan v1 검증 (GPT)"                  # → Phase 4만
+/fz-modernize execute "Plan v3.1 inline 정정 적용"            # → Phase 5만
+/fz-modernize validate "AC8 link 자동 검증"                   # → Phase 6만
+```
+
+## Prerequisites
+
+- **외부 자료 접근**: WebSearch + WebFetch + GPT CLI (cross-model verify)
+- **GPT CLI**: cross-model 검증 — ⛔ **GPT 단계마다 직전**(light micro-eval · full Phase 3 독립 플랜 · Phase 4): `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정 — `ask` 면 § 모델·effort 선택의 `options` → `set` 후 다시 decide · 버전 플로어도 같은 파일). trust_level="trusted" 설정 필요 (30차 교훈)
+- **6+ 스텝 자동 티켓 폴더 생성**: `{CWD}/fz-modernize-{date}/` 또는 티켓 ID
+
+## 모듈 참조
+
+| 모듈/가이드 | 용도 |
+|----|------|
+| guides/prompt-optimization.md | Tier 1+2 인용 정책 + 헤더 갱신 패턴 |
+| guides/skill-authoring.md | 본 스킬 작성 시 표준 |
+| modules/cross-validation.md | GPT 3회 한도 + Reflection Rate |
+| modules/context-artifacts.md | 티켓 폴더 + 산출물 보존 |
+| modules/memory-guide.md | feedback_* 교훈 태깅 규칙 |
+| Bash background+redirect 교훈 | xargs 병렬 패턴 (AC8 enforcement) |
+
+## 출처 표기 규약 (Tier 분류)
+
+```
+[verified: <Tier 1+2 source>]                 ← Tier 1 (공식) 또는 Tier 2 (peer-reviewed)
+[verified: A1; supporting: A5]                 ← Tier 1 + Tier 3 보강 (조합 verified)
+[partially-verified: A5; A1 직접 진술 없음]   ← Tier 3 only — single verified 금지 (AC9)
+[arxiv preprint, YYYY-MM]                      ← preprint 명시
+[ICLR 2026 Oral / peer-reviewed]              ← peer-reviewed 명시
+[official framework: dspy.ai]                  ← 회사 공식 도구/SDK
+[community: cobusgreyling.medium.com/...]      ← Tier 3 그대로 (verified 표기 금지)
+[미검증: <구체적 사유>]                        ← 검증 불가 (예: Korean 실측 부재)
+```
+
+### Tier 매핑 (사용자 합의 후 적용)
+
+| Tier | 출처 종류 | verified 단독 처리 |
+|------|---------|---------------------|
+| 1 | 공식 (Anthropic/OpenAI 등) | ✅ 단독 verified 가능 |
+| 2 | peer-reviewed 학술 | ✅ 단독 verified 가능 |
+| 2.5 | arxiv preprint | ⚠️ `[arxiv preprint]` Status 필수 |
+| 3 | Medium / blog (커뮤니티) | ⛔ 단독 verified 금지 — supporting only |
+
+> **컨벤션 (원칙 인용 + frozen 모델)**: ⓐ 일반 원칙(모델 무관)의 인용은 **모델-무관 출처**(공식 docs·peer-reviewed)로 앵커 — frozen/특정 모델 doc을 일반 원칙의 sole source로 쓰지 않는다. ⓑ frozen 모델(예: 제재 모델) 인용 감지 시 **Bucket 분류 선행**: A(일반원칙·frozen이 sole anchor → 재앵커) / B(그 모델 specific 또는 비-frozen 앵커 보유 → 보존) / C(registry) / D(live-framing → frozen 캐비엇 추가). A만 재앵커, canonical ref = 해당 모델 가이드 frozen 섹션.
+
+---
+
+## Phase 0: Work Dir Pre-flight
+
+> 참조: `modules/context-artifacts.md` Work Dir Resolution
+
+1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출 → 있으면 `{CWD}/{TICKET}/` 사용
+2. 패턴 없으면 → `fz-modernize-{YYYY-MM-DD}/` 자동 생성 (사용자 확인)
+3. 폴더 구조 자동 생성:
+   ```
+   {WORK_DIR}/
+   ├── index.md              ← 작업 추적 + Resume Trigger
+   ├── probe/                ← Phase 1 산출물
+   ├── audit/                ← Phase 2 산출물
+   ├── plan/                 ← Phase 3 산출물 (v1, v2, v3 버전 별)
+   ├── execute/              ← Phase 5 변경 사항 추적 (선택)
+   └── verify/               ← Phase 4 + Phase 6 검증 결과
+   ```
+
+### Gate 0: Work Dir Ready
+- [ ] WORK_DIR 결정?
+- [ ] 5개 하위 폴더 생성?
+- [ ] index.md 초기화 (Active Phase + Key Decisions + Constraints + Pending)?
+
+---
+
+## Phase 1: Probe (외부 자료 리서치)
+
+**핵심 원칙**: Plan 작성 전 외부 자료 실측 (31차 교훈 — Plan-before-Probe Anti-Pattern 금지).
+
+### 절차
+
+1. **사용자 Tier 합의 확인** (AskUserQuestion) — **34차 4-axes 시각화 적용**:
+   - Tier 1 only — 깊이:낮음 / 검증:최고 / 시간:빠름 / 비용:적음
+   - Tier 1+2 (Recommended) — 깊이:중간 / 검증:높음 / 시간:중간 / 비용:중간
+   - Tier 1+2+3 — 깊이:높음 / 검증:중간 / 시간:느림 / 비용:큼
+   - 사용자 직접 제공 — 깊이:가변 / 검증:가변 / 시간:즉시 / 비용:사용자 부담
+2. **WebSearch 병렬 5건 이상**:
+   - 모델 release notes (예: Anthropic / OpenAI 공식)
+   - 학술 논문 (arxiv, ICLR/NeurIPS/ACL 등)
+   - 주요 engineering 블로그
+   - 커뮤니티 가이드 (Tier 3, 사용자 합의 시)
+3. **자료 분류 + 카테고리화** (probe-report.md template 따름):
+   - A: 공식 모델 / B: 학술 논문 / C: 외부 도구 / D: 프롬프트·하네스 엔지니어링 / E: 도구·SDK / F: 멀티에이전트 / G: Community (Tier 3)
+   - 각 자료 → URL + 발행일 + 핵심 인용
+4. **`probe/probe-report.md` 작성** (template: `skills/fz-modernize/templates/probe-report.md`)
+   - Tier별 매트릭스
+   - Status 칼럼 (peer-reviewed / arxiv preprint / official / community)
+   - 영향 예상 표 (어느 가이드의 어느 line이 stale인지)
+
+### Gate 1: Probe Complete
+- [ ] Tier 합의 명시?
+- [ ] 5+ 자료 수집?
+- [ ] 각 자료 3-axes 검증 (존재 / 권한·경계 / 결과 contract — 32차)? **Tier 1 필수 / Tier 2 권장 / Tier 3 존재만** (차등 적용)
+- [ ] Status 칼럼 포함?
+- [ ] 영향 예상 표 작성?
+
+> **저비용 보강 옵션**: 사용자가 추가 카테고리 요청 시 (예: "프롬프트 잘 짜는 법") → 추가 검색 4-5건 + `probe-supplement.md` 별도 파일.
+
+---
+
+## Phase 2: Audit (현재 가이드 line-level stale 분석)
+
+**핵심 원칙**: probe-report.md 자료 ↔ 현재 가이드 line 매핑.
+
+### 절차
+
+1. **최신성 lint 실행 (기계 탐지 — 선행 의무)**:
+   ```bash
+   python3 scripts/lint_doc_freshness.py --days 90
+   ```
+   - 산출: `missing-audit-date`(외부 출처 인용하나 감사일자 없음) · `stale-audit`(경과 초과) · `stale-model-ref`(구세대 모델명만 있고 현행 미언급)
+   - **현행 모델명은 `guides/llm-references.md`의 `모델 정책: <X> only`에서 자동 파싱**(SSOT) — 새 모델 출시 시 그 한 줄만 갱신하면 lint가 따라온다
+   - ⛔ **한계**: 최신성 ≠ 정확성. lint가 clean이어도 내용 검증은 별도 (Phase 1 probe 소관)
+
+2. **lint 미포괄 패턴 grep** (태그·인용):
+   ```bash
+   grep -nE "\[미검증|미검증:|Deprecated|deprecated|outdated" guides/*.md
+   grep -nE "arxiv|arXiv" guides/*.md
+   ```
+3. **각 stale 항목 → 해소 자료 매핑**: (선택 — 항목이 많고 서로 독립이면 항목 대조를 `workflows/swarm.js` 조각으로 돌린다 · 대조할 probe 자료는 브리프에 싣는다 · 준비 · 고정 트리 · 호출은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로)
+   - probe-report의 어느 자료로 해소?
+   - A1 직접 진술 가능? A5 해석으로 supporting? 또는 partially-verified?
+4. **`audit/audit-report.md` 작성** (template: `skills/fz-modernize/templates/audit-report.md`)
+   - 가이드별 변경 영향 표 (LOC 예상)
+   - 미검증 태그 line 단위 처리 결정
+   - Anti-Pattern Constraints 사전 식별
+5. **갱신한 파일에 감사일자 기록**: 외부 출처를 실제로 대조한 파일에만 `> **Sources (last audited: YYYY-MM-DD — {감사 축}):** ...` 헤더 갱신/추가.
+   - ⛔ **대조하지 않은 파일에 날짜를 넣지 말 것** — 하지 않은 감사를 주장하는 것이며 lint의 목적을 무력화한다. 미대조 파일은 lint 백로그로 남긴다.
+   - 감사 축을 명시할 것(예: `모델 사실 축`) — 무엇을 확인했는지 없으면 다음 세션이 "전부 확인됨"으로 오독한다
+
+### Gate 2: Audit Complete
+- [ ] **lint 실행 완료? 신규 `stale-model-ref` 0건?** (`missing-audit-date` 잔존은 백로그로 허용 — 단 이번에 갱신한 파일은 해소 의무)
+- [ ] 미검증 태그 전수 식별?
+- [ ] 각 line별 처리 결정 (verified/partially-verified/community/유지)?
+- [ ] 가이드별 LOC 예상?
+
+---
+
+## Phase 3: Plan (변경 사항 + Anti-Pattern Constraints)
+
+**핵심 원칙**: probe + audit 결과를 반영한 변경 plan을 작성. Plan은 v1→v2→v3로 진화 가능 (GPT verify 후 inline 정정).
+
+### 절차
+
+1. **`plan/update-plan.md` 초안 (v1)**:
+   - Step 분해 (가이드별 1 Step)
+   - Anti-Pattern Constraints 9개 (AC1-AC9, 아래 §AC 참조)
+   - 출처 표기 규약 (Tier 분류 + Status)
+   - 검증 게이트 정의 (5c-1 ~ 5d-3)
+1.5. **(full) 초안과 동시에 GPT 독립 플랜** (직전 decide 가 `run`·`config` 면): 요청 원문 · Tier 합의 · `probe/probe-report.md` · `audit/audit-report.md` · AC1-AC9 표를 이은 `{WORK_DIR}/plan/gpt-independent-input.md`(Lead 초안 `plan/update-plan.md` 는 넣지 않는다)로 `FZ_GPT_ARTIFACT=guide-plan FZ_WORK_DIR={WORK_DIR} "${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-plan --requirement {WORK_DIR}/plan/gpt-independent-input.md --repo {대상 레포} --deny {WORK_DIR} --arm gpt --run-id {run} --out-dir {WORK_DIR}/verify/gpt-independent` 를 background 로 띄운다. 끝나면 v1 Step 을 `{WORK_DIR}/plan/draft-steps.json`(`{steps:[{id, files}]}`)으로 적고 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {WORK_DIR}/plan/draft-steps.json --gpt {WORK_DIR}/verify/gpt-independent/gpt-{run}.json` 차이표의 결정 항목을 Lead 가 v1 에 반영한다. 실패(10~17 · 오염 · planner 거부)나 정문 exit 19(`GPT-ROUNDS:` — 독립 계열은 작업 폴더당 1회)면 다시 띄우지 않고 차이표 없이 Phase 4 `modernize-verify` 로 간다(19 가 `same-input` 이면 stderr 가 가리킨 직전 독립 플랜으로 차이표를 만든다)
+2. **사용자 Phase 4 합의**:
+   - 범위 (전체 vs 핵심 1-2개)
+   - 깊이 (Reference + 미검증 태그 해소 vs 본문 재구성 vs 새 원칙 추가)
+   - Work Dir 위치
+3. **GPT verify 후 v1 → v2 정정** (Phase 4 결과 반영)
+4. **GPT verify 후 v2 → v3.1 정정** (마지막 사이클)
+
+### Anti-Pattern Constraints (AC1-AC9)
+
+| # | 금지 패턴 | 검증 grep/스크립트 |
+|---|---------|------|
+| AC1 | 본문 재구성 (단락 통째 교체) | git diff 변경 LOC > `min(200, 가이드 줄수 × 0.2)` → 알림 (작은 가이드 보호) |
+| AC2 | 기존 verified 태그 변경 | `grep -nE "verified: <protected source>"` 변경 전후 비교 |
+| AC3 | 임의 deprecation 추가 | 사용자 명시 신호 없으면 Deprecated 목록 변경 0 |
+| AC4 | 출처 표기 통일성 위반 | 한 가이드 안에서 `[verified: {ID}]` 또는 `[verified: {URL}]` 일관성 |
+| AC5 | 미검증 사실 임의 verified 처리 | "Korean 실측 부재" 등 정확한 미검증 사유 보호 |
+| AC6 | 도서 기반 stable 가이드 본문 변경 | clean-architecture.md 같은 곳은 References 1줄 추가만 |
+| AC7 | 새 원칙/섹션 추가 | 합의 깊이 제한 — 모든 변경 = 기존 표/리스트 추가/교체 |
+| AC8 | broken link 미감지 | 다음 스크립트 (POSIX grep 추출 · URL 0건 = UNRUN) |
+| AC9 | Tier 3 단독 verified | A5 단독 발견 시 → `[partially-verified]` 격하 |
+
+### AC8 스크립트 (xargs 병렬, Bash background+redirect 교훈)
+
+정본은 `skills/fz-modernize/scripts/ac8-link-check.sh` 하나다 — 여기에 사본을 두지 않는다(F-224: 스크립트 · 인라인 사본 모두 `rg` 였고 rg 없는 셸에서 exit 127). exit 0 broken 0건 · 1 broken 있음 · 2 UNRUN(URL 0건, ⛔ 통과 아님) · 3 입력 오류. 실패한 단계는 기존 산출물(`/tmp/urls-to-check.txt` · `/tmp/link-check-results.txt`)을 덮지 않는다. `FZ_PLUGIN_ROOT` 는 `modules/cross-validation.md` § FZ_PLUGIN_ROOT 초기화로 **같은 Bash 호출 안에서** 먼저 잡는다 — 미설정이면 아래 줄이 'parameter not set' 으로 끝나는데(zsh exit 1 · bash 127) 그것은 broken 이 아니다.
+
+```bash
+bash "${FZ_PLUGIN_ROOT:?FZ_PLUGIN_ROOT 미설정 - 같은 Bash 호출에서 초기화를 먼저}"/skills/fz-modernize/scripts/ac8-link-check.sh guides /tmp
+```
+
+### AC9 스크립트 (Tier 3 단독 verified 검증)
+
+```bash
+#!/usr/bin/env bash
+# ⛔ 프로세스 치환(서브셸 카운터 소실 방지) · `/usr/bin/grep`(rg 는 zsh 함수) · positive control 필수 — 근거: skills/fz-modernize/references/rationale.md § AC9
+control=$(/usr/bin/grep -hoE '\[verified:' guides/*.md | wc -l | tr -d ' ')
+[ "$control" -gt 0 ] || { echo "AC9 UNRUN — positive control 0건 (경로·도구 확인)"; exit 2; }
+violations=0
+while IFS=: read -r file line content; do
+  # 순서 무관: A5 존재 + Tier 1/2 supporting 존재 모두 확인
+  has_a5=$(echo "$content" | grep -oE '\[verified: [^]]*\]' | grep -q 'A5' && echo yes || echo no)
+  has_tier12=$(echo "$content" | grep -oE '\[verified: [^]]*\]' | grep -qE 'A[1-4]|A6|B[1-9]|C[1-9]|D[1-9]|E[1-9]|F[1-3]' && echo yes || echo no)
+  if [ "$has_a5" = "yes" ] && [ "$has_tier12" = "no" ]; then
+    echo "VIOLATION: $file:$line — A5 단독 verified"
+    violations=$((violations + 1))
+  fi
+done < <(/usr/bin/grep -nE '\[verified: [^]]*A5[^]]*\]' guides/*.md)
+test "$violations" -eq 0 || { echo "AC9 FAIL — A5 단독 verified ${violations}건"; exit 1; }
+echo "AC9_OK (대상 $(/usr/bin/grep -cE '\[verified: [^]]*A5[^]]*\]' guides/*.md | awk -F: '{s+=$NF} END{print s+0}')건 · control ${control})"
+```
+
+### Gate 3: Plan Approved
+- [ ] AC1-AC9 명시?
+- [ ] 사용자 Phase 4 합의 (범위/깊이/Work Dir)?
+- [ ] GPT verify 통과 또는 needs_revision 후 정정?
+
+---
+
+## Phase 4: Verify (GPT Cross-Model 검증)
+
+**핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **재검증 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한**(판정과 무관하게 유효 판정 라운드를 센다). 모델·effort 는 호출에 적지 않는다 — `modules/gpt-strategy.md` § 모델·effort 선택.
+
+### 절차
+
+1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수 · `ask` 면 질문 → `set` → 다시 decide). `run` · `config` 면 아래 § GPT 호출 한 형태(래퍼 exec · architect 본문 · 5 Q 과제 · `gpt_review_schema`). 래퍼 exit 10~14 는 측정 실패다 — 판정으로 읽지 않는다. `skip`(또는 래퍼 exit 18 `GPT-OFF`)은 GPT 미사용이다 — 그 단계는 `[GPT 미사용 — 사유]` 표기만(self-review 폴백 아님 · `modules/gpt-strategy.md` § GPT 미사용). 선택 관련 실패(`CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그 · 모델·effort 거부 12)는 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 먼저 따르고, 그 밖은 에러 대응 표 'GPT CLI 통신 실패' 행으로 간다
+2. **5 Q 검증 관점** (Plan-specific):
+   - Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류)
+   - Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜)
+   - Q3: 출처 매핑 일관성 (Plan ↔ 가이드 line)
+   - Q4: Anti-Pattern Constraints 누락 위험
+   - Q5: 실행 순서 안전성 (impact-scan 사전 확인)
+3. **결과 분기** (`gpt_review_schema` 의 `verdict`):
+   - approved → Phase 5 진행
+   - needs_revision → v{N+1} 작성 (라운드는 정문이 센다 — approved · rejected 도 같다)
+   - rejected → 사용자 에스컬레이션 (⛔ v{N+1} 자동 작성 금지)
+4. **재검증 상한 소진** (정문 exit 19 `budget-exhausted` — 처리는 아래 에러 대응 표의 GPT 누적 한도 행): 사용자 에스컬레이션 의무 (18차 교훈)
+
+### GPT 호출
+
+```bash
+# hygiene(stdin close 29차 · trust_level 30차 · `--` 구분자 · exit 계약)는 정문이 부르는 래퍼가 처리한다 — modules/fz-gpt-bash-hygiene.md §8
+# kind modernize-verify — architect 본문 주입 · gpt_review_schema · 폴백 지시는 레지스트리. 5Q 본문은 verify 의 Q1~Q8 과 섞지 않는다(XE-15)
+[ -s "{PLAN_PATH}" ] || { echo "PLAN_PATH 없음·빈 파일 — GPT verify UNRUN" >&2; exit 2; }
+mkdir -p "{WORK_DIR}/verify"   # --out 의 상위 폴더 — 없으면 정문이 10 으로 거부한다
+P_MOD="$(mktemp "${TMPDIR:-/tmp}/fz-modernize-verify.XXXXXX")" || exit 2   # 호출별 파일 — 공유 /tmp 경로는 동시 세션끼리 덮어쓴다(XE-15)
+cat > "$P_MOD" <<EOF
+아래 Plan 을 5 관점으로 검증하고 관점마다 판정과 근거를 제시하라 — Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류) · Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜) · Q3: 출처 매핑 일관성 (Plan ↔ 가이드 line) · Q4: Anti-Pattern Constraints 누락 위험 · Q5: 실행 순서 안전성 (impact-scan 사전 확인). Plan 원문:
+$(cat "{PLAN_PATH}")
+EOF
+FZ_GPT_ARTIFACT=guide-plan FZ_WORK_DIR="{WORK_DIR}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" modernize-verify --cd "{WORK_DIR}" \
+  --out "{WORK_DIR}/verify/gpt-verify-v{N}-result.json" --prompt-file "$P_MOD"; RC=$?
+rm -f "$P_MOD"   # Plan 원문 사본을 TMPDIR 에 남기지 않는다
+exit "$RC"       # 정문 exit 를 덮지 않는다(hygiene §8)
+```
+
+### Gate 4: Cross-Verify Complete
+- [ ] GPT verify 1+ 회 실행?
+- [ ] 누적 카운터 한도 미초과 (≤3)?
+- [ ] approved 또는 사용자 에스컬레이션?
+
+---
+
+## Phase 5: Execute (line-level Edit)
+
+**핵심 원칙**: Plan v3.1 §3 미검증 처리 표 + AC1-AC9 enforcement에 따라 정확한 line별 Edit.
+
+**36차 준수**: 외부 자료 reference URL 변경(broken link archive.org 대체 외)은 팀 공유 영역 — 사용자 명시 합의 의무.
+
+### 절차
+
+1. **Step별 순차 실행**:
+   - Step 1: 1순위 가이드 (가장 영향 큰 미검증 태그 + 학술 표 보강)
+   - Step 2: 2순위 가이드
+   - Step 3-N: 나머지 가이드
+2. **각 Edit 시 정확한 old_string 매칭**:
+   - 본문 의미 변경 0 (AC1)
+   - Reference 추가 + 태그 교체만
+3. **Step 완료 후 검증**:
+   ```bash
+   grep -nE "\[미검증" guides/{filename} | wc -l
+   # 의도된 미검증만 남아야 함 (예: Korean tokenizer 실측 부재)
+   ```
+4. **사용자 검토 체크포인트** (Step 1 완료 후 권장)
+5. **⛔ 소비처 전파 확인**: 가이드 canonical 수정 후, 변경된 개념/태그를 소비처(modules/skills/agents)에 grep 전수 → stale 잔존 0 확인. 가이드만 고치고 소비처 미전파 = "guide 새 vs consumer stale" 불일치(전파 완전성).
+
+### Gate 5: Execute Complete
+- [ ] 모든 Step Edit 완료?
+- [ ] AC1-AC9 grep 통과?
+- [ ] git diff LOC ≤ Plan 예상 1.5x?
+- [ ] 의도된 미검증 태그만 잔존?
+
+---
+
+## Phase 6: Validate (AC8 link + Impact Scan)
+
+**핵심 원칙**: 변경된 가이드의 모든 URL이 실제 도달 가능한지 자동 검증.
+
+### 절차
+
+1. **AC8 link 자동 검증** (위 §AC8 스크립트):
+   - 27+ URL 5병렬 처리 → ~15초
+   - HEAD 실패 시 GET fallback (`-A "Mozilla/5.0..."` UA 추가 가능)
+   - 403 (bot 차단) ≠ broken link 구분
+2. **Impact Scan** (line 번호 deep-link 의존 모듈 확인):
+   ```bash
+   # ⛔ Gate 6의 "deep-link 0건?" 판정 근거이므로 **총계를 먼저** 센다 (자른 목록으로 판정하면 틀린다)
+   grep -rnE "guides/\{filename\}:L[0-9]+" modules/ skills/ 2>/dev/null | grep -c . || true
+   grep -rnE "guides/\{filename\}:L[0-9]+" modules/ skills/ 2>/dev/null | head -20   # 표시만 자름
+   # line 번호 deep-link 발견 시 → 깨질 위험. path/section 참조만이 안전
+   ```
+3. **verify-evidence-matrix.md 업데이트**:
+   - 25 row 매트릭스 (source_id, claim, required_terms, url)
+   - AC8 결과 + 잔여 미완 항목
+
+### Gate 6: Validate Complete
+- [ ] AC8 link broken 0건 (또는 bot-block 식별)?
+- [ ] Impact Scan: line 번호 deep-link 0건?
+- [ ] verify-evidence-matrix.md 갱신?
+
+---
+
+## 메타 안전 장치 (본 세션 교훈 반영)
+
+| 장치 | 트리거 | 대응 | 출처 |
+|------|------|------|-----|
+| GPT 재검증 상한 | 정문 exit 19 `budget-exhausted`(횟수 정본 `modules/cross-validation.md` § 재검증 라운드 상한 — 판정과 무관하게 유효 라운드를 센다) | 사용자 에스컬레이션 의무 | 18차 |
+| Self-application contract | 대상이 fz-modernize/* 자체 | Phase 4 GPT 검증 non-skippable(GPT 켬일 때 — 끈 세션 · CLI 없음은 decide `skip` → `[GPT 미사용 — 사유]` · `modules/gpt-strategy.md` § 단계 실행 판정) + 사용자 ASR 의무 | 23차 (16차 meta) |
+| Scope Inflation | 변경 LOC > Plan 예상 1.5x | 즉시 중단, 사용자 확인 | 18차 |
+| Speculation Fallacy | "원본/기존/이전" 표현 사용 | git show / Read 실측 후 진술 | CLAUDE.md Verification Discipline |
+| Reflection Gap | Plan 자체 stale 가능 | 5d 시작 전 plan 재검토 1회 | 17차 |
+| Cross-model 안전망 | self-review로 발견 못한 사실 오류 | GPT 단독 발견 우선 적용 | 17차/16차 |
+| Bash background redirect | while loop + redirect 시 0 bytes | xargs 병렬 패턴 | Bash background+redirect 교훈 |
+| Plan-before-Probe | 외부 실측 없이 Plan 작성 | Probe → Audit → Plan 순서 강제 | 31차 |
+
+---
+
+## Few-shot 예시
+
+```
+예시 1 — full 파이프라인:
+  /fz-modernize "fz 가이드 8개를 Opus 5 출시 후 최신화"
+  → 티켓 폴더 자동 생성
+  → Phase 1 (Probe): WebSearch 5건 + Tier 1+2 분류
+  → Phase 2 (Audit): grep으로 미검증 8곳 식별
+  → Phase 3 (Plan v1): AC1-AC9 + Step 분해
+  → Phase 4 (GPT verify v1): needs_revision (R1: A5 과승격)
+  → Plan v2 작성 → GPT verify v2: needs_revision (Q4: G1 NeurIPS 2025 단독 발견)
+  → Plan v3 작성 → GPT verify v3: needs_revision (F2 Khattab 공저자 정정)
+  → Plan v3.1 점 수정 4건 → Phase 5d 실행
+  → Phase 6: AC8 link 검증 (29 URL, 27 OK + 2 bot-block)
+
+예시 2 — phase 단독 호출:
+  /fz-modernize probe "최신 Claude 4.x docs"
+  → Phase 1만 실행 → probe-report.md 작성
+
+예시 3 — BAD vs GOOD:
+  BAD:  Plan 먼저 작성 후 외부 자료 검색 (31차 위반) → Plan 재작성 사이클 폭주
+  GOOD: Probe 먼저 → Audit → Plan v1 (Probe 실측 기반) → GPT verify
+```
+
+```
+BAD (Tier 3 단독 근거):
+커뮤니티 블로그 1건으로 가이드 항목 갱신 + [verified] 태그.
+→ AC9 위반. 단일 Tier 3는 supporting-only.
+
+GOOD:
+Tier 1(공식)/Tier 2(arxiv) 교차 확인 → [verified: Tier1/2], Tier 3 단독은 [partially-verified].
+```
+
+```
+BAD (링크 미검증 인용):
+URL을 추론으로 작성 → resolve 실패(환각 인용).
+
+GOOD:
+Phase 6 AC8 link 검증 (WebFetch resolve, 200 OK) 후 인용.
+```
+
+---
+
+## Boundaries
+
+**Will**:
+- 외부 자료 리서치 (Tier 1+2 우선)
+- 가이드/문서의 line-level stale 식별
+- Plan v1→v2→v3 진화 (GPT 3회 한도)
+- AC1-AC9 enforcement
+- AC8 link 자동 검증 (xargs 병렬)
+- verify-evidence-matrix.md 갱신
+- 사용자 합의 기반 깊이 제한
+- **light 모드 (40차)**: 사용자 신호(정본 목록 `modules/mode-gate.md` § 신호어) 감지 시 Phase 1+2 + GPT micro-eval만 실행 (카운터 1 소비)
+  - ⛔ 단 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**(`modules/cross-validation.md §Coverage Gate`)는 light에서도 **생략 불가** — light는 절차 생략이지 검증 생략이 아니다. 본 스킬은 *최신성 전수 판정*을 산출하므로 특히 해당한다. ⛔ **부정 주장(0건·부재)은 §Negative-Result Gate 도 함께** — Coverage 는 범위, Negative-Result 는 도구 유효성이며 N 오측정 시 0/0 으로 통과한다
+  - ⛔ **AC5·AC9 는 light 에서도 적용한다.** 나머지 AC 는 Phase 5 Execute 의 편집을 제약하므로 편집이 0인 light 에서 공허하지만, 이 둘은 **출처 표기**를 제약하고 그 표기를 만드는 것은 light 가 실제로 도는 Phase 1(Probe)·2(Audit) 다. AC 선언이 Phase 3, 집행이 Phase 5 에 있어 light 가 둘 다 건너뛰면 Tier 3 단독 발견이 `[verified]` 로 남는다 — `[partially-verified: A5; …]` 격하(AC9)와 미검증 사유 보존(AC5)은 Phase 2 산출 시점에 적용한다.
+
+**Will Not**:
+- 본문 단락 통째 재구성 (AC1 위반)
+- Tier 3 단독 verified 처리 (AC9 위반)
+- GPT 한도 초과 자율 반복 (18차 위반)
+- 사용자 합의 없이 새 원칙/섹션 추가 (AC7 위반)
+- Plan-before-Probe (31차 위반)
+
+## 에러 대응
+
+| 에러 | 대응 | 폴백 |
+|------|------|------|
+| Probe WebSearch 실패 | 재시도 1회 → 사용자에게 직접 자료 요청 | manual probe |
+| GPT CLI 통신 실패 · 래퍼 exit 10~14(측정 실패 — 11·12 선택 복구는 Phase 4 절차 1단) | 30차 trust_level 확인 → 재시도 | self-review로 폴백 (Cross-model 안전망 상실 명시) |
+| decide `skip` · 래퍼 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 · 폴백 없음(`modules/gpt-strategy.md` § GPT 미사용) |
+| GPT 누적 한도 도달 · 정문 exit 19(`GPT-ROUNDS:` 재검증 라운드 거부 — 정본 `modules/cross-validation.md` § 재검증 라운드 상한) | 다시 부르지 않는다 — `same-input` 은 stderr 가 가리킨 직전 판정 파일을 쓰고, `budget-exhausted` 는 그 키를 미해결로 보고한다(`python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_rounds.py" status --work-dir {WORK_DIR}` — 통과 아님) · 사용자 에스컬레이션 의무 | "최소 수정 승인" 모드 (GPT 권고 점 수정 N건만) |
+| AC8 broken link 발견 | archive.org 폴백 또는 인용 제거 | 사용자 결정 |
+| Impact Scan line 번호 깨짐 | 모듈에서 path/section 참조로 변경 권고 | 영향 모듈 목록 보고 |
+
+## Completion → Next
+
+Phase 6 통과 후:
+- 코드 변경 있음 → `/fz-commit` 제안
+- 가이드 변경만 → 사용자 직접 git commit
+- 교훈 발견 → feedback_*.md 저장(`/sc:sc-save --type learnings` 는 선택)
+- 티켓 폴더 산출물 보존 → 새 세션에서 `index.md` Resume Trigger로 복원
+
+> N차 교훈 범례: `references/rationale.md` § 관련 메모리

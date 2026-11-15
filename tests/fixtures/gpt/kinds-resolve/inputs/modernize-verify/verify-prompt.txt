@@ -1,0 +1,2 @@
+아래 Plan 을 5 관점으로 검증하고 관점마다 판정과 근거를 제시하라 — Q1: 미검증 태그 해소 정당성 (A1 primary / A5 supporting 분류) · Q2: 학술 인용 정확성 (arxiv ID, 저자명, 날짜) · Q3: 출처 매핑 일관성 (Plan ↔ 가이드 line) · Q4: Anti-Pattern Constraints 누락 위험 · Q5: 실행 순서 안전성 (impact-scan 사전 확인). Plan 원문:
+PLAN-FIXED
