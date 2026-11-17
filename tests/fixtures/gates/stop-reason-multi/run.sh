@@ -9,6 +9,10 @@
 #   length-cap    소유 원장 8개 × 긴 요약 → 사유 ≤ 4000자 · 안내 줄 보존 · 표시 줄 + `…외 N줄` = 8 · 지문 8항
 #   invalid       소유 원장 계약 위반(중복 id) → `⛔ 원장 계약 위반` 사유 · 지문 = sha12("<원장>:invalid")(exit 3 사유 경로)
 #   infra         소유 원장 읽기 불가(chmod 000) → 판정기 exit 2 · `인프라` 진단 · 통과(인프라 실패 회귀)
+#   state-cap     상태 상한 200항목 — 남의 항목 199개 · 세션 A 2회 차단 · 항목 2개 더 · 세션 B 차단(상한 초과) → A 셋째는 통과 ·
+#                 저장 뒤 200항목 · 버린 것은 가장 오래된 3개뿐(전부 비우면 A 의 횟수가 지워져 A 가 다시 막힌다)
+#   state-cap-lru 가장 먼저 들어왔지만 계속 활성인 세션 A — 갱신하면 맨 뒤로 가므로 상한을 넘겨도 A 대신 가장 오래 갱신되지
+#                 않은 항목 12개를 버린다(먼저 들어온 순서로 버리면 A 가 지워진다)
 # 지문은 기준 공식(`gate_stop_hook.py` 지문 블록 — 원장 경로:판정 종류의 sha12)을 여기서 따로 계산해 상태 파일 키와 맞춘다.
 # 기준 트리는 끝 줄만 실어 two-unmet · over-cap · long-ids 에서 앞 id 를 놓치고, 남의 원장을 접지 않는다 → exit 1.
 # exit: 0 전건 통과 · 1 단언 실패 · 2 중첩 실행(`UNRUN:`) · 3 준비 실패(인자 · 스크립트 · 임시 폴더 · 단언기 고장)
@@ -51,6 +55,7 @@ sys.dont_write_bytecode = True
 HOOK = pathlib.Path(sys.argv[1]) / "gate_stop_hook.py"
 PY = sys.executable
 IDS_SHOWN, SUMMARY_MAX, FOLD_K, REASON_MAX, MAX_BLOCKS = 8, 400, 3, 4000, 2   # 사유 계약 값(F-360 · EC-07)
+STATE_MAX = 200                                                                  # 루프 방어 상태 파일 상한(항목 수)
 FAIL = []
 
 
@@ -133,6 +138,18 @@ def state(home):
         raise Setup(f"상태 파일 읽기 실패: {e}")
 
 
+def seed(home, keys):
+    """상태 파일 끝에 남의 항목 `keys`(카운트 1)를 덧붙인다 — 기존 항목의 순서는 그대로 둔다."""
+    st = state(home)
+    st.update(dict.fromkeys(keys, 1))
+    p = home / ".fz" / "stop-hook-state.json"
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(st), encoding="utf-8")
+    except OSError as e:
+        raise Setup(f"상태 파일 기록 실패: {e}")
+
+
 def summary_of(reason, prefix, led):
     """사유에서 `<prefix><원장> — ` 줄의 요약 부분. 없으면 None."""
     head = f"{prefix}{led} — "
@@ -198,6 +215,32 @@ def summary_cell(name, ids, want_ids_all):
         st = state(c.home)
         check(name, st == {f"{c.session}|{fp([f'{led}:unmet'])}": 1},
               "지문 = 기준 공식 sha12(<원장>:unmet) · 카운트 1", st)
+
+
+def cap_cell(name, steps, evicted):
+    """상태 상한 — 넘치면 가장 오래 갱신되지 않은 항목부터 버리고, 갱신 중인 세션의 횟수는 남긴다.
+    steps = ("seed", 접두, 수) | ("fire", 세션 꼬리). 마지막 발사는 세션 A 의 셋째 시도다."""
+    with Cell(name) as c:
+        led = ledger(c.cwd, "T-0001", ["S36", "S28d"])
+        tp = transcript(c.cwd, [led])
+        seeded, rcs, err = [], [], ""
+        for step in steps:
+            if step[0] == "seed":
+                keys = [f"{step[1]}{i}|x" for i in range(step[2])]
+                seed(c.home, keys)
+                seeded += keys
+            else:
+                rc, _reason, err = hook(c.cwd, c.home, f"{c.session}-{step[1]}", tp)
+                rcs.append(rc)
+        check(name, rcs == [2, 2, 2, 0], "A 2회 · B 1회 차단 뒤 A 셋째는 통과 — 상한이 A 의 횟수를 지우지 않는다", rcs)
+        check(name, "회 막았다" in err, "A 셋째 통과는 루프 방어 진단", err[-200:])
+        st = state(c.home)
+        key = lambda s: f"{c.session}-{s}|{fp([f'{led}:unmet'])}"
+        check(name, len(st) == STATE_MAX, f"저장 뒤 항목 = 상한 {STATE_MAX}(넣은 뒤 기준)", len(st))
+        gone = [k for k in seeded if k not in st]
+        check(name, gone == evicted, f"버린 항목 = 가장 오래 갱신되지 않은 {len(evicted)}개", gone[:20])
+        check(name, st.get(key("A")) == MAX_BLOCKS + 1 and st.get(key("B")) == 1, "A 카운트 3 · B 카운트 1",
+              {k: v for k, v in st.items() if not k.endswith("|x")})
 
 
 try:
@@ -287,6 +330,12 @@ try:
         check("infra", rc == 0 and reason is None, "판정기 인프라 실패 → 통과(exit 0)", f"rc={rc} {err[-300:]}")
         check("infra", f"{led}: 인프라 — INFRA:" in err, "진단에 `<원장>: 인프라 — INFRA:` 줄", err[-300:])
         check("infra", state(c.home) == {}, "통과는 상태 파일을 쓰지 않는다", state(c.home))
+
+    # ── state-cap · state-cap-lru — 상태 상한이 활성 세션의 차단 횟수를 지우지 않는다 ─────────
+    cap_cell("state-cap", [("seed", "old", 199), ("fire", "A"), ("fire", "A"), ("seed", "new", 2),
+                           ("fire", "B"), ("fire", "A")], [f"old{i}|x" for i in range(3)])
+    cap_cell("state-cap-lru", [("fire", "A"), ("seed", "mid", 150), ("fire", "A"), ("seed", "late", 60),
+                               ("fire", "B"), ("fire", "A")], [f"mid{i}|x" for i in range(12)])
 except Setup as e:
     print(f"SETUP {e}")
     sys.exit(3)

@@ -1629,7 +1629,7 @@ def self_test() -> int:
             sys.stdout, sys.stderr = captured, captured_err
             try:
                 if argv is None:
-                    code = _dispatch(["--discover", str(sandbox / "discover")],
+                    code = _dispatch(["--discover", str(sandbox / case.get("discover_dir", "discover"))],
                                      quiet=False)
                 elif case.get("pty_input") is not None:
                     code, o_s, e_s = _run_pty(argv + [str(ledger_path)], case["pty_input"])
@@ -2842,8 +2842,15 @@ def discover(root_dir: str) -> int:
     ⛔ 발견한 원장을 **자르지 않고** 전부 파싱한다(F-378 — CHECK 를 돌리지 않아 수가 많아도 싸다). 읽지 못한 원장은
        요약의 `미판정 N` 으로 센다 — 종료 코드는 그대로다(미판정도 미충족처럼 실패가 아니다. hook 의 exit 2 는 차단이고
        health-check 는 exit 2 를 '탐색 실행 불가' 로 센다).
+
+    ⛔ **탐색 루트가 디렉터리가 아니면 exit 2(INFRA)다** — 탐색을 못 한 것을 '원장 0건 (게이트 미사용)' 으로 보고하지 않는다.
+       원장을 환경 변수로 지정했으면 루트를 쓰지 않으므로 확인하지 않는다. 확인은 여기 둔다 — `find_ledgers` 는 Stop 훅도 쓴다.
     """
-    ledgers, note = find_ledgers(root_dir, os.environ.get(LEDGER_ENV, ""))
+    env_ledgers = os.environ.get(LEDGER_ENV, "")
+    if not env_ledgers and not Path(root_dir).is_dir():
+        print(f"INFRA: 탐색 루트 없음 — {root_dir} (디렉터리가 아니다 · ⛔ 게이트 미사용 아님)", file=sys.stderr)
+        return EXIT_INFRA
+    ledgers, note = find_ledgers(root_dir, env_ledgers)
     if not ledgers:
         print(note or "원장 0건 (게이트 미사용)")
         return EXIT_OK

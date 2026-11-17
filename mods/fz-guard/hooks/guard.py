@@ -9,8 +9,10 @@
       창은 연 prompt 안에서만 판정한다 — 승인 없이 그 턴을 끝내면 Stop 을 1회 막는다. 셋 다 interactive(entrypoint=cli)에서만 발화한다.
       질문 없이 긴 답(LONG_ANSWER 자 이상)으로 끝낸 턴은 Stop 에 경고를 따로 싣는다(F-451 · 차단 아님).
   AG  F-058 · F-119 — fz 세션 표지(/fz · /fz-* · /fz:* · Skill fz*)가 선 세션에서 Agent · Task 의 subagent_type 이
-      native 채택 목록(modules/native-agents.md) 밖이면 ask 한다.
-  FR  F-518 · F-565 — 같은 prompt_id 에서 메모리에 fz 교훈을 쓰고 레지스트리 entries/F-*.md 쓰기가 없으면 Stop 을 1회 막는다.
+      채택 목록(modules/native-agents.md — 접두 포함 이름 완전 일치) 밖이면 ask 한다.
+  FR  F-518 · F-565 — 같은 prompt_id 에서 메모리에 fz 교훈을 쓰고 레지스트리 entries/F-*.md 가 이 턴에 쓰이지 않았으면 Stop 을
+      1회 막는다. 쓰기 도구의 성공 기록이 없으면 FZ_FINDINGS_ROOT/entries/ 항목의 파일 시각(턴 시작 이후)으로 한 번 더 본다 — 스크립트 ·
+      Bash 리다이렉트로 쓴 항목도 센다. 루트를 모르면 지금처럼 막는다. ponytail: 다른 세션이 같은 때 쓴 항목도 이 턴 기록으로 센다.
       교훈 토큰은 마크다운 링크 · 백틱을 지운 본문에서 찾는다(링크만 든 MEMORY.md 는 교훈이 아니다).
   GP  F-094 · F-297 — fz-review 를 부른 턴이 GPT 리뷰 호출도 '[외부: GPT]' · '[GPT 미사용 — 사유]' 줄도 없이 끝나면 Stop 을
       1회 막는다(interactive 한정). fz 플러그인 파일에 옛 모델 호칭을 넣는 쓰기는 모드와 무관하게 deny 한다 —
@@ -33,7 +35,7 @@ transcript 에서는 굳은 사실 하나만 읽는다: 첫 줄들의 entrypoint
 
 모드
   (인자 없음)                훅 — stdin JSON 하나 → stdout 결정 JSON(없으면 빈 출력) · exit 0
-  --self-test                합성 입력 92 케이스 — `PASS <case>` 줄
+  --self-test                합성 입력 124 케이스 — `PASS <case>` 줄
   --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS 인가 (0 일치 · 1 불일치 · 2 표 없음)
   --make-synthetic BYTES OUT --with-marker|--no-marker   큰 transcript 합성(첫 줄들에 entrypoint 를 둘지)
   --bench FILE               entrypoint 판정 소요 — `mode=<…> elapsed_ms=<n>`
@@ -66,10 +68,12 @@ RULES = ("P4", "AG", "FR", "GP")
 WRITE_EXACT = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 SERENA_WRITE = re.compile(r"^mcp__.*serena__(replace_symbol_body|insert_after_symbol|insert_before_symbol|replace_content|"
                           r"replace_in_files|rename_symbol|safe_delete_symbol)$")
-XCODE_WRITE = re.compile(r"^mcp__xcode__Xcode(Write|Update|MV|RM|MakeDir)$")
+# 서버 이름은 사용자가 등록한 이름이라(xcode · Xcode · plugin_<이름>_<서버> …) 묻지 않고 도구 이름으로 판정한다.
+#   hooks.json 두 matcher 도 같은 꼴이다 — 가변 자리는 `.*` 만 쓴다(scripts/check_rule_copies.py `_expand` 가 펼친다)
+XCODE_WRITE = re.compile(r"^mcp__.*__Xcode(Write|Update|MV|RM|MakeDir)$")
 AGENT_TOOLS = {"Agent", "Task"}
 # modules/native-agents.md 채택 표와 같아야 한다 — `--check-allowlist` 가 대조한다(health-check 5.2)
-ALLOW_AGENTS = {"silent-failure-hunter", "type-design-analyzer", "code-simplifier", "deep-research-agent"}
+ALLOW_AGENTS = {"pr-review-toolkit:silent-failure-hunter", "pr-review-toolkit:type-design-analyzer", "pr-review-toolkit:code-simplifier"}
 PHASE4_HEADER = "Phase 4"
 NOT_APPROVAL = re.compile(r"커스텀|취소|거절|중단|cancel|reject|abort", re.I)
 # F-565 — F-ID 는 그 자체로 교훈 기록이다. fz 이름(fz-findings 포함)만 든 본문은 교훈 단서어가 함께 있어야 교훈이다 — 스킬 이름 ·
@@ -97,6 +101,8 @@ LOCK_TIMEOUT = 3.0
 KEEP_PROMPTS = 64
 STALE_DAYS, PRUNE_MAX = 7, 200                    # F-564 — 이 날수보다 오래 기록이 없는 세션 상태를 지운다
 LONG_ANSWER = 1500                                # F-451 — 승인을 묻기 전 답이 이 글자 수 이상이면 경고
+ENTRY_SCAN = 5000                                 # F-518 — Stop 이 entries/ 에서 보는 이름 수 상한(훅 시간 제한 10초)
+MTIME_SLACK = 1.0                                 # F-518 — 초 단위로 잘리는 파일 시각을 턴 시작과 견줄 때의 여유(초)
 
 WARN_UNDECIDED = "FZ-GUARD-WARN P4-UNDECIDED"
 WARN_INCOMPLETE = "FZ-GUARD-WARN STATE-INCOMPLETE"
@@ -178,6 +184,30 @@ def in_registry(path: str, env) -> bool:
 
 def registry_entry(path: str, env) -> bool:
     return in_registry(path, env) and bool(ENTRY_NAME.match(os.path.basename(path)))
+
+
+def entry_since(env, since, limit=ENTRY_SCAN) -> bool:
+    """FR(F-518) — FZ_FINDINGS_ROOT/entries/ 에 턴 시작(since) 뒤 고쳐진 항목(F-NNN….md)이 있는가. 쓰기 방법(쓰기 도구 · 스크립트 ·
+    Bash 리다이렉트)과 무관하게 파일 시각으로 본다. 루트나 턴 시작을 모르거나 entries/ 를 못 열면 False — 기록을 볼 수 없으니 지금처럼 막는다.
+    시각을 못 읽는 항목(깨진 링크 등) 하나는 건너뛰고 뒤 항목을 계속 본다 — 그 항목 때문에 이 턴에 쓴 항목을 놓치지 않는다.
+    ponytail: 다른 세션이 같은 때 쓴 항목도 이 턴의 기록으로 센다(거짓 통과 — FR 은 1회 알림이라 거짓 차단이 더 방해된다) ·
+    앞 limit 개 이름만 본다(넘으면 못 본 항목은 기록 없음 — 거짓 차단 1회)"""
+    root = env.get("FZ_FINDINGS_ROOT")
+    if not root or not isinstance(since, (int, float)):
+        return False
+    try:
+        with os.scandir(os.path.join(os.path.expanduser(root), "entries")) as it:
+            for i, e in enumerate(it):
+                if i >= limit:
+                    break
+                try:
+                    if ENTRY_NAME.match(e.name) and e.stat().st_mtime >= since - MTIME_SLACK:
+                        return True
+                except OSError:
+                    continue
+    except OSError:
+        return False
+    return False
 
 
 def workdir_index(path: str, cwd) -> bool:
@@ -594,23 +624,113 @@ def _write_targets(n: str, args):
     return out
 
 
-def defined_functions(toks) -> set:
-    """어느 깊이든 이 명령에서 정의한 함수 이름 — 그 호출은 쓰기 자리가 아니다(본문 명령이 따로 판정된다)."""
-    out = set()
+# 복합 명령을 여는 명령 자리 예약어 → 닫는 말 · 뒤가 아직 명령 자리인 예약어(shell_tokens 렉서의 명령 자리 규칙과 같은 표 — 렉서는 함수
+# 정의를 이 자리에서만 읽는다). defined_functions 가 파이프라인 한 칸 · 목록의 범위를 가르는 데 쓴다(`( … )` 는 연산자 괄호다)
+_SCOPE_OPEN = {"{": "}", "if": "fi", "while": "done", "until": "done", "for": "done", "select": "done"}
+_SCOPE_LEAD = frozenset(("!", "{", "if", "then", "else", "elif", "do", "while", "until", "time"))
+
+
+def defined_functions(toks) -> dict:
+    """맨 바깥 셸에서 정의한 함수 — 이름 → 가장 이른 정의가 끝나는 위치(toks 와 같은 좌표). 이름만 필요하면 키를 쓴다.
+    맨 바깥 = toks 에 바로 놓인 정의 중 bash 가 서브셸에서 돌리지 않는 자리다. 서브셸 자리는 셋이다 — `( … )` 괄호 안 · 두 명령 이상
+    파이프라인(`|` · `|&`)의 한 칸 · `&` 로 끝난 목록(`a && b &` 는 목록 전체). 그 칸이 묶음 `{ …; }` · if · while · until · for 면 그 안
+    전부가 서브셸이다. 치환(`$(…)` · 백틱 · heredoc 본문 치환 · `<(…)`) · 서브셸 안 정의는 그 셸이 끝나면 사라져 밖의 호출에 닿지 않고,
+    함수 본문 안 정의는 그 함수가 불려야 생긴다 — 모두 넣지 않는다(보수 판정: 같은 치환 · 서브셸 · 파이프라인 칸 · 본문 안 호출도 면제하지
+    않는다). `&&` · `||` 목록의 한 명령과 지금 셸에서 도는 묶음 · if · 루프 안 정의는 넣는다 — 조건이 돌지 않아 정의가 생기지 않는 꼴은
+    가르지 않는다. 예약어 짝이 맞지 않으면(닫는 말 없음 · 다른 닫는 말 · 짝 없는 `)`) 범위를 모르므로 아무것도 넣지 않는다."""
+    frames = [[None, [], [], [], False]]       # 칸마다 [닫는 말, 끝난 목록의 정의, 이 목록의 정의, 이 파이프라인의 정의, 파이프라인이 두 칸 이상]
+    cmd_pos, after_time, joined = True, False, False
+
+    def end_pipe(f):
+        if not f[4]:
+            f[2] += f[3]                       # 한 칸 파이프라인은 지금 셸에서 돈다
+        f[3], f[4] = [], False
+
+    def end_list(f, background=False):
+        end_pipe(f)
+        if not background:
+            f[1] += f[2]                       # `&` 로 끝난 목록은 서브셸이다 — 그 정의를 버린다
+        f[2] = []
+
+    def close(word):
+        if frames[-1][0] != word:
+            return False
+        f = frames.pop()
+        end_list(f)
+        if word != ")":
+            frames[-1][3] += f[1]              # 지금 셸에서 끝난 묶음 · if · 루프 — 그 정의는 바깥 파이프라인의 한 칸에 놓인다
+        return True
     for t in toks:
+        if isinstance(t, shell_tokens.Op):
+            if t.text == "\n" and joined:
+                continue                       # `|` · `&&` · `||` 뒤 줄바꿈은 같은 명령을 잇는다
+            if t.text in ("|", "|&"):
+                frames[-1][4] = True
+            elif t.text in ("&&", "||"):
+                end_pipe(frames[-1])
+            elif t.text == "(":
+                frames.append([")", [], [], [], False])
+            elif t.text == ")":
+                if not close(")"):
+                    return {}
+            else:
+                end_list(frames[-1], t.text == "&")   # ; ;; & 줄바꿈
+            cmd_pos, after_time, joined = t.text != ")", False, t.text in ("|", "|&", "&&", "||")
+            continue
+        joined = False
         if isinstance(t, shell_tokens.Func):
-            out.add(t.name)
-        for sub in shell_tokens.nested(t)[1]:
-            out |= defined_functions(sub)
+            frames[-1][3].append(t)
+            cmd_pos = after_time = False
+        elif isinstance(t, shell_tokens.Word) and cmd_pos and not t.quoted:
+            if t.text in _SCOPE_OPEN:
+                frames.append([_SCOPE_OPEN[t.text], [], [], [], False])
+            elif t.text in ("}", "fi", "done") and not close(t.text):
+                return {}
+            elif t.text in ("then", "else", "elif", "do"):
+                end_list(frames[-1])
+            keep = after_time and t.text.startswith("-")   # `time -p` 뒤는 아직 명령 자리다
+            after_time, cmd_pos = t.text == "time" or keep, t.text in _SCOPE_LEAD or keep
+        elif isinstance(t, shell_tokens.Word):
+            cmd_pos = after_time = False
+    if len(frames) > 1:
+        return {}
+    end_list(frames[0])
+    kept, out = {id(t) for t in frames[0][1]}, {}
+    for t in toks:
+        if id(t) in kept:
+            out[t.name] = min(out.get(t.name, t.end), t.end)
     return out
 
 
-def write_sites(cmd, fragment=False, known=()):
+def _runs_at(toks) -> dict:
+    """치환 안 단어(id) → 그 치환을 품은 맨 바깥 토큰의 시작 위치(toks 와 같은 좌표). 치환은 그 토큰의 명령이 돌 때 돌고 그 앞의 맨 바깥
+    정의를 물려받는다 — 백틱 · heredoc 본문 치환 안 단어의 위치는 그 안 글자 기준이라 맨 바깥 정의 위치와 견줄 수 없다."""
+    out = {}
+
+    def walk(ts, at):
+        for t in ts:
+            ws, subs = shell_tokens.nested(t)
+            out.update((id(w), at) for w in ws)
+            for sub in subs:
+                walk(sub, at)
+    for t in toks:
+        for sub in shell_tokens.nested(t)[1]:
+            walk(sub, t.start)
+    return out
+
+
+def write_sites(cmd, fragment=False, known=(), whole_funcs=None):
     """명령의 쓰기 자리 — [(대상 Word | None, Cmd)] · None 이면 못 읽었다(표 밖 꼴 · 토크나이저 없음).
     대상 None = 그 명령이 대상을 모르는 쓰기다(읽기 표 밖 이름 · 명령 자리 미상 · 펼쳐지는 명령 이름 · WRITE_ARGS 의 표 밖 옵션 · xargs 뒤).
     대상 Word 는 리다이렉트(`>` · `>>` · `>|` · `&>` · `<>` · fd 가 아닌 `>&`)와 WRITE_ARGS 명령(tee · rm · touch · mkdir · cp · mv)의 대상이다 —
-    펼치지 않은 글자 그대로이고, 그 명령의 깊이 · 지연(함수 본문)은 Cmd 에 있다. 이 명령에서 정의한 함수(와 `known` — 조각만 넘길 때 바깥
-    명령이 정의한 함수)의 호출은 자리가 아니다(본문이 따로 나온다).
+    펼치지 않은 글자 그대로이고, 그 명령의 깊이 · 지연(함수 본문)은 Cmd 에 있다. 이 명령의 맨 바깥 셸에서 정의한 함수(defined_functions)의
+    호출은 **정의 뒤에 있을 때만** 자리가 아니다(본문이 따로 나온다) — 정의보다 앞선 맨 이름 호출은 외부 명령이다(`rm -rf build; rm() { :; }`).
+    치환 · 서브셸(파이프라인 칸 · `&` 목록 포함) 안 호출은 그 앞의 맨 바깥 정의를 물려받고(치환은 품은 맨 바깥 토큰 자리에서 돈다), 치환 ·
+    서브셸 안 정의는 아무 호출도 면제하지 않는다(`(rm() { :; }); rm -rf build` · `rm() { :; } | rm -rf build` 는 쓰기다). 함수 본문 안 호출은
+    이름으로 갈린다 — WRITE_ARGS 명령은 맨 바깥 호출과 같은 규칙이라 본문보다 앞의 맨 바깥 정의만 면제한다(`f() { rm -rf build; }; f; rm() { :; }`
+    의 본문 rm 은 외부 명령이다 · 정의 뒤에 f 를 불러도 쓰기로 읽는다). 그 밖 이름은 명령 어디의 맨 바깥 정의로도 면제한다(`f() { g; }; g() { :; }; f`).
+    조각만 넘길 때 `known` 은 그 조각 **앞에서** 맨 바깥 셸이 정의한 함수(맨 바깥 호출 · 본문 안 WRITE_ARGS 명령에 쓴다), `whole_funcs` 는 명령
+    전체가 정의한 함수(본문 안 그 밖 이름에 쓴다 · 없으면 이 명령의 정의)다 — 넘긴 쪽이 순서 · 범위를 걸렀다.
     ⛔ guard(P4)와 gate_stop_hook(원장 소유)이 같은 판정을 쓴다 — 한쪽만 고치면 두 판정이 갈린다."""
     if not isinstance(cmd, str) or shell_tokens is None:
         return None
@@ -618,7 +738,8 @@ def write_sites(cmd, fragment=False, known=()):
     cmds = shell_tokens.commands(toks)
     if shell_tokens.is_unknown(cmds):
         return None
-    funcs, out = defined_functions(toks) | set(known), []
+    ends, runs_at, known, out = defined_functions(toks), _runs_at(toks), set(known), []
+    in_body = known | set(ends) | set(whole_funcs or ())
     for c in cmds:
         out += [(r.target, c) for r in c.redirs if r.op in WRITE_OPS or (r.op == ">&" and not re.fullmatch(r"[0-9]+|-", r.target.text))]
         if c.unsure:
@@ -633,7 +754,9 @@ def write_sites(cmd, fragment=False, known=()):
             out.append((None, c))                  # `$CMD x` — 무엇을 실행하는지 모른다
             continue
         # 함수 조회는 래퍼 없이 경로 없는 이름으로 부를 때만이다 — `command touch` · `env touch` · `/usr/bin/touch` 는 외부 명령을 실행한다
-        rule = True if n in funcs and not c.via and "/" not in c.name.text else READ.get(n)
+        after = n in known or (n in ends and runs_at.get(id(c.name), c.name.start) >= ends[n])
+        is_func = n in in_body if c.deferred and n not in WRITE_ARGS else after
+        rule = True if is_func and not c.via and "/" not in c.name.text else READ.get(n)
         if rule is True or (rule is not None and rule(c.args)):
             continue
         ws = _write_targets(n, c.args) if n in WRITE_ARGS and "xargs" not in c.via else None
@@ -1055,7 +1178,7 @@ def on_stop(inp: dict, env, st: dict, pid, off: set, sid: str):
     w = st.get("window")
     turn = st["turns"].get(pid) or {}
     p4 = "P4" not in off and pid in st["prompts"] and w and w.get("promptId") == pid and not w.get("approved")   # 시작을 못 본 prompt = p4_pre 와 같이 무차단
-    fr = "FR" not in off and turn.get("memoryLesson") and not turn.get("registryWrite")
+    fr = "FR" not in off and turn.get("memoryLesson") and not turn.get("registryWrite") and not entry_since(env, turn.get("start"))
     gp = "GP" not in off and turn.get("review") and not turn.get("gpt") and not GPT_MARK.search(lam)
     long_answer = p4 and not w.get("asked") and len(lam) >= LONG_ANSWER
     mode = session_mode(inp.get("transcript_path")) if (p4 or fr or gp) else ""
@@ -1103,6 +1226,8 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
         tok = first_token(inp.get("prompt"))
         if pid and pid not in st["prompts"]:
             st["prompts"].append(pid)
+        if pid:
+            turn_of(st, pid)["start"] = time.time()   # F-518 — FR 이 이 턴에 쓰인 레지스트리 항목을 파일 시각으로 가린다(entry_since)
         if tok.startswith("/") and fz_marker(tok):
             st["fzSession"] = True
         if opens_window(tok):
@@ -1136,7 +1261,7 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
             if "AG" in off or not st["fzSession"]:
                 return None
             kind = ti.get("subagent_type") if isinstance(ti.get("subagent_type"), str) and ti.get("subagent_type") else "general-purpose"
-            if kind.split(":")[-1] in ALLOW_AGENTS or autonomous(env):
+            if kind in ALLOW_AGENTS or autonomous(env):
                 return None
             mode = session_mode(inp.get("transcript_path"))
             if mode == "headless":
@@ -1144,7 +1269,7 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
             if mode == "unknown":
                 return warn_once(st, f"undecided-agent:{pid}", f"{WARN_UNDECIDED} — 실행 모드를 판정하지 못했다 · 에이전트({kind}) 확인을 묻지 않는다")
             return decision("ask", f"fz-guard AG(F-058 · F-119): fz 세션에서 허용 목록 밖 에이전트({kind})를 띄운다. "
-                                   "fz 위임은 Workflow 경유가 규칙이다(native 4종만 예외). 그대로 띄울지 확인한다")
+                                   "fz 위임은 Workflow 경유가 규칙이다(선택 플러그인 에이전트 3종만 예외). 그대로 띄울지 확인한다")
         if p4_tool(name) and "P4" not in off:
             return p4_pre(inp, env, st, ti, pid)
         return None
@@ -1369,6 +1494,13 @@ def self_test() -> int:
     @cell
     def c3():
         case("p4-xcode-write-before-approval-denied", kind(fz("c3").pre("mcp__xcode__XcodeWrite", {"filePath": "/srv/demo/a.swift"})) == "deny")
+
+    @cell
+    def c3b():                                     # 서버 등록명이 xcode 가 아니어도(다른 이름 · 플러그인 접두 · 대문자) 같은 쓰기 도구다
+        s = fz("c3b")
+        got = [kind(s.pre(t, {"filePath": "/srv/demo/a.swift"})) for t in
+               ("mcp__xcodemcp__XcodeWrite", "mcp__plugin_xcode_xcode__XcodeWrite", "mcp__Xcode__XcodeUpdate")]
+        case("p4-xcode-other-server-name-write-denied", got == ["deny"] * 3, got)
 
     @cell
     def c4():
@@ -1948,6 +2080,26 @@ def self_test() -> int:
              got == [(True, ["gates/plan.md"])] * 3 + [(False, [])], got)
 
     @cell
+    def function_order():
+        got = [bash_write(c, "/srv/demo") for c in ("rm -rf build; rm() { echo no; }", "touch x; touch() { :; }", "x=$(touch a); touch() { :; }",
+                                                    "rm() { echo no; }; rm -rf build", "f() { g; }; g() { :; }; f",
+                                                    "touch() { :; }; echo $(touch gates/plan.md)")]
+        case("function-exempt-after-definition-only — 같은 이름 함수 면제는 정의 뒤의 맨 이름 호출만이다: 정의보다 앞선 호출 · 정의 앞 치환 안 호출은 "
+             "외부 명령(쓰기) · 정의 뒤 호출 · 함수 본문 안 쓰기 명령 밖 이름 호출(뒤에 정의된 함수 포함) · 정의 뒤 치환 안 호출은 면제",
+             got == [(True, ["build"]), (True, ["x"]), (True, [])] + [(False, [])] * 3, got)
+
+    @cell
+    def function_body_order():
+        got = [bash_write(c, "/srv/demo") for c in ("f() { rm -rf build; }; f; rm() { :; }", "f() { rm -rf build; }; rm() { :; }; f",
+                                                    "f() { tee build/x; }; f; tee() { :; }", "f() { mkdir -m 700 build/y; }; f; mkdir() { :; }",
+                                                    "rm() { :; }; f() { rm -rf build; }; f", "f() { helper gates/plan.md; }; helper() { :; }; f",
+                                                    "f() { helper gates/plan.md; }; f; helper() { :; }")]
+        case("function-body-write-command-needs-earlier-definition — 함수 본문 안 쓰기 명령(tee · rm · touch · mkdir · cp · mv)은 본문보다 앞의 "
+             "맨 바깥 같은 이름 정의만 면제한다: 뒤 정의(본문이 정의 전에 불리든 뒤에 불리든 · 표 밖 옵션 포함)는 외부 명령(대상 미상 쓰기) · "
+             "앞 정의는 면제 · 쓰기 명령 밖 이름(main · helper 꼴)은 명령 어디의 정의로도 면제",
+             got == [(True, [])] * 4 + [(False, [])] * 3, got)
+
+    @cell
     def r3_s1_r6_003():
         got = [bash_write(c, "/srv/demo") for c in ("env -Cmods touch TKT-123/index.md", "env --chdir=mods touch TKT-123/index.md",
                                                     "touch TKT-123/index.md")]
@@ -2050,9 +2202,20 @@ def self_test() -> int:
     @cell
     def c26():
         s = fz("c26")
-        got = [s.pre("Agent", {"subagent_type": t}) for t in ("pr-review-toolkit:silent-failure-hunter", "deep-research-agent",
+        got = [s.pre("Agent", {"subagent_type": t}) for t in ("pr-review-toolkit:silent-failure-hunter",
                                                               "pr-review-toolkit:code-simplifier", "pr-review-toolkit:type-design-analyzer")]
-        case("agent-native-allowlisted", got == [None] * 4, got)
+        case("agent-native-allowlisted", got == [None] * 3, got)
+
+    @cell
+    def c26b():
+        o = fz("c26b").pre("Agent", {"subagent_type": "deep-research-agent"})
+        case("agent-outside-allowlist-asked", kind(o) == "ask", o)
+
+    @cell
+    def c26c():
+        s = fz("c26c")
+        got = [kind(s.pre("Agent", {"subagent_type": t})) for t in ("silent-failure-hunter", "other:silent-failure-hunter")]
+        case("agent-allowlist-exact-prefixed-name-only", got == ["ask"] * 2, got)
 
     @cell
     def c27():
@@ -2110,6 +2273,121 @@ def self_test() -> int:
         lesson(s)
         active = s.stop(active=True)
         case("stop-hook-active-passes", active is None and blocked(s.stop()), active)
+
+    def reg_root(tag):                              # 디스크에 실제로 있는 레지스트리(FZ_FINDINGS_ROOT)
+        r = tmp / tag / "fz-findings"
+        (r / "entries").mkdir(parents=True)
+        return r
+
+    def turn_start(s):
+        st = load_state(pathlib.Path(s.env["FZ_RUN_STATE"]) / "fz-guard" / f"{s.sid}.json")
+        return (st["turns"].get(s.pid) or {}).get("start")
+
+    @cell
+    def c4_script():
+        r = reg_root("c4a")
+        s = S("c4a", FZ_FINDINGS_ROOT=str(r))
+        s.prompt("분석해줘", "p1")
+        lesson(s)
+        (r / "entries" / "F-601-sample.md").write_text("x\n")   # 스크립트 · Bash 리다이렉트 쓰기 — 쓰기 도구 사건이 없다
+        o = s.stop()
+        case("c4-fr-script-entry-allowed", o is None, o)
+
+    @cell
+    def c4_stale():
+        r = reg_root("c4b")
+        e = r / "entries" / "F-601-sample.md"
+        e.write_text("x\n")
+        old = time.time() - 3600
+        os.utime(e, (old, old))                     # 턴 시작 전부터 있던 항목
+        s = S("c4b", FZ_FINDINGS_ROOT=str(r))
+        s.prompt("분석해줘", "p1")
+        lesson(s)
+        o = s.stop()
+        case("c4-fr-stale-entry-blocked", blocked(o), o)
+
+    @cell
+    def c4_name():
+        r = reg_root("c4c")
+        s = S("c4c", FZ_FINDINGS_ROOT=str(r))
+        s.prompt("분석해줘", "p1")
+        lesson(s)
+        (r / "entries" / "README.md").write_text("x\n")   # 항목 이름(F-NNN….md)이 아닌 파일은 기록이 아니다
+        o = s.stop()
+        case("c4-fr-fresh-non-entry-blocked", blocked(o), o)
+
+    @cell
+    def c4_slack():
+        r = reg_root("c4d")
+        s = S("c4d", FZ_FINDINGS_ROOT=str(r))
+        s.prompt("분석해줘", "p1")
+        lesson(s)
+        e = r / "entries" / "F-601-sample.md"
+        e.write_text("x\n")
+        t0 = turn_start(s)
+        os.utime(e, (t0 - 0.5, t0 - 0.5))           # 초 단위로 잘린 파일 시각 — 턴 시작과 같은 초에 쓴 항목
+        o = s.stop()
+        case("c4-fr-same-second-entry-allowed", o is None, f"{o} start={t0}")
+
+    @cell
+    def c4_root():
+        r = reg_root("c4e")
+        s = S("c4e")                                # FZ_FINDINGS_ROOT 없음 — 레지스트리 위치를 모른다
+        s.prompt("분석해줘", "p1")
+        lesson(s)
+        (r / "entries" / "F-601-sample.md").write_text("x\n")
+        o = s.stop()
+        case("c4-fr-root-unknown-blocked", blocked(o) and not s.err, f"{o} {s.err!r}")
+
+    @cell
+    def c4_noentries():
+        s = S("c4i", FZ_FINDINGS_ROOT=str(tmp / "c4i" / "no-such-registry"))   # 루트는 있으나 entries/ 가 디스크에 없다
+        s.prompt("분석해줘", "p1")
+        lesson(s)
+        o = s.stop()
+        case("c4-fr-entries-missing-blocked", blocked(o) and not s.err, f"{o} {s.err!r}")
+
+    @cell
+    def c4_nostart():
+        r = reg_root("c4f")
+        s = S("c4f", FZ_FINDINGS_ROOT=str(r))
+        s.pid = "p9"                                # UserPromptSubmit 을 못 본 prompt — 턴 시작을 모른다
+        lesson(s)
+        (r / "entries" / "F-601-sample.md").write_text("x\n")
+        o = s.stop()
+        case("c4-fr-turn-start-unknown-blocked", blocked(o) and not s.err, f"{o} {s.err!r}")
+
+    @cell
+    def c4_other():
+        r = reg_root("c4g")
+        a, b = S("c4g", sid="sa", FZ_FINDINGS_ROOT=str(r)), S("c4g", sid="sb", FZ_FINDINGS_ROOT=str(r))
+        a.prompt("분석해줘", "p1")
+        lesson(a)
+        b.prompt("다른 세션", "p1")
+        e = r / "entries" / "F-602-other.md"
+        e.write_text("x\n")
+        b.post("Write", {"file_path": str(e), "content": "x"})
+        o = a.stop()                                # ponytail: 다른 세션이 같은 때 쓴 항목도 이 턴 기록으로 센다(받아들인 거짓 통과)
+        case("c4-fr-other-session-entry-allowed", o is None and b.stop() is None, o)
+
+    @cell
+    def c4_cap():
+        r = reg_root("c4h")
+        (r / "entries" / "F-601-sample.md").write_text("x\n")
+        env, since = {"FZ_FINDINGS_ROOT": str(r)}, time.time() - 60
+        case("c4-fr-scan-capped", entry_since(env, since) and not entry_since(env, since, limit=0))
+
+    @cell
+    def fr_broken_entry():
+        r = reg_root("frb")
+        for name in ("F-001-a.md", "F-002-b.md"):
+            (r / "entries" / name).symlink_to(r / "gone" / name)   # 깨진 링크 — 시각을 읽으면 OSError 다
+        s = S("frb", FZ_FINDINGS_ROOT=str(r))
+        s.prompt("분석해줘", "p1")
+        lesson(s)
+        (r / "entries" / "F-900-fresh.md").write_text("x\n")
+        o = s.stop()
+        case("fr-unreadable-entry-skipped-fresh-entry-allowed", o is None and not s.err, f"{o} {s.err!r}")
 
     @cell
     def c34():

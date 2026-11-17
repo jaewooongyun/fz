@@ -5,19 +5,27 @@
 #   write   only-literal · reverify-literal · set-state-literal · default-literal · only-var-abs(`$L` 같은 명령 대입) ·
 #           only-var-sourced(env 파일이 G · L 을 준다 — 명령 줄에 'gates' · 'plan.md' · 판정기 이름이 없다, F-422) ·
 #           default-var-sourced(플래그 없는 기본 실행 + source) · set-state-cd(`cd …/gates` 뒤 상대명) ·
-#           set-state-abbrev(`--set active` — argparse 축약 = `--set-state`)
+#           set-state-abbrev(`--set active` — argparse 축약 = `--set-state`) ·
+#           deferred-write-before-same-name-func(함수 본문을 같은 이름 함수 정의 전에 불러 본문의 외부 tee 가 쓴다 — 본문에 뒤 함수 호출도 있다) ·
+#           deferred-unknown-option-before-same-name-func(같은 꼴의 표 밖 옵션 `cp -N` — 대상을 못 뽑는 본문 쓰기 명령)
 #           → 원장이 바뀌고 훅이 막는다(exit 2 · 사유에 `미충족 게이트: <원장>`)
 #   read    status-literal · status-only(`--status --only`) · status-only-sourced · discover · cat-args(판정기 이름이 인자로만 지나감) ·
 #           status-abbrev(`--stat` — argparse 축약 = `--status`) ·
 #           source-missing-unrelated(못 읽은 source 뒤 판정기와 무관한 스크립트 — 어휘 밖 옵션) ·
-#           stdin-script-args(`python3 -` 의 stdin 스크립트에 판정기 경로 · 변수를 인자로 넘김 — 판정기 호출이 아니다)
+#           stdin-script-args(`python3 -` 의 stdin 스크립트에 판정기 경로 · 변수를 인자로 넘김 — 판정기 호출이 아니다) ·
+#           deferred-call-later-func(함수 본문 안 호출이 뒤에 정의된 함수를 부른다 — `-guard` 셀은 가드 P4 판정도 읽기인지 본다)
 #           → 원장 불변 · 훅 통과(exit 0 · `다른 세션의 원장(막지 않음): <원장>`)
 #   tilde   tilde-source-owned — `. ~/env.sh`(셀 HOME 에 실재) 뒤 `"$G" --only S1 "$L"` → 소유로 막되 '대상 미상 쓰기' 가 아니다
 #   unknown only-profile-var — 원장 인자가 이 명령 · source 밖(셸 프로필)에서 온 쓰기 → 훅이 '대상 미상 쓰기' 로 전 원장 판정(차단)
 #           only-sourced-gone — source 한 env 파일이 훅 전에 지워진 쓰기(`"$G"` · `"$L"` 를 못 푼다) → 같은 '대상 미상 쓰기'
+#           deferred-call-undefined-unknown — 함수 본문 안 호출의 이름이 명령 어디에도 정의되지 않았다 → 같은 '대상 미상 쓰기'
 #   control control-finalize — `--finalize <원장>` 리터럴(기준 훅도 소유로 본다 — 하네스가 소유를 읽는다는 대조)
 #   pair    own-and-foreign — 한 세션이 원장 A 는 `--only` 로 쓰고 B 는 `--status` 로 읽기만 → A 만 막고 B 는 경고
 #   loop    loop-guard — 소유 원장 미충족은 MAX_BLOCKS(2)회 막고 3회째 루프 방어로 통과(불변)
+#   scope   function-scope-guard-hook-agree — 같은 이름 함수 면제의 셸 범위 표(치환 · 서브셸 · 파이프라인 칸 · `&` 목록 안 정의는 밖 호출에
+#           닿지 않고, 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&` 명령은 앞 정의를 물려받는다)와 함수 본문 안 호출의 정의 순서 표(쓰기 명령은
+#           본문보다 앞의 정의만 · 그 밖 이름은 어디의 정의로도 함수)를 가드 bash_write 와 훅 _bash_write_targets 에 함께 돌려 기대값 · 두 판정의
+#           일치를 본다
 # 기준 트리(4.44.0)는 판정기 쓰기 플래그 · 기본 실행 · 변수 경로 · source 를 쓰기로 보지 않아 write 셀이 '다른 세션의 원장' 으로
 #   통과한다 → exit 1.
 # ⛔ 셀 집합 대조(F-408): 실제로 돈 셀(단언 1개 이상)의 이름 · 횟수가 EXPECTED_CELLS 와 다르면 FAIL — 끝 줄 `CELLS n=<수> ran=<…>`.
@@ -65,10 +73,12 @@ G_LINE = 'G="${FZ_PLUGIN_ROOT}/scripts/gate_check.py"'   # fz-code 6.4 블록과
 FAIL, CHECKS, RAN = [], [], []
 EXPECTED_CELLS = {
     "only-literal": 1, "reverify-literal": 1, "set-state-literal": 1, "default-literal": 1, "only-var-abs": 1,
-    "only-var-sourced": 1, "default-var-sourced": 1, "set-state-cd": 1, "set-state-abbrev": 1,
+    "only-var-sourced": 1, "default-var-sourced": 1, "set-state-cd": 1, "set-state-abbrev": 1, "write-before-same-name-func": 1,
     "status-literal": 1, "status-only": 1, "status-only-sourced": 1, "discover": 1, "cat-args": 1,
     "status-abbrev": 1, "source-missing-unrelated": 1, "stdin-script-args": 1, "tilde-source-owned": 1,
     "only-profile-var": 1, "only-sourced-gone": 1, "control-finalize": 1, "own-and-foreign": 1, "loop-guard": 1,
+    "deferred-call-later-func": 1, "deferred-call-later-func-guard": 1, "deferred-call-undefined-unknown": 1,
+    "deferred-write-before-same-name-func": 1, "deferred-unknown-option-before-same-name-func": 1, "function-scope-guard-hook-agree": 1,
     "for-loop-var": 1, "for-loop-prior-value": 1, "for-loop-body-reassign": 1, "for-loop-break-after-done": 1,
     "for-loop-after-done-use": 1, "for-loop-continue-unknown": 1, "for-loop-nested-unknown": 1, "for-loop-glob-unknown": 1,
     "for-loop-charclass-unknown": 1, "for-loop-brace-unknown": 1, "for-loop-source-reassign": 1, "for-loop-multiword-list-unknown": 1,
@@ -233,6 +243,50 @@ def read_cell(name, make_cmds):
               "읽기는 소유가 아니다(exit 0 · `다른 세션의 원장(막지 않음): <원장>`)", f"rc={rc} {err[-300:]}")
 
 
+def guard_bash_write(cmd, env):
+    """가드 P4 판정 `bash_write(cmd)` 의 repr — 훅이 쓰기 자리를 빌려 오는 그 가드(훅의 GUARD_PATH 와 같은 자리)를 따로 돌린다."""
+    guard = HOOK.resolve().parent.parent / "mods" / "fz-guard" / "hooks" / "guard.py"
+    if not guard.is_file():
+        raise Setup(f"guard.py 없음: {guard}")
+    code = ("import importlib.util, sys\ns = importlib.util.spec_from_file_location('fz_guard_sites', sys.argv[1])\n"
+            "m = importlib.util.module_from_spec(s)\ns.loader.exec_module(m)\nprint(m.bash_write(sys.argv[2]))")
+    try:
+        r = subprocess.run([PY, "-B", "-c", code, str(guard), cmd], capture_output=True, env=env, timeout=120)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise Setup(f"가드 실행 실패: {e}")
+    if r.returncode != 0:
+        raise Setup(f"가드 실행 실패 rc={r.returncode} {r.stderr.decode('utf-8', 'replace')[-200:]}")
+    return r.stdout.decode("utf-8", "replace").strip()
+
+
+def judge_pair(cmds, env):
+    """명령마다 [가드 bash_write, 훅 _bash_write_targets(cwd `/w`)의 대상, 대상 미상 수] — 훅과 그 훅이 쓰기 자리를 빌려 오는 가드를
+    한 프로세스에서 나란히 부른다(훅 실행 없이 두 판정만 견준다)."""
+    guard = HOOK.resolve().parent.parent / "mods" / "fz-guard" / "hooks" / "guard.py"
+    if not guard.is_file():
+        raise Setup(f"guard.py 없음: {guard}")
+    code = ("import importlib.util, json, sys\n"
+            "def load(name, path):\n"
+            "    s = importlib.util.spec_from_file_location(name, path)\n"
+            "    m = importlib.util.module_from_spec(s)\n"
+            "    s.loader.exec_module(m)\n"
+            "    return m\n"
+            "g, h = load('fz_guard_sites', sys.argv[1]), load('gate_stop_hook', sys.argv[2])\n"
+            "rows = []\n"
+            "for c in json.loads(sys.argv[3]):\n"
+            "    unk = []\n"
+            "    rows.append([list(g.bash_write(c)), h._bash_write_targets(c, '/w', unk), len(unk)])\n"
+            "print(json.dumps(rows))")
+    try:
+        r = subprocess.run([PY, "-B", "-c", code, str(guard), str(HOOK), json.dumps(cmds)], capture_output=True, env=env, timeout=120)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise Setup(f"판정 실행 실패: {e}")
+    lines = r.stdout.decode("utf-8", "replace").strip().splitlines()
+    if r.returncode != 0 or not lines:
+        raise Setup(f"판정 실행 실패 rc={r.returncode} {r.stderr.decode('utf-8', 'replace')[-200:]}")
+    return json.loads(lines[-1])
+
+
 try:
     # ── write — 원장을 쓰는 판정기 호출(F-377) ───────────────────────────────────────
     write_cell("only-literal", "finalized", lambda c, L: [f'{G_LINE}\npython3 "$G" --only S1 {L}'])
@@ -245,6 +299,15 @@ try:
     write_cell("set-state-cd", "rfr",
                lambda c, L: [f'cd {L.parent} && python3 "${{FZ_PLUGIN_ROOT}}/scripts/gate_check.py" --set-state active plan.md'])
     write_cell("set-state-abbrev", "rfr", lambda c, L: [f'{G_LINE}\npython3 "$G" --set active {L}'])
+    # 같은 이름 함수 면제는 정의 뒤 호출만이다 — 정의보다 앞선 `tee` 는 외부 명령이고 원장을 실제로 쓴다(뒤의 정의가 그 쓰기를 가리지 않는다)
+    write_cell("write-before-same-name-func", "finalized", lambda c, L: [f"printf '\\n' | tee -a {L} >/dev/null; tee() {{ :; }}"])
+    # 함수 본문이 같은 이름 함수의 정의보다 먼저 불리면 본문의 `tee` 도 외부 명령이다 — 같은 본문의 `g`(뒤에 정의된 함수 · 쓰기 명령 밖
+    #   이름)가 면제를 받아도 본문의 쓰기 명령은 그 면제를 따라가지 않는다
+    write_cell("deferred-write-before-same-name-func", "finalized",
+               lambda c, L: [f"f() {{ g; printf '\\n' | tee -a {L} >/dev/null; }}; g() {{ :; }}; f; tee() {{ :; }}"])
+    # 대상을 못 뽑는 쓰기 명령(표 밖 옵션 `cp -N`)도 같다 — 본문 뒤의 같은 이름 정의는 그 본문 호출을 함수로 만들지 않는다(외부 cp 가 쓴다)
+    write_cell("deferred-unknown-option-before-same-name-func", "finalized",
+               lambda c, L: [f"cat {L} > src.txt; echo >> src.txt; f() {{ cp -N src.txt {L}; }}; f; cp() {{ :; }}"])
 
     # ── read — 읽기 전용 호출은 소유로 승격되지 않는다 ─────────────────────────────────
     read_cell("status-literal", lambda c, L: [f'{G_LINE}\npython3 "$G" --status {L}'])
@@ -259,6 +322,80 @@ try:
     # `python3 -` 는 stdin 의 스크립트를 돌린다 — 뒤의 판정기 경로 · `$T` 는 그 스크립트의 sys.argv 다
     read_cell("stdin-script-args",
               lambda c, L: ["P=/opt/plug; python3 - $P/scripts/gate_check.py $T <<'PY'\nimport sys\nprint(len(sys.argv))\nPY"])
+    # 함수 본문은 불릴 때 돈다 — 본문 안 `g` 는 뒤에 정의된 함수(`:`)라 아무것도 쓰지 않는다. 쓰기 명령 밖 이름이라 맨 바깥 호출과 달리
+    #   글자 순서로 가르지 않는다
+    #   (훅 소유 판정 · 가드 P4 가 같게 읽는다 — `-guard` 셀이 같은 명령의 가드 판정을 본다)
+    later_func = lambda L: f"f() {{ g {L}; }}; g() {{ :; }}; f"  # noqa: E731
+    read_cell("deferred-call-later-func", lambda c, L: [later_func(L)])
+    with Cell("deferred-call-later-func-guard") as c:
+        got = guard_bash_write(later_func(c.cwd / "TICKET-0000" / "gates" / "plan.md"), c.env)
+        check(c.name, got == "(False, [])", "가드도 같은 명령을 읽기로 본다(bash_write → (False, []) — 두 판정이 갈리지 않는다)", got)
+
+    # 같은 이름 함수 면제는 정의가 호출과 같은 셸이나 그 바깥 셸에 있을 때만이다 — `$(…)` · 백틱 · heredoc 본문 치환 · `( … )` 서브셸 ·
+    #   파이프라인 칸 · `&` 목록 안 정의는 밖의 호출에 닿지 않고(괄호가 조각 경계를 넘는 꼴 포함), 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&`
+    #   명령은 앞에서 정의한 함수를 물려받는다. 앞 글자 길이와
+    #   무관하다(`aaa…` 꼴). 명령마다 가드 P4(글자 그대로 · `build` 를 원장 꼴로 바꾼 명령)와 훅 소유 판정(원장 꼴)이 기대값과 같다
+    scope_writes = ["rm -rf build; rm() { :; }",
+                    "echo aaaaaaaaaaaaaaaaaaaaaaaaaa; rm -rf build; echo `rm() { :; }`",
+                    "echo aaaaaaaaaaaaaaaaaaaaaaaaaa; rm -rf build; cat <<EOF\n$(rm() { :; })\nEOF",
+                    'echo "$(rm() { :; })"; rm -rf build',
+                    "echo `rm() { :; }`; rm -rf build",
+                    "(rm() { :; }); rm -rf build",
+                    "x=$(rm() { :; }; rm -rf inner); rm -rf build",
+                    "(echo x; rm() { :; }); rm -rf build",
+                    # 두 명령 이상 파이프라인의 칸 · `&` 로 끝난 목록은 bash 가 서브셸에서 돌린다 — 그 안 정의(묶음 · if · while · for 칸 포함)는
+                    #   밖 호출에 닿지 않는다. 파이프 뒤 줄바꿈은 같은 파이프라인이다
+                    "rm() { :; } | rm -rf build",
+                    "rm() { :; } & wait; rm -rf build",
+                    "{ rm() { :; }; } | cat; rm -rf build",
+                    "if true; then rm() { :; }; fi | cat; rm -rf build",
+                    "cat /dev/null | rm() { :; }; rm -rf build",
+                    "touch() { :; } | cat; touch build",
+                    "tee() { :; } & wait; echo x | tee -a build",
+                    "while true; do rm() { :; }; break; done | cat; rm -rf build",
+                    "for x in a; do rm() { :; }; done | cat; rm -rf build",
+                    "{ rm() { :; } | cat; }; rm -rf build",
+                    "true | { rm() { :; }; }; rm -rf build",
+                    "rm() { :; } && true & wait; rm -rf build",
+                    "cat /dev/null |\nrm() { :; }; rm -rf build",
+                    # 함수 본문 안의 쓰기 명령(tee · rm · touch · mkdir · cp · mv)은 같은 이름 함수가 그 본문보다 앞에 정의됐을 때만 함수다 —
+                    #   본문이 정의 전에 불리면 외부 명령이 쓴다. 정의 뒤에 불리는 꼴(둘째 줄)도 쓰기로 읽는다(보수 판정)
+                    "f() { rm -rf build; }; f; rm() { :; }",
+                    "f() { rm -rf build; }; rm() { :; }; f",
+                    "f() { tee -a build; }; f; tee() { :; }",
+                    "f() { mkdir -m 700 build; }; f; mkdir() { :; }"]
+    scope_reads = ["rm() { :; }; rm -rf build",
+                   "rm() { :; }; (rm -rf build)",
+                   'rm() { :; }; echo "$(rm -rf build)"',
+                   "rm() { :; }; echo `rm -rf build`",
+                   "rm() { :; }; echo aaaaaaaaaaaaaaaaaaaaaaaaaaaa; echo `rm -rf build`",
+                   "rm() { :; }; cat <<EOF\n$(rm -rf build)\nEOF",
+                   # `&&` · `||` 목록의 한 명령 · 맨 바깥 묶음 · if 는 지금 셸에서 돈다 — 앞의 맨 바깥 정의는 뒤 파이프라인 칸 · `&` 명령이 물려받는다
+                   "rm() { :; } && rm -rf build",
+                   "rm() { :; } || true; rm -rf build",
+                   "true && rm() { :; }; rm -rf build",
+                   "rm() { :; } && true | cat; rm -rf build",
+                   "rm() { :; } &&\nrm -rf build",
+                   "{ rm() { :; }; }; rm -rf build",
+                   "if true; then rm() { :; }; fi; rm -rf build",
+                   "rm() { :; }; rm -rf build | cat",
+                   "rm() { :; }; rm -rf build & wait",
+                   "rm() { :; }; { rm -rf build; } | cat",
+                   "tee() { :; }; echo x | tee -a build",
+                   # 본문보다 앞에 정의된 같은 이름 함수는 본문 안 쓰기 명령도 면제한다 · 쓰기 명령 표 밖 이름의 본문 안 호출은 명령 어디의
+                   #   정의로도 면제된다(main · helper 꼴 — 정의 순서와 무관)
+                   "rm() { :; }; f() { rm -rf build; }; f",
+                   "f() { helper build; }; helper() { :; }; f",
+                   "f() { helper build; }; f; helper() { :; }"]
+    with Cell("function-scope-guard-hook-agree") as c:
+        rows = [(cmd, True) for cmd in scope_writes] + [(cmd, False) for cmd in scope_reads]
+        got = judge_pair([cmd for cmd, _ in rows] + [cmd.replace("build", "gates/plan.md") for cmd, _ in rows], c.env)
+        for k, (cmd, want) in enumerate(rows):
+            lit, (led, targets, unk) = got[k][0], got[len(rows) + k]
+            hook = bool(targets) or unk > 0
+            ok = lit[0] == want and led[0] == want and hook == want and (want or (lit == [False, []] and led == [False, []]))
+            check(c.name, ok, f"{'쓰기' if want else '쓰기 아님'} — 가드 · 훅 같은 판정: {cmd!r}",
+                  f"가드={lit} · 가드(원장 꼴)={led} · 훅 대상={targets} · 대상 미상={unk}")
 
     # ── tilde — `~` 로 source 한 env 파일이 실재하면 그 대입으로 푼다(소유 · '대상 미상' 아님) ───────────
     with Cell("tilde-source-owned") as c:
@@ -300,6 +437,17 @@ try:
         r = reason or ""
         check(c.name, rc == 2 and "대상 미상 쓰기" in r and f"미충족 게이트: {led} — " in r,
               "source 한 파일이 사라져 못 푼 쓰기도 '다른 세션의 원장' 이 아니다 — '대상 미상 쓰기' · 차단", f"rc={rc} {err[-300:]}")
+
+    # 본문 안 호출이라도 명령 어디에도 정의되지 않은 이름은 읽기 표 밖 명령이다 — 무엇을 쓰는지 모른다(fail-closed 그대로)
+    with Cell("deferred-call-undefined-unknown") as c:
+        led = c.ledger()
+        before = sha(led)
+        c.run(f"f() {{ nosuchcmd {led}; }}; f")
+        check(c.name, sha(led) == before, "명령이 원장을 쓰지 않는다(없는 명령 — 훅은 그 이름이 무엇을 하는지 모른다)", "")
+        rc, reason, err = c.hook()
+        r = reason or ""
+        check(c.name, rc == 2 and "대상 미상 쓰기" in r and f"미충족 게이트: {led} — " in r,
+              "정의 없는 이름의 본문 호출은 이름 미상 쓰기다 — '대상 미상 쓰기' · 차단", f"rc={rc} {err[-300:]}")
 
     # ── control — 기준 훅도 소유로 보는 꼴(하네스가 소유를 읽는다는 대조) ─────────────────────
     with Cell("control-finalize") as c:
