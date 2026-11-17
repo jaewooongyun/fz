@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
-"""check_unrun_except.py — 넓은 except 가 UNRUN(측정 실패 · exit 2)을 내면 사유를 적게 한다.
+"""check_unrun_except.py — 넓은 except 가 UNRUN(측정 실패 · exit 2)이나 성공 꼴 값을 내면 사유를 적게 한다.
 
 왜: `except Exception` 은 결함(파싱 버그 · 오타 · 내용 이상)까지 삼킨다. 그 본문이 UNRUN 을 내면 위반이어야 할 결과가
 '판정 불가' 로 바뀌어 고칠 대상이 가려진다(F-396 — 내용 이상 셋이 UNRUN 으로 새고 있었다). 환경 실패(모듈 적재 ·
-실행기 예외)처럼 넓게 잡는 것이 맞는 자리도 있으므로 금지하지 않는다 — 그 자리에 사유를 적게 한다.
+실행기 예외)처럼 넓게 잡는 것이 맞는 자리도 있으므로 금지하지 않는다 — 그 자리에 사유를 적게 한다. 본문이 성공 꼴 값
+하나(`pass` · `return {}` …)뿐이어도 같다 — 결함이 '통과' 로 바뀌어 아무 줄도 남지 않는다.
 
 판정: 대상 파일의 except 절 중
   ① 넓다      — 맨 `except:` · `Exception` · `BaseException` (튜플 안에 있어도)
-  ② UNRUN 을 낸다 — 본문에 `return UNRUN|2` · `sys.exit/exit/os._exit/SystemExit(UNRUN|2)` · 'UNRUN' 을 담은 문자열
+  ② 덮는다   — 둘 중 하나
+     ②a UNRUN 을 낸다 — 본문에 `return UNRUN|2` · `sys.exit/exit/os._exit/SystemExit(UNRUN|2)` · 'UNRUN' 을 담은 문자열
+     ②b 성공 꼴 하나로 끝난다 — 본문이 한 문장이고 그것이 `pass` · `continue` · 맨 `return` ·
+        `return None|True|0|{}|[]|()|set()|dict()|list()` · 상수만 쓴 식 문장(`...` · 문자열)이다
   ③ 사유가 없다 — except 줄 주석에 `noqa: BLE001 — <사유>` 가 없다(표시만 있고 사유가 없으면 위반)
 셋이 겹치면 위반이다. 좁은 except · 실패(FAIL)로 남기는 넓은 except 는 보지 않는다.
+②b 는 본문이 두 문장 이상이면 보지 않는다 — 정리 뒤 다시 던지는 꼴(`fh.close(); raise`) · 실패를 모은 뒤 계속하는
+꼴(`fails.append(e); continue`)은 결함을 삼키지 않는다. `False` · `1` · 메시지를 담은 튜플(`return {}, "실행 실패…"`)은
+실패를 알리는 값이라 성공 꼴이 아니다.
+한계: 핸들러 본문의 문장만 본다 — 값을 넣어 두고 핸들러 밖에서 돌려주는 꼴(`code = OK` 뒤 아래의 `return code`)과
+성공 값을 담은 이름(`return OK`)은 잡지 않는다.
 
 대상: scripts/*.py · skills/*/scripts/*.py · mods/*/hooks/*.py (tests/fixtures 는 일부러 결함을 담으므로 뺀다)
 
@@ -34,6 +43,7 @@ GLOBS = ("scripts/*.py", "skills/*/scripts/*.py", "mods/*/hooks/*.py")
 MIN_FILES = 40      # 실측 90여 개 — 순회가 죽어 '위반 0' 으로 통과하는 것을 막는 하한
 BROAD = {"Exception", "BaseException"}
 EXIT_FUNCS = {"exit", "_exit", "SystemExit"}
+EMPTY_CALLS = {"dict", "list", "set"}
 REASON_RE = re.compile(r"#.*noqa:\s*BLE001\s*(?:—|--|-|:)\s*\S")
 
 
@@ -65,6 +75,29 @@ def _yields_unrun(handler: ast.ExceptHandler) -> bool:
     return False
 
 
+def _is_success_value(v) -> bool:
+    """맨 return · None · True · 0 · 빈 컨테이너. ⛔ False(== 0)는 실패를 알리는 값이라 빼고, 인자가 있는 호출은 빈 것이 아니다."""
+    if v is None:
+        return True
+    if isinstance(v, ast.Constant):
+        return v.value is None or v.value is True or (type(v.value) is int and v.value == 0)
+    if isinstance(v, (ast.Dict, ast.List, ast.Tuple)):
+        return not (v.keys if isinstance(v, ast.Dict) else v.elts)
+    if isinstance(v, ast.Call):
+        return isinstance(v.func, ast.Name) and v.func.id in EMPTY_CALLS and not v.args and not v.keywords
+    return False
+
+
+def _success_shaped(handler: ast.ExceptHandler) -> bool:
+    """본문이 성공 꼴 한 문장뿐이다. ⛔ 두 문장 이상(정리 뒤 raise · 실패를 모은 뒤 continue/return)은 보지 않는다."""
+    if len(handler.body) != 1:
+        return False
+    s = handler.body[-1]
+    if isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant):
+        return True   # `...` · 문자열 같은 상수 식 문장은 pass 처럼 아무것도 하지 않는다
+    return isinstance(s, (ast.Pass, ast.Continue)) or (isinstance(s, ast.Return) and _is_success_value(s.value))
+
+
 def scan_source(src: str, rel: str):
     """(넓은 except 수, 위반 목록). ⛔ 파싱 실패는 SyntaxError 로 올린다 — 호출자가 UNRUN 으로 낸다."""
     tree = ast.parse(src, filename=rel)
@@ -74,13 +107,20 @@ def scan_source(src: str, rel: str):
         if not isinstance(node, ast.ExceptHandler) or not _is_broad(node.type):
             continue
         broad += 1
-        if not _yields_unrun(node):
+        if _yields_unrun(node):
+            what = "UNRUN 을 낸다 — 내용 이상까지 '판정 불가' 로 덮는다"
+            tag = " (F-396)"
+        elif _success_shaped(node):
+            seg = ast.get_source_segment(src, node.body[-1]) or type(node.body[-1]).__name__
+            what = f"성공 꼴 `{seg}` 하나로 끝난다 — 결함까지 '통과' 로 덮는다"
+            tag = ""
+        else:
             continue
         line = lines[node.lineno - 1] if node.lineno <= len(lines) else ""
         if REASON_RE.search(line):
             continue
-        hits.append(f"{rel}:{node.lineno}: 넓은 except 가 UNRUN 을 낸다 — 내용 이상까지 '판정 불가' 로 덮는다. "
-                    f"좁히거나 except 줄에 `# noqa: BLE001 — <왜 넓게 잡는가>` 를 적는다 (F-396)")
+        hits.append(f"{rel}:{node.lineno}: 넓은 except 가 {what}. "
+                    f"좁히거나 except 줄에 `# noqa: BLE001 — <왜 넓게 잡는가>` 를 적는다{tag}")
     return broad, hits
 
 
@@ -131,6 +171,32 @@ def self_test() -> int:
         ("bare-except-exit2-flagged", "except:", "sys.exit(2)", 1),
         ("tuple-with-exception-flagged", "except (ValueError, Exception):", "raise SystemExit(UNRUN)", 1),
         ("return-1-not-unrun", "except Exception:", "return 1", 0),
+        # 성공 꼴 축 — 본문이 성공 꼴 한 문장뿐이면 결함까지 '통과' 로 덮인다
+        ("success-return-empty-dict-flagged", "except Exception:", "return {}", 1),
+        ("success-pass-flagged", "except Exception:", "pass", 1),
+        ("success-continue-flagged", "except Exception:", "continue", 1),
+        ("success-return-none-marker-only-flagged", "except Exception:  # noqa: BLE001", "return None", 1),
+        ("success-bare-return-flagged", "except BaseException:", "return", 1),
+        ("success-return-true-flagged", "except Exception:", "return True", 1),
+        ("success-return-0-flagged", "except Exception:", "return 0", 1),
+        ("success-return-empty-list-flagged", "except:", "return []", 1),
+        ("success-return-empty-tuple-flagged", "except (ValueError, Exception):", "return ()", 1),
+        ("success-return-set-call-flagged", "except Exception:", "return set()", 1),
+        ("success-return-dict-call-flagged", "except Exception:", "return dict()", 1),
+        ("success-return-list-call-flagged", "except Exception:", "return list()", 1),
+        ("success-ellipsis-flagged", "except Exception:", "...", 1),
+        ("success-string-flagged", "except Exception:", '"""swallow"""', 1),
+        ("success-constant-expr-reason-allowed", "except Exception:  # noqa: BLE001 — 선택 기능이라 실패는 건너뛴다", "...", 0),
+        ("constant-then-raise-ignored", "except Exception:", '"note"; raise', 0),
+        ("success-reason-allowed", "except Exception:  # noqa: BLE001 — 탐색 실패는 통과다", "return None", 0),
+        ("success-narrow-except-ignored", "except (OSError, ValueError):", "pass", 0),
+        ("cleanup-reraise-ignored", "except Exception:", "fh.close(); raise", 0),
+        ("collect-then-continue-ignored", "except Exception as e:", "fails.append(e); continue", 0),
+        ("collect-then-return-ignored", "except Exception as e:", "fails.append(e); return", 0),
+        ("return-false-not-success", "except Exception:", "return False", 0),
+        ("return-message-tuple-not-success", "except Exception as e:", 'return {}, f"실행 실패: {e}"', 0),
+        ("return-nonempty-dict-not-success", "except Exception:", 'return {"k": 1}', 0),
+        ("return-call-with-args-not-success", "except Exception:", "return list(items)", 0),
     ]
     for name, exc, act, want in cases:
         try:
@@ -141,6 +207,16 @@ def self_test() -> int:
                 fails.append(f"{name}: 위반 {len(hits)} (기대 {want}) {hits[:1]}")
         except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게 그 케이스의 FAIL 로 남긴다
             fails.append(f"{name}: 예외 {type(e).__name__}: {e}")
+
+    # 축별 메시지 — 성공 꼴 위반은 UNRUN 문구가 아니라 돌려준 값과 '통과' 로 읽힌다는 문구를 낸다
+    try:
+        _, hits = scan_source(body.format(exc="except Exception:", act="return {}"), "x.py")
+        if len(hits) == 1 and "성공 꼴" in hits[0] and "`return {}`" in hits[0] and "UNRUN" not in hits[0]:
+            ok("success-axis-message")
+        else:
+            fails.append(f"success-axis-message: {hits}")
+    except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게 그 케이스의 FAIL 로 남긴다
+        fails.append(f"success-axis-message: 예외 {type(e).__name__}: {e}")
 
     # 트리 수준 — 하한 미만 = UNRUN · 파싱 실패 = UNRUN · 위반 파일 하나 = VIOLATION
     def tree(files: dict, min_files: int, want: int, name: str):
@@ -165,6 +241,8 @@ def self_test() -> int:
     tree({"scripts/a.py": "def f(:\n"}, 1, UNRUN, "syntax-error-unrun")
     tree({"scripts/a.py": "x = 1\n", "skills/s/scripts/b.py": bad}, 2, VIOLATION, "skill-script-scanned")
     tree({"scripts/a.py": "x = 1\n", "tests/fixtures/c.py": bad}, 1, OK, "fixtures-excluded")
+    tree({"scripts/a.py": "x = 1\n", "mods/m/hooks/b.py": body.format(exc="except Exception:", act="return {}")}, 2, VIOLATION,
+         "success-shaped-tree-violation")
 
     for f in fails:
         print(f"  FAIL {f}")

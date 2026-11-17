@@ -33,12 +33,12 @@ ROOT = Path(__file__).resolve().parent.parent   # scripts/ → 플러그인 루�
 # ─────────────────────────────────────────────────────────────────────────────
 ITEMS = [
     # id,   판정자,          대상,        설명
-    ("1",  "DETERMINISTIC", "fz-*",      "YAML 필수 필드 (L1 공식 4 + L2 fz 정책 2) — 정본 modules/governance.md §스킬 최소 기준"),
+    ("1",  "DETERMINISTIC", "fz-*",      "YAML 필수 필드 (L1 공식 3 + L1 fz 정책 1 + L2 fz 정책 2) — 정본 modules/governance.md §스킬 최소 기준"),
     ("2",  "SEMANTIC",      "fz-*",      "MCP 유효성 — allowed-tools의 MCP 도구 실존 (서버 상태 의존)"),
     ("3",  "DETERMINISTIC", "fz-*",      "provides/needs 충족 + DAG 사이클 부재"),
     ("4",  "DETERMINISTIC", "fz-*",      "intent-triggers 겹침 · 누수 — 합성 corpus(tests/fixtures/routing/intent-corpus/cases.tsv)의 필수 · 금지 라벨을 scripts/intent_route_probe.py 로 판정(F-528 — 임계를 문장 단언으로 정했다)"),
     ("5",  "DETERMINISTIC", "fz-*",      "SKILL.md ≤500줄"),
-    ("6",  "DETERMINISTIC", "all",       "깨진 파일 참조"),
+    ("6",  "DETERMINISTIC", "all",       "깨진 파일 참조 — 백틱 경로(.md · .js · .py) + 비백틱 경로(.md 의 표 칸 · 산문 · 코드블록 — .py/.js 문자열은 범위 밖) + 루트 변수 경로(.md — `${FZ_PLUGIN_ROOT}/경로` · `$PLUGIN_ROOT/경로`, 중괄호 유무 무관 · 저장소 루트 기준만 · 다른 변수는 보지 않는다) · `skills/<이름>/` 안 파일은 루트에서 못 찾으면 그 스킬 폴더 기준으로도 푼다 · Markdown 링크 목적지는 #N15 소관(두 번 세지 않는다)"),
     ("7",  "DETERMINISTIC", "agents",    "에이전트 파일 필드 (name/description/model/tools)"),
     ("8",  "SEMANTIC",      "agents",    "Team 불가 MCP 참조 — 판정에 런타임 지식 필요"),
     ("9",  "SEMANTIC",      "fz-*",      "테스트 케이스 충분성 — 존재는 세지만 충분성은 의미 판단"),
@@ -74,6 +74,7 @@ ITEMS = [
     ("N13", "DETERMINISTIC", "agents",   "memory 필드 재도입 금지 — `agents/`(memory-curator 제외)·`templates/` 에 `^memory:` 0 (A2-01·AC-7: 필드가 Read/Write/Edit 를 자동 부여해 Workflow 에이전트의 쓰기 없음 계약과 충돌하고, 세션 간 기록이 A/B 입력을 오염시킨다. guides 의 기능 설명 예시는 범위 밖)"),
     ("N9", "DETERMINISTIC", "all",       "cross-file 섹션 앵커 — `` `X.md` §N `` 의 대상 문서에 해당 번호 heading 실재 (⛔ 범위 외: 파일명 없는 `§N` — 대상 특정 불가, 실측 오탐 36%)"),
     ("N14", "DETERMINISTIC", "all",      "빈 mktemp 치환 cd — 실행 코드(.sh·.py·.js)의 `cd`/`pushd` 인자가 `$(mktemp …)` 치환 0 (F-355: mktemp 가 실패하면 `cd \"\"` 가 성공해 현재 폴더가 임시 폴더가 되고 정리가 그 폴더를 지운다. ⛔ 범위 외: 주석·`.sh` 따옴표 구분자 heredoc 본문·`.md` 의 BAD 예시 — 설명이다 · 결과를 확인 없이 변수로 받은 뒤 `cd \"$d\"` 하는 두 줄 꼴)"),
+    ("N15", "DETERMINISTIC", "all",      "상대 Markdown 링크 · 앵커 해소 — `](경로#조각)` 의 경로는 **그 문서 폴더 기준**으로 실재(파일시스템)를 보고, `#조각` 은 대상 문서(조각만 있으면 그 문서)의 heading slug(#N8 규칙 + H1)에서 찾는다. 펜스 · 인라인 코드 스팬 · URL 은 뺀다. 꺾쇠 목적지 `<…>` 는 벗겨서 판정한다. 소관: 목차 블록의 같은 파일 앵커는 #N8 · 링크 목적지 밖의 경로 표기는 #6 (⛔ 범위 외 — 건너뛴다: 참조형 링크 · HTML 앵커 · .md 아닌 대상의 조각 · `%` 가 든 목적지 · `/` 로 시작하는 목적지)"),
 ]
 DET = {i for i, k, _, _ in ITEMS if k == "DETERMINISTIC"}
 
@@ -94,7 +95,7 @@ MIN_HITS = {
     "3": 15,     # 동일
     "4": 10,     # 합성 corpus 16문장
     "5": 15,     # 동일
-    "6": 300,    # 참조 564건 — 절반 수준
+    "6": 300,    # 참조 실측 1809건(백틱 1430 · 비백틱 .md 248 · 루트 변수 .md 131 — README 의 링크 목적지 9건은 #N15 소관) — 하한 300 은 보수적으로 유지
     "7": 10,     # 에이전트 13개
     "14": 20,    # 목차 보유 모듈 30개
     "16": 10,    # 에이전트 13개
@@ -125,6 +126,7 @@ MIN_HITS = {
                  #   ⛔ 121은 도입 판정 프로브(5개 디렉토리 한정) 값이니 하한 근거로 쓰지 말 것
     "N14": 70,   # 실행 코드의 `cd`/`pushd` 줄 **실측 147**(2026-10-08 · .sh 139 · .py 8 · .js 0 — 자기 파일 제외 · 지금 값은 `--only N14` 의 검사 대상) — 절반 이하로 보수적. 하한은 순회·확장자 집합
                  #   붕괴를 잡는다 — 주석·heredoc 과잉 제거(fail-open)는 하한 위에서도 남으므로 self-test·통합 fixture 가 잡는다
+    "N15": 10,   # 링크 **실측 30**(파일 링크 18 · 목차 밖 같은 파일 앵커 12 — #N8 소관으로 건너뛴 목차 앵커 275건은 세지 않는다) — 보수적으로 10
 }
 
 
@@ -170,7 +172,7 @@ def frontmatter(p: Path):
        (조회는 `fm_get()` 경유 — S7 에서 최상위 폴백 회수). 표준 들여쓰기는 **2-스페이스**이고
        [실측 272/272], `^ {2,}` 는 더 깊은 `key:` 줄도 1단계로 받아 폭 차이에 깨지지 않는다.
     ⛔ 분기는 **`metadata` 블록 안에서만** 갈린다 — 그 밖의 연속행 접기는 종전과 같은 경로를
-       탄다(REQ_L1·에이전트 frontmatter·#N* 검사의 입력 불변).
+       탄다(REQ_L1·REQ_L1_FZ·에이전트 frontmatter·#N* 검사의 입력 불변).
     """
     lines = read(p).split("\n")
     if not lines or lines[0].strip() != "---":
@@ -205,7 +207,7 @@ def fm_get(fm: dict, key: str, default=None):
     ⛔ 최상위 폴백을 지웠다: L2 fz 정책 키(`provides`·`needs`·`intent-triggers`)의 정본
        위치는 `metadata:` 하위 하나뿐이며, 최상위에 남은 키는 #1 에서 누락으로 잡힌다.
        정본 선언 = `modules/governance.md` § 스킬 최소 기준.
-    ⛔ L1 공식 4키는 이 함수를 거치지 않는다 — `chk_1` 이 `fm` 최상위를 직접 본다.
+    ⛔ L1 최상위 4키(공식 3 + fz 정책 `allowed-tools`)는 이 함수를 거치지 않는다 — `chk_1` 이 `fm` 최상위를 직접 본다.
     """
     return fm.get(NESTED_KEY, {}).get(key, default)
 
@@ -271,7 +273,8 @@ SCRIPTS = sorted(p for p in (ROOT / "scripts").glob("*") if p.is_file())
 # 검사 구현 — 각 함수는 (violations, positive_control_hits) 반환
 #   positive_control_hits: 검사기가 실제로 무언가를 봤다는 증거 (0이면 도구 고장 의심)
 # ─────────────────────────────────────────────────────────────────────────────
-REQ_L1 = ("name", "description", "user-invocable", "allowed-tools")
+REQ_L1 = ("name", "description", "user-invocable")
+REQ_L1_FZ = ("allowed-tools",)   # 최상위 키지만 공식 사양에서는 선택 — fz 정책으로 필수다(정본 modules/governance.md § 스킬 최소 기준)
 REQ_L2 = ("provides", "needs")
 
 
@@ -283,7 +286,7 @@ def chk_1():
         if fm is None:
             raise ParseError(f"skills/{name}/SKILL.md: frontmatter 파싱 실패")
         seen += 1
-        miss = ([f for f in REQ_L1 if f not in fm]
+        miss = ([f for f in REQ_L1 + REQ_L1_FZ if f not in fm]
                 + [f for f in REQ_L2 if fm_get(fm, f) is None])   # ⛔ L2 는 `metadata:` 하위**만** (S7 창 회수)
         if miss:
             v.append(f"skills/{name}/SKILL.md: 필수 필드 누락 {miss}")
@@ -355,10 +358,21 @@ def chk_5():
     return v, seen
 
 
-PATHREF = re.compile(
-    r"`((?:guides|modules|skills|workflows|agents|scripts|schemas|examples|templates|gpt-skills)"
-    r"/[A-Za-z0-9_./\-]+\.(?:md|js|py|sh|json))`"
-)
+_REF_PATH = (r"((?:guides|modules|skills|workflows|agents|scripts|schemas|examples|templates|gpt-skills)"
+             r"/[A-Za-z0-9_./\-]+\.(?:md|js|py|sh|json))")
+PATHREF = re.compile(r"`" + _REF_PATH + r"`")
+# 비백틱 경로 — **.md 전용**(표 칸 · 산문 · 코드블록). .py/.js 는 백틱만 본다: 문자열 리터럴의 예시 경로가
+#   깨진 참조 142건으로 걸린다(이 검사를 넣을 때의 실측 — self-test · fixture 의 합성 경로). .md 의 비백틱 적중은 256건 중 깨진 것 1건(REF_ALLOW 의 fixture 경로)이었다.
+# 앞 경계: 낱말 글자 · 백틱(백틱 경로는 PATHREF 몫 — 두 번 세지 않는다) · `/`(상대 · URL 경로의 꼬리) · `.` · `-` · `$` · `}`
+# 뒤 경계: 낱말 글자 · `-` · 이어지는 확장자(`.` + 영숫자 — `hooks.json.example` 이 `hooks.json` 으로 잘리지 않게)
+# ⛔ 낱말 글자는 ASCII 로 둔다 — `\w` 는 한글을 포함해 `modules/x.md의` 처럼 조사가 붙은 참조를 놓친다(현 트리 1건 실측)
+_REF_TAIL = r"(?![A-Za-z0-9_\-]|\.[A-Za-z0-9])"
+PATHREF_BARE = re.compile(r"(?<![A-Za-z0-9_`/.\-$}])" + _REF_PATH + _REF_TAIL)
+# 루트 변수 경로 — **.md 전용** · `"${FZ_PLUGIN_ROOT}/scripts/x.sh"` · `"$PLUGIN_ROOT/scripts/x.py"`(중괄호 유무 무관). 코드블록의 정규
+#   표기인데 앞 경계(`/`)가 막아 PATHREF_BARE 는 이 꼴을 보지 않는다. 변수는 이 트리가 플러그인 루트(= 저장소 루트)로 쓰는 두 이름뿐이다 —
+#   아무 `$X/` 나 받지 않는다(GPT CLI 홈 · mod 의 `${CLAUDE_PLUGIN_ROOT}` 는 저장소 루트가 아니고, `$R` 같은 한 글자 이름은 스니펫마다
+#   뜻이 다르다). 저장소 루트를 못 박은 표기라 스킬 폴더 기준으로 다시 풀지 않는다. 뒤 경계(_REF_TAIL)는 PATHREF_BARE 와 같다
+PATHREF_ROOT = re.compile(r"\$(?:\{(?:FZ_)?PLUGIN_ROOT\}|(?:FZ_)?PLUGIN_ROOT)/" + _REF_PATH + _REF_TAIL)
 # 의도된 플레이스홀더·예시 (본 감사에서 FP로 판정된 것 — 근거는 plan/plan-final.md S9)
 REF_ALLOW = {
     "modules/X.md", "templates/X.md",
@@ -366,20 +380,41 @@ REF_ALLOW = {
     "modules/scope-drift-monitor.md",     # 기각된 제안 기록 (docs/design — "옵션 B 채택, §4.4에 흡수")
     "scripts/check_patterns.sh",          # skill-authoring §11 표의 예시
     "scripts/parse_build_log.sh",         # 동
+    "scripts/foo.py",                     # 게이트 fixture(tests/fixtures/gates/affected)의 합성 경로 — 기대 출력이 이 글자를 단정한다
 }
 
 
-def chk_6():
-    existing = {rel for rel, _ in walk_files()}
+def chk_6(root: Path | None = None):
+    """깨진 파일 참조. 백틱 경로는 .md · .js · .py 전부, 비백틱 경로 · 루트 변수 경로는 .md 만 본다(PATHREF_BARE · PATHREF_ROOT 주석).
+
+    `skills/<이름>/` 안 파일의 경로는 저장소 루트에서 못 찾으면 그 스킬 폴더 기준으로 한 번 더 푼다
+    (스킬 문서는 자기 `scripts/` · `templates/` 를 스킬 폴더 기준으로 적는다 — 현 트리 비백틱 3건이 이 기준으로만 풀린다).
+    루트 변수 경로(`${FZ_PLUGIN_ROOT}/…`)는 저장소 루트로만 푼다.
+    ⛔ Markdown 링크 목적지(펜스 · 코드 스팬 밖 — md_links)는 #N15 소관이라 그 열의 적중은 건너뛴다. 링크는 문서 폴더 기준으로
+       풀어야 하고, 두 검사가 같은 깨진 목적지를 각자 보고하면 한 위반이 두 줄이 된다.
+    """
+    existing = {rel for rel, _ in walk_files(root=root)}
     v, seen = [], 0
-    for rel, p in walk_files(".md", ".js", ".py"):
+    for rel, p in walk_files(".md", ".js", ".py", root=root):
         if rel == "CHANGELOG.md":
             continue
-        for i, line in enumerate(read(p).split("\n"), 1):
-            for m in PATHREF.finditer(line):
-                seen += 1
-                t = m.group(1)
-                if t not in existing and t not in REF_ALLOW:
+        parts = rel.split("/")
+        skill = f"skills/{parts[1]}/" if len(parts) > 2 and parts[0] == "skills" else None
+        pats = (PATHREF, PATHREF_BARE, PATHREF_ROOT) if rel.endswith(".md") else (PATHREF,)
+        txt = read(p)
+        links = defaultdict(list)
+        if rel.endswith(".md"):
+            for li, _, s, e, _ in md_links(txt):
+                links[li].append((s, e))
+        for i, line in enumerate(txt.split("\n"), 1):
+            for pat in pats:
+                for m in pat.finditer(line):
+                    if any(s <= m.start() < e for s, e in links.get(i, ())):
+                        continue                          # 링크 목적지 — #N15 소관
+                    seen += 1
+                    t = m.group(1)
+                    if t in existing or t in REF_ALLOW or (skill and pat is not PATHREF_ROOT and skill + t in existing):
+                        continue
                     v.append(f"{rel}:{i}: 깨진 참조 `{t}`")
     return v, seen
 
@@ -802,11 +837,12 @@ def gh_slug(heading: str) -> str:
     return GH_STRIP.sub("", heading.strip().lower()).replace(" ", "-")
 
 
-def iter_headings(txt: str):
+def iter_headings(txt: str, h1: bool = False):
     """fenced 코드 블록 **밖**의 heading 텍스트만 순서대로 낸다.
 
     ⛔ 신설 근거: 1차 구현은 fence 안의 `## …` 도 heading으로 셌다 — 목차가 실재하지 않는
        앵커를 가리켜도 '해소됨'으로 보일 수 있었다 (외부 감사 ISSUE-007).
+    `h1` — ATX `# …` 도 낸다(#N15: 링크는 문서 제목도 가리킨다). 기본값(#N8 목차)은 `##` 이상만 본다.
     """
     fence: str | None = None
     prev: str | None = None
@@ -824,8 +860,8 @@ def iter_headings(txt: str):
             if m and m.group(2)[0] == fence[0] and len(m.group(2)) >= len(fence):
                 fence = None
             continue
-        h = re.match(r"^ {0,3}(#{2,6})\s+(.*?)\s*$", line)
-        if h:
+        h = re.match(r"^ {0,3}(#{1,6})\s+(.*?)\s*$", line)
+        if h and (h1 or len(h.group(1)) > 1):
             # ⛔ ATX 닫는 해시 제거 — `## Foo ##` 의 GitHub slug 는 `foo` 다 (ISSUE-004)
             yield re.sub(r"\s+#+\s*$", "", h.group(2))
             prev = None
@@ -841,8 +877,8 @@ def iter_headings(txt: str):
         prev = line if PARAGRAPH_LINE.match(line) else None
 
 
-def gh_anchors(txt: str) -> dict:
-    """slug → heading. 중복은 **github-slugger의 occupied-slug 루프**를 따른다.
+def gh_anchors(txt: str, h1: bool = False) -> dict:
+    """slug → heading. 중복은 **github-slugger의 occupied-slug 루프**를 따른다. `h1` 은 iter_headings 로 넘긴다.
 
     ⛔ 1차 구현은 `slug-N` 을 만들고 그것이 이미 점유됐는지 확인하지 않아 덮어썼다:
        `Foo`/`Foo`/`Foo-1` → foo, foo-1 (2개) — GitHub는 foo, foo-1, **foo-1-1** (3개).
@@ -850,7 +886,7 @@ def gh_anchors(txt: str) -> dict:
     """
     out: dict[str, str] = {}
     counts: dict[str, int] = {}
-    for heading in iter_headings(txt):
+    for heading in iter_headings(txt, h1):
         base = gh_slug(heading)
         slug = base
         if slug in out:
@@ -884,6 +920,102 @@ def chk_N8(root: Path | None = None):
             seen += 1
             if m.group(1) not in valid:
                 v.append(f"{rel}: 목차 앵커 `#{m.group(1)}` 가 어떤 heading으로도 해소되지 않는다")
+    return v, seen
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #N15 상대 Markdown 링크 · 앵커 해소
+#
+# ⛔ 신설 근거: #6 은 경로 표기(백틱 · 비백틱)만, #N8 은 '## 목차' 블록의 `](#…)` 만 본다. 일반 링크 `](경로#조각)` 와
+#    목차 밖 본문 앵커 · 다른 파일의 조각은 어떤 검사도 해소를 확인하지 않았다(도입 시 실측: 파일 링크 18 · 앵커 287 · 깨진 것 0).
+# 규칙: 경로는 **그 문서가 있는 폴더 기준**으로 풀고(GitHub 와 같다 — 루트로 다시 풀지 않는다) 실재는 파일시스템으로 본다
+#    (walk_files 는 docs/releases/ 를 건너뛰어 폴더 링크가 오탐이 된다). `#조각` 은 대상 문서(조각만 있으면 그 문서)의
+#    heading slug(gh_anchors · H1 포함)에서 찾는다. 대상이 .md 가 아니면 조각은 보지 않는다(`x.py#L3` 은 heading 이 아니다).
+# ⛔ 소관 — 같은 위반을 두 번 보고하지 않는다:
+#    · 링크 목적지(펜스 · 코드 스팬 밖)의 실재는 이 검사 하나가 본다. #6 은 그 목적지 열에 든 경로 적중을 건너뛴다(chk_6).
+#    · 목차 블록의 같은 파일 앵커는 #N8 이 본다 — #N8 이 무는 바로 그 자리(_n8_owned)만 여기서 뺀다.
+# 꺾쇠 목적지(`](<경로>)` — 안에 공백 · 괄호가 들어도 된다)는 꺾쇠를 벗겨 다른 목적지와 같은 규칙으로 판정한다.
+# 목적지 뒤에는 따옴표 · 괄호로 싼 제목만 받는다 — `[x](a b.md)` 는 CommonMark 에서 링크가 아니라 판정하지 않는다.
+# ⛔ 범위 외: 참조형 링크(`[x][id]` · `[id]: 경로`) · HTML 앵커(`<a id>`) · 꺾쇠 밖 목적지의 괄호 · 공백 · 여러 줄 코드 스팬 ·
+#    퍼센트 인코딩 · 스킴 없는 절대 경로(`/x` 는 저장소가 아니라 파일시스템 루트로 풀린다 · `//호스트` 는 URL 이다).
+#    `%` 가 든 목적지와 `/` 로 시작하는 목적지는 판정하지 않고 건너뛴다(위반 아님 · 세지 않는다).
+# ─────────────────────────────────────────────────────────────────────────────
+MD_LINK = re.compile(r"\]\((<[^<>\n]*>|[^()\s]+)(?:\s+(?:\"[^\"]*\"|'[^']*'|\([^()]*\)))?\s*\)")
+CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)")
+URL_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*:")
+
+
+def md_links(txt: str):
+    """(줄 번호, `]` 열, 목적지 시작 열, 목적지 끝 열, 목적지) — 펜스 · 인라인 코드 스팬 밖의 인라인 링크 · 이미지만, URL 은 뺀다.
+
+    펜스 여닫이는 iter_headings 와 같은 규칙이다. 코드 스팬은 같은 길이의 공백으로 지워 열을 보존한다 —
+    chk_6 이 목적지 열로 소관을 가르고, chk_N15 가 `]` 열로 #N8 의 목차 자리를 가린다.
+    꺾쇠 목적지 `<…>` 는 꺾쇠를 벗긴 목적지와 그 열을 낸다.
+    """
+    fence: str | None = None
+    for i, line in enumerate(txt.split("\n"), 1):
+        if fence is None:
+            m = FENCE_OPEN.match(line)
+            if m:
+                fence = m.group(2)
+                continue
+        else:
+            m = FENCE_CLOSE.match(line)
+            if m and m.group(2)[0] == fence[0] and len(m.group(2)) >= len(fence):
+                fence = None
+            continue
+        for m in MD_LINK.finditer(CODE_SPAN.sub(lambda c: " " * len(c.group(0)), line)):
+            s, e, dest = m.start(1), m.end(1), m.group(1)
+            if dest.startswith("<") and dest.endswith(">"):
+                s, e, dest = s + 1, e - 1, dest[1:-1]
+            if not URL_SCHEME.match(dest):
+                yield i, m.start(), s, e, dest
+
+
+def _n8_owned(txt: str) -> set[int]:
+    """#N8 이 판정하는 목차 링크의 `]` 오프셋(문서 전체 기준) — chk_N8 과 같은 블록 · 같은 정규식 · 줄마다 첫 적중."""
+    k = txt.find("## 목차")
+    if k < 0:
+        return set()
+    off = k + len("## 목차")
+    out: set[int] = set()
+    for line in txt[off:].split("\n##", 1)[0].split("\n"):
+        m = TOC_LINK.search(line)
+        if m:
+            out.add(off + m.start())
+        off += len(line) + 1
+    return out
+
+
+def chk_N15(root: Path | None = None):
+    base = root or ROOT
+    anchors: dict[str, dict] = {}
+    v, seen = [], 0
+    for rel, p in walk_files(".md", root=root):
+        if rel == "CHANGELOG.md":
+            continue
+        txt = read(p)
+        starts = [0]
+        for line in txt.split("\n"):
+            starts.append(starts[-1] + len(line) + 1)
+        toc = _n8_owned(txt)
+        for i, col, _, _, dest in md_links(txt):
+            if starts[i - 1] + col in toc:
+                continue                                  # 목차 블록의 같은 파일 앵커 — #N8 소관
+            if "%" in dest or dest.startswith("/"):
+                continue                                  # 퍼센트 인코딩 · 스킴 없는 절대 경로 — 범위 외(머리 주석)
+            seen += 1
+            path, _, frag = dest.partition("#")
+            t = os.path.normpath(os.path.join(os.path.dirname(rel), path)) if path else rel
+            if path and not (base / t).exists():
+                v.append(f"{rel}:{i}: 링크 대상 없음 `{dest}` — 문서 폴더 기준 `{t}`")
+                continue
+            if not frag or not t.endswith(".md"):
+                continue
+            if t not in anchors:
+                anchors[t] = gh_anchors(read(base / t), h1=True)
+            if frag not in anchors[t]:
+                v.append(f"{rel}:{i}: 앵커 `{dest}` 가 `{t}` 의 heading 으로 해소되지 않는다")
     return v, seen
 
 
@@ -1296,6 +1428,63 @@ INTEG_TREE = {
     "modules/ok_n14.md": '```bash\ncd "$(mktemp -d)"\n```\n',
     "node_modules/decoy_n14.sh": 'cd "$(mktemp -d)"\n',
     "docs/releases/decoy_n14.sh": 'cd "$(mktemp -d)"\n',
+    # #6: 깨진 파일 참조 — 비백틱(.md 의 표 칸 · 산문 · 코드블록) × 저장소 기준 · 스킬 폴더 기준 + 루트 변수 경로(코드블록).
+    #     같은 파일에 음성(해소되는 경로 · 이어지는 확장자 · 앞뒤 경계)을 함께 둬 경계 소실과 '전부 위반' 뒤집힘을 잡는다.
+    #     루트 변수: 중괄호 · 맨 이름 둘 다 양성 · 해소되는 경로와 루트 변수가 아닌 이름(`$HOME` · 이름을 품은 `$MY_…` · 한 글자)은 음성 ·
+    #     스킬 문서의 루트 변수 경로는 그 스킬 폴더에만 있는 파일이어도 양성(저장소 루트로만 푼다).
+    #     백틱 줄은 한 번만 세져야 한다(비백틱 정규식이 백틱 뒤를 다시 물면 2건이 된다).
+    #     ⛔ 백틱 경로는 문자열을 조각내 적는다 — 이 파일도 #6 의 .py 백틱 대상이라 그대로 쓰면 실제 참조로 걸린다
+    #     ⛔ scripts/ 밖에 둔다 — scripts/ 의 .sh/.py 는 #N5·#N6 대상이라 그 건수가 바뀐다
+    "modules/bad_6.md": '| 칸 | 경로 |\n|---|---|\n| 표 칸 | modules/nope_6_cell.md |\n'
+                        '산문 참조 modules/nope_6_prose.md 를 본다\n'
+                        '조사가 붙은 참조 modules/nope_6_josa.md를 본다\n'
+                        '백틱 참조 `modules' '/nope_6_tick.md` 는 한 번만 센다\n'
+                        '```bash\nbash scripts/nope_6_code.sh\n```\n'
+                        '해소되는 참조 modules/ok.md · 이어지는 확장자 scripts/hooks_6.json.example · '
+                        '꼬리 modules/nope_6.md-x · modules/nope_6.mdx\n'
+                        '앞 경계 ../modules/nope_6.md · ${R}modules/nope_6.md · $modules/nope_6.md · '
+                        'a.modules/nope_6.md · a-modules/nope_6.md · amodules/nope_6.md\n'
+                        '```bash\nbash "${FZ_PLUGIN_ROOT}/scripts/nope_6_root.sh"\npython3 "$PLUGIN_ROOT/scripts/nope_6_root.py"\n'
+                        'python3 "${FZ_PLUGIN_ROOT}/scripts/ok.py" · cat "$HOME/modules/nope_6_home.md" '
+                        '"$MY_PLUGIN_ROOT/modules/nope_6_my.md" "${R}/modules/nope_6_r.md"\n```\n',
+    # (스킬 폴더) 루트에 없고 그 스킬 폴더에 있는 경로는 음성 · 두 기준 모두에 없는 경로는 양성
+    "skills/s6/SKILL.md": '# S6\n\n| 도구 | 경로 |\n|---|---|\n| 수집 | scripts/gather_6.sh |\n'
+                          '스킬 기준 산문 scripts/gather_6.sh 와 루트 기준 modules/ok.md\n'
+                          '```bash\nbash scripts/gather_6.sh\n```\n'
+                          '두 기준 모두에 없는 scripts/nope_6_skill.sh\n'
+                          '루트 변수 경로는 저장소 루트만 본다 "${FZ_PLUGIN_ROOT}/scripts/gather_6.sh"\n',
+    "skills/s6/scripts/gather_6.sh": '#!/bin/bash\necho ok\n',
+    # (.py) 백틱 경로는 본다(양성) · 백틱 없는 문자열 리터럴은 보지 않는다(음성)
+    "tests/bad_6.py": '# 백틱 참조 `modules' '/nope_6_py.md` 는 .py 에서도 본다\nX = "modules/nope_6_pystr.md"\n',
+    # #N15: 상대 Markdown 링크 · 앵커 — 경로는 **그 문서 폴더 기준**, 다른 파일의 `#조각` 은 **그 파일**의 heading 에서 찾는다.
+    #      ⛔ 소관(두 번 세지 않는다): 링크 목적지의 실재는 #N15 하나가 본다. bad_n15.md 5번째 줄은 #6 의 비백틱 경로 꼴이기도
+    #         하지만 #6 은 링크 목적지 열을 건너뛴다 — 아래 "6" 기대에 bad_n15.md 가 없는 것이 그 단정이다. 목차 블록의 같은 파일 앵커는
+    #         #N8 소관이라 bad_n8.md 의 목차 앵커는 #N15 가 세지 않는다(아래 "N8" · "N15" 기대가 함께 단정한다).
+    #      양성: 없는 본문 앵커 · 없는 파일(문서 폴더 기준) · 루트에만 있는 파일 · 꺾쇠를 벗겨도 없는 파일 · 제목이 붙은 링크의 없는 파일 ·
+    #            중첩 폴더 문서의 없는 조각 · 없는 파일
+    #      음성: 같은 문서 H1 · 중복 제목 slug · 폴더 링크(walk_files 가 건너뛰는 docs/releases/) · URL · .md 아닌 대상의 조각 ·
+    #            코드 스팬 · 펜스 · 다른 파일의 H1 · H2 조각 · CHANGELOG.md · 꺾쇠 목적지(조각 · 안 공백) ·
+    #            범위 밖 목적지(퍼센트 인코딩 · `//호스트` · `/` 절대 경로) · 꺾쇠 밖 공백(링크가 아니다)
+    "modules/bad_n15.md": '# N15 Title\n\n[t](#n15-title) 같은 문서 H1 · [d](#dup-1) 중복 제목 slug\n'
+                          '[a](#n15-gone) 없는 본문 앵커\n'
+                          '[x](modules/nope_n15.md) 문서 폴더 기준으로 푼다 — #6 의 비백틱 꼴이기도 하다\n'
+                          '[y](modules/ok.md) 루트에만 있는 파일 — 문서 폴더 기준으로는 없다\n'
+                          '[r](../docs/releases/) 폴더 · [u](https://example.com/nope_n15.md) URL · '
+                          '[c](../scripts/ok.py#L2) .md 아닌 대상의 조각\n'
+                          '자리표시 `[topic.md](topic.md)` 는 코드 스팬이다\n'
+                          '[p](<target_n15.md#둘째-절>) 꺾쇠 목적지 · [sp](<n15 sp.md>) 꺾쇠 안 공백\n'
+                          '[q](<nope n15 angle.md>) 꺾쇠를 벗겨도 없는 파일(안 공백)\n'
+                          '[t](nope_n15_title.md "제목") 제목이 붙은 링크도 판정한다\n'
+                          '[e](n15%20sp.md) 퍼센트 인코딩 · [s](//example.com/nope_n15) · [b](/nope_n15_abs.md) 스킴 없는 절대 경로 · '
+                          '[w](n15 sp.md) 꺾쇠 밖 공백은 링크가 아니다\n'
+                          '```md\n[f](nope_n15_fence.md)\n```\n\n## Dup\n\n## Dup\n',
+    "modules/target_n15.md": '# Alpha Beta\n\n## 둘째 절\n\n본문\n',
+    "modules/n15 sp.md": '# Sp\n',
+    "guides/n15/linker.md": '# Linker\n\n'
+                            '[ok](../../modules/target_n15.md#alpha-beta) H1 조각 · [ok2](../../modules/target_n15.md#둘째-절)\n'
+                            '[bad](../../modules/target_n15.md#no-such-frag-n15)\n'
+                            '[gone](../../modules/nope_n15_file.md)\n',
+    "CHANGELOG.md": '[x](nope_n15_changelog.md)\n',
     # 정상 대조군 — 위반 0이어야 한다
     "modules/ok.md": '# T\n\n## 목차\n\n- [실제절](#실제절)\n\n## 실제절\n\n본문\n',
     "scripts/ok.py": 'from pathlib import Path\nroot = Path(__file__).resolve().parent\n',
@@ -1313,6 +1502,11 @@ INTEG_EXPECT = {
     "N8": ["modules/bad_n8.md"],
     "N9": ["modules/bad_n9.md:4"],
     "N14": ["tests/bad_n14.sh:7", "tests/bad_n14.sh:8", "tests/bad_n14.py:2", "tests/bad_n14.js:2"],
+    "6": ["modules/bad_6.md:3", "modules/bad_6.md:4", "modules/bad_6.md:5", "modules/bad_6.md:6",
+          "modules/bad_6.md:8", "modules/bad_6.md:13", "modules/bad_6.md:14",
+          "skills/s6/SKILL.md:10", "skills/s6/SKILL.md:11", "tests/bad_6.py:1"],
+    "N15": ["modules/bad_n15.md:4", "modules/bad_n15.md:5", "modules/bad_n15.md:6", "modules/bad_n15.md:10",
+            "modules/bad_n15.md:11", "guides/n15/linker.md:4", "guides/n15/linker.md:5"],
 }
 
 
@@ -1719,7 +1913,7 @@ CHECKS = {
     "12": chk_12, "14": chk_14, "16": chk_16, "N12": chk_N12,
     "N1": chk_N1, "N2": chk_N2, "N3": chk_N3, "N4": chk_N4, "N5": chk_N5, "N6": chk_N6,
     "N7": chk_N7, "N8": chk_N8, "N9": chk_N9, "N10": chk_N10,
-    "N11": chk_N11, "N13": chk_N13, "N14": chk_N14,
+    "N11": chk_N11, "N13": chk_N13, "N14": chk_N14, "N15": chk_N15,
 }
 
 

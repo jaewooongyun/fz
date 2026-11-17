@@ -382,6 +382,7 @@ fi
 #    그래서 여섯 검사를 이 트리에 **실모드**로 돌린다(합산 1~2s).
 # ⛔ 워크플로 문법은 check_wf_syntax.js(AsyncFunction 파싱)로 본다 — 워크플로 파일은 async 함수 본문이라
 #    일반 JS 파서 검사로는 판별력이 0 이다(Node v26 에서 심은 문법 오류도 rc=0).
+#    같은 행이 agentType 리터럴의 agents/<이름>.md 실재도 본다(없는 이름은 문법이 멀쩡해 여기서만 걸린다).
 # ⛔ `node` 부재는 **문법 실패가 아니라 미실행**이다 (ISSUE-001과 동일 클래스) — 실패로 적으면 "문법이 깨졌다"고
 #    오귀속하고, 통과로 적으면 SKIP을 PASS로 만든다.
 # ⛔ `--realmode-only` 는 이 블록만 돌리고 멈춘다 — 배선 fixture(tests/fixtures/health/wiring-failure) 전용이며
@@ -549,7 +550,9 @@ fi
 # ⛔ 세 글롭은 scripts/health_select.py 의 RUNNER_GLOBS 와 같아야 한다 — 다르면 선택기가 고른 러너를 여기서 모른다
 # tests/fixtures/health/mutation-neighbors/run.sh 도 이 글롭으로 돈다 — fallback 을 지나는 기존 셀이 방어를 지운 사본에서 여전히
 #   실패하는가를 매번 다시 잰다. fallback 의미를 바꾼 수정이 이웃 셀을 공허 통과로 만들면 SURVIVOR 로 실패한다(F-573)
-chk_runners "$ROOT"/tests/workflows/*.js "$ROOT"/tests/lib/*.test.js "$ROOT"/tests/fixtures/*/*/run.sh
+# tests/fixtures/doc-freshness/run.sh 는 글롭보다 한 단계 얕아 이름으로 붙인다 — 문서 최신성 lint 의 버전 대조 exit(0 · 1 · 2)와
+#   기본 실행의 무네트워크를 본다. 선택기 글롭 밖이라 부분 실행은 고르지 않는다(부분 실행은 출하 게이트가 아니다)
+chk_runners "$ROOT"/tests/workflows/*.js "$ROOT"/tests/lib/*.test.js "$ROOT"/tests/fixtures/*/*/run.sh "$ROOT"/tests/fixtures/doc-freshness/run.sh
 
 # ── 4.7 G8 문체 게이트 fixture 계약 ────────────────────────────
 # ⛔ 신설 근거: `negative-clean.md` 가 "오검출 0/8" 을 기대값으로 적어 두고 **한 번도
@@ -787,11 +790,16 @@ GP="$(cd "$ROOT" && python3 scripts/check_gpt_skill_portability.py 2>&1)"; GP_CO
 record3 "GPT 스킬 이식성" "$GP_CODE" "$GP" \
   "$(printf '%s\n' "$GP" | grep -E '^gpt-skill-portability' | tail -1)" \
   "⛔ $(printf '%s\n' "$GP" | grep -E 'VIOLATION|UNRUN' | head -1)"
+# ⛔ Claude 문서 모드 — Swift 기준 줄에 프로젝트 조건을 단 Claude 문서가 조건 없는 스택 규칙을 다시 싣지 않는다(계약 CLAUDE_DOCS).
+GC="$(cd "$ROOT" && python3 scripts/check_gpt_skill_portability.py --claude-docs 2>&1)"; GC_CODE=$?
+record3 "Claude 문서 이식성" "$GC_CODE" "$GC" \
+  "$(printf '%s\n' "$GC" | grep -E '^claude-doc-portability' | tail -1)" \
+  "⛔ $(printf '%s\n' "$GC" | grep -E 'VIOLATION|UNRUN' | head -1)"
 
-# ── 넓은 except 의 UNRUN 사유 (F-396) ────────────────────────
-# ⛔ 넓은 except 가 UNRUN 을 내면 내용 이상까지 '판정 불가' 로 덮인다 — 넓게 잡는 자리는 `noqa: BLE001 — 사유` 를 적는다.
+# ── 넓은 except 의 UNRUN · 성공 꼴 사유 (F-396) ───────────────
+# ⛔ 넓은 except 가 UNRUN 을 내면 내용 이상까지 '판정 불가' 로, 성공 꼴 값 하나(`pass` · `return {}` …)로 끝나면 결함까지 '통과' 로 덮인다 — 넓게 잡는 자리는 `noqa: BLE001 — 사유` 를 적는다.
 UE="$(cd "$ROOT" && python3 scripts/check_unrun_except.py 2>&1)"; UE_CODE=$?
-record3 "넓은 except UNRUN 사유" "$UE_CODE" "$UE" \
+record3 "넓은 except UNRUN · 성공 꼴 사유" "$UE_CODE" "$UE" \
   "$(printf '%s\n' "$UE" | grep -E '^unrun-except' | tail -1)" \
   "⛔ $(printf '%s\n' "$UE" | grep -E 'VIOLATION|UNRUN' | head -1)"
 
@@ -939,7 +947,7 @@ else
   record "fz-compact guard" 1 "⛔ $(printf '%s\n' "$FC_GUARD" | head -2 | tr '\n' ' ')"
 fi
 
-# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 98 케이스) · 허용 목록(채택 표 == guard 상수).
+# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 124 케이스) · 허용 목록(채택 표 == guard 상수).
 #    self-test 와 허용 목록은 python3 만 써서 CLI 분기 밖에서 돈다. self-test 는 HOME · 상태 폴더를 임시로 새로 짓는다.
 if command -v claude >/dev/null 2>&1; then
   FG_VAL="$(bash "$ROOT/scripts/plugin_validate.sh" "$ROOT/mods/fz-guard" 2>&1)"; FG_VAL_CODE=$?

@@ -44,7 +44,9 @@ rsync -a --exclude .git "$R/" "$C/" || { echo "SETUP 사본 생성 실패"; exit
 python3 - "$C" <<'PY' || { echo "SETUP plant 실패"; exit 3; }
 import pathlib, sys
 c = pathlib.Path(sys.argv[1])
-for p in list(c.glob("tests/fixtures/*/*/run.sh")) + list(c.glob("tests/workflows/*.js")) + list(c.glob("tests/lib/*.test.js")):
+# health-check 가 도는 러너를 전부 지운다 — 글롭 셋과, 글롭보다 한 단계 얕아 이름으로 붙은 러너(scripts/health-check.sh 의 chk_runners 줄)
+for p in (list(c.glob("tests/fixtures/*/*/run.sh")) + list(c.glob("tests/workflows/*.js")) + list(c.glob("tests/lib/*.test.js"))
+          + list(c.glob("tests/fixtures/doc-freshness/run.sh"))):
     p.unlink()
 
 def stub(rel, body):

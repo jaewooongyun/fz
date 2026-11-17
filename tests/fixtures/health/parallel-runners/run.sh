@@ -21,7 +21,9 @@ rsync -a --exclude .git "$R/" "$C/" || { echo "UNRUN: 사본 생성 실패"; exi
 python3 - "$C" <<'PY' || { echo "UNRUN: plant 실패"; exit 2; }
 import pathlib, sys
 c = pathlib.Path(sys.argv[1])
-for p in list(c.glob("tests/fixtures/*/*/run.sh")) + list(c.glob("tests/workflows/*.js")) + list(c.glob("tests/lib/*.test.js")):
+# health-check 가 도는 러너를 전부 지운다 — 글롭 셋과, 글롭보다 한 단계 얕아 이름으로 붙은 러너(scripts/health-check.sh 의 chk_runners 줄)
+for p in (list(c.glob("tests/fixtures/*/*/run.sh")) + list(c.glob("tests/workflows/*.js")) + list(c.glob("tests/lib/*.test.js"))
+          + list(c.glob("tests/fixtures/doc-freshness/run.sh"))):
     p.unlink()
 body = {"a-pass": "echo ok; exit 0", "b-fail": "echo 'planted 실패'; exit 1",
         "c-unrun": "echo 'UNRUN: planted 측정 불가'; exit 2", "d-crash": "kill -9 $$"}
