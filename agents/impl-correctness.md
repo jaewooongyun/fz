@@ -73,7 +73,7 @@ Primary code implementer. Implements code step by step based on plans, writes te
 
 ## 메모리 관리
 
-- `weak var` 캡처 후 optional chaining (`?.`) 사용 (CLAUDE.md 코딩 규칙 절 참조)
+- `weak var` 캡처 후 optional chaining (`?.`) 사용 (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우 · CLAUDE.md 코딩 규칙 절 참조)
 
 ## New File Header
 

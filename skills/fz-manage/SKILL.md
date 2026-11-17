@@ -31,6 +31,7 @@ metadata:
 - 전체 스킬 일괄 품질 평가 (benchmark)
 - 스킬 CRUD (생성/편집/삭제)
 - 거버넌스 (`modules/governance.md`)
+- ⛔ **선택 도구 상태**: 서브커맨드 첫 단계에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
 
 ## 사용 시점
 
@@ -107,7 +108,7 @@ build.md, governance.md, session.md, skill-template.md, README.md
 | 항목 | 값 |
 |------|---|
 | 크기 | 220줄 |
-| allowed-tools | serena(7), context7(2), sequential-thinking(1), atlassian(2) |
+| allowed-tools | serena(7), context7(2), sequential-thinking(1) |
 | provides | planning, architecture-analysis |
 | needs | none |
 | intent-triggers | 계획, 설계, 아키텍처, 요구사항 |
@@ -145,13 +146,12 @@ needs=commit:       fz-pr
 
 ```
 fz-search      → serena(7), context7(2), lsp(4)
-fz-plan        → serena(7), context7(2), sequential-thinking(1), atlassian(2)
+fz-plan        → serena(7), context7(2), sequential-thinking(1)
 fz-code        → serena(10), context7(2), lsp(2)
 fz-fix         → serena(7), sequential-thinking(1), context7(2), lsp(3)
 fz-review      → serena(5), sequential-thinking(1), lsp(2)
 fz-peer-review → serena(6), sequential-thinking(1), github(5), context7(2)
-fz-commit      → atlassian(2)
-fz-pr          → github(3), atlassian(3)
+fz-pr          → github(3)
 fz-manage      → serena(4)
 ```
 

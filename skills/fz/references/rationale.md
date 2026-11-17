@@ -8,7 +8,7 @@
 
 ## effort 이력과 공식 출발점
 
-  > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 갱신)**: 현행 배선은 전 호출 `effort: EFFORT` — Lead 세션 effort 를 args 로 전달(미지정 `xhigh` · 2026-10-19 · `modules/mode-gate.md` § effort). 공식 출발점: **Fable 5.1 `high` · Opus 5.5 `medium`(Opus 5 는 `high`)** 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
+  > ℹ️ **effort (2026-07-25, Opus 5 / 2026-09-06 Fable 5.1 · 2026-11-16 Fable 5.2 갱신)**: 현행 배선은 전 호출 `effort: EFFORT` — Lead 세션 effort 를 args 로 전달(미지정 `xhigh` · 2026-10-19 · `modules/mode-gate.md` § effort). 공식 기본값: **Claude Code 모델 기본 `medium`(Fable 5.2 · Opus 5.5) · Fable 5.2 API 기본 `high`**(Opus 5 는 `high` — 이력) [verified: code.claude.com/docs/en/model-config + platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2] 이고 `low`/`medium`이 비용·지연의 1차 레버 — `xhigh`는 여전히 유효 범위지만 **더 이상 문서상 출발점이 아니다**. Fable 5.1은 세대가 바뀌어도 sweep을 이월하지 말라고 명시한다 — "Re-run the sweep even if you already ran one on Claude Fable 5" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. ⛔ 상수 일괄 교체 금지, **fresh sweep 후** 스테이지별 차등 배정 (`guides/skill-authoring.md` § 배치·호출 규약).
 
 ## 트리거 소스
 

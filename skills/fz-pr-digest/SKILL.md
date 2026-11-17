@@ -14,8 +14,8 @@ allowed-tools: >-
   mcp__github__get_pull_request,
   mcp__github__get_pull_request_files,
   mcp__github__get_pull_request_comments,
-  mcp__context7__resolve-library-id,
-  mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
+  mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   Bash(git *), Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Workflow
 metadata:
   provides: [pr-digest, code-understanding]
@@ -95,6 +95,7 @@ Tutor는 자동 선택되지 않는다. --tutor 명시 또는 peer-review --expl
 ---
 
 ## Step 1: Gather (컨텍스트 수집)
+> ⛔ **선택 도구 상태**: diff 를 모으기 전에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
 
 peer-review의 Gather와 동일한 방식으로 diff를 수집하되, 원본 코드에 더 집중한다.
 

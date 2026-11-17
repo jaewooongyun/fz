@@ -21,8 +21,8 @@ allowed-tools: >-
   mcp__github__get_pull_request_comments,
   mcp__github__create_pull_request_review,
   mcp__github__add_issue_comment,
-  mcp__context7__resolve-library-id,
-  mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
+  mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(tar -xf - -C *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
 metadata:
   provides: [peer-review]
@@ -94,7 +94,7 @@ metadata:
 | `modules/team-facing-writing.md` | 팀원에게 가는 글(코멘트 · 답글 · PR 본문)의 어조 · 형태 — Comment Style Guide 정본 |
 | `scripts/check_comment_worthy.py` | Curate 계약(카드 필드 · E1~E8 · 커버리지) — 렌더러가 `--require-curation` 으로 부른다 |
 | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
-| `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 — gather 의 risk.json `plugin_refs`(그 모듈 `## 자동 감지 트리거` 표 전체를 조건으로 잰 값)가 비지 않으면 그 참조 항목을 Read 하고 review.json `pluginRefsRead[{plugin, refs}]` 에 적는다(F-520 · Curate 검사기가 대조) |
+| `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 — gather 의 risk.json `plugin_refs`(그 모듈 `## 자동 감지 트리거` 표 전체를 조건으로 잰 값 · Swift(`.swift`) 파일 추가 행만 — 파일별)가 비지 않으면 그 참조 항목을 Read 하고 review.json `pluginRefsRead[{plugin, refs}]` 에 적는다(F-520 · Curate 검사기가 대조) |
 | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4(+§6 craft — 이 스킬은 기본 · 롤백 때는 뺀다)를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
 | `skills/code-auditor/SKILL.md` | 관점 4(Decomposition) + 관점 5(Modern API) + 관점 6(Dependency) + 관점 7(Refactoring) |
@@ -159,7 +159,7 @@ mcp__plugin_fz_serena__find_symbol                → Protocol 정의, conformer
 
 ### 1.5. 요구사항 수집 → `${WORK_DIR}/requirements.md`
 
-PR title/body에서 JIRA 티켓 ID 추출 + acceptance criteria 수집. JIRA 연동 시 Atlassian MCP 활용.
+PR title/body에서 트래커 티켓 ID 추출 + acceptance criteria 수집. 티켓 조회는 CLAUDE.md 가 선언한 트래커 MCP 가 연결돼 있을 때만(`modules/governance.md` § 팀 스킬 위임).
 
 ### 2.5. 판별 방법(oracle) 명시  ⛔ **Gather 2.5** — Synthesize 의 `2.5 PR Intent Alignment` 와 다른 절이다
 
@@ -238,7 +238,7 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 ```bash
 python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" "${WORK_DIR}" --tier {5.5 에서 정한 Tier}
 ```
-exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다 · `2` 는 판정 불가(⛔ 통과 아님). 요구 슬롯은 `modules/peer-review-tiers.md` § Tier-Adaptive Evidence 의 ✓ 이고, `evidence/tools.md` 첫 줄(Serena 상태 · 리뷰 대상 SHA)과 `caller-analysis.md` 의 `## 호출` · `## 구현` 도 본다 — 절차 `modules/evidence-collection.md`
+exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다 · `2` 는 판정 불가(⛔ 통과 아님). 요구 슬롯은 `modules/peer-review-tiers.md` § Tier-Adaptive Evidence 의 ✓ 이고, `evidence/tools.md` 첫 줄(Serena 상태 · 리뷰 대상 SHA · 선택 도구 상태 — 형식 `modules/tool-status.md`)과 `caller-analysis.md` 의 `## 호출` · `## 구현` 도 본다 — 절차 `modules/evidence-collection.md`
 
 #### Few-shot
 ```

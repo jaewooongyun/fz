@@ -12,8 +12,8 @@ allowed-tools: >-
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__activate_project,
-  mcp__context7__resolve-library-id,
-  mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
+  mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   Read, Grep, Glob
 metadata:
   provides: [structure-explanation, code-understanding]
@@ -61,6 +61,7 @@ metadata:
 ---
 
 ## Phase 1: Seed 산출
+> ⛔ **선택 도구 상태**: seed 를 잡기 전에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
 
 입력이 셋 중 무엇인지 판별하고 seed 심볼 집합을 만든다.
 

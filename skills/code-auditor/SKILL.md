@@ -154,7 +154,9 @@ var body: some View {
 
 ## 관점 5: Modern API Adoption
 
-### Tier 분류 (프로젝트 최소 지원 버전 기준 — CLAUDE.md 참조)
+### Tier 분류 (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우 · 프로젝트 최소 지원 버전 기준 — CLAUDE.md 참조)
+
+> 다른 언어 프로젝트는 아래 Tier 표를 쓰지 않는다 — CLAUDE.md 에 적힌 최소 버전·권장 API 가 기준이다.
 
 **Tier 1 — 필수 (위반 시 반드시 지적)**
 | 구버전 API | 권장 대체 | 비고 |

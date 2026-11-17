@@ -80,6 +80,8 @@ symbols.json에 없는 심볼이 필요하면 Serena MCP를 직접 호출해도 
 
 ### 분석 기준
 
+> Protocol Composition 부터 Value vs Reference 까지 네 항목은 Swift 문법 기준이라 CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우에만 적용한다. 컴포넌트 역할 분리 · 의존성 방향 검증은 언어와 무관하게 적용한다.
+
 **Protocol Composition vs Inheritance**
 - 상속 2단계 이상 발견 → Protocol + Default Implementation 전환 검토
 - 다중 상속 불필요한 곳에서 class 사용 → struct + protocol 전환 제안
@@ -111,6 +113,8 @@ symbols.json에 없는 심볼이 필요하면 Serena MCP를 직접 호출해도 
 ## 관점 2: Extensibility
 
 ### 분석 기준
+
+> 이 관점의 기준(some vs any · @retroactive · @unknown default · Module Boundary)은 Swift 문법 기준이라 CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우에만 적용한다.
 
 **some vs any 확장성 (중요)**
 - public API에 `some Protocol` 반환 → 미래에 다형성 확장 불가 (단일 concrete 타입 고정)

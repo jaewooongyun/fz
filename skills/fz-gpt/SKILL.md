@@ -132,6 +132,7 @@ echo 'openai-docs 스킬로 GPT-6 prompting guide 의 preamble 패턴 핵심을 
 ---
 
 ## 서브커맨드
+> ⛔ **선택 도구 상태**: 서브커맨드를 실행하기 전에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
 
 > **상세 정의**:
 > - **Core (review/verify/validate/check)**: `modules/fz-gpt-subcommands-core.md`

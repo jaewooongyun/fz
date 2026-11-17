@@ -30,6 +30,7 @@ metadata:
 - **Description 최적화**: skill-creator의 `run_loop.py` 활용, 실측 트리거율 기반 자동 개선
 - 문서 작성 + 글쓰기 + 프롬프트 최적화 (스킬/에이전트 외 일반 문서 포함)
 - 3단계 자동화: L3(자동) → L2(대화형) → L1(템플릿+체크리스트)
+- ⛔ **선택 도구 상태**: 서브커맨드 첫 단계에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
 
 ## 사용 시점
 
@@ -81,7 +82,7 @@ metadata:
    - `metadata.intent-triggers`: 중복 없는 한영 패턴
    - `allowed-tools`: 필요한 도구만
    - `user-invocable`: 오케스트레이터 전용 하위 스킬이면 `false`
-   > ⛔ **필수 필드 정본** = `modules/governance.md` § 스킬 최소 기준 (L1 공식 4 + L2 fz 정책 2). ⛔ `team-agents`·`composable`·`model-strategy`는 **2026-08-09 제거** — 멀티에이전트 구성·모델은 `workflows/{skill}-{pattern}.js`가 소유한다
+   > ⛔ **필수 필드 정본** = `modules/governance.md` § 스킬 최소 기준 (L1 공식 3 + L1 fz 정책 1 + L2 fz 정책 2). ⛔ `team-agents`·`composable`·`model-strategy`는 **2026-08-09 제거** — 멀티에이전트 구성·모델은 `workflows/{skill}-{pattern}.js`가 소유한다
 
 3. 디렉토리 생성: `skills/fz-{name}/`
 

@@ -15,8 +15,8 @@ allowed-tools: >-
   mcp__plugin_fz_serena__read_memory,
   mcp__plugin_fz_serena__write_memory,
   mcp__sequential-thinking__sequentialthinking,
-  mcp__context7__resolve-library-id,
-  mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
+  mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
   Edit, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow
@@ -120,6 +120,7 @@ metadata:
 - [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile fix` exit 0? (아래 · WORK_DIR 없는 세션은 건너뜀을 보고)
 
 ⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile fix {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
+⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`
 
 ---
 
@@ -213,7 +214,7 @@ metadata:
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus) → 이슈가 있으면 Stage 3 수정. 1-3 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
-3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke. ⛔ `reason:'changeset-defect'` fallback 이면 적용하지 않는다 · 적용 뒤 오라클(Serena `find_symbol` `include_body: true` 심볼 재독 · Edit 앵커 · Step 기준 numstat)은 fz-code 절차 4 그대로다 — 조건을 여기 다시 적지 않는다(두 벌이면 한쪽만 고쳐진다)
+3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke. ⛔ `reason:'changeset-defect'` fallback 이면 적용하지 않는다 · 적용 뒤 오라클(Serena `find_symbol` `include_body: true` 심볼 재독 · Edit 앵커 · Step 기준 numstat)은 fz-code 절차 4 그대로다 — 조건을 여기 다시 적지 않는다(두 벌이면 한쪽만 고쳐진다) · 반환의 렌즈 회계도 fz-code 절차 6 그대로 본다 — light 의 단독 렌즈가 죽으면 `reviewVerdict` 가 `'skipped'` 로 오므로 `lensesCompleted` < `lensesExpected` 로 가린다
 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
    Mode A Bug Fix Step 1-4 직접 진입은 **L4 사용자 승인 후**다. 어느 경로로 가든 **Step 4 GPT check 책임은 유효**하고(§ 단계 실행 판정),
    사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 에 기록한다(규약: `experiment-log.md` 머리 문단)

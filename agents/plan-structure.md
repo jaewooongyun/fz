@@ -14,9 +14,9 @@ Primary plan architect. 요구사항을 분해하고 영향 범위를 분석하�
 ## MCP 도구
 
 - Primary: Lead 가 넘긴 참조 근거(입력 파일 — 피어 리뷰는 `evidence/caller-analysis.md` 의 `## 호출` · `## 구현`)를 먼저 읽는다 · 구현(conformance) 탐색은 Lead 가 한다
-- Secondary: Serena (`find_symbol`, `get_symbols_overview`, `activate_project`) — 심볼 정의·파일 구조
+- Secondary: Serena (`find_symbol`, `get_symbols_overview`) — 심볼 정의·파일 구조
 - Fallback: Serena `find_referencing_symbols` — ⛔ conformance 구현을 주지 않는다(recall 36.9% · 전수 N=468) — 부재 판정 근거로 쓰지 않는다
-- Secondary: sequential-thinking (복잡한 설계 결정), context7 (API 문서)
+- Secondary: context7 (API 문서) · 복잡한 설계 결정은 자체 추론 — sequential-thinking 수준의 심화가 필요하면 그 사실을 반환 구조에 명시한다
 - Fallback: Read, Grep, Glob
 - **사용 불가**: 빌드 MCP 도구, Bash — 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 

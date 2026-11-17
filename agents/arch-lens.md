@@ -45,17 +45,17 @@ Reviews architecture decisions and layer violations in the submitted diff or fil
 
 ### 4. State Lifecycle Alignment
 
-- 상태 저장 메커니즘(UserDefaults/Keychain/CoreData 등)이 컴포넌트 라이프사이클에 비해 과도하지 않은가?
-- 컴포넌트가 살아있는 동안 유지되는 상태를 영속 저장소에 중복 저장하고 있지 않은가? (RIBs: Interactor 라이프사이클 기준)
+- 상태 저장 메커니즘(CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우 UserDefaults/Keychain/CoreData 등)이 컴포넌트 라이프사이클에 비해 과도하지 않은가?
+- 컴포넌트가 살아있는 동안 유지되는 상태를 영속 저장소에 중복 저장하고 있지 않은가? (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우 · RIBs: Interactor 라이프사이클 기준)
 - A/B 테스트 등 외부 시스템(Firebase RC 등)이 관리하는 값을 앱 로컬에 캐싱하면 실험 왜곡
 - 판단 기준: "앱 재시작 후에도 이 값이 반드시 유지되어야 하는가?" — NO면 인메모리(Subject/State)로 충분
-- **싱글톤 스레드 접근성**: `static let shared` + `internal` getter → 모듈 내 임의 스레드에서 읽기 가능. main confinement 쓰기가 있어도 읽기 보장 불가 → `@MainActor`/`actor` 전환이 근본 해결. plugin-refs.md 역방향 트리거 참조
+- **싱글톤 스레드 접근성** (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우): `static let shared` + `internal` getter → 모듈 내 임의 스레드에서 읽기 가능. main confinement 쓰기가 있어도 읽기 보장 불가 → `@MainActor`/`actor` 전환이 근본 해결. plugin-refs.md 역방향 트리거 참조
 
 ### 5. Consumer Integration Quality (모듈화/캡슐화 작업 시)
 
 - 모듈의 public API를 사용하는 **앱 측 소비자 코드**가 설계 의도대로 사용하는가?
 - 소비자가 모듈 내부 구현에 의존하지 않고 public 인터페이스만 사용하는가?
-- 앱 생명주기 진입점(AppDelegate, SceneDelegate, UIWindow extension)에서 모듈 연동이 올바른가?
+- 앱 생명주기 진입점(CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우 AppDelegate, SceneDelegate, UIWindow extension)에서 모듈 연동이 올바른가?
 - 모듈화 이전의 레거시 패턴(직접 참조, 중복 로직, 인라인 구현)이 앱에 남아있지 않은가?
 - **Base class의 optional DI 변경 시, subclass가 화면별로 필요한 dependency를 주입하는가?** (default nil = silent regression. Gate 4.6.5 참조)
 - 판단 기준: "이 소비자 코드가 모듈의 존재 목적을 무력화하지 않는가?"

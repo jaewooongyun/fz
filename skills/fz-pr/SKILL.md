@@ -10,8 +10,6 @@ allowed-tools: >-
   mcp__github__create_pull_request,
   mcp__github__get_pull_request,
   mcp__github__list_pull_requests,
-  mcp__atlassian-jira__jira_get,
-  mcp__atlassian-jira__jira_post,
   Bash(git *),
   Bash(python3 */scripts/*)
 metadata:
@@ -102,7 +100,7 @@ CLAUDE.md 에 fork 기반 워크플로우가 정의되어 있으면(절 제목 �
 
 **Will**:
 - origin(fork)에 push 후 upstream으로 PR 생성
-- JIRA 티켓 ID 기반 PR 제목 및 설명 자동 생성
+- 트래커 티켓 ID 기반 PR 제목 및 설명 자동 생성 — 트래커 도구는 사전 승인하지 않는다(티켓 조회 · 상태 전환 규칙은 위 '규칙 참조' 의 팀 스킬 위임 정본)
 - PR 중복 여부 확인 후 기존 PR URL 안내
 - Assignee 자동 설정
 
@@ -121,13 +119,13 @@ CLAUDE.md 에 fork 기반 워크플로우가 정의되어 있으면(절 제목 �
 | unpushed 커밋 없음 | 커밋 없음 안내 | `/fz-commit` 먼저 실행하도록 안내 |
 | PR 이미 존재 | 기존 PR URL 출력 후 종료 | 사용자에게 기존 PR 확인 요청 |
 | GitHub MCP 실패 | MCP 오류 안내 | `gh pr create` 명령어 수동 실행 안내 |
-| JIRA 티켓 조회 실패 | 티켓 정보 없이 PR 생성 | 사용자에게 제목/설명 직접 입력 요청 |
+| 트래커 티켓 조회 실패 · 불가 (호출 오류 · 선언한 트래커 MCP 미연결 · 선언 없음 · 권한 거절) | 티켓 정보 없이 PR 생성 | 사용자에게 제목/설명 직접 입력 요청 |
 | Target 브랜치 선택 불명확 | 브랜치 목록 출력 후 사용자 선택 | 기본 develop 브랜치 제안 |
 
 ---
 
 ## Completion → Next
 
-- PR 생성 성공 시: PR URL 출력 + 템플릿 섹션 대조 결과 줄(템플릿이 있을 때) → JIRA 티켓 상태 전환(In Review) 수행
+- PR 생성 성공 시: PR URL 출력 + 템플릿 섹션 대조 결과 줄(템플릿이 있을 때) → 트래커 티켓 상태 전환은 프로젝트 규칙이 요구할 때만, 사전 승인 없이(권한 프롬프트를 거쳐) 한다 — 규칙이 없으면 전환하지 않는다(`modules/governance.md` § 팀 스킬 위임)
 - PR 이미 존재 시: 기존 PR URL 안내 → 필요 시 내용 업데이트 여부 확인
 - 실패 시: 원인 분석 안내 → 수동 PR 생성 방법 제시

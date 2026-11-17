@@ -16,8 +16,8 @@ allowed-tools: >-
   mcp__plugin_fz_serena__write_memory,
   mcp__plugin_fz_serena__read_memory,
   mcp__plugin_fz_serena__edit_memory,
-  mcp__context7__resolve-library-id,
-  mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
+  mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
   Edit, Write, Read, Bash(xcodebuild *), Bash(cd *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow
@@ -122,8 +122,8 @@ metadata:
 4. **changeset 적용 (Lead)**: 각 symbolEdit를 replace_symbol_body/Edit로 적용 — newBody가 의사코드/생략 포함 시 적용 중단 + 해당 Step 재invoke(buildFeedback에 사유). ⛔ 반환이 `mode:'fallback'` · `reason:'changeset-defect'` 면 적용하지 않는다(`defects` 를 buildFeedback 에 넣어 재invoke). **적용 뒤 오라클**(워크플로 검사는 자기보고 일관성까지만 잰다 — 시작 줄만 준 앵커가 spanLines 와 자기일관이면 통과하므로, 남은 옛 줄은 diff 본문 확인과 절차 5 빌드가 잡는다): replace_symbol_body 는 대상 심볼을 Serena `find_symbol`(`include_body: true`)로 다시 읽어 본문 == newBody · Edit 는 **적용 전** 파일에 oldAnchor 1회 · 적용 뒤 newBody 1회(newBody 가 oldAnchor 를 품는 삽입 · 감싸기는 적용 뒤 oldAnchor 가 남는 것이 정상) · 증감은 **이 Step 적용 직전에 잰** `git diff --numstat -- <파일>`(미추적 파일은 줄 수)과의 차 = 그 파일 Edit 편집의 Σ(newBody 줄 − spanLines) — replace_symbol_body 편집이 섞인 파일은 numstat 을 대조하지 않는다(그 편집의 spanLines 는 0 이다) · Bash/python 인라인 편집은 뒤에 diff 본문을 보고 삽입 앵커 개수 1(F-231). 어긋나면 그 편집을 되돌리고 재invoke · 적용한 파일 전부에 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_applied_escapes.py" --base HEAD <파일…>` — exit 1 이면 태그 앞 이스케이프(`<\task-notification>` 꼴)가 새로 생긴 것이다(JSON 이중 이스케이프가 파일에 풀린 흔적 · F-551). 그 편집을 되돌리고 재invoke · exit 2 는 측정 실패다(통과 아님)
 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소 가능하면 계속, 아니면 revert) (b) 재시도 = buildFeedback 포함 **새 invoke** (resume 비의존 — buildFeedback이 캐시 키를 바꿈) (c) Stage1 null 재시도는 1회 한정·일시 장애 의심 시만
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead
-   - ⛔ **렌즈 회계를 먼저 본다** (F-216 N1): `lensesCompleted` < `lensesExpected` 면 `reviewVerdict` 가 `'partial'` 로 오고 `residualNote` 에 죽은 렌즈 이름이 담긴다. 이전 판은 렌즈 하나가 죽어도 `'pass'` + 완주 3/3 을 인쇄해 **검토 절반이 빠진 것을 반환값만으로는 알 수 없었다**.
-   - `'partial'` 이면 그 관점(아키텍처 또는 품질)은 **적용되지 않았다** — 다음 Step 으로 넘어가기 전에 재invoke 할지 Lead 가 판정한다
+   - ⛔ **렌즈 회계를 먼저 본다** (F-216 N1): `lensesCompleted` < `lensesExpected` 면 검토 렌즈가 죽었고 `residualNote` 에 죽은 렌즈 이름이 담긴다 — `reviewVerdict` 는 일부만 죽으면 `'partial'`, 전부 죽으면(light 의 단독 렌즈 포함) `'skipped'` 다. ⛔ `'skipped'` 만 보고 생략으로 읽지 않는다 — 검토를 의도해 생략한 반환은 `lensesExpected` 0 · `residualNote` null 이다. 이전 판은 렌즈 하나가 죽어도 `'pass'` + 완주 3/3 을 인쇄해 **검토 절반이 빠진 것을 반환값만으로는 알 수 없었다**.
+   - 렌즈가 죽었으면(`'partial'` · `lensesCompleted` < `lensesExpected` 인 `'skipped'`) 그 관점(아키텍처 또는 품질)은 **적용되지 않았다** — 다음 Step 으로 넘어가기 전에 재invoke 할지 Lead 가 판정한다
    - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). ⛔ 여기서 사다리를 재정의하지 않는다
    - **code-pair 고유분만**: ① H5 크기 가드 — `split_required`/`splitSuggested` 시 Step 분할(과대 changeset scaffold collapse 방지) ② 재시도는 `buildFeedback` 포함 **새 invoke**(캐시 키 변경 → resume 비의존) ③ Stage1 null 재시도는 **1회 한정**·일시 장애 의심 시만
 7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5 — `gpt-choice.sh decide` 판정) — Workflow는 "구현+검토 쌍"만 대체
@@ -142,6 +142,7 @@ metadata:
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
@@ -170,8 +171,8 @@ metadata:
 
    | 작업 범위에 포함 | plan에 있어야 하는 결정 | Serena fallback 필드 |
    |------|------|------|
-   | SwiftUI View | owner / availability / View 책임 | `swiftDecisions.swiftUI` |
-   | Concurrency (`actor`·`@MainActor`·async) | isolation 범위 | `swiftDecisions.isolation` |
+   | SwiftUI View (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우) | owner / availability / View 책임 | `swiftDecisions.swiftUI` |
+   | Concurrency (`actor`·`@MainActor`·async — CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우) | isolation 범위 | `swiftDecisions.isolation` |
    | 패턴 변환 (마이그레이션·치환) | 원본 동작 보존 | `swiftDecisions.transform` |
 
    누락 시 → 마찰 신호 **"plan 계약 미충족"** 보고 후 계속 (판단은 사용자).

@@ -137,6 +137,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
@@ -193,8 +194,8 @@ Phase 5: Cross-Review (5+2 검증)
 ├─ [병렬 1] Claude + Serena: 참조 무결성 검증
 ├─ [병렬 2] → /fz-gpt review: GPT 코드 리뷰
 ├─ [병렬 3] /sc:sc-analyze: 정적 분석
-├─ [병렬 4] L3 silent-failure-hunter: 에러 처리 스캔 (조건부 — modules/native-agents.md)
-└─ [병렬 5] L3 type-design-analyzer: 타입 설계 평가 (조건부 — modules/native-agents.md)
+├─ [병렬 4] L3 pr-review-toolkit:silent-failure-hunter: 에러 처리 스캔 (조건부 · 미설치면 생략·고지 — modules/native-agents.md)
+└─ [병렬 5] L3 pr-review-toolkit:type-design-analyzer: 타입 설계 평가 (조건부 · 미설치면 생략·고지 — modules/native-agents.md)
 
     ↓ 모든 결과 수집
 
@@ -225,7 +226,7 @@ fz-gpt가 수행하는 작업:
 - JSON 응답 파싱 → Issue Tracker 자동 기록
 - 이슈 요약 반환
 
-> **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=Fable 5.1) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: GPT]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 미가용 시 /sc:sc-analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents]
+> **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=`fable` alias) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: GPT]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 미가용 시 /sc:sc-analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 2026-11-16]
 >
 > **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. GPT CLI 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(Agent·/sc:sc-analyze)로 **상속되지 않는다**.
 > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 규모는 그 근거 밖이다.
@@ -465,10 +466,11 @@ Gate 5 통과 후:
 
 | 에러 | 대응 | 폴백 |
 |------|------|------|
-| fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백 | Claude 자체 판단 |
+| fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 검증 2 불능 분기(Phase 5 — fresh-context Agent, Agent 미가용 시 /sc:sc-analyze) | fresh-context Claude 검증자 |
 | fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다(직전 `gpt-choice.sh decide` 가 `skip` 이면 probe 도 부르지 않고 `[GPT 미사용 — 사유]`). probe 성립 = kind `availability-probe`(`gpt-call.sh availability-probe` — 역할 없음 · ephemeral) 가 **non-empty 산출 + exit 0**(`--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |
+| pr-review-toolkit 에이전트 없음 (Agent 도구의 agentType 목록에 접두 포함 이름이 없다) | 그 다리(Phase 5 병렬 4 · 5)를 생략하고 보고에 `[L3 생략 — pr-review-toolkit 없음]` 한 줄 (`modules/native-agents.md` 스폰 규칙 6) | 병렬 1~3 과 GPT 검증으로 진행 |
 | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp · `cmp -s`)가 비0 이면 부르지 않는다. 준비한 복사본까지 거부되면 원본 경로로 낮추지 않는다 | 사용자 에스컬레이션(L4) — ⛔ **SOLO 폴백 아님** |
 
 ## Completion → Next

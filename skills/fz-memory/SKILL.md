@@ -11,7 +11,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__edit_memory, mcp__plugin_fz_serena__delete_memory,
   mcp__plugin_fz_serena__list_memories,
   mcp__plugin_fz_serena__find_symbol,
-  mcp__context7__resolve-library-id, mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   mcp__sequential-thinking__sequentialthinking
 metadata:
   provides: [memory-management, memory-recall]
@@ -33,6 +33,7 @@ metadata:
 - 3-Layer 메모리 관리: L1(Auto Memory) + L2(Serena) + L3(티켓 폴더 파일)
 - topic file 태그 기반 교훈 매칭
 - 코드 유효성 검증 (find_symbol + Grep)
+- ⛔ **선택 도구 상태**: 서브커맨드 첫 단계에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
 
 ## 사용 시점
 

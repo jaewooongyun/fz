@@ -15,10 +15,9 @@ allowed-tools: >-
   mcp__plugin_fz_serena__write_memory,
   mcp__plugin_fz_serena__edit_memory,
   mcp__plugin_fz_serena__list_memories,
-  mcp__context7__resolve-library-id,
-  mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
+  mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
-  mcp__atlassian-jira__jira_get,
   Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [planning, architecture-analysis]
@@ -116,7 +115,7 @@ metadata:
 4. **반환 처리** — 잠정 플랜: Workflow 결과는 잠정 플랜과 방향 · 완주 판정이다. `degraded`(아래 완주 보류 — L3 재개 → L4) 이거나 `directionEscalation`(RECONSIDER · REDIRECT — 아래 사용자 확인)이면 그 항목 절차대로 처리하고, 풀리기 전에는 4.5 · 5 로 넘어가지 않는다:
    - `mode:'workflow'` → plan(§X readScope/§Y writeScope/§Z acceptanceCriteria + RTM 5필드 + implicationRegister + unresolvedPeerIssues[archVerdict])을 Phase 1 산출물로 통합 → plan-v{N}.md 기록 + top-level `directionAlternatives`(plan 객체 밖 — PlanSchema에 없음)를 plan 문서 '구조 결정 옵션 테이블' 섹션으로 **별도 병합** (병합 누락 시 옵션이 사용자에게 미도달)
    - ⛔ **`degraded: true` 면 완주가 아니다** (A3-01) — `missingLenses` 에 적힌 렌즈(edge·impactArch·merge)가 빠진 결과이고 `metrics.stagesCompleted` 도 그만큼 낮다. 이 반환으로 plan-v{N} 을 확정하거나 Gate 1 로 넘기지 않는다(**완주 보류**).
-     → `guides/skill-authoring.md` §12 사다리 **L3** — 같은 세션이면 `Workflow({ scriptPath, resumeFromRunId })` 로 재개한다. 재개 뒤에도 `degraded` 면(죽은 렌즈의 null 이 캐시로 재생되면 같은 결과가 온다) **L4** — 빠진 렌즈 이름과 선택지(새 호출 재실행·범위 축소·중단)를 사용자에게 보고한다. ⛔ 빠진 렌즈를 Lead 가 SOLO 로 채우지 않는다(L4 승인 후에만)
+     → `guides/skill-authoring.md` §12 사다리 **L3** — `Workflow({ scriptPath, resumeFromRunId })` 로 재개한다(CC 를 종료했으면 `claude --resume` 뒤). 재개 뒤에도 `degraded` 면(죽은 렌즈의 null 이 캐시로 재생되면 같은 결과가 온다) **L4** — 빠진 렌즈 이름과 선택지(새 호출 재실행·범위 축소·중단)를 사용자에게 보고한다. ⛔ 빠진 렌즈를 Lead 가 SOLO 로 채우지 않는다(L4 승인 후에만)
    - ⛔ `delta`(있으면) 처리: `stepAmendments` 를 해당 Step 에 반영하고 `addedEdgeCases`·`addedImpact` 를 plan 에 편입한다 — 편입은 내용을 옮기는 것이다. id 만 나열하지 않고 `case`·`failureScenario` 를 그 Step 의 경계 항목으로 적는다(R-C: id 만 나열한 run 이 시간대 경계를 잃었다). `unresolved` 는 사용자 보고 대상 — 조용히 버리지 않는다
    - ⛔ **반환 전체를 `{WORK_DIR}/plan/workflow-result.json` 으로 먼저 기록한다** — 아래 resolve 스크립트와 `plan_integrity_check.py` 가 그 파일을 읽는다. 기록하지 않으면 두 스크립트가 읽을 입력이 없어 계약이 no-op 이 된다(읽는 곳 3 · 쓰는 지시 0 이었다).
    - ⛔ `impactRequests` 가 비어 있지 않으면 **Lead 가 resolve 한다** — impact 렌즈는 Bash 가 없어 base 원본·이전 호출자 수를 직접 못 얻는다(`agents/plan-impact.md`). 요청을 무시하면 영향 분석이 그만큼 비어 있는 채로 plan 에 들어간다
@@ -169,6 +168,7 @@ metadata:
 3. **프로젝트 활성화**:
    - `mcp__plugin_fz_serena__activate_project` → LSP 서버 활성화
    - ⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile plan {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
+   - ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`
 4. **대상 모듈 심볼 파악**:
    - `mcp__plugin_fz_serena__get_symbols_overview` → 작업 대상 파일 심볼 구조
    - `mcp__plugin_fz_serena__find_symbol` → 컴포넌트 탐색

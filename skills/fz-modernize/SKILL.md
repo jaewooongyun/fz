@@ -40,7 +40,7 @@ metadata:
 ## 사용 시점
 
 ```bash
-/fz-modernize "fz 가이드 8개를 Opus 5 출시 후 최신화"          # → full 파이프라인
+/fz-modernize "fz 가이드 8개를 새 모델 출시 후 최신화"          # → full 파이프라인
 /fz-modernize light "그냥 가볍게 최신화"                       # → Phase 1+2 + GPT micro-eval (40차 simplified mode, 카운터 1 소비)
 /fz-modernize probe "guides/harness-engineering.md"           # → Phase 1만
 /fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
@@ -109,6 +109,7 @@ metadata:
    ├── execute/              ← Phase 5 변경 사항 추적 (선택)
    └── verify/               ← Phase 4 + Phase 6 검증 결과
    ```
+4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] WORK_DIR 결정?
@@ -162,11 +163,12 @@ metadata:
    ```bash
    python3 scripts/lint_doc_freshness.py --days 90
    ```
-   - 산출: `missing-audit-date`(외부 출처 인용하나 감사일자 없음) · `stale-audit`(경과 초과) · `stale-model-ref`(구세대 모델명만 있고 현행 미언급)
+   - 산출: `missing-audit-date`(외부 출처 인용하나 감사일자 없음) · `stale-audit`(경과 초과) · `stale-model-ref`(구세대 모델명만 있고 현행 미언급) · `cc-version-ahead`(설치 Claude Code 가 `guides/llm-references.md` 의 `대조 기준 Claude Code` 줄보다 높다) · `cc-version-unjudged`(기준 줄 · CLI 를 읽지 못해 미판정 — 통과 아님)
+   - **`--online` 사용 시점**: `cc-version-ahead` 가 떴을 때(또는 Phase 1 probe 에서 changelog 를 볼 때) `python3 scripts/lint_doc_freshness.py --online` 으로 기준 뒤 changelog 를 대조한다 — 새 기본 모델 공지가 있으면 `cc-new-default-model`(exit 1), 받지 못하면 판정 불가(exit 2 — 통과 아님). 네트워크를 쓰므로 opt-in 이고 health-check 는 부르지 않는다. 대조를 마친 뒤에만 기준 줄을 대조한 마지막 changelog 버전으로 고친다
    - **현행 모델명은 `guides/llm-references.md`의 `모델 정책: <X> only`에서 자동 파싱**(SSOT) — 새 모델 출시 시 그 한 줄만 갱신하면 lint가 따라온다
    - ⛔ **한계**: 최신성 ≠ 정확성. lint가 clean이어도 내용 검증은 별도 (Phase 1 probe 소관)
 
-2. **lint 미포괄 패턴 grep** (태그·인용):
+2. **lint 미포괄 패턴 grep** (태그·인용 — 옛 모델용 프롬프트 패턴은 `/doctor prompt-audit`(Claude Code 2.1.283+ 슬래시 명령 · 스킬 안에서 부를 수 있는지 미확인 — 필요하면 사용자에게 실행을 부탁)로도 보되 아래 grep 을 대신하지 않는다):
    ```bash
    grep -nE "\[미검증|미검증:|Deprecated|deprecated|outdated" guides/*.md
    grep -nE "arxiv|arXiv" guides/*.md
@@ -381,7 +383,7 @@ exit "$RC"       # 정문 exit 를 덮지 않는다(hygiene §8)
 
 ```
 예시 1 — full 파이프라인:
-  /fz-modernize "fz 가이드 8개를 Opus 5 출시 후 최신화"
+  /fz-modernize "fz 가이드 8개를 새 모델 출시 후 최신화"
   → 티켓 폴더 자동 생성
   → Phase 1 (Probe): WebSearch 5건 + Tier 1+2 분류
   → Phase 2 (Audit): grep으로 미검증 8곳 식별

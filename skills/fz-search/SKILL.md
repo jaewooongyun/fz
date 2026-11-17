@@ -12,8 +12,8 @@ allowed-tools: >-
   mcp__plugin_fz_serena__activate_project,
   mcp__plugin_fz_serena__read_memory,
   mcp__plugin_fz_serena__write_memory,
-  mcp__context7__resolve-library-id,
-  mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
+  mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   LSP,
   Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Workflow
 
@@ -88,6 +88,7 @@ metadata:
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?

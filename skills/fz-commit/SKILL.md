@@ -7,7 +7,6 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[TICKET-ID]"
 allowed-tools: >-
-  mcp__atlassian-jira__jira_get,
   Bash(git *)
 metadata:
   provides: [commit]
@@ -67,7 +66,7 @@ CLAUDE.md 에 팀 커밋 스킬이 선언되어 있으면(절 제목과 무관 �
 
 **Will**:
 - Conventional Commits 형식으로 커밋 메시지 생성
-- JIRA 티켓 ID를 커밋 prefix에 포함
+- 트래커 티켓 ID를 커밋 prefix에 포함 — 조회는 CLAUDE.md 가 선언한 트래커 MCP(연결돼 있을 때 · 권한 프롬프트를 거친다), 없으면 인자 · 수동 입력(`modules/governance.md` § 팀 스킬 위임)
 - CLAUDE.md 의 팀 커밋 규칙 · 스킬 선언 우선 적용(절 제목 무관 — `modules/governance.md` § 팀 스킬 위임)
 - 커밋 단위 판단 및 분리 제안
 
@@ -91,7 +90,7 @@ CLAUDE.md 에 팀 커밋 스킬이 선언되어 있으면(절 제목과 무관 �
 |------|------|------|
 | nothing to commit | staged 파일 없음 안내 | `git status` 확인 후 스테이징 요청 |
 | commit-msg hook 실패 | 훅 오류 메시지 안내 | 메시지 형식 수정 후 재시도 |
-| JIRA 티켓 조회 실패 | MCP 없이 수동 입력 안내 | 인자로 전달받은 티켓 ID 직접 사용 |
+| 트래커 티켓 조회 실패 · 불가 (호출 오류 · 선언한 트래커 MCP 미연결 · 선언 없음 · 권한 거절) | 수동 입력 안내 — 트래커 도구는 사전 승인하지 않는다 | 인자로 전달받은 티켓 ID 직접 사용 |
 | 커밋 단위 판단 불명확 | 변경 파일 목록 출력 후 사용자 확인 | 사용자 지시에 따라 분리 |
 | 분할 커밋 단독 검증 실패 | 실패 커밋의 검사 로그 끝과 원인을 보인다 | 묶음·순서를 고쳐 격리 검증부터 다시 — 실제 저장소에는 커밋하지 않는다 |
 

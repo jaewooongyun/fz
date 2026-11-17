@@ -14,10 +14,10 @@ allowed-tools: >-
   mcp__plugin_fz_serena__write_memory,
   mcp__plugin_fz_serena__edit_memory,
   mcp__plugin_fz_serena__list_memories,
-  mcp__context7__resolve-library-id,
-  mcp__context7__query-docs,
+  mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
+  mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
-  Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow
+  Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Bash(*/scripts/gpt-choice.sh*), Workflow, WebSearch, WebFetch
 metadata:
   provides: [landscape-map, trade-off-table, open-questions]
   needs: [none]
@@ -53,7 +53,6 @@ metadata:
 |------|------|
 | guides/skill-authoring.md §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본) |
 | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-| modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
 | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
 | modules/lead-reasoning.md | Speculation-to-Fact Fallacy (§1.5) — 탐색 결과 주장 시 [verified] 태그 |
 | modules/uncertainty-verification.md | Default-Deny — 증거 없는 옵션/제약 주장 차단 |
@@ -65,7 +64,7 @@ metadata:
 | Phase 1 | `/sc:sc-analyze` | 기존 코드/아키텍처 분석으로 암묵적 제약 사전 식별 |
 | Phase 2 | `/sc:sc-brainstorm` | 후보 옵션 발산이 필요할 때 |
 | Phase 2 | `/fz-explain` | 기존 패턴/규칙 설명 (F-023) |
-| Phase 2 | L3 `deep-research-agent` | 외부 기술/라이브러리 조사 (modules/native-agents.md) |
+| Phase 2 | Lead `WebSearch` · `WebFetch` | 외부 기술/라이브러리 조사 |
 | Phase 3 | `/sc:sc-reflect` | 수렴된 결과 자체 검증 |
 | Phase 4 | `→ /fz-plan` | 정제된 요구사항으로 구현 계획 수립 |
 
@@ -161,6 +160,7 @@ GOOD: "proxy에 @Published는 안 됩니다.
 - [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile discover` exit 0? (아래 · WORK_DIR 없는 세션은 건너뜀을 보고)
 
 ⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile discover {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
+⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`
 
 ---
 

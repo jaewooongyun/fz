@@ -48,8 +48,8 @@ Reviews code quality, dead code, and performance characteristics of the submitte
 
 ### 5. Concurrency Safety (동시성 코드 포함 시 **또는 역방향 감지 트리거 활성 시**, CLAUDE.md 플러그인·최소 타겟 정보 참조)
 
-- actor isolation 경계 위반 여부
-- Sendable conformance 적절성
+- actor isolation 경계 위반 여부 (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우)
+- Sendable conformance 적절성 (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우)
 - structured vs unstructured concurrency 선택 합리성
 
 ### 6. Comment-Abstraction Alignment

@@ -35,9 +35,9 @@ metadata:
 - **6-Phase 오케스트레이션**: 세션 부트스트랩 → 의도 분석 → 복잡도 평가 → 파이프라인+팀 결정 → 확인 → 실행
 - **사전 정의 파이프라인** (19개): 자주 쓰는 조합을 즉시 매칭 (빠른 경로)
 - **동적 파이프라인**: `provides`/`needs` 그래프 기반 자동 구성 (폴백)
-- **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(Fable 5.1) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
+- **2-모드 시스템**: SOLO (Lead 단독) / TEAM (Lead(`fable` alias) + opus 워커 동시 ≤3 + 단순 작업 sonnet)
 - **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 값은 Lead 세션 effort · `modules/mode-gate.md` § effort) — fable 판단 지점 3곳과 별개
-- **3-Tier 모델**: **Fable 5.1**(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
+- **3-Tier 모델**: **fable** alias(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
 - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없고 fz-discover 는 `--deep` 명시 플래그 · commit/pr 은 명시 호출 전용(정본 `modules/gpt-strategy.md` § 단계 실행 판정)(끔 · CLI 없음 → `[GPT 미사용 — 사유]` — `modules/gpt-strategy.md` § GPT 미사용)
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
 - **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + GPT 교차검증(fz-search 엔 없음 · fz-discover 는 `--deep` 때만)
@@ -106,6 +106,7 @@ metadata:
 
 ### 절차
 
+0. ⛔ **선택 도구 상태**: 화면 한 줄로만 알린다 — 승인(Phase 4) 전 파일 쓰기는 가드가 막는다 · 파일 기록은 승인 뒤. 형식 `modules/tool-status.md`
 1. **이전 세션 복원** (새 세션일 때만):
    - 티켓 폴더가 있으면 `index.md` 의 `## Essential Context` 를 Read 해 Active Phase · Pending 을 이어받는다 — 복원 원천은 티켓 폴더 산출물이다(3b 와 같은 근거)
    - `/sc:sc-load` 는 선택 — SuperClaude 를 쓰고 이전에 `/sc:sc-save` 한 데이터가 있을 때만
@@ -336,7 +337,7 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
 3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/GPT) + 통합
 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
-   **L1** split_required/splitSuggested → Step 분할 후 재invoke · **L2** 입력 오류 → 수정 후 재invoke(설계된 fail-fast) · **L3** 스톨·일시 장애 → **`resume` 우선**(동일 세션 한정) · **L4** 미해소 → 사용자 에스컬레이션 — ⛔ Lead 단독 SOLO 수행은 **사용자 승인 후에만** (Lead=fable 자동 SOLO 금지)
+   **L1** split_required/splitSuggested → Step 분할 후 재invoke · **L2** 입력 오류 → 수정 후 재invoke(설계된 fail-fast) · **L3** 스톨·일시 장애 → **`resume` 우선**(CC 를 종료했으면 `claude --resume` 뒤) · **L4** 미해소 → 사용자 에스컬레이션 — ⛔ Lead 단독 SOLO 수행은 **사용자 승인 후에만** (Lead=fable 자동 SOLO 금지)
 ```
 
 ### Verification Discipline Brief (모든 agent() spawn에 자동 포함)
