@@ -40,7 +40,6 @@ GUIDE_NAMES = {"CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", "GEMINI.md"}
 GUIDE_PATHS = {".github/copilot-instructions.md"}
 SKIP_DIRS = {".git", "node_modules", ".build", "build", "DerivedData", "Pods", "Carthage", ".venv", "venv",
              "vendor", "dist", ".next", "target", ".gradle", "__pycache__"}
-MAX_DEPTH = 6
 
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$")
 CLOSING = re.compile(r"[ \t]+#+$")
@@ -51,11 +50,12 @@ LINKS = (re.compile(r"\]\(([^)\s#]+\.md)(?:#[^)\s]*)?\)"), re.compile(r"`([^`\s]
 
 
 def guide_files(root: pathlib.Path) -> list:
-    """⛔ 읽지 못한 폴더를 건너뛰지 않는다 — os.walk 는 기본값에서 오류를 삼켜, 못 읽은 지침을 '지침 없음'으로 만든다."""
+    """⛔ 읽지 못한 폴더를 건너뛰지 않는다 — os.walk 는 기본값에서 오류를 삼켜, 못 읽은 지침을 '지침 없음'으로 만든다.
+    ⛔ 깊이 상한을 두지 않는다 — 상한보다 깊은 폴더의 지침이 잘림 표시 없이 빠진다. 건너뛰는 것은 SKIP_DIRS 뿐이다."""
     found, errors = [], []
     for cur, dirs, files in os.walk(root, onerror=errors.append):
         rel_dir = pathlib.Path(cur).relative_to(root)
-        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS) if len(rel_dir.parts) < MAX_DEPTH else []
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
         for f in files:
             rel = (rel_dir / f).as_posix()
             if f in GUIDE_NAMES or rel in GUIDE_PATHS:
@@ -223,6 +223,25 @@ def self_test() -> int:
             got = [s["heading"] for s in extract(fz)["sections"]]
             case("⛔ 네 백틱 펜스 안의 세 백틱 줄은 펜스를 닫지 않는다(같은 문자 · 같거나 긴 길이)", got == ["앞", "뒤"], got)
 
+        def t_deep():
+            # 깊이 n = 저장소 루트에서 지침 파일이 든 폴더까지의 폴더 수. 7 하나만 보면 상한을 올린 수정도 통과한다 — 20 · 64 를 함께 본다
+            dp = pathlib.Path(tmp) / "deep"
+            chain = lambda n: dp.joinpath(f"d{n}", *["x"] * (n - 1))  # noqa: E731
+            want = []
+            for n in (6, 7, 20, 64):
+                chain(n).mkdir(parents=True)
+                (chain(n) / "AGENTS.md").write_text(f"## 깊이 {n}\n", encoding="utf-8")
+                want.append((chain(n) / "AGENTS.md").relative_to(dp).as_posix())
+            for skip, name in ((chain(20) / "node_modules" / "pkg", "AGENTS.md"), (chain(64) / ".git" / "x", "CLAUDE.md"),
+                               (chain(7) / "x" / "vendor", "GEMINI.md")):
+                skip.mkdir(parents=True)
+                (skip / name).write_text("# 무시\n", encoding="utf-8")
+            idx = extract(dp)
+            case("deep-guide-no-depth-cap 깊이 6 · 7 · 20 · 64 폴더의 지침이 모두 files 에 든다 — 깊은 지침을 '지침 없음'으로 만들지 않는다",
+                 idx["absent"] is False and set(want) <= set(idx["files"]), [f.count("/") for f in idx["files"]])
+            case("deep-skip-dir-still-skipped 깊은 폴더 아래의 제외 폴더(node_modules · .git · vendor) 속 지침은 여전히 빠진다",
+                 not [f for f in idx["files"] if set(f.split("/")) & {"node_modules", ".git", "vendor"}], idx["files"])
+
         def t_locked():
             if os.geteuid() != 0:                      # root 는 권한을 무시해 이 경우를 만들 수 없다
                 lk = pathlib.Path(tmp) / "locked"
@@ -320,7 +339,7 @@ def self_test() -> int:
             r = run("--project", str(proj), "--link-source", str(solo / "없다.md"))
             case("link-source-missing-exit2 없는 --link-source 는 exit 2 · stdout 비움", r.returncode == UNRUN and r.stdout == "", f"exit {r.returncode}")
 
-        for t in (t_index, t_cli, t_fence4, t_locked, t_links):
+        for t in (t_index, t_cli, t_fence4, t_deep, t_locked, t_links):
             try:
                 t()
             except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다

@@ -1,0 +1,7 @@
+diff --git a/src/a.swift b/src/a.swift
+index 1111111..2222222 100644
+--- a/src/a.swift
++++ b/src/a.swift
+@@ -1,1 +1,2 @@
+ import Foundation
++async function f() { await g() }

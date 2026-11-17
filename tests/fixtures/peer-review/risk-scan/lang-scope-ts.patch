@@ -1,0 +1,7 @@
+diff --git a/src/a.ts b/src/a.ts
+index 1111111..2222222 100644
+--- a/src/a.ts
++++ b/src/a.ts
+@@ -1,1 +1,2 @@
+ export {}
++async function f() { await g() }

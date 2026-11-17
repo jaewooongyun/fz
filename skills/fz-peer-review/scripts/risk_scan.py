@@ -312,7 +312,7 @@ def scan(diff_text):
         "files": len(by_file),
         "runtime_axes": runtime_axes(blob, removed_blob),
         "doc_contract_deleted": doc_contract_deleted(diff_text),
-        "plugin_refs": plugin_refs(blob),
+        "plugin_refs": plugin_refs(by_file),
     }
 
 
@@ -373,15 +373,24 @@ def plugin_table():
     return rows
 
 
-def plugin_refs(blob):
-    """추가 행에 표의 토큰이 있으면 그 행의 플러그인 · 참조 항목 — {플러그인: [참조 항목]}. 표가 없으면 None."""
+def plugin_refs(by_file):
+    """Swift(`.swift`) 파일 추가 행에 표의 토큰이 있으면 그 행의 플러그인 · 참조 항목 — {플러그인: [참조 항목]}. 표가 없으면 None.
+
+    ⛔ 파일별로 잰다 — 표는 Swift 플러그인 표다. 모든 파일의 추가 행을 blob 하나로 합치면 .ts · .py 의 async/await 도
+       Swift Concurrency 참조를 Read 하라는 의무(pluginRefsRead)가 된다. 혼합 diff 는 파일마다 가르고 결과는 합집합이다.
+       일반 동시성 범주(CATEGORIES)와 runtime_axes 는 언어와 무관하게 blob 으로 그대로 잰다.
+    """
     rows = plugin_table()
     if rows is None:
         return None
     out = {}
-    for toks, plugin, refs in rows:
-        if any(t and t in blob for t in toks):
-            out.setdefault(plugin, set()).update(refs)
+    for path, lines in by_file.items():
+        if not path.lower().endswith(".swift"):
+            continue
+        text = "\n".join(lines)
+        for toks, plugin, refs in rows:
+            if any(t and t in text for t in toks):
+                out.setdefault(plugin, set()).update(refs)
     return {k: sorted(v) for k, v in sorted(out.items())}
 
 

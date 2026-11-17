@@ -133,6 +133,11 @@
     "f013-doc-comment-contract-deleted": {"doc_contract_deleted": [{"path": "src/Checkout.swift", "lines": ["반드시 메인 스레드에서 호출한다.", "주문 처리 중이면 먼저 멈춘다."]}], "risk": 0},
     "f258-runtime-axis-marked": {"runtime_axes": ["gesture", "on_change", "state_capture"]},
     "f520-plugin-refs-full-table": {"plugin_refs": {"Swift Concurrency": ["performance", "sendable", "tasks"], "SwiftUI Expert": ["latest-apis", "localization", "state-management", "view-structure"]}},
+    "lang-scope-ts": {"plugin_refs": {}, "categories": ["concurrency"], "why": ".ts 의 async/await 는 Swift 플러그인 참조를 부르지 않는다 — 일반 동시성 범주는 남는다"},
+    "lang-scope-python": {"plugin_refs": {}, "categories": ["concurrency"], "why": ".py 의 async/await 도 Swift 플러그인 참조가 없다 — 일반 동시성 범주는 남는다"},
+    "lang-scope-swift": {"plugin_refs": {"Swift Concurrency": ["async-await-basics", "tasks"]}, "categories": ["concurrency"], "why": "양성 대조: ts 셀과 같은 표본을 .swift 에 넣으면 참조가 나온다"},
+    "lang-scope-mixed": {"plugin_refs": {"Swift Concurrency": ["actors"]}, "categories": ["concurrency"], "why": "혼합 diff 는 파일별로 가른다 — .ts 의 async 는 빠지고 .swift 의 @MainActor 만 참조를 부른다"},
+    "lang-scope-swift-upper-ext": {"plugin_refs": {"Swift Concurrency": ["actors"]}, "categories": ["concurrency"], "why": "확장자는 대소문자를 가리지 않는다 — .SWIFT 도 Swift 파일이다"},
     "f516-convention-deviation-collected": {"convention_deviations": [{"path": "src/StoreVC.swift", "role": "onSelect", "line": 15, "missing": ["!isCheckoutLocked"], "siblings": 2}]}
   }
 }

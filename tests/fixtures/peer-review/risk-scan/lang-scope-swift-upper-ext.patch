@@ -1,0 +1,7 @@
+diff --git a/src/B.SWIFT b/src/B.SWIFT
+index 3333333..4444444 100644
+--- a/src/B.SWIFT
++++ b/src/B.SWIFT
+@@ -1,1 +1,2 @@
+ import Foundation
++@MainActor final class M {}
