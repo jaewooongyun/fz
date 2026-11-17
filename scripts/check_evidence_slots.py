@@ -13,6 +13,9 @@
   ③ `evidence/tools.md` 첫 줄 = `Serena: active <path> @<sha> (languages: <목록>)` 또는 `[Serena 미사용 — <사유>]`.
      active 면 언어 목록이 비지 않아야 하고(빈 목록 = 언어 서버 미활성) `@sha` 가 `target.json` 의 `sha` 와 같은 커밋이어야 한다
      (앞부분 일치 · 7자 이상) — 작업 트리가 리뷰 대상이 아니면 Serena 결과는 근거가 아니다.
+     같은 줄 끝에 선택 도구 꼬리 ` · context7 목록✓|목록✗ · sc 목록✓|목록✗` 가 있어야 하고, ✗ 가 하나라도 있으면
+     ` — 빠지는 단계: <단계>` 를 붙인다(✓ 뿐이면 붙이지 않는다). 목록✓ = 도구 목록에 이름이 있다 — 연결됐다는 뜻이 아니다.
+     꼬리 없는 첫 줄 · 다른 표기 · 둘째 줄에 적은 상태는 위반이다(첫 줄만 읽는다 — 정본은 modules/tool-status.md).
   ④ `evidence/caller-analysis.md` 가 있으면 `## 호출` · `## 구현` 두 절이 다 있고, 각 절은 내용 또는 `해당 없음 — <사유>` 다.
      `TODO` 자리표시는 거부한다(개인 도구가 `## 구현` 을 TODO 로 남겨 Lead 가 채우게 한다).
   ⑤ `evidence/error-paths.md` 가 있으면 에러 전파 주장(`## 주장: …`)마다 체인의 층(`- 층 N <심볼>: <파일>:<줄> \`코드\``)이
@@ -21,7 +24,7 @@
 
 profile(`--profile`): peer-review(기본 — ①~⑤) · plan · discover · fix(③ · ⑤ — 참조 탐색을 하는 스킬의 첫 단계 활성 기록 · F-534).
   plan · discover · fix 의 ③ 대상 = `target.json` 의 `root`(세션 대상 트리 — 같은 경로여야 한다) · `sha`(있으면 앞부분 일치).
-  `[Serena 미사용 — 사유]` 는 통과 · 기록 없음 · 다른 트리 활성 · 빈 언어 목록은 위반이다.
+  `[Serena 미사용 — 사유]`(+ 꼬리)는 통과 · 기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 꼬리 없음은 위반이다.
 
 exit code:
   0  PASS
@@ -50,6 +53,8 @@ TIER_KEY = re.compile(r"(?i)\btier\s*[=:]?\s*([0-3])\b")
 TIER_BARE = re.compile(r"^\s*([0-3])\s*$")
 TOOLS_ACTIVE = re.compile(r"^Serena: active (\S.*?) @([0-9a-f]{7,40}) \(languages: ([^)]*)\)\s*$")
 TOOLS_UNUSED = re.compile(r"^\[Serena 미사용 — (\S.*)\]\s*$")
+# 선택 도구 꼬리 — Serena 부분(group 1) 뒤 같은 줄. 표기는 목록✓|목록✗ 둘뿐 · group 4 = 빠지는 단계(✗ 가 있을 때만)
+TOOLS_TAIL = re.compile(r"^(\S.*?) · context7 (목록[✓✗]) · sc (목록[✓✗])(?: — 빠지는 단계: (\S.*?))?\s*$")
 PROFILES = ("peer-review", "plan", "discover", "fix")
 CLAIM_HEAD = re.compile(r"^##\s+주장:\s*(\S.*)$")
 LAYER = re.compile(r"^-\s*층\s*(\d+)\b([^:]*):\s*(.*)$")
@@ -123,15 +128,20 @@ def sections(text: str):
 
 
 def tools_problems(work: str, profile: str) -> list:
-    """③ Serena 활성 기록 — 첫 줄 형식 · 언어 · 대상 일치. peer-review 는 target.json sha, 나머지는 root(+sha)."""
+    """③ Serena 활성 기록 — 첫 줄 형식 · 언어 · 대상 일치 + 선택 도구 꼬리. peer-review 는 target.json sha, 나머지는 root(+sha)."""
     tools = os.path.join(work, "evidence", "tools.md")
     first = open(tools, encoding="utf-8").readline().rstrip("\n") if os.path.isfile(tools) else None
-    act = TOOLS_ACTIVE.match(first) if first else None
     if first is None:
-        return ["evidence/tools.md 없음 — 첫 줄에 Serena 상태를 적는다"]
+        return ["evidence/tools.md 없음 — 첫 줄에 Serena 상태와 선택 도구 상태를 적는다"]
+    tail = TOOLS_TAIL.match(first)
+    head = tail.group(1) if tail else first
+    bad = [] if tail else [f"tools.md 첫 줄에 선택 도구 상태가 없거나 형식 밖 — 끝에 ` · context7 목록✓|목록✗ · sc 목록✓|목록✗`"
+                           f"(✗ 가 있으면 ` — 빠지는 단계: …`) · {first[:80]!r}"]
+    if tail and ("목록✗" in (tail.group(2), tail.group(3))) != bool(tail.group(4)):
+        bad.append("tools.md: ✗ 가 있으면 ` — 빠지는 단계: …` 를 붙이고 ✓ 뿐이면 붙이지 않는다")
+    act = TOOLS_ACTIVE.match(head)
     if not act:
-        return [] if TOOLS_UNUSED.match(first) else [f"tools.md 첫 줄 형식 밖 — {first[:80]!r}"]
-    bad = []
+        return bad if TOOLS_UNUSED.match(head) else bad + [f"tools.md 첫 줄 형식 밖 — {head[:80]!r}"]
     if not act.group(3).strip():
         bad.append("tools.md: languages 가 비었다 — 언어 서버가 안 떴다(미활성)")
     try:
@@ -152,7 +162,7 @@ def tools_problems(work: str, profile: str) -> list:
     if not sha or len(sha) < 7:
         bad.append("tools.md 가 Serena active 인데 target.json 의 sha 를 못 읽었다 — 대상 일치를 판정할 수 없다")
     elif not (sha.startswith(at) or at.startswith(sha)):
-        bad.append(f"tools.md: Serena 트리 @{at} ≠ 리뷰 대상 {sha[:12]} — 대상 트리에서 다시 켜거나 `[Serena 미사용 — 작업 트리 ≠ 대상]`")
+        bad.append(f"tools.md: Serena 트리 @{at} ≠ 리뷰 대상 {sha[:12]} — 대상 트리에서 다시 켜거나 `[Serena 미사용 — 작업 트리 ≠ 대상]`(+ 선택 도구 꼬리)")
     return bad
 
 
@@ -262,8 +272,9 @@ def self_test() -> int:
     real = required_slots(TIERS_DOC, 1)
     case("table-tier1", real == ["requirements", "old-new-pairs", "base-behavior", "base-patterns"], real)
 
+    tail = " · context7 목록✓ · sc 목록✓"   # 선택 도구 꼬리 — Serena 부분만 보는 셀은 정상 꼬리를 붙여 Serena 판정만 남긴다
     with tempfile.TemporaryDirectory() as t:
-        def mk(name, tools="Serena: active /x @abc1234def (languages: swift)\n"):
+        def mk(name, tools="Serena: active /x @abc1234def (languages: swift)" + tail + "\n"):
             d = os.path.join(t, name)
             os.makedirs(os.path.join(d, "evidence"))
             for p in ("tier.txt", "requirements.md", "base-behavior.md", "evidence/old-new-pairs.md", "evidence/base-patterns.md"):
@@ -296,10 +307,12 @@ def self_test() -> int:
         case("impl-not-applicable-ok", check(d, None) == OK)
         w(d, "evidence/caller-analysis.md", "## 호출\n- a\n")
         case("impl-section-missing", check(d, None) == VIOLATION)
-        case("serena-sha-mismatch", check(mk("sha", "Serena: active /x @fff0000 (languages: swift)\n"), None) == VIOLATION)
-        case("serena-no-languages", check(mk("lang", "Serena: active /x @abc1234 (languages: )\n"), None) == VIOLATION)
-        case("serena-unused-ok", check(mk("unused", "[Serena 미사용 — 작업 트리 ≠ 대상]\n"), None) == OK)
+        case("serena-sha-mismatch", check(mk("sha", "Serena: active /x @fff0000 (languages: swift)" + tail + "\n"), None) == VIOLATION)
+        case("serena-no-languages", check(mk("lang", "Serena: active /x @abc1234 (languages: )" + tail + "\n"), None) == VIOLATION)
+        case("serena-unused-ok", check(mk("unused", "[Serena 미사용 — 작업 트리 ≠ 대상]" + tail + "\n"), None) == OK)
         case("tools-free-text", check(mk("free", "Serena 썼음\n"), None) == VIOLATION)
+        case("tools-free-text-with-tail", check(mk("freetail", "Serena 썼음" + tail + "\n"), None) == VIOLATION)
+        case("tools-no-tail-peer-review", check(mk("notail", "Serena: active /x @abc1234def (languages: swift)\n"), None) == VIOLATION)
         d = mk("notools")
         os.remove(os.path.join(d, "evidence", "tools.md"))
         case("tools-missing", check(d, None) == VIOLATION)
@@ -320,12 +333,33 @@ def self_test() -> int:
         got = {}
         for pf in ("plan", "discover", "fix"):
             got[pf] = (check(prof(f"{pf}-none", None, tree), None, profile=pf),
-                       check(prof(f"{pf}-other", f"Serena: active {other} @abc1234 (languages: swift)\n", tree), None, profile=pf),
-                       check(prof(f"{pf}-nolang", f"Serena: active {tree} @abc1234 (languages: )\n", tree), None, profile=pf),
-                       check(prof(f"{pf}-unused", "[Serena 미사용 — 비 git 작업 폴더 · 대상 트리 없음]\n", tree), None, profile=pf),
-                       check(prof(f"{pf}-ok", f"Serena: active {tree} @abc1234 (languages: swift, python)\n", tree), None, profile=pf))
+                       check(prof(f"{pf}-other", f"Serena: active {other} @abc1234 (languages: swift){tail}\n", tree), None, profile=pf),
+                       check(prof(f"{pf}-nolang", f"Serena: active {tree} @abc1234 (languages: ){tail}\n", tree), None, profile=pf),
+                       check(prof(f"{pf}-unused", f"[Serena 미사용 — 비 git 작업 폴더 · 대상 트리 없음]{tail}\n", tree), None, profile=pf),
+                       check(prof(f"{pf}-ok", f"Serena: active {tree} @abc1234 (languages: swift, python){tail}\n", tree), None, profile=pf))
         case("r3-f534-activate-record-three-profiles",
              all(v == (VIOLATION, VIOLATION, VIOLATION, OK, OK) for v in got.values()), got)
+
+        # 선택 도구 꼬리 — 목록✓|목록✗ 두 표기 · ✗ 가 있으면 빠지는 단계 · 상태 없음 · 다른 표기 · 둘째 줄의 상태는 위반
+        u = "[Serena 미사용 — 비 git 작업 폴더]"
+        grammar = {
+            "ext": (u + " · context7 목록✗ · sc 목록✓ — 빠지는 단계: 라이브러리 문서 조회", OK),
+            "allok": (u + tail, OK),
+            "both-missing": (u + " · context7 목록✗ · sc 목록✗ — 빠지는 단계: 문서 조회 · 정적 분석", OK),
+            "active": (f"Serena: active {tree} @abc1234 (languages: swift) · context7 목록✓ · sc 목록✗ — 빠지는 단계: 정적 분석", OK),
+            "nostate": (u, VIOLATION),
+            "badmark": (u + " · context7 있음 · sc 목록✓", VIOLATION),
+            "noskip": (u + " · context7 목록✗ · sc 목록✓", VIOLATION),
+            "skip-without-missing": (u + tail + " — 빠지는 단계: 없음", VIOLATION),
+            "emptyskip": (u + " · context7 목록✗ · sc 목록✓ — 빠지는 단계: ", VIOLATION),
+            "nosc": (u + " · context7 목록✓", VIOLATION),
+            "order": (u + " · sc 목록✓ · context7 목록✓", VIOLATION),
+            "second-line": (u + "\ncontext7 목록✗ · sc 목록✓ — 빠지는 단계: 문서 조회", VIOLATION),
+            "inside-bracket": ("[Serena 미사용 — 비 git 작업 폴더" + tail + "]", VIOLATION),
+        }
+        got = {k: check(prof(f"tail-{k}", line + "\n", tree), None, profile="discover") for k, (line, _) in grammar.items()}
+        case("toolstate-tail-grammar", all(got[k] == want for k, (_, want) in grammar.items()),
+             {k: v for k, v in got.items() if v != grammar[k][1]})
     print(f"self-test {passed}/{total} passed")
     return OK if passed == total else 1
 

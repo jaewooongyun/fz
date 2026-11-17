@@ -254,7 +254,7 @@ def lead_effort(env=None, projects: Path | None = None) -> dict:
         if e_val and e_val != t_val:
             out["note"] = f"transcript {t_val} ≠ env {e_val} — transcript 채택(그 턴의 실제 값)"
     elif e_val:
-        out = {"value": e_val, "source": "env", "note": "transcript 판독 실패 — env 사용(세션 중 /effort 변경 반영 여부 미확인)"}
+        out = {"value": e_val, "source": "env", "note": "transcript 판독 실패 — env 사용(Bash 서브프로세스 시작 시점의 effort 설정값)"}
     else:
         out = {"value": None, "source": "none", "note": "출처 없음 — args.effort 를 넘기지 않는다(워크플로 미지정 = 'xhigh')"}
         if t_val or e_raw:

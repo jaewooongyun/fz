@@ -17,8 +17,9 @@
 #         단일 편집(총계 2/4 로 변화)은 정상 포착. same-total swap 은 AC-1 생산 스테이지 규칙 +
 #         코드리뷰가 backstop (완전 자동 차단은 label-set 검사 필요).
 #      ⛔ fable 지정 지점을 의도적으로 늘리거나 줄이면 아래 EXPECTED_FABLE 값도 함께 갱신할 것
-#   ③ CLAUDE_CODE_SUBAGENT_MODEL 환경변수 설정 시 경고 (exit 0 유지 — 경고만)
-#      → AC-2 (전면 override 금지 — workflow 의 model explicit 지정과 충돌 소지)
+#   ③ CLAUDE_CODE_SUBAGENT_MODEL_FORCE 또는 CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL 설정 시 경고,
+#      CLAUDE_CODE_SUBAGENT_MODEL 단독은 정보 줄 (exit 0 유지 — 경고만)
+#      → AC-2 (전면 override 금지 — 두 변수는 workflow 의 model explicit 지정을 덮을 수 있다. SUBAGENT_MODEL 단독은 기본값이라 덮지 않는다)
 #
 # 검사 원리: agent 호출 opts 리터럴은 전부 single-line 이며 'agentType:' 를 고유 마커로
 #   갖는다 (주석의 destructuring {..model, agentType} 는 콜론이 없어 자동 제외). 따라서
@@ -145,8 +146,16 @@ done < <(grep -nHE 'agentType[[:space:]]*:' "$WORKFLOWS_DIR"/*.js)
 fable_count=$(grep -hoE "model[[:space:]]*:[[:space:]]*'fable'" "$WORKFLOWS_DIR"/*.js | wc -l | tr -d ' ') || true
 
 # ── ③ 환경변수 일괄 override 경고 (AC-2 — exit 0 유지, 경고만) ──
-if [ -n "${CLAUDE_CODE_SUBAGENT_MODEL:-}" ]; then
-  echo "⚠️  경고: CLAUDE_CODE_SUBAGENT_MODEL='${CLAUDE_CODE_SUBAGENT_MODEL}' 설정됨 — AC-2 (전면 override 금지). workflow 의 model explicit 지정을 무력화할 수 있음."
+#    결정 순서 정본 = guides/model-guide.md § 서브에이전트 · 워크플로 (호출별 model → 정의의 model → CLAUDE_CODE_SUBAGENT_MODEL → 세션 모델)
+#    ⛔ 경고 · 정보 줄은 아래 판정 줄보다 먼저 찍는다 — health-check 는 이 lint 출력의 마지막 줄만 기록한다
+#    ⛔ CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL 의 결정 순서 안 위치는 확인하지 못했다(model-guide.md 의 미검증 표기) — 문구가 그 위치를 단정하지 않는다
+if [ -n "${CLAUDE_CODE_SUBAGENT_MODEL_FORCE:-}" ]; then
+  echo "⚠️  경고: CLAUDE_CODE_SUBAGENT_MODEL_FORCE='${CLAUDE_CODE_SUBAGENT_MODEL_FORCE}' 설정됨 — AC-2 (전면 override 금지). 에이전트 정의의 model 을 무시하고 호출별 model 도 받지 않는다(CLAUDE_CODE_SUBAGENT_MODEL 이 없으면 메인 대화 모델). workflow 의 model explicit 지정을 무력화할 수 있음."
+elif [ -n "${CLAUDE_CODE_SUBAGENT_MODEL:-}" ]; then
+  echo "ℹ️  정보: CLAUDE_CODE_SUBAGENT_MODEL='${CLAUDE_CODE_SUBAGENT_MODEL}' 설정됨 — 기본값이다. 호출별 model 과 정의의 model 이 먼저라 workflow 의 model explicit 지정을 덮지 않는다."
+fi
+if [ -n "${CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL:-}" ]; then
+  echo "⚠️  경고: CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL='${CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL}' 설정됨 — AC-2 (전면 override 금지). workflow 에이전트 전부를 한 모델로 돌리는 변수다. workflow 의 model explicit 지정을 무력화할 수 있음."
 fi
 
 # ── 판정 ──

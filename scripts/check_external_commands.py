@@ -43,22 +43,25 @@ SCRIPT_DIR_PARENT = pathlib.Path(__file__).resolve().parent.parent   # scripts/ 
 #    required=True 는 부재 시 절차가 죽는 것, False 는 있으면 좋은 것.
 # ⛔ **하드코딩하지 않는다** — 목록이 소비자마다 흩어지면 한 곳만 고쳐진다(N4).
 #    단일 출처: `schemas/tool-inventory.json` (`lint_contracts` #12 · S6 · S20 이 같은 파일을 읽는다).
-def _declared() -> dict:
-    """{명령: required}. ⛔ 부재·파싱 실패는 **예외**다 — 빈 dict 로 폴백하면
+def _declared() -> tuple:
+    """({명령: required}, 셸 내장 집합). ⛔ 부재·파싱 실패는 **예외**다 — 빈 dict 로 폴백하면
     선언이 0건이 되어 '미선언 명령 0건' 으로 조용히 통과한다."""
     import json
     q = SCRIPT_DIR_PARENT / "schemas" / "tool-inventory.json"
     try:
         with open(q, "r", encoding="utf-8") as fh:
             inv = json.load(fh)
-        return {k: bool(vv.get("required", False)) for k, vv in inv["external_commands"].items()}
+        return ({k: bool(vv.get("required", False)) for k, vv in inv["external_commands"].items()},
+                set(inv["shell_builtins"]))
     except (OSError, ValueError, KeyError) as e:
         # ⛔ exit 2 = 측정 실패. 빈 선언으로 넘기면 '미선언 0건' 으로 조용히 통과한다.
         print(f"⛔ 도구 인벤토리를 읽지 못했다 — {q}: {type(e).__name__}: {e}", file=sys.stderr)
         raise SystemExit(2)
 
 
-DECLARED = _declared()
+# ⛔ 셸 내장(`command` 등)은 인벤토리의 `shell_builtins` 에 둔다 — external_commands 에 두면 `shutil.which` 를 거치는데
+#    셸 내장은 실행 파일로 깔려 있다는 보장이 없어, 실행 파일이 없는 환경에서 필수 부재로 FAIL 한다. 선언·실존 확인 없이 스캔에서 걷는다.
+DECLARED, SHELL_BUILTINS = _declared()
 # ⛔ 명령이 아닌 것 — 언어 키워드·문서 내 함수. 스캔 오탐의 실측 원인이다.
 NOT_A_COMMAND = {
     "import", "from", "elif", "else", "return", "print", "def", "class", "with", "try",
@@ -96,7 +99,7 @@ def scan_commands(root: pathlib.Path):
             for blk in CODE_BLOCK.findall(q.read_text(encoding="utf-8")):
                 for m in FIRST_TOKEN.finditer(blk):
                     tok = m.group(1)
-                    if tok in NOT_A_COMMAND or tok in POSIX_UTILS:
+                    if tok in NOT_A_COMMAND or tok in POSIX_UTILS or tok in SHELL_BUILTINS:
                         continue
                     if "_" in tok:          # 문서 내 함수 관례 (init_or_use_session)
                         continue
@@ -293,6 +296,21 @@ def self_test():
         rc = check(r)
         assert rc == OK, f"⛔ POSIX 유틸·셸 키워드를 미선언 명령으로 오탐했다 (rc={rc})"
 
+    def c_shell_builtin_command_ok(tmp):
+        """⛔ 오탐 방어 — 셸 내장 `command` 는 실행 파일이 없어도(which → None) 필수 부재가 아니고, `command -v` 줄도 미선언이 아니다."""
+        r = mk(tmp / "r", "# x\n\n```bash\ncommand -v jq >/dev/null || echo \"jq 필요\"\n```\n")
+        real = shutil.which
+
+        def gone(c, *a, **k):
+            return None if c == "command" else real(c, *a, **k)
+
+        g = globals(); g["shutil"].which = gone
+        try:
+            rc = check(r)
+        finally:
+            g["shutil"].which = real
+        assert rc == OK, f"⛔ 셸 내장 command 를 외부 명령으로 다뤘다 (rc={rc})"
+
     def c_awk_nonascii(tmp):
         r = mk(tmp / "r", "# x\n")
         mk(r, "#!/bin/bash\nawk -F'\\t' '$3 == \"연기\" {print}' f.tsv\n", "scripts/a.sh")
@@ -335,7 +353,8 @@ def self_test():
                  ("non-bash-block-ignored", c_non_bash_block_ignored),
                  ("two-letter-undeclared-detected", c_two_letter_undeclared_detected),
                  ("two-letter-rg-reported", c_two_letter_rg_reported),
-                 ("posix-util-keyword-not-flagged", c_posix_util_and_keyword_not_flagged)]:
+                 ("posix-util-keyword-not-flagged", c_posix_util_and_keyword_not_flagged),
+                 ("shell-builtin-command-ok", c_shell_builtin_command_ok)]:
         case(n, f)
 
     print(f"self-test {len(passed)}/{cases} 통과")

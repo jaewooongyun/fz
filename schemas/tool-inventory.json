@@ -3,8 +3,9 @@
   "_why": "N4: '/sc:·Serena·LSP·JIRA 를 세 서버째 손으로 고쳤고 검사는 없다'. 목록이 소비자마다 흩어져 있으면 한 곳만 고쳐진다(같은 사실의 선언처가 여럿).",
   "_update_method": [
     "MCP 서버 추가/개명 시: (1) mcp_servers 에 추가 (2) 개명이면 retired_mcp_prefixes 에 옛 접두 → 새 이름 (3) `python3 scripts/lint_contracts.py` 로 #12 확인",
-    "실사용 서버 전수는 이 명령으로 뽑는다: grep -rhoE 'mcp__(plugin_[a-z-]+_)?[a-z0-9_-]+__' agents skills modules | sort -u",
+    "실사용 서버 전수는 이 명령으로 뽑는다: grep -rhoE 'mcp__(plugin_[a-z-]+_)?[A-Za-z0-9_-]+__' agents skills modules | sort -u",
     "외부 명령 추가 시: external_commands 에 {required} 와 함께 추가 → `python3 scripts/check_external_commands.py`",
+    "셸 내장(`command` 등)은 external_commands 가 아니라 shell_builtins 에 둔다 — 실행 파일로 깔려 있다는 보장이 없어 `shutil.which` 로 실존을 확인하지 않고 문서 스캔에서만 걷는다",
     "⛔ 이 파일은 **선언**이다. 실제 가용성(서버가 떠 있는가)은 별개 축이며 lint_contracts #2(SEMANTIC)가 소관이다 — 정적으로 닫히지 않는다."
   ],
   "_measured": "2026-09-22 — 실사용 MCP 서버 6종 · 외부 명령 17종",
@@ -12,16 +13,17 @@
   "mcp_servers": {
     "plugin_fz_serena": { "form": "plugin", "note": "플러그인 제공 — 런타임이 `plugin_fz_` 접두를 붙인다" },
     "context7":         { "form": "plain",  "note": "라이브러리 문서" },
-    "plugin_context7_context7": { "form": "plugin", "note": "공식 마켓플레이스 context7 플러그인으로 깔았을 때의 등록 이름 — agents tools 에 context7 이름과 함께 둔다(F-544 · 없는 이름은 무시된다)" },
+    "plugin_context7_context7": { "form": "plugin", "note": "공식 마켓플레이스 context7 플러그인으로 깔았을 때의 등록 이름 — agents tools 와 스킬 allowed-tools 에 context7 이름과 함께 둔다(F-544 · 없는 이름은 무시된다)" },
     "sequential-thinking": { "form": "plain", "note": "단계 추론" },
-    "atlassian-jira":   { "form": "plain",  "note": "REST path 를 받는 범용 도구" },
-    "github":           { "form": "plain",  "note": "PR·이슈" }
+    "github":           { "form": "plain",  "note": "PR·이슈" },
+    "XcodeBuildMCP":    { "form": "plain",  "note": "빌드 검증 — 프로젝트 CLAUDE.md 가 XcodeBuildMCP 를 명시할 때만 쓴다(modules/build.md 빌드 명령 결정). #12 대상(agents · skills) 밖에서만 쓴다 — 선언만" },
+    "xcode":            { "form": "plain",  "note": "Xcode 쓰기 도구(XcodeWrite · XcodeUpdate · XcodeMV · XcodeRM · XcodeMakeDir)를 fz-guard 가 `/fz` 승인 전 막는다. 서버 이름은 사용자가 등록한 이름이라 가드는 이름과 무관하게 도구 이름으로 판정한다(mods/fz-guard/hooks/guard.py XCODE_WRITE) — 이 키는 대표 이름이다. #12 대상(agents · skills) 밖에서만 쓴다 — 선언만" }
   },
 
   "retired_mcp_prefixes": {
     "mcp__serena__":    "mcp__plugin_fz_serena__ (v4.35.0 — 런타임은 플러그인 접두를 붙인다)",
     "mcp__lsp__":       "네이티브 LSP 도구 (v4.36.0 — 그런 이름의 MCP 서버가 없다)",
-    "mcp__atlassian__": "mcp__atlassian-jira__ (v4.36.0 — REST path 를 받는 범용 도구)"
+    "mcp__atlassian__": "대체 이름 없음 — 트래커 도구는 스킬 · 에이전트가 사전 승인하지 않는다. 프로젝트 CLAUDE.md 가 선언한 트래커 MCP 를 권한 프롬프트를 거쳐 쓴다(modules/governance.md § 팀 스킬 위임 · v4.36.0 의 대체 이름 mcp__atlassian-jira__ 도 내렸다)"
   },
 
   "external_commands": {
@@ -35,10 +37,16 @@
     "mkdir":   { "required": true }, "cat":  { "required": true },
     "printf":  { "required": true }, "xargs": { "required": true },
     "sleep":   { "required": true }, "test": { "required": true },
-    "command": { "required": true }, "find": { "required": true },
+    "find":    { "required": true },
     "sed":     { "required": true }, "sort": { "required": true },
     "wc":      { "required": true },
     "cmp":     { "required": true,  "note": "Workflow 준비 — 원본 ↔ WORK_DIR 복사본 바이트 일치(guides/skill-authoring.md §12 0단계)" },
-    "tar":     { "required": false, "note": "swarm 고정 트리 준비 — git archive | tar -xf - (guides/skill-authoring.md §12 공용 읽기 전용 swarm 절) · 부재 시 swarm 만 못 한다" }
-  }
+    "tar":     { "required": false, "note": "swarm 고정 트리 준비 — git archive | tar -xf - (guides/skill-authoring.md §12 공용 읽기 전용 swarm 절) · 부재 시 swarm 만 못 한다" },
+    "node":    { "required": false, "note": "점검(/fz-manage check · health-check)의 회귀 오라클 · scripts/check_wf_*.js — 부재 시 그 검사들이 미실행으로 남아 health-check 가 exit 2 로 끝난다" },
+    "perl":    { "required": false, "note": "GPT 호출 래퍼(scripts/gpt-call.sh · scripts/gpt_independent.sh)가 어댑터를 자기 프로세스 그룹에서 띄운다 — 부재 시 gpt-call.sh 가 exit 11 로 끝나 GPT 단계만 못 한다" },
+    "uvx":     { "required": false, "note": "번들 Serena MCP 기동 명령(.mcp.json) — 부재 시 번들 Serena 가 뜨지 않는다(Serena 는 선택 도구)" },
+    "claude":  { "required": false, "note": "문서 최신성 lint 기본 실행의 설치 버전 확인(scripts/lint_doc_freshness.py — claude --version) — 부재 시 그 대조만 미판정 경고로 남는다" }
+  },
+
+  "shell_builtins": ["command"]
 }

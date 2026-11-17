@@ -38,13 +38,15 @@ import tempfile
 
 # ── 단가 $/M: (input, cache_write_1h, cache_read, output, cache_write_5m) ─────
 # 출처: platform.claude.com/docs/en/about-claude/pricing (2026-09-06 확인 · 2026-11-06 재대조:
-#    5m 쓰기 = 입력 ×1.25, 1h 쓰기 = 입력 ×2, 캐시 읽기는 Fable 5.1 ×0.025 · Opus 5.5·Sonnet 5.5 ×0.05 · 나머지 ×0.1).
+#    5m 쓰기 = 입력 ×1.25, 1h 쓰기 = 입력 ×2, 캐시 읽기는 Fable 5.1·Fable 5.2 ×0.025 · Opus 5.5·Sonnet 5.5 ×0.05 · 나머지 ×0.1.
+#    Fable 5.2 행은 2026-11-16 대조 — 옛 모델 행은 그 모델로 돈 옛 세션의 단가라 남긴다).
 # ⛔ 5m 쓰기 열은 **맨 뒤**에 붙였다 — 인덱스 0~3 을 읽는 계산(`call_cost`)과 옛 호출부를 깨지 않으려는 것이다.
 # ⛔ Haiku 5.5 는 프롬프트가 100K 토큰을 넘으면 단가가 5배다(같은 페이지). 아래 행은 100K 이하 단가뿐이다 —
 #    fz 는 haiku 를 쓰지 않아 구간 분기를 두지 않았다. 쓰게 되면 `call_cost` 에서 입력 합계로 가른다.
 # ⛔ evidence/usage_agg.py 의 표와 다르다 — 그 표는 Fable 5.1 캐시읽기를 1.0 으로,
 #    Sonnet 5 를 3/6/0.3/15 로 적어 두었다. 정본은 아래(계약 §Step1).
 PRICES = {
+    "claude-fable-5-2": (8.0, 16.0, 0.2, 40.0, 10.0),
     "claude-fable-5-1": (10.0, 20.0, 0.25, 50.0, 12.5),
     "claude-fable-5": (10.0, 20.0, 1.0, 50.0, 12.5),
     "claude-opus-5-5": (4.0, 8.0, 0.2, 20.0, 5.0),  # whats-new-opus-5-5 (2026-09-25 대조) — 1h 쓰기 = 입력 ×2
@@ -2098,6 +2100,8 @@ def self_test():
     ua._accumulate("claude-unknown-9", "main", {}, {"input_tokens": 1, "output_tokens": 1}, None, None)
     check("단가 미등록 호출 수 집계", dict(ua.unpriced), {"claude-unknown-9": 2})
     check("Fable 5.1 캐시읽기 단가", PRICES["claude-fable-5-1"][2], 0.25)
+    for mid in ("claude-fable-5-2", "claude-fable-5-2[1m]"):   # 입력 · 1h 쓰기 · 캐시 읽기 · 출력 · 5m 쓰기 — pricing 표 그대로
+        check("단가 Fable 5.2 " + mid, price_for(mid), (8.0, 16.0, 0.2, 40.0, 10.0))
     check("단가 sonnet-5-5·haiku-5-5 등록", (price_for("claude-sonnet-5-5"), price_for("claude-haiku-5-5")),
           ((2.0, 4.0, 0.1, 10.0, 2.5), (0.1, 0.2, 0.01, 0.5, 0.125)))
     sa = TranscriptAgg()

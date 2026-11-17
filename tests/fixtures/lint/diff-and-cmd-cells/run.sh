@@ -21,8 +21,8 @@
 #     shell-keywords                 for · do · done · if · then · fi 줄 → 위반 아님(셸 키워드)
 #     kubectl-ctl                    3글자 이상 미선언 → VIOLATION (두 트리 공통 양성 대조 — 스캐너가 살아 있다)
 #     mixed-cmd                      rg · gh · fd · ag · cd · ls · do · python3 한 블록 → 미선언 = {ag, fd, rg} 정확히
-#     no-which-ec33                  cd · ls · cp · mv · rm · tr · sh · rg · gh 가 실행 파일로 없는 환경(shutil.which → None)을 흉내 내도
-#                                    위반 아님 — 셸 내장을 which 로 확인하는 필수 항목이 없다(EC-33)
+#     no-which-ec33                  cd · ls · cp · mv · rm · tr · sh · rg · gh · command 가 실행 파일로 없는 환경(shutil.which → None)을
+#                                    흉내 내도 위반 아님 — 셸 내장을 which 로 확인하는 필수 항목이 없고 `command -v` 줄은 미선언이 아니다(EC-33)
 #   live-diff-lint · live-cmd-lint   트리 자신에 두 lint → exit 0 (라이브 오탐 0)
 # 기준 트리는 2글자 명령 · 따옴표 뒤가 아닌 `^\+` 를 못 봐 양성 셀을 놓친다 → exit 1.
 # exit: 0 전건 통과 · 1 단언 실패 · 2 중첩 실행(`UNRUN:`) · 3 준비 실패(인자 · 도구 · 임시 폴더 · lint traceback ·
@@ -196,7 +196,7 @@ NO_WHICH = r'''
 import importlib.util, io, contextlib, pathlib, shutil, sys
 tree, root = sys.argv[1:3]
 real = shutil.which
-GONE = {"cd", "ls", "cp", "mv", "rm", "tr", "sh", "rg", "gh"}
+GONE = {"cd", "ls", "cp", "mv", "rm", "tr", "sh", "rg", "gh", "command"}
 shutil.which = lambda c, *a, **k: None if c in GONE else real(c, *a, **k)
 s = importlib.util.spec_from_file_location("cmds_under_test", tree + "/scripts/check_external_commands.py")
 m = importlib.util.module_from_spec(s)
@@ -272,13 +272,13 @@ try:
         check("mixed-cmd", rc == 1 and und == {"ag", "fd", "rg"}, "선언 gh · POSIX · 키워드 · 미선언 fd · ag · rg 혼합 → 미선언 = {ag, fd, rg}",
               f"exit {rc} · 미선언 {sorted(und)}")
         nw = cb / "no-which-ec33"
-        write(nw, "skills/x/SKILL.md", "# x\n\n```bash\ncd /tmp\nls -l\ncp a b\ngh pr view 1\n```\n")
+        write(nw, "skills/x/SKILL.md", "# x\n\n```bash\ncd /tmp\nls -l\ncp a b\ngh pr view 1\ncommand -v jq >/dev/null\n```\n")
         _, out = run(["-c", NO_WHICH, TREE, nw], allowed=(0,))
         m = re.search(r"^RC=(\d+)$", out, re.M)
         if not m:
             raise Setup(f"no-which-ec33: RC 줄 없음 ⏎ {out[-200:]}")
         check("no-which-ec33", m.group(1) == "0",
-              "cd · ls · cp · gh 가 실행 파일로 없는 환경을 흉내 내도 위반 아님 — GONE 집합의 명령을 which 로 확인하는 필수 항목 없음",
+              "cd · ls · cp · gh · command 가 실행 파일로 없는 환경을 흉내 내도 위반 아님 — GONE 집합의 명령을 which 로 확인하는 필수 항목 없음",
               out)
 
         # ── 라이브 트리 ─────────────────────────────────────────────
