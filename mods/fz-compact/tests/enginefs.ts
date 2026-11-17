@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
-import { fakeHost } from './fakehost.ts'
-import type { FakeHost } from './fakehost.ts'
+import { fakeHost } from './fakehost'
+import type { FakeHost } from './fakehost'
 
 /**
  * The fake host of `tests/fakehost.ts` standing beneath the plugin under test as the engine's file system and

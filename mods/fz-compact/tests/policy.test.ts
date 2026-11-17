@@ -1,7 +1,7 @@
 import type { SessionMessage } from 'claude-code'
 import { test, expect } from 'claude-code/testing'
-import { ALLOWED_TOOLS, MARK_PREFIX, applyMasks, dropRepeatedRows, placeholder, selectMasks } from '../lib/policy.ts'
-import type { MaskCandidate, MaskCounts } from '../lib/policy.ts'
+import { ALLOWED_TOOLS, MARK_PREFIX, applyMasks, dropRepeatedRows, placeholder, selectMasks } from '../lib/policy'
+import type { MaskCandidate, MaskCounts } from '../lib/policy'
 
 const OPTS = { keepRecentUserTurns: 6, minMaskChars: 1200, imageIds: new Set<string>() }
 const COUNT_KEYS = ['mask', 'recent', 'error', 'image', 'tool', 'small', 'already'] as const
@@ -47,6 +47,12 @@ function spillMap(candidates: readonly MaskCandidate[]): Map<string, string> {
   return new Map(candidates.map((c): [string, string] => [c.tool_use_id, placeholder(c.tool, c.chars, `/spill/s1/${c.tool_use_id}.txt`)]))
 }
 
+function rowAt(rows: readonly SessionMessage[], index: number): SessionMessage {
+  const row = rows[index]
+  if (row === undefined) throw new Error(`no row ${index} in ${rows.length} rows`)
+  return row
+}
+
 function expectCounts(actual: MaskCounts, want: Partial<MaskCounts>): void {
   expect(Object.keys(actual).join(',')).toBe(COUNT_KEYS.join(','))
   for (const key of COUNT_KEYS) expect(`${key}=${actual[key]}`).toBe(`${key}=${want[key] ?? 0}`)
@@ -74,14 +80,14 @@ test('policy: masks eligible result', () => {
   const out = applyMasks(messages, replacements)
   expect(out.length).toBe(messages.length)
   expect(out.every((m, i) => i === 2 || m === messages[i])).toBe(true)
-  const row = out[2]
+  const row = rowAt(out, 2)
   expect(row === messages[2]).toBe(false)
   expect('handle' in row).toBe(false)
   expect(`${row.role}|${row.text}`).toBe('user|')
   expect((row.toolResults ?? []).map((r) => r.tool_use_id).join(',')).toBe('t1,t2,t3,t4')
   expect((row.toolResults ?? []).every((r) => r.text === replacements.get(r.tool_use_id) && r.isError === false && !('result' in r))).toBe(true)
-  expect(messages[2].handle).toBe('handle-t1-t2-t3-t4')
-  expect(messages[2].toolResults?.[0]?.text).toBe(big('a'))
+  expect(rowAt(messages, 2).handle).toBe('handle-t1-t2-t3-t4')
+  expect(rowAt(messages, 2).toolResults?.[0]?.text).toBe(big('a'))
 })
 
 test('policy: keeps recent', () => {
@@ -244,7 +250,7 @@ test('policy: skips already masked', () => {
   expectCounts(first.counts, { mask: 1, already: 1 })
 
   const masked = applyMasks(messages, spillMap(first.candidates))
-  const shown = masked[2].toolResults?.[0]?.text ?? ''
+  const shown = rowAt(masked, 2).toolResults?.[0]?.text ?? ''
   expect(shown).toBe(placeholder('Read', 1500, '/spill/s1/t1.txt'))
   expect(shown.length < OPTS.minMaskChars).toBe(true)
 
@@ -273,7 +279,7 @@ test('policy: keeps mixed row whole', () => {
 
   const whole = applyMasks(messages, new Map([['t1', 'mask one'], ['t2', 'mask two']]))
   expect(whole[2] === messages[2]).toBe(false)
-  expect((whole[2].toolResults ?? []).map((r) => `${r.tool_use_id}=${r.text}`).join(',')).toBe('t1=mask one,t2=mask two')
+  expect((rowAt(whole, 2).toolResults ?? []).map((r) => `${r.tool_use_id}=${r.text}`).join(',')).toBe('t1=mask one,t2=mask two')
   expect(whole[3] === messages[3]).toBe(true)
 })
 
@@ -317,8 +323,8 @@ test('policy: drops repeated rows', () => {
   expect(out.messages.map((m) => messages.indexOf(m)).join(',')).toBe('0,1,3,5,8,9,10,11,12,13,14')
   expect(out.messages[1] === messages[1]).toBe(true)
   expect(out.messages[2] === messages[3]).toBe(true)
-  expect(out.messages[2].handle).toBe('handle-t1')
-  expect(out.messages[2].toolResults?.[0]?.text).toBe(big('a'))
+  expect(rowAt(out.messages, 2).handle).toBe('handle-t1')
+  expect(rowAt(out.messages, 2).toolResults?.[0]?.text).toBe(big('a'))
   expect(out.messages[3] === messages[5]).toBe(true)
 
   const clean = [prompt('first'), calls([['t1', 'Read']]), results([{ id: 't1', text: big('a') }]), reply('done')]

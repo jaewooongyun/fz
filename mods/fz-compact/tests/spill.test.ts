@@ -1,8 +1,8 @@
 import { test, expect } from 'claude-code/testing'
-import { cleanup, loadManifest, logPathOf, settleEntries, spillBatch, touchActivity } from '../lib/spill.ts'
-import type { Manifest, SpillItem } from '../lib/spill.ts'
-import { fakeHost } from './fakehost.ts'
-import type { FakeHost } from './fakehost.ts'
+import { cleanup, loadManifest, logPathOf, settleEntries, spillBatch, touchActivity } from '../lib/spill'
+import type { Manifest, SpillItem } from '../lib/spill'
+import { fakeHost } from './fakehost'
+import type { FakeHost } from './fakehost'
 
 const ROOT = '/spill'
 const MIB = 1024 * 1024
@@ -292,7 +292,7 @@ test('spill: rewrite releases the replaced bytes', async () => {
 test('spill: cleanup rechecks mtime before delete', async () => {
   const now = 100 * DAY
   const host = fakeHost(now)
-  const sid = 'aaaaaaaa-0000-4000-8000-000000000009'
+  const sid = '00000000-0000-7000-8000-000000000001'
   const dir = `${ROOT}/${sid}`
   host.put(`${ROOT}/${sid}.json`, manifestText(sid, now, ['named']), now)
   host.put(`${dir}/named.txt`, 'n', now - 31 * DAY)
@@ -316,9 +316,9 @@ test('spill: cleanup rechecks mtime before delete', async () => {
 test('spill: cleanup reclaims unreferenced files', async () => {
   const now = 100 * DAY
   const host = fakeHost(now)
-  const sid = 'aaaaaaaa-0000-4000-8000-000000000010'
-  const idle = 'aaaaaaaa-0000-4000-8000-000000000011'
-  const locked = 'aaaaaaaa-0000-4000-8000-000000000012'
+  const sid = '00000000-0000-7000-8000-000000000001'
+  const idle = '00000000-0000-7000-8000-000000000002'
+  const locked = '00000000-0000-7000-8000-000000000003'
   const dir = `${ROOT}/${sid}`
   host.put(`${ROOT}/${sid}.json`, manifestText(sid, now - HOUR, ['named', 'old']), now - HOUR)
   host.put(`${dir}/named.txt`, 'n', now - 25 * HOUR)
@@ -349,7 +349,7 @@ test('spill: cleanup reclaims unreferenced files', async () => {
   expect(want.every((path) => argv.includes(path))).toBe(true)
 
   const bulk = fakeHost(now)
-  const many = 'aaaaaaaa-0000-4000-8000-000000000013'
+  const many = '00000000-0000-7000-8000-000000000004'
   // Its manifest is what makes the folder the plugin's.
   bulk.put(`${ROOT}/${many}.json`, manifestText(many, now, []), now)
   for (let i = 0; i < 2000; i += 1) bulk.put(`${ROOT}/${many}/stray-${String(i).padStart(4, '0')}-${'x'.repeat(40)}.txt`, 's', now - 25 * HOUR)
@@ -364,8 +364,8 @@ test('spill: cleanup reclaims unreferenced files', async () => {
 test('spill: cleanup leaves folders without a manifest', async () => {
   const now = 100 * DAY
   const host = fakeHost(now)
-  const orphan = 'aaaaaaaa-0000-4000-8000-000000000014'
-  const sid = 'aaaaaaaa-0000-4000-8000-000000000015'
+  const orphan = '00000000-0000-7000-8000-000000000001'
+  const sid = '00000000-0000-7000-8000-000000000002'
   const lone = `${ROOT}/${orphan}`
   // A folder named like a session id with no manifest beside it, its manifest-shaped temporary file, and a folder not named so: someone else's.
   const kept = [`${lone}/old.txt`, `${lone}/old.txt.tmp-5`, `${lone}/stray.txt`, `${ROOT}/${orphan}.json.tmp-6`, `${ROOT}/build/out.log`]
@@ -390,7 +390,7 @@ test('spill: cleanup leaves folders without a manifest', async () => {
 test('spill: cleanup keeps a manifest until its folder is emptied', async () => {
   const now = 100 * DAY
   const host = fakeHost(now)
-  const sid = 'aaaaaaaa-0000-4000-8000-000000000016'
+  const sid = '00000000-0000-7000-8000-000000000001'
   const dir = `${ROOT}/${sid}`
   const manifestPath = `${ROOT}/${sid}.json`
   const logPath = logPathOf(ROOT, sid)
@@ -424,8 +424,8 @@ test('spill: cleanup keeps a manifest until its folder is emptied', async () => 
 test('spill: cleanup leaves the live session alone', async () => {
   const now = 100 * DAY
   const host = fakeHost(now)
-  const live = 'aaaaaaaa-0000-4000-8000-000000000017'
-  const other = 'aaaaaaaa-0000-4000-8000-000000000018'
+  const live = '00000000-0000-7000-8000-000000000001'
+  const other = '00000000-0000-7000-8000-000000000002'
   // Both past every keep: the manifest and log 31 days old, the named file past 30 days, the unnamed one and the manifest's temporary file past 24 hours.
   for (const sid of [live, other]) {
     host.put(`${ROOT}/${sid}.json`, manifestText(sid, now - 31 * DAY, ['named']), now - 31 * DAY)

@@ -1,8 +1,8 @@
 import type { Register, SessionMessage } from 'claude-code'
-import { applyMasks, dropRepeatedRows, placeholder, selectMasks } from '../lib/policy.ts'
-import type { MaskCandidate, MaskCounts } from '../lib/policy.ts'
-import { cleanup, loadManifest, logPathOf, settleEntries, spillBatch, spillRootOf, touchActivity } from '../lib/spill.ts'
-import type { SpillHost } from '../lib/spill.ts'
+import { applyMasks, dropRepeatedRows, placeholder, selectMasks } from '../lib/policy'
+import type { MaskCandidate, MaskCounts } from '../lib/policy'
+import { cleanup, loadManifest, logPathOf, settleEntries, spillBatch, spillRootOf, touchActivity } from '../lib/spill'
+import type { SpillHost } from '../lib/spill'
 
 /** What `$.clock.after` hands back: `cancel()` before it fires stops it. */
 type TimerHandle = { cancel(): unknown }

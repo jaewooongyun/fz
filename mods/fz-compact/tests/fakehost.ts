@@ -1,4 +1,4 @@
-import type { SpillHost } from '../lib/spill.ts'
+import type { SpillHost } from '../lib/spill'
 
 /**
  * One file of the memory file system. `size`, when set, is what `list` and `stat` report in place of the

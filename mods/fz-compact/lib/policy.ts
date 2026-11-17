@@ -94,7 +94,8 @@ function recentStart(messages: readonly SessionMessage[], keep: number): number 
   if (keep <= 0) return messages.length
   let seen = 0
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (!isHumanPrompt(messages[index])) continue
+    const message = messages[index]
+    if (message === undefined || !isHumanPrompt(message)) continue
     seen += 1
     if (seen >= keep) return index
   }
@@ -185,7 +186,7 @@ export function applyMasks(messages: readonly SessionMessage[], replacements: Re
 
 /** Whether two lists name the same tool_use_ids in the same order. */
 function isSameIds(a: readonly { tool_use_id: string }[], b: readonly { tool_use_id: string }[]): boolean {
-  return a.length === b.length && a.every((entry, index) => entry.tool_use_id === b[index].tool_use_id)
+  return a.length === b.length && a.every((entry, index) => entry.tool_use_id === b[index]?.tool_use_id)
 }
 
 /**
@@ -214,7 +215,8 @@ function isRepeatOf(message: SessionMessage, kept: SessionMessage): boolean {
 export function dropRepeatedRows(messages: readonly SessionMessage[]): { messages: SessionMessage[]; dropped: number } {
   const kept: SessionMessage[] = []
   for (const message of messages) {
-    if (kept.length > 0 && isRepeatOf(message, kept[kept.length - 1])) continue
+    const last = kept[kept.length - 1]
+    if (last !== undefined && isRepeatOf(message, last)) continue
     kept.push(message)
   }
   return { messages: kept, dropped: messages.length - kept.length }

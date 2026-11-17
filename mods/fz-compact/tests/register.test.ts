@@ -1,11 +1,11 @@
 import type { On, SessionMessage, SessionUsage } from 'claude-code'
 import { test, expect, mock } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
-import { placeholder } from '../lib/policy.ts'
-import { loadManifest } from '../lib/spill.ts'
-import type { Manifest, ManifestEntry } from '../lib/spill.ts'
-import { engineFs } from './enginefs.ts'
-import type { EngineFs } from './enginefs.ts'
+import { placeholder } from '../lib/policy'
+import { loadManifest } from '../lib/spill'
+import type { Manifest, ManifestEntry } from '../lib/spill'
+import { engineFs } from './enginefs'
+import type { EngineFs } from './enginefs'
 
 const HOME = '/h'
 /** Where the plugin spills with `spillDir` empty and HOME at `/h`. */
@@ -143,6 +143,13 @@ function plain(rows: readonly SessionMessage[]): SessionMessage[] {
     if (row.toolResults === undefined) return { role: row.role, text: row.text, toolUses }
     return { role: row.role, text: row.text, toolUses, toolResults: row.toolResults.map((result) => ({ tool_use_id: result.tool_use_id, text: result.text, isError: result.isError })) }
   })
+}
+
+/** Row `index` of `rows`; with no row there it throws, which fails the test. */
+function rowAt(rows: readonly SessionMessage[], index: number): SessionMessage {
+  const row = rows[index]
+  if (row === undefined) throw new Error(`no row ${index} in ${rows.length} rows`)
+  return row
 }
 
 /** Every row's text, every tool call's arguments as JSON and every tool result's text, in characters: what a saving is weighed against. */
@@ -489,7 +496,7 @@ test('register: partial spill rechecks the saving', { options: STRICT }, async (
   // r1's result saves over minNetReductionTokens, with r2's or alone; r2's alone saves under it.
   const huge = 'h'.repeat(60_000)
   const messages = twoReads()
-  messages[2] = { ...messages[2], toolResults: [{ tool_use_id: 'r1', text: huge, isError: false }] }
+  messages[2] = { ...rowAt(messages, 2), toolResults: [{ tool_use_id: 'r1', text: huge, isError: false }] }
   await startSession($)
   await mainTurn($, 't1')
   await clock.settle()
@@ -680,18 +687,18 @@ test('register: resume drops repeated rows', { options: SMALL }, async ($, on) =
   // placeholder, and the last answer twice.
   const rows = transcript()
   const repeated: SessionMessage[] = [
-    rows[0],
-    rows[1],
-    ...plain([rows[1]]),
-    rows[2],
+    rowAt(rows, 0),
+    rowAt(rows, 1),
+    ...plain([rowAt(rows, 1)]),
+    rowAt(rows, 2),
     { role: 'user', text: '', toolUses: [], toolResults: [{ tool_use_id: 'r1', text: shown, isError: false }] },
-    rows[3],
-    rows[4],
-    ...plain([rows[4]]),
+    rowAt(rows, 3),
+    rowAt(rows, 4),
+    ...plain([rowAt(rows, 4)]),
   ]
   const first = await $.session.compact({ trigger: 'manual', instructions: RESUME, messages: repeated })
   const want = transcript()
-  want[2] = { ...want[2], toolResults: [{ tool_use_id: 'r1', text: shown, isError: false }] }
+  want[2] = { ...rowAt(want, 2), toolResults: [{ tool_use_id: 'r1', text: shown, isError: false }] }
   expect(first.skip).toBeUndefined()
   expect(shapeOf(first.messages)).toEqual(shapeOf(want))
   expect((first.messages ?? []).flatMap((row) => (row.toolResults ?? []).filter((result) => result.tool_use_id === 'r1').map((result) => result.text))).toEqual([shown])
@@ -699,7 +706,7 @@ test('register: resume drops repeated rows', { options: SMALL }, async ($, on) =
 
   // Its own answer resumed the same way: every result a placeholder already, only the repeats to drop.
   const own = plain(first.messages ?? [])
-  const again = await $.session.compact({ trigger: 'manual', instructions: RESUME, messages: plain([own[0], own[1], own[1], own[2], own[2], own[3], own[4], own[4]]) })
+  const again = await $.session.compact({ trigger: 'manual', instructions: RESUME, messages: plain([0, 1, 1, 2, 2, 3, 4, 4].map((index) => rowAt(own, index))) })
   expect(again.skip).toBeUndefined()
   expect(shapeOf(again.messages)).toEqual(shapeOf(first.messages))
   expect(w.logs.some((line) => line.startsWith('fz-compact deduped: dropped 3 repeated rows; no tool result to mask (') && line.includes(`tool results ${2 * shown.length} -> ${shown.length} chars`))).toBe(true)
