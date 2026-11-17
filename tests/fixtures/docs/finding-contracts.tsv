@@ -167,3 +167,5 @@ F-577	skills/fz-plan/SKILL.md	lacks	2.7 독립 플랜도 없다
 F-577	skills/fz-plan/references/rationale.md	has:replace	light 도 2.7 을 기본으로 띄운다
 F-577	skills/fz-plan/references/rationale.md	lacks	light 에는 처음부터 2.7
 F-578	modules/fz-gpt-subcommands-core.md	has	앞 라운드 resume 교차가 격리 폴더를 지웠으면
+F-213	guides/skill-authoring.md	has:replace	2.1.318
+F-213	guides/skill-authoring.md	lacks	동일 Claude Code 세션 내에서만

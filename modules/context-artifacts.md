@@ -267,7 +267,7 @@ Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이
 
 ## Artifact Token Budget
 
-> 현재 환경: **Fable 5.1 (Lead 운용)** · 워커(수행 에이전트)는 opus(=Opus 5.5, 2026-09-22~)/sonnet. Fable 5.1·**Opus 5.5** 모두 1M context — "The 1M token context window is the default, and a header sent for older models has no effect." [verified: platform.claude.com/docs/en/models/opus-5-5/migration-guide]. 티켓 폴더 파일 전략은 모델 무관 유지
+> 현재 환경: **Lead = `fable` alias(Claude Code v2.1.321 부터 Fable 5.2 — fz 운용 선택)** · 워커(수행 에이전트)는 opus(=Opus 5.5, 2026-09-22~)/sonnet. 이전 Lead Fable 5.1·**Opus 5.5** 는 모두 1M context(Fable 5.2 의 컨텍스트 창은 2026-11-16 대조 범위 밖) — "The 1M token context window is the default, and a header sent for older models has no effect." [verified: platform.claude.com/docs/en/models/opus-5-5/migration-guide]. 티켓 폴더 파일 전략은 모델 무관 유지
 > ⚠️ **tokenizer**: 1.00-1.35x 토큰 증가 (pre-4.7 baseline, fz 자체 실측 미완료) `[미검증: fz 자체 count_tokens 측정 대기]`. **Opus 4.7/4.8/5 · Fable 5는 동일 tokenizer** → 이들 간 이전 시 토큰 수 거의 불변 [verified: claude-api 번들 스킬 — "same tokenizer as Opus 4.8"]. 측정 후 하단 테이블 크기 조정 가능.
 > ℹ️ **프롬프트 캐시 최소 prefix**: Opus 5.5 = **512 tokens**, Opus 4.8 = 1024 — "The minimum cacheable prompt length on Claude Opus 5.5 is 512 tokens, down from 1,024 tokens on Claude Opus 4.8." [verified: platform.claude.com/docs/en/models/opus-5-5/migration-guide]. 짧은 artifact도 캐시 대상이 되므로 분할 전략 재검토 여지 있음.
 > 원칙: 전체 artifact 로드 합계 ≤ 100K tokens. 나머지는 실행 working memory.
@@ -439,7 +439,7 @@ compact 후 복원은 context summary보다 **파일 Read가 더 정확**하다.
 
 1. **MCP 출력 격리**: 대용량 결과(Grep, 심볼 분석, GPT)는 파일로 저장 후 Read 참조. context에 raw 출력 남기지 않음
 2. **중간 산출물 즉시 기록**: 분석 결과가 나오면 대화에 축적하지 말고 티켓 폴더 파일/Serena에 즉시 기록 → compact 시 Read로 복원
-3. **에이전트 스폰 최소화**: 스폰마다 ~50K 토큰 재주입. 단순 작업은 직접 실행
+3. **에이전트 스폰 최소화**: 스폰마다 토큰이 든다(스폰당 양은 재지 않았다). 단순 작업은 직접 실행
 4. **참조 파일 선택적 로드**: 전체 파일 Read 대신 필요 섹션만 (offset/limit). 500줄+ 파일은 분할 읽기
 
 > 상세: `guides/prompt-optimization.md` §2.5 (Context Budget 관리)

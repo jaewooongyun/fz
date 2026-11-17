@@ -250,7 +250,7 @@ GOOD (Mesh / Peer-to-Peer):
   - **순차 승격** 허용: 병렬 opus 스폰은 순차 승격으로도 상한(≤3)을 넘지 않도록 유지한다.
   - 예외: full-cycle / plan-to-code 파이프라인에서 plan과 code 각각 Primary가 다르므로 순차적으로 opus를 사용한다.
 - **sonnet 상한**: 명시적 제한 없음. 단, 거버넌스 리소스 초과(5개+ 동시 실행) 시 추가 스폰 차단.
-- **Fable 5.1 (2026-09-01 GA, Lead 모델)**: 판단 tier 모델, 출력·캐시쓰기 단가는 opus 5의 2배($10/$50 vs $5/$25)나 **캐시 읽기는 $0.25/MTok로 opus 5($0.50)의 절반** — 캐시 지배 세션에서는 "2배" 진술이 성립하지 않는다(fz 실측 2026-09-06: 동일 트래픽을 Fable 5.1 단가로 환산 시 opus 대비 **+9%**). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/model-guide.md` §5. ⚠️ 2026-09-06 정정: "opus의 2배" 단정은 출력·캐시쓰기 단가에만 참이다. 위 비교는 Opus 5 단가 기준이다(이력 — 2026-09-06 당시 기준). 워커 Opus 5.5($4/$20·캐시 읽기 $0.20) 대비 단가 배율은 입력·출력 2.5배·캐시 읽기 1.25배이고, +9% 실측의 Opus 5.5 기준 재산정은 미실시(선택 과제 — `guides/model-guide.md` §5 가격 비교). 가격 정본은 `guides/llm-references.md` § 1.2 모델 프롬프팅의 about-claude/pricing 행 [verified: https://platform.claude.com/docs/en/about-claude/pricing].
+- **Lead 모델 — `fable` alias (Claude Code v2.1.321 부터 Fable 5.2 · 이전 Lead 는 Fable 5.1, 2026-09-01 GA)**: 판단 tier 모델. Fable 5.2 단가는 $8/$40 · 캐시 읽기 $0.20 이라 워커 Opus 5.5($4/$20 · $0.20) 대비 입력·출력 2배, 캐시 읽기 같음이다 [verified: https://platform.claude.com/docs/en/about-claude/pricing 2026-11-16]. 이하 단가 비교는 Fable 5.1 기준 이력이다 — 출력·캐시쓰기 단가는 opus 5의 2배($10/$50 vs $5/$25)나 **캐시 읽기는 $0.25/MTok로 opus 5($0.50)의 절반** — 캐시 지배 세션에서는 "2배" 진술이 성립하지 않는다(fz 실측 2026-09-06: 동일 트래픽을 Fable 5.1 단가로 환산 시 opus 대비 **+9%**). Lead는 세션 모델(`/model fable`)로 Fable이고, Workflow 판단 지점은 서브에이전트도 `model: "fable"` 지정 [verified: 환경 실측 2026-06-12, Agent tool model enum]. 승격 기준·옵션 비교는 `guides/model-guide.md` §5. ⚠️ 2026-09-06 정정: "opus의 2배" 단정은 출력·캐시쓰기 단가에만 참이다. 위 비교는 Opus 5 단가 기준이다(이력 — 2026-09-06 당시 기준). 워커 Opus 5.5($4/$20·캐시 읽기 $0.20) 대비 단가 배율은 입력·출력 2.5배·캐시 읽기 1.25배이고, +9% 실측의 Opus 5.5 기준 재산정은 미실시(선택 과제 — `guides/model-guide.md` §5 가격 비교). 가격 정본은 `guides/llm-references.md` § 1.2 모델 프롬프팅의 about-claude/pricing 행 [verified: https://platform.claude.com/docs/en/about-claude/pricing].
 
 ### 모델 승격 매트릭스
 
@@ -378,7 +378,7 @@ GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 �
 
 ## 8. Agent Frontmatter 고급 기능 (v2.1+)
 
-> Source: Claude Code 공식 Sub-agents/Agent Teams 문서 (2026-03, v2.1.32+). 기존 fz 에이전트에 점진적으로 적용.
+> Source: Claude Code 공식 Sub-agents/Agent Teams 문서 (2026-03, v2.1.32+). 기존 fz 에이전트에 점진적으로 적용 — 단 `hooks`(§8.3) · `mcpServers` · `permissionMode`(§8.5)는 플러그인 에이전트에서 무시되므로 적용 대상이 아니다.
 > **(이력 — fz 미사용) 공식 사양** [verified: 2차 research 2026-04-21, code.claude.com/docs/en/agent-teams]:
 > ⛔ 아래는 **Claude Code 플랫폼 기능의 사실 서술**이지 fz 처방이 아니다 — fz 실행 경로는 Workflow이며 P2P 채널을 쓰지 않는다.
 > - 활성화 flag: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
@@ -423,7 +423,9 @@ skills:
 
 ### 8.3 Per-Agent Hooks (`hooks` 필드)
 
-에이전트별 라이프사이클 훅으로 자동 품질 게이트를 구현한다.
+⛔ **fz 에이전트에는 적지 않는다 — 플러그인 에이전트는 이 필드를 지원하지 않는다**: 플러그인에서 불러올 때 `hooks` · `mcpServers` · `permissionMode` 가 무시된다 [verified: code.claude.com/docs/en/sub-agents, 2026-11-16]. `agents/*.md` 는 셋 다 쓰지 않는다. 아래 예시와 표는 **플러그인 밖에서 정의한 에이전트**에만 해당한다. fz 본체는 훅을 등록하지 않는다(루트에 `hooks/` 가 없고 `.claude-plugin/plugin.json` 에 `hooks` 키가 없다) — 훅으로 거는 기계 강제는 선택형 하위 플러그인의 `mods/fz-guard/hooks/hooks.json` 이 맡는다.
+
+플러그인 밖에서 정의한 에이전트는 에이전트별 라이프사이클 훅으로 자동 품질 게이트를 구현할 수 있다.
 
 ```yaml
 ---
@@ -469,8 +471,8 @@ isolation: worktree
 |------|------|---------|
 | `maxTurns` | 에이전트 턴 수 제한 | Supporting 에이전트의 과도한 분석 방지 |
 | `disallowedTools` | 도구 차단 (denylist) | `tools` allowlist의 보완 |
-| `permissionMode` | 에이전트별 권한 | 전 리뷰·분석·**changeset 생산** 에이전트 → `plan`(read-only). ⛔ `acceptEdits`는 **디스크를 실제로 쓰는 에이전트에만**. ⛔⛔ **Workflow 경로에서는 이 필드가 무효다** — 워크플로 서브에이전트는 세션 permission mode와 무관하게 `acceptEdits`로 실행되고 파일 편집이 자동 승인된다 [verified: `llm-references.md` §1.1b /workflows]. 워크플로 워커의 유일한 강제 수단은 **스키마 수준 `tools:` 제거**다 |
-| `mcpServers` | 에이전트별 MCP | fz 에이전트는 이 필드를 쓰지 않고 `tools:` 에 MCP 도구를 직접 나열한다 — review-arch = serena `find_symbol`·`find_referencing_symbols`·`get_symbols_overview` + context7 `query-docs`, review-quality = 같은 구성에서 `get_symbols_overview` 제외 (2026-11-01 `agents/review-arch.md`·`agents/review-quality.md` frontmatter 대조 — 구판 예시 "review-arch → serena만, review-quality → serena + context7" 은 실제와 달랐다) |
+| `permissionMode` | 에이전트별 권한 | ⛔ **fz 에이전트에는 적지 않는다 — 플러그인 에이전트는 이 필드를 지원하지 않는다**: 플러그인에서 불러올 때 `permissionMode` 가 무시된다 [verified: code.claude.com/docs/en/sub-agents, 2026-11-16]. fz 워커의 권한 방어는 **스키마 수준 `tools:` 허용 목록**이다(리뷰·분석·**changeset 생산** 에이전트에 쓰기 도구를 주지 않는다). 플러그인 밖에서 정의한 에이전트라면 **세션 모드가 먼저다** — 메인 대화가 `bypassPermissions` · `acceptEdits` · auto 모드면 서브에이전트도 그 모드로 돌고 이 필드는 무시된다. `default` · `dontAsk` 면 이 필드에 적은 모드로 돈다. 워크플로 서브에이전트도 같은 규칙으로 정해진다 [verified: code.claude.com/docs/en/sub-agents#permission-modes · code.claude.com/docs/en/workflows, 2026-11-16] |
+| `mcpServers` | 에이전트별 MCP | ⛔ **fz 에이전트에는 적지 않는다** — 플러그인에서 불러올 때 이 필드는 무시된다(§8.3 · [verified: code.claude.com/docs/en/sub-agents, 2026-11-16]). fz 에이전트는 이 필드를 쓰지 않고 `tools:` 에 MCP 도구를 직접 나열한다 — review-arch = serena `find_symbol`·`find_referencing_symbols`·`get_symbols_overview` + context7 `query-docs`, review-quality = 같은 구성에서 `get_symbols_overview` 제외 (2026-11-01 `agents/review-arch.md`·`agents/review-quality.md` frontmatter 대조 — 구판 예시 "review-arch → serena만, review-quality → serena + context7" 은 실제와 달랐다) |
 | `background: true` | 항상 백그라운드 | 탐색/캐싱 에이전트에 적합 |
 
 ---
@@ -501,6 +503,6 @@ isolation: worktree
 고급 (§8):
   memory: project → 세션 간 학습 (⛔ 워크플로 에이전트 금지 — §8.1)
   skills: [fz-code] → 스킬 사전 주입
-  hooks: PostToolUse → 자동 품질 게이트
+  hooks: PostToolUse → 자동 품질 게이트 (⛔ 플러그인 밖 에이전트 전용 — fz 에이전트에서는 무시된다 · §8.3)
   isolation: worktree → 코드 수정 격리
 ```

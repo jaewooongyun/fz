@@ -40,7 +40,7 @@ fz-peer-review Gate 4.4-A에서 mapping claim의 [verified] 부재 = `mapping_st
 
 | 등급 | 적용 대상 | 검증 요구 |
 |------|----------|----------|
-| **Heavy** | 스레드 모델 변경, API 계약 변경 (omit vs default) | 3단계: Context7 + downstream 전수 + 플러그인 |
+| **Heavy** | 스레드 모델 변경, API 계약 변경 (omit vs default) | 3단계: Context7 + downstream 전수 + 해당 언어 문서 |
 | **Light** | 일반 기술적 주장 (async 여부, Sendable 등) | 코드 확인 + 1개 신뢰 소스 |
 | **Skip** | 코드에서 직접 확인 가능한 사실 | Read/Grep 결과만 |
 
@@ -50,7 +50,7 @@ Heavy 트리거: Transformation Spec의 "실행 스레드" 또는 "요청 파라
 
 > 발동: CLAUDE.md `## Architecture`가 Swift/iOS를 지정하는 프로젝트에서 Swift/iOS 관련 기술 주장 시. 일반 Heavy/Light/Skip Tier 위에 도메인 강제 layer 추가.
 >
-> ⛔ **Heavy Tier semantics 명확화 (F4 fix)**: 본 Domain Tier는 일반 Heavy Tier 정의를 **약화하지 않음(non-overriding)** + **추가 layer로 동작(additive)**. 일반 Heavy Tier(스레드 모델/API 계약)는 여전히 "3단계: Context7 + downstream 전수 + 플러그인" 모두 충족 의무. Swift/iOS Domain Tier는 그 위에 Mandatory Sources 인용을 추가 의무화한다 (택1이 아님).
+> ⛔ **Heavy Tier semantics 명확화 (F4 fix)**: 본 Domain Tier는 일반 Heavy Tier 정의를 **약화하지 않음(non-overriding)** + **추가 layer로 동작(additive)**. 일반 Heavy Tier(스레드 모델/API 계약)는 여전히 "3단계: Context7 + downstream 전수 + 해당 언어 문서" 모두 충족 의무. Swift/iOS Domain Tier는 그 위에 Mandatory Sources 인용을 추가 의무화한다 (택1이 아님).
 >
 > 일반 Heavy 트리거 충돌 시: 일반 Heavy(3단계 모두 충족) + Domain Tier(Mandatory Source 인용 의무) 둘 다 충족.
 
@@ -102,7 +102,7 @@ Heavy 트리거: Transformation Spec의 "실행 스레드" 또는 "요청 파라
 
 1. **Context7 조회**: `query-docs("{프레임워크} {API} observer thread")` — 공식 문서에서 스레드 보장 확인
 2. **Downstream 전수 확인**: Grep → subscriber/observer 수집 → 모든 consumer thread-independent
-3. **플러그인 참조**: `swift-concurrency` 또는 `swiftui-expert`에서 패턴 스레드 특성 확인
+3. **해당 언어 문서 참조**: 해당 언어의 공식 동시성 문서 또는 그 언어의 플러그인(있을 때)에서 패턴 스레드 특성 확인
 
 하나라도 미확인 → Zero-Exception 기본값 유지.
 

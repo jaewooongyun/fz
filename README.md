@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/jaewooongyun/fz?label=latest&color=blue)](https://github.com/jaewooongyun/fz/releases/latest) [![License](https://img.shields.io/github/license/jaewooongyun/fz?color=green)](LICENSE) [![Changelog](https://img.shields.io/badge/changelog-md-lightgrey)](CHANGELOG.md)
 
-AI 개발 워크플로우를 오케스트레이션하는 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 플러그인이다.
+AI 개발 워크플로우를 오케스트레이션하는 [Claude Code](https://code.claude.com/docs/en/overview) 플러그인이다.
 
 자연어로 요청하면 복잡도를 평가해 스킬 파이프라인을 구성하고 필요하면 여러 에이전트를 붙여 실행한다. 계획, 구현, 리뷰, 커밋이 한 흐름으로 이어지고 단계마다 검증 게이트가 들어간다.
 
@@ -17,6 +17,8 @@ AI 개발 워크플로우를 오케스트레이션하는 [Claude Code](https://d
 ## 설치
 
 ```bash
+claude plugin install fz --marketplace jaewooongyun/fz   # Claude Code 2.1.292+ 한 줄 설치
+# 2.1.292 미만이면 위 줄 대신 아래 두 줄
 claude plugin marketplace add jaewooongyun/fz   # 최초 1회
 claude plugin install fz
 claude plugin install fz-compact@fz-orchestrator  # 선택. bg 세션 로컬 마스킹 압축, 기본 꺼짐
@@ -28,7 +30,8 @@ claude
 
 프로젝트 루트에 `CLAUDE.md` 를 둔다. `## Architecture`, `## Build`, `## Code Conventions` 세 섹션이 있어야 하고 템플릿은 `templates/CLAUDE.md.template` 이다.
 
-런타임으로 `python3` 3.9 이상, `git`, `node`, `perl` 이 필요하다. 판정기와 lint 는 3.9 문법에 맞춰 있고 `perl` 은 GPT 호출 래퍼가 쓴다(macOS 기본 포함).
+런타임으로 `python3` 3.9 이상과 `git` 이 필요하다. 판정기와 lint 는 3.9 문법에 맞춰 있다. `perl` 은 GPT 호출 래퍼만 쓰고(macOS 기본 포함) 없으면 GPT 단계만 못 한다.
+`node` 는 점검(`/fz-manage check` · health-check)에만 필요하다. 없으면 회귀 오라클 · workflow 문법 · 문구 배선 검사가 미실행으로 남고 점검은 exit 2 로 끝난다.
 
 ### 함께 쓰는 도구
 
@@ -36,30 +39,31 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
 
 | 도구 | 없으면 | 사용처 | 설치 |
 |------|--------|:------:|------|
-| **Claude Node CLI** | 동작 불가 | 전부 | `npm install -g @anthropic-ai/claude-code` |
-| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 15/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
+| **Claude Code** | 동작 불가 | 전부 | 네이티브 설치(권장) — [설치 문서](https://code.claude.com/docs/en/setup) · 또는 `npm install -g @anthropic-ai/claude-code` |
+| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 14/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
 | **Serena MCP** | 심볼 탐색이 Grep 으로 (14 중 7 폴백) | 14/22 | 자동 등록. `uv` 필수 (`brew install uv`), 첫 기동 전에 캐시를 채운다(아래) |
 | **GPT CLI** (`@openai/codex`) | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
 | **sequential-thinking** | 구조화 추론 실패 (폴백 0) | 9/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
-| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (9 중 1 폴백) | 9/22 | `claude mcp add context7 -- npx -y @upstash/context7-mcp` |
+| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (9 중 1 폴백) | 9/22 | `claude plugin install context7@claude-plugins-official` |
+| **pr-review-toolkit** | fz-review Phase 5 병렬 4·5 생략 · 보고에 한 줄 고지 | 1/22 | 공식 마켓플레이스에서 `/plugin` 으로 설치. 에이전트 이름은 접두 꼴 `pr-review-toolkit:<이름>`(`modules/native-agents.md`) |
 
-> 사용처는 스킬 22개 가운데 그 도구를 호출하는 스킬 수다. MCP 는 `mcp__…`, GPT 는 `fz-gpt`, SuperClaude 는 `sc:` 로 센다. 언급만 한 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. 폴백은 각 스킬 `## 에러 대응` 표에 대체 경로를 적은 스킬 수다.
+> 사용처는 스킬 22개 가운데 그 도구를 호출하는 스킬 수다. MCP 는 frontmatter `allowed-tools` 의 `mcp__…`, GPT 는 `fz-gpt`, SuperClaude 는 `sc:<이름>` 호출 꼴(`/sc:sc-analyze` 처럼 이름이 붙은 것 — 이름 없이 `sc:` 만 적은 목록 언급은 빠진다), pr-review-toolkit 은 `pr-review-toolkit:` 로 센다. 언급만 한 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. 폴백은 각 스킬 `## 에러 대응` 표에 대체 경로를 적은 스킬 수다.
 
 ⛔ `sc:` 는 자체 폴백이 없고 다른 도구가 실패했을 때 내려가는 자리(`/sc:sc-analyze 단독`)이기도 하다. 그래서 없으면 폴백 사슬의 끝이 사라진다.
 
-표 밖의 도구 셋은 특정 기능에만 쓴다. `lsp` 는 4개 스킬이 정의와 참조 탐색에, `github` 는 3개 스킬이 PR 에, JIRA(`atlassian-jira`)는 3개 스킬이 티켓 조회에 쓴다. `lsp` 는 폴백이 없어 없으면 그 기능이 멈춘다. `github` 는 fz-pr 만 `gh pr create` 안내로 내려가고 JIRA 는 fz-commit 과 fz-pr 이 수동 입력으로 내려간다.
+표 밖의 도구 둘은 특정 기능에만 쓴다. `lsp` 는 4개 스킬이 정의와 참조 탐색에, `github` 는 3개 스킬이 PR 에 쓴다. `lsp` 는 그 스킬들의 `allowed-tools` 에 사전 승인으로만 있고 본문에 호출 지시는 없다. `github` 는 fz-pr 만 `gh pr create` 안내로 내려간다. 티켓 트래커는 서버를 정해 두지 않는다 — 티켓 조회는 프로젝트 CLAUDE.md 가 선언한 트래커 MCP 가 연결돼 있으면 권한 프롬프트를 거쳐 그 도구로, 아니면 수동 입력으로 한다. 어느 스킬도 트래커 도구를 사전 승인하지 않고, PR 뒤 티켓 상태 전환은 프로젝트 규칙이 요구할 때만 한다(`modules/governance.md` § 팀 스킬 위임).
 
 프로젝트에 따라 더 붙인다. iOS 는 XcodeBuildMCP 와 SwiftUI Expert, Swift Concurrency 를 쓰고 웹은 기본 구성으로 충분하다.
 
 #### 설치 뒤 확인할 것
 
-- ⛔ MCP 서버 이름이 계약이다. 위 표의 `claude mcp add <이름>` 그대로 등록한다. 다른 이름으로 등록하거나 공식 마켓플레이스 플러그인으로 깔면 도구 이름이 `mcp__plugin_…` 으로 바뀐다. 그러면 Lead 는 그 도구를 쓰지만 워커 에이전트에는 오류 없이 전달되지 않는다. `github` 와 `XcodeBuildMCP` 도 같다. JIRA 는 `atlassian-jira` 서버의 `jira_get` 을 가정하므로 다른 Jira MCP 면 티켓 정보를 수동 입력으로 받는다
+- ⛔ MCP 서버 이름이 계약이다. 위 표의 `claude mcp add <이름>` 그대로 등록한다. 다른 이름으로 등록하거나 공식 마켓플레이스 플러그인으로 깔면 도구 이름이 `mcp__plugin_…` 으로 바뀐다. 그러면 Lead 는 그 도구를 쓰지만 워커 에이전트에는 오류 없이 전달되지 않는다. `github` 와 `XcodeBuildMCP` 도 같다. Context7 은 예외다 — 스킬 `allowed-tools` 와 에이전트 `tools` 에 두 이름(`mcp__context7__…` · `mcp__plugin_context7_context7__…`)을 함께 적어 두어 위 표의 공식 플러그인으로 깔아도, `claude mcp add context7 …` 로 등록해도 된다. 트래커 MCP 는 이 계약 밖이다 — 스킬이 서버 이름을 적지 않으므로 어떤 이름으로 등록해도 되고, 쓰려면 프로젝트 CLAUDE.md 에 그 서버를 선언한다(규칙은 위 '표 밖의 도구' 문단)
 - ⛔ Serena 는 첫 기동에 실패하기 쉽다. 처음에는 약 300MB 를 내려받느라 MCP 연결 한도인 30초를 넘기곤 한다. 한 번 실패하면 Claude Code 가 약 15분 동안 다시 띄우지 않는다(Claude Code 2.1.318 실측). 설치 직후 미리 한 번 받아 둔다.
   ```bash
   uvx --from git+https://github.com/oraios/serena@v2.1.0 serena --help
   ```
 - GPT CLI 는 설치만 하면 감지된다. 로그인하지 않으면 호출마다 약 18초 동안 재시도한 뒤 실패하고 대체 경로로 넘어간다
-- 빠진 도구가 있어도 fz 는 깨지지 않는다. Grep 이나 자체 판단으로 대신하고 GPT 단계는 `[GPT 미사용]` 으로 표기한다. 다만 빠졌다고 알려 주지 않으니 세션에서 `/mcp` 를 열어 `plugin:fz:serena` 가 connected 인지 확인한다
+- 빠진 도구가 있어도 fz 는 깨지지 않는다. Grep 이나 자체 판단으로 대신하고 GPT 단계는 `[GPT 미사용]` 으로 표기한다. 선택 도구(Serena · context7 · sequential-thinking)를 쓰는 스킬은 첫 단계에 Serena · context7 · sc 의 상태와 빠지는 단계를 알린다(`evidence/tools.md` 첫 줄 또는 화면 한 줄 — 형식 `modules/tool-status.md`). 그 표시는 도구 목록에 이름이 있는지만 본다(목록에 있음 ≠ 연결됨). 그러니 세션에서 `/mcp` 를 열어 `plugin:fz:serena` 가 connected 인지 확인한다
 
 GPT CLI 를 쓰면 네이티브 스킬을 심볼릭 링크로 연결한다. 링크가 없어도 exec 모드 호출은 번들 스킬 본문을 직접 넣지만 review 모드 호출은 역할 스킬 없이 돈다.
 
@@ -165,15 +169,15 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 
 | 가이드 | 줄 | 내용 |
 |--------|---:|------|
-| [`llm-references.md`](guides/llm-references.md) | 186 | LLM·AI 권위 자료를 모은 단일 참조점. Tier1 공식, Tier2 arxiv 실증, Tier3 커뮤니티로 나누고 가이드와 스킬을 고칠 때 1차 출처로 쓴다 |
+| [`llm-references.md`](guides/llm-references.md) | 206 | LLM·AI 권위 자료를 모은 단일 참조점. Tier1 공식, Tier2 arxiv 실증, Tier3 커뮤니티로 나누고 가이드와 스킬을 고칠 때 1차 출처로 쓴다 |
 | [`prompt-optimization.md`](guides/prompt-optimization.md) | 753 | 프롬프트 10원칙, Context Rot 대응, Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 683 | 스킬 작성. YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
-| [`skill-testing.md`](guides/skill-testing.md) | 530 | 스킬 테스트. Triggering·Functional 3단계와 테스트 스펙 템플릿 |
+| [`skill-authoring.md`](guides/skill-authoring.md) | 689 | 스킬 작성. YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
+| [`skill-testing.md`](guides/skill-testing.md) | 548 | 스킬 테스트. Triggering·Functional 3단계와 테스트 스펙 템플릿 |
 | [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 295 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
-| [`agent-team-guide.md`](guides/agent-team-guide.md) | 506 | 에이전트와 팀 구성. Task Brief, 모델 전략, §8 Workflow 공식 사양 |
-| [`model-guide.md`](guides/model-guide.md) | 325 | 모델 운용. Lead 는 Fable 5.1, 실질 생산 워커는 Opus 5.5 이고 effort 배정 기준을 둔다 |
+| [`agent-team-guide.md`](guides/agent-team-guide.md) | 508 | 에이전트와 팀 구성. Task Brief, 모델 전략, §8 Workflow 공식 사양 |
+| [`model-guide.md`](guides/model-guide.md) | 361 | 모델 운용. Lead 는 `fable` alias(현재 Fable 5.2 — Claude Code 2.1.321+, fz 운용 선택), 실질 생산 워커는 Opus 5.5 이고 effort 배정 기준을 둔다 |
 | [`clean-architecture.md`](guides/clean-architecture.md) | 324 | Dependency Rule 과 SOLID 로 레이어를 판정하는 기준 |
-| [`harness-engineering.md`](guides/harness-engineering.md) | 1,373 | AI 에이전트 하네스 설계. 게이트, 오라클, negative control, NLAH Gap 분석 |
+| [`harness-engineering.md`](guides/harness-engineering.md) | 1,398 | AI 에이전트 하네스 설계. 게이트, 오라클, negative control, NLAH Gap 분석 |
 
 ---
 

@@ -146,6 +146,7 @@ Orchestrator가 사전에 제공해야 한다.
 0. **도구 상태** → `evidence/tools.md` 첫 줄(`scripts/check_evidence_slots.py` 가 읽는다):
    - 리뷰 대상 SHA(`target.json` 의 `sha` — PR 이면 headRefOid)에 맞춘 워크트리(`git worktree add … pr-{PR}`)에서 `activate_project` 를 부르고 `Serena: active <그 경로> @<그 트리 HEAD sha> (languages: <언어 서버 목록>)` 로 적는다. 언어 목록이 비면 언어 서버가 안 뜬 것이다 — active 로 적지 않는다
    - 대상 트리에 맞추지 못하면 `[Serena 미사용 — 작업 트리 ≠ 대상]` 처럼 사유를 적고 아래 2·3 을 `git grep … pr-{PR}` 로만 한다(⛔ 다른 트리의 Serena 결과를 근거로 쓰지 않는다)
+   - ⛔ **선택 도구 상태** — 형식 `modules/tool-status.md`. 검사기는 첫 줄만 읽고, 상태가 없거나 다른 표기이거나 빠지는 단계 규칙을 어긴 첫 줄과 둘째 줄에 적은 상태를 거부한다
    - ⚠️ 번들 Serena 는 git 저장소가 아닌 폴더에서 시작하면 프로젝트 없이 뜬다(`--project-from-cwd` 실패 — F-534) — 활성화를 명시한다
    - 피어 리뷰 밖에서 참조를 탐색하는 스킬(fz-plan · fz-discover · fz-fix)도 첫 단계에 같은 첫 줄을 쓰고 `check_evidence_slots.py --profile plan|discover|fix` 로 잰다 — 대상은 `target.json` 의 `root`(세션 대상 git root) · `sha`. 에러 전파 경로를 주장하면 `evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — 같은 검사 ⑤ · 승격 원장 D-1)
    - `activate_project` 의 `session` 값은 `initial_instructions` 결과에서 받는다 — v2.0.0 부터 Serena 가 세션을 직접 관리해 이 값 없이는 활성화를 거부한다

@@ -176,7 +176,7 @@ Swift Concurrency/SwiftUI 플러그인 활성 여부와 **무관하게** 항상 
 
 ### 피어 리뷰 트리거 (fz-peer-review)
 
-diff에 `@MainActor`, `actor`, `async`, `await`, `Task`, `Sendable`, `AsyncStream` 패턴 감지 시 활성화.
+diff의 Swift 파일에 `@MainActor`, `actor`, `async`, `await`, `Task`, `Sendable`, `AsyncStream` 패턴 감지 시 활성화.
 
 ## 참조 스킬
 
@@ -197,7 +197,7 @@ diff에 `@MainActor`, `actor`, `async`, `await`, `Task`, `Sendable`, `AsyncStrea
 2. **스택 지식은 조건부 팩에 둔다** — `gpt-skills/<스킬>/references/domain-<스택>.md`. 본문의 로더 줄 한 줄이 조건(예: `*.swift` 소스 · `Package.swift` · `.xcodeproj`)이 맞을 때만 팩을 읽게 한다. 팩 안의 프레임워크 절(RIBs 등)은 그 프레임워크를 실제로 쓸 때만 적용된다
 3. **팩에서만 나온 발견은 `ruleSource: plugin-default` · 상한 `suggestion` 이다** — 같은 내용을 프로젝트 지침이 말하면 그 규칙(`ruleSource: project`)과 규칙 기반 severity 로 낸다. 코드로 보일 수 있는 결함(누수 · 경합 · 크래시)은 상한 대상이 아니다 — 팩은 찾는 것을 돕기만 한다
 4. **작성자 프로젝트의 관례는 팩에도 싣지 않는다** — 고정 레이어 순서 · 명명 템플릿 · 호출 관례는 그 저장소 지침이 말할 때 런타임 추출이 가져온다. 최소 배포 타겟도 고정값을 쓰지 않고 프로젝트 설정에서 읽는다
-5. **검사** — `scripts/check_gpt_skill_portability.py`(health-check 배선): 본문 프레임워크 토큰(로더 줄 제외) · `AI/*guidelines` 경로 · 고정 레이어 순서 사슬 · 작성자 관례 표지 · 두 절 · 지침 파일 집합 · fz-reviewer 6축 · fz-architect Q1~Q8 · fz-planner JSON · `agents/openai.yaml` 정책
+5. **검사** — `scripts/check_gpt_skill_portability.py`(health-check 배선): 본문 프레임워크 토큰(로더 줄 제외) · `AI/*guidelines` 경로 · 고정 레이어 순서 사슬 · 작성자 관례 표지 · 두 절 · 지침 파일 집합 · fz-reviewer 6축 · fz-architect Q1~Q8 · fz-planner JSON · `agents/openai.yaml` 정책. `--claude-docs` 모드(health-check 배선)는 Swift 기준 줄에 조건 문구 `CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우` 를 실은 Claude 문서 8개(agents/ 다섯 · fz-code · code-auditor · arch-critic — 스크립트의 `CLAUDE_DOCS` 계약)를 본다: 조건이 덮지 않는 프레임워크 토큰 · 작성자 관례 표지(덮는 범위 = 문구를 실은 줄 · 문구를 실은 제목 줄이나 제목 바로 아래 첫 줄의 절) · `AI/*guidelines` 경로 · 레이어 사슬. 계약이 읽지 않는다고 적은 절만 건너뛰고 새 절은 읽는다. GPT 스킬 구조 규칙(두 절 이하)은 돌리지 않는다
 
 ### 팩 현황
 팩이 있는 스킬은 architect · challenger · drift · fixer · guardian · planner · reviewer 일곱이다(`references/domain-ios.md`). fz-searcher 는 탐색 전용이라 팩이 없다.

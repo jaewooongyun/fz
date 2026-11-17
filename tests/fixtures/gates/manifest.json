@@ -1224,6 +1224,45 @@
       "why": "hook 미설치 머신에서 미충족 원장이 보이는 **유일한 경로**다. 충족(closed)·미충족(active)·계약위반(헤더 중복) 세 트리를 함께 두어 세 분류가 다 발화하는지 본다. ⛔ 미충족은 exit 에 반영되지 않는다(작업 중 정상 상태) — 계약 위반만 exit 3. `lint_doc_freshness` 선례: findings 가 있어도 exit 0, 건수만 보고 ⛔ 기대 문자열이 `\"미충족\"` 하나였을 때는 상세 줄 제거를 관측하지 못했다 — 요약줄에도 `미충족 0` 이 나오기 때문이다(2026-08-25 실측). 상세 줄에만 있는 형태(`  미충족 <경로> — ['G1']`)와 요약 수치(`미충족 1`)를 나눠서 본다"
     },
     {
+      "id": "discover-missing-root",
+      "category": "discover",
+      "ledger": "verdict/ledger.md",
+      "mode": "discover",
+      "discover_dir": "no-such-dir",
+      "env": {
+        "FZ_GATES_LEDGER": ""
+      },
+      "expect": {
+        "exit": 2,
+        "mutates": false,
+        "expect_stderr": [
+          "INFRA: 탐색 루트 없음"
+        ],
+        "expect_stdout_absent": [
+          "원장 0건"
+        ]
+      },
+      "why": "탐색 루트가 디렉터리가 아니면 탐색을 못 한 것이다. 이전에는 '원장 0건 (게이트 미사용)' · exit 0 으로 끝나 오타 난 경로 · 지워진 작업 폴더가 게이트를 쓰지 않는 저장소로 읽혔다. `discover_dir` 는 sandbox 기준 탐색 폴더다(기본 `discover`)"
+    },
+    {
+      "id": "discover-missing-root-env-ledger",
+      "category": "discover",
+      "ledger": "verdict/ledger.md",
+      "mode": "discover",
+      "discover_dir": "no-such-dir",
+      "env": {
+        "FZ_GATES_LEDGER": "{SANDBOX}/discover/ok-work/gates/plan.md"
+      },
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "원장 1건"
+        ]
+      },
+      "why": "원장을 환경 변수로 지정하면 탐색 루트를 쓰지 않는다 — 그 경로에서는 루트를 확인하지 않는다. 루트 확인을 무조건 걸면 지정 경로가 쓸데없이 exit 2 로 실패한다"
+    },
+    {
       "id": "finalize-stamp-placement",
       "category": "finalize",
       "ledger": "finalize/eight-gates.md",

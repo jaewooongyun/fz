@@ -5,9 +5,9 @@
 > fz-gpt SKILL.md 서브커맨드에서 참조. 공통 설정 (Base Branch / 모델·effort 선택 / Diff 크기 / CLI 모드).
 
 > **Authority Sources** (Cgap-1 보강, 2026-05-16):
-> - **Cross-model 검증 근거**: Anthropic "Harness Design for Long-Running Apps" (2026-03) [verified: A2] — "Self-evaluation is unreliable" → cross-model verify
-> - **Diff 크기 정책**: Context Rot (Chroma Research, 18 frontier models) [verified: empirical study] — focused 300 tokens > unfocused 113K tokens. Small (<2000) full diff / Medium (2000-8000) file-split / Large (>8000) key files + summary
-> - **CLI 버전**: GPT CLI Changelog [verified: official] — gpt-5.5 (0.124.0+) · gpt-6-astra (0.153.1+, 0.153.4에서 bundled default) · gpt-6-sol (0.156.1 모델 선택기 추가 · 0.157.0 정식 추가 · bundled default, medium) · **gpt-6.1-sol (0.159.0 추가 · 0.159.1 bundled default, medium)**. ⚠️ 실제 모델은 세션 선택(없으면 `config.toml`)과 CLI 버전에 따른다 — 호출 문서는 모델을 적지 않는다(§ 모델·effort 선택)
+> - **Cross-model 검증 근거**: Anthropic "Harness Design for Long-Running Apps" — 자기 채점은 후하게 기운다(*"agents reliably skew positive when grading their own work"*) → 생성과 판정을 나눈다 → cross-model verify [verified: https://www.anthropic.com/research/harness-design-long-running-apps 2026-11-16]
+> - **Diff 크기 정책**: Context Rot (Chroma Research, 18 frontier models) — focused 300 tokens > unfocused 113K tokens. 이 수치를 잰 조건(입력인지 출력인지 · 실험 대상)은 원문으로 확인하지 못했다(조회 2026-11-16). Small (<2000) full diff / Medium (2000-8000) file-split / Large (>8000) key files + summary 경계는 fz 로컬 운영 휴리스틱이다 — 연구 수치에서 나온 값이 아니다
+> - **CLI 버전**: 실제 모델은 세션 선택(없으면 `config.toml`)과 CLI 버전에 따른다 — 호출 문서는 모델을 적지 않는다(§ 모델·effort 선택). GPT CLI 모델 · 번들 기본값 전환 사실은 필요 시 `guides/llm-references.md` §1.4 에서 본다
 >   출처: https://learn.chatgpt.com/docs/changelog (구 `developers.openai.com/codex/changelog` 는 여기로 308)
 
 ## 목차

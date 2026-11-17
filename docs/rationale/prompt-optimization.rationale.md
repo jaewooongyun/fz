@@ -24,7 +24,7 @@ Claude's reasoning frequently exceeds what a human would prescribe."
 
 ## 원칙 6: 피드백 루프 내장 — 외부 검증 우선
 
-**근거**: §3b H2 참조 — "Self-evaluation is unreliable." 같은 모델이 생성하고 같은 모델이 검증하면 동일한 맹점을 공유한다.
+**근거**: §3b H2 참조 — 자기 채점은 후하게 기운다(*"agents reliably skew positive when grading their own work"* — Anthropic, Harness Design for Long-Running Apps). 같은 모델이 생성하고 같은 모델이 검증하면 동일한 맹점을 공유한다.
 
 ## 원칙 7: 도구 설명에 프롬프트만큼 공 들이기
 
@@ -51,7 +51,7 @@ Claude's reasoning frequently exceeds what a human would prescribe."
 ## 1b. TEAM 모드 추론 품질 3원칙 (2026-03-10 추가)
 
 > Sources: MAST (NeurIPS 2025, arXiv 2503.13657), Multi-Agent Collaboration Survey (arXiv 2501.06322), CONSENSAGENT (ACL 2025), Addy Osmani: The Code Agent Orchestra (2026)
-> Harness: Harness Design for Long-Running Apps (Anthropic 2026-03) — "self-evaluation is unreliable" → cross-model 검증 정당화
+> Harness: Harness Design for Long-Running Apps (Anthropic 2026-03) — 자기 채점은 후하게 기운다(*"agents reliably skew positive when grading their own work"*) → cross-model 검증 정당화
 
 ## 다양성 (Diversity)
 

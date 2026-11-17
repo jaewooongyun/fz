@@ -129,10 +129,11 @@
 
 ## 팀 스킬 위임
 
-> 이 절이 정본이다 — `fz-commit` · `fz-pr` 은 여기를 가리킨다(F-486).
+> 이 절이 정본이다 — `fz-commit` · `fz-pr` 은 여기를 가리킨다(F-486 · 트래커 규칙은 `fz-peer-review` 도).
 
 - 프로젝트 CLAUDE.md 가 커밋 · PR 스킬을 선언하면(스킬 경로나 이름 — **절 제목과 무관**) 그 스킬의 절차 전체로 위임한다. `## Git Workflow` 같은 특정 제목에 묶지 않는다 — 실제 프로젝트는 다른 제목 아래 선언한다.
 - 선언이 없으면 fz-commit 은 Conventional Commits 형식으로, fz-pr 은 `gh pr create` 로 진행한다.
+- 프로젝트 CLAUDE.md 가 트래커(티켓 시스템)의 MCP 서버를 선언하면(**절 제목과 무관**) 티켓 조회는 그 서버가 연결돼 있을 때 그 도구로 한다. 선언이 없거나 연결돼 있지 않으면 티켓 ID · 제목 · 설명을 인자나 수동 입력으로 받는다. ⛔ 어떤 fz 스킬도 트래커 서버의 도구를 `allowed-tools` 로 사전 승인하지 않는다 — 공개 플러그인을 한 환경의 서버 이름에 묶지 않으려는 것이고, 호출은 보통의 권한 프롬프트를 거친다. PR 생성 뒤 티켓 상태 전환은 프로젝트 규칙이 요구할 때만 하고, 이것도 사전 승인 없이 한다.
 - 어느 경우든 commit · push · PR 생성은 사용자가 그 턴에 요청했을 때만 한다 — 위 § 자율 모드의 BLOCK 집합이다. 위임은 형식과 절차를 정할 뿐 이 조건을 풀지 않는다.
 - ⛔ 푸시된 커밋을 다시 쓰는 일(`reset` · force push)은 위임이나 커밋 요청과 **따로** 승인받고, 이력에서 사라지는 커밋을 먼저 알린다. '테스트 · 해보려고 · 확인해보고' 지시로 고친 것은 워킹 트리에만 두고 커밋하지 않는다(F-264 — 코드 방향 지시를 커밋 · force push 승인으로 읽어 실험 이력을 지웠다).
 
@@ -169,7 +170,7 @@
 
 | 항목 | 기준 | 근거 |
 |------|------|------|
-| YAML 필수 필드 (**정본** — 2층) | **L1 Claude Code 공식**(최상위): `name` · `description` · `allowed-tools` · `user-invocable` / **L2 fz 정책**(`metadata:` 하위): `metadata.provides` · `metadata.needs` | L1은 Progressive Disclosure L1, L2는 `/fz` 동적 파이프라인(`skills/fz/SKILL.md` §3.2)이 실제 소비 |
+| YAML 필수 필드 (**정본** — 2층) | **L1 Claude Code 공식**(최상위): `name` · `description` · `user-invocable` / **L1 fz 정책**(최상위): `allowed-tools` / **L2 fz 정책**(`metadata:` 하위): `metadata.provides` · `metadata.needs` | L1은 Progressive Disclosure L1, L2는 `/fz` 동적 파이프라인(`skills/fz/SKILL.md` §3.2)이 실제 소비. `allowed-tools` 는 Claude Code 공식 사양에서 선택 필드다 — 스킬을 부른 턴에만 유효한 사전 승인이고 사용자가 다음 메시지를 보내면 풀린다. 도구를 막는 제한이 아니며 제한은 `disallowed-tools` 다. fz 는 이 사전 승인을 정책으로 필수로 둔다 — 없으면(다른 허용 규칙도 없을 때) Workflow · Bash 준비 단계가 권한을 묻고, `-p` 실행 · `dontAsk` 모드에서는 거부된다 |
 | Description 4요소 | what + when + when-not + 한영키워드 | 트리거 정확도 |
 | 크기 제한 | ≤500줄 | Progressive Disclosure L2 |
 | Boundaries | Will/Will Not + 대안 | 범위 명확화 |
@@ -207,7 +208,7 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 | **팀 구성 (에이전트 목록)** | **`workflows/*.js`의 `agentType` 인자** — ⛔ 단서: `workflows/swarm.js` 만 고정하지 않고 args 로 받는다(스크립트 `READ_ONLY_AGENTS` 안만 · 밖이면 콜 0 fallback — 그 호출의 팀 구성 정본은 그 목록과 args) | team-registry.md, patterns/*.md — ⛔ 스킬 YAML `team-agents`는 **2026-08-09 제거**(런타임 효과 0이었다) |
 | **모델 배정** | **`workflows/*.js`의 `opts.model`** | agents/*.md(기본값 표기만), team-registry.md `promoted` 열. 감시 = `scripts/lint-model-explicit.sh` · ⛔ 스킬 YAML `model-strategy`는 **제거** |
 | **opus 동시 상한** | **`guides/model-guide.md` §5** | governance.md kill-switch 행, agent-team-guide.md, skill-authoring.md §12 |
-| **YAML 필수 필드** | **본 문서 § 스킬 최소 기준** (L1 공식 4 + L2 fz 정책 2) | fz-manage check #1, skill-troubleshooting.md #1, templates/skill-template.md |
+| **YAML 필수 필드** | **본 문서 § 스킬 최소 기준** (L1 공식 3 + L1 fz 정책 1 + L2 fz 정책 2) | fz-manage check #1, skill-troubleshooting.md #1, templates/skill-template.md |
 | 에이전트 도구 | 에이전트 YAML `tools` | 본문 설명 |
 | 파이프라인 정의 | modules/pipelines.md | fz SKILL.md 인라인 |
 | **light · full 추천 임계** | **`scripts/mode_gate.py` 상수** | modules/mode-gate.md(계약만 — 숫자 없음) · 스킬 모드 게이트 줄. 감시 = `scripts/check_single_source.py` |

@@ -44,7 +44,7 @@
 |---------|------|--------|
 | **Self-preference bias 상쇄** | 2025 LLM-as-Judge 연구 다수 — 같은 모델이 자기 출력을 우호적으로 평가 (메모리 23차 Self-review blind spot 메커니즘) | Generator (Claude) ≠ Evaluator (GPT) 강제. fz-gpt `verify`/`check`가 이 분리의 구체화 |
 | **이종 blind spot 보완** | MoA "collaborativeness" (Wang 2024, ICLR 2025 Spotlight, +7.6pp AlpacaEval) | Claude family blind spot을 GPT family가 catch (15차/23차 패턴 — GPT 단독 발견 누적 사례) |
-| **Generator≠Evaluator 강제** | Anthropic Harness Engineering H2 (2026-03) — "Self-evaluation is unreliable"; fresh-context verifier > self-critique [verified: code.claude.com/docs/en/best-practices, code.claude.com/docs/en/sub-agents] | GPT 를 켠 세션이면 light · full 모두 GPT 필수 참여. 모드와 무관하게 결정론적 도구 호출 (Q-OBSERVE 경량). GPT 불능(켰는데 실패) 시 fresh-context Claude 검증자가 self-review blind spot(23차)을 부분 보강 — 동종 한계 명시. GPT 미사용(off · CLI 없음)은 표기만(`modules/gpt-strategy.md` § GPT 미사용) |
+| **Generator≠Evaluator 강제** | Anthropic, Harness Design for Long-Running Apps — 자기 채점은 후하게 기운다(*"agents reliably skew positive when grading their own work"*) · 생성과 판정을 나누는 것이 강한 지렛대(*"proves to be a strong lever"*) [verified: https://www.anthropic.com/research/harness-design-long-running-apps 2026-11-16]; fresh-context 검증자는 self-critique 보다 나은 경향(*"tend to outperform self-critique"*) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 2026-11-16] | GPT 를 켠 세션이면 light · full 모두 GPT 필수 참여. 모드와 무관하게 결정론적 도구 호출 (Q-OBSERVE 경량). GPT 불능(켰는데 실패) 시 fresh-context Claude 검증자가 self-review blind spot(23차)을 부분 보강 — 동종 한계 명시. GPT 미사용(off · CLI 없음)은 표기만(`modules/gpt-strategy.md` § GPT 미사용) |
 | **Position bias 회피** | Order effect on judgment (LLM-Judge 연구) | T1-G ensemble: 출력 randomize + Source label anonymize (CP-1 Step 3 규칙 5/6/7) |
 
 ### "Debate 프레임" 회의론 (X-3 기각 근거)
@@ -91,8 +91,8 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | search 포함 | 교차 검증 | search-symbolic + search-pattern (search-cross-verify Workflow — GPT 단계 없음) | --deep |
 | commit/pr 포함 | Pre-ship gate | `fz-gpt check` — 명시 호출 전용(fz-commit · fz-pr 에 자동 배선 없음) | 명시 호출 때 GPT 켬(`gpt-strategy.md` § 단계 실행 판정 — 그때도 decide) |
 | fix 포함 | 수정 검증 | `fz-gpt check` (fz-fix Step 4 — 플래그 없음) | GPT 켬이면 필수(light · full — `gpt-strategy.md` § 단계 실행 판정) |
-| review 포함 | L3 에러 처리 스캔 | silent-failure-hunter (Agent background) | fz-review Phase 5 병렬 4 — diff에 에러처리 코드 포함 시(`modules/native-agents.md` 조건표) |
-| review 포함 | L3 타입 설계 평가 | type-design-analyzer (Agent background) | fz-review Phase 5 병렬 5 — diff에 새 타입 정의 포함 시(`modules/native-agents.md` 조건표) |
+| review 포함 | L3 에러 처리 스캔 | pr-review-toolkit:silent-failure-hunter (Agent background · 미설치 시 생략) | fz-review Phase 5 병렬 4 — diff에 에러처리 코드 포함 시(`modules/native-agents.md` 조건표) |
+| review 포함 | L3 타입 설계 평가 | pr-review-toolkit:type-design-analyzer (Agent background · 미설치 시 생략) | fz-review Phase 5 병렬 5 — diff에 새 타입 정의 포함 시(`modules/native-agents.md` 조건표) |
 | code-changes 생산 | SC 빌드 진단 | `/sc:sc-troubleshoot --fix`(선택) | 빌드 2회 연속 실패 시 |
 | planning 생산 | SC 공수 추정 | `/sc:sc-estimate --breakdown` | plan + 복잡도 4+ |
 | review 포함 | L3 결과 반영 | Lead가 **다음 Workflow invoke의 args/브리프에 주입** — ⛔ Workflow 워커는 `SendMessage` 를 쓰지 않는 1-shot(OVERRIDE — P2P 통신 없음)이라 중간 채널 없음 (2026-11-01 정정 — 이전 표기 "`SendMessage` 부재(v2.1.178~)"는 틀렸다. 2.1.178 이 없앤 것은 `TeamCreate`/`TeamDelete`) | Workflow (L3 이슈 1건+, 다음 스테이지 전) |
@@ -285,7 +285,7 @@ Gate 실패 시: 해당 단계를 "완료"로 표시할 수 없다. 반드시 �
 | 세는 호출 | 호출자가 env `FZ_GPT_ARTIFACT=<산출물 계열>` 을 밝힌 정문 호출만 — 값이 없으면 정문은 원장을 건드리지 않는다. ⛔ 세는 kind(`gpt_rounds.py` 의 `KIND_SLOTS`)로 산출물을 검증하는 호출 줄은 `FZ_GPT_ARTIFACT=` 를 반드시 붙인다 — 빠진 줄은 상한 밖이고 정문은 알리지 않는다 |
 | 키 | 산출물 계열(`plan` · `guide-plan` · `code`) × kind 계열 — 검증 계열(`verify` · `verify-gates` · `verify-cross` · `modernize-verify` · `validate`) 누적 **3** 라운드 · `independent-plan` **1** · 계약(`sprint-contract`) **2**(작성 1 · modify 재확인 1) |
 | 단위 | 호출이 아니라 라운드다. 한 라운드의 필수 kind(fz-plan Phase 2 의 `verify` ∥ `verify-gates` · fz-review 5.5 의 `validate` · `verify-gates`)는 같은 라운드의 별도 슬롯이다 — 가장 최근 라운드에 그 슬롯이 비어 있으면 거기 들고, 차 있으면 다음 라운드를 연다. 상한은 라운드 번호가 아니라 살아 있는(예약 · 완료) 라운드 개수로 잰다 |
-| 일찍 멈춤 | 같은 슬롯의 직전 유효 판정과 입력 manifest 가 같고, 그 판정 파일(`--out` · `--out-dir`)이 끝맺을 때 그대로이고, 그 뒤 새 근거가 없으면 거부한다(`same-input` — stderr 에 그 판정 파일). 판정 파일이 사라졌거나 바뀌었으면 거부하지 않는다(다시 읽을 판정이 없다). manifest = kind · 산출물 버전(env `FZ_GPT_ARTIFACT_VERSION`) · 입력 파일 내용(프롬프트 · 감사 · 요구 · 첨부 · 스냅숏) · 검토 대상 코드(`--cd` · `--repo` 의 HEAD + 작업 트리 diff + 추적 안 된 파일) — 코드만 바뀌어도 새 입력이다. 분류 밖 입력이 있거나 일부를 못 읽으면 manifest 는 unknown 이고 같은 입력 판정만 건너뛴다 |
+| 일찍 멈춤 | 같은 슬롯의 직전 유효 판정과 입력 manifest 가 같고, 그 판정 파일(`--out` · `--out-dir`)이 끝맺을 때 그대로이고, 그 뒤 새 근거가 없으면 거부한다(`same-input` — stderr 에 그 판정 파일). 판정 파일이 사라졌거나 바뀌었으면 거부하지 않는다(다시 읽을 판정이 없다). manifest = kind · 산출물 버전(env `FZ_GPT_ARTIFACT_VERSION`) · 입력 파일 내용(프롬프트 · 감사 · 요구 · 첨부 · 스냅숏) · 검토 대상 코드(`--cd` · `--repo` 의 HEAD + 작업 트리 diff + 추적 안 된 파일) — 코드만 바뀌어도 새 입력이다. 분류 밖 입력이 있거나 일부를 못 읽으면 manifest 는 unknown 이고 같은 입력 판정만 건너뛴다 — git 이 아닌 `--cd` · `--repo` 폴더도 unknown 이다(코드 스냅숏이 없다) |
 | 새 근거 | Lead 가 `gpt_rounds.py evidence --new-evidence <파일> --kind <kind>` 로 남긴다 — 같은 입력의 재라운드를 연다. 상한은 열지 않는다 |
 | 예산 소진 | 상한을 넘는 라운드는 거부한다(`budget-exhausted`) — 미해결로 보고하고 통과로 적지 않는다. `gpt_rounds.py status` 의 `unresolved` 가 그 키를 보인다 |
 | 소비 | 유효 판정(어댑터 exit 0)만 라운드를 쓴다. 통신 실패 · 스키마 위반 재시도(12~14) · 런처 실패(15~17) · 신호 · exit 18(GPT 미사용 — 실패 아님)은 쓰지 않는다. `verify-gates` 사후 대조(`--verdict-check`) 실패 뒤 1회 재호출은 env `FZ_GPT_RECALL=post-check` 로 부른다 — 직전 판정의 라운드를 잇고 라운드를 쓰지 않는다(라운드당 1회 · 넘으면 `recall-used`) |
@@ -294,7 +294,7 @@ Gate 실패 시: 해당 단계를 "완료"로 표시할 수 없다. 반드시 �
 | 거부 신호 | 정문 exit 19 · stderr `GPT-ROUNDS: <사유> — …` — 어댑터를 띄우지 않았다. `same-input` 이고 이번 `--out` 이 직전 판정 파일이면 정문은 그 파일을 지우지 않는다(그 판정이 답이다). `budget-exhausted` 도 이번 `--out` 이 마지막 판정 파일이면 남긴다(미해결 보고의 근거다). 그 밖의 거부는 다른 거부처럼 래퍼 kind 의 옛 `--out` 을 지운다 — 옛 결과를 새 판정으로 읽지 않게. 원장을 판정하지 못하면 11 이다(측정 실패 · 0건 아님) |
 
 - ⛔ 재라운드 프롬프트에서 GPT 에게 앞 라운드 지적이 반영됐는지 확인하라고 시키지 않는다 — 반영 대조는 Lead 몫이다(앵커드 재검증 · F-508). GPT 는 새 입력을 처음 보듯 판정한다
-- 회귀: `python3 scripts/gpt_rounds.py --self-test` — cap-3 · same-input-stop · budget-exhausted · lock-reserve · orphan-recovery. case 앞에서 `KIND_SLOTS` · 입력 분류가 레지스트리(`scripts/gpt-kinds.json`)와 맞는지 본다
+- 회귀: `python3 scripts/gpt_rounds.py --self-test` — cap-3 · same-input-stop · budget-exhausted · lock-reserve · orphan-recovery · outside-git-roundtrip · aux-boundary-roundtrip. case 앞에서 `KIND_SLOTS` · 입력 분류가 레지스트리(`scripts/gpt-kinds.json`)와 맞는지 본다
 
 ---
 
@@ -380,7 +380,7 @@ printf '%s\n' "{과제 지시}" > "$P"
 위 호출 계약의 GPT 는 대상 저장소와 **같은 디스크**를 본다 — 작업 폴더의 Claude 산출물과 `~/.claude/projects` 로그도 읽을 수 있다. 첫 패스를 Claude 결과와 독립으로 돌려야 할 때(SC-1)는 런처를 쓴다.
 
 - 허용 입력만 격리 폴더에 복사한다 — 요구사항 원문 · 합의 Sprint Contract · PR 메타 · diff · `base/` · `head/` 스냅샷 · 지침 원문 색인 · 소비자 스냅샷. Claude 산출물 이름(`code-context*` · `plan-v*` · `*workflow-result*` · 리뷰 산출물)이나 `~/.claude` 아래 경로가 들어오면 exit 15 다
-- 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` 는 deny, 격리 폴더(와 `--repo`)만 read 다
+- 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` · 격리 폴더의 실제 부모(`${TMPDIR:-/tmp}` 실경로)는 deny, 격리 폴더(와 `--repo`)만 read 다
 - rollout 을 전부 감사한다 — HOME deny 가 없거나 금지 경로 · 홈 재귀 검색이 있으면 exit 15 와 `.contaminated` 다. 읽는 대상이 명령에 없는 읽기가 있어 읽기 로그만으로는 "안 읽었다"를 증명할 수 없다 — 감사는 보조다
 - review 의 `--gpt-agents`(opt-in)는 역할 파일(`gpt-agents/`)로 두 렌즈 역할을 spawn 한다. 하위 에이전트는 부모와 같은 권한 프로필을 강제받는다(S11 ⑤ · R-G1 S1 실측 — 자식 turn_context 에 HOME deny). 부모 이력을 물려받는지는 `spawn_agent` 의 `fork_turns` 를 모델이 매번 고른다(S1 관측 2건 모두 `none`) — 부모가 격리돼 있어 어느 쪽이든 독립은 유지된다. `--gpt-agents` 가 없으면 프롬프트로 하위 에이전트를 금지하고 감사가 spawn 수를 기록한다 — 지시 + 기록이고 강제가 아니다(spawn 도구는 노출된다 — F-436)
 - 산출은 `<arm>-<run>.json`(`schemas/gpt_independent_{plan,review}_schema.json`) · `.md` · `.audit.json` · `.rollouts/` 다. 호출법은 `modules/fz-gpt-subcommands-aux.md` § independent-plan · independent-review

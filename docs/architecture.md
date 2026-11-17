@@ -8,15 +8,15 @@ fz-plugin/
 ├── skills/          22개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
 ├── agents/          15개 — plan-structure, impl-correctness, review-arch ...
 ├── workflows/       8개 — 네이티브 Workflow 결정적 스크립트 (discover-adversarial, plan-lean2, code-pair, swarm ...)
-├── modules/         48개 — gates(완료 게이트 SSOT), pipelines, cross-validation, lead-action-default, gpt-strategy, memory-guide, fz-gpt-bash-hygiene, fz-gpt-subcommands-core/aux ...
+├── modules/         49개 — gates(완료 게이트 SSOT), pipelines, cross-validation, lead-action-default, gpt-strategy, memory-guide, fz-gpt-bash-hygiene, fz-gpt-subcommands-core/aux ...
 │   (TEAM 사료 — team-core·patterns 5종 — 는 2026-09-21 이동 후 2026-09-25 삭제. 결정: `modules/promotion-ledger.md` § TEAM 일몰)
 ├── guides/          9개 — prompt-optimization, skill-authoring, harness-engineering, agent-team-guide, skill-testing, model-guide, llm-references ...
 ├── gpt-skills/    8개 — GPT 네이티브 스킬 + Authority 인용 + Memory Lesson inline (fz-reviewer, fz-architect ...)
 ├── gpt-agents/  GPT 역할 파일 — 독립 리뷰 렌즈(fz-review-arch · fz-review-quality) · opt-in
 ├── schemas/         8개 — JSON 스키마 (GPT 응답 7 · Issue Tracker 1) + tool-inventory.json
 ├── scripts/         109개 — gate_check(완료 판정기) · gate_stop_hook(종료 차단) · lint 3 · gpt-exec · health-check ...
-├── tests/           fixtures/gates/ — 판정기 회귀 173케이스 (20범주, 기대 exit·산출물·시간·stdout·stderr)
-│                    fixtures/*/*/run.sh 회귀 오라클(health-check 가 자동 실행) · lib/ 가짜 워크플로 런타임 ·
+├── tests/           fixtures/gates/ — 판정기 회귀 175케이스 (20범주, 기대 exit·산출물·시간·stdout·stderr)
+│                    fixtures/*/*/run.sh · fixtures/doc-freshness/run.sh 회귀 오라클(health-check 가 자동 실행) · lib/ 가짜 워크플로 런타임 ·
 │                    workflows/ 완주·실패 주입 · ab/ A/B 원장 통합 · docs/ 문서 계약
 ├── mods/            선택형 하위 플러그인 2개(따로 설치) — fz-compact(bg 세션 로컬 마스킹 압축) ·
 │                    fz-guard(Phase 4 승인 · ad-hoc Agent · 메모리만 쓴 교훈을 훅으로 강제 · fail-open)
@@ -41,7 +41,7 @@ Phase 5  Execute ────────────── 스킬 체인 실행
 ## 멀티에이전트 실행 — 네이티브 Workflow
 
 ```
-Lead (Fable 5) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/Gate 실행
+Lead (`fable`) ─── Workflow({scriptPath}) 호출 + changeset 적용 + 빌드/Gate 실행
     │
     └── workflows/*.js ─── 결정적 스크립트가 stage 오케스트레이션
         agent(agentType: 'fz:plan-structure', schema) → 스키마 강제 JSON 반환

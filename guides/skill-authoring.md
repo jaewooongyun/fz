@@ -126,13 +126,13 @@ GOOD: "버그 수정 경량 스킬. 원인 분석 → 수정 → 빌드 검증�
 
 ### Level 2: SKILL.md 본문 (관련 시 로드)
 
-- 실행 지침을 담는다 → **500줄 이하** 유지 (Context Rot 과학적 근거)
+- 실행 지침을 담는다 → **500줄 이하** 유지 — 공식 권고: *"Keep `SKILL.md` under 500 lines. Move detailed reference material to separate files."* [verified: https://code.claude.com/docs/en/skills 2026-11-16]
 - 핵심만 포함한다: Phase, Gate, Boundaries
 - 부수적 내용은 경로만 명시한다:
   ```
   빌드 검증 세부 절차는 `modules/build.md` 참조.
   ```
-- 500줄 초과 시 증상: Claude가 후반부 지침을 무시하기 시작한다
+- 공식 모범 사례는 같은 상한을 성능 이유로 든다 — *"Keep the `SKILL.md` body under 500 lines for optimal performance."* [verified: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices 2026-11-16]. 넘을 때 어떤 증상이 나는지는 확인하지 못했다(조회 2026-11-16)
 
 #### ⛔ 트리밍 비저하 원칙
 
@@ -534,7 +534,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 ### 배치·호출 규약
 
 - 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
-- 호출(Lead): 아래 § scriptPath 거부 우회 계약의 **0단계 준비**(매 호출) 뒤 복사본을 부른다 — `Workflow({ scriptPath: '{WORK_DIR}/....js', args })`. 원본은 `{플러그인 루트}/workflows/....js` 다. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (누락 시 호출 불가 dead code)
+- 호출(Lead): 아래 § scriptPath 거부 우회 계약의 **0단계 준비**(매 호출) 뒤 복사본을 부른다 — `Workflow({ scriptPath: '{WORK_DIR}/....js', args })`. 원본은 `{플러그인 루트}/workflows/....js` 다. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (fz 정책 — 누락 시 다른 허용 규칙이 없으면 Workflow 호출이 권한을 묻고, `-p` 실행 · `dontAsk` 모드에서는 거부된다). ⚠️ `allowed-tools` 는 공식 사양에서 선택 필드이고 도구를 막는 제한이 아니라 사전 승인이다 — 스킬을 부른 턴에만 유효하고 사용자가 다음 메시지를 보내면 풀린다. 다중 턴 파이프라인에서 승인 게이트(예: Phase 4)의 답을 받은 뒤 이어지는 단계는 이 사전 승인 밖이다
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
   - ⛔ **비ASCII 본문은 손으로 이스케이프하지 않는다** — MCP 도구 파라미터는 UTF-8 문자열을 그대로 받는다. `\uXXXX` 수동 변환은 안전장치가 아니라 **오류원**이다: 5천 자 한국어를 이스케이프해 보낸 호출이 **200 성공 + 본문 11곳 손상**으로 끝난 실측이 있다. 짧은 본문에서는 재현되지 않아 길이가 늘수록 위험하다.
   - ⛔ 외부 시스템(JIRA·GitHub·Slack)에 비ASCII 본문을 기록한 직후 **반환 본문을 1회 스캔**한다. 이 층에는 빌드도 린트도 없어 *성공 응답이 정확한 산출물을 뜻하지 않는다* — 유일한 오라클이 반환값 확인이다. 파일로 먼저 쓴 뒤 그 내용을 보내는 경로가 있으면 그쪽이 안전하다.
@@ -542,8 +542,8 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 - agent() 호출 시 `opts.model` + `opts.effort` **모두 명시 의무** — model 생략 시 세션 모델(fable) 상속(생산 워커가 fable로 스폰돼 비용 2배 함정 — 이력, 2026-09 당시 서술. 정정: `agentType` 을 준 호출은 에이전트 정의 `model:` 이 이겨 fz 에서는 sonnet(= Sonnet 5.5)으로 강등되고, `agentType` 도 없을 때만 세션 모델을 따른다. "2배"는 출력·캐시쓰기 단가에만 맞다 — `guides/model-guide.md` § 서브에이전트 · 워크플로), effort 생략 시 세션 effort 가 아니라 **워커 모델 기본**으로 돈다(Opus 5.5 = `medium` — 2026-09-25 실측 2회, Lead 세션은 `xhigh`). 특정 콜이 effort를 거부하면 그 콜만 effort 제거(model 유지) — 폴백 계약. 제거한 콜은 모델 기본 effort 로 돈다는 점을 결과 보고에 적는다. `scripts/lint-model-explicit.sh`가 model·effort 둘 다 기계 검증 — ⛔ **차단이 아니라 "요청 시 검출"이다.** `/fz-manage check`가 호출할 때만 돌고, 실제 차단은 훅 설치 시에만 성립한다(훅은 `settings.json` = 사용자 소관, `modules/governance.md` § Hook 최소 강제 권고)
 - **effort 값 선택 (2026-07-25 Opus 5 갱신)**: 현행 워크플로는 전 호출 `effort: EFFORT` — 값은 args.effort 로 받은 **Lead 세션 effort**(미지정 `'xhigh'` · 2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort). Opus 5 공식 권장은 **출발점 `high`(기본)**, **`low`/`medium`을 비용·지연의 1차 레버**, demanding coding/agentic만 `xhigh` [verified: platform.claude.com/docs/en/build-with-claude/effort]. `'xhigh'`는 **여전히 유효 범위**라 현행 배선이 깨진 것은 아니나, 그 근거였던 Opus 4.7/4.8의 *"Start with `xhigh` for coding and agentic use cases"* 문장은 **Opus 5 페이지에 없다**. **Opus 5.5 는 기본 `medium`·같은 effort 에서 사고량 증가** [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] — fz 의 워커 effort 는 Lead 세션 effort 를 따른다(2026-10-19 사용자 결정 — `modules/mode-gate.md` § effort · 이전: 2026-09-25 `xhigh` 유지 · 하향 sweep 종결).
   - ⛔ **상수 일괄 교체 금지**: 공식이 *"If you carried effort settings over from an earlier model, **run a fresh effort sweep on your evals** rather than reusing them"* 을 요구. **sweep 사전등록(임계 · arm)은 `experiment-log.md` §5.8 ⑥, 측정 행 기록은 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 의 같은 절**(세션 effort sweep — plan, 2026-09-11 신설 · 규약: `experiment-log.md` 머리 문단)이며 ①(frontmatter)은 철회된 사료라 대상이 아니다. 측정 주체는 `scripts/fz_wf_metrics.py`(stage별 wall·out_tok·thinking·advisor·so_retries) + `scripts/fz_telemetry_report.py --plan-segments`(Lead·GPT 층 분리) 다 — 사전등록만 하고 재는 주체가 없으면 표가 빈 채로 남는다(실측: 두 달). 측정 없이 `xhigh`→`high`로 치환하는 건 근거 없는 값을 근거 없는 값으로 바꾸는 것. **워크로드별 sweep 후** 스테이지 성격(생산/판정/탐색)에 맞춰 차등 배정. 미측정 상태의 기본값 = **현행 유지**(2026-10-19 부터 워커 값은 Lead 세션 effort 이므로 이 규칙은 Lead 세션 effort 를 바꿀 때 적용된다).
-  - **[2026-09-06 추가] Fable 5.1 갱신**: 이월 금지가 세대를 건너서도 반복 적용된다 — "Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. Lead(Fable 5.1)에도 동일 적용 — Fable 5·Opus 5에서 측정한 sweep 결과를 그대로 이월하지 않는다.
-  - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [실측 2026-10-19 1회: per-call `opts.effort` 가 세션 값을 이긴다 — Lead `xhigh` 세션에서 `'high'` 로 부른 워커 transcript effort 6/6 = `high`. env · frontmatter 대비는 미측정 · 문서화된 체인은 `env var > frontmatter > 세션`이며 per-call opts는 미명시]
+  - **[2026-09-06 추가] Fable 5.1 갱신**: 이월 금지가 세대를 건너서도 반복 적용된다 — "Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models." [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]. Lead(`fable` alias — Claude Code v2.1.321 부터 Fable 5.2)에도 같은 원칙을 적용한다 — 이전 세대(Fable 5 · Opus 5 · Fable 5.1)에서 측정한 sweep 결과를 그대로 이월하지 않는다.
+  - ⚠️ **세션 레벨과 한 세트**: `.js`의 per-call `opts.effort`만 바꿔도 `~/.claude/settings.json`의 `effortLevel`이 남아 있으면 효과가 반감된다 — 두 곳을 함께 검토. [실측 2026-10-19 1회: per-call `opts.effort` 가 세션 값을 이긴다 — Lead `xhigh` 세션에서 `'high'` 로 부른 워커 transcript effort 6/6 = `high`. env · frontmatter 대비는 미측정 · 문서화된 체인은 `env var > frontmatter > 세션`이고, Claude 가 fork 아닌 서브에이전트를 부를 때 넘기는 per-invocation `effort` 파라미터(v2.1.292+)는 frontmatter `effort` 를 이기며 env var 가 둘 다를 이긴다(sub-agents 문서 2026-11-16 대조 — `guides/skill-testing.md` §8.1) · Workflow `agent()` 의 per-call opts 가 같은 레이어인지는 공식 대조가 없다]
   - ⛔ **effort로 응답 길이를 줄이려 하지 말 것** — Opus 5에서 effort는 사고량을 조절할 뿐 가시 응답 길이를 신뢰성 있게 줄이지 못한다. 길이는 프롬프트로. [verified: 동 effort 문서]
 
 #### ⛔ scriptPath 거부 우회 계약 (도구 경로 게이트)
@@ -595,7 +595,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 [실측: 2026-09-03 세션 — 플러그인 루트 경로는 거부되고 `{WORK_DIR}/code/code-pair.js` 복사본 경로는 **6 invoke 전부 성공**(agent 17 · error 0 · resume 정상)] ⛔ 그 경로의 `code/` 는 복사 **이전에 이미 존재했다** — `cp` 가 부모를 만든 증거가 아니다. 계약이 `{WORK_DIR}` 루트를 쓰는 이유다.
 
 - ⛔ **복사본은 산출물이 아니다** — 원본이 바뀌면 stale 이 된다. WORK_DIR 밖으로 옮기거나 커밋하지 않는다. 0단계가 매 호출 덮어쓰고 `cmp -s` 로 확인하므로 원본을 고쳐도 다음 호출은 새 본을 부른다.
-- ⛔ **소비자 SKILL.md 에 권한이 없으면 0단계와 2·3 단계가 실행되지 않는다** — `allowed-tools` 에 `Bash(grep *)`·`Bash(cp *)`·`Bash(cmp *)` 를 둔다(`cmp` 는 `schemas/tool-inventory.json` 에도 선언한다). 위 배치·호출 규약의 `Workflow` 추가 의무와 같은 계약이며, 없으면 준비는 정확히 그것이 필요한 상황에서 죽는다. 경로 판정의 `cd`·`pwd -P` 는 셸 내장이다 [미검증: 권한 규칙이 명령 치환 안의 내장을 따로 묻는지 — 실세션 관측 전]. [실측: 2026-09-03 — `Workflow` 를 가진 소비자 9곳 전부에 두 권한이 0이었다]
+- ⛔ **소비자 SKILL.md `allowed-tools` 에 사전 승인이 없으면 0단계와 2·3 단계가 권한을 묻고, `-p` 실행 · `dontAsk` 모드에서는 거부된다** — `allowed-tools` 에 `Bash(grep *)`·`Bash(cp *)`·`Bash(cmp *)` 를 둔다(`cmp` 는 `schemas/tool-inventory.json` 에도 선언한다). 위 배치·호출 규약의 `Workflow` 추가 의무와 같은 계약이며, 없으면 준비는 정확히 그것이 필요한 상황에서 권한 질문에 멈추거나 거부된다. 경로 판정의 `cd`·`pwd -P` 는 셸 내장이다 [미검증: 권한 규칙이 명령 치환 안의 내장을 따로 묻는지 — 실세션 관측 전]. [실측: 2026-09-03 — `Workflow` 를 가진 소비자 9곳 전부에 두 권한이 0이었다]
 
 #### 공용 읽기 전용 swarm — `workflows/swarm.js` (정본 호출 사이트)
 
@@ -614,10 +614,9 @@ scriptPath must be a script path this tool returned, or a file you can already r
 > 신설 정당화 (DELETE/MERGE-default): 본 §12는 배치·호출·model/effort·산출물·intentContext를 이미 소유하나 **중단 후 재개**와 **워커가 상속하는 세션 설정**을 다루지 않았다 — 기존 하위절 흡수 불가. 둘 다 실측으로 확인된 계약만 수록.
 
 **resume** [verified: code.claude.com/docs/en/workflows]
-- `Workflow({ scriptPath, resumeFromRunId })` — 변경되지 않은 `agent()` 호출의 **최장 prefix가 캐시로 즉시 반환**되고 첫 변경 지점부터 재실행된다. 같은 스크립트 + 같은 args = 100% 캐시 히트.
-- ⛔ **재생 순서 규칙**: *"Cached results stop at the first agent that didn't finish, and **every agent that started after that one runs again, even if it completed**."* → 팬아웃 중간에 멈추면 뒤에 시작된 완료분까지 전부 재실행된다.
-- ⚠️ **설계 함의**: 공식 결론은 *"**다수의 작은 에이전트가 하나의 큰 에이전트보다 진행을 더 보존한다**"* 이다. fz의 현행 워크플로는 **소수의 큰 에이전트 + 스테이지 배리어** 구조라 이 방향과 반대다 — 스테이지 세분화의 이득은 **미측정**이며 재검토 대상으로 남긴다.
-- **경계**: resume은 **동일 Claude Code 세션 내에서만** 동작한다. CC를 종료하면 다음 세션은 워크플로를 처음부터 시작한다 → 장기 워크플로는 티켓 폴더 아티팩트가 여전히 1차 복원 수단이다.
+- `Workflow({ scriptPath, resumeFromRunId })` — 끝난 에이전트는 **저장된 결과를 돌려준다**. 이전 실행과 프롬프트가 다른 첫 에이전트(스크립트를 고쳤거나 앞 에이전트가 다른 결과를 돌려준 경우)부터 다시 돌고, 그 뒤 에이전트도 끝났던 것까지 모두 다시 돈다 — *"The first agent whose prompt differs from the previous run … runs again, and so does every agent after it, even ones that completed."*
+- **사용량 한도로 실패한 실행** (Claude Code **2.1.318 이상**): 다시 띄우면 실패한 에이전트가 다시 돌고, 끝난 에이전트는 저장된 결과를 돌려준다. 2.1.318 미만의 동작은 확인하지 않았다.
+- **경계**: Claude Code 를 종료했으면 셸에서 `claude --resume` 으로 세션을 되살린 뒤 워크플로를 다시 띄우라고 요청한다. `--resume` 없이 연 새 세션에는 다시 띄울 이전 실행이 없어 워크플로를 처음부터 시작한다 → 세션을 되살릴 수 없으면 티켓 폴더 아티팩트로 복원한다.
 - **진단**: `<transcriptDir>/journal.jsonl`이 agent별 **실제 반환값**을 1줄씩 기록한다. ⛔ 빈 결과·이상 결과 원인 규명 시 **추측 금지, journal 먼저 Read**.
 - ⛔ 스크립트 결정성 요구와 한 세트다 — `Date.now()`/`Math.random()`/무인자 `new Date()`는 **throw**된다(resume을 깨뜨리므로).
 
@@ -626,14 +625,14 @@ scriptPath must be a script path this tool returned, or a file you can already r
   - **비용 계측 불가**(이력 — 2026-08-08 당시 판정): advisor 호출은 `usage.server_tool_use`에 기록되지 않는다(워커 트랜스크립트 `agent-*.jsonl`에서도 동일). `governance.md §사각지대` 참조 — `opus 동시 ≤3` envelope이 advisor 지출을 bound하지 않는다.
     - 2026-11-01 정정 — '불가'는 아니다. 공식 문서상 advisor 호출은 advisor 모델 단가로 과금되는 별도 하위 추론이고 `usage.iterations[]` 의 `type: "advisor_message"` 항목으로 보고된다(top-level `usage` 에는 합산되지 않는다) — "Advisor calls run as a separate sub-inference billed at the advisor model's rates. Usage is reported in the `usage.iterations[]` array" [verified: https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool]. 단 fz 트랜스크립트에는 `iterations` 가 없는 세션이 있어 그것으로 세면 과소 집계된다 — `scripts/fz_wf_metrics.py` 는 호출 수를 `advisor_tool_result`·`server_tool_use`(name=advisor) 블록으로 센다(그 스크립트의 측정 규약 · 2026-09-11 정정 이력). envelope 이 advisor 지출을 bound 하지 않는다는 위 판정은 그대로다.
   - ⛔ **ad-hoc 프로브 작성 시 advisor 호출을 유도하는 지시를 넣지 말 것** — 계측되지 않는 지출이 된다(도구 가용성 실증 같은 명시적 목적 제외).
-- ⛔ **`CLAUDE_CODE_SUBAGENT_MODEL`은 `opts.model`을 override한다** — *"the model Claude Code uses for all subagents, agent teams, and **agents in a workflow** … overrides the per-invocation `model` parameter and the subagent definition's `model` frontmatter"* [verified: /model-config]. 즉 **본 §12의 "model 명시 의무"를 무력화할 수 있는 유일한 변수**다. 워커 모델이 예상과 다르면 **1순위로 이 env var를 확인**하고, `inherit`로 정상 해석에 복귀시킨다.
+- ⛔ **워커 모델이 예상과 다르면 1순위로 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` · `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` 를 확인한다** — 결정 순서는 `guides/model-guide.md` § 서브에이전트 · 워크플로가 정본이다(호출별 `model` → 정의의 `model`(`inherit` 포함) → `CLAUDE_CODE_SUBAGENT_MODEL` → 메인 대화 모델 [verified: https://code.claude.com/docs/en/sub-agents 2026-11-16] — workflow 의 `opts.model` 은 호출별 `model` 자리다: 같은 절의 workflows 인용). `CLAUDE_CODE_SUBAGENT_MODEL` 단독은 3번째 기본값이라 본 §12의 "model 명시 의무"를 덮지 않는다. FORCE 가 설정돼 있으면 *"Claude Code ignores the `model` field in subagent definitions, and Claude can't pass a model when it starts a subagent."* [verified: 동] — 정의에 `inherit` 를 적어도 풀리지 않는다. 두 변수는 `scripts/lint-model-explicit.sh` 가 경고한다.
 
 ### 산출물·거버넌스 계약
 
 - 반환: `{ mode: 'workflow'|'fallback', ..., metrics: { agentCalls, nullCount, fallbackCount, 완주지표 } }` — 완주지표는 구조에 맞는 명칭(`roundsCompleted` 라운드형 / `stagesCompleted` 스테이지형 = **완전 완주 stage 수**), experiment-log §5.7 해당 스킬 칼럼명과 일치 의무 — ⛔ `mode='fallback'` 이면 **아래 § 실패 복구 사다리의 판별 표로 분기**한다(SOLO 직행 아님 — `fallback` 하나에 분할 요구·입력 오류·실행 실패가 함께 담긴다). wall-clock은 Lead 측정 (스크립트 내 시각 API 불가)
 - 거버넌스: 동시 실행 ≤4 chunk (governance.md "5개+ 동시 차단" 정합) / **opus 동시 ≤3** (워커 기준 — Lead는 fable, fan-out은 sonnet. **정본 = `guides/model-guide.md` §5** — ⛔ 여기서 값을 재정의하지 않는다) · fable 동시 1 (Lead 제외) / budget 가드는 prose 금지·코드 배선 (`budget.total && budget.remaining() < ...`) — **가변 fan-out 스크립트 의무**, 고정-call 스크립트는 '해당 없음' 헤더 명시로 갈음
 - 해석 작업(병합·동일성 판정)은 **agent 언어 지시**, binary 규칙(등급 부여·집계)은 **스크립트 코드** — §11 판단 기준을 단계별로 적용
-- 검증 oracle: `node scripts/check_wf_syntax.js --root {플러그인 루트}`(AsyncFunction 컴파일 + `export const meta` 첫 문장 — health-check 가 같은 검사를 돈다. ⛔ 직접 `node --check` 는 판별력 0 이고, 함수로 감싼 파싱은 본문이 `})` 로 탈출하면 통과할 수 있어 판정에 쓰지 않는다) + **실 invoke ≥1** + 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 지표 기록
+- 검증 oracle: `node scripts/check_wf_syntax.js --root {플러그인 루트}`(AsyncFunction 컴파일 + `export const meta` 첫 문장 + agentType 리터럴의 이름 규칙(`[a-z0-9-]+`)과 `agents/<이름>.md` 실재 — health-check 가 같은 검사를 돈다. ⛔ 직접 `node --check` 는 판별력 0 이고, 함수로 감싼 파싱은 본문이 `})` 로 탈출하면 통과할 수 있어 판정에 쓰지 않는다) + **실 invoke ≥1** + 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 지표 기록
 
 ### ⛔ 실패 복구 사다리 (`mode:'fallback'` · 스톨 — **본 절이 정본**)
 
@@ -653,8 +652,8 @@ scriptPath must be a script path this tool returned, or a file you can already r
 | 2 | **분할 요구** | `mode:'split_required'` · 또는 `mode:'fallback'` + `splitSuggested:true` | **L1** |
 | 3 | **입력 오류** | `mode:'fallback'` + args 파싱 실패·필수 키 누락 (설계된 fail-fast) · `reason:'changeset-defect'`(code-pair 최종 changeset 결함 — `defects` 를 buildFeedback 에 넣어 재invoke) | **L2** |
 | 4 | **일시 장애** | 스테이지 스톨 · 세션/rate limit · 타임아웃 | **L3** |
-| 5 | **스폰 실패** | agent 스폰 예외 · `metrics.agentCalls` 가 0 인데 `mode` 는 정상 | **L3** 우선(일시 장애 의심) → 미해소 시 **L4** |
-| 6 | **렌즈 결손 (degraded)** | `mode:'workflow'` 인데 렌즈가 빠졌다 — 반환 형태가 정상이라 놓치기 쉽다. 워크플로마다 알리는 필드가 다르다: `plan-lean2.js` 는 `degraded:true` · `missingLenses`(비어 있지 않음), `code-pair.js` 는 `reviewVerdict:'partial'`(`lensesCompleted < lensesExpected`) · `residualNote` | ⛔ **완주로 세지 않는다.** **L3** 1회(죽은 렌즈의 null 이 캐시로 재생되면 즉시 같은 결과 — 비용이 거의 없다) → 여전히 degraded 면 **L4**(선택지: 새 invoke 재실행 — 워크플로 1회 전체 비용 · 범위 축소 · 중단). `code-pair.js` 의 `partial` 은 `skills/fz-code/SKILL.md` 반환 처리 6 이 정한다(다음 Step 전 재invoke 여부를 Lead 가 판정) |
+| 5 | **스폰 실패** · 예외 없이 `null` 을 돌려준 콜 | agent 스폰 예외, 또는 예외 없이 `null` 을 돌려준 콜 — 워크플로는 던진 콜을 null 워커로 접는다: run 이 reject 하지 않고, 반환은 **같은 콜이 null 을 돌려준 때와 같다**(그래서 둘은 이 행 하나다). 꼴은 병렬 아래냐 직접 호출이냐가 아니라 그 콜 없이 진행하느냐로 갈린다 — 없으면 못 가는 콜이면 `mode:'fallback'`(`reason` 이 `args invalid` 로 시작하지 않고 `null` 이 든다, 예: `'merge null'` · `'stage1 both null'` · code-pair `'impl null — …'` · 함께 온 `splitSuggested:true` 는 2행), 아니면 `mode:'workflow'` 에 `metrics.nullCount` ≥ 1 · 완주 수 미달(직접 호출도 그렇다 — 예: plan-collaborative `stage5-recheck` · 6행 신호가 함께 나올 수 있다). `metrics.agentCalls` 는 콜을 내기 전에 세므로 실패한 콜도 들어 있다. ⛔ 반환만으로는 null 워커와 가를 수 없다 — 가르는 것은 로그다: 던진 콜은 `WARN <label> 실패 — <사유>` 와 `WARN <label> null` 을, 예외 없는 null 은 `WARN <label> null` 만 남긴다(재시도로 회복한 콜은 이 줄들만 남고 `nullCount` 에서 빠질 수 있다) | **L3** 우선(일시 장애 의심) → 미해소 시 **L4** |
+| 6 | **렌즈 결손 (degraded)** | `mode:'workflow'` 인데 렌즈가 빠졌다 — 반환 형태가 정상이라 놓치기 쉽다. 워크플로마다 알리는 필드가 다르다: `plan-lean2.js` 는 `degraded:true` · `missingLenses`(비어 있지 않음), `code-pair.js` 는 `lensesCompleted < lensesExpected` · `residualNote`(죽은 렌즈 이름) — `reviewVerdict` 는 렌즈 일부만 죽으면 `'partial'`, 전부 죽으면(light 의 단독 렌즈 포함) `'skipped'` 다. ⛔ `'skipped'` 는 검토를 의도해 생략한 반환과 같은 값이라 verdict 로 가르지 않는다 — 생략은 `lensesExpected:0` · `residualNote:null` 이다 | ⛔ **완주로 세지 않는다.** **L3** 1회(죽은 렌즈의 null 이 캐시로 재생되면 즉시 같은 결과 — 비용이 거의 없다) → 여전히 degraded 면 **L4**(선택지: 새 invoke 재실행 — 워크플로 1회 전체 비용 · 범위 축소 · 중단). `code-pair.js` 의 렌즈 결손(`'partial'` · 렌즈가 죽은 `'skipped'`)은 `skills/fz-code/SKILL.md` 반환 처리 6 이 정한다(다음 Step 전 재invoke 여부를 Lead 가 판정) |
 | 7 | **알 수 없는 반환** | 위 여섯 중 어느 판별에도 걸리지 않음 (`mode` 값이 예상 밖이거나 metrics 부재) | **L4 직행** — ⛔ 판정 불가를 추측으로 메우지 않는다 |
 
 ⛔ **일곱 중 어느 것도 SOLO 직행이 아니다.** Lead 단독 SOLO 수행은 **L4 에서 사용자 승인 후에만**
@@ -664,11 +663,11 @@ scriptPath must be a script path this tool returned, or a file you can already r
 |:--:|---|---|---|
 | **L1** | `mode:'split_required'` 또는 `mode:'fallback'`+`splitSuggested:true` | **Step 분할 후 재invoke** (과대 changeset scaffold collapse 방어 — H5) | — |
 | **L2** | `mode:'fallback'` + 입력 오류 (args 파싱·필수 키 누락) | **입력 수정 후 재invoke.** ⛔ 워크플로 실패가 아니라 **설계된 fail-fast**다 | §5.7 fz-code #1 (2026-07-10, args 유니코드 이스케이프 깨짐 → 수정 후 회복) |
-| **L3** | 스테이지 스톨·일시 장애(세션/rate limit) | **`resume` 우선** — `Workflow({ scriptPath, resumeFromRunId })`. 변경 없는 agent()의 최장 prefix가 캐시 재생된다 | §5.7 fz-review #8 (2026-07-20, 초회 7287s 스톨 → resume 부분 재시도 성공) |
+| **L3** | 스테이지 스톨·일시 장애(세션/rate limit) | **`resume` 우선** — `Workflow({ scriptPath, resumeFromRunId })`. 끝난 에이전트는 저장된 결과를 돌려주고 프롬프트가 바뀐 첫 에이전트부터 다시 돈다. 사용량 한도 실패는 Claude Code 2.1.318 이상에서 실패한 에이전트가 다시 돈다. CC 를 종료했으면 `claude --resume` 으로 세션을 되살린 뒤 재개한다 | §5.7 fz-review #8 (2026-07-20, 초회 7287s 스톨 → resume 부분 재시도 성공) |
 | **L4** | L1~L3 미해소 | **사용자 에스컬레이션** — 선택지(재시도/범위축소/중단) 제시. ⛔ **Lead 단독 SOLO 수행은 사용자 승인 후에만** (Lead=fable 자동 SOLO 금지) | — |
 
 - ⛔ **호출 자체가 거부된 경우는 이 사다리가 아니다** — 반환에 `mode` 가 없다(스크립트 미실행). § scriptPath 거부 우회 계약으로 간다. `mode:'fallback'` 으로 읽어 SOLO 로 강등하는 것이 정확히 막으려는 실패다
-- ⛔ **`resume`은 동일 Claude Code 세션 내에서만** 동작한다 — 세션이 끝났으면 L3를 건너뛰고 티켓 폴더 아티팩트로 복원한다
+- ⛔ **세션이 끝났으면 셸에서 `claude --resume` 으로 세션을 되살린 뒤 L3 를 시도한다** — 되살릴 수 없을 때만 티켓 폴더 아티팩트로 복원한다(`--resume` 없이 연 새 세션은 워크플로를 처음부터 시작한다)
 - ⛔ **재시도는 `buildFeedback` 등을 args에 넣어 캐시 키를 바꾼다** (resume 비의존 경로)
 - ⛔ **진단은 추측 금지** — `<transcriptDir>/journal.jsonl`이 agent별 실제 반환값을 기록한다. 빈 결과·이상 결과는 journal을 먼저 Read
 - TEAM 사료(team-core + patterns 5종)는 **2026-09-25 삭제**됐다 — 결정: `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰. 폴백 실행 절차는 위 사다리뿐이다

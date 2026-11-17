@@ -206,7 +206,7 @@ by agent ID or name, or one of your other Claude Code sessions" [verified: https
 
 **솔루션 (Workflow 경로):**
 - ⛔ **추측 금지 — `<transcriptDir>/journal.jsonl` 을 먼저 Read** 한다. agent 별 실제 반환값이 1줄씩 기록된다
-- 렌즈 회계를 본다: `lensesCompleted` < `lensesExpected` 면 `reviewVerdict` 가 `'partial'` 이고 그 관점은 **적용되지 않았다**
+- 렌즈 회계를 본다: `lensesCompleted` < `lensesExpected` 면 검토 렌즈가 죽었고 그 관점은 **적용되지 않았다** — `reviewVerdict` 는 일부만 죽으면 `'partial'`, 전부 죽으면(light 의 단독 렌즈 포함) `'skipped'` 다(의도한 생략은 `lensesExpected` 0 · `residualNote` null)
 - 대형 입력은 args 가 아니라 **파일 경로**로 전달한다 (`guides/skill-authoring.md` §12 배치·호출 규약)
 - 스톨·일시 장애는 **`resume` 우선** — 실패 분기는 §12 판별 표 7종을 따른다
 
@@ -251,7 +251,7 @@ by agent ID or name, or one of your other Claude Code sessions" [verified: https
 
 | 항목 | 실패 시 조치 |
 |------|------------|
-| #1 YAML 필수 필드 | 정본 `modules/governance.md` § 스킬 최소 기준 확인 — L1 공식(`name`·`description`·`allowed-tools`·`user-invocable`) + L2 fz 정책(`metadata.provides`·`metadata.needs`). ⛔ 여기서 목록 재정의 금지 |
+| #1 YAML 필수 필드 | 정본 `modules/governance.md` § 스킬 최소 기준 확인 — L1 공식(`name`·`description`·`user-invocable`) + L1 fz 정책(`allowed-tools` — 공식 사양에서는 선택) + L2 fz 정책(`metadata.provides`·`metadata.needs`). ⛔ 여기서 목록 재정의 금지 |
 | #2 MCP 유효성 | MCP 서버 상태 확인, allowed-tools에서 무효 도구 제거 |
 | #3 metadata.provides/metadata.needs 체인 | 누락된 metadata.provides 토큰 추가, metadata.needs 체인 DAG 검증 |
 | #4 intent-triggers 중복 | §1.3 절차대로 키워드 분리 |
@@ -268,7 +268,7 @@ by agent ID or name, or one of your other Claude Code sessions" [verified: https
 | #15 금지 패턴 | (이력 — 현행 `--list` 에 #15 가 없다) 측정 파이프의 `head`/`tail` 잘림 제거 → `wc -l` 재실행. ⛔ BAD/GOOD few-shot 예시는 대상 아님 |
 | #16 registry ↔ agents | `modules/team-registry.md` Capabilities 표와 `agents/*.md` 양방향 일치 |
 | #17 Gate Evidence 패턴 | ⏸ THRESHOLD(정규식 미정) — Gate 체크리스트에 `Evidence:` 행 존재 여부를 사람이 확인 |
-| #N1~N14 (lint 신설 — 이전 표기 N1~N6 은 이력) | `--list`로 항목 확인. N1=스키마 $defs 정합 · N2=인벤토리 동기 · N3=줄번호 인용 · N4=ERE alternation · N5=신호 폐기 · N6=루트 앵커 · N7=셸 변수 정의-사용 · N8=목차 앵커 · N9=cross-file § 앵커 · N10=structured-output strict · N11=경량 경로 검증 계약 · N12=`/sc:` 네임스페이스 · N13=memory 필드 재도입 금지 · N14=빈 mktemp 치환 cd |
+| #N1~N15 (lint 신설 — 이전 표기 N1~N6 은 이력) | `--list`로 항목 확인. N1=스키마 $defs 정합 · N2=인벤토리 동기 · N3=줄번호 인용 · N4=ERE alternation · N5=신호 폐기 · N6=루트 앵커 · N7=셸 변수 정의-사용 · N8=목차 앵커 · N9=cross-file § 앵커 · N10=structured-output strict · N11=경량 경로 검증 계약 · N12=`/sc:` 네임스페이스 · N13=memory 필드 재도입 금지 · N14=빈 mktemp 치환 cd · N15=상대 Markdown 링크 · 앵커 해소(경로는 문서 폴더 기준) |
 
 > ⛔ **항목 목록의 SSOT는 `scripts/lint_contracts.py --list`다.** 위 표는 *실패 시 조치*만 담고 항목 정의를 재정의하지 않는다.
 

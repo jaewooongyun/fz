@@ -155,7 +155,7 @@ EOF
 
 > 경로 기준은 **플러그인 루트**다 — `scripts/resolve-plugin-root.sh` 로 해석한 `${FZ_PLUGIN_ROOT}` 를 앞에 붙인다. 스킬 base directory 기준으로 읽으면 `skills/fz-gpt/scripts/` 를 찾다가 파일 없음에서 막힌다.
 
-> ⛔ **호출자는 정문만 부른다** — `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" <kind> [입력…]`. 모드 · 역할 스킬 · schema · 고정 플래그는 레지스트리(`scripts/gpt-kinds.json`)가 정하고 `scripts/gpt_kinds.py` 가 푼다. 래퍼(`gpt-exec.sh`) · 런처(`gpt_independent.sh`)를 마크다운 레시피에서 직접 부르지 않는다 — `gpt_kinds.py lint --consumers` 가 bash 블록을 검사한다(등록 예외 E1~E8 은 레지스트리 `consumer_allow`).
+> ⛔ **호출자는 정문만 부른다** — `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" <kind> [입력…]`. 모드 · 역할 스킬 · schema · 고정 플래그는 레지스트리(`scripts/gpt-kinds.json`)가 정하고 `scripts/gpt_kinds.py` 가 푼다. 래퍼(`gpt-exec.sh`) · 런처(`gpt_independent.sh`)를 마크다운 레시피에서 직접 부르지 않는다 — `gpt_kinds.py lint --consumers` 가 bash 블록을 검사한다(등록 예외 E1~E8 은 레지스트리 `consumer_allow`). 호출 낱말이 레지스트리 kind 인지도 본다 — 산문 포함, 변수(`"$KIND"`)와 자리표시(`<kind>`)는 kind 낱말이 아니다.
 > 정문은 정책 플래그(`--schema` · `--inject-skill` · `--gpt-skill(-path)` · `--ephemeral` · `-c` · `-p` · `--profile` · `--ignore-user-config` · `--config-permissions`)를 10 으로 거부하고, 어댑터의 exit(10~17 · 18)를 다시 매기지 않고 넘긴다. 같은 `--out` 동시 호출은 정문 잠금이 10 으로 막는다. 18(stderr `GPT-OFF:`)은 측정 실패가 아니라 GPT 미사용이다 — `modules/gpt-strategy.md` § GPT 미사용.
 
 > §1~§7을 손으로 조립하지 않는다. `guides/skill-authoring.md` §11 판정("결과가 binary(pass/fail)인가? → 스크립트")이 본 모듈 전체에 적용된다 — hygiene 규칙은 전부 binary다.

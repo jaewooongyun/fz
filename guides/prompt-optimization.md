@@ -10,14 +10,14 @@
 > - Anthropic 32-page Skills Guide (2026-01-29) — progressive disclosure, trigger testing, YAML, skill-MCP
 > - Building Effective Agents (Anthropic 2024-12) — foundational, augmented-LLM building blocks
 > - Effective Harnesses for Long-Running Agents (Anthropic 2025-11) — Initializer/Coding Agent 패턴, JSON > Markdown, clean state
-> - Harness Design for Long-Running Apps (Anthropic 2026-03) — Planner/Generator/Evaluator, **"self-evaluation is unreliable"**, context reset > compaction
+> - Harness Design for Long-Running Apps (Anthropic 2026-03) — Planner/Generator/Evaluator, 자기 채점은 후하게 기운다(*"agents reliably skew positive when grading their own work"*), context reset > compaction
 > - Scaling Managed Agents (Anthropic 2026-04) — Brain/Hands/Session 분리, session = queryable event log
 > - 2026 Agentic Coding Trends Report (Anthropic) — 산업 데이터, human-in-the-loop 패턴
 > - Anthropic Platform Best Practices (living reference) — Long context, State management, Multi-context workflows
 > - Anthropic Claude Code Best Practices (living reference) — Subagent isolation, Compaction, filesystem > compaction
 > - **Effective Context Engineering for AI Agents (Anthropic 2026)** — "context engineering = load-bearing skill of 2026"
 > - **Tool Use Context Engineering Cookbook (Anthropic 2026)** — memory, compaction, tool clearing 실전
-> - ℹ️ 2026-11-01 — 현행 Claude 4종 = Fable 5.1 · Opus 5.5 · Sonnet 5.5 · Haiku 5.5. 아래 Opus 4.8 · Opus 5 · Fable 5 행은 퇴출이 아니라 **legacy(still available)** 다 — "Legacy models (still available): Claude Fable 5, Claude Opus 5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 5, Claude Sonnet 4.6, Claude Haiku 4.5." [verified: platform.claude.com/docs/en/models/overview]
+> - ℹ️ 2026-11-16 — 현행 Claude 4종 = Fable 5.2 · Opus 5.5 · Sonnet 5.5 · Haiku 5.5 [verified: platform.claude.com/docs/en/models/overview] (2026-11-01 대조 때는 Fable 5.1 자리). 아래 Opus 4.8 · Opus 5 · Fable 5 행은 퇴출이 아니라 **legacy(still available)** 다(2026-11-01 대조) — "Legacy models (still available): Claude Fable 5, Claude Opus 5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 5, Claude Sonnet 4.6, Claude Haiku 4.5." [verified: platform.claude.com/docs/en/models/overview]
 > - **Introducing Claude Opus 4.8 (Anthropic 2026-05-28)** — (이력 — legacy, still available) release announcement (effort 기본 high, 자기 코드 결함 ~4x↓, tool-calling 효율↑, 단일 세션 수백 parallel subagents)
 > - **Introducing Claude Opus 5 (Anthropic 2026-07-24)** — (이력 — legacy, Opus 5.5 가 상속하는 근거로만) release announcement. "comes close to the frontier intelligence of Claude Fable 5 at half the price", $5/$25(4.8 동일), effort dial 강조
 > - **What's new in Claude Opus 5.5 / Prompting Claude Opus 5.5 (Anthropic 2026-09-22)** — **현행 워커 정본**. thinking 끄기 불가(400) · forced `tool_choice` 400 · effort 기본 `medium` · 상속("the patterns in Prompting Claude Opus 5 remain a reasonable starting point") · elapsed 시간 신호 · text-only 턴 종료는 보고 [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5] → 상세: `llm-references.md` §1.2
@@ -28,7 +28,7 @@
 > - **Prompting Claude Fable 5.1 (Anthropic, live)** — effort **재sweep 필수**("Re-run the sweep even if you already ran one on Claude Fable 5: effort level names don't correspond to the same amount of thinking across models" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1]), 코딩 루프 한정 배칭 변동·fewer progress update·append-only 히스토리(compaction 늦게 실험 권고)
 > - **Claude Code: Model configuration (Anthropic, live)** — /model fable, effort 체계(frontmatter effort 포함), 안전 분류기 자동 폴백
 > - **Best Practices for Claude Code (Anthropic, live reference)** — Claude Code 전용 prompt 가이드
-> - **Anthropic Prompting Best Practices (live, `claude-prompting-best-practices`)** — 전 모델 공통 기법 + **모델별 페이지 분기**(`prompting-claude-{opus-5-5|opus-5|fable-5-1|fable-5|sonnet-5|opus-4-8}`). ⚠️ 모델별 프롬프팅이 1급 문서로 승격돼 세대 간 프롬프트 재사용이 기본 가정이 아니게 됨. 2026-11-01 — 현행 4종 페이지 = `prompting-claude-{fable-5-1|opus-5-5|sonnet-5-5|haiku-5-5}`(Sonnet 5.5·Haiku 5.5 신설), 구판(`opus-5`·`fable-5`·`sonnet-5`·`opus-4-8`)은 legacy 모델 페이지로 상속 근거로만 쓴다. 새 페이지는 델타 형식이다 — "Existing Claude Opus 5 prompts should perform well without changes" (Opus 5.5 페이지) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices]
+> - **Anthropic Prompting Best Practices (live, `claude-prompting-best-practices`)** — 전 모델 공통 기법 + **모델별 페이지 분기**(`prompting-claude-{opus-5-5|opus-5|fable-5-1|fable-5|sonnet-5|opus-4-8}`). ⚠️ 모델별 프롬프팅이 1급 문서로 승격돼 세대 간 프롬프트 재사용이 기본 가정이 아니게 됨. 2026-11-01 — 현행 4종 페이지 = `prompting-claude-{fable-5-1|opus-5-5|sonnet-5-5|haiku-5-5}`(Sonnet 5.5·Haiku 5.5 신설 · 2026-11-16 부터 Fable 자리는 `prompting-claude-fable-5-2` [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2]), 구판(`opus-5`·`fable-5`·`sonnet-5`·`opus-4-8`)은 legacy 모델 페이지로 상속 근거로만 쓴다. 새 페이지는 델타 형식이다 — "Existing Claude Opus 5 prompts should perform well without changes" (Opus 5.5 페이지) [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices]
 > - **Anthropic Interactive Prompt Engineering Tutorial (GitHub, 2026)** — 공식 튜토리얼
 > - **OpenAI Prompt Guidance (live)** — 공식 API prompt 가이드. 2026-11-01 — 옛 `api/docs/guides/prompt-guidance` URL 은 latest-model 가이드("Using GPT-6")로 301 이동했다. 아래 latest-model 행과 같은 문서다 [verified: developers.openai.com/api/docs/guides/latest-model]
 > - **GPT-5 Prompting Guide (OpenAI Cookbook, 2026)** — 공식 Cookbook. (이력 — 2026-11-01 기준 보관 처리: "This recipe is archived and may reference outdated models or APIs." [verified: developers.openai.com/cookbook/examples/gpt-5/gpt-5_prompting_guide]. GPT-6 쿡북 프롬프팅 가이드는 없다 — 현행 근거는 아래 latest-model 행)
@@ -312,8 +312,8 @@ BEST: "코드를 작성하라. GPT로 교차 검증 후, 불일치 시 수정. 3
 > 옮긴 설명: `docs/rationale/prompt-optimization.rationale.md` § 원칙 7: 도구 설명에 프롬프트만큼 공 들이기
 
 **체크리스트:**
-- [ ] `allowed-tools`에 필요한 도구만 포함되어 있는가?
-- [ ] 불필요한 도구가 목록에 없는가? (도구가 많을수록 혼란 증가)
+- [ ] `allowed-tools`에 묻지 않고 써야 하는 도구만 두었는가? (부른 턴의 사전 승인일 뿐 도구를 제한하지 않는다 — 목록 밖 도구도 그대로 호출할 수 있다)
+- [ ] 이 스킬이 쓰지 말아야 할 도구가 있으면 `disallowed-tools`에 두었는가? (스킬이 활성인 동안 도구 풀에서 뺀다)
 - [ ] MCP 도구 활용 전략이 계층화되어 있는가?
 - [ ] Bash 패턴 제한이 필요한 경우 적용되어 있는가?
 
@@ -515,7 +515,7 @@ TEAM 모드에서 고성능 추론을 보장하는 3축:
 
 | 원칙 | 적용 맥락 | ⛔ 비적용 맥락 |
 |------|----------|--------------|
-| "집중 300토큰 > 비집중 113K토큰" | **출력** 작성 시 불필요한 정보 배제 | 입력 탐색 범위 축소. "전체" 분석 지시 시 탐색 범위는 축소하지 않는다 |
+| "집중 300토큰 > 비집중 113K토큰" | 프롬프트 · 문서에 넣을 정보를 고를 때 불필요한 정보 배제 (연구가 이 수치를 입력과 출력 중 어디서 쟀는지는 원문으로 확인하지 못했다 — 조회 2026-11-16) | 입력 탐색 범위 축소. "전체" 분석 지시 시 탐색 범위는 축소하지 않는다 |
 | "500줄 이하 유지" | SKILL.md 본문 | 가이드(guides/), 모듈(modules/)은 제한 없음 |
 | "Claude가 아는 것 반복 금지" | 프로젝트 고유 정보 작성 시 | Gate 체크리스트, Few-shot 예시는 삭제 금지 (트리밍 비저하 원칙) |
 | "원칙+이유 > if-then 테이블" | 행동 가이드 작성 시 | 결정론적 검증(빌드, Grep 패턴)은 if-then이 더 정확 |
@@ -557,7 +557,7 @@ GOOD: head_limit 설정 + 필요한 파일만 선별 Read
 - defer_loading 활용: 필요 시에만 ToolSearch로 로드
 - 통합 가능한 도구는 통합 (20개→8개 = 60% 감소 사례)
 
-**D. 서브에이전트 효율** — 스폰마다 ~50K 토큰 재주입 [미검증: 출처 없음 — 원문 재대조 필요] (단, max+ultracode 운영점에선 *비용*보다 coordination·MAST 오버헤드가 binding 회피 이유 — `guides/harness-engineering.md §5 원칙 7` 참조) (이력 — max+ultracode 운영점은 2026-09-06 이전 전제다. 현행은 Lead 세션 effort(미지정 `xhigh`)를 워커가 따르고 `ultracode` 는 effort arm 이 아니다 — `guides/model-guide.md` § 현행 운용 (2026-09-06))
+**D. 서브에이전트 효율** — 스폰마다 토큰이 든다(스폰당 양은 fz 가 재지 않았다) (단, max+ultracode 운영점에선 *비용*보다 coordination·MAST 오버헤드가 binding 회피 이유 — `guides/harness-engineering.md §5 원칙 7` 참조) (이력 — max+ultracode 운영점은 2026-09-06 이전 전제다. 현행은 Lead 세션 effort(미지정 `xhigh`)를 워커가 따르고 `ultracode` 는 effort arm 이 아니다 — `guides/model-guide.md` § 현행 운용 (2026-09-06))
 - 단순 작업은 서브에이전트 대신 직접 실행
 - 에이전트 스폰은 Workflow `agent()` 경로에서만 (standalone Agent 남발 금지). (이력 — 이전 표기 "TEAM 모드에서만"은 TEAM 일몰로 대체)
 - governance.md 에이전트 상한 준수
@@ -623,11 +623,11 @@ BAD:  실패할 때마다 체크리스트 행 추가 → 500개 규칙 → 68% �
 GOOD: "이 실패가 반복되는가?" → Yes: 원칙+이유 1줄 → No: 일회성이면 추가하지 않음
 ```
 
-### 원칙 H2: Self-evaluation은 unreliable — 외부 Evaluator 필수
+### 원칙 H2: 자기 채점은 후하게 기운다 — 생성과 판정을 나눈다
 
-> "Self-evaluation is unreliable — external evaluators outperform self-grading." — Anthropic 2026-03
+> *"Whether a layout feels polished or generic is a judgment call, and agents reliably skew positive when grading their own work."* · *"Separating the agent doing the work from the agent judging it proves to be a strong lever to address this issue."* — Anthropic, Harness Design for Long-Running Apps [verified: https://www.anthropic.com/research/harness-design-long-running-apps 2026-11-16]
 
-같은 모델이 생성하고 같은 모델이 평가하면 동일한 맹점을 공유한다. Planner/Generator/Evaluator 3-agent GAN 패턴에서 독립 Evaluator가 self-grading 대비 유의미하게 높은 정확도를 보임.
+같은 모델이 생성하고 같은 모델이 평가하면 동일한 맹점을 공유한다. 위 두 인용이 말하는 것은 레이아웃처럼 판단이 갈리는 채점에서 자기 채점이 후하게 기운다는 것과, 생성과 판정을 나누는 것이 강한 지렛대라는 것까지다 — 독립 Evaluator 가 self-grading 보다 얼마나 정확한지 잰 수치는 확인하지 못했다(조회 2026-11-16). 그래서 검증자를 하나 더 들일 때는 그 경로가 실제로 낸 고유 발견과 드는 비용을 비교해 정한다.
 
 fz 적용:
 - Claude(생성) + GPT/GPT(검증)의 cross-model 패턴이 이 원칙의 직접 구현
@@ -717,7 +717,7 @@ fz 적용:
 | 실패에서 체크리스트 행 추가 반사 | 규칙 수 증가→준수율 저하, Claude 추론 억압 | 원칙+이유 한 줄로 대체 (보충 4a) |
 | 예시 없이 장문으로 설명 | 모호함, 해석 편차 | Few-shot 예시 3-5개로 대체 |
 | 검증 단계 없이 생성만 지시 | 오류 누적, 품질 저하 | validate -> fix -> repeat 루프 내장 |
-| 모든 도구를 allowed-tools에 포함 | 불필요한 도구 호출 증가 | 필요한 도구만 선별 |
+| 모든 도구를 allowed-tools에 포함 · 도구를 막으려고 allowed-tools를 좁힘 | allowed-tools 는 부른 턴의 사전 승인이다 — 넣은 도구는 모두 묻지 않고 쓰이고, 목록 밖 도구도 그대로 호출할 수 있다(제한 효과 없음) | 묻지 않고 써야 하는 도구만 allowed-tools 에, 막을 도구는 disallowed-tools 에 둔다 |
 | 스킬 간 책임 범위 중복 | 충돌, 예측 불가 행동 | Will / Will Not 경계 명확히 설정 |
 | Base class 변경 후 상속 체인 미검증 | Subclass silent regression (컴파일러 미탐지) | Inheritance Chain Impact Gate: base_class_hierarchy → subclass init + 화면별 dependency 검증 |
 | TEAM에서 Gate를 "권고"로 취급 | 검증 누락, 품질 저하 | Gate 절차적 강제 (스킵 불가 조건 명시) |

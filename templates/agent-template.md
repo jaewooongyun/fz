@@ -13,18 +13,13 @@ description: >-                        # 필수: 역할 + 전문성 + 위임 시
 model: sonnet                          # sonnet|opus|inherit
 # Model upgrade note: upgraded to opus in {specific teams} (see team-registry.md)
 tools: Read, Grep, Glob, Bash         # 도구 제한 (생략 시 부모 상속)
-permissionMode: default                # default|acceptEdits|plan|bypassPermissions
+# permissionMode: 필드를 넣지 않는다 — 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다(guides/agent-team-guide.md §8.5)
 maxTurns: 15                           # 합리적인 턴 제한
 # memory: 필드를 넣지 않는다 — Read/Write/Edit 가 자동 부여돼 Workflow 에이전트의 '쓰기 없음' 계약과 충돌하고
 #   세션 간 기록이 A/B 입력을 오염시킨다(guides/agent-team-guide.md §8.1). 예외는 워크플로 밖 memory-curator 뿐이다
 skills:                                # 사전 로드 스킬
   - skill-name
-hooks:                                 # 라이프사이클 훅 (선택)
-  PreToolUse:
-    - matcher: "ToolName"
-      hooks:
-        - type: command
-          command: "./scripts/validate.sh"
+# hooks: · mcpServers: 필드를 넣지 않는다 — 플러그인 에이전트는 두 필드를 지원하지 않아 불러올 때 무시된다(guides/agent-team-guide.md §8.3 · §8.5)
 ---
 ```
 
@@ -36,11 +31,12 @@ hooks:                                 # 라이프사이클 훅 (선택)
 | `description` | Yes | 역할 + 전문성 + 어떤 팀에서 사용되는지 |
 | `model` | Yes | 기본 모델. Primary Worker는 opus, 지원 역할은 sonnet |
 | `tools` | No | 허용 도구 목록. 생략하면 부모 컨텍스트 상속 |
-| `permissionMode` | No | 권한 모드. 대부분 default 사용 |
+| `permissionMode` | ⛔ 넣지 않음 | 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다. 권한 방어는 `tools` 허용 목록이 맡는다(guides/agent-team-guide.md §8.5) |
 | `maxTurns` | No | 최대 턴 수. 10-20 권장 |
 | `memory` | ⛔ 넣지 않음 | Read/Write/Edit 가 자동 부여돼 Workflow '쓰기 없음' 계약과 충돌하고 A/B 입력을 오염시킨다(guides/agent-team-guide.md §8.1 · lint #N13). 예외는 워크플로 밖 memory-curator 뿐 |
 | `skills` | No | 자동 로드할 스킬 목록 |
-| `hooks` | No | 도구 사용 전후 검증 훅 |
+| `hooks` | ⛔ 넣지 않음 | 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다. fz 본체는 훅을 등록하지 않는다(guides/agent-team-guide.md §8.3) |
+| `mcpServers` | ⛔ 넣지 않음 | 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다. MCP 도구는 `tools` 에 직접 나열한다(`agents/review-arch.md` · guides/agent-team-guide.md §8.5) |
 
 ## System Prompt Body
 

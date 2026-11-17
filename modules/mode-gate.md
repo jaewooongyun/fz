@@ -4,6 +4,8 @@
 
 > 신설 정당화 (DELETE/MERGE-default): 스킬마다 다르던 light 절 · 신호어 목록 네 벌 · "full 모드 강제" 세 줄 · peer-review 자동 Tier 경계를 이 모듈과 `scripts/mode_gate.py` 로 합친다. 소비 문서는 가리키기만 한다.
 
+> **Sources (last audited: 2026-11-16 — § effort 의 env `CLAUDE_EFFORT` 인용 한 줄만 공식 페이지와 대조):** code.claude.com/docs/en/env-vars
+
 ## 목차
 
 - [참조 스킬](#참조-스킬)
@@ -136,7 +138,7 @@ light 는 새 모드가 아니라 각 스킬이 이미 가진 **Workflow 없는 
 - 출처 순서: 세션 id 에 묶인 transcript 의 최신 assistant `effort` → env `CLAUDE_EFFORT`. 둘이 다르면 transcript 를 쓰고 결과 `note` 에 남는다
 - ⛔ effort 를 생략하면 워커는 세션 값이 아니라 모델 기본(Opus 5.5 = medium)으로 돈다 — 그래서 명시로 넘긴다(`guides/skill-authoring.md` §12)
 - `CLAUDE_CODE_EFFORT_LEVEL` 이 설정돼 있으면 콜 명시값보다 그것이 우선한다 — 결과 `override` 로 보인다(`guides/skill-testing.md`)
-- 한계: Lead 와 워커의 모델이 다르면 같은 수준 이름이 같은 사고량은 아니다(`guides/model-guide.md`). 세션 중 `/effort` 변경이 env `CLAUDE_EFFORT` 에 반영되는지는 확인하지 못했다 — transcript 를 1순위로 두는 이유다(최신성 미확인)
+- 한계: Lead 와 워커의 모델이 다르면 같은 수준 이름이 같은 사고량은 아니다(`guides/model-guide.md`). env `CLAUDE_EFFORT` 는 Bash 도구 서브프로세스 · 훅 명령이 시작될 때의 effort 설정값이다("Set automatically in Bash tool subprocesses and hook commands to the effort level setting when the subprocess starts" [verified: code.claude.com/docs/en/env-vars, 2026-11-16]). transcript 를 1순위로 두는 이유는 그것이 그 턴에 실제로 기록된 effort 이고 env 는 설정값이기 때문이다(둘이 다르면 transcript 를 쓴다)
 - Lead 를 `xhigh` 아래로 내리면 워커도 내려간다. `experiment-log.md` §5.8 ⑥ 에 `high` 가 plan 에서 major 손실을 낸 기록이 있다
 
 ## 사용자 결정

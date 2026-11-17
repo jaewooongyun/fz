@@ -1,7 +1,8 @@
 # Skill Template
 
 > Template for authoring Claude Code skills (`skills/fz-*.md`).
-> Each SKILL.md should stay under **500 lines** — focused 300 tokens outperform unfocused 113K tokens.
+> Each SKILL.md should stay under **500 lines** — official guidance: *"Keep the `SKILL.md` body under 500 lines for optimal performance."* (https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+> **Sources (last audited: 2026-11-16 — 위 500줄 인용 한 줄만 공식 페이지와 대조)**
 
 ---
 
@@ -17,7 +18,7 @@ description: >-                           # required (L1 공식) — the most im
   Bilingual keywords for matching.
 user-invocable: true|false               # required (L1 공식)
 argument-hint: "[target] [--options]"     # optional
-allowed-tools: >-                         # required (L1 공식) — comma-separated
+allowed-tools: >-                         # 공식은 선택 · required (L1 fz 정책) — 부른 턴에만 유효한 사전 승인, comma-separated
   mcp__plugin_fz_serena__find_symbol,
   Edit, Read, Grep, Glob, Bash(pattern)
 metadata:                                 # required (L2 fz 정책) — fz 자작 키 3종은 이 맵 하위
@@ -32,7 +33,7 @@ disable-model-invocation: false          # true: 사용자 명시 호출만 허�
 ---
 ```
 
-> ⛔ **필수 필드 정본은 `modules/governance.md` § 스킬 최소 기준**이다 — L1(Claude Code 공식 4) + L2(fz 정책 2). 이 템플릿은 그 정본을 반영하며 재정의하지 않는다.
+> ⛔ **필수 필드 정본은 `modules/governance.md` § 스킬 최소 기준**이다 — L1(Claude Code 공식 3 + fz 정책 `allowed-tools` 1) + L2(fz 정책 2). 이 템플릿은 그 정본을 반영하며 재정의하지 않는다.
 > ⛔ **제거된 필드 3종** (2026-08-09): `team-agents` · `composable` · `model-strategy` — 전부 fz 자작 필드로 **런타임 효과가 없었다**. 실효 결정자는 팀 구성·모델 = `workflows/*.js`, 파이프라인 = `provides`/`needs`.
 
 ---
@@ -45,7 +46,7 @@ disable-model-invocation: false          # true: 사용자 명시 호출만 허�
 | `description` | required | LLM selection signal | **The most critical field.** Claude picks skills by reasoning over this text — there is no algorithmic router *for Claude's own skill selection*. ⛔ `/fz` is different: it **does** route algorithmically, by matching `modules/intent-registry.md` patterns in Phase 1. Both paths matter — `description` drives Claude, registry patterns drive `/fz`. Write in 3rd person ("Processes files" not "I can help you"). Include what + when + when-not + bilingual keywords. |
 | `user-invocable` | required | Whether users can call directly | `false` for sub-skills called only by orchestrators |
 | `argument-hint` | optional | Usage hint shown to user | Keep concise: `"[file] [--strict]"` |
-| `allowed-tools` | required (L1) | Tools this skill may use | List only what is needed. Bash can be pattern-restricted: `Bash(xcodebuild *)`, `Bash(git *)` |
+| `allowed-tools` | **required (L1 fz 정책)** · 공식은 선택 | Tools Claude may use without asking permission during the turn that invokes this skill — 사전 승인이지 제한이 아니다 | List only what must run without a prompt. 승인은 사용자의 다음 메시지에서 풀린다. 목록 밖 도구도 그대로 호출할 수 있다 — 막을 도구는 `disallowed-tools` 에 둔다. Bash 승인은 패턴으로 좁힌다: `Bash(xcodebuild *)`, `Bash(git *)` |
 | `provides` | **required (L2 fz)** | Capability tokens this skill outputs | See registry below. `/fz` §3.2 동적 파이프라인이 실제 소비한다 |
 | `needs` | **required (L2 fz)** | Capability tokens required as input | Use `[none]` if self-contained |
 | `intent-triggers` | **required if `user-invocable: true`** (except `fz` itself) | Patterns for `/fz` orchestrator | Korean and English trigger phrases. ⛔ **`/fz` Phase 1 reads `modules/intent-registry.md`, not this field** — add the pattern there too, or `/fz` will never route to this skill. This field documents the skill and feeds `fz-skill eval`. |
@@ -274,6 +275,6 @@ Before finalizing a new skill, verify:
 
 Workflow(멀티에이전트 오케스트레이션)를 호출하는 스킬이면 다음 필수 (`guides/skill-authoring.md` §12):
 
-- [ ] frontmatter `allowed-tools`에 `Workflow` 추가 (누락 시 호출 불가 dead code)
+- [ ] frontmatter `allowed-tools`에 `Workflow` 추가 (누락 시 호출마다 권한 질문 · `-p` 실행 · `dontAsk` 모드에서는 거부)
 - [ ] 표준 3종 (OVERRIDE 블록 / args 방어 파싱+fail-fast / agentType `fz:`)
-- [ ] 반환 `{mode, metrics{...}}` 계약 + 검증 oracle (`node scripts/check_wf_syntax.js --root` + 실 invoke ≥1 + §5.7 기록)
+- [ ] 반환 `{mode, metrics{...}}` 계약 + 검증 oracle (`node scripts/check_wf_syntax.js --root` — 문법 · meta · agentType 의 이름 규칙과 에이전트 파일 실재 + 실 invoke ≥1 + §5.7 기록)
