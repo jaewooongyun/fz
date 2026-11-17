@@ -54,17 +54,21 @@ tc = {"type": "turn_context", "payload": {"multi_agent_version": "v2"}}
 spawn = {"type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent", "arguments": "{}"}}
 kid_msg = {"type": "response_item", "payload": {"type": "agent_message", "recipient": "/root", "author": "/root/agent-1"}}
 tok = lambda n: {"type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"total_tokens": n}}}}
-S2, S0, SR, SE = ("aaaaaaaa-0000-0000-0000-00000000000%d" % i for i in (2, 3, 4, 5))
+# 세션 ID 는 누수 규칙 정본의 합성 목록(SYNTHETIC_SESSION_IDS) 값만 글자 그대로 쓴다(캡처 ID 감사가 이 파일도 본다). 셀마다 CLI 홈
+#   (rollout 폴더)이 따로라 셀 사이에는 값이 겹쳐도 된다 — 한 셀 안의 부모 · 자식만 서로 다르다. 가짜 CLI 의 기본값(1111…)은 쓰지 않는다 — 세션 ID 를
+#   주지 않는 셀(no-rollout · corrupt-rollout)과 갈리지 않게
+S2, S0, SR, SE = ("00000000-0000-7000-8000-000000000001", "00000000-0000-7000-8000-000000000002",
+                  "00000000-0000-7000-8000-000000000003", "00000000-0000-7000-8000-000000000004")
 files = {
     "spawn2.jsonl": [meta(S2), tc, spawn, spawn, kid_msg, kid_msg, tok(1000)],
-    "spawn2-kid1.jsonl": [meta("bbbbbbbb-0000-0000-0000-000000000001", parent_thread_id=S2, source={"subagent": {"thread_spawn": {}}}), tok(300)],
-    "spawn2-kid2.jsonl": [meta("bbbbbbbb-0000-0000-0000-000000000002", parent_thread_id=S2, source={"subagent": {"thread_spawn": {}}}), tok(200)],
+    "spawn2-kid1.jsonl": [meta("00000000-0000-7000-8000-000000000002", parent_thread_id=S2, source={"subagent": {"thread_spawn": {}}}), tok(300)],
+    "spawn2-kid2.jsonl": [meta("00000000-0000-7000-8000-000000000003", parent_thread_id=S2, source={"subagent": {"thread_spawn": {}}}), tok(200)],
     "spawn0.jsonl": [meta(S0), tc, tok(500)],
     "parent.jsonl": [meta(SR), tc, spawn, spawn, kid_msg, kid_msg, tok(1000)],
     "resume-part.jsonl": [tc, tok(1600)],
     "eph.jsonl": [meta(SE), tc, spawn, tok(10)],
 }
-SK, KK = "aaaaaaaa-0000-0000-0000-000000000006", "bbbbbbbb-0000-0000-0000-000000000006"
+SK, KK = "00000000-0000-7000-8000-000000000011", "00000000-0000-7000-8000-000000000001"
 kmeta = meta(KK, parent_thread_id=SK, source={"subagent": {"thread_spawn": {}}})
 at = lambda r, ts: dict(r, timestamp=ts)
 files.update({
@@ -100,10 +104,10 @@ spec() {   # $1 = id · $2 = row · $3 = want "spawn kids tokens" · $4 = want e
 }
 EX=()   # exit 기록 — exit-unchanged
 
-rc=$(run s2 "FZ_SHIM_SESSION_ID=aaaaaaaa-0000-0000-0000-000000000002" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/spawn2.jsonl" \
+rc=$(run s2 "FZ_SHIM_SESSION_ID=00000000-0000-7000-8000-000000000001" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/spawn2.jsonl" \
        "FZ_SHIM_CHILD_ROLLOUTS=$T/rolls/spawn2-kid1.jsonl,$T/rolls/spawn2-kid2.jsonl" -- "$WRAP" exec --cd "$T/repo" --out "$T/c/s2/o.txt" --prompt-file "$T/p.txt"); EX+=("$rc:0")
 spec spawn-2 "$(row s2)" "2 2 1500" 0
-rc=$(run s0 "FZ_SHIM_SESSION_ID=aaaaaaaa-0000-0000-0000-000000000003" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/spawn0.jsonl" -- "$WRAP" exec --cd "$T/repo" --out "$T/c/s0/o.txt" --prompt-file "$T/p.txt"); EX+=("$rc:0")
+rc=$(run s0 "FZ_SHIM_SESSION_ID=00000000-0000-7000-8000-000000000002" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/spawn0.jsonl" -- "$WRAP" exec --cd "$T/repo" --out "$T/c/s0/o.txt" --prompt-file "$T/p.txt"); EX+=("$rc:0")
 spec spawn-0 "$(row s0)" "0 0 500" 0
 rc=$(run nr -- "$WRAP" exec --cd "$T/repo" --out "$T/c/nr/o.txt" --prompt-file "$T/p.txt"); EX+=("$rc:0")
 spec no-rollout "$(row nr)" "? ? ?" 0
@@ -113,11 +117,11 @@ rc=$(run e10 -- "$WRAP" exec --cd "$T/repo" --out "$T/c/e10/o.txt"); EX+=("$rc:1
 spec exit-10 "$(row e10)" "? ? ?" 10
 rc=$(run e12 "FZ_SHIM_EXIT=1" -- "$WRAP" exec --cd "$T/repo" --out "$T/c/e12/o.txt" --prompt-file "$T/p.txt"); EX+=("$rc:12")
 spec exit-12 "$(row e12)" "? ? ?" 12
-rc=$(run eph "FZ_SHIM_SESSION_ID=aaaaaaaa-0000-0000-0000-000000000005" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/eph.jsonl" -- "$WRAP" exec --cd "$T/repo" --out "$T/c/eph/o.txt" --prompt-file "$T/p.txt" --ephemeral); EX+=("$rc:0")
+rc=$(run eph "FZ_SHIM_SESSION_ID=00000000-0000-7000-8000-000000000004" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/eph.jsonl" -- "$WRAP" exec --cd "$T/repo" --out "$T/c/eph/o.txt" --prompt-file "$T/p.txt" --ephemeral); EX+=("$rc:0")
 spec ephemeral "$(row eph)" "? ? ?" 0
 
 # resume — 같은 CODEX_HOME · 같은 텔레메트리 폴더에서 부모 exec 뒤 resume
-SR=aaaaaaaa-0000-0000-0000-000000000004
+SR=00000000-0000-7000-8000-000000000003
 rc=$(run rs "FZ_SHIM_SESSION_ID=$SR" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/parent.jsonl" -- "$WRAP" exec --cd "$T/repo" --out "$T/c/rs/o.txt" --prompt-file "$T/p.txt"); EX+=("$rc:0")
 rc=$(run rs "FZ_SHIM_SESSION_ID=$SR" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/resume-part.jsonl" -- "$WRAP" resume --cd "$T/repo" --out "$T/c/rs/o2.txt" --prompt-file "$T/p.txt" --session-file "$T/c/rs/o.txt.session"); EX+=("$rc:0")
 r_rows="$(row rs)"
@@ -125,7 +129,7 @@ spec resume-incremental "$(printf '%s\n' "$r_rows" | awk -F'\t' '$5=="resume"')"
 # 부모 exec 는 spawn 2 인데 자식 rollout 이 없다 — 토큰은 '?' 다(부모만 적으면 합을 과소 집계한다)
 [ "$(printf '%s\n' "$r_rows" | awk -F'\t' '$5=="exec"{print $7" "$9}')" = "2 ?" ] || no resume-incremental "부모 행이 spawn 2 · tokens ? 가 아니다"
 # 앞 exec 가 만든 자식이 resume 중에 300 → 450 — 자식은 증분 150 만 (누적 450 이 아니다) · 부모 증분 600 과 합쳐 750
-SK=aaaaaaaa-0000-0000-0000-000000000006
+SK=00000000-0000-7000-8000-000000000011
 rc=$(run pk "FZ_SHIM_SESSION_ID=$SK" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/pk-parent.jsonl" "FZ_SHIM_CHILD_ROLLOUTS=$T/rolls/pk-kid-v1.jsonl" -- "$WRAP" exec --cd "$T/repo" --out "$T/c/pk/o.txt" --prompt-file "$T/p.txt"); EX+=("$rc:0")
 rc=$(run pk "FZ_SHIM_SESSION_ID=$SK" "FZ_SHIM_SESSION_ROLLOUT=$T/rolls/pk-resume.jsonl" "FZ_SHIM_CHILD_ROLLOUTS=$T/rolls/pk-kid-v2.jsonl" -- "$WRAP" resume --cd "$T/repo" --out "$T/c/pk/o2.txt" --prompt-file "$T/p.txt" --session-file "$T/c/pk/o.txt.session"); EX+=("$rc:0")
 spec resume-child-increment "$(row pk | awk -F'\t' '$5=="resume"')" "0 0 750" 0

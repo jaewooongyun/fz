@@ -17,9 +17,12 @@
 #              정책과 달리 자리표시 이름 · 예약 도메인도 전부 거부한다
 #   형식 규칙  스트림 로그 = 배너 머리(둘째 구분선까지)만 · transcript/journal/meta/layout = 허용 키만 + 자유 문장 금지
 #   ⛔ 소비 프로젝트 이름을 금지어로 적지 않는다(적으면 그 이름이 공개 저장소에 들어간다) — 자유 문장 자체를 금지한다
-# 캡처 ID 감사(capture_id_audit)는 표본 감사와 따로 돈다 — 범위는 한 폴더(보통 tests/fixtures) 아래 모든 캡처 로그(CAPTURE_EXTS:
-#   *.log · *.jsonl · *.session)이고 보는 것은 세션 ID(UUID 꼴)와 워크플로 실행 ID 꼴 둘뿐이다. 줄마다 누수 규칙 정본의 capture_id_tokens
-#   를 부른다 — ANSI 제어열 걷기와 합성 목록(SYNTHETIC_SESSION_IDS · SYNTHETIC_RUN_IDS) 대조는 정본 한 벌이다(여기 사본을 두지 않는다).
+# 캡처 ID 감사(capture_id_audit)는 표본 감사와 따로 돈다 — 범위는 한 폴더(보통 tests/fixtures) 아래 모든 파일(확장자를 가리지 않는다 —
+#   *.sh · *.ts · *.json 같은 시험 코드 · 자료도 세션 ID 를 싣는다)이고 보는 것은 세션 ID(UUID 꼴)와 워크플로 실행 ID 꼴 둘뿐이다.
+#   그 폴더가 git 작업 트리 안이면 git 이 내보낼 파일(추적 + 무시되지 않은 미추적)만 본다 — 무시된 부산물(.DS_Store 등)은 범위 밖이다.
+#   그 git 은 부르는 쪽의 GIT_DIR 등(훅이 내보낸다)을 지우고 부른다 — 답은 그 폴더가 든 작업 트리에서 온다.
+#   줄마다 누수 규칙 정본의 capture_id_tokens 를 부른다 — ANSI 제어열 걷기와 합성 목록(SYNTHETIC_SESSION_IDS · SYNTHETIC_RUN_IDS)
+#   대조는 정본 한 벌이다(여기 사본을 두지 않는다).
 #   목록은 값이다(대역 규칙이 아니다: 실제 UUIDv7 도 0 으로 시작한다)
 #   표본용 형식 규칙(format_hits — 스트림 로그 = 배너만 등)은 이 범위에 쓰지 않는다 — 평문 배너 뒤에 본문을 둔 로그가 그 규칙에 걸린다.
 #   읽기 · 디코드 실패(NUL 포함 — 정본의 읽기 계약)는 건너뛰지 않고 따로 돌려준다 · 순회 실패는 정본의 Unrun(판정 불가)이다
@@ -29,6 +32,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import traceback
 
@@ -401,23 +405,44 @@ def run(name, here, expected, cells, tmp):
     return OK
 
 
-# ── 캡처 ID 감사 — 한 폴더 아래 모든 캡처 로그의 세션 ID · 워크플로 실행 ID ──────────────────────────────────────────
-CAPTURE_EXTS = (".log", ".jsonl", ".session")
+# ── 캡처 ID 감사 — 한 폴더 아래 모든 파일의 세션 ID · 워크플로 실행 ID ──────────────────────────────────────────
+# 저장소를 바꾸는 git 환경 변수 — 훅이나 다른 도구가 내보낸다. 남기면 git 이 root 가 든 작업 트리가 아니라 그 저장소로 답한다
+_GIT_REPO_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+                 "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_PREFIX")
+
+
+def _git_ignored(root):
+    """root 가 git 작업 트리 안이면 그 아래의 무시된 미추적 파일 → root 기준 상대 경로 집합(git 이 내보내지 않는 파일).
+    작업 트리 밖 · git 부재 · git 실패면 빈 집합이다 — 그때는 걸은 파일 전부를 본다(범위를 줄이는 쪽으로 틀리지 않는다).
+    ⛔ git 은 부르는 쪽의 저장소 환경 변수(_GIT_REPO_ENV)를 지우고 부른다 — 답은 늘 root 가 든 작업 트리에서 온다. 남기면 다른 저장소의
+       (더 넓을 수 있는) 무시 규칙으로 감사할 파일이 빠진다."""
+    env = {k: v for k, v in os.environ.items() if k not in _GIT_REPO_ENV}
+    try:
+        r = subprocess.run(["git", "-C", root, "ls-files", "-z", "--others", "--ignored", "--exclude-standard"], capture_output=True,
+                           env=env)
+    except OSError:
+        return set()
+    return {p for p in r.stdout.decode("utf-8", "surrogateescape").split("\0") if p} if r.returncode == 0 else set()
 
 
 def capture_files(root):
-    """root 아래 캡처 로그(CAPTURE_EXTS) → root 기준 상대 경로(순회 순서 — 폴더 · 파일 이름 정렬). 숨은 폴더도 본다. 심볼릭 링크 폴더는
-    따라가지 않는다(가리키는 곳은 이 트리의 캡처가 아니다). ⛔ 순회 오류(root 부재 포함)는 정본의 Unrun(판정 불가 — 정본 tree_files 와
+    """root 아래 모든 파일(확장자를 가리지 않는다) → root 기준 상대 경로(순회 순서 — 폴더 · 파일 이름 정렬). 숨은 폴더도 본다.
+    root 가 git 작업 트리 안이면 git 이 내보낼 파일만 — 추적 파일과 무시되지 않은 미추적 파일이다. 걸은 파일에서 무시된 미추적 파일만
+    뺀다: 폴더를 열면 OS 가 만드는 .DS_Store 같은 무시된 부산물이 감사를 판정 불가로 만들지 않게. 무시 규칙에 걸려도 추적하는 파일 ·
+    아직 커밋하지 않은 새 파일은 본다. 작업 트리 밖(이력 없는 사본 · 임시 폴더)이면 걸은 파일 전부다.
+    그 git 은 부르는 쪽의 GIT_DIR 등과 무관하게 root 가 든 작업 트리에 묻는다(_git_ignored).
+    심볼릭 링크 폴더는 따라가지 않는다(가리키는 곳은 이 트리의 캡처가 아니다). ⛔ 순회 오류(root 부재 포함)는 정본의 Unrun(판정 불가 — 정본 tree_files 와
     같은 형식)이다 — 다 읽지 못한 범위를 '위반 0' 으로 읽지 않는다."""
     if LEAK is None:   # 정본 없이 범위를 정하지 않는다
         raise RuntimeError(LEAK_ERR)
     errors, out = [], []
     for dp, dns, fns in os.walk(root, onerror=errors.append):
         dns.sort()
-        out += [os.path.relpath(os.path.join(dp, f), root) for f in sorted(fns) if f.endswith(CAPTURE_EXTS)]
+        out += [os.path.relpath(os.path.join(dp, f), root) for f in sorted(fns)]
     if errors:
         raise LEAK.Unrun(f"폴더를 다 읽지 못했다: {errors[0]}")
-    return out
+    ignored = _git_ignored(root)
+    return [rel for rel in out if rel not in ignored]
 
 
 def capture_id_hits(text):
@@ -429,7 +454,7 @@ def capture_id_hits(text):
 
 
 def capture_id_audit(root):
-    """root 아래 캡처 로그 전부 → (파일 수, [(파일, 줄, 종류, 토큰)], [(읽지 못한 파일, 사유)]). 형식 규칙(format_hits)은 쓰지 않는다.
+    """root 아래 파일(capture_files 의 범위) → (파일 수, [(파일, 줄, 종류, 토큰)], [(읽지 못한 파일, 사유)]). 형식 규칙(format_hits)은 쓰지 않는다.
     경로 이름도 본다(적중의 줄은 0) — 세션 기록은 `<세션 ID>.jsonl` · `wf_<실행 ID>/…` 처럼 이름에 ID 가 든다. 내용이 깨끗해도 이름은 공개된다.
     ⛔ 읽기 · 디코드 실패 · NUL 바이트(정본의 읽기 계약 read_text)는 건너뛰지 않고 셋째 목록에 싣는다 — 부르는 쪽은 판정 불가로 끝낸다.
        순회 실패는 정본의 Unrun 이 그대로 올라간다. 파일 수 0 도 부르는 쪽이 판정 불가로 읽는다(범위를 못 찾은 감사는 통과가 아니다)."""

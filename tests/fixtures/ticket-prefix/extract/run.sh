@@ -76,7 +76,7 @@ except Exception as exc:  # noqa: BLE001 — 판정 불가는 실행 오류(2)�
     print("parse_memory.py 를 불러오지 못했다: %s: %s" % (type(exc).__name__, exc), file=sys.stderr)
     raise SystemExit(2)
 
-SESSION_ID = "0f9c1d22-1111-2222-3333-444455556666"
+SESSION_ID = "00000000-0000-7000-8000-000000000001"
 SESSION_FM = {"metadata": "originSessionId: %s" % SESSION_ID}
 SESSION_EXPECT = "session=%s" % SESSION_ID
 

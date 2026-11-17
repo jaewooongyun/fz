@@ -35,7 +35,8 @@
                env 다음에 git 설정 fz.neutralizeRules 를 보고, 그래도 없으면 유지관리자 표지(git 설정 fz.maintainer)가 참일 때
                판정 불가다
 정책은 돌릴 계열도 고른다 — POLICY_DOC 은 등록된 계열 전부(새 계열은 `@family` 로 등록만 하면 들어간다), POLICY_CAPTURE 는
-home · home-slug · mail 만이다. 캡처 로그의 세션 ID(UUID 꼴)와 실행 ID 는 정책이 아니라 캡처 ID 감사(tests/lib/sample_replay.py 의
+home · home-slug · mail 만이다. 캡처 fixture(tests/fixtures 아래 모든 파일 — 확장자를 가리지 않는다 · git 작업 트리 안이면 git 이 내보낼 파일만: 무시된 미추적 부산물은 뺀다)의 세션 ID(UUID 꼴)와 실행 ID 는
+정책이 아니라 캡처 ID 감사(tests/lib/sample_replay.py 의
 capture_id_audit)가 이 모듈의 capture_id_tokens 로 본다 — ANSI 제어열을 걷고 합성 목록(SYNTHETIC_SESSION_IDS · SYNTHETIC_RUN_IDS)
 밖 값만 낸다(걷기 · 대조는 여기 한 벌이다). 신원(author · committer · tagger 의 메일)은 내용과 다른 축이다 — noreply 둘(IDENTITY_EXACT ·
 IDENTITY_SUFFIX)만 통과한다. 훅 정책의 커밋마다 축(push 훅)은 이 신원 메일 규칙을 유지관리자 표지가 참일 때만 켠다(비공개 규칙은
@@ -239,6 +240,8 @@ UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 #   …0001 ~ …0004  rollout-replay 표본(provenance.json 이 sha256 을 고정한다 — 표본을 다시 쓰지 않는다)
 #   …0011          mini-ledger 스트림 로그와 그 기대값(scripts/ab_ledger_selftest_r3.py)
 #   1111…5555      가짜 GPT CLI 계열(tests/fixtures/gpt/_shim · kinds-resolve 입력)
+#   ⛔ 목록 밖 값을 여기 더하지 않는다 — 세션 ID 자리가 더 필요한 시험(spawn-audit · ticket-prefix · fz-compact spill)은 위 값을
+#      다시 쓴다(셀 · 시험마다 따로라 겹쳐도 된다)
 #   ⛔ 값은 [0-9a-f-]{36} 꼴이어야 한다 — 수집기 · 래퍼가 그 꼴로 세션을 읽는다(밖이면 세션이 빈 값이 되어 배너 연결 판정이 바뀐다)
 #   ⛔ 값은 이어 붙여 만든다 — 이 파일에 UUID 를 글자 그대로 두지 않는다
 SYNTHETIC_SESSION_IDS = frozenset(["00000000-0000-7000-8000-" + format(n, "012x") for n in (0x1, 0x2, 0x3, 0x4, 0x11)]

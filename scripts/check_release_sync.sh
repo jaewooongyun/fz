@@ -13,7 +13,7 @@
 #           직전 태그가 없으면(첫 출하) `.githooks/*` 와 셔뱅 추적 파일의 실행 비트를 절대 기준으로 본다
 # exit: 0=전부 충족(DOCS_SYNC_OK · RELEASE_SYNC_OK) / 1=불일치 / 2=대상 부재 · 인자 오류 · 판정 불가(측정 실패)
 #       ⛔ 판정 불가 = 누수 축(정본 모듈이 2 를 냈거나 끝 줄이 종료 코드와 맞지 않는다) 또는 목록 추출(기준 태그 · 로컬 태그 · 변경 목록 ·
-#          git status · git ls-files) 실패. 불일치가 함께 있어도 2 다(health-check 의 규약과 같다 — 미판정이 실패보다 앞선다). 그 밖의 축 미판정은 불일치로 센다
+#          git status · git ls-files · 직전 태그의 하위 plugin.json 읽기) 실패. 불일치가 함께 있어도 2 다(health-check 의 규약과 같다 — 미판정이 실패보다 앞선다). 그 밖의 축 미판정은 불일치로 센다
 # diff-parse: not-a-diff — 이 스크립트는 diff 를 읽지 않는다. ⑦ · ⑧ 의 추가 줄 해석은 누수 규칙 정본(scripts/leak_rules.py)이 한다
 #
 # 모드(모드 다음의 옵션은 순서와 무관하게 받는다 · 모르는 인자는 exit 2):
@@ -217,7 +217,7 @@ findings_axis() {   # $1=노트 경로
 #      같은 버전이면 `plugin update` 가 바뀐 내용을 건너뛴다. v* 태그가 없거나 태그에 없던 폴더(새 플러그인)는 넘어간다.
 #    ⛔ 직전 태그는 HEAD 에 붙은 태그를 **포함한** describe 다 — ②-c · ⑦ · ⑧ 의 release_base(HEAD 태그를 뺀다)와 뜻이 다르다. 태그를 단 뒤
 #       다시 돌리면 그 태그 이후의 변경(미커밋 · untracked)만 본다. self-test 의 sub-changed-* 셀이 HEAD 태그 대비 변경을 단언한다
-#    반환: 0=충족 · 1=불일치(사유를 stdout 에) · 2=marketplace 의 plugins 를 읽지 못함 · 3=직전 태그 · 변경 목록 추출 실패(판정 불가)
+#    반환: 0=충족 · 1=불일치(사유를 stdout 에) · 2=marketplace 의 plugins 를 읽지 못함 · 3=직전 태그 · 변경 목록 추출 · 직전 태그의 하위 plugin.json 읽기 실패(판정 불가)
 subplugin_axis() {   # $1=리포 디렉토리
   python3 - "$1" <<'PY'
 import json, subprocess, sys
@@ -273,6 +273,13 @@ for entry in plugins[1:]:
         continue
     before = git("show", f"{tag}:{path}/.claude-plugin/plugin.json")
     if before.returncode != 0:
+        # ⛔ show 실패를 전부 '태그에 없던 새 플러그인' 으로 읽지 않는다 — 객체를 읽지 못한 것도 show 실패다. 태그의 트리에 그 경로가
+        #    없을 때(ls-tree 성공 · 빈 출력)만 넘어간다. --full-tree 는 경로를 show 의 `태그:경로` 처럼 저장소 루트 기준으로 푼다
+        at_tag = git("ls-tree", "--full-tree", tag, "--", f"{path}/.claude-plugin/plugin.json")
+        if at_tag.returncode == 0 and at_tag.stdout.strip() == "":
+            continue
+        print(f"  ⚠️ {name}: {tag} 의 {path}/.claude-plugin/plugin.json 을 읽지 못했다(git show 실패 · 태그 트리에 경로가 있거나 ls-tree 도 실패 — ⛔ 통과 아님)")
+        unrun = 1
         continue
     # ⛔ 목록 명령의 실패를 '바뀌지 않음' 으로 읽지 않는다 — diff --quiet 는 0(같음) · 1(다름) 밖이 실패다
     diff = git("diff", "--quiet", tag, "--", path)
@@ -282,7 +289,13 @@ for entry in plugins[1:]:
         unrun = 1
         continue
     changed = diff.returncode == 1 or others.stdout.strip() != ""
-    if changed and version_of(before.stdout) == own:
+    # ⛔ 태그 쪽 버전을 읽지 못한 빈 값을 '버전이 바뀌었다' 로 읽지 않는다 — 빈 값은 own 과 늘 달라 올림 검사가 통과로 샌다
+    prior = version_of(before.stdout)
+    if changed and prior == "":
+        print(f"  ⚠️ {name}: {tag} 의 {path}/.claude-plugin/plugin.json 에서 버전을 읽지 못했다 — 버전 올림을 판정하지 못했다(⛔ 통과 아님)")
+        unrun = 1
+        continue
+    if changed and prior == own:
         print(f"  ❌ {name}: {tag} 뒤 {path} 가 바뀌었는데 버전이 {own} 그대로다 — plugin update 가 건너뛴다")
         bad = 1
 sys.exit(3 if unrun else bad)
@@ -441,12 +454,13 @@ for ent in r.stdout.split(b"\0"):
     lack = [w for w, ok in (("HEAD " + (hm or b"").decode(), hm != b"100644"), ("인덱스 " + mode.decode(), mode == b"100755"),
                             ("작업 트리", bool(st.st_mode & 0o111))) if not ok]
     if lack:
-        how = "의도한 것이면 tests/fixtures/release-mode-allow.txt 에 적는다"
+        head_lacks = lack[0].startswith("HEAD")   # 순서는 HEAD · 인덱스 · 작업 트리다
+        # 커밋만 실행 비트가 없다(인덱스 · 작업 트리는 이미 실행 가능) — 남은 일은 커밋이다. 훅이든 셔뱅 스크립트든 같은 안내를 낸다
+        given = "실행 비트는 이미 줬다. 커밋한 뒤 다시 돌린다" if head_lacks and len(lack) == 1 else ""
+        how = given or "의도한 것이면 tests/fixtures/release-mode-allow.txt 에 적는다"
         if path.startswith(".githooks/"):   # 훅은 허용 목록으로 풀리지 않는다(mode_allow 가 훅 줄을 뺀다) — 따라 하면 풀리는 안내만 낸다
-            head_lacks = lack[0].startswith("HEAD")   # 순서는 HEAD · 인덱스 · 작업 트리다
             how = "훅은 허용 목록으로 풀 수 없다 — " + (
-                "실행 비트는 이미 줬다. 커밋한 뒤 다시 돌린다" if head_lacks and len(lack) == 1
-                else "실행 비트를 준다(chmod +x 뒤 stage)" + (" · 그리고 커밋한다" if head_lacks else ""))
+                given or "실행 비트를 준다(chmod +x 뒤 stage)" + (" · 그리고 커밋한다" if head_lacks else ""))
         print(f"  ❌ 실행 비트가 없다({' · '.join(lack)}): {shown} — 직전 태그가 없어 절대 기준으로 본다. {how}")
         bad = 1
 # 커밋에만 남은 것 — 위 순회는 작업 트리의 파일로 대상을 정한다(훅이거나 셔뱅으로 시작한다). 인덱스에서 뺐거나 작업 트리에서 지웠거나 셔뱅
@@ -580,7 +594,7 @@ release_leak() {   # $1=리포 · $2=기준 태그(빈 값 = 태그 없는 첫 �
 
 # 축 판정 줄 — `축 함수 || { 2 → 미판정 note · 3 → 목록 추출 실패(판정 불가) · 그 밖 → 불일치 +1 }`. 2(판정 불가)는 통과가 아니다:
 #    미판정 note 를 남겨 최종 판정(finish)이 0 을 내지 못하게 한다. 3 은 목록(기준 태그 · 변경 목록 · git status · git ls-files)을 뽑지
-#    못한 것이라 unrun 으로 올린다(최종 exit 2). ⛔ 2 · 3 을 적중(1)과 한 칸으로 접지 않는다 — 고칠 것과 돌리지 못한 검사는 사유가 다르다
+#    못했거나 직전 태그의 하위 plugin.json 을 읽지 못한 것이라 unrun 으로 올린다(최종 exit 2). ⛔ 2 · 3 을 적중(1)과 한 칸으로 접지 않는다 — 고칠 것과 돌리지 못한 검사는 사유가 다르다
 axis_note() {   # $1=축 이름(미판정 줄에 싣는다) · 나머지=부를 축 함수와 인자
   local name="$1" rc=0; shift
   "$@" || { rc=$?; case "$rc" in 2) note "$name 미판정 — 통과가 아니다" ;; 3) unrun_note "$name 목록 추출 실패" ;; *) fail=$((fail + 1)) ;; esac; }
@@ -824,6 +838,10 @@ if [ "$MODE" = "self-test" ]; then
   gq git -C "$R" -c user.email=t@t -c user.name=t add -A; gq git -C "$R" -c user.email=t@t -c user.name=t commit -qm s
   chmod 755 "$R/run.sh"; gq git -C "$R" add -A
   case_ax "exec-bit-fixed-uncommitted-flagged" 1 mode_axis "$R"
+  #    인덱스 · 작업 트리는 이미 실행 가능하고 커밋만 남았다 — 허용 목록 · chmod 를 권하면 고친 것을 두고 엉뚱한 일을 시킨다(훅 쪽은 아래 *-hook-head-only-* 셀)
+  out=$(mode_axis "$R")
+  if grep -q '커밋한 뒤 다시 돌린다' <<< "$out" && ! grep -q 'release-mode-allow.txt 에 적는다' <<< "$out" && ! grep -q 'chmod' <<< "$out"; then ok_ "exec-bit-script-head-only-advice-says-commit"
+  else failed=$((failed+1)); echo "  FAIL exec-bit-script-head-only-advice-says-commit: 커밋만 남았는데 허용 목록 · chmod 를 권한다"; echo "$out" | sed 's/^/        /'; fi
   gq git -C "$R" -c user.email=t@t -c user.name=t commit -qm fix; case_ax "exec-bit-fixed-committed-ok" 0 mode_axis "$R"; rm -rf "$R"
   #    허용 목록에 훅을 적어도 허용하지 않는다 — 태그 없는 저장소의 0644 훅은 목록과 무관하게 불일치다
   mkr 1.0.0; R="$REPO"; mkdir -p "$R/.githooks" "$R/tests/fixtures"; printf '#!/bin/bash\n' > "$R/.githooks/pre-push"; chmod 644 "$R/.githooks/pre-push"
@@ -1062,6 +1080,21 @@ if [ "$MODE" = "self-test" ]; then
   mki 1.0.0; R="$REPO"; sub_files "$R" 0.1.0 0.1.0; gi -C "$R" add -A; gi -C "$R" commit -qm sub; gi -C "$R" tag v1.0.0
   printf 'x' > "$R/.git/index"
   case_ax "list-fail-subplugin-unrun" 3 subplugin_axis "$R"; rm -rf "$R"
+  #    태그 쪽 하위 plugin.json 을 읽지 못한다 — blob 객체만 지운 것(태그 트리에는 경로가 있다) · 그 폴더의 트리 객체를 지운 것(ls-tree 도
+  #    실패한다). git show 실패를 '태그에 없던 새 플러그인' 으로 읽으면 버전 올림 검사가 조용히 빠진다. 태그에 경로가 없는 실제 부재는
+  #    위 sub-new-after-tag 셀이 계속 통과로 본다
+  mki 1.0.0; R="$REPO"; sub_files "$R" 0.1.0 0.1.0; gi -C "$R" add -A; gi -C "$R" commit -qm sub; gi -C "$R" tag v1.0.0
+  BLOB="$(gx -C "$R" rev-parse 'v1.0.0:mods/sub/.claude-plugin/plugin.json')" && OBJ="$R/.git/objects/${BLOB:0:2}/${BLOB:2}" && [ -f "$OBJ" ] && rm -f "$OBJ" \
+    || { echo "⛔ 픽스처 준비 실패: 태그 쪽 하위 plugin.json 의 느슨한 blob 객체를 지우지 못했다" >&2; exit 2; }
+  case_ax "list-fail-subplugin-tag-show-unrun" 3 subplugin_axis "$R"; rm -rf "$R"
+  mki 1.0.0; R="$REPO"; sub_files "$R" 0.1.0 0.1.0; gi -C "$R" add -A; gi -C "$R" commit -qm sub; gi -C "$R" tag v1.0.0
+  TOBJ="$(gx -C "$R" rev-parse 'v1.0.0:mods/sub/.claude-plugin')" && OBJ="$R/.git/objects/${TOBJ:0:2}/${TOBJ:2}" && [ -f "$OBJ" ] && rm -f "$OBJ" \
+    || { echo "⛔ 픽스처 준비 실패: 태그 쪽 하위 .claude-plugin 의 트리 객체를 지우지 못했다" >&2; exit 2; }
+  case_ax "list-fail-subplugin-tag-tree-unrun" 3 subplugin_axis "$R"; rm -rf "$R"
+  #    태그 쪽 하위 plugin.json 에서 버전을 읽지 못한다(JSON 이 아니다) — 빈 값을 '버전이 바뀌었다' 로 읽으면 바뀐 하위 플러그인이 올림 검사를 지나간다
+  mki 1.0.0; R="$REPO"; sub_files "$R" 0.1.0 0.1.0; printf 'not json\n' > "$R/mods/sub/.claude-plugin/plugin.json"
+  gi -C "$R" add -A; gi -C "$R" commit -qm sub; gi -C "$R" tag v1.0.0
+  sub_files "$R" 0.1.0 0.1.0; case_ax "sub-tag-version-unreadable-unrun" 3 subplugin_axis "$R"; rm -rf "$R"
   #    --staged 는 자기 루트에서 돈다 — 스크립트 사본을 임시 저장소에 두고 실제 진입점으로 부른다
   mki 1.0.0; R="$REPO"; mkdir -p "$R/scripts" && cp "$SELF_DIR/$(basename "${BASH_SOURCE[0]}")" "$R/scripts/check_release_sync.sh" \
     || { echo "⛔ 픽스처 준비 실패: 스크립트 사본" >&2; exit 2; }
