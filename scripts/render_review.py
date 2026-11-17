@@ -168,6 +168,10 @@ def validate(r) -> None:
             raise InputError(f"{key} 는 {' · '.join(need)} 문자열을 가진 객체 배열이다")
     if "costLog" in r and not (isinstance(r["costLog"], str) and r["costLog"].strip()):
         raise InputError("costLog 는 cost-log.json 상대 경로(문자열)다")
+    # 빈 문자열 · None 은 절을 생략한다. 그 밖의 타입은 비어 있든 0 · False 든 입력 오류다 — 참 · 거짓으로 거르면 [] · 0 은 조용히
+    # 넘어가고 ["x"] 는 렌더 중 .strip() 에서 죽는다(그 예외는 exit 1 = 거부로 읽히고 이전 산출물을 지우지 않는다)
+    if r.get("matrix") is not None and not isinstance(r["matrix"], str):
+        raise InputError(f"matrix 는 Confidence Matrix 마크다운(문자열)이다 — {type(r['matrix']).__name__}")
 
 
 def loc(path: str, s: dict) -> str:
@@ -1040,6 +1044,23 @@ def self_test() -> int:
         r = cli_run(review(base, costLog="no-such-cost-log.json"), "cost-miss")
         case("f212-cost-log-missing-unrun — costLog 파일이 없으면 UNRUN(exit 2) · 파일 0", r.returncode == 2 and files_in("cost-miss") == [],
              (r.returncode, r.stderr[-200:]))
+        # 문자열이 아닌 matrix 는 입력 오류다 — 예외로 죽으면 exit 1(거부)로 읽히고 이전 렌더의 산출물이 그대로 남는다
+        ok0 = cli_run(review(base), "matrix-bad")
+        r = cli_run(review(base, matrix=["| a |"]), "matrix-bad")
+        case("matrix-not-string-unrun — matrix 가 문자열이 아니면 UNRUN(exit 2) · 이전 렌더의 산출물도 지운다",
+             ok0.returncode == 0 and r.returncode == 2 and files_in("matrix-bad") == [], (ok0.returncode, r.returncode, r.stderr[-200:]))
+
+        def shape(v):
+            try:
+                render(review(base, matrix=v), SELF_DIFF)
+                return "R"
+            except InputError:
+                return "E"
+            except Exception:
+                return "C"
+        got = "".join(shape(v) for v in (["x"], [], {"a": 1}, {}, 0, 5, False, True)) + " " + "".join(shape(v) for v in ("", None, "| a |"))
+        case("matrix-type-table — list · dict · 숫자 · bool 은 비어 있든 0 · False 든 입력 오류(E), 빈 문자열 · None · 문자열은 렌더(R)",
+             got == "EEEEEEEE RRR", got)
         # F-201 — 재평가 뒤 파생 산출물(인덱스 · 구조화 JSON)도 같은 판정으로
         d = tmp / "reeval"
         d.mkdir()

@@ -13,6 +13,7 @@
 //   Stage2 교차: 각자 상대 결과를 받아 FP 판정/보완 (cross-verify Round 2 동형).
 //   Stage3 병합: plan-structure 렌즈 + fable (동일성 판정 = 해석 작업 — §11/§12 분류). 3-Tier 수렴 merge 판단 지점.
 //   등급 부여: 스크립트 binary 규칙 — ★★★ 양쪽 발견 / ★★ 단독+교차확인 / ★ 단독+교차미확인
+//     병합자의 sources · crossVerified 는 주장이다 — 스크립트가 이 실행의 렌즈 · 교차 결손으로 걸러 등급을 매긴다(렌즈 결손 = 전 항목 ★ · 교차 결손 = 교차 확인 불인정).
 //     (cross-verify.md 신뢰도 표의 규칙은 명문 [verified] — 부여 주체는 Lead→스크립트 이관 [design: calibration 확인 대상]).
 //   budget 가드: 해당 없음 — 고정 5-call(가변 fan-out 없음). §12 거버넌스 단서 참조.
 
@@ -98,9 +99,12 @@ const input = (() => {
 let agentCalls = 0
 let nullCalls = 0
 let fallbackCount = 0
+// ⛔ agent() 가 던져도 null 워커로 센다(swarm.js callAgent 와 같다) — 세지 않으면 parallel 이 null 로 돌려준 그 자리가 nullCount 에서
+//    빠지고(재시도 취소가 있으면 음수가 된다), parallel 밖 호출은 null 가드에 닿기 전에 run 전체가 reject 한다. 던진 사유는 로그에 남긴다
 async function callAgent(prompt, opts) {
   agentCalls += 1
-  const out = await agent(prompt, opts)
+  let out = null
+  try { out = await agent(prompt, opts) } catch (e) { log(`WARN ${opts.label} 실패 — ${e && e.message}`) }
   if (!out) { nullCalls += 1; log(`WARN ${opts.label} null`) }
   return out
 }
@@ -160,7 +164,7 @@ if (sym && pat) {
   ])
   crossOnPattern = crossResults[0]
   crossOnSymbolic = crossResults[1]
-  if (!crossOnPattern || !crossOnSymbolic) log('WARN stage2 부분 null — 교차 미확인 항목은 등급 ★')
+  if (!crossOnPattern || !crossOnSymbolic) log('WARN stage2 부분 null — 교차 확인을 인정하지 않는다(단독 출처 항목은 등급 ★)')
 }
 
 // ════════ Stage 3: 병합 (fable 언어 지시 — 동일성 판정은 해석 작업) ════════
@@ -179,10 +183,16 @@ if (!merged) {
 }
 
 // 등급 부여 — 스크립트 binary 규칙 (cross-verify.md 명문 규칙, §12 분류)
-const results = merged.merged.map((m) => ({
-  ...m,
-  confidence: m.sources.length === 2 ? '★★★' : (m.crossVerified ? '★★' : '★'),
-}))
+// ⛔ 병합자의 sources · crossVerified 는 주장이다 — 이 실행에서 실제로 일어난 일로 거른다:
+//    출처는 중복을 걷어 센다 · 렌즈 하나라도 null 이면 전 항목 ★(위 '등급 상한 ★' 로그) · 교차 확인은 교차 판정 둘이 다 있을 때만 인정한다.
+//    항목은 버리지 않는다(등급만 낮춘다). 콜이 전부 성공한 뒤 병합자가 지어낸 출처 · 교차 확인은 여기서 걸러지지 않는다 —
+//    병합 스키마에 원본 finding id 연결이 없다.
+const bothLenses = !!(sym && pat)
+const bothCross = !!(crossOnPattern && crossOnSymbolic)
+const results = merged.merged.map((m) => {
+  const distinct = new Set(m.sources.filter(s => s === 'symbolic' || s === 'pattern')).size
+  return { ...m, confidence: !bothLenses ? '★' : (distinct === 2 ? '★★★' : (m.crossVerified && bothCross ? '★★' : '★')) }
+})
 const dist = { three: results.filter(r => r.confidence === '★★★').length, two: results.filter(r => r.confidence === '★★').length, one: results.filter(r => r.confidence === '★').length }
 log(`등급 분포: ★★★ ${dist.three} / ★★ ${dist.two} / ★ ${dist.one}`)
 

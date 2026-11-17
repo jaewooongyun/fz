@@ -13,6 +13,8 @@
 //   고정본은 이 러너 옆에서 찾는다 — FZ_WF_ROOT 로 다른 트리를 대상으로 돌려도 기준 원문은 같다.
 //   ⛔ 명시한 선택자(빈 값 포함)를 읽지 못하면 고정본으로 내려가지 않는다. 고정본이 없어도 그 대조는 UNRUN(exit 2)이고 줄에 사유가 붙는다 — 통과가 아니다.
 //   ⛔ 고정본 편집 규칙은 default-off-regression.js 머리말과 같다 — 의도한 동작 변경은 고정본을 고쳐 맞추지 않고 비교 쪽(rollbackArgs · intended())에 적는다.
+//   ⛔ 고정본은 해시 목록 tests/fixtures/workflow-base/SHA256SUMS 에 묶여 있다 — 대조는 resolveBase 가 기준을 고르기 전에 한다(이 파일에 사본을 두지 않는다).
+//      어긋나면 ③ · 스키마 대조가 UNRUN 이다. 목록을 다시 쓰는 명령과 규칙은 그 머리말에 있다.
 // ⛔ FZ_WF_ROOT 로 기준 트리를 대상으로 돌리면 ① · ② 가 FAIL 이어야 한다(기준은 effort 를 읽지 않는다).
 // code-pair 스키마(S7): code-pair-schema-intended-only — 콜 스키마(키 정렬 JSON) == 기준 스키마 + 의도한 변환(spanLines · required · oldAnchor 설명).
 //   대조군 schema-compare-detects-{unrelated-field,required-change,description-change} — 그 셋을 바꾼 사본은 비교에서 떨어져야 한다.

@@ -16,6 +16,14 @@
 //    명시한 선택자(빈 값 포함)를 읽지 못하면 고정본으로 내려가지 않고 UNRUN(exit 2)이다. 고정본이 없어도 UNRUN 이다. 검사 이름의 `기준(…)` 이 출처다.
 //    ⛔ 고정본은 두 가지 편집만 받는다 — 콜 입력 밖(주석)의 치환과, workflows/*.js 에 똑같이 적용한 문자열 치환. 유래 커밋과의 차이는 이 둘뿐이어야 한다.
 //       의도한 기본 경로 변경은 고정본을 고쳐 맞추지 않고 아래 INTENDED 변환으로 적는다 — 고정본을 고쳐 FAIL 을 지우면 회귀가 가려진다.
+//    ⛔ 고정본 16개(이 러너의 default-off/ 8개 + effort-arg.js 의 effort-arg/ 8개 — 어느 러너도 읽지 않는 사본 포함)는 해시 목록
+//       tests/fixtures/workflow-base/SHA256SUMS 에 묶여 있다(verifyPinned). 기준을 고르기 전에 — 선택자를 줬어도 — 전부 대조하고, 어긋나거나
+//       파일 집합이 다르거나 목록이 없으면 UNRUN(exit 2)이다. 견주는 파일 집합(pinnedFiles)은 그 폴더가 git 작업 트리 안이면 git 이 내보낼
+//       파일(추적 + 무시되지 않은 미추적 — .DS_Store 같은 무시된 부산물은 빠진다)이고, 밖이면 폴더의 파일 전부다. 그 git 은 부르는 쪽의
+//       GIT_DIR 등(훅이 내보낸다)을 지우고 부른다 — 답은 그 폴더가 든 작업 트리에서 온다.
+//       위 두 가지 편집으로 고정본을 일부러 바꿨으면 같은 커밋에서 목록을 다시 쓴다(같은 집합을 고른다 — 작업 트리 밖이면 git 이 아무것도 내지 않아 전부다):
+//         (cd tests/fixtures/workflow-base && shasum -a 256 $(find . -type f ! -name SHA256SUMS | sed 's#^\./##' | grep -vxF -f <(git ls-files -o -i --exclude-standard 2>/dev/null) | sort) > SHA256SUMS)
+//       목록만 고쳐 UNRUN 을 지우지 않는다 — 고정본의 diff 와 목록의 diff 가 같은 커밋에 함께 보여야 한다.
 //    health-check 러너는 env 를 비우지 않고 부른다 — 호출자 env 를 그대로 물려받는다. 그래서 전용 이름만 읽는다: 범용 FZ_BASE_TREE · FZ_BASE_SHA 는
 //    A/B 기준 arm · 게이트 환경이 다른 뜻으로 내보낸다(F-363). 새 이름 없이 옛 이름만 있으면 WARN 줄을 내고 고정본으로 돈다.
 // ⛔ 옵션마다 세 가지를 본다: 미지정 == 기준(defaultOn 이면 미지정 == 켬) · false == 기준 · true != 기준(옵션이 실제로 배선돼 있다 — 헛돌이 방어).
@@ -24,6 +32,7 @@
 //    그 값이 가리키는 전용 테스트가 본다. 미지정 == 기준 · off == 기준 은 똑같이 본다.
 // 인자: --option NAME(여러 번) · --all-rb-options · 인자 없음 = 등록된 옵션 전부(health-check 러너가 인자 없이 돈다).
 'use strict'
+const crypto = require('crypto')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -182,13 +191,74 @@ const INTENDED = {
 }
 const intended = (wf, calls) => calls.map(c => ((INTENDED[wf] || {})[c.label] ? INTENDED[wf][c.label](c) : c))
 
+// 고정본 해시 목록 대조 — root(기본: 저장소의 tests/fixtures/workflow-base) 아래 파일(pinnedFiles)을 SHA256SUMS 와 견준다. 반환 = 대조한 파일 수.
+//   목록 줄 = `<sha256 64자><공백 2><root 기준 상대 경로>`(`shasum -a 256` 출력 꼴). 목록 ↔ 폴더의 파일 집합이 같아야 하고 해시가 전부 같아야 한다.
+//   ⛔ 어긋나면 던진다(사유에 목록 파일 이름) — 호출자가 UNRUN(exit 2)으로 끝낸다. 통과시키면 변조된 기준으로 '회귀 없음' 이 나온다.
+const PINNED_ROOT = path.join(__dirname, '..', 'fixtures', 'workflow-base')
+const SUMS_NAME = 'SHA256SUMS'
+// 저장소를 바꾸는 git 환경 변수 — 훅이나 다른 도구가 내보낸다. 남기면 git 이 root 가 든 작업 트리가 아니라 그 저장소로 답한다
+const GIT_REPO_ENV = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_COMMON_DIR',
+  'GIT_NAMESPACE', 'GIT_PREFIX']
+// root 가 git 작업 트리 안이면 그 아래의 무시된 미추적 파일(git 이 내보내지 않는 파일 — root 기준 상대 경로). 작업 트리 밖 · git 부재 ·
+//   git 실패면 빈 집합이다 — 그때는 폴더 전부를 견준다(대조를 줄이는 쪽으로 틀리지 않는다)
+//   ⛔ git 은 부르는 쪽의 저장소 환경 변수(GIT_REPO_ENV)를 지우고 부른다 — 답은 늘 root 가 든 작업 트리에서 온다. 남기면 다른 저장소의
+//      (더 넓을 수 있는) 무시 규칙으로 목록 밖 파일이 대조에서 빠진다
+function gitIgnored(root) {
+  const env = Object.assign({}, process.env)
+  for (const k of GIT_REPO_ENV) delete env[k]
+  try {
+    return new Set(execFileSync('git', ['-C', root, 'ls-files', '-z', '--others', '--ignored', '--exclude-standard'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env }).split('\0').filter(Boolean))
+  } catch (e) { return new Set() }
+}
+// 목록과 견줄 파일 — root 아래 파일(목록 파일 제외) → root 기준 상대 경로(`/` 구분). 자기 시험의 사본도 이 집합만 옮긴다.
+//   root 가 git 작업 트리 안이면 git 이 내보낼 파일(추적 + 무시되지 않은 미추적)만 — 폴더를 열면 OS 가 만드는 .DS_Store 같은 무시된
+//   부산물이 두 러너를 UNRUN 으로 만들지 않는다. 무시 규칙에 걸려도 추적하는 파일 · 무시되지 않은 새 파일은 남는다(목록에 없으면 UNRUN)
+function pinnedFiles(root) {
+  const have = [], ignored = gitIgnored(root)
+  const walk = rel => {
+    for (const e of fs.readdirSync(path.join(root, rel), { withFileTypes: true })) {
+      const r = rel ? `${rel}/${e.name}` : e.name
+      if (e.isDirectory()) walk(r)
+      else if (r !== SUMS_NAME && !ignored.has(r)) have.push(r)
+    }
+  }
+  walk('')
+  return have
+}
+function verifyPinned(root = PINNED_ROOT) {
+  let text
+  try { text = fs.readFileSync(path.join(root, SUMS_NAME), 'utf8') } catch (e) {
+    throw new Error(`고정본 해시 목록 ${SUMS_NAME} 을 읽지 못했다 — ${path.join(root, SUMS_NAME)}: ${e.code || e.message}`)
+  }
+  const listed = new Map()
+  for (const line of text.split('\n').filter(Boolean)) {
+    const m = /^([0-9a-f]{64}) {2}(\S.*)$/.exec(line)
+    if (!m || listed.has(m[2])) throw new Error(`${SUMS_NAME} 의 줄을 읽지 못했다(형식 · 중복) — ${line.slice(0, 80)}`)
+    listed.set(m[2], m[1])
+  }
+  const have = pinnedFiles(root)
+  const extra = have.filter(p => !listed.has(p)), gone = [...listed.keys()].filter(p => !have.includes(p))
+  if (extra.length || gone.length) {
+    throw new Error(`${SUMS_NAME} 와 고정본 폴더의 파일 집합이 다르다 — 목록에 없는 파일 ${extra.length}(${extra[0] || '-'}) · 폴더에 없는 파일 ${gone.length}(${gone[0] || '-'})`)
+  }
+  for (const [rel, want] of listed) {
+    const got = crypto.createHash('sha256').update(fs.readFileSync(path.join(root, rel))).digest('hex')
+    if (got !== want) throw new Error(`${SUMS_NAME} 와 고정본이 다르다 — ${rel} (목록 ${want.slice(0, 12)} · 실제 ${got.slice(0, 12)})`)
+  }
+  return listed.size
+}
+
 // 기준 원문 하나를 고른다 — 머리말의 순서(트리 > SHA > 고정본)와 '명시한 선택자는 고정본으로 내려가지 않는다' 의 유일한 구현이다.
 //   effort-arg.js 도 자기 sel 로 이것을 부른다 — 이력에 묶인 러너가 늘면 이 본문을 복사하지 않고 이것을 부른다.
-//   sel = { tree · sha: 선택자 env 이름, gitRoot: git show 를 돌릴 저장소, pinnedDir: 고정본 폴더, pinnedSha: 고정본의 유래(출처 표기) }
+//   sel = { tree · sha: 선택자 env 이름, gitRoot: git show 를 돌릴 저장소, pinnedDir: 고정본 폴더, pinnedSha: 고정본의 유래(출처 표기),
+//           pinnedRoot?: 해시 목록을 대조할 루트(시험용 — 없으면 저장소 고정본 루트) }
 //   반환 { file, from } — SHA · 고정본 원문은 tmp/<wf>.base.js 로 써서 넘긴다(하네스는 .js 를 읽는다).
 //   ⛔ 읽지 못하면 던진다 — 호출자가 UNRUN(exit 2)으로 끝낸다. 빈 값도 명시다: 미지정으로 읽으면 조용히 고정본으로 가고,
 //      빈 트리 값을 경로로 쓰면 path.join('', 'workflows') 가 cwd 의 workflows/ 를 기준으로 읽는다.
+//   ⛔ 기준을 고르기 전에 고정본 전부를 해시 목록과 대조한다 — 선택자를 줘서 고정본을 읽지 않는 실행도 같다(변조된 고정본을 둔 채 통과하지 않는다).
 function resolveBase(wf, tmp, sel) {
+  verifyPinned(sel.pinnedRoot)
   const tree = process.env[sel.tree], sha = process.env[sel.sha]
   const noFallback = '명시한 선택자는 고정본으로 내려가지 않는다'
   if (tree !== undefined) {
@@ -239,10 +309,51 @@ module.exports = { OPTIONS, SCENARIOS, BASE_ARGS, callsOf, firstDiff, resolveBas
 
 if (require.main === module) (async () => {
   const argv = process.argv.slice(2)
+  // 고정본이 목록과 다르면 아래 자기 시험도 돌리지 않는다 — 자식들이 같은 사유로 UNRUN 이 되어 무관한 셀이 FAIL 로 찍힌다
+  try { verifyPinned() } catch (e) {
+    console.log(`UNRUN  고정본을 믿을 수 없다 — ${e.message.split('\n')[0]} (⛔ 통과 아님)`)
+    process.exit(2)
+  }
   // F-406 — UNRUN 경로가 임시 폴더를 남기지 않는다: 전용 TMPDIR 에서 기준 소스가 없는 자식을 돌려 남은 fz-default-off-* 를 센다
+  let selfUnrun = ''   // 자기 시험을 준비하지 못한 사유 — 임시 폴더를 지운 뒤 UNRUN(exit 2)으로 끝낸다
   if (!process.env.FZ_DEFAULT_OFF_CHILD) {
     const box = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-f406-'))
     try {
+      // 해시 목록 대조(verifyPinned) — 고정본 루트의 사본을 한 군데씩 건드리면 resolveBase 가 기준을 고르기 전에 던진다
+      const copyTree = (src, dst) => {
+        fs.mkdirSync(dst, { recursive: true })
+        for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+          if (e.isDirectory()) copyTree(path.join(src, e.name), path.join(dst, e.name))
+          else fs.copyFileSync(path.join(src, e.name), path.join(dst, e.name))
+        }
+      }
+      // 사본에는 목록과 견주는 파일과 목록만 옮긴다 — 고정본 폴더의 무시된 부산물까지 옮기면 아래 셀이 변조가 아니라 그 파일 때문에 던진다
+      const copyPinned = dst => {
+        for (const rel of [...pinnedFiles(PINNED_ROOT), SUMS_NAME]) {
+          fs.mkdirSync(path.dirname(path.join(dst, rel)), { recursive: true })
+          fs.copyFileSync(path.join(PINNED_ROOT, rel), path.join(dst, rel))
+        }
+      }
+      check(`pinned-sums-clean — 저장소 고정본이 ${SUMS_NAME} 와 같다`, verifyPinned() > 0, '대조한 파일 0')
+      const refused = (name, what, mutate, sel = BASE_SEL) => {
+        const root = path.join(box, `pin-${name}`)
+        copyPinned(root)
+        mutate(root)
+        let msg = ''
+        try { resolveBase('plan-lean2', box, Object.assign({}, sel, { pinnedRoot: root })) } catch (e) { msg = e.message }
+        check(`pinned-sums-${name} — ${what}: resolveBase 가 던진다(사유에 ${SUMS_NAME})`, msg.includes(SUMS_NAME), msg || '던지지 않았다')
+      }
+      const unread = path.join('default-off', 'workflows', 'code-pair.js.base')   // 이 러너가 읽지 않는 사본
+      refused('tampered-unread-copy', '어느 러너도 읽지 않는 사본을 고쳤다', r => fs.appendFileSync(path.join(r, unread), '\n// tamper\n'))
+      refused('extra-file', '목록에 없는 사본이 생겼다', r => fs.writeFileSync(path.join(r, 'default-off', 'workflows', 'extra.js.base'), '// x\n'))
+      refused('missing-file', '목록의 사본이 없다', r => fs.rmSync(path.join(r, 'effort-arg', 'workflows', 'plan-lean.js.base')))
+      refused('missing-list', '목록 파일이 없다', r => fs.rmSync(path.join(r, SUMS_NAME)))
+      // 선택자를 준 실행도 대조를 건너뛰지 않는다 — 트리 선택자가 가리키는 기준은 멀쩡하고 고정본만 변조된 경우
+      process.env.FZ_PINNED_SELFTEST_TREE = ROOT
+      try {
+        refused('checked-before-selector', '트리 선택자를 줬고 고정본이 변조됐다', r => fs.appendFileSync(path.join(r, unread), '\n// tamper\n'),
+          Object.assign({}, BASE_SEL, { tree: 'FZ_PINNED_SELFTEST_TREE' }))
+      } finally { delete process.env.FZ_PINNED_SELFTEST_TREE }
       const { spawnSync } = require('child_process')
       const r = spawnSync(process.execPath, [__filename, '--option', 'mergeMode'], { encoding: 'utf8',
         env: Object.assign({}, process.env, { FZ_DEFAULT_OFF_CHILD: '1', TMPDIR: box, FZ_REGRESSION_BASE_TREE: path.join(box, 'no-such-tree') }) })
@@ -267,7 +378,87 @@ if (require.main === module) (async () => {
         env: Object.assign({}, process.env, { FZ_DEFAULT_OFF_CHILD: '1', TMPDIR: box, FZ_REGRESSION_BASE_TREE: dirTree }) })
       check('unreadable-tree-file-unrun — 기준 트리의 워크플로 자리가 폴더면 고정본으로 내려가지 않는다(UNRUN exit 2)',
         ur.status === 2 && /^UNRUN .*읽지 못했다/m.test(ur.stdout || ''), `exit ${ur.status}`)
+      // git 작업 트리 안에서는 git 이 내보낼 파일만 목록과 견준다 — 임시 git 작업 트리에 두 러너가 읽는 파일과 고정본을 옮겨 두고 자식으로 돌린다.
+      //   무시 규칙은 그 저장소의 info/exclude(`.DS_Store`)에만 두고 사용자 전역 무시 파일을 끊는다(core.excludesFile — 사람마다 갈리지 않게).
+      //   바깥 git 환경(훅이 건 GIT_DIR 등)과 기준 선택자 · 대상 트리 env 는 넘기지 않는다 — 자식은 고정본으로 돈다
+      const gitTree = path.join(box, 'git-tree'), kidTmp = path.join(box, 'git-kid-tmp')
+      const gitEnv = Object.assign({}, process.env)
+      for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_COMMON_DIR',
+        'GIT_NAMESPACE', 'GIT_PREFIX', 'FZ_REGRESSION_BASE_TREE', 'FZ_REGRESSION_BASE_SHA', 'FZ_EFFORT_BASE_TREE', 'FZ_EFFORT_BASE_SHA', 'FZ_WF_ROOT']) delete gitEnv[k]
+      const git = (...a) => spawnSync('git', ['-C', gitTree, ...a], { encoding: 'utf8', env: gitEnv })
+      for (const rel of [['workflows'], ['tests', 'lib'], ['tests', 'workflows'], ['tests', 'fixtures', 'workflows']]) {
+        copyTree(path.join(ROOT, ...rel), path.join(gitTree, ...rel))
+      }
+      fs.mkdirSync(path.join(gitTree, 'scripts'))
+      fs.copyFileSync(path.join(ROOT, 'scripts', 'check_wf_syntax.js'), path.join(gitTree, 'scripts', 'check_wf_syntax.js'))
+      const wb = path.join(gitTree, 'tests', 'fixtures', 'workflow-base')
+      copyPinned(wb)
+      fs.mkdirSync(kidTmp)
+      const prep = [git('init', '-q'), git('config', 'core.excludesFile', os.devnull)]
+      if (prep.every(p => p.status === 0)) {
+        fs.mkdirSync(path.join(gitTree, '.git', 'info'), { recursive: true })
+        fs.writeFileSync(path.join(gitTree, '.git', 'info', 'exclude'), '.DS_Store\n')
+        prep.push(git('add', '-A'))
+      }
+      const drop = Buffer.from([0, 0, 0, 1, 0x42, 0x75, 0x64, 0x31])   // 폴더를 열면 OS 가 남기는 .DS_Store 꼴(NUL 바이트)
+      const drops = [['.DS_Store'], ['effort-arg', '.DS_Store']]
+      for (const d of drops) fs.writeFileSync(path.join(wb, ...d), drop)
+      // 전제 — 놓은 부산물은 무시되고(check-ignore 0) 아래 메모 파일은 무시되지 않는다(1)
+      const ign = rel => git('check-ignore', '-q', path.posix.join('tests/fixtures/workflow-base', rel)).status
+      const pre = [...drops.map(d => ign(d.join('/'))), ign('notes.txt')]
+      if (prep.some(p => p.status !== 0) || pre.join(',') !== '0,0,1') {
+        selfUnrun = `임시 git 작업 트리를 준비하지 못했다 — git exit ${prep.map(p => p.status).join(',')} · check-ignore ${pre.join(',')}(기대 0,0,1)`
+      } else {
+        const kids = () => [['default-off-regression.js', '--option', 'mergeMode'], ['effort-arg.js']].map(([f, ...a]) =>
+          spawnSync(process.execPath, [path.join(gitTree, 'tests', 'workflows', f), ...a], { cwd: gitTree, encoding: 'utf8',
+            env: Object.assign({}, gitEnv, { FZ_DEFAULT_OFF_CHILD: '1', TMPDIR: kidTmp }) }))
+        const said = ks => ks.map(k => `exit ${k.status} ${String(k.stdout || '').trim().split('\n').pop().slice(0, 140)}`).join(' · ')
+        // 부산물은 끝까지 둔다 — 아래 두 셀은 UNRUN 의 사유가 부산물이 아니라 그 파일 하나인지까지 본다
+        const onlyExtra = (ks, rel) => ks.every(k => k.status === 2 && String(k.stdout).includes(`${SUMS_NAME} 와 고정본 폴더의 파일 집합이 다르다 — 목록에 없는 파일 1(${rel})`))
+        let ks = kids()
+        check('pinned-sums-git-ignored-dropping — git 이 무시하는 미추적 파일(.DS_Store)이 고정본 폴더에 있어도 두 러너가 돈다(exit 0)',
+          ks.every(k => k.status === 0), said(ks))
+        fs.writeFileSync(path.join(wb, 'notes.txt'), '메모\n')
+        ks = kids()
+        check(`pinned-sums-git-untracked-extra — 무시되지 않은 미추적 파일은 목록에 없는 파일이다: 두 러너 UNRUN(exit 2 · 사유 = ${SUMS_NAME} 에 없는 notes.txt 하나)`,
+          onlyExtra(ks, 'notes.txt'), said(ks))
+        // 부르는 쪽의 GIT_DIR 이 무시 규칙이 더 넓은 다른 저장소(.DS_Store 에 notes.txt 도 무시)를 가리켜도 견주는 집합은 고정본 폴더가 든
+        //   작업 트리의 git 이 정한다 — 그 저장소의 규칙으로 답하면 notes.txt 가 빠져 목록 밖 파일을 둔 채 대조가 통과한다.
+        //   GIT_DIR 은 이 셀 안에서만 걸고 되돌린다
+        const other = path.join(box, 'git-other'), otherEnv = Object.assign({}, gitEnv, { GIT_DIR: path.join(box, 'git-other', '.git') })
+        fs.mkdirSync(other)
+        const oprep = [['init', '-q'], ['config', 'core.excludesFile', os.devnull]].map(a => spawnSync('git', ['-C', other, ...a], { encoding: 'utf8', env: gitEnv }))
+        if (oprep.every(p => p.status === 0)) {
+          fs.mkdirSync(path.join(other, '.git', 'info'), { recursive: true })
+          fs.writeFileSync(path.join(other, '.git', 'info', 'exclude'), '.DS_Store\nnotes.txt\n')
+        }
+        // 전제 — 이 환경을 그대로 물려받은 git 은 다른 저장소의 규칙으로 답한다(notes.txt 를 무시된 파일로 낸다)
+        const probe = spawnSync('git', ['-C', wb, 'ls-files', '-z', '-o', '-i', '--exclude-standard'], { encoding: 'utf8', env: otherEnv })
+        if (oprep.some(p => p.status !== 0) || probe.status !== 0 || !String(probe.stdout).split('\0').includes('notes.txt')) {
+          selfUnrun = `다른 저장소를 가리키는 GIT_DIR 이 git 의 답을 바꾸지 않는다 — git exit ${[...oprep, probe].map(p => p.status).join(',')}`
+        } else {
+          const before = process.env.GIT_DIR
+          let have = [], msg = ''
+          process.env.GIT_DIR = otherEnv.GIT_DIR
+          try {
+            have = pinnedFiles(wb)
+            try { verifyPinned(wb) } catch (e) { msg = e.message }
+          } finally { if (before === undefined) delete process.env.GIT_DIR; else process.env.GIT_DIR = before }
+          check(`pinned-sums-git-env-other-repo — 부르는 쪽 GIT_DIR 이 다른 저장소를 가리켜도 그 저장소만 무시하는 notes.txt 를 견준다(${SUMS_NAME} 에 없는 파일 하나)`,
+            have.includes('notes.txt') && msg.includes(`${SUMS_NAME} 와 고정본 폴더의 파일 집합이 다르다 — 목록에 없는 파일 1(notes.txt)`),
+            `견준 파일에 notes.txt ${have.includes('notes.txt')} · ${msg || '던지지 않았다'}`)
+        }
+        fs.rmSync(path.join(wb, 'notes.txt'))
+        const forced = git('add', '-f', 'tests/fixtures/workflow-base/effort-arg/.DS_Store')
+        ks = kids()
+        check(`pinned-sums-git-tracked-ignored — 무시 규칙에 걸려도 추적하는 파일은 목록에 없는 파일이다: 두 러너 UNRUN(exit 2 · 사유 = ${SUMS_NAME} 에 없는 effort-arg/.DS_Store 하나)`,
+          forced.status === 0 && onlyExtra(ks, 'effort-arg/.DS_Store'), `git add -f exit ${forced.status} · ${said(ks)}`)
+      }
     } finally { fs.rmSync(box, { recursive: true, force: true }) }
+  }
+  if (selfUnrun) {
+    console.log(`UNRUN  ${selfUnrun} (⛔ 통과 아님)`)
+    process.exit(2)
   }
   const asked = argv.flatMap((a, i) => (a === '--option' ? [argv[i + 1]] : []))
   const names = argv.includes('--all-rb-options') || asked.length === 0 ? Object.keys(OPTIONS) : asked

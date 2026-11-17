@@ -5,6 +5,10 @@
 //   ① 완주로 계산되지 않는다 — metrics.stagesCompleted < 그 경로의 완주 기준, 또는 mode:'fallback'
 //   ② 해당 신호가 나온다 — 워크플로가 결손을 알리는 필드(degraded·missingLenses · partial·lensesCompleted · nullCount·reviews)
 // 대조 셀(아무도 죽이지 않음)은 완주 기준에 도달해야 한다 — 그래야 ① 의 "미달" 이 주입 때문임을 안다.
+// throw 셀: 같은 워커가 null 을 돌려주는 대신 **던진다**(스폰 예외). 워크플로는 그것을 null 워커로 접는다 —
+//   run 이 reject 하지 않고 · nullCount ≥ 1(음수 아님) · 던진 사유가 로그에 남는다. 기존 묶음은 null 셀과 같은 미달 · 신호도 본다.
+//   ⛔ 신호만 보면 접지 않아도 통과한다 — 하네스 parallel 이 던진 자리를 null 로 돌려줘 미달 신호는 그대로 나온다. 그래서 nullCount 를 본다.
+//   discover-adversarial(lean · deep) · plan-collaborative · search-cross-verify 는 throw 셀만 둔다(throwOnly — null 셀은 이 묶음의 범위가 아니다).
 // ⛔ 스크립트를 통째로 돌린다(tests/lib/wf_harness.js). 워커 응답은 label 로 고른 최소 객체다.
 // 대상(--scope independent · S24b): R-C 속도 arm 에서 '생략' 과 '결손' 이 같은 완주로 보고되지 않는다 —
 //   review-live stage2 conditional(생략 = 완주 3 · 교차 null = 완주 아님) · plan-lean2 mergeMode(생략 = degraded 아님 · 병합 null = degraded)
@@ -41,9 +45,30 @@ const RESP = {
   'stage1-impl': { files: [{ path: 'a.swift', symbolEdits: [] }], summary: 's', buildExpectation: 'b' },
   'stage2-review-arch': { issues: [] }, 'stage2-review-quality': { issues: [] },
   'stage3-revise': { files: [{ path: 'a.swift', symbolEdits: [] }], summary: 's', buildExpectation: 'b' },
+  // search-cross-verify
+  'stage1-symbolic': { findings: [] }, 'stage1-pattern': { findings: [] },
+  'stage2-sym-on-pat': { verdicts: [], additions: [] }, 'stage2-pat-on-sym': { verdicts: [], additions: [] },
+  'stage3-merge': { merged: [] },
+  // plan-collaborative
+  'stage0-direction': { verdict: 'PROCEED', alternatives: [], concerns: [] },
+  'stage1-draft': { steps: [], readScope: [], assumptions: [] },
+  'stage2-impact': { impactFiles: [], hiddenDependencies: [], deadCode: [] },
+  'stage2-edge': { edgeCases: [] },
+  'stage2-arch': { patternVerdicts: [], violations: [] },
+  'stage3-impact-on-edge': { links: [], additions: [] }, 'stage3-edge-on-impact': { links: [], additions: [] },
+  'stage4-integrate': { steps: [], writeScope: [], rtm: [] },
+  'stage5-recheck': { remainingIssues: [], verdict: 'pass' },
+  // discover-adversarial (lean · deep)
+  'r1-paths': { paths: [{ id: 'P1' }] }, 'cost:r1': { costs: [] }, 'r2-paths': { paths: [{ id: 'P2' }] }, 'cost:r2': { costs: [] },
+  'lens:reuse-first': { paths: [{ id: 'L1' }] }, 'lens:greenfield': { paths: [{ id: 'L2' }] }, 'lens:hybrid': { paths: [{ id: 'L3' }] },
+  'merge': { paths: [{ id: 'M1' }] }, 'cost:deep-0': { costs: [] },
+  'landscape': { tradeoffs: [], openQuestions: [] },
 }
-const responder = (dead, extra = {}) => (prompt, opts) =>
-  (dead.includes(opts.label) ? null : JSON.parse(JSON.stringify(Object.assign({}, RESP[opts.label], extra[opts.label] || {}))))
+const THROWN = 'injected spawn failure'
+const responder = (dead, extra = {}, thrown = []) => (prompt, opts) => {
+  if (thrown.includes(opts.label)) throw new Error(THROWN)
+  return dead.includes(opts.label) ? null : JSON.parse(JSON.stringify(Object.assign({}, RESP[opts.label], extra[opts.label] || {})))
+}
 
 // 워크플로별 경로 · 완주 기준 · 결손 신호
 const SUITES = [
@@ -74,6 +99,16 @@ const SUITES = [
     args: { mode: 'full', stepSpec: { id: 'S1', title: 't', goal: 'g', files: ['a.swift'], verify: { kind: 'manual', criterion: 'c' }, complexity: 3, estimatedNewBodyLines: 10 }, contextPath: '/tmp/c.md', changesetTarget: 'repo' },
     dead: ['stage2-review-arch', 'stage2-review-quality'], first: 'stage1-impl',
     signal: r => r.lensesCompleted < r.lensesExpected && !!r.residualNote && r.reviewVerdict !== 'pass', signalName: 'lensesCompleted·residualNote·verdict≠pass' },
+  // throw 셀만 두는 묶음 — done 은 그 워크플로의 완주 수(대조 셀용)
+  { name: 'search-cross-verify', file: 'search-cross-verify.js', full: 3, throwOnly: true,
+    args: { query: 'q', codeContext: '/tmp' }, dead: ['stage1-symbolic', 'stage2-sym-on-pat', 'stage3-merge'] },
+  { name: 'plan-collaborative', file: 'plan-collaborative.js', full: 5, throwOnly: true,
+    args: { requirement: 'r', codeContextPath: '/tmp/c.md' },
+    dead: ['stage0-direction', 'stage1-draft', 'stage2-edge', 'stage3-impact-on-edge', 'stage4-integrate', 'stage5-recheck'] },
+  { name: 'discover-adversarial lean', file: 'discover-adversarial.js', full: 2, throwOnly: true, done: r => r.metrics.roundsCompleted,
+    args: { problem: 'p', codeContextPath: '/tmp/c.md' }, dead: ['r1-paths', 'cost:r1', 'r2-paths', 'landscape'] },
+  { name: 'discover-adversarial deep', file: 'discover-adversarial.js', full: 2, throwOnly: true, done: r => r.metrics.roundsCompleted,
+    args: { problem: 'p', codeContextPath: '/tmp/c.md', deep: true }, dead: ['lens:greenfield', 'merge', 'cost:deep-0', 'landscape'] },
 ]
 
 let fail = 0
@@ -123,8 +158,20 @@ async function independent() {
     process.exit(fail ? 1 : 0)
   }
   for (const s of SUITES) {
+    const done = s.done || (r => r.metrics.stagesCompleted)
     const ctl = (await run(wf(s.file), { args: s.args, responder: responder([], s.extra) })).result
-    check(`${s.name} · 대조(주입 없음) → 완주 ${s.full}`, ctl.mode === 'workflow' && ctl.metrics.stagesCompleted === s.full, brief(ctl))
+    check(`${s.name} · 대조(주입 없음) → 완주 ${s.full}`, ctl.mode === 'workflow' && done(ctl) === s.full, brief(ctl))
+    // throw 셀 — 셀마다 따로 잡는다: run 이 reject 하면 그 셀만 FAIL 이고 나머지는 계속 돈다
+    for (const lab of [...new Set(s.dead.concat(s.throwOnly ? [] : s.first))]) {
+      let out = null, err = null
+      try { out = await run(wf(s.file), { args: s.args, responder: responder([], s.extra, [lab]) }) } catch (e) { err = e }
+      const r = out && out.result, m = (r && r.metrics) || {}
+      const short = !!r && (s.throwOnly || r.mode === 'fallback' || (done(r) < s.full && s.signal(r, lab)))
+      check(`${s.name} · ${lab} throw → reject 없이 반환 · nullCount ≥ 1 · 사유가 로그에${s.throwOnly ? '' : ' · null 셀과 같은 미달 · 신호'}`,
+        !err && short && m.nullCount >= 1 && m.agentCalls >= 1 && out.logs.some(l => l.includes(THROWN)),
+        err ? `reject — ${err.message}` : brief(r))
+    }
+    if (s.throwOnly) continue
     for (const lab of s.dead) {
       const r = (await run(wf(s.file), { args: s.args, responder: responder([lab], s.extra) })).result
       check(`${s.name} · ${lab} null → 완주 아님(<${s.full})`, r.mode === 'fallback' || r.metrics.stagesCompleted < s.full, brief(r))

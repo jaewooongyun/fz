@@ -8,6 +8,9 @@
 //    Workflow 스크립트는 agent·parallel 런타임에 의존해 통째로는 못 불러온다. 마커 블록의
 //    외부 의존은 agent·log·parallel 셋뿐이라 주입으로 해결한다.
 //    ⚠️ 마커가 사라지면 이 테스트는 **에러로 죽는다** — 조용히 통과하지 않는다.
+// ⛔ 스텁은 런타임 의미를 따른다(tests/lib/wf_harness.js 와 같다): parallel 은 던진 thunk 의 자리를 null 로 돌려주고
+//    reject 하지 않는다. 스텁 agent 는 seqs 값이 Error 면 그것을 던진다 — callAgent 가 예외를 null 로 세지 않으면
+//    재시도의 취소(`nullCalls -= 1`)가 세지 않은 null 을 빼서 nullCount 가 음수가 된다(케이스 4 · 5).
 const fs = require('fs')
 const path = require('path')
 
@@ -37,10 +40,13 @@ function freshHarness(seqs) {
   const scope = {}
   const agent = async (prompt) => {
     if (!(prompt in seqs)) throw new Error('스텁에 없는 프롬프트: ' + prompt)
-    return seqs[prompt].shift()
+    const v = seqs[prompt].shift()
+    if (v instanceof Error) throw v
+    return v
   }
-  const log = () => {}
-  const parallel = async (thunks) => Promise.all(thunks.map(t => t()))
+  scope.logs = []
+  const log = m => { scope.logs.push(String(m)) }
+  const parallel = async (thunks) => Promise.all(thunks.map(t => Promise.resolve().then(t).catch(() => null)))
   new Function('agent', 'log', 'parallel', 'exports', PURE +
     '\nexports.callAgent = callAgent' +
     '\nexports.parallelWithRetry = parallelWithRetry' +
@@ -76,11 +82,40 @@ const run = async () => {
   ])
   const c3 = h.metrics(1)
 
+  // 케이스 4: 첫 시도가 던짐 → 재시도 성공 ⇒ 잔존 null 0, 호출수 4 (예외도 null 워커로 센 뒤 취소된다)
+  const boom = () => new Error('spawn exploded')
+  h = freshHarness({ a: [boom(), 'OK'], b: ['B'], c: ['C'] })
+  const out4 = await h.parallelWithRetry([
+    () => h.callAgent('a', { label: 'a' }),
+    () => h.callAgent('b', { label: 'b' }),
+    () => h.callAgent('c', { label: 'c' }),
+  ])
+  const c4 = h.metrics(1), logs4 = h.logs
+
+  // 케이스 5: 첫 시도도 재시도도 던짐 ⇒ 잔존 null 1 (음수 아님 · 이중 계상 없음)
+  h = freshHarness({ a: [boom(), boom()], b: ['B'], c: ['C'] })
+  await h.parallelWithRetry([
+    () => h.callAgent('a', { label: 'a' }),
+    () => h.callAgent('b', { label: 'b' }),
+    () => h.callAgent('c', { label: 'c' }),
+  ])
+  const c5 = h.metrics(1)
+
+  // 케이스 6: parallel 밖의 직접 호출이 던짐 ⇒ reject 하지 않고 null 을 돌려준다 (호출자의 null 가드가 fallback 을 낸다)
+  h = freshHarness({ a: [boom()] })
+  let direct = 'unset'
+  try { direct = await h.callAgent('a', { label: 'a' }) } catch (e) { direct = 'REJECT ' + e.message }
+  const c6 = h.metrics(0)
+
   const t = [
     ['재시도 성공 → nullCount 0', c1.nullCount === 0, JSON.stringify(c1)],
     ['재시도 성공 → agentCalls 4 (호출수는 유지)', c1.agentCalls === 4, JSON.stringify(c1)],
     ['재시도 실패 → nullCount 1 (이중 계상 없음)', c2.nullCount === 1, JSON.stringify(c2)],
     ['무장애 → nullCount 0 / agentCalls 3', c3.nullCount === 0 && c3.agentCalls === 3, JSON.stringify(c3)],
+    ['throw → 재시도 성공 → nullCount 0 / agentCalls 4 / 결과 회수', c4.nullCount === 0 && c4.agentCalls === 4 && out4[0] === 'OK', JSON.stringify(c4)],
+    ['throw → 사유가 로그에 남는다(WARN a 실패 — spawn exploded)', logs4.some(l => l.includes('a 실패') && l.includes('spawn exploded')), JSON.stringify(logs4)],
+    ['throw → 재시도도 throw → nullCount 1 (음수 아님)', c5.nullCount === 1 && c5.agentCalls === 4, JSON.stringify(c5)],
+    ['직접 호출 throw → reject 없이 null / nullCount 1', direct === null && c6.nullCount === 1 && c6.agentCalls === 1, JSON.stringify({ direct, c6 })],
   ]
   let fail = 0
   for (const [name, ok, got] of t) { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${got}`); if (!ok) fail++ }

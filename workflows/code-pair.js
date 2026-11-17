@@ -150,9 +150,12 @@ let agentCalls = 0
 let nullCalls = 0
 let fallbackCount = 0
 let splitCount = 0 // H5 pre-flight split_required 발동 수 — 임계 재조정 관측용(§12 observation 축)
+// ⛔ agent() 가 던져도 null 워커로 센다(swarm.js callAgent 와 같다) — 세지 않으면 parallel 이 null 로 돌려준 그 자리가 nullCount 에서
+//    빠지고(재시도 취소가 있으면 음수가 된다), parallel 밖 호출은 null 가드에 닿기 전에 run 전체가 reject 한다. 던진 사유는 로그에 남긴다
 async function callAgent(prompt, opts) {
   agentCalls += 1
-  const out = await agent(prompt, opts)
+  let out = null
+  try { out = await agent(prompt, opts) } catch (e) { log(`WARN ${opts.label} 실패 — ${e && e.message}`) }
   if (!out) { nullCalls += 1; log(`WARN ${opts.label} null`) }
   return out
 }
