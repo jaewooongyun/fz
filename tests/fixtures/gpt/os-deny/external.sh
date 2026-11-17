@@ -22,13 +22,16 @@
 # UNRUN(exit 2 · 줄 맨 앞 `UNRUN:`): 비 macOS · CLI 부재 · 중첩 샌드박스(CODEX_SANDBOX 설정 · `sandbox_apply` 거부) ·
 #    `--version` 실패 · `sandbox` 하위 명령 없음(남는 실증 경로는 모델 호출뿐). 그 밖의 어긋남은 FAIL 이다 — UNRUN 으로 세탁하지 않는다.
 # 출력: `EVIDENCE-CLASS=live` 는 4셀을 실 CLI 로 돌렸을 때만(FAIL 포함) · `OS-DENY-CELLS=<PASS 수>/4`.
-# --launcher-profile (P-12): 위 4셀에 더해, 이 트리의 런처(scripts/gpt_independent.sh)가 실제로 쓴 격리 config 로 5셀을 돈다.
+# --launcher-profile (P-12): 위 4셀에 더해, 이 트리의 런처(scripts/gpt_independent.sh)가 실제로 쓴 격리 config 로 6셀을 돈다.
 #   런처는 가짜 CLI(../_shim)로 돌려 --keep-iso 로 격리 홈만 남긴다(모델 호출 없음). 그 홈을 CODEX_HOME 으로 `sandbox` 를 부른다.
+#   런처는 두 번 돈다 — 기본 TMPDIR 로 한 번(lp-parent-deny 밖 다섯 셀), TMPDIR 을 HOME · 임시 루트 밖(/Users/Shared)에 두고 한 번(lp-parent-deny).
 #   lp-home-deny        실제 HOME 아래 표지 → 거부(HOME 은 임시 루트 밖이라 이 셀은 HOME 규칙만 잰다)
 #   lp-tmp-deny         /private/tmp 아래 표지 → 거부
 #   lp-varfolders-deny  사용자 임시 폴더(/private/var/folders 아래) 표지 → 거부
 #   lp-explicit-deny    HOME · 임시 루트 밖 폴더(/Users/Shared)를 --deny 로 준 표지 → 거부 · 같은 위치의 --deny 아닌 폴더 표지 → 읽힘(대조)
 #   lp-iso-read         격리 폴더 입력(diff.patch) → 읽힘(임시 루트 거부 안의 읽기 예외)
+#   lp-parent-deny      격리 폴더의 실제 부모(두 번째 run 의 TMPDIR) 아래 표지 → 거부(부모 deny 말고는 막을 규칙이 없는 자리) ·
+#                       같은 run 의 격리 입력 → 읽힘(대조 — 부모 deny 안의 읽기 예외)
 #   줄 형식 `PASS|FAIL  [<셀>] …` · `PROFILE-SOURCE=launcher` — 원장 게이트가 셀 id 를 센다(N/N 개수식은 0/0 을 받는다)
 # exit: 0 전 셀 PASS · 1 셀 FAIL · 2 UNRUN · 3 준비 실패(인자 · 상한 값 · 임시 폴더)
 # usage: external.sh [--tree <플러그인 루트>] [--launcher-profile]   (기본: 이 파일이 든 트리)
@@ -175,7 +178,7 @@ else cell no-profile-control FAIL "exit $RC · 비밀 마커 $(grep -c 'OS-DENY-
 
 NCELL=4
 if [ -n "$LP" ]; then
-  NCELL=9
+  NCELL=10
   SHIMD="$R/tests/fixtures/gpt/_shim"
   [ -f "$SHIMD/codex" ] && [ -f "$R/scripts/gpt_independent.sh" ] || { echo "SETUP shim · 런처 없음: $R"; exit 3; }
   [ -f "${HOME:?}/.codex/auth.json" ] || unrun "실제 홈에 인증 파일이 없다 — 런처가 격리 홈을 만들지 않는다"
@@ -184,7 +187,8 @@ if [ -n "$LP" ]; then
   [ -n "$VFT" ] || unrun "사용자 임시 폴더(DARWIN_USER_TEMP_DIR)를 알 수 없다"
   LPD=""
   for spec in "HM:$HOME/.fz-os-deny.XXXXXX" "TM:/private/tmp/fz-os-deny.XXXXXX" "VF:${VFT%/}/fz-os-deny.XXXXXX" \
-              "EX:/Users/Shared/fz-os-deny.XXXXXX" "EA:/Users/Shared/fz-os-allow.XXXXXX" "OU:/Users/Shared/fz-os-out.XXXXXX"; do
+              "EX:/Users/Shared/fz-os-deny.XXXXXX" "EA:/Users/Shared/fz-os-allow.XXXXXX" "OU:/Users/Shared/fz-os-out.XXXXXX" \
+              "PT:/Users/Shared/fz-os-ptmp.XXXXXX"; do
     d_="$(mktemp -d "${spec#*:}")" || { echo "SETUP 표지 폴더 생성 실패: ${spec#*:}"; exit 3; }
     d_="$(cd "$d_" && pwd -P)"; LPD="$LPD $d_"
     printf 'OS-DENY-LP-%s-7\n' "${spec%%:*}" > "$d_/m.txt"
@@ -198,8 +202,18 @@ if [ -n "$LP" ]; then
     --deny "$D_EX" --keep-iso > "$T/lp-launcher.out" 2>&1
   ISO="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("iso") or "")' "$T/lp-out/gpt-osd.audit.json" 2>/dev/null)"
   [ -n "$ISO" ] && [ -f "$ISO/gpt-home/config.toml" ] || { echo "SETUP 런처가 격리 config 를 남기지 않았다(로그 $T/lp-launcher.out)"; tail -5 "$T/lp-launcher.out"; exit 3; }
+  # 두 번째 run(lp-parent-deny) — TMPDIR 을 HOME · 임시 루트 밖 표지 폴더(PT)로 준다. 격리 폴더는 그 안에 생기고(PT 와 함께 지워진다),
+  #   PT 의 표지를 막을 규칙은 격리 폴더의 실제 부모 deny 뿐이다
+  env -u CODEX_HOME PATH="$SHIMD:$PATH" FZ_TELEMETRY_DIR="$T/lp-tel" FZ_GPT_CHOICE_DIR="$T/lp-nc" TMPDIR="$D_PT" \
+    FZ_SHIM_OUTPUT="$(cat "$R/tests/fixtures/gpt/independent-arm/sample-review-ok.json")" \
+    bash "$R/scripts/gpt_independent.sh" review --diff "$T/lp.diff" --arm gpt --run-id osdp --out-dir "$T/lp-out" \
+    --keep-iso > "$T/lp-launcher-parent.out" 2>&1
+  PISO="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("iso") or "")' "$T/lp-out/gpt-osdp.audit.json" 2>/dev/null)"
+  [ -n "$PISO" ] && [ "${PISO%/*}" = "$D_PT" ] && [ -f "$PISO/gpt-home/config.toml" ] \
+    || { echo "SETUP 두 번째 런처 run 이 TMPDIR 아래 격리 config 를 남기지 않았다(격리 '${PISO}' · 로그 $T/lp-launcher-parent.out)"; tail -5 "$T/lp-launcher-parent.out"; exit 3; }
   echo "PROFILE-SOURCE=launcher"
   echo "  [launcher] config $ISO/gpt-home/config.toml · deny 줄 $(grep -c '= "deny"' "$ISO/gpt-home/config.toml")"
+  echo "  [launcher-parent] config $PISO/gpt-home/config.toml · TMPDIR $D_PT · 부모 deny 줄 $(grep -cxF "\"$D_PT\" = \"deny\"" "$PISO/gpt-home/config.toml")"
   # ⛔ 셀 출력 파일은 거부 루트 밖(OU)에 둔다 — 임시 폴더에 두면 프로필이 그 루트를 막아 `cat: stdout: Operation not permitted` 로
   #    읽기 성공 셀이 실패로 보인다(실측). 출력 파일 자체는 표지가 아니다
   LPH="$ISO/gpt-home"; RUN_CWD="$ISO/input"; RUN_OUT="$D_OU"
@@ -235,6 +249,17 @@ if [ -n "$LP" ]; then
     echo "PASS  [lp-iso-read] 격리 입력 읽힘(임시 루트 거부 안의 읽기 예외)"; PASS=$((PASS + 1))
   else
     echo "FAIL  [lp-iso-read] exit $RC — 격리 입력이 막혔다"; BAD="$BAD lp-iso-read"
+  fi
+  LPH="$PISO/gpt-home"; RUN_CWD="$PISO/input"
+  if lp_deny lp-parent-deny "$D_PT/m.txt" >/dev/null; then
+    if lp_read lp-parent-iso "$PISO/input/diff.patch" 'OS-DENY-LP-ISO-7'; then
+      echo "PASS  [lp-parent-deny] 격리 폴더의 부모 표지 거부 · 같은 run 의 격리 입력은 읽힘(부모 deny 안의 읽기 예외)"
+    else
+      PASS=$((PASS - 1)); BAD="$BAD lp-parent-deny"
+      echo "FAIL  [lp-parent-deny] 부모 deny 가 격리 입력까지 막았다(exit $RC)"
+    fi
+  else
+    echo "FAIL  [lp-parent-deny] 격리 폴더의 부모 표지가 막히지 않았다(exit $RC)"
   fi
 fi
 

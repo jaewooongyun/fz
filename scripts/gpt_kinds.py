@@ -26,6 +26,8 @@ usage:
                                            --allowed-tools: a skill that may call GPT has Bash(*/scripts/gpt-call.sh*)
                                            markdown ```bash blocks must not hand-assemble wrapper / launcher calls
                                            a counted-kind call line (gpt_rounds.py KIND_SLOTS) carries FZ_GPT_ARTIFACT=
+                                           a literal `gpt-call.sh <kind>` word (skills · modules · guides · agents · workflows ·
+                                           README · CLAUDE.md) is a registry kind — variables and placeholders are not kind words
   gpt_kinds.py table --write|--check [--root DIR]
                                            the generated blocks in skills/fz-gpt/SKILL.md (kind count · roles · kinds)
   gpt_kinds.py --self-test
@@ -35,7 +37,9 @@ exit: 0 ok · 10 usage (unknown kind, missing / unknown / forbidden input, exper
       ⛔ never 1 or 2 — those mean something else elsewhere in fz (XE-02).
 """
 import ast
+import contextlib
 import glob
+import io
 import json
 import os
 import re
@@ -542,6 +546,41 @@ def lint_consumers(root=ROOT, only=None, reg=None):
     return v, len(files), nb
 
 
+# ── kind-name lint: a literal kind word after gpt-call.sh names a registry kind ──────────────────────────────────────────
+# An unknown kind fails only when the call runs (exit 10), so a typo or a renamed / dropped kind in a page stays silent until then.
+# Prose and ```bash alike. A variable ("$KIND", ${K}) or a placeholder (<kind>, {kind}, KIND) does not start with a lowercase letter
+# and is not a kind word; a quoted literal ("review") is. The word runs over ASCII letters · digits · _ · - (verify_x is not read as
+# verify; a Korean particle ends it). Own scope, not CONSUMER_DIRS — widening that would widen the bash-block and round lints too.
+# Approximate: a kind word on the next line after a `\` continuation, or a kind held in a variable, is not checked.
+KIND_REF_RE = re.compile(r'gpt-call\.sh["\']?\s+["\']?([a-z][A-Za-z0-9_-]*)')
+KIND_REF_DIRS = ("skills", "modules", "guides", "agents")   # *.md, plus workflows/**/*.js and KIND_REF_FILES
+KIND_REF_FILES = ("README.md", "CLAUDE.md")
+
+
+def lint_kind_refs(root=ROOT, reg=None, only=None):
+    """-> (violations, literal kind words checked)."""
+    reg = load(os.path.join(root, "scripts", "gpt-kinds.json")) if reg is None else reg
+    if only:
+        files = list(only)
+    else:
+        files = sorted([os.path.relpath(f, root) for d in KIND_REF_DIRS for f in glob.glob(os.path.join(root, d, "**", "*.md"), recursive=True)]
+                       + [os.path.relpath(f, root) for f in glob.glob(os.path.join(root, "workflows", "**", "*.js"), recursive=True)]
+                       + [f for f in KIND_REF_FILES if os.path.isfile(os.path.join(root, f))])
+    v, n = [], 0
+    for rel in files:
+        path = os.path.join(root, rel)
+        if not os.path.isfile(path):
+            v.append(f"{rel}: file not found")
+            continue
+        for i, line in enumerate(open(path, encoding="utf-8", errors="replace").read().split("\n"), 1):
+            for m in KIND_REF_RE.finditer(line):
+                n += 1
+                if m.group(1) not in reg["kinds"]:
+                    v.append(f"{rel}:{i}: `gpt-call.sh {m.group(1)}` — {m.group(1)!r} is not a registry kind (scripts/gpt-kinds.json): "
+                             f"{line.strip()[:100]}")
+    return v, n
+
+
 def lint_allow(reg, root=ROOT):
     v = []
     for i, a in enumerate(reg.get("consumer_allow") or []):
@@ -1005,6 +1044,39 @@ def self_test():
         expect("rounds: tree without gpt_rounds.py -> broken", lambda: counted_kinds(cr), ("broken",))
         open(os.path.join(cr, "scripts", "gpt_rounds.py"), "w").write("KIND_SLOTS = dict(verify=1)\n")
         expect("rounds: KIND_SLOTS not a literal -> broken", lambda: counted_kinds(cr), ("broken",))
+        # kind-name lint: a literal kind word after gpt-call.sh is a registry kind (bash or prose) · a variable or a placeholder is
+        #   not a kind word, a quoted literal and a word tail (verify_x) are · own scope (agents · workflows/*.js · README · CLAUDE.md
+        #   too — not tests/ · docs/ · scripts/) · `lint --consumers` fails on it (exit 11) and counts kind-refs
+        kr = os.path.join(t, "kindroot")
+        for sub in ("scripts", "modules", os.path.join("skills", "s"), "guides", "agents", "workflows", "tests", "docs"):
+            os.makedirs(os.path.join(kr, sub))
+        kmd = os.path.join(kr, "modules", "k.md")
+        open(kmd, "w").write('```bash\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" reviews --cd x\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" "$KIND" --cd x\n'
+                             '"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" ${KIND} --cd x\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" <kind> --cd x\n'
+                             '"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" {kind} --cd x\n```\nthe gate is `scripts/gpt-call.sh KIND` · `gpt-call.sh <kind>`\n')
+        expect("kind-refs: unregistered literal caught · variables and placeholders skipped", lambda: lint_kind_refs(kr, reg, ["modules/k.md"]),
+               ("ok", lambda r: len(r[0]) == 1 and r[0][0].startswith("modules/k.md:2:") and "'reviews'" in r[0][0] and r[1] == 1))
+        open(kmd, "w").write('```bash\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd x\n```\nprose: `gpt-call.sh verify-gates` · gpt-call.sh check, then gpt-call.sh final을\n')
+        expect("kind-refs: registered kinds (bash + prose) -> clean", lambda: lint_kind_refs(kr, reg, ["modules/k.md"]), ("ok", lambda r: r == ([], 4)))
+        open(kmd, "w").write('```bash\n"$R/scripts/gpt-call.sh" "reviews" --cd x\n"$R/scripts/gpt-call.sh" verify_x --cd x\n```\n')
+        expect("kind-refs: a quoted literal and a word tail are kind words", lambda: lint_kind_refs(kr, reg, ["modules/k.md"]),
+               ("ok", lambda r: len(r[0]) == 2 and "'verify_x'" in r[0][1] and r[1] == 2))
+        in_scope = ["CLAUDE.md", "README.md", "agents/a.md", "guides/g.md", "modules/k.md", "skills/s/SKILL.md", "workflows/w.js"]
+        for rel in in_scope + ["tests/t.md", "docs/d.md", "scripts/x.py"]:
+            open(os.path.join(kr, rel), "w").write("x\ngpt-call.sh reviews --cd x\n")
+        expect("kind-refs: scope = skills · modules · guides · agents · workflows/*.js · README · CLAUDE.md", lambda: lint_kind_refs(kr, reg),
+               ("ok", lambda r: sorted(x.split(":")[0] for x in r[0]) == in_scope and r[1] == len(in_scope)))
+        json.dump(dict(reg, consumer_allow=[]), open(os.path.join(kr, "scripts", "gpt-kinds.json"), "w"), ensure_ascii=False)
+        open(os.path.join(kr, "scripts", "gpt_rounds.py"), "w").write('KIND_SLOTS = {"verify": ("verify", "main")}\n')
+        open(kmd, "w").write('```bash\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" reviews --cd x\n```\n')
+
+        def run_main(args):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = main(args)
+            return rc, buf.getvalue()
+        expect("kind-refs: lint --consumers fails on an unregistered kind (exit 11)", lambda: run_main(["lint", "--consumers", "--root", kr, "--only", "modules/k.md"]),
+               ("ok", lambda r: r[0] == 11 and "LINT modules/k.md:2:" in r[1] and "FAIL (1)" in r[1] and "kind-refs=1" in r[1]))
         # table: missing markers fail · write then check passes · a registry change makes check fail
         os.makedirs(os.path.join(cr, "skills", "fz-gpt"))
         doc = os.path.join(cr, "skills", "fz-gpt", "SKILL.md")
@@ -1087,13 +1159,15 @@ def main(argv):
         if not vr and nr == 0 and not only:
             vr = ["round lint: no counted-kind call line under skills · modules · guides — measured nothing"]
         v += vr
+        vk, nk = lint_kind_refs(root, reg, only)
+        v += vk
         nt = 0
         if tools:
             vt, nt = lint_allowed_tools(root)
             v += vt
         for x in v:
             print("LINT", x)
-        print("GPT-KINDS-CONSUMERS", "OK" if not v else f"FAIL ({len(v)})", f"files={nf} bash-blocks={nb} round-calls={nr}" + (f" gpt-skills={nt}" if tools else ""))
+        print("GPT-KINDS-CONSUMERS", "OK" if not v else f"FAIL ({len(v)})", f"files={nf} bash-blocks={nb} round-calls={nr} kind-refs={nk}" + (f" gpt-skills={nt}" if tools else ""))
         return 0 if not v and nb > 0 else 11
     if argv[:1] == ["table"] and len(argv) in (2, 4) and argv[1] in ("--write", "--check") and (len(argv) == 2 or argv[2] == "--root"):
         root = os.path.abspath(argv[3]) if len(argv) == 4 else ROOT

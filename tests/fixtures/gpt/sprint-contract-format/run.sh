@@ -1,6 +1,6 @@
 #!/bin/bash
 # modes: --fixture caller=manual last-pass=7b89bd4 result=9 PASS · 기본 DIR quality/plan-feature(2026-11-05 배선 감사)
-# modes: --live caller=manual last-pass=none result=실제 GPT CLI 호출(네트워크) — 사람 호출 전용
+# modes: --live caller=manual last-pass=none result=실제 GPT CLI 호출(네트워크) · 독립 런처 격리(gpt_independent.sh iso) — 사람 호출 전용
 # Sprint Contract 형식 러너 (S12) — fz-architect 로 Sprint Contract 를 만들 때(modules/sprint-contract.md 절차 2) SC 산출 형식이 유지되는가.
 #
 # 기본 모드(게이트) — GPT 를 부르지 않는다. 결정론이다.
@@ -9,11 +9,20 @@
 #   ② 우선: fz-architect 본문에 '과제 형식이 이긴다' 규칙과 SC 키 이름이 있다 — 없으면 본문의 검증 형식이 SC 형식을 덮는다
 #   ③ 기록: recorded/sc-output.yaml 이 SC 스키마 키를 갖고, recorded/provenance.json 의 architect 본문·과제 프롬프트 해시가 지금과 같다
 #      ⛔ 기록이 없거나 해시가 다르면 FAIL 이다 — 옛 기록으로 통과시키지 않는다. `--live` 로 다시 기록한다
-# --live — 실제 GPT CLI 1회(effort high · read-only)로 기록을 새로 만든 뒤 기본 모드를 돈다. 사람이 부른다(게이트는 부르지 않는다)
+#   ④ 격리: --live 재녹화 호출이 독립 런처와 같은 격리(gpt_independent.sh iso)로 도는가 — 모델에게 묻지 않고 실행으로 본다.
+#      가짜 CLI 앞에 호출마다 한 줄 남기는 래퍼를 두고 --live 를 돌려 첫 호출(재녹화)의 HOME · CODEX_HOME · 권한 프로필 deny ·
+#      sandbox_mode 부재 · 플러그인 트리 deny · 저장소 read 를 보고, 기록의 격리 증거와 격리 폴더 정리를 본다
+#   ⑤ iso 사전 게이트: gpt_independent.sh iso 가 메인 경로와 같은 두 게이트 — 격리 폴더 자리(TMPDIR 이 ~/.claude 아래 → exit 11) ·
+#      금지 입력(--repo 가 ~/.claude 아래 → exit 15 · ~/.claude 가 링크면 링크 경로 · 링크 대상 경로 둘 다) — 를 격리 폴더를 만들기 전에 거는가(빈 stdout · 폴더 0개). 대조: 같은 가짜 HOME 에서
+#      ~/.claude 밖 자리 · 저장소면 exit 0 과 격리 폴더 경로 한 줄. 가짜 HOME · 러너 임시 폴더 안 TMPDIR 만 쓴다(실제 ~/.claude · 임시 루트를 가리키지 않는다)
+# --live — 실제 GPT CLI 1회(effort high · read-only 권한 프로필)로 기록을 새로 만든 뒤 기본 모드를 돈다. 사람이 부른다(게이트는 부르지 않는다)
+#   호출은 독립 런처와 같은 격리 아래서 돈다 — gpt_independent.sh iso 가 만든 격리 폴더(가짜 HOME · 격리 CODEX_HOME · 권한 프로필:
+#   HOME · 임시 루트 · 플러그인 트리 deny · 저장소 사본 read)와 래퍼 --config-permissions. 기록(provenance.json)에 격리 config 의 deny 경로 수를 남긴다
 #
 # ⛔ 필수 키는 여기 적지 않는다 — modules/sprint-contract.md 의 스키마 블록에서 읽는다(형식 정본이 한 곳이다)
 # ⛔ exit 셋을 섞지 않는다(F-396): 모듈 파일이 없다 = 측정 실패(2) · 파일은 있는데 스키마 블록이 없다 = 내용 위반(1).
 #    FZ_SC_MODULE 은 자기 시험 전용 덮어쓰기다 — 블록 없는 사본으로 자신을 다시 불러 exit 1 을 확인한다.
+#    FZ_SC_RECORD_DIR 도 자기 시험 전용이다 — ④ 가 --live 를 가짜 CLI 로 돌릴 때 트리의 recorded/ 대신 임시 폴더에 쓴다.
 # usage: run.sh [--fixture DIR] [--live]
 set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
@@ -29,7 +38,7 @@ done
 [ -n "$FIXTURE" ] && [ -s "$FIXTURE/requirement.md" ] || { echo "UNRUN: --fixture 에 requirement.md 가 없다: '$FIXTURE'"; exit 2; }
 ARCH="$R/gpt-skills/fz-architect/SKILL.md"
 MOD="${FZ_SC_MODULE:-$R/modules/sprint-contract.md}"
-REC="$HERE/recorded"
+REC="${FZ_SC_RECORD_DIR:-$HERE/recorded}"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 
 fail=0
@@ -131,14 +140,23 @@ sha() { python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"r
 if [ "$LIVE" -eq 1 ]; then
   bash "$FIXTURE/build-repo.sh" "$T/repo" >/dev/null 2>&1 || { echo "UNRUN: fixture 저장소 복원 실패"; exit 2; }
   mkdir -p "$REC"
-  env FZ_TELEMETRY_DIR="$T/tel" bash "$R/scripts/gpt-exec.sh" exec --cd "$T/repo" --out "$T/live.yaml" --prompt-file "$T/task.txt" \
-    --effort high --gpt-skill architect --inject-skill "$ARCH" || { echo "FAIL  --live: 래퍼 exit $? (기록하지 않는다)"; exit 1; }
+  # 격리 — 독립 런처와 같은 한 벌(gpt_independent.sh iso): 가짜 HOME · 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필) ·
+  #   저장소 사본 read · 플러그인 트리 deny(옛 기록 recorded/ 가 새 기록으로 새지 않게). 래퍼는 --config-permissions 로 sandbox_mode 를 넘기지 않는다.
+  #   ⛔ 가짜 HOME 이면 래퍼의 선택 폴더가 격리 홈 아래로 바뀐다 — 런처처럼 실제 홈 기준 선택 폴더를 명시로 넘긴다
+  REPO_DIR="$(cd "$T/repo" && pwd -P)"
+  ISO="$(bash "$R/scripts/gpt_independent.sh" iso --repo "$REPO_DIR" --deny "$R")" && [ -d "$ISO/gpt-home" ] || { echo "UNRUN: 격리 폴더 생성 실패(gpt_independent.sh iso)"; exit 2; }
+  trap 'bash "$R/scripts/gpt_independent.sh" cleanup --iso "$ISO" >/dev/null 2>&1; rm -rf "$T"' EXIT
+  env HOME="$ISO/home" CODEX_HOME="$ISO/gpt-home" FZ_TELEMETRY_DIR="$T/tel" FZ_GPT_CHOICE_DIR="${FZ_GPT_CHOICE_DIR:-$HOME/.fz/gpt-choice}" \
+    bash "$R/scripts/gpt-exec.sh" exec --cd "$REPO_DIR" --out "$T/live.yaml" --prompt-file "$T/task.txt" --effort high --gpt-skill architect \
+    --inject-skill "$ISO/gpt-home/skills/fz-architect/SKILL.md" --config-permissions || { echo "FAIL  --live: 래퍼 exit $? (기록하지 않는다)"; exit 1; }
   check_format "$T/live.yaml" >/dev/null || { echo "FAIL  --live: 산출물이 SC 형식이 아니다 — $(check_format "$T/live.yaml")"; cp "$T/live.yaml" "$REC/sc-output.rejected.yaml"; exit 1; }
   cp "$T/live.yaml" "$REC/sc-output.yaml"
-  python3 - "$REC/provenance.json" "$(sha "$ARCH")" "$(sha "$T/task.txt")" "$(codex --version 2>/dev/null | head -1)" <<'PY'
-import datetime, json, os, sys
+  python3 - "$REC/provenance.json" "$(sha "$ARCH")" "$(sha "$T/task.txt")" "$(codex --version 2>/dev/null | head -1)" "$ISO/gpt-home/config.toml" <<'PY'
+import datetime, json, re, sys
+# 격리 증거 — 래퍼가 받은 격리 config 의 권한 프로필 deny 경로 수(호출자 env 의 자기 보고가 아니다)
+deny = len(re.findall(r'(?m)^".+" = "deny"$', open(sys.argv[5], encoding="utf-8").read()))
 json.dump({"architect_sha256_16": sys.argv[2], "task_sha256_16": sys.argv[3], "cli_version": sys.argv[4], "effort": "high",
-           "codex_home": "isolated" if os.environ.get("CODEX_HOME") else "default",
+           "codex_home": "isolated" if deny else "default", "iso_deny_paths": deny,
            "recorded": datetime.date.today().isoformat(), "note": "run.sh --live 가 쓴다 — 손으로 고치지 않는다"},
           open(sys.argv[1], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 PY
@@ -186,6 +204,92 @@ else
     || no "기록 해시: architect 본문이 기록 뒤 바뀌었다 — --live 로 다시 기록한다"
   [ "${P##* }" = "$(sha "$T/task.txt")" ] && ok "기록 해시: 과제 프롬프트(스키마·요구)가 기록 때와 같다" \
     || no "기록 해시: 과제 프롬프트가 기록 뒤 바뀌었다 — --live 로 다시 기록한다"
+fi
+
+# ④ 격리 — 가짜 CLI 앞 기록 래퍼가 호출마다 한 줄(HOME · CODEX_HOME · 그 config 의 deny 줄 수 · 인자의 sandbox_mode 유무)을 남긴다.
+#    둘째 줄은 러너가 기록(provenance.json)에 CLI 버전을 적으려고 래퍼(gpt-exec.sh) 밖에서 부르는 버전 조회(`--version`)다(러너의 바깥
+#    env 그대로 — 격리가 아니다). 조립용 호출(①)은 PATH 맨 앞에 _shim 을 두어 기록 래퍼를 거치지 않는다. 그래서 첫 줄(재녹화 호출)을 본다.
+#    첫 호출의 config 는 사본으로 남긴다.
+#    ⛔ 트리의 recorded/ 를 덮지 않는다(FZ_SC_RECORD_DIR) · 실제 GPT 홈 대신 임시 인증 파일(CODEX_HOME) · 안쪽 실행(--live · 자기 시험)은 다시 들어가지 않는다
+if [ "$LIVE" -eq 0 ] && [ -z "${FZ_SC_MODULE:-}" ]; then
+  mkdir -p "$T/lw" "$T/lgh" "$T/lrec"; echo '{"fake":"auth"}' > "$T/lgh/auth.json"
+  cat > "$T/lw/codex" <<'WRAP'
+#!/bin/bash
+d=$(grep -c '= "deny"' "${CODEX_HOME:-/nonexistent}/config.toml" 2>/dev/null)
+case " $* " in *sandbox_mode*) s=1 ;; *) s=0 ;; esac
+printf 'CALL HOME=%s CODEX_HOME=%s DENY=%s SBX=%s\n' "${HOME:-}" "${CODEX_HOME:-}" "${d:-0}" "$s" >> "$FZ_SC_CALLS"
+[ -e "$FZ_SC_CALLS.toml" ] || cp "${CODEX_HOME:-/nonexistent}/config.toml" "$FZ_SC_CALLS.toml" 2>/dev/null
+[ -e "$FZ_SC_CALLS.cwd" ] || { p=""; for a in "$@"; do [ "$p" = "-C" ] && printf '%s\n' "$a" > "$FZ_SC_CALLS.cwd"; p="$a"; done; }
+exec "$FZ_SC_SHIM/codex" "$@"
+WRAP
+  chmod +x "$T/lw/codex"
+  env PATH="$T/lw:$PATH" CODEX_HOME="$T/lgh" FZ_GPT_CHOICE_DIR="$T/no-choice" FZ_SC_CALLS="$T/calls.txt" FZ_SC_SHIM="$R/tests/fixtures/gpt/_shim" \
+    FZ_SC_RECORD_DIR="$T/lrec" FZ_SHIM_OUTPUT="$(cat "$REC/sc-output.yaml" 2>/dev/null)" bash "${BASH_SOURCE[0]}" --fixture "$FIXTURE" --live > "$T/live.out" 2>&1
+  L1="$(head -1 "$T/calls.txt" 2>/dev/null)"
+  LC="$(printf '%s\n' "$L1" | sed -n 's/^CALL HOME=[^ ]* CODEX_HOME=\([^ ]*\) DENY=.*/\1/p')"; LI="${LC%/gpt-home}"
+  LISO=0; case "${LI##*/}" in fz-gpt-iso.??????) [ "$LC" = "$LI/gpt-home" ] && LISO=1 ;; esac
+  LCFG="$T/calls.txt.toml"
+  case "$LISO:$L1" in "1:CALL HOME=$LI/home CODEX_HOME=$LC DENY="*) ok "live-iso-env — 재녹화 호출이 격리 폴더(gpt_independent.sh iso)의 HOME · CODEX_HOME 으로 돈다" ;;
+    *) no "live-iso-env — 첫 호출 '${L1:-없음}' · $(tail -1 "$T/live.out" 2>/dev/null)" ;; esac
+  case "$L1" in ""|*" DENY=0 SBX="*) no "live-iso-deny — 첫 호출의 config 에 권한 프로필 deny 줄이 없다: '${L1:-없음}'" ;;
+    *) ok "live-iso-deny — 첫 호출의 config 에 권한 프로필 deny 줄이 있다" ;; esac
+  case "$L1" in *" SBX=0") ok "live-iso-no-sandbox-mode — 재녹화 호출 인자에 sandbox_mode 가 없다(--config-permissions — 프로필 deny 를 덮지 않는다)" ;;
+    *) no "live-iso-no-sandbox-mode — 첫 호출 '${L1:-없음}'" ;; esac
+  LCWD="$(cat "$T/calls.txt.cwd" 2>/dev/null)"
+  [ -n "$LCWD" ] && grep -qxF "\"$(cd "$R" && pwd -P)\" = \"deny\"" "$LCFG" 2>/dev/null && grep -qxF "\"$LCWD\" = \"read\"" "$LCFG" && grep -qxF "[projects.\"$LCWD\"]" "$LCFG" \
+    && ok "live-iso-paths — 플러그인 트리(옛 기록 recorded/ 포함) deny · 재녹화 cwd(저장소 사본 실경로) read · 신뢰" \
+    || no "live-iso-paths — 첫 호출의 config 에 플러그인 트리 deny · cwd '${LCWD:-없음}' read · 신뢰 중 빠진 것이 있다"
+  LP="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); print(d.get("codex_home"), d.get("iso_deny_paths"))' "$T/lrec/provenance.json" 2>/dev/null)"
+  case "$LP" in "isolated "[1-9]*) ok "live-iso-provenance — 기록에 격리 증거(격리 config 의 deny 경로 $(printf '%s' "$LP" | cut -d' ' -f2)개)" ;;
+    *) no "live-iso-provenance — 기록의 격리 표기 '${LP:-없음}'(자기 보고가 아니라 격리 config 의 deny 수여야 한다)" ;; esac
+  [ "$LISO" = 1 ] && [ ! -e "$LI" ] && ok "live-iso-cleanup — 재녹화 뒤 격리 폴더가 남지 않는다" || no "live-iso-cleanup — 격리 폴더 '${LI:-없음}' 가 남았거나 격리가 아니다"
+fi
+
+# ⑤ iso 사전 게이트 — 가짜 HOME(.claude 만) · 실제 GPT 홈 대신 임시 인증 파일(CODEX_HOME) · 이 러너의 임시 폴더($T) 안 TMPDIR 로
+#    iso 를 부른다(모델 · CLI 호출 없음). 인증이 있어도 두 게이트가 먼저 멈추는지 본다.
+#    ⛔ 지우는 격리 폴더는 iso 가 stdout 으로 돌려준 경로 하나뿐이다(cleanup --iso) — 나머지는 $T 와 함께 지워진다
+if [ "$LIVE" -eq 0 ] && [ -z "${FZ_SC_MODULE:-}" ]; then
+  IH="$T/ih"
+  mkdir -p "$IH/.claude/tmp" "$IH/.claude/projects/p" "$T/igh" "$T/it-repo" "$T/it-ok" "$T/irepo"; echo '{"fake":"auth"}' > "$T/igh/auth.json"
+  iso_run() {   # $1 = TMPDIR · 나머지 = iso 인자 → $T/iso.out(stdout) · $T/iso.err · 종료값 · IHOME = 가짜 HOME(기본 $IH)
+    local tmp="$1"; shift
+    env HOME="${IHOME:-$IH}" CODEX_HOME="$T/igh" TMPDIR="$tmp" bash "$R/scripts/gpt_independent.sh" iso "$@" > "$T/iso.out" 2> "$T/iso.err"
+  }
+  isos() { find "$1" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' '; }
+  iso_run "$IH/.claude/tmp"; IRC=$?
+  [ "$IRC" = 11 ] && [ ! -s "$T/iso.out" ] && grep -qF '격리 폴더가 ~/.claude 아래에 생긴다' "$T/iso.err" && [ "$(isos "$IH/.claude/tmp")" = 0 ] \
+    && ok "iso-claude-tmpdir-refused — TMPDIR 이 ~/.claude 아래면 iso 도 메인 경로처럼 exit 11 · 빈 stdout · 격리 폴더를 만들지 않는다" \
+    || no "iso-claude-tmpdir-refused — exit $IRC · stdout '$(cat "$T/iso.out")' · 격리 폴더 $(isos "$IH/.claude/tmp")개 · $(tail -1 "$T/iso.err")"
+  iso_run "$T/it-repo" --repo "$IH/.claude/projects/p"; IRC=$?
+  [ "$IRC" = 15 ] && [ ! -s "$T/iso.out" ] && grep -qF '허용 목록 밖 입력 — 독립 첫 패스가 아니다' "$T/iso.err" && [ "$(isos "$T/it-repo")" = 0 ] \
+    && ok "iso-claude-repo-refused — --repo 가 ~/.claude 아래면 iso 도 메인 경로처럼 exit 15 · 빈 stdout · 격리 폴더를 만들지 않는다" \
+    || no "iso-claude-repo-refused — exit $IRC · stdout '$(cat "$T/iso.out")' · 격리 폴더 $(isos "$T/it-repo")개 · $(tail -1 "$T/iso.err")"
+  # ~/.claude 가 링크인 가짜 HOME(대상은 같은 HOME 아래 claude-data) — 링크 경로로 적든 대상 경로로 적든 같은 금지 입력이다.
+  #   ⛔ 막지 못해 만들어진 격리 폴더는 iso 가 stdout 으로 돌려준 경로로만 지운다(cleanup --iso)
+  IL="$T/il"; mkdir -p "$IL/claude-data/projects/p" "$IL/dev/repo"; ln -s "$IL/claude-data" "$IL/.claude"
+  iso_link_refused() {   # $1 = 셀 이름 · $2 = 경로 설명 · $3 = --repo 값
+    local lt="$T/it-$1"; mkdir -p "$lt"
+    IHOME="$IL" iso_run "$lt" --repo "$3"; IRC=$?
+    [ "$IRC" = 15 ] && [ ! -s "$T/iso.out" ] && grep -qF '~/.claude 아래(에이전트 로그 · journal)' "$T/iso.err" && [ "$(isos "$lt")" = 0 ] \
+      && ok "$1 — ~/.claude 가 링크면 --repo 를 $2로 적어도 exit 15 · 빈 stdout · 격리 폴더를 만들지 않는다" \
+      || no "$1 — exit $IRC · stdout '$(cat "$T/iso.out")' · 격리 폴더 $(isos "$lt")개 · $(tail -1 "$T/iso.err")"
+    IP="$(cat "$T/iso.out")"
+    case "$IP" in "$(cd "$lt" && pwd -P)/fz-gpt-iso."??????) bash "$R/scripts/gpt_independent.sh" cleanup --iso "$IP" >/dev/null 2>&1 ;; esac
+  }
+  iso_link_refused iso-claude-link-repo-refused "링크 경로(~/.claude/…)" "$IL/.claude/projects/p"
+  iso_link_refused iso-claude-link-target-repo-refused "링크 대상 경로" "$IL/claude-data/projects/p"
+  mkdir -p "$T/it-lok"; IHOME="$IL" iso_run "$T/it-lok" --repo "$IL/dev/repo"; IRC=$?
+  IP="$(cat "$T/iso.out")"
+  case "$IRC:$(grep -c . "$T/iso.out"):$IP" in "0:1:$(cd "$T/it-lok" && pwd -P)/fz-gpt-iso."??????) [ -d "$IP/gpt-home" ] && IOK=1 || IOK=0 ;; *) IOK=0 ;; esac
+  case "$IP" in "$(cd "$T/it-lok" && pwd -P)/fz-gpt-iso."??????) bash "$R/scripts/gpt_independent.sh" cleanup --iso "$IP" >/dev/null 2>&1 ;; esac
+  [ "$IOK" = 1 ] && ok "iso-claude-link-control — ~/.claude 가 링크인 HOME 에서도 ~/.claude 밖 저장소면 exit 0 · 격리 폴더 경로 한 줄" \
+    || no "iso-claude-link-control — exit $IRC · stdout '$IP' · $(tail -1 "$T/iso.err")"
+  iso_run "$T/it-ok" --repo "$T/irepo"; IRC=$?
+  IP="$(cat "$T/iso.out")"
+  case "$IRC:$(grep -c . "$T/iso.out"):$IP" in "0:1:$(cd "$T/it-ok" && pwd -P)/fz-gpt-iso."??????) [ -d "$IP/gpt-home" ] && IOK=1 || IOK=0 ;; *) IOK=0 ;; esac
+  case "$IP" in "$(cd "$T/it-ok" && pwd -P)/fz-gpt-iso."??????) bash "$R/scripts/gpt_independent.sh" cleanup --iso "$IP" >/dev/null 2>&1 ;; esac
+  [ "$IOK" = 1 ] && ok "iso-gates-control — 같은 가짜 HOME 에서 ~/.claude 밖 자리 · 저장소면 exit 0 · 격리 폴더 경로 한 줄" \
+    || no "iso-gates-control — exit $IRC · stdout '$IP' · $(tail -1 "$T/iso.err")"
 fi
 
 echo

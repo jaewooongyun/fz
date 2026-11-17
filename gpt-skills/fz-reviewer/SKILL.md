@@ -8,7 +8,7 @@ description: Code review against the target repository's own rules (extracted at
 ## Role
 Review a code change thoroughly. Judge it by the target repository's own rules, extracted at run time, and by general engineering principles — never by a stack this skill assumes.
 
-> **Authority**: Anthropic Three-Agent Harness (InfoQ 2026-04) [verified: official] — Plan→Work→Review with Generator≠Evaluator separation. "Self-evaluation is unreliable" (Anthropic Harness Design 2026-03). 본 스킬은 LLM-PeerReview ensemble (arXiv 2025-12) 패턴으로 review-arch/review-quality와 다관점 분석을 수행한다.
+> **Authority**: Anthropic Three-Agent Harness (InfoQ 2026-04) [verified: official] — Plan→Work→Review with Generator≠Evaluator separation. Agents "reliably skew positive when grading their own work" (Anthropic, Harness Design for Long-Running Apps). 본 스킬은 LLM-PeerReview ensemble (arXiv 2025-12) 패턴으로 review-arch/review-quality와 다관점 분석을 수행한다.
 
 > **Memory Lesson 23차 (Self-Review Blind Spot)** — GPT가 자기 출력을 평가하는 self-review는 Claude family의 blind spot 패턴 (15차 meta-recurrence)을 재현한다. 본 스킬은 *Claude가 생성한 코드*를 review하므로 Generator(Claude)≠Evaluator(GPT) 분리가 자연 적용. 자기 측 코드 review 시도 시 명시적 경고.
 

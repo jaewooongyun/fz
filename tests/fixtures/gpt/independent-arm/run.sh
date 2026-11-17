@@ -76,13 +76,13 @@ roll "$T/r-quoted.jsonl" 1 'cat "work dir/review-report.md"'
 roll "$T/r-pattern.jsonl" 1 "rg -n 'review-report\\.md' scripts"
 roll "$T/r-sq.jsonl" 1 "RAWINPUT:const r = await tools.exec_command({cmd:'cat review-report.md',max_output_tokens:2000});"
 
-run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자 · CSID=세션 id(기본 = 선택 파일 없는 id)
+run() {    # $1=셀 · $2=shim 출력 파일(없으면 빈 값) · $3=rollout 목록(쉼표) · 나머지=런처 인자 · CSID=세션 id(기본 = 선택 파일 없는 id) · HOMEX=임시 "실제 홈"(기본 $H)
   local name="$1" outf="$2" rolls="$3"; shift 3
   local d="$T/c-$name"; mkdir -p "$d/out"
   local body="ok"; [ -n "$outf" ] && body="$(cat "$outf")"
   local start; start=$(date +%s)
   local pg=(); [ -n "${PG:-}" ] && pg=(perl -e 'setpgrp(0, 0); open(my $f, ">", shift) or die; print $f $$; close $f; exec @ARGV' "$d/pgid")
-  ${pg[@]+"${pg[@]}"} env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="$H" CLAUDE_CODE_SESSION_ID="${CSID:-arm-no-choice}" \
+  ${pg[@]+"${pg[@]}"} env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="${HOMEX:-$H}" CLAUDE_CODE_SESSION_ID="${CSID:-arm-no-choice}" \
     FZ_TELEMETRY_DIR="$d/tel" FZ_SHIM_CAPTURE="$d/argv.json" FZ_SHIM_ENV_CAPTURE="$d/env.txt" \
     FZ_SHIM_OUTPUT="$body" FZ_SHIM_ROLLOUT="$rolls" ${SLEEP:+FZ_SHIM_SLEEP="$SLEEP"} ${SLEEP:+FZ_SHIM_TAG="$RUNTAG-$name"} ${IGNORE_TERM:+FZ_SHIM_IGNORE_TERM=1} ${TMPX:+TMPDIR="$TMPX"} \
     bash "$L" "$@" --arm A --run-id "$name" --out-dir "$d/out" > "$d/stdout" 2> "$d/stderr"
@@ -178,6 +178,18 @@ run bad5 "" "" plan --requirement "$H/.claude/projects/p/notes.md"
 for c in bad1 bad2 bad3 bad4 bad5; do
   check "금지 입력($c): exit 15" "$(rc $c)" 15
   check "금지 입력($c): CLI 미호출" "$(called $c)" 0
+done
+# ~/.claude 가 링크인 실제 홈(대상은 같은 홈 아래 claude-data) — --repo 든 직접 입력 파일이든 링크 경로 · 링크 대상 경로 어느 쪽으로 적어도
+#   같은 금지 입력이다(exit 15 · CLI 미호출 · ~/.claude 사유 줄 · 빈 stdout). 막지 못하면 CLI 를 부른 뒤 감사가 15 를 내므로 종료값만으로는 가르지 못한다
+HL="$T/linkhome"; mkdir -p "$HL/.codex" "$HL/claude-data/projects/p"; ln -s "$HL/claude-data" "$HL/.claude"
+cp "$H/.codex/auth.json" "$HL/.codex/auth.json"; echo "claude log" > "$HL/claude-data/projects/p/notes.md"
+HOMEX="$HL" run claude-link-repo "" "" plan --requirement "$IN/requirement.md" --repo "$HL/.claude/projects/p"
+HOMEX="$HL" run claude-link-target-repo "" "" plan --requirement "$IN/requirement.md" --repo "$HL/claude-data/projects/p"
+HOMEX="$HL" run claude-link-file "" "" plan --requirement "$HL/.claude/projects/p/notes.md"
+HOMEX="$HL" run claude-link-target-file "" "" review --diff "$HL/claude-data/projects/p/notes.md"
+for c in claude-link-repo claude-link-target-repo claude-link-file claude-link-target-file; do
+  check "금지 입력($c): exit 15 · CLI 미호출 · ~/.claude 사유 줄 · 빈 stdout" \
+    "$(rc $c)|$(called $c)|$(grep -cF '~/.claude 아래(에이전트 로그 · journal)' "$T/c-$c/stderr" 2>/dev/null)|$(wc -c < "$T/c-$c/stdout" | tr -d ' ')" "15|0|1|0"
 done
 
 # ④ rollout 감사 → exit 15 + 오염 표시
@@ -365,6 +377,54 @@ check "--deny(저장소 없이): exit 0" "$(rc denyonly)" 0
 DISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-denyonly/env.txt")"
 grep -qF "\"$(cd "$IN/snap-ok" && pwd -P)\" = \"deny\"" "$DISO/gpt-home/config.toml" 2>/dev/null && ok "--deny: 권한 프로필에 deny 가 있다" || no "--deny: 권한 프로필에 없다"
 [ -n "$DISO" ] && bash "$L" cleanup --iso "$DISO" >/dev/null 2>&1
+# ⑬j 격리 폴더의 실제 부모(TMPDIR 실경로)도 deny — 표준 임시 루트 밖 TMPDIR(Linux /tmp 포함)에서 형제 fz-gpt-iso.* 가 읽히지 않게.
+#     ⛔ 부모가 이미 deny 인 경로(HOME · /private/tmp)와 같으면 한 번만 넣는다 — 같은 키가 두 번이면 CLI 가 config 를 거부한다(TOML 중복 키)
+fskeys() { sed -n '/^\[permissions\.fz-iso\.filesystem\]$/,/^\[/p' "$1" 2>/dev/null | sed -n 's/^\(".*"\) = "[a-z]*"$/\1/p'; }   # $1=config — 권한 표의 경로 키
+mkdir -p "$T/usertmp"
+TMPX="$T/usertmp" run usertmp "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --keep-iso
+UISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-usertmp/env.txt")"
+[ "$(rc usertmp)" = 0 ] && [ -n "$UISO" ] && [ "${UISO%/*}" = "$T/usertmp" ] \
+  && grep -qxF "\"$T/usertmp\" = \"deny\"" "$UISO/gpt-home/config.toml" && grep -qxF "\"$UISO\" = \"read\"" "$UISO/gpt-home/config.toml" \
+  && ok "usertmp-parent-deny — 표준 밖 TMPDIR: 부모 실경로 deny · 격리 폴더 read" \
+  || no "usertmp-parent-deny — exit $(rc usertmp) · 격리 '${UISO:-없음}' · 부모 deny 줄 $(grep -cxF "\"$T/usertmp\" = \"deny\"" "$UISO/gpt-home/config.toml" 2>/dev/null)"
+[ -n "$UISO" ] && bash "$L" cleanup --iso "$UISO" >/dev/null 2>&1
+TMPX="$H" run usertmpdup "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --keep-iso
+VISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-usertmpdup/env.txt")"
+VDUP="$(fskeys "$VISO/gpt-home/config.toml" | sort | uniq -d | tr '\n' ' ')"
+[ "$(rc usertmpdup)" = 0 ] && [ "${VISO%/*}" = "$HREAL" ] && [ -z "$VDUP" ] && [ "$(grep -cxF "\"$HREAL\" = \"deny\"" "$VISO/gpt-home/config.toml" 2>/dev/null)" = 1 ] \
+  && ok "usertmp-dup-key — TMPDIR = HOME: 홈 deny 한 줄 · 중복 키 없음" \
+  || no "usertmp-dup-key — exit $(rc usertmpdup) · 격리 '${VISO:-없음}' · 중복 키 '${VDUP}' · 홈 deny 줄 $(grep -cxF "\"$HREAL\" = \"deny\"" "$VISO/gpt-home/config.toml" 2>/dev/null)"
+[ -n "$VISO" ] && bash "$L" cleanup --iso "$VISO" >/dev/null 2>&1
+#     ⛔ 부모가 --repo(read)와 같으면(TMPDIR = --repo) 부모 deny 를 넣을 수도(중복 키) 뺄 수도(형제 격리 폴더가 읽힌다) 없다 —
+#        조용히 건너뛰지 않고 CLI 를 부르기 전에 exit 11 로 멈춘다. --keep-iso 로 돌려 config 가 남았다면 부모 deny 가 있는지 본다. iso 하위 명령도 같은 자리다
+SR="$T/samerepo"; mkdir -p "$SR/src"; echo b > "$SR/src/a.ts"
+TMPX="$SR" run usertmprepo "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --repo "$SR" --keep-iso
+SOPEN=0; for c in "$SR"/fz-gpt-iso.*/gpt-home/config.toml; do [ -f "$c" ] && ! grep -qxF "\"$SR\" = \"deny\"" "$c" && SOPEN=$((SOPEN + 1)); done
+SMSG="$(grep -c '^INDEPENDENT-FAIL(11): 격리 폴더의 실제 부모가 --repo 와 같다' "$T/c-usertmprepo/stderr" 2>/dev/null)"
+[ "$(rc usertmprepo)" = 11 ] && [ "$(called usertmprepo)" = 0 ] && [ "$SMSG" = 1 ] && [ "$SOPEN" = 0 ] \
+  && ok "usertmp-repo-conflict — TMPDIR = --repo: exit 11 · CLI 미호출 · 충돌 줄 1 · 부모를 열어 둔 config 0" \
+  || no "usertmp-repo-conflict — exit $(rc usertmprepo) · CLI 호출 $(called usertmprepo) · 충돌 줄 ${SMSG:-0} · 부모를 열어 둔 config $SOPEN"
+for d in "$SR"/fz-gpt-iso.??????; do [ -d "$d" ] && bash "$L" cleanup --iso "$d" >/dev/null 2>&1; done
+SOUT="$(env -u CODEX_HOME HOME="$H" TMPDIR="$SR" bash "$L" iso --repo "$SR" 2> "$T/samerepo-iso.err")"; SRC=$?
+SLEFT="$(ls -d "$SR"/fz-gpt-iso.* 2>/dev/null | wc -l | tr -d ' ')"
+[ "$SRC" = 11 ] && [ -z "$SOUT" ] && [ "$SLEFT" = 0 ] && grep -q '^INDEPENDENT-FAIL(11): 격리 폴더의 실제 부모가 --repo 와 같다' "$T/samerepo-iso.err" \
+  && ok "usertmp-repo-conflict-iso — iso 하위 명령: exit 11 · 빈 stdout · 만들던 격리 폴더 0 · 충돌 줄" \
+  || no "usertmp-repo-conflict-iso — exit $SRC · stdout '${SOUT:-}' · 남은 격리 폴더 $SLEFT"
+for d in "$SR"/fz-gpt-iso.??????; do [ -d "$d" ] && bash "$L" cleanup --iso "$d" >/dev/null 2>&1; done
+# ⑬k 격리 폴더만 만드는 하위 명령(iso) — 런처 밖 재녹화 러너(sprint-contract-format --live)가 메인 경로와 같은 한 벌을 부른다.
+#     계약: stdout = 격리 폴더 실경로 한 줄 · --repo 는 read · cwd 신뢰 · --deny 는 deny · 실패 = 0 이 아닌 종료와 빈 stdout · 정리는 부른 쪽(cleanup --iso)
+KISO="$(env -u CODEX_HOME HOME="$H" bash "$L" iso --repo "$H/dev/repo" --deny "$IN/snap-ok" 2>/dev/null)"; KRC=$?
+KCFG="$KISO/gpt-home/config.toml"
+KNAME=0; case "${KISO##*/}" in fz-gpt-iso.??????) [ "$(printf '%s\n' "$KISO" | wc -l | tr -d ' ')" = 1 ] && KNAME=1 ;; esac
+[ "$KRC" = 0 ] && [ "$KNAME" = 1 ] && [ "$(head -1 "$KCFG" 2>/dev/null)" = 'default_permissions = "fz-iso"' ] \
+  && grep -qxF "\"$HREAL\" = \"deny\"" "$KCFG" && grep -qxF "\"$KISO\" = \"read\"" "$KCFG" && grep -qxF "\"$(cd "$IN/snap-ok" && pwd -P)\" = \"deny\"" "$KCFG" \
+  && grep -qxF "\"$HREAL/dev/repo\" = \"read\"" "$KCFG" && grep -qxF "[projects.\"$HREAL/dev/repo\"]" "$KCFG" \
+  && [ -L "$KISO/gpt-home/auth.json" ] && [ -f "$KISO/gpt-home/skills/fz-architect/SKILL.md" ] && [ -d "$KISO/home" ] \
+  && ok "iso-subcommand — stdout 한 줄 = 격리 폴더 · 홈 deny · 격리 read · --deny · --repo read · 신뢰 · 인증 링크 · 스킬 사본" \
+  || no "iso-subcommand — exit $KRC · stdout '${KISO:-없음}'"
+[ "$KNAME" = 1 ] && [ -d "$KISO" ] && bash "$L" cleanup --iso "$KISO" >/dev/null 2>&1
+KOUT="$(env -u CODEX_HOME HOME="$H" bash "$L" iso --deny "$T/no-such-dir" 2>/dev/null)"; KRC=$?
+[ "$KRC" != 0 ] && [ -z "$KOUT" ] && ok "iso-subcommand-fail — 없는 --deny: 0 이 아닌 종료 · 빈 stdout" || no "iso-subcommand-fail — exit $KRC · stdout '${KOUT:-}'"
 # ⑬f head/ 결손 표시 — 변경 후 파일이 head/ 에 없으면 감사가 빠진 경로를 적는다(F14 · fail-visible)
 mkdir -p "$IN/head-empty"
 run headmiss "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --base "$IN/base" --head "$IN/head-empty"

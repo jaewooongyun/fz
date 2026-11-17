@@ -18,7 +18,7 @@
           manifest = kind · 산출물 버전(env FZ_GPT_ARTIFACT_VERSION) · 입력 파일 내용(FILE_INPUTS) · 검토 대상 코드(REPO_INPUTS 의
           git HEAD + 작업 트리 diff + 추적 안 된 파일 — 출력 경로 · 원장 제외). 코드만 바뀌어도 새 입력이다.
           일부를 못 읽거나 분류(FILE_INPUTS · REPO_INPUTS · SKIP_INPUTS) 밖 입력이 있으면 manifest 는 unknown 이고 같은 입력
-          판정만 건너뛴다(상한은 그대로 센다)
+          판정만 건너뛴다(상한은 그대로 센다) — git 이 아닌 --cd · --repo 폴더도 unknown 이다(코드 스냅숏이 없다)
 재호출    env FZ_GPT_RECALL=post-check — verify-gates 사후 대조(gate_check.py --verdict-check) 실패 뒤 1회. 직전 게이트 판정의
           라운드를 잇고 라운드를 쓰지 않는다(라운드당 1회 — 넘으면 recall-used)
 
@@ -202,9 +202,9 @@ def _git(top: str, *args: str) -> bytes:
 
 
 def excluded(real: str, exclude) -> bool:
-    """exclude = [(경로, 묶음)] — 'stem' 은 그 경로로 시작하는 이름 전부(OUT · OUT.session · OUT.lock …) · 'tree' 는 그 폴더 아래."""
+    """exclude = [(경로, 묶음)] — 'stem' 은 그 경로와 '<경로>.<접미>' 부속(OUT · OUT.session · OUT.lock …) · 'tree' 는 그 폴더 아래."""
     for path, how in exclude:
-        if real == path or real.startswith(path if how == "stem" else path + os.sep):
+        if real == path or real.startswith(path + "." if how == "stem" else path + os.sep):
             return True
     return False
 
@@ -218,14 +218,15 @@ def excluded_spec(top: str, exclude) -> list:
 
 
 def code_digest(path: str, exclude) -> str:
-    """검토 대상 코드 스냅숏 — HEAD · 작업 트리 diff(스테이징 포함) · 추적 안 된 파일(무시 규칙 밖 · 출력과 원장 제외)."""
+    """검토 대상 코드 스냅숏 — HEAD · 작업 트리 diff(스테이징 포함) · 추적 안 된 파일(무시 규칙 밖 · 출력과 원장 제외).
+    git 작업 트리가 아니면(작업 폴더를 --cd 로 준 kind) Unreadable — manifest 는 unknown 이다."""
     real = os.path.realpath(path)
     if not os.path.isdir(real):
         raise Unreadable(f"코드 폴더가 없다: {path}")
     probe = subprocess.run(["git", "-C", real, "rev-parse", "--show-toplevel"], capture_output=True, text=True,
                            timeout=GIT_TIMEOUT_SEC)
-    if probe.returncode != 0:
-        return "nogit"      # git 작업 트리가 아니다 — 검토할 코드가 없는 호출(작업 폴더를 --cd 로 준 kind)
+    if probe.returncode != 0:   # 내용과 무관한 고정 지문을 두면 내용이 바뀐 재검증도 같은 입력으로 거부된다
+        raise Unreadable(f"git 작업 트리가 아니다: {path} — 코드 스냅숏 없음")
     top = os.path.realpath(probe.stdout.strip())
     h, spec = hashlib.sha256(), excluded_spec(top, exclude)
     head = subprocess.run(["git", "-C", top, "rev-parse", "--verify", "-q", "HEAD"], capture_output=True,
@@ -764,6 +765,9 @@ def self_test() -> int:
         def slots_of(root, key):
             return json.loads((root / "wd" / LEDGER_FILE).read_text(encoding="utf-8"))["keys"][key]["slots"]
 
+        def ledger_key(root, key):
+            return json.loads((root / "wd" / LEDGER_FILE).read_text(encoding="utf-8"))["keys"][key]
+
         def c_cap3():
             root, env = world("cap")
             got, failed = [], []
@@ -891,8 +895,64 @@ def self_test() -> int:
             return ok, (f"first=({first[0]},{round_of(first[1])}) orphan={orphan.get('state')}/{orphan.get('reason')} "
                         f"second=({second[0]},{round_of(second[1])}) third=({third[0]},{round_of(third[1])})")
 
+        def c_outside_git():
+            root, env = world("outside-git")
+            code = root / "code"                                        # git 밖 폴더를 --cd 로 준다(작업 폴더를 --cd 로 주는 kind 와 같은 꼴)
+            probe = subprocess.run(["git", "-C", str(code), "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                                   timeout=60)
+            if probe.returncode == 0:
+                return False, f"임시 폴더가 git 작업 트리 안이다(측정 불가): {probe.stdout.strip()[:120]}"
+            (code / "src.txt").write_text("v1", encoding="utf-8")
+            p = write(root, "p.md", "같은 계획")
+            a = run(env, vcall(root, "verify", p, "a"))
+            (code / "src.txt").write_text("v2", encoding="utf-8")       # 내용만 바뀌었다 — 내용과 무관한 고정 지문이면 같은 입력으로 거부된다
+            b = run(env, vcall(root, "verify", p, "b"))
+            c = run(env, vcall(root, "verify", p, "c"))                 # 내용도 그대로 — manifest 를 모르면 같은 입력 판정을 건너뛰고 상한이 막는다
+            d = run(env, vcall(root, "verify", p, "d"))
+            rec = ledger_key(root, "plan/verify")
+            slots = [(s.get("round"), s.get("state"), s.get("manifest")) for s in rec["slots"]]
+            notes = [s.get("manifest_note") or "" for s in rec["slots"]]
+            refusals = [r.get("reason") for r in rec["refusals"]]
+            ok = (a[:2] == (0, "1") and b[:2] == (0, "2") and "manifest=unknown(" in b[2].get("ROUND", "")
+                  and c[:2] == (0, "3") and d[0] == REFUSED and d[2].get("ROUND-REFUSED") == "budget-exhausted"
+                  and slots == [(1, "completed", None), (2, "completed", None), (3, "completed", None)]
+                  and all("git" in n for n in notes) and refusals == ["budget-exhausted"])
+            return ok, (f"a={a[:2]} b={b[:2]} c={c[:2]} d=rc{d[0]}/{d[2].get('ROUND-REFUSED')} slots={slots} "
+                        f"refusals={refusals} {(b[3] + d[3]).strip()[:160]}")
+
+        def c_aux_boundary():
+            root, env = world("aux")
+            repo = root / "repo"
+            repo.mkdir()
+            (repo / "src.txt").write_text("v1", encoding="utf-8")
+            for cmd in (["git", "init", "-q"], ["git", "add", "-f", "src.txt"]):
+                proc = subprocess.run(cmd, cwd=str(repo), capture_output=True, text=True, timeout=60)
+                if proc.returncode != 0:
+                    return False, f"{' '.join(cmd[:2])} 실패(측정 불가): {proc.stderr.strip()[:120]}"
+            out, near = repo / "out.json", repo / "out.json-source.py"  # 판정 파일이 저장소 안 — 이름만 그 경로로 시작하는 형제는 코드다
+            near.write_text("v1", encoding="utf-8")
+            p = write(root, "p.md", "같은 계획")
+            call = ["verify", "--cd", str(repo), "--out", str(out), "--prompt-file", p]
+            a = run(env, call)
+            for suffix in (".session", ".stream.log"):                  # 어댑터가 남기는 부속(<OUT>.<접미>) — 새 입력이 아니다
+                Path(str(out) + suffix).write_text("부속", encoding="utf-8")
+            b = run(env, call)
+            near.write_text("v2", encoding="utf-8")                     # 부속이 아닌 형제만 바뀌었다 → 새 입력
+            c = run(env, call)
+            rec = ledger_key(root, "plan/verify")
+            slots = [(s.get("round"), s.get("state")) for s in rec["slots"]]
+            manifests = [s.get("manifest") for s in rec["slots"]]
+            refusals = [r.get("reason") for r in rec["refusals"]]
+            ok = (a[:2] == (0, "1") and b[0] == REFUSED and b[2].get("ROUND-REFUSED") == "same-input"
+                  and b[2].get("ROUND-KEEP-OUT") == "1" and c[:2] == (0, "2")
+                  and slots == [(1, "completed"), (2, "completed")] and all(manifests) and len(set(manifests)) == 2
+                  and refusals == ["same-input"])
+            return ok, (f"a={a[:2]} b=rc{b[0]}/{b[2].get('ROUND-REFUSED')}/{b[2].get('ROUND-KEEP-OUT')} c={c[:2]} "
+                        f"slots={slots} refusals={refusals} {(b[3] + c[3]).strip()[:160]}")
+
         for name, fn in (("cap-3", c_cap3), ("same-input-stop", c_same_input), ("budget-exhausted", c_budget),
-                         ("lock-reserve", c_lock_reserve), ("orphan-recovery", c_orphan)):
+                         ("lock-reserve", c_lock_reserve), ("orphan-recovery", c_orphan),
+                         ("outside-git-roundtrip", c_outside_git), ("aux-boundary-roundtrip", c_aux_boundary)):
             try:
                 ok, why = fn()
             except Exception as exc:  # noqa: BLE001 — case 하나의 고장은 그 case 의 FAIL 이다

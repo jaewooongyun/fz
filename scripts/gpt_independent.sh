@@ -19,7 +19,13 @@
 #             (templates/gpt-frames/NAME-review.md)을 기본 본문 **뒤에** 덧붙인다 — 기본 본문은 바이트 그대로다
 #   역할 · 스키마 · spawn 문장 · frame 은 이 런처가 정하지 않는다 — resolver(`gpt_kinds.py launcher-policy`)가 레지스트리에서 답한다(R-06).
 #             정문 경유면 정문이 넘긴 kind 라벨(FZ_GPT_CALL_LABEL)로, 직접 호출이면 모드의 기본 kind 로 묻는다 — argv 는 그대로다
-#   gpt_independent.sh cleanup --iso D   --keep-iso 로 남긴 격리 폴더를 지운다(resume 교차 뒤). 이름 fz-gpt-iso.XXXXXX · gpt-home/ 가 맞을 때만
+#   gpt_independent.sh cleanup --iso D   --keep-iso 로 남긴 격리 폴더를 지운다(resume 교차 뒤 · iso 가 만든 폴더도). 이름 fz-gpt-iso.XXXXXX · gpt-home/ 가 맞을 때만
+#   gpt_independent.sh iso [--repo D] [--deny D]...   격리 폴더만 만든다 — 런처 밖에서 래퍼를 부르는 쪽(재녹화 러너
+#             tests/fixtures/gpt/sprint-contract-format/run.sh --live)이 같은 격리를 쓴다(격리 config 를 쓰는 코드는 make_iso 한 벌).
+#             --repo · --deny 는 메인 경로와 같은 뜻이다(--repo 는 cwd 신뢰도 받는다). 만들기 전에 메인 경로와 같은 사전 게이트 둘을
+#             건다 — 격리 폴더 자리(${TMPDIR:-/tmp} 실경로가 실제 홈 ~/.claude 아래 → 11) · 금지 입력(--repo 가 ~/.claude 아래 → 15). stdout = 격리 폴더 실경로 한 줄 ·
+#             실패 = 0 이 아닌 종료와 빈 stdout · 정리 = 부른 쪽(cleanup --iso). 부른 쪽은 HOME=<격리>/home CODEX_HOME=<격리>/gpt-home 으로
+#             래퍼를 --config-permissions 와 함께 부른다
 #   --model · --effort 보통 넘기지 않는다. 기본값 없음 — 정본 modules/gpt-strategy.md § 모델·effort 선택
 #             주면 그대로 래퍼로 넘긴다(형식 검증은 래퍼 — 빈 값 · 불량 값이면 래퍼 exit 10). 안 주면 래퍼가 필드마다 정한다 —
 #             Lead 세션 선택(선택 폴더를 실제 홈 기준으로 넘긴다) > 격리 config(실제 config 최상위 model · model_reasoning_effort 두 줄 사본)
@@ -28,7 +34,7 @@
 #             부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
 #   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 는 막는다
 #   --deny    더 막을 폴더(작업 폴더 WORK_DIR 등) — --repo 와 무관하게 권한 프로필 deny 로 넣는다. 권한 프로필은 디스크 전체 읽기에서
-#             HOME · 임시 폴더만 막으므로, HOME 밖 작업 폴더의 Claude 산출은 --deny 가 없으면 읽힌다
+#             HOME · 임시 폴더 · 격리 폴더의 실제 부모만 막으므로, HOME 밖 작업 폴더의 Claude 산출은 --deny 가 없으면 읽힌다
 #   --rules-index 지침 원문 색인(extract_project_rules.py 출력 — files · sections). ⛔ 규칙 레코드(rules · axes — Claude 가 해석한
 #             check_project_rules 통과본)를 넘기면 독립이 깨진다 — 모양으로 판별해 exit 11
 #   --snapshot 소비자 · 공유 모듈 본문 폴더 — 격리 폴더의 snapshot/<이름>/ 으로 복사한다(리뷰 범위를 줄이지 않는다)
@@ -36,7 +42,7 @@
 # 산출(out-dir): <arm>-<run-id>.json (스키마 출력) · .md (사람용) · .audit.json · .rollouts/ (세션 로그 사본) · .contaminated (오염 시) · .json.session(세션 ID — 감사 sessionFile · --keep-iso 면 감사 iso · resume 입력)
 #   ⛔ 시작할 때 같은 stem 의 옛 산출을 지우고 감사를 'running'(exit null)으로 먼저 쓴다 — 중간에 멈춘 run 의 산출은 병합 · 차이표가 거부한다
 # stderr: 래퍼의 적용값 줄 'GPT-CHOICE model=<값> (출처) effort=<값> (출처)' 을 그대로 한 줄 옮긴다(래퍼가 그 줄 전에 멈추면 없다)
-# exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건(격리 폴더 자리 ${TMPDIR:-/tmp} 가 실제 홈 ~/.claude 아래인 경우 포함 — GPT 호출 전 · F-509) · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
+# exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건(격리 폴더 자리 ${TMPDIR:-/tmp} 가 실제 홈 ~/.claude 아래인 경우(F-509) · 그 실경로가 --repo 와 같은 경우 포함 — GPT 호출 전) · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
 #       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off. 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
 #          stderr 'GPT-OFF: <사유> — …' · 감사 <stem>.audit.json 에 "exit": 18 · "gptOff": "<사유>"(오염 · 측정 실패 아님 — 병합은 --gpt-unavailable)
@@ -65,9 +71,154 @@ if [ "$MODE" = "cleanup" ]; then
   echo "INDEPENDENT-CLEANUP: $D"
   exit 0
 fi
+
+# ── 격리 폴더 — 메인 경로(plan · review)와 iso 하위 명령이 이 한 벌을 쓴다(격리 config 사본을 두지 않는다).
+#    읽는 값: MODE · REAL_HOME · REAL_GPT_HOME · PLUGIN_ROOT · GPT_AGENTS · REPO · DENIES. 정하는 값: ISO · REPO_REAL · CD. 실패는 die 11
+#    ⛔ 경로는 전부 realpath(`/tmp`→`/private/tmp` · `/var/folders`→`/private/var/folders`). deny·read 표기가 어긋나면 중첩 규칙이 안 맞는다
+#    격리 폴더의 실제 부모(${TMPDIR:-/tmp})도 권한 프로필 deny 다 — 같은 부모 아래 형제 격리 폴더를 막는다(아래 config 블록).
+#    그 부모가 --repo(read)와 같으면 deny 를 넣을 수 없어 die 11 로 멈춘다(config 를 쓰기 전 · CLI 를 부르기 전)
+#    ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp …)"` 꼴은 mktemp 가 실패해도 `cd ""` 가 성공해 현재 폴더가 격리 폴더가 된다(bash 3.2 실측)
+make_iso() {
+  ISO_TMP="$(mktemp -d "${TMPDIR:-/tmp}/fz-gpt-iso.XXXXXX")" || die 11 "격리 폴더 생성 실패(mktemp)"
+  ISO="$(cd "$ISO_TMP" && pwd -P)" || die 11 "격리 폴더 경로 해석 실패: $ISO_TMP"
+  mkdir -p "$ISO/gpt-home/skills" "$ISO/home" "$ISO/input" || die 11 "격리 폴더 구성 실패"
+  ln -s "$REAL_GPT_HOME/auth.json" "$ISO/gpt-home/auth.json" || die 11 "인증 링크 실패"   # ⛔ 인증은 링크만 — 내용을 복사하지 않는다
+  for s in "$PLUGIN_ROOT"/gpt-skills/fz-*; do cp -R "$s" "$ISO/gpt-home/skills/" || die 11 "스킬 사본 실패: $s"; done
+  if [ -n "$GPT_AGENTS" ]; then
+    mkdir -p "$ISO/gpt-home/agents" && cp "$PLUGIN_ROOT"/gpt-agents/*.toml "$ISO/gpt-home/agents/" || die 11 "역할 파일 사본 실패: $PLUGIN_ROOT/gpt-agents"
+  fi   # ⛔ 사본 — HOME 아래 링크 대상은 샌드박스에서 안 읽힌다
+  REPO_REAL=""; [ -n "$REPO" ] && REPO_REAL="$(cd "$REPO" && pwd -P)"
+  CD="$ISO/input"; case "$MODE" in plan|iso) [ -n "$REPO_REAL" ] && CD="$REPO_REAL" ;; esac
+
+  FZ_ISO_AGENTS="$GPT_AGENTS" python3 - "$ISO" "$REAL_HOME" "$REAL_GPT_HOME/config.toml" "$REPO_REAL" "$CD" "${DENIES[@]+"${DENIES[@]}"}" <<'PY' || { [ $? -eq 3 ] && die 11 "격리 폴더의 실제 부모가 --repo 와 같다 — TMPDIR 이나 --repo 를 바꾼다(TMPDIR='${TMPDIR:-}' → ${ISO%/*}). 부모 deny 를 넣으면 --repo 의 read 와 키가 겹쳐 CLI 가 config 를 거부하고, 빼면 형제 격리 폴더(fz-gpt-iso.*)가 읽힌다. GPT 를 부르지 않았다"; die 11 "격리 config 작성 실패"; }
+import json, os, re, sys
+iso, home, real_cfg, repo, cd, denies = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6:]
+q = lambda p: json.dumps(p)          # TOML basic string — JSON 이스케이프와 호환
+# ⛔ 최상위(첫 표 앞) model · model_reasoning_effort 두 줄만 옮긴다 — MCP env 등 다른 줄은 옮기지 않는다. 줄 머리 key · 큰따옴표 값 하나로 끝나는 줄만(엄격 판독)
+#    런처는 effort 기본값이 없다 — effort 줄을 빼면 '묻지 않으면 config 그대로' 가 격리 팔에서만 CLI 의 모델 기본 effort 로 바뀐다.
+#    래퍼의 GPT-CHOICE 줄(출처 config)도 이 격리 config 를 읽는다 — 표시와 실제로 쓰일 값이 같다
+keep = []
+try:
+    head = re.split(r"(?m)^\s*\[", open(real_cfg, encoding="utf-8").read(), maxsplit=1)[0]
+    for key in ("model", "model_reasoning_effort"):
+        m = re.search(r'(?m)^' + key + r'\s*=\s*"[^"\n]*"\s*$', head)
+        if m:
+            keep.append(m.group(0))
+except OSError:
+    pass
+fs = [(home, "deny")]
+for p in ("/private/tmp", "/private/var/folders"):
+    if os.path.isdir(p):
+        fs.append((os.path.realpath(p), "deny"))
+fs.append((iso, "read"))
+if repo:
+    fs.append((repo, "read"))
+    for sub in (".claude", ".fz-work"):
+        if os.path.isdir(os.path.join(repo, sub)):
+            fs.append((os.path.join(repo, sub), "deny"))
+for d in denies:   # ⛔ --repo 와 무관 — 프로필은 디스크 전체 읽기에서 출발해 HOME 밖 작업 폴더는 이것이 없으면 읽힌다
+    fs.append((os.path.realpath(d), "deny"))
+# 격리 폴더의 실제 부모(${TMPDIR:-/tmp} 실경로) — 위 두 임시 루트 밖 TMPDIR(Linux /tmp 포함)이면 형제 fz-gpt-iso.* 가 읽힌다.
+#   격리 폴더 read 가 더 구체적이라 이긴다(macOS 실측 — os-deny external.sh 의 lp-parent-deny · Linux 는 재지 않았다)
+#   ⛔ 이미 deny 로 든 경로(TMPDIR 미설정 macOS 의 /private/tmp · HOME 과 같은 TMPDIR)면 넣지 않는다 — 같은 키가 두 번이면 CLI 가 config 를 거부한다(TOML 중복 키)
+#   ⛔ 같은 경로가 deny 아닌 값으로 들어 있으면(TMPDIR 이 --repo 와 같아 read) 넣을 수도(중복 키) 건너뛸 수도(형제 격리 폴더가 읽힌다) 없다 —
+#      조용히 넘어가지 않고 config 를 쓰기 전에 exit 3 으로 끝낸다. 위 die 11 이 충돌을 알리고 CLI 를 부르지 않는다
+parent = os.path.realpath(os.path.dirname(iso))
+if any(p == parent and a != "deny" for p, a in fs):
+    sys.exit(3)
+if parent not in {p for p, _ in fs}:
+    fs.append((parent, "deny"))
+lines = ['default_permissions = "fz-iso"'] + keep
+lines += ["", "[features]", "memories = false"]
+if not os.environ.get("FZ_ISO_AGENTS"):   # 하위 에이전트를 구조로 끈다(F-436) — 프롬프트 금지 문장은 경계가 아니다. --gpt-agents 만 켠다
+    lines += ["", "[agents]", "enabled = false"]
+lines += ["", "[permissions.fz-iso]", 'extends = ":read-only"', "", "[permissions.fz-iso.filesystem]"]
+lines += [f"{q(p)} = {q(a)}" for p, a in fs]
+lines += ["", f"[projects.{q(cd)}]", 'trust_level = "trusted"', ""]
+open(os.path.join(iso, "gpt-home", "config.toml"), "w", encoding="utf-8").write("\n".join(lines))
+PY
+}
+
+# ── 사전 게이트 둘 — 메인 경로(plan · review)와 iso 하위 명령이 이 한 벌을 부른다. 둘 다 make_iso 전에 건다(실패면 아무것도 만들지 않았다)
+# 격리 폴더 자리(⛔ exit 11 · F-509) — 격리 폴더는 ${TMPDIR:-/tmp} 아래에 생기고 과제 · 권한 프로필이 그 경로를 입력
+#    폴더로 연다. 그 자리가 실제 홈의 ~/.claude 아래면 GPT 가 Claude 로그 · journal 옆에서 돌고, rollout 감사는 GPT 를 부른 **뒤**에야
+#    그 경로(`.claude/`)를 잡는다(호출 비용이 이미 났다). 그래서 mktemp · 래퍼 호출 전에 실경로로 비교해 멈춘다.
+#    TMPDIR 이 없거나 풀리지 않으면 여기서 판정하지 않는다 — make_iso 의 mktemp 가 11 로 멈춘다. ~/.claude 가 링크여도 실경로로 함께 본다
+#    읽는 값: REAL_HOME
+gate_iso_place() {
+  ISO_PARENT="$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)" || ISO_PARENT=""
+  CLAUDE_DIR="$REAL_HOME/.claude"
+  CLAUDE_DIR_REAL="$(cd "$CLAUDE_DIR" 2>/dev/null && pwd -P)" || CLAUDE_DIR_REAL="$CLAUDE_DIR"
+  if [ -n "$ISO_PARENT" ]; then
+    case "$ISO_PARENT/" in
+      "$CLAUDE_DIR"/*|"$CLAUDE_DIR_REAL"/*)
+        die 11 "격리 폴더가 ~/.claude 아래에 생긴다 — TMPDIR 을 바꾸거나 unset 한다(TMPDIR='${TMPDIR:-}' → $ISO_PARENT · F-509). GPT 를 부르지 않았다" ;;
+    esac
+  fi
+}
+
+# 금지 입력(⛔ exit 15 — Claude 산출물이 첫 패스에 들어가면 독립이 아니다). 인자: 직접 입력 파일… -- 폴더(base · head · 스냅샷)… -- --repo
+#    ~/.claude 아래(실경로)는 무엇이든 금지 · 이름 규칙은 파일과 폴더 안 파일에만. --deny 폴더는 입력이 아니라 보지 않는다. 읽는 값: REAL_HOME
+gate_inputs() {
+  GUARD="$(FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$REAL_HOME" "$@" <<'PY'
+import os, re, sys
+home, argv = sys.argv[1], sys.argv[2:]
+a = argv.index("--"); b = argv.index("--", a + 1)
+files, dirs, repo = [x for x in argv[:a] if x], [x for x in argv[a + 1:b] if x], [x for x in argv[b + 1:] if x]
+FZ = re.compile(os.environ["FZ_ART_NAMES"])                 # fz 고유 이름 — 어디서든 금지
+GENERIC = re.compile(r"payload\.json|.+-result\.json")      # 범용 이름 — 직접 입력에만(base/head 미러 · 스냅샷은 저장소 파일이다)
+claude = os.path.join(home, ".claude")
+claudes = {claude, os.path.realpath(claude)}
+hits = []
+def check(p, names):
+    rp = os.path.realpath(p)
+    if any(rp == c or rp.startswith(c + os.sep) for c in claudes):
+        hits.append(f"{p} — ~/.claude 아래(에이전트 로그 · journal)")
+    elif any(r.fullmatch(os.path.basename(rp)) for r in names):
+        hits.append(f"{p} — Claude 산출물 이름")
+for f in files:
+    check(f, (FZ, GENERIC))
+for d in dirs:
+    check(d, ())
+    for root, _, names in os.walk(d):
+        for n in names:
+            check(os.path.join(root, n), (FZ,))
+for r in repo:
+    check(r, ())
+print("\n".join(hits))
+PY
+)" || die 11 "입력 판정 실패"
+  [ -z "$GUARD" ] || die 15 "허용 목록 밖 입력 — 독립 첫 패스가 아니다:
+$GUARD"
+}
+
+# 격리 폴더만 만든다(iso) — 런처 밖에서 래퍼를 부르는 쪽이 독립 런처와 같은 격리를 쓴다(재녹화 러너 sprint-contract-format --live).
+#   메인 경로와 같은 사전 게이트 둘(격리 폴더 자리 11 · 금지 입력 --repo 15)을 make_iso 전에 건다 — 같은 종료값 · 같은 메시지
+#   ⛔ 실패면 stdout 이 비고 만들던 폴더를 지운다(경로를 받지 못한 쪽은 지울 수 없다). 성공한 폴더의 정리는 부른 쪽이 한다(cleanup --iso)
+if [ "$MODE" = "iso" ]; then
+  REPO="" GPT_AGENTS="" DENIES=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) need $# "--repo"; REPO="$2"; shift 2 ;;
+      --deny) need $# "--deny"; DENIES+=("$2"); shift 2 ;;
+      *) die 10 "iso 는 --repo D · --deny D 만 받는다 — 받은 값: $1" ;;
+    esac
+  done
+  REAL_HOME="$(cd "${HOME:?HOME 미설정}" && pwd -P)"
+  gate_iso_place
+  REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)" || die 11 "실제 GPT CLI 홈이 없다: ${CODEX_HOME:-$REAL_HOME/.codex}"
+  [ -f "$REAL_GPT_HOME/auth.json" ] || die 11 "인증 파일이 없다: $REAL_GPT_HOME/auth.json (로그인 필요)"
+  for d in "$REPO" "${DENIES[@]+"${DENIES[@]}"}"; do [ -z "$d" ] || [ -d "$d" ] || die 11 "입력 폴더 없음: $d"; done
+  gate_inputs -- -- "$REPO"
+  ISO=""; trap '[ -n "$ISO" ] && case "${ISO##*/}" in fz-gpt-iso.??????) rm -rf "$ISO" ;; esac' EXIT
+  make_iso
+  trap - EXIT
+  echo "$ISO"
+  exit 0
+fi
 case "$MODE" in
   plan|review) ;;
-  *) die 10 "mode 는 plan|review|cleanup — 받은 값: '${MODE}'" ;;
+  *) die 10 "mode 는 plan|review|cleanup|iso — 받은 값: '${MODE}'" ;;
 esac
 
 ARM="" RUN_ID="" OUT_DIR="" TIMEOUT=1800 REQ="" SC="" RULES="" DIFF="" META="" BASE_DIR="" HEAD_DIR="" REPO="" KEEP_ISO="" GPT_AGENTS="" FRAME=""
@@ -174,56 +325,17 @@ if [ -n "$OFF_WHY" ]; then
   exit 18
 fi
 
-# ── 사전 게이트: 격리 폴더 자리(⛔ exit 11 · F-509) — 격리 폴더는 ${TMPDIR:-/tmp} 아래에 생기고 과제 · 권한 프로필이 그 경로를 입력
-#    폴더로 연다. 그 자리가 실제 홈의 ~/.claude 아래면 GPT 가 Claude 로그 · journal 옆에서 돌고, rollout 감사는 GPT 를 부른 **뒤**에야
-#    그 경로(`.claude/`)를 잡는다(호출 비용이 이미 났다). 그래서 mktemp · 래퍼 호출 전에 실경로로 비교해 멈춘다.
+# ── 사전 게이트: 격리 폴더 자리(⛔ exit 11) — gate_iso_place(위 · iso 하위 명령과 같은 한 벌)
 #    ⛔ GPT 미사용 사전 게이트(18) 뒤다 — GPT 를 쓰지 않는 세션은 여기까지 오지 않는다(18 이 11 을 이긴다 · tests/fixtures/gpt/off).
-#    TMPDIR 이 없거나 풀리지 않으면 여기서 판정하지 않는다 — 아래 mktemp 가 11 로 멈춘다. ~/.claude 가 링크여도 실경로로 함께 본다
 REAL_HOME="$(cd "${HOME:?HOME 미설정}" && pwd -P)"
-ISO_PARENT="$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)" || ISO_PARENT=""
-CLAUDE_DIR="$REAL_HOME/.claude"
-CLAUDE_DIR_REAL="$(cd "$CLAUDE_DIR" 2>/dev/null && pwd -P)" || CLAUDE_DIR_REAL="$CLAUDE_DIR"
-if [ -n "$ISO_PARENT" ]; then
-  case "$ISO_PARENT/" in
-    "$CLAUDE_DIR"/*|"$CLAUDE_DIR_REAL"/*)
-      die 11 "격리 폴더가 ~/.claude 아래에 생긴다 — TMPDIR 을 바꾸거나 unset 한다(TMPDIR='${TMPDIR:-}' → $ISO_PARENT · F-509). GPT 를 부르지 않았다" ;;
-  esac
-fi
+gate_iso_place
 
-# ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — Claude 산출물이 첫 패스에 들어가면 독립이 아니다)
+# ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — gate_inputs(위 · iso 하위 명령과 같은 한 벌))
 REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)" || die 11 "실제 GPT CLI 홈이 없다: ${CODEX_HOME:-$REAL_HOME/.codex}"
 [ -f "$REAL_GPT_HOME/auth.json" ] || die 11 "인증 파일이 없다: $REAL_GPT_HOME/auth.json (로그인 필요)"
 for f in "$REQ" "$SC" "$RULES" "$DIFF" "$META"; do [ -z "$f" ] || [ -s "$f" ] || die 11 "입력 파일 없음/빈 파일: $f"; done
 for d in "$BASE_DIR" "$HEAD_DIR" "$REPO" "${SNAPS[@]+"${SNAPS[@]}"}" "${DENIES[@]+"${DENIES[@]}"}"; do [ -z "$d" ] || [ -d "$d" ] || die 11 "입력 폴더 없음: $d"; done
-GUARD="$(FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$REAL_HOME" "$REQ" "$SC" "$RULES" "$DIFF" "$META" -- "$BASE_DIR" "$HEAD_DIR" "${SNAPS[@]+"${SNAPS[@]}"}" -- "$REPO" <<'PY'
-import os, re, sys
-home, argv = sys.argv[1], sys.argv[2:]
-a = argv.index("--"); b = argv.index("--", a + 1)
-files, dirs, repo = [x for x in argv[:a] if x], [x for x in argv[a + 1:b] if x], [x for x in argv[b + 1:] if x]
-FZ = re.compile(os.environ["FZ_ART_NAMES"])                 # fz 고유 이름 — 어디서든 금지
-GENERIC = re.compile(r"payload\.json|.+-result\.json")      # 범용 이름 — 직접 입력에만(base/head 미러 · 스냅샷은 저장소 파일이다)
-claude = os.path.join(home, ".claude")
-hits = []
-def check(p, names):
-    rp = os.path.realpath(p)
-    if rp == claude or rp.startswith(claude + os.sep):
-        hits.append(f"{p} — ~/.claude 아래(에이전트 로그 · journal)")
-    elif any(r.fullmatch(os.path.basename(rp)) for r in names):
-        hits.append(f"{p} — Claude 산출물 이름")
-for f in files:
-    check(f, (FZ, GENERIC))
-for d in dirs:
-    check(d, ())
-    for root, _, names in os.walk(d):
-        for n in names:
-            check(os.path.join(root, n), (FZ,))
-for r in repo:
-    check(r, ())
-print("\n".join(hits))
-PY
-)" || die 11 "입력 판정 실패"
-[ -z "$GUARD" ] || die 15 "허용 목록 밖 입력 — 독립 첫 패스가 아니다:
-$GUARD"
+gate_inputs "$REQ" "$SC" "$RULES" "$DIFF" "$META" -- "$BASE_DIR" "$HEAD_DIR" "${SNAPS[@]+"${SNAPS[@]}"}" -- "$REPO"
 # ⛔ --rules-index 는 원문 색인이다 — 규칙 레코드(Claude 의 해석)를 넘기면 GPT 가 그 해석을 원문으로 알고 받아쓴다(독립 붕괴 · 리뷰 C:C-1)
 if [ -n "$RULES" ] && python3 -c 'import json, sys
 d = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -247,61 +359,13 @@ trap cleanup EXIT
 clear_stem
 printf '{"exit": null, "note": "running — 감사가 끝나기 전에 런처가 멈췄다(중단 · 시그널 · 감사 실패). 결과가 아니다"}\n' > "$OUT_DIR/$BASE_NAME.audit.json"
 
-# ── 격리 폴더 — ⛔ 경로는 전부 realpath(`/tmp`→`/private/tmp` · `/var/folders`→`/private/var/folders`). deny·read 표기가 어긋나면 중첩 규칙이 안 맞는다
-#    ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp …)"` 꼴은 mktemp 가 실패해도 `cd ""` 가 성공해 현재 폴더가 격리 폴더가 된다(bash 3.2 실측)
-ISO_TMP="$(mktemp -d "${TMPDIR:-/tmp}/fz-gpt-iso.XXXXXX")" || die 11 "격리 폴더 생성 실패(mktemp)"
-ISO="$(cd "$ISO_TMP" && pwd -P)" || die 11 "격리 폴더 경로 해석 실패: $ISO_TMP"
-mkdir -p "$ISO/gpt-home/skills" "$ISO/home" "$ISO/input" || die 11 "격리 폴더 구성 실패"
-ln -s "$REAL_GPT_HOME/auth.json" "$ISO/gpt-home/auth.json" || die 11 "인증 링크 실패"   # ⛔ 인증은 링크만 — 내용을 복사하지 않는다
-for s in "$PLUGIN_ROOT"/gpt-skills/fz-*; do cp -R "$s" "$ISO/gpt-home/skills/" || die 11 "스킬 사본 실패: $s"; done
-if [ -n "$GPT_AGENTS" ]; then
-  mkdir -p "$ISO/gpt-home/agents" && cp "$PLUGIN_ROOT"/gpt-agents/*.toml "$ISO/gpt-home/agents/" || die 11 "역할 파일 사본 실패: $PLUGIN_ROOT/gpt-agents"
-fi   # ⛔ 사본 — HOME 아래 링크 대상은 샌드박스에서 안 읽힌다
+# ── 격리 폴더 · 격리 config — make_iso(위 · iso 하위 명령과 같은 한 벌). 입력 사본은 그 뒤에 격리 입력 폴더로 넣는다
+make_iso
 put() { [ -z "$1" ] || cp "$1" "$ISO/input/$2" || die 11 "입력 복사 실패: $1"; }
 put_dir() { [ -z "$1" ] || { mkdir -p "$ISO/input/$2" && cp -R "$1"/. "$ISO/input/$2/"; } || die 11 "입력 폴더 복사 실패: $1"; }
 put "$REQ" requirement.md; put "$SC" sprint-contract.md; put "$RULES" rules-index.json; put "$DIFF" diff.patch; put "$META" pr-meta.json
 put_dir "$BASE_DIR" base; put_dir "$HEAD_DIR" head
 for d in "${SNAPS[@]+"${SNAPS[@]}"}"; do put_dir "$d" "snapshot/$(basename "$d")"; done
-REPO_REAL=""; [ -n "$REPO" ] && REPO_REAL="$(cd "$REPO" && pwd -P)"
-CD="$ISO/input"; [ "$MODE" = "plan" ] && [ -n "$REPO_REAL" ] && CD="$REPO_REAL"
-
-FZ_ISO_AGENTS="$GPT_AGENTS" python3 - "$ISO" "$REAL_HOME" "$REAL_GPT_HOME/config.toml" "$REPO_REAL" "$CD" "${DENIES[@]+"${DENIES[@]}"}" <<'PY' || die 11 "격리 config 작성 실패"
-import json, os, re, sys
-iso, home, real_cfg, repo, cd, denies = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6:]
-q = lambda p: json.dumps(p)          # TOML basic string — JSON 이스케이프와 호환
-# ⛔ 최상위(첫 표 앞) model · model_reasoning_effort 두 줄만 옮긴다 — MCP env 등 다른 줄은 옮기지 않는다. 줄 머리 key · 큰따옴표 값 하나로 끝나는 줄만(엄격 판독)
-#    런처는 effort 기본값이 없다 — effort 줄을 빼면 '묻지 않으면 config 그대로' 가 격리 팔에서만 CLI 의 모델 기본 effort 로 바뀐다.
-#    래퍼의 GPT-CHOICE 줄(출처 config)도 이 격리 config 를 읽는다 — 표시와 실제로 쓰일 값이 같다
-keep = []
-try:
-    head = re.split(r"(?m)^\s*\[", open(real_cfg, encoding="utf-8").read(), maxsplit=1)[0]
-    for key in ("model", "model_reasoning_effort"):
-        m = re.search(r'(?m)^' + key + r'\s*=\s*"[^"\n]*"\s*$', head)
-        if m:
-            keep.append(m.group(0))
-except OSError:
-    pass
-fs = [(home, "deny")]
-for p in ("/private/tmp", "/private/var/folders"):
-    if os.path.isdir(p):
-        fs.append((os.path.realpath(p), "deny"))
-fs.append((iso, "read"))
-if repo:
-    fs.append((repo, "read"))
-    for sub in (".claude", ".fz-work"):
-        if os.path.isdir(os.path.join(repo, sub)):
-            fs.append((os.path.join(repo, sub), "deny"))
-for d in denies:   # ⛔ --repo 와 무관 — 프로필은 디스크 전체 읽기에서 출발해 HOME 밖 작업 폴더는 이것이 없으면 읽힌다
-    fs.append((os.path.realpath(d), "deny"))
-lines = ['default_permissions = "fz-iso"'] + keep
-lines += ["", "[features]", "memories = false"]
-if not os.environ.get("FZ_ISO_AGENTS"):   # 하위 에이전트를 구조로 끈다(F-436) — 프롬프트 금지 문장은 경계가 아니다. --gpt-agents 만 켠다
-    lines += ["", "[agents]", "enabled = false"]
-lines += ["", "[permissions.fz-iso]", 'extends = ":read-only"', "", "[permissions.fz-iso.filesystem]"]
-lines += [f"{q(p)} = {q(a)}" for p, a in fs]
-lines += ["", f"[projects.{q(cd)}]", 'trust_level = "trusted"', ""]
-open(os.path.join(iso, "gpt-home", "config.toml"), "w", encoding="utf-8").write("\n".join(lines))
-PY
 
 # ── 과제 프롬프트 — 역할 본문은 래퍼 --inject-skill 이 넣는다(격리 사본 경로 → 팩 경로가 풀린다)
 {
