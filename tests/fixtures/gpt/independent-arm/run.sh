@@ -425,6 +425,73 @@ KNAME=0; case "${KISO##*/}" in fz-gpt-iso.??????) [ "$(printf '%s\n' "$KISO" | w
 [ "$KNAME" = 1 ] && [ -d "$KISO" ] && bash "$L" cleanup --iso "$KISO" >/dev/null 2>&1
 KOUT="$(env -u CODEX_HOME HOME="$H" bash "$L" iso --deny "$T/no-such-dir" 2>/dev/null)"; KRC=$?
 [ "$KRC" != 0 ] && [ -z "$KOUT" ] && ok "iso-subcommand-fail — 없는 --deny: 0 이 아닌 종료 · 빈 stdout" || no "iso-subcommand-fail — exit $KRC · stdout '${KOUT:-}'"
+# ⑬l claude-link-grid — ~/.claude · 저장소 .claude · .fz-work 가 링크면 권한 표에 대상 실경로 deny 가 든다(저장소 쪽 링크 경로 키는 그대로).
+#     홈 밖 대상은 홈 deny 가, 저장소 아래 대상은 저장소 read 가 열어 둔다. 링크 키만으로 대상이 막히는지는 실 CLI 측정 몫이다(os-deny external.sh).
+#     ⛔ 새 키는 --deny · 임시 루트 · 홈 · 다른 자리의 같은 대상과 겹칠 수 있다 — 같은 키가 두 번이면 실제 CLI 가 config 를 거부하는데
+#        가짜 CLI 는 config 를 읽지 않아 종료값으로 못 본다. 셀마다 같은 키 두 번 0 을 직접 단언한다(iso 하위 명령 · fskeys 재사용).
+#     꼴: dir 실폴더 · out 홈 · 저장소 밖 · in-home 홈 안 · under-repo 저장소 아래 · self 자기 자리(홈이면 홈 · 저장소면 저장소) · broken 없는 대상
+#         게이트 꼴 — 새 deny 가 저장소 read · 격리 부모와 겹치는 자리는 make_iso 전에 멈춘다: repo 홈 .claude → --repo(15) · tmp 홈 .claude → TMPDIR(11)
+#     자리: home · repo · fz(저장소 .fz-work) · both(홈 · 저장소 .claude 가 같은 대상) × --deny: none · same(대상 폴더를 --deny 로도 준다)
+#     ⛔ self 저장소 × same(--deny = --repo)은 넣지 않는다 — .claude 와 무관하게 입력끼리 read · deny 가 부딪는 꼴이다
+#     기대 'exit|대상 실경로 deny 줄|저장소 링크 키 줄|홈 deny 줄|같은 키|stdout' — config 가 없으면 '-'
+GL="$T/glink"
+glink() {
+  local form="$1" place="$2" dny="$3" c="$GL/$1-$2-$3"
+  local h="$c/home" r="$c/repo" tmp="$c/tmp" tgt="" rl="$c/repo/.claude" links=() args=() out rc cfg tp nt="-" nl="-" nh="-" dup="" so=""
+  mkdir -p "$h/.codex" "$r/src" "$tmp"; echo '{}' > "$h/.codex/auth.json"
+  case "$place" in home) links=("$h/.claude") ;; repo) links=("$rl") ;; fz) rl="$r/.fz-work"; links=("$rl") ;; both) links=("$h/.claude" "$rl") ;; esac
+  case "$form" in
+    dir) tgt="${links[0]}" ;;
+    out) tgt="$c/out" ;;
+    in-home) tgt="$h/claude-data" ;;
+    under-repo) tgt="$r/claude-data" ;;
+    self) tgt="$h"; [ "$place" = home ] || tgt="$r" ;;
+    broken) tgt="$c/missing" ;;
+    repo) tgt="$r" ;;
+    tmp) tgt="$c/out"; tmp="$tgt" ;;
+  esac
+  [ "$form" = broken ] || mkdir -p "$tgt"
+  [ "$form" = dir ] || for l in "${links[@]}"; do ln -s "$tgt" "$l"; done
+  [ "$dny" = same ] && args=(--deny "$tgt")
+  out="$(env -u CODEX_HOME HOME="$h" TMPDIR="$tmp" bash "$L" iso --repo "$r" ${args[@]+"${args[@]}"} 2> "$c/err")"; rc=$?
+  cfg="$out/gpt-home/config.toml"
+  if [ -n "$out" ] && [ -f "$cfg" ]; then
+    tp="$(cd "$tgt" 2>/dev/null && pwd -P)" || tp="$tgt"; nt="$(grep -cxF "\"$tp\" = \"deny\"" "$cfg")"   # 없는 대상은 적은 경로 그대로(GL 은 실경로)
+    nl="$(grep -cxF "\"$rl\" = \"deny\"" "$cfg")"; nh="$(grep -cxF "\"$h\" = \"deny\"" "$cfg")"
+    dup="$(fskeys "$cfg" | sort | uniq -d | tr '\n' ' ')"
+  fi
+  [ -n "$out" ] && so="bad"; case "$out" in "$tmp"/fz-gpt-iso.??????) [ -f "$cfg" ] && so="iso" ;; esac
+  check "claude-link-grid $form@$place/$dny" "$rc|$nt|$nl|$nh|$dup|$so" "$4"
+}
+#     꼴         자리  --deny 기대
+glink dir        home none "0|0|0|1||iso"     # 실폴더 ~/.claude — 홈 deny 가 덮는다(제 줄 없음)
+glink dir        home same "0|1|0|1||iso"
+glink dir        repo none "0|1|1|1||iso"     # 저장소 실폴더 — 링크 키가 곧 대상 키(한 줄)
+glink dir        repo same "0|1|1|1||iso"     # --deny 가 같은 키 — 한 번
+glink out        home none "0|1|0|1||iso"
+glink out        home same "0|1|0|1||iso"
+glink out        repo none "0|1|1|1||iso"
+glink out        repo same "0|1|1|1||iso"
+glink in-home    home none "0|1|0|1||iso"
+glink in-home    home same "0|1|0|1||iso"
+glink in-home    repo none "0|1|1|1||iso"
+glink in-home    repo same "0|1|1|1||iso"
+glink under-repo home none "0|1|0|1||iso"     # 저장소 read 가 홈 deny 보다 구체적이다 — 대상 키가 없으면 열린다
+glink under-repo home same "0|1|0|1||iso"
+glink under-repo repo none "0|1|1|1||iso"
+glink under-repo repo same "0|1|1|1||iso"
+glink self       home none "0|1|0|1||iso"     # ~/.claude → ~ — 대상 줄 = 홈 deny 한 줄
+glink self       home same "0|1|0|1||iso"     # --deny ~ 도 한 번
+glink self       repo none "0|0|1|1||iso"     # .claude → 저장소 — 대상은 저장소 read 다. deny 를 넣으면 값이 다른 같은 키라 넣지 않는다
+glink broken     home none "0|0|0|1||iso"     # 없는 대상에는 deny 를 넣지 않는다
+glink broken     home same "11|-|-|-||"       # 없는 --deny — 격리 폴더를 만들기 전에 11
+glink broken     repo none "0|0|0|1||iso"
+glink broken     repo same "11|-|-|-||"
+glink out        fz   none "0|1|1|1||iso"     # 저장소 .fz-work 도 같은 규칙
+glink out        both none "0|1|1|1||iso"     # 두 자리가 같은 대상 — 키 한 줄
+glink out        both same "0|1|1|1||iso"
+glink repo       home none "15|-|-|-||"       # 금지 입력 게이트가 먼저다
+glink tmp        home none "11|-|-|-||"       # 격리 폴더 자리 게이트가 먼저다
 # ⑬f head/ 결손 표시 — 변경 후 파일이 head/ 에 없으면 감사가 빠진 경로를 적는다(F14 · fail-visible)
 mkdir -p "$IN/head-empty"
 run headmiss "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --base "$IN/base" --head "$IN/head-empty"

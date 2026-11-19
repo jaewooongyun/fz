@@ -22,9 +22,10 @@
 # UNRUN(exit 2 · 줄 맨 앞 `UNRUN:`): 비 macOS · CLI 부재 · 중첩 샌드박스(CODEX_SANDBOX 설정 · `sandbox_apply` 거부) ·
 #    `--version` 실패 · `sandbox` 하위 명령 없음(남는 실증 경로는 모델 호출뿐). 그 밖의 어긋남은 FAIL 이다 — UNRUN 으로 세탁하지 않는다.
 # 출력: `EVIDENCE-CLASS=live` 는 4셀을 실 CLI 로 돌렸을 때만(FAIL 포함) · `OS-DENY-CELLS=<PASS 수>/4`.
-# --launcher-profile (P-12): 위 4셀에 더해, 이 트리의 런처(scripts/gpt_independent.sh)가 실제로 쓴 격리 config 로 6셀을 돈다.
+# --launcher-profile (P-12): 위 4셀에 더해, 이 트리의 런처(scripts/gpt_independent.sh)가 실제로 쓴 격리 config 로 8셀을 돌고, 링크 키 측정 1셀을 더 돈다.
 #   런처는 가짜 CLI(../_shim)로 돌려 --keep-iso 로 격리 홈만 남긴다(모델 호출 없음). 그 홈을 CODEX_HOME 으로 `sandbox` 를 부른다.
-#   런처는 두 번 돈다 — 기본 TMPDIR 로 한 번(lp-parent-deny 밖 다섯 셀), TMPDIR 을 HOME · 임시 루트 밖(/Users/Shared)에 두고 한 번(lp-parent-deny).
+#   런처는 세 번 돈다 — 기본 TMPDIR 로 한 번(lp-home-deny ~ lp-iso-read 다섯 셀), TMPDIR 을 HOME · 임시 루트 밖(/Users/Shared)에 두고 한 번(lp-parent-deny),
+#   ~/.claude 가 링크인 가짜 HOME 과 .claude 가 링크인 --repo 로 한 번(lp-claude-link-deny · lp-repo-claude-link-deny).
 #   lp-home-deny        실제 HOME 아래 표지 → 거부(HOME 은 임시 루트 밖이라 이 셀은 HOME 규칙만 잰다)
 #   lp-tmp-deny         /private/tmp 아래 표지 → 거부
 #   lp-varfolders-deny  사용자 임시 폴더(/private/var/folders 아래) 표지 → 거부
@@ -32,6 +33,10 @@
 #   lp-iso-read         격리 폴더 입력(diff.patch) → 읽힘(임시 루트 거부 안의 읽기 예외)
 #   lp-parent-deny      격리 폴더의 실제 부모(두 번째 run 의 TMPDIR) 아래 표지 → 거부(부모 deny 말고는 막을 규칙이 없는 자리) ·
 #                       같은 run 의 격리 입력 → 읽힘(대조 — 부모 deny 안의 읽기 예외)
+#   lp-claude-link-deny  가짜 HOME 의 ~/.claude 가 풀리는 HOME 밖 폴더(/Users/Shared) 표지 → 거부(HOME deny 가 덮지 않는 자리 — 대상 실경로 deny)
+#   lp-repo-claude-link-deny  --repo 의 .claude 가 풀리는 저장소 밖 폴더(/Users/Shared) 표지 → 거부 · 같은 run 의 저장소 표지 → 읽힘(대조)
+#   lp-link-key-deny    측정 — 손으로 만든 프로필에 링크 경로만 deny 로 두고 대상 경로로 읽는다. 거부(CLI 가 링크 경로 키를 대상으로 푼다) ·
+#                       읽힘(풀지 않는다) 둘 다 PASS 이고 결과를 줄에 남긴다 — 런처는 대상 실경로 키를 따로 넣으므로 어느 쪽이든 런처 셀은 같다
 #   줄 형식 `PASS|FAIL  [<셀>] …` · `PROFILE-SOURCE=launcher` — 원장 게이트가 셀 id 를 센다(N/N 개수식은 0/0 을 받는다)
 # exit: 0 전 셀 PASS · 1 셀 FAIL · 2 UNRUN · 3 준비 실패(인자 · 상한 값 · 임시 폴더)
 # usage: external.sh [--tree <플러그인 루트>] [--launcher-profile]   (기본: 이 파일이 든 트리)
@@ -178,7 +183,7 @@ else cell no-profile-control FAIL "exit $RC · 비밀 마커 $(grep -c 'OS-DENY-
 
 NCELL=4
 if [ -n "$LP" ]; then
-  NCELL=10
+  NCELL=13
   SHIMD="$R/tests/fixtures/gpt/_shim"
   [ -f "$SHIMD/codex" ] && [ -f "$R/scripts/gpt_independent.sh" ] || { echo "SETUP shim · 런처 없음: $R"; exit 3; }
   [ -f "${HOME:?}/.codex/auth.json" ] || unrun "실제 홈에 인증 파일이 없다 — 런처가 격리 홈을 만들지 않는다"
@@ -188,7 +193,8 @@ if [ -n "$LP" ]; then
   LPD=""
   for spec in "HM:$HOME/.fz-os-deny.XXXXXX" "TM:/private/tmp/fz-os-deny.XXXXXX" "VF:${VFT%/}/fz-os-deny.XXXXXX" \
               "EX:/Users/Shared/fz-os-deny.XXXXXX" "EA:/Users/Shared/fz-os-allow.XXXXXX" "OU:/Users/Shared/fz-os-out.XXXXXX" \
-              "PT:/Users/Shared/fz-os-ptmp.XXXXXX"; do
+              "PT:/Users/Shared/fz-os-ptmp.XXXXXX" "CL:/Users/Shared/fz-os-cl.XXXXXX" "RP:/Users/Shared/fz-os-repo.XXXXXX" \
+              "RC:/Users/Shared/fz-os-rc.XXXXXX" "LK:/Users/Shared/fz-os-lk.XXXXXX"; do
     d_="$(mktemp -d "${spec#*:}")" || { echo "SETUP 표지 폴더 생성 실패: ${spec#*:}"; exit 3; }
     d_="$(cd "$d_" && pwd -P)"; LPD="$LPD $d_"
     printf 'OS-DENY-LP-%s-7\n' "${spec%%:*}" > "$d_/m.txt"
@@ -211,9 +217,22 @@ if [ -n "$LP" ]; then
   PISO="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("iso") or "")' "$T/lp-out/gpt-osdp.audit.json" 2>/dev/null)"
   [ -n "$PISO" ] && [ "${PISO%/*}" = "$D_PT" ] && [ -f "$PISO/gpt-home/config.toml" ] \
     || { echo "SETUP 두 번째 런처 run 이 TMPDIR 아래 격리 config 를 남기지 않았다(격리 '${PISO}' · 로그 $T/lp-launcher-parent.out)"; tail -5 "$T/lp-launcher-parent.out"; exit 3; }
+  # 세 번째 run(lp-claude-link-deny · lp-repo-claude-link-deny) — 가짜 HOME 의 ~/.claude 는 CL 로, --repo(RP)의 .claude 는 RC 로 가는 링크다.
+  #   두 표지를 막을 규칙은 런처가 넣는 대상 실경로 deny 뿐이다. 인증은 실제 홈 파일로 가는 링크 · 격리 폴더는 TMPDIR=T 아래(T 와 함께 지워진다)
+  LH="$T/lp-home"
+  mkdir -p "$LH/.codex" && ln -s "$HOME/.codex/auth.json" "$LH/.codex/auth.json" && ln -s "$D_CL" "$LH/.claude" && ln -s "$D_RC" "$D_RP/.claude" \
+    || { echo "SETUP 링크 홈 · 링크 저장소 생성 실패: $LH · $D_RP"; exit 3; }
+  env -u CODEX_HOME HOME="$LH" PATH="$SHIMD:$PATH" FZ_TELEMETRY_DIR="$T/lp-tel" FZ_GPT_CHOICE_DIR="$T/lp-nc" TMPDIR="$T" \
+    FZ_SHIM_OUTPUT="$(cat "$R/tests/fixtures/gpt/independent-arm/sample-review-ok.json")" \
+    bash "$R/scripts/gpt_independent.sh" review --diff "$T/lp.diff" --repo "$D_RP" --arm gpt --run-id osdc --out-dir "$T/lp-out" \
+    --keep-iso > "$T/lp-launcher-claude.out" 2>&1
+  CISO="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("iso") or "")' "$T/lp-out/gpt-osdc.audit.json" 2>/dev/null)"
+  [ -n "$CISO" ] && [ -f "$CISO/gpt-home/config.toml" ] \
+    || { echo "SETUP 세 번째 런처 run 이 격리 config 를 남기지 않았다(격리 '${CISO}' · 로그 $T/lp-launcher-claude.out)"; tail -5 "$T/lp-launcher-claude.out"; exit 3; }
   echo "PROFILE-SOURCE=launcher"
   echo "  [launcher] config $ISO/gpt-home/config.toml · deny 줄 $(grep -c '= "deny"' "$ISO/gpt-home/config.toml")"
   echo "  [launcher-parent] config $PISO/gpt-home/config.toml · TMPDIR $D_PT · 부모 deny 줄 $(grep -cxF "\"$D_PT\" = \"deny\"" "$PISO/gpt-home/config.toml")"
+  echo "  [launcher-claude] config $CISO/gpt-home/config.toml · ~/.claude 대상 deny 줄 $(grep -cxF "\"$D_CL\" = \"deny\"" "$CISO/gpt-home/config.toml") · 저장소 .claude 대상 deny 줄 $(grep -cxF "\"$D_RC\" = \"deny\"" "$CISO/gpt-home/config.toml")"
   # ⛔ 셀 출력 파일은 거부 루트 밖(OU)에 둔다 — 임시 폴더에 두면 프로필이 그 루트를 막아 `cat: stdout: Operation not permitted` 로
   #    읽기 성공 셀이 실패로 보인다(실측). 출력 파일 자체는 표지가 아니다
   LPH="$ISO/gpt-home"; RUN_CWD="$ISO/input"; RUN_OUT="$D_OU"
@@ -260,6 +279,33 @@ if [ -n "$LP" ]; then
     fi
   else
     echo "FAIL  [lp-parent-deny] 격리 폴더의 부모 표지가 막히지 않았다(exit $RC)"
+  fi
+  LPH="$CISO/gpt-home"; RUN_CWD="$CISO/input"
+  lp_deny lp-claude-link-deny "$D_CL/m.txt"
+  if lp_deny lp-repo-claude-link-deny "$D_RC/m.txt" >/dev/null; then
+    if lp_read lp-repo-claude-control "$D_RP/m.txt" 'OS-DENY-LP-RP-7'; then
+      echo "PASS  [lp-repo-claude-link-deny] 저장소 .claude 링크 대상 표지 거부 · 같은 run 의 저장소 표지는 읽힘(차단은 대상 실경로 deny 에서 온다)"
+    else
+      PASS=$((PASS - 1)); BAD="$BAD lp-repo-claude-link-deny"
+      echo "FAIL  [lp-repo-claude-link-deny] 저장소 표지도 막혔다(exit $RC) — 차단이 대상 실경로 deny 에서 온다고 볼 수 없다"
+    fi
+  else
+    echo "FAIL  [lp-repo-claude-link-deny] 저장소 .claude 링크 대상 표지가 막히지 않았다(exit $RC)"
+  fi
+  # 측정(판정 아님) — 위 HP 모양 프로필에 링크 경로($T/lk-link → LK)만 deny 로 두고 대상 경로로 읽는다
+  HK="$T/home-linkkey"
+  mkdir -p "$HK" && ln -s "$D_LK" "$T/lk-link" || { echo "SETUP 링크 키 프로필 생성 실패: $HK"; exit 3; }
+  printf 'default_permissions = "iso"\n\n[permissions.iso]\nextends = ":read-only"\n\n[permissions.iso.filesystem]\n"%s" = "deny"\n' "$T/lk-link" > "$HK/config.toml"
+  run lp-link-key-deny "$HK" "$CLI" sandbox -- /bin/cat "$D_LK/m.txt"
+  show lp-link-key-deny "CODEX_HOME=<link-key profile> sandbox -- /bin/cat $D_LK/m.txt"
+  ln_="$(denied "$OUTF" "$D_LK/m.txt")"
+  if [ "$CAPPED" = 0 ] && [ "$RC" != 0 ] && [ -n "$ln_" ] && ! grep -q 'OS-DENY-LP-LK-7' "$OUTF"; then
+    echo "PASS  [lp-link-key-deny] 측정: 링크 경로만 deny → 대상 경로 읽기 거부 — CLI 가 링크 경로 키를 대상으로 푼다 · '$ln_'"; PASS=$((PASS + 1))
+  elif [ "$CAPPED" = 0 ] && [ "$RC" = 0 ] && grep -qx 'OS-DENY-LP-LK-7' "$OUTF"; then
+    echo "PASS  [lp-link-key-deny] 측정: 링크 경로만 deny → 대상 경로 읽힘 — CLI 가 링크 경로 키를 풀지 않는다(런처는 대상 실경로 키를 따로 넣는다)"; PASS=$((PASS + 1))
+  else
+    echo "FAIL  [lp-link-key-deny] 측정 불가 — exit $RC · 거부 줄 '${ln_:-없음}' · 표지 $(grep -c 'OS-DENY-LP-LK-7' "$OUTF")건$([ "$CAPPED" = 1 ] && echo " · 상한 ${CAP}s 초과")"
+    BAD="$BAD lp-link-key-deny"
   fi
 fi
 

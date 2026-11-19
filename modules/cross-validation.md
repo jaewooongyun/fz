@@ -380,7 +380,7 @@ printf '%s\n' "{과제 지시}" > "$P"
 위 호출 계약의 GPT 는 대상 저장소와 **같은 디스크**를 본다 — 작업 폴더의 Claude 산출물과 `~/.claude/projects` 로그도 읽을 수 있다. 첫 패스를 Claude 결과와 독립으로 돌려야 할 때(SC-1)는 런처를 쓴다.
 
 - 허용 입력만 격리 폴더에 복사한다 — 요구사항 원문 · 합의 Sprint Contract · PR 메타 · diff · `base/` · `head/` 스냅샷 · 지침 원문 색인 · 소비자 스냅샷. Claude 산출물 이름(`code-context*` · `plan-v*` · `*workflow-result*` · 리뷰 산출물)이나 `~/.claude` 아래 경로가 들어오면 exit 15 다
-- 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` · 격리 폴더의 실제 부모(`${TMPDIR:-/tmp}` 실경로)는 deny, 격리 폴더(와 `--repo`)만 read 다
+- 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` · 격리 폴더의 실제 부모(`${TMPDIR:-/tmp}` 실경로) · 링크인 `~/.claude` 의 대상 실경로는 deny, 격리 폴더(와 `--repo`)만 read 다
 - rollout 을 전부 감사한다 — HOME deny 가 없거나 금지 경로 · 홈 재귀 검색이 있으면 exit 15 와 `.contaminated` 다. 읽는 대상이 명령에 없는 읽기가 있어 읽기 로그만으로는 "안 읽었다"를 증명할 수 없다 — 감사는 보조다
 - review 의 `--gpt-agents`(opt-in)는 역할 파일(`gpt-agents/`)로 두 렌즈 역할을 spawn 한다. 하위 에이전트는 부모와 같은 권한 프로필을 강제받는다(S11 ⑤ · R-G1 S1 실측 — 자식 turn_context 에 HOME deny). 부모 이력을 물려받는지는 `spawn_agent` 의 `fork_turns` 를 모델이 매번 고른다(S1 관측 2건 모두 `none`) — 부모가 격리돼 있어 어느 쪽이든 독립은 유지된다. `--gpt-agents` 가 없으면 프롬프트로 하위 에이전트를 금지하고 감사가 spawn 수를 기록한다 — 지시 + 기록이고 강제가 아니다(spawn 도구는 노출된다 — F-436)
 - 산출은 `<arm>-<run>.json`(`schemas/gpt_independent_{plan,review}_schema.json`) · `.md` · `.audit.json` · `.rollouts/` 다. 호출법은 `modules/fz-gpt-subcommands-aux.md` § independent-plan · independent-review

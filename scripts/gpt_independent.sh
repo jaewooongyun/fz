@@ -32,9 +32,9 @@
 #   --gpt-agents review 전용 — 역할 파일(gpt-agents/*.toml)을 격리 홈 agents/ 에 넣고 두 렌즈 역할(fz-review-arch · fz-review-quality)만
 #             spawn 하게 한다(S14 · opt-in). 없으면 격리 config `[agents] enabled = false` 로 하위 에이전트를 끈다(F-436). 하위 에이전트는
 #             부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
-#   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 는 막는다
+#   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 는 막는다(링크면 대상 실경로도)
 #   --deny    더 막을 폴더(작업 폴더 WORK_DIR 등) — --repo 와 무관하게 권한 프로필 deny 로 넣는다. 권한 프로필은 디스크 전체 읽기에서
-#             HOME · 임시 폴더 · 격리 폴더의 실제 부모만 막으므로, HOME 밖 작업 폴더의 Claude 산출은 --deny 가 없으면 읽힌다
+#             HOME · 임시 폴더 · 격리 폴더의 실제 부모 · 링크인 ~/.claude 의 대상만 막으므로, HOME 밖 작업 폴더의 Claude 산출은 --deny 가 없으면 읽힌다
 #   --rules-index 지침 원문 색인(extract_project_rules.py 출력 — files · sections). ⛔ 규칙 레코드(rules · axes — Claude 가 해석한
 #             check_project_rules 통과본)를 넘기면 독립이 깨진다 — 모양으로 판별해 exit 11
 #   --snapshot 소비자 · 공유 모듈 본문 폴더 — 격리 폴더의 snapshot/<이름>/ 으로 복사한다(리뷰 범위를 줄이지 않는다)
@@ -74,7 +74,9 @@ fi
 
 # ── 격리 폴더 — 메인 경로(plan · review)와 iso 하위 명령이 이 한 벌을 쓴다(격리 config 사본을 두지 않는다).
 #    읽는 값: MODE · REAL_HOME · REAL_GPT_HOME · PLUGIN_ROOT · GPT_AGENTS · REPO · DENIES. 정하는 값: ISO · REPO_REAL · CD. 실패는 die 11
-#    ⛔ 경로는 전부 realpath(`/tmp`→`/private/tmp` · `/var/folders`→`/private/var/folders`). deny·read 표기가 어긋나면 중첩 규칙이 안 맞는다
+#    ⛔ 경로는 realpath 다(`/tmp`→`/private/tmp` · `/var/folders`→`/private/var/folders`). deny·read 표기가 어긋나면 중첩 규칙이 안 맞는다.
+#       예외: 저장소 .claude · .fz-work 가 링크면 링크 경로 키를 두고 대상 실경로 키를 따로 넣는다. CLI 샌드박스가 링크 경로 키를 대상으로
+#       푸는지는 재지 않았다 — 실 CLI 측정 셀은 os-deny external.sh --launcher-profile 의 lp-link-key-deny(사람 실행)다
 #    격리 폴더의 실제 부모(${TMPDIR:-/tmp})도 권한 프로필 deny 다 — 같은 부모 아래 형제 격리 폴더를 막는다(아래 config 블록).
 #    그 부모가 --repo(read)와 같으면 deny 를 넣을 수 없어 die 11 로 멈춘다(config 를 쓰기 전 · CLI 를 부르기 전)
 #    ⛔ mktemp 결과를 따로 받는다 — `cd "$(mktemp …)"` 꼴은 mktemp 가 실패해도 `cd ""` 가 성공해 현재 폴더가 격리 폴더가 된다(bash 3.2 실측)
@@ -117,7 +119,15 @@ if repo:
         if os.path.isdir(os.path.join(repo, sub)):
             fs.append((os.path.join(repo, sub), "deny"))
 for d in denies:   # ⛔ --repo 와 무관 — 프로필은 디스크 전체 읽기에서 출발해 HOME 밖 작업 폴더는 이것이 없으면 읽힌다
-    fs.append((os.path.realpath(d), "deny"))
+    if (os.path.realpath(d), "deny") not in fs:   # 이미 deny 인 경로(HOME · 저장소 .claude · 같은 --deny 두 번)면 한 번 — 아래 중복 키 주석
+        fs.append((os.path.realpath(d), "deny"))
+# Claude 폴더(~/.claude · 저장소 .claude · .fz-work)가 링크면 대상 실경로도 deny — 홈 밖 대상은 HOME deny 가, 저장소 아래 대상은 --repo read 가 열어 둔다.
+#   저장소 쪽 링크 경로 키(위)는 그대로 둔다. --deny 루프 뒤라 --deny 로 준 같은 대상을 아래 키 집합으로 거른다
+#   ⛔ 이미 든 키면 넣지 않는다 — 임시 루트 · HOME · --deny · 다른 자리의 같은 대상은 이미 deny 이고, 저장소 자신(.claude → .)은 read 라 넣으면 값이 다른 같은 키다
+for link in [os.path.join(home, ".claude")] + [os.path.join(repo, s) for s in (".claude", ".fz-work") if repo]:
+    real = os.path.realpath(link)
+    if real != link and os.path.isdir(real) and real not in {p for p, _ in fs}:
+        fs.append((real, "deny"))
 # 격리 폴더의 실제 부모(${TMPDIR:-/tmp} 실경로) — 위 두 임시 루트 밖 TMPDIR(Linux /tmp 포함)이면 형제 fz-gpt-iso.* 가 읽힌다.
 #   격리 폴더 read 가 더 구체적이라 이긴다(macOS 실측 — os-deny external.sh 의 lp-parent-deny · Linux 는 재지 않았다)
 #   ⛔ 이미 deny 로 든 경로(TMPDIR 미설정 macOS 의 /private/tmp · HOME 과 같은 TMPDIR)면 넣지 않는다 — 같은 키가 두 번이면 CLI 가 config 를 거부한다(TOML 중복 키)
