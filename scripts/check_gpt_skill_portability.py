@@ -85,7 +85,10 @@ CLAUDE_EXTRA_RE = re.compile(r"(?<![\w@#.])(?:UserDefaults|Keychain|CoreData|App
 #   건너뛰는 범위는 그 제목부터 다음 제목(수준 무관) 전까지다 — 그 안에 새 하위 절을 넣으면 읽는다.
 #   목록에 없는 절(새 절 포함)은 모두 읽는다. 사유: 예시(코드 · 출력 · 괄호 예시) · 이름(원칙 · 문서 이름) ·
 #   다른 조건(이 문구가 아닌 조건을 단 절) · 미조건(조건 없는 Swift 기준 — 조건을 달면 목록에서 뺀다)
+# 심볼 도구 공통 블록 — 언어 낱말은 괄호 예시(`shell, Python, JavaScript, Swift and so on`)뿐이다. 그 도구를 가진 에이전트가 모두 싣는다
+SYMBOL_TOOLS_HEAD = "## Symbol tools — use them whenever they are in your tool list"
 _LENS_UNREAD = {
+    SYMBOL_TOOLS_HEAD: "예시",
     "### 2. UI Framework Architecture (CLAUDE.md에 UI 프레임워크 명시 시)": "다른 조건",
     "## Library Semantics (이슈 판정 전 확인)": "다른 조건",
     "## Few-shot": "예시",
@@ -94,15 +97,16 @@ CLAUDE_DOCS = {
     "agents/arch-lens.md": {"### 1. Architecture Decision (Clean Architecture — Uncle Bob)": "이름", **_LENS_UNREAD},
     "agents/review-arch.md": {"### 1. Architecture Decision (Clean Architecture — Uncle Bob)": "이름", **_LENS_UNREAD},
     "agents/review-quality.md": {
+        SYMBOL_TOOLS_HEAD: "예시",
         "### 2. Modern API + Dead Code (Layer 2 - CLAUDE.md references)": "예시",
         "### 4. UI Framework Quality (CLAUDE.md 플러그인·최소 타겟 정보에 UI 프레임워크 플러그인 명시 시)": "다른 조건",
         "## Library Semantics (이슈 판정 전 확인)": "다른 조건",
     },
-    "agents/impl-correctness.md": {},
-    "agents/plan-structure.md": {},
+    "agents/impl-correctness.md": {SYMBOL_TOOLS_HEAD: "예시"},
+    "agents/plan-structure.md": {SYMBOL_TOOLS_HEAD: "예시"},
     "skills/fz-code/SKILL.md": {
         "## 모듈 참조": "이름",
-        "## Plugin 참조 (SwiftUI + Swift Concurrency)": "다른 조건",
+        "## 스택 스킬 (있으면 쓴다 · 없어도 진행)": "다른 조건",
         "### 실행 절차 (Lead — Step 루프 소유)": "다른 조건",
         "## Phase 0.5: Swift Pattern Pre-detection (Swift/iOS 프로젝트 한정)": "다른 조건",
         "### Gate 0.5: Swift Pattern Pre-detection 통과": "다른 조건",

@@ -6,8 +6,17 @@
 - 이 스킬이 부르지 않는 도구나 대체 경로로 도는 도구가 ✗ 이면 빠지는 단계 자리에 그 사실을 적는다: ` — 빠지는 단계: 없음 — <사유>` 또는 ` — 빠지는 단계: → <대체 경로>`. 예: fz-review 의 sc ✗ 는 `→ 셋째 검증을 새 컨텍스트 에이전트로`
 - `목록✓` = Lead 의 도구 목록에 그 이름이 있다 — context7 은 MCP 도구, sc 는 `sc:sc-analyze`(별칭 `sc:analyze`) 스킬이다(설명 · 조사 같은 형제 명령만 있으면 ✗ — 리뷰 셋째 검증의 경로 판정 `check_evidence_slots.py --third-path` 와 같은 기준). 연결됐다는 뜻이 아니다. 목록만 보고 적는다(확인용 호출 없음)
 - seq = sequential-thinking MCP 도구 — ✗ 이면 그 분해를 표로 쓴다(칸: 무엇을 · 근거 · 결론). pr-review `목록✓` = 에이전트 목록에 `pr-review-toolkit:` 으로 시작하는 이름이 있다
-- `스택 스킬` = 세션의 스킬 가운데 설명이 대상 트리의 언어 · 프레임워크를 다룬다는 것(`, ` 로 잇는다 · fz 자신의 스킬 · 범용 스킬 · 판단이 안 서면 빼고 · 없으면 `없음`)
-- 작업 폴더 프로필(peer-review · plan · discover · fix): `evidence/tools.md` 첫 줄의 Serena 부분 뒤 **같은 줄**에 꼬리를 붙인다. 예: `[Serena 미사용 — 비 git 작업 폴더] · context7 목록✗ · sc 목록✓ · seq 목록✓ · pr-review 목록✓ · 스택 스킬 없음 — 빠지는 단계: 라이브러리 문서 조회`
+- `스택 스킬` 의 이름은 이 세션의 스킬 목록에서 고른다. 설명에 대상 트리의 언어나 프레임워크를 다룬다고 적힌 스킬이다. 이름이 여럿이면 `, ` 로 잇는다. fz 자신의 스킬과 범용 스킬은 적지 않는다. 판단이 서지 않으면 그 스킬은 뺀다. 하나도 없으면 `없음` 이라고 적는다
+- 작업 폴더 프로필(peer-review · plan · discover · fix · code · review): `evidence/tools.md` 첫 줄의 Serena 부분 뒤 **같은 줄**에 꼬리를 붙인다. 예: `[Serena 미사용 — 비 git 작업 폴더] · context7 목록✗ · sc 목록✓ · seq 목록✓ · pr-review 목록✓ · 스택 스킬 없음 — 빠지는 단계: 라이브러리 문서 조회`
 - 나머지 스킬: 화면 한 줄 `[선택 도구] Serena 목록✓|목록✗` + 꼬리
-- 작업 폴더가 없는 세션(plan · discover · fix 를 저장 없이 진행): 기록 파일과 검사를 건너뛰고 나머지 스킬과 같은 화면 한 줄로 알린다 — 그 줄 끝에 ` · 기록 · 검사 건너뜀(작업 폴더 없음)` 을 붙인다
+- 작업 폴더가 없는 세션(plan · discover · fix · code · review 를 저장 없이 진행): 기록 파일과 검사를 건너뛰고 나머지 스킬과 같은 화면 한 줄로 알린다 — 그 줄 끝에 ` · 기록 · 검사 건너뜀(작업 폴더 없음)` 을 붙인다
 - 오케스트레이터(`/fz`)는 승인(Phase 4) 전에는 화면에만 알린다(승인 전 쓰기는 가드가 막는다) — 파일 기록은 승인 뒤다
+
+## 워커 심볼 도구 — 쓰였는지 재는 법
+
+- 워커를 띄우기 전: 상태 기록 첫 줄이 `[Serena 미사용 — <사유>]` 면 그 호출에서 워커가 읽는 입력(맥락 파일 · 의도 맥락 · 브리프)의 끝에 `[symbol tools: off — <사유>]` 한 줄을 붙인다
+- 점검 명령 셋 — 워크플로가 반환한 뒤 · 직접 띄운 에이전트가 끝난 뒤에 돌린다(작업 폴더가 없으면 `--tools-md` 를 뺀다):
+  - 워크플로: `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`
+  - 탐색 팔(교차 탐색의 첫 탐색 단계 — 보고 모드): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --only-label stage1-symbolic`
+  - 직접 호출(워크플로 밖에서 띄운 에이전트): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --direct --only-agent <종류> --session '{세션 id 앞 8자}*' --tools-md {WORK_DIR}/evidence/tools.md`
+- 출력 낱말마다 할 일 · exit 1 일 때 볼 것 · 재지 않는 에이전트는 점검을 돌린 뒤 `modules/symbol-tools-audit.md` 에서 읽는다

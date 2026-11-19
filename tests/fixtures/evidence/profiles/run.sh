@@ -9,7 +9,8 @@
 #                                          ③' do 블록만 인용(`do { try x() } catch let e`) → exit 1
 #                                          FP ③ catch 부수효과(nil 반환)가 결론을 뒤집는 체인을 층마다 인용 → exit 0
 #                                             ④ 실제 전파(catch 가 다시 던짐) 체인을 층마다 인용 → exit 0
-#   f534-skill-wiring                      fz-plan · fz-discover · fz-fix SKILL.md 가 첫 단계에서 profile 검사를 부른다
+#   f534-skill-wiring                      fz-plan · fz-discover · fz-fix · fz-code · fz-review SKILL.md 가 첫 단계에서 profile 검사를 부른다
+#                                          (구현 · 리뷰 스킬의 기록 — 워커 심볼 도구 점검이 이 기록으로 미사용 환경과 배선 고장을 가른다)
 #   toolstate-tail-cli                     tools.md 첫 줄의 선택 도구 꼬리 — 꼬리 붙은 줄 → exit 0 · 꼬리 없는 줄 · 둘째 줄의 꼬리 → exit 1
 #   tail-seq                               seq 목록✗ 만 있으면 빠지는 단계를 붙이지 않는다(표로 대신한다) → exit 0 · seq 때문에 붙이면 → exit 1
 #   tail-pr-review                         pr-review 목록✗ + 빠지는 단계 → exit 0 · 빠지는 단계 없이 → exit 1
@@ -54,7 +55,7 @@ rc=0
 if [ -z "$fail" ]; then echo "PASS  r3-f009-d1-middle-catch-uncited-fails  (TP 3/3 · FP 0/2)"; else echo "FAIL  r3-f009-d1-middle-catch-uncited-fails  —$fail"; rc=1; fi
 
 miss=""
-for s in fz-plan fz-discover fz-fix; do
+for s in fz-plan fz-discover fz-fix fz-code fz-review; do
   p="${s#fz-}"
   grep -q "check_evidence_slots.py\" --profile $p" "$ROOT/skills/$s/SKILL.md" || miss="$miss $s"
 done

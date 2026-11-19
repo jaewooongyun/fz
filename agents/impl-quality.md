@@ -18,6 +18,24 @@ in real time, providing feedback directly to `impl-correctness`.
   - ⛔ Serena `find_referencing_symbols` 는 conformance 구현을 주지 않는다(recall 36.9% · 전수 N=468) — 부재 판정 근거로 쓰지 않는다
 - **Secondary**: context7 (표준 API 패턴 확인)
 
+## Symbol tools — use them whenever they are in your tool list
+
+If any `mcp__plugin_fz_serena__` tool is in your tool list, the lead session has a symbol server running. Use the ones you have for every code file, scripts included (shell, Python, JavaScript, Swift and so on). Do not guess whether the server covers a file type: call the tool on the first file of that type and see. A line below that names a tool you do not have does not apply to you: do that part with Grep and Read, and do not report it as a fallback.
+- `find_symbol` — where a named function, type or method is defined: call it first, not Grep.
+- `find_referencing_symbols` — who calls or uses it: call it first. It returns real references only (no comments, no strings). It does not return protocol or interface implementations, so never treat a short or empty result as proof of absence.
+- `get_symbols_overview` — the shape of an unfamiliar code file: call it before reading the whole file.
+Then run one Grep for the same name and reconcile the two: report the references the symbol tool found, and separately the text-only hits (comments, docs, strings, dynamic uses).
+
+When not to call them.
+- The task text for this call tells you to reason only from the input it gives you, or contains a line starting `[symbol tools: off`: call no symbol tool. The caller's limit wins over this section.
+- The symbol server reads one tree: the one the lead activated. If its answer disagrees with what Read or Grep shows in the tree you were given (the file is missing, the line or body differs), it is on another tree. Stop using it for this task, answer from Read and Grep, and write `[symbol tools: unavailable - not on the target tree]`.
+
+Fallback, and say so.
+- The tools are not in your tool list, or a call returns an error: use Grep, Read and Glob for that target and write `[symbol tools: unavailable - <reason>]` once. Do not retry the same target. If the error names the active language servers, that file type is not covered: stop calling the symbol tools for every file of that type in this task. If it says the path is ignored, fall back for that file only; when a second file of the same type gets the same error, treat the type as not covered.
+- A call returns an empty result: that is not evidence of absence. A search that names no file returns nothing, with no error, for every file type the server does not cover. Confirm with Grep and write `[symbol tools: empty for <target> - grep used]`.
+- Report once: `symbol tools: used <n> calls` or `symbol tools: not used - <reason>`.
+Where these lines go: in a free-text answer, write them as lines of the answer. When the output is bound to a schema, put them in a free-text field (note, evidence, detail, rationale, summary) of an item you are already returning. Never add a finding, issue or item only to carry them, and never change a verdict for them. If the schema has no such place, leave them out: the lead counts your tool calls from the run record.
+
 ## Monitoring Focus (Layer 1 - Generic Checklist)
 
 ### Architecture Consistency (Clean Architecture — Uncle Bob)
@@ -39,7 +57,6 @@ in real time, providing feedback directly to `impl-correctness`.
 
 ### UI Framework / Concurrency Quality (CLAUDE.md 플러그인·최소 타겟 정보에 명시된 플러그인 기준)
 - UI 프레임워크: CLAUDE.md 플러그인·최소 타겟 정보의 플러그인 기준으로 state 관리 패턴 검증
-- Concurrency: `swift-concurrency` 플러그인 기준으로 actor isolation, Sendable 검증 (해당 시)
 - 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md 플러그인·최소 타겟 정보 참조)
 
 ### Complexity Warning

@@ -33,6 +33,8 @@ claude
 런타임으로 `python3` 3.9 이상과 `git` 이 필요하다. 판정기와 lint 는 3.9 문법에 맞춰 있다. `perl` 은 GPT 호출 래퍼만 쓰고(macOS 기본 포함) 없으면 GPT 단계만 못 한다.
 `node` 는 점검(`/fz-manage check` · health-check)에만 필요하다. 없으면 회귀 오라클 · workflow 문법 · 문구 배선 검사가 미실행으로 남고 점검은 exit 2 로 끝난다.
 
+설치하면 Stop 훅 하나가 함께 켜진다(`hooks/hooks.json`). 턴이 끝날 때 워커 에이전트가 심볼 도구를 썼는지 세어 이 머신의 `${FZ_RUN_STATE:-~/.fz/runs}/mcp-sweep.jsonl` 에만 기록하고, fz 스킬이 상태 기록(`evidence/tools.md`)을 남긴 세션에서 의심스러우면 한 줄 알린다 — 막지 않고 `FZ_GATES_OFF=1` 로 끈다. 미충족 게이트로 세션 종료를 막는 훅은 선택 설치다(`docs/completion-gates.md`).
+
 ### 함께 쓰는 도구
 
 fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.

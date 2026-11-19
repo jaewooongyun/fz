@@ -460,6 +460,11 @@ MCP_TOKEN = re.compile(r"mcp__[A-Za-z0-9_-]+(?:__[A-Za-z0-9_-]+)?")
 #    이전 판은 `plugin_[A-Za-z0-9]+_` 라 `mcp__plugin_my-plugin_server__tool` 을 위반으로 잡았다
 #    (현재 트리는 플러그인명이 `fz` 라 오탐 0 — 다른 플러그인 도입 시 발화했을 잠재 오탐).
 MCP_OK = re.compile(r"^mcp__(?:plugin_[A-Za-z0-9-]+_[A-Za-z0-9-]+|[A-Za-z0-9-]+)__[A-Za-z0-9_-]+$")
+# 본문의 서버 접두 언급(`mcp__plugin_fz_serena__` — 도구 이름 없이 그 서버의 도구 전부를 가리킨다)은
+#   도구 이름이 아니라 이름공간이다. 심볼 도구 공통 블록이 이 꼴로 조건을 건다.
+#   ⛔ 본문에서만 받는다 — frontmatter 선언의 빈 도구 이름은 배선 고장이라 형식 위반 그대로다.
+#   받은 접두도 retired 축과 선언 축은 그대로 거친다(없는 서버의 접두는 잡힌다).
+MCP_PREFIX_OK = re.compile(r"^mcp__(?:plugin_[A-Za-z0-9-]+_[A-Za-z0-9-]+|[A-Za-z0-9-]+)__$")
 
 # ⛔ retired 접두 — 과거 드리프트로 **이미 고친** 이름이다. 문법만으로는 정상 형식과
 #   구분되지 않으므로(둘 다 `mcp__<a>__<b>`) 명시 목록이 유일한 판별 수단이다.
@@ -525,8 +530,10 @@ def chk_12(root: Path | None = None):
         decl = fm.get("tools") or fm.get("allowed-tools") or ""
         decl_raw = decl if isinstance(decl, str) else " ".join(map(str, decl))
         # 축1 — 문법: frontmatter 와 본문의 모든 mcp 토큰
-        for tok in set(MCP_TOKEN.findall(decl_raw)) | set(MCP_TOKEN.findall(body)):
-            if not MCP_OK.match(tok):
+        decl_toks = set(MCP_TOKEN.findall(decl_raw))
+        for tok in decl_toks | set(MCP_TOKEN.findall(body)):
+            tok_ok = bool(MCP_OK.match(tok)) or (tok not in decl_toks and bool(MCP_PREFIX_OK.match(tok)))
+            if not tok_ok:
                 v.append(f"{rel}: MCP 도구명 형식 위반 `{tok}` — mcp__<server>__<tool> 또는 mcp__plugin_<plugin>_<server>__<tool>")
             # 축2 — retired 재등장
             for bad, fix in RETIRED_MCP.items():
@@ -540,7 +547,7 @@ def chk_12(root: Path | None = None):
             #    '문법은 맞지만 등록되지 않은 서버' 를 못 잡는다").
             # ⛔ retired 토큰은 제외한다 — 같은 사실이 두 줄로 인쇄되고, 사람이 할 일은
             #    "인벤토리에 추가" 가 아니라 "새 이름으로 교체" 다(retired 축이 그것을 준다).
-            if MCP_OK.match(tok) and not any(tok.startswith(b) for b in RETIRED_MCP):
+            if tok_ok and not any(tok.startswith(b) for b in RETIRED_MCP):
                 srv = _mcp_servers(tok)
                 for sv in srv:
                     if sv not in DECLARED_SERVERS:
@@ -1383,6 +1390,12 @@ INTEG_TREE = {
     #        대조할 것이 없어 통과가 정답이었고 이 fixture 가 음성이었다. 이제 선언 여부는
     #        정적으로 닫히므로 양성이다. #2 에 남는 것은 *선언됐으나 실제로 안 떠 있는* 경우뿐이다.
     "agents/bad_12_undeclared.md": "---\nname: b\ntools: mcp__nosuchserver__sometool\n---\n\n본문\n",
+    # (음성) 본문의 서버 접두 언급은 이름공간이다 — 형식 위반이 아니다
+    "agents/ok_12_prefix_body.md": "---\nname: o\ntools: mcp__plugin_fz_serena__find_symbol\n---\n\nIf any `mcp__plugin_fz_serena__` tool is in your tool list\n",
+    # (양성) 같은 접두가 frontmatter 선언에 있으면 빈 도구 이름이다 — 형식 위반
+    "agents/bad_12_prefix_decl.md": "---\nname: b\ntools: Read, mcp__plugin_fz_serena__\n---\n\n본문\n",
+    # (양성) 본문 접두도 선언 축을 거친다 — 인벤토리에 없는 서버
+    "agents/bad_12_prefix_undeclared.md": "---\nname: b\ntools: Read\n---\n\n`mcp__nosuchserver__` 도구를 쓴다\n",
     # #15: 잘림 + 3줄 뒤 카운트 → 위반 1
     # #N12: `/sc:` 네임스페이스 → 위반 1 (양성) + 정상형 1 (음성 — "전부 위반" 뒤집힘 방어)
     "modules/bad_n12.md": '실행: `/sc:analyze` 로 본다\n정상형: `/sc:sc-analyze` 도 함께 쓴다\n',
@@ -1494,7 +1507,8 @@ INTEG_TREE = {
 INTEG_EXPECT = {
     "N12": ["modules/bad_n12.md"],
            "12": ["agents/bad_12_retired.md", "agents/bad_12_syntax.md", "agents/bad_12_primary.md",
-           "agents/bad_12_primary_list.md", "agents/bad_12_undeclared.md", "agents/bad_12_kebab_undeclared.md"],
+           "agents/bad_12_primary_list.md", "agents/bad_12_undeclared.md", "agents/bad_12_kebab_undeclared.md",
+           "agents/bad_12_prefix_decl.md", "agents/bad_12_prefix_undeclared.md"],
     "N4": ["modules/bad_n4.md:1", "scripts/bad_n4.sh:3", "scripts/bad_n4.py:3"],
     "N5": ["scripts/bad_n5.sh:3", "scripts/bad_n5.py:4"],
     "N6": ["scripts/bad_n6.py", "scripts/bad_n6.sh"],

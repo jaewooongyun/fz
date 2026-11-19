@@ -7,6 +7,8 @@
 ## 목차
 
 - [활용 원칙](#활용-원칙)
+- [알려진 짝](#알려진-짝)
+- [스킬별 Swift 기준 (스킬의 스택 스킬 절에서 옮김)](#스킬별-swift-기준-스킬의-스택-스킬-절에서-옮김)
 - [iOS/Swift (Swift, SwiftUI, RIBs 프로젝트)](#iosswift-swift-swiftui-ribs-프로젝트)
 - [자동 감지 트리거](#자동-감지-트리거)
 - [역방향 감지 트리거 (부재 패턴)](#역방향-감지-트리거-부재-패턴)
@@ -20,10 +22,29 @@
 
 ## 활용 원칙
 
-1. 플러그인은 Claude가 자동 로드 — 스킬에서 플러그인 내용을 반복하지 않는다
+1. 플러그인 스킬은 Skill 도구로 불러야 읽힌다 — 스킬에서 플러그인 내용을 반복하지 않는다
 2. 스킬은 "어떤 상황에서 플러그인 참조를 활용할지" 가이드만 제공한다
 3. 프로젝트가 해당 언어/프레임워크를 사용하는지는 CLAUDE.md `## Architecture`에서 확인한다
 4. 최소 타겟 제약 — CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API는 availability 가드 필수
+
+## 알려진 짝
+
+스킬의 `## 스택 스킬` 절은 상태 줄의 `스택 스킬` 에 적힌 스킬을 부른다. 아래는 이 저장소가 아는 짝이다 — 다른 스택의 짝은 그 개발자 환경의 스킬 설명으로 찾는다(표에 없어도 쓴다).
+
+| 대상 코드 | 스킬(호출명) | 다루는 것 |
+|---|---|---|
+| Swift — SwiftUI 화면 · 상태 | `swiftui-expert:swiftui-expert-skill`(플러그인 `swiftui-expert`) | 상태 관리 · 뷰 구조 · 성능 · 최신 API — 아래 SwiftUI Expert |
+| Swift — 동시성(async · actor · Sendable) | `swift-concurrency:swift-concurrency`(플러그인 `swift-concurrency`) | isolation · Sendable · Task · 마이그레이션 — 아래 Swift Concurrency |
+
+## 스킬별 Swift 기준 (스킬의 스택 스킬 절에서 옮김)
+
+Swift 파일을 다룰 때만 적용한다. 각 스킬의 `## 스택 스킬` 절은 이 모듈을 가리키는 한 줄만 둔다.
+
+- **fz-plan** — Swift Concurrency(계획 시) 섹션. **iOS 16 minimum target 제약**: CLAUDE.md `## Plugins` 참조. 계획에 iOS 17+ API (`@Observable`, `@Bindable`, onChange new signature) 사용 명시 시 `#available` 가드 step 포함 의무. **availability 사전 결정**: SwiftUI State 설계 (iOS 16: `ObservableObject + @StateObject` / iOS 17+: `@Observable + @State`) → plan에 `#available` 분기 명시
+- **fz-code · fz-fix** — SwiftUI Expert(구현 · 수정 시) + Swift Concurrency(구현 · 수정 시) 섹션. SwiftUI View 작업 시 `swiftui-expert` 플러그인 패턴 참조. **최소 타겟 제약**: CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API 사용 시 availability 가드 필수. 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조(트리거 목록: 아래 자동 감지 트리거). **역방향 트리거**: 아래 역방향 감지 트리거 — `@MainActor`/`actor` 등이 없어도 싱글톤+가변상태 감지 시 안전성 분석 활성화(fz-fix 는 수정 전 3 패턴 점검을 스킬 본문의 역방향 트리거 절에 둔다)
+- **fz-review** — SwiftUI Expert + Swift Concurrency (리뷰 시) 섹션. diff에 `@MainActor|actor|async|@Observable` 감지 시 해당 플러그인 참조. **역방향 트리거**: 동시성 키워드 없어도 `static let shared` + `var` 등 감지 시 Concurrency Safety 적용. **iOS 16 minimum target 검증**: diff에 iOS 17+ API (`@Observable`, `@Bindable`, onChange new signature) 사용 시 `#available` 가드 존재 여부 검증 의무
+- **fz-discover** — SwiftUI Expert(상태 관리 결정 시) + Swift Concurrency(동시성 관련 제약 시)
+- **fz-search** — SwiftUI Expert 섹션 (탐색 시 View 구조/패턴 판단 기준)
 
 ## iOS/Swift (Swift, SwiftUI, RIBs 프로젝트)
 

@@ -62,9 +62,11 @@ metadata:
 | Phase 2 | Lead `WebSearch` · `WebFetch` | 외부 기술/라이브러리 조사 |
 | Phase 4 | `→ /fz-plan` | 정제된 요구사항으로 구현 계획 수립 |
 
-## Plugin 참조
+## 스택 스킬 (있으면 쓴다 · 없어도 진행)
 
-> 참조: `modules/plugin-refs.md` — SwiftUI Expert(상태 관리 결정 시) + Swift Concurrency(동시성 관련 제약 시)
+> 상태 줄(선택 도구 상태)의 `스택 스킬` 에 적힌 스킬이 지금 탐색하는 코드의 언어 · 프레임워크를 다루면, 그 코드를 다루기 전에 Skill 도구로 한 번 부른다. `없음` 이면 건너뛴다(막지 않는다).
+> 워커에는 Skill 도구가 없다 — `스택 스킬은 Lead 판단용` 이다. 부른 결과는 Lead 의 판단에만 쓰고 워커에게 넘기지 않는다(접근 탐색 워크플로는 알려진 제약을 첫 경로 생성 단계에만 싣는다 — 넘겨도 뒤 단계 워커는 읽지 못한다).
+> Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
 
 ## 팀 에이전트 모드 (Workflow 오케스트레이션 — pilot)
 
@@ -88,6 +90,7 @@ metadata:
    - `mode: 'fallback'` → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`(입력 오류)와 `agent null`(일시 장애)에만
      이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
      L4 사용자 에스컬레이션). Lead 단독 REP 는 **사용자 승인 후**에만. 사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 에 기록(규약: `experiment-log.md` 머리 문단)
+4.5. **심볼 도구 점검** (`mode: 'workflow'` 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 5. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` Workflow tracing 섹션에 수동 append
 6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(명시 플래그 단계 — `modules/gpt-strategy.md` § 단계 실행 판정). `run` · `config` 면 `/fz-gpt verify` 별도 실행(`ARTIFACT=` 빈 값 — 산출물 계열 밖이라 재검증 라운드 상한에 세지 않는다 · `modules/fz-gpt-subcommands-core.md` § verify 호출자 표) · `skip` 이면 `[GPT 미사용 — 사유]` · `ask` 면 질문 → `set` → 다시 decide (스크립트 내 cross-provider 스폰 금지)
 

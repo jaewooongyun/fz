@@ -535,6 +535,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 
 - 스크립트: 플러그인 루트 `workflows/{skill}-{pattern}.js` (§11 `scripts/`와 목적 분리 — 루트 오케스트레이션 vs 스킬 binary 검증)
 - 호출(Lead): 아래 § scriptPath 거부 우회 계약의 **0단계 준비**(매 호출) 뒤 복사본을 부른다 — `Workflow({ scriptPath: '{WORK_DIR}/....js', args })`. 원본은 `{플러그인 루트}/workflows/....js` 다. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (fz 정책 — 누락 시 다른 허용 규칙이 없으면 Workflow 호출이 권한을 묻고, `-p` 실행 · `dontAsk` 모드에서는 거부된다). ⚠️ `allowed-tools` 는 공식 사양에서 선택 필드이고 도구를 막는 제한이 아니라 사전 승인이다 — 스킬을 부른 턴에만 유효하고 사용자가 다음 메시지를 보내면 풀린다. 다중 턴 파이프라인에서 승인 게이트(예: Phase 4)의 답을 받은 뒤 이어지는 단계는 이 사전 승인 밖이다
+- ⛔ **반환 뒤 심볼 도구 점검** (Workflow 를 부르는 문서마다 한 줄 — 재발 방지 lint `audit-wiring` 이 센다 · 아래 공용 swarm 도 같다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다). 탐색 팔 · 직접 호출 꼴과 끔 신호는 `modules/tool-status.md` § 워커 심볼 도구 — 낱말마다 할 일은 점검을 돌린 뒤 `modules/symbol-tools-audit.md`
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
   - ⛔ **비ASCII 본문은 손으로 이스케이프하지 않는다** — MCP 도구 파라미터는 UTF-8 문자열을 그대로 받는다. `\uXXXX` 수동 변환은 안전장치가 아니라 **오류원**이다: 5천 자 한국어를 이스케이프해 보낸 호출이 **200 성공 + 본문 11곳 손상**으로 끝난 실측이 있다. 짧은 본문에서는 재현되지 않아 길이가 늘수록 위험하다.
   - ⛔ 외부 시스템(JIRA·GitHub·Slack)에 비ASCII 본문을 기록한 직후 **반환 본문을 1회 스캔**한다. 이 층에는 빌드도 린트도 없어 *성공 응답이 정확한 산출물을 뜻하지 않는다* — 유일한 오라클이 반환값 확인이다. 파일로 먼저 쓴 뒤 그 내용을 보내는 경로가 있으면 그쪽이 안전하다.
@@ -607,7 +608,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 1. **준비** (위 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/swarm.js {WORK_DIR}/swarm.js && cmp -s {플러그인 루트}/workflows/swarm.js {WORK_DIR}/swarm.js` 가 exit 0 일 때만 이어간다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 2. **고정 트리**: `git -C {GIT_ROOT} archive --prefix=swarm-tree-{sha}/ {sha} | tar -xf - -C {WORK_DIR}` 가 exit 0 이고 `{WORK_DIR}/swarm-tree-{sha}` 가 생겼을 때만 이어간다(파이프의 종료 코드는 tar 의 것이라 git 실패를 가릴 수 있다). args `tree` = 그 절대 경로 — 한 번 부를 때 SHA 하나, SHA 가 여럿이면 트리마다 따로 부른다. 권한: 소비자 `allowed-tools` 의 `Bash(git -C * archive *)` · `Bash(tar -xf - -C *)`(무제한 `Bash` 면 그것) · `tar` 는 `schemas/tool-inventory.json` 에 선언돼 있다
 3. **호출**: `Workflow({ scriptPath: '{WORK_DIR}/swarm.js', args: { fragments, tree, effort } })` — `effort` = Lead 세션 effort(lead-effort · null 이면 넣지 않는다 — `modules/mode-gate.md` § effort). 선택 인자 `maxFragments`(기본 12) · `maxAgents`(기본 = 상한 2 × 돌릴 조각) · `concurrency`(기본 = 상한 3) · `agentType`(스크립트 `READ_ONLY_AGENTS` 안만 — 기본 `fz:review-correctness`)
-4. **반환**: `table` = 입력 조각마다 정확히 1행(`PASS` · `ISSUES` · `BLOCKED` — BLOCKED `reason` 은 budget · no-sha-method · worker-null · bad-status · worker-blocked). `mode:'fallback'` 이면 아래 § 실패 복구 사다리의 판별 표 — ⛔ SOLO 직행 아님
+4. **반환**: `table` = 입력 조각마다 정확히 1행(`PASS` · `ISSUES` · `BLOCKED` — BLOCKED `reason` 은 budget · no-sha-method · worker-null · bad-status · worker-blocked). `mode:'fallback'` 이면 아래 § 실패 복구 사다리의 판별 표 — ⛔ SOLO 직행 아님 · 반환 뒤 심볼 도구 점검은 위 배치·호출 규약의 줄 그대로다(기본 워커 `fz:review-correctness` 는 심볼 도구를 가진다)
 
 ### resume 계약 + advisor 상속 (2026-08-08 신설)
 

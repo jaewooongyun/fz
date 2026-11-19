@@ -61,9 +61,11 @@ metadata:
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
 
-## Plugin 참조 (SwiftUI)
+## 스택 스킬 (있으면 쓴다 · 없어도 진행)
 
-> 참조: `modules/plugin-refs.md` — SwiftUI Expert 섹션 (탐색 시 View 구조/패턴 판단 기준)
+> 상태 줄(선택 도구 상태)의 `스택 스킬` 에 적힌 스킬이 지금 찾는 코드의 언어 · 프레임워크를 다루면, 그 코드를 다루기 전에 Skill 도구로 한 번 부른다. `없음` 이면 건너뛴다(막지 않는다).
+> 워커에는 Skill 도구가 없다 — `스택 스킬은 Lead 판단용` 이다. 부른 결과는 Lead 의 판단에만 쓰고 워커에게 넘기지 않는다.
+> Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
 
 ## 스킬 전환
 
@@ -256,6 +258,7 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - Stage 1 독립 병렬(symbolic+pattern, 피어 미주입) → Stage 2 교차(FP 판정+보완) → **Stage 3 병합(`fable` — 수렴 merge 판단 지점)** → 등급은 스크립트 binary 규칙. 총 5-call
 3. **반환 처리**: `mode:'workflow'` → results(신뢰도 포함)를 출력 형식으로 정리 / `mode:'fallback'` → 기본 모드(순차) 수행 + 사유 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 기록(규약: `experiment-log.md` 머리 문단)
+3.5. **심볼 팔 점검** (반환 뒤 · 보고 모드): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --only-label stage1-symbolic` — 출력 낱말에 맞는 표지 `[심볼 팔: …]` 한 줄을 결과에 싣는다(낱말별 표지는 `modules/symbol-tools-audit.md` · 그 라벨의 워커가 없으면 표지 없이 판정 못 한 사실을 적는다)
 4. **지표 기록**: `return.metrics`(agentCalls/nullCount/stages/fallback) + wall-clock(Lead 측정) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-search 테이블
 
 ### 신뢰도 등급 (canonical: cross-verify.md — 본 표가 구버전 출처-기준 표를 대체)
@@ -265,6 +268,8 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 | ★★★ | Symbolic + Pattern 모두 발견 | 교차 확인 완료 (최고 신뢰) |
 | ★★ | 한쪽 발견 + 교차 검증 통과(confirmed) | 검증된 단독 발견 |
 | ★ | 한쪽 발견 + 교차 미확인 | 노이즈 가능 — 수동 확인 권장 |
+
+> 폴백 표지가 붙은 실행의 ★★★ 는 같은 방법 두 번의 일치다 — 심볼 팔도 글자 검색으로 찾았다(표지 `[심볼 팔: 글자 검색 폴백 …]`)
 
 ### 기본 모드 (--deep 없이)
 

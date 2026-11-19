@@ -35,6 +35,7 @@
      가 정확히 그렇게 누락돼 있었다.
    - base 원본은 Gather에서 prefetch하여 `basePath`로 전달 — 에이전트가 SendMessage로 요청하지 않는다 (채널 우선순위 원칙, `agent-team-guide.md` §2)
 2. **반환 처리**: `mode:'workflow'` → reviews/issues를 Synthesize Step 입력으로. `mode:'fallback'` → Lead SOLO 리뷰 폴백.
+2.5. **심볼 도구 점검** (Lead · `mode:'workflow'` 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md "${WORK_DIR}/evidence/tools.md"` — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 3. **GPT Analyze** (out-of-band, `--gpt`/Tier3): Lead가 `modules/peer-review-tiers.md` § GPT Analyze 호출 한 형태(래퍼 exec · `gpt_peer_review_schema`)로 challenger 를 부른다 (⛔ 스크립트 내 cross-provider 스폰 금지 — 마이그레이션 결정). 결과(`gpt-challenger-result.json`)는 Synthesize Confidence Matrix의 GPT 열로 주입 — Matrix 생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9.
    - ⊕ 기본으로 이 단계는 **병합**이다 — `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude … --gpt … --diff … --out "${WORK_DIR}/merged.json"`(오염 · 실패 · stale 거부 · ⛔ 병합본은 고정 경로에 남긴다 — Curate 가 후보 원본으로 읽고, 없으면 렌더가 판정 불가로 멈춘다). challenger 를 따로 부르지 않고, Tier 3 GPT DA 는 병합 뒤 한 번이다
 

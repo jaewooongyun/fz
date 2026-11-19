@@ -604,6 +604,7 @@ jq -e '
 3.5 Lead: launch smoke (F-366 · Workflow 와 병렬 가능 · 인자는 Tier 1 Analyze 와 같다)
      python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --risk "${WORK_DIR}/risk.json" --rule "${WORK_DIR}/rules/rules.json" --repo {head 트리} --expect-head {headRefOid} --out "${WORK_DIR}/launch-smoke.md"
 4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
+4.5 Lead: 심볼 도구 점검 — python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md "${WORK_DIR}/evidence/tools.md"   // exit 1 · 2 는 통과 아님 · 낱말마다 할 일 modules/symbol-tools-audit.md
 5. Lead: Deliver 전 — python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --check-report "${WORK_DIR}/review-report.md" --smoke "${WORK_DIR}/launch-smoke.md"   // exit 1 이면 요약 줄을 review.json launchSmoke 에 넣고 다시 렌더
 ```
 

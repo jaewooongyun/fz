@@ -1,0 +1,694 @@
+# lint:no-root-anchor — 플러그인 루트를 참조하지 않는다. 합성 기록은 호출자가 넘긴 임시 폴더에만 쓰고 형제 모듈만 import 한다.
+"""fz_wf_metrics_selftest.py — fz_wf_metrics 의 self-test 와 합성 기록(probe). `fz_wf_metrics.py --self-test` 와
+`fz_wf_metrics._write_probe` 가 부를 때만 이 모듈을 싣는다.
+
+⛔ 계측기 지문(ab_ledger_base.INSTRUMENTS) 밖이다 — 측정 경로(collect · recollect · judge · show)는 이 모듈을 import 하지 않는다.
+   사례 · 합성 기록만 고친 변경은 instrument_sha 를 바꾸지 않아 채점 행이 낡지 않는다. 판정 코드를 여기에 두지 않는다(지문 밖
+   코드가 판정에 섞인다). fz_wf_metrics.py 가 모듈 머리에서 이 모듈을 실으면 tests/fixtures/ab/structure-d 의 fingerprint-coverage
+   셀이 실패한다. 나눈 까닭: 계측기 파일 하나가 1500줄 상한(같은 fixture 의 split-size 셀)을 넘었다.
+"""
+from __future__ import annotations
+
+import datetime
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+import fz_wf_metrics as wfm   # 형제 모듈(판정 코드) — 이 모듈은 그 함수를 부르기만 한다. ⛔ 모듈 머리에서 wfm 의 이름을 읽지 않는다(순환 import)
+
+
+def _write_probe(root: str, kind: str) -> None:
+    """self-test · 단언 fixture — kind 별 합성 기록(정상 · 고장 · advisor 스톨 · 시도 · `--mcp-audit` 판정마다의 꼴)."""
+    folder = os.path.join(root, "proj", "sess-probe", "subagents", "workflows", "wf_probe")
+    os.makedirs(folder, exist_ok=True)
+    if kind == "empty":
+        return
+    p = os.path.join(folder, "agent-a1.jsonl")
+    if kind == "corrupt":
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write("{not json at all\n")
+        return
+    if kind == "no-turns":
+        # 완결 턴 0 — stop_reason 없음 + output_tokens 플레이스홀더. 반환은 journal 에만 있다.
+        rows = [
+            {"type": "user", "timestamp": "2026-09-11T00:00:00Z",
+             "message": {"content": "[역할] 경계 케이스 발굴자 — CC 교차"}},
+            {"type": "assistant", "timestamp": "2026-09-11T00:07:00Z",
+             "message": {"content": [{"type": "tool_use", "id": "t1", "name": "StructuredOutput", "input": {}}],
+                         "usage": {"output_tokens": 2}}},
+        ]
+        with open(p, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        with open(os.path.join(folder, "agent-a1.meta.json"), "w", encoding="utf-8") as fh:
+            json.dump({"agentType": "fz:plan-edge-case", "model": "opus"}, fh)
+        with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"type": "result", "agentId": "a1", "result": {"links": [{"sourceId": "E:E1", "finding": "x" * 500}], "additions": []}}, ensure_ascii=False) + "\n")
+        return
+    if kind == "sweep-effort":
+        rows = [
+            {"type": "user", "timestamp": "2026-09-11T00:00:00Z",
+             "message": {"content": "[역할] 구조 설계자"}},
+            {"type": "assistant", "timestamp": "2026-09-11T00:02:00Z",
+             "message": {"stop_reason": "tool_use", "effort": "xhigh",
+                         "content": [{"type": "tool_use", "id": "t1", "name": "StructuredOutput", "input": {}}],
+                         "usage": {"output_tokens": 70, "output_tokens_details": {"thinking_tokens": 20}}}},
+        ]
+        with open(p, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        with open(os.path.join(folder, "agent-a1.meta.json"), "w", encoding="utf-8") as fh:
+            json.dump({"agentType": "fz:plan-structure", "model": "opus"}, fh)
+        with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
+            fh.write('{"type": "result", "agentId": "a1", "result": "x"}\n')
+        return
+    if kind in ("stall", "resume", "no-resume"):
+        # stall: advisor 호출 2(srvtoolu_A1 결과 2줄 중복 · srvtoolu_A2 결과 없음) — 실 블록 꼴(server_tool_use + 별도 줄 결과)
+        # resume · no-resume: 같은 key 의 실패 시도(0~6000s) 뒤 재개 시도(50000~50600s) / 재개 없이 실패로 끝남
+        def agent(name, rows, meta="fz:plan-structure"):
+            with open(os.path.join(folder, f"agent-{name}.jsonl"), "w", encoding="utf-8") as fh:
+                for r in rows:
+                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+            with open(os.path.join(folder, f"agent-{name}.meta.json"), "w", encoding="utf-8") as fh:
+                json.dump({"agentType": meta, "model": "opus"}, fh)
+        t = lambda sec: (datetime.datetime(2026, 10, 1) + datetime.timedelta(seconds=sec)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        role = {"type": "user", "timestamp": t(0), "message": {"content": "[역할] 설계자 — 이 과제의 계획"}}
+        if kind == "stall":
+            call = lambda i: {"type": "server_tool_use", "id": f"srvtoolu_{i}", "name": "advisor", "input": {}}
+            res = {"type": "advisor_tool_result", "tool_use_id": "srvtoolu_A1", "content": {"type": "advisor_result"}}
+            agent("a1", [role] + [{"type": "assistant", "timestamp": t(sec), "message": {"id": "m1", "content": [b]}}
+                                  for sec, b in ((10, call("A1")), (60, res), (60, res), (90, call("A2")))])
+            journal = [{"type": "started", "key": "k1", "agentId": "a1"}]
+        else:
+            done = {"type": "assistant", "timestamp": t(50600),
+                    "message": {"id": "m2", "stop_reason": "end_turn", "usage": {"output_tokens": 9}, "content": []}}
+            agent("a1", [role, {"type": "assistant", "timestamp": t(6000), "message": {"id": "m1", "content": []}}])
+            journal = [{"type": "started", "key": "k1", "agentId": "a1"}, {"type": "failed", "key": "k1", "agentId": "a1"}]
+            if kind == "resume":
+                agent("a2", [dict(role, timestamp=t(50000)), done])
+                journal += [{"type": "started", "key": "k1", "agentId": "a2"},
+                            {"type": "result", "key": "k1", "agentId": "a2", "result": "x"}]
+        with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
+            for ev in journal:
+                fh.write(json.dumps(ev) + "\n")
+        return
+    if kind in ("mcp-arm", "mcp-arm-err", "mcp-nolabel", "mcp-othertree", "mcp-allerr", "mcp-uncovered", "mcp-nopath",
+                "mcp-direct", "mcp-sweep", "mcp-sweep-nostate", "mcp-sweep-latestate"):
+        # 심볼 도구 결과 · 단계 라벨 · 다른 트리 표지 · 직접 호출 · 세션 훑기. 호출 = (도구, 지목한 파일 | None, 결과) · 결과 = (is_error, 글).
+        # 결과 글은 Serena 의 실제 꼴이다 — 찾기는 JSON 목록(없으면 `[]`) · 오류는 is_error 없는 `Error…` 글.
+        S = "mcp__plugin_fz_serena__"
+        found = (False, '[{"name_path": "main", "relative_path": "scripts/run.sh", "body_location": {"start_line": 3}}]')
+        no_project = (False, "Error: No active project. Ask the user to provide the project path or to select a project "
+                             "from this list of known projects: []")
+        no_tool = (True, "<tool_use_error>Error: No such tool available: mcp__plugin_fz_serena__find_symbol</tool_use_error>")
+        ignored = lambda f: (False, f"Error executing tool: ValueError - The explicitly passed file {f} is ignored, not returning overview.")
+        grep = ("Grep", None, (False, "scripts/run.sh:3:main() {"))
+        read = ("Read", "scripts/run.sh", (False, "     3\tmain() {"))
+        stamp = lambda m: f"2026-09-11T00:{m:02d}:00Z"
+
+        def worker(dst, aid, meta, calls, minute=0, label=None, final="so", note=""):
+            uses, results = [], []
+            for i, (tool, target, res) in enumerate(calls, 1):
+                tid = f"{aid}-t{i}"
+                inp = ({"relative_path": target} if target else {"name_path_pattern": "main"}) if tool.startswith(S) else (
+                    {"file_path": target} if tool == "Read" else {"skill": target} if tool == "Skill" else
+                    {"libraryId": target, "query": "main"} if "context7" in tool else {"pattern": "main"})
+                uses.append({"type": "tool_use", "id": tid, "name": tool, "input": inp})
+                err, text = res
+                results.append(dict({"type": "tool_result", "tool_use_id": tid,
+                                     "content": text if err else [{"type": "text", "text": text}]}, **({"is_error": True} if err else {})))
+            done = ({"type": "tool_use", "id": f"{aid}-so", "name": "StructuredOutput", "input": {"findings": [], "note": note}}
+                    if final == "so" else {"type": "text", "text": f"검토를 마쳤다. {note}".strip()})
+            rows = [{"type": "user", "timestamp": stamp(minute), "message": {"content": "[역할] 심볼 탐색자"}}]
+            if uses:
+                rows += [{"type": "assistant", "timestamp": stamp(minute), "message": {
+                             "id": f"m-{aid}-1", "stop_reason": "tool_use", "content": uses, "usage": {"output_tokens": 40}}},
+                         {"type": "user", "timestamp": stamp(minute + 1), "message": {"content": results}}]
+            rows.append({"type": "assistant", "timestamp": stamp(minute + 1), "message": {
+                "id": f"m-{aid}-2", "stop_reason": "tool_use" if final == "so" else "end_turn", "content": [done],
+                "usage": {"output_tokens": 30}}})
+            with open(os.path.join(dst, f"agent-{aid}.jsonl"), "w", encoding="utf-8") as fh:
+                for r in rows:
+                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+            with open(os.path.join(dst, f"agent-{aid}.meta.json"), "w", encoding="utf-8") as fh:
+                json.dump({"agentType": meta, "model": "sonnet"}, fh)
+            return [dict({"type": "started", "key": f"k-{aid}", "agentId": aid}, **({"label": label} if label else {})),
+                    {"type": "result", "key": f"k-{aid}", "agentId": aid, "result": {"findings": [], "note": note}}]
+
+        if kind == "mcp-direct":
+            # 같은 종류의 직접 호출 둘(앞 = 호출 있음 · 뒤 = 0회) + 다른 종류 둘(호출 있음 · 켜진 언어 파일에 전부 오류) —
+            # 합쳐 세면 통과로 읽히는 꼴이다. 직접 호출은 journal 이 없고 세션의 subagents/ 에 바로 쌓인다
+            direct = os.path.join(root, "proj", "sess-probe", "subagents")
+            worker(direct, "d1", "fz:review-correctness", [(S + "find_symbol", "scripts/run.sh", found), read], 0, final="text")
+            worker(direct, "d3", "general-purpose", [(S + "find_symbol", "scripts/run.sh", found)], 5, final="text")
+            worker(direct, "d4", "fz:review-quality", [(S + "find_symbol", "scripts/run.sh", no_project),
+                                                       (S + "find_referencing_symbols", "scripts/run.sh", no_project), read],
+                   8, final="text")
+            worker(direct, "d2", "fz:review-correctness", [read, grep], 10, final="text")
+            return
+        if kind.startswith("mcp-sweep"):
+            # 세션 하나(root = 세션 기록 폴더)의 끝난 실행 넷 — 성공 1(워크플로) · 0회(워크플로) · 해당 없음(심볼 도구가 없는 종류의
+            # 직접 호출 — fz 밖 스킬 호출 하나와 fz 스킬 호출 하나를 담는다) · 켜진 언어 파일에 전부 오류(직접 호출 — 일반 · 직접 호출 모드의
+            # `mcp-allerr` 와 같은 입력). 상태 기록 `state/tools.md` 는 실행보다 먼저(mcp-sweep) · 없음(-nostate) · 실행 뒤에 고침(-latestate)
+            sub = os.path.join(root, "subagents")
+            c7 = ("mcp__context7__query-docs", "/example/lib", (False, "Example docs: main() starts the run."))
+            for n, (wid, meta, calls) in enumerate((("wf_sw1", "fz:plan-structure", [(S + "find_symbol", "scripts/run.sh", found), c7, read]),
+                                                  ("wf_sw2", "fz:plan-impact", [read, grep]))):
+                dst = os.path.join(sub, "workflows", wid)
+                os.makedirs(dst, exist_ok=True)
+                with open(os.path.join(dst, "journal.jsonl"), "w", encoding="utf-8") as fh:
+                    for ev in [{"type": "launched"}] + worker(dst, "a1", meta, calls, n * 4, "impact"):
+                        fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
+            skill = lambda name: ("Skill", name, (False, f"Launching skill: {name}"))
+            worker(sub, "d1", "general-purpose", [read, skill("example-stack:example-skill"), skill("fz:fz-plan")], 8, final="text")
+            worker(sub, "d2", "fz:review-quality", [(S + "find_symbol", "scripts/run.sh", no_project),
+                                                    (S + "find_referencing_symbols", "scripts/run.sh", no_project), read], 12, final="text")
+            if kind != "mcp-sweep-nostate":
+                state = os.path.join(root, "state", "tools.md")
+                os.makedirs(os.path.dirname(state), exist_ok=True)
+                with open(state, "w", encoding="utf-8") as fh:
+                    fh.write("Serena: active /tmp/x @abc1234 (languages: bash) · context7 목록✓ · sc 목록✓ · seq 목록✓ · pr-review 목록✓"
+                             " · 스택 스킬 example-stack:example-skill\n")
+                hour = 6 if kind == "mcp-sweep-latestate" else -24   # 실행(2026-09-11 00:00~)보다 뒤 · 앞
+                t = (datetime.datetime(2026, 9, 11, tzinfo=datetime.timezone.utc) + datetime.timedelta(hours=hour)).timestamp()
+                os.utime(state, (t, t))
+            return
+        sym_err =[(S + "find_symbol", "scripts/run.sh", no_tool), (S + "get_symbols_overview", "scripts/run.sh", no_project), grep]
+        plan = {
+            # 첫 탐색 = 글자 검색뿐(0회) · 교차 단계 = 결과가 돌아온 호출 — 같은 에이전트 종류라 라벨로만 갈린다
+            "mcp-arm": [("a1", "fz:search-symbolic", [grep, read], "stage1-symbolic", ""),
+                        ("a2", "fz:search-pattern", [grep], "stage1-pattern", ""),
+                        ("a3", "fz:search-symbolic", [(S + "find_referencing_symbols", "scripts/run.sh", found)],
+                         "stage2-sym-on-pat", "")],
+            # 불렀으나 전부 오류 — 도구 오류(is_error) 하나 · Serena 오류 글 하나
+            "mcp-arm-err": [("a1", "fz:search-symbolic", sym_err, "stage1-symbolic", ""),
+                            ("a2", "fz:search-pattern", [grep], "stage1-pattern", "")],
+            "mcp-nolabel": [("a1", "fz:search-symbolic", [grep], "stage1-symbolic", ""),
+                            ("a2", "fz:search-symbolic", [grep], None, "")],
+            # 첫 탐색 워커가 호출 둘에 성공하고 결과에 다른 트리 표지를 남겼다
+            "mcp-othertree": [("a1", "fz:search-symbolic", [(S + "find_symbol", "scripts/run.sh", found),
+                                                            (S + "find_referencing_symbols", "scripts/run.sh", found), read],
+                               "stage1-symbolic", wfm.OTHER_TREE_MARK),
+                              ("a2", "fz:search-pattern", [grep], "stage1-pattern", "")],
+            # 켜진 언어(bash)의 파일을 물었는데 전부 오류 — 프로젝트가 활성화되지 않았을 때의 꼴
+            "mcp-allerr": [("a1", "fz:plan-impact", [(S + "find_symbol", "scripts/run.sh", no_project),
+                                                     (S + "find_referencing_symbols", "scripts/run.sh", no_project), read],
+                            "impact", "")],
+            # 켜진 언어 밖의 파일만 물었고 전부 오류 — 언어 미지원 폴백
+            "mcp-uncovered": [("a1", "fz:plan-impact", [(S + "get_symbols_overview", "scripts/report.py", ignored("scripts/report.py")),
+                                                        (S + "get_symbols_overview", "workflows/pipeline.js",
+                                                         ignored("workflows/pipeline.js")), read], "impact", "")],
+            # 파일을 지정하지 않은 찾기 하나가 `[]` 를 돌려줬다 — 결과도 아니고 켜진 언어 파일의 오류도 아니다
+            "mcp-nopath": [("a1", "fz:plan-impact", [(S + "find_symbol", None, (False, "[]")), grep], "impact", "")],
+        }[kind]
+        journal = []
+        for n, (aid, meta, calls, label, note) in enumerate(plan):
+            journal += worker(folder, aid, meta, calls, n * 2, label, note=note)
+        with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
+            for ev in journal:
+                fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
+        return
+    if kind in ("mcp-ok", "mcp-dead", "mcp-unrun", "mcp-nocontrol"):
+        # ⛔ 세 픽스처는 **도구 호출 조합만** 다르다 — 판정이 그 조합에서만 갈리는지 보기 위해서다(mcp-ok 만 심볼 도구 결과 한 줄을 더 갖는다).
+        calls = {"mcp-ok": [("mcp__plugin_fz_serena__find_symbol", "s1"), ("Read", "r1")],
+                 "mcp-dead": [("Read", "r1"), ("Grep", "g1")],
+                 "mcp-unrun": [],
+                 # ⛔ 작업은 했지만 **대조 심볼이 없다** — 부재를 주장할 근거가 없는 경로
+                 "mcp-nocontrol": [("Grep", "g1")]}[kind]
+        blocks = [{"type": "tool_use", "id": i, "name": nm, "input": {}} for nm, i in calls]
+        blocks.append({"type": "tool_use", "id": "so1", "name": "StructuredOutput", "input": {}})
+        rows = [
+            {"type": "user", "timestamp": "2026-09-11T00:00:00Z",
+             "message": {"content": "[역할] 심볼 탐색자"}},
+            {"type": "assistant", "timestamp": "2026-09-11T00:01:00Z",
+             "message": {"stop_reason": "tool_use", "content": blocks,
+                         "usage": {"output_tokens": 50}}},
+        ]
+        if kind == "mcp-ok":   # 심볼 도구 호출에 결과(찾은 심볼)가 돌아왔다 — 판정은 결과를 돌려준 호출 수로 낸다
+            rows.append({"type": "user", "timestamp": "2026-09-11T00:01:00Z", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "s1",
+                 "content": [{"type": "text", "text": '[{"name_path": "main", "relative_path": "scripts/run.sh"}]'}]}]}})
+        with open(p, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        with open(os.path.join(folder, "agent-a1.meta.json"), "w", encoding="utf-8") as fh:
+            json.dump({"agentType": "fz:search-symbolic", "model": "opus"}, fh)
+        with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
+            fh.write('{"type": "result", "agentId": "a1", "result": "x"}\n')
+        return
+    rows = [
+        {"type": "user", "timestamp": "2026-09-11T00:00:00Z",
+         "message": {"content": "[역할] 방향성 도전자(review-direction 렌즈)"}},
+        {"type": "assistant", "timestamp": "2026-09-11T00:01:00Z",
+         "message": {"stop_reason": "tool_use", "content": [
+             {"type": "advisor_tool_result", "tool_use_id": "adv1"},
+             {"type": "tool_use", "id": "t1", "name": "StructuredOutput", "input": {}}],
+             "usage": {"output_tokens": 100, "output_tokens_details": {"thinking_tokens": 40},
+                       "cache_read_input_tokens": 10, "cache_creation_input_tokens": 5}}},
+        {"type": "assistant", "timestamp": "2026-09-11T00:01:30Z",
+         "message": {"content": [{"type": "advisor_tool_result", "tool_use_id": "adv1"}]}},
+    ]
+    with open(p, "w", encoding="utf-8") as fh:
+        for r in rows:
+            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    with open(os.path.join(folder, "agent-a1.meta.json"), "w", encoding="utf-8") as fh:
+        json.dump({"agentType": "fz:review-direction", "model": "fable"}, fh)
+    with open(os.path.join(folder, "journal.jsonl"), "w", encoding="utf-8") as fh:
+        fh.write('{"type": "started", "agentId": "a1"}\n{"type": "result", "agentId": "a1", "result": "x"}\n')
+
+
+def self_test() -> int:
+    me = os.path.abspath(wfm.__file__)
+    passed, fails = 0, []
+
+    def run(kind, spec_runs, want_exit, want_text=None):
+        nonlocal passed
+        root = tempfile.mkdtemp(prefix="fzwf-")
+        try:
+            _write_probe(root, kind)
+            fx = os.path.join(root, "expected.json")
+            with open(fx, "w", encoding="utf-8") as fh:
+                json.dump({"tolerance_seconds": 1.0, "runs": spec_runs}, fh)
+            proc = subprocess.run([sys.executable, me, "--expect", fx, "--root", root],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+            out = (proc.stdout or b"").decode("utf-8", "replace")
+            why = []
+            if proc.returncode != want_exit:
+                why.append(f"exit {proc.returncode} (기대 {want_exit})")
+            if want_text and want_text not in out:
+                why.append(f"출력에 {want_text!r} 없음: {out.strip()[:120]}")
+            if why:
+                fails.append(f"{kind}/{want_exit}: {'; '.join(why)}")
+            else:
+                passed += 1
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    good = [{"id": "probe", "session_glob": "sess-probe", "wf": "wf_probe",
+             "wall_s": 90.0, "agents": 1, "advisor": 1}]
+    # ① 정상: 값 일치 → METRICS_OK (advisor 는 중복 id 를 1로 센다 — 블록 2개, 고유 1개)
+    run("good", good, 0, "METRICS_OK")
+    # ② 값 불일치 → 실패 (조용한 통과 금지)
+    run("good", [dict(good[0], wall_s=1.0)], 1, "wall")
+    run("good", [dict(good[0], advisor=7)], 1, "advisor")
+    # ③ 기록 없음 → unavailable + exit 1 (측정 실패를 0 으로 쓰지 않는다)
+    run("good", [{"id": "missing", "session_glob": "nope*", "wf": "wf_none",
+                  "wall_s": 1.0, "agents": 1, "advisor": 0}], 1, "unavailable")
+    # ④ 빈 폴더 → agent 0건 → wall unavailable + exit 1
+    run("empty", good, 1, "unavailable")
+    # ⑤ 손상 jsonl → 파싱 불가 → exit 1
+    run("corrupt", good, 1, None)
+    # ⑥ runs 빈 배열 → 0/0 통과 금지
+    run("good", [], 1, "runs 가 없다")
+    # ⑦ ⛔ 완결 턴 없는 agent — 반환은 있는데 usage 가 플레이스홀더뿐이면 0 이 아니라 unavailable
+    #    (실측 wf_00000000-006 S3-edge: 6,342자 반환 · out_tok 0 으로 인쇄됐다)
+    root = tempfile.mkdtemp(prefix="fzwf-nt-")
+    try:
+        _write_probe(root, "no-turns")
+        folder = os.path.join(root, "proj", "sess-probe", "subagents", "workflows", "wf_probe")
+        wf = wfm.read_wf(folder)
+        a = wf["agents"][0]
+        if a["out_tok"] is None and a["result_chars"] and wf["tokens_partial"]:
+            passed += 1
+        else:
+            fails.append(f"no-turns: out_tok={a['out_tok']} (기대 None) · result_chars={a.get('result_chars')} · partial={wf['tokens_partial']}")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    # ⑧~⑩ --mcp-audit 판정 — 도구 조합 · 결과 · 상태 기록 · 라벨 · 직접 호출만 바꿔 판정을 각각 확인한다(셀 이름 = mcp-audit/<이름>)
+    tail = " · context7 목록✓ · sc 목록✓ · seq 목록✓ · pr-review 목록✓ · 스택 스킬 없음"
+    states = {"active": "Serena: active /tmp/x @abc1234 (languages: bash)" + tail,
+              "unused": "[Serena 미사용 — 미설치]" + tail,
+              "old-tail": "[Serena 미사용 — 미설치] · context7 목록✓ · sc 목록✓",   # 옛 꼬리 — Serena 부분만 읽는다
+              "unknown-lang": "Serena: active /tmp/x @abc1234 (languages: example-lang)" + tail,
+              "bad": "not a state line"}
+
+    def audit(name, kind, want_exit, want_text, extra=(), state=None, direct=False, prep=None):
+        nonlocal passed
+        r2 = tempfile.mkdtemp(prefix="fzwf-mcp-")
+        try:
+            _write_probe(r2, kind)
+            try:
+                if prep:
+                    prep(r2)
+            except OSError as exc:
+                fails.append(f"mcp-audit/{name}: 준비 실패 {type(exc).__name__}")
+                return
+            argv =[sys.executable, me, "--mcp-audit", "--root", r2, "--session", "*"]
+            argv += ["--direct"] if direct else ["--wf", "wf_probe"]
+            argv += list(extra)
+            if state:
+                with open(os.path.join(r2, "tools.md"), "w", encoding="utf-8") as fh:
+                    fh.write(states[state] + "\n")
+                argv += ["--tools-md", os.path.join(r2, "tools.md")]
+            proc = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+            out = (proc.stdout or b"").decode("utf-8", "replace")
+            why = []
+            if proc.returncode != want_exit:
+                why.append(f"exit {proc.returncode} (기대 {want_exit})")
+            if want_text not in out:
+                why.append(f"출력에 {want_text!r} 없음: {out.strip()[:140]}")
+            if why:
+                fails.append(f"mcp-audit/{name}: " + " · ".join(why))
+            else:
+                passed += 1
+        finally:
+            shutil.rmtree(r2, ignore_errors=True)
+
+    audit("mcp-ok", "mcp-ok", 0, "MCP_AUDIT_OK")
+    audit("mcp-dead", "mcp-dead", 1, "MCP_WIRING_SUSPECT")
+    audit("mcp-unrun", "mcp-unrun", 2, "도구 작업이 0건")
+    audit("mcp-nocontrol", "mcp-nocontrol", 2, "대조 심볼")
+    audit("result-kinds", "mcp-ok", 0, "serena 결과: 성공 1 · 오류 0 · 빈 결과 0")
+    # 상태 기록(--tools-md) — 상태를 인자로 받지 않고 세션 시작 기록의 첫 줄에서 읽는다
+    audit("tools-md-active", "mcp-dead", 1, "MCP_WIRING_SUSPECT", state="active")
+    audit("tools-md-unused", "mcp-dead", 0, "MCP_FALLBACK (사유: 미설치)", state="unused")
+    audit("tools-md-mismatch", "mcp-ok", 1, "MCP_STATE_MISMATCH", state="unused")
+    audit("tools-md-bad", "mcp-dead", 2, "UNRUN: 상태 기록", state="bad")
+    audit("tools-md-unrun", "mcp-unrun", 2, "도구 작업이 0건", state="unused")
+    audit("tools-md-old-tail", "mcp-dead", 0, "MCP_FALLBACK (사유: 미설치)", state="old-tail")
+    # 탐색 팔(--only-label) — 보고 모드라 판정은 exit 0 · 라벨을 못 읽거나 그 라벨의 워커가 없으면 2
+    audit("mcp-arm-text-only", "mcp-arm", 0, "ARM_TEXT_ONLY", ("--only-label", "stage1-symbolic"))
+    audit("mcp-arm-used", "mcp-arm", 0, "ARM_SYMBOL_USED", ("--only-label", "stage2-sym"))
+    audit("mcp-arm-err", "mcp-arm-err", 0, "ARM_CALLED_NO_RESULT", ("--only-label", "stage1-symbolic"))
+    audit("mcp-arm-nolabel", "mcp-nolabel", 2, "UNRUN: 라벨", ("--only-label", "stage1-symbolic"))
+    audit("mcp-arm-no-worker", "mcp-arm", 2, "UNRUN: 라벨", ("--only-label", "no-such-stage"))
+    audit("mcp-arm-othertree", "mcp-othertree", 0, "ARM_OTHER_TREE", ("--only-label", "stage1-symbolic"))
+    audit("mcp-othertree", "mcp-othertree", 1, "MCP_OTHER_TREE")
+    # 직접 호출(--direct) — 그 종류의 가장 최근 호출 하나를 판정한다(앞 호출의 사용이 뒤 호출의 0회를 가리지 않게)
+    audit("mcp-direct-latest", "mcp-direct", 1, "MCP_WIRING_SUSPECT", ("--only-agent", "fz:review-correctness"), direct=True)
+    audit("mcp-direct-other-kind", "mcp-direct", 0, "MCP_AUDIT_OK", ("--only-agent", "general-purpose"), direct=True)
+    audit("mcp-direct-no-agent", "mcp-direct", 2, "--only-agent", direct=True)
+    audit("only-agent-unreadable", "mcp-direct", 2, "UNRUN: 에이전트 종류", ("--only-agent", "general-purpose"), direct=True,
+          prep=lambda r: os.remove(os.path.join(r, "proj", "sess-probe", "subagents", "agent-d4.meta.json")))
+    # 성공 수 판정 — 같은 "전부 오류" 가 지목한 파일에 따라 다른 판정을 받는다 · 일반과 직접 호출이 같은 판정 함수를 쓴다
+    audit("mcp-allerr", "mcp-allerr", 1, "MCP_CALLED_NO_RESULT", state="active")
+    audit("mcp-allerr-direct", "mcp-direct", 1, "MCP_CALLED_NO_RESULT", ("--only-agent", "fz:review-quality"),
+          state="active", direct=True)
+    audit("mcp-allerr-nostate", "mcp-allerr", 2, "UNRUN: 성공 0")
+    audit("mcp-uncovered", "mcp-uncovered", 0, "MCP_FALLBACK_UNCOVERED", state="active")
+    audit("mcp-nopath", "mcp-nopath", 2, "MCP_UNDECIDED", state="active")
+    audit("lang-table-miss", "mcp-allerr", 2, "UNRUN: 상태 기록의 언어", state="unknown-lang")
+    # 심볼 도구 결과 판독 — 빈 JSON · 빈 글 = 빈 결과 · 오류 표지 = 오류. 외부 MCP 판독기의 뜻(`[]` 도 본문)은 그대로다
+    got = [wfm.symbol_result_kind(False, "[]"), wfm.symbol_result_kind(False, [{"type": "text", "text": "{}"}]),
+           wfm.symbol_result_kind(False, " "), wfm.symbol_result_kind(True, "x"),
+           wfm.symbol_result_kind(False, "Error executing tool: ValueError - x"),
+           wfm.symbol_result_kind(False, '[{"name_path": "main"}]'), wfm.mcp_result_kind(False, "[]")]
+    want = ["empty", "empty", "empty", "error", "error", "ok", "content"]
+    if got == want:
+        passed += 1
+    else:
+        fails.append(f"symbol-result-kind: {got} (기대 {want})")
+
+    # 세션 훑기(--mcp-audit --sweep) — 심볼 도구를 가진 종류의 워커만 센다 · 같은 '전부 오류' 입력(넷째 실행)이 일반 · 직접 호출과 같은 판정 ·
+    # 상태 기록이 하나가 아니거나 실행 뒤에 고쳐졌으면 0회 · 성공 0 은 미판정 · 이미 본 실행(열쇠 = 실행 id + 워커 기록 수)은 다시 세지 않는다
+    sym = "mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols"
+    agent_defs = (("plan-structure", f"Read, Grep, Glob, {sym}, mcp__context7__query-docs"), ("plan-impact", f"Read, Grep, Glob, {sym}"),
+                  ("review-quality", f"Read, Grep, Glob, {sym}"), ("search-pattern", "Read, Grep, Glob"),
+                  ("memory-curator", "Read, Grep, Glob, mcp__plugin_fz_serena__read_memory, mcp__plugin_fz_serena__find_symbol"),
+                  ("plan-merge", None))   # 머리에 도구 선언이 없다 — 본문의 `tools:` 줄은 선언이 아니다
+
+    def write_agents(d):
+        os.makedirs(d)
+        for nm, tools in agent_defs:
+            with open(os.path.join(d, nm + ".md"), "w", encoding="utf-8") as fh:
+                fh.write(f"---\nname: {nm}\ndescription: 합성 에이전트 정의\nmodel: sonnet\n" + (f"tools: {tools}\n" if tools else "")
+                         + "---\n\n본문 예시 — tools: mcp__plugin_fz_serena__find_symbol\ntools: mcp__plugin_fz_serena__find_symbol\n")
+
+    def sweep_cell(name, kind, steps):
+        """steps = [(추가 인자, 준비 | None, 출력에 있어야 할 글 | None, 검사(기록 줄들, 열쇠) → 사유 | None)] — 같은 세션을 차례로 훑는다."""
+        nonlocal passed
+        r = tempfile.mkdtemp(prefix="fzwf-swp-")
+        try:
+            sess, rec = os.path.join(r, "sess"), os.path.join(r, "runs", "mcp-sweep.jsonl")
+            write_agents(os.path.join(r, "agents"))
+            if kind:
+                _write_probe(sess, kind)
+            os.makedirs(sess, exist_ok=True)
+            for i, (extra, prep, want_text, check) in enumerate(steps, 1):
+                if prep:
+                    prep(sess)
+                extra = [x.replace("{sess}", sess) for x in extra]
+                proc = subprocess.run([sys.executable, me, "--mcp-audit", "--sweep", sess, "--record", rec,
+                                       "--agents-dir", os.path.join(r, "agents")] + extra,
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+                out = (proc.stdout or b"").decode("utf-8", "replace")
+                lines, keys = [], None
+                if os.path.isfile(rec):
+                    with open(rec, "r", encoding="utf-8") as fh:
+                        lines = [json.loads(x) for x in fh if x.strip()]
+                if os.path.isfile(os.path.join(r, "runs", "mcp-sweep.keys.json")):
+                    with open(os.path.join(r, "runs", "mcp-sweep.keys.json"), "r", encoding="utf-8") as fh:
+                        keys = json.load(fh)
+                why = [] if proc.returncode == 0 else [f"exit {proc.returncode} (기대 0)"]
+                if want_text and want_text not in out:
+                    why.append(f"출력에 {want_text!r} 없음: {out.strip()[:160]}")
+                bad = check(lines, keys) if check and not why else None
+                if bad:
+                    why.append(bad)
+                if why:
+                    fails.append(f"mcp-sweep/{name} {i}회째: " + " · ".join(why))
+                    return
+            passed += 1
+        finally:
+            shutil.rmtree(r, ignore_errors=True)
+
+    def runs_of(line):
+        return {x["run"]: x for x in line["runs"]}
+
+    def first_line(lines, keys):
+        if len(lines) != 1:
+            return f"기록 줄 {len(lines)} (기대 1)"
+        ln, text = lines[0], json.dumps(lines[0], ensure_ascii=False)
+        rs = runs_of(ln)
+        if '"fz:' in text:
+            return "기록에 `fz:` 로 시작하는 값이 있다"
+        if ln.get("skills") != {"example-stack:example-skill": 1} or ln.get("stack_skills") != ["example-stack:example-skill"]:
+            return f"스킬 칸: skills={ln.get('skills')} stack_skills={ln.get('stack_skills')}"
+        if (rs.get("agent-d2") or {}).get("word") != "MCP_CALLED_NO_RESULT" or (rs.get("agent-d2") or {}).get("error") != 2:
+            return f"넷째 실행(켜진 언어 파일에 전부 오류) 판정: {rs.get('agent-d2')}"
+        if (rs.get("wf_sw1") or {}).get("context7") != {"content": 1} or (rs.get("wf_sw1") or {}).get("ok") != 1:
+            return f"첫 실행 결과 수: {rs.get('wf_sw1')}"
+        if sorted(keys or {}) != ["sess/agent-d1", "sess/agent-d2", "sess/wf_sw1", "sess/wf_sw2"]:
+            return f"열쇠: {keys}"
+        return None
+
+    state = ["--state", "{sess}/state/tools.md"]
+    same = ([], None, "MCP_SWEEP runs=0 ", lambda lines, keys: None if len(lines) == 1 else f"다시 훑었는데 기록 줄 {len(lines)} (기대 1)")
+    sweep_cell("active", "mcp-sweep", [(state, None, "used=1 suspect=2 fallback=0 undecided=0 n/a=1", first_line), same])
+    sweep_cell("nostate", "mcp-sweep-nostate", [([], None, "used=1 suspect=0 fallback=0 undecided=2 n/a=1", None)])
+    sweep_cell("latestate", "mcp-sweep-latestate", [(state, None, "used=1 suspect=0 fallback=0 undecided=2 n/a=1", None)])
+    sweep_cell("two-states", "mcp-sweep", [(state + state, None, "used=1 suspect=0 fallback=0 undecided=2 n/a=1", None)])
+
+    def unfinish(sess):   # 끝나지 않은 실행 둘 — 0회 워크플로의 워커가 결과를 아직 내지 않았고 · 전부 오류인 직접 호출이 아직 돈다(끝 응답 전)
+        for p, gone in ((os.path.join(sess, "subagents", "workflows", "wf_sw2", "journal.jsonl"), '"type": "result"'),
+                        (os.path.join(sess, "subagents", "agent-d2.jsonl"), '"stop_reason": "end_turn"')):
+            with open(p, "r", encoding="utf-8") as fh:
+                full = fh.read()
+            with open(p + ".full", "w", encoding="utf-8") as fh:
+                fh.write(full)
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.writelines(x for x in full.splitlines(True) if gone not in x)
+
+    def finish(sess):
+        for p in (os.path.join(sess, "subagents", "workflows", "wf_sw2", "journal.jsonl"), os.path.join(sess, "subagents", "agent-d2.jsonl")):
+            os.replace(p + ".full", p)
+
+    def resume(sess):     # 같은 실행의 다음 시도 — 워커 기록이 하나 늘었다(앞 워커를 복사해 새 id 로 둔다)
+        d = os.path.join(sess, "subagents", "workflows", "wf_sw1")
+        for ext in (".jsonl", ".meta.json"):
+            shutil.copy(os.path.join(d, "agent-a1" + ext), os.path.join(d, "agent-a2" + ext))
+        with open(os.path.join(d, "journal.jsonl"), "a", encoding="utf-8") as fh:
+            fh.write('{"type": "started", "key": "k-a2", "agentId": "a2"}\n{"type": "result", "key": "k-a2", "agentId": "a2", "result": {}}\n')
+
+    sweep_cell("pending", "mcp-sweep", [
+        (state, unfinish, "used=1 suspect=0 fallback=0 undecided=0 n/a=1",
+         lambda lines, keys: None if sorted(keys or {}) == ["sess/agent-d1", "sess/wf_sw1"] else f"끝나지 않은 실행의 열쇠: {keys}"),
+        (state, finish, "MCP_SWEEP runs=2 used=0 suspect=2 ", None)])
+
+    def main_log(sess):   # 본 대화 기록(세션 폴더와 같은 이름의 형제 파일)의 Skill 호출 — fz 밖 하나 · fz 하나
+        call = lambda i, name: {"type": "tool_use", "id": f"m{i}", "name": "Skill", "input": {"skill": name}}
+        with open(sess + ".jsonl", "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"type": "assistant", "timestamp": "2026-09-11T00:00:00Z", "message": {
+                "id": "m-main", "content": [call(1, "example-stack:example-skill"), call(2, "fz:fz-code")]}}, ensure_ascii=False) + "\n")
+
+    sweep_cell("main-log", "mcp-sweep", [(state, main_log, "MCP_SWEEP runs=4 ",
+                                          lambda lines, keys: None if lines and lines[0].get("skills") == {"example-stack:example-skill": 2}
+                                          else f"스킬 칸: {lines[0].get('skills') if lines else '기록 없음'}")])
+    sweep_cell("resumed", "mcp-sweep", [(state, None, "MCP_SWEEP runs=4 ", None),
+                                        (state, resume, "MCP_SWEEP runs=1 used=1 ",
+                                         lambda lines, keys: None if (keys or {}).get("sess/wf_sw1") == 2 else f"열쇠: {keys}")])
+    sweep_cell("budget", "mcp-sweep", [
+        (state + ["--budget", "0"], None, "MCP_SWEEP runs=1 ",
+         lambda lines, keys: None if len(lines) == 1 and list(keys or {}) == ["sess/wf_sw1"] else f"본 데까지: 줄 {len(lines)} · 열쇠 {keys}"),
+        (state, None, "MCP_SWEEP runs=3 ", lambda lines, keys: None if len(lines) == 2 and len(keys or {}) == 4 else f"줄 {len(lines)} · 열쇠 {keys}")])
+    # 실행 기록이 없는 세션 — 기록 · 열쇠 파일을 만들지 않는다
+    sweep_cell("idle", None, [([], None, "MCP_SWEEP runs=0 ",
+                               lambda lines, keys: None if not lines and keys is None else "실행 없는 세션에서 파일을 만들었다")])
+
+    def only_na(sess):    # 해당 없음 실행(심볼 도구가 없는 종류의 직접 호출) 하나만 남긴다
+        shutil.rmtree(os.path.join(sess, "subagents", "workflows"))
+        for ext in (".jsonl", ".meta.json"):
+            os.remove(os.path.join(sess, "subagents", "agent-d2" + ext))
+
+    # 새로 판정한 실행이 전부 해당 없음 — 열쇠만 쓰고 기록 줄은 쓰지 않는다(아무도 보지 않는 머신에서 기록이 자라지 않게)
+    sweep_cell("all-na", "mcp-sweep", [(state, only_na, "MCP_SWEEP runs=1 used=0 suspect=0 fallback=0 undecided=0 n/a=1",
+                                        lambda lines, keys: None if not lines and keys == {"sess/agent-d1": 1}
+                                        else f"전부 해당 없음인데 기록 줄 {len(lines)} · 열쇠 {keys}")])
+    big = {}
+
+    def big_record(sess):  # 돌림 크기에 이른 기록(유효한 JSON 줄) + 앞서 돌린 옛 파일 하나
+        big["old"] = os.path.join(os.path.dirname(sess), "runs", "mcp-sweep.jsonl.1")
+        os.makedirs(os.path.dirname(big["old"]), exist_ok=True)
+        row = json.dumps({"at": "2026-09-10T00:00:00Z", "session": "sess-old", "summary": {}, "runs": []}) + "\n"
+        with open(big["old"][:-len(".1")], "w", encoding="utf-8") as fh:
+            fh.write(row * (getattr(wfm, "SWEEP_RECORD_MAX", 1_000_000) // len(row) + 1))
+        with open(big["old"], "w", encoding="utf-8") as fh:
+            fh.write(row)
+
+    def rotated(lines, keys):
+        size = os.path.getsize(big["old"]) if os.path.isfile(big["old"]) else 0
+        if len(lines) == 1 and size >= getattr(wfm, "SWEEP_RECORD_MAX", 1_000_000) and not os.path.exists(big["old"][:-1] + "2"):
+            return None
+        return f"돌림: 기록 줄 {len(lines)} (기대 1 — 새 줄만) · 옛 파일 {size}바이트 (기대 돌린 기록 하나)"
+
+    # 기록이 돌림 크기에 이르면 덧붙이기 전에 한 번 돌린다 — 옛 파일은 하나만 남는다(앞서 돌린 것을 덮는다)
+    sweep_cell("rotate", "mcp-sweep", [(state, big_record, "MCP_SWEEP runs=4 ", rotated)])
+    r8 = tempfile.mkdtemp(prefix="fzwf-hold-")
+    try:
+        write_agents(os.path.join(r8, "agents"))
+        got = wfm.symbol_holders(os.path.join(r8, "agents")) if hasattr(wfm, "symbol_holders") else "symbol_holders 없음"
+        if got =={"fz:plan-structure", "fz:plan-impact", "fz:review-quality"}:
+            passed += 1
+        else:
+            fails.append(f"mcp-sweep/holders: {got} (기대 심볼 도구 선언이 있는 세 종류 — 본문 줄 · 큐레이터 제외)")
+    finally:
+        shutil.rmtree(r8, ignore_errors=True)
+
+    # ⑪~⑬ --sweep-row — 측정값과 사람 판정 칸이 섞이지 않는지, 부재를 0 으로 쓰지 않는지
+    def sweep(kind, want_exit, want_text):
+        nonlocal passed
+        r3 = tempfile.mkdtemp(prefix="fzwf-sw-")
+        try:
+            _write_probe(r3, kind)
+            proc = subprocess.run([sys.executable, me, "--sweep-row", "--root", r3,
+                                   "--wf", "wf_probe", "--session", "*"],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+            out = (proc.stdout or b"").decode("utf-8", "replace")
+            why = []
+            if proc.returncode != want_exit:
+                why.append(f"exit {proc.returncode} (기대 {want_exit})")
+            if want_text not in out:
+                why.append(f"출력에 {want_text!r} 없음: {out.strip()[:140]}")
+            if why:
+                fails.append(f"sweep-row/{kind}: " + " · ".join(why))
+            else:
+                passed += 1
+        finally:
+            shutil.rmtree(r3, ignore_errors=True)
+
+    sweep("sweep-effort", 0, "`xhigh`×1")     # 실측된 effort 가 행에 들어간다
+    sweep("mcp-ok", 0, "unavailable (raw")    # ⛔ 부재를 0 으로 쓰지 않는다
+    sweep("empty", 2, "UNRUN")                # agent 0건은 통과가 아니다
+
+    # ⑭ stage 규칙 — 현행 워크플로의 실제 [역할] 문구(앞 60자 이내)가 기대 라벨로 가는가.
+    #    ⛔ 첫 일치 규칙이라 순서가 틀리면 조용히 다른 라벨이 붙는다(교차 콜이 Stage 1 로 읽힌다).
+    stage_cases = (
+        ("설계자 — 이 과제의 계획을 **혼자** 끝낸다. 방향 판정·영향 범위·", "L1-full"),
+        ("경계 케이스 적대자 — 이 접근이 **어디서 깨지는가**만 판다.", "L1-edge"),
+        ("영향 범위 + 아키텍처 검증자 — **이 변경이 어디까지 퍼지는가**와", "L1-impact"),
+        ("통합자 — 적대 렌즈와 영향·아키 렌즈의 발견을 기존 계획에", "L2-merge"),
+        ("아키텍처 리뷰어(review-arch 렌즈) — 설계 결정·레이어 위반·확장성", "R1-arch"),
+        ("품질 리뷰어(review-quality 렌즈) — 코드 품질·dead code·성능", "R1-quality"),
+        ("정확성 리뷰어(review-correctness 렌즈) — 요구사항 충족·로직", "R1-correct"),
+        ("아키텍처 리뷰어 — 교차 조정", "R2-arch"),
+        ("품질 리뷰어 — 교차 보충", "R2-quality"),
+        ("반론자(review-counter 렌즈) — Devil's Advocate", "R3-counter"),
+        ("아키텍처 검증자(review-arch 렌즈)", "S2-arch"),          # 옛 배선 — 라벨 불변
+        ("설계자(plan-structure 렌즈) — 방향 반박", "S0-reb"),
+        ("구조 설계자", "?"),                                        # sweep probe — 새 규칙에 걸리면 안 된다
+    )
+    bad_stage = [f"{r[:18]}…→{wfm._stage_of(r)}(기대 {want})" for r, want in stage_cases if wfm._stage_of(r) != want]
+    if bad_stage:
+        fails.append("stage 규칙: " + " · ".join(bad_stage))
+    else:
+        passed += 1
+
+    # ⑮ ⛔ usage 중복 — 같은 id 의 content block 줄 3개가 usage 를 반복해도 응답 1건으로 센다.
+    #    같은 fixture 로 하네스 래퍼 뒤의 [역할] 도 본다(첫 메시지만 보면 stage 가 '?').
+    root = tempfile.mkdtemp(prefix="fzwf-dup-")
+    try:
+        p = os.path.join(root, "agent-d1.jsonl")
+        u = {"output_tokens": 100, "output_tokens_details": {"thinking_tokens": 40}}
+        rows = [{"type": "user", "timestamp": "2026-09-26T00:00:00Z",
+                 "message": {"content": "[Workflow harness — user request] relayed"}},
+                {"type": "user", "timestamp": "2026-09-26T00:00:00Z",
+                 "message": {"content": "[Workflow harness — computed task]\n[역할] 통합자 — x"}}]
+        rows += [{"type": "assistant", "timestamp": f"2026-09-26T00:00:0{i}Z",
+                  "message": {"id": "msg_1", "stop_reason": "tool_use", "usage": u,
+                              "content": [{"type": kind}]}} for i, kind in enumerate(("thinking", "text", "tool_use"), 1)]
+        rows.append({"type": "assistant", "timestamp": "2026-09-26T00:00:09Z",
+                     "message": {"id": "msg_2", "stop_reason": "end_turn", "usage": {"output_tokens": 7}, "content": []}})
+        with open(p, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        a = wfm.read_agent(p)
+        if (a["turns"], a["out_tok"], a["thinking"], a["stage"]) == (2, 107, 40, "L2-merge"):
+            passed += 1
+        else:
+            fails.append(f"usage 중복: turns={a['turns']} out_tok={a['out_tok']} thinking={a['thinking']} "
+                         f"stage={a['stage']} (기대 2·107·40·L2-merge)")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+    # ⑯ advisor 스톨 (F-382) — 호출 2 · 결과 1(2줄 중복) → advisor 1(결과 기반 불변) · calls 2 · stalled 1.
+    #    결과만 있고 호출 블록이 없는 ① probe 는 스톨 수를 0 이 아니라 unavailable(None)로 둔다.
+    #    --expect 가 적힌 advisor_stalled 를 비교하는가(틀린 값 0 → exit 1)
+    def wf_of(kind):
+        r = tempfile.mkdtemp(prefix="fzwf-at-")
+        _write_probe(r, kind)
+        return r, wfm.read_wf(os.path.join(r, "proj", "sess-probe", "subagents", "workflows", "wf_probe"))
+
+    r4, wf = wf_of("stall")
+    try:
+        got = (wf["advisor"], wf["advisor_calls"], wf["advisor_stalled"])
+        r5, wg = wf_of("good")
+        shutil.rmtree(r5, ignore_errors=True)
+        if got == (1, 2, 1) and wg["advisor_stalled"] is None and wg["advisor"] == 1:
+            passed += 1
+        else:
+            fails.append(f"advisor 스톨: (advisor, calls, stalled)={got} (기대 1·2·1) · 호출 블록 없는 probe stalled={wg['advisor_stalled']} (기대 None)")
+    finally:
+        shutil.rmtree(r4, ignore_errors=True)
+    st_run = {"id": "probe", "session_glob": "sess-probe", "wf": "wf_probe", "wall_s": 90.0, "agents": 1,
+              "advisor": 1, "advisor_calls": 2, "advisor_stalled": 1}
+    run("stall", [st_run], 0, "METRICS_OK")
+    run("stall", [dict(st_run, advisor_stalled=0)], 1, "advisor_stalled 1 ≠ 0")
+
+    # ⑰ 시도 구분 (F-387) — 실패 시도 + 재개: wall · critical_path 는 마지막 시도(600s) · failed_attempts 1 ·
+    #    재개 없이 실패로 끝난 run 은 경계를 정할 수 없어 wall · critical_path UNRUN(None) — 0 도 전 agent 값도 아니다
+    r6, wr = wf_of("resume")
+    r7, wn = wf_of("no-resume")
+    try:
+        got = (wr["wall"], wr["critical_path"], wr["failed_attempts"], wr["attempt_ambiguous"],
+               wn["wall"], wn["critical_path"], bool(wn["attempt_ambiguous"]))
+        if got == (600.0, 600.0, 1, None, None, None, True):
+            passed += 1
+        else:
+            fails.append(f"시도 구분: (wall, crit, failed_attempts, ambiguous | 무재개 wall, crit, ambiguous)={got} "
+                         f"(기대 600·600·1·None | None·None·True)")
+    finally:
+        shutil.rmtree(r6, ignore_errors=True)
+        shutil.rmtree(r7, ignore_errors=True)
+
+    for f in fails:
+        print(f"  FAIL {f}")
+    total = passed + len(fails)
+    if fails:
+        print(f"fz_wf_metrics self-test {passed}/{total} passed")
+        return 1
+    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 28 · 심볼 결과 판독 1 · mcp-sweep 12 · sweep-row 3"
+          f" · stage 규칙 1 · usage 중복 1 · advisor 스톨 3 · 시도 구분 1)")
+    return 0

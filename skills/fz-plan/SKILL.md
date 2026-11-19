@@ -57,10 +57,10 @@ metadata:
 | modules/promotion-ledger.md | P1/P2 조치 eligible session 관측 기록 (학습 승격 금지) |
 | modules/plan-direction-preflight.md | Phase 0c·0.5 절차 본문 (Phase 0c·0.5 진입 시 Read — 조건부) |
 
-## Plugin 참조 (Swift Concurrency)
-> 참조: `modules/plugin-refs.md` — Swift Concurrency(계획 시) 섹션
-> **iOS 16 minimum target 제약**: CLAUDE.md `## Plugins` 참조. 계획에 iOS 17+ API (`@Observable`, `@Bindable`, onChange new signature) 사용 명시 시 `#available` 가드 step 포함 의무.
-> **availability 사전 결정**: SwiftUI State 설계 (iOS 16: `ObservableObject + @StateObject` / iOS 17+: `@Observable + @State`) → plan에 `#available` 분기 명시
+## 스택 스킬 (있으면 쓴다 · 없어도 진행)
+> 상태 줄(선택 도구 상태)의 `스택 스킬` 에 적힌 스킬이 지금 계획하는 코드의 언어 · 프레임워크를 다루면, 그 코드를 다루기 전에 Skill 도구로 한 번 부른다. `없음` 이면 건너뛴다(막지 않는다).
+> 워커에는 Skill 도구가 없다 — full 모드에서는 부른 뒤 `스택 스킬 요구 사항`(그 스킬이 이 변경에 요구하는 것 몇 줄 · 출처 스킬 이름과 함께)을 워커에게 가는 기존 통로에 싣는다: 알려진 제약 인자(`constraintsKnown` — 실행 절차 2 의 args 에 한 항목).
+> Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
 
 ## 팀 에이전트 모드
 
@@ -80,7 +80,7 @@ metadata:
    원문 색인(`extract_project_rules.py`) → 규칙 레코드(모델이 각자) → `check_project_rules.py --check` 통과본만 쓴다. `archConstraints` 는 그 **호환 투영**이다(`--project-arch` — 4축 `architecturePattern` / `uiStack` / `dependencyDirection` / `naming` + 그 축의 `conflicts`).
    - 미확정 축 → `null` + `gaps`(Probe Coverage Gap). 코드 실측(grep) 1회로 보완을 시도하고(`authority: 관례` — 코드를 인용), 실패하면 **null 유지 + 그 축 제약 미적용** (중단·재질문 아님)
    - ⛔ **소스 간 모순 축은 자동 승자를 선정하지 않는다** — 축을 `null`로 두고 `conflicts[{axis, sources, claim_a, claim_b}]`에 보존 + 사용자 **1회** 보고. 이유: 현재 런타임(Claude Code / GPT)을 판별할 결정론적 입력이 없어 peer 지침 간 precedence를 세울 근거가 없다
-2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고) / `edgeAxes`=적대 렌즈 필수 축(⛔ 비UI 과제 — 스크립트 · 문서 · 플러그인 인프라 — 면 과제 · 프로젝트 규칙에서 축을 유도해 넘긴다. 미지정이면 UI 화면 과제용 기본 축이 들어간다 · F-383) / `minSteps`=요구 분해로 아는 최소 Step 수(있으면 — 부분 제출을 fallback 으로 받는다 · F-146) / `stepComplexity`=`true`(Step 마다 complexity 1-5 를 받는다 — fz-code 모드 게이트 입력 · 반환에 없으면 3.1 에서 Lead 가 채운다 · F-587) / `effort`=1.2 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
+2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약(스택 스킬을 불렀으면 그 요구 사항 한 항목 포함 — 위 `## 스택 스킬`) / `archConstraints`=절차 1.5 산출(있으면 — 미전달 시 워커 프롬프트 무변화) / `discoverJournalPath`=discover 산출물 경로(있으면 — 전제 아닌 참고) / `edgeAxes`=적대 렌즈 필수 축(⛔ 비UI 과제 — 스크립트 · 문서 · 플러그인 인프라 — 면 과제 · 프로젝트 규칙에서 축을 유도해 넘긴다. 미지정이면 UI 화면 과제용 기본 축이 들어간다 · F-383) / `minSteps`=요구 분해로 아는 최소 Step 수(있으면 — 부분 제출을 fallback 으로 받는다 · F-146) / `stepComplexity`=`true`(Step 마다 complexity 1-5 를 받는다 — fz-code 모드 게이트 입력 · 반환에 없으면 3.1 에서 Lead 가 채운다 · F-587) / `effort`=1.2 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
 2.5. **준비** (⛔ 매 호출 사전 복사 — 거부 왕복을 없앤다):
    매 호출 `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비**를 **선행**한다 — 경로 판정(실제 경로 · 세그먼트 경계) · self-contained 확인 · cp 덮어쓰기 · `cmp -s`:
    `grep -c '^import\|require(' {플러그인 루트}/workflows/plan-lean2.js` 가 `0` 임을 확인(⛔ 무출력은 0이 아니라 경로 오류) → 복사 → 바이트 일치 → 그 경로로 **1회** 호출:
@@ -119,7 +119,7 @@ metadata:
    python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --wf {runId 폴더명}            # stage 상세(advisor·so_retries·cache)
    python3 "${FZ_PLUGIN_ROOT}/scripts/fz_telemetry_report.py" --plan-segments {세션 id 앞 8자}   # Lead·GPT 층 분리
    ```
-   ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 않는다. ⛔ 같은 runId 에 `--mcp-audit` 도 돌린다 — 배선이 죽으면 MCP 호출이 0이 되는데 산출물에는 표시가 없다(exit 1=배선 의심 · 2=미판정, **둘 다 통과 아님**)
+   ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 않는다. ⛔ 같은 runId 에 심볼 도구 점검 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md` 도 돌린다(작업 폴더가 없으면 `--tools-md` 를 뺀다) — 배선이 죽으면 MCP 호출이 0이 되는데 산출물에는 표시가 없다(exit 1=배선 의심 · 2=미판정, **둘 다 통과 아님** · 낱말마다 할 일은 `modules/symbol-tools-audit.md`)
 
 > 렌즈 설계(Stage 1 = 전체 플랜 ∥ edge 적대 ∥ impact+arch · Phase 2 = Lead 의 GPT verify — 같은 질문 금지): `references/rationale.md` § 차별화된 렌즈
 

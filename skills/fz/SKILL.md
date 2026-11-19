@@ -317,6 +317,7 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{WORK_DIR}/{skill}-{pattern}.js', args })   — args 에 `effort` = `mode_gate.py lead-effort` 의 `effort.value`(null 이면 뺀다) → ⛔ 거부 시 정본 = `guides/skill-authoring.md` §12 우회 계약 (SOLO 폴백 아님)
 2. 스크립트가 Stage 병렬/교차/DA 라운드를 결정적 실행 (agentType `fz:` 재사용, OVERRIDE 주입)
 3. 반환 { mode:'workflow', ..., metrics } → Lead가 게이트 실행 (빌드/GPT) + 통합
+3.5 반환 뒤 심볼 도구 점검: 그 스킬의 점검 줄(fz_wf_metrics.py --mcp-audit — 명령 꼴 정본 modules/tool-status.md § 워커 심볼 도구)을 그대로 돌린다 → exit 1 · 2 는 통과 아님
 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
    **L1** split_required/splitSuggested → Step 분할 후 재invoke · **L2** 입력 오류 → 수정 후 재invoke(설계된 fail-fast) · **L3** 스톨·일시 장애 → **`resume` 우선**(CC 를 종료했으면 `claude --resume` 뒤) · **L4** 미해소 → 사용자 에스컬레이션 — ⛔ Lead 단독 SOLO 수행은 **사용자 승인 후에만** (Lead=fable 자동 SOLO 금지)
 ```

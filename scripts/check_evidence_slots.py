@@ -23,8 +23,9 @@
      전부 코드 인용을 갖는다. `catch` 층은 catch 본문까지 인용한다 — 중간 층을 읽지 않고 '전파 확정' 을 적으면 catch 의 부수효과
      (nil 반환 · 다른 에러로 정규화)가 결론을 뒤집는다(F-009 · 승격 원장 D-1).
 
-profile(`--profile`): peer-review(기본 — ①~⑤) · plan · discover · fix(③ · ⑤ — 참조 탐색을 하는 스킬의 첫 단계 활성 기록 · F-534).
-  plan · discover · fix 의 ③ 대상 = `target.json` 의 `root`(세션 대상 트리 — 같은 경로여야 한다) · `sha`(있으면 앞부분 일치).
+profile(`--profile`): peer-review(기본 — ①~⑤) · plan · discover · fix · code · review(③ · ⑤ — 참조 탐색을 하는 스킬의 첫 단계 활성 기록 · F-534).
+  code · review 는 plan 과 같은 검사다(구현 · 리뷰 스킬의 첫 단계 기록 — 워커 심볼 도구 점검이 이 기록으로 미사용 환경과 배선 고장을 가른다).
+  plan · discover · fix · code · review 의 ③ 대상 = `target.json` 의 `root`(세션 대상 트리 — 같은 경로여야 한다) · `sha`(있으면 앞부분 일치).
   `[Serena 미사용 — 사유]`(+ 꼬리)는 통과 · 기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 꼬리 없음은 위반이다.
 
 리뷰 셋째 검증의 경로(`--third-path --skills <Lead 스킬 목록의 sc: 이름들>` — 쉼표 구분): 목록에 `sc:sc-analyze`(별칭 `sc:analyze`)가
@@ -64,7 +65,7 @@ TOOLS_UNUSED = re.compile(r"^\[Serena 미사용 — (\S.*)\]\s*$")
 # · group 6 = 스택 스킬(이름을 `, ` 로 잇거나 `없음` — 빈 값은 위반) · group 7 = 빠지는 단계(context7 · sc · pr-review 에 ✗ 가 있을 때만)
 TOOLS_TAIL = re.compile(r"^(\S.*?) · context7 (목록[✓✗]) · sc (목록[✓✗]) · seq (목록[✓✗]) · pr-review (목록[✓✗])"
                         r" · 스택 스킬 ([^\s,]+(?:, [^\s,]+)*)(?: — 빠지는 단계: (\S.*?))?\s*$")
-PROFILES = ("peer-review", "plan", "discover", "fix")
+PROFILES = ("peer-review", "plan", "discover", "fix", "code", "review")
 THIRD_PATH_SC = {"sc:sc-analyze", "sc:analyze"}   # 리뷰 셋째 검증을 sc 로 돌리는 이름 — 설명 · 조사 같은 형제 명령은 아니다
 CLAIM_HEAD = re.compile(r"^##\s+주장:\s*(\S.*)$")
 LAYER = re.compile(r"^-\s*층\s*(\d+)\b([^:]*):\s*(.*)$")
@@ -359,6 +360,12 @@ def self_test() -> int:
                        check(prof(f"{pf}-ok", f"Serena: active {tree} @abc1234 (languages: swift, python){tail}\n", tree), None, profile=pf))
         case("r3-f534-activate-record-three-profiles",
              all(v == (VIOLATION, VIOLATION, VIOLATION, OK, OK) for v in got.values()), got)
+        # 구현 · 리뷰 스킬의 첫 단계 기록 — 명령줄의 프로파일 이름으로 받아 plan 과 같은 판정(심볼 도구 점검이 '없는 환경' 과 '배선 고장' 을 가르는 기록)
+        cli = {}
+        for pf in ("code", "review"):
+            cli[pf] = tuple(subprocess.run([sys.executable, os.path.abspath(__file__), "--profile", pf, os.path.join(t, f"plan-{k}")],
+                                           capture_output=True, text=True).returncode for k in ("none", "other", "nolang", "unused", "ok"))
+        case("profile-code-review-cli", all(v == (VIOLATION, VIOLATION, VIOLATION, OK, OK) for v in cli.values()), cli)
 
         # 선택 도구 꼬리 — 목록✓|목록✗ 두 표기 · ✗ 가 있으면 빠지는 단계 · 상태 없음 · 다른 표기 · 둘째 줄의 상태는 위반
         # 셀마다 한 곳만 바꾼다 — rest = context7 · sc 뒤의 정상 토큰(seq · pr-review · 스택 스킬)
@@ -422,7 +429,7 @@ def main() -> int:
     ap.add_argument("work_dir", nargs="?")
     ap.add_argument("--tier", type=int, choices=(0, 1, 2, 3))
     ap.add_argument("--profile", choices=PROFILES, default="peer-review",
-                    help="plan · discover · fix = 첫 단계 활성 기록 · 에러 전파 인용만(Tier 슬롯 없음 · F-534)")
+                    help="plan · discover · fix · code · review = 첫 단계 활성 기록 · 에러 전파 인용만(Tier 슬롯 없음 · F-534)")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--third-path", action="store_true",
                     help="리뷰 셋째 검증의 경로를 찍는다 — sc-analyze · fresh-context · undetermined(exit 3 — --skills 없음)")

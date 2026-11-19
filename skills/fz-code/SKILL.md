@@ -6,6 +6,7 @@ description: >-
 user-invocable: true
 argument-hint: "[구현 대상 설명] [light]"
 allowed-tools: >-
+  mcp__plugin_fz_serena__activate_project,
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__find_implementations,
@@ -71,13 +72,11 @@ metadata:
 | modules/lead-reasoning.md | Implication Scan — 제거/리팩토링 시 의미론적 완결성 |
 | modules/system-reminders.md | Instruction fade-out 대응 — 트리거 기반 리마인더 |
 
-## Plugin 참조 (SwiftUI + Swift Concurrency)
+## 스택 스킬 (있으면 쓴다 · 없어도 진행)
 
-> 참조: `modules/plugin-refs.md` — SwiftUI Expert(구현 시) + Swift Concurrency(구현 시) 섹션
-> SwiftUI View 작업 시 `swiftui-expert` 플러그인 패턴 참조
-> **최소 타겟 제약**: CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API 사용 시 availability 가드 필수
-> 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
-> **역방향 트리거**: `modules/plugin-refs.md` "역방향 감지 트리거" 참조. `@MainActor`/`actor` 등이 없어도 싱글톤+가변상태 감지 시 안전성 분석 활성화
+> 상태 줄(선택 도구 상태)의 `스택 스킬` 에 적힌 스킬이 지금 구현하는 코드의 언어 · 프레임워크를 다루면, 그 코드를 다루기 전에 Skill 도구로 한 번 부른다. `없음` 이면 건너뛴다(막지 않는다).
+> 워커에는 Skill 도구가 없다 — full 모드에서는 부른 뒤 `스택 스킬 요구 사항`(그 스킬이 이 변경에 요구하는 것 몇 줄 · 출처 스킬 이름과 함께)을 워커에게 가는 기존 통로에 싣는다: Step 맥락 파일(`contextPath` — 팀 에이전트 모드 실행 절차 1 의 목록에 한 항목).
+> Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
 
 ## 팀 에이전트 모드
 
@@ -96,9 +95,9 @@ metadata:
 0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" code --steps {WORK_DIR}/plan/steps.json --estimate code-pair`(없으면 `--plan-doc` · `--no-plan`) 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 이 루프 대신 Lead 가 구현 절차로 Step 마다 직접 구현한다(아래 light 모드) · **full** 이면 이 루프 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 
 1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
-   ⛔ 아래 넷도 **같은 파일에 요약해 넣는다** — 별도 arg 를 만들지 않고 기존 `contextPath` 하나로 전달한다:
+   ⛔ 아래 다섯도 **같은 파일에 요약해 넣는다** — 별도 arg 를 만들지 않고 기존 `contextPath` 하나로 전달한다:
    `code/phase-0.5-detection.md`(Swift token 검출 + 대응 step) · `discover/discover-journal.md` 의 🔒 불변 제약 ·
-   `plan/direction-challenge.md` 의 방향 판정 · `plan/verify-result.md` 의 미해소 이슈(있으면).
+   `plan/direction-challenge.md` 의 방향 판정 · `plan/verify-result.md` 의 미해소 이슈(있으면) · 스택 스킬 요구 사항(위 `## 스택 스킬` — 불렀으면).
    ⚠️ 만들기만 하고 넘기지 않으면 무력하다 — 렌즈는 `contextPath` 밖 파일을 열 수 없다.
 2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 참조),complexity 1-5 — invoke마다 Lead 재평가, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight 가드용 — `effort`=0 결과 `effort.value`(lead-effort — null 이면 넣지 않는다) · `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 예상 시 스폰 전 `split_required` 반환. 임계값은 상수가 single source)} / `contextPath` / `changesetTarget`=대상 레포 설명 / `buildFeedback`=이전 적용 빌드 결과(재시도 시만 — 빈 문자열 금지, 없으면 생략)
 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
@@ -111,6 +110,7 @@ metadata:
    - 렌즈가 죽었으면(`'partial'` · `lensesCompleted` < `lensesExpected` 인 `'skipped'`) 그 관점(아키텍처 또는 품질)은 **적용되지 않았다** — 다음 Step 으로 넘어가기 전에 재invoke 할지 Lead 가 판정한다
    - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). ⛔ 여기서 사다리를 재정의하지 않는다
    - **code-pair 고유분만**: ① H5 크기 가드 — `split_required`/`splitSuggested` 시 Step 분할(과대 changeset scaffold collapse 방지) ② 재시도는 `buildFeedback` 포함 **새 invoke**(캐시 키 변경 → resume 비의존) ③ Stage1 null 재시도는 **1회 한정**·일시 장애 의심 시만
+   - ⛔ **심볼 도구 점검** (Step 마다 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5 — `gpt-choice.sh decide` 판정) — Workflow는 "구현+검토 쌍"만 대체
 8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-code 테이블(**2026-07-10 시리즈 — 현행**; 2026-06-05 표는 사료 · 규약: `experiment-log.md` 머리 문단). Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
 
@@ -127,12 +127,14 @@ metadata:
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
-4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
+4. ⛔ **Serena 활성 기록 (첫 단계 — fz-fix 와 같은 기록)**: 같은 작업 폴더에 앞 단계(plan · fix 등)가 남긴 `{WORK_DIR}/evidence/tools.md` 의 트리 · `@sha` 가 지금 대상(작업할 git root · HEAD)과 같으면 활성화 · 기록을 건너뛰고 검사만 한다 — 꼬리가 옛 형식이면(검사 exit 1) 재사용하지 않고 다시 적는다. 그 밖에는 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile code {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 옛 꼬리)이면 기록을 고친다. WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 이 기록이 없으면 워커 심볼 도구 점검이 '도구가 없는 환경' 과 '배선 고장' 을 가르지 못한다
+5. ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한 줄 · 목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
 - [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / 저장 없이 진행)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
+- [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile code` exit 0? (위 4 · WORK_DIR 없는 세션은 건너뜀을 보고)
 
 ---
 
@@ -350,6 +352,7 @@ metadata:
    ```
    - 에이전트 구현 결과를 cross-model로 검증
    - 실패 시: 재시도 1회 → 실패 사실 기록 후 새 컨텍스트 에이전트 1회(`fz:review-correctness` · 읽기 전용 · 모델 명시 — `skills/fz-review/SKILL.md` 검증 2 의 GPT 불능 분기와 같다)로 검증하고 결과 표지 `[fresh-context: claude]`(동종 검증) · 에이전트도 못 띄우면 `[검증 불능 — 사유]` 로 적고 사용자에게 알린다
+   - review-correctness 를 띄웠으면(이 실패 분기 · 절차 7 의 요구 부합 검증) 끝난 뒤 심볼 도구 점검 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --direct --only-agent fz:review-correctness --session '{세션 id 앞 8자}*' --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — 낱말마다 할 일은 `modules/symbol-tools-audit.md`
    - decide 가 `skip` 이거나 정문이 exit 18 `GPT-OFF` 면 `[GPT 미사용 — 사유]` 를 남긴다 · `ask` 면 질문 → `set` → 다시 decide — `modules/gpt-strategy.md` § GPT 미사용
 
 ### 빌드 실패 대응

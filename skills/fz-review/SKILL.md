@@ -6,6 +6,7 @@ description: >-
 user-invocable: true
 argument-hint: "[리뷰 대상 설명] [light|full] [--render] [--gpt-independent]"
 allowed-tools: >-
+  mcp__plugin_fz_serena__activate_project,
   mcp__plugin_fz_serena__find_symbol,
   mcp__plugin_fz_serena__find_implementations,
   mcp__plugin_fz_serena__find_referencing_symbols,
@@ -67,10 +68,10 @@ metadata:
 | modules/cross-validation.md | 검증 게이트 + 외부 피드백 검증 + 런타임 주장 검증 + Coverage Gate + Reflection Rate 정본 |
 | modules/review-structural-axes.md | 구조 판정 5축 (fz-peer-review 공유). ⛔ Phase 5 전 **Read 후** §3+§4를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
 
-## Plugin 참조 (SwiftUI + Swift Concurrency)
-> 참조: `modules/plugin-refs.md` — SwiftUI Expert + Swift Concurrency (리뷰 시) 섹션
-> diff에 `@MainActor|actor|async|@Observable` 감지 시 해당 플러그인 참조. **역방향 트리거**: 동시성 키워드 없어도 `static let shared` + `var` 등 감지 시 Concurrency Safety 적용
-> **iOS 16 minimum target 검증**: diff에 iOS 17+ API (`@Observable`, `@Bindable`, onChange new signature) 사용 시 `#available` 가드 존재 여부 검증 의무.
+## 스택 스킬 (있으면 쓴다 · 없어도 진행)
+> 상태 줄(선택 도구 상태)의 `스택 스킬` 에 적힌 스킬이 지금 리뷰하는 코드의 언어 · 프레임워크를 다루면, 그 코드를 다루기 전에 Skill 도구로 한 번 부른다. `없음` 이면 건너뛴다(막지 않는다).
+> 워커에는 Skill 도구가 없다 — full 모드에서는 부른 뒤 `스택 스킬 요구 사항`(그 스킬이 이 변경에 요구하는 것 몇 줄 · 출처 스킬 이름과 함께)을 워커에게 가는 기존 통로에 싣는다: 의도 맥락(`intentContext`)의 참조 가이드 칸 — 출처가 있는 바깥 요구만 싣는다(실행 절차 2 의 '자기 설계 판단은 넣지 않는다' 그대로).
+> Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
 
 ## 팀 에이전트 모드 (Review Squad)
 
@@ -87,7 +88,7 @@ metadata:
 1.2. **이동 후보 표시**: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_moved_code.py" {BASE} WORKTREE --repo {GIT_ROOT}`(리뷰 대상이 커밋 범위면 `WORKTREE` 대신 그 끝 커밋) — `MOVE-CANDIDATE` 파일은 신규 코드로 읽기 전에 BASE 의 출처를 본다(F-078 · 신규성 판정은 사람)
 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 2~4.5 를 건너뛰고 Phase 5 Lead 3중 검증으로 간다(아래 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
-2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계 — ⛔ `plan-final.md` 등에서 온 자기 설계 판단 · 위험 추정은 넣지 않는다: 렌즈가 내 판단을 확인만 하게 된다 · F-042) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
+2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드(스택 스킬을 불렀으면 그 요구 사항 — 위 `## 스택 스킬`) (기존 Intent Context 계약 승계 — ⛔ `plan-final.md` 등에서 온 자기 설계 판단 · 위험 추정은 넣지 않는다: 렌즈가 내 판단을 확인만 하게 된다 · F-042) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
    - ⊕ (`judgmentSlots` · 기본 off — 이 워크플로의 옵션 묶음은 S25 판정 전까지 off) `judgmentSlots: true` 면 렌즈가 재지 않은 전제 · 한정 문구 · 동적 축 질문 답을 낸다 — 반환 `unverifiedPremises` 를 Phase 5 판정 입력으로 읽고, finding `limits` 가 있으면 그 지적은 suggestion 까지다(peer-review 병합기와 같은 규칙 · F-448 · F-178)
 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**(직전 `gpt-choice.sh decide` — `skip` 이면 띄우지 않고 병합은 `--gpt-unavailable`): `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh independent-review --diff {diff.patch} --deny {WORK_DIR} [--rules-index {원문 색인}] …` — 켜면 Workflow args 에 `locatedFindings: true` 를 함께 준다(위치 필드가 없는 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다). ⛔ 규칙 레코드(`projectRulesPath`)는 런처에 넘기지 않는다(exit 11). 경로는 **플러그인 루트 기준**. 순서 · 거부 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서
 2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js && cmp -s {플러그인 루트}/workflows/review-live.js {WORK_DIR}/review-live.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
@@ -95,6 +96,7 @@ metadata:
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
 3.5. **기본 GPT review 동시 기동**(F-473): Workflow 를 띄운 직후 Phase 5 검증 2 의 GPT review 를 background 로 함께 띄운다 — 입력이 diff 범위라 Workflow 반환을 기다릴 이유가 없다. 직전 `gpt-choice.sh decide` 가 `run` · `config` 면 `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd {GIT_ROOT} --out {WORK_DIR}/review/gpt-review.md --base {BASE}`(`modules/fz-gpt-subcommands-core.md` § review) · `skip` 이면 `[GPT 미사용 — 사유]`. 2.5 독립 첫 패스를 띄운 run 에는 이 단계가 없다(4.5 가 대신)
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기. SOLO 3중 검증은 **L4 사용자 승인 후**. 사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 기록(규약: `experiment-log.md` 머리 문단) · (선택) 서로 독립인 조각 검사(조각마다 한 SHA 의 고정 트리로 판정 가능)를 따로 돌릴 때는 이 반환 **뒤에** `workflows/swarm.js` 를 부른다 — 준비 · 고정 트리 · 호출은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로다
+   - ⛔ **심볼 도구 점검** (`mode:'workflow'` 반환 뒤 · swarm 을 따로 돌렸으면 그 runId 에도): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 4.5. **(`--gpt-independent`) 병합**: 두 패스가 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환} --gpt {독립 첫 패스 .json} --diff {같은 diff.patch}` — 런처 옆 파일로 오염 · 실패 · stale 을 거부한다. 결과가 Phase 5 [병렬 2] GPT 리뷰를 대신한다(두 번 부르지 않는다)
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + GPT validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
 6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-review 테이블. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
@@ -124,12 +126,14 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
-4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
+4. ⛔ **Serena 활성 기록 (첫 단계 — fz-fix 와 같은 기록)**: 같은 작업 폴더에 앞 단계(plan · fix 등)가 남긴 `{WORK_DIR}/evidence/tools.md` 의 트리 · `@sha` 가 지금 대상(작업할 git root · HEAD)과 같으면 활성화 · 기록을 건너뛰고 검사만 한다 — 꼬리가 옛 형식이면(검사 exit 1) 재사용하지 않고 다시 적는다. 그 밖에는 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile review {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 옛 꼬리)이면 기록을 고친다. WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 이 기록이 없으면 워커 심볼 도구 점검이 '도구가 없는 환경' 과 '배선 고장' 을 가르지 못한다
+5. ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한 줄 · 목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
 - [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / 저장 없이 진행)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
+- [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile review` exit 0? (위 4 · WORK_DIR 없는 세션은 건너뜀을 보고)
 
 ## Phase 4.5: Requirements Alignment (요구사항 부합)
 ### 절차
@@ -214,6 +218,8 @@ fz-gpt가 수행하는 작업:
 - 이슈 요약 반환
 
 > **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(agentType `fz:review-correctness` — review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=`fable` alias) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: GPT]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 도 띄우지 못하면 `[검증 불능 — 사유]` 로 적고 사용자에게 알린다(대체 경로 없음 — 검증 2 를 마친 것으로 적지 않는다). 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 2026-11-16]
+>
+> **review-correctness 점검**: Phase 4.5 나 이 분기에서 `fz:review-correctness` 를 띄웠으면 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --direct --only-agent fz:review-correctness --session '{세션 id 앞 8자}*' --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 >
 > **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. GPT CLI 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(fresh-context Agent)로 **상속되지 않는다**.
 > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 규모는 그 근거 밖이다.

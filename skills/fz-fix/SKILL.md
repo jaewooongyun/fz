@@ -66,14 +66,13 @@ metadata:
 | skills/fz-gpt/SKILL.md | GPT check 위임 — GPT 를 켠 세션이면 필수 (check verdict contract) |
 | modules/gpt-strategy.md | § 단계 실행 판정 — GPT check 직전 `gpt-choice.sh decide` 한 줄로 실행 · 건너뜀을 정한다 |
 
-## Plugin 참조 (SwiftUI + Swift Concurrency)
+## 스택 스킬 (있으면 쓴다 · 없어도 진행)
 
-> 참조: `modules/plugin-refs.md` — SwiftUI Expert(수정 시) + Swift Concurrency(수정 시) 섹션
-> SwiftUI View 작업 시 `swiftui-expert` 플러그인 패턴 참조
-> **최소 타겟 제약**: CLAUDE.md `## Plugins` 참조. 최소 타겟 이상 API 사용 시 availability 가드 필수
-> 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
+> 상태 줄(선택 도구 상태)의 `스택 스킬` 에 적힌 스킬이 지금 고치는 코드의 언어 · 프레임워크를 다루면, 그 코드를 다루기 전에 Skill 도구로 한 번 부른다. `없음` 이면 건너뛴다(막지 않는다).
+> 워커에는 Skill 도구가 없다 — full 모드에서는 부른 뒤 `스택 스킬 요구 사항`(그 스킬이 이 변경에 요구하는 것 몇 줄 · 출처 스킬 이름과 함께)을 워커에게 가는 기존 통로에 싣는다: 버그 분석 요약 파일(`contextPath` — 팀 에이전트 모드 실행 절차 1 에 한 항목).
+> Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
 
-### ⛔ 역방향 트리거 (absence-pattern detection)
+### ⛔ 역방향 트리거 (absence-pattern detection — Swift 파일을 수정하는 경우에만)
 
 > 참조: `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 부재해도 다음 패턴이 감지되면 안전성 분석을 활성화한다.
 
@@ -198,10 +197,11 @@ metadata:
 ### 실행 절차 (Lead)
 
 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" fix --files {수정 대상 파일 수} --estimate code-pair` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 Mode A Bug Fix Step 1-4 를 Lead 가 직접 한다(Workflow 없음 · Step 4 GPT check 는 그대로) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
-1. **args 조립**: `mode:'light'` / `stepSpec`={id,title,goal,files,verify,**complexity**, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 시 `split_required`. 임계값 single source=상수)} / `effort`=0 결과 `effort.value`(lead-effort — null 이면 넣지 않는다) / `contextPath`(버그 분석 요약 파일) / `changesetTarget` / `buildFeedback`(재시도 시)
+1. **args 조립**: `mode:'light'` / `stepSpec`={id,title,goal,files,verify,**complexity**, `estimatedNewBodyLines`=예상 총 newBody 줄수(Lead 추정, H5 pre-flight — `code-pair.js` `SPLIT_THRESHOLD` 상수 초과 시 `split_required`. 임계값 single source=상수)} / `effort`=0 결과 `effort.value`(lead-effort — null 이면 넣지 않는다) / `contextPath`(버그 분석 요약 파일 — 스택 스킬을 불렀으면 그 요구 사항 한 항목 포함 · 위 `## 스택 스킬`) / `changesetTarget` / `buildFeedback`(재시도 시)
    - ⛔ **complexity 측정 계약**: 수정 대상 파일 수 또는 아키텍처 영향 범위를 1-5로 점수화 — **Lead가 invoke마다 재평가**하여 주입. 3+ → review-arch 검토 포함, 미만 → impl 단독(1-call). 누락 시 스크립트가 review 포함(안전 default)
 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js && cmp -s {플러그인 루트}/workflows/code-pair.js {WORK_DIR}/code-pair.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Stage 2 review-arch(opus) → 이슈가 있으면 Stage 3 수정. 1-3 call ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
+2.5. **심볼 도구 점검** (반환 뒤 — 재시도 invoke 마다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 3. **changeset 적용 + 빌드 검증 (Lead)**: fz-code 절차 4-5와 동형. 실패 재시도 = buildFeedback 포함 새 invoke. ⛔ `reason:'changeset-defect'` fallback 이면 적용하지 않는다 · 적용 뒤 오라클(Serena `find_symbol` `include_body: true` 심볼 재독 · Edit 앵커 · Step 기준 numstat)은 fz-code 절차 4 그대로다 — 조건을 여기 다시 적지 않는다(두 벌이면 한쪽만 고쳐진다) · 반환의 렌즈 회계도 fz-code 절차 6 그대로 본다 — light 의 단독 렌즈가 죽으면 `reviewVerdict` 가 `'skipped'` 로 오므로 `lensesCompleted` < `lensesExpected` 로 가린다
 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
    Mode A Bug Fix Step 1-4 직접 진입은 **L4 사용자 승인 후**다. 어느 경로로 가든 **Step 4 GPT check 책임은 유효**하고(§ 단계 실행 판정),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""재발 방지 lint 8종 (B6) — 고친 문서 결함이 다시 생기면 잡는다.
+"""재발 방지 lint 10종 (B6) — 고친 문서 결함이 다시 생기면 잡는다.
 
 결함을 고치기만 하면 다시 생긴다. 등재된 결함마다 기계 검사를 하나씩 둔다.
 
@@ -13,11 +13,13 @@
 | broken-refs | "<대상>: <모듈 경로> 참조" 의 대상 이름이 그 파일에 없다(앵커 없는 산문 참조) | F-474 |
 | count-mismatch | "**N개 …**" 머리말 바로 아래 표의 행 수가 N 이 아니다 | F-479 |
 | catalog-required | 점검 카탈로그(templates/check-catalog-*.md)가 있어야 할 경로에 없다 — Workflow 워커 · GPT 역할 스킬은 공용 블록 · light Lead 는 템플릿 Read 지시 | F-005 외 PROMPT 15 |
+| audit-wiring | 워크플로 호출 지시(`Workflow({ scriptPath …`)가 적힌 스킬 · 모듈 · 가이드에 워커 심볼 도구 점검 줄(`--mcp-audit` 이 든 줄 — 직접 호출 `--direct` 줄은 세지 않는다)이 없다 | 점검이 호출 지시 파일 11개 중 1개에만 있었다 — 새 스킬이 빠뜨리지 않게 |
+| stack-skill-channel | `## 스택 스킬` 절이 있는 스킬의 그 절에 소비 경로 낱말(`스택 스킬 요구 사항` · `스택 스킬은 Lead 판단용`)이 정확히 하나가 아니다 · 워커에게 가는 통로가 있는 스킬(구현 · 수정 · 계획 · 리뷰)이 앞의 것이 아니다 | 스택 스킬을 Lead 만 읽고 코드를 쓰는 워커는 모르는 일을 막는다 |
 
 ⛔ 미실행은 PASS 가 아니다 — 검사 대상이 0개면 그 lint 는 UNRUN 이고 전체도 PASS 가 아니다.
 
 usage: lint_recurrence.py [--root R] [--only NAME]   ·   --self-test
-출력: lint 마다 `<name>: PASS|WARN|FAIL|UNRUN …` · 끝에 `lint_recurrence: k/8 PASS`
+출력: lint 마다 `<name>: PASS|WARN|FAIL|UNRUN …` · 끝에 `lint_recurrence: k/10 PASS`
 exit: 0 전부 PASS(WARN 포함) · 1 위반 · 2 미실행 있음
 """
 from __future__ import annotations
@@ -30,7 +32,8 @@ import tempfile
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(SCRIPT_DIR)
-LINTS = ("copies", "project-rules", "team-residue", "head-declaration", "module-size", "broken-refs", "count-mismatch", "catalog-required")
+LINTS = ("copies", "project-rules", "team-residue", "head-declaration", "module-size", "broken-refs", "count-mismatch", "catalog-required",
+         "audit-wiring", "stack-skill-channel")
 TEMPLATES = {"review-core": "templates/review-shared-block.md", "project-rules": "templates/project-rules-block.md",
              "catalog-plan": "templates/check-catalog-plan.md", "catalog-review": "templates/check-catalog-review.md",
              "catalog-code": "templates/check-catalog-code.md"}
@@ -47,6 +50,11 @@ TEAM_OK = re.compile(r"일몰|없음|없다|부재|아니다|아님|않|미사�
 REF_RE = re.compile(r"(?P<term>[A-Za-z가-힣][^:|`*\n]{2,40}?)\**\s*[:：]\s*`?(?P<file>(?:modules|guides)/[\w.-]+\.md)`?\s*참조")
 PROPER = re.compile(r"[A-Z][A-Za-z0-9]+(?:\s+[A-Z0-9][\w.]*)*")   # 대상의 고유 이름(영문) — 한국어 이름표(상세 · 절차)는 낱말 대조 대상이 아니다
 COUNT_RE = re.compile(r"\*\*(\d+)개 ([^*\n]{2,40})\*\*")
+WF_CALL = re.compile(r"Workflow\(\{ *scriptPath")   # 워크플로 호출 지시 — 이 꼴이 적힌 문서는 반환 뒤 심볼 도구 점검 줄을 함께 둔다
+WIRING_DOCS = ("skills/*/SKILL.md", "modules/*.md", "guides/*.md")
+STACK_HEAD = re.compile(r"^## 스택 스킬.*$", re.M)
+STACK_WORKER, STACK_LEAD = "스택 스킬 요구 사항", "스택 스킬은 Lead 판단용"   # 소비 경로 두 낱말 — 워커 전달 · Lead 판단용
+STACK_WORKER_SKILLS = ("fz-code", "fz-fix", "fz-plan", "fz-review")   # 워커에게 가는 기존 통로(Step 맥락 · 알려진 제약 · 의도 맥락)가 있는 스킬
 
 
 def _read(p):
@@ -192,9 +200,40 @@ def lint_catalog_required(root):
     return v, f"블록 경로 {sum(len(x) for x in CATALOG_BLOCKS.values())} · Read 경로 {len(CATALOG_READS)}"
 
 
+def lint_audit_wiring(root):
+    """워크플로를 부르는 문서마다 반환 뒤 심볼 도구 점검 줄이 있는가 — 직접 호출(`--direct`) 줄은 워크플로 점검이 아니라 세지 않는다."""
+    files = [p for p in _files(root, WIRING_DOCS) if WF_CALL.search(_read(p))]
+    if not files:
+        return None, "워크플로 호출 지시가 있는 문서 0개"
+    v = [f"{os.path.relpath(p, root)}: 워크플로를 부르는데 심볼 도구 점검 줄(`--mcp-audit`)이 없다 — 명령 꼴은 modules/tool-status.md"
+         for p in files if not any("--mcp-audit" in ln and "--direct" not in ln for ln in _read(p).split("\n"))]
+    return v, f"워크플로 호출 문서 {len(files)}개"
+
+
+def lint_stack_skill_channel(root):
+    """`## 스택 스킬` 절(다음 `## ` 제목 전까지)에 소비 경로 낱말이 정확히 하나 · 워커 통로가 있는 스킬은 워커 전달이어야 한다."""
+    skills = [p for p in _files(root, ("skills/*/SKILL.md",)) if STACK_HEAD.search(_read(p))]
+    if not skills:
+        return None, "`## 스택 스킬` 절이 있는 스킬 0개"
+    v = []
+    for p in skills:
+        t = _read(p)
+        m = STACK_HEAD.search(t)
+        nxt = re.search(r"^## ", t[m.end():], re.M)
+        sec = t[m.end():m.end() + nxt.start()] if nxt else t[m.end():]
+        has = [w for w in (STACK_WORKER, STACK_LEAD) if w in sec]
+        rel, name = os.path.relpath(p, root), os.path.basename(os.path.dirname(p))
+        if len(has) != 1:
+            v.append(f"{rel}: 스택 스킬 절의 소비 경로 낱말이 {len(has)}개다 — `{STACK_WORKER}` 또는 `{STACK_LEAD}` 가운데 하나만 적는다")
+        elif name in STACK_WORKER_SKILLS and has[0] != STACK_WORKER:
+            v.append(f"{rel}: 워커에게 가는 통로가 있는 스킬인데 `{STACK_LEAD}` 다 — `{STACK_WORKER}` 를 그 통로에 싣는다")
+    return v, f"스택 스킬 절 {len(skills)}개"
+
+
 FUNCS = {"copies": lint_copies, "project-rules": lint_project_rules, "team-residue": lint_team_residue,
          "head-declaration": lint_head_declaration, "module-size": lint_module_size, "broken-refs": lint_broken_refs,
-         "count-mismatch": lint_count_mismatch, "catalog-required": lint_catalog_required}
+         "count-mismatch": lint_count_mismatch, "catalog-required": lint_catalog_required, "audit-wiring": lint_audit_wiring,
+         "stack-skill-channel": lint_stack_skill_channel}
 
 
 def run(root, only=None):
@@ -228,11 +267,17 @@ def self_test():
     blk = lambda n, b: f"x\n<!-- shared:{n} begin -->\n{b}<!-- shared:{n} end -->\n"
     mod = "modules" + "/"          # 합성 경로 — 조립해 둬야 계약 lint #6 이 실제 참조로 읽지 않는다
     ref_m = "`" + mod + "m.md` 참조"
+    wf_call = "3. **Workflow 호출**: `Workflow(" + "{ scriptPath: '{WORK_DIR}/w.js', args })`\n"   # 조립 — 저장소의 호출 지시 집계에 섞이지 않게
+    audit = "4. **심볼 도구 점검**: `python3 \"${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py\" --mcp-audit --wf {runId 폴더명}`\n"
+    direct = "5. 직접 호출: `fz_wf_metrics.py --mcp-audit --direct --only-agent fz:review-correctness`\n"
     clean = {
         "templates/project-rules-block.md": "rules\n", "templates/review-shared-block.md": "core\n",
         "gpt-skills/a/SKILL.md": blk("project-rules", "rules\n"), "agents/x.md": blk("pair", "p\n"), "agents/y.md": blk("pair", "p\n"),
         "skills/s/SKILL.md": blk("review-core", "core\n") + "**2개 렌즈**\n\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n",
         mod + "m.md": "# m\n일반 모듈\nFinal Report 형식\n", mod + "u.md": "2. **Final Report 생성**: " + ref_m + "\n> 상세 원칙: " + ref_m + "\nTeamCreate 는 일몰됐다\n",
+        "skills/w/SKILL.md": wf_call + audit + direct,
+        "skills/fz-fix/SKILL.md": f"# f\n## 스택 스킬 (있으면 쓴다)\n{STACK_WORKER} 를 Step 맥락에 싣는다\n## 다음 절\n{STACK_LEAD}\n",   # 절 밖의 낱말은 세지 않는다
+        "skills/fz-search/SKILL.md": f"## 스택 스킬 (있으면 쓴다)\n{STACK_LEAD} — 워커에게 넘기지 않는다\n",
     }
     for n, paths in CATALOG_BLOCKS.items():          # 카탈로그 원문 · 블록 배치 · light Read 지시(합성)
         clean[TEMPLATES[n]] = f"| {n} |\n"
@@ -251,7 +296,12 @@ def self_test():
         "broken-refs": {mod + "r.md": "2. **Missing Section 생성**: " + ref_m + "\n"},
         "count-mismatch": {"skills/c/SKILL.md": "**3개 렌즈**\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"},
         "catalog-required": {"gpt-skills/fz-fixer/SKILL.md": "블록 없음\n"},
+        "audit-wiring": {"guides/g.md": wf_call + direct},   # 직접 호출 줄만 있다 — 워크플로 점검 줄로 세지 않는다
+        "stack-skill-channel": {"skills/fz-plan/SKILL.md": "## 스택 스킬\n부른 뒤 Lead 가 읽는다\n"},   # 둘 다 없음
     }
+    # stack-skill-channel 의 나머지 꼴 — 절에 두 낱말이 다 있음 · 워커 통로가 있는 스킬인데 Lead 판단용(절 밖의 낱말은 세지 않는다)
+    stack_more = {"both": {"skills/fz-review/SKILL.md": f"## 스택 스킬\n{STACK_WORKER} · {STACK_LEAD}\n"},
+                  "lead-on-worker-skill": {"skills/fz-fix/SKILL.md": f"## 스택 스킬\n{STACK_LEAD}\n## 다른 절\n{STACK_WORKER}\n"}}
     with tempfile.TemporaryDirectory() as d:
         _mk(d, clean)
         res = run(d)
@@ -262,6 +312,11 @@ def self_test():
             _mk(d, {**clean, **seeded[name]})
             st = run(d, only=name)[name][0]
             case(f"{name}-seeded", st == "FAIL", f"state {st}")
+    for k, extra in stack_more.items():
+        with tempfile.TemporaryDirectory() as d:
+            _mk(d, {**clean, **extra})
+            st = run(d, only="stack-skill-channel")["stack-skill-channel"][0]
+            case(f"stack-skill-channel-{k}", st == "FAIL", f"state {st}")
     with tempfile.TemporaryDirectory() as d:
         res = run(d)
         case("not-run-is-not-pass", all(r[0] == "UNRUN" for r in res.values()) and summary(res)[1] == 2,
