@@ -35,7 +35,7 @@ transcript 에서는 굳은 사실 하나만 읽는다: 첫 줄들의 entrypoint
 
 모드
   (인자 없음)                훅 — stdin JSON 하나 → stdout 결정 JSON(없으면 빈 출력) · exit 0
-  --self-test                합성 입력 124 케이스 — `PASS <case>` 줄
+  --self-test                합성 입력 125 케이스 — `PASS <case>` 줄
   --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS 인가 (0 일치 · 1 불일치 · 2 표 없음)
   --make-synthetic BYTES OUT --with-marker|--no-marker   큰 transcript 합성(첫 줄들에 entrypoint 를 둘지)
   --bench FILE               entrypoint 판정 소요 — `mode=<…> elapsed_ms=<n>`
@@ -719,18 +719,17 @@ def _runs_at(toks) -> dict:
     return out
 
 
-def write_sites(cmd, fragment=False, known=(), whole_funcs=None):
+def write_sites(cmd, fragment=False, known=()):
     """명령의 쓰기 자리 — [(대상 Word | None, Cmd)] · None 이면 못 읽었다(표 밖 꼴 · 토크나이저 없음).
     대상 None = 그 명령이 대상을 모르는 쓰기다(읽기 표 밖 이름 · 명령 자리 미상 · 펼쳐지는 명령 이름 · WRITE_ARGS 의 표 밖 옵션 · xargs 뒤).
     대상 Word 는 리다이렉트(`>` · `>>` · `>|` · `&>` · `<>` · fd 가 아닌 `>&`)와 WRITE_ARGS 명령(tee · rm · touch · mkdir · cp · mv)의 대상이다 —
     펼치지 않은 글자 그대로이고, 그 명령의 깊이 · 지연(함수 본문)은 Cmd 에 있다. 이 명령의 맨 바깥 셸에서 정의한 함수(defined_functions)의
     호출은 **정의 뒤에 있을 때만** 자리가 아니다(본문이 따로 나온다) — 정의보다 앞선 맨 이름 호출은 외부 명령이다(`rm -rf build; rm() { :; }`).
     치환 · 서브셸(파이프라인 칸 · `&` 목록 포함) 안 호출은 그 앞의 맨 바깥 정의를 물려받고(치환은 품은 맨 바깥 토큰 자리에서 돈다), 치환 ·
-    서브셸 안 정의는 아무 호출도 면제하지 않는다(`(rm() { :; }); rm -rf build` · `rm() { :; } | rm -rf build` 는 쓰기다). 함수 본문 안 호출은
-    이름으로 갈린다 — WRITE_ARGS 명령은 맨 바깥 호출과 같은 규칙이라 본문보다 앞의 맨 바깥 정의만 면제한다(`f() { rm -rf build; }; f; rm() { :; }`
-    의 본문 rm 은 외부 명령이다 · 정의 뒤에 f 를 불러도 쓰기로 읽는다). 그 밖 이름은 명령 어디의 맨 바깥 정의로도 면제한다(`f() { g; }; g() { :; }; f`).
-    조각만 넘길 때 `known` 은 그 조각 **앞에서** 맨 바깥 셸이 정의한 함수(맨 바깥 호출 · 본문 안 WRITE_ARGS 명령에 쓴다), `whole_funcs` 는 명령
-    전체가 정의한 함수(본문 안 그 밖 이름에 쓴다 · 없으면 이 명령의 정의)다 — 넘긴 쪽이 순서 · 범위를 걸렀다.
+    서브셸 안 정의는 아무 호출도 면제하지 않는다(`(rm() { :; }); rm -rf build` · `rm() { :; } | rm -rf build` 는 쓰기다). 함수 본문 안 호출도
+    이름과 무관하게(WRITE_ARGS 명령 · 그 밖 이름) 맨 바깥 호출과 같은 규칙이라 본문보다 앞의 맨 바깥 정의만 면제한다(`f() { rm -rf build; }; f; rm() { :; }`
+    의 본문 rm 은 외부 명령이다). 뒤 정의는 감싼 함수를 그 뒤에 불러도 쓰기로 읽는다(과차단: `f() { g; }; g() { :; }; f`).
+    조각만 넘길 때 `known` 은 그 조각 **앞에서** 맨 바깥 셸이 정의한 함수다 — 넘긴 쪽이 순서 · 범위를 걸렀다.
     ⛔ guard(P4)와 gate_stop_hook(원장 소유)이 같은 판정을 쓴다 — 한쪽만 고치면 두 판정이 갈린다."""
     if not isinstance(cmd, str) or shell_tokens is None:
         return None
@@ -739,7 +738,6 @@ def write_sites(cmd, fragment=False, known=(), whole_funcs=None):
     if shell_tokens.is_unknown(cmds):
         return None
     ends, runs_at, known, out = defined_functions(toks), _runs_at(toks), set(known), []
-    in_body = known | set(ends) | set(whole_funcs or ())
     for c in cmds:
         out += [(r.target, c) for r in c.redirs if r.op in WRITE_OPS or (r.op == ">&" and not re.fullmatch(r"[0-9]+|-", r.target.text))]
         if c.unsure:
@@ -755,8 +753,7 @@ def write_sites(cmd, fragment=False, known=(), whole_funcs=None):
             continue
         # 함수 조회는 래퍼 없이 경로 없는 이름으로 부를 때만이다 — `command touch` · `env touch` · `/usr/bin/touch` 는 외부 명령을 실행한다
         after = n in known or (n in ends and runs_at.get(id(c.name), c.name.start) >= ends[n])
-        is_func = n in in_body if c.deferred and n not in WRITE_ARGS else after
-        rule = True if is_func and not c.via and "/" not in c.name.text else READ.get(n)
+        rule = True if after and not c.via and "/" not in c.name.text else READ.get(n)
         if rule is True or (rule is not None and rule(c.args)):
             continue
         ws = _write_targets(n, c.args) if n in WRITE_ARGS and "xargs" not in c.via else None
@@ -2084,9 +2081,9 @@ def self_test() -> int:
         got = [bash_write(c, "/srv/demo") for c in ("rm -rf build; rm() { echo no; }", "touch x; touch() { :; }", "x=$(touch a); touch() { :; }",
                                                     "rm() { echo no; }; rm -rf build", "f() { g; }; g() { :; }; f",
                                                     "touch() { :; }; echo $(touch gates/plan.md)")]
-        case("function-exempt-after-definition-only — 같은 이름 함수 면제는 정의 뒤의 맨 이름 호출만이다: 정의보다 앞선 호출 · 정의 앞 치환 안 호출은 "
-             "외부 명령(쓰기) · 정의 뒤 호출 · 함수 본문 안 쓰기 명령 밖 이름 호출(뒤에 정의된 함수 포함) · 정의 뒤 치환 안 호출은 면제",
-             got == [(True, ["build"]), (True, ["x"]), (True, [])] + [(False, [])] * 3, got)
+        case("function-exempt-after-definition-only — 같은 이름 함수 면제는 정의 뒤의 맨 이름 호출만이다: 정의보다 앞선 호출 · 정의 앞 치환 안 호출 · "
+             "본문보다 뒤에 정의된 함수의 본문 안 호출(감싼 함수를 그 정의 뒤에 불러도 — 과차단 쪽)은 외부 명령(쓰기) · 정의 뒤 호출 · 정의 뒤 치환 안 호출은 면제",
+             got == [(True, ["build"]), (True, ["x"]), (True, []), (False, []), (True, []), (False, [])], got)
 
     @cell
     def function_body_order():
@@ -2094,10 +2091,19 @@ def self_test() -> int:
                                                     "f() { tee build/x; }; f; tee() { :; }", "f() { mkdir -m 700 build/y; }; f; mkdir() { :; }",
                                                     "rm() { :; }; f() { rm -rf build; }; f", "f() { helper gates/plan.md; }; helper() { :; }; f",
                                                     "f() { helper gates/plan.md; }; f; helper() { :; }")]
-        case("function-body-write-command-needs-earlier-definition — 함수 본문 안 쓰기 명령(tee · rm · touch · mkdir · cp · mv)은 본문보다 앞의 "
-             "맨 바깥 같은 이름 정의만 면제한다: 뒤 정의(본문이 정의 전에 불리든 뒤에 불리든 · 표 밖 옵션 포함)는 외부 명령(대상 미상 쓰기) · "
-             "앞 정의는 면제 · 쓰기 명령 밖 이름(main · helper 꼴)은 명령 어디의 정의로도 면제",
-             got == [(True, [])] * 4 + [(False, [])] * 3, got)
+        case("function-body-write-command-needs-earlier-definition — 함수 본문 안 호출은 이름과 무관하게(쓰기 명령 tee · rm · touch · mkdir · cp · mv "
+             "· 그 밖 이름) 본문보다 앞의 맨 바깥 같은 이름 정의만 면제한다: 뒤 정의(본문이 정의 전에 불리든 뒤에 불리든 · 표 밖 옵션 · main · helper "
+             "꼴 포함)는 외부 명령(대상 미상 쓰기) · 앞 정의는 면제",
+             got == [(True, [])] * 4 + [(False, [])] + [(True, [])] * 2, got)
+
+    @cell
+    def function_body_outside_name_order():
+        got = [bash_write(c, "/srv/demo") for c in ("f() { unlink build/x; }; f; unlink() { :; }", "f() { sed -i '' s/a/b/ x; }; f; sed() { :; }",
+                                                    "f() { python3 -c 'print(1)'; }; f; python3() { :; }",
+                                                    "sed() { :; }; f() { sed -i '' s/a/b/ x; }; f", "helper() { :; }; f() { helper x; }; f")]
+        case("function-body-outside-name-order — 쓰기 명령 밖 이름(읽기 표 밖 프로그램 · 쓰기 옵션을 든 읽기 명령 · 인터프리터)의 본문 안 호출도 "
+             "본문보다 앞의 정의만 면제한다: 본문 → 감싼 함수 호출 → 같은 이름 정의 꼴은 bash 가 외부 명령을 돌린다(대상 미상 쓰기) · 앞 정의는 면제",
+             got == [(True, [])] * 3 + [(False, [])] * 2, got)
 
     @cell
     def r3_s1_r6_003():

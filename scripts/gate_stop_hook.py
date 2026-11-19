@@ -279,7 +279,7 @@ def load_checker_module():
         return None
 
 
-def _write_sites(cmd: str, fragment: bool = False, known=(), whole_funcs=None):
+def _write_sites(cmd: str, fragment: bool = False, known=()):
     """fz-guard write_sites — 못 불러오거나 못 읽으면 None(호출부가 '대상 미상' 으로 본다 · 정규식으로 돌아가지 않는다)."""
     if not _GUARD:
         try:
@@ -290,7 +290,7 @@ def _write_sites(cmd: str, fragment: bool = False, known=(), whole_funcs=None):
             _GUARD.append(mod if callable(getattr(mod, "write_sites", None)) and mod.shell_tokens is not None else None)
         except Exception:                                  # noqa: BLE001 — 훅은 어떤 오류로도 세션을 감금하지 않는다
             _GUARD.append(None)
-    return _GUARD[0].write_sites(cmd, fragment, known, whole_funcs) if _GUARD[0] is not None else None
+    return _GUARD[0].write_sites(cmd, fragment, known) if _GUARD[0] is not None else None
 
 
 def load_state() -> dict:
@@ -572,12 +572,10 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
     # 호출만이고(`tee -a 원장; tee() { :; }` 의 앞선 tee 는 외부 명령이다), 같은 조각 안의 앞뒤는 write_sites 가 위치로 가른다. 정의는 명령 전체에서
     # 가드와 같은 함수로 모은다 — 서브셸 괄호가 조각 경계를 넘고(`(echo; g() { :; }); g`) `|` · `&` 는 조각 경계라(`g() { :; } | cat; g`) 조각마다
     # 따로 읽으면 서브셸 · 파이프라인 칸 · `&` 목록 안 정의가 맨 바깥 것이 된다.
-    # 함수 본문 안의 쓰기 명령 밖 이름은 명령 전체가 정의한 함수(`seen`)로 가른다(`f() { g 원장; }; g() { :; }; f`) — 두 집합을 다 넘기고
-    # 본문 안 호출을 어느 집합으로 가를지는 write_sites 가 정한다(가드가 명령 전체를 읽을 때와 같은 판정)
     whole = shell_tokens.lex(cmd)
     defs = _GUARD[0].defined_functions(whole)
     starts = [0] + [t.end for t in whole if isinstance(t, shell_tokens.Op) and t.text not in ("(", ")")]   # segments() 와 같은 경계
-    funcs_before, seen = [frozenset(n for n, end in defs.items() if end <= s) for s in starts], set(defs)
+    funcs_before = [frozenset(n for n, end in defs.items() if end <= s) for s in starts]
     out = []
     cur_dir, cd_next, stack = None, None, []
     marks = _subshell_marks(cmd, len(segs))
@@ -644,7 +642,7 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
         if missed is not None and unknown is not None:
             unknown.append((missed, cur_dir))
         # 쓰기 자리(fz-guard write_sites) — 대상 글자는 따옴표를 벗긴 그대로이고 펼침은 펼쳐지는 단어(`expands`)만 한다(작은따옴표 `'$W'` 는 글자다)
-        sites = _write_sites(seg, fragment=True, known=funcs_before[i], whole_funcs=seen) or []
+        sites = _write_sites(seg, fragment=True, known=funcs_before[i]) or []
         # 판정기 호출은 위 _gate_call 이 맡는다(쓰기 여부 · 원장 인자) — 맨 바깥 명령의 미상 자리로 세지 않는다 · `--from-plan` 의 `--out` 값은 쓰기 대상이다
         found = [(w.text, w.expands, w.quoted, bool(c.depth or c.deferred)) for w, c in sites if w is not None]
         if gate:
@@ -1450,10 +1448,8 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
         lines.append(tool_use("Bash", {"command": f"W={ledger.parent.parent}; python3 -c 'open(\"'$W'/gates/plan.md\",\"w\")'"}, cwd=root / "elsewhere"))
     elif kind == "r3-funcdef-read":
         lines.append(tool_use("Bash", {"command": f"g() {{ grep -n STATE {ledger}; }}; g"}, cwd=root / "elsewhere"))
-        # 본문 안 호출의 같은 이름 함수 — 쓰기 명령 표 밖 이름은 명령 어디의 정의로도 · 쓰기 명령은 본문보다 앞의 정의로 함수다(쓰지 않는다)
-        for cmd in (f"f() {{ helper {ledger}; }}; helper() {{ :; }}; f", f"f() {{ helper {ledger}; }}; f; helper() {{ :; }}",
-                    f"rm() {{ :; }}; f() {{ rm -f {ledger}; }}; f"):
-            lines.append(tool_use("Bash", {"command": cmd}, cwd=root / "elsewhere"))
+        # 본문 안 호출의 같은 이름 함수 — 이름과 무관하게 본문보다 앞의 정의로만 함수다(쓰지 않는다)
+        lines.append(tool_use("Bash", {"command": f"rm() {{ :; }}; f() {{ rm -f {ledger}; }}; f"}, cwd=root / "elsewhere"))
     elif kind == "r3-named-no-literal":
         lines.append(tool_use("Bash", {"command": f"python3 tool.py --root {root} --gates-report"}, cwd=root))
     elif kind == "r6-cd-chain":

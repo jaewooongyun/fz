@@ -7,14 +7,16 @@
 #           default-var-sourced(플래그 없는 기본 실행 + source) · set-state-cd(`cd …/gates` 뒤 상대명) ·
 #           set-state-abbrev(`--set active` — argparse 축약 = `--set-state`) ·
 #           deferred-write-before-same-name-func(함수 본문을 같은 이름 함수 정의 전에 불러 본문의 외부 tee 가 쓴다 — 본문에 뒤 함수 호출도 있다) ·
-#           deferred-unknown-option-before-same-name-func(같은 꼴의 표 밖 옵션 `cp -N` — 대상을 못 뽑는 본문 쓰기 명령)
+#           deferred-unknown-option-before-same-name-func(같은 꼴의 표 밖 옵션 `cp -N` — 대상을 못 뽑는 본문 쓰기 명령) ·
+#           deferred-outside-name-before-same-name-func(같은 꼴의 쓰기 명령 밖 이름 `python3 -c` — 본문의 외부 python3 이 쓴다)
 #           → 원장이 바뀌고 훅이 막는다(exit 2 · 사유에 `미충족 게이트: <원장>`)
 #   read    status-literal · status-only(`--status --only`) · status-only-sourced · discover · cat-args(판정기 이름이 인자로만 지나감) ·
 #           status-abbrev(`--stat` — argparse 축약 = `--status`) ·
 #           source-missing-unrelated(못 읽은 source 뒤 판정기와 무관한 스크립트 — 어휘 밖 옵션) ·
-#           stdin-script-args(`python3 -` 의 stdin 스크립트에 판정기 경로 · 변수를 인자로 넘김 — 판정기 호출이 아니다) ·
-#           deferred-call-later-func(함수 본문 안 호출이 뒤에 정의된 함수를 부른다 — `-guard` 셀은 가드 P4 판정도 읽기인지 본다)
+#           stdin-script-args(`python3 -` 의 stdin 스크립트에 판정기 경로 · 변수를 인자로 넘김 — 판정기 호출이 아니다)
 #           → 원장 불변 · 훅 통과(exit 0 · `다른 세션의 원장(막지 않음): <원장>`)
+#   overblock deferred-call-later-func-overblock — 함수 본문 안 호출이 본문보다 뒤에 정의된 함수를 부른다(감싼 함수는 그 정의 뒤에 부른다) →
+#           원장 불변인데 가드 P4 는 대상 미상 쓰기 · 훅은 '대상 미상 쓰기' 로 막는다(과차단 고정 — 본문보다 앞의 정의만 면제한다)
 #   tilde   tilde-source-owned — `. ~/env.sh`(셀 HOME 에 실재) 뒤 `"$G" --only S1 "$L"` → 소유로 막되 '대상 미상 쓰기' 가 아니다
 #   unknown only-profile-var — 원장 인자가 이 명령 · source 밖(셸 프로필)에서 온 쓰기 → 훅이 '대상 미상 쓰기' 로 전 원장 판정(차단)
 #           only-sourced-gone — source 한 env 파일이 훅 전에 지워진 쓰기(`"$G"` · `"$L"` 를 못 푼다) → 같은 '대상 미상 쓰기'
@@ -23,9 +25,11 @@
 #   pair    own-and-foreign — 한 세션이 원장 A 는 `--only` 로 쓰고 B 는 `--status` 로 읽기만 → A 만 막고 B 는 경고
 #   loop    loop-guard — 소유 원장 미충족은 MAX_BLOCKS(2)회 막고 3회째 루프 방어로 통과(불변)
 #   scope   function-scope-guard-hook-agree — 같은 이름 함수 면제의 셸 범위 표(치환 · 서브셸 · 파이프라인 칸 · `&` 목록 안 정의는 밖 호출에
-#           닿지 않고, 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&` 명령은 앞 정의를 물려받는다)와 함수 본문 안 호출의 정의 순서 표(쓰기 명령은
-#           본문보다 앞의 정의만 · 그 밖 이름은 어디의 정의로도 함수)를 가드 bash_write 와 훅 _bash_write_targets 에 함께 돌려 기대값 · 두 판정의
-#           일치를 본다
+#           닿지 않고, 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&` 명령은 앞 정의를 물려받는다)와 함수 본문 안 호출의 정의 순서 표(이름과
+#           무관하게 본문보다 앞의 정의만 함수)를 가드 bash_write 와 훅 _bash_write_targets 에 함께 돌려 기대값 · 두 판정의 일치를 본다
+#   grid    body-def-grid — 함수 본문 안 이름(쓰기 명령 표 안 · 쓰기 옵션을 든 읽기 명령 · 읽기 표 밖) × 같은 이름 정의 자리(본문 앞 · 본문 뒤
+#           호출 앞 · 호출 뒤 · 없음) × 감싼 함수 호출 꼴 × 경유를 실제 bash 의 대상 바이트 변화와 가드 · 훅 판정에 견준다 — 놓침 0 · 불일치 0 ·
+#           과차단 = 본문 → 정의 → 호출 칸 전부
 # 기준 트리(4.44.0)는 판정기 쓰기 플래그 · 기본 실행 · 변수 경로 · source 를 쓰기로 보지 않아 write 셀이 '다른 세션의 원장' 으로
 #   통과한다 → exit 1.
 # ⛔ 셀 집합 대조(F-408): 실제로 돈 셀(단언 1개 이상)의 이름 · 횟수가 EXPECTED_CELLS 와 다르면 FAIL — 끝 줄 `CELLS n=<수> ran=<…>`.
@@ -77,8 +81,9 @@ EXPECTED_CELLS = {
     "status-literal": 1, "status-only": 1, "status-only-sourced": 1, "discover": 1, "cat-args": 1,
     "status-abbrev": 1, "source-missing-unrelated": 1, "stdin-script-args": 1, "tilde-source-owned": 1,
     "only-profile-var": 1, "only-sourced-gone": 1, "control-finalize": 1, "own-and-foreign": 1, "loop-guard": 1,
-    "deferred-call-later-func": 1, "deferred-call-later-func-guard": 1, "deferred-call-undefined-unknown": 1,
-    "deferred-write-before-same-name-func": 1, "deferred-unknown-option-before-same-name-func": 1, "function-scope-guard-hook-agree": 1,
+    "deferred-call-later-func-overblock": 1, "deferred-call-undefined-unknown": 1,
+    "deferred-write-before-same-name-func": 1, "deferred-unknown-option-before-same-name-func": 1,
+    "deferred-outside-name-before-same-name-func": 1, "function-scope-guard-hook-agree": 1, "body-def-grid": 1,
     "for-loop-var": 1, "for-loop-prior-value": 1, "for-loop-body-reassign": 1, "for-loop-break-after-done": 1,
     "for-loop-after-done-use": 1, "for-loop-continue-unknown": 1, "for-loop-nested-unknown": 1, "for-loop-glob-unknown": 1,
     "for-loop-charclass-unknown": 1, "for-loop-brace-unknown": 1, "for-loop-source-reassign": 1, "for-loop-multiword-list-unknown": 1,
@@ -301,13 +306,16 @@ try:
     write_cell("set-state-abbrev", "rfr", lambda c, L: [f'{G_LINE}\npython3 "$G" --set active {L}'])
     # 같은 이름 함수 면제는 정의 뒤 호출만이다 — 정의보다 앞선 `tee` 는 외부 명령이고 원장을 실제로 쓴다(뒤의 정의가 그 쓰기를 가리지 않는다)
     write_cell("write-before-same-name-func", "finalized", lambda c, L: [f"printf '\\n' | tee -a {L} >/dev/null; tee() {{ :; }}"])
-    # 함수 본문이 같은 이름 함수의 정의보다 먼저 불리면 본문의 `tee` 도 외부 명령이다 — 같은 본문의 `g`(뒤에 정의된 함수 · 쓰기 명령 밖
-    #   이름)가 면제를 받아도 본문의 쓰기 명령은 그 면제를 따라가지 않는다
+    # 함수 본문이 같은 이름 함수의 정의보다 먼저 불리면 본문의 `tee` 도 외부 명령이다 — 같은 본문의 `g`(본문보다 뒤에 정의된 함수)도
+    #   면제를 받지 않는다(감싼 함수를 그 정의 뒤에 불러 bash 는 함수를 돌리지만 판정은 쓰기 — 과차단 쪽)
     write_cell("deferred-write-before-same-name-func", "finalized",
                lambda c, L: [f"f() {{ g; printf '\\n' | tee -a {L} >/dev/null; }}; g() {{ :; }}; f; tee() {{ :; }}"])
     # 대상을 못 뽑는 쓰기 명령(표 밖 옵션 `cp -N`)도 같다 — 본문 뒤의 같은 이름 정의는 그 본문 호출을 함수로 만들지 않는다(외부 cp 가 쓴다)
     write_cell("deferred-unknown-option-before-same-name-func", "finalized",
                lambda c, L: [f"cat {L} > src.txt; echo >> src.txt; f() {{ cp -N src.txt {L}; }}; f; cp() {{ :; }}"])
+    # 쓰기 명령 밖 이름(인터프리터 `python3 -c`)도 같다 — 본문 뒤의 같은 이름 정의는 본문 호출을 함수로 만들지 않는다(외부 python3 이 쓴다)
+    write_cell("deferred-outside-name-before-same-name-func", "finalized",
+               lambda c, L: [f"f() {{ python3 -c 'import sys; open(sys.argv[1], \"a\").write(\"\\n\")' {L}; }}; f; python3() {{ :; }}"])
 
     # ── read — 읽기 전용 호출은 소유로 승격되지 않는다 ─────────────────────────────────
     read_cell("status-literal", lambda c, L: [f'{G_LINE}\npython3 "$G" --status {L}'])
@@ -322,14 +330,22 @@ try:
     # `python3 -` 는 stdin 의 스크립트를 돌린다 — 뒤의 판정기 경로 · `$T` 는 그 스크립트의 sys.argv 다
     read_cell("stdin-script-args",
               lambda c, L: ["P=/opt/plug; python3 - $P/scripts/gate_check.py $T <<'PY'\nimport sys\nprint(len(sys.argv))\nPY"])
-    # 함수 본문은 불릴 때 돈다 — 본문 안 `g` 는 뒤에 정의된 함수(`:`)라 아무것도 쓰지 않는다. 쓰기 명령 밖 이름이라 맨 바깥 호출과 달리
-    #   글자 순서로 가르지 않는다
-    #   (훅 소유 판정 · 가드 P4 가 같게 읽는다 — `-guard` 셀이 같은 명령의 가드 판정을 본다)
-    later_func = lambda L: f"f() {{ g {L}; }}; g() {{ :; }}; f"  # noqa: E731
-    read_cell("deferred-call-later-func", lambda c, L: [later_func(L)])
-    with Cell("deferred-call-later-func-guard") as c:
-        got = guard_bash_write(later_func(c.cwd / "TICKET-0000" / "gates" / "plan.md"), c.env)
-        check(c.name, got == "(False, [])", "가드도 같은 명령을 읽기로 본다(bash_write → (False, []) — 두 판정이 갈리지 않는다)", got)
+
+    # ── overblock — 본문보다 뒤에 정의된 함수의 본문 안 호출(과차단 고정) ──────────────────────
+    #    함수 본문은 불릴 때 돈다 — 감싼 함수를 g 의 정의 뒤에 부르므로 bash 는 함수 g(`:`)를 돌려 아무것도 쓰지 않는다. 판정은 이름과
+    #    무관하게 본문보다 앞의 정의만 면제하므로 가드 P4 는 대상 미상 쓰기 · 훅은 원장 글자를 든 이름 미상 쓰기로 막는다
+    with Cell("deferred-call-later-func-overblock") as c:
+        led = c.ledger()
+        before = sha(led)
+        cmd = f"f() {{ g {led}; }}; g() {{ :; }}; f"
+        c.run(cmd)
+        check(c.name, sha(led) == before, "명령이 원장을 쓰지 않는다(바이트 불변 — 본문의 g 는 함수)", "")
+        got = guard_bash_write(cmd, c.env)
+        check(c.name, got == "(True, [])", "가드는 본문보다 뒤 정의를 면제하지 않는다(bash_write → (True, []) — 과차단)", got)
+        rc, reason, err = c.hook()
+        r = reason or ""
+        check(c.name, rc == 2 and "대상 미상 쓰기" in r and f"미충족 게이트: {led} — " in r,
+              "훅도 같은 명령을 '대상 미상 쓰기' 로 막는다(두 판정이 갈리지 않는다)", f"rc={rc} {err[-300:]}")
 
     # 같은 이름 함수 면제는 정의가 호출과 같은 셸이나 그 바깥 셸에 있을 때만이다 — `$(…)` · 백틱 · heredoc 본문 치환 · `( … )` 서브셸 ·
     #   파이프라인 칸 · `&` 목록 안 정의는 밖의 호출에 닿지 않고(괄호가 조각 경계를 넘는 꼴 포함), 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&`
@@ -358,12 +374,18 @@ try:
                     "true | { rm() { :; }; }; rm -rf build",
                     "rm() { :; } && true & wait; rm -rf build",
                     "cat /dev/null |\nrm() { :; }; rm -rf build",
-                    # 함수 본문 안의 쓰기 명령(tee · rm · touch · mkdir · cp · mv)은 같은 이름 함수가 그 본문보다 앞에 정의됐을 때만 함수다 —
-                    #   본문이 정의 전에 불리면 외부 명령이 쓴다. 정의 뒤에 불리는 꼴(둘째 줄)도 쓰기로 읽는다(보수 판정)
+                    # 함수 본문 안 호출은 이름과 무관하게(쓰기 명령 tee · rm · touch · mkdir · cp · mv · 그 밖 이름) 같은 이름 함수가 그 본문보다
+                    #   앞에 정의됐을 때만 함수다 — 본문이 정의 전에 불리면 외부 명령이 쓴다. 정의 뒤에 불리는 꼴(main · helper 꼴 포함)도 쓰기로
+                    #   읽는다(보수 판정 — 과차단 쪽)
                     "f() { rm -rf build; }; f; rm() { :; }",
                     "f() { rm -rf build; }; rm() { :; }; f",
                     "f() { tee -a build; }; f; tee() { :; }",
-                    "f() { mkdir -m 700 build; }; f; mkdir() { :; }"]
+                    "f() { mkdir -m 700 build; }; f; mkdir() { :; }",
+                    "f() { helper build; }; helper() { :; }; f",
+                    "f() { helper build; }; f; helper() { :; }",
+                    "f() { sed -i '' s/a/b/ build; }; f; sed() { :; }",
+                    "f() { python3 -c x build; }; f; python3() { :; }",
+                    "f() { unlink build; }; f; unlink() { :; }"]
     scope_reads = ["rm() { :; }; rm -rf build",
                    "rm() { :; }; (rm -rf build)",
                    'rm() { :; }; echo "$(rm -rf build)"',
@@ -382,11 +404,9 @@ try:
                    "rm() { :; }; rm -rf build & wait",
                    "rm() { :; }; { rm -rf build; } | cat",
                    "tee() { :; }; echo x | tee -a build",
-                   # 본문보다 앞에 정의된 같은 이름 함수는 본문 안 쓰기 명령도 면제한다 · 쓰기 명령 표 밖 이름의 본문 안 호출은 명령 어디의
-                   #   정의로도 면제된다(main · helper 꼴 — 정의 순서와 무관)
+                   # 본문보다 앞에 정의된 같은 이름 함수는 본문 안 호출도 면제한다(쓰기 명령 · 그 밖 이름)
                    "rm() { :; }; f() { rm -rf build; }; f",
-                   "f() { helper build; }; helper() { :; }; f",
-                   "f() { helper build; }; f; helper() { :; }"]
+                   "helper() { :; }; f() { helper build; }; f"]
     with Cell("function-scope-guard-hook-agree") as c:
         rows = [(cmd, True) for cmd in scope_writes] + [(cmd, False) for cmd in scope_reads]
         got = judge_pair([cmd for cmd, _ in rows] + [cmd.replace("build", "gates/plan.md") for cmd, _ in rows], c.env)
@@ -396,6 +416,63 @@ try:
             ok = lit[0] == want and led[0] == want and hook == want and (want or (lit == [False, []] and led == [False, []]))
             check(c.name, ok, f"{'쓰기' if want else '쓰기 아님'} — 가드 · 훅 같은 판정: {cmd!r}",
                   f"가드={lit} · 가드(원장 꼴)={led} · 훅 대상={targets} · 대상 미상={unk}")
+
+    # ── grid — 함수 본문 안 호출의 정의 순서 격자(body-def-grid) ───────────────────────────────
+    #    본문 안 이름(쓰기 명령 표 안 rm · cp / 쓰기 옵션을 든 읽기 명령 sort -o · awk 리다이렉트 · find -delete / 읽기 표 밖 python3 -c ·
+    #    bash -c · unlink · PATH 스텁) × 같은 이름 정의 자리(본문 앞 · 본문 뒤 호출 앞 · 호출 뒤 · 없음) × 감싼 함수 호출 꼴(`f` · `$(f)` ·
+    #    `f | cat` · `true && f`) × 경유(직접 · f 가 h 를 거쳐 부름). 칸마다 실제 bash 로 대상 바이트 변화를 재고 가드 bash_write · 훅
+    #    _bash_write_targets 판정과 견준다 — 실제 bash 가 쓰는 칸 = 호출 뒤 정의 · 정의 없음 · 가드 놓침 0 · 훅 놓침 0 · 두 판정 불일치 0 ·
+    #    과차단(쓰지 않는데 쓰기) = 본문 → 정의 → 호출 칸 전부이고 그 밖에는 없다.
+    #    만들지 않는 것: PATH · hash · alias 로 바뀌는 이름 풀이 · 호출 사이 재정의 · unset -f · eval 정의 · export -f · 재귀
+    grid_names = [("rm", "rm -f gates/plan.md"), ("cp", "cp src.txt gates/plan.md"),
+                  ("sort", "sort -o gates/plan.md gates/plan.md"), ("awk", "awk 'BEGIN { printf \"x\" > \"gates/plan.md\" }'"),
+                  ("find", "find gates -name plan.md -delete"),
+                  ("python3", "python3 -c 'import sys; open(sys.argv[1], \"a\").write(\"x\")' gates/plan.md"),
+                  ("bash", "bash -c 'printf x >> \"$0\"' gates/plan.md"), ("unlink", "unlink gates/plan.md"),
+                  ("stubwrite", "stubwrite gates/plan.md")]
+    grid_orders = {"def-body-call": "{d}; {w}; {call}", "body-def-call": "{w}; {d}; {call}", "body-call-def": "{w}; {call}; {d}",
+                   "no-def": "{w}; {call}"}
+    grid_calls = ["f", 'echo "$(f)"', "f | cat", "true && f"]
+    grid_vias = ["f() {{ {body}; }}", "h() {{ {body}; }}; f() {{ h; }}"]
+    with Cell("body-def-grid") as c:
+        stub, target, src, seed = c.root / "bin" / "stubwrite", c.cwd / "gates" / "plan.md", c.cwd / "src.txt", b"b\na\n"
+        try:
+            stub.parent.mkdir()
+            stub.write_text('#!/bin/sh\nprintf x >> "$1"\n', encoding="utf-8")
+            stub.chmod(0o755)
+            target.parent.mkdir()
+            src.write_bytes(b"copy\n")
+        except OSError as e:
+            raise Setup(f"격자 준비 실패: {e}")
+        path = {"PATH": f"{stub.parent}{os.pathsep}{c.env.get('PATH', '')}"}
+        rows = []
+        for name, body in grid_names:
+            for order, shape in grid_orders.items():
+                for call in grid_calls:
+                    for wrap in grid_vias:
+                        cmd = shape.format(d=f"{name}() {{ :; }}", w=wrap.format(body=body), call=call)
+                        try:
+                            target.write_bytes(seed)
+                        except OSError as e:
+                            raise Setup(f"격자 대상 준비 실패: {e}")
+                        c.run(cmd, record=False, extra=path)
+                        rows.append((cmd, order, (target.read_bytes() if target.is_file() else None) != seed))
+        got = judge_pair([cmd for cmd, _, _ in rows], c.env)
+        oracle, miss_g, miss_h, split, over = [], [], [], [], []
+        for (cmd, order, wrote), (g, targets, unk) in zip(rows, got):
+            guard, hook = bool(g[0]), bool(targets) or unk > 0
+            oracle += [cmd] if wrote != (order in ("body-call-def", "no-def")) else []
+            miss_g += [cmd] if wrote and not guard else []
+            miss_h += [cmd] if wrote and not hook else []
+            split += [cmd] if guard != hook else []
+            over += [cmd] if guard and not wrote else []
+        want_over = [cmd for cmd, order, _ in rows if order == "body-def-call"]
+        check(c.name, not oracle, f"실제 bash 가 쓰는 칸 = 호출 뒤 정의 · 정의 없음({len(rows)}칸)", oracle[:3])
+        check(c.name, not miss_g, "가드 놓침 0(실제 bash 가 쓰는 칸은 가드도 쓰기)", miss_g[:3])
+        check(c.name, not miss_h, "훅 놓침 0(실제 bash 가 쓰는 칸은 훅도 대상 · 대상 미상)", miss_h[:3])
+        check(c.name, not split, "가드 · 훅 판정 불일치 0", split[:3])
+        check(c.name, over == want_over, f"과차단 = 본문 → 정의 → 호출 칸 전부({len(want_over)}칸) · 그 밖 0",
+              f"뜻밖={[x for x in over if x not in want_over][:3]} · 빠짐={[x for x in want_over if x not in over][:3]}")
 
     # ── tilde — `~` 로 source 한 env 파일이 실재하면 그 대입으로 푼다(소유 · '대상 미상' 아님) ───────────
     with Cell("tilde-source-owned") as c:
