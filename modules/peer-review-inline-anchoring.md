@@ -111,9 +111,7 @@ hunk:  89-96 / 101-109          ← 97-100이 미변경이라 갈라짐
 
 ### 6) 게시 실행
 
-```bash
-gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST --input payload.json
-```
+게시와 review id 캡처는 아래 7) 블록의 POST 한 번이다 — 따로 POST 하지 않는다(같은 POST 를 두 번 부르면 리뷰가 두 번 달린다 · 셸 변수가 Bash 호출 사이에 이어진다는 보장이 없어 POST 와 착지 검증을 한 블록에 둔다).
 
 > ⛔ 게시 POST 는 쓰기라 `SKILL.md` frontmatter `allowed-tools` 로 사전 승인하지 않는다 — 권한 프롬프트를 거친다. gh 는 조회 꼴(`gh auth status` · `gh pr view`)만 사전 승인한다. 게시 경로는 `gh api` 하나다 — GitHub 리뷰 API 의 `comments[]` 에 `start_line`·`start_side`·`side` 를 넣어야 범위 하이라이트·LEFT 앵커가 된다. `comments[]` 를 `{path,line,body}` / `{path,position,body}` 두 형태로만 받는 MCP 리뷰 도구로는 **범위 하이라이트와 LEFT 앵커가 불가능**하다.
 
@@ -122,7 +120,7 @@ gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST --input payload.json
 게시했다고 원하는 줄에 달린 것은 아니다. 재조회해서 대조하되, **PR 전체 코멘트를 조회하면 안 된다** — 기존 코멘트를 새 것으로 오인하고, 실패 시 삭제 대상도 특정할 수 없다(기존 코멘트가 많은 PR 일수록 그렇다).
 
 ```bash
-# 6단계 POST 응답에서 review id를 잡아 둔다
+# 6단계 게시 — 이 POST 한 번의 응답에서 review id 를 잡는다(따로 POST 하지 않는다)
 REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST \
               --input payload.json --jq '.id')
 
@@ -130,7 +128,7 @@ REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST \
 python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/verify_landing.py" --payload payload.json --pr {N} --review-id "$REVIEW_ID"
 ```
 
-`verify_landing.py` 는 두 호출을 나눈다. ① 리뷰 하위 컬렉션(`/pulls/{N}/reviews/{id}/comments`)에서는 **id 만** 모은다 — 이 응답은 `line`·`side`·`start_*` 를 null 로 주고 `position`·`diff_hunk` 만 채울 수 있다(F-150 · F-256 · F-282, 실측 3회). ② 필드 대조는 id 마다 개별 조회(`/pulls/comments/{id}`)한 값으로만 한다. 짝은 코멘트 본문으로 맞추고(렌더 경로는 본문에 `<!-- fz-review:ID -->` 표지가 있다), payload 항목마다 넷 중 하나로 판정한다. 개수도 함께 본다 — 짝 없는 코멘트는 `unpaired` 로 따로 나온다.
+`verify_landing.py` 는 세 호출을 나눈다. ① 리뷰 하위 컬렉션(`/pulls/{N}/reviews/{id}/comments`)에서는 **id 만** 모은다 — 이 응답은 `line`·`side`·`start_*` 를 null 로 주고 `position`·`diff_hunk` 만 채울 수 있다(F-150 · F-256 · F-282, 실측 3회). ② 필드 대조는 id 마다 개별 조회(`/pulls/comments/{id}`)한 값으로만 한다. 짝은 코멘트 본문으로 맞추고(렌더 경로는 본문에 `<!-- fz-review:ID -->` 표지가 있다), payload 항목마다 넷 중 하나로 판정한다. 개수도 함께 본다 — 짝 없는 코멘트는 `unpaired` 로 따로 나온다. ③ 리뷰 자체(`/pulls/{N}/reviews/{id}`)를 한 번 조회해 payload 의 `event` · 본문 · `commit_id` 와 대조한다 — 인라인 0건이어도 돈다(코멘트가 없으면 이 대조가 유일한 착지 확인이다).
 
 | 판정 | 조건 | 대응 |
 |------|------|------|
@@ -142,7 +140,8 @@ python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/verify_landing.py" --pa
 - 단일 줄 코멘트는 `start_line`·`start_side` 를 보내지 않으므로 응답의 두 값이 null 이어도 `OK` 다
 - ⛔ null 은 "값이 다르다" 가 아니라 "이 응답이 그 값을 주지 않았다" 일 수 있다 — null 을 불일치로 읽고 지우면 정상 게시가 사라지고 알림이 두 번 간다. 삭제는 되돌릴 수 없다
 - POST 와 조회 사이 PR head 가 움직이면 두 경우다(payload 최상위 `commit_id` = 게시 시점 head 로 가른다). ① 코멘트가 outdated 가 되면 `line` 은 null 이고 `original_line` 만 남는다 → `UNVERIFIED`. ② 코멘트가 새 head 로 이월되면 `line` 이 다시 매겨지고 `commit_id` 가 전진한다 → 응답 `original_commit_id` 가 payload `commit_id` 와 같을 때만 `line`·`start_line` 을 `original_line`·`original_start_line` 과, `path`·`side`·`start_side` 는 현재 값과 대조해 `OK`/`MISMATCH`, 같지 않으면 `UNVERIFIED`. 다시 매긴 `line` 을 게시값과 바로 비교해 `MISMATCH` 로 확정하지 않는다. payload 에 `commit_id` 가 없으면 이월을 가르지 못해 현재 값으로 대조한다 [미검증: 실 GitHub 가 이월 코멘트의 `line` 을 다시 매기는지 — 실 API UNRUN]
-- exit: 0 전건 `OK` · 1 `OK` 아닌 항목이 있다 · 짝 없는 코멘트(`unpaired`)가 있다 · 2 판정 불가(gh 부재 · 하위 컬렉션 조회 실패 · payload 읽기 실패 · review id 비정상 — ⛔ 통과 아님)
+- 리뷰 자체 대조(③)는 보고 JSON 의 `review` 에 따로 나온다(`counts` 에 넣지 않는다). state 는 `event` 이름을 바꿔 대조한다(`COMMENT`→`COMMENTED` · `APPROVE`→`APPROVED` · `REQUEST_CHANGES`→`CHANGES_REQUESTED`) · 본문은 줄 끝 공백 · CRLF 를 정규화해 대조한다. 셋 중 하나라도 다르면 `UNVERIFIED` 다 — 지우지도 다시 올리지도 않고 사용자에게 보고한다. payload 에 `event` 가 없으면 GitHub 은 제출되지 않은 `PENDING` 리뷰를 만든다 — 리뷰가 `PENDING` 이면 판정 `PENDING`(불일치가 아니라 미제출 — 다시 POST 하지 않고 사용자에게 보고)이다
+- exit: 0 전건 `OK` 이고 리뷰 자체도 `OK`(event · 본문 · commit 일치 — 인라인 0건 포함) · 1 `OK` 아닌 항목이 있다 · 짝 없는 코멘트(`unpaired`)가 있다 · 리뷰 자체가 `UNVERIFIED` · `PENDING` 이다 · 2 판정 불가(gh 부재 · 리뷰 조회 실패 · 하위 컬렉션 조회 실패 · payload 읽기 실패 · review id 비정상 — ⛔ 통과 아님)
 
 ## 4. 게시 전 확인 게이트
 

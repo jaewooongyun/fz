@@ -17,7 +17,7 @@
 
 사용:
   run_metrics.py start --skill S --mode light|full --recommended light|full|none
-                       [--source arg|fz|signal|autonomous|gate] [--work-dir W] [--reason TEXT]
+                       [--source arg|fz|signal|autonomous|gate] [--work-dir W] [--reason TEXT] [--reuse-open]
   run_metrics.py end   --skill S [--work-dir W] --status completed|interrupted|failed [--workflow-run-id wf_x]
                        [--gate-issues GATE=N ...] [--findings gpt=N,claude=N,convergent=N]
   run_metrics.py sweep [--older-than-hours N]
@@ -26,6 +26,9 @@
 
 start  end 없이 남은 앞 시도의 표지를 status interrupted 1행으로 먼저 닫고 다음 attempt 의 표지를 연다.
        attempt = 1 + 그 run_id 의 끝난 행 수(번호가 비어 있으면 최대 attempt + 1). stdout `RUN <run_id> attempt <n>`.
+       --reuse-open 이면 그 run_id 의 열린 표지가 있을 때 닫지 않고 그 시도를 그대로 쓴다(표지를 바꾸지 않는다 ·
+       stdout `RUN <run_id> attempt <n> reused`) — 같은 실행 안에서 다시 불리는 호출자(피어 리뷰 근거 슬롯 검사)의 재호출이
+       새 실행으로 세어지지 않게 한다. 열린 표지가 없으면 보통 start 와 같다.
 end    열린 표지를 1행으로 닫는다. model = 세션 트랜스크립트의 마지막 assistant message.model ·
        effort = mode_gate.lead_effort 의 override(있으면) 또는 value. 트랜스크립트를 못 읽으면 둘 다 unknown(추측하지 않는다).
        같은 시도에 두 번 부르면 두 번째는 `RUN <run_id> already ended` 이고 행을 더 쓰지 않는다.
@@ -468,6 +471,10 @@ def cmd_start(args, env) -> int:
     rid = run_id_of(pid, args.skill)
     pdir = state_root(env) / pid
     with locked(pdir):
+        reuse = open_markers(pdir, rid) if args.reuse_open else []
+        if reuse:   # 같은 실행 안의 재호출 — 열린 시도를 그대로 쓴다(닫고 번호를 올리면 재호출이 새 실행으로 세어진다)
+            print(f"RUN {rid} attempt {reuse[-1][0]} reused")
+            return 0
         for attempt, _, path in open_markers(pdir, rid):   # end 없이 끝난 앞 시도 — 이번 start 는 재개다
             if close_marker(pdir, path, rid, attempt, "interrupted", None, env, args.projects_root, skill=args.skill):
                 print(f"RUN {rid} attempt {attempt} interrupted")
@@ -602,6 +609,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--source", choices=SOURCES)
     s.add_argument("--work-dir")
     s.add_argument("--reason")
+    s.add_argument("--reuse-open", action="store_true",
+                   help="그 run_id 의 열린 시도가 있으면 닫지 않고 그대로 쓴다(같은 실행 안에서 다시 부르는 호출자)")
     e = sub.add_parser("end", parents=[common], help="완료 보고 직전")
     e.add_argument("--skill", required=True, type=skill)
     e.add_argument("--work-dir")
@@ -779,6 +788,20 @@ def self_test() -> int:
                   and re.search(r"^RUN [0-9a-f]{12} attempt 2$", outs[2][1], re.M) is not None)
             return ok, f"rc={[o[0] for o in outs]} rows={got} run_ids={len(run_ids)}"
 
+        def c_reuse_open():
+            st, wd = base / "s-reuse", base / "wd-reuse"
+            outs = [start(st, "fz-search", wd), start(st, "fz-search", wd, "--reuse-open")]
+            first = sorted(p.name for p in st.glob(f"*/{OPEN_DIR}/*.json"))
+            rows, _ = rows_of(st)
+            kept = (len(first) == 1 and first[0].endswith(".1.json") and not rows
+                    and re.search(r"^RUN [0-9a-f]{12} attempt 1 reused$", outs[1][1], re.M) is not None)
+            outs += [end(st, "fz-search", wd), start(st, "fz-search", wd, "--reuse-open")]   # 열린 시도가 없으면 보통 start 와 같다
+            after = sorted(p.name for p in st.glob(f"*/{OPEN_DIR}/*.json"))
+            rows, _ = rows_of(st)
+            ok = (all(o[0] == 0 for o in outs) and kept and len(after) == 1 and after[0].endswith(".2.json")
+                  and [(r.get("attempt"), r.get("status")) for r in rows] == [(1, "completed")])
+            return ok, f"rc={[o[0] for o in outs]} open={first} → {after} rows={len(rows)} out={outs[1][1].strip()!r}"
+
         def c_harness_fields():
             st, wd = base / "s-harness", base / "wd-harness"
             gate_b = "Confident Error (cross-model 불일치)"
@@ -839,7 +862,7 @@ def self_test() -> int:
 
         cases = (("concurrent", c_concurrent), ("duplicate-end", c_duplicate_end), ("interrupted", c_interrupted),
                  ("write-failure", c_write_failure), ("no-body-copy", c_no_body_copy), ("source-default", c_source_default),
-                 ("resume-attempt", c_resume_attempt),
+                 ("resume-attempt", c_resume_attempt), ("reuse-open", c_reuse_open),
                  ("harness-fields", c_harness_fields), ("skill-alias", c_skill_alias),
                  ("unknown-skill", c_unknown_skill), ("active-min", c_active_min))
         passed = 0

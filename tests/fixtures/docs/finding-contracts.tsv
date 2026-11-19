@@ -333,3 +333,10 @@ F-678	skills/fz-discover/SKILL.md	has:replace	크기 기준: `modules/context-ar
 F-679	modules/peer-review-tiers.md	count=1	## 발견 축 집계
 F-679	modules/peer-review-tiers.md	lacks	> 0건인 축도 행을 지우지 않는다
 F-679	modules/peer-review-tiers.md	has:replace	**축별 집계** — Tier 0 Deliver 와 같다
+# F-510 — 피어 리뷰 실행 기록의 시작은 Lead 가 건너뛸 수 있는 산문 단계가 아니라 근거 슬롯 검사가 남긴다 · 종료는 같은 작업 폴더로 부른다(다르면 열린 시도를 찾지 못한다)
+F-510	skills/fz-peer-review/SKILL.md	has:replace	실행 기록의 시작은 아래 근거 슬롯 검사가 통과할 때 그 스크립트가 남긴다
+F-510	skills/fz-peer-review/SKILL.md	lacks	Tier 가 정해지면 기록 `run_metrics.py start`
+F-510	skills/fz-peer-review/SKILL.md	has	--tier {5.5 에서 정한 Tier} --recommended {추천} --source {선택 출처}
+F-510	skills/fz-peer-review/SKILL.md	has	`run_metrics.py end --skill fz-peer-review --work-dir "${WORK_DIR}" --status completed`
+F-510	modules/mode-gate.md	has:replace	fz-peer-review 는 `start` 를 직접 부르지 않는다 — 근거 슬롯 검사(`scripts/check_evidence_slots.py`)가 통과할 때
+F-510	modules/mode-gate.md	lacks	fz-peer-review 는 Tier 0 · 1 을

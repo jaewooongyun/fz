@@ -24,15 +24,23 @@
        payload 에 commit_id 가 없으면 이월을 가르지 못해 현재 값으로 대조한다(이유에 그렇게 적는다)
      짝 맞춤은 2단계다 — ① 본문이 같고 판정 OK 인 짝을 최대 일대일 매칭(증가 경로)으로 먼저 정하고 ② 남은 항목만 남은 같은 본문 코멘트에 맞춘다
        (①을 순서대로 고르면 응답 순서에 따라 정상 착지끼리 짝을 잘못 가져가 UNVERIFIED 가 생긴다 — 같은 본문의 단일 줄 · 다중 줄)
+  5. 리뷰 자체  `gh api repos/{owner}/{repo}/pulls/{N}/reviews/{review_id}`(--jq 없이) 한 번 — 인라인 0건이어도 돈다.
+               state 를 payload event 와(COMMENT→COMMENTED · APPROVE→APPROVED · REQUEST_CHANGES→CHANGES_REQUESTED · event 없음→PENDING),
+               norm(body) 를 payload body 와, commit_id 를 payload commit_id 와 대조해 보고 JSON 의 review 에 따로 적는다(counts 에 넣지 않는다)
+       OK          셋이 모두 같다(payload 에 commit_id 가 없으면 commit 대조는 생략하고 이유에 적는다)
+       UNVERIFIED  하나라도 다르다 — ⛔ 삭제 · 재게시 금지(사용자에게 보고)
+       PENDING     payload 에 event 가 없고 리뷰가 PENDING(제출 전)이다 — 불일치가 아니라 미제출이다. 다시 POST 하지 않고 사용자에게 보고
+     코멘트가 없으면 commit 이 코멘트별 판정에 넘어가지 않으므로 이 대조가 없으면 다른 commit 에 달린 리뷰가 통과한다.
 
 ⛔ 이 스크립트는 삭제 · 재게시를 하지 않는다. UNVERIFIED 는 삭제 · 재게시 대상이 아니다. MISMATCH · MISSING 의 삭제 · 재게시는
    사용자에게 보이고 확인받은 뒤 Lead 가 한다(출력의 confirmBeforeDelete 는 MISMATCH id 만 담는다).
 
 usage: verify_landing.py --payload payload.json --pr N --review-id ID [--repo OWNER/REPO]
   --repo 기본값 `{owner}/{repo}` — gh 가 현재 폴더의 저장소로 채운다(GH_REPO 가 있으면 그 값)
-출력: stdout = 판정 JSON(reviewId · ids · counts · items · unpaired · confirmBeforeDelete) · stderr 마지막 줄 = `verify_landing: …` 요약
-exit: 0 전건 OK · 1 OK 아닌 항목이 있다(MISMATCH · UNVERIFIED · MISSING · 짝 없는 코멘트) ·
-      2 판정 불가(gh 부재 · 하위 컬렉션 조회 실패 · payload 읽기 실패 · review id 비정상 — ⛔ 통과 아님 · 실 API 를 못 부르면 UNRUN)
+출력: stdout = 판정 JSON(reviewId · ids · counts · items · unpaired · review · confirmBeforeDelete) · stderr 마지막 줄 = `verify_landing: …` 요약
+exit: 0 전건 OK 이고 리뷰 자체도 OK(인라인 0건 포함) · 1 OK 아닌 항목이 있다(MISMATCH · UNVERIFIED · MISSING · 짝 없는 코멘트) ·
+      리뷰 자체가 UNVERIFIED · PENDING 이다 ·
+      2 판정 불가(gh 부재 · 하위 컬렉션 조회 실패 · 리뷰 조회 실패 · payload 읽기 실패 · review id 비정상 — ⛔ 통과 아님 · 실 API 를 못 부르면 UNRUN)
 
 Python 3.9 stdlib 전용.
 """
@@ -48,6 +56,7 @@ import sys
 OK, NOT_OK, UNRUN = 0, 1, 2
 VERDICTS = ("OK", "MISMATCH", "UNVERIFIED", "MISSING")
 ANCHOR_KEYS = ("path", "line", "side", "start_line", "start_side")
+EVENT_STATE = {"COMMENT": "COMMENTED", "APPROVE": "APPROVED", "REQUEST_CHANGES": "CHANGES_REQUESTED"}   # 게시 event → 리뷰 state(GitHub REST 문서의 이름)
 MARK_RE = re.compile(r"<!-- fz-review:([A-Za-z0-9:_.\-]+) -->")   # scripts/render_review.py MARK 와 같은 표지
 
 
@@ -95,6 +104,33 @@ def judge(want: dict, got: dict, sent_commit) -> tuple:
     return "OK", note
 
 
+def judge_review(payload: dict, got: dict) -> dict:
+    """리뷰 자체(/pulls/{N}/reviews/{id}) ↔ payload 의 event · body · commit_id → {verdict, reason, want, got}.
+
+    인라인 0건이면 코멘트별 판정이 없으므로 이 대조가 유일한 착지 확인이다. 다르면 UNVERIFIED(⛔ 삭제 · 재게시 금지 — 사용자에게 보고).
+    payload 에 event 가 없으면 GitHub 은 제출되지 않은 PENDING 리뷰를 만든다(REST 문서) — 기대 state 는 PENDING 이고,
+    그대로 PENDING 이면 판정 PENDING(불일치가 아니라 미제출 — 다시 POST 하지 않고 사용자에게 보고)이다.
+    """
+    event = payload.get("event")
+    want_state = EVENT_STATE.get(event, event) if event else "PENDING"
+    sent = payload.get("commit_id") or None
+    diffs, note = [], ""
+    if got.get("state") != want_state:
+        diffs.append(f"state 기대 {want_state!r} · 실제 {got.get('state')!r}")
+    if norm(got.get("body")) != norm(payload.get("body")):
+        diffs.append("본문이 payload body 와 다르다(줄 끝 · CRLF 정규화 뒤)")
+    if sent is None:
+        note = "payload commit_id 없음 — commit 대조 생략"
+    elif got.get("commit_id") != sent:
+        diffs.append(f"commit_id 기대 {sent!r} · 실제 {got.get('commit_id')!r}")
+    out = {"want": {"state": want_state, "commit_id": sent}, "got": {"state": got.get("state"), "commit_id": got.get("commit_id")}}
+    if diffs:
+        return dict(out, verdict="UNVERIFIED", reason="; ".join(diffs) + " — ⛔ 삭제 · 재게시 금지(사용자에게 보고)")
+    if not event:
+        return dict(out, verdict="PENDING", reason="payload 에 event 가 없어 리뷰가 제출되지 않았다(PENDING) — 다시 POST 하지 않고 사용자에게 보고")
+    return dict(out, verdict="OK", reason=note)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="인라인 리뷰 착지 검증 — 판정만 한다(삭제 · 재게시 없음)")
     ap.add_argument("--payload", required=True)
@@ -133,6 +169,16 @@ def main() -> int:
             fetched.append(obj)
         else:
             unfetched[cid] = f"개별 조회 실패(exit {rc}): {(err.strip().splitlines() or [''])[-1]}"
+
+    # 리뷰 자체 — 인라인 0건이어도 돈다(코멘트가 없으면 commit 이 코멘트별 판정에 넘어가지 않아 대조가 통째로 빠진다)
+    rc, out, err = gh(["api", f"{base}/{a.pr}/reviews/{a.review_id}"])
+    try:
+        rev = json.loads(out) if rc == 0 else None
+    except ValueError:
+        rev = None
+    if not isinstance(rev, dict):
+        unrun(f"리뷰 조회 실패(exit {rc}): {(err.strip().splitlines() or [''])[-1]}")
+    review = judge_review(payload, rev)
 
     # 1차 — 짝을 모두 정한 뒤 2차에서 판정한다(짝 없는 항목의 MISSING · UNVERIFIED 는 남은 코멘트를 다 알아야 가른다)
     #   짝 맞춤 ① 본문이 같고 판정 OK 인 짝을 최대 일대일 매칭(증가 경로)으로 정한다 — 응답 순서 · 키 부분집합과 무관하게 OK 짝 수가 최대
@@ -185,12 +231,12 @@ def main() -> int:
     unpaired += [{"id": int(cid) if cid.isdigit() else cid, "reason": why} for cid, why in unfetched.items()]
 
     counts = {v: sum(1 for it in items if it["verdict"] == v) for v in VERDICTS}
-    report = {"reviewId": str(a.review_id), "ids": ids, "counts": counts, "items": items, "unpaired": unpaired,
+    report = {"reviewId": str(a.review_id), "ids": ids, "counts": counts, "items": items, "unpaired": unpaired, "review": review,
               "confirmBeforeDelete": [it["id"] for it in items if it["verdict"] == "MISMATCH"]}
     print(json.dumps(report, ensure_ascii=False, indent=1))
-    print("verify_landing: " + " · ".join(f"{v} {counts[v]}" for v in VERDICTS) + f" · 짝 없음 {len(unpaired)}"
+    print("verify_landing: " + " · ".join(f"{v} {counts[v]}" for v in VERDICTS) + f" · 짝 없음 {len(unpaired)} · 리뷰 {review['verdict']}"
           + " — ⛔ 이 스크립트는 삭제 · 재게시하지 않는다(UNVERIFIED 는 금지 · MISMATCH · MISSING 은 사용자 확인 뒤)", file=sys.stderr)
-    return OK if counts["OK"] == len(items) and not unpaired else NOT_OK
+    return OK if counts["OK"] == len(items) and not unpaired and review["verdict"] == "OK" else NOT_OK
 
 
 if __name__ == "__main__":

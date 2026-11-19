@@ -28,6 +28,14 @@ profile(`--profile`): peer-review(기본 — ①~⑤) · plan · discover · fix
   plan · discover · fix · code · review 의 ③ 대상 = `target.json` 의 `root`(세션 대상 트리 — 같은 경로여야 한다) · `sha`(있으면 앞부분 일치).
   `[Serena 미사용 — 사유]`(+ 꼬리)는 통과 · 기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 꼬리 없음은 위반이다.
 
+실행 기록(profile peer-review 이고 판정이 PASS 일 때만 — 명령줄 실행만 · check() 를 직접 부르는 self-test 셀은 쓰지 않는다):
+  `run_metrics.py start --skill fz-peer-review --work-dir <WORK_DIR> --reuse-open` 을 부른다. mode = Tier 0·1 light · 2·3 full ·
+  `--recommended`(기본 none) · `--source`(선택)는 그대로 넘긴다(값은 modules/mode-gate.md § 기록). 같은 WORK_DIR 의 열린 시도가 있으면
+  그대로 쓴다 — 근거를 보완한 재검사가 새 실행으로 세어지지 않는다(같은 폴더에서 리뷰를 처음부터 다시 시작해도 end 전이면 한 실행이다).
+  종료는 스킬이 Deliver 끝에 같은 `--work-dir` 로 `run_metrics.py end --skill fz-peer-review` 를 부른다(pipeline 이 WORK_DIR 로 정해진다).
+  저장은 `${FZ_RUN_STATE:-~/.fz/runs}` — ⛔ 시험에서 이 명령을 부를 때는 FZ_RUN_STATE 를 임시 폴더로 준다(없으면 사용자 기록에 쓴다).
+  기록기의 출력 · 실패는 stderr 로만 간다 — exit code 와 stdout 줄은 기록이 바꾸지 않는다.
+
 리뷰 셋째 검증의 경로(`--third-path --skills <Lead 스킬 목록의 sc: 이름들>` — 쉼표 구분): 목록에 `sc:sc-analyze`(별칭 `sc:analyze`)가
   있을 때만 `sc-analyze`, 아니면 `fresh-context`(형제 명령만 있는 목록 · 빈 목록도) 를 찍는다. 작업 폴더를 읽지 않는다 — 상태를 화면에만
   알린 리뷰도 같은 판정을 받는다. 상태 줄의 `sc 목록✓` 도 같은 기준이다(정본 문장 modules/tool-status.md).
@@ -54,6 +62,7 @@ OK, VIOLATION, UNRUN, UNDETERMINED = 0, 1, 2, 3
 # ⛔ N6 루트 앵커 — lint_contracts ANCHOR_LINES 허용 형태와 정확히 일치
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TIERS_DOC = os.path.join(SCRIPT_DIR, "..", "modules", "peer-review-tiers.md")
+RUN_METRICS = os.path.join(SCRIPT_DIR, "run_metrics.py")
 
 # tier.txt 실측 6형식(2026-11-05 저장본 38개): `TIER=2 (…)` · `tier=0 (auto) · …` · `Tier 0 (user: …)` · 첫 줄 숫자만(`2` + rationale 줄)
 # · 둘째 줄 `tier=1` · 한 줄 `tier=1 mode=light …`. `tier_delta=1` 같은 이웃 키는 `\btier` 뒤 `_` 때문에 걸리지 않는다
@@ -66,6 +75,8 @@ TOOLS_UNUSED = re.compile(r"^\[Serena 미사용 — (\S.*)\]\s*$")
 TOOLS_TAIL = re.compile(r"^(\S.*?) · context7 (목록[✓✗]) · sc (목록[✓✗]) · seq (목록[✓✗]) · pr-review (목록[✓✗])"
                         r" · 스택 스킬 ([^\s,]+(?:, [^\s,]+)*)(?: — 빠지는 단계: (\S.*?))?\s*$")
 PROFILES = ("peer-review", "plan", "discover", "fix", "code", "review")
+RECOMMENDS = ("light", "full", "none")                                  # run_metrics.py 와 같은 이름 · 같은 값(실행 기록 start 인자)
+SOURCES = ("arg", "fz", "signal", "autonomous", "gate", "default")      # run_metrics.py 와 같은 이름 · 같은 값
 THIRD_PATH_SC = {"sc:sc-analyze", "sc:analyze"}   # 리뷰 셋째 검증을 sc 로 돌리는 이름 — 설명 · 조사 같은 형제 명령은 아니다
 CLAIM_HEAD = re.compile(r"^##\s+주장:\s*(\S.*)$")
 LAYER = re.compile(r"^-\s*층\s*(\d+)\b([^:]*):\s*(.*)$")
@@ -93,6 +104,30 @@ def tier_from_text(text: str):
     if lines and TIER_BARE.match(lines[0]):
         found.add(int(lines[0].strip()))
     return found.pop() if len(found) == 1 else None
+
+
+def tier_file(work: str):
+    tp = os.path.join(work, "tier.txt")
+    return tier_from_text(open(tp, encoding="utf-8", errors="replace").read()) if os.path.isfile(tp) else None
+
+
+def record_start(work: str, tier: int, recommended: str, source) -> None:
+    """근거 슬롯 검사를 통과한 피어 리뷰 실행의 시작을 실행 기록에 남긴다 — `run_metrics.py start --reuse-open`.
+
+    Tier 0·1 = light · 2·3 = full(modules/mode-gate.md § 기록). 같은 WORK_DIR 의 열린 시도가 있으면 그대로 쓴다 — 근거를 보완한 재검사는
+    새 실행이 아니다. 기록기의 출력 · 실패는 stderr 로만 보낸다 — 검사기의 exit code 와 stdout 줄은 기록과 무관하다.
+    """
+    cmd = [sys.executable, "-B", RUN_METRICS, "start", "--skill", "fz-peer-review", "--mode", "light" if tier <= 1 else "full",
+           "--recommended", recommended, "--work-dir", work, "--reuse-open"]
+    if source:
+        cmd += ["--source", source]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        out = (r.stdout + r.stderr).strip()
+    except (OSError, subprocess.SubprocessError) as e:
+        out = f"RUN_METRICS_UNAVAILABLE {type(e).__name__}: {e}"
+    if out:
+        log(out)
 
 
 def required_slots(doc_path: str, tier: int):
@@ -232,8 +267,7 @@ def check(work: str, tier_arg, doc_path: str = TIERS_DOC, profile: str = "peer-r
         for b in bad:
             print(f"  ✗ {b}")
         return VIOLATION if bad else OK
-    tp = os.path.join(work, "tier.txt")
-    file_tier = tier_from_text(open(tp, encoding="utf-8", errors="replace").read()) if os.path.isfile(tp) else None
+    file_tier = tier_file(work)
     tier = tier_arg if tier_arg is not None else file_tier
     if tier is None:
         log("UNRUN: Tier 미상 — --tier 가 없고 tier.txt 를 읽지 못했다(없음 · 형식 밖 · 값이 엇갈림)")
@@ -420,6 +454,82 @@ def self_test() -> int:
         r = subprocess.run([sys.executable, os.path.abspath(__file__), "--third-path", *args], capture_output=True, text=True)
         got[args] = (r.stdout.strip(), r.returncode)
     case("third-path-cli", got == cli, {k: v for k, v in got.items() if v != cli[k]})
+
+    # 실행 기록 — 명령줄 검사가 통과하면(profile peer-review) 시작을 남기고, 다시 불러도 열린 시도를 그대로 쓴다.
+    # 셀마다 자기 임시 FZ_RUN_STATE(⛔ 없으면 통과한 실행이 사용자의 ~/.fz/runs 에 표지를 쓴다) · 세션 id 는 넘기지 않는다
+    with tempfile.TemporaryDirectory() as t:
+        env0 = {k: v for k, v in os.environ.items() if k not in ("FZ_RUN_STATE", "CLAUDE_CODE_SESSION_ID")}
+
+        def slots(name, tier=0, tools="[Serena 미사용 — 시험]" + tail + "\n"):
+            d = os.path.join(t, name)
+            os.makedirs(os.path.join(d, "evidence"))
+            for i in required_slots(TIERS_DOC, tier) or []:
+                open(os.path.join(d, "evidence", f"{i}.md"), "w").write("x\n")
+            open(os.path.join(d, "evidence", "tools.md"), "w").write(tools)
+            return d
+
+        def run(state, *args):
+            r = subprocess.run([sys.executable, "-B", os.path.abspath(__file__), *args], capture_output=True, text=True,
+                               env=dict(env0, FZ_RUN_STATE=state), stdin=subprocess.DEVNULL)
+            return r.returncode, r.stdout, r.stderr
+
+        def metrics(state, *args):
+            return subprocess.run([sys.executable, "-B", RUN_METRICS, *args, "--projects-root", os.path.join(t, "projects"), "--strict"],
+                                  capture_output=True, text=True, env=dict(env0, FZ_RUN_STATE=state), stdin=subprocess.DEVNULL).returncode
+
+        def runs(state):
+            """(열린 표지 목록, 끝난 행 목록)."""
+            marks, rows = [], []
+            for dp, _, fs in os.walk(state):
+                for f in fs:
+                    p = os.path.join(dp, f)
+                    if os.path.basename(dp) == "open" and f.endswith(".json"):
+                        marks.append(json.load(open(p, encoding="utf-8")))
+                    elif f == "runs.jsonl":
+                        rows += [json.loads(ln) for ln in open(p, encoding="utf-8") if ln.strip()]
+            return marks, rows
+
+        st, d = os.path.join(t, "s-reuse"), slots("reuse")
+        rcs = [run(st, d, "--tier", "0")[0] for _ in range(2)]
+        marks, rows = runs(st)
+        case("record-reuse-open", rcs == [OK, OK] and len(marks) == 1 and marks[0].get("attempt") == 1 and not rows,
+             (rcs, [m.get("attempt") for m in marks], [r.get("status") for r in rows]))
+        st, d = os.path.join(t, "s-retry"), slots("retry")
+        miss = os.path.join(d, "evidence", required_slots(TIERS_DOC, 0)[0] + ".md")
+        os.remove(miss)
+        first = (run(st, d, "--tier", "0")[0], runs(st))
+        open(miss, "w").write("x\n")
+        second = run(st, d, "--tier", "0")[0]
+        marks, rows = runs(st)
+        case("record-fail-then-pass", first == (VIOLATION, ([], [])) and second == OK and len(marks) == 1 and not rows,
+             (first[0], len(first[1][0]), second, len(marks), len(rows)))
+        st, d = os.path.join(t, "s-profile"), slots("profile")
+        case("record-other-profile", run(st, d, "--profile", "plan")[0] == OK and runs(st) == ([], []), runs(st))
+        st = os.path.join(t, "s-notok")
+        rcs = (run(st, slots("notok", tools="Serena 썼음\n"), "--tier", "0")[0], run(st, slots("notier"))[0])
+        case("record-not-ok", rcs == (VIOLATION, UNRUN) and runs(st) == ([], []), (rcs, runs(st)))
+        st, d = os.path.join(t, "s-hand"), slots("hand")   # 앞 문구로 손으로 연 시도 — 검사기가 닫지 않고 그대로 쓴다
+        hand = metrics(st, "start", "--skill", "fz-peer-review", "--mode", "full", "--recommended", "full", "--source", "gate", "--work-dir", d)
+        rc = run(st, d, "--tier", "0")[0]
+        marks, rows = runs(st)
+        case("record-hand-start", (hand, rc) == (0, OK) and [m.get("mode") for m in marks] == ["full"] and not rows,
+             (hand, rc, [m.get("mode") for m in marks], len(rows)))
+        st, d = os.path.join(t, "s-end"), slots("end")
+        rc = run(st, d, "--tier", "0")[0]
+        end = metrics(st, "end", "--skill", "fz-peer-review", "--work-dir", d, "--status", "completed")
+        marks, rows = runs(st)
+        case("record-end-same-workdir", (rc, end) == (OK, 0) and not marks and [r.get("status") for r in rows] == ["completed"],
+             (rc, end, len(marks), [r.get("status") for r in rows]))
+        st, d2, d0 = os.path.join(t, "s-args"), slots("args2", tier=2), slots("args0")
+        rcs = (run(st, d2, "--tier", "2", "--recommended", "full", "--source", "gate")[0], run(st, d0, "--tier", "0")[0])
+        got = {m.get("work_dir"): (m.get("mode"), m.get("recommended"), m.get("source")) for m in runs(st)[0]}
+        want = {os.path.realpath(d2): ("full", "full", "gate"), os.path.realpath(d0): ("light", "none", None)}
+        case("record-mode-args", rcs == (OK, OK) and got == want, (rcs, got))
+        d, blocker = slots("quiet"), os.path.join(t, "blocker")
+        open(blocker, "w").write("x")
+        ok_run, bad_run = run(os.path.join(t, "s-quiet"), d, "--tier", "0"), run(os.path.join(blocker, "runs"), d, "--tier", "0")
+        case("record-quiet-stdout-exit", ok_run[0] == bad_run[0] == OK and ok_run[1] == bad_run[1] and "RUN" not in ok_run[1]
+             and "RUN_METRICS_UNAVAILABLE" in bad_run[2], (ok_run[0], bad_run[0], ok_run[1][-80:], bad_run[2][-120:]))
     print(f"self-test {passed}/{total} passed")
     return OK if passed == total else 1
 
@@ -434,6 +544,9 @@ def main() -> int:
     ap.add_argument("--third-path", action="store_true",
                     help="리뷰 셋째 검증의 경로를 찍는다 — sc-analyze · fresh-context · undetermined(exit 3 — --skills 없음)")
     ap.add_argument("--skills", help="--third-path 의 입력 — Lead 스킬 목록의 sc: 이름들(쉼표 구분 · sc: 스킬이 없으면 빈 값)")
+    ap.add_argument("--recommended", choices=RECOMMENDS, default="none",
+                    help="실행 기록의 추천(mode_gate.py 결과의 recommend — modules/mode-gate.md § 기록) · profile peer-review 만")
+    ap.add_argument("--source", choices=SOURCES, help="실행 기록의 선택 출처(modules/mode-gate.md § 기록) · profile peer-review 만")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
@@ -447,7 +560,10 @@ def main() -> int:
     if not a.work_dir:
         log("UNRUN: WORK_DIR 인자가 필요하다")
         return UNRUN
-    return check(a.work_dir, a.tier, profile=a.profile)
+    rc = check(a.work_dir, a.tier, profile=a.profile)
+    if rc == OK and a.profile == "peer-review":
+        record_start(a.work_dir, a.tier if a.tier is not None else tier_file(a.work_dir), a.recommended, a.source)
+    return rc
 
 
 if __name__ == "__main__":

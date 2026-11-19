@@ -33,6 +33,15 @@
 #   explicit-null-start    payload 단일 줄에 start_line · start_side 를 null 로 명시 → 안 보낸 것으로 세어 OK
 #   unrun-subcollection    하위 컬렉션 HTTP 500 → exit 2 · 판정 JSON 없음
 #   unrun-no-gh            PATH 에 gh 없음 → exit 2(실 API 를 못 부르면 UNRUN)
+#   zero-inline-ok         인라인 0건 · 리뷰 자체(/pulls/{N}/reviews/{id} — --jq 없이 1회)의 state · 본문(CRLF · 줄 끝 공백 정규화) · commit 일치
+#                          → exit 0 · review OK (코멘트가 없으면 리뷰 자체 대조가 유일한 착지 확인이다)
+#   zero-inline-commit     인라인 0건 · state · 본문은 같고 commit 만 다른 리뷰 → exit 1 · review UNVERIFIED · counts 0 · 삭제 0 · 재게시 0
+#   zero-inline-state      인라인 0건 · event COMMENT 인데 state APPROVED → exit 1 · review UNVERIFIED
+#   zero-inline-body       인라인 0건 · 리뷰 본문 ≠ payload body → exit 1 · review UNVERIFIED
+#   zero-inline-event-map  REQUEST_CHANGES → CHANGES_REQUESTED · APPROVE → APPROVED 는 일치(exit 0)
+#   zero-inline-pending    payload 에 event 가 없다 → 리뷰 PENDING(제출 전)은 review PENDING · exit 1(COMMENTED 와의 불일치로 읽지 않는다) ·
+#                          event 없는데 state COMMENTED → review UNVERIFIED
+#   review-get-404         리뷰 자체 조회 HTTP 404 → exit 2 · 판정 JSON 없음(판정 불가 — 통과 아님)
 # 셀 (--cells doc) — 문서가 같은 결정을 말하는가(키워드 존재가 아니라 판정별 방향)
 #   doc-section7           `### 7)` 절에 verify_landing.py · /pulls/comments/{id} · 네 판정 · 무조건 삭제 문장 0 · 판정 표를 행 단위로 —
 #                          UNVERIFIED 대응에 '금지' 가 있고 DELETE · '재게시한다' 0 · MISMATCH 대응에 '확인받은 뒤' 가 있고 '없이' 0 ·
@@ -40,13 +49,15 @@
 #   doc-fewshot            Few-shot GOOD 에 '불일치 발견 시 해당 코멘트 삭제 후 재게시' 0 · 개별 조회 · UNVERIFIED · 사용자 확인 ·
 #                          UNVERIFIED 를 주어로 말하는 줄(UNVERIFIED 뒤에 조사)이 1줄 이상이고 모두 '지우지도' 또는 '금지'
 #   doc-skill-deliver      fz-peer-review SKILL.md Deliver 흐름 줄의 착지 검증에 verify_landing.py · UNVERIFIED
-#   regress-section6       `### 6) 게시 실행` 의 POST 줄이 그대로다
+#   regress-section6       게시 POST 는 한 번 — `### 6) 게시 실행` 의 bash 블록에 `-X POST` 0 · 6) 이 7) 블록의 POST 를 가리킨다(따로 POST 하지 않는다) ·
+#                          `### 7)` 의 bash 블록 전체에 `-X POST` 줄 1 · 그 줄이 첫 블록에 있다(같은 POST 를 두 번 적으면 리뷰가 두 번 달린다)
 #   doc-direction-negatives 반대 방향 사본 5건(UNVERIFIED 행 → 삭제 후 재게시 · → 바로 지운다 · Few-shot UNVERIFIED 도 삭제 ·
 #                          MISMATCH 확인 없이 삭제 · 단일 줄 규칙 삭제)을 임시 사본 문서로 만들어 위 두 셀의 단언이 각각 FAIL 하는지
 # 셀 (--cells wiring) — `### 7)` 절 첫 bash 블록을 그대로 재생한다({N} 만 채운다 · FZ_PLUGIN_ROOT=트리 · cwd 에 payload.json)
 #   payload 는 scripts/render_review.py 가 render-single-source/review.json 에서 만든 것(인라인 7건 · `<!-- fz-review:ID -->` 표지)
 #   wiring-replay          블록 exit 0 · helper 판정 OK 7 · 판정의 이슈 id = payload 표지 집합(render_review MARK 짝맞춤) ·
-#                          POST 1회 · 보낸 본문 = payload.json(§6 게시 회귀) · 하위 컬렉션 1회 · 개별 조회 = id 수 · DELETE 0 · 거부 0
+#                          POST 1회 · 보낸 본문 = payload.json(§6 게시 회귀) · 리뷰 자체 조회 1회 · 하위 컬렉션 1회 · 개별 조회 = id 수 ·
+#                          DELETE 0 · 거부 0
 #   wiring-call-removed    같은 블록에서 verify_landing.py 호출 줄을 지운 사본 → 위 단언이 FAIL 해야 통과(호출 제거 음성 · 배선 탐지기 양성 대조)
 #   wiring-nonok-no-delete 착지 1건 MISMATCH · 1건 head 이동 → 블록 exit 1 · MISMATCH 1 · UNVERIFIED 1 · DELETE 0 · POST 1(재게시 0)
 # 기준 트리(be8c871)는 verify_landing.py 가 없고 §7 블록이 하위 컬렉션 필드를 jq 로 바로 뽑는다 → verdict · doc · wiring 이 FAIL → exit 1.
@@ -218,13 +229,17 @@ HEAD_OTHER = "fedcba9876543210fedcba9876543210fedcba98"   # payload 와 무관�
 EXPECTED = {
     "verdict": ["ok-two-call", "single-line-start-null", "mismatch-confirmed", "null-required", "head-moved", "head-moved-remapped",
                 "head-moved-remapped-wrong", "head-moved-unknown-origin", "missing", "four-values", "zero-ids", "fetch-fail",
-                "body-altered", "same-body-two", "same-body-single-multi", "explicit-null-start", "unrun-subcollection", "unrun-no-gh"],
+                "body-altered", "same-body-two", "same-body-single-multi", "explicit-null-start", "unrun-subcollection", "unrun-no-gh",
+                "zero-inline-ok", "zero-inline-commit", "zero-inline-state", "zero-inline-body", "zero-inline-event-map", "zero-inline-pending",
+                "review-get-404"],
     "doc": ["doc-section7", "doc-fewshot", "doc-skill-deliver", "regress-section6", "doc-direction-negatives"],
     "wiring": ["wiring-replay", "wiring-call-removed", "wiring-nonok-no-delete"],
 }
 DEL_SENTENCE = "불일치한 코멘트는 조회로 얻은"
 OLD_GOOD = "불일치 발견 시 해당 코멘트 삭제 후 재게시"
-SEC6_POST = "gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST --input payload.json"
+POST_LINE = "gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST"   # 게시 POST — 문서의 bash 블록 전체에 한 줄
+SEC6_POINT = "따로 POST 하지 않는다"   # 6) 이 7) 블록의 POST 한 번을 가리키는 문장
+NO_VERDICTS = {"OK": 0, "MISMATCH": 0, "UNVERIFIED": 0, "MISSING": 0}
 MARK_RE = re.compile(r"<!-- fz-review:([A-Za-z0-9:_.\-]+) -->")
 VERDICT_ROW = re.compile(r"^\|\s*`(OK|MISMATCH|UNVERIFIED|MISSING)`\s*\|")
 UNV_SUBJECT = re.compile(r"UNVERIFIED\s?[가-힣]")   # 'UNVERIFIED 는 · 도 · 를 …' — 판정 나열('· UNVERIFIED ·')은 빼고 주어로 말하는 줄만
@@ -283,6 +298,20 @@ def first_bash(lines):
     return None
 
 
+def bash_blocks(lines):
+    """절 안의 ```bash 블록마다 줄 목록 — 실행할 줄 전체(첫 블록만 보는 first_bash 와 달리 둘째 블록의 POST 도 센다)."""
+    out, cur = [], None
+    for line in lines:
+        if cur is None and line.startswith("```bash"):
+            cur = []
+        elif cur is not None and line.startswith("```"):
+            out.append(cur)
+            cur = None
+        elif cur is not None:
+            cur.append(line)
+    return out
+
+
 # ── 응답 모양 ───────────────────────────────────────────────
 def sub_item(cid, w):
     """리뷰 하위 컬렉션 — 실측 모양(F-150 · F-256 · F-282): 앵커 필드 null · position · diff_hunk 만."""
@@ -301,22 +330,34 @@ def one(cid, w, **over):
     return d
 
 
-def mkcell(name, wants, landed, over=None, sub_status=200, fail_ids=(), order=None):
-    """landed = payload 색인 목록(그 항목들이 게시됐다) · over = {색인: 개별 응답 덮어쓰기} · order = 하위 컬렉션 순서(색인)."""
+def review_obj(text, sha, **over):
+    """리뷰 자체 조회(/pulls/{N}/reviews/{id}) — 객체 하나(id · state · body · commit_id). 게시 event COMMENT 의 state 는 COMMENTED."""
+    d = {"id": int(RID), "state": "COMMENTED", "body": text, "commit_id": sha}
+    d.update(over)
+    return d
+
+
+def mkcell(name, wants, landed, over=None, sub_status=200, fail_ids=(), order=None, review=None, review_status=200, event="COMMENT"):
+    """landed = payload 색인 목록(그 항목들이 게시됐다) · over = {색인: 개별 응답 덮어쓰기} · order = 하위 컬렉션 순서(색인) ·
+    review = 리뷰 자체 조회 응답 덮어쓰기 · event = payload event(None 이면 넣지 않는다 — 제출되지 않은 PENDING 리뷰)."""
     d = os.path.join(TMP, "cells", name)
     os.makedirs(d)
     over = over or {}
     cid = {i: 7001 + i for i in landed}
     seq = order if order is not None else landed
     routes = {f"POST pulls/{PR}/reviews": {"status": 200, "body": {"id": int(RID), "state": "COMMENTED", "commit_id": HEAD}},
+              f"GET pulls/{PR}/reviews/{RID}": {"status": review_status,
+                                                "body": review_obj("report", HEAD, **(review or {})) if review_status == 200 else None},
               f"GET pulls/{PR}/reviews/{RID}/comments": {"status": sub_status,
                                                          "body": [sub_item(cid[i], {**wants[i], **over.get(i, {})}) for i in seq] if sub_status == 200 else None}}
     for i in landed:
         if cid[i] not in fail_ids:
             routes[f"GET pulls/comments/{cid[i]}"] = {"status": 200, "body": one(cid[i], wants[i], **over.get(i, {}))}
     json.dump(routes, open(os.path.join(d, "routes.json"), "w", encoding="utf-8"), ensure_ascii=False)
-    json.dump({"commit_id": HEAD, "event": "COMMENT", "body": "report", "comments": wants},
-              open(os.path.join(d, "payload.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    pay = {"commit_id": HEAD, "event": event, "body": "report", "comments": wants}
+    if event is None:
+        del pay["event"]
+    json.dump(pay, open(os.path.join(d, "payload.json"), "w", encoding="utf-8"), ensure_ascii=False)
     open(os.path.join(d, "gh-calls.log"), "w").close()
     return d, cid, routes
 
@@ -344,6 +385,7 @@ def calls(d):
     return {"req": req, "unsup": [l for l in log if l.startswith("UNSUPPORTED")],
             "delete": [x for x in req if x.startswith("DELETE ")], "post": [x for x in req if x.startswith("POST ")],
             "sub": [x for x in req if x.startswith(f"GET pulls/{PR}/reviews/{RID}/comments")],
+            "rev": [x for x in req if x.startswith(f"GET pulls/{PR}/reviews/{RID}") and not x.startswith(f"GET pulls/{PR}/reviews/{RID}/")],
             "one": [x.split()[1].rsplit("/", 1)[1] for x in req if x.startswith("GET pulls/comments/")]}
 
 
@@ -378,6 +420,7 @@ def verdict_cells():
     check(c, len(k["sub"]) == 1 and " paginate" in k["sub"][0] and k["sub"][0].endswith("jq=.[].id"),
           f"하위 컬렉션은 id 수집 1회(--paginate · --jq .[].id) — {k['sub']}")
     check(c, k["one"] == [str(cid[0])], f"id 마다 개별 조회 /pulls/comments/{{id}} — {k['one']}")
+    check(c, k["rev"] == [f"GET pulls/{PR}/reviews/{RID}"], f"리뷰 자체 조회 1회(--jq 없이 — 객체 전체) — {k['rev']}")
     no_delete(c, d)
 
     c = "single-line-start-null"
@@ -523,6 +566,76 @@ def verdict_cells():
     check(c, rc == 2 and rep is None and "gh 부재" in err, f"PATH 에 gh 없음 → exit 2(UNRUN) — exit {rc} · {err.strip()[-100:]}")
     check(c, not read(os.path.join(d, "gh-calls.log")), "gh 호출 0(shim 도 실 gh 도 불리지 않았다)")
 
+    # 인라인 0건 — 코멘트별 판정이 없으므로 리뷰 자체(state · 본문 · commit)의 대조가 유일한 착지 확인이다
+    def review_of(rep):
+        return rep.get("review") if isinstance(rep, dict) and isinstance(rep.get("review"), dict) else {}
+
+    c = "zero-inline-ok"
+    d, cid, _ = mkcell(c, [], [], review={"body": "report  \r\n"})
+    rc, rep, err = helper(d)
+    rv = review_of(rep)
+    check(c, rc == 0 and verdicts(rep) == [] and rv.get("verdict") == "OK",
+          f"인라인 0건 · state · 본문(CRLF · 줄 끝 공백은 정규화) · commit 일치 → exit 0 · review OK — exit {rc} · review {rv} · {err.strip()[-100:]}")
+    k = calls(d)
+    check(c, len(k["rev"]) == 1 and len(k["sub"]) == 1 and not k["one"],
+          f"리뷰 자체 조회 1회 · 하위 컬렉션 1회 · 개별 조회 0 — {k['rev']} · {k['sub']} · {k['one']}")
+    no_delete(c, d)
+
+    c = "zero-inline-commit"
+    d, cid, _ = mkcell(c, [], [], review={"commit_id": HEAD_OTHER})
+    rc, rep, err = helper(d)
+    rv = review_of(rep)
+    check(c, rc == 1 and verdicts(rep) == [] and rv.get("verdict") == "UNVERIFIED" and "commit_id" in rv.get("reason", ""),
+          f"인라인 0건 · state · 본문은 같고 다른 commit 에 달린 리뷰 → exit 1 · review UNVERIFIED · 이유에 commit_id — exit {rc} · review {rv}")
+    check(c, isinstance(rep, dict) and rep.get("counts") == NO_VERDICTS and rep.get("confirmBeforeDelete") == [],
+          f"리뷰 수준 불일치는 counts 에 넣지 않고 삭제 후보도 아니다 — {rep.get('counts') if isinstance(rep, dict) else None}")
+    no_delete(c, d, "리뷰 수준 불일치도 삭제 0 · 재게시 0")
+
+    c = "zero-inline-state"
+    d, cid, _ = mkcell(c, [], [], review={"state": "APPROVED"})
+    rc, rep, err = helper(d)
+    rv = review_of(rep)
+    check(c, rc == 1 and rv.get("verdict") == "UNVERIFIED" and "state" in rv.get("reason", ""),
+          f"인라인 0건 · event COMMENT 인데 state APPROVED → exit 1 · review UNVERIFIED — exit {rc} · review {rv}")
+    no_delete(c, d)
+
+    c = "zero-inline-body"
+    d, cid, _ = mkcell(c, [], [], review={"body": "report\n(서버가 바꿔 돌려준 본문)"})
+    rc, rep, err = helper(d)
+    rv = review_of(rep)
+    check(c, rc == 1 and rv.get("verdict") == "UNVERIFIED" and "본문" in rv.get("reason", ""),
+          f"인라인 0건 · 리뷰 본문 ≠ payload body → exit 1 · review UNVERIFIED — exit {rc} · review {rv}")
+    no_delete(c, d)
+
+    c = "zero-inline-event-map"
+    got = {}
+    for event, state in (("REQUEST_CHANGES", "CHANGES_REQUESTED"), ("APPROVE", "APPROVED")):
+        d, cid, _ = mkcell(f"{c}-{event}", [], [], review={"state": state}, event=event)
+        rc, rep, err = helper(d)
+        got[event] = (rc, review_of(rep).get("verdict"))
+    check(c, got == {"REQUEST_CHANGES": (0, "OK"), "APPROVE": (0, "OK")},
+          f"event → state 이름(REQUEST_CHANGES → CHANGES_REQUESTED · APPROVE → APPROVED)은 일치 — {got}")
+
+    c = "zero-inline-pending"
+    d, cid, _ = mkcell(c, [], [], review={"state": "PENDING"}, event=None)
+    rc, rep, err = helper(d)
+    rv = review_of(rep)
+    check(c, rc == 1 and rv.get("verdict") == "PENDING" and "event" in rv.get("reason", ""),
+          f"payload event 없음 · state PENDING → review PENDING(제출 전 — COMMENTED 와의 불일치가 아니다) · exit 1 — exit {rc} · review {rv}")
+    no_delete(c, d, "제출 전 리뷰도 삭제 0 · 다시 POST 0")
+    d, cid, _ = mkcell(f"{c}-commented", [], [], event=None)
+    rc, rep, err = helper(d)
+    rv = review_of(rep)
+    check(c, rc == 1 and rv.get("verdict") == "UNVERIFIED" and "PENDING" in rv.get("reason", ""),
+          f"payload event 없음인데 state COMMENTED → 기대는 PENDING · review UNVERIFIED — exit {rc} · review {rv}")
+
+    c = "review-get-404"
+    d, cid, _ = mkcell(c, [], [], review_status=404)
+    rc, rep, err = helper(d)
+    check(c, rc == 2 and rep is None and "UNRUN" in err and "리뷰" in err,
+          f"리뷰 자체 조회 HTTP 404 → exit 2 · 판정 JSON 없음(판정 불가 — 통과 아님) — exit {rc} · {err.strip()[-100:]}")
+    no_delete(c, d)
+
 
 def verdict_rows(s7):
     """§7 판정 표 → {판정: [칸 목록, …]} — 칸 = [판정, 조건, 대응]."""
@@ -575,6 +688,8 @@ def doc_asserts(text):
             (f"DELETE 를 말하는 줄 {len(dels)}개가 모두 '확인받은 뒤' · '사용자 확인 뒤' 중 하나를 말하고 '없이' 0",
              bool(dels) and all(any(p in l for p in CONFIRM) and "없이" not in l for l in dels)),
             (f"§7 bash 블록({len(blk)}줄)에 DELETE 0 — 재생해도 지우지 않는다", bool(blk) and not any("DELETE" in l for l in blk)),
+            ("§7 이 리뷰 자체 조회(`/pulls/{N}/reviews/{id}`)와 인라인 0건에서도 도는 event · 본문 · commit 대조를 말한다",
+             "`/pulls/{N}/reviews/{id}`" in j7 and "인라인 0건" in j7 and all(w in j7 for w in ("event", "commit_id", "PENDING"))),
         ],
         "doc-fewshot": [
             (f"Few-shot GOOD — '{OLD_GOOD}' 0 · 개별 조회 · UNVERIFIED · 사용자 확인",
@@ -602,8 +717,14 @@ def doc_cells():
           f"SKILL.md Deliver 흐름 줄({len(dl)}개)의 착지 검증 = verify_landing.py · UNVERIFIED 금지 · 사용자 확인")
 
     c = "regress-section6"
-    s6 = section(text, "### 6) ")
-    check(c, SEC6_POST in s6, f"`### 6) 게시 실행` POST 줄 그대로 — {SEC6_POST}")
+    s6, s7 = section(text, "### 6) "), section(text, "### 7) ")
+    p6 = [l for b in bash_blocks(s6) for l in b if "-X POST" in l]
+    p7 = [l for b in bash_blocks(s7) for l in b if "-X POST" in l]
+    first7 = [l for l in (first_bash(s7) or []) if "-X POST" in l]
+    check(c, bool(s6) and not p6 and any(SEC6_POINT in l for l in s6),
+          f"`### 6) 게시 실행` 의 bash 블록에 POST 0 · 7) 블록의 POST 를 가리킨다('{SEC6_POINT}') — POST {len(p6)}줄")
+    check(c, len(p7) == 1 and len(first7) == 1 and POST_LINE in first7[0],
+          f"`### 7)` 의 bash 블록 전체에 게시 POST 1줄 · 첫 블록에 있다({POST_LINE}) — 전체 {len(p7)} · 첫 블록 {len(first7)}")
 
     c = "doc-direction-negatives"
     d = os.path.join(TMP, "cells", c)
@@ -641,6 +762,7 @@ def replay(name, block, raw, pay, over=None):
     os.makedirs(d)
     cid = {i: 7101 + i for i in range(n)}
     routes = {f"POST pulls/{PR}/reviews": {"status": 200, "body": {"id": int(RID), "state": "COMMENTED", "commit_id": HEAD}},
+              f"GET pulls/{PR}/reviews/{RID}": {"status": 200, "body": review_obj(pay["body"], pay["commit_id"])},
               f"GET pulls/{PR}/reviews/{RID}/comments": {"status": 200, "body": [sub_item(cid[i], ws[i]) for i in reversed(range(n))]}}
     for i in range(n):
         routes[f"GET pulls/comments/{cid[i]}"] = {"status": 200, "body": one(cid[i], ws[i], **(over or {}).get(i, {}))}
@@ -669,6 +791,7 @@ def wiring_asserts(d, cid, r, rep, raw, pay):
          isinstance(rep, dict) and rep.get("counts", {}).get("OK") == len(pay["comments"]) and (verdicts(rep) or []).count("OK") == len(pay["comments"])),
         (f"판정의 이슈 id = payload 표지 집합(render_review MARK 짝맞춤) — {got}", got == marks),
         (f"POST 1회 · 보낸 본문 = payload.json 바이트(§6 게시 회귀) — POST {len(k['post'])} · 일치 {same}", len(k["post"]) == 1 and same),
+        (f"리뷰 자체 조회 1회 — {k['rev']}", len(k["rev"]) == 1),
         (f"하위 컬렉션 1회(--jq .[].id) — {k['sub']}", len(k["sub"]) == 1 and k["sub"][0].endswith("jq=.[].id")),
         (f"개별 조회 = id {len(cid)}건 각 1회 — {len(k['one'])}회", sorted(k["one"]) == sorted(str(v) for v in cid.values())),
         (f"DELETE 0 · 거부 0 — DELETE {len(k['delete'])} · 거부 {k['unsup'][:1]}", not k["delete"] and not k["unsup"]),

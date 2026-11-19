@@ -209,13 +209,13 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 > ⛔ Gather Step 5 직후 필수 실행 — 측정 → 추천(`scripts/mode_gate.py peer`) → 추천 full 일 때만 질문(그 밖은 묻지 않고 light + 통보 · 명시 인자 · 신호어 · `/fz` 명시 선택 · `--tier` 면 재지 않는다).
 > **실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED · 위험 카테고리는 추천 근거): `modules/peer-review-tiers.md` "## 모드 선택 (측정 · 추천 · 질문)" → "### 자동 선택 실행 bash" 참조 (SSOT 단일 지점, L18 규칙).
 
-상세 절차 (Tier 0/1 분기, evidence 범위): `modules/peer-review-tiers.md` 참조. Tier 가 정해지면 기록 `run_metrics.py start`(Tier 0·1 = light · 2·3 = full — `modules/mode-gate.md` § 기록).
+상세 절차 (Tier 0/1 분기, evidence 범위): `modules/peer-review-tiers.md` 참조. 실행 기록의 시작은 아래 근거 슬롯 검사가 통과할 때 그 스크립트가 남긴다 — `run_metrics.py start` 를 따로 부르지 않는다(`modules/mode-gate.md` § 기록).
 
-⛔ **근거 슬롯 검사** — tier.txt 를 쓴 뒤, Analyze · GPT 독립 패스를 띄우기 **전에** 한 번 부른다. `--tier` 는 방금 정한 값을 적는다(재개 실행의 옛 tier.txt 를 믿지 않는다):
+⛔ **근거 슬롯 검사** — tier.txt 를 쓴 뒤, Analyze · GPT 독립 패스를 띄우기 **전에** 한 번 부른다. `--tier` 는 방금 정한 값을 적는다(재개 실행의 옛 tier.txt 를 믿지 않는다) · `--recommended` · `--source` 는 5.5 의 추천(`light`·`full`·`none`)과 선택 출처(`modules/mode-gate.md` § 기록의 값)다:
 ```bash
-python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" "${WORK_DIR}" --tier {5.5 에서 정한 Tier}
+python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" "${WORK_DIR}" --tier {5.5 에서 정한 Tier} --recommended {추천} --source {선택 출처}
 ```
-exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다 · `2` 는 판정 불가(⛔ 통과 아님). 요구 슬롯은 `modules/peer-review-tiers.md` § Tier-Adaptive Evidence 의 ✓ 이고, `evidence/tools.md` 첫 줄(Serena 상태 · 리뷰 대상 SHA · 선택 도구 상태 — 형식 `modules/tool-status.md`)과 `caller-analysis.md` 의 `## 호출` · `## 구현` 도 본다 — 절차 `modules/evidence-collection.md`
+exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다(다시 불러도 같은 실행이다) · `2` 는 판정 불가(⛔ 통과 아님). 요구 슬롯은 `modules/peer-review-tiers.md` § Tier-Adaptive Evidence 의 ✓ 이고, `evidence/tools.md` 첫 줄(Serena 상태 · 리뷰 대상 SHA · 선택 도구 상태 — 형식 `modules/tool-status.md`)과 `caller-analysis.md` 의 `## 호출` · `## 구현` 도 본다 — 절차 `modules/evidence-collection.md`
 
 #### Few-shot
 ```
@@ -460,4 +460,4 @@ git worktree add ../shop-app-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 
 `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (gpt 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다** — 단 exit 18(`GPT-OFF`)은 GPT 미사용이라 `solo (gpt 실패)` 강등 · ×0.7 감쇠 대상이 아니고 `[GPT 미사용 — 사유]` 만 적는다(`modules/gpt-strategy.md` § GPT 미사용), GPT timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
 
 ## Completion → Next
-`--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계. Deliver(문서 저장 · `--post` 게시와 착지 검증 포함)가 끝나면 기록 `run_metrics.py end`(`modules/mode-gate.md` § 기록).
+`--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계. Deliver(문서 저장 · `--post` 게시와 착지 검증 포함)가 끝나면 기록 `run_metrics.py end --skill fz-peer-review --work-dir "${WORK_DIR}" --status completed`(시작을 남긴 근거 슬롯 검사와 같은 작업 폴더 — 다르면 열린 시도를 찾지 못한다 · `modules/mode-gate.md` § 기록).
