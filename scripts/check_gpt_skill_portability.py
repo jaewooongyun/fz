@@ -26,6 +26,7 @@ Claude 문서 모드(`--claude-docs`) — Swift 기준 줄에 프로젝트 조�
 규칙)는 돌리지 않는다. 계약이 읽지 않는다고 적은 절(제목 그대로 · 사유와 함께) 밖의 줄을 모두 읽는다 — 새 절도 읽는다.
   framework · author     프레임워크 토큰(+ CLAUDE_EXTRA_RE) · 작성자 관례 표지 — 조건 문구(CLAUDE_COND)가 덮지 않으면 위반.
                          덮는 범위: 문구를 실은 줄 · 문구를 실은 제목 줄이나 제목 바로 아래 첫 줄(목록 항목 · 표 행 아님)의 절 전체
+                         제목 = 줄 머리 `#` 1~6개 + ASCII 공백 · 탭(유니코드 공백 뒤 표지는 제목이 아니다)
   ai-path · layer-chain  조건과 무관하게 위반
   contract               계약이 읽지 않는다고 적은 절 제목이 파일에 없다
   대상 파일이 없으면 측정 실패(2)
@@ -69,7 +70,9 @@ OLD_REJECT = "Claude plan detected. Provide requirements only"
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 
 # ── Claude 문서 모드(--claude-docs) ──────────────────────────────────────────────
-HEADING_RE = re.compile(r"^(#{1,6})\s")
+# 제목 표지 뒤는 ASCII 공백 · 탭만 받는다(CommonMark ATX 제목) — `\s` 는 유니코드 공백(전각 공백 · NBSP 등)도 받아,
+#   `##` 뒤에 전각 공백을 둔 줄처럼 제목이 아닌 줄의 조건 문구가 절 전체를 덮고 그 아래 조건 없는 스택 규칙이 위반에서 빠진다
+HEADING_RE = re.compile(r"^(#{1,6})[ \t]")
 LIST_RE = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|\|)")   # 목록 항목 · 표 행 — 절 머리 조건이 될 수 없다(그 줄만 덮는다)
 # 조건 문구는 하나다. 줄 안에 두면 그 줄을, 절 제목 줄 또는 제목 바로 아래 첫 줄(`>` 줄 · 문단 — 목록 항목 · 표 행 아님)에
 # 두면 그 절 전체(같거나 높은 수준의 다음 제목 전까지)를 덮는다.
@@ -536,6 +539,12 @@ def self_test() -> int:
         ("claude-docs: 조사가 붙은 AI 지침 경로 · 레이어 사슬 → ai-path · layer-chain", lambda d: edit(d, cdoc, "일반 원칙만 적는다.", "지침은AI/ai-guidelines.md 를 읽고 계층은Network → Repository를 따른다."), ["ai-path", "layer-chain"]),
         ("claude-docs: ASCII 영숫자 · `_` 가 붙은 경로 · 레이어 이름 → 위반 0", lambda d: edit(d, cdoc, "일반 원칙만 적는다.", "dataAI/ai-guidelines.md · my_AI/ai-guidelines.md · Network → Repository2 · UseCase → Workflow_x · xNetwork → UseCase"), []),
         ("claude-docs: 계약이 읽지 않는다고 적은 절이 없다 → contract", lambda d: edit(d, cdoc, "## 예시", "## 보기"), ["contract", "framework"]),
+        ("claude-docs: 전각 공백 뒤 표지는 제목이 아니다 — 그 줄의 조건은 아래 규칙을 덮지 않는다 → framework",
+         lambda d: edit(d, cdoc, "일반 원칙만 적는다.", f"일반 원칙만 적는다.\n\n##\u3000{CLAUDE_COND}\n\n- SwiftUI View 는 @MainActor 로 격리한다"), ["framework"]),
+        ("claude-docs: 같은 자리 공백 뒤 표지는 제목이다 — 제목의 조건이 아래 규칙을 덮는다 → 위반 0",
+         lambda d: edit(d, cdoc, "일반 원칙만 적는다.", f"일반 원칙만 적는다.\n\n## {CLAUDE_COND}\n\n- SwiftUI View 는 @MainActor 로 격리한다"), []),
+        ("claude-docs: 같은 자리 탭 뒤 표지도 제목이다 — 제목의 조건이 아래 규칙을 덮는다 → 위반 0",
+         lambda d: edit(d, cdoc, "일반 원칙만 적는다.", f"일반 원칙만 적는다.\n\n##\t{CLAUDE_COND}\n\n- SwiftUI View 는 @MainActor 로 격리한다"), []),
     ]
     for name, mutate, want in claude_cases:
         d = pathlib.Path(tempfile.mkdtemp(prefix="fz-gsp-claude-"))
@@ -586,6 +595,54 @@ def self_test() -> int:
             ok(name)
         else:
             fails.append(f"{name}: 위반 {len(base)}건 · 조건 {seen}개 · 지워도 위반이 없는 자리 {dead}")
+    except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게
+        fails.append(f"{name}: 예외 {type(e).__name__}: {e}")
+    finally:
+        shutil.rmtree(d)
+    # 제목 표지 뒤 문자 격자 — 파이썬이 공백으로 보는 문자 전부(실행 중 계산 — 파이썬 판마다 다르다) × 표지 길이 1~7 × 조건 자리 × 앞 맥락.
+    #   오라클은 변형 관계다: 유니코드 공백 문서는 그 문자를 'x' 로 바꾼 문서와, 탭 문서는 공백 문서와 판정이 같아야 한다.
+    #   앞 맥락마다 공백 문서와 'x' 문서의 판정이 갈리는 칸이 있어야 한다 — 없으면 관계가 헛돈다.
+    #   격자 밖: 앞 공백 1~3칸 제목 · 닫는 `#` · setext 제목 · HTML 블록 · 유니코드 공백 뒤 펜스 표지(FENCE_RE)
+    rule = "- SwiftUI View 는 @MainActor 로 격리한다\n"
+    leads = {   # 앞 맥락 → (시험 줄 앞 본문, 계약이 읽지 않는 절)
+        "조건 절": (f"## 조건 절 ({CLAUDE_COND})\n\n일반 문장이다.\n\n", {}),
+        "읽지 않는 절": ("## 예시\n\n일반 문장이다.\n\n", {"## 예시": "예시"}),
+        "평범한 절": ("## Role\n\n일반 원칙만 적는다.\n\n", {}),
+    }
+    spots = {   # 조건 자리 → 표지 줄부터 문서 끝까지
+        "그 줄": lambda h: f"{h}{CLAUDE_COND}\n\n{rule}",
+        "아래 문단 첫 줄": lambda h: f"{h}규칙\n\n{CLAUDE_COND}, 아래를 따른다.\n\n{rule}",
+        "아래 목록 첫 줄": lambda h: f"{h}규칙\n\n- {CLAUDE_COND} UserDefaults 를 본다\n{rule}",
+        "없음": lambda h: f"{h}규칙\n\n{rule}",
+    }
+    spaces = [c for c in map(chr, range(0x110000)) if c.isspace() and c not in " \t\n\r"]
+    name = (f"claude-docs: heading-space-grid — 유니코드 공백 {len(spaces)}자 × 표지 1~7 × 조건 자리 {len(spots)} × 앞 맥락 {len(leads)}"
+            " → 공백 · 탭 뒤 표지만 제목")
+    d = pathlib.Path(tempfile.mkdtemp(prefix="fz-gsp-claude-grid-"))
+    try:
+        (d / "agents").mkdir()
+
+        def verdict(lead, unread, text):
+            (d / cdoc).write_text(f"---\nname: x\n---\n\n{lead}{text}", encoding="utf-8")
+            return sorted((i, r) for _, i, r, _ in scan_claude(d, {cdoc: unread})[1])
+
+        bad, split = [], dict.fromkeys(leads, 0)
+        for n in range(1, 8):
+            for c in [" ", "\t", "x"] + spaces:
+                if bool(outline(["#" * n + c + "규칙"])) != (n <= 6 and c in " \t"):
+                    bad.append(f"outline 표지 {n} · {hex(ord(c))}")
+            for lk, (lead, unread) in leads.items():
+                for sk, body in spots.items():
+                    sp, x = verdict(lead, unread, body("#" * n + " ")), verdict(lead, unread, body("#" * n + "x"))
+                    split[lk] += sp != x
+                    for c in ["\t"] + spaces:
+                        got, want = verdict(lead, unread, body("#" * n + c)), (sp if c == "\t" else x)
+                        if got != want:
+                            bad.append(f"표지 {n} · {hex(ord(c))} · {lk} · 조건 {sk}: want {want} got {got}")
+        if not bad and all(split.values()):
+            ok(name)
+        else:
+            fails.append(f"{name}: 어긋난 칸 {len(bad)}개 {bad[:4]} · 공백과 'x' 가 갈리는 칸 {split}")
     except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게
         fails.append(f"{name}: 예외 {type(e).__name__}: {e}")
     finally:
