@@ -21,7 +21,7 @@
 #   *.sh · *.ts · *.json 같은 시험 코드 · 자료도 세션 ID 를 싣는다)이고 보는 것은 세션 ID(UUID 꼴)와 워크플로 실행 ID 꼴 둘뿐이다.
 #   그 폴더가 git 작업 트리 안이면 git 이 내보낼 파일(추적 + 무시되지 않은 미추적)만 본다 — 무시된 부산물(.DS_Store 등)은 범위 밖이고
 #   통째로 무시된 폴더는 내려가지 않는다. 그 git 은 부르는 쪽의 GIT_DIR 등(훅이 내보낸다)과 설정 주입(GIT_CONFIG_PARAMETERS ·
-#   GIT_CONFIG_COUNT/KEY/VALUE · GIT_CONFIG_GLOBAL)을 지우고 부른다 — 답은 그 폴더가 든 작업 트리와 그 설정에서 온다.
+#   GIT_CONFIG_COUNT/KEY/VALUE · GIT_CONFIG_GLOBAL · GIT_CONFIG_SYSTEM)을 지우고 부른다 — 답은 그 폴더가 든 작업 트리와 그 설정에서 온다.
 #   줄마다 누수 규칙 정본의 capture_id_tokens 를 부른다 — ANSI 제어열 걷기와 합성 목록(SYNTHETIC_SESSION_IDS · SYNTHETIC_RUN_IDS)
 #   대조는 정본 한 벌이다(여기 사본을 두지 않는다).
 #   목록은 값이다(대역 규칙이 아니다: 실제 UUIDv7 도 0 으로 시작한다)
@@ -411,8 +411,9 @@ def run(name, here, expected, cells, tmp):
 _GIT_REPO_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
                  "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_PREFIX")
 # 설정을 바꾸는 git 환경 변수 — 명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT 와 그 GIT_CONFIG_KEY_<n> · GIT_CONFIG_VALUE_<n>
-#   묶음 — 묶음은 접두로 지운다)은 저장소 로컬 core.excludesFile 을 이기고, 전역 설정 경로(GIT_CONFIG_GLOBAL)는 로컬 값이 없을 때 무시 규칙을 정한다
-_GIT_CONFIG_ENV = ("GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_CONFIG_GLOBAL")
+#   묶음 — 묶음은 접두로 지운다)은 저장소 로컬 core.excludesFile 을 이기고, 전역 · 시스템 설정 경로(GIT_CONFIG_GLOBAL · GIT_CONFIG_SYSTEM)는
+#   그보다 앞서는 값이 없을 때 무시 규칙을 정한다
+_GIT_CONFIG_ENV = ("GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM")
 _GIT_CONFIG_PREFIX = ("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")
 
 

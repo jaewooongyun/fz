@@ -226,6 +226,8 @@ const ARCH_CTX = AC ? `\n[아키텍처 제약] ${JSON.stringify({
   dependencyDirection: AC.dependencyDirection, naming: AC.naming,
   conflicts: AC.conflicts,
 })}` : ''
+// constraintsKnown 은 CTX 에만 실린다 — CTX 를 쓰지 않는 Stage 3 · 5 에는 ARCH_CTX 옆에 이것으로 직접 싣는다. 한 항목 이상일 때만(빈 배열 · 미전달 · 배열 아님 → '' → 프롬프트 무변화)
+const KNOWN_CTX = Array.isArray(input.constraintsKnown) && input.constraintsKnown.length ? `\n[기지 제약] ${JSON.stringify(input.constraintsKnown)}` : ''
 
 const CTX = `[요구사항] ${input.requirement}\n[코드 컨텍스트] 요약 파일: ${input.codeContextPath} (Read로 로드)\n[기지 제약] ${JSON.stringify(input.constraintsKnown || [])}` + ARCH_CTX +
   (input.intentContext ? `\n[과제 목적] ${input.intentContext}` : '') +
@@ -296,11 +298,11 @@ let edgeOnImpact = null
 if (impact && edge) {
   const cc = await parallel([
     () => callAgent(
-      `${OVERRIDE}\n[역할] 영향 범위 분석가 — CC 교차\n[경계 케이스] ${JSON.stringify(edge.edgeCases)}\n[기존 영향 범위] ${JSON.stringify(impact.impactFiles)}${ARCH_CTX}\n` +
+      `${OVERRIDE}\n[역할] 영향 범위 분석가 — CC 교차\n[경계 케이스] ${JSON.stringify(edge.edgeCases)}\n[기존 영향 범위] ${JSON.stringify(impact.impactFiles)}${ARCH_CTX}${KNOWN_CTX}\n` +
       `[목표] 각 경계 케이스가 영향 범위 내 어느 파일에서 발생하는지 연쇄 발견 (links: sourceId=E:id) + 영향 범위 추가분.`,
       { label: 'stage3-impact-on-edge', agentType: 'fz:plan-impact', model: 'opus', effort: EFFORT, schema: CrossSchema }),
     () => callAgent(
-      `${OVERRIDE}\n[역할] 경계 케이스 발굴자 — CC 교차 (입력 기반 — 제공된 영향 범위 데이터와 아키텍처 제약에서만 추론; 코드 컨텍스트 Read·독립 탐색 금지)\n[영향 범위] ${JSON.stringify(impact.impactFiles)}\n[숨은 의존성] ${JSON.stringify(impact.hiddenDependencies)}\n[기존 케이스] ${JSON.stringify(edge.edgeCases)}${ARCH_CTX}\n` +
+      `${OVERRIDE}\n[역할] 경계 케이스 발굴자 — CC 교차 (입력 기반 — 제공된 영향 범위 데이터와 아키텍처 제약에서만 추론; 코드 컨텍스트 Read·독립 탐색 금지)\n[영향 범위] ${JSON.stringify(impact.impactFiles)}\n[숨은 의존성] ${JSON.stringify(impact.hiddenDependencies)}\n[기존 케이스] ${JSON.stringify(edge.edgeCases)}${ARCH_CTX}${KNOWN_CTX}\n` +
       `[목표] 영향 범위에서 파생되는 추가 경계 케이스 (additions — 기존 미포함만).`,
       { label: 'stage3-edge-on-impact', agentType: 'fz:plan-edge-case', model: 'opus', effort: EFFORT, schema: CrossSchema }),
   ])
@@ -373,7 +375,7 @@ if (!plan) { fallbackCount += 1; return { mode: 'fallback', reason: 'integrate n
 // ════════ Stage 5: 재검증 (collaborative Round 2 — 잔여는 반환, 수정 루프는 Lead 층) ════════
 phase('Stage 5: 아키 재검증')
 const recheck = await callAgent(
-  `${OVERRIDE}\n[역할] 아키텍처 검증자 — 재검증\n[1차 검증 결과] ${JSON.stringify(arch)}\n[최종 계획] ${JSON.stringify(plan)}${ARCH_CTX}\n` +
+  `${OVERRIDE}\n[역할] 아키텍처 검증자 — 재검증\n[1차 검증 결과] ${JSON.stringify(arch)}\n[최종 계획] ${JSON.stringify(plan)}${ARCH_CTX}${KNOWN_CTX}\n` +
   `[목표] 1차 피드백 반영 여부 + 잔여 이슈. [아키텍처 제약]이 있으면 그것이 프로젝트 준수 재검증의 직접 근거다. 각 잔여에 archVerdict(must-fix/optional/disagree) 마커 — 합의/불합의 명시.`,
   { label: 'stage5-recheck', agentType: 'fz:arch-lens', model: 'opus', effort: EFFORT, schema: RecheckSchema })
 if (!recheck) log('WARN stage5 null — 재검증 미수행 (unresolvedPeerIssues 빈 채 반환)')

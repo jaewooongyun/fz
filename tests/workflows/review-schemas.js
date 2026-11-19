@@ -22,8 +22,11 @@
 //   r3-catalog-code-pair-switch-on-recorded  catalogHits:true — Stage 1 스키마 필수 칸 · 프롬프트 [점검 카탈로그] · 반환 catalogHits(구현 콜 값) · 검토 · 수정 콜엔 없다
 //   c-prompts-05-open-questions-declared  code-pair 구현 · 수정 콜(기본 · catalogHits:true) 스키마에 openQuestions(문자열 배열 · required 아님) —
 //                              impl-correctness 가 설계 의문 · Redundant Import 신호를 돌려주는 칸이다. 검토 콜엔 없다
-//   c-prompts-05-open-questions-carried   Stage 3 수정본이 changeset 을 갈아 끼워도 Stage 1 의 openQuestions 가 남는다 — 반환 칸 = Stage 1 목록 뒤에
-//                              수정본 목록(중복 제거 · 순서 유지). 수정본에 칸이 없으면 Stage 1 그대로 · 양쪽 다 없으면 칸도 없다(반환 모양 불변)
+//   c-prompts-05-open-questions-carried   Stage 3 수정본이 changeset 을 갈아 끼워도 Stage 1 의 openQuestions 가 남는다 — 반환 칸 = 수정본 목록 그대로
+//                              뒤에 수정본이 다시 적지 않은 Stage 1 의문(앞에 '[1단계 의문 · 수정 단계가 다시 적지 않음] ' — 풀렸는지 Lead 가 가른다)
+//                              · 중복 없음. 배열 아닌 값은 빈 목록 · 양쪽 다 비거나 없으면 수정본 객체 그대로(반환 모양 불변)
+//   c-prompts-05-open-questions-defect-return  최종 changeset 에 결함이 남은 반환(fallback · changeset-defect)에도 같은 openQuestions(없으면 빈
+//                              배열) — Lead 가 Step 을 다시 부를 때 의문을 잃지 않는다. 그 반환의 다른 키는 그대로다
 'use strict'
 const fs = require('fs')
 const path = require('path')
@@ -233,14 +236,26 @@ async function capture(wf, extra, resp) {
     [cpOff, cpOn].map(c => [...CSC, ...RVC].map(k => `${k}:${!!(c.schemas[k] && c.schemas[k].properties.openQuestions)}`).join(',')).join(' / '))
   // 검토 이슈(CP_RESP stage2-review-arch)로 Stage 3 이 돈다 — 수정본은 summary 로 알아본다
   const withQ = (cs, q) => (q === undefined ? { ...cs } : { ...cs, openQuestions: q })
-  const carried = async (s1, s3) => (await capture('code-pair', CP,
-    { ...CP_RESP, 'stage1-impl': withQ(CS, s1), 'stage3-revise': withQ({ ...CS, summary: 'revised' }, s3) })).result || {}
+  const carried = async (s1, s3, base = CS) => (await capture('code-pair', CP,
+    { ...CP_RESP, 'stage1-impl': withQ(base, s1), 'stage3-revise': withQ({ ...base, summary: 'revised' }, s3) })).result || {}
+  const ONLY1 = '[1단계 의문 · 수정 단계가 다시 적지 않음] '
   const qa = await carried(['q1'], undefined), qb = await carried(['q1'], ['q2', 'q1']), qc = await carried(undefined, undefined)
+  const qd = await carried(['q1', 'q2', 'q1'], ['q2']), qe = await carried([], []), qf = await carried('q1', ['q2'])
   const csOf = r => r.changeset || {}
   check('c-prompts-05-open-questions-carried',
-    [qa, qb, qc].every(r => csOf(r).summary === 'revised')
-    && JSON.stringify(csOf(qa).openQuestions) === '["q1"]' && JSON.stringify(csOf(qb).openQuestions) === '["q1","q2"]' && !('openQuestions' in csOf(qc)),
-    [qa, qb, qc].map(r => `${csOf(r).summary}:${JSON.stringify(csOf(r).openQuestions)}`).join(' / '))
+    [qa, qb, qc, qd, qe, qf].every(r => csOf(r).summary === 'revised')
+    && JSON.stringify(csOf(qa).openQuestions) === JSON.stringify([`${ONLY1}q1`]) && JSON.stringify(csOf(qb).openQuestions) === '["q2","q1"]'
+    && !('openQuestions' in csOf(qc)) && JSON.stringify(csOf(qd).openQuestions) === JSON.stringify(['q2', `${ONLY1}q1`])
+    && JSON.stringify(csOf(qe)) === JSON.stringify({ ...CS, summary: 'revised', openQuestions: [] }) && JSON.stringify(csOf(qf).openQuestions) === '["q2"]',
+    [qa, qb, qc, qd, qe, qf].map(r => `${csOf(r).summary}:${JSON.stringify(csOf(r).openQuestions)}`).join(' / '))
+  // 최종 changeset 에 결함이 남아 적용을 멈추는 반환(changeset-defect)도 같은 목록을 싣는다 — 두 단계 모두 spanLines 가 앵커 줄 수와 다르다
+  const DEF = { ...CS, files: [{ ...CS.files[0], symbolEdits: [{ ...CS.files[0].symbolEdits[0], oldAnchor: 'a\nb', spanLines: 1 }] }] }
+  const da = await carried(['q1'], ['q2'], DEF), db = await carried(undefined, undefined, DEF)
+  const defOk = r => r.mode === 'fallback' && r.reason === 'changeset-defect' && Array.isArray(r.defects) && r.defects.length > 0
+    && Object.keys(r).sort().join() === 'defects,metrics,mode,openQuestions,reason'
+  check('c-prompts-05-open-questions-defect-return',
+    defOk(da) && JSON.stringify(da.openQuestions) === JSON.stringify(['q2', `${ONLY1}q1`]) && defOk(db) && JSON.stringify(db.openQuestions) === '[]',
+    [da, db].map(r => `${r.mode}/${r.reason}:${Object.keys(r).sort()}:${JSON.stringify(r.openQuestions)}`).join(' / '))
 
   console.log(`review-schemas: ${fail ? 'FAIL' : 'OK'} (${total - fail}/${total})`)
   process.exit(fail ? 1 : 0)

@@ -31,11 +31,11 @@
 #   git-tracked-ignored-hit   같은 작업 트리 — 무시 규칙에 걸려도 추적하는 파일(git add -f)의 실제 꼴 세션 ID 는 적중한다
 #   git-env-other-repo-kept   같은 작업 트리 — 부르는 쪽의 GIT_DIR 이 무시 규칙이 더 넓은 다른 저장소를 가리켜도(셀 안에서만 건다) 감사
 #                             범위는 감사 루트가 든 작업 트리의 git 이 정한다: 그 저장소만 무시하는 미추적 파일도 감사하고 적중한다
-#   git-env-grid-dropped      격자 — 같은 작업 트리 · PATH 앞의 가짜 git: 저장소 위치 env 여덟 · 명령 범위 설정 · 개수/키/값 묶음 · 전역 설정
-#                             경로를 하나씩 걸고 감사 범위를 정하게 하면 그 이름은 git 에 닿지 않는다(지우지 않는 대조 변수가 닿지 않으면 판정 불가)
-#   git-config-inject-kept    격자 — 명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT/KEY/VALUE — 같은 작업 트리)과 전역 설정 경로
-#                             (GIT_CONFIG_GLOBAL — 로컬 core.excludesFile 이 없는 자기 작은 트리)로 무시 규칙을 넓혀도(core.excludesFile ·
-#                             include.path) 무시되지 않은 미추적 파일을 감사한다 · 키 없는 개수(git 오류)도 감사 범위를 바꾸지 않는다
+#   git-env-grid-dropped      격자 — 같은 작업 트리 · PATH 앞의 가짜 git: 저장소 위치 env 여덟 · 명령 범위 설정 · 개수/키/값 묶음 · 전역 · 시스템
+#                             설정 경로를 하나씩 걸고 감사 범위를 정하게 하면 그 이름은 git 에 닿지 않는다(지우지 않는 대조 변수가 닿지 않으면 판정 불가)
+#   git-config-inject-kept    격자 — 명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT/KEY/VALUE — 같은 작업 트리)과 전역 · 시스템 설정
+#                             경로(GIT_CONFIG_GLOBAL · GIT_CONFIG_SYSTEM — 로컬 core.excludesFile 이 없는 자기 작은 트리)로 무시 규칙을 넓혀도
+#                             (core.excludesFile · include.path) 무시되지 않은 미추적 파일을 감사한다 · 키 없는 개수(git 오류)도 감사 범위를 바꾸지 않는다
 #   git-ignored-unreadable-dir-skipped  자기 임시 작업 트리 — 통째로 무시된 폴더(info/exclude `cache/`)는 읽을 수 없어도 내려가지 않는다:
 #                             판정 불가가 아니고 감사 파일 = 추적 + 무시되지 않은 파일
 #   git-unignored-unreadable-dir-unrun  같은 작업 트리 — 무시되지 않은 폴더를 읽을 수 없으면 여전히 정본의 판정 불가(Unrun)다
@@ -376,11 +376,11 @@ def env_set(values):
                 os.environ[k] = v
 
 
-# 감사 모듈이 git 에 넘기지 않아야 하는 env — 저장소 위치 여덟 · 명령 범위 설정 · 개수/키/값 묶음(키 · 값은 첫 번호) · 전역 설정 경로.
+# 감사 모듈이 git 에 넘기지 않아야 하는 env — 저장소 위치 여덟 · 명령 범위 설정 · 개수/키/값 묶음(키 · 값은 첫 번호) · 전역 · 시스템 설정 경로.
 #   감사 모듈의 상수를 읽지 않고 따로 적는다 — 그 상수가 줄면 이 격자가 잡는다
 GIT_ENV_GRID = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR",
                 "GIT_NAMESPACE", "GIT_PREFIX", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0",
-                "GIT_CONFIG_GLOBAL")
+                "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM")
 GRID_PROBE = "FZ_GIT_ENV_GRID_PROBE"   # 지우지 않는 대조 변수 — 가짜 git 에 닿아야 이 격자가 env 전달을 가른다
 
 
@@ -413,12 +413,13 @@ def c_git_env_grid():
 
 
 def c_git_config_inject():
-    """명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT/KEY/VALUE)은 저장소 로컬 설정(core.excludesFile)을 이기고, 전역 설정
-    경로(GIT_CONFIG_GLOBAL)는 로컬 core.excludesFile 이 없는 저장소에서 같은 일을 한다 — 무시 규칙을 넓혀 무시되지 않은 미추적 파일
-    new/notes.md 를 감사에서 뺄 수 있다. 격자: 주입 경로(parameters · count · global) × 넓히는 키(core.excludesFile · include.path →
-    core.excludesFile) + 키 없는 개수(git 오류 → 빈 무시 집합 → 무시된 부산물까지 감사). 칸마다 전제(그 env 를 물려받은 git 의 답이 실제로
-    바뀐다 — global 은 그 이름을 뺀 git 이 notes.md 를 무시하지 않는다는 것까지)를 먼저 보고, 서지 않으면 판정 불가다.
-    전역 칸의 작은 트리는 HOME · XDG_CONFIG_HOME 을 빈 폴더로 두고 시스템 설정을 끈다 — 사용자 설정이 칸을 가르지 않게. env 는 칸 안에서만 건다."""
+    """명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT/KEY/VALUE)은 저장소 로컬 설정(core.excludesFile)을 이기고, 전역 · 시스템
+    설정 경로(GIT_CONFIG_GLOBAL · GIT_CONFIG_SYSTEM)는 로컬 core.excludesFile 이 없는 저장소에서 같은 일을 한다 — 무시 규칙을 넓혀 무시되지
+    않은 미추적 파일 new/notes.md 를 감사에서 뺄 수 있다. 격자: 주입 경로(parameters · count · global · system) × 넓히는 키(core.excludesFile ·
+    include.path → core.excludesFile) + 키 없는 개수(git 오류 → 빈 무시 집합 → 무시된 부산물까지 감사). 칸마다 전제(그 env 를 물려받은 git 의
+    답이 실제로 바뀐다 — global · system 은 그 이름을 뺀 git 이 notes.md 를 무시하지 않는다는 것까지)를 먼저 보고, 서지 않으면 판정 불가다.
+    전역 칸의 작은 트리는 HOME · XDG_CONFIG_HOME 을 빈 폴더로 두고 시스템 설정을 끈다 — 사용자 설정이 칸을 가르지 않게. 시스템 칸은 같은 트리에서
+    시스템 설정 끔(GIT_CONFIG_NOSYSTEM — 켜 두면 git 이 그 경로를 읽지 않는다)만 뺀다. env 는 칸 안에서만 건다."""
     fx = git_tree()
     d = os.path.join(WORK, "git-inject")   # 감사 루트(fx) 밖 — outside-repo-walks-all 이 fx 를 복사한다
     ign = put(d, "ignore", "notes.md\n")
@@ -441,7 +442,10 @@ def c_git_config_inject():
     rows = [(f"parameters×{k}", fx, {"GIT_CONFIG_PARAMETERS": f"'{k}={v}'"}) for k, v in target.items()]
     rows += [(f"count×{k}", fx, {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": k, "GIT_CONFIG_VALUE_0": v}) for k, v in target.items()]
     rows += [(f"global×{k}", gfx, dict(quiet, GIT_CONFIG_GLOBAL=p)) for k, p in gcfg.items()]
+    sysq = dict(quiet, GIT_CONFIG_NOSYSTEM=None)
+    rows += [(f"system×{k}", gfx, dict(sysq, GIT_CONFIG_SYSTEM=p)) for k, p in gcfg.items()]
     rows.append(("count-without-key", fx, {"GIT_CONFIG_COUNT": "1"}))
+    plain_env = {"global": quiet, "system": dict(sysq, GIT_CONFIG_SYSTEM=None)}   # 칸의 이름을 뺀 git — notes.md 를 무시하지 않아야 한다
     want = {fx: sorted(rel for rel, (s, _) in GIT_LAYOUT.items() if s != "무시된 미추적"), gfx: ["clean.txt", "new/notes.md"]}
     lsi = ("ls-files", "-z", "--others", "--ignored", "--exclude-standard")
     bad = []
@@ -450,8 +454,9 @@ def c_git_config_inject():
             probe = git(root, *lsi)
         hit = "new/notes.md" in probe.stdout.decode("utf-8", "replace").split("\0")
         pre = probe.returncode != 0 if name == "count-without-key" else probe.returncode == 0 and hit
-        if name.startswith("global×"):
-            with env_set(quiet):
+        axis = name.split("×")[0]
+        if axis in plain_env:
+            with env_set(plain_env[axis]):
                 plain = git(root, *lsi)
             pre = pre and plain.returncode == 0 and "new/notes.md" not in plain.stdout.decode("utf-8", "replace").split("\0")
         if not pre:

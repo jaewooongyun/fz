@@ -15,12 +15,14 @@
 //   반환: { mode:'workflow', changeset, reviewVerdict, lensesExpected, lensesCompleted,
 //            residualIssues, residualNote, metrics }
 //   changeset.openQuestions(문자열 배열 · 필수 아님): 구현자의 설계 의문 · Redundant Import 신호 — Lead 가 반환 처리에서 읽는다(fz-code 절차 6).
-//     Stage 3 이 수정본을 돌려주면 반환 칸 = 원 changeset 의 칸 뒤에 수정본의 칸(중복 제거 · 순서 유지)이다 — 둘 다 비거나 없으면 수정본 그대로다.
+//     Stage 3 이 수정본을 돌려주면 반환 칸 = 수정본의 칸 그대로 뒤에 수정본이 다시 적지 않은 원 changeset 의 의문(앞에 '[1단계 의문 · 수정 단계가
+//     다시 적지 않음] ' — 수정이 풀었는지 Lead 가 가른다 · 중복 없음)이다 — 둘 다 비거나 없으면 수정본 그대로다. 배열 아닌 값은 빈 목록으로 읽는다.
 //   ⛔ reviewVerdict 는 'pass'|'issues'|'partial'|'skipped'. **'partial' 은 스크립트가 조립한다**
 //      (ReviewSchema enum 은 워커 출력용이라 pass|issues 만 갖는다 — 두 층을 섞지 않는다).
 //      partial = lensesCompleted < lensesExpected. 그 관점은 적용되지 않았으므로 pass 로 읽으면 안 된다.
 //     | { mode:'fallback', reason, splitSuggested?, metrics } → Lead는 실패 복구 사다리(guides/skill-authoring.md §12 L1~L4) — ⛔ 즉시 SOLO 아님, L4는 사용자 승인 후
-//     | { mode:'fallback', reason:'changeset-defect', defects, metrics } → 최종 changeset 에 결함이 남았다 — Lead 는 적용하지 않는다(fz-code 절차 4)
+//     | { mode:'fallback', reason:'changeset-defect', defects, openQuestions, metrics } → 최종 changeset 에 결함이 남았다 — Lead 는 적용하지 않는다(fz-code 절차 4).
+//       openQuestions = 위 changeset.openQuestions 와 같은 목록(없으면 빈 배열)
 //     | { mode:'split_required', reason, metrics } → Lead는 Step 분할 후 재invoke.
 //   ⛔ 책임 재배분 (S0, 사용자 승인 OQ1): 에이전트는 디스크를 수정하지 않는다 — changeset JSON만 반환.
 //     Lead가 적용(replace_symbol_body/Edit) + 빌드 검증 + 다음 Step invoke. 부분 적용 후 빌드 실패 시
@@ -297,6 +299,8 @@ if (needReview) {
 }
 
 // ════════ Stage 3: 이슈 반영 수정 (조건부 — issues일 때만. pass면 dead-call 제거) ════════
+// 수정본이 다시 적지 않은 Stage 1 의문의 표지 — 반환 changeset.openQuestions 에만 붙는다(워커 입력 아님)
+const STAGE1_ONLY = '[1단계 의문 · 수정 단계가 다시 적지 않음] '
 let finalChangeset = changeset
 // ⛔ verdict 문자열이 아니라 **이슈 존재**로 건다 — partial(렌즈 일부 실패)에서도 나온 이슈는 반영한다.
 const s3Issues = [...(review ? review.issues : []), ...defectIssues]
@@ -307,8 +311,11 @@ if (s3Issues.length > 0) {
     `[목표] 이슈를 반영한 수정 changeset. 동의하지 않는 이슈는 그대로 두되 summary에 사유 명시.`,
     { label: 'stage3-revise', agentType: 'fz:impl-correctness', model: 'opus', effort: EFFORT, schema: ChangesetSchema })
   if (revised) {
-    // 수정본이 changeset 을 갈아 끼워도 Stage 1 의 의문은 남긴다 — 검토가 이슈를 낸 바로 그때 사라지면 Lead 가 못 읽는다
-    const qs = [...new Set([changeset, revised].flatMap(cs => (Array.isArray(cs.openQuestions) ? cs.openQuestions : [])))]
+    // 수정본이 changeset 을 갈아 끼워도 Stage 1 의 의문은 남긴다 — 검토가 이슈를 낸 바로 그때 사라지면 Lead 가 못 읽는다.
+    //   수정본 목록이 앞이고, 수정본이 다시 적지 않은 Stage 1 의문은 표지를 붙여 뒤에 둔다 — 수정이 풀었는지 Lead 가 가른다(버리지 않는다)
+    const listed = cs => (Array.isArray(cs.openQuestions) ? cs.openQuestions : [])
+    const fixQs = listed(revised)
+    const qs = [...new Set([...fixQs, ...listed(changeset).filter(q => !fixQs.includes(q)).map(q => `${STAGE1_ONLY}${q}`)])]
     finalChangeset = qs.length ? { ...revised, openQuestions: qs } : revised
   } else log('WARN stage3 null — 원 changeset 반환 (이슈 미반영, residualIssues 유지)')
 }
@@ -323,7 +330,9 @@ const defects = changesetDefects(finalChangeset)
 if (defects.length) {
   fallbackCount += 1
   log(`FATAL changeset 결함 ${defects.length}건 잔존 — 적용 중단`)
-  return { mode: 'fallback', reason: 'changeset-defect', defects, metrics: metrics(stagesCompleted) }
+  // 의문은 이 반환에도 싣는다 — Lead 가 Step 을 다시 부르는 바로 이 경로에서 사라지면 못 읽는다(없으면 빈 배열)
+  const openQuestions = Array.isArray(finalChangeset.openQuestions) ? finalChangeset.openQuestions : []
+  return { mode: 'fallback', reason: 'changeset-defect', defects, openQuestions, metrics: metrics(stagesCompleted) }
 }
 log(`완주 ${stagesCompleted}/3 — changeset 파일 ${finalChangeset.files.length}개 / 검토 ${review ? review.verdict : 'skipped'}`)
 

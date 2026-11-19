@@ -28,6 +28,7 @@
 //   review-live stage2 conditional(생략 = 완주 3 · 교차 null = 완주 아님) · plan-lean2 mergeMode(생략 = degraded 아님 · 병합 null = degraded)
 //   · 교차 delta(id 누락 = unreviewed · crossCoverage 보고 — agree 로 채우지 않는다).
 //   런처 · 병합 · divergence 가 실패한 GPT 산출로 판정을 만들지 않는지는 tests/fixtures/gpt/failure-injection/run.sh --scope launcher 가 본다.
+// 응답 표(RESP · responder)는 tests/workflows/stack-skill-channel.js 가 plan-collaborative 를 끝까지 돌릴 때 재사용한다(require — 실행부는 직접 실행할 때만 돈다).
 'use strict'
 const fs = require('fs')
 const path = require('path')
@@ -91,6 +92,7 @@ const flaky = (lab, n, extra) => {
   const base = responder([], extra)
   return (prompt, opts) => (opts.label === lab && k++ < n ? null : base(prompt, opts))
 }
+module.exports = { RESP, responder }
 
 // 워크플로별 경로 · 완주 기준 · 결손 신호
 const SUITES = [
@@ -202,7 +204,7 @@ async function independent() {
     JSON.stringify({ verdicts: two.map(x => x.crossVerdict), coverage: d.crossCoverage }))
 }
 
-;(async () => {
+if (require.main === module) (async () => {
   if (scope === 'independent') {
     await independent()
     console.log(`\n실패 주입 B(independent) ${fail ? '실패 ' + fail + '건' : '전건 통과'}`)

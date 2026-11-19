@@ -468,7 +468,7 @@ Sprint Contract 4차원 (Correctness/Coverage/Severity/Actionability) 기반 Mul
 
 ### ⑤ direction verdict fable vs opus (신설 2026-07-06)
 
-> 배선 근거: `plan-collaborative.js:239` stage0-direction · `:252` stage0-final을 fable로 승격(판정문 출력 — 생산 스테이지 대비 출력량 작아 비용 할증 최소). rebuttal·draft·integrate 등 생산 스테이지는 opus 유지.
+> 배선 근거: `plan-collaborative.js:241` stage0-direction · `:254` stage0-final을 fable로 승격(판정문 출력 — 생산 스테이지 대비 출력량 작아 비용 할증 최소). rebuttal·draft·integrate 등 생산 스테이지는 opus 유지.
 > 주 측정 대상: **stage0-direction**(상시 실행) · **stage0-final**은 비-PROCEED 시만 보너스 기록.
 > control (비교군): **retro-baseline** 기본 — 저장소 밖 로그의 §5.7 fz-plan **#1-2**(opus 세션; #3은 Fable 세션 첫 invoke라 제외 — ① retro-baseline 선례 계승, session_model=fable 오염 방지)의 stage0 direction 판정 관찰(근거 재현성·대안 품질·escalation 정확성)을 fable 판정과 대조. 불충분 시 **shadow-opus 3회 한정**(동일 case를 opus로 재판정해 직접 대조).
 > 임계 (사전등록): N=3 누적 — 판정 품질(근거 재현성·대안 품질·escalation 정확성)이 opus 대비 비열화 ≥2/3 AND wall-clock 비악화 → 유지 / 미달 → opus 롤백(2줄 원복).

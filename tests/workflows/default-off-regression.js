@@ -12,7 +12,7 @@
 // ⛔ 기준 소스(앞이 이긴다 — resolveBase, effort-arg.js 도 이것을 쓴다): env FZ_REGRESSION_BASE_TREE 의 workflows/<wf>.js
 //    → env FZ_REGRESSION_BASE_SHA 의 이 저장소 이력 `git show <sha>:workflows/<wf>.js`(부르는 쪽 GIT_DIR 등 · 설정 주입을 지우고 부른다 —
 //    늘 이 저장소의 이력이다) → 둘 다 없을 때만 저장소 고정본
-//    tests/fixtures/workflow-base/default-off/workflows/<wf>.js.base(커밋 13755a6 의 workflows/*.js 와 콜 입력이 같다 — 이력 없는 사본에서도 돈다.
+//    tests/fixtures/workflow-base/default-off/workflows/<wf>.js.base(콜 입력 = 커밋 13755a6 의 workflows/*.js 에 workflows/*.js 와 똑같이 적용한 문자열 치환을 더한 것 — 이력 없는 사본에서도 돈다.
 //    .js 가 아니어서 .js 글롭 검사가 옛 원문을 훑지 않는다 — 임시 <wf>.base.js 로 써서 넘긴다).
 //    명시한 선택자(빈 값 포함)를 읽지 못하면 고정본으로 내려가지 않고 UNRUN(exit 2)이다. 고정본이 없어도 UNRUN 이다. 검사 이름의 `기준(…)` 이 출처다.
 //    ⛔ 고정본은 두 가지 편집만 받는다 — 콜 입력 밖(주석)의 치환과, workflows/*.js 에 똑같이 적용한 문자열 치환. 유래 커밋과의 차이는 이 둘뿐이어야 한다.
@@ -22,7 +22,7 @@
 //       파일 집합이 다르거나 목록이 없으면 UNRUN(exit 2)이다. 견주는 파일 집합(pinnedFiles)은 그 폴더가 git 작업 트리 안이면 git 이 내보낼
 //       파일(추적 + 무시되지 않은 미추적 — .DS_Store 같은 무시된 부산물은 빠지고 통째로 무시된 폴더는 내려가지 않는다)이고, 밖이면 폴더의
 //       파일 전부다. 그 git 은 부르는 쪽의 GIT_DIR 등(훅이 내보낸다)과 설정 주입(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT/KEY/VALUE ·
-//       GIT_CONFIG_GLOBAL)을 지우고 부른다 — 답은 그 폴더가 든 작업 트리와 그 설정에서 온다.
+//       GIT_CONFIG_GLOBAL · GIT_CONFIG_SYSTEM)을 지우고 부른다 — 답은 그 폴더가 든 작업 트리와 그 설정에서 온다.
 //       위 두 가지 편집으로 고정본을 일부러 바꿨으면 같은 커밋에서 목록을 다시 쓴다(같은 집합을 고른다 — 작업 트리 밖이면 git 이 아무것도 내지 않아 전부다):
 //         (cd tests/fixtures/workflow-base && shasum -a 256 $(find . -type f ! -name SHA256SUMS | sed 's#^\./##' | grep -vxF -f <(git ls-files -o -i --exclude-standard 2>/dev/null) | sort) > SHA256SUMS)
 //       목록만 고쳐 UNRUN 을 지우지 않는다 — 고정본의 diff 와 목록의 diff 가 같은 커밋에 함께 보여야 한다.
@@ -202,8 +202,9 @@ const SUMS_NAME = 'SHA256SUMS'
 const GIT_REPO_ENV = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_COMMON_DIR',
   'GIT_NAMESPACE', 'GIT_PREFIX']
 // 설정을 바꾸는 git 환경 변수 — 명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT 와 그 GIT_CONFIG_KEY_<n> · GIT_CONFIG_VALUE_<n> 묶음 —
-//   묶음은 접두로 지운다)은 저장소 로컬 core.excludesFile 을 이기고, 전역 설정 경로(GIT_CONFIG_GLOBAL)는 로컬 값이 없을 때 무시 규칙을 정한다
-const GIT_CONFIG_ENV = ['GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_GLOBAL']
+//   묶음은 접두로 지운다)은 저장소 로컬 core.excludesFile 을 이기고, 전역 · 시스템 설정 경로(GIT_CONFIG_GLOBAL · GIT_CONFIG_SYSTEM)는 그보다 앞서는
+//   값이 없을 때 무시 규칙을 정한다
+const GIT_CONFIG_ENV = ['GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_SYSTEM']
 const GIT_CONFIG_PREFIX = ['GIT_CONFIG_KEY_', 'GIT_CONFIG_VALUE_']
 // git 에 넘길 env — 부르는 쪽 env 에서 GIT_REPO_ENV · GIT_CONFIG_ENV · 설정 키/값 묶음을 지운 사본. 무시 조회(gitIgnored)와 기준 SHA 의
 //   git show(resolveBase)가 함께 쓴다 — 답은 늘 그 git 이 가리킨 작업 트리 · 저장소와 그 설정에서 온다
@@ -301,7 +302,7 @@ function resolveBase(wf, tmp, sel) {
   }
   const f = path.join(tmp, `${wf}.base.js`)
   fs.writeFileSync(f, src)
-  return { file: f, from: sha !== undefined ? `git ${sha}(${sel.sha})` : `고정본 ${sel.pinnedSha}` }
+  return { file: f, from: sha !== undefined ? `git ${sha}(${sel.sha})` : `고정본 ${sel.pinnedSha} + 같은 문자열 치환` }
 }
 
 function baseFile(wf, tmp) { return resolveBase(wf, tmp, BASE_SEL) }
@@ -534,13 +535,26 @@ if (require.main === module) (async () => {
           check('pinned-sums-git-config-inject-global — 부르는 쪽 GIT_CONFIG_GLOBAL 이 로컬 무시 설정이 없는 저장소의 무시 규칙을 넓혀도 notes.txt 를 견준다',
             have.includes('notes.txt'), `견준 파일 ${JSON.stringify(have)}`)
         }
+        // 시스템 설정 경로(GIT_CONFIG_SYSTEM)도 로컬 · 전역 값이 없는 저장소에서 무시 규칙을 넓힌다 — 같은 작은 저장소에서 시스템 설정 끔
+        //   (GIT_CONFIG_NOSYSTEM — 켜 두면 git 이 그 경로를 읽지 않는다)만 뺀다. 전제: 그 이름을 건 git 은 notes.txt 를 무시하고 뺀 git 은 무시하지 않는다
+        const sPlain = Object.assign({}, gPlain)
+        for (const k of ['GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_SYSTEM']) delete sPlain[k]
+        const sOn = lsIgnored(gPin, Object.assign({}, sPlain, { GIT_CONFIG_SYSTEM: gCfg })), sOff = lsIgnored(gPin, sPlain)
+        if (gInit.status !== 0 || !lists(sOn, 'notes.txt') || sOff.status !== 0 || lists(sOff, 'notes.txt')) {
+          selfUnrun = `시스템 설정 경로가 git 의 답을 바꾸지 않는다 — git exit ${[gInit, sOn, sOff].map(p => p.status).join(',')} · notes.txt 무시 ${lists(sOn, 'notes.txt')},${lists(sOff, 'notes.txt')}(기대 true,false)`
+        } else {
+          const have = withEnv({ HOME: gHome, XDG_CONFIG_HOME: gHome, GIT_CONFIG_NOSYSTEM: undefined, GIT_CONFIG_SYSTEM: gCfg }, () => pinnedFiles(gPin))
+          check('pinned-sums-git-config-inject-system — 부르는 쪽 GIT_CONFIG_SYSTEM 이 로컬 · 전역 무시 설정이 없는 저장소의 무시 규칙을 넓혀도 notes.txt 를 견준다',
+            have.includes('notes.txt'), `견준 파일 ${JSON.stringify(have)}`)
+        }
         fs.rmSync(path.join(wb, 'notes.txt'))
         // 격자(git-env-grid · JS 헬퍼 × 무시 조회 · 기준 SHA git show) — 받은 env 의 이름만 적는 가짜 git 을 PATH 앞에 두고 아래 이름을 하나씩
         //   걸면 두 호출 모두 그 이름을 git 에 넘기지 않는다. 저장소 위치 env 몇은 git 의 답을 바꾸지 않아 답으로는 가를 수 없다 — 그래서 git 이
         //   받은 env 를 본다. 이름은 GIT_REPO_ENV 를 읽지 않고 따로 적는다(상수가 줄면 이 격자가 잡는다).
         //   전제: 칸마다 가짜 git 이 무시 조회(ls-files)와 git show 를 받고 모든 호출에 지우지 않는 대조 변수가 닿는다
         const gridNames = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_COMMON_DIR',
-          'GIT_NAMESPACE', 'GIT_PREFIX', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0', 'GIT_CONFIG_GLOBAL']
+          'GIT_NAMESPACE', 'GIT_PREFIX', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0', 'GIT_CONFIG_GLOBAL',
+          'GIT_CONFIG_SYSTEM']
         const fakeDir = path.join(box, 'git-env-grid'), callLog = path.join(fakeDir, 'calls.log'), gridProbe = 'FZ_GIT_ENV_GRID_PROBE'
         const shq = s => `'${s.replace(/'/g, `'\\''`)}'`
         fs.mkdirSync(fakeDir)
@@ -569,14 +583,18 @@ if (require.main === module) (async () => {
         })
         if (gridBad.length) selfUnrun = `가짜 git 이 두 호출과 대조 변수를 받지 못했다(${gridBad[0]}) — 격자가 env 전달을 가를 수 없다`
         else {
-          check(`pinned-sums-git-env-grid — 저장소 위치 env 여덟 · 명령 범위 설정 · 개수/키/값 묶음 · 전역 설정 경로를 하나씩 걸어도 무시 조회 · 기준 SHA git show 가 그 이름을 git 에 넘기지 않는다(${gridNames.length * 2}칸)`,
+          check(`pinned-sums-git-env-grid — 저장소 위치 env 여덟 · 명령 범위 설정 · 개수/키/값 묶음 · 전역 · 시스템 설정 경로를 하나씩 걸어도 무시 조회 · 기준 SHA git show 가 그 이름을 git 에 넘기지 않는다(${gridNames.length * 2}칸)`,
             leaked.length === 0, `git 에 닿은 이름 ${leaked.join(' · ')}`)
         }
         // 통째로 무시된 폴더는 읽을 수 없어도 내려가지 않는다 — 고정본 폴더 안 cache/ 를 info/exclude 로 무시하고 권한을 0 으로 두어도 두 러너가
         //   돈다. 대조: 무시되지 않은 폴더(locked/)를 읽을 수 없으면 두 러너 UNRUN(exit 2)이다. 전제: check-ignore(0 · 1) · 실제로 읽을 수 없다(root 면
         //   읽힌다) · ls-files --directory 가 무시된 폴더만 `<이름>/` 한 줄로 낸다. 권한 · 폴더 · exclude 줄은 셀 끝에 되돌린다(뒤 셀과 바깥
         //   fs.rmSync 가 권한 0 폴더에서 깨지지 않게)
+        //   권한 0 폴더가 읽히는 환경(root 등)에서는 그 셀만 건너뛴다 — `NOTE` 한 줄 · PASS 없음 · 회귀 비교는 그대로 돈다. 다른 전제
+        //   (check-ignore · --directory)가 서지 않거나 읽기가 EACCES 아닌 오류로 실패하면 여전히 UNRUN 이다. FZ_DEFAULT_OFF_SIM_READABLE 은 그
+        //   갈래를 root 없이 여는 자기 시험 이음매다 — 읽기 탐침만 '읽힘' 으로 바꾼다(아래 readable-skip 셀의 자식만 건다)
         const excl = path.join(gitTree, '.git', 'info', 'exclude')
+        const readProbe = process.env.FZ_DEFAULT_OFF_SIM_READABLE ? () => [] : fs.readdirSync
         const unreadableDir = (name, ignored) => {
           const dir = path.join(wb, name)
           fs.mkdirSync(dir)
@@ -586,11 +604,12 @@ if (require.main === module) (async () => {
           try {
             const ig = git('check-ignore', '-q', `tests/fixtures/workflow-base/${name}/`).status
             let denied = ''
-            try { fs.readdirSync(dir) } catch (e) { denied = e.code || 'error' }
+            try { readProbe(dir) } catch (e) { denied = e.code || 'error' }
             const folded = lists(lsIgnored(wb, gitEnv, '--directory'), `${name}/`)
-            if (ig !== (ignored ? 0 : 1) || denied !== 'EACCES' || folded !== ignored) {
+            if (ig !== (ignored ? 0 : 1) || (denied && denied !== 'EACCES') || folded !== ignored) {
               return { pre: `check-ignore ${ig}(기대 ${ignored ? 0 : 1}) · readdir ${denied || '읽힘'}(기대 EACCES — root 면 읽힌다) · --directory 의 ${name}/ ${folded}(기대 ${ignored})` }
             }
+            if (!denied) return { skip: `권한 0 폴더(${name}/)가 이 환경에서 읽힌다(root 등) — 읽을 수 없는 폴더를 만들 수 없다 · PASS 아님` }
             return { ks: kids() }
           } finally {
             fs.chmodSync(dir, 0o755)
@@ -600,15 +619,31 @@ if (require.main === module) (async () => {
         }
         const ud = unreadableDir('cache', true)
         if (ud.pre) selfUnrun = `무시된 읽을 수 없는 폴더 셀의 전제가 서지 않는다 — ${ud.pre}`
+        else if (ud.skip) console.log(`NOTE  pinned-sums-git-ignored-unreadable-dir 건너뜀 — ${ud.skip}`)
         else {
           check('pinned-sums-git-ignored-unreadable-dir — 통째로 무시된 폴더(cache/)는 읽을 수 없어도 내려가지 않는다: 두 러너가 돈다(exit 0)',
             ud.ks.every(k => k.status === 0), said(ud.ks))
         }
         const ul = unreadableDir('locked', false)
         if (ul.pre) selfUnrun = `무시되지 않은 읽을 수 없는 폴더 셀의 전제가 서지 않는다 — ${ul.pre}`
+        else if (ul.skip) console.log(`NOTE  pinned-sums-git-unignored-unreadable-dir 건너뜀 — ${ul.skip}`)
         else {
           check('pinned-sums-git-unignored-unreadable-dir — 무시되지 않은 폴더(locked/)를 읽을 수 없으면 두 러너 UNRUN(exit 2)',
             ul.ks.every(k => k.status === 2 && /^UNRUN /m.test(String(k.stdout || ''))), said(ul.ks))
+        }
+        // 건너뜀 갈래 — 읽기 탐침만 '읽힘' 으로 바꾼 자식(root 흉내)에서 위 두 셀은 NOTE 로 건너뛰고(PASS 없음) 러너는 UNRUN 없이 회귀 비교까지
+        //   간다(exit 0 · 비교 줄 · 끝 줄). 자식은 이 셀을 다시 돌지 않고 기준 선택자를 받지 않는다(고정본으로 돈다)
+        if (!process.env.FZ_DEFAULT_OFF_SIM_READABLE) {
+          const simTmp = path.join(box, 'sim-readable-tmp'), simEnv = Object.assign({}, process.env, { FZ_DEFAULT_OFF_SIM_READABLE: '1', TMPDIR: simTmp })
+          for (const k of ['FZ_DEFAULT_OFF_CHILD', 'FZ_REGRESSION_BASE_TREE', 'FZ_REGRESSION_BASE_SHA']) delete simEnv[k]
+          fs.mkdirSync(simTmp)
+          const sim = spawnSync(process.execPath, [__filename, '--option', 'mergeMode'], { encoding: 'utf8', env: simEnv })
+          const out = String(sim.stdout || '')
+          const skipped = ['pinned-sums-git-ignored-unreadable-dir', 'pinned-sums-git-unignored-unreadable-dir']
+            .filter(n => new RegExp(`^NOTE  ${n} 건너뜀 — 권한 0 폴더`, 'm').test(out) && !new RegExp(`^PASS  ${n} `, 'm').test(out))
+          check('pinned-sums-git-unreadable-dir-readable-skip — 권한 0 폴더가 읽히는 환경(읽기 탐침을 바꾼 자식)에서 두 셀은 NOTE 로 건너뛰고(PASS 없음) 러너는 회귀 비교까지 간다(exit 0)',
+            sim.status === 0 && skipped.length === 2 && /^PASS  mergeMode · plan-lean2 /m.test(out) && /^기본값 회귀 전건 통과/m.test(out),
+            `자식 exit ${sim.status} · 건너뛴 셀 ${skipped.length}/2 · ${out.trim().split('\n').pop().slice(0, 160)}`)
         }
         const forced = git('add', '-f', 'tests/fixtures/workflow-base/effort-arg/.DS_Store')
         ks = kids()
