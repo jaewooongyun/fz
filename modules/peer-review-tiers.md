@@ -460,7 +460,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 | `base-patterns` | — | ✓ | ✓ | ✓ | — |
 | `producer-consumer` | — | — | ✓ | ✓ | — |
 | `convention-samples` | — | — | ✓ | ✓ | — |
-| `caller-analysis` | ⊕ | ⊕ | ⊕ | ✓ | init·DI·초기화 경로 변경 |
+| `caller-analysis` | ⊕ | ⊕ | ⊕ | ✓ | init·DI·초기화 경로 · class init · willSet/didSet 변경 |
 | `semantic-mapping` | ⊕ | ⊕ | ⊕ | ✓ | 리팩토링·치환·마이그레이션 |
 | `deletion-verification` | ⊕ | ⊕ | ⊕ | ✓ | 심볼·함수 제거 |
 

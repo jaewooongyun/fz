@@ -33,7 +33,3 @@
 | guides/skill-authoring.md §12 | T4 Lead Checkpoint + 실패 복구 사다리 분기에서 참조 |
 | cross-validation.md | Gate 삽입 규칙에서 참조 |
 | lead-reasoning.md | T3에서 Implication Scan 연결 |
-
-## 측정
-
-- 발동 후 Gate 통과율 변화 → Ablation 데이터로 활용

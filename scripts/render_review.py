@@ -28,6 +28,7 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
   review 선택 costLog(review.json 폴더 기준 cost-log.json 상대 경로 — `## 실측 비용` 절 · 파일이 없으면 UNRUN)
         cost-log.json 에서 읽는 키(형식의 정본은 여기다): tier.selected · tokens.total · tokens.method · duration_ms · phases_ms(구간별 ms) ·
         issues.{critical · major · minor · suggestion}
+        ⚠️ 지금은 플러그인의 어느 단계도 cost-log.json 을 만들지 않는다 — 렌더러는 파일이 있을 때만 읽는다
   판정 한계(round 2 S9 — 키가 없으면 옛 바이트 그대로)
     issue 선택 alternatives[{label, description, pros?, cons?}] · recommended(그 label 중 하나) — 외부 렌즈(GPT)가 낸 대안을 **원문**
               그대로 옮긴다(F-115 — 자기 말로 요약하면 추천 해법이 사라졌다). recommended 가 label 에 없으면 입력 불가(재서술 차단)

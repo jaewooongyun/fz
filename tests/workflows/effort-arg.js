@@ -9,7 +9,7 @@
 // ⛔ 콜이 실제로 effort 식별자를 쓰는지(리터럴이 남지 않았는지)는 lint-model-explicit.sh --baseline 이 정적으로 본다 — 여기서는 런타임 전달을 본다.
 // 기준 소스(앞이 이긴다 — 고르는 곳은 default-off-regression.js 의 resolveBase 하나다): env FZ_EFFORT_BASE_TREE 의 workflows/<wf>.js
 //   → env FZ_EFFORT_BASE_SHA 의 ROOT 이력 `git show <sha>:workflows/<wf>.js` → 둘 다 없을 때만 저장소 고정본
-//   tests/fixtures/workflow-base/effort-arg/workflows/<wf>.js.base(커밋 26c42d3 의 workflows/*.js 와 콜 입력이 같다 — 이력 없는 사본에서도 돈다).
+//   tests/fixtures/workflow-base/effort-arg/workflows/<wf>.js.base(콜 입력 = 커밋 26c42d3 의 workflows/*.js 에 workflows/*.js 와 똑같이 적용한 문자열 치환을 더한 것 — 이력 없는 사본에서도 돈다).
 //   고정본은 이 러너 옆에서 찾는다 — FZ_WF_ROOT 로 다른 트리를 대상으로 돌려도 기준 원문은 같다.
 //   ⛔ 명시한 선택자(빈 값 포함)를 읽지 못하면 고정본으로 내려가지 않는다. 고정본이 없어도 그 대조는 UNRUN(exit 2)이고 줄에 사유가 붙는다 — 통과가 아니다.
 //   ⛔ 고정본 편집 규칙은 default-off-regression.js 머리말과 같다 — 의도한 동작 변경은 고정본을 고쳐 맞추지 않고 비교 쪽(rollbackArgs · intended())에 적는다.

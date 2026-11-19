@@ -33,7 +33,7 @@ claude
 런타임으로 `python3` 3.9 이상과 `git` 이 필요하다. 판정기와 lint 는 3.9 문법에 맞춰 있다. `perl` 은 GPT 호출 래퍼만 쓰고(macOS 기본 포함) 없으면 GPT 단계만 못 한다.
 `node` 는 점검(`/fz-manage check` · health-check)에만 필요하다. 없으면 회귀 오라클 · workflow 문법 · 문구 배선 검사가 미실행으로 남고 점검은 exit 2 로 끝난다.
 
-설치하면 Stop 훅 하나가 함께 켜진다(`hooks/hooks.json`). 턴이 끝날 때 워커 에이전트가 심볼 도구를 썼는지 세어 이 머신의 `${FZ_RUN_STATE:-~/.fz/runs}/mcp-sweep.jsonl` 에만 기록하고, fz 스킬이 상태 기록(`evidence/tools.md`)을 남긴 세션에서 의심스러우면 한 줄 알린다 — 막지 않고 `FZ_MCP_SWEEP_OFF=1` 로 끈다(`FZ_GATES_OFF=1` 은 게이트 판정과 함께 끈다). 미충족 게이트로 세션 종료를 막는 훅은 선택 설치다(`docs/completion-gates.md`).
+설치하면 Stop 훅 하나가 함께 켜진다(`hooks/hooks.json`). 턴이 끝날 때 서브에이전트를 쓴 세션이면(fz 세션이 아니어도) 워커 에이전트가 심볼 도구를 썼는지 세어 이 머신의 `${FZ_RUN_STATE:-~/.fz/runs}` 폴더에만 기록하고, fz 스킬이 상태 기록(`evidence/tools.md`)을 남긴 세션에서 의심스러우면 한 줄 알린다 — 막지 않고 `FZ_MCP_SWEEP_OFF=1` 로 끈다(`FZ_GATES_OFF=1` 은 게이트 판정과 함께 끈다). 미충족 게이트로 세션 종료를 막는 훅은 선택 설치다(`docs/completion-gates.md`).
 
 ### 함께 쓰는 도구
 
@@ -43,7 +43,7 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
 |------|--------|:------:|------|
 | **Claude Code** | 동작 불가 | 전부 | 네이티브 설치(권장) — [설치 문서](https://code.claude.com/docs/en/setup) · 또는 `npm install -g @anthropic-ai/claude-code` |
 | **SuperClaude** | 리뷰 셋째 검증이 새 컨텍스트 에이전트로 · 설명 · 조사 명령은 건너뛴다 | 3/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
-| **Serena MCP** | 심볼 탐색이 Grep 으로 (14 중 7 폴백) | 14/22 | 자동 등록. `uv` 필수 (`brew install uv`), 첫 기동 전에 캐시를 채운다(아래) |
+| **Serena MCP** | 심볼 탐색이 Grep 으로 (11 중 7 폴백) | 11/22 | 자동 등록. `uv` 필수 (`brew install uv`), 첫 기동 전에 캐시를 채운다(아래) |
 | **GPT CLI** (`@openai/codex`) | 교차 검증이 새 컨텍스트 Claude 검증자로 — 동종 검증 `[fresh-context: claude]` (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
 | **sequential-thinking** | 없으면 같은 분해를 표로 직접 쓴다 | 9/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
 | **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (9 중 1 폴백) | 9/22 | `claude plugin install context7@claude-plugins-official` |
@@ -104,7 +104,7 @@ claude plugin update fz-guard@fz-orchestrator     # fz-guard 를 설치했을 �
 | **개발** | `/fz-plan` | 요구사항 분석, 영향 범위, RTM |
 | | `/fz-code` | 계획에 따른 점진적 구현과 빌드 검증 |
 | | `/fz-fix` | 버그 수정 (4-Phase 디버깅) |
-| | `/fz-review` | 3중 검증 (Claude + GPT + sc:analyze) |
+| | `/fz-review` | 3중 검증 (Claude + GPT + 셋째 검증(sc-analyze · 없으면 새 컨텍스트 에이전트)) |
 | | `/fz-commit`, `/fz-pr` | 커밋, Fork 기반 PR |
 | | `/fz-rebase` | 롱텀 브랜치 리베이스와 양방향 조용한 유실 게이트 (경로 단위 배타 분할, prepush 원격 실측) |
 | **탐색** | `/fz-discover` | 풍경 탐색과 경로 매핑 |
@@ -170,8 +170,8 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 | 가이드 | 줄 | 내용 |
 |--------|---:|------|
 | [`llm-references.md`](guides/llm-references.md) | 206 | LLM·AI 권위 자료를 모은 단일 참조점. Tier1 공식, Tier2 arxiv 실증, Tier3 커뮤니티로 나누고 가이드와 스킬을 고칠 때 1차 출처로 쓴다 |
-| [`prompt-optimization.md`](guides/prompt-optimization.md) | 753 | 프롬프트 10원칙, Context Rot 대응, Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 689 | 스킬 작성. YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
+| [`prompt-optimization.md`](guides/prompt-optimization.md) | 752 | 프롬프트 10원칙, Context Rot 대응, Progressive Disclosure |
+| [`skill-authoring.md`](guides/skill-authoring.md) | 691 | 스킬 작성. YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
 | [`skill-testing.md`](guides/skill-testing.md) | 548 | 스킬 테스트. Triggering·Functional 3단계와 테스트 스펙 템플릿 |
 | [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 295 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
 | [`agent-team-guide.md`](guides/agent-team-guide.md) | 508 | 에이전트와 팀 구성. Task Brief, 모델 전략, §8 Workflow 공식 사양 |

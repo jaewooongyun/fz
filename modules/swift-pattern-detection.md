@@ -170,6 +170,7 @@ GOOD:
 ## 발동 결과 기록
 
 - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/code/phase-0.5-detection.md`에 발견된 token + 대응 step 매핑
+- 작업 폴더 없음(저장 없이 진행): 기록을 건너뛰고 token + step 매핑 표는 대화에 둔다 — 저장하지 않았다고 보고한다
 
 ## 검증 명령 (외부 grep용)
 

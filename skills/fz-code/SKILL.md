@@ -108,11 +108,11 @@ metadata:
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead
    - ⛔ **렌즈 회계를 먼저 본다** (F-216 N1): `lensesCompleted` < `lensesExpected` 면 검토 렌즈가 죽었고 `residualNote` 에 죽은 렌즈 이름이 담긴다 — `reviewVerdict` 는 일부만 죽으면 `'partial'`, 전부 죽으면(light 의 단독 렌즈 포함) `'skipped'` 다. ⛔ `'skipped'` 만 보고 생략으로 읽지 않는다 — 검토를 의도해 생략한 반환은 `lensesExpected` 0 · `residualNote` null 이다. 이전 판은 렌즈 하나가 죽어도 `'pass'` + 완주 3/3 을 인쇄해 **검토 절반이 빠진 것을 반환값만으로는 알 수 없었다**.
    - 렌즈가 죽었으면(`'partial'` · `lensesCompleted` < `lensesExpected` 인 `'skipped'`) 그 관점(아키텍처 또는 품질)은 **적용되지 않았다** — 다음 Step 으로 넘어가기 전에 재invoke 할지 Lead 가 판정한다
-   - `changeset.openQuestions`(구현자의 설계 의문 · Redundant Import 신호)가 비어 있지 않으면 Lead 가 읽는다 — Redundant Import 는 절차 3 의 마찰 신호로, 설계 의문은 사용자 질문으로 올린다. 칸이 없거나 빈 배열이면 할 일이 없다
+   - `changeset.openQuestions`(구현자의 설계 의문 · Redundant Import 신호 — `reason:'changeset-defect'` 반환은 같은 목록을 최상위 `openQuestions` 로 싣는다)가 비어 있지 않으면 Lead 가 읽는다 — Redundant Import 는 절차 3 의 마찰 신호로, 설계 의문은 사용자 질문으로 올린다. 머리에 `[1단계 의문 · 수정 단계가 다시 적지 않음] ` 이 붙은 항목은 수정 단계가 다시 적지 않은 1단계 의문이다 — 수정이 풀었는지 Lead 가 가른다. 칸이 없거나 빈 배열이면 할 일이 없다
    - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). ⛔ 여기서 사다리를 재정의하지 않는다
    - **code-pair 고유분만**: ① H5 크기 가드 — `split_required`/`splitSuggested` 시 Step 분할(과대 changeset scaffold collapse 방지) ② 재시도는 `buildFeedback` 포함 **새 invoke**(캐시 키 변경 → resume 비의존) ③ Stage1 null 재시도는 **1회 한정**·일시 장애 의심 시만
-   - ⛔ **심볼 도구 점검** (Step 마다 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
-7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5 — `gpt-choice.sh decide` 판정) — Workflow는 "구현+검토 쌍"만 대체
+   - ⛔ **심볼 도구 점검** (Step 마다 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
+7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + 요구 부합 검증(절차 7) + GPT 교차 검증(8.5 — `gpt-choice.sh decide` 판정) — Workflow는 "구현+검토 쌍"만 대체
 8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-code 테이블(**2026-07-10 시리즈 — 현행**; 2026-06-05 표는 사료 · 규약: `experiment-log.md` 머리 문단). Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
 
 ---
@@ -126,7 +126,7 @@ metadata:
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
-4. ⛔ **Serena 활성 기록 (첫 단계 — fz-fix 와 같은 기록)**: 같은 작업 폴더에 앞 단계(plan · fix 등)가 남긴 `{WORK_DIR}/evidence/tools.md` 의 트리 · `@sha` 가 지금 대상(작업할 git root · HEAD)과 같으면 활성화 · 기록을 건너뛰고 검사만 한다 — 꼬리가 옛 형식이면(검사 exit 1) 재사용하지 않고 다시 적는다. 그 밖에는 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile code {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 옛 꼬리)이면 기록을 고친다. WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 이 기록이 없으면 워커 심볼 도구 점검이 '도구가 없는 환경' 과 '배선 고장' 을 가르지 못한다
+4. ⛔ **Serena 활성 기록 (첫 단계 — fz-fix 와 같은 기록)**: 같은 작업 폴더에 앞 단계(plan · fix 등)가 남긴 `{WORK_DIR}/evidence/tools.md` 의 트리 · `@sha` 가 지금 대상(작업할 git root · HEAD)과 같으면 기록을 다시 쓰지 않는다 — ⛔ 기록이 있다고 활성화를 건너뛰지 않는다: 활성 프로젝트는 세션(MCP 프로세스)마다 따로라 이 세션에서 그 트리로 `activate_project` 를 아직 부르지 않았으면 부르고(실패하거나 언어 목록이 비면 기록을 `[Serena 미사용 — <사유>]` 로 다시 적는다) 검사한다 · 꼬리가 옛 형식이면(검사 exit 1) 재사용하지 않고 다시 적는다. 그 밖에는 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile code {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 옛 꼬리)이면 기록을 고친다. WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 이 기록이 없으면 워커 심볼 도구 점검이 '도구가 없는 환경' 과 '배선 고장' 을 가르지 못한다
 5. ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한 줄 · 목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
@@ -351,7 +351,7 @@ metadata:
    ```
    - 에이전트 구현 결과를 cross-model로 검증
    - 실패 시: 재시도 1회 → 실패 사실 기록 후 새 컨텍스트 에이전트 1회(`fz:review-correctness` · 읽기 전용 · 모델 명시 — `skills/fz-review/SKILL.md` 검증 2 의 GPT 불능 분기와 같다)로 검증하고 결과 표지 `[fresh-context: claude]`(동종 검증) · 에이전트도 못 띄우면 `[검증 불능 — 사유]` 로 적고 사용자에게 알린다
-   - review-correctness 를 띄웠으면(이 실패 분기 · 절차 7 의 요구 부합 검증) 끝난 뒤 심볼 도구 점검 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --direct --only-agent fz:review-correctness --session '{세션 id 앞 8자}*' --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — 낱말마다 할 일은 `modules/symbol-tools-audit.md`
+   - 이 실패 분기에서 review-correctness 를 띄웠으면 끝난 뒤 심볼 도구 점검 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --direct --only-agent fz:review-correctness --session '{세션 id 앞 8자}*' --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것) — 낱말마다 할 일은 `modules/symbol-tools-audit.md`
    - decide 가 `skip` 이거나 정문이 exit 18 `GPT-OFF` 면 `[GPT 미사용 — 사유]` 를 남긴다 · `ask` 면 질문 → `set` → 다시 decide — `modules/gpt-strategy.md` § GPT 미사용
 
 ### 빌드 실패 대응

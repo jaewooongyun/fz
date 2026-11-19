@@ -184,6 +184,7 @@ Claude + GPT 교차 검증:
 
 ### Disagreement 기록
 - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/verify/consensus-{YYYYMMDD_HHMMSS}.md` (timestamp suffix로 같은 날 다중 session overwrite 방지)
+- 작업 폴더 없음(저장 없이 진행): 기록을 건너뛰고 불일치 표는 대화에 둔다 — 저장하지 않았다고 보고한다
 
 ---
 
@@ -396,7 +397,7 @@ printf '%s\n' "{과제 지시}" > "$P"
 
 > 다음 Phase 가 읽는 것은 요약 파일 하나다.
 
-- **티켓 폴더(WORK_DIR) 활성**: `verify-result.md` (요약 3K, Hydration 대상)
+- **티켓 폴더(WORK_DIR) 활성**: `verify-result.md`
 - 다음 Phase 스킬은 `verify-result.md` 요약을 Read.
 
 ---

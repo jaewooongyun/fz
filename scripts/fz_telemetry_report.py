@@ -1178,7 +1178,7 @@ def read_last_snapshot(telemetry_dir):
 # ── 4b. 실행 기록 (run_metrics.py 가 쓴 runs.jsonl) ──────────────────────────
 RUN_SCHEMA = 1                                           # run_metrics.py 와 같은 이름 · 같은 값
 RUN_STATUSES = ("completed", "interrupted", "failed")    # run_metrics.py 와 같은 이름 · 같은 값
-RUN_OPEN_STALE_HOURS = 24.0                              # run_metrics.py sweep 기본값과 같은 이름 · 같은 값
+RUN_OPEN_STALE_HOURS = 24.0                              # run_metrics.py 와 같은 이름 · 같은 값 — 그쪽에서는 sweep 기본값이자 start --reuse-open 의 재사용 한도다
 RUN_REQUIRED = ("run_id", "attempt", "skill", "mode", "status", "started_at")
 
 

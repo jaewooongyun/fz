@@ -1,7 +1,7 @@
 ---
 name: fz-review
 description: >-
-  자기 코드 3중 검증(Claude+GPT+sc:analyze) + 역방향 검증.
+  자기 코드 3중 검증(Claude+GPT+셋째 검증) + 역방향 검증.
   예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR →fz-peer-review, 직접 수정 →fz-fix)
 user-invocable: true
 argument-hint: "[리뷰 대상 설명] [light|full] [--render] [--gpt-independent]"
@@ -27,16 +27,16 @@ metadata:
 
 > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2512.20845(MAR) · `code.claude.com/docs/en/{best-practices, sub-agents}`. ⚠️ 이 감사에서 **레지스트리 미등재 4종** 발견 — `2510.05381` · `2510.07777` · `2512.20845` · `2601.15300` (`guides/llm-references.md` · `guides/harness-engineering.md` §참고문헌 둘 다에 없다). ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
 
-> **행동 원칙**: 3중 검증(Claude+GPT+sc:analyze)으로 코드 품질을 확보하고, GPT 역방향 검증으로 피드백 반영을 정량화한다. 검증 결과가 기준 미달이면 반복 개선한다.
+> **행동 원칙**: 3중 검증(Claude+GPT+셋째 검증)으로 코드 품질을 확보하고, GPT 역방향 검증으로 피드백 반영을 정량화한다. 검증 결과가 기준 미달이면 반복 개선한다.
 >
 > **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.md` 사전 참조. **Decision Tree (evidence ≥ 3 sessions) + 태깅 (`[skill:][status:][priority:]`) + MEMORY.md 200줄 한도** 모두 검증. 사후 catch 방지 (Layer 1+2+3 systematic weakness 차단).
 
 ## 개요
 
-> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 5 (3중 검증: Serena // /fz-gpt review // /sc:sc-analyze) → Phase 5.5 (/fz-gpt validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
+> ⛔ Phase 0 (Work Dir Pre-flight) → Phase 5 (3중 검증: Serena // /fz-gpt review // 셋째 검증(sc-analyze · 없으면 새 컨텍스트 에이전트)) → Phase 5.5 (/fz-gpt validate) → Rate gating(**N≥10 시**) → Phase 7 완료 | Phase 6 (개선) → 반복
 > 루프 프리미티브: Evaluator-Optimizer + Multi-Attempt Retry (H6, Inside the Scaffold)
 
-3중 검증(Claude+GPT+sc:analyze) + 역방향 검증 + Reflection Rate 정량화.
+3중 검증(Claude+GPT+셋째 검증(sc-analyze · 없으면 새 컨텍스트 에이전트)) + 역방향 검증 + Reflection Rate 정량화.
 ⛔ **threshold gating은 `N≥10`에서만** — `N<10`은 `preliminary`(measurement only, verdict 보류)다. **정본 = `modules/cross-validation.md §Reflection Rate threshold`** (`:203` `N<10 → verdict 보류` · `:212` `N≥10에서만 ≥80% gating, N=0이면 vacuous pass`). 본 스킬은 정본을 인용하며 자체 임계를 정의하지 않는다.
 
 > 이론 근거: MAR — Multi-Agent Reflexion (arxiv 2512.20845) — **acting/diagnosing/critiquing/aggregating 역할 분리**가 단일 에이전트 self-review보다 정확도 높음. fz의 Claude(acting) + GPT(critiquing/diagnosing) + Lead(aggregating) 역할 분리와 구조적 정합.
@@ -96,7 +96,7 @@ metadata:
    - Stage 1 독립 병렬(review-arch opus + review-quality opus — 동시 opus 2, Lead 세션 fable 별도) → Stage 2 id-기반 교차 severity 조정(opus) → Stage 3 review-counter DA(opus; okAreas 도전 포함, 항상 실행 — UC-14 승계) → 병합은 스크립트 binary 규칙. 총 5-call
 3.5. **기본 GPT review 동시 기동**(F-473): Workflow 를 띄운 직후 Phase 5 검증 2 의 GPT review 를 background 로 함께 띄운다 — 입력이 diff 범위라 Workflow 반환을 기다릴 이유가 없다. 직전 `gpt-choice.sh decide` 가 `run` · `config` 면 `"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd {GIT_ROOT} --out {WORK_DIR}/review/gpt-review.md --base {BASE}`(`modules/fz-gpt-subcommands-core.md` § review) · `skip` 이면 `[GPT 미사용 — 사유]`. 2.5 독립 첫 패스를 띄운 run 에는 이 단계가 없다(4.5 가 대신)
 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false_positive/refute 플래그의 최종 기각은 Lead 판정** (live-review Lead 역할 보존) / `mode:'fallback'` → ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기. SOLO 3중 검증은 **L4 사용자 승인 후**. 사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 기록(규약: `experiment-log.md` 머리 문단) · (선택) 서로 독립인 조각 검사(조각마다 한 SHA 의 고정 트리로 판정 가능)를 따로 돌릴 때는 이 반환 **뒤에** `workflows/swarm.js` 를 부른다 — 준비 · 고정 트리 · 호출은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로다
-   - ⛔ **심볼 도구 점검** (`mode:'workflow'` 반환 뒤 · swarm 을 따로 돌렸으면 그 runId 에도): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
+   - ⛔ **심볼 도구 점검** (`mode:'workflow'` 반환 뒤 · swarm 을 따로 돌렸으면 그 runId 에도): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 4.5. **(`--gpt-independent`) 병합**: 두 패스가 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환} --gpt {독립 첫 패스 .json} --diff {같은 diff.patch}` — 런처 옆 파일로 오염 · 실패 · stale 을 거부한다. 결과가 Phase 5 [병렬 2] GPT 리뷰를 대신한다(두 번 부르지 않는다)
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무)**: L3 에이전트 통합(Phase 5 병렬 4/5) + review-correctness 검증(Phase 4.5, RTM/plan 존재 시) + GPT validate(Phase 5.5) + memory-curator recall은 기존 Phase 절차대로 Lead가 수행 — Workflow는 Phase 5의 [병렬 1] Claude 검증 부분만 대체
 6. **지표 기록**: `return.metrics` + wall-clock(Lead 측정) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-review 테이블. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append
@@ -125,7 +125,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
 3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
-4. ⛔ **Serena 활성 기록 (첫 단계 — fz-fix 와 같은 기록)**: 같은 작업 폴더에 앞 단계(plan · fix 등)가 남긴 `{WORK_DIR}/evidence/tools.md` 의 트리 · `@sha` 가 지금 대상(작업할 git root · HEAD)과 같으면 활성화 · 기록을 건너뛰고 검사만 한다 — 꼬리가 옛 형식이면(검사 exit 1) 재사용하지 않고 다시 적는다. 그 밖에는 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile review {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 옛 꼬리)이면 기록을 고친다. WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 이 기록이 없으면 워커 심볼 도구 점검이 '도구가 없는 환경' 과 '배선 고장' 을 가르지 못한다
+4. ⛔ **Serena 활성 기록 (첫 단계 — fz-fix 와 같은 기록)**: 같은 작업 폴더에 앞 단계(plan · fix 등)가 남긴 `{WORK_DIR}/evidence/tools.md` 의 트리 · `@sha` 가 지금 대상(작업할 git root · HEAD)과 같으면 기록을 다시 쓰지 않는다 — ⛔ 기록이 있다고 활성화를 건너뛰지 않는다: 활성 프로젝트는 세션(MCP 프로세스)마다 따로라 이 세션에서 그 트리로 `activate_project` 를 아직 부르지 않았으면 부르고(실패하거나 언어 목록이 비면 기록을 `[Serena 미사용 — <사유>]` 로 다시 적는다) 검사한다 · 꼬리가 옛 형식이면(검사 exit 1) 재사용하지 않고 다시 적는다. 그 밖에는 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile review {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 옛 꼬리)이면 기록을 고친다. WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 이 기록이 없으면 워커 심볼 도구 점검이 '도구가 없는 환경' 과 '배선 고장' 을 가르지 못한다
 5. ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한 줄 · 목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
@@ -218,7 +218,7 @@ fz-gpt가 수행하는 작업:
 
 > **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(agentType `fz:review-correctness` — review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=`fable` alias) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: GPT]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 도 띄우지 못하면 `[검증 불능 — 사유]` 로 적고 사용자에게 알린다(대체 경로 없음 — 검증 2 를 마친 것으로 적지 않는다). 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 2026-11-16]
 >
-> **review-correctness 점검**: Phase 4.5 나 이 분기에서 `fz:review-correctness` 를 띄웠으면 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --direct --only-agent fz:review-correctness --session '{세션 id 앞 8자}*' --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — 낱말마다 할 일은 `modules/symbol-tools-audit.md`
+> **review-correctness 점검**: Phase 4.5 나 이 분기에서 `fz:review-correctness` 를 띄웠으면 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --direct --only-agent fz:review-correctness --session '{세션 id 앞 8자}*' --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것) — 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 >
 > **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. GPT CLI 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(fresh-context Agent)로 **상속되지 않는다**.
 > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 규모는 그 근거 밖이다.
@@ -429,7 +429,7 @@ Gate 5 통과 후:
 
 ## Boundaries
 
-**Will**: 3중 검증(Claude+GPT+sc:analyze), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리
+**Will**: 3중 검증(Claude+GPT+셋째 검증), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리
 **Will Not**: 대규모 구현 (→ /fz-code), GPT 직접 호출 (→ /fz-gpt), 계획 수립 (→ /fz-plan)
 
 ### light 모드 (모드 게이트 — `modules/mode-gate.md`)

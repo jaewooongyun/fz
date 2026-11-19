@@ -45,6 +45,7 @@ Phase 1 산출물의 "구조화된 계획 출력"에 RTM 테이블을 필수 포
 
 갱신 위치:
 - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/plan-final.md` 내 RTM 테이블 직접 수정
+- 작업 폴더 없음(저장 없이 진행): 파일 갱신을 건너뛰고 대화에 둔 RTM 테이블을 갱신한다 — 저장하지 않았다고 보고한다
 
 ### fz-review (검증)
 
@@ -52,7 +53,7 @@ Phase 4.5(Requirements Alignment)에서 RTM 기반 기계적 확인:
 
 ```
 절차:
-1. RTM 테이블 로드 (plan-final.md)
+1. RTM 테이블 로드 (plan-final.md · 작업 폴더가 없으면 대화에 둔 RTM 테이블)
 2. 모든 Req-ID의 상태 확인
 3. pending 잔존 → requirements_gap 이슈 생성 (category: requirements_gap)
 4. implemented 전체 → Phase 5 진입

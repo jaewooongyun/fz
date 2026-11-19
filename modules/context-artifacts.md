@@ -122,7 +122,7 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 
 ## Compact Recovery Protocol
 
-1. WORK_DIR 를 찾는다 — 인자 · 브랜치의 티켓, 없으면 `Glob("**/{TICKET_PREFIX}-*/index.md")` · `Glob("**/NOTASK-*/index.md")`
+1. WORK_DIR 를 찾는다 — 인자 · 브랜치의 티켓, 없으면 `Glob("**/{TICKET_PREFIX}-*/index.md")` · `Glob("**/NOTASK-*/index.md")`. 후보가 여럿이면(NOTASK 폴더는 날마다 하나 · 티켓 폴더 여럿) Active Phase 가 끝나지 않은 폴더 가운데 `index.md` 를 가장 최근에 고친 것을 고르고, 그래도 하나로 좁혀지지 않으면 사용자에게 묻는다
 2. `{WORK_DIR}/index.md` 읽기 → `## Essential Context` 섹션으로 상세 복원
 3. Active Phase의 최신 아티팩트 로드
 4. 상위 Phase 핵심 산출물 로드 (discover→discover-journal.md Current State, plan→plan-final.md)

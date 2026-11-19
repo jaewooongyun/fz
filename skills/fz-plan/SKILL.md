@@ -119,7 +119,7 @@ metadata:
    python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --wf {runId 폴더명}            # stage 상세(advisor·so_retries·cache)
    python3 "${FZ_PLUGIN_ROOT}/scripts/fz_telemetry_report.py" --plan-segments {세션 id 앞 8자}   # Lead·GPT 층 분리
    ```
-   ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 않는다. ⛔ 같은 runId 에 심볼 도구 점검 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md` 도 돌린다(작업 폴더가 없으면 `--tools-md` 를 뺀다) — 배선이 죽으면 MCP 호출이 0이 되는데 산출물에는 표시가 없다(exit 1=배선 의심 · 2=미판정, **둘 다 통과 아님** · 낱말마다 할 일은 `modules/symbol-tools-audit.md`)
+   ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 않는다. ⛔ 같은 runId 에 심볼 도구 점검 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md` 도 돌린다(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것) — 배선이 죽으면 MCP 호출이 0이 되는데 산출물에는 표시가 없다(exit 1=배선 의심 · 2=미판정, **둘 다 통과 아님** · 낱말마다 할 일은 `modules/symbol-tools-audit.md`)
 
 > 렌즈 설계(Stage 1 = 전체 플랜 ∥ edge 적대 ∥ impact+arch · Phase 2 = Lead 의 GPT verify — 같은 질문 금지): `references/rationale.md` § 차별화된 렌즈
 

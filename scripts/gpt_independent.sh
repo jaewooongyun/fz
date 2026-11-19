@@ -34,7 +34,7 @@
 #             부모 이력을 물려받는다 — 격리된 부모 안이라 독립이 유지된다
 #   --repo    대상 저장소 — 복사하지 않고 권한 프로필 read 로 연다. 그 안의 .claude · .fz-work 는 막는다(링크면 대상 실경로도)
 #   --deny    더 막을 폴더(작업 폴더 WORK_DIR 등) — --repo 와 무관하게 권한 프로필 deny 로 넣는다. 권한 프로필은 디스크 전체 읽기에서
-#             HOME · 임시 폴더 · 격리 폴더의 실제 부모 · 링크인 ~/.claude 의 대상만 막으므로, HOME 밖 작업 폴더의 Claude 산출은 --deny 가 없으면 읽힌다
+#             HOME · 임시 폴더 · 격리 폴더의 실제 부모 · --repo 안의 .claude · .fz-work · 링크인 Claude 폴더(~/.claude · 저장소 .claude · .fz-work)의 대상만 막으므로, HOME 밖 작업 폴더의 Claude 산출은 --deny 가 없으면 읽힌다
 #   --rules-index 지침 원문 색인(extract_project_rules.py 출력 — files · sections). ⛔ 규칙 레코드(rules · axes — Claude 가 해석한
 #             check_project_rules 통과본)를 넘기면 독립이 깨진다 — 모양으로 판별해 exit 11
 #   --snapshot 소비자 · 공유 모듈 본문 폴더 — 격리 폴더의 snapshot/<이름>/ 으로 복사한다(리뷰 범위를 줄이지 않는다)

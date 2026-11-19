@@ -139,9 +139,10 @@ f. **⛔ Import Removal Symbol Inventory** (import 제거 작업 시 필수):
 - **요청 파라미터 키 목록**: 원본 API 호출의 파라미터 키를 열거. After에서 키 추가/삭제 시 명시적 근거 필수. nil → default value 전송은 "키 추가"에 해당
 - **spec-version**: Transformation Spec에 `spec-version: 3.8` 필드 추가
 
-### 절차 9. ⛔ 계획 파일 기록 (항상 — compact recovery 필수)
+### 절차 9. ⛔ 계획 파일 기록 (작업 폴더가 있으면 항상 — compact recovery 필수)
 
 - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/plan-v{N}.md` + `{WORK_DIR}/index.md` 업데이트
+- 작업 폴더 없음(저장 없이 진행): 기록을 건너뛰고 계획은 대화에 둔다 — 저장하지 않았다고 보고한다
 형식 참조: `modules/context-artifacts.md`
 
 ---

@@ -328,6 +328,13 @@ F-677	modules/context-artifacts.md	lacks	Upstream (Read 대상)
 F-677	modules/context-artifacts.md	has:replace	각 스킬 SKILL.md 의 Phase 0 · 티켓 폴더 컨텍스트 로딩 목록이 정본이다
 F-677	guides/skill-authoring.md	lacks	Upstream Hydration Sets와 일치
 F-677	guides/skill-authoring.md	has:replace	티켓 폴더 컨텍스트 로딩 목록이 SKILL.md 안에 있는가(정본)?
+# F-534 — 앞 단계의 활성 기록이 지금 대상과 같아도 건너뛰는 것은 기록 다시 쓰기뿐이다 — 활성 프로젝트는 세션마다 따로라 이 세션이 아직 활성화하지 않았으면 부른다
+F-534	skills/fz-code/SKILL.md	lacks	활성화 · 기록을 건너뛰고 검사만 한다
+F-534	skills/fz-code/SKILL.md	has:replace	기록이 있다고 활성화를 건너뛰지 않는다
+F-534	skills/fz-review/SKILL.md	lacks	활성화 · 기록을 건너뛰고 검사만 한다
+F-534	skills/fz-review/SKILL.md	has:replace	기록이 있다고 활성화를 건너뛰지 않는다
+# F-481 — 지난 판이 쓰던 세션 상태 키는 gc 의 일회 정리 단계가 목록을 보이고 사용자 확인 뒤에만 지운다(audit 이 그 키를 끝없이 orphan 으로 보고하지 않게)
+F-481	skills/fz-memory/SKILL.md	has	`fz:consensus:*` 키를 모아 목록을 보여 주고, ⛔ 사용자 확인 뒤에만 `delete_memory` 로 지운다
 # F-678 — 아무것도 재거나 막지 않는 파일별 크기 상한 표와 축출 순서가 돌아오지 않는다 · 남는 크기 규칙은 로드 합계 원칙 하나와
 #   discover 파일 압축 기준 한 곳(Phase-Tagged Discover 절)이다 — 스킬 본문은 숫자를 다시 적지 않고 그 절을 가리킨다
 F-678	modules/context-artifacts.md	lacks	Eviction 우선순위
@@ -345,6 +352,16 @@ F-678	skills/fz-discover/SKILL.md	has:replace	크기 기준: `modules/context-ar
 F-679	modules/peer-review-tiers.md	count=1	## 발견 축 집계
 F-679	modules/peer-review-tiers.md	lacks	> 0건인 축도 행을 지우지 않는다
 F-679	modules/peer-review-tiers.md	has:replace	**축별 집계** — Tier 0 Deliver 와 같다
+# F-481 — 세션 상태를 Serena 키에 두던 층을 걷어 낸 뒤: 두 모듈에도 그 키가 돌아오지 않는다 · 압축 뒤 복구는 후보 폴더가 여럿이면 고르는 규칙을 따른다 ·
+#   작업 폴더가 없는 세션의 RTM 은 대화에 둔 표를 갱신한다(저장하지 않았다고 보고한다)
+F-481	modules/sprint-contract.md	lacks	fz:checkpoint
+F-481	modules/memory-guide.md	lacks	fz:checkpoint
+F-481	modules/context-artifacts.md	has	Active Phase 가 끝나지 않은 폴더 가운데 `index.md` 를 가장 최근에 고친 것을 고르고, 그래도 하나로 좁혀지지 않으면 사용자에게 묻는다
+F-481	modules/rtm.md	has	작업 폴더 없음(저장 없이 진행): 파일 갱신을 건너뛰고 대화에 둔 RTM 테이블을 갱신한다
+# F-205 — 작성 가이드의 반환 뒤 점검 줄도 작업 폴더가 없을 때 상태 한 줄을 임시 파일로 넘긴다(인자를 빼면 판정이 아니라 판정 불가로 끝난다)
+F-205	guides/skill-authoring.md	count=1	(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것)
+F-205	guides/skill-authoring.md	lacks	(작업 폴더가 없으면 `--tools-md` 를 뺀다)
+F-205	modules/symbol-tools-audit.md	lacks	`--tools-md` 를 뺐다면
 # F-510 — 피어 리뷰 실행 기록의 시작은 Lead 가 건너뛸 수 있는 산문 단계가 아니라 근거 슬롯 검사가 남긴다 · 종료는 같은 작업 폴더로 부른다(다르면 열린 시도를 찾지 못한다)
 F-510	skills/fz-peer-review/SKILL.md	has:replace	실행 기록의 시작은 아래 근거 슬롯 검사가 통과할 때 그 스크립트가 남긴다
 F-510	skills/fz-peer-review/SKILL.md	lacks	Tier 가 정해지면 기록 `run_metrics.py start`

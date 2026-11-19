@@ -3,7 +3,7 @@
 // 셀:
 //   span-mismatch-sent-to-revise      full · 검토 pass 인데 spanLines ≠ oldAnchor 줄 수 → Stage 3 프롬프트에 D1 · 수정본 반환
 //   escape-introduced-sent-to-revise  newBody 에만 태그 앞 역슬래시('<\task-notification>') → D1(F-551) · 수정본 반환
-//   defect-remaining-fallback         Stage 3 수정본에도 결함 → { mode:'fallback', reason:'changeset-defect', defects }
+//   defect-remaining-fallback         Stage 3 수정본에도 결함 → { mode:'fallback', reason:'changeset-defect', defects, openQuestions }
 //   escape-already-in-anchor-ok       oldAnchor 에 같은 꼴이 같은 수 → 결함 아님 · Stage 3 없음
 //   create-without-anchor-ok          create · oldAnchor 없음 · spanLines 아무 값 → span 면제
 //   delete-without-anchor-ok          delete 도 면제

@@ -70,7 +70,7 @@ metadata:
 **L2 검사 (Serena 영속 키)**:
 1. `list_memories()` → 전체 키 수집
 2. 영속 키(decision · pattern)를 수명 정책과 대조 (`modules/memory-policy.md`)
-3. orphan 키 (정의에 없는 패턴) 감지
+3. orphan 키 (정의에 없는 패턴) 감지 — 지난 판의 세션 상태 키(`fz:session:*` · `fz:checkpoint:*` · `fz:artifact:*` · `fz:rtm:*` · `fz:consensus:*`)는 gc 5단계(은퇴한 키 묶음 일회 정리)로 지운다
 4. stale persistent 키 (30일+ 미참조) 목록
 
 **L3 검사**:
@@ -107,6 +107,10 @@ L1 stale 항목 정리 제안 + L3 잔존 티켓 폴더 정리 (+ `--persistent`
 4. **승격 원장 candidate 만료 점검** (보고만 — 원장을 쓰거나 지우지 않는다):
    - `python3 "${FZ_PLUGIN_ROOT}/scripts/candidate_expiry.py" --ledger "${FZ_PLUGIN_ROOT}/modules/promotion-ledger.md"`
    - `재평가필요` 는 종결 · 연장 · 승격 판단을, `판정불가`(관측 날짜 없음)는 날짜 보강을 사용자에게 묻는다 — 3개월 재평가 규칙(`modules/promotion-ledger.md`)의 실행 지점이다(F-477)
+
+5. **은퇴한 키 묶음 일회 정리** (지난 판이 쓰던 세션 상태 키 — 이 판은 쓰지도 읽지도 않는다):
+   - `list_memories()` 로 `fz:session:*` · `fz:checkpoint:*` · `fz:artifact:*` · `fz:rtm:*` · `fz:consensus:*` 키를 모아 목록을 보여 주고, ⛔ 사용자 확인 뒤에만 `delete_memory` 로 지운다(확인 없이 지우지 않는다)
+   - `fz:decision:*` · `fz:pattern:*` 는 이 정리에 들지 않는다
 
 ### Gate: GC Complete
 - [ ] 사용자 확인 항목 처리?

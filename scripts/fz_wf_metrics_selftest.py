@@ -404,6 +404,8 @@ def self_test() -> int:
     # 직접 호출(--direct) — 그 종류의 가장 최근 호출 하나를 판정한다(앞 호출의 사용이 뒤 호출의 0회를 가리지 않게)
     audit("mcp-direct-latest", "mcp-direct", 2, "UNRUN: serena 0건 · Read 1건인데 상태 기록이 없다", ("--only-agent", "fz:review-correctness"),
           direct=True)
+    audit("mcp-direct-latest-active", "mcp-direct", 1, "MCP_WIRING_SUSPECT", ("--only-agent", "fz:review-correctness"),
+          state="active", direct=True)
     audit("mcp-direct-other-kind", "mcp-direct", 0, "MCP_AUDIT_OK", ("--only-agent", "general-purpose"), direct=True)
     audit("mcp-direct-no-agent", "mcp-direct", 2, "--only-agent", direct=True)
     audit("only-agent-unreadable", "mcp-direct", 2, "UNRUN: 에이전트 종류", ("--only-agent", "general-purpose"), direct=True,
@@ -795,6 +797,6 @@ def self_test() -> int:
     if fails:
         print(f"fz_wf_metrics self-test {passed}/{total} passed")
         return 1
-    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 40 · 심볼 결과 판독 2 · mcp-sweep 17 · sweep-row 3"
+    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 41 · 심볼 결과 판독 2 · mcp-sweep 17 · sweep-row 3"
           f" · stage 규칙 1 · usage 중복 1 · advisor 스톨 3 · 시도 구분 1)")
     return 0

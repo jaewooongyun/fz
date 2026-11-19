@@ -38,7 +38,7 @@
     },
     "status_reason": {
       "type": "string",
-      "description": "상태 설명 (예: '정상', 'pre-cache 부분 실패, import_graph 누락')"
+      "description": "상태 설명 (예: '정상', '근거 슬롯 일부 미수집(caller-analysis)')"
     },
     "issues": {
       "type": "array",

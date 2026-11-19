@@ -193,7 +193,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 - diff 에 class init · willSet/didSet 변경
 - INCLUDE 이슈 중 "DI 변경", "init 시그니처", "optional", "willSet/didSet" 키워드
 
-⛔ **하위 클래스 근거가 없다고 조용히 스킵하지 않는다.** 입력은 `evidence/caller-analysis.md` `## 구현` 의 하위 클래스 목록이다(Tier 3 상시 · Tier 0-2 는 init·DI 변경 시 — `modules/peer-review-tiers.md` § Tier-Adaptive Evidence). 목록이 없으면 Lead 가 `git grep` 으로 즉석 수집한다. 그래도 못 하면 이 게이트와 **관점 6(Dependency Impact) 전체**가 부분 수행이다 — 리포트에 **"관점 6·Gate 4.6.5 부분 수행 — 하위 클래스 근거 없음"**을 명시하고 confidence ceiling 70을 적용한다.
+⛔ **하위 클래스 근거가 없다고 조용히 스킵하지 않는다.** 입력은 `evidence/caller-analysis.md` `## 구현` 의 하위 클래스 목록이다(Tier 3 상시 · Tier 0-2 는 init·DI·초기화 경로 · class init · willSet/didSet 변경 시 — `modules/peer-review-tiers.md` § Tier-Adaptive Evidence 의 `caller-analysis` 행). 목록이 없으면 Lead 가 `git grep` 으로 즉석 수집한다. 그래도 못 하면 이 게이트와 **관점 6(Dependency Impact) 전체**가 부분 수행이다 — 리포트에 **"관점 6·Gate 4.6.5 부분 수행 — 하위 클래스 근거 없음"**을 명시하고 confidence ceiling 70을 적용한다.
 
 **처리 절차**:
 ```
@@ -214,7 +214,8 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 **Functional Test**:
 - Given: Base init에 optional param 추가, subclass 여러 개 → When: Gate 실행 → Then: 미주입+활성 화면 major 보고
 - Given: Base init 변경 없음 → When: 조건 체크 → Then: Gate 스킵
-- Given: 하위 클래스 근거 없음 → When: Gate 실행 → Then: Grep 폴백 + confidence ceiling 70
+- Given: 하위 클래스 목록 없음 → When: Gate 실행 → Then: Lead 가 `git grep` 으로 즉석 수집해 진행 (ceiling 없음)
+- Given: 하위 클래스 근거를 수집하지 못함 → When: Gate 실행 → Then: "관점 6·Gate 4.6.5 부분 수행" 명시 + confidence ceiling 70
 
 ---
 

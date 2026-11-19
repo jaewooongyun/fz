@@ -2,7 +2,7 @@
 
 > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2601.15300 · 2510.05381(EMNLP 2025 Findings) · `platform.claude.com` memory-tool. ⚠️ 이 감사에서 **레지스트리 미등재 4종** 발견 — `2510.05381` · `2510.07777` · `2512.20845` · `2601.15300` (`guides/llm-references.md` · `guides/harness-engineering.md` §참고문헌 둘 다에 없다). ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
 
-> Serena Memory 영속 키(decision · pattern · peer) 네이밍 + GC 정책. 세션 상태(checkpoint · session · artifact · rtm · consensus)는 키로 두지 않는다 — 복원은 티켓 폴더 파일로 한다(`modules/context-artifacts.md`)
+> Serena Memory 키(영속 decision · pattern · 임시 peer) 네이밍 + GC 정책. 세션 상태(checkpoint · session · artifact · rtm · consensus)는 키로 두지 않는다 — 복원은 티켓 폴더 파일로 한다(`modules/context-artifacts.md`). 옛 판이 쓴 그 계열 키는 `/fz-memory gc` 가 사용자 확인 뒤 지운다(그 스킬의 한 번 하는 정리 단계)
 
 ## 목차
 
@@ -22,7 +22,7 @@
 
 | 네임스페이스 | 카테고리 | 예시 | 용도 |
 |------------|---------|------|------|
-| `fz` | `decision` | `fz:decision:{topic}` | 아키텍처 결정사항 (영속) · ⛔ 생산자 없음(쓰는 절차 0 — memory-curator 읽기만 남았다) |
+| `fz` | `decision` | `fz:decision:{topic}` | 아키텍처 결정사항 (영속) · 생산자 `/fz-discover` |
 | `fz` | `pattern` | `fz:pattern:{name}` | 학습된 패턴 (영속) · ⛔ 생산자 없음(쓰는 절차 0 — memory-curator 읽기만 남았다) |
 | `fz` | `peer` | `fz:peer:pr-{number}` | 피어 리뷰 결과 (임시) · ⛔ 생산자 없음(쓰는 절차 0) |
 
@@ -50,7 +50,7 @@
 | L1 Hot | auto-memory (MEMORY.md) | 세션 간 영속. 프로젝트 수준 교훈/패턴/규칙. `modules/memory-guide.md` 정책 준수 |
 | L3 File Artifact | 티켓 폴더 파일 | 세션 내 상세. 무제한 크기 구조화 산출물. L3=canonical |
 
-> L1.5: Serena decision/pattern 키는 영속. GC 대상 아님.
+> L2: Serena decision/pattern 키는 영속. 기본 GC 는 건드리지 않는다 — `/fz-memory gc --persistent` 만 사용자 확인 뒤 정리한다.
 
 ### Claude Memory tool과의 관계
 
@@ -65,7 +65,7 @@
 | 세션 | cross-session (파일 기반) | cross-session 가능 (backend 구성에 따름) |
 | 이식성 | Claude Code 독립 | Claude API/Code 공통 |
 
-**현재 정책**: fz는 자체 L1/L3 (+ L1.5 영속 키) 유지. 이유 — (a) 명시적 정책/태깅 제어, (b) 영속 키는 Serena MCP와 직접 연동, (c) fz 파이프라인 Gate 연계. **미래 전환 판단 기준**: Memory tool을 fz L1.5 수준 정책(태깅/GC/읽기 권한)으로 감싸는 어댑터를 만들 가치가 생기면 재검토. [미검증: 2026-04 시점 공식 문서 기반, 실사용 실측 부재]
+**현재 정책**: fz는 자체 L1/L3 (+ L2 영속 키) 유지. 이유 — (a) 명시적 정책/태깅 제어, (b) 영속 키는 Serena MCP와 직접 연동, (c) fz 파이프라인 Gate 연계. **미래 전환 판단 기준**: Memory tool을 fz L2 수준 정책(태깅/GC/읽기 권한)으로 감싸는 어댑터를 만들 가치가 생기면 재검토. [미검증: 2026-04 시점 공식 문서 기반, 실사용 실측 부재]
 
 상세: `modules/context-artifacts.md` 참조 / L1 관리: `modules/memory-guide.md` 참조
 

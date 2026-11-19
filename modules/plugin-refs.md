@@ -8,7 +8,7 @@
 
 - [활용 원칙](#활용-원칙)
 - [알려진 짝](#알려진-짝)
-- [스킬별 Swift 기준 (스킬의 스택 스킬 절에서 옮김)](#스킬별-swift-기준-스킬의-스택-스킬-절에서-옮김)
+- [스킬별 Swift 기준](#스킬별-swift-기준)
 - [iOS/Swift (Swift, SwiftUI, RIBs 프로젝트)](#iosswift-swift-swiftui-ribs-프로젝트)
 - [자동 감지 트리거](#자동-감지-트리거)
 - [역방향 감지 트리거 (부재 패턴)](#역방향-감지-트리거-부재-패턴)
@@ -36,7 +36,7 @@
 | Swift — SwiftUI 화면 · 상태 | `swiftui-expert:swiftui-expert-skill`(플러그인 `swiftui-expert`) | 상태 관리 · 뷰 구조 · 성능 · 최신 API — 아래 SwiftUI Expert |
 | Swift — 동시성(async · actor · Sendable) | `swift-concurrency:swift-concurrency`(플러그인 `swift-concurrency`) | isolation · Sendable · Task · 마이그레이션 — 아래 Swift Concurrency |
 
-## 스킬별 Swift 기준 (스킬의 스택 스킬 절에서 옮김)
+## 스킬별 Swift 기준
 
 Swift 파일을 다룰 때만 적용한다. 각 스킬의 `## 스택 스킬` 절은 이 모듈을 가리키는 한 줄만 둔다.
 

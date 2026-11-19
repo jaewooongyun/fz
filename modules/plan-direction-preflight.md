@@ -61,6 +61,7 @@
    - RECONSIDER → 대안 비교표 + 사용자 확인 후 진입
    - REDIRECT → 대안 강력 권고 + 사용자 확인 필수
 
-4. **⛔ 방향 판정 기록** (항상):
+4. **⛔ 방향 판정 기록** (작업 폴더가 있으면 항상):
    - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/direction-challenge.md`에 판정 결과 + 대안 비교 기록
+   - 작업 폴더 없음(저장 없이 진행): 기록을 건너뛰고 판정 결과 + 대안 비교 표는 대화에 둔다 — 저장하지 않았다고 보고한다
    형식 참조: `modules/context-artifacts.md`

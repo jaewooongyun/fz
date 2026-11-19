@@ -5,6 +5,7 @@
 ```
 fz-plugin/
 ├── .claude-plugin/  plugin.json + marketplace.json
+├── hooks/           hooks.json — 플러그인이 스스로 등록하는 Stop 항목 하나(gate_stop_hook.py --audit-only · 막지 않는다)
 ├── skills/          22개 — /fz, /fz-plan, /fz-code, /fz-review, /fz-fix, /fz-modernize ...
 ├── agents/          15개 — plan-structure, impl-correctness, review-arch ...
 ├── workflows/       8개 — 네이티브 Workflow 결정적 스크립트 (discover-adversarial, plan-lean2, code-pair, swarm ...)

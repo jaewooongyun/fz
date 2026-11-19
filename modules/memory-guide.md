@@ -104,13 +104,13 @@ GC 품질은 recall/staleness만이 아니라 다음 2축으로 점검한다:
 | 계층 | 도구 | 저장 대상 | 수명 |
 |------|------|----------|------|
 | L1 (Auto Memory) | MEMORY.md + topic files | 영속적 사실, 교훈, 패턴 | 영구 (사용자 관리) |
-| L1.5 (Serena Persistent) | `fz:decision:*`, `fz:pattern:*` | 아키텍처 결정, 학습 패턴 | 영속 (GC 미대상) |
+| L2 (Serena Persistent) | `fz:decision:*`, `fz:pattern:*` | 아키텍처 결정, 학습 패턴 | 영속 (기본 GC 미대상 — `/fz-memory gc --persistent` 만 사용자 확인 뒤 정리) |
 | L3 (File Artifact) | 티켓 폴더 파일 | 구조화된 상세 산출물 | 세션 내 (Read로 복원) |
 
 - L1은 **세션을 넘어 유지**되는 지식 (교훈, 패턴, 결정)
 - L3는 **무제한 크기** 구조화 산출물 — L3=canonical, 위치는 `index.md` 가 가리킨다
-- L1.5 persistent 키는 L1 승격 후보 (30일+ 유지 시 topic file로 승격 고려)
-- 상세: `modules/context-artifacts.md` (L3 구조), `modules/memory-policy.md` (L1.5 키)
+- L2 persistent 키는 L1 승격 후보 (30일+ 유지 시 topic file로 승격 고려)
+- 상세: `modules/context-artifacts.md` (L3 구조), `modules/memory-policy.md` (L2 키)
 
 ## 참조 스킬
 

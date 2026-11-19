@@ -15,7 +15,7 @@ Learning curator. Discovers relevant learnings from topic files and Serena Memor
 ## MCP Tool Priority
 
 - **Primary** (메모리 탐색): Read, Grep, Glob
-  - topic file 스캔 + `[skill: fz-{current}]` 태그 매칭
+  - topic file 스캔 + `[skill: …]` 태그 안의 스킬 이름 매칭
 - **Primary** (L2 탐색): Serena `read_memory` + `list_memories`
   - `fz:decision:*`, `fz:pattern:*` 키에서 관련 결정/패턴 발굴
 - **심볼 도구** (유효성 검증): 아래 `## Symbol tools` 를 따른다 — Serena `find_symbol` + `Grep`
@@ -53,7 +53,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 1. 작업 컨텍스트는 브리프 입력으로 수신 (예: "fz-plan 실행 예정, 라이브러리 버전업 관련")
 2. 병렬 탐색:
-   a. L1: `memory/` 폴더 topic file 스캔 (Grep `[skill: fz-{current}]`)
+   a. L1: `memory/` 폴더 topic file 스캔 (Grep `skill:.*fz-{current}`)
    b. L2: `list_memories()` → `fz:decision:*`, `fz:pattern:*` 중 관련 키 `read_memory`
 3. 발견된 교훈/결정의 유효성 검증:
    a. `find_symbol` → 언급된 심볼이 아직 존재하는지
@@ -96,7 +96,7 @@ Lead로부터 Task Brief를 수신한다:
 BAD: "관련 교훈이 없습니다."
 → topic file 태그 매칭만 시도. Serena Memory + 파일 탐색 미수행
 
-GOOD: "Grep('[skill: fz-plan]', memory/) → peer-review-learnings.md 2건 매칭.
+GOOD: "Grep('skill:.*fz-plan', memory/) → peer-review-learnings.md 2건 매칭.
 read_memory('fz:pattern:*') → 'protocol-conformance' 패턴 발견.
 교훈 전달 3건:
 1. [peer-review-learnings] 프로토콜 시그니처 변경 시 conformance 확인 필수

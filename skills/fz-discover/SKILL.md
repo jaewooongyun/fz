@@ -90,7 +90,7 @@ metadata:
    - `mode: 'fallback'` → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`(입력 오류)와 `agent null`(일시 장애)에만
      이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
      L4 사용자 에스컬레이션). Lead 단독 REP 는 **사용자 승인 후**에만. 사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 에 기록(규약: `experiment-log.md` 머리 문단)
-4.5. **심볼 도구 점검** (`mode: 'workflow'` 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
+4.5. **심볼 도구 점검** (`mode: 'workflow'` 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`
 5. **지표 기록**: `return.metrics`(nullCount/roundsCompleted/agentCalls/fallbackCount) + wall-clock(Lead 측정) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` Workflow tracing 섹션에 수동 append
 6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(명시 플래그 단계 — `modules/gpt-strategy.md` § 단계 실행 판정). `run` · `config` 면 `/fz-gpt verify` 별도 실행(`ARTIFACT=` 빈 값 — 산출물 계열 밖이라 재검증 라운드 상한에 세지 않는다 · `modules/fz-gpt-subcommands-core.md` § verify 호출자 표) · `skip` 이면 `[GPT 미사용 — 사유]` · `ask` 면 질문 → `set` → 다시 decide (스크립트 내 cross-provider 스폰 금지)
 
@@ -357,7 +357,7 @@ GOOD: "proxy에 @Published는 안 됩니다.
    - `/fz-plan`으로 전환 시: 정제된 요구사항이 /fz-plan Phase 1의 입력이 됨
      - /fz-plan은 "요구사항 구조 분해" 단계를 건너뛰고 "영향 분석"부터 시작
    - PR 코멘트 시: 제약 매트릭스 + 결정 근거를 읽기 쉬운 형태로 가공
-   - 기록 시: `mcp__plugin_fz_serena__write_memory` → 결정사항 영속화
+   - 기록 시: `mcp__plugin_fz_serena__write_memory("fz:decision:{topic}", …)` → 결정사항 영속화
 
 3. **완료 보고** (직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
 

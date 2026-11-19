@@ -141,7 +141,7 @@ Orchestrator가 사전에 제공해야 한다.
 - 새로 추가된 init/factory (UseCase, Repository, ViewModel, Builder)
 - protocol 시그니처 변경
 - public/internal API 시그니처 변경
-- class init · willSet/didSet 변경 → 하위 클래스 전수(Gate 4.6.5 상속 체인 입력)
+- class init · willSet/didSet 변경 → 하위 클래스 전수(Gate 4.6.5 상속 체인 입력 · 수집 조건은 `modules/peer-review-tiers.md` § Tier-Adaptive Evidence 의 `caller-analysis` 행)
 
 수집:
 0. **도구 상태** → `evidence/tools.md` 첫 줄(`scripts/check_evidence_slots.py` 가 읽는다):

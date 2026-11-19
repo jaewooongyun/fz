@@ -137,6 +137,8 @@ needs=commit:       fz-pr
 
 ### MCP 의존성 매트릭스
 
+> 출력 형식 예시다 — 괄호 숫자는 `deps` 를 돌릴 때 각 스킬 `allowed-tools` 에서 세는 값이고, 아래 숫자는 지금 값이 아니다.
+
 ```
 fz-search      → serena(7), context7(2), lsp(4)
 fz-plan        → serena(7), context7(2), sequential-thinking(1)
