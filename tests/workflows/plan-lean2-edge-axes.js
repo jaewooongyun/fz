@@ -2,11 +2,15 @@
 // 셀:
 //   f383-edge-axes-from-args          기본(미지정)은 UI 축 그대로 · edgeAxes 를 주면 그 축만 들어가고 UI 축(좌표계 · 애니메이션)이 없다 ·
 //                                     문자열이 아닌 원소는 fallback(args invalid) · 콜 0
-//   f146-item-count-short             minSteps 3 · full steps 1 → fallback 'partial-submit' · 병합 콜 없음 / minSteps 1 → 정상 / 'x' → args invalid
+//   f146-item-count-short             minSteps 3 · full steps 1 → fallback 'partial-submit' · 병합 콜 없음 / minSteps 1 → 정상 / 'x' → args invalid ·
+//                                     판별 표 2행 표지 대조 — 부분 제출 반환이 실은 표지(splitSuggested:true 면 그 문자열, 아니면 reason 접두)가
+//                                     guides/skill-authoring.md §12 판별 표 2행(분할 요구)과 사다리 L1 조건 · skills/fz-plan/SKILL.md 절차 4 의
+//                                     fallback 사유 목록에 있다
 //   f438-defense-without-failurepath  defenseFailurePath — failurePath 없는 방어는 demoted:'suggestion'(반환 · 병합 입력) · 병합 프롬프트에 한 줄 ·
 //                                     failurePath 있는 방어는 그대로 · edge 스키마 사본에 failurePath / 끄면 스키마 · 프롬프트 그대로
 // exit: 0 전건 통과 · 1 단언 실패
 'use strict'
+const fs = require('fs')
 const path = require('path')
 const { run } = require('../lib/wf_harness')
 
@@ -50,10 +54,16 @@ function check(name, cond, got) {
   const short = await run(WF, { args: Object.assign({}, BASE, { minSteps: 3 }), responder: responder(table([E1])) })
   const enough = await run(WF, { args: Object.assign({}, BASE, { minSteps: 1 }), responder: responder(table([E1])) })
   const badN = await run(WF, { args: Object.assign({}, BASE, { minSteps: 'x' }), responder: responder(table([E1])) })
-  check('f146-item-count-short — steps 1 < minSteps 3 → partial-submit · 병합 없음 / 충분하면 정상 / 불량 값 fallback',
+  // 받은 쪽이 고르는 처방 — §12 판별 표 2행 · 사다리 L1 조건에 이 반환의 표지가 없으면 7행(알 수 없는 반환 → L4 직행)으로 떨어진다
+  const guide = fs.readFileSync(path.join(ROOT, 'guides', 'skill-authoring.md'), 'utf8').split('\n')
+  const row2 = guide.find(l => /^\| 2 \| \*\*분할 요구\*\*/.test(l)) || '', rowL1 = guide.find(l => /^\| \*\*L1\*\* \|/.test(l)) || ''
+  const reasons = fs.readFileSync(path.join(ROOT, 'skills', 'fz-plan', 'SKILL.md'), 'utf8').split('\n').find(l => l.includes('에만 이 값을 돌려준다')) || ''
+  const marker = short.result.splitSuggested === true ? 'splitSuggested:true' : String(short.result.reason || '').split(':')[0]
+  check('f146-item-count-short — steps 1 < minSteps 3 → partial-submit · 병합 없음 / 충분하면 정상 / 불량 값 fallback · 판별 표 2행 · L1 · fz-plan 사유 목록에 표지',
     short.result.mode === 'fallback' && /^partial-submit: steps 1 < minSteps 3/.test(short.result.reason || '') && !short.calls.some(c => c.label === 'lean2-merge')
-      && enough.result.mode === 'workflow' && badN.result.mode === 'fallback' && /minSteps/.test(badN.result.reason || '') && badN.calls.length === 0,
-    `short ${short.result.mode}/${short.result.reason} · enough ${enough.result.mode} · bad ${badN.result.mode}`)
+      && enough.result.mode === 'workflow' && badN.result.mode === 'fallback' && /minSteps/.test(badN.result.reason || '') && badN.calls.length === 0
+      && marker.length > 0 && row2.includes(marker) && rowL1.includes(marker) && reasons.includes(marker),
+    `short ${short.result.mode}/${short.result.reason} · enough ${enough.result.mode} · bad ${badN.result.mode} · 표지 '${marker}' 2행 ${row2.includes(marker)} · L1 ${rowL1.includes(marker)} · fz-plan ${reasons.includes(marker)}`)
 
   // F-438
   const DEF = [Object.assign({}, E1, { defense: true }), Object.assign({}, E1, { id: 'E2', defense: true, failurePath: 'a() 뒤 b() — 호출처 X.swift:12' })]

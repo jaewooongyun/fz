@@ -22,6 +22,8 @@
 //   r3-catalog-code-pair-switch-on-recorded  catalogHits:true — Stage 1 스키마 필수 칸 · 프롬프트 [점검 카탈로그] · 반환 catalogHits(구현 콜 값) · 검토 · 수정 콜엔 없다
 //   c-prompts-05-open-questions-declared  code-pair 구현 · 수정 콜(기본 · catalogHits:true) 스키마에 openQuestions(문자열 배열 · required 아님) —
 //                              impl-correctness 가 설계 의문 · Redundant Import 신호를 돌려주는 칸이다. 검토 콜엔 없다
+//   c-prompts-05-open-questions-carried   Stage 3 수정본이 changeset 을 갈아 끼워도 Stage 1 의 openQuestions 가 남는다 — 반환 칸 = Stage 1 목록 뒤에
+//                              수정본 목록(중복 제거 · 순서 유지). 수정본에 칸이 없으면 Stage 1 그대로 · 양쪽 다 없으면 칸도 없다(반환 모양 불변)
 'use strict'
 const fs = require('fs')
 const path = require('path')
@@ -229,6 +231,16 @@ async function capture(wf, extra, resp) {
   check('c-prompts-05-open-questions-declared',
     [cpOff, cpOn].every(c => CSC.every(k => hasOpenQ(c.schemas[k])) && RVC.every(k => c.schemas[k] && !c.schemas[k].properties.openQuestions)),
     [cpOff, cpOn].map(c => [...CSC, ...RVC].map(k => `${k}:${!!(c.schemas[k] && c.schemas[k].properties.openQuestions)}`).join(',')).join(' / '))
+  // 검토 이슈(CP_RESP stage2-review-arch)로 Stage 3 이 돈다 — 수정본은 summary 로 알아본다
+  const withQ = (cs, q) => (q === undefined ? { ...cs } : { ...cs, openQuestions: q })
+  const carried = async (s1, s3) => (await capture('code-pair', CP,
+    { ...CP_RESP, 'stage1-impl': withQ(CS, s1), 'stage3-revise': withQ({ ...CS, summary: 'revised' }, s3) })).result || {}
+  const qa = await carried(['q1'], undefined), qb = await carried(['q1'], ['q2', 'q1']), qc = await carried(undefined, undefined)
+  const csOf = r => r.changeset || {}
+  check('c-prompts-05-open-questions-carried',
+    [qa, qb, qc].every(r => csOf(r).summary === 'revised')
+    && JSON.stringify(csOf(qa).openQuestions) === '["q1"]' && JSON.stringify(csOf(qb).openQuestions) === '["q1","q2"]' && !('openQuestions' in csOf(qc)),
+    [qa, qb, qc].map(r => `${csOf(r).summary}:${JSON.stringify(csOf(r).openQuestions)}`).join(' / '))
 
   console.log(`review-schemas: ${fail ? 'FAIL' : 'OK'} (${total - fail}/${total})`)
   process.exit(fail ? 1 : 0)

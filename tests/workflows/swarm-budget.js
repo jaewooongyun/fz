@@ -12,6 +12,8 @@
 //   allowlist-readonly   swarm.js READ_ONLY_AGENTS = 행동으로 받는 agentType 집합이고, 그 전부가 agents/*.md 에서 tools 가 비지 않고
 //                        쓰기 도구 · memory 필드가 없다 — 목록 안 에이전트에 쓰기 도구를 더하면 여기서 깨진다
 //   args-fallback        필수 인자 · id 중복 · SHA 형식 · SHA 둘 · 상대 tree · effort · 정수 인자 오류 → fallback · 콜 0 (대조: JSON 문자열 args 는 돈다)
+//   throw-null-equivalence  조각 하나의 콜이 던지는 run 과 null 을 돌려주는 run — 반환 전체(table · metrics)가 같다(throw≡null · §12 판별 표 5행).
+//                        첫 시도만 · 재스폰도 두 경우 · 던진 사유는 로그에 남는다. swarm:<조각 id> 는 동적 label 이라 failure-injection.js 가 여기로 넘긴다
 // 출력: 케이스마다 `<case>: PASS|FAIL <why>` 한 줄 + 끝 줄 `swarm-budget: PASS|FAIL` · exit 0 전건 통과 / 1 하나라도 실패.
 // ⛔ FZ_WF_ROOT 로 swarm.js 가 없는 트리를 가리키면 케이스마다 FAIL 줄과 exit 1 이다 — 조용히 죽지 않는다(review-live-stage2-arm.js 와 같은 관용).
 // ⛔ 예산 임계(BUDGET_RESERVE) 값에 묶지 않는다 — low-budget-stop 은 "중간에 멈춘다 · 안 돈 조각 = BLOCKED 'budget'" 만 단언한다.
@@ -38,6 +40,7 @@ const CASES = [
   ['agenttype-fallback', agentTypeFallback],
   ['allowlist-readonly', allowlistReadonly],
   ['args-fallback', argsFallback],
+  ['throw-null-equivalence', throwNullEquivalence],
 ]
 
 const frag = id => ({ id, brief: `조각 ${id} 의 주장을 고정 트리에서 판정한다`, sha: SHA, method: METHOD })
@@ -280,6 +283,21 @@ async function argsFallback(expect) {
   const str = await go(JSON.stringify(base), () => ok('PASS'))
   expect(str.res.mode === 'workflow' && str.calls.length === 2, `대조 JSON 문자열 args → mode ${str.res.mode} · 콜 ${str.calls.length}`)
   return `거부 ${cases.length}종 · 대조 1종`
+}
+
+async function throwNullEquivalence(expect) {
+  const THROWN = 'injected spawn failure'
+  const notes = []
+  for (const [name, hit, residual] of [['첫 시도만', n => n === 1, 0], ['재스폰도', () => true, 1]]) {
+    const thrown = await go({ fragments: frags(3), tree: TREE }, (id, n) => { if (id === 'F2' && hit(n)) throw new Error(THROWN); return ok('PASS') })
+    const nul = await go({ fragments: frags(3), tree: TREE }, (id, n) => (id === 'F2' && hit(n) ? null : ok('PASS')))
+    const tm = thrown.res.metrics || {}
+    expect(JSON.stringify(thrown.res) === JSON.stringify(nul.res), `${name} — throw 반환 ${JSON.stringify(thrown.res)} ≠ null 반환 ${JSON.stringify(nul.res)}`)
+    expect(tm.nullCount === residual && thrown.per.F2 === 2, `${name} — nullCount ${tm.nullCount}(잔존 ${residual} 기대) · F2 콜 ${thrown.per.F2}/2`)
+    expect(thrown.logs.some(l => l.includes(THROWN)), `${name} — 던진 사유가 로그에 없다`)
+    notes.push(`${name} 잔존 null ${tm.nullCount}`)
+  }
+  return `throw≡null — ${notes.join(' · ')}`
 }
 
 ;(async () => {

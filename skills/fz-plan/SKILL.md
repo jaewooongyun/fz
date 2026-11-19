@@ -107,7 +107,7 @@ metadata:
    - ⛔ `directionEscalation` 이 **null 이 아니면** → 대안 비교표 제시 + 사용자 확인 (Phase 0.5 RECONSIDER/REDIRECT 절차 준용).
      `{ verdict, alternatives }` 형태이며 `directionVerdict` 가 `RECONSIDER`·`REDIRECT` 일 때만 실린다.
      (롤백해 `plan-collaborative.js` 를 쓰면 그쪽은 `mode:'direction_escalation'` 으로 온다 — 두 형태를 모두 받는다.)
-   - `mode:'fallback'` (두 배선 공통) → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`·`agent null` 에만 이 값을 돌려준다 —
+   - `mode:'fallback'` (두 배선 공통) → ⛔ **SOLO 직행 아님**. 스크립트는 `args invalid`·`agent null`·`partial-submit`(minSteps — 판별 표 2행 L1) 에만 이 값을 돌려준다 —
      도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 기록(규약: `experiment-log.md` 머리 문단)
 4.5. **(2.7 을 띄웠을 때) 합치기**: 두 패스가 끝나면 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_apply_delta.py" --result {WORK_DIR}/plan/workflow-result.json` 로 `delta` 를 반영하고 `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_divergence.py" --claude {WORK_DIR}/plan/workflow-result.json --gpt {out-dir}/gpt-{run}.json` 차이표를 붙인다 — 런처 옆 파일이 오염 · 실패(planner 거부 포함)를 말하면 exit 1 로 거부한다. 차이표의 결정 항목은 사용자 보고 대상이다(판정은 Lead)
 5. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 설계 스트레스 테스트 Q1-Q6 + RTM 검증 + Sprint Contract(5.5 · 5.7 — 발동 시) + GPT verify(Phase 2) + memory-curator recall + plan 파일 기록은 기존 Phase 절차대로 Lead가 **반환 후 실수행** — Workflow는 Phase 1의 협업 분석 부분만 대체

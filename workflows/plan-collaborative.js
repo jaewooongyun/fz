@@ -191,12 +191,15 @@ function metrics(stagesCompleted) {
 }
 // rate-limit/스폰 실패 폴백 (Stage 2 병렬 3콜 한정): parallel 결과의 null 항목만 동일 thunk로 1회 순차 재시도
 // (parallel 경유 = barrier 실패→null 계약 재사용). 여전히 null이면 기존 all-null→fallback / 부분-null→WARN 경로 유지.
+// ⛔ nullCount = 잔존 null — 성공한 재시도는 첫 시도의 null 을 세지 않는다 · 재시도도 실패하면 1(peer-review.js · swarm.js 재시도와 같다). agentCalls 는 실제 호출 수다
 async function parallelWithRetry(thunks) {
   const out = await parallel(thunks)
   for (let i = 0; i < out.length; i += 1) {
     if (!out[i]) {
       log(`병렬 ${i}번 null — 순차 재시도 1회 (rate-limit/스폰 실패 폴백)`)
+      nullCalls -= 1  // 첫 시도분 취소 — 재시도 결과가 최종 상태를 정한다
       out[i] = (await parallel([thunks[i]]))[0]
+      if (out[i]) log(`병렬 ${i}번 재시도 성공 — 잔존 null 아님`)
     }
   }
   return out

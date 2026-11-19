@@ -15,7 +15,7 @@
 //   반환: { mode:'workflow', changeset, reviewVerdict, lensesExpected, lensesCompleted,
 //            residualIssues, residualNote, metrics }
 //   changeset.openQuestions(문자열 배열 · 필수 아님): 구현자의 설계 의문 · Redundant Import 신호 — Lead 가 반환 처리에서 읽는다(fz-code 절차 6).
-//     Stage 3 이 돌면 수정본의 칸이 남는다(원 changeset 의 칸을 합치지 않는다).
+//     Stage 3 이 수정본을 돌려주면 반환 칸 = 원 changeset 의 칸 뒤에 수정본의 칸(중복 제거 · 순서 유지)이다 — 둘 다 비거나 없으면 수정본 그대로다.
 //   ⛔ reviewVerdict 는 'pass'|'issues'|'partial'|'skipped'. **'partial' 은 스크립트가 조립한다**
 //      (ReviewSchema enum 은 워커 출력용이라 pass|issues 만 갖는다 — 두 층을 섞지 않는다).
 //      partial = lensesCompleted < lensesExpected. 그 관점은 적용되지 않았으므로 pass 로 읽으면 안 된다.
@@ -306,8 +306,11 @@ if (s3Issues.length > 0) {
     `${OVERRIDE}\n[역할] 구현자 — 검토 반영\n${STEP}\n[원 changeset] ${JSON.stringify(changeset)}\n[검토 이슈] ${JSON.stringify(s3Issues)}\n` +
     `[목표] 이슈를 반영한 수정 changeset. 동의하지 않는 이슈는 그대로 두되 summary에 사유 명시.`,
     { label: 'stage3-revise', agentType: 'fz:impl-correctness', model: 'opus', effort: EFFORT, schema: ChangesetSchema })
-  if (revised) finalChangeset = revised
-  else log('WARN stage3 null — 원 changeset 반환 (이슈 미반영, residualIssues 유지)')
+  if (revised) {
+    // 수정본이 changeset 을 갈아 끼워도 Stage 1 의 의문은 남긴다 — 검토가 이슈를 낸 바로 그때 사라지면 Lead 가 못 읽는다
+    const qs = [...new Set([changeset, revised].flatMap(cs => (Array.isArray(cs.openQuestions) ? cs.openQuestions : [])))]
+    finalChangeset = qs.length ? { ...revised, openQuestions: qs } : revised
+  } else log('WARN stage3 null — 원 changeset 반환 (이슈 미반영, residualIssues 유지)')
 }
 
 const s1 = !!changeset
