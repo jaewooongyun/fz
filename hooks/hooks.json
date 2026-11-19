@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v python3 >/dev/null 2>&1 || exit 0; [ -f \"${CLAUDE_PLUGIN_ROOT}/scripts/gate_stop_hook.py\" ] || exit 0; exec python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate_stop_hook.py\" --audit-only",
+            "command": "command -v python3 >/dev/null 2>&1 || exit 0; [ -f \"${CLAUDE_PLUGIN_ROOT}/scripts/gate_stop_hook.py\" ] || exit 0; if [ \"$(uname -s 2>/dev/null)\" = Darwin ] && [ \"$(command -v python3)\" = /usr/bin/python3 ] && ! xcode-select -p >/dev/null 2>&1; then exit 0; fi; { python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate_stop_hook.py\" --audit-only; } 2>/dev/null; exit 0",
             "timeout": 15
           }
         ]

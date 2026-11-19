@@ -423,7 +423,7 @@ skills:
 
 ### 8.3 Per-Agent Hooks (`hooks` 필드)
 
-⛔ **fz 에이전트에는 적지 않는다 — 플러그인 에이전트는 이 필드를 지원하지 않는다**: 플러그인에서 불러올 때 `hooks` · `mcpServers` · `permissionMode` 가 무시된다 [verified: code.claude.com/docs/en/sub-agents, 2026-11-16]. `agents/*.md` 는 셋 다 쓰지 않는다. 아래 예시와 표는 **플러그인 밖에서 정의한 에이전트**에만 해당한다. fz 본체는 훅을 등록하지 않는다(루트에 `hooks/` 가 없고 `.claude-plugin/plugin.json` 에 `hooks` 키가 없다) — 훅으로 거는 기계 강제는 선택형 하위 플러그인의 `mods/fz-guard/hooks/hooks.json` 이 맡는다.
+⛔ **fz 에이전트에는 적지 않는다 — 플러그인 에이전트는 이 필드를 지원하지 않는다**: 플러그인에서 불러올 때 `hooks` · `mcpServers` · `permissionMode` 가 무시된다 [verified: code.claude.com/docs/en/sub-agents, 2026-11-16]. `agents/*.md` 는 셋 다 쓰지 않는다. 아래 예시와 표는 **플러그인 밖에서 정의한 에이전트**에만 해당한다. fz 본체가 스스로 등록하는 훅은 Stop 항목 하나다(루트 `hooks/hooks.json` → `gate_stop_hook.py --audit-only` — 워커 심볼 도구 사용을 세고 · 기록하고 · 알릴 뿐 막지 않는다 · `.claude-plugin/plugin.json` 에는 `hooks` 키가 없다). 막는 훅은 여전히 선택 설치다 — 완료 게이트 차단 항목(`examples/hooks.json.example` 을 설정에 옮긴다)과 선택형 하위 플러그인 `mods/fz-guard/hooks/hooks.json` 이 맡는다.
 
 플러그인 밖에서 정의한 에이전트는 에이전트별 라이프사이클 훅으로 자동 품질 게이트를 구현할 수 있다.
 

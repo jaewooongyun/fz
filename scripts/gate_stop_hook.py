@@ -80,8 +80,10 @@ stderr로 남긴다. 미사용과 미발견이 같은 침묵이면 놓친 원장
 **종료 훅 훑기 (워커 심볼 도구 사용 점검).** 게이트 판정 뒤 모든 정상 종료 경로(원장 없음 · 전부 충족 · 막음)에서
 `fz_wf_metrics.py --mcp-audit --sweep` 으로 이 세션의 끝난 워크플로 실행 · 직접 호출을 센다(`sweep_session`). 스킬 문서의
 점검 줄은 Lead 가 건너뛰면 돌지 않으므로 훅이 직접 센다. 자기 예외 경계 안 · 남은 예산의 최대 5초 · 막지 않는다 —
-'의심' 이 있으면 알림 칸(`systemMessage`)에 한 줄, 막는 판정이면 기록만 하고 알림은 같은 세션의 다음 막지 않는 종료로 미룬다.
-`FZ_GATES_OFF=1` 이 함께 끈다. `--audit-only` 는 게이트 판정 없이 이 훑기만 한다(막지 않는 종료로 훑는다).
+'의심' 이 있으면 알림 칸(`systemMessage`)에 한 줄, 막는 판정이면 기록만 하고 알림은 같은 세션의 다음 막지 않는 종료로 미룬다 —
+그 미룸은 차단 항목만 등록한 머신에서만 성립한다(두 항목이 함께 돌면 막는 종료에도 한 번 알릴 수 있다 · `sweep_session`).
+훑기만 끄려면 `FZ_MCP_SWEEP_OFF=1`(게이트 판정 · 종료 코드 · 사유는 그대로), `FZ_GATES_OFF=1` 은 게이트 판정과 함께 끈다.
+`--audit-only` 는 게이트 판정 없이 이 훑기만 한다(막지 않는 종료로 훑는다).
 """
 from __future__ import annotations
 
@@ -1207,36 +1209,54 @@ def _gate_verdict(payload: dict, started: float) -> int:
 SWEEP_CAP_S = 5.0                      # 훑기 상한 — 훅 예산의 남은 몫 안에서 이만큼만 쓴다
 SWEEP_MIN_S = 0.5                      # 남은 몫이 이보다 작으면 부르지 않는다(못 본 실행은 다음 종료 때 본다)
 SWEEP_BUDGET_ENV = "FZ_MCP_SWEEP_BUDGET_S"   # 훑기 안 예산(--budget)을 줄이기만 하는 시험 노브 — 0 이면 실행 하나만 보고 멈춘다
+SWEEP_OFF_ENV = "FZ_MCP_SWEEP_OFF"     # 훑기만 끄는 스위치 — 값이 정확히 `1` 일 때만(`FZ_GATES_OFF` 와 같은 규칙) · 게이트 판정 · 종료 코드 · 사유는 그대로다
+# 상태 기록 찾기의 transcript 읽기는 이 줄 수마다 마감을 본다. 줄마다 봐도 비용은 작지만(시계 한 번 약 0.05µs · 선필터로 버리는 줄 하나
+# 약 5µs — 2026-11-19 합성 기록 실측) 묶어 봐도 넘침이 이 줄 수 읽기(같은 실측으로 약 1ms)로 묶여 `SWEEP_MIN_S` 보다 훨씬 작다.
+# 줄 하나가 아주 길면(수 MB 도구 결과) 그만큼 늘어난다
+STATE_SCAN_CHECK_LINES = 256
 RUN_STATE_ENV = "FZ_RUN_STATE"         # 실행 상태 폴더(기본 ~/.fz/runs — run_metrics.py 와 같은 이름 · 같은 값)
 SWEEP_RECORD = "mcp-sweep.jsonl"       # 그 폴더 아래 판정 기록 — 판정한 실행의 열쇠는 옆의 mcp-sweep.keys.json(훑기가 쓴다)
 SWEEP_LOCK = "mcp-sweep.lock"          # 같은 폴더의 배타 잠금 — 두 항목(플러그인 · 설정)이 같은 종료에 함께 돌아도 실행마다 한 번만 판정 · 알린다
-SWEEP_HELD = "mcp-sweep.held.json"     # 막는 종료에서 판정한 '의심' — 세션별로 미뤘다가 그 세션의 다음 막지 않는 종료가 한 번 알리고 지운다
+SWEEP_HELD = "mcp-sweep.held.json"     # 막는 종료에서 판정한 '의심' — 세션별로 미뤘다가 그 세션을 막지 않는 판정으로 다음에 훑는 쪽이 한 번 알리고 지운다
+#                                        (차단 항목만 등록한 머신이면 다음 막지 않는 종료 · 두 항목이 함께 돌면 같은 막는 종료의 감사 항목일 수 있다)
 SWEEP_HELD_MAX = 200                   # 미룬 알림을 둔 세션 수 상한 — 넘으면 가장 먼저 미룬 세션부터 버린다
 SWEEP_LINE_RE = re.compile(r"^MCP_SWEEP runs=(\d+) used=\d+ suspect=(\d+) ", re.M)
 SWEEP_SUSPECT_RE = re.compile(r"^  의심: (\S+) (\S+)", re.M)
 
 
-def find_state_records(cwd: Path, transcript_path, gcmod) -> list:
+def find_state_records(cwd: Path, transcript_path, gcmod, deadline: float):
     """이 세션이 쓴 상태 기록(`evidence/tools.md`) — 원장을 찾는 방식 그대로다. 판정기의 원장 glob(깊이 0~3)에서 원장 자리를
     `evidence/tools.md` 로 바꿔 찾고 판정기가 건너뛰는 폴더를 뺀 뒤, transcript 가 `Write`/`Edit` · Bash 쓰기 자리로 쓴 것만 고른다
     (경로 비교는 원장과 같은 `_same_ledger`).
 
+    - Parameters: deadline — `time.monotonic()` 값. glob 패턴 사이 · glob 이 낸 경로마다 · transcript `STATE_SCAN_CHECK_LINES` 줄마다 본다.
+    - Returns: 상태 기록 경로 목록 · 마감이 지나 끝내지 못했으면 None('못 찾음' 인 빈 목록과 다르다 — 부르는 쪽은 이번 종료를 훑지 않는다).
     - Note: Bash 쓰기 대상은 fz-guard write_sites 의 자리를 그 줄의 cwd 로 푼다 — 같은 명령의 `cd` 는 따라가지 않는다. 못 찾거나
       못 읽으면 빈 목록이다 — 상태를 모르면 훑기가 0회 · 성공 0 을 미판정으로 둔다(틀린 상태로 의심을 내지 않는다).
     """
     found = set()
     for pat in (g.replace("gates/plan.md", "evidence/tools.md") for g in getattr(gcmod, "LEDGER_GLOBS", ())):
+        if time.monotonic() >= deadline:
+            return None
         try:
-            found |= {q.resolve() for q in cwd.glob(pat) if q.is_file() and not gcmod._skipped(q, cwd)}
+            hits = set()
+            for q in cwd.glob(pat):
+                if time.monotonic() >= deadline:
+                    return None
+                if q.is_file() and not gcmod._skipped(q, cwd):
+                    hits.add(q.resolve())
         except OSError:
             continue
+        found |= hits
     tp = Path(str(transcript_path or ""))
     if not found or not transcript_path or not tp.is_file():
         return []
     owned = set()
     try:
         with tp.open("r", encoding="utf-8", errors="replace") as fh:
-            for line in fh:
+            for n, line in enumerate(fh, 1):
+                if n % STATE_SCAN_CHECK_LINES == 0 and time.monotonic() >= deadline:
+                    return None
                 if '"tool_use"' not in line or "tools.md" not in line:
                     continue
                 try:
@@ -1266,23 +1286,34 @@ def find_state_records(cwd: Path, transcript_path, gcmod) -> list:
 
 def sweep_session(payload: dict, started: float, code: int) -> None:
     """종료 훅 훑기 — `main` 이 게이트 판정 뒤에(원장 없음 · 전부 충족 · 막음 모두), `audit_main` 이 게이트 판정 없이 막지 않는 종료로 부른다
-    (`FZ_GATES_OFF=1` 이면 둘 다 여기까지 오지 않는다).
+    (`FZ_GATES_OFF=1` 이면 둘 다 여기까지 오지 않는다). `SWEEP_OFF_ENV` 가 `1` 이면 맨 위에서 돌아간다 — 세션 폴더도 보지 않고 파일 · 잠금 ·
+    프로세스 · 출력이 없다(게이트 판정은 이미 끝났고 그대로다).
 
     세션 기록 폴더(transcript 경로에서 `.jsonl` 을 뗀 폴더)에 워크플로 실행 · 직접 호출 기록이 없으면 파일을 만들지 않고 곧장 돌아간다.
     있으면 `find_state_records` 가 찾은 상태 기록을 `--state` 로 넘겨 `fz_wf_metrics.py --mcp-audit --sweep` 을 돌린다 — 기록은
     `${FZ_RUN_STATE:-~/.fz/runs}/mcp-sweep.jsonl`, 판정한 실행의 열쇠는 옆의 `mcp-sweep.keys.json` 이다.
 
     - Important: 자기 예외 경계 안에서 돈다 — 어떤 오류 · 시간 초과도 종료 코드 · stderr 를 만들지 않는다(게이트의 종료 코드 · 막는
-      횟수 · 사유를 바꾸지 못한다). 시간은 훅 예산(`_hook_budget`)의 남은 몫 안에서 최대 `SWEEP_CAP_S` 초다 — 훑기 프로세스를 그
-      시간에 끊고, 그보다 1초 먼저 끝나는 `--budget` 이 훑기를 멈춰 본 데까지 기록 · 열쇠를 남긴다.
+      횟수 · 사유를 바꾸지 못한다). 시간은 훅 예산(`_hook_budget`)의 남은 몫 안에서 최대 `SWEEP_CAP_S` 초다 — 상태 기록 찾기는 그 몫에서
+      `SWEEP_MIN_S` 를 뺀 마감까지만 돌고, 끝내지 못하면 이번 종료는 훑지 않는다(감사 프로세스 · 기록 · 열쇠 · 알림이 없고 실행 상태 폴더 ·
+      잠금 파일도 만들지 않는다 — 다음 종료가 다시 본다). 잠금을 쥔 뒤 남은 몫이 `SWEEP_MIN_S` 보다 작아도 감사 프로세스를 띄우지 않는다.
+      띄우면 그 프로세스를 남은 몫에 끊고, 그보다 1초 먼저 끝나는 `--budget` 이 훑기를 멈춰 본 데까지 기록 · 열쇠를 남긴다.
+      남는 한계: 디렉토리 열거 한 번(아주 큰 트리에서 glob 패턴 하나가 경로를 내기 전까지)은 파이썬에서 끊을 수 없어, 찾기가 그 한 번의
+      길이만큼 마감을 넘길 수 있다 — 바깥 상한은 훅 항목의 `timeout` 이다.
     - Note: '의심' 이 하나라도 있고 막지 않는 판정이면 stdout 에 `{"systemMessage": …}` 한 줄을 낸다. 막는 판정이면 기록만 하고 그 의심을
-      기록 옆 `SWEEP_HELD` 에 세션별로 미룬다 — 같은 세션의 다음 막지 않는 종료(어느 항목이든)가 한 번 알리고 지운다(기록 줄은 다시 쓰지 않는다).
+      기록 옆 `SWEEP_HELD` 에 세션별로 미룬다 — 그 세션을 막지 않는 판정으로 다음에 훑는 쪽이 한 번 알리고 지운다(기록 줄은 다시 쓰지 않는다).
+      다음 막지 않는 종료까지 미뤄지는 것은 차단 항목 하나만 등록한 머신에서뿐이다(아래).
     - Important: 두 항목(플러그인의 `--audit-only` · 설정의 전체 항목)이 같은 종료에 함께 돌 수 있다. 기록 폴더의 배타 잠금(`SWEEP_LOCK` —
       자리는 기록과 같은 `${FZ_RUN_STATE:-~/.fz/runs}` 에서 온다 · 플러그인 루트 · 작업 폴더와 무관)을 열쇠 읽기 → 판정 → 기록 → 열쇠 쓰기와
-      미룬 알림 처리 내내 쥔다. 잠금은 남은 몫 안에서만 기다리고 못 얻으면 조용히 끝난다(쥔 쪽이 판정 · 알린다).
+      미룬 알림 처리 내내 쥔다. 잠금은 남은 몫 안에서만 기다리고 못 얻으면 조용히 끝난다(쥔 쪽이 판정 · 알린다). 두 항목은 서로의 판정을
+      모른다 — 감사 항목은 막지 않으므로 어느 쪽이 먼저 잠금을 쥐든 차단 항목이 막는 그 종료에 알림이 실릴 수 있다(감사 항목이 먼저면 새로
+      판정한 의심을, 차단 항목이 먼저면 방금 미룬 의심을 감사 항목이 알린다 · 한 번뿐 — 잠금과 열쇠가 두 번째 알림을 막는다). 막는 종료를
+      피해 미루려면 다른 항목의 판정이 필요한데 이 항목은 그것을 알 수 없다.
     """
     lock = None
     try:
+        if os.environ.get(SWEEP_OFF_ENV) == "1":
+            return                                       # 훑기만 끈다 — 세션 폴더도 보지 않는다(파일 · 잠금 · 프로세스 · 출력 없음)
         t0 = time.monotonic()
         tp = str(payload.get("transcript_path") or "")
         sess = Path(tp[:-len(".jsonl")]) if tp.endswith(".jsonl") else None
@@ -1294,13 +1325,17 @@ def sweep_session(payload: dict, started: float, code: int) -> None:
             return                                       # 남은 예산이 없다 — 못 본 실행은 다음 종료 때 본다
         gcmod = load_checker_module()
         cwd = Path(payload.get("cwd") or os.getcwd()).resolve()
-        states = find_state_records(cwd, tp, gcmod) if gcmod is not None and cwd.is_dir() else []
+        states = find_state_records(cwd, tp, gcmod, t0 + cap - SWEEP_MIN_S) if gcmod is not None and cwd.is_dir() else []
+        if states is None:
+            return                                       # 상태 기록 찾기가 마감 안에 끝나지 않았다 — 이번 종료는 훑지 않는다(다음 종료가 다시 본다)
         runs = Path(os.path.expanduser(os.environ.get(RUN_STATE_ENV) or "~/.fz/runs"))
         runs.mkdir(parents=True, exist_ok=True)
         lock = _sweep_lock(runs / SWEEP_LOCK, t0 + cap - SWEEP_MIN_S)
         if lock is None:
             return                                       # 다른 항목이 같은 기록을 훑는 중 — 그쪽이 판정 · 알린다(못 본 실행은 다음 종료 때 본다)
         left = cap - (time.monotonic() - t0)
+        if left < SWEEP_MIN_S:
+            return                                       # 감사 프로세스를 띄울 몫이 없다 — 잠금을 놓고 끝난다(못 본 실행은 다음 종료 때 본다)
         soft = max(0.0, left - 1.0)
         try:
             soft = min(soft, max(0.0, float(os.environ.get(SWEEP_BUDGET_ENV, ""))))
@@ -1321,7 +1356,7 @@ def sweep_session(payload: dict, started: float, code: int) -> None:
         except (OSError, ValueError):
             held = {}
         held = held if isinstance(held, dict) else {}
-        if code == EXIT_BLOCK:                           # 막는 판정 — 기록만 하고 알림은 이 세션의 다음 막지 않는 종료로 미룬다(막는 사유가 먼저다)
+        if code == EXIT_BLOCK:                           # 막는 판정 — 기록만 하고 알림은 미룬다(막는 사유가 먼저다 · 같은 종료의 감사 항목이 알릴 수 있다 — 위 Important)
             if sus:
                 held[key] = _held_of(held.pop(key, None)) + sus
                 while len(held) > SWEEP_HELD_MAX:
@@ -1337,7 +1372,7 @@ def sweep_session(payload: dict, started: float, code: int) -> None:
         earlier = f" · 앞서 막은 종료에서 미룬 의심 {len(prior)}" if prior else ""
         print(json.dumps({"systemMessage": f"[fz] 워커 심볼 도구 점검 — 이번에 끝난 실행 {m.group(1) if m else 0}개 중 의심 {len(sus)}{earlier} "
                                            f"({shown}) · 낱말 뜻 {ROOT / 'modules' / 'symbol-tools-audit.md'} · 기록 {runs / SWEEP_RECORD}"
-                                           f" · 끄기 FZ_GATES_OFF=1(게이트 판정과 함께)"}, ensure_ascii=False))
+                                           f" · 끄기 {SWEEP_OFF_ENV}=1(이 점검만) · FZ_GATES_OFF=1(게이트 판정과 함께)"}, ensure_ascii=False))
     except Exception:                                    # noqa: BLE001 — 훑기는 게이트 결과를 바꾸지 못한다(어떤 오류도 조용히 끝난다)
         return
     finally:
@@ -1751,7 +1786,7 @@ def _sweep_cell(name: str, home: Path, ledger_env: str) -> str:
         Path(str(sess) + ".jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
         runs = d / "runs"
         env = dict(os.environ, HOME=str(home), **{RUN_STATE_ENV: str(runs)})
-        for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV, SWEEP_BUDGET_ENV):
+        for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV, SWEEP_BUDGET_ENV, SWEEP_OFF_ENV):
             env.pop(var, None)
         env.update({"sweep-off": {"FZ_GATES_OFF": "1"}, "sweep-budget": {SWEEP_BUDGET_ENV: "0"}}.get(name, {}))
         if name == "sweep-error":                        # 실행 상태 폴더를 만들 수 없다(파일 아래) — 훑기 안에서 예외가 난다
@@ -1802,7 +1837,8 @@ def _sweep_cell(name: str, home: Path, ledger_env: str) -> str:
 # 플러그인 등록 · 감사 전용 셀 — 플러그인이 스스로 등록한 Stop 항목(`hooks/hooks.json` → `--audit-only`)은 게이트를 판정하지 않고 위 훑기만
 # 한다. 설정에 전체 항목을 더한 머신은 같은 종료에 두 항목이 함께 돈다(잠금 · 미룬 알림). 이름에 `sweep-` 접두를 쓰지 않는다(위 여섯만 센다)
 AUDIT_CELLS = ("audit-only-notice", "audit-only-no-block", "audit-only-quiet-errors", "audit-only-off", "audit-only-idle",
-               "audit-only-one-record", "held-notice", "plugin-hook-registration")
+               "audit-only-one-record", "held-notice", "plugin-hook-registration", "plugin-hook-python-fails", "plugin-hook-macos-guard")
+CELL_NOT_RUN = "미실행 — "               # 셀이 이 머리로 시작하는 사유를 돌려주면 실패가 아니라 미실행이다(통과로 세지 않고 따로 적는다)
 
 
 def _audit_session(d: Path, ledger: bool) -> dict:
@@ -1848,15 +1884,107 @@ def _registration_cell(d: Path) -> str:
     (d / "empty").mkdir()
     idle = json.dumps({"hook_event_name": "Stop", "cwd": str(d), "session_id": "selftest-reg",
                        "transcript_path": str(d / "none.jsonl")}).encode()
-    base = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_PLUGIN_ROOT", "FZ_GATES_OFF", BUDGET_ENV, SWEEP_BUDGET_ENV)}
+    base = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_PLUGIN_ROOT", "FZ_GATES_OFF", BUDGET_ENV, SWEEP_BUDGET_ENV, SWEEP_OFF_ENV)}
     base.update({"HOME": str(d), RUN_STATE_ENV: str(d / "runs")})
-    for label, extra in (("등록", {"CLAUDE_PLUGIN_ROOT": str(ROOT)}), ("python3 없음", {"CLAUDE_PLUGIN_ROOT": str(ROOT), "PATH": str(d / "empty")}),
-                         ("플러그인 루트 없음", {})):
-        proc = subprocess.run(["/bin/sh", "-c", cmd], input=idle, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              env=dict(base, **extra), timeout=60)
-        if proc.returncode != 0 or proc.stdout or proc.stderr:
-            return f"{label}: exit {proc.returncode} · stdout {proc.stdout[:80]!r} · stderr {proc.stderr[:80]!r} (기대 exit 0 · 출력 없음)"
+    if "\n" in cmd or re.search(r"(?:^|[;&|]\s*)exec\s", cmd) or not cmd.rstrip().endswith("; exit 0"):
+        return f"명령 {cmd!r} 이 한 줄 · exec 없음 · `; exit 0` 끝이 아니다(인터프리터가 무엇을 하든 exit 0 이어야 한다)"
+    import shutil
+    shells = ["/bin/sh"] + [s for s in (shutil.which("dash"),) if s and os.path.realpath(s) != os.path.realpath("/bin/sh")]
+    for sh in shells:                                    # dash 가 있으면 함께 — POSIX sh 밖 문법(bash 전용)을 쓰면 거기서 깨진다
+        for label, extra in (("등록", {"CLAUDE_PLUGIN_ROOT": str(ROOT)}), ("python3 없음", {"CLAUDE_PLUGIN_ROOT": str(ROOT), "PATH": str(d / "empty")}),
+                             ("플러그인 루트 없음", {})):
+            proc = subprocess.run([sh, "-c", cmd], input=idle, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  env=dict(base, **extra), timeout=60)
+            if proc.returncode != 0 or proc.stdout or proc.stderr:
+                return f"{sh} {label}: exit {proc.returncode} · stdout {proc.stdout[:80]!r} · stderr {proc.stderr[:80]!r} (기대 exit 0 · 출력 없음)"
     return "" if not (d / "runs").exists() else "실행 기록 없는 세션에서 실행 상태 폴더를 만들었다"
+
+
+def _registered_cmd() -> str:
+    """`hooks/hooks.json` 의 Stop 명령 하나(다시 쓰지 않고 파일에서 읽는다) · 꼴이 다르면 빈 글(모양은 `plugin-hook-registration` 이 본다)."""
+    try:
+        data = json.loads((ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+        cmds = [h for g in data["hooks"]["Stop"] for h in g.get("hooks") or []]
+        return str(cmds[0].get("command") or "") if len(cmds) == 1 else ""
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return ""
+
+
+def _hook_env(d: Path) -> dict:
+    """등록 명령을 돌리는 환경 — 바깥의 플러그인 루트 · 끄기 스위치 · 예산 노브를 넘기지 않는다."""
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_PLUGIN_ROOT", "FZ_GATES_OFF", BUDGET_ENV, SWEEP_BUDGET_ENV, SWEEP_OFF_ENV)}
+    env.update({"HOME": str(d), RUN_STATE_ENV: str(d / "runs")})
+    return env
+
+
+def _fake_tool(folder: Path, name: str, body: str) -> None:
+    folder.mkdir(exist_ok=True)
+    (folder / name).write_text("#!/bin/sh\n" + body + "\n", encoding="utf-8")
+    (folder / name).chmod(0o755)
+
+
+def _python_fails_cell(d: Path) -> str:
+    """PATH 맨 앞의 `python3` 가 실패한다(깨진 shim 등) — 등록 명령은 그래도 exit 0 · stderr 0바이트이고 stdout 은 그대로 내보낸다(알림 줄 자리).
+    세 꼴: stderr 를 쓰고 exit 1 · 신호로 죽음(셸이 그 사실을 자기 stderr 에 적는다 — 묶음 밖 `2>/dev/null` 로는 남는다) · stdout 에 알림 줄."""
+    cmd = _registered_cmd()
+    if not cmd:
+        return "hooks/hooks.json 의 Stop 명령을 읽지 못했다"
+    root = d / "plugin"
+    (root / "scripts").mkdir(parents=True)
+    (root / "scripts" / "gate_stop_hook.py").write_text("raise SystemExit(0)\n", encoding="utf-8")   # 파일 가드만 지나게 — 실행되지 않는다
+    line = '{"systemMessage": "x"}'
+    bad = []
+    for i, (label, body, want) in enumerate((("exit 1", 'echo "python3: broken interpreter shim" >&2\nexit 1', b""),
+                                             ("신호", 'echo "python3: broken" >&2\nkill -TERM $$', b""),
+                                             ("stdout 통과", f"echo '{line}'\necho noise >&2\nexit 3", (line + "\n").encode()))):
+        _fake_tool(d / f"bin{i}", "python3", body)
+        proc = subprocess.run(["/bin/sh", "-c", cmd], input=b"{}", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60,
+                              env=dict(_hook_env(d), PATH=f"{d / f'bin{i}'}:/usr/bin:/bin", CLAUDE_PLUGIN_ROOT=str(root)))
+        if proc.returncode != 0 or proc.stderr or proc.stdout != want:
+            bad.append(f"{label}: exit {proc.returncode} · stdout {proc.stdout[:60]!r} · stderr {len(proc.stderr)}바이트 {proc.stderr[:60]!r}")
+    return " / ".join(bad)
+
+
+def _macos_guard_cell(d: Path) -> str:
+    """개발자 도구 없는 macOS — `uname -s` 가 Darwin · `command -v python3` 가 `/usr/bin/python3` · `xcode-select -p` 실패면 그 python3 는 도구 설치
+    대화상자를 여는 껍데기라 등록 명령이 띄우지 않는다(exit 0 · 출력 없음). 조건 하나만 빠져도 띄운다 — 대조 셋(도구 있음 · Linux · 다른 python3).
+    가짜 `xcode-select`(와 이 머신이 아닌 체계의 가짜 `uname`)를 PATH 맨 앞에 둔다. `/usr/bin/python3` 가 없거나 이 머신이 바로 그 macOS 면 미실행이다."""
+    import platform
+    here = platform.system()
+    if not os.access("/usr/bin/python3", os.X_OK):
+        return CELL_NOT_RUN + "/usr/bin/python3 가 없다 — 이 머신에서는 그 경로의 가드를 돌려 볼 수 없다"
+    if here == "Darwin":
+        try:
+            tools = subprocess.run(["xcode-select", "-p"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30).returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            tools = False
+        if not tools:
+            return CELL_NOT_RUN + "이 머신의 /usr/bin/python3 가 도구 설치를 여는 껍데기다(xcode-select -p 실패) — 대조가 대화상자를 연다"
+    cmd = _registered_cmd()
+    if not cmd:
+        return "hooks/hooks.json 의 Stop 명령을 읽지 못했다"
+    scripts = d / "plugin" / "scripts"
+    scripts.mkdir(parents=True)
+    marker = scripts / "ran"
+    (scripts / "gate_stop_hook.py").write_text("import pathlib\npathlib.Path(__file__).with_name('ran').write_text('x')\n", encoding="utf-8")
+    bad = []
+    for i, (label, system, tools_ok, own_python, want) in enumerate((("도구 없는 macOS", "Darwin", False, False, False),
+                                                                     ("도구 있는 macOS", "Darwin", True, False, True),
+                                                                     ("Linux", "Linux", False, False, True),
+                                                                     ("다른 python3", "Darwin", False, True, True))):
+        b = d / f"bin{i}"
+        _fake_tool(b, "xcode-select", "exit 0" if tools_ok else "exit 2")
+        if system != here:
+            _fake_tool(b, "uname", f"echo {system}")
+        if own_python:
+            _fake_tool(b, "python3", f'exec "{sys.executable}" "$@"')
+        if marker.exists():
+            marker.unlink()
+        proc = subprocess.run(["/bin/sh", "-c", cmd], input=b"{}", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60,
+                              env=dict(_hook_env(d), PATH=f"{b}:/usr/bin:/bin", CLAUDE_PLUGIN_ROOT=str(scripts.parent)))
+        if proc.returncode != 0 or proc.stdout or proc.stderr or marker.exists() != want:
+            bad.append(f"{label}: exit {proc.returncode} · 출력 {proc.stdout[:40]!r}/{proc.stderr[:60]!r} · python3 실행 {marker.exists()} (기대 {want})")
+    return " / ".join(bad)
 
 
 def _audit_cell(name: str, home: Path, ledger_env: str) -> str:
@@ -1867,9 +1995,13 @@ def _audit_cell(name: str, home: Path, ledger_env: str) -> str:
     try:
         if name == "plugin-hook-registration":
             return _registration_cell(d)
+        if name == "plugin-hook-python-fails":
+            return _python_fails_cell(d)
+        if name == "plugin-hook-macos-guard":
+            return _macos_guard_cell(d)
         runs = d / "runs"
         env = dict(os.environ, HOME=str(home), **{RUN_STATE_ENV: str(runs)})
-        for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV, SWEEP_BUDGET_ENV, "CLAUDE_PLUGIN_ROOT"):
+        for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV, SWEEP_BUDGET_ENV, SWEEP_OFF_ENV, "CLAUDE_PLUGIN_ROOT"):
             env.pop(var, None)
         me = str(Path(__file__).resolve())
 
@@ -1983,6 +2115,188 @@ def _audit_cell(name: str, home: Path, ledger_env: str) -> str:
         shutil.rmtree(d, ignore_errors=True)
 
 
+# 훑기의 시간 경계 · 훑기만 끄는 스위치 셀 — 상태 기록 찾기가 마감 안에 끝나지 않거나 잠금 뒤 남은 몫이 `SWEEP_MIN_S` 보다 작으면 감사
+# 프로세스를 띄우지 않는다 · `SWEEP_OFF_ENV` 는 훑기만 끈다. 이름에 `sweep-` 접두를 쓰지 않는다(위 여섯만 센다)
+BOUND_CELLS = ("state-search-deadline", "state-search-unfinished", "state-search-late", "mcp-off-audit-only", "mcp-off-gate-kept")
+# 시계 이음매 — 훅을 모듈로 불러 감사 프로세스 띄우기(`--mcp-audit` 를 실은 `subprocess.run`)를 표지 파일에 남기고, 훑기 안의 한 자리 뒤에서
+# 시계를 60초 당긴다(`load_checker_module` 뒤 = 찾기 전 · `find_state_records` 뒤 = 찾은 뒤 · `none` = 당기지 않는다). 진입은 `__main__` 블록과 같다
+_SEAM_DRIVER = r'''
+import subprocess, sys, time
+sys.path.insert(0, sys.argv[1])
+import gate_stop_hook as g
+at, mark, audit = sys.argv[2], sys.argv[3], sys.argv[4] == "audit"
+real_run, real_clock, shift, armed = subprocess.run, time.monotonic, [0.0], [False]
+def spy(argv, *a, **k):
+    if "--mcp-audit" in argv:
+        with open(mark, "a", encoding="utf-8") as fh:
+            fh.write("started\n")
+    return real_run(argv, *a, **k)
+def after(fn):
+    def wrapped(*a, **k):
+        out = fn(*a, **k)
+        if armed[0]:
+            shift[0] += 60.0
+        return out
+    return wrapped
+def arm(fn):
+    def wrapped(*a, **k):
+        armed[0] = True
+        return fn(*a, **k)
+    return wrapped
+subprocess.run = spy
+time.monotonic = lambda: real_clock() + shift[0]
+g.sweep_session = arm(g.sweep_session)
+if at != "none":
+    setattr(g, at, after(getattr(g, at)))
+if audit:
+    try:
+        g.audit_main()
+    except Exception:
+        pass
+    sys.exit(0)
+sys.exit(g.main())
+'''
+
+
+def _deadline_cell(d: Path) -> str:
+    """`find_state_records` 의 마감 — 이미 지난 마감 → None(끝나지 않음) · 넉넉한 마감 → 지금과 같은 답(이 세션이 쓴 것 · 아무도 안 씀 · 없음
+    → 빈 목록). 시계를 바꿔 끼워 글롭이 내는 경로마다 · transcript `STATE_SCAN_CHECK_LINES` 줄마다 마감을 보는지 센다."""
+    gcmod = load_checker_module()
+    if gcmod is None:
+        return "판정기를 불러오지 못했다"
+    states = [d / f"TICKET-000{i}" / "evidence" / "tools.md" for i in range(4)]
+    for p in states[:2]:
+        p.parent.mkdir(parents=True)
+        p.write_text("Serena: active\n", encoding="utf-8")
+    write = json.dumps({"type": "assistant", "cwd": str(d), "message": {"content": [
+        {"type": "tool_use", "name": "Write", "input": {"file_path": str(states[0]), "content": "x"}}]}})
+    filler = json.dumps({"type": "user", "message": {"content": "x"}})
+    short, long_ = d / "short.jsonl", d / "long.jsonl"
+    short.write_text("\n".join([filler] * (STATE_SCAN_CHECK_LINES - 2) + [write]) + "\n", encoding="utf-8")
+    long_.write_text("\n".join([filler] * (2 * STATE_SCAN_CHECK_LINES) + [write]) + "\n", encoding="utf-8")
+    (d / "empty").mkdir()
+    far, owned = time.monotonic() + 3600, [states[0].resolve()]
+    got = {"owned": find_state_records(d, short, gcmod, far), "none-owned": find_state_records(d, d / "none.jsonl", gcmod, far),
+           "no-state": find_state_records(d / "empty", short, gcmod, far), "past": find_state_records(d, short, gcmod, time.monotonic() - 1),
+           "past-no-state": find_state_records(d / "empty", short, gcmod, time.monotonic() - 1)}   # 글롭이 아무것도 내지 않아도 패턴 사이에서 본다
+    real, calls = time.monotonic, [0]
+
+    def clock(limit):                                    # limit 번째 읽기까지는 마감(1.0) 전 · 그 뒤는 마감 뒤
+        def tick():
+            calls[0] += 1
+            return 0.0 if calls[0] <= limit else 2.0
+        return tick
+    try:
+        time.monotonic = clock(10 ** 9)
+        got["glob-reads"] = (find_state_records(d, short, gcmod, 1.0), calls[0])      # 짧은 transcript — 글롭 쪽 읽기만
+        k = calls[0]
+        calls[0] = 0
+        time.monotonic = clock(k)
+        got["cut-long"] = find_state_records(d, long_, gcmod, 1.0)                        # 글롭은 마감 전 · transcript 를 읽는 중에 넘는다
+        calls[0] = 0
+        got["cut-short"] = find_state_records(d, short, gcmod, 1.0)
+        for p in states[2:]:                                                             # 글롭이 내는 경로 둘을 더한다 — 시계 읽기도 둘 늘어야 한다
+            p.parent.mkdir(parents=True)
+            p.write_text("Serena: active\n", encoding="utf-8")
+        calls[0] = 0
+        time.monotonic = clock(10 ** 9)
+        find_state_records(d, short, gcmod, 1.0)
+        got["per-path"] = calls[0] - k
+    finally:
+        time.monotonic = real
+    want = {"owned": owned, "none-owned": [], "no-state": [], "past": None, "past-no-state": None, "glob-reads": (owned, k), "cut-long": None,
+            "cut-short": owned, "per-path": 2}
+    return "" if got == want else f"얻음 {got} · 기대 {want}"
+
+
+def _bound_cell(name: str, home: Path, ledger_env: str) -> str:
+    """시간 경계 · 스위치 셀 하나 → 실패 사유(통과면 빈 글)."""
+    import shutil
+    import tempfile
+    d = Path(tempfile.mkdtemp(prefix="fz-hook-bound-"))
+    try:
+        if name == "state-search-deadline":
+            return _deadline_cell(d)
+        runs = d / "runs"
+        env = dict(os.environ, HOME=str(home), **{RUN_STATE_ENV: str(runs)})
+        for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV, SWEEP_BUDGET_ENV, SWEEP_OFF_ENV, "CLAUDE_PLUGIN_ROOT"):
+            env.pop(var, None)
+        payload = _audit_session(d, ledger=name in ("state-search-unfinished", "mcp-off-gate-kept"))
+        homes = iter(range(100))
+
+        def fire(audit: bool, at=None, **extra):
+            """훅 한 번 → (exit, stdout, stderr, 감사 프로세스를 띄웠나). 차단 항목(audit=False)은 새 HOME 에서 돈다(루프 방어 상태를 나누지 않는다).
+            `at` 이 있으면 시계 이음매(`_SEAM_DRIVER`)로 돌린다 — 그때만 감사 프로세스 띄우기를 센다."""
+            run_env = dict(env, **extra)
+            if not audit:
+                run_env["HOME"] = str(d / f"home{next(homes)}")
+            mark = d / f"started-{time.monotonic_ns()}"
+            if at is None:
+                argv = [sys.executable, str(Path(__file__).resolve())] + (["--audit-only"] if audit else [])
+            else:
+                driver = d / "seam.py"
+                driver.write_text(_SEAM_DRIVER, encoding="utf-8")
+                argv = [sys.executable, "-B", str(driver), str(ROOT / "scripts"), at, str(mark), "audit" if audit else "full"]
+            proc = subprocess.run(argv, input=json.dumps(payload).encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=run_env, timeout=60)
+            return proc.returncode, proc.stdout.decode("utf-8", "replace").strip(), proc.stderr.decode("utf-8", "replace"), mark.exists()
+
+        def notice(out: str) -> str:
+            try:
+                return json.loads(out).get("systemMessage", "") if out else ""
+            except (ValueError, AttributeError):
+                return f"(JSON 아님) {out[:80]}"
+
+        def suspects() -> list:
+            rec = runs / SWEEP_RECORD
+            lines = rec.read_text(encoding="utf-8").splitlines() if rec.is_file() else []
+            return [json.loads(x).get("summary", {}).get("suspect") for x in lines if x.strip()]
+
+        def blocked(code: int, err: str) -> bool:
+            return code == EXIT_BLOCK and '"decision": "block"' in err and "예상 외 오류" not in err
+
+        if name == "state-search-unfinished":            # 찾기 전에 시계가 마감을 넘는다 — 감사 프로세스 · 기록 · 열쇠 · 알림 · 실행 상태 폴더 · 잠금 없음
+            c0, o0, e0, s0 = fire(True, "none")          # 대조: 이음매를 통해도 당기지 않으면 지금처럼 띄우고 알린다
+            sus0 = suspects()
+            shutil.rmtree(runs, ignore_errors=True)
+            c1, o1, e1, s1 = fire(False, "none")         # 대조: 차단 항목 — 막는 판정 · 사유(아래와 같아야 한다)
+            shutil.rmtree(runs, ignore_errors=True)
+            c2, o2, e2, s2 = fire(True, "load_checker_module")
+            made2 = runs.exists()
+            c3, o3, e3, s3 = fire(False, "load_checker_module")
+            made3 = runs.exists()
+            ok = (c0 == 0 and s0 and "의심 2" in notice(o0) and sus0 == [2] and blocked(c1, e1) and s1
+                  and c2 == 0 and not o2 and not e2 and not s2 and not made2
+                  and blocked(c3, e3) and e3 == e1 and not o3 and not s3 and not made3)
+            return "" if ok else (f"대조 exit {c0}/{c1} · 띄움 {s0}/{s1} · 알림 {notice(o0)[:40]!r} · 의심 {sus0} / 감사 전용 exit {c2} · 출력 {o2[:40]!r}/{e2[:60]!r} · "
+                                  f"띄움 {s2} · 폴더 {made2} / 차단 항목 exit {c3} · 사유 같음 {e3 == e1} · 띄움 {s3} · 폴더 {made3}")
+        if name == "state-search-late":                  # 찾기는 끝났는데 잠금 뒤 남은 몫이 `SWEEP_MIN_S` 보다 작다 — 감사 프로세스 · 기록 없음
+            code, out, err, started = fire(True, "find_state_records")
+            lock, rec = (runs / SWEEP_LOCK).exists(), (runs / SWEEP_RECORD).exists()
+            ok = code == 0 and not out and not err and not started and lock and not rec
+            return "" if ok else f"exit {code} · 출력 {out[:40]!r}/{err[:60]!r} · 띄움 {started} · 잠금 파일 {lock} (기대 있음 — 찾기가 끝났다) · 기록 {rec}"
+        if name == "mcp-off-audit-only":                 # 스위치 `1` → 감사 전용은 아무것도 하지 않는다 · 다른 값 · 없음 → 지금처럼 알린다
+            c1, o1, e1, _s = fire(True, **{SWEEP_OFF_ENV: "1"})
+            made = runs.exists()
+            c2, o2, _e, _s = fire(True, **{SWEEP_OFF_ENV: "true"})
+            shutil.rmtree(runs, ignore_errors=True)
+            c3, o3, _e, _s = fire(True)
+            named = f"{SWEEP_OFF_ENV}=1" in notice(o3)        # 알림 줄이 이 스위치를 이름으로 알린다
+            ok = c1 == 0 and not o1 and not e1 and not made and "의심 2" in notice(o2) and "의심 2" in notice(o3) and named and c2 == c3 == 0
+            return "" if ok else (f"스위치 1: exit {c1} · 출력 {o1[:60]!r}/{e1[:60]!r} · 실행 상태 폴더 {made} / true: {notice(o2)[:40]!r} / "
+                                  f"없음: {notice(o3)[:40]!r} · 알림에 스위치 이름 {named} (기대 조용 · 폴더 없음 / 알림 / 알림 · 이름 있음)")
+        # mcp-off-gate-kept — 차단 항목은 스위치가 있어도 같은 원장을 같은 사유로 막는다(exit 2) · 훑기 기록만 없다
+        c1, o1, e1, _s = fire(False, **{SWEEP_OFF_ENV: "1"})
+        made = runs.exists()
+        c2, _o, e2, _s = fire(False)
+        ok = blocked(c1, e1) and e1 == e2 and not o1 and not made and blocked(c2, e2) and suspects() == [2]
+        return "" if ok else (f"스위치 1: exit {c1} · 출력 {o1[:40]!r} · 실행 상태 폴더 {made} / 없음: exit {c2} · 사유 같음 {e1 == e2} · 의심 {suspects()} "
+                              f"(기대 막음 · 폴더 없음 / 막음 · 같은 사유 · 기록 [2])")
+    except Exception as exc:                             # noqa: BLE001 — 셀 준비 실패도 실패로 센다
+        return f"셀 실행 실패 {type(exc).__name__}: {exc}"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def self_test() -> int:
     import shutil
     import tempfile
@@ -2026,7 +2340,7 @@ def self_test() -> int:
             child = dict(os.environ)
             child["HOME"] = str(home)
             # ⛔ 바깥 셸의 원장 지정 · 추적 · 예산 노브를 넘기지 않는다 — 넘기면 바깥 원장을 판정하거나 케이스가 흔들린다
-            for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV, RUN_STATE_ENV, SWEEP_BUDGET_ENV):
+            for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV, RUN_STATE_ENV, SWEEP_BUDGET_ENV, SWEEP_OFF_ENV):
                 child.pop(var, None)
             child.update(env)
             child["FZ_HOOK_PROBE_ROOT"] = str(d)        # cd-env-var — 물려받은 환경 변수로 원장 폴더를 준다(F-458)
@@ -2077,8 +2391,20 @@ def self_test() -> int:
             if listing:
                 print(f"  ok   {name}")
     # 플러그인 등록 · 감사 전용 — 게이트를 판정하지 않는다 · 어떤 경로에서도 exit 0 · 두 항목이 함께 돌아도 실행마다 한 번 · 미룬 알림
+    not_run = []
     for name in AUDIT_CELLS:
         why = _audit_cell(name, home, ledger_env)
+        if why.startswith(CELL_NOT_RUN):
+            not_run.append(f"{name}: {why[len(CELL_NOT_RUN):]}")
+        elif why:
+            failed.append(f"{name}: {why}")
+        else:
+            passed += 1
+            if listing:
+                print(f"  ok   {name}")
+    # 훑기의 시간 경계 · 훑기만 끄는 스위치 — 찾기가 마감을 넘거나 남은 몫이 없으면 감사 프로세스를 띄우지 않는다 · 스위치는 게이트 판정을 바꾸지 않는다
+    for name in BOUND_CELLS:
+        why = _bound_cell(name, home, ledger_env)
         if why:
             failed.append(f"{name}: {why}")
         else:
@@ -2099,8 +2425,10 @@ def self_test() -> int:
 
     for f in failed:
         print(f"  FAIL {f}", file=sys.stderr)
-    total = len(SELF_TEST_CASES) + 2 + len(SWEEP_CELLS) + len(AUDIT_CELLS)   # + gate-vocab · parity · 종료 훅 훑기 · 감사 전용
-    print(f"stop-hook self-test {passed}/{total} passed")
+    for f in not_run:
+        print(f"  NOT RUN {f} (⛔ 통과 아님)", file=sys.stderr)
+    total = len(SELF_TEST_CASES) + 2 + len(SWEEP_CELLS) + len(AUDIT_CELLS) + len(BOUND_CELLS)   # + gate-vocab · parity · 종료 훅 훑기 · 감사 전용 · 시간 경계
+    print(f"stop-hook self-test {passed}/{total} passed" + (f" · 미실행 {len(not_run)}" if not_run else ""))
     return EXIT_PASS if not failed else 1
 
 

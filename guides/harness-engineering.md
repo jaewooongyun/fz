@@ -1209,7 +1209,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Cross-model Verification | fz-gpt (Claude + GPT; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
 | Lazy Tool Discovery | modules/ Progressive Disclosure Level 3 | 필요 시에만 로드 |
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
-| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Workflow 교차 스테이지(이력: Team — TEAM 일몰) + GPT. **차단 Hook은 opt-in** — 플러그인이 스스로 등록하는 hook 은 `hooks/hooks.json` 의 Stop 항목 하나다(`gate_stop_hook.py --audit-only` — 워커 심볼 도구 사용을 세고 · 기록하고 · 알릴 뿐 막지 않는다 · `plugin.json`에 `hooks` 키 없음 — 기본 위치). 막는 실행체는 같은 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 85케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **차단 등록은 사용자가 `.claude/settings.json`으로 복사**한다(두 항목이 함께 있어도 훑기는 실행마다 한 번). `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
+| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Workflow 교차 스테이지(이력: Team — TEAM 일몰) + GPT. **차단 Hook은 opt-in** — 플러그인이 스스로 등록하는 hook 은 `hooks/hooks.json` 의 Stop 항목 하나다(`gate_stop_hook.py --audit-only` — 워커 심볼 도구 사용을 세고 · 기록하고 · 알릴 뿐 막지 않는다 · `plugin.json`에 `hooks` 키 없음 — 기본 위치). 막는 실행체는 같은 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 92케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **차단 등록은 사용자가 `.claude/settings.json`으로 복사**한다(두 항목이 함께 있어도 훑기는 실행마다 한 번). `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
 
 ### Gap 분석 (NLAH 기반, 2026-04-14)
 
@@ -1228,7 +1228,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 | 6런타임책임 (2606.20683) | fz 컴포넌트 | 상대 강도 |
 |------|-----------|----------|
-| observation (관찰) | discover/search 스킬 · workflow metrics · `scripts/fz_wf_metrics.py` · `scripts/fz_telemetry_report.py` · `scripts/fz_stop_telemetry.py` | 약 — 트레이스 관측성 명시적 책임 부재(이력 — 2026-07 판정) → 2026-11-01 재평가 **중**: 계측 스크립트 3개(Workflow stage 집계 · 하네스 부하 리포트 · Stop 훅 턴 이벤트)가 있다. Stop 훅은 사용자 등록(opt-in)일 때만 기록 |
+| observation (관찰) | discover/search 스킬 · workflow metrics · `scripts/fz_wf_metrics.py` · `scripts/fz_telemetry_report.py` · `scripts/fz_stop_telemetry.py` | 약 — 트레이스 관측성 명시적 책임 부재(이력 — 2026-07 판정) → 2026-11-01 재평가 **중**: 계측 스크립트 3개(Workflow stage 집계 · 하네스 부하 리포트 · Stop 훅 턴 이벤트)가 있다. 턴 이벤트 Stop 훅(`fz_stop_telemetry.py`)과 완료 게이트 차단은 사용자 등록(opt-in)일 때만 돈다 · 워커 심볼 도구 훑기(`gate_stop_hook.py --audit-only`)는 플러그인이 스스로 등록해 설치한 머신마다 기록한다(`${FZ_RUN_STATE:-~/.fz/runs}/mcp-sweep.jsonl`) |
 | context (컨텍스트) | fz-memory · context-artifacts | 중~강 |
 | control (제어) | orchestrator 위임 로직 | 강 |
 | action (행동) | code/fix 스킬 · Adapters(Grep/git/빌드) | 강 |
