@@ -185,7 +185,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 Phase 5: Cross-Review (5+2 검증)
 ├─ [병렬 1] Claude + Serena: 참조 무결성 검증
 ├─ [병렬 2] → /fz-gpt review: GPT 코드 리뷰
-├─ [병렬 3] /sc:sc-analyze: 정적 분석
+├─ [병렬 3] 셋째 검증: /sc:sc-analyze 정적 분석 · 없으면 새 컨텍스트 에이전트 (검증 3)
 ├─ [병렬 4] L3 pr-review-toolkit:silent-failure-hunter: 에러 처리 스캔 (조건부 · 미설치면 생략·고지 — modules/native-agents.md)
 └─ [병렬 5] L3 pr-review-toolkit:type-design-analyzer: 타입 설계 평가 (조건부 · 미설치면 생략·고지 — modules/native-agents.md)
 
@@ -218,18 +218,21 @@ fz-gpt가 수행하는 작업:
 - JSON 응답 파싱 → Issue Tracker 자동 기록
 - 이슈 요약 반환
 
-> **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=`fable` alias) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: GPT]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 미가용 시 /sc:sc-analyze 폴백. 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 2026-11-16]
+> **GPT 불능 분기** (통신 실패 재시도 1회 후, 또는 장기 불능 기간(quota/spend cap 등) — 에러 대응 표 참조): Agent tool 가용 시 **fresh-context Agent 1-spawn**(agentType `fz:review-correctness` — review-correctness 관점, `model` **명시** — 기본 `opus`(검증 깊이 우선), 소규모 diff(<100 LOC·5파일 미만)는 `sonnet`. 미지정 시 부모 세션 모델(현행 Lead=`fable` alias) 상속 — 소규모 diff에 과투자)으로 검증 2를 대체한다. 결과 인용 태그는 `[외부: GPT]` 대신 `[fresh-context: claude]` — **이종 안전망 상실 명시** (동종 Claude 검증, 15/23차). Workflow 가용 여부와 무관한 직교 조건 (Workflow 폴백 ≠ GPT 폴백). Agent 도 띄우지 못하면 `[검증 불능 — 사유]` 로 적고 사용자에게 알린다(대체 경로 없음 — 검증 2 를 마친 것으로 적지 않는다). 근거: "Separate, fresh-context verifier subagents tend to outperform self-critique" [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5 2026-11-16]
 >
-> **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. GPT CLI 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(Agent·/sc:sc-analyze)로 **상속되지 않는다**.
+> **⛔ 폴백 검증자도 읽기 전용**: 프롬프트에 "파일 수정 금지 — 발견만 보고" 를 명시하고, 쓰기 도구가 없는 agentType 을 우선 고른다. GPT CLI 의 `--sandbox read-only` 는 CLI 실행 성질이지 검증 계약이 아니어서 대체 경로(fresh-context Agent)로 **상속되지 않는다**.
 > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 규모는 그 근거 밖이다.
 > **⛔ retain cycle 점검 (rank3b, 2026-06-18 · 원장 `promotion-ledger.md` **P2-C** candidate `active=false`)**: fresh-context 검증자는 retain cycle 검사 시 `gpt-skills/fz-reviewer/SKILL.md` Memory and Resource Management(소유자를 강하게 잡는 closure·콜백·구독)와, Swift 저장소면 `references/domain-ios.md` 의 `[weak self]` 항목을 명시 적용한다 — GPT 부재 시 이종 parity 복원. 저장 프로퍼티 보유 closure·completion handler·Rx subscription 포함 (View 파일 한정 아님).
 > **보조 이종 소스 (rank6)**: PR이 열려 있으면 `/fz` pr-comment-review로 CodeRabbit 코멘트를 보조 이종 소스로 활용 가능 (강제 아닌 Lead 판단).
 
-### 검증 3: SuperClaude 정적 분석
+### 검증 3: 셋째 검증 (sc-analyze · 없으면 새 컨텍스트 에이전트)
 
-```
-/sc:sc-analyze → 코드 품질, 보안, 성능, 아키텍처 종합 분석 (도구 목록에 있으면 쓴다)
-```
+경로는 함수 하나가 정한다 — Lead 의 스킬 목록에서 `sc:` 로 시작하는 이름들을 넘긴다(하나도 없으면 빈 값 `""`): `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --third-path --skills "<sc: 이름, …>"`. 판정 기준은 `modules/tool-status.md` 의 `sc 목록✓` 와 같다. 작업 폴더 기록을 읽지 않으므로 상태를 화면에만 알린 실행도 같은 판정이다. `undetermined`(exit 3)는 목록을 넘기지 않은 것이다 — 목록을 넣어 다시 부른다.
+
+- `sc-analyze` → `/sc:sc-analyze` 로 코드 품질, 보안, 성능, 아키텍처를 종합 분석한다. 결과에 `[셋째 검증: sc-analyze]`
+- `fresh-context` → 읽기 전용 새 컨텍스트 에이전트 1회로 대신한다: `Agent(subagent_type="fz:search-pattern", model="opus")` — 그 정의의 기본 모델은 sonnet 이라 모델을 적는다. 브리프에 보안 · 성능 · 자원 점검표(입력 검증 · 비밀 노출 · 권한 경계 / 반복 안의 비싼 호출 · 불필요한 복사 / 닫지 않은 자원 · 해제 누락 · 끝나지 않는 대기)와 변경 파일 목록 · diff 파일 경로(실행 절차 1 의 `{WORK_DIR}/review/diff.patch`)를 싣는다 — 그 정의에는 Bash 가 없다. "파일 수정 금지 — 발견만 보고" 를 적고, 앞 검증(1 · 2)의 결과는 주지 않는다. 결과에 `[셋째 검증: fresh-context]` — 같은 모델 계열이라 독립 검증이 아니라 각도를 더한 것이다. GPT 불능 분기의 `fz:review-correctness` 와 다른 정의라 GPT 도 sc 도 없을 때 같은 정의가 두 번 돌지 않는다
+- 에이전트도 띄우지 못하면 `[검증 불능 — 사유]` 로 적고 사용자에게 알린다(셋째 검증을 마친 것으로 적지 않는다)
+- GPT 를 끈 세션(`[GPT 미사용]` — 실행 실패와 다른 길)에서도 이 검증은 돈다
 
 ### 검증 4: Refactoring Completeness (리팩토링 완성도)
 
@@ -300,7 +303,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 참조 무결성 확인? (Serena)
 - [ ] ⛔ GPT 리뷰 통과? (**Critical 0건 + Major는 결함(회귀·버그·영향범위)에 한해 차단** — ⛔ 구조 개선 제안은 major여도 **non-blocking**. `ReviewFindingsSchema`에 `origin`이 없어 기계 판별이 불가하므로 **Lead가 결함/개선을 판정**한다. 이 구분이 없으면 "제안"이 강제 수정이 된다. GPT 실행 자체는 필수)
-- [ ] /sc:sc-analyze 통과? (도구 목록에 있을 때 · 심각한 문제 없음)
+- [ ] 셋째 검증 통과? (`[셋째 검증: sc-analyze]` 또는 `[셋째 검증: fresh-context]` · 심각한 문제 없음 · `[검증 불능 — 사유]` 면 사용자에게 알렸는가)
 - [ ] Constraint Matrix Compliance 통과? (제약 매트릭스 부합, /fz-discover 산출물 있을 때)
 - [ ] Refactoring Completeness 통과? (deprecated dead code 없음)
 - [ ] Module Boundary 통과? (access control이 의도와 일치)
@@ -437,6 +440,7 @@ Gate 5 통과 후:
 
 진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
 - review-live 를 띄우지 않고 Phase 5 Lead 3중 검증 · Phase 5.5 역방향 검증 · Reflection Rate 를 그대로 한다 — GPT 단계는 full 과 같다(끈 세션이면 `[GPT 미사용]`) · 산출물도 full 과 같다
+- 셋째 검증(검증 3)도 full 과 같다 — 경로 판정 · 두 표지 · sc 가 없을 때의 새 컨텍스트 에이전트가 그대로다(sc 가 없다고 건너뛰지 않는다)
 - ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
 - 점검 카탈로그: `templates/check-catalog-review.md` 를 Read 해 리뷰 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 리뷰 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <review 산출물> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-review.md"` 로 잰다
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
@@ -445,7 +449,7 @@ Gate 5 통과 후:
 
 | 에러 | 대응 | 폴백 |
 |------|------|------|
-| fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 검증 2 불능 분기(Phase 5 — fresh-context Agent, Agent 미가용 시 /sc:sc-analyze) | fresh-context Claude 검증자 |
+| fz-gpt 통신 실패 | 재시도 1회 → 실패 사실 기록 후 검증 2 불능 분기(Phase 5 — fresh-context Agent · `[fresh-context: claude]`, Agent 도 못 띄우면 `[검증 불능 — 사유]` + 사용자 고지) | fresh-context Claude 검증자 |
 | fz-gpt 불능 (probe 실패) | ⛔ **날짜·기록 기반 선제 생략 금지** — 호출 직전 probe 1회로 판별한다(직전 `gpt-choice.sh decide` 가 `skip` 이면 probe 도 부르지 않고 `[GPT 미사용 — 사유]`). probe 성립 = kind `availability-probe`(`gpt-call.sh availability-probe` — 역할 없음 · ephemeral) 가 **non-empty 산출 + exit 0**(`--version` 성공은 quota를 증명하지 않는다). probe 실패 시에만 검증 2 불능 분기(Phase 5) 직행 | fresh-context Claude 검증자 |
 | Rate < 60% 3회 | 사용자 에스컬레이션 | DEFERRED 마킹 |
 | Issue Tracker 손상 | 새 세션 시작 | 수동 관리 |

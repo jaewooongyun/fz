@@ -40,16 +40,14 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
 | 도구 | 없으면 | 사용처 | 설치 |
 |------|--------|:------:|------|
 | **Claude Code** | 동작 불가 | 전부 | 네이티브 설치(권장) — [설치 문서](https://code.claude.com/docs/en/setup) · 또는 `npm install -g @anthropic-ai/claude-code` |
-| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 5/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
+| **SuperClaude** | 리뷰 셋째 검증이 새 컨텍스트 에이전트로 · 설명 · 조사 명령은 건너뛴다 | 3/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
 | **Serena MCP** | 심볼 탐색이 Grep 으로 (14 중 7 폴백) | 14/22 | 자동 등록. `uv` 필수 (`brew install uv`), 첫 기동 전에 캐시를 채운다(아래) |
-| **GPT CLI** (`@openai/codex`) | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
+| **GPT CLI** (`@openai/codex`) | 교차 검증이 새 컨텍스트 Claude 검증자로 — 동종 검증 `[fresh-context: claude]` (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
 | **sequential-thinking** | 없으면 같은 분해를 표로 직접 쓴다 | 9/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
 | **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (9 중 1 폴백) | 9/22 | `claude plugin install context7@claude-plugins-official` |
 | **pr-review-toolkit** | fz-review Phase 5 병렬 4·5 생략 · 보고에 한 줄 고지 | 1/22 | 공식 마켓플레이스에서 `/plugin` 으로 설치. 에이전트 이름은 접두 꼴 `pr-review-toolkit:<이름>`(`modules/native-agents.md`) |
 
 > 사용처는 스킬 22개 가운데 그 도구를 호출하는 스킬 수다. MCP 는 frontmatter `allowed-tools` 의 `mcp__…`, GPT 는 `fz-gpt`, SuperClaude 는 `sc:<이름>` 호출 꼴(`/sc:sc-analyze` 처럼 이름이 붙은 것 — 이름 없이 `sc:` 만 적은 목록 언급은 빠진다), pr-review-toolkit 은 `pr-review-toolkit:` 로 센다. 언급만 한 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. 폴백은 각 스킬 `## 에러 대응` 표에 대체 경로를 적은 스킬 수다.
-
-⛔ `sc:` 는 자체 폴백이 없고 다른 도구가 실패했을 때 내려가는 자리(`/sc:sc-analyze 단독`)이기도 하다. 그래서 없으면 폴백 사슬의 끝이 사라진다.
 
 표 밖의 도구 `lsp` 는 4개 스킬이 정의와 참조 탐색에만 쓴다. `lsp` 는 그 스킬들의 `allowed-tools` 에 사전 승인으로만 있고 본문에 호출 지시는 없다. GitHub 은 MCP 서버 없이 `gh` CLI 로만 다룬다 — 스킬은 조회 꼴(`gh auth status` · `gh pr view` 등)만 사전 승인하고 PR 생성 · 리뷰 게시는 권한 프롬프트를 거친다. 티켓 트래커는 서버를 정해 두지 않는다 — 티켓 조회는 프로젝트 CLAUDE.md 가 선언한 트래커 MCP 가 연결돼 있으면 권한 프롬프트를 거쳐 그 도구로, 아니면 수동 입력으로 한다. 어느 스킬도 트래커 도구를 사전 승인하지 않고, PR 뒤 티켓 상태 전환은 프로젝트 규칙이 요구할 때만 한다(`modules/governance.md` § 팀 스킬 위임).
 

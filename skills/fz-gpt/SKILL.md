@@ -221,7 +221,7 @@ GPT CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행�
 |------|------|------|
 | CLAUDE.md 미발견 | `../CLAUDE.md` → `CLAUDE.md` → `find .. -maxdepth 2` | 경고 후 계속 |
 | Guidelines 미발견 | CLAUDE.md `## Code Conventions` 참조 | 일반 규칙 적용 |
-| GPT CLI 통신 실패 | 컨텍스트 축소 후 재시도 | /sc:sc-analyze 단독 |
+| GPT CLI 통신 실패 | 컨텍스트 축소 후 재시도 | 새 컨텍스트 에이전트 1회(`fz:review-correctness` · 읽기 전용 · 모델 명시 — `skills/fz-review/SKILL.md` 검증 2 의 GPT 불능 분기와 같다) · 결과 표지 `[fresh-context: claude]`(동종 검증) · 에이전트도 못 띄우면 `[검증 불능 — 사유]` + 사용자 고지 |
 | `gpt-call.sh review` 실패 | exec 모드 kind(`gpt-call.sh verify` 등) + diff 인라인 프롬프트 | 수동 분석 |
 | JSON 파싱 실패 | `-o` 파일 캡처 폴백 | Claude 분석 |
 | 모델 미지원 (구버전 CLI가 config 모델·세션 선택 모델 미인식) | CLI 업데이트 권장, 불가 시 세션 선택을 다시 묻거나(`modules/gpt-strategy.md § 모델·effort 선택`) config `model`을 호환 모델로 조정 (사용자 소관 — 호출부에 모델을 적지 않는다) | -- |

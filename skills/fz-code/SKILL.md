@@ -355,7 +355,7 @@ metadata:
    /fz-gpt check "구현 코드 교차 검증"
    ```
    - 에이전트 구현 결과를 cross-model로 검증
-   - 실패 시: 재시도 1회 → 실패 사실 기록 후 /sc:sc-analyze 폴백
+   - 실패 시: 재시도 1회 → 실패 사실 기록 후 새 컨텍스트 에이전트 1회(`fz:review-correctness` · 읽기 전용 · 모델 명시 — `skills/fz-review/SKILL.md` 검증 2 의 GPT 불능 분기와 같다)로 검증하고 결과 표지 `[fresh-context: claude]`(동종 검증) · 에이전트도 못 띄우면 `[검증 불능 — 사유]` 로 적고 사용자에게 알린다
    - decide 가 `skip` 이거나 정문이 exit 18 `GPT-OFF` 면 `[GPT 미사용 — 사유]` 를 남긴다 · `ask` 면 질문 → `set` → 다시 decide — `modules/gpt-strategy.md` § GPT 미사용
 
 ### 빌드 실패 대응

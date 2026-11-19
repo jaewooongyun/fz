@@ -201,6 +201,37 @@ def cell_review_light():
     absent("skills/fz-review/SKILL.md", ["review-arch 단독", "full 모드 강제", "5 파일 미만", "100 LOC 미만"])
 
 
+# 리뷰 셋째 검증 — sc-analyze 가 목록에 있으면 그것, 없으면 읽기 전용 새 컨텍스트 에이전트 1회. 경로는 함수 하나
+# (check_evidence_slots.py --third-path)가 정하고 판정 기준 문장은 상태 줄 모듈 한 곳에만 있다. GPT 실패 폴백은 sc 로 끝나지 않는다
+THIRD_TAGS = ("[셋째 검증: sc-analyze]", "[셋째 검증: fresh-context]")
+THIRD_CRIT = "(별칭 `sc:analyze`)"
+SC_END = re.compile(r"(/sc:sc-analyze|sc:analyze)`? (단독|폴백)|Agent 미가용 시 `?/sc:")
+GPT_FALLBACK = ("skills/fz-review/SKILL.md", "skills/fz-plan/SKILL.md", "skills/fz-code/SKILL.md", "skills/fz-gpt/SKILL.md")
+
+
+def cell_review_third_path():
+    rel = "skills/fz-review/SKILL.md"
+    doc = read(rel)
+    v3 = section(doc, "검증 3", rel)
+    need(v3, [*THIRD_TAGS, "--third-path", "modules/tool-status.md", "[검증 불능", "[GPT 미사용]"], f"{rel} § 검증 3")
+    if not re.search(r"fz:search-pattern[^\n]*opus|opus[^\n]*fz:search-pattern", v3):
+        raise Fail(f"{rel} § 검증 3 의 대체 에이전트 줄에 fz:search-pattern 과 모델(opus)이 함께 없다")
+    need(section(doc, "light 모드", rel), ["셋째 검증(검증 3)도 full 과 같다"], f"{rel} § light 모드")
+    need(read("modules/tool-status.md"), [THIRD_CRIT, "--third-path"], "modules/tool-status.md")
+    docs = sorted(list((tree / "skills").rglob("*.md")) + list((tree / "modules").glob("*.md")))
+    copies = [p.relative_to(tree).as_posix() for p in docs
+              if p.relative_to(tree).as_posix() != "modules/tool-status.md" and THIRD_CRIT in p.read_text(encoding="utf-8")]
+    if copies:
+        raise Fail(f"sc 판정 기준 문장의 사본: {', '.join(copies)} — 정본 modules/tool-status.md 를 가리킨다")
+    ends = [f"{p.relative_to(tree).as_posix()}:{i}" for p in docs
+            for i, ln in enumerate(p.read_text(encoding="utf-8").split("\n"), 1) if SC_END.search(ln)]
+    if ends:
+        raise Fail(f"GPT 실패 폴백이 sc 로 끝난다: {', '.join(ends[:4])}")
+    miss = [r for r in GPT_FALLBACK if "[fresh-context: claude]" not in read(r)]
+    if miss:
+        raise Fail(f"GPT 실패 폴백에 동종 검증 표지 `[fresh-context: claude]` 가 없다: {', '.join(miss)}")
+
+
 def cell_peer_tier():
     rel = "modules/peer-review-tiers.md"
     doc = read(rel)
@@ -405,6 +436,7 @@ CELLS = {
     "consumers": cell_consumers,
     "review-order": cell_review_order,
     "review-light": cell_review_light,
+    "review-third-path": cell_review_third_path,
     "peer-tier": cell_peer_tier,
     "plan-order": cell_plan_order,
     "plan-light": cell_plan_light,

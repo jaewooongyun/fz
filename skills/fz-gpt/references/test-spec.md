@@ -30,4 +30,4 @@ should-NOT-trigger (Boundaries Will Not / '비사용:' 대안 스킬)
 | Claude 계획 초안 존재 | `/fz-gpt verify` | gpt가 plan을 `--output-schema`로 독립 재작성 → Claude 계획과 diff → divergence 기록 + verdict 판정 후 /fz-plan으로 반환 (Gate 3/3 통과) | normal |
 | base branch 후보 불확실(자동 결정 불가) | `/fz-gpt review` | Will Not "Base branch를 추측하지 않음" — 추측 base 실행 0건, 사용자에게 질문 → 확정 후 실행 | edge-case |
 | CLAUDE.md `## GPT Skills` 테이블(Tier 1) 부재 | `/fz-gpt verify` | Tier 2(글로벌 fz-*) → Tier 3(인라인 프롬프트) 순차 폴백으로 서브커맨드 실행 완료 (Gate "서브커맨드 실행 완료" 통과) | edge-case |
-| GPT CLI 통신 실패 | `/fz-gpt review` | 컨텍스트 축소 후 재시도 → 실패 시 Issue Tracker에 기록 + /sc:sc-analyze 단독 폴백 실행 (3회 연속 실패 시 사용자 에스컬레이션) | failure |
+| GPT CLI 통신 실패 | `/fz-gpt review` | 컨텍스트 축소 후 재시도 → 실패 시 Issue Tracker에 기록 + 새 컨텍스트 에이전트(`fz:review-correctness`) 1회로 검증 + 결과 표지 `[fresh-context: claude]` (에이전트도 못 띄우면 `[검증 불능 — 사유]` + 사용자 고지 · 3회 연속 실패 시 사용자 에스컬레이션) | failure |

@@ -23,7 +23,8 @@
 
 | Given | When | Then | type |
 |-------|------|------|------|
-| 구현된 코드 diff 존재 + GPT CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-gpt review` + `/sc:sc-analyze`) 모두 실행(GPT 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
+| 구현된 코드 diff 존재 + GPT CLI 가용 + 소규모 아님(리팩토링 포함) | `/fz-review "구현한 코드 리뷰해줘"` | 검증 1/2/3(Serena 참조 무결성 + `/fz-gpt review` + 셋째 검증 — `/sc:sc-analyze` · 없으면 새 컨텍스트 에이전트) 모두 실행(GPT 리뷰 생략 0건) → Gate 4(Review Passed) 체크리스트 통과 → Phase 5.5 역방향 검증 후 Gate 5(Reflection Rate ≥ 80%) 통과; 완료 보고에 총이슈→해결/보류 + Reflection Rate 명시 | normal |
 | 모드 게이트에서 light 선택(또는 `light` 인자 · 신호어) | `/fz-review light "가볍게 봐줘"` | review-live 미기동 + Phase 5 Lead 3중 검증(`/fz-gpt review` 포함 — 끈 세션이면 `[GPT 미사용]`) + Phase 5.5 · Reflection Rate 그대로; 산출물에 전수/카운트/부정 주장 포함 시 Coverage Gate 적용(light에서도 생략 불가) | edge-case |
 | 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴 없음 + 브랜치명 없음 | `/fz-review "내 코드 봐줘"` | Phase 0에서 저장 여부 AskUserQuestion 발생 → '예' 시 `NOTASK-{YYYYMMDD}/` + index.md 생성 / '아니오' 시 Serena fallback → WORK_DIR 결정 → Gate 0(Work Dir Ready) 3개 항목 통과 | edge-case |
-| 코드 diff 존재 + 검증 2에서 fz-gpt 통신 실패 | `/fz-review "리뷰해줘"` | 재시도 1회 후 fresh-context Agent(review-correctness 관점)로 검증 2 대체 + 인용 태그 `[fresh-context: claude]` + 이종 안전망 상실 명시 (Agent 미가용 시 `/sc:sc-analyze` 폴백); 검증 2 미생략 상태로 Gate 4 진행 | failure |
+| 코드 diff 존재 + 검증 2에서 fz-gpt 통신 실패 | `/fz-review "리뷰해줘"` | 재시도 1회 후 fresh-context Agent(review-correctness 관점)로 검증 2 대체 + 인용 태그 `[fresh-context: claude]` + 이종 안전망 상실 명시 (Agent 도 못 띄우면 `[검증 불능 — 사유]` + 사용자 고지 — 검증 2 를 마친 것으로 적지 않는다); 검증 2 미생략 상태로 Gate 4 진행 | failure |
+| 코드 diff 존재 + 스킬 목록에 `sc:sc-analyze` 없음(설명 · 조사 명령만 있거나 sc 없음) | `/fz-review "리뷰해줘"` | `check_evidence_slots.py --third-path` 가 `fresh-context` → `fz:search-pattern`(opus) 새 컨텍스트 에이전트 1회(보안 · 성능 · 자원 점검표 · 앞 검증 결과 없음)로 검증 3 대체 + 결과 표지 `[셋째 검증: fresh-context]`; 셋째 검증 미생략 상태로 Gate 4 진행 | edge-case |

@@ -27,10 +27,15 @@ profile(`--profile`): peer-review(기본 — ①~⑤) · plan · discover · fix
   plan · discover · fix 의 ③ 대상 = `target.json` 의 `root`(세션 대상 트리 — 같은 경로여야 한다) · `sha`(있으면 앞부분 일치).
   `[Serena 미사용 — 사유]`(+ 꼬리)는 통과 · 기록 없음 · 다른 트리 활성 · 빈 언어 목록 · 꼬리 없음은 위반이다.
 
+리뷰 셋째 검증의 경로(`--third-path --skills <Lead 스킬 목록의 sc: 이름들>` — 쉼표 구분): 목록에 `sc:sc-analyze`(별칭 `sc:analyze`)가
+  있을 때만 `sc-analyze`, 아니면 `fresh-context`(형제 명령만 있는 목록 · 빈 목록도) 를 찍는다. 작업 폴더를 읽지 않는다 — 상태를 화면에만
+  알린 리뷰도 같은 판정을 받는다. 상태 줄의 `sc 목록✓` 도 같은 기준이다(정본 문장 modules/tool-status.md).
+
 exit code:
-  0  PASS
+  0  PASS (`--third-path` 는 경로를 찍었다)
   1  VIOLATION — 빠진 슬롯 · 형식 위반 · 대상 불일치
-  2  UNRUN — WORK_DIR 부재 · Tier 미상 · 표 파싱 실패. ⛔ 통과로 읽지 않는다
+  2  UNRUN — WORK_DIR 부재 · Tier 미상 · 표 파싱 실패 · 인자 오류. ⛔ 통과로 읽지 않는다
+  3  UNDETERMINED — `--third-path` 에 `--skills` 가 없다(목록을 모르면 경로를 정하지 않는다)
 
 Python 3.9 stdlib 전용.
 """
@@ -40,10 +45,11 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 
-OK, VIOLATION, UNRUN = 0, 1, 2
+OK, VIOLATION, UNRUN, UNDETERMINED = 0, 1, 2, 3
 # ⛔ N6 루트 앵커 — lint_contracts ANCHOR_LINES 허용 형태와 정확히 일치
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TIERS_DOC = os.path.join(SCRIPT_DIR, "..", "modules", "peer-review-tiers.md")
@@ -59,6 +65,7 @@ TOOLS_UNUSED = re.compile(r"^\[Serena 미사용 — (\S.*)\]\s*$")
 TOOLS_TAIL = re.compile(r"^(\S.*?) · context7 (목록[✓✗]) · sc (목록[✓✗]) · seq (목록[✓✗]) · pr-review (목록[✓✗])"
                         r" · 스택 스킬 ([^\s,]+(?:, [^\s,]+)*)(?: — 빠지는 단계: (\S.*?))?\s*$")
 PROFILES = ("peer-review", "plan", "discover", "fix")
+THIRD_PATH_SC = {"sc:sc-analyze", "sc:analyze"}   # 리뷰 셋째 검증을 sc 로 돌리는 이름 — 설명 · 조사 같은 형제 명령은 아니다
 CLAIM_HEAD = re.compile(r"^##\s+주장:\s*(\S.*)$")
 LAYER = re.compile(r"^-\s*층\s*(\d+)\b([^:]*):\s*(.*)$")
 CITE = re.compile(r"\S+:\d+\s+`([^`]+)`")
@@ -68,6 +75,14 @@ SKIP_LINE = re.compile(r"^\s*-\s*([a-z-]+)\s*:\s*(\S.*)$")
 
 def log(*a):
     print(*a, file=sys.stderr)
+
+
+def third_path(skills):
+    """리뷰 셋째 검증의 경로 — skills = Lead 스킬 목록의 sc: 이름들(쉼표 · 공백 구분) · None = 목록을 넘기지 않았다."""
+    if skills is None:
+        return "undetermined"
+    names = {s.lstrip("/") for s in re.split(r"[\s,]+", skills) if s}
+    return "sc-analyze" if names & THIRD_PATH_SC else "fresh-context"
 
 
 def tier_from_text(text: str):
@@ -375,10 +390,29 @@ def self_test() -> int:
             "without-seq": (u + " · context7 목록✓ · sc 목록✓ · pr-review 목록✓ · 스택 스킬 없음", VIOLATION),
             "without-pr": (u + " · context7 목록✓ · sc 목록✓ · seq 목록✓ · 스택 스킬 없음", VIOLATION),
             "without-stack": (u + " · context7 목록✓ · sc 목록✓ · seq 목록✓ · pr-review 목록✓", VIOLATION),
+            # 스킬이 부르지 않는 도구 · 대체 경로로 도는 도구의 ✗ — 빠지는 단계 자리에 '없음 — 사유' 또는 '→ 대체 경로'
+            "unused-tool": (u + " · context7 목록✓ · sc 목록✗" + rest + " — 빠지는 단계: 없음 — 이 스킬은 sc 를 부르지 않는다", OK),
+            "substitute-path": (u + " · context7 목록✓ · sc 목록✗" + rest + " — 빠지는 단계: → 셋째 검증을 새 컨텍스트 에이전트로", OK),
         }
         got = {k: check(prof(f"tail-{k}", line + "\n", tree), None, profile="discover") for k, (line, _) in grammar.items()}
         case("toolstate-tail-grammar", all(got[k] == want for k, (_, want) in grammar.items()),
              {k: v for k, v in got.items() if v != grammar[k][1]})
+
+    # 리뷰 셋째 검증의 경로 — sc-analyze(별칭 sc:analyze)가 목록에 있을 때만 sc-analyze · 형제 명령만 · 빈 목록 · 비슷한 이름은
+    # fresh-context · 목록을 넘기지 않으면 undetermined
+    want = {"sc:sc-analyze,sc:sc-explain": "sc-analyze", "sc:analyze": "sc-analyze", " sc:sc-research , /sc:sc-analyze ": "sc-analyze",
+            "sc:sc-explain,sc:sc-research": "fresh-context", "": "fresh-context", "sc:sc-analyze-extra": "fresh-context",
+            None: "undetermined"}
+    got = {k: third_path(k) for k in want}
+    case("third-path-select", got == want, {k: v for k, v in got.items() if v != want[k]})
+    # 같은 판정이 명령줄에서도 — 찍는 낱말과 exit(undetermined 는 3 · 인자 오류 2 와 다르다)
+    cli = {("--skills", "sc:sc-analyze,sc:sc-explain"): ("sc-analyze", OK), ("--skills", "sc:sc-explain"): ("fresh-context", OK),
+           ("--skills", ""): ("fresh-context", OK), (): ("undetermined", UNDETERMINED)}
+    got = {}
+    for args in cli:
+        r = subprocess.run([sys.executable, os.path.abspath(__file__), "--third-path", *args], capture_output=True, text=True)
+        got[args] = (r.stdout.strip(), r.returncode)
+    case("third-path-cli", got == cli, {k: v for k, v in got.items() if v != cli[k]})
     print(f"self-test {passed}/{total} passed")
     return OK if passed == total else 1
 
@@ -390,9 +424,19 @@ def main() -> int:
     ap.add_argument("--profile", choices=PROFILES, default="peer-review",
                     help="plan · discover · fix = 첫 단계 활성 기록 · 에러 전파 인용만(Tier 슬롯 없음 · F-534)")
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--third-path", action="store_true",
+                    help="리뷰 셋째 검증의 경로를 찍는다 — sc-analyze · fresh-context · undetermined(exit 3 — --skills 없음)")
+    ap.add_argument("--skills", help="--third-path 의 입력 — Lead 스킬 목록의 sc: 이름들(쉼표 구분 · sc: 스킬이 없으면 빈 값)")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
+    if a.third_path:
+        path = third_path(a.skills)
+        print(path)
+        if path == "undetermined":
+            log("UNDETERMINED: --skills 가 없다 — Lead 스킬 목록의 sc: 이름들을 넘긴다(하나도 없으면 빈 값 \"\")")
+            return UNDETERMINED
+        return OK
     if not a.work_dir:
         log("UNRUN: WORK_DIR 인자가 필요하다")
         return UNRUN
