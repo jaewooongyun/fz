@@ -154,7 +154,7 @@ PY
 #    폴더로 연다. 그 자리가 실제 홈의 ~/.claude 아래면 GPT 가 Claude 로그 · journal 옆에서 돌고, rollout 감사는 GPT 를 부른 **뒤**에야
 #    그 경로(`.claude/`)를 잡는다(호출 비용이 이미 났다). 그래서 mktemp · 래퍼 호출 전에 실경로로 비교해 멈춘다.
 #    TMPDIR 이 없거나 풀리지 않으면 여기서 판정하지 않는다 — make_iso 의 mktemp 가 11 로 멈춘다. ~/.claude 가 링크여도 실경로로 함께 본다
-#    읽는 값: REAL_HOME
+#    읽는 값: REAL_HOME. 정하는 값: CLAUDE_DIR · CLAUDE_DIR_REAL(메인 경로의 rollout 감사가 FZ_CLAUDE_REAL 로 받는다 — 홈 밖 링크 대상 읽기)
 gate_iso_place() {
   ISO_PARENT="$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)" || ISO_PARENT=""
   CLAUDE_DIR="$REAL_HOME/.claude"
@@ -438,7 +438,7 @@ grep -m1 '^GPT-OFF: ' "$OUT_DIR/$BASE_NAME.wrapper.log" >&2 2>/dev/null   # 래�
 #    R-G2 실 CLI exec · resume 프로브 `multi_agent_version: disabled` · F-436. 감사는 그래도 spawn 수를 센다)
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
-FZ_ART_NAMES="$FZ_ART_NAMES" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" "$FRAME" "$FRAME_FILE" <<'PY'
+FZ_ART_NAMES="$FZ_ART_NAMES" FZ_CLAUDE_REAL="$CLAUDE_DIR_REAL" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" "$FRAME" "$FRAME_FILE" <<'PY'
 import glob, hashlib, importlib.util, json, os, re, shlex, sys
 mode, out, stem, home, repo, iso, rc, timed_out, schema_p = sys.argv[1:10]
 keep = sys.argv[10:11] == ["1"]   # --keep-iso — 격리 홈이 남아야 resume 이 세션을 잇는다
@@ -531,6 +531,7 @@ if mode == "review" and os.path.isdir(hdir) and os.path.isfile(dpath):
 rolls = sorted(glob.glob(os.path.join(stem + ".rollouts", "*.jsonl")))
 ROOTS = r"(~|\$HOME|/Users(?:/[^\s'\"]*)?|/)(?=[\s'\";|&)]|$)"
 FZ_ART = re.compile(os.environ["FZ_ART_NAMES"])
+CLAUDE_REAL = os.environ.get("FZ_CLAUDE_REAL", "")   # 홈 .claude 의 실경로(링크 대상) — 런처가 입력 게이트의 CLAUDE_DIR_REAL 을 넘긴다. 비면 forbid_hit 의 그 규칙은 꺼진다
 JS_ESC = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f", "v": "\v", "0": "\0"}
 def js_strings(src):
     """JS 문자열 리터럴의 값 — rollout 의 exec 입력은 JS 프로그램이다(`tools.exec_command({cmd:"…"})` · `{cmd:'…'}` · `const paths = ["…"]`).
@@ -583,6 +584,9 @@ def shell_words(s):
         return s.split()
 def forbid_hit(cmd):
     """Claude 산출물 참조 — `.claude/` 경로 또는 fz 고유 산출물 이름(경로 성분 전체 일치 · 입력 가드와 같은 표).
+    또는 홈 `.claude` 의 실경로(CLAUDE_REAL — 링크 대상) 아래 경로 · 맨 대상 단어(`ls <대상>` · `find <대상> …`) — 대상이 홈 밖이면 home_ref 가,
+       --repo 아래면 허용 판정이 놓친다. 이름이 대상으로 시작하는 형제(`<대상>2/…` · `<대상>.bak`)는 적중이 아니다.
+       실경로 글자만 본다 — 다른 링크로 가리킨 경로 · `..` 로 돌아 들어오는 꼴은 보지 않는다
     ⛔ 부분 문자열로 보지 않는다 — `code-context-builder.swift` · `ci/test-result.json` · 검색 패턴 'workflow-result' 는 산출물이 아니다.
        범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다
     ⛔ 글자를 지워 정규화하지 않는다 — 직렬화 층을 해독하고(원문 + JS 문자열 리터럴) 셸 단어로 나눈 뒤 `/` 성분을 본다.
@@ -592,6 +596,8 @@ def forbid_hit(cmd):
        · 변수 전개 · 이름 조립(`$'…'` · `${p}`)은 보지 않는다"""
     for s in [cmd] + js_strings(cmd):
         if ".claude/" in s:
+            return True
+        if CLAUDE_REAL and (CLAUDE_REAL + "/" in s or CLAUDE_REAL in shell_words(s)):   # 대상 아래 경로 · 맨 대상 단어(끝 `/` 없음)
             return True
         if any(FZ_ART.fullmatch(c.strip("[](){},;:'\"`")) for w in shell_words(s) for c in w.split("/")):   # 양 끝만 — JS 배열 · 호출 구두점
             return True
