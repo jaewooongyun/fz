@@ -30,14 +30,11 @@
 | `fz` | `artifact` | `fz:artifact:step1` | 파이프라인 단계 산출물 · ⛔ 생산자 없음(쓰는 절차 0 — GC 만 남았다) |
 | `fz` | `checkpoint` | `fz:checkpoint:{skill}-{phase}` | Phase 완료 또는 의미 있는 결과 시 경량 저장. 티켓 폴더(WORK_DIR) 미활성 시 유일한 compact recovery 수단. ~3,000자 <!-- 기존: 500자 --> 핵심 결정 요약 (Essential Context 포함) |
 | `fz` | `checkpoint` | `fz:checkpoint:essential` | /fz가 단독 관리. 현재 Active State + Key Decisions + Constraints (~3,000자 <!-- 기존: 500자 -->). 파이프라인 완료 시 삭제 |
-| `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}` | mid-pipeline discover 결과. phase={plan\|code\|review}. 파이프라인 완료 시 삭제 |
-| `fz` | `checkpoint` | `fz:checkpoint:discover-{tag}-final` | discover 수렴 완료 시 최종 결과. `-final` suffix는 동일 phase 키를 덮어쓰지 않고 수렴 상태를 별도 보존 |
 | `fz` | `checkpoint` | `fz:checkpoint:review-issues` | fz-review Phase 5 완료 후 이슈 요약. 비-티켓 세션 모드 전용 |
 | `fz` | `checkpoint` | `fz:checkpoint:implication-{skill}` | Implication Scan 결과 (비-티켓 세션 시). 실행/관찰 함의 요약. 파이프라인 완료 시 삭제 |
 | `fz` | `checkpoint` | `fz:checkpoint:plan-direction` | 방향 판정 결과 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:plan-v{N}` | 계획 버전 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:plan-verify` | 검증 결과 (임시) |
-| `fz` | `checkpoint` | `fz:checkpoint:plan-final` | 최종 승인 계획 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:code-step{N}` | 구현 Step 진행 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:fix-{bug}` | 버그 수정 결과 (임시) |
 | `fz` | `checkpoint` | `fz:checkpoint:search` | 탐색 결과 (임시) |
@@ -96,7 +93,6 @@
 | 의존 관계 | 설명 |
 |----------|------|
 | `session:current` → `artifact:*` | artifact 키의 work_dir 해석이 session:current에 의존 |
-| `checkpoint:plan-*` → `checkpoint:code-*` | code checkpoint는 plan 결과를 전제 |
 | `decision:*` → `artifact:*` | artifact가 decision을 참조할 수 있음 |
 
 GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락이 소실된다. GC 순서: artifact → checkpoint → session(유지).
@@ -106,12 +102,11 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 | 스킬 | 읽기 | 쓰기 |
 |------|------|------|
 | /fz | `fz:session:current` (복원) | `fz:session:current` (초기화 + work_dir), `fz:checkpoint:essential` |
-| /fz-plan | `fz:session:current` | `fz:checkpoint:plan-direction`, `plan-v{N}`, `plan-verify`, `plan-final` (+ `fz:decision:{topic}` 영속 — ⛔ 생산 절차 없음, 키 표 참조) |
-| /fz-code | `fz:decision:{topic}`, `fz:checkpoint:plan-*` | `fz:checkpoint:code-step{N}` (임시) |
+| /fz-plan | `fz:session:current` | `fz:checkpoint:plan-direction`, `plan-v{N}`, `plan-verify` (+ `fz:decision:{topic}` 영속 — ⛔ 생산 절차 없음, 키 표 참조) |
+| /fz-code | `fz:decision:{topic}` | `fz:checkpoint:code-step{N}` (임시) |
 | /fz-review | `fz:checkpoint:code-*` | `fz:checkpoint:review-issues` (임시) |
 | /fz-fix | `fz:session:current` | `fz:checkpoint:fix-{bug}` (임시) (+ `fz:pattern:{bug_type}` 영속 — ⛔ 생산 절차 없음, 키 표 참조) |
 | /fz-search | `fz:decision:{topic}` | `fz:checkpoint:search` (임시) |
-| /fz-discover | `fz:checkpoint:discover-{tag}` | `fz:checkpoint:discover-{tag}` (journal=덮어쓰기, phase=APPEND), `discover-{tag}-final` (수렴) |
 | /fz-memory | `fz:*` (전체 조회) | - (관리 전용, 직접 쓰기 없음) |
 | /fz-manage | `fz:session:current` | - (읽기 전용 조회) |
 | /fz-peer-review | `fz:checkpoint:peer-review-*` | `fz:checkpoint:peer-review-synthesize` (임시), `peer-review-deliver` (임시) |
@@ -128,7 +123,7 @@ GC 시 주의: `session:current`를 먼저 삭제하면 artifact 키의 맥락�
 | /fz-fix | checkpoint:fix-{bug} + pattern 키 쓰기 |
 | /fz-search | checkpoint:search 쓰기 |
 | /fz-gpt | session 키 읽기 |
-| /fz-discover | checkpoint:discover-{tag} 쓰기 + 결정사항 영속화 |
+| /fz-discover | 결정사항 영속화 |
 | /fz-manage | session/checkpoint 읽기 + list (관리 조회) |
 | /fz-peer-review | checkpoint:peer-review-synthesize/deliver 쓰기 |
 

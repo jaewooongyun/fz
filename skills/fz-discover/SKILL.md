@@ -276,7 +276,6 @@ GOOD: "proxy에 @Published는 안 됩니다.
      - journal: 파일 전체를 매 라운드 갱신 (~2K tokens). 상세하게 기록: 제약 매트릭스, 생존/탈락 후보, 핵심 결정 흐름, 미결 질문.
      - phase: APPEND + `## Topic: {질문 요약}` header. 1K tokens 초과 시 이전 topic 압축.
      - Round History는 유지하지 않음 — 탈락 후보 사유가 롤백 근거 역할.
-   - 비-티켓 세션: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}", "제약 {N}개: {C1~CN}. 생존: {후보}. 핵심 추론: {요약}")` (매 라운드 덮어쓰기)
    형식 참조: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)"
 
 ### discover-journal 형식
@@ -325,7 +324,6 @@ GOOD: "proxy에 @Published는 안 됩니다.
 
 4. **⛔ 저널 최종 갱신** (항상):
    - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` 최종 갱신 + `{WORK_DIR}/index.md` 업데이트
-   - 비-티켓 세션: `write_memory("fz:checkpoint:discover-{DISCOVER_TAG}-final", "경로 {N}개. 조건: {요약}. 열린질문: {N}개")`
 
 ### Gate 3: Paths Mapped
 - [ ] 경로가 2개 이상 매핑되었는가?

@@ -199,9 +199,6 @@ Disposable: "Grep 결과 42개 파일 매칭. find_referencing_symbols 호출 3�
    - /fz-plan → discover-plan.md (있으면)
    - /fz-code → discover-code.md (있으면)
    - /fz-review → discover-review.md (있으면)
-
-3. 비-티켓 세션 모드:
-   - fz:checkpoint:discover-{phase} 키로 Serena Memory에 저장
 ```
 
 ### 동일 Phase 내 다중 Discover 규칙

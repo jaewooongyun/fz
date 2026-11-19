@@ -368,13 +368,10 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
    - 현재 계획으로 구현 진행
    - 추가 논의
 
-4. **⛔ 계획 기록** (항상 — compact recovery 필수 + `/fz-code` Phase 0.4 핸드오프 소스):
+4. **⛔ 계획 기록** (항상 — compact recovery 필수 + `/fz-code` Phase 0.4 핸드오프 소스인 `{WORK_DIR}/plan/` 파일):
    ⛔ **이슈 0건 승인이어도 이 기록은 발화한다.** `### Gate 2 전제조건`이 본 Phase보다 앞에 있어, 피드백이 없으면 본 Phase를 건너뛰어 `plan-final`이 생성되지 않는 경로가 생긴다.
    - **WORK_DIR 존재(티켓 폴더 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` + `index.md` 업데이트
      ⛔ **`plan-v{N}` 은 변경 이력이고 `plan-final.md` 는 승인본이다 — 승인 시 `plan-final.md`·`plan/steps.json`·`gates/plan.md` 를 같은 버전으로 완전 재생성한다**(해당 구역만 고쳐 쓰는 것도 허용 — 요구는 *결과가 단일 최신 상태*라는 것).
-   - **Serena fallback**: `write_memory("fz:checkpoint:plan-final", …)` — ⛔ 요약 문자열이 아니라 **계약 필드**를 담는다:
-     `{steps:[{id,title,files,verify}], swiftDecisions:{swiftUI,isolation,transform}, rtm:[…], verdict}`
-     — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?, tools?}` 또는 `{kind:'manual', criterion}` (정의: `workflows/plan-lean2.js` VerifySpec · 배선: `modules/gates.md`)
 
 4.5. **⛔ 원장 확정** (draft 원장이 있을 때): Phase 2 판정(3.2)을 반영해 `gates/plan.draft.md` → `gates/plan.md` 로 복사하고, 실행 게이트마다 `SIDE_EFFECTS: none|tmp|writes — <사유>` 를 원장에 선언한 뒤 무변경 트리 기준선을 먼저 잰다 — `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --baseline-probe {WORK_DIR}/gates/plan.md`(none · tmp 만 돈다 · 허용 밖 PASS = exit 1 → 그 게이트를 고치거나 의도면 `--allow-pass <id>` · WARN 의 TIMEOUT 은 실측 소요로 다시 정한다 · 잴 수 없으면 확정에 `--no-baseline <사유>`). 이어 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --finalize {WORK_DIR}/gates/plan.md` 를 돌린다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 도장을 찍고 `APPROVED: yes` 를 남긴다. ⛔ 도장이 없으면 승인 계약이 존재하지 않는다(검사는 있으나 발급이 없어 한 번도 발화하지 않았다). `revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 `MANUAL:`로 전환. 이어 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --set-state planned {WORK_DIR}/gates/plan.md` — 승인·미착수라 Stop hook 이 ABANDON 없이 통과시킨다(진행 기록이 있으면 거부 · `/fz-code` Phase 0.4 가 `active` 로 연다). 확정 후 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status {WORK_DIR}/gates/plan.md`.
    exit별 행동 — `0` 진행 · `1` 미충족 보고 후 진행(작업 중 정상 상태) · `2` **인프라 경고 후 진행**(경로·인터프리터 문제이지 원장 결함이 아니다) · `3` **미통과 차단**(확정 원장이 계약을 위반하면 안 된다).

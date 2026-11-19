@@ -151,18 +151,17 @@ metadata:
    |------|------|
    | 동일 세션 연속 | 대화 컨텍스트 (별도 로드 불요) |
    | 티켓 폴더 / NOTASK | `{WORK_DIR}/plan/plan-final.md` → 없으면 `{WORK_DIR}/plan/plan-light.md` (WORK_DIR은 Gate 0에서 결정) |
-   | Serena fallback | `read_memory("fz:checkpoint:plan-final")` |
 
    전 소스 실패 시 → plan 없는 구현으로 진행하되 **그 사실을 보고**한다 (차단 아님).
 
 2. **plan 구조 검사** (마찰 신호 — ⛔ Gate 차단 아님):
    복원된 plan의 **작업 범위**(변경 파일·Step 기준)가 아래 요소를 건드리면 대응 결정이 plan에 있는지 확인한다.
 
-   | 작업 범위에 포함 | plan에 있어야 하는 결정 | Serena fallback 필드 |
-   |------|------|------|
-   | SwiftUI View (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우) | owner / availability / View 책임 | `swiftDecisions.swiftUI` |
-   | Concurrency (`actor`·`@MainActor`·async — CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우) | isolation 범위 | `swiftDecisions.isolation` |
-   | 패턴 변환 (마이그레이션·치환) | 원본 동작 보존 | `swiftDecisions.transform` |
+   | 작업 범위에 포함 | plan에 있어야 하는 결정 |
+   |------|------|
+   | SwiftUI View (CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우) | owner / availability / View 책임 |
+   | Concurrency (`actor`·`@MainActor`·async — CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우) | isolation 범위 |
+   | 패턴 변환 (마이그레이션·치환) | 원본 동작 보존 |
 
    누락 시 → 마찰 신호 **"plan 계약 미충족"** 보고 후 계속 (판단은 사용자).
    ⛔ 이 검사는 D/E/F/G token 발견 여부와 **무관하게** 실행한다 — 결정이 빠진 plan은 token도 없으므로, token 게이팅 하에 두면 검사가 스스로 비활성화된다.
