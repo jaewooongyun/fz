@@ -35,7 +35,7 @@ transcript 에서는 굳은 사실 하나만 읽는다: 첫 줄들의 entrypoint
 
 모드
   (인자 없음)                훅 — stdin JSON 하나 → stdout 결정 JSON(없으면 빈 출력) · exit 0
-  --self-test                합성 입력 125 케이스 — `PASS <case>` 줄
+  --self-test                합성 입력 126 케이스 — `PASS <case>` 줄
   --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS 인가 (0 일치 · 1 불일치 · 2 표 없음)
   --make-synthetic BYTES OUT --with-marker|--no-marker   큰 transcript 합성(첫 줄들에 entrypoint 를 둘지)
   --bench FILE               entrypoint 판정 소요 — `mode=<…> elapsed_ms=<n>`
@@ -636,29 +636,34 @@ def defined_functions(toks) -> dict:
     파이프라인(`|` · `|&`)의 한 칸 · `&` 로 끝난 목록(`a && b &` 는 목록 전체). 그 칸이 묶음 `{ …; }` · if · while · until · for 면 그 안
     전부가 서브셸이다. 치환(`$(…)` · 백틱 · heredoc 본문 치환 · `<(…)`) · 서브셸 안 정의는 그 셸이 끝나면 사라져 밖의 호출에 닿지 않고,
     함수 본문 안 정의는 그 함수가 불려야 생긴다 — 모두 넣지 않는다(보수 판정: 같은 치환 · 서브셸 · 파이프라인 칸 · 본문 안 호출도 면제하지
-    않는다). `&&` · `||` 목록의 한 명령과 지금 셸에서 도는 묶음 · if · 루프 안 정의는 넣는다 — 조건이 돌지 않아 정의가 생기지 않는 꼴은
-    가르지 않는다. 예약어 짝이 맞지 않으면(닫는 말 없음 · 다른 닫는 말 · 짝 없는 `)`) 범위를 모르므로 아무것도 넣지 않는다."""
-    frames = [[None, [], [], [], False]]       # 칸마다 [닫는 말, 끝난 목록의 정의, 이 목록의 정의, 이 파이프라인의 정의, 파이프라인이 두 칸 이상]
+    않는다). 지금 셸의 정의도 늘 도는 자리 — `&&` · `||` 목록의 첫 명령과 묶음 `{ …; }` 안 — 만 넣는다. `&&` · `||` 뒤와 if · while ·
+    until · for 안(조건 목록 포함) 정의는 조건 · 반복 수에 따라 생기지 않을 수 있어 조건이 참이어도 넣지 않는다(과차단 쪽 — 같은 갈래 안
+    뒤 호출도 면제하지 않는다: `true && rm() { :; }; rm -rf build` · `if true; then rm() { :; }; fi; rm -rf build` 는 쓰기다).
+    예약어 짝이 맞지 않으면(닫는 말 없음 · 다른 닫는 말 · 짝 없는 `)`) 범위를 모르므로 아무것도 넣지 않는다."""
+    # 칸마다 [닫는 말, 끝난 목록의 정의, 이 목록의 정의, 이 파이프라인의 정의, 파이프라인이 두 칸 이상, 이 목록이 `&&` · `||` 를 지났다]
+    frames = [[None, [], [], [], False, False]]
     cmd_pos, after_time, joined = True, False, False
 
     def end_pipe(f):
-        if not f[4]:
-            f[2] += f[3]                       # 한 칸 파이프라인은 지금 셸에서 돈다
+        if not f[4] and not f[5]:
+            f[2] += f[3]                       # 한 칸 파이프라인은 지금 셸에서 돈다 — `&&` · `||` 뒤 파이프라인은 조건이 돌지 않으면 돌지 않는다
         f[3], f[4] = [], False
 
     def end_list(f, background=False):
         end_pipe(f)
         if not background:
             f[1] += f[2]                       # `&` 로 끝난 목록은 서브셸이다 — 그 정의를 버린다
-        f[2] = []
+        f[2], f[5] = [], False
 
     def close(word):
         if frames[-1][0] != word:
             return False
         f = frames.pop()
         end_list(f)
+        if word in ("fi", "done"):
+            return True                        # if · 루프 — 조건 · 반복 수에 따라 돌지 않을 수 있어 그 안 정의를 버린다
         if word != ")":
-            frames[-1][3] += f[1]              # 지금 셸에서 끝난 묶음 · if · 루프 — 그 정의는 바깥 파이프라인의 한 칸에 놓인다
+            frames[-1][3] += f[1]              # 지금 셸에서 끝난 묶음 — 그 정의는 바깥 파이프라인의 한 칸에 놓인다
         return True
     for t in toks:
         if isinstance(t, shell_tokens.Op):
@@ -668,8 +673,9 @@ def defined_functions(toks) -> dict:
                 frames[-1][4] = True
             elif t.text in ("&&", "||"):
                 end_pipe(frames[-1])
+                frames[-1][5] = True
             elif t.text == "(":
-                frames.append([")", [], [], [], False])
+                frames.append([")", [], [], [], False, False])
             elif t.text == ")":
                 if not close(")"):
                     return {}
@@ -683,7 +689,7 @@ def defined_functions(toks) -> dict:
             cmd_pos = after_time = False
         elif isinstance(t, shell_tokens.Word) and cmd_pos and not t.quoted:
             if t.text in _SCOPE_OPEN:
-                frames.append([_SCOPE_OPEN[t.text], [], [], [], False])
+                frames.append([_SCOPE_OPEN[t.text], [], [], [], False, False])
             elif t.text in ("}", "fi", "done") and not close(t.text):
                 return {}
             elif t.text in ("then", "else", "elif", "do"):
@@ -2095,6 +2101,18 @@ def self_test() -> int:
              "· 그 밖 이름) 본문보다 앞의 맨 바깥 같은 이름 정의만 면제한다: 뒤 정의(본문이 정의 전에 불리든 뒤에 불리든 · 표 밖 옵션 · main · helper "
              "꼴 포함)는 외부 명령(대상 미상 쓰기) · 앞 정의는 면제",
              got == [(True, [])] * 4 + [(False, [])] + [(True, [])] * 2, got)
+
+    @cell
+    def function_conditional_definition():
+        miss = ("false && touch() { :; }; touch x", "true || touch() { :; }; touch x", "if false; then touch() { :; }; fi; touch x",
+                "if true; then :; else touch() { :; }; fi; touch x", "while false; do touch() { :; }; done; touch x")
+        over = ("true && touch() { :; }; touch x", "if true; then touch() { :; }; fi; touch x")
+        keep = ("touch() { :; } && false; touch x", "touch() { :; } || true; touch x", "{ touch() { :; }; }; touch x",
+                "true && false; touch() { :; }; touch x")
+        got = [bash_write(c, "/srv/demo") for c in miss + over + keep]
+        case("function-conditional-definition — `&&` · `||` 뒤와 if · 루프 안 정의는 조건과 무관하게 면제 근거가 아니다: 돌지 않는 조건 · 갈래 "
+             "뒤의 호출은 외부 명령(쓰기) · 도는 조건도 쓰기(과차단 고정) · 목록 첫 명령 · 묶음 안 정의 · 앞 목록이 끝난 뒤 목록의 첫 정의는 면제",
+             got == [(True, ["x"])] * 7 + [(False, [])] * 4, got)
 
     @cell
     def function_body_outside_name_order():

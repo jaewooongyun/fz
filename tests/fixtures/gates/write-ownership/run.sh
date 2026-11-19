@@ -8,7 +8,8 @@
 #           set-state-abbrev(`--set active` — argparse 축약 = `--set-state`) ·
 #           deferred-write-before-same-name-func(함수 본문을 같은 이름 함수 정의 전에 불러 본문의 외부 tee 가 쓴다 — 본문에 뒤 함수 호출도 있다) ·
 #           deferred-unknown-option-before-same-name-func(같은 꼴의 표 밖 옵션 `cp -N` — 대상을 못 뽑는 본문 쓰기 명령) ·
-#           deferred-outside-name-before-same-name-func(같은 꼴의 쓰기 명령 밖 이름 `python3 -c` — 본문의 외부 python3 이 쓴다)
+#           deferred-outside-name-before-same-name-func(같은 꼴의 쓰기 명령 밖 이름 `python3 -c` — 본문의 외부 python3 이 쓴다) ·
+#           conditional-def-before-write(돌지 않는 `&&` 뒤의 같은 이름 정의 — 함수가 생기지 않아 뒤의 외부 tee 가 쓴다)
 #           → 원장이 바뀌고 훅이 막는다(exit 2 · 사유에 `미충족 게이트: <원장>`)
 #   read    status-literal · status-only(`--status --only`) · status-only-sourced · discover · cat-args(판정기 이름이 인자로만 지나감) ·
 #           status-abbrev(`--stat` — argparse 축약 = `--status`) ·
@@ -25,11 +26,14 @@
 #   pair    own-and-foreign — 한 세션이 원장 A 는 `--only` 로 쓰고 B 는 `--status` 로 읽기만 → A 만 막고 B 는 경고
 #   loop    loop-guard — 소유 원장 미충족은 MAX_BLOCKS(2)회 막고 3회째 루프 방어로 통과(불변)
 #   scope   function-scope-guard-hook-agree — 같은 이름 함수 면제의 셸 범위 표(치환 · 서브셸 · 파이프라인 칸 · `&` 목록 안 정의는 밖 호출에
-#           닿지 않고, 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&` 명령은 앞 정의를 물려받는다)와 함수 본문 안 호출의 정의 순서 표(이름과
-#           무관하게 본문보다 앞의 정의만 함수)를 가드 bash_write 와 훅 _bash_write_targets 에 함께 돌려 기대값 · 두 판정의 일치를 본다
+#           닿지 않고, 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&` 명령은 앞 정의를 물려받는다 · 면제를 주는 정의는 목록 첫 명령 · 묶음 안
+#           정의뿐이고 `&&` · `||` 뒤 · if · 루프 안 정의는 조건이 참이어도 면제하지 않는다 — 과차단 고정)와 함수 본문 안 호출의 정의 순서
+#           표(이름과 무관하게 본문보다 앞의 정의만 함수)를 가드 bash_write 와 훅 _bash_write_targets 에 함께 돌려 기대값 · 두 판정의 일치를 본다
 #   grid    body-def-grid — 함수 본문 안 이름(쓰기 명령 표 안 · 쓰기 옵션을 든 읽기 명령 · 읽기 표 밖) × 같은 이름 정의 자리(본문 앞 · 본문 뒤
 #           호출 앞 · 호출 뒤 · 없음) × 감싼 함수 호출 꼴 × 경유를 실제 bash 의 대상 바이트 변화와 가드 · 훅 판정에 견준다 — 놓침 0 · 불일치 0 ·
 #           과차단 = 본문 → 정의 → 호출 칸 전부
+#           conditional-def-grid — 같은 이름 정의 자리(목록 · 조건 · 루프 · 묶음) × 조건 참/거짓 × 이름 × 호출 자리 × 구분자를 실제 bash 의
+#           대상 변화와 가드 · 훅 판정에 견준다 — 놓침 0 · 불일치 0 · 과차단 = 조건 자리 ∧ (정의 갈래가 돈다 ∨ 같은 갈래 안 호출) 칸 전부
 # 기준 트리(4.44.0)는 판정기 쓰기 플래그 · 기본 실행 · 변수 경로 · source 를 쓰기로 보지 않아 write 셀이 '다른 세션의 원장' 으로
 #   통과한다 → exit 1.
 # ⛔ 셀 집합 대조(F-408): 실제로 돈 셀(단언 1개 이상)의 이름 · 횟수가 EXPECTED_CELLS 와 다르면 FAIL — 끝 줄 `CELLS n=<수> ran=<…>`.
@@ -56,7 +60,7 @@ command -v python3 >/dev/null 2>&1 || { echo "SETUP python3 부재"; exit 3; }
   || { echo "SETUP gate_stop_hook.py · gate_check.py 없음: ${S:-?}"; exit 3; }
 
 FZ_WRITE_OWNERSHIP_FIXTURE=1 PYTHONDONTWRITEBYTECODE=1 python3 -B - "$S" <<'PY'
-import hashlib, json, os, pathlib, subprocess, sys, tempfile, traceback
+import hashlib, json, os, pathlib, shutil, subprocess, sys, tempfile, traceback
 
 
 def _crash(*exc):   # 단언기 고장은 3 — 미처리 예외의 기본 exit 1 은 '단언 실패' 와 구별되지 않는다
@@ -84,6 +88,7 @@ EXPECTED_CELLS = {
     "deferred-call-later-func-overblock": 1, "deferred-call-undefined-unknown": 1,
     "deferred-write-before-same-name-func": 1, "deferred-unknown-option-before-same-name-func": 1,
     "deferred-outside-name-before-same-name-func": 1, "function-scope-guard-hook-agree": 1, "body-def-grid": 1,
+    "conditional-def-before-write": 1, "conditional-def-grid": 1,
     "for-loop-var": 1, "for-loop-prior-value": 1, "for-loop-body-reassign": 1, "for-loop-break-after-done": 1,
     "for-loop-after-done-use": 1, "for-loop-continue-unknown": 1, "for-loop-nested-unknown": 1, "for-loop-glob-unknown": 1,
     "for-loop-charclass-unknown": 1, "for-loop-brace-unknown": 1, "for-loop-source-reassign": 1, "for-loop-multiword-list-unknown": 1,
@@ -316,6 +321,9 @@ try:
     # 쓰기 명령 밖 이름(인터프리터 `python3 -c`)도 같다 — 본문 뒤의 같은 이름 정의는 본문 호출을 함수로 만들지 않는다(외부 python3 이 쓴다)
     write_cell("deferred-outside-name-before-same-name-func", "finalized",
                lambda c, L: [f"f() {{ python3 -c 'import sys; open(sys.argv[1], \"a\").write(\"\\n\")' {L}; }}; f; python3() {{ :; }}"])
+    # 돌지 않는 `&&` 뒤의 같은 이름 정의는 함수를 만들지 않는다 — 뒤의 `tee` 는 외부 명령이고 원장을 실제로 쓴다(조건 안 정의는 면제 근거가 아니다)
+    write_cell("conditional-def-before-write", "finalized",
+               lambda c, L: [f"false && tee() {{ :; }}; printf '\\n' | tee -a {L} >/dev/null"])
 
     # ── read — 읽기 전용 호출은 소유로 승격되지 않는다 ─────────────────────────────────
     read_cell("status-literal", lambda c, L: [f'{G_LINE}\npython3 "$G" --status {L}'])
@@ -374,6 +382,17 @@ try:
                     "true | { rm() { :; }; }; rm -rf build",
                     "rm() { :; } && true & wait; rm -rf build",
                     "cat /dev/null |\nrm() { :; }; rm -rf build",
+                    # `&&` · `||` 뒤와 if · 루프 안 정의는 조건이 돌지 않으면 생기지 않는다 — 면제 근거가 아니다(돌지 않는 조건 · 갈래 뒤 호출은
+                    #   외부 명령이 지운다). 조건이 참인 두 줄은 bash 에서는 함수가 지우지 않지만 쓰기로 읽는다(과차단 고정 행)
+                    "false && rm() { :; }; rm -rf build",
+                    "true || rm() { :; }; rm -rf build",
+                    "if false; then rm() { :; }; fi; rm -rf build",
+                    "if true; then :; else rm() { :; }; fi; rm -rf build",
+                    "while false; do rm() { :; }; done; rm -rf build",
+                    "true && { rm() { :; }; }; rm -rf build",
+                    "false ||\nrm() { :; }; rm -rf build",
+                    "true && rm() { :; }; rm -rf build",
+                    "if true; then rm() { :; }; fi; rm -rf build",
                     # 함수 본문 안 호출은 이름과 무관하게(쓰기 명령 tee · rm · touch · mkdir · cp · mv · 그 밖 이름) 같은 이름 함수가 그 본문보다
                     #   앞에 정의됐을 때만 함수다 — 본문이 정의 전에 불리면 외부 명령이 쓴다. 정의 뒤에 불리는 꼴(main · helper 꼴 포함)도 쓰기로
                     #   읽는다(보수 판정 — 과차단 쪽)
@@ -392,14 +411,14 @@ try:
                    "rm() { :; }; echo `rm -rf build`",
                    "rm() { :; }; echo aaaaaaaaaaaaaaaaaaaaaaaaaaaa; echo `rm -rf build`",
                    "rm() { :; }; cat <<EOF\n$(rm -rf build)\nEOF",
-                   # `&&` · `||` 목록의 한 명령 · 맨 바깥 묶음 · if 는 지금 셸에서 돈다 — 앞의 맨 바깥 정의는 뒤 파이프라인 칸 · `&` 명령이 물려받는다
+                   # `&&` · `||` 목록의 첫 명령 · 맨 바깥 묶음은 지금 셸에서 돈다 — 앞의 맨 바깥 정의는 뒤 파이프라인 칸 · `&` 명령이 물려받는다 ·
+                   #   앞 목록이 끝나면 다음 목록의 첫 명령 자리다
                    "rm() { :; } && rm -rf build",
                    "rm() { :; } || true; rm -rf build",
-                   "true && rm() { :; }; rm -rf build",
                    "rm() { :; } && true | cat; rm -rf build",
                    "rm() { :; } &&\nrm -rf build",
                    "{ rm() { :; }; }; rm -rf build",
-                   "if true; then rm() { :; }; fi; rm -rf build",
+                   "true && false; rm() { :; }; rm -rf build",
                    "rm() { :; }; rm -rf build | cat",
                    "rm() { :; }; rm -rf build & wait",
                    "rm() { :; }; { rm -rf build; } | cat",
@@ -473,6 +492,98 @@ try:
         check(c.name, not split, "가드 · 훅 판정 불일치 0", split[:3])
         check(c.name, over == want_over, f"과차단 = 본문 → 정의 → 호출 칸 전부({len(want_over)}칸) · 그 밖 0",
               f"뜻밖={[x for x in over if x not in want_over][:3]} · 빠짐={[x for x in want_over if x not in over][:3]}")
+
+    # ── grid — 조건 · 루프 안 정의의 면제 격자(conditional-def-grid) ───────────────────────────────────
+    #    같은 이름 정의 자리(`;` 단독 · `&&` 앞/뒤 · `||` 앞/뒤 · if 조건 · then · elif · else · while 조건/몸체 · until 몸체 · for 몸체(값 있음/빈
+    #    목록) · 묶음 `{ }` · `&&` 뒤 묶음 · then 안 묶음) × 조건 명령 true/false × 이름(touch · rm · tee · mkdir · cp · mv · sed -i · python3 -c ·
+    #    PATH 스텁) × 호출 자리(맨 바깥 뒤 · 같은 갈래 안 뒤 · 뒤의 `$(…)` · 뒤의 파이프라인 칸 · 뒤에 부른 함수 본문) × 구분자(`;` · 줄바꿈).
+    #    정의 갈래는 `&&` 뒤 · then · elif · while 몸체 · for · `&&` 뒤 묶음 · then 안 묶음에서 조건이 참일 때, `||` 뒤 · else · until 몸체에서
+    #    거짓일 때 돌고, 목록 첫 명령 · `;` 단독 · 묶음 · if · while 조건 목록 안 정의는 늘 돈다. while · until 몸체는 끝의 break 로 한 번만 돈다
+    #    (break 가 정의 여부를 가르지 않는다). 칸마다 실제 bash 로 대상의 변화(바이트 · 생김 · 사라짐)를 재고 가드 bash_write · 훅
+    #    _bash_write_targets 판정과 견준다 — 실제 bash 가 쓰는 칸 = 정의 갈래가 돌지 않은 갈래 밖 호출 · 가드 놓침 0 · 훅 놓침 0 · 두 판정
+    #    불일치 0 · 과차단(쓰지 않는데 쓰기) = 조건 자리(`&&` · `||` 뒤 · if · 루프 안) ∧ (정의 갈래가 돈다 ∨ 같은 갈래 안 호출 — 갈래가 돌지
+    #    않으면 그 호출도 돌지 않는다) 칸 전부이고 그 밖에는 없다.
+    #    만들지 않는 것: case 갈래 · function 키워드 꼴(토크나이저 Unknown — 이미 쓰기) · eval · source · alias 로 만든 정의 · 실행 중 값으로
+    #    갈리는 조건 · break · continue · exit 로 갈리는 루프 · select · coproc · zsh 의미 · 호출돼야 생기는 본문 안 정의
+    cond_names = [("touch", "touch gates/plan.md", None), ("rm", "rm -f gates/plan.md", b"b\na\n"),
+                  ("tee", "echo x | tee -a gates/plan.md", b"b\na\n"), ("mkdir", "mkdir gates/plan.md", None),
+                  ("cp", "cp src.txt gates/plan.md", b"b\na\n"), ("mv", "mv gates/plan.md gates/old.md", b"b\na\n"),
+                  ("sed", "sed -i.bak s/a/b/ gates/plan.md", b"b\na\n"),
+                  ("python3", "python3 -c 'import sys; open(sys.argv[1], \"a\").write(\"x\")' gates/plan.md", b"b\na\n"),
+                  ("stubwrite", "stubwrite gates/plan.md", b"b\na\n")]
+    # 자리 → (조건 자리인가, 정의 갈래가 도는 조건 명령(None = 늘 돈다), 정의 꼴, 정의 뒤 같은 갈래 안 호출 꼴)
+    cond_spots = {
+        "semi": (False, None, "{c}{s}{d}", "{c}{s}{d}{s}{x}"),
+        "and-head": (False, None, "{d} && {c}", "{d} && {x} && {c}"),
+        "or-head": (False, None, "{d} || {c}", "{d} && {x} || {c}"),
+        "group": (False, None, "{c}{s}{{ {d}{s}}}", "{c}{s}{{ {d}{s}{x}{s}}}"),
+        "and-tail": (True, "true", "{c} && {d}", "{c} && {d} && {x}"),
+        "or-tail": (True, "false", "{c} || {d}", "{c} || {{ {d}{s}{x}{s}}}"),
+        "if-cond": (True, None, "if {d}{s}{c}{s}then :{s}fi", "if {d}{s}{x}{s}{c}{s}then :{s}fi"),
+        "then": (True, "true", "if {c}{s}then {d}{s}fi", "if {c}{s}then {d}{s}{x}{s}fi"),
+        "elif": (True, "true", "if false{s}then :{s}elif {c}{s}then {d}{s}fi", "if false{s}then :{s}elif {c}{s}then {d}{s}{x}{s}fi"),
+        "else": (True, "false", "if {c}{s}then :{s}else {d}{s}fi", "if {c}{s}then :{s}else {d}{s}{x}{s}fi"),
+        "while-cond": (True, None, "while {d}{s}{c}{s}do break{s}done", "while {d}{s}{x}{s}{c}{s}do break{s}done"),
+        "while-body": (True, "true", "while {c}{s}do {d}{s}break{s}done", "while {c}{s}do {d}{s}{x}{s}break{s}done"),
+        "until-body": (True, "false", "until {c}{s}do {d}{s}break{s}done", "until {c}{s}do {d}{s}{x}{s}break{s}done"),
+        "for-body": (True, "true", "for v in{f}{s}do {d}{s}done", "for v in{f}{s}do {d}{s}{x}{s}done"),
+        "and-group": (True, "true", "{c} && {{ {d}{s}}}", "{c} && {{ {d}{s}{x}{s}}}"),
+        "then-group": (True, "true", "if {c}{s}then {{ {d}{s}}}{s}fi", "if {c}{s}then {{ {d}{s}{x}{s}}}{s}fi"),
+    }
+    cond_calls = {"outer": "{p}{s}{x}", "branch": "{q}", "subst": '{p}{s}echo "$({x})"', "pipe": "{p}{s}{x} | cat",
+                  "body": "{p}{s}g() {{ {x}{s}}}{s}g"}
+    with Cell("conditional-def-grid") as c:
+        stub, gates, src = c.root / "bin" / "stubwrite", c.cwd / "gates", c.cwd / "src.txt"
+        target = gates / "plan.md"
+        try:
+            stub.parent.mkdir()
+            stub.write_text('#!/bin/sh\nprintf x >> "$1"\n', encoding="utf-8")
+            stub.chmod(0o755)
+            src.write_bytes(b"copy\n")
+        except OSError as e:
+            raise Setup(f"격자 준비 실패: {e}")
+        path = {"PATH": f"{stub.parent}{os.pathsep}{c.env.get('PATH', '')}"}
+
+        def state():
+            return ("dir", b"") if target.is_dir() else ("file", target.read_bytes()) if target.is_file() else (None, b"")
+        rows = []
+        for name, call_text, seed in cond_names:
+            for spot, (cond, on, plain, branch) in cond_spots.items():
+                for cv in ("true", "false"):
+                    for call, shape in cond_calls.items():
+                        for s in ("; ", "\n"):
+                            kw = dict(c=cv, d=f"{name}() {{ :; }}", s=s, x=call_text, f=" a" if cv == "true" else "")
+                            cmd = shape.format(p=plain.format(**kw), q=branch.format(**kw), s=s, x=call_text)
+                            try:
+                                shutil.rmtree(gates, ignore_errors=True)
+                                gates.mkdir()
+                                if seed is not None:
+                                    target.write_bytes(seed)
+                                before = state()
+                            except OSError as e:
+                                raise Setup(f"격자 대상 준비 실패: {e}")
+                            c.run(cmd, record=False, extra=path)
+                            runs = on is None or cv == on
+                            rows.append((cmd, cond, call != "branch" and not runs, state() != before))
+        got = []
+        for k in range(0, len(rows), 500):    # 명령 묶음은 인자 하나로 넘긴다 — 인자 한 개 길이 상한(Linux 128KiB) 아래로 나눈다
+            got += judge_pair([cmd for cmd, _, _, _ in rows[k:k + 500]], c.env)
+        oracle, miss_g, miss_h, split, over, want_over = [], [], [], [], [], []
+        for (cmd, cond, exp, wrote), (g, targets, unk) in zip(rows, got):
+            guard, hook = bool(g[0]), bool(targets) or unk > 0
+            oracle += [cmd] if wrote != exp else []
+            miss_g += [cmd] if wrote and not guard else []
+            miss_h += [cmd] if wrote and not hook else []
+            split += [cmd] if guard != hook else []
+            over += [cmd] if guard and not wrote else []
+            want_over += [cmd] if cond and not exp else []
+        check(c.name, not oracle, f"실제 bash 가 쓰는 칸 = 정의 갈래가 돌지 않은 갈래 밖 호출({len(rows)}칸)", oracle[:3])
+        check(c.name, not miss_g, "가드 놓침 0(실제 bash 가 쓰는 칸은 가드도 쓰기)", miss_g[:3])
+        check(c.name, not miss_h, "훅 놓침 0(실제 bash 가 쓰는 칸은 훅도 대상 · 대상 미상)", miss_h[:3])
+        check(c.name, not split, "가드 · 훅 판정 불일치 0", split[:3])
+        extra, lack = sorted(set(over) - set(want_over)), sorted(set(want_over) - set(over))
+        check(c.name, over == want_over,
+              f"과차단 = 조건 자리 ∧ (정의 갈래가 돈다 ∨ 같은 갈래 안 호출) 칸 전부({len(want_over)}칸) · 그 밖 0", f"뜻밖={extra[:3]} · 빠짐={lack[:3]}")
 
     # ── tilde — `~` 로 source 한 env 파일이 실재하면 그 대입으로 푼다(소유 · '대상 미상' 아님) ───────────
     with Cell("tilde-source-owned") as c:
