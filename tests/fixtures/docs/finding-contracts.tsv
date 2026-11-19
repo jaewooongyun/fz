@@ -188,6 +188,7 @@ F-544	skills/fz-pr/SKILL.md	lacks	Bash(git *)
 F-544	skills/fz-pr-digest/SKILL.md	lacks	Bash(git *)
 F-544	skills/fz-peer-review/SKILL.md	lacks	Bash(git *)
 F-544	skills/fz-peer-review/SKILL.md	lacks	Bash(gh *)
+F-544	skills/fz-peer-review/SKILL.md	lacks	Bash(git -C * status *)
 F-544	skills/fz-commit/SKILL.md	lacks	Bash(git *)
 F-544	skills/fz-commit/SKILL.md	has	프롬프트 없이 쓰려면 자기 설정의 허용 목록(`permissions.allow`)에 그 꼴을 넣는다
 F-544	skills/fz-rebase/SKILL.md	lacks	Bash(git *)

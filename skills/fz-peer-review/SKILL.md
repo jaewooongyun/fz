@@ -15,7 +15,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
-  Bash(git diff *), Bash(git show *), Bash(git fetch *), Bash(git rev-parse *), Bash(git -C * status *), Bash(git -C * archive *), Bash(gh auth status *), Bash(gh pr view *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(tar -xf - -C *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
+  Bash(git diff *), Bash(git show *), Bash(git fetch *), Bash(git rev-parse *), Bash(git -C * archive *), Bash(gh auth status *), Bash(gh pr view *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(tar -xf - -C *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
 metadata:
   provides: [peer-review]
   needs: [none]
