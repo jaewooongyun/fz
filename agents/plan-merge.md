@@ -1,7 +1,8 @@
 ---
 name: plan-merge
 description: >-
-  plan-lean2 델타 병합 전용 에이전트. 탐색 도구 없이 Stage 1 렌즈 결과(JSON)만으로 기존 계획에 델타를 접는다.
+  델타 병합자 — Stage 1 렌즈 결과(JSON)만으로 기존 계획에 접을 델타(MergeSchema)를 반환한다. 탐색 도구가 없다.
+  fz 워크플로 내부 워커(plan-lean2 Stage 2) — 직접 쓰지 않는다.
 model: sonnet
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 tools:

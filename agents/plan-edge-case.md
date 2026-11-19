@@ -1,7 +1,8 @@
 ---
 name: plan-edge-case
 description: >-
-  엣지 케이스 + 실패 시나리오 발굴 에이전트. 계획의 약점과 누락 탐지.
+  경계 · 실패 시나리오 렌즈 — 계획의 엣지 케이스와 누락된 처리를 호출 워크플로 스키마로 반환한다.
+  fz 워크플로 내부 워커(plan-lean2 · 롤백 plan-collaborative) — 직접 쓰지 않는다.
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_referencing_symbols
 ---
@@ -101,7 +102,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## 반환
 
-- 반환은 호출 워크플로(`plan-lean2.js` 기본 · 롤백 `plan-collaborative.js`)의 스키마를 따르고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로(`plan-lean2.js` 기본 · 롤백 `plan-collaborative.js`)의 스키마를 따르고 Lead 가 통합한다. 채널은 브리프가 정한다.
 
 ---
 
@@ -111,6 +112,3 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

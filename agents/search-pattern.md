@@ -1,7 +1,8 @@
 ---
 name: search-pattern
 description: >-
-  패턴 기반 코드 탐색 에이전트. Grep/Glob으로 넓은 범위 텍스트/파일 패턴 탐색.
+  패턴 탐색자 — Grep · Glob 으로 찾은 텍스트 · 파일 패턴 발견(파일 · 위치 · 근거)을 반환한다.
+  search-cross-verify 워크플로가 쓰고, Lead 가 직접 부르기도 한다(fz-review 의 새 컨텍스트 검증).
 model: sonnet
 tools: Read, Grep, Glob
 ---
@@ -35,11 +36,11 @@ Pattern-based broad code searcher using `Grep`, `Glob`, and `Read`.
 2. Determine scope using the architecture section of CLAUDE.md to avoid irrelevant directories.
 3. Run `Glob` for file discovery; `Grep` for content matches.
 4. Use `Read` to inspect ambiguous results in context.
-5. Escalate unresolved symbols to `search-symbolic` for precise lookup.
+5. Name the symbols you could not resolve in the returned result — there is no hand-off to another agent.
 
 ## Return
 
-1. 발견은 호출 워크플로의 스키마로 반환하고 스크립트가 교차 검증한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+1. 발견은 호출 워크플로의 스키마로 반환하고 스크립트가 교차 검증한다. 채널은 브리프가 정한다.
 2. 브리프에 `search-symbolic` 의 발견이 있으면 패턴 레벨로 보완 검색한다.
 
 ## Result Format
@@ -50,7 +51,7 @@ Return each finding in the calling workflow's schema — the schema owns the fie
 
 - Refer to the coding-rules section of CLAUDE.md for naming conventions and scope boundaries.
 - 검색 루트는 현재 작업 디렉토리 또는 CLAUDE.md 컨텍스트에서 파생한다.
-- Prefer broad coverage first, then narrow with additional patterns; hand off to `search-symbolic` for symbol-level precision.
+- Prefer broad coverage first, then narrow with additional patterns.
 
 ---
 
@@ -60,6 +61,3 @@ Return each finding in the calling workflow's schema — the schema owns the fie
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

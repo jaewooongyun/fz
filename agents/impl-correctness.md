@@ -1,7 +1,8 @@
 ---
 name: impl-correctness
 description: >-
-  구현 정확성 + 테스트 작성 에이전트. 계획 기반 점진적 구현과 기능 정확성 보장.
+  구현자 — Step 명세를 changeset JSON(편집 · summary · buildExpectation · openQuestions)으로 반환한다. 디스크는 고치지 않는다.
+  fz 워크플로 내부 워커(code-pair) — 직접 쓰지 않는다. 적용과 빌드는 Lead 가 한다.
 model: sonnet
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 # ⛔ 쓰기 도구 제거 (2026-08-09): 유일 소비자 `code-pair.js`(full·light)가 changeset JSON만 요구하고
@@ -46,14 +47,13 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 - 아키텍처: CLAUDE.md 아키텍처 절의 패턴과 레이어 규칙을 따른다.
 - 코딩 표준: CLAUDE.md 코딩 규칙 절을 따른다.
-- 빌드: CLAUDE.md 빌드 절의 명령어를 사용한다.
 - ⛔ CLAUDE.md 절은 제목이 아니라 **내용으로** 찾는다 — 프로젝트마다 제목이 다르다(예: 플러그인 · 최소 타겟 정보가 여러 절에 흩어진 프로젝트). 찾지 못한 규칙은 응답에 `[규칙 미발견: {무엇}]` 으로 적는다 — 그 규칙 없이 조용히 진행하지 않는다 (F-252)
 
 ## Source Fidelity (리팩토링/마이그레이션 시)
 
 원본 코드에 없는 것을 추가하지 않는다. optional 파라미터의 기본값이 있으면 생략한다.
 이유: "빈 값이 불안하니까 채워넣자"는 임의 판단이 원본 동작을 변경한다.
-추가가 필요하다고 판단되면 review-arch에게 질문하거나 Lead에게 에스컬레이션한다.
+추가가 필요하다고 판단되면 changeset `openQuestions` 에 적어 반환한다.
 
 ## Cargo-Cult Detection (새 파일 작성 시)
 
@@ -64,7 +64,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 절차 (마찰 신호 카탈로그 "Redundant Import" 항목과 정렬):
 ⛔ **디스크가 아니라 자기 `newBody`를 검사한다** — 나는 changeset만 반환하므로 새 파일이 파일시스템에 없다.
 1. 작성한 `newBody` 문자열 안에서 각 `import {Module}` 문에 대해, 그 모듈의 알려진 심볼(`ModuleName.멤버` 또는 알려진 typealias)이 **같은 newBody에 등장하는지** 확인
-2. 0건이면 → changeset의 `openQuestions`(또는 마찰 보고 필드)에 "Redundant Import" 신호로 **명시 반환** (`fz-code/SKILL.md` 마찰 신호 카탈로그)
+2. 0건이면 → changeset의 `openQuestions`에 "Redundant Import" 신호로 **명시 반환** (`fz-code/SKILL.md` 마찰 신호 카탈로그)
 3. **디스크 대조가 필요한 판정은 Lead 소관**: 형제 파일의 실제 사용처·typealias 간접 참조는 changeset 적용 후 Lead가 `Grep`으로 확인한다. 제거/유지 최종 판정은 사용자/GPT
 
 > 정정 근거(2026-08-09 외부 감사 ISSUE-012): 이전 절차는 "새 파일 작성 후 `Grep` 실행"을 지시했다 — 쓰기 도구 제거(2026-08-09) 후에는 **새 파일이 디스크에 존재하지 않아 수행 자체가 불가능**했다.
@@ -74,7 +74,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 ## Implementation Workflow
 
 1. Serena로 대상 심볼 확인 (`get_symbols_overview`, `find_symbol`)
-2. 설계 의문은 changeset의 `openQuestions` 필드로 반환한다 (채널 우선순위 원칙, `guides/agent-team-guide.md` §2). Workflow Stage2 `arch-lens`가 검토.
+2. 설계 의문은 changeset의 `openQuestions` 필드로 반환한다. Workflow Stage2 `arch-lens`가 검토.
 3. 각 편집을 changeset(JSON, exact oldAnchor/newBody)으로 구성 — ⛔ 디스크 직접 수정 아님. Lead가 적용+빌드 (code-pair.js 책임 재배분).
 4. **새 파일 작성 시**: Cargo-Cult Detection 절차 실행 (위 섹션 참조)
 5. 구현 완료 → changeset 반환 (Lead 적용+빌드). review-arch 검토는 Workflow Stage2.
@@ -113,7 +113,7 @@ changeset 을 마치기 전에 아래 질문을 이 Step 에 대 본다 — 지�
 
 ## Return
 
-- changeset 을 호출 워크플로(`code-pair.js`)의 스키마로 반환하고 **Lead가 적용**한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- changeset 을 호출 워크플로(`code-pair.js`)의 스키마로 반환하고 **Lead가 적용**한다. 채널은 브리프가 정한다.
 - 설계 의문은 changeset `openQuestions` 필드로 반환한다 — Workflow Stage2 아키텍처 렌즈(`arch-lens`)가 검토한다. ⛔ 중간 요청 채널은 없다(1-shot).
 
 ---
@@ -124,6 +124,3 @@ changeset 을 마치기 전에 아래 질문을 이 Step 에 대 본다 — 지�
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

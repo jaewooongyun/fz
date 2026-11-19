@@ -1,7 +1,8 @@
 ---
 name: review-correctness
 description: >-
-  기능 정확성 + 요구사항 충족 리뷰 에이전트. 구현이 계획과 일치하는지 검증.
+  정확성 리뷰 렌즈 — 구현이 요구사항 · 계획과 맞는지 본 발견(누락 요구 · 로직 오류 · 누락 경계)을 반환한다.
+  Lead 가 직접 부르고(요구 부합 검증 · GPT 불능 때의 새 컨텍스트 검증) peer-review 워크플로도 쓴다.
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__get_symbols_overview
 ---
@@ -50,10 +51,10 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 - 상태 전이가 완전한가 (모든 입력 경우를 처리하는가)
 - 조건 분기 누락 (else/default 누락 등)
 - **Function Responsibility Audit** (함수 제거 / 호출 중단 감지 시):
-  1. 원본 body는 브리프의 base 경로(Lead가 Gather에서 prefetch)에서 Read한다 (채널 우선순위 원칙, `guides/agent-team-guide.md` §2). 브리프에 base가 없으면 `originBodyRequest`(파일 경로) 필드로 반환 → Lead가 resolve 후 재주입.
+  1. 원본 body는 브리프의 base 경로(Lead가 Gather에서 prefetch)에서 Read한다. 브리프에 base가 없으면 `originBodyRequest`(파일 경로) 필드로 반환 → Lead가 resolve 후 재주입.
   2. Lead는 **PR base ref** (`origin/{base_branch}` 또는 `git merge-base HEAD @{upstream}`)를 resolve하여 `git show ${BASE_REF}:filepath`로 prefetch (⛔ `HEAD^` 하드코딩 금지 — stacked/multi-commit 리뷰에서 잘못된 baseline 위험. 단일 commit local mode에서만 `HEAD^` 폴백 허용)
   3. 원본 body를 조건 분기 1개 = 책임 1개로 분해
-  4. Scalability: ≤ 20줄 자동 분해, 21-100줄 sampling + AskUserQuestion, 100+ 줄 사용자 에스컬레이션
+  4. Scalability: ≤ 20줄 자동 분해, 21줄 이상은 sampling 으로 분해하고 보지 못한 범위(줄 · 사유)를 반환에 적는다 — 사용자 확인은 Lead 가 한다
   5. After diff에서 각 책임 대응 코드 추적
   6. 대응 없는 책임 → "missing_responsibility" (severity: Critical)
   - Baseline 결정 실패 시: `[baseline: unknown]` 태그 → Gate skip + 사유 기록
@@ -84,12 +85,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## Return
 
-- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
-
-## Escalation to Lead
-- 요구사항과 구현 간 불일치가 의도적인지 판단 불가 시
-- 판단 confidence < 60% 시
-- Boundaries 밖 이슈 발견 시
+- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다.
 
 ---
 
@@ -99,6 +95,3 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

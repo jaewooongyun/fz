@@ -16,7 +16,7 @@
 //   ⛔ 고정본은 해시 목록 tests/fixtures/workflow-base/SHA256SUMS 에 묶여 있다 — 대조는 resolveBase 가 기준을 고르기 전에 한다(이 파일에 사본을 두지 않는다).
 //      어긋나면 ③ · 스키마 대조가 UNRUN 이다. 목록을 다시 쓰는 명령과 규칙은 그 머리말에 있다.
 // ⛔ FZ_WF_ROOT 로 기준 트리를 대상으로 돌리면 ① · ② 가 FAIL 이어야 한다(기준은 effort 를 읽지 않는다).
-// code-pair 스키마(S7): code-pair-schema-intended-only — 콜 스키마(키 정렬 JSON) == 기준 스키마 + 의도한 변환(spanLines · required · oldAnchor 설명).
+// code-pair 스키마(S7): code-pair-schema-intended-only — 콜 스키마(키 정렬 JSON) == 기준 스키마 + 의도한 변환(spanLines · required · oldAnchor 설명 · openQuestions 칸).
 //   대조군 schema-compare-detects-{unrelated-field,required-change,description-change} — 그 셋을 바꾼 사본은 비교에서 떨어져야 한다.
 'use strict'
 const fs = require('fs')
@@ -86,13 +86,15 @@ async function schemasAt(file) {
   } })
   return seen
 }
-// 의도한 변환만 — symbolEdits 항목에 spanLines(정수 · required)와 oldAnchor 설명 교정(F-120). 이 밖의 차이는 전부 FAIL 이다
+// 의도한 변환만 — symbolEdits 항목에 spanLines(정수 · required)와 oldAnchor 설명 교정(F-120) · 루트에 openQuestions(문자열 배열 · required 아님 —
+//   구현자의 설계 의문 · Redundant Import 신호를 돌려주는 칸). 이 밖의 차이는 전부 FAIL 이다
 const editItem = o => o.properties.files.items.properties.symbolEdits.items
 function intended(baseJson) {
   const o = JSON.parse(baseJson), it = editItem(o)
   it.required.push('spanLines')
   it.properties.oldAnchor.description = '교체할 원문 전체(Edit old_string) — 시작 줄만 주면 나머지가 남는다(F-120)'
   it.properties.spanLines = { type: 'integer', description: 'oldAnchor 가 있는 교체 편집에서 oldAnchor 의 줄 수, 없으면 0' }
+  o.properties.openQuestions = { type: 'array', items: { type: 'string' }, description: '설계 의문 · 마찰 신호(Redundant Import 등) — Lead 가 읽는다. 없으면 빈 배열' }
   return sortedJSON(o)
 }
 const mutated = (json, f) => { const o = JSON.parse(json); f(o); return sortedJSON(o) }

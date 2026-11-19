@@ -159,7 +159,7 @@ const RecheckSchema = {
 }
 
 const OVERRIDE =
-  '[Workflow 모드 오버라이드] P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시는 적용하지 않는다. ' +
+  '[Workflow 모드 오버라이드] P2P 통신 없음. ' +
   '에이전트 정의의 Phase 절차·티켓 폴더(WORK_DIR)·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
   '이 프롬프트의 [요구사항]/[코드 컨텍스트]/[기지 제약]/[아키텍처 제약]만이 과제의 전부다. ' +
   '무관한 작업 폴더(티켓 폴더·토픽 폴더 등)를 읽지 말 것. 파일 접근은 명시된 경로와 그 안에 나열된 파일, 그리고 프롬프트가 허용한 모듈 문서만. ' +
@@ -268,8 +268,7 @@ phase('Stage 2: 영향/경계/아키 병렬 분석')
 const DRAFT_CTX = `${CTX}\n[계획 초안] ${JSON.stringify(draft)}`
 const [impact, edge, arch] = await parallelWithRetry([
   () => callAgent(
-    `${OVERRIDE}\n[역할] 영향 범위 분석가(plan-impact 렌즈) — Exhaustive Impact Scan a-f\n` +
-    `(참조 허용: {플러그인 루트}/modules/plan-deep-planning.md — Scan 절차 정의)\n${DRAFT_CTX}\n` +
+    `${OVERRIDE}\n[역할] 영향 범위 분석가(plan-impact 렌즈) — Exhaustive Impact Scan a-f\n${DRAFT_CTX}\n` +
     `[목표] 텍스트 전수 검색 + 소비자 + dead code + 숨은 의존성. 각 항목 evidence 인용.`,
     { label: 'stage2-impact', agentType: 'fz:plan-impact', model: 'opus', effort: EFFORT, schema: ImpactSchema }),
   () => callAgent(

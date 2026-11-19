@@ -20,6 +20,8 @@
 //   catalog-hits-edge-schema   (S19) plan-lean2 적대 렌즈 — catalogHits:true 면 스키마 · 프롬프트에 칸 · 방어 스키마와 함께 켜도 둘 다 남는다 · 기본엔 없다 · 다른 콜엔 없다
 //   r3-catalog-code-pair-switch-off-default  (round 3 S3) code-pair 기본 — Stage 1 스키마 · 프롬프트 · 반환 어디에도 catalogHits 가 없다
 //   r3-catalog-code-pair-switch-on-recorded  catalogHits:true — Stage 1 스키마 필수 칸 · 프롬프트 [점검 카탈로그] · 반환 catalogHits(구현 콜 값) · 검토 · 수정 콜엔 없다
+//   c-prompts-05-open-questions-declared  code-pair 구현 · 수정 콜(기본 · catalogHits:true) 스키마에 openQuestions(문자열 배열 · required 아님) —
+//                              impl-correctness 가 설계 의문 · Redundant Import 신호를 돌려주는 칸이다. 검토 콜엔 없다
 'use strict'
 const fs = require('fs')
 const path = require('path')
@@ -221,6 +223,12 @@ async function capture(wf, extra, resp) {
     && !!cpOn.result && JSON.stringify(cpOn.result.catalogHits) === JSON.stringify([HIT])
     && cpLater(cpOn).length > 0 && cpLater(cpOn).every(k => noCatalog(cpOn.schemas[k])),
     `스키마 ${hasCatalog(cpOn.schemas['stage1-impl'])} · 반환 ${JSON.stringify(cpOn.result && cpOn.result.catalogHits)} · 다른 콜 ${cpLater(cpOn)}`)
+  const hasOpenQ = s => !!s && !!s.properties.openQuestions && s.properties.openQuestions.type === 'array'
+    && s.properties.openQuestions.items.type === 'string' && !s.required.includes('openQuestions')
+  const CSC = ['stage1-impl', 'stage3-revise'], RVC = ['stage2-review-arch', 'stage2-review-quality']
+  check('c-prompts-05-open-questions-declared',
+    [cpOff, cpOn].every(c => CSC.every(k => hasOpenQ(c.schemas[k])) && RVC.every(k => c.schemas[k] && !c.schemas[k].properties.openQuestions)),
+    [cpOff, cpOn].map(c => [...CSC, ...RVC].map(k => `${k}:${!!(c.schemas[k] && c.schemas[k].properties.openQuestions)}`).join(',')).join(' / '))
 
   console.log(`review-schemas: ${fail ? 'FAIL' : 'OK'} (${total - fail}/${total})`)
   process.exit(fail ? 1 : 0)

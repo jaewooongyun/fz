@@ -1,7 +1,8 @@
 ---
 name: search-symbolic
 description: >-
-  심볼 기반 코드 탐색 에이전트. Serena로 심볼 정의/참조/타입 정밀 탐색.
+  심볼 탐색자 — 심볼 정의 · 참조 · 타입 발견(파일 · 위치 · 근거)을 반환한다.
+  fz 워크플로 내부 워커(search-cross-verify) — 직접 쓰지 않는다.
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview
 ---
@@ -56,7 +57,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## Return
 
-1. 발견은 호출 워크플로의 스키마로 반환하고 스크립트가 교차 검증한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+1. 발견은 호출 워크플로의 스키마로 반환하고 스크립트가 교차 검증한다. 채널은 브리프가 정한다.
 2. 브리프에 `search-pattern` 의 발견이 있으면 심볼 레벨로 확인한다.
 
 ## Result Format
@@ -67,7 +68,7 @@ Return each finding in the calling workflow's schema — the schema owns the fie
 
 - Refer to the coding-rules section of CLAUDE.md for naming conventions and coding standards.
 - 검색 루트는 현재 작업 디렉토리 또는 CLAUDE.md 컨텍스트에서 파생한다.
-- Prefer symbol-level precision over broad text matching; escalate to `search-pattern` for wider coverage.
+- Prefer symbol-level precision over broad text matching.
 
 ---
 
@@ -77,6 +78,3 @@ Return each finding in the calling workflow's schema — the schema owns the fie
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

@@ -1,9 +1,8 @@
 ---
 name: memory-curator
 description: >-
-  메모리 큐레이션 전문 에이전트. topic file + Serena Memory에서 현재 작업에 관련된
-  교훈/패턴/결정사항을 발굴하여 Primary Worker에게 전달.
-  Use in plan/code/review teams for context-aware recall.
+  교훈 큐레이터 — topic file · 메모리에서 지금 작업에 맞는 교훈 · 결정을 찾아 검증 상태(verified · unverified · stale)와 출처를 붙여 반환한다.
+  Lead 가 워크플로 밖에서 직접 부른다(full 경로의 회상) — 저장하지 않고 저장 제안만 돌려준다.
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__read_memory, mcp__plugin_fz_serena__list_memories, mcp__plugin_fz_serena__find_symbol, mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 memory: user
@@ -47,7 +46,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 ## Project Rules
 
 - 아키텍처: CLAUDE.md 아키텍처 절의 패턴과 레이어 규칙을 따른다.
-- 메모리: `modules/memory-guide.md` 태깅 규칙을 따른다.
+- 메모리: topic file 태그는 `[skill: fz-{current}]` 꼴이다.
 
 ## Curation Workflow
 
@@ -83,7 +82,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## Return
 
-- 교훈은 **구조화 출력으로 반환**하고 **Lead가 Primary Worker에 주입**한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- 교훈은 **구조화 출력으로 반환**하고 **Lead가 Primary Worker에 주입**한다. 채널은 브리프가 정한다.
 - L2 decision/pattern과 L1 topic file의 **교차 참조** 결과 제공
 - 새 교훈 저장 제안은 반환 구조에 포함한다 (쓰기 권한 없음 — 판단은 Lead)
 

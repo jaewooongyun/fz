@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""재발 방지 lint 10종 (B6) — 고친 문서 결함이 다시 생기면 잡는다.
+"""재발 방지 lint 11종 (B6) — 고친 문서 결함이 다시 생기면 잡는다.
 
 결함을 고치기만 하면 다시 생긴다. 등재된 결함마다 기계 검사를 하나씩 둔다.
 
@@ -15,11 +15,12 @@
 | catalog-required | 점검 카탈로그(templates/check-catalog-*.md)가 있어야 할 경로에 없다 — Workflow 워커 · GPT 역할 스킬은 공용 블록 · light Lead 는 템플릿 Read 지시 | F-005 외 PROMPT 15 |
 | audit-wiring | 워크플로 호출 지시(`Workflow({ scriptPath …`)가 적힌 스킬 · 모듈 · 가이드에 워커 심볼 도구 점검 줄(`--mcp-audit` 이 든 줄 — 직접 호출 `--direct` 줄은 세지 않는다)이 없다 | 점검이 호출 지시 파일 11개 중 1개에만 있었다 — 새 스킬이 빠뜨리지 않게 |
 | stack-skill-channel | `## 스택 스킬` 절이 있는 스킬의 그 절에 소비 경로 낱말(`스택 스킬 요구 사항` · `스택 스킬은 Lead 판단용`)이 정확히 하나가 아니다 · 워커에게 가는 통로가 있는 스킬(구현 · 수정 · 계획 · 리뷰)이 앞의 것이 아니다 | 스택 스킬을 Lead 만 읽고 코드를 쓰는 워커는 모르는 일을 막는다 |
+| symbol-tools-block | frontmatter `tools:` 에 Serena 심볼 도구(`find_symbol` · `find_referencing_symbols` · `get_symbols_overview`)가 있는 에이전트에 `## Symbol tools` 절(그 제목 줄부터 다음 `## ` 제목 전까지)이 정확히 하나가 아니다 · 그 절이 에이전트끼리 · `templates/agent-template.md` 와 글자가 다르다 · 그 도구가 없는 에이전트에 절이 있다 | 같은 절의 사본이 에이전트 13개와 템플릿에 있는데 저장소 안에서 같음을 지키는 검사가 없었다 |
 
 ⛔ 미실행은 PASS 가 아니다 — 검사 대상이 0개면 그 lint 는 UNRUN 이고 전체도 PASS 가 아니다.
 
 usage: lint_recurrence.py [--root R] [--only NAME]   ·   --self-test
-출력: lint 마다 `<name>: PASS|WARN|FAIL|UNRUN …` · 끝에 `lint_recurrence: k/10 PASS`
+출력: lint 마다 `<name>: PASS|WARN|FAIL|UNRUN …` · 끝에 `lint_recurrence: k/11 PASS`
 exit: 0 전부 PASS(WARN 포함) · 1 위반 · 2 미실행 있음
 """
 from __future__ import annotations
@@ -33,7 +34,7 @@ import tempfile
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(SCRIPT_DIR)
 LINTS = ("copies", "project-rules", "team-residue", "head-declaration", "module-size", "broken-refs", "count-mismatch", "catalog-required",
-         "audit-wiring", "stack-skill-channel")
+         "audit-wiring", "stack-skill-channel", "symbol-tools-block")
 TEMPLATES = {"review-core": "templates/review-shared-block.md", "project-rules": "templates/project-rules-block.md",
              "catalog-plan": "templates/check-catalog-plan.md", "catalog-review": "templates/check-catalog-review.md",
              "catalog-code": "templates/check-catalog-code.md"}
@@ -55,6 +56,9 @@ WIRING_DOCS = ("skills/*/SKILL.md", "modules/*.md", "guides/*.md")
 STACK_HEAD = re.compile(r"^## 스택 스킬.*$", re.M)
 STACK_WORKER, STACK_LEAD = "스택 스킬 요구 사항", "스택 스킬은 Lead 판단용"   # 소비 경로 두 낱말 — 워커 전달 · Lead 판단용
 STACK_WORKER_SKILLS = ("fz-code", "fz-fix", "fz-plan", "fz-review")   # 워커에게 가는 기존 통로(Step 맥락 · 알려진 제약 · 의도 맥락)가 있는 스킬
+SYMBOL_HEAD = "## Symbol tools"   # 심볼 도구 공통 절의 제목 줄 머리 — 절은 이 줄부터 다음 `## ` 제목 전까지다
+SYMBOL_TOOL_RE = re.compile(r"(?:(?<![\w-])|(?<=__))(?:find_symbol|find_referencing_symbols|get_symbols_overview)(?![\w-])")   # 맨 이름 · 서버 접두(`…__find_symbol`)
+AGENT_TEMPLATE = "templates/agent-template.md"
 
 
 def _read(p):
@@ -230,10 +234,68 @@ def lint_stack_skill_channel(root):
     return v, f"스택 스킬 절 {len(skills)}개"
 
 
+def _symbol_sections(text):
+    """`## Symbol tools` 로 시작하는 줄부터 다음 `## ` 제목 줄 전까지의 절 목록(끝 빈 줄은 뺀다)."""
+    lines, out = text.split("\n"), []
+    for i, ln in enumerate(lines):
+        if ln.startswith(SYMBOL_HEAD):
+            j = next((k for k in range(i + 1, len(lines)) if lines[k].startswith("## ")), len(lines))
+            out.append("\n".join(lines[i:j]).rstrip())
+    return out
+
+
+def _agent_tools(text):
+    """frontmatter `tools:` 값(같은 줄 · 아래 `- 항목` 줄) — 주석 줄은 보지 않는다. frontmatter 가 없으면 빈 문자열."""
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return ""
+    end = next((k for k in range(1, len(lines)) if lines[k].strip() == "---"), len(lines))
+    vals = []
+    for i in range(1, end):
+        if lines[i].startswith("tools:"):
+            vals.append(lines[i][len("tools:"):])
+            vals += [x for x in lines[i + 1:end] if x.lstrip().startswith("- ")]
+    return " ".join(vals)
+
+
+def lint_symbol_tools_block(root):
+    """심볼 도구를 선언한 에이전트마다 `## Symbol tools` 절이 하나 · 그 글자가 서로 · 템플릿과 같다 · 선언하지 않은 에이전트엔 절이 없다."""
+    agents = _files(root, ("agents/*.md",))
+    if not agents:
+        return None, "에이전트 0개"
+    v, holders = [], {}
+    for p in agents:
+        t, rel = _read(p), os.path.relpath(p, root)
+        secs = _symbol_sections(t)
+        if SYMBOL_TOOL_RE.search(_agent_tools(t)):
+            if len(secs) != 1:
+                v.append(f"{rel}: 심볼 도구를 선언했는데 `{SYMBOL_HEAD}` 절이 {len(secs)}개다 — 정확히 하나를 둔다")
+            else:
+                holders[rel] = secs[0]
+        elif secs:
+            v.append(f"{rel}: 심볼 도구를 선언하지 않았는데 `{SYMBOL_HEAD}` 절이 있다 — 절을 빼거나 `tools:` 에 도구를 둔다")
+    if not holders and not v:
+        return None, "심볼 도구를 선언한 에이전트 0개"
+    tp = os.path.join(root, AGENT_TEMPLATE)
+    tsecs = _symbol_sections(_read(tp)) if os.path.isfile(tp) else []
+    tsec = tsecs[0] if len(tsecs) == 1 else None
+    if tsec is None:
+        v.append(f"{AGENT_TEMPLATE}: `{SYMBOL_HEAD}` 절이 {len(tsecs)}개다 — 원문 절을 정확히 하나 둔다")
+    # 기준 글자 = 에이전트 사본의 다수 — 같은 수면 템플릿 글자가 이긴다. 다른 쪽(에이전트 · 템플릿)을 이름으로 낸다
+    votes = {}
+    for sec in holders.values():
+        votes[sec] = votes.get(sec, 0) + 1
+    ref = max(votes, key=lambda x: (votes[x], x == tsec)) if votes else tsec
+    v += [f"{rel}: `{SYMBOL_HEAD}` 절이 다른 사본과 글자가 다르다" for rel, sec in holders.items() if sec != ref]
+    if tsec is not None and ref is not None and tsec != ref:
+        v.append(f"{AGENT_TEMPLATE}: `{SYMBOL_HEAD}` 절이 에이전트 사본과 글자가 다르다")
+    return v, f"심볼 도구 선언 에이전트 {len(holders)}개 · 템플릿 절 {len(tsecs)}개"
+
+
 FUNCS = {"copies": lint_copies, "project-rules": lint_project_rules, "team-residue": lint_team_residue,
          "head-declaration": lint_head_declaration, "module-size": lint_module_size, "broken-refs": lint_broken_refs,
          "count-mismatch": lint_count_mismatch, "catalog-required": lint_catalog_required, "audit-wiring": lint_audit_wiring,
-         "stack-skill-channel": lint_stack_skill_channel}
+         "stack-skill-channel": lint_stack_skill_channel, "symbol-tools-block": lint_symbol_tools_block}
 
 
 def run(root, only=None):
@@ -270,6 +332,9 @@ def self_test():
     wf_call = "3. **Workflow 호출**: `Workflow(" + "{ scriptPath: '{WORK_DIR}/w.js', args })`\n"   # 조립 — 저장소의 호출 지시 집계에 섞이지 않게
     audit = "4. **심볼 도구 점검**: `python3 \"${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py\" --mcp-audit --wf {runId 폴더명}`\n"
     direct = "5. 직접 호출: `fz_wf_metrics.py --mcp-audit --direct --only-agent fz:review-correctness`\n"
+    sym = (SYMBOL_HEAD + " — use them whenever they are in your tool list\n\n"
+           "If a symbol tool is in your tool list, call it before Grep.\n- `find_symbol` — where a named function is defined.\n\n")
+    sym_agent = lambda tools, body: f"---\nname: a\ntools: Read, Grep, {tools}\n---\n\n## Role\n\nr\n\n{body}## Return\n\nx\n"
     clean = {
         "templates/project-rules-block.md": "rules\n", "templates/review-shared-block.md": "core\n",
         "gpt-skills/a/SKILL.md": blk("project-rules", "rules\n"), "agents/x.md": blk("pair", "p\n"), "agents/y.md": blk("pair", "p\n"),
@@ -278,6 +343,9 @@ def self_test():
         "skills/w/SKILL.md": wf_call + audit + direct,
         "skills/fz-fix/SKILL.md": f"# f\n## 스택 스킬 (있으면 쓴다)\n{STACK_WORKER} 를 Step 맥락에 싣는다\n## 다음 절\n{STACK_LEAD}\n",   # 절 밖의 낱말은 세지 않는다
         "skills/fz-search/SKILL.md": f"## 스택 스킬 (있으면 쓴다)\n{STACK_LEAD} — 워커에게 넘기지 않는다\n",
+        "agents/sym-a.md": sym_agent("mcp__plugin_fz_serena__find_symbol", sym),
+        "agents/sym-b.md": sym_agent("mcp__plugin_fz_serena__get_symbols_overview", sym),
+        AGENT_TEMPLATE: "# t\n\n```markdown\n## 도구 전략\n\n" + sym + "## 핵심 역할\n```\n",
     }
     for n, paths in CATALOG_BLOCKS.items():          # 카탈로그 원문 · 블록 배치 · light Read 지시(합성)
         clean[TEMPLATES[n]] = f"| {n} |\n"
@@ -298,10 +366,17 @@ def self_test():
         "catalog-required": {"gpt-skills/fz-fixer/SKILL.md": "블록 없음\n"},
         "audit-wiring": {"guides/g.md": wf_call + direct},   # 직접 호출 줄만 있다 — 워크플로 점검 줄로 세지 않는다
         "stack-skill-channel": {"skills/fz-plan/SKILL.md": "## 스택 스킬\n부른 뒤 Lead 가 읽는다\n"},   # 둘 다 없음
+        "symbol-tools-block": {"agents/sym-b.md": sym_agent("mcp__plugin_fz_serena__get_symbols_overview", sym.replace("before Grep", "after Grep"))},
     }
     # stack-skill-channel 의 나머지 꼴 — 절에 두 낱말이 다 있음 · 워커 통로가 있는 스킬인데 Lead 판단용(절 밖의 낱말은 세지 않는다)
     stack_more = {"both": {"skills/fz-review/SKILL.md": f"## 스택 스킬\n{STACK_WORKER} · {STACK_LEAD}\n"},
                   "lead-on-worker-skill": {"skills/fz-fix/SKILL.md": f"## 스택 스킬\n{STACK_LEAD}\n## 다른 절\n{STACK_WORKER}\n"}}
+    # symbol-tools-block 의 실패 꼴 — 절 없음 · 절 둘 · 에이전트끼리 다름 · 템플릿과 다름 · 도구 없는 에이전트에 절. 셀마다 그 파일 이름이 위반 줄에 있어야 한다
+    symbol_more = {"missing": ("agents/sym-b.md", {"agents/sym-b.md": sym_agent("mcp__plugin_fz_serena__find_referencing_symbols", "")}),
+                   "duplicate": ("agents/sym-a.md", {"agents/sym-a.md": sym_agent("mcp__plugin_fz_serena__find_symbol", sym + sym)}),
+                   "differs": ("agents/sym-b.md", seeded["symbol-tools-block"]),
+                   "template": (AGENT_TEMPLATE, {AGENT_TEMPLATE: "# t\n\n```markdown\n" + sym.replace("a named", "the") + "## 핵심 역할\n```\n"}),
+                   "no-tool-has-section": ("agents/plain.md", {"agents/plain.md": sym_agent("mcp__context7__query-docs", sym)})}
     with tempfile.TemporaryDirectory() as d:
         _mk(d, clean)
         res = run(d)
@@ -317,6 +392,11 @@ def self_test():
             _mk(d, {**clean, **extra})
             st = run(d, only="stack-skill-channel")["stack-skill-channel"][0]
             case(f"stack-skill-channel-{k}", st == "FAIL", f"state {st}")
+    for k, (named, extra) in symbol_more.items():
+        with tempfile.TemporaryDirectory() as d:
+            _mk(d, {**clean, **extra})
+            st, v, _ = run(d, only="symbol-tools-block")["symbol-tools-block"]
+            case(f"symbol-tools-block-{k}", st == "FAIL" and any(x.startswith(named + ":") for x in v), f"state {st} · {v[:2]}")
     with tempfile.TemporaryDirectory() as d:
         res = run(d)
         case("not-run-is-not-pass", all(r[0] == "UNRUN" for r in res.values()) and summary(res)[1] == 2,

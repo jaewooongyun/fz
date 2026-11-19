@@ -21,7 +21,7 @@ const { execFileSync } = require('child_process')
 
 const ROOT = path.join(__dirname, '..', '..')
 const WF = path.join(ROOT, 'workflows')
-// 노출을 거둔 워크플로 — 측정 재현용으로 tests/fixtures/workflows/ 에 바이트 그대로 둔다(H1-9). 분류표 검사는 그 자리에서 계속한다
+// 노출을 거둔 워크플로 — 측정 재현용으로 tests/fixtures/workflows/ 에 옮겨 둔다(H1-9 — 그 뒤 바뀐 것은 OVERRIDE 부정문 치환 하나다 · 파일 머리). 분류표 검사는 그 자리에서 계속한다
 const RETIRED = { 'plan-lean.js': path.join(ROOT, 'tests', 'fixtures', 'workflows') }
 const dirOf = f => RETIRED[f] || WF
 const EXPECTED = {

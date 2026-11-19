@@ -220,3 +220,54 @@ F-481	modules/memory-policy.md	lacks	| `fz` | `checkpoint` |
 F-481	modules/context-artifacts.md	has	아니오 → 저장 없이 진행(이어받기 없음)
 F-481	modules/context-artifacts.md	has	/fz 없이 직접 호출된 스킬은 그 스킬의 Lead 가 완료할 때 Essential Context
 F-534	modules/tool-status.md	has	작업 폴더가 없는 세션
+# F-482 — 워커 프롬프트에 죽은 지시가 돌아오지 않는다: 워크플로 OVERRIDE 의 부정문(에이전트 쪽 지시를 걷어 덮을 것이 없다) · 격리 워커가 못 하는 실측 지시 ·
+#   Lead 에스컬레이션 절 · 피어 에이전트로 넘기는 지시(부정문이 사라져 돌아오면 살아 있는 지시가 된다) · TEAM 시절 채널 원칙 포인터 · 팀 문구
+F-482	workflows/code-pair.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	workflows/discover-adversarial.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	workflows/peer-review.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	workflows/plan-collaborative.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	workflows/plan-lean2.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	workflows/review-live.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	workflows/search-cross-verify.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	workflows/swarm.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	tests/fixtures/workflows/plan-lean.js	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	guides/skill-authoring.md	lacks	SendMessage/피어 회신/Lead 보고 지시
+F-482	agents/arch-lens.md	lacks	T6/T7
+F-482	agents/impl-correctness.md	lacks	T6/T7
+F-482	agents/impl-quality.md	lacks	T6/T7
+F-482	agents/plan-edge-case.md	lacks	T6/T7
+F-482	agents/plan-impact.md	lacks	T6/T7
+F-482	agents/plan-structure.md	lacks	T6/T7
+F-482	agents/review-arch.md	lacks	T6/T7
+F-482	agents/review-correctness.md	lacks	T6/T7
+F-482	agents/review-counter.md	lacks	T6/T7
+F-482	agents/review-direction.md	lacks	T6/T7
+F-482	agents/review-quality.md	lacks	T6/T7
+F-482	agents/search-pattern.md	lacks	T6/T7
+F-482	agents/search-symbolic.md	lacks	T6/T7
+F-482	templates/agent-template.md	lacks	T6/T7
+F-482	templates/skill-template.md	lacks	T6/T7
+F-482	agents/arch-lens.md	lacks	agent-team-guide.md
+F-482	agents/impl-correctness.md	lacks	agent-team-guide.md
+F-482	agents/impl-quality.md	lacks	agent-team-guide.md
+F-482	agents/memory-curator.md	lacks	agent-team-guide.md
+F-482	agents/plan-edge-case.md	lacks	agent-team-guide.md
+F-482	agents/plan-impact.md	lacks	agent-team-guide.md
+F-482	agents/plan-structure.md	lacks	agent-team-guide.md
+F-482	agents/review-arch.md	lacks	agent-team-guide.md
+F-482	agents/review-correctness.md	lacks	agent-team-guide.md
+F-482	agents/review-counter.md	lacks	agent-team-guide.md
+F-482	agents/review-direction.md	lacks	agent-team-guide.md
+F-482	agents/review-quality.md	lacks	agent-team-guide.md
+F-482	agents/search-pattern.md	lacks	agent-team-guide.md
+F-482	agents/search-symbolic.md	lacks	agent-team-guide.md
+F-482	agents/memory-curator.md	lacks	Use in plan/code/review teams
+F-482	agents/impl-quality.md	lacks	providing feedback directly to
+F-482	agents/arch-lens.md	lacks	Escalation to Lead
+F-482	agents/review-arch.md	lacks	Escalation to Lead
+F-482	agents/review-quality.md	lacks	Escalation to Lead
+F-482	agents/review-counter.md	lacks	Escalation to Lead
+F-482	agents/review-correctness.md	lacks	Escalation to Lead
+F-482	agents/review-direction.md	lacks	Escalation to Lead
+F-482	agents/search-pattern.md	lacks	to `search-symbolic`
+F-482	agents/search-symbolic.md	lacks	to `search-pattern`

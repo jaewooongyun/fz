@@ -1,7 +1,8 @@
 ---
 name: review-counter
 description: >-
-  반론 + Devil's Advocate 에이전트. 다른 리뷰어의 판단에 의도적으로 반론.
+  반론 렌즈 — 다른 렌즈 판정에 대한 반론(challenge · supplement · reverse · agree · maintain)과 놓친 발견을 반환한다.
+  fz 워크플로 내부 워커(review-live · peer-review Stage 3) — 직접 쓰지 않는다.
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_referencing_symbols
@@ -94,13 +95,8 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## Return
 
-- 반론은 호출 워크플로의 스키마로 반환하고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- 반론은 호출 워크플로의 스키마로 반환하고 Lead 가 통합한다. 채널은 브리프가 정한다.
 - 현재 활성 배정: fz-review `review-live.js` Stage 3, fz-peer-review `peer-review.js` **Tier 3 Stage 3** (Tier 2에는 counter 없음)
-
-## Escalation to Lead
-- 반론이 기각되었지만 강한 근거가 있는 경우 재에스컬레이션
-- 판단 confidence < 60% 시
-- 모든 피어가 동의하여 반론 대상이 없는 경우 (역할 미수행 보고)
 
 ---
 
@@ -110,6 +106,3 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

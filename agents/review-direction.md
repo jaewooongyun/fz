@@ -1,7 +1,8 @@
 ---
 name: review-direction
 description: >-
-  방향성 적합성 + 대안 제시 + 비판적 평가 에이전트. 접근 방향 자체가 최선인지 도전.
+  방향 비평 렌즈 — 접근 방향 판정(PROCEED · RECONSIDER · REDIRECT)과 대안 2개 이상을 반환한다.
+  fz 워크플로 내부 워커(롤백 plan-collaborative Stage 0) — 직접 쓰지 않는다.
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__get_symbols_overview, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
@@ -128,7 +129,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## Return
 
-- 방향 판정은 호출 워크플로의 스키마로 반환하고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- 방향 판정은 호출 워크플로의 스키마로 반환하고 Lead 가 통합한다. 채널은 브리프가 정한다.
 - 브리프에 `plan-structure` 의 반박이 들어 있으면 재평가해 PROCEED / RECONSIDER / REDIRECT 로 최종 판정한다.
 
 ## Input Format
@@ -146,11 +147,6 @@ Alternative 2: Combine 기반 반응형 — 기존 RxSwift와 혼재, 마이그�
 판정: PROCEED (기존 패턴 활용이 유지보수 비용 최소)"
 ```
 
-## Escalation to Lead
-- 6관점 분석 중 3개+ 관점에서 CONCERN 시
-- REDIRECT 판정이지만 confidence < 60% 시
-- 기존 코드베이스에 유사 선례가 없는 완전 새 접근 시
-
 ---
 
 ## Verification
@@ -159,6 +155,3 @@ Alternative 2: Combine 기반 반응형 — 기존 RxSwift와 혼재, 마이그�
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

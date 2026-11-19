@@ -75,13 +75,13 @@ bash scripts/setup-hooks.sh
 
 ## Verification Discipline (v3.11+)
 
-모든 스킬/에이전트는 다음 규약을 따른다:
+모든 스킬/에이전트는 다음 규약을 따른다 — 셋째 줄(T6/T7)은 Lead 가 세션에서 따르는 규약이라 에이전트 본문과 두 템플릿에는 싣지 않는다:
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
 - T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
 
-상세: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy), `templates/agent-template.md` + `templates/skill-template.md` (자동 상속 섹션).
+상세: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy), `templates/agent-template.md` + `templates/skill-template.md` (자동 상속 섹션 — 앞 두 줄).
 
 ## Opus 5.5 Adaptation (현행 기본 모델)
 

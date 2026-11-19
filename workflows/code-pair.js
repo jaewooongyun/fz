@@ -14,6 +14,8 @@
 //   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, lensesExpected, lensesCompleted,
 //            residualIssues, residualNote, metrics }
+//   changeset.openQuestions(문자열 배열 · 필수 아님): 구현자의 설계 의문 · Redundant Import 신호 — Lead 가 반환 처리에서 읽는다(fz-code 절차 6).
+//     Stage 3 이 돌면 수정본의 칸이 남는다(원 changeset 의 칸을 합치지 않는다).
 //   ⛔ reviewVerdict 는 'pass'|'issues'|'partial'|'skipped'. **'partial' 은 스크립트가 조립한다**
 //      (ReviewSchema enum 은 워커 출력용이라 pass|issues 만 갖는다 — 두 층을 섞지 않는다).
 //      partial = lensesCompleted < lensesExpected. 그 관점은 적용되지 않았으므로 pass 로 읽으면 안 된다.
@@ -76,6 +78,7 @@ const ChangesetSchema = {
     },
     summary: { type: 'string' },
     buildExpectation: { type: 'string', description: 'Lead 빌드 검증 시 기대 결과 (검증 가능 형태)' },
+    openQuestions: { type: 'array', items: { type: 'string' }, description: '설계 의문 · 마찰 신호(Redundant Import 등) — Lead 가 읽는다. 없으면 빈 배열' },
   },
 }
 
@@ -131,7 +134,7 @@ function changesetDefects(cs) {
 const SPLIT_THRESHOLD = 600 // 총 newBody 줄수 — C1 실측(≤500 안전)+H5 실사고(~800 실패) 사이 보수값. split_required=Lead 판단 요구(하드 차단 아님). 관측 실패에서 재조정.
 
 const OVERRIDE =
-  '[Workflow 모드 오버라이드] P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시는 적용하지 않는다. ' +
+  '[Workflow 모드 오버라이드] P2P 통신 없음. ' +
   '에이전트 정의의 Phase 절차·티켓 폴더(WORK_DIR)·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
   '이 프롬프트의 [Step 명세]/[컨텍스트]만이 과제의 전부다. ' +
   '⛔ 디스크 수정 금지: Edit/Write/replace_symbol 등 어떤 파일 변경 도구도 사용하지 않는다 — changeset JSON 반환만. ' +

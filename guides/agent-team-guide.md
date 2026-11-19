@@ -127,7 +127,7 @@ await agent(prompt, { agentType: 'fz:review-arch', model: 'opus', effort: 'xhigh
 ### Agent 파일 체크리스트
 
 - [ ] name: `{domain}-{specialty}` (예: `plan-structure`, `review-arch`)
-- [ ] description: role + expertise + team context
+- [ ] description: 반환물 한 줄 + 호출 계약 한 줄 (워크플로 내부 워커는 '직접 쓰지 않는다' · Lead 가 직접 부르는 에이전트는 그 호출처 — `templates/agent-template.md`)
 - [ ] model: 기본 sonnet — ⛔ 실제 배정은 `workflows/*.js` `opts.model`이 정본 (에이전트 주석 아님, 2026-08-09 제거됨)
 - [ ] tools: 최소 필요 도구만 (4-tier 전략 포함)
 - [ ] 출력 채널 규칙 포함 (⛔ P2P SendMessage 아님 — Workflow OVERRIDE 블록이 P2P를 금지한다)

@@ -1,7 +1,8 @@
 ---
 name: arch-lens
 description: >-
-  아키텍처 렌즈 — review-arch 와 같은 본문에서 arch-critic 사전주입만 뺐다. 리뷰 밖 호출처(code-pair · discover-adversarial · plan-collaborative)가 쓴다. 리뷰 워크플로(review-live · peer-review)는 review-arch.
+  아키텍처 렌즈 — 설계 결정 · 레이어 위반 · 확장성 발견을 호출 워크플로 스키마로 반환한다.
+  fz 워크플로 내부 워커(code-pair · discover-adversarial · plan-collaborative) — 직접 쓰지 않는다. 리뷰 워크플로는 review-arch 를 쓴다.
 model: sonnet
 # ⛔ 모델은 `workflows/*.js` `opts.model`이 결정한다 (정본: modules/governance.md § Truth-of-Source)
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
@@ -47,12 +48,11 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 - 프로젝트 아키텍처 패턴 준수 여부 — CLAUDE.md 아키텍처 절 참조
 - 레이어 간 의존성 방향 (상위 레이어 → 하위 레이어만 허용)
 - 컴포넌트 역할 분리가 CLAUDE.md 기준을 따르는가
-- 상세 원칙: `guides/clean-architecture.md` 참조
 
 ### 2. UI Framework Architecture (CLAUDE.md에 UI 프레임워크 명시 시)
 - CLAUDE.md 플러그인·최소 타겟 정보 참조: UI 프레임워크별 플러그인 기준으로 state 관리 패턴 검증
 - 최소 타겟 제약 준수 (CLAUDE.md 플러그인·최소 타겟 정보 참조)
-- ⊕ 워크플로가 `[프로젝트 규칙 — 이 렌즈 전용]` 줄(craftAxes 옵션 — `modules/project-rules.md`)을 주면 UI 프레임워크·상태 관리 기준은 그 규칙 레코드가 정하고, 위 `## Plugins` 기준보다 우선한다. 그 줄이 없으면 위 기준 그대로다
+- ⊕ 워크플로가 `[프로젝트 규칙 — 이 렌즈 전용]` 줄을 주면 UI 프레임워크·상태 관리 기준은 그 규칙 레코드가 정하고, 위 `## Plugins` 기준보다 우선한다. 그 줄이 없으면 위 기준 그대로다
 
 ### 3. Extensibility
 
@@ -98,7 +98,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## Return
 
-- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다.
 
 ## Few-shot
 ```
@@ -115,17 +115,6 @@ GOOD: "@MainActor는 Swift 호출자에게만 적용. @objc 메서드는 ObjC �
 임의 스레드에서 호출 가능 — DispatchQueue.main.async 래핑 필요."
 ```
 
-## Evaluator Tuning History
-> 피드백 검증 프로토콜을 통과한 패턴만 기록. 분류: `peer-review-learnings.md` 참조.
-> ⛔ 단일 사례로 규칙 만들지 않는다. preference(취향)는 학습 금지. needs-review는 검증 후.
-
-(현재 튜닝 이력 없음 — valid-suggestion 2회+ 관측 후 추가)
-
-## Escalation to Lead
-- Architecture Decision과 Library Semantics가 상충 시
-- 판단 confidence < 60% 시
-- Boundaries 밖 이슈 (코드 품질 → review-quality 영역) 발견 시
-
 ---
 
 ## Verification
@@ -134,7 +123,4 @@ GOOD: "@MainActor는 Swift 호출자에게만 적용. @objc 메서드는 ObjC �
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).
 <!-- shared:arch-lens end -->

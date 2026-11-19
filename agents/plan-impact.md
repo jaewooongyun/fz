@@ -1,8 +1,8 @@
 ---
 name: plan-impact
 description: >-
-  영향 범위 + 소비자 변경 추적 에이전트. Exhaustive Impact Scan(a~g) 전담 수행.
-  변경의 파급 효과를 심볼 기반 + 텍스트 전수 검색으로 빠짐없이 분석.
+  영향 범위 렌즈 — Exhaustive Impact Scan(a~g)으로 찾은 소비자 · 간접 영향과 Read · Write Scope 를 호출 워크플로 스키마로 반환한다.
+  fz 워크플로 내부 워커(plan-lean2 · 롤백 plan-collaborative) — 직접 쓰지 않는다.
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__plugin_fz_serena__get_symbols_overview
 ---
@@ -53,7 +53,7 @@ discover 결과가 있더라도, 변경 대상의 **상위 추상화까지 확�
 a. **텍스트 전수 검색**: 대상 타입/클래스명 + Scope Expansion으로 확장된 타입명으로 Grep 전수 검색. 심볼 기반 결과와 대조하여 빠진 참조 식별.
 b. **런타임 도달성 검증**: 각 진입점의 실제 런타임 도달 여부 확인 (active/latent 구분).
 c. **사이드이펙트/순서 분석**: 기존 액션 패턴의 순서 의존성 식별.
-d. **Dead code 감지**: ⛔ 참조 0건만으로 dead code 로 단정하지 않는다 — LSP `references` 는 conformance 구현을 주지 않아 0건이 19%다(recall 36.9%). Lead 가 넘긴 구현 목록(`find_implementations`) + `Grep` 전수를 교차한 뒤에만 후보로 올린다. 근거·절차: `modules/cross-validation.md` § Negative-Result Gate.
+d. **Dead code 감지**: ⛔ 참조 0건만으로 dead code 로 단정하지 않는다 — LSP `references` 는 conformance 구현을 주지 않아 0건이 19%다(recall 36.9%). Lead 가 넘긴 구현 목록(`find_implementations`) + `Grep` 전수를 교차한 뒤에만 후보로 올린다.
 e. **소비자 코드 품질 스캔** (모듈화 시): 앱 측 소비자 파일 전수 수집 + 사용 패턴 확인.
 f. **Import Symbol Inventory** (import 제거 시): 제거 대상 모듈의 모든 심볼 추출.
 g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필수):
@@ -109,7 +109,7 @@ g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필�
 
 ## 반환
 
-- 반환은 호출 워크플로(`plan-lean2.js` 기본 · 롤백 `plan-collaborative.js`)의 스키마를 따르고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로(`plan-lean2.js` 기본 · 롤백 `plan-collaborative.js`)의 스키마를 따르고 Lead 가 통합한다. 채널은 브리프가 정한다.
 
 ---
 
@@ -119,6 +119,3 @@ g. **Call-Site Deprecation Audit** (호출 중단 / 함수 body 제거 시 필�
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

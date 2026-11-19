@@ -1,7 +1,8 @@
 ---
 name: review-quality
 description: >-
-  코드 품질 + Dead Code + 성능 리뷰 에이전트. 기능 분리, API 사용, 성능 평가.
+  품질 리뷰 렌즈 — 기능 분리 · API 사용 · Dead Code · 성능 발견을 리뷰 스키마로 반환한다. code-auditor 를 미리 올린다.
+  fz 워크플로 내부 워커(review-live · peer-review) — 직접 쓰지 않는다.
 model: sonnet
 tools: Read, Grep, Glob, mcp__plugin_fz_serena__find_symbol, mcp__plugin_fz_serena__find_referencing_symbols, mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs
 skills:
@@ -74,7 +75,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 - TODO/FIXME가 실제로 불가능한 작업인가, 이미 가능한 작업을 유보하는가? (SDK 설치 후 "전환 예정" 등)
 - 래퍼 함수의 시그니처 파라미터가 내부 호출에 모두 전달되는가? (파라미터 미전달 = 무효화 버그)
 - **Base class init의 optional 파라미터가 subclass에서 전달되는가?** (default nil = dependency 미전달 = 기능 무효화. 컴파일러 미탐지)
-- ⚠️ **[candidate — 비차단 관찰, 활성 강제 X, 5 sessions 관측 후 active 재판정]** 활성 프로젝트의 CLAUDE.md/guidelines가 **"미래 변경 주석에 검증 가능한 트리거를 요구"하는 조항을 실제 선언·인용한 경우에만** 관찰: 미래 변경을 주장하는 주석(`TODO`/`FIXME`/`for now`/`later`/`필요 시`)이 검증 가능한 트리거(코드·테스트·운영지표 — 예: `N>1000일 때`, `p95 latency 초과 시`)를 명시하는가? 없으면 rot 위험 → `Comment Rot Risk | WARNING | 근거(프로젝트 정책 파일·절 인용) | 제거 또는 자립적 재작성`. 티켓ID/세션차수/시안은 트리거 근거 아님. (표기 근거: `guides/skill-authoring.md` §Sibling-Convention Check)
+- ⚠️ **[candidate — 비차단 관찰, 활성 강제 X, 5 sessions 관측 후 active 재판정]** 활성 프로젝트의 CLAUDE.md/guidelines가 **"미래 변경 주석에 검증 가능한 트리거를 요구"하는 조항을 실제 선언·인용한 경우에만** 관찰: 미래 변경을 주장하는 주석(`TODO`/`FIXME`/`for now`/`later`/`필요 시`)이 검증 가능한 트리거(코드·테스트·운영지표 — 예: `N>1000일 때`, `p95 latency 초과 시`)를 명시하는가? 없으면 rot 위험 → `Comment Rot Risk | WARNING | 근거(프로젝트 정책 파일·절 인용) | 제거 또는 자립적 재작성`. 티켓ID/세션차수/시안은 트리거 근거 아님.
 
 ### 7. Source Fidelity (리팩토링/마이그레이션 컨텍스트에서만)
 
@@ -84,7 +85,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ### 8. Cargo-Cult Import Detection (신규 파일/import 추가 컨텍스트)
 
-- 새로 추가된 `import X`에 대해 X 모듈의 알려진 심볼이 파일에서 사용되는가? (`modules/review-checks.md` 검증 4-E 항목 7 *추가 방향* 양방향 Symbol Coverage)
+- 새로 추가된 `import X`에 대해 X 모듈의 알려진 심볼이 파일에서 사용되는가?
 - 0건이면 → "redundant_import" 이슈 (severity: **minor**) 보고
 - false positive 가능성 인지: typealias 간접 참조, 타입 추론에 의한 Module 의존, generic constraint 등
 - 판정: agree(removal) / maintain(retain) — 사용자/GPT 최종
@@ -114,7 +115,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## Return
 
-- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다(`guides/agent-team-guide.md` §2).
+- 반환은 호출 워크플로의 스키마를 따른다 — 구조화 출력으로 돌려주고 Lead 가 통합한다. 채널은 브리프가 정한다.
 
 ## Few-shot
 ```
@@ -135,17 +136,6 @@ Q-n: `fetchOrders(reset:)`가 2개 독립 의도(재로드/페이지네이션)�
 권장: `reloadOrders()`/`loadNextPage()` 분리 + 공통 `fetchOrders(page:)`. evidence: 호출부 2곳 인용.
 ```
 
-## Evaluator Tuning History
-> 피드백 검증 프로토콜을 통과한 패턴만 기록. 분류: `peer-review-learnings.md` 참조.
-> ⛔ 단일 사례로 규칙 만들지 않는다. preference(취향)는 학습 금지. needs-review는 검증 후.
-
-(현재 튜닝 이력 없음 — valid-suggestion 2회+ 관측 후 추가)
-
-## Escalation to Lead
-- 7개 관점 분석 간 모순 발견 시
-- 판단 confidence < 60% 시
-- 아키텍처 영역 이슈 발견 시 (→ review-arch 영역)
-
 ---
 
 ## Verification
@@ -154,6 +144,3 @@ Q-n: `fetchOrders(reset:)`가 2개 독립 의도(재로드/페이지네이션)�
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7/T8), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

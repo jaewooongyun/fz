@@ -7,9 +7,9 @@ Custom subagent 정의 파일(`agents/*.md`) 작성 시 이 템플릿을 참고�
 ```yaml
 ---
 name: {agent-name}                    # lowercase+hyphen, 필수
-description: >-                        # 필수: 역할 + 전문성 + 위임 시점
-  {역할 설명}.
-  Use in {team-type} teams for {purpose}.
+description: >-                        # 필수: 반환물 한 줄 + 호출 계약 한 줄
+  {역할} — {무엇을 반환하는가}.
+  fz 워크플로 내부 워커({호출 워크플로}) — 직접 쓰지 않는다.
 model: sonnet                          # sonnet|opus|inherit
 # Model upgrade note: upgraded to opus in {specific teams} (see team-registry.md)
 tools: Read, Grep, Glob, Bash         # 도구 제한 (생략 시 부모 상속)
@@ -28,7 +28,7 @@ skills:                                # 사전 로드 스킬
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | Yes | 에이전트 식별자. lowercase + hyphen |
-| `description` | Yes | 역할 + 전문성 + 어떤 팀에서 사용되는지 |
+| `description` | Yes | 두 줄 — 반환물 한 줄 + 호출 계약 한 줄. 워크플로 내부 워커는 `fz 워크플로 내부 워커({호출 워크플로}) — 직접 쓰지 않는다`, Lead 가 직접 부르는 에이전트는 그 호출처를 적고 '내부 워커' 문구를 쓰지 않는다 |
 | `model` | Yes | 기본 모델. Primary Worker는 opus, 지원 역할은 sonnet |
 | `tools` | No | 허용 도구 목록. 생략하면 부모 컨텍스트 상속 |
 | `permissionMode` | ⛔ 넣지 않음 | 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다. 권한 방어는 `tools` 허용 목록이 맡는다(guides/agent-team-guide.md §8.5) |
@@ -57,7 +57,7 @@ You are a {role} for {domain/project}.
 - `mcp__context7__query-docs` → {purpose}
 
 ### 사용 불가 (Team agent 제약)
-- {tool} → Lead에게 요청하세요
+- {tool} → 필요 시 **반환 구조에 명시**한다 (Lead가 재주입 — ⛔ 1-shot이므로 중간 요청 채널은 없다)
 
 ## Symbol tools — use them whenever they are in your tool list
 
@@ -85,7 +85,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 ## 통신 규칙 (Workflow)
 1. 이 에이전트는 `workflows/*.js` 결정적 스크립트가 라운드를 소유한다 — P2P SendMessage 없음.
 2. 발견은 구조화 출력(schema)으로 반환하고, Lead/스크립트가 통합한다.
-3. 브리프 명시 채널이 에이전트 기본 지시보다 우선한다 (`guides/agent-team-guide.md` §2).
+3. 브리프 명시 채널이 에이전트 기본 지시보다 우선한다.
 
 ## 워크플로우
 1. {first action}
@@ -103,13 +103,13 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 ```
 BAD:  "Helps review code"
 BAD:  "I am a code reviewer who checks quality"
-GOOD: "아키텍처 비평 전문 에이전트. RIBs + Clean Architecture 설계 결정, 확장성 평가.
-       Use in peer-review or review teams for architecture analysis."
-GOOD: "설계 및 계획 구조 전문 에이전트. 요구사항 분해 + 영향 범위 분석 + 구현 전략 수립.
-       Use in full-cycle or plan teams for architecture planning."
+GOOD: "아키텍처 리뷰 렌즈 — 설계 결정 · 레이어 위반 · 확장성 발견을 리뷰 스키마로 반환한다.
+       fz 워크플로 내부 워커(review-live · peer-review) — 직접 쓰지 않는다."
+GOOD: "교훈 큐레이터 — 지금 작업에 맞는 교훈 · 결정을 검증 상태와 출처를 붙여 반환한다.
+       Lead 가 워크플로 밖에서 직접 부른다."
 ```
 
-핵심: 역할 + 전문성 한 줄, 팀 컨텍스트 한 줄.
+핵심: 반환물 한 줄, 호출 계약 한 줄 — 워크플로 내부 워커는 '직접 쓰지 않는다', Lead 가 직접 부르는 에이전트는 그 호출처를 적는다('내부 워커' 문구를 쓰지 않는다).
 
 ## Model Selection Guide
 
@@ -149,7 +149,7 @@ GOOD: "설계 및 계획 구조 전문 에이전트. 요구사항 분해 + 영�
 
 새 에이전트 파일 작성 후 확인하세요.
 
-- [ ] description에 역할 + 전문성 + 팀 컨텍스트 포함?
+- [ ] description이 반환물 한 줄 + 호출 계약 한 줄인가?
 - [ ] model이 역할에 맞는가 (sonnet for support, opus for primary)?
 - [ ] tools가 최소한인가 (필요한 것만)?
 - [ ] 반환 규칙(호출 워크플로 스키마가 정본 · enum 값 복사 금지) 포함?
@@ -167,6 +167,3 @@ GOOD: "설계 및 계획 구조 전문 에이전트. 요구사항 분해 + 영�
 
 - 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
 - 외부 모델/도구 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-- T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 후 계속
-
-관련 modules: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).

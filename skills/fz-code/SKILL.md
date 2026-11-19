@@ -108,6 +108,7 @@ metadata:
 6. **반환 처리**: `residualIssues`(stage3 미반영/미동의) 최종 판정은 Lead
    - ⛔ **렌즈 회계를 먼저 본다** (F-216 N1): `lensesCompleted` < `lensesExpected` 면 검토 렌즈가 죽었고 `residualNote` 에 죽은 렌즈 이름이 담긴다 — `reviewVerdict` 는 일부만 죽으면 `'partial'`, 전부 죽으면(light 의 단독 렌즈 포함) `'skipped'` 다. ⛔ `'skipped'` 만 보고 생략으로 읽지 않는다 — 검토를 의도해 생략한 반환은 `lensesExpected` 0 · `residualNote` null 이다. 이전 판은 렌즈 하나가 죽어도 `'pass'` + 완주 3/3 을 인쇄해 **검토 절반이 빠진 것을 반환값만으로는 알 수 없었다**.
    - 렌즈가 죽었으면(`'partial'` · `lensesCompleted` < `lensesExpected` 인 `'skipped'`) 그 관점(아키텍처 또는 품질)은 **적용되지 않았다** — 다음 Step 으로 넘어가기 전에 재invoke 할지 Lead 가 판정한다
+   - `changeset.openQuestions`(구현자의 설계 의문 · Redundant Import 신호)가 비어 있지 않으면 Lead 가 읽는다 — Redundant Import 는 절차 3 의 마찰 신호로, 설계 의문은 사용자 질문으로 올린다. 칸이 없거나 빈 배열이면 할 일이 없다
    - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). ⛔ 여기서 사다리를 재정의하지 않는다
    - **code-pair 고유분만**: ① H5 크기 가드 — `split_required`/`splitSuggested` 시 Step 분할(과대 changeset scaffold collapse 방지) ② 재시도는 `buildFeedback` 포함 **새 invoke**(캐시 키 변경 → resume 비의존) ③ Stage1 null 재시도는 **1회 한정**·일시 장애 의심 시만
    - ⛔ **심볼 도구 점검** (Step 마다 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 `--tools-md` 를 뺀다) — exit 1 · 2 는 통과가 아니다 · 낱말마다 할 일은 `modules/symbol-tools-audit.md`

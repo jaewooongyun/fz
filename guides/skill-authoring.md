@@ -527,7 +527,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 
 ### 표준 패턴 3종 (전 스크립트 의무 — pilot 실측 검증)
 
-1. **OVERRIDE 블록**: agentType 재사용 시 모든 agent() 프롬프트 선두에 — "P2P 통신 없음. SendMessage/피어 회신/Lead 보고 지시 미적용. 에이전트 정의의 Phase 절차·티켓 폴더·이전 세션·메모리 컨텍스트 로딩도 미적용 — 이 프롬프트의 입력만이 과제 전부. 무관 작업 폴더 읽기 금지. 최종 텍스트가 반환값(1-shot raw data). ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다)." [근거: pilot invoke #1 — 에이전트 정의의 컨텍스트 로딩이 args를 압도해 무관 폴더 anchoring] [advisor 문구 근거: 워커는 세션 `advisorModel` 을 상속하고 네이티브 차단 수단이 없다(`modules/governance.md` 운용 규칙 5) — 표준에 문구가 없던 시기 워크플로 4개가 누락해 `scripts/check_wf_advisor_ban.py` 가 표준을 강제한다]
+1. **OVERRIDE 블록**: agentType 재사용 시 모든 agent() 프롬프트 선두에 — "P2P 통신 없음. 에이전트 정의의 Phase 절차·티켓 폴더·이전 세션·메모리 컨텍스트 로딩도 미적용 — 이 프롬프트의 입력만이 과제 전부. 무관 작업 폴더 읽기 금지. 최종 텍스트가 반환값(1-shot raw data). ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다)." [근거: pilot invoke #1 — 에이전트 정의의 컨텍스트 로딩이 args를 압도해 무관 폴더 anchoring] [advisor 문구 근거: 워커는 세션 `advisorModel` 을 상속하고 네이티브 차단 수단이 없다(`modules/governance.md` 운용 규칙 5) — 표준에 문구가 없던 시기 워크플로 4개가 누락해 `scripts/check_wf_advisor_ban.py` 가 표준을 강제한다]
 2. **args 방어 파싱 + fail-fast**: scriptPath 호출 시 args가 JSON **문자열**로 도착한다 [실측: probe wf_00000000-002, typeof=string] → `typeof args === 'string' ? JSON.parse(args) : args` + 필수 키 누락 시 에이전트 스폰 전 `{mode:'fallback'}` 즉시 반환 (fabrication 방지)
 3. **agentType 네임스페이스**: 플러그인 에이전트는 `fz:` prefix 필수 [실측: S0 — 'plan-structure' not found / 'fz:plan-structure' 동작]
 
