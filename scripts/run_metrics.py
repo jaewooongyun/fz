@@ -26,9 +26,12 @@
 
 start  end 없이 남은 앞 시도의 표지를 status interrupted 1행으로 먼저 닫고 다음 attempt 의 표지를 연다.
        attempt = 1 + 그 run_id 의 끝난 행 수(번호가 비어 있으면 최대 attempt + 1). stdout `RUN <run_id> attempt <n>`.
-       --reuse-open 이면 그 run_id 의 열린 표지가 있을 때 닫지 않고 그 시도를 그대로 쓴다(표지를 바꾸지 않는다 ·
+       --reuse-open 이면 그 run_id 의 가장 새 열린 표지를 닫지 않고 그 시도를 그대로 쓴다(표지를 바꾸지 않는다 ·
        stdout `RUN <run_id> attempt <n> reused`) — 같은 실행 안에서 다시 불리는 호출자(피어 리뷰 근거 슬롯 검사)의 재호출이
-       새 실행으로 세어지지 않게 한다. 열린 표지가 없으면 보통 start 와 같다.
+       새 실행으로 세어지지 않게 한다. 단 둘 다 맞을 때만이다: 연 지 RUN_OPEN_STALE_HOURS 미만(sweep 과 같은 시각 기준) ·
+       표지의 session_id 가 이번 호출의 세션과 같다(어느 한쪽 세션을 모르면 세션은 보지 않고 나이만 본다). 아니면 보통 start 와
+       같다 — 그 표지를 interrupted 로 닫고 이번 호출의 값으로 다음 attempt 를 연다. 더 오래된 열린 표지는 어느 쪽이든 닫는다.
+       열린 표지가 없으면 보통 start 와 같다.
 end    열린 표지를 1행으로 닫는다. model = 세션 트랜스크립트의 마지막 assistant message.model ·
        effort = mode_gate.lead_effort 의 override(있으면) 또는 value. 트랜스크립트를 못 읽으면 둘 다 unknown(추측하지 않는다).
        같은 시도에 두 번 부르면 두 번째는 `RUN <run_id> already ended` 이고 행을 더 쓰지 않는다.
@@ -71,7 +74,7 @@ PLUGIN_ROOT = SCRIPT_DIR.parent
 
 RUN_SCHEMA = 1                          # fz_telemetry_report.py 와 같은 이름 · 같은 값 — 읽는 쪽은 이 schema 의 행만 센다
 DEFAULT_RUN_STATE = "~/.fz/runs"        # 사용자 중립 기본값 — 개인 경로는 env FZ_RUN_STATE 로 (fz_telemetry_report.py 와 같은 이름 · 같은 값)
-RUN_OPEN_STALE_HOURS = 24.0             # sweep 기본값 · 리포터의 '오래 열린 시도' 기준 — fz_telemetry_report.py 와 같은 이름 · 같은 값
+RUN_OPEN_STALE_HOURS = 24.0             # sweep 기본값 · start --reuse-open 의 재사용 한도 · 리포터의 '오래 열린 시도' 기준 — fz_telemetry_report.py 와 같은 이름 · 같은 값
 RUN_STATUSES = ("completed", "interrupted", "failed")   # fz_telemetry_report.py 와 같은 이름 · 같은 값
 DEFAULT_PROJECTS = "~/.claude/projects"
 RUNS_FILE = "runs.jsonl"
@@ -466,18 +469,35 @@ def close_marker(pdir: Path, path: Path, run_id: str, attempt: int, status: str,
 
 
 # ── 명령 ────────────────────────────────────────────────────────────────────
+def reusable(path: Path, sid: str) -> bool:
+    """`start --reuse-open` 이 이 열린 표지를 그대로 써도 되나 — 둘 다 맞을 때만 그렇다.
+
+    연 지 RUN_OPEN_STALE_HOURS 미만(시각은 sweep 과 같은 marker_epoch) · 표지의 session_id 가 이번 호출의 세션과 같다
+    (어느 한쪽 세션을 모르면 세션은 보지 않고 나이만 본다). 같은 작업 폴더면 run_id 가 다시 같으므로(피어 리뷰는 PR 마다 폴더가
+    고정이다) 버려진 시도의 표지를 다른 세션이나 며칠 뒤의 호출이 이어 쓰면 옛 모드 · 추천 · 시작 시각이 새 실행의 행에 실린다.
+    """
+    marker = read_marker(path)
+    theirs = marker.get("session_id") if isinstance(marker.get("session_id"), str) else ""
+    if sid and theirs and sid != theirs:
+        return False
+    return marker_epoch(path, marker) > time.time() - RUN_OPEN_STALE_HOURS * 3600.0
+
+
 def cmd_start(args, env) -> int:
     pid = pipeline_id(args.work_dir, env)
     rid = run_id_of(pid, args.skill)
     pdir = state_root(env) / pid
     with locked(pdir):
         reuse = open_markers(pdir, rid) if args.reuse_open else []
-        if reuse:   # 같은 실행 안의 재호출 — 열린 시도를 그대로 쓴다(닫고 번호를 올리면 재호출이 새 실행으로 세어진다)
-            print(f"RUN {rid} attempt {reuse[-1][0]} reused")
-            return 0
+        keep = reuse[-1][2] if reuse and reusable(reuse[-1][2], session_of(env)) else None   # 가장 새 표지만 후보다
         for attempt, _, path in open_markers(pdir, rid):   # end 없이 끝난 앞 시도 — 이번 start 는 재개다
+            if path == keep:
+                continue
             if close_marker(pdir, path, rid, attempt, "interrupted", None, env, args.projects_root, skill=args.skill):
                 print(f"RUN {rid} attempt {attempt} interrupted")
+        if keep is not None:   # 같은 실행 안의 재호출 — 열린 시도를 그대로 쓴다(닫고 번호를 올리면 재호출이 새 실행으로 세어진다)
+            print(f"RUN {rid} attempt {reuse[-1][0]} reused")
+            return 0
         rows = read_rows(pdir, rid)
         attempt = 1 + max([len(rows)] + attempts_of(rows))
         marker = {"run_id": rid, "attempt": attempt, "skill": args.skill, "mode": args.mode,
@@ -610,7 +630,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--work-dir")
     s.add_argument("--reason")
     s.add_argument("--reuse-open", action="store_true",
-                   help="그 run_id 의 열린 시도가 있으면 닫지 않고 그대로 쓴다(같은 실행 안에서 다시 부르는 호출자)")
+                   help="그 run_id 의 가장 새 열린 시도를 닫지 않고 그대로 쓴다(같은 실행 안에서 다시 부르는 호출자) — "
+                        f"연 지 {RUN_OPEN_STALE_HOURS:g}시간 미만이고 세션 id 가 같을 때만(한쪽 세션을 모르면 나이만 본다) · 아니면 보통 start")
     e = sub.add_parser("end", parents=[common], help="완료 보고 직전")
     e.add_argument("--skill", required=True, type=skill)
     e.add_argument("--work-dir")
@@ -647,16 +668,18 @@ def self_test() -> int:
             encoding="utf-8")
         me = str(Path(__file__).resolve())
 
-        def env_for(state):
+        def env_for(state, session=sid):
             env = {k: v for k, v in os.environ.items() if k not in STRIP_ENV}
-            env.update({"FZ_RUN_STATE": str(state), "CLAUDE_CODE_SESSION_ID": sid, "PYTHONDONTWRITEBYTECODE": "1"})
+            env.update({"FZ_RUN_STATE": str(state), "CLAUDE_CODE_SESSION_ID": session, "PYTHONDONTWRITEBYTECODE": "1"})
+            if not session:   # 세션 id 를 모르는 호출 — 빈 값으로 두지 않고 변수를 뺀다
+                del env["CLAUDE_CODE_SESSION_ID"]
             return env
 
         def argv(*args, strict=True):
             return [sys.executable, "-B", me, *args, "--projects-root", str(projects)] + (["--strict"] if strict else [])
 
-        def cli(state, *args, strict=True):
-            proc = subprocess.run(argv(*args, strict=strict), env=env_for(state), capture_output=True, text=True,
+        def cli(state, *args, strict=True, session=sid):
+            proc = subprocess.run(argv(*args, strict=strict), env=env_for(state, session), capture_output=True, text=True,
                                   timeout=120, stdin=subprocess.DEVNULL)
             return proc.returncode, proc.stdout, proc.stderr
 
@@ -802,6 +825,64 @@ def self_test() -> int:
                   and [(r.get("attempt"), r.get("status")) for r in rows] == [(1, "completed")])
             return ok, f"rc={[o[0] for o in outs]} open={first} → {after} rows={len(rows)} out={outs[1][1].strip()!r}"
 
+        def reuse_full(st, wd, session=sid):   # 앞 시도(light)와 다른 값의 --reuse-open — 새 시도가 열리면 이 값이 표지에 실린다
+            return cli(st, "start", "--skill", "fz-search", "--mode", "full", "--recommended", "full", "--source", "gate",
+                       "--work-dir", str(wd), "--reuse-open", session=session)
+
+        def age_marker(st, attempt, hours):   # 열린 표지의 started_at 을 hours 시간 전으로 되돌린다
+            for path in st.glob(f"*/{OPEN_DIR}/*.{attempt}.json"):
+                marker = json.loads(path.read_text(encoding="utf-8"))
+                marker["started_at"] = datetime.fromtimestamp(time.time() - hours * 3600.0, timezone.utc).strftime(TS_FORMAT)
+                path.write_text(json.dumps(marker), encoding="utf-8")
+
+        def state_of(st):   # ([(attempt, mode, recommended, session_id)] 열린 표지, [(attempt, status, mode)] 끝난 행)
+            marks = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(st.glob(f"*/{OPEN_DIR}/*.json"))]
+            rows, _ = rows_of(st)
+            return ([(m.get("attempt"), m.get("mode"), m.get("recommended"), m.get("session_id")) for m in marks],
+                    [(r.get("attempt"), r.get("status"), r.get("mode")) for r in rows])
+
+        def reopened(outs, st, session=sid):   # 앞 시도는 interrupted 1행 · 이번 호출의 값으로 attempt 2 가 열렸다
+            got = state_of(st)
+            ok = (all(o[0] == 0 for o in outs) and got == ([(2, "full", "full", session or None)], [(1, "interrupted", "light")])
+                  and re.search(r"^RUN [0-9a-f]{12} attempt 1 interrupted\nRUN [0-9a-f]{12} attempt 2$", outs[-1][1], re.M) is not None)
+            return ok, f"rc={[o[0] for o in outs]} open={got[0]} rows={got[1]} out={outs[-1][1].strip()!r}"
+
+        def c_reuse_open_other_session():
+            st, wd = base / "s-reuse-other", base / "wd-reuse-other"
+            other = "selftest-session-0002"   # 같은 작업 폴더를 다른 세션이 다시 연다 — 버려진 앞 시도를 이어 쓰지 않는다
+            return reopened([start(st, "fz-search", wd), reuse_full(st, wd, session=other)], st, session=other)
+
+        def c_reuse_open_stale():
+            st, wd = base / "s-reuse-stale", base / "wd-reuse-stale"
+            outs = [start(st, "fz-search", wd)]
+            age_marker(st, 1, RUN_OPEN_STALE_HOURS + 1)   # 같은 세션이어도 sweep 기준보다 오래 열린 표지는 버려진 시도다
+            outs.append(reuse_full(st, wd))
+            return reopened(outs, st)
+
+        def c_reuse_open_no_session():
+            st, wd = base / "s-reuse-nosess", base / "wd-reuse-nosess"
+            outs = [start(st, "fz-search", wd), reuse_full(st, wd, session="")]   # 호출 쪽 세션 모름 · 새 표지 → 나이만 본다
+            fresh = re.search(r"^RUN [0-9a-f]{12} attempt 1 reused$", outs[1][1], re.M) is not None
+            age_marker(st, 1, RUN_OPEN_STALE_HOURS + 1)
+            outs.append(reuse_full(st, wd, session=""))   # 세션 모름 · 오래된 표지 → 닫고 새 시도(세션 없는 표지)
+            stale, why = reopened(outs, st, session="")
+            outs.append(reuse_full(st, wd))   # 표지 쪽 세션 모름 · 새 표지 → 그대로 쓴다
+            again = (outs[-1][0] == 0 and state_of(st) == ([(2, "full", "full", None)], [(1, "interrupted", "light")])
+                     and re.search(r"^RUN [0-9a-f]{12} attempt 2 reused$", outs[-1][1], re.M) is not None)
+            return fresh and stale and again, f"fresh={fresh} stale={stale} again={again} {why} last={outs[-1][1].strip()!r}"
+
+        def c_reuse_open_newest():
+            st, wd = base / "s-reuse-newest", base / "wd-reuse-newest"
+            outs = [start(st, "fz-search", wd)]
+            for path in st.glob(f"*/{OPEN_DIR}/*.1.json"):   # 같은 run 의 열린 표지 둘 — 가장 새 것만 후보 · 나머지는 보통 start 처럼 닫는다
+                marker = dict(json.loads(path.read_text(encoding="utf-8")), attempt=2)
+                path.with_name(path.name[:-len(".1.json")] + ".2.json").write_text(json.dumps(marker), encoding="utf-8")
+            outs.append(start(st, "fz-search", wd, "--reuse-open"))
+            got = state_of(st)
+            ok = (all(o[0] == 0 for o in outs) and got == ([(2, "light", "light", sid)], [(1, "interrupted", "light")])
+                  and re.search(r"^RUN [0-9a-f]{12} attempt 1 interrupted\nRUN [0-9a-f]{12} attempt 2 reused$", outs[1][1], re.M) is not None)
+            return ok, f"rc={[o[0] for o in outs]} open={got[0]} rows={got[1]} out={outs[1][1].strip()!r}"
+
         def c_harness_fields():
             st, wd = base / "s-harness", base / "wd-harness"
             gate_b = "Confident Error (cross-model 불일치)"
@@ -863,6 +944,8 @@ def self_test() -> int:
         cases = (("concurrent", c_concurrent), ("duplicate-end", c_duplicate_end), ("interrupted", c_interrupted),
                  ("write-failure", c_write_failure), ("no-body-copy", c_no_body_copy), ("source-default", c_source_default),
                  ("resume-attempt", c_resume_attempt), ("reuse-open", c_reuse_open),
+                 ("reuse-open-other-session", c_reuse_open_other_session), ("reuse-open-stale", c_reuse_open_stale),
+                 ("reuse-open-no-session", c_reuse_open_no_session), ("reuse-open-newest", c_reuse_open_newest),
                  ("harness-fields", c_harness_fields), ("skill-alias", c_skill_alias),
                  ("unknown-skill", c_unknown_skill), ("active-min", c_active_min))
         passed = 0

@@ -31,7 +31,8 @@ profile(`--profile`): peer-review(기본 — ①~⑤) · plan · discover · fix
 실행 기록(profile peer-review 이고 판정이 PASS 일 때만 — 명령줄 실행만 · check() 를 직접 부르는 self-test 셀은 쓰지 않는다):
   `run_metrics.py start --skill fz-peer-review --work-dir <WORK_DIR> --reuse-open` 을 부른다. mode = Tier 0·1 light · 2·3 full ·
   `--recommended`(기본 none) · `--source`(선택)는 그대로 넘긴다(값은 modules/mode-gate.md § 기록). 같은 WORK_DIR 의 열린 시도가 있으면
-  그대로 쓴다 — 근거를 보완한 재검사가 새 실행으로 세어지지 않는다(같은 폴더에서 리뷰를 처음부터 다시 시작해도 end 전이면 한 실행이다).
+  그대로 쓴다 — 근거를 보완한 재검사가 새 실행으로 세어지지 않는다(같은 세션이 같은 폴더에서 리뷰를 처음부터 다시 시작해도 end 전이면 한 실행이다).
+  다른 세션이 열었거나 RUN_OPEN_STALE_HOURS 넘게 열린 시도는 이어 쓰지 않는다 — 기록기가 interrupted 로 닫고 새 시도를 연다(조건은 run_metrics.py start).
   종료는 스킬이 Deliver 끝에 같은 `--work-dir` 로 `run_metrics.py end --skill fz-peer-review` 를 부른다(pipeline 이 WORK_DIR 로 정해진다).
   저장은 `${FZ_RUN_STATE:-~/.fz/runs}` — ⛔ 시험에서 이 명령을 부를 때는 FZ_RUN_STATE 를 임시 폴더로 준다(없으면 사용자 기록에 쓴다).
   기록기의 출력 · 실패는 stderr 로만 간다 — exit code 와 stdout 줄은 기록이 바꾸지 않는다.
@@ -115,7 +116,7 @@ def record_start(work: str, tier: int, recommended: str, source) -> None:
     """근거 슬롯 검사를 통과한 피어 리뷰 실행의 시작을 실행 기록에 남긴다 — `run_metrics.py start --reuse-open`.
 
     Tier 0·1 = light · 2·3 = full(modules/mode-gate.md § 기록). 같은 WORK_DIR 의 열린 시도가 있으면 그대로 쓴다 — 근거를 보완한 재검사는
-    새 실행이 아니다. 기록기의 출력 · 실패는 stderr 로만 보낸다 — 검사기의 exit code 와 stdout 줄은 기록과 무관하다.
+    새 실행이 아니다(다른 세션이 열었거나 오래 열린 시도는 기록기가 닫고 새로 연다). 기록기의 출력 · 실패는 stderr 로만 보낸다 — 검사기의 exit code 와 stdout 줄은 기록과 무관하다.
     """
     cmd = [sys.executable, "-B", RUN_METRICS, "start", "--skill", "fz-peer-review", "--mode", "light" if tier <= 1 else "full",
            "--recommended", recommended, "--work-dir", work, "--reuse-open"]
