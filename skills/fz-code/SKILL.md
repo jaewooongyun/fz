@@ -83,17 +83,6 @@ metadata:
 > 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
 > **역방향 트리거**: `modules/plugin-refs.md` "역방향 감지 트리거" 참조. `@MainActor`/`actor` 등이 없어도 싱글톤+가변상태 감지 시 안전성 분석 활성화
 
-## sc: 활용 (SuperClaude 연계)
-
-| 조건 | sc: 명령어 | 쓰는 방식 |
-|------|-----------|----------|
-| 빌드 **2회 연속** 실패 | `/sc:sc-troubleshoot --fix` | 선택 |
-| 5+ 파일 변경한 Step | `/sc:sc-analyze --focus quality` | **자동 제안** |
-| SOLO + 3+ 파일 변경 | `/sc:sc-reflect --type correctness` | 선택 |
-| 3+ Step 구현 중간점 | `/sc:sc-reflect --type task` | 선택 |
-| 복잡한 다중 파일 구현 | `/sc:sc-implement` | 수동 |
-| API 불확실 | Context7 + `/sc:sc-explain` | 수동 |
-
 ## 팀 에이전트 모드
 
 > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
@@ -214,7 +203,6 @@ metadata:
 | 파일 시작에 코드 추가 | `mcp__plugin_fz_serena__insert_before_symbol` | import 등 |
 | 심볼 이름 변경 | 정의부 `Edit` + `find_referencing_symbols`(호출) ∪ `find_implementations`(구현) ∪ `Grep` 전수로 소비자를 열거한 뒤 개별 치환 | ⛔ `rename_symbol` 은 배선에서 뺐다 — dry-run 실측에서 프로토콜 메서드 이름 변경 시 편집 대상이 **선언 1파일뿐**이고 conformance 구현부를 빠뜨렸다(빌드 파손) |
 | 새 파일 생성 | `Write` + `/fz-new-file` | 헤더 규칙 준수 |
-| 복잡한 다중 파일 | `/sc:sc-implement` | SuperClaude 위임 |
 | 단순 텍스트 수정 | `Edit` | 간단한 인라인 수정 |
 
 ---
@@ -312,7 +300,7 @@ metadata:
 
 4. **API 문법 확인** (불확실할 때 + SDK 래퍼 작성 시 필수):
    - `mcp__context7__query-docs` → 정확한 문법/시그니처
-   - `/sc:sc-explain` → API 사용법 설명
+   - `/sc:sc-explain` → API 사용법 설명 (도구 목록에 있으면 쓴다)
    - **SDK 래퍼 원칙**: 래퍼 함수의 모든 파라미터가 내부 SDK 호출에 전달되는지 확인. SDK에 해당 파라미터를 받는 오버로드가 있는지 반드시 검증
 
 5. **(선택) /simplify 게이트**: 코드 변경이 있을 때 `/simplify focus on {step-context}` (참조: modules/execution-modes.md)
@@ -355,7 +343,7 @@ metadata:
    형식 참조: `modules/context-artifacts.md`
 
 7. **요구사항 부합 검증** (선택 — 3+ Step 구현에서만):
-   - `/sc:sc-reflect --type task` → 현재까지의 구현이 계획에 부합하는지 확인
+   - Lead 가 현재까지의 구현을 계획의 Step 목록과 대조해 부합하는지 확인
    - 조건: 전체 Step이 3개 이상인 구현의 중간 지점에서 실행
    - 목적: 방향 이탈 조기 발견 → 토큰 낭비 방지
 
@@ -391,7 +379,6 @@ metadata:
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
 - [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
-- [ ] SOLO + 3+ 파일 변경에서 `/sc:sc-reflect` 를 실행했으면(선택) 결과를 기록했는가? (하네스 원칙 4 + Gap G-R1, 관찰 중)
 - [ ] ⛔ GPT 교차 검증 완료? (GPT 를 켠 세션 — light · full 모두 Lead가 /fz-gpt check 실행 · 끈 세션은 `[GPT 미사용]` 기록)
 
 ---

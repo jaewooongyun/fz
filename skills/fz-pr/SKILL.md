@@ -38,7 +38,7 @@ metadata:
 
 ## 사용 도구
 
-`/sc:sc-git` 스킬을 사용하여 푸시 및 PR 생성을 실행합니다.
+`git push` 로 푸시하고 `gh pr create` 로 PR 을 생성합니다.
 
 ---
 

@@ -90,14 +90,10 @@ metadata:
 
 수정 자체가 안티패턴 도입할 위험이 있으므로 fix 시작 전 위 3 패턴 사전 점검 의무.
 
-## sc: 활용 (SuperClaude 연계)
+## 스킬 전환
 
-| Mode/상황 | sc: 명령어 | 용도 |
+| Mode/상황 | 전환 | 용도 |
 |----------|-----------|------|
-| 버그 수정 | `/sc:sc-troubleshoot` | 에러 원인 진단(선택) |
-| 복잡한 에러 | `/sc:sc-explain` | 프레임워크/라이브러리 깊은 에러 교육적 설명 |
-| 수정 후 | `/sc:sc-analyze` | 수정 코드 빠른 품질 체크 |
-| 복잡한 수정 후 | `/sc:sc-reflect --type task` | 근본 원인 해결 여부 자체 검증 |
 | 코드 탐색 필요 | `→ /fz-search` | 전용 탐색 스킬로 전환 |
 | 복잡도 초과 | `→ /fz-plan` 또는 `→ /fz-code` | 스킬 전환 |
 
@@ -163,8 +159,7 @@ metadata:
 
 1. **구조적 추론** (복잡한 버그):
    - `mcp__sequential-thinking__sequentialthinking` → 5 Whys 기법 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
-   - `/sc:sc-troubleshoot` → 진단(선택)
-   - `/sc:sc-explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명
+   - `/sc:sc-explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명 (도구 목록에 있으면 쓴다)
 2. **⛔ Step 1c 완료 전 코드 수정 금지**. root-cause가 불명확하면 AskUserQuestion.
 
 ### Step 2: 수정
@@ -178,7 +173,6 @@ metadata:
 | 심볼 수정 | `mcp__plugin_fz_serena__replace_symbol_body` |
 | 코드 추가 | `mcp__plugin_fz_serena__insert_after_symbol` |
 | 간단 수정 | `Edit` |
-| 복잡한 수정 | `/sc:sc-troubleshoot` |
 
 ### Step 3: 빌드 검증
 
@@ -190,9 +184,6 @@ metadata:
 
 수정이 재현 경로(Step 1a)에서 문제를 해결했는지 확인:
 - `mcp__plugin_fz_serena__find_referencing_symbols` → 참조 무결성 확인
-- `/sc:sc-analyze` → 빠른 품질 체크
-- `/sc:sc-reflect --type task` → 수정이 근본 원인을 해결했는지 자체 검증
-  (트리거: 복잡한 버그 수정 완료 후, 단순 수정은 스킵)
 - GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다
   - `run` · `config` → `/fz-gpt check` 호출 → cross-model 검증. verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
   - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.md` § GPT 미사용) / `ask` → 모델 질문 → `set` → 다시 decide

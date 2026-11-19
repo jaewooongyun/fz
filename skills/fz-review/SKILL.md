@@ -77,14 +77,6 @@ metadata:
 > diff에 `@MainActor|actor|async|@Observable` 감지 시 해당 플러그인 참조. **역방향 트리거**: 동시성 키워드 없어도 `static let shared` + `var` 등 감지 시 Concurrency Safety 적용
 > **iOS 16 minimum target 검증**: diff에 iOS 17+ API (`@Observable`, `@Bindable`, onChange new signature) 사용 시 `#available` 가드 존재 여부 검증 의무.
 
-## sc: 활용 (SuperClaude 연계)
-
-| Phase | sc: 명령어 | 용도 |
-|-------|-----------|------|
-| 5 | `/sc:sc-analyze`, `/fz-gpt review`, `/sc:sc-spec-panel` | 품질분석, GPT 리뷰, 스펙 패널 |
-| 5.5 | `/fz-gpt validate` | 역검증 |
-| 6 | `/sc:sc-improve`, `/sc:sc-cleanup`, `/sc:sc-reflect` | 개선, 정리, 자체검증 |
-| 7 | `/sc:sc-test` | 최종 테스트 검증 |
 ## 팀 에이전트 모드 (Review Squad)
 
 > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
@@ -236,7 +228,7 @@ fz-gpt가 수행하는 작업:
 ### 검증 3: SuperClaude 정적 분석
 
 ```
-/sc:sc-analyze → 코드 품질, 보안, 성능, 아키텍처 종합 분석
+/sc:sc-analyze → 코드 품질, 보안, 성능, 아키텍처 종합 분석 (도구 목록에 있으면 쓴다)
 ```
 
 ### 검증 4: Refactoring Completeness (리팩토링 완성도)
@@ -304,30 +296,17 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 - **완료기준 (UI/제스처/애니메이션 동작 변경 시)**: 빌드 통과 ≠ 완료. visual oracle(launch_app_sim + screenshot · 실기기 시각 확인) 미충족 시 "완료" 선언 지양 — fz는 런타임 동작을 정적으로 못 봄(자동 실행 불가 = 사람 영역, 🔒 강제 게이트 불가). 기존 'screenshot 권고'를 evidence 3 sessions(38차 OBS-07 · OBS-10 · OBS-16) 기반으로 강화.
 ```
 
-### 검증 6: Spec Panel 스펙 부합 (조건부)
-
-새 모듈 생성이 포함된 변경사항에서만 실행:
-
-```
-/sc:sc-spec-panel --mode critique --focus requirements|architecture
-```
-
-- 트리거: diff에 새 Router/Interactor/Builder 파일 포함 시
-- 전문가 패널이 스펙 부합 여부, 아키텍처 결정의 타당성 리뷰
-- 결과: Issue Tracker에 spec_concern 카테고리로 기록
-
 ### Gate 4: Review Passed
 - [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 참조 무결성 확인? (Serena)
 - [ ] ⛔ GPT 리뷰 통과? (**Critical 0건 + Major는 결함(회귀·버그·영향범위)에 한해 차단** — ⛔ 구조 개선 제안은 major여도 **non-blocking**. `ReviewFindingsSchema`에 `origin`이 없어 기계 판별이 불가하므로 **Lead가 결함/개선을 판정**한다. 이 구분이 없으면 "제안"이 강제 수정이 된다. GPT 실행 자체는 필수)
-- [ ] /sc:sc-analyze 통과? (심각한 문제 없음)
+- [ ] /sc:sc-analyze 통과? (도구 목록에 있을 때 · 심각한 문제 없음)
 - [ ] Constraint Matrix Compliance 통과? (제약 매트릭스 부합, /fz-discover 산출물 있을 때)
 - [ ] Refactoring Completeness 통과? (deprecated dead code 없음)
 - [ ] Module Boundary 통과? (access control이 의도와 일치)
 - [ ] ⛔ 타입 소속 검증 통과? (각 public type의 관심사가 모듈 책임에 부합)
 - [ ] Anti-Pattern Enforcement 통과? (금지 패턴 0건, Plan에 Constraints 있을 때)
 - [ ] UI/UX Safety 통과? (UI/제스처/애니메이션 변경 시 visual oracle 권장 — 빌드통과≠완료, fz 자동 불가=사람 영역. evidence 3 sessions 강화)
-- [ ] Spec Panel 통과? (새 모듈 시, 스펙 부합 확인)
 - [ ] Protocol Conformance 통과? (시그니처 변경 시, 프로토콜 선언부 동기화 확인)
 - [ ] Source Fidelity 통과? (리팩토링 시, 원본 대비 추가된 파라미터/로직 없음)
 - [ ] Transformation Equivalence 통과? (Spec 있을 때, 스레드/에러/추상화 요구사항 준수)
@@ -382,7 +361,7 @@ N (GPT 제기 이슈 수) >= 10 ?
 ### 절차
 
 1. **미해결 이슈 로드**: Issue Tracker에서 미해결 이슈 추출
-2. **이슈 수정** (Lead 직접 — `review-live.js`는 수정 에이전트를 스폰하지 않는다): `mcp__plugin_fz_serena__replace_symbol_body` → 심볼 단위 수정, `/sc:sc-improve` → 복잡한 개선
+2. **이슈 수정** (Lead 직접 — `review-live.js`는 수정 에이전트를 스폰하지 않는다): `mcp__plugin_fz_serena__replace_symbol_body` → 심볼 단위 수정
 3. **빌드 재검증**: 참조 `modules/build.md` — 빌드 검증 절차
 4. **Issue Tracker 상태 업데이트**: addressed로 변경
 5. **Phase 5.5로 돌아가 재검증**: `/fz-gpt validate`

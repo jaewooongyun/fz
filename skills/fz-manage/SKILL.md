@@ -62,27 +62,23 @@ metadata:
 
 ## list -- 전체 인벤토리
 
-모든 fz- 스킬, sc: 명령어, 공유 모듈, 메모리를 조회합니다.
+모든 fz- 스킬, 공유 모듈, 메모리를 조회합니다.
 
 ### 절차
 
 1. `Glob("skills/*/SKILL.md")` → fz- 스킬 목록
 2. 각 SKILL.md의 YAML frontmatter 파싱
-3. `Glob("~/.claude/commands/sc/*.md")` → sc: 명령어 목록
-4. `Glob("modules/*.md")` → 공유 모듈 목록
+3. `Glob("modules/*.md")` → 공유 모듈 목록
 
 ### 출력 형식
 
 ```markdown
 ## fz- 스킬 인벤토리
 
-| 스킬 | 카테고리 | 상태 | 크기 | sc: 활용 |
-|------|---------|------|------|---------|
-| fz-plan | workflow | OK | 220줄 | design, analyze |
-| ... | ... | ... | ... | ... |
-
-## sc: 명령어
-analyze, brainstorm, build, cleanup, ...
+| 스킬 | 카테고리 | 상태 | 크기 |
+|------|---------|------|------|
+| fz-plan | workflow | OK | 220줄 |
+| ... | ... | ... | ... |
 
 ## 공유 모듈
 build.md, governance.md, session.md, skill-template.md, README.md

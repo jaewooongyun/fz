@@ -40,7 +40,7 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
 | 도구 | 없으면 | 사용처 | 설치 |
 |------|--------|:------:|------|
 | **Claude Code** | 동작 불가 | 전부 | 네이티브 설치(권장) — [설치 문서](https://code.claude.com/docs/en/setup) · 또는 `npm install -g @anthropic-ai/claude-code` |
-| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 14/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
+| **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 5/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
 | **Serena MCP** | 심볼 탐색이 Grep 으로 (14 중 7 폴백) | 14/22 | 자동 등록. `uv` 필수 (`brew install uv`), 첫 기동 전에 캐시를 채운다(아래) |
 | **GPT CLI** (`@openai/codex`) | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
 | **sequential-thinking** | 없으면 같은 분해를 표로 직접 쓴다 | 9/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |

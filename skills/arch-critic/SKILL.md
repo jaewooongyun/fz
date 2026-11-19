@@ -7,7 +7,6 @@ user-invocable: false
 metadata:
   category: tool
   requires: []
-  sc-commands: [sc:analyze, sc:design]
   provides: [architecture-analysis]
   needs: [none]
   intent-triggers: []

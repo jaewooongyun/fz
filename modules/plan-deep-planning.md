@@ -74,14 +74,9 @@ f. **⛔ Import Removal Symbol Inventory** (import 제거 작업 시 필수):
 - `guides/clean-architecture.md` 참조 — Dependency Rule, SOLID, Uncle Bob's Decision Rules
 - 설계가 Dependency Rule을 위반하지 않는지 자문: "안쪽이 바깥을 아는가?"
 
-### 절차 5a. SuperClaude 연계 (필요 시)
+### 절차 5a. 외부 기술 조사 (필요 시)
 
-- `/sc:sc-design` → 새 아키텍처 설계
-- `/sc:sc-brainstorm` → 요구사항 탐색
-- `/sc:sc-analyze` → 기존 코드 심층 분석
-- `/sc:sc-research` → 외부 기술 조사
-- `/sc:sc-workflow` → PRD/요구사항 → 구현 워크플로우 자동 생성 (트리거: 구현 Step이 5개 이상 예상될 때)
-- `/sc:sc-spec-panel` → 아키텍처 스펙 전문가 패널 리뷰 (트리거: 새 모듈 생성 시, --deep 옵션 시) (모드: `--mode critique --focus architecture`)
+- `/sc:sc-research` → 외부 기술 조사 (도구 목록에 있으면 쓴다)
 
 ### 절차 5b. 설계 스트레스 테스트 (Design Stress Test)
 

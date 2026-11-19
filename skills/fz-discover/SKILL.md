@@ -57,15 +57,12 @@ metadata:
 | modules/lead-reasoning.md | Speculation-to-Fact Fallacy (§1.5) — 탐색 결과 주장 시 [verified] 태그 |
 | modules/uncertainty-verification.md | Default-Deny — 증거 없는 옵션/제약 주장 차단 |
 
-## sc: 활용 (SuperClaude 연계)
+## 연계 (스킬 · 도구)
 
-| Phase | sc: 명령어 | 용도 |
+| Phase | 연계 | 용도 |
 |-------|-----------|------|
-| Phase 1 | `/sc:sc-analyze` | 기존 코드/아키텍처 분석으로 암묵적 제약 사전 식별 |
-| Phase 2 | `/sc:sc-brainstorm` | 후보 옵션 발산이 필요할 때 |
 | Phase 2 | `/fz-explain` | 기존 패턴/규칙 설명 (F-023) |
 | Phase 2 | Lead `WebSearch` · `WebFetch` | 외부 기술/라이브러리 조사 |
-| Phase 3 | `/sc:sc-reflect` | 수렴된 결과 자체 검증 |
 | Phase 4 | `→ /fz-plan` | 정제된 요구사항으로 구현 계획 수립 |
 
 ## Plugin 참조

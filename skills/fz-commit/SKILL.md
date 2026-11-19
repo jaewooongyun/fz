@@ -27,7 +27,7 @@ CLAUDE.md 에 팀 커밋 스킬이 선언되어 있으면(절 제목과 무관 �
 
 ## 사용 도구
 
-팀 커밋 스킬이 없을 때만 `/sc:sc-git` 으로 커밋한다(위 § 규칙 참조 — 요청 없는 커밋은 하지 않는다).
+팀 커밋 스킬이 없을 때만 `git commit` 으로 커밋한다(위 § 규칙 참조 — 요청 없는 커밋은 하지 않는다).
 
 `allowed-tools` 는 조회 꼴(`git status` · `git diff` · `git log` · `git fetch`)만 사전 승인한다 — 쓰기(`git add` · `git commit` · `git reset`)는 권한 프롬프트를 거친다. 프롬프트 없이 쓰려면 자기 설정의 허용 목록(`permissions.allow`)에 그 꼴을 넣는다.
 

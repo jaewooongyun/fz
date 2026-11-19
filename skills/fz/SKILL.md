@@ -100,7 +100,7 @@ metadata:
 
 ---
 
-## Phase 0: Session Bootstrap (SuperClaude 연계)
+## Phase 0: Session Bootstrap
 
 파이프라인 시작 전 세션 컨텍스트를 준비합니다. **파이프라인당 1회만 실행.**
 
@@ -109,11 +109,9 @@ metadata:
 0. ⛔ **선택 도구 상태**: 화면 한 줄로만 알린다 — 승인(Phase 4) 전 파일 쓰기는 가드가 막는다 · 파일 기록은 승인 뒤. 형식 `modules/tool-status.md`
 1. **이전 세션 복원** (새 세션일 때만):
    - 티켓 폴더가 있으면 `index.md` 의 `## Essential Context` 를 Read 해 Active Phase · Pending 을 이어받는다 — 복원 원천은 티켓 폴더 산출물이다(3b 와 같은 근거)
-   - `/sc:sc-load` 는 선택 — SuperClaude 를 쓰고 이전에 `/sc:sc-save` 한 데이터가 있을 때만
 
 2. **프로젝트 인덱스 확인**:
    - `PROJECT_INDEX.md` 존재 확인 → 있으면 읽기 (3K 토큰)
-   - 없고 탐색 파이프라인이면 → `/sc:sc-index-repo` 실행 제안
    - 조건: explore, explore-plan, bug-hunt 파이프라인에서만
 
 3. **Work Dir 초기화** (6+ 스텝 또는 context-heavy 스킬 포함 시):
@@ -461,7 +459,6 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 
 1. **세션 저장** (모든 파이프라인):
    - 티켓 폴더가 있으면 `index.md` Essential Context 를 갱신한다 — 다음 세션은 이것으로 복원한다
-   - `/sc:sc-save --type learnings` 는 선택(SuperClaude 를 쓸 때)
 
 2. **상황별 안내**:
    - 코드 변경 있음 → `/fz-commit` 제안

@@ -53,15 +53,6 @@ metadata:
 | modules/memory-policy.md | L2 Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | L3 티켓 폴더 관리 |
 
-## sc: 활용 (SuperClaude 연계)
-
-| 서브커맨드 | sc: 명령어 | 용도 |
-|-----------|-----------|------|
-| audit | `sc:analyze` | L1/L2/L3 건강도 정량 분석 |
-| recall | `sc:explain` | 회상된 교훈의 관련성 설명 |
-| organize | `sc:reflect` | 재구성 후 자체 검증 (200줄 한도, 중복 없음) |
-| remind | `sc:reflect` | 미개선 항목의 현재 적용 여부 재검증 |
-
 ---
 
 ## 서브커맨드 1: audit
@@ -86,7 +77,7 @@ metadata:
 1. {TICKET_PREFIX}-*/index.md 존재 + 정합성 확인 (예: TKT-*)
 2. 완료된 파이프라인의 잔존 티켓 폴더 감지
 
-보고: `sc:analyze` 활용하여 정량 보고서 생성.
+보고: 정량 보고서 생성.
 
 ### Gate: Audit Complete
 - [ ] L1/L2/L3 각 레이어 검사 완료?
@@ -161,7 +152,6 @@ MEMORY.md 재구성 + topic file 분리/병합.
 2. MEMORY.md 200줄 한도 확인 → 초과 시 상세 내용을 topic file로 분리
 3. topic file 간 중복 검사 → 병합 대상 식별
 4. 태그 정합성 검사 → 누락 태그 추가
-5. `sc:reflect` → 재구성 결과 자체 검증
 
 ### Gate: Organize Complete
 - [ ] MEMORY.md 200줄 이하?
@@ -189,7 +179,6 @@ MEMORY.md 재구성 + topic file 분리/병합.
    - fz-code: {설명} (peer-review-learnings.md)
    처리하시겠습니까?
    ```
-5. `sc:reflect` → 판단 자체를 재검증
 
 ### Gate: Remind Complete
 - [ ] pending 항목 전수 검색?

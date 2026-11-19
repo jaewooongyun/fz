@@ -247,4 +247,4 @@ GPT CLI 응답 실패 시에도 Issue Tracker에 기록하고 폴백을 실행�
 
 ## 관련 GPT 스킬
 
-3-Tier 디스커버리로 결정. sc: `sc:reflect`(교차검증), `sc:analyze`(보완), `sc:troubleshoot`(통신 문제).
+3-Tier 디스커버리로 결정.

@@ -28,14 +28,14 @@ fz-plugin/
 ```
 자연어 요청
     ↓
-Phase 0  Session Bootstrap ─── sc:load, 인덱스, PRJ 폴더
+Phase 0  Session Bootstrap ─── 인덱스, PRJ 폴더
 Phase 1  Intent Analysis ───── 키워드 → intent-triggers 매칭
 Phase 2  Complexity ─────────── 5차원 평가 → SOLO(0-3) / TEAM(4+)
 Phase 3  Pipeline + Team ────── 19개 파이프라인 매칭 + 에이전트 배정
 Phase 4  User Confirmation ─── 시각화 → 승인
 Phase 5  Execute ────────────── 스킬 체인 실행 + Gate 검증
     ↓
-완료: GC → sc:save → 다음 행동 안내
+완료: GC → 다음 행동 안내
 ```
 
 ## 멀티에이전트 실행 — 네이티브 Workflow

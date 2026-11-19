@@ -62,20 +62,6 @@ metadata:
 | modules/promotion-ledger.md | P1/P2 조치 eligible session 관측 기록 (학습 승격 금지) |
 | modules/plan-direction-preflight.md | Phase 0c·0.5 절차 본문 (Phase 0c·0.5 진입 시 Read — 조건부) |
 
-## sc: 활용 (SuperClaude 연계)
-
-| Phase | sc: 명령어 | 용도 |
-|-------|-----------|------|
-| Phase 1 | `/sc:sc-design` | 아키텍처 설계, API 설계 |
-| Phase 1 | `/sc:sc-analyze` | 기존 코드 분석, 영향 범위 |
-| Phase 1 | `/sc:sc-brainstorm` | 요구사항 탐색 (복잡한 경우) |
-| Phase 1 | `/sc:sc-research` | 외부 기술/라이브러리 조사 |
-| Phase 1 | `/sc:sc-workflow` | PRD → 구현 워크플로우 자동 생성 (5+ Step 시) |
-| Phase 1 | `/sc:sc-spec-panel` | 아키텍처 스펙 전문가 패널 리뷰 (새 모듈 시, --deep 시) |
-| Phase 2 | `/fz-gpt verify` | 계획 검증 (독립 스킬 — GPT 교차 검증, `modules/fz-gpt-subcommands-core.md § verify`) |
-| Phase 2 | `/sc:sc-estimate` | 공수 추정 (복잡도 4+ 시, 조건부) |
-| Phase 3 | `/sc:sc-reflect` | 피드백 반영 후 자체 검증 |
-
 ## Plugin 참조 (Swift Concurrency)
 > 참조: `modules/plugin-refs.md` — Swift Concurrency(계획 시) 섹션
 > **iOS 16 minimum target 제약**: CLAUDE.md `## Plugins` 참조. 계획에 iOS 17+ API (`@Observable`, `@Bindable`, onChange new signature) 사용 명시 시 `#available` 가드 step 포함 의무.
@@ -228,7 +214,7 @@ metadata:
 ## Phase 1: Deep Planning
 
 > **프로젝트 규칙**: CLAUDE.md `## Architecture` 섹션을 따른다.
-> **본문**: `modules/plan-deep-planning.md` 참조 (Level 3) — 9 절차 (요구사항 분해, Exhaustive Impact Scan a-f, API 확인, Clean Architecture, SuperClaude, 설계 스트레스 테스트 Q1-Q6, RTM, 계획 출력, Transformation Spec, 계획 파일 기록).
+> **본문**: `modules/plan-deep-planning.md` 참조 (Level 3) — 9 절차 (요구사항 분해, Exhaustive Impact Scan a-f, API 확인, Clean Architecture, 외부 기술 조사, 설계 스트레스 테스트 Q1-Q6, RTM, 계획 출력, Transformation Spec, 계획 파일 기록).
 
 ### 절차 요약
 
@@ -236,7 +222,7 @@ metadata:
 2. 코드베이스 영향 분석 + ⛔ Exhaustive Impact Scan a-f (텍스트 검색/런타임 도달성/사이드이펙트/Dead code/소비자 스캔/Symbol Inventory)
 3. API/라이브러리 문서 확인 (Context7)
 4. Clean Architecture 원칙 확인
-5a. SuperClaude 연계 (sc: 명령어)
+5a. 외부 기술 조사 (필요 시)
 5b. 설계 스트레스 테스트 Q1-Q6 (Evaluator-Optimizer 패턴, max 2회 반복)
 6. ⛔ RTM 작성
 7. 구조화된 계획 출력 (리스크 매트릭스 + Anti-Pattern Constraints + Implication Register)
@@ -376,7 +362,6 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 
 2. **요구사항 일치 검증**:
    - `mcp__sequential-thinking__sequentialthinking` → 수정 전후 요구사항 부합도 단계별 비교 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
-   - `/sc:sc-reflect` → 자체 검증
 
 3. **사용자 의사결정** (AskUserQuestion):
    - 수정 후 Phase 2 재검증

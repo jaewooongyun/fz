@@ -8,7 +8,6 @@ user-invocable: false
 metadata:
   category: tool
   requires: []
-  sc-commands: [sc:analyze, sc:reflect]
   provides: [code-quality-analysis]
   needs: [none]
   intent-triggers: []

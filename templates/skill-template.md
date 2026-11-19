@@ -118,13 +118,6 @@ Input → Phase 1 → Phase 2 → ... → Output
 | `guides/skill-authoring.md` §12 | 팀 모드 정본 — Workflow 규약 + 실패 복구 사다리 L1~L4. ⛔ 삭제된 TEAM 사료를 팀 프로토콜로 지목하지 말 것 |
 | `modules/team-registry.md` | 에이전트 동적 구성 |
 
-## sc: 활용 (SuperClaude 연계)
-
-| Phase | sc: 명령어 | 용도 |
-|-------|-----------|------|
-| 분석 | `sc:analyze` | 코드 분석 |
-| 검증 | `sc:reflect` | 자체 검증 |
-
 ## 팀 에이전트 모드
 
 - **Workflow**: `workflows/{skill}-{pattern}.js` 결정적 스크립트가 fan-out/수렴 소유 (§12)
