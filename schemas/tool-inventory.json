@@ -15,7 +15,6 @@
     "context7":         { "form": "plain",  "note": "라이브러리 문서" },
     "plugin_context7_context7": { "form": "plugin", "note": "공식 마켓플레이스 context7 플러그인으로 깔았을 때의 등록 이름 — agents tools 와 스킬 allowed-tools 에 context7 이름과 함께 둔다(F-544 · 없는 이름은 무시된다)" },
     "sequential-thinking": { "form": "plain", "note": "단계 추론" },
-    "github":           { "form": "plain",  "note": "PR·이슈" },
     "XcodeBuildMCP":    { "form": "plain",  "note": "빌드 검증 — 프로젝트 CLAUDE.md 가 XcodeBuildMCP 를 명시할 때만 쓴다(modules/build.md 빌드 명령 결정). #12 대상(agents · skills) 밖에서만 쓴다 — 선언만" },
     "xcode":            { "form": "plain",  "note": "Xcode 쓰기 도구(XcodeWrite · XcodeUpdate · XcodeMV · XcodeRM · XcodeMakeDir)를 fz-guard 가 `/fz` 승인 전 막는다. 서버 이름은 사용자가 등록한 이름이라 가드는 이름과 무관하게 도구 이름으로 판정한다(mods/fz-guard/hooks/guard.py XCODE_WRITE) — 이 키는 대표 이름이다. #12 대상(agents · skills) 밖에서만 쓴다 — 선언만" }
   },
@@ -23,7 +22,8 @@
   "retired_mcp_prefixes": {
     "mcp__serena__":    "mcp__plugin_fz_serena__ (v4.35.0 — 런타임은 플러그인 접두를 붙인다)",
     "mcp__lsp__":       "네이티브 LSP 도구 (v4.36.0 — 그런 이름의 MCP 서버가 없다)",
-    "mcp__atlassian__": "대체 이름 없음 — 트래커 도구는 스킬 · 에이전트가 사전 승인하지 않는다. 프로젝트 CLAUDE.md 가 선언한 트래커 MCP 를 권한 프롬프트를 거쳐 쓴다(modules/governance.md § 팀 스킬 위임 · v4.36.0 의 대체 이름 mcp__atlassian-jira__ 도 내렸다)"
+    "mcp__atlassian__": "대체 이름 없음 — 트래커 도구는 스킬 · 에이전트가 사전 승인하지 않는다. 프로젝트 CLAUDE.md 가 선언한 트래커 MCP 를 권한 프롬프트를 거쳐 쓴다(modules/governance.md § 팀 스킬 위임 · v4.36.0 의 대체 이름 mcp__atlassian-jira__ 도 내렸다)",
+    "mcp__github__":    "대체 이름 없음 — GitHub 은 `gh` CLI 로만 다룬다. 스킬은 조회 꼴만 사전 승인하고 PR 생성 · 리뷰 게시는 권한 프롬프트를 거친다(리뷰 게시가 `gh api` 인 이유: modules/peer-review-inline-anchoring.md 6절)"
   },
 
   "external_commands": {
@@ -33,7 +33,7 @@
     "bash":    { "required": true },
     "codex":   { "required": false, "note": "/fz-gpt — 부재 시 fresh-context Agent 폴백이 정의돼 있다" },
     "jq":      { "required": false, "note": "일부 게이트 예시" },
-    "gh":      { "required": false, "note": "PR 조회·게시(fz-peer-review) — 부재 시 그 단계만 못 한다" },
+    "gh":      { "required": false, "note": "PR 조회 · 생성 · 게시(fz-pr · fz-pr-digest · fz-peer-review) — 부재 시 그 단계만 못 한다" },
     "mkdir":   { "required": true }, "cat":  { "required": true },
     "printf":  { "required": true }, "xargs": { "required": true },
     "sleep":   { "required": true }, "test": { "required": true },

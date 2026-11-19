@@ -26,8 +26,8 @@
 
 | Given | When | Then (pass/fail oracle) | type |
 |-------|------|------|------|
-| unpushed 커밋 존재 + origin(fork) remote 설정 + 트래커 티켓 ID 식별 가능 | `/fz-pr develop` | origin(fork)에 push(Step 2) → 템플릿 기반 create_pull_request 호출(Step 3) → Assignee(Step 4)·Reviewer(프로젝트 리뷰어 매핑, Step 5) 지정 → PR URL 출력 + 티켓 상태 전환은 프로젝트 규칙이 요구할 때만(사전 승인 없이 권한 프롬프트를 거쳐 · 규칙이 없으면 전환 없음) = **Step 5까지 완료** | normal |
-| 대상 브랜치에 동일 PR 이미 존재 (Step 0 감지) | `/fz-pr develop` | create_pull_request **미호출** + 기존 PR URL 출력 후 종료 | edge-case |
+| unpushed 커밋 존재 + origin(fork) remote 설정 + 트래커 티켓 ID 식별 가능 | `/fz-pr develop` | origin(fork)에 push(Step 2) → 템플릿 기반 `gh pr create` 호출(Step 3) → Assignee(Step 4)·Reviewer(프로젝트 리뷰어 매핑, Step 5) 지정 → PR URL 출력 + 티켓 상태 전환은 프로젝트 규칙이 요구할 때만(사전 승인 없이 권한 프롬프트를 거쳐 · 규칙이 없으면 전환 없음) = **Step 5까지 완료** | normal |
+| 대상 브랜치에 동일 PR 이미 존재 (Step 0 감지) | `/fz-pr develop` | `gh pr create` **미호출** + 기존 PR URL 출력 후 종료 | edge-case |
 | Target 브랜치 인자 없음 + 후보 브랜치 복수 (Step 1) | `/fz-pr` | 브랜치 목록 출력 후 사용자 선택 대기 (기본 develop 제안), 선택 전 push/PR **미실행** | edge-case |
-| unpushed 커밋 없음 | `/fz-pr` | PR 생성 중단 + "커밋 없음" 안내 + `/fz-commit` 먼저 실행 폴백 안내 (create_pull_request **미호출**) | failure |
-| unpushed 커밋 존재하나 GitHub MCP 호출 실패 | `/fz-pr develop` | MCP 오류 안내 + `gh pr create` 수동 실행 폴백 안내 출력 | failure |
+| unpushed 커밋 없음 | `/fz-pr` | PR 생성 중단 + "커밋 없음" 안내 + `/fz-commit` 먼저 실행 폴백 안내 (`gh pr create` **미호출**) | failure |
+| unpushed 커밋 존재하나 gh 부재 · 미인증(`gh auth status` 실패) | `/fz-pr develop` | `gh pr create` **미호출** + `gh auth login` 뒤 재실행 또는 웹에서 PR 생성 안내 출력 | failure |

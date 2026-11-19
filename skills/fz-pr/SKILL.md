@@ -7,10 +7,7 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[TICKET-ID]"
 allowed-tools: >-
-  mcp__github__create_pull_request,
-  mcp__github__get_pull_request,
-  mcp__github__list_pull_requests,
-  Bash(git *),
+  Bash(git status *), Bash(git log *), Bash(git diff *), Bash(git rev-parse *), Bash(git branch -r), Bash(git remote -v), Bash(gh auth status *), Bash(gh pr view *), Bash(gh pr list *),
   Bash(python3 */scripts/*)
 metadata:
   provides: [pr]
@@ -118,7 +115,7 @@ CLAUDE.md 에 fork 기반 워크플로우가 정의되어 있으면(절 제목 �
 |------|------|------|
 | unpushed 커밋 없음 | 커밋 없음 안내 | `/fz-commit` 먼저 실행하도록 안내 |
 | PR 이미 존재 | 기존 PR URL 출력 후 종료 | 사용자에게 기존 PR 확인 요청 |
-| GitHub MCP 실패 | MCP 오류 안내 | `gh pr create` 명령어 수동 실행 안내 |
+| gh 부재 · 미인증(`gh auth status` 실패) | 오류 안내 | `gh auth login` 뒤 재실행 또는 웹에서 PR 생성 안내 |
 | 트래커 티켓 조회 실패 · 불가 (호출 오류 · 선언한 트래커 MCP 미연결 · 선언 없음 · 권한 거절) | 티켓 정보 없이 PR 생성 | 사용자에게 제목/설명 직접 입력 요청 |
 | Target 브랜치 선택 불명확 | 브랜치 목록 출력 후 사용자 선택 | 기본 develop 브랜치 제안 |
 

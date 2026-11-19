@@ -9,8 +9,8 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[--onto <base>] [--branch <name>]"
 allowed-tools: >-
-  Bash(git *),
-  Bash(bash *),
+  Bash(git status *), Bash(git log *), Bash(git diff *), Bash(git show *), Bash(git fetch *), Bash(git rev-parse *), Bash(git rev-list *), Bash(git ls-files *), Bash(git for-each-ref *), Bash(git config --get *), Bash(git symbolic-ref --short HEAD), Bash(git branch -r),
+  Bash(bash */scripts/verify-rebase.sh *),
   AskUserQuestion
 metadata:
   provides: []
@@ -31,6 +31,7 @@ metadata:
 - 프로젝트에 지침 파일(`CLAUDE.md`·`AGENTS.md` 등)이 있으면 그 git 규약을 따른다 — 특히 fork 기반인지(origin=개인 fork, upstream=공유 repo) 확인한다. 이 스킬 호출 자체가 "git 작업 명시 요청"이지만, force-push는 그 안에서도 추가 확인을 받는다.
 - 롱텀 브랜치의 force-push 대상은 기본적으로 `origin`(개인 fork)이다. 공유 원격(팀 repo)으로의 force-push는 **그 브랜치의 소유자가 명시적으로 승인한 경우에만** 한다 — 이 스킬은 그 승인을 확인하지 않으므로, 대상 원격이 공유 repo이면 소유권을 사용자에게 되묻는다.
 - 롱텀 브랜치에는 **팀원도 직접 push한다**. 즉 내 리베이스는 남의 커밋을 지날 수 있고, 내 force-push는 남의 커밋을 지울 수 있다 — 양방향 게이트가 필요한 이유.
+- `allowed-tools` 는 조회 꼴과 `verify-rebase.sh` 실행만 사전 승인한다 — 쓰기(`merge --ff-only` · `rebase` · 충돌 해소의 `add`/`rm` · `update-ref -d` · `reset --hard` · force-push)는 권한 프롬프트를 거친다. 프롬프트 없이 쓰려면 자기 설정의 허용 목록(`permissions.allow`)에 그 꼴을 넣는다 — force-push 앞 확인 게이트(Step 4)는 그와 별개로 남는다.
 
 ## 사용 시점
 

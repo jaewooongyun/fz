@@ -150,8 +150,7 @@ fz-plan        → serena(7), context7(2), sequential-thinking(1)
 fz-code        → serena(10), context7(2), lsp(2)
 fz-fix         → serena(7), sequential-thinking(1), context7(2), lsp(3)
 fz-review      → serena(5), sequential-thinking(1), lsp(2)
-fz-peer-review → serena(6), sequential-thinking(1), github(5), context7(2)
-fz-pr          → github(3)
+fz-peer-review → serena(6), sequential-thinking(1), context7(2)
 fz-manage      → serena(4)
 ```
 

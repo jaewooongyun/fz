@@ -16,14 +16,9 @@ allowed-tools: >-
   mcp__plugin_fz_serena__write_memory,
   mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
-  mcp__github__get_pull_request,
-  mcp__github__get_pull_request_files,
-  mcp__github__get_pull_request_comments,
-  mcp__github__create_pull_request_review,
-  mcp__github__add_issue_comment,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
-  Bash(git *), Bash(gh *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(tar -xf - -C *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
+  Bash(git diff *), Bash(git show *), Bash(git fetch *), Bash(git rev-parse *), Bash(git -C * status *), Bash(git -C * archive *), Bash(gh auth status *), Bash(gh pr view *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(tar -xf - -C *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
 metadata:
   provides: [peer-review]
   needs: [none]
@@ -89,7 +84,7 @@ metadata:
 | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
 | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
 | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Origin Verification, 4.9 Call-site & Convention 포함) |
-| `modules/peer-review-inline-anchoring.md` | Deliver `--post` 인라인 앵커 게시 7단계 + 확인 게이트 + 다지점 분할(SSOT). `Bash(gh *)`·`Write` 선언이 여기서 쓰인다 |
+| `modules/peer-review-inline-anchoring.md` | Deliver `--post` 인라인 앵커 게시 7단계 + 확인 게이트 + 다지점 분할(SSOT). `Write` 선언이 여기서 쓰인다 — 게시 `gh api … -X POST` 는 사전 승인하지 않아 권한 프롬프트를 거친다 |
 | `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
 | `modules/team-facing-writing.md` | 팀원에게 가는 글(코멘트 · 답글 · PR 본문)의 어조 · 형태 — Comment Style Guide 정본 |
 | `scripts/check_comment_worthy.py` | Curate 계약(카드 필드 · E1~E8 · 커버리지) — 렌더러가 `--require-curation` 으로 부른다 |
@@ -450,7 +445,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 > ⛔ 게시 직전 렌더는 `--head-sha "$(gh pr view {N} --json headRefOid -q .headRefOid)"` 를 붙인다 — 리뷰 대상 sha 와 다르면 렌더러가 거부한다(F-068 · 리뷰 중 force-push). 인라인 코멘트 전건의 site 에 `expect` 가 있어야 한다(Gate 4.5 · F-069). 프로젝트 응답 언어가 한국어면 `--lang ko`(F-020 — 사용자 대면 산출물 언어)
 
 > ⛔ **확인 게이트** — 미리보기는 항상 출력한다. 셋 중 하나면 `AskUserQuestion` 으로 승인받은 뒤 게시한다: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 — 대체 형식은 `modules/peer-review-inline-anchoring.md` 5절(코드블록 인용 + `file:line`)을 Read 해 따른다 (c) 겹치는 hunk 복수로 Lead가 구간 선택 (F-073).
-> ⛔ `mcp__github__create_pull_request_review`로 대체 불가 — `comments[]`에 `start_line`·`side`가 없어 범위 하이라이트·LEFT 앵커가 안 된다. 이 스킬만 `Bash(gh *)`를 선언하는 이유.
+> ⛔ 게시 경로는 `gh api` 하나다 — `comments[]` 에 `start_line`·`start_side`·`side` 를 넣지 못하는 게시 도구로 바꾸면 범위 하이라이트·LEFT 앵커가 안 된다(근거: `modules/peer-review-inline-anchoring.md` 6절). `allowed-tools` 는 gh 의 조회 꼴(`gh auth status` · `gh pr view`)만 사전 승인하고, 게시 POST 는 쓰기라 권한 프롬프트를 거친다.
 
 **비-티켓 세션 Serena Fallback** (WORK_DIR 없을 때):
 ```

@@ -11,12 +11,9 @@ allowed-tools: >-
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__activate_project,
-  mcp__github__get_pull_request,
-  mcp__github__get_pull_request_files,
-  mcp__github__get_pull_request_comments,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
-  Bash(git *), Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Workflow
+  Bash(git diff *), Bash(git show *), Bash(git fetch *), Bash(gh pr view *), Bash(gh pr diff *), Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Workflow
 metadata:
   provides: [pr-digest, code-understanding]
   needs: [none]

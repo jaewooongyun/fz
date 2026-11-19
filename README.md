@@ -51,13 +51,13 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
 
 ⛔ `sc:` 는 자체 폴백이 없고 다른 도구가 실패했을 때 내려가는 자리(`/sc:sc-analyze 단독`)이기도 하다. 그래서 없으면 폴백 사슬의 끝이 사라진다.
 
-표 밖의 도구 둘은 특정 기능에만 쓴다. `lsp` 는 4개 스킬이 정의와 참조 탐색에, `github` 는 3개 스킬이 PR 에 쓴다. `lsp` 는 그 스킬들의 `allowed-tools` 에 사전 승인으로만 있고 본문에 호출 지시는 없다. `github` 는 fz-pr 만 `gh pr create` 안내로 내려간다. 티켓 트래커는 서버를 정해 두지 않는다 — 티켓 조회는 프로젝트 CLAUDE.md 가 선언한 트래커 MCP 가 연결돼 있으면 권한 프롬프트를 거쳐 그 도구로, 아니면 수동 입력으로 한다. 어느 스킬도 트래커 도구를 사전 승인하지 않고, PR 뒤 티켓 상태 전환은 프로젝트 규칙이 요구할 때만 한다(`modules/governance.md` § 팀 스킬 위임).
+표 밖의 도구 `lsp` 는 4개 스킬이 정의와 참조 탐색에만 쓴다. `lsp` 는 그 스킬들의 `allowed-tools` 에 사전 승인으로만 있고 본문에 호출 지시는 없다. GitHub 은 MCP 서버 없이 `gh` CLI 로만 다룬다 — 스킬은 조회 꼴(`gh auth status` · `gh pr view` 등)만 사전 승인하고 PR 생성 · 리뷰 게시는 권한 프롬프트를 거친다. 티켓 트래커는 서버를 정해 두지 않는다 — 티켓 조회는 프로젝트 CLAUDE.md 가 선언한 트래커 MCP 가 연결돼 있으면 권한 프롬프트를 거쳐 그 도구로, 아니면 수동 입력으로 한다. 어느 스킬도 트래커 도구를 사전 승인하지 않고, PR 뒤 티켓 상태 전환은 프로젝트 규칙이 요구할 때만 한다(`modules/governance.md` § 팀 스킬 위임).
 
 프로젝트에 따라 더 붙인다. iOS 는 XcodeBuildMCP 와 SwiftUI Expert, Swift Concurrency 를 쓰고 웹은 기본 구성으로 충분하다.
 
 #### 설치 뒤 확인할 것
 
-- ⛔ MCP 서버 이름이 계약이다. 위 표의 `claude mcp add <이름>` 그대로 등록한다. 다른 이름으로 등록하거나 공식 마켓플레이스 플러그인으로 깔면 도구 이름이 `mcp__plugin_…` 으로 바뀐다. 그러면 Lead 는 그 도구를 쓰지만 워커 에이전트에는 오류 없이 전달되지 않는다. `github` 와 `XcodeBuildMCP` 도 같다. Context7 은 예외다 — 스킬 `allowed-tools` 와 에이전트 `tools` 에 두 이름(`mcp__context7__…` · `mcp__plugin_context7_context7__…`)을 함께 적어 두어 위 표의 공식 플러그인으로 깔아도, `claude mcp add context7 …` 로 등록해도 된다. 트래커 MCP 는 이 계약 밖이다 — 스킬이 서버 이름을 적지 않으므로 어떤 이름으로 등록해도 되고, 쓰려면 프로젝트 CLAUDE.md 에 그 서버를 선언한다(규칙은 위 '표 밖의 도구' 문단)
+- ⛔ MCP 서버 이름이 계약이다. 위 표의 `claude mcp add <이름>` 그대로 등록한다. 다른 이름으로 등록하거나 공식 마켓플레이스 플러그인으로 깔면 도구 이름이 `mcp__plugin_…` 으로 바뀐다. 그러면 Lead 는 그 도구를 쓰지만 워커 에이전트에는 오류 없이 전달되지 않는다. `XcodeBuildMCP` 도 같다. Context7 은 예외다 — 스킬 `allowed-tools` 와 에이전트 `tools` 에 두 이름(`mcp__context7__…` · `mcp__plugin_context7_context7__…`)을 함께 적어 두어 위 표의 공식 플러그인으로 깔아도, `claude mcp add context7 …` 로 등록해도 된다. 트래커 MCP 는 이 계약 밖이다 — 스킬이 서버 이름을 적지 않으므로 어떤 이름으로 등록해도 되고, 쓰려면 프로젝트 CLAUDE.md 에 그 서버를 선언한다(규칙은 위 '표 밖의 도구' 문단)
 - ⛔ Serena 는 첫 기동에 실패하기 쉽다. 처음에는 약 300MB 를 내려받느라 MCP 연결 한도인 30초를 넘기곤 한다. 한 번 실패하면 Claude Code 가 약 15분 동안 다시 띄우지 않는다(Claude Code 2.1.318 실측). 설치 직후 미리 한 번 받아 둔다.
   ```bash
   uvx --from git+https://github.com/oraios/serena@v2.1.0 serena --help

@@ -115,7 +115,7 @@ hunk:  89-96 / 101-109          ← 97-100이 미변경이라 갈라짐
 gh api repos/{owner}/{repo}/pulls/{N}/reviews -X POST --input payload.json
 ```
 
-> ⛔ `SKILL.md` frontmatter `allowed-tools`에 **`Bash(gh *)`가 필요**하다. 플러그인 내 다른 스킬은 이를 선언하지 않지만, 이 경로는 `mcp__github__create_pull_request_review`로 대체 불가하다 — 그 MCP 도구의 `comments[]`는 `{path,line,body}` / `{path,position,body}` 두 형태뿐이라 **`start_line`·`side`가 없어 범위 하이라이트와 LEFT 앵커가 불가능**하다.
+> ⛔ 게시 POST 는 쓰기라 `SKILL.md` frontmatter `allowed-tools` 로 사전 승인하지 않는다 — 권한 프롬프트를 거친다. gh 는 조회 꼴(`gh auth status` · `gh pr view`)만 사전 승인한다. 게시 경로는 `gh api` 하나다 — GitHub 리뷰 API 의 `comments[]` 에 `start_line`·`start_side`·`side` 를 넣어야 범위 하이라이트·LEFT 앵커가 된다. `comments[]` 를 `{path,line,body}` / `{path,position,body}` 두 형태로만 받는 MCP 리뷰 도구로는 **범위 하이라이트와 LEFT 앵커가 불가능**하다.
 
 ### 7) 착지 검증 — ⛔ **방금 만든 리뷰만** 대조한다
 
