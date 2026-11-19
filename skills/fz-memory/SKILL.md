@@ -157,7 +157,7 @@ MEMORY.md 재구성 + topic file 분리/병합.
 
 ### 절차
 
-1. `sequential-thinking` → 현재 구조 분석 + 재구성 계획
+1. `sequential-thinking` → 현재 구조 분석 + 재구성 계획 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
 2. MEMORY.md 200줄 한도 확인 → 초과 시 상세 내용을 topic file로 분리
 3. topic file 간 중복 검사 → 병합 대상 식별
 4. 태그 정합성 검사 → 누락 태그 추가

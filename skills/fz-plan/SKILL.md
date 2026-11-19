@@ -367,7 +367,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 ### 절차
 
 1. **피드백 심화 분석**:
-   - `mcp__sequential-thinking__sequentialthinking` → 이슈별 심각도 분류
+   - `mcp__sequential-thinking__sequentialthinking` → 이슈별 심각도 분류 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
      - **Critical**: 즉시 수정 필수
      - **Major**: 수정 권장
      - **Minor**: 선택적 수정
@@ -375,7 +375,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 1b. **⛔ Scope Challenge (이슈당 필수)**: 각 GPT 이슈를 플랜에 반영 전 `modules/scope-challenge.md` Q-S1~S4 실행 → `scope_disposition` 분류. Lead는 GPT 결과를 **읽기 전** 독립 판정 후 비교 (Generator≠Evaluator).
 
 2. **요구사항 일치 검증**:
-   - `mcp__sequential-thinking__sequentialthinking` → 수정 전후 요구사항 부합도 단계별 비교
+   - `mcp__sequential-thinking__sequentialthinking` → 수정 전후 요구사항 부합도 단계별 비교 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
    - `/sc:sc-reflect` → 자체 검증
 
 3. **사용자 의사결정** (AskUserQuestion):

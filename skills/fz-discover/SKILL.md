@@ -308,7 +308,7 @@ GOOD: "proxy에 @Published는 안 됩니다.
 ### 절차
 
 1. **Landscape Map 최종 정리**:
-   - `mcp__sequential-thinking__sequentialthinking` → 각 경로가 성립하는 조건과 비용을 정리
+   - `mcp__sequential-thinking__sequentialthinking` → 각 경로가 성립하는 조건과 비용을 정리 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
    - 경로별: 전제조건 + 비용 + 리스크 + 조건 충족도
 
 2. **Trade-off Table 생성**:

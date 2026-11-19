@@ -162,7 +162,7 @@ metadata:
 ### Step 1c: Root-Cause — 증상이 아닌 원인 추적
 
 1. **구조적 추론** (복잡한 버그):
-   - `mcp__sequential-thinking__sequentialthinking` → 5 Whys 기법
+   - `mcp__sequential-thinking__sequentialthinking` → 5 Whys 기법 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
    - `/sc:sc-troubleshoot` → 진단(선택)
    - `/sc:sc-explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명
 2. **⛔ Step 1c 완료 전 코드 수정 금지**. root-cause가 불명확하면 AskUserQuestion.

@@ -26,7 +26,7 @@
 - /fz-discover의 `landscape-map`이 있으면 → 경로 비교 기반으로 최적 경로를 선택하고 영향 분석으로 진입
 - /fz-discover의 `open-questions`가 있으면 → 구조 분해 시 해당 질문을 우선 탐색
 - /fz-discover의 `trade-off-table`이 있으면 → Direction Challenge(Phase 0.5)에서 이미 비교된 경로 활용
-- 없으면 → `mcp__sequential-thinking__sequentialthinking` → 단계별 분해 (기존 절차)
+- 없으면 → `mcp__sequential-thinking__sequentialthinking` → 단계별 분해 (기존 절차) (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
 
 ### 절차 2. 코드베이스 영향 분석
 
@@ -86,7 +86,7 @@ f. **⛔ Import Removal Symbol Inventory** (import 제거 작업 시 필수):
 ### 절차 5b. 설계 스트레스 테스트 (Design Stress Test)
 
 계획의 핵심 설계 결정(새 타입, 패턴 변경, 추상화 도입 등)에 대해 6가지 질문으로 스트레스 테스트.
-- `mcp__sequential-thinking__sequentialthinking` → 설계 결정별 순차 검증
+- `mcp__sequential-thinking__sequentialthinking` → 설계 결정별 순차 검증 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
 
 | 질문 | 내용 | 실패 시 행동 |
 |------|------|-------------|

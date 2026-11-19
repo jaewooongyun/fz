@@ -207,7 +207,7 @@ Results Merge & Dedup → Issue Tracker 통합
 ```
 mcp__plugin_fz_serena__find_referencing_symbols → 변경된 심볼의 모든 참조 확인
 Grep → 변경 후 패턴 일관성
-mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분석 (요구사항별 충족 여부 단계별 검증)
+mcp__sequential-thinking__sequentialthinking → diff↔요구사항 매핑 분석 (요구사항별 충족 여부 단계별 검증) (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
 ```
 
 ⛔ 소비자를 정본에 맞춘 변경이면 정본 안에서 같은 대상을 말하는 진술끼리 먼저 대조한다 — 정본이 두 말을 하면 정합 작업이 그 모호함을 소비자로 복제한다 (F-121)
@@ -404,7 +404,7 @@ N (GPT 제기 이슈 수) >= 10 ?
 ## Phase 7: Completion (완료 처리)
 
 Gate 5 통과 후:
-1. **잔여 작업 확인**: sequential-thinking → 완료 체크리스트 (Gate 통과, 미해결 이슈, 범위 외 변경)
+1. **잔여 작업 확인**: sequential-thinking → 완료 체크리스트 (Gate 통과, 미해결 이슈, 범위 외 변경) (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
 2. **최종 이슈 보고 정리**: Issue Tracker 이슈를 상태별로 묶는다(상태 정의 `modules/session.md` § 이슈 상태 머신) — 보고 형식은 4번 아티팩트(`self-review.md` · `--render` 면 `review.json`)다(F-474)
 3. **세션 저장**: `write_memory` (작업 요약 + 결정사항 + 변경 심볼)
 4. **아티팩트 기록** (티켓 폴더(WORK_DIR) 활성 시): `{WORK_DIR}/review/self-review.md` + `index.md` 업데이트

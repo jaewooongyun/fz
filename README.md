@@ -43,7 +43,7 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
 | **SuperClaude** | `sc:` 명령 미매칭 (폴백 0) | 14/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
 | **Serena MCP** | 심볼 탐색이 Grep 으로 (14 중 7 폴백) | 14/22 | 자동 등록. `uv` 필수 (`brew install uv`), 첫 기동 전에 캐시를 채운다(아래) |
 | **GPT CLI** (`@openai/codex`) | 교차 검증이 `sc:analyze` 단독 (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
-| **sequential-thinking** | 구조화 추론 실패 (폴백 0) | 9/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
+| **sequential-thinking** | 없으면 같은 분해를 표로 직접 쓴다 | 9/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
 | **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (9 중 1 폴백) | 9/22 | `claude plugin install context7@claude-plugins-official` |
 | **pr-review-toolkit** | fz-review Phase 5 병렬 4·5 생략 · 보고에 한 줄 고지 | 1/22 | 공식 마켓플레이스에서 `/plugin` 으로 설치. 에이전트 이름은 접두 꼴 `pr-review-toolkit:<이름>`(`modules/native-agents.md`) |
 
@@ -63,7 +63,7 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
   uvx --from git+https://github.com/oraios/serena@v2.1.0 serena --help
   ```
 - GPT CLI 는 설치만 하면 감지된다. 로그인하지 않으면 호출마다 약 18초 동안 재시도한 뒤 실패하고 대체 경로로 넘어간다
-- 빠진 도구가 있어도 fz 는 깨지지 않는다. Grep 이나 자체 판단으로 대신하고 GPT 단계는 `[GPT 미사용]` 으로 표기한다. 선택 도구(Serena · context7 · sequential-thinking)를 쓰는 스킬은 첫 단계에 Serena · context7 · sc 의 상태와 빠지는 단계를 알린다(`evidence/tools.md` 첫 줄 또는 화면 한 줄 — 형식 `modules/tool-status.md`). 그 표시는 도구 목록에 이름이 있는지만 본다(목록에 있음 ≠ 연결됨). 그러니 세션에서 `/mcp` 를 열어 `plugin:fz:serena` 가 connected 인지 확인한다
+- 빠진 도구가 있어도 fz 는 깨지지 않는다. Grep 이나 자체 판단으로 대신하고 GPT 단계는 `[GPT 미사용]` 으로 표기한다. 선택 도구(Serena · context7 · sequential-thinking)를 쓰는 스킬은 첫 단계에 Serena 상태 뒤에 꼬리 ` · context7 목록✓|목록✗ · sc 목록✓|목록✗ · seq 목록✓|목록✗ · pr-review 목록✓|목록✗ · 스택 스킬 <이름, …>|없음` 로 선택 도구 상태와 빠지는 단계를 알린다(`evidence/tools.md` 첫 줄 또는 화면 한 줄 — 형식 `modules/tool-status.md`). 그 표시는 도구 목록에 이름이 있는지만 본다(목록에 있음 ≠ 연결됨). 그러니 세션에서 `/mcp` 를 열어 `plugin:fz:serena` 가 connected 인지 확인한다
 
 GPT CLI 를 쓰면 네이티브 스킬을 심볼릭 링크로 연결한다. 링크가 없어도 exec 모드 호출은 번들 스킬 본문을 직접 넣지만 review 모드 호출은 역할 스킬 없이 돈다.
 

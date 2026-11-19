@@ -294,7 +294,7 @@ Anti-Sycophancy 규칙(코드 증거 없는 self-reverse 금지), reverse 판정
 
 ## Step: Synthesize (종합)
 
-sequential-thinking으로 Confidence Matrix를 계산한다 (Tier 별 생성 여부·산식은 `modules/peer-review-gates.md` § MergeContract § 9 — 이 절의 dedup·투표 서술 적용 범위는 같은 계약 서두).
+sequential-thinking으로 Confidence Matrix를 계산한다 (Tier 별 생성 여부·산식은 `modules/peer-review-gates.md` § MergeContract § 9 — 이 절의 dedup·투표 서술 적용 범위는 같은 계약 서두). (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
 
 ### 1. 결측 에이전트 처리
 
