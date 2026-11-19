@@ -73,7 +73,7 @@ if [ "$MODE" = "cleanup" ]; then
 fi
 
 # ── 격리 폴더 — 메인 경로(plan · review)와 iso 하위 명령이 이 한 벌을 쓴다(격리 config 사본을 두지 않는다).
-#    읽는 값: MODE · REAL_HOME · REAL_GPT_HOME · PLUGIN_ROOT · GPT_AGENTS · REPO · DENIES. 정하는 값: ISO · REPO_REAL · CD. 실패는 die 11
+#    읽는 값: MODE · REAL_HOME · REAL_GPT_HOME · PLUGIN_ROOT · GPT_AGENTS · REPO · DENIES. 정하는 값: ISO · REPO_REAL · CD · CLAUDE_REALS. 실패는 die 11
 #    ⛔ 경로는 realpath 다(`/tmp`→`/private/tmp` · `/var/folders`→`/private/var/folders`). deny·read 표기가 어긋나면 중첩 규칙이 안 맞는다.
 #       예외: 저장소 .claude · .fz-work 가 링크면 링크 경로 키를 두고 대상 실경로 키를 따로 넣는다. CLI 샌드박스가 링크 경로 키를 대상으로
 #       푸는지는 재지 않았다 — 실 CLI 측정 셀은 os-deny external.sh --launcher-profile 의 lp-link-key-deny(사람 실행)다
@@ -91,8 +91,15 @@ make_iso() {
   fi   # ⛔ 사본 — HOME 아래 링크 대상은 샌드박스에서 안 읽힌다
   REPO_REAL=""; [ -n "$REPO" ] && REPO_REAL="$(cd "$REPO" && pwd -P)"
   CD="$ISO/input"; case "$MODE" in plan|iso) [ -n "$REPO_REAL" ] && CD="$REPO_REAL" ;; esac
+  # Claude 폴더(~/.claude · 저장소 .claude · .fz-work) 중 링크인 것의 대상 실경로 — 권한 표 deny(아래 config 블록)와 rollout 감사(FZ_CLAUDE_REALS)가
+  #   이 한 목록을 쓴다(감사가 홈 대상만 받아 저장소 링크 대상 읽기를 놓쳤다). 줄바꿈으로 가른다 — 줄바꿈이 든 경로는 범위 밖이다
+  CLAUDE_REALS="$(python3 -c 'import os, sys
+for link in sys.argv[1:]:
+    real = os.path.realpath(link)
+    if real != link and os.path.isdir(real):
+        print(real)' "$REAL_HOME/.claude" ${REPO_REAL:+"$REPO_REAL/.claude" "$REPO_REAL/.fz-work"})" || die 11 "Claude 폴더 링크 대상 해석 실패"
 
-  FZ_ISO_AGENTS="$GPT_AGENTS" python3 - "$ISO" "$REAL_HOME" "$REAL_GPT_HOME/config.toml" "$REPO_REAL" "$CD" "${DENIES[@]+"${DENIES[@]}"}" <<'PY' || { [ $? -eq 3 ] && die 11 "격리 폴더의 실제 부모가 --repo 와 같다 — TMPDIR 이나 --repo 를 바꾼다(TMPDIR='${TMPDIR:-}' → ${ISO%/*}). 부모 deny 를 넣으면 --repo 의 read 와 키가 겹쳐 CLI 가 config 를 거부하고, 빼면 형제 격리 폴더(fz-gpt-iso.*)가 읽힌다. GPT 를 부르지 않았다"; die 11 "격리 config 작성 실패"; }
+  FZ_CLAUDE_REALS="$CLAUDE_REALS" FZ_ISO_AGENTS="$GPT_AGENTS" python3 - "$ISO" "$REAL_HOME" "$REAL_GPT_HOME/config.toml" "$REPO_REAL" "$CD" "${DENIES[@]+"${DENIES[@]}"}" <<'PY' || { [ $? -eq 3 ] && die 11 "격리 폴더의 실제 부모가 --repo 와 같다 — TMPDIR 이나 --repo 를 바꾼다(TMPDIR='${TMPDIR:-}' → ${ISO%/*}). 부모 deny 를 넣으면 --repo 의 read 와 키가 겹쳐 CLI 가 config 를 거부하고, 빼면 형제 격리 폴더(fz-gpt-iso.*)가 읽힌다. GPT 를 부르지 않았다"; die 11 "격리 config 작성 실패"; }
 import json, os, re, sys
 iso, home, real_cfg, repo, cd, denies = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6:]
 q = lambda p: json.dumps(p)          # TOML basic string — JSON 이스케이프와 호환
@@ -122,11 +129,10 @@ for d in denies:   # ⛔ --repo 와 무관 — 프로필은 디스크 전체 읽
     if (os.path.realpath(d), "deny") not in fs:   # 이미 deny 인 경로(HOME · 저장소 .claude · 같은 --deny 두 번)면 한 번 — 아래 중복 키 주석
         fs.append((os.path.realpath(d), "deny"))
 # Claude 폴더(~/.claude · 저장소 .claude · .fz-work)가 링크면 대상 실경로도 deny — 홈 밖 대상은 HOME deny 가, 저장소 아래 대상은 --repo read 가 열어 둔다.
-#   저장소 쪽 링크 경로 키(위)는 그대로 둔다. --deny 루프 뒤라 --deny 로 준 같은 대상을 아래 키 집합으로 거른다
+#   목록은 make_iso 의 CLAUDE_REALS 다(rollout 감사와 같은 목록). 저장소 쪽 링크 경로 키(위)는 그대로 둔다. --deny 루프 뒤라 --deny 로 준 같은 대상을 아래 키 집합으로 거른다
 #   ⛔ 이미 든 키면 넣지 않는다 — 임시 루트 · HOME · --deny · 다른 자리의 같은 대상은 이미 deny 이고, 저장소 자신(.claude → .)은 read 라 넣으면 값이 다른 같은 키다
-for link in [os.path.join(home, ".claude")] + [os.path.join(repo, s) for s in (".claude", ".fz-work") if repo]:
-    real = os.path.realpath(link)
-    if real != link and os.path.isdir(real) and real not in {p for p, _ in fs}:
+for real in os.environ["FZ_CLAUDE_REALS"].split("\n"):
+    if real and real not in {p for p, _ in fs}:
         fs.append((real, "deny"))
 # 격리 폴더의 실제 부모(${TMPDIR:-/tmp} 실경로) — 위 두 임시 루트 밖 TMPDIR(Linux /tmp 포함)이면 형제 fz-gpt-iso.* 가 읽힌다.
 #   격리 폴더 read 가 더 구체적이라 이긴다(macOS 실측 — os-deny external.sh 의 lp-parent-deny · Linux 는 재지 않았다)
@@ -154,7 +160,7 @@ PY
 #    폴더로 연다. 그 자리가 실제 홈의 ~/.claude 아래면 GPT 가 Claude 로그 · journal 옆에서 돌고, rollout 감사는 GPT 를 부른 **뒤**에야
 #    그 경로(`.claude/`)를 잡는다(호출 비용이 이미 났다). 그래서 mktemp · 래퍼 호출 전에 실경로로 비교해 멈춘다.
 #    TMPDIR 이 없거나 풀리지 않으면 여기서 판정하지 않는다 — make_iso 의 mktemp 가 11 로 멈춘다. ~/.claude 가 링크여도 실경로로 함께 본다
-#    읽는 값: REAL_HOME. 정하는 값: CLAUDE_DIR · CLAUDE_DIR_REAL(메인 경로의 rollout 감사가 FZ_CLAUDE_REAL 로 받는다 — 홈 밖 링크 대상 읽기)
+#    읽는 값: REAL_HOME. 정하는 값: CLAUDE_DIR · CLAUDE_DIR_REAL(rollout 감사의 링크 대상 목록은 make_iso 의 CLAUDE_REALS 다)
 gate_iso_place() {
   ISO_PARENT="$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)" || ISO_PARENT=""
   CLAUDE_DIR="$REAL_HOME/.claude"
@@ -438,7 +444,7 @@ grep -m1 '^GPT-OFF: ' "$OUT_DIR/$BASE_NAME.wrapper.log" >&2 2>/dev/null   # 래�
 #    R-G2 실 CLI exec · resume 프로브 `multi_agent_version: disabled` · F-436. 감사는 그래도 spawn 수를 센다)
 rm -rf "$OUT_DIR/$BASE_NAME.rollouts"; mkdir -p "$OUT_DIR/$BASE_NAME.rollouts"
 find "$ISO/gpt-home/sessions" -name '*.jsonl' -exec cp {} "$OUT_DIR/$BASE_NAME.rollouts/" \; 2>/dev/null
-FZ_ART_NAMES="$FZ_ART_NAMES" FZ_CLAUDE_REAL="$CLAUDE_DIR_REAL" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" "$FRAME" "$FRAME_FILE" <<'PY'
+FZ_ART_NAMES="$FZ_ART_NAMES" FZ_CLAUDE_REALS="$CLAUDE_REALS" python3 - "$MODE" "$OUT" "$OUT_DIR/$BASE_NAME" "$REAL_HOME" "$REPO_REAL" "$ISO" "$RC" "$TIMED_OUT" "$SCHEMA" "$KEEP_ISO" "$PLUGIN_ROOT" "$FRAME" "$FRAME_FILE" <<'PY'
 import glob, hashlib, importlib.util, json, os, re, shlex, sys
 mode, out, stem, home, repo, iso, rc, timed_out, schema_p = sys.argv[1:10]
 keep = sys.argv[10:11] == ["1"]   # --keep-iso — 격리 홈이 남아야 resume 이 세션을 잇는다
@@ -531,7 +537,9 @@ if mode == "review" and os.path.isdir(hdir) and os.path.isfile(dpath):
 rolls = sorted(glob.glob(os.path.join(stem + ".rollouts", "*.jsonl")))
 ROOTS = r"(~|\$HOME|/Users(?:/[^\s'\"]*)?|/)(?=[\s'\";|&)]|$)"
 FZ_ART = re.compile(os.environ["FZ_ART_NAMES"])
-CLAUDE_REAL = os.environ.get("FZ_CLAUDE_REAL", "")   # 홈 .claude 의 실경로(링크 대상) — 런처가 입력 게이트의 CLAUDE_DIR_REAL 을 넘긴다. 비면 forbid_hit 의 그 규칙은 꺼진다
+# Claude 폴더 링크 대상 실경로 — 런처가 make_iso 의 CLAUDE_REALS(권한 표 deny 와 같은 목록)를 줄바꿈으로 넘긴다. 비면 forbid_hit 의 그 규칙은 꺼진다
+#   ⛔ 저장소 자신이나 그 조상인 대상은 뺀다 — 넣으면 허용된 저장소 읽기가 전부 적중이 된다
+CLAUDE_REALS = [p for p in os.environ.get("FZ_CLAUDE_REALS", "").split("\n") if p and not (p == repo or repo.startswith(p.rstrip("/") + "/"))]
 JS_ESC = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f", "v": "\v", "0": "\0"}
 def js_strings(src):
     """JS 문자열 리터럴의 값 — rollout 의 exec 입력은 JS 프로그램이다(`tools.exec_command({cmd:"…"})` · `{cmd:'…'}` · `const paths = ["…"]`).
@@ -582,10 +590,24 @@ def shell_words(s):
         return list(lx)
     except ValueError:
         return s.split()
+PATH_CH = re.compile(r"[\w.~-]")   # 경로 성분 글자 — 유니코드 단어 글자 · `.` · `~` · `-`
+def refers_to(s, target):
+    """s 가 target 이나 그 아래 경로를 가리키는가 — 출현이 경로를 시작하고(왼쪽 `/` 묶음을 건너면 텍스트 시작이거나 경로 성분 밖 글자)
+    성분을 끝낼 때(다음 글자가 없거나 경로 성분 밖 글자 — `/` 포함)만 센다."""
+    i = s.find(target)
+    while i >= 0:
+        j, k = i, i + len(target)
+        while j > 0 and s[j - 1] == "/":
+            j -= 1
+        if (j == 0 or not PATH_CH.match(s[j - 1])) and (k == len(s) or not PATH_CH.match(s[k])):
+            return True
+        i = s.find(target, i + 1)
+    return False
 def forbid_hit(cmd):
     """Claude 산출물 참조 — `.claude/` 경로 또는 fz 고유 산출물 이름(경로 성분 전체 일치 · 입력 가드와 같은 표).
-    또는 홈 `.claude` 의 실경로(CLAUDE_REAL — 링크 대상) 아래 경로 · 맨 대상 단어(`ls <대상>` · `find <대상> …`) — 대상이 홈 밖이면 home_ref 가,
-       --repo 아래면 허용 판정이 놓친다. 이름이 대상으로 시작하는 형제(`<대상>2/…` · `<대상>.bak`)는 적중이 아니다.
+    또는 Claude 폴더 링크 대상(CLAUDE_REALS — 홈 `.claude` · 저장소 `.claude` · `.fz-work` 의 실경로) 아래 경로 · 맨 대상(`ls <대상>` · `find <대상> …`)
+       — 대상이 홈 밖이면 home_ref 가, --repo 아래면 허용 판정이 놓친다. 경계는 refers_to 다 — 원문과 셸 단어(역슬래시 · 쪼갠 따옴표를 푼 값)마다
+       경로를 시작하고 성분을 끝내는 출현만 센다: 다른 경로 성분 뒤의 같은 글자(`vendor/mirror<대상>/…` · `./…` · `$X<대상>`) · 형제(`<대상>2/…` · `<대상>.bak`)는 적중이 아니다.
        실경로 글자만 본다 — 다른 링크로 가리킨 경로 · `..` 로 돌아 들어오는 꼴은 보지 않는다
     ⛔ 부분 문자열로 보지 않는다 — `code-context-builder.swift` · `ci/test-result.json` · 검색 패턴 'workflow-result' 는 산출물이 아니다.
        범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다
@@ -597,7 +619,7 @@ def forbid_hit(cmd):
     for s in [cmd] + js_strings(cmd):
         if ".claude/" in s:
             return True
-        if CLAUDE_REAL and (CLAUDE_REAL + "/" in s or CLAUDE_REAL in shell_words(s)):   # 대상 아래 경로 · 맨 대상 단어(끝 `/` 없음)
+        if any(refers_to(v, t) for v in [s] + shell_words(s) for t in CLAUDE_REALS):   # 대상 아래 경로 · 맨 대상 — 원문과 셸 단어
             return True
         if any(FZ_ART.fullmatch(c.strip("[](){},;:'\"`")) for w in shell_words(s) for c in w.split("/")):   # 양 끝만 — JS 배열 · 호출 구두점
             return True
