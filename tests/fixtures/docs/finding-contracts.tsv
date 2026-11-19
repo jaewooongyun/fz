@@ -331,6 +331,9 @@ F-677	guides/skill-authoring.md	has:replace	티켓 폴더 컨텍스트 로딩 �
 # F-534 — 앞 단계의 활성 기록이 지금 대상과 같아도 건너뛰는 것은 기록 다시 쓰기뿐이다 — 활성 프로젝트는 세션마다 따로라 이 세션이 아직 활성화하지 않았으면 부른다
 F-534	skills/fz-code/SKILL.md	lacks	활성화 · 기록을 건너뛰고 검사만 한다
 F-534	skills/fz-code/SKILL.md	has:replace	기록이 있다고 활성화를 건너뛰지 않는다
+F-694	skills/fz-code/SKILL.md	has	적용 전에 `openQuestions`(`changeset.openQuestions` — `changeset-defect` 반환은 최상위 칸)를 읽고 항목마다 답하거나 보고한다 — 아직 열린 설계 의문은 사용자에게 올리고 풀릴 때까지 적용하지 않는다
+F-697	skills/fz-fix/SKILL.md	has	를 읽고 항목마다 답하거나 보고한다 — 아직 열린 설계 의문은 사용자에게 올리고 풀릴 때까지 적용하지 않는다(머리 표지의 뜻은 fz-code 절차 6)
+F-697	workflows/code-pair.js	lacks	Lead 가 반환 처리에서 읽는다(fz-code 절차 6)
 F-534	skills/fz-review/SKILL.md	lacks	활성화 · 기록을 건너뛰고 검사만 한다
 F-534	skills/fz-review/SKILL.md	has:replace	기록이 있다고 활성화를 건너뛰지 않는다
 # F-481 — 지난 판이 쓰던 세션 상태 키는 gc 의 일회 정리 단계가 목록을 보이고 사용자 확인 뒤에만 지운다(audit 이 그 키를 끝없이 orphan 으로 보고하지 않게)

@@ -22,7 +22,7 @@
 | `ARM_OTHER_TREE` | 0 | 탐색 팔: 워커가 다른 트리 표지를 남겼다 | 결과에 `[심볼 팔: 글자 검색 폴백 — serena 가 다른 트리에 떠 있었다 · 두 팔이 같은 방법이다]` 를 싣는다 |
 | `ARM_TEXT_ONLY` | 0 | 탐색 팔: 호출 0 | 결과에 `[심볼 팔: 글자 검색 폴백 — 두 팔이 같은 방법이다]` 를 싣는다 |
 
-- 심볼 호출은 Serena 의 심볼 읽기 도구 다섯(`find_symbol` · `find_referencing_symbols` · `get_symbols_overview` · `find_implementations` · `find_declaration`)뿐이다. 메모리 · 프로젝트 활성 · 설정 · 안내 등 그 밖의 Serena 도구는 호출 수에도 성공 · 오류 · 빈 결과에도 세지 않고 정보 줄(도구 이름별 수)로만 찍는다.
+- 심볼 호출은 Serena 의 심볼 읽기 도구 다섯(`find_symbol` · `find_referencing_symbols` · `get_symbols_overview` · `find_implementations` · `find_declaration`)뿐이다. 메모리 · 프로젝트 활성 · 설정 · 안내 등 그 밖의 Serena 도구는 호출 수에도 도구 작업에도 성공 · 오류 · 빈 결과에도 세지 않고 정보 줄(도구 이름별 수)로만 찍는다.
 - 탐색 팔(`--only-label`)은 보고 모드다 — 경보가 아니라 표지를 고르는 데 쓴다. 탐색 팔의 `UNRUN`(라벨을 못 읽은 워커가 있다 · 그 라벨의 워커가 없다)이면 표지를 싣지 않고 판정하지 못한 사실을 결과에 적는다.
 - 직접 호출(`--direct`)은 그 에이전트 종류의 가장 최근 호출 하나만 판정하고 앞선 호출은 정보 줄로만 찍는다 — 같은 종류를 두 번 띄웠으면 한 번 끝날 때마다 돌린다.
 

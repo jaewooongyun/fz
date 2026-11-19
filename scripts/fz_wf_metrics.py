@@ -146,12 +146,14 @@ OTHER_TREE_MARK = "[symbol tools: unavailable - not on the target tree]"
 def symbol_result_kind(is_error, content) -> str:
     """심볼 도구 결과 종류 — error · empty · ok. 외부 MCP 판독기(`mcp_result_kind`)와 따로 둔다 — 그 판독기는 본문의 뜻을 읽지
     않아 `[]` 도 본문이다. 오류 표지(is_error · Serena 의 오류 머리말)면 오류, 본문이 빈 글이거나 빈 JSON(`[]` · `{}`)이면 빈 결과,
-    그 밖은 성공이다. 글이 아닌 블록은 본문이다. 결과가 아예 없는 호출은 이 함수 밖 — 어느 쪽에도 세지 않는다.
+    그 밖은 성공이다. 글이 아닌 블록은 본문이다(빈 결과가 아니다) — 다만 곁의 글 블록 하나가 같은 블록 규칙으로 오류면 결과는 오류다.
+    결과가 아예 없는 호출은 이 함수 밖 — 어느 쪽에도 세지 않는다.
     글 블록이 여럿이면 블록마다 같은 규칙으로 판정해 합친다 — 오류 블록이 하나라도 있으면 오류, 아니면 전부 빈 결과일 때 빈 결과, 그 밖은
     성공이다(이어 붙이면 `[]` · `{}` 가 JSON 이 아닌 글이 되고, 빈 블록 뒤의 오류 머리말이 글 맨 앞에서 밀려난다)."""
     blocks = [{"type": "text", "text": content}] if isinstance(content, str) else (content or [])
     if any(not isinstance(b, dict) or b.get("type", "text") != "text" for b in blocks):
-        return "error" if is_error else "ok"
+        texts = [str(b.get("text") or "").strip() for b in blocks if isinstance(b, dict) and b.get("type", "text") == "text"]
+        return "error" if is_error or any(symbol_result_kind(False, t) == "error" for t in texts) else "ok"
     texts = [str(b.get("text") or "").strip() for b in blocks]
     if len(texts) > 1:
         kinds = {symbol_result_kind(is_error, t) for t in texts}
@@ -877,7 +879,8 @@ def is_symbol_call(name) -> bool:
 
 
 def audit_counts(agents) -> dict:
-    """도구 이름별 수 → serena(심볼 호출) · 대조 · 도구 작업 · 이름별 분포 · other(심볼 읽기가 아닌 Serena 호출 — 정보로만 찍는다)."""
+    """도구 이름별 수 → serena(심볼 호출) · 대조 · 도구 작업 · 이름별 분포 · other(심볼 읽기가 아닌 Serena 호출 — 도구 작업에도 세지 않고
+    정보로만 찍는다)."""
     serena = 0
     control = 0
     work = 0
@@ -890,6 +893,7 @@ def audit_counts(agents) -> dict:
                 serena += c
             elif nm.startswith(MCP_PREFIXES):
                 other[nm] = other.get(nm, 0) + c
+                continue                       # 심볼 읽기가 아닌 Serena 호출은 도구 작업이 아니다
             if nm == CONTROL_TOOL:
                 control += c
             if nm not in NOT_WORK:
@@ -1147,7 +1151,6 @@ def audit_verdict(agents, tools_md):
 #  적는다) — 업데이트 뒤 옛 정의로 돈 실행이 고칠 수 없는 경보를 내지 않게. 그 파일을 못 읽거나 시각이 미래면 경계가 없다.
 #  기록 · 열쇠를 쓰지 못하면 `MCP_SWEEP_UNRUN` 줄 하나만 찍는다 — 기록하지 못한 판정은 알리지 않는다(열쇠가 없으니 다음 훑기가 다시 판정한다).
 #  언제나 exit 0 — 판정은 요약 줄 `MCP_SWEEP runs=… used=… suspect=… fallback=… undecided=… n/a=…` 과 기록에만 남는다.
-SYMBOL_TOOLS = ("find_symbol", "find_referencing_symbols", "get_symbols_overview")
 SWEEP_SKIP_AGENTS = ("memory-curator",)   # 메모리 회상이 일이라 심볼 호출 0 이 정상이다 — 재지 않는다
 SWEEP_KEYS_MAX = 5000                     # 열쇠 파일 상한 — 넘으면 가장 오래 고치지 않은 열쇠부터 버린다
 SWEEP_RECORD_MAX = 1_000_000              # 기록 파일 돌림 크기(바이트) — 돌린 옛 파일 하나까지 이 머신에 남는 기록은 약 2MB 다
@@ -1155,7 +1158,8 @@ SWEEP_VERDICTS = ("used", "suspect", "fallback", "undecided", "n/a")
 
 
 def symbol_holders(agents_dir):
-    """에이전트 정의 폴더 → 머리(frontmatter)의 `tools:` 줄에 심볼 도구가 있는 종류(`fz:<파일 이름>`) 집합 · 못 읽거나 비었으면 None."""
+    """에이전트 정의 폴더 → 머리(frontmatter)의 `tools:` 줄에 심볼 읽기 도구(`SYMBOL_READ_TOOLS` — 호출을 세는 목록과 같다)가 있는
+    종류(`fz:<파일 이름>`) 집합 · 못 읽거나 비었으면 None."""
     try:
         names = sorted(n for n in os.listdir(agents_dir) if n.endswith(".md"))
     except OSError:
@@ -1169,7 +1173,7 @@ def symbol_holders(agents_dir):
             return None
         m = re.search(r"^tools:(.*)$", text.split("\n---", 1)[0] if text.startswith("---") else "", re.M)
         tools = {t.strip() for t in m.group(1).split(",")} if m else set()
-        if n[:-3] not in SWEEP_SKIP_AGENTS and any(p + t in tools for p in MCP_PREFIXES for t in SYMBOL_TOOLS):
+        if n[:-3] not in SWEEP_SKIP_AGENTS and any(p + t in tools for p in MCP_PREFIXES for t in SYMBOL_READ_TOOLS):
             out.add("fz:" + n[:-3])
     return out if names else None
 

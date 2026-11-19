@@ -98,9 +98,10 @@ def _write_probe(root: str, kind: str) -> None:
         return
     if kind in ("mcp-arm", "mcp-arm-err", "mcp-nolabel", "mcp-othertree", "mcp-allerr", "mcp-uncovered", "mcp-nopath",
                 "mcp-nonsymbol", "mcp-upper-ext", "mcp-folder", "mcp-extless", "mcp-noresult", "mcp-unanswered",
-                "mcp-na-kind", "mcp-na-mixed", "mcp-direct", "mcp-sweep", "mcp-sweep-nostate", "mcp-sweep-latestate"):
+                "mcp-na-kind", "mcp-na-mixed", "mcp-direct", "mcp-sweep", "mcp-sweep-nostate", "mcp-sweep-latestate",
+                "mcp-mixed-err", "mcp-impl-only", "mcp-decl-only"):
         # 심볼 도구 결과 · 단계 라벨 · 다른 트리 표지 · 직접 호출 · 세션 훑기. 호출 = (도구, 지목한 파일 | None, 결과 | None) · 결과 = (is_error, 글)
-        # · 결과가 None 이면 그 호출의 결과 줄을 쓰지 않는다(기록이 중간에 끊긴 꼴).
+        # · 결과가 None 이면 그 호출의 결과 줄을 쓰지 않는다(기록이 중간에 끊긴 꼴) · 글 자리에 블록 목록을 두면 그 목록이 결과 본문이다.
         # 결과 글은 Serena 의 실제 꼴이다 — 찾기는 JSON 목록(없으면 `[]`) · 오류는 is_error 없는 `Error…` 글.
         S = "mcp__plugin_fz_serena__"
         found = (False, '[{"name_path": "main", "relative_path": "scripts/run.sh", "body_location": {"start_line": 3}}]')
@@ -124,7 +125,8 @@ def _write_probe(root: str, kind: str) -> None:
                     continue
                 err, text = res
                 results.append(dict({"type": "tool_result", "tool_use_id": tid,
-                                     "content": text if err else [{"type": "text", "text": text}]}, **({"is_error": True} if err else {})))
+                                     "content": text if err or not isinstance(text, str) else [{"type": "text", "text": text}]},
+                                    **({"is_error": True} if err else {})))
             done = ({"type": "tool_use", "id": f"{aid}-so", "name": "StructuredOutput", "input": {"findings": [], "note": note}}
                     if final == "so" else {"type": "text", "text": f"검토를 마쳤다. {note}".strip()})
             rows = [{"type": "user", "timestamp": stamp(minute), "message": {"content": "[역할] 심볼 탐색자"}}]
@@ -226,6 +228,13 @@ def _write_probe(root: str, kind: str) -> None:
             "mcp-na-kind": [("a1", "fz:search-pattern", [read, grep], "stage1-pattern", "")],
             "mcp-na-mixed": [("a1", "fz:search-pattern", [read, grep], "stage1-pattern", ""),
                              ("a2", "general-purpose", [grep], "impact", "")],
+            # 켜진 언어 파일을 물은 찾기의 결과가 글이 아닌 블록(리소스) 하나 + Serena 오류 글 블록 하나다 — 오류 블록이 결과를 오류로 만든다
+            "mcp-mixed-err": [("a1", "fz:plan-impact", [(S + "find_symbol", "scripts/run.sh", (False, [
+                {"type": "resource", "resource": {"uri": "file:///tmp/x/scripts/run.sh", "mimeType": "text/x-sh", "text": "main() {"}},
+                {"type": "text", "text": no_project[1]}])), read], "impact", "")],
+            # 구현 찾기만 · 선언 찾기만 선언한 종류의 워커가 파일만 읽었다(정의 폴더는 셀이 따로 쓴다)
+            "mcp-impl-only": [("a1", "fz:impl-correctness", [read, grep], "impact", "")],
+            "mcp-decl-only": [("a1", "fz:review-correctness", [read, grep], "impact", "")],
         }[kind]
         journal = []
         for n, (aid, meta, calls, label, note) in enumerate(plan):
@@ -234,13 +243,16 @@ def _write_probe(root: str, kind: str) -> None:
             for ev in journal:
                 fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
         return
-    if kind in ("mcp-ok", "mcp-dead", "mcp-unrun", "mcp-nocontrol"):
-        # ⛔ 세 픽스처는 **도구 호출 조합만** 다르다 — 판정이 그 조합에서만 갈리는지 보기 위해서다(mcp-ok 만 심볼 도구 결과 한 줄을 더 갖는다).
+    if kind in ("mcp-ok", "mcp-dead", "mcp-unrun", "mcp-nocontrol", "mcp-info", "mcp-info-read"):
+        # ⛔ 여섯 픽스처는 **도구 호출 조합만** 다르다 — 판정이 그 조합에서만 갈리는지 보기 위해서다(mcp-ok 만 심볼 도구 결과 한 줄을 더 갖는다).
         calls = {"mcp-ok": [("mcp__plugin_fz_serena__find_symbol", "s1"), ("Read", "r1")],
                  "mcp-dead": [("Read", "r1"), ("Grep", "g1")],
                  "mcp-unrun": [],
                  # ⛔ 작업은 했지만 **대조 심볼이 없다** — 부재를 주장할 근거가 없는 경로
-                 "mcp-nocontrol": [("Grep", "g1")]}[kind]
+                 "mcp-nocontrol": [("Grep", "g1")],
+                 # 심볼 읽기가 아닌 Serena 호출(안내) 하나뿐 · 그 호출과 파일 읽기 — 안내 호출은 도구 작업이 아니다
+                 "mcp-info": [("mcp__plugin_fz_serena__initial_instructions", "i1")],
+                 "mcp-info-read": [("Read", "r1"), ("mcp__plugin_fz_serena__initial_instructions", "i1")]}[kind]
         blocks = [{"type": "tool_use", "id": i, "name": nm, "input": {}} for nm, i in calls]
         blocks.append({"type": "tool_use", "id": "so1", "name": "StructuredOutput", "input": {}})
         rows = [
@@ -393,6 +405,13 @@ def self_test() -> int:
     audit("tools-md-bad", "mcp-dead", 2, "UNRUN: 상태 기록", state="bad")
     audit("tools-md-unrun", "mcp-unrun", 2, "도구 작업이 0건", state="unused")
     audit("tools-md-old-tail", "mcp-dead", 0, "MCP_FALLBACK (사유: 미설치)", state="old-tail")
+    # 심볼 읽기가 아닌 Serena 호출(안내)은 도구 작업이 아니다 — 상태(기록 없음 · 미사용 · 활성)마다 산출 제출뿐인 워커(mcp-unrun)와 안내 호출
+    # 하나를 더한 워커(mcp-info)가 같은 낱말 · 종료 코드다. 파일 읽기가 있으면 안내 호출을 더해도 판정이 그대로다(mcp-dead 의 tools-md-active)
+    audit("tools-md-active-unrun", "mcp-unrun", 2, "UNRUN: 도구 작업이 0건", state="active")
+    audit("info-only", "mcp-info", 2, "UNRUN: 도구 작업이 0건")
+    audit("info-only-unused", "mcp-info", 2, "UNRUN: 도구 작업이 0건", state="unused")
+    audit("info-only-active", "mcp-info", 2, "UNRUN: 도구 작업이 0건", state="active")
+    audit("info-read-active", "mcp-info-read", 1, "MCP_WIRING_SUSPECT", state="active")
     # 탐색 팔(--only-label) — 보고 모드라 판정은 exit 0 · 라벨을 못 읽거나 그 라벨의 워커가 없으면 2
     audit("mcp-arm-text-only", "mcp-arm", 0, "ARM_TEXT_ONLY", ("--only-label", "stage1-symbolic"))
     audit("mcp-arm-used", "mcp-arm", 0, "ARM_SYMBOL_USED", ("--only-label", "stage2-sym"))
@@ -415,6 +434,8 @@ def self_test() -> int:
     audit("mcp-allerr-direct", "mcp-direct", 1, "MCP_CALLED_NO_RESULT", ("--only-agent", "fz:review-quality"),
           state="active", direct=True)
     audit("mcp-allerr-nostate", "mcp-allerr", 2, "UNRUN: 성공 0")
+    # 결과에 글이 아닌 블록이 섞여도 오류 글 블록이 있으면 오류다 — 켜진 언어 파일을 물은 유일한 호출이 그 결과면 통과가 아니다
+    audit("mixed-block-error", "mcp-mixed-err", 1, "MCP_CALLED_NO_RESULT", state="active")
     audit("mcp-uncovered", "mcp-uncovered", 0, "MCP_FALLBACK_UNCOVERED", state="active")
     audit("mcp-nopath", "mcp-nopath", 2, "MCP_UNDECIDED", state="active")
     audit("lang-table-miss", "mcp-allerr", 2, "UNRUN: 상태 기록의 언어", state="unknown-lang")
@@ -448,6 +469,15 @@ def self_test() -> int:
         passed += 1
     else:
         fails.append(f"symbol-result-blocks: {got} (기대 {want})")
+    # 글이 아닌 블록(리소스)은 본문이라 빈 결과가 아니지만 곁의 오류 글 블록을 가리지 않는다 — 오류 표지 · 오류 글 블록이 먼저다
+    res = {"type": "resource", "resource": {"uri": "file:///tmp/x/scripts/run.sh", "mimeType": "text/x-sh", "text": "main() {"}}
+    got = [wfm.symbol_result_kind(False, [res] + blocks("Error: No active project.")), wfm.symbol_result_kind(False, [res] + blocks(" ")),
+           wfm.symbol_result_kind(False, [res]), wfm.symbol_result_kind(True, [res])]
+    want = ["error", "ok", "ok", "error"]
+    if got == want:
+        passed += 1
+    else:
+        fails.append(f"symbol-result-nontext: {got} (기대 {want})")
 
     # 세션 훑기(--mcp-audit --sweep) — 심볼 도구를 가진 종류의 워커만 센다 · 같은 '전부 오류' 입력(넷째 실행)이 일반 · 직접 호출과 같은 판정 ·
     # 상태 기록이 하나가 아니거나 실행 뒤에 고쳐졌으면 0회 · 성공 0 은 미판정 · 이미 본 실행(열쇠 = 실행 id + 워커 기록 수)은 다시 세지 않는다
@@ -457,9 +487,9 @@ def self_test() -> int:
                   ("memory-curator", "Read, Grep, Glob, mcp__plugin_fz_serena__read_memory, mcp__plugin_fz_serena__find_symbol"),
                   ("plan-merge", None))   # 머리에 도구 선언이 없다 — 본문의 `tools:` 줄은 선언이 아니다
 
-    def write_agents(d):
+    def write_agents(d, defs=agent_defs):
         os.makedirs(d)
-        for nm, tools in agent_defs:
+        for nm, tools in defs:
             with open(os.path.join(d, nm + ".md"), "w", encoding="utf-8") as fh:
                 fh.write(f"---\nname: {nm}\ndescription: 합성 에이전트 정의\nmodel: sonnet\n" + (f"tools: {tools}\n" if tools else "")
                          + "---\n\n본문 예시 — tools: mcp__plugin_fz_serena__find_symbol\ntools: mcp__plugin_fz_serena__find_symbol\n")
@@ -674,6 +704,19 @@ def self_test() -> int:
     finally:
         shutil.rmtree(r9, ignore_errors=True)
     audit("na-kind-default-dir", "mcp-na-kind", 0, "MCP_NOT_APPLICABLE", state="active")
+    # 심볼 도구를 가진 종류는 심볼 읽기 도구 다섯으로 가른다 — 구현 찾기만 · 선언 찾기만 선언한 종류의 워커도 세고(파일만 읽었으면 의심),
+    # 다섯 중 어느 것도 없는 종류(심볼 읽기가 아닌 Serena 도구만 있어도)는 여전히 뺀다
+    r10 = tempfile.mkdtemp(prefix="fzwf-defs5-")
+    try:
+        defs5 = os.path.join(r10, "agents")
+        write_agents(defs5, (("impl-correctness", "Read, Grep, Glob, mcp__plugin_fz_serena__find_implementations"),
+                             ("review-correctness", "Read, Grep, Glob, mcp__plugin_fz_serena__find_declaration"),
+                             ("search-pattern", "Read, Grep, Glob, mcp__plugin_fz_serena__read_memory")))
+        audit("holder-impl-only", "mcp-impl-only", 1, "MCP_WIRING_SUSPECT", ("--agents-dir", defs5), state="active")
+        audit("holder-decl-only", "mcp-decl-only", 1, "MCP_WIRING_SUSPECT", ("--agents-dir", defs5), state="active")
+        audit("holder-none-left-out", "mcp-na-kind", 0, "MCP_NOT_APPLICABLE", ("--agents-dir", defs5), state="active")
+    finally:
+        shutil.rmtree(r10, ignore_errors=True)
 
     # ⑪~⑬ --sweep-row — 측정값과 사람 판정 칸이 섞이지 않는지, 부재를 0 으로 쓰지 않는지
     def sweep(kind, want_exit, want_text):
@@ -797,6 +840,6 @@ def self_test() -> int:
     if fails:
         print(f"fz_wf_metrics self-test {passed}/{total} passed")
         return 1
-    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 41 · 심볼 결과 판독 2 · mcp-sweep 17 · sweep-row 3"
+    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 50 · 심볼 결과 판독 3 · mcp-sweep 17 · sweep-row 3"
           f" · stage 규칙 1 · usage 중복 1 · advisor 스톨 3 · 시도 구분 1)")
     return 0

@@ -14,7 +14,7 @@
 //   effort 계약: 전 agent() 호출 model+effort 명시 — effort 값은 args.effort(Lead 세션 effort · 미지정 'xhigh' — modules/mode-gate.md § effort). 특정 콜에서 effort 옵션 거부 회귀 시 그 콜의 effort 키만 제거(모델 유지).
 //   반환: { mode:'workflow', changeset, reviewVerdict, lensesExpected, lensesCompleted,
 //            residualIssues, residualNote, metrics }
-//   changeset.openQuestions(문자열 배열 · 필수 아님): 구현자의 설계 의문 · Redundant Import 신호 — Lead 가 반환 처리에서 읽는다(fz-code 절차 6).
+//   changeset.openQuestions(문자열 배열 · 필수 아님): 구현자의 설계 의문 · Redundant Import 신호 — Lead 가 적용 전에 읽는다(fz-code 절차 4 · 머리 표지의 뜻은 절차 6).
 //     Stage 3 이 수정본을 돌려주면 반환 칸 = 수정본의 칸 그대로 뒤에 수정본이 다시 적지 않은 원 changeset 의 의문(앞에 '[1단계 의문 · 수정 단계가
 //     다시 적지 않음] ' — 수정이 풀었는지 Lead 가 가른다 · 중복 없음)이다 — 둘 다 비거나 없으면 수정본 그대로다. 배열 아닌 값은 빈 목록으로 읽는다.
 //   ⛔ reviewVerdict 는 'pass'|'issues'|'partial'|'skipped'. **'partial' 은 스크립트가 조립한다**
