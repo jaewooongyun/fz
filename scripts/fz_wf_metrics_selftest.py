@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 import fz_wf_metrics as wfm   # 형제 모듈(판정 코드) — 이 모듈은 그 함수를 부르기만 한다. ⛔ 모듈 머리에서 wfm 의 이름을 읽지 않는다(순환 import)
 
@@ -96,8 +97,10 @@ def _write_probe(root: str, kind: str) -> None:
                 fh.write(json.dumps(ev) + "\n")
         return
     if kind in ("mcp-arm", "mcp-arm-err", "mcp-nolabel", "mcp-othertree", "mcp-allerr", "mcp-uncovered", "mcp-nopath",
-                "mcp-direct", "mcp-sweep", "mcp-sweep-nostate", "mcp-sweep-latestate"):
-        # 심볼 도구 결과 · 단계 라벨 · 다른 트리 표지 · 직접 호출 · 세션 훑기. 호출 = (도구, 지목한 파일 | None, 결과) · 결과 = (is_error, 글).
+                "mcp-nonsymbol", "mcp-upper-ext", "mcp-folder", "mcp-extless", "mcp-noresult", "mcp-unanswered",
+                "mcp-na-kind", "mcp-na-mixed", "mcp-direct", "mcp-sweep", "mcp-sweep-nostate", "mcp-sweep-latestate"):
+        # 심볼 도구 결과 · 단계 라벨 · 다른 트리 표지 · 직접 호출 · 세션 훑기. 호출 = (도구, 지목한 파일 | None, 결과 | None) · 결과 = (is_error, 글)
+        # · 결과가 None 이면 그 호출의 결과 줄을 쓰지 않는다(기록이 중간에 끊긴 꼴).
         # 결과 글은 Serena 의 실제 꼴이다 — 찾기는 JSON 목록(없으면 `[]`) · 오류는 is_error 없는 `Error…` 글.
         S = "mcp__plugin_fz_serena__"
         found = (False, '[{"name_path": "main", "relative_path": "scripts/run.sh", "body_location": {"start_line": 3}}]')
@@ -117,6 +120,8 @@ def _write_probe(root: str, kind: str) -> None:
                     {"file_path": target} if tool == "Read" else {"skill": target} if tool == "Skill" else
                     {"libraryId": target, "query": "main"} if "context7" in tool else {"pattern": "main"})
                 uses.append({"type": "tool_use", "id": tid, "name": tool, "input": inp})
+                if res is None:
+                    continue
                 err, text = res
                 results.append(dict({"type": "tool_result", "tool_use_id": tid,
                                      "content": text if err else [{"type": "text", "text": text}]}, **({"is_error": True} if err else {})))
@@ -203,6 +208,24 @@ def _write_probe(root: str, kind: str) -> None:
                                                          ignored("workflows/pipeline.js")), read], "impact", "")],
             # 파일을 지정하지 않은 찾기 하나가 `[]` 를 돌려줬다 — 결과도 아니고 켜진 언어 파일의 오류도 아니다
             "mcp-nopath": [("a1", "fz:plan-impact", [(S + "find_symbol", None, (False, "[]")), grep], "impact", "")],
+            # 심볼 읽기가 아닌 Serena 호출(안내) 하나는 성공 · 켜진 언어 파일을 물은 찾기 둘은 전부 오류
+            "mcp-nonsymbol": [("a1", "fz:plan-impact", [(S + "initial_instructions", None, (False, "You are a professional coding agent.")),
+                                                        (S + "find_symbol", "scripts/run.sh", no_project),
+                                                        (S + "find_referencing_symbols", "scripts/run.sh", no_project), read],
+                               "impact", "")],
+            # 대문자 확장자의 켜진 언어 파일을 물었는데 오류
+            "mcp-upper-ext": [("a1", "fz:plan-impact", [(S + "find_symbol", "scripts/RUN.SH", no_project), read], "impact", "")],
+            # 폴더 · 확장자 없는 경로를 물었고 빈 결과 — 불명 대상
+            "mcp-folder": [("a1", "fz:plan-impact", [(S + "find_symbol", "src/", (False, "[]")), read], "impact", "")],
+            "mcp-extless": [("a1", "fz:plan-impact", [(S + "find_symbol", "scripts", (False, "[]")), read], "impact", "")],
+            # 켜진 언어 파일을 물은 호출 하나가 결과 줄 없이 남았다(기록이 끊겼다) · 그 앞에 켜진 언어 밖 파일의 오류 하나(-unanswered)
+            "mcp-noresult": [("a1", "fz:plan-impact", [(S + "find_symbol", "scripts/run.sh", None), read], "impact", "")],
+            "mcp-unanswered": [("a1", "fz:plan-impact", [(S + "get_symbols_overview", "docs/guide.md", ignored("docs/guide.md")),
+                                                         (S + "find_symbol", "scripts/run.sh", None), read], "impact", "")],
+            # 심볼 도구가 없는 종류(글자 탐색 팔)의 워커뿐 · 그 워커와 정의 폴더에 없는 종류의 워커(-mixed)
+            "mcp-na-kind": [("a1", "fz:search-pattern", [read, grep], "stage1-pattern", "")],
+            "mcp-na-mixed": [("a1", "fz:search-pattern", [read, grep], "stage1-pattern", ""),
+                             ("a2", "general-purpose", [grep], "impact", "")],
         }[kind]
         journal = []
         for n, (aid, meta, calls, label, note) in enumerate(plan):
@@ -343,7 +366,7 @@ def self_test() -> int:
                 with open(os.path.join(r2, "tools.md"), "w", encoding="utf-8") as fh:
                     fh.write(states[state] + "\n")
                 argv += ["--tools-md", os.path.join(r2, "tools.md")]
-            proc = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+            proc = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60, cwd=r2)
             out = (proc.stdout or b"").decode("utf-8", "replace")
             why = []
             if proc.returncode != want_exit:
@@ -358,7 +381,8 @@ def self_test() -> int:
             shutil.rmtree(r2, ignore_errors=True)
 
     audit("mcp-ok", "mcp-ok", 0, "MCP_AUDIT_OK")
-    audit("mcp-dead", "mcp-dead", 1, "MCP_WIRING_SUSPECT")
+    # 상태 기록 없이 0회 · Read 있음 — 심볼 서버가 없는 머신과 배선 끊김을 가를 수 없어 미판정이다(의심은 활성 기록이 있을 때만 · tools-md-active)
+    audit("mcp-dead", "mcp-dead", 2, "UNRUN: serena 0건 · Read 1건인데 상태 기록이 없다")
     audit("mcp-unrun", "mcp-unrun", 2, "도구 작업이 0건")
     audit("mcp-nocontrol", "mcp-nocontrol", 2, "대조 심볼")
     audit("result-kinds", "mcp-ok", 0, "serena 결과: 성공 1 · 오류 0 · 빈 결과 0")
@@ -378,7 +402,8 @@ def self_test() -> int:
     audit("mcp-arm-othertree", "mcp-othertree", 0, "ARM_OTHER_TREE", ("--only-label", "stage1-symbolic"))
     audit("mcp-othertree", "mcp-othertree", 1, "MCP_OTHER_TREE")
     # 직접 호출(--direct) — 그 종류의 가장 최근 호출 하나를 판정한다(앞 호출의 사용이 뒤 호출의 0회를 가리지 않게)
-    audit("mcp-direct-latest", "mcp-direct", 1, "MCP_WIRING_SUSPECT", ("--only-agent", "fz:review-correctness"), direct=True)
+    audit("mcp-direct-latest", "mcp-direct", 2, "UNRUN: serena 0건 · Read 1건인데 상태 기록이 없다", ("--only-agent", "fz:review-correctness"),
+          direct=True)
     audit("mcp-direct-other-kind", "mcp-direct", 0, "MCP_AUDIT_OK", ("--only-agent", "general-purpose"), direct=True)
     audit("mcp-direct-no-agent", "mcp-direct", 2, "--only-agent", direct=True)
     audit("only-agent-unreadable", "mcp-direct", 2, "UNRUN: 에이전트 종류", ("--only-agent", "general-purpose"), direct=True,
@@ -391,16 +416,36 @@ def self_test() -> int:
     audit("mcp-uncovered", "mcp-uncovered", 0, "MCP_FALLBACK_UNCOVERED", state="active")
     audit("mcp-nopath", "mcp-nopath", 2, "MCP_UNDECIDED", state="active")
     audit("lang-table-miss", "mcp-allerr", 2, "UNRUN: 상태 기록의 언어", state="unknown-lang")
+    # 심볼 읽기 도구만 심볼 호출이다 — 성공한 안내 호출이 전부 오류인 찾기를 가리지 않고, 정보 줄에만 찍힌다
+    audit("nonsymbol-serena", "mcp-nonsymbol", 1, "MCP_CALLED_NO_RESULT", state="active")
+    audit("nonsymbol-serena-info", "mcp-nonsymbol", 1, "판정에 세지 않는다): mcp__plugin_fz_serena__initial_instructions=1", state="active")
+    # 확장자는 대소문자를 가리지 않는다 · 폴더와 확장자 없는 경로의 빈 결과는 불명 대상이다
+    audit("upper-ext", "mcp-upper-ext", 1, "MCP_CALLED_NO_RESULT", state="active")
+    audit("folder-target", "mcp-folder", 2, "MCP_UNDECIDED", state="active")
+    audit("extless-target", "mcp-extless", 2, "MCP_UNDECIDED", state="active")
+    # 결과 줄이 없는 호출 — 전부 결과가 없으면 그 사실을 적고, 켜진 언어 파일을 물은 호출이 결과 없이 남았으면 켜진 언어 밖 폴백이 아니다
+    audit("no-result-yet", "mcp-noresult", 2, "MCP_UNDECIDED: 성공 0 · 오류 0 · 빈 결과 0 — 심볼 호출 1건이 전부 아직 결과가 없다", state="active")
+    audit("uncovered-unanswered", "mcp-unanswered", 2, "MCP_UNDECIDED", state="active")
     # 심볼 도구 결과 판독 — 빈 JSON · 빈 글 = 빈 결과 · 오류 표지 = 오류. 외부 MCP 판독기의 뜻(`[]` 도 본문)은 그대로다
     got = [wfm.symbol_result_kind(False, "[]"), wfm.symbol_result_kind(False, [{"type": "text", "text": "{}"}]),
            wfm.symbol_result_kind(False, " "), wfm.symbol_result_kind(True, "x"),
            wfm.symbol_result_kind(False, "Error executing tool: ValueError - x"),
+           wfm.symbol_result_kind(False, "RuntimeError while processing the request: the language server is not running"),
            wfm.symbol_result_kind(False, '[{"name_path": "main"}]'), wfm.mcp_result_kind(False, "[]")]
-    want = ["empty", "empty", "empty", "error", "error", "ok", "content"]
+    want = ["empty", "empty", "empty", "error", "error", "error", "ok", "content"]
     if got == want:
         passed += 1
     else:
         fails.append(f"symbol-result-kind: {got} (기대 {want})")
+    # 글 블록이 여럿이면 블록마다 따로 판정해 합친다 — 오류 블록이 하나라도 있으면 오류 · 전부 빈 결과면 빈 결과 · 그 밖은 성공
+    blocks = lambda *xs: [{"type": "text", "text": x} for x in xs]
+    got = [wfm.symbol_result_kind(False, blocks("[]", "{}")), wfm.symbol_result_kind(False, blocks("[]", "Error: No active project.")),
+           wfm.symbol_result_kind(False, blocks('[{"name_path": "main"}]', "[]")), wfm.symbol_result_kind(True, blocks("[]", "{}"))]
+    want = ["empty", "error", "ok", "error"]
+    if got == want:
+        passed += 1
+    else:
+        fails.append(f"symbol-result-blocks: {got} (기대 {want})")
 
     # 세션 훑기(--mcp-audit --sweep) — 심볼 도구를 가진 종류의 워커만 센다 · 같은 '전부 오류' 입력(넷째 실행)이 일반 · 직접 호출과 같은 판정 ·
     # 상태 기록이 하나가 아니거나 실행 뒤에 고쳐졌으면 0회 · 성공 0 은 미판정 · 이미 본 실행(열쇠 = 실행 id + 워커 기록 수)은 다시 세지 않는다
@@ -417,8 +462,10 @@ def self_test() -> int:
                 fh.write(f"---\nname: {nm}\ndescription: 합성 에이전트 정의\nmodel: sonnet\n" + (f"tools: {tools}\n" if tools else "")
                          + "---\n\n본문 예시 — tools: mcp__plugin_fz_serena__find_symbol\ntools: mcp__plugin_fz_serena__find_symbol\n")
 
-    def sweep_cell(name, kind, steps):
-        """steps = [(추가 인자, 준비 | None, 출력에 있어야 할 글 | None, 검사(기록 줄들, 열쇠) → 사유 | None)] — 같은 세션을 차례로 훑는다."""
+    def sweep_cell(name, kind, steps, plugin_time=None):
+        """steps = [(추가 인자, 준비 | None, 출력에 있어야 할 글(하나 · 튜플) | None, 검사(기록 줄들, 열쇠) → 사유 | None[, 출력에 없어야 할 글 튜플])]
+        — 같은 세션을 차례로 훑는다. plugin_time 이 있으면 이 스크립트를 임시 플러그인 루트(`scripts/` · 수정 시각을 그 값으로 둔
+        `.claude-plugin/plugin.json`)에 복사해 그 사본으로 훑는다."""
         nonlocal passed
         r = tempfile.mkdtemp(prefix="fzwf-swp-")
         try:
@@ -427,11 +474,20 @@ def self_test() -> int:
             if kind:
                 _write_probe(sess, kind)
             os.makedirs(sess, exist_ok=True)
-            for i, (extra, prep, want_text, check) in enumerate(steps, 1):
+            script = me
+            if plugin_time is not None:
+                os.makedirs(os.path.join(r, "plug", "scripts"))
+                os.makedirs(os.path.join(r, "plug", ".claude-plugin"))
+                script = shutil.copy(me, os.path.join(r, "plug", "scripts"))
+                manifest = os.path.join(r, "plug", ".claude-plugin", "plugin.json")
+                with open(manifest, "w", encoding="utf-8") as fh:
+                    fh.write('{"name": "example-plugin", "version": "0.0.1"}\n')
+                os.utime(manifest, (plugin_time, plugin_time))
+            for i, (extra, prep, want_text, check, *absent) in enumerate(steps, 1):
                 if prep:
                     prep(sess)
                 extra = [x.replace("{sess}", sess) for x in extra]
-                proc = subprocess.run([sys.executable, me, "--mcp-audit", "--sweep", sess, "--record", rec,
+                proc = subprocess.run([sys.executable, script, "--mcp-audit", "--sweep", sess, "--record", rec,
                                        "--agents-dir", os.path.join(r, "agents")] + extra,
                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
                 out = (proc.stdout or b"").decode("utf-8", "replace")
@@ -443,8 +499,12 @@ def self_test() -> int:
                     with open(os.path.join(r, "runs", "mcp-sweep.keys.json"), "r", encoding="utf-8") as fh:
                         keys = json.load(fh)
                 why = [] if proc.returncode == 0 else [f"exit {proc.returncode} (기대 0)"]
-                if want_text and want_text not in out:
-                    why.append(f"출력에 {want_text!r} 없음: {out.strip()[:160]}")
+                for want in (want_text if isinstance(want_text, tuple) else (want_text,)):
+                    if want and want not in out:
+                        why.append(f"출력에 {want!r} 없음: {out.strip()[:160]}")
+                for gone in (absent[0] if absent else ()):
+                    if gone in out:
+                        why.append(f"출력에 {gone!r} 가 있다: {out.strip()[:160]}")
                 bad = check(lines, keys) if check and not why else None
                 if bad:
                     why.append(bad)
@@ -481,6 +541,10 @@ def self_test() -> int:
     sweep_cell("nostate", "mcp-sweep-nostate", [([], None, "used=1 suspect=0 fallback=0 undecided=2 n/a=1", None)])
     sweep_cell("latestate", "mcp-sweep-latestate", [(state, None, "used=1 suspect=0 fallback=0 undecided=2 n/a=1", None)])
     sweep_cell("two-states", "mcp-sweep", [(state + state, None, "used=1 suspect=0 fallback=0 undecided=2 n/a=1", None)])
+    # 상태를 모르는 0회 실행의 기록 줄 — 미판정에는 미판정 낱말(UNRUN)이 붙는다(내린 의심 낱말이 남지 않는다)
+    sweep_cell("nostate-recorded-word", "mcp-sweep-nostate", [([], None, "undecided=2", lambda lines, keys: None if lines and (
+        runs_of(lines[0]).get("wf_sw2") or {}).get("verdict") == "undecided" and runs_of(lines[0])["wf_sw2"].get("word") == "UNRUN"
+        else f"0회 실행의 기록: {runs_of(lines[0]).get('wf_sw2') if lines else '기록 없음'}")])
 
     def unfinish(sess):   # 끝나지 않은 실행 둘 — 0회 워크플로의 워커가 결과를 아직 내지 않았고 · 전부 오류인 직접 호출이 아직 돈다(끝 응답 전)
         for p, gone in ((os.path.join(sess, "subagents", "workflows", "wf_sw2", "journal.jsonl"), '"type": "result"'),
@@ -556,6 +620,33 @@ def self_test() -> int:
 
     # 기록이 돌림 크기에 이르면 덧붙이기 전에 한 번 돌린다 — 옛 파일은 하나만 남는다(앞서 돌린 것을 덮는다)
     sweep_cell("rotate", "mcp-sweep", [(state, big_record, "MCP_SWEEP runs=4 ", rotated)])
+
+    def block_record(sess):   # 기록 폴더 자리에 보통 파일 — 기록 · 열쇠를 쓰지 못한다
+        with open(os.path.join(os.path.dirname(sess), "runs"), "w", encoding="utf-8") as fh:
+            fh.write("x\n")
+
+    # 기록하지 못한 판정은 알리지 않는다 — 기록 · 열쇠 쓰기가 실패하면 UNRUN 줄 하나뿐(요약 · 의심 줄 없음) · 쓸 수 있으면 둘 다 찍는다
+    sweep_cell("record-unwritable", "mcp-sweep", [(state, block_record, "MCP_SWEEP_UNRUN", None, ("MCP_SWEEP runs=", "의심:"))])
+    sweep_cell("record-writable", "mcp-sweep", [(state, None, ("MCP_SWEEP runs=4 ", "  의심: wf_sw2 MCP_WIRING_SUSPECT"), None)])
+    now = time.time()
+
+    def age_run(sess):    # 0회 워크플로 실행(wf_sw2)의 기록 파일이 두 시간 전에 끝났다
+        d = os.path.join(sess, "subagents", "workflows", "wf_sw2")
+        for n in os.listdir(d):
+            os.utime(os.path.join(d, n), (now - 7200, now - 7200))
+
+    def predated(lines, keys):
+        got = runs_of(lines[0]).get("wf_sw2") if lines else None
+        ok = got and got.get("verdict") == "n/a" and "설치된 플러그인보다 먼저" in str(got.get("reason")) and len(keys or {}) == 4
+        return None if ok else f"설치 전 실행의 기록: {got} · 열쇠 {keys}"
+
+    # 플러그인 설치(루트의 .claude-plugin/plugin.json 수정 시각)보다 먼저 끝난 실행은 판정하지 않는다 — 해당 없음 · 사유 · 알림 없음 · 열쇠는 적는다.
+    # 설치 시각이 미래면 경계가 없다(둘 다 판정)
+    sweep_cell("predates-plugin", "mcp-sweep", [
+        (state, age_run, ("MCP_SWEEP runs=4 used=1 suspect=1 fallback=0 undecided=0 n/a=2", "  의심: agent-d2 "), predated, ("의심: wf_sw2",)),
+        same], plugin_time=now - 3600)
+    sweep_cell("plugin-time-future", "mcp-sweep", [(state, age_run, "MCP_SWEEP runs=4 used=1 suspect=2 fallback=0 undecided=0 n/a=1", None)],
+               plugin_time=now + 86400)
     r8 = tempfile.mkdtemp(prefix="fzwf-hold-")
     try:
         write_agents(os.path.join(r8, "agents"))
@@ -566,6 +657,21 @@ def self_test() -> int:
             fails.append(f"mcp-sweep/holders: {got} (기대 심볼 도구 선언이 있는 세 종류 — 본문 줄 · 큐레이터 제외)")
     finally:
         shutil.rmtree(r8, ignore_errors=True)
+    # 일반 모드(--wf · --only-agent 없음)는 정의 폴더에 정의돼 있고 심볼 도구가 없는 종류의 워커를 세지 않는다 — 남는 워커가 없으면 해당 없음.
+    # 정의에 없는 종류 · --only-agent 로 고른 워커 · 정의 폴더를 못 읽었을 때는 그대로 센다. 정의 폴더 기본값은 이 스크립트 플러그인의 agents/ 다
+    r9 = tempfile.mkdtemp(prefix="fzwf-defs-")
+    try:
+        defs = os.path.join(r9, "agents")
+        write_agents(defs)
+        audit("na-kind-only", "mcp-na-kind", 0, "MCP_NOT_APPLICABLE: 심볼 도구를 가진 종류의 워커가 없다(뺀 종류: fz:search-pattern 1)",
+              ("--agents-dir", defs), state="active")
+        audit("na-kind-mixed", "mcp-na-mixed", 2, "대조 심볼", ("--agents-dir", defs), state="active")
+        audit("na-kind-only-agent", "mcp-na-kind", 1, "MCP_WIRING_SUSPECT", ("--agents-dir", defs, "--only-agent", "fz:search-pattern"),
+              state="active")
+        audit("na-kind-no-defs", "mcp-na-kind", 1, "MCP_WIRING_SUSPECT", ("--agents-dir", os.path.join(r9, "missing")), state="active")
+    finally:
+        shutil.rmtree(r9, ignore_errors=True)
+    audit("na-kind-default-dir", "mcp-na-kind", 0, "MCP_NOT_APPLICABLE", state="active")
 
     # ⑪~⑬ --sweep-row — 측정값과 사람 판정 칸이 섞이지 않는지, 부재를 0 으로 쓰지 않는지
     def sweep(kind, want_exit, want_text):
@@ -689,6 +795,6 @@ def self_test() -> int:
     if fails:
         print(f"fz_wf_metrics self-test {passed}/{total} passed")
         return 1
-    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 28 · 심볼 결과 판독 1 · mcp-sweep 12 · sweep-row 3"
+    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 40 · 심볼 결과 판독 2 · mcp-sweep 17 · sweep-row 3"
           f" · stage 규칙 1 · usage 중복 1 · advisor 스톨 3 · 시도 구분 1)")
     return 0

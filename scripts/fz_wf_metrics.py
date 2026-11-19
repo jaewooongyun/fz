@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-# lint:no-root-anchor — 플러그인 루트를 참조하지 않는다. 트랜스크립트 루트는 `--root`(기본 `~/.claude/projects`),
+# lint:no-root-anchor — 플러그인 루트(이 파일의 `scripts/` 위 폴더)는 기본 에이전트 정의 폴더와 훑기의 설치 시각에만 쓰고, 못 읽으면
+#   그 규칙 없이 센다. 트랜스크립트 루트는 `--root`(기본 `~/.claude/projects`),
 #   fixture 경로는 호출자가 넘긴다. 문서 경로 인용은 주석뿐이며 파일을 열지 않는다 (lint #N6 면제 형태 c). 에이전트 정의 폴더는
-#   `--agents-dir`(기본 = 작업 폴더의 `agents/` · 종료 훅은 자기 플러그인의 것을 넘긴다)이다.
+#   `--agents-dir`(기본 = 이 파일이 든 플러그인의 `agents/` · 종료 훅은 자기 플러그인의 것을 넘긴다)이다.
 """fz_wf_metrics.py — Workflow 실행 1건을 stage 단위로 집계한다. 새로 기록하지 않는다 — 종료 훅 훑기(`--mcp-audit --sweep`)만
 저장소 밖 기록(`--record`)에 한 줄을 덧붙이고 그 옆 열쇠 파일을 고친다.
 
@@ -16,7 +17,8 @@
   · `…/subagents/agent-*.jsonl` · `.meta.json`       — 워크플로 밖 직접 호출(`--mcp-audit --direct`)
   · `evidence/tools.md` 첫 줄                       — 세션 시작 상태 기록(`--mcp-audit --tools-md` · `--state` · Lead 가 쓴다)
   · 세션 기록 폴더 `…/<세션>/` · 본 대화 기록 `…/<세션>.jsonl` — 종료 훅 훑기(`--mcp-audit --sweep`)
-  · `agents/*.md` 의 `tools:` 줄                      — 심볼 도구를 가진 에이전트 종류(훑기가 세는 워커)
+  · `agents/*.md` 의 `tools:` 줄                      — 심볼 도구를 가진 에이전트 종류(훑기가 세는 워커 · 일반 모드가 빼는 워커)
+  · 플러그인 루트의 `.claude-plugin/plugin.json` 수정 시각 — 설치 시각(훑기는 그보다 먼저 끝난 실행을 판정하지 않는다)
 
 측정 규약 (⛔ 오측정 재발 방지 — 2026-09-11 정정 이력):
   · **advisor 는 content block `type == "advisor_tool_result"` 를 `tool_use_id` 로 중복 제거해 센다.**
@@ -60,6 +62,7 @@ import re
 import sys
 
 DEFAULT_ROOT = os.path.expanduser("~/.claude/projects")
+PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # 이 파일이 든 플러그인의 루트(`scripts/` 위)
 
 # 역할 문구 → stage 라벨. Workflow meta 에는 label 이 없어 프롬프트 [역할] 로 판별한다.
 # ⛔ 첫 일치가 이긴다(부분 문자열). 현행 배선 규칙을 **일반 규칙보다 앞에** 둔다:
@@ -143,11 +146,17 @@ OTHER_TREE_MARK = "[symbol tools: unavailable - not on the target tree]"
 def symbol_result_kind(is_error, content) -> str:
     """심볼 도구 결과 종류 — error · empty · ok. 외부 MCP 판독기(`mcp_result_kind`)와 따로 둔다 — 그 판독기는 본문의 뜻을 읽지
     않아 `[]` 도 본문이다. 오류 표지(is_error · Serena 의 오류 머리말)면 오류, 본문이 빈 글이거나 빈 JSON(`[]` · `{}`)이면 빈 결과,
-    그 밖은 성공이다. 글이 아닌 블록은 본문이다. 결과가 아예 없는 호출은 이 함수 밖 — 어느 쪽에도 세지 않는다."""
+    그 밖은 성공이다. 글이 아닌 블록은 본문이다. 결과가 아예 없는 호출은 이 함수 밖 — 어느 쪽에도 세지 않는다.
+    글 블록이 여럿이면 블록마다 같은 규칙으로 판정해 합친다 — 오류 블록이 하나라도 있으면 오류, 아니면 전부 빈 결과일 때 빈 결과, 그 밖은
+    성공이다(이어 붙이면 `[]` · `{}` 가 JSON 이 아닌 글이 되고, 빈 블록 뒤의 오류 머리말이 글 맨 앞에서 밀려난다)."""
     blocks = [{"type": "text", "text": content}] if isinstance(content, str) else (content or [])
     if any(not isinstance(b, dict) or b.get("type", "text") != "text" for b in blocks):
         return "error" if is_error else "ok"
-    text = "".join(str(b.get("text") or "") for b in blocks).strip()
+    texts = [str(b.get("text") or "").strip() for b in blocks]
+    if len(texts) > 1:
+        kinds = {symbol_result_kind(is_error, t) for t in texts}
+        return "error" if "error" in kinds else "empty" if kinds == {"empty"} else "ok"
+    text = texts[0] if texts else ""
     if is_error or SYMBOL_ERROR.match(text):
         return "error"
     try:
@@ -180,7 +189,7 @@ def read_agent(path: str) -> dict:
     msg_models = {}
     effort_raw = {}
     ext_mcp = {}   # (세션, 호출 id) → [도구, 결과 종류] — 결과가 오지 않은 호출은 unresolved(미측정 — 유입 없음으로 읽지 않는다)
-    sym = {}       # (세션, 호출 id) → [도구, 지목한 파일(relative_path), 결과 종류, 결과 글 앞부분] — 심볼 도구(--mcp-audit)
+    sym = {}       # (세션, 호출 id) → [도구, 지목한 파일(relative_path), 결과 종류, 결과 글 앞부분] — 심볼 읽기 도구(`is_symbol_call` · --mcp-audit)
     other_tree = False   # 워커가 돌려준 글 · 산출에 다른 트리 표지가 있다
     skills = collections.Counter()   # Skill 호출의 스킬 이름별 횟수(종료 훅 훑기의 기록)
     last_stop = None                 # 마지막 완결 응답의 stop_reason — 직접 호출이 끝났는가(`tool_use` · 없음 = 아직 돈다)
@@ -276,7 +285,7 @@ def read_agent(path: str) -> dict:
                             tool_names[nm] = tool_names.get(nm, 0) + 1
                             if is_external_mcp(nm):
                                 ext_mcp.setdefault((ev.get("sessionId") or "", b.get("id") or f"anon-{total_lines}"), [nm, "unresolved"])
-                            if nm.startswith(MCP_PREFIXES):
+                            if is_symbol_call(nm):
                                 inp = b.get("input") if isinstance(b.get("input"), dict) else {}
                                 sym.setdefault((ev.get("sessionId") or "", b.get("id") or f"anon-{total_lines}"),
                                                [nm, inp.get("relative_path"), "unresolved", ""])
@@ -849,28 +858,43 @@ def cmd_sweep_row(args) -> int:
 #     `Read` 가 불렸다면 워커는 파일 작업을 했고, 그런데도 serena 가 0이면 배선을 의심한다.
 #     대조가 없으면 경보가 아니라 **미판정**이다.
 #  호출 1 이상이면 호출 수가 아니라 **결과를 돌려준 호출 수**로 판정한다(`judge_symbol_calls`) — 전부 오류인 실행이
-#  "사용함" 으로 통과하지 않게. 상태 기록(`--tools-md`)이 미사용이면 0회는 폴백이고 호출은 모순이다.
+#  "사용함" 으로 통과하지 않게. 상태 기록(`--tools-md`)이 미사용이면 0회는 폴백이고 호출은 모순이다. 상태 기록이 없으면 0회는
+#  의심이 아니라 미판정(UNRUN)이다 — 심볼 서버가 없는 머신과 배선 끊김을 가를 수 없다(의심은 활성 기록이 있을 때만).
+#  심볼 호출은 Serena 의 심볼 읽기 도구(`SYMBOL_READ_TOOLS`)뿐이다 — 메모리 · 프로젝트 활성 · 설정 · 안내와 목록이 모르는 Serena 도구는
+#  판정에 세지 않고 정보 줄로만 찍는다. 일반 모드(`--wf` · `--only-agent` 없음)는 정의 폴더에 정의돼 있고 심볼 도구가 없는 종류의 워커를 뺀다.
 #  탐색 팔(`--only-label`)은 보고 모드 · 직접 호출(`--direct --only-agent`)은 그 종류의 가장 최근 호출 하나를 판정한다.
 MCP_PREFIXES = ("mcp__plugin_fz_serena__", "mcp__serena__")
+SYMBOL_READ_TOOLS = ("find_symbol", "find_referencing_symbols", "get_symbols_overview", "find_implementations", "find_declaration")
 CONTROL_TOOL = "Read"
 NOT_WORK = ("StructuredOutput",)   # 산출 제출은 "도구 작업"이 아니다
 
 
+def is_symbol_call(name) -> bool:
+    """Serena 접두 뒤 이름이 심볼 읽기 도구 목록(`SYMBOL_READ_TOOLS`)에 있는가 — 허용 목록이다. 목록이 모르는 Serena 도구는 심볼 호출이
+    아니다(모르는 도구가 실행을 통과시키지 않게)."""
+    nm = str(name or "")
+    return any(nm.startswith(p) and nm[len(p):] in SYMBOL_READ_TOOLS for p in MCP_PREFIXES)
+
+
 def audit_counts(agents) -> dict:
+    """도구 이름별 수 → serena(심볼 호출) · 대조 · 도구 작업 · 이름별 분포 · other(심볼 읽기가 아닌 Serena 호출 — 정보로만 찍는다)."""
     serena = 0
     control = 0
     work = 0
     names = {}
+    other = {}
     for a in agents:
         for nm, c in (a.get("tool_names") or {}).items():
             names[nm] = names.get(nm, 0) + c
-            if nm.startswith(MCP_PREFIXES):
+            if is_symbol_call(nm):
                 serena += c
+            elif nm.startswith(MCP_PREFIXES):
+                other[nm] = other.get(nm, 0) + c
             if nm == CONTROL_TOOL:
                 control += c
             if nm not in NOT_WORK:
                 work += c
-    return {"serena": serena, "control": control, "work": work, "names": names}
+    return {"serena": serena, "control": control, "work": work, "names": names, "other": other}
 
 
 # 상태 기록(세션 시작 때 Lead 가 적는 `evidence/tools.md` 첫 줄)의 Serena 부분만 읽는다 — 꼬리(선택 도구 · 스택 스킬)의
@@ -913,10 +937,12 @@ def read_tools_md(path):
 
 
 def target_side(target, exts) -> str:
-    """호출이 지목한 파일 → covered(켜진 언어) · uncovered(그 밖) · unknown(파일을 지정하지 않았다 · 폴더 · 확장자 없는 경로)."""
+    """호출이 지목한 파일 → covered(켜진 언어) · uncovered(그 밖) · unknown(파일을 지정하지 않았다 · 폴더 · 확장자 없는 경로).
+    확장자는 대소문자를 가리지 않는다. ⛔ 알려진 한계: 끝에 `/` 가 없고 마지막 마디에 점이 있는 폴더 이름(`lib/pkg.v2`)은 켜진 언어 밖
+    파일로 읽힌다."""
     if not isinstance(target, str) or not target.strip() or target.rstrip().endswith("/"):
         return "unknown"
-    ext = os.path.splitext(target.strip())[1]
+    ext = os.path.splitext(target.strip())[1].lower()
     if not ext:
         return "unknown"
     return "covered" if ext in exts else "uncovered"
@@ -926,11 +952,13 @@ def judge_symbol_calls(calls, langs):
     """심볼 도구 호출이 1 이상인 실행의 판정 — 호출 수가 아니라 결과를 돌려준 호출 수로 낸다. 일반 · 직접 호출 · 훑기가 이 함수 하나를 부른다.
 
     - Parameters:
-      - calls: 센 워커의 심볼 도구 호출 `[{"target", "kind", "text"}]` — 결과가 아직 없는 호출(unresolved)은 어느 쪽에도 세지 않는다.
+      - calls: 센 워커의 심볼 도구 호출 `[{"target", "kind", "text"}]` — 결과가 아직 없는 호출(unresolved)은 성공 · 오류 · 빈 결과 수에
+        세지 않지만, 켜진 언어 밖 폴백 판정에는 넣는다.
       - langs: 상태 기록의 켜진 언어 목록 · None = 상태 기록이 없거나 미사용이다(켜진 언어를 모른다).
     - Returns: (낱말, 종료 코드, 설명).
-    - Important: 성공 0 일 때 우선순위 — 켜진 언어의 파일을 물은 호출에 오류 → `MCP_CALLED_NO_RESULT` · 그 밖에 전부 켜진 언어 밖
-      → `MCP_FALLBACK_UNCOVERED` · 나머지(불명이 섞였거나 켜진 언어 파일의 빈 결과뿐) → `MCP_UNDECIDED`. 가르는 기준은 오류 글자가
+    - Important: 성공 0 일 때 우선순위 — 켜진 언어의 파일을 물은 호출에 오류 → `MCP_CALLED_NO_RESULT` · 결과가 온 호출이 있고
+      결과가 없는 호출까지 전부 켜진 언어 밖 → `MCP_FALLBACK_UNCOVERED` · 나머지(불명이 섞였거나 켜진 언어 파일의 빈 결과뿐 · 결과 없이
+      남은 호출이 켜진 언어 파일이나 불명 대상을 물었다 · 결과가 온 호출이 없다) → `MCP_UNDECIDED`. 가르는 기준은 오류 글자가
       아니라 지목한 파일의 확장자다 — 파일을 지정하지 않은 빈 찾기는 서버가 엉뚱한 프로젝트를 볼 때도 나온다.
     """
     done = [c for c in calls if c["kind"] in ("ok", "error", "empty")]
@@ -948,7 +976,12 @@ def judge_symbol_calls(calls, langs):
     if err:
         return "MCP_CALLED_NO_RESULT", 1, f"{counts} — 켜진 언어의 파일을 물었는데 결과가 없다(배선 의심): {err[0]['text']}"
     if side and all(s == "uncovered" for s, _ in side):
-        return "MCP_FALLBACK_UNCOVERED", 0, f"{counts} — 물은 파일이 전부 켜진 언어({', '.join(langs)}) 밖이다 · 글자 검색 폴백"
+        if all(target_side(c["target"], exts) == "uncovered" for c in calls):
+            return "MCP_FALLBACK_UNCOVERED", 0, f"{counts} — 물은 파일이 전부 켜진 언어({', '.join(langs)}) 밖이다 · 글자 검색 폴백"
+        return "MCP_UNDECIDED", 2, (f"{counts} — 결과가 온 호출은 전부 켜진 언어 밖인데 결과 없이 남은 호출이 켜진 언어 파일이나 "
+                                    "불명 대상을 물었다 (⛔ 통과 아님)")
+    if not done:
+        return "MCP_UNDECIDED", 2, f"{counts} — 심볼 호출 {len(calls)}건이 전부 아직 결과가 없다(기록이 중간에 끊겼다) (⛔ 통과 아님)"
     return "MCP_UNDECIDED", 2, f"{counts} — 파일을 지정하지 않은 찾기 · 폴더 · 켜진 언어 파일의 빈 결과가 남았다 (⛔ 통과 아님)"
 
 
@@ -1011,6 +1044,22 @@ def cmd_mcp_audit(args) -> int:
         agents = [a for a in agents if a["agentType"] == args.only_agent]
     if args.only_label is not None:
         return _audit_arm(agents, args.only_label)
+    left = collections.Counter()
+    if not args.only_agent:
+        # 일반 모드 — 정의 폴더에 정의돼 있고 심볼 도구가 없는 종류의 워커는 세지 않는다(정의에 없는 종류는 센다 · 정의를 못 읽으면 전부 센다)
+        defs = args.agents_dir or os.path.join(PLUGIN_ROOT, "agents")
+        holders = symbol_holders(defs)
+        try:
+            defined = {"fz:" + nm[:-3] for nm in os.listdir(defs) if nm.endswith(".md")}
+        except OSError:
+            defined = set()
+        if holders is not None:
+            left = collections.Counter(a["agentType"] for a in agents if a["agentType"] in defined - holders)
+            agents = [a for a in agents if a["agentType"] not in left]
+        if left and not agents:
+            print("MCP_NOT_APPLICABLE: 심볼 도구를 가진 종류의 워커가 없다(뺀 종류: "
+                  + ", ".join(f"{k} {v}" for k, v in sorted(left.items())) + ") — 판정할 것이 없다")
+            return 0
     if args.only_agent and not agents:
         print(f"UNRUN: {args.only_agent} 워커가 없다 — 미판정")
         return 2
@@ -1030,11 +1079,15 @@ def cmd_mcp_audit(args) -> int:
     print(f"{'session' if args.direct else 'wf'}={name} · agents={len(wf['agents'])}")
     if args.only_agent:
         print(f"  센 워커: {args.only_agent} {len(agents)}" + (f" (가장 최근 호출 {agents[0]['file']})" if args.direct else ""))
+    if left:
+        print("  뺀 워커(심볼 도구가 없는 종류 — 세지 않는다): " + ", ".join(f"{k} {v}" for k, v in sorted(left.items())))
     for a in earlier:
         k = collections.Counter(s["kind"] for s in a["symbol_calls"])
         print(f"  앞선 직접 호출(정보 — 판정하지 않는다): {a['file']} serena {len(a['symbol_calls'])}"
               f" · 성공 {k['ok']} · 오류 {k['error']} · 빈 결과 {k['empty']}")
     print(f"  serena 호출 {c['serena']} · 대조({CONTROL_TOOL}) {c['control']} · 도구작업 {c['work']}")
+    if c["other"]:
+        print("  심볼 읽기가 아닌 serena 호출(정보 — 판정에 세지 않는다): " + ", ".join(f"{k}={v}" for k, v in sorted(c["other"].items())))
     print(f"  도구 분포: {top}")
     print(f"  serena 결과: 성공 {n['ok']} · 오류 {n['error']} · 빈 결과 {n['empty']}"
           + (f" · 결과 없음 {n['unresolved']}" if n["unresolved"] else ""))
@@ -1050,8 +1103,8 @@ def audit_verdict(agents, tools_md):
     - Parameters:
       - agents: 센 워커(`read_agent` 결과 — `read_wf` 가 agentType 을 더한다).
       - tools_md: `read_tools_md` 결과 · None = 상태 기록이 없다(훑기는 상태를 모르는 실행도 None 으로 넘긴다).
-    - Returns: (낱말, 종료 코드, 출력 줄). 0회 규칙(도구 작업 · 다른 트리 · 미사용 기록 · 대조 심볼)을 먼저 보고, 호출 1 이상은
-      `judge_symbol_calls` 의 성공 수 판정이다.
+    - Returns: (낱말, 종료 코드, 출력 줄). 0회 규칙(도구 작업 · 다른 트리 · 미사용 기록 · 대조 심볼 · 상태 기록 없음)을 먼저 보고,
+      호출 1 이상은 `judge_symbol_calls` 의 성공 수 판정이다. `MCP_WIRING_SUSPECT` 는 활성 상태 기록이 있을 때만 낸다.
     """
     unused = tools_md is not None and tools_md["state"] == "unused"
     c = audit_counts(agents)
@@ -1066,6 +1119,9 @@ def audit_verdict(agents, tools_md):
     if c["serena"] == 0 and c["control"] == 0:
         return "UNRUN", 2, (f"UNRUN: serena 0건이지만 대조 심볼({CONTROL_TOOL})도 0건이다 — "
                             "부재를 주장할 근거가 없다 (⛔ 통과 아님)")
+    if c["serena"] == 0 and tools_md is None:
+        return "UNRUN", 2, (f"UNRUN: serena 0건 · {CONTROL_TOOL} {c['control']}건인데 상태 기록이 없다 — 상태 기록 없이는 '이 머신에 심볼 서버가 "
+                            "없다' 와 '배선이 끊겼다' 를 가를 수 없다. 세션의 상태를 상태 기록 꼴로 파일에 적어 --tools-md 로 넘겨라 (⛔ 통과 아님)")
     if c["serena"] == 0:
         return "MCP_WIRING_SUSPECT", 1, (f"MCP_WIRING_SUSPECT: serena 0건인데 {CONTROL_TOOL} {c['control']}건 — "
                                          "워커는 파일 작업을 했다. 배선을 확인하라")
@@ -1087,6 +1143,9 @@ def audit_verdict(agents, tools_md):
 #  걸려 못 본 실행은 열쇠를 적지 않고 다음 훑기에서 본다. 기록의 어느 값도 `fz:` 로 시작하지 않는다(에이전트 종류 · fz 스킬 이름을 싣지 않는다).
 #  새로 판정한 실행이 전부 해당 없음이면 열쇠만 쓰고 기록 줄은 쓰지 않는다 — 아무도 기록을 보지 않는 머신(심볼 도구를 가진 에이전트를
 #  쓰지 않는 세션뿐)에서 기록이 자라지 않게. 기록 파일이 `SWEEP_RECORD_MAX` 바이트에 이르면 덧붙이기 전에 `<기록>.1` 로 한 번 돌린다(옛 파일은 하나만).
+#  이 플러그인이 설치되기 전(루트의 `.claude-plugin/plugin.json` 수정 시각)에 끝난 실행은 판정하지 않고 해당 없음으로 적는다(사유 칸 · 열쇠를
+#  적는다) — 업데이트 뒤 옛 정의로 돈 실행이 고칠 수 없는 경보를 내지 않게. 그 파일을 못 읽거나 시각이 미래면 경계가 없다.
+#  기록 · 열쇠를 쓰지 못하면 `MCP_SWEEP_UNRUN` 줄 하나만 찍는다 — 기록하지 못한 판정은 알리지 않는다(열쇠가 없으니 다음 훑기가 다시 판정한다).
 #  언제나 exit 0 — 판정은 요약 줄 `MCP_SWEEP runs=… used=… suspect=… fallback=… undecided=… n/a=…` 과 기록에만 남는다.
 SYMBOL_TOOLS = ("find_symbol", "find_referencing_symbols", "get_symbols_overview")
 SWEEP_SKIP_AGENTS = ("memory-curator",)   # 메모리 회상이 일이라 심볼 호출 0 이 정상이다 — 재지 않는다
@@ -1136,6 +1195,25 @@ def _session_skills(path):
     return out
 
 
+def _install_time(now):
+    """이 파일이 든 플러그인의 설치 시각 — 루트의 `.claude-plugin/plugin.json` 수정 시각 · 못 읽거나 `now` 보다 뒤면 None(경계 없음)."""
+    try:
+        t = os.path.getmtime(os.path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json"))
+    except OSError:
+        return None
+    return t if t <= now else None
+
+
+def _run_ended(path):
+    """실행이 끝난 때 — 훑기가 끝남을 가르는 기록 파일(워크플로: `journal.jsonl` · `agent-*.jsonl` / 직접 호출: 그 `agent-*.jsonl`)의
+    가장 늦은 수정 시각 · 못 읽으면 None."""
+    files = glob.glob(os.path.join(path, "agent-*.jsonl")) + [os.path.join(path, "journal.jsonl")] if os.path.isdir(path) else [path]
+    try:
+        return max(os.path.getmtime(f) for f in files if os.path.isfile(f))
+    except (OSError, ValueError):
+        return None
+
+
 def cmd_mcp_sweep(args) -> int:
     """종료 훅 훑기 — 위 머리 주석의 규칙. 예상 밖 오류도 exit 0(판정하지 않았다는 줄만 남긴다)."""
     try:
@@ -1156,9 +1234,10 @@ def _sweep_session(args) -> int:
     if not runs:
         print("MCP_SWEEP runs=0 used=0 suspect=0 fallback=0 undecided=0 n/a=0 — 워크플로 실행 · 직접 호출 기록이 없다(파일을 만들지 않는다)")
         return 0
-    holders = symbol_holders(args.agents_dir)
+    agents_dir = args.agents_dir or os.path.join(PLUGIN_ROOT, "agents")
+    holders = symbol_holders(agents_dir)
     if not args.record or holders is None:
-        why = "--record 가 없다" if not args.record else f"에이전트 정의를 못 읽었다({args.agents_dir})"
+        why = "--record 가 없다" if not args.record else f"에이전트 정의를 못 읽었다({agents_dir})"
         print(f"MCP_SWEEP_UNRUN: {why} — 판정하지 않는다")
         return 0
     keys_path = os.path.splitext(args.record)[0] + ".keys.json"
@@ -1172,8 +1251,9 @@ def _sweep_session(args) -> int:
     st = read_tools_md(states[0]) if len(states) == 1 else None
     st_time = datetime.datetime.fromtimestamp(os.path.getmtime(states[0]), datetime.timezone.utc) if st else None
     sess = os.path.basename(folder)
+    cutoff = _install_time(time.time())
     tally, out_runs, new_keys, skills = collections.Counter(), [], {}, collections.Counter()
-    seen = pending = left = 0
+    seen = pending = left = predated = 0
     for rid, path, n in runs:
         key = f"{sess}/{rid}"
         if keys.get(key) == n:
@@ -1200,20 +1280,25 @@ def _sweep_session(args) -> int:
         start = min((a["first"] if a["first"].tzinfo else a["first"].replace(tzinfo=datetime.timezone.utc)
                      for a in agents if a["first"]), default=None)
         use = st if st and start is not None and st_time <= start else None   # 실행이 시작된 뒤에 고친 상태 기록은 쓰지 않는다
-        if "unavailable" in {a["agentType"] for a in agents}:
+        ended = _run_ended(path) if cutoff is not None else None
+        before_install = ended is not None and ended < cutoff
+        if before_install:
+            counted, verdict, word = [], "n/a", "N/A"   # 이 플러그인보다 먼저 끝난 실행 — 옛 정의로 돈 워커다(판정하지 않는다)
+            predated += 1
+        elif "unavailable" in {a["agentType"] for a in agents}:
             verdict, word = "undecided", "UNRUN"       # 종류를 못 읽은 워커 — 세는 종류인지 모른다
         elif not counted:
             verdict, word = "n/a", "N/A"
         else:
             word, code, _line = audit_verdict(counted, use)
-            if use is None and word == "MCP_WIRING_SUSPECT":
-                code = 2                               # 상태를 모르는 0회 — 의심이 아니라 미판정
             verdict = {0: "used" if word == "MCP_AUDIT_OK" else "fallback", 1: "suspect"}.get(code, "undecided")
         k = collections.Counter(s["kind"] for a in counted for s in a["symbol_calls"])
         c7 = collections.Counter(m["kind"] for a in agents for m in a["mcp_external"] if "context7" in m["name"])
         out_runs.append({"run": rid, "workers": n, "counted": len(counted), "verdict": verdict, "word": word,
                          "ok": k["ok"], "error": k["error"], "empty": k["empty"], "state": use["state"] if use else None,
                          "languages": use.get("langs") if use else None, "context7": dict(c7)})
+        if before_install:
+            out_runs[-1]["reason"] = "설치된 플러그인보다 먼저 끝난 실행 — 판정하지 않는다"
         tally[verdict] += 1
         for a in agents:
             skills.update(a["skills"])
@@ -1243,10 +1328,13 @@ def _sweep_session(args) -> int:
             os.replace(keys_path + ".tmp", keys_path)
         except OSError as exc:
             print(f"MCP_SWEEP_UNRUN: 기록 · 열쇠를 쓰지 못했다({type(exc).__name__}) — 열쇠가 없는 실행은 다음 훑기에서 다시 본다")
+            return 0                                   # 기록하지 못한 판정은 알리지 않는다(요약 · 의심 줄 없음)
     print(f"MCP_SWEEP runs={len(out_runs)} " + " ".join(f"{v}={tally[v]}" for v in SWEEP_VERDICTS))
     for r in out_runs:
         if r["verdict"] == "suspect":
             print(f"  의심: {r['run']} {r['word']} (성공 {r['ok']} · 오류 {r['error']} · 빈 결과 {r['empty']})")
+    if predated:
+        print(f"  설치 전 실행 {predated} — 해당 없음(이 플러그인이 설치되기 전에 끝났다 · 판정하지 않는다)")
     if pending:
         print(f"  끝나지 않은 실행 {pending} — 열쇠를 적지 않는다(다음 훑기에서 본다)")
     if left:
@@ -1283,7 +1371,8 @@ def main() -> int:
     ap.add_argument("--record", metavar="FILE", help="--sweep: 판정 기록(JSONL · 저장소 밖) — 판정한 실행의 열쇠는 옆의 <이름>.keys.json")
     ap.add_argument("--state", metavar="FILE", action="append",
                     help="--sweep: 그 세션이 쓴 상태 기록(evidence/tools.md) — 찾은 수만큼 준다(하나가 아니면 0회 · 성공 0 은 미판정)")
-    ap.add_argument("--agents-dir", default="agents", help="--sweep: 에이전트 정의 폴더 (기본 작업 폴더의 agents/)")
+    ap.add_argument("--agents-dir", help="--mcp-audit: 에이전트 정의 폴더 — 일반 모드는 심볼 도구가 없는 정의된 종류의 워커를 빼고 · --sweep 은"
+                                         " 심볼 도구를 가진 종류만 센다 (기본 이 파일이 든 플러그인의 agents/)")
     ap.add_argument("--budget", type=float, metavar="SEC", help="--sweep: 이 초가 지나면 다음 실행을 보지 않는다(실행 하나는 언제나 본다)")
     ap.add_argument("--row", action="store_true", help="experiment-log §5.7 행 형식 출력")
     ap.add_argument("--summary", action="store_true", help="stage 상세 출력")

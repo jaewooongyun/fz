@@ -742,8 +742,8 @@ record3 "GPT kind 생성 표 drift" "$GKT_CODE" "$GKT" \
   "⛔ $(printf '%s\n' "$GKT" | grep -E '^TABLE|^GPT-KINDS-TABLE' | head -1)"
 
 # ── Workflow 계측기 self-test (B6/S5) ─────────────────────────
-# ⛔ 12케이스가 통합 검사에서 **한 번도 돌지 않았다**(§4.9 가 경고한 비대칭 그대로).
-#    `--mcp-audit` 3분 판정도 여기서만 회귀가 잡힌다.
+# ⛔ 이 self-test 가 통합 검사에서 **한 번도 돌지 않던** 때가 있었다(§4.9 가 경고한 비대칭 그대로) — 셀 수는 self-test 가 스스로 찍는다.
+#    `--mcp-audit` 판정(일반 · 직접 호출 · 탐색 팔 · 종료 훅 훑기)의 회귀도 여기서 잡힌다.
 WM="$(cd "$ROOT" && python3 scripts/fz_wf_metrics.py --self-test 2>&1)"; WM_CODE=$?
 record3 "Workflow 계측기 self-test" "$WM_CODE" "$WM" \
   "$(printf '%s\n' "$WM" | grep -E 'SELFTEST_OK' | tail -1)" \
