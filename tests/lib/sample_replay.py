@@ -19,13 +19,14 @@
 #   ⛔ 소비 프로젝트 이름을 금지어로 적지 않는다(적으면 그 이름이 공개 저장소에 들어간다) — 자유 문장 자체를 금지한다
 # 캡처 ID 감사(capture_id_audit)는 표본 감사와 따로 돈다 — 범위는 한 폴더(보통 tests/fixtures) 아래 모든 파일(확장자를 가리지 않는다 —
 #   *.sh · *.ts · *.json 같은 시험 코드 · 자료도 세션 ID 를 싣는다)이고 보는 것은 세션 ID(UUID 꼴)와 워크플로 실행 ID 꼴 둘뿐이다.
-#   그 폴더가 git 작업 트리 안이면 git 이 내보낼 파일(추적 + 무시되지 않은 미추적)만 본다 — 무시된 부산물(.DS_Store 등)은 범위 밖이다.
-#   그 git 은 부르는 쪽의 GIT_DIR 등(훅이 내보낸다)을 지우고 부른다 — 답은 그 폴더가 든 작업 트리에서 온다.
+#   그 폴더가 git 작업 트리 안이면 git 이 내보낼 파일(추적 + 무시되지 않은 미추적)만 본다 — 무시된 부산물(.DS_Store 등)은 범위 밖이고
+#   통째로 무시된 폴더는 내려가지 않는다. 그 git 은 부르는 쪽의 GIT_DIR 등(훅이 내보낸다)과 설정 주입(GIT_CONFIG_PARAMETERS ·
+#   GIT_CONFIG_COUNT/KEY/VALUE · GIT_CONFIG_GLOBAL)을 지우고 부른다 — 답은 그 폴더가 든 작업 트리와 그 설정에서 온다.
 #   줄마다 누수 규칙 정본의 capture_id_tokens 를 부른다 — ANSI 제어열 걷기와 합성 목록(SYNTHETIC_SESSION_IDS · SYNTHETIC_RUN_IDS)
 #   대조는 정본 한 벌이다(여기 사본을 두지 않는다).
 #   목록은 값이다(대역 규칙이 아니다: 실제 UUIDv7 도 0 으로 시작한다)
 #   표본용 형식 규칙(format_hits — 스트림 로그 = 배너만 등)은 이 범위에 쓰지 않는다 — 평문 배너 뒤에 본문을 둔 로그가 그 규칙에 걸린다.
-#   읽기 · 디코드 실패(NUL 포함 — 정본의 읽기 계약)는 건너뛰지 않고 따로 돌려준다 · 순회 실패는 정본의 Unrun(판정 불가)이다
+#   읽기 · 디코드 실패(NUL 포함 — 정본의 읽기 계약)는 건너뛰지 않고 따로 돌려준다 · 순회 실패(무시되지 않은 폴더)는 정본의 Unrun(판정 불가)이다
 import hashlib
 import importlib.util
 import json
@@ -409,16 +410,22 @@ def run(name, here, expected, cells, tmp):
 # 저장소를 바꾸는 git 환경 변수 — 훅이나 다른 도구가 내보낸다. 남기면 git 이 root 가 든 작업 트리가 아니라 그 저장소로 답한다
 _GIT_REPO_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
                  "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_PREFIX")
+# 설정을 바꾸는 git 환경 변수 — 명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT 와 그 GIT_CONFIG_KEY_<n> · GIT_CONFIG_VALUE_<n>
+#   묶음 — 묶음은 접두로 지운다)은 저장소 로컬 core.excludesFile 을 이기고, 전역 설정 경로(GIT_CONFIG_GLOBAL)는 로컬 값이 없을 때 무시 규칙을 정한다
+_GIT_CONFIG_ENV = ("GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_CONFIG_GLOBAL")
+_GIT_CONFIG_PREFIX = ("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")
 
 
 def _git_ignored(root):
-    """root 가 git 작업 트리 안이면 그 아래의 무시된 미추적 파일 → root 기준 상대 경로 집합(git 이 내보내지 않는 파일).
+    """root 가 git 작업 트리 안이면 그 아래의 무시된 미추적 파일과 통째로 무시된 폴더 → root 기준 상대 경로 집합(git 이 내보내지 않는
+    것). 폴더는 `<경로>/` 한 줄이다(--directory — 추적 파일이 없고 안이 전부 무시된 폴더. git 은 그 안을 읽지 않는다).
     작업 트리 밖 · git 부재 · git 실패면 빈 집합이다 — 그때는 걸은 파일 전부를 본다(범위를 줄이는 쪽으로 틀리지 않는다).
-    ⛔ git 은 부르는 쪽의 저장소 환경 변수(_GIT_REPO_ENV)를 지우고 부른다 — 답은 늘 root 가 든 작업 트리에서 온다. 남기면 다른 저장소의
-       (더 넓을 수 있는) 무시 규칙으로 감사할 파일이 빠진다."""
-    env = {k: v for k, v in os.environ.items() if k not in _GIT_REPO_ENV}
+    ⛔ git 은 부르는 쪽의 저장소 환경 변수(_GIT_REPO_ENV)와 설정 환경 변수(_GIT_CONFIG_ENV · 키/값 묶음)를 지우고 부른다 — 답은 늘 root 가
+       든 작업 트리와 그 설정에서 온다. 남기면 다른 저장소나 주입한 설정의 (더 넓을 수 있는) 무시 규칙으로 감사할 파일이 빠진다."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in _GIT_REPO_ENV and k not in _GIT_CONFIG_ENV and not k.startswith(_GIT_CONFIG_PREFIX)}
     try:
-        r = subprocess.run(["git", "-C", root, "ls-files", "-z", "--others", "--ignored", "--exclude-standard"], capture_output=True,
+        r = subprocess.run(["git", "-C", root, "ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"], capture_output=True,
                            env=env)
     except OSError:
         return set()
@@ -430,18 +437,20 @@ def capture_files(root):
     root 가 git 작업 트리 안이면 git 이 내보낼 파일만 — 추적 파일과 무시되지 않은 미추적 파일이다. 걸은 파일에서 무시된 미추적 파일만
     뺀다: 폴더를 열면 OS 가 만드는 .DS_Store 같은 무시된 부산물이 감사를 판정 불가로 만들지 않게. 무시 규칙에 걸려도 추적하는 파일 ·
     아직 커밋하지 않은 새 파일은 본다. 작업 트리 밖(이력 없는 사본 · 임시 폴더)이면 걸은 파일 전부다.
-    그 git 은 부르는 쪽의 GIT_DIR 등과 무관하게 root 가 든 작업 트리에 묻는다(_git_ignored).
-    심볼릭 링크 폴더는 따라가지 않는다(가리키는 곳은 이 트리의 캡처가 아니다). ⛔ 순회 오류(root 부재 포함)는 정본의 Unrun(판정 불가 — 정본 tree_files 와
-    같은 형식)이다 — 다 읽지 못한 범위를 '위반 0' 으로 읽지 않는다."""
+    통째로 무시된 폴더(_git_ignored 의 `<경로>/`)는 내려가지 않는다 — 읽을 수 없는 무시된 폴더가 감사를 판정 불가로 만들지 않는다.
+    그 git 은 부르는 쪽의 GIT_DIR 등 · 설정 주입과 무관하게 root 가 든 작업 트리에 묻는다(_git_ignored).
+    심볼릭 링크 폴더는 따라가지 않는다(가리키는 곳은 이 트리의 캡처가 아니다). ⛔ 순회 오류(root 부재 포함 — 내려간 폴더, 곧 무시되지 않은
+    폴더에서만 난다)는 정본의 Unrun(판정 불가 — 정본 tree_files 와 같은 형식)이다 — 다 읽지 못한 범위를 '위반 0' 으로 읽지 않는다."""
     if LEAK is None:   # 정본 없이 범위를 정하지 않는다
         raise RuntimeError(LEAK_ERR)
     errors, out = [], []
+    ignored = _git_ignored(root)   # 걷기 전에 묻는다 — 무시된 폴더를 내려가기 전에 가지친다
     for dp, dns, fns in os.walk(root, onerror=errors.append):
         dns.sort()
+        dns[:] = [d for d in dns if os.path.relpath(os.path.join(dp, d), root) + "/" not in ignored]
         out += [os.path.relpath(os.path.join(dp, f), root) for f in sorted(fns)]
     if errors:
         raise LEAK.Unrun(f"폴더를 다 읽지 못했다: {errors[0]}")
-    ignored = _git_ignored(root)
     return [rel for rel in out if rel not in ignored]
 
 

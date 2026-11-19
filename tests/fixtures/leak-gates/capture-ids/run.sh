@@ -5,7 +5,8 @@
 #   값만 둔다. 대상 트리 전체를 캡처 ID 감사(tests/lib/sample_replay.py
 #   의 capture_id_audit — 줄마다 정본의 capture_id_tokens: ANSI 제어열을 걷고 합성 목록과 대조)로 보고, 사본에 목록 밖 값을 넣으면
 #   감사와 정본의 실행 ID 계열이 잡는지 단언한다. 대상 트리가 git 작업 트리면 감사 범위는 git 이 내보낼 파일(추적 + 무시되지 않은
-#   미추적)이다 — 폴더를 열면 OS 가 만드는 .DS_Store 같은 무시된 부산물이 기본 health 검사를 판정 불가로 만들지 않는다.
+#   미추적)이다 — 폴더를 열면 OS 가 만드는 .DS_Store 같은 무시된 부산물이 기본 health 검사를 판정 불가로 만들지 않고, 통째로 무시된
+#   폴더는 읽을 수 없어도 내려가지 않는다.
 #
 # ⛔ 대상 트리(기본: 이 러너가 든 트리 · --tree)의 감사 모듈과 정본을 싣는다 — 사본 트리를 넘기면 그 사본의 코드로 그 사본의 fixture 를
 #    본다. 대상 트리에는 쓰지 않는다(python -B · 바이트코드 끔). 주입 · 시험 로그는 mktemp 임시 폴더에만 만든다.
@@ -30,6 +31,17 @@
 #   git-tracked-ignored-hit   같은 작업 트리 — 무시 규칙에 걸려도 추적하는 파일(git add -f)의 실제 꼴 세션 ID 는 적중한다
 #   git-env-other-repo-kept   같은 작업 트리 — 부르는 쪽의 GIT_DIR 이 무시 규칙이 더 넓은 다른 저장소를 가리켜도(셀 안에서만 건다) 감사
 #                             범위는 감사 루트가 든 작업 트리의 git 이 정한다: 그 저장소만 무시하는 미추적 파일도 감사하고 적중한다
+#   git-env-grid-dropped      격자 — 같은 작업 트리 · PATH 앞의 가짜 git: 저장소 위치 env 여덟 · 명령 범위 설정 · 개수/키/값 묶음 · 전역 설정
+#                             경로를 하나씩 걸고 감사 범위를 정하게 하면 그 이름은 git 에 닿지 않는다(지우지 않는 대조 변수가 닿지 않으면 판정 불가)
+#   git-config-inject-kept    격자 — 명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT/KEY/VALUE — 같은 작업 트리)과 전역 설정 경로
+#                             (GIT_CONFIG_GLOBAL — 로컬 core.excludesFile 이 없는 자기 작은 트리)로 무시 규칙을 넓혀도(core.excludesFile ·
+#                             include.path) 무시되지 않은 미추적 파일을 감사한다 · 키 없는 개수(git 오류)도 감사 범위를 바꾸지 않는다
+#   git-ignored-unreadable-dir-skipped  자기 임시 작업 트리 — 통째로 무시된 폴더(info/exclude `cache/`)는 읽을 수 없어도 내려가지 않는다:
+#                             판정 불가가 아니고 감사 파일 = 추적 + 무시되지 않은 파일
+#   git-unignored-unreadable-dir-unrun  같은 작업 트리 — 무시되지 않은 폴더를 읽을 수 없으면 여전히 정본의 판정 불가(Unrun)다
+#   git-mixed-untracked-dir-kept        같은 작업 트리 — 무시 파일과 무시되지 않은 파일이 섞인 미추적 폴더는 접히지 않는다: 무시되지 않은
+#                             파일은 감사한다
+#   git-ignored-dir-tracked-kept        같은 작업 트리 — 무시된 폴더 안이라도 추적하는 파일(git add -f)은 감사한다
 #   outside-repo-walks-all    같은 파일을 저장소 밖 폴더에 두면 걸은 파일 전부를 센다 — 무시 규칙 꼴 이름의 NUL 파일도 읽지 못한 목록에 싣는다
 #   path-only-id-hit          내용은 깨끗하고 파일 이름 · 폴더 이름에만 목록 밖 ID 가 있으면 줄 0 으로 적중한다
 #   run-id-synthetic-ok       정본 목록의 합성 실행 ID 는 캡처 감사 · 문서 정책(정본의 실행 ID 계열) 모두 통과
@@ -59,13 +71,18 @@ done
 unset FZ_NEUTRALIZE_RULES
 # 바깥 git 환경(훅이 건 GIT_DIR · GIT_INDEX_FILE 등)이 임시 작업 트리의 git 을 바깥 저장소로 돌리지 않게 끊는다
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE GIT_PREFIX
+# 부모 git 이 `-c` 로 넘긴 설정도 끊는다 — 남으면 임시 작업 트리의 로컬 설정(core.excludesFile)을 덮어 셀의 전제가 갈린다.
+#   설정 주입 셀은 이 변수를 셀 안에서 다시 건다(여기의 unset 이 감사 모듈의 결함을 가리지 않는다)
+unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/fz-capture-ids.XXXXXX")" && [ -n "$WORK" ] && [ -d "$WORK" ] \
   || { echo "UNRUN: 임시 폴더를 만들지 못했다"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
 
 PYTHONDONTWRITEBYTECODE=1 python3 -I -B - "$TREE" "$WORK" <<'PY'
+import contextlib
 import importlib.util
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -340,6 +357,226 @@ def c_git_env_other_repo():
                 f"(기대 new/notes.md:2 session-id) · 읽지 못한 파일 {[f for f, _ in unread]}(기대 없음)")
 
 
+@contextlib.contextmanager
+def env_set(values):
+    """os.environ 을 셀 안에서만 바꾼다(값 None = 지움) — 끝나면 되돌린다(뒤 셀 · 러너 맨 위의 unset 이 오염되지 않게)."""
+    before = {k: os.environ.get(k) for k in values}
+    try:
+        for k, v in values.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        yield
+    finally:
+        for k, v in before.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+# 감사 모듈이 git 에 넘기지 않아야 하는 env — 저장소 위치 여덟 · 명령 범위 설정 · 개수/키/값 묶음(키 · 값은 첫 번호) · 전역 설정 경로.
+#   감사 모듈의 상수를 읽지 않고 따로 적는다 — 그 상수가 줄면 이 격자가 잡는다
+GIT_ENV_GRID = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR",
+                "GIT_NAMESPACE", "GIT_PREFIX", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0",
+                "GIT_CONFIG_GLOBAL")
+GRID_PROBE = "FZ_GIT_ENV_GRID_PROBE"   # 지우지 않는 대조 변수 — 가짜 git 에 닿아야 이 격자가 env 전달을 가른다
+
+
+def c_git_env_grid():
+    """격자(git-env-grid · 파이썬 헬퍼 × 무시 조회) — 받은 env 의 이름만 적는 가짜 git 을 PATH 앞에 두고 GIT_ENV_GRID 의 이름을 하나씩
+    걸어 감사 범위를 정하게 하면, 가짜 git 이 받은 env 에 그 이름이 없다. 저장소 위치 env 몇은 무시 조회의 답을 바꾸지 않아 답으로는
+    가를 수 없다 — 그래서 git 이 받은 env 를 본다. 전제: 칸마다 감사가 가짜 git 을 ls-files 로 부르고 대조 변수(GRID_PROBE)가 닿는다 —
+    아니면 판정 불가. 가짜 git 은 아무것도 내지 않고 0 으로 끝난다(이 셀은 범위가 아니라 env 만 본다)."""
+    fx = git_tree()
+    d = os.path.join(WORK, "git-env-grid")
+    os.makedirs(d)
+    log, fake = os.path.join(d, "calls.log"), os.path.join(d, "git")
+    with open(fake, "w", encoding="utf-8") as fh:
+        fh.write('#!/bin/sh\nseen="$3"\n' + "".join(f'[ -z "${{{n}+x}}" ] || seen="$seen {n}"\n' for n in GIT_ENV_GRID + (GRID_PROBE,))
+                 + f'echo "$seen" >> {shlex.quote(log)}\n')
+    os.chmod(fake, 0o755)
+    leaked = []
+    with env_set({"PATH": d + os.pathsep + os.environ.get("PATH", ""), GRID_PROBE: "1"}):
+        for name in GIT_ENV_GRID:
+            open(log, "w").close()
+            with env_set({name: os.path.join(WORK, "git-elsewhere")}):
+                R.capture_files(fx)
+            with open(log, encoding="utf-8") as fh:
+                calls = [ln.split() for ln in fh.read().splitlines()]
+            if not calls or any(c[:1] != ["ls-files"] or GRID_PROBE not in c for c in calls):
+                raise Unrun(f"가짜 git 이 감사의 ls-files 와 대조 변수를 받지 못했다({name} 칸 — {calls}) — 이 격자가 env 전달을 가를 수 없다")
+            if any(name in c for c in calls):
+                leaked.append(name)
+    return not leaked, f"격자 {len(GIT_ENV_GRID)}칸(이름 × 무시 조회) · git 에 닿은 이름 {leaked}(기대 없음)"
+
+
+def c_git_config_inject():
+    """명령 범위 설정(GIT_CONFIG_PARAMETERS · GIT_CONFIG_COUNT/KEY/VALUE)은 저장소 로컬 설정(core.excludesFile)을 이기고, 전역 설정
+    경로(GIT_CONFIG_GLOBAL)는 로컬 core.excludesFile 이 없는 저장소에서 같은 일을 한다 — 무시 규칙을 넓혀 무시되지 않은 미추적 파일
+    new/notes.md 를 감사에서 뺄 수 있다. 격자: 주입 경로(parameters · count · global) × 넓히는 키(core.excludesFile · include.path →
+    core.excludesFile) + 키 없는 개수(git 오류 → 빈 무시 집합 → 무시된 부산물까지 감사). 칸마다 전제(그 env 를 물려받은 git 의 답이 실제로
+    바뀐다 — global 은 그 이름을 뺀 git 이 notes.md 를 무시하지 않는다는 것까지)를 먼저 보고, 서지 않으면 판정 불가다.
+    전역 칸의 작은 트리는 HOME · XDG_CONFIG_HOME 을 빈 폴더로 두고 시스템 설정을 끈다 — 사용자 설정이 칸을 가르지 않게. env 는 칸 안에서만 건다."""
+    fx = git_tree()
+    d = os.path.join(WORK, "git-inject")   # 감사 루트(fx) 밖 — outside-repo-walks-all 이 fx 를 복사한다
+    ign = put(d, "ignore", "notes.md\n")
+    inc = put(d, "include.cfg", "[core]\n\texcludesFile = " + ign + "\n")
+    home = os.path.join(d, "home")
+    os.makedirs(home)
+    quiet = {"HOME": home, "XDG_CONFIG_HOME": home, "GIT_CONFIG_NOSYSTEM": "1"}
+    gtop = os.path.join(d, "global-tree")
+    os.makedirs(gtop)
+    with env_set(quiet):
+        r = git(gtop, "init", "-q")
+    if r.returncode != 0:
+        raise Unrun(f"전역 칸의 작은 트리 준비 실패 — git init: {r.stderr.decode('utf-8', 'replace').strip()[:160]}")
+    for rel, body in (("fx/clean.txt", "깨끗한 줄\n"), ("fx/new/notes.md", "머리\n깨끗한 줄\n")):
+        put(gtop, rel, body)
+    gfx = os.path.join(gtop, "fx")
+    gcfg = {"core.excludesFile": put(d, "global-excludes.cfg", "[core]\n\texcludesFile = " + ign + "\n"),
+            "include.path": put(d, "global-include.cfg", "[include]\n\tpath = " + inc + "\n")}
+    target = {"core.excludesFile": ign, "include.path": inc}
+    rows = [(f"parameters×{k}", fx, {"GIT_CONFIG_PARAMETERS": f"'{k}={v}'"}) for k, v in target.items()]
+    rows += [(f"count×{k}", fx, {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": k, "GIT_CONFIG_VALUE_0": v}) for k, v in target.items()]
+    rows += [(f"global×{k}", gfx, dict(quiet, GIT_CONFIG_GLOBAL=p)) for k, p in gcfg.items()]
+    rows.append(("count-without-key", fx, {"GIT_CONFIG_COUNT": "1"}))
+    want = {fx: sorted(rel for rel, (s, _) in GIT_LAYOUT.items() if s != "무시된 미추적"), gfx: ["clean.txt", "new/notes.md"]}
+    lsi = ("ls-files", "-z", "--others", "--ignored", "--exclude-standard")
+    bad = []
+    for name, root, inject in rows:
+        with env_set(inject):
+            probe = git(root, *lsi)
+        hit = "new/notes.md" in probe.stdout.decode("utf-8", "replace").split("\0")
+        pre = probe.returncode != 0 if name == "count-without-key" else probe.returncode == 0 and hit
+        if name.startswith("global×"):
+            with env_set(quiet):
+                plain = git(root, *lsi)
+            pre = pre and plain.returncode == 0 and "new/notes.md" not in plain.stdout.decode("utf-8", "replace").split("\0")
+        if not pre:
+            raise Unrun(f"{name} 칸 — 주입이 git 의 답을 바꾸지 않는다(git exit {probe.returncode} · notes.md 무시 {hit}) — 이 칸이 가를 수 없다")
+        with env_set(inject):
+            got = sorted(R.capture_files(root))
+        if got != want[root]:
+            bad.append(f"{name}: {got}")
+    return not bad, f"격자 {len(rows)}칸(주입 경로 × 넓히는 키 + 키 없는 개수) · 감사 범위가 바뀐 칸 {bad}(기대 없음)"
+
+
+GIT_DIRS = None   # 무시 폴더 셀의 임시 git 작업 트리 감사 루트 — GIT_FX 와 따로 둔다: outside-repo-walks-all 이 GIT_FX 를 통째로 복사해
+#   읽을 수 없는 폴더가 거기 남으면 안 된다
+# 감사 루트 기준 파일 → 놓는 상태. 무시 규칙(info/exclude): 폴더 `cache/` · 폴더 `vault/` · 파일 `*.tmp`
+DIRS_LAYOUT = {"clean.txt": "추적", "cache/blob": "무시된 미추적", "locked/note.md": "무시되지 않은 미추적",
+               "mixed/keep.md": "무시되지 않은 미추적", "mixed/junk.tmp": "무시된 미추적", "vault/kept.md": "무시 규칙에 걸린 추적",
+               "vault/loose.md": "무시된 미추적"}
+DIRS_AUDITED = sorted(rel for rel, s in DIRS_LAYOUT.items() if s != "무시된 미추적")
+
+
+def dirs_tree():
+    """무시 폴더 셀의 임시 git 작업 트리를 만든다 → 감사 루트(꼭대기 아래 fx). 사용자 전역 무시 파일을 끊는다(core.excludesFile).
+    놓은 뒤 git 상태가 DIRS_LAYOUT 의 상태와 같은지 확인한다 — 다르면 판정 불가."""
+    global GIT_DIRS
+    if GIT_DIRS:
+        return GIT_DIRS
+    top = os.path.join(WORK, "git-dirs")
+    os.makedirs(top)
+    for args in (("init", "-q"), ("config", "core.excludesFile", os.devnull)):
+        r = git(top, *args)
+        if r.returncode != 0:
+            raise Unrun(f"임시 작업 트리 준비 실패 — git {args[0]}: {r.stderr.decode('utf-8', 'replace').strip()[:160]}")
+    put(top, ".git/info/exclude", "cache/\nvault/\n*.tmp\n")
+    for rel in DIRS_LAYOUT:
+        put(top, os.path.join("fx", rel), "깨끗한 줄\n")
+    for args in (("add", "fx/clean.txt"), ("add", "-f", "fx/vault/kept.md")):
+        r = git(top, *args)
+        if r.returncode != 0:
+            raise Unrun(f"임시 작업 트리 준비 실패 — git {' '.join(args)}: {r.stderr.decode('utf-8', 'replace').strip()[:160]}")
+    st = git(top, "status", "--porcelain", "-z", "--ignored", "--untracked-files=all")
+    got = sorted(e for e in st.stdout.decode("utf-8", "replace").split("\0") if e)
+    want = sorted({"추적": "A  ", "무시 규칙에 걸린 추적": "A  ", "무시되지 않은 미추적": "?? ", "무시된 미추적": "!! "}[s] + "fx/" + rel
+                  for rel, s in DIRS_LAYOUT.items())
+    if st.returncode != 0 or got != want:
+        raise Unrun(f"무시 폴더 작업 트리의 git 상태가 전제와 다르다 — {got} (기대 {want})")
+    GIT_DIRS = os.path.join(top, "fx")
+    return GIT_DIRS
+
+
+def unreadable(p):
+    """폴더를 정말 읽을 수 없는가 — root 로 돌면 권한 0 폴더도 읽힌다(그러면 셀의 전제가 서지 않는다)."""
+    try:
+        os.listdir(p)
+    except PermissionError:
+        return True
+    return False
+
+
+def c_git_ignored_unreadable():
+    """통째로 무시된 폴더(cache/)는 읽을 수 없어도 내려가지 않는다 — git 이 내보내지 않는 폴더의 순회 실패로 감사가 판정 불가가 되지
+    않는다. 전제: check-ignore 가 그 폴더를 무시로 본다 · 실제로 읽을 수 없다 · ls-files --directory 가 그 폴더를 `cache/` 한 줄로 낸다.
+    무시된 폴더까지 걷는 꼴은 정본의 Unrun 으로 끝난다 — 이 셀은 그것을 잡아 FAIL 로 낸다."""
+    fx = dirs_tree()
+    c = os.path.join(fx, "cache")
+    os.chmod(c, 0)
+    try:
+        ign = git(fx, "check-ignore", "-q", "cache/").returncode
+        lst = git(fx, "ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory")
+        listed = "cache/" in lst.stdout.decode("utf-8", "replace").split("\0")
+        if ign != 0 or not unreadable(c) or lst.returncode != 0 or not listed:
+            raise Unrun(f"전제가 서지 않는다 — check-ignore cache/ {ign}(기대 0) · 읽기 막힘 {unreadable(c)}(기대 True — root 면 막히지 않는다)"
+                        f" · ls-files --directory exit {lst.returncode} · cache/ 줄 {listed}")
+        try:
+            got, why = sorted(R.capture_files(fx)), ""
+        except L.Unrun as e:
+            got, why = None, str(e)
+    finally:
+        os.chmod(c, 0o755)
+    return got == DIRS_AUDITED, (f"읽을 수 없는 무시된 폴더 cache/ → 감사 파일 {got}(기대 {DIRS_AUDITED})"
+                                 + (f" · 정본 Unrun — {why[:160]}" if why else ""))
+
+
+def c_git_unignored_unreadable():
+    """대조 — 무시되지 않은 폴더(locked/)를 읽을 수 없으면 여전히 정본의 판정 불가(Unrun)다: 내려가지 않는 폴더는 git 이 무시된다고 답한
+    폴더뿐이다. 전제: check-ignore 가 그 폴더를 무시하지 않는다(1) · 실제로 읽을 수 없다."""
+    fx = dirs_tree()
+    lk = os.path.join(fx, "locked")
+    os.chmod(lk, 0)
+    try:
+        ign = git(fx, "check-ignore", "-q", "locked/").returncode
+        if ign != 1 or not unreadable(lk):
+            raise Unrun(f"전제가 서지 않는다 — check-ignore locked/ {ign}(기대 1) · 읽기 막힘 {unreadable(lk)}(기대 True — root 면 막히지 않는다)")
+        try:
+            R.capture_files(fx)
+            walk = "예외 없음"
+        except L.Unrun:
+            walk = "Unrun"
+    finally:
+        os.chmod(lk, 0o755)
+    return walk == "Unrun", f"읽을 수 없는 무시되지 않은 폴더 locked/ → {walk}(기대 Unrun)"
+
+
+def c_git_mixed_untracked():
+    """무시 파일과 무시되지 않은 파일이 섞인 미추적 폴더(mixed/)는 접히지 않는다 — 무시되지 않은 mixed/keep.md 는 감사하고 무시된
+    mixed/junk.tmp 만 뺀다. 전제: mixed/ 자체는 무시되지 않고(1) 두 파일은 각각 무시되지 않음(1) · 무시됨(0)이다."""
+    fx = dirs_tree()
+    pre = [git(fx, "check-ignore", "-q", p).returncode for p in ("mixed/", "mixed/keep.md", "mixed/junk.tmp")]
+    if pre != [1, 1, 0]:
+        raise Unrun(f"전제가 서지 않는다 — check-ignore mixed/ · keep.md · junk.tmp {pre}(기대 [1, 1, 0])")
+    got = sorted(R.capture_files(fx))
+    return got == DIRS_AUDITED, f"섞인 미추적 폴더 mixed/ → 감사 파일 {got}(기대 {DIRS_AUDITED} — mixed/keep.md 포함)"
+
+
+def c_git_ignored_dir_tracked():
+    """무시된 폴더(vault/) 안이라도 추적하는 파일(git add -f vault/kept.md)은 감사한다 — 그 폴더의 추적하지 않는 vault/loose.md 만 뺀다.
+    전제: 무시 규칙이 vault/ 폴더에 걸리고(check-ignore --no-index 0 — 추적 파일이 든 폴더는 인덱스를 보면 1 이다) vault/kept.md 는 추적된다."""
+    fx = dirs_tree()
+    ign = git(fx, "check-ignore", "--no-index", "-q", "vault/").returncode
+    tracked = git(fx, "ls-files", "--error-unmatch", "vault/kept.md").returncode
+    if ign != 0 or tracked != 0:
+        raise Unrun(f"전제가 서지 않는다 — check-ignore --no-index vault/ {ign}(기대 0) · vault/kept.md 추적 exit {tracked}(기대 0)")
+    got = sorted(R.capture_files(fx))
+    return got == DIRS_AUDITED, f"무시된 폴더 vault/ → 감사 파일 {got}(기대 {DIRS_AUDITED} — vault/kept.md 포함)"
+
+
 def c_outside_repo():
     d = os.path.join(WORK, "plain-tree")
     shutil.copytree(git_tree(), d)   # 감사 루트만 옮긴다 — .git 은 작업 트리 꼭대기에 있어 따라오지 않는다
@@ -414,6 +651,9 @@ CELLS = (("tree-ids-synthetic-only", c_tree), ("injected-real-uuid-hit", c_injec
          ("scope-log-jsonl-session", c_scope), ("scope-any-extension", c_scope_any), ("unreadable-reported", c_unread),
          ("git-ignored-dropping-skipped", c_git_ignored), ("git-untracked-unignored-hit", c_git_untracked),
          ("git-tracked-ignored-hit", c_git_tracked_ignored), ("git-env-other-repo-kept", c_git_env_other_repo),
+         ("git-env-grid-dropped", c_git_env_grid), ("git-config-inject-kept", c_git_config_inject),
+         ("git-ignored-unreadable-dir-skipped", c_git_ignored_unreadable), ("git-unignored-unreadable-dir-unrun", c_git_unignored_unreadable),
+         ("git-mixed-untracked-dir-kept", c_git_mixed_untracked), ("git-ignored-dir-tracked-kept", c_git_ignored_dir_tracked),
          ("outside-repo-walks-all", c_outside_repo),
          ("path-only-id-hit", c_path_only), ("run-id-synthetic-ok", c_run_synth),
          ("run-id-real-shape-hit", c_run_real),
