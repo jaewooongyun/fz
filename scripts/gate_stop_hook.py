@@ -1276,6 +1276,8 @@ SELF_TEST_CASES = (
     ("r3-unknown-final-stop-hook", "unmet", {"transcript": "r3-unlexable"}, {}, 2, "대상 미상 쓰기"),
     # 함수 정의는 토크나이저가 읽지만(Func) 본문의 판정기 호출은 이름으로 불릴 때 돈다 — 함수를 따라가지 않으므로 대상 미상이다(공백 꼴 포함)
     ("r3-s1-funcdef-stop-hook-unknown", "unmet", {"transcript": "r3-funcdef"}, {}, 2, "대상 미상 쓰기"),
+    # 본문 안 쓰기 명령은 본문보다 앞의 같은 이름 정의만 면제한다 — 뒤 정의(`f() { tee -a 원장; }; f; tee() { :; }`)의 본문 tee 는 외부 명령이라 쓰기다(소유 차단)
+    ("r3-s1-funcdef-body-write-later-def", "unmet", {"transcript": "r3-funcdef-later-def"}, {}, 2, "대상 미상 쓰기"),
     # r3 적대 검토 ISSUE-003 — heredoc 을 정규식으로 지우기 전에 원문을 읽는다: 본문의 표 밖 꼴 · 실행되는 본문 치환의 쓰기
     ("r3-f458-heredoc-unknown-stop-hook", "unmet", {"transcript": "r3-heredoc-unknown"}, {}, 2, "대상 미상 쓰기"),
     ("r3-f458-heredoc-exec-stop-hook", "unmet", {"transcript": "r3-heredoc-exec"}, {}, 2, "대상 미상 쓰기"),
@@ -1435,6 +1437,9 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
         lines.append(tool_use("Bash", {"command": f"cd {ledger.parent} && printf x \\>> plan.md"}, cwd=root / "elsewhere"))
     elif kind == "r3-funcdef":
         lines.append(tool_use("Bash", {"command": f"cd {ledger.parent} && f () {{ printf x > plan.md; }}; f"}, cwd=root / "elsewhere"))
+    elif kind == "r3-funcdef-later-def":
+        # 원장 쓰기 신호는 본문 tee 하나뿐이다 — 다른 신호(리다이렉트 · 판정기 호출 · 원장 글자를 든 표 밖 명령)가 섞이면 면제 규칙을 되돌려도 막혀 이 케이스가 그 회귀를 못 본다
+        lines.append(tool_use("Bash", {"command": f"f() {{ tee -a {ledger}; }}; f; tee() {{ :; }}"}, cwd=root / "elsewhere"))
     elif kind == "r3-touch":
         lines.append(tool_use("Bash", {"command": f"cd {ledger.parent} && touch plan.md"}, cwd=root / "elsewhere"))
     elif kind == "r3-dash-c":
