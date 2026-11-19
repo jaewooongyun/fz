@@ -643,7 +643,7 @@ fz 적용:
 2. 새 컨텍스트에서 **파일을 Read**하여 복원 (structured handoff)
 3. 이 방식이 compact된 요약보다 정확한 복원을 보장
 
-fz 적용: `modules/context-artifacts.md`의 티켓 폴더 전략이 이 원칙의 구현. `fz:checkpoint:essential`은 경량 버전.
+fz 적용: `modules/context-artifacts.md`의 티켓 폴더 전략이 이 원칙의 구현.
 
 ### 원칙 H4: Session 계층 관리 전략
 
@@ -656,7 +656,7 @@ fz 적용: `modules/context-artifacts.md`의 티켓 폴더 전략이 이 원칙�
 
 | 컴포넌트 | 역할 | fz 대응 |
 |---------|------|---------|
-| **Session** | 상태 추적 + 이벤트 로그 | 티켓 폴더 + Serena Memory |
+| **Session** | 상태 추적 + 이벤트 로그 | 티켓 폴더 |
 
 핵심: Session을 context window **밖**의 조회 가능한 이벤트 로그로 관리한다. context window 안에 모든 상태를 유지하려 하면 Context Rot이 가속된다.
 

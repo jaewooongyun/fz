@@ -30,7 +30,7 @@ metadata:
 > 서브커맨드 선택 → 실행 → 결과 보고
 
 - 5개 서브커맨드: audit, gc, recall, organize, remind
-- 3-Layer 메모리 관리: L1(Auto Memory) + L2(Serena) + L3(티켓 폴더 파일)
+- 3-Layer 메모리 관리: L1(Auto Memory) + L2(Serena 영속 키 — decision · pattern) + L3(티켓 폴더 파일)
 - topic file 태그 기반 교훈 매칭
 - 코드 유효성 검증 (find_symbol + Grep)
 - ⛔ **선택 도구 상태**: 서브커맨드 첫 단계에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
@@ -50,7 +50,7 @@ metadata:
 | 모듈 | 용도 |
 |------|------|
 | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
-| modules/memory-policy.md | L2 Serena Memory 키 네이밍 + GC 정책 |
+| modules/memory-policy.md | L2 Serena 영속 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | L3 티켓 폴더 관리 |
 
 ---
@@ -67,9 +67,9 @@ metadata:
 3. MEMORY.md ↔ topic file **양방향** 정합성 — 끊어진 링크(MEMORY.md→없는 파일) + **orphan**(파일 존재 → MEMORY.md 미참조). orphan은 색인 추가 또는 archive 대상
 4. 태그 통계: `[status: pending/applied/deferred]` 분포
 
-**L2 검사 (Serena)**:
+**L2 검사 (Serena 영속 키)**:
 1. `list_memories()` → 전체 키 수집
-2. 키별 수명 정책과 대조 (`modules/memory-policy.md`)
+2. 영속 키(decision · pattern)를 수명 정책과 대조 (`modules/memory-policy.md`)
 3. orphan 키 (정의에 없는 패턴) 감지
 4. stale persistent 키 (30일+ 미참조) 목록
 
@@ -87,34 +87,28 @@ metadata:
 
 ## 서브커맨드 2: gc
 
-L2 임시키 삭제 + L1 stale 항목 정리 제안 + L3 잔존 티켓 폴더 정리.
+L1 stale 항목 정리 제안 + L3 잔존 티켓 폴더 정리 (+ `--persistent` 면 L2 영속 키).
 
 ### 절차
 
-1. **L2 임시키 GC**:
-   - `list_memories()` → `fz:artifact:*`, `fz:checkpoint:*`, `fz:rtm:*`, `fz:consensus:*` 수집
-   - 각 키에 `delete_memory()` 실행
-   - `fz:session:current`는 유지
-
-2. **L2 persistent 키 GC** (`--persistent` 옵션 시):
+1. **L2 persistent 키 GC** (`--persistent` 옵션 시):
    - `fz:decision:*`, `fz:pattern:*` 중 30일+ 미참조 키 목록화
    - 사용자 확인 후 삭제
 
-3. **L1 stale 항목 정리 제안**:
+2. **L1 stale 항목 정리 제안**:
    - `[status: applied]` + 6개월+ → 아카이브 후보 표시
    - 끊어진 링크 보고
    - 삭제/아카이브는 사용자 확인 필수
 
-4. **L3 잔존 티켓 폴더 정리**:
+3. **L3 잔존 티켓 폴더 정리**:
    - 완료된 파이프라인의 티켓 폴더 목록
    - 사용자 확인 후 삭제
 
-5. **승격 원장 candidate 만료 점검** (보고만 — 원장을 쓰거나 지우지 않는다):
+4. **승격 원장 candidate 만료 점검** (보고만 — 원장을 쓰거나 지우지 않는다):
    - `python3 "${FZ_PLUGIN_ROOT}/scripts/candidate_expiry.py" --ledger "${FZ_PLUGIN_ROOT}/modules/promotion-ledger.md"`
    - `재평가필요` 는 종결 · 연장 · 승격 판단을, `판정불가`(관측 날짜 없음)는 날짜 보강을 사용자에게 묻는다 — 3개월 재평가 규칙(`modules/promotion-ledger.md`)의 실행 지점이다(F-477)
 
 ### Gate: GC Complete
-- [ ] L2 임시키 삭제 완료?
 - [ ] 사용자 확인 항목 처리?
 
 ---

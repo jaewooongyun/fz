@@ -211,3 +211,11 @@ F-204	README.md	lacks	`sc:` 명령 미매칭 (폴백 0)
 F-204	README.md	has:replace	교차 검증이 새 컨텍스트 Claude 검증자로 — 동종 검증 `[fresh-context: claude]`
 F-204	README.md	lacks	교차 검증이 `sc:analyze` 단독
 F-204	README.md	lacks	폴백 사슬의 끝이 사라진다
+F-481	skills/fz/SKILL.md	lacks	fz:checkpoint:essential
+F-481	skills/fz-code/SKILL.md	lacks	read_memory("fz:checkpoint:plan-final")
+F-481	modules/context-artifacts.md	lacks	fz:session:current
+F-481	modules/session.md	lacks	fz:session:current
+F-481	modules/memory-policy.md	lacks	| `fz` | `checkpoint` |
+F-481	modules/context-artifacts.md	has	아니오 → 저장 없이 진행(이어받기 없음)
+F-481	modules/context-artifacts.md	has	/fz 없이 직접 호출된 스킬은 그 스킬의 Lead 가 완료할 때 Essential Context
+F-534	modules/tool-status.md	has	작업 폴더가 없는 세션

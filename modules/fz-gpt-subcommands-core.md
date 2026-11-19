@@ -39,12 +39,12 @@ fz-plan의 Phase 2. **kind `verify` — 래퍼 exec · architect 본문 주입 �
 
 | 호출자 | `ARTIFACT` | `WORK_DIR` |
 |---|---|---|
-| fz-plan Phase 2 | `plan` | 티켓 작업 폴더 — 같은 라운드의 `verify-gates` 와 한 원장(`{WORK_DIR}/gpt-rounds.json`). 작업 폴더가 없으면(Serena fallback) `WORK_DIR=` 빈 값 — 세션 원장(`${FZ_RUN_STATE:-~/.fz/runs}/<pipeline_id>/gpt-rounds.json`)에 센다 |
+| fz-plan Phase 2 | `plan` | 티켓 작업 폴더 — 같은 라운드의 `verify-gates` 와 한 원장(`{WORK_DIR}/gpt-rounds.json`). 작업 폴더가 없으면(저장 없이 진행) `WORK_DIR=` 빈 값 — 세션 원장(`${FZ_RUN_STATE:-~/.fz/runs}/<pipeline_id>/gpt-rounds.json`)에 센다 |
 | fz-discover `--deep` · 직접 `/fz-gpt verify` | 빈 값(`ARTIFACT=`) — 산출물 계열 밖이라 세지 않는다 | 없어도 된다 |
 
 ```bash
 : "${ARTIFACT?호출자가 산출물 계열을 정한다 — 위 호출자 표(빈 값이면 세지 않는다)}"
-: "${ARTIFACT:+${WORK_DIR?세는 호출은 호출자가 WORK_DIR 를 정한다 — 작업 폴더 없음(Serena fallback)은 WORK_DIR 를 빈 값으로 정한다 → 세션 원장}}"
+: "${ARTIFACT:+${WORK_DIR?세는 호출은 호출자가 WORK_DIR 를 정한다 — 작업 폴더 없음(저장 없이 진행)은 WORK_DIR 를 빈 값으로 정한다 → 세션 원장}}"
 cat > "$P_VERIFY" <<EOF
 이 구현 계획을 검증하라.
 CLAUDE.md ## Code Conventions 섹션의 가이드라인을 참조하라.
@@ -97,7 +97,7 @@ FZ_GPT_ARTIFACT=plan FZ_WORK_DIR="${WORK_DIR:?fz-plan 작업 폴더 — 라운�
 
 발동: 원장이 있을 때만. 원장이 없으면 게이트 판정이 무의미하다.
 
-⛔ **대상 원장 · 산출물 계열 · 작업 폴더는 호출자가 정한다** — 특정 파일명에 묶지 않는다. 작업 폴더(`WORK_DIR`)는 라운드 원장 `{WORK_DIR}/gpt-rounds.json` 의 자리다 — 같은 라운드의 `verify` · `validate` 와 같은 폴더여야 한 원장에 든다(`modules/cross-validation.md` § 재검증 라운드 상한). 작업 폴더가 없는 세션(Serena fallback)에는 게이트 원장이 없어 이 kind 를 부르지 않는다.
+⛔ **대상 원장 · 산출물 계열 · 작업 폴더는 호출자가 정한다** — 특정 파일명에 묶지 않는다. 작업 폴더(`WORK_DIR`)는 라운드 원장 `{WORK_DIR}/gpt-rounds.json` 의 자리다 — 같은 라운드의 `verify` · `validate` 와 같은 폴더여야 한 원장에 든다(`modules/cross-validation.md` § 재검증 라운드 상한). 작업 폴더가 없는 세션(저장 없이 진행)에는 게이트 원장이 없어 이 kind 를 부르지 않는다.
 
 | 호출자 | 원장 | 시점 | 계열(`ARTIFACT`) |
 |---|---|---|---|
@@ -168,7 +168,7 @@ fz-review의 Phase 5.5. **kind `validate` — 래퍼 exec · guardian 본문 주
 
 ```bash
 : "${ARTIFACT?호출자가 산출물 계열을 정한다 — fz-review Phase 5.5: code · 직접 호출: 빈 값}"
-: "${ARTIFACT:+${WORK_DIR?세는 호출은 호출자가 WORK_DIR 를 정한다 — 작업 폴더 없음(Serena fallback)은 WORK_DIR 를 빈 값으로 정한다 → 세션 원장}}"
+: "${ARTIFACT:+${WORK_DIR?세는 호출은 호출자가 WORK_DIR 를 정한다 — 작업 폴더 없음(저장 없이 진행)은 WORK_DIR 를 빈 값으로 정한다 → 세션 원장}}"
 cat > "$P_VALIDATE" <<EOF
 피드백 반영 여부를 검증하라.
 CLAUDE.md ## Code Conventions 섹션의 리뷰 가이드라인을 참조하라.

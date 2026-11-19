@@ -63,5 +63,4 @@
 
 4. **⛔ 방향 판정 기록** (항상):
    - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/direction-challenge.md`에 판정 결과 + 대안 비교 기록
-   - 비-티켓 세션: `write_memory("fz:checkpoint:plan-direction", "판정: {PROCEED/RECONSIDER/REDIRECT}. 대안: {요약}. 선택근거: {1줄}")`
    형식 참조: `modules/context-artifacts.md`

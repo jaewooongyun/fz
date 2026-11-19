@@ -8,7 +8,6 @@ argument-hint: "[probe|audit|plan|verify|execute|validate|full|light] [target]"
 allowed-tools: >-
   Read, Edit, Write, Bash, Bash(*/scripts/gpt-call.sh*), Bash(grep *), Bash(cp *), Bash(cmp *), Grep, Glob,
   WebSearch, WebFetch,
-  mcp__plugin_fz_serena__write_memory, mcp__plugin_fz_serena__read_memory,
   mcp__sequential-thinking__sequentialthinking,
   Task, TaskCreate, TaskUpdate, Workflow,
   Skill

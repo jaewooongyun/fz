@@ -18,4 +18,3 @@
 |-------|------|------|
 | topic file에 [status: pending] 2건 | /fz-memory remind | 미반영 2건 보고 |
 | MEMORY.md 250줄 | /fz-memory audit | 200줄 초과 경고 |
-| L2에 stale artifact 키 3개 | /fz-memory gc | 3개 삭제 |

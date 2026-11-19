@@ -4,8 +4,7 @@
 
 ## 목차
 
-- [세션 관리 — Serena Memory 활용 (Primary)](#세션-관리--serena-memory-활용-primary)
-- [세션 자동 감지 (Bash Fallback)](#세션-자동-감지-bash-fallback)
+- [세션 자동 감지](#세션-자동-감지)
 - [이슈 상태 머신](#이슈-상태-머신)
 - [이슈 관리 (Bash)](#이슈-관리-bash)
 - [관련 스키마](#관련-스키마)
@@ -14,41 +13,9 @@
 
 ---
 
-## 세션 관리 — Serena Memory 활용 (Primary)
+## 세션 자동 감지
 
-> MCP First: Serena memory를 세션 저장소로 사용.
-
-### 키 네이밍
-
-> 키 정의 및 GC 정책: `modules/memory-policy.md` 참조. 아래는 이 모듈에서 사용하는 주요 키만 기재.
-
-### 세션 시작
-```
-mcp__plugin_fz_serena__write_memory("fz:session:current", {
-  session_id: "SESSION-{YYYYMMDD_HHMMSS}",
-  task_description: "",
-  issues: [],
-  iterations: [],
-  metrics: { total_issues: 0, resolved: 0, reflection_rate: 0 },
-  status: "in_progress"
-})
-```
-
-### 세션 복원
-```
-mcp__plugin_fz_serena__read_memory("fz:session:current") → 기존 세션 데이터 로드
-```
-
-### 이슈 기록/업데이트
-```
-mcp__plugin_fz_serena__edit_memory("fz:session:current", { issues: [...updated] })
-```
-
----
-
-## 세션 자동 감지 (Bash Fallback)
-
-Serena 불가 시 사용. 1시간 이내 기존 세션을 자동 감지합니다.
+Issue Tracker 의 저장소는 아래 세션 파일(`TRACKER_FILE`) 하나다. 1시간 이내 기존 세션을 자동 감지합니다.
 
 ```bash
 TRACKER_DIR="$HOME/.claude/sessions"
@@ -129,7 +96,6 @@ jq '[.issues[] | select(.status != "resolved" and .status != "deferred")]' "$TRA
 
 | 스킬 | 참조 이유 |
 |------|----------|
-| /fz | 세션 초기화 + 복원 |
 | /fz-gpt | Issue Tracker 연동 (검증 결과 기록) |
 
 ## 설계 원칙

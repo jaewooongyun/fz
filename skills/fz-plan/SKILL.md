@@ -11,10 +11,6 @@ allowed-tools: >-
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__find_implementations,
   mcp__plugin_fz_serena__activate_project,
-  mcp__plugin_fz_serena__read_memory,
-  mcp__plugin_fz_serena__write_memory,
-  mcp__plugin_fz_serena__edit_memory,
-  mcp__plugin_fz_serena__list_memories,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
@@ -53,8 +49,7 @@ metadata:
 | 모듈 | 용도 |
 |------|------|
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
-| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-| modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 비-티켓 세션 Serena checkpoint |
+| modules/context-artifacts.md | 티켓 폴더 기반 compact recovery |
 | modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
 | modules/code-transform-validation.md | 코드 변환 동등성 — Transformation Spec + 검증 체크리스트 (패턴 변환 시) |
 | modules/uncertainty-verification.md | 기술적 주장 → Default-Deny 검증 (하네스 원칙, Transformation Spec Pilot) |
@@ -135,11 +130,11 @@ metadata:
 
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / 저장 없이 진행)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
@@ -148,13 +143,11 @@ metadata:
 ### 절차
 
 1. **세션 감지**: 참조 `modules/session.md`
-2. **이전 세션 복원**:
-   - `mcp__plugin_fz_serena__list_memories` → 관련 이전 세션 검색
-   - `mcp__plugin_fz_serena__read_memory` → 결정사항, 잔여 이슈 로드
+2. **이전 세션 복원**: WORK_DIR 이 있으면 `index.md` 의 `## Essential Context` 를 읽어 결정사항 · 잔여 이슈를 이어받는다
 3. **프로젝트 활성화**:
    - `mcp__plugin_fz_serena__activate_project` → LSP 서버 활성화
-   - ⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile plan {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
-   - ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`
+   - ⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile plan {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
+   - ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한 줄)
 4. **대상 모듈 심볼 파악**:
    - `mcp__plugin_fz_serena__get_symbols_overview` → 작업 대상 파일 심볼 구조
    - `mcp__plugin_fz_serena__find_symbol` → 컴포넌트 탐색
@@ -255,7 +248,7 @@ metadata:
 - [ ] ⛔ "실행 스레드"가 Zero-Exception 규칙을 준수하는가?
 - [ ] ⛔ 요청 파라미터 키 목록이 원본과 일치하는가?
 - [ ] 구조 결정 옵션 테이블 포함 + 사용자 보고 제시? (Workflow 모드면 `directionAlternatives` 병합 확인. 답습/미러링이면 3축 필수 — 45차)
-- [ ] ⛔ 계획 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] ⛔ 계획 기록 완료? (티켓 폴더: 파일, 저장 없이 진행: 건너뜀)
 - [ ] 플랜 산문의 수치 · 건수 · `경로:줄` 주장에 출처를 달았는가? (F-185 — WARN 은 차단이 아니다. 줄마다 `[verified: 출처]` 나 code-context 행 참조를 달거나 주장을 고친다)
       Evidence: `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_integrity_check.py" --plan-doc {WORK_DIR}/plan/plan-v{N}.md` → WARN 미검증 주장 {N}건
 
@@ -292,7 +285,7 @@ Phase 번호(0.7)는 이력상 이름이다 — 실행은 Phase 1 · 1.5 뒤 · 
 
 ### Gate 0.7: Sprint Contract Agreed
 
-- [ ] GPT Sprint Contract 작성 완료? (`sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`)
+- [ ] GPT Sprint Contract 작성 완료? (`sprint-contract-gpt.md`)
 - [ ] 모든 SC가 measurable + binary 판정 가능?
 - [ ] anti_criteria 명시? (제거/리팩토링 작업 시)
 - [ ] Lead 동의 (agree) 또는 modify 후 합의?
@@ -342,7 +335,6 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 
 3.5. **⛔ 검증 결과 기록** (항상):
    - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/verify-result.md`에 verdict + 이슈 요약 기록
-   - 비-티켓 세션: `write_memory("fz:checkpoint:plan-verify", "verdict: {approved/rejected}. 이슈: {N}개. Critical: {요약}")`
 
 ### Gate 2 전제조건
 - 검증 verdict가 `approved` 또는 사용자 승인

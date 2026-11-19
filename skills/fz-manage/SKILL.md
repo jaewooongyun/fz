@@ -7,8 +7,6 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[list|info|deps|check|benchmark|reflect-to-module|create|edit|delete] [대상]"
 allowed-tools: >-
-  mcp__plugin_fz_serena__list_memories,
-  mcp__plugin_fz_serena__read_memory,
   Read, Grep, Glob, Bash, Edit, Write
 metadata:
   provides: []
@@ -31,7 +29,6 @@ metadata:
 - 전체 스킬 일괄 품질 평가 (benchmark)
 - 스킬 CRUD (생성/편집/삭제)
 - 거버넌스 (`modules/governance.md`)
-- ⛔ **선택 도구 상태**: 서브커맨드 첫 단계에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
 
 ## 사용 시점
 

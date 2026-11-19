@@ -26,7 +26,7 @@
 
 | Type | Given | When | Then (pass/fail oracle) |
 |------|-------|------|--------------------------|
-| normal | 비-티켓 세션 컨텍스트, Serena 연결됨, 질의에 "모듈/구조" 키워드 | `/fz-search "OrderDetail 모듈 구조"` | arch 모드 자동 선택(모드 판별 표) + Gate: Search Complete 5/5 통과 (비-티켓 세션 분기 → `write_memory("fz:checkpoint:search", ...)` 기록 완료) |
+| normal | 비-티켓 세션 컨텍스트, Serena 연결됨, 질의에 "모듈/구조" 키워드 | `/fz-search "OrderDetail 모듈 구조"` | arch 모드 자동 선택(모드 판별 표) + Gate: Search Complete 5/5 통과 |
 | normal | 인자에 `[A-Z]{2,6}-\d{2,5}` 패턴, "누가 쓰는"·"전수" 키워드, Serena 연결됨 | `/fz-search "TKT-1234 AuthRepository 누가 쓰는지 전수"` | Gate 0 (Work Dir Ready) 3/3 통과 (`{CWD}/TKT-1234/` + index.md 생성) + impact depth 2 추적 + Coverage Gate 통과(전수 주장) + `{WORK_DIR}/search/search-result.md` 기록 |
 | edge-case | `--deep` 플래그 + 네이티브 Workflow 도구 가용 | `/fz-search --deep "Checkout 모듈 구조"` | `mode:'workflow'` 반환 → 출력에 신뢰도 등급 열(★★★/★★/★) 표시 + `return.metrics`(agentCalls/nullCount/stages/fallback) → `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 기록 |
 | edge-case | 모드 트리거 키워드가 복수/모호한 질의 | `/fz-search "Checkout 관련된 거"` | AskUserQuestion으로 모드 확인 (임의 모드 선택 금지) → 사용자가 선택한 모드로 실행 |

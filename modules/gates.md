@@ -47,7 +47,7 @@
 └── shards/<worker>.md   BATCH worker별 (append-only, 2차 계층)
 ```
 
-WORK_DIR 결정은 `modules/context-artifacts.md` Work Dir Resolution을 따른다. **Serena fallback(disk WORK_DIR 없음)은 명시적 비지원** — 원장을 만들지 않는다.
+WORK_DIR 결정은 `modules/context-artifacts.md` Work Dir Resolution을 따른다. **저장 없이 진행한 세션(disk WORK_DIR 없음)은 명시적 비지원** — 원장을 만들지 않는다.
 
 ### STATE 와 전이표
 

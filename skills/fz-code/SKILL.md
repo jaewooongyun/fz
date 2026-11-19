@@ -13,9 +13,6 @@ allowed-tools: >-
   mcp__plugin_fz_serena__replace_symbol_body,
   mcp__plugin_fz_serena__insert_after_symbol,
   mcp__plugin_fz_serena__insert_before_symbol,
-  mcp__plugin_fz_serena__write_memory,
-  mcp__plugin_fz_serena__read_memory,
-  mcp__plugin_fz_serena__edit_memory,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
@@ -65,7 +62,6 @@ metadata:
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
-| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
@@ -130,12 +126,12 @@ metadata:
 
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
 4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / 저장 없이 진행)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
@@ -186,7 +182,7 @@ metadata:
 - [ ] ⚠️ H (figma 대조) 발견 시 축 분류 후 방법 선택? *(candidate — 강제 X, 미충족은 기록만)*
 - 미통과 시 → ⛔ 구현 절차 진입 차단 (H 제외)
 
-발동 시 행동: trigger 매칭 결과를 `{WORK_DIR}/code/phase-0.5-detection.md`에 기록 (티켓 폴더(WORK_DIR) 활성 시) 또는 Serena `fz:checkpoint:phase-0.5` (비-티켓 세션).
+발동 시 행동: trigger 매칭 결과를 `{WORK_DIR}/code/phase-0.5-detection.md`에 기록 (티켓 폴더(WORK_DIR) 활성 시).
 
 ---
 
@@ -338,7 +334,6 @@ metadata:
    각 구현 Step 완료 후 진행 상태를 기록한다.
    - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/code/step-{N}.md` + `progress.md` + `index.md` 업데이트
    - ⛔ `step-{N}.md` 에 `## 기각한 위험` 절 — 구현 중 검토하고 기각한 위험마다 ``- `R-n` — <기제 이름> · 근거: <기각 근거> · 재현: <재현 경로>`` 한 줄, 없으면 `없음` 한 줄. fz-pr 이 행을 PR 본문으로 옮기고 `check_pr_template.py --risks` 가 그 이송을 잰다(F-523 — "드문 경우" 로 넘긴 위험이 Step · 리뷰 · PR 어디에도 남지 않아 리뷰어가 같은 기제를 다시 찾았다)
-   - 비-티켓 세션: `write_memory("fz:checkpoint:code-step{N}", "Step {N}/{M}: {변경 파일}. 빌드: OK/FAIL. 결정: {요약}")`
    형식 참조: `modules/context-artifacts.md`
 
 7. **요구사항 부합 검증** (선택 — 3+ Step 구현에서만):
@@ -373,7 +368,7 @@ metadata:
 - [ ] 빌드 경고 최소화?
 - [ ] 아키텍처 패턴 준수?
 - [ ] ⛔ UI · 제스처 · 애니메이션 Step 이 있으면 Step 마다 visual oracle 충족? — 못 본 Step 은 완료가 아니라 미충족으로 보고한다 (F-230 · `modules/build.md` Gate 체크리스트와 같은 기준)
-- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 저장 없이 진행: 건너뜀)
 - [ ] ⛔ Step 산출물마다 `## 기각한 위험` 절(위험 행 또는 `없음`)을 남겼는가? (F-523 — 비면 PR 이송 검사가 대조 불가로 멈춘다)
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)

@@ -184,7 +184,6 @@ Claude + GPT 교차 검증:
 
 ### Disagreement 기록
 - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/verify/consensus-{YYYYMMDD_HHMMSS}.md` (timestamp suffix로 같은 날 다중 session overwrite 방지)
-- 비-티켓 세션: `write_memory("fz:consensus:{YYYYMMDD_HHMMSS}", "합의/불일치 요약")` (상수 key 대신 timestamp suffix)
 
 ---
 
@@ -398,7 +397,6 @@ printf '%s\n' "{과제 지시}" > "$P"
 > 1M context 활용: 요약 + 원본 분리 (Progressive Disclosure)
 
 - **티켓 폴더(WORK_DIR) 활성**: `verify-result.md` (요약 3K, Hydration 대상) + `verify-result-full.md` (원본, drill-down용)
-- **비-티켓 세션**: Serena checkpoint 요약만 (기존 동작)
 - 다음 Phase 스킬은 `verify-result.md` 요약을 Read. 상세 확인 시 `-full.md` drill-down.
 
 ---

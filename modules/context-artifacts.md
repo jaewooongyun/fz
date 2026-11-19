@@ -15,8 +15,7 @@
 - [Upstream Hydration Sets](#upstream-hydration-sets)
 - [Phase-Tagged Discover](#phase-tagged-discover)
 - [Ephemeral vs Persistent (/btw 통합)](#ephemeral-vs-persistent-btw-통합)
-- [Serena Memory와의 관계](#serena-memory와의-관계)
-- [비-티켓 세션 모드 (Serena Memory Fallback)](#비-티켓-세션-모드-serena-memory-fallback)
+- [파이프라인 길이별 저장](#파이프라인-길이별-저장)
 - [Artifact Token Budget](#artifact-token-budget)
 - [실행 기록](#실행-기록)
 - [Few-shot 예시](#few-shot-예시)
@@ -88,7 +87,7 @@ fz-peer-review는 티켓 폴더와 별도 WORK_DIR을 사용:
 
 ## Work Dir 결정
 
-우선순위: 명시적 인자 {TICKET} > 브랜치명 (`[A-Z]{2,6}-\d{2,5}` 추출) > AskUserQuestion(저장 여부) > Serena Memory fallback
+우선순위: 명시적 인자 {TICKET} > 브랜치명 (`[A-Z]{2,6}-\d{2,5}` 추출) > AskUserQuestion(저장 여부) > fallback: 저장 없이 진행(이어받기 없음)
 
 ## index.md 프로토콜
 
@@ -114,7 +113,7 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 - [code] step-1.md — Repository 완료
 ```
 
-> **핵심**: `## Essential Context`는 /fz가 단독 관리하는 **덮어쓰기** 섹션. 서브스킬은 Essential 항목을 반환하고 /fz가 기록한다.
+> **핵심**: `## Essential Context`는 /fz가 단독 관리하는 **덮어쓰기** 섹션. 서브스킬은 Essential 항목을 반환하고 /fz가 기록한다. /fz 없이 직접 호출된 스킬은 그 스킬의 Lead 가 완료할 때 Essential Context(Active Phase · Key Decisions · Constraints · Pending)를 덮어쓴다 — /fz 파이프라인 안에서는 덮어쓰지 않고 항목만 /fz 에 돌려준다.
 
 ### plan-final.md 템플릿 (OBS-03 v2.2 P0-A)
 
@@ -128,14 +127,13 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 
 ## Compact Recovery Protocol
 
-0. `fz:checkpoint:essential` 읽기 → Essential Context (Key Decisions, Constraints, Active Phase) 즉시 복원
-1. `fz:session:current`에서 `work_dir` 읽기
+1. WORK_DIR 를 찾는다 — 인자 · 브랜치의 티켓, 없으면 `Glob("**/{TICKET_PREFIX}-*/index.md")` · `Glob("**/NOTASK-*/index.md")`
 2. `{WORK_DIR}/index.md` 읽기 → `## Essential Context` 섹션으로 상세 복원
 3. Active Phase의 최신 아티팩트 로드
 4. 상위 Phase 핵심 산출물 로드 (discover→discover-journal.md Current State, plan→plan-final.md)
 5. 컨텍스트 복원 완료 알림
 
-> **추상화 참조**: Anthropic "Scaling Managed Agents: Decoupling the Brain from the Hands" (2026-04) — `emitEvent`/`getEvents` 같은 API contract가 파일 기반 영속화보다 일관성·queryability 우수 [verified: A3]. 현재 fz는 **파일 기반** (index.md + Serena Memory)이고 향후 API 추상화 도입 가능. fz의 티켓 폴더 + Essential Context = Anthropic의 Session event log 개념의 **filesystem 구현체**.
+> **추상화 참조**: Anthropic "Scaling Managed Agents: Decoupling the Brain from the Hands" (2026-04) — `emitEvent`/`getEvents` 같은 API contract가 파일 기반 영속화보다 일관성·queryability 우수 [verified: A3]. 현재 fz는 **파일 기반** (index.md)이고 향후 API 추상화 도입 가능. fz의 티켓 폴더 + Essential Context = Anthropic의 Session event log 개념의 **filesystem 구현체**.
 
 ## Proactive Context Protocol
 
@@ -222,45 +220,15 @@ discover-{phase}.md (DISCOVER_TAG=plan|code|review): APPEND + topic header
 
 **판별 규칙**: 답변이 향후 Phase에 영향을 미치면 persistent (/fz-discover), 아니면 ephemeral (/btw).
 
-## Serena Memory와의 관계
+## 파이프라인 길이별 저장
 
 | 파이프라인 길이 | 전략 | 이유 |
 |---------------|------|------|
-| 1-3 스텝 | Serena `fz:checkpoint:essential` (3K) | compact 대비 경량 보호 |
-| 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 티켓 폴더 | compact 위험 낮음. context-heavy 스킬 포함 시 티켓 폴더 권장 |
+| 1-5 스텝 | 티켓 폴더가 있으면 파일, 없으면 대화 컨텍스트만(이어받기 없음) | compact 위험 낮음. context-heavy 스킬 포함 시 티켓 폴더 권장 |
 | 6+ 스텝 또는 context-heavy | 티켓 폴더 파일 기반 (이 모듈) | compact 후 Read로 복원 <!-- 기존: 4+ 스텝 --> |
 | 10+ 스텝 | 티켓 폴더 필수 + compact 주의 안내 | 장기 파이프라인 |
 
 > **context-heavy 스킬**: discover, search --deep, peer-review (대량 context 생산)
-
-## 비-티켓 세션 모드 (Serena Memory Fallback)
-
-티켓 폴더가 없어도 핵심 산출물은 Serena Memory에 경량 저장한다.
-
-| 항목 | 내용 |
-|------|------|
-| 트리거 | 각 스킬의 Phase 완료 또는 의미 있는 분석 결과 발생 |
-| 키 | `fz:checkpoint:{skill}-{phase}` (예: `fz:checkpoint:plan-analysis`) |
-| 내용 | ~200자 핵심 결정 요약 (discover는 ~500자 — 제약 매트릭스+생존 후보+핵심 추론 포함) |
-| 복원 | `list_memories("fz:checkpoint:*")` → 최신 키 읽기 → 마지막 진행 지점 재개 |
-| GC | 파이프라인 완료 시 `fz:checkpoint:*` 일괄 삭제 (기존 GC 로직) |
-
-### Checkpoint 저장 패턴 (각 스킬의 ⛔ 기록 섹션에서 사용)
-
-```
-티켓 폴더(WORK_DIR) 활성: Write("{WORK_DIR}/{phase}/{artifact}.md") + index.md 업데이트
-비-티켓 세션:            write_memory("fz:checkpoint:{skill}-{phase}", "핵심 결정 ~200자 요약")
-Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이중 안전망)
-```
-
-### 비-티켓 세션 Compact Recovery 절차
-
-```
-1. list_memories("fz:checkpoint:*") → 키 목록
-2. 키 이름에서 스킬+Phase 파싱 → 마지막 진행 지점 판별
-3. 해당 키 read_memory() → 컨텍스트 복원
-4. 복원 완료 알림 → 중단 지점부터 재개
-```
 
 ## Artifact Token Budget
 
@@ -351,7 +319,7 @@ Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이
 
 ```
 [Compact 감지] 대화 컨텍스트 손실됨.
-1. fz:session:current → work_dir: "{CWD}/TKT-1234"
+1. 브랜치의 티켓 TKT-1234 → work_dir: "{CWD}/TKT-1234"
 2. TKT-1234/index.md 읽기 → Active Phase: code, Step 1/3 완료
 3. code/progress.md 로드 → Step 1-2 완료 이력 + Step 3 진행 중
 4. plan/plan-final.md 로드 → 3-Step 계획 확인
@@ -362,19 +330,16 @@ Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이
 
 | 상황 | 대응 |
 |------|------|
-| 세션 전환 | `fz:session:current`에 `work_dir` 저장하여 다음 세션에서 복원 |
+| 세션 전환 | 다음 세션은 `index.md` 로 복원 — 위치는 인자 · 브랜치의 티켓, 없으면 직접 검색 (`Glob("**/{TICKET_PREFIX}-*/index.md")` — 예: `TKT-*` — 또는 `Glob("**/NOTASK-*/index.md")`) |
 | /fz 없이 직접 스킬 호출 | ⛔ Work Dir Resolution 실행: 티켓 패턴 → 자동 생성, 없으면 → 사용자 질문 |
 | 단일 티켓 제약 | 동시 작업은 1개 티켓만 허용 |
 | Compact 중 파일 쓰기 | Write 완료 후 index.md 업데이트 (atomic ordering) |
-| GC 누락 | /fz Completion에서 `list_memories → fz:artifact:*` 확인 → 있으면 삭제 |
-| 다중 세션 키 충돌 | `fz:session:current`는 단일 값만 유지. 이전 세션 work_dir가 덮어쓰기됨. 복원 필요 시 index.md를 직접 검색 (`Glob("**/{TICKET_PREFIX}-*/index.md")` — 예: `TKT-*` — 또는 `Glob("**/NOTASK-*/index.md")`) |
-| Orphan checkpoint | Session Bootstrap 시 `fz:checkpoint:essential` 존재 확인 → 이전 중단 세션 감지 → 복원/삭제 선택 제안 |
 
 ## 참조 스킬
 
 | 스킬 | 참조 이유 |
 |------|----------|
-| /fz | Work Dir Resolution + work_dir 저장 |
+| /fz | Work Dir Resolution |
 | /fz-discover | discover-journal.md 누적 기록 |
 | /fz-plan | plan 버전 기록 |
 | /fz-code | step/progress 기록 |
@@ -397,14 +362,14 @@ Both:                    티켓 폴더 파일 + Serena Memory 동시 저장 (이
    a. 브랜치명에서 [A-Z]{2,6}-\d{2,5} 추출 시도 → 있으면 2번과 동일
    b. 없으면 → AskUserQuestion: "이 작업의 산출물을 파일로 저장할까요?"
       - 예 → {CWD}/NOTASK-{YYYYMMDD}/ 폴더 생성 + index.md + WORK_DIR 설정
-      - 아니오 → Serena Memory fallback (경량)
+      - 아니오 → 저장 없이 진행(이어받기 없음) — 선택지에 "이 세션 밖으로 계획 · 탐색을 넘기지 못한다" 를 적는다
 ```
 
 **Gate 0 (Work Dir Resolution):**
 - [ ] 인자/브랜치에서 티켓 패턴 체크 완료?
 - [ ] 티켓 패턴 있으면 폴더 자동 생성 완료?
 - [ ] 패턴 없으면 사용자에게 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / 저장 없이 진행)
 
 ## 사전 예방적 Context 관리
 
@@ -420,8 +385,8 @@ auto-compact는 맥락 손실을 수반한다. 그래서 컨텍스트를 덜 채
 > — Anthropic Claude Code Best Practices (2026)
 
 compact 후 복원은 context summary보다 **파일 Read가 더 정확**하다. 따라서:
-- L3(파일)가 canonical, L2(Serena)는 cursor(위치 표시)
-- compact 발생 시: L2 읽기 → L3 파일 경로 파악 → L3 Read로 상세 복원
+- L3(파일)가 canonical — 위치는 `index.md` 가 가리킨다
+- compact 발생 시: `index.md` 읽기 → L3 파일 경로 파악 → L3 Read로 상세 복원
 
 ### Context Decay 방어 (4유형 — 프로젝트 자체 분류)
 
@@ -435,7 +400,7 @@ compact 후 복원은 context summary보다 **파일 Read가 더 정확**하다.
 ### 적용 규칙
 
 1. **MCP 출력 격리**: 대용량 결과(Grep, 심볼 분석, GPT)는 파일로 저장 후 Read 참조. context에 raw 출력 남기지 않음
-2. **중간 산출물 즉시 기록**: 분석 결과가 나오면 대화에 축적하지 말고 티켓 폴더 파일/Serena에 즉시 기록 → compact 시 Read로 복원
+2. **중간 산출물 즉시 기록**: 분석 결과가 나오면 대화에 축적하지 말고 티켓 폴더 파일에 즉시 기록 → compact 시 Read로 복원
 3. **에이전트 스폰 최소화**: 스폰마다 토큰이 든다(스폰당 양은 재지 않았다). 단순 작업은 직접 실행
 4. **참조 파일 선택적 로드**: 전체 파일 Read 대신 필요 섹션만 (offset/limit). 500줄+ 파일은 분할 읽기
 

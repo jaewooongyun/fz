@@ -10,10 +10,6 @@ allowed-tools: >-
   mcp__plugin_fz_serena__find_implementations,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__get_symbols_overview,
-  mcp__plugin_fz_serena__write_memory,
-  mcp__plugin_fz_serena__read_memory,
-  mcp__plugin_fz_serena__edit_memory,
-  mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
@@ -63,7 +59,6 @@ metadata:
 | modules/session.md | 세션 감지, Issue Tracker 연동 |
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
-| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/rtm.md | RTM 검증 — Phase 4.5에서 Req-ID 상태 확인 |
 | modules/native-agents.md | L3 에이전트 스폰 — Phase 5 병렬 검증 |
@@ -128,12 +123,12 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
 4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / 저장 없이 진행)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ## Phase 4.5: Requirements Alignment (요구사항 부합)
@@ -141,7 +136,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 
 ```
 1. ⛔ RTM 기반 기계적 확인 (참조: modules/rtm.md):
-   - plan-final.md 또는 Serena memory에서 RTM 로드
+   - plan-final.md 에서 RTM 로드
    - 모든 Req-ID가 implemented 상태인지 확인
    - pending 잔존 → requirements_gap 이슈
 2. 요구사항 목록화 → 체크리스트
@@ -173,7 +168,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 지표③: `[verified]` / `[미검증]` 태그 빈도 + 무태그 과거 주장("원본/기존/이전/D{N} 이전") 위반 건수
 - [ ] 지표④: 세션 reversal 횟수 (사용자 판정 뒤집기 — 기준선 4회)
 - [ ] 지표⑤: A5 micro-eval 호출 건수 N + confirmed C + false positive F → precision = C/N
-- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (티켓 폴더 세션 임시) 또는 Serena `fz:metrics:phase-a-session-{N}` (비-티켓 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함
+- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (티켓 폴더 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함
 - [ ] **canonical sink**: 세션 결과는 완료 직전 `run_metrics.py end` 의 `--gate-issues` · `--findings` 로 실행 기록에 남긴다 — B1/B2 진입 판정(Gate 10회부터 neutral-candidate · load-bearing)은 `fz_telemetry_report.py` 의 harness 절이 낸다. 다른 sink는 backlink만 허용 (3중화 금지).
 
 ## Phase 5: Cross-Review (3중 검증)
@@ -377,21 +372,17 @@ N (GPT 제기 이슈 수) >= 10 ?
 - [ ] 최종 빌드 성공? (modules/build.md 절차)
 - [ ] Reflection Rate — **N≥10이면 ≥80%, N<10이면 `preliminary` 기록 후 N/A** (정본: `cross-validation.md §Reflection Rate threshold`)
 - [ ] 최대 반복 횟수 미초과?
-- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 저장 없이 진행: 건너뜀)
 - [ ] ⛔ `[미측정: 자동화 불가]` 시나리오마다 수동 이관 줄(`수동 이관: 요청 · 결과 · 거절`)이 있는가? — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_unmeasured_handoff.py" {리뷰 보고}` exit 0 (F-524: 측정 못 한 구역을 넘기지 않아 그 구역의 결함이 리뷰 뒤에 발견됐다)
-
-### 비-티켓 세션 Checkpoint (Phase 5 완료 후)
-- 비-티켓 세션 모드: `write_memory("fz:checkpoint:review-issues", "이슈 {N}개. Critical: {요약}. Reflection Rate: {X}%")`
 
 ## Phase 7: Completion (완료 처리)
 
 Gate 5 통과 후:
 1. **잔여 작업 확인**: sequential-thinking → 완료 체크리스트 (Gate 통과, 미해결 이슈, 범위 외 변경) (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
-2. **최종 이슈 보고 정리**: Issue Tracker 이슈를 상태별로 묶는다(상태 정의 `modules/session.md` § 이슈 상태 머신) — 보고 형식은 4번 아티팩트(`self-review.md` · `--render` 면 `review.json`)다(F-474)
-3. **세션 저장**: `write_memory` (작업 요약 + 결정사항 + 변경 심볼)
-4. **아티팩트 기록** (티켓 폴더(WORK_DIR) 활성 시): `{WORK_DIR}/review/self-review.md` + `index.md` 업데이트
+2. **최종 이슈 보고 정리**: Issue Tracker 이슈를 상태별로 묶는다(상태 정의 `modules/session.md` § 이슈 상태 머신) — 보고 형식은 3번 아티팩트(`self-review.md` · `--render` 면 `review.json`)다(F-474)
+3. **아티팩트 기록** (티켓 폴더(WORK_DIR) 활성 시): `{WORK_DIR}/review/self-review.md` + `index.md` 업데이트
    - ⊕ `--render`(기본 off)면 이슈 목록을 손으로 다시 쓰지 않는다 — 판정·문장만 `{WORK_DIR}/review/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review {WORK_DIR}/review/review.json --diff {WORK_DIR}/review/diff.patch --out-dir {WORK_DIR}/review` 가 `review-report.md` 를 만든다(PR 이 없으면 payload 는 만들지 않는다). review.json 형식은 `render_review.py --example` 이 내는 최소 예시를 따른다 — 렌더러 코드를 다시 읽지 않는다. 미지정이면 위 절차 그대로다
-5. **Git 연계** (사용자 확인 후): `/fz-commit` → `/fz-pr`
+4. **Git 연계** (사용자 확인 후): `/fz-commit` → `/fz-pr`
 
 완료 보고(직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록): 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계
 

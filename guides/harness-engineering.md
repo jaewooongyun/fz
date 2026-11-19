@@ -289,7 +289,7 @@ Working Memory (현재 대화 — 빠르지만 휘발적)
 → 토큰 폭발 방지: Episodic 전체를 로드하지 않고 관련성 기반 필터링
 ```
 
-**fz 생태계 대응**: Episodic = 티켓 폴더 + Serena Memory, Working = 대화 컨텍스트 + 스킬 로드
+**fz 생태계 대응**: Episodic = 티켓 폴더, Working = 대화 컨텍스트 + 스킬 로드
 
 #### 서브시스템 4: System Reminders (Instruction Fade-out 대응)
 
@@ -1196,7 +1196,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 
 | 하네스 패턴 | fz 대응 | 상세 |
 |-----------|---------|------|
-| Initializer 패턴 | 티켓 폴더 + index.md + Serena Memory | 세션 간 상태 영속화 |
+| Initializer 패턴 | 티켓 폴더 + index.md | 세션 간 상태 영속화 |
 | Three-Agent | /fz-plan → /fz-code → /fz-review | 파이프라인 체인 |
 | Generator≠Evaluator | impl-correctness(생산) ↔ review-arch(평가 · full 모드는 impl-quality 병렬) | `workflows/code-pair.js` Workflow — stage1 impl → stage2 review (이력: TEAM Pair Programming) |
 | 파일 기반 핸드오프 | context-artifacts.md + plan-final.md | 티켓 폴더 산출물 프로토콜 |

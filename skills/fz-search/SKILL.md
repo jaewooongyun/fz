@@ -10,8 +10,6 @@ allowed-tools: >-
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__activate_project,
-  mcp__plugin_fz_serena__read_memory,
-  mcp__plugin_fz_serena__write_memory,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   LSP,
@@ -85,12 +83,12 @@ metadata:
 
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
 4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 경로 / NOTASK 경로 / 저장 없이 진행)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 
 ---
@@ -327,13 +325,12 @@ CheckoutBuilder → CheckoutInteractor → ProductUseCase → ProductRepository 
 
 탐색 완료 후 결과를 기록한다.
 - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/search/search-result.md` + `index.md` 업데이트
-- 비-티켓 세션: `write_memory("fz:checkpoint:search", "모드: {mode}. 발견: {N}개 심볼. 핵심: {요약}")`
 
 ## Gate: Search Complete
 - [ ] ⛔ Gate 0 (Work Dir Pre-flight) 통과했는가?
 - [ ] 대상 심볼/패턴 파악 완료?
 - [ ] 영향 범위 식별?
-- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 비-티켓 세션: Serena checkpoint)
+- [ ] ⛔ 아티팩트 기록 완료? (티켓 폴더: 파일, 저장 없이 진행: 건너뜀)
 - [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/M 병기)이면** Coverage Gate 통과? (단위 U 확정 후 M/`N_U` 보고 — canonical: `modules/cross-validation.md` § Coverage Gate 절차 0, ⛔ 어휘 9개 동기)
 - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation.md` §Negative-Result Gate)
 

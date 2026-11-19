@@ -45,7 +45,6 @@ Phase 1 산출물의 "구조화된 계획 출력"에 RTM 테이블을 필수 포
 
 갱신 위치:
 - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/plan/plan-final.md` 내 RTM 테이블 직접 수정
-- 비-티켓 세션: `write_memory("fz:rtm:{Req-ID}", "implemented. Step {N}. 변경: {파일 요약}")`
 
 ### fz-review (검증)
 
@@ -53,7 +52,7 @@ Phase 4.5(Requirements Alignment)에서 RTM 기반 기계적 확인:
 
 ```
 절차:
-1. RTM 테이블 로드 (plan-final.md 또는 Serena memory)
+1. RTM 테이블 로드 (plan-final.md)
 2. 모든 Req-ID의 상태 확인
 3. pending 잔존 → requirements_gap 이슈 생성 (category: requirements_gap)
 4. implemented 전체 → Phase 5 진입

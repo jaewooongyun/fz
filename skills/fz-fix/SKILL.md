@@ -12,8 +12,6 @@ allowed-tools: >-
   mcp__plugin_fz_serena__replace_symbol_body,
   mcp__plugin_fz_serena__insert_after_symbol,
   mcp__plugin_fz_serena__find_referencing_symbols,
-  mcp__plugin_fz_serena__read_memory,
-  mcp__plugin_fz_serena__write_memory,
   mcp__sequential-thinking__sequentialthinking,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
@@ -61,7 +59,6 @@ metadata:
 |------|------|
 | modules/build.md | 빌드 검증 |
 | modules/execution-modes.md | LOOP 실행 모드 |
-| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
 | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
@@ -107,16 +104,16 @@ metadata:
 
 1. 인자에서 `[A-Z]{2,6}-\d{2,5}` 패턴 추출
 2. 패턴 있으면 → `{CWD}/{TICKET}/` 폴더 + index.md 생성 (없으면) + WORK_DIR 설정
-3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: Serena fallback
+3. 패턴 없으면 → 브랜치명 확인 → 없으면 AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` + index.md 생성 / 아니오: 저장 없이 진행(이어받기 없음)
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 티켓 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / 저장 없이 진행)
 - [ ] index.md 존재 확인 완료? (없으면 생성)
 - [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile fix` exit 0? (아래 · WORK_DIR 없는 세션은 건너뜀을 보고)
 
-⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile fix {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
-⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`
+⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile fix {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
+⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한 줄)
 
 ---
 
@@ -234,11 +231,11 @@ metadata:
 
 ## Gate: Bug Fix Complete
 - [ ] 티켓 패턴 또는 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / 저장 없이 진행)
 - [ ] 빌드 성공?
 - [ ] 원인-수정 대응 명확?
 - [ ] GPT check 완료 또는 `[GPT 미사용 — 사유]` 표기? (Step 4 — 직전 `gpt-choice.sh decide` 줄 · GPT 를 켠 세션이면 필수)
-- [ ] 아티팩트 기록 완료? (티켓 폴더: `{WORK_DIR}/fix/fix-analysis.md`, 비-티켓 세션: `write_memory("fz:checkpoint:fix-{bug}", "원인: {요약}. 수정: {파일}. 빌드: OK")`)
+- [ ] 아티팩트 기록 완료? (티켓 폴더: `{WORK_DIR}/fix/fix-analysis.md`, 저장 없이 진행: 건너뜀)
 
 ---
 

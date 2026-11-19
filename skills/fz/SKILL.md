@@ -11,11 +11,6 @@ argument-hint: >-
   [자연어 요청] [--solo] [--team] [--deep]
   예: "버그 찾아줘", "구현하고 리뷰" --team, "PR 리뷰" --deep
 allowed-tools: >-
-  mcp__plugin_fz_serena__write_memory,
-  mcp__plugin_fz_serena__read_memory,
-  mcp__plugin_fz_serena__edit_memory,
-  mcp__plugin_fz_serena__delete_memory,
-  mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob
 metadata:
@@ -81,7 +76,6 @@ metadata:
 
 | 모듈 | 용도 |
 |------|------|
-| modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
 | modules/complexity.md | 5차원 복잡도 → 모드 결정 |
 | modules/team-registry.md | 에이전트 + 모델 자동 결정 |
 | modules/cross-validation.md | 검증 게이트 자동 삽입 |
@@ -108,7 +102,7 @@ metadata:
 
 0. ⛔ **선택 도구 상태**: 화면 한 줄로만 알린다 — 승인(Phase 4) 전 파일 쓰기는 가드가 막는다 · 파일 기록은 승인 뒤. 형식 `modules/tool-status.md`
 1. **이전 세션 복원** (새 세션일 때만):
-   - 티켓 폴더가 있으면 `index.md` 의 `## Essential Context` 를 Read 해 Active Phase · Pending 을 이어받는다 — 복원 원천은 티켓 폴더 산출물이다(3b 와 같은 근거)
+   - 티켓 폴더가 있으면 `index.md` 의 `## Essential Context` 를 Read 해 Active Phase · Pending 을 이어받는다 — 복원 원천은 티켓 폴더 산출물이다("Starting fresh + filesystem discovery" 패턴 · 폴더 찾기는 `modules/context-artifacts.md` § Compact Recovery Protocol 1단계)
 
 2. **프로젝트 인덱스 확인**:
    - `PROJECT_INDEX.md` 존재 확인 → 있으면 읽기 (3K 토큰)
@@ -117,18 +111,8 @@ metadata:
 3. **Work Dir 초기화** (6+ 스텝 또는 context-heavy 스킬 포함 시):
    - Ticket ID 해석 (참조: `modules/context-artifacts.md`)
    - 티켓 패턴 → `{CWD}/{TICKET}/` 자동 생성
-   - 패턴 없음 → AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: Serena fallback
-   - `fz:session:current`에 `work_dir` 경로 저장
+   - 패턴 없음 → AskUserQuestion(저장 여부) → 예: `{CWD}/NOTASK-{YYYYMMDD}/` / 아니오: 저장 없이 진행(이어받기 없음)
    - context-heavy 스킬: discover, search --deep, peer-review <!-- 기존: 4+ 스텝 -->
-
-3b. **이전 중단 세션 감지**:
-   - `read_memory("fz:checkpoint:essential")` 확인
-   - 존재 시: "이전 중단된 세션이 있습니다. 복원하시겠습니까?" AskUserQuestion
-     - 예 → 티켓 폴더의 `index.md` Read → Active Phase + Essential Context 복원 ("Starting fresh + filesystem discovery" 패턴)
-     - 아니오 → `delete_memory("fz:checkpoint:essential")` 후 새 세션 시작
-   - **essential 미존재 시 폴백**: `list_memories("fz:checkpoint:*")` → phase checkpoint 존재 여부 확인
-     - 존재 시: 최신 checkpoint 키를 시간순 정렬 → 마지막 키 read → 해당 phase부터 복원 제안
-     - 미존재 시: 완전 새 세션 (복원 대상 없음)
 
 4. **교훈 사전 로드** (강제, 모든 파이프라인):
    - SOLO: `modules/lead-action-default.md` Trigger Matrix 매칭 → 매칭된 메모리 ID + 적용 패턴 명시 출력
@@ -140,7 +124,6 @@ metadata:
 
 5. **핵심 모듈 선로드** (6+ 스텝 또는 TEAM):
    - `Read(modules/context-artifacts.md)` — Artifact Budget Table + 산출물 프로토콜
-   - `Read(modules/memory-policy.md)` — 메모리 키 네이밍
 ### Gate 0: Session Ready
 - [ ] 새 세션이고 티켓 폴더가 있으면 `index.md` Essential Context 를 읽었는가?
 - [ ] 탐색 파이프라인이면 인덱스 확인?
@@ -319,7 +302,7 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
 4. Gate 체크 → 통과 시 다음 단계, 실패 시 중단/계속 선택
 ```
 
-**컨텍스트 패싱**: 대화 기반 (기존 v1과 동일). 4스텝+ 시 /compact 안내 (작업은 중단 없이 계속 — checkpoint/티켓 폴더로 복원 가능).
+**컨텍스트 패싱**: 대화 기반 (기존 v1과 동일). 4스텝+ 시 /compact 안내 (작업은 중단 없이 계속 — 티켓 폴더로 복원 가능).
 
 ### 5.2 Workflow Execution
 
@@ -369,8 +352,7 @@ Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④�
 
 | 파이프라인 길이 | 전략 | 이유 |
 |---------------|------|------|
-| 1-3 스텝 | Serena `fz:checkpoint:essential` (3K) | compact 대비 경량 보호 |
-| 4-5 스텝 | Serena checkpoint 확장 (3K) + 선택적 티켓 폴더 | compact 위험 낮음 |
+| 1-5 스텝 | 티켓 폴더가 있으면 파일, 없으면 대화 컨텍스트만(이어받기 없음) | compact 위험 낮음 |
 | 6+ 스텝 또는 context-heavy | 티켓 폴더 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
 | 10+ 스텝 | 티켓 폴더 필수 + compact 대비 기록 확인(작업은 계속 — 아티팩트로 복원 가능) | 장기 파이프라인 |
 
@@ -378,7 +360,6 @@ Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④�
 
 각 스킬 완료 후 /fz가 중앙 관리:
 - **티켓 폴더(WORK_DIR) 활성**: `index.md`의 `## Essential Context` 섹션 **덮어쓰기** (Active Phase + Key Decisions + Constraints + Pending)
-- **비-티켓 세션 / 1-5 스텝**: `write_memory("fz:checkpoint:essential", "[{skill}] {핵심결정}. Constraints: {C목록}. Pending: {다음}.")` (~3,000자) <!-- 기존: ~500자 -->
 - **mid-pipeline /fz-discover 호출 시**: index.md Active Phase를 discover에 전달 → Phase-Tagged 저장 지원
 
 ### 단계 완료 보고 (각 단계)
@@ -444,18 +425,15 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
 | Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | ⛔ SOLO 직행 아님 — `guides/skill-authoring.md` §12 판별 표 |
 | 팀 에이전트 스폰 실패 | §12 판별 표 **상태 5** → L3(일시 장애 의심) 우선 | 미해소 시 L4 사용자 에스컬레이션 (⛔ SOLO 는 승인 후) |
 | provides/needs 체인 끊김 | 중간 스킬 자동 제안 | AskUserQuestion |
-| 파이프라인 12스텝+ | Artifact + 체크포인트 | compact 대비 기록 확인(작업은 계속 — 아티팩트로 복원 가능) <!-- 기존: 6스텝+ --> |
+| 파이프라인 12스텝+ | Artifact | compact 대비 기록 확인(작업은 계속 — 아티팩트로 복원 가능) <!-- 기존: 6스텝+ --> |
 
 ## Completion → Next
 
 파이프라인 완료 후:
 
-0. **GC 실행** (필수):
-   - L2: `list_memories()` → `fz:artifact:*`, `fz:checkpoint:*`, `fz:rtm:*`, `fz:consensus:*` 키 수집 → 각 `delete_memory()` 실행
-   - `fz:checkpoint:essential` 명시적 삭제: `delete_memory("fz:checkpoint:essential")`
+0. **L1 저장 판단** (필수):
    - L1: 새 교훈 발생 여부 판단 → 있으면 topic file에 태깅하여 저장
    - L1 저장 시 `modules/memory-guide.md` 정책 준수: `[skill: X]` `[status: Y]` `[priority: Z]` 태깅
-   - 참조: `modules/memory-policy.md`
 
 1. **세션 저장** (모든 파이프라인):
    - 티켓 폴더가 있으면 `index.md` Essential Context 를 갱신한다 — 다음 세션은 이것으로 복원한다

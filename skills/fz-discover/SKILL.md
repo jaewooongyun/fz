@@ -10,10 +10,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__get_symbols_overview,
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__activate_project,
-  mcp__plugin_fz_serena__read_memory,
   mcp__plugin_fz_serena__write_memory,
-  mcp__plugin_fz_serena__edit_memory,
-  mcp__plugin_fz_serena__list_memories,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
   mcp__sequential-thinking__sequentialthinking,
@@ -146,18 +143,18 @@ GOOD: "proxy에 @Published는 안 됩니다.
    a. 브랜치명에서 `[A-Z]{2,6}-\d{2,5}` 추출 시도 → 있으면 2번과 동일
    b. 없으면 → **AskUserQuestion**: "이 작업의 산출물을 파일로 저장할까요?"
       - 예 → `{CWD}/NOTASK-{YYYYMMDD}/discover/` 생성 + WORK_DIR 설정
-      - 아니오 → Serena Memory fallback (경량)
+      - 아니오 → 저장 없이 진행(이어받기 없음) — 선택지에 "이 세션 밖으로 계획 · 탐색을 넘기지 못한다" 를 적는다
 
 ### Gate 0: Work Dir Ready
 - [ ] ⛔ 인자/브랜치에서 티켓 패턴 체크 완료?
 - [ ] 티켓 패턴 있으면 폴더 자동 생성 완료?
 - [ ] 패턴 없으면 사용자에게 저장 여부 질문 완료?
-- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / Serena fallback)
+- [ ] WORK_DIR 결정됨? (티켓 폴더 / NOTASK / 저장 없이 진행)
 - [ ] DISCOVER_TAG 설정됨? (index.md Active Phase 기반)
 - [ ] ⛔ Serena 활성 기록 + `check_evidence_slots.py --profile discover` exit 0? (아래 · WORK_DIR 없는 세션은 건너뜀을 보고)
 
-⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile discover {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(Serena fallback)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
-⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`
+⛔ **Serena 활성 기록 (F-534 — 첫 단계)**: 순서 = 세션 대상 트리(작업할 git root) 확인 → `mcp__plugin_fz_serena__activate_project(<대상 git root>)` → 기록 → 검사. 기록은 `{WORK_DIR}/evidence/tools.md` 첫 줄 — 성공이면 `Serena: active <git root> @<HEAD sha> (languages: <목록>)`, 못 쓰면 `[Serena 미사용 — <사유>]` · 대상은 `{WORK_DIR}/target.json` = `{"root": "<git root>", "sha": "<HEAD sha>"}`. 검사 = `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --profile discover {WORK_DIR}` — exit 1(기록 없음 · 다른 트리 활성 · 빈 언어 목록)이면 기록을 고친다. 에러 전파 경로를 주장하면 `{WORK_DIR}/evidence/error-paths.md` 에 층마다 `파일:줄` 과 코드를 인용한다(catch 층은 본문까지 — F-009 · 같은 검사가 잰다). WORK_DIR 이 없는 세션(저장 없이 진행)은 기록 · 검사를 건너뛰고 그 사실을 보고한다. 이유: 비 git 작업 폴더에서 Serena 가 프로젝트 없이 떠 심볼 도구가 조용히 0회가 되고 Grep 으로 흡수됐다
+⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한 줄)
 
 ---
 

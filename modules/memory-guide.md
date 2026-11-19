@@ -10,7 +10,7 @@
 - [Lesson Intake Decision Tree](#lesson-intake-decision-tree)
 - [Tagging Convention](#tagging-convention)
 - [Staleness Policy](#staleness-policy)
-- [L1 ↔ L2 ↔ L3 경계](#l1--l2--l3-경계)
+- [L1 ↔ L3 경계](#l1--l3-경계)
 - [참조 스킬](#참조-스킬)
 - [Claude Memory tool과의 관계](#claude-memory-tool과의-관계)
 - [설계 원칙](#설계-원칙)
@@ -61,7 +61,7 @@
 
 > ⛔ 승격(candidate→active) 임계 canonical = `modules/promotion-ledger.md` Track A (**5 sessions**). 위 ≥3은 별도 모듈 분리(new principle) 자격이지 active 임계가 아님 — 코드 태그 표기도 5세션으로 통일 (2026-07-09 D3).
 
-**Evidence 출처**: `scripts/run_metrics.py` 행(`end --gate-issues` · `--findings`) → `scripts/fz_telemetry_report.py` 리포트의 `harness` 판정(§8 Gate 기여도) 또는 `fz:checkpoint:*` memory keys. `experiment-log.md §5.4` 는 손으로 붙이던 시절의 과거 데이터로만 남는다(새 행을 붙이지 않는다). 동일 failure mode가 **별개 세션**에서 관찰돼야 1 count.
+**Evidence 출처**: `scripts/run_metrics.py` 행(`end --gate-issues` · `--findings`) → `scripts/fz_telemetry_report.py` 리포트의 `harness` 판정(§8 Gate 기여도). `experiment-log.md §5.4` 는 손으로 붙이던 시절의 과거 데이터로만 남는다(새 행을 붙이지 않는다). 동일 failure mode가 **별개 세션**에서 관찰돼야 1 count.
 
 **예시**: 31/32/33 = same mode (Lead risk-aversion) → 단일 `lead-action-default.md` merge. 34차+ 후보 시 본 decision tree 먼저 실행.
 
@@ -99,20 +99,18 @@ GC 품질은 recall/staleness만이 아니라 다음 2축으로 점검한다:
 - fz 함의: `/fz-memory audit`에 "모순 탐지" 체크 1행 권고.
 - MemClaw 4실패모드 중 leakage/provenance는 단일 사용자 환경이라 범위 밖 — forgetting/contradiction만 채택.
 
-## L1 ↔ L2 ↔ L3 경계
+## L1 ↔ L3 경계
 
 | 계층 | 도구 | 저장 대상 | 수명 |
 |------|------|----------|------|
 | L1 (Auto Memory) | MEMORY.md + topic files | 영속적 사실, 교훈, 패턴 | 영구 (사용자 관리) |
 | L1.5 (Serena Persistent) | `fz:decision:*`, `fz:pattern:*` | 아키텍처 결정, 학습 패턴 | 영속 (GC 미대상) |
-| L2 (Serena Memory) | `fz:checkpoint:*`, `fz:artifact:*` | 파이프라인 내 단기 전달 | 임시 (GC로 정리) |
 | L3 (File Artifact) | 티켓 폴더 파일 | 구조화된 상세 산출물 | 세션 내 (Read로 복원) |
 
 - L1은 **세션을 넘어 유지**되는 지식 (교훈, 패턴, 결정)
-- L2는 **파이프라인 내에서만** 유효한 상태 (artifact, checkpoint)
-- L3는 **무제한 크기** 구조화 산출물 — L3=canonical, L2=cursor (위치 표시)
+- L3는 **무제한 크기** 구조화 산출물 — L3=canonical, 위치는 `index.md` 가 가리킨다
 - L1.5 persistent 키는 L1 승격 후보 (30일+ 유지 시 topic file로 승격 고려)
-- 상세: `modules/context-artifacts.md` (L3 구조), `modules/memory-policy.md` (L1.5/L2 키)
+- 상세: `modules/context-artifacts.md` (L3 구조), `modules/memory-policy.md` (L1.5 키)
 
 ## 참조 스킬
 

@@ -19,7 +19,7 @@
 1. **입력**: 잠정 플랜(Phase 1 을 마친 plan-v{N} — `steps` · `acceptanceCriteria` · `writeScope`) + `directionVerdict`(② 를 통과한 방향 판정) + 요구사항 원문 (+ discover 산출물 있으면) → GPT
 
 2. **GPT Sprint Contract 작성** (kind `sprint-contract` — `FZ_GPT_ARTIFACT=plan FZ_WORK_DIR={WORK_DIR} scripts/gpt-call.sh sprint-contract` · architect 본문 주입 · 계약 계열 — 횟수 · 거부(exit 19)는 `modules/cross-validation.md` § 재검증 라운드 상한):
-   - 출력: `{WORK_DIR}/plan/sprint-contract-gpt.md` 또는 `fz:checkpoint:sprint-contract`
+   - 출력: `{WORK_DIR}/plan/sprint-contract-gpt.md`
    - 형식: 아래 schema 참조
 
 3. **Claude 동의/수정** (Lead):

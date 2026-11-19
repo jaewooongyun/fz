@@ -12,9 +12,6 @@ allowed-tools: >-
   mcp__plugin_fz_serena__find_referencing_symbols,
   mcp__plugin_fz_serena__find_implementations,
   mcp__plugin_fz_serena__activate_project,
-  mcp__plugin_fz_serena__read_memory,
-  mcp__plugin_fz_serena__write_memory,
-  mcp__plugin_fz_serena__list_memories,
   mcp__sequential-thinking__sequentialthinking,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
@@ -379,11 +376,6 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 
 > review-index.md: Phase + Artifacts 목록 기록. Compact 감지 시 이 파일 읽어 산출물 로드 → 중단 지점 재개.
 
-**비-티켓 세션 Serena Fallback** (WORK_DIR 없을 때):
-```
-write_memory("fz:checkpoint:peer-review-synthesize", "PR#{number}: 이슈 {N}개 (Critical:{c}/Major:{m}/Minor:{n}). Confidence: {avg}%. 핵심: {top3_요약}")
-```
-
 ---
 
 ## Step: Curate (코멘트 가치 선별)
@@ -446,11 +438,6 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 
 > ⛔ **확인 게이트** — 미리보기는 항상 출력한다. 셋 중 하나면 `AskUserQuestion` 으로 승인받은 뒤 게시한다: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 — 대체 형식은 `modules/peer-review-inline-anchoring.md` 5절(코드블록 인용 + `file:line`)을 Read 해 따른다 (c) 겹치는 hunk 복수로 Lead가 구간 선택 (F-073).
 > ⛔ 게시 경로는 `gh api` 하나다 — `comments[]` 에 `start_line`·`start_side`·`side` 를 넣지 못하는 게시 도구로 바꾸면 범위 하이라이트·LEFT 앵커가 안 된다(근거: `modules/peer-review-inline-anchoring.md` 6절). `allowed-tools` 는 gh 의 조회 꼴(`gh auth status` · `gh pr view`)만 사전 승인하고, 게시 POST 는 쓰기라 권한 프롬프트를 거친다.
-
-**비-티켓 세션 Serena Fallback** (WORK_DIR 없을 때):
-```
-write_memory("fz:checkpoint:peer-review-deliver", "PR#{number}: 판정 {verdict}. Critical:{c}/Major:{m}. 핵심이슈: {top3}. --post: {Y/N}")
-```
 
 ---
 

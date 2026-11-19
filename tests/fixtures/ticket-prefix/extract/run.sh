@@ -15,7 +15,7 @@
 #      additive·범위 밖이다.
 #   ③ 다중 티켓 = **첫 매치 채택** + GATHER-NOTE 1행(나머지 후보 나열)
 #   ④ WORK_DIR 우선순위 **보존** = 명시적 인자 > 브랜치명 > AskUserQuestion >
-#      Serena Memory fallback [modules/context-artifacts.md '## Work Dir 결정']
+#      fallback(저장 없이 진행) [modules/context-artifacts.md '## Work Dir 결정']
 #
 # ⛔ 기대값은 **현행 동작이 아니라 계약값**이다. 그래서 S2 적용 전에는 red 가 나오는 것이
 #    정상이고, exit 0 이 나오면 이 러너가 아무것도 재고 있지 않다는 뜻이다.

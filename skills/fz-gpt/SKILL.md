@@ -7,8 +7,6 @@ user-invocable: true
 argument-hint: "[review|verify|verify-gates|validate|check|final|adversarial|drift|plan|micro-eval|independent-plan|independent-review] [대상]"
 allowed-tools: >-
   mcp__plugin_fz_serena__find_symbol,
-  mcp__plugin_fz_serena__write_memory,
-  mcp__plugin_fz_serena__read_memory,
   Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-choice.sh*), Read, Grep
 metadata:
   provides: [verification]
