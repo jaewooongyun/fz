@@ -14,9 +14,9 @@
 
 ## 워커 심볼 도구 — 쓰였는지 재는 법
 
-- 워커를 띄우기 전: 상태 기록 첫 줄이 `[Serena 미사용 — <사유>]` 면 그 호출에서 워커가 읽는 입력(맥락 파일 · 의도 맥락 · 브리프)의 끝에 `[symbol tools: off — <사유>]` 한 줄을 붙인다
-- 점검 명령 셋 — 워크플로가 반환한 뒤 · 직접 띄운 에이전트가 끝난 뒤에 돌린다(작업 폴더가 없으면 `--tools-md` 를 뺀다):
+- 워커를 띄우기 전: 상태 기록 첫 줄이 `[Serena 미사용 — <사유>]` 면 `[symbol tools: off — <사유>]` 한 줄을 그 호출에서 워커가 받는 글의 끝에 붙인다 — 워크플로에 프롬프트 인자가 있으면 그 인자, 없으면 맥락 파일이다(워커는 첫 심볼 호출 전에 그 파일을 읽는다)
+- 점검 명령 셋 — 워크플로가 반환한 뒤 · 직접 띄운 에이전트가 끝난 뒤에 돌린다(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것):
   - 워크플로: `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`
   - 탐색 팔(교차 탐색의 첫 탐색 단계 — 보고 모드): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --only-label stage1-symbolic`
   - 직접 호출(워크플로 밖에서 띄운 에이전트): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --direct --only-agent <종류> --session '{세션 id 앞 8자}*' --tools-md {WORK_DIR}/evidence/tools.md`
-- 출력 낱말마다 할 일 · exit 1 일 때 볼 것 · 재지 않는 에이전트는 점검을 돌린 뒤 `modules/symbol-tools-audit.md` 에서 읽는다
+- 출력 낱말마다 할 일 · exit 1 일 때 볼 것 · exit 2 일 때 볼 것 · 재지 않는 에이전트는 점검을 돌린 뒤 `modules/symbol-tools-audit.md` 에서 읽는다

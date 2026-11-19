@@ -35,7 +35,7 @@ skills:                                # 사전 로드 스킬
 | `maxTurns` | No | 최대 턴 수. 10-20 권장 |
 | `memory` | ⛔ 넣지 않음 | Read/Write/Edit 가 자동 부여돼 Workflow '쓰기 없음' 계약과 충돌하고 A/B 입력을 오염시킨다(guides/agent-team-guide.md §8.1 · lint #N13). 예외는 워크플로 밖 memory-curator 뿐 |
 | `skills` | No | 자동 로드할 스킬 목록 |
-| `hooks` | ⛔ 넣지 않음 | 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다. fz 본체는 훅을 등록하지 않는다(guides/agent-team-guide.md §8.3) |
+| `hooks` | ⛔ 넣지 않음 | 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다. fz 본체가 스스로 등록하는 훅은 `hooks/hooks.json` 의 종료 훅 하나뿐이다(`gate_stop_hook.py --audit-only` — 막지 않는다 · guides/agent-team-guide.md §8.3) |
 | `mcpServers` | ⛔ 넣지 않음 | 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다. MCP 도구는 `tools` 에 직접 나열한다(`agents/review-arch.md` · guides/agent-team-guide.md §8.5) |
 
 ## System Prompt Body
@@ -68,14 +68,15 @@ If any `mcp__plugin_fz_serena__` tool is in your tool list, the lead session has
 Then run one Grep for the same name and reconcile the two: report the references the symbol tool found, and separately the text-only hits (comments, docs, strings, dynamic uses).
 
 When not to call them.
-- The task text for this call tells you to reason only from the input it gives you, or contains a line starting `[symbol tools: off`: call no symbol tool. The caller's limit wins over this section.
+- The task text for this call tells you to reason only from the input it gives you, or a line starting `[symbol tools: off` is in the task text or in a context file it tells you to read (read that file before any symbol call): call no symbol tool. The caller's limit wins over this section.
+- A limit on which files you may open, or a sentence saying the prompt is the whole task, does not switch the symbol tools off: call them for the symbols of the files you were given, and when an answer points outside those files, report it from the answer (file and line) without opening it.
 - The symbol server reads one tree: the one the lead activated. If its answer disagrees with what Read or Grep shows in the tree you were given (the file is missing, the line or body differs), it is on another tree. Stop using it for this task, answer from Read and Grep, and write `[symbol tools: unavailable - not on the target tree]`.
 
 Fallback, and say so.
 - The tools are not in your tool list, or a call returns an error: use Grep, Read and Glob for that target and write `[symbol tools: unavailable - <reason>]` once. Do not retry the same target. If the error names the active language servers, that file type is not covered: stop calling the symbol tools for every file of that type in this task. If it says the path is ignored, fall back for that file only; when a second file of the same type gets the same error, treat the type as not covered.
 - A call returns an empty result: that is not evidence of absence. A search that names no file returns nothing, with no error, for every file type the server does not cover. Confirm with Grep and write `[symbol tools: empty for <target> - grep used]`.
 - Report once: `symbol tools: used <n> calls` or `symbol tools: not used - <reason>`.
-Where these lines go: in a free-text answer, write them as lines of the answer. When the output is bound to a schema, put them in a free-text field (note, evidence, detail, rationale, summary) of an item you are already returning. Never add a finding, issue or item only to carry them, and never change a verdict for them. If the schema has no such place, leave them out: the lead counts your tool calls from the run record.
+Where these lines go: in a free-text answer, write them as lines of the answer. When the output is bound to a schema, put them in a free-text field (note, detail, rationale, summary, overall assessment) of the result or of an item you are already returning, never in a field that quotes code or the diff (evidence, quote, anchor) or one with a fixed set of values. Never add a finding, issue or item only to carry them, and never change a verdict for them. If the schema has no such place, leave them out: the lead counts your tool calls from the run record.
 
 ## 핵심 역할 (3-5줄)
 - 책임 1

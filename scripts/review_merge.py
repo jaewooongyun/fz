@@ -9,7 +9,7 @@ Lead 가 손으로 하던 기계 작업만 한다 — 판정(`include`·`observa
   경로         후보 경로를 diff 경로로 푼다(basename · `./` · git 따옴표 · 탭 꼬리) — 경로 의미는 diff_anchors.py 한 곳이다
   보존         ⛔ 후보를 지우지 않는다 — 입력 후보 수 = 출력 후보 수(AC-4). 같은 키는 그룹으로 묶을 뿐이다
   귀속         그룹마다 both · claude_only · gpt_only (GPT 독립 첫 패스와 Claude 렌즈 중 누가 찾았나)
-  근거 재실측   증거 속 인용(백틱 구간, 없으면 전문)이 그 파일 hunk 에 공백 정규화 후 **전부** 있으면 evidenceVerified.
+  근거 재실측   증거 속 인용(백틱 구간, 없으면 전문 · 심볼 도구 보고 줄은 뺀다)이 그 파일 hunk 에 공백 정규화 후 **전부** 있으면 evidenceVerified.
                file 이 없거나 diff 에서 경로를 못 푼 후보는 false(hold) + 사유 — 전 파일을 뒤지지 않는다
   게시 등급     post · hold · suggestion — 미확인 근거는 hold(삭제 아님) · craft 는 ruleRef 가 있고 confidence 80 이상일
                때만 post(확신도가 낮으면 suggestion 채널) · pre-existing 은 suggestion 으로 cap(§7) · confidence 80 미만 결함은 hold
@@ -62,6 +62,9 @@ AXIS_NAME = {3: "finding", 2: "gap", 1: "none", 0: "not_applicable"}
 LIMIT_KINDS = ("final-state-ok", "premise-island", "weak-evidence")   # 하나라도 있으면 severity 상한 suggestion(F-178 · 워크플로 judgmentSlots 의 limits)
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 QUOTE_RE = re.compile(r"`([^`\n]+)`")
+# 워커가 근거에 섞어 쓴 심볼 도구 보고 줄(공백 · 백틱 · 맨 앞 `[` 하나를 걷으면 `symbol tools:` 로 시작) — 인용이 아니라 재실측에서 뺀다.
+#   줄 가운데에 그 낱말이 있는 코드 줄은 인용으로 남는다
+REPORT_LINE_RE = re.compile(r"[\s`]*\[?[\s`]*symbol tools:")
 HERE = os.path.dirname(os.path.abspath(__file__))
 ANCHORS = pathlib.Path(HERE).parent / "skills" / "fz-peer-review" / "scripts" / "diff_anchors.py"
 
@@ -145,7 +148,7 @@ def evidence_check(cand: dict, texts, path_why) -> tuple:
         return False, "file 없음 — 어느 hunk 인지 몰라 재실측하지 않았다"
     if path_why:
         return False, f"경로를 diff 에서 풀지 못했다 — {path_why}"
-    ev = cand.get("evidence") or ""
+    ev = "\n".join(l for l in (cand.get("evidence") or "").split("\n") if not REPORT_LINE_RE.match(l))
     spans = [norm(q) for q in QUOTE_RE.findall(ev)] or [norm(ev)]
     spans = [s for s in spans if len(s) >= 3]
     if not spans:
@@ -539,6 +542,18 @@ def self_test() -> int:
         e1, e2 = (next(c for c in r["candidates"] if c["id"] == f"claude:{k}") for k in ("E1", "E2"))
         case("evidence — 공백이 달라도 인용이 있으면 verified · post", e1["evidenceVerified"] is True and e1["grade"] == "post", e1)
         case("evidence — 인용이 없으면 false · hold 이고 지우지 않는다", e2["evidenceVerified"] is False and e2["grade"] == "hold" and r["summary"]["candidatesOut"] == 2, e2)
+        r = M([issue("R1", ev="`let x = 2`\n`symbol tools: used 3 calls`"),
+               issue("R2", axis="correctness", ev="[symbol tools: unavailable - not on the target tree]\n  symbol tools: not used - no code symbols")])
+        r1, r2 = (next(c for c in r["candidates"] if c["id"] == f"claude:{k}") for k in ("R1", "R2"))
+        case("evidence-report-line — 인용 + 심볼 도구 보고 줄이면 보고 줄은 인용이 아니다(verified · post)",
+             r1["evidenceVerified"] is True and r1["grade"] == "post", r1)
+        case("evidence-report-line-only — 보고 줄뿐이면 인용 없는 근거와 같다(false · hold)",
+             r2["evidenceVerified"] is False and r2["grade"] == "hold" and r2["evidenceNote"] == "3자 이상의 인용이 없다", r2)
+        cdiff = hunk_text("diff --git a/src/c.py b/src/c.py\n--- a/src/c.py\n+++ b/src/c.py\n@@ -1 +1 @@\n-old\n"
+                          "+log.info(\"symbol tools: used 2 calls\")\n")
+        c = M([issue("R3", file="src/c.py", lr="1", ev="`log.info(\"symbol tools: used 2 calls\")`")], t=cdiff)["candidates"][0]
+        case("evidence-report-words-in-code — 코드 줄 가운데의 낱말 symbol tools: 는 인용으로 남는다(verified)",
+             c["evidenceVerified"] is True, c)
         r = M([issue("H1", ev="`+++ literal plus line`")])
         case("hunk-state — hunk 안의 `+++` 행은 헤더가 아니라 내용이다", r["candidates"][0]["evidenceVerified"] is True, r["candidates"][0])
         c = M([issue("F1", file=None)])["candidates"][0]

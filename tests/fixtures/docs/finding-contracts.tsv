@@ -220,6 +220,18 @@ F-481	modules/memory-policy.md	lacks	| `fz` | `checkpoint` |
 F-481	modules/context-artifacts.md	has	아니오 → 저장 없이 진행(이어받기 없음)
 F-481	modules/context-artifacts.md	has	/fz 없이 직접 호출된 스킬은 그 스킬의 Lead 가 완료할 때 Essential Context
 F-534	modules/tool-status.md	has	작업 폴더가 없는 세션
+# F-205 — 워커 심볼 도구 공통 블록(원문 templates/agent-template.md — 에이전트 사본이 글자까지 같은지는 lint_recurrence 의 symbol-tools-block 이 잰다)과 Lead 쪽 안내:
+#   보고 줄은 인용을 담는 칸에 넣지 않는다 · 파일 접근 제한은 심볼 도구를 끄지 않는다 · 끔 신호 줄은 읽으라는 맥락 파일에 있어도 센다 · 작업 폴더가 없으면 상태 한 줄을 임시 파일로 넘긴다
+F-205	templates/agent-template.md	has:replace	never in a field that quotes code or the diff (evidence, quote, anchor)
+F-205	templates/agent-template.md	lacks	free-text field (note, evidence, detail, rationale, summary)
+F-205	templates/agent-template.md	has	or a sentence saying the prompt is the whole task, does not switch the symbol tools off
+F-205	templates/agent-template.md	has	report it from the answer (file and line) without opening it
+F-205	templates/agent-template.md	has:replace	is in the task text or in a context file it tells you to read (read that file before any symbol call)
+F-205	templates/agent-template.md	lacks	or contains a line starting `[symbol tools: off`
+F-205	modules/tool-status.md	has:replace	워크플로에 프롬프트 인자가 있으면 그 인자, 없으면 맥락 파일이다(워커는 첫 심볼 호출 전에 그 파일을 읽는다)
+F-205	modules/tool-status.md	lacks	워커가 읽는 입력(맥락 파일 · 의도 맥락 · 브리프)의 끝
+F-205	modules/tool-status.md	count=1	(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것)
+F-205	modules/tool-status.md	lacks	(작업 폴더가 없으면 `--tools-md` 를 뺀다)
 # F-482 — 워커 프롬프트에 죽은 지시가 돌아오지 않는다: 워크플로 OVERRIDE 의 부정문(에이전트 쪽 지시를 걷어 덮을 것이 없다) · 격리 워커가 못 하는 실측 지시 ·
 #   Lead 에스컬레이션 절 · 피어 에이전트로 넘기는 지시(부정문이 사라져 돌아오면 살아 있는 지시가 된다) · TEAM 시절 채널 원칙 포인터 · 팀 문구
 F-482	workflows/code-pair.js	lacks	SendMessage/피어 회신/Lead 보고 지시

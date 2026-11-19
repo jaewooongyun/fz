@@ -637,7 +637,7 @@ Lead 가 `crossVerdicts[]` 를 읽고 § 4(Lead 실측의 자격)로 판정한�
 스크립트가 하는 일:
 - §3 키로 그룹을 묶는다 — ⛔ 후보를 지우지 않는다(입력 후보 수 = 출력 후보 수, AC-4). 후보 경로는 먼저 diff 경로로 푼다(basename · `./` · git 따옴표 · 탭 꼬리 — `diff_anchors.resolve_path` 와 같은 의미)
 - 그룹마다 누가 찾았는지 귀속한다 — `both` · `claude_only` · `gpt_only`
-- 근거를 재실측한다 — 증거의 인용(백틱 구간, 없으면 전문)이 그 파일 hunk 에 공백 정규화 후 전부 있어야 `evidenceVerified`. 없으면 `hold` 로 두고 지우지 않는다. ⛔ file 이 없거나 diff 에서 경로를 못 푼 후보는 전 파일을 뒤지지 않고 `hold` + 사유(`evidenceNote`)다
+- 근거를 재실측한다 — 증거의 인용(백틱 구간, 없으면 전문 · 심볼 도구 보고 줄은 뺀다)이 그 파일 hunk 에 공백 정규화 후 전부 있어야 `evidenceVerified`. 없으면 `hold` 로 두고 지우지 않는다. ⛔ file 이 없거나 diff 에서 경로를 못 푼 후보는 전 파일을 뒤지지 않고 `hold` + 사유(`evidenceNote`)다
 - §6 `reverse` 를 `question` + oracle 로 바꾸고, `challenge` 와 `contested` 는 Lead 확인으로 표시한다. `question` 의 게시 등급은 `hold` 이고 보고서에는 `question` 목록에만 싣는다
 - §7 pre-existing 을 suggestion 으로 cap 한다(원본 severity 는 남긴다)
 - 게시 등급을 매긴다 — craft 항목은 ruleRef 가 있고 confidence 80 이상일 때만 `post`(확신도가 낮으면 suggestion 채널), confidence 80 미만 결함은 `hold`
