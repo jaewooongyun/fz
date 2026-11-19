@@ -26,8 +26,9 @@ usage:
                                            --allowed-tools: a skill that may call GPT has Bash(*/scripts/gpt-call.sh*)
                                            markdown ```bash blocks must not hand-assemble wrapper / launcher calls
                                            a counted-kind call line (gpt_rounds.py KIND_SLOTS) carries FZ_GPT_ARTIFACT=
-                                           a literal `gpt-call.sh <kind>` word (skills · modules · guides · agents · workflows ·
-                                           README · CLAUDE.md) is a registry kind — variables and placeholders are not kind words
+                                           a literal `gpt-call.sh <kind>` word in a command shape (fence · backtick span · line-head
+                                           command) (skills · modules · guides · agents · workflows · README · CLAUDE.md) is a
+                                           registry kind — variables and placeholders are not kind words
   gpt_kinds.py table --write|--check [--root DIR]
                                            the generated blocks in skills/fz-gpt/SKILL.md (kind count · roles · kinds)
   gpt_kinds.py --self-test
@@ -548,13 +549,35 @@ def lint_consumers(root=ROOT, only=None, reg=None):
 
 # ── kind-name lint: a literal kind word after gpt-call.sh names a registry kind ──────────────────────────────────────────
 # An unknown kind fails only when the call runs (exit 10), so a typo or a renamed / dropped kind in a page stays silent until then.
-# Prose and ```bash alike. A variable ("$KIND", ${K}) or a placeholder (<kind>, {kind}, KIND) does not start with a lowercase letter
+# Command shapes only: inside a fence of any info string (``` · ```bash · ```yaml · ~~~ — closed by the same mark at least as long,
+# code to the end when unclosed) · inside a backtick code span · the line-head command (indent and NAME=value prefixes allowed) ·
+# every line of workflows/*.js. A word in .md prose ("The gate scripts/gpt-call.sh is …") is not a call and is not read.
+# A variable ("$KIND", ${K}) or a placeholder (<kind>, {kind}, KIND) does not start with a lowercase letter
 # and is not a kind word; a quoted literal ("review") is. The word runs over ASCII letters · digits · _ · - (verify_x is not read as
 # verify; a Korean particle ends it). Own scope, not CONSUMER_DIRS — widening that would widen the bash-block and round lints too.
-# Approximate: a kind word on the next line after a `\` continuation, or a kind held in a variable, is not checked.
+# Approximate: a kind word on the next line after a `\` continuation, or a kind held in a variable, is not checked; a code span over
+# two lines, HTML <code>, a fence inside a `>` quote and a 4-space indented block are not read as code, nor a second call after `;`
+# on a prose line; an English sentence that opens with the script name at the line head ("gpt-call.sh wraps …") is still read as a call.
 KIND_REF_RE = re.compile(r'gpt-call\.sh["\']?\s+["\']?([a-z][A-Za-z0-9_-]*)')
+KIND_REF_FENCE_RE = re.compile(r'\s*(`{3,}|~{3,})(.*)')   # a fence line; a ``` info string holding a backtick is an inline span instead
+KIND_REF_HEAD_RE = re.compile(r'\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*[^\s`]*(?=gpt-call\.sh)')   # ends where the line-head command's script name starts
 KIND_REF_DIRS = ("skills", "modules", "guides", "agents")   # *.md, plus workflows/**/*.js and KIND_REF_FILES
 KIND_REF_FILES = ("README.md", "CLAUDE.md")
+
+
+def code_spans(line):
+    """-> [(start, end)] of the backtick code spans on one line: a run of n backticks opens, the next run of exactly n closes it
+    (an opener without its closer is a literal backtick)."""
+    runs, out, i = [m.span() for m in re.finditer(r'`+', line)], [], 0
+    while i < len(runs):
+        n = runs[i][1] - runs[i][0]
+        j = next((k for k in range(i + 1, len(runs)) if runs[k][1] - runs[k][0] == n), None)
+        if j is None:
+            i += 1
+        else:
+            out.append((runs[i][1], runs[j][0]))
+            i = j + 1
+    return out
 
 
 def lint_kind_refs(root=ROOT, reg=None, only=None):
@@ -572,8 +595,21 @@ def lint_kind_refs(root=ROOT, reg=None, only=None):
         if not os.path.isfile(path):
             v.append(f"{rel}: file not found")
             continue
+        md, fence = rel.endswith(".md"), None   # fence: the open fence's mark (``` · ~~~ run) while inside one
         for i, line in enumerate(open(path, encoding="utf-8", errors="replace").read().split("\n"), 1):
+            f = KIND_REF_FENCE_RE.match(line) if md else None
+            if f and fence is None and not (f.group(1)[0] == "`" and "`" in f.group(2)):
+                fence = f.group(1)
+                continue
+            if f and fence is not None and f.group(1)[0] == fence[0] and len(f.group(1)) >= len(fence) and not f.group(2).strip():
+                fence = None
+                continue
+            prose = md and fence is None   # outside a fence a hit counts only in a backtick span or as the line-head command
+            spans = code_spans(line) if prose else []
+            head = KIND_REF_HEAD_RE.match(line) if prose else None
             for m in KIND_REF_RE.finditer(line):
+                if prose and not (any(s <= m.start() < e for s, e in spans) or (head and head.end() == m.start())):
+                    continue
                 n += 1
                 if m.group(1) not in reg["kinds"]:
                     v.append(f"{rel}:{i}: `gpt-call.sh {m.group(1)}` — {m.group(1)!r} is not a registry kind (scripts/gpt-kinds.json): "
@@ -1044,9 +1080,10 @@ def self_test():
         expect("rounds: tree without gpt_rounds.py -> broken", lambda: counted_kinds(cr), ("broken",))
         open(os.path.join(cr, "scripts", "gpt_rounds.py"), "w").write("KIND_SLOTS = dict(verify=1)\n")
         expect("rounds: KIND_SLOTS not a literal -> broken", lambda: counted_kinds(cr), ("broken",))
-        # kind-name lint: a literal kind word after gpt-call.sh is a registry kind (bash or prose) · a variable or a placeholder is
-        #   not a kind word, a quoted literal and a word tail (verify_x) are · own scope (agents · workflows/*.js · README · CLAUDE.md
-        #   too — not tests/ · docs/ · scripts/) · `lint --consumers` fails on it (exit 11) and counts kind-refs
+        # kind-name lint: a literal kind word after gpt-call.sh in a command shape (a fence of any info string · a backtick span ·
+        #   a line-head command; every line of workflows/*.js) is a registry kind — a word in .md prose is not read · a variable or a
+        #   placeholder is not a kind word, a quoted literal and a word tail (verify_x) are · own scope (agents · workflows/*.js ·
+        #   README · CLAUDE.md too — not tests/ · docs/ · scripts/) · `lint --consumers` fails on it (exit 11) and counts kind-refs
         kr = os.path.join(t, "kindroot")
         for sub in ("scripts", "modules", os.path.join("skills", "s"), "guides", "agents", "workflows", "tests", "docs"):
             os.makedirs(os.path.join(kr, sub))
@@ -1057,10 +1094,70 @@ def self_test():
         expect("kind-refs: unregistered literal caught · variables and placeholders skipped", lambda: lint_kind_refs(kr, reg, ["modules/k.md"]),
                ("ok", lambda r: len(r[0]) == 1 and r[0][0].startswith("modules/k.md:2:") and "'reviews'" in r[0][0] and r[1] == 1))
         open(kmd, "w").write('```bash\n"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" review --cd x\n```\nprose: `gpt-call.sh verify-gates` · gpt-call.sh check, then gpt-call.sh final을\n')
-        expect("kind-refs: registered kinds (bash + prose) -> clean", lambda: lint_kind_refs(kr, reg, ["modules/k.md"]), ("ok", lambda r: r == ([], 4)))
+        expect("kind-refs: registered kinds (bash + backtick) -> clean · bare prose is not read", lambda: lint_kind_refs(kr, reg, ["modules/k.md"]),
+               ("ok", lambda r: r == ([], 2)))
         open(kmd, "w").write('```bash\n"$R/scripts/gpt-call.sh" "reviews" --cd x\n"$R/scripts/gpt-call.sh" verify_x --cd x\n```\n')
         expect("kind-refs: a quoted literal and a word tail are kind words", lambda: lint_kind_refs(kr, reg, ["modules/k.md"]),
                ("ok", lambda r: len(r[0]) == 2 and "'verify_x'" in r[0][1] and r[1] == 2))
+
+        def lint_k(lines, hits=None):
+            # hits: each line must hold that many KIND_REF_RE hits first — a cell then cannot pass because the regex missed the word
+            if hits is not None and [len(KIND_REF_RE.findall(x)) for x in lines] != [hits] * len(lines):
+                raise Broken(f"precondition: each line holds {hits} `gpt-call.sh <word>` hit(s)")
+            open(kmd, "w").write("\n".join(lines) + "\n")
+            return lint_kind_refs(kr, reg, ["modules/k.md"])
+        expect("kind-refs: English prose after the script name is not a kind word",
+               lambda: lint_k(["The gate scripts/gpt-call.sh is the only entry", 'Use "gpt-call.sh" and "gpt-exec.sh" together',
+                               "- gpt-call.sh wraps the adapters", "정문 gpt-call.sh kind 를 넘긴다"], 1), ("ok", lambda r: r == ([], 0)))
+        expect("kind-refs: a typo kind in a command shape is caught",
+               lambda: lint_k(["`gpt-call.sh reviews --cd x`", "`FZ_GPT_ARTIFACT=plan gpt-call.sh verfy --cd x`", "```yaml", 'then: "gpt-call.sh reviews 실행"',
+                               "```", "~~~", "gpt-call.sh reviews", "~~~"]), ("ok", lambda r: [x.split(":")[1] for x in r[0]] == ["1", "2", "4", "7"] and r[1] == 4))
+        expect("kind-refs: an English word in a backtick span is a kind word — the place decides, not the word",
+               lambda: lint_k(["the gate is `gpt-call.sh is`"], 1), ("ok", lambda r: len(r[0]) == 1 and "'is'" in r[0][0] and r[1] == 1))
+        expect("kind-refs: prose after a line-head command is not read", lambda: lint_k(["gpt-call.sh review --cd x · like gpt-call.sh wraps the adapters"], 2),
+               ("ok", lambda r: r == ([], 1)))
+        # kind-ref-grid: place × name form × separator × word, every product cell run on its own file. Oracle: counted ⇔ a command
+        #   shape ∧ a lowercase literal · violation ⇔ counted ∧ not a registry kind. Each text holds its KIND_REF_RE hit first (literal
+        #   words only), so a place cannot pass because the regex missed the word. A call in a fence never opens its line (`run …` ·
+        #   `then: …`), so a fence cell is not passed by the line-head rule. Not made here: a code span over two lines · the line after a `\`
+        #   continuation · HTML <code> · a fence inside a `>` quote · a 4-space indented code block · a NAME=value prefix whose quoted
+        #   value holds a space
+        gr = os.path.join(t, "gridroot")
+        os.makedirs(os.path.join(gr, "modules")); os.makedirs(os.path.join(gr, "workflows"))
+        places = (("fence-bash", "x\n```bash\nif true; then {c} --cd x; fi\n```\n", True), ("fence-plain", "x\n```\nrun {c} --cd x\n```\n", True),
+                  ("fence-yaml", 'x\n```yaml\nthen: "{c} 실행"\n```\n', True), ("fence-tilde", "x\n~~~\nrun {c} --cd x\n~~~\n", True),
+                  ("fence-nested", "x\n````md\n```\nrun {c} --cd x\n```\n````\n", True), ("fence-unclosed", "x\n```\nrun {c} --cd x\n", True),
+                  ("fence-info-line-not-a-closer", "x\n```\n```bash\nrun {c} --cd x\n```\n", True),
+                  ("fence-tilde-not-closed-by-backticks", "x\n~~~\n```\nrun {c} --cd x\n~~~\n", True),
+                  ("after-fence", "```bash\necho x\n```\nThe gate {c} is the only entry\n", False),
+                  ("span-single", "the gate: `{c} --cd x` here\n", True), ("span-double", "the gate: ``{c} --cd x`` here\n", True),
+                  ("span-triple-inline", "```{c} --cd x```\n", True), ("span-after-double", "``a`b`` then `{c} --cd x`\n", True),
+                  ("after-span", "`x` then {c} is here\n", False), ("head", "{c} --cd x\n", True), ("head-indent", "x\n  {c} --cd x\n", True),
+                  ("head-env", 'FZ_GPT_ARTIFACT=plan FZ_WORK_DIR="$W" {c} --cd x\n', True), ("list", "- {c} wraps the adapters\n", False),
+                  ("quote", "> {c} --cd x\n", False), ("table", "| {c} --cd x | ok |\n", False), ("prose", "The gate {c} is the only entry\n", False),
+                  ("prose-ko", "정문 {c} 를 넘긴다\n", False), ("js", "// the gate {c} is the only entry\n", True))
+        names = ("gpt-call.sh", "scripts/gpt-call.sh", '"${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh"', '"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh', "'scripts/gpt-call.sh'")
+        words = (("review", "review"), ("reviews", "reviews"), ("is", "is"), ("실행", None), ("<kind>", None), ('"$KIND"', None), ('"reviews"', "reviews"),
+                 ("verify_x", "verify_x"))
+
+        def grid(place, text, code):
+            rel = "workflows/w.js" if place == "js" else "modules/g.md"
+            line = str([i for i, x in enumerate(text.split("\n"), 1) if "{c}" in x][0])
+            miss = []
+            for nm in names:
+                for sep in (" ", "\t", "\u00a0", "   "):
+                    for word, kind in words:
+                        body, counted = text.replace("{c}", nm + sep + word), code and kind is not None
+                        if len(KIND_REF_RE.findall(body)) != (kind is not None):
+                            miss.append(f"{nm} + {sep!r} + {word}: regex precondition")
+                            continue
+                        open(os.path.join(gr, rel), "w").write(body)
+                        v, n = lint_kind_refs(gr, reg, [rel])
+                        if n != int(counted) or [x.split(":")[1] for x in v] != ([line] if counted and kind not in reg["kinds"] else []):
+                            miss.append(f"{nm} + {sep!r} + {word}: {len(v)} violation(s) · {n} counted")
+            return miss
+        for place, text, code in places:
+            expect(f"kind-ref-grid {place}", lambda p=place, x=text, c=code: grid(p, x, c), ("ok", lambda r: r == []))
         in_scope = ["CLAUDE.md", "README.md", "agents/a.md", "guides/g.md", "modules/k.md", "skills/s/SKILL.md", "workflows/w.js"]
         for rel in in_scope + ["tests/t.md", "docs/d.md", "scripts/x.py"]:
             open(os.path.join(kr, rel), "w").write("x\ngpt-call.sh reviews --cd x\n")
