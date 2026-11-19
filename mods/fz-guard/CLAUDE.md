@@ -7,7 +7,7 @@ fz 규칙 넷을 문장 대신 도구 호출 자리에서 강제한다. 모두 "
 | 규칙 | finding | 하는 일 |
 |---|---|---|
 | P4 | F-368 · F-384 · F-451 · F-119 · F-553 | `/fz` 뒤 Phase 4 승인 전 쓰기 · Workflow · 쓰는 Bash 를 deny, 승인 없이 끝나는 턴의 Stop 을 1회 block, 질문 없이 긴 답으로 끝낸 턴에 경고 |
-| AG | F-058 · F-119 | fz 세션에서 선택 플러그인 에이전트 3종 밖 Agent · Task 를 ask |
+| AG | F-058 · F-119 | fz 세션에서 선택 플러그인 에이전트 3종 · Lead 가 직접 띄우는 fz 에이전트 2종 밖 Agent · Task 를 ask |
 | FR | F-518 · F-565 | 메모리에 fz 교훈만 쓰고 레지스트리 엔트리가 그 턴에 쓰이지 않은 턴의 Stop 을 1회 block(쓰기 방법 무관 — 파일 시각) |
 | GP | F-094 · F-297 | fz-review 턴이 GPT 리뷰 없이 끝나면 Stop 을 1회 block · fz 플러그인 파일에 옛 모델 호칭을 넣는 쓰기를 deny |
 
@@ -29,7 +29,7 @@ fz 규칙 넷을 문장 대신 도구 호출 자리에서 강제한다. 모두 "
   - 응답을 알아보지 못하면 `FZ-GUARD-WARN P4-UNDECIDED` 경고만 내고 막지 않는다(warn-allow). ⛔ 이것이 라이브에서 보이면 파서가 실제 모양을 못 읽은 것이다 — 고친다
 - **막지 않는 경우**(P4 · AG · FR · GP 의 Stop 공통): `FZ_AUTONOMY=autonomous`(CLI 프로세스 env · `scripts/autonomy_decide.py` 와 같이 공백 · 대소문자 정규화) · headless · 레지스트리 `fz-findings/entries/` 쓰기(Phase 0~3 의 발견 등재 · F-518 — FR 은 스크립트 · Bash 로 쓴 항목도 파일 시각으로 센다 · 아래 FR) · Phase 0 의 WORK_DIR 초기화 `{cwd}/{티켓 · NOTASK-YYYYMMDD}/index.md` 와 그 폴더의 `mkdir`(F-553 — `..` 를 접은 뒤 판정 · 폴더는 mkdir 대상으로만 면제한다 — 지우기는 면제가 아니다). 모드 불명은 `P4-UNDECIDED`, 이 입력의 시작을 못 본 상태(설치 전 시작한 세션 등)는 `STATE-INCOMPLETE` 경고만 낸다. 경고는 `systemMessage` 라 사용자에게 보인다
 - **Stop**: `stop_hook_active` 면 통과. 차단은 (세션 · 규칙 · prompt_id) 지문당 1회
-- **AG**: fz 세션 표지(첫 토큰 `/fz` · `/fz-*` · `/fz:*` · Skill `fz*`)는 세션 단위로 남는다. `subagent_type` 을 접두 포함 이름 3종(`pr-review-toolkit:<이름>`)과 정확히 대조한다(`--check-allowlist modules/native-agents.md` 가 표와 상수를 대조)
+- **AG**: fz 세션 표지(첫 토큰 `/fz` · `/fz-*` · `/fz:*` · Skill `fz*`)는 세션 단위로 남는다. `subagent_type` 을 접두 포함 이름 3종(`pr-review-toolkit:<이름>`) · Lead 가 직접 띄우는 읽기 전용 fz 에이전트 2종(`fz:review-correctness` · `fz:search-pattern`)과 정확히 대조한다 — 그 밖의 `fz:` 에이전트 · 접두 없는 같은 이름은 ask(`--check-allowlist modules/native-agents.md` 가 두 표와 두 상수를 대조 · 어느 쪽이 어긋나도 불일치)
 - **Bash 쓰기**(F-119 · F-368 · F-458): 계약은 「읽기 표 밖 이름 = 대상 미상 쓰기」다. 명령 자리는 공용 해석기(`hooks/shell_tokens.py` 의 `commands` — 예약어 · 루프 머리 · 대입 · 래퍼와 옵션 · 함수 본문 지연)가 정한다. `READ` 표(항상 읽기) · 쓰기 모드가 있는 명령의 읽기 꼴 판정(sed · awk · find · sort · uniq · git · gh · rg · date · base64) · `PLUGIN_READ`(승인 전 창에서 /fz 가 부르는 플러그인 스크립트)만 읽기다. 리다이렉트(`>` · `>>` · `&>` — fd 복제와 `/dev/null` 류 제외)와 tee · rm · touch · mkdir · cp · mv 는 대상을 뽑고, 그 밖 이름(인터프리터 포함)은 대상 미상 쓰기다. 대상을 아는 쓰기만 면제 판정(레지스트리 · WORK_DIR index.md · WORK_DIR 폴더 mkdir)을 받는다 — 명령 어딘가에서 폴더를 옮기면(cd · pushd · popd · `-C`) 상대 대상은 미상이다. 같은 쓰기 자리 판정(`write_sites`)을 플러그인의 `scripts/gate_stop_hook.py` 가 원장 소유 판정에 빌려 쓴다
 - **승인 전 긴 답**(F-451): 창이 열린 prompt 에서 AskUserQuestion 을 한 번도 내지 않고 `last_assistant_message` 가 1500자 이상이면 Stop 에 `FZ-GUARD-WARN P4-LONG-ANSWER` 를 싣는다(차단은 P4 가 따로 한다 · 이어진 Stop 에서도 1회)
 - **FR**: 같은 prompt_id 에서 PostToolUse(쓰기 성공)로 `.claude/projects/*/memory/*.md` 에 fz 교훈 토큰(`fz-` · `F-NNN`)이 든 쓰기가 있고 — 토큰은 마크다운 링크 · 백틱을 지운 본문에서 찾는다(F-565: 링크만 든 MEMORY.md 는 교훈이 아니다) — `fz-findings/entries/F-*.md` 가 그 턴에 쓰이지 않았을 때. 쓰였는지는 둘로 본다: 쓰기 도구의 성공 쓰기(실패한 쓰기는 PostToolUseFailure 라 기록되지 않는다), 없으면 `FZ_FINDINGS_ROOT/entries/` 의 항목 이름(`F-NNN….md`) 파일 시각이 턴 시작(UserPromptSubmit 마다 다시 적는다 · 1초 여유) 이후인지 — 스크립트 · Bash 리다이렉트로 쓴 항목도 센다(앞 5000개 이름만 본다). `FZ_FINDINGS_ROOT` 가 없거나 턴 시작을 못 봤으면 둘째 확인을 못 하므로 지금처럼 막는다. ponytail: 다른 세션이 같은 때 쓴 항목도 이 턴 기록으로 센다(거짓 통과 · 1회 알림이라 거짓 차단보다 낫다)
@@ -44,13 +44,14 @@ fz 규칙 넷을 문장 대신 도구 호출 자리에서 강제한다. 모두 "
 - GPT 리뷰 증거(GP)는 명령 이름이 따옴표 밖에서 펼쳐져도(`$P/scripts/gpt-call.sh review`) basename 으로 호출을 인정한다 — 값에 공백이 있으면 셸이 필드를 나눠 다른 명령을 실행한다(`X='printf ignored'; $X/gpt-call.sh review` · r6 ISSUE-011). 가장 좁은 규칙(이름의 따옴표 밖 펼침 거절)도 실제 호출을 막는다 — 실측(transcript 117개 · 판정기가 인정한 review 호출 122건): 따옴표 밖 펼침 35 · 큰따옴표로 감싼 펼침 59 · 펼침 없음 28
 - 오라클 경계(F-582): 계약(렉싱 · 명령 자리 · 읽기 표 · 대상 · 원장 소유 · GPT 호출 증거 · JS 렉심)은 bash · JS 의 동작 전체를 말하지만 오라클은 표본이다 — 토크나이저 규칙마다 셀 하나(`--list-rules` · 제거 probe)와 지적마다 처분 셀. 표본 밖 입력이 실제 동작과 갈리는 꼴은 적대 검토가 찾을 때마다 처분 셀 또는 이 절의 한계로 닫는다
 - 같은 이름 함수 면제는 정의 뒤의 맨 이름 호출에만 준다 — 정의보다 앞선 호출(`touch x; touch() { :; }`)과 `command` · 래퍼 · 경로로 부른 호출은 외부 명령으로 판정한다. 면제를 주는 정의는 맨 바깥 셸의 것뿐이다(보수 판정 — 셸 범위를 정확히 따라가지 않는다): `$(…)` · 백틱 · heredoc 본문 치환 · `( … )` 서브셸 · 두 명령 이상 파이프라인의 한 칸 · `&` 로 끝난 목록(bash 는 둘 다 서브셸에서 돌린다 — 그 칸이 묶음 `{ …; }` · if · while · for 면 그 안 전부) · 함수 본문 안 정의는 아무 호출도 면제하지 않는다(`(rm() { :; }); rm -rf build` · `rm() { :; } | rm -rf build` · `rm() { :; } & wait; rm -rf build` 는 쓰기 · 같은 치환 · 같은 칸 안 호출 `x=$(rm() { :; }; rm -rf a)` · `{ rm() { :; }; rm -rf a; } | cat` 도 쓰기다). 지금 셸의 정의도 `&&` · `||` 목록의 첫 명령과 묶음 `{ …; }` 안 정의만 면제를 준다(`rm() { :; } && true | cat; rm -rf build` · `{ rm() { :; }; }; rm -rf build` 는 쓰기가 아니다). `&&` · `||` 뒤와 if · while · until · for 안(조건 목록 포함) 정의는 조건이 돌지 않으면 생기지 않으므로 조건이 참이어도 면제를 주지 않는다(`false && touch() { :; }; touch x` · `if true; then :; else touch() { :; }; fi; touch x` 의 `touch` 는 외부 명령이다 · 과차단: `true && rm() { :; }; rm -rf build` · `if true; then rm() { :; }; fi; rm -rf build` 와 같은 갈래 안 뒤 호출도 쓰기로 읽는다). 치환 · 서브셸 · 파이프라인 칸 · `&` 명령 안 호출은 그 앞의 맨 바깥 정의를 물려받는다(`rm() { :; }; echo "$(rm -rf build)"` · `rm() { :; }; rm -rf build | cat` 는 쓰기가 아니다). 예약어 짝이 맞지 않는 명령은 범위를 모르므로 어떤 정의도 면제를 주지 않는다. 범위는 bash 로 읽는다 — zsh 는 파이프라인 마지막 칸을 지금 셸에서 돌리지만(`cat /dev/null | rm() { :; }; rm -rf build` 는 zsh 에서 지우지 않는다) 그 칸의 정의도 면제하지 않는다. 함수 본문 안 호출도 이름과 무관하게(쓰기 명령 tee · rm · touch · mkdir · cp · mv · 읽기 표 밖 프로그램 · `sed -i` · `python3 -c …` 같은 인터프리터) 맨 바깥 호출과 같은 규칙이라 본문보다 앞의 맨 바깥 정의만 면제를 주고, 뒤의 정의는 본문 호출을 함수로 만들지 않는다(`f() { rm -rf build; }; f; rm() { :; }` · `f() { unlink build/x; }; f; unlink() { :; }` 의 본문 호출은 외부 명령이다 · f 를 정의 뒤에 부르는 main · helper 꼴 `f() { rm -rf build; }; rm() { :; }; f` · `f() { helper x; }; helper() { :; }; f` 도 쓰기로 읽는다 — 과차단 쪽). 가드와 Stop 훅이 같은 판정(`defined_functions` · `write_sites`)을 쓴다.
+- 자기를 부르는 함수(재귀 함수)는 본문이 읽기만 해도 대상 미상 쓰기로 읽는다 — 본문 안 자기 호출은 그 정의가 끝나기 전의 호출이라 위 면제를 받지 못하고 읽기 표 밖 이름이 된다. 승인 전 창에서는 그런 한 줄(`f() { grep -r foo .; [ -n "$1" ] && f; }; f x`)이 막힌다(과차단)
 - `/fz` 파이프라인 안에서 SKILL.md 를 읽어 도는 fz-review 는 표지가 없어 GP Stop 이 보지 못한다
 - Phase 0 은 WORK_DIR 폴더 mkdir 과 `index.md` 만 허용한다 — 다른 산출물은 승인 뒤에 쓴다
-- Workflow 스크립트 안 `agent()` 스폰이 PreToolUse(Agent) 를 발화하는지는 라이브 관측 대상이다(발화하면 `fz:*` 타입이 채택 목록 밖이라 ask 가 뜬다)
+- Workflow 스크립트 안 `agent()` 스폰이 PreToolUse(Agent) 를 발화하는지는 라이브 관측 대상이다(발화하면 Lead 가 직접 띄우는 2종 밖의 `fz:*` 타입은 허용 목록 밖이라 ask 가 뜬다)
 - 조직 managed settings 가 사용자 tier 하위 플러그인 훅을 건너뛰면 fz-guard 는 없는 것과 같다 — 라이브에서 훅 발화부터 확인한다
 
 ## 시험
-- `python3 hooks/guard.py --self-test` — 합성 입력 126 케이스(`PASS <case>`) · HOME · FZ_RUN_STATE 를 임시 폴더로 새로 짓는다
+- `python3 hooks/guard.py --self-test` — 합성 입력 130 케이스(`PASS <case>`) · HOME · FZ_RUN_STATE 를 임시 폴더로 새로 짓는다
 - `python3 hooks/guard.py --check-allowlist ../../modules/native-agents.md`
 - `python3 hooks/guard.py --make-synthetic BYTES OUT --with-marker|--no-marker` · `--bench OUT` — 큰 transcript 에서 entrypoint 판정 소요
 - health-check 5.2 가 validate · self-test · allowlist 를 돈다

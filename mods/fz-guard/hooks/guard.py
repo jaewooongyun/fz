@@ -9,7 +9,7 @@
       창은 연 prompt 안에서만 판정한다 — 승인 없이 그 턴을 끝내면 Stop 을 1회 막는다. 셋 다 interactive(entrypoint=cli)에서만 발화한다.
       질문 없이 긴 답(LONG_ANSWER 자 이상)으로 끝낸 턴은 Stop 에 경고를 따로 싣는다(F-451 · 차단 아님).
   AG  F-058 · F-119 — fz 세션 표지(/fz · /fz-* · /fz:* · Skill fz*)가 선 세션에서 Agent · Task 의 subagent_type 이
-      채택 목록(modules/native-agents.md — 접두 포함 이름 완전 일치) 밖이면 ask 한다.
+      채택 목록 · Lead 가 직접 띄우는 fz 에이전트 목록(modules/native-agents.md 두 표 — 접두 포함 이름 완전 일치) 밖이면 ask 한다.
   FR  F-518 · F-565 — 같은 prompt_id 에서 메모리에 fz 교훈을 쓰고 레지스트리 entries/F-*.md 가 이 턴에 쓰이지 않았으면 Stop 을
       1회 막는다. 쓰기 도구의 성공 기록이 없으면 FZ_FINDINGS_ROOT/entries/ 항목의 파일 시각(턴 시작 이후)으로 한 번 더 본다 — 스크립트 ·
       Bash 리다이렉트로 쓴 항목도 센다. 루트를 모르면 지금처럼 막는다. ponytail: 다른 세션이 같은 때 쓴 항목도 이 턴 기록으로 센다.
@@ -35,8 +35,9 @@ transcript 에서는 굳은 사실 하나만 읽는다: 첫 줄들의 entrypoint
 
 모드
   (인자 없음)                훅 — stdin JSON 하나 → stdout 결정 JSON(없으면 빈 출력) · exit 0
-  --self-test                합성 입력 126 케이스 — `PASS <case>` 줄
-  --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS 인가 (0 일치 · 1 불일치 · 2 표 없음)
+  --self-test                합성 입력 130 케이스 — `PASS <case>` 줄
+  --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS · Lead 직접 표 == LEAD_DIRECT_AGENTS 인가
+                             (0 일치 · 1 불일치 — Lead 직접 표 없음 포함 · 2 채택 표 없음)
   --make-synthetic BYTES OUT --with-marker|--no-marker   큰 transcript 합성(첫 줄들에 entrypoint 를 둘지)
   --bench FILE               entrypoint 판정 소요 — `mode=<…> elapsed_ms=<n>`
 """
@@ -46,6 +47,7 @@ import argparse
 import contextlib
 import fcntl
 import importlib.util
+import io
 import json
 import os
 import pathlib
@@ -74,6 +76,10 @@ XCODE_WRITE = re.compile(r"^mcp__.*__Xcode(Write|Update|MV|RM|MakeDir)$")
 AGENT_TOOLS = {"Agent", "Task"}
 # modules/native-agents.md 채택 표와 같아야 한다 — `--check-allowlist` 가 대조한다(health-check 5.2)
 ALLOW_AGENTS = {"pr-review-toolkit:silent-failure-hunter", "pr-review-toolkit:type-design-analyzer", "pr-review-toolkit:code-simplifier"}
+# 스킬이 Lead 에게 Agent 도구로 직접 띄우라고 적은 읽기 전용 fz 에이전트(정의의 tools: 에 쓰기 도구가 없다) —
+#   modules/native-agents.md 「fz 에이전트 — Lead 가 직접 띄우는 둘」 표와 같아야 한다(`--check-allowlist` 가 대조한다)
+LEAD_DIRECT_AGENTS = {"fz:review-correctness", "fz:search-pattern"}
+LEAD_TABLE_HEADER = "Lead 가 띄우는 때"
 PHASE4_HEADER = "Phase 4"
 NOT_APPROVAL = re.compile(r"커스텀|취소|거절|중단|cancel|reject|abort", re.I)
 # F-565 — F-ID 는 그 자체로 교훈 기록이다. fz 이름(fz-findings 포함)만 든 본문은 교훈 단서어가 함께 있어야 교훈이다 — 스킬 이름 ·
@@ -1264,6 +1270,8 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
             if "AG" in off or not st["fzSession"]:
                 return None
             kind = ti.get("subagent_type") if isinstance(ti.get("subagent_type"), str) and ti.get("subagent_type") else "general-purpose"
+            if kind in LEAD_DIRECT_AGENTS:
+                return None
             if kind in ALLOW_AGENTS or autonomous(env):
                 return None
             mode = session_mode(inp.get("transcript_path"))
@@ -1272,7 +1280,8 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
             if mode == "unknown":
                 return warn_once(st, f"undecided-agent:{pid}", f"{WARN_UNDECIDED} — 실행 모드를 판정하지 못했다 · 에이전트({kind}) 확인을 묻지 않는다")
             return decision("ask", f"fz-guard AG(F-058 · F-119): fz 세션에서 허용 목록 밖 에이전트({kind})를 띄운다. "
-                                   "fz 위임은 Workflow 경유가 규칙이다(선택 플러그인 에이전트 3종만 예외). 그대로 띄울지 확인한다")
+                                   f"fz 위임은 Workflow 경유가 규칙이다(선택 플러그인 에이전트 {len(ALLOW_AGENTS)}종 · "
+                                   f"Lead 가 직접 띄우는 fz 에이전트 {len(LEAD_DIRECT_AGENTS)}종만 예외). 그대로 띄울지 확인한다")
         if p4_tool(name) and "P4" not in off:
             return p4_pre(inp, env, st, ti, pid)
         return None
@@ -1351,12 +1360,12 @@ def run(stdin_text: str, env) -> tuple:
 
 
 # ── 보조 모드 ──────────────────────────────────────────────────────
-def allowlist_from(md: str) -> list:
-    """채택 표(헤더에 '스폰 방식')의 **굵은** 이름만 — 같은 문서의 불채택 표는 읽지 않는다."""
+def allowlist_from(md: str, header: str = "스폰 방식") -> list:
+    """헤더 줄에 header 가 든 첫 표의 **굵은** 이름만 — 채택 표('스폰 방식') · Lead 직접 표(LEAD_TABLE_HEADER). 같은 문서의 불채택 표는 읽지 않는다."""
     names, inside = [], False
     for line in md.splitlines():
         if not inside:
-            inside = line.startswith("|") and "스폰 방식" in line
+            inside = line.startswith("|") and header in line
             continue
         if not line.startswith("|"):
             break
@@ -1368,17 +1377,23 @@ def allowlist_from(md: str) -> list:
 
 def check_allowlist(path: str) -> int:
     try:
-        names = allowlist_from(pathlib.Path(path).read_text(encoding="utf-8"))
+        md = pathlib.Path(path).read_text(encoding="utf-8")
     except OSError as e:
         print(f"UNRUN: 표를 읽지 못했다 — {e}")
         return 2
+    names, lead = allowlist_from(md), allowlist_from(md, LEAD_TABLE_HEADER)
     if not names:
         print("UNRUN: 채택 표('스폰 방식' 헤더)를 찾지 못했다")
         return 2
-    if set(names) != ALLOW_AGENTS:
+    bad = set(names) != ALLOW_AGENTS
+    if bad:
         print(f"MISMATCH: 표만 {sorted(set(names) - ALLOW_AGENTS)} · guard 만 {sorted(ALLOW_AGENTS - set(names))}")
+    if set(lead) != LEAD_DIRECT_AGENTS:            # Lead 직접 표가 없어도 불일치다(표 없음 = guard 만 쪽에 이름이 남는다)
+        print(f"MISMATCH: Lead 직접 표만 {sorted(set(lead) - LEAD_DIRECT_AGENTS)} · guard 만 {sorted(LEAD_DIRECT_AGENTS - set(lead))}")
+        bad = True
+    if bad:
         return 1
-    print(f"ALLOWLIST OK — {len(names)}종")
+    print(f"ALLOWLIST OK — {len(names)}종 · Lead 직접 {len(lead)}종")
     return 0
 
 
@@ -2240,6 +2255,46 @@ def self_test() -> int:
         s = fz("c26c")
         got = [kind(s.pre("Agent", {"subagent_type": t})) for t in ("silent-failure-hunter", "other:silent-failure-hunter")]
         case("agent-allowlist-exact-prefixed-name-only", got == ["ask"] * 2, got)
+
+    @cell
+    def c26d():
+        s = fz("c26d")
+        got = [s.pre("Agent", {"subagent_type": t, "model": "opus", "prompt": "x"}) for t in ("fz:review-correctness", "fz:search-pattern")]
+        case("agent-fz-lead-direct-allowed", got == [None] * 2, got)
+
+    @cell
+    def c26e():
+        s = fz("c26e")
+        got = [s.pre("Agent", {"subagent_type": t}) for t in ("fz:impl-correctness", "fz:plan-structure", "search-pattern", "review-correctness")]
+        case("agent-fz-other-or-unprefixed-asked", [kind(o) for o in got] == ["ask"] * 4
+             and all("Lead 가 직접 띄우는 fz 에이전트" in o["hookSpecificOutput"]["permissionDecisionReason"] for o in got), got)
+
+    adopted = ["pr-review-toolkit:silent-failure-hunter", "pr-review-toolkit:type-design-analyzer", "pr-review-toolkit:code-simplifier"]
+    lead = ["fz:review-correctness", "fz:search-pattern"]
+
+    def allow_check(tag, adopted_names, lead_names):
+        """채택 표 · Lead 직접 표를 가진 합성 문서로 --check-allowlist 를 돈다 — 이름 목록이 None 이면 그 표가 없다."""
+        def table(head, names):
+            return "" if names is None else head + "".join(f"| **{n}** | x | x |\n" for n in names)
+        md = (table("| 에이전트 | 고유 가치 | 스폰 방식 |\n|---|---|---|\n", adopted_names) + "\n## 다음\n\n"
+              + table("| 에이전트 | Lead 가 띄우는 때 | 정하는 스킬 |\n|---|---|---|\n", lead_names))
+        p = tmp / f"allow-{tag}.md"
+        p.write_text(md, encoding="utf-8")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = check_allowlist(str(p))
+        return code, buf.getvalue().strip()
+
+    @cell
+    def c26f():
+        got = [allow_check("a-" + t, a, lead) for t, a in (("ok", adopted), ("doc-only", adopted + ["pr-review-toolkit:pr-test-analyzer"]),
+                                                            ("guard-only", adopted[1:]), ("missing", None))]
+        case("allowlist-adopted-table-compared", [c for c, _ in got] == [0, 1, 1, 2] and all("MISMATCH" in o for _, o in got[1:3]), got)
+
+    @cell
+    def c26g():
+        got = [allow_check("l-" + t, adopted, ln) for t, ln in (("doc-only", lead + ["fz:impl-correctness"]), ("guard-only", lead[1:]), ("missing", None))]
+        case("allowlist-lead-table-compared", [c for c, _ in got] == [1, 1, 1] and all("MISMATCH" in o for _, o in got), got)
 
     @cell
     def c27():
