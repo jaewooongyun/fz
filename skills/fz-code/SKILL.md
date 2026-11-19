@@ -115,8 +115,6 @@ metadata:
 7. **Workflow 외부 Lead 책임 (이관 아님 — 회귀 확인 의무, 15차)**: 마찰 감지(절차 3) + RTM implemented 갱신 + BEC(6.3) + 아티팩트(6.5) + memory-curator recall + review-correctness(절차 7) + GPT 교차 검증(8.5 — `gpt-choice.sh decide` 판정) — Workflow는 "구현+검토 쌍"만 대체
 8. **지표 기록**: **세션당 1행** (N-Step 누적 집계 — invoke당 N행 발산 방지) → 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.7 fz-code 테이블(**2026-07-10 시리즈 — 현행**; 2026-06-05 표는 사료 · 규약: `experiment-log.md` 머리 문단). Stage2 null이 있었던 Step 수 별도 표기. iOS 코드 세션이면 §5.6 Plugin Trigger 행도 append (트리거 수·플러그인 참조·catch 수)
 
-> 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
-
 ---
 
 ## ⛔ Phase 0: Work Dir Pre-flight

@@ -77,7 +77,7 @@ WHY: 이슈 수가 많으면 리뷰어 피로가 증가하고, 진짜 문제가 
 **Evidence-Only Brief Template**:
 ```
 [Goal] {관점}에서 독립 이슈 발굴
-[Data] diff.patch + evidence/*.md + symbols.json + requirements.md + base-behavior.md
+[Data] diff.patch + evidence/*.md + requirements.md + base-behavior.md
 [Constraints]
 - 피어 참조 금지, max 10, origin 필수, 추론 아닌 코드 증거 기반만
 - ⛔ init/DI 이슈 시: evidence/caller-analysis.md 필수 확인 — "호출자가 어떤 타입을 알아야 하는가?"

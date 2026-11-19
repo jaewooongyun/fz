@@ -36,11 +36,6 @@
 | plan-impact (영향+아키) | Stage 1 통합 렌즈 | "어디까지 퍼지는가 · 기존 패턴과 맞는가?" — `secondaryHosts`·`existingTestSuites` 를 schema 로 명시 요구 |
 | GPT verify (독립 검증) | Workflow 외부 — Lead가 /fz-gpt verify (Phase 2) | "이 계획에 빠진 것은?" |
 
-## 통신 기록 · TEAM 일몰
-
-
-> 통신 기록: plan-team.md 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰이 정본이다(⛔ 여기서 재서술하지 않는다).
-
 ## Gate 1 을 SKILL 에 남기는 이유
 
 > 각 절차 상세는 `modules/plan-deep-planning.md` 참조. 트리밍 비저하 원칙(single source: `guides/prompt-optimization.md` §1 보충 3a)으로 Gate 1 + Why(H1)는 본 SKILL에 보존.

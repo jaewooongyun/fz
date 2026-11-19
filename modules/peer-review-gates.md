@@ -175,7 +175,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
    ├─ "경고 발생한다" 주장 + 실제 경고 없음 → EXCLUDE (이슈 DROP)
    ├─ "경고 발생한다" 주장 + 실제 경고 있음 → INCLUDE 유지
    └─ Swift 6 모드도 추가 확인: -swift-version 6
-4. confidence-matrix.md에 기록: compiler_verified: true/false + result
+4. synthesized-issues.json 의 그 이슈에 기록: compiler_verified: true/false + result
 ```
 
 **검증 불가 시** (XcodeBuildMCP 없음, SDK 미확인 등):
@@ -190,14 +190,14 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 > 원인: diff에 subclass init 변경이 없어 분석 대상에서 제외됨. 컴파일러도 default value 존재로 미탐지.
 
 **감지 조건** (하나라도):
-- `symbols.json.base_class_hierarchy` 존재
+- diff 에 class init · willSet/didSet 변경
 - INCLUDE 이슈 중 "DI 변경", "init 시그니처", "optional", "willSet/didSet" 키워드
 
-⛔ **`symbols.json` 부재 시 조용히 스킵하지 않는다.** Gather Step 2(Serena pre-caching)를 생략했으면 이 게이트와 **관점 6(Dependency Impact) 전체**가 무력화된다(`protocol_conformers`·`base_class_hierarchy`·`import_graph` 의존). 부재를 확인하면 리포트에 **"관점 6·Gate 4.6.5 부분 수행 — symbols.json 미생성"**을 명시하고, INCLUDE 이슈 키워드 경로로 Grep 폴백 + confidence ceiling 70을 적용한다.
+⛔ **하위 클래스 근거가 없다고 조용히 스킵하지 않는다.** 입력은 `evidence/caller-analysis.md` `## 구현` 의 하위 클래스 목록이다(Tier 3 상시 · Tier 0-2 는 init·DI 변경 시 — `modules/peer-review-tiers.md` § Tier-Adaptive Evidence). 목록이 없으면 Lead 가 `git grep` 으로 즉석 수집한다. 그래도 못 하면 이 게이트와 **관점 6(Dependency Impact) 전체**가 부분 수행이다 — 리포트에 **"관점 6·Gate 4.6.5 부분 수행 — 하위 클래스 근거 없음"**을 명시하고 confidence ceiling 70을 적용한다.
 
 **처리 절차**:
 ```
-1. base_class_hierarchy에서 변경된 base class 추출
+1. caller-analysis.md `## 구현` 의 하위 클래스 목록에서 변경된 base class 추출
 2. 각 subclass init 패턴 검증:
    ├─ super.init(newParam: value) 명시 전달 → OK
    └─ default init (newParam = nil) → Step 3으로
@@ -214,7 +214,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
 **Functional Test**:
 - Given: Base init에 optional param 추가, subclass 여러 개 → When: Gate 실행 → Then: 미주입+활성 화면 major 보고
 - Given: Base init 변경 없음 → When: 조건 체크 → Then: Gate 스킵
-- Given: Serena 실패 → When: Gate 실행 → Then: Grep 폴백 + confidence ceiling 70
+- Given: 하위 클래스 근거 없음 → When: Gate 실행 → Then: Grep 폴백 + confidence ceiling 70
 
 ---
 
@@ -241,7 +241,7 @@ Major 이상 이슈의 line_range를 실제 PR 브랜치 코드로 검증:
    │   → confidence ceiling 65 + "[불변식 확인 필요]" 태그 + severity 하향 검토
    ├─ guard 없는 setter 경로 존재 → 불변식 불성립 → INCLUDE 유지
    └─ 추적 불가 → confidence ceiling 70 + "[런타임 검증 필요]" 태그
-6. confidence-matrix.md에 기록: behavior_verified: true/false + trace
+6. synthesized-issues.json 의 그 이슈에 기록: behavior_verified: true/false + trace
 ```
 
 ⛔ **'이 상태에 갇힌다' 류 주장**은 탈출 경로를 다 세는 것으로 끝나지 않는다 — 그 상태로 들어가는 진입 함수의 **프로덕션 호출자**만 센다(테스트 · 선언 · 주석 제외). 그리고 그 호출부의 가드까지 확인한다(F-243: 프로덕션 호출은 1건뿐이었고 그 호출부가 이미 막고 있었다).
@@ -329,7 +329,7 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
    - 또는 Grep으로 PR에서 변경된 파일 전체 스캔
 4. 결과 해석:
    ├─ 동일/유사 로직이 다른 파일에 존재 → "relocated" 판정
-   │   → EXCLUDE (이슈 DROP) + confidence-matrix에 relocated: true 기록
+   │   → EXCLUDE (이슈 DROP) — synthesized-issues.json 에 disposition exclude + disposition_reason relocated
    ├─ 유사하지만 조건/범위가 다름 → confidence ceiling 70 + "[이동 확인 필요]" 태그
    └─ 어디에도 없음 → INCLUDE 유지 (진짜 삭제)
 ```
@@ -365,7 +365,7 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
    ├─ 동일 패턴 (코드 구조 같음) → origin: pre-existing, severity cap: suggestion
    ├─ 유사 패턴 (다른 메커니즘 같은 효과) → origin 유지, "[base에도 유사 패턴]" 태그
    └─ base에 없는 새 패턴 → origin: regression 확인 (severity 유지)
-4. confidence-matrix.md에 기록: origin_verified: true/false + base_evidence
+4. 그 이슈의 base_evidence 칸에 기록: path:line@base-sha (아래 기계 검사의 review.json 칸과 같은 형식)
 
 ⛔ evidence 파일이 없으면 (Gather에서 미수집):
   Orchestrator가 즉석에서 git show base:{file} 실행하여 확인.
@@ -396,7 +396,7 @@ Pattern-Consistency 이슈: 패턴 불일치가 functional difference를 만드�
    b. 내부 `try?` / `.catch` / `.catchErrorJustReturn` 등 에러 흡수 여부 검색
    c. Kingfisher/URLSession 콜백에서 에러가 실제로 Single error로 전달되는지 확인
 3. 결과 해석:
-   ├─ 에러 emit 불가로 확인 → EXCLUDE + confidence-matrix에 error_path_verified: false
+   ├─ 에러 emit 불가로 확인 → EXCLUDE — synthesized-issues.json 에 disposition exclude + disposition_reason(에러 emit 불가)
    └─ 에러 emit 가능 → INCLUDE 유지, evidence_trace에 에러 경로 명시
 ```
 
@@ -494,8 +494,7 @@ GOOD (Gate 4.9 적용):
 게이트 실행 완료 후 반드시 파일로 저장:
 
 ```
-${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+게이트 검증 결과 — 투표 적용 Tier 는 § MergeContract § 9)
-${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (Tier 별 생성 여부는 § MergeContract § 9)
+${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+게이트 검증 결과 — 투표 적용 Tier 는 § MergeContract § 9) · Confidence Matrix 를 만들었으면(Tier 1·3) 최상위 matrix(마크다운 문자열)를 함께 싣는다 — dict 모양 {issues, matrix}
 ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리포인트
 ```
 

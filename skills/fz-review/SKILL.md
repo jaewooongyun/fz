@@ -105,7 +105,6 @@ metadata:
 - `{WORK_DIR}/code/progress.md` 읽기 → 구현 진행 상태 복원
 - `{WORK_DIR}/code/step-*.md` 읽기 → 전체 구현 Step 상세 (1M context 활용)
 - `{WORK_DIR}/discover/discover-review.md` 읽기 → mid-pipeline discover 결과 (있으면)
-- ~~`{WORK_DIR}/code/code-team.md`~~ ⛔ **Workflow 모드에서 미생성** — transcript(runId)가 대체한다(`skills/fz-code/SKILL.md` 통신 기록). 읽을 파일이 없다
 
 ### ⛔ 모듈화 리뷰 원칙 (Modularization Review Scope)
 
@@ -172,7 +171,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
 - [ ] 지표③: `[verified]` / `[미검증]` 태그 빈도 + 무태그 과거 주장("원본/기존/이전/D{N} 이전") 위반 건수
 - [ ] 지표④: 세션 reversal 횟수 (사용자 판정 뒤집기 — 기준선 4회)
 - [ ] 지표⑤: A5 micro-eval 호출 건수 N + confirmed C + false positive F → precision = C/N
-- [ ] 결과 → `{WORK_DIR}/review/phase-a-metrics.md` (티켓 폴더 세션 임시). 최종 보고 "## Phase A Metrics" 섹션 포함
+- [ ] 최종 보고 "## Phase A Metrics" 섹션 포함
 - [ ] **canonical sink**: 세션 결과는 완료 직전 `run_metrics.py end` 의 `--gate-issues` · `--findings` 로 실행 기록에 남긴다 — B1/B2 진입 판정(Gate 10회부터 neutral-candidate · load-bearing)은 `fz_telemetry_report.py` 의 harness 절이 낸다. 다른 sink는 backlink만 허용 (3중화 금지).
 
 ## Phase 5: Cross-Review (3중 검증)

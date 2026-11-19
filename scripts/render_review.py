@@ -26,6 +26,8 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
         expect(그 줄에 있어야 할 코드 조각 — ⛔ payload 를 만들 때 인라인 코멘트 **전건**에 필수 · F-069 아래)
   issue 선택 axis(발견 축 — code_quality · structure · correctness · runtime_safety · direction · other)
   review 선택 costLog(review.json 폴더 기준 cost-log.json 상대 경로 — `## 실측 비용` 절 · 파일이 없으면 UNRUN)
+        cost-log.json 에서 읽는 키(형식의 정본은 여기다): tier.selected · tokens.total · tokens.method · duration_ms · phases_ms(구간별 ms) ·
+        issues.{critical · major · minor · suggestion}
   판정 한계(round 2 S9 — 키가 없으면 옛 바이트 그대로)
     issue 선택 alternatives[{label, description, pros?, cons?}] · recommended(그 label 중 하나) — 외부 렌즈(GPT)가 낸 대안을 **원문**
               그대로 옮긴다(F-115 — 자기 말로 요약하면 추천 해법이 사라졌다). recommended 가 label 에 없으면 입력 불가(재서술 차단)
@@ -332,7 +334,7 @@ def judgment_lines(r: dict) -> list:
 
 
 def axes_lines(r: dict, plans: list) -> list:
-    """`## 발견 축 집계` — issue.axis 로 센다(없으면 other). 0건 축도 행을 남긴다(0 이 관측인지 미탐색인지 — tiers.md Tier 1 Deliver).
+    """`## 발견 축 집계` — issue.axis 로 센다(없으면 other). 0건 축도 행을 남긴다(0 이 관측인지 미탐색인지 — tiers.md Tier 0 Deliver).
 
     큐레이션 리뷰는 항상 · 비큐레이션은 axis 가 하나라도 있을 때만 — 옛 렌더 바이트를 바꾸지 않는다(F-212).
     """
@@ -346,7 +348,7 @@ def axes_lines(r: dict, plans: list) -> list:
 
 
 def cost_lines(cost: dict | None, rel: str | None) -> list:
-    """`## 실측 비용` — review.costLog 가 가리키는 cost-log.json(tiers.md § 비용 로깅 형식 2)에서 그린다(F-212)."""
+    """`## 실측 비용` — review.costLog 가 가리키는 cost-log.json(형식은 이 파일 머리말 costLog)에서 그린다(F-212)."""
     if cost is None:
         return []
     tier = cost.get("tier") if isinstance(cost.get("tier"), dict) else {}

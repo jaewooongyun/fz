@@ -141,6 +141,7 @@ Orchestrator가 사전에 제공해야 한다.
 - 새로 추가된 init/factory (UseCase, Repository, ViewModel, Builder)
 - protocol 시그니처 변경
 - public/internal API 시그니처 변경
+- class init · willSet/didSet 변경 → 하위 클래스 전수(Gate 4.6.5 상속 체인 입력)
 
 수집:
 0. **도구 상태** → `evidence/tools.md` 첫 줄(`scripts/check_evidence_slots.py` 가 읽는다):
@@ -153,7 +154,7 @@ Orchestrator가 사전에 제공해야 한다.
    - 신뢰하지 않은 프로젝트에서는 심볼릭 링크로 들어온 파일을 보지 않는다(v2.0.0) — 링크된 소스의 결과가 0건이면 "참조 없음" 으로 읽기 전에 신뢰 설정(`trusted_project_path_patterns`)부터 확인한다
 1. diff에서 신규/변경 init · protocol 요구사항 식별 (함수 시그니처 추출)
 2. **호출** = `find_referencing_symbols` ∪ `git grep "TypeName(" pr-{PR} -- '*.swift'` → 호출자 파일:라인 · 대상이 프로퍼티면 `<prop> *=` 직접 대입도 세고 함수 호출 집합과의 차집합(대입으로만 바뀌는 자리)을 적는다(F-197)
-3. **구현** = `find_implementations` ∪ `git grep` 전수 — 프로토콜 메서드 · 오버라이드의 conformance 구현. `find_referencing_symbols` 는 호출 지점만 주고 구현은 주지 않는다(F-535). 해당 없으면 `해당 없음 — <사유>`
+3. **구현** = `find_implementations` ∪ `git grep` 전수 — 프로토콜 메서드 · 오버라이드의 conformance 구현. 하위 클래스(`: Base` · override init)는 `super.init` 에 새 파라미터를 넘기는지도 적는다. `find_referencing_symbols` 는 호출 지점만 주고 구현은 주지 않는다(F-535). 해당 없으면 `해당 없음 — <사유>`
 4. 각 호출자의 해당 라인 ±5줄 추출 (default param이 있으면 호출자의 default 값도 포함)
 5. 호출자가 참조하는 concrete 타입 목록 추출
 

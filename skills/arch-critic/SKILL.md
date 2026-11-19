@@ -27,13 +27,12 @@ allowed-tools: []
 
 ```
 ${WORK_DIR}/diff.patch                      # 변경 diff (베이스 브랜치 기준)
-${WORK_DIR}/symbols.json                    # Serena pre-cached 심볼 정보
 ${WORK_DIR}/evidence/caller-analysis.md     # 신규/변경 init의 호출자 코드 + 참조 타입
 ${WORK_DIR}/evidence/convention-samples.md  # 프로젝트 내 동일 패턴 샘플
 ${WORK_DIR}/evidence/semantic-mapping.md    # API/condition mapping atom-level (v4.4.0, refactoring PR 시)
 ```
 
-symbols.json에 없는 심볼이 필요하면 Serena MCP를 직접 호출해도 됩니다.
+심볼 정보가 더 필요하면 Serena MCP를 직접 호출해도 됩니다.
 
 <!-- shared:review-core begin -->
 ## ⛔ 분석 제약

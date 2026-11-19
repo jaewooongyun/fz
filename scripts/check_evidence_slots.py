@@ -110,7 +110,7 @@ def required_slots(doc_path: str, tier: int):
             break
         if not ln.startswith("|"):
             if header and out:
-                break   # 첫 표만 — 아래 pre-cache 표는 다른 집합이다
+                break   # 첫 표만 — 요구 슬롯 표다(절 안에 표가 더 생겨도 읽지 않는다)
             continue
         cells = [c.strip() for c in ln.strip().strip("|").split("|")]
         if header is None:

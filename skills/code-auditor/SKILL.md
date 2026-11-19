@@ -28,7 +28,6 @@ allowed-tools: []
 
 ```
 ${WORK_DIR}/diff.patch                      # 변경 diff (베이스 브랜치 기준)
-${WORK_DIR}/symbols.json                    # Serena pre-cached 심볼 정보
 ${WORK_DIR}/evidence/caller-analysis.md     # 신규/변경 init의 호출자 코드 + 참조 타입
 ${WORK_DIR}/evidence/convention-samples.md  # 프로젝트 내 동일 패턴 샘플
 ```
@@ -187,18 +186,18 @@ var body: some View {
 ### 판단 원칙
 
 - 대상 diff에서 **신규 작성 코드**에만 적용 (기존 코드 지적 제외)
-- 프로젝트 최소 배포 타깃 확인 (`symbols.json.platform_target` 또는 CLAUDE.md)
+- 프로젝트 최소 배포 타깃 확인 (CLAUDE.md)
 - 멀티 플랫폼 프로젝트의 경우 `#if os(...)` 분기 필요 여부 확인
 
 ---
 
 ## 관점 6: Dependency Impact
 
-⛔ **본 관점은 `symbols.json` 의존이 크다** — `protocol_conformers`·`base_class_hierarchy`·`import_graph`. 파일이 없거나 프롬프트가 경로를 주지 않았으면 **관점 6은 부분 수행**이다. 그 사실을 `overall_assessment`에 *"관점 6 부분 수행 — symbols.json 미제공"*으로 명시하고 Grep 폴백으로 대체한다 (`code-auditor:174` 부분 분석 표기 패턴과 동형).
+⛔ **본 관점은 `evidence/caller-analysis.md` 의존이 크다** — `## 호출`(호출자) · `## 구현`(conformance 구현 · 하위 클래스). 파일이 없거나 프롬프트가 경로를 주지 않았으면 **관점 6은 부분 수행**이다. 그 사실을 `overall_assessment`에 *"관점 6 부분 수행 — caller-analysis 미제공"*으로 명시하고 Grep 폴백으로 대체한다 (`code-auditor:174` 부분 분석 표기 패턴과 동형).
 
 ### 프로토콜 변경 파급 분석
 
-symbols.json의 `protocol_conformers` 사용:
+caller-analysis.md `## 구현` 사용:
 - Protocol signature 변경 시 모든 conformer 탐지
 - 미탐지 conformer가 있으면 `overall_assessment`에 "conformer 일부 미탐지 — 부분 분석"으로 명시 (⛔ `agent_status` 필드는 스키마에 없다)
 
@@ -218,7 +217,7 @@ protocol OrderDetailInteractable {
 **감지 조건**: Base class init에 optional param 추가/제거, willSet/didSet에 optional chaining 추가
 
 **분석 절차**:
-1. `symbols.json.base_class_hierarchy` 로드
+1. caller-analysis.md `## 구현` 의 하위 클래스 목록 확인
 2. 각 subclass 확인: super.init()에서 새 param을 명시 전달하는가?
 3. Default init(nil) 사용 subclass → 해당 화면에서 dependency가 실제 필요한가?
    - 화면에 쿠폰 검증/결제/network 등 활성 기능 → dependency nil이면 기능 무효화
@@ -231,7 +230,7 @@ GOOD: subclass 전수에서 미주입 화면 식별 → 쿠폰 검증 활성 화
 
 ### 아키텍처 레이어 위반 탐지 (CLAUDE.md `## Architecture` 참조)
 
-`symbols.json.import_graph` 활용:
+diff 의 import 줄 + Grep:
 - 하위 레이어에서 상위 레이어로의 역방향 참조 → critical
 - 레이어를 건너뛰는 직접 접근 → major
 - 구체적인 레이어 구조는 CLAUDE.md `## Architecture` 섹션에서 확인
@@ -240,7 +239,7 @@ GOOD: subclass 전수에서 미주입 화면 식별 → 쿠폰 검증 활성 화
 
 신규 import 추가 시:
 - A가 B를 import하는데, B도 A를 import → 순환 참조 위험
-- `symbols.json.import_graph`로 A->B->A 경로 탐지
+- import 줄 Grep 으로 A->B->A 경로 탐지
 
 ### 신규 의존성 도입
 
@@ -465,12 +464,12 @@ GOOD: find_referencing_symbols로 대체 대상 `OrderRepository` 사용처 역�
      → @available(*, deprecated) 어노테이션 누락도 함께 지적
 ```
 
-### 예시 3 — 아키텍처 레이어 위반 (symbols.json.import_graph 활용)
+### 예시 3 — 아키텍처 레이어 위반 (import 줄 Grep)
 
 ```
 BAD: 새 import 라인만 훑고 "상위 모듈 참조" 문자열 매칭으로 판정
      → 중간 레이어 경유 여부 미확인 → 정상 참조를 violation으로 오판
-GOOD: symbols.json.import_graph 로드 → Repository → UseCase 역방향 참조 경로 탐지
+GOOD: import 줄 Grep → Repository → UseCase 역방향 참조 경로 탐지
      → CLAUDE.md `## Architecture`의 레이어 순서(Network→Repository→UseCase→Workflow)와 대조
      → 역방향 참조 확인 시 critical, 레이어 건너뛰기면 major로 세분화
 ```

@@ -13,7 +13,7 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 - [Tier 0 (Solo) 절차](#tier-0-solo-절차)
 - [Tier 1 (Solo + GPT) 절차](#tier-1-solo--gpt-절차)
 - [Tier-Adaptive Evidence](#tier-adaptive-evidence)
-- [비용 로깅 (모든 Tier)](#비용-로깅-모든-tier)
+- [비용 · 소요 기록 (모든 Tier)](#비용--소요-기록-모든-tier)
 - [Tier 2: Lite — 실행 시퀀스](#tier-2-lite--실행-시퀀스)
 - [Tier 3: Full (--deep) — 추가 시퀀스](#tier-3-full---deep--추가-시퀀스)
 - [GPT Analyze 호출](#gpt-analyze-호출)
@@ -39,7 +39,7 @@ diff 크기에 따라 구성과 비용을 자동 조절하는 티어 시스템.
 >
 > ⛔ **모델은 스크립트가 single source** — `peer-review.js`의 `label: 'stage1-arch'`·`'stage1-quality'`·`'stage1-correctness'`(Stage1) · `'stage2-arch-on-quality'`·`'stage2-quality-on-arch'`(Stage2) · `'stage3-counter'`(Stage3) 전 호출이 `model:'opus'`다. 에이전트 frontmatter(`review-quality`·`review-correctness`·`review-counter` = `sonnet`)와 `skills/code-auditor/SKILL.md` `main: sonnet`은 **스크립트에 의해 override된다** — 실행 경로는 스크립트다.
 > ⛔ **재시도 포함 실제 호출 수는 더 클 수 있다** — `parallelWithRetry`가 Stage1 null 항목마다 1회 재호출하므로 **Tier 2는 3~6, Tier 3는 6~9**다(`peer-review.js`의 `parallelWithRetry`). 부분 실패로 Stage2가 생략되면 Tier 3가 6보다 적을 수도 있다. **권위 있는 수치는 반환값 `metrics.agentCalls`뿐이다.**
-> ⛔ **비용 상한 수치 열을 제거했다.** 기존 `~$2.00`/`~$3.50`은 "opus 1 + sonnet 1" 전제로 산정된 값이라 실제(opus 3 / opus 6)와 맞지 않았다. 추정치를 다른 추정치로 바꾸는 대신 **검증 가능한 call 수**로 대체한다 — 실제 비용은 `cost-log.json`이 invoke마다 실측으로 남긴다. [참고 실측: PR Tier 2 = 448K tokens]
+> ⛔ **비용 상한 수치 열을 제거했다.** 기존 `~$2.00`/`~$3.50`은 "opus 1 + sonnet 1" 전제로 산정된 값이라 실제(opus 3 / opus 6)와 맞지 않았다. 추정치를 다른 추정치로 바꾸는 대신 **검증 가능한 call 수**로 대체한다 — 실제 비용은 `scripts/fz_telemetry_report.py`(usage × 단가) · 소요와 모드는 `run_metrics.py` 행이 남긴다. [참고 실측: PR Tier 2 = 448K tokens]
 
 ## 모드 선택 (측정 · 추천 · 질문)
 
@@ -339,7 +339,6 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 ### Deliver
 - `${WORK_DIR}/review-report.md` 작성 (의무)
 - `${WORK_DIR}/pr-comments.md` 작성 (선택)
-- `${WORK_DIR}/cost-log.json` — Lead 가 작성한다(Synthesize 직전 · 아래 §비용 로깅 형식 2 · 쓰는 스크립트는 없다). 렌더 경로면 review.json 에 `"costLog": "cost-log.json"` 을 두면 렌더러가 `## 실측 비용` 절을 그린다(파일이 없으면 UNRUN)
 - ⛔ **축별 집계** — review-report.md 끝에 아래 표를 붙인다. 렌더 경로면 review.json 이슈마다 `axis` 를 적는다 — 렌더러가 이 표를 그린다(큐레이션 경로는 항상 · 손으로 붙이지 않는다 · F-212)
 
 ```markdown
@@ -388,24 +387,9 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - Independence: GPT sandbox 독립 = HIGH
 
 ### Deliver
-- review-report.md + pr-comments.md + cost-log.json
+- review-report.md + pr-comments.md
 - ⛔ `python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --check-report "${WORK_DIR}/review-report.md" --smoke "${WORK_DIR}/launch-smoke.md"` — exit 1 이면 `launch-smoke.md` 첫 줄을 `review.json` 의 `launchSmoke` 에 넣고 렌더를 다시 돌린다(⛔ 렌더된 리포트를 손으로 고치지 않는다 — payload body 와 어긋난다 · `--render` 를 끈 경로만 리포트에 직접 쓴다). '대상 아님' 은 검사하지 않는다. 미실행을 적기만 하고 게이트로 쓰지 않은 것이 F-366 이다
-- **축별 집계** — review-report.md 끝에 아래 표를 붙인다.
-
-```markdown
-## 발견 축 집계
-| 축 | 건수 | 비고 |
-|---|---:|---|
-| code_quality | {n} | |
-| structure | {n} | |
-| correctness | {n} | |
-| runtime_safety | {n} | |
-| direction | {n} | |
-| other | {n} | 어디에도 안 맞은 것 |
-```
-
-> 리뷰 집계 스키마(`PeerReviewSchema`)는 Tier 2/3 전용이다 — 그 `discoveryAxis` 가 이 집계를 담는다. Tier 1 GPT challenger 호출은 `gpt_peer_review_schema` 를 쓴다(축 집계 필드 없음). Tier 0/1 은 **이 표가 그 자리를 대신한다** — 축 이름을 그대로 써야 경로 간 비교가 성립한다.
-> 0건인 축도 행을 지우지 않는다. **0이 관측인지 미탐색인지** 구별하려면 자리가 남아 있어야 한다.
+- **축별 집계** — Tier 0 Deliver 와 같다(렌더 경로면 렌더러가 그린다)
 
 ---
 
@@ -490,18 +474,6 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 ⭐ **조건부는 Tier 0/1 에도 열려 있다.** C2 가 Refactoring Completeness · Dependency Impact 를 Tier 0/1 조건부 관점으로 올렸는데, 그 관점은 위 `⊕` 3종을 입력으로 요구한다. **관점만 켜고 입력을 막으면 부분 분석이 된다.**
 
-**pre-cache 7종** — ⛔ 지금까지 Tier 차등 없이 전부 수집했다. Tier 0 Gather 가 *"SKILL.md Gather Step 0-5 그대로"* 라서 작은 PR 에서도 전량이 돈다.
-
-| ID | 발화 조건 |
-|---|---|
-| `arch_layer_map` | 상시 (구조 축 입력) |
-| `import_graph` | import·의존 방향 변경 |
-| `protocol_conformers` | protocol 선언·conformance 변경 |
-| `deprecated_symbols` | 상시 (저비용 grep) |
-| `stream_paradigms` | 리액티브·비동기 패턴 등장 |
-| `existing_utilities` | 신규 타입·헬퍼 추가 |
-| `base_class_hierarchy` | class init·willSet 변경 |
-
 ⛔ **신호가 애매하면 켠다.** 과수집은 시간을 쓰고 누락은 판정을 망친다 — 비용이 대칭이 아니다.
 
 ⛔ **스킵은 기록한다.** 무엇을 건너뛰었는지 리포트에 남기지 않으면 "수집했는데 없었다"와 "안 봤다"를 구별할 수 없다.
@@ -510,82 +482,9 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 ---
 
-## 비용 로깅 (모든 Tier)
+## 비용 · 소요 기록 (모든 Tier)
 
-> 측정 없이 검증 불가. Tier별 토큰/duration/이슈 발견 수를 기록하여 사용자가 before/after 비교.
-
-### 수집 시점
-Synthesize 단계 직전 (Lead가 모든 agent/GPT 응답 합류 후).
-
-### 수집 소스
-- **Agent <usage> 블록**: Agent tool 응답에 포함된 `<usage>total_tokens: N tool_uses: M duration_ms: T</usage>`
-- **GPT output**: 래퍼 스트림 로그(`${OUT}.stream.log`) 마지막 부분 `tokens used N`
-- **Lead 추정**: tool_use 횟수 × 평균 (보수적)
-
-### 출력 형식 1 — review-report.md 안
-
-```markdown
-## 실측 비용
-- Tier: {0|1|2|3}  ·  Stage2 발화: {true|false}
-- Total tokens: {N}K (Lead {a}K + Agents {b}K + GPT {c}K)
-- Duration: {N}분 {M}초  ← ⛔ **구간 분해**: Gather {x}분 / Analyze {y}분 / Synthesize·Deliver {z}분
-- 필수 read-set: {N}줄  (`python3 scripts/hydration_manifest.py`)
-- 이슈 발견 수: Critical {n} / Major {m} / Minor {l} / Suggestion {p}
-- 축별 발견: code_quality {n} / structure {n} / correctness {n} / runtime_safety {n} / direction {n} / other {n}
-- cost-log.json: ${WORK_DIR}/cost-log.json
-```
-
-⛔ **구간 분해가 없으면 판정이 불가능하다.** 계약 도입으로 Lead 가 읽는 양이 늘었고(필수 read-set 증가) 동시에 교차·DA 가 워크플로로 넘어가 Lead 수동 작업이 줄었다. **두 변화가 반대 방향**이라 총 duration 하나로는 어느 쪽이 이겼는지 알 수 없다.
-
-- Gather 가 늘었으면 → 수집 게이팅이 덜 먹혔거나 read-set 증가가 원인
-- Synthesize·Deliver 가 줄었으면 → 교차·DA 이관이 먹힌 것
-- ⛔ 둘 다 늘었으면 **되돌릴 후보를 지목**한다 (계약 압축 · 게이팅 강화)
-
-⚠️ 구간 경계는 산출물 생성 시각으로 근사한다 — 정밀 계측이 아니다. 턴 사이 대기가 섞이므로 **같은 방식으로 잰 값끼리만** 비교한다.
-
-쓰기 실패 시: 본 섹션에 `"⚠️ 비용 로깅 실패 ({reason}). 토큰 추정만 가능 (~{est}K)."` 명시 (silent skip 금지).
-
-### 출력 형식 2 — cost-log.json
-
-```json
-{
-  "$schema": "fz-plugin/cost-log-v1",
-  "pr_number": 1234,
-  "tier": {
-    "selected": 0,
-    "auto": 0,
-    "override": "auto",
-    "rationale": "CHANGED_LINES=13"
-  },
-  "changed_lines": {"added": 11, "deleted": 2, "total": 13},
-  "tokens": {
-    "lead": 30000,
-    "agents": {},
-    "gpt": 0,
-    "total": 30000,
-    "method": "actual"
-  },
-  "duration_ms": 60000,
-  "issues": {"critical": 0, "major": 0, "minor": 1, "suggestion": 1},
-  "timestamp": "2026-05-12T08:00:00Z",
-  "version": "1.0"
-}
-```
-
-### Schema validation
-```bash
-jq -e '
-  (.tier.selected | type == "number" and . >= 0 and . <= 3) and
-  (.tokens.total | type == "number" and . > 0) and
-  (.changed_lines.total | type == "number" and . >= 0) and
-  (.timestamp | test("^[0-9]{4}-[0-9]{2}"))
-' ${WORK_DIR}/cost-log.json
-```
-
-### 에러 처리
-- cost-log.json 쓰기 실패 → review-report.md에 visible warning + 본문에 토큰 추정만
-- tokens 파싱 실패 → `"method": "estimated"` 표시 + warning
-- jq 미설치 → JSON skip + warning (review-report.md만 작성)
+실행마다 모드 · 소요는 `scripts/run_metrics.py` 행(start · end — `modules/mode-gate.md` § 기록)이 남기고, 토큰 · 비용은 `scripts/fz_telemetry_report.py` 가 트랜스크립트 usage × 단가로 집계한다. Lead 가 손으로 쓰는 비용 파일은 없다.
 
 ---
 

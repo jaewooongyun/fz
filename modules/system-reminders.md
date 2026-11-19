@@ -36,5 +36,4 @@
 
 ## 측정
 
-- 리마인더 발동 횟수 → session-metrics.md에 기록
 - 발동 후 Gate 통과율 변화 → Ablation 데이터로 활용

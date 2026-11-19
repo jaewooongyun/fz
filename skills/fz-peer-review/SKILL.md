@@ -134,21 +134,6 @@ bash "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/gather.sh" \
 
 ⛔ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-mapping` 은 Lead 가 채운다 (`modules/peer-review-tiers.md` § canonical set). ⛔ **패턴·일관성 이슈를 낼 때 `convention-samples` 를 건너뛰지 않는다** — 관례를 위반으로 판정하는 것도, 관례 이탈을 지적하는 것도 같은 N:M 카운트를 요구한다(실측: "형제 2곳이 다르다"로 적었는데 전수는 4:1이었다).
 
-### 2. Serena Pre-caching → `${WORK_DIR}/symbols.json`
-
-```
-mcp__plugin_fz_serena__get_symbols_overview       → 변경 파일 심볼 목록
-mcp__plugin_fz_serena__find_referencing_symbols   → 변경 심볼의 참조 관계
-mcp__plugin_fz_serena__find_symbol                → Protocol 정의, conformer
-```
-
-**추가 필드**: `arch_layer_map` (아키텍처 컴포넌트 매핑, CLAUDE.md ## Architecture 기반), `import_graph` (의존성 방향), `stream_paradigms` (리액티브 프레임워크 사용 패턴), `protocol_conformers`, `deprecated_symbols`
-
-**추가 pre-cache** (관점 6-7):
-- `deprecated_symbols`: `Grep` → `@available(*, deprecated)` 탐지
-- `existing_utilities`: diff 신규 객체 → 기존 extension/유틸 Grep
-- `base_class_hierarchy`: class init/willSet 변경 시 → `find_referencing_symbols`로 subclass 수집 (optional param default:nil → subclass silent regression 주의)
-
 ### 1.5. 요구사항 수집 → `${WORK_DIR}/requirements.md`
 
 PR title/body에서 트래커 티켓 ID 추출 + acceptance criteria 수집. 티켓 조회는 CLAUDE.md 가 선언한 트래커 MCP 가 연결돼 있을 때만(`modules/governance.md` § 팀 스킬 위임).
@@ -224,7 +209,7 @@ DIFF_LINES=$(wc -l < ${WORK_DIR}/diff.patch)
 > ⛔ Gather Step 5 직후 필수 실행 — 측정 → 추천(`scripts/mode_gate.py peer`) → 추천 full 일 때만 질문(그 밖은 묻지 않고 light + 통보 · 명시 인자 · 신호어 · `/fz` 명시 선택 · `--tier` 면 재지 않는다).
 > **실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED · 위험 카테고리는 추천 근거): `modules/peer-review-tiers.md` "## 모드 선택 (측정 · 추천 · 질문)" → "### 자동 선택 실행 bash" 참조 (SSOT 단일 지점, L18 규칙).
 
-상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조. Tier 가 정해지면 기록 `run_metrics.py start`(Tier 0·1 = light · 2·3 = full — `modules/mode-gate.md` § 기록).
+상세 절차 (Tier 0/1 분기, evidence 범위): `modules/peer-review-tiers.md` 참조. Tier 가 정해지면 기록 `run_metrics.py start`(Tier 0·1 = light · 2·3 = full — `modules/mode-gate.md` § 기록).
 
 ⛔ **근거 슬롯 검사** — tier.txt 를 쓴 뒤, Analyze · GPT 독립 패스를 띄우기 **전에** 한 번 부른다. `--tier` 는 방금 정한 값을 적는다(재개 실행의 옛 tier.txt 를 믿지 않는다):
 ```bash
@@ -365,8 +350,7 @@ Dedup: 동일 파일 + 겹치는 line_range + 동일 perspective → 병합
 > **⛔ Synthesize 완료 직후, Deliver 단계로 넘어가기 전에 반드시 Write 도구로 저장하세요. 저장 전 대화 출력 금지.**
 
 ```
-${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 라인 — 투표 적용 Tier 는 modules/peer-review-gates.md § MergeContract § 9)
-${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (마크다운 — Tier 별 생성 여부는 modules/peer-review-gates.md § MergeContract § 9)
+${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 라인 — 투표 적용 Tier 는 modules/peer-review-gates.md § MergeContract § 9) · Confidence Matrix 를 만들었으면(Tier 1·3) 최상위 matrix(마크다운 문자열)를 함께 싣는다 — dict 모양 {issues, matrix}
 ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 ```
 
@@ -390,7 +374,7 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
    - Tier 2/3: 새 맥락 검증자 — `workflows/swarm.js` 를 `agentType: 'fz:review-counter'` 로 부른다. 조각 = 카드 ≤ 8장(넘으면 조각을 나눈다 · maxFragments 12 = 카드 96 상한 — 그 밖은 BLOCKED budget). 브리프 = 카드 id · 카드 본문 · 기존 스레드 스냅샷(고정 트리 밖이라 브리프에 인라인) · method = "카드마다 반박 시도 · 테스트 파일이 diff 에 있으면 연다(Gate 4.10) · 결과를 findings 에 `<카드 id>: upheld|refuted|blocked — 근거` 로"
    - ⛔ Lead 는 **카드 id 집합 = findings 의 id 집합**인지 대조한다 — 누락 · BLOCKED · 예산 부족 카드는 코멘트로 두지 않고 ③ 질문 또는 excluded(E1)로 보낸다. `refute` 칸에 swarm run id 를 인용한다
 3. **판정** — 카드마다 코멘트 또는 제외. 코멘트는 review.json `issues[]`(kind · evidence · repro · symptom_* · measure(관례 표본 N:M 필수) · origin · suggestion · refute · comment · covers · major 이상이면 `chain[{step, grade: code|comment|inference}]` · `severity_basis{kind: output-change|path-only|zero-cases, note}`(주석 · 추론 단계나 경로만 · 사례 0 이면 minor 까지 — F-116 · F-090) · 제안 코드에 새 · SDK 심볼이 있으면 `symbol_notes{이름: new|sdk}`(F-063) · origin=regression 이면 `base_quote`(base 원문 인용 — F-037) · origin=regression 이면 `base_evidence` = `path:line@<base-sha.txt>`), 제외는 `excluded[]`(`{id, what, code, reason}` · E5 = `duplicateOf` + 선택 `reply` 답글 초안 · E8 = `refute`). 같은 결함을 여러 후보가 말하면 `covers` 로 묶는다 — 한 후보는 소유자 하나다 제외 코드 E1~E8 의 뜻은 검사기 머리말이 정본이다(E1 도달 미확인 · E2 SDK 가정 · E4 원래 있던 문제 · E5 스레드 중복 · E8 반박됨 …)
-4. **review.json 머리** — risk.json `runtime_axes`(onChange · @State 캡처 · 제스처 · 상태 전환 — 읽기로 판정 못 하는 축)가 비지 않으면 축마다 `runtimeAxes[{axis, how: probe | gpt | none, note}]`(격리 프로브 · GPT 명시 질문 · 안 함은 사유 · F-258) · `plugin_refs` 가 비지 않으면 `pluginRefsRead[{plugin, refs}]`(F-520) — 둘 다 Curate 검사기가 risk.json 과 대조한다 · `target` = `${WORK_DIR}/target.json` 그대로 · `meta.base_sha` = `${WORK_DIR}/base-sha.txt` 그대로(regression 근거의 기준 · F-037) · `strengths` 마다 `strengthGaps[{claim, uncovered}]`(그 강점이 못 막는 시나리오) · `candidates` = 독립 패스 병합이 돌았으면(기본) `["merged.json", "synthesized-issues.json"]` · `--no-gpt-independent`(challenger — 병합본 없음) · GPT 없는 Tier 0 은 `["synthesized-issues.json"]`(review.json 기준 상대 경로) · `gptPass` = 이번 실행의 GPT 경로(`independent` · `challenger` · `none` — 같은 작업 폴더에 지난 실행의 `gpt-independent/` 가 남아 있어도 challenger · none 이면 병합본을 요구하지 않는다)
+4. **review.json 머리** — risk.json `runtime_axes`(onChange · @State 캡처 · 제스처 · 상태 전환 — 읽기로 판정 못 하는 축)가 비지 않으면 축마다 `runtimeAxes[{axis, how: probe | gpt | none, note}]`(격리 프로브 · GPT 명시 질문 · 안 함은 사유 · F-258) · `plugin_refs` 가 비지 않으면 `pluginRefsRead[{plugin, refs}]`(F-520) — 둘 다 Curate 검사기가 risk.json 과 대조한다 · `target` = `${WORK_DIR}/target.json` 그대로 · `meta.base_sha` = `${WORK_DIR}/base-sha.txt` 그대로(regression 근거의 기준 · F-037) · `matrix` = synthesized-issues.json 의 `matrix` 그대로(있을 때 — 렌더러가 `## Confidence Matrix` 절을 그린다) · `strengths` 마다 `strengthGaps[{claim, uncovered}]`(그 강점이 못 막는 시나리오) · `candidates` = 독립 패스 병합이 돌았으면(기본) `["merged.json", "synthesized-issues.json"]` · `--no-gpt-independent`(challenger — 병합본 없음) · GPT 없는 Tier 0 은 `["synthesized-issues.json"]`(review.json 기준 상대 경로) · `gptPass` = 이번 실행의 GPT 경로(`independent` · `challenger` · `none` — 같은 작업 폴더에 지난 실행의 `gpt-independent/` 가 남아 있어도 challenger · none 이면 병합본을 요구하지 않는다)
 5. **검사** — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_comment_worthy.py" "${WORK_DIR}/review.json"` 이 exit 0 이어야 Deliver 로 간다(렌더러가 `--require-curation` 으로 같은 검사를 한 번 더 한다). exit 1 은 고친다 · exit 2 는 판정 불가다(⛔ 통과 아님 — target · 후보 원본 · GPT 병합본을 확인한다)
 
 #### Gate Curate

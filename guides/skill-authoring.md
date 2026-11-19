@@ -431,7 +431,7 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 - [ ] 새 provides 토큰을 정의했으면 `templates/skill-template.md` 레지스트리에 추가했는가?
 - [ ] 500줄을 초과하면 공유 모듈(`modules/`)로 분리했는가?
 - [ ] ⛔ Phase 0 Work Dir Pre-flight가 포함되어 있는가? (`modules/context-artifacts.md` → Work Dir Resolution)
-- [ ] 티켓 폴더 컨텍스트 로딩(Hydration Set)이 `modules/context-artifacts.md` Upstream Hydration Sets와 일치하는가?
+- [ ] 티켓 폴더 컨텍스트 로딩 목록이 SKILL.md 안에 있는가(정본)?
 
 ### 프롬프트 최적화 (§4 기반)
 

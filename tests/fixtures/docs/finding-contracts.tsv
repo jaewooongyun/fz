@@ -5,7 +5,7 @@ F-346	skills/fz-plan/SKILL.md	has	입력 파일은 `{steps:[…], rtm:[…]}` �
 F-476	skills/fz-pr-digest/SKILL.md	has:replace	목차 정본 = `modules/explanation-output.md`
 F-476	skills/fz-pr-digest/SKILL.md	lacks	B. 동작↔코드 1:1 매핑 (동작 하나당 블록 하나
 F-287	guides/llm-references.md	has	트리가 인용하는 arxiv ID 는 이 표 ∪ `harness-engineering.md` §참고 문헌 안에 있어야 한다
-F-072	modules/peer-review-tiers.md	has:replace	cost-log.json` — Lead 가 작성한다
+F-072	modules/peer-review-tiers.md	has:replace	토큰 · 비용은 `scripts/fz_telemetry_report.py` 가 트랜스크립트 usage × 단가로 집계한다
 F-072	modules/peer-review-tiers.md	lacks	cost-log.json` 자동 작성
 F-069	modules/peer-review-gates.md	has:replace	트리거는 severity 가 아니라 **게시 대상 여부**다
 F-069	modules/peer-review-gates.md	lacks	## Gate 4.5: Line Verification (Major 이슈만)
@@ -271,3 +271,65 @@ F-482	agents/review-correctness.md	lacks	Escalation to Lead
 F-482	agents/review-direction.md	lacks	Escalation to Lead
 F-482	agents/search-pattern.md	lacks	to `search-symbolic`
 F-482	agents/search-symbolic.md	lacks	to `search-pattern`
+# F-201 — 신뢰 행렬은 따로 쓰는 파일이 아니라 통합 이슈 파일의 최상위 칸이다: 별도 파일 이름이 돌아오면 아무도 읽지 않는 사본이 다시 생긴다 ·
+#   게이트 검증 흔적은 통합 이슈 파일의 그 이슈 칸과 처분 사유에 남는다
+F-201	skills/fz-peer-review/SKILL.md	lacks	confidence-matrix.md
+F-201	modules/peer-review-gates.md	lacks	confidence-matrix
+F-201	modules/context-artifacts.md	lacks	confidence-matrix.md
+F-201	skills/fz-peer-review/references/test-spec.md	lacks	confidence-matrix.md
+F-201	skills/fz-peer-review/SKILL.md	has:replace	Confidence Matrix 를 만들었으면(Tier 1·3) 최상위 matrix(마크다운 문자열)를 함께 싣는다
+F-201	modules/peer-review-gates.md	has:replace	Confidence Matrix 를 만들었으면(Tier 1·3) 최상위 matrix(마크다운 문자열)를 함께 싣는다
+F-201	skills/fz-peer-review/SKILL.md	has	`matrix` = synthesized-issues.json 의 `matrix` 그대로
+F-201	modules/peer-review-gates.md	count=2	synthesized-issues.json 의 그 이슈에 기록
+# F-072 — 비용 파일을 Lead 가 손으로 쓰라는 지시와 그 형식 절이 돌아오지 않는다(쓰는 스크립트가 없다) · 비용과 소요의 출처는 집계기와 실행 기록이다
+F-072	modules/peer-review-tiers.md	lacks	cost-log.json` — Lead 가 작성한다
+F-072	modules/peer-review-tiers.md	lacks	## 비용 로깅
+F-072	modules/peer-review-tiers.md	lacks	cost-log.json
+F-072	skills/fz-peer-review/SKILL.md	lacks	비용 로깅
+F-072	modules/context-artifacts.md	lacks	cost-log.json
+# F-676 — 아무도 만들지 않는 심볼 사전 캐시 파일을 읽으라는 지시가 돌아오지 않는다 · 상속 체인 게이트와 의존 관점의 입력은 호출자 분석 파일의 구현 절이다
+F-676	skills/fz-peer-review/SKILL.md	lacks	symbols.json
+F-676	modules/peer-review-gates.md	lacks	symbols.json
+F-676	skills/code-auditor/SKILL.md	lacks	symbols.json
+F-676	skills/arch-critic/SKILL.md	lacks	symbols.json
+F-676	modules/peer-review-workflow.md	lacks	symbols.json
+F-676	skills/fz-pr-digest/SKILL.md	lacks	symbols.json
+F-676	modules/peer-review-tiers.md	lacks	pre-cache
+F-676	modules/cross-validation.md	lacks	base_class_hierarchy
+F-676	modules/peer-review-gates.md	has:replace	diff 에 class init · willSet/didSet 변경
+F-676	skills/code-auditor/SKILL.md	has:replace	관점 6 부분 수행 — caller-analysis 미제공
+F-676	modules/evidence-collection.md	has	class init · willSet/didSet 변경 → 하위 클래스 전수
+# F-482 — 만들지 않는 산출물(팀 통신 기록 · 함의 · 세션 지표 · 검증 원본)의 이름과 미생성 고지가 돌아오지 않는다 — 고지가 사라진 뒤 이름이 돌아오면 살아 있는 읽기 지시가 된다
+F-482	modules/context-artifacts.md	lacks	-team.md
+F-482	modules/context-artifacts.md	lacks	implications.md
+F-482	modules/context-artifacts.md	lacks	session-metrics
+F-482	modules/cross-validation.md	lacks	verify-result-full.md
+F-482	modules/cross-validation.md	lacks	-full.md
+F-482	modules/system-reminders.md	lacks	session-metrics.md
+F-482	skills/fz-review/SKILL.md	lacks	phase-a-metrics.md
+F-482	skills/fz-review/SKILL.md	lacks	code-team.md
+F-482	skills/fz-code/SKILL.md	lacks	code-team.md
+F-482	skills/fz-plan/references/rationale.md	lacks	plan-team.md
+F-482	skills/fz-discover/references/rationale.md	lacks	discover-team.md
+# F-677 — 스킬별 읽기 목록의 사본 표가 돌아오지 않는다 — 목록의 정본은 각 스킬 본문이고 사본은 이미 어긋나 있었다
+F-677	modules/context-artifacts.md	lacks	Upstream (Read 대상)
+F-677	modules/context-artifacts.md	has:replace	각 스킬 SKILL.md 의 Phase 0 · 티켓 폴더 컨텍스트 로딩 목록이 정본이다
+F-677	guides/skill-authoring.md	lacks	Upstream Hydration Sets와 일치
+F-677	guides/skill-authoring.md	has:replace	티켓 폴더 컨텍스트 로딩 목록이 SKILL.md 안에 있는가(정본)?
+# F-678 — 아무것도 재거나 막지 않는 파일별 크기 상한 표와 축출 순서가 돌아오지 않는다 · 남는 크기 규칙은 로드 합계 원칙 하나와
+#   discover 파일 압축 기준 한 곳(Phase-Tagged Discover 절)이다 — 스킬 본문은 숫자를 다시 적지 않고 그 절을 가리킨다
+F-678	modules/context-artifacts.md	lacks	Eviction 우선순위
+F-678	modules/context-artifacts.md	lacks	K tokens |
+F-678	modules/context-artifacts.md	lacks	측정 후 하단 테이블 크기 조정 가능
+F-678	modules/context-artifacts.md	has	원칙: 전체 artifact 로드 합계 ≤ 100K tokens
+F-678	skills/fz/SKILL.md	lacks	Artifact Budget Table
+F-678	skills/fz/SKILL.md	has:replace	artifact 로드 총합 원칙 + 산출물 프로토콜
+F-678	modules/context-artifacts.md	lacks	1K tokens 초과
+F-678	modules/context-artifacts.md	has:replace	파일 크기 5K tokens 초과 시 → 이전 topic 요약 압축
+F-678	skills/fz-discover/SKILL.md	lacks	1K tokens 초과
+F-678	skills/fz-discover/SKILL.md	lacks	~2K tokens
+F-678	skills/fz-discover/SKILL.md	has:replace	크기 기준: `modules/context-artifacts.md` § Phase-Tagged Discover
+# F-679 — 발견 축 집계 표의 사본은 Tier 0 Deliver 한 벌이다 — Tier 1 쪽 사본은 렌더 경로 안내가 빠진 채 갈라져 있었다
+F-679	modules/peer-review-tiers.md	count=1	## 발견 축 집계
+F-679	modules/peer-review-tiers.md	lacks	> 0건인 축도 행을 지우지 않는다
+F-679	modules/peer-review-tiers.md	has:replace	**축별 집계** — Tier 0 Deliver 와 같다

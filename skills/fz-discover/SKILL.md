@@ -273,8 +273,8 @@ GOOD: "proxy에 @Published는 안 됩니다.
    - DISCOVER_TAG = "journal" → **전체 덮어쓰기** (매 라운드). compact 후 이 파일 하나만 Read하면 전체 복원.
    - DISCOVER_TAG = plan|code|review → **APPEND** + topic header (동일 phase 다중 discover 지원)
    - 티켓 폴더(WORK_DIR) 활성: `{WORK_DIR}/discover/discover-{DISCOVER_TAG}.md` + `{WORK_DIR}/index.md` 업데이트
-     - journal: 파일 전체를 매 라운드 갱신 (~2K tokens). 상세하게 기록: 제약 매트릭스, 생존/탈락 후보, 핵심 결정 흐름, 미결 질문.
-     - phase: APPEND + `## Topic: {질문 요약}` header. 1K tokens 초과 시 이전 topic 압축.
+     - journal: 파일 전체를 매 라운드 갱신 (크기 기준: `modules/context-artifacts.md` § Phase-Tagged Discover). 상세하게 기록: 제약 매트릭스, 생존/탈락 후보, 핵심 결정 흐름, 미결 질문.
+     - phase: APPEND + `## Topic: {질문 요약}` header. 같은 크기 기준을 넘으면 이전 topic 압축.
      - Round History는 유지하지 않음 — 탈락 후보 사유가 롤백 근거 역할.
    형식 참조: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)"
 

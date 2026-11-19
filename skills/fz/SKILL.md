@@ -123,7 +123,7 @@ metadata:
    - ⛔ 선언만으로는 Gate 0 통과 불가 — 3-step chain 명시 의무 (edge-cases Failure 1-1 완화)
 
 5. **핵심 모듈 선로드** (6+ 스텝 또는 TEAM):
-   - `Read(modules/context-artifacts.md)` — Artifact Budget Table + 산출물 프로토콜
+   - `Read(modules/context-artifacts.md)` — artifact 로드 총합 원칙 + 산출물 프로토콜
 ### Gate 0: Session Ready
 - [ ] 새 세션이고 티켓 폴더가 있으면 `index.md` Essential Context 를 읽었는가?
 - [ ] 탐색 파이프라인이면 인덱스 확인?

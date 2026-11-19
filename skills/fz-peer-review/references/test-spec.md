@@ -21,7 +21,7 @@
 
 | Given | When | Then (pass/fail oracle) | 유형 |
 |-------|------|------------------------|------|
-| PR 번호 입력, `gh auth status` 성공, 표준 규모 diff(auto Tier 2 결정) | `/fz-peer-review 123` | Gate 5.5 통과(`tier.txt` 기록) 후 Synthesize CHECKPOINT 2파일(`synthesized-issues.json`·`review-index.md`) + Deliver CHECKPOINT 2파일(`review-report.md`·`pr-comments.md`) 모두 Write 완료 = pass. `confidence-matrix.md` 요구 여부는 `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행이 정본 | normal |
+| PR 번호 입력, `gh auth status` 성공, 표준 규모 diff(auto Tier 2 결정) | `/fz-peer-review 123` | Gate 5.5 통과(`tier.txt` 기록) 후 Synthesize CHECKPOINT 2파일(`synthesized-issues.json`·`review-index.md`) + Deliver CHECKPOINT 2파일(`review-report.md`·`pr-comments.md`) 모두 Write 완료 = pass. `synthesized-issues.json` 의 `matrix` 요구 여부는 `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행이 정본 | normal |
 | 변경 13줄 소규모 PR, `--tier` 미지정 | `/fz-peer-review 45` | Gate 5.5에서 auto Tier 0 결정 → `tier.txt == "0"` 기록 + **Workflow 미호출**(Lead 단독 분석 — `workflows/peer-review.js` invoke 0회) = pass | normal |
 | 지적 패턴이 base 브랜치에 이미 존재(`base-behavior.md`상 pre-existing), 에이전트가 `origin=pre-existing` 보고 | `/fz-peer-review 123` | Synthesize Origin 보정으로 해당 이슈 severity가 `suggestion`으로 cap + Confidence Matrix Origin 열 `P`(형태·생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9) + 리포트 `[기존 동작 동일]` 태그 부착 = pass | edge-case |
 | `gh auth status` 실패 | `/fz-peer-review 123` | git 폴백 경로(`git fetch upstream` + `git diff`)로 `${WORK_DIR}/diff.patch` 생성(비어있지 않음) → 리뷰 파이프라인 계속 진행 = pass | failure |

@@ -375,7 +375,7 @@ fz-peer-review에서 `--explain` 옵션으로 호출 시, 리뷰 완료 후 자�
 이 경우 Gather 단계의 diff/원본 코드를 peer-review의 WORK_DIR에서 재사용한다:
 ```
 peer-review WORK_DIR: ${PROJECT_ROOT}/peer-review-{PR_NUMBER}/
-  → diff.patch, base-behavior.md, symbols.json 재활용
+  → diff.patch, base-behavior.md 재활용
 ```
 
 ---

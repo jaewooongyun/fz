@@ -77,7 +77,7 @@ ICLR 2025 Blogposts: Debate 효과 대부분이 **majority voting**으로 환원
 | code-changes 생산 (리팩토링) | enforcement 검증 | Anti-Pattern Grep + Module Boundary | 모든 모드 (Plan에 Constraints 있을 때) |
 | code-changes 생산 (모듈화/캡슐화) | consumer quality 검증 | 소비자 파일 전수 수집 + 사용 패턴 + 진입점 검증 | 모든 모드 (모듈화 작업 시) |
 | code-changes 생산 (시그니처 변경) | protocol conformance 검증 | find_referencing_symbols → 프로토콜 요구사항 양방향 확인 | 모든 모드 |
-| code-changes 생산 (init 변경) | inheritance DI conformance | base_class_hierarchy → subclass init + 화면별 dependency 확인 (Gate 4.6.5) | 모든 모드 (init 변경 시) |
+| code-changes 생산 (init 변경) | inheritance DI conformance | 하위 클래스 전수(caller-analysis `## 구현`) → subclass init + 화면별 dependency 확인 (Gate 4.6.5) | 모든 모드 (init 변경 시) |
 | code-changes 생산 (제거/리팩토링) | implication-scan | lead-reasoning.md § Implication Scan | 모든 모드 (1차/2차 트리거) |
 | code-changes 생산 (모든) | Q-OBSERVE 경량 | lead-reasoning.md § 상시 경량 | 모든 모드 (상시) |
 | revert 작업 | origin-equivalence | lead-reasoning.md + cross-validation.md § origin-equivalence | 모든 모드 (revert 키워드) |
@@ -394,10 +394,10 @@ printf '%s\n' "{과제 지시}" > "$P"
 
 ## GPT 검증 결과 보존 정책
 
-> 1M context 활용: 요약 + 원본 분리 (Progressive Disclosure)
+> 다음 Phase 가 읽는 것은 요약 파일 하나다.
 
-- **티켓 폴더(WORK_DIR) 활성**: `verify-result.md` (요약 3K, Hydration 대상) + `verify-result-full.md` (원본, drill-down용)
-- 다음 Phase 스킬은 `verify-result.md` 요약을 Read. 상세 확인 시 `-full.md` drill-down.
+- **티켓 폴더(WORK_DIR) 활성**: `verify-result.md` (요약 3K, Hydration 대상)
+- 다음 Phase 스킬은 `verify-result.md` 요약을 Read.
 
 ---
 

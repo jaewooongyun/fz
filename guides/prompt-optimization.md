@@ -718,7 +718,7 @@ fz 적용:
 | 검증 단계 없이 생성만 지시 | 오류 누적, 품질 저하 | validate -> fix -> repeat 루프 내장 |
 | 모든 도구를 allowed-tools에 포함 · 도구를 막으려고 allowed-tools를 좁힘 | allowed-tools 는 부른 턴의 사전 승인이다 — 넣은 도구는 모두 묻지 않고 쓰이고, 목록 밖 도구도 그대로 호출할 수 있다(제한 효과 없음) | 묻지 않고 써야 하는 도구만 allowed-tools 에, 막을 도구는 disallowed-tools 에 둔다 |
 | 스킬 간 책임 범위 중복 | 충돌, 예측 불가 행동 | Will / Will Not 경계 명확히 설정 |
-| Base class 변경 후 상속 체인 미검증 | Subclass silent regression (컴파일러 미탐지) | Inheritance Chain Impact Gate: base_class_hierarchy → subclass init + 화면별 dependency 검증 |
+| Base class 변경 후 상속 체인 미검증 | Subclass silent regression (컴파일러 미탐지) | Inheritance Chain Impact Gate: 하위 클래스 전수 → subclass init + 화면별 dependency 검증 |
 | TEAM에서 Gate를 "권고"로 취급 | 검증 누락, 품질 저하 | Gate 절차적 강제 (스킵 불가 조건 명시) |
 | 에이전트 간 초안 공유 후 분석 | Sycophancy/동조 수렴 | Round 1 독립 분석 → Round 2 피드백 순서 강제 |
 | 비구조화 Task 전달 | 역할 혼동, 중복/누락 작업 | Task Brief 5요소 형식 사용 |

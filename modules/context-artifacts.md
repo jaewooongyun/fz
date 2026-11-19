@@ -31,7 +31,7 @@
 
 - 아티팩트를 파일로 기록하는 이유: compact 후에도 Read로 복원할 수 있다.
 - index.md를 유지하는 이유: 새 세션에서 한 파일만 읽으면 전체 맥락을 파악할 수 있다.
-- 파일 크기를 제한하는 이유: 과도한 파일은 context re-explosion을 유발한다.
+- artifact 로드 합계를 제한하는 이유: 과도한 파일은 context re-explosion을 유발한다.
 
 ## 폴더 구조
 
@@ -42,25 +42,21 @@
 │   ├── discover-journal.md  # plan 전 discover (canonical)
 │   ├── discover-plan.md     # plan 실행 중 ad-hoc (Phase-Tagged)
 │   ├── discover-code.md     # code 실행 중 ad-hoc (Phase-Tagged)
-│   ├── discover-review.md   # review 실행 중 ad-hoc (Phase-Tagged)
-│   └── discover-team.md     # TEAM 모드 adversarial discovery 통신 기록 (Workflow pilot: 미생성 — transcript가 대체, canonical discover-journal.md 무변경)
+│   └── discover-review.md   # review 실행 중 ad-hoc (Phase-Tagged)
 ├── plan/
 │   ├── plan-v1.md ~ plan-vN.md
 │   ├── plan-final.md
 │   ├── direction-challenge.md  # Phase 0.5 방향성 도전 결과 (PROCEED/RECONSIDER/REDIRECT)
-│   ├── plan-team.md            # TEAM 모드 collaborative design 통신 기록 (Workflow 전환 후 미생성 — transcript가 대체)
 │   └── verify-result.md        # Phase 2 검증 verdict + 이슈 요약
 ├── code/
 │   ├── step-1.md ~ step-N.md
-│   ├── progress.md       # 전체 진행 상태 (누적형 — 이전 Step 핵심 결정 한 줄씩 유지)
-│   └── code-team.md      # TEAM 모드 pair programming 통신 기록 (Workflow 전환 후 미생성 — transcript가 대체)
+│   └── progress.md       # 전체 진행 상태 (누적형 — 이전 Step 핵심 결정 한 줄씩 유지)
 ├── fix/
 │   └── fix-analysis.md   # fz-fix 원인 분석 + 수정 기록
 ├── search/
 │   └── search-result.md  # fz-search 탐색 결과
 └── review/
-    ├── self-review.md     # fz-review 자기 리뷰 결과
-    └── review-team.md     # TEAM 모드 live review 핵심 통신 기록 (Workflow 전환 후 미생성 — transcript가 대체)
+    └── self-review.md     # fz-review 자기 리뷰 결과
 ```
 
 ### Standalone Work Dir (peer-review)
@@ -71,7 +67,6 @@ fz-peer-review는 티켓 폴더와 별도 WORK_DIR을 사용:
 {PROJECT_ROOT}/peer-review-{PR_NUMBER}/
 ├── review-index.md
 ├── synthesized-issues.json
-├── confidence-matrix.md       # 생성 경로는 modules/peer-review-gates.md § MergeContract § 9
 ├── merged.json                # review_merge.py 병합본 — Curate 후보 원본
 ├── existing-threads.json      # gather 가 모은 기존 스레드(status ok · unavailable · not-a-pr)
 ├── target.json                # 리뷰 대상 {kind, ref, sha} — evidence · Serena 트리 @sha 대조 기준
@@ -155,8 +150,8 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 | Gate 통과/실패 이력 | 코드 diff 상세 |
 | Active Phase + Step 진행률 | 빌드 로그 |
 | mid-pipeline discover 결정 | /btw로 물어본 일회성 질문 |
-| Implication Register + 관찰 함의 (implications.md) | Implication Scan 중간 로그 |
-| Session Metrics (session-metrics.md) — gate/compact/reminder/turns | 개별 도구 결과 로그 |
+| Implication Register + 관찰 함의 | Implication Scan 중간 로그 |
+| | 개별 도구 결과 로그 |
 
 ```
 Essential: "[plan] Step 3개 계획 확정. RIBs 패턴. OrderDetail{Builder,Router,Interactor,VC}."
@@ -165,17 +160,7 @@ Disposable: "Grep 결과 42개 파일 매칭. find_referencing_symbols 호출 3�
 
 ## Upstream Hydration Sets
 
-> GPT M5: 스킬별 Phase 0에서 Read해야 하는 파일 목록 표준화. Artifact drift 방지.
-
-| 스킬 | Upstream (Read 대상) |
-|------|---------------------|
-| discover | (없음 — 첫 진입점) |
-| discover (mid-pipeline) | `index.md` → Active Phase 판별 |
-| plan | `discover/discover-journal.md` (있으면), `discover/discover-plan.md` (있으면) |
-| code | `plan/plan-final.md` (없으면 `plan/plan-light.md`), `plan/verify-result.md` (있으면), `discover/discover-journal.md`, `discover/discover-code.md` (있으면), `code/progress.md`, 최신 `code/step-N.md` |
-| review | `plan/plan-final.md` (없으면 `plan/plan-light.md`), `plan/verify-result.md` (있으면), `code/progress.md`, 최신 `code/step-N.md`, `discover/discover-review.md` (있으면) |
-| fix | `fix/fix-analysis.md` (있으면), `search/` 결과 (있으면) |
-| search | (없음 — 독립 탐색) |
+각 스킬 SKILL.md 의 Phase 0 · 티켓 폴더 컨텍스트 로딩 목록이 정본이다(이 모듈은 사본을 두지 않는다).
 
 > ⛔ `constraints.md` 참조 금지 — canonical은 `discover-journal.md`
 
@@ -202,10 +187,10 @@ Disposable: "Grep 결과 42개 파일 매칭. find_referencing_symbols 호출 3�
 ### 동일 Phase 내 다중 Discover 규칙
 
 ```
-discover-journal.md (DISCOVER_TAG=journal): 전체 덮어쓰기 (매 라운드)
+discover-journal.md (DISCOVER_TAG=journal): 전체 덮어쓰기 (매 라운드) · 10K tokens 이내
 discover-{phase}.md (DISCOVER_TAG=plan|code|review): APPEND + topic header
 - topic header로 분리: ## Topic: {질문 요약} (YYYY-MM-DD HH:MM)
-- 파일 크기 1K tokens 초과 시 → 이전 topic 요약 압축 (최신 topic 상세 유지)
+- 파일 크기 5K tokens 초과 시 → 이전 topic 요약 압축 (최신 topic 상세 유지)
 ```
 
 ## Ephemeral vs Persistent (/btw 통합)
@@ -233,26 +218,10 @@ discover-{phase}.md (DISCOVER_TAG=plan|code|review): APPEND + topic header
 ## Artifact Token Budget
 
 > 현재 환경: **Lead = `fable` alias(Claude Code v2.1.321 부터 Fable 5.2 — fz 운용 선택)** · 워커(수행 에이전트)는 opus(=Opus 5.5, 2026-09-22~)/sonnet. 이전 Lead Fable 5.1·**Opus 5.5** 는 모두 1M context(Fable 5.2 의 컨텍스트 창은 2026-11-16 대조 범위 밖) — "The 1M token context window is the default, and a header sent for older models has no effect." [verified: platform.claude.com/docs/en/models/opus-5-5/migration-guide]. 티켓 폴더 파일 전략은 모델 무관 유지
-> ⚠️ **tokenizer**: 1.00-1.35x 토큰 증가 (pre-4.7 baseline, fz 자체 실측 미완료) `[미검증: fz 자체 count_tokens 측정 대기]`. **Opus 4.7/4.8/5 · Fable 5는 동일 tokenizer** → 이들 간 이전 시 토큰 수 거의 불변 [verified: claude-api 번들 스킬 — "same tokenizer as Opus 4.8"]. 측정 후 하단 테이블 크기 조정 가능.
+> ⚠️ **tokenizer**: 1.00-1.35x 토큰 증가 (pre-4.7 baseline, fz 자체 실측 미완료) `[미검증: fz 자체 count_tokens 측정 대기]`. **Opus 4.7/4.8/5 · Fable 5는 동일 tokenizer** → 이들 간 이전 시 토큰 수 거의 불변 [verified: claude-api 번들 스킬 — "same tokenizer as Opus 4.8"].
 > ℹ️ **프롬프트 캐시 최소 prefix**: Opus 5.5 = **512 tokens**, Opus 4.8 = 1024 — "The minimum cacheable prompt length on Claude Opus 5.5 is 512 tokens, down from 1,024 tokens on Claude Opus 4.8." [verified: platform.claude.com/docs/en/models/opus-5-5/migration-guide]. 짧은 artifact도 캐시 대상이 되므로 분할 전략 재검토 여지 있음.
 > 원칙: 전체 artifact 로드 합계 ≤ 100K tokens. 나머지는 실행 working memory.
 > Context Rot 원칙(집중 > 분산)은 context 크기와 무관하게 동일 적용.
-
-| 파일 유형 | 최대 크기 | 비고 |
-|----------|----------|------|
-| Essential Context (index.md) | 3K tokens | Key Decisions + Constraints + Active State <!-- 기존: 500자 --> |
-| discover-journal | 10K tokens | 매 라운드 전체 덮어쓰기 (**상세**). Round History 없음 <!-- 기존: 2K --> |
-| discover-{phase} | 5K tokens | Phase별 APPEND + topic header <!-- 기존: 1K --> |
-| plan-v{N} / plan-final | 10K tokens | 설계 결정 + 영향 분석 + 리스크 <!-- 기존: 3K --> |
-| code/step-{N} | 3K tokens | 구현 결과 + 결정 근거 <!-- 기존: 1.5K --> |
-| code/progress | 5K tokens | 전체 Step 진행 상황 <!-- 기존: 1.5K --> |
-| workflow-result.json | 5K tokens | Workflow 반환 기록(Lead 작성). 에이전트 간 통신 원본은 Workflow transcript(runId) — Hydration 대상 아님 |
-| verify-result.md | 3K tokens | GPT 요약 (원본: verify-result-full.md) |
-
-**Eviction 우선순위** (budget 100K 초과 시):
-1. 가장 오래된 discover-{phase}.md (journal은 보존)
-2. 완료된 step-{N}.md (progress.md 요약으로 대체)
-3. workflow-result.json (요약만 보존 — 원본은 transcript)
 
 ## 실행 기록
 
@@ -344,7 +313,7 @@ discover-{phase}.md (DISCOVER_TAG=plan|code|review): APPEND + topic header
 | /fz-plan | plan 버전 기록 |
 | /fz-code | step/progress 기록 |
 | /fz-review | self-review 기록 |
-| /fz-peer-review | review-index.md + 파일 산출물 (synthesized-issues.json, confidence-matrix.md, pr-comments.md, cost-log.json, tier.txt) — Serena checkpoint 미사용. confidence-matrix.md 생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9 |
+| /fz-peer-review | review-index.md + 파일 산출물 (synthesized-issues.json, pr-comments.md, tier.txt) — Serena checkpoint 미사용. |
 
 ## ⛔ Work Dir Resolution (모든 fz-* 스킬 필수)
 
