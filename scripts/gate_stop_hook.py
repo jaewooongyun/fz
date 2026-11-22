@@ -109,7 +109,7 @@ except Exception:                       # noqa: BLE001 — 권한 · 구문 오�
 ROOT = Path(__file__).resolve().parent.parent  # scripts/ → 플러그인 루트
 
 HOOK_EVENTS = ("Stop", "SubagentStop")
-# ⛔ 원장 발견(glob 깊이·SKIP_DIRS)과 `FZ_GATES_LEDGER` 는 **판정기가 소유한다** —
+# ⛔ 원장 발견(걷기 깊이·SKIP_DIRS)과 `FZ_GATES_LEDGER` 는 **판정기가 소유한다** —
 #    `gate_check.py`의 `find_ledgers` · `LEDGER_ENV`. 여기에 복제하면 두 구현이 갈린다(이름도 판정기 상수를 읽는다).
 CHECK_TIMEOUT_S = 20                   # 판정기 1회 호출 상한
 TOTAL_BUDGET_S = 45                    # 전체 예산 — 소유 원장을 먼저 쓰고, 남는 만큼 남의 원장을 본다
@@ -212,7 +212,7 @@ _CMD_PREFIX_WORDS = frozenset(("env", "command", "exec", "time", "nohup", "-i", 
 _REDIR_ONLY_RE = re.compile(r"^(?:[0-9]*>>?|<|&>>?)$")           # 대상이 다음 단어인 리다이렉션
 _REDIR_RE = re.compile(r"^(?:[0-9]*>>?|<|&>>?|[0-9]*>&)")           # 대상이 붙은 리다이렉션(`>/dev/null` · `2>&1`)
 _UNRESOLVED_RE = re.compile(r"[$`*]")                          # 풀리지 않은 변수 · 치환 · 글롭
-# 원장 인자 · 루프 값은 이 글자만으로 된 경로일 때만 '풀렸다' 로 본다 — 허용 목록이다(F-458). 차단 목록은 `~` · `[…]` ·
+# 원장 인자 · 루프 값(과 상태 기록 찾기의 cd 대상)은 이 글자만으로 된 경로일 때만 '풀렸다' 로 본다 — 허용 목록이다(F-458). 차단 목록은 `~` · `[…]` ·
 # `{a,b}` · `?` 처럼 셸이 바꾸는 꼴을 하나 빠뜨릴 때마다 남의 원장으로 판정해 Stop 을 통과시켰다(fail-open)
 # 공백은 따옴표로 묶은 한 단어 안에서만 온다(따옴표 값에 공백이 있는 대입은 미상 표식 — `_assign`) — 공백 든 원장 경로를 받는다(리뷰 R6)
 _RESOLVED_PATH_RE = re.compile(r"^(?!-)[\w./@%+=:, -]+$")         # `-` 로 시작하면 변수로 들어온 옵션이다(`"$OPT"`)
@@ -1300,30 +1300,65 @@ SWEEP_LINE_RE = re.compile(r"^MCP_SWEEP runs=(\d+) used=\d+ suspect=(\d+) ", re.
 SWEEP_SUSPECT_RE = re.compile(r"^  의심: (\S+) (\S+)", re.M)
 
 
-def find_state_records(cwd: Path, transcript_path, gcmod, deadline: float):
-    """이 세션이 쓴 상태 기록(`evidence/tools.md`) — 원장을 찾는 방식 그대로다. 판정기의 원장 glob(깊이 0~3)에서 원장 자리를
-    `evidence/tools.md` 로 바꿔 찾고 판정기가 건너뛰는 폴더를 뺀 뒤, transcript 가 `Write`/`Edit` · Bash 쓰기 자리로 쓴 것만 고른다
-    (경로 비교는 원장과 같은 `_same_ledger`).
+def _state_targets(cmd: str, base: Path) -> list:
+    """Bash 명령의 쓰기 자리(fz-guard write_sites) 대상 — 같은 명령의 `cd` · `pushd` 를 따라 상대 대상을 쓰는 때의 폴더로 푼다(상태 기록 찾기용).
 
-    - Parameters: deadline — `time.monotonic()` 값. glob 패턴 사이 · glob 이 낸 경로마다 · transcript `STATE_SCAN_CHECK_LINES` 줄마다 본다.
-    - Returns: 상태 기록 경로 목록 · 마감이 지나 끝내지 못했으면 None('못 찾음' 인 빈 목록과 다르다 — 부르는 쪽은 이번 종료를 훑지 않는다).
-    - Note: Bash 쓰기 대상은 fz-guard write_sites 의 자리를 그 줄의 cwd 로 푼다 — 같은 명령의 `cd` 는 따라가지 않는다. 못 찾거나
-      못 읽으면 빈 목록이다 — 상태를 모르면 훑기가 0회 · 성공 0 을 미판정으로 둔다(틀린 상태로 의심을 내지 않는다).
+    조각(맨 바깥 연산자)마다 그때의 폴더를 들고 간다 — 절대 cd 는 그 폴더 · 상대 cd 는 앞 폴더에 쌓는다 · 서브셸 `( … )` 안의 cd 는 괄호를
+    나오면 되돌린다 · cd 조각의 리다이렉트는 cd 전 폴더에서 열린다. cd 대상을 못 풀면(변수 미상 · 글롭 · `-`) 그 뒤 상대 대상은 버린다
+    — 어디서 썼는지 모르면 이 세션 것으로 고르지 않는다(틀린 상태로 의심을 내지 않는다). 대상 · cd 글자는 훅 환경으로만 편다(같은 명령의
+    대입은 보지 않는다). heredoc 본문 안 치환의 쓰기는 조각에 들지 않아 보지 않는다(고르지 않는 쪽).
     """
-    found = set()
-    for pat in (g.replace("gates/plan.md", "evidence/tools.md") for g in getattr(gcmod, "LEDGER_GLOBS", ())):
-        if time.monotonic() >= deadline:
-            return None
-        try:
-            hits = set()
-            for q in cwd.glob(pat):
-                if time.monotonic() >= deadline:
-                    return None
-                if q.is_file() and not gcmod._skipped(q, cwd):
-                    hits.add(q.resolve())
-        except OSError:
-            continue
-        found |= hits
+    if shell_tokens is None or not cmd:
+        return []
+    segs = shell_tokens.segments(cmd)
+    if shell_tokens.is_unknown(segs) or _write_sites(cmd) is None:
+        return []
+    whole = shell_tokens.lex(cmd)
+    defs = _GUARD[0].defined_functions(whole)
+    starts = [0] + [t.end for t in whole if isinstance(t, shell_tokens.Op) and t.text not in ("(", ")")]   # segments() 와 같은 경계
+    marks = _subshell_marks(cmd, len(segs))
+    cur, stack, out = str(base), [], []
+    for i, seg in enumerate(segs):
+        for _ in range(marks[i - 1][1] if i else 0):
+            if stack:
+                cur = stack.pop()          # 닫힌 서브셸 — 그 안의 cd 는 뒤로 이어지지 않는다
+        stack += [cur] * marks[i][0]
+        known = frozenset(n for n, end in defs.items() if end <= starts[i])   # 앞 조각이 맨 바깥에서 정의한 함수
+        for w, _c in _write_sites(seg, fragment=True, known=known) or []:
+            if w is None:
+                continue
+            t = _expand(w.text, {}) if w.expands else w.text
+            if t.startswith("/"):
+                out.append(t)
+            elif cur is not None:
+                out.append(f"{cur}/{t}")
+        mcd = CD_RE.match(seg)
+        if mcd:                            # 이 조각의 cd — 다음 조각부터 그 폴더다
+            d = _tilde(_expand(mcd.group(1), {}), {})
+            if not _RESOLVED_PATH_RE.match(d):
+                cur = None                 # 못 푼 cd — 그 뒤 상대 대상은 어디에 썼는지 모른다
+            elif d.startswith("/"):
+                cur = d
+            elif cur is not None:
+                cur = f"{cur}/{d}"         # 상대 cd 는 앞 폴더에 쌓인다
+    return out
+
+
+def find_state_records(cwd: Path, transcript_path, gcmod, deadline: float):
+    """이 세션이 쓴 상태 기록(`evidence/tools.md`) — 원장을 찾는 방식 그대로다. 판정기의 가지치기 걷기(`walk_named` — 깊이 0~3 · 판정기가
+    건너뛰는 폴더에는 들어가지 않는다)로 원장 자리 대신 `evidence/tools.md` 를 찾은 뒤, transcript 가 `Write`/`Edit` · Bash 쓰기 자리로 쓴
+    것만 고른다(경로 비교는 원장과 같은 `_same_ledger`).
+
+    - Parameters: deadline — `time.monotonic()` 값. 걷는 폴더마다 · transcript `STATE_SCAN_CHECK_LINES` 줄마다 본다.
+    - Returns: 상태 기록 경로 목록 · 마감이 지나 끝내지 못했으면 None('못 찾음' 인 빈 목록과 다르다 — 부르는 쪽은 이번 종료를 훑지 않는다).
+    - Note: Bash 쓰기 대상은 fz-guard write_sites 의 자리를 같은 명령의 `cd` 를 따라 푼다(`_state_targets` — 못 푼 cd 뒤 상대 대상은
+      버린다). 못 찾거나 못 읽으면 빈 목록이다 — 상태를 모르면 훑기가 0회 · 성공 0 을 미판정으로 둔다(틀린 상태로 의심을 내지 않는다).
+    """
+    walk = getattr(gcmod, "walk_named", None)
+    found = walk(cwd, "evidence/tools.md", deadline=deadline) if callable(walk) else []
+    if found is None:
+        return None                                      # 걷기가 마감 안에 끝나지 않았다
+    found = {q.resolve() for q in found}
     tp = Path(str(transcript_path or ""))
     if not found or not transcript_path or not tp.is_file():
         return []
@@ -1350,8 +1385,7 @@ def find_state_records(cwd: Path, transcript_path, gcmod, deadline: float):
                     if blk.get("name") in WRITE_TOOLS:
                         targets = [str(inp.get("file_path") or "")]
                     elif blk.get("name") == "Bash":
-                        sites = _write_sites(str(inp.get("command") or "")) or []
-                        targets = [_expand(w.text, {}) if w.expands else w.text for w, _c in sites if w is not None]
+                        targets = _state_targets(str(inp.get("command") or ""), base)
                     else:
                         continue
                     owned |= {rec for rec in found for t in targets if _same_ledger(t, rec, base)}
@@ -1374,8 +1408,8 @@ def sweep_session(payload: dict, started: float, code: int) -> None:
       `SWEEP_MIN_S` 를 뺀 마감까지만 돌고, 끝내지 못하면 이번 종료는 훑지 않는다(감사 프로세스 · 기록 · 열쇠 · 알림이 없고 실행 상태 폴더 ·
       잠금 파일도 만들지 않는다 — 다음 종료가 다시 본다). 잠금을 쥔 뒤 남은 몫이 `SWEEP_MIN_S` 보다 작아도 감사 프로세스를 띄우지 않는다.
       띄우면 그 프로세스를 남은 몫에 끊고, 그보다 1초 먼저 끝나는 `--budget` 이 훑기를 멈춰 본 데까지 기록 · 열쇠를 남긴다.
-      남는 한계: 디렉토리 열거 한 번(아주 큰 트리에서 glob 패턴 하나가 경로를 내기 전까지)은 파이썬에서 끊을 수 없어, 찾기가 그 한 번의
-      길이만큼 마감을 넘길 수 있다 — 바깥 상한은 훅 항목의 `timeout` 이다.
+      남는 한계: 디렉토리 하나의 열거(`os.scandir` 한 번)는 파이썬에서 끊을 수 없어, 찾기가 그 한 번의 길이만큼 마감을 넘길 수 있다 —
+      바깥 상한은 훅 항목의 `timeout` 이다.
     - Note: '의심' 이 하나라도 있고 막지 않는 판정이면 stdout 에 `{"systemMessage": …}` 한 줄을 낸다. 막는 판정이면 기록만 하고 그 의심을
       기록 옆 `SWEEP_HELD` 에 세션별로 미룬다 — 그 세션을 막지 않는 판정으로 다음에 훑는 쪽이 한 번 알리고 지운다(기록 줄은 다시 쓰지 않는다).
       다음 막지 않는 종료까지 미뤄지는 것은 차단 항목 하나만 등록한 머신에서뿐이다(아래).
@@ -1859,6 +1893,11 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
 SWEEP_CELLS = ("sweep-notice", "sweep-quiet", "sweep-off", "sweep-budget", "sweep-error", "sweep-block-kept")
 
 
+def _notice_docs(notice: str) -> list:
+    """알림 줄의 '낱말 뜻' 문서 경로 — 라벨 뒤부터 다음 ` · ` 칸(또는 줄 끝) 앞의 `.md` 까지. 경로에 공백 · 괄호 · `·` 가 있어도 통째다."""
+    return re.findall(r"낱말 뜻 (/.+?\.md)(?= · |$)", notice)
+
+
 def _sweep_cell(name: str, home: Path, ledger_env: str) -> str:
     """훑기 셀 하나 → 실패 사유(통과면 빈 글). sweep-quiet 만 그 상태 기록을 이 세션이 쓰지 않았다(상태 모름 → 미판정 → 조용).
     sweep-error · sweep-block-kept 는 이 세션이 쓴 미충족 원장이 있다(막는 판정)."""
@@ -1905,9 +1944,15 @@ def _sweep_cell(name: str, home: Path, ledger_env: str) -> str:
         blocked = code == EXIT_BLOCK and '"decision": "block"' in err and "예상 외 오류" not in err
         sums = [r.get("summary", {}).get("suspect") for r in recs]
         if name == "sweep-notice":                       # 알림이 낱말 뜻을 적은 문서를 이 트리의 실제 경로로 가리킨다(설치만 한 사람이 읽을 곳)
-            docs = re.findall(r"(/[^\s()·]+\.md)", notice)
+            docs = _notice_docs(notice)
             named = bool(docs) and all(Path(p).is_file() and _under(Path(p), ROOT) for p in docs)
-            return "" if code == 0 and "의심 2" in notice and sums == [2] and named else f"exit {code} · 알림 {notice!r} · 의심 {sums} · 문서 {docs}"
+            # 뿌리 경로에 공백 · 괄호 · '·' 가 있어도 라벨 뒤 경로를 통째로 뽑는다 — 문서가 가운데(뒤에 ' · 기록') · 끝
+            synth = [_notice_docs(s) for s in ("[fz] 워커 심볼 도구 점검 — 이번에 끝난 실행 4개 중 의심 1 (wf_sw2 MCP_WIRING_SUSPECT) · "
+                                               "낱말 뜻 /x/a b/modules/symbol-tools-audit.md · 기록 /x/runs/mcp-sweep.jsonl",
+                                               "[fz] 워커 심볼 도구 점검 · 낱말 뜻 /x/(a)·b/modules/symbol-tools-audit.md")]
+            synth_ok = synth == [["/x/a b/modules/symbol-tools-audit.md"], ["/x/(a)·b/modules/symbol-tools-audit.md"]]
+            return ("" if code == 0 and "의심 2" in notice and sums == [2] and named and synth_ok
+                    else f"exit {code} · 알림 {notice!r} · 의심 {sums} · 문서 {docs} · 합성 알림의 문서 {synth}")
         if name == "sweep-quiet":
             ok = code == 0 and not notice and [r.get("summary", {}).get("undecided") for r in recs] == [2]
             return "" if ok else f"exit {code} · 알림 {notice!r} · 기록 {[r.get('summary') for r in recs]}"
@@ -2020,7 +2065,10 @@ def _fake_tool(folder: Path, name: str, body: str) -> None:
 
 def _python_fails_cell(d: Path) -> str:
     """PATH 맨 앞의 `python3` 가 실패한다(깨진 shim 등) — 등록 명령은 그래도 exit 0 · stderr 0바이트이고 stdout 은 그대로 내보낸다(알림 줄 자리).
-    세 꼴: stderr 를 쓰고 exit 1 · 신호로 죽음(셸이 그 사실을 자기 stderr 에 적는다 — 묶음 밖 `2>/dev/null` 로는 남는다) · stdout 에 알림 줄."""
+    세 꼴: stderr 를 쓰고 exit 1 · 신호로 죽음(셸이 그 사실을 자기 stderr 에 적는다 — 묶음 밖 `2>/dev/null` 로는 남는다) · stdout 에 알림 줄.
+    `/bin/sh` 에 더해 bash 로도 돈다(있고 실경로가 `/bin/sh` 와 다를 때) — 신호로 죽은 자식을 stderr 에 알리는 셸은 bash 계열이라, `/bin/sh` 가
+    dash 인 머신에서도 묶음 회귀를 잡는다."""
+    import shutil
     cmd = _registered_cmd()
     if not cmd:
         return "hooks/hooks.json 의 Stop 명령을 읽지 못했다"
@@ -2028,33 +2076,42 @@ def _python_fails_cell(d: Path) -> str:
     (root / "scripts").mkdir(parents=True)
     (root / "scripts" / "gate_stop_hook.py").write_text("raise SystemExit(0)\n", encoding="utf-8")   # 파일 가드만 지나게 — 실행되지 않는다
     line = '{"systemMessage": "x"}'
-    bad = []
+    bash = shutil.which("bash")
+    with_bash = bool(bash) and os.path.realpath(bash) != os.path.realpath("/bin/sh")
+    shells = ["/bin/sh"] + ([bash] if with_bash else [])
+    bad, ran = [], set()
     for i, (label, body, want) in enumerate((("exit 1", 'echo "python3: broken interpreter shim" >&2\nexit 1', b""),
                                              ("신호", 'echo "python3: broken" >&2\nkill -TERM $$', b""),
                                              ("stdout 통과", f"echo '{line}'\necho noise >&2\nexit 3", (line + "\n").encode()))):
         _fake_tool(d / f"bin{i}", "python3", body)
-        proc = subprocess.run(["/bin/sh", "-c", cmd], input=b"{}", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60,
-                              env=dict(_hook_env(d), PATH=f"{d / f'bin{i}'}:/usr/bin:/bin", CLAUDE_PLUGIN_ROOT=str(root)))
-        if proc.returncode != 0 or proc.stderr or proc.stdout != want:
-            bad.append(f"{label}: exit {proc.returncode} · stdout {proc.stdout[:60]!r} · stderr {len(proc.stderr)}바이트 {proc.stderr[:60]!r}")
+        for sh in shells:
+            ran.add(sh)
+            proc = subprocess.run([sh, "-c", cmd], input=b"{}", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60,
+                                  env=dict(_hook_env(d), PATH=f"{d / f'bin{i}'}:/usr/bin:/bin", CLAUDE_PLUGIN_ROOT=str(root)))
+            if proc.returncode != 0 or proc.stderr or proc.stdout != want:
+                bad.append(f"{label} [{sh}]: exit {proc.returncode} · stdout {proc.stdout[:60]!r} · stderr {len(proc.stderr)}바이트 {proc.stderr[:60]!r}")
+    if with_bash and bash not in ran:
+        bad.append(f"bash({bash}) 로 돌지 않았다 — /bin/sh 가 dash 인 머신에서는 묶음 회귀를 놓친다")
     return " / ".join(bad)
 
 
 def _macos_guard_cell(d: Path) -> str:
-    """개발자 도구 없는 macOS — `uname -s` 가 Darwin · `command -v python3` 가 `/usr/bin/python3` · `xcode-select -p` 실패면 그 python3 는 도구 설치
-    대화상자를 여는 껍데기라 등록 명령이 띄우지 않는다(exit 0 · 출력 없음). 조건 하나만 빠져도 띄운다 — 대조 셋(도구 있음 · Linux · 다른 python3).
-    가짜 `xcode-select`(와 이 머신이 아닌 체계의 가짜 `uname`)를 PATH 맨 앞에 둔다. `/usr/bin/python3` 가 없거나 이 머신이 바로 그 macOS 면 미실행이다."""
+    """개발자 도구 없는 macOS — `uname -s` 가 Darwin · `command -v python3` 가 `/usr/bin/python3` · `xcode-select -p` 가 실패하거나 가리키는 폴더가
+    없으면 그 python3 는 도구 설치 대화상자를 여는 껍데기라 등록 명령이 띄우지 않는다(exit 0 · 출력 없음 — 실패 · 지워진 선택 폴더 · 빈 출력).
+    조건 하나만 빠져도 띄운다 — 대조 셋(있는 폴더를 가리키는 도구 · Linux · 다른 python3). 가짜 `xcode-select`(와 이 머신이 아닌 체계의 가짜
+    `uname`)를 PATH 맨 앞에 둔다. `/usr/bin/python3` 가 없거나 이 머신이 바로 그 macOS 면 미실행이다."""
     import platform
     here = platform.system()
     if not os.access("/usr/bin/python3", os.X_OK):
         return CELL_NOT_RUN + "/usr/bin/python3 가 없다 — 이 머신에서는 그 경로의 가드를 돌려 볼 수 없다"
     if here == "Darwin":
         try:
-            tools = subprocess.run(["xcode-select", "-p"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30).returncode == 0
+            sel = subprocess.run(["xcode-select", "-p"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30)
+            tools = sel.returncode == 0 and os.path.isdir(sel.stdout.decode("utf-8", "replace").rstrip("\n"))
         except (OSError, subprocess.TimeoutExpired):
             tools = False
         if not tools:
-            return CELL_NOT_RUN + "이 머신의 /usr/bin/python3 가 도구 설치를 여는 껍데기다(xcode-select -p 실패) — 대조가 대화상자를 연다"
+            return CELL_NOT_RUN + "이 머신의 /usr/bin/python3 가 도구 설치를 여는 껍데기다(xcode-select -p 실패 · 가리키는 폴더 없음) — 대조가 대화상자를 연다"
     cmd = _registered_cmd()
     if not cmd:
         return "hooks/hooks.json 의 Stop 명령을 읽지 못했다"
@@ -2063,12 +2120,14 @@ def _macos_guard_cell(d: Path) -> str:
     marker = scripts / "ran"
     (scripts / "gate_stop_hook.py").write_text("import pathlib\npathlib.Path(__file__).with_name('ran').write_text('x')\n", encoding="utf-8")
     bad = []
-    for i, (label, system, tools_ok, own_python, want) in enumerate((("도구 없는 macOS", "Darwin", False, False, False),
-                                                                     ("도구 있는 macOS", "Darwin", True, False, True),
-                                                                     ("Linux", "Linux", False, False, True),
-                                                                     ("다른 python3", "Darwin", False, True, True))):
+    for i, (label, system, select, own_python, want) in enumerate((("도구 없는 macOS", "Darwin", "exit 2", False, False),
+                                                                   ("도구 있는 macOS", "Darwin", f'echo "{d}"; exit 0', False, True),
+                                                                   ("선택 폴더가 지워진 macOS", "Darwin", f'echo "{d / "gone"}"; exit 0', False, False),
+                                                                   ("빈 출력 macOS", "Darwin", "exit 0", False, False),
+                                                                   ("Linux", "Linux", "exit 2", False, True),
+                                                                   ("다른 python3", "Darwin", "exit 2", True, True))):
         b = d / f"bin{i}"
-        _fake_tool(b, "xcode-select", "exit 0" if tools_ok else "exit 2")
+        _fake_tool(b, "xcode-select", select)
         if system != here:
             _fake_tool(b, "uname", f"echo {system}")
         if own_python:
@@ -2210,9 +2269,11 @@ def _audit_cell(name: str, home: Path, ledger_env: str) -> str:
         shutil.rmtree(d, ignore_errors=True)
 
 
-# 훑기의 시간 경계 · 훑기만 끄는 스위치 셀 — 상태 기록 찾기가 마감 안에 끝나지 않거나 잠금 뒤 남은 몫이 `SWEEP_MIN_S` 보다 작으면 감사
-# 프로세스를 띄우지 않는다 · `SWEEP_OFF_ENV` 는 훑기만 끈다. 이름에 `sweep-` 접두를 쓰지 않는다(위 여섯만 센다)
-BOUND_CELLS = ("state-search-deadline", "state-search-unfinished", "state-search-late", "mcp-off-audit-only", "mcp-off-gate-kept")
+# 훑기의 시간 경계 · 상태 기록 찾기 · 훑기만 끄는 스위치 셀 — 상태 기록 찾기가 마감 안에 끝나지 않거나 잠금 뒤 남은 몫이 `SWEEP_MIN_S` 보다
+# 작으면 감사 프로세스를 띄우지 않는다 · 찾기는 같은 명령의 cd 를 따르고 판정기의 가지치기 걷기를 쓴다 · `SWEEP_OFF_ENV` 는 훑기만 끈다.
+# 이름에 `sweep-` 접두를 쓰지 않는다(위 여섯만 센다)
+BOUND_CELLS = ("state-search-deadline", "state-search-unfinished", "state-search-late", "mcp-off-audit-only", "mcp-off-gate-kept",
+               "state-search-cd", "state-search-pruned-walk")
 # 시계 이음매 — 훅을 모듈로 불러 감사 프로세스 띄우기(`--mcp-audit` 를 실은 `subprocess.run`)를 표지 파일에 남기고, 훑기 안의 한 자리 뒤에서
 # 시계를 60초 당긴다(`load_checker_module` 뒤 = 찾기 전 · `find_state_records` 뒤 = 찾은 뒤 · `none` = 당기지 않는다). 진입은 `__main__` 블록과 같다
 _SEAM_DRIVER = r'''
@@ -2255,7 +2316,7 @@ sys.exit(g.main())
 
 def _deadline_cell(d: Path) -> str:
     """`find_state_records` 의 마감 — 이미 지난 마감 → None(끝나지 않음) · 넉넉한 마감 → 지금과 같은 답(이 세션이 쓴 것 · 아무도 안 씀 · 없음
-    → 빈 목록). 시계를 바꿔 끼워 글롭이 내는 경로마다 · transcript `STATE_SCAN_CHECK_LINES` 줄마다 마감을 보는지 센다."""
+    → 빈 목록). 시계를 바꿔 끼워 걷는 폴더마다 · transcript `STATE_SCAN_CHECK_LINES` 줄마다 마감을 보는지 센다."""
     gcmod = load_checker_module()
     if gcmod is None:
         return "판정기를 불러오지 못했다"
@@ -2273,7 +2334,7 @@ def _deadline_cell(d: Path) -> str:
     far, owned = time.monotonic() + 3600, [states[0].resolve()]
     got = {"owned": find_state_records(d, short, gcmod, far), "none-owned": find_state_records(d, d / "none.jsonl", gcmod, far),
            "no-state": find_state_records(d / "empty", short, gcmod, far), "past": find_state_records(d, short, gcmod, time.monotonic() - 1),
-           "past-no-state": find_state_records(d / "empty", short, gcmod, time.monotonic() - 1)}   # 글롭이 아무것도 내지 않아도 패턴 사이에서 본다
+           "past-no-state": find_state_records(d / "empty", short, gcmod, time.monotonic() - 1)}   # 걷기가 아무것도 내지 않아도 폴더마다 본다
     real, calls = time.monotonic, [0]
 
     def clock(limit):                                    # limit 번째 읽기까지는 마감(1.0) 전 · 그 뒤는 마감 뒤
@@ -2283,25 +2344,163 @@ def _deadline_cell(d: Path) -> str:
         return tick
     try:
         time.monotonic = clock(10 ** 9)
-        got["glob-reads"] = (find_state_records(d, short, gcmod, 1.0), calls[0])      # 짧은 transcript — 글롭 쪽 읽기만
+        got["walk-reads"] = (find_state_records(d, short, gcmod, 1.0), calls[0])      # 짧은 transcript — 걷기 쪽 읽기만
         k = calls[0]
         calls[0] = 0
         time.monotonic = clock(k)
-        got["cut-long"] = find_state_records(d, long_, gcmod, 1.0)                        # 글롭은 마감 전 · transcript 를 읽는 중에 넘는다
+        got["cut-long"] = find_state_records(d, long_, gcmod, 1.0)                        # 걷기는 마감 전 · transcript 를 읽는 중에 넘는다
         calls[0] = 0
         got["cut-short"] = find_state_records(d, short, gcmod, 1.0)
-        for p in states[2:]:                                                             # 글롭이 내는 경로 둘을 더한다 — 시계 읽기도 둘 늘어야 한다
+        for p in states[2:]:                                                             # 걷는 폴더 넷(티켓 둘 · 그 evidence 둘)을 더한다 — 시계 읽기도 넷 늘어야 한다
             p.parent.mkdir(parents=True)
             p.write_text("Serena: active\n", encoding="utf-8")
         calls[0] = 0
         time.monotonic = clock(10 ** 9)
         find_state_records(d, short, gcmod, 1.0)
-        got["per-path"] = calls[0] - k
+        got["per-dir"] = calls[0] - k
     finally:
         time.monotonic = real
-    want = {"owned": owned, "none-owned": [], "no-state": [], "past": None, "past-no-state": None, "glob-reads": (owned, k), "cut-long": None,
-            "cut-short": owned, "per-path": 2}
+    want = {"owned": owned, "none-owned": [], "no-state": [], "past": None, "past-no-state": None, "walk-reads": (owned, k), "cut-long": None,
+            "cut-short": owned, "per-dir": 4}
     return "" if got == want else f"얻음 {got} · 기대 {want}"
+
+
+def _state_cd_cell(d: Path) -> str:
+    """상태 기록 찾기의 Bash 갈래가 같은 명령의 `cd` · `pushd` 를 따른다. 상태 기록은 둘 — 옮겨 갈 폴더(`T-1`)와 그 줄의 cwd(`x`).
+    격자: 이동(없음 · cd 절대 · cd 상대 · pushd 절대 · cd "$미상" · cd 글롭 · 서브셸 `(cd T-1 && true)` 뒤) × 대상(상대 · 절대 · 훅 환경
+    `$W/…` 펼침 — 절대 둘은 `T-1` 의 것) × 순서(이동 전 쓰기 · 이동 뒤 쓰기). 상대 대상은 쓰는 때의 폴더로 푼다 — 이동 뒤면 옮겨 간 폴더
+    (cd 절대 · cd 상대 · pushd 절대 → `T-1`) · 못 푼 cd 뒤면 버린다(아무것도 고르지 않는다) · 이동 전과 서브셸을 나온 뒤는 줄의 cwd(`x`)다.
+    절대 · 펼친 대상은 이동과 무관하게 `T-1` 이다."""
+    gcmod = load_checker_module()
+    if gcmod is None:
+        return "판정기를 불러오지 못했다"
+    root = d.resolve()
+    target_dir, line_cwd = root / "T-1", root / "x"
+    names = {}
+    for name, folder in (("T-1", target_dir), ("x", line_cwd)):
+        p = folder / "evidence" / "tools.md"
+        p.parent.mkdir(parents=True)
+        p.write_text("Serena: active\n", encoding="utf-8")
+        names[p.resolve()] = name
+    moves = {"없음": "", "cd 절대": f"cd {target_dir}", "cd 상대": "cd ../T-1", "pushd 절대": f"pushd {target_dir} >/dev/null",
+             "cd 미상": 'cd "$FZ_STATE_CD_UNSET"', "cd 글롭": f"cd {root}/T-*", "서브셸 뒤": f"(cd {target_dir} && true)"}
+    targets = {"상대": "evidence/tools.md", "절대": f"{target_dir}/evidence/tools.md", "펼침": "$FZ_STATE_CD_W/evidence/tools.md"}
+    saved = {k: os.environ.get(k) for k in ("FZ_STATE_CD_W", "FZ_STATE_CD_UNSET")}
+    os.environ["FZ_STATE_CD_W"] = str(target_dir)                # 훅 환경의 변수 — 대상 글자는 이것으로만 편다
+    os.environ.pop("FZ_STATE_CD_UNSET", None)
+    bad = []
+    try:
+        for mv, move in moves.items():
+            for tg, target in targets.items():
+                for order in ("이동 전", "이동 뒤"):
+                    write = f"printf x > {target}"
+                    cmd = write if not move else f"{write} && {move}" if order == "이동 전" else f"{move} && {write}"
+                    after = order == "이동 뒤"
+                    want = (["T-1"] if tg != "상대" or after and mv in ("cd 절대", "cd 상대", "pushd 절대")
+                            else [] if after and mv in ("cd 미상", "cd 글롭") else ["x"])
+                    tp = root / "t.jsonl"
+                    tp.write_text(json.dumps({"type": "assistant", "cwd": str(line_cwd), "message": {"content": [
+                        {"type": "tool_use", "name": "Bash", "input": {"command": cmd}}]}}) + "\n", encoding="utf-8")
+                    got = find_state_records(root, tp, gcmod, time.monotonic() + 3600)
+                    picked = sorted(names.get(p, str(p)) for p in got) if got is not None else None
+                    if picked != want:
+                        bad.append(f"{mv} × {tg} × {order}: {picked} (기대 {want}) — {cmd!r}")
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    return " / ".join(bad)
+
+
+def _pruned_walk_cell(d: Path) -> str:
+    """판정기의 가지치기 걷기(`walk_named`) — 원장 찾기와 상태 기록 찾기가 함께 쓴다. 고정 트리: 깊이 0~4 · 건너뛸 이름마다 그 바로 아래와
+    한 단계 더 깊은 자리 · 숨김 폴더(`.claude` · 깊이 2 의 `.hid`) · 건너뛸 이름 · `gates` 와 같은 이름의 파일 · 폴더 링크 · 순환 링크 · 끊긴 링크.
+    (1) 세 꼬리(`gates/plan.md` · `evidence/tools.md` · 폴더 `gates`)마다 옛 글롭(깊이 0~3 패턴 + 건너뛸 폴더 거르기)과 같은 경로를 낸다 — 그
+    경로는 깊이 0~3 과 숨김 폴더 여섯 자리다. (2) 건너뛸 이름의 폴더 안을 열거하지 않는다(`os.scandir` 기록). (3) `find_ledgers`(원장 ·
+    `gates/` 진단) · `find_state_records` 가 그 걷기를 부른다(대체 기록기). (4) 마감 — 넉넉하면 같은 답 · 지났으면 None · 걷는 중에 지나면
+    그 폴더에서 끝난다(시계 읽기 셋째에 None)."""
+    gcmod = load_checker_module()
+    walk = getattr(gcmod, "walk_named", None) if gcmod is not None else None
+    if not callable(walk):
+        return "판정기에 walk_named 가 없다"
+    tree, diag = d.resolve() / "tree", d.resolve() / "diag"
+    kept = ("", "a", "a/b", "a/b/c", ".claude", "x/.hid")                                    # 찾아야 하는 자리 — 깊이 0~3 · 숨김 폴더
+    dropped = ("a/b/c/e",) + tuple(s for n in sorted(gcmod.SKIP_DIRS) for s in (n, f"p/{n}/q"))   # 깊이 4 · 건너뛸 폴더 아래
+    tails = (("gates/plan.md", False), ("evidence/tools.md", False), ("gates", True))
+    for rel in kept + dropped:
+        for tail in ("gates/plan.md", "evidence/tools.md"):
+            p = tree / rel / tail
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("x\n", encoding="utf-8")
+    (tree / "f").mkdir()
+    for n in ("node_modules", "gates"):                                                    # 같은 이름의 파일
+        (tree / "f" / n).write_text("x\n", encoding="utf-8")
+    (tree / "lnk").symlink_to(tree / "a")                                                  # 폴더 링크 — 같은 자리를 다시 낸다(resolve 뒤 같다)
+    (tree / "a" / "loop").symlink_to(tree)                                                 # 순환 — 깊이로 끝난다
+    (tree / "dead").symlink_to(tree / "nowhere")                                           # 끊긴 링크
+    rel_of = lambda paths: sorted(str(p.relative_to(tree)) for p in paths)
+    bad = []
+    for tail, dirs in tails:
+        old = {q.resolve() for k in range(4) for q in tree.glob("/".join(["*"] * k + [tail]))
+               if (q.is_dir() if dirs else q.is_file()) and not any(s in gcmod.SKIP_DIRS for s in q.relative_to(tree).parts)}
+        new = {q.resolve() for q in walk(tree, tail, dirs=dirs)}
+        want = {(tree / rel / tail).resolve() for rel in kept}
+        if not old == new == want:
+            bad.append(f"{tail}: 걷기만 {rel_of(new - old)} · 옛 글롭만 {rel_of(old - new)} · 기대 밖 {rel_of(new ^ want)}")
+    real_scandir, seen = gcmod.os.scandir, []
+
+    def spy(path=".", *a, **k):
+        seen.append(Path(path))
+        return real_scandir(path, *a, **k)
+    gcmod.os.scandir = spy
+    try:
+        for tail, dirs in tails:
+            walk(tree, tail, dirs=dirs)
+    finally:
+        gcmod.os.scandir = real_scandir
+    into = sorted({str(p) for p in seen if any(s in gcmod.SKIP_DIRS for s in p.parts[len(tree.parts):])})
+    if not seen or into:
+        bad.append(f"건너뛸 폴더 안 열거 {into} · 열거 {len(seen)}회 (기대 없음 · 1회 이상)")
+    state = tree / "a" / "evidence" / "tools.md"
+    transcript = d / "t.jsonl"
+    transcript.write_text(json.dumps({"type": "assistant", "cwd": str(tree), "message": {"content": [
+        {"type": "tool_use", "name": "Write", "input": {"file_path": str(state), "content": "x"}}]}}) + "\n", encoding="utf-8")
+    (diag / "w" / "gates").mkdir(parents=True)
+    (diag / "w" / "gates" / "plan.draft.md").write_text("x\n", encoding="utf-8")
+    calls, real_walk = [], gcmod.walk_named
+
+    def recorder(root, tail, *a, **k):
+        calls.append(tail)
+        return real_walk(root, tail, *a, **k)
+    gcmod.walk_named = recorder
+    try:
+        leds, _note = gcmod.find_ledgers(tree)
+        states = find_state_records(tree, transcript, gcmod, time.monotonic() + 3600)
+        none, note = gcmod.find_ledgers(diag)
+    finally:
+        gcmod.walk_named = real_walk
+    want_leds = sorted((tree / rel / "gates" / "plan.md").resolve() for rel in kept)
+    if (calls != ["gates/plan.md", "evidence/tools.md", "gates/plan.md", "gates"] or leds != want_leds or states != [state.resolve()]
+            or none or str(diag / "w" / "gates") not in note):
+        bad.append(f"부른 꼬리 {calls} · 원장 {rel_of(leds)} · 상태 기록 {states} · 진단 {none} {note!r} "
+                   f"(기대 원장 · 상태 기록 · 원장 · gates 넷을 걷기로 · 원장 여섯 · 상태 기록 하나 · gates 진단)")
+    same = walk(tree, "gates/plan.md", deadline=time.monotonic() + 3600) == walk(tree, "gates/plan.md")
+    past = walk(tree, "gates/plan.md", deadline=time.monotonic() - 1)
+    real_clock, reads = time.monotonic, [0]
+
+    def tick():                                          # 둘째 읽기까지 마감(1.0) 전 · 그 뒤는 마감 뒤
+        reads[0] += 1
+        return 0.0 if reads[0] <= 2 else 2.0
+    time.monotonic = tick
+    try:
+        mid = walk(tree, "gates/plan.md", deadline=1.0)
+    finally:
+        time.monotonic = real_clock
+    if not same or past is not None or mid is not None or reads[0] != 3:
+        bad.append(f"마감: 넉넉 같음 {same} · 지남 {past is None} · 걷는 중 {mid is None} · 시계 읽기 {reads[0]} (기대 True · True · True · 3)")
+    return " / ".join(bad)
 
 
 def _bound_cell(name: str, home: Path, ledger_env: str) -> str:
@@ -2312,6 +2511,10 @@ def _bound_cell(name: str, home: Path, ledger_env: str) -> str:
     try:
         if name == "state-search-deadline":
             return _deadline_cell(d)
+        if name == "state-search-cd":
+            return _state_cd_cell(d)
+        if name == "state-search-pruned-walk":
+            return _pruned_walk_cell(d)
         runs = d / "runs"
         env = dict(os.environ, HOME=str(home), **{RUN_STATE_ENV: str(runs)})
         for var in (ledger_env, "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV, SWEEP_BUDGET_ENV, SWEEP_OFF_ENV, "CLAUDE_PLUGIN_ROOT"):

@@ -491,7 +491,7 @@ case "$HOOK_CODE" in
   *) record "Stop hook 계약" "$HOOK_CODE" "⛔ self-test 실행 불가 (PASS도 SKIP도 아님)" ;;
 esac
 
-# ── 2.7 게이트 원장 상태 (hook 미설치 머신의 유일한 노출 경로) ──────────
+# ── 2.7 게이트 원장 상태 (차단 항목이 없는 머신의 유일한 노출 경로) ──────────
 # ⛔ 미충족은 **실패가 아니다** — 작업 중 원장이 미충족인 것은 정상 상태다. exit 에
 #    반영하면 원장 있는 모든 세션에서 이 검사가 빨개져 사람이 health-check 를 안 돌리게
 #    된다(`lint_doc_freshness` 선례: findings 가 있어도 exit 0, 건수만 보고).

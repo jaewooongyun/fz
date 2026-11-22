@@ -2,7 +2,7 @@
 # gpt-cli: none — health-check 를 --block ledgers 로만 부른다(§4.5 에 닿지 않는다)
 # health-check 2.7 원장 범위 회귀 판정 (F-265) — 다른 티켓 원장의 계약 위반이 플러그인 health-check 를 빨갛게 하지 않는다.
 #
-# health-check 는 호출 CWD 아래 원장을 찾는다(hook 미설치 머신의 노출 경로). 그 아래 다른 티켓의 원장이 계약을 어기면
+# health-check 는 호출 CWD 아래 원장을 찾는다(차단 항목이 없는 머신의 노출 경로). 그 아래 다른 티켓의 원장이 계약을 어기면
 # 플러그인 결함이 아닌데도 실패로 표시됐다. 이 플러그인 트리 · 이 세션 WORK_DIR(FZ_WORK_DIR) 밖의 위반은 제외 수로만 낸다.
 # 셀:
 #   f265-foreign-ledger-skipped  위반 원장이 FZ_WORK_DIR 밖뿐 → 원장 상태 0 · 비고에 '제외 1'

@@ -472,11 +472,8 @@ def load(path: Path, allow_unstamped: bool = False) -> Ledger:
 # ── 원장 발견 (Stop hook · health-check 공용) ─────────────────────────────
 # ⛔ 깊이를 하나로 고정하지 않는다. `*/gates/plan.md`(깊이 2)만 보면
 #    `{CWD}/gates/plan.md`(깊이 1)·`{CWD}/a/b/gates/plan.md`(깊이 3)를 놓치고
-#    **조용히 통과**한다 (2026-08-25 실측: 4종 중 1종만 발견). 명시적 깊이 목록으로
-#    상한을 분명히 둔다 — `rglob` 은 큰 트리에서 hook 을 늘어지게 만든다.
-LEDGER_GLOBS = ("gates/plan.md", "*/gates/plan.md",
-                "*/*/gates/plan.md", "*/*/*/gates/plan.md")
-GATES_DIR_GLOBS = ("gates", "*/gates", "*/*/gates", "*/*/*/gates")
+#    **조용히 통과**한다 (2026-08-25 실측: 4종 중 1종만 발견). 걷기(`walk_named`)가 깊이 0~3 을
+#    모두 보고 상한을 분명히 둔다 — `rglob` 은 큰 트리에서 hook 을 늘어지게 만든다.
 # ⛔ `tests` 를 넣는 이유 — fixture 원장은 **테스트 자산**이고 작업 원장이 아니다.
 #    플러그인 루트에서 `--discover` 를 돌리면 `tests/fixtures/gates/` 가 "확정 원장 없는
 #    gates 디렉토리"로 잡혀 진단이 매번 뜬다(2026-08-25 실측 — 위반은 아니지만 노이즈).
@@ -485,22 +482,53 @@ SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".build", "
 #    원장이 리포 루트에 있으면 어떤 glob 으로도 못 찾는다 — 설계 한계다.
 LEDGER_ENV = "FZ_GATES_LEDGER"
 # ⛔ 발견 수에 상한을 두지 않는다(F-378). 8개에서 자르던 구판은 사전순 뒤(대개 최신 티켓)의 원장을 **말없이** 빼서, 그 원장이
-#    이 세션의 미충족 원장이어도 Stop hook 이 통과했고 `--discover` 는 '원장 8건' 만 냈다. glob 은 상한과 무관하게 전부 돈다 —
+#    이 세션의 미충족 원장이어도 Stop hook 이 통과했고 `--discover` 는 '원장 8건' 만 냈다. 걷기는 상한과 무관하게 전부 돈다 —
 #    비용은 판정 쪽이므로 상한은 소비자가 정한다(hook 은 남의 원장 판정에만 상한 · `--discover` 는 파싱만이라 전부 본다).
 
 
-def _skipped(path: Path, base: Path) -> bool:
-    try:
-        parts = path.relative_to(base).parts
-    except ValueError:
-        return False
-    return any(seg in SKIP_DIRS for seg in parts)
+def walk_named(root, tail: str, max_depth: int = 3, deadline=None, dirs: bool = False):
+    """`root` 아래 깊이 0~`max_depth` 폴더 중 `tail`(`gates/plan.md` · `evidence/tools.md` · `gates`)을 가진 경로 — 얕은 깊이부터, 같은 깊이는 이름순.
+
+    원장 찾기(`find_ledgers`)와 종료 훅의 상태 기록 찾기가 함께 쓰는 가지치기 걷기다. `SKIP_DIRS` 이름의 폴더에는 들어가지 않는다(그 아래를
+    열거하지 않는다). 숨김 폴더(`.claude` 등)는 들어가고, 폴더 링크는 따라가되 깊이로 묶는다(순환 링크도 끝난다). `dirs` 면 `tail` 이 폴더인
+    경로, 아니면 파일인 경로다. 경로는 `root` 에 이어 붙인 그대로다(resolve 는 부르는 쪽이 한다). 못 읽는 폴더 · 경로는 건너뛴다.
+
+    - Parameters: deadline — `time.monotonic()` 값이면 폴더 하나를 보기 전마다 확인한다.
+    - Returns: 경로 목록 · 마감을 넘겼으면 None(끝내지 못함 — '없음' 인 빈 목록과 다르다).
+    - Note: 폴더 하나의 열거(`os.scandir` 한 번)는 끊을 수 없다 — 마감은 그 사이에서만 본다.
+    """
+    level, out = [Path(root)], []
+    for depth in range(max_depth + 1):
+        deeper = []
+        for folder in level:
+            if deadline is not None and time.monotonic() >= deadline:
+                return None
+            hit = folder / tail
+            try:
+                if hit.is_dir() if dirs else hit.is_file():
+                    out.append(hit)
+            except OSError:
+                pass
+            if depth == max_depth:
+                continue
+            try:
+                with os.scandir(folder) as entries:
+                    for e in entries:
+                        try:
+                            if e.name not in SKIP_DIRS and e.is_dir():
+                                deeper.append(folder / e.name)
+                        except OSError:
+                            continue
+            except OSError:
+                continue
+        level = sorted(deeper)
+    return out
 
 
 def ledger_name_warning(path: Path) -> str:
     """`gates/` 아래 원장 이름이 발견 규약(`plan.md` · `plan.draft.md`) 밖이면 경고 문장(F-384) — 아니면 빈 문자열.
 
-    Stop 훅 · `--discover` 는 `LEDGER_GLOBS`(`gates/plan.md`)로만 찾는다. 다른 이름의 원장은 미충족이 남아도
+    Stop 훅 · `--discover` 는 `walk_named(…, "gates/plan.md")` 로만 찾는다. 다른 이름의 원장은 미충족이 남아도
     세션 종료 판정에서 조용히 빠진다 — `FZ_GATES_LEDGER` 로 지정했으면 경고하지 않는다.
     """
     p = path.resolve()
@@ -539,26 +567,15 @@ def find_ledgers(cwd, env_raw: str = "") -> tuple:
         note = f"{LEDGER_ENV} 의 경로 {missing} 를 찾을 수 없다" if missing else ""
         return picked, note
 
-    found = []
-    for pattern in LEDGER_GLOBS:
-        try:
-            found += [p for p in cwd.glob(pattern)
-                      if p.is_file() and not _skipped(p, cwd)]
-        except OSError:
-            continue
+    found = walk_named(cwd, "gates/plan.md")
     uniq = sorted({p.resolve() for p in found})
     if uniq:
         return uniq, ""
 
     # 원장은 없다 — `gates/` 자체가 없으면 게이트 미사용 세션이다(조용히 통과).
-    for pattern in GATES_DIR_GLOBS:
-        try:
-            for g in cwd.glob(pattern):
-                if g.is_dir() and not _skipped(g, cwd):
-                    return [], (f"`{g}` 가 있는데 확정 원장(plan.md)이 없다 — "
-                                f"draft 단계이거나 확정(`--finalize`)이 빠졌다")
-        except OSError:
-            continue
+    for g in walk_named(cwd, "gates", dirs=True)[:1]:
+        return [], (f"`{g}` 가 있는데 확정 원장(plan.md)이 없다 — "
+                    f"draft 단계이거나 확정(`--finalize`)이 빠졌다")
     return [], ""
 
 
@@ -2836,7 +2853,7 @@ def discover(root_dir: str) -> int:
     ⛔ **원장 계약 위반(exit 3)은 실패다.** fz 가 만든 원장이 자기 계약을 어긴 것은
        plugin 자산 결함이고, 그것이 health-check 의 관심사다.
 
-    이것이 hook 미설치 머신의 유일한 노출 경로다 — 배선 1~3 은 SKILL.md 산문이라
+    이것이 차단 항목이 없는 머신의 유일한 노출 경로다 — 배선 1~3 은 SKILL.md 산문이라
     건너뛰어도 신호가 없고, `FZ_GATES_TRACE` 는 환경변수 opt-in 이다.
 
     ⛔ 발견한 원장을 **자르지 않고** 전부 파싱한다(F-378 — CHECK 를 돌리지 않아 수가 많아도 싸다). 읽지 못한 원장은
