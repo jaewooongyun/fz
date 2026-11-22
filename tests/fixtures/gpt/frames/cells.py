@@ -197,17 +197,6 @@ def registry_driven():
         check("registry-propagates", g_ok and d_ok and own, f"gate={g_ok} direct+env={d_ok} direct-own-tree={own}")
     finally:
         env.close()
-    reg = json.load(open(os.path.join(R, "scripts", "gpt-kinds.json"), encoding="utf-8"))
-    reg["kinds"]["independent-review"]["spawn"] = "lenses-optin"
-    env = capture.Env(registry_text=json.dumps(reg, ensure_ascii=False))
-    try:
-        d = kd(env, "independent-review")
-        _, _, cli = env.run(d, review(), shim_output=REVIEW_OK)
-        pr = cli[0][-1] if cli else ""
-        lens = gpt_kinds.SPAWN_LINES["lenses-optin"]
-        check("spawn-sentence-from-registry", lens in pr and f"\n{NO_SPAWN}\n" not in pr, f"lens line present={lens in pr}")
-    finally:
-        env.close()
 
 
 def main():

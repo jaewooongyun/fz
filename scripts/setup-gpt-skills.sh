@@ -11,23 +11,21 @@
 # 소유 = 링크 대상 `<루트>/(skills|gpt-skills)/<이름>` 의 루트가 이 플러그인 루트이거나, 루트 매니페스트 name 이 같다
 #   (같은 name 의 포크·구버전 캐시는 같은 플러그인 계열로 본다). 루트가 사라져 판정할 수 없으면 보존한다.
 #
-# Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh [--gpt-agents] [--check]
-#   --gpt-agents  GPT 역할 파일(gpt-agents/*.toml — 독립 리뷰의 렌즈 역할)도 ${CODEX_HOME:-~/.codex}/agents 에 링크한다.
-#                 opt-in 이다 — 없으면 agents 폴더를 건드리지 않는다. 역할 파일 형식 실측: probe/p2 ①②(S11)
+# Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh [--check]
 #   --check       읽기 전용 점검 — 아래 세 prune 판정에 걸리는 stale 링크를 `  stale: <이름> …` 줄로 나열만 한다.
 #                 판정은 `Check: N stale` 요약 줄로 한다 — 그 줄 없이 끝난 exit 1 은 stale 이 아니라 준비 오류(매니페스트 · gpt-skills 없음)다.
 #                 소유를 판정할 수 없는 끊긴 `fz-*` 링크(setup 의 'keep: … 소유 판정 불가')는 `  unknown: <이름> …` 줄로 따로 낸다(stale 아님).
-#                 스킬 폴더만 보고(--gpt-agents 는 무시) 아무것도 만들거나 지우지 않는다. exit: 0 = stale 0 · 1 = stale 있음
+#                 번들 gpt-skills 가운데 스킬 폴더에 아직 없는 이름은 `  missing: <이름> …` 줄로 따로 낸다(stale 아님 — review 모드
+#                 kind 는 CLI 가 이 폴더에서 역할을 고르므로 그 역할 없이 돈다 · exec 모드는 번들 본문을 직접 넣는다).
+#                 스킬 폴더만 보고 아무것도 만들거나 지우지 않는다. exit: 0 = stale 0 · 1 = stale 있음(unknown · missing 은 exit 에 반영하지 않는다)
 
 set -euo pipefail
 
-WITH_AGENTS=0
 CHECK=0
 for a in "$@"; do
   case "$a" in
-    --gpt-agents) WITH_AGENTS=1 ;;
     --check) CHECK=1; export PYTHONDONTWRITEBYTECODE=1 ;;   # 읽기 전용 — 시스템 python3 가 $HOME/Library/Caches 에 바이트코드를 쓰지 않게
-    *) echo "Error: unknown option: $a (usage: setup-gpt-skills.sh [--gpt-agents] [--check])"; exit 1 ;;
+    *) echo "Error: unknown option: $a (usage: setup-gpt-skills.sh [--check])"; exit 1 ;;
   esac
 done
 
@@ -94,7 +92,8 @@ fi
 #    stale = 아래 prune ① · ② · ③ 의 판정(같은 norm · owned_under · retired_skill)에 걸리는 링크다. 그래서 정리(인자 없는 실행) 뒤 다시 보면 0 이다.
 # ⛔ 비교 기준은 링크 대상의 설치 루트다 — 루트 매니페스트 name 으로 소유를 본다. 이 실행 트리 경로와 같은지는 보지 않는다:
 #    그렇게 보면 dev 트리·격리 clone 에서 돌릴 때 설치본을 가리키는 정상 GPT 스킬 링크가 전부 stale 로 보인다(트리마다 결과가 달라진다).
-#    같은 이유로 살아 있는 다른 판의 GPT 스킬 링크(인자 없는 실행이 이 판으로 다시 거는 것)와 아직 링크되지 않은 스킬은 내지 않는다.
+#    같은 이유로 살아 있는 다른 판의 GPT 스킬 링크(인자 없는 실행이 이 판으로 다시 거는 것)는 내지 않는다. 아직 링크되지 않은 스킬은
+#    stale 로 내지 않는다 — `  missing:` 줄로 따로 낸다(review 모드 kind 는 그 역할 없이 돈다 · exit 에 반영하지 않는다).
 #    살아 있어도 이 판이 걷은 스킬을 가리키는 소유 링크는 다시 걸 곳이 없어 stale 이다(prune ③).
 if [ "$CHECK" -eq 1 ]; then
   stale=0; unknown=0
@@ -119,7 +118,17 @@ if [ "$CHECK" -eq 1 ]; then
     fi
     stale=$((stale + 1))
   done
+  missing=0
+  for src in "$GPT_SOURCE_DIR"/*/SKILL.md; do                                # 번들 역할 스킬 가운데 스킬 폴더에 항목이 없는 이름(링크 · 실제 폴더 · 끊긴 링크 모두 아님)
+    [ -f "$src" ] || continue
+    name="$(basename "$(dirname "$src")")"
+    if [ ! -e "$TARGET_DIR/$name" ] && [ ! -L "$TARGET_DIR/$name" ]; then
+      echo "  missing: $name (링크 없음 — review 모드 kind 는 이 역할 없이 돈다)"
+      missing=$((missing + 1))
+    fi
+  done
   note=""; [ "$unknown" -gt 0 ] && note=" · 판정 불가 $unknown"
+  [ "$missing" -gt 0 ] && note="$note · 링크 없음 $missing"
   if [ "$stale" -eq 0 ]; then
     echo "Check: 0 stale in $TARGET_DIR$note"
     exit 0
@@ -205,39 +214,6 @@ for link in "$TARGET_DIR"/fz-*; do
   fi
 done
 
-# ── GPT 역할 파일 (opt-in --gpt-agents) — 스킬 링크와 같은 소유 규칙: 남의 살아 있는 링크 · 실제 파일은 건드리지 않는다
-agents_linked=0
-if [ "$WITH_AGENTS" -eq 1 ]; then
-  AGENT_SOURCE_DIR="$PLUGIN_DIR/gpt-agents"
-  AGENT_TARGET_DIR="${FZ_AGENT_TARGET:-${CODEX_HOME:-$HOME/.codex}/agents}"   # ⛔ 테스트 주입점 — FZ_SKILL_TARGET 과 같은 이유
-  [ -d "$AGENT_SOURCE_DIR" ] || { echo "Error: role directory not found at $AGENT_SOURCE_DIR"; exit 1; }
-  mkdir -p "$AGENT_TARGET_DIR"
-  for role in "$AGENT_SOURCE_DIR"/*.toml; do
-    [ -f "$role" ] || continue
-    role_name="$(basename "$role")"
-    target="$AGENT_TARGET_DIR/$role_name"
-    if [ -L "$target" ]; then
-      current="$(readlink "$target")"
-      if [ "$current" = "$role" ]; then
-        echo "  skip: agent $role_name (already linked)"
-        continue
-      fi
-      cur_norm="$(norm "$current" "$AGENT_TARGET_DIR")"
-      if [ -e "$target" ] && ! owned_under "$cur_norm" gpt-agents; then
-        echo "  skip: agent $role_name (다른 플러그인 링크 -> $current — manual resolution needed)"
-        continue
-      fi
-      rm "$target"
-    elif [ -e "$target" ]; then
-      echo "  skip: agent $role_name (real file exists — manual resolution needed)"
-      continue
-    fi
-    ln -s "$role" "$target"
-    echo "  link: agent $role_name -> $role"
-    agents_linked=$((agents_linked + 1))
-  done
-fi
-
 echo ""
-echo "Done: $linked linked, $skipped skipped, $pruned pruned.$([ "$WITH_AGENTS" -eq 1 ] && echo " agents: $agents_linked linked.")"
+echo "Done: $linked linked, $skipped skipped, $pruned pruned."
 echo "Verify: ls -la $TARGET_DIR/fz-*"

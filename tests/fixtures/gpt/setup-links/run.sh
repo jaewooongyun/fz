@@ -1,16 +1,22 @@
 #!/bin/bash
 # modes: --stale-exit caller=manual last-pass=7b89bd4 result=--stale-exit 1 · 20 PASS(2026-11-05 배선 감사)
+# gpt-cli: none — health-check.sh 는 4.5b 'GPT 스킬 링크' 본문만 떼어 돌린다(§4.5 check-gpt-flags · GPT CLI 에 닿지 않는다)
 # setup-gpt-skills.sh 링크 계약 러너 (A2-02).
 #
 # 판정: ① GPT 스킬(SKILL.md 가진 gpt-skills/ 전부)이 현 판으로 링크된다 ② 이 플러그인 skills/ 를 가리키는
 #       링크가 0 이다(구버전 캐시·이름 무관 포함) ③ 다른 플러그인 링크·실제 디렉토리는 보존된다
 #       ④ 재실행은 멱등이다 ⑤ Tier 2a 디스커버리(resolver `scripts/gpt_kinds.py skill-path`)가 역할 전부를 이 폴더에서 해석한다
-#       ⑥ 인자 없으면 agents 폴더를 건드리지 않는다 ⑦ --gpt-agents 면 역할 파일(gpt-agents/*.toml)을 현 판으로 링크하고
-#          남의 같은 이름 링크 · 실제 파일은 보존한다 · 재실행 멱등 (S14 · opt-in)
-#       ⑧ --check 읽기 전용 점검(F-353) — 셀 check-stale-owned · check-preserve-unowned · check-clean-after-setup.
+#          (링크된 판 P 가 resolver 의 트리 R 과 다른 같은 이름 루트면 resolver 는 R 번들을 돌려준다 — 기대값도 그쪽이다)
+#       ⑥ 인자 없으면 agents 폴더를 건드리지 않는다 ⑦ 셀 retired-option-gpt-agents — 걷은 옵션(역할 파일 링크 opt-in)으로 부르면
+#          조용히 받지 않는다: exit 1 · 옵션 이름 · 스킬 폴더 그대로 · agents 폴더 없음
+#       ⑧ --check 읽기 전용 점검(F-353) — 셀 check-stale-owned · check-preserve-unowned · check-clean-after-setup · check-missing-listed.
 #          stale 이면 --stale-exit 값과 **정확한 목록**(`  stale: <이름>` 줄의 이름 집합), 정리 뒤 exit 0 · 목록 0,
 #          전후 트리 해시 동일 · 스킬 폴더가 없으면 만들지 않는다 · 비소유 링크와 설치 루트가 다른 소유 GPT 링크는 목록에 없다
 #          ⛔ 기준 트리는 --check 를 모르는 옵션으로 exit 1 한다 — stale exit 1 과 종료 코드로는 구별되지 않아 목록 단언이 판별한다
+#          check-missing-listed — 번들 역할 스킬 가운데 스킬 폴더에 항목이 없는 이름이 `  missing: <이름>` 줄로 정확히 나온다
+#          (stale 아님 · exit 무변경) · 정리 뒤 0 · 스킬 폴더가 없는 빈 홈은 전부 missing 이면서 폴더를 만들지 않는다
+#          check-missing-dangling — 같은 이름의 끊긴 링크는 missing 이 아니다(unknown 그대로)
+#          health-missing-note — 이 트리 health-check 4.5b 본문(record 는 대역)이 missing 건수를 비고에 싣고 record 는 0 그대로다
 #       ⑨ 셀 check-removed-role-skill — 이전 판 설치의 마이그레이션: 이 판이 걷은(이 판 gpt-skills 에 없는) 역할 스킬을 가리키는
 #          링크(구버전 캐시의 살아 있는 링크 · 이 루트의 끊긴 링크)를 --check 가 stale 로 내고, 정리가 지우고, 정리 뒤 --check 는 0 이다
 # ⛔ 실제 사용자 폴더를 건드리지 않는다 — HOME·FZ_SKILL_TARGET 은 임시 폴더, CODEX_HOME 은 비운다.
@@ -86,12 +92,15 @@ snap() { for f in "$TG"/*; do if [ -L "$f" ]; then echo "$(basename "$f") -> $(r
 runc() { env -u CODEX_HOME PYTHONDONTWRITEBYTECODE=1 HOME="$H" FZ_SKILL_TARGET="$TG" bash "$SETUP" --check > "$T/out.$1" 2>&1; }
 stale_set() { sed -n 's/^  stale: \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sort; }
 unknown_set() { sed -n 's/^  unknown: \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sort; }
+missing_set() { sed -n 's/^  missing: \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sort; }
 tsig() { (cd "$T" && find . ! -name 'out.*' -print | LC_ALL=C sort | while IFS= read -r p; do
   if [ -L "$p" ]; then echo "L $p -> $(readlink "$p")"; elif [ -d "$p" ]; then echo "D $p"; else echo "F $p $(shasum -a 256 < "$p")"; fi
 done) | shasum -a 256; }
 words() { printf '%s' "$1" | tr '\n' ' '; }
 
 # ⑧-1 check-stale-owned — 정리 전: 소유 stale 6건(이름 무관 · 구버전 캐시 · `..` · 끝 슬래시 · 소유 dangling)이 정확히 나온다
+want_missing0="$(for d in "$P"/gpt-skills/*/; do [ -f "$d/SKILL.md" ] || continue; n="$(basename "$d")"
+  [ -e "$TG/$n" ] || [ -L "$TG/$n" ] || echo "$n"; done | LC_ALL=C sort)"   # 정리 전 기대 missing — 번들 이름 − 스킬 폴더에 항목이 있는 이름
 sig0="$(tsig)"; runc c0; rc0=$?; sig1="$(tsig)"
 want_stale="$(printf '%s\n' fz-review arch-critic code-auditor fz-renamed-old fz-dotdot fz-slash | LC_ALL=C sort)"
 got_stale="$(stale_set "$T/out.c0")"
@@ -152,45 +161,67 @@ sig2="$(tsig)"; runc c2; rc2=$?; sig3="$(tsig)"
   && ok "check-clean-after-setup: 정리 뒤 exit 0 · 목록 0 · 전후 해시 동일 · 정리 전 목록 = 지운 목록" \
   || no "check-clean-after-setup: exit $rc2 · 남은 목록[$(words "$(stale_set "$T/out.c2")")] · 해시 $([ "$sig2" = "$sig3" ] && echo 동일 || echo 변경) · 지운 목록[$(words "$pruned_set")] — $(tail -1 "$T/out.c2")"
 
+# ⑧-4 check-missing-listed — 정리 전(c0) missing 집합 = 번들 이름 − 스킬 폴더에 항목이 있는 이름 · 정리 뒤(c2) 0 · 빈 홈은 번들 전부
+want_missing_e="$(for d in "$P"/gpt-skills/*/; do [ -f "$d/SKILL.md" ] && basename "$d"; done | LC_ALL=C sort)"
+got_missing0="$(missing_set "$T/out.c0")"; got_missing2="$(missing_set "$T/out.c2")"; got_missing_e="$(missing_set "$T/out.c-empty")"
+[ -n "$want_missing0" ] && [ "$got_missing0" = "$want_missing0" ] && [ -z "$got_missing2" ] && [ "$got_missing_e" = "$want_missing_e" ] && [ -z "$(ls -A "$EH")" ] \
+  && ok "check-missing-listed: 정리 전 missing $(printf '%s\n' "$got_missing0" | grep -c .)건 정확 · 정리 뒤 0 · 빈 홈 $(printf '%s\n' "$got_missing_e" | grep -c .)건 · 폴더 생성 0" \
+  || no "check-missing-listed: 정리 전 [$(words "$got_missing0")] 기대 [$(words "$want_missing0")] · 정리 뒤 [$(words "$got_missing2")] · 빈 홈 [$(words "$got_missing_e")] 기대 [$(words "$want_missing_e")] · 빈 홈 항목[$(words "$(ls -A "$EH")")]"
+# ⑧-4b check-missing-dangling — 같은 이름의 끊긴 링크(소유 판정 불가)는 unknown 으로만 나오고 missing 에는 없다
+DH="$T/dangling-home"; mkdir -p "$DH/skills"; dn="$(printf '%s\n' "$want_missing_e" | head -1)"; ln -s "$T/nowhere/$dn" "$DH/skills/$dn"
+env -u CODEX_HOME PYTHONDONTWRITEBYTECODE=1 HOME="$DH" FZ_SKILL_TARGET="$DH/skills" bash "$SETUP" --check > "$T/out.c-dangling" 2>&1
+want_missing_d="$(printf '%s\n' "$want_missing_e" | grep -vx "$dn")"
+[ -n "$dn" ] && [ "$(missing_set "$T/out.c-dangling")" = "$want_missing_d" ] && [ "$(unknown_set "$T/out.c-dangling")" = "$dn" ] \
+  && ok "check-missing-dangling: 같은 이름의 끊긴 링크($dn)는 unknown 으로만 · missing 에 없다" \
+  || no "check-missing-dangling: 끊긴 링크 $dn — missing [$(words "$(missing_set "$T/out.c-dangling")")] · unknown [$(words "$(unknown_set "$T/out.c-dangling")")]"
+# ⑧-5 health-missing-note — health-check 4.5b 'GPT 스킬 링크' 본문만 떼어 돌린다(record 는 대역 · 대상은 이 트리 R 의 setup).
+#      스킬 폴더가 없는 홈 → record 0 · 비고에 '역할 링크 없음 <R 번들 수>건' / 정리한 홈 → record 0 · 그 말이 없다
+HB="$T/hc-45b.sh"; HE="$T/hc-empty-home"; mkdir -p "$HE"
+{ echo 'record() { printf "RECORD|%s|%s|%s\n" "$1" "$2" "$3"; }'; printf 'ROOT=%q\n' "$R"; sed -n '/^SL_OUT=/,/^fi$/p' "$R/scripts/health-check.sh"; } > "$HB"
+hn="$(ls "$R"/gpt-skills/*/SKILL.md 2>/dev/null | wc -l | tr -d ' ')"
+he="$(env -u CODEX_HOME -u FZ_SKILL_TARGET HOME="$HE" bash "$HB" 2>&1)"; hl="$(env -u CODEX_HOME -u FZ_SKILL_TARGET HOME="$H" bash "$HB" 2>&1)"
+case "$he" in "RECORD|GPT 스킬 링크|0|"*"역할 링크 없음 ${hn}건"*) he_ok=1 ;; *) he_ok=0 ;; esac
+case "$hl" in "RECORD|GPT 스킬 링크|0|"*"역할 링크 없음"*) hl_ok=0 ;; "RECORD|GPT 스킬 링크|0|"*) hl_ok=1 ;; *) hl_ok=0 ;; esac
+[ "$hn" -gt 0 ] && [ "$he_ok" = 1 ] && [ "$hl_ok" = 1 ] \
+  && ok "health-missing-note: 빈 홈 비고에 역할 링크 없음 ${hn}건 · 정리한 홈은 그 말 없음 · record 0" \
+  || no "health-missing-note: 빈 홈 [$he] · 정리한 홈 [$hl] · 번들 $hn"
+
 before="$(snap)"; run 2; after="$(snap)"
 [ "$before" = "$after" ] && ok "재실행 멱등" || no "재실행이 상태를 바꿨다"
 
 # ⑤ Tier 2a — 정본 구현(resolver scripts/gpt_kinds.py skill_path — R-G1 에서 문서 인라인 함수를 옮겼다)을 실행한다.
-#    resolver 는 Tier 2a 가 없으면 플러그인 번들(Tier 2b)을 돌려준다 — 기대값이 Tier 2a 경로라 링크가 깨지면 그대로 miss 다
+#    resolver 는 Tier 2a 가 없으면 플러그인 번들(Tier 2b)을 돌려준다 — 기대값이 Tier 2a 경로라 링크가 깨지면 그대로 miss 다.
+#    P == R(실경로)이면 Tier 2a 경로다. P ≠ R 이고 매니페스트 name 이 같으면(--tree · FZ_SETUP_UNDER_TEST 로 다른 판을 링크했다)
+#    resolver 는 P 를 가리키는 링크 대신 자기 트리 R 의 번들을 돌려준다 — 그 역할의 R 번들이 있을 때만이고, 없거나 링크가 P 가 아닌
+#    곳(남의 플러그인 fz-reviewer)을 가리키면 Tier 2a 경로다
 if [ ! -f "$R/scripts/gpt_kinds.py" ]; then
   no "resolver scripts/gpt_kinds.py 가 없다"
 else
   roles=0 hit=0 miss=""
+  other_root=0; [ "$(cd "$P" && pwd -P)" != "$(cd "$R" && pwd -P)" ] && [ "$(mname "$R")" = "$NAME" ] && other_root=1
   for d in "$P"/gpt-skills/fz-*/; do
     [ -f "$d/SKILL.md" ] || continue
     role="$(basename "$d")"; role="${role#fz-}"; roles=$((roles + 1))
     got="$(cd "$T" && env -u FZ_PLUGIN_ROOT HOME="$H" python3 "$R/scripts/gpt_kinds.py" skill-path "$role")"
-    [ "$got" = "$H/.codex/skills/fz-$role/SKILL.md" ] && [ -f "$got" ] && hit=$((hit + 1)) || miss="$miss $role"
+    want_sp="$H/.codex/skills/fz-$role/SKILL.md"
+    [ "$other_root" = 1 ] && [ "$(readlink "$H/.codex/skills/fz-$role")" = "${d%/}" ] && [ -f "$R/gpt-skills/fz-$role/SKILL.md" ] \
+      && want_sp="$R/gpt-skills/fz-$role/SKILL.md"
+    [ "$got" = "$want_sp" ] && [ -f "$got" ] && hit=$((hit + 1)) || miss="$miss $role"
   done
   [ "$roles" -gt 0 ] && [ "$hit" -eq "$roles" ] && ok "Tier 2a 디스커버리 $hit/$roles 역할" || no "Tier 2a 디스커버리 $hit/$roles — 미해석:$miss"
 fi
 
-# ⑥ 인자 없는 두 번의 실행 뒤에도 agents 폴더가 없다(opt-in)
-[ -e "$H/.codex/agents" ] && no "인자 없이 agents 폴더가 생겼다(opt-in 아님)" || ok "인자 없으면 agents 폴더를 건드리지 않는다"
+# ⑥ 인자 없는 두 번의 실행 뒤에도 agents 폴더가 없다 — setup 은 스킬 폴더만 다룬다
+[ -e "$H/.codex/agents" ] && no "인자 없이 agents 폴더가 생겼다" || ok "인자 없으면 agents 폴더를 건드리지 않는다"
 
-# ⑦ --gpt-agents — 역할 파일 링크 · 남의 링크 · 실제 파일 보존 · 멱등
-AG="$T/agents"; mkdir -p "$AG" "$OTH/gpt-agents"
-echo 'name = "x"' > "$OTH/gpt-agents/fz-review-quality.toml"
-ln -s "$OTH/gpt-agents/fz-review-quality.toml" "$AG/fz-review-quality.toml"   # 남의 살아 있는 같은 이름 링크 → 보존
-echo 'name = "mine"' > "$AG/my-role.toml"                                      # 실제 파일 → 보존
-runa() { env -u CODEX_HOME HOME="$H" FZ_SKILL_TARGET="$TG" FZ_AGENT_TARGET="$AG" bash "$SETUP" --gpt-agents > "$T/out.a$1" 2>&1; }
-runa 1 && ok "--gpt-agents exit 0" || no "--gpt-agents exit $? — $(tail -2 "$T/out.a1" | tr '\n' ' ')"
-want=0 good=0
-for f in "$P"/gpt-agents/*.toml; do
-  [ -f "$f" ] || continue
-  n="$(basename "$f")"; [ "$n" = "fz-review-quality.toml" ] && continue
-  want=$((want + 1)); [ "$(readlink "$AG/$n" 2>/dev/null)" = "$f" ] && good=$((good + 1))
-done
-[ "$want" -gt 0 ] && [ "$good" -eq "$want" ] && ok "역할 파일 링크 $good/$want (현 판)" || no "역할 파일 링크 $good/$want"
-[ "$(readlink "$AG/fz-review-quality.toml")" = "$OTH/gpt-agents/fz-review-quality.toml" ] && ok "남의 같은 이름 역할 링크 보존" || no "남의 역할 링크를 바꿨다"
-[ -f "$AG/my-role.toml" ] && [ ! -L "$AG/my-role.toml" ] && ok "실제 역할 파일 보존" || no "실제 역할 파일이 바뀌었다"
-abefore="$(ls -l "$AG" | tail -n +2)"; runa 2; aafter="$(ls -l "$AG" | tail -n +2)"
-[ "$abefore" = "$aafter" ] && ok "--gpt-agents 재실행 멱등" || no "--gpt-agents 재실행이 상태를 바꿨다"
+# ⑦ retired-option-gpt-agents — 역할 파일 링크 opt-in 을 걷었다. 옛 옵션으로 부르면 조용히 받지 않는다:
+#    모르는 옵션으로 exit 1 · 그 옵션 이름 · 스킬 폴더 그대로 · agents 폴더 없음(그 옵션을 아는 판은 링크를 걸고 exit 0 이라 이 셀이 실패한다)
+before="$(snap)"
+env -u CODEX_HOME HOME="$H" FZ_SKILL_TARGET="$TG" bash "$SETUP" --gpt-agents > "$T/out.retired" 2>&1; rcr=$?
+after="$(snap)"
+[ "$rcr" -eq 1 ] && grep -qF 'unknown option: --gpt-agents' "$T/out.retired" && [ "$before" = "$after" ] && [ ! -e "$H/.codex/agents" ] \
+  && ok "retired-option-gpt-agents: 걷은 옵션 → exit 1 · 옵션 이름 · 스킬 폴더 그대로 · agents 폴더 없음" \
+  || no "retired-option-gpt-agents: exit $rcr · $(tail -1 "$T/out.retired") · 스킬 폴더 $([ "$before" = "$after" ] && echo 그대로 || echo 바뀜) · agents 폴더 $([ -e "$H/.codex/agents" ] && echo 있음 || echo 없음)"
 
 # ⑨ check-removed-role-skill — 이 판이 걷은 역할 스킬을 가리키는 옛 링크만 든 홈(위 셀들과 섞이지 않게 따로 둔다).
 #    구버전 캐시가 아직 남아 링크가 살아 있는 fz-retired-live 와 이 루트에서 폴더가 사라져 끊긴 fz-retired-gone 둘 다 stale 이다.

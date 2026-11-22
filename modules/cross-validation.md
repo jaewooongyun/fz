@@ -331,6 +331,8 @@ GIT_ROOT="${GIT_ROOT_REL:-.}"
 
 Tier 1: 호출자 cwd 의 `CLAUDE.md` `## GPT Skills` 테이블 → Tier 2a: `${CODEX_HOME:-~/.codex}/skills/fz-<역할>` (setup 심볼릭 또는 기존 설치) → Tier 2b: 플러그인 번들 `gpt-skills/fz-<역할>` → Tier 3: kind 의 `fallback_prompt`(레지스트리)를 프롬프트 앞에 붙인다.
 
+- 같은 플러그인의 다른 설치 판을 가리키는 Tier 2a 링크는 실행 트리 번들(Tier 2b)로 대신한다 — 링크 실경로가 다른 설치 루트의 `gpt-skills/fz-<역할>` 이고 그 루트 매니페스트 name 이 실행 트리와 같을 때다(플러그인 업데이트는 setup 을 다시 돌리지 않아 옛 캐시 판 링크가 살아 남는다). 실행 트리 번들이 없거나 매니페스트를 못 읽으면 Tier 2a 그대로이고, Tier 1 · 실제 폴더 · 남의 플러그인 링크 · 실행 트리를 가리키는 링크는 바꾸지 않는다. review 모드(implicit)는 CLI 가 스킬 폴더를 직접 읽어 이 예외 밖이다
+
 - 해석은 **호출자의 cwd · env 기준**이다 — 정문이 cwd 를 바꾸기 전에 resolver 를 부른다(Tier 1 이 대상 프로젝트를 본다). verify-cross 의 격리 `CODEX_HOME` 은 경로를 정한 **뒤** 래퍼에만 준다(격리 홈이 Tier 2a 에 새지 않는다)
 - 직접 확인: `python3 "${FZ_PLUGIN_ROOT}/scripts/gpt_kinds.py" skill-path architect` — 빈 줄이면 Tier 3 다
 - 이력: 2026-08-09 이전 판은 Tier 2b 에서 이름만 돌려줘 호출자가 없는 경로를 `cat` 했다 · 같은 날 경로 반환으로 고쳤다 · R-G1(2026-10) 에서 마크다운 인라인 함수를 resolver 로 옮겼다
@@ -377,10 +379,10 @@ printf '%s\n' "{과제 지시}" > "$P"
 
 위 호출 계약의 GPT 는 대상 저장소와 **같은 디스크**를 본다 — 작업 폴더의 Claude 산출물과 `~/.claude/projects` 로그도 읽을 수 있다. 첫 패스를 Claude 결과와 독립으로 돌려야 할 때(SC-1)는 런처를 쓴다.
 
-- 허용 입력만 격리 폴더에 복사한다 — 요구사항 원문 · 합의 Sprint Contract · PR 메타 · diff · `base/` · `head/` 스냅샷 · 지침 원문 색인 · 소비자 스냅샷. Claude 산출물 이름(`code-context*` · `plan-v*` · `*workflow-result*` · 리뷰 산출물)이나 `~/.claude` 아래 경로가 들어오면 exit 15 다
+- 허용 입력만 격리 폴더에 복사한다 — 요구사항 원문 · 합의 Sprint Contract · PR 메타 · diff · `base/` · `head/` 스냅샷 · 지침 원문 색인 · 소비자 스냅샷. Claude 산출물 이름(`code-context*` · `plan-v*` · `*workflow-result*` · 리뷰 산출물)이나 `~/.claude` 아래 경로 · `--repo` 의 `.claude` · `.fz-work` 아래 경로(링크면 대상 실경로 — 그 실경로가 저장소 자신이거나 저장소 · 홈을 품으면 빼고)가 들어오면 exit 15 다
 - 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` · 격리 폴더의 실제 부모(`${TMPDIR:-/tmp}` 실경로) · 링크인 `~/.claude` 의 대상 실경로는 deny, 격리 폴더(와 `--repo`)만 read 다
 - rollout 을 전부 감사한다 — HOME deny 가 없거나 금지 경로 · 홈 재귀 검색이 있으면 exit 15 와 `.contaminated` 다. 읽는 대상이 명령에 없는 읽기가 있어 읽기 로그만으로는 "안 읽었다"를 증명할 수 없다 — 감사는 보조다
-- review 의 `--gpt-agents`(opt-in)는 역할 파일(`gpt-agents/`)로 두 렌즈 역할을 spawn 한다. 하위 에이전트는 부모와 같은 권한 프로필을 강제받는다(S11 ⑤ · R-G1 S1 실측 — 자식 turn_context 에 HOME deny). 부모 이력을 물려받는지는 `spawn_agent` 의 `fork_turns` 를 모델이 매번 고른다(S1 관측 2건 모두 `none`) — 부모가 격리돼 있어 어느 쪽이든 독립은 유지된다. `--gpt-agents` 가 없으면 프롬프트로 하위 에이전트를 금지하고 감사가 spawn 수를 기록한다 — 지시 + 기록이고 강제가 아니다(spawn 도구는 노출된다 — F-436)
+- 하위 에이전트는 격리 config(`[agents] enabled = false`)가 끈다(F-436) — 프롬프트의 금지 문장과 감사의 spawn 수 기록은 그대로 둔다
 - 산출은 `<arm>-<run>.json`(`schemas/gpt_independent_{plan,review}_schema.json`) · `.md` · `.audit.json` · `.rollouts/` 다. 호출법은 `modules/fz-gpt-subcommands-aux.md` § independent-plan · independent-review
 - 기본값은 스킬마다 다르다 — fz-peer-review 는 기본으로 쓰고(`--no-gpt-independent` 로 끈다 · S25p · S27 판정 뒤 v4.42.0), fz-plan · fz-modernize 는 full 에서 기본으로 쓰고(fz-plan 은 `--no-gpt-independent` 로 끈다 · 2026-11-01 사용자 결정 Q3), fz-review 는 `--gpt-independent` 로 켠다. 쓰지 않는 경로에서는 위 호출 계약이 그대로다
 

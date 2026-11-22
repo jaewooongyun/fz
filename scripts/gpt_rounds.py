@@ -91,7 +91,7 @@ REFUSED = 19                        # 정문 exit 19 — 라운드 거부
 FILE_INPUTS = {"prompt-file", "audit", "requirement", "sprint-contract", "rules-index", "diff", "pr-meta", "snapshot"}
 REPO_INPUTS = {"cd", "repo"}
 OUTPUT_INPUTS = {"out", "out-dir", "prompt-out"}
-SKIP_INPUTS = OUTPUT_INPUTS | {"run-id", "arm", "deny", "keep-iso", "gpt-agents", "model", "effort", "timeout", "experimental"}
+SKIP_INPUTS = OUTPUT_INPUTS | {"run-id", "arm", "deny", "keep-iso", "model", "effort", "timeout", "experimental"}
 VERDICT_INPUTS = ("out", "out-dir")   # 판정이 놓이는 곳 — 래퍼 kind 는 --out · 독립 kind 는 --out-dir(앞이 우선)
 SPEC_FIELDS = ("required", "optional", "repeatable", "flags", "experimental_only")   # 레지스트리 kinds.<K>.inputs 의 이름 목록들
 

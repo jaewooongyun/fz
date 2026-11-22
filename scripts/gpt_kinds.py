@@ -17,7 +17,7 @@ usage:
                  · ERROR (message, on exit 10 / 11)
   gpt_kinds.py compose --plan-dir DIR      write the composed prompt described by DIR/compose.json
   gpt_kinds.py skill-path ROLE             Tier 1 -> 2a -> 2b role SKILL.md path for the caller's cwd / env ('' if none)
-  gpt_kinds.py launcher-policy KIND [--gpt-agents] [--frame NAME]
+  gpt_kinds.py launcher-policy KIND [--frame NAME]
                                            the launcher's policy for an independent kind (R-06 · SC-2): ROLE · SCHEMA ·
                                            SPAWN_LINE · FRAME as KEY=VALUE lines. The launcher asks this itself, so a gate
                                            call and a direct launcher call get the same answer and the argv stays as given
@@ -28,14 +28,16 @@ usage:
                                            a counted-kind call line (gpt_rounds.py KIND_SLOTS) carries FZ_GPT_ARTIFACT=
                                            a literal `gpt-call.sh <kind>` word in a command shape (fence · backtick span · line-head
                                            command) (skills · modules · guides · agents · workflows · README · CLAUDE.md) is a
-                                           registry kind — variables and placeholders are not kind words
+                                           registry kind — variables and placeholders are not kind words; a full run (no --only)
+                                           that reads no kind word fails (measured nothing)
   gpt_kinds.py table --write|--check [--root DIR]
                                            the generated blocks in skills/fz-gpt/SKILL.md (kind count · roles · kinds)
   gpt_kinds.py --self-test
 
 exit: 0 ok · 10 usage (unknown kind, removed kind — the message names the kind to use instead (registry removed_kinds),
-      missing / unknown / forbidden input, experimental kind without --experimental, bad audit) · 11 registry or dependency
-      failure (unreadable registry, missing schema, internal error).
+      removed input — the message names it and why (registry removed_inputs), missing / unknown / forbidden input,
+      experimental kind without --experimental, bad audit) · 11 registry or dependency failure (unreadable registry,
+      missing schema, internal error).
       ⛔ never 1 or 2 — those mean something else elsewhere in fz (XE-02).
 """
 import ast
@@ -65,15 +67,12 @@ FIXED_OK = {"--uncommitted", "--ephemeral"}
 LAUNCHERS = {"wrapper": ("gpt-exec.sh", ("review", "exec", "resume")), "independent": ("gpt_independent.sh", ("plan", "review"))}
 DELIVERY = {None, "implicit", "inject", "path", "iso-copy"}
 INDEPENDENCE = {"plain", "resumes-session", "isolated-fresh"}
-SPAWN = {"inherit-audited", "forbid-prompt", "lenses-optin"}
+SPAWN = {"inherit-audited", "forbid-prompt"}
 STATUS = {"stable", "experimental"}
-# The launcher's no-spawn / lens sentence comes from the kind's registry spawn value (SC-2) — the text lives here, keyed by
+# The launcher's no-spawn sentence comes from the kind's registry spawn value (SC-2) — the text lives here, keyed by
 # that value, so the launcher holds no policy of its own. ⛔ forbid-prompt is byte-for-byte the S0 default prompt line.
 SPAWN_LINES = {
     "forbid-prompt": "하위 에이전트를 만들지 않는다.",
-    "lenses-optin": ("하위 에이전트는 역할 두 개만 만든다 — agent_type `fz-review-arch`(아키텍처 렌즈) · "
-                     "`fz-review-quality`(품질 렌즈). 각 렌즈에 diff 와 네가 만든 규칙 레코드를 넘기고, "
-                     "두 결과를 합쳐 스키마 JSON 하나로 낸다. 다른 하위 에이전트는 만들지 않는다."),
 }
 INDEP_KEYS = {"required", "optional", "repeatable", "flags", "experimental_only"}
 CORE13 = {"review", "check", "verify", "verify-gates", "validate", "final", "adversarial", "drift", "plan", "micro-eval",
@@ -103,6 +102,10 @@ def skill_path(role, env=None, cwd=None, root=ROOT):
     """Tier 1 -> 2a -> 2b, the same order and tests as the former get_gpt_skill_path (modules/cross-validation.md).
     Tier 1: the caller's cwd CLAUDE.md `## GPT Skills` table maps ROLE to an installed skill name.
     Tier 2a: ${CODEX_HOME:-$HOME/.codex}/skills/fz-ROLE. Tier 2b: this plugin's bundled gpt-skills/fz-ROLE.
+    Exception: a Tier 2a entry whose real path is gpt-skills/fz-ROLE of another install root carrying the same plugin name
+    (root manifest name — an older cached version that setup linked before an update) yields to this tree's bundle when the bundle
+    exists — the running version's role body is injected, not the old one. A real folder, another plugin's link, a link into this
+    root, an unreadable manifest and Tier 1 keep their answer.
     Returns '' when none resolves (Tier 3 — the kind's fallback_prompt applies)."""
     env = os.environ if env is None else env
     cwd = os.getcwd() if cwd is None else cwd
@@ -122,13 +125,38 @@ def skill_path(role, env=None, cwd=None, root=ROOT):
     name = " ".join(picked)
     if name and os.path.isfile(os.path.join(sk_root, name, "SKILL.md")):
         return os.path.join(sk_root, name, "SKILL.md")
-    if os.path.isfile(os.path.join(sk_root, f"fz-{role}", "SKILL.md")):
-        return os.path.join(sk_root, f"fz-{role}", "SKILL.md")
     bundled = os.path.join(root, "gpt-skills", f"fz-{role}", "SKILL.md")
+    if os.path.isfile(os.path.join(sk_root, f"fz-{role}", "SKILL.md")):
+        real = os.path.realpath(os.path.join(sk_root, f"fz-{role}"))
+        other = os.path.dirname(os.path.dirname(real))
+        if (os.path.basename(real) == f"fz-{role}" and os.path.basename(os.path.dirname(real)) == "gpt-skills"
+                and other != os.path.realpath(root) and os.path.isfile(bundled)
+                and _plugin_name(root) and _plugin_name(other) == _plugin_name(root)):
+            return bundled
+        return os.path.join(sk_root, f"fz-{role}", "SKILL.md")
     return bundled if os.path.isfile(bundled) else ""
 
 
-def parse_inputs(tokens):
+def _plugin_name(root):
+    """The top-level name of <root>/.claude-plugin/plugin.json — '' when missing or unreadable (no comparison then)."""
+    try:
+        with open(os.path.join(root, ".claude-plugin", "plugin.json"), encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return ""
+    name = d.get("name") if isinstance(d, dict) else None
+    return name if isinstance(name, str) else ""
+
+
+def _gone_input(key, removed):
+    """A caller written for an older version passes an input taken out of the registry (removed_inputs): the refusal names it
+    and why instead of 'unknown input'."""
+    gone = (removed or {}).get(key)
+    if isinstance(gone, dict):
+        raise Usage(f"--{key} was removed — drop it ({gone.get('why') or 'scripts/gpt-kinds.json removed_inputs'})")
+
+
+def parse_inputs(tokens, removed=None):
     """Caller tokens after KIND -> ({input: value}, experimental). Refuses forbidden, unknown and repeated flags."""
     got, experimental, i = {}, False, 0
     while i < len(tokens):
@@ -156,6 +184,7 @@ def parse_inputs(tokens):
                 raise Usage(f"--{key} value is empty or has a newline")
             got[key], i = v, i + 2
         else:
+            _gone_input(key, removed)
             raise Usage(f"unknown input: --{key}")
     return got, experimental
 
@@ -176,10 +205,10 @@ def resolve(kind, tokens, env=None, cwd=None, root=ROOT, reg=None):
     plan = {"adapter": adapter, "argv": [], "lock": "", "session_in": "", "codex_home": "", "cleanup_iso": "", "compose": None}
 
     if launcher == "independent":
-        plan["argv"] = [k["mode"]] + _independent_tokens(kind, k, tokens)
+        plan["argv"] = [k["mode"]] + _independent_tokens(kind, k, tokens, reg.get("removed_inputs"))
         return plan
 
-    got, experimental = parse_inputs(tokens)
+    got, experimental = parse_inputs(tokens, reg.get("removed_inputs"))
     _status_gate(kind, k, experimental)
     inputs = k.get("inputs") or {}
     req, opt = list(inputs.get("required") or []), set(inputs.get("optional") or [])
@@ -282,7 +311,7 @@ def resolve(kind, tokens, env=None, cwd=None, root=ROOT, reg=None):
     return plan
 
 
-def _independent_tokens(kind, k, tokens):
+def _independent_tokens(kind, k, tokens, removed=None):
     """Explicit inputs of an independent kind (D6): the caller's tokens are checked against the registry list and handed
     to the launcher in the caller's order — the argv stays byte-identical to the S0 golden. Measurement inputs (E8 —
     experimental_only) need --experimental; --experimental on a stable kind is accepted only to unlock them."""
@@ -305,6 +334,7 @@ def _independent_tokens(kind, k, tokens):
             raise Usage(f"unexpected argument: '{t}'")
         key = t[2:]
         if key not in allowed:
+            _gone_input(key, removed)
             raise Usage(f"--{key} is not an input of kind {kind}")
         if key in seen and key not in repeat:
             raise Usage(f"--{key} given twice")
@@ -334,15 +364,13 @@ def _independent_tokens(kind, k, tokens):
     return out
 
 
-def launcher_policy(kind, gpt_agents=False, frame=None, root=ROOT, reg=None):
+def launcher_policy(kind, frame=None, root=ROOT, reg=None):
     """The launcher's policy for an independent kind (R-06 · SC-2) -> {ROLE, SCHEMA, SPAWN_LINE, FRAME}."""
     reg = load(os.path.join(root, "scripts", "gpt-kinds.json")) if reg is None else reg
     k = reg["kinds"].get(kind)
     if not isinstance(k, dict) or k.get("launcher") != "independent":
         raise Usage(f"{kind!r} is not an independent kind")
-    spawn = k.get("spawn_opt_in") if gpt_agents else k.get("spawn")
-    if gpt_agents and not spawn:
-        raise Usage(f"--gpt-agents: kind {kind} has no lens opt-in (spawn_opt_in)")
+    spawn = k.get("spawn")
     if spawn not in SPAWN_LINES:
         raise Broken(f"kind {kind}: spawn {spawn!r} has no launcher sentence")
     schema = os.path.join(root, k.get("schema") or "")
@@ -406,20 +434,18 @@ def compose(d):
 
 
 SCHEMA_NULL = {"check", "micro-eval"}   # XE-08: check is judged by grep on severity words; micro-eval is a prose contract
-# A2 — role files must not pin model / effort: the session choice (wrapper) decides. TOML `key = …` · YAML `key: …`
-PIN_TOML = re.compile(r"^\s*(model|model_reasoning_effort|review_model|reasoning_effort|model_provider)\s*=", re.M)
+# A2 — role files must not pin model / effort: the session choice (wrapper) decides. YAML `key: …`
 PIN_YAML = re.compile(r"^\s*(model|model_reasoning_effort|reasoning_effort|effort)\s*:", re.M)
 
 
 def role_pins(root=ROOT):
-    """-> (violations, files checked) for gpt-agents/*.toml and gpt-skills/*/agents/*.yaml."""
+    """-> (violations, files checked) for gpt-skills/*/agents/*.yaml."""
     v, seen = [], 0
-    for pat, rx in ((os.path.join(root, "gpt-agents", "*.toml"), PIN_TOML), (os.path.join(root, "gpt-skills", "*", "agents", "*.yaml"), PIN_YAML)):
-        for f in sorted(glob.glob(pat)):
-            seen += 1
-            txt = open(f, encoding="utf-8", errors="replace").read()
-            for m in rx.finditer(txt):
-                v.append(f"{os.path.relpath(f, root)}:{txt[:m.start()].count(chr(10)) + 1}: pins {m.group(1)} — role files must not pin model / effort (A2)")
+    for f in sorted(glob.glob(os.path.join(root, "gpt-skills", "*", "agents", "*.yaml"))):
+        seen += 1
+        txt = open(f, encoding="utf-8", errors="replace").read()
+        for m in PIN_YAML.finditer(txt):
+            v.append(f"{os.path.relpath(f, root)}:{txt[:m.start()].count(chr(10)) + 1}: pins {m.group(1)} — role files must not pin model / effort (A2)")
     return v, seen
 
 
@@ -487,13 +513,8 @@ def lint(reg=None, root=ROOT):
                 v.append(f"{name}: repeatable / flags must be listed inputs")
             if set(ins.get("experimental_only") or []) & alln:
                 v.append(f"{name}: an E8 input cannot also be a normal input")
-            for sv in (k.get("spawn"), k.get("spawn_opt_in")):
-                if sv and sv not in SPAWN_LINES:
-                    v.append(f"{name}: spawn {sv!r} has no launcher sentence")
-        if k.get("spawn_opt_in") and not (lau == "independent" and k.get("mode") == "review"):
-            v.append(f"{name}: spawn_opt_in (lens opt-in) is for the review launcher only")
-        if k.get("spawn_opt_in") and k.get("spawn_opt_in") not in SPAWN:
-            v.append(f"{name}: spawn_opt_in {k.get('spawn_opt_in')!r}")
+            if k.get("spawn") and k.get("spawn") not in SPAWN_LINES:
+                v.append(f"{name}: spawn {k.get('spawn')!r} has no launcher sentence")
         rec = k.get("recipe")
         if rec:
             rp = os.path.join(root, rec)
@@ -958,6 +979,17 @@ def self_test():
         # independent kinds: explicit inputs (D6) · E8 inputs need --experimental · order kept
         ir = ["--diff", pf, "--arm", "a", "--run-id", "r", "--out-dir", os.path.join(t, "od")]
         expect("independent unknown input", lambda: resolve("independent-review", ir + ["--bogus", "x"], env, cwd, reg=reg), ("usage",))
+        # removed inputs (registry removed_inputs): a caller written for an older version is refused with the input's name and why,
+        #   on an independent and a wrapper kind alike — not as an unknown input · without the registry row it is a plain refusal
+        gone_in = sorted(reg.get("removed_inputs") or {})
+        expect("removed inputs listed in the registry", lambda: gone_in, ("ok", lambda g: len(g) > 0))
+        for key in gone_in:
+            expect(f"removed input --{key} on an independent kind names it", lambda key=key: resolve("independent-review", ir + [f"--{key}"], env, cwd, reg=reg),
+                   ("usage", lambda m, key=key: m.startswith(f"--{key} was removed — ") and "not an input" not in m))
+            expect(f"removed input --{key} on a wrapper kind names it", lambda key=key: resolve("verify", base + ["--prompt-file", pf, f"--{key}"], env, cwd, reg=reg),
+                   ("usage", lambda m, key=key: m.startswith(f"--{key} was removed — ") and "unknown input" not in m))
+            expect(f"removed input --{key} without the registry row -> plain refusal",
+                   lambda key=key: resolve("independent-review", ir + [f"--{key}"], env, cwd, reg=dict(reg, removed_inputs={})), ("usage", lambda m: "is not an input of kind" in m))
         expect("independent missing required", lambda: resolve("independent-review", ir[2:], env, cwd, reg=reg), ("usage",))
         expect("E8 --timeout without --experimental", lambda: resolve("independent-review", ir + ["--timeout", "60"], env, cwd, reg=reg), ("usage",))
         expect("E8 --frame without --experimental", lambda: resolve("independent-review", ir + ["--frame", "repro"], env, cwd, reg=reg), ("usage",))
@@ -969,8 +1001,6 @@ def self_test():
         # launcher policy (R-06 · SC-2)
         expect("policy review", lambda: launcher_policy("independent-review", reg=reg),
                ("ok", lambda d: d["ROLE"] == "reviewer" and d["SPAWN_LINE"] == SPAWN_LINES["forbid-prompt"] and d["SCHEMA"].endswith("gpt_independent_review_schema.json") and d["FRAME"] == ""))
-        expect("policy lenses", lambda: launcher_policy("independent-review", gpt_agents=True, reg=reg), ("ok", lambda d: d["SPAWN_LINE"] == SPAWN_LINES["lenses-optin"]))
-        expect("policy plan + lenses", lambda: launcher_policy("independent-plan", gpt_agents=True, reg=reg), ("usage",))
         expect("policy frame", lambda: launcher_policy("independent-review", frame="repro", reg=reg), ("ok", lambda d: d["FRAME"].endswith("templates/gpt-frames/repro-review.md")))
         expect("policy falsify frame rolled back (E1)", lambda: launcher_policy("independent-review", frame="falsify", reg=reg), ("usage",))
         expect("policy bad frame", lambda: launcher_policy("independent-review", frame="nope", reg=reg), ("usage",))
@@ -1012,6 +1042,43 @@ def self_test():
         expect("tier 1 (cwd)", lambda: skill_path("architect", env, cwd), ("ok", lambda p: p == os.path.join(sk, "my-arch", "SKILL.md")))
         expect("tier 1 other cwd", lambda: skill_path("architect", env, home), ("ok", lambda p: p == os.path.join(sk, "fz-architect", "SKILL.md")))
         expect("no skill", lambda: skill_path("no-such-role", env, home), ("ok", lambda p: p == ""))
+        # tier 2a link into another install root with the same plugin name (an older cached version) -> this tree's bundle ·
+        #   a link into this root, another plugin's link, a run root without the bundle or without a manifest (also when the other
+        #   root has none), a link to another folder or another role of a same-name root keep the 2a path
+        vr = os.path.join(t, "vroots")
+
+        def vroot(tag, name, bundle=True):
+            r = os.path.join(vr, tag)
+            os.makedirs(os.path.join(r, "gpt-skills", "fz-architect") if bundle else r)
+            if name:
+                os.makedirs(os.path.join(r, ".claude-plugin"))
+                json.dump({"name": name}, open(os.path.join(r, ".claude-plugin", "plugin.json"), "w"))
+            if bundle:
+                open(os.path.join(r, "gpt-skills", "fz-architect", "SKILL.md"), "w").write(tag + "\n")
+            return r
+        run_r, old_r, oth_r, bare_r, noman_r = vroot("run", "fz"), vroot("old", "fz"), vroot("oth", "zz"), vroot("bare", "fz", False), vroot("noman", "")
+        noman2_r = vroot("noman2", "")
+        for sub in ("skills", "gpt-skills"):   # same-name root: a Claude skill folder of the role's name · another role's bundle
+            os.makedirs(os.path.join(old_r, sub, "fz-architect" if sub == "skills" else "fz-planner"))
+            open(os.path.join(old_r, sub, "fz-architect" if sub == "skills" else "fz-planner", "SKILL.md"), "w").write("x\n")
+        vh = os.path.join(vr, "home")
+        vlink = os.path.join(vh, ".codex", "skills", "fz-architect")
+        os.makedirs(os.path.dirname(vlink))
+
+        def via(target, root, rel=os.path.join("gpt-skills", "fz-architect")):
+            if os.path.lexists(vlink):
+                os.remove(vlink)
+            os.symlink(os.path.join(target, rel), vlink)
+            return skill_path("architect", {"HOME": vh}, home, root)
+        v2a = os.path.join(vlink, "SKILL.md")
+        expect("tier 2a other-version link -> bundle", lambda: via(old_r, run_r), ("ok", lambda p: p == os.path.join(run_r, "gpt-skills", "fz-architect", "SKILL.md")))
+        expect("tier 2a link to this root -> 2a path", lambda: via(run_r, run_r), ("ok", lambda p: p == v2a))
+        expect("tier 2a other plugin link -> 2a", lambda: via(oth_r, run_r), ("ok", lambda p: p == v2a))
+        expect("tier 2a other-version link, no bundle -> 2a", lambda: via(old_r, bare_r), ("ok", lambda p: p == v2a))
+        expect("tier 2a other-version link, run root without a manifest -> 2a", lambda: via(old_r, noman_r), ("ok", lambda p: p == v2a))
+        expect("tier 2a link between two roots without a manifest -> 2a", lambda: via(noman2_r, noman_r), ("ok", lambda p: p == v2a))
+        expect("tier 2a link to another folder of a same-name root -> 2a", lambda: via(old_r, run_r, os.path.join("skills", "fz-architect")), ("ok", lambda p: p == v2a))
+        expect("tier 2a link to another role of a same-name root -> 2a", lambda: via(old_r, run_r, os.path.join("gpt-skills", "fz-planner")), ("ok", lambda p: p == v2a))
         # verify-cross: env from the audit, composed prompt, cleanup
         vc = lambda: resolve("verify-cross", ["--audit", sample["audit"], "--cd", cwd, "--out", sample["out"], "--prompt-file", pf, "--prompt-out", sample["prompt-out"]], env, home, reg=reg)
         expect("verify-cross plan", vc, ("ok", lambda p: p["codex_home"].endswith("fz-gpt-iso.ABCDEF/gpt-home") and p["cleanup_iso"].endswith("fz-gpt-iso.ABCDEF")
@@ -1041,7 +1108,6 @@ def self_test():
                ("experimental kind with a default-flow caller", mut("review-repro", callers=["skills/fz-review/SKILL.md"]), "experimental"),
                ("experimental kind without evidence", mut("review-repro", evidence=[]), "experimental"),
                ("independent passthrough (D6)", mut("independent-review", inputs={"passthrough": True}), "passthrough"),
-               ("spawn opt-in on plan", mut("independent-plan", spawn_opt_in="lenses-optin"), "spawn_opt_in"),
                ("spawn value without a sentence", mut("independent-review", spawn="inherit-audited"), "launcher sentence"),
                ("resume kind marked fresh", mut("final-deep", independence="plain"), "resumes-session"),
                ("missing frame file", mut("review-repro", frame="templates/gpt-frames/nope.md"), "frame"),
@@ -1052,15 +1118,13 @@ def self_test():
         for label, r, needle in neg:
             expect(f"lint negative: {label}", lambda r=r: lint(r), ("ok", lambda v, needle=needle: any(needle in x for x in v)))
         pin_root = os.path.join(t, "pinroot")
-        for sub in ("gpt-agents", os.path.join("gpt-skills", "fz-x", "agents"), "scripts", "schemas"):
+        for sub in (os.path.join("gpt-skills", "fz-x", "agents"), "scripts", "schemas"):
             os.makedirs(os.path.join(pin_root, sub))
         shutil.copy(REGISTRY, os.path.join(pin_root, "scripts", "gpt-kinds.json"))
-        open(os.path.join(pin_root, "gpt-agents", "a.toml"), "w").write('name = "a"\ndescription = "d"\n')
         open(os.path.join(pin_root, "gpt-skills", "fz-x", "agents", "openai.yaml"), "w").write("interface:\n  display_name: x\n")
-        expect("role files without pins", lambda: role_pins(pin_root), ("ok", lambda r: r == ([], 2)))
-        open(os.path.join(pin_root, "gpt-agents", "a.toml"), "a").write('model = "gpt-x"\n')
+        expect("role files without pins", lambda: role_pins(pin_root), ("ok", lambda r: r == ([], 1)))
         open(os.path.join(pin_root, "gpt-skills", "fz-x", "agents", "openai.yaml"), "a").write("  effort: high\n")
-        expect("role-file pins caught (toml + yaml)", lambda: role_pins(pin_root), ("ok", lambda r: len(r[0]) == 2 and r[1] == 2))
+        expect("role-file pins caught (yaml)", lambda: role_pins(pin_root), ("ok", lambda r: len(r[0]) == 1 and r[1] == 1))
         expect("shipped role files: no pins", lambda: role_pins(ROOT), ("ok", lambda r: r[0] == [] and r[1] > 0))
         # consumer lint: a hand-assembled wrapper call in a bash block is caught, the gate form passes, comments are skipped
         cr = os.path.join(t, "consroot")
@@ -1206,6 +1270,18 @@ def self_test():
             return rc, buf.getvalue()
         expect("kind-refs: lint --consumers fails on an unregistered kind (exit 11)", lambda: run_main(["lint", "--consumers", "--root", kr, "--only", "modules/k.md"]),
                ("ok", lambda r: r[0] == 11 and "LINT modules/k.md:2:" in r[1] and "FAIL (1)" in r[1] and "kind-refs=1" in r[1]))
+        # a full run that reads no kind word measured nothing (a scope shrunk to zero stays green otherwise) — the tree has a bash
+        #   block and a counted call line, so only the kind-name guard can fail it · --only keeps 0 (the round guard's rule)
+        zr = os.path.join(t, "zeroroot")
+        os.makedirs(os.path.join(zr, "scripts")); os.makedirs(os.path.join(zr, "skills", "s"))
+        json.dump(dict(reg, consumer_allow=[]), open(os.path.join(zr, "scripts", "gpt-kinds.json"), "w"), ensure_ascii=False)
+        open(os.path.join(zr, "scripts", "gpt_rounds.py"), "w").write('KIND_SLOTS = {"verify": ("verify", "main")}\n')
+        open(os.path.join(zr, "skills", "s", "SKILL.md"), "w").write("```bash\necho x\n```\nrun FZ_GPT_ARTIFACT=plan gpt-call.sh verify --cd x\n")
+        expect("kind-refs: a full run that reads no kind word fails (exit 11)", lambda: run_main(["lint", "--consumers", "--root", zr]),
+               ("ok", lambda r: r[0] == 11 and "LINT kind-name lint: no literal kind word" in r[1] and "measured nothing" in r[1] and "kind-refs=0" in r[1]
+                and "round-calls=1" in r[1] and "FAIL (1)" in r[1]))
+        expect("kind-refs: --only that reads no kind word stays 0", lambda: run_main(["lint", "--consumers", "--root", zr, "--only", "skills/s/SKILL.md"]),
+               ("ok", lambda r: r[0] == 0 and "kind-refs=0" in r[1] and "measured nothing" not in r[1]))
         # table: missing markers fail · write then check passes · a registry change makes check fail
         os.makedirs(os.path.join(cr, "skills", "fz-gpt"))
         doc = os.path.join(cr, "skills", "fz-gpt", "SKILL.md")
@@ -1243,17 +1319,15 @@ def main(argv):
     if argv[:1] == ["--self-test"]:
         return self_test()
     if argv[:1] == ["launcher-policy"] and len(argv) >= 2:
-        rest, ga, fr = argv[2:], False, None
+        rest, fr = argv[2:], None
         while rest:
-            if rest[0] == "--gpt-agents":
-                ga, rest = True, rest[1:]
-            elif rest[0] == "--frame" and len(rest) >= 2:
+            if rest[0] == "--frame" and len(rest) >= 2:
                 fr, rest = rest[1], rest[2:]
             else:
                 print(f"GPT-KINDS-USAGE(10): unknown argument {rest[0]}", file=sys.stderr)
                 return 10
         try:
-            pol = launcher_policy(argv[1], ga, fr)
+            pol = launcher_policy(argv[1], fr)
         except Usage as e:
             print(f"GPT-KINDS-USAGE(10): {e}", file=sys.stderr)
             return 10
@@ -1289,6 +1363,9 @@ def main(argv):
             vr = ["round lint: no counted-kind call line under skills · modules · guides — measured nothing"]
         v += vr
         vk, nk = lint_kind_refs(root, reg, only)
+        if not vk and nk == 0 and not only:
+            vk = ["kind-name lint: no literal kind word after gpt-call.sh in a command shape (skills · modules · guides · agents · "
+                  "workflows · README · CLAUDE.md) — measured nothing"]
         v += vk
         nt = 0
         if tools:

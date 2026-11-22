@@ -526,9 +526,11 @@ esac
 #    스크립트 자체의 판정은 §4.6 회귀 오라클의 setup-links 셀이 임시 홈에서 본다.
 # ⛔ 판정 불가도 record 0(경고) 이다 — 계획 문언 '경고 행(FAIL 아님)'. 대상이 사용자 홈이라 UNRUN 으로 올리면 이 트리와 무관하게
 #    health-check 가 exit 2 가 된다. 스크립트가 깨진 경우는 setup-links 셀이 실패로 잡는다. 소유 판정 불가 링크(unknown)는 건수만 비고에.
+#    아직 링크되지 않은 역할 스킬(missing — setup 을 건너뛴 설치)도 건수만 비고에 — review 모드 kind 는 그 역할 없이 돈다(record 는 0 그대로).
 SL_OUT="$(bash "$ROOT/scripts/setup-gpt-skills.sh" --check 2>&1)"; SL_CODE=$?
 SL_N="$(printf '%s\n' "$SL_OUT" | grep -E '^Check: [0-9]+ stale' | tail -1 | grep -oE '[0-9]+' | head -1)"
 SL_U="$(printf '%s\n' "$SL_OUT" | grep -c '^  unknown: ')"; SL_UN=""; [ "$SL_U" -gt 0 ] && SL_UN=" · ⚠️ 소유 판정 불가 ${SL_U}건(끊긴 링크 — setup 이 보존)"
+SL_M="$(printf '%s\n' "$SL_OUT" | grep -c '^  missing: ')"; [ "$SL_M" -gt 0 ] && SL_UN="${SL_UN} · ⚠️ 역할 링크 없음 ${SL_M}건(review 모드는 역할 없이 돈다 — bash scripts/setup-gpt-skills.sh)"
 if [ "$SL_CODE" -eq 0 ] && [ "${SL_N:-x}" = 0 ]; then
   record "GPT 스킬 링크" 0 "stale 0건${SL_UN}"
 elif [ "$SL_CODE" -eq 1 ] && [ "${SL_N:-0}" -gt 0 ]; then
@@ -728,7 +730,7 @@ record3 "health-check 배선 대조" "$HW_CODE" "$HW_OUT" \
   "⛔ $(printf '%s\n' "$HW_OUT" | grep -E '✗' | head -2 | tr '\n' ' ')"
 
 # ── 4.9b GPT kind 레지스트리 lint (R-G1 S3) ───────────────────
-# ⛔ self-test 는 검사기만 본다 — 실제 레지스트리(scripts/gpt-kinds.json)와 역할 파일(gpt-agents · gpt-skills/*/agents)의
+# ⛔ self-test 는 검사기만 본다 — 실제 레지스트리(scripts/gpt-kinds.json)와 역할 파일(gpt-skills/*/agents)의
 #    model · effort 핀은 lint 로 따로 본다. 레지스트리 손상은 exit 11 이다(PASS 아님).
 GKL="$(cd "$ROOT" && python3 scripts/gpt_kinds.py lint --root "$ROOT" 2>&1)"; GKL_CODE=$?
 record3 "GPT kind 레지스트리 lint" "$GKL_CODE" "$GKL" \

@@ -69,7 +69,6 @@ roll "$T/r-claude.jsonl" 1 "cat /x/.claude/projects/p/a.jsonl"
 roll "$T/r-find.jsonl" 1 "find ~ -name '*.md'"
 roll "$T/r-home.jsonl" 1 "head -1 $HREAL/dev/notes.md"
 roll "$T/r-nodeny.jsonl" 0 "cat requirement.md"
-roll "$T/r-roles.jsonl" 1 "SPAWN:fz-review-arch" "SPAWN:fz-review-quality" "cat diff.patch"
 roll "$T/r-repo.jsonl" 1 "rg --files $HREAL/dev/repo -g '!.git'" "find $HREAL/dev/repo -name '*.ts'" "grep -rn b $HREAL/dev/repo"
 roll "$T/r-repomix.jsonl" 1 "rg b $HREAL/dev/repo ~"
 roll "$T/r-quoted.jsonl" 1 'cat "work dir/review-report.md"'
@@ -191,6 +190,30 @@ for c in claude-link-repo claude-link-target-repo claude-link-file claude-link-t
   check "금지 입력($c): exit 15 · CLI 미호출 · ~/.claude 사유 줄 · 빈 stdout" \
     "$(rc $c)|$(called $c)|$(grep -cF '~/.claude 아래(에이전트 로그 · journal)' "$T/c-$c/stderr" 2>/dev/null)|$(wc -c < "$T/c-$c/stdout" | tr -d ' ')" "15|0|1|0"
 done
+# ③-b --repo 의 .claude · .fz-work 아래(링크면 대상 실경로) 직접 입력 · 폴더 입력 → exit 15 · CLI 미호출 · 저장소 사유 줄 · 빈 stdout.
+#      직접 입력은 격리 입력 폴더로 이름을 바꿔 복사되므로 권한 표 deny 도 rollout 감사도 보지 못한다 — 게이트가 막아야 한다.
+#      그대로인 칸: self-link(.claude → 저장소 자신 · .fz-work → 저장소의 부모)면 저장소 안 정상 입력은 통과 · --repo 가 없으면 이 규칙이 없다
+RD="$H/dev/rc-direct"; mkdir -p "$RD/.claude/notes" "$RD/src"; echo "claude log" > "$RD/.claude/notes/notes.md"
+RL="$H/dev/rc-link"; mkdir -p "$RL/src" "$T/rc-out"; ln -s "$T/rc-out" "$RL/.claude"; echo "claude log" > "$T/rc-out/notes.md"
+RF="$H/dev/rc-fz"; mkdir -p "$RF/.fz-work/T-1" "$RF/src"; echo "claude log" > "$RF/.fz-work/T-1/notes.md"
+RS="$H/dev/rc-self"; mkdir -p "$RS/docs"; ln -s "$RS" "$RS/.claude"; ln -s "$H/dev" "$RS/.fz-work"; cp "$IN/requirement.md" "$RS/docs/requirement.md"
+RT="$H/dev/rc-root"; mkdir -p "$RT/docs"; ln -s / "$RT/.claude"; cp "$IN/requirement.md" "$RT/docs/requirement.md"   # .claude → / — 저장소 · 홈을 품는 맨 끝 조상
+run repo-claude-direct-input "" "" plan --requirement "$RD/.claude/notes/notes.md" --repo "$RD"
+run repo-claude-link-input "" "" plan --requirement "$T/rc-out/notes.md" --repo "$RL"
+run repo-claude-link-path-input "" "" plan --requirement "$RL/.claude/notes.md" --repo "$RL"
+run repo-fzwork-input "" "" plan --requirement "$RF/.fz-work/T-1/notes.md" --repo "$RF"
+run repo-claude-folder-input "" "" review --diff "$IN/diff.patch" --snapshot "$RD/.claude/notes" --repo "$RD"
+for c in repo-claude-direct-input repo-claude-link-input repo-claude-link-path-input repo-fzwork-input repo-claude-folder-input; do
+  want=1; [ "$c" = repo-claude-folder-input ] && want=2   # 폴더 입력은 폴더 · 그 안 파일 하나 — 사유 줄 둘
+  check "$c — exit 15 · CLI 미호출 · 저장소 사유 줄 $want · 빈 stdout" \
+    "$(rc $c)|$(called $c)|$(grep -cF '저장소 .claude · .fz-work 아래' "$T/c-$c/stderr" 2>/dev/null)|$(wc -c < "$T/c-$c/stdout" | tr -d ' ')" "15|0|$want|0"
+done
+run repo-claude-self-link "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$RS/docs/requirement.md" --repo "$RS"
+check "repo-claude-self-link — .claude → 저장소 자신 · .fz-work → 저장소의 부모: 저장소 안 정상 입력 exit 0 · CLI 호출" "$(rc repo-claude-self-link)|$(called repo-claude-self-link)" "0|1"
+run repo-claude-root-link "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$RT/docs/requirement.md" --repo "$RT"
+check "repo-claude-root-link — .claude → /: 저장소 안 정상 입력 exit 0 · CLI 호출" "$(rc repo-claude-root-link)|$(called repo-claude-root-link)" "0|1"
+run repo-claude-no-repo "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirement "$RD/.claude/notes/notes.md"
+check "repo-claude-no-repo — --repo 없이 같은 파일: 이 규칙 밖(exit 0)" "$(rc repo-claude-no-repo)|$(called repo-claude-no-repo)" "0|1"
 
 # ④ rollout 감사 → exit 15 + 오염 표시
 run aud1 "$HERE/sample-plan-ok.json" "$T/r-claude.jsonl" plan --requirement "$IN/requirement.md"
@@ -316,28 +339,27 @@ check "6축 중복: exit 14" "$(rc dup)" 14
 run nocov "$HERE/sample-review-no-coverage.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch"
 check "스키마 위반: exit 14" "$(rc nocov)" 14
 
-# ⑪-a 역할 파일(--gpt-agents · S14) — 켜면 격리 홈에 역할 사본 · 두 역할 spawn 지시 · 감사에 역할 이름 / 끄면 agents 없음 · 하위 에이전트 금지
-run roleson "$HERE/sample-review-ok.json" "$T/r-roles.jsonl" review --diff "$IN/diff.patch" --gpt-agents --keep-iso
-check "역할 켬: exit 0" "$(rc roleson)" 0
-AISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-roleson/env.txt")"
-[ -f "$AISO/gpt-home/agents/fz-review-arch.toml" ] && [ -f "$AISO/gpt-home/agents/fz-review-quality.toml" ] && [ ! -L "$AISO/gpt-home/agents/fz-review-arch.toml" ] \
-  && ok "역할 켬: 격리 홈 agents/ 에 역할 사본 2" || no "역할 켬: 역할 사본이 없다"
-check "역할 켬: 두 역할 spawn 지시" "$(count roleson 'agent_type `fz-review-arch`')" 1
-check "역할 켬: 감사에 spawn 역할" "$(audit roleson spawnedRoles)" "['fz-review-arch', 'fz-review-quality']"
-AON="$(grep -c '^\[agents\]$' "$AISO/gpt-home/config.toml" 2>/dev/null)"
-rm -rf "$AISO"
+# ⑪-a 하위 에이전트 — 격리 config 가 늘 끈다(켜는 옵션은 없다) · agents 폴더 없음 · 프롬프트 금지 문장 · 감사 spawn 0
 run rolesoff "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --keep-iso
 OISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-rolesoff/env.txt")"
-[ ! -e "$OISO/gpt-home/agents" ] && ok "역할 끔: agents 폴더 없음" || no "역할 끔: agents 폴더가 있다"
-check "역할 끔: 하위 에이전트 금지" "$(count rolesoff '하위 에이전트를 만들지 않는다.')" 1
-check "역할 끔: 감사 spawn 0" "$(audit rolesoff spawnAgent)" 0
+[ ! -e "$OISO/gpt-home/agents" ] && ok "하위 에이전트 끔: agents 폴더 없음" || no "하위 에이전트 끔: agents 폴더가 있다"
+check "하위 에이전트 끔: 하위 에이전트 금지" "$(count rolesoff '하위 에이전트를 만들지 않는다.')" 1
+check "하위 에이전트 끔: 감사 spawn 0" "$(audit rolesoff spawnAgent)" 0
 AOFF="$(sed -n '/^\[agents\]$/,/^\[/p' "$OISO/gpt-home/config.toml" 2>/dev/null | grep -c '^enabled = false$')"
-# F-436 — 기본(역할 끔)은 격리 config 가 spawn 도구를 끈다 · --gpt-agents 는 그 표가 없다(프롬프트 금지는 경계가 아니다)
-[ "$AOFF" = 1 ] && [ "$AON" = 0 ] && ok "f436-agents-disabled — 역할 끔: [agents] enabled = false · 역할 켬: [agents] 표 없음" \
-  || no "f436-agents-disabled — 역할 끔 enabled=false $AOFF · 역할 켬 [agents] $AON"
+# F-436 — 격리 config 가 spawn 도구를 끈다(프롬프트 금지는 경계가 아니다)
+[ "$AOFF" = 1 ] && ok "f436-agents-disabled — 격리 config: [agents] enabled = false" || no "f436-agents-disabled — [agents] enabled = false 줄 $AOFF"
 rm -rf "$OISO"
-run rolesplan "" "" plan --requirement "$IN/requirement.md" --gpt-agents
-check "역할 plan: exit 10(review 전용)" "$(rc rolesplan)" 10
+# ⑪-b 걷은 옵션 --gpt-agents(하위 에이전트 렌즈 opt-in) — 옛 호출을 조용히 받지 않는다. 정문은 레지스트리 removed_inputs 로
+#      '걷은 입력' 사유를 내고, 런처 직접 호출은 모르는 인자로 멈춘다 — 둘 다 exit 10 · CLI 미호출
+GG="$T/c-gone-gate"; mkdir -p "$GG/tel"
+env -u CODEX_HOME -u FZ_GPT_CHOICE_DIR HOME="$H" FZ_TELEMETRY_DIR="$GG/tel" FZ_SHIM_CAPTURE="$GG/argv.json" \
+  bash "$R/scripts/gpt-call.sh" independent-review --diff "$IN/diff.patch" --gpt-agents --arm A --run-id gone-gate --out-dir "$GG/out" > "$GG/stdout" 2> "$GG/stderr"
+echo $? > "$GG/rc"
+check "retired-option-gpt-agents — 정문: exit 10 · CLI 미호출 · 걷은 입력 사유 줄" \
+  "$(rc gone-gate)|$(called gone-gate)|$(grep -c '^GPT-CALL-USAGE(10): --gpt-agents was removed — ' "$GG/stderr")" "10|0|1"
+run gone-direct "" "" review --diff "$IN/diff.patch" --gpt-agents
+check "retired-option-gpt-agents — 런처 직접: exit 10 · CLI 미호출 · 모르는 인자 줄" \
+  "$(rc gone-direct)|$(called gone-direct)|$(grep -c '^INDEPENDENT-FAIL(10): 알 수 없는 인자: --gpt-agents$' "$T/c-gone-direct/stderr")" "10|0|1"
 
 # ⑪ 사용법 → exit 10
 run u1 "" "" plan
