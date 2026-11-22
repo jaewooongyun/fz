@@ -10,7 +10,7 @@
 #                             기대 매핑(skip 18 off-user · run 0 · config 0 · ask 3 · skip 18 off-no-cli · 인증 없음이면 run · ask · config 자리가 모두
 #                             skip 18 off-no-auth · off 는 off-user · CLI 없음은 off-no-cli 그대로)인지 본다. 인증 없음 밖의 상태는 CLI 홈에 합성 인증 파일을 둔다
 #   tmpdir-claude-zero-calls  TMPDIR=<임시 홈>/.claude/x(있는 폴더)에서 정문 `gpt-call.sh independent-plan` → exit 11 · ~/.claude 메시지 ·
-#                             기록 CLI 호출 0 · 격리 폴더 미생성. GPT 홈 · 인증은 갖춰 둔다(다른 11 사유로 통과하지 않게)
+#                             GPT 호출 0(기록 CLI 에 남는 것은 인증 판정의 `login status` 뿐) · 격리 폴더 미생성. GPT 홈 · 인증은 갖춰 둔다(다른 11 사유로 통과하지 않게)
 #   all-consumers-use-common  GPT kind 를 실제로 부르는 스킬(`gpt_kinds.py callers` 의 JSON — kinds-callers 와 같은 판독기)마다
 #                             decide 또는 § 단계 실행 판정을 가리킨다 · fz-fix 에 `--gpt` opt-in 이 없다 · gpt-strategy 에 정본 절이 있다
 #   contract-order            fz-plan full 순서(B2b · F-468) — skills/fz-plan/SKILL.md 의 `### 실행 절차 (Lead)` 머리 뒤에서 각 토큰이 처음 나오는 줄이 이 순서다:
@@ -129,13 +129,13 @@ case_tmpdir_claude_zero_calls() {
       "TMPDIR=$h/.claude/x" /bin/bash "$ROOT/scripts/gpt-call.sh" independent-plan --requirement "$d/requirement.md" \
       --arm gpt --run-id br-tmp --out-dir "$d/out" < /dev/null ) > "$d/stdout" 2> "$d/stderr"
   rc=$?
-  n="$(wc -l < "$CALLS" | tr -d ' ')"
+  n="$(grep -cvx 'login status' "$CALLS")"   # 인증 판정(auth-check)의 login status 는 모델 호출이 아니다 — 그 밖의 줄이 GPT 호출이다
   iso="$(find "$h/.claude/x" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' ')"
   [ "$rc" = 11 ] || add "exit 기대 11 · 실제 $rc"
   grep -qF '격리 폴더가 ~/.claude 아래에 생긴다' "$d/stderr" || add "~/.claude 메시지 없음 — stderr '$(head -c 240 "$d/stderr" | tr '\n' ' ')'"
-  [ "$n" = 0 ] || add "기록 CLI 호출 ${n}회(0 이어야 한다)"
+  [ "$n" = 0 ] || add "기록 CLI 의 GPT 호출 ${n}회(0 이어야 한다 · login status 제외)"
   [ "$iso" = 0 ] || add "격리 폴더가 ~/.claude 아래에 남았다(${iso}개)"
-  verdict tmpdir-claude-zero-calls "$WHY" "exit 11 · ~/.claude 메시지 · 기록 CLI 호출 0 · 격리 폴더 미생성(GPT 홈 · 인증은 있다)"
+  verdict tmpdir-claude-zero-calls "$WHY" "exit 11 · ~/.claude 메시지 · GPT 호출 0(login status 제외) · 격리 폴더 미생성(GPT 홈 · 인증은 있다)"
 }
 
 # ── all-consumers-use-common ───────────────────────────────────────

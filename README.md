@@ -44,7 +44,7 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
 | **Claude Code** | 동작 불가 | 전부 | 네이티브 설치(권장) — [설치 문서](https://code.claude.com/docs/en/setup) · 또는 `npm install -g @anthropic-ai/claude-code` |
 | **SuperClaude** | 리뷰 셋째 검증이 새 컨텍스트 에이전트로 · 설명 · 조사 명령은 건너뛴다 | 3/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
 | **Serena MCP** | 심볼 탐색이 Grep 으로 (11 중 7 폴백) | 11/22 | 자동 등록. `uv` 필수 (`brew install uv`), 첫 기동 전에 캐시를 채운다(아래) |
-| **GPT CLI** (`@openai/codex`) | 교차 검증이 새 컨텍스트 Claude 검증자로 — 동종 검증 `[fresh-context: claude]` (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
+| **GPT CLI** (`@openai/codex`) | `[GPT 미사용 — CLI 없음]` 표기만 — 대신하는 검증은 없다. 켠 GPT 호출이 실패했을 때만 교차 검증이 새 컨텍스트 Claude 검증자로 — 동종 검증 `[fresh-context: claude]` (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
 | **sequential-thinking** | 없으면 같은 분해를 표로 직접 쓴다 | 9/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
 | **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (9 중 1 폴백) | 9/22 | `claude plugin install context7@claude-plugins-official` |
 | **pr-review-toolkit** | fz-review Phase 5 병렬 4·5 생략 · 보고에 한 줄 고지 | 1/22 | 공식 마켓플레이스에서 `/plugin` 으로 설치. 에이전트 이름은 접두 꼴 `pr-review-toolkit:<이름>`(`modules/native-agents.md`) |
@@ -73,7 +73,7 @@ bash "$(printf '%s\n' ~/.claude/plugins/cache/fz-orchestrator/fz/*/ | sort -V | 
 
 ⛔ 캐시에 버전이 여럿이면 glob 을 그대로 실행하지 않는다. 사전순으로 첫 경로가 돌아 가장 오래된 판에 링크될 수 있다. 위 명령처럼 `sort -V` 로 최신 하나를 고르거나 로컬 체크아웃이면 그 플러그인 루트에서 `bash scripts/setup-gpt-skills.sh` 를 실행한다. setup 은 `gpt-skills/` 만 링크하고 이 플러그인의 Claude 스킬(`skills/`)을 가리키는 옛 링크는 지운다.
 
-⛔ README 는 GPT 모델과 CLI 버전 하한을 고정하지 않는다. 모델과 effort 는 세션에서 고르고(지난 선택이 있으면 새 세션은 묻지 않고 이어 쓴다) 고르지 않으면 `~/.codex/config.toml` 값을 쓴다. 정본은 `modules/gpt-strategy.md` § 모델·effort 선택이다. CLI 가 구버전이면 에러 대응표가 업데이트를 권한다.
+⛔ README 는 GPT 모델과 CLI 버전 하한을 고정하지 않는다. 모델과 effort 는 세션에서 고르고 고르지 않으면 `~/.codex/config.toml` 값을 쓴다. 대화 세션은 GPT 를 켠 마지막 선택을 묻지 않고 이어 쓴다(그 모델이 지금 모델 목록에 있을 때). off 는 고른 그 세션에만 남고, 자율 세션은 지난 선택을 이어 쓰지 않는다. 정본은 `modules/gpt-strategy.md` § 모델·effort 선택이다. CLI 가 구버전이면 에러 대응표가 업데이트를 권한다.
 
 ### 업데이트
 

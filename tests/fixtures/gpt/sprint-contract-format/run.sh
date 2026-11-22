@@ -15,6 +15,7 @@
 #   ⑤ iso 사전 게이트: gpt_independent.sh iso 가 메인 경로와 같은 두 게이트 — 격리 폴더 자리(TMPDIR 이 ~/.claude 아래 → exit 11) ·
 #      금지 입력(--repo 가 ~/.claude 아래 → exit 15 · ~/.claude 가 링크면 링크 경로 · 링크 대상 경로 둘 다) — 를 격리 폴더를 만들기 전에 거는가(빈 stdout · 폴더 0개). 대조: 같은 가짜 HOME 에서
 #      ~/.claude 밖 자리 · 저장소면 exit 0 과 격리 폴더 경로 한 줄. 가짜 HOME · 러너 임시 폴더 안 TMPDIR 만 쓴다(실제 ~/.claude · 임시 루트를 가리키지 않는다)
+#      인증 파일 없음(CLI 홈에 auth.json 이 없다 — API 키 env 가 있어도)은 두 게이트보다 먼저 exit 18 · 'GPT-OFF: 인증 파일 없음(격리 첫 패스)'(메인 경로와 같은 GPT 미사용)
 # --live — 실제 GPT CLI 1회(effort high · read-only 권한 프로필)로 기록을 새로 만든 뒤 기본 모드를 돈다. 사람이 부른다(게이트는 부르지 않는다)
 #   호출은 독립 런처와 같은 격리 아래서 돈다 — gpt_independent.sh iso 가 만든 격리 폴더(가짜 HOME · 격리 CODEX_HOME · 권한 프로필:
 #   HOME · 임시 루트 · 플러그인 트리 deny · 저장소 사본 read)와 래퍼 --config-permissions. 기록(provenance.json)에 격리 config 의 deny 경로 수를 남긴다
@@ -290,6 +291,15 @@ if [ "$LIVE" -eq 0 ] && [ -z "${FZ_SC_MODULE:-}" ]; then
   case "$IP" in "$(cd "$T/it-ok" && pwd -P)/fz-gpt-iso."??????) bash "$R/scripts/gpt_independent.sh" cleanup --iso "$IP" >/dev/null 2>&1 ;; esac
   [ "$IOK" = 1 ] && ok "iso-gates-control — 같은 가짜 HOME 에서 ~/.claude 밖 자리 · 저장소면 exit 0 · 격리 폴더 경로 한 줄" \
     || no "iso-gates-control — exit $IRC · stdout '$IP' · $(tail -1 "$T/iso.err")"
+  # 인증 파일 없음 — 격리 홈은 실제 CLI 홈의 auth.json 을 링크해서 돈다. 없으면 메인 경로처럼 GPT 미사용(18 · GPT-OFF)이고 자리 게이트(11)보다 먼저다
+  #   (TMPDIR 이 ~/.claude 아래여도 18) · API 키 env 가 있어도 같다 · 빈 stdout · 격리 폴더 0개
+  mkdir -p "$T/igh-none" "$T/it-na"
+  env HOME="$IH" CODEX_HOME="$T/igh-none" TMPDIR="$IH/.claude/tmp" OPENAI_API_KEY=sk-test-synthetic bash "$R/scripts/gpt_independent.sh" iso --repo "$T/irepo" > "$T/iso.out" 2> "$T/iso.err"; IRC=$?
+  env HOME="$IH" CODEX_HOME="$T/igh-none" TMPDIR="$T/it-na" bash "$R/scripts/gpt_independent.sh" iso --repo "$T/irepo" > "$T/iso2.out" 2> "$T/iso2.err"; IRC2=$?
+  [ "$IRC:$IRC2" = "18:18" ] && [ ! -s "$T/iso.out" ] && [ ! -s "$T/iso2.out" ] && grep -q '^GPT-OFF: 인증 파일 없음(격리 첫 패스) — ' "$T/iso.err" \
+    && [ "$(isos "$IH/.claude/tmp"):$(isos "$T/it-na")" = "0:0" ] \
+    && ok "iso-no-auth-file-off — 인증 파일이 없으면 iso 도 메인 경로처럼 exit 18 · 'GPT-OFF: 인증 파일 없음(격리 첫 패스)' · 자리 게이트(11)보다 먼저 · 빈 stdout · 격리 폴더 0" \
+    || no "iso-no-auth-file-off — exit $IRC · $IRC2 · stdout '$(cat "$T/iso.out" "$T/iso2.out")' · 격리 폴더 $(isos "$IH/.claude/tmp") · $(isos "$T/it-na")개 · $(tail -1 "$T/iso.err")"
 fi
 
 echo

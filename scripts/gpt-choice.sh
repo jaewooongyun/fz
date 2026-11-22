@@ -20,15 +20,17 @@
 #   값 config = 그 필드를 넘기지 않는다(config.toml 그대로). `set --model config --effort config` 는 "물었고 config" 센티넬이다.
 #   값 off = GPT 미사용(두 줄 모두 off — 한쪽만 off 면 손상). 래퍼 · 독립 런처는 CLI 를 부르지 않고 exit 18 이다
 #   (정본 modules/gpt-strategy.md § GPT 미사용).
-#   사용자 기본값: 같은 폴더의 .last — set 이 세션 파일을 쓴 뒤 같은 두 줄을 남긴다(마지막 set 값 · off 포함 · 기록 실패는 무시 — 세션 기록이 계약이다).
-#   get 이 선택 없음 · 묻기(3) 경로에서만 그 값을 새 세션 파일로 복사해 0 으로 낸다(stderr 안내 한 줄). CLI 없음 자동 off 는 .last 에 남기지 않는다
+#   사용자 기본값: 같은 폴더의 .last — GPT 를 켜는 set(모델 · config)이 세션 파일을 쓴 뒤 같은 두 줄을 남긴다(마지막 그런 set 값 · 기록 실패는 무시 —
+#   세션 기록이 계약이다). set --model off 는 세션 파일만 쓰고 .last 를 그대로 둔다(off 는 그 세션에만). get 이 선택 없음 · 묻기(3) 경로에서만, 그 모델이
+#   지금 options 목록(config · models[])에 있을 때 그 값을 새 세션 파일로 복사해 0 으로 낸다(stderr 안내 한 줄). CLI 없음 자동 off 는 .last 에 남기지 않는다
 # 입력: ${CODEX_HOME:-$HOME/.codex}/models_cache.json (options·set) · 같은 폴더 config.toml 의 최상위(첫 표 앞) model·model_reasoning_effort (options·set·config)
 #   GPT CLI 존재: 같은 폴더 gpt-exec.sh cli-check(0=있음 · 18=없음) — 실행 파일 이름은 래퍼 한 곳에 둔다
 #   GPT 인증: 같은 폴더 gpt-exec.sh auth-check(0=있음 · 18=없음) — decide 만 본다. 인증 파일 · API 키 env 이름도 래퍼 한 곳에 둔다
 #
 # exit:
 #   get     0=선택 있음(off 포함 — stdout 'model=off effort=off') · 3=없음(물어도 됨) · 4=없음 + 자율 모드(묻지 않음)
-#           ⊕ 3 자리에서 이전 선택(.last)이 유효하면 묻지 않고 0 · 그 값 — 세션 파일로 복사하고(쓰지 못해도 낸다) stderr 안내. 손상 · 없음이면 3
+#           ⊕ 3 자리에서 이전 선택(.last)이 유효하고 그 모델이 지금 options 목록에 있으면 묻지 않고 0 · 그 값 — 세션 파일로 복사하고(쓰지 못해도 낸다)
+#             stderr 안내. 손상 · 없음 · 목록 밖(목록에서 빠진 모델 · 모델 목록 캐시를 못 읽을 때의 config 밖 모델)이면 3
 #           11=선택 파일 손상(다시 묻고 set 으로 덮어쓴다)
 #           5=저장할 수 없는 세션(세션 id 없음·불량 · FZ_GPT_CHOICE_DIR 가 절대 경로 아님) — 묻지 않고 config, stderr 안내
 #           ⊕ 선택이 없고 GPT CLI 가 없으면 묻지 않고 0 · 'model=off effort=off' — off 를 기록하고(저장할 수 없는 세션이면 기록 없이) stderr 안내
@@ -50,8 +52,9 @@
 #           인증 없음은 선택 판독 뒤 · 선택 off 다음이다(사용자가 끈 세션은 off-user)
 #           판독은 get 그대로이고 부작용도 get 의 것뿐이다(CLI 없음이면 get 을 부르지 않아 off 기록도 없다)
 #   (공통)  10=사용법
-# ⛔ get 은 모델 목록 캐시를 읽지 않는다 — 독립 런처는 격리 CODEX_HOME 에서 래퍼를 띄우므로 캐시가 없을 수 있다.
+# ⛔ get 은 세션 선택 판독에 모델 목록 캐시를 읽지 않는다 — 독립 런처는 격리 CODEX_HOME 에서 래퍼를 띄우므로 캐시가 없을 수 있다.
 #    모델별 검증은 set 한 곳에서 fail-closed 로 하고, get 은 형식·모델 문자셋·effort 화이트리스트만 본다.
+#    예외는 이전 선택(.last) 재사용 하나다 — 그 모델이 지금 options 목록에 있는지 캐시로 본다(last_listed · 캐시가 없으면 config 만 목록이다)
 set -u
 
 die() { echo "gpt-choice: $2" >&2; exit "$1"; }
@@ -115,6 +118,13 @@ resolve_file() {
   CHOICE_DIR="$dir"; CHOICE_FILE="$dir/$sid"
 }
 
+# 이전 선택의 모델이 지금 options 목록에 있는가 — config 는 늘 선택지다(degraded 포함). 그 밖은 models[] 와 같은 판독(choice_py listed) ·
+#   python3 · 캐시가 없거나 읽지 못하면 options 도 config / off 만 내므로 목록 밖이다. off 는 models[] 에 없다(옛 .last 의 off 도 묻는다)
+last_listed() {
+  [ "$1" = "config" ] && return 0
+  command -v python3 >/dev/null 2>&1 && [ -f "$CACHE" ] && choice_py listed "$1" "" 2>/dev/null
+}
+
 # 선택 파일 판독 — 정확히 두 줄 'model=…' 'effort=…'(이 순서)와 값 검증. 위반이면 1(손상)
 read_choice() {
   local f="$1" n=0 line
@@ -151,10 +161,10 @@ write_choice() {   # $1=모델 · $2=effort · $3=쓸 자리(기본 세션 파�
   return 1
 }
 
-# 모델 목록 캐시 판독 — options(JSON 출력)와 set(검증)이 같은 판독을 쓴다. exit: 0 · 10(set 검증 실패) · 11(캐시 판독 불가)
+# 모델 목록 캐시 판독 — options(JSON 출력) · set(검증) · listed(이전 선택 재사용 판정)가 같은 판독을 쓴다. exit: 0 · 10(set 검증 실패 · listed 목록 밖) · 11(캐시 판독 불가)
 #   config 모드는 config.toml 최상위 값(config_top — options · set 과 같은 판독)만 내고 캐시를 열기 전에 끝난다(exit 0)
 #   degraded 모드는 캐시 없이 config / off 두 선택지 JSON 을 낸다($2 = 사유) — 캐시를 열기 전에 끝난다(exit 0)
-choice_py() {   # $1=모드(options|set|config|degraded) · $2=모델(degraded 는 사유) · $3=effort (options · config · degraded 는 빈 값)
+choice_py() {   # $1=모드(options|set|config|degraded|listed) · $2=모델(degraded 는 사유) · $3=effort (options · config · degraded · listed 는 빈 값)
   python3 - "$1" "$CACHE" "$CFG" "$EFFORT_WHITELIST" "$MODEL_RE" "$2" "$3" "$OFF_LABEL" <<'PY'
 import json
 import re
@@ -254,6 +264,10 @@ for m in raw:
     #    'off' 는 GPT 미사용 예약어라 모델로 내지 않는다(set --model off 는 모델 기록이 아니다)
     if m.get("visibility") == "list" and re.fullmatch(model_re, m["slug"]) and m["slug"] != "off":
         listed.append(m)
+
+if mode == "listed":
+    # 이전 선택(.last) 재사용 판정 — options 의 models[] 와 같은 목록(visibility=list · 저장 가능한 slug · off 아님)에 그 모델이 있는가
+    sys.exit(0 if any(m["slug"] == want_model for m in listed) else 10)
 
 cfg_model, cfg_effort = config_top(cfg)
 cm = by_slug.get(cfg_model) if cfg_model != "?" else None
@@ -390,9 +404,11 @@ cmd_get() {
     #    PROCEED(0) 만 4 이고 ASK·BLOCK·측정 실패·python3 부재는 전부 3 이다.
     python3 "$(dirname "$0")/autonomy_decide.py" --action gpt_model_choice --in-scope --reversible >/dev/null 2>&1; rc=$?
     [ "$rc" -eq 0 ] && exit 4
-    # 이전 선택(.last — 마지막 set 값)이 유효하면 묻지 않고 이어 쓴다 — 묻기(3) 경로에서만이다(자율 4 · 저장 불가 5 · CLI 없음 off 는 위에서 끝났다).
+    # 이전 선택(.last — GPT 를 켠 마지막 set 값)이 유효하면 묻지 않고 이어 쓴다 — 묻기(3) 경로에서만이다(자율 4 · 저장 불가 5 · CLI 없음 off 는 위에서 끝났다).
     #   세션 파일로 복사해 이 세션의 다음 판독도 같은 값이다. 복사하지 못해도 그 값을 낸다(CLI 없음 off 와 같은 규칙). 손상 · 없음이면 그대로 3
+    #   ⛔ 그 모델이 지금 options 목록에 없으면(목록에서 빠짐 · 캐시 없음) 묻는다(3) — 목록을 떠난 모델을 묻지 않고 계속 쓰지 않게
     if read_choice "$CHOICE_DIR/.last"; then
+      last_listed "$SEL_MODEL" || exit 3
       if write_choice "$SEL_MODEL" "$SEL_EFFORT"; then
         echo "gpt-choice: 이전 선택을 이어 쓴다 — 바꾸려면 다시 묻고 set (model=$SEL_MODEL effort=$SEL_EFFORT · 기록: $CHOICE_FILE)" >&2
       else
@@ -454,10 +470,10 @@ cmd_set() {
   # ⛔ off(GPT 미사용)는 캐시 · config · python3 검증 **앞**에서 기록한다 — 모델 목록이 없는 환경(신규 설치 · CLI 미설치)에서도 끌 수 있어야 한다.
   #    effort 는 받아도 쓰지 않는다(off 에는 effort 가 없다 — 두 줄 모두 off). 기록 실패는 11 — Lead 는 config 우회가 아니라
   #    호출마다 --model off 를 붙인다(config 우회는 GPT 를 켠다 — modules/gpt-strategy.md § GPT 미사용)
+  #    ⛔ off 는 세션 파일만 쓴다 — .last(사용자 기본값)는 그대로 둔다. off 를 남기면 이후 모든 세션 · 프로젝트가 묻지 않고 GPT 를 끈다
   if [ -n "$has_m" ] && [ "$m" = "off" ]; then
     resolve_file || die 11 "off 를 저장할 수 없다 — $WHY. 이 세션의 GPT 호출에 --model off 를 붙인다"
     write_choice off off || die 11 "선택 파일을 쓰지 못했다: $CHOICE_FILE — 이 세션의 GPT 호출에 --model off 를 붙인다"
-    write_choice off off "$CHOICE_DIR/.last" || true   # 사용자 기본값 — 실패는 무시한다(세션 기록이 계약이다)
     printf 'model=off effort=off\n'
     return 0
   fi

@@ -7,7 +7,8 @@
 #                    GPT 미사용(off — modules/gpt-strategy.md § GPT 미사용): options 모델 질문의 off(config + 모델 2 + off ≤ 4) ·
 #                    캐시 없음·손상·python3 없음이어도 config / off 로 묻는 degraded · set --model off 는 캐시 없이 기록 · off 짝 손상 판정 ·
 #                    get: 선택 없음 + GPT CLI 없음 → 묻지 않고 0 · model=off(기록 · 저장 불가 세션이면 기록 없이) · CLI 있음이면 3 · 파일 미기록
-#                    이전 선택(.last — 마지막 set 값): 새 세션의 묻기(3) 경로에서만 이어 쓴다 · 자율 4 · CLI 없음 off · 손상 3 · 쓰기 실패 · 인증 없음 ·
+#                    이전 선택(.last — GPT 를 켠 마지막 set 값 · off 는 남기지 않는다): 새 세션의 묻기(3) 경로에서만 · 지금 목록의 모델만 이어 쓴다 ·
+#                    자율 4 · CLI 없음 off · 손상 3 · 쓰기 실패 · 인증 없음 · CLI login status 가 인증 판정에 먼저다 ·
 #                    get → decide → 래퍼 argv 가 .last 값(셀마다 HOME · CLI 홈 · 선택 폴더를 따로 둔다)
 #   --scope wrapper: 래퍼 결정 순서 — 필드마다 플래그 > 세션 선택 > config(미전달) · exec/review/resume · --config-permissions ·
 #                    stderr GPT-CHOICE 한 줄(출처 라벨 · config 실제 값 · '?') · 손상 선택 파일 · gpt-choice.sh 부재 → 11 ·
@@ -570,12 +571,20 @@ model_reasoning_effort = "high"'
   lrun h s2 - sid-b "$CLIP" /bin/bash "$CHOICE" set --model fake-delta --effort high
   lrun h get - sid-c "$CLIP" /bin/bash "$CHOICE" get
   check "get 선택 없음 · 이전 선택 = 마지막 set 값(다른 세션의 set) · 앞 세션 파일 그대로" "$(lr h s1)|$(lr h s2)|$(lr h get)|$(body "$T/L-h/sel/sid-a")" "0|model=fake-beta effort=xhigh|0|model=fake-delta effort=high|0|model=fake-delta effort=high|model=fake-beta|effort=xhigh|"
-  # off 도 이전 선택이다 — 새 세션은 off 그대로(decide skip off-user)
-  lprep i
+  # off 는 그 세션에만 남는다 — set --model off 는 세션 파일만 쓰고 .last 를 건드리지 않는다. 이전 선택이 없던 사용자의 새 세션은 묻는다(3) ·
+  #   off 를 고른 세션 자신은 off 그대로(decide skip off-user)
+  lprep i; rm -f "$T/L-i/sel/.last"
   lrun i s - sid-a "$CLIP" /bin/bash "$CHOICE" set --model off
   lrun i get - sid-b "$CLIP" /bin/bash "$CHOICE" get
   lrun i dec - sid-c "$CLIP" /bin/bash "$CHOICE" decide
-  check "get 선택 없음 · 이전 선택 off(set --model off) → off 그대로 · decide skip off-user" "$(lr i s)|$(lr i get)|$(lr i dec)" "0|model=off effort=off|0|model=off effort=off|18|GPT-DECIDE skip reason=off-user"
+  lrun i deca - sid-a "$CLIP" /bin/bash "$CHOICE" decide
+  check "get 선택 없음 · 다른 세션의 off(set --model off) · 이전 선택 없음 → 새 세션 묻기 3 · decide ask · .last 미기록" "$(lr i s)|$(lr i get)|$(lr i dec)|$([ -e "$T/L-i/sel/.last" ] && echo 1 || echo 0)" "0|model=off effort=off|3||3|GPT-DECIDE ask|0"
+  check "off 를 고른 세션 자신 → decide skip off-user(off 는 그 세션의 선택이다)" "$(lr i deca)" "18|GPT-DECIDE skip reason=off-user"
+  # GPT 를 켠 이전 선택(.last)은 off 세션 뒤에도 그대로다 — 새 세션은 그 값을 이어 쓴다
+  lprep i2
+  lrun i2 s - sid-a "$CLIP" /bin/bash "$CHOICE" set --model off
+  lrun i2 get - sid-b "$CLIP" /bin/bash "$CHOICE" get
+  check "set --model off → .last 그대로(GPT 를 켠 이전 선택) · 새 세션은 그 값을 이어 쓴다" "$(body "$T/L-i2/sel/.last")|$(lr i2 get)" "model=fake-delta|effort=medium||0|model=fake-delta effort=medium"
   # .last 기록 실패는 set 을 실패시키지 않는다(세션 기록이 계약) — 자리가 폴더면 그 안에 쓰지 않는다 · 임시 파일도 남지 않는다
   lprep j; rm -f "$T/L-j/sel/.last"; mkdir "$T/L-j/sel/.last"
   lrun j s - sid-a "$CLIP" /bin/bash "$CHOICE" set --model fake-beta --effort xhigh
@@ -585,6 +594,18 @@ model_reasoning_effort = "high"'
   lrun k get1 - sid-a "$NOCLI" /bin/bash "$CHOICE" get
   lrun k get2 - sid-b "$CLIP" /bin/bash "$CHOICE" get
   check "get 선택 없음 · 이전 선택 없음 · CLI 없음 자동 off 는 이전 선택으로 남지 않는다 → CLI 설치 뒤 새 세션 3" "$(lr k get1)|$([ -e "$T/L-k/sel/.last" ] && echo 1 || echo 0)|$(lr k get2)" "0|model=off effort=off|0|3|"
+  # 이어 쓰는 것은 지금 options 가 내는 모델(config · models[])뿐이다 — 목록에서 빠진 모델 · 모델 목록 캐시가 없을 때의 목록 모델 · off 를 남긴 옛 .last 는
+  #   묻는다(3 · 세션 파일 미기록). config 는 캐시가 없어도 늘 선택지다(degraded 포함)
+  lprep m; printf 'model=fake-gone\neffort=high\n' > "$T/L-m/sel/.last"
+  lrun m get - sid-new "$CLIP" /bin/bash "$CHOICE" get
+  lprep m2; rm -f "$T/L-m2/ch/models_cache.json"
+  lrun m2 get - sid-new "$CLIP" /bin/bash "$CHOICE" get
+  lprep m3; printf 'model=off\neffort=off\n' > "$T/L-m3/sel/.last"
+  lrun m3 get - sid-new "$CLIP" /bin/bash "$CHOICE" get
+  check "get 선택 없음 · 이전 선택 모델이 지금 목록에 없음(목록에서 빠짐 · 캐시 없음 · 옛 off) → 묻기 3 · 세션 파일 없음" "$(lr m get)|$(body "$T/L-m/sel/sid-new")|$(lr m2 get)|$(body "$T/L-m2/sel/sid-new")|$(lr m3 get)" "3||<없음>|3||<없음>|3|"
+  lprep m4; rm -f "$T/L-m4/ch/models_cache.json"; printf 'model=config\neffort=config\n' > "$T/L-m4/sel/.last"
+  lrun m4 get - sid-new "$CLIP" /bin/bash "$CHOICE" get
+  check "get 선택 없음 · 이전 선택 config · 캐시 없음 → 0 · config 를 이어 쓴다(config 는 늘 선택지다)" "$(lr m4 get)" "0|model=config effort=config"
 
   # ── 사용법 · 화이트리스트 대조
   cell u-sub - s1 bogus
@@ -796,6 +817,25 @@ run_wrapper() {
   a8="$(acx "CODEX_HOME=$T/w-ac-no" "OPENAI_API_KEY=" "CODEX_API_KEY=" /bin/bash "$WX" auth-check)"
   a9="$(acx "HOME=$T/w-ac-h" /bin/bash "$WX" auth-check)"
   check "인증 판정: auth.json 폴더 18 · 깨진 링크 18 · API 키 env 둘 0 · 빈 env 18 · 기본 CLI 홈(HOME/.codex) 0" "$a4|$a5|$a6|$a7|$a8|$a9" "18|18|0|0|18|0"
+  # CLI 의 답이 먼저다 — 가짜 CLI 의 `login status`(FZ_SHIM_LOGIN) 0 = 있음 · 1 = 없음. 그 밖(하위 명령 모름 2 · 멈춤)이면 위 파일 · env 규칙이다.
+  #   자격 증명 저장소(config cli_auth_credentials_store = "keyring")로 로그인한 사용자는 auth.json 이 없다 — CLI 가 0 이면 있음이다
+  mkdir -p "$T/w-ac-store" "$T/w-ac-sel"; printf 'cli_auth_credentials_store = "keyring"\n' > "$T/w-ac-store/config.toml"
+  l1="$(acx "CODEX_HOME=$T/w-ac-store" "FZ_SHIM_LOGIN=0" /bin/bash "$WX" auth-check)"
+  check "auth-check: CLI login status 0 · 인증 파일 없음(자격 증명 저장소) → 0" "$l1" 0
+  l2="$(acx "CODEX_HOME=$T/w-ac-yes" "FZ_SHIM_LOGIN=1" /bin/bash "$WX" auth-check)"
+  l3="$(acx "CODEX_HOME=$T/w-ac-yes" "FZ_SHIM_LOGIN=2" /bin/bash "$WX" auth-check)"
+  l4="$(acx "CODEX_HOME=$T/w-ac-no" "FZ_SHIM_LOGIN=2" /bin/bash "$WX" auth-check)"
+  check "auth-check: login status 1 + 인증 파일 → 18(CLI 의 답이 이긴다) · login 모름(2) + 인증 파일 → 0 · 모름 + 없음 → 18" "$l2|$l3|$l4" "18|0|18"
+  l0=$(date +%s)
+  l5="$(acx "CODEX_HOME=$T/w-ac-yes" "FZ_SHIM_LOGIN=hang" /bin/bash "$WX" auth-check)"
+  l6="$(acx "CODEX_HOME=$T/w-ac-no" "FZ_SHIM_LOGIN=hang" /bin/bash "$WX" auth-check)"
+  l7=$(( $(date +%s) - l0 ))
+  check "auth-check: 멈춘 CLI → 시간 상한 뒤 파일 규칙(인증 파일 0 · 없음 18 · 두 번 합 20초 미만)" "$l5|$l6|$([ "$l7" -lt 20 ] && echo bounded || echo "slow ${l7}s")" "0|18|bounded"
+  # decide 도 같은 판정이다 — 자격 증명 저장소 로그인(파일 없음)은 skip 이 아니다(선택이 없어 ask) · 같은 상태에서 CLI 가 답하지 못하면 off-no-auth
+  dcx() { local o; o="$(env -u FZ_AUTONOMY -u CODEX_HOME -u OPENAI_API_KEY -u CODEX_API_KEY "PATH=$CLIP" "HOME=$T/home" "CODEX_HOME=$T/w-ac-store" \
+            "FZ_GPT_CHOICE_DIR=$T/w-ac-sel" "CLAUDE_CODE_SESSION_ID=w-ac-dec" "FZ_TELEMETRY_DIR=$T/w-ac-tel" "$@" /bin/bash "$CHOICE" decide 2>/dev/null)"; printf '%s|%s' "$o" "$?"; }
+  check "decide: CLI login status 0 · 인증 파일 없음 → ask 3(skip 아님) · login 모름(2) → skip off-no-auth 18" \
+    "$(dcx "FZ_SHIM_LOGIN=0")|$(dcx "FZ_SHIM_LOGIN=2")" "GPT-DECIDE ask|3|GPT-DECIDE skip reason=off-no-auth|18"
   check "auth-check: 호출 행 없음" "$(cat "$T/w-ac-tel/gpt-calls.tsv" 2>/dev/null | wc -l | tr -d ' ')" 0
 
   # ── 두 스크립트의 MODEL_RE 가 같은 문자열 — 한쪽만 넓히면 set 이 거부하는 값을 래퍼가 받는다(또는 그 반대)

@@ -11,9 +11,13 @@
 #   (c) 모델 목록 캐시 손상 + off   → options 가 degraded 로 off 를 내고 · set --model off 가 캐시 없이 0 · 세 입구 18 · CLI 호출 0
 #   (d) GPT CLI 없음(실행 파일 codex 가 든 폴더를 PATH 에서 뺀다 · GPT 홈도 없다) → get 이 묻지 않고 off(0) · 세 입구 18 'GPT-OFF: CLI 없음'
 #       — 런처는 GPT 홈 · 인증 게이트(11)보다 먼저 18 이다
-#   (e) 인증 없음(CLI 있음 · CLI 홈에 인증 파일 없음 · API 키 env 없음) → decide skip off-no-auth 18 · 선택 파일 미기록 ·
-#       런처 · 정문 경유 런처 18 'GPT-OFF: 로그인 필요' · CLI 호출 0 · 감사 gptOff · 격리 폴더 미생성. 래퍼는 인증을 판정하지 않는다(CLI 1회).
-#       인증 파일을 만들면 decide 가 skip 이 아니다(off 를 기록하지 않았다)
+#   (e) 인증 없음(CLI 있음 · CLI 홈에 인증 파일 없음 · API 키 env 없음 · 가짜 CLI 의 login status 는 모름 2) → decide skip off-no-auth 18 · 선택 파일 미기록 ·
+#       런처 · 정문 경유 런처 18 'GPT-OFF: 인증 파일 없음(격리 첫 패스)' · CLI 호출 0 · 감사 gptOff · 격리 폴더 미생성. 래퍼는 인증을 판정하지 않는다(CLI 1회).
+#       인증 파일을 만들면 decide 가 skip 이 아니다(off 를 기록하지 않았다). 인증 파일이 있어도 CLI 의 login status 가 1 이면 런처 18
+#       'GPT-OFF: 로그인 필요' — CLI 호출은 그 login status 하나뿐이다(GPT 호출 0)
+#   (f) API 키 env 만 있고 인증 파일이 없다 → decide 는 skip 이 아니다(키 = 인증 있음) · 런처 · 정문 경유 런처 18 'GPT-OFF: 인증 파일 없음(격리 첫 패스)'
+#       (격리 첫 패스는 실제 CLI 홈의 인증 파일을 격리 홈에 링크해서 돈다 — 입력 게이트 11 이 아니다) · CLI 호출 0 · 감사 gptOff.
+#       양성 대조: 같은 env 에 인증 파일을 두면 런처가 그 게이트를 지나 CLI 를 부른다(exit 18 · 11 아님)
 #   런처 감사: <stem>.audit.json 의 exit 18 · gptOff · .contaminated 없음 · 격리 폴더 미생성. 병합: --gpt-unavailable 은 0, 그 감사를 --gpt 로
 #       넘기면 거부(1). 정문 호출 행(gpt-calls.tsv) exit 열 18
 #   비대화: FZ_AUTONOMY 미설정 + CLI 있음 + 선택 없음 — 스크립트는 질문 도구 유무를 알 수 없다(get 은 3 · 아무것도 쓰지 않는다).
@@ -72,18 +76,19 @@ mkdir -p "$T/ch-bad"; echo 'not json {' > "$T/ch-bad/models_cache.json"; cp "$T/
 mkdir -p "$T/ro"; chmod 0555 "$T/ro"
 
 # ── 셀 — 세 입구를 같은 env 로 돈다. env 는 셀 앞에서 정하고(아래 변수) 셀은 그것만 쓴다
-#    C_PATH · C_HOME · C_CH(CODEX_HOME — '-' 면 unset) · C_SEL(FZ_GPT_CHOICE_DIR) · C_SID · C_AUTO('-' 면 unset)
+#    C_PATH · C_HOME · C_CH(CODEX_HOME — '-' 면 unset) · C_SEL(FZ_GPT_CHOICE_DIR) · C_SID · C_AUTO('-' 면 unset) · C_XENV(env 한 개 'NAME=값' — '-' 면 없음)
 run_in() {   # $1=셀 이름 · 나머지=명령 — stdout/stderr/rc/calls 를 $T/c-<셀>/ 에
   local name="$1" d e
   shift
   d="$T/c-$name"; mkdir -p "$d" "$d/tmp" "$d/tel"
   # ⛔ API 키 env 두 이름을 지운다 — 사용자 env 에 키가 있으면 (e) 의 '인증 없음' 이 '있음' 으로 읽힌다
   e=(env -u FZ_AUTONOMY -u CLAUDE_CODE_SESSION_ID -u CODEX_HOME -u FZ_GPT_CALL_ID -u FZ_GPT_CALL_LABEL -u FZ_GPT_POLICY_ROOT
-     -u FZ_GPT_IDLE_SEC -u OPENAI_API_KEY -u CODEX_API_KEY "PATH=$C_PATH" "HOME=$C_HOME" "FZ_GPT_CHOICE_DIR=$C_SEL" "FZ_TELEMETRY_DIR=$d/tel" "TMPDIR=$d/tmp"
+     -u FZ_GPT_IDLE_SEC -u OPENAI_API_KEY -u CODEX_API_KEY -u FZ_SHIM_LOGIN "PATH=$C_PATH" "HOME=$C_HOME" "FZ_GPT_CHOICE_DIR=$C_SEL" "FZ_TELEMETRY_DIR=$d/tel" "TMPDIR=$d/tmp"
      "FZ_OFF_CALLS=$d/calls.log")
   [ "$C_CH" = "-" ] || e+=("CODEX_HOME=$C_CH")
   [ "$C_SID" = "-" ] || e+=("CLAUDE_CODE_SESSION_ID=$C_SID")
   [ "$C_AUTO" = "-" ] || e+=("FZ_AUTONOMY=$C_AUTO")
+  [ "$C_XENV" = "-" ] || e+=("$C_XENV")
   ( cd "$T/repo" && "${e[@]}" "$@" < /dev/null ) > "$d/stdout" 2> "$d/stderr"
   echo $? > "$d/rc"
 }
@@ -105,7 +110,7 @@ four() {   # $1=접두 · $2=기대 사유 · 나머지=입구 추가 인자 —
     check "$p $c: stderr 'GPT-OFF: $why'" "$(offl "$p-$c")" "GPT-OFF: $why"
   done
 }
-reset_env() { C_PATH="$CLIPATH" C_HOME="$T/home" C_CH="$T/home/.codex" C_SEL="$T/sel" C_SID="-" C_AUTO="-"; }
+reset_env() { C_PATH="$CLIPATH" C_HOME="$T/home" C_CH="$T/home/.codex" C_SEL="$T/sel" C_SID="-" C_AUTO="-" C_XENV="-"; }
 
 # ── (a) 세션 선택 off — Lead 가 options 의 off 를 골라 set 한 세션
 reset_env; C_SID="sid-a"
@@ -162,27 +167,56 @@ reset_env; C_SID="sid-d2"; C_PATH="$NOCLI"
 wrap d-nosel
 check "(d) CLI 없음 · 선택 없음 · 래퍼 직접: 18 'GPT-OFF: CLI 없음'" "$(rc d-nosel)|$(offl d-nosel)" "18|GPT-OFF: CLI 없음"
 
-# ── (e) 인증 없음(로그인 필요) — CLI 있음 · 선택 없음 · CLI 홈에 config 만 있고 인증 파일이 없다
+# ── (e) 인증 없음(로그인 필요) — CLI 있음 · 선택 없음 · CLI 홈에 config 만 있고 인증 파일이 없다(가짜 CLI 의 login status 는 모름 2 — 파일 · env 규칙)
 mkdir -p "$T/home-na/.codex"; cp "$T/home/.codex/config.toml" "$T/home-na/.codex/"
 reset_env; C_SID="sid-e"; C_HOME="$T/home-na"; C_CH="$T/home-na/.codex"; C_SEL="$T/sel-e"
 choice e-dec decide
 check "(e) decide · 인증 없음 → skip off-no-auth 18 · 선택 파일 미기록" "$(rc e-dec)|$(out e-dec)|$(find "$T/sel-e" -type f 2>/dev/null | wc -l | tr -d ' ')" "18|GPT-DECIDE skip reason=off-no-auth|0"
+# 런처는 인증 파일을 로그인 판정보다 먼저 본다 — 파일이 없으면 CLI 를 부르지 않고 '인증 파일 없음(격리 첫 패스)' 이다('로그인 필요' 는 아래 login status 1 셀)
 lnch e-lnch; glnch e-glnch
 for c in lnch glnch; do
   check "(e) $c: exit 18 · CLI 호출 0" "$(rc "e-$c")|$(calls "e-$c")" "18|0"
-  check "(e) $c: stderr 'GPT-OFF: 로그인 필요'" "$(offl "e-$c")" "GPT-OFF: 로그인 필요"
+  check "(e) $c: stderr 'GPT-OFF: 인증 파일 없음(격리 첫 패스)'" "$(offl "e-$c")" "GPT-OFF: 인증 파일 없음(격리 첫 패스)"
 done
 E="$T/o/e-lnch/gpt-e-lnch"
-check "(e) 런처 감사: exit 18 · gptOff '로그인 필요' · 격리 폴더 미생성 · 인증 게이트(11) 아님" "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("exit"), d.get("gptOff"))' "$E.audit.json" 2>/dev/null)|$(find "$T/c-e-lnch/tmp" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' ')|$(grep -c 'INDEPENDENT-FAIL(11)' "$T/c-e-lnch/stderr" 2>/dev/null)" "18 로그인 필요|0|0"
+check "(e) 런처 감사: exit 18 · gptOff '인증 파일 없음(격리 첫 패스)' · 격리 폴더 미생성 · 입력 게이트(11) 아님" "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("exit"), d.get("gptOff"))' "$E.audit.json" 2>/dev/null)|$(find "$T/c-e-lnch/tmp" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' ')|$(grep -c 'INDEPENDENT-FAIL(11)' "$T/c-e-lnch/stderr" 2>/dev/null)" "18 인증 파일 없음(격리 첫 패스)|0|0"
 # 래퍼 본 경로는 인증을 보지 않는다 — 가짜 CLI 가 불린다(실제 CLI 면 인증 실패가 exit 12 로 드러난다 · 래퍼 픽스처는 인증 없는 CLI 홈으로 돈다)
 wrap e-wrap
 check "(e) 래퍼 직접 · 인증 없음: 판정하지 않는다 — exit 0 · CLI 1회" "$(rc e-wrap)|$(calls e-wrap)" "0|1"
 printf '{}\n' > "$T/home-na/.codex/auth.json"
 choice e-login decide
 check "(e) 인증 파일을 만든 뒤 decide → skip 아님(ask 3 — off 를 기록하지 않았다)" "$(rc e-login)|$(out e-login)" "3|GPT-DECIDE ask"
+# 인증 파일이 있어도 CLI 가 로그인 안 됨(login status 1)이라고 답하면 그 답이 이긴다 — decide skip off-no-auth · 런처 '로그인 필요'.
+#   CLI 호출은 그 login status 하나다(GPT 호출 0)
+C_XENV="FZ_SHIM_LOGIN=1"
+choice e-st1-dec decide
+check "(e) 인증 파일 + CLI login status 1 · decide → skip off-no-auth 18" "$(rc e-st1-dec)|$(out e-st1-dec)" "18|GPT-DECIDE skip reason=off-no-auth"
+lnch e-st1-lnch; glnch e-st1-glnch
+for c in lnch glnch; do
+  check "(e) $c: exit 18 · 'GPT-OFF: 로그인 필요' — 인증 파일 + CLI login status 1 · CLI 호출은 login status 하나" "$(rc "e-st1-$c")|$(offl "e-st1-$c")|$(tr '\n' ' ' < "$T/c-e-st1-$c/calls.log" 2>/dev/null)" "18|GPT-OFF: 로그인 필요|login status "
+done
+check "(e) 인증 파일 + CLI login status 1 · 런처 감사 gptOff '로그인 필요'" "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("exit"), d.get("gptOff"))' "$T/o/e-st1-lnch/gpt-e-st1-lnch.audit.json" 2>/dev/null)" "18 로그인 필요"
+
+# ── (f) API 키 env 만 — CLI 홈에 인증 파일이 없다. decide 는 켠다(키 = 인증 있음) · 격리 첫 패스는 실제 CLI 홈의 인증 파일을 격리 홈에 링크해서 돈다
+mkdir -p "$T/home-key/.codex"; cp "$T/home/.codex/config.toml" "$T/home-key/.codex/"
+reset_env; C_SID="sid-f"; C_HOME="$T/home-key"; C_CH="$T/home-key/.codex"; C_SEL="$T/sel-f"; C_XENV="OPENAI_API_KEY=sk-test-synthetic"
+choice f-dec decide
+check "(f) decide · API 키만(인증 파일 없음) → skip 아님(ask 3)" "$(rc f-dec)|$(out f-dec)" "3|GPT-DECIDE ask"
+lnch f-lnch; glnch f-glnch
+for c in lnch glnch; do
+  check "(f) $c: exit 18 · CLI 호출 0" "$(rc "f-$c")|$(calls "f-$c")" "18|0"
+  check "(f) $c: stderr 'GPT-OFF: 인증 파일 없음(격리 첫 패스)'" "$(offl "f-$c")" "GPT-OFF: 인증 파일 없음(격리 첫 패스)"
+done
+F="$T/o/f-lnch/gpt-f-lnch"
+check "(f) 런처 감사: exit 18 · gptOff '인증 파일 없음(격리 첫 패스)' · 격리 폴더 미생성 · 입력 게이트(11) 아님" "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("exit"), d.get("gptOff"))' "$F.audit.json" 2>/dev/null)|$(find "$T/c-f-lnch/tmp" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' ')|$(grep -c 'INDEPENDENT-FAIL(11)' "$T/c-f-lnch/stderr" 2>/dev/null)" "18 인증 파일 없음(격리 첫 패스)|0|0"
+# 양성 대조 — 같은 env 에 인증 파일을 두면 런처가 GPT 미사용 게이트를 지나 CLI 를 부른다(GPT 호출 exec 1회)
+printf '{}\n' > "$T/home-key/.codex/auth.json"
+lnch f-ctl
+f_ctl="passed"; { [ "$(rc f-ctl)" = 18 ] || [ "$(rc f-ctl)" = 11 ]; } && f_ctl="rc $(rc f-ctl)"
+check "(f) 양성 대조: 인증 파일이 있으면 게이트를 지난다 — exit 18 · 11 아님 · GPT 호출(exec) 1회" "$f_ctl|$(grep -c '^exec ' "$T/c-f-ctl/calls.log" 2>/dev/null)" "passed|1"
 
 # ── 비대화 — FZ_AUTONOMY 미설정 + CLI 있음 + 선택 없음: 스크립트는 묻지 않는다(질문은 Lead 몫)
-# ⛔ 이전 선택(.last)이 없는 선택 폴더다 — (a) · (c) 의 set --model off 가 $T/sel 에 .last(off)를 남겨 '선택 없음' 이 이어 쓰기로 바뀐다
+# ⛔ 이전 선택(.last)이 없는 선택 폴더다 — 다른 셀이 쓴 선택 파일 · .last 가 '선택 없음' 을 이어 쓰기로 바꾸지 않게
 reset_env; C_SID="sid-n"; C_SEL="$T/sel-n"
 choice n-get get
 check "비대화: get → 3(물어도 됨 — 스크립트는 질문 도구 유무를 모른다) · 아무것도 쓰지 않는다" "$(rc n-get)|$([ -e "$T/sel-n/sid-n" ] && echo 1 || echo 0)" "3|0"

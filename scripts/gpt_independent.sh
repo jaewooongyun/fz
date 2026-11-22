@@ -22,7 +22,8 @@
 #   gpt_independent.sh cleanup --iso D   --keep-iso 로 남긴 격리 폴더를 지운다(resume 교차 뒤 · iso 가 만든 폴더도). 이름 fz-gpt-iso.XXXXXX · gpt-home/ 가 맞을 때만
 #   gpt_independent.sh iso [--repo D] [--deny D]...   격리 폴더만 만든다 — 런처 밖에서 래퍼를 부르는 쪽(재녹화 러너
 #             tests/fixtures/gpt/sprint-contract-format/run.sh --live)이 같은 격리를 쓴다(격리 config 를 쓰는 코드는 make_iso 한 벌).
-#             --repo · --deny 는 메인 경로와 같은 뜻이다(--repo 는 cwd 신뢰도 받는다). 만들기 전에 메인 경로와 같은 사전 게이트 둘을
+#             --repo · --deny 는 메인 경로와 같은 뜻이다(--repo 는 cwd 신뢰도 받는다). 만들기 전에 메인 경로와 같은 인증 파일 게이트(실제 CLI 홈에 auth.json 이
+#             없으면 18 · 'GPT-OFF: 인증 파일 없음(격리 첫 패스)')와 사전 게이트 둘을
 #             건다 — 격리 폴더 자리(${TMPDIR:-/tmp} 실경로가 실제 홈 ~/.claude 아래 → 11) · 금지 입력(--repo 가 ~/.claude 아래 → 15). stdout = 격리 폴더 실경로 한 줄 ·
 #             실패 = 0 이 아닌 종료와 빈 stdout · 정리 = 부른 쪽(cleanup --iso). 부른 쪽은 HOME=<격리>/home CODEX_HOME=<격리>/gpt-home 으로
 #             래퍼를 --config-permissions 와 함께 부른다
@@ -42,7 +43,9 @@
 # stderr: 래퍼의 적용값 줄 'GPT-CHOICE model=<값> (출처) effort=<값> (출처)' 을 그대로 한 줄 옮긴다(래퍼가 그 줄 전에 멈추면 없다)
 # exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건(격리 폴더 자리 ${TMPDIR:-/tmp} 가 실제 홈 ~/.claude 아래인 경우(F-509) · 그 실경로가 --repo 와 같은 경우 포함 — GPT 호출 전) · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
-#       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off · 인증 없음(로그인 필요 — 래퍼 auth-check 18). 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
+#       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off · 인증 파일 없음(격리 첫 패스 — 실제 CLI 홈에 auth.json 이 없다 · API 키 env ·
+#          CLI 로그인 상태와 무관) · 인증 없음(로그인 필요 — 래퍼 auth-check 18). 격리 폴더를 만들지 않고 GPT 를 부르지 않는다(로그인 필요 판정만 CLI 의
+#          login status 를 묻는다 — 모델 호출이 아니다).
 #          stderr 'GPT-OFF: <사유> — …' · 감사 <stem>.audit.json 에 "exit": 18 · "gptOff": "<사유>"(오염 · 측정 실패 아님 — 병합은 --gpt-unavailable)
 #       래퍼의 10 · 11 도 그대로 낸다 — --model · --effort 불량(10) · 세션 선택 판독 실패(11) 포함, 사유는 .wrapper.log
 #   ⛔ 10~17 은 전부 첫 패스 결과가 아니다 — 0건으로 읽지 않는다. 18 도 결과가 아니지만 실패가 아니다(정본 modules/gpt-strategy.md § GPT 미사용)
@@ -149,6 +152,13 @@ open(os.path.join(iso, "gpt-home", "config.toml"), "w", encoding="utf-8").write(
 PY
 }
 
+# ── 인증 파일(⛔ 없으면 exit 18 · GPT 미사용 — 정본 modules/gpt-strategy.md § GPT 미사용) — 격리 첫 패스는 실제 CLI 홈의 auth.json 을 격리 홈에
+#    링크해서 돈다(make_iso). 그 파일이 없으면 API 키 env 나 CLI 의 로그인 상태(파일 밖 자격 증명 저장소)가 있어도 돌리지 않는다 — 입력 오류(11)가 아니라
+#    그 단계를 건너뛰는 18 이다. 메인 경로 GPT 미사용 게이트와 iso 하위 명령이 이 한 벌을 쓴다 — 둘 다 아래 사전 게이트 · 입력 게이트 앞이고,
+#    로그인 판정(래퍼 auth-check — CLI 의 login status 를 부른다)보다 먼저라 파일이 없으면 CLI 를 부르지 않는다
+AUTH_FILE_WHY="인증 파일 없음(격리 첫 패스)"
+auth_file_absent() { [ ! -f "${CODEX_HOME:-${HOME:-}/.codex}/auth.json" ]; }
+
 # ── 사전 게이트 둘 — 메인 경로(plan · review)와 iso 하위 명령이 이 한 벌을 부른다. 둘 다 make_iso 전에 건다(실패면 아무것도 만들지 않았다)
 # 격리 폴더 자리(⛔ exit 11 · F-509) — 격리 폴더는 ${TMPDIR:-/tmp} 아래에 생기고 과제 · 권한 프로필이 그 경로를 입력
 #    폴더로 연다. 그 자리가 실제 홈의 ~/.claude 아래면 GPT 가 Claude 로그 · journal 옆에서 돌고, rollout 감사는 GPT 를 부른 **뒤**에야
@@ -226,10 +236,13 @@ if [ "$MODE" = "iso" ]; then
       *) die 10 "iso 는 --repo D · --deny D 만 받는다 — 받은 값: $1" ;;
     esac
   done
+  if auth_file_absent; then
+    echo "GPT-OFF: $AUTH_FILE_WHY — 격리 폴더를 만들지 않았다(GPT 미사용 · 측정 실패 아님 · modules/gpt-strategy.md § GPT 미사용)" >&2
+    exit 18
+  fi
   REAL_HOME="$(cd "${HOME:?HOME 미설정}" && pwd -P)"
   gate_iso_place
-  REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)" || die 11 "실제 GPT CLI 홈이 없다: ${CODEX_HOME:-$REAL_HOME/.codex}"
-  [ -f "$REAL_GPT_HOME/auth.json" ] || die 11 "인증 파일이 없다: $REAL_GPT_HOME/auth.json (로그인 필요)"
+  REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)"   # 위 인증 파일 게이트가 이 폴더 안의 파일을 봤다 — cd 는 실패하지 않는다
   for d in "$REPO" "${DENIES[@]+"${DENIES[@]}"}"; do [ -z "$d" ] || [ -d "$d" ] || die 11 "입력 폴더 없음: $d"; done
   gate_inputs -- -- "$REPO"
   ISO=""; trap '[ -n "$ISO" ] && case "${ISO##*/}" in fz-gpt-iso.??????) rm -rf "$ISO" ;; esac' EXIT
@@ -317,8 +330,9 @@ clear_stem() {
 
 # ── 사전 게이트: GPT 미사용(⛔ exit 18 — 정본 modules/gpt-strategy.md § GPT 미사용) — 플래그 --model off · GPT CLI 없음(래퍼 cli-check 18) ·
 #    세션 선택 off(래퍼와 같은 규칙 — 두 필드가 모두 플래그가 아니면 선택을 본다)면 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
-#    ⛔ 실제 GPT 홈 · 인증 · 입력 게이트보다 먼저다 — GPT 를 쓰지 않는 사용자는 GPT 홈 · 인증이 없을 수 있다(11 이 18 을 가리지 않게).
-#    인증 없음(래퍼 auth-check 18)도 여기서 '로그인 필요' 로 끝난다 — 앞 사유(플래그 · CLI 없음 · 사용자 선택)가 있으면 그 사유가 이긴다
+#    ⛔ 격리 폴더 자리 · 입력 게이트(11 · 15)보다 먼저다 — GPT 를 쓰지 않는 사용자는 GPT 홈 · 인증이 없을 수 있다(11 이 18 을 가리지 않게).
+#    인증 파일 없음(auth_file_absent — 위)이 그다음이고, 인증 없음(래퍼 auth-check 18)도 여기서 '로그인 필요' 로 끝난다 — 앞 사유(플래그 · CLI 없음 ·
+#    사용자 선택 · 인증 파일 없음)가 있으면 그 사유가 이긴다. 인증 파일을 먼저 보므로 파일이 없으면 auth-check 의 CLI(login status)도 부르지 않는다
 #    ⛔ 감사에 exit 18 · gptOff 를 남긴다 — 같은 stem 의 옛 산출을 지운 뒤다(옛 결과가 새 판정으로 읽히지 않게). 오염(.contaminated) · 측정 실패가 아니다
 OFF_WHY=""
 if [ -n "$MODEL_OFF" ]; then
@@ -331,6 +345,7 @@ else
     # get 의 stdout 만 본다 — 'model=off effort=off' 는 exit 0 에서만 나온다(3 · 4 · 5 · 11 은 stdout 이 없다 — off 가 아니다)
     [ "$(bash "$SCRIPT_DIR/gpt-choice.sh" get 2>/dev/null)" = "model=off effort=off" ] && OFF_WHY="사용자 선택"
   fi
+  [ -z "$OFF_WHY" ] && auth_file_absent && OFF_WHY="$AUTH_FILE_WHY"
   if [ -z "$OFF_WHY" ]; then
     bash "$SCRIPT_DIR/gpt-exec.sh" auth-check >/dev/null 2>&1
     [ $? -eq 18 ] && OFF_WHY="로그인 필요"
@@ -355,8 +370,7 @@ REAL_HOME="$(cd "${HOME:?HOME 미설정}" && pwd -P)"
 gate_iso_place
 
 # ── 사전 게이트: 입력 실재 · 금지 입력(⛔ exit 15 — gate_inputs(위 · iso 하위 명령과 같은 한 벌))
-REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)" || die 11 "실제 GPT CLI 홈이 없다: ${CODEX_HOME:-$REAL_HOME/.codex}"
-[ -f "$REAL_GPT_HOME/auth.json" ] || die 11 "인증 파일이 없다: $REAL_GPT_HOME/auth.json (로그인 필요)"
+REAL_GPT_HOME="$(cd "${CODEX_HOME:-$REAL_HOME/.codex}" 2>/dev/null && pwd -P)"   # GPT 미사용 게이트(인증 파일)가 이 폴더 안의 파일을 봤다 — cd 는 실패하지 않는다
 for f in "$REQ" "$SC" "$RULES" "$DIFF" "$META"; do [ -z "$f" ] || [ -s "$f" ] || die 11 "입력 파일 없음/빈 파일: $f"; done
 for d in "$BASE_DIR" "$HEAD_DIR" "$REPO" "${SNAPS[@]+"${SNAPS[@]}"}" "${DENIES[@]+"${DENIES[@]}"}"; do [ -z "$d" ] || [ -d "$d" ] || die 11 "입력 폴더 없음: $d"; done
 gate_inputs "$REQ" "$SC" "$RULES" "$DIFF" "$META" -- "$BASE_DIR" "$HEAD_DIR" "${SNAPS[@]+"${SNAPS[@]}"}" -- "$REPO"

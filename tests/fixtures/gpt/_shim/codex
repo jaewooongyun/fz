@@ -17,7 +17,13 @@
 #   FZ_SHIM_CHILD_ROLLOUTS : 쉼표로 가른 jsonl 들을 같은 날짜 폴더에 rollout-2026-09-28T00-00-0N-child-N.jsonl 로 복사한다(자식 rollout)
 #   FZ_SHIM_TAG     : 이 shim 과 그 자식(sleep)의 argv0 를 `fz-shim[<태그>]` 로 바꾼다 — 러너가 잔존을 이름(`sleep N`)이 아니라
 #                     셀 태그로 센다(전역 이름 검색은 동시 실행과 충돌한다 · F-407). 환경 변수는 ps 에 보이지 않아 argv 에 싣는다
+#   FZ_SHIM_LOGIN   : `login status` 의 종료코드(기본 2 — 그 하위 명령을 모르는 구버전 CLI 처럼 끝나 래퍼 auth-check 가 파일 · env 규칙으로 간다) ·
+#                     hang = 멈춘 CLI(auth-check 의 시간 상한 셀). 이 호출은 위 env(출력 · 캡처 · rollout · sleep · 태그)를 쓰지 않는다
 if [ "${1:-}" = "--version" ]; then echo "codex-cli 0.0.0-shim"; exit 0; fi
+if [ "${1:-}" = "login" ] && [ "${2:-}" = "status" ]; then
+  [ "${FZ_SHIM_LOGIN:-2}" = "hang" ] && exec sleep 30
+  exit "${FZ_SHIM_LOGIN:-2}"
+fi
 if [ -n "${FZ_SHIM_TAG:-}" ] && [ -z "${FZ_SHIM_TAGGED:-}" ]; then
   export FZ_SHIM_TAGGED=1; exec -a "fz-shim[$FZ_SHIM_TAG]" /bin/bash "$0" "$@"
 fi
