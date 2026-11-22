@@ -21,20 +21,21 @@
 # OVERRIDE 블록 · 리터럴은 scripts/check_wf_advisor_ban.py 의 같은 함수로 뗀다 — 두 검사가 블록을 다르게 읽지 않는다.
 # ⛔ 트리에 쓰지 않는다 — 읽기만 한다. 합성 경로는 조각을 이어 만든다(계약 lint 의 깨진 참조 검사가 실제 참조로 읽지 않게).
 # 출력: 셀마다 `<셀>: PASS|FAIL <이유>` · 끝에 `worker-prompt-guards: PASS|FAIL`
-# exit: 0 전건 통과 · 1 단언 실패 · 2 준비 실패(python3 · 파일 부재 · 인자)
+# exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패(python3 · 파일 부재 · 인자 · 검사 대상 0개 — 줄 맨 앞 `SETUP`)
+#   ⛔ 형제 러너와 같은 계약이다 — health-check 는 `SETUP` 표지를 exit 3 일 때만 미실행으로 센다(exit 2 는 `UNRUN` 표지일 때만)
 # usage: run.sh [--tree <플러그인 루트>]   (기본: 이 fixture 가 든 트리)
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." 2>/dev/null && pwd)"
 while [ $# -gt 0 ]; do
   case "$1" in
-    --tree) [ $# -ge 2 ] || { echo "SETUP --tree 에 경로가 없다"; exit 2; }
-            ROOT="$(cd "$2" 2>/dev/null && pwd)" || { echo "SETUP --tree 경로 없음: $2"; exit 2; }; shift 2 ;;
-    *) echo "SETUP 알 수 없는 인자: $1"; exit 2 ;;
+    --tree) [ $# -ge 2 ] || { echo "SETUP --tree 에 경로가 없다"; exit 3; }
+            ROOT="$(cd "$2" 2>/dev/null && pwd)" || { echo "SETUP --tree 경로 없음: $2"; exit 3; }; shift 2 ;;
+    *) echo "SETUP 알 수 없는 인자: $1"; exit 3 ;;
   esac
 done
-command -v python3 >/dev/null 2>&1 || { echo "SETUP python3 부재"; exit 2; }
+command -v python3 >/dev/null 2>&1 || { echo "SETUP python3 부재"; exit 3; }
 for f in scripts/check_wf_advisor_ban.py workflows/plan-collaborative.js skills/fz-code/SKILL.md; do
-  [ -f "$ROOT/$f" ] || { echo "SETUP $f 없음: $ROOT"; exit 2; }
+  [ -f "$ROOT/$f" ] || { echo "SETUP $f 없음: $ROOT"; exit 3; }
 done
 
 PYTHONDONTWRITEBYTECODE=1 python3 -B - "$ROOT" <<'PY'
@@ -156,7 +157,7 @@ wfs = {os.path.basename(p): read(p) for p in sorted(glob.glob(os.path.join(ROOT,
 agents = {os.path.basename(p)[:-3]: read(p) for p in sorted(glob.glob(os.path.join(ROOT, "agents", "*.md")))}
 if not wfs or not agents:
     print(f"SETUP 워크플로 {len(wfs)}개 · 에이전트 {len(agents)}개 — 검사 대상 0개는 통과가 아니다: {ROOT}")
-    sys.exit(2)
+    sys.exit(3)
 show = lambda bad: " · ".join(bad[:4]) + (f" 외 {len(bad) - 4}" if len(bad) > 4 else "")
 bad = p_placeholder(wfs.get("plan-collaborative.js", ""))
 case("collab-no-placeholder", not bad, show(bad))

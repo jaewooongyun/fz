@@ -387,31 +387,45 @@ def register(reg, base):
     @reg
     def r3_adv_corpus_guard_launcher_closure():
         # 009 — 진입점 · 런처를 고친 과제는 동결하지 않는다. 런처 셋(과 그 .sh 가 부르는 .sh)의 주석 밖 참조 파일은 저장소 어디에 있든
-        #   전부 가드에 든다(scripts/ 밖 diff_anchors.py · gpt-exec.sh 가 부르는 validate-gpt-output.py — 2차 ISSUE-009) · 008 절대 경로 거부
+        #   전부 가드에 든다(scripts/ 밖 diff_anchors.py · gpt-exec.sh 가 부르는 validate-gpt-output.py — 2차 ISSUE-009) · 008 절대 경로 거부.
+        #   같은 닫힘을 점 폴더(설치 위치 `.claude/plugins/cache/…`) 아래에 놓은 트리 사본에서 한 번 더 구한다 — 걷기가 루트가 놓인 자리에
+        #   기대면 사본의 참조가 비어 원본과 갈린다(사본은 걷기가 빼는 폴더 — 점 폴더 · tests · __pycache__ — 를 옮기지 않는다)
         def frz(*paths):
             return freeze_corpus({"input_tree_sha": "b" * 40, "tasks": [{"id": "T1", "diff_paths": list(paths),
                                                                         "a0_smoke": {"sha256": "a" * 64, "audit_hits": 0}}]})
+
+        def closure(root):
+            files = _repo_files(root)
+            refs, todo, seen = set(), ["scripts/gpt-call.sh", "scripts/gpt_independent.sh", "scripts/gpt-exec.sh"], set()
+            while todo:
+                rel = todo.pop()
+                if rel in seen:
+                    continue
+                seen.add(rel)
+                with open(os.path.join(root, rel), encoding="utf-8") as fh:   # 주석(줄 전체 · 공백 뒤 끝 주석)은 참조가 아니다
+                    code = "\n".join(re.sub(r"(^|\s)#.*$", "", ln) for ln in fh.read().splitlines())
+                for m in re.findall(r"[A-Za-z0-9_.-]+\.(?:sh|py|json)\b", code):
+                    for hit in files.get(m, ()):
+                        refs.add(hit)
+                        if hit.endswith(".sh"):
+                            todo.append(hit)
+            return refs
         root = os.path.dirname(here)
-        files = _repo_files(root)
-        refs, todo, seen = set(), ["scripts/gpt-call.sh", "scripts/gpt_independent.sh", "scripts/gpt-exec.sh"], set()
-        while todo:
-            rel = todo.pop()
-            if rel in seen:
-                continue
-            seen.add(rel)
-            with open(os.path.join(root, rel), encoding="utf-8") as fh:   # 주석(줄 전체 · 공백 뒤 끝 주석)은 참조가 아니다
-                code = "\n".join(re.sub(r"(^|\s)#.*$", "", ln) for ln in fh.read().splitlines())
-            for m in re.findall(r"[A-Za-z0-9_.-]+\.(?:sh|py|json)\b", code):
-                for hit in files.get(m, ()):
-                    refs.add(hit)
-                    if hit.endswith(".sh"):
-                        todo.append(hit)
+        refs = closure(root)
+        td = tempfile.mkdtemp(prefix="abl-dot-")
+        try:
+            dot = os.path.join(td, ".claude", "plugins", "cache", "x")
+            shutil.copytree(root, dot, ignore=lambda d, names: [n for n in names if n in ("tests", "__pycache__")
+                                                                or (n.startswith(".") and os.path.isdir(os.path.join(d, n)))])
+            dot_refs = closure(dot)
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
         guard = {"scripts/" + n for n in INSTRUMENTS} | set(CORPUS_GUARD_EXTRA)
         rejects = [frz(p)[0] is None for p in ("scripts/gpt-call.sh", "skills/fz-peer-review/scripts/diff_anchors.py",
                                                "scripts/validate-gpt-output.py", os.path.join(root, "scripts/ab_ledger_judge.py"),
                                                "../x/scripts/ab_ledger.py")]
-        ok = all(rejects) and frz("skills/fz/SKILL.md")[0] is not None and refs and refs <= guard
-        return ok, [str(rejects), f"가드 밖 런처 참조 {sorted(refs - guard)}"]
+        ok = all(rejects) and frz("skills/fz/SKILL.md")[0] is not None and refs and refs <= guard and dot_refs == refs
+        return ok, [str(rejects), f"가드 밖 런처 참조 {sorted(refs - guard)}", f"점 폴더 아래 사본의 런처 참조 {sorted(dot_refs)} (원본 {len(refs)}개)"]
 
     @reg
     def r3_adv_corpus_guard_walk_root_independent():

@@ -2,7 +2,7 @@
 """measure_constraint_load.py — fz 제약 가이드 hot-path 로드 부하 계측 (COST 축).
 
 목적: Opus 4.8 전환 이후 "강한 제약 가이드로 인한 성능 저하" 가설을 데이터로 검증하기
-위한 1차 도구. 각 스킬이 참조하는 modules/guides의 토큰/라인 부하를 계측하고, 각 모듈의
+위한 1차 도구. 각 스킬이 참조하는 modules/guides의 글자÷4(토큰 수 아님)/라인 부하를 계측하고, 각 모듈의
 operative(게이트/체크리스트/절차) vs justification(근거/인용/서사) 비율을 추정한다.
 
 ⛔ 한계 (정직성):
@@ -368,11 +368,11 @@ def cmd_ceiling(scopes: dict, path: Path) -> int:
     for scope, cur in scopes.items():
         for name, val in sorted(cur.items()):
             if name not in frozen[scope]:
-                bad.append(f"FAIL {scope}/{name}: 동결값에 없는 항목 (~{val} tok) — 의도한 추가면 --freeze 로 다시 동결한다")
+                bad.append(f"FAIL {scope}/{name}: 동결값에 없는 항목 (글자÷4 {val}) — 의도한 추가면 --freeze 로 다시 동결한다")
                 continue
             limit = int(frozen[scope][name] * (1 + head / 100))
             if val > limit:
-                bad.append(f"FAIL {scope}/{name}: ~{val} tok > 동결 {frozen[scope][name]} × {1 + head / 100:.2f} = {limit}")
+                bad.append(f"FAIL {scope}/{name}: 글자÷4 {val} > 동결 {frozen[scope][name]} × {1 + head / 100:.2f} = {limit}")
     for b in bad:
         print(b)
     total = {k: sum(v.values()) for k, v in scopes.items()}
@@ -387,7 +387,7 @@ FLOOR_DEFINITION = ("정의: floor = 무조건 참조 문서(modules · guides) 
 
 
 def uncond_loads(skill_md: Path, docs_: dict) -> dict:
-    """무조건 로드 참조 {rel: ~tokens} — floor 의 구성원."""
+    """무조건 로드 참조 {rel: 글자÷4} — floor 의 구성원."""
     return {r: docs_[r]["tokens"] for r, m in ref_files_in_skill(skill_md).items()
             if m["bucket"] == "load" and not m["conditional"] and r in docs_}
 
@@ -396,9 +396,9 @@ def diff_refs_lines(before_md: Path, now_md: Path, docs_: dict) -> list:
     """이동 · 분리의 floor 이득 반사실(F-151) — 빠지는 무조건 참조 목록이 비면 이득 0 이다(본문 줄 감소는 floor 가 아니다)."""
     b, a = uncond_loads(before_md, docs_), uncond_loads(now_md, docs_)
     gone, new = sorted(set(b) - set(a)), sorted(set(a) - set(b))
-    out = [f"diff-refs {before_md.name} → 지금: floor {sum(b.values())} → {sum(a.values())} ~tokens (차 {sum(a.values()) - sum(b.values()):+d})"]
-    out += [f"  - 빠진 무조건 참조 {r} ~{b[r]} tok" for r in gone] or ["  빠진 무조건 참조 없음 — 이 변경의 floor 이득 0"]
-    out += [f"  + 생긴 무조건 참조 {r} ~{a[r]} tok" for r in new]
+    out = [f"diff-refs {before_md.name} → 지금: floor {sum(b.values())} → {sum(a.values())} 글자÷4 (차 {sum(a.values()) - sum(b.values()):+d})"]
+    out += [f"  - 빠진 무조건 참조 {r} 글자÷4 {b[r]}" for r in gone] or ["  빠진 무조건 참조 없음 — 이 변경의 floor 이득 0"]
+    out += [f"  + 생긴 무조건 참조 {r} 글자÷4 {a[r]}" for r in new]
     return out
 
 
@@ -412,7 +412,7 @@ def refs_report(root: Path, skill: str, before: Path | None = None) -> list:
     t = sum(docs_[r]["tokens"] for r in ld)
     ex = sum(docs_[r]["tokens"] for r, m in refs.items() if m["bucket"] != "load" and r in docs_)
     out = [f"참조 판정: skills/{skill}/SKILL.md", FLOOR_DEFINITION,
-           f"  floor(무조건 로드) {u} / ceiling(로드 전체) {t} ~tokens  · 로드 아님(카탈로그·출처표기) {ex} 제외"]
+           f"  floor(무조건 로드) {u} / ceiling(로드 전체) {t} 글자÷4  · 로드 아님(카탈로그·출처표기) {ex} 제외"]
     if before is not None:
         out += diff_refs_lines(before, skill_md, docs_)
     out += ["⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).",
@@ -424,7 +424,7 @@ def refs_report(root: Path, skill: str, before: Path | None = None) -> list:
             tag = "로드/조건부" if meta["conditional"] else "로드/무조건"
         else:
             tag = "카탈로그  " if meta["bucket"] == "catalog" else "출처표기  "
-        out.append(f"[{tag}] {rel:<38} ~{tok:>6} tok")
+        out.append(f"[{tag}] {rel:<38} {tok:>6} 글자÷4")
         for st in meta["sites"]:
             mark = {"catalog": "  ·", "citation": "  ~"}.get(st["bucket"], "  ?" if st["conditional"] else "  !")
             out.append(f"   {mark} L{st['line']}: {st['text']}")
@@ -459,6 +459,18 @@ def self_test() -> int:
               and any("(차 -" in ln for ln in gone) and any("이득 0" in ln for ln in same) and any("(차 +0)" in ln for ln in same))
         case("r3-f151-diff-refs-lists-removed — --diff-refs 가 빠지는 무조건 참조와 floor 차를 내고 · 빠지는 것이 없으면 이득 0", ok,
              [ln for ln in gone + same if "diff-refs" in ln or "참조" in ln][:6])
+        # 값을 찍는 줄은 정의 줄과 같은 단위(글자÷4)를 적는다 — 정의 줄 아래에서 토큰 단위로 적히면 토큰 수로 인용된다
+        import contextlib, io, subprocess
+        (root / "frozen.json").write_text(json.dumps({"headroom_pct": 10, "agents": {"a": 1}}), encoding="utf-8")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cmd_ceiling({"agents": {"a": 50, "new": 7}}, root / "frozen.json")
+        report = subprocess.run([sys.executable, "-B", __file__, str(root)], capture_output=True, text=True).stdout
+        lines = [ln for ln in rep + gone + buf.getvalue().splitlines() + report.splitlines()
+                 if re.search(r"floor\(무조건|diff-refs|무조건 참조 modules|^\[로드|^FAIL |개 · 합", ln)]
+        ok = len(lines) >= 8 and all("글자÷4" in ln and "tok" not in ln for ln in lines)
+        case("r3-unit-wording — --refs · --diff-refs · 상한 FAIL · 표3 의 값 줄이 정의 줄과 같은 단위 글자÷4 를 적는다", ok,
+             [ln for ln in lines if "글자÷4" not in ln or "tok" in ln][:4] or lines[:2])
     print(f"self-test {sum(results)}/{len(results)} passed (measure_constraint_load)")
     return 0 if all(results) else 1
 
@@ -558,7 +570,7 @@ def main() -> None:
     print("  워커는 agent 정의 전문과 워크플로가 조립한 프롬프트를 받는다 — 스킬 floor 에 안 잡히는 부하다")
     for scope in ("agents", "workflows"):
         vals = scopes[scope]
-        print(f"  {scope:<10} {len(vals):>3}개 · 합 ~{sum(vals.values())} tok · 최대 "
+        print(f"  {scope:<10} {len(vals):>3}개 · 합 {sum(vals.values())} 글자÷4 · 최대 "
               + (max(vals.items(), key=lambda x: x[1])[0] if vals else "-"))
 
     print("\n■ 강등 PoC 후보 (justification 절대량 ↑, 단 VALUE 측정 전 제거 금지)")

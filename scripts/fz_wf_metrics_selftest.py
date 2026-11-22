@@ -746,6 +746,20 @@ def self_test() -> int:
          lambda lines, keys: None if len(lines) == 1 and len(keys or {}) == 4 and isinstance(keys.get("sess/agent-d2"), list)
          else f"되살린 열쇠: 줄 {len(lines)} · 열쇠 {keys}"),
         (state, finish, "MCP_SWEEP runs=2 used=0 suspect=2 ", None)], plugin_time=now - 30 * 86400)
+
+    def one_suspect(sess):    # 의심 실행을 하나(0회 워크플로 wf_sw2)만 남긴다 — 켜진 언어 파일에 전부 오류인 직접 호출(agent-d2)을 뺀다
+        for ext in (".jsonl", ".meta.json"):
+            os.remove(os.path.join(sess, "subagents", "agent-d2" + ext))
+
+    # 기록 줄을 쓰고 열쇠를 쓰지 못한 종료는 그 의심을 알리지 못했다 — 열쇠를 되살린 훑기가 그 의심 줄을 앞선 훑기의 판정으로 한 번 찍고
+    # 기록 줄은 새로 쓰지 않는다(요약 줄은 이번에 판정한 실행만 센다) · 다음 훑기는 조용하다 · 되살린 성공 · 해당 없음 실행은 아무것도 찍지 않는다
+    sweep_cell("keys-recover-notice", "mcp-sweep", [
+        (state, lambda s: (one_suspect(s), block_keys(s)), "MCP_SWEEP_UNRUN", one_line, ("의심:",)),
+        (state, lambda s: os.rmdir(os.path.join(os.path.dirname(s), "runs", "mcp-sweep.keys.json")),
+         ("MCP_SWEEP runs=0 used=0 suspect=0 ", "  의심: wf_sw2 MCP_WIRING_SUSPECT", "앞선 훑기의 판정"),
+         lambda lines, keys: None if len(lines) == 1 and sorted(keys or {}) == ["sess/agent-d1", "sess/wf_sw1", "sess/wf_sw2"]
+         else f"되살린 훑기: 기록 줄 {len(lines)} (기대 1) · 열쇠 {keys}", ("의심: wf_sw1", "의심: agent-d1")),
+        (state, None, "MCP_SWEEP runs=0 ", one_line, ("의심:",))])
     r8 = tempfile.mkdtemp(prefix="fzwf-hold-")
     try:
         write_agents(os.path.join(r8, "agents"))
@@ -937,7 +951,7 @@ def self_test() -> int:
             fails.append(f"낱말-표 짝: 원문 낱말 {len(words)}개 · 어긋남 {gaps or '없음'} · 못 잡은 표 변이 {missed or '없음'}")
 
     # 요약 줄의 묶음 수는 손으로 적는다 — 묶음 합이 총수와 다르면 셀을 더하고 묶음 수를 고치지 않은 것이다(요약이 셀 수를 속이지 않게)
-    groups = (("양성", 1), ("음성", 7), ("mcp-audit", 53), ("심볼 결과 판독", 3), ("mcp-sweep", 21), ("sweep-row", 3),
+    groups = (("양성", 1), ("음성", 7), ("mcp-audit", 53), ("심볼 결과 판독", 3), ("mcp-sweep", 22), ("sweep-row", 3),
               ("stage 규칙", 1), ("usage 중복", 1), ("advisor 스톨", 3), ("시도 구분", 1), ("낱말-표 짝", 1))
     total = passed + len(fails)
     if sum(n for _, n in groups) != total:

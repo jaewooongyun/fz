@@ -1147,7 +1147,8 @@ def audit_verdict(agents, tools_md):
 #  고쳐졌으면 그 실행의 0회 · 성공 0 은 의심이 아니라 미판정이다 — 틀린 상태로 판정하느니 판정하지 않는다.
 #  판정한 실행의 열쇠(실행 id + 워커 기록 수)는 기록 옆 `<기록 이름>.keys.json` 에 둔다 — 기록 줄을 먼저 쓰고 열쇠를 나중에 쓴다
 #  (임시 파일에 쓴 뒤 이름 바꾸기). 워커 기록이 늘어난 실행(재개 · 다음 시도)은 다시 판정한다. 열쇠가 맞지 않는 실행이 있으면 먼저 기록
-#  (돌린 `.1` 포함)의 이 세션 줄에서 열쇠를 되살린다 — 열쇠 쓰기만 실패한 종료 뒤에 같은 실행의 기록 줄이 둘 되지 않게. 끝나지 않은 실행과
+#  (돌린 `.1` 포함)의 이 세션 줄에서 열쇠를 되살린다 — 열쇠 쓰기만 실패한 종료 뒤에 같은 실행의 기록 줄이 둘 되지 않게. 그 종료가 알리지 못한
+#  의심은 되살린 훑기가 `앞선 훑기의 판정` 표시로 한 번 찍는다(기록 줄은 새로 쓰지 않는다 · 요약 줄은 이번에 판정한 실행만 센다). 끝나지 않은 실행과
 #  예산(`--budget`)에 걸려 못 본 실행은 열쇠를 적지 않고 다음 훑기에서 본다 — 다만 기록 파일이 `SWEEP_STALE_HOURS` 넘게 멈춘 실행은 미판정(설치 전 ·
 #  센 워커가 없으면 해당 없음)으로 적고 열쇠(워커 기록 수 + 기록 크기 — 재개가 기존 워커 기록에 덧붙여도 맞지 않게 된다)를 적는다. 기록의 어느
 #  값도 `fz:` 로 시작하지 않는다(에이전트 종류 · fz 스킬 이름을 싣지 않는다).
@@ -1242,11 +1243,11 @@ def _stall_hit(v, path, n) -> bool:
     return isinstance(v, list) and v == [n, _run_bytes(path)]
 
 
-def _recover_keys(record, sess, keys, runs) -> int:
-    """열쇠가 맞지 않는 실행이 있을 때만 기록 · 돌린 기록(`.1`)의 이 세션 줄에서 그 실행마다 마지막 열쇠를 `keys` 에 되살리고 수를 돌려준다 —
-    기록 줄은 썼는데 열쇠를 쓰지 못한 종료 뒤에 같은 실행을 다시 판정하지 않게(워커 기록이 그 뒤에 늘었으면 되살린 열쇠도 맞지 않는다)."""
+def _recover_keys(record, sess, keys, runs) -> dict:
+    """열쇠가 맞지 않는 실행이 있을 때만 기록 · 돌린 기록(`.1`)의 이 세션 줄에서 그 실행마다 마지막 열쇠를 `keys` 에 되살리고 {열쇠: 그 기록 줄의 실행 칸}
+    을 돌려준다 — 기록 줄은 썼는데 열쇠를 쓰지 못한 종료 뒤에 같은 실행을 다시 판정하지 않게(워커 기록이 그 뒤에 늘었으면 되살린 열쇠도 맞지 않는다)."""
     want = {f"{sess}/{rid}" for rid, path, n in runs if keys.get(f"{sess}/{rid}") != n and not _stall_hit(keys.get(f"{sess}/{rid}"), path, n)}
-    found, needle = {}, '"session": ' + json.dumps(sess, ensure_ascii=False)
+    found, row_of, needle = {}, {}, '"session": ' + json.dumps(sess, ensure_ascii=False)
     for p in (record + ".1", record) if want else ():  # 옛 파일부터 — 뒤 줄이 앞 줄을 덮는다
         try:
             with open(p, "r", encoding="utf-8", errors="replace") as fh:
@@ -1260,13 +1261,14 @@ def _recover_keys(record, sess, keys, runs) -> int:
                         k = f"{sess}/{r.get('run')}" if isinstance(r, dict) else None
                         if k in want and isinstance(r.get("workers"), int):
                             found[k] = [r["workers"], r["bytes"]] if isinstance(r.get("bytes"), int) else r["workers"]
+                            row_of[k] = r
         except OSError:
             continue
     found = {k: v for k, v in found.items() if keys.get(k) != v}
     for k in found:
         keys.pop(k, None)                              # 되살린 열쇠는 새로 고친 열쇠다(상한을 넘으면 가장 늦게 버린다)
     keys.update(found)
-    return len(found)
+    return {k: row_of[k] for k in found}
 
 
 def cmd_mcp_sweep(args) -> int:
@@ -1311,6 +1313,7 @@ def _sweep_session(args) -> int:
     tally, out_runs, new_keys, skills = collections.Counter(), [], {}, collections.Counter()
     seen = pending = left = predated = stalled = 0
     recovered = _recover_keys(args.record, sess, keys, runs)
+    earlier = [r for r in recovered.values() if r.get("verdict") == "suspect"]   # 열쇠를 되살린 의심 실행 — 알리지 못한 앞선 판정
     for rid, path, n in runs:
         key = f"{sess}/{rid}"
         if keys.get(key) == n:
@@ -1401,6 +1404,8 @@ def _sweep_session(args) -> int:
     for r in out_runs:
         if r["verdict"] == "suspect":
             print(f"  의심: {r['run']} {r['word']} (성공 {r['ok']} · 오류 {r['error']} · 빈 결과 {r['empty']})")
+    for r in earlier:                                  # 열쇠를 이제 썼다 — 다음 훑기는 되살리지 않으니 한 번뿐이다
+        print(f"  의심: {r['run']} {r.get('word')} (성공 {r.get('ok')} · 오류 {r.get('error')} · 빈 결과 {r.get('empty')}) — 앞선 훑기의 판정(요약 줄에 세지 않는다)")
     if predated:
         print(f"  설치 전 실행 {predated} — 해당 없음(이 플러그인이 설치되기 전에 끝났다 · 판정하지 않는다)")
     if stalled:
