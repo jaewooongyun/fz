@@ -15,16 +15,21 @@
 
 ## 세션 자동 감지
 
-Issue Tracker 의 저장소는 아래 세션 파일(`TRACKER_FILE`) 하나다. 1시간 이내 기존 세션을 자동 감지합니다.
+Issue Tracker 의 저장소는 아래 세션 파일(`TRACKER_FILE`) 하나다. 1시간 이내 기존 세션을 자동 감지합니다. 다른 세션이 만든 파일은 이어받지 않는다(이번 호출과 파일의 세션 id(`CLAUDE_CODE_SESSION_ID`) 중 하나라도 모르면 나이만 본다) · 읽을 수 없는 파일은 건너뛴다 · 파일을 쓰지 못하면 변수를 내보내지 않고 1 로 끝난다.
 
 ```bash
 TRACKER_DIR="$HOME/.claude/sessions"
 mkdir -p "$TRACKER_DIR"
 
+# -exec … + 는 찾은 파일이 없으면 ls 를 돌리지 않는다(xargs 는 GNU 에서 빈 입력에도 ls 를 돌려 현재 폴더를 나열한다)
 find_recent_session() {
-  RECENT=$(find "$TRACKER_DIR" -name "SESSION-*_issues.json" -mmin -60 2>/dev/null | \
-           xargs ls -t 2>/dev/null | awk 'NR==1')
-  echo "$RECENT"
+  find "$TRACKER_DIR" -name "SESSION-*_issues.json" -mmin -60 -exec ls -t {} + 2>/dev/null | \
+    while IFS= read -r f; do
+      THEIRS=$(jq -er '.claude_session_id // ""' "$f" 2>/dev/null) || continue
+      if [ -z "${CLAUDE_CODE_SESSION_ID:-}" ] || [ -z "$THEIRS" ] || [ "$THEIRS" = "$CLAUDE_CODE_SESSION_ID" ]; then
+        echo "$f"; break
+      fi
+    done
 }
 
 init_or_use_session() {
@@ -38,9 +43,10 @@ init_or_use_session() {
     SESSION_ID="SESSION-${TIMESTAMP}"
     TRACKER_FILE="${TRACKER_DIR}/${SESSION_ID}_issues.json"
 
-    cat > "$TRACKER_FILE" << EOF
+    cat > "$TRACKER_FILE" << EOF || { echo "트래커 파일을 쓸 수 없다: $TRACKER_FILE" >&2; return 1; }
 {
   "session_id": "${SESSION_ID}",
+  "claude_session_id": "${CLAUDE_CODE_SESSION_ID:-}",
   "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "task_description": "",
   "issues": [],

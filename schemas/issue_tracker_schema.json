@@ -11,6 +11,10 @@
       "pattern": "^SESSION-[0-9]{8}_[0-9]{6}$",
       "description": "세션 고유 식별자 (예: SESSION-20260130_143022)"
     },
+    "claude_session_id": {
+      "type": "string",
+      "description": "이 파일을 만든 Claude Code 세션 id (Bash 환경의 CLAUDE_CODE_SESSION_ID). 빈 값 · 이 속성이 없는 옛 파일 = 모름. 이번 호출과 이 값이 둘 다 있고 다르면 자동 감지가 이어받지 않는다"
+    },
     "created_at": {
       "type": "string",
       "format": "date-time",
