@@ -2,7 +2,7 @@
 
 > **Scope of Applicability**: `fz-gpt` SKILL.md의 주력 서브커맨드 4개. fz-review Phase 5 (review/check), fz-plan Phase 2 (verify), fz-review Phase 5.5 (validate) 위임 시 본 모듈 참조.
 >
-> **Purpose**: 가장 자주 사용되는 4개 서브커맨드(주력) 정의 + verdict contract + 후속 fz-fixer 연결. 보조 7개는 `modules/fz-gpt-subcommands-aux.md` 참조.
+> **Purpose**: 가장 자주 사용되는 4개 서브커맨드(주력) 정의 + verdict contract. 보조 7개는 `modules/fz-gpt-subcommands-aux.md` 참조.
 
 ## 목차
 
@@ -185,20 +185,6 @@ EOF
 FZ_GPT_ARTIFACT="$ARTIFACT" FZ_WORK_DIR="${WORK_DIR:-}" "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" validate --cd "$GIT_ROOT" --out "$VERIFICATION_FILE" --prompt-file "$P_VALIDATE"
 ```
 
-**/fz-searcher 연결**: verify/validate 중 심볼 탐색이 필요할 때(계획에 영향 심볼이 명시되지 않은 경우) /fz-searcher 스킬을 사전 단계로 실행하여 영향 범위를 파악한다.
-
-```bash
-if [ -z "$AFFECTED_SYMBOLS" ]; then
-  cat > "$P_SEARCH" <<EOF
-아래 변경 대상의 영향 심볼과 의존성 체인을 탐색하라.
-## 변경 대상
-$PLAN_CONTENT
-파일을 수정하지 마라(읽기 전용 분석).
-EOF
-  "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" search --cd "$GIT_ROOT" --out "$SEARCH_FILE" --prompt-file "$P_SEARCH"   # searcher 본문은 정문이 래퍼로 주입한다
-fi
-```
-
 ## check -- 커밋 전 빠른 검증
 
 스테이징/언스테이징 변경을 커밋 전에 빠르게 검증합니다.
@@ -223,20 +209,6 @@ fi
 **판정**: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_verdict.py" "$REVIEW_FILE"` 가 stdout 한 줄로 위 넷 중 하나를 낸다. 손 grep 으로 대신하지 않는다 — check 는 리뷰 모드 자유 서식이라 지적 머리가 `- [P2] 제목 — 경로:줄` 꼴이고 `severity` 낱말이 없다. severity 낱말만 보던 옛 grep 은 지적 6건이 든 출력을 pass 로 읽었다(F-581).
 
 > severity enum: `critical | major | minor | suggestion` (review schemas 정의). `warn`/`warning`은 매칭 대상 아님.
-
-**/fz-fixer 연결**: 리뷰 결과에 수정 제안이 포함된 경우(issues with suggestion 필드 비어있지 않음), /fz-fixer 스킬을 참조하여 수정 전략을 제시한다.
-
-```bash
-if [ "$HAS_FIXABLE_ISSUES" = "true" ]; then
-  cat > "$P_FIX" <<EOF
-위 리뷰 결과에서 수정이 필요한 이슈에 대해 Root Cause와 Fix Strategy를 제시하라.
-## 이슈 목록
-$FIXABLE_ISSUES
-파일을 수정하지 마라(읽기 전용 분석).
-EOF
-  "${FZ_PLUGIN_ROOT}/scripts/gpt-call.sh" fix-suggest --cd "$GIT_ROOT" --out "$FIXER_FILE" --prompt-file "$P_FIX"   # fixer 는 exec + 본문 주입(check 와 다른 kind — XE-06)
-fi
-```
 
 ---
 

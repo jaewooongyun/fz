@@ -1,11 +1,13 @@
 """kinds-resolve behaviour cells — run by `capture.py cells` (see run.sh). Each cell prints PASS / FAIL.
 
-Covers plan S2 보강[verify] (a)-(h), the R1-R4 choice variants (Z-05), exit 10-17 pass-through (Z-11), same / different --out
+Covers plan S2 보강[verify] (a)-(f) and (h) ((g) checked the fix-suggest kind, removed since), removed kinds (10 · the message
+names the kind to use instead), the R1-R4 choice variants (Z-05), exit 10-17 pass-through (Z-11), same / different --out
 concurrency (XE-04), lock lifetime and cleanup ownership (P-09 · P-13 · P-17 · R-04), TERM / INT forwarding, the verify-cross
 environment, and a discrimination cell (a registry change must change the captured argv).
 """
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -84,6 +86,13 @@ def cells(env, tag0):
                              ("--experimental on stable", 'check --cd "$GIT_ROOT" --out "$K/o" --experimental', 10)):
         p, entry, cli = gate(env, kd, args)
         check(f"(c) {name} -> {want}", p.returncode == want and not cli, f"rc={p.returncode} {p.stderr.strip()[-120:]}")
+    # a caller written for an older version names a kind taken out of the registry: 10 · nothing runs · the message names a live kind to use instead
+    live = json.load(open(os.path.join(R, "scripts", "gpt-kinds.json"), encoding="utf-8"))["kinds"]
+    for gone in ("search", "fix-suggest", "openai-docs"):
+        p, entry, cli = gate(env, kd, f'{gone} --cd "$GIT_ROOT" --out "$K/o" --prompt-file "$K/run.sh"')
+        use = re.search(r"use '([a-z][a-z0-9-]*)' instead", p.stderr)
+        check(f"(c) removed kind {gone} -> 10 · names the kind to use instead", p.returncode == 10 and not entry and not cli and gone not in live
+              and f"'{gone}'" in p.stderr and bool(use) and use.group(1) in live, f"rc={p.returncode} {p.stderr.strip()[-160:]}")
     p, _, _ = gate(env, kd, 'verify --cd "$GIT_ROOT" --out "$K/nodir/o" --prompt-file "$K/run.sh"')
     check("(c) out parent missing says so (not 'running')", "parent folder" in p.stderr and "실행 중" not in p.stderr, p.stderr[-160:])
     nopy = f"{T}/nopy"
@@ -151,12 +160,6 @@ def cells(env, tag0):
     e = entry[-1] if entry else []
     check("(f) another cwd -> bundled skill", e[-1:] == ["<R>/gpt-skills/fz-architect/SKILL.md"], str(e[-2:]))
     shutil.rmtree(f"{env.H}/.codex/skills")
-
-    # (g) XE-06 fixer is exec + inject (not a review-mode check)
-    kd = env.kdir("g", "fix-suggest")
-    p, entry, _ = gate(env, kd, 'fix-suggest --cd "$GIT_ROOT" --out "$K/fix.md" --prompt-file "$K/p.txt"')
-    e = entry[0] if entry else []
-    check("(g) fix-suggest -> exec + --inject-skill fz-fixer", e[1:2] == ["exec"] and e[-2:] == ["--inject-skill", "<R>/gpt-skills/fz-fixer/SKILL.md"], str(e))
 
     # (h) check_gpt_surface is unchanged by the gate (it still PASSes on this tree)
     p = subprocess.run(["python3", os.path.join(R, "scripts", "check_gpt_surface.py")], capture_output=True, text=True, cwd=R)

@@ -50,7 +50,7 @@ metadata:
 /fz "빌드 실패 반복" --loop                    # → LOOP (자동 반복)
 /fz "스킬 트리거 최적화해줘"                    # → skill-optimize (SOLO)
 /fz "드리프트 체크해줘"                        # → drift-check (SOLO, fz-gpt drift)
-/fz "독립 플랜 만들어줘"                       # → plan-parallel (SOLO, fz-gpt plan)
+/fz "독립 플랜 만들어줘"                       # → plan-parallel (SOLO, fz-gpt independent-plan)
 /fz "전체 봐줘"                               # → Medium confidence → AskUserQuestion 먼저
 /fz "안됨"                                    # → Low confidence → AskUserQuestion 먼저
 ```

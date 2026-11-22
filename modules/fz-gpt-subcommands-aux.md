@@ -84,6 +84,8 @@ EOF
 
 요구사항을 기반으로 Claude 계획과 독립적으로 플랜을 생성합니다.
 
+> ⛔ **비격리** — 래퍼는 디스크 전체를 읽어 작업 폴더의 Claude 산출에 닿을 수 있다. 격리 첫 패스는 § independent-plan 이다(/fz plan-parallel 도 그쪽 — `modules/pipelines.md` §16). 이 kind 는 명시 호출 전용이다.
+
 ```bash
 REQUIREMENTS="$1"
 cat > "$P_PLAN" <<EOF
@@ -167,9 +169,10 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 |------|----------------|
 | /fz-review | Phase 5 → final (PR 전) |
 | /fz-pr | PR 생성 전 → final |
-| /fz-plan | cross-check → plan (독립 비교), full 2.7 → independent-plan (기본 · `--no-gpt-independent` 로 끈다), micro-eval (claim 재평가) |
+| /fz-plan | full 2.7 → independent-plan (기본 · `--no-gpt-independent` 로 끈다), micro-eval (claim 재평가) |
 | /fz-modernize | full Phase 3 1.5 → independent-plan (초안과 동시 · 실패 · 거부면 Phase 4 modernize-verify) |
 | /fz (drift-check · `modules/pipelines.md` §15) | drift (전체 스캔) |
+| /fz | (plan-parallel · pipelines §16) → independent-plan (격리 첫 패스 · 작업 폴더 deny) |
 
 ## 설계 원칙
 

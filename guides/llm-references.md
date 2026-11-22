@@ -134,10 +134,10 @@
 | 2608.09290 | OpenCodeReview: Determinism over Non-Determinism for Cost-Effective Agent-Based Code Review | Li (11인) | 2026-08 | 무제한 도구 사용이 리뷰 결과를 불안정하게 만든다 — 결정론 파이프라인이 주류 코딩 에이전트 대비 SEM-F1 최대 2.17배, 토큰 5~15배 절감(AACR-Bench 200 PR). → fz-review 결정론 스테이지 설계 근거. abs meta 대조 2026-09-25 |
 | 2609.15309 | When Agents Slow Down: Test-Time Strategies via Elo-per-token | Liu (9인) | 2026-09 | *"agents can initially convert tokens into Elo faster than independent sampling, but their marginal gains diminish"* — 1억 토큰을 병렬 세션으로 나누면 긴 단일 세션 대비 +264 Elo. → effort·세션 길이 배분(Track M) 참고. abs meta 대조 2026-09-25 |
 | 2608.16068 | CAPO: Constraint-Aware Prompt Optimization for LLM Agents | Dong (4인) | 2026-08 | 운영 제약 하 시스템 프롬프트 최적화(primal-dual) — *"more reliably reaches empirically feasible operating points while improving task performance"*. → 프롬프트 개정 시 제약(길이·비용) 명시 최적화. abs meta 대조 2026-09-25 |
-| 2210.03629 | ReAct: Synergizing Reasoning and Acting in Language Models | Yao | 2022-10 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-searcher · fz-planner |
-| 2303.11366 | Reflexion: Language Agents with Verbal Reinforcement Learning | Shinn | 2023-03 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-fixer |
+| 2210.03629 | ReAct: Synergizing Reasoning and Acting in Language Models | Yao | 2022-10 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-planner |
+| 2303.11366 | Reflexion: Language Agents with Verbal Reinforcement Learning | Shinn | 2023-03 | 트리 인용 등재(2026-11-09) — 인용처: 없음(역할 스킬 삭제) |
 | 2307.03172 | Lost in the Middle: How Language Models Use Long Contexts | Liu | 2023-07 | 트리 인용 등재(2026-11-09) — 인용처: guides/prompt-optimization.md · skill-troubleshooting.md |
-| 2309.11495 | Chain-of-Verification Reduces Hallucination in Large Language Models | Dhuliawala | 2023-09 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-fixer · fz-guardian · schemas/gpt_verification_schema.json · skills/fz-gpt |
+| 2309.11495 | Chain-of-Verification Reduces Hallucination in Large Language Models | Dhuliawala | 2023-09 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-guardian · schemas/gpt_verification_schema.json · skills/fz-gpt |
 | 2505.16997 | X-MAS: Towards Building Multi-Agent Systems with Heterogeneous LLMs | Ye | 2025-05 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-planner · modules/cross-validation.md |
 | 2510.04618 | Agentic Context Engineering: Evolving Contexts for Self-Improving Language Models | Zhang | 2025-10 | 트리 인용 등재(2026-11-09) — 인용처: guides/prompt-optimization.md · docs/rationale |
 | 2510.05156 | VeriGuard: Enhancing LLM Agent Safety via Verified Code Generation | Miculicich | 2025-10 | 트리 인용 등재(2026-11-09) — 인용처: gpt-skills/fz-guardian · schemas · modules/cross-validation.md |

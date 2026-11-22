@@ -14,7 +14,7 @@
 # Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh [--gpt-agents] [--check]
 #   --gpt-agents  GPT 역할 파일(gpt-agents/*.toml — 독립 리뷰의 렌즈 역할)도 ${CODEX_HOME:-~/.codex}/agents 에 링크한다.
 #                 opt-in 이다 — 없으면 agents 폴더를 건드리지 않는다. 역할 파일 형식 실측: probe/p2 ①②(S11)
-#   --check       읽기 전용 점검 — 아래 두 prune 판정에 걸리는 stale 링크를 `  stale: <이름> …` 줄로 나열만 한다.
+#   --check       읽기 전용 점검 — 아래 세 prune 판정에 걸리는 stale 링크를 `  stale: <이름> …` 줄로 나열만 한다.
 #                 판정은 `Check: N stale` 요약 줄로 한다 — 그 줄 없이 끝난 exit 1 은 stale 이 아니라 준비 오류(매니페스트 · gpt-skills 없음)다.
 #                 소유를 판정할 수 없는 끊긴 `fz-*` 링크(setup 의 'keep: … 소유 판정 불가')는 `  unknown: <이름> …` 줄로 따로 낸다(stale 아님).
 #                 스킬 폴더만 보고(--gpt-agents 는 무시) 아무것도 만들거나 지우지 않는다. exit: 0 = stale 0 · 1 = stale 있음
@@ -75,6 +75,10 @@ owned_under() {
   [ "$root" = "$SELF_ROOT" ] || [ "$(plugin_name "$root")" = "$SELF_NAME" ]
 }
 
+# $1=정규화한 대상 — 이 플러그인 소유 `gpt-skills/<이름>` 인데 이 판 gpt-skills 에 그 스킬이 없으면 0 (이 판이 걷은 역할 스킬).
+#   이전 판 설치의 옛 링크다 — 인자 없는 실행은 그 이름을 다시 걸지 않으므로, 구버전 캐시가 남아 링크가 살아 있으면 그대로 남는다
+retired_skill() { owned_under "$1" gpt-skills && [ ! -f "$GPT_SOURCE_DIR/${1##*/}/SKILL.md" ]; }
+
 SELF_NAME="$(plugin_name "$PLUGIN_DIR")"
 SELF_ROOT="$(cd "$PLUGIN_DIR" && pwd -P)"
 if [ -z "$SELF_NAME" ]; then
@@ -87,10 +91,11 @@ if [ ! -d "$GPT_SOURCE_DIR" ]; then
 fi
 
 # ── --check: 읽기 전용 점검 — ⛔ mkdir -p 앞에서 끝낸다(스킬 폴더가 없으면 만들지 않고 stale 0 이다)
-#    stale = 아래 prune ① · ② 의 판정(같은 norm · owned_under)에 걸리는 링크다. 그래서 정리(인자 없는 실행) 뒤 다시 보면 0 이다.
+#    stale = 아래 prune ① · ② · ③ 의 판정(같은 norm · owned_under · retired_skill)에 걸리는 링크다. 그래서 정리(인자 없는 실행) 뒤 다시 보면 0 이다.
 # ⛔ 비교 기준은 링크 대상의 설치 루트다 — 루트 매니페스트 name 으로 소유를 본다. 이 실행 트리 경로와 같은지는 보지 않는다:
 #    그렇게 보면 dev 트리·격리 clone 에서 돌릴 때 설치본을 가리키는 정상 GPT 스킬 링크가 전부 stale 로 보인다(트리마다 결과가 달라진다).
 #    같은 이유로 살아 있는 다른 판의 GPT 스킬 링크(인자 없는 실행이 이 판으로 다시 거는 것)와 아직 링크되지 않은 스킬은 내지 않는다.
+#    살아 있어도 이 판이 걷은 스킬을 가리키는 소유 링크는 다시 걸 곳이 없어 stale 이다(prune ③).
 if [ "$CHECK" -eq 1 ]; then
   stale=0; unknown=0
   for link in "$TARGET_DIR"/*; do
@@ -101,7 +106,11 @@ if [ "$CHECK" -eq 1 ]; then
       echo "  stale: $name (Claude skill link -> $dest)"                 # prune ① 대상
     else
       case "$name" in fz-*) ;; *) continue ;; esac
-      [ -e "$link" ] && continue
+      if [ -e "$link" ]; then                                                 # 살아 있는 링크는 이 판이 걷은 스킬일 때만
+        retired_skill "$dest" || continue
+        echo "  stale: $name (retired skill -> $dest)"                       # prune ③ 대상
+        stale=$((stale + 1)); continue
+      fi
       if ! owned_under "$dest" gpt-skills; then                               # prune ② 의 keep — 판정 불가는 stale 이 아니다
         echo "  unknown: $name (dangling — 소유 판정 불가 -> $dest)"
         unknown=$((unknown + 1)); continue
@@ -176,9 +185,16 @@ done
 #    옛 링크는 영원히 남는다(2026-09-06 codex→gpt 개명에서 실측). 링크가 죽어도 아무 게이트가 잡지 않는다.
 # ⛔ dangling 이면서 **이 플러그인 소유**인 것만 제거한다 — 살아있는 링크 · 실제 디렉토리 · `fz-` 아닌 링크 ·
 #    다른 플러그인의 끊어진 `fz-*` 는 건드리지 않는다(GPT R-A 검토 008). 소유를 판정할 수 없으면 보존하고 알린다.
+# ── prune ③: 살아 있어도 이 판이 걷은 역할 스킬(retired_skill)을 가리키는 소유 `fz-*` 링크 — 구버전 캐시가 남은 이전 판 설치
 for link in "$TARGET_DIR"/fz-*; do
   [ -L "$link" ] || continue      # 심볼릭이 아니면 skip (실제 디렉토리 보호)
-  [ -e "$link" ] && continue      # 타겟이 살아 있으면 skip
+  if [ -e "$link" ]; then         # 타겟이 살아 있으면 skip — prune ③ 만 지운다
+    retired_skill "$(norm "$(readlink "$link")")" || continue
+    echo "  prune: $(basename "$link") (retired skill)"
+    rm "$link"
+    pruned=$((pruned + 1))
+    continue
+  fi
   dest="$(norm "$(readlink "$link")")"
   if owned_under "$dest" gpt-skills || owned_under "$dest" skills; then
     echo "  prune: $(basename "$link") (dangling)"

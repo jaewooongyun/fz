@@ -41,7 +41,7 @@ TEMPLATES = {"review-core": "templates/review-shared-block.md", "project-rules":
 # 점검 카탈로그가 있어야 할 곳(round 3 S3) — copies 는 있는 사본이 같은지만 본다. 빠진 경로는 여기서 잡는다
 CATALOG_BLOCKS = {"catalog-plan": ("agents/plan-edge-case.md", "gpt-skills/fz-planner/SKILL.md", "gpt-skills/fz-architect/SKILL.md"),
                   "catalog-review": ("agents/review-counter.md", "gpt-skills/fz-reviewer/SKILL.md"),
-                  "catalog-code": ("agents/impl-correctness.md", "gpt-skills/fz-fixer/SKILL.md")}
+                  "catalog-code": ("agents/impl-correctness.md",)}
 CATALOG_READS = {"skills/fz-plan/SKILL.md": "templates/check-catalog-plan.md", "skills/fz-review/SKILL.md": "templates/check-catalog-review.md",
                  "skills/fz-code/SKILL.md": "templates/check-catalog-code.md"}   # light Lead — Workflow 가 없어 템플릿을 직접 Read 한다
 SHARED = re.compile(r"<!-- shared:([\w-]+) begin -->\n(.*?)<!-- shared:\1 end -->", re.S)
@@ -363,7 +363,7 @@ def self_test():
         "module-size": {"skills/big/SKILL.md": "x\n" * 501},
         "broken-refs": {mod + "r.md": "2. **Missing Section 생성**: " + ref_m + "\n"},
         "count-mismatch": {"skills/c/SKILL.md": "**3개 렌즈**\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"},
-        "catalog-required": {"gpt-skills/fz-fixer/SKILL.md": "블록 없음\n"},
+        "catalog-required": {"gpt-skills/fz-reviewer/SKILL.md": "블록 없음\n"},
         "audit-wiring": {"guides/g.md": wf_call + direct},   # 직접 호출 줄만 있다 — 워크플로 점검 줄로 세지 않는다
         "stack-skill-channel": {"skills/fz-plan/SKILL.md": "## 스택 스킬\n부른 뒤 Lead 가 읽는다\n"},   # 둘 다 없음
         "symbol-tools-block": {"agents/sym-b.md": sym_agent("mcp__plugin_fz_serena__get_symbols_overview", sym.replace("before Grep", "after Grep"))},

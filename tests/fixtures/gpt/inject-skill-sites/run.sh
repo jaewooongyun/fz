@@ -113,7 +113,7 @@ if "--out" in a and a.index("--out") + 1 < len(a):
 # ⛔ bash 머리 — 옛 형태는 대역을 직접 실행하고 정문은 어댑터를 `bash <어댑터>` 로 띄운다. 둘 다 같은 Python 을 돌린다
 STUB = "#!/bin/bash\nexec python3 -c " + shlex.quote(STUB_PY) + ' "$@"\n'
 # ARTIFACT — core § verify · § validate 레시피의 호출자 계열(가드가 정해져 있기를 요구한다 · 값이 틀리면 정문 10)
-FIXED = {"AFFECTED_SYMBOLS": "", "MAJOR_ISSUES_COUNT": "1", "HAS_FIXABLE_ISSUES": "true", "ARTIFACT": "plan"}   # 호출 분기에 들어가는 전제
+FIXED = {"AFFECTED_SYMBOLS": "", "MAJOR_ISSUES_COUNT": "1", "ARTIFACT": "plan"}   # 호출 분기에 들어가는 전제
 ENV_GIVEN = {"FZ_PLUGIN_ROOT", "HOME", "PATH"}
 RUN_N = [0]
 

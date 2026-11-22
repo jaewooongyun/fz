@@ -221,10 +221,10 @@ diff의 Swift 파일에 `@MainActor`, `actor`, `async`, `await`, `Task`, `Sendab
 5. **검사** — `scripts/check_gpt_skill_portability.py`(health-check 배선): 본문 프레임워크 토큰(로더 줄 제외) · `AI/*guidelines` 경로 · 고정 레이어 순서 사슬 · 작성자 관례 표지 · 두 절 · 지침 파일 집합 · fz-reviewer 6축 · fz-architect Q1~Q8 · fz-planner JSON · `agents/openai.yaml` 정책. `--claude-docs` 모드(health-check 배선)는 Swift 기준 줄에 조건 문구 `CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우` 를 실은 Claude 문서 8개(agents/ 다섯 · fz-code · code-auditor · arch-critic — 스크립트의 `CLAUDE_DOCS` 계약)를 본다: 조건이 덮지 않는 프레임워크 토큰 · 작성자 관례 표지(덮는 범위 = 문구를 실은 줄 · 문구를 실은 제목 줄이나 제목 바로 아래 첫 줄의 절) · `AI/*guidelines` 경로 · 레이어 사슬. 계약이 읽지 않는다고 적은 절만 건너뛰고 새 절은 읽는다. GPT 스킬 구조 규칙(두 절 이하)은 돌리지 않는다
 
 ### 팩 현황
-팩이 있는 스킬은 architect · challenger · drift · fixer · guardian · planner · reviewer 일곱이다(`references/domain-ios.md`). fz-searcher 는 탐색 전용이라 팩이 없다.
+팩이 있는 스킬은 architect · challenger · drift · guardian · planner · reviewer 여섯이다(`references/domain-ios.md`).
 
 ### 암묵 호출 정책
-`gpt-skills/*/agents/openai.yaml` 의 `policy.allow_implicit_invocation` 은 fz-reviewer 만 `true` 이고 나머지 7개는 `false` 다. 프롬프트가 없는 review 모드 호출(`gpt-exec.sh review`)에서 CLI 가 암묵으로 고를 수 있는 fz 스킬이 fz-reviewer 하나가 된다. 나머지 스킬은 래퍼(`--inject-skill`)가 본문을 프롬프트에 넣어서만 쓴다(`modules/cross-validation.md` 호출 계약).
+`gpt-skills/*/agents/openai.yaml` 의 `policy.allow_implicit_invocation` 은 fz-reviewer 만 `true` 이고 나머지 5개는 `false` 다. 프롬프트가 없는 review 모드 호출(`gpt-exec.sh review`)에서 CLI 가 암묵으로 고를 수 있는 fz 스킬이 fz-reviewer 하나가 된다. 나머지 스킬은 래퍼(`--inject-skill`)가 본문을 프롬프트에 넣어서만 쓴다(`modules/cross-validation.md` 호출 계약).
 
 ## 설계 원칙
 

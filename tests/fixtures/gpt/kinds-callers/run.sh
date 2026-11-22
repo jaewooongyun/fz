@@ -8,6 +8,9 @@
 #                         ② 사본에 배선 없는 선언(final ← '/fz-pr 전')을 심으면 FAIL — unwired claim
 #                         ③ 사본의 fz-commit 에 선언 없는 실제 호출(gpt-call.sh peer-da)을 심으면 FAIL
 #                         ④ '명시 호출' 줄은 배선으로 세지 않는다(같은 호출을 그 표시와 함께 심으면 OK)
+#   pipeline-chain-declared  /fz 파이프라인 체인(modules/pipelines.md `| 체인 | fz-gpt <kind> |`)도 배선이다. 사본에 심으면 FAIL:
+#                         ① §16 체인을 비격리 plan 으로 되돌림 — plan 의 callers 가 §16 을 들지 않는다
+#                         ② independent-plan callers 에서 §16 표지를 뺌 ③ plan callers 에 §16 표지를 다시 넣음 — 그 절 체인은 plan 을 부르지 않는다
 #   challenger-roundtrip  두 칸(compiler_verifiable · ruleSource)을 issues · challenges 에 담은 응답이 통과하고
 #                         값이 그대로 남는다 · null 도 통과 · ruleSource 'bogus' 는 거부(exit 1)
 # 출력: 셀마다 `<셀>: PASS|FAIL <이유>` · 끝에 `kinds-callers: PASS|FAIL`
@@ -78,6 +81,57 @@ try:
 finally:
     shutil.rmtree(d, ignore_errors=True)
 case("table-equals-grep", not problems, "; ".join(problems))
+
+# ── pipeline-chain-declared ─────────────────────────────────────────
+PLAN_PARALLEL = "/fz plan-parallel (modules/pipelines.md §16)"
+CHAIN_ISO, CHAIN_PLAIN = "| 체인 | fz-gpt independent-plan |", "| 체인 | fz-gpt plan |"
+
+
+def seeded(edit_pipe=False, edit_reg=None):
+    """사본 하나에 결함 하나를 심고 `callers` 를 돌린다 → (rc, 출력) · 심을 자리가 없으면 (None, 사유)."""
+    d = sandbox()
+    try:
+        pipe = os.path.join(d, "modules", "pipelines.md")
+        reg_p = os.path.join(d, "scripts", "gpt-kinds.json")
+        if edit_pipe:
+            text = open(pipe, encoding="utf-8").read()
+            if text.count(CHAIN_ISO) != 1:
+                return None, f"modules/pipelines.md has {text.count(CHAIN_ISO)} '{CHAIN_ISO}' rows (seed target missing)"
+            open(pipe, "w", encoding="utf-8").write(text.replace(CHAIN_ISO, CHAIN_PLAIN))
+        if edit_reg:
+            reg = json.load(open(reg_p, encoding="utf-8"))
+            why = edit_reg(reg["kinds"])
+            if why:
+                return None, why
+            json.dump(reg, open(reg_p, "w", encoding="utf-8"), ensure_ascii=False)
+        return callers(d)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def drop_ip_label(kinds):
+    c = kinds.get("independent-plan", {}).get("callers") or []
+    if PLAN_PARALLEL not in c:
+        return f"independent-plan callers have no '{PLAN_PARALLEL}' (seed target missing)"
+    kinds["independent-plan"]["callers"] = [x for x in c if x != PLAN_PARALLEL]
+
+
+def add_plan_label(kinds):
+    if "plan" not in kinds or PLAN_PARALLEL in (kinds["plan"].get("callers") or []):
+        return f"registry has no kind 'plan', or its callers already carry '{PLAN_PARALLEL}' (seed target missing)"
+    kinds["plan"]["callers"] = list(kinds["plan"].get("callers") or []) + [PLAN_PARALLEL]
+
+
+problems = []
+for name, kw, want in (("chain back to plan", {"edit_pipe": True}, "kind plan: modules/pipelines.md §16 chains it"),
+                       ("independent-plan label dropped", {"edit_reg": drop_ip_label}, "kind independent-plan: modules/pipelines.md §16 chains it"),
+                       ("plan label put back", {"edit_reg": add_plan_label}, f"kind plan: declared caller '{PLAN_PARALLEL}' cites modules/pipelines.md §16")):
+    rc, out = seeded(**kw)
+    if rc is None:
+        problems.append(f"{name}: {out}")
+    elif rc == 0 or want not in out:
+        problems.append(f"{name}: not caught (rc={rc})")
+case("pipeline-chain-declared", not problems, "; ".join(problems))
 
 # ── challenger-roundtrip ────────────────────────────────────────────
 VAL = os.path.join(ROOT, "scripts", "validate-gpt-output.py")

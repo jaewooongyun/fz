@@ -11,6 +11,8 @@
 #          stale 이면 --stale-exit 값과 **정확한 목록**(`  stale: <이름>` 줄의 이름 집합), 정리 뒤 exit 0 · 목록 0,
 #          전후 트리 해시 동일 · 스킬 폴더가 없으면 만들지 않는다 · 비소유 링크와 설치 루트가 다른 소유 GPT 링크는 목록에 없다
 #          ⛔ 기준 트리는 --check 를 모르는 옵션으로 exit 1 한다 — stale exit 1 과 종료 코드로는 구별되지 않아 목록 단언이 판별한다
+#       ⑨ 셀 check-removed-role-skill — 이전 판 설치의 마이그레이션: 이 판이 걷은(이 판 gpt-skills 에 없는) 역할 스킬을 가리키는
+#          링크(구버전 캐시의 살아 있는 링크 · 이 루트의 끊긴 링크)를 --check 가 stale 로 내고, 정리가 지우고, 정리 뒤 --check 는 0 이다
 # ⛔ 실제 사용자 폴더를 건드리지 않는다 — HOME·FZ_SKILL_TARGET 은 임시 폴더, CODEX_HOME 은 비운다.
 # ⛔ FZ_SETUP_UNDER_TEST 로 다른 판(기준 트리)의 스크립트를 같은 러너로 돌린다 — 판별력 대조용.
 #    이때 기대값은 **그 스크립트의** 플러그인 루트 기준이다.
@@ -189,6 +191,23 @@ done
 [ -f "$AG/my-role.toml" ] && [ ! -L "$AG/my-role.toml" ] && ok "실제 역할 파일 보존" || no "실제 역할 파일이 바뀌었다"
 abefore="$(ls -l "$AG" | tail -n +2)"; runa 2; aafter="$(ls -l "$AG" | tail -n +2)"
 [ "$abefore" = "$aafter" ] && ok "--gpt-agents 재실행 멱등" || no "--gpt-agents 재실행이 상태를 바꿨다"
+
+# ⑨ check-removed-role-skill — 이 판이 걷은 역할 스킬을 가리키는 옛 링크만 든 홈(위 셀들과 섞이지 않게 따로 둔다).
+#    구버전 캐시가 아직 남아 링크가 살아 있는 fz-retired-live 와 이 루트에서 폴더가 사라져 끊긴 fz-retired-gone 둘 다 stale 이다.
+#    살아 있는 쪽은 prune ③ 이 없는 판(걷은 스킬 판정 없음)에서 다른 판 링크로 보여 목록에 없고 지워지지도 않아 이 셀이 실패한다
+MH="$T/migrate-home"; MT="$MH/skills"; mkdir -p "$MT" "$OLD/gpt-skills/fz-retired-live"
+echo x > "$OLD/gpt-skills/fz-retired-live/SKILL.md"
+ln -s "$OLD/gpt-skills/fz-retired-live" "$MT/fz-retired-live"   # 구버전 캐시 — 살아 있다
+ln -s "$P/gpt-skills/fz-retired-gone" "$MT/fz-retired-gone"     # 이 루트 — 걷은 스킬이라 끊겼다
+H0="$H" TG0="$TG"; H="$MH" TG="$MT"                             # run · runc 를 이 홈에 돌린다
+runc m0; rcm0=$?; run m1; rcm1=$?; runc m2; rcm2=$?
+H="$H0" TG="$TG0"
+want_m="$(printf '%s\n' fz-retired-gone fz-retired-live | LC_ALL=C sort)"; got_m="$(stale_set "$T/out.m0")"
+pruned_m="$(sed -n 's/^  prune: \([^ ]*\) .*/\1/p' "$T/out.m1" | LC_ALL=C sort)"; left_m="$(stale_set "$T/out.m2")"
+[ "$rcm0" -eq "$STALE_EXIT" ] && [ "$got_m" = "$want_m" ] && [ "$rcm1" -eq 0 ] && [ "$pruned_m" = "$want_m" ] \
+  && [ ! -L "$MT/fz-retired-live" ] && [ ! -L "$MT/fz-retired-gone" ] && [ "$rcm2" -eq 0 ] && [ -z "$left_m" ] \
+  && ok "check-removed-role-skill: 걷은 역할 스킬 링크(구버전 캐시 · 끊긴 현 루트) --check exit $rcm0 · 목록 2 · 정리가 지우고 정리 뒤 0" \
+  || no "check-removed-role-skill: --check exit $rcm0(기대 $STALE_EXIT) · 목록 [$(words "$got_m")] 기대 [$(words "$want_m")] · setup exit $rcm1 · 지운 목록 [$(words "$pruned_m")] · 정리 뒤 exit $rcm2 · 남은 목록 [$(words "$left_m")]"
 
 echo
 [ "$fail" -eq 0 ] && echo "setup-links: 전건 통과" || echo "setup-links: 실패 있음"

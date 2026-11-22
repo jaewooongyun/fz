@@ -33,8 +33,9 @@ usage:
                                            the generated blocks in skills/fz-gpt/SKILL.md (kind count · roles · kinds)
   gpt_kinds.py --self-test
 
-exit: 0 ok · 10 usage (unknown kind, missing / unknown / forbidden input, experimental kind without --experimental,
-      bad audit) · 11 registry or dependency failure (unreadable registry, missing schema, internal error).
+exit: 0 ok · 10 usage (unknown kind, removed kind — the message names the kind to use instead (registry removed_kinds),
+      missing / unknown / forbidden input, experimental kind without --experimental, bad audit) · 11 registry or dependency
+      failure (unreadable registry, missing schema, internal error).
       ⛔ never 1 or 2 — those mean something else elsewhere in fz (XE-02).
 """
 import ast
@@ -164,6 +165,9 @@ def resolve(kind, tokens, env=None, cwd=None, root=ROOT, reg=None):
     reg = load() if reg is None else reg
     k = reg["kinds"].get(kind)
     if not isinstance(k, dict):
+        gone = (reg.get("removed_kinds") or {}).get(kind)
+        if isinstance(gone, dict) and gone.get("use"):   # a caller written for an older version — say what replaced it
+            raise Usage(f"kind '{kind}' was removed — use '{gone['use']}' instead ({gone.get('why') or 'scripts/gpt-kinds.json removed_kinds'})")
         raise Usage(f"unknown kind: '{kind}' (known: {', '.join(sorted(reg['kinds']))})")
     launcher = k.get("launcher")
     if launcher not in LAUNCHERS or k.get("mode") not in LAUNCHERS[launcher][1]:
@@ -814,10 +818,14 @@ def table(root=ROOT, write=False):
 # A caller label in the registry is a claim ("/fz-pr 전" runs final). Two directions are checked:
 #   undeclared — a skill step really calls the kind (front door or /fz-gpt) but the registry does not name that skill;
 #   unwired    — a declared label names a skill or module whose text (one hop through the modules it cites) never names the kind.
+# /fz pipeline chains are wiring too (modules/pipelines.md `### N.` section · `| 체인 | fz-gpt <kind> |` row): a kind a section
+#   chains cites that section in a caller label (`modules/pipelines.md §N`), and a label citing §N belongs to a kind §N chains.
 # fz-gpt itself documents every kind for explicit use, so its own pages are recipes, not callers. A line that says
 # "명시 호출" documents how a user calls a kind by hand (e.g. "commit/pr 전 → gpt check 는 명시 호출 전용") — not wiring.
 CALLER_TOKEN = re.compile(r"(/fz(?:-[a-z]+)*)(?![\w-])|(modules/[\w.-]+\.md)")
 EXPLICIT_ONLY = "명시 호출"
+PIPELINES = "modules/pipelines.md"
+PIPE_CITE = re.compile(re.escape(PIPELINES) + r"\s*§(\d+)")
 
 
 def _strict(kind):
@@ -846,6 +854,18 @@ def callers_scan(root=ROOT, reg=None):
     return {n: sorted(s for s, t in texts.items() if _strict(n).search(t)) for n in reg["kinds"]}
 
 
+def pipeline_chains(root=ROOT):
+    """-> {section number: {kind, ...}} — the kinds each `| 체인 |` row of modules/pipelines.md runs after `fz-gpt`."""
+    p, out, sec = os.path.join(root, PIPELINES), {}, None
+    for line in _read(p).split("\n") if os.path.isfile(p) else []:
+        m = re.match(r"###\s+(\d+)\.\s", line)
+        if m:
+            sec = m.group(1)
+        elif sec and line.startswith("| 체인 |"):
+            out.setdefault(sec, set()).update(re.findall(r"fz-gpt\s+([a-z][a-z0-9-]*)", line))
+    return out
+
+
 def check_callers(reg, root=ROOT):
     problems, real = [], callers_scan(root, reg)
     for n, k in reg["kinds"].items():
@@ -869,6 +889,18 @@ def check_callers(reg, root=ROOT):
         for s in real[n]:
             if s not in declared_skills:
                 problems.append(f"kind {n}: skills/{s} calls it but the registry callers do not name /{s}")
+    chains = pipeline_chains(root)
+    for n, k in reg["kinds"].items():
+        cites = {}
+        for label in k.get("callers") or []:
+            for sec in PIPE_CITE.findall(label):
+                cites.setdefault(sec, label)
+        for sec, ks in sorted(chains.items()):
+            if n in ks and sec not in cites:
+                problems.append(f"kind {n}: {PIPELINES} §{sec} chains it but the registry callers do not cite that section")
+        for sec, label in sorted(cites.items()):
+            if n not in chains.get(sec, set()):
+                problems.append(f"kind {n}: declared caller '{label}' cites {PIPELINES} §{sec}, whose chain does not run it")
     return problems
 
 

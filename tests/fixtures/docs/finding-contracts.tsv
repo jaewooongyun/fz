@@ -158,7 +158,6 @@ F-101	templates/check-catalog-review.md	has	| F-101 | 미이행을 결함으로 
 F-574	templates/check-catalog-review.md	has	| F-574 | severity 를 도달성으로 매길 때 — 배포 대상 전체(지원하는 최소 OS 부터 최신까지 · 지원 기기)에서 닿는가로 판정했는가
 F-574	agents/review-counter.md	has	| F-574 | 부동소수 → 정수 변환 앞에 유한성(무한 · NaN) · 범위 가드가 있는가
 F-574	gpt-skills/fz-reviewer/references/domain-ios.md	has	may be called several times in one pass with `.zero`, `.infinity` and `.unspecified` (`nil`) proposals
-F-574	gpt-skills/fz-fixer/references/domain-ios.md	has	**Floating-point → `Int` in layout math**: `Int(_:)` traps on `.infinity`, `.nan` or an out-of-range value
 F-134	modules/plugin-refs.md	has	| `withAnimation`, `.animation(`, `.transition(`, `Animatable`, `animatableData` | SwiftUI Expert | animation-basics, animation-transitions, animation-advanced |
 F-038	skills/fz-peer-review/SKILL.md	lacks	× 0.6
 F-038	skills/fz-peer-review/SKILL.md	lacks	× 0.7

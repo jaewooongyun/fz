@@ -144,8 +144,6 @@ RECIPES = {
     "verify": ("verify", GC_CALL + 'verify --cd "$GIT_ROOT" --out "$K/verify.json" --prompt-file "$K/p.txt"\n', REVIEW_OK, None),
     "verify-gates": ("verify-gates", GC_CALL + 'verify-gates --cd "$GIT_ROOT" --out "$K/gv.json" --prompt-file "$K/prompt.txt"\n', None, None),
     "validate": ("validate", GC_CALL + 'validate --cd "$GIT_ROOT" --out "$K/val.json" --prompt-file "$K/p.txt"\n', None, None),
-    "search": ("search", GC_CALL + 'search --cd "$GIT_ROOT" --out "$K/search.md" --prompt-file "$K/p.txt"\n', None, None),
-    "fix-suggest": ("fix-suggest", GC_CALL + 'fix-suggest --cd "$GIT_ROOT" --out "$K/fix.md" --prompt-file "$K/p.txt"\n', None, None),
     "final": ("final", GC_CALL + 'final --cd "$GIT_ROOT" --out "$K/final.md" --base main --title "[TICKET] PR 전 최종 리뷰"\n'
               + GC_CALL + 'final-deep --cd "$GIT_ROOT" --out "$K/final-deep.md" --prompt-file "$K/p_deep.txt" --session-file "$K/final.md.session"\n', None, None),
     "final-da": ("final-da", GC_CALL + 'final-da --cd "$GIT_ROOT" --out "$K/da.json" --prompt-file "$K/p.txt"\n', None, None),
@@ -154,7 +152,6 @@ RECIPES = {
     "plan": ("plan", GC_CALL + 'plan --cd "$GIT_ROOT" --out "$K/plan.md" --prompt-file "$K/p.txt"\n', None, None),
     "peer-challenger": ("peer-challenger", GC_CALL + 'peer-challenger --cd "$K" --out "$K/gpt-challenger-result.json" --prompt-file "$K/gpt-challenger-prompt.txt"\n', None, None),
     "modernize-verify": ("modernize-verify", 'mkdir -p "$K/verify"\n' + GC_CALL + 'modernize-verify --cd "$K" --out "$K/verify/gpt-verify-v1-result.json" --prompt-file "$K/verify-prompt.txt"\n', REVIEW_OK, None),
-    "openai-docs": ("openai-docs", GC_CALL + 'openai-docs --cd "$K" --out "$K/docs.md" --prompt-file "$K/p.txt"\n', None, None),
     "verify-cross": ("verify-cross", GC_CALL + 'verify-cross --audit "$K/audit.json" --cd "$GIT_ROOT" --out "$K/cross.json" --prompt-file "$K/p_verify.txt" --prompt-out "$K/p_cross.txt"\n', REVIEW_OK, None),
     "micro-eval": ("micro-eval", GC_CALL + 'micro-eval --cd "$GIT_ROOT" --out "$K/micro.md" --prompt-file "$K/p.txt"\n', None, None),
     "sprint-contract": ("sprint-contract", GC_CALL + 'sprint-contract --cd "$GIT_ROOT" --out "$K/sc.yaml" --prompt-file "$K/task.txt"\n', None, None),
