@@ -57,6 +57,7 @@ metadata:
 | 모듈 | 용도 |
 |------|------|
 | modules/build.md | 빌드 검증 |
+| modules/gates.md | 버그 수정 변이 셀 정본 — § 원장 운용 규율 3 (Step 4) |
 | modules/execution-modes.md | LOOP 실행 모드 |
 | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
 | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
@@ -179,6 +180,7 @@ metadata:
 
 수정이 재현 경로(Step 1a)에서 문제를 해결했는지 확인:
 - `mcp__plugin_fz_serena__find_referencing_symbols` → 참조 무결성 확인
+- **변이 셀** (수정 hunk 가 있는 Step 만 — 비용 상한): 수정의 핵심 호출을 지운(되돌린) 사본에서 이 수정을 검증한 같은 테스트 · 검사를 다시 돌려 FAIL 하는지 한 번 잰다 — 통과하면 그 검사는 수정을 보지 않는다(떼어 낸 판정 함수만 부르는 테스트는 본체를 지워도 통과한다). 처방은 fz-code 6.4 와 같다 — 정본 근거 `modules/gates.md` § 원장 운용 규율 3(F-447 · F-705)
 - GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다
   - `run` · `config` → `/fz-gpt check` 호출 → cross-model 검증. verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
   - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.md` § GPT 미사용) / `ask` → 모델 질문 → `set` → 다시 decide

@@ -388,6 +388,15 @@ F-544	skills/fz-rebase/SKILL.md	has	Bash(git range-diff *)
 F-471	skills/fz-gpt/SKILL.md	lacks	plan 독립재작성
 F-471	skills/fz-gpt/references/test-spec.md	lacks	독립 재작성
 F-470	modules/gpt-strategy.md	has	## Sandbox Permissions
+# F-624 — fz-plan 2.7 의 --requirement 자리표시는 파일이다(정문 · 런처가 값을 파일 경로로 읽는다 — 여러 줄 본문을 넘기면 정문이 exit 10)
+F-624	skills/fz-plan/SKILL.md	has:replace	independent-plan --requirement {요구 원문 파일}
+F-624	skills/fz-plan/SKILL.md	lacks	--requirement {요구 원문}
+# F-705 — 버그 수정 변이 셀 처방은 버그 수정 경로 둘(fz-fix Step 4 · fz-code 6.4)과 정본(modules/gates.md)에 다 있다 — 한쪽에만 든 의무는 다른 쪽에서 재발한다
+F-705	skills/fz-fix/SKILL.md	has	**변이 셀** (수정 hunk 가 있는 Step 만 — 비용 상한): 수정의 핵심 호출을 지운(되돌린) 사본에서
+F-705	skills/fz-fix/SKILL.md	has	처방은 fz-code 6.4 와 같다 — 정본 근거 `modules/gates.md` § 원장 운용 규율 3
+F-705	skills/fz-fix/SKILL.md	has	| modules/gates.md | 버그 수정 변이 셀 정본
+F-705	skills/fz-code/SKILL.md	has	버그 수정 Step 이면 **변이 셀**: 수정의 핵심 호출을 지운(되돌린) 사본에서 그 Step 테스트가 FAIL 하는지 한 번 잰다
+F-705	modules/gates.md	has	**버그 수정 Step 은 변이 셀을 갖는다**
 # F-622 — VerifySpec 선택 칸 pin 은 두 워크플로 스키마와 원장 변환 문서에 다 있다(한 워크플로에만 있으면 롤백 경로에서 pin 이 조용히 빠진다)
 F-622	workflows/plan-lean2.js	has	pin: { type: 'array', items: { type: 'string' },
 F-622	workflows/plan-collaborative.js	has	pin: { type: 'array', items: { type: 'string' },

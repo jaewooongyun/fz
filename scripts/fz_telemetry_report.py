@@ -847,8 +847,14 @@ def count_judgments(stage, result):
 
 
 # ── 3. fz-findings frontmatter ──────────────────────────────────────────────
+OWNER_DEFAULT = "plugin"   # 머리말 owner 가 없는 엔트리의 귀속(레지스트리 README §4 — 없으면 플러그인 귀속)
+
+
 def collect_findings(findings_dir, since, until, ledger_path=None):
-    """`---` 블록에서 date·detector·stage·status·gap_type·harness_verdict 만 읽는다.
+    """`---` 블록에서 date·detector·stage·status·gap_type·harness_verdict·owner 만 읽는다.
+
+    owner 는 대기열 스냅샷을 귀속별로 나눌 때만 쓴다(`backlog["owner"]` — 없으면 OWNER_DEFAULT · 합 = backlog n).
+    ⛔ 재발 간선 · 뿌리 · 트랙 D 후보(failure_class)는 owner 와 무관하게 센다 — 귀속이 달라도 같은 재발이다.
 
     ⛔ harness_verdict 는 **읽기만** 한다. 없으면 detector 로 추정:
        user→missed · self→caught · 그 외→external. 추정치는 표에 `(추정)` 로 표기한다.
@@ -868,7 +874,8 @@ def collect_findings(findings_dir, since, until, ledger_path=None):
         "axis": collections.Counter(),
         # 대기열 스냅샷 — 기간 창과 무관하게 entries 전체(미반영 재고). 나이는 until 기준.
         "backlog": {"n": 0, "weighted": 0, "axis": collections.Counter(), "axis_age60": collections.Counter(),
-                    "age": collections.Counter(), "recurs_edges": 0, "recurs_roots": collections.Counter()},
+                    "age": collections.Counter(), "recurs_edges": 0, "recurs_roots": collections.Counter(),
+                    "owner": collections.Counter()},   # 귀속별 대기 — 값은 건수만(합 = n)
         "enumeration_error": None,
     }
     names = []
@@ -899,6 +906,7 @@ def collect_findings(findings_dir, since, until, ledger_path=None):
         axis = str(meta.get("axis") or "-")
         backlog = out["backlog"]
         backlog["n"] += 1
+        backlog["owner"][str(meta.get("owner") or OWNER_DEFAULT)] += 1
         bundle = str(meta.get("bundle_size") or "")
         backlog["weighted"] += int(bundle) if bundle.isdigit() else 1
         backlog["axis"][axis] += 1
@@ -1822,6 +1830,10 @@ def render_markdown(payload):
     lines.append("")
     lines.append("대기 %d건(묶음 가중 %d) · 나이 " % (backlog["n"], backlog["weighted"])
                  + " · ".join("%s %d" % (k, age.get(k, 0)) for k in ("<30", "30-59", "60+", "(date 없음)")))
+    owners = backlog.get("owner") or {}
+    lines.append("귀속(`owner` · 없으면 %s): " % OWNER_DEFAULT
+                 + (" · ".join("%s %d" % kv for kv in sorted(owners.items(), key=lambda kv: (kv[0] != OWNER_DEFAULT, -kv[1], kv[0]))) or "-")
+                 + " — 합 %d = 대기 %d" % (sum(owners.values()), backlog["n"]))
     lines.append("")
     lines.append("| axis | 대기 | 60일+ | 배출 |")
     lines.append("|---|---|---|---|")
@@ -2068,7 +2080,7 @@ def _write_selftest_tree(base):
                      "axis: tool\nrecurs_of: F-001\nbundle_size: 3\n---\n\n# F-002\n")
     # 측정 필드(2026-10-29) — 창 밖 엔트리 1(스냅샷에만) · 주석 섞인 값 · archive 2 · APPLIED 세 형식
     with open(os.path.join(findings_dir, "F-003-z.md"), "w") as handle:
-        handle.write("---\nid: F-003\ndate: 2026-06-01\nstatus: open\nclass: hole            # hole | miss\n  ---\naxis: review\n---\n\n# F-003\n")
+        handle.write("---\nid: F-003\ndate: 2026-06-01\nstatus: open\nclass: hole            # hole | miss\n  ---\naxis: review\nowner: wave-kit\n---\n\n# F-003\n")
     archive = os.path.join(base, ".archive")
     os.makedirs(archive, exist_ok=True)
     with open(os.path.join(archive, "F-090-gone.md"), "w") as handle:
@@ -2307,6 +2319,8 @@ def self_test():
     check("묶음 가중(1+3+1)", backlog["weighted"], 5)
     check("60일+ 와 그 axis", (backlog["age"]["60+"], backlog["axis_age60"]["review"]), (1, 1))
     check("재발 간선 · 뿌리", (backlog["recurs_edges"], backlog["recurs_roots"]["F-001"]), (1, 1))
+    check("d1-owner-split — 대기열 귀속별(owner 없음 = plugin · 합 = 대기)", (dict(backlog["owner"]), sum(backlog["owner"].values())),
+          ({OWNER_DEFAULT: 2, "wave-kit": 1}, backlog["n"]))
     check("archive axis(없으면 -)", (outflow["archived"], outflow["axis"]["works"], outflow["axis"]["-"]), (2, 1, 1))
     check("APPLIED 세 형식 처리 값(4열 applied 포함)", dict(outflow["kind"]), {"applied": 2, "closes": 1, "works": 1})
     check("창 안 처리 값 · 날짜 없는 행", (dict(outflow["kind_in_window"]), outflow["undated_rows"]), ({"applied": 2, "works": 1}, 1))
@@ -2375,6 +2389,7 @@ def self_test():
           (True, 1, True))
     check("단가 미등록 경고 줄", "단가 미등록 모델: claude-unknown-9×2" in md, True)
     check("단가 미등록 없으면 경고 줄 없음", "단가 미등록 모델" in render_markdown(payload), False)
+    check("d1-owner-split-rendered — 대기열 스냅샷에 귀속 줄", "귀속(`owner` · 없으면 plugin): plugin 2 · wave-kit 1 — 합 3 = 대기 3" in md, True)
     check("JSON 왕복 — 분모", payload["denominators"]["assistant_messages"], 1)
     check("JSON 왕복 — 실행 기록 n · unreadable · open", (payload["runs"]["n"], payload["runs"]["unreadable"], payload["runs"]["open"]), (2, 2, 2))
     check("JSON 왕복 — harness(칸 없는 실행 기록 = Gate 0 · findings None)",
@@ -2428,6 +2443,18 @@ def self_test():
               ([("F-108", False), ("F-109", False)], False))
         check("track-d-count-rule-unchanged", sorted((c["class"], c["days"]) for c in tdd["candidates"]),
               [("live-c", 2), ("reg-a", 2), ("unreg-b", 2)])
+        # D1 — owner 를 단 판과 지운 판: 귀속 칸만 다르고 트랙 D 후보(failure_class · 관측일 · 구성원) · 재발 간선 · 뿌리는 같다
+        def cut(o):
+            return (sorted((c["class"], c["days"], sorted(m["id"] for m in c["members"])) for c in o["track_d"]["candidates"]),
+                    o["backlog"]["recurs_edges"], dict(o["backlog"]["recurs_roots"]), o["backlog"]["n"])
+        span = (parse_day("2026-09-01"), parse_day("2026-11-01"))
+        bare = collect_findings(ent, *span)
+        put("entries", "F-107", "2026-10-05", "chain-x", "recurs_of: F-101\nowner: wave-kit\n")
+        put("entries", "F-102", "2026-10-02", "reg-a", "owner: wave-kit\n")
+        owned = collect_findings(ent, *span)
+        check("d1-owner-split-keeps-recurrence — owner 는 귀속 칸만 바꾼다(트랙 D 후보 · 재발 계수 불변 · 합 = 대기)",
+              (cut(owned) == cut(bare), dict(bare["backlog"]["owner"]), dict(owned["backlog"]["owner"])),
+              (True, {OWNER_DEFAULT: 9}, {OWNER_DEFAULT: 7, "wave-kit": 2}))
 
     # F-148 — 도달 경로 열 · auto 가 아닌 경로의 0 은 미사용 판정 불가
     with tempfile.TemporaryDirectory() as t:
