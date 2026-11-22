@@ -458,6 +458,71 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
 - 관측 #3: **F-026 재관측** (2026-10-19 — 비-0 분모 계열)
 - ✅ 2026-11-09(round 2): 절차 6 처방 교체 완료 — `modules/cross-validation.md` § Coverage Gate 6항(실패 모드가 다른 조달원 · 독립 N 과 `Σ부분=전체` · 못 구하면 커버리지 미검증 — ①②③ 포함)
 
+
+> D-4 ~ D-23 — 2026-11-23 Wave 4 S6 등재. 작성 세션 = 엔트리 경로가 처음 나오는 transcript(관측일은 세션 수가 아니다).
+
+### D-4: known-pitfall-recurred-despite-note
+- 관측 #1~#7: F-610 · F-612 · F-647 · F-649 · F-654 · F-673 · F-727
+- 분리 자식(관측 아님 · open): F-734 · F-735 · F-736 · F-737 · 작성 세션 c305d1cf(6) · 96fbd609(F-727) · 별개 세션 충족 2 · fixture 없음 · 외부 채점 예정 S7 · 차단 fixture · 채점 — **승격 진행 — Wave 4 S7**
+
+### D-5: count-tool-domain-narrower-than-target
+- 관측 #1·#2: F-611 · F-726
+- 작성 세션 c305d1cf · 96fbd609 · 별개 세션 충족 2 · fixture 없음 · 외부 채점 예정 S7 · 차단 fixture · 채점 — **승격 진행 — Wave 4 S7**
+
+### D-6: declared-artifact-never-executed
+- F-040 · F-470 · F-598 · 작성 세션 08-25 · d5ede45a · 11-12 감사 · 별개 세션 충족 ≥2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-7: strength-or-exclusion-judgment-unverified
+- F-517 · F-643 · F-683 · 작성 세션 11-02 PR 리뷰 · 6e57d57d · 미확인 · 별개 세션 충족 ≥2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-8: approval-question-names-decision-not-what-it-removes
+- F-648 · F-655 · F-658 · 작성 세션 c305d1cf · 별개 세션 미달 1 · fixture 0 · 외부 채점 0 · 차단 세션 · fixture · 채점
+
+### D-9: cumulative-check-only-run-on-the-increment-so-drift-surfaces-at-the-final-long-run
+- F-668 · F-672 · F-698 · 작성 세션 c305d1cf · F-698 미확인 · 별개 세션 미확인 · fixture 0 · 외부 채점 0 · 차단 세션 확인 · fixture · 채점
+
+### D-10: decision-measured-on-some-input-classes-only
+- F-721 · F-723 · 작성 세션 미확인 둘 · 별개 세션 미확인 · fixture 0 · 외부 채점 0 · 차단 세션 확인 · fixture · 채점
+
+### D-11: decision-scope-narrowed-at-implementation
+- F-577 · F-661 · 작성 세션 11-10(c305d1cf 전) · c305d1cf · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-12: declared-inventory-diverges-from-producers
+- F-481 · F-677 · 작성 세션 d5ede45a · 11-18 · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-13: design-proposal-without-removal-history-check
+- F-043 · F-492 · F-495 · F-502 · 작성 세션 08-25 · d5ede45a · 별개 세션 충족 2 · fixture 있음(`removal_history.py --self-test`) · 외부 채점 없음 · 구현 확인 장치 `scripts/removal_history.py`(그 줄을 지운 커밋) · `agents/plan-edge-case.md` 카탈로그 F-043 행 · 차단 채점
+
+### D-14: diagnostic-cause-inferred-not-measured
+- F-087 · F-680 · 작성 세션 08-28 · c305d1cf · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-15: fix-verified-without-positive-control
+- F-369 · F-496 · 작성 세션 10-07 · d5ede45a · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 구현 확인(문서) `modules/cross-validation.md` § Negative-Result Gate positive control · `modules/gates.md` § 원장 운용 규율 3 · 차단 fixture · 채점
+
+### D-16: parser-built-on-synthetic-format
+- F-321 · F-498 · 작성 세션 09-26 · d5ede45a · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-17: plan-gate-prose-promises-what-command-never-checks
+- F-245 · F-294 · 작성 세션 09-15 · 09-25 · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-18: plan-premise-inferred-not-remeasured
+- F-185 · F-500 · F-503 · 작성 세션 09-10 · d5ede45a · 별개 세션 충족 2 · fixture 있음(`tests/fixtures/plan-integrity/doc` 셀 r3-f185) · 외부 채점 없음 · 구현 확인(경고) `plan_integrity_check.py` unverified_claims · 차단 채점
+
+### D-19: probe-input-assumed-equal-to-authored-prompt
+- F-660 · F-682 · F-730 · 작성 세션 c305d1cf(F-660 · F-682) · 96fbd609(F-730) · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-20: replacement-without-feature-parity-scan
+- F-126 · F-415 · 작성 세션 09-03 · 10-09 · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-21: verification-tool-first-run-without-smoke
+- F-689 · F-713 · 작성 세션 미확인 둘(11-19 · 11-20) · 별개 세션 미확인 · fixture 0 · 외부 채점 0 · 차단 세션 확인 · fixture · 채점
+
+### D-22: recall-by-name-without-reading-current-body
+- F-632 · F-728 · 작성 세션 ec067eeb · 96fbd609 · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
+### D-23: cross-model-check-anchored-on-claude-artifact
+- F-508 · F-729 · 작성 세션 d5ede45a · 96fbd609 · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
+
 ### OBS-02 잔여 항목 처분 (2026-09-01)
 
 30건 감사의 잔여분이다. ⛔ **조사를 더 하지 않는다는 기록이지 결함이 사라졌다는 기록이 아니다.**
@@ -599,3 +664,29 @@ eligible session 없이 3개월 경과 시:
 - 해당 P1/P2 항목 재평가
 - 사용자 문의 → DEFERRED 또는 REMOVED
 - DEFERRED는 6개월 후 재평가. REMOVED는 제안 폐기.
+
+#### T-old 재평가 (Wave 4)
+
+측정일: 2026-11-23 · 기한 = 기록일 + 3개월 · 처분(DEFERRED / REMOVED)은 사용자 결정 — 미구현은 DEFERRED 권장
+
+| id | 기한 | 상태 | 근거 |
+|---|---|---|---|
+| F-014 | 2026-11-13 | 미구현 | 4-I 수량 주석 대조 없음('수량 주장' 0 · '4-I' 9) · F-173 행 일부 겹침 |
+| F-018 | 2026-11-14 | 미구현 | Negative-Report Gate 0 · 'Negative-Result' 36 |
+| F-048 | 2026-11-25 | 예정 | |
+| F-049 | 2026-11-26 | 예정 | |
+| F-062 | 2026-11-26 | 예정 | |
+| F-083 | 2026-11-28 | 예정 | |
+| F-086 | 2026-11-28 | 예정 | |
+| F-105 | 2026-12-01 | 예정 | |
+| F-113 | 2026-12-01 | 예정 | |
+| F-131 | 2026-12-04 | 예정 | |
+| F-132 | 2026-12-04 | 예정 | |
+| F-137 | 2026-12-06 | 예정 | |
+| F-153 | 2026-12-07 | 예정 | |
+| F-154 | 2026-12-07 | 예정 | |
+| F-172 | 2026-12-10 | 예정 | |
+| F-196 | 2026-12-11 | 예정 | |
+| F-276 | 2026-12-06 | 예정 | |
+| F-304 | 2026-12-25 | 예정 | |
+| F-352 | 2026-12-30 | 예정 | |
