@@ -22,7 +22,7 @@ claude plugin install fz --marketplace jaewooongyun/fz   # Claude Code 2.1.292+ 
 claude plugin marketplace add jaewooongyun/fz   # 최초 1회
 claude plugin install fz
 claude plugin install fz-compact@fz-orchestrator  # 선택. bg 세션 로컬 마스킹 압축, 기본 꺼짐
-claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 생략 · ad-hoc 에이전트를 훅으로 막고, 설정한 보호 경로 아래 Bash 를 묻는다
+claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 생략을 훅으로 막고 ad-hoc 에이전트를 알리며, 설정한 보호 경로 아래 Bash 를 묻는다
 
 claude
 > /fz "안녕"                                     # 응답하면 정상

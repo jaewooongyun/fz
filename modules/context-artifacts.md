@@ -122,7 +122,7 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 
 ## Compact Recovery Protocol
 
-1. WORK_DIR 를 찾는다 — 인자 · 브랜치의 티켓, 없으면 `Glob("**/{TICKET_PREFIX}-*/index.md")` · `Glob("**/NOTASK-*/index.md")`. 후보가 여럿이면(NOTASK 폴더는 날마다 하나 · 티켓 폴더 여럿) Active Phase 가 끝나지 않은 폴더 가운데 `index.md` 를 가장 최근에 고친 것을 고르고, 그래도 하나로 좁혀지지 않으면 사용자에게 묻는다
+1. WORK_DIR 를 찾는다 — 인자 · 브랜치의 티켓, 없으면 `Glob("**/{TICKET_PREFIX}-*/index.md")` · `Glob("**/NOTASK-*/index.md")`. 후보가 여럿이면(같은 날 NOTASK 폴더가 여럿이면 접미 이름으로 가른다 · 티켓 폴더 여럿) Active Phase 가 끝나지 않은 폴더 가운데 `index.md` 를 가장 최근에 고친 것을 고르고, 그래도 하나로 좁혀지지 않으면 사용자에게 묻는다
 2. `{WORK_DIR}/index.md` 읽기 → `## Essential Context` 섹션으로 상세 복원
 3. Active Phase의 최신 아티팩트 로드
 4. 상위 Phase 핵심 산출물 로드 (discover→discover-journal.md Current State, plan→plan-final.md)
@@ -330,7 +330,7 @@ discover-{phase}.md (DISCOVER_TAG=plan|code|review): APPEND + topic header
 3. 패턴 없으면:
    a. 브랜치명에서 [A-Z]{2,6}-\d{2,5} 추출 시도 → 있으면 2번과 동일
    b. 없으면 → AskUserQuestion: "이 작업의 산출물을 파일로 저장할까요?"
-      - 예 → {CWD}/NOTASK-{YYYYMMDD}/ 폴더 생성 + index.md + WORK_DIR 설정
+      - 예 → {CWD}/NOTASK-{YYYYMMDD}/ 폴더 생성 + index.md + WORK_DIR 설정(같은 날 다른 작업이면 `NOTASK-{YYYYMMDD}-{짧은 이름}`)
       - 아니오 → 저장 없이 진행(이어받기 없음) — 선택지에 "이 세션 밖으로 계획 · 탐색을 넘기지 못한다" 를 적는다
 ```
 

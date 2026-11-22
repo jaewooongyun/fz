@@ -28,7 +28,8 @@
 #   scope   function-scope-guard-hook-agree — 같은 이름 함수 면제의 셸 범위 표(치환 · 서브셸 · 파이프라인 칸 · `&` 목록 안 정의는 밖 호출에
 #           닿지 않고, 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&` 명령은 앞 정의를 물려받는다 · 면제를 주는 정의는 목록 첫 명령 · 묶음 안
 #           정의뿐이고 `&&` · `||` 뒤 · if · 루프 안 정의는 조건이 참이어도 면제하지 않는다 — 과차단 고정)와 함수 본문 안 호출의 정의 순서
-#           표(이름과 무관하게 본문보다 앞의 정의만 함수)를 가드 bash_write 와 훅 _bash_write_targets 에 함께 돌려 기대값 · 두 판정의 일치를 본다
+#           표(이름과 무관하게 본문보다 앞의 정의만 함수) · 재귀 함수의 본문 안 자기 호출 행(unset · command 꼴은 외부 명령)을 가드 bash_write 와
+#           훅 _bash_write_targets 에 함께 돌려 기대값 · 두 판정의 일치를 본다
 #   grid    body-def-grid — 함수 본문 안 이름(쓰기 명령 표 안 · 쓰기 옵션을 든 읽기 명령 · 읽기 표 밖) × 같은 이름 정의 자리(본문 앞 · 본문 뒤
 #           호출 앞 · 호출 뒤 · 없음) × 감싼 함수 호출 꼴 × 경유를 실제 bash 의 대상 바이트 변화와 가드 · 훅 판정에 견준다 — 놓침 0 · 불일치 0 ·
 #           과차단 = 본문 → 정의 → 호출 칸 전부
@@ -404,7 +405,9 @@ try:
                     "f() { helper build; }; f; helper() { :; }",
                     "f() { sed -i '' s/a/b/ build; }; f; sed() { :; }",
                     "f() { python3 -c x build; }; f; python3() { :; }",
-                    "f() { unlink build; }; f; unlink() { :; }"]
+                    "f() { unlink build; }; f; unlink() { :; }",
+                    # 자기를 부르는 함수 — 본문 안 맨 이름 자기 호출은 함수지만 본문 쓰기는 쓰기 · 명령에 unset 이 있거나 command 로 부르면 외부 명령이다
+                    "f() { rm -rf build; f; }; f", "f() { unset -f f; f build; }; f x", "f() { command f build; }; f x"]
     scope_reads = ["rm() { :; }; rm -rf build",
                    "rm() { :; }; (rm -rf build)",
                    'rm() { :; }; echo "$(rm -rf build)"',
@@ -425,7 +428,9 @@ try:
                    "tee() { :; }; echo x | tee -a build",
                    # 본문보다 앞에 정의된 같은 이름 함수는 본문 안 호출도 면제한다(쓰기 명령 · 그 밖 이름)
                    "rm() { :; }; f() { rm -rf build; }; f",
-                   "helper() { :; }; f() { helper build; }; f"]
+                   "helper() { :; }; f() { helper build; }; f",
+                   # 본문이 읽기만인 재귀 함수 — 본문 안 자기 호출은 그 함수가 불릴 때만 돌고 그때 이름은 그 함수다(unset 없음)
+                   'f() { grep -r foo build; [ -n "$1" ] && f; }; f x']
     with Cell("function-scope-guard-hook-agree") as c:
         rows = [(cmd, True) for cmd in scope_writes] + [(cmd, False) for cmd in scope_reads]
         got = judge_pair([cmd for cmd, _ in rows] + [cmd.replace("build", "gates/plan.md") for cmd, _ in rows], c.env)
@@ -442,7 +447,7 @@ try:
     #    `f | cat` · `true && f`) × 경유(직접 · f 가 h 를 거쳐 부름). 칸마다 실제 bash 로 대상 바이트 변화를 재고 가드 bash_write · 훅
     #    _bash_write_targets 판정과 견준다 — 실제 bash 가 쓰는 칸 = 호출 뒤 정의 · 정의 없음 · 가드 놓침 0 · 훅 놓침 0 · 두 판정 불일치 0 ·
     #    과차단(쓰지 않는데 쓰기) = 본문 → 정의 → 호출 칸 전부이고 그 밖에는 없다.
-    #    만들지 않는 것: PATH · hash · alias 로 바뀌는 이름 풀이 · 호출 사이 재정의 · unset -f · eval 정의 · export -f · 재귀
+    #    만들지 않는 것: PATH · hash · alias 로 바뀌는 이름 풀이 · 호출 사이 재정의 · unset -f · eval 정의 · export -f
     grid_names = [("rm", "rm -f gates/plan.md"), ("cp", "cp src.txt gates/plan.md"),
                   ("sort", "sort -o gates/plan.md gates/plan.md"), ("awk", "awk 'BEGIN { printf \"x\" > \"gates/plan.md\" }'"),
                   ("find", "find gates -name plan.md -delete"),
@@ -503,7 +508,8 @@ try:
     #    _bash_write_targets 판정과 견준다 — 실제 bash 가 쓰는 칸 = 정의 갈래가 돌지 않은 갈래 밖 호출 · 가드 놓침 0 · 훅 놓침 0 · 두 판정
     #    불일치 0 · 과차단(쓰지 않는데 쓰기) = 조건 자리(`&&` · `||` 뒤 · if · 루프 안) ∧ (정의 갈래가 돈다 ∨ 같은 갈래 안 호출 — 갈래가 돌지
     #    않으면 그 호출도 돌지 않는다) 칸 전부이고 그 밖에는 없다.
-    #    만들지 않는 것: case 갈래 · function 키워드 꼴(토크나이저 Unknown — 이미 쓰기) · eval · source · alias 로 만든 정의 · 실행 중 값으로
+    #    만들지 않는 것: case 갈래(가드는 if 갈래로 펴 같은 규칙 · 훅은 Unknown) · function 키워드 꼴(토크나이저 Unknown — 이미 쓰기) · eval · source ·
+    #    alias 로 만든 정의 · 실행 중 값으로
     #    갈리는 조건 · break · continue · exit 로 갈리는 루프 · select · coproc · zsh 의미 · 호출돼야 생기는 본문 안 정의
     cond_names = [("touch", "touch gates/plan.md", None), ("rm", "rm -f gates/plan.md", b"b\na\n"),
                   ("tee", "echo x | tee -a gates/plan.md", b"b\na\n"), ("mkdir", "mkdir gates/plan.md", None),
