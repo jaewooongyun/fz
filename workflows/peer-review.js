@@ -43,7 +43,7 @@
 
 export const meta = {
   name: 'peer-review',
-  description: 'fz-peer-review Tier2/3 Analyze — arch/quality/correctness 3-병렬 → (deep) arch↔quality 교차 + counter DA. 3 or 6-call',
+  description: 'fz-peer-review 내부 — fz-peer-review 스킬이 인자를 준비해 부른다. 직접 실행하지 않는다',
 }
 
 // 팀원 PR 리뷰 이슈 스키마 (fz-peer-review 출력 계약 — SKILL.md:267 + arch-critic/code-auditor)
@@ -186,7 +186,7 @@ const CounterSchema = {
 const OVERRIDE =
   '[Workflow 모드 오버라이드] P2P 통신 없음. ' +
   '에이전트 정의의 Phase 절차·티켓 폴더(WORK_DIR)·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
-  '이 프롬프트의 [리뷰 대상]/[변경 의도]/[증거]만이 과제의 전부다. ' +
+  '이 프롬프트의 [리뷰 대상]/[변경 의도]/[증거]가 이 콜의 과제 범위다 — 앞에 실린 사용자 요청은 이 콜을 부른 배경이다. 범위 밖 일은 하지 않고, 요청과 과제가 어긋나 보이면 반환의 자유 텍스트 칸에 그 사실을 적는다. ' +
   '무관한 작업 폴더(티켓 폴더·토픽 폴더 등)를 읽지 말 것. 파일 접근은 이 프롬프트가 나열한 경로만. ' +
   '원본 동작이 필요하면 [증거]의 base 경로를 Read (Lead가 prefetch함 — SendMessage로 요청하지 말 것). ' +
   '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력을 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. 실행 제안 금지: git 상태변경(commit/push 등)·raw GPT CLI 호출은 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +

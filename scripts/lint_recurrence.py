@@ -14,7 +14,7 @@
 | count-mismatch | "**N개 …**" 머리말 바로 아래 표의 행 수가 N 이 아니다 | F-479 |
 | catalog-required | 점검 카탈로그(templates/check-catalog-*.md)가 있어야 할 경로에 없다 — Workflow 워커 · GPT 역할 스킬은 공용 블록 · light Lead 는 템플릿 Read 지시 | F-005 외 PROMPT 15 |
 | audit-wiring | 워크플로 호출 지시(`Workflow({ scriptPath …`)가 적힌 스킬 · 모듈 · 가이드에 워커 심볼 도구 점검 줄(`--mcp-audit` 이 든 줄 — 직접 호출 `--direct` 줄은 세지 않는다)이 없다 | 점검이 호출 지시 파일 11개 중 1개에만 있었다 — 새 스킬이 빠뜨리지 않게 |
-| stack-skill-channel | `## 스택 스킬` 절이 있는 스킬의 그 절에 소비 경로 낱말(`스택 스킬 요구 사항` · `스택 스킬은 Lead 판단용`)이 정확히 하나가 아니다 · 워커에게 가는 통로가 있는 스킬(구현 · 수정 · 계획 · 리뷰)이 앞의 것이 아니다 | 스택 스킬을 Lead 만 읽고 코드를 쓰는 워커는 모르는 일을 막는다 |
+| stack-skill-channel | `## 스택 스킬` 절이 있는 스킬의 그 절에 소비 경로 낱말(`스택 스킬 요구 사항` · `스택 스킬은 Lead 판단용`)이 정확히 하나가 아니다 · 워커에게 가는 통로가 있는 스킬(구현 · 수정 · 계획 · 리뷰 · 접근 탐색)이 앞의 것이 아니다 | 스택 스킬을 Lead 만 읽고 코드를 쓰는 워커는 모르는 일을 막는다 |
 | symbol-tools-block | frontmatter `tools:` 에 Serena 심볼 도구(`find_symbol` · `find_referencing_symbols` · `get_symbols_overview`)가 있는 에이전트에 `## Symbol tools` 절(그 제목 줄부터 다음 `## ` 제목 전까지)이 정확히 하나가 아니다 · 그 절이 에이전트끼리 · `templates/agent-template.md` 와 글자가 다르다 · 그 도구가 없는 에이전트에 절이 있다 | 같은 절의 사본이 에이전트 13개와 템플릿에 있는데 저장소 안에서 같음을 지키는 검사가 없었다 |
 
 ⛔ 미실행은 PASS 가 아니다 — 검사 대상이 0개면 그 lint 는 UNRUN 이고 전체도 PASS 가 아니다.
@@ -55,7 +55,7 @@ WF_CALL = re.compile(r"Workflow\(\{ *scriptPath")   # 워크플로 호출 지시
 WIRING_DOCS = ("skills/*/SKILL.md", "modules/*.md", "guides/*.md")
 STACK_HEAD = re.compile(r"^## 스택 스킬.*$", re.M)
 STACK_WORKER, STACK_LEAD = "스택 스킬 요구 사항", "스택 스킬은 Lead 판단용"   # 소비 경로 두 낱말 — 워커 전달 · Lead 판단용
-STACK_WORKER_SKILLS = ("fz-code", "fz-fix", "fz-plan", "fz-review")   # 워커에게 가는 기존 통로(Step 맥락 · 알려진 제약 · 의도 맥락)가 있는 스킬
+STACK_WORKER_SKILLS = ("fz-code", "fz-discover", "fz-fix", "fz-plan", "fz-review")   # 워커에게 가는 기존 통로(Step 맥락 · 알려진 제약 · 의도 맥락)가 있는 스킬
 SYMBOL_HEAD = "## Symbol tools"   # 심볼 도구 공통 절의 제목 줄 머리 — 절은 이 줄부터 다음 `## ` 제목 전까지다
 SYMBOL_TOOL_RE = re.compile(r"(?:(?<![\w-])|(?<=__))(?:find_symbol|find_referencing_symbols|get_symbols_overview)(?![\w-])")   # 맨 이름 · 서버 접두(`…__find_symbol`)
 AGENT_TEMPLATE = "templates/agent-template.md"
@@ -368,9 +368,11 @@ def self_test():
         "stack-skill-channel": {"skills/fz-plan/SKILL.md": "## 스택 스킬\n부른 뒤 Lead 가 읽는다\n"},   # 둘 다 없음
         "symbol-tools-block": {"agents/sym-b.md": sym_agent("mcp__plugin_fz_serena__get_symbols_overview", sym.replace("before Grep", "after Grep"))},
     }
-    # stack-skill-channel 의 나머지 꼴 — 절에 두 낱말이 다 있음 · 워커 통로가 있는 스킬인데 Lead 판단용(절 밖의 낱말은 세지 않는다)
+    # stack-skill-channel 의 나머지 꼴 — 절에 두 낱말이 다 있음 · 워커 통로가 있는 스킬인데 Lead 판단용(절 밖의 낱말은 세지 않는다 ·
+    #   접근 탐색도 알려진 제약 인자로 워커에게 간다)
     stack_more = {"both": {"skills/fz-review/SKILL.md": f"## 스택 스킬\n{STACK_WORKER} · {STACK_LEAD}\n"},
-                  "lead-on-worker-skill": {"skills/fz-fix/SKILL.md": f"## 스택 스킬\n{STACK_LEAD}\n## 다른 절\n{STACK_WORKER}\n"}}
+                  "lead-on-worker-skill": {"skills/fz-fix/SKILL.md": f"## 스택 스킬\n{STACK_LEAD}\n## 다른 절\n{STACK_WORKER}\n"},
+                  "lead-on-discover": {"skills/fz-discover/SKILL.md": f"## 스택 스킬\n{STACK_LEAD}\n"}}
     # symbol-tools-block 의 실패 꼴 — 절 없음 · 절 둘 · 에이전트끼리 다름 · 템플릿과 다름 · 도구 없는 에이전트에 절. 셀마다 그 파일 이름이 위반 줄에 있어야 한다
     symbol_more = {"missing": ("agents/sym-b.md", {"agents/sym-b.md": sym_agent("mcp__plugin_fz_serena__find_referencing_symbols", "")}),
                    "duplicate": ("agents/sym-a.md", {"agents/sym-a.md": sym_agent("mcp__plugin_fz_serena__find_symbol", sym + sym)}),

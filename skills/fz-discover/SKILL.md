@@ -65,7 +65,7 @@ metadata:
 ## 스택 스킬 (있으면 쓴다 · 없어도 진행)
 
 > 상태 줄(선택 도구 상태)의 `스택 스킬` 에 적힌 스킬이 지금 탐색하는 코드의 언어 · 프레임워크를 다루면, 그 코드를 다루기 전에 Skill 도구로 한 번 부른다. `없음` 이면 건너뛴다(막지 않는다).
-> 워커에는 Skill 도구가 없다 — `스택 스킬은 Lead 판단용` 이다. 부른 결과는 Lead 의 판단에만 쓰고 워커에게 넘기지 않는다(접근 탐색 워크플로는 알려진 제약을 첫 경로 생성 단계에만 싣는다 — 넘겨도 뒤 단계 워커는 읽지 못한다).
+> 워커에는 Skill 도구가 없다 — full 모드에서는 부른 뒤 `스택 스킬 요구 사항`(그 스킬이 이 변경에 요구하는 것 몇 줄 · 출처 스킬 이름과 함께)을 워커에게 가는 기존 통로에 싣는다: 알려진 제약 인자(`constraintsKnown` — 실행 절차 2 의 args 에 한 항목 · 접근 탐색 워크플로가 모든 단계 프롬프트에 싣는다).
 > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
 
 ## 팀 에이전트 모드 (Workflow 오케스트레이션 — pilot)
@@ -80,7 +80,7 @@ metadata:
 
 1. **codeContext 선행 기록**: 심볼 탐색 산출 요약을 `{WORK_DIR}/discover/code-context.md`로 기록 (대형 입력은 파일 경로 전달 — §12)
 1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" discover --complexity {점수} --estimate discover-adversarial` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 2~4 를 건너뛰고 SOLO 탐색으로 간다 · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
-2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록 / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다)
+2. **args 조립**: `problem`=사용자 요구사항 원문 / `codeContextPath`=요약 파일 절대 경로 / `constraintsKnown`=Phase 1 수집 제약 목록(스택 스킬을 불렀으면 그 요구 사항 한 항목 포함 — 위 `## 스택 스킬`) / `deep`=--deep 플래그 (ts 불요 — wall-clock은 Lead 측정, args 고정 시 resume 캐시 적중) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다)
 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js && cmp -s {플러그인 루트}/workflows/discover-adversarial.js {WORK_DIR}/discover-adversarial.js` 가 exit 0 일 때만 아래를 부른다 — 비0 이면 L4(⛔ 원본 직접 호출·SOLO 아님)
 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-authoring.md` §12 우회 계약
    - default: lean 5-call — 경로생성(opus) → 비용평가(sonnet) → R2 추가경로 → R2 비용 → 합성(opus). TEAM 2-agent 비용 동급대

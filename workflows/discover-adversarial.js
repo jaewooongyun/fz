@@ -21,7 +21,7 @@
 
 export const meta = {
   name: 'discover-adversarial',
-  description: 'fz-discover 비대화 다라운드 탐색 — lean 5-call(default) / 렌즈 fan-out(--deep). 결론 미산출, Landscape Map 반환',
+  description: 'fz-discover 내부 — fz-discover 스킬이 인자를 준비해 부른다. 직접 실행하지 않는다',
 }
 
 // ── 스키마 (루트 전부 object — schema 강제) ──
@@ -108,7 +108,7 @@ const MergedPathSetSchema = {
 const OVERRIDE =
   '[Workflow 모드 오버라이드] P2P 통신 없음. ' +
   '에이전트 정의의 Phase 절차·티켓 폴더(WORK_DIR)·이전 세션·메모리 컨텍스트 로딩도 적용하지 않는다 — ' +
-  '이 프롬프트의 [문제]/[코드 컨텍스트]/[기지 제약]만이 과제의 전부다. ' +
+  '이 프롬프트의 [문제]/[코드 컨텍스트]/[기지 제약]이 이 콜의 과제 범위다 — 앞에 실린 사용자 요청은 이 콜을 부른 배경이다. 범위 밖 일은 하지 않고, 요청과 과제가 어긋나 보이면 반환의 자유 텍스트 칸에 그 사실을 적는다. ' +
   '무관한 작업 폴더(티켓 폴더·토픽 폴더 등)를 읽지 말 것. 파일 탐색은 [코드 컨텍스트]가 지시한 범위만. ' +
   '보고하는 모든 주장은 이 세션의 도구 결과 또는 프롬프트가 제공한 입력 데이터를 근거로 지목할 수 있어야 한다. [verified:] 태그는 해당 출력/입력을 확인한 경우에만. 외부 모델 판정 인용 시 원문 그대로 + [외부: name] 태그 — 재포장·재수치화 금지. 실행 제안 금지: git 상태변경(commit/push 등)·raw GPT CLI 호출은 직접 명령으로 제안하지 말고 사용자/스킬 경유로만 안내한다. ' +
   '최종 텍스트가 반환값. 멀티턴 없음 — 1-shot raw data. ⛔ advisor 도 호출하지 않는다(스톨 시 런타임이 6회 반복해 시간을 태우고, 비용이 워크플로 계측 밖으로 샌다). 출력은 schema 준수 JSON.'
@@ -138,7 +138,7 @@ async function callAgent(prompt, opts) {
 function evalCostThunk(pathBundle, lensLabel) {
   return () => callAgent(
     `${OVERRIDE}\n[역할] 비용/리스크 평가자(review-arch 렌즈)\n` +
-    `[경로] ${JSON.stringify(pathBundle)}\n` +
+    `[경로] ${JSON.stringify(pathBundle)}${KNOWN_CTX}\n` +
     `[채점축] 각 경로 cost/risk(low/mid/high) + 조건 불변성(locked/unlocked) 1회 판정 + 근거 코드 인용(evidence) + 확신도(confidence). ` +
     `부수지 말고 비용을 밝힌다.`,
     { label: `cost:${lensLabel}`, agentType: 'fz:arch-lens', model: 'sonnet', effort: EFFORT, schema: CostRiskSchema })
@@ -161,7 +161,7 @@ async function runLean() {
 
   phase('Round 2: 추가 경로 + 조건 도전')
   const r2paths = await callAgent(
-    `${OVERRIDE}\n[역할] 경로 생성자\n[기존 경로+비용] ${JSON.stringify({ r1paths, r1cost })}\n` +
+    `${OVERRIDE}\n[역할] 경로 생성자\n[기존 경로+비용] ${JSON.stringify({ r1paths, r1cost })}${KNOWN_CTX}\n` +
     `[목표] unlocked(🔓) 조건을 무시한 새 경로 탐색 + 기존 경로 조건 업데이트.`,
     { label: 'r2-paths', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: PathSetSchema })
   const r2cost = r2paths ? await evalCostThunk(r2paths.paths, 'r2')() : null
@@ -199,7 +199,7 @@ async function runDeep() {
   // merge = opus agent 언어 지시 (해석 필요 작업 — skill-authoring §11 분류. 기계적 유사도 판정 금지)
   phase('Round 1.5 (deep): 렌즈 경로 병합')
   const merged = await callAgent(
-    `${OVERRIDE}\n[역할] 경로 병합자\n[렌즈별 경로] ${JSON.stringify(lensResults)}\n` +
+    `${OVERRIDE}\n[역할] 경로 병합자\n[렌즈별 경로] ${JSON.stringify(lensResults)}${KNOWN_CTX}\n` +
     `[목표] 본질이 같은 경로는 병합하되 mergedFrom에 출처 렌즈 표기. 어떤 경로도 제거하지 말 것 — ` +
     `병합은 표기이지 탈락이 아니다. 진짜 다른 축만 분리 유지(REP 규칙 2).`,
     { label: 'merge', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: MergedPathSetSchema })
@@ -239,7 +239,7 @@ async function synth(allPaths, allCost, roundsCompleted) {
   phase('합성: Landscape Map')
   const map = await callAgent(
     `${OVERRIDE}\n[역할] Landscape 통합자\n[경로] ${JSON.stringify(allPaths)}\n` +
-    `[비용/조건] ${JSON.stringify(allCost)}\n` +
+    `[비용/조건] ${JSON.stringify(allCost)}${KNOWN_CTX}\n` +
     `[목표] Trade-off Table + Open Questions 3개 이상. 병합 경로는 mergedFrom 유지. ` +
     `결론을 내리지 말 것 — 경로 선택은 plan의 몫.`,
     { label: 'landscape', agentType: 'fz:plan-structure', model: 'opus', effort: EFFORT, schema: LandscapeSchema })
@@ -268,4 +268,8 @@ if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(EFFORT)) {
   fallbackCount += 1
   return { mode: 'fallback', reason: `args invalid: effort=${JSON.stringify(input.effort)}`, metrics: metrics() }
 }
+// 알려진 제약(Lead 가 부른 스택 스킬의 요구 사항 포함 — skills/fz-discover/SKILL.md § 스택 스킬)은 첫 경로 생성(r1-paths · 렌즈)의 기존 줄에 더해
+//   그 뒤 단계(비용 평가 · 둘째 경로 · 병합 · 합성)에도 이것으로 싣는다. 한 항목 이상일 때만(빈 배열 · 미전달 · 배열 아님 → '' → 프롬프트 무변화 —
+//   plan-collaborative 의 KNOWN_CTX 와 같다). fail-fast 뒤에 둔다 — input 이 null 이면 위에서 이미 돌아갔다
+const KNOWN_CTX = Array.isArray(input.constraintsKnown) && input.constraintsKnown.length ? `\n[기지 제약] ${JSON.stringify(input.constraintsKnown)}` : ''
 return input.deep ? await runDeep() : await runLean()
