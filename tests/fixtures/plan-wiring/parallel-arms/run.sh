@@ -2,7 +2,8 @@
 # modes: --capture caller=manual last-pass=7b89bd4 result=출력 == verify-default.golden.json(2026-11-05 배선 감사)
 # fz-plan 배선 러너 (S23) — `--gpt-independent` 경로의 순서 · Phase 2 resume 교차 · 기본 verify 불변을 본다.
 #
-# ① 순서 — 독립 플랜 기동(gpt_independent.sh plan) < Workflow 호출 < 합치기(plan_divergence.py)
+# ① 순서 — 독립 플랜 기동(gpt_independent.sh plan) < Workflow 호출 < 합치기(plan_divergence.py) · `### 실행 절차 (Lead)` 블록 안에서 잰다
+#    (기본 경로인 light 절이 개요 바로 뒤에 있어 합치기 토큰을 먼저 담는다 — 그 절은 ④ 가 본다)
 # ② Phase 2 절에 resume 교차(resume --session-file)와 병렬 계약 네 토큰이 있다(check_wf_text --section-has)
 # ③ 기본 verify 불변 — core 모듈 § verify 의 bash 블록을 고정 입력 · 가짜 CLI 로 **실제로 돌려** CLI 인자(프롬프트 포함)를
 #    verify-default.golden.json 과 바이트 단위로 대조한다.
@@ -54,11 +55,19 @@ if [ "${1:-}" = "--capture" ]; then capture "$2"; exit $?; fi
 fail=0
 ok() { echo "PASS  $1"; }
 no() { echo "FAIL  $1"; fail=1; }
-first() { /usr/bin/grep -nF -- "$2" "$R/$1" 2>/dev/null | head -1 | cut -d: -f1; }
 P=skills/fz-plan/SKILL.md
 
-# ① 순서
-a="$(first "$P" 'gpt-call.sh independent-plan')"; b="$(first "$P" "Workflow({ scriptPath: '{2.5에서 정한 경로}'")"; c="$(first "$P" 'plan_divergence.py')"
+# ① 순서 — 실행 절차 (Lead) 블록([s, e) 줄)의 첫 등장만 센다. 블록이 없으면 s=0 이라 세 값이 비어 FAIL 이다
+read -r s e < <(python3 - "$R/$P" <<'PY'
+import re, sys
+L = open(sys.argv[1], encoding="utf-8").read().split("\n")
+s = next((i for i, l in enumerate(L, 1) if re.match(r"^### 실행 절차 \(Lead\)\s*$", l)), 0)
+e = next((i for i, l in enumerate(L, 1) if i > s and re.match(r"^#{2,3} ", l)), len(L) + 1) if s else 0
+print(s, e)
+PY
+)
+first_in() { /usr/bin/grep -nF -- "$2" "$R/$1" 2>/dev/null | cut -d: -f1 | awk -v s="$s" -v e="$e" '$1 > s && $1 < e { print; exit }'; }
+a="$(first_in "$P" 'gpt-call.sh independent-plan')"; b="$(first_in "$P" "Workflow({ scriptPath: '{2.5에서 정한 경로}'")"; c="$(first_in "$P" 'plan_divergence.py')"
 if [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ "$a" -lt "$b" ] && [ "$b" -lt "$c" ]; then
   ok "$P: 독립 플랜 기동($a) < Workflow($b) < 합치기($c)"
 else
@@ -79,11 +88,11 @@ else
   no "기본 verify: CLI 인자가 golden 과 다르다 — $(diff <(printf '%s\n' "$got") "$HERE/verify-default.golden.json" | head -4 | tr '\n' ' ')"
 fi
 
-# ④ light 문구 — light 절(`### light 모드` ~ 다음 제목)을 뽑아 본다
+# ④ light 문구 — light 절(`## light 모드` · `### light 모드` ~ 다음 제목)을 뽑아 본다
 light="$(python3 - "$R/$P" <<'PY'
 import re, sys
 t = open(sys.argv[1], encoding="utf-8").read()
-m = re.search(r"^### light 모드.*?(?=^#{2,3} )", t, re.S | re.M)
+m = re.search(r"^#{2,3} light 모드.*?(?=^#{2,3} )", t, re.S | re.M)
 print(m.group(0) if m else "")
 PY
 )"

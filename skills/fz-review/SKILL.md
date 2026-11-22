@@ -2,7 +2,7 @@
 name: fz-review
 description: >-
   자기 코드 3중 검증(Claude+GPT+셋째 검증) + 역방향 검증.
-  예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR →fz-peer-review, 직접 수정 →fz-fix)
+  예: 리뷰해줘, 검증해줘, 품질 확인, 괜찮아?, 내 코드 봐줘 (비사용: 팀원 PR → 사용자가 /fz-peer-review 로 직접 실행, 직접 수정 →fz-fix)
 user-invocable: true
 argument-hint: "[리뷰 대상 설명] [light|full] [--render] [--gpt-independent]"
 allowed-tools: >-
@@ -47,6 +47,17 @@ metadata:
 /fz-review "GPT 피드백 반영, 재검증" /fz-review "Gate 5 통과 확인해줘"
 ```
 
+## light 모드 (기본 경로 — 모드 게이트 `modules/mode-gate.md`)
+
+진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+- review-live 를 띄우지 않고 Phase 5 Lead 3중 검증 · Phase 5.5 역방향 검증 · Reflection Rate 를 그대로 한다 — GPT 단계는 full 과 같다(끈 세션이면 `[GPT 미사용]`) · 산출물도 full 과 같다
+- ⊕ `--gpt-independent` 면 실행 절차 2.5 를 Workflow 없이 그대로 background 로 띄운다(`locatedFindings` 는 없다). 4.5 병합의 `--claude` 는 Lead 발견을 `{WORK_DIR}/review/lead-findings.json` 으로 쓴 파일이다(형식 · `line_range` · evidence 인용 규칙 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4) · 검증 2 기본 GPT review 는 부르지 않는다(병합이 대신한다)
+- 셋째 검증(검증 3)도 full 과 같다 — 경로 판정 · 두 표지 · sc 가 없을 때의 새 컨텍스트 에이전트가 그대로다(sc 가 없다고 건너뛰지 않는다)
+- ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
+- 점검 카탈로그: `templates/check-catalog-review.md` 를 Read 해 리뷰 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 리뷰 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <review 산출물> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-review.md"` 로 잰다
+- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
+- compact 뒤 절차가 보이지 않으면 이 SKILL.md 를 다시 Read 한다
+
 ## Prerequisites
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
@@ -84,9 +95,9 @@ metadata:
 ### 실행 절차 (Lead)
 
 > ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 · 2)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 참조 무결성 확인 · L3 에이전트)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 첫 패스(2.5)는 백그라운드 한 줄이라 그대로 직전에 둔다(S22). 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
-1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). **대형 diff는 args가 아닌 파일 경로 전달** (§12) · ⛔ 기록 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_review_diff.py" --diff {WORK_DIR}/review/diff.patch --repo {GIT_ROOT} --work-dir {WORK_DIR}` — exit 1 이면 `MISSING` 신규 파일을 덧붙이고 다시 돈다(F-270: 신규 파일을 빠뜨려 변경의 60% 가 리뷰 밖에 있었다) · exit 2 는 대조 불가(통과 아님)
+1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). 작업 폴더가 없으면 diff 는 임시 폴더(`mktemp -d`)의 `diff.patch` 에 쓰고, 그 절대 경로를 이 단계 · 1.5 · 검증 3 브리프의 diff 경로로 그대로 쓴다. **대형 diff는 args가 아닌 파일 경로 전달** (§12) · ⛔ 기록 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_review_diff.py" --diff {WORK_DIR}/review/diff.patch --repo {GIT_ROOT} --work-dir {WORK_DIR}` — exit 1 이면 `MISSING` 신규 파일을 덧붙이고 다시 돈다(F-270: 신규 파일을 빠뜨려 변경의 60% 가 리뷰 밖에 있었다) · exit 2 는 대조 불가(통과 아님)
 1.2. **이동 후보 표시**: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_moved_code.py" {BASE} WORKTREE --repo {GIT_ROOT}`(리뷰 대상이 커밋 범위면 `WORKTREE` 대신 그 끝 커밋) — `MOVE-CANDIDATE` 파일은 신규 코드로 읽기 전에 BASE 의 출처를 본다(F-078 · 신규성 판정은 사람)
-1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 2~4.5 를 건너뛰고 Phase 5 Lead 3중 검증으로 간다(아래 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
+1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 2~4.5 를 건너뛰고(⊕ `--gpt-independent` 면 2.5 는 그대로 띄우고 4.5 는 Lead 발견 JSON 으로 병합한다) Phase 5 Lead 3중 검증으로 간다(위 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드(스택 스킬을 불렀으면 그 요구 사항 — 위 `## 스택 스킬`) (기존 Intent Context 계약 승계 — ⛔ `plan-final.md` 등에서 온 자기 설계 판단 · 위험 추정은 넣지 않는다: 렌즈가 내 판단을 확인만 하게 된다 · F-042) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
    - ⊕ (`judgmentSlots` · 기본 off — 이 워크플로의 옵션 묶음은 S25 판정 전까지 off) `judgmentSlots: true` 면 렌즈가 재지 않은 전제 · 한정 문구 · 동적 축 질문 답을 낸다 — 반환 `unverifiedPremises` 를 Phase 5 판정 입력으로 읽고, finding `limits` 가 있으면 그 지적은 suggestion 까지다(peer-review 병합기와 같은 규칙 · F-448 · F-178)
@@ -230,7 +241,7 @@ fz-gpt가 수행하는 작업:
 경로는 함수 하나가 정한다 — Lead 의 스킬 목록에서 `sc:` 로 시작하는 이름들을 넘긴다(하나도 없으면 빈 값 `""`): `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" --third-path --skills "<sc: 이름, …>"`. 판정 기준은 `modules/tool-status.md` 의 `sc 목록✓` 와 같다. 작업 폴더 기록을 읽지 않으므로 상태를 화면에만 알린 실행도 같은 판정이다. `undetermined`(exit 3)는 목록을 넘기지 않은 것이다 — 목록을 넣어 다시 부른다.
 
 - `sc-analyze` → `/sc:sc-analyze` 로 코드 품질, 보안, 성능, 아키텍처를 종합 분석한다. 결과에 `[셋째 검증: sc-analyze]`
-- `fresh-context` → 읽기 전용 새 컨텍스트 에이전트 1회로 대신한다: `Agent(subagent_type="fz:search-pattern", model="opus")` — 그 정의의 기본 모델은 sonnet 이라 모델을 적는다. 브리프에 보안 · 성능 · 자원 점검표(입력 검증 · 비밀 노출 · 권한 경계 / 반복 안의 비싼 호출 · 불필요한 복사 / 닫지 않은 자원 · 해제 누락 · 끝나지 않는 대기)와 변경 파일 목록 · diff 파일 경로(실행 절차 1 의 `{WORK_DIR}/review/diff.patch`)를 싣는다 — 그 정의에는 Bash 가 없다. "파일 수정 금지 — 발견만 보고" 를 적고, 앞 검증(1 · 2)의 결과는 주지 않는다. 결과에 `[셋째 검증: fresh-context]` — 같은 모델 계열이라 독립 검증이 아니라 각도를 더한 것이다. GPT 불능 분기의 `fz:review-correctness` 와 다른 정의라 GPT 도 sc 도 없을 때 같은 정의가 두 번 돌지 않는다
+- `fresh-context` → 읽기 전용 새 컨텍스트 에이전트 1회로 대신한다: `Agent(subagent_type="fz:search-pattern", model="opus")` — 그 정의의 기본 모델은 sonnet 이라 모델을 적는다. 브리프에 보안 · 성능 · 자원 점검표(입력 검증 · 비밀 노출 · 권한 경계 / 반복 안의 비싼 호출 · 불필요한 복사 / 닫지 않은 자원 · 해제 누락 · 끝나지 않는 대기)와 변경 파일 목록 · diff 파일 경로(실행 절차 1 의 `{WORK_DIR}/review/diff.patch` — 작업 폴더가 없으면 실행 절차 1 의 임시 경로)를 싣는다 — 그 정의에는 Bash 가 없다. "파일 수정 금지 — 발견만 보고" 를 적고, 앞 검증(1 · 2)의 결과는 주지 않는다. 결과에 `[셋째 검증: fresh-context]` — 같은 모델 계열이라 독립 검증이 아니라 각도를 더한 것이다. GPT 불능 분기의 `fz:review-correctness` 와 다른 정의라 GPT 도 sc 도 없을 때 같은 정의가 두 번 돌지 않는다
 - 에이전트도 띄우지 못하면 `[검증 불능 — 사유]` 로 적고 사용자에게 알린다(셋째 검증을 마친 것으로 적지 않는다)
 - GPT 를 끈 세션(`[GPT 미사용]` — 실행 실패와 다른 길)에서도 이 검증은 돈다
 
@@ -431,15 +442,6 @@ Gate 5 통과 후:
 
 **Will**: 3중 검증(Claude+GPT+셋째 검증), 역방향 검증, Reflection Rate 정량화, 반복 개선, 완료 처리
 **Will Not**: 대규모 구현 (→ /fz-code), GPT 직접 호출 (→ /fz-gpt), 계획 수립 (→ /fz-plan)
-
-### light 모드 (모드 게이트 — `modules/mode-gate.md`)
-
-진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
-- review-live 를 띄우지 않고 Phase 5 Lead 3중 검증 · Phase 5.5 역방향 검증 · Reflection Rate 를 그대로 한다 — GPT 단계는 full 과 같다(끈 세션이면 `[GPT 미사용]`) · 산출물도 full 과 같다
-- 셋째 검증(검증 3)도 full 과 같다 — 경로 판정 · 두 표지 · sc 가 없을 때의 새 컨텍스트 에이전트가 그대로다(sc 가 없다고 건너뛰지 않는다)
-- ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
-- 점검 카탈로그: `templates/check-catalog-review.md` 를 Read 해 리뷰 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 리뷰 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <review 산출물> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-review.md"` 로 잰다
-- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
 
 ## 에러 대응
 

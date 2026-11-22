@@ -41,6 +41,7 @@ has skills/fz-peer-review/SKILL.md '--deny "${WORK_DIR}"' '기본 호출이 작�
 has skills/fz-review/SKILL.md '--deny {WORK_DIR}' 'opt-in 호출이 작업 폴더를 deny 로 넘긴다'
 has skills/fz-plan/SKILL.md '--deny {WORK_DIR}' 'plan 호출이 작업 폴더를 deny 로 넘긴다'
 has skills/fz-review/SKILL.md 'locatedFindings: true' '--gpt-independent 면 위치 필드를 켠다'
+has skills/fz-review/SKILL.md 'lead-findings.json' 'light + --gpt-independent 는 Lead 발견 JSON 으로 병합한다'
 
 # 권한 — 런처 · 래퍼 · 병합을 부를 수 있고, Will Not(GPT CLI 직접 호출 금지)과 모순되는 권한이 없다
 for f in skills/fz-review/SKILL.md skills/fz-peer-review/SKILL.md; do

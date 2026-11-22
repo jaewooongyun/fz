@@ -1,7 +1,7 @@
 ---
 name: fz-search
 description: >-
-  코드 탐색 + 의존성 추적. Serena 심볼 기반 정밀 검색.
+  코드 탐색 + 의존성 추적. 심볼 단위 정밀 검색.
   예: 찾아줘, 탐색해줘, 어디 있어?, 누가 쓰고 있어? (비사용: 접근 방식 탐색 →fz-discover; search=코드 위치)
 user-invocable: true
 argument-hint: "[검색 대상] [--mode arch|layer|impact|pattern] [--deep]"

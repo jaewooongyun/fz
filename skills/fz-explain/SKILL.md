@@ -3,7 +3,7 @@ name: fz-explain
 description: >-
   코드·구조·기능 설명. 전체 흐름 위에 동작↔코드를 1:1로 매핑하고, 낯선 타입은 정의부터 보인다.
   예: 구조 설명해줘, 이거 어떻게 동작해?, 어떤 역할이야?, 과외하듯 설명해줘, 처음 보는 사람도 알게
-  (비사용: 위치만 찾기 →fz-search, 변경사항 해설 →fz-pr-digest, 문제 지적 →fz-review, 원인 찾아 수정 →fz-fix)
+  (비사용: 위치만 찾기 →fz-search, 변경사항 해설 → 사용자가 /fz-pr-digest 로 직접 실행, 문제 지적 →fz-review, 원인 찾아 수정 →fz-fix)
   explain structure, how does it work, walkthrough, onboarding, code comprehension
 user-invocable: true
 argument-hint: "[기능·모듈·심볼 이름 또는 상황] [--light]"

@@ -2,7 +2,7 @@
 name: fz-code
 description: >-
   코드 구현 + 빌드 검증. 계획 기반 점진적 구현과 매 Step 빌드 검증.
-  예: 구현해줘, 코드 짜줘, 만들어줘, 개발해줘, 빌드해줘 (비사용: 버그 수정 →fz-fix, 계획·설계 →fz-plan)
+  예: 구현해줘, 코드 짜줘, 만들어줘, 개발해줘 (비사용: 버그 수정 →fz-fix, 계획·설계 →fz-plan)
 user-invocable: true
 argument-hint: "[구현 대상 설명] [light]"
 allowed-tools: >-
@@ -41,6 +41,15 @@ metadata:
 - 점진적 구현 + 매 Step 빌드 검증
 - 프로젝트 빌드 검증
 - 리뷰 검증은 `/fz-review`로 위임 가능
+
+## light 모드 (기본 경로 — 모드 게이트 `modules/mode-gate.md`)
+
+진입: 팀 모드 실행 절차 0 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+- code-pair 를 띄우지 않고 Plan 의 **모든** Step 을 Lead 가 구현 절차(1~8.5)대로 직접 구현한다 — Step 마다 빌드 · 원장 게이트(6.4) · 마찰 감지 그대로
+- GPT 교차 검증(8.5)은 full 과 같다(끈 세션이면 `[GPT 미사용]`)
+- 점검 카탈로그: `templates/check-catalog-code.md` 를 Read 해 Step 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 Step 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <code/step-N.md> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-code.md"` 로 잰다
+- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
+- compact 뒤 절차가 보이지 않으면 이 SKILL.md 를 다시 Read 한다
 
 ## 사용 시점
 
@@ -92,7 +101,7 @@ metadata:
 
 각 Plan Step마다 **invoke → 적용 → 빌드 → 다음** 루프를 Lead가 운영한다:
 
-0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" code --steps {WORK_DIR}/plan/steps.json --estimate code-pair`(없으면 `--plan-doc` · `--no-plan`) 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 이 루프 대신 Lead 가 구현 절차로 Step 마다 직접 구현한다(아래 light 모드) · **full** 이면 이 루프 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
+0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" code --steps {WORK_DIR}/plan/steps.json --estimate code-pair`(없으면 `--plan-doc` · `--no-plan`) 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 이 루프 대신 Lead 가 구현 절차로 Step 마다 직접 구현한다(위 light 모드) · **full** 이면 이 루프 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
 
 1. **컨텍스트 기록**: plan 요약 + 진행 상태를 `{WORK_DIR}/code/step-context.md`로 기록 (대형 입력 파일 경로 전달 — §12)
    ⛔ 아래 다섯도 **같은 파일에 요약해 넣는다** — 별도 arg 를 만들지 않고 기존 `contextPath` 하나로 전달한다:
@@ -428,14 +437,6 @@ Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
 - 계획 없이 대규모 코드 생성 (→ /fz-plan)
 - 코드 리뷰/검증 (→ /fz-review)
 - **팀 공유 영역 자동 변경 (36차)**: `.swiftlint.yml` / `.github/` / `Package.swift` / `*.xcconfig` / pre-commit hook 등 변경 시 사용자 명시 합의 의무. CLAUDE.md "팀 공유 영역" 정의 우선, 부재 시 fallback list 적용
-
-### light 모드 (모드 게이트 — `modules/mode-gate.md`)
-
-진입: 팀 모드 실행 절차 0 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
-- code-pair 를 띄우지 않고 Plan 의 **모든** Step 을 Lead 가 구현 절차(1~8.5)대로 직접 구현한다 — Step 마다 빌드 · 원장 게이트(6.4) · 마찰 감지 그대로
-- GPT 교차 검증(8.5)은 full 과 같다(끈 세션이면 `[GPT 미사용]`)
-- 점검 카탈로그: `templates/check-catalog-code.md` 를 Read 해 Step 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 Step 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <code/step-N.md> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-code.md"` 로 잰다
-- 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
 
 ## 에러 대응
 

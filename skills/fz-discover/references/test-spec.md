@@ -12,7 +12,7 @@
 | "방향 정해졌으니 구현 계획 세워줘" | NOT trigger | → fz-plan (방향 확정 후 계획 수립) |
 | "이 함수 어디서 쓰는지 찾아줘" | NOT trigger | → fz-search (코드 위치 탐색) |
 | "이 버그 고쳐줘" | NOT trigger | → fz-fix (코드 직접 수정) |
-| "이 코드 빌드해줘" | NOT trigger | → fz-code (빌드 실행) |
+| "이 코드 빌드해줘" | NOT trigger | → 스킬 없이 빌드만 실행 (구현 요청이 아니다) |
 | "명확한 요구사항이니 단순 설계만 해줘" | NOT trigger | → fz-plan (명확한 요구사항의 단순 설계) |
 
 ### Functional Test

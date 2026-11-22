@@ -21,7 +21,7 @@
 | "이거 구현해줘" | NOT trigger | → /fz-code | 비사용: 구현 →fz-code |
 | "어떻게 접근할지 모르겠어, 방식이 여러 개야" | NOT trigger | → /fz-discover | 비사용: 접근 불명확 시 →fz-discover |
 | "이 코드 수정해줘" | NOT trigger | → /fz-code | Boundaries Will Not: 코드 수정 |
-| "빌드 돌려줘" | NOT trigger | → /fz-code | Boundaries Will Not: 빌드 실행 |
+| "빌드 돌려줘" | NOT trigger | → 스킬 없이 빌드만 실행 | Boundaries Will Not: 빌드 실행 · 빌드만 원하는 요청은 구현 스킬(fz-code)로 끌지 않는다 |
 
 ### Functional Test (Given/When/Then)
 

@@ -12,7 +12,6 @@
 | "코드 짜줘" | trigger | description 예 — 코드 작성 |
 | "만들어줘" | trigger | description 예 + intent-trigger "만들어" |
 | "개발해줘" | trigger | description 예 + intent-trigger "개발" |
-| "빌드해줘" | trigger | description 예 — 매 Step 빌드 검증 |
 
 **should-NOT-trigger** (description '비사용:' / Boundaries Will Not의 대안 스킬)
 
@@ -21,6 +20,7 @@
 | "이 버그 고쳐줘" | NOT trigger | /fz-fix | description 비사용 "버그 수정 →fz-fix" |
 | "아키텍처 설계해줘" | NOT trigger | /fz-plan | description 비사용 "계획·설계 →fz-plan" + Will Not "계획 없이 대규모 코드 생성 (→/fz-plan)" |
 | "구현한 코드 리뷰해줘" | NOT trigger | /fz-review | Boundaries Will Not "코드 리뷰/검증 (→/fz-review)" |
+| "빌드해줘" | NOT trigger | 없음 — 스킬 없이 빌드만 실행 | description 예에서 뺐다 — 빌드만 원하는 요청은 구현 스킬로 끌지 않는다 |
 
 ### Functional
 

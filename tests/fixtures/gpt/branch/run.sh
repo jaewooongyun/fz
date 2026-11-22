@@ -11,7 +11,7 @@
 #                             기록 CLI 호출 0 · 격리 폴더 미생성. GPT 홈 · 인증은 갖춰 둔다(다른 11 사유로 통과하지 않게)
 #   all-consumers-use-common  GPT kind 를 실제로 부르는 스킬(`gpt_kinds.py callers` 의 JSON — kinds-callers 와 같은 판독기)마다
 #                             decide 또는 § 단계 실행 판정을 가리킨다 · fz-fix 에 `--gpt` opt-in 이 없다 · gpt-strategy 에 정본 절이 있다
-#   contract-order            fz-plan full 순서(B2b · F-468) — skills/fz-plan/SKILL.md 에서 각 토큰이 처음 나오는 줄이 이 순서다:
+#   contract-order            fz-plan full 순서(B2b · F-468) — skills/fz-plan/SKILL.md 의 `### 실행 절차 (Lead)` 머리 뒤에서 각 토큰이 처음 나오는 줄이 이 순서다:
 #                             독립 플랜 기동(`gpt-call.sh independent-plan`) < `Workflow({ scriptPath:` < 방향 · 완주 정지(RECONSIDER · degraded 한 줄)
 #                             < `plan_divergence.py` < Sprint Contract 단계(`directionVerdict` 한 줄) < 재생성(`--from-plan`) < Phase 2 절의 `verify-gates`
 #                             · 그리고 tests/fixtures/plan-wiring/parallel-arms 러너가 그대로 통과한다
@@ -185,7 +185,8 @@ PY
 }
 
 # ── contract-order ─────────────────────────────────────────────────
-# fz-plan full 순서(B2b · F-468) — 자리마다 그 토큰이 처음 나오는 줄이다. verify-gates 만 Phase 2 절 머리 뒤에서 찾는다
+# fz-plan full 순서(B2b · F-468) — 자리마다 `### 실행 절차 (Lead)` 머리 뒤에서 그 토큰이 처음 나오는 줄이다(기본 경로인 light 절이
+#   개요 바로 뒤에서 합치기 토큰을 먼저 담는다). verify-gates 만 Phase 2 절 머리 뒤에서 찾는다
 #   (Prerequisites 줄이 GPT 단계 목록으로 verify-gates 를 먼저 적는다). 이어서 parallel-arms 러너가 그대로 통과하는지 본다
 case_contract_order() {
   local res rc arms="$ROOT/tests/fixtures/plan-wiring/parallel-arms/run.sh"
@@ -209,13 +210,21 @@ def first(*tokens, start=1):
 
 
 p2 = first("## Phase 2: Plan Validation")
+blk = first("### 실행 절차 (Lead)")
+
+
+def at(*tokens):
+    """실행 절차 머리 뒤의 첫 줄 — 머리가 없으면 None(자리 없음)"""
+    return first(*tokens, start=blk) if blk else None
+
+
 marks = [
-    ("독립 플랜 기동", first("gpt-call.sh independent-plan")),
-    ("Workflow 호출", first("Workflow({ scriptPath:")),
-    ("방향 · 완주 정지", first("RECONSIDER", "degraded")),
-    ("합치기", first("plan_divergence.py")),
-    ("Sprint Contract", first("Sprint Contract", "directionVerdict")),
-    ("재생성", first("--from-plan")),
+    ("독립 플랜 기동", at("gpt-call.sh independent-plan")),
+    ("Workflow 호출", at("Workflow({ scriptPath:")),
+    ("방향 · 완주 정지", at("RECONSIDER", "degraded")),
+    ("합치기", at("plan_divergence.py")),
+    ("Sprint Contract", at("Sprint Contract", "directionVerdict")),
+    ("재생성", at("--from-plan")),
     ("Phase 2 verify-gates", first("verify-gates", start=p2) if p2 else None),
 ]
 why = [f"{name} 자리 없음" for name, at in marks if at is None]
