@@ -393,6 +393,11 @@ E 성격(하네스 결함 · 측정 실패 · 판정 오류 · 게이트 위음�
 
 ⛔ **이 임계값은 실측 근거가 아직 얇다.** 트랙 A 의 5세션처럼 누적 관측에서 도출된 값이 아니라 인접 트랙과의 정합성으로 정했다. **트랙 D 승격이 3건 누적되면 값을 재검토**한다 — 너무 헐거우면 게이트가 단조 증가하고(IFScale), 너무 빡빡하면 지금과 같은 적체가 재현된다.
 
+#### 임계값 재검토 (2026-11-23 · Wave 4 S7)
+
+- 누적 2건(D-2 · D-4 T-pitfall) · T-domain 은 채점 revise 로 보류 — 3건 전이라 **유지**. 막는 사유는 D-6 ~ D-23 모두 fixture · 채점이고 세션은 4절뿐이다
+- ⛔ `관측 #` 줄은 기록된 명령 · 주장을 반영처에 넣어 발화한 엔트리만(F-742) · 채점 판정이 라운드마다 갈린다(F-746)
+
 ### D-1: evidence-insufficient-confirmation (트랙 D 관측 #1·#2)
 
 - 관측 #1: `fz-findings` **F-009** (2026-08-13, detector `external:advisor`) — `throws` **시그니처**를 전파 **동작**의 증거로 오용. 체인 5층 중 2층만 읽고 silent failure "확정" 표기
@@ -423,7 +428,7 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
 
 - ⛔ **승격 완료 → 근거 엔트리 `applied: full`** — 트랙 D 절에 `✅ **승격 완료` 를 적은 판은 그 절 `관측 #` 엔트리에 `applied: full` 을 쓰고, 남은 축은 새 엔트리로 쪼갠다. 배출은 승격 판 노트 `Closes:` 또는 레지스트리 README §1 처분이다. 위생 검사 `--ledger` 가 `승격 완료 근거 잔존` 으로 남은 근거를 센다(이 축이 없어 D-2 근거 F-022 · F-045 · F-098 이 두 달 남았다)
 - ⛔ **반영 기록은 수리한 세션이 쓴다** — 엔트리 frontmatter `applied` · `applied_ref` 와 본문 `## 반영` 절을 같은 세션에 쓴다. 다음 릴리스 노트의 `Closes:` 는 이 기록에서 `applied: full` 만 모은다
-- 대조기: `scripts/check_release_closes.py --findings-root <레지스트리> --note <노트>` — `applied: full` ↔ `Closes:` · partial · `applied_ref` · 승격 잔존 · 미등재 트랙 D 를 발행 전에 본다(레지스트리는 쓰지 않는다)
+- 대조기: `scripts/check_release_closes.py --findings-root <레지스트리> --note <노트> --expect-ref <태그|SHA>` — `applied: full` ↔ `Closes:` · partial · `applied_ref` · 승격 잔존 · 미등재 트랙 D 를 발행 전에 본다(레지스트리는 쓰지 않는다)
 
 ### D-2: coverage-unit-mismatch (트랙 D 관측 #1~#3)
 
@@ -462,12 +467,14 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
 > D-4 ~ D-23 — 2026-11-23 Wave 4 S6 등재. 작성 세션 = 엔트리 경로가 처음 나오는 transcript(관측일은 세션 수가 아니다).
 
 ### D-4: known-pitfall-recurred-despite-note
-- 관측 #1~#7: F-610 · F-612 · F-647 · F-649 · F-654 · F-673 · F-727
-- 분리 자식(관측 아님 · open): F-734 · F-735 · F-736 · F-737 · 작성 세션 c305d1cf(6) · 96fbd609(F-727) · 별개 세션 충족 2 · fixture 없음 · 외부 채점 예정 S7 · 차단 fixture · 채점 — **승격 진행 — Wave 4 S7**
+- 관측 #1~#3: F-654 · F-673 · F-727
+- 검출 밖(관측 아님 · open): F-610 · F-612 · F-647 · F-649 · F-745 · 분리 자식 F-734 · F-735 · F-736 · F-737 · F-739 · F-740
+- 작성 세션 c305d1cf · 96fbd609 = 별개 세션 2 · fixture guard.py t-pitfall 3셀 · 외부 채점 3회(1 accept · 2 revise → 지적 처분 · 3 accept · F-746) · 차단 없음
+- ✅ **승격 완료 (2026-11-23)**: 반영처 = fz-guard `run()` T-pitfall 경고(설치자만 · 막지 않음)
 
 ### D-5: count-tool-domain-narrower-than-target
-- 관측 #1·#2: F-611 · F-726
-- 작성 세션 c305d1cf · 96fbd609 · 별개 세션 충족 2 · fixture 없음 · 외부 채점 예정 S7 · 차단 fixture · 채점 — **승격 진행 — Wave 4 S7**
+- 관측 #1·#2: F-611 · F-726 · 분리 자식(관측 아님 · open) F-741
+- 작성 세션 c305d1cf · 96fbd609 · 별개 세션 충족 2 · fixture `plan-integrity/doc/absence.md` · 외부 채점 revise 3회(0 아닌 수 · 대조 영역) · 구현 확인(경고) `plan_integrity_check.py` 부재 주장 WARN · 차단 채점
 
 ### D-6: declared-artifact-never-executed
 - F-040 · F-470 · F-598 · 작성 세션 08-25 · d5ede45a · 11-12 감사 · 별개 세션 충족 ≥2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
@@ -479,7 +486,7 @@ A·B 로 처리한 엔트리는 findings 에서 **배출**한다 — 릴리즈 �
 - F-648 · F-655 · F-658 · 작성 세션 c305d1cf · 별개 세션 미달 1 · fixture 0 · 외부 채점 0 · 차단 세션 · fixture · 채점
 
 ### D-9: cumulative-check-only-run-on-the-increment-so-drift-surfaces-at-the-final-long-run
-- F-668 · F-672 · F-698 · 작성 세션 c305d1cf · F-698 미확인 · 별개 세션 미확인 · fixture 0 · 외부 채점 0 · 차단 세션 확인 · fixture · 채점
+- F-668 · F-672 · F-698 · F-743 · 작성 세션 c305d1cf · 96fbd609(F-743) · 별개 세션 충족 2 · fixture 0 · 외부 채점 0 · 차단 fixture · 채점
 
 ### D-10: decision-measured-on-some-input-classes-only
 - F-721 · F-723 · 작성 세션 미확인 둘 · 별개 세션 미확인 · fixture 0 · 외부 채점 0 · 차단 세션 확인 · fixture · 채점
