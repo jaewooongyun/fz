@@ -31,7 +31,7 @@ F-405	modules/fz-gpt-subcommands-core.md	has	새 env · 플래그 이름을 재�
 F-413	modules/fz-gpt-subcommands-core.md	has	그 상태의 마지막 쓰기(최종 소비 지점)까지 재생하는가
 F-522	modules/fz-gpt-subcommands-core.md	has	수정이 다루지 않은 다른 상태(같은 진입 경로가 읽는 다른 변수 · 낡은 값)
 F-445	skills/fz-plan/SKILL.md	has	착수 전 `extract_project_rules.py` 원문 색인 1회
-F-470	modules/gpt-strategy.md	has:replace	**보류(미적용 · 미측정)**
+F-470	modules/gpt-strategy.md	lacks	GPT Preamble 표준
 F-470	modules/gpt-strategy.md	lacks	- `fz-gpt` SKILL.md verify/validate/plan 서브커맨드 prompt template
 F-469	modules/gpt-strategy.md	has:replace	**수동 전략(미배선)**
 F-469	modules/gpt-strategy.md	lacks	자동 전환
@@ -387,3 +387,4 @@ F-544	skills/fz-peer-review/SKILL.md	lacks	Bash(gh auth status *)
 F-544	skills/fz-rebase/SKILL.md	has	Bash(git range-diff *)
 F-471	skills/fz-gpt/SKILL.md	lacks	plan 독립재작성
 F-471	skills/fz-gpt/references/test-spec.md	lacks	독립 재작성
+F-470	modules/gpt-strategy.md	has	## Sandbox Permissions

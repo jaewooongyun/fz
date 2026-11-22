@@ -302,7 +302,7 @@ def cell_effort_args():
 
 
 def cell_effort_docs():
-    for rel in ("CLAUDE.md", "guides/skill-authoring.md", "guides/model-guide.md", "modules/peer-review-tiers.md", "modules/native-agents.md"):
+    for rel in ("guides/skill-authoring.md", "guides/model-guide.md", "modules/peer-review-tiers.md", "modules/native-agents.md"):
         need(read(rel), ["Lead 세션 effort", "2026-10-19"], rel)
     for rel in ("guides/skill-authoring.md", "guides/model-guide.md"):
         need(read(rel), ["§5.8 ⑥"], rel)

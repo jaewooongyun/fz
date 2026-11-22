@@ -55,8 +55,7 @@ metadata:
 
 ## Prerequisites
 
-- TEAM 모드는 네이티브 **Workflow 도구** 가용 환경 필요 (미가용 시 SOLO 폴백). ⛔ `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`은 **TeamCreate 경로 전용**이며 Wave 4 전환 후 Workflow 경로에는 불필요 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
+- TEAM 모드는 네이티브 **Workflow 도구** 가용 환경 필요 (미가용 시 SOLO 폴백). (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
 
 ## 모듈 참조
 

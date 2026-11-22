@@ -52,7 +52,6 @@ metadata:
 ## Prerequisites
 
 - 교차 검증 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 기본 모드(순차) 폴백
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
 
@@ -246,7 +245,6 @@ CLAUDE.md `## Architecture` 섹션에 정의된 프로젝트 아키텍처 패턴
 
 ## 병렬 교차 검증 (`--deep` 모드 — Workflow 오케스트레이션 pilot)
 
-> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 1 전환.
 > Cross-Verify 패턴은 `workflows/search-cross-verify.js` 가 평탄화 구현한다.
 > 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern·**plan-structure** 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > **모델 배정**: Stage 1·2는 `search-*`(sonnet 성격 — retrieval·breadth), **Stage 3 병합은 `plan-structure` 렌즈 + `fable`** — 3-Tier 정책의 *수렴 merge* 판단 지점 3곳 중 하나다(`scripts/lint-model-explicit.sh`의 `fable=3`에 계상).

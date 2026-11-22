@@ -56,7 +56,7 @@ metadata:
 | 모듈 템플릿 | `templates/module-template.md` | 모듈 생성 필요 시 |
 | 프롬프트 최적화 | `guides/prompt-optimization.md` | 모든 생성/수정 시 |
 | 스킬 작성법 | `guides/skill-authoring.md` | create, update 시 |
-| 에이전트/팀 가이드 | `guides/agent-team-guide.md` | new-agent 시 |
+| 에이전트/팀 가이드 | `guides/agent-team-guide.md` §1 · §7 · §8 (§2 · §3 은 역사 기록) | new-agent 시 |
 
 ## create — 새 스킬 생성
 
@@ -181,7 +181,7 @@ Gate 통과 후 실측 트리거율 기반 description 최적화를 제안한다
 ### 절차
 
 1. `Read(templates/agent-template.md)` → 템플릿 로드
-2. `Read(guides/agent-team-guide.md)` → 에이전트 작성법
+2. `Read(guides/agent-team-guide.md)` → 에이전트 작성법 (§1 · §7 · §8 만 따른다 — §2 · §3 은 역사 기록)
 3. YAML frontmatter 채우기:
    - `name`: `{domain}-{specialty}` 형식 (`modules/team-registry.md` 네이밍 규칙 준수)
    - `description`: 역할+전문성+팀컨텍스트

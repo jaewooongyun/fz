@@ -3,6 +3,8 @@
 > **Scope of Applicability**: `fz-gpt` SKILL.md의 모든 Bash 예시 (review/verify/validate/check/final/commit/adversarial/drift/plan/micro-eval). 다른 스킬은 본 모듈을 직접 참조하지 않으며, fz-gpt 위임을 통해 간접 적용된다.
 >
 > **Purpose**: GPT CLI(`exec`·`review` 서브커맨드)를 Bash 도구로 부를 때의 무한 hang / trusted directory 에러 / sandbox 무효화 / base mismatch 등을 방지하는 표준 절차. ⛔ **호출은 §8 정문(`scripts/gpt-call.sh <kind>`) 경유** — §1~§7 은 정문이 부르는 래퍼(`scripts/gpt-exec.sh`)가 내부에서 처리하는 교훈이며, 직접 호출 예시가 아니다.
+>
+> **Sources (last audited: 2026-11-01 — §5 원인 줄의 GPT CLI 0.149.0 · 0.150.0 동작 인용만 learn.chatgpt.com/docs/changelog 와 대조):**
 
 ## 목차
 

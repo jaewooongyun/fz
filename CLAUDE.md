@@ -1,7 +1,5 @@
 # CLAUDE.md — fz Plugin
 
-> **Sources (last audited: 2026-07-25 — 모델 사실 축):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조. 최신성 검사: `python3 scripts/lint_doc_freshness.py`
-
 ## Build
 - 빌드 없음 (마크다운 프로젝트)
 - 검증: `bash scripts/plugin_validate.sh` — 대상은 plugin.json(루트 디렉터리를 주면 marketplace 만 검증한다)
@@ -82,23 +80,12 @@ bash scripts/setup-hooks.sh
 
 상세: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy), `templates/agent-template.md` + `templates/skill-template.md` (자동 상속 섹션 — 앞 두 줄).
 
-## Opus 5.5 Adaptation (현행 기본 모델)
+## 모델
 
-- **GA**: 2026-09-22, `claude-opus-5-5`. **$4/$20**(캐시 읽기 $0.20) — Opus 5($5/$25)보다 낮다 [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5]
-- **Tokenizer**: Opus 4.7 도입분을 Opus 5.5 도 쓴다 — *"Claude Opus 4.7 introduced a new tokenizer, which later Opus models, including Claude Opus 5.5, also use."* [verified: platform.claude.com/docs/en/models/opus-5-5/migration-guide 2026-11-16] → 4.7/4.8 대비 토큰 수 거의 불변. (pre-4.7 대비 1.00-1.35x 증가는 유지, fz 자체 실측 미완료)
-- **Breaking 4** (정본 `guides/llm-references.md` whats-new-opus-5-5 행): ① **thinking 상시 ON — 끄기 불가**: `thinking:{"type":"disabled"}`·manual `budget_tokens` 는 effort 와 무관하게 **400** (Opus 5 는 effort ≤ `high` 에서 끌 수 있었다) — `max_tokens`는 thinking+응답 **합산** 하드캡이라 타이트한 값은 **응답 절단** 위험 ② forced `tool_choice`(`any`·`tool`) → **400** — `auto` + strict tool use 또는 structured outputs 로 대체 ③ thinking block 이 모델·대화 prefix 에 묶인다(prefix 를 바꿔 재생하면 400) ④ `computer_20251124` 거부. 동작 변화: 도구 호출 사이 진행 텍스트가 `text` 가 아니라 **progress-update `thinking` 블록**으로 온다 — 기본 `display: "omitted"` 에서는 스트리밍 UI 가 조용해진다 [verified: whats-new-opus-5-5]
-- **effort**: 기본 **`medium`**(Opus 5 는 `high`) + **같은 effort 에서 사고량 증가**(`xhigh`·`max` 에서 가장 크다) [verified: whats-new-opus-5-5]. 공식은 이전 모델 값 재사용 대신 **fresh sweep** 을 권한다 — fz 는 워커 effort = Lead 세션 effort 를 워크플로 args 로 명시 전달한다(사용자 결정 2026-10-19 · 미지정이면 `xhigh` — `modules/mode-gate.md` § effort · 이전: 2026-09-25 `xhigh` 고정) [verified: platform.claude.com/docs/en/build-with-claude/effort]
-- **Behavior** [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5]: **자체검증 내장 → 검증 지시 삭제**(over-verification) / **subagent 위임 과다 → 캡**(4.8과 역방향) / 응답·산출물 장문화 → **길이는 프롬프트로**(effort로 안 됨) / 스코프 확장·자기정정 서술 과다 → 명시 제약
-- **Behavior (5.5 — 위 Opus 5 패턴 상속)**: "Existing Claude Opus 5 prompts should perform well without changes, and the patterns in Prompting Claude Opus 5 remain a reasonable starting point." 보강 3가지: **elapsed 시간 신호**(매 메시지 끝에 경과 시간 1줄) / text-only 턴 종료는 완료 증거가 아니라 **보고** / **premature stopping** 대응 자동 continuation 은 같은 작업에 **2~3회 상한** [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5]. ⛔ 5.5 페이지에 subagent 캡 절이 없는 것은 위 캡의 폐기 근거가 아니다(상속)
-- **Context window**: 1M 유지 (기본값이자 최대값). safety net 원칙, Intelligence Degradation + Context Length Hurts 논문 근거
+현행 모델 사실의 정본은 `guides/llm-references.md` §1.2 · 운용은 `guides/model-guide.md` — 여기에 사본을 두지 않는다.
 
-상세: `guides/llm-references.md` §1.2·§5 (정본), `modules/context-artifacts.md` (1M context 정책), `guides/harness-engineering.md` §1.3 (세대 전환 테이블), `guides/prompt-optimization.md` 원칙 8 (literal interpretation 대응), `guides/model-guide.md` (Fable 5 대비).
+## Agent Teams Environment Flag — 설정하지 않는다
 
-## Agent Teams Environment Flag — ⛔ 현행 경로에 불필요 (역사적 기록)
-
-⛔ **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`을 설정하지 말 것.** 이 플래그는 `TeamCreate` 경로 전용이고, **`TeamCreate`는 Claude Code v2.1.178부터 부재**하다. 멀티에이전트 실행은 v4.22.0(Wave 4)에서 `workflows/*.js` 결정적 Workflow로 전면 이관됐다 — Workflow 도구는 이 플래그를 요구하지 않는다.
+⛔ **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`을 설정하지 말 것.** 멀티에이전트 실행은 `workflows/*.js` Workflow 이고 이 플래그를 요구하지 않는다.
 
 - 팀 모드 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
-- 역사적 사양(TEAM P2P 시절): `guides/agent-team-guide.md` §8 — ⛔ 실행 절차로 참조하지 않는다
-
-> 정정 근거(2026-08-09 외부 감사 ISSUE-011): 본 절이 "설정 필수"라 지시하는 동안 같은 리포가 `TeamCreate` 부재를 선언하고 있었다 — **런타임 진입 문서가 존재하지 않는 실행 경로를 활성화하라고 지시**하는 모순이었다.

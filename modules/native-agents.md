@@ -33,8 +33,8 @@
 
 ## 스폰 규칙
 
-1. **TeamCreate와 독립**: L3 에이전트는 Agent() 도구로 스폰. fz TEAM의 2.5-Turn Protocol에 참여하지 않음
-2. **Background 스폰**: review에서 fz TEAM과 병렬로 background 실행
+1. **직접 스폰**: L3 에이전트는 Agent() 도구로 직접 스폰한다
+2. **Background 스폰**: review에서 fz Workflow 와 병렬로 background 실행
 3. **결과 통합**: Lead가 L3 결과 수신 → Issue Tracker에 merge (fz 이슈와 동일 형식)
 4. **조건부 스폰**: 아래 조건 충족 시에만 스폰
 5. **모델·effort 명시**: L3 및 직접 Agent 스폰도 model 명시 의무 — 실질 분석·생산 관점은 `opus`, retrieval·breadth 성격은 `sonnet`, **effort 명시 필수** (미지정 시 모델은 부모 세션 모델 상속 · effort 는 메인 대화와 다른 모델이면 세션 값이 아니라 그 모델의 저장값 또는 기본값 — "use that model's saved effort level or its default, instead of the session's effort level" [verified: code.claude.com/docs/en/changelog, 2026-11-16]). Workflow 워커는 Lead 세션 effort 를 args 로 명시 전달한다(2026-10-19 — `modules/mode-gate.md` § effort). 값 선택: Opus 5.5 공식 기본은 `medium`(Opus 5 는 `high`), 탐색·retrieval 성격은 `low`/`medium`, demanding coding/agentic만 `xhigh` — ⛔ 이전 모델 값 재사용 말고 sweep 후 결정 [verified: platform.claude.com/docs/en/build-with-claude/effort]. 미측정 상태의 기본값은 현행(`xhigh`) 유지. Lead(`fable` alias → Claude Code v2.1.321 부터 Fable 5.2) 공식 출발점은 API 기본 `high`(Claude Code 모델 기본은 `medium`) [verified: platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2 + code.claude.com/docs/en/model-config] · 워커 Opus 5.5 공식 기본은 `medium`(Opus 5 는 `high`) [verified: platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5] — effort 이름이 모델마다 같은 사고량을 뜻하지 않으므로 승격 시 별도 sweep [verified: platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1].
@@ -75,11 +75,7 @@ L3 결과가 Workflow와 동시에 진행될 때의 피드백 흐름:
    → 해당 렌즈 워커가 재분석 → severity 조정 + 연쇄 이슈 식별
 4. **이미 진행 중인 invoke**: Lead가 직접 Issue Tracker에 merge (반환 후 통합)
 
-⛔ **P2P 채널 없음**: Workflow 워커는 `SendMessage` 를 쓰지 않는 1-shot이다(OVERRIDE 블록 — P2P 통신 없음) — 실행 중 워커에게 끼어들 수 없다. 피드백 전달 단위는 **invoke 경계**다. (2026-11-01 정정 — 이전 판의 "`SendMessage`는 v2.1.178부터 부재"는 틀렸다. 2.1.178 이 없앤 것은 `TeamCreate`/`TeamDelete` 이고 `SendMessage` 는 현존한다 — `guides/skill-troubleshooting.md` § 3.4 에이전트 통신 실패)
-
-### ⛔ Anti-Pattern
-- L3 에이전트를 TeamCreate로 스폰 금지 (2.5-Turn에 범용 에이전트 참여 = 품질 저하)
-- TEAM Round 1~2 실행 중 L3 피드백 끼어들기 금지
+⛔ **P2P 채널 없음**: Workflow 워커는 `SendMessage` 를 쓰지 않는 1-shot이다(OVERRIDE 블록 — P2P 통신 없음) — 실행 중 워커에게 끼어들 수 없다. 피드백 전달 단위는 **invoke 경계**다.
 
 ## 설계 원칙
 

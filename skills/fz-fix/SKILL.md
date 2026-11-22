@@ -51,7 +51,6 @@ metadata:
 ## Prerequisites
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
 
@@ -190,7 +189,7 @@ metadata:
 
 ## 팀 에이전트 모드 (복잡한 버그 — Workflow 오케스트레이션, Wave 3)
 
-> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체. 복잡한 버그(여러 파일, 아키텍처 영향)에서 활성화.
+> 복잡한 버그(여러 파일, 아키텍처 영향)에서 활성화.
 > Pair Programming(경량)은 `workflows/code-pair.js` 가 평탄화 구현한다.
 > 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.md` §12.
 > ⛔ 책임 재배분 (사용자 승인): 에이전트는 changeset JSON만 반환 — **Lead가 적용 + 빌드 검증**.

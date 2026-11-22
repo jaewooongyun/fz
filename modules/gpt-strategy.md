@@ -20,7 +20,6 @@
 - [장기 불능 인지 (기간 조건부)](#장기-불능-인지-기간-조건부)
 - [CLI 모드 선택 전략](#cli-모드-선택-전략)
 - [Sandbox Permissions](#sandbox-permissions)
-- [GPT Preamble 표준 (Cnew-3, 2026-05-16)](#gpt-preamble-표준-cnew-3-2026-05-16)
 
 ---
 
@@ -312,40 +311,3 @@ DIFF_LINES=$(printf '%s\n' "$DIFF_RAW" \
 
 > `disk-full-read-access`는 GPT가 프로젝트 디렉토리 전체를 읽을 수 있게 허용한다.
 > 쓰기 권한은 부여하지 않으므로 코드 수정 위험 없음.
-
----
-
-## GPT Preamble 표준 (Cnew-3, 2026-05-16)
-
-> ⛔ **보류(미적용 · 미측정)** — 이 표준은 어느 GPT 프롬프트 템플릿에도 들어가 있지 않고(verify · validate · plan 템플릿에서 0건 · F-470), 이 플러그인에서 효과를 잰 적도 없다. 규칙으로 인용하지 않는다.
-
-> ⚠️ 이 표준은 GPT-5.5 시절(2026-05-16)에 세웠다. 현행 GPT-6 Sol 에서의 유효성은 미측정이다 [미검증: GPT-6 Sol 재측정 없음].
-
-> **Authority**: GPT-5 Prompting Guide (OpenAI Cookbook 2026) [verified: official] — "rephrase goal → outline plan → narrate" preamble 패턴 권장.
-
-OpenAI 가이드가 권하는 3단계 preamble 은 아래와 같다(이 플러그인에서의 효과는 재지 않았다):
-
-```
-1. Rephrase Goal: 작업 목표를 자기 언어로 1-2문장 재기술
-2. Outline Plan: 검증 단계 3-5개를 bullet로 outline
-3. Narrate: 각 단계 실행 시 결과 narrate (verdict + reasoning)
-```
-
-**넣는다면 후보 위치**(⛔ 지금은 어디에도 없다 — 넣기 전에 고정 입력 A/B 로 템플릿 하나에서 먼저 잰다):
-- `modules/fz-gpt-subcommands-core.md` verify · validate 프롬프트 · `modules/fz-gpt-subcommands-aux.md` plan 프롬프트
-- GPT CLI 네이티브 스킬 (`${CODEX_HOME:-~/.codex}/skills/.system/openai-docs` 활용 가능)
-
-**Few-shot 예시**:
-```
-BAD (preamble 없음):
-"이 plan을 검증하라."
-
-GOOD (3-step preamble):
-"
-[Rephrase] Plan v1을 GPT(현행 모델)로 cross-model verify. 5 Q 평가 + verdict.
-[Outline] (a) 6 가설 grep 재현 (b) Tier 우선순위 평가 (c) false positive 식별 (d) GPT 단독 발견 (e) 최종 verdict.
-[Narrate] 각 Q마다 verdict (pass/warn/fail) + reasoning + 파일:line 인용.
-"
-```
-
-> GPT CLI 네이티브 `openai-docs` system skill로 OpenAI 공식 권장 패턴 추가 확인 가능.

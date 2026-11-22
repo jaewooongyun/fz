@@ -63,7 +63,6 @@ metadata:
 ## Prerequisites
 
 - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 구현 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/skill-authoring.md` §12 판별 표)
-- 참조: `guides/agent-team-guide.md` §8 (공식 사양)
 
 ## 모듈 참조
 
@@ -91,7 +90,6 @@ metadata:
 
 > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
 
-> TEAM(TeamCreate+SendMessage) 모드를 네이티브 Workflow 결정적 스크립트로 대체한 Wave 3 전환.
 > Pair Programming 패턴은 `workflows/code-pair.js` 가 평탄화 구현한다.
 > 스크립트: `workflows/code-pair.js` (mode='full') — agents/의 impl-correctness·arch-lens 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-authoring.md` §12.
 > ⛔ **책임 재배분 (사용자 승인)**: 에이전트는 디스크를 수정하지 않는다 — changeset JSON(exact syntax) 반환 → **Lead가 적용 + 빌드 검증**. "구현 중 즉석 질문"의 실시간성은 Step 경계로 양자화됨 (수용된 trade-off).
