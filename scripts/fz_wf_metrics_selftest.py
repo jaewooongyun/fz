@@ -100,7 +100,7 @@ def _write_probe(root: str, kind: str) -> None:
     if kind in ("mcp-arm", "mcp-arm-err", "mcp-nolabel", "mcp-othertree", "mcp-allerr", "mcp-uncovered", "mcp-nopath",
                 "mcp-nonsymbol", "mcp-upper-ext", "mcp-folder", "mcp-extless", "mcp-noresult", "mcp-unanswered",
                 "mcp-na-kind", "mcp-na-mixed", "mcp-direct", "mcp-sweep", "mcp-sweep-nostate", "mcp-sweep-latestate",
-                "mcp-mixed-err", "mcp-impl-only", "mcp-decl-only"):
+                "mcp-mixed-err", "mcp-impl-only", "mcp-decl-only", "mcp-info-othertree", "mcp-unrun-othertree", "mcp-dotted"):
         # 심볼 도구 결과 · 단계 라벨 · 다른 트리 표지 · 직접 호출 · 세션 훑기. 호출 = (도구, 지목한 파일 | None, 결과 | None) · 결과 = (is_error, 글)
         # · 결과가 None 이면 그 호출의 결과 줄을 쓰지 않는다(기록이 중간에 끊긴 꼴) · 글 자리에 블록 목록을 두면 그 목록이 결과 본문이다.
         # 결과 글은 Serena 의 실제 꼴이다 — 찾기는 JSON 목록(없으면 `[]`) · 오류는 is_error 없는 `Error…` 글.
@@ -201,6 +201,10 @@ def _write_probe(root: str, kind: str) -> None:
                                                             (S + "find_referencing_symbols", "scripts/run.sh", found), read],
                                "stage1-symbolic", wfm.OTHER_TREE_MARK),
                               ("a2", "fz:search-pattern", [grep], "stage1-pattern", "")],
+            # 다른 트리 표지를 산출에 남긴 워커 — 심볼 읽기가 아닌 Serena 호출(안내) 하나 뒤 · 호출 없이(-unrun-). 둘 다 도구 작업은 0 이다
+            "mcp-info-othertree": [("a1", "fz:plan-impact", [(S + "initial_instructions", None, (False, "You are a professional coding agent."))],
+                                    "impact", wfm.OTHER_TREE_MARK)],
+            "mcp-unrun-othertree": [("a1", "fz:plan-impact", [], "impact", wfm.OTHER_TREE_MARK)],
             # 켜진 언어(bash)의 파일을 물었는데 전부 오류 — 프로젝트가 활성화되지 않았을 때의 꼴
             "mcp-allerr": [("a1", "fz:plan-impact", [(S + "find_symbol", "scripts/run.sh", no_project),
                                                      (S + "find_referencing_symbols", "scripts/run.sh", no_project), read],
@@ -221,9 +225,12 @@ def _write_probe(root: str, kind: str) -> None:
             # 폴더 · 확장자 없는 경로를 물었고 빈 결과 — 불명 대상
             "mcp-folder": [("a1", "fz:plan-impact", [(S + "find_symbol", "src/", (False, "[]")), read], "impact", "")],
             "mcp-extless": [("a1", "fz:plan-impact", [(S + "find_symbol", "scripts", (False, "[]")), read], "impact", "")],
+            # 마지막 마디에 점이 든 폴더 이름(확장자 표 밖)을 물었고 오류 — 켜진 언어 밖 파일이 아니라 불명 대상
+            "mcp-dotted": [("a1", "fz:plan-impact", [(S + "find_symbol", "vendor/gopkg.in/yaml.v3", ignored("vendor/gopkg.in/yaml.v3")), read],
+                            "impact", "")],
             # 켜진 언어 파일을 물은 호출 하나가 결과 줄 없이 남았다(기록이 끊겼다) · 그 앞에 켜진 언어 밖 파일의 오류 하나(-unanswered)
             "mcp-noresult": [("a1", "fz:plan-impact", [(S + "find_symbol", "scripts/run.sh", None), read], "impact", "")],
-            "mcp-unanswered": [("a1", "fz:plan-impact", [(S + "get_symbols_overview", "docs/guide.md", ignored("docs/guide.md")),
+            "mcp-unanswered": [("a1", "fz:plan-impact", [(S + "get_symbols_overview", "scripts/report.py", ignored("scripts/report.py")),
                                                          (S + "find_symbol", "scripts/run.sh", None), read], "impact", "")],
             # 심볼 도구가 없는 종류(글자 탐색 팔)의 워커뿐 · 그 워커와 정의 폴더에 없는 종류의 워커(-mixed)
             "mcp-na-kind": [("a1", "fz:search-pattern", [read, grep], "stage1-pattern", "")],
@@ -413,6 +420,10 @@ def self_test() -> int:
     audit("info-only-unused", "mcp-info", 2, "UNRUN: 도구 작업이 0건", state="unused")
     audit("info-only-active", "mcp-info", 2, "UNRUN: 도구 작업이 0건", state="active")
     audit("info-read-active", "mcp-info-read", 1, "MCP_WIRING_SUSPECT", state="active")
+    # 다른 트리 표지를 낸 워커가 Serena 를 불렀으면(안내 호출뿐이어도) 표지가 서버 관찰에서 나올 수 있다 — 도구 작업 0 보다 다른 트리가 먼저다.
+    # 호출이 아예 없는 워커의 표지는 인용일 가능성이 커 미판정 그대로다
+    audit("info-only-othertree", "mcp-info-othertree", 1, "MCP_OTHER_TREE")
+    audit("unrun-othertree", "mcp-unrun-othertree", 2, "UNRUN: 도구 작업이 0건")
     # 탐색 팔(--only-label) — 보고 모드라 판정은 exit 0 · 라벨을 못 읽거나 그 라벨의 워커가 없으면 2
     audit("mcp-arm-text-only", "mcp-arm", 0, "ARM_TEXT_ONLY", ("--only-label", "stage1-symbolic"))
     audit("mcp-arm-used", "mcp-arm", 0, "ARM_SYMBOL_USED", ("--only-label", "stage2-sym"))
@@ -443,10 +454,11 @@ def self_test() -> int:
     # 심볼 읽기 도구만 심볼 호출이다 — 성공한 안내 호출이 전부 오류인 찾기를 가리지 않고, 정보 줄에만 찍힌다
     audit("nonsymbol-serena", "mcp-nonsymbol", 1, "MCP_CALLED_NO_RESULT", state="active")
     audit("nonsymbol-serena-info", "mcp-nonsymbol", 1, "판정에 세지 않는다): mcp__plugin_fz_serena__initial_instructions=1", state="active")
-    # 확장자는 대소문자를 가리지 않는다 · 폴더와 확장자 없는 경로의 빈 결과는 불명 대상이다
+    # 확장자는 대소문자를 가리지 않는다 · 폴더와 확장자 없는 경로의 빈 결과 · 확장자 표 밖 대상(점이 든 폴더 이름)의 오류는 불명 대상이다
     audit("upper-ext", "mcp-upper-ext", 1, "MCP_CALLED_NO_RESULT", state="active")
     audit("folder-target", "mcp-folder", 2, "MCP_UNDECIDED", state="active")
     audit("extless-target", "mcp-extless", 2, "MCP_UNDECIDED", state="active")
+    audit("dotted-folder-target", "mcp-dotted", 2, "MCP_UNDECIDED", state="active")
     # 결과 줄이 없는 호출 — 전부 결과가 없으면 그 사실을 적고, 켜진 언어 파일을 물은 호출이 결과 없이 남았으면 켜진 언어 밖 폴백이 아니다
     audit("no-result-yet", "mcp-noresult", 2, "MCP_UNDECIDED: 성공 0 · 오류 0 · 빈 결과 0 — 심볼 호출 1건이 전부 아직 결과가 없다", state="active")
     audit("uncovered-unanswered", "mcp-unanswered", 2, "MCP_UNDECIDED", state="active")
@@ -680,6 +692,60 @@ def self_test() -> int:
         same], plugin_time=now - 3600)
     sweep_cell("plugin-time-future", "mcp-sweep", [(state, age_run, "MCP_SWEEP runs=4 used=1 suspect=2 fallback=0 undecided=0 n/a=1", None)],
                plugin_time=now + 86400)
+
+    def stall(sess):      # 끝나지 않은 두 실행(unfinish)의 기록 파일이 이틀 전에 멈췄다
+        unfinish(sess)
+        d = os.path.join(sess, "subagents", "workflows", "wf_sw2")
+        for p in [os.path.join(d, x) for x in os.listdir(d)] + [os.path.join(sess, "subagents", "agent-d2.jsonl")]:
+            os.utime(p, (now - 2 * 86400, now - 2 * 86400))
+
+    def stalled_rows(lines, keys):   # 멈춘 두 실행 — 미판정 · 사유 · 열쇠 = [워커 기록 수, 기록 크기]
+        rs, keys = (runs_of(lines[0]) if len(lines) == 1 else {}), keys or {}
+        bad = [r for r in ("wf_sw2", "agent-d2") if not (rs.get(r) and rs[r]["verdict"] == "undecided" and rs[r]["word"] == "UNRUN"
+               and "24시간 넘게 멈춘" in str(rs[r].get("reason")) and keys.get(f"sess/{r}") == [1, rs[r].get("bytes")])]
+        return f"멈춘 실행: 줄 {len(lines)} · 열쇠 {keys} · 어긋난 실행 {[(r, rs.get(r)) for r in bad]}" if bad or len(keys) != 4 else None
+
+    def retry(sess):      # 멈춘 워크플로 실행의 다음 시도 — 새 워커 기록 하나(앞 워커를 복사해 새 id 로 둔다 · 기존 기록 파일은 그대로)
+        d = os.path.join(sess, "subagents", "workflows", "wf_sw2")
+        for ext in (".jsonl", ".meta.json"):
+            shutil.copy(os.path.join(d, "agent-a1" + ext), os.path.join(d, "agent-a2" + ext))
+
+    def retry_done(sess):  # 그 시도가 끝났다 — 앞 시도는 실패 · 새 시도는 결과
+        with open(os.path.join(sess, "subagents", "workflows", "wf_sw2", "journal.jsonl"), "a", encoding="utf-8") as fh:
+            fh.write('{"type": "failed", "key": "k-a1", "agentId": "a1"}\n{"type": "started", "key": "k-a1", "agentId": "a2"}\n'
+                     '{"type": "result", "key": "k-a1", "agentId": "a2", "result": {}}\n')
+
+    unchanged = ([], None, "MCP_SWEEP runs=0 ", lambda lines, keys: None if len(lines) == 1 else f"멈춘 실행을 다시 읽었다 — 기록 줄 {len(lines)}",
+                 ("멈춘 실행", "끝나지 않은 실행"))
+    # 끝나지 않은 채 기록이 24시간 넘게 멈춘 실행은 미판정으로 적고 열쇠(워커 기록 수 + 기록 크기)를 적는다 — 그대로면 다시 읽지 않고, 재개가
+    # 기존 워커 기록에 덧붙이면(워커 수 그대로 · stale-pending) · 새 워커 기록을 더하면(stale-retry) 다시 본다. 설치 전이면 해당 없음이 먼저다
+    sweep_cell("stale-pending", "mcp-sweep", [
+        (state, stall, ("MCP_SWEEP runs=4 used=1 suspect=0 fallback=0 undecided=2 n/a=1", "  멈춘 실행 2"), stalled_rows), unchanged,
+        (state, finish, "MCP_SWEEP runs=2 used=0 suspect=2 ", lambda lines, keys: None if len(lines) == 2 and (keys or {}).get("sess/wf_sw2") == 1
+         and keys.get("sess/agent-d2") == 1 else f"기존 기록에 덧붙인 재개 뒤: 줄 {len(lines)} · 열쇠 {keys}")], plugin_time=now - 30 * 86400)
+    sweep_cell("stale-retry", "mcp-sweep", [
+        (state, stall, "undecided=2 ", stalled_rows),
+        (state, retry, ("MCP_SWEEP runs=0 ", "  끝나지 않은 실행 1"), None, ("멈춘 실행",)),
+        (state, retry_done, "MCP_SWEEP runs=1 used=0 suspect=1 ", lambda lines, keys: None if len(lines) == 2 and (keys or {}).get("sess/wf_sw2") == 2
+         else f"새 워커 기록을 더한 재개 뒤: 줄 {len(lines)} · 열쇠 {keys}")], plugin_time=now - 30 * 86400)
+    sweep_cell("stale-predates", "mcp-sweep", [
+        (state, stall, ("MCP_SWEEP runs=4 used=1 suspect=0 fallback=0 undecided=0 n/a=3", "  설치 전 실행 2"),
+         lambda lines, keys: None if lines and "설치된 플러그인보다 먼저" in str((runs_of(lines[0]).get("wf_sw2") or {}).get("reason"))
+         and isinstance((keys or {}).get("sess/wf_sw2"), list) else f"설치 전에 멈춘 실행: {lines[-1] if lines else '기록 없음'} · 열쇠 {keys}",
+         ("멈춘 실행",)), unchanged], plugin_time=now - 3600)
+
+    def block_keys(sess):     # 열쇠 파일 자리에 폴더 — 기록 줄은 쓰고 열쇠는 읽지도 쓰지도 못한다
+        os.makedirs(os.path.join(os.path.dirname(sess), "runs", "mcp-sweep.keys.json"))
+
+    one_line = lambda lines, keys: None if len(lines) == 1 else f"기록 줄 {len(lines)} (기대 1 — 같은 실행을 다시 판정했다)"
+    # 기록 줄을 쓰고 열쇠를 쓰지 못한 종료 뒤 — 다음 훑기는 기록 줄에서 열쇠를 되살려 다시 판정하지 않고, 쓸 수 있게 되면 열쇠 파일을 다시 쓴다.
+    # 멈춘 실행의 열쇠는 기록 크기까지 되살아나 기존 기록에 덧붙인 재개를 다시 본다
+    sweep_cell("keys-recover", "mcp-sweep", [
+        (state, lambda s: (stall(s), block_keys(s)), "MCP_SWEEP_UNRUN", one_line), (state, None, "MCP_SWEEP_UNRUN", one_line),
+        (state, lambda s: os.rmdir(os.path.join(os.path.dirname(s), "runs", "mcp-sweep.keys.json")), "MCP_SWEEP runs=0 ",
+         lambda lines, keys: None if len(lines) == 1 and len(keys or {}) == 4 and isinstance(keys.get("sess/agent-d2"), list)
+         else f"되살린 열쇠: 줄 {len(lines)} · 열쇠 {keys}"),
+        (state, finish, "MCP_SWEEP runs=2 used=0 suspect=2 ", None)], plugin_time=now - 30 * 86400)
     r8 = tempfile.mkdtemp(prefix="fzwf-hold-")
     try:
         write_agents(os.path.join(r8, "agents"))
@@ -871,7 +937,7 @@ def self_test() -> int:
             fails.append(f"낱말-표 짝: 원문 낱말 {len(words)}개 · 어긋남 {gaps or '없음'} · 못 잡은 표 변이 {missed or '없음'}")
 
     # 요약 줄의 묶음 수는 손으로 적는다 — 묶음 합이 총수와 다르면 셀을 더하고 묶음 수를 고치지 않은 것이다(요약이 셀 수를 속이지 않게)
-    groups = (("양성", 1), ("음성", 7), ("mcp-audit", 50), ("심볼 결과 판독", 3), ("mcp-sweep", 17), ("sweep-row", 3),
+    groups = (("양성", 1), ("음성", 7), ("mcp-audit", 53), ("심볼 결과 판독", 3), ("mcp-sweep", 21), ("sweep-row", 3),
               ("stage 규칙", 1), ("usage 중복", 1), ("advisor 스톨", 3), ("시도 구분", 1), ("낱말-표 짝", 1))
     total = passed + len(fails)
     if sum(n for _, n in groups) != total:

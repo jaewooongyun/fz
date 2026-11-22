@@ -921,6 +921,7 @@ LANG_EXTS = {
     "php": (".php",),
     "dart": (".dart",),
 }
+KNOWN_EXTS = {e for v in LANG_EXTS.values() for e in v}   # 표의 모든 확장자 — 이 밖의 확장자(문서 · 설정 · 점이 든 폴더 이름)는 언어를 모른다
 
 
 def read_tools_md(path):
@@ -941,13 +942,13 @@ def read_tools_md(path):
 
 
 def target_side(target, exts) -> str:
-    """호출이 지목한 파일 → covered(켜진 언어) · uncovered(그 밖) · unknown(파일을 지정하지 않았다 · 폴더 · 확장자 없는 경로).
-    확장자는 대소문자를 가리지 않는다. ⛔ 알려진 한계: 끝에 `/` 가 없고 마지막 마디에 점이 있는 폴더 이름(`lib/pkg.v2`)은 켜진 언어 밖
-    파일로 읽힌다."""
+    """호출이 지목한 파일 → covered(켜진 언어) · uncovered(확장자 표의 다른 언어) · unknown(파일을 지정하지 않았다 · 폴더 · 확장자 없는
+    경로 · 확장자 표에 없는 확장자 — 문서 · 설정 파일 · 점이 든 폴더 이름 `vendor/gopkg.in/yaml.v3`). 확장자는 대소문자를 가리지 않는다.
+    ⛔ 알려진 한계: 끝에 `/` 가 없고 표 안 확장자로 끝나는 폴더 이름(`lib/x.go`)만 파일로 읽힌다."""
     if not isinstance(target, str) or not target.strip() or target.rstrip().endswith("/"):
         return "unknown"
     ext = os.path.splitext(target.strip())[1].lower()
-    if not ext:
+    if ext not in exts and ext not in KNOWN_EXTS:      # 확장자 없는 경로(빈 확장자)도 표 밖이다
         return "unknown"
     return "covered" if ext in exts else "uncovered"
 
@@ -963,7 +964,8 @@ def judge_symbol_calls(calls, langs):
     - Important: 성공 0 일 때 우선순위 — 켜진 언어의 파일을 물은 호출에 오류 → `MCP_CALLED_NO_RESULT` · 결과가 온 호출이 있고
       결과가 없는 호출까지 전부 켜진 언어 밖 → `MCP_FALLBACK_UNCOVERED` · 나머지(불명이 섞였거나 켜진 언어 파일의 빈 결과뿐 · 결과 없이
       남은 호출이 켜진 언어 파일이나 불명 대상을 물었다 · 결과가 온 호출이 없다) → `MCP_UNDECIDED`. 가르는 기준은 오류 글자가
-      아니라 지목한 파일의 확장자다 — 파일을 지정하지 않은 빈 찾기는 서버가 엉뚱한 프로젝트를 볼 때도 나온다.
+      아니라 지목한 파일의 확장자다 — 파일을 지정하지 않은 빈 찾기는 서버가 엉뚱한 프로젝트를 볼 때도 나온다. 확장자 표 밖 대상은 불명이다
+      (켜진 언어 밖 폴백이 되지 않는다).
     """
     done = [c for c in calls if c["kind"] in ("ok", "error", "empty")]
     n = collections.Counter(c["kind"] for c in done)
@@ -1108,12 +1110,13 @@ def audit_verdict(agents, tools_md):
       - agents: 센 워커(`read_agent` 결과 — `read_wf` 가 agentType 을 더한다).
       - tools_md: `read_tools_md` 결과 · None = 상태 기록이 없다(훑기는 상태를 모르는 실행도 None 으로 넘긴다).
     - Returns: (낱말, 종료 코드, 출력 줄). 0회 규칙(도구 작업 · 다른 트리 · 미사용 기록 · 대조 심볼 · 상태 기록 없음)을 먼저 보고,
-      호출 1 이상은 `judge_symbol_calls` 의 성공 수 판정이다. `MCP_WIRING_SUSPECT` 는 활성 상태 기록이 있을 때만 낸다.
+      호출 1 이상은 `judge_symbol_calls` 의 성공 수 판정이다. `MCP_WIRING_SUSPECT` 는 활성 상태 기록이 있을 때만 낸다. 다른 트리 표지를 낸
+      워커가 Serena 를 불렀으면(안내 호출뿐이어도 — 표지가 서버 관찰에서 나올 수 있다) 도구 작업 0 보다 다른 트리를 먼저 본다.
     """
     unused = tools_md is not None and tools_md["state"] == "unused"
     c = audit_counts(agents)
     calls = [s for a in agents for s in a["symbol_calls"]]
-    if c["work"] == 0:
+    if c["work"] == 0 and not any(a["other_tree"] and any(nm.startswith(MCP_PREFIXES) for nm in a.get("tool_names") or {}) for a in agents):
         return "UNRUN", 2, "UNRUN: 도구 작업이 0건이다 — 배선 죽음과 '할 일이 없었음'을 구별할 수 없다 (⛔ 통과 아님)"
     if any(a["other_tree"] for a in agents):
         return "MCP_OTHER_TREE", 1, ("MCP_OTHER_TREE: 워커가 다른 트리 표지를 남겼다 — 그 호출은 쓴 것으로 세지 않는다. "
@@ -1143,18 +1146,23 @@ def audit_verdict(agents, tools_md):
 #  (에이전트 정의 머리의 `tools:` 줄 · 그런 워커가 없는 실행은 해당 없음). 상태 기록(`--state`)이 하나가 아니거나 실행이 시작된 뒤에
 #  고쳐졌으면 그 실행의 0회 · 성공 0 은 의심이 아니라 미판정이다 — 틀린 상태로 판정하느니 판정하지 않는다.
 #  판정한 실행의 열쇠(실행 id + 워커 기록 수)는 기록 옆 `<기록 이름>.keys.json` 에 둔다 — 기록 줄을 먼저 쓰고 열쇠를 나중에 쓴다
-#  (임시 파일에 쓴 뒤 이름 바꾸기). 워커 기록이 늘어난 실행(재개 · 다음 시도)은 다시 판정한다. 끝나지 않은 실행과 예산(`--budget`)에
-#  걸려 못 본 실행은 열쇠를 적지 않고 다음 훑기에서 본다. 기록의 어느 값도 `fz:` 로 시작하지 않는다(에이전트 종류 · fz 스킬 이름을 싣지 않는다).
+#  (임시 파일에 쓴 뒤 이름 바꾸기). 워커 기록이 늘어난 실행(재개 · 다음 시도)은 다시 판정한다. 열쇠가 맞지 않는 실행이 있으면 먼저 기록
+#  (돌린 `.1` 포함)의 이 세션 줄에서 열쇠를 되살린다 — 열쇠 쓰기만 실패한 종료 뒤에 같은 실행의 기록 줄이 둘 되지 않게. 끝나지 않은 실행과
+#  예산(`--budget`)에 걸려 못 본 실행은 열쇠를 적지 않고 다음 훑기에서 본다 — 다만 기록 파일이 `SWEEP_STALE_HOURS` 넘게 멈춘 실행은 미판정(설치 전 ·
+#  센 워커가 없으면 해당 없음)으로 적고 열쇠(워커 기록 수 + 기록 크기 — 재개가 기존 워커 기록에 덧붙여도 맞지 않게 된다)를 적는다. 기록의 어느
+#  값도 `fz:` 로 시작하지 않는다(에이전트 종류 · fz 스킬 이름을 싣지 않는다).
 #  새로 판정한 실행이 전부 해당 없음이면 열쇠만 쓰고 기록 줄은 쓰지 않는다 — 아무도 기록을 보지 않는 머신(심볼 도구를 가진 에이전트를
 #  쓰지 않는 세션뿐)에서 기록이 자라지 않게. 기록 파일이 `SWEEP_RECORD_MAX` 바이트에 이르면 덧붙이기 전에 `<기록>.1` 로 한 번 돌린다(옛 파일은 하나만).
 #  이 플러그인이 설치되기 전(루트의 `.claude-plugin/plugin.json` 수정 시각)에 끝난 실행은 판정하지 않고 해당 없음으로 적는다(사유 칸 · 열쇠를
 #  적는다) — 업데이트 뒤 옛 정의로 돈 실행이 고칠 수 없는 경보를 내지 않게. 그 파일을 못 읽거나 시각이 미래면 경계가 없다.
-#  기록 · 열쇠를 쓰지 못하면 `MCP_SWEEP_UNRUN` 줄 하나만 찍는다 — 기록하지 못한 판정은 알리지 않는다(열쇠가 없으니 다음 훑기가 다시 판정한다).
+#  기록 · 열쇠를 쓰지 못하면 `MCP_SWEEP_UNRUN` 줄 하나만 찍는다 — 기록하지 못한 판정은 알리지 않는다(열쇠가 없으니 다음 훑기가 기록 줄에서
+#  열쇠를 되살리거나 다시 판정한다).
 #  언제나 exit 0 — 판정은 요약 줄 `MCP_SWEEP runs=… used=… suspect=… fallback=… undecided=… n/a=…` 과 기록에만 남는다.
 SWEEP_SKIP_AGENTS = ("memory-curator",)   # 메모리 회상이 일이라 심볼 호출 0 이 정상이다 — 재지 않는다
 SWEEP_KEYS_MAX = 5000                     # 열쇠 파일 상한 — 넘으면 가장 오래 고치지 않은 열쇠부터 버린다
 SWEEP_RECORD_MAX = 1_000_000              # 기록 파일 돌림 크기(바이트) — 돌린 옛 파일 하나까지 이 머신에 남는 기록은 약 2MB 다
 SWEEP_VERDICTS = ("used", "suspect", "fallback", "undecided", "n/a")
+SWEEP_STALE_HOURS = 24.0                  # 끝나지 않은 채 이 시간 넘게 기록이 없으면 멈춘 실행 — run_metrics.py RUN_OPEN_STALE_HOURS(버려진 시도)와 같은 값 · 같은 뜻
 
 
 def symbol_holders(agents_dir):
@@ -1208,14 +1216,57 @@ def _install_time(now):
     return t if t <= now else None
 
 
+def _run_files(path):
+    """훑기가 끝남 · 멈춤을 가르는 실행 기록 파일 — 워크플로: `journal.jsonl` · `agent-*.jsonl` / 직접 호출: 그 `agent-*.jsonl`."""
+    return glob.glob(os.path.join(path, "agent-*.jsonl")) + [os.path.join(path, "journal.jsonl")] if os.path.isdir(path) else [path]
+
+
 def _run_ended(path):
-    """실행이 끝난 때 — 훑기가 끝남을 가르는 기록 파일(워크플로: `journal.jsonl` · `agent-*.jsonl` / 직접 호출: 그 `agent-*.jsonl`)의
-    가장 늦은 수정 시각 · 못 읽으면 None."""
-    files = glob.glob(os.path.join(path, "agent-*.jsonl")) + [os.path.join(path, "journal.jsonl")] if os.path.isdir(path) else [path]
+    """실행이 끝난 때 — 실행 기록 파일(`_run_files`)의 가장 늦은 수정 시각 · 못 읽으면 None."""
     try:
-        return max(os.path.getmtime(f) for f in files if os.path.isfile(f))
+        return max(os.path.getmtime(f) for f in _run_files(path) if os.path.isfile(f))
     except (OSError, ValueError):
         return None
+
+
+def _run_bytes(path):
+    """멈춘 실행 열쇠의 둘째 칸 — 실행 기록 파일 크기의 합(재개가 기존 워커 기록에 덧붙여도 바뀐다) · 못 읽으면 None."""
+    try:
+        return sum(os.path.getsize(f) for f in _run_files(path) if os.path.isfile(f))
+    except OSError:
+        return None
+
+
+def _stall_hit(v, path, n) -> bool:
+    """멈춘 채 적은 실행의 열쇠([워커 기록 수, 기록 크기])가 지금 기록과 같은가 — 같으면 다시 읽지 않는다."""
+    return isinstance(v, list) and v == [n, _run_bytes(path)]
+
+
+def _recover_keys(record, sess, keys, runs) -> int:
+    """열쇠가 맞지 않는 실행이 있을 때만 기록 · 돌린 기록(`.1`)의 이 세션 줄에서 그 실행마다 마지막 열쇠를 `keys` 에 되살리고 수를 돌려준다 —
+    기록 줄은 썼는데 열쇠를 쓰지 못한 종료 뒤에 같은 실행을 다시 판정하지 않게(워커 기록이 그 뒤에 늘었으면 되살린 열쇠도 맞지 않는다)."""
+    want = {f"{sess}/{rid}" for rid, path, n in runs if keys.get(f"{sess}/{rid}") != n and not _stall_hit(keys.get(f"{sess}/{rid}"), path, n)}
+    found, needle = {}, '"session": ' + json.dumps(sess, ensure_ascii=False)
+    for p in (record + ".1", record) if want else ():  # 옛 파일부터 — 뒤 줄이 앞 줄을 덮는다
+        try:
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    try:
+                        ev = json.loads(line) if needle in line else None
+                    except ValueError:
+                        continue
+                    rows = ev.get("runs") if isinstance(ev, dict) and ev.get("session") == sess else None
+                    for r in rows if isinstance(rows, list) else ():
+                        k = f"{sess}/{r.get('run')}" if isinstance(r, dict) else None
+                        if k in want and isinstance(r.get("workers"), int):
+                            found[k] = [r["workers"], r["bytes"]] if isinstance(r.get("bytes"), int) else r["workers"]
+        except OSError:
+            continue
+    found = {k: v for k, v in found.items() if keys.get(k) != v}
+    for k in found:
+        keys.pop(k, None)                              # 되살린 열쇠는 새로 고친 열쇠다(상한을 넘으면 가장 늦게 버린다)
+    keys.update(found)
+    return len(found)
 
 
 def cmd_mcp_sweep(args) -> int:
@@ -1255,13 +1306,17 @@ def _sweep_session(args) -> int:
     st = read_tools_md(states[0]) if len(states) == 1 else None
     st_time = datetime.datetime.fromtimestamp(os.path.getmtime(states[0]), datetime.timezone.utc) if st else None
     sess = os.path.basename(folder)
-    cutoff = _install_time(time.time())
+    now = time.time()
+    cutoff = _install_time(now)
     tally, out_runs, new_keys, skills = collections.Counter(), [], {}, collections.Counter()
-    seen = pending = left = predated = 0
+    seen = pending = left = predated = stalled = 0
+    recovered = _recover_keys(args.record, sess, keys, runs)
     for rid, path, n in runs:
         key = f"{sess}/{rid}"
         if keys.get(key) == n:
             continue                                   # 이미 판정한 실행 — 워커 기록 수가 같다
+        if _stall_hit(keys.get(key), path, n):
+            continue                                   # 멈춘 채 적은 실행 — 워커 기록 수 · 기록 크기가 그대로다
         if seen and args.budget is not None and time.monotonic() - t0 > args.budget:
             left += 1                                  # 예산 소진 — 열쇠를 적지 않는다(실행 하나는 언제나 본다)
             continue
@@ -1277,7 +1332,9 @@ def _sweep_session(args) -> int:
             except (OSError, ValueError, AttributeError):
                 a["agentType"] = "unavailable"
             agents, done = [a], a["last_stop"] not in (None, "tool_use")
-        if not done:
+        last = None if done else _run_ended(path)
+        size = _run_bytes(path) if last is not None and now - last > SWEEP_STALE_HOURS * 3600 else None   # 멈춘 실행의 기록 크기
+        if not done and size is None:
             pending += 1                               # 끝나지 않은 실행 — 열쇠를 적지 않는다
             continue
         counted = [a for a in agents if a["agentType"] in holders]
@@ -1293,6 +1350,8 @@ def _sweep_session(args) -> int:
             verdict, word = "undecided", "UNRUN"       # 종류를 못 읽은 워커 — 세는 종류인지 모른다
         elif not counted:
             verdict, word = "n/a", "N/A"
+        elif size is not None:
+            verdict, word = "undecided", "UNRUN"       # 끝나지 않은 채 멈춘 실행 — 판정하지 않는다
         else:
             word, code, _line = audit_verdict(counted, use)
             verdict = {0: "used" if word == "MCP_AUDIT_OK" else "fallback", 1: "suspect"}.get(code, "undecided")
@@ -1303,11 +1362,16 @@ def _sweep_session(args) -> int:
                          "languages": use.get("langs") if use else None, "context7": dict(c7)})
         if before_install:
             out_runs[-1]["reason"] = "설치된 플러그인보다 먼저 끝난 실행 — 판정하지 않는다"
+        elif size is not None and verdict == "undecided":
+            out_runs[-1]["reason"] = f"끝나지 않은 채 {SWEEP_STALE_HOURS:g}시간 넘게 멈춘 실행 — 판정하지 않는다"
+            stalled += 1
+        if size is not None:
+            out_runs[-1]["bytes"] = size               # 기록에서 열쇠를 되살릴 때 쓴다
         tally[verdict] += 1
         for a in agents:
             skills.update(a["skills"])
-        new_keys[key] = n
-    if out_runs:
+        new_keys[key] = n if size is None else [n, size]
+    if out_runs or recovered:                          # 되살린 열쇠만 있어도 열쇠 파일을 다시 쓴다(기록 줄은 새 판정이 있을 때만)
         main_log = folder + ".jsonl"                   # 본 대화 기록 — 세션 폴더와 같은 이름의 형제 파일
         if os.path.isfile(main_log) and os.path.abspath(main_log) != os.path.abspath(args.record):
             skills.update(_session_skills(main_log))
@@ -1339,6 +1403,8 @@ def _sweep_session(args) -> int:
             print(f"  의심: {r['run']} {r['word']} (성공 {r['ok']} · 오류 {r['error']} · 빈 결과 {r['empty']})")
     if predated:
         print(f"  설치 전 실행 {predated} — 해당 없음(이 플러그인이 설치되기 전에 끝났다 · 판정하지 않는다)")
+    if stalled:
+        print(f"  멈춘 실행 {stalled} — 미판정({SWEEP_STALE_HOURS:g}시간 넘게 기록이 없다 · 기록이 늘면 다시 본다)")
     if pending:
         print(f"  끝나지 않은 실행 {pending} — 열쇠를 적지 않는다(다음 훑기에서 본다)")
     if left:
