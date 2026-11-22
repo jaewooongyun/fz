@@ -37,7 +37,7 @@ transcript 에서는 굳은 사실 하나만 읽는다: 첫 줄들의 entrypoint
 
 모드
   (인자 없음)                훅 — stdin JSON 하나 → stdout 결정 JSON(없으면 빈 출력) · exit 0
-  --self-test                합성 입력 141 케이스 — `PASS <case>` 줄
+  --self-test                합성 입력 148 케이스 — `PASS <case>` 줄
   --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS · Lead 직접 표 == LEAD_DIRECT_AGENTS 인가
                              (0 일치 · 1 불일치 — Lead 직접 표 없음 포함 · 2 채택 표 없음)
   --make-synthetic BYTES OUT --with-marker|--no-marker   큰 transcript 합성(첫 줄들에 entrypoint 를 둘지)
@@ -79,8 +79,8 @@ AGENT_TOOLS = {"Agent", "Task"}
 # modules/native-agents.md 채택 표와 같아야 한다 — `--check-allowlist` 가 대조한다(health-check 5.2)
 ALLOW_AGENTS = {"pr-review-toolkit:silent-failure-hunter", "pr-review-toolkit:type-design-analyzer", "pr-review-toolkit:code-simplifier"}
 # 스킬이 Lead 에게 Agent 도구로 직접 띄우라고 적은 읽기 전용 fz 에이전트(정의의 tools: 에 쓰기 도구가 없다) —
-#   modules/native-agents.md 「fz 에이전트 — Lead 가 직접 띄우는 둘」 표와 같아야 한다(`--check-allowlist` 가 대조한다)
-LEAD_DIRECT_AGENTS = {"fz:review-correctness", "fz:search-pattern"}
+#   modules/native-agents.md 「fz 에이전트 — Lead 가 직접 띄우는 셋」 표와 같아야 한다(`--check-allowlist` 가 대조한다)
+LEAD_DIRECT_AGENTS = {"fz:review-correctness", "fz:search-pattern", "fz:memory-curator"}
 LEAD_TABLE_HEADER = "Lead 가 띄우는 때"
 PHASE4_HEADER = "Phase 4"
 NOT_APPROVAL = re.compile(r"커스텀|취소|거절|중단|cancel|reject|abort", re.I)
@@ -267,7 +267,9 @@ def _gpt_call_in(cmds) -> bool:
 # 인터프리터(python · node · 셸 · perl · ruby)는 표에 없다 — 코드가 무엇을 쓰는지 읽지 않는다(쓰기 신호 표를 두지 않는다 · F-458).
 # 판정 함수는 읽기 꼴만 받는다(허용 목록) — 쓰기 모드가 있는 명령(sed -i · sort -o · find -delete · git 쓰기 하위 명령 …)의 표 밖 꼴은 미상이다.
 # 옵션은 따옴표와 무관하게 옵션이다(`'-i'` 도 프로그램에는 -i). 펼쳐지는 인자(`"$W/a"` · `$SHA`)는 값(경로 · 리비전 · 줄 번호)으로 본다 —
-# ponytail: 펼친 값이 옵션이 되는 꼴(`X=--output=f; git diff $X`)은 만든 꼴이라 보지 않는다. 프로그램 · 하위 명령 자리의 펼침은 거절한다
+# ponytail: 펼친 값이 옵션이 되는 꼴(`X=--output=f; git diff $X`)은 만든 꼴이라 보지 않는다. 프로그램 · 하위 명령 자리의 펼침은 거절한다.
+# 이 값 규칙은 print · PLUGIN_READ 의 gate_check.py 판정에는 없다 — 그 둘은 옵션이 설 수 있는 자리(print 는 `--` · 첫 글자 그대로의
+# 피연산자 앞, gate_check.py 는 `--status` 뒤 원장 자리)의 펼침을 거절한다
 _EXPANSION = re.compile(r"\$\{[^{}]*\}|\$\((?:[^()]|\([^()]*\))*\)|`[^`]*`|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9?#@*$!-]")
 
 
@@ -383,13 +385,44 @@ def _sed_reads(args) -> bool:
 
 
 _AWK_RE_LEAD = frozenset("(,{};!~&|?:=\n")         # 이 글자(공백 제외) 뒤 '/' 는 정규식 리터럴의 시작이다 — 그 밖(나눗셈 · print 뒤)은 리터럴로 보지 않는다
+                                                   # (그 '/' 뒤에 리터럴이 다시 열리면 경계를 정하지 못한다 — _awk_bare 가 원문을 돌려준다)
+
+
+def _awk_open_class(body: str) -> bool:
+    """정규식 본문(닫는 '/' 앞까지)이 대괄호 표현 안에서 끝나는가 — gawk 는 `[/]` 의 '/' 에서 정규식을 닫지 않는다. `[` 바로 뒤(`^` 다음 포함)의
+    `]` 는 글자이고, 안의 `[:이름:]` · `[.x.]` · `[=x=]` 는 짝까지 건너뛴다(짝이 없으면 열린 것으로 본다)."""
+    k, n, cls = 0, len(body), False
+    while k < n:
+        ch = body[k]
+        if ch == "\\":
+            k += 2
+            continue
+        if not cls:
+            if ch == "[":
+                cls, k = True, k + 1
+                k += 1 if body[k:k + 1] == "^" else 0
+                k += 1 if body[k:k + 1] == "]" else 0
+                continue
+        elif ch == "[" and body[k + 1:k + 2] in (":", ".", "="):
+            e = body.find(body[k + 1] + "]", k + 2)
+            if e < 0:
+                return True
+            k = e + 2
+            continue
+        elif ch == "]":
+            cls = False
+        k += 1
+    return cls
 
 
 def _awk_bare(s: str) -> str:
     """awk 프로그램에서 문자열 "…" 과 정규식 자리의 /…/ 를 `_` 하나로 바꾼 글 — `|` 판정만 이 글에 한다(system( · print > 는 원문에 한다).
-    한 번의 왼→오 훑기다. 리터럴 안 역슬래시는 다음 글자를 감싸고, 대괄호 안 '/' 도 정규식을 닫는다(one-true-awk 판독 — 일찍 닫으면 덜 지운다).
-    닫는 따옴표 · '/' 가 같은 줄에 없으면 그 뒤를 지우지 않는다. 리터럴 밖 역슬래시는 다음 글자와 함께 넘긴다(줄 이음 · 앞 글자를 바꾸지 않는다)."""
-    out, prev, i, n = [], "", 0, len(s)
+    한 번의 왼→오 훑기다. 리터럴 안 역슬래시는 다음 글자를 감싸고, 닫는 따옴표 · '/' 가 같은 줄에 없으면 그 뒤를 지우지 않는다. 리터럴 밖
+    역슬래시는 다음 글자와 함께 넘긴다(줄 이음 · 앞 글자를 바꾸지 않는다).
+    ⛔ 경계를 정하지 못하면 원문을 그대로 돌려준다(옛 판정 — 원문의 `|` 하나라도 파이프): 나눗셈으로 본 '/' 뒤에 리터럴이 다시 열린다(그 '/' 가
+    print · printf · return · 연산자 뒤 등 훑기가 모르는 자리의 정규식이면 안의 따옴표 · '/' 가 뒤의 진짜 파이프를 지운다) · 정규식 본문이
+    대괄호 표현 안에서 끝난다(_awk_open_class — 구현마다 그 '/' 에서 닫는지가 다르다)."""
+    out, prev, i, n, div = [], "", 0, len(s), False
     while i < n:
         c = s[i]
         if c == "\\":
@@ -397,14 +430,19 @@ def _awk_bare(s: str) -> str:
             i += 2
             continue
         if c == '"' or (c == "/" and (not prev or prev in _AWK_RE_LEAD)):
+            if div:
+                return s                           # 앞의 나눗셈 '/' 가 정규식이었다면 이 리터럴 경계는 틀린다
             j = i + 1
             while j < n and s[j] not in (c, "\n"):
                 j += 2 if s[j] == "\\" else 1
             if j >= n or s[j] != c:
                 return "".join(out) + s[i:]
+            if c == "/" and _awk_open_class(s[i + 1:j]):
+                return s                           # `[/]` — gawk 는 이 '/' 에서 닫지 않는다
             out.append("_")
             prev, i = "_", j + 1
             continue
+        div = div or c == "/"
         out.append(c)
         prev = prev if c in " \t" else c
         i += 1
@@ -609,10 +647,17 @@ def _gh_reads(args) -> bool:
 
 
 def _print_reads(args) -> bool:
-    """zsh print — 옵션이 -r · -n · -l(묶음 포함) · -- 뿐이다. 첫 피연산자 · `--` 뒤는 값이다(펼쳐지는 피연산자도 값 — 위 표 머리).
-    -s · -z · -u · -p · -S · -v 같은 표 밖 옵션 · 홀로 선 `-` · 펼쳐지는 옵션 단어(`-$O`)는 거절한다(히스토리 · 편집 버퍼 · 다른 fd 에 쓴다)."""
+    """zsh print — 옵션이 -r · -n · -l(묶음 포함) · -- 뿐이다. `--` 뒤 · 첫 글자 그대로의 피연산자부터는 값이다(뒤 펼침도 값).
+    그 앞의 펼쳐지는 단어(`"$O"` · `${O}` · `$(…)` · 백틱 · `-$O`)는 옵션이 될 수 있어 거절한다(`O=-v` → 변수에 쓴다 · 빈 값은 사라진다).
+    -s · -z · -u · -p · -S · -v 같은 표 밖 옵션 · 홀로 선 `-` 는 거절한다(히스토리 · 편집 버퍼 · 다른 fd 에 쓴다).
+    세션 셸이 zsh 일 때만 읽기다 — 훅이 보는 신호는 SHELL 환경 변수의 basename 하나다(휴리스틱: Bash 도구가 실제로 띄우는 셸은 보지 못한다).
+    그 밖(bash · sh · 빈 값 · 없음)이면 print 는 PATH 의 다른 프로그램일 수 있어(mailcap 의 print 동작 등) 표 밖 이름처럼 거절한다."""
+    if os.path.basename(os.environ.get("SHELL") or "") != "zsh":
+        return False
     for w in args:
         t = w.text
+        if w.expands:
+            return False
         if t == "--" or not t.startswith("-"):
             return True
         if not re.fullmatch(r"-[rnl]+", t):
@@ -633,17 +678,20 @@ READ.update({"sed": _sed_reads, "awk": _awk_reads, "find": _find_reads, "sort": 
              "date": lambda a: all(w.text.startswith("+") or (w.text.startswith("-") and not w.text.startswith(("-s", "--set"))) for w in a),
              "base64": lambda a: not any(w.text.startswith(("-o", "--output")) for w in a)})
 # 승인 전 창에서 부르는 플러그인 스크립트 — 읽기만 하거나 플러그인 자기 상태(~/.fz)만 쓴다. 이름: 받는 하위 명령(None = 전부) |
-#   판정 함수(인자 → 읽기 꼴인가). gate_check.py 는 `--status <원장>`(파싱만 · CHECK 미실행)만 읽기다 — 다른 인자는 원장을 쓸 수 있다
+#   판정 함수(인자 → 읽기 꼴인가). gate_check.py 는 `--status <원장>`(파싱만 · CHECK 미실행)만 읽기다 — 다른 인자는 원장을 쓸 수 있다.
+#   원장은 펼침 없는 글자 그대로다(펼친 값은 옵션 하나 · 여럿이 될 수 있다) · 판정 함수 꼴은 앞에 환경 대입 · env 래퍼가 없을 때만(_plugin_reads)
 PLUGIN_READ = {"gpt-choice.sh": {"get", "decide", "options"}, "autonomy_decide.py": None, "mode_gate.py": None, "intent_route_probe.py": None,
-               "gate_check.py": lambda a: len(a) == 2 and a[0].text == "--status" and not a[1].text.startswith("-")}
+               "gate_check.py": lambda a: len(a) == 2 and a[0].text == "--status" and not a[1].expands and not a[1].text.startswith("-")}
 MOVERS = {"cd", "pushd", "popd"}
 # 대상이 보이는 쓰기 명령 — 받는 옵션 글자 묶음(값 받는 옵션 · 긴 옵션 · 표 밖 글자면 대상 미상) · `--` 뒤는 전부 대상
 WRITE_ARGS = {"tee": "aip", "rm": "rfRivdPWx", "touch": "acmh", "mkdir": "pv", "cp": "RrfinpvacHLPXx", "mv": "finvh"}
 
 
-def _plugin_reads(n: str, name, args) -> bool:
+def _plugin_reads(n: str, name, args, env_prefix=False) -> bool:
     """`bash …/scripts/gpt-choice.sh get` · `python3 …/scripts/mode_gate.py …` 처럼 PLUGIN_READ 의 스크립트를 부르는가 —
-    스크립트 경로는 펼쳐져도 된다(`${FZ_PLUGIN_ROOT}`) · 마지막 두 마디(scripts/이름)와 하위 명령 글자(또는 그 이름의 판정 함수)로 가린다."""
+    스크립트 경로는 펼쳐져도 된다(`${FZ_PLUGIN_ROOT}`) · 마지막 두 마디(scripts/이름)와 하위 명령 글자(또는 그 이름의 판정 함수)로 가린다.
+    판정 함수가 있는 이름(gate_check.py)은 env_prefix(앞에 `NAME=값` 대입 · env 래퍼)가 없을 때만 읽기다 — 그 스크립트는 환경 값
+    `FZ_GATES_TRACE` 가 가리키는 파일에 호출 기록을 덧붙인다."""
     if re.fullmatch(r"python[0-9.]*|bash|sh|zsh", n):
         if not args:
             return False
@@ -654,7 +702,7 @@ def _plugin_reads(n: str, name, args) -> bool:
         return False
     subs = PLUGIN_READ[base]
     if callable(subs):
-        return subs(args)
+        return not env_prefix and subs(args)
     return subs is None or (bool(args) and not args[0].expands and args[0].text in subs)
 
 
@@ -799,6 +847,25 @@ def _self_calls(toks) -> set:
             for t in _deep(f.body) if isinstance(t, shell_tokens.Word) and t.text == f.name}
 
 
+def _assigned(toks) -> set:
+    """대입(`NAME=값`)을 앞에 둔 단어(id) — 같은 단순 명령(연산자 · 함수 정의 사이) 안에서 대입 단어 뒤에 오는 단어 · 모든 깊이."""
+    out = set()
+
+    def walk(ts):
+        seen = False
+        for t in ts:
+            if isinstance(t, (shell_tokens.Op, shell_tokens.Func)):
+                seen = False
+            elif isinstance(t, shell_tokens.Word):
+                if seen:
+                    out.add(id(t))
+                seen = seen or t.assign
+            for sub in shell_tokens.nested(t)[1]:
+                walk(sub)
+    walk(toks)
+    return out
+
+
 def write_sites(cmd, fragment=False, known=()):
     """명령의 쓰기 자리 — [(대상 Word | None, Cmd)] · None 이면 못 읽었다(표 밖 꼴 · 토크나이저 없음).
     대상 None = 그 명령이 대상을 모르는 쓰기다(읽기 표 밖 이름 · 명령 자리 미상 · 펼쳐지는 명령 이름 · WRITE_ARGS 의 표 밖 옵션 · xargs 뒤).
@@ -819,7 +886,7 @@ def write_sites(cmd, fragment=False, known=()):
     if shell_tokens.is_unknown(cmds):
         return None
     ends, runs_at, known, out = defined_functions(toks), _runs_at(toks), set(known), []
-    selfc = _self_calls(toks)
+    selfc, assigned = _self_calls(toks), _assigned(toks)
     for c in cmds:
         out += [(r.target, c) for r in c.redirs if r.op in WRITE_OPS or (r.op == ">&" and not re.fullmatch(r"[0-9]+|-", r.target.text))]
         if c.unsure:
@@ -828,7 +895,7 @@ def write_sites(cmd, fragment=False, known=()):
         if c.name is None:
             continue
         n = os.path.basename(c.name.text)
-        if c.name.text.startswith("((") or _plugin_reads(n, c.name, c.args):
+        if c.name.text.startswith("((") or _plugin_reads(n, c.name, c.args, "env" in c.via or id(c.name) in assigned):
             continue                               # 산술 명령(안의 치환은 토크나이저가 거절한다) · 승인 전 창 플러그인 스크립트
         if c.name.expands:
             out.append((None, c))                  # `$CMD x` — 무엇을 실행하는지 모른다
@@ -916,7 +983,7 @@ def _uncase(cmd: str) -> str:
     if shell_tokens is None or "case" not in cmd or "`" in cmd or "<<" in cmd:
         return cmd
     out = cmd
-    for _ in range(CASE_MAX):
+    for _ in range(CASE_MAX + 1):                  # 마지막 차례는 CASE_MAX 개를 편 뒤 남은 case 가 없는지 본다 — 남았으면 상한 밖
         toks = shell_tokens.lex(out)
         if not (shell_tokens.is_unknown(toks) and toks.why == "case"):
             return out
@@ -1626,6 +1693,21 @@ def self_test() -> int:
     def blocked(o):
         return (o or {}).get("decision") == "block"
 
+    @contextlib.contextmanager
+    def login_shell(path):                          # print 판정은 SHELL 을 본다 — 셀이 값을 정하고 끝나면 되돌린다(None = 지운다)
+        old = os.environ.get("SHELL")
+        if path is None:
+            os.environ.pop("SHELL", None)
+        else:
+            os.environ["SHELL"] = path
+        try:
+            yield
+        finally:
+            if old is None:
+                os.environ.pop("SHELL", None)
+            else:
+                os.environ["SHELL"] = old
+
     W = {"file_path": "/srv/demo/a.swift", "content": "x"}
 
     def last_response(s):
@@ -2255,7 +2337,7 @@ def self_test() -> int:
     @cell
     def r4_awk_grid():
         # 리터럴 종류 → (프로그램 꼴 · 리터럴 종류) — {c} = 리터럴 안 글자 · {act} = 같은 동작 안 뒤 문장. 정규식 자리 = '/' 앞의 공백 아닌 글자가
-        #   없거나 ( , { } ; ! ~ & | ? : = 줄바꿈이다 — 나눗셈 · print 뒤 '/' 는 리터럴로 보지 않는다
+        #   없거나 ( , { } ; ! ~ & | ? : = 줄바꿈이다 — 나눗셈 · print 뒤 '/' 는 리터럴로 보지 않고, 그 뒤에 리터럴이 열리면 원문 판정이다
         kinds = {"head": ("/{c}/ {{ print $1{act} }}", "regex"), "tilde": ("$1 ~ /{c}/ {{ print $2{act} }}", "regex"),
                  "not-tilde": ("$1 !~ /{c}/ {{ print $2{act} }}", "regex"), "arg": ("{{ if (match($0, /{c}/)) print RSTART{act} }}", "regex"),
                  "string": ('{{ print "{c}"{act} }}', "string"), "division": ("{{ x = $1 /{c}/ 2; print x{act} }}", None),
@@ -2274,18 +2356,35 @@ def self_test() -> int:
                     for mn, mark in marks.items():
                         prog = shape.format(c="a" + esc + ("|" if pn == "inside" else "") + "b", act=act + mark)
                         for form, word in (("literal", "'" + prog + "'"), ("expanded", dq(prog))):
-                            # 판정이 바뀌는 칸: `|` 가 정규식 자리 /…/ · 문자열 안에만 있다(대괄호 안 '/' 는 정규식을 닫는다 — one-true-awk 판독)
+                            # 판정이 바뀌는 칸: `|` 가 정규식 자리 /…/ · 문자열 안에만 있다(대괄호 안 '/' 에서 끝나는 정규식은 원문 판정)
                             lit_pipe = pn == "inside" and (lit == "string" or (lit == "regex" and en != "bracket"))
                             want = not (form == "literal" and mn == "none" and (pn == "or" or lit_pipe))
                             got, n = bash_write(f"awk {word} f"), n + 1
                             if got != (want, []):
                                 bad.append((f"awk {word} f", got))
-        # 닫히지 않은 리터럴(같은 줄에 닫는 글자 없음)은 지우지 않는다 · 리터럴 뒤 '/' 는 나눗셈이다 — 뒤의 진짜 파이프가 남는다
+        # 닫히지 않은 리터럴(같은 줄에 닫는 글자 없음)은 지우지 않는다 · 리터럴 뒤 '/' 는 나눗셈이다 · 줄 이음(역슬래시 줄바꿈) 뒤 '/' 도 그 앞 글자로
+        #   가린다 — 뒤의 진짜 파이프가 남는다
         bad += [c for c in ("awk '/a|b { print | \"sh\" }' f", "awk '{ print \"a|b }' f", "awk '/a\n|b/ { print }' f",
-                            "awk '{ x = \"10\" / 2; print x | \"sh\"; y = z / 3 }' f") if bash_write(c) != (True, [])]
+                            "awk '{ x = \"10\" / 2; print x | \"sh\"; y = z / 3 }' f", "awk '{ x = $1 \\\n/ 2; print x | \"sh\"; y = z / 3 }' f")
+                if bash_write(c) != (True, [])]
         case(f"r4-awk-literal-pipe-grid — awk 프로그램의 리터럴 종류 × `|` 자리 × 이스케이프 × 다른 쓰기 표지 × 펼침({n}칸): 정규식 자리 /…/ · 문자열 "
              "안 `|` 만 파이프가 아니다 · print | · | getline · |& · print > · system( · 펼친 프로그램 · 나눗셈 뒤 '/' · 닫히지 않은 리터럴은 쓰기 그대로",
              n == 840 and not bad, (len(bad), bad[:3]))
+
+    @cell
+    def rp_g03_awk_unsettled():
+        # 리터럴 경계를 정하지 못하는 꼴 — 훑기가 나눗셈으로 본 '/'(print · printf · return · + 뒤)가 awk 에서는 정규식이고 그 안 따옴표 · '/' 가
+        #   뒤의 진짜 파이프를 지운다 · 대괄호 안 '/'(gawk 는 거기서 닫지 않는다) → 원문의 `|` 로 판정한다
+        writes = ["awk '{ print /a\"b/; print | \"sh\" }' f.txt", "awk '/[/]\"/ { print | \"sh\" }' f.txt", "awk '{ print | \"sh\" }' f.txt",
+                  "awk 'BEGIN { print /\"/ | \"touch out.txt\" }'", "awk '{ printf /a\"b/; print | \"sh\" }' f.txt",
+                  "awk 'function f() { return /a\"b/ } { print | \"sh\" }' f.txt", "awk '{ x = 1 + /a\"b/; print | \"sh\" }' f.txt",
+                  "awk '{ print /a=/; print | \"sh\"; y = /c/ }' f.txt", "awk '/[[:alpha:]/]\"/ { print | \"sh\" }' f.txt"]
+        reads = ["awk '{ print $1 }' f.txt", "awk '/a|b/ { print $1 }' f.txt", "awk '$1 ~ /x\"|y/ { print }' f.txt", "awk '/[a-z]|x/ { n++ }' f.txt",
+                 "awk '{ print \"a|b\", $1 / 2 }' f.txt", "awk '/a|b/ { x = $1 / 2 }' f.txt"]   # 경계가 정해진 꼴 · 리터럴 뒤 나눗셈
+        bad = [c for c in writes if bash_write(c) != (True, [])] + [c for c in reads if bash_write(c) != (False, [])]
+        case("rp-g03-awk-unsettled-literal — awk 프로그램에서 나눗셈으로 본 '/' 뒤에 리터럴이 다시 열리거나 정규식 안 대괄호가 닫히기 전에 '/' 를 만나면 "
+             "원문의 `|` 로 판정한다(print · printf · return · 연산자 뒤 정규식 · [/] 의 따옴표가 진짜 파이프를 숨기지 못한다) · 경계가 정해진 꼴은 읽기",
+             not bad, bad)
 
     @cell
     def r4_print_grid():
@@ -2293,16 +2392,37 @@ def self_test() -> int:
                 "-p": False, "-S": False, "-v out": False, "-": False, "-$O": False}
         tails = {"": True, " 2>/dev/null": True, " > /w/work/out.txt": False, " >> /w/work/out.txt": False}
         bad, n = [], 0
-        for o, o_ok in opts.items():
-            for a in ("hello", '"$x"', "-s"):
-                for t, t_ok in tails.items():
-                    cmd = " ".join(x for x in ("print", o, a) if x) + t
-                    read = o_ok and t_ok and (a != "-s" or "--" in o.split())   # 옵션 뒤 `-s` 는 `--` 뒤에서만 값이다
-                    got, n = bash_write(cmd), n + 1
-                    if got[0] == read:
-                        bad.append((cmd, got))
+        with login_shell("/bin/zsh"):
+            for o, o_ok in opts.items():
+                for a in ("hello", '"$x"', "-s"):
+                    for t, t_ok in tails.items():
+                        cmd = " ".join(x for x in ("print", o, a) if x) + t
+                        read = o_ok and t_ok and (a == "hello" or "--" in o.split())   # 옵션 뒤 `-s` · 펼침은 `--` 뒤에서만 값이다
+                        got, n = bash_write(cmd), n + 1
+                        if got[0] == read:
+                            bad.append((cmd, got))
         case(f"r4-zsh-print-grid — zsh print 의 옵션 × 인자 × 리다이렉트({n}칸): -r · -n · -l · -- 만 든 꼴은 읽기 · -s · -z · -u · -p · -S · -v · - · "
-             "펼친 옵션 · `--` 앞 -s 인자 · 진짜 리다이렉트는 쓰기", not bad, (len(bad), bad[:3]))
+             "펼친 옵션 · `--` 앞 -s · 펼친 인자 · 진짜 리다이렉트는 쓰기", not bad, (len(bad), bad[:3]))
+
+    @cell
+    def rp_g01_print():
+        # 옵션이 설 수 있는 자리(`--` · 첫 글자 그대로의 피연산자 앞)의 펼침은 옵션이 될 수 있다(`O=-v` → print -v 는 변수에 쓴다 · 빈 값은 사라진다)
+        writes = ['O=-v; print "$O" answer hi', "print ${O} hi", "print -r $(printf %s -s) x", "print -n `echo -z` x", 'print -l "$O" -- x',
+                  "print -v answer hi"]
+        reads = ['print -- "$O" answer', "print -r -- ${O} x", 'print hello "$O"', "print -rn -- $(date +%F)"]   # `--` · 첫 피연산자 뒤는 값
+        with login_shell("/bin/zsh"):
+            bad = [c for c in writes if bash_write(c) != (True, [])] + [c for c in reads if bash_write(c) != (False, [])]
+        case("rp-g01-print-expansion-option — zsh print 의 `--` · 첫 글자 그대로의 피연산자 앞 펼침(\"$O\" · ${O} · $(…) · 백틱)은 옵션이 될 수 있어 "
+             "쓰기 · `--` 뒤 · 첫 피연산자 뒤 펼침은 값이라 읽기", not bad, bad)
+
+    @cell
+    def rp_g05_print_zsh_only():
+        got = []
+        for sh in ("/bin/zsh", "/usr/local/bin/zsh", "/bin/bash", "/bin/sh", "", None):
+            with login_shell(sh):
+                got.append(bash_write("print -r -- x"))
+        case("rp-g05-print-zsh-session-only — print 읽기 꼴은 SHELL 의 basename 이 zsh 일 때만 읽기다 · bash · sh · 빈 값 · 없음이면 print 는 PATH 의 "
+             "다른 프로그램일 수 있어 대상 미상 쓰기", got == [(False, [])] * 2 + [(True, [])] * 4, got)
 
     @cell
     def r4_case_grid():
@@ -2338,11 +2458,18 @@ def self_test() -> int:
              not bad, (len(bad), bad[:3]))
 
     @cell
+    def rp_g02_case_bound():
+        one = 'case "$x" in a) echo 0;; esac'
+        got = [bash_write("; ".join([one] * k)) for k in (CASE_MAX - 1, CASE_MAX, CASE_MAX + 1)]
+        case(f"rp-g02-case-bound — 읽기만 든 case 복합문 {CASE_MAX - 1} · {CASE_MAX}개(CASE_MAX)는 읽기 · {CASE_MAX + 1}개는 상한 밖이라 대상 미상 쓰기",
+             got == [(False, [])] * 2 + [(True, [])], got)
+
+    @cell
     def r4_gate_status_grid():
         heads = {"python3 scripts/gate_check.py": True, 'python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py"': True,
                  "python3 /x/plugin/scripts/gate_check.py": True, "scripts/gate_check.py": True, "python3 other/gate_check.py": False,
                  'python3 "$G"': False, "python3 -B scripts/gate_check.py": False}
-        tails = {"--status gates/plan.md": True, '--status "$L"': True, "--status gates/plan.md 2>&1": True, "--status": False,
+        tails = {"--status gates/plan.md": True, '--status "$L"': False, "--status gates/plan.md 2>&1": True, "--status": False,
                  "--status --only S1 gates/plan.md": False, "--confirm G1 gates/plan.md": False, "--set-state active gates/plan.md": False,
                  "gates/plan.md": False, "--stat gates/plan.md": False, "--finalize gates/plan.md": False, "--status gates/plan.md gates/b.md": False,
                  "gates/plan.md --status": False, '"$SUB" gates/plan.md': False, "--status gates/plan.md > /w/work/o.txt": False,
@@ -2350,7 +2477,29 @@ def self_test() -> int:
         got = {f"{h} {t}": bash_write(f"{h} {t}") for h in heads for t in tails}
         bad = [(f"{h} {t}", got[f"{h} {t}"]) for h, h_ok in heads.items() for t, t_ok in tails.items() if got[f"{h} {t}"][0] == (h_ok and t_ok)]
         case(f"r4-gate-check-status-grid — 판정기 호출 꼴 × 인자({len(got)}칸): scripts/gate_check.py --status <원장> 만 플러그인 읽기 · 다른 인자 · "
-             "인자 하나 더 · 축약 · 펼친 하위 자리 · 경로 밖 이름 · 인터프리터 옵션 · 진짜 리다이렉트는 쓰기", not bad, bad[:3])
+             "인자 하나 더 · 축약 · 펼친 하위 자리 · 펼친 원장 · 경로 밖 이름 · 인터프리터 옵션 · 진짜 리다이렉트는 쓰기", not bad, bad[:3])
+
+    @cell
+    def rp_g01_gate_status():
+        # 원장 자리의 펼침은 옵션 하나 또는 여럿이 될 수 있다(`$ARGS` → --set-state active …) — `--status <글자 그대로의 경로>` 만 읽기다
+        g = "python3 scripts/gate_check.py --status"
+        writes = [f'ARGS="--set-state active gates/plan.md"; {g} $ARGS', f'{g} "$L"', f"{g} ${{L}}", f"{g} $(ls gates/plan.md)", f"{g} `ls gates`",
+                  f'{g} "$W/gates/plan.md"']
+        reads = [f"{g} gates/plan.md", 'python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status /w/work/gates/plan.md']
+        bad = [c for c in writes if bash_write(c) != (True, [])] + [c for c in reads if bash_write(c) != (False, [])]
+        case("rp-g01-gate-status-expansion — gate_check.py --status 뒤 원장 자리의 펼침(`$ARGS` · \"$L\" · ${L} · $(…) · 백틱 · \"$W/…\")은 옵션이 될 수 "
+             "있어 쓰기 · 글자 그대로의 원장만 읽기(스크립트 경로의 펼침은 그대로 받는다)", not bad, bad)
+
+    @cell
+    def rp_g04_gate_status_env():
+        # gate_check.py 는 FZ_GATES_TRACE 가 가리키는 파일에 호출 기록을 덧붙인다 — 환경 대입 · env 래퍼를 앞에 둔 꼴은 읽기가 아니다
+        g = "python3 scripts/gate_check.py --status gates/plan.md"
+        writes = [f"FZ_GATES_TRACE=/w/work/trace.jsonl {g}", f"env FZ_GATES_TRACE=/w/work/trace.jsonl {g}", f"env {g}", f"LC_ALL=C {g}",
+                  f"X=1 2>/dev/null {g}", f"echo a; FZ_GATES_TRACE=/w/work/t.jsonl {g}"]
+        reads = [g, f"{g} 2>&1", f"echo a && {g}"]
+        bad = [c for c in writes if bash_write(c) != (True, [])] + [c for c in reads if bash_write(c) != (False, [])]
+        case("rp-g04-gate-status-env-prefix — gate_check.py --status 앞에 환경 대입(NAME=값) · env 래퍼가 있으면 대상 미상 쓰기(FZ_GATES_TRACE 가 쓸 "
+             "파일을 정한다) · 맨 꼴은 읽기", not bad, bad)
 
     @cell
     def r4_nw173():
@@ -2375,7 +2524,8 @@ def self_test() -> int:
                   "python3 - <<'EOF'\nimport json\nprint(json.load(open('/w/work/a.json')))\nEOF",
                   "awk '{print $1}' /w/work/a.tsv > /w/work/b.txt", 'print -r -- "$x" > /w/work/out.md']
         s = fz("r4rp")
-        got = [kind(s.pre("Bash", B(c))) for c in reads + writes]
+        with login_shell("/bin/zsh"):                # print -- 꼴은 zsh 세션에서만 읽기다
+            got = [kind(s.pre("Bash", B(c))) for c in reads + writes]
         case(f"r4-p4-blocked-replay — 승인 전 창이 막던 꼴 재현: 읽기 꼴만 든 {len(reads)}개(awk 정규식 · 문자열 안 `|` · print -- · case · "
              f"gate_check --status)는 풀리고 쓰기가 든 {len(writes)}개(인터프리터 코드 · 진짜 리다이렉트)는 막힌다",
              got == [None] * len(reads) + ["deny"] * len(writes), got)
@@ -2597,6 +2747,14 @@ def self_test() -> int:
         case("agent-fz-lead-direct-allowed", got == [None] * 2, got)
 
     @cell
+    def rp_g07_memory_curator():
+        s = fz("rpg07")
+        cur = s.pre("Agent", {"subagent_type": "fz:memory-curator", "model": "sonnet", "prompt": "x"})
+        other = s.pre("Agent", {"subagent_type": "fz:plan-structure", "prompt": "x"})
+        case("rp-g07-memory-curator-lead-direct — 스킬이 Lead 에게 직접 띄우라고 적은 fz:memory-curator 는 알리지 않는다 · 목록 밖 fz 에이전트는 그대로 알린다",
+             cur is None and kind(other) is None and warned(other, "fz-guard AG"), (cur, other))
+
+    @cell
     def c26e():
         s = fz("c26e")
         got = [s.pre("Agent", {"subagent_type": t}) for t in ("fz:impl-correctness", "fz:plan-structure", "search-pattern", "review-correctness")]
@@ -2604,7 +2762,7 @@ def self_test() -> int:
              and all(warned(o, "Lead 가 직접 띄우는 fz 에이전트") for o in got), got)
 
     adopted = ["pr-review-toolkit:silent-failure-hunter", "pr-review-toolkit:type-design-analyzer", "pr-review-toolkit:code-simplifier"]
-    lead = ["fz:review-correctness", "fz:search-pattern"]
+    lead = ["fz:review-correctness", "fz:search-pattern", "fz:memory-curator"]
 
     def allow_check(tag, adopted_names, lead_names):
         """채택 표 · Lead 직접 표를 가진 합성 문서로 --check-allowlist 를 돈다 — 이름 목록이 None 이면 그 표가 없다."""

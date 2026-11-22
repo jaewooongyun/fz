@@ -959,7 +959,8 @@ def _touched_since(path: Path, ts) -> bool:
     """원장이 그 쓰기 시각(`ts` — epoch 초) 뒤에 고쳐졌는가 — 수정 시각 ≥ `ts` − `UNKNOWN_WRITE_SLACK_S`. `ts` 가 None 이거나 원장
     수정 시각을 못 읽으면 True(지금처럼 후보 — fail-closed).
 
-    - Warning: 쓰기 뒤에 수정 시각을 과거로 되돌린 원장(`cp -p` · `touch -d` · 체크아웃)은 False 다 — 받아들인 놓침 칸이다.
+    - Warning: 쓰기 뒤에 수정 시각을 과거로 되돌린 원장(`cp -p` · `touch -d` · 체크아웃)과 원본의 수정 시각을 그대로 가져온 원장(`mv` ·
+      `rsync -a` · `tar -x` — 오래된 초안을 원장 자리로 옮긴 꼴)은 False 다 — 받아들인 놓침 칸이다.
     """
     if ts is None:
         return True
