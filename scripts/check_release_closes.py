@@ -6,7 +6,7 @@
 (실측 F-550 — v4.52.0 에서 고쳤는데 Closes 누락). 이 검사기는 기대 집합을 **실행 때** live 엔트리의
 `applied: full` 에서 계산해 노트와 대조한다 — 해시로 고정한 표가 없다(F-401: 판 중간에 생긴 엔트리를 놓친다).
 
-위반 일곱:
+위반 여덟:
   (a) applied: full 인데 Closes 에 없다
   (b) Closes 토큰의 엔트리가 applied: partial 이다(applied 가 없으면 WARN)
   (c) applied full|partial 인데 applied_ref 가 없음 · pending · 없는 커밋 · HEAD 비조상
@@ -19,6 +19,10 @@
   (g) 판정 재료가 규약 밖 — applied 값이 full · partial · 없음 밖(오타 · 따옴표 · 빈 값) · applied_ref_era 값이 pre-rewrite · 없음 밖 ·
       `F-*.md` 이름이 `F-NNN-slug` 밖
       (조용히 건너뛰면 그 엔트리가 기대 집합에서 사라진다 · ID 는 eject · hygiene 과 같은 세 자리 — 넓히면 검사만 통과하고 배출이 거부한다)
+  (h) `--expect-ref <태그|SHA>` 를 주면 `--repo` 의 HEAD 가 그 커밋(태그는 가리키는 커밋으로 벗긴다)이어야 한다 — 아니면 다른 대조를
+      하지 않고 위반 하나로 끝낸다. (c) 의 실재 · 조상은 저장소 상태라 출하할 저장소 밖에서 돌리면 위반을 가리거나 거짓 위반을 만든다(F-725).
+      풀리지 않는 값(이 저장소에 없는 태그 · SHA · 빈 값)은 판정 불가(2)다. 옛 객체가 있는지는 저장소 정체성 판정에 쓰지 않는다 —
+      옛 객체를 가진 정상 저장소가 있다(재작성 전 표시는 객체가 있으면 그대로 검사한다)
 같은 ID 의 live 엔트리가 둘 이상이면 판정 불가(2) — slug 를 ID 로 접으면 하나만 닫아도 형제가 통과한다.
 `## 반영` 머리만 있고 applied 가 없는 엔트리는 기대 집합에 넣지 않고 NOTE 로만 보인다.
 
@@ -135,7 +139,8 @@ def pre_rewrite_absent(repo: pathlib.Path, ref, era):
     return False
 
 
-def check(root: pathlib.Path, note: pathlib.Path, repo: pathlib.Path, ledger: pathlib.Path | None = None) -> int:
+def check(root: pathlib.Path, note: pathlib.Path, repo: pathlib.Path, ledger: pathlib.Path | None = None,
+          expect_ref: str | None = None) -> int:
     entries = root / "entries"
     ledger = ledger or repo / "modules" / "promotion-ledger.md"
     for what, ok in (("레지스트리 entries/", entries.is_dir()), ("릴리스 노트", note.is_file()), ("원장", ledger.is_file())):
@@ -150,6 +155,19 @@ def check(root: pathlib.Path, note: pathlib.Path, repo: pathlib.Path, ledger: pa
     if head.returncode != 0:
         print(f"UNRUN: {repo} 가 git 저장소가 아니다 — 판정 불가")
         return UNRUN
+    if expect_ref is not None:   # ⛔ 넘긴 빈 값(`"$(…)"` 조회 실패)은 생략이 아니다 — 대조를 건너뛰면 아무 저장소에서나 통과한다
+        ref = expect_ref.strip()   # 태그는 `^{commit}` 으로 벗긴다(주석 태그도 가리키는 커밋으로) · `-` 로 시작해도 옵션으로 읽지 않는다
+        want = _git(repo, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{ref}^{{commit}}") if ref else None
+        if want is None or want.returncode != 0 or not want.stdout.strip():
+            print(f"UNRUN: --expect-ref {expect_ref!r} 를 {repo} 에서 커밋으로 풀지 못했다 — 출하 대상(태그 · SHA)이 이 저장소에 없거나 "
+                  "모호하다(판정 불가 · 출하할 저장소에서 다시 돈다)")
+            return UNRUN
+        h, w = head.stdout.strip(), want.stdout.strip()
+        if h != w:
+            print(f"  (h) --repo {repo} 의 HEAD {h[:12]} 가 --expect-ref {ref}({w[:12]}) 가 아니다 — applied_ref 실재 · 조상은 "
+                  "저장소 상태라 출하할 저장소 · 커밋에서 다시 돈다(F-725)")
+            print("VIOLATION: 1건 (출하 대상 불일치 — 이 저장소 상태 위의 다른 대조는 하지 않았다)")
+            return VIOLATION
     try:
         rows = read_entries(entries)
         note_text, ledger_text = note.read_text(encoding="utf-8"), ledger.read_text(encoding="utf-8")
@@ -287,12 +305,12 @@ def self_test() -> int:
             ledger.write_text(ledger_text, encoding="utf-8")
             return root, n
 
-        def run(root, n):
+        def run(root, n, expect_ref=None):
             import contextlib
             import io
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                rc = check(root, n, repo, ledger)
+                rc = check(root, n, repo, ledger, expect_ref)
             return rc, buf.getvalue()
 
         full = f"applied: full\napplied_ref: {anc[:7]}\n"
@@ -407,6 +425,32 @@ def self_test() -> int:
             after = {str(p): p.read_bytes() for p in root.rglob("*") if p.is_file()}
             assert before == after, "검사기가 레지스트리를 바꿨다(잠금 파일 포함)"
         case("checker-never-writes-registry", never_writes)
+
+        def expect_ref_cells():
+            # F-725 — 옛 객체를 가진 정상 저장소(표시가 있어도 객체가 있어 그대로 검사 · 위반 없음)에서 출하 대상만 바꿔 잰다
+            git("tag", "v9.9.9-light")
+            git("tag", "-a", "v9.9.9", "-m", "release")
+            rows = [("F-050", f"applied: full\napplied_ref: {anc[:9]}\n{era}"), ("F-051", "")]
+            got = {}
+            for name, ref in (("sha", anc), ("light-tag", "v9.9.9-light"), ("annotated-tag", "v9.9.9"), ("other-head", side),
+                              ("absent", "refs/tags/zz-absent"), ("empty", ""), ("dash", "-x")):
+                root, n = reg(rows, "Closes: F-050\n")
+                got[name] = run(root, n, ref)
+            rcs = {k: v[0] for k, v in got.items()}
+            want = {"sha": OK, "light-tag": OK, "annotated-tag": OK, "other-head": VIOLATION, "absent": UNRUN, "empty": UNRUN, "dash": UNRUN}
+            assert rcs == want, f"출하 대상 대조 rc {rcs} ≠ {want}"
+            assert "RELEASE_CLOSES_OK" in got["annotated-tag"][1] and "(h)" in got["other-head"][1] \
+                and not any("RELEASE_CLOSES_OK" in got[k][1] for k in ("other-head", "absent", "empty", "dash")), got
+        case("expect-ref-ship-target", expect_ref_cells)
+
+        def expect_ref_cli():
+            root, n = reg(base_rows, "Closes: F-050\n")
+            cli = lambda *x: subprocess.run([sys.executable, __file__, "--findings-root", str(root), "--note", str(n), "--repo", str(repo),  # noqa: E731
+                                             "--ledger", str(ledger), *x], capture_output=True, text=True)
+            a, b, c = cli("--expect-ref", anc), cli("--expect-ref", side), cli()
+            got = (a.returncode, b.returncode, c.returncode)
+            assert got == (OK, VIOLATION, OK) and "(h)" in b.stdout, f"CLI --expect-ref 배선 rc {got}\n{b.stdout}{b.stderr}"
+        case("expect-ref-cli-wired", expect_ref_cli)
         case("clean-release-ok", lambda: expect(OK, "RELEASE_CLOSES_OK", base_rows, "# v\n\nCloses: F-050\n"))
 
     bad = [(n, e) for n, e in results if e]
@@ -422,6 +466,7 @@ def main() -> int:
     ap.add_argument("--note", type=pathlib.Path, help="릴리스 노트")
     ap.add_argument("--repo", type=pathlib.Path, default=HERE.parent, help="applied_ref 를 대조할 플러그인 저장소(기본: 이 트리)")
     ap.add_argument("--ledger", type=pathlib.Path, help="promotion-ledger.md (기본: --repo/modules)")
+    ap.add_argument("--expect-ref", metavar="태그|SHA", help="출하 대상 — --repo 의 HEAD 가 이 커밋이어야 한다(아니면 (h) · 풀리지 않으면 2)")
     ap.add_argument("--list-applied", action="store_true", help="applied 가 있는 엔트리를 'F-NNN 값 ref slug' 로 낸다")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
@@ -433,7 +478,7 @@ def main() -> int:
         return list_applied(a.findings_root)
     if not a.note:
         ap.error("--note 가 필요하다 (또는 --list-applied)")
-    return check(a.findings_root, a.note, a.repo, a.ledger)
+    return check(a.findings_root, a.note, a.repo, a.ledger, a.expect_ref)
 
 
 if __name__ == "__main__":

@@ -48,7 +48,7 @@ Closes 항목마다 엔트리 오라클의 충족 근거(명령과 결과)를 �
 - ⛔ **Closes 줄에는 ID · slug 만 적는다** — 산문 · 괄호 주석 · '(부분)' 같은 표기는 노트 본문으로 옮긴다(`check_release_closes.py` (f) 가 거부)
 - ⛔ 레지스트리 `applied: full` 엔트리는 **전부** 적고 `applied: partial` 은 적지 않는다 — 남은 축을 새 엔트리로 쪼갠 뒤 full 만 닫는다
 - 원장 미등재 트랙 D 후보가 있으면 `Track-D-Review: <failure_class 또는 묶음 F-ID> — 판단` 줄을 둔다
-- 발행 전 `python3 scripts/check_release_closes.py --findings-root <레지스트리> --note <이 노트>` 가 exit 0 이어야 한다
+- 발행 전 `python3 scripts/check_release_closes.py --findings-root <레지스트리> --note <이 노트> --expect-ref vX.Y.Z` 가 exit 0 이어야 한다 — 출하할 저장소에서 돈다(그 HEAD 가 출하 커밋이 아니면 1 · 태그 · SHA 가 풀리지 않으면 2)
 
 ```bash
 # dry-run 으로 먼저 본다
