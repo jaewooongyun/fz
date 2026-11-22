@@ -27,6 +27,7 @@ Claude 문서 모드(`--claude-docs`) — Swift 기준 줄에 프로젝트 조�
   framework · author     프레임워크 토큰(+ CLAUDE_EXTRA_RE) · 작성자 관례 표지 — 조건 문구(CLAUDE_COND)가 덮지 않으면 위반.
                          덮는 범위: 문구를 실은 줄 · 문구를 실은 제목 줄이나 제목 바로 아래 첫 줄(목록 항목 · 표 행 아님)의 절 전체
                          제목 = 줄 머리 `#` 1~6개 + ASCII 공백 · 탭(유니코드 공백 뒤 표지는 제목이 아니다)
+                         펜스 · 목록 표지도 같다 — 앞뒤 공백은 ASCII 공백 · 탭만(유니코드 공백 뒤 표지는 펜스 · 목록이 아니다)
   ai-path · layer-chain  조건과 무관하게 위반
   contract               계약이 읽지 않는다고 적은 절 제목이 파일에 없다
   대상 파일이 없으면 측정 실패(2)
@@ -67,13 +68,14 @@ LOADER_RE = re.compile(r"references/(domain-[\w-]+\.md)")
 PROJECT_RULES = "## Project Rules (runtime)"
 ABSENT = "## When Project Guidelines Are Absent"
 OLD_REJECT = "Claude plan detected. Provide requirements only"
-FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
+FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
 
 # ── Claude 문서 모드(--claude-docs) ──────────────────────────────────────────────
 # 제목 표지 뒤는 ASCII 공백 · 탭만 받는다(CommonMark ATX 제목) — `\s` 는 유니코드 공백(전각 공백 · NBSP 등)도 받아,
-#   `##` 뒤에 전각 공백을 둔 줄처럼 제목이 아닌 줄의 조건 문구가 절 전체를 덮고 그 아래 조건 없는 스택 규칙이 위반에서 빠진다
+#   `##` 뒤에 전각 공백을 둔 줄처럼 제목이 아닌 줄의 조건 문구가 절 전체를 덮고 그 아래 조건 없는 스택 규칙이 위반에서 빠진다.
+#   펜스 · 목록 표지 앞뒤 공백도 같은 이유로 ASCII 공백 · 탭만 받는다(FENCE_RE · LIST_RE)
 HEADING_RE = re.compile(r"^(#{1,6})[ \t]")
-LIST_RE = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|\|)")   # 목록 항목 · 표 행 — 절 머리 조건이 될 수 없다(그 줄만 덮는다)
+LIST_RE = re.compile(r"^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|\|)")   # 목록 항목 · 표 행 — 절 머리 조건이 될 수 없다(그 줄만 덮는다)
 # 조건 문구는 하나다. 줄 안에 두면 그 줄을, 절 제목 줄 또는 제목 바로 아래 첫 줄(`>` 줄 · 문단 — 목록 항목 · 표 행 아님)에
 # 두면 그 절 전체(같거나 높은 수준의 다음 제목 전까지)를 덮는다.
 CLAUDE_COND = "CLAUDE.md 아키텍처 절이 Swift/iOS 프로젝트를 지정하는 경우"
@@ -606,7 +608,7 @@ def self_test() -> int:
     # 제목 표지 뒤 문자 격자 — 파이썬이 공백으로 보는 문자 전부(실행 중 계산 — 파이썬 판마다 다르다) × 표지 길이 1~7 × 조건 자리 × 앞 맥락.
     #   오라클은 변형 관계다: 유니코드 공백 문서는 그 문자를 'x' 로 바꾼 문서와, 탭 문서는 공백 문서와 판정이 같아야 한다.
     #   앞 맥락마다 공백 문서와 'x' 문서의 판정이 갈리는 칸이 있어야 한다 — 없으면 관계가 헛돈다.
-    #   격자 밖: 앞 공백 1~3칸 제목 · 닫는 `#` · setext 제목 · HTML 블록 · 유니코드 공백 뒤 펜스 표지(FENCE_RE)
+    #   격자 밖: 앞 공백 1~3칸 제목 · 닫는 `#` · setext 제목 · HTML 블록
     rule = "- SwiftUI View 는 @MainActor 로 격리한다\n"
     leads = {   # 앞 맥락 → (시험 줄 앞 본문, 계약이 읽지 않는 절)
         "조건 절": (f"## 조건 절 ({CLAUDE_COND})\n\n일반 문장이다.\n\n", {}),
@@ -647,6 +649,87 @@ def self_test() -> int:
             ok(name)
         else:
             fails.append(f"{name}: 어긋난 칸 {len(bad)}개 {bad[:4]} · 공백과 'x' 가 갈리는 칸 {split}")
+    except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게
+        fails.append(f"{name}: 예외 {type(e).__name__}: {e}")
+    finally:
+        shutil.rmtree(d)
+
+    def cverdict(d, lead, text):
+        (d / cdoc).write_text(f"---\nname: x\n---\n\n{lead}{text}", encoding="utf-8")
+        return sorted((i, r) for _, i, r, _ in scan_claude(d, {cdoc: {}})[1])
+
+    # 펜스 표지 앞 문자 격자 — 파이썬이 공백으로 보는 문자 전부 × 펜스 표지 셋 × 앞 맥락 둘. 가짜 펜스 줄 뒤에 조건 없는 제목과 스택 규칙을 둔다.
+    #   오라클: 유니코드 공백 문서의 판정 == 그 문자를 'x' 로 바꾼 문서의 판정 · 공백 · 탭 문서는 펜스다(아래 제목을 숨긴다 — headings() 도 같다).
+    #   조건 절 맥락은 공백 문서와 'x' 문서의 판정이 갈려야 한다(펜스가 제목을 숨기면 규칙이 조건 절에 들어가 위반이 빠진다).
+    #   평범한 절 맥락은 펜스든 아니든 규칙이 위반이다
+    fences = ("```", "~~~", "````")
+    fleads = {k: leads[k][0] for k in ("조건 절", "평범한 절")}
+    name = (f"claude-docs: fence-space-grid — 유니코드 공백 {len(spaces)}자 × 펜스 표지 {len(fences)} × 앞 맥락 {len(fleads)}"
+            " → 공백 · 탭 뒤 표지만 펜스")
+    d = pathlib.Path(tempfile.mkdtemp(prefix="fz-gsp-claude-fence-"))
+    try:
+        (d / "agents").mkdir()
+        bad, split = [], dict.fromkeys(fleads, 0)
+        for fm in fences:
+            for c in [" ", "\t", "x"] + spaces:
+                probe = [c + fm, "", "## 새 절"]
+                if bool(outline(probe)) == (c in " \t") or bool(headings(probe)) == (c in " \t"):
+                    bad.append(f"outline · headings 표지 {fm} · {hex(ord(c))}")
+            for lk, lead in fleads.items():
+                def body(c):
+                    return f"{c}{fm}\n\n## 새 절\n\n{rule}"
+                sp, x = cverdict(d, lead, body(" ")), cverdict(d, lead, body("x"))
+                split[lk] += sp != x
+                if lk == "평범한 절" and not (sp and x):
+                    bad.append(f"표지 {fm} · {lk}: 규칙이 위반이 아니다 — 공백 {sp} · 'x' {x}")
+                for c in ["\t"] + spaces:
+                    got, want = cverdict(d, lead, body(c)), (sp if c == "\t" else x)
+                    if got != want:
+                        bad.append(f"표지 {fm} · {hex(ord(c))} · {lk}: want {want} got {got}")
+        if not bad and split["조건 절"] == len(fences):
+            ok(name)
+        else:
+            fails.append(f"{name}: 어긋난 칸 {len(bad)}개 {bad[:4]} · 공백과 'x' 가 갈리는 칸 {split}")
+    except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게
+        fails.append(f"{name}: 예외 {type(e).__name__}: {e}")
+    finally:
+        shutil.rmtree(d)
+
+    # 목록 표지 앞뒤 문자 격자 — 표지 넷 × 표지 뒤 문자(공백 · 탭 · 유니코드 공백 전부) × 줄 앞 문자(없음 · 공백 · 탭 · 유니코드 공백 전부).
+    #   제목 바로 아래 첫 줄의 조건이 절을 덮는지 본다 — 목록 항목이면 그 줄만, 문단이면 절 전체를 덮는다.
+    #   오라클: 유니코드 공백을 'x' 로 바꾼 문서와 판정이 같다 · 줄 앞이 ASCII 들여쓰기뿐이고 표지 뒤가 공백 · 탭이면 목록이다.
+    #   표지마다 목록 문서와 문단 문서의 판정이 갈려야 한다(목록이면 아래 규칙이 위반 · 문단이면 조건이 덮어 위반 0)
+    marks = ("-", "*", "+", "1.")
+    name = (f"claude-docs: list-space-grid — 표지 {len(marks)} × 표지 뒤 {len(spaces) + 2}자 × 줄 앞 {len(spaces) + 3}가지"
+            " → ASCII 공백 · 탭 사이 표지만 목록")
+    d = pathlib.Path(tempfile.mkdtemp(prefix="fz-gsp-claude-list-"))
+    try:
+        (d / "agents").mkdir()
+        lead, bad, split, seen = leads["평범한 절"][0], [], 0, {}
+
+        def lverdict(pre, mk, aft):
+            key = (pre, mk, aft)
+            if key not in seen:
+                seen[key] = cverdict(d, lead, f"## 규칙\n\n{pre}{mk}{aft}{CLAUDE_COND} 아래를 따른다.\n{rule}")
+            return seen[key]
+
+        for mk in marks:
+            lst, par = lverdict("", mk, " "), lverdict("", mk, "x")
+            split += lst != par
+            for pre in ["", " ", "\t"] + spaces:
+                for aft in [" ", "\t"] + spaces:
+                    is_list = pre in ("", " ", "\t") and aft in " \t"
+                    if bool(LIST_RE.match(pre + mk + aft + "규칙")) != is_list:
+                        bad.append(f"LIST_RE 표지 {mk} · 앞 {pre!r} · 뒤 {aft!r}")
+                    x_pre = pre if pre in ("", " ", "\t") else "x"
+                    got = lverdict(pre, mk, aft)
+                    want = lst if is_list else lverdict(x_pre, mk, aft if aft in " \t" else "x")
+                    if got != want:
+                        bad.append(f"표지 {mk} · 앞 {pre!r} · 뒤 {aft!r}: want {want} got {got}")
+        if not bad and split == len(marks):
+            ok(name)
+        else:
+            fails.append(f"{name}: 어긋난 칸 {len(bad)}개 {bad[:4]} · 목록과 문단이 갈리는 표지 {split}/{len(marks)}")
     except Exception as e:  # ⛔ 케이스 하나의 예외가 나머지를 가리지 않게
         fails.append(f"{name}: 예외 {type(e).__name__}: {e}")
     finally:

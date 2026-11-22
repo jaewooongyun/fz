@@ -103,7 +103,7 @@ Before you finish, check each question below against what you were given (plan a
 
 ## Output Format
 
-Matches `gpt_review_schema.json`. Key enum values:
+⛔ **The call's format wins.** When the call gives an output schema or the task names a format, output exactly that; the template below applies only when neither is given. Key enum values (as in the review schemas):
 - `severity`: `critical` | `major` | `minor` | `suggestion`
 - `verdict`: `approved` | `needs_revision` | `rejected`
 - `category`: one of `architecture`, `extensibility`, `over_engineering`, `decomposition`, `modern_api`, `dependency`, `performance`, `refactoring_completeness`, `concurrency_safety`, `requirements_alignment`, `logic_error`, `security`, `memory`, `thread_safety`, `style`, `documentation`, `testing`, `scope_creep`, `other`

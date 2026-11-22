@@ -160,14 +160,14 @@ metadata:
 
 ## Issue Tracker 연동
 
-검증 결과를 자동으로 Issue Tracker에 기록 (참조: modules/session.md). `-o` 파일을 jq로 파싱하여 phase/status 태그 후 통합.
+검증 결과를 자동으로 Issue Tracker에 기록 (참조: modules/session.md). 결과 파일(`--out`)을 kind 의 출력 계약대로 읽어(json kind 는 jq · check 는 `check_verdict.py` · text kind 는 본문) phase/status 태그 후 통합.
 
 ---
 
 ## Gate: GPT Verification Complete
 - [ ] 서브커맨드 실행 완료?
 - [ ] Issue Tracker에 결과 기록?
-- [ ] verdict 판정 (approved/rejected/conditional)?
+- [ ] verdict 판정 — kind 의 출력 계약(json kind 는 스키마 enum · check 는 pass/warn/fail/unrun · text kind 는 본문)?
 
 ---
 
@@ -175,7 +175,7 @@ metadata:
 
 ```
 예시 1 — review: BAD gpt "LGTM" 자체판단없이 approved / GOOD gpt 3 issues + Claude 독립 1 = 4 issues + verdict
-예시 2 — verify: BAD gpt "승인" → 단일모델 Phase 2 통과 / GOOD gpt가 plan 독립재작성 → Claude와 diff → "divergence" 기록
+예시 2 — verify: BAD gpt "승인" → 단일모델 Phase 2 통과 / GOOD gpt 가 계획 본문을 Q1~Q8 로 대조 → issues · verdict 기록(계획 없이 자기 계획을 세우는 것은 independent-plan)
 예시 3 — validate: BAD Rate 85% 수치만 보고 pass (regressed 놓침) / GOOD resolved/partial/unresolved/regressed 4축 → regressed 0 + Rate 80+ 동시
 ```
 

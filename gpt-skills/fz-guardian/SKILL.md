@@ -66,7 +66,7 @@ Rules come from the target repository at run time — never from this skill.
 
 ## Output Format
 
-Matches `schemas/gpt_verification_schema.json`. Key enum values:
+⛔ **The call's format wins.** When the call gives an output schema or the task names a format, output exactly that; the template below applies only when neither is given. Key enum values (as in the verification schema):
 - `resolution_status`: `resolved` | `partially_resolved` | `unresolved` | `regressed`
 - `verdict`: `pass` | `needs_work` | `fail`
 - Feedback reflection rate: `(resolved*1.0 + partially_resolved*0.5) / total_issues`

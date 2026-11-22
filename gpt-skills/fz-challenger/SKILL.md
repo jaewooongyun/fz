@@ -69,7 +69,7 @@ For each identified issue, assign one verdict:
 
 ## Output Format
 
-Matches `schemas/gpt_peer_review_schema.json`. Key enum values:
+⛔ **The call's format wins.** When the call gives an output schema or the task names a format, output exactly that; the enum values and template below apply only when neither is given. Default enum values:
 - `action` (challenge verdict): `agree` | `challenge` | `supplement` | `reverse`
 - `severity`: `critical` | `major` | `minor` | `suggestion`
 - `origin`: `regression` | `pre-existing` | `improvement`
