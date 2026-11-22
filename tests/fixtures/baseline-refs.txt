@@ -25,7 +25,7 @@
 ===== fz =====
 참조 판정: skills/fz/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 49518 / ceiling(로드 전체) 49518 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
+  floor(무조건 로드) 49590 / ceiling(로드 전체) 49590 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
@@ -35,7 +35,7 @@
      ! L216: 2. 실질 생산 워커 판별 → opus 배정 (동시 ≤3, effort 명시 의무 — Lead 세션 effort 를 args 로 · `modules/mode-gate.md` § effort)
      ? L249: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
      ! L282: ⛔ **5.2 는 스킬 게이트를 건너뛰는 길이 아니다** — TEAM 이어도 각 단계는 5.1 처럼 스킬 SKILL.md 를 읽고 그 스킬의 모드 게이트를 거친다. Workflow 는 그 스킬의 최
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ! L36: - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없
      ! L36: - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없
      ? L249: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
@@ -63,7 +63,7 @@
      ? L309: | 6+ 스텝 또는 context-heavy | 티켓 폴더 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
 [로드/무조건] modules/lead-action-default.md           1396 글자÷4
      ! L87: - SOLO: `modules/lead-action-default.md` Trigger Matrix 매칭 → 매칭된 메모리 ID + 적용 패턴 명시 출력
-[로드/무조건] modules/cross-validation.md             11054 글자÷4
+[로드/무조건] modules/cross-validation.md             11124 글자÷4
      ! L91: - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄). 단, 산출물이 전수/카운트/부정 주장 예정이면 abbreviated여도 `Read(modules/cros
      ! L226: > 참조: `modules/cross-validation.md`
 [로드/무조건] modules/intent-registry.md               1548 글자÷4
@@ -88,7 +88,7 @@
 ===== fz-code =====
 참조 판정: skills/fz-code/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 44632 / ceiling(로드 전체) 49102 글자÷4  · 로드 아님(카탈로그·출처표기) 23661 제외
+  floor(무조건 로드) 44655 / ceiling(로드 전체) 49125 글자÷4  · 로드 아님(카탈로그·출처표기) 23661 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
@@ -148,7 +148,7 @@
      ! L274: | SDK 래퍼 부분 분석 | 외부 SDK 객체의 `?.` 메서드 중 일부만 nil 동작 분석하고 나머지 건너뜀. "안전" 결론으로 추가 분석 중단 | 같은 객체의 모든 `?.` 메서드 nil 동작
      ! L275: | Task 내부 프로퍼티 쓰기 | `Task { }` 블록 내에서 `self.property = value`를 `MainActor.run` 밖에서 실행. 특히 리뷰어 조언으로 MainActor 범
      ? L383: - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
-[로드/무조건] modules/gates.md                        10610 글자÷4
+[로드/무조건] modules/gates.md                        10631 글자÷4
      ? L109: 2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 
      ! L237: - □ UI · 제스처 · 애니메이션 Step 이면 visual oracle — 앱을 띄워 그 화면을 본다(launch_app_sim + screenshot 또는 실기기 · 범위는 `modules/
      ! L325: 6.4. **⛔ 게이트 판정** (원장이 있을 때 — `modules/gates.md` 배선 2):
@@ -156,7 +156,7 @@
 [로드/무조건] modules/swift-pattern-detection.md       1898 글자÷4
      ? L180: > 본문: `modules/swift-pattern-detection.md` 참조 (Level 3) — 5 원칙(D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환 /
      ! L186: - [ ] `modules/swift-pattern-detection.md` Read 완료? (D/E/F/G/H 원칙 5개 token 스캔)
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ! L355: 모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기하고(`modules
      ! L362: - decide 가 `skip` 이거나 정문이 exit 18 `GPT-OFF` 면 `[GPT 미사용 — 사유]` 를 남긴다 · `ask` 면 질문 → `set` → 다시 decide — `modul
 [로드/조건부] modules/plugin-refs.md                   2809 글자÷4
@@ -194,7 +194,7 @@
 ===== fz-discover =====
 참조 판정: skills/fz-discover/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 39073 / ceiling(로드 전체) 43543 글자÷4  · 로드 아님(카탈로그·출처표기) 4532 제외
+  floor(무조건 로드) 39145 / ceiling(로드 전체) 43615 글자÷4  · 로드 아님(카탈로그·출처표기) 4532 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
@@ -205,7 +205,7 @@
      ? L85: 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님
      ? L91: 이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
      ? L449: | `mode: 'fallback'` 반환(실행 중 실패) | ⛔ SOLO 아님 — `guides/skill-authoring.md` §12 판별 표로 분기 | L1~L3 후 미해소면 L4 |
-[로드/무조건] modules/cross-validation.md             11054 글자÷4
+[로드/무조건] modules/cross-validation.md             11124 글자÷4
      · L53: | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
      ~ L200: - [ ] "전체/모든/생태계/전수" 분석 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/
      ! L201: - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation
@@ -216,7 +216,7 @@
      ! L362: 3. **완료 보고** (직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
 [로드/무조건] modules/complexity.md                     627 글자÷4
      ! L77: 모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modul
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ! L95: 6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(
 [로드/무조건] modules/fz-gpt-subcommands-core.md       3346 글자÷4
      ! L95: 6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(
@@ -258,102 +258,105 @@
 ===== fz-fix =====
 참조 판정: skills/fz-fix/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 29570 / ceiling(로드 전체) 34040 글자÷4  · 로드 아님(카탈로그·출처표기) 1525 제외
+  floor(무조건 로드) 29572 / ceiling(로드 전체) 34042 글자÷4  · 로드 아님(카탈로그·출처표기) 12156 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
 [로드/무조건] guides/skill-authoring.md               11313 글자÷4
      ? L53: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중
-     ! L176: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
-     ~ L194: > 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.m
-     ! L202: 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
-     ? L203: 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Sta
-     ? L206: 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
+     ! L177: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
+     ~ L196: > 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.m
+     ! L204: 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
+     ? L205: 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Sta
+     ? L208: 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
 [로드/무조건] modules/build.md                          653 글자÷4
      · L59: | modules/build.md | 빌드 검증 |
-     ! L174: 참조: `modules/build.md` — 빌드 검증 패턴
+     ! L175: 참조: `modules/build.md` — 빌드 검증 패턴
 [로드/무조건] modules/execution-modes.md               1239 글자÷4
-     · L60: | modules/execution-modes.md | LOOP 실행 모드 |
-     ! L176: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
-     ! L280: 래더 한도(`modules/execution-modes.md`) 뒤에도 실패하면 근본 원인을 재분석한다(§12 L4 — 사용자 에스컬레이션). 복잡도 초과 시 즉시 전환한다.
-     ! L302: | 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
+     · L61: | modules/execution-modes.md | LOOP 실행 모드 |
+     ! L177: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
+     ! L282: 래더 한도(`modules/execution-modes.md`) 뒤에도 실패하면 근본 원인을 재분석한다(§12 L4 — 사용자 에스컬레이션). 복잡도 초과 시 즉시 전환한다.
+     ! L304: | 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
 [로드/무조건] modules/context-artifacts.md             3466 글자÷4
-     · L61: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
-     ! L99: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+     · L62: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
+     ! L100: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
 [로드/무조건] modules/code-transform-validation.md     1477 글자÷4
-     · L63: | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
-     ! L163: - `modules/code-transform-validation.md` 참조. 원본 런타임 특성(스레드, 에러) 확인 후 수정
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
-     · L66: | modules/gpt-strategy.md | § 단계 실행 판정 — GPT check 직전 `gpt-choice.sh decide` 한 줄로 실행 · 건너뜀을 정한다 |
-     ! L182: - GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt
-     ! L184: - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.m
+     · L64: | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
+     ! L164: - `modules/code-transform-validation.md` 참조. 원본 런타임 특성(스레드, 에러) 확인 후 수정
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
+     · L67: | modules/gpt-strategy.md | § 단계 실행 판정 — GPT check 직전 `gpt-choice.sh decide` 한 줄로 실행 · 건너뜀을 정한다 |
+     ! L184: - GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt
+     ! L186: - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.m
 [로드/무조건] modules/lead-reasoning.md                2155 글자÷4
-     ! L128: → 키워드 기반이 아닌 **상태 기반**으로 범위 정의 (참조: `modules/lead-reasoning.md`)
+     ! L129: → 키워드 기반이 아닌 **상태 기반**으로 범위 정의 (참조: `modules/lead-reasoning.md`)
 [로드/무조건] modules/mode-gate.md                     2712 글자÷4
-     ! L135: 빠른 수정-빌드 사이클로 버그를 해결합니다. 아래 팀 에이전트 모드 0 의 모드 게이트를 거치지 않고 여기서 시작하면 먼저 기록 `run_metrics.py start --skill fz-fix -
-     ! L199: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
-     ! L199: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
-     ! L199: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
-     ! L310: - 버그 수정 완료: 사용자에게 보고 + 테스트 방법 안내(보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록)
+     ! L136: 빠른 수정-빌드 사이클로 버그를 해결합니다. 아래 팀 에이전트 모드 0 의 모드 게이트를 거치지 않고 여기서 시작하면 먼저 기록 `run_metrics.py start --skill fz-fix -
+     ! L201: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
+     ! L201: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
+     ! L201: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
+     ! L312: - 버그 수정 완료: 사용자에게 보고 + 테스트 방법 안내(보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록)
 [로드/조건부] modules/plugin-refs.md                   2809 글자÷4
-     · L62: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
-     ? L72: > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
-     ? L76: > 참조(Swift 파일을 수정하는 경우에만): `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 
+     · L63: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ? L73: > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
+     ? L77: > 참조(Swift 파일을 수정하는 경우에만): `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 
 [로드/조건부] modules/tool-status.md                    665 글자÷4
-     ? L114: ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한
+     ? L115: ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한
 [로드/조건부] modules/symbol-tools-audit.md             996 글자÷4
-     ? L204: 2.5. **심볼 도구 점검** (반환 뒤 — 재시도 invoke 마다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --
-     ? L204: 2.5. **심볼 도구 점검** (반환 뒤 — 재시도 invoke 마다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --
+     ? L206: 2.5. **심볼 도구 점검** (반환 뒤 — 재시도 invoke 마다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --
+     ? L206: 2.5. **심볼 도구 점검** (반환 뒤 — 재시도 invoke 마다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --
+[출처표기  ] modules/gates.md                        10631 글자÷4
+     · L60: | modules/gates.md | 버그 수정 변이 셀 정본 — § 원장 운용 규율 3 (Step 4) |
+     ~ L183: - **변이 셀** (수정 hunk 가 있는 Step 만 — 비용 상한): 수정의 핵심 호출을 지운(되돌린) 사본에서 이 수정을 검증한 같은 테스트 · 검사를 다시 돌려 FAIL 하는지 한 번 잰다
 [카탈로그  ] modules/uncertainty-verification.md      1525 글자÷4
-     · L64: | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
+     · L65: | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
 
 ===== fz-gpt =====
 참조 판정: skills/fz-gpt/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 43219 / ceiling(로드 전체) 43219 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
+  floor(무조건 로드) 44639 / ceiling(로드 전체) 44639 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ! L22: > ⛔ **첫 GPT 호출 전**: 단계 직전 `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 세션에
      ! L22: > ⛔ **첫 GPT 호출 전**: 단계 직전 `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 세션에
      ! L26: > - effort 수준: API `reasoning.effort` 는 **모델별**이다 [verified: developers.openai.com/api/docs/guides/reasoning] 
      ! L102: > 공통 설정 (Base Branch / 모델·effort 선택 / Diff 크기 / CLI 모드): `modules/gpt-strategy.md`
      ! L117: ⛔ **exit 10~17 = 측정 실패**이며 "이슈 0건"이 아니다. exit 18(stderr `GPT-OFF:`)은 GPT 미사용 — 실패가 아니라 그 단계를 건너뛰고 `[GPT 미사용 — 
-     ! L211: | 모델 미지원 (구버전 CLI가 config 모델·세션 선택 모델 미인식) | CLI 업데이트 권장, 불가 시 세션 선택을 다시 묻거나(`modules/gpt-strategy.md § 모델·eff
+     ! L213: | 모델 미지원 (구버전 CLI가 config 모델·세션 선택 모델 미인식) | CLI 업데이트 권장, 불가 시 세션 선택을 다시 묻거나(`modules/gpt-strategy.md § 모델·eff
 [로드/무조건] modules/session.md                        823 글자÷4
      · L54: | modules/session.md | 세션 감지, Issue Tracker 연동 |
-     ! L163: 검증 결과를 자동으로 Issue Tracker에 기록 (참조: modules/session.md). 결과 파일(`--out`)을 kind 의 출력 계약대로 읽어(json kind 는 jq · che
-[로드/무조건] modules/cross-validation.md             11054 글자÷4
+     ! L165: 검증 결과를 자동으로 Issue Tracker에 기록 (참조: modules/session.md). 결과 파일(`--out`)을 kind 의 출력 계약대로 읽어(json kind 는 jq · che
+[로드/무조건] modules/cross-validation.md             11124 글자÷4
      · L55: | modules/cross-validation.md | 검증 게이트, 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`), GIT_ROOT 추출 |
      ! L59: > CLAUDE.md `## Directory Structure`에서 동적 추출. 상세: modules/cross-validation.md 참조.
      ! L63: > 3-Tier 디스커버리 정의: `modules/cross-validation.md § 역할 스킬 경로` 참조 — 구현은 `scripts/gpt_kinds.py` 한 곳이고 정문이 부른다.
      ! L140: | **micro-eval** | 래퍼 exec | 단일 주장 독립 재평가 (claim-type 라우팅) | modules/cross-validation.md Gate |
 [로드/무조건] modules/fz-gpt-bash-hygiene.md           3964 글자÷4
      ! L108: > 상세: `modules/fz-gpt-bash-hygiene.md` — Stdin 닫기 (§1) / Trusted Dir (§2) / `-o` 버퍼링 (§3) / Background Task (§
-     ! L155: ⛔ **Bash 호출 시 의무**: 모든 서브커맨드 호출은 `modules/fz-gpt-bash-hygiene.md` 준수 (stdin close / trusted dir / Base Verific
-     ! L213: | **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (`modules/fz-gpt
-     ! L214: | **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (`modules/fz-
-     ! L215: | **`--profile` 사용 시 sandbox가 read-only로 force** (30차, Critical) | `[projects.<path>] trust_level = "trusted"`
+     ! L157: ⛔ **Bash 호출 시 의무**: 모든 서브커맨드 호출은 `modules/fz-gpt-bash-hygiene.md` 준수 (stdin close / trusted dir / Base Verific
+     ! L215: | **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (`modules/fz-gpt
+     ! L216: | **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (`modules/fz-
+     ! L217: | **`--profile` 사용 시 sandbox가 read-only로 force** (30차, Critical) | `[projects.<path>] trust_level = "trusted"`
 [로드/무조건] modules/tool-status.md                    665 글자÷4
      ! L122: > ⛔ **선택 도구 상태**: 서브커맨드를 실행하기 전에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
 [로드/무조건] modules/fz-gpt-subcommands-core.md       3346 글자÷4
      ! L125: > - **Core (review/verify/validate/check)**: `modules/fz-gpt-subcommands-core.md`
-[로드/무조건] modules/fz-gpt-subcommands-aux.md        2754 글자÷4
+[로드/무조건] modules/fz-gpt-subcommands-aux.md        2845 글자÷4
      ! L126: > - **Aux (final/adversarial/drift/plan/micro-eval/independent-plan/independent-review)**: `modules/fz-gpt-sub
-     ! L153: > independent-review 는 호출 스킬이 Workflow 와 **동시에** 띄우고 `scripts/review_merge.py` 로 합친다 — 순서 정본 `modules/fz-gpt-s
-[로드/무조건] modules/promotion-ledger.md             11264 글자÷4
+     ! L155: > independent-review 는 호출 스킬이 Workflow 와 **동시에** 띄우고 `scripts/review_merge.py` 로 합친다 — 순서 정본 `modules/fz-gpt-s
+[로드/무조건] modules/promotion-ledger.md             12521 글자÷4
      ! L137: | **adversarial** | 래퍼 exec | Devil's Advocate 리뷰 — 설계 필요성 (반증 frame 아님) | modules/promotion-ledger.md 승격 판정(2
 [로드/무조건] modules/pipelines.md                     1756 글자÷4
      ! L138: | **drift** | 래퍼 exec | 아키텍처 드리프트 전체 스캔 | /fz drift-check (modules/pipelines.md §15) |
      ! L142: | **independent-plan** | 런처 plan | 격리 첫 패스 플랜 (fz-plan light · full 기본 — 끄기 --no-gpt-independent) | /fz-plan 2
 [로드/무조건] modules/scope-challenge.md               1038 글자÷4
-     ! L182: 서브커맨드: 리뷰→`gpt-call.sh review`(래퍼 review 모드), 검증→`gpt-call.sh verify`(exec · 스키마는 kind 가 정한다), 심화→`gpt-call.sh
+     ! L184: 서브커맨드: 리뷰→`gpt-call.sh review`(래퍼 review 모드), 검증→`gpt-call.sh verify`(exec · 스키마는 kind 가 정한다), 심화→`gpt-call.sh
 
 ===== fz-manage =====
 참조 판정: skills/fz-manage/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 21407 / ceiling(로드 전체) 21407 글자÷4  · 로드 아님(카탈로그·출처표기) 11054 제외
+  floor(무조건 로드) 21409 / ceiling(로드 전체) 21409 글자÷4  · 로드 아님(카탈로그·출처표기) 11124 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
@@ -365,15 +368,15 @@
 [로드/무조건] guides/skill-authoring.md               11313 글자÷4
      ! L55: | `team <pattern>` | `workflows/*.js` + `guides/skill-authoring.md` §12 | 각 스킬이 자기 Workflow를 소유 |
      ! L437: - 팀 에이전트 생성 (→ 각 스킬의 `workflows/*.js`, 규약은 `guides/skill-authoring.md` §12)
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ! L280: > **MUST 조건**: O3 (Generator ≠ Evaluator) + O9 (Cross-Model Verification) — GPT 를 켠 세션이면 GPT 외부 검증 필수(`modules
-[출처표기  ] modules/cross-validation.md             11054 글자÷4
+[출처표기  ] modules/cross-validation.md             11124 글자÷4
      ~ L175: ⛔ **exit code를 판정에 포함한다** — `>/dev/null 2>&1`로 감싸지 않는다. `2`는 **PASS도 SKIP도 아니다**(configuration/parse error). 근
 
 ===== fz-memory =====
 참조 판정: skills/fz-memory/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 12781 / ceiling(로드 전체) 12781 글자÷4  · 로드 아님(카탈로그·출처표기) 4702 제외
+  floor(무조건 로드) 14038 / ceiling(로드 전체) 14038 글자÷4  · 로드 아님(카탈로그·출처표기) 4702 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
@@ -382,7 +385,7 @@
 [로드/무조건] modules/memory-policy.md                  852 글자÷4
      · L53: | modules/memory-policy.md | L2 Serena 영속 키 네이밍 + GC 정책 |
      ! L72: 2. 영속 키(decision · pattern)를 수명 정책과 대조 (`modules/memory-policy.md`)
-[로드/무조건] modules/promotion-ledger.md             11264 글자÷4
+[로드/무조건] modules/promotion-ledger.md             12521 글자÷4
      ! L108: - `python3 "${FZ_PLUGIN_ROOT}/scripts/candidate_expiry.py" --ledger "${FZ_PLUGIN_ROOT}/modules/promotion-ledge
      ! L109: - `재평가필요` 는 종결 · 연장 · 승격 판단을, `판정불가`(관측 날짜 없음)는 날짜 보강을 사용자에게 묻는다 — 3개월 재평가 규칙(`modules/promotion-ledger.md`)의 
 [카탈로그  ] modules/memory-guide.md                  1236 글자÷4
@@ -393,11 +396,11 @@
 ===== fz-modernize =====
 참조 판정: skills/fz-modernize/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 78114 / ceiling(로드 전체) 82078 글자÷4  · 로드 아님(카탈로그·출처표기) 1236 제외
+  floor(무조건 로드) 78186 / ceiling(로드 전체) 82150 글자÷4  · 로드 아님(카탈로그·출처표기) 1236 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/cross-validation.md             11054 글자÷4
+[로드/무조건] modules/cross-validation.md             11124 글자÷4
      ! L34: - **GPT 재검증 상한** (18차 교훈): 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한(판정과 무관하게 유효 판정 라운드를 센다) — 소진(정문 e
      · L64: | modules/cross-validation.md | GPT 3회 한도 + Reflection Rate |
      ! L229: 정본은 `skills/fz-modernize/scripts/ac8-link-check.sh` 하나다 — 여기에 사본을 두지 않는다(F-224: 스크립트 · 인라인 사본 모두 `rg` 였고 rg 없는
@@ -410,7 +413,7 @@
 [로드/무조건] guides/prompt-optimization.md            9742 글자÷4
      ! L45: /fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
      · L62: | guides/prompt-optimization.md | Tier 1+2 인용 정책 + 헤더 갱신 패턴 |
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ! L55: - **GPT CLI**: cross-model 검증 — ⛔ **GPT 단계마다 직전**(light micro-eval · full Phase 3 독립 플랜 · Phase 4): `gpt-choic
      ! L265: **핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **재검증 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한**(
      ? L269: 1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md`
@@ -447,7 +450,7 @@
 ===== fz-peer-review =====
 참조 판정: skills/fz-peer-review/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 68831 / ceiling(로드 전체) 80144 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
+  floor(무조건 로드) 69052 / ceiling(로드 전체) 80365 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
@@ -464,7 +467,7 @@
      ! L395: Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9) → Major 이슈(file:line + What/Impac
      ! L447: - 3-Model Cross-Review + Confidence Matrix 투표 (적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)
      ? L459: `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-r
-[로드/무조건] modules/peer-review-tiers.md             9146 글자÷4
+[로드/무조건] modules/peer-review-tiers.md             9178 글자÷4
      ~ L36: - **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 s
      ! L132: ⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md
      ! L134: ⛔ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-m
@@ -483,10 +486,10 @@
      ! L211: 상세 절차 (Tier 0/1 분기, evidence 범위): `modules/peer-review-tiers.md` 참조. 실행 기록의 시작은 아래 근거 슬롯 검사가 통과할 때 그 스크립트가 남긴다
      ~ L213: ⛔ **근거 슬롯 검사** — tier.txt 를 쓴 뒤, Analyze · GPT 독립 패스를 띄우기 **전에** 한 번 부른다. `--tier` 는 방금 정한 값을 적는다(재개 실행의 옛 tie
      ~ L462: `--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계. Deliver(문서 저장 · `--post` 게시와 착지 검증 포함
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ! L72: - ⛔ **GPT 자리마다 직전**(독립 첫 패스(기본) · `--no-gpt-independent` 면 Tier 1·2·3 challenger · Tier 3 DA): `gpt-choice.sh 
      ? L459: `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-r
-[로드/무조건] modules/cross-validation.md             11054 글자÷4
+[로드/무조건] modules/cross-validation.md             11124 글자÷4
      ! L79: | `modules/cross-validation.md` | 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`), GIT_ROOT 추출 |
      ! L185: 4. ⛔ Fact 중 **"0건·부재·전부·~뿐"이 결론인 것**은 `modules/cross-validation.md` §Negative-Result Gate를 **Read 후 적용** — pos
      ! L339: > ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를
@@ -517,7 +520,7 @@
      ! L88: | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 — gather 의 risk.json `plugin_refs`(그 모듈 `
 [로드/무조건] modules/review-structural-axes.md        1705 글자÷4
      ! L89: | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4(+§6 craft — 이 스킬
-[로드/무조건] modules/peer-review-workflow.md          2015 글자÷4
+[로드/무조건] modules/peer-review-workflow.md          2041 글자÷4
      ! L132: ⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md
      ! L256: > `modules/peer-review-workflow.md`. Tier 0/1 은 Workflow 가 없어 **읽지 않는다**(Tier 1 의 GPT 는 아래 절).
 [로드/무조건] modules/governance.md                    3539 글자÷4
@@ -526,7 +529,7 @@
      ! L194: - `modules/code-transform-validation.md` 참조
 [로드/무조건] modules/tool-status.md                    665 글자÷4
      ! L217: exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다(다시 불러도 같은 실행이다) · `2` 는 판정 불가(⛔ 통과 
-[로드/무조건] modules/fz-gpt-subcommands-aux.md        2754 글자÷4
+[로드/무조건] modules/fz-gpt-subcommands-aux.md        2845 글자÷4
      ! L261: - 순서 · 거부(오염 · 실패 · stale) 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서. Tier 3 GPT DA 는 병합 뒤
 [로드/무조건] guides/agent-team-guide.md               6626 글자÷4
      ! L339: > ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를
@@ -539,7 +542,7 @@
 ===== fz-plan =====
 참조 판정: skills/fz-plan/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 41141 / ceiling(로드 전체) 75596 글자÷4  · 로드 아님(카탈로그·출처표기) 3497 제외
+  floor(무조건 로드) 41164 / ceiling(로드 전체) 76946 글자÷4  · 로드 아님(카탈로그·출처표기) 3497 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
@@ -568,7 +571,7 @@
      ! L110: → `guides/skill-authoring.md` §12 사다리 **L3** — `Workflow({ scriptPath, resumeFromRunId })` 로 재개한다(CC 를 종료했으면 `
      ? L122: 도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 저장소 밖 로그 `${FZ_RUN_STA
      ? L447: | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp 
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ? L56: - ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(light · full 기본 · 계획 단계의 첫 GPT 호출) · 5.5 Sprint Contract(발동 시) · Phase 2
      ! L322: bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/gpt-strategy.md § 단계 실행 판정 — 켬이면 필수): 
 [로드/무조건] modules/session.md                        823 글자÷4
@@ -585,15 +588,16 @@
      ? L323: 검증 도구로 계획 검증 위임   # core § verify ∥ § verify-gates 를 ARTIFACT=plan · WORK_DIR={WORK_DIR}(작업 폴더가 없으면 빈 값 — 세션 원
      ! L339: **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하면 
      ! L446: | 검증 실패 (GPT verify) | 새 컨텍스트 에이전트 1회(`fz:review-correctness` · 읽기 전용 · 모델 명시)에게 GPT 에 보내려던 검증 프롬프트(`$P_VERIFY
-[로드/무조건] modules/gates.md                        10610 글자÷4
+[로드/무조건] modules/gates.md                        10631 글자÷4
      ! L326: 3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 — light · full 모두 — `modules/gates.md` 배선 1):
      ? L334: 입력 파일은 `{steps:[…], rtm:[…]}` 객체 또는 steps 배열이다 — 다른 최상위 모양은 exit 2 다(F-346). 코드가 WORK_DIR 밖 형제 워크트리에 있으면 `--im
      ! L337: 3.2. **⛔ 게이트 판정** (draft 원장이 있을 때 — `modules/gates.md` 배선 1):
      ? L381: ⛔ 상대 경로 금지 — 설치된 플러그인에서 대상 레포에 파일이 없어 exit 2로 떨어지고, exit 3만 차단하는 규칙 하에서 **invalid ledger 검증이 fail-open** 된다. 절
-[로드/조건부] modules/cross-validation.md             11054 글자÷4
+[로드/조건부] modules/cross-validation.md             11124 글자÷4
      ? L56: - ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(light · full 기본 · 계획 단계의 첫 GPT 호출) · 5.5 Sprint Contract(발동 시) · Phase 2
+     ~ L264: Evidence: `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_integrity_check.py" --plan-doc {WORK_DIR}/plan/plan-v{N}.md
      ~ L305: > Phase 0.7 출처: Anthropic Harness Engineering 패턴 B (2026-03) + Plan v3.1.3 §T2-B. 학술 근거: `modules/cross-valida
-[로드/조건부] modules/promotion-ledger.md             11264 글자÷4
+[로드/조건부] modules/promotion-ledger.md             12521 글자÷4
      · L68: | modules/promotion-ledger.md | P1/P2 조치 eligible session 관측 기록 (학습 승격 금지) |
      ? L214: - [ ] 구조/경계 포크 결단 시 유형 분류 — (가) 코드 read/grep으로 정답이 1개로 좁혀지는 엔지니어링 판단 → 확신 권고+근거+"이의 없으면 진행"(옵션 메뉴화 금지) / (나) 제
 [로드/조건부] modules/plan-direction-preflight.md       822 글자÷4
@@ -687,7 +691,7 @@
 ===== fz-review =====
 참조 판정: skills/fz-review/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 103746 / ceiling(로드 전체) 109612 글자÷4  · 로드 아님(카탈로그·출처표기) 1525 제외
+  floor(무조건 로드) 103930 / ceiling(로드 전체) 109796 글자÷4  · 로드 아님(카탈로그·출처표기) 1525 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
@@ -709,7 +713,7 @@
      ? L456: | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp 
 [로드/무조건] modules/memory-guide.md                  1236 글자÷4
      ! L32: > **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.
-[로드/무조건] modules/cross-validation.md             11054 글자÷4
+[로드/무조건] modules/cross-validation.md             11124 글자÷4
      ! L40: ⛔ **threshold gating은 `N≥10`에서만** — `N<10`은 `preliminary`(measurement only, verdict 보류)다. **정본 = `modules/cros
      ! L64: - ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 
      · L78: | modules/cross-validation.md | 검증 게이트 + 외부 피드백 검증 + 런타임 주장 검증 + Coverage Gate + Reflection Rate 정본 |
@@ -726,7 +730,7 @@
      ! L100: 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드(스택 스킬을 불렀으면 그 요구 사항 — 위 `## 
      ! L404: 완료 보고(직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록): 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일
      ! L408: > **Canonical sink**: 누적은 실행 기록이다 — 이 표의 Gate 별 이슈 수와 cross-model 발견 수를 `run_metrics.py end --gate-issues … --
-[로드/무조건] modules/fz-gpt-subcommands-aux.md        2754 글자÷4
+[로드/무조건] modules/fz-gpt-subcommands-aux.md        2845 글자÷4
      ? L54: - ⊕ `--gpt-independent` 면 실행 절차 2.5 를 Workflow 없이 그대로 background 로 띄운다(`locatedFindings` 는 없다). 4.5 병합의 `--cla
      ! L102: 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**(직전 `gpt-choice.sh decide` — `s
 [로드/무조건] modules/review-structural-axes.md        1705 글자÷4
@@ -734,7 +738,7 @@
      · L79: | modules/review-structural-axes.md | 구조 판정 5축 (fz-peer-review 공유). ⛔ Phase 5 전 **Read 후** §3+§4를 `args.struct
      ! L100: 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드(스택 스킬을 불렀으면 그 요구 사항 — 위 `## 
      ! L333: - [ ] ⛔ 형제 관례 판정이 **양방향**인가? (관례 존중 + 선례 이전 가능성 — `modules/review-structural-axes.md` §E. light 는 Workflow 미호출
-[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+[로드/무조건] modules/gpt-strategy.md                  6557 글자÷4
      ! L64: - ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 
      ! L221: > ⊘ 직전 `gpt-choice.sh decide`(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수)가 `skip` 이거나 정문이 exit 18 `GPT-OFF`
      ! L221: > ⊘ 직전 `gpt-choice.sh decide`(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수)가 `skip` 이거나 정문이 exit 18 `GPT-OFF`
@@ -782,7 +786,7 @@
      ! L281: Plan에 Transformation Spec이 포함된 경우, diff가 Spec 요구사항을 준수하는지 검증. 참조: `modules/code-transform-validation.md`
 [로드/무조건] modules/feedback-verification.md          392 글자÷4
      ! L340: > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
-[로드/무조건] modules/gates.md                        10610 글자÷4
+[로드/무조건] modules/gates.md                        10631 글자÷4
      ! L346: ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
 [로드/조건부] modules/plugin-refs.md                   2809 글자÷4
      · L73: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
@@ -803,11 +807,11 @@
 ===== fz-search =====
 참조 판정: skills/fz-search/SKILL.md
 정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 29210 / ceiling(로드 전체) 33015 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
+  floor(무조건 로드) 29280 / ceiling(로드 전체) 33085 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/cross-validation.md             11054 글자÷4
+[로드/무조건] modules/cross-validation.md             11124 글자÷4
      · L61: | modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
      ~ L337: - [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/
      ! L338: - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation

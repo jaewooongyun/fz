@@ -11,7 +11,7 @@
       "name": "fz",
       "description": "AI development workflow orchestration: natural language → skill pipeline → multi-agent team → execution",
       "repository": "https://github.com/jaewooongyun/fz",
-      "version": "0.57.0",
+      "version": "0.58.0",
       "author": {
         "name": "Jaewoong Yun"
       },
@@ -46,7 +46,7 @@
       "name": "fz-guard",
       "description": "Optional fz add-on: hooks that enforce Phase 4 approval after /fz (writing Bash included), warn about ad-hoc agents in fz sessions, ask for a registry entry when FZ_FINDINGS_ROOT is set and a turn writes an fz lesson to memory, and ask for the GPT review in fz-review turns while blocking the retired model name in fz plugin files. Opt-in: asks before Bash that runs under configured protected paths. Fails open. Off until installed.",
       "repository": "https://github.com/jaewooongyun/fz",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "author": {
         "name": "Jaewoong Yun"
       },

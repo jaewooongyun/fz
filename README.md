@@ -22,7 +22,7 @@ claude plugin install fz --marketplace jaewooongyun/fz   # Claude Code 2.1.292+ 
 claude plugin marketplace add jaewooongyun/fz   # 최초 1회
 claude plugin install fz
 claude plugin install fz-compact@fz-orchestrator  # 선택. bg 세션 로컬 마스킹 압축, 기본 꺼짐
-claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 승인 생략과 보호 경로 아래 Bash 를 훅으로 막는다
+claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 승인 생략과 보호 경로 아래 Bash 를 막고, 알던 셸 함정은 경고한다
 
 claude
 > /fz "안녕"                                     # 응답하면 정상
@@ -132,7 +132,7 @@ find "${CODEX_HOME:-$HOME/.codex}/skills" -maxdepth 1 -type l \( -name fz-fixer 
 
 ---
 
-## What's New — v0.57.0
+## What's New — v0.58.0
 
-누수 검사를 정본 모듈 하나(`scripts/leak_rules.py`)로 모았다. 커밋 훅 · 새 push 훅 · 출하 게이트 · 릴리스 본문 검사가 같은 규칙으로 커밋 신원과 메시지, 태그, 본문까지 본다. 불린 적 없는 기능(SuperClaude 지시 · Serena 체크포인트 · GPT 역할 스킬 둘 · `--gpt-agents`)을 걷었고 사전 승인을 조회 명령으로 좁혔다. 공개 저장소는 이 판으로 이력과 판 번호를 새로 시작했다(4.x → 0.57.0). 4.x 에서 올라올 때는 위 업데이트 명령처럼 마켓플레이스를 먼저 갱신한다.
+fz-guard 가 알던 셸 함정(검색 명령 뒤 `| head` · 빈 글롭 · `cd X &&`)을 경고한다. 계획 · 리뷰 검사와 출하 대조가 대조값 · 인용 줄 · 출하 커밋을 직접 잰다.
 → [CHANGELOG](CHANGELOG.md)
