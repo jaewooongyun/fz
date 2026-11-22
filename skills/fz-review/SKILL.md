@@ -340,6 +340,8 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
 >
 > 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 검증"` 실행(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` · 작업 폴더가 없으면 `WORK_DIR=` 빈 값 — `modules/fz-gpt-subcommands-core.md` § validate 호출자) → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
+>
+> **validate 생략 (지적 0 · 적용 수정 0)** — 다섯이 모두 확인될 때만 validate 를 부르지 않는다: ① 직전 GPT 리뷰(Phase 5 검증 2 · 2.5 를 띄운 run 은 4.5 가 병합한 독립 첫 패스)가 exit 0 으로 끝났고 ② 그 산출이 유효하며(출력 파일이 비어 있지 않고 지적 · 판정을 읽을 수 있다 · 2.5 경로는 `review_merge.py` 가 받아들였다) ③ 그 리뷰의 지적이 0 이고 ④ 그 뒤 적용한 수정이 0 이며 ⑤ 리뷰가 본 입력이 그대로다 — 실행 절차 1 의 diff 를 같은 방법으로 다시 떠 기록한 `diff.patch` 와 `cmp -s` 로 같은지 본다. 그러면 그 자리에 `[validate 생략 — 지적 0 · 적용 수정 0]` 과 Reflection Rate N/A(`modules/cross-validation.md` § Reflection Rate — N=0)를 적는다. 하나라도 확인하지 못하면(기록한 diff 가 없거나 대조가 실패하면 포함) validate 를 부른다. 원장 재검증(`--reverify`)과 `verify-gates` 는 이 생략과 상관없이 그대로 돈다. 근거: 지적 0 · 수정 0 이면 validate 는 Phase 5 가 본 같은 입력을 다시 묻는 호출이다.
 
 ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
 
@@ -354,6 +356,7 @@ python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --reverify {WORK_DIR}/gates/pl
 - ⛔ `--status`는 재검증이 아니다 — 파싱만 하고 과거 증거를 그대로 읽는다
 - `/fz-gpt validate`(fz-guardian)의 `resolved/partially_resolved/unresolved/**regressed**` 4축에서 `regressed`가 0이 아니면 통합 차단 — 기존 `gpt_verification_schema` 유지
 - 원장이 있으면 **`verify-gates`를 추가 호출**해(같은 decide 판정 — `skip` 이면 부르지 않고 `[GPT 미사용 — 사유]`) 게이트별 판정을 받는다 — 대상은 **확정 원장** `{WORK_DIR}/gates/plan.md`다(draft는 Phase 2 산출물이다). 절차: `modules/fz-gpt-subcommands-core.md` § verify-gates(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` · `LEDGER={WORK_DIR}/gates/plan.md` — validate 와 같은 라운드의 게이트 슬롯)
+- **validate ∥ verify-gates** — 두 호출은 서로의 산출을 읽지 않는다(validate = 원본 이슈 + 적용 수정 · verify-gates = 확정 원장). validate 는 수정이 끝나면 바로 background 로 띄우고, verify-gates 는 위 `--reverify` 가 원장을 고쳐 쓴 뒤에 띄운다(먼저 띄우면 옛 원장을 판정한다). 출력 파일을 따로 두고 둘 다 끝난 뒤 판정한다 — `skills/fz-plan/SKILL.md` Phase 2 병렬 실행 계약과 같다. 직전 decide 판정 하나가 두 호출을 덮는다 · validate 를 생략한 run(위 생략 문단)은 verify-gates 만 돈다
 - ⛔ 응답은 `--verdict-check {응답.json} {WORK_DIR}/gates/plan.md` 로 전수 판정을 확인한다. exit 1이면 재호출 1회(`FZ_GPT_RECALL=post-check` — 그 라운드를 잇고 라운드를 쓰지 않는다 · `modules/fz-gpt-subcommands-core.md` § 사후 검증 블록) 후 **미판정으로 기록**
 - ⛔ validate를 대체하지 않는다 — 4축 역검증과 게이트 판정은 관심사가 다르다
 - 전 게이트 충족 시 `--set-state closed` (전진은 조건부 — 미충족이면 거부된다)

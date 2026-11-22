@@ -143,7 +143,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" set --model off                  
 - 격리 config 에 실제 config 최상위 `model` · `model_reasoning_effort` 두 줄을 옮긴다 — 선택이 없으면 격리 팔도 사용자 config 로 돈다
 - 런처 exit 10 · 11 · 12 는 래퍼 exit 를 그대로 낸 것일 수 있다 — 사유는 `<out-dir>/<arm>-<run-id>.wrapper.log` 에 있다. 세션 선택 판독 실패(11)면 런처 stderr 에 `GPT-CHOICE` 줄이 없고 `.wrapper.log` 에 `CHOICE-UNREADABLE` 또는 `CHOICE-SCRIPT-ERROR` 가 있다 — 위 결정 순서의 exit 11 규칙을 따른다. 12 는 기록 표의 exit 12 행을 따른다
 - 런처 exit 12 이고 `.wrapper.log` 에 `GPT-IDLE` 이 있으면 래퍼 진행 감시가 끊은 것이다(기록 표의 `GPT-IDLE` 행). 런처 `--timeout`(16)은 총 시간 상한이고 진행 감시는 무출력 정체다 — 둘은 따로 걸린다. 런처는 래퍼 프로세스 그룹째 죽이고 래퍼는 CLI pid 트리만 죽인다(CLI 는 래퍼 그룹 안이다)
-- max · ultra 를 고르면 런처 `--timeout` 기본 1800초(exit 16)에 걸릴 수 있다 — 필요하면 `--timeout` 을 준다
+- max · ultra 를 고르면 런처 `--timeout` 기본 1800초(exit 16)에 걸릴 수 있다 — 필요하면 정문에 `--timeout <초> --experimental` 을 준다(정문은 `--timeout` 을 `--experimental` 과 함께만 받는다)
 - 런처 exit 18 = GPT 미사용 — 격리 폴더를 만들지 않고 감사에 `"gptOff"` 를 남긴다(§ GPT 미사용)
 - 런처 exit 11 · `격리 폴더가 ~/.claude 아래에 생긴다` = `${TMPDIR:-/tmp}` 의 실경로가 실제 홈 `.claude` 아래다 — 격리 폴더를 만들기 전 · GPT 를 부르기 전에 멈춘다(F-509 · GPT 미사용 18 보다 뒤). TMPDIR 을 바꾸거나 unset 한 뒤 다시 돈다
 
@@ -191,7 +191,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # stdout 한 줄 — 그
 | 켬이면 필수 | fz-plan full 2.7 `independent-plan`(기본 — 끄기 `--no-gpt-independent`) · Phase 2 `verify` ∥ `verify-gates`(draft 원장이 있을 때 · 2.7 을 띄웠으면 `verify` 자리를 `verify-cross`) | 끈 세션의 원장 판정은 아래 § fz-plan 원장 |
 | 켬이면 필수 | fz-code 8.5 `check` | |
 | 켬이면 필수 | fz-fix Step 4 `check` · 빌드 LOOP 한도의 보조 진단 `check` | 2026-11-01 사용자 결정 — `--gpt` opt-in 을 없앴다. check 는 외부 전송이 아니다 |
-| 켬이면 필수 | fz-review Phase 5 `review` · 5.5 `validate` · 5.5 `verify-gates`(확정 원장이 있을 때) | Phase 5 직전 `availability-probe`(불능 판별)도 같은 decide 줄을 따른다 — `skip` 이면 probe 도 부르지 않는다. `--gpt-independent` 면 Phase 5 `review` 자리를 병합이 맡는다 |
+| 켬이면 필수 | fz-review Phase 5 `review` · 5.5 `validate` · 5.5 `verify-gates`(확정 원장이 있을 때) | Phase 5 직전 `availability-probe`(불능 판별)도 같은 decide 줄을 따른다 — `skip` 이면 probe 도 부르지 않는다. `--gpt-independent` 면 Phase 5 `review` 자리를 병합이 맡는다. 5.5 `validate` 는 직전 GPT 리뷰 지적 0 · 적용 수정 0 이고 입력이 그대로면 부르지 않는다(조건 전체 `skills/fz-review/SKILL.md` Phase 5.5 생략 문단 — `verify-gates` 는 그대로) |
 | 켬이면 필수 | fz-modernize full Phase 3 `independent-plan`(초안과 동시 — 실패 · 거부면 Phase 4 그대로) · Phase 4 `modernize-verify` · light 의 `micro-eval` | 자기 적용 계약의 "non-skippable" 은 켠 세션의 뜻이다 |
 | 켬이면 필수 | fz-peer-review Tier 1 · 2 · 3 의 GPT 자리 — 독립 첫 패스(`independent-review` · `--no-gpt-independent` 면 `peer-challenger`) · Tier 3 `peer-da` | Tier 0 은 GPT 가 없다(`--tier 0` 명시 때만 — `modules/peer-review-tiers.md`). 끈 세션이면 강등 · 감쇠 없이 표기만 |
 | 켬이면 필수 | fz-manage reflect-to-module Step 4 reviewer(`/fz-gpt`) | `--skip-gpt` 는 DRY-RUN 전용이다 — GPT 미사용 `skip` 과 다르다 |

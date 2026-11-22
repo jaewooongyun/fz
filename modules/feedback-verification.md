@@ -24,7 +24,7 @@
 
 ## Gate 4.5: Feedback Verified
 
-- [ ] GPT가 이전 이슈들의 해결 상태를 검증했는가?
+- [ ] GPT가 이전 이슈들의 해결 상태를 검증했는가? (직전 GPT 리뷰 지적 0 · 적용 수정 0 이고 리뷰가 본 입력이 그대로면 N/A — validate 를 부르지 않는다 · 다섯 조건과 확인하지 못할 때의 실행은 `skills/fz-review/SKILL.md` Phase 5.5 생략 문단)
 - [ ] Feedback Reflection Rate threshold pass? (N<10이면 preliminary — 참조: `modules/cross-validation.md § Reflection Rate threshold`)
 - [ ] 새로 발견된 Critical 이슈가 없는가?
 - [ ] Regressed 이슈가 없는가?
