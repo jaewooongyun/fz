@@ -12,7 +12,7 @@ description: >-                        # 필수: 반환물 한 줄 + 호출 계�
   fz 워크플로 내부 워커({호출 워크플로}) — 직접 쓰지 않는다.
 model: sonnet                          # sonnet|opus|inherit
 # Model upgrade note: upgraded to opus in {specific teams} (see team-registry.md)
-tools: Read, Grep, Glob, Bash         # 도구 제한 (생략 시 부모 상속)
+tools: Read, Grep, Glob, Bash         # 도구 제한 — fz 에이전트는 이 줄을 늘 둔다(도구가 없으면 빈 `tools:`)
 # permissionMode: 필드를 넣지 않는다 — 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다(guides/agent-team-guide.md §8.5)
 maxTurns: 15                           # 합리적인 턴 제한
 # memory: 필드를 넣지 않는다 — Read/Write/Edit 가 자동 부여돼 Workflow 에이전트의 '쓰기 없음' 계약과 충돌하고
@@ -30,7 +30,7 @@ skills:                                # 사전 로드 스킬
 | `name` | Yes | 에이전트 식별자. lowercase + hyphen |
 | `description` | Yes | 두 줄 — 반환물 한 줄 + 호출 계약 한 줄. 워크플로 내부 워커는 `fz 워크플로 내부 워커({호출 워크플로}) — 직접 쓰지 않는다`, Lead 가 직접 부르는 에이전트는 그 호출처를 적고 '내부 워커' 문구를 쓰지 않는다 |
 | `model` | Yes | 기본 모델. Primary Worker는 opus, 지원 역할은 sonnet |
-| `tools` | No | 허용 도구 목록. 생략하면 부모 컨텍스트 상속 |
+| `tools` | Yes (fz) | 허용 도구 목록. 생략하면 부모 컨텍스트 상속이지만 fz 에이전트는 줄을 늘 둔다(도구가 없으면 빈 `tools:`) — 종료 훅 훑기가 이 줄로 심볼 도구 보유를 가르고, 줄이 없는 정의는 재발 방지 lint `symbol-tools-block` 이 잡는다 |
 | `permissionMode` | ⛔ 넣지 않음 | 플러그인 에이전트는 이 필드를 지원하지 않아 불러올 때 무시된다. 권한 방어는 `tools` 허용 목록이 맡는다(guides/agent-team-guide.md §8.5) |
 | `maxTurns` | No | 최대 턴 수. 10-20 권장 |
 | `memory` | ⛔ 넣지 않음 | Read/Write/Edit 가 자동 부여돼 Workflow '쓰기 없음' 계약과 충돌하고 A/B 입력을 오염시킨다(guides/agent-team-guide.md §8.1 · lint #N13). 예외는 워크플로 밖 memory-curator 뿐 |
@@ -97,7 +97,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 (출력 구조를 명시)
 ```
 
-`## Symbol tools` 블록은 `tools:` 에 Serena 심볼 도구(`find_symbol` · `find_referencing_symbols` · `get_symbols_overview`)가 하나라도 있는 에이전트에만 넣고, 도구 전략 절 바로 아래에 글자 그대로 둔다 — 그 도구를 가진 에이전트는 모두 바이트까지 같은 블록을 쓴다. Serena 를 Secondary · Fallback 등급 줄로 따로 적지 않는다. 워커를 띄우기 전의 끔 신호 줄은 `modules/tool-status.md` § 워커 심볼 도구, 점검 낱말마다 Lead 가 할 일은 `modules/symbol-tools-audit.md` 가 정본이다.
+`## Symbol tools` 블록은 `tools:` 에 Serena 심볼 도구(`find_symbol` · `find_referencing_symbols` · `get_symbols_overview` · `find_implementations` · `find_declaration`)가 하나라도 있는 에이전트에만 넣고, 도구 전략 절 바로 아래에 글자 그대로 둔다 — 그 도구를 가진 에이전트는 모두 바이트까지 같은 블록을 쓴다. Serena 를 Secondary · Fallback 등급 줄로 따로 적지 않는다. 워커를 띄우기 전의 끔 신호 줄은 `modules/tool-status.md` § 워커 심볼 도구, 점검 낱말마다 Lead 가 할 일은 `modules/symbol-tools-audit.md` 가 정본이다.
 
 ## Description 작성 예시
 

@@ -13,9 +13,9 @@
 | broken-refs | "<대상>: <모듈 경로> 참조" 의 대상 이름이 그 파일에 없다(앵커 없는 산문 참조) | F-474 |
 | count-mismatch | "**N개 …**" 머리말 바로 아래 표의 행 수가 N 이 아니다 | F-479 |
 | catalog-required | 점검 카탈로그(templates/check-catalog-*.md)가 있어야 할 경로에 없다 — Workflow 워커 · GPT 역할 스킬은 공용 블록 · light Lead 는 템플릿 Read 지시 | F-005 외 PROMPT 15 |
-| audit-wiring | 워크플로 호출 지시(`Workflow({ scriptPath …`)가 적힌 스킬 · 모듈 · 가이드에 워커 심볼 도구 점검 줄(`--mcp-audit` 이 든 줄 — 직접 호출 `--direct` 줄은 세지 않는다)이 없다 | 점검이 호출 지시 파일 11개 중 1개에만 있었다 — 새 스킬이 빠뜨리지 않게 |
+| audit-wiring | 워크플로 호출 지시(`Workflow({ scriptPath …`)가 적힌 스킬 · 모듈 · 가이드에 워커 심볼 도구 점검 줄(`--mcp-audit` 이 든 줄 — 직접 호출 `--direct` 줄은 세지 않는다)이 없다 · 그 지시 없이 문장으로 swarm 을 부르는 문서(`` `workflows/swarm.js` 를 … 부른다 `` · `` `workflows/swarm.js` 조각으로 돌린다 ``)에 점검 줄도 정본 절 포인터 줄(같은 줄에 '심볼 도구 점검' · '공용 읽기 전용 swarm 절')도 없다 | 점검이 호출 지시 파일 11개 중 1개에만 있었다 — 새 스킬이 빠뜨리지 않게 |
 | stack-skill-channel | `## 스택 스킬` 절이 있는 스킬의 그 절에 소비 경로 낱말(`스택 스킬 요구 사항` · `스택 스킬은 Lead 판단용`)이 정확히 하나가 아니다 · 워커에게 가는 통로가 있는 스킬(구현 · 수정 · 계획 · 리뷰 · 접근 탐색)이 앞의 것이 아니다 | 스택 스킬을 Lead 만 읽고 코드를 쓰는 워커는 모르는 일을 막는다 |
-| symbol-tools-block | frontmatter `tools:` 에 Serena 심볼 도구(`find_symbol` · `find_referencing_symbols` · `get_symbols_overview`)가 있는 에이전트에 `## Symbol tools` 절(그 제목 줄부터 다음 `## ` 제목 전까지)이 정확히 하나가 아니다 · 그 절이 에이전트끼리 · `templates/agent-template.md` 와 글자가 다르다 · 그 도구가 없는 에이전트에 절이 있다 | 같은 절의 사본이 에이전트 13개와 템플릿에 있는데 저장소 안에서 같음을 지키는 검사가 없었다 |
+| symbol-tools-block | frontmatter `tools:` 에 Serena 심볼 도구(`find_symbol` · `find_referencing_symbols` · `get_symbols_overview` · `find_implementations` · `find_declaration` — 종료 훅 점검이 세는 목록과 같은 다섯)가 있는 에이전트에 `## Symbol tools` 절(그 제목 줄부터 다음 `## ` 제목 전까지)이 정확히 하나가 아니다 · 그 절이 에이전트끼리 · `templates/agent-template.md` 와 글자가 다르다 · 그 도구가 없는 에이전트에 절이 있다 · frontmatter 가 있는데 `tools:` 줄이 없다 | 같은 절의 사본이 에이전트 13개와 템플릿에 있는데 저장소 안에서 같음을 지키는 검사가 없었다 |
 
 ⛔ 미실행은 PASS 가 아니다 — 검사 대상이 0개면 그 lint 는 UNRUN 이고 전체도 PASS 가 아니다.
 
@@ -25,6 +25,7 @@ exit: 0 전부 PASS(WARN 포함) · 1 위반 · 2 미실행 있음
 """
 from __future__ import annotations
 
+import ast
 import glob
 import os
 import re
@@ -52,12 +53,15 @@ REF_RE = re.compile(r"(?P<term>[A-Za-z가-힣][^:|`*\n]{2,40}?)\**\s*[:：]\s*`?
 PROPER = re.compile(r"[A-Z][A-Za-z0-9]+(?:\s+[A-Z0-9][\w.]*)*")   # 대상의 고유 이름(영문) — 한국어 이름표(상세 · 절차)는 낱말 대조 대상이 아니다
 COUNT_RE = re.compile(r"\*\*(\d+)개 ([^*\n]{2,40})\*\*")
 WF_CALL = re.compile(r"Workflow\(\{ *scriptPath")   # 워크플로 호출 지시 — 이 꼴이 적힌 문서는 반환 뒤 심볼 도구 점검 줄을 함께 둔다
+SWARM_PROSE = re.compile(r"`workflows/swarm\.js` (?:를[^\n]*?부른다|조각으로 돌린다)")   # 문장 swarm 호출 — 호출 줄은 정본 절에 두고 소비 문서는 문장으로 부른다
+SWARM_POINTER = ("심볼 도구 점검", "공용 읽기 전용 swarm 절")   # 정본 절 포인터 줄 — 두 낱말이 한 줄에 있으면 반환 뒤 점검을 정본 절의 줄에 맡긴 것이다
 WIRING_DOCS = ("skills/*/SKILL.md", "modules/*.md", "guides/*.md")
 STACK_HEAD = re.compile(r"^## 스택 스킬.*$", re.M)
 STACK_WORKER, STACK_LEAD = "스택 스킬 요구 사항", "스택 스킬은 Lead 판단용"   # 소비 경로 두 낱말 — 워커 전달 · Lead 판단용
 STACK_WORKER_SKILLS = ("fz-code", "fz-discover", "fz-fix", "fz-plan", "fz-review")   # 워커에게 가는 기존 통로(Step 맥락 · 알려진 제약 · 의도 맥락)가 있는 스킬
 SYMBOL_HEAD = "## Symbol tools"   # 심볼 도구 공통 절의 제목 줄 머리 — 절은 이 줄부터 다음 `## ` 제목 전까지다
-SYMBOL_TOOL_RE = re.compile(r"(?:(?<![\w-])|(?<=__))(?:find_symbol|find_referencing_symbols|get_symbols_overview)(?![\w-])")   # 맨 이름 · 서버 접두(`…__find_symbol`)
+SYMBOL_TOOLS = ("find_symbol", "find_referencing_symbols", "get_symbols_overview", "find_implementations", "find_declaration")   # 종료 훅 점검의 `SYMBOL_READ_TOOLS`(scripts/fz_wf_metrics.py)와 같은 다섯 — 자체 시험이 대조한다
+SYMBOL_TOOL_RE = re.compile(r"(?:(?<![\w-])|(?<=__))(?:" + "|".join(SYMBOL_TOOLS) + r")(?![\w-])")   # 맨 이름 · 서버 접두(`…__find_symbol`)
 AGENT_TEMPLATE = "templates/agent-template.md"
 
 
@@ -205,13 +209,20 @@ def lint_catalog_required(root):
 
 
 def lint_audit_wiring(root):
-    """워크플로를 부르는 문서마다 반환 뒤 심볼 도구 점검 줄이 있는가 — 직접 호출(`--direct`) 줄은 워크플로 점검이 아니라 세지 않는다."""
-    files = [p for p in _files(root, WIRING_DOCS) if WF_CALL.search(_read(p))]
-    if not files:
-        return None, "워크플로 호출 지시가 있는 문서 0개"
+    """워크플로를 부르는 문서마다 반환 뒤 심볼 도구 점검 줄이 있는가 — 직접 호출(`--direct`) 줄은 워크플로 점검이 아니라 세지 않는다.
+    호출 지시 없이 문장으로 swarm 을 부르는 문서(`SWARM_PROSE`)는 점검 줄 또는 정본 절 포인터 줄(`SWARM_POINTER` 두 낱말이 한 줄에)을 둔다."""
+    docs = _files(root, WIRING_DOCS)
+    files = [p for p in docs if WF_CALL.search(_read(p))]
+    prose = [p for p in docs if p not in files and SWARM_PROSE.search(_read(p))]
+    if not files and not prose:
+        return None, "워크플로 호출 지시 · 문장 swarm 호출이 있는 문서 0개"
     v = [f"{os.path.relpath(p, root)}: 워크플로를 부르는데 심볼 도구 점검 줄(`--mcp-audit`)이 없다 — 명령 꼴은 modules/tool-status.md"
          for p in files if not any("--mcp-audit" in ln and "--direct" not in ln for ln in _read(p).split("\n"))]
-    return v, f"워크플로 호출 문서 {len(files)}개"
+    v += [f"{os.path.relpath(p, root)}: 문장으로 swarm 을 부르는데 심볼 도구 점검 줄(`--mcp-audit`)도 정본 절 포인터 줄(한 줄에 "
+          f"'{SWARM_POINTER[0]}' · '{SWARM_POINTER[1]}')도 없다 — 정본 절은 guides/skill-authoring.md §12"
+          for p in prose if not any(("--mcp-audit" in ln and "--direct" not in ln) or all(w in ln for w in SWARM_POINTER)
+                                    for ln in _read(p).split("\n"))]
+    return v, f"워크플로 호출 문서 {len(files)}개 · 문장 swarm 호출 문서 {len(prose)}개"
 
 
 def lint_stack_skill_channel(root):
@@ -245,7 +256,8 @@ def _symbol_sections(text):
 
 
 def _agent_tools(text):
-    """frontmatter `tools:` 값(같은 줄 · 아래 `- 항목` 줄) — 주석 줄은 보지 않는다. frontmatter 가 없으면 빈 문자열."""
+    """frontmatter `tools:` 값(같은 줄 · 아래 `- 항목` 줄) — 주석 줄은 보지 않는다. frontmatter 가 없으면 빈 문자열 ·
+    frontmatter 는 있는데 `tools:` 줄이 없으면 None(본문의 `tools:` 줄은 선언이 아니다)."""
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
         return ""
@@ -255,19 +267,22 @@ def _agent_tools(text):
         if lines[i].startswith("tools:"):
             vals.append(lines[i][len("tools:"):])
             vals += [x for x in lines[i + 1:end] if x.lstrip().startswith("- ")]
-    return " ".join(vals)
+    return " ".join(vals) if vals else None
 
 
 def lint_symbol_tools_block(root):
-    """심볼 도구를 선언한 에이전트마다 `## Symbol tools` 절이 하나 · 그 글자가 서로 · 템플릿과 같다 · 선언하지 않은 에이전트엔 절이 없다."""
+    """심볼 도구를 선언한 에이전트마다 `## Symbol tools` 절이 하나 · 그 글자가 서로 · 템플릿과 같다 · 선언하지 않은 에이전트엔 절이 없다 ·
+    frontmatter 가 있으면 `tools:` 줄이 있다(종료 훅 훑기는 그 줄만 읽는다 — 줄이 없는 정의는 조용히 빠진다)."""
     agents = _files(root, ("agents/*.md",))
     if not agents:
         return None, "에이전트 0개"
     v, holders = [], {}
     for p in agents:
         t, rel = _read(p), os.path.relpath(p, root)
-        secs = _symbol_sections(t)
-        if SYMBOL_TOOL_RE.search(_agent_tools(t)):
+        secs, tools = _symbol_sections(t), _agent_tools(t)
+        if tools is None:
+            v.append(f"{rel}: frontmatter 에 `tools:` 줄이 없다 — 종료 훅 훑기는 이 줄로 심볼 도구 보유를 가른다(도구가 없으면 빈 `tools:` 를 둔다)")
+        if SYMBOL_TOOL_RE.search(tools or ""):
             if len(secs) != 1:
                 v.append(f"{rel}: 심볼 도구를 선언했는데 `{SYMBOL_HEAD}` 절이 {len(secs)}개다 — 정확히 하나를 둔다")
             else:
@@ -332,6 +347,8 @@ def self_test():
     wf_call = "3. **Workflow 호출**: `Workflow(" + "{ scriptPath: '{WORK_DIR}/w.js', args })`\n"   # 조립 — 저장소의 호출 지시 집계에 섞이지 않게
     audit = "4. **심볼 도구 점검**: `python3 \"${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py\" --mcp-audit --wf {runId 폴더명}`\n"
     direct = "5. 직접 호출: `fz_wf_metrics.py --mcp-audit --direct --only-agent fz:review-correctness`\n"
+    swarm = "`workflows/" + "swarm.js`"   # 조립 — 저장소의 문장 swarm 호출 집계에 섞이지 않게
+    pointer = "반환 뒤 심볼 도구 점검은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로\n"
     sym = (SYMBOL_HEAD + " — use them whenever they are in your tool list\n\n"
            "If a symbol tool is in your tool list, call it before Grep.\n- `find_symbol` — where a named function is defined.\n\n")
     sym_agent = lambda tools, body: f"---\nname: a\ntools: Read, Grep, {tools}\n---\n\n## Role\n\nr\n\n{body}## Return\n\nx\n"
@@ -341,10 +358,15 @@ def self_test():
         "skills/s/SKILL.md": blk("review-core", "core\n") + "**2개 렌즈**\n\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n",
         mod + "m.md": "# m\n일반 모듈\nFinal Report 형식\n", mod + "u.md": "2. **Final Report 생성**: " + ref_m + "\n> 상세 원칙: " + ref_m + "\nTeamCreate 는 일몰됐다\n",
         "skills/w/SKILL.md": wf_call + audit + direct,
+        "skills/p/SKILL.md": "- 검증자 — " + swarm + " 를 `agentType: 'fz:review-counter'` 로 부른다 · " + pointer,   # 문장 호출 두 꼴(이 줄 · 아래 줄) + 포인터 두 낱말
+        mod + "q.md": "항목 대조를 " + swarm + " 조각으로 돌린다 · " + pointer,
+        "guides/n.md": "#### 공용 — " + swarm + " (정본 호출 사이트)\n",   # 동사 없는 언급은 호출 지점이 아니다
+        "docs/o.md": swarm + " 를 부른다\n",   # 범위(스킬 · 모듈 · 가이드) 밖
         "skills/fz-fix/SKILL.md": f"# f\n## 스택 스킬 (있으면 쓴다)\n{STACK_WORKER} 를 Step 맥락에 싣는다\n## 다음 절\n{STACK_LEAD}\n",   # 절 밖의 낱말은 세지 않는다
         "skills/fz-search/SKILL.md": f"## 스택 스킬 (있으면 쓴다)\n{STACK_LEAD} — 워커에게 넘기지 않는다\n",
         "agents/sym-a.md": sym_agent("mcp__plugin_fz_serena__find_symbol", sym),
         "agents/sym-b.md": sym_agent("mcp__plugin_fz_serena__get_symbols_overview", sym),
+        "agents/sym-c.md": sym_agent("mcp__plugin_fz_serena__find_implementations", sym),   # 다섯 가운데 뒤의 두 이름만 선언해도 절을 싣는다
         AGENT_TEMPLATE: "# t\n\n```markdown\n## 도구 전략\n\n" + sym + "## 핵심 역할\n```\n",
     }
     for n, paths in CATALOG_BLOCKS.items():          # 카탈로그 원문 · 블록 배치 · light Read 지시(합성)
@@ -373,12 +395,20 @@ def self_test():
     stack_more = {"both": {"skills/fz-review/SKILL.md": f"## 스택 스킬\n{STACK_WORKER} · {STACK_LEAD}\n"},
                   "lead-on-worker-skill": {"skills/fz-fix/SKILL.md": f"## 스택 스킬\n{STACK_LEAD}\n## 다른 절\n{STACK_WORKER}\n"},
                   "lead-on-discover": {"skills/fz-discover/SKILL.md": f"## 스택 스킬\n{STACK_LEAD}\n"}}
-    # symbol-tools-block 의 실패 꼴 — 절 없음 · 절 둘 · 에이전트끼리 다름 · 템플릿과 다름 · 도구 없는 에이전트에 절. 셀마다 그 파일 이름이 위반 줄에 있어야 한다
+    # audit-wiring 의 문장 swarm 호출 꼴 — 포인터 없음 · 직접 호출 줄만 · 포인터 낱말 하나만. 셀마다 그 파일 이름이 위반 줄에 있어야 한다
+    audit_more = {"prose-swarm": ("skills/p/SKILL.md", {"skills/p/SKILL.md": "- 검증자 — " + swarm + " 를 `agentType: 'fz:review-counter'` 로 부른다\n"}),
+                  "prose-swarm-direct-only": (mod + "q.md", {mod + "q.md": "항목 대조를 " + swarm + " 조각으로 돌린다\n" + direct}),
+                  "prose-swarm-pointer-half": ("guides/h.md", {"guides/h.md": swarm + " 를 부른다 — 호출은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로\n"})}
+    # symbol-tools-block 의 실패 꼴 — 절 없음 · 절 둘 · 에이전트끼리 다름 · 템플릿과 다름 · 도구 없는 에이전트에 절 · 뒤의 두 이름만 선언하고 절 없음 ·
+    #   frontmatter 에 `tools:` 줄 없음(본문의 `tools:` 줄은 선언이 아니다). 셀마다 그 파일 이름이 위반 줄에 있어야 한다
     symbol_more = {"missing": ("agents/sym-b.md", {"agents/sym-b.md": sym_agent("mcp__plugin_fz_serena__find_referencing_symbols", "")}),
                    "duplicate": ("agents/sym-a.md", {"agents/sym-a.md": sym_agent("mcp__plugin_fz_serena__find_symbol", sym + sym)}),
                    "differs": ("agents/sym-b.md", seeded["symbol-tools-block"]),
                    "template": (AGENT_TEMPLATE, {AGENT_TEMPLATE: "# t\n\n```markdown\n" + sym.replace("a named", "the") + "## 핵심 역할\n```\n"}),
-                   "no-tool-has-section": ("agents/plain.md", {"agents/plain.md": sym_agent("mcp__context7__query-docs", sym)})}
+                   "no-tool-has-section": ("agents/plain.md", {"agents/plain.md": sym_agent("mcp__context7__query-docs", sym)}),
+                   "impl-only": ("agents/decl.md", {"agents/decl.md": sym_agent("mcp__plugin_fz_serena__find_declaration", "")}),
+                   "no-tools-line": ("agents/notools.md", {"agents/notools.md": "---\nname: n\nmodel: sonnet\n---\n\n## Role\n\nr\n"}),
+                   "tools-in-body": ("agents/bodytools.md", {"agents/bodytools.md": "---\nname: b\nmodel: sonnet\n---\n\ntools: mcp__plugin_fz_serena__find_symbol\n"})}
     with tempfile.TemporaryDirectory() as d:
         _mk(d, clean)
         res = run(d)
@@ -394,11 +424,23 @@ def self_test():
             _mk(d, {**clean, **extra})
             st = run(d, only="stack-skill-channel")["stack-skill-channel"][0]
             case(f"stack-skill-channel-{k}", st == "FAIL", f"state {st}")
+    for k, (named, extra) in audit_more.items():
+        with tempfile.TemporaryDirectory() as d:
+            _mk(d, {**clean, **extra})
+            st, v, _ = run(d, only="audit-wiring")["audit-wiring"]
+            case(f"audit-wiring-{k}", st == "FAIL" and any(x.startswith(named + ":") for x in v), f"state {st} · {v[:2]}")
     for k, (named, extra) in symbol_more.items():
         with tempfile.TemporaryDirectory() as d:
             _mk(d, {**clean, **extra})
             st, v, _ = run(d, only="symbol-tools-block")["symbol-tools-block"]
             case(f"symbol-tools-block-{k}", st == "FAIL" and any(x.startswith(named + ":") for x in v), f"state {st} · {v[:2]}")
+    # 절을 요구하는 이름 = 종료 훅 점검이 세는 이름 — 한쪽에만 도구를 더하면 점검은 세는데 절은 요구받지 않는(또는 그 반대) 에이전트가 생긴다
+    wfm = os.path.join(SCRIPT_DIR, "fz_wf_metrics.py")
+    audit_names = next((ast.literal_eval(n.value) for n in (ast.parse(_read(wfm)).body if os.path.isfile(wfm) else [])
+                        if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "SYMBOL_READ_TOOLS" for t in n.targets)), None)
+    case("symbol-tools-block-names-match-audit",
+         audit_names is not None and set(audit_names) == set(SYMBOL_TOOLS) and all(SYMBOL_TOOL_RE.fullmatch(x) for x in audit_names),
+         f"lint {sorted(SYMBOL_TOOLS)} · 점검 {audit_names}")
     with tempfile.TemporaryDirectory() as d:
         res = run(d)
         case("not-run-is-not-pass", all(r[0] == "UNRUN" for r in res.values()) and summary(res)[1] == 2,

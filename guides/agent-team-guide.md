@@ -37,7 +37,7 @@ GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS projec
 | Secondary (필요 시) | 보조 도구 | context7 query-docs |
 | Unavailable (Workflow `tools:` allowlist 에 없음 — 구판 표기 "Team 제약") | Lead 전용 | Atlassian, XcodeBuild, LSP (일부) |
 
-> 심볼 도구(Serena `find_symbol` · `find_referencing_symbols` · `get_symbols_overview`)의 사용 · 폴백 · 보고는 등급 줄이 아니라 본문의 공통 블록 `## Symbol tools — use them whenever they are in your tool list` 가 정한다. 그 도구를 `tools:` 에 가진 에이전트는 이 블록을 글자 그대로 싣는다(원문: `templates/agent-template.md`). 끔 신호 줄은 `modules/tool-status.md` § 워커 심볼 도구, 점검 낱말마다 할 일은 `modules/symbol-tools-audit.md` 에 있다.
+> 심볼 도구(Serena `find_symbol` · `find_referencing_symbols` · `get_symbols_overview` · `find_implementations` · `find_declaration`)의 사용 · 폴백 · 보고는 등급 줄이 아니라 본문의 공통 블록 `## Symbol tools — use them whenever they are in your tool list` 가 정한다. 그 도구를 `tools:` 에 가진 에이전트는 이 블록을 글자 그대로 싣는다(원문: `templates/agent-template.md`). 끔 신호 줄은 `modules/tool-status.md` § 워커 심볼 도구, 점검 낱말마다 할 일은 `modules/symbol-tools-audit.md` 에 있다.
 
 에이전트 파일에 Primary, Secondary, Unavailable만 선언한다:
 

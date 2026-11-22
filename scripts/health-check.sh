@@ -897,9 +897,10 @@ record3 "하네스 계측기 self-test" "$HM_CODE" "$HM_OUT" \
   "$(printf '%s\n' "$HM_OUT" | grep -E 'self-test: PASS' | tr '\n' ' ')" \
   "⛔ $(printf '%s\n' "$HM_OUT" | grep -E 'FAIL' | head -2 | tr '\n' ' ')"
 
-# ── 4.8j 재발 방지 lint 11종 (B6) ──────────────────────────────────
+# ── 4.8j 재발 방지 lint (B6) ──────────────────────────────────────
+# 종류 목록의 정본은 scripts/lint_recurrence.py LINTS 다 — 여기에 수 · 이름을 적지 않는다(lint 를 더할 때마다 낡는다).
 # ⛔ self-test 먼저 — 검사기 고장을 "위반 0"으로 읽지 않는다. 트리 실행의 UNRUN(대상 0개)은 PASS 가 아니다(exit 2).
-#    모듈 500줄 초과는 경고(WARN)라 exit 0 이다(F-485) — 실패는 SKILL 500줄 · 사본 불일치 · TEAM 지시 · 끊긴 참조 · 개수 불일치.
+#    모듈 500줄 초과만 경고(WARN)라 exit 0 이다(F-485) — 다른 lint 의 위반은 실패다.
 chk_recurrence
 chk_retired_commands
 
