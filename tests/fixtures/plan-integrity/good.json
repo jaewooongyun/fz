@@ -11,7 +11,10 @@
      "kind": "command",
      "criterion": "c",
      "command": "true",
-     "expect": "OK"
+     "expect": "OK",
+     "pin": [
+      "a.js"
+     ]
     }
    },
    {
@@ -29,7 +32,8 @@
   "readScope": [
    "`a.js` — 변경 대상",
    "b.js",
-   "§X c.md (참고)"
+   "§X c.md (참고)",
+   "d.md — run(), main 과 helper 를 읽는다"
   ],
   "writeScope": [
    {

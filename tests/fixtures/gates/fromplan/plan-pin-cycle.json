@@ -1,0 +1,20 @@
+{
+  "title": "PIN 사이클",
+  "scope": "생성 → 기준선 → 확정 → 위임 표 1바이트 변경 → stale 거부(F-622)",
+  "steps": [
+    {
+      "id": "G1",
+      "title": "위임 표 완료",
+      "verify": {
+        "kind": "command",
+        "criterion": "위임 표가 DONE 이다",
+        "command": "grep -q DONE pin-table.txt",
+        "expect": "exit 0",
+        "side_effects": "none",
+        "pin": [
+          "pin-table.txt"
+        ]
+      }
+    }
+  ]
+}

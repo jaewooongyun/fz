@@ -1,0 +1,16 @@
+{
+  "title": "PIN 수동 거부",
+  "steps": [
+    {
+      "id": "G1",
+      "title": "사람 확인",
+      "verify": {
+        "kind": "manual",
+        "criterion": "사람이 확인한다 — 사용자 결정",
+        "pin": [
+          "pin/table.txt"
+        ]
+      }
+    }
+  ]
+}

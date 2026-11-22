@@ -63,6 +63,8 @@ const VerifySpec = {
                  description: 'command 가 필요로 하는 외부 명령 (예: ["xcodebuild"]). 부재 시 게이트를 돌리지 않고 미판정으로 남긴다 — 셸 exit 127 을 일반 실패로 오귀속하지 않기 위함' },
         env: { type: 'array', items: { type: 'string' },
                description: 'command 가 ${NAME:?} 등으로 요구하는 환경 변수 이름 (예: ["FZ_IMPL_ROOT"]). 없거나 비면 게이트를 돌리지 않고 미판정으로 남긴다 — 통과 증거를 강등하지 않기 위함(F-342)' },
+        pin: { type: 'array', items: { type: 'string' },
+               description: '판정이 기대는 입력 파일(command 가 부르는 러너의 단언 표 · fixture) — ROOT 기준 · 절대 · ${env 변수}/… 경로, 항목 하나 = 경로 하나. 원장 PIN 으로 옮겨져 승인 뒤 그 파일이 바뀌면 게이트가 재승인을 요구한다(F-622)' },
       },
       additionalProperties: false,
     },

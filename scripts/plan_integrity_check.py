@@ -7,17 +7,19 @@
   재는 것: 문서 **내부 참조**가 서로를 가리키는가 —
     · `rtm[].stepId` 가 `steps[].id` 에 있는가        (계획이 자기 Step 을 가리키는가)
     · CC `links[].sourceId` 가 `edgeCases[].id` 에 있는가 (교차가 실재하는 케이스를 가리키는가)
+    · `readScope` · `writeScope[].file` 한 항목에 경로가 하나인가(F-599 — 묶음이면 분해 제안을 내고 실패한다)
     · `writeScope[].file` 이 `readScope` 안에 있는가   (⛔ 읽지도 않은 파일을 고치기로 하지 않았는가)
       — 단 **신규 생성 파일은 면제**한다. 존재하지 않는 파일은 읽을 수 없으므로 readScope 에 있을 수 없다.
         ⛔ 이 면제가 없던 1차 판에서 실제 플랜(TKT-0101)의 신규 3파일이 위반으로 뜨는 오탐이 있었다
         (2026-09-11 실데이터 대조로 발견 — fixture 만으로는 드러나지 않았다). 면제 조건은
         rationale·file 에 `신규`/`new` 표기가 있는 것이며, 표기 없는 범위 밖 파일은 여전히 위반이다.
-    · `steps[].verify` 가 VerifySpec 계약을 지키는가   (command=criterion+command+expect · manual=criterion)
+    · `steps[].verify` 가 VerifySpec 계약을 지키는가   (command=criterion+command+expect · manual=criterion · 선택 칸 pin=command 의 경로 배열)
     · id 가 유일한가                                    (중복은 개수 검사를 무력화한다)
   `--plan-doc` (plan 마크다운 — plan-v{N} · plan-final) 에서 재는 것(round 2 S17):
     · `경로:줄` 바로 뒤 따옴표 인용이 그 원문 줄과 같은가(F-432 — 렌즈가 규칙을 반대로 인용했다 · `--root` 가 있을 때)
     · "F-NNN 이 기록한" 꼴 근거 문장의 문단에 엔트리 원문 줄 포인터(`entries/F-NNN-*.md:줄`)가 있는가(F-453 — 기억으로 인용했다)
     · 보강 표지 `⊕` 가 남았는가 · Step 제목 id 가 겹치는가(F-315 — 중간본도 단일 최신 상태로 접는다)
+    · (WARN) 수치 주장의 출처(F-185) · '0건 · 없다 · 미발견' 주장의 같은 줄 대조값(F-611 · F-726)
   ⛔ 재지 못하는 것: 계획이 **요구사항을 충족하는가** · 그 파일이 실제로 존재하는가 ·
      verify 가 제목이 말하는 것을 측정하는가. 앞의 둘은 Lead·GPT 판정이고, 마지막은
      `gpt-exec.sh verify-gates` 의 measurement_fit 축이다.
@@ -42,14 +44,81 @@ VERIFY_REQUIRED = {"command": ("criterion", "command", "expect"), "manual": ("cr
 NEW_FILE_MARKERS = ("신규", "new file", "New file", "(new)", "생성")
 
 
+def _path_head(raw) -> str:
+    """범위 항목에서 설명(`— 설명` · `(설명)`) · 백틱 · `§X ` 를 뗀 경로 자리 원문."""
+    t = str(raw).strip().strip("`")
+    t = re.split(r"\s+[—–-]\s+|\s+\(", t)[0].strip().strip("`")
+    return re.sub(r"^§\S+\s*", "", t).strip()
+
+
 def norm_path(raw: str) -> str:
     """readScope 항목은 순수 경로가 아니다 — `경로 — 설명`·`§X 경로`·백틱 포함 형태가 섞인다.
     ⛔ 문자열 동일성으로 비교하면 전부 위반으로 뜬다(GPT verify #7). 경로 토큰만 뽑아 정규화한다."""
-    t = str(raw).strip().strip("`")
-    t = re.split(r"\s+[—–-]\s+|\s+\(", t)[0].strip().strip("`")
-    t = re.sub(r"^§\S+\s*", "", t).strip()
-    t = t.lstrip("./").rstrip("/")
+    t = _path_head(raw).lstrip("./").rstrip("/")
     return os.path.normpath(t) if t else ""
+
+
+SCOPE_SEP_CHARS = ",;·、"
+_SEG = r"[A-Za-z0-9_.@+~${}-]+(?: [A-Za-z0-9_.@+~${}-]+)*"     # 경로 마디 — 마디 안 공백 하나씩은 허용(`My File.swift`)
+PATH_PIECE = re.compile(rf"({_SEG}(?:/{_SEG})*/?)(?::\d+(?:[-–]\d+)?)?\Z")
+PATH_EXT = re.compile(r"\.[A-Za-z]\w{0,5}/?\Z")
+BRACE_ALT = re.compile(r"\{([^{}]*,[^{}]*)\}")
+
+
+def _complete_path(p: str) -> bool:
+    m = PATH_PIECE.match(p)
+    return bool(m) and "/" in m.group(1).strip("/") and (PATH_EXT.search(m.group(1)) is not None or m.group(1).endswith("/"))
+
+
+def _scope_tokens(head: str) -> list:
+    """구분자(쉼표 · 세미콜론 · 가운뎃점)로 자른다 — `{a,b}` 안의 쉼표는 자르지 않는다(중괄호 전개 꼴).
+    공백은 셋으로 가른다: 조각이 모두 완결 경로(`/` 를 품고 `.확장자` · `/` 로 끝남)면 자른다(`a/x.py b/y.py`) · 덩어리 전체가
+    공백 든 경로 하나로 읽히면(`Sources/My File.swift`) 자르지 않는다 · 그 밖(경로 + 낱말 · `§3 c.md`)은 공백으로 자른다.
+    - Note: 산문이 낀 덩어리(`docs/x.md and src/y.md`)는 공백 든 경로 하나로 읽혀 묶음을 놓칠 수 있다 — 실제 공백 경로를 둘로 쪼개는
+      거짓 위반(하드 실패)보다 놓침(경고 없음) 쪽을 골랐다."""
+    chunks, buf, depth = [], "", 0
+    for ch in head + ",":
+        depth = max(0, depth + (ch == "{") - (ch == "}"))
+        if depth == 0 and ch in SCOPE_SEP_CHARS:
+            if buf.strip().strip("`").strip():
+                chunks.append(buf.strip().strip("`").strip())
+            buf = ""
+        else:
+            buf += ch
+    out = []
+    for c in chunks:
+        parts = [p.strip("`") for p in c.split() if p.strip("`")]
+        if len(parts) > 1 and not all(_complete_path(p) for p in parts) and "/" in c and PATH_PIECE.match(c):
+            out.append(c)
+        else:
+            out.extend(parts)
+    return out
+
+
+def _expand_braces(tok: str) -> list:
+    m = BRACE_ALT.search(tok)
+    if not m:
+        return [tok]
+    return [y for alt in m.group(1).split(",") for y in _expand_braces(tok[:m.start()] + alt.strip() + tok[m.end():])]
+
+
+def bundled_paths(raw) -> list:
+    """F-599 — 범위 항목 하나의 경로 자리에 경로가 둘 이상 묶였으면 그 경로들(적힌 그대로 · 분해 제안용) · 아니면 [].
+
+    경로 꼴 조각(`/` 를 품거나 `.확장자` 로 끝나는 ASCII 토큰 · 뒤 `:줄` 은 뗀다)만 센다 — `§3` · `L10` · 낱말은 경로가 아니라 묶음이 아니다.
+    설명(`— …`)은 먼저 떼므로 설명 속 쉼표는 묶음이 아니다. `dir/{a,b}/x.md` 는 전개해 센다.
+    ⛔ 분해는 제안일 뿐 통과 근거가 아니다 — 구분자 추측이 reader 마다 갈리면(F-576) 같은 반환이 도구마다 다르게 읽힌다.
+       호출자는 묶음을 위반으로 내고, Lead 가 목록을 고쳐 다시 넣어 포함 관계를 다시 잰다.
+    """
+    pieces = [e for t in _scope_tokens(_path_head(raw)) for e in _expand_braces(t)]
+    paths = [m.group(1) for m in (PATH_PIECE.match(x) for x in pieces)
+             if m and ("/" in m.group(1).strip("/") or PATH_EXT.search(m.group(1)))]
+    return paths if len(paths) > 1 else []
+
+
+def _bundle_violation(field: str, raw, parts: list) -> str:
+    return (f"{field} 항목 하나에 경로 {len(parts)}개가 묶였다 — {str(raw)[:120]!r} → 분해 제안: "
+            f"{json.dumps(parts, ensure_ascii=False)} (한 항목 = 경로 하나로 고쳐 다시 넣는다 · 포함 관계는 고친 목록으로 다시 잰다)")
 
 
 def check(doc: dict) -> tuple:
@@ -85,6 +154,12 @@ def check(doc: dict) -> tuple:
         for key in VERIFY_REQUIRED[kind]:
             if not str(ver.get(key) or "").strip():
                 v.append(f"{sid}: verify({kind}) 에 {key} 누락")
+        pin = ver.get("pin")                            # F-622 — 원장 PIN 으로 옮겨지는 선택 칸(gate_check.py pin_of 와 같은 규칙)
+        if pin not in (None, []):
+            if kind != "command":
+                v.append(f"{sid}: verify.pin 은 kind=command 에서만 — 수동 게이트는 명령을 돌리지 않는다")
+            elif not isinstance(pin, list) or any(not isinstance(x, str) or not x.strip() or any(c in x for c in ",\n\r") for x in pin):
+                v.append(f"{sid}: verify.pin 은 경로 문자열 배열이다(빈 항목 · 쉼표 · 개행 금지 — 원장 PIN 은 쉼표로 나눠 읽는다) — {pin!r}")
 
     # ② rtm → steps
     rtm = plan.get("rtm") or []
@@ -102,7 +177,16 @@ def check(doc: dict) -> tuple:
                 v.append(f"rtm({row.get('reqId', '?')}): stepId {r!r} 가 steps.id 에 없다")
 
     # ③ writeScope ⊆ readScope
-    read = {norm_path(x) for x in (plan.get("readScope") or []) if norm_path(x)}
+    # F-599 — 묶음 항목은 위반이다(통과시키지 않는다). 포함 관계는 분해 제안 기준으로 함께 잰다 — 묶음 때문에 생긴 거짓 위반은 빠지고
+    #   나머지 포함 관계 위반은 그대로 남는다. 어느 쪽이든 묶음 위반이 있으니 exit 1 이다
+    read = set()
+    for x in plan.get("readScope") or []:
+        parts = bundled_paths(x)
+        if parts:
+            v.append(_bundle_violation("readScope", x, parts))
+            read.update(norm_path(p) for p in parts)
+        elif norm_path(x):
+            read.add(norm_path(x))
     new_exempt = []
     for w in plan.get("writeScope") or []:
         if not isinstance(w, dict):
@@ -111,7 +195,10 @@ def check(doc: dict) -> tuple:
         f = norm_path(w.get("file"))
         blob = f"{w.get('file') or ''} {w.get('rationale') or ''}"
         is_new = any(m in blob for m in NEW_FILE_MARKERS)
-        if not f:
+        parts = bundled_paths(w.get("file"))
+        if parts:                                       # 묶음은 신규 표기 면제보다 먼저 — 묶인 신규 파일이 면제로 빠져나가지 않는다
+            v.append(_bundle_violation("writeScope.file", w.get("file"), parts))
+        elif not f:
             v.append("writeScope 에 file 이 비어 있다")
         elif read and f not in read:
             if is_new:
@@ -154,6 +241,12 @@ AMEND_MARK = "⊕"
 COUNT_CLAIM = re.compile(r"(?<![\w.-])\d[\d,.]*\s?(?:건|개(?!월)|곳|줄|행|파일|회|번|배|초|%|토큰|케이스|셀)")   # 단위 뒤 조사 · 서술어는 붙는다(12개다)
 PATH_LINE_CLAIM = re.compile(r"[\w./-]+\.[A-Za-z]\w{0,5}:\d+")
 CLAIM_EVIDENCE = re.compile(r"\[verified:|code-context(?:\.md)?(?::\d+|#[\w-]+)")
+# '0건 · 없다 · 미발견' 부재 주장 — `10건` 의 0 · `잴 수 없다`(능력) · `필요 없다`(결정)는 부재 주장이 아니다
+ABSENCE_CLAIM = re.compile(r"(?<![\d.,])0\s?건|(?<!수 )(?<!필요 )없다(?![가-힣])|미발견")
+# 대조값 = 단위가 붙은 양수 적중 수가 든 표지 — 양성 대조는 적중이 1 이상이다(빈 `[대조:]` · `저장소 전체에서 0건` ·
+#   F-번호 · `a.py:12` 같은 숫자만 든 표지는 대조값이 아니다)
+_POS_HIT = r"(?<![\w.:-])[1-9][\d,]*\s?(?:건|개(?!월)|곳|줄|행|파일|회|번|케이스|셀)"
+CONTROL_VALUE = re.compile(rf"\[대조:[^\]]*{_POS_HIT}|(?:양성 대조|저장소 전체)[^\n]*?{_POS_HIT}")
 
 
 def _flat(s: str) -> str:
@@ -227,6 +320,25 @@ def unverified_claims(text: str) -> list:
     return out
 
 
+def absence_without_control(text: str) -> list:
+    """F-611 · F-726 — '0건 · 없다 · 미발견' 주장 중 같은 줄에 대조값(`[대조:` · 양성 대조 · 저장소 전체 수)이 없는 것 → [(줄, 원문)].
+    `[verified:` 출처가 있어도 본다 — 출처는 '무엇으로 쟀나' 이고, 대조값은 '그 도구가 주장이 겨누는 영역에서 보이나' 다(F-726 은 대조값이
+    다른 기간에서 나왔다). unverified_claims 와 같은 WARN 이고 같은 범위(코드 블록 · 인라인 코드 제외)를 본다.
+
+    - Note: 표지에는 단위가 붙은 양수 적중 수(`3건` · `12파일`)가 있어야 한다. 대조값의 영역(기간 · 언어 · 파일 집합)이 주장과 같은지는 보지 않는다 —
+      문장 규칙(`modules/cross-validation.md` § Negative-Result Gate)이 맡는다. 0 이 아닌 과소 집계(F-611)도 이 경고 밖이다."""
+    out, fence = [], False
+    for i, ln in enumerate(text.split("\n"), 1):
+        if ln.lstrip().startswith("```"):
+            fence = not fence
+            continue
+        if fence or CONTROL_VALUE.search(ln):
+            continue
+        if ABSENCE_CLAIM.search(re.sub(r"`[^`]*`", "", ln)):
+            out.append((i, ln.strip()))
+    return out
+
+
 def run_doc(path: str, root=None, findings=None, quiet: bool = False) -> int:
     try:
         with open(path, "r", encoding="utf-8") as fh:
@@ -244,6 +356,12 @@ def run_doc(path: str, root=None, findings=None, quiet: bool = False) -> int:
             print(f"  WARN 미검증 주장 줄 {ln}: {s[:100]}")
         if claims:
             print(f"  WARN 미검증 주장 {len(claims)}건 — 같은 줄에 [verified: 출처] 나 code-context 행 참조를 단다(위반 아님 · exit 무관)")
+        absent = absence_without_control(text)
+        for ln, s in absent:
+            print(f"  WARN 대조값 없는 부재 주장 줄 {ln}: {s[:100]}")
+        if absent:
+            print(f"  WARN 대조값 없는 부재 주장 {len(absent)}건 — 같은 줄에 [대조: 같은 도구가 주장이 겨누는 영역에서 찾은 양성 대조 · 저장소 전체 수]를 단다"
+                  "(위반 아님 · exit 무관 · modules/cross-validation.md § Negative-Result Gate)")
         for x in v:
             print(f"  VIOLATION {x}")
         print((f"integrity=FAIL ({len(v)} 위반) " if v else "INTEGRITY_PASS ") + os.path.basename(path))
@@ -295,9 +413,37 @@ def self_test(fixture_dir: str) -> int:
             passed += 1
         else:
             fails.append(f"{os.path.basename(b)} 가 통과했다 (음성 실패 — 위반을 못 잡는다)")
-    doc = os.path.join(fixture_dir, "doc")
     listing = bool(os.environ.get("FZ_SELFTEST_LIST"))
+    bundle_cells = (("f599-read-bundle-split-suggested", "bad-read-bundle.json", '분해 제안: ["c.md", "d.md"]'),
+                    ("f599-write-bundle-split-suggested", "bad-write-bundle.json", '분해 제안: ["new-a.js", "new-b.js"]'))
+    for cell, name, want in bundle_cells:               # F-599 — 묶음 음성은 exit 만이 아니라 분해 제안(묶음 원문이 아닌 경로 배열)을 낸다
+        try:
+            with open(os.path.join(fixture_dir, name), "r", encoding="utf-8") as fh:
+                got = check(json.load(fh))[0]
+        except (OSError, ValueError) as exc:
+            got = [f"fixture 를 읽을 수 없다 ({type(exc).__name__})"]
+        if any(want in x for x in got):
+            passed += 1
+            if listing:
+                print(f"PASS {cell}")
+        else:
+            fails.append(f"{cell} — 위반 {got} (기대 {want!r})")
+            print(f"FAIL {cell}: 위반 {got} (기대 {want!r})")
+    # 공백 든 한 경로는 묶음이 아니다 · 완결 경로 둘을 공백으로 붙이면 묶음이다(GPT check 8.5 P2)
+    sp = [bundled_paths("Sources/My File.swift"), bundled_paths("App Resources/a.png, App Resources/b.png"),
+          bundled_paths("scripts/a.py scripts/b.py"), bundled_paths("§X c.md, d.md (참고)")]
+    cell = "f599-space-in-single-path-not-bundle"
+    if sp == [[], ["App Resources/a.png", "App Resources/b.png"], ["scripts/a.py", "scripts/b.py"], ["c.md", "d.md"]]:
+        passed += 1
+        if listing:
+            print(f"PASS {cell}")
+    else:
+        fails.append(f"{cell} — {sp}")
+        print(f"FAIL {cell}: {sp}")
+    doc = os.path.join(fixture_dir, "doc")
+    doc_cells = 0
     if os.path.isdir(doc):                              # plan 문서 셀(round 2 S17) — 셀마다 양성(good.md) 대조를 함께 본다
+        doc_cells = 5
         root, ents = os.path.join(doc, "root"), os.path.join(doc, "entries")
 
         def doc_v(name):
@@ -327,13 +473,40 @@ def self_test(fixture_dir: str) -> int:
         else:
             fails.append(f"{cell} — 경고 줄 {got} (기대 [5, 8])")
             print(f"FAIL {cell}: 경고 줄 {got} (기대 [5, 8])")
+        # F-611 · F-726 — 대조값 없는 부재 주장 경고 줄 집합이 정확히 5 · 6 · 7 · 15 ~ 19(빈 표지 · 0 뿐인 표지 · ID · 줄 번호만 든 표지 포함 · 출처만 단 줄 포함 · 대조값 · 능력 · 결정 · 10건 · 코드는 제외)
+        with open(os.path.join(doc, "absence.md"), "r", encoding="utf-8") as fh:
+            text = fh.read()
+        got = [ln for ln, _s in absence_without_control(text)]
+        cell = "t-domain-absence-claim-no-control-warn"
+        if got == [5, 6, 7, 15, 16, 17, 18, 19] and check_doc(text)[0] == []:
+            passed += 1
+            if listing:
+                print(f"PASS {cell}")
+        else:
+            fails.append(f"{cell} — 경고 줄 {got} (기대 [5, 6, 7, 15, 16, 17, 18, 19])")
+            print(f"FAIL {cell}: 경고 줄 {got} (기대 [5, 6, 7, 15, 16, 17, 18, 19])")
+        # 운영 경로 — fz-plan Gate 1 은 --plan-doc(run_doc)의 출력을 읽는다. 함수만 재면 run_doc 의 호출을 지워도 통과한다(채점 2차 ISSUE-005)
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc_doc = run_doc(os.path.join(doc, "absence.md"))
+        shown = re.findall(r"WARN 대조값 없는 부재 주장 줄 (\d+):", buf.getvalue())
+        cell = "t-domain-run-doc-prints-warn-exit-0"
+        if rc_doc == 0 and [int(x) for x in shown] == [5, 6, 7, 15, 16, 17, 18, 19] and "WARN 대조값 없는 부재 주장 8건" in buf.getvalue():
+            passed += 1
+            if listing:
+                print(f"PASS {cell}")
+        else:
+            fails.append(f"{cell} — rc={rc_doc} 줄 {shown}")
+            print(f"FAIL {cell}: rc={rc_doc} 줄 {shown}")
     for f in fails:
         print(f"  FAIL {f}")
     total = passed + len(fails)
     if fails:
         print(f"plan_integrity self-test {passed}/{total} passed")
         return 1
-    print(f"INTEGRITY_SELFTEST_OK (양성 1 · 음성 {len(bads)} · 문서 셀 {4 if os.path.isdir(doc) else 0} — {passed}/{total})")
+    print(f"INTEGRITY_SELFTEST_OK (양성 1 · 음성 {len(bads)} · 묶음 셀 {len(bundle_cells)} · 문서 셀 {doc_cells} — {passed}/{total})")
     return 0
 
 

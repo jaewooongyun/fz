@@ -1828,7 +1828,33 @@ def tools_of(verify: dict, gid: str) -> list:
     return out
 
 
-VERIFY_KEYS = frozenset(("kind", "criterion", "command", "expect", "cwd", "tools", "env", "timeout", "side_effects"))
+def pin_of(verify: dict, gid: str, envs: list) -> list:
+    """VerifySpec 의 `pin`(문자열 배열)을 원장 `PIN:` 항목으로 — 계획에서 만든 원장도 위임 표 · fixture 를 승인에 묶는다(F-622).
+
+    ⛔ 원장에 쓰기 **전에** 거른다 — from_plan 은 쓴 뒤에야 load() 로 파싱한다. 경로 규칙은 Gate.validate 와 같다
+       (ROOT 기준 · 절대 · `${ENV 선언 변수}/…` · `..` 금지). 쉼표 · 개행이 든 항목은 거부한다 — 원장 PIN 은 쉼표로 나눠
+       읽어 한 항목이 여럿으로 쪼개지고, 개행은 원장 구조를 깬다(tools_of 와 같은 인젝션 축).
+    """
+    raw = verify.get("pin")
+    if raw in (None, []):
+        return []
+    if not isinstance(raw, list):
+        raise InfraError(f"{gid}: verify.pin 은 경로 문자열 배열이다 — 받은 값 {raw!r}")
+    out = []
+    for it in raw:
+        if not isinstance(it, str) or not it.strip() or any(c in it for c in ",\n\r"):
+            raise InfraError(f"{gid}: verify.pin 항목은 비지 않은 경로 하나다(쉼표 · 개행 금지) — {it!r}")
+        tok = it.strip()
+        m = PIN_VAR_RE.match(tok)
+        rest = m.group(2) if m else tok
+        if (m and m.group(1) not in envs) or "$" in rest or ".." in Path(rest).parts:
+            raise InfraError(f"{gid}: verify.pin 경로는 ROOT 기준 · 절대 · '${{verify.env 변수}}/…' 만 — {tok!r}")
+        if tok not in out:
+            out.append(tok)
+    return out
+
+
+VERIFY_KEYS = frozenset(("kind", "criterion", "command", "expect", "cwd", "tools", "env", "timeout", "side_effects", "pin"))
 
 
 def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "") -> str:
@@ -1920,7 +1946,12 @@ def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "")
                 if not isinstance(se, str) or "\n" in se or "\r" in se or not SIDE_EFFECTS_RE.match(se.strip()):
                     raise InfraError(f"{gid}: verify.side_effects 는 none · tmp · 'writes — <사유>' 중 하나 — 받은 값 {se!r}")
                 lines.append(f"  SIDE_EFFECTS: {se.strip()}")
+            pins = pin_of(verify, gid, envs)
+            if pins:
+                lines.append(f"  PIN: {', '.join(pins)}")
         else:
+            if verify.get("pin") not in (None, []):
+                raise InfraError(f"{gid}: verify.pin 은 kind=command 에서만 — 수동 게이트는 명령을 돌리지 않는다")
             lines.append(f"  MANUAL: {criterion}")
             lines.append(f"  CRITERION_HASH: {sha(criterion)}")
         lines.append("  EVIDENCE: pending")

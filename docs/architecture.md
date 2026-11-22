@@ -15,7 +15,7 @@ fz-plugin/
 ├── gpt-skills/    6개 — GPT 네이티브 스킬 + Authority 인용 + Memory Lesson inline (fz-reviewer, fz-architect, fz-guardian, fz-challenger, fz-drift, fz-planner)
 ├── schemas/         8개 — JSON 스키마 (GPT 응답 7 · Issue Tracker 1) + tool-inventory.json
 ├── scripts/         110개 — gate_check(완료 판정기) · gate_stop_hook(종료 차단) · lint 3 · gpt-exec · health-check ...
-├── tests/           fixtures/gates/ — 판정기 회귀 175케이스 (20범주, 기대 exit·산출물·시간·stdout·stderr)
+├── tests/           fixtures/gates/ — 판정기 회귀 180케이스 (20범주, 기대 exit·산출물·시간·stdout·stderr)
 │                    fixtures/*/*/run.sh · fixtures/doc-freshness/run.sh 회귀 오라클(health-check 가 자동 실행) · lib/ 가짜 워크플로 런타임 ·
 │                    workflows/ 완주·실패 주입 · ab/ A/B 원장 통합 · docs/ 문서 계약
 ├── mods/            선택형 하위 플러그인 2개(따로 설치) — fz-compact(bg 세션 로컬 마스킹 압축) ·

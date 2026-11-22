@@ -261,7 +261,7 @@ lock을 지금 넣지 않는 이유는 설계가 필요하기 때문이다. `wri
 
 ### 1. fz-plan — 생성
 
-Phase 1 산출 시 `steps[].verify`를 읽어 `{WORK_DIR}/gates/plan.draft.md`를 만든다. `verify.kind`가 `command`면 `CHECK:`/`EXPECT:`, `manual`이면 `MANUAL:`+`CRITERION_HASH:`. `verify.tools`가 있으면 `TOOLS:`로 옮긴다 — ⛔ VerifySpec이 `additionalProperties: false`라 스키마에 필드가 없으면 plan 저자가 채울 수 없다(`workflows/plan-collaborative.js`가 정의, `plan-lean2.js`도 같은 필드). `verify.timeout`(1..86400 정수 초) · `verify.side_effects`(none · tmp · `writes — <사유>`)가 있으면 `TIMEOUT:` · `SIDE_EFFECTS:`로 옮기고, 모르는 칸은 stderr 로 경고한다(F-579 — 버리면 TIMEOUT 은 기본 120초 · 기준선 프로브는 UNRUN 이었다). 두 칸은 Lead 가 쓰는 steps.json(light)에서 채운다 — Workflow VerifySpec 스키마에는 아직 없다.
+Phase 1 산출 시 `steps[].verify`를 읽어 `{WORK_DIR}/gates/plan.draft.md`를 만든다. `verify.kind`가 `command`면 `CHECK:`/`EXPECT:`, `manual`이면 `MANUAL:`+`CRITERION_HASH:`. `verify.tools`가 있으면 `TOOLS:`로, `verify.pin`(경로 문자열 배열 — 판정이 기대는 기대 표 · fixture)이 있으면 `PIN:`으로 옮긴다(수동 게이트는 거부 · F-622) — ⛔ VerifySpec이 `additionalProperties: false`라 스키마에 필드가 없으면 plan 저자가 채울 수 없다(`workflows/plan-collaborative.js`가 정의, `plan-lean2.js`도 같은 필드). `verify.timeout`(1..86400 정수 초) · `verify.side_effects`(none · tmp · `writes — <사유>`)가 있으면 `TIMEOUT:` · `SIDE_EFFECTS:`로 옮기고, 모르는 칸은 stderr 로 경고한다(F-579 — 버리면 TIMEOUT 은 기본 120초 · 기준선 프로브는 UNRUN 이었다). 두 칸은 Lead 가 쓰는 steps.json(light)에서 채운다 — Workflow VerifySpec 스키마에는 아직 없다.
 
 Phase 2의 `verify-gates`가 **게이트마다 판정 1개**를 낸다 — "이 `CHECK:`가 제목이 말하는 것을 측정하는가" + noninteractive·rerunnable·side-effect·determinism. Phase 3에서 판정을 반영해 `plan.md`로 확정하고 `--set-state planned` 로 승인·미착수를 남긴다(계획만 하고 끝나는 세션이 Stop hook 에 막히지 않는다).
 

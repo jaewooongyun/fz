@@ -1360,6 +1360,117 @@
       "why": "F-579 — 플랜의 verify.timeout · side_effects 를 버리면 원장 TIMEOUT 은 기본 120초가 되고 기준선 프로브는 UNRUN 이다. 선언한 게이트에만 줄이 생기고(TIMEOUT 총 1회) 모르는 칸은 stderr 로 경고한다"
     },
     {
+      "id": "fromplan-pin-carried",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-pin.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_contains": {
+          "  PIN: pin/table.txt\n": 1,
+          "PIN:": 1
+        }
+      },
+      "why": "F-622 — 계획에서 만든 원장에 PIN 을 실을 칸이 없어 위임 표가 바뀌어도 CHECK 해시가 그대로였다. verify.pin 이 선언한 command 게이트에만 PIN 줄(중복 접힘)로 옮겨지고, 선언 없는 G2 · 수동 G3 에는 줄이 생기지 않는다(PIN 총 1회)"
+    },
+    {
+      "id": "fromplan-pin-cycle-stale-refused",
+      "category": "pin",
+      "ledger": "fromplan/pin-cycle.md",
+      "pre": [
+        [
+          "--from-plan",
+          "tests/fixtures/gates/fromplan/plan-pin-cycle.json",
+          "--root",
+          "tests/fixtures/gates/fromplan",
+          "--out"
+        ],
+        [
+          "--baseline-probe"
+        ],
+        [
+          "--finalize"
+        ]
+      ],
+      "write_files": {
+        "fromplan/pin-table.txt": "pendinG\n"
+      },
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 3,
+        "mutates": false,
+        "expect_stderr": [
+          "G1: PIN 파일이 승인 뒤 바뀌었다"
+        ]
+      },
+      "why": "F-622 — 생성 → 기준선 → 확정 → 위임 표 1바이트 변경 → stale 거부. CHECK 글자는 그대로라 PIN 이 없으면 바뀐 표를 옛 승인으로 돌린다"
+    },
+    {
+      "id": "fromplan-pin-cycle-unchanged-runs",
+      "category": "pin",
+      "ledger": "fromplan/pin-cycle.md",
+      "pre": [
+        [
+          "--from-plan",
+          "tests/fixtures/gates/fromplan/plan-pin-cycle.json",
+          "--root",
+          "tests/fixtures/gates/fromplan",
+          "--out"
+        ],
+        [
+          "--baseline-probe"
+        ],
+        [
+          "--finalize"
+        ]
+      ],
+      "args": [
+        "--only",
+        "G1"
+      ],
+      "expect": {
+        "exit": 1,
+        "mutates": false,
+        "expect_stdout": [
+          "FAIL"
+        ]
+      },
+      "why": "대조 — 같은 사이클에서 표를 안 바꾸면 PIN 거부 없이 CHECK 를 돌린다(표가 pending 이라 FAIL · exit 1). 거부가 표 변경에만 반응한다"
+    },
+    {
+      "id": "fromplan-pin-manual-refused",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-pin-manual.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 2,
+        "mutates": false,
+        "expect_stderr": [
+          "verify.pin 은 kind=command 에서만"
+        ]
+      },
+      "why": "F-622 — 수동 게이트는 명령을 돌리지 않아 PIN 이 no-op 이다(Gate.validate 와 같은 규칙). 조용히 버리지 않고 원장을 쓰기 전에 거부한다"
+    },
+    {
+      "id": "fromplan-pin-comma-refused",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-pin-comma.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 2,
+        "mutates": false,
+        "expect_stderr": [
+          "verify.pin 항목은"
+        ]
+      },
+      "why": "F-622 — 원장 PIN 은 쉼표로 나눠 읽는다. 쉼표가 든 항목은 한 핀이 둘로 쪼개지므로 원장을 쓰기 전에 거부한다"
+    },
+    {
       "id": "fromplan-tools-injection",
       "category": "fromplan",
       "ledger": "fromplan/plan-tools-injection.json",

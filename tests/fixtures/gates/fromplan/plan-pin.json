@@ -1,0 +1,38 @@
+{
+  "title": "PIN 발급",
+  "scope": "VerifySpec 의 pin 이 원장 PIN 줄로 옮겨진다 — 선언한 command 게이트에만(F-622)",
+  "steps": [
+    {
+      "id": "G1",
+      "title": "위임 표 판정",
+      "verify": {
+        "kind": "command",
+        "criterion": "위임 표가 통과한다",
+        "command": "printf ok",
+        "expect": "ok",
+        "pin": [
+          "pin/table.txt",
+          "pin/table.txt"
+        ]
+      }
+    },
+    {
+      "id": "G2",
+      "title": "선언 없음",
+      "verify": {
+        "kind": "command",
+        "criterion": "짧은 검사가 통과한다",
+        "command": "printf ok",
+        "expect": "ok"
+      }
+    },
+    {
+      "id": "G3",
+      "title": "사람 확인",
+      "verify": {
+        "kind": "manual",
+        "criterion": "사람이 확인한다 — 사용자 결정"
+      }
+    }
+  ]
+}

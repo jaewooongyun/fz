@@ -31,6 +31,7 @@ import contextlib
 import io
 import json
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -119,7 +120,7 @@ def numstat_size(path: str) -> dict:
 
 
 def module_of(p: str) -> str:
-    parts = PurePosixPath(p.strip().lstrip("./")).parts
+    parts = PurePosixPath(p.strip()).parts   # 입력은 normpath 를 거친 줄 — lstrip("./") 는 `../x` 를 `x` 로 · `.github` 를 `github` 로 접었다(F-591)
     return "/".join(parts[:2]) if len(parts) > 2 else (parts[0] if parts else "")
 
 
@@ -131,6 +132,7 @@ def repo_relative(p: str) -> tuple[str, str] | None:
     - Important: 입력 규약 — 상대경로 줄은 한 저장소 기준이고 다른 저장소는 절대경로로 적는다. 절대 루트가 하나면 상대경로를
       그 저장소로 읽는다. 절대 루트가 여럿인데 상대경로가 섞이면 어느 저장소인지 몰라 모듈 수를 미상으로 둔다(rec_plan).
       ⛔ cwd 로 풀지 않는다 — 같은 read-scope 가 실행 위치에 따라 다른 값을 낸다.
+    - Note: 입력은 rec_plan 이 `posixpath.normpath` 로 접은 줄이다 — `./a` · `x/../a` · `a` 가 한 파일이다(F-591).
     """
     p = p.strip()
     if not p.startswith("/"):
@@ -162,7 +164,8 @@ def rec_review(m: dict, risk: int | None = None) -> tuple[str, list]:
 
 
 def rec_plan(files: list, new_arch: bool) -> tuple[dict, str, list]:
-    raw = [f.strip() for f in files if f.strip()]
+    # F-591 — 경로 정체성은 문자열 POSIX 정규화로 정한다(`./a` · `x/../a` → `a`). ⛔ cwd · resolve 로 풀지 않는다(F-586)
+    raw = [posixpath.normpath(f.strip()) for f in files if f.strip()]
     pairs = [repo_relative(f) for f in raw]
     # 루트가 하나면 절대 · 상대 표기를 하나로 합친다. 여럿이면 루트를 붙여 센다 — 다른 저장소의 같은 상대경로는 다른 파일이다
     multi = len({pr[0] for pr in pairs if pr and pr[0]}) > 1
@@ -463,6 +466,19 @@ def self_test() -> int:
         o_loose = plan([str(repo / p) for p in rel3] + [str(repo2 / p) for p in rel3] + rel3)
         check("절대 루트 둘 + 상대 별칭 → 파일 6 · 모듈 null(루트 불명)",
               o_loose["metrics"]["files"] == 6 and o_loose["metrics"]["modules"] is None and "루트 불명" in o_loose["reasons"][1], o_loose)
+        # F-591 — 별칭(`./` · `x/../` · `/./`)은 문자열 정규화로 한 파일이다. 서로 다른 파일 · 다른 저장소의 같은 상대경로는 그대로 따로 센다
+        o_alias = plan(["scripts/mode_gate.py", "./scripts/mode_gate.py", "scripts/../scripts/mode_gate.py"])
+        check("상대 별칭 셋(./ · x/../) → 파일 1 · 모듈 1", o_alias["metrics"]["files"] == 1 and o_alias["metrics"]["modules"] == 1, o_alias)
+        o_pair = plan(["scripts/mode_gate.py", "./scripts/gate_check.py"])
+        check("서로 다른 상대경로 둘 → 파일 2", o_pair["metrics"]["files"] == 2, o_pair)
+        o_mod = plan(["x/a.py", "../x/a.py", ".github/w/a.yml", "github/w/a.yml"])
+        check("모듈 축 — `../x` ≠ `x` · `.github` ≠ `github` → 모듈 4", o_mod["metrics"]["modules"] == 4, o_mod)
+        o_abs_alias = plan([f"{repo}/./scripts/c.py", f"{repo}/x/../scripts/c.py", "./scripts/c.py"])
+        check("절대 별칭(/./ · /x/../) · 상대 별칭 → 파일 1 · 모듈 1",
+              o_abs_alias["metrics"]["files"] == 1 and o_abs_alias["metrics"]["modules"] == 1, o_abs_alias)
+        o_two_alias = plan([str(repo / p) for p in rel3] + [f"{repo2}/./{p}" for p in rel3] + [f"./{p}" for p in rel3])
+        check("두 저장소(한쪽 /./ 별칭) + 상대 별칭 → 파일 6 · 모듈 null",
+              o_two_alias["metrics"]["files"] == 6 and o_two_alias["metrics"]["modules"] is None, o_two_alias)
         o_nogit = plan([str(t / "norepo" / f"pkg/m{i % 5}/f{i}.md") for i in range(30)])
         check(".git 없는 절대경로 → 모듈 null · 새 아키텍처 아니면 light",
               o_nogit["metrics"]["modules"] is None and o_nogit["recommend"] == "light" and "루트 불명" in o_nogit["reasons"][1], o_nogit)

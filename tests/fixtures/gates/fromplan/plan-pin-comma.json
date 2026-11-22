@@ -1,0 +1,18 @@
+{
+  "title": "PIN 쉼표 거부",
+  "steps": [
+    {
+      "id": "G1",
+      "title": "묶인 핀",
+      "verify": {
+        "kind": "command",
+        "criterion": "위임 표가 통과한다",
+        "command": "printf ok",
+        "expect": "ok",
+        "pin": [
+          "pin/table.txt, pin/other.txt"
+        ]
+      }
+    }
+  ]
+}

@@ -261,7 +261,7 @@ metadata:
 - [ ] 구조 결정 옵션 테이블 포함 + 사용자 보고 제시? (Workflow 모드면 `directionAlternatives` 병합 확인. 답습/미러링이면 3축 필수 — 45차)
 - [ ] ⛔ 계획 기록 완료? (티켓 폴더: 파일, 저장 없이 진행: 건너뜀)
 - [ ] 플랜 산문의 수치 · 건수 · `경로:줄` 주장에 출처를 달았는가? (F-185 — WARN 은 차단이 아니다. 줄마다 `[verified: 출처]` 나 code-context 행 참조를 달거나 주장을 고친다)
-      Evidence: `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_integrity_check.py" --plan-doc {WORK_DIR}/plan/plan-v{N}.md` → WARN 미검증 주장 {N}건
+      Evidence: `python3 "${FZ_PLUGIN_ROOT}/scripts/plan_integrity_check.py" --plan-doc {WORK_DIR}/plan/plan-v{N}.md` → WARN 미검증 주장 {N}건 · WARN 대조값 없는 부재 주장 {M}건(같은 줄에 `[대조: …]` — 근거 `modules/cross-validation.md` § Negative-Result Gate)
 
 > **Gate 증거 첨부** (H2 원칙 — self-check 보완): 결정론적 도구 출력이 있는 Gate 항목은
 > `Evidence:` 행에 도구 결과 요약을 기록한다. self-check "완료?"보다 도구 출력이 신뢰할 수 있다.
@@ -325,7 +325,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 
 3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 — light · full 모두 — `modules/gates.md` 배선 1):
    Phase 1 반환의 `steps[]`를 JSON으로 임시 기록한 뒤 변환한다 — 실행 절차 5.7 이 원장을 이미 다시 만들었으면 그 원장을 그대로 쓴다(반환 `steps[]` 로 덮어쓰지 않는다 — Phase 2 는 합의본 스냅샷을 읽는다). ⛔ **이 단계가 없으면 원장이 생기지 않아 배선 2·3이 전부 no-op이다.**
-   Step 마다 `complexity`(1-5 · `modules/complexity.md`)를 싣는다 — Workflow 반환에 없으면 Lead 가 채운다. fz-code 모드 게이트가 이 값으로 full 여부를 재고, 없으면 그 구현은 light 다(F-587). `verify` 는 명령으로 판정하면 `{kind:'command', criterion, command, expect}`, 사람 확인만 되면 `{kind:'manual', criterion}` 이다(칸 정의 `workflows/plan-lean2.js` VerifySpec · 원장으로 옮기는 규칙은 위 배선 1).
+   Step 마다 `complexity`(1-5 · `modules/complexity.md`)를 싣는다 — Workflow 반환에 없으면 Lead 가 채운다. fz-code 모드 게이트가 이 값으로 full 여부를 재고, 없으면 그 구현은 light 다(F-587). `verify` 는 명령으로 판정하면 `{kind:'command', criterion, command, expect}`, 사람 확인만 되면 `{kind:'manual', criterion}` 이다 — 명령 판정이 기대 표 · fixture 파일에 기대면 `pin: [경로]` 를 함께 싣는다(원장 `PIN:` · 승인 뒤 그 파일이 바뀌면 거부)(칸 정의 `workflows/plan-lean2.js` VerifySpec · 원장으로 옮기는 규칙은 위 배선 1).
    ```bash
    python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" \
      --from-plan {WORK_DIR}/plan/steps.json --root {WORK_DIR} --out {WORK_DIR}/gates/plan.draft.md \

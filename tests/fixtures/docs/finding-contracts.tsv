@@ -388,6 +388,14 @@ F-544	skills/fz-rebase/SKILL.md	has	Bash(git range-diff *)
 F-471	skills/fz-gpt/SKILL.md	lacks	plan 독립재작성
 F-471	skills/fz-gpt/references/test-spec.md	lacks	독립 재작성
 F-470	modules/gpt-strategy.md	has	## Sandbox Permissions
+# F-622 — VerifySpec 선택 칸 pin 은 두 워크플로 스키마와 원장 변환 문서에 다 있다(한 워크플로에만 있으면 롤백 경로에서 pin 이 조용히 빠진다)
+F-622	workflows/plan-lean2.js	has	pin: { type: 'array', items: { type: 'string' },
+F-622	workflows/plan-collaborative.js	has	pin: { type: 'array', items: { type: 'string' },
+F-622	modules/gates.md	has	`verify.pin`(경로 문자열 배열 — 판정이 기대는 기대 표 · fixture)이 있으면 `PIN:`으로 옮긴다
+F-622	skills/fz-plan/SKILL.md	has	`pin: [경로]` 를 함께 싣는다
+# F-726 — 대조값은 주장이 겨누는 영역 안에서 고른다(Negative-Result Gate) · 그 경고를 fz-plan Gate 1 증거 줄이 이름으로 받는다
+F-726	modules/cross-validation.md	has	**대조값은 주장이 겨누는 영역 · 언어 · 구간 안에서 고른다**
+F-726	skills/fz-plan/SKILL.md	has	WARN 대조값 없는 부재 주장 {M}건
 # F-644 · F-645 — Curate 판정 안내가 검사기의 새 키(premiseCheck · citeExpect)를 이름으로 적는다(안내 없이 검사만 있으면 Lead 가 무엇을 써야 통과하는지 모른다)
 F-644	skills/fz-peer-review/SKILL.md	has	`premiseCheck{how: measured, note}`(그 전제를 잰 방법 — F-644)
 F-645	skills/fz-peer-review/SKILL.md	has	`citeExpect{"path:line": 토큰}`(F-645)

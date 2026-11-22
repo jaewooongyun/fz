@@ -175,13 +175,34 @@ function addEnv(node, hit) {
   }
   return out
 }
+// F-622: VerifySpec 에 pin — 위 변환이 넣은 `env` 바로 뒤에 `pin` 을 넣는다. 새 모양의 정본은 workflows/plan-lean2.js VerifySpec 이다
+//   (설명 문구가 어긋나면 이 비교가 실패한다). env 가 없거나 pin 이 이미 있으면 던진다.
+const PIN_PROP = { type: 'array', items: { type: 'string' },
+  description: '판정이 기대는 입력 파일(command 가 부르는 러너의 단언 표 · fixture) — ROOT 기준 · 절대 · ${env 변수}/… 경로, 항목 하나 = 경로 하나. 원장 PIN 으로 옮겨져 승인 뒤 그 파일이 바뀌면 게이트가 재승인을 요구한다(F-622)' }
+function addPin(node, hit) {
+  if (Array.isArray(node)) return node.map(n => addPin(n, hit))
+  if (!node || typeof node !== 'object') return node
+  const out = {}
+  for (const [k, v] of Object.entries(node)) {
+    out[k] = addPin(v, hit)
+    if (k === 'env' && v && v.type === 'array' && v.description === ENV_PROP.description) {
+      if ('pin' in node) throw new Error('기준 VerifySpec 에 이미 pin 이 있다 — 기준 트리가 F-622 이후인지 본다')
+      out.pin = PIN_PROP
+      hit.n++
+    }
+  }
+  return out
+}
 const INTENDED = {
   'plan-lean2': {
     'lean2-full': c => {
       const hit = { n: 0 }
       const schema = addEnv(JSON.parse(c.schema), hit)
       if (hit.n < 1) throw new Error('기준 lean2-full 스키마에 VerifySpec tools 가 없다 — F4-2 변환 전제와 다르다')
-      return Object.assign({}, c, { schema: JSON.stringify(schema) })
+      const pinHit = { n: 0 }
+      const pinned = addPin(schema, pinHit)
+      if (pinHit.n < 1) throw new Error('기준 lean2-full 스키마에 VerifySpec env 가 없다 — F-622 변환 전제와 다르다')
+      return Object.assign({}, c, { schema: JSON.stringify(pinned) })
     },
     'lean2-merge': c => {
       if (c.agentType !== 'fz:plan-structure' || c.prompt.split(MERGE_AT).length !== 2 || c.prompt.includes(MERGE_CONTRACT)) {
