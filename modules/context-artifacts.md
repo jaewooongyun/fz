@@ -145,13 +145,12 @@ index.md는 두 섹션으로 구성: `## Essential Context`(덮어쓰기)와 `##
 | Essential (보존) | Disposable (자연 소멸 OK) |
 |-----------------|-------------------------|
 | 사용자 결정/승인 | 탐색 중간 결과 |
-| 제약 조건 | raw MCP 출력 |
+| 제약 조건 | raw MCP 출력 · 개별 도구 결과 로그 |
 | 아키텍처 선택 근거 | 에이전트 간 토론 과정 |
 | Gate 통과/실패 이력 | 코드 diff 상세 |
 | Active Phase + Step 진행률 | 빌드 로그 |
 | mid-pipeline discover 결정 | /btw로 물어본 일회성 질문 |
 | Implication Register + 관찰 함의 | Implication Scan 중간 로그 |
-| | 개별 도구 결과 로그 |
 
 ```
 Essential: "[plan] Step 3개 계획 확정. RIBs 패턴. OrderDetail{Builder,Router,Interactor,VC}."

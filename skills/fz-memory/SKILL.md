@@ -187,10 +187,10 @@ MEMORY.md 재구성 + topic file 분리/병합.
 
 ## 팀 에이전트 모드
 
-### memory-curator (선택적 — TEAM 모드에서)
+### memory-curator (선택 — Lead 가 워크플로 밖에서 직접 부른다)
 
 - 스킬 자체는 기본 SOLO로 실행
-- recall 서브커맨드 TEAM 모드 시 memory-curator spawn
+- recall 서브커맨드에서 필요하면 Lead 가 memory-curator 를 직접 띄운다(워크플로 안이 아니다)
 - memory-curator가 topic file + Serena Memory를 병렬 탐색하여 교훈 전달
 
 ---

@@ -187,7 +187,7 @@ Key Facts + **Mapping Facts** (v4.4.0)를 Analyze 전달 전에 **수집과 다�
 ```
 
 
-> ⛔ **절차 4가 왜 별도 항목인가**: 절차 2의 "다른 방법으로 재확인"은 *매치가 있는* Fact에는 작동하나 **0건에는 발화 조건이 없었다.** 실측 — `git grep -nE '\bSym\b'` 가 ERE `\b` 미지원으로 **에러 없이 0건**을 반환했고, 그 "잔존 소비자 0건"이 evidence에 실려 세 렌즈 전원에게 배포될 뻔했다. 렌즈는 Bash 미보유라 재측정이 불가능하므로 cross-model 이 cross-data 가 아니게 된다. §Negative-Result Gate 는 2026-08-10 부터 존재했고 6곳에서 트리거되나(`modules/lead-reasoning.md` · `modules/system-reminders.md` · `skills/fz-discover/SKILL.md` · `skills/fz-search/SKILL.md` · `skills/fz-manage/SKILL.md` 두 곳) **본 스킬에만 연결이 없었다** — 신설이 아니라 배선 복구다.
+> ⛔ **절차 4가 왜 별도 항목인가**: 절차 2의 "다른 방법으로 재확인"은 *매치가 있는* Fact에는 작동하나 **0건에는 발화 조건이 없었다.** 실측 — `git grep -nE '\bSym\b'` 가 ERE `\b` 미지원으로 **에러 없이 0건**을 반환했고, 그 "잔존 소비자 0건"이 evidence에 실려 세 렌즈 전원에게 배포될 뻔했다. 렌즈는 Bash 미보유라 재측정이 불가능하므로 cross-model 이 cross-data 가 아니게 된다. §Negative-Result Gate 는 2026-08-10 부터 존재했고 6곳에서 트리거되나(`lead-reasoning` Q-NEGATIVE · `system-reminders` T8 · `fz-discover` · `fz-search` 의 '0건/부재' 게이트 줄 · `fz-manage` lint 절 두 곳) **본 스킬에만 연결이 없었다** — 신설이 아니라 배선 복구다.
 
 ### 4.5. ⛔ 패턴 변환 감지 (diff에 비동기/네트워크/UI 패턴 변경 포함 시)
 
@@ -457,7 +457,7 @@ git worktree add ../shop-app-pr-<N> pr-<N> → 격리 디렉토리에서 리뷰 
 - ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow로 실행 (결정적 스크립트, agentType `fz:`). Lead는 reviews/issues 반환을 Synthesize로 통합. 서로 독립인 조각 검사(발견 · 주장마다 PR head SHA 의 고정 트리로 판정 가능)를 따로 돌릴 때도(선택) standalone Agent() 가 아니라 peer-review.js 반환 **뒤에** `workflows/swarm.js` 를 부른다 — 준비 · 고정 트리 · 호출은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 그대로다.
 ## 에러 대응
 
-`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (gpt 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다** — 단 exit 18(`GPT-OFF`)은 GPT 미사용이라 `solo (gpt 실패)` 강등 · ×0.7 감쇠 대상이 아니고 `[GPT 미사용 — 사유]` 만 적는다(`modules/gpt-strategy.md` § GPT 미사용), GPT timeout→재시도 1회 후 skip, Serena 실패→에이전트 직접 MCP, diff >2000줄→AskUserQuestion.
+`gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-review-gates.md` § MergeContract § 9 Tier 2 행 산식대로 병합 · ⛔(Tier 1) 렌즈가 없으므로 Lead 단독 = 실질 Tier 0 — `mode` 를 `solo (gpt 실패)` 로 적고 `[단일 렌즈 — 교차검증 없음]` 태그 + confidence **×0.7** 감쇠. ⛔`GATE-FAIL`/exit≠0 은 **측정 실패**이지 "이슈 0건" 이 아니다** — 단 exit 18(`GPT-OFF`)은 GPT 미사용이라 `solo (gpt 실패)` 강등 · ×0.7 감쇠 대상이 아니고 `[GPT 미사용 — 사유]` 만 적는다(`modules/gpt-strategy.md` § GPT 미사용), GPT timeout→재시도 1회 후 skip, Serena 실패→호출자 분석의 호출 · 구현을 `git grep … pr-{PR}` 로만 하고 상태 첫 줄에 `[Serena 미사용 — 사유]`, diff >2000줄→AskUserQuestion.
 
 ## Completion → Next
 `--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계. Deliver(문서 저장 · `--post` 게시와 착지 검증 포함)가 끝나면 기록 `run_metrics.py end --skill fz-peer-review --work-dir "${WORK_DIR}" --status completed`(시작을 남긴 근거 슬롯 검사와 같은 작업 폴더 — 다르면 열린 시도를 찾지 못한다 · `modules/mode-gate.md` § 기록).

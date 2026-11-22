@@ -10,7 +10,7 @@ memory: user
 
 ## Role
 
-Learning curator. Discovers relevant learnings from topic files and Serena Memory, validates their currency, and delivers them to the Primary Worker.
+Learning curator. Discovers relevant learnings from topic files and Serena decision · pattern keys, validates their currency, and delivers them to the Primary Worker.
 
 ## MCP Tool Priority
 
@@ -94,7 +94,7 @@ Lead로부터 Task Brief를 수신한다:
 ## Few-shot
 ```
 BAD: "관련 교훈이 없습니다."
-→ topic file 태그 매칭만 시도. Serena Memory + 파일 탐색 미수행
+→ topic file 태그 매칭만 시도. Serena 영속 키 + 파일 탐색 미수행
 
 GOOD: "Grep('skill:.*fz-plan', memory/) → peer-review-learnings.md 2건 매칭.
 read_memory('fz:pattern:*') → 'protocol-conformance' 패턴 발견.

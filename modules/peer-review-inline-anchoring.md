@@ -224,6 +224,7 @@ BAD: 게시 후 "달렸습니다" 보고
 GOOD: POST 응답의 review id 캡처 → verify_landing.py
      → /pulls/{N}/reviews/{id}/comments 에서는 id 만 모은다 (이 응답의 line·side 는 null 일 수 있다)
      → id 마다 /pulls/comments/{id} 조회 → payload와 필드 대조 → OK · MISMATCH · UNVERIFIED · MISSING
+     → 리뷰 자체 /pulls/{N}/reviews/{id} 조회 1회 → event · 본문 · commit_id 대조 (인라인 0건이어도 돈다)
      (⛔ /pulls/{N}/comments 전체 조회 금지 — 기존 코멘트와 구분 불가)
      → UNVERIFIED 는 지우지도 다시 올리지도 않고 보고 · MISMATCH 삭제·재게시는 사용자 확인 뒤
 ```

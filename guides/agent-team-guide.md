@@ -39,7 +39,7 @@ GOOD: "You are an architecture critic for a RIBs + Clean Architecture iOS projec
 
 > 심볼 도구(Serena `find_symbol` · `find_referencing_symbols` · `get_symbols_overview` · `find_implementations` · `find_declaration`)의 사용 · 폴백 · 보고는 등급 줄이 아니라 본문의 공통 블록 `## Symbol tools — use them whenever they are in your tool list` 가 정한다. 그 도구를 `tools:` 에 가진 에이전트는 이 블록을 글자 그대로 싣는다(원문: `templates/agent-template.md`). 끔 신호 줄은 `modules/tool-status.md` § 워커 심볼 도구, 점검 낱말마다 할 일은 `modules/symbol-tools-audit.md` 에 있다.
 
-에이전트 파일에 Primary, Secondary, Unavailable만 선언한다:
+에이전트 파일의 도구 전략 절에는 등급 줄(Primary · Secondary · Unavailable)을 선언한다 — 심볼 도구 규칙은 등급 줄이 아니라 위 공통 블록이다:
 
 ```markdown
 ## Tools Strategy
@@ -225,7 +225,7 @@ GOOD (Mesh / Peer-to-Peer):
 | Pair Programming | fz-code | impl-correctness changeset → review-arch·impl-quality 병렬 검토 → 조건부 수정 (Step 단위 — `skills/fz-code/SKILL.md`) | `workflows/code-pair.js` |
 | Live Review | fz-review | review-arch ∥ review-quality → 교차 severity 조정 → review-counter DA (`skills/fz-review/SKILL.md`) | `workflows/review-live.js` |
 | Adversarial Constraint Discovery | fz-discover | plan-structure(생성) 결과를 review-arch(파괴) 가 받아 제약을 드러낸다 — 라운드마다 스크립트가 전달 | `workflows/discover-adversarial.js` |
-| Cross-Verify Search | fz-search --deep | search-symbolic(AST/LSP) ∥ search-pattern(텍스트) → 서로의 결과를 교차 확인 | `workflows/search-cross-verify.js` |
+| Cross-Verify Search | fz-search --deep | search-symbolic(심볼) ∥ search-pattern(텍스트) → 서로의 결과를 교차 확인 | `workflows/search-cross-verify.js` |
 
 > **실행 전환 (Wave 1-4, 완료)**: 위 5 패턴의 구현은 `workflows/{discover-adversarial,plan-collaborative,review-live,code-pair,search-cross-verify}.js` 결정적 Workflow다 — fz-plan 기본 실행은 `plan-lean2.js` 이고 `plan-collaborative.js` 는 롤백 경로다(P2P SendMessage 아님 — 라운드 의미론은 스크립트가 구현). 규약: `guides/skill-authoring.md` §12.
 > - ⛔ **정정 (2026-08-08)**: 이전 판은 *"TeamCreate+P2P 경로는 Workflow 미보유 팀(예: fz-peer-review)에 보존"* 이라 적었으나 **fz-peer-review는 `workflows/peer-review.js`를 보유**한다 [verified: `skills/fz-peer-review/SKILL.md:71` — *"Tier 2/3 Analyze는 네이티브 Workflow 도구 필요"*]. **Workflow 미보유 팀은 현재 없다** — `workflows/*.js` 가 전 패턴을 덮는다(2026-11-01 기준 8개 — 개수는 디렉터리가 정본, 구판 표기 "6개").
@@ -337,7 +337,7 @@ GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 �
   - review-direction: 방향성 도전, PROCEED/RECONSIDER/REDIRECT 판정
   - impl-correctness: 코드 구현
   - impl-quality: 구현 품질
-  - search-symbolic: AST/LSP 기반 탐색
+  - search-symbolic: 심볼(정의 · 참조 · 타입) 기반 탐색
   - search-pattern: 텍스트 패턴 기반 탐색
 - [ ] MCP 도구 4-tier 전략을 명시했는가?
 - [ ] 출력 채널 규칙을 포함했는가? (⛔ P2P SendMessage 아님 — `skill-authoring.md` §12 OVERRIDE)
@@ -363,12 +363,12 @@ GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 �
 | plan-impact | plan | sonnet | 영향 범위 분석 |
 | review-arch | review | sonnet (opus 승격) | 아키텍처 비평, 설계 검증 |
 | review-quality | review | sonnet | 코드 품질, 컨벤션 감사 |
-| review-correctness | review, implement | sonnet | 정확성, 로직 검증 (fz-code TEAM 배정) |
+| review-correctness | review, implement | sonnet | 정확성, 로직 검증 (Lead 직접 호출 · peer-review · swarm) |
 | review-counter    | review    | sonnet             | 역방향 검증, 반박 |
 | review-direction  | review    | sonnet (opus 승격) | 방향성 도전, PROCEED/RECONSIDER/REDIRECT 판정 |
 | impl-correctness | implement | sonnet (opus 승격) | 코드 구현, 리팩토링 |
 | impl-quality | implement | sonnet | 구현 품질, 최적화 |
-| search-symbolic | search | sonnet | AST/LSP 심볼 탐색 |
+| search-symbolic | search | sonnet | 심볼 탐색 (정의 · 참조 · 타입) |
 | search-pattern | search | sonnet | 텍스트 패턴 탐색 |
 | memory-curator | memory | sonnet | 교훈 발굴, 컨텍스트 매칭 |
 
