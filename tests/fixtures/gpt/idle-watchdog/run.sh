@@ -10,11 +10,14 @@
 #    전역 이름 검색은 동시 실행과 충돌하고(F-407), 환경 변수는 이 macOS 의 ps 에 보이지 않는다(실측). 정리는 늘 KILL 이다 —
 #    TERM 으로 치우면 TERM 무시 자손이 남아 다음 셀 계수에 섞인다(F-402).
 #
-# 셀(16) — 이름이 PASS/FAIL 줄의 둘째 칸이다
+# 셀(12) — 이름이 PASS/FAIL 줄의 둘째 칸이다
 #   <mode>:stall        mode = exec · review · resume. 2줄 쓰고 무출력 정체 → exit 12 · GPT-IDLE · 경과 ∈ [IDLE, E] · 잔존 0
-#   <mode>:tick         1초마다 1줄 × 7(총 7초 > 2 × IDLE) → exit 0 · GATE-PASS · 마지막 줄까지 · GPT-IDLE 없음
+#   exec:tick           1초마다 1줄 × 7(총 7초 > 2 × IDLE) → exit 0 · GATE-PASS · 마지막 줄까지 · GPT-IDLE 없음
 #   <mode>:term-ignore  1줄 뒤 TERM 무시 자손이 정체 → exit 12 · GPT-IDLE · 잔존 0(KILL 까지 갔다)
-#   <mode>:watch-off    FZ_GPT_IDLE_SEC=0 · 1줄 뒤 6초 무출력 → exit 0 · GATE-PASS · 경과 ≥ 5초(끊지 않았다)
+#   exec:watch-off      FZ_GPT_IDLE_SEC=0 · 1줄 뒤 6초 무출력 → exit 0 · GATE-PASS · 경과 ≥ 5초(끊지 않았다)
+#   ⛔ tick · watch-off 는 exec 만 — 감시 루프(scripts/gpt-exec.sh guard_wait · 감시 끔 분기 포함)는 세 모드가 같은 함수다.
+#      모드별로 다른 것은 kill 경로(review · resume 은 서브셸)라 stall · term-ignore 는 세 모드 모두 돈다.
+#      guard_wait 를 모드별로 가르면 이 전제가 깨진다 — 그때는 review · resume 의 tick · watch-off 셀을 되살린다
 #   concurrent:one-stall    두 exec 호출을 동시에(준비 동기화 — 둘 다 산 채로 준비) — 정체 쪽만 12 · 지속 출력 쪽은 0 으로 끝까지
 #   launcher:group-kill     런처 --timeout 2 · 감시 끔 · TERM 무시 자손 → 런처 exit 16 · 잔존 0(런처의 그룹 kill 이 CLI 까지 닿는다 —
 #                           CLI 가 래퍼 그룹 밖이면 남는다)
@@ -379,7 +382,7 @@ run_distinguish() {
 }
 
 # ── 셀 목록 · 실행
-CELLS="exec:stall exec:tick exec:term-ignore exec:watch-off review:stall review:tick review:term-ignore review:watch-off resume:stall resume:tick resume:term-ignore resume:watch-off concurrent:one-stall launcher:group-kill launcher:idle-12 distinguish:idle-vs-cli-fail"
+CELLS="exec:stall exec:tick exec:term-ignore exec:watch-off review:stall review:term-ignore resume:stall resume:term-ignore concurrent:one-stall launcher:group-kill launcher:idle-12 distinguish:idle-vs-cli-fail"
 NCELL=0 NPASS=0 LEAK_TOTAL=0 CAP3X_BAD=0 BAD="" REPS_OK=1
 for CELL in $CELLS; do
   NCELL=$((NCELL + 1)); cell_ok=1
