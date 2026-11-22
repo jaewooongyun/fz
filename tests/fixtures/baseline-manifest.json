@@ -1,6 +1,6 @@
 {
- "date": "2026-11-22",
- "file_count": 1058,
+ "date": "2026-11-23",
+ "file_count": 1059,
  "files": {
   ".claude-plugin/marketplace.json": "d8895553e314cafef1dc4ddc073c1e2bf520273616654c63996d1db67a885d34",
   ".claude-plugin/plugin.json": "ef4f87bec16822f20ebe2e8c56a8294946a3948e5b0db29d543f04ea3c20eaf3",
@@ -11,7 +11,7 @@
   "CHANGELOG.md": "a88f4acb01a7ea97a64b8a382a6e44a2a13e0eff255f2a8786cf92e0924a0544",
   "CLAUDE.md": "2278f9d70764acf550c6c34deb4041a755808a0af22d7127465c0a83e28d04f2",
   "LICENSE": "aa4766104936008ba4d5ea37e0e1fcd75520cb3fd1f686a908d78c79389f4259",
-  "README.md": "083576b6d7c1c711ef4a1c86653147acbe7756993bee338c2ebd936f3844cbcd",
+  "README.md": "850a4ef9d4b63b5d4e1fc91ec95d50b43a74b53660fe230289fd5e3792e5ab6c",
   "agents/arch-lens.md": "4885fa8a8822c3dd8d573fb7cdbc714d87ead05fcaa8e45ba0fa27fb99fee565",
   "agents/impl-correctness.md": "ebac691d1fa6c38ffeee9d2d3feac77d6c1c9d1bfc8a4e288fc9205db76df1c3",
   "agents/impl-quality.md": "3555f4cbf9a3a10785d568821624dd34a845b8c151df721758b319a8dca287b5",
@@ -38,6 +38,7 @@
   "docs/rationale/review-structural-axes.rationale.md": "eb9086a28f62535087d447ee206d6aceb6f3f74cbbee73bffe12e839fc9fc7f8",
   "docs/releases/_TEMPLATE.md": "05b0e153d248c37a16b97888aa07ea1758dfa5daa4e94aa0a76a0fca31ee35c5",
   "docs/releases/v0.57.0.md": "bc6085d11ffc11d532ee88faca2d9755f4ae3a0c3eb2a9b6ea16ecb09c518e84",
+  "docs/tools.md": "94a88b6fe3f5a6a5e1654a971bc80f0c96be9c9c46bee275defa788ff7aeb7ee",
   "examples/hooks.json.example": "4a69260ba68b4c65b929466f791f9821977703ba66d49c2f3a4339d396c9d82d",
   "experiment-log.md": "cf2b494fde2630cd9a47ae84ac682fdefa3ee9a9918beb3273b2458f8e131eed",
   "gpt-skills/fz-architect/SKILL.md": "422b56c201ca9fe52231fbc7aa6d9100bc3d795825eee90a97329bd901c343c7",
@@ -519,7 +520,7 @@
   "tests/fixtures/doc-freshness/root/guides/llm-references.md": "a9ff4023e0681110044510f2f31eb5b0d41aca738b60635167b542e563beea83",
   "tests/fixtures/doc-freshness/run.sh": "0ae06103c2aae2f66bceaada27571291a9947be5831a9a5c9e4e360546be5000",
   "tests/fixtures/docs/agent-guide-memory/run.sh": "51304b28582bdb5c043ee016ca188f1e92284464146296eff44beeac73aabf77",
-  "tests/fixtures/docs/finding-contracts.tsv": "a116fe94fc1380eba90343b045328d6bd7ff94a4dbd34dd30aca77765cda2cff",
+  "tests/fixtures/docs/finding-contracts.tsv": "958dfc7208d021a124bae4038b7e80a787f6f5a43913288c539fa1c7ebea3446",
   "tests/fixtures/docs/worker-prompt-guards/run.sh": "60855e998b48a448ac778f85c2bff3a6f8c91615e2eb75e49bd33243ca315a4f",
   "tests/fixtures/docs/workflow-first/run.sh": "a9cfb418a89e263aee8989d4b7237a1b8986ab2c62d67c381efc93c107dd4e8a",
   "tests/fixtures/evidence/profiles/run.sh": "89ea2f87fec5b1b8c142c0514eebf316dc3efb9c6481e71a1ac2a5a794a89667",
@@ -1061,9 +1062,9 @@
   "workflows/search-cross-verify.js": "d1ed618d31743f4237c3fe7eabd24886d49a2f7b4118e5297842c7fa9b68d85f",
   "workflows/swarm.js": "be28b1368614f0861897b14f422b349c39f90d4923b7d7650ace0489792b8ced"
  },
- "git_head": "d58cf26b9454e2b30773212228c65249c54958a8",
+ "git_head": "72665789f9c0f2541b23f0427956b9ae03ad49c4",
  "refs_file": "tests/fixtures/baseline-refs.txt",
  "refs_sha256": "f63f9dd9dd25bfc01b2fe21da3c11d29827a370e8e76a60bb1b31d44992b7ffe",
  "schema": 1,
- "uncommitted_at_freeze": 6
+ "uncommitted_at_freeze": 3
 }
