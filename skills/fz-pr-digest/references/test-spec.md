@@ -30,7 +30,7 @@
 | `--deep` 명시, gh 인증 정상 | `/fz-pr-digest 1234 --deep` | `pr-digest-deep.md`에 '기술 해설'·'학습 포인트' 섹션 존재 + Context7 query-docs 1회 이상 호출(Step 1.4) | normal |
 | diff < 50줄 PR, 플래그 미지정 | `/fz-pr-digest 1234` | 자동 Tier=Light 선택 + `pr-digest-light.md` 생성(한 줄 요약 + 파일별 변경 테이블), Before/After 섹션 부재 | edge-case |
 | 신규 추가 파일(BASE에 원본 미존재) | `/fz-pr-digest 1234` | 해당 파일 Before가 "(신규 파일)"로 표기 + After만 해설(중단 없음) | edge-case |
-| gh 인증 실패(gh CLI unauthenticated) | `/fz-pr-digest 1234` | git 폴백(git fetch + git diff)으로 diff 수집 성공, 해설 정상 생성(중단 없음) | failure |
+| gh 인증 실패(gh CLI unauthenticated) | `/fz-pr-digest 1234` | git 폴백(`scripts/git_prep.py fetch` + git diff)으로 diff 수집 성공, 해설 정상 생성(중단 없음) | failure |
 | Serena 심볼 탐색 실패(activate/find_symbol 에러) | `/fz-pr-digest 1234` | diff 기반 Light 수준 해설로 폴백 + 아키텍처 맥락 섹션 생략(중단 없음) | failure |
 | `--tutor` 명시, Serena 정상 | `/fz-pr-digest 1234 --tutor` | `pr-digest-tutor.md`에 A~D 4섹션 모두 존재 + 모든 매핑 블록에 `file:line` 인용 존재(G1) + 모든 "없으면"에 [기계적]\|[추론] 태그 존재(G2) | normal |
 | 변경 심볼이 protocol 채택 타입 | `/fz-pr-digest 1234 --tutor` | §7-D 구조 근거에 채택자 수가 [실측: 채택자 N] 형태로 기재(G3) + 주입 지점 `file:line` 명시 | normal |

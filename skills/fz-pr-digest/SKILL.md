@@ -13,7 +13,7 @@ allowed-tools: >-
   mcp__plugin_fz_serena__activate_project,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
-  Bash(git diff *), Bash(git show *), Bash(git fetch *), Bash(gh pr view *), Bash(gh pr diff *), Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Workflow
+  Bash(git diff *), Bash(git show *), Bash(gh pr view *), Bash(gh pr diff *), Bash(grep *), Bash(cp *), Bash(cmp *), Read, Grep, Glob, Bash(python3 */scripts/*), Workflow
 metadata:
   provides: [pr-digest, code-understanding]
   needs: [none]
@@ -453,7 +453,7 @@ Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체
 
 | 에러 | 대응 |
 |------|------|
-| gh 인증 실패 | git 폴백 (fetch + diff) |
+| gh 인증 실패 | git 폴백 (fetch + diff · 가져오기는 `scripts/git_prep.py fetch`) |
 | 원본 파일 미존재 (신규 파일) | Before를 "(신규 파일)" 표기, After만 해설 |
 | Serena 심볼 탐색 실패 | diff 기반 해설로 폴백 (Light 수준) |
 | diff > 2000줄 | 파일별 요약으로 전환 + 핵심 변경 그룹만 상세 해설 |

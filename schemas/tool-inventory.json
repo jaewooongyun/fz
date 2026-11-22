@@ -41,7 +41,7 @@
     "sed":     { "required": true }, "sort": { "required": true },
     "wc":      { "required": true },
     "cmp":     { "required": true,  "note": "Workflow 준비 — 원본 ↔ WORK_DIR 복사본 바이트 일치(guides/skill-authoring.md §12 0단계)" },
-    "tar":     { "required": false, "note": "swarm 고정 트리 준비 — git archive | tar -xf - (guides/skill-authoring.md §12 공용 읽기 전용 swarm 절) · 부재 시 swarm 만 못 한다" },
+    "tar":     { "required": false, "note": "swarm 고정 트리 준비 — scripts/git_prep.py tree 가 git archive | tar -xf - 로 푼다 (guides/skill-authoring.md §12 공용 읽기 전용 swarm 절) · 부재 시 swarm 만 못 한다" },
     "node":    { "required": false, "note": "점검(/fz-manage check · health-check)의 회귀 오라클 · scripts/check_wf_*.js — 부재 시 그 검사들이 미실행으로 남아 health-check 가 exit 2 로 끝난다" },
     "perl":    { "required": false, "note": "GPT 호출 래퍼(scripts/gpt-call.sh · scripts/gpt_independent.sh)가 어댑터를 자기 프로세스 그룹에서 띄운다 — 부재 시 gpt-call.sh 가 exit 11 로 끝나 GPT 단계만 못 한다" },
     "uvx":     { "required": false, "note": "번들 Serena MCP 기동 명령(.mcp.json) — 부재 시 번들 Serena 가 뜨지 않는다(Serena 는 선택 도구)" },

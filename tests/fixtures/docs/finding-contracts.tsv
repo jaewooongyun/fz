@@ -371,3 +371,17 @@ F-510	skills/fz-peer-review/SKILL.md	has	--tier {5.5 에서 정한 Tier} --recom
 F-510	skills/fz-peer-review/SKILL.md	has	`run_metrics.py end --skill fz-peer-review --work-dir "${WORK_DIR}" --status completed`
 F-510	modules/mode-gate.md	has:replace	fz-peer-review 는 `start` 를 직접 부르지 않는다 — 근거 슬롯 검사(`scripts/check_evidence_slots.py`)가 통과할 때
 F-510	modules/mode-gate.md	lacks	fz-peer-review 는 Tier 0 · 1 을
+F-544	skills/fz-peer-review/SKILL.md	lacks	Bash(git -C * archive *)
+F-544	skills/fz-peer-review/SKILL.md	lacks	Bash(git fetch *)
+F-544	skills/fz-peer-review/SKILL.md	lacks	Bash(tar -xf - -C *)
+F-544	skills/fz-review/SKILL.md	lacks	Bash(git -C * archive *)
+F-544	skills/fz-review/SKILL.md	lacks	Bash(tar -xf - -C *)
+F-544	skills/fz-pr-digest/SKILL.md	lacks	Bash(git fetch *)
+F-544	templates/skill-template.md	lacks	Bash(git -C * archive *)
+F-544	guides/skill-authoring.md	has:replace	scripts/git_prep.py tree --repo {GIT_ROOT} --sha {sha} --into {WORK_DIR}
+F-544	guides/skill-authoring.md	lacks	Bash(git -C * archive *)
+F-544	skills/fz-peer-review/SKILL.md	has:replace	git_prep.py" status --repo
+F-544	skills/fz-peer-review/SKILL.md	lacks	일부러 사전 승인하지 않았다
+F-544	skills/fz-peer-review/SKILL.md	has:replace	Bash(gh auth status), Bash(gh pr view *)
+F-544	skills/fz-peer-review/SKILL.md	lacks	Bash(gh auth status *)
+F-544	skills/fz-rebase/SKILL.md	has	Bash(git range-diff *)

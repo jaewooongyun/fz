@@ -9,7 +9,7 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[--onto <base>] [--branch <name>]"
 allowed-tools: >-
-  Bash(git status *), Bash(git log *), Bash(git diff *), Bash(git show *), Bash(git fetch *), Bash(git rev-parse *), Bash(git rev-list *), Bash(git ls-files *), Bash(git for-each-ref *), Bash(git config --get *), Bash(git symbolic-ref --short HEAD), Bash(git branch -r),
+  Bash(git status *), Bash(git log *), Bash(git diff *), Bash(git show *), Bash(git range-diff *), Bash(git fetch *), Bash(git rev-parse *), Bash(git rev-list *), Bash(git ls-files *), Bash(git for-each-ref *), Bash(git config --get *), Bash(git symbolic-ref --short HEAD), Bash(git branch -r),
   Bash(bash */scripts/verify-rebase.sh *),
   AskUserQuestion
 metadata:
@@ -83,7 +83,7 @@ fi
 - 이름이 `main`·`master`·`release/*`인 후보에는 배포 브랜치일 수 있다고 표시한다. ⛔ 자동 배제는 하지 않는다 — 팀마다 브랜치 운용이 달라 이름 기반 판정은 또 다른 오판이 된다.
 
 > 스크립트 경로: 스킬 주입 헤더 `Base directory for this skill: <경로>` 의 그 경로가 이 스킬의 디렉토리다.
-> `$SKILL_DIR` = `<그 경로>` 로 **절대경로를 1회 확정**한 뒤 `bash "$SKILL_DIR"/scripts/verify-rebase.sh <부명령> …` 꼴로 쓴다 — 따옴표를 `/scripts` 앞에서 닫아야 명령 글자에 `/scripts/verify-rebase.sh ` 가 남아 사전 승인 패턴에 맞는다.
+> 아래 명령의 `{SKILL_DIR}` 자리에 그 절대경로를 **글자 그대로** 적어 `bash "{SKILL_DIR}"/scripts/verify-rebase.sh <부명령> …` 꼴로 쓴다 — 셸 변수가 아니다(Bash 호출마다 셸이 새로 떠 값이 이어지지 않는다). Step 0 에서 정한 `${BASE}` · `${LTB}` · `${TRACK}` · `${PUSH_REMOTE}` 자리도 그 값을 그대로 적는다. 따옴표를 `/scripts` 앞에서 닫아야 명령 글자에 `/scripts/verify-rebase.sh ` 가 남아 사전 승인 패턴에 맞는다.
 > ⛔ 헤더가 없으면 추측하지 않는다 — 사용자에게 설치 경로를 묻는다. 잘못된 경로로 진행하면 게이트 없는 리베이스가 된다.
 > 흔한 두 곳: `~/.claude/skills/fz-rebase/scripts/` (스킬 단독 설치) · `$(claude plugin path fz)/skills/fz-rebase/scripts/` (플러그인 경유).
 
@@ -156,7 +156,7 @@ covered: 텍스트 라인 추가/삭제(양방향) · 파일 추가 · 파일 �
 ff-pull **이후**·리베이스 **직전**에 실행한다. 이유: 기준선이 pull 이전이면 팀원이 같은 브랜치에 넣은 커밋이 "내 변경"에서 빠지고, 리베이스 이후면 이미 사라진 것을 알 수 없다.
 
 ```bash
-bash "$SKILL_DIR"/scripts/verify-rebase.sh snapshot "${BASE}" "${LTB}"
+bash "{SKILL_DIR}"/scripts/verify-rebase.sh snapshot "${BASE}" "${LTB}"
 # → COMMITS=<N> MERGES=<M> (Step 3에 전달) + 롤백 앵커 ref + 위험 브리핑
 ```
 
@@ -197,7 +197,7 @@ git rebase --rebase-merges "${BASE}"
 **3-A 형태 게이트** — 개수·조상·clean만 본다 (내용 판정은 Step 3.5):
 
 ```bash
-bash "$SKILL_DIR"/scripts/verify-rebase.sh check "${BASE}" "${LTB}" <snapshot의 COMMITS> <snapshot의 MERGES> [<핵심 경로> ...]
+bash "{SKILL_DIR}"/scripts/verify-rebase.sh check "${BASE}" "${LTB}" <snapshot의 COMMITS> <snapshot의 MERGES> [<핵심 경로> ...]
 ```
 
 exit 0이 아니면 force-push하지 않는다. 커밋 수 감소는 **그 자체로 유실이 아니다** — base가 내 패치를 흡수해 드롭된 정상 케이스가 많다. Step 3.5로 판정한다.
@@ -295,7 +295,7 @@ abort가 없고 `--skip`은 현재 커밋을 통째로 버린다. 라벨이 이�
 ### Step 3.5 — 내용 게이트 (경로 전량 분할)
 
 ```bash
-bash "$SKILL_DIR"/scripts/verify-rebase.sh audit "${BASE}" "${LTB}"
+bash "{SKILL_DIR}"/scripts/verify-rebase.sh audit "${BASE}" "${LTB}"
 ```
 
 세 버킷 불변식을 검사하고 위반을 등급별로 보고한다. `INFO`는 정상(흡수·이동), `WARN`은 사람 확인 필요(OVERLAP 바이너리 · **사라진 라인의 위치 후보** · 머지 해결 축소), `HALT`만 유실이다. OVERLAP 라인 검사는 POST 트리 전역 라인 집합과 대조해 코드 이동을 유실로 오판하지 않으며, 확인 상한(cap) 없이 전량 판정한다.
@@ -311,7 +311,7 @@ git 레벨 검증은 **내용 동일성**까지다. 내 변경이 살아있으�
 되돌릴 수 없는 작업이다. **push 직전에 원격을 다시 실측**한다 — Step 1 이후 팀원이 push했을 수 있고, 그 경우 lease는 통과하면서 팀원 커밋만 사라진다(L6).
 
 ```bash
-bash "$SKILL_DIR"/scripts/verify-rebase.sh prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
+bash "{SKILL_DIR}"/scripts/verify-rebase.sh prepush "${LTB}" "${PUSH_REMOTE}" "<원격 브랜치명>"
 ```
 
 - `git ls-remote`로 원격 실측 → tracking ref가 stale이면 HALT(fetch 후 재실행). 오프라인이면 HALT — 되돌릴 수 없는 단계라 원격 상태를 모른 채 진행하지 않는다(`FZ_REBASE_SKIP_LSREMOTE=1`로 강제 우회 가능, 보호가 약해진다).

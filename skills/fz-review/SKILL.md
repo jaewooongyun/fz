@@ -14,7 +14,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__plugin_fz_serena__get_diagnostics_for_file,
   LSP,
-  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(git -C * archive *), Bash(tar -xf - -C *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
+  Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow
 metadata:
   provides: [review-results]
   needs: [code-changes]

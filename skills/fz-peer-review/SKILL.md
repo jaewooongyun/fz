@@ -15,7 +15,7 @@ allowed-tools: >-
   mcp__sequential-thinking__sequentialthinking,
   mcp__context7__resolve-library-id, mcp__plugin_context7_context7__resolve-library-id,
   mcp__context7__query-docs, mcp__plugin_context7_context7__query-docs,
-  Bash(git diff *), Bash(git show *), Bash(git fetch *), Bash(git rev-parse *), Bash(git -C * archive *), Bash(gh auth status *), Bash(gh pr view *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(tar -xf - -C *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
+  Bash(git diff *), Bash(git show *), Bash(git rev-parse *), Bash(gh auth status), Bash(gh pr view *), Bash(grep *), Bash(cp *), Bash(cmp *), Bash(*/scripts/gpt-call.sh*), Bash(*/scripts/gpt_independent.sh*), Bash(*/scripts/gpt-exec.sh*), Bash(*/scripts/gpt-choice.sh*), Bash(python3 */scripts/*), Read, Grep, Glob, Workflow, Write
 metadata:
   provides: [peer-review]
   needs: [none]
@@ -108,7 +108,7 @@ mkdir -p "${WORK_DIR}" && WORK_DIR="$(cd "${WORK_DIR}" && pwd)" && echo "${WORK_
 ### 0. 사전 점검
 
 ```bash
-gh auth status  # 성공→gh 사용, 실패→git 폴백 (git fetch upstream + git diff)
+gh auth status  # 성공→gh 사용, 실패→git 폴백 (python3 "${FZ_PLUGIN_ROOT}/scripts/git_prep.py" fetch --repo <GIT_ROOT> --remote upstream + git diff)
 # GIT_ROOT 추출: modules/cross-validation.md의 GIT_ROOT 공유 유틸 참조
 ```
 
@@ -397,7 +397,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 
 #### ⛔ CHECKPOINT — 문서 출력 (Deliver 완료 전 반드시 저장)
 
-> **⛔ 대화 출력 전에 반드시 Write 도구로 아래 파일들을 저장하세요. 저장 완료 후 사용자에게 경로를 안내합니다.** ⛔ 쓰기 경로는 **항상 절대경로**다 — cwd 는 도구 호출 사이에 리셋되므로 상대경로는 그때의 cwd(팀 레포·PR 워크트리)에 착지한다. ⛔ **종료 전** 리뷰에 쓴 레포와 PR 워크트리 각각에 `git -C <절대경로> status --porcelain` 을 1회 실행한다(⛔ 일부러 사전 승인하지 않았다 — 맞출 패턴이 쓰기 부명령에도 맞는다 · 호출마다 권한을 한 번 묻고, 물을 수 없는 세션(비대화형)이면 이 검사를 통과가 아니라 수행 못 함으로 보고한다) — 경로는 `git rev-parse --show-toplevel` 로 얻은 절대값이어야 하고, ⛔ **이 검사에는** `${GIT_ROOT}` 를 쓰지 않는다(공유 유틸은 추출 실패 시 `.` 로 떨어져 검사 자체가 cwd 의존이 된다). `??` 에 `review-report.md`·`pr-comments.md`·`*-result.json` 이 보이면 산출물 오착지다. ⛔ 출력이 비어도 **exit code 를 본다** — `fatal: not a git repository` 는 clean 이 아니라 측정 실패다(`modules/cross-validation.md` § Negative-Result Gate).
+> **⛔ 대화 출력 전에 반드시 Write 도구로 아래 파일들을 저장하세요. 저장 완료 후 사용자에게 경로를 안내합니다.** ⛔ 쓰기 경로는 **항상 절대경로**다 — cwd 는 도구 호출 사이에 리셋되므로 상대경로는 그때의 cwd(팀 레포·PR 워크트리)에 착지한다. ⛔ **종료 전** 리뷰에 쓴 레포와 PR 워크트리 각각에 `python3 "${FZ_PLUGIN_ROOT}/scripts/git_prep.py" status --repo <절대경로>` 를 1회 실행한다(`git status --porcelain` 의 출력과 종료 코드를 그대로 낸다) — 경로는 `git rev-parse --show-toplevel` 로 얻은 절대값이어야 하고, ⛔ **이 검사에는** `${GIT_ROOT}` 를 쓰지 않는다(공유 유틸은 추출 실패 시 `.` 로 떨어져 검사 자체가 cwd 의존이 된다). `??` 에 `review-report.md`·`pr-comments.md`·`*-result.json` 이 보이면 산출물 오착지다. ⛔ 출력이 비어도 **exit code 를 본다** — `fatal: not a git repository` 는 clean 이 아니라 측정 실패다(`modules/cross-validation.md` § Negative-Result Gate).
 > ```
 > 📁 산출물 저장: ${WORK_DIR}/
 >    ├── review-report.md
@@ -421,7 +421,7 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 > ⛔ 게시 직전 렌더는 `--head-sha "$(gh pr view {N} --json headRefOid -q .headRefOid)"` 를 붙인다 — 리뷰 대상 sha 와 다르면 렌더러가 거부한다(F-068 · 리뷰 중 force-push). 인라인 코멘트 전건의 site 에 `expect` 가 있어야 한다(Gate 4.5 · F-069). 프로젝트 응답 언어가 한국어면 `--lang ko`(F-020 — 사용자 대면 산출물 언어)
 
 > ⛔ **확인 게이트** — 미리보기는 항상 출력한다. 셋 중 하나면 `AskUserQuestion` 으로 승인받은 뒤 게시한다: (a) `event ≠ COMMENT` (b) `non_anchorable` 대체 발생 — 대체 형식은 `modules/peer-review-inline-anchoring.md` 5절(코드블록 인용 + `file:line`)을 Read 해 따른다 (c) 겹치는 hunk 복수로 Lead가 구간 선택 (F-073).
-> ⛔ 게시 경로는 `gh api` 하나다 — `comments[]` 에 `start_line`·`start_side`·`side` 를 넣지 못하는 게시 도구로 바꾸면 범위 하이라이트·LEFT 앵커가 안 된다(근거: `modules/peer-review-inline-anchoring.md` 6절). `allowed-tools` 는 gh 의 조회 꼴(`gh auth status` · `gh pr view`)만 사전 승인하고, 게시 POST 는 쓰기라 권한 프롬프트를 거친다. `Bash(git -C * archive *)` · `Bash(git fetch *)` 는 워크플로 준비 단계(고정 트리 스냅샷 · 원격 가져오기)를 위해 둔다 — 부명령 앞 · 뒤 와일드카드가 다른 인자에도 맞아서(앞은 인자에 `archive` 가 든 다른 부명령에도, 뒤는 `--upload-pack=<명령>` 같은 옵션에도) 이 둘은 편의이지 보호가 아니다.
+> ⛔ 게시 경로는 `gh api` 하나다 — `comments[]` 에 `start_line`·`start_side`·`side` 를 넣지 못하는 게시 도구로 바꾸면 범위 하이라이트·LEFT 앵커가 안 된다(근거: `modules/peer-review-inline-anchoring.md` 6절). `allowed-tools` 는 gh 의 조회 꼴(`gh auth status` · `gh pr view`)만 사전 승인하고, 게시 POST 는 쓰기라 권한 프롬프트를 거친다. 고정 트리 · 원격 가져오기 · 종료 전 상태 조회는 인자를 검사하는 `scripts/git_prep.py` 를 거친다(사전 승인은 `Bash(python3 */scripts/*)`).
 
 ---
 
