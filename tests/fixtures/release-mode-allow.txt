@@ -44,7 +44,6 @@ scripts/fz_telemetry_report.py
 scripts/fz_wf_metrics.py
 scripts/gpt_ab_decide.py
 scripts/gpt_merge.py
-scripts/hydration_manifest.py
 scripts/judge_corpus_diff.py
 scripts/lint_contracts.py
 scripts/lint_diff_parsers.py
