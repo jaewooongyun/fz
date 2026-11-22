@@ -24,6 +24,11 @@
   보호 경로 F-024 — env FZ_GUARD_PROTECTED(os.pathsep 구분) · <상태 폴더>/protected(줄마다 경로 · # 주석) 가 있으면 그 아래에서
       도는 Bash(cwd · `git -C` · 경로 인자)와 대상을 모르는 Bash(못 읽는 명령 · 확장이 든 cd · pushd · git -C 대상)를 ask 한다
       (거부 아님 · 사유 표시 · P4 deny 를 덮지 않는다). 기본은 비어 있어 아무 일도 하지 않는다 · 상태 파일을 열지 않는다.
+  T-pitfall F-610 · F-654 · F-673 · F-727 — 적어 둔 셸 함정 꼴이 든 Bash 에 경고한다(systemMessage · 막지 않는다 · prompt · 꼴마다 1회):
+      근거 명령(grep 류 · rg · find · git grep) 뒤 칸의 `| head` · 지금 아무것도 맞추지 않거나 펼침을 품은 따옴표 밖 글롭(zsh 는 무매칭이면
+      명령 전체를 끊는다) · 서브셸 밖 `cd X &&`(세션 작업 폴더가 바뀐다). 꼴 판정(pitfall_hits)은 상태 · 잠금 없이 읽기 Bash 조기 반환 앞에서
+      돌고, 맞은 명령만 끄기 판정 · 잠금 · 상태 경로로 간다. 규칙 이름이 따로 없다 — FZ_GUARD_DISABLE=all(네 규칙 전부)일 때 꺼진다.
+      못 읽는 명령은 판정 불가 = 경고 없이 통과다.
 
 상태 정리(F-564) — UserPromptSubmit 마다 마지막 기록이 STALE_DAYS 지난 다른 세션의 상태 · 잠금을 지운다(사건 1회에 최대 PRUNE_MAX).
 
@@ -37,7 +42,7 @@ transcript 에서는 굳은 사실 하나만 읽는다: 첫 줄들의 entrypoint
 
 모드
   (인자 없음)                훅 — stdin JSON 하나 → stdout 결정 JSON(없으면 빈 출력) · exit 0
-  --self-test                합성 입력 150 케이스 — `PASS <case>` 줄
+  --self-test                합성 입력 153 케이스 — `PASS <case>` 줄
   --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS · Lead 직접 표 == LEAD_DIRECT_AGENTS 인가
                              (0 일치 · 1 불일치 — Lead 직접 표 없음 포함 · 2 채택 표 없음)
   --make-synthetic BYTES OUT --with-marker|--no-marker   큰 transcript 합성(첫 줄들에 entrypoint 를 둘지)
@@ -48,6 +53,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import fcntl
+import glob
 import importlib.util
 import io
 import json
@@ -116,6 +122,14 @@ MTIME_SLACK = 1.0                                 # F-518 — 초 단위로 잘�
 WARN_UNDECIDED = "FZ-GUARD-WARN P4-UNDECIDED"
 WARN_INCOMPLETE = "FZ-GUARD-WARN STATE-INCOMPLETE"
 WARN_LONG = "FZ-GUARD-WARN P4-LONG-ANSWER"
+WARN_PITFALL = "FZ-GUARD-WARN T-PITFALL"
+PITFALL_EVIDENCE = frozenset(("grep", "egrep", "fgrep", "rg", "ag", "ack", "find"))   # 근거를 찾는 명령 — `git grep` 은 하위 명령으로 본다
+PITFALL_GLOB = re.compile(r"[*?\[]")
+PITFALL_TEXT = {   # 꼴 → 경고 한 마디(%s = 그 명령의 근거 낱말) — 처방은 Coverage Gate 5항 · F-673 · F-654 와 같다
+    "head": "`%s … | head` 는 근거 목록을 잘라 전수로 읽힌다 — 자르지 말고 개수(`wc -l`)를 먼저 본다(F-727 ②)",
+    "glob": "글롭 `%s` 가 맞출 파일이 없을 수 있다 — zsh 는 무매칭이면 명령 전체를 끊는다 · 있을지 모르는 경로는 `find … -name` 으로 찾는다(F-673 · F-727 ③)",
+    "cd": "`%s &&` 는 세션 작업 폴더를 바꾼다 — 절대 경로 · 도구의 폴더 인자(`git -C`) · `( cd … && … )` 로 쓴다(F-610 · F-654)",
+}
 P4_DENY = ("fz-guard P4 (F-368): this session ran /fz and the Phase 4 approval has not been given. Show the pipeline and ask "
            "the user with AskUserQuestion (header 'Phase 4') before writing files or starting a Workflow. Writes to the "
            "fz-findings registry entries/ are allowed. Autonomous runs start the CLI with FZ_AUTONOMY=autonomous.")
@@ -271,6 +285,29 @@ def _gpt_call_in(cmds) -> bool:
 # 이 값 규칙은 print · PLUGIN_READ 의 gate_check.py 판정에는 없다 — 그 둘은 옵션이 설 수 있는 자리(print 는 `--` · 첫 글자 그대로의
 # 피연산자 앞, gate_check.py 는 `--status` 뒤 원장 자리)의 펼침(따옴표 밖 중괄호 펼침 · 글롭 포함 — _literal_view)을 거절한다
 _EXPANSION = re.compile(r"\$\{[^{}]*\}|\$\((?:[^()]|\([^()]*\))*\)|`[^`]*`|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9?#@*$!-]")
+
+
+def _glob_pattern(raw: str):
+    """단어 원문에서 따옴표 · 이스케이프 밖 글롭 문자가 있으면 glob 패턴(따옴표 안 글자는 escape), 없으면 None.
+    `Word.quoted` 는 단어 일부만 따옴표여도 참이라(`"./dir/"*.md`) 단어 단위로는 따옴표 밖 글롭을 가르지 못한다."""
+    out, q, i, live = [], None, 0, False
+    while i < len(raw):
+        ch = raw[i]
+        if ch == "\\" and i + 1 < len(raw) and (q is None or (q == '"' and raw[i + 1] in '"\\$`')):
+            out.append(glob.escape(raw[i + 1]))
+            i += 2
+            continue
+        if q is None and ch in "'\"":
+            q = ch
+        elif q == ch:
+            q = None
+        elif q is None and ch in "*?[":
+            live = True
+            out.append(ch)
+        else:
+            out.append(glob.escape(ch))
+        i += 1
+    return "".join(out) if live else None
 
 
 def _sed_delim_end(s: str, i: int, d: str) -> int:
@@ -1186,6 +1223,76 @@ def disabled_rules(env, sdir: pathlib.Path) -> tuple:
     return (set(RULES) if "ALL" in tokens else tokens), ""
 
 
+def _git_sub(args) -> str:
+    """`git [전역 옵션] 하위 명령` 의 하위 명령 글자 — 값을 받는 전역 옵션은 값까지 건너뛴다(_git_dirs 와 같은 표)."""
+    i = 0
+    while i < len(args):
+        t = args[i].text
+        if not t.startswith("-"):
+            return t
+        i += 2 if t in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env") else 1
+    return ""
+
+
+def _pitfall_hits(cmd: str, cwd) -> list:
+    toks = shell_tokens.lex(cmd)
+    if shell_tokens.is_unknown(toks):
+        return []                                  # 판정 불가 = 통과(경고 없음)
+    segs, cur, depth, at = [], [], 0, 0            # 맨 바깥 단순 명령마다 (토큰, 뒤 연산자, 서브셸 깊이) — commands() 는 `( … )` 안도 깊이 0 으로 낸다
+    for t in toks:
+        if isinstance(t, shell_tokens.Op):
+            if cur:
+                segs.append((cur, t.text, at))
+            cur = []
+            depth = depth + 1 if t.text == "(" else max(0, depth - 1) if t.text == ")" else depth
+        else:
+            if not cur:
+                at = depth
+            cur.append(t)
+    if cur:
+        segs.append((cur, "", at))
+    hits, pipe, moved = [], [], False
+    for ts, op, at in segs:
+        top = [c for c in shell_tokens.commands(ts) if c.depth == 0][:1]
+        c = top[0] if top and top[0].name is not None and not top[0].unsure else None
+        name = os.path.basename(c.name.text) if c and not c.name.expands else ""
+        pipe.append("git grep" if name == "git" and _git_sub(c.args) == "grep" else name if name in PITFALL_EVIDENCE else "")
+        if name == "head" and any(pipe[:-1]):
+            hits.append(("head", next(x for x in pipe[:-1] if x)))
+        if op not in ("|", "|&"):
+            pipe = []
+        if name in ("cd", "pushd") and op == "&&" and at == 0:
+            hits.append(("cd", " ".join([name] + [a.text for a in c.args])))
+        for w in (c.args if c and name != "[[" else []):
+            bare = _EXPANSION.sub("", w.text)
+            raw = cmd[w.start:w.end] if isinstance(w.start, int) and isinstance(w.end, int) else w.text
+            pat = _glob_pattern(_EXPANSION.sub("", raw))
+            if pat is None or "{" in bare or w.text.startswith("~"):
+                continue                           # 따옴표 · 이스케이프 안 글롭 · 중괄호 펼침 · 물결은 보지 않는다(셸이 다르게 푼다)
+            if w.expands:
+                hits.append(("glob", w.text))      # 펼친 값을 모른다 — 맞출 파일이 있는지 잴 수 없다
+                continue
+            base = None if moved else cwd if isinstance(cwd, str) and cwd.startswith("/") else None
+            path = pat if pat.startswith("/") else os.path.join(glob.escape(base), pat) if base else None
+            if path is not None and next(glob.iglob(path), None) is None:
+                hits.append(("glob", w.text))
+        moved = moved or name in ("cd", "pushd", "popd")   # 이동 뒤 상대 글롭은 어디서 풀리는지 모른다 — 재지 않는다
+    return hits
+
+
+def pitfall_hits(cmd, cwd) -> list:
+    """T-pitfall — 적어 둔 셸 함정 꼴 [(꼴, 근거 낱말)]. ⛔ 상태 · 잠금 없는 순수 판정이다(읽기 Bash 조기 반환 앞에서 모든 Bash 에 돈다).
+    꼴: head — 맨 바깥 파이프라인에서 근거 명령 뒤 칸의 head(치환 안 `$(… | head -1)` 은 고르기라 보지 않는다) ·
+        glob — 따옴표 밖 글롭이 지금 아무것도 맞추지 않거나 펼침을 품었다 · cd — 서브셸 밖 cd · pushd 바로 뒤 `&&`.
+    ⛔ 못 읽은 명령 · 판정 중 오류는 빈 목록이다 — 판정 불가 = 통과(이 판정은 무엇도 막지 않는다)."""
+    if shell_tokens is None or not isinstance(cmd, str):
+        return []
+    try:
+        return _pitfall_hits(cmd, cwd)
+    except Exception:                              # noqa: BLE001 — 훅은 세션을 막지 않는다
+        return []
+
+
 # ── 상태 ───────────────────────────────────────────────────────────
 def state_dir(env) -> pathlib.Path:
     base = env.get("FZ_RUN_STATE") or os.path.join(env.get("HOME") or os.path.expanduser("~"), ".fz", "runs")
@@ -1356,6 +1463,21 @@ def warn_once(st: dict, key: str, text: str):
         return None
     st["warned"].append(key)
     return {"systemMessage": text}
+
+
+def pitfall_warn(out, st: dict, pid, hits):
+    """T-pitfall 경고를 결정에 붙인다 — prompt · 꼴마다 1회(warn_once). 기존 systemMessage 는 뒤에 잇고 결정(deny · ask)은 그대로 둔다."""
+    msgs = []
+    for k, w in dict.fromkeys(hits):
+        m = warn_once(st, f"pitfall:{pid}:{k}", PITFALL_TEXT[k] % w)
+        if m and m["systemMessage"] not in msgs:
+            msgs.append(m["systemMessage"])
+    if not msgs:
+        return out
+    text = f"{WARN_PITFALL} — " + " · ".join(msgs) + " · 막지 않는다"
+    out = dict(out or {})
+    out["systemMessage"] = " · ".join(x for x in (out.get("systemMessage"), text) if x)
+    return out
 
 
 def open_window(st: dict, pid) -> None:
@@ -1563,7 +1685,7 @@ def run(stdin_text: str, env) -> tuple:
     sid = re.sub(r"[^A-Za-z0-9_.-]", "_", str(inp.get("session_id") or ""))[:128]
     if not sid:
         return "", "fz-guard diag: session_id 가 없다 — 통과(fail-open)"
-    pp, diag = None, ""
+    pp, diag, tp, fast = None, "", [], None
     if inp.get("hook_event_name") == "PostToolUse" and inp.get("tool_name") == "Read":
         ti = inp.get("tool_input") if isinstance(inp.get("tool_input"), dict) else {}
         if not (isinstance(ti.get("file_path"), str) and REVIEW_SKILL_FILE.search(ti["file_path"])):
@@ -1579,8 +1701,12 @@ def run(stdin_text: str, env) -> tuple:
         except Exception as e:                     # noqa: BLE001 — 훅은 세션을 막지 않는다
             diag = f"보호 경로 판정 오류 {type(e).__name__}"
         diag = f"fz-guard diag: {diag} — 통과(fail-open)" if diag else ""
+        tp = pitfall_hits(cmd, inp.get("cwd"))    # T-pitfall — 상태 · 잠금 없는 순수 판정(아래 조기 반환 앞)
         if not isinstance(cmd, str) or not (bash_write(cmd, inp.get("cwd"))[0] or gpt_review_invoked(cmd)):
-            return (json.dumps(pp, ensure_ascii=False) if pp else ""), diag   # ⛔ 읽는 Bash 는 상태를 열지 않는다 — 모든 세션의 모든 Bash 에 잠금 · 저장이 붙지 않게
+            fast = json.dumps(pp, ensure_ascii=False) if pp else ""
+            if not tp:
+                return fast, diag                  # ⛔ 읽는 Bash 는 상태를 열지 않는다 — 모든 세션의 모든 Bash 에 잠금 · 저장이 붙지 않게
+            # 함정 꼴이 든 읽기만 상태 경로로 간다(경고 1회 판정). 상태 경로가 실패해도 보호 경로 ask(fast)는 그대로 낸다
     try:
         timeout = float(env.get("FZ_GUARD_LOCK_TIMEOUT") or LOCK_TIMEOUT)
     except ValueError:
@@ -1588,7 +1714,7 @@ def run(stdin_text: str, env) -> tuple:
     try:                                           # ⛔ 상태 폴더 해석 · 끄기 판정도 안쪽 — `~없는사용자/x` 도 exit 0 + 진단
         sdir = state_dir(env)
         if inside_plugin(sdir):
-            return "", f"fz-guard diag: 상태 폴더가 플러그인 안이다({sdir}) — 쓰지 않고 통과(fail-open)"
+            return fast or "", f"fz-guard diag: 상태 폴더가 플러그인 안이다({sdir}) — 쓰지 않고 통과(fail-open)"
         off, why = disabled_rules(env, sdir)
         if off >= set(RULES):
             return "", (f"fz-guard diag: {why}" if why else "")
@@ -1599,17 +1725,19 @@ def run(stdin_text: str, env) -> tuple:
             path = sdir / f"{sid}.json"
             st = load_state(path)
             out = handle(inp, env, st, off, sid)
+            if tp:
+                out = pitfall_warn(out, st, inp.get("prompt_id"), tp)
             trim(st)
             save_state(path, st)
     except LockTimeout:
-        return "", f"fz-guard diag: 상태 잠금을 {timeout}s 안에 잡지 못했다 — 통과(fail-open)"
+        return fast or "", f"fz-guard diag: 상태 잠금을 {timeout}s 안에 잡지 못했다 — 통과(fail-open)"
     except OSError as e:
-        return "", f"fz-guard diag: 상태를 읽거나 쓰지 못했다({type(e).__name__}) — 통과(fail-open)"
+        return fast or "", f"fz-guard diag: 상태를 읽거나 쓰지 못했다({type(e).__name__}) — 통과(fail-open)"
     except Exception as e:                         # noqa: BLE001 — 훅은 세션을 막지 않는다
-        return "", f"fz-guard diag: 내부 오류 {type(e).__name__} — 통과(fail-open)"
+        return fast or "", f"fz-guard diag: 내부 오류 {type(e).__name__} — 통과(fail-open)"
     if pp and ((out or {}).get("hookSpecificOutput") or {}).get("permissionDecision") != "deny":
         out = {**(out or {}), **pp}               # 보호 경로 ask 는 P4 deny 를 덮지 않는다
-    return (json.dumps(out, ensure_ascii=False) if out else ""), ""
+    return (json.dumps(out, ensure_ascii=False) if out else ""), (diag if fast is not None else "")
 
 
 # ── 보조 모드 ──────────────────────────────────────────────────────
@@ -2196,7 +2324,9 @@ def self_test() -> int:
         s = S("r3pe")
         s.prompt("분석해줘", "p1")
         got = [bash_at(s, f"git -C {prot} status"), bash_at(s, "cd $X && ls"), bash_at(s, "echo $[1]")]
-        case("r3-f024-default-empty-noop — 보호 경로가 비면(기본) 어떤 Bash 도 묻지 않는다", got == [None, None, None] and not s.err, (got, s.err))
+        # `cd $X &&` 는 T-pitfall 경고(systemMessage)를 받는다 — 여기서 재는 것은 묻지 않음(결정 없음)이다
+        case("r3-f024-default-empty-noop — 보호 경로가 비면(기본) 어떤 Bash 도 묻지 않는다",
+             got[0::2] == [None, None] and kind(got[1]) is None and not s.err, (got, s.err))
 
     @cell
     def r3_s4_git_c():
@@ -2225,6 +2355,92 @@ def self_test() -> int:
                                                        f"cd {tmp} && cd prot", f"cd {tmp} && echo x > prot/a", f"cd {tmp} && ls other")]
         case("r3-f024-cd-then-relative-asks — 앞선 cd 를 반영해 상대 경로 · git -C · 리다이렉트 대상을 푼다 · 보호 밖 형제 폴더는 무동작",
              got == ["ask"] * 4 + [None], got)
+
+    tp_root = tmp / "tpit"                          # T-pitfall 글롭 판정용 실제 폴더 — 맞는 글롭(entries/) · 무매칭 글롭(.archive/ 없음)
+    (tp_root / "entries").mkdir(parents=True)
+    (tp_root / "sub").mkdir()
+    (tp_root / "entries" / "F-594-x.md").write_text("# F-594\n", encoding="utf-8")
+
+    def pit(o):
+        return ((o or {}).get("systemMessage") or "") if WARN_PITFALL in ((o or {}).get("systemMessage") or "") else ""
+
+    @cell
+    def tpit_pos():
+        s = S("tpp")
+        # 양성 = 엔트리에 적힌 실제 명령(F-727 ② ③ · F-673 · F-654 ③ ④ · F-610) — prompt 마다 하나라 1회 경고가 가리지 않는다
+        rows = [("F-727-2", "grep -lE '0e7f5ce|applied_ref_era' entries/*.md .archive/*.md | head", ("grep … | head", "`.archive/*.md`")),
+                ("F-727-3", "for id in F-594 F-600; do ls entries/$id-*.md .archive/$id-*.md; done", ("`entries/$id-*.md`",)),
+                ("F-673", "grep -rn 'hooks/' entries docs/*.md", ("`docs/*.md`",)),
+                ("F-654-3", "cd sub && ls", ("`cd sub &&`",)),
+                ("F-654-4", "ls .archive/F-7*.md", ("`.archive/F-7*.md`",)),
+                ("F-610", "cd sub && python3 gen.py", ("`cd sub &&`",)),
+                ("F-727-3q", 'ls "./.archive/"*.md', ("`./.archive/*.md`",)),          # 경로만 따옴표 · 글롭은 밖(채점 2차 ISSUE-002)
+                ("F-727-3r", 'ls "$ROOT"/.archive/*.md', ("`$ROOT/.archive/*.md`",))]   # 따옴표 친 펼침 + 밖 글롭
+        bad = []
+        for i, (fid, cmd, needles) in enumerate(rows):
+            s.prompt("근거를 찾아 줘", f"p{i}")
+            o = bash_at(s, cmd, cwd=str(tp_root))
+            if kind(o) is not None or not all(n in pit(o) for n in needles):
+                bad.append((fid, o))
+        st = load_state(pathlib.Path(s.env["FZ_RUN_STATE"]) / "fz-guard" / "s1.json")
+        case("t-pitfall-positive-warns — 일곱 엔트리 중 셸 꼴이 적힌 명령(| head · 무매칭 · 펼침 글롭 · cd X &&)은 막지 않고 경고한다 · "
+             "경고는 상태 경로(st['warned'])를 지난다", not bad and sum(k.startswith("pitfall:") for k in st["warned"]) >= len(rows), bad)
+
+    @cell
+    def tpit_neg():
+        s = S("tpn")                               # prompt 없이 — 읽기 Bash 만으로 상태 폴더가 생기면 빠른 반환이 깨진 것이다
+        neg = [f"git -C {tp_root} status --porcelain", "grep -n -E 'def |owner' entries/F-594-x.md",
+               "find entries .archive -maxdepth 1 -name 'F-727-*.md'",   # 있을지 모르는 경로의 처방(F-727 ③)
+               "( cd sub && ls )",                    # cd 의 처방(F-610) — 서브셸 안 이동은 세션 폴더를 바꾸지 않는다
+               "ls entries/*.md",                     # 맞는 글롭
+               "f=$(ls entries | head -1)",           # 치환 안 head 는 고르기다
+               "git log --oneline | head -5",         # 근접 음성 — 근거 명령이 아닌 칸 뒤 head
+               "grep -c x entries/F-594-x.md | sort",  # 근접 음성 — 근거 명령 뒤지만 head 가 아니다
+               "echo $(( 3 * 2 ))", "(( 3 * 2 )) && echo y", '[[ $a == *.md ]] && echo y',   # 산술 · 패턴 비교
+               "find entries -name \\*.md",          # 역슬래시로 막은 글롭(F-727 ③ 처방의 다른 철자)
+               'ls "./.archive/*.md"', 'ls "entries/"*.md']   # 글롭까지 따옴표(셸이 글자로 넘긴다) · 경로만 따옴표지만 맞는 글롭
+        got = [(c, run(json.dumps({"session_id": s.sid, "transcript_path": s.tr, "cwd": str(tp_root), "hook_event_name": "PreToolUse",
+                                   "prompt_id": "p1", "tool_name": "Bash", "tool_input": B(c), "tool_use_id": "t"}), s.env)) for c in neg]
+        noisy = [(c, o) for c, o in got if o != ("", "")]
+        # 못 읽는 명령은 꼴 판정 불가 = 경고 없음(그 명령의 상태 경로는 쓰기 판정 몫 — 대상 미상 쓰기)
+        undecided = [pitfall_hits(c, str(tp_root)) for c in ("echo $[1] | head", "cd $'\\x41' && ls *.none")]
+        case("t-pitfall-negative-quiet — 처방 꼴 · 맞는 글롭 · 치환 안 head · 근접 음성은 결정 · 경고 · 상태 폴더 없이 빠르게 돌아간다 · 못 읽는 명령은 꼴 없음",
+             not noisy and not (pathlib.Path(s.env["FZ_RUN_STATE"]) / "fz-guard").exists() and undecided == [[], []], (noisy, undecided))
+
+    @cell
+    def tpit_cells():
+        import threading
+        cmd = "grep -rn 'def run' scripts | head -5"
+        a = S("tpc")
+        a.prompt("hello", "p1")
+        outs = []
+        ths = [threading.Thread(target=lambda: outs.append(a.pre("Bash", B(cmd)))) for _ in range(4)]
+        [t.start() for t in ths]
+        [t.join() for t in ths]
+        same = sum(bool(pit(o)) for o in outs) + bool(pit(a.pre("Bash", B(cmd))))
+        a.prompt("next", "p2")
+        nxt = sum(bool(pit(a.pre("Bash", B(cmd)))) for _ in range(2))
+        off = S("tpo", FZ_GUARD_DISABLE="all")
+        off.prompt("hello", "p1")
+        quiet = off.pre("Bash", B(cmd)) is None
+        pp = S("tpa", FZ_GUARD_PROTECTED=prot)
+        pp.prompt("hello", "p1")
+        asked = pp.pre("Bash", B(f"grep -rn x {prot} | head -3"))
+        w = fz("tpw")                              # P4 창 안 쓰기 — deny 는 그대로 · 경고는 덧붙는다
+        denied = w.pre("Bash", B("cd /srv/demo && mkdir -p out"))
+        lk = S("tpl", FZ_GUARD_PROTECTED=prot, FZ_GUARD_LOCK_TIMEOUT="0.05")
+        lk.prompt("hello", "p1")
+        fd = os.open(str(pathlib.Path(lk.env["FZ_RUN_STATE"]) / "fz-guard" / "s1.lock"), os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)         # 잠금을 쥔 채 — 상태 경로가 실패해도 보호 경로 ask 는 남는다
+            held = lk.pre("Bash", B(f"grep -rn x {prot} | head -3"))
+            held_err = lk.err
+        finally:
+            os.close(fd)
+        got = (same, nxt, quiet, kind(asked), bool(pit(asked)), kind(denied), bool(pit(denied)), kind(held), "잠금" in held_err)
+        case("t-pitfall-once-per-prompt-composes — 같은 prompt 병렬 4 + 재호출 → 경고 1 · 다음 prompt → 다시 1 · disable=all → 0 · "
+             "보호 경로 ask · P4 deny 는 그대로 + 경고 · 상태 잠금 실패에도 ask 유지",
+             got == (1, 1, True, "ask", True, "deny", True, "ask", True), got)
 
     @cell
     def r3_read_marks():

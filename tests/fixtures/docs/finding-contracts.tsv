@@ -396,6 +396,9 @@ F-622	skills/fz-plan/SKILL.md	has	`pin: [경로]` 를 함께 싣는다
 # F-726 — 대조값은 주장이 겨누는 영역 안에서 고른다(Negative-Result Gate) · 그 경고를 fz-plan Gate 1 증거 줄이 이름으로 받는다
 F-726	modules/cross-validation.md	has	**대조값은 주장이 겨누는 영역 · 언어 · 구간 안에서 고른다**
 F-726	skills/fz-plan/SKILL.md	has	WARN 대조값 없는 부재 주장 {M}건
+# F-727 — T-pitfall 경고는 fz-guard 문서의 규칙 표 · 판정 절에 있고 끄기 키가 없다는 것을 적는다
+F-727	mods/fz-guard/CLAUDE.md	has	| T-pitfall | F-654 · F-673 · F-727 |
+F-727	mods/fz-guard/CLAUDE.md	has	(T-pitfall 경고는 `all` 로만 꺼진다)
 # F-644 · F-645 — Curate 판정 안내가 검사기의 새 키(premiseCheck · citeExpect)를 이름으로 적는다(안내 없이 검사만 있으면 Lead 가 무엇을 써야 통과하는지 모른다)
 F-644	skills/fz-peer-review/SKILL.md	has	`premiseCheck{how: measured, note}`(그 전제를 잰 방법 — F-644)
 F-645	skills/fz-peer-review/SKILL.md	has	`citeExpect{"path:line": 토큰}`(F-645)

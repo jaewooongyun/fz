@@ -9,16 +9,17 @@ fz 규칙 넷을 문장 대신 도구 호출 자리에서 강제한다(AG 는 �
 | P4 | F-368 · F-384 · F-451 · F-119 · F-553 | `/fz` 뒤 Phase 4 승인 전 쓰기 · Workflow · 쓰는 Bash 를 deny, 승인 없이 끝나는 턴의 Stop 을 1회 block, 질문 없이 긴 답으로 끝낸 턴에 경고 |
 | AG | F-058 · F-119 | fz 세션에서 선택 플러그인 에이전트 3종 · Lead 가 직접 띄우는 fz 에이전트 3종 밖 Agent · Task 를 경고(막지 않음) |
 | FR | F-518 · F-565 | 메모리에 fz 교훈만 쓰고 레지스트리 엔트리가 그 턴에 쓰이지 않은 턴의 Stop 을 1회 block(쓰기 방법 무관 — 파일 시각 · `FZ_FINDINGS_ROOT` 를 준 머신만) |
+| T-pitfall | F-654 · F-673 · F-727 | 근거 명령 뒤 `| head` · 있을지 모르는 경로 글롭 · 맨 바깥 `cd X &&` 를 prompt 마다 꼴별 1회 경고(막지 않음 · fz-guard 설치자만) |
 | GP | F-094 · F-297 | fz-review 턴이 GPT 리뷰 없이 끝나면 Stop 을 1회 block · fz 플러그인 파일에 옛 모델 호칭을 넣는 쓰기를 deny |
 
 ## 구조
-- `hooks/hooks.json` — classic command 훅 넷(UserPromptSubmit · PreToolUse · PostToolUse · Stop) · 전부 `timeout` 10초. PreToolUse 는 Bash 도 받는다 — 쓰지도 GPT 리뷰를 부르지도 않는 Bash 는 상태를 열기 전에 빠져나간다(보호 경로 ask 는 상태 없이 그 앞에서 판정한다). PostToolUse 는 Read 도 받는다 — fz-review SKILL.md 가 아닌 Read 는 상태를 열기 전에 빠져나간다. 시간이 넘으면 호스트가 결정 없이 넘어간다(fail-open)
+- `hooks/hooks.json` — classic command 훅 넷(UserPromptSubmit · PreToolUse · PostToolUse · Stop) · 전부 `timeout` 10초. PreToolUse 는 Bash 도 받는다 — 쓰지도 GPT 리뷰를 부르지도 않는 Bash 는 상태를 열기 전에 빠져나간다(T-pitfall 꼴이 맞은 읽기만 상태 경로로 간다)(보호 경로 ask 는 상태 없이 그 앞에서 판정한다). PostToolUse 는 Read 도 받는다 — fz-review SKILL.md 가 아닌 Read 는 상태를 열기 전에 빠져나간다. 시간이 넘으면 호스트가 결정 없이 넘어간다(fail-open)
 - `hooks/guard.py` — 판정 전부(표준 라이브러리만). matcher 는 거친 필터이고 판정은 guard.py 의 정확한 도구 이름 집합으로 한다
 - `tests/fixtures/*.jsonl` — self-test 의 합성 transcript(entrypoint cli · sdk-cli · 없음)
 
 ## 설치 · 끄기 · 정리
 - 설치는 사용자가 한다(자동 배선 없음). 한 세션만: `claude --plugin-dir <fz 저장소>/mods/fz-guard`. 늘: marketplace 의 `fz-guard` 를 설치한다
-- 끄기(재시작 불필요 · 매 훅 실행에서 확인): env `FZ_GUARD_DISABLE=P4,AG,FR,GP` 또는 `all`, 또는 파일 `${FZ_RUN_STATE:-~/.fz/runs}/fz-guard/disable`(내용 = 끌 규칙 목록 · 비우면 전부). 모르는 값(`1` · `true` 등)이나 읽지 못하는 플래그는 **전부 끄고** `fz-guard diag:` 를 낸다 — 탈출구가 조용히 실패하지 않게. ⛔ env 는 CLI 를 켤 때 값만 훅에 닿는다 — 세션 중 export 로는 끌 수 없다. 세션 중에는 파일 플래그를 쓴다
+- 끄기(재시작 불필요 · 매 훅 실행에서 확인): env `FZ_GUARD_DISABLE=P4,AG,FR,GP` 또는 `all`(T-pitfall 경고는 `all` 로만 꺼진다), 또는 파일 `${FZ_RUN_STATE:-~/.fz/runs}/fz-guard/disable`(내용 = 끌 규칙 목록 · 비우면 전부). 모르는 값(`1` · `true` 등)이나 읽지 못하는 플래그는 **전부 끄고** `fz-guard diag:` 를 낸다 — 탈출구가 조용히 실패하지 않게. ⛔ env 는 CLI 를 켤 때 값만 훅에 닿는다 — 세션 중 export 로는 끌 수 없다. 세션 중에는 파일 플래그를 쓴다
 - 상태: `${FZ_RUN_STATE:-~/.fz/runs}/fz-guard/<session_id>.json` · `.lock`. 플러그인 폴더 안을 가리키면 쓰지 않는다. 지워도 된다 — 지운 뒤 첫 입력 전까지는 STATE-INCOMPLETE 경고만 낸다. 입력마다 마지막 기록이 7일 지난 다른 세션의 상태 · 잠금을 지운다(F-564 · 한 번에 최대 200). 언인스톨해도 이 폴더는 남으니 손으로 지운다
 
 ## 판정
@@ -35,6 +36,7 @@ fz 규칙 넷을 문장 대신 도구 호출 자리에서 강제한다(AG 는 �
 - **FR**: 같은 prompt_id 에서 PostToolUse(쓰기 성공)로 `.claude/projects/*/memory/*.md` 에 fz 교훈 토큰(`fz-` · `F-NNN`)이 든 쓰기가 있고 — 토큰은 마크다운 링크 · 백틱을 지운 본문에서 찾는다(F-565: 링크만 든 MEMORY.md 는 교훈이 아니다) — `fz-findings/entries/F-*.md` 가 그 턴에 쓰이지 않았을 때. 쓰였는지는 둘로 본다: 쓰기 도구의 성공 쓰기(실패한 쓰기는 PostToolUseFailure 라 기록되지 않는다), 없으면 `FZ_FINDINGS_ROOT/entries/` 의 항목 이름(`F-NNN….md`) 파일 시각이 턴 시작(UserPromptSubmit 마다 다시 적는다 · 1초 여유) 이후인지 — 스크립트 · Bash 리다이렉트로 쓴 항목도 센다(앞 5000개 이름만 본다). FR 은 `FZ_FINDINGS_ROOT` 가 있을 때만 돈다 — 공개판 기본은 꺼짐이고, 레지스트리를 쓰는 머신은 CLI 를 띄우는 환경(셸 프로필 · `~/.claude/settings.json` 의 `env`)에 `FZ_FINDINGS_ROOT=<레지스트리 루트>` 를 둬서 켠다. 턴 시작을 못 봤으면 둘째 확인을 못 하므로 막는다. ponytail: 다른 세션이 같은 때 쓴 항목도 이 턴 기록으로 센다(거짓 통과 · 1회 알림이라 거짓 차단보다 낫다)
 - **GP**: `/fz-review` · `/fz:fz-review` · Skill `fz-review` 를 부른 prompt(또는 /fz 창이 연 prompt 에서 `skills/fz-review/SKILL.md` 를 Read 한 prompt — F-094 잔여) 가 `gpt-call.sh review`(Bash) 호출도, 답의 `[외부: GPT]` · `[GPT 미사용 — 사유]` 줄도 없이 끝나면 Stop 을 1회 막는다(interactive 한정 — 자율 · headless 는 면제). Write · Edit 류가 `.claude-plugin/plugin.json` 이름이 `fz` 인 폴더 아래 파일에 옛 모델 호칭을 넣으면 모드와 무관하게 deny 한다 — 판별식 · 제외 · 경계 · 보존 행은 그 저장소의 `scripts/check_gpt_surface.py` 를 불러 그대로 쓰고, 못 부르면 이 판정만 건너뛴다
 - **보호 경로**(F-024): env `FZ_GUARD_PROTECTED`(os.pathsep 구분) · `<상태 폴더>/protected`(줄마다 경로) 가 있으면 그 아래에서 도는 Bash(cwd · `git -C` · 경로 인자 — 앞선 cd · pushd 를 차례로 반영한 위치로도 푼다)와 대상을 모르는 Bash(못 읽는 명령 · 확장이 든 cd · pushd · git -C 대상)를 ask 한다(사유 표시 · P4 deny 를 덮지 않는다). 기본은 비어 있어 아무 일도 없다 · `FZ_GUARD_DISABLE=all` 이면 함께 꺼진다
+- **T-pitfall**(규칙 키 없음): 읽기 조기 반환 앞에서 상태 · 잠금 없이 꼴만 본다 — 맨 위 파이프라인 첫 단계가 근거 명령(grep · egrep · fgrep · rg · ag · ack · find · `git grep`)이고 뒤 단계에 `head` · 따옴표 밖 글롭이 훅 시점 cwd 에서 하나도 맞지 않거나 펼침을 품음 · 서브셸 밖 `cd` · `pushd` 뒤 `&&`. 맞으면 `st['warned']` 키 `pitfall:<prompt_id>:<꼴>` 로 1회 경고한다. 해석 불가 · 오류는 꼴 없음(통과). 끄기는 `FZ_GUARD_DISABLE=all` 뿐이다. 보지 않는 꼴: `| tail` · 근거 명령 밖 `| head`(`ls` · `git log`) · `( grep … ) | head` · 따옴표 · 이스케이프 글롭 · `{}` 펼침 · `~` · 같은 명령 안 `cd` 뒤 상대 글롭
 - 병렬 도구 호출의 PostToolUse 는 동시에 돈다 — 세션별 `flock` 으로 읽기 · 병합 · 판정 · 저장을 직렬화하고 mkstemp + `os.replace` 로 바꾼다. 잠금을 3초(`FZ_GUARD_LOCK_TIMEOUT`) 안에 못 잡으면 진단만 내고 통과한다
 
 ## 한계
@@ -51,7 +53,7 @@ fz 규칙 넷을 문장 대신 도구 호출 자리에서 강제한다(AG 는 �
 - 조직 managed settings 가 사용자 tier 하위 플러그인 훅을 건너뛰면 fz-guard 는 없는 것과 같다 — 라이브에서 훅 발화부터 확인한다
 
 ## 시험
-- `python3 hooks/guard.py --self-test` — 합성 입력 150 케이스(`PASS <case>`) · HOME · FZ_RUN_STATE 를 임시 폴더로 새로 짓는다
+- `python3 hooks/guard.py --self-test` — 합성 입력 153 케이스(`PASS <case>`) · HOME · FZ_RUN_STATE 를 임시 폴더로 새로 짓는다
 - `python3 hooks/guard.py --check-allowlist ../../modules/native-agents.md`
 - `python3 hooks/guard.py --make-synthetic BYTES OUT --with-marker|--no-marker` · `--bench OUT` — 큰 transcript 에서 entrypoint 판정 소요
 - health-check 5.2 가 validate · self-test · allowlist 를 돈다
