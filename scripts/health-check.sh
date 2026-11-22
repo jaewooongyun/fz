@@ -972,7 +972,7 @@ else
   record "fz-compact guard" 1 "⛔ $(printf '%s\n' "$FC_GUARD" | head -2 | tr '\n' ' ')"
 fi
 
-# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 148 케이스) · 허용 목록(채택 표 · Lead 직접 표 == guard 상수).
+# ── 5.2 fz-guard 하위 플러그인 (mods/fz-guard) — validate(claude CLI) · self-test(합성 150 케이스) · 허용 목록(채택 표 · Lead 직접 표 == guard 상수).
 #    self-test 와 허용 목록은 python3 만 써서 CLI 분기 밖에서 돈다. self-test 는 HOME · 상태 폴더를 임시로 새로 짓는다.
 if command -v claude >/dev/null 2>&1; then
   FG_VAL="$(bash "$ROOT/scripts/plugin_validate.sh" "$ROOT/mods/fz-guard" 2>&1)"; FG_VAL_CODE=$?

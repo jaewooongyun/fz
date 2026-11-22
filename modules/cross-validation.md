@@ -380,7 +380,7 @@ printf '%s\n' "{과제 지시}" > "$P"
 위 호출 계약의 GPT 는 대상 저장소와 **같은 디스크**를 본다 — 작업 폴더의 Claude 산출물과 `~/.claude/projects` 로그도 읽을 수 있다. 첫 패스를 Claude 결과와 독립으로 돌려야 할 때(SC-1)는 런처를 쓴다.
 
 - 허용 입력만 격리 폴더에 복사한다 — 요구사항 원문 · 합의 Sprint Contract · PR 메타 · diff · `base/` · `head/` 스냅샷 · 지침 원문 색인 · 소비자 스냅샷. Claude 산출물 이름(`code-context*` · `plan-v*` · `*workflow-result*` · 리뷰 산출물)이나 `~/.claude` 아래 경로 · `--repo` 의 `.claude` · `.fz-work` 아래 경로(링크면 대상 실경로 — 그 실경로가 저장소 자신이거나 저장소 · 홈을 품으면 빼고)가 들어오면 exit 15 다
-- 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` · 격리 폴더의 실제 부모(`${TMPDIR:-/tmp}` 실경로) · 링크인 `~/.claude` 의 대상 실경로는 deny, 격리 폴더(와 `--repo`)만 read 다
+- 읽기는 OS 수준에서 막는다. 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 모델 목록 캐시 사본 · 권한 프로필 · memories 끔) · 가짜 HOME · 래퍼 `--config-permissions` 를 쓰고, 실제 HOME · `/private/tmp` · `/private/var/folders` · 격리 폴더의 실제 부모(`${TMPDIR:-/tmp}` 실경로) · 링크인 `~/.claude` 의 대상 실경로는 deny, 격리 폴더(와 `--repo`)만 read 다
 - rollout 을 전부 감사한다 — HOME deny 가 없거나 금지 경로 · 홈 재귀 검색이 있으면 exit 15 와 `.contaminated` 다. 읽는 대상이 명령에 없는 읽기가 있어 읽기 로그만으로는 "안 읽었다"를 증명할 수 없다 — 감사는 보조다
 - 하위 에이전트는 격리 config(`[agents] enabled = false`)가 끈다(F-436) — 프롬프트의 금지 문장과 감사의 spawn 수 기록은 그대로 둔다
 - 산출은 `<arm>-<run>.json`(`schemas/gpt_independent_{plan,review}_schema.json`) · `.md` · `.audit.json` · `.rollouts/` 다. 호출법은 `modules/fz-gpt-subcommands-aux.md` § independent-plan · independent-review

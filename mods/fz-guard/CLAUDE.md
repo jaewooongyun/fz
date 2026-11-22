@@ -39,7 +39,7 @@ fz 규칙 넷을 문장 대신 도구 호출 자리에서 강제한다(AG 는 �
 
 ## 한계
 - 읽기 표 밖 이름은 읽기만 해도 막힌다 — 승인 전 창에서 읽기용 `python3 -c` · `bash 스크립트` · `xcrun` 도 막힌다. 쓰기 꼴을 나열하던 차단 목록은 라운드마다 새 꼴이 샜다(F-458 · r5) — 과차단 쪽을 골랐다. 실측(최근 transcript 40개의 승인 전 창 Bash 3785건): 옛 판정보다 820건이 더 막히고(python3 448 · bash 89 · claude 58 · mkdir 57 · xcrun 52 …) 풀린 것은 0건이다. 본문이 시키는 필수 명령 단독 꼴은 막히지 않는다
-- 펼쳐지는 인자(`"$W/a"` · `$SHA`)는 값으로 본다(print · gate_check.py `--status` 판정 밖 — 그 둘은 옵션이 설 수 있는 자리의 펼침을 거절한다) — 펼친 값이 옵션이 되는 꼴(`X=--output=f; git diff $X`)은 보지 않는다(find · sort · git · rg · gh 에서 따옴표 없는 펼침까지 미상으로 두면 승인 전 창 3785건 중 막힘이 1746 → 1995~2106 으로 는다 — 실측). 프로그램 · 하위 명령 자리의 펼침(`awk "$P"` · `git "$SUB"`)과 따옴표 없이 갈라지는 uniq 피연산자는 미상이다. 읽기 꼴 판정은 허용 목록이라 표 밖 옵션은 미상이다(awk 프로그램의 정규식 · 문자열 리터럴 안 `|` 는 파이프가 아니다 · 나눗셈 · print 뒤 `/` 는 리터럴로 보지 않는다 — 그 `/` 뒤에 리터럴이 다시 열리거나 정규식이 대괄호 안 `/` 에서 끝나면 경계를 정하지 못해 원문의 `|` 로 판정한다)
+- 펼쳐지는 인자(`"$W/a"` · `$SHA`)는 값으로 본다(print · gate_check.py `--status` 판정 밖 — 그 둘은 옵션이 설 수 있는 자리의 펼침(따옴표 밖 중괄호 펼침 · 글롭 포함)을 거절한다) — 펼친 값이 옵션이 되는 꼴(`X=--output=f; git diff $X`)은 보지 않는다(find · sort · git · rg · gh 에서 따옴표 없는 펼침까지 미상으로 두면 승인 전 창 3785건 중 막힘이 1746 → 1995~2106 으로 는다 — 실측). 프로그램 · 하위 명령 자리의 펼침(`awk "$P"` · `git "$SUB"`)과 따옴표 없이 갈라지는 uniq 피연산자는 미상이다. 읽기 꼴 판정은 허용 목록이라 표 밖 옵션은 미상이다(awk 프로그램의 정규식 · 문자열 리터럴 안 `|` 는 파이프가 아니다 · 나눗셈 · print 뒤 `/` 는 리터럴로 보지 않는다 — 그 `/` 뒤에 리터럴이 다시 열리거나 정규식이 대괄호 안 `/` 에서 끝나면 경계를 정하지 못해 원문의 `|` 로 판정한다)
 - 토크나이저가 bash 와 같게 읽는다고 보증하지 못하는 꼴(산술 치환 안 명령 치환 · `case` 를 품은 치환 · 배열 대입 · 이스케이프가 든 `$'…'` · `$"…"` 등 — 정본 `scripts/shell_tokens.py` 의 `OUTSIDE`)은 Unknown 이다. Unknown 은 대상 미상 쓰기로 읽으므로 P4 창 안에서는 읽기 명령이어도 막힌다(과차단 · 놓침 0 쪽으로 기운다). P4 는 `case … esac` 복합문만 if 갈래로 펴서 다시 읽는다(위 Bash 쓰기 — Stop 훅의 원장 소유 판정은 지금처럼 Unknown)
 - GPT 리뷰 증거(GP)는 명령 이름이 따옴표 밖에서 펼쳐져도(`$P/scripts/gpt-call.sh review`) basename 으로 호출을 인정한다 — 값에 공백이 있으면 셸이 필드를 나눠 다른 명령을 실행한다(`X='printf ignored'; $X/gpt-call.sh review` · r6 ISSUE-011). 가장 좁은 규칙(이름의 따옴표 밖 펼침 거절)도 실제 호출을 막는다 — 실측(transcript 117개 · 판정기가 인정한 review 호출 122건): 따옴표 밖 펼침 35 · 큰따옴표로 감싼 펼침 59 · 펼침 없음 28
 - 오라클 경계(F-582): 계약(렉싱 · 명령 자리 · 읽기 표 · 대상 · 원장 소유 · GPT 호출 증거 · JS 렉심)은 bash · JS 의 동작 전체를 말하지만 오라클은 표본이다 — 토크나이저 규칙마다 셀 하나(`--list-rules` · 제거 probe)와 지적마다 처분 셀. 표본 밖 입력이 실제 동작과 갈리는 꼴은 적대 검토가 찾을 때마다 처분 셀 또는 이 절의 한계로 닫는다
@@ -51,7 +51,7 @@ fz 규칙 넷을 문장 대신 도구 호출 자리에서 강제한다(AG 는 �
 - 조직 managed settings 가 사용자 tier 하위 플러그인 훅을 건너뛰면 fz-guard 는 없는 것과 같다 — 라이브에서 훅 발화부터 확인한다
 
 ## 시험
-- `python3 hooks/guard.py --self-test` — 합성 입력 148 케이스(`PASS <case>`) · HOME · FZ_RUN_STATE 를 임시 폴더로 새로 짓는다
+- `python3 hooks/guard.py --self-test` — 합성 입력 150 케이스(`PASS <case>`) · HOME · FZ_RUN_STATE 를 임시 폴더로 새로 짓는다
 - `python3 hooks/guard.py --check-allowlist ../../modules/native-agents.md`
 - `python3 hooks/guard.py --make-synthetic BYTES OUT --with-marker|--no-marker` · `--bench OUT` — 큰 transcript 에서 entrypoint 판정 소요
 - health-check 5.2 가 validate · self-test · allowlist 를 돈다

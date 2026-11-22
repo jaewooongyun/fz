@@ -349,7 +349,7 @@ CHOICE_FIX="이 세션의 GPT 호출은 --model config --effort config 로 부�
 #    '사용자 선택' 으로 잘못 적지 않는 순서이기도 하다.
 [ -n "$MODEL_SET" ] && [ "$MODEL" = "off" ] && gpt_off "플래그" "--model off"
 command -v codex >/dev/null 2>&1 || gpt_off "CLI 없음" "GPT CLI 가 PATH 에 없다"
-# ⛔ 모델 목록 캐시는 읽지 않는다 — 독립 런처는 격리 CODEX_HOME(캐시 없음)에서 래퍼를 띄운다. 모델별 검증은 gpt-choice.sh set 한 곳이 한다.
+# ⛔ 모델 목록 캐시는 읽지 않는다 — 독립 런처는 격리 CODEX_HOME(실제 CLI 홈에 캐시가 없으면 캐시 없음)에서 래퍼를 띄운다. 모델별 검증은 gpt-choice.sh set 한 곳이 한다.
 if [ -z "$MODEL_SRC" ] || [ -z "$EFFORT_SRC" ]; then
   CHOICE_ERR="$(mktemp "${TMPDIR:-/tmp}/fz-gpt-choice.XXXXXX" 2>/dev/null)" || die 11 "선택 판독용 임시 파일을 만들지 못했다(TMPDIR='${TMPDIR:-}')"
   CHOICE_OUT="$(bash "$(dirname "$0")/gpt-choice.sh" get 2> "$CHOICE_ERR")"; CHOICE_RC=$?

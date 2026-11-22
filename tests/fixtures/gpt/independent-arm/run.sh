@@ -551,6 +551,39 @@ CSID=arm-sel run sel "$HERE/sample-plan-ok.json" "$T/r-ok.jsonl" plan --requirem
 check "세션 선택(임시 실제 홈 .fz/gpt-choice): exit 0" "$(rc sel)" 0
 check "세션 선택: argv 에 선택 모델 · effort(-c 뒤) · 그 둘뿐" "$(argc sel 'model="m-sel"')|$(argc sel 'model_reasoning_effort=low')|$(leak sel)" "1|1|2"
 check "세션 선택: 런처 stderr GPT-CHOICE (session)" "$(gline sel)" "GPT-CHOICE model=m-sel (session) effort=low (session)"
+# ⑭b 이전 선택(.last) × 선택 폴더 쓰기 불가 — 래퍼의 get 은 세션 파일을 쓰지 못해도 .last 를 내지만 그 모델이 모델 목록 캐시에 있을 때만이다.
+#     래퍼는 격리 CODEX_HOME 에서 돈다 — 실제 CLI 홈의 캐시가 격리 홈에 사본으로 있어야 .last 가 이어진다. 실제 CLI 홈에 캐시가 없으면 지금처럼 config 다.
+#     셀마다 실제 홈을 따로 둔다(공유 홈 $H 에 .last 를 두면 뒤 셀의 config 가 바뀐다) · 자율 판정(FZ_AUTONOMY)은 셀 안에서 지운다(자율이면 .last 를 보지 않는다)
+lastrun() {   # $1=셀 · $2=실제 CLI 홈의 모델 목록 캐시(1 = m-last 를 싣는다 · 0 = 없음) → 실제 홈 $T/home-<셀>(인증 · config m-test · medium · .last m-last · high)
+  local h="$T/home-$1"; mkdir -p "$h/.codex" "$h/.fz/gpt-choice"
+  cp "$H/.codex/auth.json" "$H/.codex/config.toml" "$h/.codex/"
+  [ "$2" = 0 ] || printf '%s\n' '{"models": [{"slug": "m-last", "visibility": "list", "default_reasoning_level": "high", "supported_reasoning_levels": [{"effort": "high"}]}]}' > "$h/.codex/models_cache.json"
+  printf 'model=m-last\neffort=high\n' > "$h/.fz/gpt-choice/.last"
+  ( HREAL="$(cd "$h" && pwd -P)"; roll "$T/r-$1.jsonl" 1 "cat requirement.md" )   # 감사의 홈 deny 는 그 셀의 실제 홈 기준이다
+  chmod 0555 "$h/.fz/gpt-choice"
+  ( unset FZ_AUTONOMY; CSID="arm-$1" HOMEX="$h" run "$1" "$HERE/sample-plan-ok.json" "$T/r-$1.jsonl" plan --requirement "$IN/requirement.md" --keep-iso )
+  chmod 0755 "$h/.fz/gpt-choice"
+}
+isocache() {   # $1=격리 폴더 · $2=실제 홈 — 격리 홈의 캐시: copy(링크 아닌 파일 · 내용 같음) · none · link · differ · no-iso(격리 폴더가 없다)
+  local f="$1/gpt-home/models_cache.json"
+  if [ -z "$1" ] || [ ! -d "$1/gpt-home" ]; then echo no-iso; elif [ -L "$f" ]; then echo link; elif [ ! -e "$f" ]; then echo none; elif cmp -s "$f" "$2/.codex/models_cache.json"; then echo copy; else echo differ; fi
+}
+lastrun last 1
+LISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-last/env.txt")"
+check "last-choice-iso-cache — 실제 CLI 홈 캐시에 .last 모델 · 선택 폴더 쓰기 불가 → exit 0 · argv 에 .last 모델 · effort · GPT-CHOICE (session) · 격리 홈 캐시 사본 · 세션 파일 없음" \
+  "$(rc last)|$(argc last 'model="m-last"')|$(argc last 'model_reasoning_effort=high')|$(gline last)|$(isocache "$LISO" "$T/home-last")|$(ls "$T/home-last/.fz/gpt-choice")" \
+  "0|1|1|GPT-CHOICE model=m-last (session) effort=high (session)|copy|"
+[ -n "$LISO" ] && bash "$L" cleanup --iso "$LISO" >/dev/null 2>&1
+lastrun lastnc 0
+LISO="$(sed -n 's/^CODEX_HOME=\(.*\)\/gpt-home$/\1/p' "$T/c-lastnc/env.txt")"
+check "last-choice-iso-nocache — 실제 CLI 홈에 캐시 없음 · .last · 선택 폴더 쓰기 불가 → 지금처럼 config(argv 에 모델 · effort 0 · GPT-CHOICE config) · 격리 홈 캐시 없음" \
+  "$(rc lastnc)|$(leak lastnc)|$(gline lastnc)|$(isocache "$LISO" "$T/home-lastnc")" "0|0|GPT-CHOICE model=m-test (config) effort=medium (config)|none"
+[ -n "$LISO" ] && bash "$L" cleanup --iso "$LISO" >/dev/null 2>&1
+# iso 하위 명령도 같은 make_iso 다 — 캐시가 있는 실제 CLI 홈이면 사본 · 없으면 없음
+KISO="$(env -u CODEX_HOME HOME="$T/home-last" bash "$L" iso 2>/dev/null)"; KISO_NC="$(env -u CODEX_HOME HOME="$T/home-lastnc" bash "$L" iso 2>/dev/null)"
+check "last-choice-iso-subcommand-cache — iso 하위 명령: 실제 CLI 홈 캐시 → 격리 홈 사본 · 캐시 없음 → 없음" \
+  "$(isocache "$KISO" "$T/home-last")|$(isocache "$KISO_NC" "$T/home-lastnc")" "copy|none"
+for d in "$KISO" "$KISO_NC"; do [ -n "$d" ] && bash "$L" cleanup --iso "$d" >/dev/null 2>&1; done
 run eff "$HERE/sample-review-ok.json" "$T/r-ok.jsonl" review --diff "$IN/diff.patch" --effort max
 check "--effort 명시 · review: exit 0 · 그대로 전달 · 모델 0" "$(rc eff)|$(argc eff 'model_reasoning_effort=max')|$(leak eff)" "0|1|1"
 check "--effort 명시: GPT-CHOICE (config · flag)" "$(gline eff)" "GPT-CHOICE model=m-test (config) effort=max (flag)"

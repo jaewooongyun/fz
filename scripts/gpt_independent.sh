@@ -5,7 +5,7 @@
 # ⛔ 왜: Claude 워크플로가 병렬로 도는 동안 런타임이 ~/.claude/projects 에 로그를 쓰고, 작업 폴더에는 Claude 산출물이 쌓인다.
 #    시간 격리는 성립하지 않는다. 읽기 로그로 "안 읽었다"를 증명할 수도 없다(S11 ⑥ 반례 — `sh show.sh` 는 읽는 대상이 명령에 없다).
 #    그래서 읽기 자체를 OS 수준에서 막는다(S11 ⑦ · ⑨ · ⑩):
-#      격리 CODEX_HOME(인증 링크 · gpt-skills **사본** · 권한 프로필 · memories 끔) + 가짜 HOME(사용자 전역 스킬 폴더 차단)
+#      격리 CODEX_HOME(인증 링크 · gpt-skills **사본** · 모델 목록 캐시 사본(실제 CLI 홈에 있을 때) · 권한 프로필 · memories 끔) + 가짜 HOME(사용자 전역 스킬 폴더 차단)
 #      + 래퍼 --config-permissions(sandbox_mode 가 프로필을 덮지 않게 · F-348)
 #    rollout 감사는 격리가 실제로 걸렸는지와 시도를 보는 보조 확인이다.
 #
@@ -87,6 +87,9 @@ make_iso() {
   ISO="$(cd "$ISO_TMP" && pwd -P)" || die 11 "격리 폴더 경로 해석 실패: $ISO_TMP"
   mkdir -p "$ISO/gpt-home/skills" "$ISO/home" "$ISO/input" || die 11 "격리 폴더 구성 실패"
   ln -s "$REAL_GPT_HOME/auth.json" "$ISO/gpt-home/auth.json" || die 11 "인증 링크 실패"   # ⛔ 인증은 링크만 — 내용을 복사하지 않는다
+  # 모델 목록 캐시 — 래퍼의 gpt-choice.sh get 은 선택 파일을 쓰지 못한 세션에서 이전 선택(.last)을 이 폴더의 캐시로 확인한다. 없으면 사용자의
+  #   선택 대신 config 로 돈다. 실제 CLI 홈에 캐시가 없으면 두지 않는다(지금처럼 config). ⛔ 사본 — 링크가 아니다(스킬처럼 · 격리 CLI 가 받은 목록을 다시 써도 실제 홈 파일은 그대로다)
+  if [ -f "$REAL_GPT_HOME/models_cache.json" ]; then cp "$REAL_GPT_HOME/models_cache.json" "$ISO/gpt-home/models_cache.json" || die 11 "모델 목록 캐시 사본 실패"; fi
   for s in "$PLUGIN_ROOT"/gpt-skills/fz-*; do cp -R "$s" "$ISO/gpt-home/skills/" || die 11 "스킬 사본 실패: $s"; done   # ⛔ 사본 — HOME 아래 링크 대상은 샌드박스에서 안 읽힌다
   REPO_REAL=""; [ -n "$REPO" ] && REPO_REAL="$(cd "$REPO" && pwd -P)"
   CD="$ISO/input"; case "$MODE" in plan|iso) [ -n "$REPO_REAL" ] && CD="$REPO_REAL" ;; esac

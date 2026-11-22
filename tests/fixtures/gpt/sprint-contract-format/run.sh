@@ -143,7 +143,7 @@ sha() { python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"r
 if [ "$LIVE" -eq 1 ]; then
   bash "$FIXTURE/build-repo.sh" "$T/repo" >/dev/null 2>&1 || { echo "UNRUN: fixture 저장소 복원 실패"; exit 2; }
   mkdir -p "$REC"
-  # 격리 — 독립 런처와 같은 한 벌(gpt_independent.sh iso): 가짜 HOME · 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 권한 프로필) ·
+  # 격리 — 독립 런처와 같은 한 벌(gpt_independent.sh iso): 가짜 HOME · 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 모델 목록 캐시 사본 · 권한 프로필) ·
   #   저장소 사본 read · 플러그인 트리 deny(옛 기록 recorded/ 가 새 기록으로 새지 않게). 래퍼는 --config-permissions 로 sandbox_mode 를 넘기지 않는다.
   #   ⛔ 가짜 HOME 이면 래퍼의 선택 폴더가 격리 홈 아래로 바뀐다 — 런처처럼 실제 홈 기준 선택 폴더를 명시로 넘긴다
   REPO_DIR="$(cd "$T/repo" && pwd -P)"

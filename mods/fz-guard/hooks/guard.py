@@ -37,7 +37,7 @@ transcript 에서는 굳은 사실 하나만 읽는다: 첫 줄들의 entrypoint
 
 모드
   (인자 없음)                훅 — stdin JSON 하나 → stdout 결정 JSON(없으면 빈 출력) · exit 0
-  --self-test                합성 입력 148 케이스 — `PASS <case>` 줄
+  --self-test                합성 입력 150 케이스 — `PASS <case>` 줄
   --check-allowlist FILE     native-agents.md 채택 표 == ALLOW_AGENTS · Lead 직접 표 == LEAD_DIRECT_AGENTS 인가
                              (0 일치 · 1 불일치 — Lead 직접 표 없음 포함 · 2 채택 표 없음)
   --make-synthetic BYTES OUT --with-marker|--no-marker   큰 transcript 합성(첫 줄들에 entrypoint 를 둘지)
@@ -269,7 +269,7 @@ def _gpt_call_in(cmds) -> bool:
 # 옵션은 따옴표와 무관하게 옵션이다(`'-i'` 도 프로그램에는 -i). 펼쳐지는 인자(`"$W/a"` · `$SHA`)는 값(경로 · 리비전 · 줄 번호)으로 본다 —
 # ponytail: 펼친 값이 옵션이 되는 꼴(`X=--output=f; git diff $X`)은 만든 꼴이라 보지 않는다. 프로그램 · 하위 명령 자리의 펼침은 거절한다.
 # 이 값 규칙은 print · PLUGIN_READ 의 gate_check.py 판정에는 없다 — 그 둘은 옵션이 설 수 있는 자리(print 는 `--` · 첫 글자 그대로의
-# 피연산자 앞, gate_check.py 는 `--status` 뒤 원장 자리)의 펼침을 거절한다
+# 피연산자 앞, gate_check.py 는 `--status` 뒤 원장 자리)의 펼침(따옴표 밖 중괄호 펼침 · 글롭 포함 — _literal_view)을 거절한다
 _EXPANSION = re.compile(r"\$\{[^{}]*\}|\$\((?:[^()]|\([^()]*\))*\)|`[^`]*`|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9?#@*$!-]")
 
 
@@ -646,9 +646,39 @@ def _gh_reads(args) -> bool:
     return a in GH_READ and (GH_READ[a] is None or (len(pos) > 1 and pos[1].text in GH_READ[a]))
 
 
+# 따옴표 · 이스케이프 밖이면 셸이 프로그램을 띄우기 전에 한 단어를 여러 낱말로 펴는 글자 — 중괄호 펼침(`{a,b}` · `{1..3}`)과 글롭(`*` · `?` · `[`).
+#   토크나이저의 expands 는 매개변수 · 명령 · 산술 · 프로세스 치환만 센다
+SPLITS = re.compile(r"[{*?\[]")
+
+
+def _splits(w, src: str) -> bool:
+    """단어에 따옴표 · 이스케이프 밖 SPLITS 글자가 있는가. 따옴표가 없는 단어는 글자로 바로 판정한다. 토크나이저의 quoted 는 단어 어딘가에
+    따옴표가 있다는 표시뿐이라(`""{a,b}` 도 quoted) 따옴표가 든 단어는 원문 조각(src[start:end])을 인자 자리에서 다시 읽어 그 글자마다 따옴표
+    구간인지 본다(shell_tokens.in_quotes). 원문 조각이 같은 단어로 다시 읽히지 않으면 편다고 본다 — 백틱 · heredoc 본문 안 단어의 좌표는 그 안 글
+    기준이다."""
+    if not SPLITS.search(w.text):
+        return False
+    if not w.quoted:
+        return True
+    raw = ": " + src[w.start:w.end]
+    toks = shell_tokens.lex(raw)
+    if shell_tokens.is_unknown(toks) or len(toks) != 2 or not isinstance(toks[1], shell_tokens.Word) or toks[1].text != w.text:
+        return True
+    return any(shell_tokens.in_quotes(raw, m.start()) is not True for m in SPLITS.finditer(raw))
+
+
+def _literal_view(args, src: str) -> list:
+    """옵션이 설 수 있는 자리에 글자 그대로의 단어만 받는 판정(zsh print · PLUGIN_READ 의 gate_check.py)에 넘길 인자 — 따옴표 밖 중괄호 ·
+    글롭 단어(_splits)는 펼치는 단어(expands)로 바꾼다. 셸이 그 단어를 여러 낱말로 펴면 옵션 · 인자 수가 바뀐다(`print {-v,answer,hi}` →
+    print -v answer hi · `--status {--set-state,active,gates/plan.md}` → 원장 대신 --set-state). PLUGIN_READ 의 하위 명령 글자 비교도 이것을
+    받지만 표의 글자에 그 글자가 없어 결과가 같다. READ 의 다른 판정은 c.args 를 그대로 받는다(펼친 인자는 값이다 — 위 읽기 표 머리)."""
+    return [w._replace(expands=True) if not w.expands and _splits(w, src) else w for w in args]
+
+
 def _print_reads(args) -> bool:
     """zsh print — 옵션이 -r · -n · -l(묶음 포함) · -- 뿐이다. `--` 뒤 · 첫 글자 그대로의 피연산자부터는 값이다(뒤 펼침도 값).
-    그 앞의 펼쳐지는 단어(`"$O"` · `${O}` · `$(…)` · 백틱 · `-$O`)는 옵션이 될 수 있어 거절한다(`O=-v` → 변수에 쓴다 · 빈 값은 사라진다).
+    그 앞의 펼쳐지는 단어(`"$O"` · `${O}` · `$(…)` · 백틱 · `-$O` · 따옴표 밖 중괄호 · 글롭 `{-v,a}` · `*` — _literal_view)는 옵션이 될 수 있어
+    거절한다(`O=-v` → 변수에 쓴다 · 빈 값은 사라진다).
     -s · -z · -u · -p · -S · -v 같은 표 밖 옵션 · 홀로 선 `-` 는 거절한다(히스토리 · 편집 버퍼 · 다른 fd 에 쓴다).
     세션 셸이 zsh 일 때만 읽기다 — 훅이 보는 신호는 SHELL 환경 변수의 basename 하나다(휴리스틱: Bash 도구가 실제로 띄우는 셸은 보지 못한다).
     그 밖(bash · sh · 빈 값 · 없음)이면 print 는 PATH 의 다른 프로그램일 수 있어(mailcap 의 print 동작 등) 표 밖 이름처럼 거절한다."""
@@ -679,7 +709,7 @@ READ.update({"sed": _sed_reads, "awk": _awk_reads, "find": _find_reads, "sort": 
              "base64": lambda a: not any(w.text.startswith(("-o", "--output")) for w in a)})
 # 승인 전 창에서 부르는 플러그인 스크립트 — 읽기만 하거나 플러그인 자기 상태(~/.fz)만 쓴다. 이름: 받는 하위 명령(None = 전부) |
 #   판정 함수(인자 → 읽기 꼴인가). gate_check.py 는 `--status <원장>`(파싱만 · CHECK 미실행)만 읽기다 — 다른 인자는 원장을 쓸 수 있다.
-#   원장은 펼침 없는 글자 그대로다(펼친 값은 옵션 하나 · 여럿이 될 수 있다) · 판정 함수 꼴은 앞에 환경 대입 · env 래퍼가 없을 때만(_plugin_reads)
+#   원장은 펼침(따옴표 밖 중괄호 펼침 · 글롭 포함) 없는 글자 그대로다(펼친 값은 옵션 하나 · 여럿이 될 수 있다) · 판정 함수 꼴은 앞에 환경 대입 · env 래퍼가 없을 때만(_plugin_reads)
 PLUGIN_READ = {"gpt-choice.sh": {"get", "decide", "options"}, "autonomy_decide.py": None, "mode_gate.py": None, "intent_route_probe.py": None,
                "gate_check.py": lambda a: len(a) == 2 and a[0].text == "--status" and not a[1].expands and not a[1].text.startswith("-")}
 MOVERS = {"cd", "pushd", "popd"}
@@ -895,7 +925,8 @@ def write_sites(cmd, fragment=False, known=()):
         if c.name is None:
             continue
         n = os.path.basename(c.name.text)
-        if c.name.text.startswith("((") or _plugin_reads(n, c.name, c.args, "env" in c.via or id(c.name) in assigned):
+        lit = _literal_view(c.args, cmd)           # PLUGIN_READ · print 판정이 받는다 — 따옴표 밖 중괄호 · 글롭 단어도 펼침이다
+        if c.name.text.startswith("((") or _plugin_reads(n, c.name, lit, "env" in c.via or id(c.name) in assigned):
             continue                               # 산술 명령(안의 치환은 토크나이저가 거절한다) · 승인 전 창 플러그인 스크립트
         if c.name.expands:
             out.append((None, c))                  # `$CMD x` — 무엇을 실행하는지 모른다
@@ -904,7 +935,7 @@ def write_sites(cmd, fragment=False, known=()):
         after = n in known or (n in ends and runs_at.get(id(c.name), c.name.start) >= ends[n])
         after = after or id(c.name) in selfc       # 본문 안 맨 이름 자기 호출 — 정의가 끝나기 전 자리지만 그 함수가 불릴 때만 돈다
         rule = True if after and not c.via and "/" not in c.name.text else READ.get(n)
-        if rule is True or (rule is not None and rule(c.args)):
+        if rule is True or (rule is not None and rule(lit if rule is _print_reads else c.args)):
             continue
         ws = _write_targets(n, c.args) if n in WRITE_ARGS and "xargs" not in c.via else None
         out += [(None, c)] if ws is None else [(w, c) for w in ws]
@@ -2416,6 +2447,20 @@ def self_test() -> int:
              "쓰기 · `--` 뒤 · 첫 피연산자 뒤 펼침은 값이라 읽기", not bad, bad)
 
     @cell
+    def rp_k01_print_brace_glob():
+        # 따옴표 밖 중괄호 · 글롭은 셸이 print 를 띄우기 전에 여러 낱말로 편다(`print {-v,answer,hi}` → print -v answer hi — 변수에 쓴다).
+        #   토크나이저의 quoted 는 단어 어딘가에 따옴표가 있다는 표시라 `""{…}` 처럼 일부만 따옴표인 단어도 편다
+        brace = ["print {-v,answer,hi}", 'print ""{-v,answer,hi}', "print -r {-v,x}", "print {1..3}", 'echo $(print ""{-v,a,b})',
+                 'echo `print ""{-v,a,b}`']
+        glob = ["print *", "print -n gates/*.md", "print ?", "print [-]v x", 'print "gates/"*.md']
+        reads = ["print '{-v,a}'", 'print "{-v,a}"', "print \\{-v,a\\}", "print '{'-v,a'}'", 'print "hello"', "print '*'", 'print "gates/*.md"',
+                 "print \\*", "print hello {-v,x}", "print -- {-v,x}", "print -r -- gates/*.md"]   # 따옴표 · 이스케이프 안 · `--` · 첫 피연산자 뒤는 값
+        with login_shell("/bin/zsh"):
+            bad = [c for c in brace + glob if bash_write(c) != (True, [])] + [c for c in reads if bash_write(c) != (False, [])]
+        case("rp-k01-print-brace-glob — zsh print 의 `--` · 첫 글자 그대로의 피연산자 앞 따옴표 밖 중괄호 펼침 · 글롭(일부만 따옴표인 단어 · 치환 안 포함)은 "
+             "옵션이 될 수 있어 쓰기 · 따옴표 · 이스케이프 안 글자 · `--` 뒤 · 첫 피연산자 뒤는 읽기", not bad, bad)
+
+    @cell
     def rp_g05_print_zsh_only():
         got = []
         for sh in ("/bin/zsh", "/usr/local/bin/zsh", "/bin/bash", "/bin/sh", "", None):
@@ -2489,6 +2534,19 @@ def self_test() -> int:
         bad = [c for c in writes if bash_write(c) != (True, [])] + [c for c in reads if bash_write(c) != (False, [])]
         case("rp-g01-gate-status-expansion — gate_check.py --status 뒤 원장 자리의 펼침(`$ARGS` · \"$L\" · ${L} · $(…) · 백틱 · \"$W/…\")은 옵션이 될 수 "
              "있어 쓰기 · 글자 그대로의 원장만 읽기(스크립트 경로의 펼침은 그대로 받는다)", not bad, bad)
+
+    @cell
+    def rp_k01_gate_status_brace_glob():
+        # 원장 자리의 따옴표 밖 중괄호 · 글롭은 셸이 여러 낱말로 편다(`{--set-state,active,gates/plan.md}` → --set-state active gates/plan.md)
+        g = "python3 scripts/gate_check.py --status"
+        brace = [f"{g} {{--set-state,active,gates/plan.md}}", f'{g} ""{{--set-state,active,gates/plan.md}}', f"{g} gates/{{plan,b}}.md",
+                 f"{g} {{1..2}}"]
+        glob = [f"{g} gates/*.md", f"{g} gates/plan.m?", f"{g} gates/[p]lan.md", f'{g} "gates/"*.md']
+        reads = [f"{g} '{{--set-state,active}}'", f'{g} "{{--set-state,active}}"', f"{g} \\{{--set-state,active\\}}", f"{g} gates/plan.md",
+                 f"{g} 'gates/*.md'", f"{g} gates/\\*.md"]
+        bad = [c for c in brace + glob if bash_write(c) != (True, [])] + [c for c in reads if bash_write(c) != (False, [])]
+        case("rp-k01-gate-status-brace-glob — gate_check.py --status 뒤 원장 자리의 따옴표 밖 중괄호 펼침 · 글롭(일부만 따옴표인 단어 포함)은 원장이 여럿 · "
+             "옵션이 될 수 있어 쓰기 · 따옴표 · 이스케이프 안 글자와 글자 그대로의 원장은 읽기", not bad, bad)
 
     @cell
     def rp_g04_gate_status_env():

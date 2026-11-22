@@ -205,7 +205,7 @@ def config_top(path):
 
 
 if mode == "config":
-    # ⛔ 캐시를 열기 전에 끝낸다 — 래퍼는 격리 CODEX_HOME(캐시 없음)에서도 GPT-CHOICE 줄에 config 값을 적는다
+    # ⛔ 캐시를 열기 전에 끝낸다 — 래퍼는 격리 CODEX_HOME(캐시가 없을 수 있다)에서도 GPT-CHOICE 줄에 config 값을 적는다
     top_model, top_effort = config_top(cfg)
     print(f"model={top_model} effort={top_effort}")
     sys.exit(0)
