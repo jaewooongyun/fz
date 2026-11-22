@@ -21,6 +21,8 @@
 #   toolstate-skill-notice                frontmatter allowed-tools 에 선택 도구(Serena · context7 · sequential-thinking)가 있는
 #                                          스킬마다 `선택 도구 상태` 줄이 형식 모듈 경로를 같이 적고, 꼬리 문법은 그 모듈 한 곳에만 있다
 #                                          (다른 modules · SKILL.md 에 사본이 있으면 FAIL)
+#   toolstate-format-copy-partial         꼬리 문법 토큰 다섯 가운데 하나만 · 뒷부분(seq · pr-review · 스택 스킬)만 베낀 사본도
+#                                          정본 밖 modules · SKILL.md 에서 형식사본으로 잡고 정본 자리는 잡지 않는다
 # exit: 0 통과 · 1 단언 실패 · 3 준비 실패
 set -uo pipefail
 
@@ -107,11 +109,41 @@ for f in "$ROOT"/skills/*/SKILL.md; do
   grep -F '선택 도구 상태' "$f" | grep -qF "$FMT" || miss="$miss $(basename "$(dirname "$f")")"
 done
 grep -qF 'context7 목록✓|목록✗ · sc 목록✓|목록✗ · seq 목록✓|목록✗ · pr-review 목록✓|목록✗ · 스택 스킬 <이름, …>|없음' "$ROOT/$FMT" || miss="$miss $FMT(꼬리 문법 없음)"
-for f in "$ROOT"/modules/*.md "$ROOT"/skills/*/SKILL.md; do
-  [ "$f" = "$ROOT/$FMT" ] && continue
-  grep -qF 'context7 목록✓|목록✗ · sc 목록✓|목록✗' "$f" && miss="$miss 형식사본:${f#"$ROOT"/}"
-done
+# 꼬리 문법 토큰 — 공통 앞부분(context7 · sc)만 찾으면 뒷부분만 떼어 베낀 사본이 빠지므로 토큰마다 따로 찾는다
+TOK=('context7 목록✓|목록✗' 'sc 목록✓|목록✗' 'seq 목록✓|목록✗' 'pr-review 목록✓|목록✗' '스택 스킬 <이름, …>|없음')
+copies() {   # $1 트리 → 정본($FMT) 밖 modules · SKILL.md 가운데 꼬리 문법 토큰을 하나라도 품은 파일마다 ` 형식사본:<트리 기준 경로>`
+  local f t
+  for f in "$1"/modules/*.md "$1"/skills/*/SKILL.md; do
+    [ -f "$f" ] || continue
+    [ "$f" = "$1/$FMT" ] && continue
+    for t in "${TOK[@]}"; do
+      grep -qF "$t" "$f" && { printf ' 형식사본:%s' "${f#"$1"/}"; break; }
+    done
+  done
+}
+miss="$miss$(copies "$ROOT")"
 if [ "$n" -gt 0 ] && [ -z "$miss" ]; then echo "PASS  toolstate-skill-notice  (스킬 $n)"
 else echo "FAIL  toolstate-skill-notice  — 선택 도구 스킬 $n · 고지 줄(형식 $FMT)이 없다:$miss"; rc=1; fi
+
+# 토큰 부분집합(하나씩 다섯 · 뒷부분 연속 · 전체) × 위치(modules · skills · 정본 자리) — 정본 밖 두 곳만 사본으로 센다
+fail=""
+want=" 형식사본:modules/x.md 형식사본:skills/s/SKILL.md"
+for k in c7 sc seq pr stack back full none; do
+  case "$k" in
+    c7) s='context7 목록✓|목록✗' ;;
+    sc) s='sc 목록✓|목록✗' ;;
+    seq) s='seq 목록✓|목록✗' ;;
+    pr) s='pr-review 목록✓|목록✗' ;;
+    stack) s='스택 스킬 <이름, …>|없음' ;;
+    back) s='seq 목록✓|목록✗ · pr-review 목록✓|목록✗ · 스택 스킬 <이름, …>|없음' ;;
+    full) s='context7 목록✓|목록✗ · sc 목록✓|목록✗ · seq 목록✓|목록✗ · pr-review 목록✓|목록✗ · 스택 스킬 <이름, …>|없음' ;;
+    none) s="선택 도구 상태 — 형식은 $FMT" ;;   # 대조군 — 형식 모듈 경로만 적은 고지 줄은 사본이 아니다
+  esac
+  rm -rf "$T/fmt" && mkdir -p "$T/fmt/modules" "$T/fmt/skills/s" || exit 3
+  for p in "$FMT" modules/x.md skills/s/SKILL.md; do printf '꼬리: %s\n' "$s" > "$T/fmt/$p"; done
+  got=$(copies "$T/fmt")
+  if [ "$k" = none ]; then [ -z "$got" ] || fail="$fail $k=[$got]"; else [ "$got" = "$want" ] || fail="$fail $k=[$got]"; fi
+done
+cell toolstate-format-copy-partial "$fail"
 [ "$rc" = 0 ] && echo "EVIDENCE_PROFILES_OK"
 exit "$rc"

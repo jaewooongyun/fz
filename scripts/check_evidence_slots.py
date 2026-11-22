@@ -457,7 +457,7 @@ def self_test() -> int:
     case("third-path-cli", got == cli, {k: v for k, v in got.items() if v != cli[k]})
 
     # 실행 기록 — 명령줄 검사가 통과하면(profile peer-review) 시작을 남기고, 다시 불러도 열린 시도를 그대로 쓴다.
-    # 셀마다 자기 임시 FZ_RUN_STATE(⛔ 없으면 통과한 실행이 사용자의 ~/.fz/runs 에 표지를 쓴다) · 세션 id 는 넘기지 않는다
+    # 셀마다 자기 임시 FZ_RUN_STATE(⛔ 없으면 통과한 실행이 사용자의 ~/.fz/runs 에 표지를 쓴다) · 세션 id 는 sid 를 준 호출만 넘긴다
     with tempfile.TemporaryDirectory() as t:
         env0 = {k: v for k, v in os.environ.items() if k not in ("FZ_RUN_STATE", "CLAUDE_CODE_SESSION_ID")}
 
@@ -469,9 +469,12 @@ def self_test() -> int:
             open(os.path.join(d, "evidence", "tools.md"), "w").write(tools)
             return d
 
-        def run(state, *args):
+        def run(state, *args, sid=None):   # sid = 이 호출의 CLAUDE_CODE_SESSION_ID · None 이면 세션을 넘기지 않는다
+            env = dict(env0, FZ_RUN_STATE=state)
+            if sid:
+                env["CLAUDE_CODE_SESSION_ID"] = sid
             r = subprocess.run([sys.executable, "-B", os.path.abspath(__file__), *args], capture_output=True, text=True,
-                               env=dict(env0, FZ_RUN_STATE=state), stdin=subprocess.DEVNULL)
+                               env=env, stdin=subprocess.DEVNULL)
             return r.returncode, r.stdout, r.stderr
 
         def metrics(state, *args):
@@ -495,6 +498,11 @@ def self_test() -> int:
         marks, rows = runs(st)
         case("record-reuse-open", rcs == [OK, OK] and len(marks) == 1 and marks[0].get("attempt") == 1 and not rows,
              (rcs, [m.get("attempt") for m in marks], [r.get("status") for r in rows]))
+        st, d = os.path.join(t, "s-other-session"), slots("other-session")   # 같은 WORK_DIR 을 다른 세션이 다시 검사한다 — 앞 세션의 열린 시도를 이어 쓰지 않는다
+        rcs = [run(st, d, "--tier", "0", sid=s)[0] for s in ("selftest-session-0001", "selftest-session-0002")]
+        marks, rows = runs(st)
+        got = ([m.get("attempt") for m in marks], [(r.get("attempt"), r.get("status")) for r in rows])
+        case("record-other-session-reopens", rcs == [OK, OK] and got == ([2], [(1, "interrupted")]), (rcs, got))
         st, d = os.path.join(t, "s-retry"), slots("retry")
         miss = os.path.join(d, "evidence", required_slots(TIERS_DOC, 0)[0] + ".md")
         os.remove(miss)
