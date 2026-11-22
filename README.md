@@ -105,7 +105,7 @@ claude plugin update fz-guard@fz-orchestrator     # fz-guard 를 설치했을 �
 | | `/fz-code` | 계획에 따른 점진적 구현과 빌드 검증 |
 | | `/fz-fix` | 버그 수정 (4-Phase 디버깅) |
 | | `/fz-review` | 3중 검증 (Claude + GPT + 셋째 검증(sc-analyze · 없으면 새 컨텍스트 에이전트)) |
-| | `/fz-commit`, `/fz-pr` | 커밋, Fork 기반 PR |
+| | `/fz-commit`, `/fz-pr` | 커밋, PR (origin 푸시 · fork 규칙이 있으면 fork) |
 | | `/fz-rebase` | 롱텀 브랜치 리베이스와 양방향 조용한 유실 게이트 (경로 단위 배타 분할, prepush 원격 실측) |
 | **탐색** | `/fz-discover` | 풍경 탐색과 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic, pattern) |

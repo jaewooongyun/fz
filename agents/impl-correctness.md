@@ -82,7 +82,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 
 ## Plugin 참조 (CLAUDE.md 플러그인·최소 타겟 정보에 명시된 플러그인 적용)
 
-- UI 프레임워크 작업 시 → CLAUDE.md 플러그인·최소 타겟 정보의 해당 플러그인 참조
+- UI 프레임워크 작업 시 → 입력의 `스택 스킬 요구 사항`(있으면)을 따른다(플러그인 스킬은 부를 수 없다)
 - 최소 타겟 제약: CLAUDE.md 플러그인·최소 타겟 정보 참조
 
 ## 테스트 작성

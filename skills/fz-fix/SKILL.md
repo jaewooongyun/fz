@@ -74,7 +74,7 @@ metadata:
 
 ### ⛔ 역방향 트리거 (absence-pattern detection — Swift 파일을 수정하는 경우에만)
 
-> 참조: `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 부재해도 다음 패턴이 감지되면 안전성 분석을 활성화한다.
+> 참조(Swift 파일을 수정하는 경우에만): `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 부재해도 다음 패턴이 감지되면 안전성 분석을 활성화한다.
 
 수정 대상이 다음 3 패턴 중 하나라도 해당하면 동시성 안전성 검증 의무:
 
@@ -184,6 +184,7 @@ metadata:
   - `run` · `config` → `/fz-gpt check` 호출 → cross-model 검증. verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
   - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.md` § GPT 미사용) / `ask` → 모델 질문 → `set` → 다시 decide
 - 또는 `/fz-review`로 전환
+- 작업 폴더가 있으면 원인(Step 1c) · 수정 · 검증 결과를 `{WORK_DIR}/fix/fix-analysis.md` 에 적는다 — 다음 세션이 컨텍스트 로딩에서 읽는다 · 저장 없이 진행이면 건너뛴다(팀 모드 경로도 같다)
 
 ---
 

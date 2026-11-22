@@ -58,7 +58,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 - `Grep`으로 동일 패턴 사용 사례 확인
 
 ### UI Framework / Concurrency Quality (CLAUDE.md 플러그인·최소 타겟 정보에 명시된 플러그인 기준)
-- UI 프레임워크: CLAUDE.md 플러그인·최소 타겟 정보의 플러그인 기준으로 state 관리 패턴 검증
+- UI 프레임워크: 입력의 `스택 스킬 요구 사항`(있으면) 기준으로 state 관리 패턴 검증(플러그인 스킬은 부를 수 없다)
 - 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md 플러그인·최소 타겟 정보 참조)
 
 ### Complexity Warning

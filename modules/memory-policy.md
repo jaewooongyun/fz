@@ -1,4 +1,4 @@
-# Serena Memory 영속 키 정책
+# Serena Memory 키 정책 (영속 · 임시)
 
 > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2601.15300 · 2510.05381(EMNLP 2025 Findings) · `platform.claude.com` memory-tool. ⚠️ 이 감사에서 **레지스트리 미등재 4종** 발견 — `2510.05381` · `2510.07777` · `2512.20845` · `2601.15300` (`guides/llm-references.md` · `guides/harness-engineering.md` §참고문헌 둘 다에 없다). ⛔ **원문 재조회는 포함하지 않았다** — 외부 페이지가 바뀌었는지는 이 감사의 범위 밖이다.
 

@@ -1,7 +1,7 @@
 ---
 name: fz-pr
 description: >-
-  PR 생성. Fork 기반 푸시 + 티켓 연동 + 리뷰어 자동 지정.
+  PR 생성. origin 푸시(fork 규칙이 있으면 fork) + 티켓 연동 + 리뷰어 자동 지정.
   예: PR 만들어, 풀리퀘스트, PR 생성 (비사용: 커밋만 →fz-commit)
 user-invocable: true
 disable-model-invocation: true
@@ -46,7 +46,7 @@ metadata:
 
 | Step | 설명 |
 |------|------|
-| 0 | 현재 상태 감지 (PR 존재 여부, unpushed 커밋 확인) |
+| 0 | 현재 상태 감지 (`gh auth status` · PR 존재 여부 · unpushed 커밋 확인) |
 | 1 | Target Branch 결정 (인자 또는 선택) |
 | 2 | Push |
 | 3 | PR 생성 (템플릿 기반 — 본문 어조 `modules/team-facing-writing.md`) · ⛔ 생성 **직전** 템플릿 섹션 대조(아래) |
@@ -96,13 +96,13 @@ CLAUDE.md 에 fork 기반 워크플로우가 정의되어 있으면(절 제목 �
 ## Boundaries
 
 **Will**:
-- origin(fork)에 push 후 upstream으로 PR 생성
+- origin 에 push 후 PR 생성 — fork 규칙이 있으면 origin(fork) → upstream PR
 - 트래커 티켓 ID 기반 PR 제목 및 설명 자동 생성 — 트래커 도구는 사전 승인하지 않는다(티켓 조회 · 상태 전환 규칙은 위 '규칙 참조' 의 팀 스킬 위임 정본)
 - PR 중복 여부 확인 후 기존 PR URL 안내
 - Assignee 자동 설정
 
 **Will Not**:
-- upstream에 직접 push → fork 기반 PR만 허용
+- fork 규칙이 있을 때 upstream 에 직접 push
 - 코드 수정 → `/fz-code` 또는 `/fz-fix` 사용
 - 커밋 생성 → `/fz-commit` 먼저 실행
 - PR 머지 또는 PR 승인

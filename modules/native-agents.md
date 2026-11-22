@@ -28,7 +28,7 @@
 
 | 에이전트 | Lead 가 띄우는 때 | 정하는 스킬 |
 |---------|-----------------|-----------|
-| **fz:review-correctness** | GPT 검증을 부르지 못할 때 대신하는 새 컨텍스트 검증 1회 · 요구 부합 검증 | `skills/fz-review/SKILL.md` 검증 2 의 GPT 불능 분기 · Phase 4.5 · `skills/fz-code/SKILL.md` 절차 7 · 8.5 · `skills/fz-gpt/SKILL.md` · `skills/fz-plan/SKILL.md` 에러 대응 표 |
+| **fz:review-correctness** | GPT 검증을 부르지 못할 때 대신하는 새 컨텍스트 검증 1회 · 요구 부합 검증 | `skills/fz-review/SKILL.md` 검증 2 의 GPT 불능 분기 · Phase 4.5 · `skills/fz-code/SKILL.md` 절차 8.5 · `skills/fz-gpt/SKILL.md` · `skills/fz-plan/SKILL.md` 에러 대응 표 |
 | **fz:search-pattern** | 셋째 검증의 분석 스킬(`sc:sc-analyze`)이 없을 때 대신하는 새 컨텍스트 검증 1회 | `skills/fz-review/SKILL.md` 셋째 검증의 `fresh-context` 갈래 |
 
 ## 스폰 규칙
