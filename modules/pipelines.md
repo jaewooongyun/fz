@@ -178,7 +178,7 @@
 | 트리거 | `독립.*플랜\|GPT.*계획\|교차.*플랜\|플랜.*검증\|병렬.*플랜\|독립.*계획` |
 | 체인 | fz-gpt independent-plan |
 | 기본 모드 | SOLO |
-| 실행자 | Lead → GPT independent-plan (격리 런처 · 레시피 `modules/fz-gpt-subcommands-aux.md` § independent-plan · 계열 `plan` · 작업 폴더 deny) |
+| 실행자 | Lead → GPT independent-plan (격리 런처 · 레시피 `modules/fz-gpt-subcommands-aux.md` § independent-plan · 계열 `plan` · 작업 폴더(없으면 임시 폴더) deny) |
 | 주의 | **C4 원칙**: Claude 계획 텍스트 전달 금지. 요구사항만 공유 |
 | 출력 | Claude 계획과 교차 비교용 독립 계획서 |
 

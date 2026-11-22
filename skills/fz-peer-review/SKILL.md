@@ -107,8 +107,8 @@ mkdir -p "${WORK_DIR}" && WORK_DIR="$(cd "${WORK_DIR}" && pwd)" && echo "${WORK_
 ### 0. 사전 점검
 
 ```bash
-gh auth status  # 성공→gh 사용, 실패→git 폴백 (python3 "${FZ_PLUGIN_ROOT}/scripts/git_prep.py" fetch --repo <GIT_ROOT> --remote upstream + git diff)
-# GIT_ROOT 추출: modules/cross-validation.md의 GIT_ROOT 공유 유틸 참조
+gh auth status  # 성공→gh 사용, 실패→git 폴백 (python3 "${FZ_PLUGIN_ROOT}/scripts/git_prep.py" fetch --repo "$(git rev-parse --show-toplevel)" --remote upstream + git diff)
+# --repo 는 절대 경로만 받는다(상대 경로는 exit 10) — 공유 유틸의 GIT_ROOT(실패 시 `.`)를 넘기지 않는다
 ```
 
 ### 0.5. PR 브랜치 fetch

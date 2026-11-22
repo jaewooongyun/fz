@@ -117,7 +117,7 @@ FZ_GPT_ARTIFACT="${ARTIFACT:?호출자의 산출물 계열 — fz-plan: plan · 
 - 역할 본문은 격리 사본 `gpt-skills/fz-planner` · `fz-reviewer` 를 래퍼 `--inject-skill` 로 넣는다. 모델·effort 기본값은 없다 — `--model` · `--effort` 를 주지 않으면 Lead 세션 선택 > 격리 config(실제 config 최상위 두 줄 사본) 순이다(`modules/gpt-strategy.md` § 모델·effort 선택)
 - 하위 에이전트 — 격리 config 에 `[agents] enabled = false` 를 늘 넣어 spawn 도구를 끈다(F-436 — CLI 0.159.2 exec · resume 실측 `multi_agent_version: disabled`). 프롬프트의 금지 문장과 감사의 spawn 수 기록은 그대로 둔다
 - `--repo` 는 복사하지 않고 권한 프로필 read 로 연다 — 그 안의 `.claude` · `.fz-work`(링크면 대상 실경로도)와 `--deny` 는 막는다. 그 `.claude` · `.fz-work` 아래 파일 · 폴더를 입력으로 넘기면 exit 15 다(복사된 입력은 권한 프로필이 보지 못한다). review 의 `head/` 는 `skills/fz-peer-review/scripts/gather.sh` 가 만든다
-- `--deny "$WORK_DIR"` 는 늘 준다 — 권한 프로필은 디스크 전체 읽기에서 HOME · 임시 폴더 · 격리 폴더의 실제 부모 · 링크인 `~/.claude` 의 대상만 막는다. 작업 폴더가 HOME 밖이거나 저장소 안이면 Claude 산출이 읽힌다
+- `--deny "$WORK_DIR"` 는 늘 준다 — 권한 프로필은 디스크 전체 읽기에서 HOME · 임시 폴더 · 격리 폴더의 실제 부모 · 링크인 `~/.claude` 의 대상만 막는다. 작업 폴더가 HOME 밖이거나 저장소 안이면 Claude 산출이 읽힌다. 작업 폴더가 없으면(`/fz` plan-parallel 의 SOLO 한 단계 등) `--out-dir` · `--deny` 둘 다 임시 폴더(`mktemp -d`) 하나를 쓴다 — 빈 `--deny ""` 는 정문이 exit 10 으로 거부한다
 - `--rules-index` 는 지침 **원문 색인**이다(`extract_project_rules.py` 출력 — `modules/project-rules.md`). ⛔ 규칙 레코드(`projectRulesPath`)를 넘기면 런처가 모양으로 판별해 exit 11 로 거부한다 — Claude 의 해석이 GPT 첫 패스의 원문이 되기 때문이다
 - `$REVIEW_DIFF` 는 `review-surface.patch`(gather 가 중복 커밋을 뺀 patch)가 있으면 그것, 없으면 `diff.patch` 다 — Claude 렌즈의 1차 리뷰 대상과 같아야 두 패스가 같은 범위를 본다. 병합 `--diff` 도 이 파일이다. `head/` 는 그대로 쓴다(표면의 상위 집합이다)
 - `--pr-meta` 는 PR 입력일 때 gather 가 만든 `pr-meta.json`(작성자가 쓴 제목 · 본문)이다. ⛔ Lead 가 채운 `requirements.md` 는 넘기지 않는다 — Lead 의 해석이 GPT 에 닿는다(InputHygiene)
@@ -172,7 +172,7 @@ Full verify/validate보다 **경량** — 수백 토큰 단위 호출로 Claim-T
 | /fz-plan | full 2.7 → independent-plan (기본 · `--no-gpt-independent` 로 끈다), micro-eval (claim 재평가) |
 | /fz-modernize | full Phase 3 1.5 → independent-plan (초안과 동시 · 실패 · 거부면 Phase 4 modernize-verify) |
 | /fz (drift-check · `modules/pipelines.md` §15) | drift (전체 스캔) |
-| /fz | (plan-parallel · pipelines §16) → independent-plan (격리 첫 패스 · 작업 폴더 deny) |
+| /fz | (plan-parallel · pipelines §16) → independent-plan (격리 첫 패스 · 작업 폴더(없으면 임시 폴더) deny) |
 
 ## 설계 원칙
 

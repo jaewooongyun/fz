@@ -80,9 +80,9 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 4. **새 파일 작성 시**: Cargo-Cult Detection 절차 실행 (위 섹션 참조)
 5. 구현 완료 → changeset 반환 (Lead 적용+빌드). review-arch 검토는 Workflow Stage2.
 
-## Plugin 참조 (CLAUDE.md 플러그인·최소 타겟 정보에 명시된 플러그인 적용)
+## Plugin 참조 (CLAUDE.md 플러그인·최소 타겟 정보)
 
-- UI 프레임워크 작업 시 → 입력의 `스택 스킬 요구 사항`(있으면)을 따른다(플러그인 스킬은 부를 수 없다)
+- UI 프레임워크 작업 시 → 입력의 `스택 스킬 요구 사항`(있으면)을 따른다(플러그인 스킬은 부를 수 없다) · 없으면 CLAUDE.md 의 UI 프레임워크 · 최소 타겟 규칙과 기존 코드 패턴으로 판단하고 출력에 `[스택 스킬 입력 없음]` 을 적는다
 - 최소 타겟 제약: CLAUDE.md 플러그인·최소 타겟 정보 참조
 
 ## 테스트 작성

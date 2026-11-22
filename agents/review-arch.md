@@ -53,7 +53,7 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 - 컴포넌트 역할 분리가 CLAUDE.md 기준을 따르는가
 
 ### 2. UI Framework Architecture (CLAUDE.md에 UI 프레임워크 명시 시)
-- UI 프레임워크별 state 관리 패턴: 입력의 `스택 스킬 요구 사항`(있으면) 기준으로 검증(플러그인 스킬은 부를 수 없다)
+- UI 프레임워크별 state 관리 패턴: 입력의 `스택 스킬 요구 사항`(있으면) 기준으로 검증(플러그인 스킬은 부를 수 없다) · 없으면 CLAUDE.md 의 UI 프레임워크 · 최소 타겟 규칙과 기존 코드 패턴으로 판단하고 출력에 `[스택 스킬 입력 없음]` 을 적는다
 - 최소 타겟 제약 준수 (CLAUDE.md 플러그인·최소 타겟 정보 참조)
 - ⊕ 워크플로가 `[프로젝트 규칙 — 이 렌즈 전용]` 줄을 주면 UI 프레임워크·상태 관리 기준은 그 규칙 레코드가 정하고, 위 두 줄의 기준보다 우선한다. 그 줄이 없으면 위 기준 그대로다
 

@@ -4,7 +4,6 @@
 
 ## 이력
 
-- 판 표기: `/fz` v3 — 제목에서 옮겼다.
 - 개별 스킬 팀 강화 — Wave 4 전환 완료, P2P SendMessage 없음(plan/code/review/search/discover/peer-review 모두 `workflows/*.js` 결정적 Workflow · P2P 시절 통신 패턴: `references/rationale.md` § 스킬별 통신 패턴)
 
 ## 사용 시점 예시

@@ -57,8 +57,8 @@ Where these lines go: in a free-text answer, write them as lines of the answer. 
 - 새 패턴 도입 시 기존 패턴과의 충돌 여부 확인
 - `Grep`으로 동일 패턴 사용 사례 확인
 
-### UI Framework / Concurrency Quality (CLAUDE.md 플러그인·최소 타겟 정보에 명시된 플러그인 기준)
-- UI 프레임워크: 입력의 `스택 스킬 요구 사항`(있으면) 기준으로 state 관리 패턴 검증(플러그인 스킬은 부를 수 없다)
+### UI Framework / Concurrency Quality (CLAUDE.md 플러그인·최소 타겟 정보 참조)
+- UI 프레임워크: 입력의 `스택 스킬 요구 사항`(있으면) 기준으로 state 관리 패턴 검증(플러그인 스킬은 부를 수 없다) · 없으면 CLAUDE.md 의 UI 프레임워크 · 최소 타겟 규칙과 기존 코드 패턴으로 판단하고 출력에 `[스택 스킬 입력 없음]` 을 적는다
 - 최소 타겟 이상 API 사용 시 availability 가드 확인 (CLAUDE.md 플러그인·최소 타겟 정보 참조)
 
 ### Complexity Warning

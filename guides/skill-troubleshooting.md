@@ -1,6 +1,6 @@
 # 스킬 트러블슈팅 가이드
 
-> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조 · §2.4 인용을 본문 실제와 맞춤(Claude 4.8 출처는 이력 표기 · GPT 문장은 Astra 한정) · 이전 감사 2026-09-25 — 모델 사실 축: "§2.4 인용 모델을 현행(Fable 5.1·Opus 5.5·GPT-6 Sol)으로 갱신"이라 적었으나 본문은 바뀌지 않았다(이력) · 중복 절을 prompt-optimization 보충 8a 참조로 축약):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
+> **Sources (last audited: 2026-11-01 — 사실 정정 5a — research/probe-report 대조 · §2.4 인용을 본문 실제와 맞춤(GPT 문장은 Astra 한정) · 이전 감사 2026-09-25 — 모델 사실 축: "§2.4 인용 모델을 현행(Fable 5.1·Opus 5.5·GPT-6 Sol)으로 갱신"이라 적었으나 본문은 바뀌지 않았다(이력) · 중복 절을 prompt-optimization 보충 8a 참조로 축약):** `guides/llm-references.md` §1 정본 대조 완료. 그 외 인용은 개별 `[verified:]` 태그 참조.
 >
 > fz-* 스킬에서 발생하는 일반적인 문제의 진단과 해결 방법.
 > Anthropic 32p Skills Guide의 Under/Over-triggering, Instructions Not Followed 패턴 기반.

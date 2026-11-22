@@ -51,7 +51,7 @@ metadata:
 
 진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
 - review-live 를 띄우지 않고 Phase 5 Lead 3중 검증 · Phase 5.5 역방향 검증 · Reflection Rate 를 그대로 한다 — GPT 단계는 full 과 같다(끈 세션이면 `[GPT 미사용]`) · 산출물도 full 과 같다
-- ⊕ `--gpt-independent` 면 실행 절차 2.5 를 Workflow 없이 그대로 background 로 띄운다(`locatedFindings` 는 없다). 4.5 병합의 `--claude` 는 Lead 발견을 `{WORK_DIR}/review/lead-findings.json` 으로 쓴 파일이다(형식 · `line_range` · evidence 인용 규칙 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4) · 검증 2 기본 GPT review 는 부르지 않는다(병합이 대신한다)
+- ⊕ `--gpt-independent` 면 실행 절차 2.5 를 Workflow 없이 그대로 background 로 띄운다(`locatedFindings` 는 없다). 4.5 병합의 `--claude` 는 Lead 발견을 `{WORK_DIR}/review/lead-findings.json` 으로 쓴 파일이다(형식 · `line_range` · evidence 인용 규칙 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4) · 작업 폴더가 없으면 이 파일 · 런처 `--out-dir` · `--deny` 셋 다 실행 절차 1 의 임시 폴더를 쓴다(그 폴더를 deny 해 런처가 Lead 발견을 읽지 못하게 한다) · 검증 2 기본 GPT review 는 부르지 않는다(병합이 대신한다)
 - 셋째 검증(검증 3)도 full 과 같다 — 경로 판정 · 두 표지 · sc 가 없을 때의 새 컨텍스트 에이전트가 그대로다(sc 가 없다고 건너뛰지 않는다)
 - ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3+§4 Read). craft 를 쓰기로 했을 때만(R-B 기본 off) §6(F~J)과 규칙 레코드 · axisCoverage 표를 더한다
 - 점검 카탈로그: `templates/check-catalog-review.md` 를 Read 해 리뷰 산출물에 대 본다(Workflow 워커 · GPT 역할 스킬과 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 리뷰 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <review 산출물> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-review.md"` 로 잰다
@@ -341,7 +341,7 @@ View 파일 패턴: *View.swift, *Screen.swift, *Cell.swift
 >
 > 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 검증"` 실행(`ARTIFACT=code` · `WORK_DIR={WORK_DIR}` · 작업 폴더가 없으면 `WORK_DIR=` 빈 값 — `modules/fz-gpt-subcommands-core.md` § validate 호출자) → Reflection Rate 계산 → N≥10에서만 threshold gating (참조: `modules/cross-validation.md` § Reflection Rate threshold).
 >
-> **validate 생략 (지적 0 · 적용 수정 0)** — 다섯이 모두 확인될 때만 validate 를 부르지 않는다: ① 직전 GPT 리뷰(Phase 5 검증 2 · 2.5 를 띄운 run 은 4.5 가 병합한 독립 첫 패스)가 exit 0 으로 끝났고 ② 그 산출이 유효하며(출력 파일이 비어 있지 않고 지적 · 판정을 읽을 수 있다 · 2.5 경로는 `review_merge.py` 가 받아들였다) ③ 그 리뷰의 지적이 0 이고 ④ 그 뒤 적용한 수정이 0 이며 ⑤ 리뷰가 본 입력이 그대로다 — 실행 절차 1 의 diff 를 같은 방법으로 다시 떠 기록한 `diff.patch` 와 `cmp -s` 로 같은지 본다. 그러면 그 자리에 `[validate 생략 — 지적 0 · 적용 수정 0]` 과 Reflection Rate N/A(`modules/cross-validation.md` § Reflection Rate — N=0)를 적는다. 하나라도 확인하지 못하면(기록한 diff 가 없거나 대조가 실패하면 포함) validate 를 부른다. 원장 재검증(`--reverify`)과 `verify-gates` 는 이 생략과 상관없이 그대로 돈다. 근거: 지적 0 · 수정 0 이면 validate 는 Phase 5 가 본 같은 입력을 다시 묻는 호출이다.
+> **validate 생략 (지적 0 · 적용 수정 0)** — 다섯이 모두 확인될 때만 validate 를 부르지 않는다: ① 직전 GPT 리뷰(Phase 5 검증 2 · 2.5 를 띄운 run 은 4.5 가 병합한 독립 첫 패스)가 exit 0 으로 끝났고 ② 그 산출이 유효하며(출력 파일이 비어 있지 않고 지적 · 판정을 읽을 수 있다 · 2.5 경로는 `review_merge.py` 가 받아들였다) ③ 그 리뷰의 지적이 0 이고 ④ 그 뒤 적용한 수정이 0 이며 ⑤ 리뷰가 본 입력이 그대로다 — 실행 절차 1 의 diff 를 같은 방법으로 다시 뜨되 기록한 `diff.patch` 옆의 `diff.recheck.patch` 에 쓰고(기록한 파일은 덮어쓰지 않는다) 둘을 `cmp -s` 로 대조한다. 그러면 그 자리에 `[validate 생략 — 지적 0 · 적용 수정 0]` 과 Reflection Rate N/A(`modules/cross-validation.md` § Reflection Rate — N=0)를 적는다. 하나라도 확인하지 못하면(기록한 diff 가 없거나 대조가 실패하면 포함) validate 를 부른다. 원장 재검증(`--reverify`)과 `verify-gates` 는 이 생략과 상관없이 그대로 돈다. 근거: 지적 0 · 수정 0 이면 validate 는 Phase 5 가 본 같은 입력을 다시 묻는 호출이다.
 
 ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
 

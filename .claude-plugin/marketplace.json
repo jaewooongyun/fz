@@ -44,7 +44,7 @@
     },
     {
       "name": "fz-guard",
-      "description": "Optional fz add-on: hooks that enforce Phase 4 approval after /fz (writing Bash included), confirm ad-hoc agents in fz sessions, ask for a registry entry when a turn writes an fz lesson to memory, and ask for the GPT review in fz-review turns while blocking the retired model name in fz plugin files. Opt-in: asks before Bash that runs under configured protected paths. Fails open. Off until installed.",
+      "description": "Optional fz add-on: hooks that enforce Phase 4 approval after /fz (writing Bash included), warn about ad-hoc agents in fz sessions, ask for a registry entry when FZ_FINDINGS_ROOT is set and a turn writes an fz lesson to memory, and ask for the GPT review in fz-review turns while blocking the retired model name in fz plugin files. Opt-in: asks before Bash that runs under configured protected paths. Fails open. Off until installed.",
       "repository": "https://github.com/jaewooongyun/fz",
       "version": "0.4.0",
       "author": {
