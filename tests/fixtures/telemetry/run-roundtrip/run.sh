@@ -6,7 +6,7 @@
 #   record-to-report       start → end → `fz_telemetry_report.py --runs-root … --runs-json` 에 그 run_id 가 가짜 트랜스크립트의 model · effort 로 있다
 #   resume-attempt-2       end 없이 다시 start → 같은 run_id 에 attempt 1(interrupted) · 2(completed) 가 둘 다 리포터에 보인다
 #   schema-version         schema 99 행을 섞으면 리포트 JSON runs.unreadable 1 · --runs-json 에는 없다 · 나머지 행 집계는 그대로
-#   run_metrics-self-test  run_metrics.py --self-test(동시 실행 · 중복 end · 중단 · 쓰기 실패 · 본문 복제 · 재개 · Harness 칸)가 exit 0 · PASS —
+#   run_metrics-self-test  run_metrics.py --self-test 의 case 전부가 exit 0 · PASS —
 #                          health-check 글롭이 도는 것은 이 러너뿐이라 기록기 self-test 를 여기서 회귀 감시한다
 #   harness-metrics-judgement  별도 임시 FZ_RUN_STATE 에 `end --gate-issues · --findings` 로 11회 기록 → 리포트 JSON harness 가
 #                          10회 이슈 0 Gate = neutral-candidate · 10회 이슈 있음 = load-bearing · 9회 = preliminary ·
@@ -140,7 +140,7 @@ with tempfile.TemporaryDirectory(prefix="fz-run-roundtrip-") as td:
          "report rc=%s runs-json rc=%s unreadable=%s listed=%d groups=%s · %s"
          % (rc1, rc2, runs.get("unreadable"), len(listed), groups, (o1 + e1).strip()[-200:]))
 
-    # run_metrics-self-test — 기록기 self-test 7 case 를 이 러너로 회귀 감시한다(내부 self-test 는 자기 임시 FZ_RUN_STATE 를 쓴다)
+    # run_metrics-self-test — 기록기 self-test 의 case 전부를 이 러너로 회귀 감시한다(내부 self-test 는 자기 임시 FZ_RUN_STATE 를 쓴다)
     rc, out, err = run([RM, "--self-test"])
     lines = out.strip().splitlines()
     case("run_metrics-self-test",

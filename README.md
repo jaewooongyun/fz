@@ -165,19 +165,19 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 
 ### 작성·설계 가이드
 
-`guides/` 아래 9개가 있다. 스킬, 에이전트, 모듈을 만들거나 고칠 때 본다. 줄 수는 `wc -l` 기준이다.
+`guides/` 아래 9개가 있다. 스킬, 에이전트, 모듈을 만들거나 고칠 때 본다.
 
-| 가이드 | 줄 | 내용 |
-|--------|---:|------|
-| [`llm-references.md`](guides/llm-references.md) | 206 | LLM·AI 권위 자료를 모은 단일 참조점. Tier1 공식, Tier2 arxiv 실증, Tier3 커뮤니티로 나누고 가이드와 스킬을 고칠 때 1차 출처로 쓴다 |
-| [`prompt-optimization.md`](guides/prompt-optimization.md) | 752 | 프롬프트 10원칙, Context Rot 대응, Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 691 | 스킬 작성. YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
-| [`skill-testing.md`](guides/skill-testing.md) | 548 | 스킬 테스트. Triggering·Functional 3단계와 테스트 스펙 템플릿 |
-| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 295 | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
-| [`agent-team-guide.md`](guides/agent-team-guide.md) | 508 | 에이전트와 팀 구성. Task Brief, 모델 전략, §8 Workflow 공식 사양 |
-| [`model-guide.md`](guides/model-guide.md) | 361 | 모델 운용. Lead 는 `fable` alias(현재 Fable 5.2 — Claude Code 2.1.321+, fz 운용 선택), 실질 생산 워커는 Opus 5.5 이고 effort 배정 기준을 둔다 |
-| [`clean-architecture.md`](guides/clean-architecture.md) | 324 | Dependency Rule 과 SOLID 로 레이어를 판정하는 기준 |
-| [`harness-engineering.md`](guides/harness-engineering.md) | 1,398 | AI 에이전트 하네스 설계. 게이트, 오라클, negative control, NLAH Gap 분석 |
+| 가이드 | 내용 |
+|--------|------|
+| [`llm-references.md`](guides/llm-references.md) | LLM·AI 권위 자료를 모은 단일 참조점. Tier1 공식, Tier2 arxiv 실증, Tier3 커뮤니티로 나누고 가이드와 스킬을 고칠 때 1차 출처로 쓴다 |
+| [`prompt-optimization.md`](guides/prompt-optimization.md) | 프롬프트 10원칙, Context Rot 대응, Progressive Disclosure |
+| [`skill-authoring.md`](guides/skill-authoring.md) | 스킬 작성. YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
+| [`skill-testing.md`](guides/skill-testing.md) | 스킬 테스트. Triggering·Functional 3단계와 테스트 스펙 템플릿 |
+| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
+| [`agent-team-guide.md`](guides/agent-team-guide.md) | 에이전트와 팀 구성. Task Brief, 모델 전략, §8 Workflow 공식 사양 |
+| [`model-guide.md`](guides/model-guide.md) | 모델 운용. Lead 는 `fable` alias(현재 Fable 5.2 — Claude Code 2.1.321+, fz 운용 선택), 실질 생산 워커는 Opus 5.5 이고 effort 배정 기준을 둔다 |
+| [`clean-architecture.md`](guides/clean-architecture.md) | Dependency Rule 과 SOLID 로 레이어를 판정하는 기준 |
+| [`harness-engineering.md`](guides/harness-engineering.md) | AI 에이전트 하네스 설계. 게이트, 오라클, negative control, NLAH Gap 분석 |
 
 ---
 

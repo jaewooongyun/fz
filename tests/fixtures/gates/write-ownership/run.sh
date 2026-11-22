@@ -35,6 +35,8 @@
 #           과차단 = 본문 → 정의 → 호출 칸 전부
 #           conditional-def-grid — 같은 이름 정의 자리(목록 · 조건 · 루프 · 묶음) × 조건 참/거짓 × 이름 × 호출 자리 × 구분자를 실제 bash 의
 #           대상 변화와 가드 · 훅 판정에 견준다 — 놓침 0 · 불일치 0 · 과차단 = 조건 자리 ∧ (정의 갈래가 돈다 ∨ 같은 갈래 안 호출) 칸 전부
+#           judge-pair-large-input — 아무것도 쓰지 않는 1.1MB 명령 하나를 판정 헬퍼 judge_pair 에 넘겨 행 1개가 돌아온다(명령 목록은
+#           stdin 으로 넘긴다 — argv 한 칸이면 인자 길이 상한에 걸린다)
 # 기준 트리(4.44.0)는 판정기 쓰기 플래그 · 기본 실행 · 변수 경로 · source 를 쓰기로 보지 않아 write 셀이 '다른 세션의 원장' 으로
 #   통과한다 → exit 1.
 # ⛔ 셀 집합 대조(F-408): 실제로 돈 셀(단언 1개 이상)의 이름 · 횟수가 EXPECTED_CELLS 와 다르면 FAIL — 끝 줄 `CELLS n=<수> ran=<…>`.
@@ -89,7 +91,7 @@ EXPECTED_CELLS = {
     "deferred-call-later-func-overblock": 1, "deferred-call-undefined-unknown": 1,
     "deferred-write-before-same-name-func": 1, "deferred-unknown-option-before-same-name-func": 1,
     "deferred-outside-name-before-same-name-func": 1, "function-scope-guard-hook-agree": 1, "body-def-grid": 1,
-    "conditional-def-before-write": 1, "conditional-def-grid": 1,
+    "conditional-def-before-write": 1, "conditional-def-grid": 1, "judge-pair-large-input": 1,
     "for-loop-var": 1, "for-loop-prior-value": 1, "for-loop-body-reassign": 1, "for-loop-break-after-done": 1,
     "for-loop-after-done-use": 1, "for-loop-continue-unknown": 1, "for-loop-nested-unknown": 1, "for-loop-glob-unknown": 1,
     "for-loop-charclass-unknown": 1, "for-loop-brace-unknown": 1, "for-loop-source-reassign": 1, "for-loop-multiword-list-unknown": 1,
@@ -272,7 +274,7 @@ def guard_bash_write(cmd, env):
 
 def judge_pair(cmds, env):
     """명령마다 [가드 bash_write, 훅 _bash_write_targets(cwd `/w`)의 대상, 대상 미상 수] — 훅과 그 훅이 쓰기 자리를 빌려 오는 가드를
-    한 프로세스에서 나란히 부른다(훅 실행 없이 두 판정만 견준다)."""
+    한 프로세스에서 나란히 부른다(훅 실행 없이 두 판정만 견준다). 명령 목록은 stdin 의 JSON 으로 넘긴다 — 인자 길이 상한이 목록 크기를 막지 않는다."""
     guard = HOOK.resolve().parent.parent / "mods" / "fz-guard" / "hooks" / "guard.py"
     if not guard.is_file():
         raise Setup(f"guard.py 없음: {guard}")
@@ -284,12 +286,13 @@ def judge_pair(cmds, env):
             "    return m\n"
             "g, h = load('fz_guard_sites', sys.argv[1]), load('gate_stop_hook', sys.argv[2])\n"
             "rows = []\n"
-            "for c in json.loads(sys.argv[3]):\n"
+            "for c in json.loads(sys.stdin.read()):\n"
             "    unk = []\n"
             "    rows.append([list(g.bash_write(c)), h._bash_write_targets(c, '/w', unk), len(unk)])\n"
             "print(json.dumps(rows))")
     try:
-        r = subprocess.run([PY, "-B", "-c", code, str(guard), str(HOOK), json.dumps(cmds)], capture_output=True, env=env, timeout=120)
+        r = subprocess.run([PY, "-B", "-c", code, str(guard), str(HOOK)], input=json.dumps(cmds).encode("utf-8"), capture_output=True,
+                           env=env, timeout=120)
     except (OSError, subprocess.SubprocessError) as e:
         raise Setup(f"판정 실행 실패: {e}")
     lines = r.stdout.decode("utf-8", "replace").strip().splitlines()
@@ -571,9 +574,7 @@ try:
                             c.run(cmd, record=False, extra=path)
                             runs = on is None or cv == on
                             rows.append((cmd, cond, call != "branch" and not runs, state() != before))
-        got = []
-        for k in range(0, len(rows), 500):    # 명령 묶음은 인자 하나로 넘긴다 — 인자 한 개 길이 상한(Linux 128KiB) 아래로 나눈다
-            got += judge_pair([cmd for cmd, _, _, _ in rows[k:k + 500]], c.env)
+        got = judge_pair([cmd for cmd, _, _, _ in rows], c.env)
         oracle, miss_g, miss_h, split, over, want_over = [], [], [], [], [], []
         for (cmd, cond, exp, wrote), (g, targets, unk) in zip(rows, got):
             guard, hook = bool(g[0]), bool(targets) or unk > 0
@@ -590,6 +591,15 @@ try:
         extra, lack = sorted(set(over) - set(want_over)), sorted(set(want_over) - set(over))
         check(c.name, over == want_over,
               f"과차단 = 조건 자리 ∧ (정의 갈래가 돈다 ∨ 같은 갈래 안 호출) 칸 전부({len(want_over)}칸) · 그 밖 0", f"뜻밖={extra[:3]} · 빠짐={lack[:3]}")
+
+    # ── judge-pair-large-input — 판정 헬퍼는 명령 목록을 stdin 으로 받는다(인자 길이 상한이 목록 크기를 막지 않는다) ──────
+    #    아무것도 쓰지 않는 1.1MB 명령 하나 — argv 한 칸이면 Linux 인자 하나 128KiB · macOS 인자 전체 약 1MiB 상한에 걸려 판정 실행이 실패한다.
+    with Cell("judge-pair-large-input") as c:
+        try:
+            got = judge_pair([": " + "x" * 1_100_000], c.env)
+        except Setup as e:
+            got = f"Setup {e}"
+        check(c.name, isinstance(got, list) and len(got) == 1, "1.1MB 명령 하나 → 판정 행 1개(목록은 stdin — 인자 길이 상한 밖)", str(got)[:300])
 
     # ── tilde — `~` 로 source 한 env 파일이 실재하면 그 대입으로 푼다(소유 · '대상 미상' 아님) ───────────
     with Cell("tilde-source-owned") as c:

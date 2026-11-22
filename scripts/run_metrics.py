@@ -17,7 +17,7 @@
 
 사용:
   run_metrics.py start --skill S --mode light|full --recommended light|full|none
-                       [--source arg|fz|signal|autonomous|gate] [--work-dir W] [--reason TEXT] [--reuse-open]
+                       [--source arg|fz|signal|autonomous|default|gate] [--work-dir W] [--reason TEXT] [--reuse-open]
   run_metrics.py end   --skill S [--work-dir W] --status completed|interrupted|failed [--workflow-run-id wf_x]
                        [--gate-issues GATE=N ...] [--findings gpt=N,claude=N,convergent=N]
   run_metrics.py sweep [--older-than-hours N]

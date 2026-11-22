@@ -422,7 +422,9 @@ def _git_ignored(root):
     것). 폴더는 `<경로>/` 한 줄이다(--directory — 추적 파일이 없고 안이 전부 무시된 폴더. git 은 그 안을 읽지 않는다).
     작업 트리 밖 · git 부재 · git 실패면 빈 집합이다 — 그때는 걸은 파일 전부를 본다(범위를 줄이는 쪽으로 틀리지 않는다).
     ⛔ git 은 부르는 쪽의 저장소 환경 변수(_GIT_REPO_ENV)와 설정 환경 변수(_GIT_CONFIG_ENV · 키/값 묶음)를 지우고 부른다 — 답은 늘 root 가
-       든 작업 트리와 그 설정에서 온다. 남기면 다른 저장소나 주입한 설정의 (더 넓을 수 있는) 무시 규칙으로 감사할 파일이 빠진다."""
+       든 작업 트리와 그 설정에서 온다. 남기면 다른 저장소나 주입한 설정의 (더 넓을 수 있는) 무시 규칙으로 감사할 파일이 빠진다.
+    ⛔ `git status --ignored` 로 바꾸지 않는다 — 그 꼴은 무시 파일과 읽을 수 없는 무시되지 않은 하위 폴더가 함께 든 폴더를 `<폴더>/` 한 줄로
+       접는다. 그러면 걷기가 그 폴더를 가지쳐, 읽지 못한 하위 폴더가 내던 Unrun 이 조용히 사라진다."""
     env = {k: v for k, v in os.environ.items()
            if k not in _GIT_REPO_ENV and k not in _GIT_CONFIG_ENV and not k.startswith(_GIT_CONFIG_PREFIX)}
     try:
