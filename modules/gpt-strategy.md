@@ -171,7 +171,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # stdout 한 줄 — 그
 | `GPT-DECIDE config` (0) | 선택 없음 + 자율 모드(`get` 4) · 저장할 수 없는 세션(`get` 5) | 묻지 않고 같은 호출 — config 그대로다 |
 | `GPT-DECIDE skip reason=off-user` (18) | 세션 선택 off | 부르지 않는다 — 그 자리에 `[GPT 미사용 — 사용자 선택]` 을 남기고 잇는다(§ GPT 미사용 소비자 규칙) |
 | `GPT-DECIDE skip reason=off-no-cli` (18) | GPT CLI 가 PATH 에 없다 | 부르지 않는다 — `[GPT 미사용 — CLI 없음]` |
-| `GPT-DECIDE skip reason=off-no-auth` (18) | GPT 인증 없음 — GPT CLI 의 `login status` 가 로그인 안 됨이다(그 답이 없으면 CLI 홈의 인증 파일도 API 키 env 도 없다 — `gpt-exec.sh auth-check` 18 · 판정 순서는 § GPT 미사용 의 로그인 필요) | 부르지 않는다 — `[GPT 미사용 — 로그인 필요]`. off 를 기록하지 않으므로 로그인하면 다음 decide 부터 켜진다 |
+| `GPT-DECIDE skip reason=off-no-auth` (18) | GPT 인증 없음 — API 키 env 가 없고 GPT CLI 의 `login status` 가 로그인 안 됨이다(그 답이 없으면 CLI 홈의 인증 파일도 없다 — `gpt-exec.sh auth-check` 18 · 판정 순서는 § GPT 미사용 의 로그인 필요) | 부르지 않는다 — `[GPT 미사용 — 로그인 필요]`. off 를 기록하지 않으므로 로그인하면 다음 decide 부터 켜진다 |
 | `GPT-DECIDE ask` (3) | 선택 · 이전 선택(`.last`) 없음 · 물어도 된다 | § 모델·effort 선택의 질문 형식으로 묻고 `set` 한 뒤 decide 를 다시 부른다. 질문 도구를 쓸 수 없는 실행이면 `config` 처럼 진행한다 |
 | `GPT-DECIDE ask` (11) | 선택 파일 손상 | 다시 묻고 `set` 으로 덮어쓴 뒤 decide 를 다시 부른다 |
 | 줄 없음 · exit 11 | 선택 스크립트 오류(`get` 이 계약 밖으로 끝났다) | 다시 묻지 않는다 — 부르고 알린다(래퍼가 따로 판독한다 · `CHOICE-SCRIPT-ERROR` 면 § 모델·effort 선택의 우회) |
@@ -220,8 +220,8 @@ GPT 는 모드와 독립이다(`modules/mode-gate.md` § GPT 는 모드와 독�
 | 사용자 선택 | 세션 선택이 off — `get` stdout `model=off effort=off`(모델 질문에서 off · `set --model off`) | 래퍼 · 런처가 선택을 읽을 때 |
 | 플래그 | 호출에 `--model off` — 선택 파일을 읽지 않는다 | 래퍼 · 런처 · 정문(어댑터로 그대로 넘긴다) |
 | CLI 없음 | GPT CLI 가 PATH 에 없다(`gpt-exec.sh cli-check` exit 18) | 래퍼 · 런처 — `get` 은 선택이 없으면 묻지 않고 off 를 기록한다 |
-| 로그인 필요 | GPT CLI 인증이 없다(`gpt-exec.sh auth-check` exit 18). 판정 순서 ① GPT CLI 의 `login status`(출력 버림 · 5초 상한) — 0 이면 로그인됨 · 1 이면 로그인 안 됨(자격 증명 저장소처럼 `auth.json` 밖에 둔 로그인도 이 답으로 본다) ② 그 밖(하위 명령이 없는 구버전 · 다른 종료 · 시간 초과)이면 CLI 홈의 `auth.json` 이 파일이 아니고 API 키 env 도 없을 때 로그인 안 됨 | decide(`skip reason=off-no-auth`) · 런처(인증 파일이 있을 때 — 없으면 아래 행) — off 를 기록하지 않는다. 래퍼 본 경로는 판정하지 않는다(CLI 실패 12 가 안전망) |
-| 인증 파일 없음(격리 첫 패스) | CLI 홈에 `auth.json` 파일이 없다 — 독립 첫 패스는 그 파일을 격리 홈에 링크해서 돈다(API 키 env · 자격 증명 저장소의 로그인만으로는 돌리지 않는다) | 독립 런처(본 경로 · `iso`)만 — 로그인 필요보다 먼저 보므로 CLI 를 부르지 않는다. decide 는 이 사유를 보지 않는다 |
+| 로그인 필요 | GPT CLI 인증이 없다(`gpt-exec.sh auth-check` exit 18). 판정 순서 ① API 키 env 가 비어 있지 않으면 로그인됨 — CLI 에게 묻지 않는다(`login status` 는 env 키를 보지 않는다) ② GPT CLI 의 `login status`(출력 버림 · 5초 상한) — 0 이면 로그인됨 · 1 이면 로그인 안 됨(자격 증명 저장소처럼 `auth.json` 밖에 둔 로그인도 이 답으로 본다) ③ 그 밖(하위 명령이 없는 구버전 · 다른 종료 · 시간 초과)이면 CLI 홈의 `auth.json` 이 파일이 아닐 때 로그인 안 됨 | decide(`skip reason=off-no-auth`) · 런처(본 경로 · `iso` — CLI 없음 · 사용자 선택 다음, 인증 파일 없음보다 먼저) — off 를 기록하지 않는다. 래퍼 본 경로는 판정하지 않는다(CLI 실패 12 가 안전망) |
+| 인증 파일 없음(격리 첫 패스) | CLI 홈에 `auth.json` 파일이 없다 — 독립 첫 패스는 그 파일을 격리 홈에 링크해서 돈다(API 키 env · 자격 증명 저장소의 로그인만으로는 돌리지 않는다) | 독립 런처(본 경로 · `iso`)만 — 로그인 필요 다음에 본다(로그인하지 않은 사용자는 로그인 필요다). decide 는 이 사유를 보지 않는다 |
 
 - 래퍼는 사용법 · 경로 게이트(10 · 11) **뒤**, 선택 판독 **앞**에서 플래그 off · CLI 없음을 본다 — 손상 선택 파일(11)이 off 를 가리지 않는다. 세션 선택 off 는 플래그가 한 필드만이어도 이긴다
 - 런처는 격리 폴더 자리 · 입력 게이트(11 · 15)보다 **먼저** 본다 — GPT 를 쓰지 않는 사용자는 GPT 홈이 없을 수 있다. 인증 파일이 없는 것도 입력 오류(11)가 아니라 18 이다(인증 파일 없음(격리 첫 패스))

@@ -19,6 +19,9 @@
 #          health-missing-note — 이 트리 health-check 4.5b 본문(record 는 대역)이 missing 건수를 비고에 싣고 record 는 0 그대로다
 #       ⑨ 셀 check-removed-role-skill — 이전 판 설치의 마이그레이션: 이 판이 걷은(이 판 gpt-skills 에 없는) 역할 스킬을 가리키는
 #          링크(구버전 캐시의 살아 있는 링크 · 이 루트의 끊긴 링크)를 --check 가 stale 로 내고, 정리가 지우고, 정리 뒤 --check 는 0 이다
+#       ⑩ 셀 agents-check-listed · agents-prune-owned · agents-prune-dangling · agents-keep-unowned · agents-none-silent — 이전 판
+#          --gpt-agents 가 agents 폴더에 건 역할 파일 링크 두 이름(대상이 `/gpt-agents/<같은 이름>` 으로 끝난다 · 살아 있든 끊겼든)을
+#          --check 가 stale 로 내고 정리가 지운다. 같은 이름의 실제 파일 · 다른 곳 링크 · 다른 이름은 그대로 · agents 폴더가 없으면 줄 0
 # ⛔ 실제 사용자 폴더를 건드리지 않는다 — HOME·FZ_SKILL_TARGET 은 임시 폴더, CODEX_HOME 은 비운다.
 # ⛔ FZ_SETUP_UNDER_TEST 로 다른 판(기준 트리)의 스크립트를 같은 러너로 돌린다 — 판별력 대조용.
 #    이때 기대값은 **그 스크립트의** 플러그인 루트 기준이다.
@@ -239,6 +242,46 @@ pruned_m="$(sed -n 's/^  prune: \([^ ]*\) .*/\1/p' "$T/out.m1" | LC_ALL=C sort)"
   && [ ! -L "$MT/fz-retired-live" ] && [ ! -L "$MT/fz-retired-gone" ] && [ "$rcm2" -eq 0 ] && [ -z "$left_m" ] \
   && ok "check-removed-role-skill: 걷은 역할 스킬 링크(구버전 캐시 · 끊긴 현 루트) --check exit $rcm0 · 목록 2 · 정리가 지우고 정리 뒤 0" \
   || no "check-removed-role-skill: --check exit $rcm0(기대 $STALE_EXIT) · 목록 [$(words "$got_m")] 기대 [$(words "$want_m")] · setup exit $rcm1 · 지운 목록 [$(words "$pruned_m")] · 정리 뒤 exit $rcm2 · 남은 목록 [$(words "$left_m")]"
+
+# ⑩ agents-* — 이전 판 --gpt-agents 가 agents 폴더(스킬 폴더 옆)에 건 역할 파일 링크 두 이름. 대상 경로가 `/gpt-agents/<같은 이름>` 으로
+#    끝나는 링크만(살아 있든 끊겼든) --check 가 `  stale: agents/<이름>` 으로 내고 정리가 `  prune: agents/<이름>` 으로 지운다.
+#    같은 이름의 실제 파일 · 다른 곳을 가리키는 링크 · 다른 이름은 그대로이고 목록에 없다. agents 폴더가 없는 홈(위 셀들)은 그 줄이 없다
+AGN="$(printf '%s\n' fz-review-arch.toml fz-review-quality.toml | LC_ALL=C sort)"
+ag_set() { sed -n "s/^  $2: agents\/\([^ ]*\) .*/\1/p" "$1" | LC_ALL=C sort; }   # $1=출력 · $2=stale|prune
+ag_home() {   # $1=셀 · $2=링크 대상 폴더 — 두 이름 링크를 심은 홈에서 --check · 정리 · --check (H · TG 를 잠시 바꾼다 — ⑨ 와 같다)
+  local AH="$T/ag-$1" n
+  mkdir -p "$AH/.codex/skills" "$AH/.codex/agents"
+  for n in $AGN; do ln -s "$2/$n" "$AH/.codex/agents/$n"; done
+  H0="$H" TG0="$TG"; H="$AH" TG="$AH/.codex/skills"
+  sa="$(tsig)"; runc "ag-$1-c0"; rca0=$?; sb="$(tsig)"; run "ag-$1-s"; rcas=$?; runc "ag-$1-c1"; rca1=$?
+  H="$H0" TG="$TG0"
+  left_a=""; for n in $AGN; do [ -L "$AH/.codex/agents/$n" ] && left_a="$left_a $n"; done
+}
+mkdir -p "$OLD/gpt-agents"; for n in $AGN; do echo x > "$OLD/gpt-agents/$n"; done
+ag_home live "$OLD/gpt-agents"
+[ "$rca0" -eq "$STALE_EXIT" ] && [ "$(ag_set "$T/out.ag-live-c0" stale)" = "$AGN" ] && grep -qE '^Check: 2 stale in ' "$T/out.ag-live-c0" && [ "$sa" = "$sb" ] \
+  && ok "agents-check-listed: 살아 있는 두 역할 파일 링크 --check exit $rca0 · 목록 2 · 전후 해시 동일" \
+  || no "agents-check-listed: --check exit $rca0(기대 $STALE_EXIT) · 목록 [$(words "$(ag_set "$T/out.ag-live-c0" stale)")] 기대 [$(words "$AGN")] · 해시 $([ "$sa" = "$sb" ] && echo 동일 || echo 변경) — $(tail -1 "$T/out.ag-live-c0")"
+[ "$rcas" -eq 0 ] && [ "$(ag_set "$T/out.ag-live-s" prune)" = "$AGN" ] && [ -z "$left_a" ] && [ "$rca1" -eq 0 ] && [ -z "$(ag_set "$T/out.ag-live-c1" stale)" ] \
+  && ok "agents-prune-owned: 정리가 두 링크를 지우고 이름마다 prune 줄 · 정리 뒤 --check 0" \
+  || no "agents-prune-owned: setup exit $rcas · 지운 목록 [$(words "$(ag_set "$T/out.ag-live-s" prune)")] · 남은 링크[$left_a] · 정리 뒤 exit $rca1 — $(tail -1 "$T/out.ag-live-c1")"
+ag_home gone "$T/gone-cache/gpt-agents"
+[ "$rca0" -eq "$STALE_EXIT" ] && [ "$(ag_set "$T/out.ag-gone-c0" stale)" = "$AGN" ] && [ "$rcas" -eq 0 ] && [ "$(ag_set "$T/out.ag-gone-s" prune)" = "$AGN" ] && [ -z "$left_a" ] && [ "$rca1" -eq 0 ] \
+  && ok "agents-prune-dangling: 끊긴 두 링크도 --check 목록 2 · 정리가 지운다" \
+  || no "agents-prune-dangling: --check exit $rca0 · 목록 [$(words "$(ag_set "$T/out.ag-gone-c0" stale)")] · setup exit $rcas · 지운 목록 [$(words "$(ag_set "$T/out.ag-gone-s" prune)")] · 남은 링크[$left_a]"
+KH="$T/ag-keep"; KA="$KH/.codex/agents"; mkdir -p "$KH/.codex/skills" "$KA" "$T/elsewhere"
+echo mine > "$KA/fz-review-arch.toml"                                        # 같은 이름의 실제 파일
+ln -s "$T/elsewhere/fz-review-quality.toml" "$KA/fz-review-quality.toml"     # 같은 이름 · 다른 곳
+ln -s "$OLD/gpt-agents/fz-review-extra.toml" "$KA/fz-review-extra.toml"      # 같은 꼴 · 다른 이름
+ksnap() { for f in "$KA"/*; do if [ -L "$f" ]; then echo "$(basename "$f") -> $(readlink "$f")"; else echo "$(basename "$f") $(cat "$f")"; fi; done; }
+kb="$(ksnap)"; H0="$H" TG0="$TG"; H="$KH" TG="$KH/.codex/skills"; runc ag-keep-c0; rck=$?; run ag-keep-s; H="$H0" TG="$TG0"; ka="$(ksnap)"
+[ "$rck" -eq 0 ] && [ -z "$(ag_set "$T/out.ag-keep-c0" stale)" ] && [ -z "$(ag_set "$T/out.ag-keep-s" prune)" ] && [ "$kb" = "$ka" ] \
+  && ok "agents-keep-unowned: 같은 이름의 실제 파일 · 다른 곳 링크 · 다른 이름은 목록 0 · --check exit 0 · 정리 뒤 그대로" \
+  || no "agents-keep-unowned: --check exit $rck · 목록 [$(words "$(ag_set "$T/out.ag-keep-c0" stale)")] · 지운 목록 [$(words "$(ag_set "$T/out.ag-keep-s" prune)")] · 폴더 $([ "$kb" = "$ka" ] && echo 그대로 || echo 바뀜)"
+ag_lines="$(cat "$T/out.c0" "$T/out.1" "$T/out.c2" "$T/out.2" | grep -cE '^  (stale|prune): agents/')"
+[ "$ag_lines" -eq 0 ] && [ ! -e "$H/.codex/agents" ] \
+  && ok "agents-none-silent: agents 폴더가 없는 홈은 agents 줄 0 · 폴더를 만들지 않는다" \
+  || no "agents-none-silent: agents 줄 ${ag_lines}개 · agents 폴더 $([ -e "$H/.codex/agents" ] && echo 있음 || echo 없음)"
 
 echo
 [ "$fail" -eq 0 ] && echo "setup-links: 전건 통과" || echo "setup-links: 실패 있음"

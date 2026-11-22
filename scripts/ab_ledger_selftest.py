@@ -952,6 +952,25 @@ def self_test(case=None):
             shutil.rmtree(td, ignore_errors=True)
 
     @reg
+    def gpt_agents_flag_refused():
+        # 걷은 처치 --gpt-agents — collect-gpt 는 정문처럼 'was removed' 한 줄로 거부하고(0 아님) 행을 쓰지 않는다. 짝: 같은 원천 · 플래그 없음 → 행 1
+        td = tempfile.mkdtemp(prefix="abl-")
+        try:
+            args, tree = _gpt_fixture(td)
+            led = os.path.join(td, "ledger.jsonl")
+            cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "ab_ledger.py"), "collect-gpt", "--ledger", led,
+                   "--out", args["out"], "--run-id", args["run_id"], "--env", args["env"], "--mode", args["mode"], "--fixture", args["fixture"],
+                   "--plugin-root", tree, "--input", "diff.patch=" + args["inputs"]["diff.patch"]]
+            gone = subprocess.run(cmd + ["--gpt-agents"], capture_output=True, text=True, timeout=60)
+            led_gone = os.path.exists(led)
+            kept = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            rows = [json.loads(x) for x in open(led, encoding="utf-8")] if os.path.exists(led) else []
+            return (gone.returncode != PASS and gone.stdout.count("--gpt-agents was removed") == 1 and not led_gone
+                    and kept.returncode == PASS and len(rows) == 1), [gone.stdout + gone.stderr, kept.stdout + kept.stderr, f"ledger after refusal: {led_gone}"]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    @reg
     def gpt_relative_skill_ref_uses_workdir():
         # ⛔ 실측 S27 plan — `cat gpt-home/skills/fz-planner/references/domain-ios.md` · workdir = 격리 폴더 → 사본 읽기(문제 0).
         #    같은 상대 경로라도 workdir 가 다른 곳이면 여전히 격리 홈 밖이다

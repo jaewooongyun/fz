@@ -8,7 +8,7 @@
 #                    캐시 없음·손상·python3 없음이어도 config / off 로 묻는 degraded · set --model off 는 캐시 없이 기록 · off 짝 손상 판정 ·
 #                    get: 선택 없음 + GPT CLI 없음 → 묻지 않고 0 · model=off(기록 · 저장 불가 세션이면 기록 없이) · CLI 있음이면 3 · 파일 미기록
 #                    이전 선택(.last — GPT 를 켠 마지막 set 값 · off 는 남기지 않는다): 새 세션의 묻기(3) 경로에서만 · 지금 목록의 모델만 이어 쓴다 ·
-#                    자율 4 · CLI 없음 off · 손상 3 · 쓰기 실패 · 인증 없음 · CLI login status 가 인증 판정에 먼저다 ·
+#                    자율 4 · CLI 없음 off · 손상 3 · 쓰기 실패 · 인증 없음 · 인증 판정은 API 키 env · CLI login status · 인증 파일 순이다 ·
 #                    get → decide → 래퍼 argv 가 .last 값(셀마다 HOME · CLI 홈 · 선택 폴더를 따로 둔다)
 #   --scope wrapper: 래퍼 결정 순서 — 필드마다 플래그 > 세션 선택 > config(미전달) · exec/review/resume · --config-permissions ·
 #                    stderr GPT-CHOICE 한 줄(출처 라벨 · config 실제 값 · '?') · 손상 선택 파일 · gpt-choice.sh 부재 → 11 ·
@@ -817,7 +817,7 @@ run_wrapper() {
   a8="$(acx "CODEX_HOME=$T/w-ac-no" "OPENAI_API_KEY=" "CODEX_API_KEY=" /bin/bash "$WX" auth-check)"
   a9="$(acx "HOME=$T/w-ac-h" /bin/bash "$WX" auth-check)"
   check "인증 판정: auth.json 폴더 18 · 깨진 링크 18 · API 키 env 둘 0 · 빈 env 18 · 기본 CLI 홈(HOME/.codex) 0" "$a4|$a5|$a6|$a7|$a8|$a9" "18|18|0|0|18|0"
-  # CLI 의 답이 먼저다 — 가짜 CLI 의 `login status`(FZ_SHIM_LOGIN) 0 = 있음 · 1 = 없음. 그 밖(하위 명령 모름 2 · 멈춤)이면 위 파일 · env 규칙이다.
+  # API 키 env 가 없으면 CLI 의 답이 인증 파일보다 먼저다 — 가짜 CLI 의 `login status`(FZ_SHIM_LOGIN) 0 = 있음 · 1 = 없음. 그 밖(하위 명령 모름 2 · 멈춤)이면 위 파일 규칙이다.
   #   자격 증명 저장소(config cli_auth_credentials_store = "keyring")로 로그인한 사용자는 auth.json 이 없다 — CLI 가 0 이면 있음이다
   mkdir -p "$T/w-ac-store" "$T/w-ac-sel"; printf 'cli_auth_credentials_store = "keyring"\n' > "$T/w-ac-store/config.toml"
   l1="$(acx "CODEX_HOME=$T/w-ac-store" "FZ_SHIM_LOGIN=0" /bin/bash "$WX" auth-check)"
@@ -831,6 +831,15 @@ run_wrapper() {
   l6="$(acx "CODEX_HOME=$T/w-ac-no" "FZ_SHIM_LOGIN=hang" /bin/bash "$WX" auth-check)"
   l7=$(( $(date +%s) - l0 ))
   check "auth-check: 멈춘 CLI → 시간 상한 뒤 파일 규칙(인증 파일 0 · 없음 18 · 두 번 합 20초 미만)" "$l5|$l6|$([ "$l7" -lt 20 ] && echo bounded || echo "slow ${l7}s")" "0|18|bounded"
+  # API 키 env 가 CLI 의 답보다 먼저다 — CLI 의 login status 는 env 키를 보지 않는다(키만 있고 로그인하지 않았으면 1). 키가 있으면 CLI 에게
+  #   묻지 않고 있음(멈춘 CLI + 키도 시간 상한을 기다리지 않는다) · 키가 없으면 위 순서(CLI 의 답 → 인증 파일) 그대로
+  k1="$(acx "CODEX_HOME=$T/w-ac-no" "FZ_SHIM_LOGIN=1" "CODEX_API_KEY=sk-test-synthetic" /bin/bash "$WX" auth-check)"
+  k2="$(acx "CODEX_HOME=$T/w-ac-no" "FZ_SHIM_LOGIN=1" "OPENAI_API_KEY=sk-test-synthetic" /bin/bash "$WX" auth-check)"
+  k3="$(acx "CODEX_HOME=$T/w-ac-no" "FZ_SHIM_LOGIN=1" /bin/bash "$WX" auth-check)"
+  k4="$(acx "CODEX_HOME=$T/w-ac-no" "FZ_SHIM_LOGIN=0" /bin/bash "$WX" auth-check)"
+  check "auth-check: API 키 env 가 CLI 의 답보다 먼저 — login status 1 + CODEX_API_KEY 0 · 1 + OPENAI_API_KEY 0 · 1 + 없음 18 · 0 + 없음 0" "$k1|$k2|$k3|$k4" "0|0|18|0"
+  k0=$(date +%s); k5="$(acx "CODEX_HOME=$T/w-ac-no" "FZ_SHIM_LOGIN=hang" "CODEX_API_KEY=sk-test-synthetic" /bin/bash "$WX" auth-check)"; k6=$(( $(date +%s) - k0 ))
+  check "auth-check: API 키가 있으면 CLI 에게 묻지 않는다 — 멈춘 CLI + 키 → 0 · 3초 미만" "$k5|$([ "$k6" -lt 3 ] && echo asked-none || echo "waited ${k6}s")" "0|asked-none"
   # decide 도 같은 판정이다 — 자격 증명 저장소 로그인(파일 없음)은 skip 이 아니다(선택이 없어 ask) · 같은 상태에서 CLI 가 답하지 못하면 off-no-auth
   dcx() { local o; o="$(env -u FZ_AUTONOMY -u CODEX_HOME -u OPENAI_API_KEY -u CODEX_API_KEY "PATH=$CLIP" "HOME=$T/home" "CODEX_HOME=$T/w-ac-store" \
             "FZ_GPT_CHOICE_DIR=$T/w-ac-sel" "CLAUDE_CODE_SESSION_ID=w-ac-dec" "FZ_TELEMETRY_DIR=$T/w-ac-tel" "$@" /bin/bash "$CHOICE" decide 2>/dev/null)"; printf '%s|%s' "$o" "$?"; }

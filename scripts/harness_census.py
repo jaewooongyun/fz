@@ -43,7 +43,6 @@ GLOBS = [   # (id 접두, glob, 이름 뽑기)
     ("gpt-skill", "gpt-skills/*/SKILL.md", lambda p: os.path.basename(os.path.dirname(p))),
     ("template", "templates/*", lambda p: os.path.basename(p)),
     ("schema", "schemas/*.json", lambda p: os.path.basename(p)[:-5]),
-    ("gpt-agent", "gpt-agents/*.toml", lambda p: os.path.basename(p)[:-5]),   # independent-review --gpt-agents 역할 파일
 ]
 
 
@@ -127,9 +126,14 @@ def self_test():
         os.remove(os.path.join(d, "agents", "g.md"))
         m, e = check(d, led)
         case("extra-component", e == ["agent:g"] and not m, f"missing={m} extra={e}")
+        # 걷은 범주 — 옛 판 역할 파일(gpt-agents/*.toml)은 모집단에 없다. 짝: 남은 범주(gpt-skills/*/SKILL.md)는 그대로 든다
         os.makedirs(os.path.join(d, "gpt-agents"))
         open(os.path.join(d, "gpt-agents", "r.toml"), "w").write("x")
-        case("gpt-agent-in-population", "gpt-agent:r" in census(d), f"{sorted(census(d))}")
+        os.makedirs(os.path.join(d, "gpt-skills", "s"))
+        open(os.path.join(d, "gpt-skills", "s", "SKILL.md"), "w").write("x")
+        pop = census(d)
+        case("gpt-agent-not-in-population", not any(i.startswith("gpt-agent:") for i in pop), f"{sorted(pop)}")
+        case("gpt-skill-in-population", "gpt-skill:s" in pop, f"{sorted(pop)}")
         rcs = {}
         for tag, body in (("list-top", []), ("non-object", {"schema": LEDGER_SCHEMA, "components": [1]}),
                           ("no-id", {"schema": LEDGER_SCHEMA, "components": [{"id": None}, {"id": "agent:x"}]})):

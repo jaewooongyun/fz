@@ -11,8 +11,9 @@
 #   (c) 모델 목록 캐시 손상 + off   → options 가 degraded 로 off 를 내고 · set --model off 가 캐시 없이 0 · 세 입구 18 · CLI 호출 0
 #   (d) GPT CLI 없음(실행 파일 codex 가 든 폴더를 PATH 에서 뺀다 · GPT 홈도 없다) → get 이 묻지 않고 off(0) · 세 입구 18 'GPT-OFF: CLI 없음'
 #       — 런처는 GPT 홈 · 인증 게이트(11)보다 먼저 18 이다
-#   (e) 인증 없음(CLI 있음 · CLI 홈에 인증 파일 없음 · API 키 env 없음 · 가짜 CLI 의 login status 는 모름 2) → decide skip off-no-auth 18 · 선택 파일 미기록 ·
-#       런처 · 정문 경유 런처 18 'GPT-OFF: 인증 파일 없음(격리 첫 패스)' · CLI 호출 0 · 감사 gptOff · 격리 폴더 미생성. 래퍼는 인증을 판정하지 않는다(CLI 1회).
+#   (e) 인증 없음(CLI 있음 · CLI 홈에 인증 파일 없음 · API 키 env 없음 · 가짜 CLI 의 login status 는 모름 2 · 또는 1) → decide skip off-no-auth 18 · 선택 파일 미기록 ·
+#       런처 · 정문 경유 런처 18 'GPT-OFF: 로그인 필요'(로그인 판정이 인증 파일보다 먼저다) · CLI 호출은 login status 하나(GPT 호출 0) · 감사 gptOff ·
+#       격리 폴더 미생성. login status 0(CLI 로 로그인함) · 인증 파일 없음일 때만 'GPT-OFF: 인증 파일 없음(격리 첫 패스)'. 래퍼는 인증을 판정하지 않는다(CLI 1회).
 #       인증 파일을 만들면 decide 가 skip 이 아니다(off 를 기록하지 않았다). 인증 파일이 있어도 CLI 의 login status 가 1 이면 런처 18
 #       'GPT-OFF: 로그인 필요' — CLI 호출은 그 login status 하나뿐이다(GPT 호출 0)
 #   (f) API 키 env 만 있고 인증 파일이 없다 → decide 는 skip 이 아니다(키 = 인증 있음) · 런처 · 정문 경유 런처 18 'GPT-OFF: 인증 파일 없음(격리 첫 패스)'
@@ -167,19 +168,36 @@ reset_env; C_SID="sid-d2"; C_PATH="$NOCLI"
 wrap d-nosel
 check "(d) CLI 없음 · 선택 없음 · 래퍼 직접: 18 'GPT-OFF: CLI 없음'" "$(rc d-nosel)|$(offl d-nosel)" "18|GPT-OFF: CLI 없음"
 
-# ── (e) 인증 없음(로그인 필요) — CLI 있음 · 선택 없음 · CLI 홈에 config 만 있고 인증 파일이 없다(가짜 CLI 의 login status 는 모름 2 — 파일 · env 규칙)
+# ── (e) 인증 없음(로그인 필요) — CLI 있음 · 선택 없음 · CLI 홈에 config 만 있고 인증 파일이 없다(가짜 CLI 의 login status 는 모름 2 — 인증 파일 규칙)
 mkdir -p "$T/home-na/.codex"; cp "$T/home/.codex/config.toml" "$T/home-na/.codex/"
 reset_env; C_SID="sid-e"; C_HOME="$T/home-na"; C_CH="$T/home-na/.codex"; C_SEL="$T/sel-e"
 choice e-dec decide
 check "(e) decide · 인증 없음 → skip off-no-auth 18 · 선택 파일 미기록" "$(rc e-dec)|$(out e-dec)|$(find "$T/sel-e" -type f 2>/dev/null | wc -l | tr -d ' ')" "18|GPT-DECIDE skip reason=off-no-auth|0"
-# 런처는 인증 파일을 로그인 판정보다 먼저 본다 — 파일이 없으면 CLI 를 부르지 않고 '인증 파일 없음(격리 첫 패스)' 이다('로그인 필요' 는 아래 login status 1 셀)
+# 런처는 로그인 판정을 인증 파일보다 먼저 본다 — 로그인하지 않은 사용자는 파일이 없어도 '로그인 필요' 다(decide 의 off-no-auth 와 같은 사용자).
+#   CLI 호출은 그 판정의 login status 하나다(GPT 호출 0). '인증 파일 없음(격리 첫 패스)' 은 로그인한 사용자에게만 나온다(아래 login status 0 셀 · (f) 키)
 lnch e-lnch; glnch e-glnch
 for c in lnch glnch; do
-  check "(e) $c: exit 18 · CLI 호출 0" "$(rc "e-$c")|$(calls "e-$c")" "18|0"
-  check "(e) $c: stderr 'GPT-OFF: 인증 파일 없음(격리 첫 패스)'" "$(offl "e-$c")" "GPT-OFF: 인증 파일 없음(격리 첫 패스)"
+  check "(e) $c: exit 18 · 'GPT-OFF: 로그인 필요' · CLI 호출은 login status 하나" "$(rc "e-$c")|$(offl "e-$c")|$(tr '\n' ' ' < "$T/c-e-$c/calls.log" 2>/dev/null)" "18|GPT-OFF: 로그인 필요|login status "
 done
 E="$T/o/e-lnch/gpt-e-lnch"
-check "(e) 런처 감사: exit 18 · gptOff '인증 파일 없음(격리 첫 패스)' · 격리 폴더 미생성 · 입력 게이트(11) 아님" "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("exit"), d.get("gptOff"))' "$E.audit.json" 2>/dev/null)|$(find "$T/c-e-lnch/tmp" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' ')|$(grep -c 'INDEPENDENT-FAIL(11)' "$T/c-e-lnch/stderr" 2>/dev/null)" "18 인증 파일 없음(격리 첫 패스)|0|0"
+check "(e) 런처 감사: exit 18 · gptOff '로그인 필요' · 격리 폴더 미생성 · 입력 게이트(11) 아님" "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("exit"), d.get("gptOff"))' "$E.audit.json" 2>/dev/null)|$(find "$T/c-e-lnch/tmp" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' ')|$(grep -c 'INDEPENDENT-FAIL(11)' "$T/c-e-lnch/stderr" 2>/dev/null)" "18 로그인 필요|0|0"
+gptoff() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("exit"), d.get("gptOff"))' "$T/o/$1/gpt-$1.audit.json" 2>/dev/null; }   # 감사 exit · gptOff
+# 로그인 안 됨(login status 1) · 인증 파일 없음 · 키 없음 — 같은 사용자다: '로그인 필요'(인증 파일 사유가 아니다)
+C_XENV="FZ_SHIM_LOGIN=1"
+lnch e-n1-lnch; glnch e-n1-glnch
+for c in lnch glnch; do
+  check "(e) $c: 로그인 안 됨(login status 1 · 인증 파일 없음 · 키 없음) → 18 · 'GPT-OFF: 로그인 필요' · 감사 gptOff · CLI 호출은 login status 하나" \
+    "$(rc "e-n1-$c")|$(offl "e-n1-$c")|$(gptoff "e-n1-$c")|$(tr '\n' ' ' < "$T/c-e-n1-$c/calls.log" 2>/dev/null)" "18|GPT-OFF: 로그인 필요|18 로그인 필요|login status "
+done
+# CLI 로 로그인함(login status 0 — 자격 증명 저장소처럼 auth.json 밖) · 인증 파일 없음 → 그때만 '인증 파일 없음(격리 첫 패스)'
+C_XENV="FZ_SHIM_LOGIN=0"
+lnch e-s0-lnch; glnch e-s0-glnch
+for c in lnch glnch; do
+  check "(e) $c: CLI 로그인됨(login status 0) · 인증 파일 없음 → 18 · 'GPT-OFF: 인증 파일 없음(격리 첫 패스)' · 감사 gptOff · CLI 호출은 login status 하나" \
+    "$(rc "e-s0-$c")|$(offl "e-s0-$c")|$(gptoff "e-s0-$c")|$(tr '\n' ' ' < "$T/c-e-s0-$c/calls.log" 2>/dev/null)" \
+    "18|GPT-OFF: 인증 파일 없음(격리 첫 패스)|18 인증 파일 없음(격리 첫 패스)|login status "
+done
+C_XENV="-"
 # 래퍼 본 경로는 인증을 보지 않는다 — 가짜 CLI 가 불린다(실제 CLI 면 인증 실패가 exit 12 로 드러난다 · 래퍼 픽스처는 인증 없는 CLI 홈으로 돈다)
 wrap e-wrap
 check "(e) 래퍼 직접 · 인증 없음: 판정하지 않는다 — exit 0 · CLI 1회" "$(rc e-wrap)|$(calls e-wrap)" "0|1"

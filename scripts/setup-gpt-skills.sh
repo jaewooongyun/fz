@@ -12,12 +12,13 @@
 #   (같은 name 의 포크·구버전 캐시는 같은 플러그인 계열로 본다). 루트가 사라져 판정할 수 없으면 보존한다.
 #
 # Usage: bash <fz-plugin-dir>/scripts/setup-gpt-skills.sh [--check]
-#   --check       읽기 전용 점검 — 아래 세 prune 판정에 걸리는 stale 링크를 `  stale: <이름> …` 줄로 나열만 한다.
+#   --check       읽기 전용 점검 — 아래 네 prune 판정에 걸리는 stale 링크를 `  stale: <이름> …` 줄로 나열만 한다
+#                 (prune ④ 는 스킬 폴더 옆 agents 폴더의 링크라 `  stale: agents/<이름> …` 이다).
 #                 판정은 `Check: N stale` 요약 줄로 한다 — 그 줄 없이 끝난 exit 1 은 stale 이 아니라 준비 오류(매니페스트 · gpt-skills 없음)다.
 #                 소유를 판정할 수 없는 끊긴 `fz-*` 링크(setup 의 'keep: … 소유 판정 불가')는 `  unknown: <이름> …` 줄로 따로 낸다(stale 아님).
 #                 번들 gpt-skills 가운데 스킬 폴더에 아직 없는 이름은 `  missing: <이름> …` 줄로 따로 낸다(stale 아님 — review 모드
 #                 kind 는 CLI 가 이 폴더에서 역할을 고르므로 그 역할 없이 돈다 · exec 모드는 번들 본문을 직접 넣는다).
-#                 스킬 폴더만 보고 아무것도 만들거나 지우지 않는다. exit: 0 = stale 0 · 1 = stale 있음(unknown · missing 은 exit 에 반영하지 않는다)
+#                 스킬 폴더 · agents 폴더만 보고 아무것도 만들거나 지우지 않는다. exit: 0 = stale 0 · 1 = stale 있음(unknown · missing 은 exit 에 반영하지 않는다)
 
 set -euo pipefail
 
@@ -35,6 +36,8 @@ GPT_SOURCE_DIR="$PLUGIN_DIR/gpt-skills"
 # ⛔ 테스트 주입점 — 회귀 검증이 실제 사용자 디렉토리를 변경하지 않도록 override 를 받는다.
 #    기본값은 GPT CLI 네임스페이스(`${CODEX_HOME:-~/.codex}` — 개명 금지, CLI 소유 경로다).
 TARGET_DIR="${FZ_SKILL_TARGET:-${CODEX_HOME:-$HOME/.codex}/skills}"
+# 이전 판 --gpt-agents 가 역할 파일 링크를 건 폴더 — 스킬 폴더 옆(기본 `${CODEX_HOME:-~/.codex}/agents` · 주입한 스킬 폴더면 그 옆이라 실제 홈에 닿지 않는다)
+AGENTS_DIR="$(dirname "$TARGET_DIR")/agents"
 
 # 매니페스트 최상위 name — python3 가 있으면 JSON 으로 읽는다(들여쓰기·한 줄 JSON·중첩 name 에 흔들리지 않게 — 2라운드 007).
 #   없으면 들여쓰기 2칸 줄만 읽는 근사로 떨어진다(author.name 4칸을 집지 않는다). 못 읽으면 빈 문자열.
@@ -77,6 +80,12 @@ owned_under() {
 #   이전 판 설치의 옛 링크다 — 인자 없는 실행은 그 이름을 다시 걸지 않으므로, 구버전 캐시가 남아 링크가 살아 있으면 그대로 남는다
 retired_skill() { owned_under "$1" gpt-skills && [ ! -f "$GPT_SOURCE_DIR/${1##*/}/SKILL.md" ]; }
 
+# $1=이름 — agents 폴더의 그 이름이 이전 판 --gpt-agents 가 건 역할 파일 링크면 0 (prune ④). 이 판은 그 옵션과 gpt-agents/ 를 걷었다.
+#   이 플러그인이 만든 꼴만 본다 — 아래 두 이름이고 심볼릭이며 대상 경로가 `/gpt-agents/<같은 이름>` 으로 끝난다(살아 있든 끊겼든).
+#   같은 이름의 실제 파일 · 다른 곳을 가리키는 링크 · 다른 이름은 건드리지도 나열하지도 않는다
+RETIRED_AGENTS="fz-review-arch.toml fz-review-quality.toml"
+retired_agent() { [ -L "$AGENTS_DIR/$1" ] && case "$(readlink "$AGENTS_DIR/$1")" in */gpt-agents/"$1") true ;; *) false ;; esac; }
+
 SELF_NAME="$(plugin_name "$PLUGIN_DIR")"
 SELF_ROOT="$(cd "$PLUGIN_DIR" && pwd -P)"
 if [ -z "$SELF_NAME" ]; then
@@ -89,7 +98,7 @@ if [ ! -d "$GPT_SOURCE_DIR" ]; then
 fi
 
 # ── --check: 읽기 전용 점검 — ⛔ mkdir -p 앞에서 끝낸다(스킬 폴더가 없으면 만들지 않고 stale 0 이다)
-#    stale = 아래 prune ① · ② · ③ 의 판정(같은 norm · owned_under · retired_skill)에 걸리는 링크다. 그래서 정리(인자 없는 실행) 뒤 다시 보면 0 이다.
+#    stale = 아래 prune ① · ② · ③ · ④ 의 판정(같은 norm · owned_under · retired_skill · retired_agent)에 걸리는 링크다. 그래서 정리(인자 없는 실행) 뒤 다시 보면 0 이다.
 # ⛔ 비교 기준은 링크 대상의 설치 루트다 — 루트 매니페스트 name 으로 소유를 본다. 이 실행 트리 경로와 같은지는 보지 않는다:
 #    그렇게 보면 dev 트리·격리 clone 에서 돌릴 때 설치본을 가리키는 정상 GPT 스킬 링크가 전부 stale 로 보인다(트리마다 결과가 달라진다).
 #    같은 이유로 살아 있는 다른 판의 GPT 스킬 링크(인자 없는 실행이 이 판으로 다시 거는 것)는 내지 않는다. 아직 링크되지 않은 스킬은
@@ -116,6 +125,11 @@ if [ "$CHECK" -eq 1 ]; then
       fi
       echo "  stale: $name (dangling -> $dest)"                          # prune ② 대상
     fi
+    stale=$((stale + 1))
+  done
+  for n in $RETIRED_AGENTS; do                                                # prune ④ 대상 — 스킬 폴더 옆 agents 폴더(없으면 줄 0)
+    retired_agent "$n" || continue
+    echo "  stale: agents/$n (retired agent link -> $(readlink "$AGENTS_DIR/$n"))"
     stale=$((stale + 1))
   done
   missing=0
@@ -212,6 +226,14 @@ for link in "$TARGET_DIR"/fz-*; do
   else
     echo "  keep: $(basename "$link") (dangling — 소유 판정 불가, 보존)"
   fi
+done
+
+# ── prune ④: 이전 판 --gpt-agents 의 역할 파일 링크 두 이름(retired_agent) — agents 폴더가 없으면 아무것도 하지 않는다(만들지 않는다)
+for n in $RETIRED_AGENTS; do
+  retired_agent "$n" || continue
+  echo "  prune: agents/$n (retired agent link -> $(readlink "$AGENTS_DIR/$n"))"
+  rm "$AGENTS_DIR/$n"
+  pruned=$((pruned + 1))
 done
 
 echo ""

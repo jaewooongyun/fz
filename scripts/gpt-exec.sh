@@ -37,10 +37,11 @@
 #   gpt-exec.sh cli-check  GPT CLI 가 PATH 에 있는가만 본다(호출 아님 · 호출 행 없음) — 0=있음 · 18=없음. gpt-choice.sh get · 독립 런처가
 #                     'CLI 없음' 을 이 판정으로 본다 — 실행 파일 이름은 이 래퍼 한 곳에 둔다(scripts/check_gpt_surface.py 경계 파일)
 #   gpt-exec.sh auth-check GPT CLI 인증이 있는가만 본다(모델 호출 아님 · 호출 행 없음) — 0=있음 · 18=없음(로그인 필요). 순서:
-#                     ① CLI 의 `login status`(cli-check 와 같은 실행 파일 · 출력 버림 · 5초 상한) 0 → 있음 · 1 → 없음 —
+#                     ① API 키 env(OPENAI_API_KEY · CODEX_API_KEY)가 비어 있지 않으면 있음 — CLI 에게 묻지 않는다(login status 는 env 키를 보지 않는다)
+#                     ② CLI 의 `login status`(cli-check 와 같은 실행 파일 · 출력 버림 · 5초 상한) 0 → 있음 · 1 → 없음 —
 #                     자격 증명 저장소(auth.json 밖)로 로그인한 사용자도 CLI 의 답으로 가른다
-#                     ② 그 밖(하위 명령 없음 · 다른 종료 · 시간 초과)이면 ${CODEX_HOME:-$HOME/.codex}/auth.json 이 파일(링크면 대상이 파일 — 내용은
-#                     읽지 않는다)이거나 API 키 env(OPENAI_API_KEY · CODEX_API_KEY)가 비어 있지 않을 때 있음. gpt-choice.sh decide · 독립 런처가 '로그인 필요' 를
+#                     ③ 그 밖(하위 명령 없음 · 다른 종료 · 시간 초과)이면 ${CODEX_HOME:-$HOME/.codex}/auth.json 이 파일(링크면 대상이 파일 — 내용은
+#                     읽지 않는다)일 때 있음. gpt-choice.sh decide · 독립 런처가 '로그인 필요' 를
 #                     이 판정으로 본다 — env 이름도 이 래퍼 한 곳에 둔다. 래퍼 본 경로(review · exec · resume)는 인증을 보지 않는다(CLI 실패 12 가 안전망)
 #
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건(세션 선택 판독 실패 포함) / 12=gpt 비정상종료
@@ -182,17 +183,19 @@ if [ "${1:-}" = "cli-check" ]; then
   exit 18
 fi
 # ── auth-check — GPT CLI 인증 유무만 본다. cli-check 와 같이 호출 행 trap 보다 먼저 끝낸다(확인은 모델 호출이 아니다)
-#    판정 순서 ① CLI 에게 묻는다 — cli-check 가 찾는 같은 실행 파일의 `login status`(stdin 닫음 · 출력 버림). 0 = 있음 · 1 = 없음 —
+#    판정 순서 ① API 키 env 가 비어 있지 않으면 있음 — CLI 에게 묻지 않는다. ⛔ CLI 의 `login status` 는 env 키를 보지 않는다(키만 있고
+#               로그인하지 않았으면 1) — 그 답을 먼저 들으면 키로 CLI 를 쓰는 사용자가 '로그인 필요' 로 모든 GPT 단계를 건너뛴다
+#             ② CLI 에게 묻는다 — cli-check 가 찾는 같은 실행 파일의 `login status`(stdin 닫음 · 출력 버림). 0 = 있음 · 1 = 없음 —
 #               CLI 가 인증을 auth.json 밖(자격 증명 저장소)에 두어도 이 답이 맞다. ⛔ 5초 상한 — perl alarm 은 exec 뒤에도 남아 멈춘 CLI 를
 #               SIGALRM 으로 끝낸다(decide 가 GPT 단계마다 부른다 — 멈춘 CLI 가 판정을 붙잡지 않게)
-#             ② 그 밖(하위 명령을 모르는 구버전 · 다른 종료 · 시간 초과 · CLI · perl 없음)이면 파일 · env 규칙 —
+#             ③ 그 밖(하위 명령을 모르는 구버전 · 다른 종료 · 시간 초과 · CLI · perl 없음)이면 인증 파일 규칙 —
 #               ⛔ 인증 파일은 있는지만 본다(-f — 깨진 링크 · 폴더는 없음) · 내용을 읽지 않는다
 if [ "${1:-}" = "auth-check" ]; then
   [ $# -eq 1 ] || die 10 "auth-check 는 인자를 받지 않는다: $2"
+  if [ -n "${OPENAI_API_KEY:-}" ] || [ -n "${CODEX_API_KEY:-}" ]; then exit 0; fi
   { perl -e 'alarm shift; exec @ARGV or exit 127' 5 codex login status < /dev/null > /dev/null; } 2> /dev/null   # 묶음 2> — 셸의 신호 종료 안내('Alarm clock')도 버린다
   case $? in 0) exit 0 ;; 1) exit 18 ;; esac
   [ -f "${CODEX_HOME:-${HOME:-}/.codex}/auth.json" ] && exit 0
-  if [ -n "${OPENAI_API_KEY:-}" ] || [ -n "${CODEX_API_KEY:-}" ]; then exit 0; fi
   exit 18
 fi
 trap 'calls_row $?' EXIT

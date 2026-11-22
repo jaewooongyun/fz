@@ -401,6 +401,9 @@ def cmd_show(a):
 
 
 def cmd_collect_gpt(a):
+    if a.gpt_agents:   # 걷은 처치 — 정문 · 런처가 이 입력을 거부하므로 그 run 은 일어날 수 없다. 정문처럼 이름을 대고 거부하며 행을 쓰지 않는다
+        print("UNRUN: --gpt-agents was removed — drop it (하위 에이전트 렌즈 opt-in 을 걷었다 · scripts/gpt-kinds.json removed_inputs) · 행을 쓰지 않았다")
+        return UNRUN
     inputs = {}
     for x in a.input or []:
         if "=" not in x:
@@ -610,7 +613,7 @@ def main() -> int:
     p.add_argument("--plugin-root", required=True, help="런처를 부른 플러그인 루트")
     p.add_argument("--input", action="append", help="이름=경로 — 감사 inputs 해시와 대조할 원본(반복)")
     p.add_argument("--lead-rules", help="Lead 규칙 레코드(rules.json — check_project_rules 통과본) — rules-compare")
-    p.add_argument("--gpt-agents", action="store_true", help="런처를 --gpt-agents 로 불렀다(하위 에이전트 허용)")
+    p.add_argument("--gpt-agents", action="store_true", help="걷은 처치 — 주면 거부한다(exit 2 · 행 미기록). 옛 행의 이 칸은 그대로 읽는다")
     p.set_defaults(func=cmd_collect_gpt)
 
     p = sub.add_parser("verify-evidence", help="S27 두 번째 자 — gpt-pass 행의 원천 재판독 · 매트릭스 · 규칙 fixture 범위")

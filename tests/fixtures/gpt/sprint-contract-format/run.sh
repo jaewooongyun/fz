@@ -16,6 +16,8 @@
 #      금지 입력(--repo 가 ~/.claude 아래 → exit 15 · ~/.claude 가 링크면 링크 경로 · 링크 대상 경로 둘 다) — 를 격리 폴더를 만들기 전에 거는가(빈 stdout · 폴더 0개). 대조: 같은 가짜 HOME 에서
 #      ~/.claude 밖 자리 · 저장소면 exit 0 과 격리 폴더 경로 한 줄. 가짜 HOME · 러너 임시 폴더 안 TMPDIR 만 쓴다(실제 ~/.claude · 임시 루트를 가리키지 않는다)
 #      인증 파일 없음(CLI 홈에 auth.json 이 없다 — API 키 env 가 있어도)은 두 게이트보다 먼저 exit 18 · 'GPT-OFF: 인증 파일 없음(격리 첫 패스)'(메인 경로와 같은 GPT 미사용)
+#      GPT 미사용 사유는 메인 경로와 같은 순서다 — CLI 없음 · 사용자 선택 · 로그인 필요 · 인증 파일 없음(셀 iso-cli-missing-off · iso-user-choice-off ·
+#      iso-not-signed-in-login-needed · iso-signed-in-no-auth-file · iso-key-only-no-auth-file — 가짜 CLI 의 login status 로 로그인 상태를 정한다)
 # --live — 실제 GPT CLI 1회(effort high · read-only 권한 프로필)로 기록을 새로 만든 뒤 기본 모드를 돈다. 사람이 부른다(게이트는 부르지 않는다)
 #   호출은 독립 런처와 같은 격리 아래서 돈다 — gpt_independent.sh iso 가 만든 격리 폴더(가짜 HOME · 격리 CODEX_HOME · 권한 프로필:
 #   HOME · 임시 루트 · 플러그인 트리 deny · 저장소 사본 read)와 래퍼 --config-permissions. 기록(provenance.json)에 격리 config 의 deny 경로 수를 남긴다
@@ -216,6 +218,7 @@ if [ "$LIVE" -eq 0 ] && [ -z "${FZ_SC_MODULE:-}" ]; then
   mkdir -p "$T/lw" "$T/lgh" "$T/lrec"; echo '{"fake":"auth"}' > "$T/lgh/auth.json"
   cat > "$T/lw/codex" <<'WRAP'
 #!/bin/bash
+case "${1:-} ${2:-}" in "login status") exec "$FZ_SC_SHIM/codex" "$@" ;; esac   # iso 의 인증 판정(auth-check)은 재녹화 호출이 아니다 — 줄을 남기지 않는다
 d=$(grep -c '= "deny"' "${CODEX_HOME:-/nonexistent}/config.toml" 2>/dev/null)
 case " $* " in *sandbox_mode*) s=1 ;; *) s=0 ;; esac
 printf 'CALL HOME=%s CODEX_HOME=%s DENY=%s SBX=%s\n' "${HOME:-}" "${CODEX_HOME:-}" "${d:-0}" "$s" >> "$FZ_SC_CALLS"
@@ -247,14 +250,18 @@ WRAP
 fi
 
 # ⑤ iso 사전 게이트 — 가짜 HOME(.claude 만) · 실제 GPT 홈 대신 임시 인증 파일(CODEX_HOME) · 이 러너의 임시 폴더($T) 안 TMPDIR 로
-#    iso 를 부른다(모델 · CLI 호출 없음). 인증이 있어도 두 게이트가 먼저 멈추는지 본다.
+#    iso 를 부른다(모델 호출 없음). 인증이 있어도 두 게이트가 먼저 멈추는지 본다.
+#    ⛔ iso 의 로그인 판정(래퍼 auth-check)은 CLI 의 login status 를 묻는다 — 실제 CLI 를 부르지 않게 셀마다 PATH 앞에 가짜 CLI(../_shim) 를 두고
+#       API 키 env · FZ_SHIM_LOGIN · 세션 선택 폴더를 셀이 정한다(사용자 env 가 셀에 새지 않게)
 #    ⛔ 지우는 격리 폴더는 iso 가 stdout 으로 돌려준 경로 하나뿐이다(cleanup --iso) — 나머지는 $T 와 함께 지워진다
 if [ "$LIVE" -eq 0 ] && [ -z "${FZ_SC_MODULE:-}" ]; then
   IH="$T/ih"
   mkdir -p "$IH/.claude/tmp" "$IH/.claude/projects/p" "$T/igh" "$T/it-repo" "$T/it-ok" "$T/irepo"; echo '{"fake":"auth"}' > "$T/igh/auth.json"
+  SHIMP="$R/tests/fixtures/gpt/_shim:$PATH"
+  isoenv() { env -u OPENAI_API_KEY -u CODEX_API_KEY -u FZ_SHIM_LOGIN -u FZ_AUTONOMY PATH="$SHIMP" FZ_GPT_CHOICE_DIR="$T/iso-sel" CLAUDE_CODE_SESSION_ID=iso-sid "$@"; }
   iso_run() {   # $1 = TMPDIR · 나머지 = iso 인자 → $T/iso.out(stdout) · $T/iso.err · 종료값 · IHOME = 가짜 HOME(기본 $IH)
     local tmp="$1"; shift
-    env HOME="${IHOME:-$IH}" CODEX_HOME="$T/igh" TMPDIR="$tmp" bash "$R/scripts/gpt_independent.sh" iso "$@" > "$T/iso.out" 2> "$T/iso.err"
+    isoenv HOME="${IHOME:-$IH}" CODEX_HOME="$T/igh" TMPDIR="$tmp" bash "$R/scripts/gpt_independent.sh" iso "$@" > "$T/iso.out" 2> "$T/iso.err"
   }
   isos() { find "$1" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' '; }
   iso_run "$IH/.claude/tmp"; IRC=$?
@@ -294,12 +301,30 @@ if [ "$LIVE" -eq 0 ] && [ -z "${FZ_SC_MODULE:-}" ]; then
   # 인증 파일 없음 — 격리 홈은 실제 CLI 홈의 auth.json 을 링크해서 돈다. 없으면 메인 경로처럼 GPT 미사용(18 · GPT-OFF)이고 자리 게이트(11)보다 먼저다
   #   (TMPDIR 이 ~/.claude 아래여도 18) · API 키 env 가 있어도 같다 · 빈 stdout · 격리 폴더 0개
   mkdir -p "$T/igh-none" "$T/it-na"
-  env HOME="$IH" CODEX_HOME="$T/igh-none" TMPDIR="$IH/.claude/tmp" OPENAI_API_KEY=sk-test-synthetic bash "$R/scripts/gpt_independent.sh" iso --repo "$T/irepo" > "$T/iso.out" 2> "$T/iso.err"; IRC=$?
-  env HOME="$IH" CODEX_HOME="$T/igh-none" TMPDIR="$T/it-na" bash "$R/scripts/gpt_independent.sh" iso --repo "$T/irepo" > "$T/iso2.out" 2> "$T/iso2.err"; IRC2=$?
+  isoenv HOME="$IH" CODEX_HOME="$T/igh-none" TMPDIR="$IH/.claude/tmp" OPENAI_API_KEY=sk-test-synthetic bash "$R/scripts/gpt_independent.sh" iso --repo "$T/irepo" > "$T/iso.out" 2> "$T/iso.err"; IRC=$?
+  isoenv HOME="$IH" CODEX_HOME="$T/igh-none" TMPDIR="$T/it-na" bash "$R/scripts/gpt_independent.sh" iso --repo "$T/irepo" > "$T/iso2.out" 2> "$T/iso2.err"; IRC2=$?
   [ "$IRC:$IRC2" = "18:18" ] && [ ! -s "$T/iso.out" ] && [ ! -s "$T/iso2.out" ] && grep -q '^GPT-OFF: 인증 파일 없음(격리 첫 패스) — ' "$T/iso.err" \
     && [ "$(isos "$IH/.claude/tmp"):$(isos "$T/it-na")" = "0:0" ] \
     && ok "iso-no-auth-file-off — 인증 파일이 없으면 iso 도 메인 경로처럼 exit 18 · 'GPT-OFF: 인증 파일 없음(격리 첫 패스)' · 자리 게이트(11)보다 먼저 · 빈 stdout · 격리 폴더 0" \
     || no "iso-no-auth-file-off — exit $IRC · $IRC2 · stdout '$(cat "$T/iso.out" "$T/iso2.out")' · 격리 폴더 $(isos "$IH/.claude/tmp") · $(isos "$T/it-na")개 · $(tail -1 "$T/iso.err")"
+  # GPT 미사용 순서 — 메인 경로와 같다: CLI 없음 · 사용자 선택 · 로그인 필요 · 인증 파일 없음(앞 사유가 이긴다). 셀마다 인증 파일이 없는
+  #   CLI 홈 · 가짜 CLI(login status = FZ_SHIM_LOGIN) · 러너 임시 TMPDIR — 어느 사유든 18 · 빈 stdout · 격리 폴더 0
+  iso_off() {   # $1 = 셀 · 나머지 = env 'NAME=값'(PATH 도 덮을 수 있다) → '종료값|GPT-OFF 사유|stdout 바이트|격리 폴더 수'
+    local c="$1" t="$T/it-off-$1"; shift; mkdir -p "$t"
+    isoenv HOME="$IH" CODEX_HOME="$T/igh-none" TMPDIR="$t" "$@" bash "$R/scripts/gpt_independent.sh" iso --repo "$T/irepo" > "$T/iso-$c.out" 2> "$T/iso-$c.err"
+    printf '%s|%s|%s|%s' "$?" "$(grep -m1 '^GPT-OFF: ' "$T/iso-$c.err" | sed 's/ — .*//')" "$(wc -c < "$T/iso-$c.out" | tr -d ' ')" "$(isos "$t")"
+  }
+  NOCLIP=""; for d in $(printf '%s' "$PATH" | tr ':' ' '); do [ -x "$d/codex" ] || NOCLIP="${NOCLIP:+$NOCLIP:}$d"; done   # CLI 가 든 폴더를 뺀 PATH
+  mkdir -p "$T/iso-sel"; printf 'model=off\neffort=off\n' > "$T/iso-sel/iso-off"
+  for row in "iso-not-signed-in-login-needed|FZ_SHIM_LOGIN=1|GPT-OFF: 로그인 필요|login status 1 · 인증 파일 · 키 없음" \
+             "iso-signed-in-no-auth-file|FZ_SHIM_LOGIN=0|GPT-OFF: 인증 파일 없음(격리 첫 패스)|login status 0 · 인증 파일 없음" \
+             "iso-key-only-no-auth-file|FZ_SHIM_LOGIN=1 OPENAI_API_KEY=sk-test-synthetic|GPT-OFF: 인증 파일 없음(격리 첫 패스)|API 키만(login status 1) · 인증 파일 없음" \
+             "iso-cli-missing-off|PATH=$NOCLIP|GPT-OFF: CLI 없음|CLI 없음 · 인증 파일 · 키 없음" \
+             "iso-user-choice-off|FZ_SHIM_LOGIN=1 CLAUDE_CODE_SESSION_ID=iso-off|GPT-OFF: 사용자 선택|세션 선택 off · login status 1 · 인증 파일 없음"; do
+    IFS='|' read -r cn ce cw cd_ <<< "$row"
+    got="$(iso_off "$cn" $ce)"   # ce = 셀이 정한 'NAME=값' 낱말들(공백으로 나눈다)
+    [ "$got" = "18|$cw|0|0" ] && ok "$cn — $cd_ → exit 18 · '$cw' · 빈 stdout · 격리 폴더 0" || no "$cn — $cd_ → 기대 '18|$cw|0|0' · 실제 '$got'"
+  done
 fi
 
 echo

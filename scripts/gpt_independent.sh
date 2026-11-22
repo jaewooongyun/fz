@@ -22,8 +22,8 @@
 #   gpt_independent.sh cleanup --iso D   --keep-iso 로 남긴 격리 폴더를 지운다(resume 교차 뒤 · iso 가 만든 폴더도). 이름 fz-gpt-iso.XXXXXX · gpt-home/ 가 맞을 때만
 #   gpt_independent.sh iso [--repo D] [--deny D]...   격리 폴더만 만든다 — 런처 밖에서 래퍼를 부르는 쪽(재녹화 러너
 #             tests/fixtures/gpt/sprint-contract-format/run.sh --live)이 같은 격리를 쓴다(격리 config 를 쓰는 코드는 make_iso 한 벌).
-#             --repo · --deny 는 메인 경로와 같은 뜻이다(--repo 는 cwd 신뢰도 받는다). 만들기 전에 메인 경로와 같은 인증 파일 게이트(실제 CLI 홈에 auth.json 이
-#             없으면 18 · 'GPT-OFF: 인증 파일 없음(격리 첫 패스)')와 사전 게이트 둘을
+#             --repo · --deny 는 메인 경로와 같은 뜻이다(--repo 는 cwd 신뢰도 받는다). 만들기 전에 메인 경로와 같은 순서의 GPT 미사용 게이트(CLI 없음 ·
+#             사용자 선택 · 로그인 필요 · 인증 파일 없음 → 18 · 'GPT-OFF: <사유>')와 사전 게이트 둘을
 #             건다 — 격리 폴더 자리(${TMPDIR:-/tmp} 실경로가 실제 홈 ~/.claude 아래 → 11) · 금지 입력(--repo 가 ~/.claude 아래 → 15). stdout = 격리 폴더 실경로 한 줄 ·
 #             실패 = 0 이 아닌 종료와 빈 stdout · 정리 = 부른 쪽(cleanup --iso). 부른 쪽은 HOME=<격리>/home CODEX_HOME=<격리>/gpt-home 으로
 #             래퍼를 --config-permissions 와 함께 부른다
@@ -43,8 +43,9 @@
 # stderr: 래퍼의 적용값 줄 'GPT-CHOICE model=<값> (출처) effort=<값> (출처)' 을 그대로 한 줄 옮긴다(래퍼가 그 줄 전에 멈추면 없다)
 # exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건(격리 폴더 자리 ${TMPDIR:-/tmp} 가 실제 홈 ~/.claude 아래인 경우(F-509) · 그 실경로가 --repo 와 같은 경우 포함 — GPT 호출 전) · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
-#       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off · 인증 파일 없음(격리 첫 패스 — 실제 CLI 홈에 auth.json 이 없다 · API 키 env ·
-#          CLI 로그인 상태와 무관) · 인증 없음(로그인 필요 — 래퍼 auth-check 18). 격리 폴더를 만들지 않고 GPT 를 부르지 않는다(로그인 필요 판정만 CLI 의
+#       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off · 인증 없음(로그인 필요 — 래퍼 auth-check 18) · 인증 파일 없음(격리 첫 패스 —
+#          로그인은 했는데 실제 CLI 홈에 auth.json 이 없다 · API 키 env · 자격 증명 저장소만으로는 돌리지 않는다) — 이 순서로 앞 사유가 이긴다.
+#          격리 폴더를 만들지 않고 GPT 를 부르지 않는다(로그인 필요 판정만 CLI 의
 #          login status 를 묻는다 — 모델 호출이 아니다).
 #          stderr 'GPT-OFF: <사유> — …' · 감사 <stem>.audit.json 에 "exit": 18 · "gptOff": "<사유>"(오염 · 측정 실패 아님 — 병합은 --gpt-unavailable)
 #       래퍼의 10 · 11 도 그대로 낸다 — --model · --effort 불량(10) · 세션 선택 판독 실패(11) 포함, 사유는 .wrapper.log
@@ -155,7 +156,7 @@ PY
 # ── 인증 파일(⛔ 없으면 exit 18 · GPT 미사용 — 정본 modules/gpt-strategy.md § GPT 미사용) — 격리 첫 패스는 실제 CLI 홈의 auth.json 을 격리 홈에
 #    링크해서 돈다(make_iso). 그 파일이 없으면 API 키 env 나 CLI 의 로그인 상태(파일 밖 자격 증명 저장소)가 있어도 돌리지 않는다 — 입력 오류(11)가 아니라
 #    그 단계를 건너뛰는 18 이다. 메인 경로 GPT 미사용 게이트와 iso 하위 명령이 이 한 벌을 쓴다 — 둘 다 아래 사전 게이트 · 입력 게이트 앞이고,
-#    로그인 판정(래퍼 auth-check — CLI 의 login status 를 부른다)보다 먼저라 파일이 없으면 CLI 를 부르지 않는다
+#    로그인 판정(래퍼 auth-check — CLI 의 login status 를 부른다) 뒤다: 로그인하지 않은 사용자는 '로그인 필요' 이고 이 사유는 로그인한 사용자에게만 나온다
 AUTH_FILE_WHY="인증 파일 없음(격리 첫 패스)"
 auth_file_absent() { [ ! -f "${CODEX_HOME:-${HOME:-}/.codex}/auth.json" ]; }
 
@@ -225,7 +226,7 @@ $GUARD"
 }
 
 # 격리 폴더만 만든다(iso) — 런처 밖에서 래퍼를 부르는 쪽이 독립 런처와 같은 격리를 쓴다(재녹화 러너 sprint-contract-format --live).
-#   메인 경로와 같은 사전 게이트 둘(격리 폴더 자리 11 · 금지 입력 --repo 15)을 make_iso 전에 건다 — 같은 종료값 · 같은 메시지
+#   메인 경로와 같은 순서의 GPT 미사용 게이트(18)와 사전 게이트 둘(격리 폴더 자리 11 · 금지 입력 --repo 15)을 make_iso 전에 건다 — 같은 종료값 · 같은 메시지
 #   ⛔ 실패면 stdout 이 비고 만들던 폴더를 지운다(경로를 받지 못한 쪽은 지울 수 없다). 성공한 폴더의 정리는 부른 쪽이 한다(cleanup --iso)
 if [ "$MODE" = "iso" ]; then
   REPO="" DENIES=()
@@ -236,6 +237,22 @@ if [ "$MODE" = "iso" ]; then
       *) die 10 "iso 는 --repo D · --deny D 만 받는다 — 받은 값: $1" ;;
     esac
   done
+  # GPT 미사용 — 메인 경로의 GPT 미사용 게이트(아래)와 같은 순서: CLI 없음 · 사용자 선택 · 로그인 필요 · 인증 파일 없음(앞 사유가 이긴다).
+  #   iso 는 --model · --effort 를 받지 않으므로 세션 선택을 늘 본다. 어느 사유든 격리 폴더를 만들지 않고 18 이다(CLI 에는 login status 만 묻는다)
+  ISO_OFF=""
+  bash "$SCRIPT_DIR/gpt-exec.sh" cli-check >/dev/null 2>&1
+  if [ $? -eq 18 ]; then
+    ISO_OFF="CLI 없음"
+  elif [ "$(bash "$SCRIPT_DIR/gpt-choice.sh" get 2>/dev/null)" = "model=off effort=off" ]; then
+    ISO_OFF="사용자 선택"
+  else
+    bash "$SCRIPT_DIR/gpt-exec.sh" auth-check >/dev/null 2>&1
+    [ $? -eq 18 ] && ISO_OFF="로그인 필요"
+  fi
+  if [ -n "$ISO_OFF" ]; then
+    echo "GPT-OFF: $ISO_OFF — 격리 폴더를 만들지 않았다(GPT 미사용 · 측정 실패 아님 · modules/gpt-strategy.md § GPT 미사용)" >&2
+    exit 18
+  fi
   if auth_file_absent; then
     echo "GPT-OFF: $AUTH_FILE_WHY — 격리 폴더를 만들지 않았다(GPT 미사용 · 측정 실패 아님 · modules/gpt-strategy.md § GPT 미사용)" >&2
     exit 18
@@ -331,8 +348,8 @@ clear_stem() {
 # ── 사전 게이트: GPT 미사용(⛔ exit 18 — 정본 modules/gpt-strategy.md § GPT 미사용) — 플래그 --model off · GPT CLI 없음(래퍼 cli-check 18) ·
 #    세션 선택 off(래퍼와 같은 규칙 — 두 필드가 모두 플래그가 아니면 선택을 본다)면 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
 #    ⛔ 격리 폴더 자리 · 입력 게이트(11 · 15)보다 먼저다 — GPT 를 쓰지 않는 사용자는 GPT 홈 · 인증이 없을 수 있다(11 이 18 을 가리지 않게).
-#    인증 파일 없음(auth_file_absent — 위)이 그다음이고, 인증 없음(래퍼 auth-check 18)도 여기서 '로그인 필요' 로 끝난다 — 앞 사유(플래그 · CLI 없음 ·
-#    사용자 선택 · 인증 파일 없음)가 있으면 그 사유가 이긴다. 인증 파일을 먼저 보므로 파일이 없으면 auth-check 의 CLI(login status)도 부르지 않는다
+#    인증 없음(래퍼 auth-check 18)이 그다음이라 '로그인 필요' 로 끝나고, 인증 파일 없음(auth_file_absent — 위)은 그 뒤다 — 앞 사유(플래그 · CLI 없음 ·
+#    사용자 선택 · 로그인 필요)가 있으면 그 사유가 이긴다. 로그인하지 않은 사용자는 파일이 없어도 decide(off-no-auth)와 같은 '로그인 필요' 다
 #    ⛔ 감사에 exit 18 · gptOff 를 남긴다 — 같은 stem 의 옛 산출을 지운 뒤다(옛 결과가 새 판정으로 읽히지 않게). 오염(.contaminated) · 측정 실패가 아니다
 OFF_WHY=""
 if [ -n "$MODEL_OFF" ]; then
@@ -345,11 +362,11 @@ else
     # get 의 stdout 만 본다 — 'model=off effort=off' 는 exit 0 에서만 나온다(3 · 4 · 5 · 11 은 stdout 이 없다 — off 가 아니다)
     [ "$(bash "$SCRIPT_DIR/gpt-choice.sh" get 2>/dev/null)" = "model=off effort=off" ] && OFF_WHY="사용자 선택"
   fi
-  [ -z "$OFF_WHY" ] && auth_file_absent && OFF_WHY="$AUTH_FILE_WHY"
   if [ -z "$OFF_WHY" ]; then
     bash "$SCRIPT_DIR/gpt-exec.sh" auth-check >/dev/null 2>&1
     [ $? -eq 18 ] && OFF_WHY="로그인 필요"
   fi
+  [ -z "$OFF_WHY" ] && auth_file_absent && OFF_WHY="$AUTH_FILE_WHY"
 fi
 if [ -n "$OFF_WHY" ]; then
   mkdir -p "$OUT_DIR" || die 11 "--out-dir 생성 실패: $OUT_DIR"

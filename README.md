@@ -86,8 +86,9 @@ claude plugin update fz-guard@fz-orchestrator     # fz-guard 를 설치했을 �
 
 업데이트는 GPT 스킬 setup 을 다시 돌리지 않는다. 링크 상태는 위 setup 명령에 `--check` 를 붙여 확인한다.
 
-- 남은 옛 링크(이 플러그인 Claude 스킬 링크, 끊어진 소유 링크)를 읽기 전용으로 나열하고 stale 이면 exit 1 이다
+- 인자 없는 실행이 지울 옛 링크를 읽기 전용으로 `stale:` 줄에 나열하고 stale 이면 exit 1 이다. 이 플러그인 Claude 스킬 링크, 끊어진 소유 링크, 이 판이 걷은 GPT 역할 스킬(`fz-fixer` · `fz-searcher`) 링크(옛 판 캐시가 남아 있을 때), 옛 판 `--gpt-agents` 가 `${CODEX_HOME:-~/.codex}/agents/` 에 건 `fz-review-arch.toml` · `fz-review-quality.toml` 링크다
 - 정리하려면 인자 없이 다시 실행한다. 다른 판을 가리키는 GPT 스킬 링크는 살아 있으면 나열하지 않으니 판을 맞출 때도 인자 없이 다시 실행한다
+- 옛 판 캐시가 이미 지워져 끊긴 링크는 소유를 판정할 수 없어 `unknown:` 줄로만 나오고(exit 0) 인자 없는 실행도 남긴다. 걷은 역할 스킬 링크 둘만 지우려면 `find "${CODEX_HOME:-$HOME/.codex}/skills" -maxdepth 1 -type l \( -name fz-fixer -o -name fz-searcher \) -print -delete` 를 실행한다
 - `/fz-manage check` 도 같은 점검을 경고로 보여 준다
 
 ⛔ 접미사 없이 `claude plugin update fz` 를 부르면 `Plugin "fz" not found` 로 실패한다. 설치할 때는 `fz` 로 통하지만 설치된 이름은 `fz@fz-orchestrator` 이다. 버전 문자열이 같으면 캐시를 갱신하지 않으므로 소스만 고치고 버전을 올리지 않으면 반영되지 않는다.
