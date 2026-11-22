@@ -24,6 +24,22 @@ from ab_ledger_transcript import mcp_summary, parse_transcript
 from ab_ledger_selftest import _judge, _mk
 
 
+def _repo_files(root):
+    """root 아래 파일을 {파일 이름: {저장소 상대 경로}} 로 모은다 — 점 폴더 · __pycache__ · tests 폴더 아래는 뺀다.
+
+    - Important: 빼는 폴더는 root 에서 본 상대 경로의 성분으로 가린다 — 절대 경로로 가리면 루트가 점 폴더
+      (설치 위치 `.claude/plugins/cache/…`) · tests · __pycache__ 아래에 있을 때 모든 폴더가 빠져 목록이 빈다.
+    """
+    files = {}
+    for dp, _dirs, fs in os.walk(root):
+        rel = os.path.relpath(dp, root)
+        if rel != "." and any(c.startswith(".") or "__pycache__" in c or c == "tests" for c in rel.split(os.sep)):
+            continue
+        for f in fs:
+            files.setdefault(f, set()).add(os.path.relpath(os.path.join(dp, f), root))
+    return files
+
+
 def register(reg, base):
     # ── round 3 S14 — 계측기 신원 · 코퍼스 동결 · 외부 MCP 워커 · 수면 증거 · 규칙 fixture 감사 ─────────────
     here = os.path.dirname(os.path.abspath(__file__))
@@ -376,12 +392,7 @@ def register(reg, base):
             return freeze_corpus({"input_tree_sha": "b" * 40, "tasks": [{"id": "T1", "diff_paths": list(paths),
                                                                         "a0_smoke": {"sha256": "a" * 64, "audit_hits": 0}}]})
         root = os.path.dirname(here)
-        files = {}
-        for dp, _dirs, fs in os.walk(root):
-            if "/." in dp or "__pycache__" in dp or "/tests/" in dp + "/":
-                continue
-            for f in fs:
-                files.setdefault(f, set()).add(os.path.relpath(os.path.join(dp, f), root))
+        files = _repo_files(root)
         refs, todo, seen = set(), ["scripts/gpt-call.sh", "scripts/gpt_independent.sh", "scripts/gpt-exec.sh"], set()
         while todo:
             rel = todo.pop()
@@ -401,6 +412,28 @@ def register(reg, base):
                                                "../x/scripts/ab_ledger.py")]
         ok = all(rejects) and frz("skills/fz/SKILL.md")[0] is not None and refs and refs <= guard
         return ok, [str(rejects), f"가드 밖 런처 참조 {sorted(refs - guard)}"]
+
+    @reg
+    def r3_adv_corpus_guard_walk_root_independent():
+        # 바로 위 런처 닫힘 셀의 저장소 걷기는 루트가 놓인 자리와 무관하다 — 루트 위에 점 폴더(.claude/plugins/cache/…) · tests ·
+        #   __pycache__ 성분이 있어도 저장소 안 평범 폴더(루트 · scripts/ · skills/)는 들고, 저장소 안 점 폴더 · tests/ · __pycache__/ 아래는 뺀다
+        td = tempfile.mkdtemp(prefix="abl-walk-")
+        try:
+            want = {"a.sh": {"scripts/a.sh"}, "e.sh": {"skills/x/e.sh"}, "top.json": {"top.json"}}
+            got = {}
+            for pre in ("plain", ".claude/plugins/cache/x", "x/tests", "x/__pycache__", ".claude/plugins/cache/x/tests"):
+                r = os.path.join(td, pre, "r")
+                for rel in ("scripts/a.sh", "skills/x/e.sh", "top.json", "tests/b.sh", ".hidden/c.sh", "__pycache__/d.py",
+                            "scripts/__pycache__/f.pyc", "skills/x/tests/g.sh", "skills/.cache/h.sh"):
+                    p = os.path.join(r, rel)
+                    os.makedirs(os.path.dirname(p), exist_ok=True)
+                    with open(p, "w", encoding="utf-8") as fh:
+                        fh.write("x\n")
+                got[pre] = _repo_files(r)
+            ok = all(v == want for v in got.values())
+            return ok, [f"{k}: {sorted((n, sorted(v)) for n, v in g.items())}" for k, g in got.items()]
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
 
     @reg
     def r3_s14_unreadable_artifact_unscored():

@@ -1,4 +1,4 @@
-# lint:no-root-anchor — 플러그인 루트를 참조하지 않는다. 합성 기록은 호출자가 넘긴 임시 폴더에만 쓰고 형제 모듈만 import 한다.
+# lint:no-root-anchor — 플러그인 루트를 해석하지 않는다. 합성 기록은 호출자가 넘긴 임시 폴더에만 쓰고 형제 모듈만 import 한다 · 낱말-표 짝 칸만 형제 모듈 한 단계 위의 modules/symbol-tools-audit.md 를 읽는다.
 """fz_wf_metrics_selftest.py — fz_wf_metrics 의 self-test 와 합성 기록(probe). `fz_wf_metrics.py --self-test` 와
 `fz_wf_metrics._write_probe` 가 부를 때만 이 모듈을 싣는다.
 
@@ -12,6 +12,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -834,12 +835,51 @@ def self_test() -> int:
         shutil.rmtree(r6, ignore_errors=True)
         shutil.rmtree(r7, ignore_errors=True)
 
+    # ⑱ 낱말-표 짝 — `--mcp-audit` 가 내는 판정 낱말(MCP_* · ARM_* · UNRUN — 원문의 `return "<낱말>", n` · `print("<낱말>:` · `print(f"<낱말>:` 꼴 ·
+    #    훑기 요약 줄의 MCP_SWEEP* 는 뺀다)과 modules/symbol-tools-audit.md § 출력 낱말 표의 첫 칸이 같은 집합이고 낱말마다 행이 하나다.
+    #    표 사본 변이(낱말마다 행 삭제 · 행 중복 · 이름 바꿈 + 모르는 낱말 행 추가)는 하나하나 어긋나야 한다 — 그대로만 통과한다
+    def pair_gaps(words, md):
+        sec = md.split("\n## 출력 낱말", 1)[-1].split("\n## ", 1)[0] if "\n## 출력 낱말" in md else ""
+        rows = re.findall(r"(?m)^\| `([A-Z_]+)` \|", sec)
+        return [f"표에 없음 {w}" for w in sorted(words - set(rows))] + [f"원문에 없음 {w}" for w in sorted(set(rows) - words)] + \
+               [f"행 {rows.count(w)}개 {w}" for w in sorted(set(rows)) if rows.count(w) > 1]
+
+    audit_md = os.path.join(os.path.dirname(os.path.dirname(me)), "modules", "symbol-tools-audit.md")
+    try:
+        with open(me, encoding="utf-8") as fh:
+            src = fh.read()
+        with open(audit_md, encoding="utf-8") as fh:
+            md = fh.read()
+    except OSError as exc:
+        fails.append(f"낱말-표 짝: 원문 · 표를 못 읽었다 ({type(exc).__name__}: {audit_md})")
+    else:
+        pat = r"(?:MCP|ARM)_[A-Z_]+|UNRUN"
+        words = {w for w in re.findall(rf'return "({pat})", \d', src) + re.findall(rf'print\(f?"({pat}):', src)
+                 if not w.startswith("MCP_SWEEP")}
+        lines = md.split("\n")
+        variants = {"모르는 낱말 행 추가": md.replace("|---|---|---|---|\n", "|---|---|---|---|\n| `MCP_PROBE_UNKNOWN` | 0 | 합성 | 합성 |\n", 1)}
+        for w in sorted(words):
+            head = f"| `{w}` |"
+            variants[f"{w} 행 삭제"] = "\n".join(x for x in lines if not x.startswith(head))
+            variants[f"{w} 행 중복"] = "\n".join(y for x in lines for y in ((x, x) if x.startswith(head) else (x,)))
+            variants[f"{w} 이름 바꿈"] = md.replace(head, f"| `{w}_RENAMED` |")
+        gaps = pair_gaps(words, md)
+        missed = sorted(k for k, v in variants.items() if not pair_gaps(words, v))
+        if words and not gaps and not missed:
+            passed += 1
+        else:
+            fails.append(f"낱말-표 짝: 원문 낱말 {len(words)}개 · 어긋남 {gaps or '없음'} · 못 잡은 표 변이 {missed or '없음'}")
+
+    # 요약 줄의 묶음 수는 손으로 적는다 — 묶음 합이 총수와 다르면 셀을 더하고 묶음 수를 고치지 않은 것이다(요약이 셀 수를 속이지 않게)
+    groups = (("양성", 1), ("음성", 7), ("mcp-audit", 50), ("심볼 결과 판독", 3), ("mcp-sweep", 17), ("sweep-row", 3),
+              ("stage 규칙", 1), ("usage 중복", 1), ("advisor 스톨", 3), ("시도 구분", 1), ("낱말-표 짝", 1))
+    total = passed + len(fails)
+    if sum(n for _, n in groups) != total:
+        fails.append(f"요약 묶음 합 {sum(n for _, n in groups)} ≠ 총수 {total}")
     for f in fails:
         print(f"  FAIL {f}")
-    total = passed + len(fails)
     if fails:
-        print(f"fz_wf_metrics self-test {passed}/{total} passed")
+        print(f"fz_wf_metrics self-test {passed}/{passed + len(fails)} passed")
         return 1
-    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — 양성 1 · 음성 5 · mcp-audit 50 · 심볼 결과 판독 3 · mcp-sweep 17 · sweep-row 3"
-          f" · stage 규칙 1 · usage 중복 1 · advisor 스톨 3 · 시도 구분 1)")
+    print(f"SELFTEST_OK (fz_wf_metrics self-test {passed}/{total} — " + " · ".join(f"{k} {n}" for k, n in groups) + ")")
     return 0

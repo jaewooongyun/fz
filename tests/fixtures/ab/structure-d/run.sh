@@ -7,6 +7,8 @@
 #   ① split-size F                  ab_ledger.py · ab_ledger*.py · INSTRUMENTS 파일이 각각 1500줄 이하
 #     entrypoint C                  `ab_ledger.py --help` 하위 명령이 기준 집합을 포함 · `--self-test` 가 진입점으로 돈다
 #   ② selftest-outside-fingerprint F  self_test 를 정의한 파일이 INSTRUMENTS 밖 · 사본에서 그 파일을 고쳐도 instrument_sha 불변 · 사본 self-test 통과
+#     selftest-modules-outside-fingerprint C  scripts/*_selftest*.py(1개 이상 — 사례만 싣는 모듈 · 다른 계측기에서 떼어 낸 모듈 포함)가
+#                                   전부 INSTRUMENTS 밖 · 사본에서 하나하나 고쳐도 instrument_sha 불변
 #     fingerprint-coverage C        사본에서 collect · recollect · judge · show 뒤 sys.modules 의 scripts/ 파일이 전부 INSTRUMENTS ·
 #                                   self-test 모듈(진입점 밖이면) 미적재 · INSTRUMENTS 파일 하나하나를 고치면 instrument_sha 가 바뀐다
 #   ③ criteria-table F              CRITERIA 가 mapping · 키 = IMPLEMENTED · 값 callable
@@ -93,7 +95,8 @@ LEGACY_KEYS = ("self_test", "case", "ledger", "workflow", "arm", "run", "order",
 GIT_ENV = {"GIT_AUTHOR_NAME": "fixture", "GIT_COMMITTER_NAME": "fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
            "GIT_COMMITTER_EMAIL": "fixture@example.invalid", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
            "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"}
-EXPECTED = {"split-size": "F", "entrypoint": "C", "selftest-outside-fingerprint": "F", "fingerprint-coverage": "C",
+EXPECTED = {"split-size": "F", "entrypoint": "C", "selftest-outside-fingerprint": "F",
+            "selftest-modules-outside-fingerprint": "C", "fingerprint-coverage": "C",
             "criteria-table": "F", "criteria-dispatch": "F", "collect-spec-keys": "F", "collect-spec-legacy": "C",
             "single-parse": "F", "single-parse-equal": "C", "stage-key-rename": "F", "stage-key-compat": "C",
             "history-kinds": "F", "history-legacy-winner": "C", "formal-requires-sources": "F", "formal-with-sources": "F",
@@ -450,6 +453,19 @@ def cell_selftest_outside_fingerprint():
     r = sh(PY + [os.path.join(cp, "ab_ledger.py"), "--self-test"])
     tail = (r.stdout.strip().splitlines() or [""])[-1]
     return (b0 == b1 == b2 and r.returncode == 0), f"{st[0]} 편집 전후 지문 {b0}·{b1} · 사본 self-test exit {r.returncode} '{tail}'"
+
+
+def cell_selftest_modules_outside_fingerprint():
+    # self_test 정의 파일만이 아니다 — 사례만 싣는 모듈 · 다른 계측기에서 떼어 낸 self-test 모듈도 지문 밖이어야 한다
+    mods = sorted(os.path.basename(p) for p in glob.glob(os.path.join(SCRIPTS, "*_selftest*.py")))
+    if not mods:
+        raise Cell("no-selftest-module", "scripts/*_selftest*.py 가 없다 — 지문 밖을 잴 모듈이 없다")
+    inside = sorted(set(mods) & set(instruments()))
+    if inside:
+        raise Cell("in-fingerprint", f"self-test 모듈 {inside} 이 계측기 지문 안에 있다 — 사례만 고쳐도 지문이 바뀐다")
+    cp = copy_scripts("smof")
+    moved = [f for f in mods if len(set(child(SHA_EDIT, f, scripts=cp))) != 1]
+    return not moved, f"self-test 모듈 {mods} · 지문 안 없음 · 사본에서 고치면 지문이 바뀌는 모듈 {moved or '없음'}"
 
 
 COVER = """import ab_ledger as m
@@ -867,7 +883,8 @@ def cell_clock_absent_unchanged(frozen):
 
 
 CELLS = {"split-size": cell_split_size, "entrypoint": cell_entrypoint,
-         "selftest-outside-fingerprint": cell_selftest_outside_fingerprint, "fingerprint-coverage": cell_fingerprint_coverage,
+         "selftest-outside-fingerprint": cell_selftest_outside_fingerprint,
+         "selftest-modules-outside-fingerprint": cell_selftest_modules_outside_fingerprint, "fingerprint-coverage": cell_fingerprint_coverage,
          "criteria-table": cell_criteria_table, "criteria-dispatch": cell_criteria_dispatch,
          "collect-spec-keys": cell_collect_spec_keys, "collect-spec-legacy": cell_collect_spec_legacy,
          "single-parse": cell_single_parse, "single-parse-equal": cell_single_parse_equal,
