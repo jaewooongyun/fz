@@ -9,7 +9,8 @@
 #                      전부 선택 · 이 러너 자신(그 파일을 읽지 않는다)은 미선택. 이름 적은 러너가 0개면 lint 만 단언한다
 #   prints-selection   선택 없이 실제 부분 실행 한 번(docs 아래 없는 경로 — 싼 러너만 걸린다) → 선택 줄 · PARTIAL 줄(선택 N개)이
 #                      총평 앞에 찍히고 · 고른 검사 행만 있고 · exit 이 총평과 맞는다
-#   ship-full          `--ship --changed <같은 문서>`            → mode=full (출하는 언제나 전체)
+#   end-load-elapsed   같은 부분 실행의 MACHINE-LOAD 두 줄 — 끝 줄만 `elapsed=<초>s` 로 끝난다(스크립트 시작부터 벽시계 초 · 관측 칸 · 임계 없음)
+#   ship-full         `--ship --changed <같은 문서>`            → mode=full (출하는 언제나 전체)
 # 출력: 셀마다 `<셀>: PASS|FAIL <근거>` · 끝에 `health-select: PASS|FAIL`
 # exit: 0 전건 통과 · 1 셀 FAIL · 2 준비 실패(health-check · python3 부재 — `UNRUN:` 표지)
 #   ⛔ 선택기가 없는 트리(기준 트리)는 health-check 가 새 인자를 거부한다(exit 2) — 그것은 준비 실패가 아니라 셀 FAIL 이다.
@@ -121,6 +122,13 @@ else
     ok prints-selection "선택 줄 $((n + 1))개 · '$banner' 가 총평 앞 · 고른 검사 행만 · exit $RC = 총평"
   else
     no prints-selection "${why# } · rc=$RC — $(last)"
+  fi
+  ml="$(printf '%s\n' "$OUT" | grep '^MACHINE-LOAD ')"
+  if [ "$(printf '%s\n' "$ml" | grep -c .)" -eq 2 ] && ! printf '%s\n' "$ml" | head -1 | grep -q 'elapsed=' \
+     && printf '%s\n' "$ml" | tail -1 | grep -qE ' elapsed=[0-9]+s$'; then
+    ok end-load-elapsed "MACHINE-LOAD 2줄 · 끝 줄만 $(printf '%s\n' "$ml" | tail -1 | grep -oE 'elapsed=[0-9]+s$')"
+  else
+    no end-load-elapsed "MACHINE-LOAD 두 줄 중 끝 줄만 elapsed=<초>s 로 끝나야 한다 — $(printf '%s' "$ml" | tr '\n' '|')"
   fi
 fi
 

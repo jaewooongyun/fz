@@ -1,12 +1,17 @@
 #!/bin/bash
-# gpt-cli: none — health-check 를 --block gate-selftest 로만 부른다(§4.5 에 닿지 않는다)
+# gpt-cli: none — health-check 를 --block gate-selftest · --block stop-hook 으로만 부른다(§4.5 에 닿지 않는다)
 # health-check 2.5 게이트 self-test 실패 상세 판정 (F-394) — 실패하면 '아래 상세' 가 가리키는 FAIL 줄이 실제로 찍힌다.
+# health-check 2.6 Stop hook 계약 — self-test 가 exit 0 이어도 끝 줄에 '미실행 N' 이 있으면 비고 앞에 ⚠️ 가 붙는다(표지 ✅ · exit 미반영).
 #
 # 이전 판은 비고에 '아래 상세' 라고 적고 report_and_exit 는 계약 lint 출력만 찍었다 — 어느 케이스가 깨졌는지 보려면
 # gate_check --self-test 를 따로 다시 돌려야 했다. 트리 사본의 manifest 를 두 케이스로 줄이고(빨리 돈다) 한쪽 기대값을 틀리게 바꾼다.
+# 종료 훅 self-test 는 이 머신에서 돌릴 수 없는 셀을 미실행으로 따로 세고 exit 0 으로 끝난다 — 표지만 보면 미실행이 통과로 읽힌다.
+# 사본의 gate_stop_hook.py 를 끝 줄만 찍는 가짜로 바꿔(진짜는 오래 돌고 끝 줄이 머신마다 다르다) 두 끝 줄을 돌린다.
 # 셀:
 #   f394-gate-fail-lines-shown   기대값이 틀린 사본 → exit 1 · '── 실패 상세 ──' 아래에 그 케이스의 FAIL 줄
 #   f394-gate-pass-no-detail     그대로인 사본 → 실패 상세 절이 없다(짝 — 상세가 늘 찍히면 위 셀이 헛돈다)
+#   stop-hook-unrun-visible      끝 줄 '… 3/3 passed · 미실행 1' · exit 0 → ✅ 행 · 비고가 '⚠️ <끝 줄> — 이 머신에서 돌리지 못한 셀(…)' · exit 2
+#   stop-hook-plain-no-warn      끝 줄 '… 3/3 passed' · exit 0 → ✅ 행 · 비고 = 그 끝 줄 그대로(짝 — ⚠️ 가 늘 붙으면 위 셀이 헛돈다)
 # exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패
 set -uo pipefail
 
@@ -50,6 +55,30 @@ if [ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -q '^── 실패 상세 �
   echo "PASS  f394-gate-pass-no-detail"
 else
   echo "FAIL  f394-gate-pass-no-detail  — exit $rc · 출력 끝: $(printf '%s' "$out" | tail -3 | tr '\n' '|')"; fail=$((fail + 1))
+fi
+
+# 2.6 — 가짜 종료 훅: $1 = stderr 줄(빈 값이면 없음) · $2 = 끝 줄. 인자와 무관하게 exit 0
+fake_hook() {
+  { echo 'import sys'
+    [ -n "$1" ] && printf 'print(%s, file=sys.stderr)\n' "'$1'"
+    printf 'print(%s)\n' "'$2'"; } > "$TMP/good/scripts/gate_stop_hook.py"
+}
+HOOK_ROW='✅ Stop hook 계약 | 0 | '
+
+fake_hook '  NOT RUN plugin-hook-macos-guard: 합성 사유 — 이 머신에서는 돌릴 수 없다 (⛔ 통과 아님)' 'stop-hook self-test 3/3 passed · 미실행 1'
+out="$(bash "$TMP/good/scripts/health-check.sh" --block stop-hook 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -qF "${HOOK_ROW}⚠️ stop-hook self-test 3/3 passed · 미실행 1 — 이 머신에서 돌리지 못한 셀(통과 아님 · exit 에 미반영"; then
+  echo "PASS  stop-hook-unrun-visible"
+else
+  echo "FAIL  stop-hook-unrun-visible  — exit $rc · 행: $(printf '%s\n' "$out" | grep -F 'Stop hook 계약' | head -1) · 출력 끝: $(printf '%s' "$out" | tail -2 | tr '\n' '|')"; fail=$((fail + 1))
+fi
+
+fake_hook '' 'stop-hook self-test 3/3 passed'
+out="$(bash "$TMP/good/scripts/health-check.sh" --block stop-hook 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -qxF "${HOOK_ROW}stop-hook self-test 3/3 passed"; then
+  echo "PASS  stop-hook-plain-no-warn"
+else
+  echo "FAIL  stop-hook-plain-no-warn  — exit $rc · 행: $(printf '%s\n' "$out" | grep -F 'Stop hook 계약' | head -1) · 출력 끝: $(printf '%s' "$out" | tail -2 | tr '\n' '|')"; fail=$((fail + 1))
 fi
 
 echo "$fail 건 실패"

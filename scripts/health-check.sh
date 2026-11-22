@@ -13,11 +13,12 @@
 #   · 각 검사의 exit 을 **개별 캡처**해 표로 보고하고, 하나라도 실패면 **비0**으로 종료한다
 #   · lint 의 SKIP(THRESHOLD·SEMANTIC) 건수를 **따로 표기**한다 — ⛔ SKIP 은 PASS 가 아니다
 #
-# usage: health-check.sh [--strict-freshness] [--realmode-only] [--block <ledgers|gate-selftest>] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]
+# usage: health-check.sh [--strict-freshness] [--realmode-only] [--block <ledgers|gate-selftest|stop-hook>] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]
 #   --strict-freshness : 최신성 findings 가 있으면 실패로 취급 (기본: 경고)
 #   --realmode-only    : 0.5 실모드 블록만 돌리고 멈춘다 — 배선 fixture 전용, 초록으로 끝나지 않는다(실패 1 · 그 외 2)
 #   --block <이름>     : 그 블록 하나만 돌리고 멈춘다 — fixture 전용, 초록으로 끝나지 않는다(실패 1 · 그 외 2)
 #                        ledgers = 2.7 게이트 원장(tests/fixtures/health/own-ledgers) · gate-selftest = 2.5 게이트 self-test(tests/fixtures/health/gate-fail-detail)
+#                        stop-hook = 2.6 Stop hook 계약(tests/fixtures/health/gate-fail-detail)
 #   --changed <경로>   : 바뀐 경로(반복 가능) — scripts/health_select.py 가 검사를 고른다. 전부 문서면 부분 실행, 아니면 전체
 #   --changed-from <파일> : 바뀐 경로 목록 파일(한 줄에 하나 — `git diff --name-only` 출력 그대로 · `--name-status` 면 이동 · 삭제가 있을 때 전체)
 #   --ship             : 출하 — 경로와 무관하게 전체 실행(출하 게이트는 언제나 전체다)
@@ -38,14 +39,14 @@ STRICT_FRESHNESS=0
 REALMODE_ONLY=0
 BLOCK=""
 SELECT=0 SELECT_ONLY=0 SEL_ARGS=() CHANGED=()   # 경로별 선택(H2-9) — 네 인자 중 하나라도 있어야 SELECT=1 이 된다
-USAGE="health-check.sh [--strict-freshness] [--realmode-only] [--block <ledgers|gate-selftest>] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]"
+USAGE="health-check.sh [--strict-freshness] [--realmode-only] [--block <ledgers|gate-selftest|stop-hook>] [--changed <경로>]... [--changed-from <파일>] [--ship] [--select-only]"
 while [ $# -gt 0 ]; do
   case "$1" in
     --strict-freshness) STRICT_FRESHNESS=1; shift ;;
     --realmode-only) REALMODE_ONLY=1; shift ;;
     --block) case "${2:-}" in
-               ledgers|gate-selftest) BLOCK="$2"; shift 2 ;;
-               *) echo "⛔ --block 은 ledgers · gate-selftest 중 하나다: '${2:-}' (사용법: $USAGE)" >&2; exit 2 ;;
+               ledgers|gate-selftest|stop-hook) BLOCK="$2"; shift 2 ;;
+               *) echo "⛔ --block 은 ledgers · gate-selftest · stop-hook 중 하나다: '${2:-}' (사용법: $USAGE)" >&2; exit 2 ;;
              esac ;;
     --changed) [ $# -ge 2 ] || { echo "⛔ --changed 에 경로가 없다 (사용법: $USAGE)" >&2; exit 2; }
                SELECT=1; CHANGED+=("$2"); shift 2 ;;
@@ -75,11 +76,13 @@ detail() {   # $1=검사 이름 · $2=상세 줄
   DETAIL_OUT="${DETAIL_OUT}[$1]"$'\n'"$2"$'\n'
 }
 # 1분 부하 평균 · 코어 수 — 시작 · 끝 두 줄. 소요 실측(TIMEOUT 산정)을 기계 부하와 함께 읽는다. 못 재면 '?'
+#   끝 줄(인자 end)은 스크립트 시작부터의 벽시계 초 `elapsed=<초>s` 를 덧붙인다 — 관측이다(임계 없음 · 수면이 끼면 부푼다 · 판정에 쓰지 않는다)
 machine_load() {
-  local l c
+  local l c e=""
   l="$(sysctl -n vm.loadavg 2>/dev/null | awk '{print $2}')"; [ -n "$l" ] || l="$(cut -d' ' -f1 /proc/loadavg 2>/dev/null)"
   c="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null)"
-  echo "MACHINE-LOAD load=${l:-?} cores=${c:-?}"
+  [ "${1:-}" = end ] && e=" elapsed=${SECONDS}s"
+  echo "MACHINE-LOAD load=${l:-?} cores=${c:-?}$e"
 }
 # ⛔ 3분 판정 (F-335 ⑬ · F-575): 표지가 있을 때만 미실행이다 — exit 2 + 줄 맨 앞 `UNRUN`(검사기의 측정 불가) ·
 #    exit 3 + 줄 맨 앞 `SETUP`(러너의 준비 실패). 표지 없는 exit 2 · 3 과 traceback 은 실패다 — 검사기가 죽은 것을
@@ -251,6 +254,21 @@ chk_gate_selftest() {
   esac
 }
 
+# 2.6 Stop hook 계약 — self-test 는 이 머신에서 돌릴 수 없는 셀을 미실행으로 따로 세고 exit 0 으로 끝난다(끝 줄 '… passed · 미실행 N').
+#   미실행이 있으면 표지 ✅ · exit 는 그대로 두고 비고 앞에 ⚠️ 를 붙인다(§4.5b 경고 행과 같은 관례 — 막지 않고 보이게 한다)
+chk_stop_hook() {
+  HOOK_OUT="$(cd "$ROOT" && python3 scripts/gate_stop_hook.py --self-test 2>&1)"; HOOK_CODE=$?
+  HOOK_LAST="$(printf '%s\n' "$HOOK_OUT" | tail -1)"
+  case "$HOOK_CODE" in
+    0) case "$HOOK_LAST" in
+         *"· 미실행 "[1-9]*) record "Stop hook 계약" 0 "⚠️ $HOOK_LAST — 이 머신에서 돌리지 못한 셀(통과 아님 · exit 에 미반영 · 사유는 --self-test stderr 의 NOT RUN 줄)" ;;
+         *) record "Stop hook 계약"      0 "$HOOK_LAST" ;;
+       esac ;;
+    1) record "Stop hook 계약"      1 "$HOOK_LAST — 차단이 발화하지 않을 수 있다" ;;
+    *) record "Stop hook 계약" "$HOOK_CODE" "⛔ self-test 실행 불가 (PASS도 SKIP도 아님)" ;;
+  esac
+}
+
 chk_retired_commands() {
   RC_OUT="$(python3 "$ROOT/scripts/check_retired_commands.py" --root "$ROOT" 2>&1)"; RC_CODE=$?
   record3 "퇴역 명령 참조" "$RC_CODE" "$RC_OUT" "$(printf '%s\n' "$RC_OUT" | tail -1)" \
@@ -270,7 +288,7 @@ report_and_exit() {   # $1 = 부분 실행 표지 줄 — 비면 전체 실행�
     else mark="✅"; fi
     printf "%s %-20s %-6s %s\n" "$mark" "${NAMES[$i]}" "$code" "${NOTES[$i]}"
   done
-  machine_load   # 끝 — exit 분기 앞이라 어느 경로로 끝나도 남는다
+  machine_load end   # 끝 — exit 분기 앞이라 어느 경로로 끝나도 남는다(소요 elapsed 는 이 줄에만)
 
   echo
   echo "⛔ SKIP(THRESHOLD·SEMANTIC) ${SKIP_N}항목은 **PASS가 아니다** — Lead가 별도 판정하고 보고에 남긴다."
@@ -322,6 +340,7 @@ if [ -n "$BLOCK" ]; then
   case "$BLOCK" in
     ledgers) chk_ledgers ;;
     gate-selftest) chk_gate_selftest ;;
+    stop-hook) chk_stop_hook ;;
   esac
   code="${CODES[0]}"
   if [ "$code" != 0 ]; then mark="⛔"; else mark="✅"; fi
@@ -420,7 +439,8 @@ else
 fi
 GB_OUT="$(python3 "$ROOT/scripts/check_global_budget.py" --root "$ROOT" 2>&1)"; GB_CODE=$?
 if [ "$GB_CODE" -eq 0 ]; then
-  record "동시 스폰 예산" 0 "$(printf '%s\n' "$GB_OUT" | grep -E '^분모' | tail -1)"
+  # 통과 비고 = 분모 줄 + 미측정 병렬 수 — 분모만 남기면 '블록 N개 이내' 가 전수처럼 읽힌다
+  record "동시 스폰 예산" 0 "$(printf '%s\n' "$GB_OUT" | grep -E '^분모' | tail -1) · $(printf '%s\n' "$GB_OUT" | grep -oE 'unmeasured_parallel=[0-9]+' | tail -1)"
 else
   record "동시 스폰 예산" "$GB_CODE" "⛔ $(printf '%s\n' "$GB_OUT" | grep -E '^      |UNRUN' | head -2 | tr '\n' ' ')"
 fi
@@ -483,13 +503,8 @@ chk_gate_selftest
 # ── 2.6 Stop hook 계약 (게이트 2차 계층) ─────────────────────────────
 # ⛔ hook 은 등록해야 발동하지만 계약(stdin JSON → exit + stderr)은 **등록 없이**
 #    검증된다. 등록은 사용자 소관이므로 여기까지가 닫을 수 있는 경계다.
-HOOK_OUT="$(cd "$ROOT" && python3 scripts/gate_stop_hook.py --self-test 2>&1)"; HOOK_CODE=$?
-HOOK_LAST="$(printf '%s\n' "$HOOK_OUT" | tail -1)"
-case "$HOOK_CODE" in
-  0) record "Stop hook 계약"      0 "$HOOK_LAST" ;;
-  1) record "Stop hook 계약"      1 "$HOOK_LAST — 차단이 발화하지 않을 수 있다" ;;
-  *) record "Stop hook 계약" "$HOOK_CODE" "⛔ self-test 실행 불가 (PASS도 SKIP도 아님)" ;;
-esac
+# ⛔ 미실행 셀이 있는 통과는 비고 앞 ⚠️ 로만 드러낸다 — UNRUN 으로 올리면 그 셀을 돌릴 수 없는 머신에서 health-check 가 늘 exit 2 다(chk_stop_hook)
+chk_stop_hook
 
 # ── 2.7 게이트 원장 상태 (차단 항목이 없는 머신의 유일한 노출 경로) ──────────
 # ⛔ 미충족은 **실패가 아니다** — 작업 중 원장이 미충족인 것은 정상 상태다. exit 에

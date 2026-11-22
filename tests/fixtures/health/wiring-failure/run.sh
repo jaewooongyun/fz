@@ -3,7 +3,7 @@
 # health-check 실모드 배선 fixture (A5-03) — 배선이 장식이 아님을 **동작으로** 본다.
 #
 # 트리 사본 한 벌에 `health-check.sh --realmode-only` 를 두 번 돌린다.
-#   1) 깨끗한 사본: 여섯 record 가 전부 ✅ · exit 2 (부분 실행은 PASS 가 아니다)
+#   1) 깨끗한 사본: 여섯 record 가 전부 ✅ · exit 2 (부분 실행은 PASS 가 아니다) · 동시 스폰 예산 비고에 분모 줄과 unmeasured_parallel=N
 #   2) 같은 사본에 검사마다 회귀를 하나씩 심은 뒤: 여섯 record 가 전부 ⛔ · 각 비고가 **자기 plant** 를 가리킨다 · exit 1
 # ⛔ plant 는 다른 검사로 번지지 않게 고른다 — 새 워크플로 파일은 census 고아가 되므로 기존 파일 끝에 덧붙인다.
 # ⛔ 부분 실행은 회귀 러너 구간 전에 멈춘다 — 이 fixture 가 자기 자신을 다시 부르는 재귀는 없다.
@@ -25,6 +25,10 @@ out="$(bash "$C/scripts/health-check.sh" --realmode-only 2>&1)"; rc=$?
 for n in "${NAMES[@]}"; do
   printf '%s\n' "$out" | grep -qF "✅ $n | 0 |" && ok "깨끗한 사본 ✅ $n" || no "깨끗한 사본에서 $n 가 ✅ 가 아니다"
 done
+# 통과 비고가 분모 줄만 남기면 요약 표에서 미측정 병렬 수가 사라진다 — 분모 뒤에 검사기의 unmeasured_parallel=N 이 실려야 한다
+printf '%s\n' "$out" | grep -qE '^✅ 동시 스폰 예산 [|] 0 [|].*분모.*unmeasured_parallel=[0-9]+' \
+  && ok "깨끗한 사본 동시 스폰 예산 비고에 unmeasured_parallel" \
+  || no "깨끗한 사본 동시 스폰 예산 비고에 unmeasured_parallel 이 없다 — $(printf '%s\n' "$out" | grep -F '동시 스폰 예산' | head -1)"
 
 python3 - "$C" <<'PY' || { echo "FAIL  plant 실패"; exit 1; }
 import pathlib, sys
