@@ -4,6 +4,7 @@
 #   규칙: 이번 호출의 세션 id(CLAUDE_CODE_SESSION_ID)와 파일의 claude_session_id 가 둘 다 있고 다르면 이어받지 않는다 ·
 #   어느 한쪽을 모르면(옛 파일 · 빈 값 · 미설정) 나이만 본다 — scripts/run_metrics.py reusable() 과 같은 규칙이다.
 #   한 시간 안에 시작한 다른 작업(다른 세션)이 앞 작업의 이슈 목록을 이어쓰지 않게 한다.
+#   새 파일은 있는 파일을 덮어쓰지 않는다 — 같은 초에 시작한 두 세션은 이름(초 단위 시각)이 겹치니 뒤 세션이 1초 뒤 새 시각으로 다시 만든다.
 # 셀 — 셀마다 한 줄 `<셀>: PASS <설명>` 또는 `<셀>: FAIL <사유>` · 끝에 `tracker-reuse: PASS|FAIL`
 #   first-run-new-file        빈 폴더 · 세션 A → 새 파일 1개 · JSON(session_id 꼴 · 파일 이름 · claude_session_id=A · 빈 issues · iterations ·
 #                             in_progress) · 내보낸 GPT_SESSION_ID = 파일의 session_id · GPT_TRACKER_FILE = 그 파일
@@ -17,15 +18,18 @@
 #                             xargs 와 무관하게, 빈 검색 결과가 현재 폴더 나열로 바뀌어 그 폴더의 파일을 고르는 꼴을 잡는다
 #   unreadable-json-skipped   60분 안의 더 새 파일이 깨진 JSON · 빈 파일이면 건너뛰고 더 오래된 같은 세션 파일을 이어받는다 ·
 #                             깨진 파일뿐이면 새 파일 · 깨진 파일 바이트 불변
-#   dir-create-failure        $HOME/.claude 가 일반 파일(트래커 폴더를 만들 수 없다) → exit 1 · 트래커 변수 둘 다 안 내보냄
+#   same-second-new-name      같은 초 — 세션 A 파일(이슈 1)이 있는 이름으로 세션 B 가 시작한다(PATH 앞의 시각 shim 이 파일 이름용 시각을
+#                             준다) → A 파일 바이트 · 이슈 불변 · B 는 1초 뒤 다시 읽은 시각의 새 파일(claude_session_id=B) · 파일 2
+#   same-second-all-taken     같은 초 · 시도마다 이름이 차 있다 → exit 1 · 변수 안 내보냄 · 시각을 2번 이상 읽었다(다시 시도) · A 파일 불변 · 파일 1
+#   dir-create-failure       $HOME/.claude 가 일반 파일(트래커 폴더를 만들 수 없다) → exit 1 · 트래커 변수 둘 다 안 내보냄
 #   write-failure             트래커 폴더 쓰기 금지(555) → exit 1 · 변수 안 내보냄 · 파일 0 (권한 비트가 듣지 않는 계정이면 NOTE 로 건너뛴다)
 #   schema-claude-session-id  schemas/issue_tracker_schema.json 이 claude_session_id 를 선택(required 밖) 문자열 속성으로 적는다
 #   셀 집합                   판정한 셀 + 건너뛴 셀 = 기대 셀(셀을 지운 사본은 FAIL)
 # 블록은 `env -i` 로 PATH · HOME · (있으면) CLAUDE_CODE_SESSION_ID 만 받는다 — 사용자 HOME · 사용자 트래커를 건드리지 않는다.
 #   블록 텍스트 뒤에 내보낸 변수를 printenv 로 읽는 두 줄을 붙여 한 셸에서 돈다(모델이 Bash 한 번으로 돌리는 꼴).
 # ⛔ 음성 대조: 세션 id 를 보지 않던 블록(가장 새 파일을 조건 없이 · `| xargs ls -t` · 쓰기 실패를 보지 않음)과 claude_session_id 가 없는
-#    스키마를 --tree 로 주면 열 셀이 모두 FAIL · exit 1 이다.
-# exit: 0 전건 통과 · 1 단언 실패(블록을 찾지 못함 포함) · 2 준비 실패(UNRUN — jq · bash · 임시 폴더 · 인자. PASS 아님)
+#    스키마를 --tree 로 주면 열두 셀이 모두 FAIL · exit 1 이다.
+# exit: 0 전건 통과 · 1 단언 실패(블록을 찾지 못함 포함) · 2 준비 실패(UNRUN — jq · bash · perl Time::HiRes · 임시 폴더 · 인자. PASS 아님)
 # usage: run.sh [--tree <플러그인 트리>]   (기본: 이 fixture 가 든 트리)
 set -u
 TREE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." 2>/dev/null && pwd)"
@@ -65,6 +69,27 @@ in=\$(cat)
 printf '%s\n' "\$in" | exec "$REAL_XARGS" "\$@"
 EOF
 chmod +x "$T/bin/xargs" || { echo "UNRUN  xargs shim 실행 비트 실패"; exit 2; }
+# 시각 shim — 파일 이름용 시각(`date +%Y%m%d_%H%M%S`)은 $CLOCK 의 첫 줄을 내고 그 줄을 지운다(줄이 다 떨어지면 실제 시각).
+#   읽을 때마다 실제 시각(초 · 소수 셋째 자리)을 $CLOCK.log 에 한 줄 적는다(다시 시도하기 전의 1초 대기를 본다).
+#   다른 꼴의 호출(created_at)은 실제 date 에 넘긴다. 같은 초에 시작한 두 세션을 만든다
+REAL_DATE="$(command -v date)" || { echo "UNRUN  date 없음"; exit 2; }
+REAL_PERL="$(command -v perl)" && "$REAL_PERL" -MTime::HiRes=time -e 1 2>/dev/null \
+  || { echo "UNRUN  perl Time::HiRes 없음 — 시각 shim 이 읽은 시각을 적는다"; exit 2; }
+CLOCK="$T/clock"
+mkdir -p "$T/clockbin" || { echo "UNRUN  시각 shim 폴더 실패"; exit 2; }
+cat > "$T/clockbin/date" <<EOF || { echo "UNRUN  date shim 실패"; exit 2; }
+#!/bin/sh
+if [ "\$#" = 1 ] && [ "\$1" = "+%Y%m%d_%H%M%S" ]; then
+  "$REAL_PERL" -MTime::HiRes=time -e 'printf "%.3f\n", time' >> "$CLOCK.log"
+  if [ -s "$CLOCK" ]; then
+    head -n 1 "$CLOCK"
+    sed '1d' "$CLOCK" > "$CLOCK.tmp" && mv "$CLOCK.tmp" "$CLOCK"
+    exit 0
+  fi
+fi
+exec "$REAL_DATE" "\$@"
+EOF
+chmod +x "$T/clockbin/date" || { echo "UNRUN  date shim 실행 비트 실패"; exit 2; }
 printf '{\n  "name": "sample-app",\n  "version": "1.0.0"\n}\n' > "$T/cwd/package.json" || { echo "UNRUN  현재 폴더 파일 실패"; exit 2; }
 RUNPATH="$PATH"
 PROBE='rc=$?
@@ -74,7 +99,7 @@ printf "rc=%s\nsid=%s\nfile=%s\n" "$rc" "$(printenv GPT_SESSION_ID)" "$(printenv
 CS_A=00000000-0000-7000-8000-000000000001 CS_B=00000000-0000-7000-8000-000000000002 CS_C=00000000-0000-7000-8000-000000000003
 FAILS=0 RAN="" SKIPPED="" WHY=""
 EXPECT_CELLS="first-run-new-file other-session-new-file same-session-reuses unknown-session-age-only stale-file-new no-hit-new-file
-unreadable-json-skipped dir-create-failure write-failure schema-claude-session-id"
+unreadable-json-skipped same-second-new-name same-second-all-taken dir-create-failure write-failure schema-claude-session-id"
 verdict() {   # $1=셀 · $2=실패 사유(빈 값 = 통과) · $3=통과 설명
   RAN="$RAN $1"
   if [ -z "$2" ]; then echo "$1: PASS $3"; else echo "$1: FAIL $2"; FAILS=$((FAILS + 1)); fi
@@ -159,7 +184,7 @@ WHY=""
 if [ "$(count "$H_MAIN")" != 2 ] || [ "$FILE_B" = "$FILE_A" ]; then
   add "전제: 두 세션의 파일이 따로 있어야 한다(파일 수 $(count "$H_MAIN"))"
 else
-  # 바이트도 본다 — 같은 초에 만든 새 파일은 B 파일과 이름이 겹쳐 그 자리를 덮어쓴다(경로만 보면 이어받기로 보인다)
+  # 바이트도 본다 — 같은 초에 만든 새 파일이 겹친 B 파일 이름을 덮어쓰면 경로만 보면 이어받기로 보인다
   SUM_B="$(sum "$FILE_B")"
   blk main-u "$H_MAIN" -; reuse_ok "$FILE_B" "main-u(미설정)"
   blk main-e "$H_MAIN" ""; reuse_ok "$FILE_B" "main-e(빈 값)"
@@ -219,6 +244,52 @@ blk broken2 "$H_BROKEN_ONLY" "$CS_A"; fresh_ok "$H_BROKEN_ONLY" "$CS_A" broken2
 [ "$(sum "$D/SESSION-20200101_000001_issues.json")" = "$SUM_BR1" ] && [ ! -s "$D/SESSION-20200101_000002_issues.json" ] \
   || add "깨진 파일이 바뀌었다"
 verdict unreadable-json-skipped "$WHY" "60분 안의 더 새 깨진 JSON · 빈 파일 → 건너뛰고 같은 세션 파일 · 깨진 파일뿐이면 새 파일 · 깨진 파일 불변"
+
+# 같은 초 — 세션 A 가 고정 시각 이름으로 만든 파일에 이슈 하나를 적은 뒤 세션 B 가 같은 초에 시작한다. $1=HOME · $2=시각 → FILE_SS · SUM_SS
+same_second_a() {
+  printf '%s\n' "$2" > "$CLOCK"
+  blk "ss-a-$2" "$1" "$CS_A"; FILE_SS="$FILE" SUM_SS=""
+  [ "$RC" = 0 ] && [ "$(basename "$FILE_SS")" = "SESSION-$2_issues.json" ] \
+    || { add "전제: 세션 A 가 고정 시각 이름을 쓰지 않았다 [exit $RC · $(basename "$FILE_SS")]"; return 1; }
+  jq '.issues += [{"id": "ISSUE-001", "severity": "major", "category": "logic_error", "description": "sample issue",
+                   "status": "open", "discovered_in": "plan"}]' "$FILE_SS" > "$FILE_SS.tmp" && mv "$FILE_SS.tmp" "$FILE_SS" \
+    || { add "전제: A 파일에 이슈를 적지 못했다"; return 1; }
+  SUM_SS="$(sum "$FILE_SS")"
+}
+# A 파일이 그대로인가 — 바이트 · 이슈 1개
+a_kept() {
+  [ "$(sum "$FILE_SS")" = "$SUM_SS" ] && [ "$(jq '.issues | length' "$FILE_SS" 2>/dev/null)" = 1 ] \
+    || add "$1: A 파일이 바뀌었다(이슈 $(jq '.issues | length' "$FILE_SS" 2>/dev/null)개 · 기대 1)"
+}
+WHY=""
+H_SAME="$T/h-same" H_TAKEN="$T/h-taken"
+mkdir -p "$H_SAME" "$H_TAKEN" || { echo "UNRUN  임시 HOME 실패"; exit 2; }
+RUNPATH="$T/clockbin:$PATH"
+if same_second_a "$H_SAME" 20200101_000010; then
+  printf '20200101_000010\n' > "$CLOCK"; : > "$CLOCK.log"
+  blk same-b "$H_SAME" "$CS_B"; fresh_ok "$H_SAME" "$CS_B" same-b
+  [ "$FILE" != "$FILE_SS" ] || add "same-b: 세션 B 가 A 파일 이름을 썼다"
+  LC_ALL=C awk 'NR == 1 { a = $1 } NR == 2 { b = $1 } END { exit !(NR >= 2 && b - a >= 0.9) }' "$CLOCK.log" \
+    || add "same-b: 1초를 기다린 뒤 시각을 다시 읽지 않았다(읽은 시각 [$(tr '\n' ' ' < "$CLOCK.log")])"
+  a_kept same-b
+  [ "$(count "$H_SAME")" = 2 ] || add "same-b: 파일 수 $(count "$H_SAME") (기대 2)"
+fi
+verdict same-second-new-name "$WHY" "같은 초 · 세션 B → A 파일(이슈 1)을 덮어쓰지 않고 1초 뒤 새 시각의 새 이름 · A 파일 바이트 불변 · 파일 2"
+
+WHY=""
+if same_second_a "$H_TAKEN" 20200101_000020; then
+  # 시도마다 같은 이름 — 블록의 시도 횟수보다 길게 줄 세운다(줄이 떨어지면 실제 시각이라 새 이름이 나 exit 0 으로 잡힌다)
+  for i in 1 2 3 4 5 6 7 8; do echo 20200101_000020; done > "$CLOCK"
+  blk taken-b "$H_TAKEN" "$CS_B"
+  [ "$RC" = 1 ] || add "exit $RC (기대 1)"
+  [ -z "$SID" ] && [ -z "$FILE" ] || add "트래커 변수를 내보냈다 [GPT_SESSION_ID=$SID · GPT_TRACKER_FILE=$FILE]"
+  LEFT="$(grep -c . "$CLOCK" 2>/dev/null)"
+  [ "${LEFT:-8}" -le 6 ] || add "다시 시도하지 않았다(시각을 $((8 - ${LEFT:-8}))번 읽었다 · 기대 2번 이상)"
+  a_kept taken-b
+  [ "$(count "$H_TAKEN")" = 1 ] || add "파일 수 $(count "$H_TAKEN") (기대 1)"
+fi
+RUNPATH="$PATH"
+verdict same-second-all-taken "$WHY" "같은 초 · 시도마다 이름이 차 있음 → exit 1 · 변수 둘 다 안 내보냄 · A 파일 바이트 불변 · 파일 1"
 
 WHY=""
 printf 'not a directory\n' > "$H_DIRFAIL/.claude" || { echo "UNRUN  일반 파일 실패"; exit 2; }

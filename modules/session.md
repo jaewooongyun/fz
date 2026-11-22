@@ -15,7 +15,7 @@
 
 ## 세션 자동 감지
 
-Issue Tracker 의 저장소는 아래 세션 파일(`TRACKER_FILE`) 하나다. 1시간 이내 기존 세션을 자동 감지합니다. 다른 세션이 만든 파일은 이어받지 않는다(이번 호출과 파일의 세션 id(`CLAUDE_CODE_SESSION_ID`) 중 하나라도 모르면 나이만 본다) · 읽을 수 없는 파일은 건너뛴다 · 파일을 쓰지 못하면 변수를 내보내지 않고 1 로 끝난다.
+Issue Tracker 의 저장소는 아래 세션 파일(`TRACKER_FILE`) 하나다. 1시간 이내 기존 세션을 자동 감지합니다. 다른 세션이 만든 파일은 이어받지 않는다(이번 호출과 파일의 세션 id(`CLAUDE_CODE_SESSION_ID`) 중 하나라도 모르면 나이만 본다) · 읽을 수 없는 파일은 건너뛴다 · 새 파일은 있는 파일을 덮어쓰지 않는다(같은 초에 이름이 겹치면 1초 뒤 새 시각으로 다시) · 파일을 쓰지 못하면 변수를 내보내지 않고 1 로 끝난다.
 
 ```bash
 TRACKER_DIR="$HOME/.claude/sessions"
@@ -39,11 +39,14 @@ init_or_use_session() {
     TRACKER_FILE="$EXISTING_SESSION"
     SESSION_ID=$(jq -r '.session_id' "$TRACKER_FILE")
   else
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    SESSION_ID="SESSION-${TIMESTAMP}"
-    TRACKER_FILE="${TRACKER_DIR}/${SESSION_ID}_issues.json"
+    # set -C: 이름이 이미 있으면(같은 초에 시작한 다른 세션) 덮어쓰지 않고 실패한다 → 1초 뒤 새 시각으로 다시(모두 3번)
+    TRY=1
+    while :; do
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      SESSION_ID="SESSION-${TIMESTAMP}"
+      TRACKER_FILE="${TRACKER_DIR}/${SESSION_ID}_issues.json"
 
-    cat > "$TRACKER_FILE" << EOF || { echo "트래커 파일을 쓸 수 없다: $TRACKER_FILE" >&2; return 1; }
+      ( set -C; cat > "$TRACKER_FILE" ) << EOF && break
 {
   "session_id": "${SESSION_ID}",
   "claude_session_id": "${CLAUDE_CODE_SESSION_ID:-}",
@@ -55,6 +58,11 @@ init_or_use_session() {
   "final_status": "in_progress"
 }
 EOF
+      if [ ! -e "$TRACKER_FILE" ] || [ "$TRY" -ge 3 ]; then
+        echo "트래커 파일을 쓸 수 없다: $TRACKER_FILE" >&2; return 1
+      fi
+      TRY=$((TRY + 1)); sleep 1
+    done
   fi
 
   export GPT_SESSION_ID="$SESSION_ID"
