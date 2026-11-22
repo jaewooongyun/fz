@@ -258,16 +258,10 @@ by agent ID or name, or one of your other Claude Code sessions" [verified: https
 | #5 스킬 크기 | 500줄 초과 → 모듈 분리 (Level 3) |
 | #6 깨진 파일 참조 | 경로 오류 수정, 삭제된 파일 참조 제거 |
 | #7 에이전트 파일 | `agents/` 내 YAML 필드 확인 |
-| #8 Team MCP 호환 | ⏸ SEMANTIC(런타임 지식 필요) — 팀 불가 MCP 참조 제거 |
-| #9 테스트 케이스 | "## 테스트 케이스" 섹션 또는 참조 링크 추가 |
-| #10 Triggering 테스트 | should + should-NOT 최소 3개 작성 |
-| #11 skill-creator 설치 | ⏸ SEMANTIC(외부 환경) — `run_loop.py` 존재 확인, 미설치는 WARN이지 FAIL 아님 |
 | #12 MCP 도구명 (agents) | DETERMINISTIC 4축 — 2형식 문법 · retired 접두 재등장 · 인벤토리 선언 정합 · 본문 Primary ↔ frontmatter 서버 정합 위반을 고친다. 서버가 실제로 떠 있는가는 #2 소관 (이전 판의 "⏸ THRESHOLD(도구명 grammar 미정) — 사람이 대조"는 이력) |
-| #13 CLAUDE.md 섹션 참조 | ⏸ SEMANTIC — 참조 대상이 **소비 프로젝트**의 CLAUDE.md인지 플러그인 자신의 것인지 정적 구별 불가(2026-08-09 강등, 오탐 89건 실측) |
 | #14 모듈 목차 | 100줄+ 모듈에 `## 목차` 추가. 형식 선례 `modules/review-structural-axes.md`·`guides/harness-engineering.md` |
 | #15 금지 패턴 | (이력 — 현행 `--list` 에 #15 가 없다) 측정 파이프의 `head`/`tail` 잘림 제거 → `wc -l` 재실행. ⛔ BAD/GOOD few-shot 예시는 대상 아님 |
 | #16 registry ↔ agents | `modules/team-registry.md` Capabilities 표와 `agents/*.md` 양방향 일치 |
-| #17 Gate Evidence 패턴 | ⏸ THRESHOLD(정규식 미정) — Gate 체크리스트에 `Evidence:` 행 존재 여부를 사람이 확인 |
 | #N1~N15 (lint 신설 — 이전 표기 N1~N6 은 이력) | `--list`로 항목 확인. N1=스키마 $defs 정합 · N2=인벤토리 동기 · N3=줄번호 인용 · N4=ERE alternation · N5=신호 폐기 · N6=루트 앵커 · N7=셸 변수 정의-사용 · N8=목차 앵커 · N9=cross-file § 앵커 · N10=structured-output strict · N11=경량 경로 검증 계약 · N12=`/sc:` 네임스페이스 · N13=memory 필드 재도입 금지 · N14=빈 mktemp 치환 cd · N15=상대 Markdown 링크 · 앵커 해소(경로는 문서 폴더 기준) |
 
 > ⛔ **항목 목록의 SSOT는 `scripts/lint_contracts.py --list`다.** 위 표는 *실패 시 조치*만 담고 항목 정의를 재정의하지 않는다.

@@ -193,7 +193,7 @@ var body: some View {
 
 ## 관점 6: Dependency Impact
 
-⛔ **본 관점은 `evidence/caller-analysis.md` 의존이 크다** — `## 호출`(호출자) · `## 구현`(conformance 구현 · 하위 클래스). 파일이 없거나 프롬프트가 경로를 주지 않았으면 **관점 6은 부분 수행**이다. 그 사실을 `overall_assessment`에 *"관점 6 부분 수행 — caller-analysis 미제공"*으로 명시하고 Grep 폴백으로 대체한다 (`code-auditor:174` 부분 분석 표기 패턴과 동형).
+⛔ **본 관점은 `evidence/caller-analysis.md` 의존이 크다** — `## 호출`(호출자) · `## 구현`(conformance 구현 · 하위 클래스). 파일이 없거나 프롬프트가 경로를 주지 않았으면 **관점 6은 부분 수행**이다. 그 사실을 `overall_assessment`에 *"관점 6 부분 수행 — caller-analysis 미제공"*으로 명시하고 Grep 폴백으로 대체한다 (아래 미탐지 conformer 항목의 부분 분석 표기 패턴과 동형).
 
 ### 프로토콜 변경 파급 분석
 

@@ -342,7 +342,7 @@ GPT 결과와 Claude 에이전트 결과가 충돌하면 Lead가 판단하고 �
 - [ ] MCP 도구 4-tier 전략을 명시했는가?
 - [ ] 출력 채널 규칙을 포함했는가? (⛔ P2P SendMessage 아님 — `skill-authoring.md` §12 OVERRIDE)
 - [ ] 모델 배정을 **`workflows/*.js` `opts.model`에 명시**했는가? (⛔ 에이전트 주석 아님 — `scripts/lint-model-explicit.sh`가 검출)
-- [ ] `/fz-manage check` 통과 (에이전트 건강 체크 #7, #8)?
+- [ ] `/fz-manage check` 통과 (에이전트 건강 체크 #7)?
 - [ ] `guides/prompt-optimization.md` 10대 원칙을 준수하는가?
 
 ### 추가 시 업데이트 필요 항목

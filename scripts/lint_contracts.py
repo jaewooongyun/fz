@@ -40,21 +40,12 @@ ITEMS = [
     ("5",  "DETERMINISTIC", "fz-*",      "SKILL.md ≤500줄"),
     ("6",  "DETERMINISTIC", "all",       "깨진 파일 참조 — 백틱 경로(.md · .js · .py) + 비백틱 경로(.md 의 표 칸 · 산문 · 코드블록 — .py/.js 문자열은 범위 밖) + 루트 변수 경로(.md — `${FZ_PLUGIN_ROOT}/경로` · `$PLUGIN_ROOT/경로`, 중괄호 유무 무관 · 저장소 루트 기준만 · 다른 변수는 보지 않는다) · `skills/<이름>/` 안 파일은 루트에서 못 찾으면 그 스킬 폴더 기준으로도 푼다 · Markdown 링크 목적지는 #N15 소관(두 번 세지 않는다)"),
     ("7",  "DETERMINISTIC", "agents",    "에이전트 파일 필드 (name/description/model/tools)"),
-    ("8",  "SEMANTIC",      "agents",    "Team 불가 MCP 참조 — 판정에 런타임 지식 필요"),
-    ("9",  "SEMANTIC",      "fz-*",      "테스트 케이스 충분성 — 존재는 세지만 충분성은 의미 판단"),
-    ("10", "SEMANTIC",      "fz-*",      "Triggering 테스트 3개+ — 품질은 의미 판단"),
-    ("11", "SEMANTIC",      "infra",     "skill-creator 설치 — 외부 환경"),
     ("12", "DETERMINISTIC", "agents",    "MCP 도구명 — **4축**: 2형식 문법 + retired 접두 재등장 + 인벤토리 선언 정합 + 본문 Primary ↔ frontmatter 서버 정합 (⛔ 실제 **가용성**(서버가 떠 있는가)만 #2 SEMANTIC 소관 — 정적으로 닫히지 않는다. 선언 여부는 여기서 닫는다)"),
-    # ⛔ 2026-08-09 DETERMINISTIC→SEMANTIC 강등: `agents/*.md`의 `CLAUDE.md ## Architecture` 는
-    #    **소비 프로젝트의** CLAUDE.md를 뜻한다(에이전트는 대상 프로젝트 지침을 읽는다).
-    #    플러그인 자신의 CLAUDE.md로 해석하면 89건 전부 오탐 — 정적으로 구별 불가.
-    ("13", "SEMANTIC",      "all",       "CLAUDE.md 섹션 참조 유효성 — ⛔ 참조 대상이 소비 프로젝트인지 플러그인 자신인지 정적 구별 불가"),
     ("14", "DETERMINISTIC", "modules",   "100줄+ 모듈의 목차 존재"),
     ("16", "DETERMINISTIC", "agents",    "team-registry ↔ agents/ 양방향 일치"),
-    ("17", "THRESHOLD",     "fz-*",      "Gate Evidence 패턴 — ⛔ 정규식 미정"),
     ("N1", "DETERMINISTIC", "schemas",   "gpt_base_issue $defs 값이 소비 스키마와 일치 — severity enum + confidence 경계 (⛔ 값은 **인라인**한다: fz 스키마는 `$ref` 를 쓰지 않는다(실측 0건) — 본 검사가 인라인 정합을 본다)"),
     ("N2", "DETERMINISTIC", "infra",     "인벤토리 선언 ↔ 실측 카운트 — `CLAUDE.md` + `docs/architecture.md` 트리 표기 **양쪽** (한 곳만 보면 나머지가 조용히 낡는다)"),
-    ("N3", "DETERMINISTIC", "all",       "줄번호 인용 — 대상 파일 실재 + 행 범위 내 + **빈 줄 아님** (⛔ 인용 *내용*의 정합은 여전히 검사하지 않는다 — 빈 줄만이 내용 판단 없이 닫히는 결정론 조각이다)"),
+    ("N3", "DETERMINISTIC", "all",       "줄번호 인용 — 대상 파일 실재 + 행 범위 내 + **빈 줄 아님**. 꼴 둘: `경로.확장자:N` · 확장자 없는 `<이름>:N`(skills/<이름>/SKILL.md → agents/<이름>.md → modules/<이름>.md 순으로 풀리는 것만 — 어디서도 안 풀리면 인용이 아니라 건너뛴다) (⛔ 인용 *내용*의 정합은 여전히 검사하지 않는다 — 빈 줄만이 내용 판단 없이 닫히는 결정론 조각이다)"),
     ("N4", "DETERMINISTIC", "all",       "ERE alternation 오용 — `grep -E` 같은 줄의 `\\|`"),
     ("N5", "DETERMINISTIC", "scripts",   "측정 명령의 신호 폐기 (`>/dev/null 2>&1` + exit 미사용)"),
     ("N6", "DETERMINISTIC", "scripts",   "루트 앵커 — **줄 단위 화이트리스트**(fail-closed). ⛔ 일반 분석 아님: 미지 형태는 거부하고 `ANCHOR_LINES` 에 명시 추가한다. `.sh` 는 첫 `<<` 이후를 데이터로 취급"),
@@ -67,7 +58,7 @@ ITEMS = [
     #    (a) `` `X.md` §N `` cross-file: 프로브 121건 → 위반 1, 오탐 0  → **본 검사가 담당**
     #    (b) 파일명 없는 `§N` self-file: 프로브 329건 → 위반 119(36%) → ⛔ **미도입**.
     #        대부분 다른 문서·논문의 절을 문맥상 축약한 표기(`§2.4`=OpenDev 논문, `§5.7`=experiment-log)라
-    #        정적으로 대상 문서를 특정할 수 없다. 도입하면 오탐률이 #13 강등 선례(89건)를 재현한다.
+    #        정적으로 대상 문서를 특정할 수 없다. 도입하면 오탐률이 CLAUDE.md 섹션 참조 검사를 내린 선례(89건 전부 오탐)를 재현한다.
     ("N12", "DETERMINISTIC", "all",     "`/sc:` 네임스페이스 형식 — `/sc:sc-*` 만 유효 (v4.35.0 에서 86곳을 고쳤는데 **지키는 검사가 없었다**. B14: done 판정의 오라클이 `mcp__serena__` 0건이었고 그것은 다른 대상을 잰다)"),
     ("N11", "DETERMINISTIC", "skills", "경량 경로 검증 계약 — light/tier 경로를 가진 스킬은 **그 경로 절차가 있는 문서**에 어떤 검증이 살아남는지 선언한다. ⛔ 절차를 모듈로 위임하면 그 모듈에도 있어야 한다 — SKILL.md 에만 적으면 위임 절차를 따르는 Lead 가 못 본다 (실측: Coverage Gate 가 `### 4. Confidence Matrix 출력` 안에 있는데 Tier 0 은 그 섹션을 건너뛴다)"),
     ("N10", "DETERMINISTIC", "schemas", "structured-output strict 준수 — `--output-schema`/`--schema` 로 **실제 전달되는** 스키마의 모든 객체가 `additionalProperties:false` + `required ⊇ properties` (⛔ 대상은 사용처 grep 으로 정한다: 파일명 목록도, top-level properties 유무도 아니다. `issue_tracker_schema` 는 Issue Tracker 산출물이고 gpt 응답이 아니다)"),
@@ -435,11 +426,6 @@ def chk_7():
 SECREF = re.compile(r"CLAUDE\.md\s*`##\s*([^`]+)`")
 
 
-# ⛔ `chk_13` 제거 (2026-08-10, 3라운드 감사 ISSUE-008): 항목 13은 SEMANTIC(스크립트 판정 대상 아님)인데
-#    `CHECKS` 에 등록돼 있어 **도달 불가 구현 15줄**이 남아 있었다. 새 레지스트리 불변식이 이를 검출했다.
-#    판정 근거는 항목 설명에 있다 — 참조 대상이 소비 프로젝트인지 플러그인 자신인지 정적 구별 불가.
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # #12 MCP 도구명 — 3축 (문법 · retired 재등장 · Primary 정합)
 #
@@ -786,31 +772,44 @@ def _chk_N2_legacy():
 
 
 CITE = re.compile(r"([A-Za-z0-9_./\-]+\.(?:md|js|py|sh|json)):(\d+)")
+# 확장자 없는 `<이름>:N` — 앞 경계가 낱말 글자 · `.` · `/` · `-` 가 아닌 자리만 본다(`SKILL.md:267` 의 `md:267` 이나
+#   `a/이름:N` 꼬리를 다시 물지 않는다). 이름은 아래 순서로 실제 파일로 풀고, 어디서도 안 풀리면(`tier:3` · `path:120` ·
+#   `ledger:81`) 인용이 아니라 건너뛴다. 확장자 있는 꼴은 basename 이 둘 이상이면 건너뛰므로 이 꼴을 하나도 보지 못했다.
+CITE_BARE = re.compile(r"(?<![\w./-])([a-z][a-z0-9-]+):(\d+)")
+CITE_BARE_TARGETS = ("skills/{}/SKILL.md", "agents/{}.md", "modules/{}.md")
 
 
-def chk_N3():
-    """인용의 **구조**만 판정한다 — 파일 실재 · 행 범위 · 빈 줄 여부.
+def chk_N3(root: Path | None = None):
+    """인용의 **구조**만 판정한다 — 파일 실재 · 행 범위 · 빈 줄 여부. 꼴은 CITE(확장자 있음) · CITE_BARE(확장자 없음) 둘이다.
 
     ⛔ 인용 *내용*의 정합(그 줄이 정말 그 주장을 뒷받침하는가)은 여전히 사람 몫이다.
        빈 줄만 예외인 이유: 내용을 읽지 않고도 오류임이 확정되는 유일한 조각이다.
+    ⛔ `root` 는 통합 fixture 주입점이다(walk_files 와 같은 규약) — 순회와 대상 읽기를 같은 기준으로 한다.
     """
+    base = root or ROOT
     by_base = defaultdict(list)
-    for rel, _ in walk_files():
+    for rel, _ in walk_files(root=base):
         by_base[Path(rel).name].append(rel)
-    existing = {rel for rel, _ in walk_files()}
+    existing = {rel for rel, _ in walk_files(root=base)}
     v, seen = [], 0
-    for rel, p in walk_files(".md", ".js"):
+    for rel, p in walk_files(".md", ".js", root=base):
         if rel == "CHANGELOG.md":
             continue
         for i, line in enumerate(read(p).split("\n"), 1):
+            cites = []
             for m in CITE.finditer(line):
                 raw, num = m.group(1).lstrip("./"), int(m.group(2))
                 target = raw if raw in existing else (by_base[Path(raw).name][0]
                                                      if len(by_base.get(Path(raw).name, [])) == 1 else None)
+                cites.append((target, num))
+            for m in CITE_BARE.finditer(line):
+                target = next((t for t in (f.format(m.group(1)) for f in CITE_BARE_TARGETS) if t in existing), None)
+                cites.append((target, int(m.group(2))))
+            for target, num in cites:
                 if target is None:
                     continue
                 seen += 1
-                tl = read(ROOT / target).split("\n")
+                tl = read(base / target).split("\n")
                 if num > len(tl):
                     v.append(f"{rel}:{i}: → {target}:{num} 범위 초과 (파일 {len(tl)}줄)")
                 elif not tl[num - 1].strip():
@@ -1498,6 +1497,21 @@ INTEG_TREE = {
                             '[bad](../../modules/target_n15.md#no-such-frag-n15)\n'
                             '[gone](../../modules/nope_n15_file.md)\n',
     "CHANGELOG.md": '[x](nope_n15_changelog.md)\n',
+    # #N3: 줄번호 인용 — 격자 축은 꼴(확장자 있음 · 없음) × 풀이(스킬 · 모듈 · 안 풀림) × 대상 줄(빈 줄 · 범위 밖 · 정상).
+    #      확장자 있는 인용의 빈 줄 · 범위 밖 두 줄은 넓히기 전부터 있던 판정이다 — 넓힌 뒤에도 그대로 걸려야 한다.
+    #      음성: 정상 줄 · 파일로 안 풀리는 이름(`tier` · `path`) · 없는 파일 · 앞 경계(`.` · `/` · `-` · `_` 뒤 — 빈 줄을 가리켜
+    #      경계가 사라지면 위반으로 늘어난다) · 이름에 붙은 꼴(`a-n3t` · `an3t` — 다른 이름이라 안 풀린다).
+    #      확장자 있는 인용의 `md:2` 를 확장자 없는 꼴로 다시 세면 4번째 줄이 2건이 된다.
+    #      ⛔ 백틱 경로를 넣지 않는다(#6 대상) · 비백틱 경로는 이 트리에 있는 파일만 쓴다
+    "modules/n3t.md": 'a\n\nc\n',
+    "skills/n3s/SKILL.md": 'x\n\ny\n',
+    "modules/bad_n3.md": '확장자 없음 · 모듈 · 빈 줄 n3t:2\n'
+                         '확장자 없음 · 스킬 · 빈 줄 n3s:2\n'
+                         '확장자 없음 · 범위 밖 n3t:9 · n3s:9\n'
+                         '확장자 있음 · 빈 줄 n3t.md:2\n'
+                         '확장자 있음 · 범위 밖 modules/n3t.md:9\n'
+                         '정상 n3t:3 · n3s:3 · n3t.md:3 · 안 풀림 tier:3 · path:120 · nope_n3.md:2\n'
+                         '앞 경계 x.n3t:2 · a/n3t:2 · -n3t:2 · _n3t:2 · a-n3t:2 · an3t:2\n',
     # 정상 대조군 — 위반 0이어야 한다
     "modules/ok.md": '# T\n\n## 목차\n\n- [실제절](#실제절)\n\n## 실제절\n\n본문\n',
     "scripts/ok.py": 'from pathlib import Path\nroot = Path(__file__).resolve().parent\n',
@@ -1515,6 +1529,8 @@ INTEG_EXPECT = {
     "N7": ["modules/bad_n7.md:2"],
     "N8": ["modules/bad_n8.md"],
     "N9": ["modules/bad_n9.md:4"],
+    "N3": ["modules/bad_n3.md:1", "modules/bad_n3.md:2", "modules/bad_n3.md:3", "modules/bad_n3.md:3",
+           "modules/bad_n3.md:4", "modules/bad_n3.md:5"],
     "N14": ["tests/bad_n14.sh:7", "tests/bad_n14.sh:8", "tests/bad_n14.py:2", "tests/bad_n14.js:2"],
     "6": ["modules/bad_6.md:3", "modules/bad_6.md:4", "modules/bad_6.md:5", "modules/bad_6.md:6",
           "modules/bad_6.md:8", "modules/bad_6.md:13", "modules/bad_6.md:14",

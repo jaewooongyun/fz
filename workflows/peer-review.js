@@ -46,7 +46,7 @@ export const meta = {
   description: 'fz-peer-review 내부 — fz-peer-review 스킬이 인자를 준비해 부른다. 직접 실행하지 않는다',
 }
 
-// 팀원 PR 리뷰 이슈 스키마 (fz-peer-review 출력 계약 — SKILL.md:267 + arch-critic/code-auditor)
+// 팀원 PR 리뷰 이슈 스키마 (fz-peer-review 출력 계약 — skills/fz-peer-review/SKILL.md + arch-critic/code-auditor)
 const PeerReviewSchema = {
   type: 'object', required: ['issues', 'strengths', 'overall_assessment'],
   properties: {

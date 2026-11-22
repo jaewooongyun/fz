@@ -187,7 +187,7 @@ Key Facts + **Mapping Facts** (v4.4.0)를 Analyze 전달 전에 **수집과 다�
 ```
 
 
-> ⛔ **절차 4가 왜 별도 항목인가**: 절차 2의 "다른 방법으로 재확인"은 *매치가 있는* Fact에는 작동하나 **0건에는 발화 조건이 없었다.** 실측 — `git grep -nE '\bSym\b'` 가 ERE `\b` 미지원으로 **에러 없이 0건**을 반환했고, 그 "잔존 소비자 0건"이 evidence에 실려 세 렌즈 전원에게 배포될 뻔했다. 렌즈는 Bash 미보유라 재측정이 불가능하므로 cross-model 이 cross-data 가 아니게 된다. §Negative-Result Gate 는 2026-08-10 부터 존재했고 6곳에서 트리거되나(`lead-reasoning:183` · `system-reminders:24` · `fz-discover:231` · `fz-search:343` · `fz-manage:178,195`) **본 스킬에만 연결이 없었다** — 신설이 아니라 배선 복구다.
+> ⛔ **절차 4가 왜 별도 항목인가**: 절차 2의 "다른 방법으로 재확인"은 *매치가 있는* Fact에는 작동하나 **0건에는 발화 조건이 없었다.** 실측 — `git grep -nE '\bSym\b'` 가 ERE `\b` 미지원으로 **에러 없이 0건**을 반환했고, 그 "잔존 소비자 0건"이 evidence에 실려 세 렌즈 전원에게 배포될 뻔했다. 렌즈는 Bash 미보유라 재측정이 불가능하므로 cross-model 이 cross-data 가 아니게 된다. §Negative-Result Gate 는 2026-08-10 부터 존재했고 6곳에서 트리거되나(`modules/lead-reasoning.md` · `modules/system-reminders.md` · `skills/fz-discover/SKILL.md` · `skills/fz-search/SKILL.md` · `skills/fz-manage/SKILL.md` 두 곳) **본 스킬에만 연결이 없었다** — 신설이 아니라 배선 복구다.
 
 ### 4.5. ⛔ 패턴 변환 감지 (diff에 비동기/네트워크/UI 패턴 변경 포함 시)
 
