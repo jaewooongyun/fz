@@ -499,7 +499,7 @@ PY
 |---|---|---|
 | 트랜스크립트 | `~/.claude/projects/**/*.jsonl` | `usage`·`timestamp`·`effort`·`attributionSkill`·`isSidechain` |
 | 워크플로 journal | `…/<session>/subagents/workflows/wf_*/journal.jsonl` | 스테이지별 `result`(findings·verdict) |
-| Stop 훅 이벤트 | `$FZ_TELEMETRY_DIR/events.jsonl` (기본 `~/.fz/telemetry`) | 턴당 도구 수·문구 발화 수·정정 신호(**약한 신호**) |
+| Stop 훅 이벤트 | `$FZ_TELEMETRY_DIR/events.jsonl` (기본 `~/.fz/telemetry`) | 턴당 도구 수·정정 신호(**약한 신호** · 사람이 친 프롬프트만) |
 
 ```bash
 python3 scripts/fz_telemetry_report.py --since YYYY-MM-DD --until YYYY-MM-DD   # 집계 리포트
@@ -518,7 +518,7 @@ python3 scripts/fz_snapshot.py --diff                                           
 |---|---|---|
 | 워커 effort `xhigh`→`high` 해도 되나 | 같은 입력 짝 비교(§8.1): critical·major 손실 0 AND (시간 or 토큰) ≥10%↓ | `modules/peer-review-tiers.md` 짝 비교 절차 그대로 |
 | 스테이지 X 는 load-bearing 인가 | 그 스테이지의 `overturn`(refuted·refute·false_positive) **과 `adjust`**(어댑터 `verdict adjust` [verified: `scripts/fz_telemetry_report.py:440,510`]) 수, 워크플로 **N≥20** 실행 | overturn 0~1 **AND** adjust 0~1 이면 제거 A/B 후보(0~1 임계는 **잠정 휴리스틱**) — ⛔ 카운트는 판정 건수이지 옳음이 아니다 |
-| 규칙 감량이 품질을 떨어뜨렸나 | 감량 전후 fz-findings `detector: user` 월별 건수 + events `user_correction_signal` 비율 | 증가하면 되돌림 |
+| 규칙 감량이 품질을 떨어뜨렸나 | 감량 전후 fz-findings `detector: user` 월별 건수 + events `user_correction_signal` 비율(`gate_mentions` 칸이 있는 옛 행은 주입된 스킬 본문까지 본 값이라 새 행과 바로 견주지 않는다) | 증가하면 되돌림 |
 | floor 성장이 지연을 늘리나 | `snapshots.tsv` floor × 스킬별 지연 중앙값 상관 | 상관 없으면 감량 우선순위 ↓ |
 | events 의 0 은 저부하인가 | `measurement` 필드 — `complete` 만 카운트로 읽는다 | `incomplete`·`unattributable`·`no_transcript` 는 분모에서 뺀다 |
 

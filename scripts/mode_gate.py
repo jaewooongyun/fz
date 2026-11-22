@@ -280,7 +280,7 @@ def estimate(workflow: str, env=None) -> dict | None:
             rows = json.loads(out.read_text(encoding="utf-8")).get("workflows") or []
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError, ValueError, AttributeError):
             return None   # 추정 실패는 진행을 막지 않는다 — 질문에 "실측 없음"
-    approx = "full 이 더하는 Workflow 구간 · 에이전트 파일 mtime 차분 근사 · 이 환경 최근 30일"
+    approx = "full 이 더하는 Workflow 구간 · 에이전트 기록 시각 차(재시도 포함 · 근사) · 이 환경 최근 30일"
     for r in rows:
         if isinstance(r, dict) and r.get("workflow") == workflow:
             return {"workflow": workflow, "wall_median_min": r.get("wall_median_min"), "n": r.get("wall_n") or 0, "approx": approx}

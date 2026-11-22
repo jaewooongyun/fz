@@ -17,7 +17,7 @@
     `usage.iterations[]` 의 `advisor_message` 로 따로 센다 — iterations 만 세면 호출을 덜 센다(fz_wf_metrics.py 머리말).
   · 지연은 직전 `user` 엔트리와 `assistant` 엔트리의 timestamp 차분이다. 사용자 입력 대기가
     섞일 수 있어 30분 초과는 잘랐다. 도구 실행 시간은 포함하지 않는다.
-  · 워크플로 wall-time은 `agent-*.jsonl` mtime 최소~최대 차분이라 근사다(`[근사]` 표기).
+  · 워크플로 wall-time은 `agent-*.jsonl` 마다 첫 · 끝 timestamp 를 읽은 최소~최대 차라 근사다(재시도 run 은 앞 시도까지 넣는다 · `[근사]` 표기).
   · 스테이지 판별은 started 줄 라벨 → 형제 meta.json agentType → result **키 집합** 휴리스틱 순이다. 셋 다 못 가르면 `unknown` 이고 그 키 집합은 부록에 전수 열거한다.
 
 Python 3.9 stdlib 전용.
@@ -536,16 +536,57 @@ def _name_from_sibling_script(folder, wf_id):
     return None
 
 
+WALL_TAIL_BYTES = 64 * 1024   # 끝 기록 시각을 찾는 꼬리 창 — 그 안에 시각 있는 줄이 없으면 2배씩 넓힌다
+
+
+def _line_stamp(raw):
+    """JSONL 한 줄(bytes)의 최상위 timestamp → epoch 초. 잘린 줄 · 시각 없는 줄은 None."""
+    try:
+        obj = json.loads(raw)
+    except ValueError:
+        return None
+    stamp = parse_ts(obj.get("timestamp")) if isinstance(obj, dict) else None
+    return stamp.timestamp() if stamp is not None else None
+
+
+def _agent_span(path):
+    """agent 기록 하나의 (첫 기록 시각, 끝 기록 시각) epoch 초. 앞에서 첫 시각 줄 · 꼬리 창에서 마지막 시각 줄만 읽는다."""
+    with open(path, "rb") as handle:
+        first = next((s for s in map(_line_stamp, handle) if s is not None), None)
+        if first is None:
+            return None
+        size = handle.seek(0, os.SEEK_END)
+        window = WALL_TAIL_BYTES
+        while True:
+            start = max(0, size - window)
+            handle.seek(start)
+            for raw in reversed(handle.read().split(b"\n")):
+                stamp = _line_stamp(raw)
+                if stamp is not None:
+                    return first, stamp
+            if start == 0:
+                return first, first
+            window *= 2
+
+
 def _wall_seconds(folder):
-    stamps = []
+    """wf 폴더의 wall(초) — agent 기록마다 첫 · 끝 timestamp 를 읽어 min(첫) ~ max(끝).
+
+    mtime 차분은 파일마다 마지막으로 쓴 시각만 보므로 첫 에이전트가 돈 구간이 빠진다. 재시도 run 은 앞 시도의
+    agent 까지 넣어 길게 잡는다(fz_wf_metrics 의 wall 은 마지막 시도만). 기록 시각이 있는 agent 가 없으면 None.
+    """
+    firsts, lasts = [], []
     for path in glob.glob(os.path.join(folder, "agent-*.jsonl")):
         try:
-            stamps.append(os.path.getmtime(path))
+            span = _agent_span(path)
         except OSError:
             continue
-    if len(stamps) < 2:
+        if span is not None:
+            firsts.append(span[0])
+            lasts.append(span[1])
+    if not firsts:
         return None
-    return max(stamps) - min(stamps)
+    return max(lasts) - min(firsts)
 
 
 def _read_journal(journal, row, unknown):
@@ -1723,7 +1764,7 @@ def render_markdown(payload):
     lines.append("")
     lines.append(
         "> 호출 수는 트랜스크립트의 `Workflow` tool_use 이고, 나머지는 journal 이다. wall-time 은 "
-        "`agent-*.jsonl` mtime 최소~최대 차분이라 근사다. 스테이지 카운트는 **뒤집음 판정이 아니라 카운트**다 — "
+        "`agent-*.jsonl` 기록 시각(첫 timestamp 최소 ~ 끝 timestamp 최대) 차라 근사다(재시도 run 은 앞 시도까지 넣는다). 스테이지 카운트는 **뒤집음 판정이 아니라 카운트**다 — "
         "`overturn`(refuted=true·refute·false_positive) 은 검증 스테이지가 낸 **판정 건수**이지 그 판정이 옳았다는 뜻이 아니다. overturn 이 0 에 수렴하는 스테이지가 제거 A/B 후보다(`guides/skill-testing.md §8.2`)."
     )
     lines.append("")
@@ -1944,6 +1985,16 @@ SELFTEST_ASSISTANT = {
 }
 
 
+def _write_selftest_agent(folder, name, stamps, last_size=0):
+    """agent 기록 하나 — 첫 줄은 작업 지시, 그 뒤는 도구 결과 user 줄이고 줄마다 stamps 의 timestamp 를 단다.
+    last_size 를 주면 마지막 도구 결과를 그 길이로 늘린다(꼬리 창보다 긴 끝 줄)."""
+    with open(os.path.join(folder, name), "w") as handle:
+        for i, stamp in enumerate(stamps):
+            content = "작업 지시" if i == 0 else [{"type": "tool_result", "tool_use_id": "t%d" % i,
+                                                   "content": "x" * last_size if last_size and i == len(stamps) - 1 else "ok"}]
+            handle.write(json.dumps({"type": "user", "timestamp": stamp, "message": {"content": content}}) + "\n")
+
+
 def _write_selftest_tree(base):
     projects = os.path.join(base, "projects", "-proj")
     session = os.path.join(projects, "sess")
@@ -2003,11 +2054,8 @@ def _write_selftest_tree(base):
         # peer-review counter 형태 — 판정이 challenges[] 안에 중첩된다(최상위 refuted 없음)
         handle.write(json.dumps({"type": "result", "key": "k5", "agentId": "a5", "result": {"challenges": [{"target": "A1", "verdict": "refute", "note": ""}, {"target": "A2", "verdict": "uphold", "note": ""}], "missedIssues": [{"id": "CT-1"}]}}) + "\n")
         handle.write(json.dumps({"type": "result", "key": "k4", "agentId": "a4", "result": {"zzz": 1, "yyy": 2}}) + "\n")
-    for name in ("agent-a1.jsonl", "agent-a2.jsonl"):
-        with open(os.path.join(wf_dir, name), "w") as handle:
-            handle.write("{}\n")
-    os.utime(os.path.join(wf_dir, "agent-a1.jsonl"), (1785000000, 1785000000))
-    os.utime(os.path.join(wf_dir, "agent-a2.jsonl"), (1785000600, 1785000600))
+    _write_selftest_agent(wf_dir, "agent-a1.jsonl", ["2026-08-01T00:00:00Z", "2026-08-01T00:05:00Z"])
+    _write_selftest_agent(wf_dir, "agent-a2.jsonl", ["2026-08-01T00:05:00Z", "2026-08-01T00:10:00Z"])
     stamp = parse_day("2026-08-01").timestamp() + 3600
     os.utime(os.path.join(wf_dir, "journal.jsonl"), (stamp, stamp))
 
@@ -2210,6 +2258,28 @@ def self_test():
     check("count_verdicts 단위", count_verdicts({"a": [{"refuted": False}, {"verdict": "false_positive"}], "verdict": "issues"}), (1, 1, 0))
     check("additions", wf_rows["code-pair"]["additions"], 3)   # 교차 additions 2 + peer-review counter missedIssues 1
     check("wall-time 10분", round(wf_rows["code-pair"]["walls"][0] / 60.0), 10)
+    # wall 은 agent 기록의 timestamp 로 잰다 — mtime 은 파일에 마지막으로 쓴 시각뿐이라 첫 에이전트가 돈 구간이 빠진다
+    wall_root = tempfile.mkdtemp(prefix="fz-telemetry-wall-")
+    wall_dirs = {}
+    for key in ("two", "one", "none", "long"):
+        wall_dirs[key] = os.path.join(wall_root, key)
+        os.makedirs(wall_dirs[key])
+    _write_selftest_agent(wall_dirs["two"], "agent-w1.jsonl", ["2026-08-01T00:00:00Z", "2026-08-01T00:05:00Z"])
+    _write_selftest_agent(wall_dirs["two"], "agent-w2.jsonl", ["2026-08-01T00:05:00Z", "2026-08-01T00:10:00Z"])
+    for name in ("agent-w1.jsonl", "agent-w2.jsonl"):
+        os.utime(os.path.join(wall_dirs["two"], name), (1785000000, 1785000000))
+    _write_selftest_agent(wall_dirs["one"], "agent-w1.jsonl", ["2026-08-01T00:00:00Z", "2026-08-01T00:01:00Z", "2026-08-01T00:03:00Z"])
+    for name, epoch in (("agent-w1.jsonl", 1785000000), ("agent-w2.jsonl", 1785000600)):
+        with open(os.path.join(wall_dirs["none"], name), "w") as handle:
+            handle.write("{}\n")
+        os.utime(os.path.join(wall_dirs["none"], name), (epoch, epoch))
+    _write_selftest_agent(wall_dirs["long"], "agent-w1.jsonl", ["2026-08-01T00:00:00Z", "2026-08-01T00:07:00Z"],
+                          last_size=WALL_TAIL_BYTES + 4096)
+    check("wall — agent 기록 시각 차(mtime 아님)", _wall_seconds(wall_dirs["two"]), 600.0)
+    check("wall — agent 1개면 그 기록의 첫~끝 구간", _wall_seconds(wall_dirs["one"]), 180.0)
+    check("wall — 기록 시각 있는 agent 가 없으면 None", _wall_seconds(wall_dirs["none"]), None)
+    check("wall — 끝 줄이 꼬리 창보다 길어도 끝 기록 시각을 읽는다", _wall_seconds(wall_dirs["long"]), 420.0)
+    _sh.rmtree(wall_root, ignore_errors=True)
     check("미매치 형태 1종", list(unknown), [("yyy", "zzz")])
     findings = collect_findings(findings_dir, since, until)
     check("findings 2건", findings["n"], 2)

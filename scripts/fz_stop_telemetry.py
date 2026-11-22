@@ -10,7 +10,7 @@
 
 ⛔ 저장 금지 항목: 메시지 본문·경로 원문. `cwd` 는 sha1 앞 8자만 남긴다(개인정보·용량).
    트랜스크립트에 이미 있는 필드를 다시 쓰지 않는다 — 결합 키(`session_id`·`prompt_id`)만
-   겹치고, 나머지는 **트랜스크립트에 없는 파생값**(문구 발화 수·정정 신호)이다.
+   겹치고, 나머지는 **트랜스크립트에 없는 파생값**(정정 신호 등)이다.
 
 예산: 정규식만 쓰고 트랜스크립트는 **tail 200KB** 만 읽는다(전체 파싱 금지).
 
@@ -32,9 +32,6 @@ TAIL_BYTES = 200 * 1024
 DEFAULT_TELEMETRY_DIR = "~/.fz/telemetry"  # 사용자 중립 기본값 — 개인 경로는 env FZ_TELEMETRY_DIR 로 (governance:146)
 EVENTS_FILE = "events.jsonl"
 
-RE_GATE = re.compile(r"Gate \d")
-RE_VERIFY = re.compile(r"verify:")
-RE_BAN = re.compile("⛔")
 # fz 결과 줄 관례 — 본문은 저장하지 않고 **어느 표식이 났는지**만 남긴다.
 RESULT_MARKERS = (("result", re.compile(r"result:")),
                   ("needs input", re.compile(r"needs input:")),
@@ -138,8 +135,8 @@ def scan_transcript(path, prompt_id):
             is_tool_result = isinstance(content, list) and any(
                 isinstance(b, dict) and b.get("type") == "tool_result" for b in content
             )
-            # 사람이 친 프롬프트만 정정 신호 대상 — tool_result 는 도구 출력이다
-            if not is_tool_result and (not prompt_id or current_prompt == prompt_id):
+            # 사람이 친 프롬프트만 정정 신호 대상 — tool_result 는 도구 출력이고, 주입된 스킬 본문(isMeta)도 사람 글이 아니다
+            if not is_tool_result and not obj.get("isMeta") and (not prompt_id or current_prompt == prompt_id):
                 if isinstance(content, str):
                     out["last_user_text"] = content
                 elif isinstance(content, list):
@@ -223,9 +220,6 @@ def build_event(payload):
         "n_tool_use": scan["n_tool_use"],
         "n_ask": scan["n_ask"],
         "n_workflow": scan["n_workflow"],
-        "gate_mentions": len(RE_GATE.findall(last)),
-        "verify_mentions": len(RE_VERIFY.findall(last)),
-        "ban_mentions": len(RE_BAN.findall(last)),
         "result_line": result_line,
         "user_correction_signal": bool(RE_CORRECTION.search(scan["last_user_text"])),
     }
@@ -378,9 +372,6 @@ def self_test():
     check("tool_use 4건 (블록 단위 — 메시지 dedup 과 독립)", first["n_tool_use"], 4)
     check("AskUserQuestion 1건", first["n_ask"], 1)
     check("Workflow 1건", first["n_workflow"], 1)
-    check("Gate 발화", first["gate_mentions"], 1)
-    check("verify 발화", first["verify_mentions"], 1)
-    check("⛔ 발화", first["ban_mentions"], 2)
     check("result_line", first["result_line"], "result")
     check("정정 신호", first["user_correction_signal"], True)
     check("cwd 는 해시 8자만", len(first["cwd_hash"]), 8)
@@ -392,6 +383,26 @@ def self_test():
     check("transcript 없음 — 카운트 0", (second["n_assistant"], second["n_tool_use"]), (0, 0))
     check("transcript 없음 — result_line", second["result_line"], "failed")
     check("transcript 없음 — 정정 신호 False", second["user_correction_signal"], False)
+    check("이벤트 칸 — 결합 키 · 측정 상태 · 파생값만", sorted(first), sorted([
+        "ts", "session_id", "prompt_id", "cwd_hash", "skill", "effort", "permission_mode", "stop_reason", "matched",
+        "measurement", "n_assistant", "n_tool_use", "n_ask", "n_workflow", "result_line", "user_correction_signal", "attempt"]))
+
+    # 스킬 본문 주입(isMeta user 줄)은 사람 프롬프트 뒤에 붙지만 사람이 친 글이 아니다 — 정정 신호는 사람 글만 본다
+    def meta_signal(prompt_id, human_content, meta_text):
+        path = os.path.join(base, "meta-%s.jsonl" % prompt_id)
+        entries = [
+            {"type": "user", "promptId": prompt_id, "timestamp": "2026-09-06T00:02:00Z", "message": {"content": human_content}},
+            {"type": "user", "isMeta": True, "timestamp": "2026-09-06T00:02:01Z", "message": {"content": [
+                {"type": "text", "text": "Base directory for this skill: @PLUGIN@/skills/fz-plan\n\n# fz-plan\n" + meta_text}]}},
+            {"type": "assistant", "message": {"id": "m9", "content": [{"type": "text", "text": "계획을 세운다"}]}},
+        ]
+        with open(path, "w") as handle:
+            for entry in entries:
+                handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return build_event({"session_id": "s3", "prompt_id": prompt_id, "transcript_path": path})["user_correction_signal"]
+
+    check("isMeta 스킬 본문 — 정정 신호 False", meta_signal("p3", "계획 세워줘", "다시 확인한다"), False)
+    check("사람 정정 뒤 isMeta — 정정 신호 True", meta_signal("p4", [{"type": "text", "text": "아니 다시 해줘"}], "범위를 정한다"), True)
 
     # ⛔ Stop 재호출(gate block 후 이어가기) — 같은 (session, prompt) 3회 → attempt 1,2,3 (GPT 리뷰 2026-09-06)
     rep_dir = tempfile.mkdtemp(prefix="fz-hook-attempt-")
