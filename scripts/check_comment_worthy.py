@@ -28,7 +28,13 @@ issue(코멘트할 것) 필수:
   comment          코드 펜스 밖 산문 ≤ 4줄 · 마무리 어조(…부탁드립니다 · …여쭙습니다 · ?)가 없으면 WARN(차단 아님)
   duplicateOf      있으면 위반 — 중복은 E5 로 제외한다
   기존 스레드      existing-threads.json(status ok)에 같은 path ±3줄 스레드가 있으면 duplicateOf(→ 제외) 또는 distinctFrom[{thread, why}]
+  premiseCheck     id · covers 가 후보 원본(candidates[].limits)에 premise-island 한정이 붙은 후보면 premiseCheck{how: measured, note}
+                   (전제를 잰 기록) 필수 — 없거나 measured 가 아니면 위반 · 재지 못했으면 E1 로 제외한다. 한정은 review.json 이 아니라
+                   원본에서 읽는다(F-644 — 병합기의 한정은 severity 만 깎고 Curate 에 닿지 않았다)
 excluded[]       {id, what, code E1~E8, reason} · E5 = duplicateOf(+선택 reply 답글 초안) · E8 = refute
+산문 인용        issue comment · excluded reason · reply 의 `path:line[-line]` 을 review.json 폴더 head/<path> 원문과 대조한다 — 그 줄이 없으면 위반 ·
+                 그 항목에 citeExpect{"path:line": "토큰"} 을 적었으면 그 줄(구간)에 토큰이 있어야 하고 산문에 없는 키도 위반이다. 다른 커밋
+                 @sha 를 붙인 인용은 대조하지 않고, head/<path> 가 없으면 WARN(미검증)이다(F-645 — 눈으로 센 줄 번호가 어긋난 채 통과했다)
 strengths        string[] 그대로 · 원소마다 strengthGaps[{claim(= 그 강점), uncovered(그 강점이 못 막는 시나리오 — 비지 않음)}](F-117 · F-517)
   E1 도달 경로 미확인(코드 경로만 있음)       E2 SDK · 바이너리 내부 동작 가정       E3 결함 없는 설계 선호(측정값 없음)
   E4 원래 있던 문제 — 리포트 ④ 참고          E5 기존 스레드와 중복(스레드 id)        E6 작성자가 할 조치가 없음
@@ -73,6 +79,10 @@ CODES = tuple(f"E{n}" for n in range(1, 9))
 REPRO = ("reproduced", "code-determined")
 EVIDENCE_RE = re.compile(r"(?s)^(?P<path>.+):(?P<a>\d+)(?:-(?P<b>\d+))?@(?P<sha>[0-9a-f]{7,40})$")   # 경로는 공백 · @ · : 를 가질 수 있다 — 끝의 :줄@sha 만 떼어 낸다
 CLOSING_RE = re.compile(r"(?:(?:부탁드립니다|여쭙습니다)[.!]?|\?)\s*$")
+PREMISE_ISLAND = "premise-island"   # review_merge.py LIMIT_KINDS 의 한정 — 확인하지 않은 전제에 기댄 후보(F-644)
+# 산문 속 줄 인용 `path:line[-line][@sha]` — 경로는 확장자가 있는 파일 꼴이라 '4:1' · '10:30' 같은 비율 · 시각은 잡지 않는다(F-645).
+# 경로 글자에 `+` 를 넣는다(ObjC 카테고리 `UIView+Layout.swift` — 빼면 `Layout.swift` 만 잡혀 대조가 빗나간다). 공백 · 괄호가 든 경로는 잡지 않는다
+CITE_RE = re.compile(r"(?<![\w./+-])(?P<path>[\w./+-]*\w\.[A-Za-z]\w*):(?P<a>\d+)(?:-(?P<b>\d+))?(?:@(?P<sha>[0-9a-f]{7,40}))?")
 NEAR = 3
 SHA_RE = re.compile(r"[0-9a-f]{7,40}\Z")
 MAJOR_UP = ("critical", "major")
@@ -234,8 +244,9 @@ def prose_lines(comment: str) -> list:
     return out
 
 
-def load_candidates(review: dict, base: pathlib.Path):
-    """(후보 id 집합, 출처 목록, UNRUN 사유 | None)."""
+def load_candidates(review: dict, base: pathlib.Path, premise: dict | None = None):
+    """(후보 id 집합, 출처 목록, UNRUN 사유 | None). premise 를 주면 원본 limits 에 premise-island 가 붙은 후보 id → 출처를 채운다
+    (normalize 는 limits 를 옮기지 않는다 — review.json 쪽 사본이 아니라 원본 항목에서 읽는다 · F-644)."""
     srcs = review.get("candidates")
     if not isinstance(srcs, list) or not srcs or not all(isinstance(s, str) and s for s in srcs):
         return None, [], "candidates(후보 원본 파일 목록 — merged.json · synthesized-issues.json)가 없다"
@@ -254,6 +265,12 @@ def load_candidates(review: dict, base: pathlib.Path):
         if problems:   # 깨진 후보를 버리고 남은 것만 세면 커버리지가 그 후보를 놓친다
             return None, used, f"후보 원본 {rel} 에 판정할 수 없는 항목 — {problems[0]}"
         ids |= {str(x["id"]) for x in items}
+        if premise is not None:   # problems 가 없으면 원본 항목은 전부 객체다 — normalize 와 같은 목록을 읽는다
+            raw = data if isinstance(data, list) else data["issues"] if shape == "lead" else data["candidates"]
+            for it in raw:
+                lim = it.get("limits")
+                if isinstance(lim, list) and any(isinstance(x, dict) and x.get("kind") == PREMISE_ISLAND for x in lim):
+                    premise.setdefault(str(it["id"]), rel)
         used.append(rel)
     # 이번 실행의 GPT 경로를 review.json `gptPass` 로 밝혔으면(challenger · none) 남은 gpt-independent/ 로 병합본을 요구하지 않는다 —
     # 같은 작업 폴더에서 독립 패스 뒤 challenger 로 다시 돌린 경우다. 밝히지 않았으면 폴더가 안전망이다
@@ -299,6 +316,44 @@ def base_quote_misses(base: pathlib.Path, ms: list, quote: str) -> list:
         if _norm(quote) not in window:
             out.append(f"base_quote 가 base/{m['path']}:{a}-{b}(±2) 원문에 없다 — 열어 본 줄을 그대로 인용한다(F-037)")
     return out
+
+
+def cite_problems(base: pathlib.Path, sha: str, x: dict, fields) -> tuple:
+    """(위반, 대조 못 한 인용) — x 의 산문 칸(fields)에 적은 `path:line[-line]` 을 head/<path> 원문과 대조한다(F-645).
+    범위는 둘뿐이다: 그 줄이 있는가 · citeExpect{인용: 토큰} 을 적었으면 그 토큰이 그 줄(구간)에 있는가.
+    다른 커밋 @sha 를 붙인 인용(base 근거 등)과 head/ 에 없는 파일은 대조하지 않는다 — 부른 쪽이 미검증으로 드러낸다."""
+    raw = x.get("citeExpect")
+    exp = raw if isinstance(raw, dict) else {}
+    bad = [] if raw is None or isinstance(raw, dict) else ['citeExpect 는 {"path:line": "그 줄에 있어야 할 토큰"} 객체다']
+    seen, cited, unv = set(), set(), []
+    for f in fields:
+        for m in CITE_RE.finditer(_txt(x.get(f))):
+            cite = f"{m['path']}:{m['a']}" + (f"-{m['b']}" if m["b"] else "")
+            key = (cite, (m["sha"] or "").lower())      # 다른 커밋 인용과 head 인용은 다른 인용이다(base 인용이 head 대조를 가리면 안 된다)
+            if key in seen:
+                continue
+            seen.add(key)
+            cited.add(cite)
+            if m["sha"] and not _same_sha(m["sha"].lower(), sha):
+                continue
+            rel = pathlib.PurePosixPath(m["path"])
+            p = base / "head" / rel
+            if rel.is_absolute() or ".." in rel.parts or not p.is_file():   # head/ 밖을 읽지 않는다
+                unv.append(cite)
+                continue
+            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            a, b = int(m["a"]), int(m["b"] or m["a"])
+            if not 1 <= a <= b <= len(lines):
+                bad.append(f"산문 인용 `{cite}` — head/{m['path']} 는 {len(lines)}줄이라 그 줄이 없다(번호는 번호가 붙은 출력에서 옮긴다 · F-645)")
+                continue
+            if cite in exp:
+                tok = exp[cite]
+                if not isinstance(tok, str) or not tok.strip():
+                    bad.append(f"citeExpect `{cite}` 값은 그 줄에 있어야 할 토큰(비지 않은 문자열)이다")
+                elif not any(tok.strip() in ln for ln in lines[a - 1:b]):
+                    bad.append(f"산문 인용 `{cite}` 에 citeExpect {tok.strip()[:40]!r} 가 없다 — 지금 그 줄: {lines[a - 1].strip()[:60]!r}(F-645)")
+    bad += [f"citeExpect 키 `{k}` 가 산문 인용에 없다 — 인용과 같은 `path:line` 으로 적는다" for k in exp if k not in cited]
+    return bad, unv
 
 
 def code_idents(text: str) -> set:
@@ -372,7 +427,8 @@ def check_review(review: dict, base: pathlib.Path):
     sha = _txt(tgt.get("sha")).lower() if isinstance(tgt, dict) else ""
     if len(sha) < 7:
         return UNRUN, ["target.sha 가 없다 — evidence 의 @sha 를 대조할 기준이 없다(gather 의 target.json 을 review.json target 으로)"], warn, info
-    cands, _, why = load_candidates(review, base)
+    premise = {}
+    cands, _, why = load_candidates(review, base, premise)
     if why:
         return UNRUN, [why], warn, info
     info["candidates"] = len(cands)
@@ -523,6 +579,12 @@ def check_review(review: dict, base: pathlib.Path):
             warn.append(f"{iid}: comment 마무리 어조(…부탁드립니다 · …여쭙습니다 · 질문)가 없다")
         if i.get("duplicateOf"):
             bad.append(f"{iid}: duplicateOf 가 있는 항목은 코멘트가 아니다 — E5 로 제외한다")
+        # ⛔ 병합기의 premise-island 한정은 severity 만 깎았다 — 그 후보를 코멘트로 올리려면 전제를 잰 기록이 있어야 한다(F-644)
+        lim = [t for t in dict.fromkeys([str(iid)] + [str(c) for c in i.get("covers") or []]) if t in premise]
+        pc = i.get("premiseCheck") if isinstance(i.get("premiseCheck"), dict) else {}
+        if lim and not (pc.get("how") == "measured" and _txt(pc.get("note"))):
+            bad.append(f"{iid}: 후보 {', '.join(lim)} 는 원본 {premise[lim[0]]} 에 {PREMISE_ISLAND} 한정(확인하지 않은 전제)이 있다 — "
+                       "전제를 잰 기록 premiseCheck{how: measured, note} 없이는 코멘트가 아니다 · 재지 못했으면 E1 로 제외한다(F-644)")
         if threads:
             ds = {str(d.get("thread")) for d in i.get("distinctFrom") or [] if isinstance(d, dict) and _txt(d.get("why"))}
             for s in i.get("sites") or []:
@@ -547,6 +609,15 @@ def check_review(review: dict, base: pathlib.Path):
             bad.append(f"excluded {xid}: E5 는 duplicateOf(스레드 id)가 필요하다")
         if x.get("code") == "E8" and not _txt(x.get("refute")):
             bad.append(f"excluded {xid}: E8 은 refute(반박 근거)가 필요하다")
+    # 산문 속 줄 인용(F-645) — issue comment · excluded reason · reply 의 `path:line` 을 head/ 원문과 대조한다
+    for rows, fields, tag in ((issues, ("comment",), ""), (excluded, ("reason", "reply"), "excluded ")):
+        for x in rows:
+            if not isinstance(x, dict):
+                continue
+            cb, unv = cite_problems(base, sha, x, fields)
+            bad.extend(f"{tag}{x.get('id')}: {w}" for w in cb)
+            if unv:
+                warn.append(f"{tag}{x.get('id')}: 산문 인용 {', '.join(unv[:3])} 를 head/ 원문과 대조 못 함 — head/<path> 없음(미검증)")
     return (VIOLATION if bad else OK), bad, warn, info
 
 
@@ -772,6 +843,58 @@ def self_test() -> int:
         case("strength-gap-ok", r[0] == OK, r[1])
         case("strengths-string-array-kept", run(mod(strengths=[{"claim": "범위가 맞다"}], strengthGaps=[{"claim": "범위가 맞다", "uncovered": "u"}]))[0] == VIOLATION
              and r[0] == OK)
+        # F-644 — 후보 원본의 premise-island 한정(review.json 에는 limits 가 없다)
+        lim = json.loads(json.dumps(MERGED))
+        lim["candidates"][0].update(effectiveSeverity="suggestion", severityCap="limits:premise-island",
+                                    limits=[{"kind": "premise-island", "note": "런타임 순서를 재지 않았다"}])
+        r = run(BASE, merged=lim)
+        own = mod(issues=[{k: v for k, v in dict(ISSUE, id="claude:C1").items() if k != "covers"}])   # issue id 가 곧 후보 id
+        ro = run(own, merged=lim)
+        case("f644-premise-island-covered-rejected — 원본 limits 에 premise-island 가 붙은 후보를 covers · id 로 코멘트에 올리면 위반(issue id 지목)",
+             r[0] == VIOLATION and any("A1" in b and "premise-island" in b for b in r[1]) and run(own)[0] == OK
+             and ro[0] == VIOLATION and any("premise-island" in b for b in ro[1]) and run(BASE, merged=lim, cli=True)[0] == VIOLATION, (r[1], ro[1]))
+        got = [run(mi(premiseCheck={"how": "measured", "note": "시뮬에서 순서 로그로 쟀다"}), merged=lim)[0],
+               run(mi(premiseCheck={"how": "reasoned", "note": "코드로 추론"}), merged=lim)[0],
+               run(mi(premiseCheck={"how": "measured", "note": " "}), merged=lim)[0],
+               run(mod(issues=[], excluded=BASE["excluded"] + [{"id": "claude:C1", "what": "전제 미확인", "code": "E1", "reason": "도달 순서 미실측"}]),
+                   merged=lim)[0],
+               run(BASE)[0]]
+        case("f644-premise-measured-or-excluded-ok — premiseCheck{how: measured, note} · E1 제외 · 한정 없는 후보는 통과(reasoned · 빈 note 는 위반)",
+             got == [OK, VIOLATION, VIOLATION, OK, OK], got)
+        # F-645 — 산문 속 `path:line` 인용을 head/ 원문과 대조(그 줄이 있는가 · citeExpect 토큰이 그 줄에 있는가)
+        hd = {"head/src/a.swift": "func rollStep() {}\nlet items = load()\n"}
+        cm = lambda c, ce=None: mi(comment=c + " 확인 부탁드립니다.", **({"citeExpect": ce} if ce is not None else {}))   # noqa: E731
+        r = run(cm("src/a.swift:9 의 nil 경로"), trees=hd)
+        case("f645-cite-beyond-eof — 파일 길이를 넘는 줄 인용은 위반(그 path:line 을 적는다)",
+             r[0] == VIOLATION and any("src/a.swift:9" in b for b in r[1]), r[1])
+        r = run(cm("src/a.swift:1 `load()` 가 nil 이면", {"src/a.swift:1": "load()"}), trees=hd)
+        case("f645-cite-expect-off-line — citeExpect 토큰이 그 줄에 없으면 위반(인용은 :2 에 있다)",
+             r[0] == VIOLATION and any("src/a.swift:1" in b and "load()" in b for b in r[1]), r[1])
+        e5 = lambda reply, reason="같은 스레드 — 비율 4:1 · 10:30 기록": mod(excluded=[   # noqa: E731
+            {"id": "claude:C2", "what": "w", "code": "E5", "reason": reason, "duplicateOf": 77, "reply": reply}, BASE["excluded"][1]])
+        r = run(e5("src/a.swift:12 에서 이미 다뤘습니다."), trees=hd)
+        got = [run(cm("src/a.swift:2 `load()` 가 nil 이면", {"src/a.swift:2": "load()"}), trees=hd)[0],
+               run(cm("src/a.swift:1-2 구간의 `load()`", {"src/a.swift:1-2": "load()"}), trees=hd)[0],
+               run(e5("src/a.swift:2 에서 이미 다뤘습니다."), trees=hd)[0],
+               run(cm("src/a.swift:2 인용", {"a.swift:2": "load()"}), trees=hd)[0],
+               run(mod(excluded=[dict(BASE["excluded"][0], reason="base src/a.swift:40 에도 같다"), BASE["excluded"][1]]), trees=hd)[0],
+               run(mod(excluded=[dict(BASE["excluded"][0], reason=f"base src/a.swift:40@{BSHA[:7]} 에도 같다"), BASE["excluded"][1]]), trees=hd)[0]]
+        miss = run(cm("src/other.swift:40 의 호출부"), trees=hd)
+        # 차례: 바른 줄 · 구간 · 비율 4:1 · 시각 10:30 이 든 reason 과 바른 reply · 산문에 없는 citeExpect 키 · @sha 없는 reason 인용(head 기준) ·
+        #       다른 커밋 @sha 인용(대조하지 않는다)
+        case("f645-cite-reply-reason-and-ok-cites — E5 reply · reason 인용도 대조 · 바른 인용 · 구간 · 비율 · 시각 · 다른 커밋 @sha 는 통과 · 산문에 없는 citeExpect 키는 위반",
+             r[0] == VIOLATION and any("excluded claude:C2" in b and "src/a.swift:12" in b for b in r[1])
+             and got == [OK, OK, OK, VIOLATION, VIOLATION, OK], (r[1], got))
+        r = run(cm(f"base src/a.swift:40@{BSHA[:7]} 과 head src/a.swift:40 의 호출부"), trees=hd)
+        case("f645-cite-base-then-head-same-line — 다른 커밋 인용 뒤 같은 path:line 의 head 인용도 대조한다(GPT check 8.5 P2)",
+             r[0] == VIOLATION and any("src/a.swift:40" in b for b in r[1]), r[1])
+        case("f645-cite-unverifiable-warn — head/ 에 없는 파일 인용은 위반이 아니라 미검증 경고",
+             miss[0] == OK and any("src/other.swift:40" in w and "미검증" in w for w in miss[2]), miss)
+        hp = {"head/Sources/UIView+Layout.swift": "import UIKit\nlet items = load()\n"}
+        r = run(cm("Sources/UIView+Layout.swift:42 의 호출부"), trees=hp)
+        ok_ = run(cm("Sources/UIView+Layout.swift:2 의 호출부", {"Sources/UIView+Layout.swift:2": "load()"}), trees=hp)
+        case("f645-cite-plus-path — `+` 가 든 경로(ObjC 카테고리 꼴)를 통째로 잡는다(뒷조각만 잡아 미검증으로 빠지지 않는다)",
+             r[0] == VIOLATION and any("Sources/UIView+Layout.swift:42" in b for b in r[1]) and ok_[0] == OK and not ok_[2], (r[1], ok_))
     print(f"self-test {passed}/{total} passed")
     return OK if passed == total else 1
 

@@ -388,3 +388,6 @@ F-544	skills/fz-rebase/SKILL.md	has	Bash(git range-diff *)
 F-471	skills/fz-gpt/SKILL.md	lacks	plan 독립재작성
 F-471	skills/fz-gpt/references/test-spec.md	lacks	독립 재작성
 F-470	modules/gpt-strategy.md	has	## Sandbox Permissions
+# F-644 · F-645 — Curate 판정 안내가 검사기의 새 키(premiseCheck · citeExpect)를 이름으로 적는다(안내 없이 검사만 있으면 Lead 가 무엇을 써야 통과하는지 모른다)
+F-644	skills/fz-peer-review/SKILL.md	has	`premiseCheck{how: measured, note}`(그 전제를 잰 방법 — F-644)
+F-645	skills/fz-peer-review/SKILL.md	has	`citeExpect{"path:line": 토큰}`(F-645)

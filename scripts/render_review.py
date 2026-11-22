@@ -34,7 +34,8 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
               그대로 옮긴다(F-115 — 자기 말로 요약하면 추천 해법이 사라졌다). recommended 가 label 에 없으면 입력 불가(재서술 차단)
     review 선택 axisCoverage — review_merge.py 병합 행({axis, status, claude[], gpt[]}) 또는 {axis, status, note} · `## 축 판정` 표.
               gap 은 '판정 안 함'으로 그린다 — 위반 없음(none)과 섞지 않는다(F-514 · F-559)
-              unverifiedPremises[{claim, why?, howToMeasure?, affects?, lens?}] — 렌즈의 재지 않은 전제 · `## 재지 않은 전제`(F-448)
+              unverifiedPremises[{claim, why?, howToMeasure?, affects?: string[], lens?}] — 렌즈의 재지 않은 전제 · `## 재지 않은 전제`(F-448) ·
+              affects 가 배열이 아니면(문자열 포함) 입력 불가(F-584 — 문자열은 글자로 쪼개져 렌더됐다)
               dismissed[{id, what, reason}] — Lead 가 판단으로 뺀 관찰 · `## Lead 기각 — 의도 확인 후보` · synthesized-issues.json 에
               disposition exclude + disposition_reason(F-517 — 기각이 산출물에 흔적 없이 사라졌다). 큐레이션 excluded 의 reason 도 같은 칸에 싣는다
 
@@ -61,7 +62,7 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
   둘 다 파일을 쓰지 않는다. 통과하면 리포트는 ① 이번 PR 버그 ② 구조·품질 제안(non-blocking) ③ 의도 확인 질문 → ④ 참고(E4) → 제외 후보 표 →
   기존 스레드 대조 줄 → 답글 초안(E5 reply) 순이고, pr-comments.md 끝에 답글 초안을 붙인다(payload 밖 — 기존 스레드 답글은 따로 단다).
   추가 키: target{kind, ref, sha}(gather 의 target.json) · candidates(후보 원본 상대 경로) · issue.kind · evidence · repro · measure · refute · covers ·
-  distinctFrom · gptPass(independent · challenger · none) · excluded[{id, what, code E1~E8, reason, covers?, duplicateOf?, reply?, refute?}] — 계약 정본은 check_comment_worthy.py 머리말
+  distinctFrom · premiseCheck · citeExpect · gptPass(independent · challenger · none) · excluded[{id, what, code E1~E8, reason, covers?, duplicateOf?, reply?, refute?}] — 계약 정본은 check_comment_worthy.py 머리말
   --self-test
 
 exit: 0=렌더 · 1=거부(구간 선택 필요 · 후보 밖 pick · body 상한 초과) · 2=입력 불가(⛔ 통과 아님 — 빈 JSON · 필수 키 없음)
@@ -169,6 +170,11 @@ def validate(r) -> None:
         if not isinstance(r[key], list) or any(not isinstance(x, dict) or any(not isinstance(x.get(k), str) or not x[k].strip() for k in need)
                                                for x in r[key]):
             raise InputError(f"{key} 는 {' · '.join(need)} 문자열을 가진 객체 배열이다")
+    # affects 는 string[] 이다 — 문자열을 받으면 렌더가 글자마다 쪼개 '기댄 판정: @, M, a, …' 로 그렸다(F-584). None 은 생략과 같다
+    for k, x in enumerate(r.get("unverifiedPremises") or []):
+        a = x.get("affects")
+        if a is not None and (not isinstance(a, list) or any(not isinstance(v, str) or not v.strip() for v in a)):
+            raise InputError(f"unverifiedPremises[{k}].affects 는 string[](기댄 판정 id · 한 줄의 배열)이다 — {type(a).__name__} {str(a)[:40]!r}(F-584)")
     if "costLog" in r and not (isinstance(r["costLog"], str) and r["costLog"].strip()):
         raise InputError("costLog 는 cost-log.json 상대 경로(문자열)다")
     # 빈 문자열 · None 은 절을 생략한다. 그 밖의 타입은 비어 있든 0 · False 든 입력 오류다 — 참 · 거짓으로 거르면 [] · 0 은 조용히
@@ -1153,6 +1159,20 @@ def self_test() -> int:
         case("f448-premises-rendered — unverifiedPremises 를 `## 재지 않은 전제` 절로 · 이유 · 판별 방법 · 기댄 판정이 함께 실린다",
              "## 재지 않은 전제 1건" in rep and "- 새 결제 SDK 에서도 같은 취소 알림이 온다 — 못 잰 이유: 렌즈는 옛 SDK 코드만 읽었다 · 판별: 새 SDK 빌드에서 취소 로그 · 기댄 판정: A1 · 렌즈: arch" in rep,
              rep[-400:])
+        # F-584 — affects 가 문자열이면 글자로 쪼개지 않고 입력 불가 · 배열은 그대로 렌더한다
+        got = []
+        for aff in ("@MainActor 격리 오류", ["A1", ""], 3):
+            try:
+                render(review(base, unverifiedPremises=[{"claim": "c", "affects": aff}]), SELF_DIFF)
+                got.append("통과")
+            except InputError as e:
+                got.append("affects" in str(e))
+            except Exception as e:   # noqa: BLE001 — 검사가 빠지면 렌더 중 TypeError 로 터진다 — 이 셀의 FAIL 로 센다
+                got.append(type(e).__name__)
+        ok_ = render(review(base, unverifiedPremises=[{"claim": "c", "affects": ["@MainActor 격리 오류"]}, {"claim": "d", "affects": None}]),
+                     SELF_DIFF)["review-report.md"]
+        case("f584-affects-string-rejected — affects 가 문자열 · 빈 원소 · 배열 아님이면 입력 불가(affects 지목) · 배열 · None 은 렌더(글자 분할 없음)",
+             got == [True] * 3 and "기댄 판정: @MainActor 격리 오류" in ok_ and "@, M, a" not in ok_, (got, ok_[-300:]))
         # F-115 — 외부 렌즈 대안 · 추천 원문 이송
         alt = json.loads(json.dumps(base))
         alt[0]["alternatives"] = [{"label": "A: 현재 만료 방식", "description": "그대로 둔다", "pros": ["변경 없음"], "cons": ["누수"]},
