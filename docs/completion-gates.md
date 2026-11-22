@@ -128,26 +128,26 @@ print('현재 Stop 항목:', len(d.get('hooks', {}).get('Stop', [])))"
 
 ⛔ 이 경로를 하드코딩하면 **다음 업데이트에 hook 이 조용히 꺼진다.** 파일이 없으면 hook 이 fail-open 으로 통과하므로 에러도 안 난다.
 
-아래 형태를 쓴다. 캐시에서 최신 하나를 고르고, 없으면 통과한다.
+아래 형태를 쓴다. 설치 기록(`installed_plugins.json`)에서 지금 설치된 판의 폴더를 읽고, 없으면 통과한다. ⛔ 캐시에서 번호가 가장 높은 폴더(`sort -V | tail -1`)를 고르지 않는다 — Claude Code 는 갱신 뒤에도 옛 판 폴더를 한동안 남기고(`.orphaned_at` 표시 · 실측 2주 넘게), 판 번호를 다시 매긴 뒤(4.x → 0.57.0)에는 그 옛 판이 가장 높은 번호다.
 
 ```bash
-H="$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | sort -V | tail -1)"
-[ -n "$H" ] || exit 0
+H="$(python3 -c 'import json,os;b=os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude");print(json.load(open(b+"/plugins/installed_plugins.json"))["plugins"]["fz@fz-orchestrator"][0]["installPath"])' 2>/dev/null)/scripts/gate_stop_hook.py"
+[ -f "$H" ] || exit 0
 exec python3 "$H"
 ```
 
-⛔ **개발 모드(`claude --plugin-dir …`)를 쓰면 위 형태로는 hook 이 절대 돌지 않는다.** 캐시에는 옛 버전이 남아 있고 새 스크립트가 없기 때문이다 — 실측: 캐시가 `fz/4.12.0` 인데 소스는 4.25.0 이고, `gate_stop_hook.py` 는 캐시에 존재하지 않는다. glob 이 빈 값이 되어 `exit 0` 으로 조용히 통과한다.
+⛔ **개발 모드(`claude --plugin-dir …`)를 쓰면 위 형태로는 hook 이 절대 돌지 않는다.** 캐시에는 옛 버전이 남아 있고 새 스크립트가 없기 때문이다 — 실측: 캐시가 `fz/4.12.0` 인데 소스는 4.25.0 이고, `gate_stop_hook.py` 는 캐시에 존재하지 않는다. 설치본 폴더에 그 파일이 없어 `exit 0` 으로 조용히 통과한다(파일이 있으면 설치된 옛 판이 돈다).
 
 개발 모드에서는 소스를 먼저 보고 캐시로 폴백한다.
 
 ```bash
 H="/path/to/fz/scripts/gate_stop_hook.py"
-[ -f "$H" ] || H="$(ls -d "$HOME"/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | sort -V | tail -1)"
-[ -n "$H" ] || exit 0
+[ -f "$H" ] || H="$(python3 -c 'import json,os;b=os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude");print(json.load(open(b+"/plugins/installed_plugins.json"))["plugins"]["fz@fz-orchestrator"][0]["installPath"])' 2>/dev/null)/scripts/gate_stop_hook.py"
+[ -f "$H" ] || exit 0
 exec python3 "$H"
 ```
 
-⚠️ `/path/to/fz` 는 각자의 클론 경로로 바꾼다. 이 형태는 소스가 있으면 소스를, 없으면 캐시 최신을 쓴다.
+⚠️ `/path/to/fz` 는 각자의 클론 경로로 바꾼다. 이 형태는 소스가 있으면 소스를, 없으면 설치된 판을 쓴다.
 
 ### 4. `python3` 3.9+ 가 PATH 에 있어야 한다
 
@@ -186,7 +186,7 @@ export FZ_GATES_LEDGER=/path/to/PRJ-1234/gates/plan.md    # 여러 개는 : 로 
         "hooks": [
           {
             "type": "command",
-            "command": "H=\"$(ls -d ~/.claude/plugins/cache/fz-orchestrator/fz/*/scripts/gate_stop_hook.py 2>/dev/null | sort -V | tail -1)\"; [ -n \"$H\" ] || exit 0; exec python3 \"$H\""
+            "command": "H=\"$(python3 -c 'import json,os;b=os.environ.get(\"CLAUDE_CONFIG_DIR\") or os.path.expanduser(\"~/.claude\");print(json.load(open(b+\"/plugins/installed_plugins.json\"))[\"plugins\"][\"fz@fz-orchestrator\"][0][\"installPath\"])' 2>/dev/null)/scripts/gate_stop_hook.py\"; [ -f \"$H\" ] || exit 0; exec python3 \"$H\""
           }
         ]
       }

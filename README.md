@@ -68,10 +68,10 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
 GPT CLI 를 쓰면 네이티브 스킬을 심볼릭 링크로 연결한다. 링크가 없어도 exec 모드 호출은 번들 스킬 본문을 직접 넣지만 review 모드 호출은 역할 스킬 없이 돈다.
 
 ```bash
-bash "$(printf '%s\n' ~/.claude/plugins/cache/fz-orchestrator/fz/*/ | sort -V | tail -1)scripts/setup-gpt-skills.sh"
+bash "$(python3 -c 'import json,os;b=os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude");print(json.load(open(b+"/plugins/installed_plugins.json"))["plugins"]["fz@fz-orchestrator"][0]["installPath"])')/scripts/setup-gpt-skills.sh"
 ```
 
-⛔ 캐시에 버전이 여럿이면 glob 을 그대로 실행하지 않는다. 사전순으로 첫 경로가 돌아 가장 오래된 판에 링크될 수 있다. 위 명령처럼 `sort -V` 로 최신 하나를 고르거나 로컬 체크아웃이면 그 플러그인 루트에서 `bash scripts/setup-gpt-skills.sh` 를 실행한다. setup 은 `gpt-skills/` 만 링크하고 이 플러그인의 Claude 스킬(`skills/`)을 가리키는 옛 링크는 지운다.
+⛔ 캐시에 버전이 여럿이면 glob 을 그대로 실행하지 않는다. 사전순으로 첫 경로가 돌아 가장 오래된 판에 링크될 수 있다. 번호가 가장 높은 폴더(`sort -V`)도 고르지 않는다 — 판 번호를 다시 매긴 뒤(4.x → 0.57.0)에는 남은 옛 판 폴더를 고른다. 위 명령처럼 설치 기록(`installed_plugins.json`)의 설치 경로를 쓰거나 로컬 체크아웃이면 그 플러그인 루트에서 `bash scripts/setup-gpt-skills.sh` 를 실행한다. setup 은 `gpt-skills/` 만 링크하고 이 플러그인의 Claude 스킬(`skills/`)을 가리키는 옛 링크는 지운다.
 
 ⛔ README 는 GPT 모델과 CLI 버전 하한을 고정하지 않는다. 모델과 effort 는 세션에서 고르고 고르지 않으면 `~/.codex/config.toml` 값을 쓴다. 대화 세션은 GPT 를 켠 마지막 선택을 묻지 않고 이어 쓴다(그 모델이 지금 모델 목록에 있을 때). off 는 고른 그 세션에만 남고, 자율 세션은 지난 선택을 이어 쓰지 않는다. 정본은 `modules/gpt-strategy.md` § 모델·effort 선택이다. CLI 가 구버전이면 에러 대응표가 업데이트를 권한다.
 
