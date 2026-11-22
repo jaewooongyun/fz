@@ -19,7 +19,7 @@ metadata:
   intent-triggers: []
 ---
 
-# /fz - 유니버셜 오케스트레이터 (v3)
+# /fz - 유니버셜 오케스트레이터
 
 > **행동 원칙**: 자연어 요청을 분석하여 복잡도 기반으로 최적의 스킬 파이프라인 + 팀 구성 + 모델 배정을 자동 결정하고, 사용자 승인 후 실행한다.
 
@@ -35,25 +35,11 @@ metadata:
 - **3-Tier 모델**: **fable** alias(Lead 세션 + workflow 판단 지점 3곳 — 방향 판정·수렴 merge) + opus(실질 생산 워커, 동시 ≤3) + sonnet(단순 작업). haiku 사용하지 않음
 - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없고 fz-discover 는 `--deep` 명시 플래그 · commit/pr 은 명시 호출 전용(정본 `modules/gpt-strategy.md` § 단계 실행 판정)(끔 · CLI 없음 → `[GPT 미사용 — 사유]` — `modules/gpt-strategy.md` § GPT 미사용)
 - **교차 검증 자동 삽입**: 코드/계획 생산 파이프라인에 검증 게이트 주입
-- **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow (Wave 4 전환 완료, P2P SendMessage 없음) + GPT 교차검증(fz-search 엔 없음 · fz-discover 는 `--deep` 때만)
+- **개별 스킬 팀 강화**: 각 스킬이 다관점 협업 — plan/code/review/search/discover/**peer-review 모두** `workflows/*.js` 결정적 Workflow + GPT 교차검증(fz-search 엔 없음 · fz-discover 는 `--deep` 때만)
 
 ## 사용 시점
 
-```bash
-/fz "OrderDetail 크래시 버그 찾아줘"         # → bug-hunt (SOLO)
-/fz "새 기능 계획 세워줘" --team               # → plan-to-code (TEAM)
-/fz "코드 리뷰하고 커밋해줘"                   # → review-to-ship (TEAM)
-/fz "기능 구현하고 리뷰" --deep                # → code-to-review (TEAM+deep)
-/fz "타임아웃 30초로 변경" --solo              # → quick-fix (강제 SOLO)
-/fz "이걸 어떻게 구현하면 좋을까?"              # → discover (SOLO)
-/fz "모듈 12개 용어 통일" --batch              # → BATCH (worktree 병렬)
-/fz "빌드 실패 반복" --loop                    # → LOOP (자동 반복)
-/fz "스킬 트리거 최적화해줘"                    # → skill-optimize (SOLO)
-/fz "드리프트 체크해줘"                        # → drift-check (SOLO, fz-gpt drift)
-/fz "독립 플랜 만들어줘"                       # → plan-parallel (SOLO, fz-gpt independent-plan)
-/fz "전체 봐줘"                               # → Medium confidence → AskUserQuestion 먼저
-/fz "안됨"                                    # → Low confidence → AskUserQuestion 먼저
-```
+> 요청 예시 → 파이프라인 · 모드: `references/details.md` § 사용 시점 예시
 
 ### 옵션
 
@@ -74,23 +60,7 @@ metadata:
 
 ## 모듈 참조
 
-| 모듈 | 용도 |
-|------|------|
-| modules/complexity.md | 5차원 복잡도 → 모드 결정 |
-| modules/team-registry.md | 에이전트 + 모델 자동 결정 |
-| modules/cross-validation.md | 검증 게이트 자동 삽입 |
-| modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
-| modules/execution-modes.md | BATCH/LOOP/SIMPLIFY 실행 모드 |
-| modules/governance.md | kill-switch |
-| modules/pipelines.md | 19개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
-| modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
-| modules/plugin-refs.md | SwiftUI + Concurrency 플러그인 참조 가이드 |
-| modules/intent-registry.md | Phase 1 이 읽는 트리거 소스 — 스킬·파이프라인 트리거 + 구어체 보강 + Confidence 판정 |
-| modules/lead-action-default.md | 교훈 사전 로드 Trigger Matrix (Phase 0 Step 4) |
-| modules/fz-pipeline-proposal.md | 파이프라인 시각화 + AskUserQuestion 형식 (Phase 4) |
-| modules/uncertainty-verification.md | Default-Deny — 미검증 주장 차단 (Phase 5 Brief) |
-| modules/lead-reasoning.md | Speculation-to-Fact Fallacy 방어 (Phase 5 Brief) |
-| modules/system-reminders.md | T6/T7 트리거 리마인더 (Phase 5 Brief) |
+> 모듈 카탈로그(모듈 → 용도 · 로드 지시 아님): `references/details.md` § 모듈 참조
 
 ---
 
@@ -105,8 +75,8 @@ metadata:
    - 티켓 폴더가 있으면 `index.md` 의 `## Essential Context` 를 Read 해 Active Phase · Pending 을 이어받는다 — 복원 원천은 티켓 폴더 산출물이다("Starting fresh + filesystem discovery" 패턴 · 폴더 찾기는 `modules/context-artifacts.md` § Compact Recovery Protocol 1단계)
 
 2. **프로젝트 인덱스 확인**:
+   - 조건: explore, explore-plan, bug-hunt 파이프라인에서만 이 단계를 한다(그 밖은 건너뛴다)
    - `PROJECT_INDEX.md` 존재 확인 → 있으면 읽기 (3K 토큰)
-   - 조건: explore, explore-plan, bug-hunt 파이프라인에서만
 
 3. **Work Dir 초기화** (6+ 스텝 또는 context-heavy 스킬 포함 시):
    - Ticket ID 해석 (참조: `modules/context-artifacts.md`)
@@ -166,7 +136,7 @@ metadata:
       (⛔ `guides/skill-authoring.md` § 파이프라인 매칭 흐름이 규정한 3단 폴백이다.
        Gate 1 에서 바로 질문으로 빠지면 `pipelines.md` 가 잡을 요청까지 막힌다 —
        실측 예 `처음부터 끝까지 해줘` 는 full-cycle 트리거에 있으나 스킬 매칭은 0이다 — `scripts/intent_route_probe.py --check-skill-example skills/fz/SKILL.md` 가 이 문장이 지금도 참인지 잰다)
-- [ ] Confidence 판정 완료? (Medium/Low이면 AskUserQuestion 실행했는가?)
+- [ ] 두 해석이 실질적으로 다른 작업이 될 때만 AskUserQuestion 으로 물었는가? (한 스킬 · 파이프라인으로 모이면 묻지 않고 진행)
 - [ ] 동점 파이프라인 있으면 사용자 선택 완료?
 - [ ] 매칭된 스킬 간 의존성이 파악되었는가?
 - [ ] 추가 신호가 추출되었는가?
@@ -322,24 +292,7 @@ commit/pr 전 → gpt check 는 명시 호출 전용(`/fz-gpt check` — fz-comm
    **L1** split_required/splitSuggested/partial-submit → Step 분할 후 재invoke · **L2** 입력 오류 → 수정 후 재invoke(설계된 fail-fast) · **L3** 스톨·일시 장애 → **`resume` 우선**(CC 를 종료했으면 `claude --resume` 뒤) · **L4** 미해소 → 사용자 에스컬레이션 — ⛔ Lead 단독 SOLO 수행은 **사용자 승인 후에만** (Lead=fable 자동 SOLO 금지)
 ```
 
-### Verification Discipline Brief (모든 agent() spawn에 자동 포함)
-
-Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④가 자동 포함된다 (2026-07-09 D2 정합 — 6개 워크플로 전수):
-
-1. 사실 주장 전 `[verified: source]` 또는 `[미검증: 이유]` 태그 필수
-2. 외부 모델 판정 인용 시 원문 + `[외부: name]` 태그 (재포장·재수치화 금지)
-3. T6/T7 트리거 발동 시 `git show`/`Read`/`grep` 실측 — **OVERRIDE 미포함(격리 워커의 파일접근 제한과 상충) → Lead 소관**
-4. 진행/완료 보고 전 각 주장을 이 세션의 도구 결과와 대조 — 근거 지목 불가 항목은 `[미검증]` 명시
-
-참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead-reasoning.md §1.5` (Speculation-to-Fact Fallacy).
-
-### 스킬별 통신 패턴
-
-스킬별 Workflow 스크립트 — fz-discover `workflows/discover-adversarial.js` · fz-plan `workflows/plan-lean2.js`(롤백 `workflows/plan-collaborative.js`) · fz-code `workflows/code-pair.js` · fz-review `workflows/review-live.js` · fz-search --deep `workflows/search-cross-verify.js` · fz-fix(복잡) `workflows/code-pair.js` mode=light (P2P 시절 통신 패턴 이력: `references/rationale.md` § 스킬별 통신 패턴)
-
-### 개별 스킬 TEAM 모드 (핵심 패턴)
-
-> 각 스킬 SKILL.md의 "팀 에이전트 모드" 섹션 참조.
+> 워커 프롬프트(OVERRIDE)에 이미 든 검증 규약 · 스킬별 Workflow 스크립트 목록: `references/details.md` § Verification Discipline Brief · § 스킬별 통신 패턴 — T6/T7 트리거 실측(`git show` · `Read` · `grep`)은 워커 프롬프트에 없어 Lead 가 한다
 
 ### 5.3 BATCH Execution
 
@@ -365,12 +318,7 @@ Workflow agent() spawn 프롬프트(OVERRIDE 블록 일부)에 규약 ①②④�
 
 ### 단계 완료 보고 (각 단계)
 
-```markdown
-**Step N 완료**: /fz-{skill}
-**실행자**: {에이전트명} ({모델})
-**결과**: {요약}
-**다음**: /fz-{next-skill} (Step N+1)
-```
+> 각 단계가 끝나면 이 보고를 한다 — 형식: `references/details.md` § 단계 완료 보고
 
 ### Gate 실패 처리
 
@@ -384,7 +332,7 @@ Gate 실패 시:
 
 ### 파이프라인 완료 보고
 
-Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행동 제안.
+> 파이프라인이 끝나면 이 보고를 한다 — 형식: `references/details.md` § 파이프라인 완료 보고
 
 ---
 
@@ -445,6 +393,6 @@ Phase 4 시각화와 동일 형식 + 각 스텝의 상태(OK/FAIL) + 다음 행�
    - 탐색만 완료 → `/fz-fix` 또는 `/fz-plan` 제안
    - 풍경 탐색 완료 → `/fz-plan` 제안 (landscape-map + trade-off table 기반)
    - 스킬 생성/수정 완료 → `/fz-skill eval` + `/fz-skill optimize` 제안
-   - 생태계 점검 필요 → `/fz-manage benchmark` 제안. ⛔ **모델 세대가 바뀐 뒤 첫 Workflow 실행이면** `scripts/fz_wf_metrics.py --sweep-row --wf {runId}` 로 저장소 밖 로그 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` §5.8 ⑥ 행을 만든다(규약: `experiment-log.md` 머리 문단) — 공식 문서가 세대 간 effort 이월을 금지하고 fresh sweep 을 요구한다. 손으로 옮기지 않는다(이 표가 두 달 비어 있던 원인이 **재는 주체 부재**였다)
+   - 생태계 점검 필요 → `/fz-manage benchmark` 제안. ⛔ **모델 세대가 바뀐 뒤 첫 Workflow 실행이면** `scripts/fz_wf_metrics.py --sweep-row --wf {runId}` 로 sweep 행을 만든다 — 손으로 옮기지 않는다(기록 위치 · 근거: `references/details.md` § 세대 교체 sweep 행)
    - 전체 사이클 완료 → 완료 보고서 출력
-> 모듈 참조: 상단 "모듈 참조" 섹션 참조
+> 모듈 참조: `references/details.md` § 모듈 참조

@@ -327,7 +327,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 | Intent context | **채택** | skill-authoring §12 규약 성문화(agent 스폰 시 intentContext 3요소) + plan CTX 목적 축 |
 | **Batching nudge** (5.1) | ⛔ **비채택 — fz 추가 금지** | Claude Code가 이 문장을 **turn-scoped 시스템 메시지로 이미 주입**한다 [fz 실측 2026-09-06]. fz가 다시 넣으면 중복 주입 |
 | **Finish the whole task** (5.1) | 비채택(기존재) | `modules/execution-modes.md` § autonomous-reminder(LOOP 한정)가 동등 — "마지막 문단이 계획·의도·다음 단계 선언이면 해당 tool call을 실제로 실행하고, 종료는 작업 완료 또는 사용자만 줄 수 있는 입력 대기 시에만" [verified: 코드 실측 2026-09-06] |
-| **Compaction preserve** (5.1) | **미판정 (보강 후보)** | 접점은 Context reassurance 채택 행과 `skills/fz/SKILL.md:305` "4스텝+ 시 /compact 안내". 그 트리거는 **스텝 수 기반**이지 비용 기반이 아니므로 5.1의 "later compaction points"와 직접 충돌하지는 않는다. 4스텝+ 임계가 캐시 읽기 $0.25 하에서 여전히 적정인지는 **미측정** → P1 sweep 항목 |
+| **Compaction preserve** (5.1) | **미판정 (보강 후보)** | 접점은 Context reassurance 채택 행과 `skills/fz/SKILL.md` § 5.1 SOLO Execution "4스텝+ 시 /compact 안내". 그 트리거는 **스텝 수 기반**이지 비용 기반이 아니므로 5.1의 "later compaction points"와 직접 충돌하지는 않는다. 4스텝+ 임계가 캐시 읽기 $0.25 하에서 여전히 적정인지는 **미측정** → P1 sweep 항목 |
 | **Keep changes to the task** (5.1) | 비채택(기존재) | No-tidying 행과 동일 근거 — `skills/fz-code/SKILL.md:270` 관찰 보고 의무("실행 금지, 범위 외 정리 금지") + `modules/code-transform-validation.md` Scope Minimality [verified: 코드 실측 2026-09-06] |
 
 ### Fable 5.2 이행 점검
@@ -349,7 +349,7 @@ fz의 실질 생산 워커 모델. 상세 프롬프팅·anti-패턴·deprecated�
 - [ ] **`/doctor prompt-audit`** (Claude Code 2.1.283+) — "Added `/doctor prompt-audit` (also `/checkup prompt-audit`) to audit your CLAUDE.md files, skills, agents and commands for prompting patterns written for older models" [verified: code.claude.com/docs/en/changelog 2.1.283]. 슬래시 명령이다 — 스킬 안에서 Lead 가 부를 수 있는지는 확인하지 않았다(필요하면 사용자에게 실행을 부탁한다). 결과는 위 이행 점검 절의 후보로만 쓰고, 바로 위 `reasoning_extraction` 손 grep 항목을 대신하지 않는다.
 - [ ] Fable 세션에서 fz-review self-review 품질 재측정 → GPT cross-model 의존도 재조정 (단, 이종 blind-spot 안전망 자체는 유지 — 15차/23차). **→ 본 감사의 P1 sweep에 연결**: 짝 비교 절차는 `modules/peer-review-tiers.md:252-254`
 - [ ] **P1 effort sweep (신설)** — Lead 세션 effort `xhigh` ↔ `high` 짝 비교(워크플로 43콜은 Lead 값을 따른다 — arm 은 세션 레벨). 공식 근거 "Re-run the sweep even if you already ran one on Claude Fable 5". ⛔ 결과 전까지 하향 금지
-- [ ] **Compaction 임계 재측정 (신설)** — `skills/fz/SKILL.md:305` 4스텝+ `/compact` 안내가 캐시 읽기 $0.25 하에서 적정한지
+- [ ] **Compaction 임계 재측정 (신설)** — `skills/fz/SKILL.md` § 5.1 SOLO Execution 4스텝+ `/compact` 안내가 캐시 읽기 $0.25 하에서 적정한지
 - [x] `/model` effort 세션 지속성 실측 — **해소** (2026-07-05 `/model` 피커 stdout 실측). ⚠️ 현행 값은 `xhigh` (2026-09-06)
 - [x] async subagent 권고 반영 — one-shot Workflow `agent()` 전환으로 대체 결정 (T2 긴장 참조). TEAM(SendMessage) async 패턴 배선은 미채택
 

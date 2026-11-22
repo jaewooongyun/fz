@@ -24,3 +24,5 @@ fz 플러그인 고도화 방향 잡아줘	fz-manage	-	메타
 코드 짜줘	fz-code	-	코드 + 작성 동사
 처음부터 끝까지 해줘	full-cycle	fz-code,fz-fix,fz-plan	파이프라인 전용 · 스킬 0
 안녕	∅	-	어느 행에도 안 걸린다
+괜찮은 라이브러리 추천해줘	-	fz-review	수량자 함정 — 다른 낱말 속 어간
+이거 괜찮아	fz-review	-	물음표 없는 구어체
