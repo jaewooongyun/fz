@@ -42,7 +42,7 @@
 # stderr: 래퍼의 적용값 줄 'GPT-CHOICE model=<값> (출처) effort=<값> (출처)' 을 그대로 한 줄 옮긴다(래퍼가 그 줄 전에 멈추면 없다)
 # exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건(격리 폴더 자리 ${TMPDIR:-/tmp} 가 실제 홈 ~/.claude 아래인 경우(F-509) · 그 실경로가 --repo 와 같은 경우 포함 — GPT 호출 전) · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
 #       15=오염 — 금지 입력 · 격리 미적용 · rollout 감사 적중 · 16=시간 초과(프로세스 그룹째 종료) · 17=planner 가 status=rejected
-#       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off. 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
+#       18=GPT 미사용 — 플래그 --model off · GPT CLI 없음 · 세션 선택 off · 인증 없음(로그인 필요 — 래퍼 auth-check 18). 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
 #          stderr 'GPT-OFF: <사유> — …' · 감사 <stem>.audit.json 에 "exit": 18 · "gptOff": "<사유>"(오염 · 측정 실패 아님 — 병합은 --gpt-unavailable)
 #       래퍼의 10 · 11 도 그대로 낸다 — --model · --effort 불량(10) · 세션 선택 판독 실패(11) 포함, 사유는 .wrapper.log
 #   ⛔ 10~17 은 전부 첫 패스 결과가 아니다 — 0건으로 읽지 않는다. 18 도 결과가 아니지만 실패가 아니다(정본 modules/gpt-strategy.md § GPT 미사용)
@@ -318,6 +318,7 @@ clear_stem() {
 # ── 사전 게이트: GPT 미사용(⛔ exit 18 — 정본 modules/gpt-strategy.md § GPT 미사용) — 플래그 --model off · GPT CLI 없음(래퍼 cli-check 18) ·
 #    세션 선택 off(래퍼와 같은 규칙 — 두 필드가 모두 플래그가 아니면 선택을 본다)면 격리 폴더를 만들지 않고 CLI 를 부르지 않는다.
 #    ⛔ 실제 GPT 홈 · 인증 · 입력 게이트보다 먼저다 — GPT 를 쓰지 않는 사용자는 GPT 홈 · 인증이 없을 수 있다(11 이 18 을 가리지 않게).
+#    인증 없음(래퍼 auth-check 18)도 여기서 '로그인 필요' 로 끝난다 — 앞 사유(플래그 · CLI 없음 · 사용자 선택)가 있으면 그 사유가 이긴다
 #    ⛔ 감사에 exit 18 · gptOff 를 남긴다 — 같은 stem 의 옛 산출을 지운 뒤다(옛 결과가 새 판정으로 읽히지 않게). 오염(.contaminated) · 측정 실패가 아니다
 OFF_WHY=""
 if [ -n "$MODEL_OFF" ]; then
@@ -329,6 +330,10 @@ else
   elif [ -z "$MODEL_FLAG" ] || [ -z "$EFFORT_FLAG" ]; then
     # get 의 stdout 만 본다 — 'model=off effort=off' 는 exit 0 에서만 나온다(3 · 4 · 5 · 11 은 stdout 이 없다 — off 가 아니다)
     [ "$(bash "$SCRIPT_DIR/gpt-choice.sh" get 2>/dev/null)" = "model=off effort=off" ] && OFF_WHY="사용자 선택"
+  fi
+  if [ -z "$OFF_WHY" ]; then
+    bash "$SCRIPT_DIR/gpt-exec.sh" auth-check >/dev/null 2>&1
+    [ $? -eq 18 ] && OFF_WHY="로그인 필요"
   fi
 fi
 if [ -n "$OFF_WHY" ]; then

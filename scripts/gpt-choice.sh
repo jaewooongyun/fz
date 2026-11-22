@@ -20,11 +20,15 @@
 #   값 config = 그 필드를 넘기지 않는다(config.toml 그대로). `set --model config --effort config` 는 "물었고 config" 센티넬이다.
 #   값 off = GPT 미사용(두 줄 모두 off — 한쪽만 off 면 손상). 래퍼 · 독립 런처는 CLI 를 부르지 않고 exit 18 이다
 #   (정본 modules/gpt-strategy.md § GPT 미사용).
+#   사용자 기본값: 같은 폴더의 .last — set 이 세션 파일을 쓴 뒤 같은 두 줄을 남긴다(마지막 set 값 · off 포함 · 기록 실패는 무시 — 세션 기록이 계약이다).
+#   get 이 선택 없음 · 묻기(3) 경로에서만 그 값을 새 세션 파일로 복사해 0 으로 낸다(stderr 안내 한 줄). CLI 없음 자동 off 는 .last 에 남기지 않는다
 # 입력: ${CODEX_HOME:-$HOME/.codex}/models_cache.json (options·set) · 같은 폴더 config.toml 의 최상위(첫 표 앞) model·model_reasoning_effort (options·set·config)
 #   GPT CLI 존재: 같은 폴더 gpt-exec.sh cli-check(0=있음 · 18=없음) — 실행 파일 이름은 래퍼 한 곳에 둔다
+#   GPT 인증: 같은 폴더 gpt-exec.sh auth-check(0=있음 · 18=없음) — decide 만 본다. 인증 파일 · API 키 env 이름도 래퍼 한 곳에 둔다
 #
 # exit:
 #   get     0=선택 있음(off 포함 — stdout 'model=off effort=off') · 3=없음(물어도 됨) · 4=없음 + 자율 모드(묻지 않음)
+#           ⊕ 3 자리에서 이전 선택(.last)이 유효하면 묻지 않고 0 · 그 값 — 세션 파일로 복사하고(쓰지 못해도 낸다) stderr 안내. 손상 · 없음이면 3
 #           11=선택 파일 손상(다시 묻고 set 으로 덮어쓴다)
 #           5=저장할 수 없는 세션(세션 id 없음·불량 · FZ_GPT_CHOICE_DIR 가 절대 경로 아님) — 묻지 않고 config, stderr 안내
 #           ⊕ 선택이 없고 GPT CLI 가 없으면 묻지 않고 0 · 'model=off effort=off' — off 를 기록하고(저장할 수 없는 세션이면 기록 없이) stderr 안내
@@ -39,9 +43,11 @@
 #   decide  stdout 한 줄 — 정본 modules/gpt-strategy.md § 단계 실행 판정. 소비 문서가 GPT 단계 직전에 부르고 그 줄로만 분기한다
 #           0='GPT-DECIDE run model=<…> effort=<…>'(선택 있음 — get 0) · 0='GPT-DECIDE config'(get 4 · 5 — 묻지 않고 config)
 #           18='GPT-DECIDE skip reason=off-user'(세션 선택 off) · 18='GPT-DECIDE skip reason=off-no-cli'(GPT CLI 없음) — 래퍼 · 런처의 18 과 같은 뜻
+#           18='GPT-DECIDE skip reason=off-no-auth'(GPT 인증 없음 — 로그인 필요 · off 를 기록하지 않아 로그인하면 다음 decide 부터 켜진다)
 #           3='GPT-DECIDE ask'(get 3 — 묻고 set 뒤 다시 decide) · 11='GPT-DECIDE ask'(선택 파일 손상 — 다시 묻고 set)
 #           11=줄 없음(get 이 계약 밖으로 끝났다 — 스크립트 오류) · 10=사용법(인자를 받지 않는다)
-#           같은 env · 선택 파일 · CLI 유무면 같은 줄 · 같은 exit 다 — CLI 없음을 선택 판독보다 먼저 본다(래퍼 사전 게이트와 같은 순서).
+#           같은 env · 선택 파일 · CLI 유무 · 인증 유무면 같은 줄 · 같은 exit 다 — CLI 없음을 선택 판독보다 먼저 본다(래퍼 사전 게이트와 같은 순서).
+#           인증 없음은 선택 판독 뒤 · 선택 off 다음이다(사용자가 끈 세션은 off-user)
 #           판독은 get 그대로이고 부작용도 get 의 것뿐이다(CLI 없음이면 get 을 부르지 않아 off 기록도 없다)
 #   (공통)  10=사용법
 # ⛔ get 은 모델 목록 캐시를 읽지 않는다 — 독립 런처는 격리 CODEX_HOME 에서 래퍼를 띄우므로 캐시가 없을 수 있다.
@@ -60,7 +66,7 @@ EFFORT_WHITELIST="low medium high xhigh max ultra"
 #    '-' 로 시작하면 플래그로 읽힌다. 첫 글자 영숫자 + [A-Za-z0-9._:/-] 만 받는다(get · set · options 공통).
 MODEL_RE='^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
 # ⛔ 세션 id 는 파일 이름이 된다. '.'·'..' 는 [A-Za-z0-9._-] 를 통과하지만 폴더 자신·부모를 가리키므로 첫 글자를 영숫자로 한정한다.
-#    '.' 로 시작하는 이름은 set 의 임시 파일 몫이라 선택 파일과 겹치지 않는다.
+#    '.' 로 시작하는 이름은 set 의 임시 파일 · 사용자 기본값(.last) 몫이라 선택 파일과 겹치지 않는다.
 SID_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 
 # 모델 질문의 GPT 미사용 선택지(id off) — options 정상 · degraded 가 같은 문구를 쓴다
@@ -74,6 +80,11 @@ WHY="" CHOICE_DIR="" CHOICE_FILE="" SEL_MODEL="" SEL_EFFORT=""
 # GPT CLI 가 없는가 — 래퍼 cli-check 의 18 만 '없음' 이다. 래퍼 부재(127) · 그 밖은 '모름' 이라 off 로 정하지 않는다(묻는 쪽으로 간다)
 cli_absent() {
   bash "$(dirname "$0")/gpt-exec.sh" cli-check >/dev/null 2>&1
+  [ $? -eq 18 ]
+}
+# GPT 인증이 없는가 — 래퍼 auth-check 의 18 만 '없음' 이다. 래퍼 부재(127) · 그 밖은 '모름' 이라 있음으로 본다(fail-open — 판정이 GPT 를 끄지 않는다)
+auth_absent() {
+  bash "$(dirname "$0")/gpt-exec.sh" auth-check >/dev/null 2>&1
   [ $? -eq 18 ]
 }
 
@@ -127,13 +138,13 @@ read_choice() {
 }
 
 # ⛔ tmp+mv — 같은 폴더 안 rename 이라 읽는 쪽(래퍼)은 옛 파일이나 새 파일만 본다. 제자리 쓰기면 반쯤 쓴 파일을 읽고 exit 11 이 난다.
-write_choice() {   # $1=모델 · $2=effort
-  local tmp
+write_choice() {   # $1=모델 · $2=effort · $3=쓸 자리(기본 세션 파일 — 사용자 기본값은 $CHOICE_DIR/.last)
+  local tmp dest="${3:-$CHOICE_FILE}"
   mkdir -p "$CHOICE_DIR" 2>/dev/null || return 1
   # ⛔ 저장 자리가 폴더(또는 폴더 링크)면 mv 가 그 안으로 옮기고 성공을 돌려준다 — 기록했다고 알리지만 get 은 계속 11 이다
-  [ -d "$CHOICE_FILE" ] && return 1
+  [ -d "$dest" ] && return 1
   tmp="$(mktemp "$CHOICE_DIR/.tmp.XXXXXX" 2>/dev/null)" || return 1
-  if printf 'model=%s\neffort=%s\n' "$1" "$2" > "$tmp" && mv -f "$tmp" "$CHOICE_FILE"; then
+  if printf 'model=%s\neffort=%s\n' "$1" "$2" > "$tmp" && mv -f "$tmp" "$dest"; then
     return 0
   fi
   rm -f "$tmp"
@@ -379,6 +390,17 @@ cmd_get() {
     #    PROCEED(0) 만 4 이고 ASK·BLOCK·측정 실패·python3 부재는 전부 3 이다.
     python3 "$(dirname "$0")/autonomy_decide.py" --action gpt_model_choice --in-scope --reversible >/dev/null 2>&1; rc=$?
     [ "$rc" -eq 0 ] && exit 4
+    # 이전 선택(.last — 마지막 set 값)이 유효하면 묻지 않고 이어 쓴다 — 묻기(3) 경로에서만이다(자율 4 · 저장 불가 5 · CLI 없음 off 는 위에서 끝났다).
+    #   세션 파일로 복사해 이 세션의 다음 판독도 같은 값이다. 복사하지 못해도 그 값을 낸다(CLI 없음 off 와 같은 규칙). 손상 · 없음이면 그대로 3
+    if read_choice "$CHOICE_DIR/.last"; then
+      if write_choice "$SEL_MODEL" "$SEL_EFFORT"; then
+        echo "gpt-choice: 이전 선택을 이어 쓴다 — 바꾸려면 다시 묻고 set (model=$SEL_MODEL effort=$SEL_EFFORT · 기록: $CHOICE_FILE)" >&2
+      else
+        echo "gpt-choice: 이전 선택을 이어 쓴다 — 바꾸려면 다시 묻고 set (model=$SEL_MODEL effort=$SEL_EFFORT · 기록 실패: $CHOICE_FILE)" >&2
+      fi
+      printf 'model=%s effort=%s\n' "$SEL_MODEL" "$SEL_EFFORT"
+      exit 0
+    fi
     exit 3
   fi
   read_choice "$CHOICE_FILE" \
@@ -391,6 +413,13 @@ cmd_get() {
 #    선택이 없을 때 get 이 off 를 기록해 두 번째 판정이 'off-user' 로 바뀐다(같은 입력 → 다른 줄 · F-487).
 # ⛔ 선택 판독은 cmd_get 을 서브셸로 그대로 쓴다(get 의 exit 가 이 함수를 끝내지 않는다) — 판독 · 검증 규칙을 두 곳에 두지 않는다.
 #    get 의 stderr 안내는 그대로 흘린다(stdout 한 줄만 계약이다).
+# ⛔ 인증 없음(래퍼 auth-check 18)은 선택 off 다음에 본다 — 끈 세션은 off-user 다. 선택 · 묻기 · config 줄을 내기 전에 skip off-no-auth 로 끝내고
+#    아무것도 기록하지 않는다(로그인하면 다음 decide 부터 켜진다). 래퍼 본 경로는 인증을 보지 않는다(CLI 실패 12 가 안전망)
+skip_no_auth() {
+  auth_absent || return 0
+  printf 'GPT-DECIDE skip reason=off-no-auth\n'
+  exit 18
+}
 cmd_decide() {
   local out rc
   [ $# -eq 0 ] || die 10 "decide 는 인자를 받지 않는다: $1"
@@ -403,12 +432,12 @@ cmd_decide() {
     0)
       case "$out" in
         "model=off effort=off") printf 'GPT-DECIDE skip reason=off-user\n'; exit 18 ;;
-        model=*" effort="*)     printf 'GPT-DECIDE run %s\n' "$out"; exit 0 ;;
+        model=*" effort="*)     skip_no_auth; printf 'GPT-DECIDE run %s\n' "$out"; exit 0 ;;
         *) die 11 "decide — get 출력 형식 불량('$out'). 스크립트 오류다 — 다시 묻지 않는다" ;;
       esac ;;
-    3)   printf 'GPT-DECIDE ask\n'; exit 3 ;;
-    4|5) printf 'GPT-DECIDE config\n'; exit 0 ;;
-    11)  printf 'GPT-DECIDE ask\n'; exit 11 ;;
+    3)   skip_no_auth; printf 'GPT-DECIDE ask\n'; exit 3 ;;
+    4|5) skip_no_auth; printf 'GPT-DECIDE config\n'; exit 0 ;;
+    11)  skip_no_auth; printf 'GPT-DECIDE ask\n'; exit 11 ;;
     *)   die 11 "decide — get 이 계약 밖 exit $rc 로 끝났다. 스크립트 오류다 — 다시 묻지 않는다" ;;
   esac
 }
@@ -428,6 +457,7 @@ cmd_set() {
   if [ -n "$has_m" ] && [ "$m" = "off" ]; then
     resolve_file || die 11 "off 를 저장할 수 없다 — $WHY. 이 세션의 GPT 호출에 --model off 를 붙인다"
     write_choice off off || die 11 "선택 파일을 쓰지 못했다: $CHOICE_FILE — 이 세션의 GPT 호출에 --model off 를 붙인다"
+    write_choice off off "$CHOICE_DIR/.last" || true   # 사용자 기본값 — 실패는 무시한다(세션 기록이 계약이다)
     printf 'model=off effort=off\n'
     return 0
   fi
@@ -448,6 +478,7 @@ cmd_set() {
     esac
   fi
   write_choice "$m" "$e" || die 11 "선택 파일을 쓰지 못했다: $CHOICE_FILE"
+  write_choice "$m" "$e" "$CHOICE_DIR/.last" || true   # 사용자 기본값 — 실패는 무시한다(세션 기록이 계약이다)
   printf 'model=%s effort=%s\n' "$m" "$e"
 }
 

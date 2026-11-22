@@ -62,7 +62,7 @@ fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
   ```bash
   uvx --from git+https://github.com/oraios/serena@v2.1.0 serena --help
   ```
-- GPT CLI 는 설치만 하면 감지된다. 로그인하지 않으면 호출마다 약 18초 동안 재시도한 뒤 실패하고 대체 경로로 넘어간다
+- GPT CLI 는 설치만 하면 감지된다. 로그인하지 않으면 단계 판정(`gpt-choice.sh decide`)이 GPT 단계를 건너뛰고 `[GPT 미사용 — 로그인 필요]` 를 남긴다. 재시도도 대체 검증도 없고, 로그인하면 다음 GPT 단계부터 켜진다
 - 빠진 도구가 있어도 fz 는 깨지지 않는다. Grep 이나 자체 판단으로 대신하고 GPT 단계는 `[GPT 미사용]` 으로 표기한다. 선택 도구(Serena · context7 · sequential-thinking)를 쓰는 스킬은 첫 단계에 Serena 상태 뒤에 꼬리 ` · context7 목록✓|목록✗ · sc 목록✓|목록✗ · seq 목록✓|목록✗ · pr-review 목록✓|목록✗ · 스택 스킬 <이름, …>|없음` 로 선택 도구 상태와 빠지는 단계를 알린다(`evidence/tools.md` 첫 줄 또는 화면 한 줄 — 형식 `modules/tool-status.md`). 그 표시는 도구 목록에 이름이 있는지만 본다(목록에 있음 ≠ 연결됨). 그러니 세션에서 `/mcp` 를 열어 `plugin:fz:serena` 가 connected 인지 확인한다
 
 GPT CLI 를 쓰면 네이티브 스킬을 심볼릭 링크로 연결한다. 링크가 없어도 exec 모드 호출은 번들 스킬 본문을 직접 넣지만 review 모드 호출은 역할 스킬 없이 돈다.
@@ -73,7 +73,7 @@ bash "$(printf '%s\n' ~/.claude/plugins/cache/fz-orchestrator/fz/*/ | sort -V | 
 
 ⛔ 캐시에 버전이 여럿이면 glob 을 그대로 실행하지 않는다. 사전순으로 첫 경로가 돌아 가장 오래된 판에 링크될 수 있다. 위 명령처럼 `sort -V` 로 최신 하나를 고르거나 로컬 체크아웃이면 그 플러그인 루트에서 `bash scripts/setup-gpt-skills.sh` 를 실행한다. setup 은 `gpt-skills/` 만 링크하고 이 플러그인의 Claude 스킬(`skills/`)을 가리키는 옛 링크는 지운다.
 
-⛔ README 는 GPT 모델과 CLI 버전 하한을 고정하지 않는다. 모델과 effort 는 세션에서 고르고 고르지 않으면 `~/.codex/config.toml` 값을 쓴다. 정본은 `modules/gpt-strategy.md` § 모델·effort 선택이다. CLI 가 구버전이면 에러 대응표가 업데이트를 권한다.
+⛔ README 는 GPT 모델과 CLI 버전 하한을 고정하지 않는다. 모델과 effort 는 세션에서 고르고(지난 선택이 있으면 새 세션은 묻지 않고 이어 쓴다) 고르지 않으면 `~/.codex/config.toml` 값을 쓴다. 정본은 `modules/gpt-strategy.md` § 모델·effort 선택이다. CLI 가 구버전이면 에러 대응표가 업데이트를 권한다.
 
 ### 업데이트
 

@@ -11,6 +11,9 @@
 #   (c) 모델 목록 캐시 손상 + off   → options 가 degraded 로 off 를 내고 · set --model off 가 캐시 없이 0 · 세 입구 18 · CLI 호출 0
 #   (d) GPT CLI 없음(실행 파일 codex 가 든 폴더를 PATH 에서 뺀다 · GPT 홈도 없다) → get 이 묻지 않고 off(0) · 세 입구 18 'GPT-OFF: CLI 없음'
 #       — 런처는 GPT 홈 · 인증 게이트(11)보다 먼저 18 이다
+#   (e) 인증 없음(CLI 있음 · CLI 홈에 인증 파일 없음 · API 키 env 없음) → decide skip off-no-auth 18 · 선택 파일 미기록 ·
+#       런처 · 정문 경유 런처 18 'GPT-OFF: 로그인 필요' · CLI 호출 0 · 감사 gptOff · 격리 폴더 미생성. 래퍼는 인증을 판정하지 않는다(CLI 1회).
+#       인증 파일을 만들면 decide 가 skip 이 아니다(off 를 기록하지 않았다)
 #   런처 감사: <stem>.audit.json 의 exit 18 · gptOff · .contaminated 없음 · 격리 폴더 미생성. 병합: --gpt-unavailable 은 0, 그 감사를 --gpt 로
 #       넘기면 거부(1). 정문 호출 행(gpt-calls.tsv) exit 열 18
 #   비대화: FZ_AUTONOMY 미설정 + CLI 있음 + 선택 없음 — 스크립트는 질문 도구 유무를 알 수 없다(get 은 3 · 아무것도 쓰지 않는다).
@@ -74,8 +77,9 @@ run_in() {   # $1=셀 이름 · 나머지=명령 — stdout/stderr/rc/calls 를 
   local name="$1" d e
   shift
   d="$T/c-$name"; mkdir -p "$d" "$d/tmp" "$d/tel"
+  # ⛔ API 키 env 두 이름을 지운다 — 사용자 env 에 키가 있으면 (e) 의 '인증 없음' 이 '있음' 으로 읽힌다
   e=(env -u FZ_AUTONOMY -u CLAUDE_CODE_SESSION_ID -u CODEX_HOME -u FZ_GPT_CALL_ID -u FZ_GPT_CALL_LABEL -u FZ_GPT_POLICY_ROOT
-     -u FZ_GPT_IDLE_SEC "PATH=$C_PATH" "HOME=$C_HOME" "FZ_GPT_CHOICE_DIR=$C_SEL" "FZ_TELEMETRY_DIR=$d/tel" "TMPDIR=$d/tmp"
+     -u FZ_GPT_IDLE_SEC -u OPENAI_API_KEY -u CODEX_API_KEY "PATH=$C_PATH" "HOME=$C_HOME" "FZ_GPT_CHOICE_DIR=$C_SEL" "FZ_TELEMETRY_DIR=$d/tel" "TMPDIR=$d/tmp"
      "FZ_OFF_CALLS=$d/calls.log")
   [ "$C_CH" = "-" ] || e+=("CODEX_HOME=$C_CH")
   [ "$C_SID" = "-" ] || e+=("CLAUDE_CODE_SESSION_ID=$C_SID")
@@ -158,13 +162,33 @@ reset_env; C_SID="sid-d2"; C_PATH="$NOCLI"
 wrap d-nosel
 check "(d) CLI 없음 · 선택 없음 · 래퍼 직접: 18 'GPT-OFF: CLI 없음'" "$(rc d-nosel)|$(offl d-nosel)" "18|GPT-OFF: CLI 없음"
 
+# ── (e) 인증 없음(로그인 필요) — CLI 있음 · 선택 없음 · CLI 홈에 config 만 있고 인증 파일이 없다
+mkdir -p "$T/home-na/.codex"; cp "$T/home/.codex/config.toml" "$T/home-na/.codex/"
+reset_env; C_SID="sid-e"; C_HOME="$T/home-na"; C_CH="$T/home-na/.codex"; C_SEL="$T/sel-e"
+choice e-dec decide
+check "(e) decide · 인증 없음 → skip off-no-auth 18 · 선택 파일 미기록" "$(rc e-dec)|$(out e-dec)|$(find "$T/sel-e" -type f 2>/dev/null | wc -l | tr -d ' ')" "18|GPT-DECIDE skip reason=off-no-auth|0"
+lnch e-lnch; glnch e-glnch
+for c in lnch glnch; do
+  check "(e) $c: exit 18 · CLI 호출 0" "$(rc "e-$c")|$(calls "e-$c")" "18|0"
+  check "(e) $c: stderr 'GPT-OFF: 로그인 필요'" "$(offl "e-$c")" "GPT-OFF: 로그인 필요"
+done
+E="$T/o/e-lnch/gpt-e-lnch"
+check "(e) 런처 감사: exit 18 · gptOff '로그인 필요' · 격리 폴더 미생성 · 인증 게이트(11) 아님" "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("exit"), d.get("gptOff"))' "$E.audit.json" 2>/dev/null)|$(find "$T/c-e-lnch/tmp" -maxdepth 1 -name 'fz-gpt-iso.*' 2>/dev/null | wc -l | tr -d ' ')|$(grep -c 'INDEPENDENT-FAIL(11)' "$T/c-e-lnch/stderr" 2>/dev/null)" "18 로그인 필요|0|0"
+# 래퍼 본 경로는 인증을 보지 않는다 — 가짜 CLI 가 불린다(실제 CLI 면 인증 실패가 exit 12 로 드러난다 · 래퍼 픽스처는 인증 없는 CLI 홈으로 돈다)
+wrap e-wrap
+check "(e) 래퍼 직접 · 인증 없음: 판정하지 않는다 — exit 0 · CLI 1회" "$(rc e-wrap)|$(calls e-wrap)" "0|1"
+printf '{}\n' > "$T/home-na/.codex/auth.json"
+choice e-login decide
+check "(e) 인증 파일을 만든 뒤 decide → skip 아님(ask 3 — off 를 기록하지 않았다)" "$(rc e-login)|$(out e-login)" "3|GPT-DECIDE ask"
+
 # ── 비대화 — FZ_AUTONOMY 미설정 + CLI 있음 + 선택 없음: 스크립트는 묻지 않는다(질문은 Lead 몫)
-reset_env; C_SID="sid-n"
+# ⛔ 이전 선택(.last)이 없는 선택 폴더다 — (a) · (c) 의 set --model off 가 $T/sel 에 .last(off)를 남겨 '선택 없음' 이 이어 쓰기로 바뀐다
+reset_env; C_SID="sid-n"; C_SEL="$T/sel-n"
 choice n-get get
-check "비대화: get → 3(물어도 됨 — 스크립트는 질문 도구 유무를 모른다) · 아무것도 쓰지 않는다" "$(rc n-get)|$([ -e "$T/sel/sid-n" ] && echo 1 || echo 0)" "3|0"
+check "비대화: get → 3(물어도 됨 — 스크립트는 질문 도구 유무를 모른다) · 아무것도 쓰지 않는다" "$(rc n-get)|$([ -e "$T/sel-n/sid-n" ] && echo 1 || echo 0)" "3|0"
 wrap n-wrap
 check "비대화: 래퍼는 닫힌 stdin 에서 묻지 않고 config 로 돈다 — exit 0 · CLI 1회 · GPT-CHOICE config" "$(rc n-wrap)|$(calls n-wrap)|$(grep -c '^GPT-CHOICE model=fake-cfg (config) effort=low (config)' "$T/c-n-wrap/stderr")" "0|1|1"
-reset_env; C_SID="sid-n2"; C_AUTO="autonomous"
+reset_env; C_SID="sid-n2"; C_AUTO="autonomous"; C_SEL="$T/sel-n"
 choice n-auto get
 check "비대화: FZ_AUTONOMY=autonomous → get 4(묻지 않음 — config)" "$(rc n-auto)" 4
 # Lead 규칙(질문 도구를 쓸 수 없으면 exit 4 처럼) — 스크립트가 잴 수 없는 절반이라 정본 문구로 본다

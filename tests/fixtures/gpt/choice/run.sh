@@ -7,11 +7,13 @@
 #                    GPT 미사용(off — modules/gpt-strategy.md § GPT 미사용): options 모델 질문의 off(config + 모델 2 + off ≤ 4) ·
 #                    캐시 없음·손상·python3 없음이어도 config / off 로 묻는 degraded · set --model off 는 캐시 없이 기록 · off 짝 손상 판정 ·
 #                    get: 선택 없음 + GPT CLI 없음 → 묻지 않고 0 · model=off(기록 · 저장 불가 세션이면 기록 없이) · CLI 있음이면 3 · 파일 미기록
+#                    이전 선택(.last — 마지막 set 값): 새 세션의 묻기(3) 경로에서만 이어 쓴다 · 자율 4 · CLI 없음 off · 손상 3 · 쓰기 실패 · 인증 없음 ·
+#                    get → decide → 래퍼 argv 가 .last 값(셀마다 HOME · CLI 홈 · 선택 폴더를 따로 둔다)
 #   --scope wrapper: 래퍼 결정 순서 — 필드마다 플래그 > 세션 선택 > config(미전달) · exec/review/resume · --config-permissions ·
 #                    stderr GPT-CHOICE 한 줄(출처 라벨 · config 실제 값 · '?') · 손상 선택 파일 · gpt-choice.sh 부재 → 11 ·
 #                    get 은 stdout 만 판독 · get 값 재검증 · 사용법·플래그 오류(10)가 선택 판독(11)보다 먼저 · 빈 값 · 불량 모델 → 10 ·
 #                    두 스크립트의 MODEL_RE 일치 · GPT 미사용 결정 순서(세션 off 는 플래그 하나를 이긴다 · 두 플래그만 그 호출을 켠다 ·
-#                    플래그 --model off 는 선택 파일을 읽지 않는다 · 사용법 오류(10)가 off(18)보다 먼저 · cli-check 는 호출 행이 없다).
+#                    플래그 --model off 는 선택 파일을 읽지 않는다 · 사용법 오류(10)가 off(18)보다 먼저 · cli-check · auth-check 는 호출 행이 없다).
 #                    가짜 CLI(../_shim/codex)로 래퍼가 넘기는 argv 만 본다 — 정문 · 런처의 18 은 tests/fixtures/gpt/off
 #   ⛔ FZ_GPT_EXEC_UNDER_TEST 로 기준 트리의 래퍼를 같은 러너로 돌린다 — 기준 래퍼(effort 기본값 · 세션 선택 미판독)는 wrapper 가 FAIL 이어야 한다(판별력)
 #   (인자 없음)    : 구현한 scope 전부 — health-check 4.6 이 인자 없이 돌린다
@@ -347,7 +349,8 @@ model_reasoning_effort = "high"'
   check "set 목록 모델 + effort config · 그 모델이 config effort(low)를 지원 → 0" "$(rc s-cfgeff-ok)" 0
   CH="$T/ch-prof"; cell s-cfgeff-unk - s-cfgeff-unk set --model fake-beta --effort config; CH="$T/ch-a"
   check "set 목록 모델 + effort config · config effort 모름(profile) → 0(막을 근거가 없다)" "$(rc s-cfgeff-unk)" 0
-  check "set 뒤 임시 파일이 남지 않는다" "$(find "$T/sel" -type f -name '.*' | wc -l | tr -d ' ')" 0
+  # .last 는 set 이 남기는 사용자 기본값(이전 선택)이라 임시 파일이 아니다
+  check "set 뒤 임시 파일이 남지 않는다" "$(find "$T/sel" -type f -name '.*' ! -name .last | wc -l | tr -d ' ')" 0
 
   # ── get: 선택 파일 손상 → 11(다시 묻고 set 으로 덮어쓴다) — 자율 모드여도 11
   mkdir -p "$T/sel/bad-dir"
@@ -494,8 +497,94 @@ model_reasoning_effort = "high"'
   check "get CLI 없음 · 세션 id 없음 → 0 · off(5 가 아니다) · 기록 없음" "$(rc g-nocli-nosid)|$(out g-nocli-nosid)|$(said g-nocli-nosid)" "0|model=off effort=off|1"
   check "get CLI 없음 · 기존 선택 있음 → 그 선택 그대로(덮어쓰지 않는다 — 래퍼가 CLI 없음으로 18)" "$(rc g-nocli-sel)|$(out g-nocli-sel)|$(body "$T/sel/s-cfgx")" "0|model=config effort=xhigh|model=config|effort=xhigh|"
   check "get CLI 없음 · 선택 파일 손상 → 11 그대로" "$(rc g-nocli-bad)" 11
-  cell g-cli-none - g-cli-none get
-  check "get 선택 없음 + CLI 있음 · FZ_AUTONOMY 미설정 → 3 · 파일 미기록(비대화 판정은 Lead — 스크립트는 FZ_AUTONOMY 만 본다)" "$(rc g-cli-none)|$(body "$T/sel/g-cli-none")" "3|<없음>"
+  # ⛔ 이전 선택(.last)이 없는 선택 폴더다 — 위 set 셀들이 $T/sel 에 .last 를 남겨 '선택 없음' 이 이어 쓰기(0)로 바뀐다
+  SEL="$T/sel-nolast"; cell g-cli-none - g-cli-none get; SEL="$T/sel"
+  check "get 선택 없음 + CLI 있음 · FZ_AUTONOMY 미설정 → 3 · 파일 미기록(비대화 판정은 Lead — 스크립트는 FZ_AUTONOMY 만 본다)" "$(rc g-cli-none)|$(body "$T/sel-nolast/g-cli-none")" "3|<없음>"
+
+  # ── 이전 선택(.last — 마지막 set 값) — 새 세션의 묻기(3) 경로에서만 세션 파일로 복사해 0 이다. 자율 4 · CLI 없음 off · 손상 3 은 그대로.
+  #    ⛔ 셀마다 HOME · CLI 홈 · 선택 폴더를 따로 둔다 — 공유 폴더의 .last 가 다른 셀의 '선택 없음' 을 뒤집지 않게.
+  #    config(fake-alpha · high) · 옛 세션 sid-old(fake-gamma · max) · .last(fake-delta · medium)는 서로 다른 합성 값이다 — 어느 값이 이어졌는지 가른다
+  printf '과제 본문 LAST-TASK-1\n' > "$T/L-task.txt"
+  lprep() {   # $1=셀 — $T/L-<셀>/{home,ch,sel,tel,repo}. CLI 홈 = 모델 목록 A + config + 합성 인증 '{}'
+    local L="$T/L-$1"
+    mkdir -p "$L/home" "$L/ch" "$L/sel" "$L/tel" "$L/repo"
+    cp "$T/ch-a/models_cache.json" "$T/ch-a/config.toml" "$L/ch/"
+    printf '{}\n' > "$L/ch/auth.json"
+    printf 'model=fake-gamma\neffort=max\n' > "$L/sel/sid-old"
+    printf 'model=fake-delta\neffort=medium\n' > "$L/sel/.last"
+  }
+  lrun() {   # $1=셀 · $2=이름 · $3=FZ_AUTONOMY('-'=unset) · $4=세션 id · $5=PATH · 나머지=명령 → $T/L-<셀>/<이름>.{out,err,rc} · argv 는 $T/w-L-<셀>-<이름>/
+    local c="$1" L="$T/L-$1" name="$2" auto="$3" sid="$4" p="$5" e
+    shift 5
+    mkdir -p "$T/w-L-$c-$name"
+    e=(env -u FZ_AUTONOMY -u OPENAI_API_KEY -u CODEX_API_KEY -u FZ_GPT_CALL_ID -u FZ_GPT_CALL_LABEL "HOME=$L/home" "CODEX_HOME=$L/ch"
+       "FZ_GPT_CHOICE_DIR=$L/sel" "FZ_TELEMETRY_DIR=$L/tel" "FZ_SHIM_CAPTURE=$T/w-L-$c-$name/argv.json" "PATH=$p" "CLAUDE_CODE_SESSION_ID=$sid")
+    [ "$auto" = "-" ] || e+=("FZ_AUTONOMY=$auto")
+    ( cd "$T/cwd" && "${e[@]}" "$@" < /dev/null ) > "$L/$name.out" 2> "$L/$name.err"
+    echo $? > "$L/$name.rc"
+  }
+  lr() { printf '%s|%s' "$(cat "$T/L-$1/$2.rc" 2>/dev/null)" "$(cat "$T/L-$1/$2.out" 2>/dev/null)"; }   # exit|stdout
+  lwrap() { lrun "$1" "$2" - "$3" "$CLIP" /bin/bash "$WRAP" exec --cd "$T/L-$1/repo" --out "$T/L-$1/$2.txt" --prompt-file "$T/L-task.txt"; }
+  # 대화 · 새 세션: get → decide → 래퍼. get 이 .last 를 세션 파일로 복사하고, decide · 래퍼는 그 세션 선택을 쓴다
+  lprep a
+  lrun a get - sid-new "$CLIP" /bin/bash "$CHOICE" get
+  lrun a dec - sid-new "$CLIP" /bin/bash "$CHOICE" decide
+  lwrap a wrap sid-new
+  check "get 선택 없음 · 이전 선택(.last) · 대화 → 0 · .last 값(옛 세션 · config 값 아님)" "$(lr a get)" "0|model=fake-delta effort=medium"
+  check "get 선택 없음 · 이전 선택: 새 세션 파일에 복사 · stderr 안내 한 줄 · 옛 세션 파일 그대로" "$(body "$T/L-a/sel/sid-new")|$(grep -c '이전 선택을 이어 쓴다 — 바꾸려면 다시 묻고 set' "$T/L-a/get.err")|$(body "$T/L-a/sel/sid-old")" "model=fake-delta|effort=medium||1|model=fake-gamma|effort=max|"
+  check "get 선택 없음 · 이전 선택 → decide run · 래퍼 argv · GPT-CHOICE 가 .last 값" "$(lr a dec)|$(argc L-a-wrap 'model="fake-delta"')|$(argc L-a-wrap 'model_reasoning_effort=medium')|$(argc L-a-wrap 'model="fake-gamma"')|$(grep '^GPT-CHOICE ' "$T/L-a/wrap.err")" "0|GPT-DECIDE run model=fake-delta effort=medium|1|1|0|GPT-CHOICE model=fake-delta (session) effort=medium (session)"
+  # 새 세션에서 decide 를 바로 부르거나 래퍼를 바로 불러도 같은 값이다(get 을 먼저 부르지 않아도 된다)
+  lprep b
+  lrun b dec - sid-d "$CLIP" /bin/bash "$CHOICE" decide
+  lwrap b wrap sid-w
+  check "get 선택 없음 · 이전 선택 · 새 세션 decide 바로 → run .last 값 · 새 세션 래퍼 바로 → argv .last 값" "$(lr b dec)|$(argc L-b-wrap 'model="fake-delta"')|$(argc L-b-wrap 'model_reasoning_effort=medium')" "0|GPT-DECIDE run model=fake-delta effort=medium|1|1"
+  # 자율(4)은 그대로다 — 묻지 않고 config. .last 를 쓰지 않는다(A/B 러너 · 헤드리스는 사용자 기본값에 흔들리지 않는다)
+  lprep c
+  lrun c get autonomous sid-new "$CLIP" /bin/bash "$CHOICE" get
+  lrun c dec autonomous sid-new2 "$CLIP" /bin/bash "$CHOICE" decide
+  check "get 선택 없음 · 이전 선택 · autonomous → 4 그대로 · 세션 파일 없음 · decide config" "$(lr c get)|$(body "$T/L-c/sel/sid-new")|$(lr c dec)" "4||<없음>|0|GPT-DECIDE config"
+  # 손상 .last(순서 뒤바뀜 · 폴더)는 없는 것과 같다 — 3(묻기)이고 세션 파일을 쓰지 않는다
+  lprep d; printf 'effort=medium\nmodel=fake-delta\n' > "$T/L-d/sel/.last"
+  lrun d get - sid-new "$CLIP" /bin/bash "$CHOICE" get
+  lprep d2; rm -f "$T/L-d2/sel/.last"; mkdir "$T/L-d2/sel/.last"
+  lrun d2 get - sid-new "$CLIP" /bin/bash "$CHOICE" get
+  check "get 선택 없음 · 이전 선택 손상(순서 · 폴더) → 3 · 세션 파일 없음" "$(lr d get)|$(body "$T/L-d/sel/sid-new")|$(lr d2 get)|$(body "$T/L-d2/sel/sid-new")" "3||<없음>|3||<없음>"
+  # CLI 없음은 .last 보다 먼저다 — off(기록)이고 .last 는 그대로 둔다
+  lprep e
+  lrun e get - sid-new "$NOCLI" /bin/bash "$CHOICE" get
+  check "get 선택 없음 · 이전 선택 · CLI 없음 → off(이전 선택이 아니다) · .last 그대로" "$(lr e get)|$(body "$T/L-e/sel/.last")" "0|model=off effort=off|model=fake-delta|effort=medium|"
+  # 인증 없음 — decide 는 skip off-no-auth(18). off 를 기록하지 않으므로 로그인하면 바로 .last 값으로 돈다
+  lprep f; rm -f "$T/L-f/ch/auth.json"
+  lrun f dec1 - sid-new "$CLIP" /bin/bash "$CHOICE" decide
+  printf '{}\n' > "$T/L-f/ch/auth.json"
+  lrun f dec2 - sid-new "$CLIP" /bin/bash "$CHOICE" decide
+  check "get 선택 없음 · 이전 선택 · 인증 없음 → decide skip off-no-auth 18 · 로그인 뒤 run .last 값" "$(lr f dec1)|$(lr f dec2)" "18|GPT-DECIDE skip reason=off-no-auth|0|GPT-DECIDE run model=fake-delta effort=medium"
+  # 세션 파일을 쓰지 못해도 .last 값을 낸다(CLI 없음 off 와 같은 규칙) — 기록 실패를 알린다
+  lprep g; chmod 0555 "$T/L-g/sel"
+  lrun g get - sid-new "$CLIP" /bin/bash "$CHOICE" get
+  chmod 0755 "$T/L-g/sel"
+  check "get 선택 없음 · 이전 선택 · 세션 파일 쓰기 실패 → 0 · .last 값 · 기록 실패 안내" "$(lr g get)|$(body "$T/L-g/sel/sid-new")|$(grep -c '기록 실패' "$T/L-g/get.err")" "0|model=fake-delta effort=medium|<없음>|1"
+  # set 이 .last 를 남긴다 — 마지막 set 이 이긴다(다른 세션의 set 포함) · 앞 세션 파일은 그대로
+  lprep h; rm -f "$T/L-h/sel/.last"
+  lrun h s1 - sid-a "$CLIP" /bin/bash "$CHOICE" set --model fake-beta --effort xhigh
+  lrun h s2 - sid-b "$CLIP" /bin/bash "$CHOICE" set --model fake-delta --effort high
+  lrun h get - sid-c "$CLIP" /bin/bash "$CHOICE" get
+  check "get 선택 없음 · 이전 선택 = 마지막 set 값(다른 세션의 set) · 앞 세션 파일 그대로" "$(lr h s1)|$(lr h s2)|$(lr h get)|$(body "$T/L-h/sel/sid-a")" "0|model=fake-beta effort=xhigh|0|model=fake-delta effort=high|0|model=fake-delta effort=high|model=fake-beta|effort=xhigh|"
+  # off 도 이전 선택이다 — 새 세션은 off 그대로(decide skip off-user)
+  lprep i
+  lrun i s - sid-a "$CLIP" /bin/bash "$CHOICE" set --model off
+  lrun i get - sid-b "$CLIP" /bin/bash "$CHOICE" get
+  lrun i dec - sid-c "$CLIP" /bin/bash "$CHOICE" decide
+  check "get 선택 없음 · 이전 선택 off(set --model off) → off 그대로 · decide skip off-user" "$(lr i s)|$(lr i get)|$(lr i dec)" "0|model=off effort=off|0|model=off effort=off|18|GPT-DECIDE skip reason=off-user"
+  # .last 기록 실패는 set 을 실패시키지 않는다(세션 기록이 계약) — 자리가 폴더면 그 안에 쓰지 않는다 · 임시 파일도 남지 않는다
+  lprep j; rm -f "$T/L-j/sel/.last"; mkdir "$T/L-j/sel/.last"
+  lrun j s - sid-a "$CLIP" /bin/bash "$CHOICE" set --model fake-beta --effort xhigh
+  check "get 선택 없음 · 이전 선택 자리가 폴더 → set 은 0 · 세션 기록 · 폴더 안에 쓰지 않음 · 임시 파일 없음" "$(lr j s)|$(body "$T/L-j/sel/sid-a")|$(find "$T/L-j/sel/.last" -type f | wc -l | tr -d ' ')|$(find "$T/L-j/sel" -name '.tmp.*' | wc -l | tr -d ' ')" "0|model=fake-beta effort=xhigh|model=fake-beta|effort=xhigh||0|0"
+  # CLI 없음 자동 off 는 사용자의 선택이 아니다 — .last 로 남지 않아 CLI 를 깐 뒤 새 세션은 묻는다(3)
+  lprep k; rm -f "$T/L-k/sel/.last"
+  lrun k get1 - sid-a "$NOCLI" /bin/bash "$CHOICE" get
+  lrun k get2 - sid-b "$CLIP" /bin/bash "$CHOICE" get
+  check "get 선택 없음 · 이전 선택 없음 · CLI 없음 자동 off 는 이전 선택으로 남지 않는다 → CLI 설치 뒤 새 세션 3" "$(lr k get1)|$([ -e "$T/L-k/sel/.last" ] && echo 1 || echo 0)|$(lr k get2)" "0|model=off effort=off|0|3|"
 
   # ── 사용법 · 화이트리스트 대조
   cell u-sub - s1 bogus
@@ -690,6 +779,24 @@ run_wrapper() {
   env "PATH=$CLIP" "FZ_TELEMETRY_DIR=$T/w-cc-tel" /bin/bash "$WX" cli-check extra >/dev/null 2>&1; c3=$?
   check "cli-check: 있음 0 · 없음 18 · 인자 10" "$c1|$c2|$c3" "0|18|10"
   check "cli-check: 호출 행 없음" "$(cat "$T/w-cc-tel/gpt-calls.tsv" 2>/dev/null | wc -l | tr -d ' ')" 0
+  # auth-check — 인증 판정도 호출이 아니다(호출 행 없음). 있음 = CLI 홈의 auth.json 이 파일(링크면 대상이 파일) · API 키 env 가 비어 있지 않음.
+  #   내용은 보지 않는다(합성 '{}'). 사용자 env 의 API 키가 셀에 새지 않게 두 이름을 지우고 셀이 정한다
+  mkdir -p "$T/w-ac-tel" "$T/w-ac-yes" "$T/w-ac-no" "$T/w-ac-dir/auth.json" "$T/w-ac-link" "$T/w-ac-h/.codex"
+  printf '{}\n' > "$T/w-ac-yes/auth.json"; printf '{}\n' > "$T/w-ac-h/.codex/auth.json"
+  ln -s "$T/w-ac-gone/auth.json" "$T/w-ac-link/auth.json"
+  acx() { env -u CODEX_HOME -u OPENAI_API_KEY -u CODEX_API_KEY "PATH=$CLIP" "HOME=$T/home" "FZ_TELEMETRY_DIR=$T/w-ac-tel" "$@" >/dev/null 2>&1; echo $?; }
+  a1="$(acx "CODEX_HOME=$T/w-ac-yes" /bin/bash "$WX" auth-check)"
+  a2="$(acx "CODEX_HOME=$T/w-ac-no" /bin/bash "$WX" auth-check)"
+  a3="$(acx "CODEX_HOME=$T/w-ac-yes" /bin/bash "$WX" auth-check extra)"
+  check "auth-check: 있음 0 · 없음 18 · 인자 10" "$a1|$a2|$a3" "0|18|10"
+  a4="$(acx "CODEX_HOME=$T/w-ac-dir" /bin/bash "$WX" auth-check)"
+  a5="$(acx "CODEX_HOME=$T/w-ac-link" /bin/bash "$WX" auth-check)"
+  a6="$(acx "CODEX_HOME=$T/w-ac-no" "OPENAI_API_KEY=sk-test-synthetic" /bin/bash "$WX" auth-check)"
+  a7="$(acx "CODEX_HOME=$T/w-ac-no" "CODEX_API_KEY=sk-test-synthetic" /bin/bash "$WX" auth-check)"
+  a8="$(acx "CODEX_HOME=$T/w-ac-no" "OPENAI_API_KEY=" "CODEX_API_KEY=" /bin/bash "$WX" auth-check)"
+  a9="$(acx "HOME=$T/w-ac-h" /bin/bash "$WX" auth-check)"
+  check "인증 판정: auth.json 폴더 18 · 깨진 링크 18 · API 키 env 둘 0 · 빈 env 18 · 기본 CLI 홈(HOME/.codex) 0" "$a4|$a5|$a6|$a7|$a8|$a9" "18|18|0|0|18|0"
+  check "auth-check: 호출 행 없음" "$(cat "$T/w-ac-tel/gpt-calls.tsv" 2>/dev/null | wc -l | tr -d ' ')" 0
 
   # ── 두 스크립트의 MODEL_RE 가 같은 문자열 — 한쪽만 넓히면 set 이 거부하는 값을 래퍼가 받는다(또는 그 반대)
   check "MODEL_RE: 래퍼 = gpt-choice.sh" "$(re_parity)" same

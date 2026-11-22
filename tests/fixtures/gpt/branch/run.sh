@@ -5,8 +5,10 @@
 #
 # 케이스 — CASES 배열의 함수 하나가 케이스 하나다(B2b 가 contract-order · contract-regen 을 같은 배열에 더한다).
 #   케이스마다 한 줄: `<케이스>: PASS <설명>` 또는 `<케이스>: FAIL <사유>`
-#   same-input-twice          세션 상태 다섯(선택 off · 선택 있음 · 선택 없음 + 자율 · 선택 없음 + 대화 · CLI 없음)마다 decide 를 두 번 돌려
-#                             같은 줄 · 같은 exit 인지, 기대 매핑(skip 18 off-user · run 0 · config 0 · ask 3 · skip 18 off-no-cli)인지 본다
+#   same-input-twice          세션 상태 다섯(선택 off · 선택 있음 · 선택 없음 + 자율 · 선택 없음 + 대화 · CLI 없음)과 인증 없는 CLI 홈의 일곱
+#                             (선택 있음 · 대화 · 자율 · 저장 불가 세션 · 손상 · 선택 off · CLI 없음)마다 decide 를 두 번 돌려 같은 줄 · 같은 exit 인지,
+#                             기대 매핑(skip 18 off-user · run 0 · config 0 · ask 3 · skip 18 off-no-cli · 인증 없음이면 run · ask · config 자리가 모두
+#                             skip 18 off-no-auth · off 는 off-user · CLI 없음은 off-no-cli 그대로)인지 본다. 인증 없음 밖의 상태는 CLI 홈에 합성 인증 파일을 둔다
 #   tmpdir-claude-zero-calls  TMPDIR=<임시 홈>/.claude/x(있는 폴더)에서 정문 `gpt-call.sh independent-plan` → exit 11 · ~/.claude 메시지 ·
 #                             기록 CLI 호출 0 · 격리 폴더 미생성. GPT 홈 · 인증은 갖춰 둔다(다른 11 사유로 통과하지 않게)
 #   all-consumers-use-common  GPT kind 를 실제로 부르는 스킬(`gpt_kinds.py callers` 의 JSON — kinds-callers 와 같은 판독기)마다
@@ -61,26 +63,34 @@ verdict() {   # $1=케이스 · $2=실패 사유(빈 값 = 통과) · $3=통과 
 add() { WHY="${WHY:+$WHY; }$1"; }   # 케이스 안의 실패 사유를 모은다 — 케이스 머리에서 WHY="" 로 비운다
 
 # ── same-input-twice ───────────────────────────────────────────────
-dec() {   # $1=이름 · $2=PATH · $3=세션 id · $4=FZ_AUTONOMY('-'=unset) — decide 한 번 → $T/d-<이름>.{out,err,rc}
+dec() {   # $1=이름 · $2=PATH · $3=세션 id · $4=FZ_AUTONOMY('-'=unset) · $5=CODEX_HOME — decide 한 번 → $T/d-<이름>.{out,err,rc}
   local e
+  # ⛔ API 키 env 두 이름을 지운다 — 사용자 env 에 키가 있으면 '인증 없음' 상태가 '있음' 으로 읽힌다
   e=(env -u FZ_AUTONOMY -u CLAUDE_CODE_SESSION_ID -u CODEX_HOME -u FZ_GPT_CALL_ID -u FZ_GPT_CALL_LABEL -u FZ_GPT_POLICY_ROOT
-     "PATH=$2" "HOME=$T/home" "CODEX_HOME=$T/home/.codex" "FZ_GPT_CHOICE_DIR=$T/sel" "FZ_TELEMETRY_DIR=$T/tel" "TMPDIR=$T/tmp"
+     -u OPENAI_API_KEY -u CODEX_API_KEY
+     "PATH=$2" "HOME=$T/home" "CODEX_HOME=$5" "FZ_GPT_CHOICE_DIR=$T/sel" "FZ_TELEMETRY_DIR=$T/tel" "TMPDIR=$T/tmp"
      "CLAUDE_CODE_SESSION_ID=$3")
   [ "$4" = "-" ] || e+=("FZ_AUTONOMY=$4")
   "${e[@]}" /bin/bash "$ROOT/scripts/gpt-choice.sh" decide < /dev/null > "$T/d-$1.out" 2> "$T/d-$1.err"
   echo $? > "$T/d-$1.rc"
 }
 case_same_input_twice() {
-  local sub kind sid auto want wrc p a b
+  local sub kind sid auto want wrc p ch a b
   WHY=""
-  mkdir -p "$T/home/.codex" "$T/sel" "$T/tel" "$T/tmp"
+  mkdir -p "$T/home/.codex" "$T/home-noauth/.codex" "$T/sel" "$T/tel" "$T/tmp"
+  printf '{}\n' > "$T/home/.codex/auth.json"   # 합성 인증(내용은 보지 않는다 — 파일인지만 본다)
   printf 'model=off\neffort=off\n' > "$T/sel/br-off"
   printf 'model=m-branch\neffort=high\n' > "$T/sel/br-set"
-  # 상태|PATH|세션 id|FZ_AUTONOMY|기대 stdout|기대 exit — 선택 없음 세 상태(auto · ask · nocli)는 선택 파일을 두지 않는다
+  printf 'model=m-branch\neffort=high\n' > "$T/sel/br-noauth"
+  printf 'effort=high\nmodel=m-branch\n' > "$T/sel/br-na-bad"
+  # 상태|종류|세션 id|FZ_AUTONOMY|기대 stdout|기대 exit — 선택 없음 상태(auto · ask · nocli · na-ask · na-auto · na-nocli)는 선택 파일을 두지 않는다
+  #   종류: cli · nocli(CLI 없는 PATH) · noauth(CLI 있음 + 인증 파일 없는 CLI 홈) · nocli-noauth. 세션 id '..' 는 저장 불가(get 5)다
+  #   인증 없음은 선택 off 다음이다 — 선택 · 묻기 · config 자리만 skip off-no-auth 이고 off 를 기록하지 않는다
   while IFS='|' read -r sub kind sid auto want wrc; do
     [ -n "$sub" ] || continue
-    p="$CLIPATH"; [ "$kind" = "nocli" ] && p="$NOCLI"
-    dec "$sub-1" "$p" "$sid" "$auto"; dec "$sub-2" "$p" "$sid" "$auto"
+    p="$CLIPATH"; case "$kind" in nocli*) p="$NOCLI" ;; esac
+    ch="$T/home/.codex"; case "$kind" in *noauth) ch="$T/home-noauth/.codex" ;; esac
+    dec "$sub-1" "$p" "$sid" "$auto" "$ch"; dec "$sub-2" "$p" "$sid" "$auto" "$ch"
     a="$(cat "$T/d-$sub-1.out")|$(cat "$T/d-$sub-1.rc")"
     b="$(cat "$T/d-$sub-2.out")|$(cat "$T/d-$sub-2.rc")"
     [ "$a" = "$b" ] || add "$sub: 두 번이 다르다('$a' ≠ '$b')"
@@ -91,8 +101,17 @@ set|cli|br-set|-|GPT-DECIDE run model=m-branch effort=high|0
 auto|cli|br-auto|autonomous|GPT-DECIDE config|0
 ask|cli|br-ask|-|GPT-DECIDE ask|3
 nocli|nocli|br-nocli|-|GPT-DECIDE skip reason=off-no-cli|18
+noauth|noauth|br-noauth|-|GPT-DECIDE skip reason=off-no-auth|18
+na-ask|noauth|br-na-ask|-|GPT-DECIDE skip reason=off-no-auth|18
+na-auto|noauth|br-na-auto|autonomous|GPT-DECIDE skip reason=off-no-auth|18
+na-nosave|noauth|..|-|GPT-DECIDE skip reason=off-no-auth|18
+na-bad|noauth|br-na-bad|-|GPT-DECIDE skip reason=off-no-auth|18
+na-off|noauth|br-off|-|GPT-DECIDE skip reason=off-user|18
+na-nocli|nocli-noauth|br-na-nocli|-|GPT-DECIDE skip reason=off-no-cli|18
 TAB
-  verdict same-input-twice "$WHY" "다섯 상태 × 2회 같은 줄 · 같은 exit — off→skip 18 · 선택→run 0 · 자율→config 0 · 대화→ask 3 · CLI 없음→skip 18"
+  [ "$(cat "$T/sel/br-noauth")" = "$(printf 'model=m-branch\neffort=high')" ] || add "noauth: 선택 파일이 바뀌었다(off 를 기록하면 안 된다)"
+  for sid in br-na-ask br-na-auto br-na-nocli; do [ -e "$T/sel/$sid" ] && add "$sid: 인증 없음 decide 가 선택 파일을 썼다"; done
+  verdict same-input-twice "$WHY" "열두 상태 × 2회 같은 줄 · 같은 exit — off→skip 18 · 선택→run 0 · 자율→config 0 · 대화→ask 3 · CLI 없음→skip 18 · 인증 없음(선택 · 대화 · 자율 · 저장 불가 · 손상)→skip off-no-auth 18 · 인증 없음 + off→off-user · 인증 없음 + CLI 없음→off-no-cli"
 }
 
 # ── tmpdir-claude-zero-calls ───────────────────────────────────────

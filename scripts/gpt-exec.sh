@@ -36,6 +36,10 @@
 #                     넘기면 프로필의 경로 deny 를 덮는다(F-348). 프로필이 `extends = ":read-only"` 가 아니면 exit 11.
 #   gpt-exec.sh cli-check  GPT CLI 가 PATH 에 있는가만 본다(호출 아님 · 호출 행 없음) — 0=있음 · 18=없음. gpt-choice.sh get · 독립 런처가
 #                     'CLI 없음' 을 이 판정으로 본다 — 실행 파일 이름은 이 래퍼 한 곳에 둔다(scripts/check_gpt_surface.py 경계 파일)
+#   gpt-exec.sh auth-check GPT CLI 인증이 있는가만 본다(호출 아님 · 호출 행 없음) — 0=있음 · 18=없음(로그인 필요). 있음 =
+#                     ${CODEX_HOME:-$HOME/.codex}/auth.json 이 파일(링크면 대상이 파일 — 내용은 읽지 않는다)이거나 API 키 env
+#                     (OPENAI_API_KEY · CODEX_API_KEY)가 비어 있지 않다. gpt-choice.sh decide · 독립 런처가 '로그인 필요' 를 이 판정으로 본다 —
+#                     env 이름도 이 래퍼 한 곳에 둔다. 래퍼 본 경로(review · exec · resume)는 인증을 보지 않는다(CLI 실패 12 가 안전망)
 #
 # exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건(세션 선택 판독 실패 포함) / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
@@ -173,6 +177,14 @@ PY
 if [ "${1:-}" = "cli-check" ]; then
   [ $# -eq 1 ] || die 10 "cli-check 는 인자를 받지 않는다: $2"
   command -v codex >/dev/null 2>&1 && exit 0
+  exit 18
+fi
+# ── auth-check — GPT CLI 인증 유무만 본다. cli-check 와 같이 호출 행 trap 보다 먼저 끝낸다(확인은 호출이 아니다)
+#    ⛔ 인증 파일은 있는지만 본다(-f — 깨진 링크 · 폴더는 없음) · 내용을 읽지 않는다
+if [ "${1:-}" = "auth-check" ]; then
+  [ $# -eq 1 ] || die 10 "auth-check 는 인자를 받지 않는다: $2"
+  [ -f "${CODEX_HOME:-${HOME:-}/.codex}/auth.json" ] && exit 0
+  if [ -n "${OPENAI_API_KEY:-}" ] || [ -n "${CODEX_API_KEY:-}" ]; then exit 0; fi
   exit 18
 fi
 trap 'calls_row $?' EXIT

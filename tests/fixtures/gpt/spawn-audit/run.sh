@@ -147,9 +147,11 @@ if [ "$(printf '%s\n' "$g" | grep -c .)" = "1" ] && [ "$(col "$g" 4)" = "verify"
 else no label-from-gate "rc=$rc 행: $(printf '%s' "$g" | tr '\t' '|')"; fi
 # 정문을 지난 독립 kind 를 런처가 래퍼 전에 거부(규칙 레코드를 원문 색인 자리에) — 래퍼 행이 없으니 정문이 행을 남긴다
 printf 'diff --git a/x b/x\n' > "$T/d.patch"; printf '{"rules": [], "axes": {}}\n' > "$T/rules.json"
+# ⛔ 합성 인증 파일을 둔다 — 없으면 런처가 입력 게이트 전에 GPT 미사용(18 · 로그인 필요)으로 끝나 이 셀이 보는 입력 거부(11)에 닿지 않는다
+mkdir -p "$T/c/lr/ch"; printf '{}\n' > "$T/c/lr/ch/auth.json"
 rc=$(run lr -- "$GATE" independent-review --diff "$T/d.patch" --arm gpt --run-id r1 --out-dir "$T/c/lr/od" --rules-index "$T/rules.json")
 g="$(row lr)"
-if [ "$rc" = "11" ] && [ "$(printf '%s\n' "$g" | grep -c .)" = "1" ] && [ "$(col "$g" 13)" = "gate" ] && [ "$(col "$g" 4)" = "independent-review" ] && [ "$(col "$g" 12)" = "11" ]; then
+if [ "$rc" = "11" ] && grep -q -- '--rules-index 에 규칙 레코드' "$T/c/lr/err" && [ "$(printf '%s\n' "$g" | grep -c .)" = "1" ] && [ "$(col "$g" 13)" = "gate" ] && [ "$(col "$g" 4)" = "independent-review" ] && [ "$(col "$g" 12)" = "11" ]; then
   ok launcher-refusal-row "런처 거부(래퍼 전) → 정문 행 하나 · label=independent-review · exit 11"
 else no launcher-refusal-row "rc=$rc 행: $(printf '%s' "$g" | tr '\t' '|') · err: $(tail -c 200 "$T/c/lr/err")"; fi
 
