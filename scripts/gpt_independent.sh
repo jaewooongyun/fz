@@ -39,6 +39,7 @@
 #   --snapshot 소비자 · 공유 모듈 본문 폴더 — 격리 폴더의 snapshot/<이름>/ 으로 복사한다(리뷰 범위를 줄이지 않는다)
 #
 # 산출(out-dir): <arm>-<run-id>.json (스키마 출력) · .md (사람용) · .audit.json · .rollouts/ (세션 로그 사본) · .contaminated (오염 시) · .json.session(세션 ID — 감사 sessionFile · --keep-iso 면 감사 iso · resume 입력)
+#   감사 inputRefs = 격리 입력 폴더를 가리킨 rollout 명령 수(관측치 — 전체 열람 증명이 아니다) · rollout 이 없으면 "unknown"(추적 불가 · F-595)
 #   ⛔ 시작할 때 같은 stem 의 옛 산출을 지우고 감사를 'running'(exit null)으로 먼저 쓴다 — 중간에 멈춘 run 의 산출은 병합 · 차이표가 거부한다
 # stderr: 래퍼의 적용값 줄 'GPT-CHOICE model=<값> (출처) effort=<값> (출처)' 을 그대로 한 줄 옮긴다(래퍼가 그 줄 전에 멈추면 없다)
 # exit: 0=성공 · 10=사용법 · 같은 --out 동시 실행 · 11=사전조건(격리 폴더 자리 ${TMPDIR:-/tmp} 가 실제 홈 ~/.claude 아래인 경우(F-509) · 그 실경로가 --repo 와 같은 경우 포함 — GPT 호출 전) · 12~14=래퍼 측정 실패 그대로(14 는 6축 후검사도)
@@ -319,7 +320,7 @@ fi
 [ -z "$FRAME" ] || [ "$MODE" = "review" ] || die 10 "--frame 은 review 전용이다 — 계획 검증은 격리 첫 패스가 아니다(XE-11)"
 # ── 정책 — 역할 · 스키마 · spawn 문장 · frame 을 resolver 에게 묻는다(R-06 · SC-2). ⛔ 런처는 정책 값을 직접 갖지 않는다
 POL_KIND="independent-$MODE"
-case "${FZ_GPT_CALL_LABEL:-}" in independent-*) POL_KIND="$FZ_GPT_CALL_LABEL" ;; esac
+case "${FZ_GPT_CALL_LABEL:-}" in independent-*|peer-independent-*) POL_KIND="$FZ_GPT_CALL_LABEL" ;; esac
 POL_ARGS=("$POL_KIND")
 [ -n "$FRAME" ] && POL_ARGS+=(--frame "$FRAME")
 # 정문 경유면 정문이 해석에 쓴 플러그인 루트(env 채널) · 직접 호출이면 이 런처의 루트 — 같은 resolver 가 답한다
@@ -430,6 +431,8 @@ for d in "${SNAPS[@]+"${SNAPS[@]}"}"; do put_dir "$d" "snapshot/$(basename "$d")
   echo "[독립 첫 패스 — $MODE] 다른 모델과 독립으로 수행한다. 다른 모델의 계획 · 리뷰 · 중간 산출물을 찾거나 읽지 않는다."
   echo "$SPAWN_LINE"   # 레지스트리 spawn 값이 고른 문장 — resolver 소관(SC-2)
   echo "읽기는 권한 프로필로 제한돼 있다 — 막힌 경로를 우회하려 하지 않는다."
+  # F-595 — 격리 입력 폴더는 막힌 임시 루트 아래에 있다. 허용을 적지 않으면 모델이 '막힌 경로' 로 읽고 입력을 시도 없이 건너뛴다
+  echo "아래 격리 입력 폴더는 상위 폴더(임시 루트)가 막혀 있어도 읽기가 허용돼 있다 — 입력 파일은 읽어도 된다."
   echo
   echo "## 입력 (격리 입력 폴더 $ISO/input)"
   [ -n "$REQ" ] && echo "- requirement.md — 요구사항 원문"
@@ -584,7 +587,11 @@ FZ_ART = re.compile(os.environ["FZ_ART_NAMES"])
 CLAUDE_REALS = [p for p in os.environ.get("FZ_CLAUDE_REALS", "").split("\n") if p and not (p == repo or repo.startswith(p.rstrip("/") + "/"))]
 JS_ESC = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f", "v": "\v", "0": "\0"}
 def js_strings(src):
-    """JS 문자열 리터럴의 값 — rollout 의 exec 입력은 JS 프로그램이다(`tools.exec_command({cmd:"…"})` · `{cmd:'…'}` · `const paths = ["…"]`).
+    """JS 문자열 리터럴의 값 — js_literals 의 값만(호출부 호환)."""
+    return [v for v, _, _ in js_literals(src)]
+def js_literals(src):
+    """(값, 시작, 끝) — 시작 · 끝은 여는 따옴표부터 닫는 따옴표 다음까지(forbid_hit 이 리터럴 밖 원문만 따로 본다).
+    JS 문자열 리터럴의 값 — rollout 의 exec 입력은 JS 프로그램이다(`tools.exec_command({cmd:"…"})` · `{cmd:'…'}` · `const paths = ["…"]`).
     왼쪽부터 읽는다 — 큰따옴표 · 작은따옴표 · 백틱 리터럴을 각각 하나로 읽어, 한 리터럴 안의 다른 따옴표는 그 내용이다
     (`"rg -n 'review-report\\\\.md' x"` 는 큰따옴표 하나 — 안쪽 작은따옴표는 셸 인용으로 남는다). 주석을 따로 보지 않는다 — 주석 속 따옴표는 줄 끝에서 죽는 리터럴이 되고, 주석 속 산출물 경로 언급은 원문 후보가 적중시킨다(알려진 한계).
     JS 이스케이프를 푼다(`\\n` · `\\'` · `\\"` · `\\/` · `\\xHH` · `\\uXXXX` · `\\u{…}` · 그 밖 `\\c` → `c`). 닫히지 않은 리터럴은 버린다.
@@ -596,7 +603,7 @@ def js_strings(src):
         if q not in "\"'`":
             i += 1
             continue
-        i, buf, closed = i + 1, [], False
+        start, i, buf, closed = i, i + 1, [], False
         while i < n:
             ch = src[i]
             if ch == q:
@@ -621,7 +628,7 @@ def js_strings(src):
             buf.append(ch)
             i += 1
         if closed:
-            out.append("".join(buf))
+            out.append(("".join(buf), start, i + 1))
         i += 1
     return out
 def shell_words(s):
@@ -632,6 +639,29 @@ def shell_words(s):
         return list(lx)
     except ValueError:
         return s.split()
+SH_OPS = "();<>|&"
+_HIDE = {c: chr(0xE000 + i) for i, c in enumerate(SH_OPS)}   # 따옴표 · 역슬래시로 막은 연산자 글자의 임시 자리(사용자 정의 영역 글자)
+_BACK = str.maketrans({v: k for k, v in _HIDE.items()})
+def shell_words_ops(s):
+    """(셸 단어, 연산자 자리) — 단어는 shell_words 와 같다. 연산자 자리 = 따옴표 · 역슬래시 밖에 선 `|` · `;` · `&&` · 괄호 · 리다이렉션 낱말의 위치.
+    shell_words 는 따옴표를 푼 뒤라 `cat '|' x` 의 `'|'` 와 파이프를 가르지 못한다 — 막힌 연산자 글자를 임시 글자로 숨겨 자른 뒤 되돌린다."""
+    out, q, i = [], None, 0
+    while i < len(s):
+        ch = s[i]
+        if ch == "\\" and i + 1 < len(s) and (q is None or (q == '"' and s[i + 1] in '"\\$`')):
+            out += [ch, _HIDE.get(s[i + 1], s[i + 1])]
+            i += 2
+            continue
+        if q is None and ch in "'\"":
+            q = ch
+        elif q == ch:
+            q = None
+        elif q is not None:
+            ch = _HIDE.get(ch, ch)
+        out.append(ch)
+        i += 1
+    ws = shell_words("".join(out))
+    return [w.translate(_BACK) for w in ws], {k for k, w in enumerate(ws) if w and all(c in SH_OPS for c in w)}
 PATH_CH = re.compile(r"[\w.~-]")   # 경로 성분 글자 — 유니코드 단어 글자 · `.` · `~` · `-`
 def refers_to(s, target):
     """s 가 target 이나 그 아래 경로를 가리키는가 — 출현이 경로를 시작하고(왼쪽 `/` 묶음을 건너면 텍스트 시작이거나 경로 성분 밖 글자)
@@ -655,17 +685,145 @@ def forbid_hit(cmd):
        범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다
     ⛔ 글자를 지워 정규화하지 않는다 — 직렬화 층을 해독하고(원문 + JS 문자열 리터럴) 셸 단어로 나눈 뒤 `/` 성분을 본다.
        글자 제거는 정규식의 `\\.` · 이름의 `,` · `:` 까지 지워 정상 명령을 오염으로 만들었다(역검증 2차 ISSUE-001)
-    ⛔ 알려진 한계: 산출물 이름과 같은 검색 패턴(`rg "review-report.md" docs`)은 적중한다 — 패턴과 경로의 구분은 명령별 파싱이라 범위 밖이고
+    ⛔ 검색 패턴 인자는 경로가 아니다(F-596) — search_patterns 가 rg · grep 명령을 끝까지 읽어 낸 패턴 자리 낱말만 세 규칙에서 뺀다. 그 리터럴이
+       있으면 원문 후보는 리터럴 밖 글자만 본다(원문 안의 같은 패턴이 다시 적중하지 않게). 못 읽은 명령은 예전처럼 원문 부분 일치다.
+       ⛔ 금지 경로를 경로 인자로 주거나 실제로 읽으면 그대로 적중이다(`rg -n TODO <repo>/.claude/` · `rg '\\.claude/' ~/.claude/projects` · `cat ~/.claude/…`)
+    ⛔ 알려진 한계: search_patterns 가 못 읽는 꼴(-f · --files · 모르는 옵션 · 변수 · cd 뒤 상대 경로 · 허용 밖 경로 인자)의 패턴은 여전히 적중한다 —
        OS deny(--deny 작업 폴더)가 1차 방어다. 따옴표 없는 `review-report\\.md` 는 셸이 역슬래시를 걷어 실제 인자가 `review-report.md` 다
        · 변수 전개 · 이름 조립(`$'…'` · `${p}`)은 보지 않는다"""
-    for s in [cmd] + js_strings(cmd):
-        if ".claude/" in s:
+    lits = js_literals(cmd)
+    found = [(v, *shell_words_ops(v)) for v, _, _ in lits]
+    found = [(v, ws, search_patterns(ws, ops)) for v, ws, ops in found]
+    raw = cmd
+    if any(p is not None for _, _, p in found):   # 패턴을 가른 리터럴이 있으면 원문 후보는 리터럴 밖만 — 그 리터럴은 아래 자기 후보로 본다
+        for _, a, b in reversed(lits):
+            raw = raw[:a] + " " + raw[b:]
+    raw_ws, raw_ops = shell_words_ops(raw)
+    for s, ws, pats in [(raw, raw_ws, search_patterns(raw_ws, raw_ops))] + found:
+        if pats is None:
+            vs, words = [s] + ws, ws
+            if ".claude/" in s:
+                return True
+        else:                                     # 패턴 자리 낱말을 뺀 나머지(명령 · 옵션 · 옵션 값 · 경로 인자)만 본다
+            words = [w for i, w in enumerate(ws) if i not in pats]
+            vs = words
+            if any(".claude/" in w for w in words):
+                return True
+        if any(refers_to(v, t) for v in vs for t in CLAUDE_REALS):   # 대상 아래 경로 · 맨 대상 — 원문과 셸 단어
             return True
-        if any(refers_to(v, t) for v in [s] + shell_words(s) for t in CLAUDE_REALS):   # 대상 아래 경로 · 맨 대상 — 원문과 셸 단어
-            return True
-        if any(FZ_ART.fullmatch(c.strip("[](){},;:'\"`")) for w in shell_words(s) for c in w.split("/")):   # 양 끝만 — JS 배열 · 호출 구두점
+        if any(FZ_ART.fullmatch(c.strip("[](){},;:'\"`")) for w in words for c in w.split("/")):   # 양 끝만 — JS 배열 · 호출 구두점
             return True
     return False
+# 검색 명령 옵션 표(F-596) — 짧은 값 없는 글자 · 짧은 값 받는 글자 · 긴 값 없는 이름 · 긴 값 받는 이름. ⛔ 확실한 것만 적는다 — 표에 없는 옵션이
+#   하나라도 있으면 그 명령은 못 읽은 것으로 보고(None) 예전 부분 일치로 돌아간다. -f · --file(패턴 파일 = 읽는 경로) · rg --files(패턴 없음)도 표에 없다
+SEARCH_OPTS = {
+    "rg": ("nNiSswxvclLFPUauoqHIz0bp", "egtTmABCMjdEr",
+           {"hidden", "no-ignore", "no-ignore-vcs", "no-ignore-dot", "no-ignore-parent", "line-number", "no-line-number", "ignore-case",
+            "smart-case", "case-sensitive", "word-regexp", "line-regexp", "invert-match", "count", "count-matches", "files-with-matches",
+            "files-without-match", "fixed-strings", "pcre2", "multiline", "multiline-dotall", "text", "only-matching", "quiet", "with-filename",
+            "no-filename", "null", "follow", "heading", "no-heading", "column", "no-messages", "json", "vimgrep", "trim", "unrestricted",
+            "search-zip", "one-file-system", "binary", "no-config", "byte-offset", "pretty", "stats", "crlf", "null-data", "passthru",
+            "no-require-git", "glob-case-insensitive"},
+           {"regexp", "glob", "iglob", "type", "type-not", "max-count", "after-context", "before-context", "context", "max-columns",
+            "threads", "max-depth", "encoding", "replace", "sort", "sortr", "color", "max-filesize"}),
+    "grep": ("rRnHhilLcvwxqsEFGPoIZzab", "emABCdD",
+             {"recursive", "dereference-recursive", "line-number", "with-filename", "no-filename", "ignore-case", "files-with-matches",
+              "files-without-match", "count", "invert-match", "word-regexp", "line-regexp", "quiet", "silent", "no-messages",
+              "extended-regexp", "fixed-strings", "basic-regexp", "perl-regexp", "only-matching", "null", "null-data", "text",
+              "color", "colour"},
+             {"regexp", "max-count", "after-context", "before-context", "context", "include", "exclude", "exclude-dir", "directories",
+              "devices", "binary-files", "label"}),
+}
+SEARCH_OPTS["egrep"] = SEARCH_OPTS["fgrep"] = SEARCH_OPTS["grep"]
+def search_patterns(ws, ops=None):
+    """셸 단어 목록 → rg · grep 의 검색 패턴 자리 낱말 위치(집합) · 못 읽으면 None(예전 부분 일치로 판정한다 — 닫힌 쪽으로 실패).
+    읽는 조건(전부): 조각(`|` · `;` · `&&` · 괄호 · 리다이렉션 낱말 사이) 가운데 rg · grep 명령이 있고 그 옵션이 전부 SEARCH_OPTS 에 있다 ·
+    패턴이 있다(-e 값 · 없으면 첫 위치 인자) · 경로 인자가 전부 허용 저장소 · 격리 폴더 아래 절대 경로이거나 `..` 없는 상대 경로다(cd 가 있으면
+    상대 경로 · 경로 없음은 못 읽은 것) · 어느 낱말에도 변수 · 명령 치환(`$` · 백틱)이 없다. 패턴 자리 낱말 = -e · --regexp 값(붙인 꼴은 그 낱말)
+    또는 첫 위치 인자 — 그 밖 옵션 값은 패턴이 아니다(-g '.claude/*' 는 계속 본다)."""
+    if any("$" in w or "`" in w for w in ws):
+        return None
+    segs, cur = [], []
+    for i, w in enumerate(ws):                    # ops = shell_words_ops 의 연산자 자리(따옴표 안 `|` 는 낱말) · 없으면 글자로 본다
+        if (i in ops) if ops is not None else (w and all(ch in SH_OPS for ch in w)):
+            segs.append(cur); cur = []
+        else:
+            cur.append(i)
+    segs.append(cur)
+    heads = []
+    for seg in segs:
+        j = next((k for k in seg if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", ws[k])), None)
+        heads.append((seg, j))
+    has_cd = any(j is not None and os.path.basename(ws[j]) in ("cd", "pushd", "popd") for _, j in heads)
+    pats, seen = set(), False
+    for seg, j in heads:
+        tool = os.path.basename(ws[j]) if j is not None else ""
+        if tool not in SEARCH_OPTS:
+            continue
+        seen = True
+        short_nv, short_v, long_nv, long_v = SEARCH_OPTS[tool]
+        args, eps, pos, k, opts_done = seg[seg.index(j) + 1:], [], [], 0, False
+        while k < len(args):
+            w = ws[args[k]]
+            if opts_done or w == "-" or not w.startswith("-"):
+                pos.append(args[k]); k += 1
+                continue
+            if w == "--":
+                opts_done, k = True, k + 1
+                continue
+            if w.startswith("--"):
+                name, eq, _ = w[2:].partition("=")
+                if eq:
+                    if name not in long_v:
+                        return None
+                    if name == "regexp":
+                        eps.append(args[k])
+                    k += 1
+                elif name in long_nv:
+                    k += 1
+                elif name in long_v:
+                    if k + 1 >= len(args):
+                        return None
+                    if name == "regexp":
+                        eps.append(args[k + 1])
+                    k += 2
+                else:
+                    return None
+                continue
+            m, took = 1, 1
+            while m < len(w):
+                c = w[m]
+                if c in short_nv:
+                    m += 1
+                    continue
+                if c not in short_v:
+                    return None
+                if m + 1 < len(w):                 # 붙인 값(-ePAT · -A2) — 그 낱말이 값이다
+                    if c == "e":
+                        eps.append(args[k])
+                elif k + 1 < len(args):
+                    if c == "e":
+                        eps.append(args[k + 1])
+                    took = 2
+                else:
+                    return None
+                break
+            k += took
+        if not eps:
+            if not pos:
+                return None
+            eps, pos = [pos[0]], pos[1:]
+        for i in pos:
+            w = ws[i]
+            if w.startswith("/"):
+                if not under_allowed(w):
+                    return None
+            elif w.startswith("~") or has_cd or ".." in w.split("/"):
+                return None
+        if not pos and has_cd:
+            return None
+        pats.update(eps)
+    return pats if seen else None
 FIND_ROOT = re.compile(rf"\bfind\s+{ROOTS}")                      # find 는 첫 인자가 검색 뿌리다
 MULTI_HEADS = [re.compile(r"\b(?:rg|fd|ag)\b"), re.compile(r"\bgrep\s+-[a-zA-Z]*[rR][a-zA-Z]*\b"),
                re.compile(r"\bls\s+-[a-zA-Z]*R[a-zA-Z]*\b")]
@@ -726,7 +884,30 @@ def home_ref(cmd):
                         return os.path.normpath(part[i:])
                     i = part.find(home, i + 1)
     return None
-tcs, spawn, calls, hits, roles, child_results = 0, 0, 0, [], [], 0
+tcs, spawn, calls, hits, roles, child_results, input_refs = 0, 0, 0, [], [], 0, 0
+# 입력 참조 관측치(F-595) — 격리 입력 폴더(<iso>/input)를 가리킨 명령 수. 원문 · JS 문자열 리터럴에서 그 경로를 refers_to 로 찾고, CLI 의 작업 폴더가
+#   입력 폴더일 때(review · --repo 없는 plan)는 입력 폴더에 실제로 있는 상대 경로 낱말(`cat diff.patch`)도 센다 — 명령 이름 자리(조각의 첫 낱말)는 빼고
+#   (`head -1 …` 의 head 는 입력 head/ 가 아니다)
+#   ⛔ 관측치다 — 전체 열람 증명으로 쓰지 않는다(변수 · 다른 cd · 글롭으로 읽은 것은 세지 못한다). rollout 이 없으면(추적 불가) "unknown" 이다
+INPUT_DIR = os.path.join(iso, "input")
+CWD_IS_INPUT = not (mode == "plan" and repo)
+def input_ref(cmd):
+    for s in [cmd] + js_strings(cmd):
+        if refers_to(s, INPUT_DIR):
+            return True
+        if not CWD_IS_INPUT:
+            continue
+        first = True
+        for w in shell_words(s):
+            if w and all(ch in "();<>|&" for ch in w):
+                first = True
+                continue
+            if first:
+                first = False
+                continue
+            if w and not w.startswith(("/", "~", "-")) and ".." not in w.split("/") and os.path.exists(os.path.join(INPUT_DIR, w)):
+                return True
+    return False
 iso_ok = bool(rolls)
 child_rolls = set()
 for f in rolls:
@@ -772,6 +953,7 @@ for f in rolls:
         if not isinstance(cmd, str):
             continue
         calls += 1
+        input_refs += input_ref(cmd)
         why = ("금지 산출물 참조" if forbid_hit(cmd) else
                "홈 · 루트 재귀 검색" if recurse_hit(cmd) else
                ("격리 밖 홈 경로 " + home_ref(cmd)) if home_ref(cmd) else None)
@@ -780,7 +962,7 @@ for f in rolls:
 if tcs == 0:
     iso_ok = False
 audit = {"mode": mode, "rollouts": len(rolls), "turnContexts": tcs, "isolationApplied": iso_ok, "spawnAgent": spawn, "spawnedRoles": roles,
-         "toolCalls": calls, "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs, "head": head,
+         "toolCalls": calls, "inputRefs": input_refs if rolls else "unknown", "hits": hits, "wrapperExit": rc, "timedOut": timed_out, "inputs": inputs, "head": head,
          "frame": frame, "frameSha256": frame_sha, "promptSha256": prompt_sha, "childResults": child_results,
          # resume 입력(fz-plan Phase 2 resume 교차) — 격리 홈은 --keep-iso 일 때만 남는다. sessionFile 은 판정(exit) 뒤에 적는다(아래)
          "iso": iso if keep else None}

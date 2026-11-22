@@ -21,8 +21,13 @@ import tempfile
 P_TAG = re.compile(r"(?m)^\s*(?:[-*]\s+|\d+\.\s+)?(?:\*\*)?\[P([0-3])\]")   # 지적 머리 자리만 — 요약 · 설명 속 `[P0]` 언급은 지적이 아니다
 SEV_FAIL = re.compile(r"severity.*\b(critical|major)\b", re.I)
 SEV_WARN = re.compile(r"severity.*\b(minor|suggestion)\b", re.I)
+# 한국어 부재 문장의 끝맺음 — 뒤에 한글이 이어지면(`없는지` · `없음을` · `않았는지` · `없다면`) 미확인 · 조건 문장이라 세지 않는다
+_KO_END = r"(?:발견하지 못(?:했습니다|했다|함)|발견되지 않(?:았습니다|았다|음|습니다|는다)|없(?:습니다|다(?![고면는])|음))(?![가-힣])"
 NO_FINDINGS = re.compile(r"\bno (?:issues|findings|problems|defects)\b|\bdid(?: not|n't) find\b|\bnothing to (?:report|flag)\b"
-                         r"|지적(?:이|할 것이|사항이)? 없|문제(?:가|를)? (?:발견하지 못|없)|발견(?:된|한) (?:문제|이슈|지적)(?:가|이|는)? 없", re.I)
+                         rf"|지적(?:이|할 것이|사항이)? {_KO_END}|문제(?:가|를)? {_KO_END}|발견(?:된|한) (?:문제|이슈|지적)(?:가|이|는)? {_KO_END}"
+                         rf"|(?:결함|회귀|이슈)(?:은|는|이|가)? {_KO_END}", re.I)
+# ⛔ F-625 — 한국어 부재 문장(지적 · 문제 · 발견된 문제 · 결함 · 회귀 · 이슈)은 끝맺는 꼴(_KO_END)만 센다('발견하지 못했습니다|했다|함' · '발견되지 않았습니다|았다|음|습니다|는다' · '없습니다|없다|없음' — 뒤에 한글이 이어지면 아니다). '결함이 없는지 확인하지 못했다' 같은
+#    미확인 · 조건 · 인용 문장('… 확인하지 못했다' · '없다고 보기 어렵다' · '없다면')은 pass 가 아니다. 지적 머리 · severity 가 있으면 verdict() 가 먼저 fail · warn 으로 끝낸다(부재 문장이 이기지 않는다)
 
 
 def verdict(text) -> str:
@@ -66,6 +71,16 @@ def self_test() -> int:
            verdict("1. [P1] 제목 — a.py:1\n"), verdict("- **[P0]** 제목 — a.py:1\n"), verdict("  - [P3] 제목\n")]
     case("r3-f581-p-tag-header-only — [P0]~[P3] 는 지적 머리 자리(줄머리 · 목록 표지 뒤)만 센다 · 요약 · 설명 속 언급은 지적이 아니다(GPT check r7 P2)",
          got == ["pass", "warn", "fail", "fail", "warn"], got)
+    ko = "관련 레이아웃과 호출 경로에서 새로 도입된 결함은 발견하지 못했습니다.\n"
+    got = [verdict(ko), verdict("수정이 필요한 명확한 회귀는 발견하지 못했습니다.\n"), verdict("확인된 회귀는 없습니다.\n"),
+           verdict("- [P2] 제목 — a.py:1\n" + ko), verdict("issue: x\nseverity: major\n" + ko),
+           verdict("결함이 없는지는 확인하지 못했습니다.\n"), verdict("결함을 발견했습니다.\n"), verdict("결함이 없다고 보기 어렵습니다.\n"),
+           verdict("회귀가 없다면 병합한다.\n"),
+           verdict("결함이 없음을 확인하지 못했습니다.\n"), verdict("결함 없음.\n"),
+           verdict("회귀가 발견되지 않았는지는 확인하지 못했습니다.\n"), verdict("결함은 발견하지 못했는지 다시 본다.\n"), verdict("회귀가 발견되지 않았다.\n"),
+           verdict("문제가 없는지 확인하지 못했습니다.\n"), verdict("지적할 것이 없는지는 모른다.\n"), verdict("지적 없음.\n"), verdict("발견된 문제가 없습니다.\n")]
+    case("f625-korean-absence-narrow — '결함 · 회귀 · 이슈' 부재 문장은 pass · [P2] · severity major 와 함께면 warn · fail 이 이긴다 · 미확인 · 발견 문장은 pass 아님",
+         got == ["pass", "pass", "pass", "warn", "fail", "unrun", "unrun", "unrun", "unrun", "unrun", "pass", "unrun", "unrun", "pass", "unrun", "unrun", "pass", "pass"], got)
     print(f"self-test {sum(res)}/{len(res)} passed (check_verdict)")
     return 0 if all(res) else 1
 

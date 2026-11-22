@@ -193,7 +193,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # stdout 한 줄 — 그
 | 켬이면 필수 | fz-fix Step 4 `check` · 빌드 LOOP 한도의 보조 진단 `check` | 2026-11-01 사용자 결정 — `--gpt` opt-in 을 없앴다. check 는 외부 전송이 아니다 |
 | 켬이면 필수 | fz-review Phase 5 `review` · 5.5 `validate` · 5.5 `verify-gates`(확정 원장이 있을 때) | Phase 5 직전 `availability-probe`(불능 판별)도 같은 decide 줄을 따른다 — `skip` 이면 probe 도 부르지 않는다. `--gpt-independent` 면 Phase 5 `review` 자리를 병합이 맡는다. 5.5 `validate` 는 직전 GPT 리뷰 지적 0 · 적용 수정 0 이고 입력이 그대로면 부르지 않는다(조건 전체 `skills/fz-review/SKILL.md` Phase 5.5 생략 문단 — `verify-gates` 는 그대로) |
 | 켬이면 필수 | fz-modernize full Phase 3 `independent-plan`(초안과 동시 — 실패 · 거부면 Phase 4 그대로) · Phase 4 `modernize-verify` · light 의 `micro-eval` | 자기 적용 계약의 "non-skippable" 은 켠 세션의 뜻이다 |
-| 켬이면 필수 | fz-peer-review Tier 1 · 2 · 3 의 GPT 자리 — 독립 첫 패스(`independent-review` · `--no-gpt-independent` 면 `peer-challenger`) · Tier 3 `peer-da` | Tier 0 은 GPT 가 없다(`--tier 0` 명시 때만 — `modules/peer-review-tiers.md`). 끈 세션이면 강등 · 감쇠 없이 표기만 |
+| 켬이면 필수 | fz-peer-review Tier 1 · 2 · 3 의 GPT 자리 — 독립 첫 패스(`peer-independent-review` · `--no-gpt-independent` 면 `peer-challenger`) · Tier 3 `peer-da` | Tier 0 은 GPT 가 없다(`--tier 0` 명시 때만 — `modules/peer-review-tiers.md`). 끈 세션이면 강등 · 감쇠 없이 표기만 |
 | 켬이면 필수 | fz-manage reflect-to-module Step 4 reviewer(`/fz-gpt`) | `--skip-gpt` 는 DRY-RUN 전용이다 — GPT 미사용 `skip` 과 다르다 |
 | 명시 플래그 | fz-review `--gpt-independent`(`independent-review`) | 플래그가 있을 때만 — 있으면 decide 를 거친다 |
 | 명시 플래그 | fz-discover `--deep` `verify` | 같다 |

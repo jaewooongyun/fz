@@ -19,8 +19,9 @@
 #      GPT 미사용 사유는 메인 경로와 같은 순서다 — CLI 없음 · 사용자 선택 · 로그인 필요 · 인증 파일 없음(셀 iso-cli-missing-off · iso-user-choice-off ·
 #      iso-not-signed-in-login-needed · iso-signed-in-no-auth-file · iso-key-only-no-auth-file — 가짜 CLI 의 login status 로 로그인 상태를 정한다)
 # --live — 실제 GPT CLI 1회(effort high · read-only 권한 프로필)로 기록을 새로 만든 뒤 기본 모드를 돈다. 사람이 부른다(게이트는 부르지 않는다)
-#   호출은 독립 런처와 같은 격리 아래서 돈다 — gpt_independent.sh iso 가 만든 격리 폴더(가짜 HOME · 격리 CODEX_HOME · 권한 프로필:
-#   HOME · 임시 루트 · 플러그인 트리 deny · 저장소 사본 read)와 래퍼 --config-permissions. 기록(provenance.json)에 격리 config 의 deny 경로 수를 남긴다
+#   호출은 정문 kind sprint-contract-record(`gpt-call.sh sprint-contract-record`)로 독립 런처와 같은 격리 아래서 돈다 — gpt_independent.sh iso 가
+#   만든 격리 폴더(가짜 HOME · 격리 CODEX_HOME · 권한 프로필: HOME · 임시 루트 · 플러그인 트리 deny · 저장소 사본 read). 래퍼 --config-permissions 는
+#   레지스트리가 넣는다(호출자가 넘기면 정문이 10 으로 거부한다 · F-614). 기록(provenance.json)에 격리 config 의 deny 경로 수를 남긴다
 #
 # ⛔ 필수 키는 여기 적지 않는다 — modules/sprint-contract.md 의 스키마 블록에서 읽는다(형식 정본이 한 곳이다)
 # ⛔ exit 셋을 섞지 않는다(F-396): 모듈 파일이 없다 = 측정 실패(2) · 파일은 있는데 스키마 블록이 없다 = 내용 위반(1).
@@ -144,14 +145,15 @@ if [ "$LIVE" -eq 1 ]; then
   bash "$FIXTURE/build-repo.sh" "$T/repo" >/dev/null 2>&1 || { echo "UNRUN: fixture 저장소 복원 실패"; exit 2; }
   mkdir -p "$REC"
   # 격리 — 독립 런처와 같은 한 벌(gpt_independent.sh iso): 가짜 HOME · 격리 CODEX_HOME(인증 링크 · gpt-skills 사본 · 모델 목록 캐시 사본 · 권한 프로필) ·
-  #   저장소 사본 read · 플러그인 트리 deny(옛 기록 recorded/ 가 새 기록으로 새지 않게). 래퍼는 --config-permissions 로 sandbox_mode 를 넘기지 않는다.
+  #   저장소 사본 read · 플러그인 트리 deny(옛 기록 recorded/ 가 새 기록으로 새지 않게). 정문 kind sprint-contract-record 가 래퍼에 --config-permissions 를
+  #   넣어 sandbox_mode 를 넘기지 않는다. 역할 본문은 resolver 가 격리 CODEX_HOME 의 스킬 사본으로 푼다(Tier 2a) — 정문은 $T 에서 부른다(cwd 의 CLAUDE.md 를 타지 않게)
   #   ⛔ 가짜 HOME 이면 래퍼의 선택 폴더가 격리 홈 아래로 바뀐다 — 런처처럼 실제 홈 기준 선택 폴더를 명시로 넘긴다
   REPO_DIR="$(cd "$T/repo" && pwd -P)"
   ISO="$(bash "$R/scripts/gpt_independent.sh" iso --repo "$REPO_DIR" --deny "$R")" && [ -d "$ISO/gpt-home" ] || { echo "UNRUN: 격리 폴더 생성 실패(gpt_independent.sh iso)"; exit 2; }
   trap 'bash "$R/scripts/gpt_independent.sh" cleanup --iso "$ISO" >/dev/null 2>&1; rm -rf "$T"' EXIT
-  env HOME="$ISO/home" CODEX_HOME="$ISO/gpt-home" FZ_TELEMETRY_DIR="$T/tel" FZ_GPT_CHOICE_DIR="${FZ_GPT_CHOICE_DIR:-$HOME/.fz/gpt-choice}" \
-    bash "$R/scripts/gpt-exec.sh" exec --cd "$REPO_DIR" --out "$T/live.yaml" --prompt-file "$T/task.txt" --effort high --gpt-skill architect \
-    --inject-skill "$ISO/gpt-home/skills/fz-architect/SKILL.md" --config-permissions || { echo "FAIL  --live: 래퍼 exit $? (기록하지 않는다)"; exit 1; }
+  ( cd "$T" && env HOME="$ISO/home" CODEX_HOME="$ISO/gpt-home" FZ_TELEMETRY_DIR="$T/tel" FZ_GPT_CHOICE_DIR="${FZ_GPT_CHOICE_DIR:-$HOME/.fz/gpt-choice}" \
+    bash "$R/scripts/gpt-call.sh" sprint-contract-record --cd "$REPO_DIR" --out "$T/live.yaml" --prompt-file "$T/task.txt" --effort high ) \
+    || { echo "FAIL  --live: 정문 exit $? (기록하지 않는다)"; exit 1; }
   check_format "$T/live.yaml" >/dev/null || { echo "FAIL  --live: 산출물이 SC 형식이 아니다 — $(check_format "$T/live.yaml")"; cp "$T/live.yaml" "$REC/sc-output.rejected.yaml"; exit 1; }
   cp "$T/live.yaml" "$REC/sc-output.yaml"
   python3 - "$REC/provenance.json" "$(sha "$ARCH")" "$(sha "$T/task.txt")" "$(codex --version 2>/dev/null | head -1)" "$ISO/gpt-home/config.toml" <<'PY'
@@ -224,6 +226,7 @@ case " $* " in *sandbox_mode*) s=1 ;; *) s=0 ;; esac
 printf 'CALL HOME=%s CODEX_HOME=%s DENY=%s SBX=%s\n' "${HOME:-}" "${CODEX_HOME:-}" "${d:-0}" "$s" >> "$FZ_SC_CALLS"
 [ -e "$FZ_SC_CALLS.toml" ] || cp "${CODEX_HOME:-/nonexistent}/config.toml" "$FZ_SC_CALLS.toml" 2>/dev/null
 [ -e "$FZ_SC_CALLS.cwd" ] || { p=""; for a in "$@"; do [ "$p" = "-C" ] && printf '%s\n' "$a" > "$FZ_SC_CALLS.cwd"; p="$a"; done; }
+[ -e "$FZ_SC_CALLS.label" ] || printf '%s\n' "${FZ_GPT_CALL_LABEL:--}" > "$FZ_SC_CALLS.label"   # 정문 경유 표지 — gpt-call.sh 가 kind 를 env 로 넘긴다
 exec "$FZ_SC_SHIM/codex" "$@"
 WRAP
   chmod +x "$T/lw/codex"
@@ -247,6 +250,23 @@ WRAP
   case "$LP" in "isolated "[1-9]*) ok "live-iso-provenance — 기록에 격리 증거(격리 config 의 deny 경로 $(printf '%s' "$LP" | cut -d' ' -f2)개)" ;;
     *) no "live-iso-provenance — 기록의 격리 표기 '${LP:-없음}'(자기 보고가 아니라 격리 config 의 deny 수여야 한다)" ;; esac
   [ "$LISO" = 1 ] && [ ! -e "$LI" ] && ok "live-iso-cleanup — 재녹화 뒤 격리 폴더가 남지 않는다" || no "live-iso-cleanup — 격리 폴더 '${LI:-없음}' 가 남았거나 격리가 아니다"
+  LLAB="$(cat "$T/calls.txt.label" 2>/dev/null)"
+  [ "$LLAB" = "sprint-contract-record" ] && ok "f614-live-gate-kind — 재녹화 호출이 정문 kind sprint-contract-record 로 돈다(래퍼 직접 호출 아님)" \
+    || no "f614-live-gate-kind — 첫 호출의 정문 라벨 '${LLAB:-없음}'"
+  # F-614 — 격리 인자는 레지스트리가 갖는다: 호출자가 --config-permissions 를 넘기면 정문이 10('not a caller input') · CLI 미호출.
+  #   레지스트리가 넣은 --config-permissions 는 진짜로 걸린다 — 격리 권한 프로필이 없는 CODEX_HOME(인증만)에서 부르면 래퍼가 11 · CLI 미호출
+  mkdir -p "$T/f614" && printf 'x\n' > "$T/f614/p.txt"
+  f614() { env PATH="$R/tests/fixtures/gpt/_shim:$PATH" HOME="$T/f614" CODEX_HOME="$T/lgh" FZ_TELEMETRY_DIR="$T/f614/no-tel" FZ_GPT_CHOICE_DIR="$T/no-choice" \
+    FZ_SHIM_CAPTURE="$T/f614/argv-$1.json" bash "$R/scripts/gpt-call.sh" sprint-contract-record --cd "$T/f614" --out "$T/f614/$1.yaml" --prompt-file "$T/f614/p.txt" "${@:2}" \
+    > "$T/f614/$1.out" 2> "$T/f614/$1.err"; }
+  f614 caller --config-permissions; FRC=$?
+  [ "$FRC" = 10 ] && grep -q 'not a caller input' "$T/f614/caller.err" && [ ! -e "$T/f614/argv-caller.json" ] \
+    && ok "f614-caller-flag-refused — 호출자가 넘긴 --config-permissions 는 sprint-contract-record 에서도 exit 10 · 'not a caller input' · CLI 미호출" \
+    || no "f614-caller-flag-refused — exit $FRC · $(tail -1 "$T/f614/caller.err")"
+  f614 noprofile; FRC=$?
+  [ "$FRC" = 11 ] && grep -q 'GATE-FAIL(11): --config-permissions' "$T/f614/noprofile.err" && [ ! -e "$T/f614/argv-noprofile.json" ] \
+    && ok "f614-registry-flag-enforced — 권한 프로필 없는 CODEX_HOME 이면 래퍼가 exit 11 · CLI 미호출(레지스트리가 넣은 --config-permissions 가 걸렸다)" \
+    || no "f614-registry-flag-enforced — exit $FRC · $(tail -1 "$T/f614/noprofile.err")"
 fi
 
 # ⑤ iso 사전 게이트 — 가짜 HOME(.claude 만) · 실제 GPT 홈 대신 임시 인증 파일(CODEX_HOME) · 이 러너의 임시 폴더($T) 안 TMPDIR 로

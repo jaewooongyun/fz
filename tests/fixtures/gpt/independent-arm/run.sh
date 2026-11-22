@@ -240,6 +240,55 @@ run audpat "$HERE/sample-plan-ok.json" "$T/r-pattern.jsonl" plan --requirement "
 check "감사(정규식 패턴 'review-report\\.md' 검색은 참조가 아니다): exit 0" "$(rc audpat)" 0
 run audsq "$HERE/sample-plan-ok.json" "$T/r-sq.jsonl" plan --requirement "$IN/requirement.md"
 check "감사(JS 작은따옴표 명령의 산출물 참조): exit 15" "$(rc audsq)" 15
+# ④b-2 F-596 — 허용 저장소 안에서 금지 경로 문자열을 '찾는' rg · grep 은 참조가 아니다(패턴 자리 낱말은 세 규칙에서 빠진다 · 적중 0).
+#   ⛔ 경로 인자 · 실제 읽기 · 허용 밖 경로 인자 · 못 읽는 옵션(--pre) · cd 뒤 상대 경로는 그대로 15 · '금지 산출물 참조'(닫힌 쪽으로 실패)
+f596() {   # $1=셀 · $2=명령 → 'exit|첫 적중 규칙'
+  roll "$T/r-$1.jsonl" 1 "$2"
+  run "$1" "$HERE/sample-plan-ok.json" "$T/r-$1.jsonl" plan --requirement "$IN/requirement.md" --repo "$H/dev/repo"
+  printf '%s|%s' "$(rc "$1")" "$(python3 -c 'import json,sys; h=json.load(open(sys.argv[1])).get("hits") or []; print(h[0]["rule"] if h else "-")' "$T/c-$1/out/A-$1.audit.json" 2>/dev/null || echo no-audit)"
+}
+check "f596-search-pattern-rg — rg -e '~/(\\.claude/…)' <repo> 는 적중 0 · exit 0" "$(f596 f596-rg "rg -n --hidden -e '~/(\\.claude/(hooks|projects|agent-memory)|\\.codex/)' $HREAL/dev/repo")" "0|-"
+check "f596-search-pattern-grep — grep -rnE '\\.claude/…' <repo>/src 는 적중 0 · exit 0" "$(f596 f596-grep "grep -rnE '\\.claude/(projects|hooks)' $HREAL/dev/repo/src | head -20")" "0|-"
+check "f596-path-arg-hit — rg -n TODO <repo>/.claude/ (경로 인자)는 15" "$(f596 f596-path "rg -n TODO $HREAL/dev/repo/.claude/")" "15|금지 산출물 참조"
+check "f596-pattern-and-forbidden-path-hit — rg '\\.claude/' <home>/.claude/projects 는 15" "$(f596 f596-patpath "rg -n '\\.claude/' $HREAL/.claude/projects")" "15|금지 산출물 참조"
+check "f596-real-read-hit — 금지 경로 실제 읽기(cat <home>/.claude/…)는 15" "$(f596 f596-read "cat $HREAL/.claude/projects/p/notes.md")" "15|금지 산출물 참조"
+check "f596-unknown-option-fail-closed — 표에 없는 옵션(--pre)이면 패턴을 가르지 않는다(15)" "$(f596 f596-opt "rg --pre cat -n '\\.claude/' $HREAL/dev/repo")" "15|금지 산출물 참조"
+check "f596-cd-relative-fail-closed — cd 뒤 상대 경로 검색은 패턴을 가르지 않는다(15)" "$(f596 f596-cd "cd $HREAL/dev/repo && rg -n '\\.claude/' .")" "15|금지 산출물 참조"
+check "f596-quoted-operator-is-a-word — 따옴표 안 '|' 는 파이프가 아니다: cat '|' rg review-report.md 는 cat 하나의 읽기(15 · GPT check 8.5 P2)" "$(f596 f596-qop "cat '|' rg review-report.md")" "15|금지 산출물 참조"
+check "f596-escaped-operator-is-a-word — 역슬래시로 막은 ';' 도 낱말이다: cat \\; rg review-report.md 는 15" "$(f596 f596-eop "cat \\; rg review-report.md")" "15|금지 산출물 참조"
+check "f596-real-pipe-still-splits — 따옴표 밖 파이프 뒤 rg 패턴은 그대로 면제(0)" "$(f596 f596-pipe "cat $HREAL/dev/repo/README.md | rg -n 'review-report\\.md'")" "0|-"
+# ④b-3 F-595 — 과제 프롬프트에 입력 폴더 읽기 허용 줄 · 감사 inputRefs(입력 참조 관측치 — 전체 열람 증명 아님 · rollout 없으면 "unknown")
+check "f595-prompt-input-allowed — 과제에 '상위 폴더가 막혀 있어도 입력 폴더 읽기 허용' 줄 1 · 읽기 제한 줄도 남는다" \
+  "$(count plan '상위 폴더(임시 루트)가 막혀 있어도 읽기가 허용돼 있다')|$(count plan '읽기는 권한 프로필로 제한돼 있다')" "1|1"
+check "f595-input-refs-cwd-input — 작업 폴더가 입력 폴더(plan · --repo 없음)면 상대 경로 입력 읽기(cat requirement.md)를 센다" "$(audit plan inputRefs)" 1
+check "f595-input-refs-zero — 저장소만 읽은 run(--repo) 은 0" "$(audit audrepo inputRefs)" 0
+roll "$T/r-headcmd.jsonl" 1 "head -1 $HREAL/dev/repo/src/a.ts"
+run f595-headcmd "$HERE/sample-review-ok.json" "$T/r-headcmd.jsonl" review --diff "$IN/diff.patch" --head "$IN/head" --repo "$H/dev/repo"
+check "f595-input-refs-command-name — 작업 폴더가 입력 폴더여도 명령 이름(head)은 입력 head/ 참조가 아니다(0)" "$(rc f595-headcmd)|$(audit f595-headcmd inputRefs)" "0|0"
+run f595-norollout "$HERE/sample-plan-ok.json" "" plan --requirement "$IN/requirement.md"
+check "f595-input-refs-unknown — rollout 이 없으면(추적 불가) \"unknown\" · exit 15(격리 미적용)" "$(rc f595-norollout)|$(audit f595-norollout inputRefs)" "15|unknown"
+#   --repo 가 있으면 작업 폴더가 저장소라 입력은 절대 경로로만 닿는다 — 가짜 CLI 앞에 호출 시점의 격리 폴더(CODEX_HOME 의 부모)로 rollout 을 쓰는 래퍼를 둔다
+mkdir -p "$T/isobin"; cat > "$T/isobin/codex" <<'WRAP'
+#!/bin/bash
+case "${1:-} ${2:-}" in "login status"*|"--version "*) exec "$F595_SHIM/codex" "$@" ;; esac
+if [ -n "${CODEX_HOME:-}" ]; then
+  mkdir -p "$CODEX_HOME/sessions/2026/09/28"
+  python3 - "$CODEX_HOME/sessions/2026/09/28/rollout-iso.jsonl" "$F595_HOME" "cat ${CODEX_HOME%/gpt-home}/input/snapshot/snap-ok/consumer.ts" <<'PY'
+import json, sys
+f, home, cmd = sys.argv[1:4]
+ents = [{"path": {"type": "path", "path": home}, "access": "deny"}, {"path": {"type": "special", "value": {"kind": "root"}}, "access": "read"}]
+rows = [{"type": "session_meta", "payload": {"id": "x"}},
+        {"type": "turn_context", "payload": {"permission_profile": {"type": "managed", "file_system": {"type": "restricted", "entries": ents}}}},
+        {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": "tools.exec_command({cmd:" + json.dumps(cmd) + "})"}}]
+open(f, "w", encoding="utf-8").write("\n".join(json.dumps(r) for r in rows) + "\n")
+PY
+fi
+exec "$F595_SHIM/codex" "$@"
+WRAP
+chmod +x "$T/isobin/codex"
+PATH="$T/isobin:$PATH" F595_SHIM="$R/tests/fixtures/gpt/_shim" F595_HOME="$HREAL" \
+  run f595-abs "$HERE/sample-plan-ok.json" "" plan --requirement "$IN/requirement.md" --snapshot "$IN/snap-ok" --repo "$H/dev/repo"
+check "f595-input-refs-absolute — --repo 실행에서 격리 입력 폴더 절대 경로를 읽은 명령 1 · exit 0" "$(rc f595-abs)|$(audit f595-abs inputRefs)" "0|1"
 # ④c 재귀 검색 규칙 문자열 단위 — /Users 경로(macOS 저장소 모양). ⛔ 파일을 만들지 않는다 — 실제 홈을 건드리지 않는다
 #    ④b 의 가짜 홈은 /Users 밖이라 옛 결함(/Users 아래 전부 적중)을 재현하지 못한다 — 규칙 블록을 직접 꺼내 잰다
 UNIT="$(python3 - "$L" <<'UPY'

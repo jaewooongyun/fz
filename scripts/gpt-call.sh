@@ -9,6 +9,7 @@
 #       gpt-call.sh review --cd "$GIT_ROOT" --out "$F" --base "$BASE_BRANCH"
 #       gpt-call.sh verify-cross --audit "$AUDIT" --cd "$GIT_ROOT" --out "$OUT" --prompt-file "$P_VERIFY" --prompt-out "$P_CROSS"
 #       gpt-call.sh independent-review --diff "$D" --deny "$WORK_DIR" --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
+#       gpt-call.sh peer-independent-review --evidence-root "$WORK_DIR" --tier "$TIER" --diff "$D" --arm gpt --run-id "$RUN" --out-dir "$WORK_DIR/gpt-independent"
 #   ⛔ 정책 플래그(-p · --profile · --ignore-user-config · --config-permissions · -c · --schema · --inject-skill · --gpt-skill(-path) ·
 #      --ephemeral · --sandbox)는 거부(10). --model · --effort 는 값 그대로 어댑터에 넘긴다(E1 — 판정은 래퍼).
 #
@@ -30,8 +31,10 @@
 #       18 = GPT 미사용 — 어댑터가 CLI 를 부르지 않았다(세션 선택 off · 입력 --model off · GPT CLI 없음 · stderr 'GPT-OFF: <사유> — …').
 #            측정 실패가 아니다 — 소비자는 그 단계를 건너뛰고 [GPT 미사용 — 사유] 를 남긴다(정본 modules/gpt-strategy.md § GPT 미사용).
 #            판정은 어댑터 몫이다 — 정문은 --model 값을 그대로 넘기고(E1) 사용법 거부(10 · 11)가 그보다 먼저다
-#       정문 자신: 10 사용법(모르는 kind · 입력 누락/금지/미지 · 실험 kind 에 --experimental 없음 · 같은 --out 동시 · 상위 폴더 없음)
-#                  11 레지스트리 · 의존성(python3 없음 · 레지스트리 손상 · resolver 오류 · 합성 실패 · 어댑터 없음 · 라운드 원장 판정 불가) · 128+N 신호
+#       정문 자신: 10 사용법(모르는 kind · 입력 누락/금지/미지 · 실험 kind 에 --experimental 없음 · 같은 --out 동시 · 상위 폴더 없음 ·
+#                     peer-independent-review 의 근거 폴더 결속 불일치(다른 Tier · 다른 리뷰의 diff) · 근거 슬롯 미충족)
+#                  11 레지스트리 · 의존성(python3 없음 · 레지스트리 손상 · resolver 오류 · 합성 실패 · 어댑터 없음 · 라운드 원장 판정 불가 ·
+#                     근거 슬롯 검사기 판정 불가) · 128+N 신호
 #                  19 재검증 라운드 거부 — stderr 'GPT-ROUNDS: <budget-exhausted|same-input|recall-used> — …' · 어댑터를 띄우지 않았다.
 #                     측정 실패도 통과도 아니다 — budget-exhausted 는 미해결로 보고한다(정본 modules/cross-validation.md § 재검증 라운드 상한).
 #                     FZ_GPT_ARTIFACT 값 · FZ_WORK_DIR 폴더가 틀리면 10 이다
@@ -67,7 +70,7 @@ PD="$(mktemp -d "${TMPDIR:-/tmp}/fz-gpt-call.XXXXXX")" || die 11 "계획 폴더 
 python3 "$HERE/gpt_kinds.py" resolve --plan-dir "$PD" "$@"; RC=$?
 case "$RC" in 0|10|11) ;; *) echo "GPT-CALL-FAIL(11): resolver 가 계약 밖 종료 $RC 로 끝났다" >&2; RC=11 ;; esac
 
-ADAPTER="" LOCK="" SESSION_IN="" ADAPTER_HOME="" CLEANUP_ISO=""
+ADAPTER="" LOCK="" SESSION_IN="" ADAPTER_HOME="" CLEANUP_ISO="" EVIDENCE_ROOT="" EVIDENCE_TIER="" EVIDENCE_DIFF="" EVIDENCE_STEM=""
 if [ -f "$PD/meta" ]; then
   while IFS= read -r line; do
     case "$line" in
@@ -76,6 +79,10 @@ if [ -f "$PD/meta" ]; then
       SESSION_IN=*) SESSION_IN="${line#SESSION_IN=}" ;;
       CODEX_HOME=*) ADAPTER_HOME="${line#CODEX_HOME=}" ;;
       CLEANUP_ISO=*) CLEANUP_ISO="${line#CLEANUP_ISO=}" ;;
+      EVIDENCE_ROOT=*) EVIDENCE_ROOT="${line#EVIDENCE_ROOT=}" ;;
+      EVIDENCE_TIER=*) EVIDENCE_TIER="${line#EVIDENCE_TIER=}" ;;
+      EVIDENCE_DIFF=*) EVIDENCE_DIFF="${line#EVIDENCE_DIFF=}" ;;
+      EVIDENCE_STEM=*) EVIDENCE_STEM="${line#EVIDENCE_STEM=}" ;;
     esac
   done < "$PD/meta"
 fi
@@ -106,6 +113,17 @@ if [ "$RC" -ne 0 ]; then
   exit "$RC"
 fi
 [ -f "$HERE/$ADAPTER" ] || { stale_cleanup; iso_cleanup; die 11 "어댑터 없음: $HERE/$ADAPTER"; }
+# 근거 폴더 사전 검사(F-646 · 레지스트리 pre_check evidence-slots — peer-independent-review) — 어댑터 · 라운드 예약 **전에** 정문이 본다:
+#   폴더 결속(tier.txt Tier == --tier · --diff 바이트 == 폴더의 review-surface.patch, 없으면 diff.patch) → check_evidence_slots.py --tier.
+#   거부면 GPT 를 띄우지 않는다(CLI 호출 0). 판정 · 메시지는 gpt_kinds.py evidence-check 몫이다. ⛔ 통과 표식 파일을 남기지 않는다 — 호출마다 다시 본다
+if [ -n "$EVIDENCE_ROOT" ]; then
+  python3 "$HERE/gpt_kinds.py" evidence-check --root "$EVIDENCE_ROOT" --tier "$EVIDENCE_TIER" --diff "$EVIDENCE_DIFF" --stem "$EVIDENCE_STEM"; EV_RC=$?
+  case "$EV_RC" in
+    0) ;;
+    10|11) stale_cleanup; iso_cleanup; exit "$EV_RC" ;;
+    *) stale_cleanup; iso_cleanup; die 11 "근거 폴더 사전 검사가 계약 밖 종료 $EV_RC 로 끝났다 — GPT 를 띄우지 않았다" ;;
+  esac
+fi
 if [ -f "$PD/compose.json" ]; then
   python3 "$HERE/gpt_kinds.py" compose --plan-dir "$PD" || { stale_cleanup; iso_cleanup; die 11 "프롬프트 합성 실패"; }
 fi

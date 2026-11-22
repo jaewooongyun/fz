@@ -13,6 +13,10 @@
 #                         ② independent-plan callers 에서 §16 표지를 뺌 ③ plan callers 에 §16 표지를 다시 넣음 — 그 절 체인은 plan 을 부르지 않는다
 #   challenger-roundtrip  두 칸(compiler_verifiable · ruleSource)을 issues · challenges 에 담은 응답이 통과하고
 #                         값이 그대로 남는다 · null 도 통과 · ruleSource 'bogus' 는 거부(exit 1)
+#   peer-independent-gate fz-peer-review Tier 경로의 정문 kind peer-independent-review(F-646) — 실제 정문 · 런처를 가짜 CLI(../_shim)로 돌린다.
+#                         Tier 0 ~ 3 마다 유효 폴더 → exit 0 · CLI 1회 / 슬롯 부재 → 10 · CLI 0회. Tier 1 에서 결속 불일치(다른 리뷰의 diff ·
+#                         이전 Tier 폴더 · tier.txt 없음) · 검사기 실패(tools.md 없음 → 10 · 표를 못 읽는 사본 → 11) · 폴더 없음 → CLI 0회.
+#                         유효 run 은 근거 폴더를 런처 --deny 로 받는다(격리 config 의 deny 줄) · 통과 표식 파일을 남기지 않는다
 # 출력: 셀마다 `<셀>: PASS|FAIL <이유>` · 끝에 `kinds-callers: PASS|FAIL`
 # exit: 0 전건 통과 · 1 단언 실패 · 2 준비 실패(python3 · 파일 부재)
 set -u
@@ -180,6 +184,129 @@ rc, _, msg = validate(bad)
 if rc != 1:
     problems.append(f"ruleSource 'bogus' not rejected as a contract violation (rc={rc})")
 case("challenger-roundtrip", not problems, "; ".join(problems))
+
+# ── peer-independent-gate (F-646) ──────────────────────────────────
+SHIM = os.path.join(ROOT, "tests", "fixtures", "gpt", "_shim")
+SAMPLE = os.path.join(ROOT, "tests", "fixtures", "gpt", "independent-arm", "sample-review-ok.json")
+TIER_SLOTS = {0: ["requirements", "old-new-pairs", "base-behavior"], 1: ["requirements", "old-new-pairs", "base-behavior", "base-patterns"]}
+TIER_SLOTS[2] = TIER_SLOTS[1] + ["producer-consumer", "convention-samples"]
+TIER_SLOTS[3] = TIER_SLOTS[2] + ["caller-analysis", "semantic-mapping", "deletion-verification"]
+TOOLS = "[Serena 미사용 — fixture] · context7 목록✓ · sc 목록✓ · seq 목록✓ · pr-review 목록✓ · 스택 스킬 없음\n"
+DA = "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-a\n+b\n"
+DB = "diff --git a/src/z.ts b/src/z.ts\n--- a/src/z.ts\n+++ b/src/z.ts\n@@ -1 +1 @@\n-y\n+z\n"
+T = os.path.realpath(tempfile.mkdtemp(prefix="kinds-callers-pir-"))
+H = os.path.join(T, "home")
+os.makedirs(os.path.join(H, ".codex"))
+open(os.path.join(H, ".codex", "auth.json"), "w").write('{"fake":"auth"}\n')
+
+
+def evdir(name, tier, slots, diff=DA, tier_txt=True, tools=True):
+    d = os.path.join(T, name)
+    os.makedirs(os.path.join(d, "evidence"))
+    if tier_txt:
+        open(os.path.join(d, "tier.txt"), "w").write(f"{tier}\nrationale: fixture\n")   # 실제 기록 꼴(peer-review-tiers.md — 첫 줄 숫자)
+    for sl in slots:
+        body = "## 호출\n- fixture\n\n## 구현\n해당 없음 — fixture\n" if sl == "caller-analysis" else f"# {sl}\nfixture\n"
+        open(os.path.join(d, "requirements.md" if sl == "requirements" else os.path.join("evidence", sl + ".md")), "w").write(body)
+    if tools:
+        open(os.path.join(d, "evidence", "tools.md"), "w").write(TOOLS)
+    json.dump({"kind": "pr", "ref": "pr-1", "sha": "abc1234def5678"}, open(os.path.join(d, "target.json"), "w"))
+    open(os.path.join(d, "diff.patch"), "w").write(diff)
+    return d
+
+
+roll = os.path.join(T, "roll.jsonl")
+rows = [{"type": "session_meta", "payload": {"id": "x"}},
+        {"type": "turn_context", "payload": {"permission_profile": {"type": "managed", "file_system": {"type": "restricted", "entries": [
+            {"path": {"type": "path", "path": H}, "access": "deny"}, {"path": {"type": "special", "value": {"kind": "root"}}, "access": "read"}]}}}},
+        {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": "tools.exec_command({cmd:\"cat diff.patch\"})"}}]
+open(roll, "w").write("\n".join(json.dumps(r) for r in rows) + "\n")
+open(os.path.join(T, "current.patch"), "w").write(DA)
+
+
+def gate(cell, root, tier, diff, tree=ROOT, stem_of=None):
+    """정문 peer-independent-review 한 번 → (exit, CLI 호출 수, stderr, 격리 config 사본 · 없으면 ''). stem_of = 다른 셀의 --out-dir · --run-id 를 다시 쓴다."""
+    out = os.path.join(T, "out-" + (stem_of or cell))
+    os.makedirs(out, exist_ok=True)
+    cap, cfg_copy = os.path.join(T, f"argv-{cell}.json"), os.path.join(T, f"cfg-{cell}.toml")
+    wrap = os.path.join(T, f"bin-{cell}")
+    os.makedirs(wrap)
+    with open(os.path.join(wrap, "codex"), "w") as f:   # 호출 시점의 격리 config 를 사본으로 남기고 shim 으로 넘긴다
+        f.write('#!/bin/bash\ncase "${1:-} ${2:-}" in "login status"*|"--version "*) exec "$PIR_SHIM/codex" "$@" ;; esac\n'
+                '[ -n "${CODEX_HOME:-}" ] && cp "$CODEX_HOME/config.toml" "$PIR_CFG" 2>/dev/null\nexec "$PIR_SHIM/codex" "$@"\n')
+    os.chmod(os.path.join(wrap, "codex"), 0o755)
+    env = {k: v for k, v in os.environ.items() if k not in ("CODEX_HOME", "FZ_GPT_CHOICE_DIR", "FZ_GPT_ARTIFACT", "FZ_WORK_DIR", "FZ_CLAUDE_REALS",
+                                                            "OPENAI_API_KEY", "CODEX_API_KEY")}
+    env.update(PATH=wrap + ":" + SHIM + ":" + os.environ.get("PATH", ""), HOME=H, TMPDIR=os.path.join(T, "tmp"), CLAUDE_CODE_SESSION_ID="kc-pir-no-choice",
+               FZ_RUN_STATE=os.path.join(T, "runs"), FZ_TELEMETRY_DIR=os.path.join(T, "tel"), FZ_SHIM_CAPTURE=cap, FZ_SHIM_OUTPUT=open(SAMPLE).read(),
+               FZ_SHIM_ROLLOUT=roll, PIR_SHIM=SHIM, PIR_CFG=cfg_copy, PYTHONDONTWRITEBYTECODE="1")
+    os.makedirs(env["TMPDIR"], exist_ok=True)
+    r = subprocess.run(["bash", os.path.join(tree, "scripts", "gpt-call.sh"), "peer-independent-review", "--evidence-root", root, "--tier", str(tier),
+                        "--diff", diff, "--arm", "A", "--run-id", stem_of or cell, "--out-dir", out], env=env, capture_output=True, text=True, timeout=300)
+    n = 1 if os.path.isfile(cap) and os.path.getsize(cap) else 0
+    return r.returncode, n, r.stderr, (open(cfg_copy, encoding="utf-8").read() if os.path.isfile(cfg_copy) else "")
+
+
+def proxy_tree():
+    """표를 못 읽는 사본 — modules/peer-review-tiers.md 만 § Tier-Adaptive Evidence 머리를 지운 사본, 나머지는 링크(검사기가 UNRUN 2 로 끝난다)."""
+    px = os.path.join(T, "proxy")
+    os.makedirs(px)
+    for name in os.listdir(ROOT):
+        if name not in ("scripts", "modules", ".git"):
+            os.symlink(os.path.join(ROOT, name), os.path.join(px, name))
+    for sub in ("scripts", "modules"):
+        os.makedirs(os.path.join(px, sub))
+        for name in os.listdir(os.path.join(ROOT, sub)):
+            src = os.path.join(ROOT, sub, name)
+            if sub == "modules" and name == "peer-review-tiers.md":
+                open(os.path.join(px, sub, name), "w", encoding="utf-8").write(open(src, encoding="utf-8").read().replace("## Tier-Adaptive Evidence", "## (fixture)"))
+            else:
+                os.symlink(src, os.path.join(px, sub, name))
+    return px
+
+
+problems = []
+try:
+    for tier in (0, 1, 2, 3):
+        v = evdir(f"t{tier}-valid", tier, TIER_SLOTS[tier])
+        rc, n, err, cfg = gate(f"t{tier}-valid", v, tier, os.path.join(v, "diff.patch"))
+        if (rc, n) != (0, 1):
+            problems.append(f"Tier {tier} valid: rc={rc} cli={n} {err.strip().splitlines()[-1:] if err.strip() else ''}")
+        elif f'"{v}" = "deny"' not in cfg:
+            problems.append(f"Tier {tier} valid: evidence folder is not a launcher deny in the isolation config")
+        m = evdir(f"t{tier}-slot", tier, TIER_SLOTS[tier][:-1])
+        rc, n, err, _ = gate(f"t{tier}-slot", m, tier, os.path.join(m, "diff.patch"))
+        if rc != 10 or n != 0 or "evidence slots" not in err:
+            problems.append(f"Tier {tier} slot missing: rc={rc} cli={n}")
+    # 같은 stem 을 거부되는 사전 검사로 다시 부르면 옛 성공 감사가 실패 감사로 덮인다 — 병합기가 옛 결과를 받지 않게(GPT check 8.5 P2)
+    a1 = os.path.join(T, "out-t1-valid", "A-t1-valid.audit.json")
+    before = json.load(open(a1)).get("exit") if os.path.isfile(a1) else None
+    m1 = evdir("t1-reslot", 1, TIER_SLOTS[1][:-1])
+    rc, n, _, _ = gate("t1-reslot", m1, 1, os.path.join(m1, "diff.patch"), stem_of="t1-valid")
+    after = json.load(open(a1)).get("exit") if os.path.isfile(a1) else None
+    if (before, rc, n, after) != (0, 10, 0, 10):
+        problems.append(f"refused re-run of a valid stem: audit exit {before} -> {after} · rc={rc} cli={n} (want 0 -> 10 · 10 · 0)")
+    o = evdir("other-review", 1, TIER_SLOTS[1], diff=DB)
+    p2 = evdir("prior-tier", 2, TIER_SLOTS[2])
+    nt = evdir("no-tier-file", 1, TIER_SLOTS[1], tier_txt=False)
+    tm = evdir("tools-missing", 1, TIER_SLOTS[1], tools=False)
+    for cell, root, tier, diff, want_rc, want_msg in (
+            ("other-review", o, 1, os.path.join(T, "current.patch"), 10, "belongs to another review"),
+            ("prior-tier", p2, 1, os.path.join(p2, "diff.patch"), 10, "another Tier"),
+            ("no-tier-file", nt, 1, os.path.join(nt, "diff.patch"), 10, "no readable Tier"),
+            ("tools-missing", tm, 1, os.path.join(tm, "diff.patch"), 10, "evidence slots"),
+            ("no-dir", os.path.join(T, "no-such-dir"), 1, os.path.join(T, "current.patch"), 10, "not a folder"),
+            ("checker-unrun", evdir("checker-unrun", 1, TIER_SLOTS[1]), 1, None, 11, "could not judge")):
+        diff = diff or os.path.join(T, "checker-unrun", "diff.patch")
+        rc, n, err, _ = gate(cell, root, tier, diff, tree=proxy_tree() if cell == "checker-unrun" else ROOT)
+        if rc != want_rc or n != 0 or want_msg not in err:
+            problems.append(f"{cell}: rc={rc}(want {want_rc}) cli={n} msg={'yes' if want_msg in err else 'no'}")
+    marks = [os.path.join(dp, f) for dp, _, fs in os.walk(T) for f in fs if "slots-ok" in f]
+    if marks:
+        problems.append(f"a pass marker file was written: {marks[:2]}")
+finally:
+    shutil.rmtree(T, ignore_errors=True)
+case("peer-independent-gate", not problems, "; ".join(problems))
 
 print(f"kinds-callers: {'PASS' if not fails else 'FAIL'}")
 sys.exit(0 if not fails else 1)

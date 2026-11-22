@@ -2,6 +2,7 @@
 # modes: --scope caller=manual last-pass=7b89bd4 result=launcher 9 PASS(24.8s)(2026-11-05 배선 감사) · wrapper 는 기본 실행
 # 실패 주입 — GPT 호출 경로의 실패가 "완료" 로 보고되지 않는다.
 #   --scope wrapper (S24a · 기본): 래퍼(gpt-exec.sh)에 CLI 비정상 종료 · 빈 출력 · 스키마 위반을 주입한다.
+#     review --base 의 변경 파일 수(F-628 — 작업 트리 · 인덱스 · 미추적 포함 · merge-base 조회 실패 = 11 · CLI 미호출)도 본다.
 #     판정: 래퍼 exit 가 12 / 13 / 14 이고, 성공 표시(GATE-PASS)를 내지 않으며, stderr 에 GATE-FAIL 이 있다.
 #   --scope launcher (S24b): 독립 첫 패스 런처(gpt_independent.sh)를 실제로 실패시키고 그 산출을 소비자에 넣는다 —
 #     review 는 review_merge.py(시간 초과 · 오염 · 격리 미적용 · stale), plan 은 plan_divergence.py(planner 거부 · 시간 초과 · 금지 입력).
@@ -159,6 +160,39 @@ if [ "$rc" -eq 11 ] && grep -q 'GATE-FAIL(11): --out 상위 폴더 없음' "$d/s
   echo "PASS  --out 상위 폴더 없음 → exit 11 · CLI 미호출"
 else
   echo "FAIL  --out 상위 폴더 없음 — exit $rc(기대 11) · CLI 호출 $([ -e "$d/argv.json" ] && echo 있음 || echo 없음)"; fail=1
+fi
+
+# F-628 — review --base 의 변경 파일 수: merge-base 이후 추적 변경(작업 트리 · 인덱스) + 미추적을 NUL 구분으로 센다 · merge-base 조회 실패는
+#   changed_files=0 이 아니라 exit 11(CLI 미호출). 대조: 깨끗한 트리 0 · base 뒤 커밋 2파일 + 그중 1파일 작업 트리 재수정 = 2(중복 없음)
+gx() { env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e git "$@"; }
+base_review() {   # $1=셀 폴더 · $2=저장소 · $3=base → stdout · stderr · argv 캡처는 셀 폴더에 · 종료값을 돌려준다
+  mkdir -p "$1"
+  env FZ_SHIM_OUTPUT="ok" FZ_SHIM_CAPTURE="$1/argv.json" FZ_TELEMETRY_DIR="$1" FZ_GPT_CHOICE_DIR="$T/no-choice" \
+    bash "$WRAP" review --cd "$2" --out "$1/out.md" --base "$3" > "$1/stdout" 2> "$1/stderr"
+}
+nfiles() { sed -n 's/.*changed_files=\([0-9]*\)개.*/\1/p' "$1/stdout"; }
+GR="$T/f628"; mkdir -p "$GR" && gx -C "$GR" init -q && printf 'x\n' > "$GR/f1" && printf 'x\n' > "$GR/f2" && gx -C "$GR" add f1 f2 && gx -C "$GR" commit -qm base
+GB="$(gx -C "$GR" rev-parse HEAD)"
+base_review "$T/f628-clean" "$GR" "$GB"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(nfiles "$T/f628-clean")" = 0 ] && echo "PASS  f628-base-clean-zero → 깨끗한 트리 · HEAD == base 는 changed_files=0" \
+  || { echo "FAIL  f628-base-clean-zero — exit $rc · changed_files=$(nfiles "$T/f628-clean")"; fail=1; }
+printf 'y\n' >> "$GR/f1"; printf 'n\n' > "$GR/f3"; gx -C "$GR" add f3; printf 'u\n' > "$GR/f4"; printf 'u\n' > "$GR/$(printf 'n\nl')"
+base_review "$T/f628-wt" "$GR" "$GB"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(nfiles "$T/f628-wt")" = 4 ] \
+  && echo "PASS  f628-base-worktree-index-untracked → HEAD == base 에서 작업 트리 수정 1 · 인덱스 새 파일 1 · 미추적 2(줄바꿈 든 이름 1 포함) = 4" \
+  || { echo "FAIL  f628-base-worktree-index-untracked — exit $rc · changed_files=$(nfiles "$T/f628-wt")(기대 4)"; fail=1; }
+printf 'y\n' >> "$GR/f2"; gx -C "$GR" add -A && gx -C "$GR" commit -qm c2 && printf 'z\n' >> "$GR/f1"
+base_review "$T/f628-dedup" "$GR" "$GB"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(nfiles "$T/f628-dedup")" = 5 ] \
+  && echo "PASS  f628-base-committed-plus-worktree-dedup → base 뒤 커밋 5파일 + 그중 1파일 작업 트리 재수정 = 5(중복 없음)" \
+  || { echo "FAIL  f628-base-committed-plus-worktree-dedup — exit $rc · changed_files=$(nfiles "$T/f628-dedup")(기대 5)"; fail=1; }
+GO="$(gx -C "$GR" commit-tree "$(gx -C "$GR" write-tree)" -m orphan)"
+base_review "$T/f628-orphan" "$GR" "$GO"; rc=$?
+if [ "$rc" -eq 11 ] && grep -q 'GATE-FAIL(11): .*merge-base 조회 실패' "$T/f628-orphan/stderr" && ! grep -q 'changed_files=' "$T/f628-orphan/stdout" \
+   && [ ! -e "$T/f628-orphan/argv.json" ]; then
+  echo "PASS  f628-base-no-merge-base-11 → 공통 조상 없는 base 는 exit 11 · changed_files 줄 없음 · CLI 미호출(빈 집합 0 으로 삼키지 않는다)"
+else
+  echo "FAIL  f628-base-no-merge-base-11 — exit $rc(기대 11) · changed_files=$(nfiles "$T/f628-orphan") · CLI 호출 $([ -e "$T/f628-orphan/argv.json" ] && echo 있음 || echo 없음)"; fail=1
 fi
 
 echo

@@ -14,8 +14,14 @@ usage:
       meta keys: ADAPTER (gpt-exec.sh | gpt_independent.sh) · LOCK (OUT for wrapper kinds, empty for independent kinds)
                  · SESSION_IN (--session-file input, kept on gate cleanup) · CODEX_HOME (adapter-only env, empty = inherit)
                  · CLEANUP_ISO (run `gpt_independent.sh cleanup --iso` after the adapter — verify-cross, E3)
+                 · EVIDENCE_ROOT · EVIDENCE_TIER · EVIDENCE_DIFF · EVIDENCE_STEM (registry pre_check evidence-slots — the gate runs evidence-check first)
                  · ERROR (message, on exit 10 / 11)
   gpt_kinds.py compose --plan-dir DIR      write the composed prompt described by DIR/compose.json
+  gpt_kinds.py evidence-check --root R --tier N --diff F [--stem S]
+                                           the gate's pre-check of an evidence-slots kind (F-646 · peer-independent-review): folder bound
+                                           to this request (tier.txt Tier · --diff bytes) then check_evidence_slots.py R --tier N.
+                                           exit 0 · 10 not bound / slots fail · 11 unreadable / checker could not judge
+                                           · a refusal overwrites S.audit.json with a failed audit (S = the launcher's OUT stem)
   gpt_kinds.py skill-path ROLE             Tier 1 -> 2a -> 2b role SKILL.md path for the caller's cwd / env ('' if none)
   gpt_kinds.py launcher-policy KIND [--frame NAME]
                                            the launcher's policy for an independent kind (R-06 · SC-2): ROLE · SCHEMA ·
@@ -43,11 +49,13 @@ exit: 0 ok · 10 usage (unknown kind, removed kind — the message names the kin
 import ast
 import contextlib
 import glob
+import importlib.util
 import io
 import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -64,6 +72,16 @@ VALUE_INPUTS = {"cd", "out", "prompt-file", "base", "commit", "title", "expected
 FLAG_INPUTS = {"uncommitted"}
 SCOPES = ("base", "uncommitted", "commit")
 FIXED_OK = {"--uncommitted", "--ephemeral"}
+# Per-kind fixed flags beyond FIXED_OK (F-614) — the registry, not the caller, holds an isolation flag for the one kind that needs it.
+# ⛔ Never widen FIXED_OK for this: another kind naming --config-permissions in fixed_args stays Broken (11), and a caller passing it
+#    stays refused for every kind (FORBIDDEN_FLAGS · 10). sprint-contract-record = the fixture re-recorder, which runs the wrapper in the
+#    launcher's isolation home (gpt_independent.sh iso) — the wrapper refuses it (11) without that home's read-only permission profile.
+KIND_FIXED_OK = {"sprint-contract-record": {"--config-permissions"}}
+
+
+def fixed_ok(kind):
+    """Fixed flags a kind may carry: FIXED_OK plus its own KIND_FIXED_OK row."""
+    return FIXED_OK | KIND_FIXED_OK.get(kind, set())
 LAUNCHERS = {"wrapper": ("gpt-exec.sh", ("review", "exec", "resume")), "independent": ("gpt_independent.sh", ("plan", "review"))}
 DELIVERY = {None, "implicit", "inject", "path", "iso-copy"}
 INDEPENDENCE = {"plain", "resumes-session", "isolated-fresh"}
@@ -75,6 +93,12 @@ SPAWN_LINES = {
     "forbid-prompt": "하위 에이전트를 만들지 않는다.",
 }
 INDEP_KEYS = {"required", "optional", "repeatable", "flags", "experimental_only"}
+# Gate pre-checks of an independent kind (F-646 · registry `pre_check`): the check's inputs are the gate's — resolve takes them out of the
+# launcher argv and hands them to the gate in meta (EVIDENCE_*). evidence-slots = peer-independent-review: before the adapter, the gate binds
+# the evidence folder to this request (tier.txt Tier == --tier · --diff bytes == the folder's review-surface.patch, else diff.patch) and runs
+# check_evidence_slots.py on it. ⛔ No marker file — the check runs on every call, so a resumed session cannot ride an old approval.
+PRE_CHECKS = {"evidence-slots": ("evidence-root", "tier")}
+EVIDENCE_PATCHES = ("review-surface.patch", "diff.patch")
 CORE13 = {"review", "check", "verify", "verify-gates", "validate", "final", "adversarial", "drift", "plan", "micro-eval",
           "sprint-contract", "independent-plan", "independent-review"}
 
@@ -202,10 +226,13 @@ def resolve(kind, tokens, env=None, cwd=None, root=ROOT, reg=None):
     if launcher not in LAUNCHERS or k.get("mode") not in LAUNCHERS[launcher][1]:
         raise Broken(f"kind {kind}: bad launcher/mode {launcher}/{k.get('mode')}")
     adapter = LAUNCHERS[launcher][0]
-    plan = {"adapter": adapter, "argv": [], "lock": "", "session_in": "", "codex_home": "", "cleanup_iso": "", "compose": None}
+    plan = {"adapter": adapter, "argv": [], "lock": "", "session_in": "", "codex_home": "", "cleanup_iso": "", "compose": None, "evidence": None}
 
     if launcher == "independent":
-        plan["argv"] = [k["mode"]] + _independent_tokens(kind, k, tokens, reg.get("removed_inputs"))
+        toks = _independent_tokens(kind, k, tokens, reg.get("removed_inputs"))
+        if k.get("pre_check"):
+            toks, plan["evidence"] = _evidence_inputs(kind, k, toks)
+        plan["argv"] = [k["mode"]] + toks
         return plan
 
     got, experimental = parse_inputs(tokens, reg.get("removed_inputs"))
@@ -226,8 +253,8 @@ def resolve(kind, tokens, env=None, cwd=None, root=ROOT, reg=None):
         elif r not in got:
             raise Usage(f"kind {kind} needs --{r}")
     fixed = list(k.get("fixed_args") or [])
-    if any(f not in FIXED_OK for f in fixed):
-        raise Broken(f"kind {kind}: fixed_args outside {sorted(FIXED_OK)}: {fixed}")
+    if any(f not in fixed_ok(kind) for f in fixed):
+        raise Broken(f"kind {kind}: fixed_args outside {sorted(fixed_ok(kind))}: {fixed}")
 
     out = got["out"]
     for key in ("out", "prompt-out"):               # a missing parent is a usage error, not "another run holds the lock"
@@ -293,6 +320,8 @@ def resolve(kind, tokens, env=None, cwd=None, root=ROOT, reg=None):
             argv += [f"--{key}", got[key]]
     if "--ephemeral" in fixed:
         argv += ["--ephemeral"]
+    if "--config-permissions" in fixed:
+        argv += ["--config-permissions"]
     if k.get("schema"):
         sch = os.path.join(root, k["schema"])
         if not os.path.isfile(sch):
@@ -364,6 +393,123 @@ def _independent_tokens(kind, k, tokens, removed=None):
     return out
 
 
+def _evidence_inputs(kind, k, toks):
+    """F-646 — take the pre-check inputs out of the launcher tokens (the launcher does not know them). -> (launcher tokens, evidence).
+    --evidence-root must be a folder and --tier 0-3. The gate isolates the folder: it goes to the launcher as one more --deny (its
+    evidence/*.md are Claude's analysis) unless the caller already denied the same real path."""
+    keys = PRE_CHECKS.get(k.get("pre_check"))
+    if not keys:
+        raise Broken(f"kind {kind}: pre_check {k.get('pre_check')!r} is not one of {sorted(PRE_CHECKS)}")
+    flags = set((k.get("inputs") or {}).get("flags") or [])
+    out, got, i = [], {}, 0
+    while i < len(toks):
+        key = toks[i][2:]
+        if key in flags:
+            out.append(toks[i])
+            i += 1
+            continue
+        if key in keys:
+            got[key] = toks[i + 1]
+        else:
+            out += toks[i:i + 2]
+        i += 2
+    root, tier = got.get("evidence-root", ""), got.get("tier", "")
+    val = lambda f: out[out.index(f) + 1] if f in out and out.index(f) + 1 < len(out) else ""   # noqa: E731
+    arm, run = val("--arm"), val("--run-id")
+    # the launcher's OUT stem (pwd -P of --out-dir · ARM-RUN_ID) — only for components the launcher accepts ([A-Za-z0-9._-]+), so a
+    # refusal never writes outside --out-dir (an absolute or traversing --arm is refused by the launcher, after this point)
+    stem = (os.path.join(os.path.realpath(val("--out-dir")), f"{arm}-{run}")
+            if val("--out-dir") and all(re.fullmatch(r"[A-Za-z0-9._-]+", x) for x in (arm, run)) else "")
+    if tier not in ("0", "1", "2", "3"):
+        _reject_stem(stem, 10)
+        raise Usage(f"--tier must be 0-3 (the peer-review Tier the evidence folder was gathered for) — got {tier!r}")
+    if not os.path.isdir(root):
+        _reject_stem(stem, 10)
+        raise Usage(f"--evidence-root is not a folder: {root} — pass the peer-review WORK_DIR that holds tier.txt · evidence/ · the diff")
+    denied = {os.path.realpath(out[j + 1]) for j in range(len(out) - 1) if out[j] == "--deny"}
+    if os.path.realpath(root) not in denied:
+        out += ["--deny", root]
+    diff = out[out.index("--diff") + 1] if "--diff" in out else ""
+    return out, {"root": root, "tier": tier, "diff": diff, "stem": stem}
+
+
+def evidence_binding(root, tier, diff):
+    """F-646 — is this evidence folder the one gathered for this request? -> (exit, problems): 0 bound · 10 not bound · 11 unreadable.
+    Bound = tier.txt's Tier (check_evidence_slots.tier_from_text — the checker's own six forms) equals --tier, and the --diff bytes equal
+    the folder's review-surface.patch (else diff.patch). Serena or not, target.json or not — a complete folder of another review and a
+    folder gathered for another Tier are both refused."""
+    probs = []
+    try:
+        spec = importlib.util.spec_from_file_location("check_evidence_slots", os.path.join(HERE, "check_evidence_slots.py"))
+        ces = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ces)
+        file_tier = ces.tier_file(root)
+    except (OSError, ImportError, SyntaxError, AttributeError) as e:
+        return 11, [f"evidence binding: cannot read tier.txt with check_evidence_slots.py: {type(e).__name__}: {e}"]
+    if file_tier is None:
+        probs.append(f"{root}/tier.txt has no readable Tier — the folder cannot be bound to this request")
+    elif str(file_tier) != str(tier):
+        probs.append(f"{root}/tier.txt says Tier {file_tier} but the request is Tier {tier} — a folder gathered for another Tier")
+    own = next((os.path.join(root, n) for n in EVIDENCE_PATCHES if os.path.isfile(os.path.join(root, n))), None)
+    try:
+        req = open(diff, "rb").read()
+    except OSError as e:
+        return 11, probs + [f"evidence binding: --diff unreadable: {diff}: {e}"]
+    if own is None:
+        probs.append(f"{root} has no {' / '.join(EVIDENCE_PATCHES)} — the folder cannot be bound to this --diff")
+    elif open(own, "rb").read() != req:
+        probs.append(f"--diff {diff} differs from {own} — the evidence folder belongs to another review")
+    return (10 if probs else 0), probs
+
+
+def _reject_stem(stem, rc):
+    """A refused pre-check overwrites the stem's audit with a failed one (under the launcher's own OUT lock) — otherwise an earlier
+    successful run of the same stem stays mergeable although this call was refused (review_merge.gpt_sidecars reads exit · isolation).
+    A held lock = another run owns the stem · a missing folder = nothing to invalidate: both are left alone."""
+    if not stem or not os.path.isdir(os.path.dirname(stem)):
+        return
+    try:
+        os.mkdir(stem + ".json.lock")
+    except OSError:
+        return
+    try:
+        with open(stem + ".audit.json", "w", encoding="utf-8") as f:
+            json.dump({"exit": rc, "isolationApplied": False,
+                       "note": "evidence pre-check refused — GPT was not started · an earlier result of this stem is not this call's"}, f)
+            f.write("\n")
+    except OSError as e:
+        print(f"GPT-CALL-WARN: could not invalidate {stem}.audit.json ({e})", file=sys.stderr)
+    finally:
+        os.rmdir(stem + ".json.lock")
+
+
+def evidence_check(root, tier, diff, env=None, stem=""):
+    """The gate's pre-check (F-646): binding first (no side effects), then check_evidence_slots.py ROOT --tier N (its stdout goes to stderr ·
+    a PASS records the run start there). -> exit 0 · 10 (not bound · slot violation) · 11 (unreadable · checker could not judge).
+    A refusal (10 · 11) invalidates the stem's earlier audit (_reject_stem)."""
+    rc = _evidence_check(root, tier, diff, env)
+    if rc:
+        _reject_stem(stem, rc)
+    return rc
+
+
+def _evidence_check(root, tier, diff, env=None):
+    rc, probs = evidence_binding(root, tier, diff)
+    for p in probs:
+        print(f"GPT-CALL-{'USAGE' if rc == 10 else 'BROKEN'}({rc}): {p} — GPT was not started", file=sys.stderr)
+    if rc:
+        return rc
+    r = subprocess.run([sys.executable, "-B", os.path.join(HERE, "check_evidence_slots.py"), root, "--tier", str(tier)],
+                       stdout=sys.stderr, stdin=subprocess.DEVNULL, env=env)
+    if r.returncode == 0:
+        return 0
+    if r.returncode == 1:
+        print(f"GPT-CALL-USAGE(10): evidence slots of {root} fail Tier {tier} (check_evidence_slots.py exit 1) — fill them, then call again · GPT was not started", file=sys.stderr)
+        return 10
+    print(f"GPT-CALL-BROKEN(11): check_evidence_slots.py could not judge {root} (exit {r.returncode}) — GPT was not started", file=sys.stderr)
+    return 11
+
+
 def launcher_policy(kind, frame=None, root=ROOT, reg=None):
     """The launcher's policy for an independent kind (R-06 · SC-2) -> {ROLE, SCHEMA, SPAWN_LINE, FRAME}."""
     reg = load(os.path.join(root, "scripts", "gpt-kinds.json")) if reg is None else reg
@@ -408,8 +554,12 @@ def _read_audit(path):
 
 
 def write_plan(d, plan, error=""):
+    ev = plan.get("evidence") or {}
     meta = {"ADAPTER": plan.get("adapter", ""), "LOCK": plan.get("lock", ""), "SESSION_IN": plan.get("session_in", ""),
-            "CODEX_HOME": plan.get("codex_home", ""), "CLEANUP_ISO": plan.get("cleanup_iso", ""), "ERROR": error.replace("\n", " ")}
+            "CODEX_HOME": plan.get("codex_home", ""), "CLEANUP_ISO": plan.get("cleanup_iso", ""),
+            "EVIDENCE_ROOT": ev.get("root", ""), "EVIDENCE_TIER": ev.get("tier", ""), "EVIDENCE_DIFF": ev.get("diff", ""),
+            "EVIDENCE_STEM": ev.get("stem", ""),
+            "ERROR": error.replace("\n", " ")}
     with open(os.path.join(d, "meta"), "w", encoding="utf-8") as f:
         f.write("".join(f"{k}={v}\n" for k, v in meta.items()))
     with open(os.path.join(d, "argv"), "wb") as f:
@@ -488,8 +638,8 @@ def lint(reg=None, root=ROOT):
             v.append(f"{name}: status {k.get('status')!r}")
         if k.get("status") == "experimental" and (not k.get("evidence") or k.get("callers")):
             v.append(f"{name}: an experimental kind needs evidence ids and no default-flow callers")
-        if any(f not in FIXED_OK for f in (k.get("fixed_args") or [])):
-            v.append(f"{name}: fixed_args {k.get('fixed_args')} outside {sorted(FIXED_OK)}")
+        if any(f not in fixed_ok(name) for f in (k.get("fixed_args") or [])):
+            v.append(f"{name}: fixed_args {k.get('fixed_args')} outside {sorted(fixed_ok(name))}")
         if name in SCHEMA_NULL and k.get("schema"):
             v.append(f"{name}: must have schema null — check is judged by severity words (a schema's 'critical': 0 reads as fail) and micro-eval is prose (XE-08)")
         if k.get("mode") == "resume":
@@ -515,6 +665,10 @@ def lint(reg=None, root=ROOT):
                 v.append(f"{name}: an E8 input cannot also be a normal input")
             if k.get("spawn") and k.get("spawn") not in SPAWN_LINES:
                 v.append(f"{name}: spawn {k.get('spawn')!r} has no launcher sentence")
+            if k.get("pre_check") and not set(PRE_CHECKS.get(k["pre_check"]) or ["?"]) <= set(ins.get("required") or []):
+                v.append(f"{name}: pre_check {k['pre_check']!r} needs its inputs {list(PRE_CHECKS.get(k['pre_check']) or [])} as required inputs (F-646)")
+        elif k.get("pre_check"):
+            v.append(f"{name}: pre_check runs before the launcher — an independent kind only (F-646)")
         rec = k.get("recipe")
         if rec:
             rp = os.path.join(root, rec)
@@ -956,12 +1110,15 @@ def self_test():
                   "audit": os.path.join(t, "audit.json"), "prompt-out": os.path.join(t, "pc.txt")}
         os.makedirs(os.path.join(t, "fz-gpt-iso.ABCDEF", "gpt-home"))
         json.dump({"iso": os.path.join(t, "fz-gpt-iso.ABCDEF"), "sessionFile": os.path.join(t, "s")}, open(sample["audit"], "w"))
-        ind = {"diff": pf, "requirement": pf, "arm": "a", "run-id": "r", "out-dir": os.path.join(t, "od")}
+        ev = os.path.join(t, "ev"); os.makedirs(ev)
+        ind = {"diff": pf, "requirement": pf, "arm": "a", "run-id": "r", "out-dir": os.path.join(t, "od"), "evidence-root": ev, "tier": "1"}
         for name, k in reg["kinds"].items():
             if k["launcher"] == "independent":
                 toks = [x for r in k["inputs"]["required"] for x in (f"--{r}", ind[r])]
+                gate = set(PRE_CHECKS.get(k.get("pre_check")) or [])   # pre-check inputs stay with the gate · the folder is denied to the launcher
+                want = [x for r in k["inputs"]["required"] if r not in gate for x in (f"--{r}", ind[r])] + (["--deny", ev] if gate else [])
                 expect(f"resolve {name}", lambda toks=toks, name=name: resolve(name, toks, env, cwd, reg=reg),
-                       ("ok", lambda p, toks=toks, k=k: p["argv"] == [k["mode"]] + toks))
+                       ("ok", lambda p, want=want, k=k: p["argv"] == [k["mode"]] + want))
                 continue
             toks = []
             for r in k["inputs"]["required"]:
@@ -998,6 +1155,57 @@ def self_test():
         expect("--experimental alone on stable independent", lambda: resolve("independent-review", ir + ["--experimental"], env, cwd, reg=reg), ("usage",))
         expect("repeatable --deny", lambda: resolve("independent-review", ir + ["--deny", cwd, "--deny", t], env, cwd, reg=reg), ("ok", lambda p: p["argv"].count("--deny") == 2))
         expect("plan has no --frame", lambda: resolve("independent-plan", ["--requirement", pf, "--arm", "a", "--run-id", "r", "--out-dir", t, "--frame", "repro", "--experimental"], env, cwd, reg=reg), ("usage",))
+        # F-646 — peer-independent-review: the gate's inputs never reach the launcher · the folder is denied once · tier 0-3 · a folder only
+        pir = ["--evidence-root", ev, "--tier", "2", "--diff", pf, "--deny", ev, "--arm", "a", "--run-id", "r", "--out-dir", os.path.join(t, "od")]
+        expect("r4-f646-gate-inputs-out-of-argv", lambda: resolve("peer-independent-review", pir, env, cwd, reg=reg),
+               ("ok", lambda p: "--evidence-root" not in p["argv"] and "--tier" not in p["argv"] and p["argv"].count("--deny") == 1
+                and p["evidence"] == {"root": ev, "tier": "2", "diff": pf, "stem": os.path.join(os.path.realpath(t), "od", "a-r")}))
+        expect("r4-f646-tier-range", lambda: resolve("peer-independent-review", [("4" if x == "2" else x) for x in pir], env, cwd, reg=reg), ("usage",))
+        expect("r4-f646-root-not-folder", lambda: resolve("peer-independent-review", [(pf if x == ev else x) for x in pir], env, cwd, reg=reg), ("usage",))
+        expect("r4-f646-root-required", lambda: resolve("peer-independent-review", pir[2:], env, cwd, reg=reg), ("usage",))
+        expect("r4-f646-plain-kind-has-no-evidence", lambda: resolve("independent-review", ir, env, cwd, reg=reg)["evidence"], ("ok", lambda e: e is None))
+        # binding: tier.txt Tier (any of the checker's forms) == --tier · --diff bytes == the folder's review-surface.patch, else diff.patch
+        bd = os.path.join(t, "bind"); os.makedirs(bd)
+        open(os.path.join(bd, "diff.patch"), "w").write("D\n")
+        open(os.path.join(bd, "tier.txt"), "w").write("2\nrationale: SIGNIFICANT=1\n")
+        dp = os.path.join(t, "req.patch"); open(dp, "w").write("D\n")
+        expect("r4-f646-bound", lambda: evidence_binding(bd, "2", dp), ("ok", lambda r: r == (0, [])))
+        expect("r4-f646-prior-tier", lambda: evidence_binding(bd, "1", dp), ("ok", lambda r: r[0] == 10 and "another Tier" in r[1][0]))
+        open(dp, "w").write("E\n")
+        expect("r4-f646-other-review", lambda: evidence_binding(bd, "2", dp), ("ok", lambda r: r[0] == 10 and "another review" in r[1][0]))
+        open(os.path.join(bd, "review-surface.patch"), "w").write("E\n")
+        expect("r4-f646-review-surface-first", lambda: evidence_binding(bd, "2", dp), ("ok", lambda r: r == (0, [])))
+        os.remove(os.path.join(bd, "tier.txt"))
+        expect("r4-f646-no-tier-file", lambda: evidence_binding(bd, "2", dp), ("ok", lambda r: r[0] == 10 and "no readable Tier" in r[1][0]))
+        expect("r4-f646-diff-unreadable", lambda: evidence_binding(bd, "2", os.path.join(t, "none.patch")), ("ok", lambda r: r[0] == 11))
+        # a refused pre-check invalidates an earlier successful audit of the same stem · a held lock leaves it (GPT check 8.5 P2)
+        so = os.path.join(t, "stem-out"); os.makedirs(so); st = os.path.join(so, "a-r")
+        ok_audit = '{"exit": 0, "isolationApplied": true}\n'
+        open(st + ".audit.json", "w").write(ok_audit)
+        def _refused_audit():
+            rc = evidence_check(bd, "2", os.path.join(t, "none.patch"), stem=st)
+            return rc, json.load(open(st + ".audit.json")).get("exit"), os.path.exists(st + ".json.lock")
+        expect("r4-f646-reject-invalidates-stem", _refused_audit, ("ok", lambda r: r == (11, 11, False)))
+        open(st + ".audit.json", "w").write(ok_audit); os.mkdir(st + ".json.lock")
+        expect("r4-f646-reject-leaves-locked-stem", lambda: (evidence_check(bd, "2", os.path.join(t, "none.patch"), stem=st), open(st + ".audit.json").read()),
+               ("ok", lambda r: r == (11, ok_audit)))
+        os.rmdir(st + ".json.lock")
+        # the stem is only the launcher's accepted components (no write outside --out-dir) · a refused --evidence-root / --tier also invalidates
+        expect("r4-f646-stem-needs-launcher-components",
+               lambda: resolve("peer-independent-review", [("/tmp/victim" if x == "a" else x) for x in pir], env, cwd, reg=reg)["evidence"]["stem"],
+               ("ok", lambda s: s == ""))
+        open(st + ".audit.json", "w").write(ok_audit)
+        pir_so = [(so if x == os.path.join(t, "od") else x) for x in pir]
+        def _root_refused():
+            try:
+                resolve("peer-independent-review", [(pf if x == ev else x) for x in pir_so], env, cwd, reg=reg)
+            except Usage:
+                return json.load(open(st + ".audit.json")).get("exit")
+            return "no refusal"
+        expect("r4-f646-root-refusal-invalidates-stem", _root_refused, ("ok", lambda r: r == 10))
+        pir_k = reg["kinds"]["peer-independent-review"]
+        no_gate_in = {"kinds": dict(reg["kinds"], **{"peer-independent-review": dict(pir_k, inputs=dict(pir_k["inputs"], required=["diff", "arm", "run-id", "out-dir"]))})}
+        expect("r4-f646-lint-pre-check-inputs", lambda: lint(no_gate_in), ("ok", lambda v: any("pre_check" in x for x in v)))
         # launcher policy (R-06 · SC-2)
         expect("policy review", lambda: launcher_policy("independent-review", reg=reg),
                ("ok", lambda d: d["ROLE"] == "reviewer" and d["SPAWN_LINE"] == SPAWN_LINES["forbid-prompt"] and d["SCHEMA"].endswith("gpt_independent_review_schema.json") and d["FRAME"] == ""))
@@ -1010,6 +1218,17 @@ def self_test():
         # canonical order and registry-owned flags
         expect("check fixed args", lambda: resolve("check", base, env, cwd, reg=reg)["argv"],
                ("ok", lambda a: a[5:] == ["--uncommitted", "--ephemeral", "--gpt-skill", "reviewer"]))
+        # F-614 — the isolation flag is the registry's, kind by kind: sprint-contract-record carries --config-permissions · a caller passing it is
+        #   refused on that kind too · the same flag in another kind's fixed_args is Broken (FIXED_OK is not widened) and lint names it
+        expect("r4-f614-kind-fixed-config-permissions", lambda: resolve("sprint-contract-record", base + ["--prompt-file", pf], env, cwd, reg=reg)["argv"],
+               ("ok", lambda a: a.count("--config-permissions") == 1 and a[:5] == ["exec", "--cd", cwd, "--out", base[3]]))
+        expect("r4-f614-caller-flag-refused", lambda: resolve("sprint-contract-record", base + ["--prompt-file", pf, "--config-permissions"], env, cwd, reg=reg),
+               ("usage", lambda m: "not a caller input" in m))
+        expect("r4-f614-sprint-contract-no-isolation-flag", lambda: resolve("sprint-contract", base + ["--prompt-file", pf], env, cwd, reg=reg)["argv"],
+               ("ok", lambda a: "--config-permissions" not in a))
+        cp_other = {"kinds": dict(reg["kinds"], review=dict(reg["kinds"]["review"], fixed_args=["--config-permissions"]))}
+        expect("r4-f614-fixed-ok-not-global", lambda: resolve("review", base + ["--base", "main"], env, cwd, reg=cp_other), ("broken",))
+        expect("r4-f614-lint-other-kind", lambda: lint(cp_other), ("ok", lambda v: any(x.startswith("review: fixed_args") for x in v)))
         expect("verify inject from bundle", lambda: resolve("verify", base + ["--prompt-file", pf], env, cwd, reg=reg)["argv"],
                ("ok", lambda a: a[-4:] == ["--gpt-skill", "architect", "--inject-skill", os.path.join(ROOT, "gpt-skills", "fz-architect", "SKILL.md")]
                 and a[a.index("--schema") + 1].endswith("schemas/gpt_review_schema.json")))
@@ -1401,6 +1620,8 @@ def main(argv):
             print("LINT", x)
         print("GPT-KINDS-LINT", "OK" if not v else f"FAIL ({len(v)})", f"kinds={n_kinds} role-files={role_pins(root)[1]}")
         return 0 if not v else 11
+    if argv[:1] == ["evidence-check"] and len(argv) in (7, 9) and argv[1:7:2] == ["--root", "--tier", "--diff"] and argv[7:8] in ([], ["--stem"]):
+        return evidence_check(argv[2], argv[4], argv[6], stem=argv[8] if len(argv) == 9 else "")
     if argv[:1] == ["compose"] and argv[1:2] == ["--plan-dir"] and len(argv) == 3:
         compose(argv[2])
         return 0

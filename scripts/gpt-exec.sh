@@ -44,7 +44,7 @@
 #                     읽지 않는다)일 때 있음. gpt-choice.sh decide · 독립 런처가 '로그인 필요' 를
 #                     이 판정으로 본다 — env 이름도 이 래퍼 한 곳에 둔다. 래퍼 본 경로(review · exec · resume)는 인증을 보지 않는다(CLI 실패 12 가 안전망)
 #
-# exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건(세션 선택 판독 실패 포함) / 12=gpt 비정상종료
+# exit: 0=성공(결과 유효) / 10=사용법·플래그 충돌 / 11=사전조건(세션 선택 판독 실패 · review --base 의 merge-base · 변경 파일 조회 실패 포함) / 12=gpt 비정상종료
 #       13=출력 없음·빈 파일 / 14=출력이 계약 위반(파싱·필수키·타입·enum)
 #       18=GPT 미사용 — 세션 선택 off · 플래그 --model off · GPT CLI 없음. CLI 를 부르지 않고 stderr 에 'GPT-OFF: <사유> — …' 한 줄
 #   ⛔ 10~14는 전부 **측정 실패**다 — "이슈 0건"으로 해석하면 안 된다.
@@ -422,7 +422,18 @@ if [ "$MODE" = "review" ] && [ "$IS_REPO" -eq 1 ]; then
         || die 11 "base '$SCOPE_REF' 가 존재하지 않는다"
       git -C "$CD" merge-base --is-ancestor "$SCOPE_REF" HEAD 2>/dev/null \
         || echo "WARN: base '$SCOPE_REF' 가 HEAD의 조상이 아니다 (분기된 브랜치) — diff가 예상과 다를 수 있다" >&2
-      FILES="$(git -C "$CD" diff --name-only "$SCOPE_REF"...HEAD 2>/dev/null)" ;;
+      # ⛔ F-628 — merge-base 이후 추적 변경(merge-base → 작업 트리 · 인덱스)과 미추적을 NUL 구분으로 합쳐 센다. 커밋만(BASE...HEAD) 세면
+      #    HEAD == base 인 미커밋 리뷰가 0 이 된다. 조회 실패(공통 조상 없음 · git 오류)는 빈 집합 0 이 아니라 11 이다 — 0 은 '대상 없음' 으로 읽힌다.
+      #    셸 변수는 NUL 을 버리고 파이프는 git 의 exit 를 가리므로 임시 파일로 받아 명령마다 exit 를 본다
+      MB="$(git -C "$CD" merge-base "$SCOPE_REF" HEAD 2>/dev/null)" && [ -n "$MB" ] \
+        || die 11 "base '$SCOPE_REF' 와 HEAD 의 merge-base 조회 실패(공통 조상 없음 등) — 변경 파일 수를 0 으로 세지 않는다"
+      SCOPE_LIST="$(mktemp "${TMPDIR:-/tmp}/fz-gpt-scope.XXXXXX")" || die 11 "변경 파일 목록 임시 파일 생성 실패(mktemp)"
+      { git -C "$CD" diff --name-only -z "$MB" && git -C "$CD" diff --cached --name-only -z "$MB" \
+          && git -C "$CD" ls-files --others --exclude-standard -z; } > "$SCOPE_LIST" 2>/dev/null \
+        || { rm -f "$SCOPE_LIST"; die 11 "base '$SCOPE_REF' 범위 변경 파일 조회 실패 — 변경 파일 수를 0 으로 세지 않는다"; }
+      N_FILES="$(python3 -c 'import sys; print(len({p for p in open(sys.argv[1], "rb").read().split(b"\0") if p}))' "$SCOPE_LIST")" \
+        || { rm -f "$SCOPE_LIST"; die 11 "base '$SCOPE_REF' 범위 변경 파일 수 계산 실패"; }
+      rm -f "$SCOPE_LIST" ;;
     commit)
       git -C "$CD" rev-parse --verify --quiet "$SCOPE_REF" >/dev/null \
         || die 11 "commit '$SCOPE_REF' 가 존재하지 않는다"
@@ -433,7 +444,7 @@ if [ "$MODE" = "review" ] && [ "$IS_REPO" -eq 1 ]; then
           git -C "$CD" ls-files --others --exclude-standard; } 2>/dev/null | sort -u
       )" ;;
   esac
-  N_FILES="$(printf '%s\n' "$FILES" | grep -c . || true)"
+  [ "$SCOPE_KIND" = "base" ] || N_FILES="$(printf '%s\n' "$FILES" | grep -c . || true)"   # base 는 위에서 NUL 구분으로 셌다
   echo "▶ 분석 기준 — branch=$CUR_BRANCH HEAD=$HEAD_SHA scope=$SCOPE_KIND${SCOPE_REF:+ ref=$SCOPE_REF} changed_files=${N_FILES}개"
   [ "$N_FILES" -gt 0 ] || echo "WARN: 변경 파일 0개 — 리뷰 대상이 비어 있다" >&2
 fi
