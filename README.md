@@ -22,7 +22,7 @@ claude plugin install fz --marketplace jaewooongyun/fz   # Claude Code 2.1.292+ 
 claude plugin marketplace add jaewooongyun/fz   # 최초 1회
 claude plugin install fz
 claude plugin install fz-compact@fz-orchestrator  # 선택. bg 세션 로컬 마스킹 압축, 기본 꺼짐
-claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 생략을 훅으로 막고 ad-hoc 에이전트를 알리며, 설정한 보호 경로 아래 Bash 를 묻는다
+claude plugin install fz-guard@fz-orchestrator    # 선택. Phase 4 승인 생략과 보호 경로 아래 Bash 를 훅으로 막는다
 
 claude
 > /fz "안녕"                                     # 응답하면 정상
@@ -30,50 +30,47 @@ claude
 
 프로젝트 루트에 `CLAUDE.md` 를 둔다. `## Architecture`, `## Build`, `## Code Conventions` 세 섹션이 있어야 하고 템플릿은 `templates/CLAUDE.md.template` 이다.
 
-런타임으로 `python3` 3.9 이상과 `git` 이 필요하다. 판정기와 lint 는 3.9 문법에 맞춰 있다. `perl` 은 GPT 호출 래퍼만 쓰고(macOS 기본 포함) 없으면 GPT 단계만 못 한다.
-`node` 는 점검(`/fz-manage check` · health-check)에만 필요하다. 없으면 회귀 오라클 · workflow 문법 · 문구 배선 검사가 미실행으로 남고 점검은 exit 2 로 끝난다.
+`python3` 3.9 이상과 `git` 이 필요하다. GPT 단계에는 `perl`(macOS 기본 포함)이, 점검(`/fz-manage check`)에는 `node` 가 더 필요하다. `perl` 이 없으면 GPT 단계만 빠지고, `node` 가 없으면 점검 일부가 돌지 못해 exit 2 로 끝난다.
 
-설치하면 Stop 훅 하나가 함께 켜진다(`hooks/hooks.json`). 턴이 끝날 때 서브에이전트를 쓴 세션이면(fz 세션이 아니어도) 워커 에이전트가 심볼 도구를 썼는지 세어 이 머신의 `${FZ_RUN_STATE:-~/.fz/runs}` 폴더에만 기록하고, fz 스킬이 상태 기록(`evidence/tools.md`)을 남긴 세션에서 의심스러우면 한 줄 알린다 — 막지 않고 `FZ_MCP_SWEEP_OFF=1` 로 끈다(`FZ_GATES_OFF=1` 은 게이트 판정과 함께 끈다). 미충족 게이트로 세션 종료를 막는 훅은 선택 설치다(`docs/completion-gates.md`).
+설치하면 Stop 훅 하나가 켜진다(`hooks/hooks.json`). 서브에이전트를 쓴 세션이 끝날 때(fz 세션이 아니어도) 워커가 심볼 도구를 썼는지 세어 이 머신의 `${FZ_RUN_STATE:-~/.fz/runs}` 에만 기록하고, 의심스러우면 한 줄 알린다. 막지는 않으며 `FZ_MCP_SWEEP_OFF=1` 로 끈다. 미충족 게이트로 세션 종료를 막는 훅은 따로 등록한다(`docs/completion-gates.md`).
 
 ### 함께 쓰는 도구
 
-fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다.
+fz 가 번들하는 MCP 는 Serena 하나다. 나머지는 직접 등록한다. 빠진 도구가 있어도 fz 는 깨지지 않고 아래 표대로 대신한다.
 
-| 도구 | 없으면 | 사용처 | 설치 |
-|------|--------|:------:|------|
-| **Claude Code** | 동작 불가 | 전부 | 네이티브 설치(권장) — [설치 문서](https://code.claude.com/docs/en/setup) · 또는 `npm install -g @anthropic-ai/claude-code` |
-| **SuperClaude** | 리뷰 셋째 검증이 새 컨텍스트 에이전트로 · 설명 · 조사 명령은 건너뛴다 | 3/22 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` (설치본 실측: sc 4.3.0, 2026-10-01) |
-| **Serena MCP** | 심볼 탐색이 Grep 으로 (11 중 7 폴백) | 11/22 | 자동 등록. `uv` 필수 (`brew install uv`), 첫 기동 전에 캐시를 채운다(아래) |
-| **GPT CLI** (`@openai/codex`) | `[GPT 미사용 — CLI 없음]` 표기만 — 대신하는 검증은 없다. 켠 GPT 호출이 실패했을 때만 교차 검증이 새 컨텍스트 Claude 검증자로 — 동종 검증 `[fresh-context: claude]` (11 중 3 폴백) | 11/22 | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
-| **sequential-thinking** | 없으면 같은 분해를 표로 직접 쓴다 | 9/22 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
-| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 (9 중 1 폴백) | 9/22 | `claude plugin install context7@claude-plugins-official` |
-| **pr-review-toolkit** | fz-review Phase 5 병렬 4·5 생략 · 보고에 한 줄 고지 | 1/22 | 공식 마켓플레이스에서 `/plugin` 으로 설치. 에이전트 이름은 접두 꼴 `pr-review-toolkit:<이름>`(`modules/native-agents.md`) |
+| 도구 | 없으면 | 설치 |
+|------|--------|------|
+| **Claude Code** | 동작 불가 | 네이티브 설치(권장) [설치 문서](https://code.claude.com/docs/en/setup) 또는 `npm install -g @anthropic-ai/claude-code` |
+| **SuperClaude** | 리뷰 셋째 검증이 새 컨텍스트 에이전트로 · 설명 · 조사 명령은 건너뛴다 | `/plugin marketplace add SuperClaude-Org/SuperClaude_Plugin` 다음 `/plugin install sc@superclaude` |
+| **Serena MCP** | 심볼 탐색이 Grep 으로 | 자동 등록. `uv` 가 필요하다(`brew install uv`). 첫 기동 전에 캐시를 채운다(아래) |
+| **GPT CLI** (`@openai/codex`) | `[GPT 미사용 — CLI 없음]` 표기만 남는다. 켠 GPT 호출이 실패하면 교차 검증이 새 컨텍스트 Claude 검증자로 — 동종 검증 `[fresh-context: claude]` | `npm install -g @openai/codex` 뒤 CLI 로그인 1회 |
+| **sequential-thinking** | 없으면 같은 분해를 표로 직접 쓴다 | `claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking` |
+| **Context7 MCP** | 라이브러리 문서가 WebSearch 로 | `claude plugin install context7@claude-plugins-official` |
+| **pr-review-toolkit** | fz-review Phase 5 의 병렬 4 · 5 를 건너뛰고 보고에 한 줄 알린다 | 공식 마켓플레이스에서 `/plugin` 으로 설치 |
 
-> 사용처는 스킬 22개 가운데 그 도구를 호출하는 스킬 수다. MCP 는 frontmatter `allowed-tools` 의 `mcp__…`, GPT 는 `fz-gpt`, SuperClaude 는 `sc:<이름>` 호출 꼴(`/sc:sc-analyze` 처럼 이름이 붙은 것 — 이름 없이 `sc:` 만 적은 목록 언급은 빠진다), pr-review-toolkit 은 `pr-review-toolkit:` 로 센다. 언급만 한 파일은 빠지므로 grep 어휘를 바꾸면 숫자가 달라진다. 폴백은 각 스킬 `## 에러 대응` 표에 대체 경로를 적은 스킬 수다.
+GitHub 는 MCP 서버 없이 `gh` CLI 로 다룬다. 조회 명령만 사전 승인하고 PR 생성과 리뷰 게시는 권한을 묻는다. 티켓 트래커는 프로젝트 `CLAUDE.md` 에 선언한 트래커 MCP 가 연결돼 있으면 그 도구로, 없으면 수동 입력으로 다룬다.
 
-표 밖의 도구 `lsp` 는 4개 스킬이 정의와 참조 탐색에만 쓴다. `lsp` 는 그 스킬들의 `allowed-tools` 에 사전 승인으로만 있고 본문에 호출 지시는 없다. GitHub 은 MCP 서버 없이 `gh` CLI 로만 다룬다 — 스킬은 조회 꼴(`gh auth status` · `gh pr view` 등)만 사전 승인하고 PR 생성 · 리뷰 게시는 권한 프롬프트를 거친다. 티켓 트래커는 서버를 정해 두지 않는다 — 티켓 조회는 프로젝트 CLAUDE.md 가 선언한 트래커 MCP 가 연결돼 있으면 권한 프롬프트를 거쳐 그 도구로, 아니면 수동 입력으로 한다. 어느 스킬도 트래커 도구를 사전 승인하지 않고, PR 뒤 티켓 상태 전환은 프로젝트 규칙이 요구할 때만 한다(`modules/governance.md` § 팀 스킬 위임).
+### 설치 뒤 확인
 
-프로젝트에 따라 더 붙인다. iOS 는 XcodeBuildMCP 와 SwiftUI Expert, Swift Concurrency 를 쓰고 웹은 기본 구성으로 충분하다.
-
-#### 설치 뒤 확인할 것
-
-- ⛔ MCP 서버 이름이 계약이다. 위 표의 `claude mcp add <이름>` 그대로 등록한다. 다른 이름으로 등록하거나 공식 마켓플레이스 플러그인으로 깔면 도구 이름이 `mcp__plugin_…` 으로 바뀐다. 그러면 Lead 는 그 도구를 쓰지만 워커 에이전트에는 오류 없이 전달되지 않는다. `XcodeBuildMCP` 도 같다. Context7 은 예외다 — 스킬 `allowed-tools` 와 에이전트 `tools` 에 두 이름(`mcp__context7__…` · `mcp__plugin_context7_context7__…`)을 함께 적어 두어 위 표의 공식 플러그인으로 깔아도, `claude mcp add context7 …` 로 등록해도 된다. 트래커 MCP 는 이 계약 밖이다 — 스킬이 서버 이름을 적지 않으므로 어떤 이름으로 등록해도 되고, 쓰려면 프로젝트 CLAUDE.md 에 그 서버를 선언한다(규칙은 위 '표 밖의 도구' 문단)
-- ⛔ Serena 는 첫 기동에 실패하기 쉽다. 처음에는 약 300MB 를 내려받느라 MCP 연결 한도인 30초를 넘기곤 한다. 한 번 실패하면 Claude Code 가 약 15분 동안 다시 띄우지 않는다(Claude Code 2.1.318 실측). 설치 직후 미리 한 번 받아 둔다.
+- ⛔ MCP 서버는 위 표의 이름 그대로 등록한다. 다른 이름이나 공식 마켓플레이스 플러그인으로 깔면 도구 이름이 `mcp__plugin_…` 으로 바뀌어 워커 에이전트에 오류 없이 전달되지 않는다. Context7 은 두 이름을 모두 받으므로 어느 쪽으로 깔아도 되고, 트래커 MCP 는 이름을 따지지 않는다
+- ⛔ Serena 는 첫 기동에 약 300MB 를 받느라 MCP 연결 한도(30초)를 넘기기 쉽다. 한 번 실패하면 Claude Code 가 약 15분 동안 다시 띄우지 않으니 설치 직후 미리 받아 둔다
   ```bash
   uvx --from git+https://github.com/oraios/serena@v2.1.0 serena --help
   ```
-- GPT CLI 는 설치만 하면 감지된다. 로그인하지 않으면 단계 판정(`gpt-choice.sh decide`)이 GPT 단계를 건너뛰고 `[GPT 미사용 — 로그인 필요]` 를 남긴다. 재시도도 대체 검증도 없고, 로그인하면 다음 GPT 단계부터 켜진다
-- 빠진 도구가 있어도 fz 는 깨지지 않는다. Grep 이나 자체 판단으로 대신하고 GPT 단계는 `[GPT 미사용]` 으로 표기한다. 선택 도구(Serena · context7 · sequential-thinking)를 쓰는 스킬은 첫 단계에 Serena 상태 뒤에 꼬리 ` · context7 목록✓|목록✗ · sc 목록✓|목록✗ · seq 목록✓|목록✗ · pr-review 목록✓|목록✗ · 스택 스킬 <이름, …>|없음` 로 선택 도구 상태와 빠지는 단계를 알린다(`evidence/tools.md` 첫 줄 또는 화면 한 줄 — 형식 `modules/tool-status.md`). 그 표시는 도구 목록에 이름이 있는지만 본다(목록에 있음 ≠ 연결됨). 그러니 세션에서 `/mcp` 를 열어 `plugin:fz:serena` 가 connected 인지 확인한다
+- GPT CLI 는 설치만 하면 감지된다. 로그인하지 않았으면 GPT 단계를 건너뛰고 `[GPT 미사용 — 로그인 필요]` 를 남긴다
+- 선택 도구를 쓰는 스킬은 첫 단계에 Serena 상태 뒤에 꼬리 ` · context7 목록✓|목록✗ · sc 목록✓|목록✗ · seq 목록✓|목록✗ · pr-review 목록✓|목록✗ · 스택 스킬 <이름, …>|없음` 로 도구 상태를 알린다(형식 `modules/tool-status.md`). 이 표시는 도구 목록에 이름이 있는지만 보므로 연결 여부는 `/mcp` 에서 `plugin:fz:serena` 가 connected 인지로 확인한다
 
-GPT CLI 를 쓰면 네이티브 스킬을 심볼릭 링크로 연결한다. 링크가 없어도 exec 모드 호출은 번들 스킬 본문을 직접 넣지만 review 모드 호출은 역할 스킬 없이 돈다.
+### GPT 스킬 연결
+
+GPT CLI 를 쓰면 GPT 역할 스킬을 심볼릭 링크로 연결한다. 링크가 없으면 review 모드 호출이 역할 스킬 없이 돈다.
 
 ```bash
 bash "$(python3 -c 'import json,os;b=os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude");print(json.load(open(b+"/plugins/installed_plugins.json"))["plugins"]["fz@fz-orchestrator"][0]["installPath"])')/scripts/setup-gpt-skills.sh"
 ```
 
-⛔ 캐시에 버전이 여럿이면 glob 을 그대로 실행하지 않는다. 사전순으로 첫 경로가 돌아 가장 오래된 판에 링크될 수 있다. 번호가 가장 높은 폴더(`sort -V`)도 고르지 않는다 — 판 번호를 다시 매긴 뒤(4.x → 0.57.0)에는 남은 옛 판 폴더를 고른다. 위 명령처럼 설치 기록(`installed_plugins.json`)의 설치 경로를 쓰거나 로컬 체크아웃이면 그 플러그인 루트에서 `bash scripts/setup-gpt-skills.sh` 를 실행한다. setup 은 `gpt-skills/` 만 링크하고 이 플러그인의 Claude 스킬(`skills/`)을 가리키는 옛 링크는 지운다.
+로컬 체크아웃이면 그 플러그인 루트에서 `bash scripts/setup-gpt-skills.sh` 를 실행한다. ⛔ 캐시 폴더를 glob 이나 `sort -V` 로 고르지 않는다. 갱신 뒤 캐시에 남은 옛 판 폴더가 골라질 수 있다.
 
-⛔ README 는 GPT 모델과 CLI 버전 하한을 고정하지 않는다. 모델과 effort 는 세션에서 고르고 고르지 않으면 `~/.codex/config.toml` 값을 쓴다. 대화 세션은 GPT 를 켠 마지막 선택을 묻지 않고 이어 쓴다(그 모델이 지금 모델 목록에 있을 때). off 는 고른 그 세션에만 남고, 자율 세션은 지난 선택을 이어 쓰지 않는다. 정본은 `modules/gpt-strategy.md` § 모델·effort 선택이다. CLI 가 구버전이면 에러 대응표가 업데이트를 권한다.
+GPT 모델과 effort 는 세션에서 고르고, 고르지 않으면 `~/.codex/config.toml` 값을 쓴다(정본 `modules/gpt-strategy.md` § 모델·effort 선택).
 
 ### 업데이트
 
@@ -84,20 +81,19 @@ claude plugin update fz-compact@fz-orchestrator   # fz-compact 를 설치했을 
 claude plugin update fz-guard@fz-orchestrator     # fz-guard 를 설치했을 때만
 ```
 
-업데이트는 GPT 스킬 setup 을 다시 돌리지 않는다. 링크 상태는 위 setup 명령에 `--check` 를 붙여 확인한다.
+⛔ 접미사 없이 `claude plugin update fz` 를 부르면 `Plugin "fz" not found` 로 실패한다. 설치된 이름은 `fz@fz-orchestrator` 다.
 
-- 인자 없는 실행이 지울 옛 링크를 읽기 전용으로 `stale:` 줄에 나열하고 stale 이면 exit 1 이다. 이 플러그인 Claude 스킬 링크, 끊어진 소유 링크, 이 판이 걷은 GPT 역할 스킬(`fz-fixer` · `fz-searcher`) 링크(옛 판 캐시가 남아 있을 때), 옛 판 `--gpt-agents` 가 `${CODEX_HOME:-~/.codex}/agents/` 에 건 `fz-review-arch.toml` · `fz-review-quality.toml` 링크다
-- 정리하려면 인자 없이 다시 실행한다. 다른 판을 가리키는 GPT 스킬 링크는 살아 있으면 나열하지 않으니 판을 맞출 때도 인자 없이 다시 실행한다
-- 옛 판 캐시가 이미 지워져 끊긴 링크는 소유를 판정할 수 없어 `unknown:` 줄로만 나오고(exit 0) 인자 없는 실행도 남긴다. 걷은 역할 스킬 링크 둘만 지우려면 `find "${CODEX_HOME:-$HOME/.codex}/skills" -maxdepth 1 -type l \( -name fz-fixer -o -name fz-searcher \) -print -delete` 를 실행한다
-- `/fz-manage check` 도 같은 점검을 경고로 보여 준다
+업데이트는 GPT 스킬 연결을 다시 하지 않는다. 위 연결 명령에 `--check` 를 붙이면 지울 옛 링크를 `stale:` 줄로 보여 주고(exit 1), 인자 없이 다시 실행하면 정리한다. 옛 판 캐시가 이미 지워져 끊긴 링크는 `unknown:` 줄로만 나오고 남는다. 이 판이 걷은 역할 스킬 링크 둘은 아래 명령으로 지운다.
 
-⛔ 접미사 없이 `claude plugin update fz` 를 부르면 `Plugin "fz" not found` 로 실패한다. 설치할 때는 `fz` 로 통하지만 설치된 이름은 `fz@fz-orchestrator` 이다. 버전 문자열이 같으면 캐시를 갱신하지 않으므로 소스만 고치고 버전을 올리지 않으면 반영되지 않는다.
+```bash
+find "${CODEX_HOME:-$HOME/.codex}/skills" -maxdepth 1 -type l \( -name fz-fixer -o -name fz-searcher \) -print -delete
+```
 
 ---
 
 ## Skills
 
-사용자가 직접 부르는 스킬은 19개다. 나머지 3개는 `user-invocable: false` 인 내부 도구다. `arch-critic` 과 `code-auditor` 는 `/fz-peer-review` 가 렌즈로 쓰고 `fz-new-file` 은 `/fz-code` 가 파일을 만들 때 헤더를 붙이는 데 쓴다.
+사용자가 직접 부르는 스킬은 19개다. 나머지 3개(`arch-critic` · `code-auditor` · `fz-new-file`)는 다른 스킬이 안에서 쓴다.
 
 | 카테고리 | 스킬 | 설명 |
 |---------|------|------|
@@ -105,37 +101,19 @@ claude plugin update fz-guard@fz-orchestrator     # fz-guard 를 설치했을 �
 | **개발** | `/fz-plan` | 요구사항 분석, 영향 범위, RTM |
 | | `/fz-code` | 계획에 따른 점진적 구현과 빌드 검증 |
 | | `/fz-fix` | 버그 수정 (4-Phase 디버깅) |
-| | `/fz-review` | 3중 검증 (Claude + GPT + 셋째 검증(sc-analyze · 없으면 새 컨텍스트 에이전트)) |
-| | `/fz-commit`, `/fz-pr` | 커밋, PR (origin 푸시 · fork 규칙이 있으면 fork) |
-| | `/fz-rebase` | 롱텀 브랜치 리베이스와 양방향 조용한 유실 게이트 (경로 단위 배타 분할, prepush 원격 실측) |
+| | `/fz-review` | 3중 검증 (Claude + GPT + 셋째 검증) |
+| | `/fz-commit`, `/fz-pr` | 커밋, PR |
+| | `/fz-rebase` | 롱텀 브랜치 리베이스와 양방향 유실 검사 |
 | **탐색** | `/fz-discover` | 풍경 탐색과 경로 매핑 |
 | | `/fz-search` | 코드 탐색 (symbolic, pattern) |
-| | `/fz-explain` | 코드·구조 설명 (전체 흐름 위에 동작과 코드를 1:1로 매핑) |
-| **검증** | `/fz-gpt` | GPT CLI 교차 검증과 `micro-eval` 단일 주장 재평가. 모델과 effort 는 세션에서 고른다(`modules/gpt-strategy.md` § 모델·effort 선택) |
-| | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점, caller 와 convention 검증) |
+| | `/fz-explain` | 코드·구조 설명 |
+| **검증** | `/fz-gpt` | GPT CLI 교차 검증 |
+| | `/fz-peer-review` | 동료 PR 리뷰 (9개 관점) |
 | **문서/시스템** | `/fz-memory` | 메모리 관리 |
-| | `/fz-skill` | 스킬 관리. `write` 서브커맨드는 문서 작성과 프롬프트 최적화 |
+| | `/fz-skill` | 스킬 관리와 문서 작성(`write`) |
 | | `/fz-manage` | 인벤토리와 건강 체크 |
 | | `/fz-modernize` | 가이드 최신화 |
 | **보조** | `/fz-recording`, `/fz-pr-digest` | 회의록, PR 요약 |
-
----
-
-## Agents
-
-Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 정의다. 리뷰 밖에서 쓰는 아키텍처 렌즈는 `arch-lens` 다. `review-arch` 에서 리뷰 전용 사전 주입(arch-critic)을 뺀 것이다.
-
-모델은 워크플로가 호출마다 정한다(opus 34곳, sonnet 6곳, fable 3곳). 에이전트 정의의 기본값은 sonnet 이다.
-
-| 도메인 | Primary | Supporting |
-|--------|:---:|---|
-| **계획** | plan-structure | plan-impact, plan-edge-case, plan-merge(병합 전용, 도구 없음). 롤백 경로 plan-collaborative 는 arch-lens 와 review-direction 도 쓴다 |
-| **구현** | impl-correctness | arch-lens, impl-quality |
-| **리뷰** | review-arch | review-quality, review-correctness, review-counter |
-| **탐색** | — | search-symbolic, search-pattern. fz-discover 는 plan-structure 와 arch-lens 를 쓴다 |
-| **공통** | — | memory-curator(회상 전용, 워크플로는 부르지 않는다). swarm.js 기본 워커는 review-correctness |
-
----
 
 ## Pipelines (주요)
 
@@ -148,9 +126,7 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 | **review-to-ship** | "리뷰하고 커밋" | fz-review → fz-commit → fz-pr |
 | **full-cycle** | "처음부터 끝까지" | fz-plan → fz-code → fz-review → fz-commit → fz-pr |
 
-체인 칸에는 스킬만 적었다. 빌드와 GPT 교차 검증 게이트는 파이프라인마다 자동으로 끼워 넣어 여기서는 뺐다. 어느 지점에 무엇이 들어가는지는 `modules/pipelines.md` 각 항목의 `게이트` 행에 있다.
-
-전체 19개는 `modules/pipelines.md` 에 있다.
+빌드와 GPT 교차 검증 게이트는 파이프라인마다 자동으로 들어가서 체인 칸에서는 뺐다. 전체 19개와 게이트 위치는 `modules/pipelines.md` 에 있다.
 
 ---
 
@@ -158,27 +134,12 @@ Workflow 스크립트가 `agentType: 'fz:{name}'` 으로 불러 쓰는 렌즈 �
 
 | 문서 | 내용 |
 |------|------|
-| [완료 게이트](docs/completion-gates.md) | 작업 완료를 명령으로 판정하는 계층. 원장 문법, 발화 지점, 탈출로, 세션 종료 차단을 다룬다 |
-| [아키텍처](docs/architecture.md) | 디렉토리 구조, 오케스트레이션 흐름, 멀티에이전트 실행 방식 |
+| [완료 게이트](docs/completion-gates.md) | 작업 완료를 명령으로 판정하는 계층과 세션 종료 차단 |
+| [아키텍처](docs/architecture.md) | 디렉토리 구조, 오케스트레이션 흐름, 에이전트 구성 |
 | [개발과 릴리즈](docs/development.md) | fz 자체를 수정할 때의 절차 |
-| [CHANGELOG](CHANGELOG.md) · [릴리즈 노트](docs/releases/) | 버전별 변경 이력. CHANGELOG 는 맨 위 판만 본문을 두고 나머지 판은 제목 한 줄만 남긴다. 릴리즈 노트는 v4.56.0 보다 뒤 판에만 둔다 |
-| [A/B 끝점 시계](docs/ab-endpoint-clock.md) | `ab_ledger.py collect --endpoint-clock` 이 읽는 러너 시계 줄의 형식과 판정 |
+| [CHANGELOG](CHANGELOG.md) · [릴리즈 노트](docs/releases/) | 판별 변경 이력. CHANGELOG 는 맨 위 판만 본문을 둔다 |
 
-### 작성·설계 가이드
-
-`guides/` 아래 9개가 있다. 스킬, 에이전트, 모듈을 만들거나 고칠 때 본다.
-
-| 가이드 | 내용 |
-|--------|------|
-| [`llm-references.md`](guides/llm-references.md) | LLM·AI 권위 자료를 모은 단일 참조점. Tier1 공식, Tier2 arxiv 실증, Tier3 커뮤니티로 나누고 가이드와 스킬을 고칠 때 1차 출처로 쓴다 |
-| [`prompt-optimization.md`](guides/prompt-optimization.md) | 프롬프트 10원칙, Context Rot 대응, Progressive Disclosure |
-| [`skill-authoring.md`](guides/skill-authoring.md) | 스킬 작성. YAML 계약, 500줄 제한, §12 Workflow 오케스트레이션 규약과 실패 복구 사다리 |
-| [`skill-testing.md`](guides/skill-testing.md) | 스킬 테스트. Triggering·Functional 3단계와 테스트 스펙 템플릿 |
-| [`skill-troubleshooting.md`](guides/skill-troubleshooting.md) | 스킬이 발화하지 않거나 잘못 매칭될 때의 진단 절차 |
-| [`agent-team-guide.md`](guides/agent-team-guide.md) | 에이전트와 팀 구성. Task Brief, 모델 전략, §8 Workflow 공식 사양 |
-| [`model-guide.md`](guides/model-guide.md) | 모델 운용. Lead 는 `fable` alias(현재 Fable 5.2 — Claude Code 2.1.321+, fz 운용 선택), 실질 생산 워커는 Opus 5.5 이고 effort 배정 기준을 둔다 |
-| [`clean-architecture.md`](guides/clean-architecture.md) | Dependency Rule 과 SOLID 로 레이어를 판정하는 기준 |
-| [`harness-engineering.md`](guides/harness-engineering.md) | AI 에이전트 하네스 설계. 게이트, 오라클, negative control, NLAH Gap 분석 |
+스킬, 에이전트, 모듈을 만들거나 고칠 때는 `guides/` 를 본다. 시작점은 [`skill-authoring.md`](guides/skill-authoring.md) 와 [`agent-team-guide.md`](guides/agent-team-guide.md) 다.
 
 ---
 
