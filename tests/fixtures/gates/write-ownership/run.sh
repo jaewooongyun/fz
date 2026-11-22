@@ -24,7 +24,7 @@
 #           deferred-call-undefined-unknown — 함수 본문 안 호출의 이름이 명령 어디에도 정의되지 않았다 → 같은 '대상 미상 쓰기'
 #   control control-finalize — `--finalize <원장>` 리터럴(기준 훅도 소유로 본다 — 하네스가 소유를 읽는다는 대조)
 #   pair    own-and-foreign — 한 세션이 원장 A 는 `--only` 로 쓰고 B 는 `--status` 로 읽기만 → A 만 막고 B 는 경고
-#   loop    loop-guard — 소유 원장 미충족은 MAX_BLOCKS(2)회 막고 3회째 루프 방어로 통과(불변)
+#   loop    loop-guard — 소유 원장 미충족은 MAX_BLOCKS(1)회 막고 2회째 루프 방어로 통과(불변)
 #   scope   function-scope-guard-hook-agree — 같은 이름 함수 면제의 셸 범위 표(치환 · 서브셸 · 파이프라인 칸 · `&` 목록 안 정의는 밖 호출에
 #           닿지 않고, 안쪽 치환 · 서브셸 · 파이프라인 칸 · `&` 명령은 앞 정의를 물려받는다 · 면제를 주는 정의는 목록 첫 명령 · 묶음 안
 #           정의뿐이고 `&&` · `||` 뒤 · if · 루프 안 정의는 조건이 참이어도 면제하지 않는다 — 과차단 고정)와 함수 본문 안 호출의 정의 순서
@@ -76,7 +76,7 @@ sys.dont_write_bytecode = True
 SCRIPTS = pathlib.Path(sys.argv[1])
 GC, HOOK = SCRIPTS / "gate_check.py", SCRIPTS / "gate_stop_hook.py"
 PY = sys.executable
-MAX_BLOCKS = 2                    # 훅 루프 방어 계약 값 — 훅 상수를 import 하지 않는다
+MAX_BLOCKS = 1                    # 훅 루프 방어 계약 값 — 훅 상수를 import 하지 않는다
 DROP_ENV = ("FZ_GATES_LEDGER", "FZ_GATES_OFF", "FZ_GATES_TRACE", "FZ_GATES_HOOK_BUDGET_S")
 G_LINE = 'G="${FZ_PLUGIN_ROOT}/scripts/gate_check.py"'   # fz-code 6.4 블록과 같은 꼴
 FAIL, CHECKS, RAN = [], [], []

@@ -5,7 +5,7 @@
 #   n8-own8 · n9-own8     회귀 · 대조 — 8개 이하 / 8번째 소유는 지금도 막힌다(출력 · 종료 불변)
 #   own4-slow             소유 4개 + 남의 원장 3개 · 느린 판정기(셀 안 shim) · 예산 축소(FZ_GATES_HOOK_BUDGET_S) → 소유 원장을 먼저
 #                         판정하고(남의 원장보다 앞) 예산이 다해 못 본 소유 원장이 남으면 통과하지 않는다(미판정 수 · 이유)
-#   own4-budget0          소유 4개 · 예산 0 → `소유 원장 4개 미판정` 으로 차단 · 루프 방어는 그대로(2회 막고 3회째 통과)
+#   own4-budget0          소유 4개 · 예산 0 → `소유 원장 4개 미판정` 으로 차단 · 루프 방어는 그대로(1회 막고 2회째 통과)
 #   foreign-only-cap      남의 원장 12개뿐 → 통과하되 상한(8) 밖 4개를 '미판정' 수로 남긴다(말없이 자르지 않는다)
 #   discover-invalid-last 원장 10개 중 마지막이 계약 위반 → `--discover` exit 3 · `계약위반 1`(자르면 위반이 안 보여 exit 0)
 #   discover-unreadable   원장 9개 중 마지막을 못 읽음 → `--discover` exit 0 · `원장 9건` · `미판정 1`
@@ -50,7 +50,7 @@ sys.dont_write_bytecode = True
 SCRIPTS = pathlib.Path(sys.argv[1])
 GC, HOOK = SCRIPTS / "gate_check.py", SCRIPTS / "gate_stop_hook.py"
 PY = sys.executable
-MAX_BLOCKS, FOREIGN_MAX = 2, 8          # 계약 값 — 훅 루프 방어 · 남의 원장 판정 상한. 훅 상수를 import 하지 않는다
+MAX_BLOCKS, FOREIGN_MAX = 1, 8          # 계약 값 — 훅 루프 방어 · 남의 원장 판정 상한. 훅 상수를 import 하지 않는다
 BUDGET_ENV = "FZ_GATES_HOOK_BUDGET_S"
 DROP_ENV = ("FZ_GATES_LEDGER", "FZ_GATES_OFF", "FZ_GATES_TRACE", BUDGET_ENV)
 FAIL, CHECKS, RAN = [], [], []

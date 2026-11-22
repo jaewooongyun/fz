@@ -53,7 +53,9 @@ tool_use 가 있으면 이 세션의 원장이다. `--status`(`--only` 와 함�
 ⛔ transcript 를 못 읽으면 전 원장을 판정한다(fail-closed) — 소유를 모를 때 통과시키면 자기 원장도 놓친다. 원장을 쓰는
 판정기 호출인데 원장 인자를 풀지 못하면('대상 미상 쓰기') 그 쓰기가 돌던 폴더(transcript 줄의 cwd) 아래 원장과, 그 명령
 글자에 적힌 원장 경로 리터럴(`L=$(realpath ../w/gates/plan.md)` 의 `../w/gates/plan.md`)을 그 폴더 기준으로 푼 원장을 판정한다 —
-글자에 원장 경로가 없는 밖의 원장은 막지 않는다(F-554 · 잔존: `$(find ..)` 처럼 경로를 글자로 쓰지 않은 폴더 밖 쓰기). `FZ_GATES_LEDGER` 명시 지정은 소유 판정을
+글자에 원장 경로가 없는 밖의 원장은 막지 않는다(F-554 · 잔존: `$(find ..)` 처럼 경로를 글자로 쓰지 않은 폴더 밖 쓰기). 그 후보도 그
+쓰기가 적힌 transcript 줄의 시각(`timestamp`)에서 2초를 뺀 뒤에 고쳐진 원장뿐이다 — 그 뒤 한 번도 바뀌지 않은 원장은 그 쓰기가 쓴
+원장일 수 없다(시각이 없거나 못 읽거나 원장 수정 시각을 못 읽으면 지금처럼 후보다). `FZ_GATES_LEDGER` 명시 지정은 소유 판정을
 건너뛴다(명시가 우선).
 
 **발견 상한 없음 · 소유 원장 먼저 (F-378 · F-404).** 발견한 원장 전부에 소유 판정을 하고, 소유 원장을 예산(45초)
@@ -93,7 +95,9 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:                                    # 공용 토크나이저(F-458) — 없으면 None 이고 Bash 원장 쓰기 판정은 '대상 미상' 으로 끝난다
@@ -112,7 +116,7 @@ TOTAL_BUDGET_S = 45                    # 전체 예산 — 소유 원장을 먼�
 # 예산을 **줄이기만** 하는 시험 노브(0 ≤ 값 < TOTAL_BUDGET_S 일 때만 쓴다). 느린 판정기에서 미판정 소유 원장 처리를 재려고 둔다
 BUDGET_ENV = "FZ_GATES_HOOK_BUDGET_S"
 FOREIGN_JUDGED_MAX = 8                 # 남의 원장 판정 상한 — 막지 않는 원장에 예산을 다 쓰지 않게. ⛔ 소유 원장에는 상한이 없다
-MAX_BLOCKS = 2                         # 같은 상태로 이 횟수까지만 막는다
+MAX_BLOCKS = 1                         # 같은 상태로 한 번만 막는다(fz-guard Stop 과 같은 지문당 1회)
 # 사유 크기 — 차단 사유는 막을 때마다 Claude 컨텍스트에 실린다(F-360 · EC-07).
 # 한 줄 ≈ 접두 + 원장 경로(~100) + 요약(≤400) ≈ 500자 → 전체 상한 4000 ≈ 8줄. 원장 발견에 상한이 없으므로(F-378) 소유
 # 원장이 많으면 이 상한이 사유를 묶는다 — 자를 때는 본문 끝(진단 · 남의 원장 경고)부터 빼고 `…외 N줄 생략` 으로 수를 남기며,
@@ -123,6 +127,10 @@ UNMET_IDS_SHOWN = 8                    # 요약에 싣는 미충족 id 상한 �
 FOREIGN_NOTES_FOLD = 3                 # 남의 원장 경고가 이보다 많으면 한 줄로 접는다
 REASON_MAX_CHARS = 4000                # 차단 사유 전체 상한 — 넘는 본문 줄은 `…외 N줄 생략`
 STATE_FILE = Path.home() / ".fz" / "stop-hook-state.json"
+# 상태 파일은 모든 세션이 함께 쓴다 — 읽기부터 저장까지 옆 파일의 배타 잠금 안에서 한다(동시 Stop 이 서로의 횟수를 덮지 않게).
+# 잠금을 이 상한 안에 못 잡으면 상태를 못 쓴 것과 같다(통과) — 대기가 훅 예산을 먹지 않게 짧게 둔다(fz-guard 상태 잠금과 같은 3초)
+STATE_LOCK = STATE_FILE.with_name("stop-hook-state.lock")
+STATE_LOCK_TIMEOUT_S = 3.0
 # 소유 판정 — transcript 의 tool_use 중 원장을 **쓴** 것만 센다. 읽기·grep·hook 피드백
 # 인용은 제외(진단 세션이 남의 원장 경로를 출력만 해도 소유가 되면 안 된다).
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit")
@@ -130,6 +138,8 @@ WRITE_TOOLS = ("Write", "Edit", "MultiEdit")
 # ⛔ "gates/" 로 두면 `cd …/gates⏎cp plan.draft.md plan.md` 줄이 파싱 전에 버려진다 — 실측 #10·#24·#28.
 # ⛔ "gates" 하나로 두면 원장 경로를 source 한 env 파일에서 받는 쓰기(`. env.sh && python3 "$G" --only S1 "$L"`)가
 #    파싱 전에 버려진다(F-422) — 판정기 · 원장 이름에 더해 Bash 줄의 `.`/`source` 도 본다.
+# 대상 미상 쓰기의 시각 여유 — 그 쓰기가 적힌 transcript 줄의 시각에서 이만큼 뺀 뒤에 고쳐진 원장만 그 쓰기의 후보다(초 · 시계 단위 차)
+UNKNOWN_WRITE_SLACK_S = 2.0
 TRANSCRIPT_LINE_HINTS = ("gates", "gate_check", "plan.md", "$'")   # `$'…'` 는 경로 글자를 이스케이프로 감출 수 있다(F-458)
 SOURCE_LINE_RE = re.compile(r'(?:^|[\s;&|("]|\\n)(?:\.|source)\s+[^\s;&|]')   # JSON 으로 인코딩된 줄 위에서 본다
 _TOKEN = r"[^\s\"'`;|&<>()]*plan\.md"              # 원장 경로 토큰 — 상대명 `plan.md` 도 허용
@@ -317,15 +327,55 @@ def load_state() -> dict:
 
 def save_state(state: dict) -> bool:
     """⛔ 실패하면 False. 루프 방어를 못 하므로 호출부는 **통과**를 택한다 —
-    상태를 못 쓰는데 막으면 무한 block 이 된다."""
+    상태를 못 쓰는데 막으면 무한 block 이 된다. 임시 파일은 부를 때마다 새 이름이다 — 고정 이름이면 동시 저장이 서로의 임시
+    파일을 옮겨 rename 이 실패한다(잠금 없이 도는 저장이 있어도 같다). 실패하면 임시 파일을 지운다."""
+    tmp = None
     try:
         STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        tmp = STATE_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        fd, tmp = tempfile.mkstemp(dir=str(STATE_FILE.parent), prefix=STATE_FILE.stem + ".", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(state, ensure_ascii=False))
         os.replace(tmp, STATE_FILE)
         return True
     except OSError:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
         return False
+
+
+def _bump_block_count(key: str) -> int | None:
+    """`key`(세션 | 지문)의 차단 횟수를 1 올려 저장하고 새 횟수를 돌려준다 — 읽기부터 저장까지 `STATE_LOCK` 의 배타 잠금 안이다.
+
+    - Returns: 새 횟수. 잠금을 `STATE_LOCK_TIMEOUT_S` 안에 못 잡거나 상태를 못 쓰면 None — 호출부는 통과한다(루프 방어를 못
+      하는데 막으면 무한 block 이 된다).
+    - Note: 잠금은 `_sweep_lock` 을 빌린다 — 잠금이 없는 플랫폼(`fcntl` 이 없거나 그 파일 시스템이 잠금을 받지 않는다)이면 잠그지 않고
+      지금처럼 진행한다.
+    """
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        lock = _sweep_lock(STATE_LOCK, time.monotonic() + STATE_LOCK_TIMEOUT_S)
+    except OSError:
+        return None
+    if lock is None:
+        return None
+    try:
+        state = load_state()
+        count = int(state.get(key) or 0) + 1
+        # 오래된 항목 정리 — 상태 파일이 무한히 자라지 않게
+        # ⛔ 전부 비우지 않는다 — 다른 세션의 차단 횟수가 지워지면 그 세션이 같은 원장 상태로 MAX_BLOCKS 를 넘겨 다시 막힌다.
+        #    dict 순서(저장도 정렬 없이 한다) = 갱신 순서로 두고 가장 오래 갱신되지 않은 항목부터 버린다. 갱신한 키는 빼고
+        #    맨 뒤로 다시 넣는다 — 먼저 들어온 순서로 버리면 오래 열린 활성 세션의 횟수가 먼저 사라진다.
+        #    수는 넣은 뒤에 잰다(저장 뒤 ≤ 200). 지금 키는 맨 뒤라 버려지지 않는다.
+        state.pop(key, None)
+        state[key] = count
+        while len(state) > 200:
+            del state[next(iter(state))]
+        return count if save_state(state) else None
+    finally:
+        lock.close()                                     # 닫으면 잠금이 풀린다
 
 
 def _gate_call_writes(flags: set) -> bool:
@@ -564,6 +614,9 @@ def _bash_write_targets(cmd: str, cwd=None, unknown=None) -> list:
     ⛔ 종료 태그가 없는 heredoc 은 토크나이저가 못 읽는다(Unknown) — 그 명령은 '대상 미상' 이다(fail-closed 방향).
     ⛔ `plan.md` 리터럴만으로 조기 반환하지 않는다 — 원장 경로가 변수(`"$L"`)나 source 한 파일에서 오면 명령에
        그 낱말이 없다(F-377 · F-422). 판정기 이름 · `source` 가 하나도 없을 때만 돌아간다.
+
+    - Note: 이 함수는 같은 명령을 두 번 읽는다(명령 전체 · 조각 — 둘 다 같은 fz-guard 판정). 되돌림 시험은 한쪽 호출만 바꾸면 다른 쪽이
+      같은 원장을 다시 잡아 끝 판정이 그대로인 셀이 있으니, 두 판독이 함께 쓰는 guard 규칙(write_sites · READ · WRITE_ARGS)에 건다.
     """
     if not cmd:
         return []
@@ -799,6 +852,7 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
                 #    훅이 받은 cwd 로 풀면 앞 호출에서 `cd` 한 뒤의 `gates/plan.md` 가 엉뚱한 원장을 가리킨다
                 ev_cwd = ev.get("cwd")
                 base = Path(ev_cwd) if isinstance(ev_cwd, str) and ev_cwd.startswith("/") else cwd
+                ev_ts = _event_time(ev.get("timestamp"))   # 대상 미상 쓰기의 후보를 그 쓰기 뒤에 고쳐진 원장으로 좁힌다(못 읽으면 None)
                 for blk in content:
                     if not (isinstance(blk, dict) and blk.get("type") == "tool_use"):
                         continue
@@ -819,7 +873,7 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
                             # cd 대상을 못 풀었으면 그 쓰기가 어디서 돌았는지 모른다 — None 은 전 원장(fail-closed)
                             bs = (base,) if d is None else None if re.search(r"[$`*?\[]", d) else \
                                 (base, Path(d) if d.startswith("/") else base / d)
-                            unknown.append((t, bs, cmd_s, lits[0] if lits else None))
+                            unknown.append((t, bs, cmd_s, lits[0] if lits else None, ev_ts))
                         for led, res in resolved.items():
                             if any(_same_ledger(t, res, base) for t in tokens):
                                 owned.add(led)
@@ -829,16 +883,21 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
         return None, f"transcript 읽기 실패({type(exc).__name__}) — 전 원장 판정"
     if unknown and len(owned) < len(ledgers):
         # ⛔ 원장을 쓰는 판정기 호출인데 어느 원장인지 모른다 — 조용히 '다른 세션의 원장' 으로 보내면 그 쓰기의 미충족이
-        #    통과한다(F-377 · F-422 — fail-open 의 비용은 한도가 없고, fail-closed 의 비용은 루프 방어가 2회로 묶는다).
+        #    통과한다(F-377 · F-422 — fail-open 의 비용은 한도가 없고, fail-closed 의 비용은 루프 방어가 1회로 묶는다).
         #    F-554 — 후보는 **그 쓰기가 돌던 폴더 아래 원장** + **그 명령 글자에 적힌 원장 경로 리터럴을 그 폴더 기준으로 푼 원장**
         #    (`L=$(realpath ../w/gates/plan.md)` 처럼 `..` 이나 명령 치환으로 폴더 밖을 가리켜도 글자가 남는다). 둘 다 아닌 원장은
         #    막지 않는다 — 남의 원장으로 종료를 막지 않는다. 잔존: 경로를 글자로 쓰지 않은 폴더 밖 쓰기(`$(find ..)`)
         #    F-554 리뷰 — 폴더는 같은 명령의 `cd` 를 반영하고(못 푼 cd · 글롭 cd 는 전 원장), 명령에 적힌 폴더 경로
         #    (`..` · 절대 · `~/` — `$(find ../w …)` · `$(find /abs/w …)`) 아래 원장도 후보다(`./../w` 도 — 정규화한 경로). 폴더를 변수로만 넘긴 검색(`$(find "$X" …)`)은 전 원장 후보다(F-554 r3)
-        cand = {led for led, res in resolved.items() for _t, bs, c, lits in unknown if _unknown_hits(res, bs, c, lits)}
-        sample = ", ".join(sorted({t for t, _b, _c, _l in unknown})[:3])
+        #    쓰기 시각 — 그 쓰기가 적힌 줄의 시각(여유 UNKNOWN_WRITE_SLACK_S 를 뺀 값) 뒤에 한 번도 고쳐지지 않은 원장은 그 쓰기가 쓴
+        #    원장일 수 없다 — 후보에서 뺀다. 같은 원장을 가리키는 미상 쓰기 중 하나라도 '그 뒤 고침' 이거나 시각을 모르면 후보다(fail-closed)
+        hits = [(led, ts) for led, res in resolved.items() for _t, bs, c, lits, ts in unknown if _unknown_hits(res, bs, c, lits)]
+        cand = {led for led, ts in hits if _touched_since(resolved[led], ts)}
+        stale = len({led for led, _ts in hits} - cand - owned)
+        sample = ", ".join(sorted({u[0] for u in unknown})[:3])
         return owned | cand, (f"대상 미상 쓰기 {len(unknown)}건(원장 인자 {sample} 를 풀지 못했다) — 그 쓰기가 돌던 폴더(cd 반영) 아래 · "
-                              f"명령에 적힌 원장 경로 · 폴더 아래로 원장 {len(cand)}개를 이 세션 원장으로 판정한다(그 밖의 원장은 막지 않는다)")
+                              f"명령에 적힌 원장 경로 · 폴더 아래로 원장 {len(cand)}개를 이 세션 원장으로 판정한다(그 밖의 원장은 막지 않는다"
+                              + (f" · 그 쓰기 뒤 바뀌지 않은 원장 {stale}개는 후보에서 뺐다" if stale else "") + ")")
     return owned, ""
 
 
@@ -881,6 +940,33 @@ def _unknown_hits(res: Path, bases, cmd: str, lits=None) -> bool:
         return any(_same_ledger(x, res, f) for x in all_lits for f in list(bases) + [b / u for b in bases or (Path("/"),) for u in ups])
     return any(_under(res, b) or any(_same_ledger(x, res, b) for x in all_lits) or any(_under(res, b / u) for u in ups)
                for b in bases)
+
+
+def _event_time(raw) -> float | None:
+    """transcript 줄의 `timestamp`(ISO 8601 · 끝 `Z` 는 UTC) → epoch 초. 없거나 · 문자열이 아니거나 · 못 읽거나 · 시간대가 없으면 None —
+    시간대 없는 시각을 이 머신의 지역 시각으로 읽으면 그 쓰기의 시각이 몇 시간 뒤로 밀려 자기 원장이 후보에서 빠질 수 있다."""
+    if not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    try:
+        dt = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    except ValueError:
+        return None
+    return dt.timestamp() if dt.tzinfo is not None else None
+
+
+def _touched_since(path: Path, ts) -> bool:
+    """원장이 그 쓰기 시각(`ts` — epoch 초) 뒤에 고쳐졌는가 — 수정 시각 ≥ `ts` − `UNKNOWN_WRITE_SLACK_S`. `ts` 가 None 이거나 원장
+    수정 시각을 못 읽으면 True(지금처럼 후보 — fail-closed).
+
+    - Warning: 쓰기 뒤에 수정 시각을 과거로 되돌린 원장(`cp -p` · `touch -d` · 체크아웃)은 False 다 — 받아들인 놓침 칸이다.
+    """
+    if ts is None:
+        return True
+    try:
+        return os.stat(path).st_mtime >= ts - UNKNOWN_WRITE_SLACK_S
+    except OSError:
+        return True
 
 
 def _under(path: Path, base: Path) -> bool:
@@ -1139,19 +1225,9 @@ def _gate_verdict(payload: dict, started: float) -> int:
     )))
     session = str(payload.get("session_id") or "no-session")
     key = f"{session}|{fingerprint}"
-    state = load_state()
-    count = int(state.get(key) or 0) + 1
-
-    # 오래된 항목 정리 — 상태 파일이 무한히 자라지 않게
-    # ⛔ 전부 비우지 않는다 — 다른 세션의 차단 횟수가 지워지면 그 세션이 같은 원장 상태로 MAX_BLOCKS 를 넘겨 다시 막힌다.
-    #    dict 순서(저장도 정렬 없이 한다) = 갱신 순서로 두고 가장 오래 갱신되지 않은 항목부터 버린다. 갱신한 키는 빼고
-    #    맨 뒤로 다시 넣는다 — 먼저 들어온 순서로 버리면 오래 열린 활성 세션의 횟수가 먼저 사라진다.
-    #    수는 넣은 뒤에 잰다(저장 뒤 ≤ 200). 지금 키는 맨 뒤라 버려지지 않는다.
-    state.pop(key, None)
-    state[key] = count
-    while len(state) > 200:
-        del state[next(iter(state))]
-    if not save_state(state):
+    # 상태 파일은 모든 세션이 함께 쓴다 — 읽기 · 올리기 · 상한 정리 · 저장을 잠금 하나 안에서 한다(동시 Stop 의 횟수 유실 · rename 경쟁)
+    count = _bump_block_count(key)
+    if count is None:
         return _pass("루프 방어 상태를 쓸 수 없어 통과 — 무한 block 을 만들지 않는다")
 
     if count > MAX_BLOCKS:
@@ -1549,6 +1625,15 @@ SELF_TEST_CASES = (
     ("f458-cd-var-ledger-owned", "unmet",  {"transcript": "cd-env-var"}, {}, 2, '"decision": "block"'),
     # ⛔ **예산 소진은 통과가 아니다** (F-378 · F-404) — 소유 원장을 판정하지 못하면 미판정 수를 사유로 막는다.
     ("budget-undecided", "unmet",          {"transcript": "write"}, {"FZ_GATES_HOOK_BUDGET_S": "0"}, 2, "소유 원장 1개 미판정"),
+    # 대상 미상 쓰기의 시각 — 그 쓰기가 적힌 줄의 시각(여유 2초를 뺀 값) 뒤에 한 번도 고쳐지지 않은 원장은 그 쓰기가 쓴 원장일 수 없다:
+    # 후보에서 빠져 남의 원장으로 경고만 하고, 예산도 먹지 않는다(예산 0 이어도 '소유 원장 미판정' 이 아니다). 쓰기 뒤(또는 여유 안)에
+    # 고쳐진 원장 · 시각을 못 읽거나 시간대가 없는 줄은 지금처럼 후보다(fail-closed)
+    ("w3-unknown-stale-foreign", "unmet",  {"transcript": "unknown-ts-future"}, {}, 0, "그 쓰기 뒤 바뀌지 않은 원장 1개는 후보에서 뺐다"),
+    ("w3-unknown-fresh-owned", "unmet",    {"transcript": "unknown-ts-past"}, {}, 2, "대상 미상 쓰기"),
+    ("w3-unknown-ts-unparsed", "unmet",    {"transcript": "unknown-ts-bad"}, {}, 2, "대상 미상 쓰기"),
+    ("w3-unknown-ts-in-slack", "unmet",    {"transcript": "unknown-ts-slack"}, {}, 2, "대상 미상 쓰기"),
+    ("w3-unknown-ts-naive", "unmet",       {"transcript": "unknown-ts-naive"}, {}, 2, "대상 미상 쓰기"),
+    ("w3-stale-candidate-budget", "unmet", {"transcript": "unknown-ts-future"}, {"FZ_GATES_HOOK_BUDGET_S": "0"}, 0, "다른 세션의 원장 1개 미판정"),
 )
 # 반복 발사가 필요한 케이스 — 이름 → 발사 횟수
 REPEAT_CASES = {"loop-guard": MAX_BLOCKS + 1, "loop-guard-churn": MAX_BLOCKS + 1}
@@ -1609,10 +1694,12 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
     `Write` tool_use, `bash` 는 `--finalize` Bash tool_use. 진단 세션이 남의 원장 경로를
     인용하는 것이 소유로 잡히면 안 되므로 `none` 에도 경로를 넣는다."""
     tp = root / "transcript.jsonl"
-    def tool_use(name, inp, cwd=None):
+    def tool_use(name, inp, cwd=None, ts=None):
         ev = {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": name, "input": inp}]}}
         if cwd is not None:
             ev["cwd"] = str(cwd)
+        if ts is not None:
+            ev["timestamp"] = ts
         return json.dumps(ev, ensure_ascii=False)
     lines = [json.dumps({"type": "user", "message": {"content": f"미충족 게이트: {ledger}"}},
                         ensure_ascii=False),
@@ -1654,6 +1741,14 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
         lines.append(tool_use("Bash", {"command": f"python3 gate_check.py --status --only G1 {ledger}"}))
     elif kind == "unknown":
         lines.append(tool_use("Bash", {"command": 'python3 gate_check.py --only G1 "$LEDGER_FROM_PROFILE"'}))
+    elif kind.startswith("unknown-ts-"):
+        # `unknown` 과 같은 대상 미상 쓰기 + 그 줄의 시각 — 원장(이미 썼다)의 수정 시각보다 한 시간 뒤 · 한 시간 앞 · 1초 뒤(여유 안) ·
+        # 못 읽는 글 · 시간대 없는 먼 뒤
+        iso = lambda t: datetime.fromtimestamp(t, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        mtime = ledger.stat().st_mtime
+        ts = {"unknown-ts-future": iso(mtime + 3600), "unknown-ts-past": iso(mtime - 3600), "unknown-ts-slack": iso(mtime + 1.0),
+              "unknown-ts-bad": "not-a-time", "unknown-ts-naive": "2099-01-01T00:00:00.000"}[kind]
+        lines.append(tool_use("Bash", {"command": 'python3 gate_check.py --only G1 "$LEDGER_FROM_PROFILE"'}, ts=ts))
     elif kind == "unknown-elsewhere":
         lines.append(tool_use("Bash", {"command": 'python3 gate_check.py --only G1 "$LEDGER_FROM_PROFILE"'}, cwd=root / "elsewhere"))
     elif kind == "loop-env-prefix":

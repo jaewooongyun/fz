@@ -1209,7 +1209,7 @@ Build R2-3: $42.77 (34%)  — 피드백 반영은 초기 구현의 60%
 | Cross-model Verification | fz-gpt (Claude + GPT; cross-provider 확장 비채택) | 이종 family blind spot 보완 |
 | Lazy Tool Discovery | modules/ Progressive Disclosure Level 3 | 필요 시에만 로드 |
 | System Reminders | modules/execution-modes.md + 마찰 감지 | Instruction fade-out 대응 |
-| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Workflow 교차 스테이지(이력: Team — TEAM 일몰) + GPT. **차단 Hook은 opt-in** — 플러그인이 스스로 등록하는 hook 은 `hooks/hooks.json` 의 Stop 항목 하나다(`gate_stop_hook.py --audit-only` — 워커 심볼 도구 사용을 세고 · 기록하고 · 알릴 뿐 막지 않는다 · `plugin.json`에 `hooks` 키 없음 — 기본 위치). 막는 실행체는 같은 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 92케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **차단 등록은 사용자가 `.claude/settings.json`으로 복사**한다(두 항목이 함께 있어도 훑기는 실행마다 한 번). `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
+| Defense-in-Depth | 4계층 활성: SKILL Gate + cross-validation + Workflow 교차 스테이지(이력: Team — TEAM 일몰) + GPT. **차단 Hook은 opt-in** — 플러그인이 스스로 등록하는 hook 은 `hooks/hooks.json` 의 Stop 항목 하나다(`gate_stop_hook.py --audit-only` — 워커 심볼 도구 사용을 세고 · 기록하고 · 알릴 뿐 막지 않는다 · `plugin.json`에 `hooks` 키 없음 — 기본 위치). 막는 실행체는 같은 `scripts/gate_stop_hook.py`(게이트 2차 계층, 계약 self-test 98케이스가 health-check 2.6에 배선), 템플릿은 `examples/hooks.json.example`, **차단 등록은 사용자가 `.claude/settings.json`으로 복사**한다(두 항목이 함께 있어도 훑기는 실행마다 한 번). `.githooks` commit-msg는 dev-time | 다중 검증 레이어 |
 
 ### Gap 분석 (NLAH 기반, 2026-04-14)
 

@@ -3,16 +3,18 @@
 #   two-unmet     소유 원장 미충족 2개 → 사유에 두 id · `UNMET: 2` · 지문 = sha12("<원장>:unmet")
 #   over-cap      미충족 11개 → 표시 id ≤ 8 · 표시 id 수 + `…외 N건` = 11
 #   long-ids      긴 id 11개 → 요약 ≤ 400자로 줄어도 표시 + 생략 = 11
-#   churn         같은 세션 · 같은 원장이 2개 → 11개로 바뀌어도 지문 1개 · 2회 막고 3회째 통과(MAX_BLOCKS=2)
+#   churn         같은 세션 · 같은 원장이 2개 → 11개로 바뀌어도 지문 1개 · 1회 막고 2회째 통과(MAX_BLOCKS=1)
 #   foreign-k     남의 원장 3개(= 접기 한도 k) → 원장별 경고 3줄 · 통과(비소유 notes 회귀)
 #   foreign-fold  남의 원장 5개(미충족 4 · 계약 위반 1) + 소유 1개 → 경고는 건수 한 줄 · 원장 경로 0
 #   length-cap    소유 원장 8개 × 긴 요약 → 사유 ≤ 4000자 · 안내 줄 보존 · 표시 줄 + `…외 N줄` = 8 · 지문 8항
 #   invalid       소유 원장 계약 위반(중복 id) → `⛔ 원장 계약 위반` 사유 · 지문 = sha12("<원장>:invalid")(exit 3 사유 경로)
 #   infra         소유 원장 읽기 불가(chmod 000) → 판정기 exit 2 · `인프라` 진단 · 통과(인프라 실패 회귀)
-#   state-cap     상태 상한 200항목 — 남의 항목 199개 · 세션 A 2회 차단 · 항목 2개 더 · 세션 B 차단(상한 초과) → A 셋째는 통과 ·
+#   state-cap     상태 상한 200항목 — 남의 항목 199개 · 세션 A 1회 차단 · 항목 2개 더 · 세션 B 차단(상한 초과) → A 둘째는 통과 ·
 #                 저장 뒤 200항목 · 버린 것은 가장 오래된 3개뿐(전부 비우면 A 의 횟수가 지워져 A 가 다시 막힌다)
 #   state-cap-lru 가장 먼저 들어왔지만 계속 활성인 세션 A — 갱신하면 맨 뒤로 가므로 상한을 넘겨도 A 대신 가장 오래 갱신되지
 #                 않은 항목 12개를 버린다(먼저 들어온 순서로 버리면 A 가 지워진다)
+#   state-concurrent 같은 HOME 에서 프로세스 4개가 동시에 차단 횟수를 200번씩 올린다(`_bump_block_count`) → 최종 800 · 잠금 실패 0 ·
+#                 상태 저장(`save_state`)을 동시에 200번씩 → 실패 0(임시 파일 이름이 부를 때마다 다르다)
 # 지문은 기준 공식(`gate_stop_hook.py` 지문 블록 — 원장 경로:판정 종류의 sha12)을 여기서 따로 계산해 상태 파일 키와 맞춘다.
 # 기준 트리는 끝 줄만 실어 two-unmet · over-cap · long-ids 에서 앞 id 를 놓치고, 남의 원장을 접지 않는다 → exit 1.
 # exit: 0 전건 통과 · 1 단언 실패 · 2 중첩 실행(`UNRUN:`) · 3 준비 실패(인자 · 스크립트 · 임시 폴더 · 단언기 고장)
@@ -40,7 +42,7 @@ command -v python3 >/dev/null 2>&1 || { echo "SETUP python3 부재"; exit 3; }
   || { echo "SETUP gate_stop_hook.py · gate_check.py 없음: ${S:-?}"; exit 3; }
 
 FZ_STOP_REASON_MULTI_FIXTURE=1 PYTHONDONTWRITEBYTECODE=1 python3 -B - "$S" <<'PY'
-import hashlib, json, os, pathlib, re, subprocess, sys, tempfile, traceback
+import hashlib, json, os, pathlib, re, subprocess, sys, tempfile, time, traceback
 
 
 def _crash(*exc):   # 단언기 고장은 3 — 미처리 예외의 기본 exit 1 은 '단언 실패' 와 구별되지 않는다
@@ -54,7 +56,7 @@ sys.dont_write_bytecode = True
 
 HOOK = pathlib.Path(sys.argv[1]) / "gate_stop_hook.py"
 PY = sys.executable
-IDS_SHOWN, SUMMARY_MAX, FOLD_K, REASON_MAX, MAX_BLOCKS = 8, 400, 3, 4000, 2   # 사유 계약 값(F-360 · EC-07)
+IDS_SHOWN, SUMMARY_MAX, FOLD_K, REASON_MAX, MAX_BLOCKS = 8, 400, 3, 4000, 1   # 사유 계약 값(F-360 · EC-07)
 STATE_MAX = 200                                                                  # 루프 방어 상태 파일 상한(항목 수)
 FAIL = []
 
@@ -219,27 +221,31 @@ def summary_cell(name, ids, want_ids_all):
 
 def cap_cell(name, steps, evicted):
     """상태 상한 — 넘치면 가장 오래 갱신되지 않은 항목부터 버리고, 갱신 중인 세션의 횟수는 남긴다.
-    steps = ("seed", 접두, 수) | ("fire", 세션 꼬리). 마지막 발사는 세션 A 의 셋째 시도다."""
+    steps = ("seed", 접두, 수) | ("fire", 세션 꼬리). 세션마다 MAX_BLOCKS 번째 시도까지 막고 그 뒤는 루프 방어로 통과한다 —
+    마지막 발사는 세션 A 의 그다음 시도다."""
     with Cell(name) as c:
         led = ledger(c.cwd, "T-0001", ["S36", "S28d"])
         tp = transcript(c.cwd, [led])
-        seeded, rcs, err = [], [], ""
+        seeded, rcs, err, want, fired = [], [], "", [], {}
         for step in steps:
             if step[0] == "seed":
                 keys = [f"{step[1]}{i}|x" for i in range(step[2])]
                 seed(c.home, keys)
                 seeded += keys
             else:
+                fired[step[1]] = fired.get(step[1], 0) + 1
+                want.append(2 if fired[step[1]] <= MAX_BLOCKS else 0)
                 rc, _reason, err = hook(c.cwd, c.home, f"{c.session}-{step[1]}", tp)
                 rcs.append(rc)
-        check(name, rcs == [2, 2, 2, 0], "A 2회 · B 1회 차단 뒤 A 셋째는 통과 — 상한이 A 의 횟수를 지우지 않는다", rcs)
-        check(name, "회 막았다" in err, "A 셋째 통과는 루프 방어 진단", err[-200:])
+        check(name, rcs == want and want[-1] == 0,
+              f"A {MAX_BLOCKS + 1}회째부터 통과 · B 첫 시도는 차단 — 상한이 A 의 횟수를 지우지 않는다", f"{rcs} (기대 {want})")
+        check(name, "회 막았다" in err, "A 마지막 시도의 통과는 루프 방어 진단", err[-200:])
         st = state(c.home)
         key = lambda s: f"{c.session}-{s}|{fp([f'{led}:unmet'])}"
         check(name, len(st) == STATE_MAX, f"저장 뒤 항목 = 상한 {STATE_MAX}(넣은 뒤 기준)", len(st))
         gone = [k for k in seeded if k not in st]
         check(name, gone == evicted, f"버린 항목 = 가장 오래 갱신되지 않은 {len(evicted)}개", gone[:20])
-        check(name, st.get(key("A")) == MAX_BLOCKS + 1 and st.get(key("B")) == 1, "A 카운트 3 · B 카운트 1",
+        check(name, st.get(key("A")) == fired["A"] and st.get(key("B")) == 1, f"A 카운트 {fired['A']} · B 카운트 1",
               {k: v for k, v in st.items() if not k.endswith("|x")})
 
 
@@ -256,13 +262,14 @@ try:
         shots = [hook(c.cwd, c.home, c.session, tp)]
         ledger(c.cwd, "T-0001", [f"U{i:02d}" for i in range(1, 12)])          # 옆 편집 — 내용 · 요약이 바뀐다
         shots += [hook(c.cwd, c.home, c.session, tp) for _ in range(MAX_BLOCKS)]
+        after = hook(c.cwd, c.home / "after", c.session, tp)[1]              # 옆 편집 뒤의 사유 — 횟수가 없는 다른 HOME 의 첫 차단
         rcs = [s[0] for s in shots]
         check("churn", rcs == [2] * MAX_BLOCKS + [0], f"{MAX_BLOCKS}회 막고 {MAX_BLOCKS + 1}회째 통과", rcs)
         check("churn", "회 막았다" in shots[-1][2], "마지막 통과는 루프 방어 진단", shots[-1][2][-200:])
-        check("churn", shots[0][1] != shots[1][1], "두 차단의 사유는 다르다(요약이 바뀐 셀)", "")
+        check("churn", after is not None and shots[0][1] != after, "옆 편집 전후의 차단 사유는 다르다(요약이 바뀐 셀)", "")
         st = state(c.home)
         check("churn", st == {f"{c.session}|{fp([f'{led}:unmet'])}": MAX_BLOCKS + 1},
-              "지문 1개 · 카운트 3 — 요약 변화가 카운터를 리셋하지 않는다", st)
+              f"지문 1개 · 카운트 {MAX_BLOCKS + 1} — 요약 변화가 카운터를 리셋하지 않는다", st)
 
     # ── foreign-k — 남의 원장 k 개는 원장별 경고(비소유 notes 회귀) ────────────────
     with Cell("foreign-k") as c:
@@ -332,10 +339,77 @@ try:
         check("infra", state(c.home) == {}, "통과는 상태 파일을 쓰지 않는다", state(c.home))
 
     # ── state-cap · state-cap-lru — 상태 상한이 활성 세션의 차단 횟수를 지우지 않는다 ─────────
-    cap_cell("state-cap", [("seed", "old", 199), ("fire", "A"), ("fire", "A"), ("seed", "new", 2),
+    cap_cell("state-cap", [("seed", "old", 199)] + [("fire", "A")] * MAX_BLOCKS + [("seed", "new", 2),
                            ("fire", "B"), ("fire", "A")], [f"old{i}|x" for i in range(3)])
     cap_cell("state-cap-lru", [("fire", "A"), ("seed", "mid", 150), ("fire", "A"), ("seed", "late", 60),
                                ("fire", "B"), ("fire", "A")], [f"mid{i}|x" for i in range(12)])
+
+    # ── state-concurrent — 동시 Stop 의 횟수 갱신이 서로를 덮지 않는다(읽기부터 저장까지 잠금 · 임시 파일은 부를 때마다 새 이름) ──
+    #    같은 시각에 함께 출발한다 — 기동 시간 차로 차례로 돌면 잠금 없이도 유실이 없어 이 셀이 그 회귀를 못 본다
+    with Cell("state-concurrent") as c:
+        workers, bumps = 4, 200
+        key = f"{c.session}|{fp(['x:unmet'])}"
+        prog = ("import importlib.util, sys, time\n"
+                "s = importlib.util.spec_from_file_location('h', sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)\n"
+                "time.sleep(max(0.0, float(sys.argv[4]) - time.time()))\n"
+                "n = int(sys.argv[3])\n"
+                "if sys.argv[2] == 'save':\n"
+                "    print(sum(not m.save_state({'k': i}) for i in range(n)))\n"
+                "else:\n"
+                "    print(sum(m._bump_block_count(sys.argv[2]) is None for _ in range(n)))\n")
+        env = {k: v for k, v in os.environ.items() if k not in ("FZ_GATES_LEDGER", "FZ_GATES_OFF", "FZ_GATES_TRACE")}
+        env.update(HOME=str(c.home), PYTHONDONTWRITEBYTECODE="1")
+
+        def race(arg):
+            start = f"{time.time() + 1.5:.3f}"
+            try:
+                procs = [subprocess.Popen([PY, "-B", "-c", prog, str(HOOK), arg, str(bumps), start], stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE, env=env) for _ in range(workers)]
+                outs = [p.communicate(timeout=120) for p in procs]
+            except (OSError, subprocess.SubprocessError) as e:
+                raise Setup(f"동시 프로세스 실행 실패: {e}")
+            return [p.returncode for p in procs], [o.decode("utf-8", "replace").strip() for o, _e in outs], \
+                " ⏎ ".join(e.decode("utf-8", "replace").strip()[-200:] for _o, e in outs)
+
+        rcs, misses, err = race(key)
+        check("state-concurrent", rcs == [0] * workers and misses == ["0"] * workers,
+              f"프로세스 {workers}개 × {bumps}회 갱신 — 잠금을 못 잡거나 못 쓴 갱신 0", f"rc={rcs} · 실패={misses} · {err}")
+        check("state-concurrent", state(c.home) == {key: workers * bumps},
+              f"최종 횟수 = {workers * bumps}(갱신 유실 0)", state(c.home))
+        rcs, misses, err = race("save")
+        check("state-concurrent", rcs == [0] * workers and misses == ["0"] * workers,
+              f"상태 저장 {workers}개 × {bumps}회 동시 — 저장 실패 0", f"rc={rcs} · 실패={misses} · {err}")
+        left = sorted(p.name for p in (c.home / ".fz").iterdir()) if (c.home / ".fz").is_dir() else []
+        check("state-concurrent", left == ["stop-hook-state.json", "stop-hook-state.lock"],
+              "상태 폴더에 남은 것 = 상태 파일 · 잠금 파일(임시 파일 0)", left)
+        # 잠금을 남이 쥐고 있다 — 상한 안에 못 잡으면 막지 않고 통과 · 상태 그대로(루프 방어를 못 하는데 막으면 무한 block 이다)
+        led = ledger(c.cwd, "T-0001", ["S36", "S28d"])
+        tp = transcript(c.cwd, [led])
+        before = state(c.home)
+        try:
+            import fcntl
+            holder = open(c.home / ".fz" / "stop-hook-state.lock", "a", encoding="utf-8")
+            fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+        except (ImportError, OSError) as e:
+            raise Setup(f"잠금을 쥘 수 없다: {e}")
+        try:
+            rc, reason, err = hook(c.cwd, c.home, c.session, tp)
+        finally:
+            holder.close()
+        check("state-concurrent", rc == 0 and reason is None and "루프 방어 상태를 쓸 수 없어 통과" in err,
+              "잠금을 남이 쥐고 있으면 막지 않고 통과(진단만)", f"rc={rc} {err[-300:]}")
+        check("state-concurrent", state(c.home) == before, "잠금을 못 잡은 훅은 상태를 바꾸지 않는다", state(c.home))
+        # 상태 파일 자리가 폴더라 바꿔 넣기가 실패한다 — 저장 실패로 세고 임시 파일을 남기지 않는다
+        sf = c.home / ".fz" / "stop-hook-state.json"
+        try:
+            sf.unlink()
+            sf.mkdir()
+            r = subprocess.run([PY, "-B", "-c", prog, str(HOOK), "save", "1", "0"], capture_output=True, env=env, timeout=60)
+        except (OSError, subprocess.SubprocessError) as e:
+            raise Setup(f"저장 실패 준비 실패: {e}")
+        left = sorted(p.name for p in (c.home / ".fz").iterdir())
+        check("state-concurrent", r.returncode == 0 and r.stdout.decode().strip() == "1" and left == ["stop-hook-state.json", "stop-hook-state.lock"],
+              "바꿔 넣기가 실패한 저장은 실패(False) · 임시 파일 0", f"rc={r.returncode} · 실패={r.stdout.decode().strip()} · {left}")
 except Setup as e:
     print(f"SETUP {e}")
     sys.exit(3)

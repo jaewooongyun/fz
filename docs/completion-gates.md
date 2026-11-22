@@ -155,14 +155,14 @@ exec python3 "$H"
 
 ```bash
 python3 --version
-python3 <플러그인>/scripts/gate_stop_hook.py --self-test   # 92/92 passed
+python3 <플러그인>/scripts/gate_stop_hook.py --self-test   # 98/98 passed
 ```
 
 ### 5. 상태 파일을 홈에 만든다
 
-`~/.fz/stop-hook-state.json` — 무한 루프 방어용 카운터다. 같은 원장 상태로 두 번 막은 뒤에는 통과시킨다. 쓰기에 실패하면 즉시 통과한다(방어 없이 막으면 무한 block 이 된다).
+`~/.fz/stop-hook-state.json` — 무한 루프 방어용 카운터다. 같은 원장 상태로 한 번 막은 뒤에는 통과시킨다. 모든 세션이 이 파일 하나를 쓰므로 읽기부터 저장까지 옆의 잠금 파일 `~/.fz/stop-hook-state.lock` 을 잡고 한다. 잠금을 3초 안에 못 잡거나 쓰기에 실패하면 즉시 통과한다(방어 없이 막으면 무한 block 이 된다).
 
-워크플로 실행이나 직접 호출 기록이 있는 세션에서는 아래 훑기가 `${FZ_RUN_STATE:-~/.fz/runs}/mcp-sweep.jsonl`(판정 기록) · `mcp-sweep.keys.json`(판정한 실행의 열쇠) · `mcp-sweep.lock`(두 항목이 함께 돌 때의 잠금) · `mcp-sweep.held.json`(막는 종료에서 미룬 알림)도 만든다. 플러그인만 설치한 머신도 같다 — 상태 파일(`stop-hook-state.json`)은 차단 항목만 만든다.
+워크플로 실행이나 직접 호출 기록이 있는 세션에서는 아래 훑기가 `${FZ_RUN_STATE:-~/.fz/runs}/mcp-sweep.jsonl`(판정 기록) · `mcp-sweep.keys.json`(판정한 실행의 열쇠) · `mcp-sweep.lock`(두 항목이 함께 돌 때의 잠금) · `mcp-sweep.held.json`(막는 종료에서 미룬 알림)도 만든다. 플러그인만 설치한 머신도 같다 — 상태 파일(`stop-hook-state.json` · 잠금 `stop-hook-state.lock`)은 차단 항목만 만든다.
 
 ### 6. 원장을 못 찾으면 차단도 없다
 
