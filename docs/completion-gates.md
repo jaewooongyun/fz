@@ -155,7 +155,7 @@ exec python3 "$H"
 
 ```bash
 python3 --version
-python3 <플러그인>/scripts/gate_stop_hook.py --self-test   # 100/100 passed
+python3 <플러그인>/scripts/gate_stop_hook.py --self-test   # 101/101 passed
 ```
 
 ### 5. 상태 파일을 홈에 만든다

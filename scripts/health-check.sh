@@ -710,9 +710,10 @@ fi
 # ⛔ 스크립트가 없으면 UNRUN 이 아니다 — 위 사전조건이 이미 부재를 exit 2 로 잡는다.
 for FS in check_release_notes check_report_regen eject_findings check_findings_hygiene check_release_closes migrate_findings_frontmatter check_symptom_anchor check_external_commands check_global_budget check_asset_census report_stale_findings autonomy_decide check_failure_table check_single_source candidate_expiry check_wf_advisor_ban check_gpt_surface check_gpt_skill_portability gpt_kinds gpt_merge gpt_ab_decide mode_gate counter_adapter gpt_rounds health_select check_retired_commands run_runners check_evidence_slots fz_snapshot fz_stop_telemetry fz_telemetry_report lint_contracts lint_doc_freshness run_metrics check_health_wiring check_synthesized check_comment_worthy intent_route_probe check_finding_contracts check_unrun_except check_rule_copies check_marker_leak collect_env_axes call_set_diff check_moved_code collect_weak_unwrap check_applied_escapes check_pr_template check_review_diff check_unmeasured_handoff removal_history measure_constraint_load check_catalog_hits catalog_hits_report check_verdict judge_corpus_diff leak_rules git_prep; do
   FS_OUT="$(cd "$ROOT" && python3 "scripts/$FS.py" --self-test 2>&1)"; FS_CODE=$?
-  # 통과 비고 = 분모가 보이는 요약 줄 — `self-test N/M …` · `N/M passed` · `… (N/M)` · `… 전부 통과`. `^self-test` 만 보던 판은
-  #   다른 꼴로 요약하는 도구 다섯을 빈 비고로 통과시켰다. exit 0 인데 요약 줄이 없으면 무엇을 셌는지 모르는 통과라 실패로 센다
-  FS_NOTE="$(printf '%s\n' "$FS_OUT" | grep -E '^self-test|[0-9]+/[0-9]+ passed|\([0-9]+/[0-9]+\)$|전부 통과' | tail -1)"
+  # 통과 비고 = 분모가 보이는 요약 줄 — 같은 줄에 셈(`N/M` 또는 `N checks, M failed`)이 있는 `self-test …` · `N/M passed` · `… (N/M)` ·
+  #   `… 전부 통과`. `^self-test` 만 보던 판은 다른 꼴로 요약하는 도구 다섯을 빈 비고로 통과시켰고, 셈 없는 `self-test PASS` 도 비고로 받았다.
+  #   exit 0 인데 요약 줄이 없으면 무엇을 셌는지 모르는 통과라 실패로 센다
+  FS_NOTE="$(printf '%s\n' "$FS_OUT" | grep -E '^self-test.*([0-9]+/[0-9]+|[0-9]+ checks, [0-9]+ failed)|[0-9]+/[0-9]+ passed|\([0-9]+/[0-9]+\)$|전부 통과' | tail -1)"
   if [ "$FS_CODE" -eq 0 ] && [ -z "$FS_NOTE" ]; then
     record "레지스트리 도구 self-test ($FS)" 1 "⛔ 분모 없는 통과 — 비고 줄 없음"
   else

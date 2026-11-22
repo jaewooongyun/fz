@@ -11,9 +11,13 @@
 #   c-harness-12-remark-forms        통과 요약 꼴 다섯 — `self-test N/M passed` · `N/M passed` · `X self-test: PASS (N/M)` · `… 전부 통과` ·
 #                                    분모 줄 뒤에 `X self-test: PASS` 가 붙는 꼴 → 전부 통과(0) · 비고 = 그 요약 줄(마지막 꼴은 분모 줄)
 #   c-harness-12-no-denominator      exit 0 인데 요약 줄이 없는 도구 → 실패(1) · 비고 '분모 없는 통과'
+#   c-harness-12-selftest-no-count   exit 0 · `self-test PASS` 처럼 셈 없는 `self-test` 줄뿐인 도구 → 실패(1) · 비고 '분모 없는 통과'
+#   c-harness-12-selftest-count-forms  `self-test` 줄의 셈 두 꼴 — `self-test x: OK (N checks, M failed)` · `self-test N/M passed` → 통과(0) ·
+#                                    비고 = 그 줄
 #   c-harness-12-fail-still-fires    exit 1 도구 → 실패(1) · 비고 = 그 FAIL 줄(통과 비고를 넓혀도 실패 판정은 그대로다)
 #   c-harness-12-unrun-still-unrun   `UNRUN:` 표지 + exit 2 도구 → 미실행(UNRUN) · 미실행 수 +1(가드는 exit 0 에만 걸린다)
-# 기준 트리(통과 비고 = `^self-test` 만 · 가드 없음 · SKIP 일곱)는 remark-forms · no-denominator · retired-skip-gone 이 실패해 exit 1 이다.
+# 기준 트리(통과 비고 = `^self-test` 만 · 가드 없음 · SKIP 일곱)는 remark-forms · no-denominator · selftest-no-count · retired-skip-gone 이
+# 실패해 exit 1 이다.
 # exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패(인자 · 트리 · 함수 추출 · 임시 폴더 · 단언기 고장)
 #   ⛔ 준비 실패를 1 로 내면 '기준 트리 exit 1' 이 기능 부재 재현 없이 통과한다 — 그래서 3 이다(미처리 예외도 3).
 # usage: run.sh [--tree <플러그인 루트>]   (기본: 이 fixture 가 든 트리)
@@ -109,7 +113,7 @@ def run_block(P, root, block):
 
 # 심는 도구 — 이름 → (출력, exit). 출력 꼴은 이 트리 도구들의 실제 요약 줄 꼴을 따른다
 #   (`self-test N/M passed` · fz_snapshot 의 `N/M passed` · run_metrics 의 `… self-test: PASS (N/M)` · lint_contracts 의 `… 전부 통과` ·
-#    counter_adapter 의 분모 줄 + `… self-test: PASS`)
+#    counter_adapter 의 분모 줄 + `… self-test: PASS` · gpt_kinds 의 `self-test X: OK (N checks, M failed)`)
 PLANT = {
     "shape_selftest": ("case-a: PASS\nself-test 3/3 passed\n", 0),
     "shape_passed": ("PASS 스냅숏 기록\nPASS 플러그인 루트 아님 → exit 2\n26/26 passed\n", 0),
@@ -117,6 +121,9 @@ PLANT = {
     "shape_all_pass": ("양성 대조 78건 + 통합 fixture 12검사(46 위치) 전부 통과\n", 0),
     "shape_trailing_pass": ("cli-missing-or-junk: PASS\nself-test 11/11 passed\nshape_trailing_pass self-test: PASS\n", 0),
     "shape_no_denominator": ("케이스를 돌렸다\n", 0),
+    "shape_selftest_bare": ("case-a: PASS\nself-test PASS\n", 0),
+    "shape_selftest_checks": ("checks-a: PASS\nself-test shape_selftest_checks: OK (12 checks, 0 failed)\n", 0),
+    "shape_selftest_count": ("case-a: PASS\nself-test 12/12 passed\n", 0),
     "shape_fail": ("self-test 2/3 passed\nFAIL case-b: 기대 1 · 실제 0\n", 1),
     "shape_unrun": ("UNRUN: 입력 원장 없음 — 판정 불가\n", 2),
 }
@@ -147,6 +154,13 @@ try:
     c, note = got["shape_no_denominator"]
     check("c-harness-12-no-denominator", c == "1" and "분모 없는 통과" in note, "exit 0 · 요약 줄 없음 → 실패(1) · 비고 '분모 없는 통과'",
           f"code={c} note={note}")
+    c, note = got["shape_selftest_bare"]
+    check("c-harness-12-selftest-no-count", c == "1" and "분모 없는 통과" in note,
+          "exit 0 · 셈 없는 `self-test PASS` 줄뿐 → 실패(1) · 비고 '분모 없는 통과'", f"code={c} note={note}")
+    want_count = {"shape_selftest_checks": "self-test shape_selftest_checks: OK (12 checks, 0 failed)",
+                  "shape_selftest_count": "self-test 12/12 passed"}
+    bad = {k: got[k] for k in want_count if got[k] != ("0", want_count[k])}
+    check("c-harness-12-selftest-count-forms", not bad, "`self-test` 줄의 셈 두 꼴(N checks, M failed · N/M) → 통과(0) · 비고 = 그 줄", bad)
     c, note = got["shape_fail"]
     check("c-harness-12-fail-still-fires", c == "1" and note == "⛔ FAIL case-b: 기대 1 · 실제 0", "exit 1 → 실패(1) · 비고 = FAIL 줄",
           f"code={c} note={note}")

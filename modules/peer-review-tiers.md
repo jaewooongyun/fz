@@ -95,13 +95,13 @@ elif [[ "$INPUT" =~ ^[0-9]+$ ]]; then
   RENAMED_LINES=$(gh pr view "$INPUT" --json files 2>/dev/null | jq '[.files[] | select(.previous_filename != null or .previousFilename != null) | .additions + .deletions] | add // 0' 2>/dev/null || echo 0)
   CHANGED_FILES=$(gh pr view "$INPUT" --json files -q '.files | length' 2>/dev/null || echo 0)
 else
-  # branch input — BASE 존재 검증
+  # branch input — BASE 존재 검증 · 로컬에 없으면 origin 에서 가져와 그 뒤로는 origin/$BASE 로 잰다(가져오기는 로컬 가지를 만들지 않는다)
   case "$INPUT" in
     feature/*) BASE="${BASE:-develop}";;
     hotfix/*)  BASE="${BASE:-main}";;
     *) BASE=$(AskUserQuestion "Base branch?");;
   esac
-  git rev-parse --verify "$BASE" >/dev/null 2>&1 || python3 "${FZ_PLUGIN_ROOT}/scripts/git_prep.py" fetch --repo "$(git rev-parse --show-toplevel)" --remote origin --ref "$BASE" 2>/dev/null || { echo "⛔ BASE '$BASE' not found. Abort tier auto."; TIER=2; TIER_AUTO_BLOCKED=1; }
+  git rev-parse --verify "$BASE" >/dev/null 2>&1 || { python3 "${FZ_PLUGIN_ROOT}/scripts/git_prep.py" fetch --repo "$(git rev-parse --show-toplevel)" --remote origin --ref "$BASE" 2>/dev/null && BASE="origin/$BASE"; } || { echo "⛔ BASE '$BASE' not found. Abort tier auto."; TIER=2; TIER_AUTO_BLOCKED=1; }
   # ⛔ numstat 을 한 번 떠 git 종료 코드를 먼저 받는다(F-385). `git diff … 2>/dev/null | awk … END{print a+0}` 는
   #    diff 실패(없는 INPUT 브랜치 등)를 변경량 0 으로 읽어 가장 낮은 Tier 로 기운다 — F-135 와 같은 클래스.
   #    실패면 위 BASE 부재와 같이 TIER=2. 회귀: tests/fixtures/peer-review/tier-input-single-source/run.sh --cells branch

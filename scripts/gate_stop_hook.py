@@ -1299,6 +1299,7 @@ SWEEP_HELD = "mcp-sweep.held.json"     # 막는 종료에서 판정한 '의심' 
 SWEEP_HELD_MAX = 200                   # 미룬 알림을 둔 세션 수 상한 — 넘으면 가장 먼저 미룬 세션부터 버린다
 SWEEP_LINE_RE = re.compile(r"^MCP_SWEEP runs=(\d+) used=\d+ suspect=(\d+) ", re.M)
 SWEEP_SUSPECT_RE = re.compile(r"^  의심: (\S+) (\S+)", re.M)
+SWEEP_RESTORED_RE = re.compile(r"^  의심: \S+ \S+ .*— 앞선 훑기의 판정", re.M)   # 그중 열쇠를 되살린 훑기가 한 번 찍는 앞선 훑기의 판정(요약 줄 실행 수 밖)
 
 
 def _state_targets(cmd: str, base: Path) -> list:
@@ -1481,7 +1482,9 @@ def sweep_session(payload: dict, started: float, code: int) -> None:
             return                                       # 의심이 없으면 조용하다
         shown = ", ".join((prior + sus)[:3]) + (f" …외 {len(prior + sus) - 3}개" if len(prior + sus) > 3 else "")
         earlier = f" · 앞서 막은 종료에서 미룬 의심 {len(prior)}" if prior else ""
-        print(json.dumps({"systemMessage": f"[fz] 워커 심볼 도구 점검 — 이번에 끝난 실행 {m.group(1) if m else 0}개 중 의심 {len(sus)}{earlier} "
+        restored = len(SWEEP_RESTORED_RE.findall(out)) if m else 0   # `sus` 중 앞선 훑기의 판정 — 이번에 끝난 실행의 의심과 따로 센다
+        again = f" · 앞선 훑기가 판정한 의심 {restored}" if restored else ""
+        print(json.dumps({"systemMessage": f"[fz] 워커 심볼 도구 점검 — 이번에 끝난 실행 {m.group(1) if m else 0}개 중 의심 {len(sus) - restored}{again}{earlier} "
                                            f"({shown}) · 낱말 뜻 {ROOT / 'modules' / 'symbol-tools-audit.md'} · 기록 {runs / SWEEP_RECORD}"
                                            f" · 끄기 {SWEEP_OFF_ENV}=1(이 점검만) · FZ_GATES_OFF=1(게이트 판정과 함께)"}, ensure_ascii=False))
     except Exception:                                    # noqa: BLE001 — 훑기는 게이트 결과를 바꾸지 못한다(어떤 오류도 조용히 끝난다)
@@ -1978,7 +1981,8 @@ def _sweep_cell(name: str, home: Path, ledger_env: str) -> str:
 # 플러그인 등록 · 감사 전용 셀 — 플러그인이 스스로 등록한 Stop 항목(`hooks/hooks.json` → `--audit-only`)은 게이트를 판정하지 않고 위 훑기만
 # 한다. 설정에 전체 항목을 더한 머신은 같은 종료에 두 항목이 함께 돈다(잠금 · 미룬 알림). 이름에 `sweep-` 접두를 쓰지 않는다(위 여섯만 센다)
 AUDIT_CELLS = ("audit-only-notice", "audit-only-no-block", "audit-only-quiet-errors", "audit-only-off", "audit-only-idle",
-               "audit-only-one-record", "held-notice", "plugin-hook-registration", "plugin-hook-python-fails", "plugin-hook-macos-guard")
+               "audit-only-one-record", "held-notice", "restored-notice", "plugin-hook-registration", "plugin-hook-python-fails",
+               "plugin-hook-macos-guard")
 CELL_NOT_RUN = "미실행 — "               # 셀이 이 머리로 시작하는 사유를 돌려주면 실패가 아니라 미실행이다(통과로 세지 않고 따로 적는다)
 
 
@@ -2241,6 +2245,16 @@ def _audit_cell(name: str, home: Path, ledger_env: str) -> str:
                   and len(lines) == 1 and lines[0].get("summary", {}).get("suspect") == 2)
             return "" if ok else (f"exit {code1}/{code2}/{code3} · 알림 {notice1!r} / {notice2!r} / {notice3!r} · 기록 줄 {len(lines)} "
                                   "(기대 막음 · 알림 없음 / 미룬 의심 2 / 없음 · 줄 1)")
+        if name == "restored-notice":                    # 기록 줄은 썼는데 열쇠를 잃은 종료 뒤 — 되살린 훑기의 의심은 이번 판정과 따로 센다 · 한 번뿐
+            code1, notice1, _e = fire(True, payload)
+            os.remove((runs / SWEEP_RECORD).with_suffix(".keys.json"))   # 열쇠만 잃는다 — 다음 훑기가 기록 줄에서 열쇠를 되살린다
+            code2, notice2, _e = fire(True, payload)
+            code3, notice3, _e = fire(True, payload)     # 그다음 종료 — 되살린 판정을 다시 알리지 않는다
+            lines = recs()
+            ok = (code1 == 0 and code2 == 0 and code3 == 0 and "의심 2 (" in notice1 and "앞선 훑기" not in notice1
+                  and "이번에 끝난 실행 0개 중 의심 0 · 앞선 훑기가 판정한 의심 2 (" in notice2 and not notice3 and len(lines) == 1)
+            return "" if ok else (f"exit {code1}/{code2}/{code3} · 알림 {notice1!r} / {notice2!r} / {notice3!r} · 기록 줄 {len(lines)} "
+                                  "(기대 의심 2 / 이번 0 · 앞선 훑기가 판정한 의심 2 / 없음 · 줄 1)")
         # audit-only-one-record — 두 항목이 한 세션의 같은 종료에 돈다: 플러그인 항목(감사 전용 · CLAUDE_PLUGIN_ROOT 있음)과 설정 항목(없음).
         # 시험이 잠금을 쥔 동안에는 둘 다 기다리다 조용히 끝나고(아무것도 쓰지 않는다), 놓은 뒤 함께 띄우면 실행마다 기록 한 번 · 알림 한 번이다
         import fcntl

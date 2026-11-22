@@ -16,6 +16,8 @@
 #   branch  브랜치 입력 diff 실패(F-385) — 문서의 브랜치 분기 블록(`# branch input` ~ `fi` + `CHANGED_LINES=` 줄)을 뽑아
 #           임시 git 리포(BASE=develop 존재 · 원격 없음 · GIT_ALLOW_PROTOCOL=file · AskUserQuestion stub)에서 실행한다.
 #           없는 INPUT(feature/no-such-branch)은 0줄이 아니라 '⛔ diff 실패' 표지 + 판정 불가 표시, 정상 브랜치는 실제 변경량.
+#           그 리포를 로컬 파일 원격 origin 으로 둔 clone(로컬 develop · origin/develop 없음)에서: 원격에만 있는 BASE 는 가져온 뒤
+#           origin/develop 으로 잰 실제 변경량(TIER=2 폴백 · 판정 불가 아님) · 어디에도 없는 BASE 는 예전 그대로 BASE 부재 표지 + TIER=2.
 #           ⛔ 기준 블록(`2>/dev/null | awk … END{print a+0}`)은 CHANGED_LINES=0 으로 진행한다 — 이 셀이 FAIL(exit 1)
 #           모드 단락(`# 2. 모드` — modules/mode-gate.md · 2026-11-12)까지 돌리면: 판정 불가는 **묻지 않고** light = TIER=1 + '측정 불가' 통보
 #           (mode_gate.py peer --unmeasured) · 정상 브랜치는 추천 light → 묻지 않고 TIER=1 · MODE=full 이 정해져 있으면 TIER=2 ·
@@ -217,6 +219,31 @@ printf "RESULT TIER=%s CHANGED_LINES=%s ADDED=%s DELETED=%s RENAMED_LINES=%s REC
   fi
   [ ! -s "$TMP/ask.log" ] && pass "branch AskUserQuestion 호출 0" "feature/* → BASE=develop (stub 미호출)" \
     || fail "branch AskUserQuestion 호출 0" "$(head -1 "$TMP/ask.log")"
+  # 원격에만 있는 BASE — 위 리포를 로컬 파일 원격 origin 으로 둔 clone 에서 로컬 develop 과 origin/develop 을 지운다(네트워크 없음).
+  #   가져오기는 origin/develop · FETCH_HEAD 만 고치고 로컬 develop 을 만들지 않는다 — 블록이 그 뒤 origin/develop 으로 diff 를 떠야 실제 변경량이다
+  C="$TMP/clone"
+  { git clone -q "$R" "$C" && git -C "$C" checkout -q -b feature/ok origin/feature/ok && git -C "$C" branch -q -D develop \
+    && git -C "$C" remote set-head origin -d && git -C "$C" update-ref -d refs/remotes/origin/develop; } >/dev/null 2>&1 \
+    || { echo "원격 BASE 셀 clone 준비 실패" >&2; exit 2; }
+  ! git -C "$C" rev-parse -q --verify develop >/dev/null && ! git -C "$C" rev-parse -q --verify origin/develop >/dev/null \
+    || { echo "전제 불성립 — clone 에 develop · origin/develop 이 남아 있다" >&2; exit 2; }
+  out_far=$(R="$C"; run_block feature/ok)
+  res_far=$(printf '%s\n' "$out_far" | command grep -m1 '^RESULT ')
+  if [ "$res_far" = "RESULT TIER=unset CHANGED_LINES=7 ADDED=5 DELETED=2 RENAMED_LINES=5 REC=unset MODE=unset" ] \
+     && ! printf '%s\n' "$out_far" | command grep -qF '⛔' && git -C "$C" rev-parse -q --verify origin/develop >/dev/null; then
+    pass "branch 원격에만 있는 BASE: 가져와 실제 변경량" "$res_far"
+  else
+    fail "branch 원격에만 있는 BASE: 가져와 실제 변경량" "기대 TIER=unset CHANGED_LINES=7 ADDED=5 DELETED=2 RENAMED_LINES=5 · 실측 ${res_far:-RESULT 없음} · $(printf '%s\n' "$out_far" | command grep -m1 '⛔')"
+  fi
+  # 어디에도 없는 BASE — 가져오기가 실패하면 예전 그대로 판정 불가(BASE 부재 표지 · TIER=2 · 표지의 BASE 는 원래 이름)
+  out_none=$(R="$C"; run_block feature/ok "" BASE=no-such-base)
+  res_none=$(printf '%s\n' "$out_none" | command grep -m1 '^RESULT ')
+  case "$res_none" in
+    *"TIER=2 "*) printf '%s\n' "$out_none" | command grep -qF "⛔ BASE 'no-such-base' not found. Abort tier auto." \
+                   && pass "branch 어디에도 없는 BASE: 판정 불가" "$res_none" \
+                   || fail "branch 어디에도 없는 BASE: 판정 불가" "BASE 부재 표지 없음 — $(printf '%s\n' "$out_none" | command grep -m1 '⛔')" ;;
+    *) fail "branch 어디에도 없는 BASE: 판정 불가" "${res_none:-RESULT 없음}" ;;
+  esac
 fi
 
 # ── mode: 펜스 블록 전체 — 추천 full 일 때만 질문 (2026-11-12) ───────────────────

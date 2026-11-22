@@ -1151,7 +1151,7 @@ def disabled_rules(env, sdir: pathlib.Path) -> tuple:
     tokens = {t.strip().upper() for t in re.split(r"[,\s]+", raw) if t.strip()}
     unknown = sorted(tokens - set(RULES) - {"ALL"})
     if unknown:
-        return set(RULES), f"끄기 값 {unknown} 를 모른다(P4 · AG · FR · all) — 전부 끈다"
+        return set(RULES), f"끄기 값 {unknown} 를 모른다(P4 · AG · FR · GP · all) — 전부 끈다"
     return (set(RULES) if "ALL" in tokens else tokens), ""
 
 
