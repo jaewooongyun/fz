@@ -32,8 +32,9 @@ operative(게이트/체크리스트/절차) vs justification(근거/인용/서�
   python3 scripts/measure_constraint_load.py [ROOT] --freeze  tests/fixtures/constraint-ceiling.json   # 지금 값으로 동결
 
 상한(F-139 — floor 를 잰 뒤 6주 만에 +19~89% 자랐는데 측정만 하는 도구라 아무 게이트도 울리지 않았다):
-  --ceiling FILE 은 세 범위를 동결값과 대조한다 — 스킬별 floor · agents/*.md 본문 · 워크플로 직접 프롬프트(workflows/*.js 의
-  문자열 리터럴). 어느 하나라도 동결값 × (1 + headroom_pct/100) 을 넘거나 동결값에 없는 항목이 생기면 exit 1.
+  --ceiling FILE 은 네 범위를 동결값과 대조한다 — 스킬별 floor · 스킬 본문(SKILL.md 전문 — 줄 수 게이트는 긴 한 줄로
+  우회된다) · agents/*.md 본문 · 워크플로 직접 프롬프트(workflows/*.js 의 문자열 리터럴). 단위는 모두 글자÷4 다.
+  어느 하나라도 동결값 × (1 + headroom_pct/100) 을 넘거나 동결값에 없는 항목이 생기면 exit 1.
   ⛔ 상한을 올리는 것은 `--freeze` 로 **의도해서** 한다 — 판 전후 값은 리뷰 기록에 남긴다.
   exit: 0 상한 안 · 1 초과 · 2 동결 파일을 읽지 못함(⛔ 통과 아님)
 
@@ -64,7 +65,7 @@ JUSTIFICATION_PAT = re.compile(
 
 
 def est_tokens(text: str) -> int:
-    """거친 토큰 추정 (chars/4). 정밀 토크나이저 없이 상대 비교용."""
+    """글자÷4 — 토큰 수가 아니다. 한국어 본문은 실제 토큰보다 작게 나온다 · 판 사이 상대 비교용."""
     return len(text) // 4
 
 
@@ -328,9 +329,11 @@ def measure(root: Path):
 
 
 def load_scopes(root: Path, skill_load: dict) -> dict:
-    """상한 대조 범위 셋 — 스킬 floor · agents 본문 · 워크플로 직접 프롬프트(모두 ~tokens)."""
+    """상한 대조 범위 넷 — 스킬 floor · 스킬 본문(SKILL.md 전문) · agents 본문 · 워크플로 직접 프롬프트(모두 글자÷4)."""
     return {
         "skills_floor": {n: d["uncond_tokens"] for n, d in skill_load.items()},
+        "skills_body": {p.parent.name: est_tokens(p.read_text(encoding="utf-8", errors="replace"))
+                        for p in sorted((root / "skills").glob("*/SKILL.md"))},
         "agents": {p.stem: est_tokens(p.read_text(encoding="utf-8", errors="replace"))
                    for p in sorted((root / "agents").glob("*.md"))},
         "workflows": {p.stem: js_string_chars(p.read_text(encoding="utf-8", errors="replace")) // 4
@@ -379,7 +382,7 @@ def cmd_ceiling(scopes: dict, path: Path) -> int:
 
 
 # 수치를 인용하는 쪽이 정의를 같이 보게 출력 머리에 둔다(F-145 — floor 를 "스킬 로드 전체" 로 읽은 일이 재관측됐다)
-FLOOR_DEFINITION = ("정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · "
+FLOOR_DEFINITION = ("정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · "
                     "ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정")
 
 
@@ -449,8 +452,8 @@ def self_test() -> int:
         moved = root / "moved.md"                 # 본문만 줄었고 무조건 참조는 그대로인 이동
         moved.write_text(now.read_text(encoding="utf-8") + "\n## 옮길 절\n\n긴 설명 줄\n" * 5, encoding="utf-8")
         rep = refs_report(root, "x")
-        case("r3-f145-definition-header — --refs 출력 머리에 floor 정의(무조건 참조 문서 토큰 합 · SKILL.md 본문 제외)가 있다",
-             rep[1] == FLOOR_DEFINITION and "SKILL.md 본문 제외" in rep[1], rep[:2])
+        case("r3-f145-definition-header — --refs 출력 머리에 floor 정의(무조건 참조 문서 글자÷4 합 · SKILL.md 본문 제외)가 있다",
+             rep[1] == FLOOR_DEFINITION and "SKILL.md 본문 제외" in rep[1] and "글자÷4" in rep[1], rep[:2])
         gone, same = refs_report(root, "x", before), refs_report(root, "x", moved)
         ok = (any("빠진 무조건 참조 modules/a.md" in ln for ln in gone) and not any("이득 0" in ln for ln in gone)
               and any("(차 -" in ln for ln in gone) and any("이득 0" in ln for ln in same) and any("(차 +0)" in ln for ln in same))
@@ -533,14 +536,14 @@ def main() -> None:
     print("  " + FLOOR_DEFINITION)
     print("  floor = 조건 마커 없는 참조만 = 그 스킬을 부르면 **항상** 드는 비용")
     print("  ceiling = 전체 정적 참조 (기존 UPPER BOUND). 검증: --refs <skill>")
-    print(f"{'skill':<16}{'refs':>5}{'floor~tok':>11}{'ceil~tok':>10}{'floor%':>8}")
-    print("-" * 51)
+    print(f"{'skill':<16}{'refs':>5}{'floor(글자÷4)':>14}{'ceil(글자÷4)':>13}{'floor%':>8}")
+    print("-" * 57)
     for name, d in sorted(skill_load.items(), key=lambda x: -x[1]["tokens"]):
         if not d["ref_count"]:
             continue
         pct = round(100 * d["uncond_tokens"] / (d["tokens"] or 1))
-        print(f"{name:<16}{d['ref_count']:>5}{d['uncond_tokens']:>11}"
-              f"{d['tokens']:>10}{pct:>7}%")
+        print(f"{name:<16}{d['ref_count']:>5}{d['uncond_tokens']:>14}"
+              f"{d['tokens']:>13}{pct:>7}%")
 
     print("\n■ 표2: 모듈/가이드별 부하 + justification 비율 (강등 후보 식별)")
     print("  just_pct 높음 + ref 적음 = 저위험 강등 후보 (operative 보존, 근거만 이동)")

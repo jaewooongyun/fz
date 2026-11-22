@@ -1157,7 +1157,7 @@ RE_LOAD_ROW = re.compile(r"^([A-Za-z][\w-]*)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s*
 
 
 def parse_constraint_table(text):
-    """표1 행: `skill  refs  floor~tok  ceil~tok  floor%`. 열 폭 고정이 아니라 공백 분해."""
+    """표1 행: `skill  refs  floor(글자÷4)  ceil(글자÷4)  floor%`. 열 폭 고정이 아니라 공백 분해."""
     rows = {}
     in_table = False
     for line in text.splitlines():
@@ -1877,7 +1877,7 @@ def render_markdown(payload):
         lines.append("`n/a` — %s" % payload["static_load_error"])
     else:
         baseline = payload["snapshot_baseline"]
-        lines.append("| 스킬 | refs | floor~tok | ceil~tok | floor% | 직전 스냅샷 대비 |")
+        lines.append("| 스킬 | refs | floor(글자÷4) | ceil(글자÷4) | floor% | 직전 스냅샷 대비 |")
         lines.append("|---|---|---|---|---|---|")
         for row in sorted(payload["static_load"], key=lambda r: -r["floor"]):
             delta = "n/a"

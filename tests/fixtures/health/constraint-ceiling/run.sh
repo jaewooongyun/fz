@@ -1,7 +1,7 @@
 #!/bin/bash
 # 제약 부하 상한 판정 (F-139) — floor 를 잰 뒤 6주 만에 +19~89% 자랐는데 측정만 하는 도구라 아무 게이트도 울리지 않았다.
 #
-# measure_constraint_load.py --ceiling 이 스킬 floor · agents 본문 · 워크플로 직접 프롬프트를 동결값과 대조한다.
+# measure_constraint_load.py --ceiling 이 스킬 floor · 스킬 본문(SKILL.md 전문) · agents 본문 · 워크플로 직접 프롬프트를 동결값과 대조한다.
 # 트리 사본에서 지금 값을 동결하고, 범위마다 하나씩 부풀려 그 범위가 FAIL 하는지 본다.
 # 셀:
 #   f139-load-within-ceiling-ok     바꾸지 않은 사본 → exit 0 (짝 — 늘 FAIL 하면 아래 셀이 헛돈다)
@@ -9,6 +9,8 @@
 #   f139-agents-scope-measured      agents/<첫 파일>.md 를 20% 부풀림 → FAIL agents/<이름>
 #   f139-workflow-prompt-measured   workflows/<첫 파일>.js 에 긴 문자열 리터럴 → FAIL workflows/<이름>
 #   f139-new-agent-unfrozen-fails   동결값에 없는 agent 파일 → FAIL '동결값에 없는 항목'
+#   f139-skill-body-measured        skills/<첫 스킬>/SKILL.md 에 본문 20% 넘는 한 줄 → FAIL skills_body/<스킬>
+#   f139-new-skill-body-unfrozen-fails  동결값에 없는 스킬 → FAIL skills_body/<이름> '동결값에 없는 항목'
 #   f139-real-tree-within-ceiling   실제 트리 × tests/fixtures/constraint-ceiling.json → exit 0
 # exit: 0 전건 통과 · 1 단언 실패 · 3 준비 실패
 set -uo pipefail
@@ -74,6 +76,19 @@ printf '# new agent\n' > "$TMP/c/agents/zz-new-agent.md"
 out="$(check "$TMP/c")"; rc=$?
 if [ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q '^FAIL agents/zz-new-agent: 동결값에 없는 항목'; then ok "f139-new-agent-unfrozen-fails"
 else no "f139-new-agent-unfrozen-fails — exit $rc · $(printf '%s' "$out" | tail -1)"; fi
+
+# 스킬 본문 — 줄 수 게이트(SKILL 500줄)는 긴 한 줄로 우회된다. 첫 SKILL.md 에 본문 20% 넘는 한 줄을 붙인다
+mk "$TMP/d" || { echo "SETUP 사본 준비 실패"; exit 3; }
+SB="$(ls "$TMP/d/skills" | head -1)"
+python3 -c 'import sys; p=sys.argv[1]; t=open(p,encoding="utf-8").read(); open(p,"a",encoding="utf-8").write("\n"+"z"*(len(t)//5+40)+"\n")' "$TMP/d/skills/$SB/SKILL.md"
+out="$(check "$TMP/d")"; rc=$?
+if [ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q "^FAIL skills_body/$SB:"; then ok "f139-skill-body-measured"
+else no "f139-skill-body-measured — '$SB' · exit $rc · $(printf '%s' "$out" | tail -1)"; fi
+
+mkdir -p "$TMP/d/skills/zz-new-skill" && printf '# new skill\n' > "$TMP/d/skills/zz-new-skill/SKILL.md"
+out="$(check "$TMP/d")"; rc=$?
+if [ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q '^FAIL skills_body/zz-new-skill: 동결값에 없는 항목'; then ok "f139-new-skill-body-unfrozen-fails"
+else no "f139-new-skill-body-unfrozen-fails — exit $rc · $(printf '%s' "$out" | tail -1)"; fi
 
 out="$(python3 "$MCL" --ceiling "$CEIL" 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && ok "f139-real-tree-within-ceiling" || no "f139-real-tree-within-ceiling — exit $rc · $(printf '%s\n' "$out" | grep '^FAIL' | head -3 | tr '\n' '|')"

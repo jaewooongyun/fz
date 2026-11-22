@@ -278,8 +278,8 @@ def diff_snapshot(args, out):
 FAKE_MEASURE = '''\
 import sys
 print("■ 표1: x")
-print("skill            refs  floor~tok  ceil~tok  floor%")
-print("-" * 51)
+print("skill            refs   floor(글자÷4)   ceil(글자÷4)  floor%")
+print("-" * 57)
 print("alpha              3       1000      1200     83%")
 print("beta               1          0         0      0%")
 print("")
