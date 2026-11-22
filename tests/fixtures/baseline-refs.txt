@@ -1,854 +1,862 @@
 ===== arch-critic =====
 참조 판정: skills/arch-critic/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 0 / ceiling(로드 전체) 7219 ~tokens  · 로드 아님(카탈로그·출처표기) 3020 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 0 / ceiling(로드 전체) 7309 글자÷4  · 로드 아님(카탈로그·출처표기) 3020 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/조건부] modules/peer-review-gates.md           ~  7219 tok
-     ? L60: > ⊕ 워크플로 프롬프트에 `[후보 보존]` 문장(preserveLowConfidence 옵션 — `modules/peer-review-gates.md` §10)이 있으면 위 문장과 아래 `자체 신
-[출처표기  ] modules/review-checks.md               ~  3020 tok
-     ~ L52: ⛔ **N 강도 임계는 미정이다 — severity를 부여하지 않는다.** 표본 1건(PR I3, N=5)으로는 등급 근거가 없다. 형제 N곳을 세어 **근거로 제시하고 관찰 보고로 남긴다.** 임
+[로드/조건부] modules/peer-review-gates.md             7309 글자÷4
+     ? L58: > ⊕ 워크플로 프롬프트에 `[후보 보존]` 문장(preserveLowConfidence 옵션 — `modules/peer-review-gates.md` §10)이 있으면 위 문장과 아래 `자체 신
+[출처표기  ] modules/review-checks.md                 3020 글자÷4
+     ~ L50: ⛔ **N 강도 임계는 미정이다 — severity를 부여하지 않는다.** 표본 1건(PR I3, N=5)으로는 등급 근거가 없다. 형제 N곳을 세어 **근거로 제시하고 관찰 보고로 남긴다.** 임
 
 ===== code-auditor =====
 참조 판정: skills/code-auditor/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 0 / ceiling(로드 전체) 7219 ~tokens  · 로드 아님(카탈로그·출처표기) 3020 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 0 / ceiling(로드 전체) 7309 글자÷4  · 로드 아님(카탈로그·출처표기) 3020 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/조건부] modules/peer-review-gates.md           ~  7219 tok
-     ? L60: > ⊕ 워크플로 프롬프트에 `[후보 보존]` 문장(preserveLowConfidence 옵션 — `modules/peer-review-gates.md` §10)이 있으면 위 문장과 아래 `자체 신
-[출처표기  ] modules/review-checks.md               ~  3020 tok
-     ~ L52: ⛔ **N 강도 임계는 미정이다 — severity를 부여하지 않는다.** 표본 1건(PR I3, N=5)으로는 등급 근거가 없다. 형제 N곳을 세어 **근거로 제시하고 관찰 보고로 남긴다.** 임
+[로드/조건부] modules/peer-review-gates.md             7309 글자÷4
+     ? L58: > ⊕ 워크플로 프롬프트에 `[후보 보존]` 문장(preserveLowConfidence 옵션 — `modules/peer-review-gates.md` §10)이 있으면 위 문장과 아래 `자체 신
+[출처표기  ] modules/review-checks.md                 3020 글자÷4
+     ~ L50: ⛔ **N 강도 임계는 미정이다 — severity를 부여하지 않는다.** 표본 1건(PR I3, N=5)으로는 등급 근거가 없다. 형제 N곳을 세어 **근거로 제시하고 관찰 보고로 남긴다.** 임
 
 ===== fz =====
 참조 판정: skills/fz/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 60954 / ceiling(로드 전체) 60954 ~tokens  · 로드 아님(카탈로그·출처표기) 2258 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 49518 / ceiling(로드 전체) 49518 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ! L39: - **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 값은 Lead 세션 effort · `modules/mode-gate.md` § effort) — fab
-     ! L180: | `simplified_keywords` | 신호어 — 정본 목록 `modules/mode-gate.md` § 신호어 (단, **`--deep`/`--team` override 시 무력화** — 
-     ! L265: 2. 실질 생산 워커 판별 → opus 배정 (동시 ≤3, effort 명시 의무 — Lead 세션 effort 를 args 로 · `modules/mode-gate.md` § effort)
-     ? L298: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
-     ! L331: ⛔ **5.2 는 스킬 게이트를 건너뛰는 길이 아니다** — TEAM 이어도 각 단계는 5.1 처럼 스킬 SKILL.md 를 읽고 그 스킬의 모드 게이트를 거친다. Workflow 는 그 스킬의 최
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ! L41: - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없
-     ! L41: - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없
-     ? L298: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
-[로드/무조건] modules/execution-modes.md             ~  1245 tok
-     ! L71: | `--loop` | Gate 반복 모드 강제 — Lead 가 래더 한도까지 다시 돈다(`modules/execution-modes.md` · §12) |
-     · L89: | modules/execution-modes.md | BATCH/LOOP/SIMPLIFY 실행 모드 |
-     ! L205: 4. **실행 모드 결정**: STANDARD / BATCH / LOOP (참조: modules/execution-modes.md)
-     ! L363: > 참조: `modules/execution-modes.md` — BATCH 모드 상세
-     ! L428: - Gate 반복 + 에스컬레이션 래더(`modules/execution-modes.md` · §12)
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ? L77: - TEAM 모드는 네이티브 **Workflow 도구** 가용 환경 필요 (미가용 시 SOLO 폴백). ⛔ `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`은 **TeamCr
-     ? L184: (⛔ `guides/skill-authoring.md` § 파이프라인 매칭 흐름이 규정한 3단 폴백이다.
-     ! L327: > 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본).
-     ? L335: 1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{WORK_DIR}/{skill}-{pattern}.js', args })   — args 에 `effort` = `m
-     ? L338: 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
-     ! L399: ├─ full(Workflow) → `guides/skill-authoring.md` §12 실패 복구 사다리(L1~L4)
-     ! L445: | Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | ⛔ SOLO 직행 아님 — `guides/skill-authoring.md` §12 판별 표 |
-[로드/무조건] guides/agent-team-guide.md             ~  6173 tok
-     ! L78: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-[로드/무조건] modules/memory-policy.md               ~  2052 tok
-     · L84: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-     ? L144: - `Read(modules/memory-policy.md)` — 메모리 키 네이밍
-     ! L459: - 참조: `modules/memory-policy.md`
-[로드/무조건] modules/complexity.md                  ~   627 tok
-     · L85: | modules/complexity.md | 5차원 복잡도 → 모드 결정 |
-     ! L196: > 참조: `modules/complexity.md`
-[로드/무조건] modules/team-registry.md               ~  1372 tok
-     · L86: | modules/team-registry.md | 에이전트 + 모델 자동 결정 |
-     ! L259: > 참조: `modules/team-registry.md`
-[로드/무조건] modules/cross-validation.md            ~ 10992 tok
-     · L87: | modules/cross-validation.md | 검증 게이트 자동 삽입 |
-     ! L139: - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄). 단, 산출물이 전수/카운트/부정 주장 예정이면 abbreviated여도 `Read(modules/cros
-     ! L275: > 참조: `modules/cross-validation.md`
-[로드/무조건] modules/context-artifacts.md           ~  4289 tok
-     · L88: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
-     ? L119: - Ticket ID 해석 (참조: `modules/context-artifacts.md`)
-     ? L143: - `Read(modules/context-artifacts.md)` — Artifact Budget Table + 산출물 프로토콜
-     ! L369: > 참조: `modules/context-artifacts.md`
-     ? L375: | 6+ 스텝 또는 context-heavy | 티켓 폴더 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
-[로드/무조건] modules/governance.md                  ~  3340 tok
-     · L90: | modules/governance.md | kill-switch |
-     ? L298: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
-     ! L414: 사용자 승인 없이 파이프라인을 실행하지 않는다 (Phase 4 필수 — 예외는 `modules/governance.md` § 자율 모드뿐).
-     ! L432: - 사용자 승인 없이 실행 (Phase 4 필수 — 예외는 `modules/governance.md` § 자율 모드뿐)
-[로드/무조건] modules/pipelines.md                   ~  1727 tok
-     · L91: | modules/pipelines.md | 19개 사전 정의 파이프라인 (트리거+체인+게이트+TEAM) |
-     ! L225: > 참조: `modules/pipelines.md` — 19개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
-[로드/무조건] modules/memory-guide.md                ~  1273 tok
-     · L92: | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
-     ! L458: - L1 저장 시 `modules/memory-guide.md` 정책 준수: `[skill: X]` `[status: Y]` `[priority: Z]` 태깅
-[로드/무조건] modules/intent-registry.md             ~  1534 tok
-     · L94: | modules/intent-registry.md | Phase 1 이 읽는 트리거 소스 — 스킬·파이프라인 트리거 + 구어체 보강 + Confidence 판정 |
-     ! L164: 2. **트리거 매칭**: `modules/intent-registry.md` 의 트리거 표와 대조한다(스킬 YAML `intent-triggers` 는 스킬 자체 문서 — 아래 참조)
-     ! L169: > ⛔ **Phase 1 이 읽는 트리거 소스는 `modules/intent-registry.md` 다** — 스킬 YAML `intent-triggers` 는 `fz-skill` eval 용 문서
-[로드/무조건] modules/lead-action-default.md         ~  1396 tok
-     · L95: | modules/lead-action-default.md | 교훈 사전 로드 Trigger Matrix (Phase 0 Step 4) |
-     ! L135: - SOLO: `modules/lead-action-default.md` Trigger Matrix 매칭 → 매칭된 메모리 ID + 적용 패턴 명시 출력
-[로드/무조건] modules/fz-pipeline-proposal.md        ~  1040 tok
-     · L96: | modules/fz-pipeline-proposal.md | 파이프라인 시각화 + AskUserQuestion 형식 (Phase 4) |
-     ? L298: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
-     ! L305: - [ ] 승인 질문의 header 가 `Phase 4` 인가? 승인 = 제시한 선택지 중 커스텀이 아닌 것이다. 커스텀 · 자유 입력으로 답하면 변경안을 반영해 다시 Phase 4 질문으로 묻는다
-[로드/무조건] modules/uncertainty-verification.md    ~  1523 tok
-     · L97: | modules/uncertainty-verification.md | Default-Deny — 미검증 주장 차단 (Phase 5 Brief) |
-     ! L351: 참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead
-[로드/무조건] modules/lead-reasoning.md              ~  2155 tok
-     · L98: | modules/lead-reasoning.md | Speculation-to-Fact Fallacy 방어 (Phase 5 Brief) |
-     ! L351: 참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead
-[로드/무조건] modules/system-reminders.md            ~   870 tok
-     · L99: | modules/system-reminders.md | T6/T7 트리거 리마인더 (Phase 5 Brief) |
-     ! L351: 참조: `modules/uncertainty-verification.md` (Default-Deny), `modules/system-reminders.md` (T6/T7), `modules/lead
-[카탈로그  ] modules/plugin-refs.md                 ~  2258 tok
-     · L93: | modules/plugin-refs.md | SwiftUI + Concurrency 플러그인 참조 가이드 |
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ! L34: - **모델 승격**: 실질 생산 워커를 opus로 배정 (동시 ≤3, effort 명시 — 값은 Lead 세션 effort · `modules/mode-gate.md` § effort) — fab
+     ! L131: | `simplified_keywords` | 신호어 — 정본 목록 `modules/mode-gate.md` § 신호어 (단, **`--deep`/`--team` override 시 무력화** — 
+     ! L216: 2. 실질 생산 워커 판별 → opus 배정 (동시 ≤3, effort 명시 의무 — Lead 세션 effort 를 args 로 · `modules/mode-gate.md` § effort)
+     ? L249: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
+     ! L282: ⛔ **5.2 는 스킬 게이트를 건너뛰는 길이 아니다** — TEAM 이어도 각 단계는 5.1 처럼 스킬 SKILL.md 를 읽고 그 스킬의 모드 게이트를 거친다. Workflow 는 그 스킬의 최
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ! L36: - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없
+     ! L36: - **GPT 필수 참여**: GPT 를 켠 경우 light · full 모두 코드/계획 생산 스킬에 GPT CLI 포함 → cross-model 상호검증 — fz-search 엔 GPT 단계가 없
+     ? L249: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
+[로드/무조건] modules/execution-modes.md               1239 글자÷4
+     ! L52: | `--loop` | Gate 반복 모드 강제 — Lead 가 래더 한도까지 다시 돈다(`modules/execution-modes.md` · §12) |
+     ! L156: 4. **실행 모드 결정**: STANDARD / BATCH / LOOP (참조: modules/execution-modes.md)
+     ! L298: > 참조: `modules/execution-modes.md` — BATCH 모드 상세
+     ! L356: - Gate 반복 + 에스컬레이션 래더(`modules/execution-modes.md` · §12)
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ? L58: - TEAM 모드는 네이티브 **Workflow 도구** 가용 환경 필요 (미가용 시 SOLO 폴백). (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/ski
+     ? L135: (⛔ `guides/skill-authoring.md` § 파이프라인 매칭 흐름이 규정한 3단 폴백이다.
+     ! L278: > 참조: `guides/skill-authoring.md` §12 — Workflow 규약 + **실패 복구 사다리 L1~L4**(정본).
+     ? L286: 1. 스킬의 Workflow 호출: Workflow({ scriptPath: '{WORK_DIR}/{skill}-{pattern}.js', args })   — args 에 `effort` = `m
+     ? L290: 4. 실패 시 → ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리**:
+     ! L327: ├─ full(Workflow) → `guides/skill-authoring.md` §12 실패 복구 사다리(L1~L4)
+     ! L373: | Gate 실패 (TEAM) | 서브 에이전트에게 이슈 전달 | ⛔ SOLO 직행 아님 — `guides/skill-authoring.md` §12 판별 표 |
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L72: 0. ⛔ **선택 도구 상태**: 화면 한 줄로만 알린다 — 승인(Phase 4) 전 파일 쓰기는 가드가 막는다 · 파일 기록은 승인 뒤. 형식 `modules/tool-status.md`
+     ! L289: 3.5 반환 뒤 심볼 도구 점검: 그 스킬의 점검 줄(fz_wf_metrics.py --mcp-audit — 명령 꼴 정본 modules/tool-status.md § 워커 심볼 도구)을 그대로 돌
+[로드/무조건] modules/context-artifacts.md             3466 글자÷4
+     ? L74: - 티켓 폴더가 있으면 `index.md` 의 `## Essential Context` 를 Read 해 Active Phase · Pending 을 이어받는다 — 복원 원천은 티켓 폴더 산출물이다(
+     ? L81: - Ticket ID 해석 (참조: `modules/context-artifacts.md`)
+     ? L95: - `Read(modules/context-artifacts.md)` — artifact 로드 총합 원칙 + 산출물 프로토콜
+     ! L304: > 참조: `modules/context-artifacts.md`
+     ? L309: | 6+ 스텝 또는 context-heavy | 티켓 폴더 파일 기반 (`modules/context-artifacts.md`) | compact 후 Read로 복원 |
+[로드/무조건] modules/lead-action-default.md           1396 글자÷4
+     ! L87: - SOLO: `modules/lead-action-default.md` Trigger Matrix 매칭 → 매칭된 메모리 ID + 적용 패턴 명시 출력
+[로드/무조건] modules/cross-validation.md             11054 글자÷4
+     ! L91: - 단순 요청(40차 매칭) 시 abbreviated recall: ID 목록만 (~1줄). 단, 산출물이 전수/카운트/부정 주장 예정이면 abbreviated여도 `Read(modules/cros
+     ! L226: > 참조: `modules/cross-validation.md`
+[로드/무조건] modules/intent-registry.md               1548 글자÷4
+     ! L115: 2. **트리거 매칭**: `modules/intent-registry.md` 의 트리거 표와 대조한다(스킬 YAML `intent-triggers` 는 스킬 자체 문서 — 아래 참조)
+     ! L120: > ⛔ **Phase 1 이 읽는 트리거 소스는 `modules/intent-registry.md` 다** — 스킬 YAML `intent-triggers` 는 `fz-skill` eval 용 문서
+[로드/무조건] modules/complexity.md                     627 글자÷4
+     ! L147: > 참조: `modules/complexity.md`
+[로드/무조건] modules/pipelines.md                     1756 글자÷4
+     ! L176: > 참조: `modules/pipelines.md` — 19개 사전 정의 파이프라인 (트리거 패턴 + 체인 + 게이트 + TEAM 구성)
+[로드/무조건] modules/team-registry.md                 1372 글자÷4
+     ! L210: > 참조: `modules/team-registry.md`
+[로드/무조건] modules/fz-pipeline-proposal.md          1040 글자÷4
+     ? L249: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
+     ! L256: - [ ] 승인 질문의 header 가 `Phase 4` 인가? 승인 = 제시한 선택지 중 커스텀이 아닌 것이다. 커스텀 · 자유 입력으로 답하면 변경안을 반영해 다시 Phase 4 질문으로 묻는다
+[로드/무조건] modules/governance.md                    3539 글자÷4
+     ? L249: > 시각화 형식·AskUserQuestion 선택지·적극적 확인 원칙: `modules/fz-pipeline-proposal.md` 참조. ⛔ **세션 모드를 먼저 판정한다** — 무엇을 자동 진행
+     ! L342: 사용자 승인 없이 파이프라인을 실행하지 않는다 (Phase 4 필수 — 예외는 `modules/governance.md` § 자율 모드뿐).
+     ! L360: - 사용자 승인 없이 실행 (Phase 4 필수 — 예외는 `modules/governance.md` § 자율 모드뿐)
+[로드/무조건] modules/memory-guide.md                  1236 글자÷4
+     ! L384: - L1 저장 시 `modules/memory-guide.md` 정책 준수: `[skill: X]` `[status: Y]` `[priority: Z]` 태깅
 
 ===== fz-code =====
 참조 판정: skills/fz-code/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 62680 / ceiling(로드 전체) 62680 ~tokens  · 로드 아님(카탈로그·출처표기) 24908 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 44632 / ceiling(로드 전체) 49102 글자÷4  · 로드 아님(카탈로그·출처표기) 23661 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ! L36: > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guid
-     ? L58: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 구현 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중
-     ? L99: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
-     ~ L103: > 스크립트: `workflows/code-pair.js` (mode='full') — agents/의 impl-correctness·arch-lens 정의를 agentType(`fz:`)으로 재사
-     ! L119: 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
-     ? L120: 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/s
-     ? L127: - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). 
-     ! L376: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
-     ? L463: | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp 
-[로드/무조건] modules/memory-guide.md                ~  1273 tok
-     ! L36: > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guid
-[로드/무조건] guides/agent-team-guide.md             ~  6173 tok
-     ! L59: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-[로드/무조건] modules/session.md                     ~   799 tok
-     · L65: | modules/session.md | 세션 감지, Issue Tracker 연동 |
-     ! L225: 1. **세션 감지**: 참조 `modules/session.md`
-[로드/무조건] modules/build.md                       ~   648 tok
-     · L66: | modules/build.md | 빌드 검증 |
-     ? L123: 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소
-     ! L242: - □ 빌드 성공 (modules/build.md)
-     ! L245: - □ UI · 제스처 · 애니메이션 Step 이면 visual oracle — 앱을 띄워 그 화면을 본다(launch_app_sim + screenshot 또는 실기기 · 범위는 `modules/
-     ! L319: 6. **매 Step 완료 후 빌드 검증**: 참조 `modules/build.md`
-     ! L374: 참조: `modules/build.md` — 에러 유형별 대응표, 빌드-수정 반복 패턴
-     ? L387: - [ ] ⛔ UI · 제스처 · 애니메이션 Step 이 있으면 Step 마다 visual oracle 충족? — 못 본 Step 은 완료가 아니라 미충족으로 보고한다 (F-230 · `module
-     ! L429: Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
-[로드/무조건] modules/execution-modes.md             ~  1245 tok
-     · L67: | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
-     ! L248: - /simplify 자동 트리거: 새 함수 3개+ 또는 100줄+ 추가 시 (modules/execution-modes.md)
-     ? L317: 5. **(선택) /simplify 게이트**: 코드 변경이 있을 때 `/simplify focus on {step-context}` (참조: modules/execution-modes.md)
-     ! L376: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
-     ! L462: | 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
-[로드/무조건] modules/context-artifacts.md           ~  4289 tok
-     · L69: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
-     ! L138: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
-     ! L354: 형식 참조: `modules/context-artifacts.md`
-[로드/무조건] modules/plugin-refs.md                 ~  2258 tok
-     · L70: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
-     ! L80: > 참조: `modules/plugin-refs.md` — SwiftUI Expert(구현 시) + Swift Concurrency(구현 시) 섹션
-     ! L83: > 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
-     ! L84: > **역방향 트리거**: `modules/plugin-refs.md` "역방향 감지 트리거" 참조. `@MainActor`/`actor` 등이 없어도 싱글톤+가변상태 감지 시 안전성 분석 활성화
-[로드/무조건] modules/rtm.md                         ~   496 tok
-     · L71: | modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
-     ! L249: - ⛔ RTM 갱신: 해당 Step의 Req-ID를 `implemented`로 갱신 (참조: modules/rtm.md)
-[로드/무조건] modules/code-transform-validation.md   ~  1477 tok
-     · L73: | modules/code-transform-validation.md | 코드 변환 동등성 — BEC 절차 + 마찰 신호 (패턴 변환 시) |
-     ! L272: | 스레드 컨텍스트 불일치 | Plan Transformation Spec에 "@MainActor 필수" → 구현이 일반 Task. 원본이 main queue(PromiseKit .done 등)인데
-     ! L273: | 래퍼 범위 과잉 | @MainActor/do-catch/Task 블록 내에 해당 컨텍스트 불필요 문장 포함. 원본 `.done { UI업데이트; 데이터변환 }` → After `MainActor
-     ! L328: - 불일치 → 마찰 보고 → 사용자 확인. 참조: `modules/code-transform-validation.md`
-[로드/무조건] modules/lead-reasoning.md              ~  2155 tok
-     · L75: | modules/lead-reasoning.md | Implication Scan — 제거/리팩토링 시 의미론적 완결성 |
-     ! L271: | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가
-     ! L276: | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견. 단 동일 패턴이 코드베이스 3곳+ 존재하면 conventi
-     ! L282: | SDK 래퍼 부분 분석 | 외부 SDK 객체의 `?.` 메서드 중 일부만 nil 동작 분석하고 나머지 건너뜀. "안전" 결론으로 추가 분석 중단 | 같은 객체의 모든 `?.` 메서드 nil 동작
-     ! L283: | Task 내부 프로퍼티 쓰기 | `Task { }` 블록 내에서 `self.property = value`를 `MainActor.run` 밖에서 실행. 특히 리뷰어 조언으로 MainActor 범
-     ? L391: - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ? L111: 0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 
-     ? L111: 0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 
-     ? L111: 0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 
-     ! L448: ### light 모드 (모드 게이트 — `modules/mode-gate.md`)
-     ? L450: 진입: 팀 모드 실행 절차 0 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
-     ! L468: Gate 3 통과 후(완료 보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
-[로드/무조건] modules/gates.md                       ~  9346 tok
-     ? L118: 2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 
-     ! L245: - □ UI · 제스처 · 애니메이션 Step 이면 visual oracle — 앱을 띄워 그 화면을 본다(launch_app_sim + screenshot 또는 실기기 · 범위는 `modules/
-     ! L333: 6.4. **⛔ 게이트 판정** (원장이 있을 때 — `modules/gates.md` 배선 2):
-     ! L342: - 버그 수정 Step 이면 **변이 셀**: 수정의 핵심 호출을 지운(되돌린) 사본에서 그 Step 테스트가 FAIL 하는지 한 번 잰다 — 통과하면 테스트가 수정을 보지 않는다(F-447: 떼어
-[로드/무조건] modules/promotion-ledger.md            ~ 11273 tok
-     ! L132: > 통신 기록: `code-team.md` 미생성 — Workflow transcript(runId)가 대체. TEAM 일몰 상태는 `modules/promotion-ledger.md` § 결정 완
-[로드/무조건] modules/swift-pattern-detection.md     ~  1902 tok
-     ? L187: > 본문: `modules/swift-pattern-detection.md` 참조 (Level 3) — 5 원칙(D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환 /
-     ! L193: - [ ] `modules/swift-pattern-detection.md` Read 완료? (D/E/F/G/H 원칙 5개 token 스캔)
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ! L364: 모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기하고(`modules
-     ! L370: - decide 가 `skip` 이거나 정문이 exit 18 `GPT-OFF` 면 `[GPT 미사용 — 사유]` 를 남긴다 · `ask` 면 질문 → `set` → 다시 decide — `modul
-[출처표기  ] guides/harness-engineering.md          ~ 19484 tok
-     ~ L105: > ✅ **2026-08-09부터 스키마 수준 보장**: `agents/impl-correctness.md` `tools:`에서 **쓰기 도구를 전부 제거**했다 — 이전에는 프롬프트 금지(OVER
-     ~ L281: | 외부 피드백 무검증 수긍/기각 | 외부 도구/리뷰어의 "파라미터 누락" 등 지적에 함수 시그니처 확인 없이 동의 **또는 기각(dismiss)**. ⊕ **근거 종류(provenance) 미분류
-[카탈로그  ] modules/memory-policy.md               ~  2052 tok
-     · L68: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-[카탈로그  ] modules/native-agents.md               ~   979 tok
-     · L72: | modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
-[카탈로그  ] modules/uncertainty-verification.md    ~  1523 tok
-     · L74: | modules/uncertainty-verification.md | BEC fail-closed — [verified] 없는 주장 구현 전 검증 강제 |
-[카탈로그  ] modules/system-reminders.md            ~   870 tok
-     · L76: | modules/system-reminders.md | Instruction fade-out 대응 — 트리거 기반 리마인더 |
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ! L34: > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guid
+     ? L65: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 구현 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중
+     ? L91: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
+     ~ L94: > 스크립트: `workflows/code-pair.js` (mode='full') — agents/의 impl-correctness·arch-lens 정의를 agentType(`fz:`)으로 재사
+     ! L110: 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
+     ? L111: 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/s
+     ? L119: - 실패 시 ⛔ **정본 = `guides/skill-authoring.md` §12 실패 복구 사다리** (L1 분할 → L2 입력 수정 → L3 `resume` → L4 사용자 에스컬레이션). 
+     ! L368: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
+     ? L446: | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp 
+[로드/무조건] modules/memory-guide.md                  1236 글자÷4
+     ! L34: > ⛔ **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guid
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ! L45: ## light 모드 (기본 경로 — 모드 게이트 `modules/mode-gate.md`)
+     ? L47: 진입: 팀 모드 실행 절차 0 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+     ? L102: 0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 
+     ? L102: 0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 
+     ? L102: 0. **모드 게이트** (Phase 0.4 직후 1회 — `modules/mode-gate.md` · 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 
+     ! L451: Gate 3 통과 후(완료 보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
+[로드/무조건] modules/session.md                        823 글자÷4
+     · L71: | modules/session.md | 세션 감지, Issue Tracker 연동 |
+     ! L217: 1. **세션 감지**: 참조 `modules/session.md`
+[로드/무조건] modules/build.md                          653 글자÷4
+     · L72: | modules/build.md | 빌드 검증 |
+     ? L114: 5. **빌드 검증 (Lead)**: modules/build.md 절차. 실패 시 — (a) 부분 적용 상태면 되돌리기 vs 계속을 판단 (원칙: 같은 Step 내 잔여 edit이 오류 원인 해소
+     ! L234: - □ 빌드 성공 (modules/build.md)
+     ! L237: - □ UI · 제스처 · 애니메이션 Step 이면 visual oracle — 앱을 띄워 그 화면을 본다(launch_app_sim + screenshot 또는 실기기 · 범위는 `modules/
+     ! L311: 6. **매 Step 완료 후 빌드 검증**: 참조 `modules/build.md`
+     ! L366: 참조: `modules/build.md` — 에러 유형별 대응표, 빌드-수정 반복 패턴
+     ? L379: - [ ] ⛔ UI · 제스처 · 애니메이션 Step 이 있으면 Step 마다 visual oracle 충족? — 못 본 Step 은 완료가 아니라 미충족으로 보고한다 (F-230 · `module
+     ! L420: Step 2 완료 → modules/build.md 빌드 검증 → 성공 확인 후 Step 3.
+[로드/무조건] modules/execution-modes.md               1239 글자÷4
+     · L73: | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
+     ! L240: - /simplify 자동 트리거: 새 함수 3개+ 또는 100줄+ 추가 시 (modules/execution-modes.md)
+     ? L309: 5. **(선택) /simplify 게이트**: 코드 변경이 있을 때 `/simplify focus on {step-context}` (참조: modules/execution-modes.md)
+     ! L368: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
+     ! L445: | 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
+[로드/무조건] modules/context-artifacts.md             3466 글자÷4
+     · L74: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
+     ! L129: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+     ! L345: 형식 참조: `modules/context-artifacts.md`
+[로드/무조건] modules/rtm.md                            495 글자÷4
+     · L76: | modules/rtm.md | RTM 상태 갱신 — Step 완료 시 Req-ID를 implemented로 |
+     ! L241: - ⛔ RTM 갱신: 해당 Step의 Req-ID를 `implemented`로 갱신 (참조: modules/rtm.md)
+[로드/무조건] modules/code-transform-validation.md     1477 글자÷4
+     · L78: | modules/code-transform-validation.md | 코드 변환 동등성 — BEC 절차 + 마찰 신호 (패턴 변환 시) |
+     ! L264: | 스레드 컨텍스트 불일치 | Plan Transformation Spec에 "@MainActor 필수" → 구현이 일반 Task. 원본이 main queue(PromiseKit .done 등)인데
+     ! L265: | 래퍼 범위 과잉 | @MainActor/do-catch/Task 블록 내에 해당 컨텍스트 불필요 문장 포함. 원본 `.done { UI업데이트; 데이터변환 }` → After `MainActor
+     ! L320: - 불일치 → 마찰 보고 → 사용자 확인. 참조: `modules/code-transform-validation.md`
+[로드/무조건] modules/lead-reasoning.md                2155 글자÷4
+     · L80: | modules/lead-reasoning.md | Implication Scan — 제거/리팩토링 시 의미론적 완결성 |
+     ! L263: | 구조적 잔존물 | 제거/DI 변경에서, 제거 대상이 존재하기 위해 추가된 구조(override init, stored property, convenience init, DI용 protocol)가
+     ! L268: | 관찰 보고 의무 | 구현 중 지시 범위 외 설계 문제(Clean Architecture 위반, dead code, 위험한 패턴) 발견. 단 동일 패턴이 코드베이스 3곳+ 존재하면 conventi
+     ! L274: | SDK 래퍼 부분 분석 | 외부 SDK 객체의 `?.` 메서드 중 일부만 nil 동작 분석하고 나머지 건너뜀. "안전" 결론으로 추가 분석 중단 | 같은 객체의 모든 `?.` 메서드 nil 동작
+     ! L275: | Task 내부 프로퍼티 쓰기 | `Task { }` 블록 내에서 `self.property = value`를 `MainActor.run` 밖에서 실행. 특히 리뷰어 조언으로 MainActor 범
+     ? L383: - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
+[로드/무조건] modules/gates.md                        10610 글자÷4
+     ? L109: 2. **args 조립**: `mode:'full'` / `stepSpec`={id,title,goal,files,verify(**VerifySpec 객체** — `modules/gates.md` 
+     ! L237: - □ UI · 제스처 · 애니메이션 Step 이면 visual oracle — 앱을 띄워 그 화면을 본다(launch_app_sim + screenshot 또는 실기기 · 범위는 `modules/
+     ! L325: 6.4. **⛔ 게이트 판정** (원장이 있을 때 — `modules/gates.md` 배선 2):
+     ! L334: - 버그 수정 Step 이면 **변이 셀**: 수정의 핵심 호출을 지운(되돌린) 사본에서 그 Step 테스트가 FAIL 하는지 한 번 잰다 — 통과하면 테스트가 수정을 보지 않는다(F-447: 떼어
+[로드/무조건] modules/swift-pattern-detection.md       1898 글자÷4
+     ? L180: > 본문: `modules/swift-pattern-detection.md` 참조 (Level 3) — 5 원칙(D SwiftUI / E Concurrency / F 위험 패턴 / G 패턴 변환 /
+     ! L186: - [ ] `modules/swift-pattern-detection.md` Read 완료? (D/E/F/G/H 원칙 5개 token 스캔)
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ! L355: 모든 Step 구현 완료 후, Gate 3 진입 전에 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기하고(`modules
+     ! L362: - decide 가 `skip` 이거나 정문이 exit 18 `GPT-OFF` 면 `[GPT 미사용 — 사유]` 를 남긴다 · `ask` 면 질문 → `set` → 다시 decide — `modul
+[로드/조건부] modules/plugin-refs.md                   2809 글자÷4
+     · L75: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ? L87: > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
+[로드/조건부] modules/symbol-tools-audit.md             996 글자÷4
+     ? L121: - ⛔ **심볼 도구 점검** (Step 마다 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId
+     ? L121: - ⛔ **심볼 도구 점검** (Step 마다 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId
+     ? L361: - 이 실패 분기에서 review-correctness 를 띄웠으면 끝난 뒤 심볼 도구 점검 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mc
+     ? L361: - 이 실패 분기에서 review-correctness 를 띄웠으면 끝난 뒤 심볼 도구 점검 `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mc
+[로드/조건부] modules/tool-status.md                    665 글자÷4
+     ? L137: 5. ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화
+[출처표기  ] guides/harness-engineering.md           19988 글자÷4
+     ~ L96: > ✅ **2026-08-09부터 스키마 수준 보장**: `agents/impl-correctness.md` `tools:`에서 **쓰기 도구를 전부 제거**했다 — 이전에는 프롬프트 금지(OVER
+     ~ L273: | 외부 피드백 무검증 수긍/기각 | 외부 도구/리뷰어의 "파라미터 누락" 등 지적에 함수 시그니처 확인 없이 동의 **또는 기각(dismiss)**. ⊕ **근거 종류(provenance) 미분류
+[카탈로그  ] modules/native-agents.md                 1299 글자÷4
+     · L77: | modules/native-agents.md | L3 네이티브 에이전트 통합 정책 (review에서 참조) |
+[카탈로그  ] modules/uncertainty-verification.md      1525 글자÷4
+     · L79: | modules/uncertainty-verification.md | BEC fail-closed — [verified] 없는 주장 구현 전 검증 강제 |
+[카탈로그  ] modules/system-reminders.md               849 글자÷4
+     · L81: | modules/system-reminders.md | Instruction fade-out 대응 — 트리거 기반 리마인더 |
 
 ===== fz-commit =====
 참조 판정: skills/fz-commit/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 3340 / ceiling(로드 전체) 3340 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 3539 / ceiling(로드 전체) 3539 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/governance.md                  ~  3340 tok
-     ! L25: 정본: `modules/governance.md` § 팀 스킬 위임 — 커밋은 사용자가 이 턴에 요청했을 때만 한다.
-     ! L71: - CLAUDE.md 의 팀 커밋 규칙 · 스킬 선언 우선 적용(절 제목 무관 — `modules/governance.md` § 팀 스킬 위임)
+[로드/무조건] modules/governance.md                    3539 글자÷4
+     ! L24: 정본: `modules/governance.md` § 팀 스킬 위임 — 커밋은 사용자가 이 턴에 요청했을 때만 한다.
+     ? L71: - 트래커 티켓 ID를 커밋 prefix에 포함 — 조회는 CLAUDE.md 가 선언한 트래커 MCP(연결돼 있을 때 · 권한 프롬프트를 거친다), 없으면 인자 · 수동 입력(`modules/gov
+     ! L72: - CLAUDE.md 의 팀 커밋 규칙 · 스킬 선언 우선 적용(절 제목 무관 — `modules/governance.md` § 팀 스킬 위임)
 
 ===== fz-discover =====
 참조 판정: skills/fz-discover/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 42069 / ceiling(로드 전체) 42069 ~tokens  · 로드 아님(카탈로그·출처표기) 5730 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 39073 / ceiling(로드 전체) 43543 글자÷4  · 로드 아님(카탈로그·출처표기) 4532 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ? L48: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 폴백 (에러 대응 표) (⛔ **도구 부재** — 실행 중 실패와 다른 축이
-     · L54: | guides/skill-authoring.md §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본) |
-     ! L89: 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
-     ? L90: 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님
-     ? L96: 이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
-     ? L454: | `mode: 'fallback'` 반환(실행 중 실패) | ⛔ SOLO 아님 — `guides/skill-authoring.md` §12 판별 표로 분기 | L1~L3 후 미해소면 L4 |
-[로드/무조건] modules/native-agents.md               ~   979 tok
-     · L56: | modules/native-agents.md | L3 에이전트 — deep-research-agent 스폰 (외부 기술 조사 시) |
-     ! L68: | Phase 2 | L3 `deep-research-agent` | 외부 기술/라이브러리 조사 (modules/native-agents.md) |
-[로드/무조건] modules/cross-validation.md            ~ 10992 tok
-     · L57: | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
-     ~ L203: - [ ] "전체/모든/생태계/전수" 분석 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/
-     ! L204: - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation
-[로드/무조건] modules/plugin-refs.md                 ~  2258 tok
-     ! L74: > 참조: `modules/plugin-refs.md` — SwiftUI Expert(상태 관리 결정 시) + Swift Concurrency(동시성 관련 제약 시)
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ! L82: 모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modul
-     ! L87: 1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" 
-     ! L87: 1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" 
-     ! L367: 3. **완료 보고** (직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
-[로드/무조건] modules/complexity.md                  ~   627 tok
-     ! L82: 모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modul
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ! L99: 6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(
-[로드/무조건] modules/fz-gpt-subcommands-core.md     ~  3578 tok
-     ! L99: 6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(
-[로드/무조건] modules/context-artifacts.md           ~  4289 tok
-     ! L135: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
-     ! L283: 형식 참조: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)"
-     ! L287: > 형식 상세 + 예시: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)" 참조.
-[카탈로그  ] modules/memory-policy.md               ~  2052 tok
-     · L55: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-[카탈로그  ] modules/lead-reasoning.md              ~  2155 tok
-     · L58: | modules/lead-reasoning.md | Speculation-to-Fact Fallacy (§1.5) — 탐색 결과 주장 시 [verified] 태그 |
-[카탈로그  ] modules/uncertainty-verification.md    ~  1523 tok
-     · L59: | modules/uncertainty-verification.md | Default-Deny — 증거 없는 옵션/제약 주장 차단 |
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ? L45: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 폴백 (에러 대응 표) (⛔ **도구 부재** — 실행 중 실패와 다른 축이
+     · L51: | guides/skill-authoring.md §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본) |
+     ! L84: 2.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
+     ? L85: 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/discover-adversarial.js', args })` — ⛔ 거부 시 SOLO 폴백 아님
+     ? L91: 이 값을 돌려준다 — 도구 부재가 아니다. `guides/skill-authoring.md` §12 판별 표로 분기(L1 분할 → L2 입력 수정 → L3 `resume` →
+     ? L449: | `mode: 'fallback'` 반환(실행 중 실패) | ⛔ SOLO 아님 — `guides/skill-authoring.md` §12 판별 표로 분기 | L1~L3 후 미해소면 L4 |
+[로드/무조건] modules/cross-validation.md             11054 글자÷4
+     · L53: | modules/cross-validation.md | Coverage Gate (전수 분석 보장) |
+     ~ L200: - [ ] "전체/모든/생태계/전수" 분석 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/
+     ! L201: - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ! L77: 모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modul
+     ! L82: 1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" 
+     ! L82: 1.5. **모드 게이트** (명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" 
+     ! L362: 3. **완료 보고** (직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
+[로드/무조건] modules/complexity.md                     627 글자÷4
+     ! L77: 모드 게이트(`modules/mode-gate.md`): `--team` · `--deep` · `full` 을 명시하면 Workflow · 그 밖은 실행 절차 1.5 에서 복잡도 점수(`modul
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ! L95: 6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(
+[로드/무조건] modules/fz-gpt-subcommands-core.md       3346 글자÷4
+     ! L95: 6. **--deep cross-model**: Workflow 완료 후 Lead가 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 로 판정한다(
+[로드/무조건] modules/context-artifacts.md             3466 글자÷4
+     ! L131: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+     ! L276: - journal: 파일 전체를 매 라운드 갱신 (크기 기준: `modules/context-artifacts.md` § Phase-Tagged Discover). 상세하게 기록: 제약 매트릭스, 
+     ! L279: 형식 참조: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)"
+     ! L283: > 형식 상세 + 예시: `modules/context-artifacts.md` → "예시 2: discover-journal.md (discover-journal 형식)" 참조.
+[로드/조건부] modules/plugin-refs.md                   2809 글자÷4
+     ? L69: > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
+[로드/조건부] modules/symbol-tools-audit.md             996 글자÷4
+     ? L93: 4.5. **심볼 도구 점검** (`mode: 'workflow'` 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit
+     ? L93: 4.5. **심볼 도구 점검** (`mode: 'workflow'` 반환 뒤): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit
+[로드/조건부] modules/tool-status.md                    665 글자÷4
+     ? L160: ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한
+[카탈로그  ] modules/memory-policy.md                  852 글자÷4
+     · L52: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
+[카탈로그  ] modules/lead-reasoning.md                2155 글자÷4
+     · L54: | modules/lead-reasoning.md | Speculation-to-Fact Fallacy (§1.5) — 탐색 결과 주장 시 [verified] 태그 |
+[카탈로그  ] modules/uncertainty-verification.md      1525 글자÷4
+     · L55: | modules/uncertainty-verification.md | Default-Deny — 증거 없는 옵션/제약 주장 차단 |
 
 ===== fz-explain =====
 참조 판정: skills/fz-explain/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 2730 / ceiling(로드 전체) 2730 ~tokens  · 로드 아님(카탈로그·출처표기) 540 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 3395 / ceiling(로드 전체) 3395 글자÷4  · 로드 아님(카탈로그·출처표기) 540 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/explanation-protocol.md        ~  2730 tok
+[로드/무조건] modules/explanation-protocol.md          2730 글자÷4
      ! L37: - 규칙 정본은 `modules/explanation-protocol.md` — 이 스킬은 **seed 산출**과 **호출**만 맡는다
      · L56: | `modules/explanation-protocol.md` | 폐포 5축 · 어휘 등급 · 게이트 G1~G8 · 층위의 **정본** |
-     ! L91: `{플러그인 루트}/modules/explanation-protocol.md` 를 Read 한 뒤 §9 실행 절차 T2~T6 을 수행한다.
-[카탈로그  ] modules/explanation-output.md          ~   540 tok
+     ! L92: `{플러그인 루트}/modules/explanation-protocol.md` 를 Read 한 뒤 §9 실행 절차 T2~T6 을 수행한다.
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L64: > ⛔ **선택 도구 상태**: seed 를 잡기 전에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
+[카탈로그  ] modules/explanation-output.md             540 글자÷4
      · L57: | `modules/explanation-output.md` | 출력 섹션 A~E 형식 (정본 §7 에서 분리) |
 
 ===== fz-fix =====
 참조 판정: skills/fz-fix/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 37591 / ceiling(로드 전체) 37591 ~tokens  · 로드 아님(카탈로그·출처표기) 3575 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 29570 / ceiling(로드 전체) 34040 글자÷4  · 로드 아님(카탈로그·출처표기) 1525 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ? L55: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중
-     ! L186: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
-     ~ L206: > 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.m
-     ! L214: 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
-     ? L215: 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Sta
-     ? L217: 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
-[로드/무조건] guides/agent-team-guide.md             ~  6173 tok
-     ! L56: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-[로드/무조건] modules/build.md                       ~   648 tok
-     · L62: | modules/build.md | 빌드 검증 |
-     ! L184: 참조: `modules/build.md` — 빌드 검증 패턴
-[로드/무조건] modules/execution-modes.md             ~  1245 tok
-     · L63: | modules/execution-modes.md | LOOP 실행 모드 |
-     ! L186: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
-     ! L291: 래더 한도(`modules/execution-modes.md`) 뒤에도 실패하면 근본 원인을 재분석한다(§12 L4 — 사용자 에스컬레이션). 복잡도 초과 시 즉시 전환한다.
-     ! L313: | 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
-[로드/무조건] modules/context-artifacts.md           ~  4289 tok
-     · L65: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
-     ! L108: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
-[로드/무조건] modules/plugin-refs.md                 ~  2258 tok
-     · L66: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
-     ! L74: > 참조: `modules/plugin-refs.md` — SwiftUI Expert(수정 시) + Swift Concurrency(수정 시) 섹션
-     ! L77: > 자동 감지: 코드에 SwiftUI/Concurrency 패턴 발견 시 플러그인 적극 참조 (트리거 목록: `modules/plugin-refs.md`)
-     ! L81: > 참조: `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 부재해도 다음 패턴이 감지되면 안전성 
-[로드/무조건] modules/code-transform-validation.md   ~  1477 tok
-     · L67: | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
-     ! L172: - `modules/code-transform-validation.md` 참조. 원본 런타임 특성(스레드, 에러) 확인 후 수정
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     · L70: | modules/gpt-strategy.md | § 단계 실행 판정 — GPT check 직전 `gpt-choice.sh decide` 한 줄로 실행 · 건너뜀을 정한다 |
-     ! L195: - GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt
-     ! L197: - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.m
-[로드/무조건] modules/lead-reasoning.md              ~  2155 tok
-     ! L136: → 키워드 기반이 아닌 **상태 기반**으로 범위 정의 (참조: `modules/lead-reasoning.md`)
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ! L143: 빠른 수정-빌드 사이클로 버그를 해결합니다. 아래 팀 에이전트 모드 0 의 모드 게이트를 거치지 않고 여기서 시작하면 먼저 기록 `run_metrics.py start --skill fz-fix -
-     ! L211: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
-     ! L211: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
-     ! L211: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
-     ! L321: - 버그 수정 완료: 사용자에게 보고 + 테스트 방법 안내(보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록)
-[카탈로그  ] modules/memory-policy.md               ~  2052 tok
-     · L64: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-[카탈로그  ] modules/uncertainty-verification.md    ~  1523 tok
-     · L68: | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ? L53: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 수정 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중
+     ! L176: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
+     ~ L194: > 스크립트: `workflows/code-pair.js` (mode='light') — fz-code와 동일 스크립트, stage 수만 분기. 규약: `guides/skill-authoring.m
+     ! L202: 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
+     ? L203: 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/code-pair.js', args })` — Stage 1 impl(opus) → 조건부 Sta
+     ? L206: 4. **`mode:'fallback'` 반환 시**: ⛔ **SOLO 직행 아님** — `guides/skill-authoring.md` §12 판별 표로 분기.
+[로드/무조건] modules/build.md                          653 글자÷4
+     · L59: | modules/build.md | 빌드 검증 |
+     ! L174: 참조: `modules/build.md` — 빌드 검증 패턴
+[로드/무조건] modules/execution-modes.md               1239 글자÷4
+     · L60: | modules/execution-modes.md | LOOP 실행 모드 |
+     ! L176: 에스컬레이션 래더 적용 (참조: `modules/execution-modes.md` § 에스컬레이션 래더 · Workflow 반환 실패는 `guides/skill-authoring.md` §12)
+     ! L280: 래더 한도(`modules/execution-modes.md`) 뒤에도 실패하면 근본 원인을 재분석한다(§12 L4 — 사용자 에스컬레이션). 복잡도 초과 시 즉시 전환한다.
+     ! L302: | 빌드 반복 실패 | 에스컬레이션 래더 (`modules/execution-modes.md` · §12) | 사용자 에스컬레이션 |
+[로드/무조건] modules/context-artifacts.md             3466 글자÷4
+     · L61: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 산출물 전달 |
+     ! L99: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+[로드/무조건] modules/code-transform-validation.md     1477 글자÷4
+     · L63: | modules/code-transform-validation.md | 코드 변환 동등성 — 패턴 변환 수정 시 BEC 적용 |
+     ! L163: - `modules/code-transform-validation.md` 참조. 원본 런타임 특성(스레드, 에러) 확인 후 수정
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     · L66: | modules/gpt-strategy.md | § 단계 실행 판정 — GPT check 직전 `gpt-choice.sh decide` 한 줄로 실행 · 건너뜀을 정한다 |
+     ! L182: - GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt
+     ! L184: - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.m
+[로드/무조건] modules/lead-reasoning.md                2155 글자÷4
+     ! L128: → 키워드 기반이 아닌 **상태 기반**으로 범위 정의 (참조: `modules/lead-reasoning.md`)
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ! L135: 빠른 수정-빌드 사이클로 버그를 해결합니다. 아래 팀 에이전트 모드 0 의 모드 게이트를 거치지 않고 여기서 시작하면 먼저 기록 `run_metrics.py start --skill fz-fix -
+     ! L199: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
+     ! L199: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
+     ! L199: 0. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): code-pair 를 부를 상황이면 먼저 `pyt
+     ! L310: - 버그 수정 완료: 사용자에게 보고 + 테스트 방법 안내(보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록)
+[로드/조건부] modules/plugin-refs.md                   2809 글자÷4
+     · L62: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ? L72: > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
+     ? L76: > 참조(Swift 파일을 수정하는 경우에만): `modules/plugin-refs.md` "역방향 감지 트리거" 섹션. 동시성 키워드(`@MainActor`, `actor`, `async`)가 
+[로드/조건부] modules/tool-status.md                    665 글자÷4
+     ? L114: ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면 한
+[로드/조건부] modules/symbol-tools-audit.md             996 글자÷4
+     ? L204: 2.5. **심볼 도구 점검** (반환 뒤 — 재시도 invoke 마다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --
+     ? L204: 2.5. **심볼 도구 점검** (반환 뒤 — 재시도 invoke 마다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --
+[카탈로그  ] modules/uncertainty-verification.md      1525 글자÷4
+     · L64: | modules/uncertainty-verification.md | Root-Cause 진단 시 기술적 주장의 Default-Deny 검증 |
 
 ===== fz-gpt =====
 참조 판정: skills/fz-gpt/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 42313 / ceiling(로드 전체) 42313 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 43219 / ceiling(로드 전체) 43219 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ! L24: > ⛔ **첫 GPT 호출 전**: 단계 직전 `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 세션에
-     ! L24: > ⛔ **첫 GPT 호출 전**: 단계 직전 `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 세션에
-     ! L28: > - effort 수준: API `reasoning.effort` 는 **모델별**이다 [verified: developers.openai.com/api/docs/guides/reasoning] 
-     ! L115: > 공통 설정 (Base Branch / 모델·effort 선택 / Diff 크기 / CLI 모드): `modules/gpt-strategy.md`
-     ! L130: ⛔ **exit 10~17 = 측정 실패**이며 "이슈 0건"이 아니다. exit 18(stderr `GPT-OFF:`)은 GPT 미사용 — 실패가 아니라 그 단계를 건너뛰고 `[GPT 미사용 — 
-     ! L226: | 모델 미지원 (구버전 CLI가 config 모델·세션 선택 모델 미인식) | CLI 업데이트 권장, 불가 시 세션 선택을 다시 묻거나(`modules/gpt-strategy.md § 모델·eff
-[로드/무조건] modules/session.md                     ~   799 tok
-     · L56: | modules/session.md | 세션 감지, Issue Tracker 연동 |
-     ! L178: 검증 결과를 자동으로 Issue Tracker에 기록 (참조: modules/session.md). `-o` 파일을 jq로 파싱하여 phase/status 태그 후 통합.
-[로드/무조건] modules/cross-validation.md            ~ 10992 tok
-     · L57: | modules/cross-validation.md | 검증 게이트, 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`), GIT_ROOT 추출 |
-     ! L61: > CLAUDE.md `## Directory Structure`에서 동적 추출. 상세: modules/cross-validation.md 참조.
-     ! L65: > 3-Tier 디스커버리 정의: `modules/cross-validation.md § 역할 스킬 경로` 참조 — 구현은 `scripts/gpt_kinds.py` 한 곳이고 정문이 부른다.
-     ! L152: | **micro-eval** | 래퍼 exec | 단일 주장 독립 재평가 (claim-type 라우팅) | modules/cross-validation.md Gate |
-[로드/무조건] modules/fz-gpt-bash-hygiene.md         ~  3902 tok
-     ! L121: > 상세: `modules/fz-gpt-bash-hygiene.md` — Stdin 닫기 (§1) / Trusted Dir (§2) / `-o` 버퍼링 (§3) / Background Task (§
-     ! L170: ⛔ **Bash 호출 시 의무**: 모든 서브커맨드 호출은 `modules/fz-gpt-bash-hygiene.md` 준수 (stdin close / trusted dir / Base Verific
-     ! L228: | **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (`modules/fz-gpt
-     ! L229: | **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (`modules/fz-
-     ! L230: | **`--profile` 사용 시 sandbox가 read-only로 force** (30차, Critical) | `[projects.<path>] trust_level = "trusted"`
-[로드/무조건] modules/fz-gpt-subcommands-core.md     ~  3578 tok
-     ! L137: > - **Core (review/verify/validate/check)**: `modules/fz-gpt-subcommands-core.md`
-[로드/무조건] modules/fz-gpt-subcommands-aux.md      ~  2669 tok
-     ! L138: > - **Aux (final/adversarial/drift/plan/micro-eval/independent-plan/independent-review)**: `modules/fz-gpt-sub
-     ! L168: > independent-review 는 호출 스킬이 Workflow 와 **동시에** 띄우고 `scripts/review_merge.py` 로 합친다 — 순서 정본 `modules/fz-gpt-s
-[로드/무조건] modules/promotion-ledger.md            ~ 11273 tok
-     ! L149: | **adversarial** | 래퍼 exec | Devil's Advocate 리뷰 — 설계 필요성 (반증 frame 아님) | modules/promotion-ledger.md 승격 판정(2
-[로드/무조건] modules/pipelines.md                   ~  1727 tok
-     ! L150: | **drift** | 래퍼 exec | 아키텍처 드리프트 전체 스캔 | /fz drift-check (modules/pipelines.md §15) |
-     ! L151: | **plan** | 래퍼 exec | 독립 플랜 (Claude 와 교차 비교, C4 원칙) | /fz-plan cross-check · /fz plan-parallel (modules/pipel
-[로드/무조건] modules/scope-challenge.md             ~  1038 tok
-     ! L197: 서브커맨드: 리뷰→`gpt-call.sh review`(래퍼 review 모드), 검증→`gpt-call.sh verify`(exec · 스키마는 kind 가 정한다), 심화→`gpt-call.sh
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ! L22: > ⛔ **첫 GPT 호출 전**: 단계 직전 `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 세션에
+     ! L22: > ⛔ **첫 GPT 호출 전**: 단계 직전 `gpt-choice.sh decide` 한 줄로 분기한다(`modules/gpt-strategy.md` § 단계 실행 판정) — `ask` 면 세션에
+     ! L26: > - effort 수준: API `reasoning.effort` 는 **모델별**이다 [verified: developers.openai.com/api/docs/guides/reasoning] 
+     ! L102: > 공통 설정 (Base Branch / 모델·effort 선택 / Diff 크기 / CLI 모드): `modules/gpt-strategy.md`
+     ! L117: ⛔ **exit 10~17 = 측정 실패**이며 "이슈 0건"이 아니다. exit 18(stderr `GPT-OFF:`)은 GPT 미사용 — 실패가 아니라 그 단계를 건너뛰고 `[GPT 미사용 — 
+     ! L211: | 모델 미지원 (구버전 CLI가 config 모델·세션 선택 모델 미인식) | CLI 업데이트 권장, 불가 시 세션 선택을 다시 묻거나(`modules/gpt-strategy.md § 모델·eff
+[로드/무조건] modules/session.md                        823 글자÷4
+     · L54: | modules/session.md | 세션 감지, Issue Tracker 연동 |
+     ! L163: 검증 결과를 자동으로 Issue Tracker에 기록 (참조: modules/session.md). 결과 파일(`--out`)을 kind 의 출력 계약대로 읽어(json kind 는 jq · che
+[로드/무조건] modules/cross-validation.md             11054 글자÷4
+     · L55: | modules/cross-validation.md | 검증 게이트, 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`), GIT_ROOT 추출 |
+     ! L59: > CLAUDE.md `## Directory Structure`에서 동적 추출. 상세: modules/cross-validation.md 참조.
+     ! L63: > 3-Tier 디스커버리 정의: `modules/cross-validation.md § 역할 스킬 경로` 참조 — 구현은 `scripts/gpt_kinds.py` 한 곳이고 정문이 부른다.
+     ! L140: | **micro-eval** | 래퍼 exec | 단일 주장 독립 재평가 (claim-type 라우팅) | modules/cross-validation.md Gate |
+[로드/무조건] modules/fz-gpt-bash-hygiene.md           3964 글자÷4
+     ! L108: > 상세: `modules/fz-gpt-bash-hygiene.md` — Stdin 닫기 (§1) / Trusted Dir (§2) / `-o` 버퍼링 (§3) / Background Task (§
+     ! L155: ⛔ **Bash 호출 시 의무**: 모든 서브커맨드 호출은 `modules/fz-gpt-bash-hygiene.md` 준수 (stdin close / trusted dir / Base Verific
+     ! L213: | **`Reading additional input from stdin...` hang** (29차) | `< /dev/null` 추가하여 stdin 명시 close (`modules/fz-gpt
+     ! L214: | **`Not inside a trusted directory` 에러** (29차) | `--skip-git-repo-check` 추가 또는 git repo 내부에서 실행 (`modules/fz-
+     ! L215: | **`--profile` 사용 시 sandbox가 read-only로 force** (30차, Critical) | `[projects.<path>] trust_level = "trusted"`
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L122: > ⛔ **선택 도구 상태**: 서브커맨드를 실행하기 전에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
+[로드/무조건] modules/fz-gpt-subcommands-core.md       3346 글자÷4
+     ! L125: > - **Core (review/verify/validate/check)**: `modules/fz-gpt-subcommands-core.md`
+[로드/무조건] modules/fz-gpt-subcommands-aux.md        2754 글자÷4
+     ! L126: > - **Aux (final/adversarial/drift/plan/micro-eval/independent-plan/independent-review)**: `modules/fz-gpt-sub
+     ! L153: > independent-review 는 호출 스킬이 Workflow 와 **동시에** 띄우고 `scripts/review_merge.py` 로 합친다 — 순서 정본 `modules/fz-gpt-s
+[로드/무조건] modules/promotion-ledger.md             11264 글자÷4
+     ! L137: | **adversarial** | 래퍼 exec | Devil's Advocate 리뷰 — 설계 필요성 (반증 frame 아님) | modules/promotion-ledger.md 승격 판정(2
+[로드/무조건] modules/pipelines.md                     1756 글자÷4
+     ! L138: | **drift** | 래퍼 exec | 아키텍처 드리프트 전체 스캔 | /fz drift-check (modules/pipelines.md §15) |
+     ! L142: | **independent-plan** | 런처 plan | 격리 첫 패스 플랜 (fz-plan light · full 기본 — 끄기 --no-gpt-independent) | /fz-plan 2
+[로드/무조건] modules/scope-challenge.md               1038 글자÷4
+     ! L182: 서브커맨드: 리뷰→`gpt-call.sh review`(래퍼 review 모드), 검증→`gpt-call.sh verify`(exec · 스키마는 kind 가 정한다), 심화→`gpt-call.sh
 
 ===== fz-manage =====
 참조 판정: skills/fz-manage/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 20169 / ceiling(로드 전체) 20169 ~tokens  · 로드 아님(카탈로그·출처표기) 10992 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 21407 / ceiling(로드 전체) 21407 글자÷4  · 로드 아님(카탈로그·출처표기) 11054 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/governance.md                  ~  3340 tok
-     ! L33: - 거버넌스 (`modules/governance.md`)
-     ! L58: | `governance` | `modules/governance.md` | 거버넌스 프레임워크 |
-     ! L98: 2b. **실효 모델은 YAML이 아니라 스크립트에서 읽는다** — `Grep("agentType: 'fz:", "workflows/{skill}-*.js")` → `model`/`effort` 인
-     ! L437: - 거버넌스 프레임워크 (`modules/governance.md`)
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ! L57: | `team <pattern>` | `workflows/*.js` + `guides/skill-authoring.md` §12 | 각 스킬이 자기 Workflow를 소유 |
-     ! L443: - 팀 에이전트 생성 (→ 각 스킬의 `workflows/*.js`, 규약은 `guides/skill-authoring.md` §12)
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ! L286: > **MUST 조건**: O3 (Generator ≠ Evaluator) + O9 (Cross-Model Verification) — GPT 를 켠 세션이면 GPT 외부 검증 필수(`modules
-[출처표기  ] modules/cross-validation.md            ~ 10992 tok
-     ~ L181: ⛔ **exit code를 판정에 포함한다** — `>/dev/null 2>&1`로 감싸지 않는다. `2`는 **PASS도 SKIP도 아니다**(configuration/parse error). 근
+[로드/무조건] modules/governance.md                    3539 글자÷4
+     ! L31: - 거버넌스 (`modules/governance.md`)
+     ! L56: | `governance` | `modules/governance.md` | 거버넌스 프레임워크 |
+     ! L92: 2b. **실효 모델은 YAML이 아니라 스크립트에서 읽는다** — `Grep("agentType: 'fz:", "workflows/{skill}-*.js")` → `model`/`effort` 인
+     ! L431: - 거버넌스 프레임워크 (`modules/governance.md`)
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ! L55: | `team <pattern>` | `workflows/*.js` + `guides/skill-authoring.md` §12 | 각 스킬이 자기 Workflow를 소유 |
+     ! L437: - 팀 에이전트 생성 (→ 각 스킬의 `workflows/*.js`, 규약은 `guides/skill-authoring.md` §12)
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ! L280: > **MUST 조건**: O3 (Generator ≠ Evaluator) + O9 (Cross-Model Verification) — GPT 를 켠 세션이면 GPT 외부 검증 필수(`modules
+[출처표기  ] modules/cross-validation.md             11054 글자÷4
+     ~ L175: ⛔ **exit code를 판정에 포함한다** — `>/dev/null 2>&1`로 감싸지 않는다. `2`는 **PASS도 SKIP도 아니다**(configuration/parse error). 근
 
 ===== fz-memory =====
 참조 판정: skills/fz-memory/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 13325 / ceiling(로드 전체) 13325 ~tokens  · 로드 아님(카탈로그·출처표기) 5562 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 12781 / ceiling(로드 전체) 12781 글자÷4  · 로드 아님(카탈로그·출처표기) 4702 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/memory-policy.md               ~  2052 tok
-     · L52: | modules/memory-policy.md | L2 Serena Memory 키 네이밍 + GC 정책 |
-     ! L80: 2. 키별 수명 정책과 대조 (`modules/memory-policy.md`)
-[로드/무조건] modules/promotion-ledger.md            ~ 11273 tok
-     ! L121: - `python3 "${FZ_PLUGIN_ROOT}/scripts/candidate_expiry.py" --ledger "${FZ_PLUGIN_ROOT}/modules/promotion-ledge
-     ! L122: - `재평가필요` 는 종결 · 연장 · 승격 판단을, `판정불가`(관측 날짜 없음)는 날짜 보강을 사용자에게 묻는다 — 3개월 재평가 규칙(`modules/promotion-ledger.md`)의 
-[카탈로그  ] modules/memory-guide.md                ~  1273 tok
-     · L51: | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
-[카탈로그  ] modules/context-artifacts.md           ~  4289 tok
-     · L53: | modules/context-artifacts.md | L3 티켓 폴더 관리 |
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L36: - ⛔ **선택 도구 상태**: 서브커맨드 첫 단계에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
+[로드/무조건] modules/memory-policy.md                  852 글자÷4
+     · L53: | modules/memory-policy.md | L2 Serena 영속 키 네이밍 + GC 정책 |
+     ! L72: 2. 영속 키(decision · pattern)를 수명 정책과 대조 (`modules/memory-policy.md`)
+[로드/무조건] modules/promotion-ledger.md             11264 글자÷4
+     ! L108: - `python3 "${FZ_PLUGIN_ROOT}/scripts/candidate_expiry.py" --ledger "${FZ_PLUGIN_ROOT}/modules/promotion-ledge
+     ! L109: - `재평가필요` 는 종결 · 연장 · 승격 판단을, `판정불가`(관측 날짜 없음)는 날짜 보강을 사용자에게 묻는다 — 3개월 재평가 규칙(`modules/promotion-ledger.md`)의 
+[카탈로그  ] modules/memory-guide.md                  1236 글자÷4
+     · L52: | modules/memory-guide.md | L1 auto memory 관리 정책 + 태깅 규칙 |
+[카탈로그  ] modules/context-artifacts.md             3466 글자÷4
+     · L54: | modules/context-artifacts.md | L3 티켓 폴더 관리 |
 
 ===== fz-modernize =====
 참조 판정: skills/fz-modernize/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 75098 / ceiling(로드 전체) 79000 ~tokens  · 로드 아님(카탈로그·출처표기) 1273 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 78114 / ceiling(로드 전체) 82078 글자÷4  · 로드 아님(카탈로그·출처표기) 1236 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/cross-validation.md            ~ 10992 tok
-     ! L35: - **GPT 재검증 상한** (18차 교훈): 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한(판정과 무관하게 유효 판정 라운드를 센다) — 소진(정문 e
-     · L65: | modules/cross-validation.md | GPT 3회 한도 + Reflection Rate |
-     ! L228: 정본은 `skills/fz-modernize/scripts/ac8-link-check.sh` 하나다 — 여기에 사본을 두지 않는다(F-224: 스크립트 · 인라인 사본 모두 `rg` 였고 rg 없는
-     ! L264: **핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **재검증 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한**(
-     ! L369: | GPT 재검증 상한 | 정문 exit 19 `budget-exhausted`(횟수 정본 `modules/cross-validation.md` § 재검증 라운드 상한 — 판정과 무관하게 유효 라운
-     ! L434: - ⛔ 단 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**(`modules/cross-validation.md §Coverage Gate`)는 light에서도 **생략 불
-     ! L451: | GPT 누적 한도 도달 · 정문 exit 19(`GPT-ROUNDS:` 재검증 라운드 거부 — 정본 `modules/cross-validation.md` § 재검증 라운드 상한) | 다시 부르지
-[로드/무조건] guides/harness-engineering.md          ~ 19484 tok
-     ! L45: /fz-modernize probe "guides/harness-engineering.md"           # → Phase 1만
-[로드/무조건] guides/prompt-optimization.md          ~  9521 tok
-     ! L46: /fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
-     · L63: | guides/prompt-optimization.md | Tier 1+2 인용 정책 + 헤더 갱신 패턴 |
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ! L56: - **GPT CLI**: cross-model 검증 — ⛔ **GPT 단계마다 직전**(light micro-eval · full Phase 3 독립 플랜 · Phase 4): `gpt-choic
-     ! L264: **핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **재검증 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한**(
-     ? L268: 1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md`
-     ? L268: 1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md`
-     ? L268: 1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md`
-     ! L370: | Self-application contract | 대상이 fz-modernize/* 자체 | Phase 4 GPT 검증 non-skippable(GPT 켬일 때 — 끈 세션 · CLI 없음은 d
-     ? L450: | decide `skip` · 래퍼 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 · 폴백 없음(`
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     · L64: | guides/skill-authoring.md | 본 스킬 작성 시 표준 |
-     ! L174: 3. **각 stale 항목 → 해소 자료 매핑**: (선택 — 항목이 많고 서로 독립이면 항목 대조를 `workflows/swarm.js` 조각으로 돌린다 · 대조할 probe 자료는 브리프에 싣
-[로드/무조건] modules/context-artifacts.md           ~  4289 tok
-     · L66: | modules/context-artifacts.md | 티켓 폴더 + 산출물 보존 |
-     ! L98: > 참조: `modules/context-artifacts.md` Work Dir Resolution
-[로드/무조건] guides/llm-references.md               ~ 11466 tok
-     ! L166: - **현행 모델명은 `guides/llm-references.md`의 `모델 정책: <X> only`에서 자동 파싱**(SSOT) — 새 모델 출시 시 그 한 줄만 갱신하면 lint가 따라온다
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ! L433: - **light 모드 (40차)**: 사용자 신호(정본 목록 `modules/mode-gate.md` § 신호어) 감지 시 Phase 1+2 + GPT micro-eval만 실행 (카운터 1 소비
-[로드/조건부] modules/fz-gpt-bash-hygiene.md         ~  3902 tok
-     ? L284: # hygiene(stdin close 29차 · trust_level 30차 · `--` 구분자 · exit 계약)는 정문이 부르는 래퍼가 처리한다 — modules/fz-gpt-bash-hygi
-[카탈로그  ] modules/memory-guide.md                ~  1273 tok
-     · L67: | modules/memory-guide.md | feedback_* 교훈 태깅 규칙 |
+[로드/무조건] modules/cross-validation.md             11054 글자÷4
+     ! L34: - **GPT 재검증 상한** (18차 교훈): 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한(판정과 무관하게 유효 판정 라운드를 센다) — 소진(정문 e
+     · L64: | modules/cross-validation.md | GPT 3회 한도 + Reflection Rate |
+     ! L229: 정본은 `skills/fz-modernize/scripts/ac8-link-check.sh` 하나다 — 여기에 사본을 두지 않는다(F-224: 스크립트 · 인라인 사본 모두 `rg` 였고 rg 없는
+     ! L265: **핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **재검증 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한**(
+     ! L370: | GPT 재검증 상한 | 정문 exit 19 `budget-exhausted`(횟수 정본 `modules/cross-validation.md` § 재검증 라운드 상한 — 판정과 무관하게 유효 라운
+     ! L435: - ⛔ 단 산출물이 전수/카운트/부정 주장을 포함하면 **Coverage Gate**(`modules/cross-validation.md §Coverage Gate`)는 light에서도 **생략 불
+     ! L452: | GPT 누적 한도 도달 · 정문 exit 19(`GPT-ROUNDS:` 재검증 라운드 거부 — 정본 `modules/cross-validation.md` § 재검증 라운드 상한) | 다시 부르지
+[로드/무조건] guides/harness-engineering.md           19988 글자÷4
+     ! L44: /fz-modernize probe "guides/harness-engineering.md"           # → Phase 1만
+[로드/무조건] guides/prompt-optimization.md            9742 글자÷4
+     ! L45: /fz-modernize audit "guides/prompt-optimization.md"           # → Phase 2만
+     · L62: | guides/prompt-optimization.md | Tier 1+2 인용 정책 + 헤더 갱신 패턴 |
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ! L55: - **GPT CLI**: cross-model 검증 — ⛔ **GPT 단계마다 직전**(light micro-eval · full Phase 3 독립 플랜 · Phase 4): `gpt-choic
+     ! L265: **핵심 원칙**: Plan을 GPT(또는 사용 가능한 cross-model)로 독립 검증. **재검증 횟수는 정본 `modules/cross-validation.md` § 재검증 라운드 상한**(
+     ? L269: 1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md`
+     ? L269: 1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md`
+     ? L269: 1. **GPT 호출**: 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다(`modules/gpt-strategy.md`
+     ! L371: | Self-application contract | 대상이 fz-modernize/* 자체 | Phase 4 GPT 검증 non-skippable(GPT 켬일 때 — 끈 세션 · CLI 없음은 d
+     ? L451: | decide `skip` · 래퍼 exit 18 `GPT-OFF`(사용자 선택 · CLI 없음) | 재시도하지 않는다 — 실패가 아니다 | `[GPT 미사용 — 사유]` 표기만 · 폴백 없음(`
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     · L63: | guides/skill-authoring.md | 본 스킬 작성 시 표준 |
+     ! L175: 3. **각 stale 항목 → 해소 자료 매핑**: (선택 — 항목이 많고 서로 독립이면 항목 대조를 `workflows/swarm.js` 조각으로 돌린다 · 대조할 probe 자료는 브리프에 싣
+[로드/무조건] modules/context-artifacts.md             3466 글자÷4
+     · L65: | modules/context-artifacts.md | 티켓 폴더 + 산출물 보존 |
+     ! L97: > 참조: `modules/context-artifacts.md` Work Dir Resolution
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L111: 4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
+[로드/무조건] guides/llm-references.md                12619 글자÷4
+     ! L165: - 산출: `missing-audit-date`(외부 출처 인용하나 감사일자 없음) · `stale-audit`(경과 초과) · `stale-model-ref`(구세대 모델명만 있고 현행 미언급) 
+     ! L167: - **현행 모델명은 `guides/llm-references.md`의 `모델 정책: <X> only`에서 자동 파싱**(SSOT) — 새 모델 출시 시 그 한 줄만 갱신하면 lint가 따라온다
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ! L434: - **light 모드 (40차)**: 사용자 신호(정본 목록 `modules/mode-gate.md` § 신호어) 감지 시 Phase 1+2 + GPT micro-eval만 실행 (카운터 1 소비
+[로드/조건부] modules/fz-gpt-bash-hygiene.md           3964 글자÷4
+     ? L285: # hygiene(stdin close 29차 · trust_level 30차 · `--` 구분자 · exit 계약)는 정문이 부르는 래퍼가 처리한다 — modules/fz-gpt-bash-hygi
+[카탈로그  ] modules/memory-guide.md                  1236 글자÷4
+     · L66: | modules/memory-guide.md | feedback_* 교훈 태깅 규칙 |
 
 ===== fz-new-file =====
 참조 판정: skills/fz-new-file/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
 
 ===== fz-peer-review =====
 참조 판정: skills/fz-peer-review/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 63289 / ceiling(로드 전체) 73783 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 68831 / ceiling(로드 전체) 80144 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/peer-review-gates.md           ~  7219 tok
-     ! L37: > **행동 원칙**: 팀원의 PR/브랜치를 3-렌즈 독립 분석 + GPT 교차검증으로 리뷰하고, Confidence Matrix 투표(적용 Tier 는 `modules/peer-review-gat
-     ! L45: - **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정 (적용 Tier·산식은 `modules/peer-review-gates.md` § Merge
-     ! L91: | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Orig
-     ! L297: sequential-thinking으로 Confidence Matrix를 계산한다 (Tier 별 생성 여부·산식은 `modules/peer-review-gates.md` § MergeContract
-     ? L301: Lead 보정 **불필요** — 실패 에이전트는 `reviews` 에서 이미 빠져 있고 1-review 경로가 실재한다(근거: `references/rationale.md` § 결측 에이전트). `
-     ! L333: > ⛔ **Tier 3 전용** — 그 외 Tier 의 병합·판정 산식은 `modules/peer-review-gates.md` § MergeContract § 9 가 정본이다.
-     ! L354: > ⛔ **적용 Tier** — 이 절 산출물의 Tier 별 생성 여부는 `modules/peer-review-gates.md` § MergeContract § 9, 절 안 Coverage·Nega
-     ! L367: > 참조: `modules/peer-review-gates.md` — Factual Claim (4.4) + Line (4.5) + Compiler (4.6) + Behavior (4.7) + **
-     ! L376: ${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 라인 — 투표 적용 Tier 는 modules/peer-review-gates.md § Me
-     ! L377: ${WORK_DIR}/confidence-matrix.md     — 최종 Confidence Matrix (마크다운 — Tier 별 생성 여부는 modules/peer-review-gates.md
-     ! L425: Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9) → Major 이슈(file:line + What/Impac
-     ! L482: - 3-Model Cross-Review + Confidence Matrix 투표 (적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)
-     ? L494: `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-r
-[로드/무조건] modules/peer-review-tiers.md           ~  9849 tok
-     ~ L44: - **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 s
-     ! L141: ⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md
-     ! L143: ⛔ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-m
-     ~ L233: > **실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED · 위험 카테고리는 추천 근거): `modules/peer-review-tiers.md` "## 모
-     ! L235: 상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조. Tier 가 정해지면 기록 `run_metrics.py sta
-     ! L241: exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다 · `2` 는 판정 불가(⛔ 통과 아님). 요구 슬롯은 `mod
-     ! L260: - **Tier 0** → `modules/peer-review-tiers.md` §Tier 0 절차로 위임. 본 SKILL.md Analyze 후속 섹션(Gate 0 / Tier 2 / Tier 
-     ! L261: - **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 
-     ! L284: - `--no-gpt-independent` 면 띄우지 않고 GPT challenger(`modules/peer-review-tiers.md` · `gpt-challenger-raw.txt`)를 쓴
-     ! L291: Anti-Sycophancy 규칙(코드 증거 없는 self-reverse 금지), reverse 판정 절차, DA 호출 패턴: `modules/peer-review-tiers.md` §Cross-C
-     ? L464: > 참조: `modules/peer-review-tiers.md` — Tier 구성, 자동 선택, 타임아웃 + 폴백
-     ! L489: - GPT CLI 직접 호출 (→ 정문 `scripts/gpt-call.sh <kind>` 경유 — `modules/peer-review-tiers.md` § GPT Analyze 호출)
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ? L46: - **모드 게이트 + Tier**: 크기·위험으로 추천 → 추천 full(큼 AND 복잡)일 때만 질문 · 그 밖은 묻지 않고 light + 통보 → light = Tier 1 · full = T
-     ! L74: — 리뷰 깊이는 모드 게이트(light = Tier 1 · full = Tier 2) 또는 `--tier` 로 정한다. 신호어(정본 `modules/mode-gate.md` § 신호어)는
-     ! L235: 상세 절차 (Tier 0/1 분기, evidence 범위, 비용 로깅): `modules/peer-review-tiers.md` 참조. Tier 가 정해지면 기록 `run_metrics.py sta
-     ! L497: `--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계. Deliver(문서 저장 · `--post` 게시와 착지 검증 포함
-[로드/무조건] guides/agent-team-guide.md             ~  6173 tok
-     ! L80: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-     ! L363: > ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ! L81: - ⛔ **GPT 자리마다 직전**(독립 첫 패스(기본) · `--no-gpt-independent` 면 Tier 1·2·3 challenger · Tier 3 DA): `gpt-choice.sh 
-     ? L494: `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-r
-[로드/무조건] modules/cross-validation.md            ~ 10992 tok
-     ! L88: | `modules/cross-validation.md` | 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`), GIT_ROOT 추출 |
-     ! L120: # GIT_ROOT 추출: modules/cross-validation.md의 GIT_ROOT 공유 유틸 참조
-     ! L209: 4. ⛔ Fact 중 **"0건·부재·전부·~뿐"이 결론인 것**은 `modules/cross-validation.md` §Negative-Result Gate를 **Read 후 적용** — pos
-     ! L363: > ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를
-     ! L429: > **⛔ 대화 출력 전에 반드시 Write 도구로 아래 파일들을 저장하세요. 저장 완료 후 사용자에게 경로를 안내합니다.** ⛔ 쓰기 경로는 **항상 절대경로**다 — cwd 는 도구 호출 사이에
-[로드/무조건] modules/lead-reasoning.md              ~  2155 tok
-     ! L89: | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
-[로드/무조건] modules/uncertainty-verification.md    ~  1523 tok
-     ! L90: | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
-[로드/무조건] modules/peer-review-inline-anchoring.md ~  2339 tok
-     ! L92: | `modules/peer-review-inline-anchoring.md` | Deliver `--post` 인라인 앵커 게시 7단계 + 확인 게이트 + 다지점 분할(SSOT). `Bash(gh
-     ! L446: 발견을 PR 대화창이 아니라 **코드 라인 옆**(Files changed)에 붙인다. 7단계 절차·실패 대응·다지점 분할 전문: `modules/peer-review-inline-anchoring
-     ! L452: > ⛔ **확인 게이트** — 미리보기는 항상 출력한다. 셋 중 하나면 `AskUserQuestion` 으로 승인받은 뒤 게시한다: (a) `event ≠ COMMENT` (b) `non_ancho
-[로드/무조건] modules/peer-review-finding-anatomy.md ~   963 tok
-     ! L93: | `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
-     ! L437: 서술 형태(인과가 한 문장으로 안 끝나는 결함): `modules/peer-review-finding-anatomy.md` — 필드 나열이 아니라 원칙. 결함마다 인과의 모양이 다르다
-[로드/무조건] modules/team-facing-writing.md         ~   292 tok
-     ! L94: | `modules/team-facing-writing.md` | 팀원에게 가는 글(코멘트 · 답글 · PR 본문)의 어조 · 형태 — Comment Style Guide 정본 |
-     ! L398: > 계약 정본: `scripts/check_comment_worthy.py` 머리말(카드 필드 · E1~E8 · 커버리지 · covers) · 어조: `modules/team-facing-writi
-     ! L419: 정본: `modules/team-facing-writing.md` — 단정하지 않는다 · 코드 펜스 밖 산문 4줄 이하 · 왜 중요한지 한 줄 · 마무리는 확인 요청이나 질문. ⛔ 칭찬으로 지적을 
-[로드/무조건] modules/evidence-collection.md         ~  2866 tok
-     ! L96: | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer
-     ! L174: > 참조: `modules/evidence-collection.md` — 수집 절차 상세 (a~d)
-     ! L192: > 참조: `modules/evidence-collection.md` — 섹션 e (Caller Analysis), 섹션 f (Convention Sampling)
-     ! L241: exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다 · `2` 는 판정 불가(⛔ 통과 아님). 요구 슬롯은 `mod
-     ! L275: > ⛔ **경로별 구현**(Tier 2/3 브리프 검사 · Tier 0/1 탐지·표시 + 강등 결정식) + `intentContext` 허용/금지 표: `modules/evidence-collect
-[로드/무조건] modules/plugin-refs.md                 ~  2258 tok
-     ! L97: | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 — gather 의 risk.json `plugin_refs`(그 모듈 `
-[로드/무조건] modules/review-structural-axes.md      ~  1705 tok
-     ! L98: | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4(+§6 craft — 이 스킬
-[로드/무조건] modules/peer-review-workflow.md        ~  1957 tok
-     ! L141: ⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md
-     ! L280: > `modules/peer-review-workflow.md`. Tier 0/1 은 Workflow 가 없어 **읽지 않는다**(Tier 1 의 GPT 는 아래 절).
-[로드/무조건] modules/code-transform-validation.md   ~  1477 tok
-     ! L218: - `modules/code-transform-validation.md` 참조
-[로드/무조건] modules/fz-gpt-subcommands-aux.md      ~  2669 tok
-     ! L285: - 순서 · 거부(오염 · 실패 · stale) 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서. Tier 3 GPT DA 는 병합 뒤
-[로드/조건부] guides/skill-authoring.md              ~ 10494 tok
-     ? L79: - Tier 2/3 Analyze는 네이티브 Workflow 도구 필요 (`workflows/peer-review.js`) — 미가용 시 SOLO 리뷰 폴백(`mode:'fallback'`) (⛔ 
-     ? L87: | `guides/skill-authoring.md` §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본) |
-     ? L491: - ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow
+[로드/무조건] modules/peer-review-gates.md             7309 글자÷4
+     ! L29: > **행동 원칙**: 팀원의 PR/브랜치를 3-렌즈 독립 분석 + GPT 교차검증으로 리뷰하고, Confidence Matrix 투표(적용 Tier 는 `modules/peer-review-gat
+     ! L37: - **Confidence Matrix**: 에이전트 투표 + Devil's Advocate로 편향 보정 (적용 Tier·산식은 `modules/peer-review-gates.md` § Merge
+     ! L82: | `modules/peer-review-gates.md` | Synthesize 검증 게이트 4.4-4.9 전문 (4.4 Factual Claim, 4.7-A Deleted Logic + Orig
+     ! L273: sequential-thinking으로 Confidence Matrix를 계산한다 (Tier 별 생성 여부·산식은 `modules/peer-review-gates.md` § MergeContract
+     ? L277: Lead 보정 **불필요** — 실패 에이전트는 `reviews` 에서 이미 빠져 있고 1-review 경로가 실재한다(근거: `references/rationale.md` § 결측 에이전트). `
+     ! L309: > ⛔ **Tier 3 전용** — 그 외 Tier 의 병합·판정 산식은 `modules/peer-review-gates.md` § MergeContract § 9 가 정본이다.
+     ! L330: > ⛔ **적용 Tier** — 이 절 산출물의 Tier 별 생성 여부는 `modules/peer-review-gates.md` § MergeContract § 9, 절 안 Coverage·Nega
+     ! L343: > 참조: `modules/peer-review-gates.md` — Factual Claim (4.4) + Line (4.5) + Compiler (4.6) + Behavior (4.7) + **
+     ! L352: ${WORK_DIR}/synthesized-issues.json  — 병합된 이슈 (Dedup+투표+검증 라인 — 투표 적용 Tier 는 modules/peer-review-gates.md § Me
+     ! L395: Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContract § 9) → Major 이슈(file:line + What/Impac
+     ! L447: - 3-Model Cross-Review + Confidence Matrix 투표 (적용 Tier 는 `modules/peer-review-gates.md` § MergeContract § 9)
+     ? L459: `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-r
+[로드/무조건] modules/peer-review-tiers.md             9146 글자÷4
+     ~ L36: - **3-렌즈**: review-arch + review-quality + review-correctness (Tier 2/3에서 **전부 opus** — `peer-review.js`가 모델 s
+     ! L132: ⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md
+     ! L134: ⛔ 스크립트는 **원재료까지만** 만든다. `old-new-pairs`·`producer-consumer`·`caller-analysis`·`convention-samples`·`semantic-m
+     ~ L209: > **실행 bash** (SIGNIFICANT_LINES = CHANGED − GENERATED · 위험 카테고리는 추천 근거): `modules/peer-review-tiers.md` "## 모
+     ! L211: 상세 절차 (Tier 0/1 분기, evidence 범위): `modules/peer-review-tiers.md` 참조. 실행 기록의 시작은 아래 근거 슬롯 검사가 통과할 때 그 스크립트가 남긴다
+     ! L217: exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다(다시 불러도 같은 실행이다) · `2` 는 판정 불가(⛔ 통과 
+     ! L236: - **Tier 0** → `modules/peer-review-tiers.md` §Tier 0 절차로 위임. 본 SKILL.md Analyze 후속 섹션(Gate 0 / Tier 2 / Tier 
+     ! L237: - **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 
+     ! L260: - `--no-gpt-independent` 면 띄우지 않고 GPT challenger(`modules/peer-review-tiers.md` · `gpt-challenger-raw.txt`)를 쓴
+     ! L267: Anti-Sycophancy 규칙(코드 증거 없는 self-reverse 금지), reverse 판정 절차, DA 호출 패턴: `modules/peer-review-tiers.md` §Cross-C
+     ? L429: > 참조: `modules/peer-review-tiers.md` — Tier 구성, 자동 선택, 타임아웃 + 폴백
+     ! L454: - GPT CLI 직접 호출 (→ 정문 `scripts/gpt-call.sh <kind>` 경유 — `modules/peer-review-tiers.md` § GPT Analyze 호출)
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ? L38: - **모드 게이트 + Tier**: 크기·위험으로 추천 → 추천 full(큼 AND 복잡)일 때만 질문 · 그 밖은 묻지 않고 light + 통보 → light = Tier 1 · full = T
+     ! L66: — 리뷰 깊이는 모드 게이트(light = Tier 1 · full = Tier 2) 또는 `--tier` 로 정한다. 신호어(정본 `modules/mode-gate.md` § 신호어)는
+     ! L211: 상세 절차 (Tier 0/1 분기, evidence 범위): `modules/peer-review-tiers.md` 참조. 실행 기록의 시작은 아래 근거 슬롯 검사가 통과할 때 그 스크립트가 남긴다
+     ~ L213: ⛔ **근거 슬롯 검사** — tier.txt 를 쓴 뒤, Analyze · GPT 독립 패스를 띄우기 **전에** 한 번 부른다. `--tier` 는 방금 정한 값을 적는다(재개 실행의 옛 tie
+     ~ L462: `--post`로 PR 게시, `--discover`로 Major 이슈 심층 탐색, `--explain`으로 변경사항 해설 연계. Deliver(문서 저장 · `--post` 게시와 착지 검증 포함
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ! L72: - ⛔ **GPT 자리마다 직전**(독립 첫 패스(기본) · `--no-gpt-independent` 면 Tier 1·2·3 challenger · Tier 3 DA): `gpt-choice.sh 
+     ? L459: `gh auth` 실패→git 폴백, 에이전트 spawn 실패→Tier 하위 전환, **GPT 실패→(Tier 3) GPT 열을 빼고 렌즈 투표 진행 · (Tier 2) `modules/peer-r
+[로드/무조건] modules/cross-validation.md             11054 글자÷4
+     ! L79: | `modules/cross-validation.md` | 역할 스킬 3-Tier 디스커버리(`scripts/gpt_kinds.py skill-path`), GIT_ROOT 추출 |
+     ! L185: 4. ⛔ Fact 중 **"0건·부재·전부·~뿐"이 결론인 것**은 `modules/cross-validation.md` §Negative-Result Gate를 **Read 후 적용** — pos
+     ! L339: > ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를
+     ! L399: > **⛔ 대화 출력 전에 반드시 Write 도구로 아래 파일들을 저장하세요. 저장 완료 후 사용자에게 경로를 안내합니다.** ⛔ 쓰기 경로는 **항상 절대경로**다 — cwd 는 도구 호출 사이에
+[로드/무조건] modules/lead-reasoning.md                2155 글자÷4
+     ! L80: | `modules/lead-reasoning.md` | Speculation-to-Fact Fallacy (§1.5) — 리뷰 주장 시 [verified] 태그 |
+[로드/무조건] modules/uncertainty-verification.md      1525 글자÷4
+     ! L81: | `modules/uncertainty-verification.md` | Default-Deny — 증거 없는 finding 차단 |
+[로드/무조건] modules/peer-review-inline-anchoring.md   2560 글자÷4
+     ! L83: | `modules/peer-review-inline-anchoring.md` | Deliver `--post` 인라인 앵커 게시 7단계 + 확인 게이트 + 다지점 분할(SSOT). `Write` 
+     ! L416: 발견을 PR 대화창이 아니라 **코드 라인 옆**(Files changed)에 붙인다. 7단계 절차·실패 대응·다지점 분할 전문: `modules/peer-review-inline-anchoring
+     ! L422: > ⛔ **확인 게이트** — 미리보기는 항상 출력한다. 셋 중 하나면 `AskUserQuestion` 으로 승인받은 뒤 게시한다: (a) `event ≠ COMMENT` (b) `non_ancho
+     ~ L423: > ⛔ 게시 경로는 `gh api` 하나다 — `comments[]` 에 `start_line`·`start_side`·`side` 를 넣지 못하는 게시 도구로 바꾸면 범위 하이라이트·LEFT 앵커
+[로드/무조건] modules/peer-review-finding-anatomy.md    963 글자÷4
+     ! L84: | `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
+     ! L407: 서술 형태(인과가 한 문장으로 안 끝나는 결함): `modules/peer-review-finding-anatomy.md` — 필드 나열이 아니라 원칙. 결함마다 인과의 모양이 다르다
+[로드/무조건] modules/team-facing-writing.md            292 글자÷4
+     ! L85: | `modules/team-facing-writing.md` | 팀원에게 가는 글(코멘트 · 답글 · PR 본문)의 어조 · 형태 — Comment Style Guide 정본 |
+     ! L368: > 계약 정본: `scripts/check_comment_worthy.py` 머리말(카드 필드 · E1~E8 · 커버리지 · covers) · 어조: `modules/team-facing-writi
+     ! L389: 정본: `modules/team-facing-writing.md` — 단정하지 않는다 · 코드 펜스 밖 산문 4줄 이하 · 왜 중요한지 한 줄 · 마무리는 확인 요청이나 질문. ⛔ 칭찬으로 지적을 
+[로드/무조건] modules/evidence-collection.md           2970 글자÷4
+     ! L87: | `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer
+     ! L150: > 참조: `modules/evidence-collection.md` — 수집 절차 상세 (a~d)
+     ! L168: > 참조: `modules/evidence-collection.md` — 섹션 e (Caller Analysis), 섹션 f (Convention Sampling)
+     ! L217: exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다(다시 불러도 같은 실행이다) · `2` 는 판정 불가(⛔ 통과 
+     ! L251: > ⛔ **경로별 구현**(Tier 2/3 브리프 검사 · Tier 0/1 탐지·표시 + 강등 결정식) + `intentContext` 허용/금지 표: `modules/evidence-collect
+[로드/무조건] modules/plugin-refs.md                   2809 글자÷4
+     ! L88: | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 — gather 의 risk.json `plugin_refs`(그 모듈 `
+[로드/무조건] modules/review-structural-axes.md        1705 글자÷4
+     ! L89: | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4(+§6 craft — 이 스킬
+[로드/무조건] modules/peer-review-workflow.md          2015 글자÷4
+     ! L132: ⛔ **`review-surface.md` 를 먼저 읽는다** — `git cherry` 의 `-` 커밋은 대상에서 빼고 Tier 를 재계산한다(`modules/peer-review-tiers.md
+     ! L256: > `modules/peer-review-workflow.md`. Tier 0/1 은 Workflow 가 없어 **읽지 않는다**(Tier 1 의 GPT 는 아래 절).
+[로드/무조건] modules/governance.md                    3539 글자÷4
+     ! L138: PR title/body에서 트래커 티켓 ID 추출 + acceptance criteria 수집. 티켓 조회는 CLAUDE.md 가 선언한 트래커 MCP 가 연결돼 있을 때만(`modules/gov
+[로드/무조건] modules/code-transform-validation.md     1477 글자÷4
+     ! L194: - `modules/code-transform-validation.md` 참조
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L217: exit `1` 이면 찍힌 슬롯을 채우거나 `evidence/skipped.md` 에 `- <id>: <사유>` 를 적고 다시 부른다(다시 불러도 같은 실행이다) · `2` 는 판정 불가(⛔ 통과 
+[로드/무조건] modules/fz-gpt-subcommands-aux.md        2754 글자÷4
+     ! L261: - 순서 · 거부(오염 · 실패 · stale) 규칙 정본: `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서. Tier 3 GPT DA 는 병합 뒤
+[로드/무조건] guides/agent-team-guide.md               6626 글자÷4
+     ! L339: > ⛔ 이슈·리포트에 **전수·카운트·부정 주장**("N곳"·"사용처 0건"·"형제 5/5"·"나머지는")이 있으면 `modules/cross-validation.md` §Coverage Gate를
+[로드/조건부] guides/skill-authoring.md               11313 글자÷4
+     ? L71: - Tier 2/3 Analyze는 네이티브 Workflow 도구 필요 (`workflows/peer-review.js`) — 미가용 시 SOLO 리뷰 폴백(`mode:'fallback'`) (⛔ 
+     ? L78: | `guides/skill-authoring.md` §12 | Workflow 규약 + **실패 복구 사다리 L1~L4** (팀 모드 정본) |
+     ~ L373: - Tier 2/3: 새 맥락 검증자 — `workflows/swarm.js` 를 `agentType: 'fz:review-counter'` 로 부른다. 조각 = 카드 ≤ 8장(넘으면 조각을 나눈다
+     ? L456: - ⛔ **standalone Agent() 호출 금지** — Gather 의 evidence 수집과 Tier 2/3 Analyze는 `workflows/peer-review.js` Workflow
 
 ===== fz-plan =====
 참조 판정: skills/fz-plan/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 39682 / ceiling(로드 전체) 78115 ~tokens  · 로드 아님(카탈로그·출처표기) 5548 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 41141 / ceiling(로드 전체) 75596 글자÷4  · 로드 아님(카탈로그·출처표기) 3497 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ? L49: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실
-     ? L87: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
-     ~ L90: > agents/의 plan-structure·plan-edge-case·plan-impact·plan-merge 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-
-     ! L105: 매 호출 `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비**를 **선행**한다 — 경로 판정(실제 경로 · 세그먼트 경계) · self-contained 확인 
-     ? L112: 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-autho
-     ! L119: → `guides/skill-authoring.md` §12 사다리 **L3** — 같은 세션이면 `Workflow({ scriptPath, resumeFromRunId })` 로 재개한다. 재개 
-     ? L131: 도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 저장소 밖 로그 `${FZ_RUN_STA
-     ? L472: | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp 
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ? L50: - 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(light · full 기본 · 계획 단계의 첫
-     ! L332: bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/gpt-strategy.md § 단계 실행 판정 — 켬이면 필수): 
-[로드/무조건] modules/session.md                     ~   799 tok
-     · L56: | modules/session.md | 세션 감지, Issue Tracker 연동 |
-     ! L165: 1. **세션 감지**: 참조 `modules/session.md`
-[로드/무조건] modules/context-artifacts.md           ~  4289 tok
-     · L58: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery + 비-티켓 세션 Serena checkpoint |
-     ! L149: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 0b 전에 반드시 실행.**
-[로드/무조건] modules/scope-challenge.md             ~  1038 tok
-     · L62: | modules/scope-challenge.md | Phase 3 GPT 이슈 scope_disposition 분류 + Lead 독립 판정 (additive 자동 번역 차단) |
-     ! L375: 1b. **⛔ Scope Challenge (이슈당 필수)**: 각 GPT 이슈를 플랜에 반영 전 `modules/scope-challenge.md` Q-S1~S4 실행 → `scope_dispos
-[로드/무조건] modules/fz-gpt-subcommands-core.md     ~  3578 tok
-     ! L76: | Phase 2 | `/fz-gpt verify` | 계획 검증 (독립 스킬 — GPT 교차 검증, `modules/fz-gpt-subcommands-core.md § verify`) |
-     ? L327: > ⊕ 2.7 독립 플랜을 띄웠으면(light · full 기본) `verify` 자리를 **resume 교차**가 맡는다 — 4.5 차이표(`plan_divergence.py --out`)를 P_
-     ? L333: 검증 도구로 계획 검증 위임   # core § verify ∥ § verify-gates 를 ARTIFACT=plan · WORK_DIR={WORK_DIR}(작업 폴더가 없으면 빈 값 — 세션 원
-     ! L349: **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하면 
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ! L98: 1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): readScope 를 `{WORK_DIR}/p
-     ! L98: 1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): readScope 를 `{WORK_DIR}/p
-     ! L98: 1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): readScope 를 `{WORK_DIR}/p
-     ? L103: 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약 / `ar
-     ! L455: ### light 모드 (모드 게이트 — `modules/mode-gate.md`)
-     ! L457: 진입: 실행 절차 1.2 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
-     ! L477: Gate 2 통과 후(완료 보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
-[로드/무조건] modules/sprint-contract.md             ~  1286 tok
-     ? L134: 5.5. **Sprint Contract (Phase 0.7 · 발동 시)**: 4.5 합치기(켰을 때)와 Lead 의 Phase 1 몫(5 의 스트레스 테스트 · RTM · Gate 1 · 1.5
-     ? L134: 5.5. **Sprint Contract (Phase 0.7 · 발동 시)**: 4.5 합치기(켰을 때)와 Lead 의 Phase 1 몫(5 의 스트레스 테스트 · RTM · Gate 1 · 1.5
-     ! L135: 5.7. **반영 · 재생성 (5.5 합의 뒤)**: `modules/sprint-contract.md` ⑤(재생성 규칙 정본 — 언제 다시 만드는지 포함)대로 합의본을 반영한다. 다시 만들 때 d
-     ! L299: > 발동: `modules/sprint-contract.md` § 발동 조건(정본 — full 에서 Phase 1 을 마친 잠정 플랜으로 판정한다). 미발동(light 포함)이면 이 Phase 와 
-     ! L303: - 절차: `modules/sprint-contract.md` §절차 (④ · ⑤)
-     ! L304: - Schema: `modules/sprint-contract.md` §Schema (yaml: success_criteria + anti_criteria + scope_boundary)
-     ? L460: - plan-lean2 를 띄우지 않고 Phase 1 (Deep Planning)을 Lead 가 수행한다 — Phase 0.5 · 스트레스 테스트 Q1-Q6 · RTM 은 그대로(발동 조건대로) ·
-[로드/무조건] modules/gates.md                       ~  9346 tok
-     ! L336: 3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 — light · full 모두 — `modules/gates.md` 배선 1):
-     ? L344: 입력 파일은 `{steps:[…], rtm:[…]}` 객체 또는 steps 배열이다 — 다른 최상위 모양은 exit 2 다(F-346). 코드가 WORK_DIR 밖 형제 워크트리에 있으면 `--im
-     ! L347: 3.2. **⛔ 게이트 판정** (draft 원장이 있을 때 — `modules/gates.md` 배선 1):
-     ? L392: — `verify`는 **VerifySpec 객체**다: `{kind:'command', criterion, command, expect, cwd?, tools?}` 또는 `{kind:'manual
-     ? L396: ⛔ 상대 경로 금지 — 설치된 플러그인에서 대상 레포에 파일이 없어 exit 2로 떨어지고, exit 3만 차단하는 규칙 하에서 **invalid ledger 검증이 fail-open** 된다. 절
-[로드/조건부] guides/agent-team-guide.md             ~  6173 tok
-     ? L50: - 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(light · full 기본 · 계획 단계의 첫
-[로드/조건부] modules/cross-validation.md            ~ 10992 tok
-     ? L50: - 참조: `guides/agent-team-guide.md` §8 (공식 사양) · ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(light · full 기본 · 계획 단계의 첫
-     ~ L315: > Phase 0.7 출처: Anthropic Harness Engineering 패턴 B (2026-03) + Plan v3.1.3 §T2-B. 학술 근거: `modules/cross-valida
-[로드/조건부] modules/promotion-ledger.md            ~ 11273 tok
-     · L63: | modules/promotion-ledger.md | P1/P2 조치 eligible session 관측 기록 (학습 승격 금지) |
-     ? L224: - [ ] 구조/경계 포크 결단 시 유형 분류 — (가) 코드 read/grep으로 정답이 1개로 좁혀지는 엔지니어링 판단 → 확신 권고+근거+"이의 없으면 진행"(옵션 메뉴화 금지) / (나) 제
-[로드/조건부] modules/plan-direction-preflight.md    ~   831 tok
-     · L64: | modules/plan-direction-preflight.md | Phase 0c·0.5 절차 본문 (Phase 0c·0.5 진입 시 Read — 조건부) |
-     ? L199: > **절차 본문**: `modules/plan-direction-preflight.md` Phase 0c 절 참조 (Level 3) — 3 절차(가정 추출 3 axes · 검증 분류 · probe
-     ? L216: > **절차 본문**: `modules/plan-direction-preflight.md` Phase 0.5 절 참조 (Level 3) — 발동 조건표 4행 + 4 절차(아키텍처 대조 · 6관점 검
-[로드/조건부] modules/plugin-refs.md                 ~  2258 tok
-     ? L81: > 참조: `modules/plugin-refs.md` — Swift Concurrency(계획 시) 섹션
-     ? L293: > 발동 시 행동: `modules/swift-anti-pattern-preblock.md` Read + `modules/plugin-refs.md` 역방향 트리거 섹션 강제 참조 + 3 원칙 점검
-[로드/조건부] modules/project-rules.md               ~  1518 tok
-     ? L99: 1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**) — ⛔ 정본은 `modules/project-rules.md` 다(절차 · 레코드 형식 · 검증
-[로드/조건부] modules/lead-action-default.md         ~  1396 tok
-     ? L212: > **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). verification esc
-[로드/조건부] modules/plan-deep-planning.md          ~  2028 tok
-     ? L231: > **본문**: `modules/plan-deep-planning.md` 참조 (Level 3) — 9 절차 (요구사항 분해, Exhaustive Impact Scan a-f, API 확인, Cl
-[로드/조건부] modules/swift-anti-pattern-preblock.md ~  1337 tok
-     ? L284: > 본문: `modules/swift-anti-pattern-preblock.md` 참조 (Level 3) — 3 원칙(P1 SwiftUI 결정 / P2 Concurrency isolation / 
-     ? L287: - [ ] Swift/iOS 프로젝트 + SwiftUI/Concurrency/패턴 변환 plan? (해당 시 `modules/swift-anti-pattern-preblock.md` Read 후 진
-     ? L293: > 발동 시 행동: `modules/swift-anti-pattern-preblock.md` Read + `modules/plugin-refs.md` 역방향 트리거 섹션 강제 참조 + 3 원칙 점검
-[로드/조건부] modules/complexity.md                  ~   627 tok
-     ? L338: Step 마다 `complexity`(1-5 · `modules/complexity.md`)를 싣는다 — Workflow 반환에 없으면 Lead 가 채운다. fz-code 모드 게이트가 이 값으로 
-[카탈로그  ] modules/memory-policy.md               ~  2052 tok
-     · L57: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-[카탈로그  ] modules/rtm.md                         ~   496 tok
-     · L59: | modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
-[카탈로그  ] modules/code-transform-validation.md   ~  1477 tok
-     · L60: | modules/code-transform-validation.md | 코드 변환 동등성 — Transformation Spec + 검증 체크리스트 (패턴 변환 시) |
-[카탈로그  ] modules/uncertainty-verification.md    ~  1523 tok
-     · L61: | modules/uncertainty-verification.md | 기술적 주장 → Default-Deny 검증 (하네스 원칙, Transformation Spec Pilot) |
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ! L42: ## light 모드 (기본 경로 — 모드 게이트 `modules/mode-gate.md`)
+     ! L44: 진입: 실행 절차 1.2 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+     ! L89: 1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): readScope 를 `{WORK_DIR}/p
+     ! L89: 1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): readScope 를 `{WORK_DIR}/p
+     ! L89: 1.2. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): readScope 를 `{WORK_DIR}/p
+     ? L94: 2. **args 조립**: `requirement`(필수)=요구사항 원문 / `codeContextPath`(필수)=요약 파일 절대 경로 / `constraintsKnown`=수집 제약(스택 스킬
+     ! L452: Gate 2 통과 후(완료 보고 직전 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록):
+[로드/무조건] modules/sprint-contract.md               1278 글자÷4
+     ? L47: - plan-lean2 를 띄우지 않고 Phase 1 (Deep Planning)을 Lead 가 수행한다 — Phase 0.5 · 스트레스 테스트 Q1-Q6 · RTM 은 그대로(발동 조건대로) ·
+     ? L125: 5.5. **Sprint Contract (Phase 0.7 · 발동 시)**: 4.5 합치기(켰을 때)와 Lead 의 Phase 1 몫(5 의 스트레스 테스트 · RTM · Gate 1 · 1.5
+     ? L125: 5.5. **Sprint Contract (Phase 0.7 · 발동 시)**: 4.5 합치기(켰을 때)와 Lead 의 Phase 1 몫(5 의 스트레스 테스트 · RTM · Gate 1 · 1.5
+     ! L126: 5.7. **반영 · 재생성 (5.5 합의 뒤)**: `modules/sprint-contract.md` ⑤(재생성 규칙 정본 — 언제 다시 만드는지 포함)대로 합의본을 반영한다. 다시 만들 때 d
+     ! L289: > 발동: `modules/sprint-contract.md` § 발동 조건(정본 — full 에서 Phase 1 을 마친 잠정 플랜으로 판정한다). 미발동(light 포함)이면 이 Phase 와 
+     ! L293: - 절차: `modules/sprint-contract.md` §절차 (④ · ⑤)
+     ! L294: - Schema: `modules/sprint-contract.md` §Schema (yaml: success_criteria + anti_criteria + scope_boundary)
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ? L55: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 계획 수립 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실
+     ? L78: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
+     ~ L81: > agents/의 plan-structure·plan-edge-case·plan-impact·plan-merge 정의를 agentType(`fz:`)으로 재사용. 규약: `guides/skill-
+     ! L96: 매 호출 `guides/skill-authoring.md` §12 우회 계약의 **0단계 준비**를 **선행**한다 — 경로 판정(실제 경로 · 세그먼트 경계) · self-contained 확인 
+     ? L103: 3. **Workflow 호출**: `Workflow({ scriptPath: '{2.5에서 정한 경로}', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides/skill-autho
+     ! L110: → `guides/skill-authoring.md` §12 사다리 **L3** — `Workflow({ scriptPath, resumeFromRunId })` 로 재개한다(CC 를 종료했으면 `
+     ? L122: 도구 부재와 다른 축이다. `guides/skill-authoring.md` §12 판별 표로 분기하고, SOLO 계획 수립은 **L4 승인 후**. 사유는 저장소 밖 로그 `${FZ_RUN_STA
+     ? L447: | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp 
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ? L56: - ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(light · full 기본 · 계획 단계의 첫 GPT 호출) · 5.5 Sprint Contract(발동 시) · Phase 2
+     ! L322: bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/gpt-strategy.md § 단계 실행 판정 — 켬이면 필수): 
+[로드/무조건] modules/session.md                        823 글자÷4
+     · L62: | modules/session.md | 세션 감지, Issue Tracker 연동 |
+     ! L156: 1. **세션 감지**: 참조 `modules/session.md`
+[로드/무조건] modules/context-artifacts.md             3466 글자÷4
+     · L63: | modules/context-artifacts.md | 티켓 폴더 기반 compact recovery |
+     ! L140: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 0b 전에 반드시 실행.**
+[로드/무조건] modules/scope-challenge.md               1038 글자÷4
+     · L67: | modules/scope-challenge.md | Phase 3 GPT 이슈 scope_disposition 분류 + Lead 독립 판정 (additive 자동 번역 차단) |
+     ! L364: 1b. **⛔ Scope Challenge (이슈당 필수)**: 각 GPT 이슈를 플랜에 반영 전 `modules/scope-challenge.md` Q-S1~S4 실행 → `scope_dispos
+[로드/무조건] modules/fz-gpt-subcommands-core.md       3346 글자÷4
+     ? L317: > ⊕ 2.7 독립 플랜을 띄웠으면(light · full 기본) `verify` 자리를 **resume 교차**가 맡는다 — 4.5 차이표(`plan_divergence.py --out`)를 P_
+     ? L323: 검증 도구로 계획 검증 위임   # core § verify ∥ § verify-gates 를 ARTIFACT=plan · WORK_DIR={WORK_DIR}(작업 폴더가 없으면 빈 값 — 세션 원
+     ! L339: **기존 계획 검증(`verify`)을 대체하지 않는다** — `verify-gates`를 **추가 호출**한다. gate_verdict 스키마엔 `issues`·`verdict`가 없어 교체하면 
+     ! L446: | 검증 실패 (GPT verify) | 새 컨텍스트 에이전트 1회(`fz:review-correctness` · 읽기 전용 · 모델 명시)에게 GPT 에 보내려던 검증 프롬프트(`$P_VERIFY
+[로드/무조건] modules/gates.md                        10610 글자÷4
+     ! L326: 3.1. **⛔ draft 원장 생성** (WORK_DIR 존재 — light · full 모두 — `modules/gates.md` 배선 1):
+     ? L334: 입력 파일은 `{steps:[…], rtm:[…]}` 객체 또는 steps 배열이다 — 다른 최상위 모양은 exit 2 다(F-346). 코드가 WORK_DIR 밖 형제 워크트리에 있으면 `--im
+     ! L337: 3.2. **⛔ 게이트 판정** (draft 원장이 있을 때 — `modules/gates.md` 배선 1):
+     ? L381: ⛔ 상대 경로 금지 — 설치된 플러그인에서 대상 레포에 파일이 없어 exit 2로 떨어지고, exit 3만 차단하는 규칙 하에서 **invalid ledger 검증이 fail-open** 된다. 절
+[로드/조건부] modules/cross-validation.md             11054 글자÷4
+     ? L56: - ⛔ **GPT 단계마다 직전**(실행 순서 — 2.7 독립 플랜(light · full 기본 · 계획 단계의 첫 GPT 호출) · 5.5 Sprint Contract(발동 시) · Phase 2
+     ~ L305: > Phase 0.7 출처: Anthropic Harness Engineering 패턴 B (2026-03) + Plan v3.1.3 §T2-B. 학술 근거: `modules/cross-valida
+[로드/조건부] modules/promotion-ledger.md             11264 글자÷4
+     · L68: | modules/promotion-ledger.md | P1/P2 조치 eligible session 관측 기록 (학습 승격 금지) |
+     ? L214: - [ ] 구조/경계 포크 결단 시 유형 분류 — (가) 코드 read/grep으로 정답이 1개로 좁혀지는 엔지니어링 판단 → 확신 권고+근거+"이의 없으면 진행"(옵션 메뉴화 금지) / (나) 제
+[로드/조건부] modules/plan-direction-preflight.md       822 글자÷4
+     · L69: | modules/plan-direction-preflight.md | Phase 0c·0.5 절차 본문 (Phase 0c·0.5 진입 시 Read — 조건부) |
+     ? L189: > **절차 본문**: `modules/plan-direction-preflight.md` Phase 0c 절 참조 (Level 3) — 3 절차(가정 추출 3 axes · 검증 분류 · probe
+     ? L206: > **절차 본문**: `modules/plan-direction-preflight.md` Phase 0.5 절 참조 (Level 3) — 발동 조건표 4행 + 4 절차(아키텍처 대조 · 6관점 검
+[로드/조건부] modules/plugin-refs.md                   2809 글자÷4
+     ? L74: > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
+     ? L283: > 발동 시 행동: `modules/swift-anti-pattern-preblock.md` Read + `modules/plugin-refs.md` 역방향 트리거 섹션 강제 참조 + 3 원칙 점검
+[로드/조건부] modules/project-rules.md                 1518 글자÷4
+     ? L90: 1.5. **아키텍처 제약 추출** (아키텍처 민감 과제 해당 시 — args 조립보다 **먼저**) — ⛔ 정본은 `modules/project-rules.md` 다(절차 · 레코드 형식 · 검증
+[로드/조건부] modules/symbol-tools-audit.md             996 글자÷4
+     ? L133: ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 
+     ? L133: ⛔ wall-clock 을 손으로 적지 않는다 — `§5.8` 사전등록 표가 두 달간 비어 있던 이유가 **재는 주체 부재**였다. 값을 못 얻으면 `unavailable` 로 적고 0 으로 쓰지 
+[로드/조건부] modules/tool-status.md                    665 글자÷4
+     ? L161: - ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화면
+[로드/조건부] modules/lead-action-default.md           1396 글자÷4
+     ? L202: > **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). verification esc
+[로드/조건부] modules/plan-deep-planning.md            1967 글자÷4
+     ? L221: > **본문**: `modules/plan-deep-planning.md` 참조 (Level 3) — 10 절차(5a · 5b 포함) (요구사항 분해, Exhaustive Impact Scan a-
+[로드/조건부] modules/swift-anti-pattern-preblock.md   1337 글자÷4
+     ? L274: > 본문: `modules/swift-anti-pattern-preblock.md` 참조 (Level 3) — 3 원칙(P1 SwiftUI 결정 / P2 Concurrency isolation / 
+     ? L277: - [ ] Swift/iOS 프로젝트 + SwiftUI/Concurrency/패턴 변환 plan? (해당 시 `modules/swift-anti-pattern-preblock.md` Read 후 진
+     ? L283: > 발동 시 행동: `modules/swift-anti-pattern-preblock.md` Read + `modules/plugin-refs.md` 역방향 트리거 섹션 강제 참조 + 3 원칙 점검
+[로드/조건부] modules/complexity.md                     627 글자÷4
+     ? L328: Step 마다 `complexity`(1-5 · `modules/complexity.md`)를 싣는다 — Workflow 반환에 없으면 Lead 가 채운다. fz-code 모드 게이트가 이 값으로 
+[카탈로그  ] modules/rtm.md                            495 글자÷4
+     · L64: | modules/rtm.md | Requirements Traceability Matrix — plan이 생성, code가 갱신, review가 검증 |
+[카탈로그  ] modules/code-transform-validation.md     1477 글자÷4
+     · L65: | modules/code-transform-validation.md | 코드 변환 동등성 — Transformation Spec + 검증 체크리스트 (패턴 변환 시) |
+[카탈로그  ] modules/uncertainty-verification.md      1525 글자÷4
+     · L66: | modules/uncertainty-verification.md | 기술적 주장 → Default-Deny 검증 (하네스 원칙, Transformation Spec Pilot) |
 
 ===== fz-pr =====
 참조 판정: skills/fz-pr/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 292 / ceiling(로드 전체) 3632 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 292 / ceiling(로드 전체) 3831 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] modules/team-facing-writing.md         ~   292 tok
-     ! L57: | 3 | PR 생성 (템플릿 기반 — 본문 어조 `modules/team-facing-writing.md`) · ⛔ 생성 **직전** 템플릿 섹션 대조(아래) |
-[로드/조건부] modules/governance.md                  ~  3340 tok
-     ? L30: 선언이 없으면 기본 `gh pr create` 워크플로우를 사용한다. 정본: `modules/governance.md` § 팀 스킬 위임.
+[로드/무조건] modules/team-facing-writing.md            292 글자÷4
+     ! L52: | 3 | PR 생성 (템플릿 기반 — 본문 어조 `modules/team-facing-writing.md`) · ⛔ 생성 **직전** 템플릿 섹션 대조(아래) |
+[로드/조건부] modules/governance.md                    3539 글자÷4
+     ? L25: 선언이 없으면 기본 `gh pr create` 워크플로우를 사용한다. 정본: `modules/governance.md` § 팀 스킬 위임.
+     ? L126: - PR 생성 성공 시: PR URL 출력 + 템플릿 섹션 대조 결과 줄(템플릿이 있을 때) → 트래커 티켓 상태 전환은 프로젝트 규칙이 요구할 때만, 사전 승인 없이(권한 프롬프트를 거쳐) 한다
 
 ===== fz-pr-digest =====
 참조 판정: skills/fz-pr-digest/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 13764 / ceiling(로드 전체) 16281 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 15248 / ceiling(로드 전체) 18956 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ? L58: - Deep Tier 심층 탐색은 네이티브 Workflow 도구 필요 — 미가용 시 SOLO 탐색 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/ski
-     ! L59: - 참조: `guides/skill-authoring.md` §12 (Workflow 규약)
-     ~ L422: Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체, Wave 4 — 결정적 스크립트, P2P SendMessage 없음). 규약: `guides/skill-auth
-     ! L425: - **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/s
-     ? L426: - `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — args 에 `effort`=`python3 "${FZ_PLUGI
-[로드/무조건] modules/explanation-protocol.md        ~  2730 tok
-     ! L85: ⛔ **규칙 정본은 `modules/explanation-protocol.md`** 다 — 폐포 5축 · 어휘 등급 · 게이트 G1~G8 ·
-     ! L92: 실행 전 `{플러그인 루트}/modules/explanation-protocol.md` 를 Read 하고 §3(폐포)·§5(게이트)·§10(체크리스트)을
-     ! L238: > ⛔ 매핑 블록 전문 · 구조 근거 본문 · 탐색 경계는 대화에 내지 않는다 (`modules/explanation-protocol.md` §9).
-     ! L260: Tutor: (사양 = modules/explanation-protocol.md §7 · PR 고유분 = references/tutor-mode.md)
-     ! L399: **Tutor**: 위 규칙을 적용하지 않는다. 규칙이 없는 것이 아니라 다른 규칙을 쓴다 — `modules/explanation-protocol.md` §3 폐포가 범위를 정한다.
-[로드/무조건] modules/explanation-output.md          ~   540 tok
-     ! L262: - A~E 절 — 목차 정본 = `modules/explanation-output.md` (여기 베끼지 않는다 · PR 좌표 표시는 references/tutor-mode.md)
-[로드/조건부] modules/mode-gate.md                   ~  2517 tok
-     ? L426: - `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — args 에 `effort`=`python3 "${FZ_PLUGI
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ? L55: - Deep Tier 심층 탐색은 네이티브 Workflow 도구 필요 — 미가용 시 SOLO 탐색 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실행 중 실패는 `guides/ski
+     ! L56: - 참조: `guides/skill-authoring.md` §12 (Workflow 규약)
+     ~ L420: Deep Tier의 심층 탐색은 네이티브 Workflow로 실행한다 (TEAM 대체, Wave 4 — 결정적 스크립트, P2P SendMessage 없음). 규약: `guides/skill-auth
+     ! L423: - **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflows/s
+     ? L424: - `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — args 에 `effort`=`python3 "${FZ_PLUGI
+[로드/무조건] modules/explanation-protocol.md          2730 글자÷4
+     ! L82: ⛔ **규칙 정본은 `modules/explanation-protocol.md`** 다 — 폐포 5축 · 어휘 등급 · 게이트 G1~G8 ·
+     ! L89: 실행 전 `{플러그인 루트}/modules/explanation-protocol.md` 를 Read 하고 §3(폐포)·§5(게이트)·§10(체크리스트)을
+     ! L236: > ⛔ 매핑 블록 전문 · 구조 근거 본문 · 탐색 경계는 대화에 내지 않는다 (`modules/explanation-protocol.md` §9).
+     ! L258: Tutor: (사양 = modules/explanation-protocol.md §7 · PR 고유분 = references/tutor-mode.md)
+     ! L397: **Tutor**: 위 규칙을 적용하지 않는다. 규칙이 없는 것이 아니라 다른 규칙을 쓴다 — `modules/explanation-protocol.md` §3 폐포가 범위를 정한다.
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L95: > ⛔ **선택 도구 상태**: diff 를 모으기 전에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
+[로드/무조건] modules/explanation-output.md             540 글자÷4
+     ! L260: - A~E 절 — 목차 정본 = `modules/explanation-output.md` (여기 베끼지 않는다 · PR 좌표 표시는 references/tutor-mode.md)
+[로드/조건부] modules/mode-gate.md                     2712 글자÷4
+     ? L424: - `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — args 에 `effort`=`python3 "${FZ_PLUGI
+[로드/조건부] modules/symbol-tools-audit.md             996 글자÷4
+     ? L425: - **심볼 팔 점검** (반환 뒤 · 보고 모드): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더
 
 ===== fz-rebase =====
 참조 판정: skills/fz-rebase/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
 
 ===== fz-recording =====
 참조 판정: skills/fz-recording/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 0 / ceiling(로드 전체) 0 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 0 / ceiling(로드 전체) 0 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
 
 ===== fz-review =====
 참조 판정: skills/fz-review/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 107550 / ceiling(로드 전체) 109925 ~tokens  · 로드 아님(카탈로그·출처표기) 3575 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 103746 / ceiling(로드 전체) 109612 글자÷4  · 로드 아님(카탈로그·출처표기) 1525 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] guides/llm-references.md               ~ 11466 tok
-     ! L31: > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2
-[로드/무조건] guides/harness-engineering.md          ~ 19484 tok
-     ! L31: > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2
-     ! L272: > 4-N Swift Naming Compliance · 4-O Session-added Assets Application · **4-P Post-State Consistency**(편집 라인이 놓
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ! L35: > **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.
-     ? L55: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실
-     ? L90: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
-     ~ L94: > 스크립트: `workflows/review-live.js` (플러그인 루트 상대) — agents/의 review-arch·review-quality·review-counter 정의를 agent
-     ! L106: 2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
-     ? L107: 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides
-     ? L110: 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false
-     ? L110: 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false
-     ! L377: └─ NO  → 에스컬레이션 래더 적용 (참조: modules/execution-modes.md · Workflow 반환 실패는 guides/skill-authoring.md §12)
-     ? L472: | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp 
-[로드/무조건] modules/memory-guide.md                ~  1273 tok
-     ! L35: > **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.
-[로드/무조건] modules/cross-validation.md            ~ 10992 tok
-     ! L43: ⛔ **threshold gating은 `N≥10`에서만** — `N<10`은 `preliminary`(measurement only, verdict 보류)다. **정본 = `modules/cros
-     ! L57: - ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 
-     · L72: | modules/cross-validation.md | 검증 게이트 + 외부 피드백 검증 + 런타임 주장 검증 + Coverage Gate + Reflection Rate 정본 |
-     ! L257: 정본: `modules/cross-validation.md` § Negative-Result Gate
-     ? L350: > 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 
-     ! L379: > 정본: `modules/cross-validation.md §Reflection Rate threshold`. ⛔ N<10에서 Rate 미달을 이유로 반복 루프를 돌리지 않는다 (통계적 소음).
-[로드/무조건] guides/agent-team-guide.md             ~  6173 tok
-     ! L56: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-[로드/무조건] modules/gpt-strategy.md                ~  6335 tok
-     ! L57: - ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 
+[로드/무조건] guides/llm-references.md                12619 글자÷4
+     ! L28: > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2
+[로드/무조건] guides/harness-engineering.md           19988 글자÷4
+     ! L28: > **Sources (last audited: 2026-09-21 — **인용 정합 축**(arxiv ID 형식 56종 이상 0 · 교차 파일 주장 일치 · 레지스트리 등재)):** arxiv 2
+     ! L277: > 4-N Swift Naming Compliance · 4-O Session-added Assets Application · **4-P Post-State Consistency**(편집 라인이 놓
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ! L32: > **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.
+     ? L63: - 팀 에이전트 모드(Workflow pilot)는 네이티브 Workflow 도구 가용 환경 필요 — 미가용 시 SOLO 3중 검증 폴백 (⛔ **도구 부재** — 실행 중 실패와 다른 축이다. 실
+     ? L88: > 팀 모드 규칙 정본: `guides/skill-authoring.md` §12 (Workflow 규약 + 실패 복구 사다리 L1~L4)
+     ~ L91: > 스크립트: `workflows/review-live.js` (플러그인 루트 상대) — agents/의 review-arch·review-quality·review-counter 정의를 agent
+     ! L103: 2.8. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
+     ? L104: 3. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/review-live.js', args })` — ⛔ 거부 시 SOLO 폴백 아님: `guides
+     ? L107: 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false
+     ? L107: 4. **반환 처리**: `mode:'workflow'` → findings(finalSeverity/crossVerdict/counterVerdict)를 Phase 5 결과로 통합. **false
+     ! L372: └─ NO  → 에스컬레이션 래더 적용 (참조: modules/execution-modes.md · Workflow 반환 실패는 guides/skill-authoring.md §12)
+     ? L456: | Workflow 준비 실패 · scriptPath 거부 | `guides/skill-authoring.md` §12 우회 계약 — 0단계 준비(경로 판정 · self-contained · cp 
+[로드/무조건] modules/memory-guide.md                  1236 글자÷4
+     ! L32: > **자산 추가/수정 시 가이드 명시 참조 의무**: 본 스킬 또는 메모리에 새 항목을 추가/수정 시 `guides/skill-authoring.md` + `modules/memory-guide.
+[로드/무조건] modules/cross-validation.md             11054 글자÷4
+     ! L40: ⛔ **threshold gating은 `N≥10`에서만** — `N<10`은 `preliminary`(measurement only, verdict 보류)다. **정본 = `modules/cros
+     ! L64: - ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 
+     · L78: | modules/cross-validation.md | 검증 게이트 + 외부 피드백 검증 + 런타임 주장 검증 + Coverage Gate + Reflection Rate 정본 |
+     ! L262: 정본: `modules/cross-validation.md` § Negative-Result Gate
+     ? L342: > 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 
+     ! L344: > **validate 생략 (지적 0 · 적용 수정 0)** — 다섯이 모두 확인될 때만 validate 를 부르지 않는다: ① 직전 GPT 리뷰(Phase 5 검증 2 · 2.5 를 띄운 run
+     ! L374: > 정본: `modules/cross-validation.md §Reflection Rate threshold`. ⛔ N<10에서 Rate 미달을 이유로 반복 루프를 돌리지 않는다 (통계적 소음).
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ! L50: ## light 모드 (기본 경로 — 모드 게이트 `modules/mode-gate.md`)
+     ! L52: 진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
+     ! L98: 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROO
+     ! L98: 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROO
+     ! L98: 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROO
+     ! L100: 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드(스택 스킬을 불렀으면 그 요구 사항 — 위 `## 
+     ! L404: 완료 보고(직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록): 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일
+     ! L408: > **Canonical sink**: 누적은 실행 기록이다 — 이 표의 Gate 별 이슈 수와 cross-model 발견 수를 `run_metrics.py end --gate-issues … --
+[로드/무조건] modules/fz-gpt-subcommands-aux.md        2754 글자÷4
+     ? L54: - ⊕ `--gpt-independent` 면 실행 절차 2.5 를 Workflow 없이 그대로 background 로 띄운다(`locatedFindings` 는 없다). 4.5 병합의 `--cla
+     ! L102: 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**(직전 `gpt-choice.sh decide` — `s
+[로드/무조건] modules/review-structural-axes.md        1705 글자÷4
+     ! L56: - ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3
+     · L79: | modules/review-structural-axes.md | 구조 판정 5축 (fz-peer-review 공유). ⛔ Phase 5 전 **Read 후** §3+§4를 `args.struct
+     ! L100: 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드(스택 스킬을 불렀으면 그 요구 사항 — 위 `## 
+     ! L333: - [ ] ⛔ 형제 관례 판정이 **양방향**인가? (관례 존중 + 선례 이전 가능성 — `modules/review-structural-axes.md` §E. light 는 Workflow 미호출
+[로드/무조건] modules/gpt-strategy.md                  6555 글자÷4
+     ! L64: - ⛔ **GPT 단계마다 직전**(2.5 독립 첫 패스 · Phase 5 검증 2 · 5.5 validate · verify-gates · probe): `gpt-choice.sh decide` 
      ! L221: > ⊘ 직전 `gpt-choice.sh decide`(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수)가 `skip` 이거나 정문이 exit 18 `GPT-OFF`
      ! L221: > ⊘ 직전 `gpt-choice.sh decide`(`modules/gpt-strategy.md` § 단계 실행 판정 — 켬이면 필수)가 `skip` 이거나 정문이 exit 18 `GPT-OFF`
-[로드/무조건] modules/session.md                     ~   799 tok
-     · L63: | modules/session.md | 세션 감지, Issue Tracker 연동 |
-     ! L407: 2. **최종 이슈 보고 정리**: Issue Tracker 이슈를 상태별로 묶는다(상태 정의 `modules/session.md` § 이슈 상태 머신) — 보고 형식은 4번 아티팩트(`self-r
-[로드/무조건] modules/build.md                       ~   648 tok
-     · L64: | modules/build.md | 빌드 검증 |
-     ! L385: 3. **빌드 재검증**: 참조 `modules/build.md` — 빌드 검증 절차
-     ! L394: - [ ] 최종 빌드 성공? (modules/build.md 절차)
-[로드/무조건] modules/execution-modes.md             ~  1245 tok
-     · L65: | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
-     ! L377: └─ NO  → 에스컬레이션 래더 적용 (참조: modules/execution-modes.md · Workflow 반환 실패는 guides/skill-authoring.md §12)
-[로드/무조건] modules/plugin-refs.md                 ~  2258 tok
-     · L67: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
-     ! L76: > 참조: `modules/plugin-refs.md` — SwiftUI Expert + Swift Concurrency (리뷰 시) 섹션
-[로드/무조건] modules/rtm.md                         ~   496 tok
-     · L68: | modules/rtm.md | RTM 검증 — Phase 4.5에서 Req-ID 상태 확인 |
+[로드/무조건] modules/session.md                        823 글자÷4
+     · L70: | modules/session.md | 세션 감지, Issue Tracker 연동 |
+     ! L399: 2. **최종 이슈 보고 정리**: Issue Tracker 이슈를 상태별로 묶는다(상태 정의 `modules/session.md` § 이슈 상태 머신) — 보고 형식은 3번 아티팩트(`self-r
+[로드/무조건] modules/build.md                          653 글자÷4
+     · L71: | modules/build.md | 빌드 검증 |
+     ! L380: 3. **빌드 재검증**: 참조 `modules/build.md` — 빌드 검증 절차
+     ! L389: - [ ] 최종 빌드 성공? (modules/build.md 절차)
+[로드/무조건] modules/execution-modes.md               1239 글자÷4
+     · L72: | modules/execution-modes.md | LOOP + SIMPLIFY 실행 모드 |
+     ! L372: └─ NO  → 에스컬레이션 래더 적용 (참조: modules/execution-modes.md · Workflow 반환 실패는 guides/skill-authoring.md §12)
+[로드/무조건] modules/rtm.md                            495 글자÷4
+     · L74: | modules/rtm.md | RTM 검증 — Phase 4.5에서 Req-ID 상태 확인 |
      ! L150: 1. ⛔ RTM 기반 기계적 확인 (참조: modules/rtm.md):
-[로드/무조건] modules/safety-audit.md                ~   871 tok
-     · L70: | modules/safety-audit.md | 검증 4-J Concurrency Safety Audit — 역방향 안전성 감사 |
-     ! L267: ### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 
-     ! L333: - [ ] Concurrency Safety Audit 통과? (싱글톤 가변 상태 동기화, 콜백 스레드, @Published 스레드 — modules/safety-audit.md)
-[로드/무조건] modules/review-structural-axes.md      ~  1705 tok
-     · L73: | modules/review-structural-axes.md | 구조 판정 5축 (fz-peer-review 공유). ⛔ Phase 5 전 **Read 후** §3+§4를 `args.struct
-     ! L103: 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계 — ⛔
-     ! L341: - [ ] ⛔ 형제 관례 판정이 **양방향**인가? (관례 존중 + 선례 이전 가능성 — `modules/review-structural-axes.md` §E. light 는 Workflow 미호출
-     ! L460: - ⛔ **구조 축은 Lead가 직접 적용** — Workflow 의 `args.structuralContext` 경로가 없다 (`modules/review-structural-axes.md` §3
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ! L101: 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROO
-     ! L101: 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROO
-     ! L101: 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROO
-     ! L103: 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드 (기존 Intent Context 계약 승계 — ⛔
-     ! L413: 완료 보고(직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록): 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일
-     ! L417: > **Canonical sink**: 누적은 실행 기록이다 — 이 표의 Gate 별 이슈 수와 cross-model 발견 수를 `run_metrics.py end --gate-issues … --
-     ! L456: ### light 모드 (모드 게이트 — `modules/mode-gate.md`)
-     ! L458: 진입: 실행 절차 1.5 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
-[로드/무조건] modules/fz-gpt-subcommands-aux.md      ~  2669 tok
-     ! L105: 2.5. **(`--gpt-independent` · 기본 off) GPT 독립 첫 패스 — Workflow 직전 background 기동**(직전 `gpt-choice.sh decide` — `s
-[로드/무조건] modules/fz-gpt-subcommands-core.md     ~  3578 tok
-     ! L109: 3.5. **기본 GPT review 동시 기동**(F-473): Workflow 를 띄운 직후 Phase 5 검증 2 의 GPT review 를 background 로 함께 띄운다 — 입력이 di
-     ? L350: > 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 
-     ? L364: - 원장이 있으면 **`verify-gates`를 추가 호출**해(같은 decide 판정 — `skip` 이면 부르지 않고 `[GPT 미사용 — 사유]`) 게이트별 판정을 받는다 — 대상은 **확정
-     ! L365: - ⛔ 응답은 `--verdict-check {응답.json} {WORK_DIR}/gates/plan.md` 로 전수 판정을 확인한다. exit 1이면 재호출 1회(`FZ_GPT_RECALL=pos
-[로드/무조건] modules/context-artifacts.md           ~  4289 tok
-     ! L135: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 1 전에 반드시 실행.**
-[로드/무조건] modules/fz-gpt-bash-hygiene.md         ~  3902 tok
-     ! L231: > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 
-[로드/무조건] modules/review-checks.md               ~  3020 tok
-     ? L260: ### 검증 4-D~4-H: 조건부 정밀 검증 → `modules/review-checks.md`
-     ! L262: > 모듈화/리팩토링/마이그레이션 시 실행. 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
-     ! L269: ### 검증 4-N/4-O/4-P: candidate self-check → `modules/review-checks.md`
-     ! L271: > ⚠️ candidate (evidence 1 session, 활성 강제 X — 5 sessions 후 결정). 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
-     ! L442: 예시 2 — Anti-Pattern 잔존 검증 (검증 4-F → 절차: modules/review-checks.md):
-     ! L446: 예시 3 — Source Fidelity (검증 4-H → 절차: modules/review-checks.md, 리팩토링/마이그레이션):
-[로드/무조건] modules/lead-reasoning.md              ~  2155 tok
-     ! L265: ### 검증 4-I: Implication Coverage (함의 커버리지) — `modules/lead-reasoning.md` 참조. 제거/리팩토링 시 실행. 검증 4는 diff 안(judge)
-[로드/무조건] modules/code-transform-validation.md   ~  1477 tok
-     ! L276: Plan에 Transformation Spec이 포함된 경우, diff가 Spec 요구사항을 준수하는지 검증. 참조: `modules/code-transform-validation.md`
-[로드/무조건] modules/feedback-verification.md       ~   358 tok
-     ! L348: > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
-[로드/무조건] modules/gates.md                       ~  9346 tok
-     ! L352: ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
-[로드/조건부] modules/native-agents.md               ~   979 tok
-     · L69: | modules/native-agents.md | L3 에이전트 스폰 — Phase 5 병렬 검증 |
-     ? L196: ├─ [병렬 4] L3 silent-failure-hunter: 에러 처리 스캔 (조건부 — modules/native-agents.md)
-     ? L197: └─ [병렬 5] L3 type-design-analyzer: 타입 설계 평가 (조건부 — modules/native-agents.md)
-[로드/조건부] modules/lead-action-default.md         ~  1396 tok
-     ? L346: > **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). 추가 verify round는
-[카탈로그  ] modules/memory-policy.md               ~  2052 tok
-     · L66: | modules/memory-policy.md | Serena Memory 키 네이밍 + GC 정책 |
-[카탈로그  ] modules/uncertainty-verification.md    ~  1523 tok
-     · L71: | modules/uncertainty-verification.md | 4-K enforcement — [verified] 없는 주장 violation 판정 |
+[로드/무조건] modules/native-agents.md                 1299 글자÷4
+     · L75: | modules/native-agents.md | L3 에이전트 스폰 — Phase 5 병렬 검증 |
+     ? L196: ├─ [병렬 4] L3 pr-review-toolkit:silent-failure-hunter: 에러 처리 스캔 (조건부 · 미설치면 생략·고지 — modules/native-agents.md)
+     ? L197: └─ [병렬 5] L3 pr-review-toolkit:type-design-analyzer: 타입 설계 평가 (조건부 · 미설치면 생략·고지 — modules/native-agents.md)
+     ! L455: | pr-review-toolkit 에이전트 없음 (Agent 도구의 agentType 목록에 접두 포함 이름이 없다) | 그 다리(Phase 5 병렬 4 · 5)를 생략하고 보고에 `[L3 생략 
+[로드/무조건] modules/safety-audit.md                   871 글자÷4
+     · L76: | modules/safety-audit.md | 검증 4-J Concurrency Safety Audit — 역방향 안전성 감사 |
+     ! L272: ### 검증 4-J: Concurrency Safety Audit (역방향 — 항상 실행) — `modules/safety-audit.md` 참조. diff에 동시성 키워드가 없어도 실행. 싱글톤 
+     ! L325: - [ ] Concurrency Safety Audit 통과? (싱글톤 가변 상태 동기화, 콜백 스레드, @Published 스레드 — modules/safety-audit.md)
+[로드/무조건] modules/fz-gpt-subcommands-core.md       3346 글자÷4
+     ! L106: 3.5. **기본 GPT review 동시 기동**(F-473): Workflow 를 띄운 직후 Phase 5 검증 2 의 GPT review 를 background 로 함께 띄운다 — 입력이 di
+     ? L342: > 요약: 직전 `gpt-choice.sh decide`(`skip` 이면 `[GPT 미사용 — 사유]` · Reflection Rate N/A) → `/fz-gpt validate "피드백 반영 
+     ? L358: - 원장이 있으면 **`verify-gates`를 추가 호출**해(같은 decide 판정 — `skip` 이면 부르지 않고 `[GPT 미사용 — 사유]`) 게이트별 판정을 받는다 — 대상은 **확정
+     ! L360: - ⛔ 응답은 `--verdict-check {응답.json} {WORK_DIR}/gates/plan.md` 로 전수 판정을 확인한다. exit 1이면 재호출 1회(`FZ_GPT_RECALL=pos
+[로드/무조건] modules/context-artifacts.md             3466 글자÷4
+     ! L132: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션. **Phase 1 전에 반드시 실행.**
+[로드/무조건] modules/fz-gpt-bash-hygiene.md           3964 글자÷4
+     ! L233: > **검증 전후 `git diff --shortstat` 대조**: `modules/fz-gpt-bash-hygiene.md` §8 게이트 4 의 근거는 남겨진 산출물(추가) 이고, 되돌림·삭제 
+[로드/무조건] modules/review-checks.md                 3020 글자÷4
+     ? L265: ### 검증 4-D~4-H: 조건부 정밀 검증 → `modules/review-checks.md`
+     ! L267: > 모듈화/리팩토링/마이그레이션 시 실행. 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
+     ! L274: ### 검증 4-N/4-O/4-P: candidate self-check → `modules/review-checks.md`
+     ! L276: > ⚠️ candidate (evidence 1 session, 활성 강제 X — 5 sessions 후 결정). 상세 절차+체크리스트는 `modules/review-checks.md` 참조.
+     ! L433: 예시 2 — Anti-Pattern 잔존 검증 (검증 4-F → 절차: modules/review-checks.md):
+     ! L437: 예시 3 — Source Fidelity (검증 4-H → 절차: modules/review-checks.md, 리팩토링/마이그레이션):
+[로드/무조건] modules/lead-reasoning.md                2155 글자÷4
+     ! L270: ### 검증 4-I: Implication Coverage (함의 커버리지) — `modules/lead-reasoning.md` 참조. 제거/리팩토링 시 실행. 검증 4는 diff 안(judge)
+[로드/무조건] modules/code-transform-validation.md     1477 글자÷4
+     ! L281: Plan에 Transformation Spec이 포함된 경우, diff가 Spec 요구사항을 준수하는지 검증. 참조: `modules/code-transform-validation.md`
+[로드/무조건] modules/feedback-verification.md          392 글자÷4
+     ! L340: > 상세 절차·Gate 4.5·판정 기준: `modules/feedback-verification.md` 참조
+[로드/무조건] modules/gates.md                        10610 글자÷4
+     ! L346: ### 게이트 재검증 (원장이 있을 때 — `modules/gates.md` 배선 3)
+[로드/조건부] modules/plugin-refs.md                   2809 글자÷4
+     · L73: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ? L84: > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
+[로드/조건부] modules/symbol-tools-audit.md             996 글자÷4
+     ? L108: - ⛔ **심볼 도구 점검** (`mode:'workflow'` 반환 뒤 · swarm 을 따로 돌렸으면 그 runId 에도): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz
+     ? L108: - ⛔ **심볼 도구 점검** (`mode:'workflow'` 반환 뒤 · swarm 을 따로 돌렸으면 그 runId 에도): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz
+     ? L230: > **review-correctness 점검**: Phase 4.5 나 이 분기에서 `fz:review-correctness` 를 띄웠으면 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT
+     ? L230: > **review-correctness 점검**: Phase 4.5 나 이 분기에서 `fz:review-correctness` 를 띄웠으면 끝난 뒤 `python3 "${FZ_PLUGIN_ROOT
+[로드/조건부] modules/tool-status.md                    665 글자÷4
+     ? L138: 5. ⛔ **선택 도구 상태**: 위 tools.md 첫 줄 끝에 같은 줄로 붙인다(빠지면 검사 exit 1) — 형식 `modules/tool-status.md`(작업 폴더가 없으면 그 모듈의 화
+     ? L239: 경로는 함수 하나가 정한다 — Lead 의 스킬 목록에서 `sc:` 로 시작하는 이름들을 넘긴다(하나도 없으면 빈 값 `""`): `python3 "${FZ_PLUGIN_ROOT}/scripts/c
+[로드/조건부] modules/lead-action-default.md           1396 글자÷4
+     ? L338: > **Default = action with proportional verification** (참조: `modules/lead-action-default.md`). 추가 verify round는
+[카탈로그  ] modules/uncertainty-verification.md      1525 글자÷4
+     · L77: | modules/uncertainty-verification.md | 4-K enforcement — [verified] 없는 주장 violation 판정 |
 
 ===== fz-search =====
 참조 판정: skills/fz-search/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 36723 / ceiling(로드 전체) 36723 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 29210 / ceiling(로드 전체) 33015 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] guides/agent-team-guide.md             ~  6173 tok
-     ! L57: - 참조: `guides/agent-team-guide.md` §8 (공식 사양)
-[로드/무조건] modules/plugin-refs.md                 ~  2258 tok
-     · L63: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
-     ! L68: > 참조: `modules/plugin-refs.md` — SwiftUI Expert 섹션 (탐색 시 View 구조/패턴 판단 기준)
-[로드/무조건] modules/cross-validation.md            ~ 10992 tok
-     · L64: | modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
-     ~ L339: - [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/
-     ! L340: - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation
-[로드/무조건] modules/context-artifacts.md           ~  4289 tok
-     ! L84: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ~ L253: > 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern·**plan-struc
-     ! L259: 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
-     ? L260: 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — ⛔ 거부 시 SOLO 폴백 아님:
-[로드/무조건] modules/mode-gate.md                   ~  2517 tok
-     ! L258: 1. **args 조립**: `query`=탐색 질의 원문 / `codeContext`=탐색 허용 범위(경로·디렉토리 — 명시적으로 한정) / `effort`=`python3 "${FZ_PLUGIN
+[로드/무조건] modules/cross-validation.md             11054 글자÷4
+     · L61: | modules/cross-validation.md | Coverage Gate (전수 탐색 보장) |
+     ~ L337: - [ ] "전체/모든/생태계/전수" 탐색 요청이거나 **산출물이 전수/카운트/부정 주장("~뿐"/"N곳"/"N개"/"나머지는"/"전부") · 비율 주장(%·오류율·recall — 같은 문장에 N/
+     ! L338: - [ ] "0건/부재" 결론이면 **Negative-Result Gate** 통과? (positive control + exit code + 라벨 — `modules/cross-validation
+[로드/무조건] modules/context-artifacts.md             3466 글자÷4
+     ! L81: > 참조: `modules/context-artifacts.md` → "Work Dir Resolution" 섹션
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L88: 4. ⛔ **선택 도구 상태**: 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`(목록✓ 는 연결됨이 아니다)
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ~ L249: > 스크립트: `workflows/search-cross-verify.js` (플러그인 루트 상대) — agents/의 search-symbolic·search-pattern·**plan-struc
+     ! L255: 1.5. **준비** (`guides/skill-authoring.md` §12 0단계 — 매 호출 · 경로 판정과 self-contained 확인 포함): `cp {플러그인 루트}/workflow
+     ? L256: 2. **Workflow 호출**: `Workflow({ scriptPath: '{WORK_DIR}/search-cross-verify.js', args })` — ⛔ 거부 시 SOLO 폴백 아님:
+[로드/무조건] modules/mode-gate.md                     2712 글자÷4
+     ! L254: 1. **args 조립**: `query`=탐색 질의 원문 / `codeContext`=탐색 허용 범위(경로·디렉토리 — 명시적으로 한정) / `effort`=`python3 "${FZ_PLUGIN
+[로드/조건부] modules/plugin-refs.md                   2809 글자÷4
+     · L60: | modules/plugin-refs.md | Swift 플러그인 참조 (SwiftUI/Concurrency) |
+     ? L67: > Swift 파일을 다루는 경우에만 `modules/plugin-refs.md` 를 읽는다(알려진 짝 · 최소 타겟 · 역방향 감지 트리거).
+[로드/조건부] modules/symbol-tools-audit.md             996 글자÷4
+     ? L259: 3.5. **심볼 팔 점검** (반환 뒤 · 보고 모드): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId
 
 ===== fz-skill =====
 참조 판정: skills/fz-skill/SKILL.md
-정의: floor = 무조건 참조 문서(modules · guides) 토큰 합 · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
-  floor(무조건 로드) 38665 / ceiling(로드 전체) 38665 ~tokens  · 로드 아님(카탈로그·출처표기) 0 제외
+정의: floor = 무조건 참조 문서(modules · guides) 글자÷4 합(토큰 수 아님) · SKILL.md 본문 제외 · ceiling = 로드 지시 참조 전체 합 · 둘 다 정적 판정
+  floor(무조건 로드) 41317 / ceiling(로드 전체) 41317 글자÷4  · 로드 아님(카탈로그·출처표기) 0 제외
 ⛔ 휴리스틱 3-버킷 — catalog(모듈 참조 표) / citation(출처 표기) / load(로드 지시).
    조건 판정은 참조가 적힌 *그 줄*의 마커 기준. 기본값 unconditional(보수적).
 ------------------------------------------------------------------------------
-[로드/무조건] guides/prompt-optimization.md          ~  9521 tok
-     ! L56: | 프롬프트 최적화 | `guides/prompt-optimization.md` | 모든 생성/수정 시 |
-     ! L91: 2. `Read(guides/prompt-optimization.md)` → 10대 원칙
-     ! L103: 1. **10대 원칙 체크**: `guides/prompt-optimization.md` 직접 적용 (write 섹션 체크리스트 참조)
-     ! L135: 3. `Read(guides/prompt-optimization.md)` → 수정 시에도 원칙 적용
-     ! L352: - `guides/prompt-optimization.md` — 10대 원칙 (모든 문서)
-[로드/무조건] guides/skill-authoring.md              ~ 10494 tok
-     ! L57: | 스킬 작성법 | `guides/skill-authoring.md` | create, update 시 |
-     ! L90: 1. `Read(guides/skill-authoring.md)` → 작성 가이드라인
-     ! L353: - `guides/skill-authoring.md` — 스킬 문서
-[로드/무조건] guides/agent-team-guide.md             ~  6173 tok
-     ! L58: | 에이전트/팀 가이드 | `guides/agent-team-guide.md` | new-agent 시 |
-     ! L183: 2. `Read(guides/agent-team-guide.md)` → 에이전트 작성법
-     ! L354: - `guides/agent-team-guide.md` — 에이전트 문서
-[로드/무조건] modules/governance.md                  ~  3340 tok
-     ! L84: > ⛔ **필수 필드 정본** = `modules/governance.md` § 스킬 최소 기준 (L1 공식 4 + L2 fz 정책 2). ⛔ `team-agents`·`composable`·`mo
-[로드/무조건] modules/pipelines.md                   ~  1727 tok
-     ! L144: | provides/needs 변경 | `modules/pipelines.md` 영향 확인 |
-[로드/무조건] modules/team-registry.md               ~  1372 tok
-     ! L185: - `name`: `{domain}-{specialty}` 형식 (`modules/team-registry.md` 네이밍 규칙 준수)
-     ! L196: 6. **team-registry.md 업데이트**: `modules/team-registry.md`에 에이전트 1줄 추가
-[로드/무조건] guides/skill-testing.md                ~  6038 tok
-     ! L204: 테스트 프레임워크: `guides/skill-testing.md` 참조.
-     ! L239: 단일 트리거 정확도로는 리뷰 품질을 못 잡는다. `guides/skill-testing.md` §6.4 적용.
+[로드/무조건] modules/tool-status.md                    665 글자÷4
+     ! L33: - ⛔ **선택 도구 상태**: 서브커맨드 첫 단계에 화면 한 줄로 알린다 — 형식 `modules/tool-status.md`
+[로드/무조건] guides/prompt-optimization.md            9742 글자÷4
+     ! L57: | 프롬프트 최적화 | `guides/prompt-optimization.md` | 모든 생성/수정 시 |
+     ! L92: 2. `Read(guides/prompt-optimization.md)` → 10대 원칙
+     ! L104: 1. **10대 원칙 체크**: `guides/prompt-optimization.md` 직접 적용 (write 섹션 체크리스트 참조)
+     ! L136: 3. `Read(guides/prompt-optimization.md)` → 수정 시에도 원칙 적용
+     ! L353: - `guides/prompt-optimization.md` — 10대 원칙 (모든 문서)
+[로드/무조건] guides/skill-authoring.md               11313 글자÷4
+     ! L58: | 스킬 작성법 | `guides/skill-authoring.md` | create, update 시 |
+     ! L91: 1. `Read(guides/skill-authoring.md)` → 작성 가이드라인
+     ! L354: - `guides/skill-authoring.md` — 스킬 문서
+[로드/무조건] guides/agent-team-guide.md               6626 글자÷4
+     ! L59: | 에이전트/팀 가이드 | `guides/agent-team-guide.md` §1 · §2 채널 우선순위 원칙 (§2 · §3 · §7 의 TeamCreate/SendMessage/2.5-Turn
+     ! L184: 2. `Read(guides/agent-team-guide.md)` → 에이전트 작성법 (가이드 머리말 분류 그대로 — §1 · §2 채널 우선순위 원칙은 현행, §2 · §3 · §7 의 Team
+     ! L355: - `guides/agent-team-guide.md` — 에이전트 문서
+[로드/무조건] modules/governance.md                    3539 글자÷4
+     ! L85: > ⛔ **필수 필드 정본** = `modules/governance.md` § 스킬 최소 기준 (L1 공식 3 + L1 fz 정책 1 + L2 fz 정책 2). ⛔ `team-agents`·`co
+[로드/무조건] modules/pipelines.md                     1756 글자÷4
+     ! L145: | provides/needs 변경 | `modules/pipelines.md` 영향 확인 |
+[로드/무조건] modules/team-registry.md                 1372 글자÷4
+     ! L186: - `name`: `{domain}-{specialty}` 형식 (`modules/team-registry.md` 네이밍 규칙 준수)
+     ! L197: 6. **team-registry.md 업데이트**: `modules/team-registry.md`에 에이전트 1줄 추가
+[로드/무조건] guides/skill-testing.md                  6304 글자÷4
+     ! L205: 테스트 프레임워크: `guides/skill-testing.md` 참조.
+     ! L240: 단일 트리거 정확도로는 리뷰 품질을 못 잡는다. `guides/skill-testing.md` §6.4 적용.

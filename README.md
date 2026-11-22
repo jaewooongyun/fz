@@ -143,7 +143,7 @@ find "${CODEX_HOME:-$HOME/.codex}/skills" -maxdepth 1 -type l \( -name fz-fixer 
 
 ---
 
-## What's New — v5.0.0
+## What's New — v0.57.0
 
-누수 검사를 정본 모듈 하나(`scripts/leak_rules.py`)로 모았다. 커밋 훅 · 새 push 훅 · 출하 게이트 · 릴리스 본문 검사가 같은 규칙으로 커밋 신원 · 메시지 · 태그 · 본문까지 본다. 예시와 fixture 는 합성 도메인 하나로 통일했고, 실행 기록은 저장소 밖(`~/.fz/runs`)에 쓴다. 옛 판 릴리즈 노트는 걷었고 CHANGELOG 는 판마다 한 줄만 남긴다.
+누수 검사를 정본 모듈 하나(`scripts/leak_rules.py`)로 모았다. 커밋 훅 · 새 push 훅 · 출하 게이트 · 릴리스 본문 검사가 같은 규칙으로 커밋 신원과 메시지, 태그, 본문까지 본다. 불린 적 없는 기능(SuperClaude 지시 · Serena 체크포인트 · GPT 역할 스킬 둘 · `--gpt-agents`)을 걷었고 사전 승인을 조회 명령으로 좁혔다. 공개 저장소는 이 판으로 이력과 판 번호를 새로 시작했다(4.x → 0.57.0). 4.x 에서 올라올 때는 위 업데이트 명령처럼 마켓플레이스를 먼저 갱신한다.
 → [CHANGELOG](CHANGELOG.md)

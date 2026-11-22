@@ -1,16 +1,12 @@
 # Changelog
 
-### v5.0.0 (2026-11-13) — 누수 검사는 파일 내용만 봤다 — 커밋 신원 · 메시지 · 태그 · 릴리스 본문 · push 까지 한 규칙으로 본다 [MAJOR]
+### v0.57.0 (2026-11-22) — 누수 검사를 커밋 · 태그 · 릴리스 본문 · push 까지 넓히고, 쓰이지 않던 하네스를 걷었다 [MINOR]
 
-출하 게이트의 누수 검사는 작업 트리의 파일 내용만 봤고, 커밋 훅은 CHANGELOG · 릴리즈 노트 · 작업 로그를 예외로 건너뛰었다. 이 판은 규칙을 정본 모듈 하나(`scripts/leak_rules.py`)로 모으고 커밋 훅 · push 훅 · 출하 게이트 · 릴리스 본문 검사가 그 모듈을 함께 부른다. 예시와 fixture 는 합성 도메인 하나로 통일했고, 실행 기록은 저장소 밖에 쓰며, 옛 판 릴리즈 노트는 걷었다. 공개 저장소는 이 판의 트리로 이력을 새로 시작한다. 3건을 닫는다.
+누수 검사 규칙을 정본 모듈 하나(`scripts/leak_rules.py`)로 모았고, 커밋 훅 · 새 push 훅 · 출하 게이트 · 릴리스 본문 검사가 같은 규칙으로 커밋 신원 · 메시지 · 태그까지 본다. 가드 · 종료 게이트 · GPT 격리의 빈틈을 고치고, 불린 적 없는 기능을 걷고, 사전 승인을 조회 명령으로 좁혔다. 공개 저장소의 이력과 판 번호는 이 판에서 새로 시작한다(4.x → 0.57.0) — 마켓플레이스를 먼저 갱신한 뒤 플러그인을 갱신한다.
 
-→ [릴리즈 노트](docs/releases/v5.0.0.md)
+→ [릴리즈 노트](docs/releases/v0.57.0.md)
 
-| ID | 판정 | 근거 | 검증 절차 |
-|---|---|---|---|
-| F-594 | 해결 — 실행 기록을 저장소 밖에 쓴다 | 추적 파일 `experiment-log.md` 는 프로토콜만 싣는다 · 실행 행을 쓰라는 지시가 `${FZ_RUN_STATE:-~/.fz/runs}/experiment-log.md` 를 가리킨다 · 식별자를 허용하던 예외 문장과 커밋 훅의 검사 예외를 지웠다 | `python3 scripts/check_ab_protocol.py experiment-log.md`(실행 행이 있으면 exit 1 · `RUN-ROW` 줄) · health-check |
-| F-600 | 해결 — fixture 입력과 회귀 기준을 저장소 안에 둔다 | `tests/fixtures/modernize/ac8-links/snapshot/` · `tests/fixtures/workflow-base/`(회귀 러너 둘의 기준 원문) · 선택자는 환경 변수 트리 > 환경 변수 SHA > 고정본 | 이력 없는 사본에서 `bash tests/fixtures/modernize/ac8-links/run.sh` exit 0 · `node tests/workflows/effort-arg.js` · `node tests/workflows/default-off-regression.js` exit 0 |
-| F-604 | 해결 — 태그 뒤에 새로 생긴 0644 훅을 모드 축이 잡는다 | `check_release_sync.sh` 의 모드 축이 `mode change` 줄만 읽어 새 파일(`create mode`)을 놓쳤다 · 훅(`.githooks/*`)에 한해 새로 생긴 0644 파일을 불일치로 센다 · 경계를 못 박는 시험 둘(명시 `--rules` 우선 · 허용 메일 도메인의 점 경계)을 더했다 | `bash tests/fixtures/leak-gates/release-range/run.sh`(`rel-new-hook-nonexec-exit1` · `rel-rules-empty-builtin-only`) · `python3 scripts/leak_rules.py --self-test`(`mail-content-allow-narrow`) |
+닫은 finding 없음 — 내부 추적 번호는 공개 문서에 적지 않는다.
 
 ### v4.56.0 (2026-11-12) — full 은 크고 복잡할 때만 묻고, 그 밖은 묻지 않고 light 로 간다 [MINOR]
 
