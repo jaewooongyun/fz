@@ -477,16 +477,103 @@ def launcher_unmeasured(calls, seen):
     return max(sum(1 for x in calls if not x.get("completed")), len(calls) - seen, 0)
 
 
+# ── 보관 증거 (F-423) ──────────────────────────────────────────────────
+# run 폴더(~/.fz/ab/<묶음>/<run>/)와 작업 폴더 ab/state 의 원천은 보존 기한이 지나면 사라진다. collect 는 계측기가 읽는 것만
+# 증거 폴더의 run 사본 폴더(evidence/runs/<run_id>/)에 남긴다 — recollect · 원천 대조가 원래 자리 없이 같은 판정을 낸다.
+#   상태 스냅샷 셋 · tasks 폴더  같은 파일명 사본 — 행의 collect_args · sources 가 사본을 가리킨다(return_file 과 같다)
+#   gpt-home  gpt_home_sessions 가 읽는 sessions/**/*.jsonl 만(허용 목록) — 사본을 읽는다
+#   plugin    루트를 복사하지 않는다 — 계측기가 읽는 실재 · plugin_info(HEAD · dirty · 트리 · 코드 해시)를 기록(plugin-record.json)
+ARCHIVE_DENY_RE = re.compile(r"auth|token|credential|key", re.I)   # ⛔ 허용 목록 안이라도 이 이름은 복사하지 않는다(비밀값)
+PLUGIN_RECORD = "plugin-record.json"
+
+
+def _archive_dir(evdir, run_id):
+    """run 사본 폴더 — 증거 폴더 아래 run_id 별. 경로에 못 쓰는 글자를 바꿨으면 원래 run_id 해시를 붙여 충돌을 막는다."""
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", run_id)
+    if safe != run_id:
+        safe += "-" + hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:8]
+    return os.path.join(evdir, "runs", safe)
+
+
+def _mirror_reset(dst, src):
+    """사본 폴더를 비운다 — 같은 run_id 재측정이 앞 측정의 사본 파일(rollout · 작업 출력)을 읽지 않게 원천과 같은 모양으로 다시 만든다.
+    ⛔ 원천이 있고 사본이 아닐 때만 부른다. 원천이 사본 폴더 안이면 지우지 않는다."""
+    if not (os.path.realpath(src) + os.sep).startswith(os.path.realpath(dst) + os.sep):
+        shutil.rmtree(dst, ignore_errors=True)
+
+
+def _archive_sources(a, arch):
+    """상태 스냅샷 셋 · tasks 폴더 → run 사본 폴더에 사본을 만들고 {CollectSpec 필드: 사본 경로} 를 낸다.
+    ⛔ 원천이 없으면 넣지 않는다(원래 경로 · 판정 사유 그대로) · 원천이 곧 사본이면(recollect) 복사하지 않는다 — 사본을 지우거나 비우지 않는다."""
+    out, used = {}, set()
+    for k in ("state_pristine", "state_start", "state_end"):
+        src = getattr(a, k, None)
+        if not src or not os.path.isfile(src):
+            continue
+        name = os.path.basename(src)
+        name = f"{k}.{name}" if name in used else name
+        used.add(name)
+        out[k] = os.path.join(arch, name)
+        if not _same_path(src, out[k]):
+            os.makedirs(arch, exist_ok=True)
+            shutil.copy2(src, out[k])
+    if a.tasks_dir:
+        out["tasks_dir"] = []
+        for i, d in enumerate(a.tasks_dir):
+            dst = os.path.join(arch, "tasks", str(i))
+            if os.path.isdir(d) and not _same_path(d, dst):
+                _mirror_reset(dst, d)
+                os.makedirs(dst, exist_ok=True)
+                for f in sorted(os.listdir(d)):   # _resolved_output 은 폴더 바로 아래 같은 이름만 찾는다
+                    fp = os.path.join(d, f)
+                    if os.path.isfile(fp) and not os.path.islink(fp) and not ARCHIVE_DENY_RE.search(f):   # gpt-home 과 같은 규칙(리뷰)
+                        shutil.copy2(fp, os.path.join(dst, f))
+            out["tasks_dir"].append(dst if os.path.isdir(d) else d)
+    return out
+
+
+def _archive_gpt_home(src, dst):
+    """격리 GPT 홈 → gpt_home_sessions 가 읽는 파일만 — sessions/**/*.jsonl 정규 파일 중 비밀 이름(ARCHIVE_DENY_RE)이 아닌 것.
+    ⛔ 홈에는 인증 파일(auth.json) · 토큰이 든 설정(config.toml) · 상태 DB 가 있다 — 통째로 복사하지 않는다. 홈 폴더는 만든다
+    (홈 있음 · 세션 0 = [] 과 홈 없음 = None 을 가른다)."""
+    s = os.path.join(src, "sessions")
+    _mirror_reset(dst, src)
+    os.makedirs(dst, exist_ok=True)
+    if not os.path.isdir(s):
+        return
+    os.makedirs(os.path.join(dst, "sessions"), exist_ok=True)
+    for f in sorted(pathlib.Path(s).rglob("*.jsonl")):
+        rel = str(f.relative_to(s))
+        if f.is_symlink() or not f.is_file() or ARCHIVE_DENY_RE.search(rel):
+            continue
+        os.makedirs(os.path.dirname(os.path.join(dst, "sessions", rel)), exist_ok=True)
+        shutil.copy2(f, os.path.join(dst, "sessions", rel))
+
+
+def _plugin_record(path):
+    """plugin-record.json → {roots: [str], info: plugin_info 판독 | None} — 없거나 모양이 틀리면 None. 없으면 열지 않는다."""
+    if not os.path.isfile(path):
+        return None
+    try:
+        rec = read_json(path)
+    except (OSError, ValueError, TypeError):
+        return None
+    ok = (isinstance(rec, dict) and isinstance(rec.get("roots"), list) and all(isinstance(r, str) for r in rec["roots"])
+          and isinstance(rec.get("info"), (dict, type(None))))
+    return rec if ok else None
+
+
 def source_scope(row):
     """원장 행의 원천 → {evidence_dir, archived[(종류, 경로, 있음)], original[(종류, 경로, 있음)]} (F-423).
-    보관 사본(증거 폴더 안)과 원래 자리(transcript · Workflow 폴더 · run 폴더 — 보존 기한이 지나면 사라진다)를 가른다. 존재만 본다."""
+    보관 사본(증거 폴더 안)과 원래 자리(transcript · Workflow 폴더 · run 폴더 — 보존 기한이 지나면 사라진다)를 가른다. 존재만 본다.
+    플러그인 기록(plugin_record)이 있는 행은 플러그인 사본 루트를 원래 자리로 세지 않는다 — 루트가 사라지면 기록을 읽는다."""
     src, ca = row.get("sources") or {}, row.get("collect_args") or {}
     led = ca.get("ledger")
     evdir = ca.get("evidence_dir") or (os.path.join(os.path.dirname(os.path.abspath(led)), "evidence") if led else None)
     items = []
-    for k in ("transcript", "state_pristine", "state_start", "state_end", "input_root", "input_json"):
+    for k in ("transcript", "state_pristine", "state_start", "state_end", "input_root", "input_json", "gpt_home", "plugin_record"):
         items.append((k, src.get(k)))
-    for k in ("artifacts", "wf_dirs", "tasks_dirs", "plugin_roots"):
+    for k in ("artifacts", "wf_dirs", "tasks_dirs") + (() if src.get("plugin_record") else ("plugin_roots",)):
         items += [(k, p) for p in src.get(k) or []]
     for k in ("endpoint_clock", "sleep_log"):
         items.append((k, (src.get(k) or {}).get("path")))
@@ -517,7 +604,14 @@ def build_row(a, dry=False) -> dict:
     """원천 → 원장 행. dry=True 는 원천 대조용 재구성이다(증거 사본을 쓰지 않는다).
     - Important: 인자는 CollectSpec 필드로 읽는다 — 옛 행의 collect_args 를 그대로 Namespace 로 넘겨도 없는 필드는 기본값이다."""
     evdir = _evidence_dir(a)
-    tp = parse_transcript(a.transcript, a.artifact or [], list(a.tasks_dir or []) + [evdir])
+    run_id = a.run_id or f"{a.workflow}:{a.arm}:{a.run}:{a.phase}"
+    # F-423 — run 폴더 원천의 보관 사본(상태 스냅샷 · tasks). 원천을 읽은 뒤 행이 사본을 가리킨다(return_file 과 같다)
+    arch = _archive_dir(evdir, run_id)
+    archived = {} if dry else _archive_sources(a, arch)
+    rec_path = os.path.join(arch, PLUGIN_RECORD)
+    rec = _plugin_record(rec_path)
+    # 기록이 있으면 collect 때 실재를 확인한 플러그인 루트는 사본이 사라져도 루트로 센다
+    tp = parse_transcript(a.transcript, a.artifact or [], list(a.tasks_dir or []) + [evdir], known_roots=(rec or {}).get("roots") or ())
     why = []
     clock = None
     if getattr(a, "endpoint_clock", None):
@@ -615,6 +709,14 @@ def build_row(a, dry=False) -> dict:
             why.append(f"빈 산출물(공백뿐) {x['path']}")
     roots = tp["roots"]
     plugin = plugin_info(roots[0] if len(roots) == 1 else None)
+    if len(roots) == 1 and not os.path.isdir(roots[0]) and rec and (rec.get("info") or {}).get("root") == roots[0]:
+        plugin = dict(rec["info"])   # F-423 — 플러그인 사본이 사라졌다. collect 때 잰 판독값(HEAD · dirty · 트리 · 코드 해시)을 쓴다
+    elif not dry and roots and all(os.path.isdir(r) for r in roots):
+        # 루트를 실제로 읽은 판독만 기록한다(기록에서 온 루트로 기록을 덮지 않는다)
+        os.makedirs(arch, exist_ok=True)
+        with open(rec_path, "w", encoding="utf-8") as fh:
+            json.dump({"roots": roots, "info": dict(plugin) if len(roots) == 1 else None}, fh, ensure_ascii=False, indent=1,
+                      sort_keys=True)
     plugin["roots"] = roots
     if len(roots) != 1:
         why.append(f"플러그인 경로 {len(roots)}개(1개여야 한다): {roots}")
@@ -696,7 +798,12 @@ def build_row(a, dry=False) -> dict:
     banners += lb
     # ③ arm 별 GPT 홈 rollout 과 대조 — 명령과 연결되지 않은 세션(nohup 으로 떼어 띄운 호출)은 model · 버전만 비교에 넣고 수를 남긴다
     run_dir = os.path.dirname(os.path.realpath(a.input_json)) if a.input_json else None
-    sessions = gpt_home_sessions(os.path.join(run_dir, "gpt-home")) if run_dir else None
+    home, arch_home = (os.path.join(run_dir, "gpt-home") if run_dir else None), os.path.join(arch, "gpt-home")
+    if not dry and home and os.path.isdir(home) and not _same_path(home, arch_home):
+        _archive_gpt_home(home, arch_home)
+    if os.path.isdir(arch_home):
+        home = arch_home   # F-423 — 허용 목록 사본을 읽는다(collect 도) — 원본을 읽으면 사본에서 뺀 파일만큼 재생이 갈린다
+    sessions = gpt_home_sessions(home) if home else None
     bad_home = [x["file"] for x in sessions or [] if x.get("bad_lines")]
     if bad_home:
         why.append(f"GPT 홈 rollout 파싱 불가 줄 {bad_home[:3]} — 그 세션의 모델 · 버전을 모른다(0 건으로 빼지 않는다)")
@@ -707,7 +814,7 @@ def build_row(a, dry=False) -> dict:
     wsum = [s for s in (r["summary"] for r in wf_runs) if s]
     stages_completed = [(r["metrics"] or {}).get("stagesCompleted") for r in wf_runs]
     row = {
-        "type": "run", "schema": SCHEMA, "run_id": a.run_id or f"{a.workflow}:{a.arm}:{a.run}:{a.phase}",
+        "type": "run", "schema": SCHEMA, "run_id": run_id,
         "workflow": a.workflow, "arm": a.arm, "run": a.run, "order": a.order, "phase": a.phase,
         "release": a.release, "fixture": a.fixture,
         "lead": tp["lead"], "plugin": plugin, "injected": tp["injected"], "instrument_sha": instrument_sha(),
@@ -746,10 +853,18 @@ def build_row(a, dry=False) -> dict:
                     "wf_dirs": [w["dir"] for w in tp["workflows"] if not w["rejected"]],
                     "state_pristine": a.state_pristine, "state_start": a.state_start, "state_end": a.state_end,
                     "input_root": a.input_root, "input_json": a.input_json, "tasks_dirs": list(a.tasks_dir or []),
-                    # ⛔ 재구성은 run 별 플러그인 사본이 디스크에 있어야 한다(roots 는 실재 경로만 · plugin_info 해시) — 원천으로 적는다(F-335 ⑨)
+                    # 재구성은 run 별 플러그인 사본(roots 는 실재 경로만 · plugin_info 해시) 또는 그 기록(sources.plugin_record —
+                    #   사본이 사라지면 기록을 읽는다, F-423)이 있어야 한다 — 원천으로 적는다(F-335 ⑨)
                     "plugin_roots": roots or ([pstart["root"]] if (pstart or {}).get("root") else [])},
         "collect_args": dict({k: getattr(a, k, v) for k, v in COLLECT_SPEC}, spec=COLLECT_SPEC_VERSION),
     }
+    # F-423 — 보관 사본을 가리킨다: recollect · 원천 대조(collect_args)와 원천 범위(sources)가 원래 자리 대신 사본을 읽는다
+    row["collect_args"].update(archived)
+    row["sources"].update({("tasks_dirs" if k == "tasks_dir" else k): v for k, v in archived.items()})
+    if os.path.isfile(rec_path):
+        row["sources"]["plugin_record"] = rec_path
+    if sessions is not None:
+        row["sources"]["gpt_home"] = home
     if clock is not None:
         # 시계는 사본으로 저장한다 — recollect 가 원본 대신 사본을 읽는다(CollectSpec 필드 endpoint_clock · endpoint_clock_source)
         row["collect_args"].update(endpoint_clock=clock["path"], endpoint_clock_source=clock["original"])

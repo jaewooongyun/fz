@@ -12,6 +12,9 @@
 #     (산출물 쓰기 대상 `_same_path` · GPT 로그 직접 경로 · 플러그인 경로 실재 · gpt-home 은 input.json 옆). 그래서 산출물 ·
 #     GPT 로그 · 감사 · input.json 은 원래 자리 해시 == 목록 해시, run 폴더 repo/ 는 repo.sha256 전건, 스냅샷 · tasks ·
 #     gpt_log_dir · evidence_dir · 플러그인 사본 · gpt-home 은 실재를 먼저 센다. 하나라도 어긋나면 UNRUN 이다(PASS 아님)
+#     F-423 수정 뒤 collect 한 행은 스냅샷 · tasks 가 증거 폴더 사본이고 플러그인은 기록(sources.plugin_record), GPT 홈은 허용 목록
+#     사본(sources.gpt_home)이라 그 자리를 센다. 목록의 20행은 수정 전 행이라 여전히 원래 자리가 필요하다. 원래 자리 없는 재생의
+#     고정 셀은 같은 폴더 run.sh 의 archive-replay · archive-no-secret 이다
 #   쓰기: 이 러너의 임시 폴더뿐 — 원장 사본 · evidence_dir 사본(싱크) · 파생 transcript. 끝에 원본 원장 · 원래 evidence_dir ·
 #     보관 사본 해시를 앞뒤로 대조한다. HOME 은 바꾸지 않는다(state_info 가 감시 경로를 ~ 정본과 비교한다 — 격리하면 인공물)
 # 판정
@@ -169,13 +172,18 @@ def census(r):
                 miss.append(f"부재 {p}")
             elif sha(p) != want:
                 miss.append(f"변경 {p}")
+    # 사본 행(F-423 수정 뒤 collect)은 collect_args 의 스냅샷 · tasks 가 증거 폴더 사본이고, sources 에 플러그인 기록 · GPT 홈 사본이 있다
+    src = row.get("sources") or {}
     for p in (ca.get("state_pristine"), ca.get("state_start")):
         if not p or not os.path.isfile(p):
             miss.append(f"부재 {p}")
+    if src.get("plugin_record") and not os.path.isfile(src["plugin_record"]):
+        miss.append(f"부재 {src['plugin_record']}")
     dirs = list(ca.get("tasks_dir") or []) + list(ca.get("gpt_log_dir") or []) + [ca.get("evidence_dir")]
-    dirs += list((row.get("plugin") or {}).get("roots") or [])
+    if not src.get("plugin_record"):   # 기록이 있으면 플러그인 사본이 사라져도 기록을 읽는다
+        dirs += list((row.get("plugin") or {}).get("roots") or [])
     if (row.get("gpt") or {}).get("sessions") is not None:
-        dirs.append(os.path.join(run_dir, "gpt-home"))
+        dirs.append(src.get("gpt_home") or os.path.join(run_dir, "gpt-home"))
     miss += [f"부재 {d}" for d in dirs if not d or not os.path.isdir(d)]
     return miss
 

@@ -769,8 +769,9 @@ def external_mcp(tool_uses, mcp_results):
     return mcp_summary(external_mcp_calls(tool_uses, mcp_results))
 
 
-def parse_transcript(path, artifacts=(), tasks_dirs=()):
-    """Lead transcript 1개 → Lead 층 지표. I/O 는 파일 읽기뿐이다."""
+def parse_transcript(path, artifacts=(), tasks_dirs=(), known_roots=()):
+    """Lead transcript 1개 → Lead 층 지표. I/O 는 파일 읽기뿐이다.
+    known_roots — collect 가 실재를 확인해 보관 기록(plugin-record.json)에 남긴 플러그인 루트. 사본이 사라져도 루트로 센다(F-423)."""
     evs, bad = iter_jsonl(path)
     per_id, usage_by_id, advisor_ids, versions = {}, {}, set(), set()
     tool_uses, results, mcp_results = [], {}, {}
@@ -802,7 +803,7 @@ def parse_transcript(path, artifacts=(), tasks_dirs=()):
                 r, _, sk = p.rpartition("/skills/")
                 # ⛔ 실재하는 경로만 — 문서가 인용한 헤더 형식(`…/skills/fz-gpt` · `{플러그인 루트}/skills/…`)을 로드로 세지 않는다.
                 #    실측 2026-09-26: peer-review 가 읽은 cross-validation.md 의 인용 한 줄이 루트 '…' 를 더해 "경로 2개"·"코드 변경" 거짓 판정
-                if not os.path.isdir(r):
+                if not os.path.isdir(r) and r not in known_roots:
                     continue
                 roots.add(r)
                 skills.add(sk.split("/")[0])
