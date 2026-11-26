@@ -61,6 +61,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from fz_wf_view import _secs, fmt, print_detail, print_row  # noqa: E402 — 형제 모듈(사람용 출력 · 1500줄 상한으로 나눴다)
+
 DEFAULT_ROOT = os.path.expanduser("~/.claude/projects")
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # 이 파일이 든 플러그인의 루트(`scripts/` 위)
 
@@ -168,6 +171,22 @@ def symbol_result_kind(is_error, content) -> str:
     return "empty" if body in ([], {}) else "ok"
 
 
+HARNESS_REQ = "[Workflow harness — user request]"
+
+
+def forwarded_request(text: str):
+    """하네스가 워커에게 전달한 사용자 요청의 앞부분(80자) — 없으면 None (F-660).
+
+    워커는 Lead 가 쓴 과제 말고도 이 세션의 사용자 요청을 받는다. 그 글이 재는 대상을 말하면 워커는 대조군이 아니다.
+    """
+    i = text.find(HARNESS_REQ)
+    if i < 0:
+        return None
+    body = text[i + len(HARNESS_REQ):]
+    j = body.find(":\n")
+    return " ".join((body[j + 2:] if j >= 0 else body).split())[:80]
+
+
 def read_agent(path: str) -> dict:
     """agent-*.jsonl 1개 → 지표. 파싱 불가 줄은 세고 버린다(조용히 넘기지 않는다).
 
@@ -186,6 +205,7 @@ def read_agent(path: str) -> dict:
     pending = {}
     role = ""
     role_found = False
+    forwarded = None
     bad_lines = 0
     total_lines = 0
     msg_models = {}
@@ -229,10 +249,13 @@ def read_agent(path: str) -> dict:
                 # ⛔ 첫 user 메시지만 보면 안 된다 — 현행 하네스는 `[Workflow harness — user request]` 래퍼를
                 #    먼저 쓰고 [역할] 은 다음 메시지(`… computed task`)에 온다(실측 2026-09-26: 전 stage 가 '?').
                 #    [역할] 을 찾을 때까지 본다. 끝내 없으면 첫 메시지 앞부분을 남긴다.
-                if not role_found:
+                if not role_found or forwarded is None:
                     text = content if isinstance(content, str) else ""
                     if isinstance(content, list):
                         text = " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+                    if forwarded is None:
+                        forwarded = forwarded_request(text)
+                if not role_found:
                     m = re.search(r"\[역할\]\s*([^\n]{0,60})", text)
                     if m:
                         role, role_found = m.group(1), True
@@ -313,6 +336,7 @@ def read_agent(path: str) -> dict:
         "complete_turns": turns,
         "file": os.path.basename(path),
         "role": role,
+        "forwarded": forwarded,
         "stage": _stage_of(role),
         "first": first,
         "last": last,
@@ -675,79 +699,6 @@ def read_wf(folder: str) -> dict:
         "stages_seen": sorted(by_stage.keys()),
         "errors": errors,
     }
-
-
-def fmt(v, unit=""):
-    return "unavailable" if v is None else f"{v}{unit}"
-
-
-def _secs(wf: dict, key: str, nd=None) -> str:
-    """wall · critical_path 칸. 시도 경계가 모호하면 unavailable 이 아니라 UNRUN(미판정)으로 적는다."""
-    if wf.get("attempt_ambiguous"):
-        return "UNRUN"
-    v = wf[key]
-    return fmt(None if v is None else (round(v) if nd is None else round(v, nd)), "s")
-
-
-def _attempt_note(wf: dict) -> str:
-    """실패 시도 · 재사용 구간 — wall 과 섞지 않고 따로 적는다. 단일 시도면 빈 문자열."""
-    if wf.get("attempt_ambiguous"):
-        return f"attempts=UNRUN — 시도 경계 모호: {wf['attempt_ambiguous']}"
-    if not wf.get("failed_attempts"):
-        return ""
-    sp = lambda v: fmt(None if v is None else round(v, 1), "s")
-    note = (f"failed_attempts={wf['failed_attempts']}  failed_span={sp(wf['failed_span'])}"
-            f"  last_attempt_agents={wf['last_attempt_agents']}/{wf['n_agents']}")
-    if wf["reused_agents"]:
-        note += f"  reused_agents={','.join(wf['reused_agents'])}  reused_span={sp(wf['reused_span'])}"
-    return note + "  (wall · critical_path = 마지막 시도)"
-
-
-def print_detail(wf: dict) -> None:
-    print(f"wf {wf['wf']}  agents={wf['n_agents']}  wall={_secs(wf, 'wall', 1)}"
-          f"  critical_path={_secs(wf, 'critical_path', 1)}")
-    lb = "≥" if wf["tokens_partial"] else ""
-    print(f"  advisor={wf['advisor']}  advisor_calls={wf['advisor_calls']}  advisor_stalled={fmt(wf['advisor_stalled'])}"
-          f"  out_tok={lb}{wf['out_tok']:,}  thinking={lb}{wf['thinking']:,}"
-          f"  cache_r={wf['cache_read']:,}  cache_w={wf['cache_write']:,}  so_retries={wf['so_retries']}  so_errors={wf['so_errors']}"
-          f"  journal_results={wf['journal_results']}")
-    if _attempt_note(wf):
-        print(f"  {_attempt_note(wf)}")
-    order = {s: i for i, s in enumerate(["S0", "S0-reb", "S0-fin", "S1", "S2-impact", "S2-edge", "S2-arch",
-                                         "S3-imp", "S3-edge", "S4", "S5",
-                                         "L1-full", "L1-edge", "L1-impact", "L2-merge",
-                                         "R1-arch", "R1-quality", "R1-correct", "R2-arch", "R2-quality",
-                                         "R3-counter", "?"])}
-    for a in sorted(wf["agents"], key=lambda x: (order.get(x["stage"], 99), x["file"])):
-        ot = "unavail" if a["out_tok"] is None else f"{a['out_tok']:,}"
-        th = "unavail" if a["thinking"] is None else f"{a['thinking']:,}"
-        rc = f" ret={a['result_chars']:,}자" if a.get("result_chars") else ""
-        st = f" stall={fmt(a['advisor_stalled'])}" if a["advisor_stalled"] != 0 else ""
-        at = {"earlier": " [failed-attempt]", "reused": " [reused]"}.get(a.get("attempt"), "")
-        print(f"    {a['stage']:9} {a['model']:8} dur={fmt(round(a['dur'], 1) if a['dur'] is not None else None, 's'):>9}"
-              f" turns={a['turns']:>3} tools={a['tools']:>3} out={ot:>9} think={th:>9}"
-              f" adv={a['advisor']}{st} so={a['so_calls']}/{a['so_errors']}{rc}{at}")
-    for e in wf["errors"]:
-        print(f"  ⚠️ {e}")
-
-
-def print_row(wf: dict) -> None:
-    """experiment-log §5.7 fz-plan 테이블 행 형식 (agentCalls·nullCount·stages·fallback·wall-clock)."""
-    stages = len([s for s in wf["stages_seen"] if s != "?"])
-    lb = "≥" if wf["tokens_partial"] else ""
-    # ⛔ 열은 늘리지 않는다 — 스톨 · 실패 시도는 마지막 비고 칸에 덧붙인다(wall 칸은 마지막 시도 값)
-    sec = lambda v: fmt(None if v is None else round(v), "s")
-    att = ""
-    if wf.get("attempt_ambiguous"):
-        att = " · 시도 경계 모호(wall UNRUN)"
-    elif wf.get("failed_attempts"):
-        att = f" · failed_attempts {wf['failed_attempts']} (실패 구간 {sec(wf['failed_span'])})"
-        if wf["reused_agents"]:
-            att += f" · reused {len(wf['reused_agents'])} ({sec(wf['reused_span'])})"
-    print(f"| N | DATE | {wf['n_agents']} | {max(0, wf['n_agents'] - wf['journal_results'])} | "
-          f"{stages} | 0 | {_secs(wf, 'wall')} | "
-          f"advisor {wf['advisor']} · advisor_stalled {fmt(wf['advisor_stalled'])} · so_retries {wf['so_retries']} · out_tok {lb}{wf['out_tok']:,} "
-          f"(thinking {wf['thinking']:,}) · critical_path {_secs(wf, 'critical_path')}{att} |")
 
 
 def resolve(root: str, session_glob: str, wf: str):

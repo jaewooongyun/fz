@@ -427,7 +427,7 @@ Query/Utility 스킬(fz-commit, fz-pr, fz-new-file 등)은 Phase/Gate/Few-shot �
 ### 상황별 항목
 
 - [ ] 파이프라인에 포함되는 스킬이면 `modules/pipelines.md`에 추가했는가?
-- [ ] 팀 에이전트가 필요하면 `agents/`에 에이전트 파일이 존재하는가?
+- [ ] 팀 에이전트가 필요하면 `agents/`에 에이전트 파일이 존재하는가? 같은 문안을 셋 이상의 받는 쪽(에이전트 · 스킬 · 워크플로)에 넣으면 받는 쪽마다 가진 도구 · 출력 틀 · 보는 트리 · 지켜졌는지 재는 자리를 먼저 대조하고, 시험 표본은 그 칸 값이 다른 쪽에서 고른다(F-657)
 - [ ] 새 provides 토큰을 정의했으면 `templates/skill-template.md` 레지스트리에 추가했는가?
 - [ ] 500줄을 초과하면 공유 모듈(`modules/`)로 분리했는가?
 - [ ] ⛔ Phase 0 Work Dir Pre-flight가 포함되어 있는가? (`modules/context-artifacts.md` → Work Dir Resolution)
@@ -537,6 +537,7 @@ fz-gpt는 GPT CLI의 네이티브 기능(review 모드·exec 의 schema 출력 �
 - 호출(Lead): 아래 § scriptPath 거부 우회 계약의 **0단계 준비**(매 호출) 뒤 복사본을 부른다 — `Workflow({ scriptPath: '{WORK_DIR}/....js', args })`. 원본은 `{플러그인 루트}/workflows/....js` 다. ⚠️ `{플러그인 루트}`는 **절대경로** — 스킬 디렉토리(`skills/{skill}/`) 상대경로 아님 (G7/#7). 설치본 예: `~/.claude/plugins/fz*/workflows/plan-collaborative.js` (dev 체크아웃은 해당 repo 루트로 치환). SKILL.md frontmatter `allowed-tools`에 **Workflow 추가 의무** (fz 정책 — 누락 시 다른 허용 규칙이 없으면 Workflow 호출이 권한을 묻고, `-p` 실행 · `dontAsk` 모드에서는 거부된다). ⚠️ `allowed-tools` 는 공식 사양에서 선택 필드이고 도구를 막는 제한이 아니라 사전 승인이다 — 스킬을 부른 턴에만 유효하고 사용자가 다음 메시지를 보내면 풀린다. 다중 턴 파이프라인에서 승인 게이트(예: Phase 4)의 답을 받은 뒤 이어지는 단계는 이 사전 승인 밖이다
 - ⛔ **반환 뒤 심볼 도구 점검** (Workflow 를 부르는 문서마다 한 줄 — 재발 방지 lint `audit-wiring` 이 센다 · 아래 공용 swarm 도 같다): `python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md {WORK_DIR}/evidence/tools.md`(작업 폴더가 없으면 세션의 상태를 상태 기록 꼴 한 줄로 임시 파일에 적어 넘긴다 — `modules/symbol-tools-audit.md` § exit 2 일 때 볼 것). 탐색 팔 · 직접 호출 꼴과 끔 신호는 `modules/tool-status.md` § 워커 심볼 도구 — 낱말마다 할 일은 점검을 돌린 뒤 `modules/symbol-tools-audit.md`
 - 대형 입력(diff 등)은 args가 아닌 **파일 경로 전달** — Lead가 파일 기록 후 경로+요약만 args로, 에이전트가 Read (args 직렬화 한계 미검증 regime 회피)
+- ⛔ Lead 가 만든 워커 입력(항목 표 · 과제 문장)은 워커가 명세로 믿는다 — 항목마다 원문 위치(파일:줄)를 함께 싣고, 항목 문장은 그 Step 절 안에서만 뽑는다(`scripts/md_section.py` `section()` · 키워드 첫 일치는 같은 ID 를 먼저 언급한 앞 절을 고른다). 고정 단언이 있으면 보내기 전에 과제 문장과 대조한다(F-730). 과제에 덧붙이는 Lead 메모는 설계 메모를 요약하지 않고 설계 기록에 없는 사실만 적는다(경계는 설계 기록의 줄을 가리킨다 · F-670). 문서 값 · 외부 사실은 출처 표의 행을 열어 '행에서 가져오라' 로 쓴다(F-631). 뒤 조각의 과제문은 앞 조각이 착지한 뒤 쓰고, '하지 않는다' 범위 문장이 같은 경로의 다른 일까지 끄는지 본다(F-671). 자원은 이름 조건이 아니라 확인한 식별자(UDID · 절대 경로)로 넘긴다(F-709). 다시 묻는 리뷰 라운드의 '이미 내린 결정' 목록에는 앞 라운드 판정표의 낮춤 · 미룸 행을 전부 옮긴다(F-696). 셸을 쓰는 워커의 과제에는 셸 함정 줄(변수 뒤 글자는 `${…}` · 경로 변수는 따옴표 · 있을지 모르는 경로는 `find`)을 싣는다(F-745 ②)
   - ⛔ **비ASCII 본문은 손으로 이스케이프하지 않는다** — MCP 도구 파라미터는 UTF-8 문자열을 그대로 받는다. `\uXXXX` 수동 변환은 안전장치가 아니라 **오류원**이다: 5천 자 한국어를 이스케이프해 보낸 호출이 **200 성공 + 본문 11곳 손상**으로 끝난 실측이 있다. 짧은 본문에서는 재현되지 않아 길이가 늘수록 위험하다.
   - ⛔ 외부 시스템(JIRA·GitHub·Slack)에 비ASCII 본문을 기록한 직후 **반환 본문을 1회 스캔**한다. 이 층에는 빌드도 린트도 없어 *성공 응답이 정확한 산출물을 뜻하지 않는다* — 유일한 오라클이 반환값 확인이다. 파일로 먼저 쓴 뒤 그 내용을 보내는 경로가 있으면 그쪽이 안전하다.
 - ⛔ **반환 배열 최소 길이는 스크립트가 잰다**(F-146) — StructuredOutput 스키마는 항목 수를 재지 못해 출력 상한에 걸린 부분 제출(steps 3/19)이 통과한다. 요구 수를 아는 호출은 args 로 넘기고(plan-lean2 `minSteps`) 스크립트가 반환 직후 `length < 요구 수` 면 `{mode:'fallback', reason:'partial-submit: …'}` 로 돌려준다 — 받은 쪽은 분할(L1 — 판별 표 2행) 뒤 다시 부른다
@@ -626,6 +627,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
   - **비용 계측 불가**(이력 — 2026-08-08 당시 판정): advisor 호출은 `usage.server_tool_use`에 기록되지 않는다(워커 트랜스크립트 `agent-*.jsonl`에서도 동일). `governance.md §사각지대` 참조 — `opus 동시 ≤3` envelope이 advisor 지출을 bound하지 않는다.
     - 2026-11-01 정정 — '불가'는 아니다. 공식 문서상 advisor 호출은 advisor 모델 단가로 과금되는 별도 하위 추론이고 `usage.iterations[]` 의 `type: "advisor_message"` 항목으로 보고된다(top-level `usage` 에는 합산되지 않는다) — "Advisor calls run as a separate sub-inference billed at the advisor model's rates. Usage is reported in the `usage.iterations[]` array" [verified: https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool]. 단 fz 트랜스크립트에는 `iterations` 가 없는 세션이 있어 그것으로 세면 과소 집계된다 — `scripts/fz_wf_metrics.py` 는 호출 수를 `advisor_tool_result`·`server_tool_use`(name=advisor) 블록으로 센다(그 스크립트의 측정 규약 · 2026-09-11 정정 이력). envelope 이 advisor 지출을 bound 하지 않는다는 위 판정은 그대로다.
   - ⛔ **ad-hoc 프로브 작성 시 advisor 호출을 유도하는 지시를 넣지 말 것** — 계측되지 않는 지출이 된다(도구 가용성 실증 같은 명시적 목적 제외).
+  - ⛔ **워커로 무엇을 잴 때는 워커가 받은 첫 레코드를 읽는다** — 하네스가 이 세션의 사용자 요청을 `[Workflow harness — user request]` 로 워커에게 그대로 전달한다. 그 글이 재는 대상을 말하면 그 워커는 대조군이 아니다. `fz_wf_metrics.py --wf` 상세가 워커마다 `전달 요청:` 앞부분을 찍는다 (F-660)
 - ⛔ **워커 모델이 예상과 다르면 1순위로 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` · `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` 를 확인한다** — 결정 순서는 `guides/model-guide.md` § 서브에이전트 · 워크플로가 정본이다(호출별 `model` → 정의의 `model`(`inherit` 포함) → `CLAUDE_CODE_SUBAGENT_MODEL` → 메인 대화 모델 [verified: https://code.claude.com/docs/en/sub-agents 2026-11-16] — workflow 의 `opts.model` 은 호출별 `model` 자리다: 같은 절의 workflows 인용). `CLAUDE_CODE_SUBAGENT_MODEL` 단독은 3번째 기본값이라 본 §12의 "model 명시 의무"를 덮지 않는다. FORCE 가 설정돼 있으면 *"Claude Code ignores the `model` field in subagent definitions, and Claude can't pass a model when it starts a subagent."* [verified: 동] — 정의에 `inherit` 를 적어도 풀리지 않는다. 두 변수는 `scripts/lint-model-explicit.sh` 가 경고한다.
 
 ### 산출물·거버넌스 계약
@@ -672,6 +674,7 @@ scriptPath must be a script path this tool returned, or a file you can already r
 - ⛔ **세션이 끝났으면 셸에서 `claude --resume` 으로 세션을 되살린 뒤 L3 를 시도한다** — 되살릴 수 없을 때만 티켓 폴더 아티팩트로 복원한다(`--resume` 없이 연 새 세션은 워크플로를 처음부터 시작한다)
 - ⛔ **재시도는 `buildFeedback` 등을 args에 넣어 캐시 키를 바꾼다** (resume 비의존 경로)
 - ⛔ **진단은 추측 금지** — `<transcriptDir>/journal.jsonl`이 agent별 실제 반환값을 기록한다. 빈 결과·이상 결과는 journal을 먼저 Read
+- ⛔ **L3 의 처방 보강 — 트랜스크립트 회수**(F-732 · 새 단계가 아니다): `resume` 이 같은 실패로 돌아오거나 세션을 되살릴 수 없으면 L4 전에 `python3 "${FZ_PLUGIN_ROOT}/scripts/wf_recover.py" <wf_* 폴더>` 로 journal 에 반환이 없는 워커의 마지막 StructuredOutput 입력을 회수한다. 회수분은 반환이 아니다 — Lead 가 스키마 · 근거를 다시 대조한 뒤에만 쓰고, 무엇을 회수했는지 보고에 적는다
 - TEAM 사료(team-core + patterns 5종)는 **2026-09-25 삭제**됐다 — 결정: `modules/promotion-ledger.md` § 결정 완료 — TEAM 메커니즘 일몰. 폴백 실행 절차는 위 사다리뿐이다
 
 ### intentContext 규약 (과제 목적 전달)

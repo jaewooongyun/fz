@@ -360,6 +360,33 @@ def self_test() -> int:
             fails.append(f"no-turns: out_tok={a['out_tok']} (기대 None) · result_chars={a.get('result_chars')} · partial={wf['tokens_partial']}")
     finally:
         shutil.rmtree(root, ignore_errors=True)
+    # F-660 — 하네스가 전달한 사용자 요청을 워커마다 `--wf` 상세에 찍는다(전달이 없는 워커는 조용하다)
+    root = tempfile.mkdtemp(prefix="fzwf-fw-")
+    try:
+        folder = os.path.join(root, "proj", "sess-probe", "subagents", "workflows", "wf_probe")
+        os.makedirs(folder)
+        req = {"type": "user", "timestamp": "2026-09-11T00:00:00Z",
+               "message": {"content": "[Workflow harness — user request] The harness relays, verbatim and indented below, "
+                                      "the user request that triggered this workflow run:\n  smoke 측정 해줘\n  둘째 줄"}}
+        task = {"type": "user", "timestamp": "2026-09-11T00:00:01Z",
+                "message": {"content": "[Workflow harness — computed task] script output\n[역할] 구조 설계자"}}
+        stop = {"type": "assistant", "timestamp": "2026-09-11T00:01:00Z",
+                "message": {"id": "m1", "stop_reason": "end_turn", "content": [], "usage": {"output_tokens": 5}}}
+        for name, rows in (("agent-f1.jsonl", (req, task, stop)), ("agent-f2.jsonl", (task, stop))):
+            with open(os.path.join(folder, name), "w", encoding="utf-8") as fh:
+                fh.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+        a = wfm.read_agent(os.path.join(folder, "agent-f1.jsonl"))
+        b = wfm.read_agent(os.path.join(folder, "agent-f2.jsonl"))
+        proc = subprocess.run([sys.executable, me, "--wf", "wf_probe", "--root", root],
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+        out = (proc.stdout or b"").decode("utf-8", "replace")
+        if (a["forwarded"] == "smoke 측정 해줘 둘째 줄" and a["role"].startswith("구조 설계자") and b["forwarded"] is None
+                and out.count("전달 요청: 'smoke 측정 해줘 둘째 줄'") == 1):
+            passed += 1
+        else:
+            fails.append(f"전달 요청: f1={a['forwarded']!r} role={a['role']!r} f2={b['forwarded']!r} 출력 {out.count('전달 요청')}줄")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
     # ⑧~⑩ --mcp-audit 판정 — 도구 조합 · 결과 · 상태 기록 · 라벨 · 직접 호출만 바꿔 판정을 각각 확인한다(셀 이름 = mcp-audit/<이름>)
     tail = " · context7 목록✓ · sc 목록✓ · seq 목록✓ · pr-review 목록✓ · 스택 스킬 없음"
     states = {"active": "Serena: active /tmp/x @abc1234 (languages: bash)" + tail,
@@ -524,6 +551,7 @@ def self_test() -> int:
                 os.makedirs(os.path.join(r, "plug", "scripts"))
                 os.makedirs(os.path.join(r, "plug", ".claude-plugin"))
                 script = shutil.copy(me, os.path.join(r, "plug", "scripts"))
+                shutil.copy(os.path.join(os.path.dirname(me), "fz_wf_view.py"), os.path.join(r, "plug", "scripts"))   # 형제 모듈(출력)
                 manifest = os.path.join(r, "plug", ".claude-plugin", "plugin.json")
                 with open(manifest, "w", encoding="utf-8") as fh:
                     fh.write('{"name": "example-plugin", "version": "0.0.1"}\n')
@@ -952,7 +980,8 @@ def self_test() -> int:
 
     # 요약 줄의 묶음 수는 손으로 적는다 — 묶음 합이 총수와 다르면 셀을 더하고 묶음 수를 고치지 않은 것이다(요약이 셀 수를 속이지 않게)
     groups = (("양성", 1), ("음성", 7), ("mcp-audit", 53), ("심볼 결과 판독", 3), ("mcp-sweep", 22), ("sweep-row", 3),
-              ("stage 규칙", 1), ("usage 중복", 1), ("advisor 스톨", 3), ("시도 구분", 1), ("낱말-표 짝", 1))
+              ("stage 규칙", 1), ("usage 중복", 1), ("advisor 스톨", 3), ("시도 구분", 1), ("낱말-표 짝", 1),
+              ("전달 요청", 1))
     total = passed + len(fails)
     if sum(n for _, n in groups) != total:
         fails.append(f"요약 묶음 합 {sum(n for _, n in groups)} ≠ 총수 {total}")

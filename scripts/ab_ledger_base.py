@@ -27,7 +27,7 @@ PHASES = ("baseline", "release-smoke", "change")
 #    판정 코드가 아니고, 넣으면 self-test 만 고쳐도 지문이 바뀌어 채점 행이 낡는다. ⛔ 실행 모듈을 새로 나누면 여기에 더한다
 #    (빠뜨리면 그 모듈을 고쳐도 지문이 그대로다 — fail-open). 형제 모듈은 정적 import 만 쓴다(문자열 동적 적재 금지).
 INSTRUMENTS = ("ab_ledger.py", "ab_ledger_base.py", "ab_ledger_transcript.py", "ab_ledger_collect.py", "ab_ledger_judge.py",
-               "ab_ledger_gpt.py", "fz_wf_metrics.py", "freeze_baseline.py",
+               "ab_ledger_gpt.py", "fz_wf_metrics.py", "fz_wf_view.py", "freeze_baseline.py",
                "shell_tokens.py")   # 런처 · Phase 2 호출의 명령 자리 판정(S14 구조 전환) — guard · Stop 훅과 같은 토크나이저
 # F-443 — 측정 코퍼스 과제가 건드리면 동결을 거부하는 파일 = 지문 파일 + 측정 런처 · 감사(지문 밖이다 — 판정 코드가 아니다).
 #   E1 코퍼스에 독립 런처의 rollout 감사를 고친 커밋이 과제로 들어가, GPT 가 그 diff 를 리뷰하며 감사를 직접 돌려 오염이 났다
