@@ -6,7 +6,7 @@
 - `hooks/register.ts` — 훅 등록(결정표 · bg 유휴 타이머 · 재개 재마스킹 · `tool.check`)
 - `lib/policy.ts` — 마스킹 대상 판정(순수 함수)
 - `lib/spill.ts` — 원문 보관 · manifest · 정리
-- `hooks/guard.sh` — classic PreCompact 명령 훅(`hooks.json` 의 `hooks`). fz-compact 가 줄 세운 compaction(`fz-compact:idle:<숫자>` · `fz-compact:resume`)이 모듈 훅에 닿지 못하고 core 로 떨어지면 exit 2 로 막아, 엔진이 모델 요약을 하지 않게 한다
+- `hooks/guard.sh` — classic PreCompact 명령 훅(`hooks.json` 의 `hooks`). fz-compact 가 줄 세운 compaction(`fz-compact:idle:<숫자>` · `fz-compact:resume`)이 모듈 훅에 닿지 못하고 core 로 떨어지면 exit 2 로 막아, 엔진이 모델 요약을 하지 않게 한다. 막을 때 그 세션의 자리 뺏김 표지를 남긴다(아래 「자리 뺏김 표지」)
 - `tests/*.test.ts` — `claude plugin test mods/fz-compact`
 - `tests/guard_test.sh` — `guard.sh` 판정 시험과 표식 선언 줄 대조(sh). `plugin test` 는 이 파일을 돌리지 않고, health-check 의 `fz-compact guard` 줄이 부른다
 
@@ -43,7 +43,24 @@
 - 정리는 읽을 수 있는 manifest(`<세션 id>.json`)가 옆에 있는 세션 폴더만 들여다본다. 그래서 `spillDir` 를 공유 폴더로 두어도 다른 파일은 지우지 않는다. manifest 를 끝내 쓰지 못한 세션 폴더의 잔여물(첫 spill 이 실패해 남은 임시 파일 정도)도 정리하지 않으니 필요하면 직접 지운다. 세션 폴더를 비우는 정리에서는 폴더 파일이 모두 지워진 뒤에야 manifest 와 로그를 지운다. `session.start` 의 정리는 시작한 그 세션의 폴더 · manifest 임시 파일 · manifest · 로그를 건너뛴다(같은 시작에 줄 선 재개 재마스킹이 그 파일을 다시 쓴다). 그 세션의 것은 다른 세션이 시작할 때 정리된다.
 
 ## 알려진 한계 (bg 실측 11-06 · 11-07)
-- managed settings 가 있거나 Team · Enterprise 조직 계정이면 내장 `cc-plugin-sec-default` 가 앉아서 user tier 모듈의 `session.compact` 를 건너뛰게 한다(개인 Max 계정은 앉지 않는다 — debug.log `not seated: …`). 그런 환경에서 fz-compact 는 마스킹을 하지 못한다. 줄 선 compaction 은 `guard.sh` 가 막아 엔진 요약은 일어나지 않지만, 유휴 기간마다 skip 알림이 한 줄씩 남는다. 앉음을 미리 알아내 줄 세우기를 멈추는 장치는 없다(필요해지면 첫 차단을 표시 파일로 남겨 다음 줄 세우기를 거르는 방식). `sh` 가 없는 환경이나 managed 정책이 플러그인 훅을 막는 환경에서는 `guard.sh` 도 돌지 않는다.
+- managed settings 가 있거나 Team · Enterprise 조직 계정이면 내장 `cc-plugin-sec-default` 가 앉아서 user tier 모듈의 `session.compact` 를 건너뛰게 한다(개인 Max 계정은 앉지 않는다 — debug.log `not seated: …`). 그런 환경에서 fz-compact 는 마스킹을 하지 못한다. 줄 선 compaction 은 `guard.sh` 가 막아 엔진 요약은 일어나지 않는다. 첫 차단에서 `guard.sh` 가 그 세션의 표지를 남기고, 그 뒤로 그 세션에서는 줄 세우지 않는다(아래 「자리 뺏김 표지」). 그래서 세션마다 차단 알림은 한 번 남는다. `sh` 가 없는 환경이나 managed 정책이 플러그인 훅을 막는 환경에서는 `guard.sh` 도 돌지 않는다.
+- 표지는 세션 id 별이라 같은 세션을 다시 이어도 남는다. 재개 뒤 좌석이 바뀌어(앉지 않게 되어) 다시 마스킹할 수 있게 돼도, 표지를 지우기 전에는 그 세션에서 줄 세우지 않는다.
+
+## 켜기 전 확인
+- 조직 종류(`~/.claude.json` 의 `organizationType`)는 엔진의 좌석 판정 입력이 아니다 — 11-23 에 `claude_max` 로 읽고 켰는데 실제 세션에는 sec-default 가 앉아 있었다. 켜기 전 오라클은 **평소 띄우는 방식 그대로 띄운 세션의 debug `seat` 줄**이다.
+
+```bash
+grep -o 'cc-plugin-sec-default@builtin [^"]*' <그 세션의 debug 파일>
+# "seated outermost …" → 켜도 마스킹 0 · 켜지 않는다 / "not seated …" 일 때만 켠다
+```
+
+- 켠 뒤에는 transcript 에 `sent the event on past it` 줄이 한 번이라도 있으면 그 세션은 마스킹하지 못한다. 그 세션에는 아래 표지가 생겨 더 줄 세우지 않는다.
+
+## 자리 뺏김 표지
+- 경로: `$HOME/.claude/fz-compact/passed-over/<세션 id>`(빈 파일). `guard.sh` 가 줄 선 compaction 을 막을 때(exit 2) PreCompact 입력의 `session_id` 가 영문자 · 숫자 · `_` · `-` 로만 되어 있으면 남긴다. 값이 없거나 그 밖의 글자가 있거나 쓰지 못하면 표지 없이 막기만 한다(차단은 그대로).
+- `register.ts` 는 유휴 타이머가 울릴 때와 재개 재마스킹을 줄 세우기 전에 이 표지를 본다. 있으면 줄 세우지 않고, 활성화마다 한 번 `$.ui.log` 로 이유와 표지 경로를 남긴다. 원인을 sec-default 로 단정하지 않는다 — 훅 실패로 건너뛰어진 경우도 같은 표지를 남긴다. 사람이 직접 친 `/compact` 는 표지와 상관없이 지시문을 붙여 엔진에 넘긴다.
+- 두 쪽이 같은 경로를 만든다. `guard.sh` 는 `HOME`, `register.ts` 는 `$.env.get('HOME')` 을 쓰고 `spillDir` 설정과는 무관하다. `tests/guard_test.sh` 가 `register.ts` 의 경로 줄을 그대로 대조한다.
+- 지우는 법: 그 세션에서 다시 줄 세우려면(좌석이 바뀌었을 때) `rm ~/.claude/fz-compact/passed-over/<세션 id>`. 모두 지우려면 `rm -r ~/.claude/fz-compact/passed-over`.
 - compaction 한 번마다 엔진이 `SessionStart:compact` 훅을 돌리고, 그 출력은 첨부 행으로 붙는다. 이 플러그인은 메시지를 요약하지 않으므로 앞선 첨부도 남는다. 첨부는 `session.compact` 가 받는 메시지에 없어서 걷을 수 없다. 측정한 환경에서는 compaction 마다 약 8.8K 자(약 4.5K 토큰)씩 늘었다. 늘어나는 양은 설치된 SessionStart 훅에 달렸다.
 - 실행 중인 세션에서 플러그인이 다시 적재되면(설정 변경 · worker 재시작 · 활성화) 새 활성화는 앞선 턴을 모르는 채 `session.start` 를 받는다. manifest 에 항목이 있으면 재개 재마스킹을 줄 세운다. 그때 아직 마스킹되지 않은 결과는 컨텍스트가 `idleMinTokens` 이상이고 순절감 기준을 넘어야 마스킹되므로, 손해는 캐시 재작성 한 번으로 묶인다. 턴 진행 중에 다시 적재되면 새 활성화는 그 턴의 `turn.start` 를 보지 못해 `turnUnderWay` 보호가 없다.
 - 재개 직후 사람 프롬프트가 큐에서 재마스킹보다 앞서면 재마스킹은 skip 되고, 다음 유휴 마스킹까지 원문과 반복 행이 문맥에 남는다. bg 재개에서는 재마스킹이 `session.start` 0.3초쯤 뒤에 돌아서 드물다.

@@ -1015,3 +1015,82 @@ test('tool.check: allows named spill files while disabled', { options: { enabled
   expect(verdict.decision).toBe('allow')
   expect(verdict.reason).toBe('fz-compact spill file')
 })
+
+/** The passed-over marker `hooks/guard.sh` leaves for `sessionId` under HOME `/h`. */
+function passedOverPathOf(sessionId: string): string {
+  return `${HOME}/.claude/fz-compact/passed-over/${sessionId}`
+}
+
+/** The lines that say the session is passed over. */
+function passedOverLines(w: World): string[] {
+  return w.logs.filter((line) => line.startsWith('fz-compact: a compaction it queued in this session was not answered by its hook'))
+}
+
+test('register: passed-over: idle queues nothing', { options: SMALL }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.env(on, { CLAUDE_CODE_SESSION_KIND: 'bg', HOME, FZ_COMPACT_TEST_IDLE_MS: String(IDLE_MS) })
+  const w = world(on, 'passed-idle', () => clock.now())
+  w.disk.put(passedOverPathOf(w.sessionId), '', START)
+  await startSession($)
+  await mainTurn($, 't1')
+  await clock.settle()
+  await pass(clock, IDLE_MS)
+  await mainTurn($, 't2')
+  await clock.settle()
+  await pass(clock, IDLE_MS)
+
+  // Two idle timers fired; neither queued, and the reason is said once with the marker's path.
+  expect(w.commands).toEqual([])
+  expect(passedOverLines(w)).toEqual([
+    `fz-compact: a compaction it queued in this session was not answered by its hook (a seated cc-plugin-sec-default or a failed hook), so it queues no more here; remove ${passedOverPathOf(w.sessionId)} to queue again`,
+  ])
+})
+
+test('register: passed-over: resume queues nothing', { options: SMALL }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.env(on, { CLAUDE_CODE_SESSION_KIND: 'bg', HOME })
+  const w = world(on, 'passed-resume', () => clock.now())
+  w.rows = transcript()
+  // A resumed session long idle, its manifest naming a spilled result: without the marker this queues the remask.
+  w.disk.put(spillPathOf(w.sessionId, 'r1'), BIG, START - 2 * HOUR)
+  w.disk.put(manifestPathOf(w.sessionId), manifestText(w.sessionId, START - 2 * HOUR, [knownEntry(w.sessionId)]), START - 2 * HOUR)
+  w.disk.put(passedOverPathOf(w.sessionId), '', START)
+  await startSession($)
+  await clock.settle()
+
+  expect(w.commands).toEqual([])
+  expect(passedOverLines(w).length).toBe(1)
+})
+
+test('register: no marker: idle queues as before', { options: SMALL }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.env(on, { CLAUDE_CODE_SESSION_KIND: 'bg', HOME, FZ_COMPACT_TEST_IDLE_MS: String(IDLE_MS) })
+  const w = world(on, 'no-marker-idle', () => clock.now())
+  // Another session's marker does not pass this one over.
+  w.disk.put(passedOverPathOf('some-other-session'), '', START)
+  await startSession($)
+  await mainTurn($, 't1')
+  await clock.settle()
+  await pass(clock, IDLE_MS)
+
+  expect(w.commands).toEqual(['fz-compact:idle:1'])
+  expect(passedOverLines(w)).toEqual([])
+})
+
+test('register: passed-over: user /compact still answered', { options: SMALL }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.env(on, { CLAUDE_CODE_SESSION_KIND: 'bg', HOME, FZ_COMPACT_TEST_IDLE_MS: String(IDLE_MS) })
+  const w = world(on, 'passed-user', () => clock.now())
+  w.disk.put(passedOverPathOf(w.sessionId), '', START)
+  const messages = transcript()
+  await startSession($)
+  await mainTurn($, 't1')
+  await clock.settle()
+
+  // The person's own /compact, with and without a focus, still reaches the engine with the guidance appended.
+  const focused = await $.session.compact({ trigger: 'manual', instructions: FOCUS, messages })
+  const bare = await $.session.compact({ trigger: 'manual', messages })
+  expect([focused.skip, bare.skip]).toEqual([ENGINE_SKIP, ENGINE_SKIP])
+  expect(w.compacts).toEqual([`${FOCUS}\n\n${GUIDANCE}`, GUIDANCE])
+  expect(w.commands).toEqual([])
+})

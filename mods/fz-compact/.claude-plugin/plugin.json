@@ -1,7 +1,7 @@
 {
   "name": "fz-compact",
-  "version": "0.1.1",
-  "description": "Local masking compaction for background sessions: after the prompt cache goes cold, large old tool results move to local files and are replaced by short placeholders. No model calls. Off until enabled.",
+  "version": "0.1.2",
+  "description": "Local masking compaction for background sessions: after the prompt cache goes cold, large old tool results move to local files and are replaced by short placeholders. No model calls. Off until enabled. Once enabled, the compaction guidance it appends applies to every /compact, interactive sessions included.",
   "author": {
     "name": "Jaewoong Yun"
   },

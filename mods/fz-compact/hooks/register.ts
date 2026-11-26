@@ -80,6 +80,8 @@ type State = {
   timer: { generation: number; handle: TimerHandle } | null
   /** The spill root once read: a path, null when there is none, undefined before the first read. */
   root: string | null | undefined
+  /** Whether this activation already said that the session is passed over and queues no more compactions. */
+  passedOverReported: boolean
 }
 
 /** The plugin's own `/compact` arguments: the idle compaction of one generation, or the remask after a resume. */
@@ -379,6 +381,43 @@ async function sessionIdOf($: Host): Promise<string | null> {
   }
 }
 
+/**
+ * The passed-over marker of `sessionId` under `home`: `hooks/guard.sh` leaves it when it blocks a compaction this
+ * plugin queued, which means the `session.compact` hook did not answer it (a seated cc-plugin-sec-default passes
+ * the event by, or the hook failed). guard.sh builds the same path from `HOME` and the PreCompact `session_id`.
+ * An id outside the characters guard.sh accepts has no marker.
+ */
+function passedOverPathOf(home: string, sessionId: string): string | null {
+  return /^[A-Za-z0-9_-]+$/.test(sessionId) ? `${home.replace(/\/+$/, '')}/.claude/fz-compact/passed-over/${sessionId}` : null
+}
+
+/** The marker's path when guard.sh marked this session passed over, else null. No home, no id or a failed question is no marker. */
+async function passedOverMarkerOf($: Host): Promise<string | null> {
+  const home = await homeOf($)
+  const sessionId = await sessionIdOf($)
+  const path = home && sessionId !== null ? passedOverPathOf(home, sessionId) : null
+  if (path === null) return null
+  try {
+    return (await $.fs.exists(path)) ? path : null
+  } catch {
+    return null
+  }
+}
+
+/** Says once per activation that the session is passed over, without naming a cause it cannot see. */
+function reportPassedOver($: Host, state: State, path: string): void {
+  if (state.passedOverReported) return
+  state.passedOverReported = true
+  say($, `fz-compact: a compaction it queued in this session was not answered by its hook (a seated cc-plugin-sec-default or a failed hook), so it queues no more here; remove ${path} to queue again`)
+}
+
+/** Queues `/compact <args>` unless the session is passed over; then says so once and queues nothing. */
+async function queueOwnCompact($: Host, state: State, args: string): Promise<void> {
+  const marker = await passedOverMarkerOf($)
+  if (marker !== null) return reportPassedOver($, state, marker)
+  queueCompact($, args)
+}
+
 async function homeOf($: Host): Promise<string | undefined> {
   try {
     return await $.env.get('HOME')
@@ -473,6 +512,10 @@ async function fireIdle($: Host, state: State, generation: number): Promise<void
     return
   }
   if (tokens < state.config.idleMinTokens) return
+  const passedOver = await passedOverMarkerOf($)
+  if (passedOver !== null) return reportPassedOver($, state, passedOver)
+  // The marker read awaited: a turn that started or completed meanwhile owns this generation now
+  if (state.generation !== generation || state.turnUnderWay || state.queuedGeneration === generation) return
   state.queuedGeneration = generation
   queueCompact($, `${IDLE_MARKER}${generation}`)
 }
@@ -520,13 +563,13 @@ async function queueResume($: Host, state: State): Promise<void> {
   const lastActivityAt = manifest.lastActivityAt
   const now = lastActivityAt > 0 ? await nowOf($) : null
   if (now === null) {
-    if (manifest.entries.length > 0) queueCompact($, RESUME_MARKER)
+    if (manifest.entries.length > 0) await queueOwnCompact($, state, RESUME_MARKER)
     return
   }
   const thresholdMs = await idleThresholdMs($, state.config.idleGuardMinutes)
   const idleMs = now - lastActivityAt
   const isCold = idleMs >= thresholdMs
-  if (isCold || manifest.entries.length > 0) queueCompact($, RESUME_MARKER)
+  if (isCold || manifest.entries.length > 0) await queueOwnCompact($, state, RESUME_MARKER)
   if (isCold || state.generation !== 0 || state.turnUnderWay) return
   state.lastActivityAt = lastActivityAt
   armIdleTimer($, state, state.generation, thresholdMs - idleMs)
@@ -845,6 +888,7 @@ export const register: Register = (on, options) => {
     queuedGeneration: null,
     timer: null,
     root: undefined,
+    passedOverReported: false,
   }
 
   on('session.start', async ($, e, next) => {
