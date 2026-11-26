@@ -16,6 +16,8 @@
       Bash 리다이렉트로 쓴 항목도 센다. FZ_FINDINGS_ROOT 가 없으면 FR 은 돌지 않는다(레지스트리를 가진 머신만 켠다).
       ponytail: 다른 세션이 같은 때 쓴 항목도 이 턴 기록으로 센다.
       교훈 토큰은 마크다운 링크 · 백틱을 지운 본문에서 찾는다(링크만 든 MEMORY.md 는 교훈이 아니다).
+      F-708 — fz 세션에서 PR 코멘트 · 리뷰를 가져온 턴(`gh api …/pulls|issues/N/comments|reviews` · `gh pr view --comments` ·
+      GitHub MCP 코멘트 · 리뷰 읽기)이 레지스트리 쓰기도 'finding 해당 없음' 줄도 없이 끝나도 같은 조건으로 1회 막는다.
   GP  F-094 · F-297 — fz-review 를 부른 턴이 GPT 리뷰 호출도 '[외부: GPT]' · '[GPT 미사용 — 사유]' 줄도 없이 끝나면 Stop 을
       1회 막는다(interactive 한정). fz 플러그인 파일에 옛 모델 호칭을 넣는 쓰기는 모드와 무관하게 deny 한다 —
       판별식은 그 저장소의 scripts/check_gpt_surface.py 를 불러 그대로 쓴다(못 부르면 이 판정만 건너뛴다).
@@ -100,7 +102,9 @@ LINK_OR_CODE = re.compile(r"\[[^\]\n]*\]\([^)\n]*\)|`[^`\n]*`")   # F-565 — �
 # modules/context-artifacts.md Work Dir Resolution — 같은 날 다른 작업은 NOTASK-날짜 뒤에 짧은 이름을 붙인다(빈 접미 · 하이픈 머리는 아니다)
 WORKDIR_NAME = re.compile(r"^(?:[A-Z]{2,6}-\d{2,5}|NOTASK-\d{8}(?:-[A-Za-z0-9][A-Za-z0-9._-]{0,63})?)$")
 REVIEW_SKILLS = {"fz-review", "fz:fz-review"}
+PEER_SKILLS = {"fz-peer-review", "fz:fz-peer-review"}   # F-708 면제 — 기존 스레드 대비 독립 발견은 렌더러 표(F-643)가 잰다
 REVIEW_SKILL_FILE = re.compile(r"(^|/)skills/fz-review/SKILL\.md$")   # F-094 — /fz 안에서 Read 로 도는 fz-review
+PEER_SKILL_FILE = re.compile(r"(^|/)skills/fz-peer-review/SKILL\.md$")   # F-708 면제 — /fz 안에서 Read 로 도는 fz-peer-review(리뷰 M4)
 GPT_MARK = re.compile(r"\[외부:\s*GPT\]|\[GPT 미사용")
 # Bash 쓰기 판별(F-119) — 공용 해석기(shell_tokens.commands)가 정한 명령 자리마다 아래 읽기 표(READ)를 대본다(F-458)
 WRITE_OPS = {">", ">>", ">|", "&>", "&>>", "<>"}
@@ -129,7 +133,13 @@ PITFALL_TEXT = {   # 꼴 → 경고 한 마디(%s = 그 명령의 근거 낱말)
     "head": "`%s … | head` 는 근거 목록을 잘라 전수로 읽힌다 — 자르지 말고 개수(`wc -l`)를 먼저 본다(F-727 ②)",
     "glob": "글롭 `%s` 가 맞출 파일이 없을 수 있다 — zsh 는 무매칭이면 명령 전체를 끊는다 · 있을지 모르는 경로는 `find … -name` 으로 찾는다(F-673 · F-727 ③)",
     "cd": "`%s &&` 는 세션 작업 폴더를 바꾼다 — 절대 경로 · 도구의 폴더 인자(`git -C`) · `( cd … && … )` 로 쓴다(F-610 · F-654)",
+    "shared-rm": "`rm … %s` 는 공용 임시 폴더를 글롭으로 지운다 — 다른 세션이 쓰는 같은 이름 폴더까지 지운다 · 내가 만든 경로(mktemp 가 돌려준 값)만 지우고, GPT 격리 폴더는 `gpt_independent.sh cleanup --iso <폴더>` 로 지운다(F-640)",
+    "tracked-census": "`%s` 의 개수 · 파일 목록은 추적 파일만 센다 — 커밋하지 않은 새 파일이 있는 트리면 `--untracked` 를 붙이고, 수를 알릴 때 센 집합(추적만 · 미추적 포함)을 함께 적는다(F-611)",
+    "subscript": "zsh 는 `%s[` 를 배열 첨자로 읽는다(`\"$f[^0-9]\"` → bad math expression · 0건처럼 보인다) — 변수 뒤에 글자를 붙일 때는 `${…}` 로 감싼다(F-745 ①)",
 }
+SHARED_TMP = re.compile(r"""^["']?(?:/tmp/|/private/tmp/|/var/folders/|\$\{?TMPDIR\}?/?)""")   # F-640 — 여러 세션이 함께 쓰는 임시 폴더
+# F-745 ① — 작은따옴표 밖 `$이름[` (중괄호 없는 변수 바로 뒤 `[`) — zsh 배열 첨자. `${이름}[` · `${a[1]}` · `$((…))` 는 걸리지 않는다
+ZSH_SUBSCRIPT = re.compile(r"(?<!\\)\$[A-Za-z_][A-Za-z0-9_]*\[")
 P4_DENY = ("fz-guard P4 (F-368): this session ran /fz and the Phase 4 approval has not been given. Show the pipeline and ask "
            "the user with AskUserQuestion (header 'Phase 4') before writing files or starting a Workflow. Writes to the "
            "fz-findings registry entries/ are allowed. Autonomous runs start the CLI with FZ_AUTONOMY=autonomous.")
@@ -137,6 +147,31 @@ P4_STOP = ("fz-guard P4 (F-368): /fz ran in this session but the turn is ending 
            "with AskUserQuestion (header 'Phase 4' - options = the pipeline choices) before going on.")
 FR_STOP = ("fz-guard FR (F-518): this turn wrote an fz lesson to a memory file but wrote no registry entry "
            "(fz-findings/entries/F-*.md). Record the finding in the registry this turn, or state in the reply why it is not one.")
+PC_STOP = ("fz-guard FR (F-708): this fz turn read PR comments or reviews but wrote no registry entry (fz-findings/entries/F-*.md). "
+           "A comment you judged correct that your own checks missed is a finding - record it this turn, or write the line "
+           "'finding 해당 없음 — <reason>' in the reply.")
+# F-708 — PR 코멘트 · 리뷰를 읽는 명령 · 도구(읽기만 — 같은 경로의 게시(-X POST · --input · 필드)는 pr_comment_reads 가 뺀다)
+PR_COMMENTS = re.compile(r"\bgh\b[^|;&\n]*?\b(?:api\b[^|;&\n]*?(?:pulls|issues)/\d+/(?:comments|reviews)\b"
+                         r"|pr\s+view\b[^|;&\n]*(?:--comments\b|--json\b[^|;&\n]*\b(?:comments|reviews)\b))")   # 1차 거르기 — 판정은 pr_comment_reads
+PR_COMMENT_TOOLS = re.compile(r"^mcp__.*github.*__get_pull_request_(?:comments|reviews)$")
+NO_FINDING = re.compile(r"finding\s*해당\s*없음")
+
+
+def peer_prs(st: dict, sid: str, text) -> None:
+    """피어 리뷰 명령 인자(`/fz-peer-review 1234` · Skill args)의 PR 번호를 지문에 미리 올린다 — 남의 PR 이라 F-708 이 묻지 않는다."""
+    if not isinstance(text, str):
+        return
+    m = re.search(r"<command-args>(.*?)</command-args>", text, re.S)
+    for n in re.findall(r"(?:^|[\s#/])(\d{1,6})(?=$|[\s,])", m.group(1) if m else text):
+        fp = f"{sid}:PC:pr{n}"
+        if fp not in st["fingerprints"]:
+            st["fingerprints"].append(fp)
+
+
+def mark_pr_comments(turn: dict, nums) -> None:
+    """F-708 — 이 턴이 읽은 PR 번호를 모은다. 번호를 못 읽으면 "?" — Stop 이 (세션, PR) 마다 한 번만 묻는다(같은 PR 을 다시 읽는 턴은 묻지 않는다)."""
+    have = turn.get("prComments") if isinstance(turn.get("prComments"), list) else []
+    turn["prComments"] = sorted(set(have) | ({str(n) for n in nums if n} or {"?"}))
 GP_STOP = ("fz-guard GP (F-094): this turn ran fz-review but shows no GPT review - no `gpt-call.sh review` call and no "
            "'[외부: GPT]' or '[GPT 미사용 — <reason>]' line in the reply. Run the GPT review, or write the skip line with its reason.")
 PP_ASK = "fz-guard 보호 경로(F-024): 이 명령이 보호 경로에 닿는다 — 분석 작업이 대상 시스템에서 명령을 돌리기 전에 확인한다 · "
@@ -270,6 +305,38 @@ def gpt_review_invoked(cmd) -> bool:
         return False
     cmds = shell_tokens.commands(shell_tokens.lex(cmd), shells=True)
     return not shell_tokens.is_unknown(cmds) and _gpt_call_in(cmds)
+
+
+PR_ENDPOINT = re.compile(r"(?:^|/)(?:pulls|issues)/(\d+)/(?:comments|reviews)(?:$|[/?])")
+
+
+def pr_comment_reads(cmd):
+    """명령 자리에서 PR 코멘트 · 리뷰를 읽는 gh 호출의 PR 번호 목록(번호를 못 읽으면 "?") · 없으면 None (F-708).
+    `gh api …/pulls|issues/N/comments|reviews` · `gh pr view [N] … --comments` 만 센다 — echo · grep 인자나 heredoc 본문의 언급은 읽기가 아니다
+    (GPT 리뷰 P2). ⛔ 못 읽으면(표 밖 꼴 · 토크나이저 없음) 읽기가 아니다 — 막는 규칙이라 보수 쪽은 '안 막음' 이다."""
+    if not isinstance(cmd, str) or "gh" not in cmd or shell_tokens is None or not PR_COMMENTS.search(cmd):
+        return None
+    cmds = shell_tokens.commands(shell_tokens.lex(cmd), shells=True)
+    if shell_tokens.is_unknown(cmds):
+        return None
+    got = []
+    for c in cmds:
+        if c.name is None or c.deferred or c.unsure or os.path.basename(c.name.text) != "gh":
+            continue
+        a = [w.text for w in c.args]
+        while len(a) >= 2 and a[0] in ("-R", "--repo"):
+            a = a[2:]
+        if a[:1] == ["api"]:
+            writes = any(w in ("--input", "-f", "-F", "--field", "--raw-field") or w.startswith(("--field=", "--raw-field=", "--input="))
+                         for w in a) or any(x in ("-X", "--method") and y.upper() != "GET" for x, y in zip(a, a[1:])) \
+                or any(w.startswith("--method=") and w.split("=", 1)[1].upper() != "GET" for w in a)
+            m = next((PR_ENDPOINT.search(w) for w in a[1:] if not w.startswith("-") and PR_ENDPOINT.search(w)), None)
+            if m and not writes:                   # 게시(-X POST · --input · 필드)는 읽기가 아니다(리뷰 M4)
+                got.append(m.group(1))
+        elif a[:2] == ["pr", "view"] and ("--comments" in a or any(
+                x == "--json" and re.search(r"\b(?:comments|reviews)\b", y) for x, y in zip(a, a[1:]))):
+            got.append(next((w for w in a[2:] if w.isdigit()), "?"))
+    return got or None
 
 
 def _gpt_call_in(cmds) -> bool:
@@ -744,6 +811,28 @@ READ.update({"sed": _sed_reads, "awk": _awk_reads, "find": _find_reads, "sort": 
              "rg": lambda a: not any(w.text == "--pre" or w.text.startswith("--pre=") for w in a),
              "date": lambda a: all(w.text.startswith("+") or (w.text.startswith("-") and not w.text.startswith(("-s", "--set"))) for w in a),
              "base64": lambda a: not any(w.text.startswith(("-o", "--output")) for w in a)})
+
+
+# F-583 — 승인 전 창의 읽기 전용 Apple 도구(시뮬 · 빌드 요청의 사실 확인). 하위 명령 단위로만 받는다 — create · boot · install ·
+#   io(스크린숏 파일) · -convert · -output 같은 쓰기 꼴은 표 밖이라 대상 미상 쓰기로 남는다. 인터프리터(python -c)는 그대로 막는다
+SIMCTL_READ = {"list", "getenv", "get_app_container", "listapps"}
+
+
+def _xcrun_reads(a) -> bool:
+    if len(a) < 2 or a[0].expands or a[1].expands:
+        return False
+    if a[0].text == "devicectl":                  # list 도 -j/--json-output · -l/--log-output 이면 파일을 쓴다(GPT 리뷰 P1)
+        return a[1].text == "list" and not any(w.expands or w.text in ("-j", "-l") or w.text.startswith(("--json-output", "--log-output"))
+                                               for w in a[2:])
+    return a[0].text == "simctl" and a[1].text in SIMCTL_READ
+
+
+READ.update({"xcrun": _xcrun_reads,
+             # 엔트리 제안 꼴만 받는다 — 꼴마다 실행 전후 무쓰기 대조를 남겼다(작업 폴더 fixwave/f583-nowrite.txt)
+             "plutil": lambda a: len(a) == 2 and a[0].text == "-p",
+             "vtool": lambda a: len(a) == 2 and a[0].text == "-show-build",
+             "xcode-select": lambda a: len(a) == 1 and a[0].text == "-p",
+             "xcodebuild": lambda a: len(a) == 1 and a[0].text == "-version"})
 # 승인 전 창에서 부르는 플러그인 스크립트 — 읽기만 하거나 플러그인 자기 상태(~/.fz)만 쓴다. 이름: 받는 하위 명령(None = 전부) |
 #   판정 함수(인자 → 읽기 꼴인가). gate_check.py 는 `--status <원장>`(파싱만 · CHECK 미실행)만 읽기다 — 다른 인자는 원장을 쓸 수 있다.
 #   원장은 펼침(따옴표 밖 중괄호 펼침 · 글롭 포함) 없는 글자 그대로다(펼친 값은 옵션 하나 · 여럿이 될 수 있다) · 판정 함수 꼴은 앞에 환경 대입 · env 래퍼가 없을 때만(_plugin_reads)
@@ -1234,6 +1323,52 @@ def _git_sub(args) -> str:
     return ""
 
 
+GREP_COUNT_LONG = frozenset(("--count", "--files-with-matches", "--files-without-match", "--name-only"))
+GREP_VALUE_LONG = frozenset(("--max-depth", "--max-count", "--context", "--after-context", "--before-context", "--threads",
+                             "--regexp", "--file"))       # `=` 없이 쓰면 다음 단어가 값
+GREP_ALL_FILES = frozenset(("--untracked", "--no-index", "--cached"))   # 미추적까지 보거나 · 일부러 인덱스만 본다
+REV_LIKE = re.compile(r"^(?:HEAD|FETCH_HEAD|ORIG_HEAD|@|[0-9a-f]{7,40}|refs/\S+|origin/\S+|v\d\S*|\S*(?:\.\.|[~^]|@\{)\S*)$")
+
+
+def _tracked_census(args) -> bool:
+    """`git … grep` 인자가 개수 · 파일 목록(-c · -l · -L · --count · --name-only …)을 내는데 작업 트리를 추적 파일만으로 본다 (F-611).
+    `--untracked` · `--no-index` · `--cached` · 리비전(패턴 뒤 `--` 앞 위치 인자 · 리비전 꼴 낱말)이면 아니다. 짧은 옵션 묶음은 글자마다 읽고
+    값을 받는 글자(e f m A B C)는 남은 글자 · 없으면 다음 단어를 값으로 먹는다 — `-O` 의 값은 붙여 쓰는 선택값이다.
+    ponytail: 긴 옵션 축약(`--cou`)은 보지 않는다 — git 이 받지만 드물다."""
+    a = [x.text for x in args]
+    i = next((k for k, w in enumerate(a) if w == "grep"), len(a)) + 1
+    count, pattern_given, pos, dashdash = False, False, [], False
+    while i < len(a):
+        w = a[i]
+        i += 1
+        if w == "--":
+            dashdash = True
+            break
+        if w in GREP_ALL_FILES:
+            return False
+        if w.startswith("--"):
+            name = w.split("=", 1)[0]
+            count = count or name in GREP_COUNT_LONG
+            pattern_given = pattern_given or name in ("--regexp", "--file")
+            if name in GREP_VALUE_LONG and "=" not in w:
+                i += 1
+            continue
+        if w.startswith("-") and len(w) > 1:
+            for k, ch in enumerate(w[1:]):
+                count = count or ch in "clL"
+                if ch in "efmABCO":
+                    pattern_given = pattern_given or ch in "ef"
+                    if ch != "O" and k == len(w) - 2:
+                        i += 1                     # 묶음 끝의 값 글자 — 다음 단어가 값
+                    break
+            continue
+        pos.append(w)
+    trees = pos[0 if pattern_given else 1:]
+    if trees and (dashdash or any(REV_LIKE.match(x) for x in trees)):
+        return False                               # 리비전을 읽는 grep — 추적 파일만이 의도다
+    return count
+
+
 def _pitfall_hits(cmd: str, cwd) -> list:
     toks = shell_tokens.lex(cmd)
     if shell_tokens.is_unknown(toks):
@@ -1261,9 +1396,18 @@ def _pitfall_hits(cmd: str, cwd) -> list:
             hits.append(("head", next(x for x in pipe[:-1] if x)))
         if op not in ("|", "|&"):
             pipe = []
+        if name == "rm":                           # F-640 — 공용 임시 폴더 아래 따옴표 밖 글롭(펼침 앞머리 포함)
+            for a in c.args:
+                raw = cmd[a.start:a.end] if isinstance(a.start, int) and isinstance(a.end, int) else a.text
+                if SHARED_TMP.match(raw) and _glob_pattern(_EXPANSION.sub("", raw)) is not None:
+                    hits.append(("shared-rm", raw))
+                    break
         if name in ("cd", "pushd") and op == "&&" and at == 0:
             hits.append(("cd", " ".join([name] + [a.text for a in c.args])))
-        for w in (c.args if c and name != "[[" else []):
+        # F-751 — 글롭 축은 치환 안 단순 명령의 인자도 본다(zsh 무매칭은 치환만 끊어 변수가 조용히 빈다) · head 축의 치환 제외는 그대로
+        inner = [x for x in shell_tokens.commands(ts) if x.depth > 0 and x.name is not None and not x.unsure
+                 and os.path.basename(x.name.text) != "[["]
+        for w in [a for cc in ([c] if c and name != "[[" else []) + inner for a in cc.args]:
             bare = _EXPANSION.sub("", w.text)
             raw = cmd[w.start:w.end] if isinstance(w.start, int) and isinstance(w.end, int) else w.text
             pat = _glob_pattern(_EXPANSION.sub("", raw))
@@ -1277,13 +1421,26 @@ def _pitfall_hits(cmd: str, cwd) -> list:
             if path is not None and next(glob.iglob(path), None) is None:
                 hits.append(("glob", w.text))
         moved = moved or name in ("cd", "pushd", "popd")   # 이동 뒤 상대 글롭은 어디서 풀리는지 모른다 — 재지 않는다
+        # F-611 — 추적 파일만 보는 집계(맨 바깥 · 명령 치환 안 — `n=$(git grep -l x | wc -l)` 이 흔한 꼴이다)
+        if not any(k == "tracked-census" for k, _ in hits) and any(
+                os.path.basename(x.name.text) == "git" and _git_sub(x.args) == "grep" and _tracked_census(x.args)
+                for x in ([c] if c else []) + inner):
+            hits.append(("tracked-census", "git grep"))
+    for t in _deep(toks):                          # 모든 깊이 — 치환 안 단어도 원문 좌표를 쓴다
+        if isinstance(t, shell_tokens.Word) and isinstance(t.start, int) and isinstance(t.end, int):
+            m = ZSH_SUBSCRIPT.search(re.sub(r"'[^']*'", "", cmd[t.start:t.end]))
+            if m:
+                hits.append(("subscript", m.group(0)[:-1]))
+                break
     return hits
 
 
 def pitfall_hits(cmd, cwd) -> list:
     """T-pitfall — 적어 둔 셸 함정 꼴 [(꼴, 근거 낱말)]. ⛔ 상태 · 잠금 없는 순수 판정이다(읽기 Bash 조기 반환 앞에서 모든 Bash 에 돈다).
     꼴: head — 맨 바깥 파이프라인에서 근거 명령 뒤 칸의 head(치환 안 `$(… | head -1)` 은 고르기라 보지 않는다) ·
-        glob — 따옴표 밖 글롭이 지금 아무것도 맞추지 않거나 펼침을 품었다 · cd — 서브셸 밖 cd · pushd 바로 뒤 `&&`.
+        glob — 따옴표 밖 글롭이 지금 아무것도 맞추지 않거나 펼침을 품었다 · cd — 서브셸 밖 cd · pushd 바로 뒤 `&&` ·
+        shared-rm — 맨 바깥 rm 이 공용 임시 폴더(/tmp · /private/tmp · /var/folders · $TMPDIR) 아래를 따옴표 밖 글롭으로 지운다(F-640) ·
+        tracked-census — 맨 바깥 `git grep` 이 개수 · 파일 목록을 내는데 `--untracked` · `--no-index` 가 없다(F-611).
     ⛔ 못 읽은 명령 · 판정 중 오류는 빈 목록이다 — 판정 불가 = 통과(이 판정은 무엇도 막지 않는다)."""
     if shell_tokens is None or not isinstance(cmd, str):
         return []
@@ -1561,11 +1718,16 @@ def on_stop(inp: dict, env, st: dict, pid, off: set, sid: str):
     lam = inp.get("last_assistant_message") if isinstance(inp.get("last_assistant_message"), str) else ""
     w = st.get("window")
     turn = st["turns"].get(pid) or {}
+    if turn.get("peer") and isinstance(turn.get("prComments"), list):   # 피어 리뷰 턴이 읽은 PR 은 이 세션에서 다시 묻지 않는다(이어지는 턴)
+        st["fingerprints"].extend(fp for fp in (f"{sid}:PC:pr{n}" for n in turn["prComments"] if n != "?") if fp not in st["fingerprints"])
     p4 = "P4" not in off and pid in st["prompts"] and w and w.get("promptId") == pid and not w.get("approved")   # 시작을 못 본 prompt = p4_pre 와 같이 무차단
-    fr = "FR" not in off and env.get("FZ_FINDINGS_ROOT") and turn.get("memoryLesson") and not turn.get("registryWrite") and not entry_since(env, turn.get("start"))
+    fr_base = "FR" not in off and env.get("FZ_FINDINGS_ROOT") and not turn.get("registryWrite")
+    fr = fr_base and turn.get("memoryLesson") and not entry_since(env, turn.get("start"))
+    pc = (fr_base and not fr and turn.get("prComments") and not turn.get("peer") and not NO_FINDING.search(lam)
+          and not entry_since(env, turn.get("start")))     # F-708 — 교훈 축(F-518)이 이미 막으면 한 사유만 낸다
     gp = "GP" not in off and turn.get("review") and not turn.get("gpt") and not GPT_MARK.search(lam)
     long_answer = p4 and not w.get("asked") and len(lam) >= LONG_ANSWER
-    mode = session_mode(inp.get("transcript_path")) if (p4 or fr or gp) else ""
+    mode = session_mode(inp.get("transcript_path")) if (p4 or fr or pc or gp) else ""
     if long_answer and mode != "headless":         # F-451 — 차단(P4)과 별개 축의 경고 · 이어진 Stop(stop_hook_active)에서도 1회 낸다
         m = warn_once(st, f"long-answer:{pid}", f"{WARN_LONG} — Phase 4 승인을 묻기 전에 긴 답({len(lam)}자)으로 턴을 끝냈다(F-451) · 차단하지 않는다")
         if m:
@@ -1587,6 +1749,15 @@ def on_stop(inp: dict, env, st: dict, pid, off: set, sid: str):
             reasons.append(FR_STOP)
     elif fr and mode == "unknown":
         warns.append(f"{WARN_UNDECIDED} — 실행 모드를 판정하지 못했다 · 기록 누락(F-518) Stop 을 막지 않는다")
+    if pc and mode == "interactive":
+        prs = turn["prComments"] if isinstance(turn["prComments"], list) else ["?"]
+        fps = [f"{sid}:PC:{pid}" if n == "?" else f"{sid}:PC:pr{n}" for n in prs]   # 번호가 있으면 (세션, PR) 마다 한 번
+        new = [fp for fp in fps if fp not in st["fingerprints"]]
+        if new:
+            st["fingerprints"].extend(new)
+            reasons.append(PC_STOP)
+    elif pc and mode == "unknown":
+        warns.append(f"{WARN_UNDECIDED} — 실행 모드를 판정하지 못했다 · PR 코멘트 기록 누락(F-708) Stop 을 막지 않는다")
     if gp and mode == "interactive":               # ⛔ 기존 셋과 같게 interactive 한정 — 자율 run 은 면제다(D-15 트레이드오프)
         fp = f"{sid}:GP:{pid}"
         if fp not in st["fingerprints"]:
@@ -1618,6 +1789,9 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
             open_window(st, pid)
         if tok.lstrip("/") in REVIEW_SKILLS and pid:
             turn_of(st, pid)["review"] = True     # F-094 — 이 턴은 fz-review 다
+        if tok.lstrip("/") in PEER_SKILLS and pid:
+            turn_of(st, pid)["peer"] = True       # F-708 면제 — 피어 리뷰 턴
+            peer_prs(st, sid, inp.get("prompt"))  # 명령 인자의 PR 은 이 세션에서 묻지 않는다(첫 읽기가 다음 턴이어도)
         return None
     if ev == "PreToolUse":
         if name == "Skill":
@@ -1628,11 +1802,17 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
                 open_window(st, pid)
             if skill in REVIEW_SKILLS and pid:
                 turn_of(st, pid)["review"] = True
+            if skill in PEER_SKILLS and pid:
+                turn_of(st, pid)["peer"] = True
+                peer_prs(st, sid, ti.get("args"))
             return None
         if name == "Bash":
             cmd = ti.get("command") if isinstance(ti.get("command"), str) else ""
             if gpt_review_invoked(cmd) and pid:
                 turn_of(st, pid)["gpt"] = True     # F-094 — GPT 리뷰를 불렀다(출력은 Bash 라 PostToolUse 로 못 본다)
+            prs = pr_comment_reads(cmd) if pid and st["fzSession"] else None
+            if prs:
+                mark_pr_comments(turn_of(st, pid), prs)   # F-708 — fz 턴이 PR 코멘트 · 리뷰를 읽었다(명령 자리의 gh 만)
             writes, targets = bash_write(cmd, inp.get("cwd"))
             if writes and "P4" not in off:
                 return p4_pre(inp, env, st, ti, pid, paths=targets)
@@ -1641,6 +1821,8 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
             hits = wording_hits(ti, inp.get("cwd"))
             if hits:
                 return decision("deny", GP_DENY + " | ".join(h[:120] for h in hits[:3]))
+        if pid and st["fzSession"] and PR_COMMENT_TOOLS.match(name):
+            mark_pr_comments(turn_of(st, pid), [ti.get("pull_number") or ti.get("pullNumber")])   # F-708 — GitHub MCP 로 읽은 코멘트 · 리뷰
         if name in AGENT_TOOLS:
             if "AG" in off or not st["fzSession"]:
                 return None
@@ -1663,8 +1845,11 @@ def handle(inp: dict, env, st: dict, off: set, sid: str):
     if ev == "PostToolUse":
         if name == "AskUserQuestion":
             record_answer(inp, st)
-        elif name == "Read":                      # run() 이 fz-review SKILL.md 만 들여보낸다
-            if pid and (st.get("window") or {}).get("promptId") == pid:
+        elif name == "Read":                      # run() 이 fz-review · fz-peer-review SKILL.md 만 들여보낸다
+            fp = ti.get("file_path") if isinstance(ti.get("file_path"), str) else ""
+            if pid and PEER_SKILL_FILE.search(fp) and st["fzSession"]:
+                turn_of(st, pid)["peer"] = True    # F-708 면제 — /fz 가 Read 로 도는 피어 리뷰 턴
+            elif pid and (st.get("window") or {}).get("promptId") == pid:
                 turn_of(st, pid)["review"] = True  # F-094 — /fz 창 안에서 SKILL.md 를 읽어 도는 fz-review
         elif write_tool(name):
             record_write(inp, env, st, ti, pid)
@@ -1688,7 +1873,7 @@ def run(stdin_text: str, env) -> tuple:
     pp, diag, tp, fast = None, "", [], None
     if inp.get("hook_event_name") == "PostToolUse" and inp.get("tool_name") == "Read":
         ti = inp.get("tool_input") if isinstance(inp.get("tool_input"), dict) else {}
-        if not (isinstance(ti.get("file_path"), str) and REVIEW_SKILL_FILE.search(ti["file_path"])):
+        if not (isinstance(ti.get("file_path"), str) and (REVIEW_SKILL_FILE.search(ti["file_path"]) or PEER_SKILL_FILE.search(ti["file_path"]))):
             return "", ""                          # ⛔ 다른 Read 는 상태를 열지 않는다 — 모든 Read 에 훅이 붙는다
     if inp.get("hook_event_name") == "PreToolUse" and inp.get("tool_name") == "Bash":
         ti = inp.get("tool_input") if isinstance(inp.get("tool_input"), dict) else {}
@@ -1702,7 +1887,7 @@ def run(stdin_text: str, env) -> tuple:
             diag = f"보호 경로 판정 오류 {type(e).__name__}"
         diag = f"fz-guard diag: {diag} — 통과(fail-open)" if diag else ""
         tp = pitfall_hits(cmd, inp.get("cwd"))    # T-pitfall — 상태 · 잠금 없는 순수 판정(아래 조기 반환 앞)
-        if not isinstance(cmd, str) or not (bash_write(cmd, inp.get("cwd"))[0] or gpt_review_invoked(cmd)):
+        if not isinstance(cmd, str) or not (bash_write(cmd, inp.get("cwd"))[0] or gpt_review_invoked(cmd) or PR_COMMENTS.search(cmd)):
             fast = json.dumps(pp, ensure_ascii=False) if pp else ""
             if not tp:
                 return fast, diag                  # ⛔ 읽는 Bash 는 상태를 열지 않는다 — 모든 세션의 모든 Bash 에 잠금 · 저장이 붙지 않게
@@ -2408,6 +2593,54 @@ def self_test() -> int:
              not noisy and not (pathlib.Path(s.env["FZ_RUN_STATE"]) / "fz-guard").exists() and undecided == [[], []], (noisy, undecided))
 
     @cell
+    def tpit_subst():
+        # F-751 — 치환 안 '파일 집기' 꼴(엔트리 D4 표본) · 음성은 맞는 글롭 · 치환 안 head · 따옴표 친 글롭
+        pos = ["f=$(grep -l x /nonexistent-fz-751-*)", "f=$(ls $R/F-1-*)", "x=$(grep -l x $(dirname a)/F-1-*)",
+               'echo "$(ls /nonexistent-fz-751-*)"']
+        neg = ["f=$(ls entries/*.md)", "f=$(ls entries | head -1)", "f=$(find entries -name '*.md')"]
+        got_pos = [(c, pitfall_hits(c, str(tp_root))) for c in pos]
+        got_neg = [(c, pitfall_hits(c, str(tp_root))) for c in neg]
+        case("t-pitfall-substitution-glob — 치환 안 명령의 무매칭 · 펼침 글롭도 경고한다 · 맞는 글롭 · 치환 안 head · 따옴표 글롭은 조용하다(F-751)",
+             all(any(k == "glob" for k, _ in h) for _, h in got_pos) and all(h == [] for _, h in got_neg), (got_pos, got_neg))
+
+    @cell
+    def tpit_zsh_subscript():
+        # F-745 ① — 엔트리 D1 의 실제 꼴 · 음성은 중괄호 · 작은따옴표 · 첨자 펼침 · 산술
+        pos = ['grep -E "$f[^0-9]" a.txt', "echo $name[1]", 'x=$(grep -c "$id[a-z]" b)']
+        neg = ['grep -E "${f}[^0-9]" a.txt', "grep -E '$f[^0-9]' a.txt", "echo ${arr[1]}", "echo $(( a[1] + 1 ))", "echo $f [x]"]
+        got_pos = [(c, pitfall_hits(c, str(tp_root))) for c in pos]
+        got_neg = [(c, pitfall_hits(c, str(tp_root))) for c in neg]
+        case("t-pitfall-zsh-subscript — 작은따옴표 밖 `$이름[` 는 zsh 배열 첨자라 경고한다 · `${…}` · 작은따옴표 · 산술은 조용하다(F-745 ①)",
+             all(any(k == "subscript" for k, _ in h) for _, h in got_pos)
+             and all(not any(k == "subscript" for k, _ in h) for _, h in got_neg), (got_pos, got_neg))
+
+    @cell
+    def tpit_shared_rm():
+        # F-640 — 엔트리의 실제 꼴(`/tmp/fz-gpt-iso.*`) · 음성은 정확한 경로 · 변수 하나 · 공용 밖 글롭 · rm 아닌 명령 · 따옴표 친 글롭
+        pos = ["rm -rf /tmp/fz-gpt-iso.*", "rm -rf $TMPDIR/fz-gpt-iso.*", "rm -f /private/tmp/claude-*/scratch*"]
+        neg = ["rm -rf /tmp/fz-gpt-iso.Ab12Cd", 'rm -rf "$D"', "rm -rf ./build/*", "ls /tmp/fz-gpt-iso.*", "rm -rf '/tmp/fz-gpt-iso.*'"]
+        got_pos = [(c, pitfall_hits(c, str(tp_root))) for c in pos]
+        got_neg = [(c, pitfall_hits(c, str(tp_root))) for c in neg]
+        case("t-pitfall-shared-tmp-rm — 공용 임시 폴더 아래 따옴표 밖 글롭 rm 은 경고한다 · 정확한 경로 · 변수 · 공용 밖 · 따옴표 글롭은 조용하다(F-640)",
+             all(any(k == "shared-rm" for k, _ in h) for _, h in got_pos)
+             and all(not any(k == "shared-rm" for k, _ in h) for _, h in got_neg), (got_pos, got_neg))
+
+    @cell
+    def tpit_tracked_census():
+        # F-611 — 엔트리의 꼴(추적 파일만 보는 집계 → 미추적 새 파일 40개가 빠짐) · 음성은 --untracked · --no-index · 집계 아닌 grep · 값 자리 · 따옴표 안
+        pos = ["git grep -c foo", "git -C /x grep -l foo -- '*.md' | wc -l", "git grep -ic foo", "git grep --count foo", "git grep --name-only foo",
+               "n=$(git grep -l foo | wc -l)", "git grep -lC3 foo", "git grep -cA2 foo", "git grep -O -c foo", "git grep -l -e foo docs"]
+        neg = ["git grep --untracked -c foo", "git grep -c --untracked foo", "git grep --no-index -l foo", "git grep -n foo",
+               "git grep -e -cool x", "echo 'git grep -c foo'", "grep -c foo a.txt", "git grep -c foo --untracked -- x",
+               "git grep -c foo HEAD", "git grep -l foo v1.0 -- docs", "git grep --cached -c foo", "git grep -nec foo",
+               "git grep -ie -clean x", "git grep -l foo main -- docs", "git grep -c foo HEAD~3"]
+        got_pos = [(c, pitfall_hits(c, str(tp_root))) for c in pos]
+        got_neg = [(c, pitfall_hits(c, str(tp_root))) for c in neg]
+        case("t-pitfall-tracked-census — 개수 · 파일 목록을 내는 git grep 에 --untracked · --no-index 가 없으면 경고한다 · 집계 아닌 grep · 값 자리 · 따옴표 안은 조용하다(F-611)",
+             all(any(k == "tracked-census" for k, _ in h) for _, h in got_pos)
+             and all(not any(k == "tracked-census" for k, _ in h) for _, h in got_neg), (got_pos, got_neg))
+
+    @cell
     def tpit_cells():
         import threading
         cmd = "grep -rn 'def run' scripts | head -5"
@@ -2519,6 +2752,24 @@ def self_test() -> int:
         got = [bash_write(c) for c in ("g(){ git -C x grep -n y; }; g a", "f(){ echo x > t; }", "f() ( cp a b )")]
         case("r3-s1-funcdef-deferred-guard — 함수 본문의 GPT 호출은 호출 증거가 아니다(4차 006 공백 꼴 포함) · 정의만 하는 명령은 읽기 · "
              "본문 쓰기는 대상 미상", calls == [False] * 4 and got == [(False, []), (True, []), (True, [])], f"{calls} · {got}")
+
+    @cell
+    def apple_read_forms():
+        # F-583 — 엔트리 §2 표의 읽기 행은 읽기 · 같은 도구의 쓰기 꼴은 대상 미상 쓰기 그대로 · 인터프리터 읽기는 여전히 막는다
+        reads = ["xcrun simctl list devices", "xcrun simctl getenv booted HOME", "xcrun simctl get_app_container booted com.x.app data",
+                 "xcrun simctl listapps booted", "plutil -p Info.plist", "vtool -show-build App", "xcrun devicectl list devices",
+                 "xcode-select -p", "xcodebuild -version"]
+        writes = ["xcrun simctl create a b c", "xcrun simctl boot X", "xcrun simctl install booted A.app",
+                  "xcrun simctl io booted screenshot a.png", "plutil -convert xml1 a.plist", "plutil -p a -o b",
+                  "vtool -set-build-version 1 a -output b", "xcodebuild -scheme A build", "xcrun $T list", "python3 -c 'print(1)'",
+                  "plutil -lint a.plist", "xcodebuild -showsdks",
+                  "xcrun devicectl list devices --json-output p.json", "xcrun devicectl list devices -j p.json",
+                  "xcrun devicectl list devices --log-output=l.txt", "xcrun devicectl list devices -l l.txt"]   # 무쓰기 대조를 남기지 않은 꼴은 표 밖이다
+        got_r = [(c, bash_write(c)) for c in reads]
+        got_w = [(c, bash_write(c)) for c in writes]
+        case("apple-read-forms — 승인 전 창의 읽기 전용 iOS 도구는 읽기 · 같은 도구의 쓰기 꼴과 인터프리터는 대상 미상 쓰기(F-583)",
+             all(g == (False, []) for _, g in got_r) and all(g == (True, []) for _, g in got_w),
+             ([x for x in got_r if x[1] != (False, [])], [x for x in got_w if x[1] != (True, [])]))
 
     @cell
     def r3_s1_outside_read():
@@ -3523,6 +3774,84 @@ def self_test() -> int:
         o = s.pre("Write", W)
         st = s.stop()
         case("stop-incomplete-start-not-blocked", kind(o) is None and warned(o, WARN_INCOMPLETE) and not blocked(st), f"{o} · {st}")
+
+    @cell
+    def c64():
+        # F-708 — fz 턴이 PR 코멘트를 읽고 레지스트리 쓰기도 'finding 해당 없음' 줄도 없이 끝나면 1회 막는다
+        def pr_turn(tag, sid="s1", fz=True, how="bash"):
+            s = fr_on(tag, sid=sid)
+            s.prompt("코멘트 봐줘", "p1")
+            if fz:
+                s.pre("Skill", {"skill": "fz:fz-fix"})
+            if how == "bash":
+                s.pre("Bash", {"command": "gh api repos/o/r/pulls/12/comments --paginate"})
+            else:
+                s.pre("mcp__github__get_pull_request_reviews", {"pull_number": 12})
+            return s
+        bash, mcp = pr_turn("c64a").stop(), pr_turn("c64b", how="mcp").stop()
+        said = pr_turn("c64c").stop(msg="판정 끝. finding 해당 없음 — 코멘트 6건 모두 표기 취향")
+        w = pr_turn("c64d")
+        w.post("Write", {"file_path": reg, "content": "x"})
+        wrote = w.stop()
+        plain = pr_turn("c64e", fz=False).stop()
+        again = pr_turn("c64f")
+        first, second = again.stop(), again.stop()
+        case("f708-pr-comments-without-registry-blocked — fz 턴의 PR 코멘트 읽기(gh api · GitHub MCP)는 기록 · 해당 없음 줄이 없으면 1회 막는다",
+             blocked(bash) and "F-708" in bash.get("reason", "") and blocked(mcp) and said is None and wrote is None
+             and plain is None and blocked(first) and not blocked(second), f"{bash} · {mcp} · {said} · {wrote} · {plain} · {second}")
+        # (세션, PR) 마다 한 번 — 같은 PR 을 다음 턴에 다시 읽으면 묻지 않고 다른 PR 이면 다시 묻는다 · 피어 리뷰 턴은 면제(F-643 표가 잰다)
+        r = pr_turn("c64g")
+        r.stop()
+        r.prompt("또 봐줘", "p2")
+        r.pre("Bash", {"command": "gh api repos/o/r/pulls/12/reviews"})
+        same = r.stop()
+        r.prompt("다른 PR", "p3")
+        r.pre("Bash", {"command": "gh pr view 34 --comments"})
+        other = r.stop()
+        pr = fr_on("c64h")
+        pr.prompt("<command-name>/fz:fz-peer-review</command-name>\n<command-args>12</command-args>", "p1")
+        pr.pre("Bash", {"command": "gh api repos/o/r/pulls/12/comments"})
+        peer = pr.stop()
+        # 명령 자리의 gh 만 읽기다 — echo · grep 인자 · heredoc 본문의 언급은 읽기가 아니다(GPT 리뷰 P2)
+        mention = pr_turn("c64i")
+        mention.prompt("문서 봐줘", "p2")
+        for c in ('echo "gh pr view 12 --comments"', "grep -n 'gh api repos/o/r/pulls/12/comments' notes.md",
+                  "cat <<'EOF'\ngh api repos/o/r/pulls/77/reviews\nEOF"):
+            mention.pre("Bash", {"command": c})
+        quiet = mention.stop()
+        forms = [pr_comment_reads(c) for c in ("gh -R o/r pr view 34 --comments", "gh api repos/o/r/issues/5/comments --paginate | jq .",
+                                               'echo "gh pr view 12 --comments"', "gh pr view 9 --json title",
+                                               "gh api --paginate repos/o/r/pulls/12/comments", "gh pr view 7 --json comments,reviews",
+                                               "gh api repos/o/r/pulls/123/reviews -X POST --input payload.json",
+                                               "gh api repos/o/r/pulls/123/comments -f body=x")]
+        # /fz 가 Read 로 도는 피어 리뷰 턴도 면제(리뷰 M4)
+        via = pr_turn("c64j")
+        via.prompt("팀원 PR 봐줘", "p2")
+        via.post("Read", {"file_path": "/x/plugins/fz/skills/fz-peer-review/SKILL.md"}, {"type": "text"})
+        via.pre("Bash", {"command": "gh api repos/o/r/pulls/99/comments"})
+        via_stop = via.stop()
+        via.prompt("이어서 해줘", "p3")             # 같은 PR 을 다음 턴에 다시 읽어도 묻지 않는다 · 다른 PR 은 묻는다
+        via.pre("Bash", {"command": "gh api repos/o/r/pulls/99/reviews"})
+        via_next = via.stop()
+        via.prompt("내 PR 도", "p4")
+        via.pre("Bash", {"command": "gh api repos/o/r/pulls/5/comments"})
+        via_other = via.stop()
+        nx = fr_on("c64k")                         # 피어 리뷰 명령의 PR 을 다음 턴에 처음 읽어도 묻지 않는다
+        nx.prompt("<command-name>/fz:fz-peer-review</command-name>\n<command-args>1234 light</command-args>", "p1")
+        nx.stop()
+        nx.prompt("진행해줘", "p2")
+        nx.pre("Bash", {"command": "gh api repos/o/r/pulls/1234/comments"})
+        nx_later = nx.stop()
+        case("f708-command-position-only — 명령 자리 gh 만 PR 읽기 · 언급 · 게시(POST · 필드)는 아니다 · api 앞 옵션 · --json comments 도 읽기 · "
+             "/fz 경유 피어 리뷰 Read 면제",
+             quiet is None and forms == [["34"], ["5"], None, None, ["12"], ["7"], None, None] and via_stop is None
+             and via_next is None and blocked(via_other) and nx_later is None,
+             f"{quiet} · {forms} · {via_stop} · {via_next} · {via_other} · {nx_later}")
+        hooks = json.loads((PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
+        rx = [re.compile(h["matcher"]) for h in hooks.get("PreToolUse", []) if h.get("matcher")]
+        routed = all(any(x.search(n) for x in rx) for n in ("mcp__github__get_pull_request_comments", "mcp__plugin_github_github__get_pull_request_reviews"))
+        case("f708-once-per-pr-peer-exempt-mcp-routed — 같은 PR 재읽기는 통과 · 다른 PR 은 다시 막음 · 피어 리뷰 턴 면제 · hooks.json 이 MCP 이름을 들여보낸다",
+             same is None and blocked(other) and peer is None and routed, f"{same} · {other} · {peer} · {[x.pattern[:80] for x in rx]}")
 
     try:
         for fn in cells:

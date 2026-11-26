@@ -1,6 +1,6 @@
 {
   "name": "fz-guard",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Optional fz add-on: hooks for four fz rules at the tool call - Phase 4 approval before writes (including writing Bash) after /fz, a warning for ad-hoc agents in fz sessions, a registry entry when FZ_FINDINGS_ROOT is set and a turn writes an fz lesson to memory, and a GPT review (or its skip reason) in fz-review turns plus no retired model name in fz plugin files. Opt-in: asks before Bash that runs under configured protected paths. Fails open on any error. Off by env FZ_GUARD_DISABLE or a flag file.",
   "author": {
     "name": "Jaewoong Yun"
