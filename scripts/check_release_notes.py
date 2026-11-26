@@ -14,6 +14,8 @@
     |---|---|---|---|
     | A1-04 | … | … | … |
 머리행에 요구 열이 있어야 하고, 요구한 ID 마다 행이 있고 요구 칸이 비어 있지 않아야 한다(`-`·`TBD` 는 빈 칸).
+⛔ --table-complete 는 절에 내부 추적 번호(`F-` + 세 자리 · 코드 블록 안 포함)가 있으면 exit 1 이다 — 공개 CHANGELOG 규약(v0.57.0 · F-759).
+   그래서 표의 ID 열에 finding 번호를 쓸 수 없다 — 닫은 finding 은 '닫은 finding 없음.' 표지와 관리자 메모(check_release_closes.py --note)로 넘긴다.
 --require 키 ↔ 열 이름: verdict=판정 · evidence=근거 · procedure=검증 절차
 
 usage: check_release_notes.py --ids A1-04,A2-02 [--require verdict,evidence,procedure] [--changelog F] [--version X.Y.Z]
@@ -40,6 +42,8 @@ Python 3.9 stdlib 전용.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
@@ -65,6 +69,8 @@ NO_FINDING = re.compile(r"^ {0,3}(?:[-*+][ \t]+)?닫은 finding (?:이 )?없(?:�
 #   받는 꼴이다. 토큰은 쉼표 · 공백으로 갈린다 — 네 자리 번호 · 대문자 접미처럼 그 꼴이 아닌 값뿐이면 선언이 아니다. 빈 줄 · 자리표시 값
 #   (`TBD` · `-` · '없음')도 아니다 — 닫은 것이 없으면 표지 줄로 밝힌다. ⛔ 구분 글자에 개행을 넣지 않는다 — 넣으면 빈 `Closes:` 줄의 다음
 #   줄 머리가 값으로 읽힌다
+# F-759 — 공개 노트 · CHANGELOG 에는 내부 추적 번호를 적지 않는다(v0.57.0 규약). Closes 와 근거는 관리자 메모(공개 저장소 밖 · `--note`)로 간다
+INTERNAL_ID = re.compile(r"(?<![\w-])F-\d{3}(?!\d)")
 CLOSES_DECL = re.compile(r"^Closes:(?:[^\n]*[, \t])?F-\d{3}[a-z]?(?:-[a-z0-9-]+)?(?=[, \t\r]|$)", re.M)
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 
@@ -138,6 +144,21 @@ def check_skips(summary_path, notes_path):
     return MISSING if bad else OK
 
 
+def absence_warn(text: str) -> None:
+    """F-741 — 공개 노트의 대조값 없는 부재 주장('0건 · 없다 · 미발견')을 경고한다 · 종료 코드는 바꾸지 않는다(판정 한 곳: plan_integrity_check)."""
+    import importlib.util
+    try:
+        spec = importlib.util.spec_from_file_location("fz_plan_integrity", os.path.join(os.path.dirname(os.path.abspath(__file__)), "plan_integrity_check.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        hits = mod.absence_without_control(text)
+    except Exception as e:  # noqa: BLE001 — 경고 판정기의 적재 실패는 선언 판정을 바꾸지 않는다 · 판정하지 못했음을 알린다
+        print(f"  NOTE 부재 주장 경고를 판정하지 못했다({type(e).__name__})")
+        return
+    for n, ln in hits[:3]:
+        print(f"  WARN {n}행 대조값 없는 부재 주장 — `{ln[:80]}` · 같은 줄에 [대조: 양성 대조 · 저장소 전체 수](F-741)")
+
+
 def findings_decl(note):
     """릴리즈 노트가 닫은 finding 을 밝혔는가 — 코드 블록 밖의 `Closes:` 줄(finding id 토큰이 하나 이상) 또는 표지 줄. 끝 줄 `FINDINGS_DECL closes|marker|none`.
     exit: 0=밝혔다 · 1=밝히지 않았다 · 2=노트를 읽지 못했다. 출하 게이트 ⑥ 이 종료 코드와 끝 줄을 함께 본다."""
@@ -146,8 +167,18 @@ def findings_decl(note):
     except (OSError, UnicodeDecodeError) as e:
         print(f"UNRUN: 노트를 읽지 못했다 — {note} ({e.__class__.__name__})")
         return UNRUN
-    body = outside_fences(text)
-    kind = "closes" if CLOSES_DECL.search(body) else "marker" if NO_FINDING.search(body) else "none"
+    ids = [l.strip() for l in text.split("\n") if INTERNAL_ID.search(l)]
+    if ids:
+        # 코드 블록 안도 센다 — 공개 노트에 번호를 적지 않는다는 규약은 위치를 가리지 않는다
+        for l in ids[:3]:
+            print(f"  INTERNAL-ID {l[:120]}")
+        what = "`Closes:` 줄과 근거는" if CLOSES_DECL.search(outside_fences(text)) else "번호가 필요한 설명은"
+        print(f"  공개 노트에 내부 추적 번호(F- + 세 자리) {len(ids)}줄 — {what} 관리자 메모로 옮기고"
+              " `check_release_closes.py --note <관리자 메모>` 로 넘긴다 · 노트에는 '닫은 finding 없음.' 표지(v0.57.0 · F-759)")
+        print("FINDINGS_DECL internal-id")
+        return MISSING
+    kind = "marker" if NO_FINDING.search(outside_fences(text)) else "none"
+    absence_warn(text)
     print(f"FINDINGS_DECL {kind}")
     return MISSING if kind == "none" else OK
 
@@ -162,6 +193,16 @@ def check(changelog, version, ids, require, table_complete=False, require_table=
     if sec is None:
         print(f"UNRUN: CHANGELOG 에 `### v{version}` 절이 없다")
         return UNRUN
+    if table_complete:
+        # 공개 CHANGELOG 도 공개 문서다 — 노트 검사(findings_decl)와 같은 정의 · 코드 블록 안도 센다(v0.57.0 규약 · F-759)
+        hits = [l.strip() for l in sec.split("\n") if INTERNAL_ID.search(l)]
+        if hits:
+            for l in hits[:3]:
+                print(f"  INTERNAL-ID {l[:120]}")
+            print(f"  MISSING v{version} 절에 내부 추적 번호(F- + 세 자리) {len(hits)}줄 — 공개 CHANGELOG 에는 적지 않는다 ·"
+                  " '닫은 finding 없음.' 표지를 두고 Closes 와 근거는 관리자 메모로(check_release_closes.py --note <관리자 메모>)")
+            print(f"release-notes: v{version} · 내부 추적 번호 {len(hits)}줄")
+            return MISSING
     sec = outside_fences(sec)
     want = [COLUMN[k] for k in require]
     lines = sec.split("\n")
@@ -233,10 +274,13 @@ def self_test():
           ("표 없는 절 → 0(적지 않은 릴리즈)", "# Changelog\n\n### v9.9.0 (2026-01-01) — t\n\n본문만\n", OK),
           ("구분선 없는 표의 빈 첫 행 → 1", "# Changelog\n\n### v9.9.0 — t\n\n| ID | 판정 | 근거 | 검증 절차 |\n| A1 | 해결 | - | x |\n", MISSING),
           ("같은 ID 빈 행 뒤 완성 행 → 1", full.replace("| A2 | 해결 | 실측 | `bash y` |", "| A2 | 해결 | - | - |\n| A2 | 해결 | 실측 | `bash y` |"), MISSING),
-          ("ID 머리행에 요구 열 누락 → 2", full.replace("검증 절차", "절차"), UNRUN)]
+          ("ID 머리행에 요구 열 누락 → 2", full.replace("검증 절차", "절차"), UNRUN),
+          # 공개 CHANGELOG 의 내부 추적 번호 — 칸이 다 찬 표여도 거부한다(F-759 · 노트와 같은 규약)
+          ("표 ID 가 내부 추적 번호 → 1", full.replace("| A1 |", "| F-123 |"), MISSING)]
     bare = "# Changelog\n\n### v9.9.0 (2026-01-01) — t\n\n본문만\n"
     # 표 필수 모드(--require-table) — (셀 이름, CHANGELOG, 기대). 셀 이름은 FZ_SELFTEST_LIST=1 일 때 `PASS <이름>` 으로 낸다
     rt = [("require-table-absent-exit1", bare, MISSING),
+          ("require-table-marker-with-internal-id-exit1", bare + "\n닫은 finding 없음.\n\n- F-123 의 꼴을 막았다\n", MISSING),
           ("require-table-marker-ok", bare + "\n닫은 finding 이 없어 표를 쓰지 않는다.\n", OK),
           ("require-table-marker-bullet-ok", bare + "\n- 닫은 finding 없음 — 문서만 고쳤다\n", OK),
           # 표지는 줄 머리 꼴이다 — 문장 중간의 언급은 선언이 아니다
@@ -261,7 +305,10 @@ def self_test():
           ("require-table-blank-cell-exit1", full.replace("| 실측 | `bash y` |", "| 실측 | TBD |"), MISSING),
           ("require-table-header-only-exit1", bare + "\n" + head, MISSING)]
     # --findings-decl — (셀 이름, 노트 본문 | None = 파일 없음, 기대)
-    fd = [("findings-decl-closes-ok", "# v9.9.9\n\nCloses: F-001\n", OK),
+    fd = [("findings-decl-closes-internal-id-exit1", "# v9.9.9\n\nCloses: F-001\n", MISSING),
+          ("findings-decl-prose-id-with-marker-exit1", "# v9.9.9\n\n닫은 finding 없음.\n\n- F-123 의 꼴을 막았다\n", MISSING),
+          ("findings-decl-fenced-id-with-marker-exit1", "# v9.9.9\n\n닫은 finding 없음.\n\n```\nF-123\n```\n", MISSING),
+          ("findings-decl-marker-four-digit-ok", "# v9.9.9\n\n닫은 finding 없음.\n\n- 이슈 X-1000 · F-1000 은 번호 꼴이 아니다\n", OK),
           ("findings-decl-marker-ok", "# v9.9.9\n\n- 닫은 finding 없음 — 문서만 고쳤다\n", OK),
           ("findings-decl-none-exit1", "# v9.9.9\n\n본문만 있다\n", MISSING),
           ("findings-decl-midline-marker-exit1", "# v9.9.9\n\n이 릴리즈는 " + "닫은 finding 이 없다.\n", MISSING),
@@ -271,11 +318,11 @@ def self_test():
           # 자리표시 값은 선언이 아니다 — finding 번호가 하나는 있어야 한다(slug 가 붙은 꼴 · 쉼표로 이은 꼴은 선언이다)
           ("findings-decl-closes-placeholder-exit1", "# v9.9.9\n\nCloses: TBD\n", MISSING),
           ("findings-decl-closes-dash-exit1", "# v9.9.9\n\nCloses: -\n", MISSING),
-          ("findings-decl-closes-slug-ok", "# v9.9.9\n\nCloses: note, F-123-some-entry\n", OK),
+          ("findings-decl-closes-slug-internal-id-exit1", "# v9.9.9\n\nCloses: note, F-123-some-entry\n", MISSING),
           # id 토큰의 꼴 — 네 자리 번호 · 대문자 접미는 id 가 아니다. 소문자 접미는 id 다. 빈 `Closes:` 줄의 다음 줄은 값이 아니다
           ("findings-decl-closes-four-digit-exit1", "# v9.9.9\n\nCloses: F-1000\n", MISSING),
           ("findings-decl-closes-upper-suffix-exit1", "# v9.9.9\n\nCloses: F-001A\n", MISSING),
-          ("findings-decl-closes-letter-suffix-ok", "# v9.9.9\n\nCloses: F-001a\n", OK),
+          ("findings-decl-closes-letter-suffix-internal-id-exit1", "# v9.9.9\n\nCloses: F-001a\n", MISSING),
           ("findings-decl-closes-next-line-exit1", "# v9.9.9\n\nCloses:\nF-001 은 다음 줄이다\n", MISSING),
           ("findings-decl-explaining-bullet-exit1", "# v9.9.9\n\n- 닫은 finding 없는 판은 표지 한 줄로 표를 대신한다\n", MISSING),
           ("findings-decl-indented-block-exit1", "# v9.9.9\n\n본문\n\n    닫은 finding 없음\n", MISSING),
@@ -344,6 +391,21 @@ def self_test():
                     print(f"PASS {name}")
             else:
                 fails.append(f"{name}: got {got}")
+        # F-741 — 부재 주장 경고는 종료 코드를 바꾸지 않고 줄만 낸다
+        for name, text, want_warn in (("findings-decl-absence-warns", "# v9.9.9\n\n닫은 finding 없음.\n\n- 남은 오탐 0건\n", True),
+                                      ("findings-decl-absence-with-control-quiet",
+                                       "# v9.9.9\n\n닫은 finding 없음.\n\n- 남은 오탐 0건 [대조: 같은 검사가 심은 꼴 4건]\n", False)):
+            p = os.path.join(d, "note.md")
+            open(p, "w", encoding="utf-8").write(text)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                got = findings_decl(p)
+            if got == OK and ("대조값 없는 부재 주장" in buf.getvalue()) == want_warn:
+                passed += 1
+                if listing:
+                    print(f"PASS {name}")
+            else:
+                fails.append(f"{name}: got {got} warn={'대조값 없는 부재 주장' in buf.getvalue()}")
         # UTF-8 이 아닌 CHANGELOG — 판정 불가(2)다. 예외로 죽으면 exit 1 이라 게이트가 '표가 없다' 로 읽는다
         p = os.path.join(d, "CHANGELOG.md")
         with open(p, "wb") as fh:
@@ -380,7 +442,7 @@ def self_test():
         fails.append("r3-f506-notes-match-judge-summary")
     for f in fails:
         print(f"  FAIL {f}")
-    print(f"self-test {passed + ok}/{len(cases) + len(tc) + len(rt) + len(fd) + 2} passed")
+    print(f"self-test {passed + ok}/{len(cases) + len(tc) + len(rt) + len(fd) + 2 + 2} passed")   # + 2 = 부재 주장 경고 셀(F-741)
     return OK if not fails else MISSING
 
 

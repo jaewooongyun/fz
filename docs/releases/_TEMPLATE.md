@@ -4,7 +4,7 @@
 
 요약 2~3문장 — 무엇이 문제였고 이 판이 무엇을 바꿨나. 기전을 적는다 — "왜 오류가 안 났나" 가 종종 항목의 핵심이다.
 
-Closes: F-001-some-slug, F-002-another-slug
+<!-- 닫은 finding 없음. — 공개 노트 표지(주석을 벗겨 줄 머리에 둔다). 닫은 것은 아래 규약대로 관리자 메모에 적는다 -->
 
 ## 무엇이 바뀌었나
 
@@ -28,13 +28,12 @@ Closes: F-001-some-slug, F-002-another-slug
 
 self-test 결과 · 회귀 오라클 건수 · health-check exit.
 
-## Closes 항목별 근거
-
-Closes 항목마다 엔트리 오라클의 충족 근거(명령과 결과)를 적는다(F-375). 길면 `<details>` 로 접는다.
-
 ---
 
-## ⛔ `Closes:` 줄 규약
+## ⛔ `Closes:` 줄 규약 — 관리자 메모(공개 저장소 밖)
+
+- ⛔ 공개 노트 · CHANGELOG 에는 내부 추적 번호(`F-` + 세 자리)를 적지 않는다(v0.57.0) — 공개 노트는 `check_release_notes.py --findings-decl` 와 출하 게이트 ⑥ 이, CHANGELOG 그 판 절은 `--table-complete` 와 출하 게이트 ③-b 가 거부한다(두 모드 모두). 공개 노트는 '닫은 finding 없음.' 표지만 둔다
+- `Closes:` 줄 · `Track-D-Review:` 줄 · 항목마다 엔트리 오라클의 충족 근거(명령과 결과)는 작업 폴더의 관리자 메모에 쓰고 아래 명령의 `--note` 로 그 메모를 넘긴다
 
 배출 스크립트(`scripts/eject_findings.py`)가 이 줄을 읽어 `fz-findings/entries/` → `.archive/`
 이동 + `APPLIED.md` 1행을 만든다. **이 줄이 없으면 릴리즈가 finding 을 닫아도 레지스트리는 모른다** —
@@ -53,10 +52,10 @@ Closes 항목마다 엔트리 오라클의 충족 근거(명령과 결과)를 �
 ```bash
 # dry-run 으로 먼저 본다
 python3 scripts/eject_findings.py --root <레지스트리> \
-  --note docs/releases/vX.Y.Z.md --version X.Y.Z --dry-run
+  --note <관리자 메모> --version X.Y.Z --dry-run
 # 실제 배출
 python3 scripts/eject_findings.py --root <레지스트리> \
-  --note docs/releases/vX.Y.Z.md --version X.Y.Z
+  --note <관리자 메모> --version X.Y.Z
 # 사후 대조 (manifest ↔ APPLIED ↔ .archive) + 같은 루트의 위생 검사 기본 모드
 python3 scripts/eject_findings.py --audit <레지스트리>
 ```

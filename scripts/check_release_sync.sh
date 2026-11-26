@@ -185,8 +185,8 @@ commit_axis() {   # $1=리포 디렉토리 · $2=선언 버전
   return "$bad"
 }
 
-# ⑥ findings 축 — 선언 버전 노트가 **닫은 finding 을 밝혔는가**: 코드 블록 밖의 `Closes:` 줄(finding 번호가 하나 이상) 또는 줄 머리 꼴의 '닫은 finding
-#    없음' 표지. 선언 판정은 노트 검사기(check_release_notes.py --findings-decl) 한 곳이 한다 — CHANGELOG 표 필수 모드의 표지와 같은 정의다.
+# ⑥ findings 축 — 선언 버전 노트가 **닫은 finding 을 밝혔는가**: 줄 머리 꼴의 '닫은 finding 없음' 표지. 공개 노트에 내부 추적 번호(F- + 세 자리)가
+#    있으면 거부한다(v0.57.0 규약 · F-759 — Closes 와 근거는 관리자 메모 `--note`). 선언 판정은 노트 검사기(check_release_notes.py --findings-decl) 한 곳이 한다 — CHANGELOG 표 필수 모드의 표지와 같은 정의다.
 #    ⛔ 레지스트리를 읽지 않는다 — 레지스트리 없는 머신에서도 같은 판정이다. applied ↔ Closes 대조는
 #       check_release_closes.py 를 명시로 돌린다(CLAUDE.md 릴리스 절차).
 #    반환: 0=선언 있음 · 1=선언 없음 · 2=노트 부재 · 선언 판정 실패(미판정)
@@ -204,6 +204,10 @@ findings_axis() {   # $1=노트 경로
   case "$rc:${out##*$'\n'}" in
     "0:FINDINGS_DECL closes"|"0:FINDINGS_DECL marker") return 0 ;;
     "1:FINDINGS_DECL none") ;;
+    "1:FINDINGS_DECL internal-id")
+       echo "  ❌ $n 에 내부 추적 번호가 있다 — 공개 노트에는 적지 않는다(v0.57.0 · F-759). '닫은 finding 없음.' 표지를 두고 Closes 는 관리자 메모로(check_release_closes.py --note <관리자 메모>)"
+       printf '%s\n' "$out" | grep '^  INTERNAL-ID' | head -3
+       return 1 ;;
     *) echo "  ⚠️ $n 의 선언 판정을 하지 못했다(노트 검사기 exit $rc · $(printf '%s' "${out##*$'\n'}" | cut -c1-120)) — findings 축 미판정(⛔ 통과 아님)"
        return 2 ;;
   esac
@@ -710,9 +714,9 @@ if [ "$MODE" = "self-test" ]; then
   case_ "version-file-dirty-only" 1 "$R" "1.0.0"; rm -rf "$R"
 
   # ④-b 결함 — 릴리즈 문서를 작업 트리에서만 고쳤다(추적은 된다 · 버전 선언 파일은 깨끗하다). findings 축은 작업 트리의 노트를 읽으므로
-  #    커밋하지 않은 `Closes:` 줄로 통과하면 태그가 가리킬 커밋의 노트에는 그 선언이 없다
+  #    커밋하지 않은 선언 줄('닫은 finding 없음.')로 통과하면 태그가 가리킬 커밋의 노트에는 그 선언이 없다
   mkr 1.0.0; R="$REPO"
-  printf '\nCloses: F-001\n' >> "$R/docs/releases/v1.0.0.md"
+  printf '\n닫은 finding 없음.\n' >> "$R/docs/releases/v1.0.0.md"
   case_ "release-doc-dirty-only" 1 "$R" "1.0.0"; rm -rf "$R"
 
   # ⑤ 측정 불가 — git 리포가 아니다. ⛔ 미판정은 통과가 아니다
@@ -769,7 +773,7 @@ if [ "$MODE" = "self-test" ]; then
     if [ "$rc" = "$2" ]; then ok_ "$1"
     else failed=$((failed+1)); echo "  FAIL $1: 반환 $rc (기대 $2)"; echo "$out" | sed 's/^/        /'; fi
   }
-  case_fx "findings-axis-closes-ok" 0 $'# v9.9.9\n\nCloses: F-001'
+  case_fx "findings-axis-closes-internal-id-fails" 1 $'# v9.9.9\n\nCloses: F-001'
   case_fx "findings-axis-no-finding-marker-ok" 0 $'# v9.9.9\n\n닫은 finding 이 없어 `Closes:` 줄을 쓰지 않는다.'
   case_fx "findings-axis-bullet-marker-ok" 0 $'# v9.9.9\n\n- 닫은 finding 없음 — 문서만 고쳤다'
   # 표지는 줄 머리 꼴이다 — 문장 중간의 언급 · 코드 블록 안의 예시(표지 · Closes 줄)는 선언이 아니다
@@ -1187,11 +1191,14 @@ NLOG="$(mktemp "${TMPDIR:-/tmp}/fz-release-notes.XXXXXX")" && HLOG="$(mktemp "${
   || { echo "❌ 임시 로그 파일을 만들지 못했다 (측정 실패)"; exit 2; }
 
 # ③-b 최상단 절의 finding 표 — 표가 있으면 모든 행의 판정·근거·검증 절차가 차 있어야 한다(없는 릴리즈는 통과).
+#    절에 내부 추적 번호(F- + 세 자리)가 있으면 두 모드 모두 거부한다 — 공개 CHANGELOG 도 공개 문서다(v0.57.0 규약 · F-759)
 #    ⛔ 출하(--release)는 표 필수 모드다 — 표도 '닫은 finding 없음' 표지도 없는 절은 실패한다(표를 지우면 통과하던 구멍)
 NT_ARGS=(--table-complete --version "$CV")
 [ "$MODE" != "release" ] || NT_ARGS+=(--require-table)
 if python3 scripts/check_release_notes.py "${NT_ARGS[@]}" >"$NLOG" 2>&1; then
   rm -f "$NLOG"
+elif grep -q '^  INTERNAL-ID' "$NLOG"; then
+  note "CHANGELOG v$CV 절에 내부 추적 번호가 있다 — 공개 CHANGELOG 에는 적지 않는다(v0.57.0 · F-759) · '닫은 finding 없음.' 표지를 두고 Closes 는 관리자 메모로 (로그: $NLOG)"
 elif [ "$MODE" = "release" ]; then
   note "CHANGELOG v$CV 절에 finding 표(또는 '닫은 finding 없음' 표지)가 없거나 표에 빈 칸이 있다 (로그: $NLOG)"
 else

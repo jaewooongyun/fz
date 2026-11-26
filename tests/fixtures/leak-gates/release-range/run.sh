@@ -27,7 +27,8 @@
 #       rel-intermediate-commit-exit1(중간 커밋이 더하고 다음 커밋이 지운 줄 — 범위 두 끝 비교는 깨끗하다) ·
 #       rel-merge-commit-first-parent-exit1(기준 태그 쪽 옆 가지를 들인 병합 — 첫 부모와의 차이) ·
 #       rel-head-tagged-uses-prior(HEAD 의 태그를 빼고 직전 태그 뒤를 본다) · rel-no-tag-modebit-exit1(0644 셔뱅 파일) ·
-#       rel-no-finding-table-exit1(최상단 절에 finding 표도 '닫은 finding 없음' 표지도 없다 — 출하는 표 필수 모드로 부른다)
+#       rel-no-finding-table-exit1(최상단 절에 finding 표도 '닫은 finding 없음' 표지도 없다 — 출하는 표 필수 모드로 부른다) ·
+#       rel-changelog-internal-id-exit1(최상단 절의 finding 표에 내부 추적 번호 — 공개 CHANGELOG 에 적지 않는다)
 #   2   rel-mixed-violation-and-unrun-exit2(위반 + 판정 불가) · rel-binary-or-utf16-added-exit2(바이너리 · UTF-16 · 커밋한 latin-1) ·
 #       rel-untracked-undecodable-exit2 · rel-describe-fail-exit2(닿지 않는 v* 태그만) · rel-release-no-rules-arg-exit2 ·
 #       rel-rules-file-missing-exit2 · rel-unknown-arg-exit2 ·
@@ -115,18 +116,17 @@ raw() {   # $1=저장소 안 경로 · $2=utf16|latin1|binary — UTF-8 로 읽�
 data = {"utf16": "plain text\n".encode("utf-16-le"), "latin1": "café\n".encode("latin-1"), "binary": bytes(range(256))}[sys.argv[2]]
 open(sys.argv[1], "wb").write(data)' "$R/$1" "$2" || die "쓰기 $1"
 }
-cl_section() {   # $1=판 · $2=날짜 · $3=finding ID — CHANGELOG 절 하나(제목 + 칸이 다 찬 finding 표)
-  printf '### v%s (%s) — 출하\n\n| ID | 판정 | 근거 | 검증 절차 |\n|---|---|---|---|\n| %s | 해결 | 픽스처 셀 | `bash run.sh` |\n\n' "$1" "$2" "$3"
+cl_section() {   # $1=판 · $2=날짜 — CHANGELOG 절 하나(제목 + '닫은 finding 없음.' 표지 — 공개 CHANGELOG 에 내부 추적 번호를 적지 않는다)
+  printf '### v%s (%s) — 출하\n\n닫은 finding 없음.\n\n' "$1" "$2"
 }
-version_files() {   # $1=1.0.0|1.1.0 — 버전 3곳 · CHANGELOG(최상단 절 = 그 판) · 그 판의 노트(닫은 finding 선언)
-  local v="$1" fid=F-902
-  [ "$v" != 1.0.0 ] || fid=F-901
+version_files() {   # $1=1.0.0|1.1.0 — 버전 3곳 · CHANGELOG(최상단 절 = 그 판) · 그 판의 노트(없음 표지)
+  local v="$1"
   put .claude-plugin/plugin.json "{\"name\": \"relfix\", \"version\": \"$v\"}"
   put .claude-plugin/marketplace.json "{\"name\": \"relfix\", \"plugins\": [{\"name\": \"relfix\", \"source\": \"./\", \"version\": \"$v\"}]}"
-  put "docs/releases/v$v.md" "# v$v — 출하 노트" '' "Closes: $fid"
+  put "docs/releases/v$v.md" "# v$v — 출하 노트" '' "닫은 finding 없음."   # 공개 노트에는 내부 추적 번호를 적지 않는다(F-759 규약 — Closes 는 관리자 메모)
   { printf '# Changelog\n\n'
-    [ "$v" = 1.0.0 ] || cl_section 1.1.0 2026-01-02 F-902
-    cl_section 1.0.0 2026-01-01 F-901; } > "$R/CHANGELOG.md" || die "쓰기 CHANGELOG.md"
+    [ "$v" = 1.0.0 ] || cl_section 1.1.0 2026-01-02
+    cl_section 1.0.0 2026-01-01; } > "$R/CHANGELOG.md" || die "쓰기 CHANGELOG.md"
 }
 base_repo() {   # $1=셀 — 전역 R 에 v1.0.0 산출물 전부를 커밋한 저장소(전역 C1 · 태그 없음)
   local s
@@ -371,11 +371,20 @@ verdict rel-describe-fail-exit2
 #    기본 모드의 표 검사는 표 없는 절을 통과시킨다. 출하 진입점이 표 필수 모드로 부르지 않으면 이 셀이 exit 0 으로 실패한다
 tagged_repo rel-no-finding-table-exit1
 { printf '# Changelog\n\n### v1.1.0 (2026-01-02) — 출하\n\n표 없이 본문만 적은 절이다.\n\n'
-  cl_section 1.0.0 2026-01-01 F-901; } > "$R/CHANGELOG.md" || die "쓰기 CHANGELOG.md"
+  cl_section 1.0.0 2026-01-01; } > "$R/CHANGELOG.md" || die "쓰기 CHANGELOG.md"
 commit "v1.1.0"
 gate "$R" rel-no-finding-table-exit1 --release --rules "$RULES_CORP"
 want 1 "CHANGELOG v1.1.0 절에 finding 표(또는 '닫은 finding 없음' 표지)가 없거나 표에 빈 칸이 있다"
 verdict rel-no-finding-table-exit1
+
+# 최상단 절에 내부 추적 번호가 든 finding 표 — 칸이 다 찼어도 공개 CHANGELOG 에는 번호를 적지 않는다(노트와 같은 규약)
+tagged_repo rel-changelog-internal-id-exit1
+{ printf '# Changelog\n\n### v1.1.0 (2026-01-02) — 출하\n\n| ID | 판정 | 근거 | 검증 절차 |\n|---|---|---|---|\n| F-902 | 해결 | 픽스처 셀 | `bash run.sh` |\n\n'
+  cl_section 1.0.0 2026-01-01; } > "$R/CHANGELOG.md" || die "쓰기 CHANGELOG.md"
+commit "v1.1.0"
+gate "$R" rel-changelog-internal-id-exit1 --release --rules "$RULES_CORP"
+want 1 "CHANGELOG v1.1.0 절에 내부 추적 번호가 있다" "!finding 표(또는"
+verdict rel-changelog-internal-id-exit1
 
 # ── 인자 — 대조 저장소(rel-clean)에 인자 하나만 바꿔 준다. 축에 닿기 전에 2 로 끝난다(버전 줄이 없다) ──
 # --rules 없음 — env FZ_NEUTRALIZE_RULES 에 규칙 파일이 있어도 그것으로 추정하지 않는다
