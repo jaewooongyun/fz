@@ -132,7 +132,7 @@ find "${CODEX_HOME:-$HOME/.codex}/skills" -maxdepth 1 -type l \( -name fz-fixer 
 
 ---
 
-## What's New — v0.58.0
+## What's New — v0.59.0
 
-fz-guard 가 알던 셸 함정(검색 명령 뒤 `| head` · 빈 글롭 · `cd X &&`)을 경고한다. 계획 · 리뷰 검사와 출하 대조가 대조값 · 인용 줄 · 출하 커밋을 직접 잰다.
+finding 엔트리마다 출구(조건 · 기한 · 소유자)를 요구하고, 쌓여 있던 관측을 검사기 · 가드 · 훅 · 문서에서 고쳤다. fz-guard 0.6.0 은 PR 코멘트를 읽고 기록 없이 끝난 fz 턴을 막고, fz-compact 0.1.2 는 훅이 답하지 못한 세션에 더 줄 세우지 않는다.
 → [CHANGELOG](CHANGELOG.md)
