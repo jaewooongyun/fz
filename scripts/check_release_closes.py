@@ -90,7 +90,7 @@ def odd_names(entries: pathlib.Path) -> list:
 def closes_tokens(note_text: str):
     """(정상 토큰, 거부 토큰). ⛔ eject 의 parse_closes 를 완화하지 않는다 — ID · slug 가 아니면 사유와 함께 거부한다."""
     good, bad = [], []
-    for m in CLOSES.finditer(note_text):
+    for m in CLOSES.finditer(_load("check_release_notes").outside_fences(note_text)):   # F-606 — 울타리 안 예시는 선언이 아니다
         for t in re.split(r"[,\s]+", m.group(1).strip()):
             if t:
                 (good if ID.match(t) or SLUG.match(t) else bad).append(t)
@@ -233,7 +233,7 @@ def check(root: pathlib.Path, note: pathlib.Path, repo: pathlib.Path, ledger: pa
         if i in by_id and by_id[i]["applied"] != "full":
             viol.append(f"(d) {i}: 원장 승격 완료 절의 관측인데 live · applied: full 아님")
     declared = set()
-    for m in TRACK_D.finditer(note_text):
+    for m in TRACK_D.finditer(_load("check_release_notes").outside_fences(note_text)):
         declared.update(t.strip("`") for t in re.split(r"[,\s]+", m.group(1)) if t)
     for c in unreg:
         if c["class"] not in declared and not any(mm["id"] in declared for mm in c["members"]):

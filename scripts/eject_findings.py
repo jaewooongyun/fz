@@ -45,12 +45,26 @@ def log(*a):
     print(*a, file=sys.stderr)
 
 
+def _load(name: str):
+    """같은 scripts/ 의 판정 모듈 — 판독 · 판정은 그 모듈 한 곳에 둔다(F-606 · F-741)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(f"fz_{name}", pathlib.Path(__file__).resolve().parent / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _outside_fences(text: str) -> str:
+    """코드 울타리 밖 줄만 — 판독은 check_release_notes.outside_fences 한 곳이다(F-606: 울타리 안 예시 Closes 를 배출 선언으로 읽었다)."""
+    return _load("check_release_notes").outside_fences(text)
+
+
 def parse_closes(note: pathlib.Path):
-    """릴리즈 노트에서 Closes: 토큰을 뽑는다. 여러 줄·쉼표 구분 허용."""
+    """릴리즈 노트에서 Closes: 토큰을 뽑는다. 여러 줄·쉼표 구분 허용 · 코드 울타리 안 줄은 선언이 아니다(F-606)."""
     if not note.is_file():
         return None, f"릴리즈 노트 없음: {note}"
     toks = []
-    for m in CLOSES.finditer(note.read_text(encoding="utf-8")):
+    for m in CLOSES.finditer(_outside_fences(note.read_text(encoding="utf-8"))):
         for t in re.split(r"[,\s]+", m.group(1).strip()):
             if t:
                 toks.append(t)
@@ -744,15 +758,26 @@ def _applied_value(path: pathlib.Path):
     return a.group(1) if a else None
 
 
-DISPOSE_KINDS = ("works", "subsumed", "rejected")   # APPLIED 넷째 칸 머리어 = telemetry OUTFLOW_KIND 어휘
+DISPOSE_KINDS = ("works", "subsumed", "rejected", "expired")   # APPLIED 넷째 칸 머리어 = telemetry OUTFLOW_KIND 어휘 · expired = 기한 출구(README §1 정기 처분)
 
 
 class _InjectedCrash(Exception):
     """self-test 전용 — 처분 단계 사이에서 끊긴 상황을 만든다."""
 
 
+def _warn_absence(text: str, where: str) -> None:
+    """F-741 — 대조값 없는 부재 주장('0건 · 없다 · 미발견')을 경고한다 · 막지 않는다. 판정은 plan_integrity_check.absence_without_control 한 곳이다."""
+    try:
+        hits = _load("plan_integrity_check").absence_without_control(text)
+    except Exception as e:  # noqa: BLE001 — 경고 판정기의 적재 실패는 처분을 막지 않는다 · 판정하지 못했음을 알린다
+        log(f"NOTE: {where}의 부재 주장 경고를 판정하지 못했다({type(e).__name__})")
+        return
+    if hits:
+        log(f"WARN: {where}에 대조값 없는 부재 주장 — `{hits[0][1][:80]}` · 같은 줄에 [대조: 같은 도구로 찾은 양성 대조 · 저장소 전체 수]를 단다(F-741)")
+
+
 def dispose(root: pathlib.Path, kind: str, fid: str, reason: str, _crash_at: str | None = None) -> int:
-    """`--dispose` — README §1 수동 처분(works · subsumed · rejected)을 잠금 아래 한 번에 한다.
+    """`--dispose` — README §1 수동 처분(works · subsumed · rejected · expired)을 잠금 아래 한 번에 한다.
 
     순서: archive 로 복사 → 내용 대조 → 원본 삭제 → APPLIED 1행 → INDEX 대기열 행 제거.
     ⛔ 각 단계는 앞 단계의 흔적을 보고 이어 간다 — 어디서 끊겨도 같은 명령을 다시 돌리면 중복 없이 수렴한다.
@@ -766,6 +791,7 @@ def dispose(root: pathlib.Path, kind: str, fid: str, reason: str, _crash_at: str
     if not entries.is_dir():
         log(f"UNRUN: entries 디렉토리 없음 — {entries}")
         return UNRUN
+    _warn_absence(reason, "처분 사유")
 
     def crash(point):
         if _crash_at == point:
@@ -807,8 +833,10 @@ def dispose(root: pathlib.Path, kind: str, fid: str, reason: str, _crash_at: str
         ap_slugs, _ = applied_records(applied)
         if slug not in ap_slugs:
             day = time.strftime("%Y-%m-%d")
+            # 줄바꿈은 끝 줄이 열려 있을 때만 앞에 붙인다 — 늘 붙이면 행 사이 빈 줄이 대장 표를 끊는다(릴리스 Closes 행과 같은 꼴)
+            lead = "\n" if applied.is_file() and not applied.read_bytes().endswith(b"\n") and applied.stat().st_size else ""
             with applied.open("a", encoding="utf-8") as f:
-                f.write(f"\n| {day} | {slug} | {reason} | {kind} — 수동 처분(--dispose) |\n")
+                f.write(f"{lead}| {day} | {slug} | {reason} | {kind} — 수동 처분(--dispose) |\n")
             crash("applied")
         rc = index_sync(root, {slug})
     if rc != OK:
@@ -856,6 +884,20 @@ def new_entry(root: pathlib.Path, slug: str, src: pathlib.Path) -> int:
     if not entries.is_dir():
         log(f"UNRUN: entries 디렉토리 없음 — {entries}")
         return UNRUN
+    # 유입 제어(README §0 · §4) — 출구(조건 · 기한 · 소유자)가 없는 본문은 쓰지 않는다. 출구 정의는 위생 검사 한 곳(`exit_gaps`)
+    try:        # 적재 · 계약 확인만 — 판정 계산은 이 경계 밖이다(계산 결함은 트레이스백으로 드러난다)
+        hyg = _hygiene_module()
+        st = hyg._stale_module()
+        days = st.DEFAULT_DAYS
+        if not (isinstance(days, int) and callable(getattr(hyg, "exit_gaps", None)) and callable(getattr(st, "deadline_of", None))):
+            raise AttributeError("정수 DEFAULT_DAYS · exit_gaps · deadline_of 가 없다")
+    except Exception as e:  # noqa: BLE001 — 판정기 두 모듈의 적재 · 계약 실패(환경)는 판정 불가다 — 판정 없이 쓰지 않는다
+        log(f"UNRUN: 출구 판정기를 읽지 못했다 — {type(e).__name__}: {e} (아무것도 쓰지 않았다)")
+        return UNRUN
+    gaps, _, _ = hyg.exit_gaps(body, st, days)
+    if gaps:
+        log(f"REJECT: 출구 정의(README §0)를 어긴 본문 — 빠진 요소: {' · '.join(gaps)} (아무것도 쓰지 않았다 · README §4 exit_condition)")
+        return REJECT
     with registry_lock(root) as held:
         if not held:
             return UNRUN
@@ -1787,6 +1829,13 @@ def self_test():
         after = {k: v for k, v in snap(root).items() if k != LOCK_NAME}
         assert after == before, f"⛔ 거부인데 레지스트리가 바뀌었다 — {sorted(set(after) ^ set(before)) or '내용'}"
 
+    def c_closes_fenced_example_ignored(tmp):
+        """F-606 — 코드 울타리 안 예시 `Closes:` 줄은 배출 선언이 아니다 · 밖의 줄만 읽는다."""
+        root, note = mk(tmp, ["F-001-alpha", "F-002-beta"])
+        note.write_text("Closes: F-001-alpha\n\n```\nCloses: F-002-beta\n```\n", encoding="utf-8")
+        toks, err = parse_closes(note)
+        assert err is None and toks == ["F-001-alpha"], f"⛔ 울타리 안 예시를 읽었다: {toks}"
+
     def c_closes_legacy_no_applied(tmp):
         root, note = mk(tmp, ["F-001-alpha"])
         note.write_text("Closes: F-001-alpha\n", encoding="utf-8")
@@ -1806,6 +1855,34 @@ def self_test():
             assert dispose(root, kind, "F-001", "stub 조건 그대로") == OK, f"⛔ --dispose {kind} 가 OK 가 아니다"
             assert disposed(root, kind) == (True, False, 1, True, False), f"⛔ 처분 상태 {disposed(root, kind)}"
         return fn
+
+    def c_dispose_absence_warn(tmp):
+        """F-741 — 처분 사유의 대조값 없는 부재 주장은 경고한다(처분은 그대로) · 대조값이 있으면 조용하다."""
+        import contextlib, io
+        root, _ = mk(tmp, ["F-001-alpha", "F-002-beta"])
+        ix(root, ["F-001-alpha", "F-002-beta"])
+        outs = []
+        for fid, why in (("F-001", "재관측 0건이라 닫는다"), ("F-002", "재관측 0건 [대조: 같은 검색이 다른 꼴 3건]")):
+            buf = io.StringIO()
+            with contextlib.redirect_stderr(buf):
+                rc = dispose(root, "expired", fid, why)
+            outs.append((rc, buf.getvalue()))
+        assert outs[0][0] == OK and "대조값 없는 부재 주장" in outs[0][1], f"⛔ 대조값 없는 부재 사유를 경고하지 않았다 {outs[0]}"
+        assert outs[1][0] == OK and "부재 주장" not in outs[1][1], f"⛔ 대조값이 있는 사유를 경고했다 {outs[1]}"
+
+    def c_dispose_rows_contiguous(tmp):
+        """처분 행은 대장 표에 빈 줄 없이 붙는다 · 끝 줄바꿈이 없는 대장이면 줄을 열고 붙인다(행이 앞 줄에 붙지 않는다)."""
+        root, _ = mk(tmp, ["F-001-alpha", "F-002-beta", "F-003-gamma"])
+        ix(root, ["F-001-alpha", "F-002-beta", "F-003-gamma"])
+        ap = root / "APPLIED.md"
+        assert dispose(root, "rejected", "F-001", "x") == OK and dispose(root, "expired", "F-002", "y") == OK, "⛔ 처분 실패"
+        tail = ap.read_text(encoding="utf-8").rstrip("\n").split("\n")[-2:]
+        assert all(t.startswith("| ") and "수동 처분(--dispose)" in t for t in tail), f"⛔ 처분 행 사이에 빈 줄 · 다른 줄: {tail!r}"
+        ap.write_text(ap.read_text(encoding="utf-8").rstrip("\n"), encoding="utf-8")
+        assert dispose(root, "works", "F-003", "z") == OK, "⛔ 처분 실패(끝 줄바꿈 없음)"
+        lines = ap.read_text(encoding="utf-8").split("\n")
+        assert lines[-2].startswith("| ") and "F-003-gamma" in lines[-2] and "F-002-beta" in lines[-3] and lines[-1] == "", \
+            f"⛔ 끝 줄바꿈 없는 대장에 행이 붙지 않았다: {lines[-4:]!r}"
 
     def c_dispose_lock_held(tmp):
         root, _ = mk(tmp, ["F-001-alpha"])
@@ -1862,6 +1939,16 @@ def self_test():
         finally:
             os.environ.pop(LOCK_WAIT_ENV, None) if old is None else os.environ.__setitem__(LOCK_WAIT_ENV, old)
         assert rc == OK and disposed(root, "rejected")[0], f"⛔ 잠금 아래 자식 처분이 실패했다 rc={rc}"
+
+    def c_dispose_dry_run_refused(tmp):
+        root, _ = mk(tmp, ["F-001-alpha"])
+        ix(root, ["F-001-alpha"])
+        before = sorted(str(q.relative_to(root)) for q in root.rglob("*") if q.is_file())
+        r = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve()), "--dispose", "rejected", "--id", "F-001",
+                            "--reason", "preview", "--root", str(root), "--dry-run"], capture_output=True, text=True)
+        after = sorted(str(q.relative_to(root)) for q in root.rglob("*") if q.is_file())
+        assert r.returncode == 2 and "--dry-run 은 Closes 배출" in r.stderr, f"⛔ --dispose --dry-run 을 거부하지 않았다 rc={r.returncode}"
+        assert before == after and not disposed(root, "rejected")[0], "⛔ 거부했는데 레지스트리가 바뀌었다"
 
     def c_with_lock_busy(tmp):
         root, _ = mk(tmp, ["F-001-alpha"])
@@ -1936,8 +2023,44 @@ def self_test():
 
     def entry_src(tmp):
         s = pathlib.Path(tmp) / "draft.md"
-        s.write_text("---\nid: F-NNN\nstatus: open\n---\n# F-NNN — 새 결함\n", encoding="utf-8")
+        s.write_text("---\nid: F-NNN\ndate: 2026-11-25\nstatus: open\nexit_condition: 시험 조건\n---\n# F-NNN — 새 결함\n", encoding="utf-8")
         return s
+
+    def new_entry_gap(old, new, why):
+        """유입 제어 — 출구 요소가 빠진 본문은 REJECT · 사유에 그 요소 · 아무것도 쓰지 않는다(G2 거부 사유 assert)."""
+        def fn(tmp):
+            root, _ = mk(tmp, ["F-001-alpha"])
+            s = entry_src(tmp)
+            s.write_text(s.read_text(encoding="utf-8").replace(old, new, 1), encoding="utf-8")
+            rc, _o, err = run_out(lambda: new_entry(root, "fresh", s))
+            assert rc == REJECT and why in err and "아무것도 쓰지 않았다" in err, f"⛔ 출구 없는 본문 rc={rc} · 사유 {err!r}"
+            assert sorted(q.name for q in (root / "entries").iterdir()) == ["F-001-alpha.md"], "⛔ 거부인데 썼다"
+        return fn
+
+    def c_new_entry_judge_api_missing(tmp):
+        """⛔ 판정기 모듈에 공개 함수가 없으면(deadline_of=None) 판정 불가 · 무기록 — 트레이스백(rc 1 = REJECT)이 아니다."""
+        import types
+        g = globals()
+        real = g["_hygiene_module"]
+        root, _ = mk(tmp, ["F-001-alpha"])
+        ok_dl = lambda *a: (None, None)   # noqa: E731
+        for tag, stale in (("deadline_of=None", types.SimpleNamespace(DEFAULT_DAYS=90, deadline_of=None)),
+                           ("DEFAULT_DAYS=None", types.SimpleNamespace(DEFAULT_DAYS=None, deadline_of=ok_dl)),
+                           ("DEFAULT_DAYS='90'", types.SimpleNamespace(DEFAULT_DAYS="90", deadline_of=ok_dl))):
+            g["_hygiene_module"] = lambda st=stale: types.SimpleNamespace(_stale_module=lambda: st, exit_gaps=lambda *a: ([], None, None))
+            try:
+                rc, _o, err = run_out(lambda: new_entry(root, "fresh", entry_src(tmp)))
+            finally:
+                g["_hygiene_module"] = real
+            assert rc == UNRUN and "출구 판정기를 읽지 못했다" in err and "아무것도 쓰지 않았다" in err, f"⛔ 판정기 계약 결손({tag}) rc={rc} · {err!r}"
+            assert sorted(q.name for q in (root / "entries").iterdir()) == ["F-001-alpha.md"], f"⛔ 판정 불가({tag})인데 썼다"
+
+    def c_new_entry_deadline_only_ok(tmp):
+        root, _ = mk(tmp, ["F-001-alpha"])
+        s = entry_src(tmp)
+        s.write_text(s.read_text(encoding="utf-8").replace("date: 2026-11-25\n", "deadline: 2027-02-01\n"), encoding="utf-8")
+        rc, _o, _e = run_out(lambda: new_entry(root, "fresh", s))
+        assert rc == OK and (root / "entries" / "F-002-fresh.md").is_file(), f"⛔ deadline 만 있는 본문을 거부했다 rc={rc}"
 
     def c_new_entry_locked_id(tmp):
         """F-398 — 다음 ID = entries ∪ .archive 최대 + 1 · 자리표시를 그 ID 로 바꿔 쓴다."""
@@ -1974,16 +2097,26 @@ def self_test():
                  ("f561-dispose-line-matches-result", c_dispose_line_matches_result),
                  ("f561-closed-id-dispose-rejected", c_dispose_closed_id_rejected),
                  ("f398-new-entry-locked-id", c_new_entry_locked_id), ("f398-new-entry-lock-busy-unrun", c_new_entry_lock_busy),
-                 ("f398-new-entry-bad-slug-rejected", c_new_entry_bad_slug)]:
+                 ("f398-new-entry-bad-slug-rejected", c_new_entry_bad_slug),
+                 ("new-entry-no-exit-condition-rejected", new_entry_gap("exit_condition: 시험 조건\n", "", "조건(exit_condition)")),
+                 ("new-entry-blank-exit-condition-rejected", new_entry_gap("exit_condition: 시험 조건\n", "exit_condition:  \n", "조건(exit_condition)")),
+                 ("new-entry-no-clock-rejected", new_entry_gap("date: 2026-11-25\n", "", "기한(date · last_observed · deadline 없음)")),
+                 ("new-entry-bad-deadline-rejected", new_entry_gap("date: 2026-11-25\n", "date: 2026-11-25\ndeadline: 다음 달\n", "기한(deadline 형식 틀림)")),
+                 ("new-entry-empty-owner-rejected", new_entry_gap("status: open\n", "status: open\nowner:\n", "소유자(owner: 빈 값)")),
+                 ("new-entry-deadline-only-ok", c_new_entry_deadline_only_ok),
+                 ("new-entry-judge-api-missing-unrun", c_new_entry_judge_api_missing)]:
         cases += 1
         case(n, f)
 
     for n, f in [("closes-partial-rejected", c_closes_partial_rejected), ("closes-partial-no-write", c_closes_partial_no_write),
-                 ("closes-legacy-no-applied-ok", c_closes_legacy_no_applied),
+                 ("closes-legacy-no-applied-ok", c_closes_legacy_no_applied), ("closes-fenced-example-ignored", c_closes_fenced_example_ignored),
                  ("dispose-rejected-moves", dispose_case("rejected")), ("dispose-works-moves", dispose_case("works")),
-                 ("dispose-subsumed-moves", dispose_case("subsumed")), ("dispose-lock-held-exit2", c_dispose_lock_held),
+                 ("dispose-subsumed-moves", dispose_case("subsumed")), ("dispose-expired-moves", dispose_case("expired")),
+                 ("dispose-rows-contiguous", c_dispose_rows_contiguous), ("dispose-absence-warn", c_dispose_absence_warn),
+                 ("dispose-lock-held-exit2", c_dispose_lock_held),
                  ("dispose-interrupted-rerun-converges", c_dispose_interrupted), ("dispose-unrelated-rows-unchanged", c_dispose_unrelated),
-                 ("with-lock-runs-command", c_with_lock_runs), ("with-lock-busy-exit2-no-run", c_with_lock_busy)]:
+                 ("with-lock-runs-command", c_with_lock_runs), ("with-lock-busy-exit2-no-run", c_with_lock_busy),
+                 ("dispose-dry-run-refused-no-write", c_dispose_dry_run_refused)]:
         cases += 1
         case(n, f)
 
@@ -2078,6 +2211,11 @@ def main():
 
 
 def _run(a, ap):
+    writes = [f for f, v in (("--dispose", a.dispose), ("--new-entry", a.new_entry), ("--prune-index", a.prune_index),
+                             ("--resolve-pending", a.resolve_pending)) if v]
+    if a.dry_run and writes:
+        # ⛔ 이 경로들에는 dry-run 이 없다 — 플래그를 조용히 무시하면 '미리 보기' 로 부른 호출이 레지스트리를 쓴다
+        ap.error(f"--dry-run 은 Closes 배출(--note)에만 있다 — {writes[0]} 는 바로 쓴다. 미리 보려면 --dry-run 없이 대상 엔트리를 먼저 읽는다")
     if a.new_entry:
         if not a.slug or not a.src:
             ap.error("--new-entry 는 --slug 와 --from 이 필요하다")

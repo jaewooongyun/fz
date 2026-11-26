@@ -111,6 +111,10 @@ with tempfile.TemporaryDirectory() as tmp:
     note.write_text("# v9\n\nCloses: F-001\n", encoding="utf-8")
     rc, out = run(CLOSES, "--findings-root", root, "--note", note, "--repo", repo)
     check("closes-cli-ok-exit0", rc == 0 and "RELEASE_CLOSES_OK" in out, f"rc={rc} · {out.strip()[-160:]!r}")
+    # F-606 — 코드 울타리 안 예시 Closes(full 아닌 F-002)는 선언이 아니다 — 밖의 F-001 만 대조한다
+    note.write_text("# v9\n\nCloses: F-001\n\n```\nCloses: F-002\n```\n", encoding="utf-8")
+    rc, out = run(CLOSES, "--findings-root", root, "--note", note, "--repo", repo)
+    check("closes-cli-fenced-example-ignored", rc == 0 and "Closes 1 ·" in out and "F-002" not in out, f"rc={rc} · {out.strip()[-160:]!r}")
     rc, out = run(CLOSES, "--findings-root", root, "--note", tmp / "absent.md", "--repo", repo)
     check("closes-cli-note-missing-2", rc == 2 and "RELEASE_CLOSES_OK" not in out, f"rc={rc}")
     rc, out = run(CLOSES, "--findings-root", root, "--list-applied")

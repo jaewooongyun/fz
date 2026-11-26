@@ -20,6 +20,7 @@ exit 2  UNRUN — 레지스트리 부재·빈 분모 등 판정 불가. ⛔ 통�
 from __future__ import annotations
 
 import argparse
+import datetime
 import pathlib
 import re
 import sys
@@ -72,6 +73,9 @@ REOBS_HEAD = re.compile(r"^#{2,3}\s*재관측\b", re.M)
 OPEN_DISP = re.compile(r"^- 열어 둠:\s*(.+?)\s*$", re.M)
 NO_OBS = re.compile(r"관측이 없다|관측 없음|관측이 없었다")
 BOILER_MIN = 5   # 같은 열어 둠 사유가 이만큼이면 엔트리마다 판정하지 않고 일괄로 적은 흔적이다(round 2: 28건이 한 문구)
+# 출구 축(README §0 — live 엔트리마다 조건 · 기한 · 소유자). 기한 계산은 `report_stale_findings.deadline_of` 한 곳이다
+EXIT_LINE = re.compile(r"^exit_condition:[ \t]*(.*?)[ \t]*$", re.M)
+OWNER_LINE = re.compile(r"^owner:[ \t]*(.*?)[ \t]*$", re.M)
 
 
 
@@ -147,6 +151,87 @@ def _eject_module():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def _stale_module():
+    """`report_stale_findings.py` 를 importlib 로 읽는다 — 기한 계산(`deadline_of` · `DEFAULT_DAYS`)을 여기서 다시 짜지 않는다.
+
+    ⛔ 두 CLI 가 같은 엔트리에 다른 기한을 내면 '기한 지남' 과 stale 목록이 갈린다 — 계산은 저쪽 한 곳이다(`_eject_module` 과 같은 꼴).
+    """
+    import importlib.util
+    path = pathlib.Path(__file__).resolve().parent / "report_stale_findings.py"
+    spec = importlib.util.spec_from_file_location("fz_findings_stale", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"모듈 명세를 만들지 못했다 ({path})")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _blank(v: str) -> bool:
+    """값이 비었는가 — 공백 · 따옴표만 · 주석만(`# TODO`)은 빈 값이다(YAML 주석은 줄 첫머리나 공백 뒤 `#`)."""
+    return not re.sub(r"(^|\s)#.*$", "", v).strip().strip("\"'").strip()
+
+
+def exit_gaps(text: str, st, days: int):
+    """출구 정의(README §0) 한 곳 — (어긴 요소 목록, 기한, 기한 출처). 빈 목록이면 출구 있음.
+
+    ① frontmatter `exit_condition:` 이 비지 않았다 ② 기한을 계산할 수 있다(`st.deadline_of` — st 는 report_stale_findings 모듈)
+    ③ `owner:` 가 없으면 플러그인 소유 · 있으면 비지 않은 값. 위생 출구 축과 배출 `--new-entry` 가 같이 쓴다.
+    """
+    m = FM.match(text)
+    fm = m.group(1) if m else ""
+    why = []
+    c = EXIT_LINE.search(fm)
+    if not c or _blank(c.group(1)):
+        why.append("조건(exit_condition)")
+    due, src = st.deadline_of(text, days)
+    if due is None:
+        why.append({"deadline-invalid": "기한(deadline 형식 틀림)", "clock-invalid": "기한(date · last_observed 형식 틀림)"}
+                   .get(src, "기한(date · last_observed · deadline 없음)"))
+    o = OWNER_LINE.search(fm)
+    if o and _blank(o.group(1)):
+        why.append("소유자(owner: 빈 값)")
+    return why, due, src
+
+
+def _exit_axis(texts: dict, days, today: datetime.date):
+    """출구 축 — live 엔트리마다 ① `exit_condition:` 이 비지 않았다 ② 기한을 계산할 수 있다(`deadline:` 이 날짜이거나 시계가 있다)
+    ③ 소유자가 정해진다(`owner:` 없음 = 플러그인 · 있으면 비지 않은 값). 하나라도 어기면 출구 없음.
+
+    반환 (출구 없음 수 | None, 미판정 사유 목록). None = 기한 계산기를 읽지 못해 축을 판정하지 못했다(위반 0 으로 읽지 않는다).
+    기한 지남은 [INFO] 표지 줄이다 — 판정(exit)은 정기 처분(README §1)이 사람에게 묻는 일이라 위반으로 세지 않는다.
+    """
+    try:
+        st = _stale_module()
+        days = st.DEFAULT_DAYS if days is None else days
+        if not (isinstance(days, int) and callable(getattr(st, "deadline_of", None))):    # 계약이 빠진 모듈도 읽지 못한 것이다 — 판정 중 트레이스백(rc 1 = 위반)이 되지 않게
+            raise AttributeError("정수 DEFAULT_DAYS · deadline_of 가 없다")
+    except Exception as e:      # 모듈 고장은 축 미판정이다
+        print(f"  [--strict] 출구 없는 엔트리: 미판정 (report_stale_findings.py 를 읽지 못했다 — {type(e).__name__}: {e})")
+        return None, [f"기한 계산기(report_stale_findings.deadline_of)를 읽지 못했다 — {type(e).__name__}: {e}"]
+    missing, over = [], []
+    lack = {"조건": 0, "기한": 0, "소유자": 0}
+    for d in sorted(texts):
+        why, due, src = exit_gaps(texts[d], st, days)
+        for w in why:
+            lack[w.split("(", 1)[0]] += 1
+        if due is not None and today > due:
+            over.append(f"{d}: 기한 {due} ({src}) · 지남 {(today - due).days}일")
+        if why:
+            missing.append(f"{d}: {' · '.join(why)}")
+    print(f"  [--strict] 출구 없는 엔트리: {len(missing)}")
+    for x in missing[:10]:
+        print(f"      {x}")
+    if len(missing) > 10:
+        print(f"      … 외 {len(missing) - 10}건")
+    print(f"  [INFO] 출구 없음 내역: 조건 {lack['조건']} · 기한 {lack['기한']} · 소유자 {lack['소유자']}")
+    print(f"  [INFO] 기한 지남: {len(over)} (기한 = deadline: 또는 시계+{days}일 · 기준일 {today})")
+    for x in over[:10]:
+        print(f"      [INFO] {x}")
+    if len(over) > 10:
+        print(f"      [INFO] … 외 {len(over) - 10}건")
+    return len(missing), []
 
 
 # 엔트리 본문에 남은 작성 명령(F-456) — heredoc 으로 엔트리를 쓴 셸 명령의 꼬리(`EOF` · `echo "기록 …"` · `wc -l "$F"`)가 본문이 됐다
@@ -493,7 +578,7 @@ def _drain_axes(arc: pathlib.Path, texts: dict, ledger_text: str | None):
     if legacy:
         print(f"  [INFO] recurs_of 클래스 불일치({RECURS_ALIGN_FROM} 이전 · 계수 밖): {len(legacy)}")
 
-    # apply-now 후보 — recurs_of 를 끝까지 따라간 사슬 하나 = 같은 실패의 관측들. archive 를 지난 사슬도 센다
+    # apply-now 후보 — recurs_of 를 끝까지 따라간 사슬 하나 = 같은 실패의 관측들. archive 를 지난 사슬도 센다(재관측 절은 live 본문만)
     rec_of = {}
     for d, fm in fm_of.items():
         rec = RECURS_LINE.search(fm)
@@ -517,12 +602,23 @@ def _drain_axes(arc: pathlib.Path, texts: dict, ledger_text: str | None):
             x = rec_of[x]
         return x
 
+    # 관측 = 사슬의 서로 다른 ID 수 + live 엔트리 본문의 `## 재관측` 절 수 — 재관측을 새 ID 대신 절로 적어도(README §4 작성 규칙)
+    # 후보 계수가 굶지 않는다. 사슬 3 ID 와 엔트리 1 + 재관측 절 2 는 같은 관측 3 이다
+    reobs = {}
+    for d, t in texts.items():
+        k = len(REOBS_HEAD.findall("\n".join(ln for _, ln in _fence_free(t))))
+        if k:
+            reobs[SLUG.match(d.split("/", 1)[1]).group(1)] = k
     groups = {}
-    for x in set(rec_of) | set(rec_of.values()):
+    for x in set(rec_of) | set(rec_of.values()) | set(reobs):
         groups.setdefault(chain_root(x), set()).add(x)
-    cands = sorted(f"{r} 관측 {len(m)} — live {', '.join(sorted(i for i in m if i in applied_of))}"
-                   for r, m in groups.items() if len(m) >= APPLY_NOW_MIN and any(i in applied_of for i in m))
-    print(f"  [INFO] apply-now 후보(recurs_of 사슬 관측 ≥{APPLY_NOW_MIN} · live 포함): {len(cands)}")
+
+    def observed(m):
+        return len(m) + sum(reobs.get(i, 0) for i in m)
+
+    cands = sorted(f"{r} 관측 {observed(m)} — live {', '.join(sorted(i for i in m if i in applied_of))}"
+                   for r, m in groups.items() if observed(m) >= APPLY_NOW_MIN and any(i in applied_of for i in m))
+    print(f"  [INFO] apply-now 후보(recurs_of 사슬 ID + 재관측 절 ≥{APPLY_NOW_MIN} · live 포함): {len(cands)}")
     for x in cands[:10]:
         print(f"      [INFO] {x}")
 
@@ -550,16 +646,19 @@ def _drain_axes(arc: pathlib.Path, texts: dict, ledger_text: str | None):
          sorted(f"{len(v)}건 '{k[:48]}' — {', '.join(sorted(v)[:6])}" for k, v in reasons.items() if len(v) >= BOILER_MIN))
 
 
-def check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None):
-    """`strict` 는 판정을 바꾸지 않는다(E1-7 — 기본 모드 = 옛 `--strict`). 호출부(`--strict` · self-test) 호환용으로 받는다."""
+def check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None,
+          deadline_days: int | None = None, today: datetime.date | None = None):
+    """`strict` 는 판정을 바꾸지 않는다(E1-7 — 기본 모드 = 옛 `--strict`). 호출부(`--strict` · self-test) 호환용으로 받는다.
+    deadline_days · today — 출구 축의 기한 계산(None 이면 `report_stale_findings.DEFAULT_DAYS` · 오늘)."""
     try:
-        return _check(root, strict, ledger)
+        return _check(root, strict, ledger, deadline_days, today or datetime.date.today())
     except Unreadable as e:
         print(f"UNRUN: 읽기/열거 실패 — {e} (⛔ 통과가 아니다)")
         return UNRUN
 
 
-def _check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None):
+def _check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None,
+           deadline_days: int | None = None, today: datetime.date | None = None):
     ent, arc, idx = root / "entries", root / ".archive", root / "INDEX.md"
     if not ent.is_dir():
         print(f"UNRUN: entries 디렉토리 없음 — {ent}")
@@ -706,6 +805,11 @@ def _check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None)
     _drain_axes(arc, texts, lt)
 
     sx, unjudged = _strict_axes(root, texts, {p.stem for p in files}, set(by_id), rows_all, idx_text)
+    nx, ux = _exit_axis(texts, deadline_days, today or datetime.date.today())
+    if nx is None:
+        unjudged += ux
+    else:
+        sx["출구 없음"] = nx
 
     violations = len(resolved) + len(dups) + len(reuse) + len(malformed) + len(bad_pid)
     if violations:
@@ -731,6 +835,41 @@ def _check(root: pathlib.Path, strict: bool, ledger: pathlib.Path | None = None)
     return OK
 
 
+REPAIR_EXIT = re.compile(r"^(반영:|apply-now)")   # `반영 완료 주장…` 같은 관측형 문장은 수리 출구가 아니다
+
+
+def drain(root: pathlib.Path) -> int:
+    """배출 작업의 완료 판정(F-761) — 출구 조건이 수리를 적은(`반영:` · `apply-now`) live 엔트리 가운데
+    `applied: full` 이 아닌 것을 센다. 0 이 아니면 VIOLATION — 출구를 단 것만으로는 배출이 아니다.
+
+    `applied: full` 이지만 `applied_ref: pending` 인 엔트리는 수리됨으로 세고 '커밋 대기' 로 따로 인쇄한다.
+    """
+    d = root / "entries"
+    files = sorted(f for f in list_md(d) if SLUG.match(f.stem)) if d.is_dir() else []   # _TEMPLATE 은 엔트리가 아니다
+    if not files:
+        print(f"UNRUN: 읽을 엔트리가 없다 — {d}")
+        return UNRUN
+    todo, pending = [], []
+    for p in files:
+        m = FM.match(read_or_raise(p))
+        fm = m.group(1) if m else ""
+        c = EXIT_LINE.search(fm)
+        if not (c and REPAIR_EXIT.match(c.group(1))):
+            continue
+        a = APPLIED_LINE.search(fm)
+        if a and a.group(1) == "full":
+            r = APPLIED_REF_LINE.search(fm)
+            if r and r.group(1) == "pending":
+                pending.append(p.stem[:5])
+        else:
+            todo.append(f"{p.stem[:5]} ({a.group(1) if a else 'applied 없음'}) — {c.group(1)[:60]}")
+    for t in todo:
+        print(f"  미수리 {t}")
+    print(f"[INFO] 수리됨 · 커밋 대기(applied_ref: pending): {len(pending)}" + (f" — {' '.join(pending)}" if pending else ""))
+    print(f"{'DRAIN_OK' if not todo else 'DRAIN_UNFIXED'}: 수리를 적은 출구 가운데 미수리 {len(todo)}건 (읽은 엔트리 {len(files)})")
+    return OK if not todo else VIOLATION
+
+
 def self_test():
     """fixture — 정상·resolved잔존·중복ID·archive재사용·빈분모UNRUN
     + strict무INDEX·INDEX고아·배출건오탐방어 (뒤 3종 = fz-gpt review #4/#7 회귀)."""
@@ -742,7 +881,9 @@ def self_test():
         root = pathlib.Path(tmp) / "reg"
         (root / "entries").mkdir(parents=True)
         for slug, status in entries:
-            body = f"---\nid: {slug[:5]}\nstatus: {status}\n---\n\n# {slug}\n" if status else f"# {slug}\n"
+            # 출구 축(조건 · 기한 · 소유자)을 채운 정상 엔트리 — 출구 셀은 아래 `c_exit_*` 가 이 줄을 지우거나 바꾼다
+            body = (f"---\nid: {slug[:5]}\ndate: 2026-11-01\nexit_condition: 시험 조건\nstatus: {status}\n---\n\n# {slug}\n"
+                    if status else f"# {slug}\n")
             (root / "entries" / f"{slug}.md").write_text(body, encoding="utf-8")
         if arc:
             (root / ".archive").mkdir()
@@ -911,7 +1052,8 @@ def self_test():
         return "".join(f"- 관측 {k}: {tag} 고유{tag}가{k} 근거{tag}나{k} 끝\n" for k in range(n))
 
     def entry_text(slug, title, h1, text):
-        return f"---\nid: {slug[:5]}\ntitle: {title}\nstatus: open\n---\n\n# {slug[:5]} — {h1}\n\n{text}"
+        return (f"---\nid: {slug[:5]}\ntitle: {title}\ndate: 2026-11-01\nexit_condition: 시험 조건\nstatus: open\n---\n\n"
+                f"# {slug[:5]} — {h1}\n\n{text}")
 
     LIVE = ["F-001-alpha", "F-002-beta", "F-003-gamma"]
 
@@ -1144,6 +1286,11 @@ def self_test():
         return got[1]
 
     def fm_add(root, slug, extra):
+        # extra 가 date 를 주면 fixture 의 기본 date 줄을 바꾼다 — 두 줄이면 앞의 기본값이 이긴다(첫 date 줄을 읽는다)
+        m = re.match(r"date: (\S+)\n", extra)
+        if m:
+            edit(root / "entries" / f"{slug}.md", "date: 2026-11-01\n", f"date: {m.group(1)}\n")
+            extra = extra[m.end():]
         edit(root / "entries" / f"{slug}.md", "status: open\n", "status: open\n" + extra)
 
     def promoted_ledger(tmp, ids):
@@ -1235,14 +1382,14 @@ def self_test():
         fm_add(r, "F-002-beta", "recurs_of: F-001\n")
         fm_add(r, "F-003-gamma", "recurs_of: F-002\n")
         rc, out = both(r)
-        assert rc == OK and "[INFO] apply-now 후보(recurs_of 사슬 관측 ≥3 · live 포함): 1" in out \
+        assert rc == OK and "[INFO] apply-now 후보(recurs_of 사슬 ID + 재관측 절 ≥3 · live 포함): 1" in out \
             and "[INFO] F-001 관측 3 — live F-001, F-002, F-003" in out, f"⛔ 관측 3 사슬을 후보로 내지 않았다 rc={rc}\n{out}"
 
     def c_apply_now_two_not_listed(tmp):
         r = full(tmp)
         fm_add(r, "F-002-beta", "recurs_of: F-001\n")
         rc, out = both(r)
-        assert rc == OK and "[INFO] apply-now 후보(recurs_of 사슬 관측 ≥3 · live 포함): 0" in out, f"⛔ 관측 2 를 후보로 냈다\n{out}"
+        assert rc == OK and "[INFO] apply-now 후보(recurs_of 사슬 ID + 재관측 절 ≥3 · live 포함): 0" in out, f"⛔ 관측 2 를 후보로 냈다\n{out}"
 
     def c_apply_now_through_archive(tmp):
         """사슬이 archive 를 지나도 센다 — 뿌리가 배출됐어도 live 재발이 남으면 후보다."""
@@ -1344,6 +1491,167 @@ def self_test():
         cases += 1
         case(n, f)
 
+    # ── 출구 축(README §0 — 조건 · 기한 · 소유자) · 기한 지남 · apply-now 재관측 절 ──
+    EXIT_AX = "[--strict] 출구 없는 엔트리: "
+
+    def run_exit(root, days=None, today="2026-12-15"):
+        """출구 축은 기준일 · 임계를 받는다 — 기본 모드와 --strict 가 같은 판정 · 출력인지 함께 본다."""
+        got = []
+        for s_ in (False, True):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = check(root, s_, deadline_days=days, today=datetime.date.fromisoformat(today))
+            got.append((rc, buf.getvalue()))
+        assert got[0] == got[1], f"⛔ 기본 모드와 --strict 가 갈렸다\n{got[0][1]}"
+        return got[1]
+
+    def c_exit_clean(tmp):
+        rc, out = run_exit(full(tmp))
+        assert rc == OK and f"{EXIT_AX}0\n" in out and "[INFO] 출구 없음 내역: 조건 0 · 기한 0 · 소유자 0" in out, \
+            f"⛔ 출구를 다 가진 정상 대조를 위반으로 셌다 rc={rc}\n{out}"
+
+    def exit_bad(old, new, why):
+        def fn(tmp):
+            r = full(tmp)
+            edit(r / "entries" / "F-002-beta.md", old, new)
+            rc, out = run_exit(r)
+            assert rc == VIOLATION and f"{EXIT_AX}1\n" in out and f"entries/F-002-beta: {why}" in out \
+                and "출구 없음 1" in out and "VIOLATION:" in out, f"⛔ 출구 없음({why})을 놓쳤다 rc={rc}\n{out}"
+        return fn
+
+    def exit_ok(edits, what):
+        def fn(tmp):
+            r = full(tmp)
+            for slug, old, new in edits:
+                edit(r / "entries" / f"{slug}.md", old, new)
+            rc, out = run_exit(r)
+            assert rc == OK and f"{EXIT_AX}0\n" in out, f"⛔ {what} 을 출구 없음으로 셌다 rc={rc}\n{out}"
+        return fn
+
+    def c_exit_body_only(tmp):
+        """가장 넓게 해석한 인접 입력 — 조건 줄이 본문에만 있으면 frontmatter 조건이 아니다."""
+        r = full(tmp)
+        p = r / "entries" / "F-002-beta.md"
+        edit(p, "exit_condition: 시험 조건\n", "")
+        p.write_text(p.read_text(encoding="utf-8") + "\nexit_condition: 본문에 적은 조건\n", encoding="utf-8")
+        rc, out = run_exit(r)
+        assert rc == VIOLATION and f"{EXIT_AX}1\n" in out, f"⛔ 본문 조건 줄을 frontmatter 조건으로 읽었다 rc={rc}\n{out}"
+
+    def overdue_at(due, want):
+        def fn(tmp):
+            r = full(tmp)
+            edit(r / "entries" / "F-002-beta.md", "date: 2026-11-01\n", f"date: 2026-11-01\ndeadline: {due}\n")
+            rc, out = run_exit(r, today="2026-12-15")
+            assert rc == OK and f"[INFO] 기한 지남: {want} (" in out, f"⛔ deadline {due} · 기준일 2026-12-15 에서 지남 {want} 이 아니다\n{out}"
+        return fn
+
+    def c_deadline_days_moves(tmp):
+        """--deadline-days 를 기본과 다른 값으로 주면 결과가 바뀐다(하드코딩 아님)."""
+        r = full(tmp)
+        _, a = run_exit(r, days=None)
+        _, b = run_exit(r, days=30)
+        assert "[INFO] 기한 지남: 0 (" in a and "[INFO] 기한 지남: 3 (" in b and "시계+30일" in b, \
+            f"⛔ 임계가 움직이지 않는다\n{a}\n---\n{b}"
+
+    def c_two_cli_agree(tmp):
+        """두 CLI 일치 — 같은 입력 · 기준일 · 임계에서 위생 '기한 지남' 수 = stale 수(기한 계산은 한 곳)."""
+        r = full(tmp)
+        edit(r / "entries" / "F-002-beta.md", "date: 2026-11-01\n", "date: 2026-11-01\ndeadline: 2026-12-14\n")
+        fm_add(r, "F-003-gamma", "last_observed: 2026-12-10\n")
+        st = _stale_module()
+        for days, want in ((30, 2), (90, 1)):
+            _, out = run_exit(r, days=days)
+            n = len(st.audit(r, days, datetime.date(2026, 12, 15))["stale"])
+            assert n == want and f"[INFO] 기한 지남: {n} (" in out, f"⛔ days={days}: stale {n} · 위생 출력 불일치(기대 {want})\n{out}"
+
+    def c_exit_stale_module_unrun(tmp):
+        """⛔ 기한 계산기를 못 읽으면 출구 축은 미판정이다 — 위반 0 으로 읽지 않는다."""
+        g = globals()
+        real = g["_stale_module"]
+
+        def boom():
+            raise ImportError("주입된 모듈 고장")
+
+        import types
+        r = full(tmp)
+        for fake in (boom, lambda: types.SimpleNamespace(DEFAULT_DAYS=90),      # 로딩 실패 · 이름 빠진 모듈 · 정수 아닌 기본 일수
+                     lambda: types.SimpleNamespace(DEFAULT_DAYS="90", deadline_of=lambda *a: (None, None))):
+            g["_stale_module"] = fake
+            try:
+                rc, out = run_exit(r)
+            finally:
+                g["_stale_module"] = real
+            assert rc == UNRUN and "UNRUN: 기한 계산기" in out, f"⛔ 기한 계산기 고장인데 rc={rc}\n{out}"
+
+    REOBS2 = "\n## 재관측 2026-11-10\n\n- 다시 봤다\n\n## 재관측 2026-11-20\n\n- 또 봤다\n"
+
+    def reobs_case(tail, want, what):
+        def fn(tmp):
+            r = full(tmp)
+            p = r / "entries" / "F-001-alpha.md"
+            p.write_text(p.read_text(encoding="utf-8") + tail, encoding="utf-8")
+            rc, out = run_exit(r)
+            assert rc == OK and f"[INFO] apply-now 후보(recurs_of 사슬 ID + 재관측 절 ≥3 · live 포함): {want}" in out, \
+                f"⛔ {what}\n{out}"
+            if want:
+                assert "[INFO] F-001 관측 3 — live F-001" in out, f"⛔ 엔트리 1 + 재관측 절 2 = 관측 3 이 아니다\n{out}"
+        return fn
+
+    def c_drain(tmp):
+        """F-761 — 수리를 적은 출구가 미수리면 DRAIN_UNFIXED(exit 1) · applied: full 이면 DRAIN_OK · 관측형 출구는 세지 않는다."""
+        r = mk(tmp, [("F-001-a", "open"), ("F-002-b", "open"), ("F-003-c", "open")])
+        edit(r / "entries" / "F-001-a.md", "exit_condition: 시험 조건\n", "exit_condition: 반영: 검사 수리 → applied: full\n")
+        edit(r / "entries" / "F-002-b.md", "exit_condition: 시험 조건\n", "exit_condition: apply-now(재발 ≥3): 수리\napplied: partial\n")
+        edit(r / "entries" / "F-003-c.md", "exit_condition: 시험 조건\n", "exit_condition: 반영 완료 주장마다 재실행을 확보한다\n")
+        (r / "entries" / "_TEMPLATE.md").write_text("---\nexit_condition: 반영: <고칠 곳>\n---\n", encoding="utf-8")
+
+        def run():
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = drain(r)
+            return rc, buf.getvalue()
+        rc, out = run()
+        assert rc == VIOLATION and "미수리 F-001" in out and "미수리 F-002" in out and "F-003" not in out and "_TEMP" not in out, \
+            f"⛔ 미수리 둘(반영 · apply-now partial)을 잡고 관측형은 빼야 한다\n{out}"
+        for f in ("F-001-a", "F-002-b"):
+            edit(r / "entries" / f"{f}.md", "status: open\n", "status: open\napplied: full\napplied_ref: pending\n")
+        edit(r / "entries" / "F-002-b.md", "applied: partial\n", "")
+        rc, out = run()
+        assert rc == OK and "DRAIN_OK" in out and "커밋 대기(applied_ref: pending): 2" in out, f"⛔ 둘 다 full 인데 OK 가 아니다\n{out}"
+        (r / "entries" / "F-001-a.md").unlink(); (r / "entries" / "F-002-b.md").unlink(); (r / "entries" / "F-003-c.md").unlink()
+        (r / "entries" / "_TEMPLATE.md").unlink()
+        rc, out = run()
+        assert rc == UNRUN, f"⛔ 엔트리 0 을 판정했다\n{out}"
+
+    for n, f in [("drain-unfixed-repair-entries", c_drain),
+                 ("exit-clean-ok", c_exit_clean),
+                 ("exit-missing", exit_bad("exit_condition: 시험 조건\n", "", "조건(exit_condition)")),
+                 ("exit-empty", exit_bad("exit_condition: 시험 조건\n", "exit_condition:\n", "조건(exit_condition)")),
+                 ("exit-spaces-only", exit_bad("exit_condition: 시험 조건\n", "exit_condition:    \n", "조건(exit_condition)")),
+                 ("exit-quotes-only", exit_bad("exit_condition: 시험 조건\n", 'exit_condition: ""\n', "조건(exit_condition)")),
+                 ("exit-comment-only", exit_bad("exit_condition: 시험 조건\n", "exit_condition: # TODO\n", "조건(exit_condition)")),
+                 ("exit-owner-comment-only", exit_bad("status: open\n", "status: open\nowner: # 나중에\n", "소유자(owner: 빈 값)")),
+                 ("exit-invalid-date-no-crash", exit_bad("date: 2026-11-01\n", "date: 2026-02-30\n", "기한(date · last_observed 형식 틀림)")),
+                 ("exit-observed-comment-no-fallback", exit_bad("date: 2026-11-01\n", "date: 2026-11-01\nlast_observed: 2026-11-20  # 재관측\n",
+                                                               "기한(date · last_observed 형식 틀림)")),
+                 ("exit-body-only", c_exit_body_only),
+                 ("exit-no-clock", exit_bad("date: 2026-11-01\n", "", "기한(date · last_observed · deadline 없음)")),
+                 ("exit-deadline-invalid", exit_bad("date: 2026-11-01\n", "date: 2026-11-01\ndeadline: soon\n", "기한(deadline 형식 틀림)")),
+                 ("exit-owner-empty", exit_bad("status: open\n", "status: open\nowner:\n", "소유자(owner: 빈 값)")),
+                 ("exit-deadline-only-ok", exit_ok([("F-002-beta", "date: 2026-11-01\n", "deadline: 2027-01-01\n")], "deadline 만 있는 엔트리")),
+                 ("exit-owner-all-wave-kit-ok", exit_ok([(x, "status: open\n", "status: open\nowner: wave-kit\n") for x in LIVE],
+                                                         "전부 owner: wave-kit")),
+                 ("deadline-yesterday-overdue", overdue_at("2026-12-14", 1)), ("deadline-today-not-overdue", overdue_at("2026-12-15", 0)),
+                 ("deadline-tomorrow-not-overdue", overdue_at("2026-12-16", 0)),
+                 ("deadline-days-moves", c_deadline_days_moves), ("deadline-two-cli-agree", c_two_cli_agree),
+                 ("exit-stale-module-unrun", c_exit_stale_module_unrun),
+                 ("apply-now-reobs-two-equals-chain-three", reobs_case(REOBS2, 1, "엔트리 1 + 재관측 절 2 를 후보로 내지 않았다")),
+                 ("apply-now-reobs-one-not-listed", reobs_case("\n## 재관측 2026-11-10\n\n- 한 번\n", 0, "관측 2 를 후보로 냈다")),
+                 ("apply-now-reobs-fenced-not-counted",
+                  reobs_case("\n## 재관측 2026-11-10\n\n- 한 번\n\n```\n## 재관측 2026-11-20\n```\n", 0, "펜스 안 재관측 절을 셌다"))]:
+        cases += 1
+        case(n, f)
+
     # ⛔ 분모는 세어서 인쇄한다 (상수로 적으면 케이스 증설 시 거짓이 된다)
     print(f"self-test {len(passed)}/{cases} 통과")
     for p in passed:
@@ -1359,13 +1667,28 @@ def main():
     ap.add_argument("--strict", action="store_true", help="등재율 100%% 미달도 위반으로 본다")   # %% — 단독 % 는 Python 3.14 argparse 가 거부한다(F-343)
     ap.add_argument("--ledger", type=pathlib.Path,
                     help="promotion-ledger.md — p_id 소속 대조 (미지정 시 그 축은 **미판정**)")
+    ap.add_argument("--deadline-days", type=int, default=None,
+                    help="출구 축 기한 = 시계 + N일 (deadline: 이 없을 때 · 기본 report_stale_findings.DEFAULT_DAYS)")
+    ap.add_argument("--today", help="기준일 YYYY-MM-DD (시험용 — 없으면 오늘)")
+    ap.add_argument("--drain", action="store_true",
+                    help="배출 완료 판정 — 수리를 적은 출구(반영: · apply-now) 가운데 applied: full 아닌 엔트리가 있으면 exit 1 (F-761)")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
     if not a.root:
         ap.error("--root 가 필요하다 (또는 --self-test)")
-    return check(a.root, a.strict, ledger=a.ledger)
+    if a.drain:
+        return drain(a.root)
+    if a.deadline_days is not None and a.deadline_days < 0:
+        print(f"UNRUN: --deadline-days 는 0 이상이어야 한다 (받음 {a.deadline_days})")
+        return UNRUN
+    try:
+        today = datetime.date.fromisoformat(a.today) if a.today else None
+    except ValueError:
+        print(f"UNRUN: --today 형식 오류 — {a.today}")
+        return UNRUN
+    return check(a.root, a.strict, ledger=a.ledger, deadline_days=a.deadline_days, today=today)
 
 
 if __name__ == "__main__":

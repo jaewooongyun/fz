@@ -11,6 +11,10 @@
                     ⛔ 본문에서 관측일을 추론하지 않는다 — 형식이 자유라 추론은 오판을 만든다.
   ③ 임계         : 기본 **90일**. `--days` 로 바꾼다. 3개월(월 경계)이 아니라 일수다 —
                     월 경계는 달마다 임계가 달라져 재현되지 않는다.
+  ④ 기한         : frontmatter `deadline:` 이 있으면 그 날짜가 기한이다(시계 + 임계보다 우선 — 연장 기록).
+                    없으면 기한 = 시계 + 임계. 지남 = 기준일이 기한을 **넘은** 날(기한 당일은 지나지 않음).
+                    ⛔ 기한 계산은 `deadline_of` 한 곳이다 — 위생 검사(`check_findings_hygiene.py`)가 이 함수를
+                    빌려 '기한 지남' · '기한 계산 불가(출구 없음)' 를 낸다. 두 CLI 가 같은 엔트리에 다른 기한을 내지 않는다.
 
 ⛔ **이 스크립트는 파일을 옮기지 않는다.** 이동은 `entries/` 집합을 바꿔
    `check_findings_hygiene.py` 의 「INDEX 고아 행」 불변식을 깨뜨리고, 목적지 의미가
@@ -30,9 +34,22 @@ import sys
 
 OK, FOUND, UNRUN = 0, 1, 2
 DEFAULT_DAYS = 90
-DATE_RE = re.compile(r"^(date|last_observed):\s*(\d{4})-(\d{2})-(\d{2})\s*$", re.M)
+FM_BLOCK = re.compile(r"\A---\n(.*?)\n---", re.S)
+DAY_FIELD = re.compile(r"^(date|last_observed|deadline):[ \t]*(.*?)[ \t]*$", re.M)
+ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 STATUS_RE = re.compile(r"^status:\s*(\S+)\s*$", re.M)
-FRONT_LIMIT = 4000   # frontmatter 는 앞부분에 있다 — 본문 전체를 읽지 않는다
+FRONT_LIMIT = 4000   # status 줄만 앞부분에서 찾는다 — 기한 · 시계는 frontmatter 전체를 본다(길이로 자르면 닫는 `---` 를 잃는다)
+
+
+def _day(v: str):
+    """값이 달력에 있는 `YYYY-MM-DD` 면 date, 아니면 None.
+    ⛔ 따옴표 · 줄 끝 `# 주석` 이 붙은 값도 날짜가 아니다 — frontmatter 값에 주석을 달지 않는다(레지스트리 `_TEMPLATE.md`)."""
+    if not ISO_DAY.fullmatch(v):
+        return None
+    try:
+        return datetime.date.fromisoformat(v)
+    except ValueError:      # 달력에 없는 날(`2026-02-30`)
+        return None
 
 
 def list_entries(d: pathlib.Path):
@@ -44,37 +61,63 @@ def list_entries(d: pathlib.Path):
 
 
 def clock_of(text: str):
-    """(기준일, 출처) — `last_observed:` 가 `date:` 를 이긴다. 둘 다 없으면 (None, None)."""
+    """(기준일, 출처) — `last_observed:` 가 `date:` 를 이긴다. 둘 다 없으면 (None, None).
+    ⛔ 적었는데 날짜가 아니면(달력에 없는 날 · 주석 · 따옴표 포함) (None, "clock-invalid") — `date:` 로 물러나지 않는다.
+       물러나면 재관측을 적은 엔트리가 등록일 기준으로 늙어 정기 처분에 일찍 올라온다(틀린 명시값을 조용히 덮지 않는다 · deadline 과 같다)."""
     found = {}
-    for m in DATE_RE.finditer(text):
-        key = m.group(1)
-        if key not in found:      # 첫 등장만 — 중복 선언은 아래에서 드러난다
-            found[key] = datetime.date(int(m.group(2)), int(m.group(3)), int(m.group(4)))
-    if "last_observed" in found:
-        return found["last_observed"], "last_observed"
-    if "date" in found:
-        return found["date"], "date"
+    for key, v in DAY_FIELD.findall(text):
+        if key != "deadline":
+            found.setdefault(key, v)      # 첫 등장만
+    for key in ("last_observed", "date"):
+        if key in found:
+            d = _day(found[key])
+            return (d, key) if d else (None, "clock-invalid")
     return None, None
+
+
+def deadline_of(text: str, days: int = DEFAULT_DAYS):
+    """(기한, 출처) — 기한 계산의 한 곳(정책 ④). 위생 검사도 이 함수를 쓴다.
+
+    frontmatter `deadline:` 이 있으면 그 날짜 · 출처 "deadline" — 시계보다 우선한다.
+    ⛔ `deadline:` 값이 날짜가 아니면 (None, "deadline-invalid") — 시계로 물러나지 않는다(틀린 명시값을 조용히 덮지 않는다).
+    없으면 시계(`clock_of`) + days · 출처 = 시계 필드 이름. 둘 다 없으면 (None, None) · 시계가 날짜가 아니면 (None, "clock-invalid").
+    기한이 날짜 표현 범위를 넘으면(`date: 9999-12-31` · 큰 days) 끝 날짜 — 넘지 않는 먼 날짜와 같이 지나지 않는다.
+    """
+    fm = FM_BLOCK.match(text)
+    front = fm.group(1) if fm else ""     # 기한 · 시계는 frontmatter 만 본다 — 본문 예시의 `date:` 줄은 시계가 아니다
+    dl = next((v for k, v in DAY_FIELD.findall(front) if k == "deadline"), None)
+    if dl is not None:
+        d = _day(dl)
+        return (d, "deadline") if d else (None, "deadline-invalid")
+    when, src = clock_of(front)
+    if when is None:
+        return None, src
+    try:
+        return when + datetime.timedelta(days=days), src
+    except OverflowError:
+        return (datetime.date.max if days > 0 else datetime.date.min), src
+
+
+INVALID_NOTE = {"deadline-invalid": " (deadline 형식 틀림)", "clock-invalid": " (date · last_observed 형식 틀림)"}
 
 
 def audit(root: pathlib.Path, days: int, today: datetime.date) -> dict:
     entries = list_entries(root / "entries")
     stale, fresh, undated = [], 0, []
     for p in entries:
-        head = p.read_text(encoding="utf-8", errors="replace")[:FRONT_LIMIT]
-        when, src = clock_of(head)
-        if when is None:
-            # ⛔ 날짜 없음은 "신선" 이 아니다 — 판정 불가로 따로 센다
-            undated.append(p.name)
+        text = p.read_text(encoding="utf-8", errors="replace")
+        due, src = deadline_of(text, days)
+        if due is None:
+            # ⛔ 날짜 없음 · 형식 틀림은 "신선" 이 아니다 — 판정 불가로 따로 센다
+            undated.append(p.name + INVALID_NOTE.get(src, ""))
             continue
-        age = (today - when).days
-        if age > days:
-            sm = STATUS_RE.search(head)
-            stale.append({"file": p.name, "age": age, "clock": src,
+        if today > due:
+            sm = STATUS_RE.search(text[:FRONT_LIMIT])
+            stale.append({"file": p.name, "over": (today - due).days, "due": due, "clock": src,
                           "status": sm.group(1) if sm else "(없음)"})
         else:
             fresh += 1
-    stale.sort(key=lambda r: -r["age"])
+    stale.sort(key=lambda r: -r["over"])
     return {"total": len(entries), "stale": stale, "fresh": fresh, "undated": undated, "days": days}
 
 
@@ -108,12 +151,16 @@ def main() -> int:
     print(f"기준일 {today} · 임계 {r['days']}일 · 엔트리 {r['total']}건")
     print(f"  신선 {r['fresh']} · stale {len(r['stale'])} · 날짜없음 {len(r['undated'])}")
     for row in r["stale"]:
-        print(f"    {row['file']} — {row['age']}일 (시계: {row['clock']} · status: {row['status']})")
+        print(f"    {row['file']} — 기한 {row['due']} 지남 {row['over']}일 (기준: {row['clock']} · status: {row['status']})")
     if r["undated"]:
         # ⛔ 판정 불가를 신선으로 세지 않는다 — 셋을 함께 인쇄해야 분모가 맞는다
         print(f"  ⚠️ 날짜 없어 판정 불가 {len(r['undated'])}건: {', '.join(r['undated'][:5])}"
               + (" …" if len(r["undated"]) > 5 else ""))
     if not r["stale"]:
+        if r["undated"] and args.strict:
+            # ⛔ 판정 불가가 남았는데 '0건' 으로 끝내지 않는다 — --strict 는 판정을 요구한 모드다
+            print(f"UNRUN: 판정 불가 {len(r['undated'])}건 — stale 0건이 아니다 (⛔ 통과 아님)")
+            return UNRUN
         print("STALE_NONE (임계 초과 0건)")
         return OK
     print(f"STALE_FOUND {len(r['stale'])}건 — ⛔ 이동은 이 스크립트가 하지 않는다 "
@@ -168,6 +215,70 @@ def self_test() -> int:
     case("undated", [("F-005-e.md", "id: F-005\nstatus: open\n")], 90, T, 0, want_undated=1)
     # ⑥ 임계는 인자로 움직인다 (하드코딩이 아님)
     case("threshold-moves", [("F-006-f.md", "id: F-006\ndate: 2026-08-01\nstatus: open\n")], 30, T, 1)
+    # ⑧ ⛔ deadline 이 시계 + 임계를 이긴다 — 등록일이 오래됐어도 연장 기한 안이면 지나지 않았다 · 그 반대도
+    case("deadline-beats-clock", [("F-007-g.md", "id: F-007\ndate: 2026-01-01\ndeadline: 2026-12-31\nstatus: open\n")], 90, T, 0)
+    case("deadline-earlier-than-clock", [("F-008-h.md", "id: F-008\ndate: 2026-09-20\ndeadline: 2026-09-21\nstatus: open\n")], 90, T, 1)
+    # ⑨ 경계 — 지남 = 기준일이 기한을 넘은 날. 어제 기한은 지남 · 오늘 · 내일은 아님
+    for tag, due, want in (("yesterday", "2026-09-21", 1), ("today", "2026-09-22", 0), ("tomorrow", "2026-09-23", 0)):
+        case(f"deadline-{tag}", [("F-009-i.md", f"id: F-009\ndate: 2026-09-01\ndeadline: {due}\nstatus: open\n")], 90, T, want)
+    # ⑩ 시계 경계 — 기한 = 시계 + 임계 당일은 아직 아니다(옛 `age > days` 와 같다)
+    case("clock-boundary", [("F-010-j.md", "id: F-010\ndate: 2026-06-24\nstatus: open\n")], 90, T, 0)
+    case("clock-boundary-plus1", [("F-011-k.md", "id: F-011\ndate: 2026-06-23\nstatus: open\n")], 90, T, 1)
+    # ⑪ ⛔ deadline 형식 틀림은 시계로 물러나지 않는다 — 판정 불가
+    for tag, bad in (("word", "soon"), ("empty", ""), ("no-day", "2026-13-40"), ("compact", "20261001")):
+        case(f"deadline-invalid-{tag}", [("F-012-l.md", f"id: F-012\ndate: 2026-01-01\ndeadline: {bad}\nstatus: open\n")],
+             90, T, 0, want_undated=1)
+    # ⑬ 달력에 없는 date 는 예외가 아니라 판정 불가
+    case("clock-invalid-day", [("F-014-n.md", "id: F-014\ndate: 2026-02-30\nstatus: open\n")], 90, T, 0, want_undated=1)
+    # ⑭ 본문의 date 줄은 시계가 아니다 — frontmatter 에 시계가 없으면 판정 불가
+    d = pathlib.Path(tempfile.mkdtemp(prefix="fz-stale-bodyclock-"))
+    try:
+        (d / "entries").mkdir()
+        (d / "entries" / "F-015-o.md").write_text("---\nid: F-015\nstatus: open\n---\n\n```\ndate: 2026-09-01\n```\n", encoding="utf-8")
+        r = audit(d, 90, datetime.date.fromisoformat(T))
+        if len(r["undated"]) == 1 and not r["stale"]:
+            passed += 1
+        else:
+            fails.append(f"body-clock-ignored: undated {len(r['undated'])} · stale {len(r['stale'])} (기대 1 · 0)")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    # ⑫ 본문의 deadline 줄은 기한이 아니다 — frontmatter 만 본다
+    d = pathlib.Path(tempfile.mkdtemp(prefix="fz-stale-body-"))
+    try:
+        (d / "entries").mkdir()
+        (d / "entries" / "F-013-m.md").write_text("---\nid: F-013\ndate: 2026-01-01\nstatus: open\n---\n\ndeadline: 2026-12-31\n",
+                                                  encoding="utf-8")
+        r = audit(d, 90, datetime.date.fromisoformat(T))
+        if len(r["stale"]) == 1:
+            passed += 1
+        else:
+            fails.append(f"body-deadline-ignored: stale {len(r['stale'])} (기대 1)")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    # ⑮ ⛔ 적었는데 날짜가 아닌 last_observed 는 date 로 물러나지 않는다 — 판정 불가(달력 밖 · 줄 끝 주석)
+    for tag, bad in (("no-day", "2026-11-31"), ("comment", "2026-09-10  # 재관측")):
+        case(f"observed-invalid-{tag}", [("F-016-p.md", f"id: F-016\ndate: 2026-01-01\nlast_observed: {bad}\nstatus: open\n")],
+             90, T, 0, want_undated=1)
+    # ⑯ frontmatter 가 status 탐색 한도(FRONT_LIMIT)보다 길어도 시계를 읽는다
+    case("long-frontmatter", [("F-017-q.md", "id: F-017\ndate: 2026-01-01\nnote: " + "x" * (FRONT_LIMIT + 100) + "\nstatus: open\n")],
+         90, T, 1)
+    # ⑰ 기한이 날짜 표현 범위를 넘어도 죽지 않는다 — 지나지 않는다
+    case("clock-overflow", [("F-018-r.md", "id: F-018\ndate: 9999-12-31\nstatus: open\n")], 90, T, 0)
+    # ⑱ ⛔ --strict 에서 판정 불가만 남으면 '0건' 이 아니라 UNRUN — stale 이 있으면 stale 이 이긴다
+    import subprocess
+    undated_row, aged_row = ("F-019-s.md", "id: F-019\nstatus: open\n"), ("F-020-t.md", "id: F-020\ndate: 2026-01-01\nstatus: open\n")
+    for tag, rows, want in (("undated-only-unrun", [undated_row], UNRUN), ("stale-wins", [undated_row, aged_row], FOUND),
+                            ("all-judged-ok", [("F-021-u.md", "id: F-021\ndate: 2026-09-01\nstatus: open\n")], OK)):
+        d = mk(rows)
+        try:
+            rc = subprocess.run([sys.executable, "-B", str(pathlib.Path(__file__).resolve()), "--root", str(d), "--today", T, "--strict"],
+                                capture_output=True, text=True, stdin=subprocess.DEVNULL).returncode
+            if rc == want:
+                passed += 1
+            else:
+                fails.append(f"strict-{tag}: rc {rc} (기대 {want})")
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
     # ⑦ ⛔ 열거 실패를 0건으로 인쇄하지 않는다
     d = pathlib.Path(tempfile.mkdtemp(prefix="fz-stale-noent-"))
     try:

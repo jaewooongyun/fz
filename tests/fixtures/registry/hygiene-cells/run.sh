@@ -13,6 +13,8 @@
 #   unrun           entries 부재 · 빈 분모 · archive 디코딩 실패 · APPLIED 부재 → exit 2 + 줄 맨 앞 `UNRUN:`
 #   consumer        실 레지스트리 소비자(SC-3 · G27) — manifest↔APPLIED↔archive 가 맞는 레지스트리에 고아 행만 넣으면
 #                   기본 모드(--strict 없이)와 `eject_findings.py --audit ROOT` 가 같은 `VIOLATION:` 줄로 exit 1(대장 대조는 누락 0)
+#   exitless        출구 없는 엔트리(README §0 — 조건 · 기한 · 소유자) — exit_condition 없음 · 빈 값 · 시계 없음 · deadline
+#                   형식 틀림 · owner 빈 값은 위반, owner 없음(= 플러그인)은 정상 · 기본 모드도 같은 축
 #   writer-leak*    엔트리 본문의 작성 명령 잔재(F-456) — `echo "기록` · `EOF` 뒤 echo · `EOF` 뒤 쓰기 스크립트(`python3 - <<` ·
 #                   `cat >` — 리뷰 R1)는 위반 · 펜스 안 인용과 네 백틱 펜스 안 세 백틱 인용(리뷰 R3)은 OK · 기본 모드도 같은 축
 # 손상 셀은 exit 1 + `VIOLATION:` 줄 + 그 축의 보고 줄을 함께 단언한다 — exit 만 보면 검사기가 죽은 것(traceback,
@@ -132,7 +134,8 @@ def body(slug):
 def entry(slug, title, h1=None, text=None):
     num = slug[:5]
     return (f"---\nid: {num}\ntitle: {title}\ndate: 2026-10-01\nclass: hole\nfailure_class: {slug[6:]}\n"
-            f"status: open\ndetector: self\n---\n\n# {num} — {h1 or title}\n\n{text if text is not None else body(slug)}")
+            f"status: open\ndetector: self\nexit_condition: 시험 조건\n---\n\n# {num} — {h1 or title}\n\n"
+            f"{text if text is not None else body(slug)}")
 
 
 def row(slug, one):
@@ -404,12 +407,38 @@ def c_writer_leak_nested_fence(b):
           f"대문자 줄 뒤 펜스 블록 — 종결자 아님 · exit 0 (실제 {rc})", out)
 
 
+EXIT_AXIS = "[--strict] 출구 없는 엔트리: "
+
+
+def c_exitless(b):
+    s2 = slug_of("F-002")
+    for k, (old, new, why) in enumerate((("exit_condition: 시험 조건\n", "", "조건(exit_condition)"),
+                                         ("exit_condition: 시험 조건\n", "exit_condition:   \n", "조건(exit_condition)"),
+                                         ("date: 2026-10-01\n", "", "기한(date · last_observed · deadline 없음)"),
+                                         ("date: 2026-10-01\n", "date: 2026-10-01\ndeadline: 곧\n", "기한(deadline 형식 틀림)"),
+                                         ("status: open\n", "status: open\nowner:\n", "소유자(owner: 빈 값)"))):
+        root = build(b / f"e{k}")
+        edit(root / "entries" / f"{s2}.md", old, new)
+        rc, out = strict(root)
+        expect_violation("exitless", out, rc, f"{EXIT_AXIS}1", why)
+        check("exitless", f"entries/{s2}: {why}" in out, f"{why}: 위반에 엔트리 · 빠진 요소", out)
+    root = build(b / "default")
+    edit(root / "entries" / f"{s2}.md", "exit_condition: 시험 조건\n", "")
+    rc, out = hyg(root)
+    expect_violation("exitless", out, rc, f"{EXIT_AXIS}1", "기본 모드(strict 없음)도 같은 축")
+    root = build(b / "owner")
+    for s in LIVE:
+        edit(root / "entries" / f"{s}.md", "status: open\n", "status: open\nowner: wave-kit\n")
+    rc, out = strict(root)
+    check("exitless", rc == 0 and f"{EXIT_AXIS}0" in out, f"owner 가 모두 wave-kit 이면 정상 — exit 0 (실제 {rc})", out)
+
+
 CELLS = {"control": c_control, "orphan": c_orphan, "out-of-queue": c_out_of_queue, "applied-conflict": c_applied_conflict,
          "dup-title": c_dup_title, "dup-h1-body": c_dup_h1_body, "index-dump": c_index_dump, "unrun": c_unrun,
          "consumer": c_consumer, "writer-leak": c_writer_leak, "writer-leak-eof-echo": c_writer_leak_eof_echo,
          "writer-leak-fenced": c_writer_leak_fenced, "writer-leak-default-mode": c_writer_leak_default_mode,
          "writer-leak-eof-script": c_writer_leak_eof_script, "writer-leak-nested-fence": c_writer_leak_nested_fence,
-         "writer-leak-midbody": c_writer_leak_midbody}
+         "writer-leak-midbody": c_writer_leak_midbody, "exitless": c_exitless}
 picked = []
 for tok in [t for t in CELLS_ARG.replace(" ", ",").split(",") if t] or list(CELLS):
     if tok not in CELLS:
