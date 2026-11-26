@@ -93,7 +93,7 @@ SOURCES = ("arg", "fz", "signal", "autonomous", "gate", "default")
 # 행 키 허용 집합 — 이 밖의 키는 쓰지 않는다(원장 게이트가 그 밖의 키를 거부한다)
 ROW_KEYS = ("schema", "run_id", "attempt", "pipeline_id", "skill", "mode", "recommended", "reason", "started_at",
             "ended_at", "status", "model", "effort", "active_min", "session_id", "work_dir", "workflow_run_id", "plugin_root",
-            "plugin_version", "plugin_sha", "gate_issues", "findings")
+            "plugin_version", "plugin_sha", "plugin_dirty", "gate_issues", "findings")
 # --findings 의 부분 이름 → 행 findings 키. 키 이름은 experiment-log.md §5.4 · fz_telemetry_report.HARNESS_FINDINGS 와 같다
 FINDINGS_PARTS = {"gpt": "gpt_unique_findings", "claude": "claude_unique_findings", "convergent": "convergent_findings"}
 FINDINGS_TOTAL = "total_findings"
@@ -375,11 +375,22 @@ def model_and_effort(env, sid: str, projects_root: str):
     return UNKNOWN, UNKNOWN
 
 
+def tree_dirty(root) -> "bool | None":
+    """추적 파일에 커밋 안 된 변경이 있나 — git 을 못 읽으면 None. F-196: HEAD SHA 만으로는 미커밋 변경을 덮지 못한다."""
+    with contextlib.suppress(OSError, subprocess.SubprocessError):
+        proc = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+                              capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
+        if proc.returncode == 0:
+            return bool(proc.stdout.strip())
+    return None
+
+
 @functools.lru_cache(maxsize=1)
 def plugin_info() -> tuple:
-    """(plugin_root, plugin_version, plugin_sha|None).
+    """(plugin_root, plugin_version, plugin_sha|None, plugin_dirty|None).
 
     sha 는 plugin_root 가 git 작업 트리의 꼭대기일 때만 낸다 — 플러그인을 품은 상위 레포의 HEAD 를 빌리지 않는다.
+    dirty 는 sha 를 냈을 때만 잰다 — 그 행의 측정이 HEAD 그대로였는지(F-196).
     """
     version = None
     with contextlib.suppress(OSError, ValueError, AttributeError):
@@ -393,7 +404,7 @@ def plugin_info() -> tuple:
         if (proc.returncode == 0 and len(lines) == 2 and SHA_RE.fullmatch(lines[1])
                 and os.path.realpath(lines[0]) == os.path.realpath(str(PLUGIN_ROOT))):
             sha = lines[1]
-    return str(PLUGIN_ROOT), version, sha
+    return str(PLUGIN_ROOT), version, sha, (tree_dirty(PLUGIN_ROOT) if sha else None)
 
 
 # ── 행 ──────────────────────────────────────────────────────────────────────
@@ -434,7 +445,7 @@ def close_marker(pdir: Path, path: Path, run_id: str, attempt: int, status: str,
     sid = sid or (marker.get("session_id") if isinstance(marker.get("session_id"), str) else "")
     sid = sid if SID_RE.fullmatch(sid or "") else ""
     model, effort = model_and_effort(env, sid, projects_root)
-    root, version, sha = plugin_info()
+    root, version, sha, dirty = plugin_info()
     row = {
         "schema": RUN_SCHEMA,
         "run_id": run_id,
@@ -456,10 +467,11 @@ def close_marker(pdir: Path, path: Path, run_id: str, attempt: int, status: str,
         "plugin_root": root,
         "plugin_version": version,
         "plugin_sha": sha,
+        "plugin_dirty": dirty,
         "gate_issues": gate_issues,
         "findings": findings,
     }
-    for optional in ("reason", "workflow_run_id", "plugin_sha", "gate_issues", "findings"):
+    for optional in ("reason", "workflow_run_id", "plugin_sha", "plugin_dirty", "gate_issues", "findings"):
         if row[optional] is None:
             del row[optional]
     row = {k: row[k] for k in ROW_KEYS if k in row}
@@ -519,6 +531,10 @@ def cmd_end(args, env) -> int:
         if not markers:
             done = attempts_of(read_rows(pdir, rid))
             if not done:
+                other = open_elsewhere(env, args.skill, pid)
+                if other:
+                    raise Unavailable(f"no open run for --skill {args.skill} (run {rid}) — start 는 다른 키에 열려 있다: {other} "
+                                      "— start 와 같은 --work-dir 로 end 하라(자동으로 닫지 않는다 · F-758)")
                 raise Unavailable(f"no open run for --skill {args.skill} (run {rid}) — start was not recorded")
             print(f"RUN {rid} already ended (attempt {max(done)})")
             return 0
@@ -530,6 +546,25 @@ def cmd_end(args, env) -> int:
                            gate_issues=args.gate_issues, findings=args.findings)
     print(f"RUN {rid} attempt {attempt} {args.status}" if row else f"RUN {rid} already ended (attempt {attempt})")
     return 0
+
+
+def open_elsewhere(env, skill: str, pid: str) -> str:
+    """같은 세션 · 같은 스킬의 열린 표지가 다른 실행 키 아래 있는가(F-758) — start 는 --work-dir 없이 · end 는 있게 부르면 키가 갈린다.
+    세션을 모르면 대조하지 않는다(다른 세션 표지를 가리키면 엉뚱한 안내가 된다)."""
+    sid = session_of(env)
+    if not sid:
+        return ""
+    found = []
+    for path in sorted(state_root(env).glob("*/open/*.json")):
+        if path.parent.parent.name == pid:
+            continue
+        try:
+            m = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(m, dict) and m.get("session_id") == sid and m.get("skill") == skill:
+            found.append(f"RUN {m.get('run_id')} (work_dir={m.get('work_dir') or '없음'})")
+    return " · ".join(found)
 
 
 def marker_epoch(path: Path, marker: dict) -> float:
@@ -923,6 +958,22 @@ def self_test() -> int:
             ok = rc == 1 and "RUN_METRICS_UNAVAILABLE" in err and "unknown --skill" in err and not list(st.glob("*/open/*"))
             return ok, f"rc={rc} err={err.strip()[:120]}"
 
+        def c_end_key_split():
+            # F-758 — start 를 --work-dir 없이 · end 를 --work-dir 로 부르면 키가 갈린다. 안내에 start 의 RUN id 가 나온다
+            st = base / "st-split"
+            wd = base / "wd-split"
+            wd.mkdir()
+            r1 = cli(st, "start", "--skill", "fz-plan", "--mode", "light", "--recommended", "light", "--source", "gate")
+            rid = r1[1].split()[1] if r1[1].startswith("RUN ") else "?"
+            rc, _, err = end(st, "fz-plan", wd)
+            st2 = base / "st-split-none"
+            wd2 = base / "wd-split-none"
+            wd2.mkdir()
+            rc2, _, err2 = end(st2, "fz-plan", wd2)
+            ok = (r1[0] == 0 and rc == 1 and rid in err and "다른 키에 열려 있다" in err and "work_dir=없음" in err
+                  and rc2 == 1 and "start was not recorded" in err2 and "다른 키" not in err2)
+            return ok, f"start={r1[1].strip()[:60]} rc={rc} err={err.strip()[:160]} | none rc={rc2} err={err2.strip()[:80]}"
+
         def c_active_min():
             t = base / "active.jsonl"
             def ev(ts, content, role="assistant"):
@@ -941,13 +992,34 @@ def self_test() -> int:
             d = active_minutes(t, "2026-01-01T10:30:00Z", "2026-01-01T10:00:00Z")   # 시각 이상 → None
             return (a, b, c, d) == (18.0, 3.0, None, None), f"got {(a, b, c, d)}"
 
+        def c_plugin_dirty():
+            # F-196 — 행이 HEAD SHA 를 적으면 미커밋 여부도 같이 적는다(임시 git 트리로 깨끗함 · 바뀜 두 값을 잰다)
+            repo = base / "dirty-repo"
+            repo.mkdir()
+            git = ["git", "-C", str(repo), "-c", "core.hooksPath=/dev/null", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+            (repo / "a.txt").write_text("a\n", encoding="utf-8")
+            for cmd in (["init", "-q"], ["add", "-A"], ["commit", "-qm", "base"]):
+                subprocess.run(git + cmd, check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=30)
+            clean = tree_dirty(repo)
+            (repo / "a.txt").write_text("b\n", encoding="utf-8")
+            changed = tree_dirty(repo)
+            gone = tree_dirty(base / "no-such-repo")
+            st, wd = base / "s-dirty", base / "wd-dirty"
+            outs = [start(st, "fz-search", wd), end(st, "fz-search", wd)]
+            rows, _ = rows_of(st)
+            row = rows[0] if len(rows) == 1 else {}
+            paired = ("plugin_sha" not in row) or isinstance(row.get("plugin_dirty"), bool)
+            ok = (clean, changed, gone) == (False, True, None) and all(o[0] == 0 for o in outs) and paired
+            return ok, f"clean={clean} changed={changed} gone={gone} sha={'plugin_sha' in row} dirty={row.get('plugin_dirty')!r}"
+
         cases = (("concurrent", c_concurrent), ("duplicate-end", c_duplicate_end), ("interrupted", c_interrupted),
                  ("write-failure", c_write_failure), ("no-body-copy", c_no_body_copy), ("source-default", c_source_default),
                  ("resume-attempt", c_resume_attempt), ("reuse-open", c_reuse_open),
                  ("reuse-open-other-session", c_reuse_open_other_session), ("reuse-open-stale", c_reuse_open_stale),
                  ("reuse-open-no-session", c_reuse_open_no_session), ("reuse-open-newest", c_reuse_open_newest),
                  ("harness-fields", c_harness_fields), ("skill-alias", c_skill_alias),
-                 ("unknown-skill", c_unknown_skill), ("active-min", c_active_min))
+                 ("unknown-skill", c_unknown_skill), ("end-key-split", c_end_key_split), ("active-min", c_active_min),
+                 ("plugin-dirty", c_plugin_dirty))
         passed = 0
         for name, fn in cases:
             try:

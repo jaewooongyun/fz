@@ -7,7 +7,8 @@
   3. fz-findings `entries/F-*.md` frontmatter — 사람이 쓴다
   4. `measure_constraint_load.py` 표1 — 호출 시 계산된다(정적)
   5. 실행 기록 `${FZ_RUN_STATE:-~/.fz/runs}/*/runs.jsonl` — `run_metrics.py` 가 쓴다(스킬 실행 시도 1회 = 1행 ·
-     gate_issues · findings 칸은 §8 Gate 기여도 판정 = JSON `harness` — experiment-log.md §5.4 손 기록을 대신한다)
+     gate_issues · findings 칸은 §8 Gate 기여도 판정 = JSON `harness` — experiment-log.md §5.4 손 기록을 대신한다 ·
+     work_dir 칸은 §9 명명 산출물 생산률 = JSON `artifacts` · `--artifact-rate` — 그 폴더에 `skills/*/SKILL.md` 가 이름 붙인 파일이 있는가 · F-598)
 중복 소스를 만들지 않는 것이 계측의 1차 제약이다(plan §2).
 
 한계(정직성):
@@ -963,10 +964,44 @@ def collect_findings(findings_dir, since, until, ledger_path=None):
 
 
 RE_RECUR_PHRASE = re.compile(r"(F-\d{3}[a-z]?)[^\n]{0,40}재발|재발[^\n]{0,40}(F-\d{3}[a-z]?)")
+RE_REOBS_HEAD = re.compile(r"^#{2,3}\s*재관측\b")
+RE_DAY = re.compile(r"\d+-\d+-\d+")     # 숫자 덩어리 전체 — 부분 문자열(`2026-11-301` 의 `2026-11-30`)을 날짜로 뽑지 않는다 · 판정은 `_calendar_day`
+
+
+def _calendar_day(s):
+    """`YYYY-MM-DD` 이고 달력에 있으면 s, 아니면 None — `2026-11-31` 은 관측일이 아니다."""
+    try:
+        return s if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s) and datetime.date.fromisoformat(s) else None
+    except ValueError:
+        return None
+
+
+def _reobs_days(body):
+    """(본문 `## 재관측 … YYYY-MM-DD …` 절 머리의 날짜 집합, 달력에 없는 날짜 목록) — 펜스 밖 머리 줄만(인용한 예시는 관측이 아니다)."""
+    days, bad, fence = set(), [], None    # 여는 펜스(문자 · 길이) — 같은 문자 · 같거나 긴 줄만 닫는다(CommonMark · 위생 `_fence_free` 와 같다)
+    for line in body.splitlines():
+        m = re.match(r"^\s*(`{3,}|~{3,})(.*)$", line)
+        if m:
+            run = m.group(1)
+            if fence is None:
+                fence = run
+            elif run[0] == fence[0] and len(run) >= len(fence) and not m.group(2).strip():
+                fence = None
+            continue
+        if fence is None and RE_REOBS_HEAD.match(line):
+            for d in RE_DAY.findall(line):
+                if _calendar_day(d):
+                    days.add(d)
+                else:
+                    bad.append(d)
+    return days, bad
 
 
 def _collect_track_d(findings_dir):
-    """트랙 D 후보 — 같은 `failure_class`(README §4) 묶음의 서로 다른 `date` 수(관측일). 기간 창과 무관하다.
+    """트랙 D 후보 — 같은 `failure_class`(README §4) 묶음의 서로 다른 관측일 수. 기간 창과 무관하다.
+
+    관측일 = 구성원의 `date` ∪ 본문 `## 재관측 … YYYY-MM-DD` 절 머리의 날짜(README §4 작성 규칙 — 같은 클래스 재관측은
+    새 ID 대신 절로 적는다. 절을 세지 않으면 규칙을 지킬수록 승격 계수가 굶는다).
 
     관측일은 세션 수가 아니다 — 자정을 넘긴 한 세션은 2일, 같은 날 별개 세션 둘은 1일이다.
     ⛔ `recurs_of` 는 묶지 않는다(같은 축이어도 원인이 다를 수 있다) — 클래스가 다른 간선만 `related` 로 보인다.
@@ -1000,9 +1035,15 @@ def _collect_track_d(findings_dir):
                 continue                   # 같은 번호가 live 에도 있으면 live 가 이긴다 — archive 가 덮으면 live 묶음이 사라진다
             body = text.split("\n---\n", 1)[1] if "\n---\n" in text else ""
             day = str(meta.get("date") or "")
+            reobs, bad = _reobs_days(body)
+            if day and not _calendar_day(day):
+                bad.insert(0, "date: " + day)
+            if bad:                        # ⛔ 틀린 날짜는 관측일에서 빼고 미측정으로 알린다 — 조용히 세거나 버리지 않는다
+                out["unmeasured"].append("%s 날짜 형식 틀림 %s" % (name, " · ".join(bad)))
             root = re.match(r"^\[?\s*(F-\d{3}[a-z]?)", str(meta.get("recurs_of") or ""))
             members[fid] = {"class": str(meta.get("failure_class") or ""), "archived": archived,
-                            "day": day if re.match(r"^\d{4}-\d{2}-\d{2}$", day) else None,
+                            "day": _calendar_day(day),
+                            "reobs": reobs,
                             "recurs_of": root.group(1) if root else None,
                             "refs": {a or b for a, b in RE_RECUR_PHRASE.findall(body)} - {fid}}
     groups = collections.defaultdict(list)
@@ -1018,7 +1059,7 @@ def _collect_track_d(findings_dir):
         if any(cls_of(ref) != m["class"] or not m["class"] for ref in m["refs"]):
             out["unlinked"] += 1
     for cls, ids in groups.items():
-        days = {members[i]["day"] for i in ids if members[i]["day"]}
+        days = {members[i]["day"] for i in ids if members[i]["day"]} | {d for i in ids for d in members[i]["reobs"]}
         if len(days) >= 2 and any(not members[i]["archived"] for i in ids):
             out["candidates"].append({"class": cls, "days": len(days), "members": [
                 {"id": i, "date": members[i]["day"] or "-", "archived": members[i]["archived"]}
@@ -1072,7 +1113,8 @@ def normalize_findings_dir(path):
 
 
 # APPLIED 4열 행(배출 · 수동)의 넷째 칸 머리 → 처리 값. 레거시 6열 대장은 다섯째 칸(`applied` 등)을 그대로 쓴다.
-OUTFLOW_KIND = (("works", "works"), ("subsumed", "subsumed"), ("rejected", "rejected"), ("applied", "applied"),
+OUTFLOW_KIND = (("works", "works"), ("subsumed", "subsumed"), ("rejected", "rejected"), ("expired", "expired"),
+                ("applied", "applied"),
                 ("릴리즈", "closes"), ("CORRECTION", "correction"))
 
 
@@ -1517,7 +1559,239 @@ def render_runs_section(runs):
     return lines
 
 
+# ── 4c. 명명 산출물 생산률 (F-598) ─────────────────────────────────────────────
+# 산문 지시의 실행률 — SKILL.md 가 `{WORK_DIR}/…` 로 이름 붙인 파일이 그 스킬 실행 폴더(실행 기록 work_dir)에 실제로 있는가.
+# ⛔ 경로는 원문에서 정적으로 뽑는다 — 스킬마다 산출물 목록 절이 따로 없어 읽기 · 쓰기를 가르지 않는다(표 머리에 적는다).
+# ⛔ 0% 를 그대로 실패로 치지 않는다(F-598 주의 — 0 은 측정 실패일 수 있다): 같은 스킬의 다른 명명 파일이 같은 폴더들에 있어야
+#    (대조 — `fz_wf_metrics.py --mcp-audit` 의 Read 대조와 같은 관용) 0% 가 실패다. 대조도 0 이면 미판정이다.
+# 판정 경계: 엔트리 "0% 가 두 판 넘게 이어지면 실패" — 리포터는 지난 판을 기억하지 않으므로 판 = 측정 폴더 하나로 읽는다(두 판 넘게 = 3 이상).
+ARTIFACT_FAIL_MIN_FOLDERS = 3
+RE_NAMED_ARTIFACT = re.compile(r"\{WORK_DIR\}/((?:\$?\{[^{}\s]*\}|[A-Za-z0-9_.*/-])+)")   # `${WORK_DIR}/` 도 맞는다 · `{a|b}` 는 중괄호 한 덩어리
+ARTIFACT_VERDICT_TEXT = {"ok": "-", "FAIL": "**FAIL**", "no-control": "0% — 대조 없음(미판정)",
+                         "preliminary": "0%% — 폴더 %d 미만(판정 보류)" % ARTIFACT_FAIL_MIN_FOLDERS, "unmeasured": "미측정"}
+
+
+def _artifact_glob(raw):
+    """원문 경로 → work_dir 기준 glob. `{…}` · `${…}` · 홀로 선 대문자(`step-N.md`)는 `*` 다.
+    파일이 아닌 것(마지막 조각에 확장자 없음 = 폴더)과 이름 전체가 와일드카드인 것(`*.md` — 아무 파일에나 맞아 거짓 100%)은 None."""
+    path = re.sub(r"\$?\{[^{}]*\}", "*", raw.rstrip("."))
+    path = re.sub(r"\*+", "*", re.sub(r"(?<![A-Za-z0-9])[A-Z](?![A-Za-z0-9])", "*", path))
+    stem, dot, ext = path.rsplit("/", 1)[-1].rpartition(".")
+    if not dot or not re.fullmatch(r"[A-Za-z0-9]+", ext) or not re.search(r"[A-Za-z0-9]", stem):
+        return None
+    return path
+
+
+def named_artifacts(plugin_root):
+    """{스킬: [glob]} — `<plugin_root>/skills/<스킬>/SKILL.md` 가 `{WORK_DIR}/…` 로 이름 붙인 파일 경로(중복 없이)."""
+    out = {}
+    for spec in sorted(glob.glob(os.path.join(plugin_root, "skills", "*", "SKILL.md"))):
+        try:
+            with open(spec, encoding="utf-8") as handle:
+                text = handle.read()
+        except OSError:
+            continue
+        paths = {_artifact_glob(raw) for raw in RE_NAMED_ARTIFACT.findall(text)} - {None}
+        if paths:
+            out[os.path.basename(os.path.dirname(spec))] = sorted(paths)
+    return out
+
+
+def collect_artifact_rates(rows, plugin_root):
+    """실행 기록 행 → 스킬 · 명명 경로별 생산률. 분모 = (스킬, work_dir) 폴더 중 그 스킬의 completed 행이 있고 지금 남아 있는 것.
+
+    ⛔ 재지 못한 것은 0% 가 아니라 미측정이다 — work_dir 없는 행 · 사라진 폴더 · 완료 행 없는 폴더는 분모에서 빼고 센다.
+       사양(SKILL.md)이 있는데 기간 안 실행 기록이 없는 스킬은 `unmeasured_skills` 다.
+    """
+    specs = named_artifacts(plugin_root)
+    folders = collections.defaultdict(dict)                  # 스킬 → {realpath: 완료 행 있음}
+    no_work_dir = collections.Counter()
+    for row in rows:
+        skill = str(row.get("skill"))
+        if skill not in specs:
+            continue
+        work_dir = row.get("work_dir")
+        if not isinstance(work_dir, str) or not work_dir:
+            no_work_dir[skill] += 1
+            continue
+        key = os.path.realpath(os.path.expanduser(work_dir))
+        folders[skill][key] = folders[skill].get(key, False) or row.get("status") == "completed"
+    skills, fails = [], []
+    for skill in sorted(set(folders) | set(no_work_dir)):
+        seen = folders[skill]
+        gone = sorted(wd for wd in seen if not os.path.isdir(wd))
+        measured = sorted(wd for wd, done in seen.items() if done and wd not in gone)
+        produced = {path: sum(1 for wd in measured if glob.glob(os.path.join(glob.escape(wd), path)))
+                    for path in specs[skill]}
+        control = max(produced, key=lambda p: (produced[p], p)) if measured and max(produced.values()) else None
+        paths = []
+        for path in specs[skill]:
+            got = produced[path]
+            if not measured:
+                verdict = "unmeasured"
+            elif got:
+                verdict = "ok"
+            elif control is None:
+                verdict = "no-control"
+            elif len(measured) < ARTIFACT_FAIL_MIN_FOLDERS:
+                verdict = "preliminary"
+            else:
+                verdict = "FAIL"
+                fails.append((skill, path))
+            paths.append({"path": path, "produced": got if measured else None,
+                          "rate": round(100.0 * got / len(measured), 1) if measured else None, "verdict": verdict})
+        paths.sort(key=lambda p: (p["rate"] is None, p["rate"] or 0.0, p["path"]))
+        skills.append({"skill": skill, "folders": len(measured), "no_work_dir": no_work_dir[skill], "gone": len(gone),
+                       "not_completed": sum(1 for wd, done in seen.items() if not done and wd not in gone),
+                       "control": control, "paths": paths})
+    ran = {s["skill"] for s in skills}
+    return {"specs": len(specs), "skills": skills, "fails": fails, "min_folders": ARTIFACT_FAIL_MIN_FOLDERS,
+            "unmeasured_skills": sorted(s for s in specs if s not in ran)}
+
+
+def artifact_rate_verdict(rates):
+    """(exit, 줄) — 1 FAIL 있음 · 2 잰 폴더 0(미측정 — 통과 아님) · 0 그 밖."""
+    if rates["fails"]:
+        return 1, "ARTIFACT_RATE_FAIL %d — %s" % (len(rates["fails"]), " · ".join("%s:%s" % f for f in rates["fails"]))
+    if not any(s["folders"] for s in rates["skills"]):
+        return 2, "ARTIFACT_RATE_UNRUN — 잰 실행 폴더가 0 이다(사양 %d · 실행 기록 · work_dir 를 먼저 의심하라 — ⛔ 통과 아님)" % rates["specs"]
+    return 0, "ARTIFACT_RATE_OK — 실행 폴더 %d 에서 FAIL 0" % sum(s["folders"] for s in rates["skills"])
+
+
+def render_artifact_section(rates):
+    """§9 줄 목록 — rates 는 collect_artifact_rates 결과."""
+    lines = ["## 9. 명명 산출물 생산률 (F-598)", ""]
+    lines.append("> 실행 기록(기간은 §7 과 같다)의 work_dir 에 스킬 SKILL.md 가 `{WORK_DIR}/…` 로 이름 붙인 파일이 있는 폴더 비율이다. "
+                 "분모 = (스킬, work_dir) 폴더 중 그 스킬의 완료 행이 있고 지금 남아 있는 것. 경로는 원문에서 읽기 · 쓰기를 가르지 않고 "
+                 "뽑았다(`{…}` · 홀로 선 대문자 = 와일드카드 · 폴더와 이름 전체가 와일드카드인 것은 뺀다). 지금의 SKILL.md 로 지난 실행을 재므로 "
+                 "최근에 더한 경로는 낮게 나온다. 0%% 는 같은 스킬의 다른 명명 파일이 같은 폴더들에 있고(대조) 폴더가 %d 이상일 때만 "
+                 "FAIL 이다 — 대조가 없으면 미판정이다." % rates["min_folders"])
+    lines.append("> 도구 호출률은 여기서 재지 않는다 — `scripts/fz_wf_metrics.py --mcp-audit` 가 워크플로 실행마다 Serena 심볼 읽기 도구 "
+                 "호출을 대조(Read)와 함께 판정하고, 그 exit 1(`MCP_WIRING_SUSPECT` 등)이 배선 의심이다.")
+    lines.append("")
+    lines.append("| 스킬 | 명명 경로 | 있음 | 측정 폴더 | 생산률 | 판정 |")
+    lines.append("|---|---|---|---|---|---|")
+    for skill in rates["skills"]:
+        for row in skill["paths"]:
+            lines.append("| %s | `%s`%s | %s | %d | %s | %s |" % (
+                skill["skill"], row["path"], " (대조)" if row["path"] == skill["control"] else "",
+                "n/a" if row["produced"] is None else row["produced"], skill["folders"],
+                "n/a" if row["rate"] is None else fmt(row["rate"]) + "%", ARTIFACT_VERDICT_TEXT[row["verdict"]]))
+    if not rates["skills"]:
+        lines.append("| - | - | n/a | 0 | n/a | 미측정 |")
+    lines.append("")
+    for skill in rates["skills"]:
+        if skill["no_work_dir"] or skill["gone"] or skill["not_completed"]:
+            lines.append("- %s 분모 밖(미측정): work_dir 없는 행 %d · 사라진 폴더 %d · 완료 행 없는 폴더 %d" % (
+                skill["skill"], skill["no_work_dir"], skill["gone"], skill["not_completed"]))
+    if not rates["specs"]:
+        lines.append("- 사양 없음 — `skills/*/SKILL.md` 에서 `{WORK_DIR}/…` 경로를 하나도 못 찾았다(미측정)")
+    if rates["unmeasured_skills"]:
+        lines.append("- 기간 안 실행 기록 없음(미측정 — 0%% 가 아니다): %s" % " · ".join(rates["unmeasured_skills"]))
+    lines.append("")
+    lines.append(artifact_rate_verdict(rates)[1])
+    lines.append("")
+    return lines
+
+
 # ── 5. 렌더링 ───────────────────────────────────────────────────────────────
+# ── 4d. 선언 도구 호출률 · 심볼 도구 점검 기록 (F-598 도구 축) ────────────────────────────
+TOOL_RATE_MIN_WORKERS = 3
+RE_PLUGIN_MCP = re.compile(r"^mcp__plugin_[^_]+_([^_]+)__")   # 설치 방식만 다른 두 이름(mcp__x__ · mcp__plugin_y_x__)을 하나로 센다
+
+
+def _tool_key(name):
+    return RE_PLUGIN_MCP.sub(r"mcp__\1__", name)
+
+
+def declared_tools(plugin_root):
+    """agents/*.md 머리말 `tools:` → {fz:<이름>: {정규화한 도구}}."""
+    out = {}
+    for f in sorted(glob.glob(os.path.join(plugin_root, "agents", "*.md"))):
+        try:
+            with open(f, encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        m = re.match(r"---\n(.*?)\n---", text, re.S)
+        t = re.search(r"^tools:\s*(.+)$", m.group(1), re.M) if m else None
+        if t:
+            out["fz:" + os.path.basename(f)[:-3]] = {_tool_key(x.strip()) for x in t.group(1).split(",") if x.strip()}
+    return out
+
+
+def collect_tool_rates(projects_root, plugin_root, since, until):
+    """워크플로 워커 기록(meta 의 agentType)마다 선언 도구 중 한 번이라도 부른 것 — {종류: {workers, called{도구: 워커 수}}}.
+    기간은 기록 파일 수정 시각으로 자른다. 선언 밖 도구는 세지 않는다. 판정하지 않는다(INFO — 안 쓴 선언 도구가 곧 결함은 아니다)."""
+    declared, per = declared_tools(plugin_root), {}
+    lo, hi = since.timestamp(), until.timestamp()
+    for meta in glob.glob(os.path.join(projects_root, "*", "*", "subagents", "workflows", "wf_*", "agent-*.meta.json")):
+        tr = meta[: -len(".meta.json")] + ".jsonl"
+        try:
+            with open(meta, encoding="utf-8") as fh:
+                kind = json.load(fh).get("agentType")
+            if kind not in declared or not lo <= os.path.getmtime(tr) < hi:
+                continue
+            names = set()
+            with open(tr, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    if '"tool_use"' not in line:
+                        continue
+                    try:
+                        content = ((json.loads(line).get("message") or {}).get("content")) or []
+                    except ValueError:
+                        continue
+                    names.update(_tool_key(b.get("name", "")) for b in content if isinstance(b, dict) and b.get("type") == "tool_use")
+        except (OSError, ValueError, AttributeError):
+            continue
+        rec = per.setdefault(kind, {"workers": 0, "called": {}})
+        rec["workers"] += 1
+        for n in names & declared[kind]:
+            rec["called"][n] = rec["called"].get(n, 0) + 1
+    unused = sorted((k, t, r["workers"]) for k, r in per.items() if r["workers"] >= TOOL_RATE_MIN_WORKERS
+                    for t in declared[k] if not r["called"].get(t))
+    return {"per": per, "unused": unused, "declared_kinds": len(declared)}
+
+
+def sweep_summary(runs_root, since, until):
+    """Stop 훅 심볼 도구 점검 기록(`mcp-sweep.jsonl`)의 기간 합 — 기록이 없으면 None(0 으로 쓰지 않는다)."""
+    path = os.path.join(runs_root, "mcp-sweep.jsonl")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        return None
+    tot, n = {}, 0
+    for ln in lines:
+        try:
+            rec = json.loads(ln)
+            at = datetime.datetime.strptime(rec["at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+        except (ValueError, KeyError, TypeError):
+            continue
+        if since <= at < until:
+            n += 1
+            for k, v in (rec.get("summary") or {}).items():
+                tot[k] = tot.get(k, 0) + (v if isinstance(v, int) else 0)
+    return {"records": n, **tot}
+
+
+def render_tool_lines(tools, sweep):
+    lines = ["", "## 9b. 선언 도구 호출률 · 심볼 도구 점검 (F-598 · INFO — 막지 않는다)", ""]
+    for k in sorted(tools["per"]):
+        r = tools["per"][k]
+        lines.append("- %s 워커 %d — %s" % (k, r["workers"], " · ".join("%s %d" % (t.split("__")[-1], c) for t, c in sorted(r["called"].items())) or "선언 도구 호출 0"))
+    lines.append("TOOL_RATE 워커 종류 %d/%d · 워커 %d 이상인데 한 번도 안 부른 선언 도구 %d%s" % (
+        len(tools["per"]), tools["declared_kinds"], TOOL_RATE_MIN_WORKERS, len(tools["unused"]),
+        (" — " + " · ".join("%s:%s" % (k, t.split("__")[-1]) for k, t, _ in tools["unused"][:6])) if tools["unused"] else ""))
+    if sweep is None:
+        lines.append("MCP_SWEEP 기록 없음 — Stop 훅 훑기 기록(mcp-sweep.jsonl)을 읽지 못했다(⛔ 0 이 아니다)")
+    else:
+        lines.append("MCP_SWEEP 기록 %d · 의심 %d · 미판정 %d · 사용 %d%s" % (
+            sweep["records"], sweep.get("suspect", 0), sweep.get("undecided", 0), sweep.get("used", 0),
+            " — 의심은 `fz_wf_metrics.py --mcp-audit` 낱말 표(modules/symbol-tools-audit.md)로 본다" if sweep.get("suspect") else ""))
+    return lines
+
+
 def build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot, runs, harness):
     models = []
     for key in sorted(agg.by_model, key=lambda k: -agg.by_model[k]["out"]):
@@ -1938,6 +2212,8 @@ def render_markdown(payload):
     lines.append("")
     lines.extend(render_runs_section(payload["runs"]))
     lines.extend(render_harness_section(payload["harness"]))
+    if payload.get("artifacts") is not None:
+        lines.extend(render_artifact_section(payload["artifacts"]))
     return "\n".join(lines) + "\n"
 
 
@@ -1960,6 +2236,7 @@ def run_report(args):
     harness = summarize_harness(collected_runs["rows"])
 
     payload = build_payload(args, agg, wf_rows, unknown, findings, static_rows, static_err, last_snapshot, runs, harness)
+    payload["artifacts"] = collect_artifact_rates(collected_runs["rows"], os.path.expanduser(args.plugin_root))
 
     if args.out:
         out_path = os.path.expanduser(args.out)
@@ -2092,7 +2369,8 @@ def _write_selftest_tree(base):
                      "| 2026-08-24 | F-080 | x | y | `applied` | z |\n\n"
                      "| 9.9.9 | F-091-old | `v9.9.9.md` | 릴리즈 `Closes:` 로 배출 |\n\n"
                      "| 2026-08-20 | F-090-gone | triage-x | works — 근거 |\n"
-                     "| 2026-08-22 | F-092-local | main abc1234 | applied — scripts/x.py |\n")
+                     "| 2026-08-22 | F-092-local | main abc1234 | applied — scripts/x.py |\n"
+                     "| 2026-08-23 | F-093-stale | 관측 부족 | expired — 수동 처분(--dispose) |\n")
     return os.path.join(base, "projects"), findings_dir
 
 
@@ -2322,8 +2600,8 @@ def self_test():
     check("d1-owner-split — 대기열 귀속별(owner 없음 = plugin · 합 = 대기)", (dict(backlog["owner"]), sum(backlog["owner"].values())),
           ({OWNER_DEFAULT: 2, "wave-kit": 1}, backlog["n"]))
     check("archive axis(없으면 -)", (outflow["archived"], outflow["axis"]["works"], outflow["axis"]["-"]), (2, 1, 1))
-    check("APPLIED 세 형식 처리 값(4열 applied 포함)", dict(outflow["kind"]), {"applied": 2, "closes": 1, "works": 1})
-    check("창 안 처리 값 · 날짜 없는 행", (dict(outflow["kind_in_window"]), outflow["undated_rows"]), ({"applied": 2, "works": 1}, 1))
+    check("APPLIED 세 형식 처리 값(4열 applied · expired 포함)", dict(outflow["kind"]), {"applied": 2, "closes": 1, "works": 1, "expired": 1})
+    check("창 안 처리 값 · 날짜 없는 행", (dict(outflow["kind_in_window"]), outflow["undated_rows"]), ({"applied": 2, "works": 1, "expired": 1}, 1))
     unset = collect_findings("", since, until)
     check("빈 경로 = 미설정(현재 폴더를 훑지 않는다)", (unset["total_files"], unset["enumeration_error"][:3], unset["outflow"]["archived"]), (0, "미설정", 0))
     gone = collect_findings(os.path.join(base, "없는-폴더"), since, until)
@@ -2443,6 +2721,42 @@ def self_test():
               ([("F-108", False), ("F-109", False)], False))
         check("track-d-count-rule-unchanged", sorted((c["class"], c["days"]) for c in tdd["candidates"]),
               [("live-c", 2), ("reg-a", 2), ("unreg-b", 2)])
+        # 재관측 절 관측일(ISSUE-004) — 엔트리 1 + 다른 날 재관측 절 1 = 관측일 2 · 같은 날 절은 1 · 펜스 안 절은 세지 않는다
+        put("entries", "F-111", "2026-10-08", "reobs-one", "")
+        with open(os.path.join(ent, "F-111-x.md"), "a", encoding="utf-8") as h:
+            h.write("\n## 재관측 2 — 다시 봤다 (2026-10-09 · 별개 세션)\n\n- x\n")
+        put("entries", "F-112", "2026-10-08", "reobs-same-day", "")
+        with open(os.path.join(ent, "F-112-x.md"), "a", encoding="utf-8") as h:
+            h.write("\n## 재관측 2026-10-08\n\n- 같은 날\n")
+        put("entries", "F-113", "2026-10-08", "reobs-fenced", "")
+        with open(os.path.join(ent, "F-113-x.md"), "a", encoding="utf-8") as h:
+            # 네 백틱 펜스 안에 세 백틱 예시 — 안쪽 ``` 는 펜스를 닫지 않는다
+            h.write("\n```\n## 재관측 2026-10-09\n```\n\n````markdown\n```\n## 재관측 2026-10-10\n```\n## 재관측 2026-10-11\n````\n")
+        got = {c["class"]: c["days"] for c in _collect_track_d(ent)["candidates"]}
+        check("track-d-reobs-section-adds-day — 절 날짜 = 관측일 · 같은 날 · 펜스 안은 더하지 않는다",
+              (got.get("reobs-one"), got.get("reobs-same-day"), got.get("reobs-fenced")), (2, None, None))
+        for fid in ("F-111", "F-112", "F-113"):
+            os.remove(os.path.join(ent, "%s-x.md" % fid))
+        # 달력에 없는 날짜(ISSUE-1241) — 재관측 절 · frontmatter date 어느 쪽이든 관측일로 세지 않고 미측정으로 알린다
+        put("entries", "F-114", "2026-10-08", "reobs-bad-day", "")
+        with open(os.path.join(ent, "F-114-x.md"), "a", encoding="utf-8") as h:
+            h.write("\n## 재관측 2026-11-31\n\n- 없는 날\n")
+        put("entries", "F-115", "2026-11-31", "date-bad-day", "")
+        with open(os.path.join(ent, "F-115-x.md"), "a", encoding="utf-8") as h:
+            h.write("\n## 재관측 2026-12-01\n\n- 있는 날\n")
+        put("entries", "F-116", "2026-10-08", "reobs-long-token", "")
+        with open(os.path.join(ent, "F-116-x.md"), "a", encoding="utf-8") as h:
+            h.write("\n## 재관측 2026-11-301\n\n- 긴 토큰\n\n## 재관측 12026-11-30\n\n- 앞이 긴 토큰\n")
+        tdb = _collect_track_d(ent)
+        got = {c["class"]: c["days"] for c in tdb["candidates"]}
+        check("track-d-invalid-day-not-counted — 없는 날 · 긴 숫자 토큰은 관측일이 아니고 미측정으로 남는다",
+              (got.get("reobs-bad-day"), got.get("date-bad-day"), got.get("reobs-long-token"),
+               any("F-114" in u and "2026-11-31" in u for u in tdb["unmeasured"]),
+               any("F-115" in u and "date: 2026-11-31" in u for u in tdb["unmeasured"]),
+               any("F-116" in u and "2026-11-301" in u and "12026-11-30" in u for u in tdb["unmeasured"])),
+              (None, None, None, True, True, True))
+        for fid in ("F-114", "F-115", "F-116"):
+            os.remove(os.path.join(ent, "%s-x.md" % fid))
         # D1 — owner 를 단 판과 지운 판: 귀속 칸만 다르고 트랙 D 후보(failure_class · 관측일 · 구성원) · 재발 간선 · 뿌리는 같다
         def cut(o):
             return (sorted((c["class"], c["days"], sorted(m["id"] for m in c["members"])) for c in o["track_d"]["candidates"]),
@@ -2472,6 +2786,93 @@ def self_test():
         check("r3-f148-route-annotated — 사용 표에 도달 경로 열 · manual-only · agent-preload 의 0 은 미사용 판정 불가로 적는다",
               (routes, "| auto | 0 |" in tbl["a"], "| manual-only | 0 (이 경로의 0 — 미사용 판정 불가) |" in tbl["b"], "| agent-preload | 3 |" in tbl["c"]),
               ({"a": "auto", "b": "manual-only", "c": "agent-preload", "d": "agent-preload"}, True, True, True))
+
+    # F-598 — 명명 산출물 생산률. s1 = 섞인 폴더 · s2 = 실행 기록 없음 · s3 = work_dir 없음 + 사라진 폴더 · s4 = 대조 없는 0% · s5 = 폴더 2
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory() as t:
+        specs = {"s1": "스크립트가 쓴다 `${WORK_DIR}/gen/stamp.json` · 보고서 {WORK_DIR}/out/report-{light|deep}.md\n"
+                       "사전 캐싱 {WORK_DIR}/cache/pre.md · [--risks {WORK_DIR}/code/step-N.md]...\n"
+                       "폴더 {WORK_DIR}/evidence/ · {WORK_DIR}/review · 아무 파일 {WORK_DIR}/*.md\n",
+                 "s2": "{WORK_DIR}/only.md\n", "s3": "{WORK_DIR}/x.md\n", "s4": "{WORK_DIR}/never.md\n",
+                 "s5": "{WORK_DIR}/a.md · {WORK_DIR}/b.md\n"}
+        for name, body in specs.items():
+            os.makedirs(os.path.join(t, "skills", name))
+            with open(os.path.join(t, "skills", name, "SKILL.md"), "w", encoding="utf-8") as fh:
+                fh.write("---\nname: %s\n---\n%s" % (name, body))
+        wd = os.path.join(t, "wd")
+        files = {"A": ["gen/stamp.json", "out/report-light.md"], "B": ["gen/stamp.json", "out/report-deep.md"],
+                 "C": ["gen/stamp.json", "code/step-3.md"], "D": ["gen/stamp.json"],
+                 "E": ["gen/stamp.json", "cache/pre.md"],           # E 는 완료 행이 없다 — 여기 pre.md 는 세지 않는다
+                 "F": [], "G": [], "H": [], "I": ["a.md"], "J": []}
+        for folder, names in files.items():
+            os.makedirs(os.path.join(wd, folder))
+            for rel in names:
+                os.makedirs(os.path.dirname(os.path.join(wd, folder, rel)), exist_ok=True)
+                open(os.path.join(wd, folder, rel), "w").close()
+        plan = [("s1", "A", "interrupted"), ("s1", "A", "completed"), ("s1", "B", "completed"), ("s1", "C", "completed"),
+                ("s1", "D", "completed"), ("s1", "E", "interrupted"), ("s3", None, "completed"), ("s3", "gone", "completed"),
+                ("s4", "F", "completed"), ("s4", "G", "completed"), ("s4", "H", "completed"),
+                ("s5", "I", "completed"), ("s5", "J", "completed")]
+        runs_dir = os.path.join(t, "runs", "p1")
+        os.makedirs(runs_dir)
+        with open(os.path.join(runs_dir, "runs.jsonl"), "w", encoding="utf-8") as fh:
+            for i, (skill, folder, status) in enumerate(plan):
+                fh.write(json.dumps({"schema": 1, "run_id": "r%d" % i, "attempt": 1, "skill": skill, "mode": "light", "status": status,
+                                     "started_at": "2026-08-10T00:00:00Z", "work_dir": os.path.join(wd, folder) if folder else None}) + "\n")
+        rates = collect_artifact_rates(collect_runs(os.path.join(t, "runs"))["rows"], t)
+        by = {s["skill"]: s for s in rates["skills"]}
+        cut = {s: {p["path"]: (p["produced"], p["rate"], p["verdict"]) for p in by[s]["paths"]} for s in by}
+        check("f598-artifact-extract — `{…}` · 홀로 선 대문자 = 와일드카드 · 폴더와 이름 전체 와일드카드는 뺀다",
+              named_artifacts(t)["s1"], ["cache/pre.md", "code/step-*.md", "gen/stamp.json", "out/report-*.md"])
+        check("f598-artifact-rate-mixed — 있는 폴더 · 없는 폴더가 섞인 생산률(분모 = 완료 폴더 · 같은 폴더 두 시도는 1 · 미완료 폴더는 밖)",
+              (cut["s1"], by["s1"]["folders"], by["s1"]["not_completed"]),
+              ({"cache/pre.md": (0, 0.0, "FAIL"), "code/step-*.md": (1, 25.0, "ok"), "gen/stamp.json": (4, 100.0, "ok"),
+                "out/report-*.md": (2, 50.0, "ok")}, 4, 1))
+        check("f598-artifact-positive-control — 스크립트가 늘 만드는 파일은 100% 이고 그 스킬의 대조로 잡힌다",
+              (cut["s1"]["gen/stamp.json"][1], by["s1"]["control"]), (100.0, "gen/stamp.json"))
+        s3_lines = [ln for ln in render_artifact_section(rates) if ln.startswith("| s3 |")]
+        check("f598-artifact-unmeasured — 실행 기록 없음 · work_dir 없음 · 사라진 폴더는 0% 가 아니라 미측정",
+              ("s2" in rates["unmeasured_skills"], (by["s3"]["folders"], by["s3"]["no_work_dir"], by["s3"]["gone"]), cut["s3"],
+               s3_lines, "s2" in by),
+              (True, (0, 1, 1), {"x.md": (None, None, "unmeasured")}, ["| s3 | `x.md` | n/a | 0 | n/a | 미측정 |"], False))
+        check("f598-artifact-zero-needs-control — 대조 없는 0%% 는 미판정 · 폴더 %d 미만의 0%% 는 판정 보류" % ARTIFACT_FAIL_MIN_FOLDERS,
+              (cut["s4"], cut["s5"], rates["fails"]),
+              ({"never.md": (0, 0.0, "no-control")}, {"b.md": (0, 0.0, "preliminary"), "a.md": (1, 50.0, "ok")}, [("s1", "cache/pre.md")]))
+        # F-598 도구 축 — 선언 도구 호출률(워커 3 · Read 셋 다 · Grep 0) · 기간 밖 워커 · 선언 밖 도구 · sweep 기록 기간 합
+        os.makedirs(os.path.join(t, "agents"))
+        with open(os.path.join(t, "agents", "lens.md"), "w", encoding="utf-8") as fh:
+            fh.write("---\nname: lens\ntools: Read, Grep, mcp__plugin_context7_context7__query-docs, mcp__context7__query-docs\n---\n")
+        wfd = os.path.join(t, "proj", "-p", "sess", "subagents", "workflows", "wf_x")
+        os.makedirs(wfd)
+        def worker(i, tools_, when):
+            base = os.path.join(wfd, "agent-w%d" % i)
+            with open(base + ".meta.json", "w", encoding="utf-8") as fh:
+                json.dump({"agentType": "fz:lens"}, fh)
+            with open(base + ".jsonl", "w", encoding="utf-8") as fh:
+                fh.write(json.dumps({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": n, "input": {}} for n in tools_]}}) + "\n")
+            os.utime(base + ".jsonl", (when, when))
+        aug = parse_day("2026-08-10").timestamp()
+        for i, tl in enumerate((["Read", "mcp__context7__query-docs"], ["Read", "Bash"], ["Read"])):
+            worker(i, tl, aug)
+        worker(9, ["Grep"], parse_day("2026-09-10").timestamp())   # 기간 밖 — 세지 않는다
+        with open(os.path.join(t, "runs", "mcp-sweep.jsonl"), "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"at": "2026-08-11T00:00:00Z", "summary": {"used": 2, "suspect": 1, "undecided": 0}}) + "\n"
+                     + json.dumps({"at": "2026-09-11T00:00:00Z", "summary": {"used": 5, "suspect": 4, "undecided": 1}}) + "\n")
+        tr = collect_tool_rates(os.path.join(t, "proj"), t, parse_day("2026-08-01"), parse_day("2026-09-01"))
+        sw = sweep_summary(os.path.join(t, "runs"), parse_day("2026-08-01"), parse_day("2026-09-01"))
+        check("f598-tool-rate-declared-calls — 종류별 선언 도구 호출 워커 수(두 이름 하나로) · 워커 3 이상 미호출 선언 도구 · 기간 밖 · 선언 밖 제외 · sweep 기간 합",
+              (tr["per"]["fz:lens"]["workers"], tr["per"]["fz:lens"]["called"], tr["unused"], sw["records"], sw["suspect"],
+               sweep_summary(os.path.join(t, "없는-runs"), parse_day("2026-08-01"), parse_day("2026-09-01"))),
+              (3, {"Read": 3, "mcp__context7__query-docs": 1}, [("fz:lens", "Grep", 3)], 1, 1, None))
+        window = ["--artifact-rate", "--plugin-root", t, "--projects-root", os.path.join(t, "proj"), "--since", "2026-08-01", "--until", "2026-08-31"]
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            codes = (main(window + ["--runs-root", os.path.join(t, "runs")]),
+                     main(window + ["--runs-root", os.path.join(t, "없는-runs")]))
+        check("f598-artifact-rate-mode-exit — CLI --artifact-rate: FAIL 있음 1 · 잰 폴더 0 은 2(통과 아님) · 도구 · sweep 줄",
+              (codes, "ARTIFACT_RATE_FAIL 1" in out.getvalue(), "ARTIFACT_RATE_UNRUN" in out.getvalue(),
+               "안 부른 선언 도구 1 — fz:lens:Grep" in out.getvalue(), "MCP_SWEEP 기록 1 · 의심 1" in out.getvalue(), "MCP_SWEEP 기록 없음" in out.getvalue()),
+              ((1, 2), True, True, True, True, True))
     failed = [c for c in checks if not c[1]]          # 모든 단언 뒤에 센다 — 앞에서 세면 뒤 단언의 FAIL 이 exit 0 으로 빠진다(r3 8.5 2차)
     for name, ok, got, want in checks:
         print("%s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else "  got=%r want=%r" % (got, want)))
@@ -2604,6 +3005,9 @@ def main(argv):
                         help="실행 기록 행(started_at 순 · 기간 무관)을 stdout JSON 으로 내고 끝낸다 — 다른 집계는 하지 않는다")
     parser.add_argument("--all-skills", action="store_true",
                         help="스킬 표에 호스트 프로젝트 · 다른 플러그인 · 미귀속까지 넣는다(기본: fz 소유만 — F-312)")
+    parser.add_argument("--artifact-rate", action="store_true",
+                        help="F-598 — 기간 안 실행 폴더에서 SKILL.md 가 이름 붙인 파일의 생산률(리포트 §9)만 stdout 에 내고 끝낸다 · "
+                             "exit 1 FAIL(0%% · 대조 있음 · 폴더 " + str(ARTIFACT_FAIL_MIN_FOLDERS) + " 이상) · 2 잰 폴더 0 · 0 그 밖")   # argparse 가 help 를 % 로 한 번 더 포맷한다 — %% 를 남긴다
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--plan-segments", metavar="SESSION_PREFIX",
                         help="세션의 /fz-plan 1회를 Lead 생성·GPT 대기·피드백 통합으로 분리 (plan-final S9c)")
@@ -2624,6 +3028,15 @@ def main(argv):
     if args.since is None:
         args.since = (parse_day(args.until) - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
     args.until_exclusive = ""
+    if args.artifact_rate:
+        rows = collect_runs(os.path.expanduser(args.runs_root), parse_day(args.since),
+                            parse_day(args.until) + datetime.timedelta(days=1))["rows"]
+        rates = collect_artifact_rates(rows, os.path.expanduser(args.plugin_root))
+        since, until = parse_day(args.since), parse_day(args.until) + datetime.timedelta(days=1)
+        tools = collect_tool_rates(os.path.expanduser(args.projects_root), os.path.expanduser(args.plugin_root), since, until)
+        sweep = sweep_summary(os.path.expanduser(args.runs_root), since, until)
+        print("\n".join(render_artifact_section(rates) + render_tool_lines(tools, sweep)))
+        return artifact_rate_verdict(rates)[0]
     return run_report(args)
 
 
