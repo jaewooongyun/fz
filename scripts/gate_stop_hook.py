@@ -89,7 +89,9 @@ stderr로 남긴다. 미사용과 미발견이 같은 침묵이면 놓친 원장
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import os
 import re
@@ -832,10 +834,16 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
             resolved[led] = led.resolve()
         except (OSError, RuntimeError):
             resolved[led] = led
-    owned, unknown = set(), []
+    owned, unknown, done_at = set(), [], {}
     try:
         with tp.open("r", encoding="utf-8", errors="replace") as fh:
             for line in fh:
+                m_ts = EVENT_TS.search(line) if '"tool_result"' in line else None   # F-757 — 결과 줄 시각(tool_use id 짝)
+                if m_ts:
+                    t_ev = _event_time(m_ts.group(1))
+                    if t_ev is not None:                # 병렬 도구 결과가 먼저 와도 그 쓰기의 짝 결과로 끝 시각을 찾는다(GPT 리뷰 P2)
+                        for tid in TOOL_RESULT_ID.findall(line):
+                            done_at.setdefault(tid, t_ev)
                 if not _line_may_write(line):
                     continue
                 try:
@@ -873,7 +881,8 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
                             # cd 대상을 못 풀었으면 그 쓰기가 어디서 돌았는지 모른다 — None 은 전 원장(fail-closed)
                             bs = (base,) if d is None else None if re.search(r"[$`*?\[]", d) else \
                                 (base, Path(d) if d.startswith("/") else base / d)
-                            unknown.append((t, bs, cmd_s, lits[0] if lits else None, ev_ts))
+                            unknown.append((t, bs, cmd_s, lits[0] if lits else None, ev_ts, inp.get("run_in_background") is True,
+                                            blk.get("id")))
                         for led, res in resolved.items():
                             if any(_same_ledger(t, res, base) for t in tokens):
                                 owned.add(led)
@@ -891,13 +900,18 @@ def owned_ledgers(transcript_path, ledgers: list, cwd: Path):
         #    (`..` · 절대 · `~/` — `$(find ../w …)` · `$(find /abs/w …)`) 아래 원장도 후보다(`./../w` 도 — 정규화한 경로). 폴더를 변수로만 넘긴 검색(`$(find "$X" …)`)은 전 원장 후보다(F-554 r3)
         #    쓰기 시각 — 그 쓰기가 적힌 줄의 시각(여유 UNKNOWN_WRITE_SLACK_S 를 뺀 값) 뒤에 한 번도 고쳐지지 않은 원장은 그 쓰기가 쓴
         #    원장일 수 없다 — 후보에서 뺀다. 같은 원장을 가리키는 미상 쓰기 중 하나라도 '그 뒤 고침' 이거나 시각을 모르면 후보다(fail-closed)
-        hits = [(led, ts) for led, res in resolved.items() for _t, bs, c, lits, ts in unknown if _unknown_hits(res, bs, c, lits)]
-        cand = {led for led, ts in hits if _touched_since(resolved[led], ts)}
-        stale = len({led for led, _ts in hits} - cand - owned)
+        hits = [(led, ts, bg, done_at.get(tid)) for led, res in resolved.items() for _t, bs, c, lits, ts, bg, tid in unknown
+                if _unknown_hits(res, bs, c, lits)]
+        touched = {led for led, ts, _bg, _d in hits if _touched_since(resolved[led], ts)}
+        cand = {led for led, ts, bg, done in hits if _touched_since(resolved[led], ts) and _explained(resolved[led], ts, bg, done)}
+        stale = len({led for led, _ts, _bg, _d in hits} - touched - owned)
+        foreign = len(touched - cand - owned)
         sample = ", ".join(sorted({u[0] for u in unknown})[:3])
         return owned | cand, (f"대상 미상 쓰기 {len(unknown)}건(원장 인자 {sample} 를 풀지 못했다) — 그 쓰기가 돌던 폴더(cd 반영) 아래 · "
                               f"명령에 적힌 원장 경로 · 폴더 아래로 원장 {len(cand)}개를 이 세션 원장으로 판정한다(그 밖의 원장은 막지 않는다"
-                              + (f" · 그 쓰기 뒤 바뀌지 않은 원장 {stale}개는 후보에서 뺐다" if stale else "") + ")")
+                              + (f" · 그 쓰기 뒤 바뀌지 않은 원장 {stale}개는 후보에서 뺐다" if stale else "")
+                              + (f" · 마지막 변경이 이 세션의 쓰기로 설명되지 않는 원장 {foreign}개(이 세션이 멈춰 있던 동안 바뀜)는 후보에서 뺐다" if foreign else "")
+                              + ")")
     return owned, ""
 
 
@@ -953,6 +967,25 @@ def _event_time(raw) -> float | None:
     except ValueError:
         return None
     return dt.timestamp() if dt.tzinfo is not None else None
+
+
+# 사건 줄의 시각 — 쓰기 줄 밖(도구 결과 · 사용자 · 알림)도 센다. 줄 전체를 파싱하지 않는다(스캔 비용)
+EVENT_TS = re.compile(r'"timestamp"\s*:\s*"([^"]+)"')
+TOOL_RESULT_ID = re.compile(r'"tool_use_id"\s*:\s*"([^"]+)"')
+
+
+def _explained(path: Path, ts, background: bool, done) -> bool:
+    """F-757 — 원장의 마지막 변경이 이 쓰기로 설명되는가: 수정 시각 ≤ 그 쓰기의 결과 줄(tool_use id 짝) 시각 + `UNKNOWN_WRITE_SLACK_S`.
+    결과가 온 뒤(이 세션이 그 쓰기를 끝낸 뒤) 원장이 바뀌었으면 다른 세션의 변경이다. 다른 도구의 결과 줄은 끝 시각이 아니다 — 병렬
+    도구가 먼저 끝나도 이 쓰기는 아직 돌 수 있다(GPT 리뷰 P2).
+    시각 미상 · 백그라운드 쓰기(끝나는 시각을 모른다) · 짝 결과 없음 · 수정 시각을 못 읽음은 True(지금처럼 후보 — fail-closed).
+    """
+    if ts is None or background or done is None:
+        return True
+    try:
+        return os.stat(path).st_mtime <= done + UNKNOWN_WRITE_SLACK_S
+    except OSError:
+        return True
 
 
 def _touched_since(path: Path, ts) -> bool:
@@ -1101,7 +1134,8 @@ def audit_main() -> None:
     판정하지도 않는다 · 막지 않는다 · `STATE_FILE` 을 읽지도 쓰지도 않는다) 같은 `sweep_session` 을 막지 않는 종료로 돌린다.
 
     - Important: 진단 줄을 내지 않는다(`_pass` 를 부르지 않는다) — 읽을 수 없는 입력 · 없는 transcript · 예외 · 시간 초과 어디서도
-      stderr 0바이트다. 종료 코드는 부르는 쪽이 언제나 0 으로 낸다. stdout 에는 `sweep_session` 의 알림 한 줄만 나갈 수 있다.
+      stderr 0바이트다. 종료 코드는 부르는 쪽이 언제나 0 으로 낸다. stdout 에는 알림 JSON 한 줄만 나갈 수 있다 — `sweep_session` 의
+      알림과 `run_gap_notice`(F-510 — 기록 대상 스킬을 불렀는데 run_metrics start 가 없다)를 합친 것이다.
     """
     started = time.monotonic()
     try:
@@ -1112,7 +1146,106 @@ def audit_main() -> None:
         return
     if os.environ.get("FZ_GATES_OFF") == "1":
         return                                           # 게이트와 함께 감사도 끈다
-    sweep_session(payload, started, EXIT_PASS)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        sweep_session(payload, started, EXIT_PASS)
+    notes = []
+    for line in buf.getvalue().splitlines():
+        with contextlib.suppress(ValueError, KeyError, TypeError):
+            notes.append(json.loads(line)["systemMessage"])
+    # 훅 항목 timeout(hooks/hooks.json 15초) 안에서만 — 410MB 기록 훑기 0.6초 실측(2026-11-26) · 남은 몫이 적으면 건너뛴다(다음 Stop 에 다시 본다)
+    gap = run_gap_notice(payload) if time.monotonic() - started < AUDIT_GAP_DEADLINE_S else ""
+    if gap:
+        notes.append(gap)
+    if notes:                                            # 알림은 한 줄 JSON 하나로 낸다(두 알림을 따로 찍으면 stdout 이 JSON 하나가 아니다)
+        print(json.dumps({"systemMessage": "\n".join(notes)}, ensure_ascii=False))
+
+
+# F-510 — SKILL.md 가 `run_metrics.py start` 기록을 지시하는 스킬. 산문으로만 배선한 기록을 Lead 가 건너뛰면 실행이 지표에서 사라진다
+RUN_SKILLS = ("fz-code", "fz-discover", "fz-fix", "fz-peer-review", "fz-plan", "fz-review")
+RUN_GAP_SEEN = "run-gap.seen.json"                       # 세션마다 이미 알린 스킬 — 같은 빠짐을 두 번 알리지 않는다
+RUN_GAP_SEEN_MAX = 200
+AUDIT_GAP_DEADLINE_S = 10.0                              # 이 시각을 넘겨 훑기가 끝났으면 빠짐 알림을 건너뛴다
+SKILL_CMD_RE = re.compile(r"<command-name>/?(?:fz:)?(fz-[a-z-]+)</command-name>")
+
+
+def _invoked_skills(transcript: str) -> set:
+    """이 세션 기록에서 부른 기록 대상 스킬 — Skill 도구 호출과 사용자가 친 슬래시 명령(`<command-name>`)."""
+    found = set()
+    with open(transcript, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if '"Skill"' not in line and "command-name" not in line:
+                continue
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            msg = ev.get("message") if isinstance(ev, dict) else None
+            content = msg.get("content") if isinstance(msg, dict) else None
+            if isinstance(content, str):
+                found.update(SKILL_CMD_RE.findall(content))
+                continue
+            for b in content if isinstance(content, list) else []:
+                if not isinstance(b, dict):
+                    continue
+                if b.get("type") == "tool_use" and b.get("name") == "Skill":
+                    found.add(str((b.get("input") or {}).get("skill") or "").split(":", 1)[-1])
+                elif b.get("type") == "text":
+                    found.update(SKILL_CMD_RE.findall(str(b.get("text") or "")))
+    return {x for x in found if x in RUN_SKILLS}
+
+
+def _started_skills(runs: Path, sid: str) -> set:
+    """실행 상태(`runs.jsonl` 행 · 열린 표지)에서 이 세션이 start 한 스킬."""
+    got = set()
+    for path in list(runs.glob("*/runs.jsonl")) + list(runs.glob("*/open/*.json")):
+        with contextlib.suppress(OSError, UnicodeDecodeError):
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if sid not in line:
+                    continue
+                with contextlib.suppress(ValueError):
+                    row = json.loads(line)
+                    if isinstance(row, dict) and row.get("session_id") == sid:
+                        got.add(row.get("skill"))
+    return got
+
+
+def run_gap_notice(payload: dict) -> str:
+    """F-510 — 이 세션에서 부른 기록 대상 스킬 가운데 `run_metrics.py start` 가 없는 것을 한 번 알린다(막지 않는다 · 세션 · 스킬당 한 번).
+
+    - Important: 자기 예외 경계 안에서 돈다 — 오류는 빈 글이다. 알릴 것이 없으면 실행 상태 폴더를 만들지 않는다(빈 세션은 파일 0).
+    - Note: 스킬이 모드 게이트 전에 턴을 끝내면(사용자에게 묻고 멈춤) 아직 start 전이라 한 번 알릴 수 있다 — 그 스킬을 이어 돌리면 다음 알림은 없다.
+    """
+    try:
+        tp, sid = str(payload.get("transcript_path") or ""), str(payload.get("session_id") or "")
+        if not (tp.endswith(".jsonl") and sid and os.path.isfile(tp)):
+            return ""
+        invoked = _invoked_skills(tp)
+        if not invoked:
+            return ""
+        runs = Path(os.path.expanduser(os.environ.get(RUN_STATE_ENV) or "~/.fz/runs"))
+        missing = sorted(invoked - (_started_skills(runs, sid) if runs.is_dir() else set()))
+        if not missing:
+            return ""
+        seen_path = runs / RUN_GAP_SEEN
+        try:
+            seen = json.loads(seen_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            seen = {}
+        seen = seen if isinstance(seen, dict) else {}
+        told = set(_held_of(seen.pop(sid, None)))
+        new = [x for x in missing if x not in told]
+        if not new:
+            return ""
+        seen[sid] = sorted(told | set(new))
+        while len(seen) > RUN_GAP_SEEN_MAX:
+            del seen[next(iter(seen))]
+        runs.mkdir(parents=True, exist_ok=True)
+        _write_json(seen_path, seen)
+        return (f"[fz] 실행 기록 빠짐 — 이 세션에서 부른 {', '.join(new)} 의 `run_metrics.py start` 가 없다"
+                f"(모드가 정해지면 기록 — {ROOT / 'modules' / 'mode-gate.md'} § 기록 · 기록 없는 실행은 지표에서 사라진다 · F-510)")
+    except Exception:                                    # noqa: BLE001 — 알림은 종료를 바꾸지 못한다
+        return ""
 
 
 def _hook_budget() -> float:
@@ -1672,6 +1805,12 @@ SELF_TEST_CASES = (
     ("w3-unknown-ts-in-slack", "unmet",    {"transcript": "unknown-ts-slack"}, {}, 2, "대상 미상 쓰기"),
     ("w3-unknown-ts-naive", "unmet",       {"transcript": "unknown-ts-naive"}, {}, 2, "대상 미상 쓰기"),
     ("w3-stale-candidate-budget", "unmet", {"transcript": "unknown-ts-future"}, {"FZ_GATES_HOOK_BUDGET_S": "0"}, 0, "다른 세션의 원장 1개 미판정"),
+    # F-757 — 원장의 마지막 변경이 이 세션이 멈춰 있던 동안이면(쓰기 결과 뒤 · 다음 사건 전) 다른 세션의 변경이다: 막지 않는다 ·
+    # 쓰기 결과 전에 바뀌었으면 이 세션 몫(막는다) · 백그라운드 쓰기는 끝나는 시각을 몰라 지금처럼 후보(fail-closed)
+    ("f757-foreign-change-after-idle", "unmet", {"transcript": "f757-foreign"}, {}, 0, "이 세션의 쓰기로 설명되지 않는 원장 1개"),
+    ("f757-own-change-in-window", "unmet", {"transcript": "f757-own"}, {}, 2, "대상 미상 쓰기"),
+    ("f757-background-write-kept", "unmet", {"transcript": "f757-bg"}, {}, 2, "대상 미상 쓰기"),
+    ("f757-parallel-result-first-kept", "unmet", {"transcript": "f757-parallel"}, {}, 2, "대상 미상 쓰기"),
 )
 # 반복 발사가 필요한 케이스 — 이름 → 발사 횟수
 REPEAT_CASES = {"loop-guard": MAX_BLOCKS + 1, "loop-guard-churn": MAX_BLOCKS + 1}
@@ -1732,8 +1871,11 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
     `Write` tool_use, `bash` 는 `--finalize` Bash tool_use. 진단 세션이 남의 원장 경로를
     인용하는 것이 소유로 잡히면 안 되므로 `none` 에도 경로를 넣는다."""
     tp = root / "transcript.jsonl"
-    def tool_use(name, inp, cwd=None, ts=None):
-        ev = {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": name, "input": inp}]}}
+    def tool_use(name, inp, cwd=None, ts=None, tid=None):
+        blk = {"type": "tool_use", "name": name, "input": inp}
+        if tid:
+            blk["id"] = tid
+        ev = {"type": "assistant", "message": {"content": [blk]}}
         if cwd is not None:
             ev["cwd"] = str(cwd)
         if ts is not None:
@@ -1787,6 +1929,24 @@ def _write_probe_transcript(root, kind: str, ledger: Path) -> Path:
         ts = {"unknown-ts-future": iso(mtime + 3600), "unknown-ts-past": iso(mtime - 3600), "unknown-ts-slack": iso(mtime + 1.0),
               "unknown-ts-bad": "not-a-time", "unknown-ts-naive": "2099-01-01T00:00:00.000"}[kind]
         lines.append(tool_use("Bash", {"command": 'python3 gate_check.py --only G1 "$LEDGER_FROM_PROFILE"'}, ts=ts))
+    elif kind.startswith("f757-"):
+        # F-757 — 쓰기 · 그 결과 줄 · 뒤 사건. 원장 수정 시각 기준: foreign = 쓰기 2시간 전 · 결과 10초 뒤 · 원장은 그 뒤(멈춘 동안) 바뀜 ·
+        # own = 쓰기 5초 전 · 결과가 원장 수정 뒤 · bg = foreign 과 같은 시각이지만 백그라운드(끝나는 시각 미상)
+        iso = lambda t: datetime.fromtimestamp(t, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        mtime = ledger.stat().st_mtime
+        w_ts, r_ts = {"f757-foreign": (mtime - 7200, mtime - 7190), "f757-own": (mtime - 5, mtime + 1),
+                      "f757-bg": (mtime - 7200, mtime - 7190), "f757-parallel": (mtime - 7200, mtime + 1)}[kind]
+        cmd_inp = {"command": 'python3 gate_check.py --only G1 "$LEDGER_FROM_PROFILE"'}
+        if kind == "f757-bg":
+            cmd_inp["run_in_background"] = True
+        lines.append(tool_use("Bash", cmd_inp, ts=iso(w_ts), tid="toolu_w"))
+        if kind == "f757-parallel":   # 다른 도구의 결과가 먼저 온다(쓰기는 아직 돈다) — 끝 시각은 짝 결과 줄이다
+            lines.append(json.dumps({"type": "user", "timestamp": iso(w_ts + 1),
+                                     "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_other", "content": "ok"}]}}))
+        lines.append(json.dumps({"type": "user", "timestamp": iso(r_ts),
+                                 "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_w", "content": "ok"}]}},
+                                ensure_ascii=False))
+        lines.append(json.dumps({"type": "user", "timestamp": iso(mtime + 3600), "message": {"content": "다시 왔다"}}, ensure_ascii=False))
     elif kind == "unknown-elsewhere":
         lines.append(tool_use("Bash", {"command": 'python3 gate_check.py --only G1 "$LEDGER_FROM_PROFILE"'}, cwd=root / "elsewhere"))
     elif kind == "loop-env-prefix":
@@ -1982,7 +2142,7 @@ def _sweep_cell(name: str, home: Path, ledger_env: str) -> str:
 # 한다. 설정에 전체 항목을 더한 머신은 같은 종료에 두 항목이 함께 돈다(잠금 · 미룬 알림). 이름에 `sweep-` 접두를 쓰지 않는다(위 여섯만 센다)
 AUDIT_CELLS = ("audit-only-notice", "audit-only-no-block", "audit-only-quiet-errors", "audit-only-off", "audit-only-idle",
                "audit-only-one-record", "held-notice", "restored-notice", "plugin-hook-registration", "plugin-hook-python-fails",
-               "plugin-hook-macos-guard")
+               "plugin-hook-macos-guard", "run-gap-notice")
 CELL_NOT_RUN = "미실행 — "               # 셀이 이 머리로 시작하는 사유를 돌려주면 실패가 아니라 미실행이다(통과로 세지 않고 따로 적는다)
 
 
@@ -2192,6 +2352,27 @@ def _audit_cell(name: str, home: Path, ledger_env: str) -> str:
             rec = runs / SWEEP_RECORD
             return [json.loads(x) for x in rec.read_text(encoding="utf-8").splitlines() if x.strip()] if rec.is_file() else []
 
+        if name == "run-gap-notice":                     # F-510 — 부른 기록 대상 스킬 중 start 없는 것만 한 번 알린다
+            def session(sid, skills, cmd=None):
+                tp = d / "projects" / f"{sid}.jsonl"
+                tp.parent.mkdir(parents=True, exist_ok=True)
+                evs = ([{"type": "user", "message": {"content": f"<command-name>/fz:{cmd}</command-name>"}}] if cmd else []) + [
+                    {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": f"fz:{x}"}}]}}
+                    for x in skills]
+                tp.write_text("".join(json.dumps(e) + "\n" for e in evs), encoding="utf-8")
+                return {"hook_event_name": "Stop", "cwd": str(d), "session_id": sid, "transcript_path": str(tp)}
+            (runs / "p1" / "open").mkdir(parents=True)
+            (runs / "p1" / "open" / "aaaaaaaaaaaa.1.json").write_text(json.dumps({"skill": "fz-plan", "session_id": "sess-gap"}))
+            (runs / "p2").mkdir()
+            (runs / "p2" / "runs.jsonl").write_text(json.dumps({"skill": "fz-fix", "session_id": "sess-done"}) + "\n")
+            gap = session("sess-gap", ["fz-fix", "fz-search"], cmd="fz-plan")   # plan 은 start 함 · fix 는 빠짐 · search 는 기록 대상 아님
+            first, again = fire(True, gap), fire(True, gap)
+            done_ = fire(True, session("sess-done", ["fz-fix"]))
+            seen = json.loads((runs / RUN_GAP_SEEN).read_text(encoding="utf-8"))
+            ok = (first[0] == again[0] == done_[0] == 0 and "실행 기록 빠짐" in first[1] and "fz-fix" in first[1]
+                  and "fz-plan" not in first[1] and "fz-search" not in first[1] and again[1] == "" and done_[1] == ""
+                  and not (first[2] + again[2] + done_[2]) and seen == {"sess-gap": ["fz-fix"]})
+            return "" if ok else f"first={first[1][:120]!r} again={again[1][:60]!r} done={done_[1][:60]!r} seen={seen} err={first[2][:80]!r}"
         if name == "audit-only-idle":                    # 실행 기록이 없는 세션 — 잠금 · 기록 · 실행 상태 폴더 셋 다 만들지 않는다
             tp = d / "projects" / "sess-idle.jsonl"
             tp.parent.mkdir(parents=True)
